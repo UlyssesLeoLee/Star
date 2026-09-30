@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project Worktree 管理与 Group Apps 详细设计 v4.20**
+> **渡口 Project Worktree 管理与 Group Apps 详细设计 v4.21**
 >
 > - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B-3F 已有多项条件式 API/UI 切片；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 卡内 xterm ticket-first UI、status/cancel/reattach、bounded Session listing/recovery API seam 与手动 UI 已实现；Phase 5 有 scope-aware Chat 授权提交、GLOBAL 目标目录、多选 UI、加密 Transcript/Run/outbox persistence adapter，但 production main 未装 protector/L0；Phase 6 有五表 Registry migration、生产 main 装配的 PostgreSQL 只读 projection provider/API 与 Group UI live consumer；Phase 5/6 migrations 已在隔离库重复执行并验证 12 张 FORCE RLS、策略及 trigger（事务内临时授权已回滚），目标 DB/runtime role grants 未配置；manifest trust root/ingest、lifecycle writer、capability runtime/revocation、真实 PostgreSQL RLS 验收未完成。仍缺宿主认证 provider、目标 DB migration 部署与 ACL/RLS 运行验收、真实 CLI provisioner/OS sandbox/terminal sink/audit、LangGraph 部署版本/服务身份/权限 broker；Canvas 仍缺服务端 durable event offset/realtime；历史归属 reconciliation 与跨 App 生产验收未完成）
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
@@ -8,8 +8,8 @@
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 上位需求：[`docs/requirements.md`](../requirements.md) v5.20 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.4 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v0.6、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.1、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.3、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.9 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v0.6、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.4、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.3、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Worktree → Group Apps 的应用契约，不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -548,7 +548,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 12 | Phase 8A CLI Run writer 与 migration 已有条件式实现；migration 仅在隔离临时 PostgreSQL 验证。Phase 8B Worktree/Task list/detail API 与 Task Card Run History UI 已落代码，但目标 DB/RLS 未部署，Task Contract write API、CLI exit/status、Validation/Review/Integration/Cost/Evidence/ResourceSummary producer 未接入 | 可授权浏览当前已记录 Run；无法从 Task Card 写入/完整呈现生命周期与全部证据，BI coverage 不完整 | 在目标数据库配置并验收 runtime role/grants 与 RLS；实现 Contract version commands、各来源状态/证据 producer 和全状态 reconciliation；扩充 API/E2E 与 Evidence ACL/retention 验收 |
 | 13 | Phase 9/10 Project BI、Benchmark 与 Improvement Proposal 只在需求/设计阶段定义 | 无 metric projection、coverage dashboard、隔离 replay 或策略采纳/回滚接口 | 按 DD-MULTICA-TASK-001 §14.8 增加有版本公式的 Project read model、固定 benchmark sets、隔离 runner、授权 proposal lifecycle 和 BI follow-up |
 | 14 | Phase 9 Schedule/Engineering Loop 尚无 occurrence worker、fencing、budget/stall stop 或 drain implementation | 时间计划可能重复派发；工程循环可能超预算或把 Agent 声明当验收 | 复用 `domain-automation` 唯一 Schedule Rule/Occurrence source，实现 durable idempotent dispatch、Run 内 Loop event/stop reason 与多层资源 admission/cancel/drain |
-| 15 | Rust-native Hook Engine、Advanced Settings Hooks UI、Domain lifecycle gate 与 BI projection 均未实现 | 当前 Python guard/旧 Hook DD 不覆盖产品 Worktree/Run 安全边界，且用户不能可视化配置 | 实现 Rust typed evaluator 与不可绕过 builtin、视觉 rule builder、Worktree cleanup 前后二次校验、append-only scoped events/audit 与 BI coverage |
+| 15 | Rust-native evaluator 与 9B2B policy REST API 已有代码切片；目标库/grants/RLS integration、Advanced Settings Hooks UI、Domain lifecycle gate 与 BI projection 尚未验收 | 当前尚不能用目标环境发布策略或宣称产品级 Worktree 强制门；用户可视化配置入口仍未实现 | 验收目标 DB/RLS/grants，再接入 Worktree cleanup 双门、9C Advanced Settings → Hooks 无代码 Builder、append-only scoped events/audit 与 BI coverage |
 | 16 | Agent/Memory/Skill/Context/Validation provider profiles 与 Rust CLI adapter 只有架构契约 | 无法一致冻结 provider 版本、上下文来源、独立验证与资源开销 | Phase 9 以稳定 schema/version/capability/digest resolver 实现；CLI adapter direct argv/allowlist/canonical cwd/bounded IO/deadline/process drain 通过端到端验证 |
 
 ## §14 审阅栏与修订履历
@@ -620,3 +620,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 | v4.19 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.19/basic design v5.3/Task DD v0.5；定义 Schedule/Engineering Loop、唯一 Automation occurrence owner、版本化 Agent Provider/CLI contract、Advanced Settings Hooks tab、Rust-native fail-closed Worktree gate 与 Run/BI provenance；Phase 9-13 实现门和当前未实现边界进入正文 | 用户要求多 Agent Worktree 作为管理核心，并将可扩展 Agent、Loop 与原生可视化 Hook 纳入同一体系 |
 | v4.20 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.20/basic design v5.4/Task DD v0.6；补齐 Phase 8B Worktree/Task Run list/detail API 与 Task Card Run History UI 的 scope 授权、游标、字段和数量上限；记录 Run migration 仅在隔离数据库验证，目标 DB/RLS 与剩余事件 producer 未完成 | Phase 8B 新增 Run 历史代码切片，需要让 Group 详细设计反映真实边界 |
+| v4.21 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步基本设计 v5.9 与 Hook DD v0.5.4；记录 9B2B scoped policy API 已有代码/99 个 library tests 通过，目标 DB/grants/API RLS integration 和 9B2C lifecycle gate 未完成；重申 Hook 管理入口属于 Advanced Settings 并列 tab，Worktree 只消费有效策略与结果 | 完成 Hook policy REST 切片并同步 Group 级导航与生产边界 |

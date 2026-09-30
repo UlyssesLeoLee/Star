@@ -1,8 +1,8 @@
 # DD-MULTICA-HOOK-001
 
-> **Multica Hook 域詳細設計書 v0.5.3** (继承高级设置 Hooks tab；v0.5 将安全关键 Hook 改为 Rust-native typed rules，新增可视化 Builder、Project/Worktree policy、RunEvent/BI 联动；旧 Python handler 章节仅作兼容/历史参考)
+> **Multica Hook 域詳細設計書 v0.5.4** (继承高级设置 Hooks tab；v0.5 将安全关键 Hook 改为 Rust-native typed rules，新增可视化 Builder、Project/Worktree policy、RunEvent/BI 联动；旧 Python handler 章节仅作兼容/历史参考)
 
-> - 状态: 🟡 Draft v0.5.3 (2026-09-30 JST，Phase 9B1/9B2A isolated PostgreSQL validation evidence)
+> - 状态: 🟡 Draft v0.5.4 (2026-09-30 JST，Phase 9B2B scoped policy REST API code slice and targeted tests; target database not deployed)
 > - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.1 + `docs/requirements.md` v5.20 §50.8D
 > - 下游: 实装代码 + 测试 + 报告
 > - 核心语言: Rust Hook Engine / typed rule evaluator；Rust-native desktop UI；现有 Web UI 仅作同 DTO 的 presentation adapter。旧 Python handler 不具备安全决策 authority。
@@ -1478,9 +1478,36 @@ Dry-run 使用脱敏历史 HookEvent snapshot，不执行 tool/CLI/Worktree comm
 
 桌面端以 Rust-native UI 渲染同一 typed API；复用 immutable snapshot、virtualized policy/event list、cursor paging 和 bounded cache；不可见 tab 停止订阅与刷新；不可将完整日志/规则历史/Canvas 状态复制进多个 store。大型日志在磁盘/受控 artifact 按需读取。Web adapter 暂存时也必须消费同一 API projection 和 capability checks。
 
-### 7.1.6 数据兼容、迁移与实现门
+### 7.1.6 Scoped Policy REST API 契约（Phase 9B2B）
 
-旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。Phase 9A/9B1 已有 Rust evaluator 与 bounded verified-snapshot loader；`db/migrations/2026-09-30-multica-hook-policy.sql` 定义 policy Master、TTL Draft、append-only Audit 和 FORCE RLS，并已在一次性隔离 PostgreSQL 18 集群双次应用，通过 FORCE RLS、Project/Worktree SCD2 重基、审计 scope 与 append-only/TRUNCATE 场景；项目目标数据库尚未部署，runtime grants 也未配置。正式发布仍需目标环境 schema/RLS/grants 验收、scoped store/publish API、Advanced Settings UI、Worktree Command double-check、RunEvent/Audit outbox consumer 和 BI coverage read model 全部部署/验收；隔离数据库通过不等于产品环境部署。
+所有路由挂载在 Group API；路径里的 ID 只用于定位，服务端仍从当前认证 Actor 重新解析 tenant、Project membership、Worktree binding 和 role。API 先验证 `hook:read`、`hook:write` 或 `hook:publish` scope，再应用 tenant FORCE RLS。读取与草稿保存要求有效 Project membership；发布/回滚除 `hook:publish` 外还要求 `tenant_admin` 或 `project_admin`。Worktree 路由通过现有 Worktree 授权解析所属 Project，不能信任客户端传入的 Project 或路径。
+
+| 方法与路由 | 行为 | 版本/范围门 |
+|---|---|---|
+| `GET /api/v1/projects/{project_id}/hook-policy` | 返回当前 Project policy、有效草稿和最近最多 100 条按时间倒序的审计事件 | `hook:read`；输出须复验存储 digest、scope 与 typed document |
+| `GET /api/v1/worktrees/{worktree_id}/hook-policy/effective` | 返回 Worktree overlay；无 overlay 时有效策略回退到 Project baseline；同时返回版本、草稿和最多 100 条审计 | `hook:read`；overlay 父 revision、继承 baseline version 和规则须匹配当前 Project policy |
+| `PUT /api/v1/projects/{project_id}/hook-policy/draft` | 创建或更新 Project draft | `hook:write`；请求含 `expected_current_policy_set_id`、可选 `expected_draft_version`、`correlation_id` 和完整 typed document |
+| `PUT /api/v1/worktrees/{worktree_id}/hook-policy/draft` | 创建或更新 Worktree overlay draft | `hook:write`；document 必须锚定当前 Project baseline；请求体 ≤ `MAX_POLICY_DOCUMENT_BYTES + 4096`，policy document ≤64 KiB |
+| `POST /api/v1/projects/{project_id}/hook-policy/publish` | 发布已校验的 Project draft，创建不可变新 revision | `hook:publish` + admin role；提交 `expected_draft_version` 和 `correlation_id` |
+| `POST /api/v1/worktrees/{worktree_id}/hook-policy/publish` | 发布当前 Project baseline 上的 Worktree overlay | `hook:publish` + admin role；Draft 的 base/parent revision 必须仍是当前版本 |
+| `POST /api/v1/projects/{project_id}/hook-policy/rollback` | 将历史 Project document 作为新 revision 发布，并原子重基当前 Worktree overlays | `hook:publish` + admin role；提交 `target_policy_set_id`、`expected_current_policy_set_id` 和 `correlation_id` |
+| `POST /api/v1/worktrees/{worktree_id}/hook-policy/rollback` | 将历史 Worktree rules 与当前 Project baseline 合并，作为新 overlay revision 发布 | `hook:publish` + admin role；历史 revision 不会原位恢复或改写 |
+
+Draft body 的 `expected_draft_version` 新建时为 `0`（或省略），更新时必须等于当前 Draft version；`expected_current_policy_set_id` 必须精确匹配当前 revision，无 revision 时为 `null`。Draft 默认保留 7 天，更新续期受创建时 retention deadline 限制，数据库允许的单条 retention 上限为 30 天。读接口不返回已过期 Draft；尚未过期但 base/parent revision 已变化的 Draft 带 `is_stale=true`，UI 应保留其内容供比较并要求重新保存，publish 会以 409 拒绝。Draft 只供编辑/审批读取，runtime evaluator 只能消费已发布并复验的 immutable snapshot。
+
+所有写事务先锁定当前 Project policy，再锁定当前 scope policy 和 Draft，并用 expected version 作 compare-and-swap。Project baseline 发布会在同一事务扫描旧父版本下的 Worktree overlays，按 worktree UUID keyset 分页，每批最多载入 16 个 policy document 至 Rust 内存。待重基 document 写入 transaction-scoped temporary stage；旧 overlay 关闭后才关闭旧 Project revision；新 Project revision 插入后再从 stage 插入 Worktree revisions 和 Audit facts。整体原子提交，任一 overlay 与新基线不兼容时全事务回滚。临时表的 database-side staging 随 overlay 数量增长，但 Rust-side batch 保持有界；超大 Project 的事务时长仍须在目标环境压测。
+
+Worktree publish 和 rollback 也先锁当前 Project revision，因此与 Project baseline publish 串行化；继承 revision 已变化时返回 version conflict，不会静默使用过期 Draft。Rollback 永远创建新 SCD2 revision，并留下 `rollback_source_policy_set_id` provenance。Draft save、publish、Project rebase、rollback 均在策略变更事务内追加 Audit；读接口仅返回最近 100 条，不提供深历史扫描，后续历史查阅走分页投影。
+
+`correlation_id` 是链路追踪标识，不是 replay idempotency key。当前 publish/rollback 使用 expected-version CAS 避免重复写出同一有效状态；客户端超时且不知道提交结果时，先重读当前 revision 和 Audit 再决定，不得盲目换版本重试。成功响应丢失后的原始 receipt replay 尚未实现，是 9B2B API 的明确边界。
+
+错误由统一 API 响应映射：400 schema/scope/version body 格式错误，413 request body 超过 68 KiB 上限，401/403 身份/scope/role 不足，404 不可见 Project/Worktree 或历史 revision，409 Draft/current version/过期/继承冲突，500 数据库或存储完整性错误。任何读取的 Master/Draft document 都必须重新解码、验证 scope、版本、schema、evaluator 和 digest；数据库 JSON 不能直接当作可信运行时策略。
+
+9B2B 目前是 `star-api-rest` 条件式代码切片：8 条 REST routes、typed policy 验证、scoped RLS transaction、CAS Draft、publish/rollback、Audit 和 baseline 原子重基已实现；本地目标 crate `cargo check --lib` 与 99 个 library tests 通过。目标数据库尚未应用 migration，runtime SQL grants、目标环境 RLS、API 跨 tenant/project integration tests 和 production main/provider 装配仍未完成；因此这些 routes 尚不构成生产可用配置入口。配置 UI 仍按既有 ULYS-235 位于 Advanced Settings → Hooks 独立标签，属于 Phase 9C。
+
+### 7.1.7 数据兼容、迁移与实现门
+
+旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。Phase 9A/9B1 已有 Rust evaluator 与 bounded verified-snapshot loader；`db/migrations/2026-09-30-multica-hook-policy.sql` 定义 policy Master、TTL Draft、append-only Audit 和 FORCE RLS，并已在一次性隔离 PostgreSQL 18 集群双次应用，通过 FORCE RLS、Project/Worktree SCD2 重基、审计 scope 与 append-only/TRUNCATE 场景；9B2B scoped REST policy API 有代码并通过 targeted check/单测，但目标数据库尚未部署 migration，runtime grants、目标环境 RLS 和 API database integration tests 未验收。正式发布仍需目标环境 schema/RLS/grants 验收、9B2C Worktree Domain Command double-check、Advanced Settings UI、RunEvent/Audit outbox consumer 和 BI coverage read model 全部部署/验收；隔离数据库与本地 crate tests 通过不等于产品环境部署。
 
 性能验收固定 policy size/rule count/event rate 与 concurrent Run/Worktree load，测 Rust hot-path p50/p95/p99、peak RSS、allocation、queue/backpressure、UI first paint/input p95 和 HookEvent projection coverage；阈值在可重复目标设备测量后版本化，不虚构毫秒/内存数值。Policy cache 按 scope+version+digest 有界淘汰；规则评估不可做同步 DB/network round trip；事务事实不丢，高频 UI projection 可合并并标记 gap。
 
@@ -1511,3 +1538,4 @@ Dry-run 使用脱敏历史 HookEvent snapshot，不执行 tool/CLI/Worktree comm
 | **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 交叉引用更新至当前 SRS/BD v0.5.1 与总要件 v5.20；Hook runtime、可视化 UI 和生产 gate 状态未变 | Phase 8B 增补 Run query acceptance 后同步当前上位基线 |
 | **v0.5.2** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9B1 verified policy document contract 与 9B2A 三表 W/T/M migration source；将“源码存在”与 PostgreSQL apply/RLS/runtime grants、policy API、lifecycle gate 和 UI 部署验收明确分开；高级设置 Hooks tab 导航保持既有 ULYS-235 要求 | 用户强调 Advanced Settings 是既有标签导航，并继续推进原生 Hook policy persistence |
 | **v0.5.3** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 9B2A migration 在一次性 PostgreSQL 18 集群双次 apply 与 FORCE RLS、Project/Worktree SCD2 重基、Audit scope/append-only 场景验证；目标库未部署、9B2B/C 与 UI/BI/Agent/Loop 仍开放；高级设置 Hooks 继续作为独立 tab | 完成隔离 migration 验证并同步实施边界 |
+| **v0.5.4** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 9B2B Project/Worktree scoped read/draft/publish/rollback API、Hook scopes/admin role、CAS 与 TTL、原子 Project→Worktree overlay 重基、内存批次上限、rollback provenance 和 correlation/retry 边界；记录 99 个 REST crate library tests 与 targeted check 通过、目标 DB/grants/integration/production 装配仍未完成；重申 `/settings/advanced/hooks` 是既有 Advanced Settings 并列 tab，UI 属 9C | 继续推进 9B2B scoped policy API，并同步实现状态 |
