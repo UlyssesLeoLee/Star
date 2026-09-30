@@ -17,7 +17,9 @@
 
 #![forbid(unsafe_code)] // 守门 #7
 
+pub mod db_adapter; // PR-245 新增: DB Adapter trait + MockDb impl + 8 unit tests
 pub mod ipc_adapter; // PR-241 新增: 3 adapter 子模块 (Board + Worktree + Canvas)
+use crate::db_adapter::{DbAdapter, DbAdapterError, DbCanvasEntity, DbWorkItem, DbWorktree, MockDb};
 use crate::ipc_adapter::{BoardAdapter, CanvasAdapter, WorktreeAdapter};
 
 /// Mock WorkItem for IPC #1 (list_work_items).
@@ -63,95 +65,40 @@ pub struct KeyboardLayout {
     pub statuses: Vec<String>,
 }
 
-/// IPC #1: 列出 work items (mock 4 items, 守门 #19 0 动 V0.1 业务 logic)
-#[tauri::command]
-fn list_work_items() -> Vec<WorkItem> {
-    vec![
-        WorkItem {
-            id: "wi-001".to_string(),
-            title: "feat(canvas): page W/T/M swimlane".to_string(),
-            status: "in_progress".to_string(),
-            w_t_m: "W".to_string(),
-        },
-        WorkItem {
-            id: "wi-002".to_string(),
-            title: "fix(canvas): bug #71".to_string(),
-            status: "review".to_string(),
-            w_t_m: "T".to_string(),
-        },
-        WorkItem {
-            id: "wi-003".to_string(),
-            title: "spike(wasm): layout-engine-wasm PoC".to_string(),
-            status: "done".to_string(),
-            w_t_m: "M".to_string(),
-        },
-        WorkItem {
-            id: "wi-004".to_string(),
-            title: "doc(arch): Tauri PoC research v0.1".to_string(),
-            status: "todo".to_string(),
-            w_t_m: "M".to_string(),
-        },
-    ]
-}
 
-/// IPC #2: 列出 worktree groups (mock 3 groups)
+
+/// IPC #2: 列出 worktree groups (PR-245 从 MockDb.list_worktrees 转换, 4 worktrees → 4 groups 1:1)
 #[tauri::command]
 fn list_worktree_groups() -> Vec<WorktreeGroup> {
-    vec![
-        WorktreeGroup {
-            id: "grp-001".to_string(),
-            name: "core-canvas".to_string(),
-            worktree_count: 5,
-            active: true,
-        },
-        WorktreeGroup {
-            id: "grp-002".to_string(),
-            name: "frontend-ui".to_string(),
-            worktree_count: 3,
-            active: true,
-        },
-        WorktreeGroup {
-            id: "grp-003".to_string(),
-            name: "wasm-frontend".to_string(),
-            worktree_count: 4,
-            active: false,
-        },
-    ]
+    let db = MockDb::new();
+    let worktrees: Vec<DbWorktree> = db.list_worktrees().unwrap_or_default();
+    worktrees
+        .into_iter()
+        .enumerate()
+        .map(|(idx, wt)| WorktreeGroup {
+            id: format!("grp-{:03}", idx + 1),
+            name: wt.name,
+            worktree_count: 1,
+            active: wt.status == "active",
+        })
+        .collect()
 }
 
-/// IPC #3: 列出 canvas entities (mock 4 entities)
+/// IPC #3: 列出 canvas entities (PR-245 切到 MockDb.list_canvas_entities, 4 entities 数据对齐)
 #[tauri::command]
 fn list_canvas_entities() -> Vec<CanvasEntity> {
-    vec![
-        CanvasEntity {
-            id: "ent-001".to_string(),
-            kind: "worktree".to_string(),
-            title: "wt-canvas-game".to_string(),
-            x: 100.0,
-            y: 200.0,
-        },
-        CanvasEntity {
-            id: "ent-002".to_string(),
-            kind: "worktree".to_string(),
-            title: "wt-canvas-engine".to_string(),
-            x: 300.0,
-            y: 150.0,
-        },
-        CanvasEntity {
-            id: "ent-003".to_string(),
-            kind: "branch".to_string(),
-            title: "dev".to_string(),
-            x: 500.0,
-            y: 250.0,
-        },
-        CanvasEntity {
-            id: "ent-004".to_string(),
-            kind: "agent".to_string(),
-            title: "minimax-agent".to_string(),
-            x: 200.0,
-            y: 400.0,
-        },
-    ]
+    let db = MockDb::new();
+    let entities: Vec<DbCanvasEntity> = db.list_canvas_entities().unwrap_or_default();
+    entities
+        .into_iter()
+        .map(|e| CanvasEntity {
+            id: e.id,
+            kind: e.kind,
+            title: e.title,
+            x: e.x,
+            y: e.y,
+        })
+        .collect()
 }
 
 /// IPC #4: 返回 star-desktop 版本号 (env! macro from Cargo.toml)
