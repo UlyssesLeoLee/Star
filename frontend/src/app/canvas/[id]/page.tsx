@@ -30,6 +30,7 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
   const feedbacks = useStore((s) => s.feedbacks);
   const automationRules = useStore((s) => s.automationRules);
   const comments = useStore((s) => s.comments);
+  const addCanvasElement = useStore((s) => s.addCanvasElement);
 
   // 已知缺口 (per 守门 #11): Share 暂用 navigator.clipboard 复制 URL (MVP 路径).
   //   跨 device 同步 + 协作权限 modal 留 P2 / 阻塞 P3-C 协作域.
@@ -118,7 +119,34 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
 
       {/* Canvas (ref 范围不含 Header, 跟 page.tsx:46-64 隔离) */}
       <div ref={canvasContainerRef} className="flex-1 relative">
-        <CanvasView canvas={canvas} elements={elements} connectors={connectors} highlightElementId={highlightId} />
+        <CanvasView
+          canvas={canvas}
+          elements={elements}
+          connectors={connectors}
+          highlightElementId={highlightId}
+          onCreateElement={async (b) => {
+            // preview / standalone canvas 走本地 store 直入 (无需 groupApi)
+            const id = `canvas-ele-local-${Math.random().toString(36).slice(2, 10)}`;
+            addCanvasElement({
+              id,
+              canvas_id: canvas.id,
+              kind: b.kind,
+              x: b.x,
+              y: b.y,
+              width: b.width,
+              height: b.height,
+              rotation: 0,
+              z_index: b.z_index,
+              content: b.content,
+              locked: false,
+              hidden: false,
+              created_by: "usr-001",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+            return { id };
+          }}
+        />
       </div>
     </div>
   );
