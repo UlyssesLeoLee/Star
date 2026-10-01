@@ -95,10 +95,24 @@ function AgentViewContent() {
         : "canvas",
   );
 
-  // 用户注释 / 自由连接 (per 2026-10-01 OOB 恢复无限画布画笔) - local-only state
+  // 用户注释 / 自由连接 (per 2026-10-01 OOB 恢复无限画布画笔) - local-only state + localStorage 持久化
   const [localAnns, setLocalAnns] = useState<AgentCanvasAnnotation[]>([]);
   const [localConns, setLocalConns] = useState<AgentCanvasFreeConnector[]>([]);
   const [editMode, setEditMode] = useState(false);
+
+  // load on agentId 变化
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const persisted = loadAgentAnnotations(agent.id);
+    setLocalAnns(persisted.annotations);
+    setLocalConns(persisted.freeConnectors);
+  }, [agent.id]);
+
+  // persist on change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    saveAgentAnnotations(agent.id, localAnns, localConns);
+  }, [agent.id, localAnns, localConns]);
 
   // Mount-gate for derivedAt 时间戳 (per 2026-09-06 19:42 JST hydration 修复):
   //   server render 时 derivedAt = null (避免 server t0 vs client t0+1s mismatch)
