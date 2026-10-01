@@ -32,6 +32,10 @@ import type {
   AgentCanvasAnnotation,
   AgentCanvasFreeConnector,
 } from "@/lib/agent-view/types";
+import {
+  loadAgentAnnotations,
+  saveAgentAnnotations,
+} from "@/lib/agent-view/annotationApi";
 import { AgentCanvasView } from "@/components/agent-view/AgentCanvasView";
 import { AgentFilter } from "@/components/agent-view/AgentFilter";
 import { GameHUD } from "@/components/agent-game/GameHUD";
@@ -100,19 +104,20 @@ function AgentViewContent() {
   const [localConns, setLocalConns] = useState<AgentCanvasFreeConnector[]>([]);
   const [editMode, setEditMode] = useState(false);
 
-  // load on agentId 变化
+  // load on agentId 变化 (per 任务 #1 — localStorage 持久化)
+  const currentAgentId = resolution?.agentId ?? null;
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const persisted = loadAgentAnnotations(agent.id);
+    if (typeof window === "undefined" || !currentAgentId) return;
+    const persisted = loadAgentAnnotations(currentAgentId);
     setLocalAnns(persisted.annotations);
     setLocalConns(persisted.freeConnectors);
-  }, [agent.id]);
+  }, [currentAgentId]);
 
   // persist on change
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    saveAgentAnnotations(agent.id, localAnns, localConns);
-  }, [agent.id, localAnns, localConns]);
+    if (typeof window === "undefined" || !currentAgentId) return;
+    saveAgentAnnotations(currentAgentId, localAnns, localConns);
+  }, [currentAgentId, localAnns, localConns]);
 
   // Mount-gate for derivedAt 时间戳 (per 2026-09-06 19:42 JST hydration 修复):
   //   server render 时 derivedAt = null (避免 server t0 vs client t0+1s mismatch)
@@ -395,6 +400,9 @@ function AgentViewContent() {
                   const id = `fc-local-${Math.random().toString(36).slice(2, 10)}`;
                   setLocalConns((arr) => [...arr, { id, ...body }]);
                   return id;
+                }}
+                onUpdateAnnotation={async (id, body) => {
+                  setLocalAnns((arr) => arr.map((a) => a.id === id ? { ...a, ...body, content: { ...a.content, ...(body.content || {}) } } as AgentCanvasAnnotation : a));
                 }}
               />
             </div>
