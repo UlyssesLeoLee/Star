@@ -565,12 +565,64 @@ const STATUS_OPTIONS: Array<{ value: WorkItemStatus; label: string }> = [
   { value: "wontfix", label: "不处理" },
 ];
 
+// V字モデル工程 (per IPA V字モデル 9 段階, P6 テスト 4 サブ → 12 縦列)
+// per 2026-10-01 ユーザー発令: V字モデルを Jira 視図のデフォルトにし,
+//   各工程を独立した縦列として配置, 工程内 5 状態槽横並び
+type VModelPhaseId =
+  | "P1" | "P2" | "P3" | "P4" | "P5"
+  | "P6.1" | "P6.2" | "P6.3" | "P6.4"
+  | "P7" | "P8" | "P9";
+
+interface VModelPhase {
+  id: VModelPhaseId;
+  num: string;
+  label: string;
+  ja: string;
+  side: "left" | "bottom" | "right";
+  color: string;
+  wipInProgress: number;
+  wipReview: number;
+}
+
+const VMODEL_PHASES: ReadonlyArray<VModelPhase> = [
+  { id: "P1",   num: "01",   label: "超上流工程", ja: "超上流",          side: "left",   color: "#a78bfa", wipInProgress: 3, wipReview: 2 },
+  { id: "P2",   num: "02",   label: "要件定義",   ja: "要件定義",        side: "left",   color: "#818cf8", wipInProgress: 3, wipReview: 2 },
+  { id: "P3",   num: "03",   label: "基本設計",   ja: "基本設計",        side: "left",   color: "#22d3ee", wipInProgress: 3, wipReview: 2 },
+  { id: "P4",   num: "04",   label: "詳細設計",   ja: "詳細設計",        side: "left",   color: "#34d399", wipInProgress: 3, wipReview: 2 },
+  { id: "P5",   num: "05",   label: "実装",       ja: "実装",            side: "bottom", color: "#fbbf24", wipInProgress: 4, wipReview: 2 },
+  { id: "P6.1", num: "06.1", label: "単体試験",   ja: "単体試験",        side: "right",  color: "#f59e0b", wipInProgress: 3, wipReview: 2 },
+  { id: "P6.2", num: "06.2", label: "結合試験",   ja: "結合試験",        side: "right",  color: "#f97316", wipInProgress: 3, wipReview: 2 },
+  { id: "P6.3", num: "06.3", label: "システム試験", ja: "システム試験",  side: "right",  color: "#ef4444", wipInProgress: 3, wipReview: 2 },
+  { id: "P6.4", num: "06.4", label: "受入試験",   ja: "受入試験",        side: "right",  color: "#ec4899", wipInProgress: 3, wipReview: 2 },
+  { id: "P7",   num: "07",   label: "移行・リリース", ja: "移行・リリース", side: "right", color: "#f43f5e", wipInProgress: 2, wipReview: 1 },
+  { id: "P8",   num: "08",   label: "運用・保守", ja: "運用・保守",      side: "right",  color: "#a3e635", wipInProgress: 2, wipReview: 1 },
+  { id: "P9",   num: "09",   label: "終結",       ja: "終結",            side: "right",  color: "#94a3b8", wipInProgress: 1, wipReview: 1 },
+];
+
+const VMODEL_STATUS_ORDER: ReadonlyArray<{ value: WorkItemStatus; label: string }> = [
+  { value: "todo",        label: "バックログ" },
+  { value: "in_progress", label: "To Do" },
+  { value: "review",      label: "進行中" },
+  { value: "done",        label: "完了" },
+  { value: "blocked",     label: "ブロック" },
+];
+
+const VMODEL_STATUS_LABEL_ZH: Record<WorkItemStatus, string> = {
+  todo: "待办",
+  in_progress: "进行中",
+  review: "评审",
+  blocked: "阻塞",
+  done: "完成",
+  wontfix: "不处理",
+};
+
 export default function GroupWorkspacePage({ params }: PageProps) {
   const { id: worktreeId } = ReactUse(params);
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope: ChatScope = searchParams.get("scope") === "GLOBAL" ? "GLOBAL" : "WORKTREE";
   const [canvasLinkError, setCanvasLinkError] = useState<string | null>(null);
+  const [vmodelSelectedPhase, setVmodelSelectedPhase] = useState<VModelPhaseId>("P5");
   const [cliProfileId, setCliProfileId] = useState("");
   const [cliExecutionProfileId, setCliExecutionProfileId] = useState("");
   const [cliExecutionProfiles, setCliExecutionProfiles] = useState<WorktreeExecutionProfileSummary[]>([]);
@@ -2342,32 +2394,119 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           )}
 
           {currentApp === "jira" && (
-            <div className="space-y-4">
-              <div><h2 className="text-lg font-semibold">Jira 等价视图</h2><p className="text-xs text-ink-mute">Board / Backlog / Sprint 视图复用同一组任务卡。</p></div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {(groupProjection.mode === "live"
-                  ? ["todo", "in_progress", "review", "blocked", "done", "wontfix"] as WorkItemStatus[]
-                  : ["todo", "in_progress", "review"] as WorkItemStatus[]).map((status) => (
-                  <section key={status} className="rounded-lg border border-line bg-bg-soft/40 p-3">
-                    <h3 className="mb-3 flex items-center justify-between text-xs font-semibold">
-                      {STATUS_OPTIONS.find((option) => option.value === status)?.label}
-                      <span className="font-mono text-ink-mute">{projectWorkItems.filter((item) => getTaskDisplayStatus(item) === status).length}</span>
-                    </h3>
-                    <div className="space-y-2">
-                      {projectWorkItems.filter((item) => getTaskDisplayStatus(item) === status).map((item) => (
-                        <article key={item.id} className="rounded-md border border-line bg-bg-card p-3">
-                          <Link href={taskHref(item.id)} className="block hover:text-accent">
-                            <div className="font-mono text-[10px] text-info">{item.key}</div>
-                            <div className="mt-1 text-xs">{item.title}</div>
-                          </Link>
-                          {renderLifecycleActions(item)}
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+            <div className="space-y-4" data-testid="group-vmodel-board">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">V字モデル Kanban (IPA 9 工程)</h2>
+                  <p className="text-xs text-ink-mute">12 縦列 × 5 状態槽。V字左辺 (上流→詳細) → V字底辺 (実装) → V字右辺 (テスト→運用→終結)。task 内容は生成しない, 実 WorkItem 駆動のみで表示。</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                  <span className="rounded border border-line px-2 py-0.5 font-mono uppercase tracking-wider" style={{ borderColor: "#a78bfa", color: "#a78bfa" }}>left 上流</span>
+                  <span className="rounded border border-line px-2 py-0.5 font-mono uppercase tracking-wider" style={{ borderColor: "#fbbf24", color: "#fbbf24" }}>bottom 実装</span>
+                  <span className="rounded border border-line px-2 py-0.5 font-mono uppercase tracking-wider" style={{ borderColor: "#ec4899", color: "#ec4899" }}>right テスト+運用</span>
+                </div>
               </div>
-              <p className="text-[10px] text-ink-mute">在线视图按 canonical lifecycle 与 review gate 分类；Board / Backlog / Sprint 的自定义列仍待接入。</p>
+
+              <div className="overflow-x-auto rounded-lg border border-line bg-bg-soft/40">
+                <div className="flex min-w-max divide-x divide-line" role="tablist" aria-label="V字モデル 工程 タブ">
+                  {VMODEL_PHASES.map((phase) => {
+                    const phaseTotal = projectWorkItems.filter((item) => getTaskDisplayStatus(item) !== "wontfix").length;
+                    const isActive = vmodelSelectedPhase === phase.id;
+                    return (
+                      <button
+                        key={phase.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => setVmodelSelectedPhase(phase.id)}
+                        className={`group relative flex min-w-[88px] flex-1 flex-col items-start gap-0.5 px-3 py-2 text-left transition ${isActive ? "bg-bg-card" : "hover:bg-bg-card/50"}`}
+                        style={{ borderTop: `2px solid ${phase.color}` }}
+                        data-testid={`vmodel-phase-${phase.id}`}
+                      >
+                        <span className="font-mono text-[9px] uppercase tracking-wider opacity-70">{phase.num} · {phase.side}</span>
+                        <span className="text-xs font-semibold">{phase.label}</span>
+                        <span className="text-[9px] text-ink-mute">{phase.ja}</span>
+                        <span className="font-mono text-[10px] text-ink-mute">{phaseTotal} tasks</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                {(() => {
+                  const phase = VMODEL_PHASES.find((p) => p.id === vmodelSelectedPhase) ?? VMODEL_PHASES[0];
+                  const items = projectWorkItems.filter((item) => getTaskDisplayStatus(item) !== "wontfix");
+                  const orderedStatuses: ReadonlyArray<WorkItemStatus> = groupProjection.mode === "live"
+                    ? ["todo", "in_progress", "review", "blocked", "done", "wontfix"]
+                    : ["todo", "in_progress", "review", "blocked", "done"];
+                  return (
+                    <>
+                      <section
+                        className="rounded-lg border border-line p-3 lg:col-span-2"
+                        style={{ background: `linear-gradient(135deg, ${phase.color}18 0%, transparent 80%)` }}
+                        data-testid={`vmodel-phase-summary-${phase.id}`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="font-mono text-[10px] uppercase tracking-widest opacity-70">{phase.num} · {phase.side === "left" ? "V字左辺 (上流)" : phase.side === "bottom" ? "V字底辺 (実装)" : "V字右辺 (テスト/運用/終結)"}</div>
+                            <div className="mt-0.5 text-base font-semibold">{phase.label}</div>
+                            <div className="text-[10px] text-ink-mute">{phase.ja} · WIP 進行中 ≤ {phase.wipInProgress}, レビュー ≤ {phase.wipReview}</div>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {orderedStatuses.map((s) => (
+                              <span key={s} className="rounded border border-line bg-bg-card/70 px-2 py-0.5 font-mono text-[10px]">
+                                {VMODEL_STATUS_LABEL_ZH[s]}: <span className="font-semibold">{items.filter((it) => getTaskDisplayStatus(it) === s).length}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </section>
+
+                      {VMODEL_STATUS_ORDER.map((slot) => {
+                        const status = slot.value;
+                        const slotItems = items.filter((item) => getTaskDisplayStatus(item) === status);
+                        const wipLimit = status === "in_progress" ? phase.wipInProgress : status === "review" ? phase.wipReview : null;
+                        const wipExceeded = wipLimit !== null && slotItems.length > wipLimit;
+                        return (
+                          <section
+                            key={`${phase.id}-${status}`}
+                            className={`rounded-lg border bg-bg-soft/40 p-3 ${wipExceeded ? "border-warning/60" : "border-line"}`}
+                            data-testid={`vmodel-slot-${phase.id}-${status}`}
+                            data-phase={phase.id}
+                            data-status={status}
+                          >
+                            <h3 className="mb-2 flex items-center justify-between text-xs font-semibold">
+                              <span>{slot.label} <span className="ml-1 text-[10px] font-normal text-ink-mute">({VMODEL_STATUS_LABEL_ZH[status]})</span></span>
+                              <span className="flex items-center gap-2 font-mono text-[10px]">
+                                <span className="text-ink-mute">{slotItems.length}</span>
+                                {wipLimit !== null && <span className={wipExceeded ? "text-warning" : "text-ink-mute"}>WIP ≤ {wipLimit}</span>}
+                              </span>
+                            </h3>
+                            <div className="space-y-1.5">
+                              {slotItems.length === 0 && (
+                                <p className="rounded border border-dashed border-line bg-bg-card/30 px-2 py-3 text-center text-[10px] text-ink-mute">
+                                  {groupProjection.mode === "live" ? "この工程 · この状態のタスクはありません" : "工程と状態を切り替えて確認"}
+                                </p>
+                              )}
+                              {slotItems.map((item) => (
+                                <article key={item.id} className="rounded border border-line bg-bg-card px-2 py-1.5 text-[11px]">
+                                  <Link href={taskHref(item.id)} className="block hover:text-accent">
+                                    <div className="font-mono text-[9px] text-info">{item.key}</div>
+                                    <div className="mt-0.5">{item.title}</div>
+                                  </Link>
+                                </article>
+                              ))}
+                            </div>
+                          </section>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+              </div>
+
+              <p className="text-[10px] text-ink-mute">V字モデル 12 縦列 (9 工程 + テスト 4 サブ工程)。列内 5 状態槽は IPA V字モデル 工程ごとに WIP 上限を定義。Multica 周期駆動 (P5 実装→P6.1 単体→P6.2 結合→…→P9 終結) を前提。</p>
             </div>
           )}
 
