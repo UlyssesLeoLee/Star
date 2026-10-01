@@ -77,6 +77,10 @@
 //! CREATE (m)-[:CONTAINS]->(epa),(b)-[:CALLS]->(epar);
 //! CREATE (ec:Module {name:"execution_catalogs",type:"module",language:"rust"}),(ecLoad:Function {name:"execution_catalogs::load_current_execution_admission_snapshot",type:"function",language:"rust"}),(ecRecheck:Function {name:"execution_catalogs::recheck_current_execution_admission_snapshot",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(ec),(ecLoad)-[:CALLS]->(ecRecheck);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"});
+//! CREATE (xr:Module {name:"execution_resources",type:"module",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(xr);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -106,6 +110,7 @@ mod cli_sessions;
 mod execution_catalogs;
 mod execution_profile_admin;
 mod execution_profiles;
+mod execution_resources;
 mod group_apps;
 pub(super) mod hook_policies;
 mod scoped_chat;

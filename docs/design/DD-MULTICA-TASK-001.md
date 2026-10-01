@@ -1,13 +1,13 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.11** (per 日本 IPA SEC 标准，补充 Run Profile current catalog read/recheck 实装边界)
+> **Multica Task Lifecycle 域 詳細設計書 v1.12** (per 日本 IPA SEC 标准，补充 Run Profile 快照与 Project resource admission 原子写入)
 >
-> - 状态: 🟡 Draft v1.11 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1 有条件式代码/schema 切片或设计收口；9E-4C2 已有 bounded PostgreSQL catalog schema/read/recheck 代码切片与隔离 PG18 验证，但 catalog publisher/production Runtime adapter、目标 DB/RLS grants 和 Profile-bound Run writer 仍开放)
+> - 状态: 🟡 Draft v1.12 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2 已有条件式代码/schema 切片或设计收口；9E-4C3 已有 Profile/Run/Project resource-reservation 原子写入代码切片与隔离 PG18 验证，但 catalog publisher/production Runtime reservation lifecycle、目标 DB/Auth/RLS grants、BI/Outbox 与 C4 spawn fence 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.37 §50；`docs/basic-design.md` v5.33 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.38 §50；`docs/basic-design.md` v5.34 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
+> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.3
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
@@ -990,7 +990,17 @@ REST 新 Run admission 在任何 readiness/preparation 前要求非空、非 nil
 
 `star-api-rest::execution_catalogs` 在已授权 Worktree/Task transaction 中按 Profile 引用读取最多 5 个 Provider 和 128 个 Skill，查询其规范化能力行与 current GrantSet；载入 Skill capability label 前先以数据库聚合拒绝预计 heap 超过 384 KiB 的目录，避免超限 labels 先进入 Rust；Profile document 先经 Rust verifier，域对象再以 ≤1 MiB Arc-backed snapshot 绑定精确 scope/Profile/catalog/Grant revisions、GrantSet ID/version 和 ≤5 秒 fence。preflight 使用短 REPEATABLE READ transaction 并在 Runtime readiness 前释放；final admission transaction 重新锁定并核验当前 Profile、revision projection、GrantSet、effective HookSet 与至少 1 秒余量，再走 `ExecutionProfileResolver::resolve_current_snapshot`。该快照通过 Arc 传给 Runtime readiness adapter，不在 REST/Runtime 边界克隆每项目录实体。
 
-当前仍缺 Provider/Skill/Grant publisher/source mutation API、真实 catalog 装载、目标数据库 migration/RLS grants 验收与生产 `TaskCliSessionProvisioner`；`supports_current_execution_catalogs()` 与 Profile-bound Run capability 均保持默认 false，因此数据库切片不能被称为 production authorization source 或可运行 Profile-bound Run。`domain-llm::ProviderRegistry` 的 mock fallback 与 CLI-only `SkillRegistry` 不能绕过该 gate。后续 9E-4C3 原子写 Profile/Task/Hook/RunEvent/BI/resource reservation；9E-4C4 复验并消费双 Profile identity spawn fence。Hooks 设置入口继续位于 Settings“高级设置”内容区，和 Skills/MCP/Plugins 并列，不进入 Worktree 树。
+当前仍缺 Provider/Skill/Grant publisher/source mutation API、真实 catalog 装载、目标数据库 migration/RLS grants 验收与生产 `TaskCliSessionProvisioner`；`supports_current_execution_catalogs()` 与 Profile-bound Run capability 均保持默认 false，因此数据库切片不能被称为 production authorization source 或可运行 Profile-bound Run。`domain-llm::ProviderRegistry` 的 mock fallback 与 CLI-only `SkillRegistry` 不能绕过该 gate。9E-4C3 在这些 production prerequisites 尚未装配时交付条件式 writer slice，具体事务与配额规则见 §14.11.10；后续 9E-4C4 复验并消费双 Profile identity spawn fence。Hooks 设置入口继续位于 Settings“高级设置”内容区，和 Skills/MCP/Plugins 并列，不进入 Worktree 树。
+
+#### 14.11.10 Phase 9E-4C3 Run snapshot 与 Project resource reservation 原子提交
+
+新 Profile-bound CLI Run 的最终事务采用短 `REPEATABLE READ`：重授权 GroupContext/Worktree/Task，重验 readiness fence 与 bounded catalog revision fence，读取并校验 canonical AgentExecutionProfile、effective HookSet、Task/acceptance 与 optional Schedule occurrence；调用 Rust `ExecutionProfileResolver` 后，同一事务写 Run 的 Profile ID/version/digest/document、ResourceBudget 与 Loop snapshot、Task/acceptance/Hook snapshot、Hook ledger、RunEvent 和 pending resource reservation。锁内不得执行 CLI、Provider、Plugin 或网络调用。任何 scope/授权/revision/fence 漂移、缺 active quota、预算转换溢出、容量不足或下游写入错误都回滚整笔事务，不产生可 spawn Run。
+
+`project_execution_resource_quota` 是 Project-wide Master/SCD2：一个 Project 下全部 Worktree 共用 active-run、RSS、CPU/runtime per-run、child-process、parallel-tool、provider-call、output 与 event-buffer ceilings；不配置默认 quota。Admission 用 Profile immutable snapshot 中的 per-Run maxima，checked conversion 后同时检查逐 Run 最大值与当前有效 pending/active reservations 的 Project aggregate。Reservation 是 Work，pending lease 不晚于 Runtime admission fence expiry；`reserved_maxima` 只表示上限，不得填充 observed RSS/CPU/output measurement。Reservation 的 reserved/activated/released event 是 append-only Transaction，activation/release 由 Runtime provisioner 在 consume/reject fence 时于同一事务完成；尚无 Runtime adapter 时，不开启 Profile-bound producer。
+
+`REPEATABLE READ` 中的行锁等待不会刷新既有快照。为防止两个并行 Worktree admission 都读取相同剩余容量，writer 在 quota 与 reservation usage 查询前先对 `(tenant_id, project_id)` 原子 `INSERT ... ON CONFLICT DO UPDATE` `project_execution_resource_admission_lock` allocation epoch。epoch 写冲突使并发旧快照事务收到 SQLSTATE `40001`，REST 映射为 retryable conflict；调用方必须整体重试，并在新快照中重读 quota/reservations，不能仅重试 reservation insert。Lock row 是带 30 天 expiry 的 W；租户 maintenance 必须清理过期行。quota、reservation、reservation event、admission lock 都启用 tenant `FORCE ROW LEVEL SECURITY`。
+
+Run insert、reservation、reservation Transaction event 与 `task_execution_run_event` 镜像共享事务；两种事件用相同 `event_id`、Run、WorkItem、actor、correlation 与 bounded details 建立 BI 关联。重复 idempotency key 先返回既有 Run，reservation 只在新 Run insert 成功后创建，因此 replay 不会二次占额。隔离 PostgreSQL 18 已验证 migration 两次应用、SCD2 quota/audit、Run Profile budget 与 Loop snapshot guard、reservation/RunEvent 同 event ID、RLS、append-only 和 reservation 状态转换。生产 catalog publisher/装载、目标 DB 与 runtime role grants、host Auth/ACL、epoch/reservation TTL maintenance、Runtime activate/release、Outbox/BI outcome join 及 C4 双身份 spawn fence 仍未完成；C3 的代码/迁移 slice 不代表生产 Run admission 已开启。
 
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
@@ -1035,3 +1045,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 
 
 | v1.11 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 9E-4C2 当前 SQL adapter 与 production gates 描述；补充 Skill capability 在数据库侧先通过 ≤384 KiB 聚合 heap 预算再载入 labels，减少并发 admission 峰值内存；同步 requirements v5.37/basic design v5.33 并保留 `/settings/advanced/hooks` 为 Advanced Settings 并列 tab | 完成 Phase 9E-4C2 内存上限与文档状态自审 |
+| v1.12 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.10：定义 C3 final REPEATABLE READ transaction、Profile/ResourceBudget/Loop/Task/Hook/RunEvent/reservation 原子边界、Project 跨 Worktree aggregate quota 与 no-default policy；以 Project allocation epoch write 防止 waiter 使用旧快照超额预留，SQLSTATE 40001 映射冲突；说明 W/T/M、RLS、idempotent replay、reserved maxima 与 observed metrics 区分及尚未闭合的 publisher/Runtime/DB/BI/C4 gates；Hooks 仍是 Advanced Settings 内容区并列 tab | Phase 9E-4C3 Run/resource writer 与并发审查 |
