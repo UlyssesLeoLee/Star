@@ -40,6 +40,59 @@ export interface AgentCanvasNode {
     | { kind: "work_item"; workItemId: string };
 }
 
+/** Agent 总览画布的用户注释 — sticky / text / shape / path / connector (per 2026-10-01 OOB 恢复无限画布画笔) */
+export type AgentCanvasAnnotationKind = "sticky_note" | "text" | "shape" | "path";
+
+export interface AgentCanvasAnnotationBase {
+  id: string;
+  kind: AgentCanvasAnnotationKind;
+  /** 世界坐标 */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 创作时间 (ISO8601) */
+  created_at: string;
+  /** 作者 agent / user id */
+  created_by: string;
+}
+
+export interface AgentCanvasStickyAnnotation extends AgentCanvasAnnotationBase {
+  kind: "sticky_note";
+  content: { color: string; text: string };
+}
+
+export interface AgentCanvasTextAnnotation extends AgentCanvasAnnotationBase {
+  kind: "text";
+  content: { text: string };
+}
+
+export interface AgentCanvasShapeAnnotation extends AgentCanvasAnnotationBase {
+  kind: "shape";
+  content: { shape: "rect" | "ellipse" };
+}
+
+export interface AgentCanvasPathAnnotation extends AgentCanvasAnnotationBase {
+  kind: "path";
+  content: { path_data: string; brush_size: number; brush_color: string };
+}
+
+export type AgentCanvasAnnotation =
+  | AgentCanvasStickyAnnotation
+  | AgentCanvasTextAnnotation
+  | AgentCanvasShapeAnnotation
+  | AgentCanvasPathAnnotation;
+
+/** Agent 总览画布用户连接 — annotation 之间的 connector (per 2026-10-01 OOB 恢复无限画布 connector) */
+export interface AgentCanvasFreeConnector {
+  id: string;
+  /** 起始点 (针对于 annotation id) */
+  fromAnnotationId: string;
+  toAnnotationId: string;
+  color: string;
+  label?: string;
+}
+
 /** 画布连接 (agent → worktree, worktree → work-item) */
 export interface AgentCanvasConnector {
   id: string;
