@@ -1,15 +1,16 @@
 # SRS-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 无限画布需求文档 v1.3** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
+> **AI Worktree Graph Canvas — 无限画布需求文档 v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
-> - 状态: Requirements Baseline (v1.3 群组边界补充)
+> - 状态: Requirements Baseline v1.4 (Project Graph 与 Run Canvas 双对象边界)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 > - 关联 issue: `Multica ULYS-57` (制作 Worktree 页面各级文档)
 > - 上位要件: 无独立上位 SRS (本 SRS 为新领域主册; 平行引用 `SRS-CANVAS-001.md` v1.4 无限画布总册 + `SRS-AGENT-VIEW-001.md` v1.0 个体视图 + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 ARG)
 > - 平行专题 SRS: 0 (本 SRS 为独立专题主册, 不下挂子专题)
-> - 关联后续基本設計: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.3
-> - 关联后续詳細設計: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.3 (Worktree Group 边界补充)
+> - 关联后续基本設計: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.4
+> - 关联后续詳細設計: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.4 (Project Graph 与 Run Canvas 边界补充)
+> - Run App owner 边界: `docs/design/DD-WORKTREE-GROUP-001.md` v4.25 §1 / §8.1；当前 Worktree-scoped Canvas API 是兼容切片，不代表 Run-owned schema 已迁移
 > - 关联追踪矩阵: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
@@ -26,12 +27,12 @@
 |---|---|
 | 文书 ID | SRS-WORKTREE-CANVAS-001 |
 | 文书名 | AI Worktree Graph Canvas — 无限画布 需求定义书 |
-| 版本 | v1.3 (群组边界补充) |
+| 版本 | v1.4 (Project Graph 与 Engineering Run Canvas 双对象边界) |
 | 作成日 | 2026-09-15 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
 | 关联 commit | (root 统一 commit 时填, per 守门 #1 v15) |
-| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.3 + `DD-WORKTREE-CANVAS-001.md` v1.3 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 |
+| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-GROUP-001.md` v4.25 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 |
 | 上位文档 | 无 (新领域主册) |
 | 平行文档 | `SRS-CANVAS-001.md` v1.4 (无限画布总册) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG) |
 | 拍板来源 | 2026-09-15 Multica ULYS-57 issue 创建者发令 "你是一名资深软件架构师...针对一个面向 AI 并行开发场景的 Worktree 无限画布管理模块, 依次生成需求文档 / 基本设计 / 详细设计" |
@@ -43,7 +44,7 @@
 | v1.0 | 2026-09-15 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 初版落档, 13 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/验收/风险/签字/修订), **126 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID), 39 用户故事 (≥ 39 满足), 13 已知缺口, 5 个视图模式 + 6 级 Semantic Zoom + 7 状态机 + 11 风险类型 + 5 层 Canvas 性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
 | v1.1 | 2026-09-17 JST | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01..C-04 修正) | 修正: 4 文档总数对齐 **126 唯一 ID**; FR-ACTION-002 Merge 改 Destructive (per self-review C-02); Trace §11 AC 43 项全表化 (per self-review C-03); BD §0.3/§37 总数同步 (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
 | v1.2 | 2026-09-19 JST | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" 措辞 → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
-| v1.3 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确本 SRS 是 Project/Repository 范围的 Worktree Overview Graph, 与 Worktree 下的 Infinite Canvas 分属不同对象、路由和上下文; 增加群组入口及跨画布引用边界 | 用户要求以 Worktree 为渡口顶层索引并将 Canvas 作为同级群组应用 |
+| v1.4 | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 维持 Project/Repository Worktree Overview Graph 身份；明确 Group Infinite Canvas 与 Task Card 属 Engineering Run 同级 Apps，选中 Worktree 仅为 focus/CLI target；当前 Worktree-scoped API 为兼容实现 | 用户确认右侧 tabs 属于 Engineering Run，点击其中 Worktree 后打开 |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -184,14 +185,13 @@
 
 ---
 
-### 1.6 渡口群组边界与 Canvas 消歧 (v1.3 补充)
+### 1.6 渡口 Run 工作区与双 Canvas 消歧 (v1.4 补充)
 
-- 本 SRS 定义的 **AI Worktree Graph Canvas** 是 Project/Repository 范围的 Worktree Overview Graph，用于浏览多个 Worktree 的状态、依赖、风险与 Git 关系；现有 `/worktree-canvas` 路由和本 SRS 的 Graph 数据模型继续归属该视图。
-- 渡口的 **Group Infinite Canvas** 是单个 Worktree 群组下的协作工作面，与 Task Card 索引、Multica、Jira 等价任务视图及插件入口同级。它不替代也不复用 Worktree Overview Graph 的根节点和持久化对象。
-- 两种 Canvas 可通过带 `worktree_id` 的类型化引用互相深链；Project Graph 可汇总或跳转到群组画布，但不得将 Group Canvas 元素误建模为 Worktree 状态节点。
-- Task Card、Multica 和 Jira 等价应用共同引用同一个 `work_item_id`；卡内 CLI/Agent Session 同时绑定 `worktree_id` 和 `work_item_id`。本 Graph 仅消费其类型化引用及授权后的事件，不拥有这些任务或 CLI 的状态机。
-- 群组层级及聊天范围以 [`docs/requirements.md`](../requirements.md) §50 和 [`docs/basic-design.md`](../basic-design.md) §16 为准；本文件只约束 Project 级 Worktree Overview Graph 与群组对象的连接。
-
+- 本 SRS 定义的 **AI Worktree Graph Canvas** 是 Project/Repository 范围的 Worktree Overview Graph，用于浏览跨 Engineering Run 的 Worktree 状态、依赖、风险与 Git 关系；现有 `/worktree-canvas` 路由和本 SRS 的 Graph 数据模型继续归属该视图。
+- 渡口的 **Group Infinite Canvas** 是 Engineering Run 工作区内的同级 App，与 Run Task Card、Multica、Jira 等价任务视图及插件并列。用户选中一个 Worktree 后，右侧显示其所属 Run tabs；该 Worktree 是 UI focus 和 CLI checkout target，不是 Canvas/WorkItem owner 边界。Run Canvas 可以引用该 Run 内多个 Worktree。
+- 两种 Canvas 可通过带 `engineering_run_id` 与可选 `focus_worktree_id` 的类型化引用互相深链；Project Graph 可汇总或跳转到 Run Canvas，但不得将 Group Canvas 元素误建模为 Worktree 状态节点。
+- Task Card、Multica 和 Jira 等价应用共同引用同一个 Run-owned `work_item_id`；卡内 CLI/Agent Session 同时绑定 `worktree_id`、`work_item_id` 与 `engineering_run_id`。本 Graph 仅消费其类型化引用及授权后的事件，不拥有这些任务或 CLI 的状态机。
+- 群组层级及聊天范围以 [`docs/requirements.md`](../requirements.md) §50 和 [`docs/basic-design.md`](../basic-design.md) §16 为准；本文件只约束 Project 级 Worktree Overview Graph 与 Run 应用对象的连接。现有 Worktree-scoped Group Canvas API 为迁移兼容切片，目标 Run-scoped schema/API 与历史归属迁移另列 Phase 2E。
 ## §2 用語定义 (Ubiquitous Language)
 
 | 用語 | 定义 | 出处 / 备注 |
