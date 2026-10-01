@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.36 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.40
+> **文档版本**: v5.37 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.41
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.40》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.41》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4723,7 +4723,7 @@ Commit 后 REST 将同一 fence 对象交给 provisioner。Runtime 必须先用�
 
 客户端 request fingerprint 继续表示同一用户请求的幂等身份（包含两个选定 ID）；本轮新加的 `spawn_fence_binding_digest` 对 request fingerprint 与服务端解析的两个 Profile revision、scope、catalog、HookSet 和预算做 domain-separated SHA-256，表达可执行决策身份。Run Summary/Detail 返回两种 Profile 身份和 binding digest；数据库不持久化 opaque fence ID，避免将一次性 Runtime handle 扩散到 BI/API。
 
-Rust 条件式 REST contract、Run identity migration 与 list/detail 投影已实现。`domain-local-runtime::task_execution` 已有签名 grant、scope、Approved Launch Profile ID/字段约束、canonical checkout 和一次性 nonce 基础校验，但签名内容不含 Launch Profile version/digest，也不含 AgentExecutionProfile、catalog/HookSet/ResourceBudget 或 C4 fence binding；该 helper 尚未接入生产 provisioner/OS spawn，不能视为 C4 consumer。本仓仍无生产 Approved Launch Profile authority/provider、C4 fence store/consumer 或 OS spawn adapter；reservation activate/release、过期清理、target DB/RLS grants、真实 Auth/Project ACL、catalog publisher/data 与完整 Outbox/BI 也仍开放。因此 `supports_profile_bound_run_admission()` 与 current-catalog capability 必须默认 false。导航遵循 ULYS-235：Settings 主导航的“高级设置”是父入口，Hooks 规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab，不是独立主导航项或 Worktree 树节点。
+Rust 条件式 REST contract、Run identity migration 与 list/detail 投影已实现。Phase 9E-4C5 将 fence wire contract 提到共享 `star-dto::task_run`，让携带 fence 的 grant 使用 signature v2、旧无 fence grant 保持 v1 兼容；Local Runtime 已提供完整 current-binding compare 与 SQLite nonce/fence 原子一次性 consume foundation。该 foundation 未接入 production provisioner，不授予实时 ACL/authority，不激活 reservation，也不创建 OS process；生产 Approved Launch Profile authority/provider、OS spawn adapter、reservation activate/release、过期清理、target DB/RLS grants、真实 Auth/Project ACL、catalog publisher/data 与完整 Outbox/BI 仍开放。因此 `supports_profile_bound_run_admission()` 与 current-catalog capability 必须默认 false。导航遵循 ULYS-235：Settings 主导航的“高级设置”是父入口，Hooks 规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab，不是独立主导航项或 Worktree 树节点。
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
@@ -4738,6 +4738,16 @@ Hook phase 覆盖 Run admission、before/after tool、before/after validation、
 Hook evaluation event 固定 `hook_set/rule/evaluator version + digest`、phase/decision/reason class/duration/timeout/fail-closed/override、actor/project/worktree/run/task/correlation IDs；不记录 Secret/prompt/原始 stdout/chain-of-thought。可覆盖规则的人工 override 限定角色、理由、期限并审计，核心安全规则不可 override。BI 派生 Hook coverage、deny/require-human、timeout/failure、override、阻断和恢复时间，并跟 Worktree lock/lease/claim/drain、cleanup 故障、Validation、返工、接受结果做版本化 cohort 关联；event 缺失标 unknown。HookSet 改进通过固定 Benchmark 与独立审批，禁止规则自动放宽自身限制。
 
 Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存独立 Worktree lifecycle 事件及 Run admission ledger；Run-linked execution event 同时写入有 Task/Run FK 的 `multica.task_execution_run_event`。`hook_execution_summary_v2` 在 1–90 天 Project 窗口内联合两个来源，以相同 `tenant_id + event_id` 去重；最新 Run 状态只用完整 tenant/project/work_item/run 键关联，不用 correlation ID 作为身份。缺少 phase/decision/duration/timeout 的未镜像 RunEvent 显示为排除计数。`run_state_join` 的 complete 仅表示观测到的 Run-linked Hook 行均找到最新状态，不代表 Run 已终态或 Hook coverage 全面。当前没有生产 Run admission adapter，因此运行时 coverage 仍只有 `worktree_archive`；当服务端报告已装配 Run producer 时，list/summary coverage 会列出 Run admission，比例继续为 `null`、状态 `partial`。Hooks 页面事件面板每页 30 条且最多驻留 300 条；同一 Advanced Settings Hooks 标签选择 7/30/90 天窗口，展示跨源去重后的 phase/decision、Run 状态关联与不完整投影计数。该 summary 不是完整 Project BI。目标环境认证 Provider、migration/grants/RLS、production Runtime adapter、tool/validation/review producers、Outbox delivery state、版本化 coverage/cohort read model、Run Detail/Quality & Improvement 下钻仍开放。插入失败时对应业务事务 fail closed，敏感正文不进入事件投影。
+
+### 16.18 Phase 9E-4C5 Runtime 双 Profile fence 消费基础设施
+
+REST 与 Local Runtime 共用 `star-dto::task_run` 的严格、固定结构 fence contract。Binding 只含 tenant/actor/Project/repository/Worktree/Task/Runtime/lifecycle、Approved Launch Profile 与 AgentExecutionProfile 的 ID/version/digest、catalog revision tuple、effective HookSet、ResourceBudget 与原始 request fingerprint；Provider/Skill 条目继续留在受限 Arc snapshot，不跨 Runtime fence 复制。`binding_digest` 由共享 DTO 以 `star.task_run_spawn_fence.v1\0` domain separator 计算，保持 C4 digest 格式一致。
+
+新的 Profile-bound `TaskExecutionContext` 在签名 grant 中承载完整 fence，使用 grant signature v2；旧 grant 缺少该字段时跳过序列化，保留 v1 签名 payload 与旧 grant 解码兼容。签名 builder 在序列化前验证 fence binding、定长 SHA-256 digest、时限和 digest 一致性，避免异常超长字段进入 JSON/hash 临时缓冲。旧版通用 CLI prepare/consume 入口遇到携带 fence 的 grant 会拒绝，避免绕过专用校验；只有 profile-bound consumer 可继续。Runtime 消费 helper 需要调用方刚完成实时 ACL/Worktree/Task/lifecycle 检查，并传入从当前权威 Profile/catalog/HookSet 与已提交 ResourceBudget 重建的完整 binding；helper 比较全部字段，校验 launch Profile revision、scope、issue/expiry 与 binding digest 后，才在同一 durable transaction 消费 nonce 和 fence。
+
+本地 receipt ledger 使用 SQLite FULL-synchronous WAL、`BEGIN IMMEDIATE` 与同事务 nonce/fence 两表写入；重复 fence 导致整个事务回滚，已用 nonce 不会被孤立占用。短期 receipt 最多保留 50,000 条，过期并超过 5 分钟时钟偏差窗口后懒清理；容量满、数据库错误、错绑或重放均 fail closed。该 helper 只完成签名/绑定复验和一次性 consume，尚不创建 OS process，也不自行授予或重验实时 ACL、Project aggregate reservation、Reservation activation/release 或 BI outcome；生产 provisioner/current catalog/Run capability 保持默认关闭，必须等权威 Provider、目标 DB/RLS、reservation lifecycle、OS sandbox/spawn adapter 与 BI 回执全部装配并验收后才可开启。
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|

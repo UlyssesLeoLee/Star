@@ -35,8 +35,8 @@
 //! CREATE (resources)-[:CONTAINS]->(reserve),(record)-[:CALLS]->(reserve),(reserve)-[:USES]->(snapshot),(reserve)-[:USES]->(readiness),(st)-[:USES]->(snapshot),(st)-[:USES]->(readiness);
 //! CYPHER STRUCTURE MANIFEST ADDENDUM
 //! MATCH (f:File {name:"cli_sessions.rs",type:"file"}),(m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(record:Function {name:"record_cli_task_run",type:"function"}),(append:Function {name:"append_run_admission_hook_events",type:"function"}),(readiness:Class {name:"TaskRunAdmissionReadiness",type:"class"}),(readiness_command:Class {name:"TaskRunAdmissionReadinessCommand",type:"class"}),(session_start:Class {name:"TaskCliSessionStartCommand",type:"class"}),(snapshot:Class {name:"CurrentExecutionAdmissionSnapshot",type:"class"});
-//! CREATE (profile_identity:Class {name:"TaskRunProfileRevisionIdentity",type:"class",language:"rust"}),(catalog_identity:Class {name:"TaskRunCatalogRevisionIdentity",type:"class",language:"rust"}),(fence_binding:Class {name:"TaskRunSpawnFenceBinding",type:"class",language:"rust"}),(spawn_fence:Class {name:"TaskRunSpawnFence",type:"class",language:"rust"}),(binding_digest:Function {name:"TaskRunSpawnFenceBinding::binding_digest",type:"function",language:"rust",visibility:"pub"}),(catalog_from:Function {name:"TaskRunCatalogRevisionIdentity::from",type:"function",language:"rust",visibility:"private"}),(build_binding:Function {name:"expected_task_run_spawn_fence_binding",type:"function",language:"rust",visibility:"private"}),(fence_matches:Function {name:"spawn_fence_matches_readiness_command",type:"function",language:"rust",visibility:"private"}),(digest_check:Function {name:"is_lower_hex_sha256_digest",type:"function",language:"rust",visibility:"private"}),(digest_encode:Function {name:"digest_to_lower_hex",type:"function",language:"rust",visibility:"private"}),(fence_digest_value:Variable {name:"spawn_fence_binding_digest",type:"variable",language:"rust"}),(f)-[:CONTAINS]->(profile_identity),(f)-[:CONTAINS]->(catalog_identity),(f)-[:CONTAINS]->(fence_binding),(f)-[:CONTAINS]->(spawn_fence),(f)-[:CONTAINS]->(binding_digest),(f)-[:CONTAINS]->(catalog_from),(f)-[:CONTAINS]->(build_binding),(f)-[:CONTAINS]->(fence_matches),(f)-[:CONTAINS]->(digest_check),(f)-[:CONTAINS]->(digest_encode),(f)-[:CONTAINS]->(fence_digest_value),(fence_binding)-[:HAS_METHOD]->(binding_digest),(catalog_identity)-[:HAS_METHOD]->(catalog_from),(readiness)-[:USES]->(spawn_fence),(session_start)-[:USES]->(spawn_fence),(st)-[:CALLS]->(fence_matches),(fence_matches)-[:CALLS]->(build_binding),(fence_matches)-[:CALLS]->(digest_check),(record)-[:USES]->(spawn_fence),(build_binding)-[:USES]->(readiness_command),(build_binding)-[:USES]->(snapshot),(record)-[:CALLS]->(digest_encode),(append)-[:CALLS]->(digest_encode),(record)-[:USES]->(fence_digest_value),(append)-[:USES]->(fence_digest_value),(digest_encode)-[:USES]->(fence_digest_value);
-
+//! MATCH (f:File {name:"cli_sessions.rs",type:"file"}),(m:Module {name:"cli_sessions",type:"module"}),(dto:Module {name:"star_dto::task_run",type:"module",language:"rust"}),(st:Function {name:"start_task_cli_session",type:"function"}),(record:Function {name:"record_cli_task_run",type:"function"}),(append:Function {name:"append_run_admission_hook_events",type:"function"}),(readiness:Class {name:"TaskRunAdmissionReadiness",type:"class"}),(readiness_command:Class {name:"TaskRunAdmissionReadinessCommand",type:"class"}),(session_start:Class {name:"TaskCliSessionStartCommand",type:"class"}),(snapshot:Class {name:"CurrentExecutionAdmissionSnapshot",type:"class"});
+//! CREATE (build_binding:Function {name:"expected_task_run_spawn_fence_binding",type:"function",language:"rust"}),(fence_matches:Function {name:"spawn_fence_matches_readiness_command",type:"function",language:"rust"}),(resource_budget:Function {name:"task_run_resource_budget",type:"function",language:"rust"}),(digest_check:Function {name:"is_lower_hex_sha256_digest",type:"function",language:"rust"}),(digest_encode:Function {name:"digest_to_lower_hex",type:"function",language:"rust"}),(fence_digest_value:Variable {name:"spawn_fence_binding_digest",type:"variable",language:"rust"}),(m)-[:USES]->(dto),(f)-[:CONTAINS]->(build_binding),(f)-[:CONTAINS]->(fence_matches),(f)-[:CONTAINS]->(resource_budget),(f)-[:CONTAINS]->(digest_check),(f)-[:CONTAINS]->(digest_encode),(f)-[:CONTAINS]->(fence_digest_value),(st)-[:CALLS]->(fence_matches),(fence_matches)-[:CALLS]->(build_binding),(build_binding)-[:CALLS]->(resource_budget),(fence_matches)-[:CALLS]->(digest_check),(record)-[:CALLS]->(digest_encode),(record)-[:CALLS]->(resource_budget),(append)-[:CALLS]->(digest_encode),(record)-[:USES]->(fence_digest_value),(append)-[:USES]->(fence_digest_value),(digest_encode)-[:USES]->(fence_digest_value),(readiness)-[:USES]->(dto),(session_start)-[:USES]->(dto),(record)-[:USES]->(dto);
 use async_trait::async_trait;
 use axum::{
     extract::{Path, Query, State},
@@ -46,9 +46,6 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Duration, Utc};
-use domain_agent::execution_profile::{
-    ExecutionCatalogRevisions, HookSetSnapshot, ResourceBudgetSnapshot,
-};
 use domain_hook::{
     evaluate as evaluate_hook, HookDecision, HookEventEnvelope, HookPhase, HookScope,
     RetentionLockState, EVENT_SCHEMA_VERSION,
@@ -57,6 +54,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Postgres, Row, Transaction};
+use star_dto::task_run::{
+    TaskRunCatalogRevisionIdentity, TaskRunHookSetIdentity, TaskRunProfileRevisionIdentity,
+    TaskRunResourceBudget, TaskRunSpawnFence,
+    TaskRunSpawnFenceBindingV1 as TaskRunSpawnFenceBinding,
+};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -124,74 +126,6 @@ pub struct TaskRunAdmissionReadiness {
     pub observed_at: DateTime<Utc>,
     /// Runtime-resident, single-consume fence bound to both launch and execution profiles.
     pub spawn_fence: Option<TaskRunSpawnFence>,
-}
-
-/// A compact immutable profile identity carried across the Runtime boundary.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct TaskRunProfileRevisionIdentity {
-    pub profile_id: Uuid,
-    pub version: u64,
-    pub content_digest: String,
-}
-
-/// Only revision facts cross the Runtime boundary; catalog entries remain Arc-backed in REST.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-pub struct TaskRunCatalogRevisionIdentity {
-    pub provider_catalog_revision: u64,
-    pub skill_catalog_revision: u64,
-    pub grant_set_id: Uuid,
-    pub grant_set_version: u64,
-}
-
-impl From<ExecutionCatalogRevisions> for TaskRunCatalogRevisionIdentity {
-    fn from(revisions: ExecutionCatalogRevisions) -> Self {
-        Self {
-            provider_catalog_revision: revisions.provider_catalog_revision,
-            skill_catalog_revision: revisions.skill_catalog_revision,
-            grant_set_id: revisions.grant_set_id,
-            grant_set_version: revisions.grant_set_version,
-        }
-    }
-}
-
-/// Exact immutable facts a Runtime fence must bind before it may create a process.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct TaskRunSpawnFenceBinding {
-    pub tenant_id: Uuid,
-    pub actor_id: Uuid,
-    pub project_id: Uuid,
-    pub repository_id: Uuid,
-    pub worktree_id: Uuid,
-    pub work_item_id: Uuid,
-    pub runtime_id: Uuid,
-    pub expected_lifecycle_version: i32,
-    pub approved_launch_profile: TaskRunProfileRevisionIdentity,
-    pub execution_profile: TaskRunProfileRevisionIdentity,
-    pub catalog_revisions: TaskRunCatalogRevisionIdentity,
-    pub hook_set: HookSetSnapshot,
-    pub resource_budget: ResourceBudgetSnapshot,
-    pub request_fingerprint: [u8; 32],
-}
-
-impl TaskRunSpawnFenceBinding {
-    /// Hash a versioned canonical serialization so Runtime storage can bind the opaque token to
-    /// this exact request and both immutable Profile revisions without copying catalog contents.
-    pub fn binding_digest(&self) -> Result<[u8; 32], serde_json::Error> {
-        let encoded = serde_json::to_vec(self)?;
-        let mut hasher = Sha256::new();
-        hasher.update(b"star.task_run_spawn_fence.v1\0");
-        hasher.update(encoded);
-        Ok(hasher.finalize().into())
-    }
-}
-
-/// Opaque one-time Runtime token with a small auditable binding, never a process grant.
-#[derive(Clone, Debug)]
-pub struct TaskRunSpawnFence {
-    pub fence_id: Uuid,
-    pub expires_at: DateTime<Utc>,
-    pub binding: TaskRunSpawnFenceBinding,
-    pub binding_digest: [u8; 32],
 }
 
 /// Current Group authorization context supplied to Local Runtime for a session operation.
@@ -949,11 +883,19 @@ fn run_admission_readiness_is_fresh(readiness: &TaskRunAdmissionReadiness) -> bo
     };
     readiness.runtime_healthy
         && !spawn_fence.fence_id.is_nil()
+        && spawn_fence.issued_at <= readiness.observed_at
+        && readiness
+            .observed_at
+            .signed_duration_since(spawn_fence.issued_at)
+            <= Duration::seconds(5)
         && spawn_fence.binding_digest == expected_binding_digest
         && readiness.observed_at <= now
         && now.signed_duration_since(readiness.observed_at) <= Duration::seconds(5)
         && spawn_fence.expires_at > now + Duration::seconds(5)
-        && spawn_fence.expires_at <= now + Duration::seconds(30)
+        && spawn_fence
+            .expires_at
+            .signed_duration_since(spawn_fence.issued_at)
+            <= Duration::seconds(30)
 }
 
 fn expected_task_run_spawn_fence_binding(
@@ -1002,16 +944,37 @@ fn expected_task_run_spawn_fence_binding(
             version: execution_profile.version,
             content_digest: execution_profile.content_digest.clone(),
         },
-        catalog_revisions: revisions.into(),
-        hook_set: snapshot.hook_set.clone(),
-        resource_budget: snapshot
-            .verified_profile
-            .document()
-            .profile
-            .resource_budget
-            .clone(),
+        catalog_revisions: TaskRunCatalogRevisionIdentity {
+            provider_catalog_revision: revisions.provider_catalog_revision,
+            skill_catalog_revision: revisions.skill_catalog_revision,
+            grant_set_id: revisions.grant_set_id,
+            grant_set_version: revisions.grant_set_version,
+        },
+        hook_set: TaskRunHookSetIdentity {
+            hook_set_id: snapshot.hook_set.hook_set_id,
+            version: snapshot.hook_set.version,
+            effective_digest: snapshot.hook_set.effective_digest.clone(),
+        },
+        resource_budget: task_run_resource_budget(
+            &snapshot.verified_profile.document().profile.resource_budget,
+        ),
         request_fingerprint: command.request_fingerprint,
     })
+}
+
+fn task_run_resource_budget(
+    budget: &domain_agent::execution_profile::ResourceBudgetSnapshot,
+) -> TaskRunResourceBudget {
+    TaskRunResourceBudget {
+        max_rss_bytes: budget.max_rss_bytes,
+        max_cpu_ms: budget.max_cpu_ms,
+        max_runtime_ms: budget.max_runtime_ms,
+        max_child_processes: budget.max_child_processes,
+        max_parallel_tools: budget.max_parallel_tools,
+        max_provider_calls: budget.max_provider_calls,
+        max_output_bytes: budget.max_output_bytes,
+        max_event_buffer_bytes: budget.max_event_buffer_bytes,
+    }
 }
 
 fn spawn_fence_matches_readiness_command(
@@ -1297,7 +1260,8 @@ async fn record_cli_task_run(
             != execution_snapshot.profile_identity.version
         || spawn_fence.binding.execution_profile.content_digest
             != execution_snapshot.profile_identity.content_digest
-        || spawn_fence.binding.resource_budget != profile_document.profile.resource_budget
+        || spawn_fence.binding.resource_budget
+            != task_run_resource_budget(&profile_document.profile.resource_budget)
     {
         return Err(GroupApiError::conflict(
             "run_admission_fence_binding_invalid",
@@ -1982,12 +1946,12 @@ mod tests {
                 grant_set_id: Uuid::new_v4(),
                 grant_set_version: 1,
             },
-            hook_set: HookSetSnapshot {
+            hook_set: TaskRunHookSetIdentity {
                 hook_set_id: Uuid::new_v4(),
                 version: 1,
                 effective_digest: "c".repeat(64),
             },
-            resource_budget: ResourceBudgetSnapshot {
+            resource_budget: TaskRunResourceBudget {
                 max_rss_bytes: 1024,
                 max_cpu_ms: 1000,
                 max_runtime_ms: 1000,
@@ -2000,12 +1964,14 @@ mod tests {
             request_fingerprint: [7; 32],
         };
         let binding_digest = binding.binding_digest().unwrap();
+        let ready_at = Utc::now();
         let valid = TaskRunAdmissionReadiness {
             runtime_healthy: true,
-            observed_at: Utc::now(),
+            observed_at: ready_at,
             spawn_fence: Some(TaskRunSpawnFence {
                 fence_id: Uuid::new_v4(),
-                expires_at: Utc::now() + Duration::seconds(20),
+                issued_at: ready_at,
+                expires_at: ready_at + Duration::seconds(20),
                 binding,
                 binding_digest,
             }),

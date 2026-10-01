@@ -10,12 +10,19 @@
 //! CREATE (m)-[:CONTAINS]->(nonce_store),(m)-[:CONTAINS]->(nonce_error),(m)-[:CONTAINS]->(consume),(m)-[:CONTAINS]->(verifier),(consume)-[:CALLS]->(prep),(consume)-[:USES]->(nonce_store),(prepare_verified)-[:CALLS]->(verify),(prepare_verified)-[:CALLS]->(consume),(signer)-[:HAS_METHOD]->(sign),(verifier_impl)-[:HAS_METHOD]->(verify),(verifier_impl)-[:IMPLEMENTS]->(verifier),(sign)-[:CALLS]->(signing_bytes),(verify)-[:CALLS]->(signing_bytes);
 //! CREATE (pty:Module {name:"pty",type:"module",language:"rust"});
 //! MATCH (m:Module {name:"task_execution",type:"module",language:"rust"}),(pty:Module {name:"pty",type:"module",language:"rust"}) CREATE (m)-[:CONTAINS]->(pty);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"task_execution",type:"module",language:"rust"}),(ctx:Class {name:"TaskExecutionContext",type:"class"}),(profile:Class {name:"ApprovedTaskLaunchProfile",type:"class"}),(prepared:Class {name:"PreparedTaskCliExecution",type:"class"}),(nonce_store:Interface {name:"TaskExecutionNonceStore",type:"trait"}),(verify:Function {name:"Ed25519TaskExecutionGrantVerifier::verify",type:"function"}),(prepare:Function {name:"prepare_task_cli_execution",type:"function"}),(registry:Class {name:"CliSessionRegistry",type:"class"});
+//! CREATE (fence:Class {name:"TaskRunSpawnFence",type:"class",language:"rust"}),(fence_binding:Class {name:"TaskRunSpawnFenceBindingV1",type:"class",language:"rust"}),(prepare_fenced:Function {name:"prepare_and_consume_verified_task_run_spawn_fence",type:"function",language:"rust"}),(validate_fence:Function {name:"validate_profile_bound_fence",type:"function",language:"rust"}),(consume_profile:Function {name:"TaskExecutionNonceStore::consume_profile_bound",type:"function",language:"rust"}),(fence_id:Variable {name:"spawn_fence_id",type:"variable",language:"rust"}),(fence_digest:Variable {name:"spawn_fence_binding_digest",type:"variable",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(prepare_fenced),(m)-[:CONTAINS]->(validate_fence),(ctx)-[:USES]->(fence),(profile)-[:USES]->(fence_binding),(prepared)-[:USES]->(fence_id),(prepared)-[:USES]->(fence_digest),(prepare_fenced)-[:CALLS]->(verify),(prepare_fenced)-[:CALLS]->(validate_fence),(prepare_fenced)-[:CALLS]->(prepare),(prepare_fenced)-[:CALLS]->(consume_profile),(validate_fence)-[:CALLS]->(fence),(validate_fence)-[:USES]->(fence_binding),(consume_profile)-[:USES]->(fence_id),(consume_profile)-[:USES]->(fence_digest),(registry)-[:IMPLEMENTS]->(nonce_store);
+//! CREATE (fence_test:Function {name:"profile_bound_fence_rejects_binding_drift_and_stale_issue_time",type:"function",language:"rust"}),(signature_test:Function {name:"profile_bound_grant_signature_covers_fence",type:"function",language:"rust"}),(legacy_test:Function {name:"legacy_grant_signing_bytes_remain_v1_when_fence_absent",type:"function",language:"rust"}),(legacy_consumer_test:Function {name:"legacy_consumer_rejects_profile_bound_grant",type:"function",language:"rust"}),(bounded_payload_test:Function {name:"signed_fence_payload_rejects_unbounded_digest_before_serialization",type:"function",language:"rust"}),(prepare_fence_mode:Function {name:"prepare_task_cli_execution_with_fence_mode",type:"function",language:"rust"}),(fence_well_formed:Function {name:"TaskRunSpawnFence::is_well_formed",type:"function",language:"rust"}),(digest_valid:Function {name:"is_lower_hex_sha256_digest",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(fence_test),(m)-[:CONTAINS]->(signature_test),(m)-[:CONTAINS]->(legacy_test),(m)-[:CONTAINS]->(legacy_consumer_test),(m)-[:CONTAINS]->(bounded_payload_test),(m)-[:CONTAINS]->(prepare_fence_mode),(m)-[:CONTAINS]->(fence_well_formed),(m)-[:CONTAINS]->(digest_valid),(fence_test)-[:CALLS]->(validate_fence),(signature_test)-[:CALLS]->(sign),(signature_test)-[:CALLS]->(verify),(legacy_test)-[:CALLS]->(signing_bytes),(legacy_consumer_test)-[:CALLS]->(consume),(bounded_payload_test)-[:CALLS]->(signing_bytes),(signing_bytes)-[:CALLS]->(fence_well_formed),(prepare)-[:CALLS]->(prepare_fence_mode),(prepare_fenced)-[:CALLS]->(prepare_fence_mode),(prepare_fence_mode)-[:CALLS]->(validate_context),(validate_context)-[:USES]->(err),(validate_fence)-[:CALLS]->(digest_valid);
 
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use ring::signature::{self, Ed25519KeyPair, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
+use star_dto::task_run::{TaskRunSpawnFence, TaskRunSpawnFenceBindingV1};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -53,6 +60,9 @@ pub struct TaskExecutionContext {
     pub expires_at: DateTime<Utc>,
     /// Unique grant nonce that the caller must consume exactly once.
     pub nonce: Uuid,
+    /// Optional C4 dual-Profile admission fence; absent only for legacy non-Run CLI grants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawn_fence: Option<TaskRunSpawnFence>,
 }
 
 /// Server-issued Task CLI grant signed over the complete immutable execution context.
@@ -198,14 +208,25 @@ pub fn grant_signing_bytes(
     key_id: &str,
     context: &TaskExecutionContext,
 ) -> Result<Vec<u8>, TaskExecutionGrantVerificationError> {
-    const DOMAIN: &[u8] = b"star.task-cli.execution-grant.v1\0";
+    if context
+        .spawn_fence
+        .as_ref()
+        .is_some_and(|fence| !fence.is_well_formed())
+    {
+        return Err(TaskExecutionGrantVerificationError::InvalidPayload);
+    }
+    let domain: &[u8] = if context.spawn_fence.is_some() {
+        b"star.task-cli.execution-grant.v2\0"
+    } else {
+        b"star.task-cli.execution-grant.v1\0"
+    };
     if !valid_grant_key_id(key_id) {
         return Err(TaskExecutionGrantVerificationError::InvalidPayload);
     }
     let serialized = serde_json::to_vec(context)
         .map_err(|_| TaskExecutionGrantVerificationError::InvalidPayload)?;
-    let mut payload = Vec::with_capacity(DOMAIN.len() + key_id.len() + 1 + serialized.len());
-    payload.extend_from_slice(DOMAIN);
+    let mut payload = Vec::with_capacity(domain.len() + key_id.len() + 1 + serialized.len());
+    payload.extend_from_slice(domain);
     payload.extend_from_slice(key_id.as_bytes());
     payload.push(0);
     payload.extend_from_slice(&serialized);
@@ -249,6 +270,8 @@ pub struct ApprovedTaskLaunchProfile {
     pub id: Uuid,
     /// Immutable profile revision.
     pub version: i64,
+    /// Lowercase SHA-256 digest of the canonical approved profile document.
+    pub content_digest: String,
     /// Absolute executable path approved by an administrator.
     pub executable: PathBuf,
     /// Fixed arguments approved by the profile; no user-supplied command text.
@@ -284,6 +307,10 @@ pub struct PreparedTaskCliExecution {
     pub policy_version: i64,
     /// Single-use grant nonce.
     pub nonce: Uuid,
+    /// In-memory Runtime fence correlation only; never persist this opaque ID in Run/BI records.
+    pub spawn_fence_id: Option<Uuid>,
+    /// Digest of the complete dual-Profile fence binding for an outcome receipt.
+    pub spawn_fence_binding_digest: Option<[u8; 32]>,
     /// Grant issue time.
     pub issued_at: DateTime<Utc>,
     /// Grant expiration time.
@@ -312,12 +339,27 @@ pub enum TaskExecutionError {
     #[error("approved launch profile is invalid")]
     /// Profile contains an invalid executable, argument, environment, or time limit.
     InvalidProfile,
+    /// Profile-bound grants must pass through the dual-fence consumer.
+    #[error("profile-bound task grant requires the spawn-fence consumer")]
+    ProfileBoundGrantRequiresFenceConsumer,
     #[error("runtime Worktree checkout could not be verified")]
     /// Runtime mount is unavailable or differs from the canonical Worktree checkout.
     InvalidCheckout,
     #[error("task execution grant nonce was already consumed")]
     /// The one-time grant nonce was already consumed by this Runtime.
     GrantReplay,
+    /// The one-time Profile-bound fence was already consumed by this Runtime.
+    #[error("task Run spawn fence was already consumed")]
+    SpawnFenceReplay,
+    /// A dual-Profile fence is required for Profile-bound Run admission.
+    #[error("task Run spawn fence is required")]
+    SpawnFenceRequired,
+    /// The fence does not match the current Runtime scope or authority state.
+    #[error("task Run spawn fence binding is invalid")]
+    SpawnFenceMismatch,
+    /// The short-lived fence is expired or outside its bounded issue window.
+    #[error("task Run spawn fence is expired")]
+    SpawnFenceExpired,
     #[error("task execution grant nonce store is unavailable")]
     /// Durable grant nonce storage could not complete the consume operation.
     NonceStoreUnavailable,
@@ -330,6 +372,8 @@ pub enum TaskExecutionNonceStoreError {
     InvalidOrExpired,
     /// A previous request already consumed this nonce.
     Replay,
+    /// A previous request already consumed this Runtime fence.
+    FenceReplay,
     /// The durable store failed and execution must not proceed.
     Unavailable,
 }
@@ -344,6 +388,20 @@ pub trait TaskExecutionNonceStore {
         expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
     ) -> Result<(), TaskExecutionNonceStoreError>;
+
+    /// Atomically consume a Profile-bound grant nonce and Runtime fence in one durable transaction.
+    /// Implementations without that boundary fail closed by default.
+    fn consume_profile_bound(
+        &self,
+        _tenant_id: Uuid,
+        _nonce: Uuid,
+        _fence_id: Uuid,
+        _binding_digest: [u8; 32],
+        _expires_at: DateTime<Utc>,
+        _now: DateTime<Utc>,
+    ) -> Result<(), TaskExecutionNonceStoreError> {
+        Err(TaskExecutionNonceStoreError::Unavailable)
+    }
 }
 
 impl TaskExecutionNonceStore for CliSessionRegistry {
@@ -362,6 +420,33 @@ impl TaskExecutionNonceStore for CliSessionRegistry {
                 }
                 _ => TaskExecutionNonceStoreError::Unavailable,
             })
+    }
+
+    fn consume_profile_bound(
+        &self,
+        tenant_id: Uuid,
+        nonce: Uuid,
+        fence_id: Uuid,
+        binding_digest: [u8; 32],
+        expires_at: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Result<(), TaskExecutionNonceStoreError> {
+        self.consume_task_run_spawn_fence(
+            tenant_id,
+            nonce,
+            fence_id,
+            binding_digest,
+            expires_at,
+            now,
+        )
+        .map_err(|error| match error {
+            CliSessionRegistryError::GrantNonceReplay => TaskExecutionNonceStoreError::Replay,
+            CliSessionRegistryError::SpawnFenceReplay => TaskExecutionNonceStoreError::FenceReplay,
+            CliSessionRegistryError::InvalidGrantNonce => {
+                TaskExecutionNonceStoreError::InvalidOrExpired
+            }
+            _ => TaskExecutionNonceStoreError::Unavailable,
+        })
     }
 }
 
@@ -382,7 +467,17 @@ pub fn prepare_task_cli_execution(
     profile: &ApprovedTaskLaunchProfile,
     now: DateTime<Utc>,
 ) -> Result<PreparedTaskCliExecution, TaskExecutionError> {
-    validate_context(context, binding, profile, now)?;
+    prepare_task_cli_execution_with_fence_mode(context, binding, profile, now, false)
+}
+
+fn prepare_task_cli_execution_with_fence_mode(
+    context: &TaskExecutionContext,
+    binding: &RuntimeWorktreeBinding,
+    profile: &ApprovedTaskLaunchProfile,
+    now: DateTime<Utc>,
+    allow_profile_bound_fence: bool,
+) -> Result<PreparedTaskCliExecution, TaskExecutionError> {
+    validate_context(context, binding, profile, now, allow_profile_bound_fence)?;
     validate_profile(profile)?;
 
     let mounted_path = canonical_directory(&binding.mounted_path)?;
@@ -408,6 +503,8 @@ pub fn prepare_task_cli_execution(
         profile_version: profile.version,
         policy_version: context.policy_version,
         nonce: context.nonce,
+        spawn_fence_id: None,
+        spawn_fence_binding_digest: None,
         issued_at: context.issued_at,
         expires_at: context.expires_at,
         command,
@@ -421,7 +518,7 @@ pub fn prepare_task_cli_execution(
 /// Validate and durably consume a short-lived Task Card CLI grant before spawn.
 ///
 /// The caller must authenticate the grant issuer/signature and recheck current ACL and Runtime
-/// health before calling. The nonce is retained as an append-only Transaction fact; any store
+/// health before calling. The nonce is retained as a short-lived replay receipt; any store
 /// failure is fail-closed. This function still does not start or supervise a process.
 pub fn prepare_and_consume_task_cli_execution(
     context: &TaskExecutionContext,
@@ -435,6 +532,7 @@ pub fn prepare_and_consume_task_cli_execution(
         .consume(context.tenant_id, context.nonce, context.expires_at, now)
         .map_err(|error| match error {
             TaskExecutionNonceStoreError::Replay => TaskExecutionError::GrantReplay,
+            TaskExecutionNonceStoreError::FenceReplay => TaskExecutionError::SpawnFenceReplay,
             TaskExecutionNonceStoreError::InvalidOrExpired => TaskExecutionError::InvalidGrant,
             TaskExecutionNonceStoreError::Unavailable => TaskExecutionError::NonceStoreUnavailable,
         })?;
@@ -458,12 +556,103 @@ pub fn prepare_and_consume_verified_task_cli_execution(
     prepare_and_consume_task_cli_execution(&context, binding, profile, now, nonce_store)
 }
 
+/// Authenticate and atomically consume the C4 dual-Profile fence immediately before a future
+/// production spawn adapter. `current_binding` must be freshly rebuilt from authoritative ACL,
+/// Profile/catalog/HookSet sources and the committed ResourceBudget; this function does not itself
+/// provide those sources or create a process.
+pub fn prepare_and_consume_verified_task_run_spawn_fence(
+    grant: &SignedTaskExecutionGrant,
+    verifier: &impl TaskExecutionGrantVerifier,
+    worktree_binding: &RuntimeWorktreeBinding,
+    profile: &ApprovedTaskLaunchProfile,
+    current_binding: &TaskRunSpawnFenceBindingV1,
+    now: DateTime<Utc>,
+    nonce_store: &impl TaskExecutionNonceStore,
+) -> Result<PreparedTaskCliExecution, TaskExecutionError> {
+    let context = verifier
+        .verify(grant)
+        .map_err(|_| TaskExecutionError::InvalidGrant)?;
+    let fence = context
+        .spawn_fence
+        .as_ref()
+        .ok_or(TaskExecutionError::SpawnFenceRequired)?;
+    validate_profile_bound_fence(&context, profile, fence, current_binding, now.clone())?;
+    let mut prepared = prepare_task_cli_execution_with_fence_mode(
+        &context,
+        worktree_binding,
+        profile,
+        now.clone(),
+        true,
+    )?;
+    let binding_digest = fence
+        .binding
+        .binding_digest()
+        .map_err(|_| TaskExecutionError::SpawnFenceMismatch)?;
+    nonce_store
+        .consume_profile_bound(
+            context.tenant_id,
+            context.nonce,
+            fence.fence_id,
+            binding_digest,
+            fence.expires_at,
+            now,
+        )
+        .map_err(|error| match error {
+            TaskExecutionNonceStoreError::Replay => TaskExecutionError::GrantReplay,
+            TaskExecutionNonceStoreError::FenceReplay => TaskExecutionError::SpawnFenceReplay,
+            TaskExecutionNonceStoreError::InvalidOrExpired => TaskExecutionError::SpawnFenceExpired,
+            TaskExecutionNonceStoreError::Unavailable => TaskExecutionError::NonceStoreUnavailable,
+        })?;
+    prepared.spawn_fence_id = Some(fence.fence_id);
+    prepared.spawn_fence_binding_digest = Some(binding_digest);
+    Ok(prepared)
+}
+
+fn validate_profile_bound_fence(
+    context: &TaskExecutionContext,
+    profile: &ApprovedTaskLaunchProfile,
+    fence: &TaskRunSpawnFence,
+    current_binding: &TaskRunSpawnFenceBindingV1,
+    now: DateTime<Utc>,
+) -> Result<(), TaskExecutionError> {
+    if fence.expires_at <= now {
+        return Err(TaskExecutionError::SpawnFenceExpired);
+    }
+    if !fence.is_valid_at(now.clone()) {
+        return Err(TaskExecutionError::SpawnFenceMismatch);
+    }
+    if &fence.binding != current_binding
+        || !current_binding.is_valid()
+        || fence.binding.tenant_id != context.tenant_id
+        || fence.binding.actor_id != context.actor_id
+        || fence.binding.project_id != context.project_id
+        || fence.binding.repository_id != context.repository_id
+        || fence.binding.worktree_id != context.worktree_id
+        || fence.binding.work_item_id != context.work_item_id
+        || fence.binding.runtime_id != context.runtime_id
+        || fence.binding.approved_launch_profile.profile_id != context.approved_launch_profile_id
+        || fence.binding.approved_launch_profile.profile_id != profile.id
+        || u64::try_from(profile.version).ok()
+            != Some(fence.binding.approved_launch_profile.version)
+        || profile.content_digest != fence.binding.approved_launch_profile.content_digest
+        || context.issued_at > fence.issued_at
+        || fence.expires_at > context.expires_at
+    {
+        return Err(TaskExecutionError::SpawnFenceMismatch);
+    }
+    Ok(())
+}
+
 fn validate_context(
     context: &TaskExecutionContext,
     binding: &RuntimeWorktreeBinding,
     profile: &ApprovedTaskLaunchProfile,
     now: DateTime<Utc>,
+    allow_profile_bound_fence: bool,
 ) -> Result<(), TaskExecutionError> {
+    if context.spawn_fence.is_some() && !allow_profile_bound_fence {
+        return Err(TaskExecutionError::ProfileBoundGrantRequiresFenceConsumer);
+    }
     let ids = [
         context.tenant_id,
         context.project_id,
@@ -502,6 +691,7 @@ fn validate_profile(profile: &ApprovedTaskLaunchProfile) -> Result<(), TaskExecu
         || profile.args.len() > MAX_ARGUMENTS
         || profile.max_runtime_seconds == 0
         || profile.max_runtime_seconds > 4 * 60 * 60
+        || !is_lower_hex_sha256_digest(&profile.content_digest)
         || profile
             .args
             .iter()
@@ -516,6 +706,13 @@ fn validate_profile(profile: &ApprovedTaskLaunchProfile) -> Result<(), TaskExecu
         return Err(TaskExecutionError::InvalidProfile);
     }
     Ok(())
+}
+
+fn is_lower_hex_sha256_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn canonical_directory(path: &std::path::Path) -> Result<PathBuf, TaskExecutionError> {
@@ -563,4 +760,296 @@ fn is_allowed_profile_env_key(key: &str) -> bool {
     ) && !parts.iter().any(|part| blocked_secret_parts.contains(part))
         && !(parts.windows(2).any(|pair| pair == ["API", "KEY"]))
         && !(parts.windows(2).any(|pair| pair == ["ACCESS", "KEY"]))
+}
+
+#[cfg(test)]
+mod profile_bound_fence_tests {
+    use super::*;
+    use chrono::TimeZone;
+    use ring::{rand::SystemRandom, signature::KeyPair};
+    use star_dto::task_run::{
+        TaskRunCatalogRevisionIdentity, TaskRunHookSetIdentity, TaskRunProfileRevisionIdentity,
+        TaskRunResourceBudget,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct NonceConsumeCounter(AtomicUsize);
+
+    impl TaskExecutionNonceStore for NonceConsumeCounter {
+        fn consume(
+            &self,
+            _tenant_id: Uuid,
+            _nonce: Uuid,
+            _expires_at: DateTime<Utc>,
+            _now: DateTime<Utc>,
+        ) -> Result<(), TaskExecutionNonceStoreError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    fn binding() -> TaskRunSpawnFenceBindingV1 {
+        TaskRunSpawnFenceBindingV1 {
+            tenant_id: Uuid::new_v4(),
+            actor_id: Uuid::new_v4(),
+            project_id: Uuid::new_v4(),
+            repository_id: Uuid::new_v4(),
+            worktree_id: Uuid::new_v4(),
+            work_item_id: Uuid::new_v4(),
+            runtime_id: Uuid::new_v4(),
+            expected_lifecycle_version: 1,
+            approved_launch_profile: TaskRunProfileRevisionIdentity {
+                profile_id: Uuid::new_v4(),
+                version: 3,
+                content_digest: "a".repeat(64),
+            },
+            execution_profile: TaskRunProfileRevisionIdentity {
+                profile_id: Uuid::new_v4(),
+                version: 7,
+                content_digest: "b".repeat(64),
+            },
+            catalog_revisions: TaskRunCatalogRevisionIdentity {
+                provider_catalog_revision: 11,
+                skill_catalog_revision: 12,
+                grant_set_id: Uuid::new_v4(),
+                grant_set_version: 13,
+            },
+            hook_set: TaskRunHookSetIdentity {
+                hook_set_id: Uuid::new_v4(),
+                version: 2,
+                effective_digest: "c".repeat(64),
+            },
+            resource_budget: TaskRunResourceBudget {
+                max_rss_bytes: 1024,
+                max_cpu_ms: 1000,
+                max_runtime_ms: 20_000,
+                max_child_processes: 1,
+                max_parallel_tools: 2,
+                max_provider_calls: 3,
+                max_output_bytes: 4096,
+                max_event_buffer_bytes: 2048,
+            },
+            request_fingerprint: [9; 32],
+        }
+    }
+
+    #[test]
+    fn profile_bound_fence_rejects_binding_drift_and_stale_issue_time() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let binding = binding();
+        let fence = TaskRunSpawnFence {
+            fence_id: Uuid::new_v4(),
+            issued_at: now,
+            expires_at: now + Duration::seconds(20),
+            binding: binding.clone(),
+            binding_digest: binding.binding_digest().unwrap(),
+        };
+        let context = TaskExecutionContext {
+            tenant_id: binding.tenant_id,
+            project_id: binding.project_id,
+            repository_id: binding.repository_id,
+            actor_id: binding.actor_id,
+            worktree_id: binding.worktree_id,
+            work_item_id: binding.work_item_id,
+            runtime_id: binding.runtime_id,
+            approved_launch_profile_id: binding.approved_launch_profile.profile_id,
+            policy_version: 1,
+            issued_at: now - Duration::seconds(1),
+            expires_at: now + Duration::seconds(60),
+            nonce: Uuid::new_v4(),
+            spawn_fence: Some(fence.clone()),
+        };
+        let profile = ApprovedTaskLaunchProfile {
+            id: binding.approved_launch_profile.profile_id,
+            version: 3,
+            content_digest: binding.approved_launch_profile.content_digest.clone(),
+            executable: PathBuf::from("C:\\runtime\\approved.exe"),
+            args: Vec::new(),
+            static_environment: HashMap::new(),
+            max_runtime_seconds: 20,
+        };
+
+        assert!(validate_profile_bound_fence(&context, &profile, &fence, &binding, now).is_ok());
+
+        let mut drifted = binding.clone();
+        drifted.request_fingerprint[0] ^= 1;
+        assert_eq!(
+            validate_profile_bound_fence(&context, &profile, &fence, &drifted, now),
+            Err(TaskExecutionError::SpawnFenceMismatch)
+        );
+        assert_eq!(
+            validate_profile_bound_fence(
+                &context,
+                &profile,
+                &fence,
+                &binding,
+                now + Duration::seconds(21)
+            ),
+            Err(TaskExecutionError::SpawnFenceExpired)
+        );
+    }
+
+    #[test]
+    fn legacy_grant_signing_bytes_remain_v1_when_fence_absent() {
+        let binding = binding();
+        let context = TaskExecutionContext {
+            tenant_id: binding.tenant_id,
+            project_id: binding.project_id,
+            repository_id: binding.repository_id,
+            actor_id: binding.actor_id,
+            worktree_id: binding.worktree_id,
+            work_item_id: binding.work_item_id,
+            runtime_id: binding.runtime_id,
+            approved_launch_profile_id: binding.approved_launch_profile.profile_id,
+            policy_version: 1,
+            issued_at: Utc.timestamp_opt(1_700_000_000, 0).single().unwrap(),
+            expires_at: Utc.timestamp_opt(1_700_000_060, 0).single().unwrap(),
+            nonce: Uuid::new_v4(),
+            spawn_fence: None,
+        };
+        let payload = grant_signing_bytes("issuer-1", &context).unwrap();
+        assert!(payload.starts_with(b"star.task-cli.execution-grant.v1\0issuer-1\0"));
+        let encoded = serde_json::to_value(&context).unwrap();
+        assert!(encoded.get("spawn_fence").is_none());
+    }
+
+    #[test]
+    fn profile_bound_grant_signature_covers_fence() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let binding = binding();
+        let fence = TaskRunSpawnFence {
+            fence_id: Uuid::new_v4(),
+            issued_at: now,
+            expires_at: now + Duration::seconds(20),
+            binding_digest: binding.binding_digest().unwrap(),
+            binding: binding.clone(),
+        };
+        let context = TaskExecutionContext {
+            tenant_id: binding.tenant_id,
+            project_id: binding.project_id,
+            repository_id: binding.repository_id,
+            actor_id: binding.actor_id,
+            worktree_id: binding.worktree_id,
+            work_item_id: binding.work_item_id,
+            runtime_id: binding.runtime_id,
+            approved_launch_profile_id: binding.approved_launch_profile.profile_id,
+            policy_version: 1,
+            issued_at: now,
+            expires_at: now + Duration::minutes(1),
+            nonce: Uuid::new_v4(),
+            spawn_fence: Some(fence),
+        };
+        let key_pair_pkcs8 = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
+        let signer =
+            Ed25519TaskExecutionGrantSigner::new("issuer-1", key_pair_pkcs8.as_ref()).unwrap();
+        let grant = signer.sign(context).unwrap();
+        let key_pair = Ed25519KeyPair::from_pkcs8(key_pair_pkcs8.as_ref()).unwrap();
+        let verifier = Ed25519TaskExecutionGrantVerifier::new(HashMap::from([(
+            "issuer-1".to_owned(),
+            key_pair.public_key().as_ref().to_vec(),
+        )]))
+        .unwrap();
+
+        assert!(verifier.verify(&grant).is_ok());
+
+        let mut tampered = grant;
+        tampered.context.spawn_fence.as_mut().unwrap().fence_id = Uuid::new_v4();
+        assert!(matches!(
+            verifier.verify(&tampered),
+            Err(TaskExecutionGrantVerificationError::InvalidSignature)
+        ));
+    }
+
+    #[test]
+    fn legacy_consumer_rejects_profile_bound_grant() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let binding = binding();
+        let fence = TaskRunSpawnFence {
+            fence_id: Uuid::new_v4(),
+            issued_at: now,
+            expires_at: now + Duration::seconds(20),
+            binding: binding.clone(),
+            binding_digest: binding.binding_digest().unwrap(),
+        };
+        let context = TaskExecutionContext {
+            tenant_id: binding.tenant_id,
+            project_id: binding.project_id,
+            repository_id: binding.repository_id,
+            actor_id: binding.actor_id,
+            worktree_id: binding.worktree_id,
+            work_item_id: binding.work_item_id,
+            runtime_id: binding.runtime_id,
+            approved_launch_profile_id: binding.approved_launch_profile.profile_id,
+            policy_version: 1,
+            issued_at: now,
+            expires_at: now + Duration::minutes(1),
+            nonce: Uuid::new_v4(),
+            spawn_fence: Some(fence),
+        };
+        let runtime_binding = RuntimeWorktreeBinding {
+            tenant_id: context.tenant_id,
+            project_id: context.project_id,
+            repository_id: context.repository_id,
+            worktree_id: context.worktree_id,
+            runtime_id: context.runtime_id,
+            mounted_path: PathBuf::from("C:\\runtime\\missing-checkout"),
+            canonical_checkout_path: PathBuf::from("C:\\runtime\\missing-checkout"),
+        };
+        let profile = ApprovedTaskLaunchProfile {
+            id: context.approved_launch_profile_id,
+            version: 3,
+            content_digest: "a".repeat(64),
+            executable: PathBuf::from("C:\\runtime\\approved.exe"),
+            args: Vec::new(),
+            static_environment: HashMap::new(),
+            max_runtime_seconds: 20,
+        };
+
+        let nonce_store = NonceConsumeCounter(AtomicUsize::new(0));
+        assert!(matches!(
+            prepare_and_consume_task_cli_execution(
+                &context,
+                &runtime_binding,
+                &profile,
+                now,
+                &nonce_store,
+            ),
+            Err(TaskExecutionError::ProfileBoundGrantRequiresFenceConsumer)
+        ));
+        assert_eq!(nonce_store.0.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn signed_fence_payload_rejects_unbounded_digest_before_serialization() {
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let mut binding = binding();
+        binding.approved_launch_profile.content_digest = "a".repeat(1_000_000);
+        let fence = TaskRunSpawnFence {
+            fence_id: Uuid::new_v4(),
+            issued_at: now,
+            expires_at: now + Duration::seconds(20),
+            binding,
+            binding_digest: [0; 32],
+        };
+        let context = TaskExecutionContext {
+            tenant_id: fence.binding.tenant_id,
+            project_id: fence.binding.project_id,
+            repository_id: fence.binding.repository_id,
+            actor_id: fence.binding.actor_id,
+            worktree_id: fence.binding.worktree_id,
+            work_item_id: fence.binding.work_item_id,
+            runtime_id: fence.binding.runtime_id,
+            approved_launch_profile_id: fence.binding.approved_launch_profile.profile_id,
+            policy_version: 1,
+            issued_at: now,
+            expires_at: now + Duration::minutes(1),
+            nonce: Uuid::new_v4(),
+            spawn_fence: Some(fence),
+        };
+
+        assert_eq!(
+            grant_signing_bytes("issuer-1", &context),
+            Err(TaskExecutionGrantVerificationError::InvalidPayload)
+        );
+    }
 }
