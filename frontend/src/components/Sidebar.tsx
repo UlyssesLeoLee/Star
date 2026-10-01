@@ -23,6 +23,7 @@ import {
 } from "@/lib/nav/subNavRegistry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 import { ProjectWorktreeIndexLink } from "@/components/worktree-shared/ProjectWorktreeIndexLink";
+import { ProjectRunTree } from "@/components/run/ProjectRunTree";
 
 // =====================================================================
 // Sidebar — 折叠 + scope toggle 双模态侧栏
@@ -228,6 +229,7 @@ export function Sidebar() {
         )}
         aria-label={sidebarScope === "project" ? "Project Navigation" : "Main Navigation"}
       >
+        <ProjectRunTree collapsed={isCollapsed} />
         {sidebarScope === "project" ? (
           <>
             {isProjectWorkspacePath && subNavGroup && (
