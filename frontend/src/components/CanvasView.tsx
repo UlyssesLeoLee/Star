@@ -330,17 +330,81 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       case "agent_cursor": {
         const ag = agentSessions.find((a) => a.id === el.content.agent_session_id);
         if (!ag) return null;
+        // 像素风机器人 (per 2026-09-06 12:34 JST 用户发令)
+        // 32x32 内部 pixel grid, 用 SVG <rect> 绘制保证缩放清晰
+        // 状态色码: running/active → LED 绿, paused/awaiting → LED 黄, failed/cancelled → LED 红 + 报警底色
+        const ledColor =
+          ag.status === "failed" || ag.status === "cancelled" ? "#ff4757"
+          : ag.status === "paused" || ag.status === "awaiting_feedback" || ag.status === "awaiting_human" || ag.status === "awaiting_tool" ? "#fbbf24"
+          : ag.status === "completed" ? "#94a3b8"
+          : "#51cf66";
+        const bodyColor =
+          ag.agent_kind === "claude-sonnet" ? "#a78bfa"
+          : ag.agent_kind === "gpt-4o" ? "#10b981"
+          : ag.agent_kind === "codex" ? "#22d3ee"
+          : "#3b5bdb";
+        const bodyDark =
+          ag.agent_kind === "claude-sonnet" ? "#7c3aed"
+          : ag.agent_kind === "gpt-4o" ? "#047857"
+          : ag.agent_kind === "codex" ? "#0e7490"
+          : "#1c2e6e";
+        const isAlert = ag.status === "failed" || ag.status === "cancelled";
+        const cellSize = Math.max(2, Math.floor(Math.min(w, h) / 36));
+        const gridSize = 32; // 32x32 pixel grid
+        const gridOriginX = (w - cellSize * gridSize) / 2;
+        const gridOriginY = (h - cellSize * gridSize) / 2;
+        // 简化像素精灵 (16x16 镜像即可, 32x32 是放大后的)
+        // 0 = 透明, 1 = outline, 2 = body, 3 = bodyDark, 4 = bodyLight, 5 = LED
+        // 16x16 像素精灵 (0=透明, 1=外框, 2=身体, 3=身体暗, 4=身体亮, 5=LED)
+        // 造型: 双天线 + 头部-眼带 + 躯干-胸灯 + 腰甲 + 双脚
+        const sprite: number[][] = [
+          [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+          [0,0,0,0,1,2,2,1,2,2,1,0,0,0,0,0],
+          [0,0,0,0,1,2,5,1,5,2,1,0,0,0,0,0],
+          [0,0,0,0,1,2,2,2,2,2,1,0,0,0,0,0],
+          [0,0,0,0,1,2,5,5,5,2,1,0,0,0,0,0],
+          [0,0,0,0,1,2,5,2,5,2,1,0,0,0,0,0],
+          [0,1,1,1,1,2,2,2,2,2,1,1,1,1,0,0],
+          [1,2,2,1,2,2,2,2,2,2,2,1,2,2,1,0],
+          [1,2,4,1,2,4,4,2,4,4,2,1,4,2,1,0],
+          [1,2,2,2,2,2,2,5,2,2,2,2,2,2,1,0],
+          [1,2,2,2,2,2,2,2,2,2,2,2,2,2,1,0],
+          [1,2,2,2,2,1,2,2,2,1,2,2,2,2,1,0],
+          [0,1,2,2,2,1,1,2,1,1,2,2,2,1,0,0],
+          [0,1,2,2,1,0,1,2,1,0,1,2,2,1,0,0],
+          [0,0,1,1,0,0,1,2,1,0,0,1,1,0,0,0],
+          [0,0,1,1,0,0,1,1,1,0,0,1,1,0,0,0],
+        ];
+        const colorFor = (cell: number): string | null => {
+          switch (cell) {
+            case 1: return "#0a0e1a";
+            case 2: return bodyColor;
+            case 3: return bodyDark;
+            case 4: return "#748ffc";
+            case 5: return ledColor;
+            default: return null;
+          }
+        };
+        const spriteRectX = gridOriginX;
+        const spriteRectY = gridOriginY;
+        const spriteCell = cellSize * 2; // 16 cols * cellSize*2 = gridSize
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
-            <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2 - 2} fill="#1f6feb33" stroke="#2f81f7" strokeWidth={strokeWidth} />
-            <text x={w / 2} y={h / 2 - 4} textAnchor="middle" fontSize={10 * viewport.zoom} fill="#79c0ff" fontFamily="ui-monospace, monospace">
-              {ag.id}
-            </text>
-            <text x={w / 2} y={h / 2 + 10} textAnchor="middle" fontSize={8 * viewport.zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
-              {ag.agent_kind}
-            </text>
-            <text x={w / 2} y={h / 2 + 24} textAnchor="middle" fontSize={9 * viewport.zoom} fill="#3fb950" fontFamily="ui-monospace, monospace">
-              {ag.status}
+            {isAlert && <rect x={0} y={0} width={w} height={h} fill="#ff475722" rx={6} />}
+            {/* 阴影 */}
+            <ellipse cx={w / 2} cy={h - 4} rx={w / 2 - 6} ry={3} fill="rgba(0,0,0,0.25)" />
+            {/* 像素精灵 */}
+            <g transform={`translate(${spriteRectX}, ${spriteRectY}) scale(${spriteCell / 16})`} shapeRendering="crispEdges">
+              {sprite.map((row, y) =>
+                row.map((cell, x) => {
+                  const c = colorFor(cell);
+                  return c ? <rect key={`px-${x}-${y}`} x={x} y={y} width={1} height={1} fill={c} /> : null;
+                }),
+              )}
+            </g>
+            {/* name label */}
+            <text x={w / 2} y={h - Math.max(8, cellSize * 2)} textAnchor="middle" fontSize={Math.max(8, cellSize * 1.2)} fill="#e6edf3" fontFamily="ui-monospace, monospace" style={{ paintOrder: "stroke", stroke: "#0b0d10", strokeWidth: 2 }}>
+              {ag.name}
             </text>
           </g>
         );
