@@ -117,6 +117,8 @@ export const zhCN: Dictionary = {
     recentCounter: "· {count} recent",
     ariaLabel: "Command bar",
     closeAria: "Close command bar (Esc)",
+    hitSuffix: "命中",
+    filterAll: "全部",
   },
   pageHeader: {
     trackPill: "Track {track}",

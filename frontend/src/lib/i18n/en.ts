@@ -107,6 +107,8 @@ export const en: Dictionary = {
     recentCounter: "· {count} recent",
     ariaLabel: "Command bar",
     closeAria: "Close command bar (Esc)",
+    hitSuffix: "hits",
+    filterAll: "All",
   },
   pageHeader: {
     trackPill: "Track {track}",
