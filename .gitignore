@@ -151,3 +151,5 @@ coverage-*/
 /start-canvas-game.bat
 /启动*.bat
 /deploy/_local_*
+# Disposable Engineering Run directory compiler/DDL verification artifacts.
+/.cache/engineering-run-directory/

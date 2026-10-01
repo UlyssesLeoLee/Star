@@ -1109,6 +1109,14 @@ print(f"err_count={result.stderr.count('error[')}")
 
 ------
 
+### 4.36 Engineering Run directory foundation（2026-10-02）
+
+| 任务 | 档位 | 自动化 | 结果边界 |
+|---|---|---|---|
+| ERUN-P1 persisted directory / RunContext / lazy navigation | [P] | `scripts/automation/engineering_run_directory.py`；schema/nav/API review briefs 通过 dispatcher.brief 落地，native collaboration agents 在各自只读/独立写 worktree 工作 | `--rust` 定向 all-targets compile，默认 locked；`--allow-lock-resolution` 显式临时解析后恢复原lock；`--frontend` typecheck；`--postgres-ddl` 仅新建/停止/清理自有 loopback 临时集群，重复DDL和八表FORCE RLS catalog验证；不接受生产DB URL，不执行tests或生产migration |
+
+脚本以文件重定向后台 launcher 日志，避免 Windows server 继承 pipe 导致等待不结束；进程隐藏启动，停止成功后才清理经解析验证的自有目录。旧 Worktree migration 缺外部 `audit_trigger_func`，DDL sandbox明确使用 stand-in；不提供旧 Audit、真实角色RLS、目录写工作流、EXPLAIN或产品运行证据。首次临时集群已停止，目录删除被自动审批以 blocked by policy 拒绝，保留未重试。完整证据与缺口见 `PHASE-ERUN-DIRECTORY-P1-REPORT.md` 与实施计划 §6.67。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
