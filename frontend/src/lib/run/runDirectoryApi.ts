@@ -2,7 +2,10 @@
 CREATE (f:File {name:"frontend/src/lib/run/runDirectoryApi.ts",type:"file",language:"typescript"}),
  (error:Class {name:"RunDirectoryError",type:"class"}),(client:Class {name:"RunDirectoryApiClient",type:"class"}),
  (errorCtor:Function {name:"RunDirectoryError.constructor",type:"function"}),(token:Function {name:"readAccessToken",type:"function"}),
- (tokenCancel:Function {name:"cancelTokenLookup",type:"function"}),(tokenProvider:Function {name:"RunAccessTokenProvider",type:"function"}),
+ (stage:Function {name:"awaitAbortable",type:"function"}),(stageCancel:Function {name:"cancelRequestStage",type:"function"}),(bodyCancel:Function {name:"cancelResponseBody",type:"function"}),(tokenProvider:Function {name:"RunAccessTokenProvider",type:"function"}),
+ (expire:Function {name:"expireRunDirectoryRequest",type:"function"}),(setTimer:Function {name:"setTimeout",type:"function"}),(clearTimer:Function {name:"clearTimeout",type:"function"}),
+ (controllerAbort:Function {name:"AbortController.abort",type:"function"}),(readerCancel:Function {name:"ReadableStreamDefaultReader.cancel",type:"function"}),(readerRead:Function {name:"ReadableStreamDefaultReader.read",type:"function"}),(readerRelease:Function {name:"ReadableStreamDefaultReader.releaseLock",type:"function"}),
+ (deadline:Variable {name:"deadlineTimer",type:"variable"}),(timedOut:Variable {name:"timedOut",type:"variable"}),(timeout:Variable {name:"RUN_DIRECTORY_REQUEST_TIMEOUT_MS",type:"variable"}),
  (uuidPattern:Variable {name:"UUID",type:"variable"}),(responseLimit:Variable {name:"MAX_RESPONSE_BYTES",type:"variable"}),(pageSize:Variable {name:"RUN_DIRECTORY_PAGE_SIZE",type:"variable"}),
  (project:Class {name:"AuthorizedRunProject",type:"class"}),(branch:Class {name:"CloudBranch",type:"class"}),
  (run:Class {name:"EngineeringRun",type:"class"}),(wt:Class {name:"RunWorktree",type:"class"}),
@@ -20,7 +23,11 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryApi.ts",type:"file",langu
  (wtMap:Function {name:"mapWorktree",type:"function"}),(grantMap:Function {name:"mapAuthorization",type:"function"}),(contextMap:Function {name:"mapRunContext",type:"function"}),
  (pageMap:Function {name:"mapPage",type:"function"}),(query:Function {name:"pageQuery",type:"function"}),(origin:Function {name:"trustedBaseUrl",type:"function"}),
  (json:Function {name:"readBoundedJson",type:"function"}),(abort:Function {name:"aborted",type:"function"}),(href:Function {name:"canonicalRunWorktreeHref",type:"function"}),
- (f)-[:CONTAINS]->(error),(error)-[:HAS_METHOD]->(errorCtor),(f)-[:CONTAINS]->(token),(token)-[:CONTAINS]->(tokenCancel),(token)-[:CALLS]->(tokenProvider),(tokenCancel)-[:CALLS]->(abort),(request)-[:CALLS]->(token),
+ (f)-[:CONTAINS]->(error),(error)-[:HAS_METHOD]->(errorCtor),(f)-[:CONTAINS]->(token),(f)-[:CONTAINS]->(stage),(stage)-[:CONTAINS]->(stageCancel),(json)-[:CONTAINS]->(bodyCancel),(stageCancel)-[:CALLS]->(abort),
+ (token)-[:CALLS]->(stage),(token)-[:CALLS]->(tokenProvider),(json)-[:CALLS]->(stage),(json)-[:CALLS]->(bodyCancel),(request)-[:CALLS]->(stage),(request)-[:CALLS]->(token),
+ (f)-[:CONTAINS]->(timeout),(request)-[:CONTAINS]->(deadline),(request)-[:CONTAINS]->(timedOut),(request)-[:CONTAINS]->(expire),
+ (request)-[:CALLS]->(setTimer),(request)-[:CALLS]->(clearTimer),(request)-[:USES]->(deadline),(request)-[:USES]->(timedOut),(request)-[:USES]->(timeout),(expire)-[:USES]->(timedOut),
+ (expire)-[:CALLS]->(controllerAbort),(dispose)-[:CALLS]->(controllerAbort),(bodyCancel)-[:CALLS]->(readerCancel),(json)-[:CALLS]->(readerRead),(json)-[:CALLS]->(readerRelease),
  (f)-[:CONTAINS]->(uuidPattern),(f)-[:CONTAINS]->(responseLimit),(f)-[:CONTAINS]->(pageSize),(id)-[:USES]->(uuidPattern),(json)-[:USES]->(responseLimit),(pageMap)-[:USES]->(pageSize),(query)-[:USES]->(pageSize),
  (f)-[:CONTAINS]->(client),(f)-[:CONTAINS]->(project),(f)-[:CONTAINS]->(branch),(f)-[:CONTAINS]->(run),(f)-[:CONTAINS]->(wt),(f)-[:CONTAINS]->(grant),(f)-[:CONTAINS]->(context),(f)-[:CONTAINS]->(page),(f)-[:CONTAINS]->(options),
  (f)-[:CONTAINS]->(record),(f)-[:CONTAINS]->(text),(f)-[:CONTAINS]->(id),(f)-[:CONTAINS]->(nullable),(f)-[:CONTAINS]->(version),(f)-[:CONTAINS]->(boolean),(f)-[:CONTAINS]->(projectMap),(f)-[:CONTAINS]->(branchMap),(f)-[:CONTAINS]->(runMap),(f)-[:CONTAINS]->(wtMap),(f)-[:CONTAINS]->(grantMap),(f)-[:CONTAINS]->(contextMap),(f)-[:CONTAINS]->(pageMap),(f)-[:CONTAINS]->(query),(f)-[:CONTAINS]->(origin),(f)-[:CONTAINS]->(json),(f)-[:CONTAINS]->(abort),(f)-[:CONTAINS]->(href),
@@ -72,6 +79,7 @@ export interface RunDirectoryClientOptions {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_RESPONSE_BYTES = 512 * 1024;
 export const RUN_DIRECTORY_PAGE_SIZE = 50;
+export const RUN_DIRECTORY_REQUEST_TIMEOUT_MS = 15_000;
 
 export class RunDirectoryError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) {
@@ -199,32 +207,48 @@ function trustedBaseUrl(baseUrl: string, trustedOrigins: readonly string[]): str
   }
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
 }
-async function readBoundedJson(response: Response): Promise<unknown> {
+async function readBoundedJson(response: Response, signal: AbortSignal): Promise<unknown> {
   if (!response.body) throw new RunDirectoryError(0, "invalid_projection", "目录响应为空。");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let bytes = 0;
   let text = "";
+  let complete = false;
+  const cancel = function cancelResponseBody() { void reader.cancel().catch(() => undefined); };
+  signal.addEventListener("abort", cancel, { once: true });
   try {
     while (true) {
-      const chunk = await reader.read();
+      const chunk = await awaitAbortable(() => reader.read(), signal);
       if (chunk.done) break;
       bytes += chunk.value.byteLength;
-      if (bytes > MAX_RESPONSE_BYTES) { await reader.cancel(); throw new RunDirectoryError(0, "response_limit", "目录响应超过资源上限。"); }
+      if (bytes > MAX_RESPONSE_BYTES) throw new RunDirectoryError(0, "response_limit", "目录响应超过资源上限。");
       text += decoder.decode(chunk.value, { stream: true });
     }
+    complete = true;
     return JSON.parse(text + decoder.decode()) as unknown;
-  } finally { reader.releaseLock(); }
+  } finally {
+    signal.removeEventListener("abort", cancel);
+    if (!complete) cancel();
+    reader.releaseLock();
+  }
 }
 function aborted(): DOMException { return new DOMException("Run Directory request cancelled", "AbortError"); }
-function readAccessToken(provider: RunAccessTokenProvider, signal: AbortSignal): Promise<string | null> {
+/** Release the request slot even if a trusted host operation ignores AbortSignal. */
+function awaitAbortable<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(aborted());
   return new Promise((resolve, reject) => {
-    const cancel = function cancelTokenLookup() { reject(aborted()); };
+    const cancel = function cancelRequestStage() { signal.removeEventListener("abort", cancel); reject(aborted()); };
     signal.addEventListener("abort", cancel, { once: true });
-    Promise.resolve().then(() => signal.aborted ? null : provider()).then(resolve, reject).finally(() => signal.removeEventListener("abort", cancel));
+    Promise.resolve().then(() => {
+      if (signal.aborted) throw aborted();
+      return operation();
+    }).then((result) => {
+      signal.removeEventListener("abort", cancel);
+      if (signal.aborted) reject(aborted()); else resolve(result);
+    }, (error: unknown) => { signal.removeEventListener("abort", cancel); reject(error); });
   });
 }
+function readAccessToken(provider: RunAccessTokenProvider, signal: AbortSignal): Promise<string | null> { return awaitAbortable(provider, signal); }
 
 export class RunDirectoryApiClient {
   private readonly baseUrl: string;
@@ -259,6 +283,10 @@ export class RunDirectoryApiClient {
     const cancel = () => controller.abort();
     const signals = signal ? [signal, this.lifetime.signal] : [this.lifetime.signal];
     for (const source of signals) { source.addEventListener("abort", cancel, { once: true }); if (source.aborted) cancel(); }
+    let timedOut = false;
+    const deadlineTimer = setTimeout(function expireRunDirectoryRequest() {
+      if (!controller.signal.aborted) { timedOut = true; controller.abort(); }
+    }, RUN_DIRECTORY_REQUEST_TIMEOUT_MS);
     let acquired = false;
     try {
       await this.acquire(controller.signal);
@@ -269,19 +297,23 @@ export class RunDirectoryApiClient {
         this.dispose(); this.options.onAuthorizationError?.();
         throw new RunDirectoryError(401, "session_required", "需要宿主提供已认证的用户会话。");
       }
-      const response = await (this.options.fetcher ?? fetch)(`${this.baseUrl}${path}`, {
+      const response = await awaitAbortable(() => (this.options.fetcher ?? fetch)(`${this.baseUrl}${path}`, {
         headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
         credentials: "omit", cache: "no-store", redirect: "error", signal: controller.signal,
-      });
+      }), controller.signal);
       if (response.status === 401 || response.status === 403) {
         this.dispose(); this.options.onAuthorizationError?.();
         throw new RunDirectoryError(response.status, "authorization_failed", "会话或授权已失效，请重新连接宿主会话。");
       }
       if (!response.ok) throw new RunDirectoryError(response.status, "directory_unavailable", "授权目录暂时不可用，请重试。");
-      const result = await readBoundedJson(response);
+      const result = await readBoundedJson(response, controller.signal);
       if (controller.signal.aborted) throw aborted();
       return result;
+    } catch (error) {
+      if (timedOut) throw new RunDirectoryError(0, "request_timeout", "目录请求超过 15 秒，请重试。");
+      throw error;
     } finally {
+      clearTimeout(deadlineTimer);
       for (const source of signals) source.removeEventListener("abort", cancel);
       if (acquired) this.release();
     }
