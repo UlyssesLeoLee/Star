@@ -65,8 +65,8 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   return <section data-testid="engineering-run-workspace" data-engineering-run-id={runId} data-focus-worktree-id={worktreeId} className="flex min-h-[calc(100vh-4rem)] flex-col p-4 md:p-6">
     <header className="border-b border-line pb-4">
       <p className="break-all text-xs text-ink-mute">Project {projectId} / 云端 Branch {envelope.branch.name} / Engineering Run / Worktree</p>
-      <h1 className="mt-2 text-xl font-semibold">{envelope.engineering_run.title}</h1>
-      <p className="mt-1 text-sm">Checkout 焦点：<strong>{focus.name}</strong> · {focus.machine_state}{focus.archived && " · 已归档"}</p>
+      <h1 className="mt-2 break-words text-xl font-semibold">{envelope.engineering_run.title}</h1>
+      <p className="mt-1 break-words text-sm">Checkout 焦点：<strong>{focus.name}</strong> · {focus.machine_state}{focus.archived && " · 已归档"}</p>
       <p className="mt-2 text-xs text-ink-mute">协作、任务、Canvas、Workflow、分析与插件的工作区属于此 Engineering Run。Worktree 提供本地 checkout 焦点。</p>
     </header>
     <div role="tablist" aria-label="Engineering Run Apps" className="mt-4 flex flex-wrap gap-2">

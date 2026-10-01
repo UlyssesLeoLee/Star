@@ -24,6 +24,7 @@ import {
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 import { ProjectWorktreeIndexLink } from "@/components/worktree-shared/ProjectWorktreeIndexLink";
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
+import { useRunDirectory } from "@/lib/run/runDirectorySession";
 
 // =====================================================================
 // Sidebar — 折叠 + scope toggle 双模态侧栏
@@ -61,6 +62,8 @@ export function Sidebar() {
   const toggleSidebarFold = useNavStore((s) => s.toggleSidebarFold);
   const setSidebarFold = useNavStore((s) => s.setSidebarFold);
   const selectedProjectId = useNavStore((s) => s.selectedProjectId);
+  const { focus: runFocus } = useRunDirectory();
+  const projectIndexHint = runFocus?.run_context.project_id ?? selectedProjectId;
 
   useEffect(() => setMounted(true), []);
 
@@ -92,8 +95,8 @@ export function Sidebar() {
     [subNavGroup, searchString]
   );
   // Project scope stays available in the Project workspace and the Project Worktree Index.
-  // The stored project ID is only a route hint; the destination reloads the authorized directory.
-  const hasSelectedProject = selectedProjectId.trim().length > 0;
+  // A validated Run focus supplies the route hint; the Index still reloads its authorized directory.
+  const hasSelectedProject = projectIndexHint.trim().length > 0;
   const isProjectWorkspacePath = pathname === "/projects" || pathname.startsWith("/projects/");
   const isProjectWorktreePath = pathname === "/worktree" || pathname.startsWith("/worktree/");
   const isProjectScopeAvailable =
@@ -241,7 +244,7 @@ export function Sidebar() {
             )}
             {(isProjectWorkspacePath || hasSelectedProject || isProjectWorktreePath) && (
               <ProjectWorktreeIndexLink
-                projectId={selectedProjectId}
+                projectId={projectIndexHint}
                 active={pathname === "/worktree"}
                 collapsed={isCollapsed}
               />
