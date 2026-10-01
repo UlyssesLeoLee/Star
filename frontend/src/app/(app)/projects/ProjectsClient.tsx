@@ -65,6 +65,7 @@ import { CalendarLegend } from "@/components/calendar/CalendarLegend";
 import { buildEvents } from "@/components/calendar/events";
 import {
   FolderTree,
+  FolderPlus,
   LayoutDashboard,
   SquareKanban,
   SquareChartGantt,
@@ -81,6 +82,7 @@ import type {
 } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 import { CelCard3D } from "@/components/effects/CelCard3D";
+import { CreateProjectDialog } from "@/components/project/CreateProjectDialog";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
@@ -91,8 +93,8 @@ const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode
   { id: "worktrees", label: "Worktrees", icon: <GitBranch size={12} /> },
 ];
 
-// Kanban 4 列 (per W1 KANBAN_COLUMNS, 内联避免循环 import)
-const KANBAN_COLUMNS: WorkItemStatus[] = ["todo", "in_progress", "review", "done"];
+// Kanban 5 列 (per KANBAN_COLUMNS in mocks/data/kanban.ts, blocked 状态列入主面板 — Multica 阻塞语义)
+const KANBAN_COLUMNS: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done"];
 
 // ---- 角色 mock 推导 (per 已知缺口 #4) ----
 // member_count >= 5 → project_admin, 1-4 → developer, 0 → viewer
@@ -170,6 +172,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
     }
   }, []);
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -443,6 +446,27 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         icon={<FolderTree className="text-accent" size={20} />}
         track="D"
         count={`${projects.length} projects`}
+        actions={
+          <button
+            type="button"
+            onClick={() => setCreateDialogOpen(true)}
+            className="btn-primary flex items-center gap-1.5 text-xs shadow-[0_0_12px_rgba(0,240,255,0.35)]"
+            data-testid="open-create-project-button"
+            aria-label="新規プロジェクト作成"
+          >
+            <FolderPlus size={14} />
+            <span className="font-semibold">+ 新建项目</span>
+          </button>
+        }
+      />
+
+      {/* 新建项目对话框 (默认 IPA V字モデル 12 工程, 全部字段有初始值) */}
+      <CreateProjectDialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreated={(project) => {
+          setSelectedProjectIdInStore(project.id);
+        }}
       />
 
       {/* ---- Project switcher (顶部, sticky) ---- */}
