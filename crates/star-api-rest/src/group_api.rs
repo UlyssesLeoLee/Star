@@ -66,6 +66,7 @@
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (s:Class {name:"GroupApiState",type:"class"}),(available:Function {name:"GroupApiState::run_admission_producer_available",type:"function"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
 //! CREATE (profileCapability:Function {name:"TaskCliSessionProvisioner::supports_profile_bound_run_admission",type:"function",language:"rust"}),(p)-[:HAS_METHOD]->(profileCapability),(available)-[:CALLS]->(profileCapability);
+//! CREATE (catalogCapability:Function {name:"TaskCliSessionProvisioner::supports_current_execution_catalogs",type:"function",language:"rust"}),(p)-[:HAS_METHOD]->(catalogCapability),(available)-[:CALLS]->(catalogCapability);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
 //! CREATE (ep:Module {name:"execution_profiles",type:"module",language:"rust"}),(epr:Function {name:"execution_profiles::router",type:"function",language:"rust"});
@@ -74,6 +75,8 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
 //! CREATE (epa:Module {name:"execution_profile_admin",type:"module",language:"rust"}),(epar:Function {name:"execution_profile_admin::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(epa),(b)-[:CALLS]->(epar);
+//! CREATE (ec:Module {name:"execution_catalogs",type:"module",language:"rust"}),(ecLoad:Function {name:"execution_catalogs::load_current_execution_admission_snapshot",type:"function",language:"rust"}),(ecRecheck:Function {name:"execution_catalogs::recheck_current_execution_admission_snapshot",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(ec),(ecLoad)-[:CALLS]->(ecRecheck);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -84,22 +87,23 @@ pub use worktree_lifecycle::{
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{FromRef, Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::auth::{AuthUser, JwtConfig, oauth::AuthenticatedUser};
+use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
 mod canvas;
 mod cli_sessions;
+mod execution_catalogs;
 mod execution_profile_admin;
 mod execution_profiles;
 mod group_apps;
@@ -116,6 +120,7 @@ pub use cli_sessions::{
     TaskCliSessionProvisioner, TaskCliSessionReceipt, TaskCliSessionStartCommand,
     TaskCliSessionState, TaskCliSessionStatus,
 };
+pub use execution_catalogs::CurrentExecutionAdmissionSnapshot;
 pub use group_apps::{
     GroupAppNavigationEntry, GroupAppRegistryError, GroupAppRegistryProvider,
     GroupAppRegistryQuery, GroupAppRegistrySnapshot, PgGroupAppRegistryProvider,
@@ -318,6 +323,7 @@ impl GroupApiState {
             .as_ref()
             .is_some_and(|provisioner| {
                 provisioner.supports_run_admission()
+                    && provisioner.supports_current_execution_catalogs()
                     && provisioner.supports_profile_bound_run_admission()
             })
     }

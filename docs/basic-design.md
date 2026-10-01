@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.30 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.34
+> **文档版本**: v5.33 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.37
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.31》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.37》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4639,7 +4639,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 | PAR-001..004 | §16.15 分层调度、quota、claims、coordinator event | AC-PAR-001..003 | Phase 9 |
 | PERF-001..004 | §16.15 Rust desktop memory/render/cache/plugin budget | AC-PERF-001..003 | Phase 12 |
 | Pi inspiration (no runtime dependency) | §16.15 Rust Agent core / branch history / compaction | AC-PAR / AC-AEC | Phase 9 / 12 |
-| LOOP-001..005 / AEC-001..014 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read/lifecycle 与 CLI Profile identity binding | AC-LOOP-001..006 / AC-AEC-001..015 | Phase 9-11 |
+| LOOP-001..005 / AEC-001..016 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read/lifecycle、CLI Profile identity binding 与 current catalog fence | AC-LOOP-001..006 / AC-AEC-001..016 | Phase 9-11 |
 | HOOK-001..007 | §16.17 Rust-native Hook Engine、Advanced Settings Hooks tab、Worktree enforcement 与 BI | AC-HOOK-001..006 | Phase 9-12 |
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
@@ -4694,10 +4694,20 @@ Group Hook policy loader 在调用方授权的事务中以 `FOR SHARE` 锁定 cu
 
 #### Phase 9E-4B4 Task Card CLI 的 Profile identity 分离
 
-Task Card 的 `approved_launch_profile_id` 属于 Local Runtime 命令启动授权，约束 executable、argv、environment 与工作目录；Agent `execution_profile_id` 属于多代理执行栈，固定 Agent/Memory/Skill/Context/Validation/Loop/HookSet/grant/resource budget。两个 ID 即使由同一 UI 选择也必须独立持久化、授权、版本化和审计，不能互相映射。当前 CLI start DTO 与 UI 已传递显式 Agent Execution Profile ID，request fingerprint 只在选定时使用带版本标记的编码，缺字段的历史重放保留原编码；Run insert 仍只存 HookSet，尚未写入 Agent Execution Profile ID 或 `execution_profile_snapshot`。9E-1/2 verifier/resolver 尚未接入该 Run writer，当前 Provider/Skill/Grant 也没有供 admission 使用的权威持久化目录 adapter。新 Run admission 还要求 provisioner 显式打开 Profile-bound capability，该能力默认 false，因此当前切片不能创建或启动新 Run。
+Task Card 的 `approved_launch_profile_id` 属于 Local Runtime 命令启动授权，约束 executable、argv、environment 与工作目录；Agent `execution_profile_id` 属于多代理执行栈，固定 Agent/Memory/Skill/Context/Validation/Loop/HookSet/grant/resource budget。两个 ID 即使由同一 UI 选择也必须独立持久化、授权、版本化和审计，不能互相映射。当前 CLI start DTO 与 UI 已传递显式 Agent Execution Profile ID，request fingerprint 只在选定时使用带版本标记的编码，缺字段的历史重放保留原编码；Run insert 仍只存 HookSet，尚未写入 Agent Execution Profile ID 或 `execution_profile_snapshot`。9E-1/2 verifier/resolver 尚未接入该 Run writer，Phase 9E-4C2 已加入权威 schema、Profile-scoped SQL read/recheck 与 Arc snapshot seam；catalog publisher、生产数据装载和 Run snapshot writer 仍未完成。新 Run admission 还要求 provisioner 显式打开 Profile-bound capability，该能力默认 false，因此当前切片不能创建或启动新 Run。
 
-后续实现拆为四个有序门：9E-4C1 增加独立 Profile 选择与版本化幂等指纹，同时保持既有 Run replay；9E-4C2 接入有界且权威的 Provider/Skill/Grant catalog 与当前 Worktree 状态，锁外读取后用短时版本 fence 在最终事务校验；9E-4C3 在一个受控短事务内重授权、锁定并复读 Profile/Task/HookSet/occurrence，执行 Rust resolver，并原子写 Run 自包含 Profile/Task/acceptance/Hook snapshot、Hook ledger、共享 event_id RunEvent 与资源 reservation；9E-4C4 让一次性 Runtime spawn fence 同时绑定并消费 Approved Launch Profile 与 Agent Execution Profile ID/version/digest，Runtime 在进程启动前复核 ACL、预算与完整 scope。任一门未就绪时不创建新 Run、不 spawn、不对 BI 计为成功；历史 Run 维持可读，旧 idempotency 指纹通过明确版本兼容。此划分避免在 DB row lock 内等待 CLI/provider 网络，并将 65 KiB Profile、Provider 256 项、Skill 4096 项的上限沿用至并发 admission。
-Phase 9E-4C1 已实现选择器、API identity 输入和指纹兼容；这只关闭选择/请求子门，不等于 Profile-bound Run producer 已启用。9E-4C2 接入有界且权威的 Provider/Skill/Grant catalog 与当前 Worktree 状态，锁外读取后用短时版本 fence 在最终事务校验；9E-4C3 在一个受控短事务内重授权、锁定并复读 Profile/Task/HookSet/occurrence，执行 Rust resolver，并原子写 Run 自包含 Profile/Task/acceptance/Hook snapshot、Hook ledger、共享 event_id RunEvent 与资源 reservation；9E-4C4 让一次性 Runtime spawn fence 同时绑定并消费 Approved Launch Profile 与 Agent Execution Profile ID/version/digest，Runtime 在进程启动前复核 ACL、预算与完整 scope。任一门未就绪时不创建新 Run、不 spawn、不对 BI 计为成功；历史 Run 维持可读，旧 idempotency 指纹通过明确版本兼容。此划分避免在 DB row lock 内等待 CLI/provider 网络，并将 65 KiB Profile、Provider 256 项、Skill 4096 项的上限沿用至并发 admission。
+后续实现拆为四个有序门：9E-4C1 增加独立 Profile 选择与版本化幂等指纹，同时保持既有 Run replay；9E-4C2 接入有界且权威的 Provider/Skill/Grant catalog 与当前 Worktree 状态，锁外读取后用短时版本 fence 在最终事务校验；9E-4C3 在一个受控短事务内重授权、锁定并复读 Profile/Task/HookSet/occurrence，执行 Rust resolver，并原子写 Run 自包含 Profile/Task/acceptance/Hook snapshot、Hook ledger、共享 event_id RunEvent 与资源 reservation；9E-4C4 让一次性 Runtime spawn fence 同时绑定并消费 Approved Launch Profile 与 Agent Execution Profile ID/version/digest，Runtime 在进程启动前复核 ACL、预算与完整 scope。任一门未就绪时不创建新 Run、不 spawn、不对 BI 计为成功；历史 Run 维持可读，旧 idempotency 指纹通过明确版本兼容。Profile 上限保持 65 KiB；当前 Provider/Skill directory 的存储/管理上限为 256/4,096 项，单次并行 admission 只读取 Profile 所引用的最多 5/128 项、总估算 1 MiB。
+Phase 9E-4C1 已实现选择器、API identity 输入和指纹兼容；这只关闭选择/请求子门，不等于 Profile-bound Run producer 已启用。9E-4C2 已落地 Provider/Skill/GrantSet schema、按 Profile 引用读取、Arc snapshot、数据库侧 Skill capability 预载入预算与最终事务 revision/HookSet recheck；catalog publisher、生产数据装载、目标 DB/RLS grants 和 Runtime provisioner 仍缺，因此 production C2 未关闭且 C3 不得开放 Run writer。来源补齐后，9E-4C3 在一个受控短事务内重授权、锁定并复读 Profile/Task/HookSet/occurrence，执行 fenced Rust resolver，并原子写 Run 自包含 Profile/Task/acceptance/Hook snapshot、Hook ledger、共享 event_id RunEvent 与 resource reservation；9E-4C4 让一次性 Runtime spawn fence 同时绑定并消费 Approved Launch Profile 与 Agent Execution Profile ID/version/digest，Runtime 在进程启动前复核 ACL、预算与完整 scope。任一门未就绪时不创建新 Run、不 spawn、不对 BI 计为成功；历史 Run 维持可读，旧 idempotency 指纹通过明确版本兼容。不能在 DB row lock 内等待 CLI/provider 网络。
+
+#### Phase 9E-4C2 当前执行目录与 revision fence
+
+Run 侧不读取或复制 tenant-wide Provider/Skill 全量目录，而只读取当前 Profile 精确引用的 Provider（最多 5 个）、Skill（最多 128 个）和当前 GrantSet；单次快照估算载荷最多 1 MiB。`CurrentExecutionCatalogSnapshot` 以不可变 `Arc<[T]>` 暴露借用视图，允许同一 scope/revision 下的并行 admission 共享 catalog slice。适配器先按 Profile 引用过滤；读取 Skill capability labels 前以数据库聚合预算限制 ≤384 KiB，超限在载入 Rust heap 前拒绝；随后应用行数和字节上限，超界不截断或部分成功，直接 fail closed。
+
+快照 fence 绑定 tenant/Project/Worktree、Profile ID/version/digest、Provider registry revision、Skill registry revision、GrantSet ID/version 与 read/expiry 时间。来源变更与单调 revision 递增必须同事务提交。Fence TTL ≤5 秒；进入最终 Run admission 短事务至少保留 1 秒；事务内重新授权并重读相同 revision，任何 drift、过期或 scope/profile 不匹配都回滚。`ExecutionProfileResolver::resolve_current_snapshot` 只接受此 fence 与当前 revision，通过后借用 verified Profile 与 catalog facts，不复制 Profile 或 catalog。
+
+`db/migrations/2026-10-01-multica-agent-execution-catalog.sql` 提供 Project-scoped Provider/Skill/GrantSet Master/SCD2、规范化能力关联、Provider/Skill revision projection 和 append-only catalog audit；迁移启用 tenant FORCE RLS，要求 parent/能力同事务发布，并以 deferred constraint 验证 capability_count，审计触发器只写公开 ID/digest/expiry 等 metadata。`star-api-rest::execution_catalogs` 在 actor/Worktree/Task 已授权的短 REPEATABLE READ transaction 中读取 Profile 引用的 Provider/Skill 与当前 GrantSet，载入 Skill labels 前执行 ≤384 KiB 数据库聚合预检，再检查行数和能力数量并构造 Arc snapshot；Runtime readiness 前释放读事务，最终 admission transaction 锁定 Profile/revision/GrantSet 并复核 scope、Profile/HookSet identity、catalog revision 和 fence 剩余时间。
+
+隔离 PostgreSQL 18 已验证该 migration 可重复应用、Provider 发布/关闭时 revision 与审计同步、capability_count 不匹配在提交前失败；Rust Domain 133/133、REST 118/118 tests 和 `cargo check -p star-api-rest --lib -j 4 --locked` 通过。Catalog publish/source mutation API、生产 Provider/Skill/Grant 数据装载、目标 DB/RLS grants 与 Runtime provisioner 尚未部署；`supports_current_execution_catalogs()` 与 Profile-bound Run capability 继续默认关闭，9E-4C3 Run/Profile/Hook/BI/resource writer 尚未开放。Hooks 配置仍在 Settings“高级设置”内容区，与 Skills/MCP/Plugins 并列；不属于 Worktree 子级导航。
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
@@ -4705,7 +4715,7 @@ Phase 9D-5a 的 evaluator API v2 将 HookRule 与同步 HookPhase 绑定：当�
 
 Hook Engine 是 Rust 执行核心的一部分，内置不可关闭的强制规则；用户配置的是 versioned HookSet/HookRule 数据，不是用户代码。Project HookSet 作为基线，Worktree 只能继承或追加限制，不能降低平台/租户/项目保护。Run admission 固定有效 HookSet/rule/evaluator version/hash。Hook 的同步 decision 仅为 allow/deny/require_human/defer；它可 veto 或请求人审，但不能授予 capability、修改目标/argv/Task Contract/验收事实。关键规则确定性执行，CPU/memory/time 有上限、无网络、无任意 native/plugin/script load；policy/evaluator/audit failure 或超时按操作风险 fail closed。非关键 after-commit event 由有界 Outbox consumer 处理，可重放，不回滚业务事实。Plugin hooks 最多提供隔离、受 grant 的 advisory/post-commit capability。
 
-Hook 设置沿用已拍板的“高级设置 → Hooks”选项卡，与 Skills、MCP、Plugins 等高级能力在同一设置导航内并列，不加到 Project→Worktree→Group App 树。Hook Builder 以三栏视图（规则/状态列表、结构化规则编辑、最近触发日志/影响预览）提供选择与检查；提供 Project→Worktree policy inheritance，分 scope 的规则表单、触发事件/typed condition/action、优先级、不可覆盖核心基线提示、冲突诊断、草稿/version diff、dry-run 和审批发布/回滚。用户无需写代码；任意 shell/script/native module 和无界表达式不进入表单。Worktree Index 保持为管理入口：展示 effective HookSet/version/health 和阻断摘要；从 Run Detail/Quality & Improvement 可跳到同一 Advanced Settings Hooks tab 的过滤视图。
+Hook 设置沿用已拍板的 ULYS-235“高级设置 → Hooks”选项卡：高级设置页路径为 `/settings/advanced`，Hooks 规范路由为 `/settings/advanced/hooks`，位于页面内容区并与 Skills、MCP、Plugins 等高级能力并列，不加到 Project→Worktree→Group App 树。Hook Builder 以三栏视图（规则/状态列表、结构化规则编辑、最近触发日志/影响预览）提供选择与检查；提供 Project→Worktree policy inheritance，分 scope 的规则表单、触发事件/typed condition/action、优先级、不可覆盖核心基线提示、冲突诊断、草稿/version diff、dry-run 和审批发布/回滚。用户无需写代码；任意 shell/script/native module 和无界表达式不进入表单。Worktree Index 保持为管理入口：展示 effective HookSet/version/health 和阻断摘要；从 Run Detail/Quality & Improvement 可跳到同一 Advanced Settings Hooks tab 的过滤视图。
 
 Hook phase 覆盖 Run admission、before/after tool、before/after validation、review/complete 以及 Worktree create/import/archive/restore/owner-transfer/binding-change/cleanup。特别是 destructive Worktree operation 前，Hook 和 Worktree Domain Command 都重新校验 membership/role、lifecycle version、Runtime health、活跃 Run/Agent lease、file claim、PTY/process drain 与新鲜 Git retention-lock observation；任一 unknown/expired/conflict 都拒绝并显示来源。commit 后写 append-only Audit/Outbox，Index 刷新授权投影。lease、file claim、Git lock 独立建模。
 
@@ -4789,3 +4799,8 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 | v5.27 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.31 与 Task DD v1.5；记录 9E-4B2 Project/Worktree typed Profile 生命周期 API、≤67,584-byte body、admin scope/CAS、Rust digest/scope verifier、SCD2 successor 与同事务 append-only Audit/no-store receipt；`cargo check -p star-api-rest --all-targets -j 4` 通过且新增 3 个状态机单测通过；首次链接遇 Windows LNK1104 后重试成功；SQL 并发/真实 Auth Provider/目标 DB/RLS/grants/Profile UI/Run writer/current catalogs/resource reservation 仍开放；Hooks 遵循 ULYS-235 Advanced Settings 并列 tab | Profile 管理写路径与一致性边界进入实现 |
 | v5.28 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.32 与 Task DD v1.6；补入 Phase 9E-4B3 verified effective Hook policy 到 `HookSetSnapshot` 的 Project baseline/Worktree overlay 身份映射及兼容 policy-only 调用边界；记录定向身份映射测试 1/1 通过（首次链接遇 LNK1104，确认无同名进程后重试成功）与 star-api-rest all-targets check 通过；不宣称生产 Run writer/current catalogs/resource reservation 完成；Hooks 继续在 Advanced Settings 并列标签 | 将当前 HookSet 身份接入 Profile/Run admission 设计切片 |
 | v5.30 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.34 与 Task DD v1.8；记录 Phase 9E-4C1 Task Card AgentExecutionProfile picker、独立 request identity、版本化 fingerprint 与 legacy replay 兼容；明确生产 Profile-bound Run capability 默认关闭、C2-C4 未完成；Hooks 仍是 Advanced Settings 内 Skills/MCP/Plugins 并列 tab | 将 Profile 选择与安全的 Run writer 能力边界落实为代码切片 |
+| v5.31 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.35 与 Task DD v1.9；定义 Phase 9E-4C2 reference-scoped Provider/Skill/Grant Arc snapshot（≤5 Provider、≤128 Skill、≤1 MiB）、5 秒 revision fence 与至少 1 秒提交余量；记录默认关闭 catalog capability 及缺少权威 persistence adapter 的 blocker；重申 ULYS-235 规范路由 `/settings/advanced/hooks` 位于高级设置内容区并列 tabs | 用户要求推进剩余 Phase，并确认 Hooks 沿用既有高级设置导航需求 |
+| v5.32 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.36 与 Task DD v1.10；记录 9E-4C2 Project-scoped current catalog migration、RLS/SCD2/audit/deferred count guard、bounded PostgreSQL read adapter 与 final transaction revision recheck；PG18 migration checks、133 Domain tests、118 REST tests 与 REST lib check 通过；生产 catalog publishers、目标 DB/RLS grants、Runtime adapter 与 C3 Run writer 仍未启用；Hooks 维持 ULYS-235 Advanced Settings tab | 实施 Phase 9E-4C2 持久化/read/recheck 切片并验证 |
+
+
+| v5.33 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.37 与 Task DD v1.11；更正 9E-4C1/C2 当前实现边界，补记 database-side Skill capability 预载入预算 ≤384 KiB 与 Arc 共享；publisher、目标 DB/RLS、Runtime provisioner、Run snapshot/resource writer 仍是生产门；确认 ULYS-235 Hooks 位于既有 Advanced Settings tabs | 完成 C2 预载入内存预算与基本设计状态复核 |
