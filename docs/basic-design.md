@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.39 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.42
+> **文档版本**: v5.40 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.43
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.42》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.43》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4194,6 +4194,7 @@ Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 | 组件 | 职责 | 关键输入 | 约束 |
 |---|---|---|---|
 | `ProjectSelector` | 选择当前项目范围并同步导航状态 | `GET /api/v1/projects` 的 actor 授权目录；无 API 时只在明确标注的本地预览模式使用 seed | 服务端列表按当前 tenant/user 的有效 membership 返回 `project_id`/role，UUID 游标分页，每页 ≤200、no-store；拒绝未知字段/重复 ID/无效 role；完整加载前不对未加载深链宣告无权；生产 API 错误不回退 seed；API session 切换时同步清除 Project、Index 和成员角色投影；当前无 Project 名称 SoR，使用 `Project {UUID}` 标签 |
+| `ProjectWorktreeIndexLink` | 从 Project 导航打开该 Project 的 Worktree Index | 已选 `project_id` 作为 `/worktree?project_id=...` 深链提示；空值则打开服务端 Project Selector | 深链中的 ID 不作为授权凭据；目标页必须重载当前 actor 的 membership 目录并重新授权 Index；不得挂载固定 repository/worktree ID 或本地 seed 卡片 |
 | `ProjectWorktreeIndex` / `WorktreeIndex` | Project 范围的跨 Branch/Engineering Run/Worktree 汇总与受权管理面 | `project_id`, actor permissions, authorized Branch/Run/Worktree projections | 只聚合与深链；不得代替主导航中的 Branch → Run → Worktree，也不把 Task 状态折叠成 Worktree 状态 |
 | `CloudBranchNode` | 展示 Project 下可合并的云端 Branch 及其目标 ref、保护/同步状态 | Project membership、Branch projection | Project 是左侧第一级；Branch 是远端 Git 身份，不承载 Run 应用状态 |
 | `EngineeringRunNode` | 展示 Branch 下的协作 Run、状态、资源预算、成员/Agent 摘要与活动 Worktree 集 | `branch_id`, EngineeringRun projection | `EngineeringRun` 是跨 App 的 canonical workspace，必须与单次 `TaskExecutionRun` 区分 |
@@ -4779,6 +4780,7 @@ Rust 桌面端保留轻量 client/query projection：按需加载 Run tabs，批
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
+| v5.40 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 依 WTG-020 增加 Project 导航到 Worktree Index 的受权深链规则：navStore 的 Project ID 仅作 URL hint，Index 目标页重读 membership；移除固定 Repository ID 的旧侧栏卡片，不填充本地 Worktree seed；Branch/Run 主树与权威目录仍未实现 | 实施 Project scope 到现有授权 Worktree Index 的真实入口并与需求对照 |
 | v0.2 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 继承 requirements v2.1 §50，新增 Worktree Index/Group Shell、同级 App、Group Context、受控任务卡 CLI、范围化 LangGraph Chat、Plugin 热插拔、W/T/M 分类、跨 App 事件与追踪验收 | 用户要求 Worktree 作为顶层索引及群组应用体系 |
 | v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 导航明确为 Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Group Apps；将多 Agent Worktree owner/Runtime/PR/冲突/锁可视与受控管理纳入核心职责 | 用户澄清产品要解决多 Agent Worktree 混乱及内部管理不可控 |
 | v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project Worktree Index 与 Worktree Group 的 canonical route；Project Worktrees 视图提供管理入口，Worktree 路由不再落入 Sprint 树视图 | 浏览器验收发现 `/worktree` 曾被重定向到 Sprint |

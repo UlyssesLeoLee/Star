@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.26**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.27**
 >
 > - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B-3F 已有多项条件式 API/UI 切片；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 卡内 xterm ticket-first UI、status/cancel/reattach、bounded Session listing/recovery API seam 与手动 UI 已实现；Phase 5 有 scope-aware Chat 授权提交、GLOBAL 目标目录、多选 UI、加密 Transcript/Run/outbox persistence adapter，但 production main 未装 protector/L0；Phase 6 有五表 Registry migration、生产 main 装配的 PostgreSQL 只读 projection provider/API 与 Group UI live consumer；Phase 5/6 migrations 已在隔离库重复执行并验证 12 张 FORCE RLS、策略及 trigger（事务内临时授权已回滚），目标 DB/runtime role grants 未配置；manifest trust root/ingest、lifecycle writer、capability runtime/revocation、真实 PostgreSQL RLS 验收未完成。仍缺宿主认证 provider、目标 DB migration 部署与 ACL/RLS 运行验收、真实 CLI provisioner/OS sandbox/terminal sink/audit、LangGraph 部署版本/服务身份/权限 broker；Canvas 仍缺服务端 durable event offset/realtime；历史归属 reconciliation 与跨 App 生产验收未完成）
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
@@ -10,8 +10,8 @@
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.42 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.39 §16
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.43 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.40 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.16、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -102,6 +102,7 @@ Run 查询路由固定为 `GET /api/v1/worktrees/{worktree_id}/work-items/{work_
 | 模块 | 输入 | 责任 | 不负责 |
 |---|---|---|---|
 | `ProjectSelector` | `GET /api/v1/projects` 返回的 actor membership directory | 仅呈现服务端当前 tenant/user 授权的 Project ID/role；选择、清除旧 Worktree selection、写入可分享路由 | 自行判断 membership；用本地 seed 补生产名称 |
+| `ProjectWorktreeIndexLink` | 已选 Project ID（可为空） | 从 Project scope 打开 `/worktree?project_id=...`；无 ID 时进入服务端 Project Selector | 将 navStore ID 当授权；使用固定 Repository ID、未绑定 Worktree 或 seed 填充导航 |
 | `ProjectWorktreeIndex` | `project_id` + 服务端投影 | 比较 Worktree 运行信号、显示风险并提供允许的管理动作 | 创建第二份 Worktree 状态事实 |
 | `ProjectBranchNavigator` | actor 的 Project/Branch/Run membership projection | 渲染 Project → Cloud Branch → Engineering Run → Worktree tree | 把 Project Worktree Index 当成主树父级 |
 | `ProjectWorktreeIndex` | `project_id` + 跨 Branch/Run Worktree projection | 对多 Agent Worktree 做聚合比较和受权管理 | 拥有 Run Apps 或取代 Branch/Run 导航 |
@@ -113,6 +114,8 @@ Run 查询路由固定为 `GET /api/v1/worktrees/{worktree_id}/work-items/{work_
 | `RunProjection` | Outbox / Inbox-consumed domain events | 更新 Run tabs、Project aggregate 和订阅投影 | 覆写事实所有者状态 |
 
 Engineering Run Domain 持有 Run membership 与 App context；Worktree Domain 持有 checkout lifecycle/binding 与 Git 操作；Work Item Domain 持有 Run-scoped task/plan/relation facts；Canvas Domain 持有 Run-scoped Canvas；Agent / Runtime Domain 持有 `TaskExecutionRun`、执行和终端会话；Workflow Domain 持有流程状态；Plugin Registry 持有 Run App manifest/binding；BI/Benchmark 只拥有自身指标定义、cohort 与 replay receipts；Audit 持有不可变审计事实。UI tab 可以独立发布/挂载，后端事实仍按 domain owner 管理。
+
+当前侧栏 `ProjectWorktreeIndexLink` 只把 navStore 中的 Project ID 带入 Index 深链；该值不是授权依据。`/worktree` 必须使用当前 session 的 Project membership directory 重新解析选择并按服务端投影读取 Index。固定 repository ID 的旧外部 Worktree 卡片不再挂载于 Project 导航。此切片只打通已存在的 Project Index 入口；Branch/Engineering Run 目录、`ProjectBranchNavigator` 和 canonical Run API 仍未实现，不能把链接视作新主树已完成。
 
 ## §3 核心 DTO 与不变量
 
@@ -690,3 +693,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.24 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 basic design v5.15 与 Hook DD v0.5.10；记录 Project-scoped Hook summary API 的 1–90 天 bounded window、metric v1、phase/decision 聚合和 partial/null coverage；明确它只读 archive ledger，RunEvent/outcome join、Outbox/BI UI、目标 DB/RLS/grants 与 Hooks app auth Provider 仍开放；Hooks 继续属于 Advanced Settings 并列 tab | 推进 Phase 9D summary API 并保持 Worktree 导航边界 |
 | v4.25 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 重构目标导航为 Project → Cloud Branch → Engineering Run → Run Worktree；Project Worktree Index 定位为跨 Run aggregate 管理面；定义 RunContext / Worktree focus、Run-owned同级 Apps 和旧 Worktree API/schema compatibility migration 边界；补充 owner API + same-owner stored procedure + Outbox/Inbox 与 NATS/Kafka/Fluvio 决策 | 用户确认 Project 主导航层级、Run 内 tabs 所属关系和原子化服务边界 |
 | v4.26 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对照实现同步 Phase 9E-4C5 双 Profile Runtime fence：共享 strict DTO、v2/legacy v1 签名兼容、专用 consumer 完整 binding 重验、nonce/fence SQLite 原子回执与容量/TTL 边界；明确 helper 尚未接生产 provisioner、实时 ACL/providers、Reservation lifecycle、OS sandbox/spawn 与 BI，相关 capability 继续 fail closed | 实际 C5 Runtime fence consume foundation 已比此前 CLI DD 描述更完整，按实现补充详细设计 |
+| v4.27 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对照侧栏实现与 WTG-020：新增 `ProjectWorktreeIndexLink` 从 Project scope 进入兼容 Index 深链，明确客户端 Project ID 只是提示、目标页重验当前 membership；固定 repository ID 的旧 Worktree 卡片不再挂载；Project → Branch → Run 主导航与权威 Branch/Run API 仍未实现 | 完成真实授权 Index 入口并纠正固定 repository ID 侧栏投影 |
