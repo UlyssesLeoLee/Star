@@ -169,7 +169,7 @@ export function Sidebar() {
                 </span>
               </div>
               <div className="text-[11px] font-mono tracking-wider text-[var(--cel-text-secondary,#94a3b8)] uppercase font-bold">
-                〔統制司令部〕
+                時の限界を打ち砕け！！
               </div>
             </div>
           )}
