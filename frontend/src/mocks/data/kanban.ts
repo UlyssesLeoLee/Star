@@ -10,5 +10,6 @@ export const KANBAN_COLUMNS: ReadonlyArray<WorkItemStatus> = [
   "todo",
   "in_progress",
   "review",
+  "blocked",
   "done",
 ];
