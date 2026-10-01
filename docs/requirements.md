@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.42）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.43）
 
 ## 0. 文档说明与前提
 
@@ -2295,6 +2295,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-017 | Benchmark 使用固定且版本化的 Task、repo、环境、验收标准和评分口径，隔离 tuning/holdout 并记录不可复现条件；改进 proposal 必须可追溯、可回滚，候选策略不得降低验收标准 | P2 |
 | WTG-018 | `EngineeringRun` 必须与 Task 的 `TaskExecutionRun` 区分；EngineeringRun 汇总协作范围/Worktree set/App tabs/Run BI，TaskExecutionRun 记录一次执行尝试并保留可空 Worktree snapshot | P0 |
 | WTG-019 | 每个 Run App 必须声明 canonical owner scope、读写 API 和 capability；前端同级 App 不等于独立微服务；跨域写通过 owner API/领域事务/Outbox + 幂等 Inbox 投影，不共享表写入 | P0 |
+| WTG-020 | Project 导航必须提供 Project Worktree Index 入口；客户端已选 `project_id` 仅是深链提示，目标页必须重新读取当前 actor 的 membership 并授权 Index；无有效项目时要求从服务端目录选择，禁止用固定 repository/worktree ID 或本地 seed 填充导航 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
@@ -2756,3 +2757,4 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-AEC-018：一次性 Runtime fence 绑定双 Profile revision、scope、catalog revisions、HookSet、ResourceBudget 与用户请求；Run 持久化 Approved Launch Profile identity 和版本化 binding digest，Run Detail 可追溯；opaque fence ID 不进 Run snapshot；说明 adapter 未装配前继续 fail closed，并明确原请求幂等 fingerprint 与 server-resolved fence digest 的不同职责；Hooks 保持 ULYS-235 Advanced Settings 内容区并列 tab | 完成 Phase 9E-4C4 双 Profile spawn-fence 与 Run 投影代码切片 |
 | v5.41 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-AEC-019：共享 typed dual-Profile fence DTO、C4 signature v2、Runtime binding recheck 与 grant nonce/fence 的原子一次性消费；规定 receipt 上限与 TTL cleanup，并明确该基础设施不等于生产 ACL/reservation/OS spawn/BI consumer，capability 继续关闭 | 推进 Phase 9E-4C5 Runtime fence consume foundation |
 | v5.42 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project → Cloud Branch → Engineering Run → Worktree 主导航和 Run-owned tabs/BI/Benchmark；Project Worktree Index 限定为 aggregate 管理视图；补充 owner API、同域存储过程、Outbox/Inbox、Rust 桌面资源边界与 NATS/Kafka/Fluvio 选择门；新增 AC-ERUN-001/002、AC-EVENT-001；明确未迁移 Run schema/API 仍保持未完成 | 用户澄清 Branch/Run/Worktree 层级并要求服务原子解耦及 Kafka/Fluvio 评估 |
+| v5.43 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 WTG-020：Project 导航提供 Worktree Index 入口；本地 selected project 只能作为深链提示，目标页必须重新读取 membership 并授权，不能使用固定 Repository/Worktree ID 或 seed 填充导航；保留 Cloud Branch/Engineering Run 权威目录未实现的状态 | 移除 Project 侧栏中指向固定 repository ID 的旧 Worktree 卡片，并提供授权 Index 链接 |
