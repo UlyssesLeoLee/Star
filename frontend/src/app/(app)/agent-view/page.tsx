@@ -407,6 +407,11 @@ function AgentViewContent() {
                 onAnnotationPositionChange={async (body) => {
                   setLocalAnns((arr) => arr.map((a) => a.id === body.id ? { ...a, x: body.x, y: body.y } : a));
                 }}
+                onBulkDeleteAnnotation={async (ids) => {
+                  const idSet = new Set(ids);
+                  setLocalAnns((arr) => arr.filter((a) => !idSet.has(a.id)));
+                  setLocalConns((arr) => arr.filter((c) => !idSet.has(c.fromAnnotationId) && !idSet.has(c.toAnnotationId)));
+                }}
               />
             </div>
           )}
