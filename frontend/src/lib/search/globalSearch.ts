@@ -99,11 +99,23 @@ function scoreHit(q: string, fields: Array<{ value: string; weight: number; tag?
     // label 越靠前, score 越高
     const positionScore = idx === 0 ? 3 : idx < 5 ? 2 : 1;
     total += f.weight * positionScore;
-    if (!matchedField || f.weight > (matchedField.tag === "doc" ? 5 : matchedField.tag === "tag" ? 3 : matchedField.tag === "label" ? 10 : 8)) {
-      matchedField = { field: f.tag === "doc" ? "subLabel" : f.tag === "tag" ? "tag" : f.tag === "code" ? "code" : "label", value: f.value };
+    if (!matchedField || f.weight > matchedFieldWeight(matchedField)) {
+      matchedField = {
+        field: f.tag === "doc" ? "subLabel" : f.tag === "tag" ? "tag" : f.tag === "code" ? "code" : "label",
+        value: f.value,
+      };
     }
   }
   return total;
+}
+
+function matchedFieldWeight(m: NonNullable<SearchHit["match"]>): number {
+  switch (m.field) {
+    case "label": return 10;
+    case "code": return 8;
+    case "tag": return 3;
+    case "subLabel": return 5;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -273,14 +285,13 @@ function buildIndex(): IndexEntry[] {
       id: `milestone:${m.id}`,
       type: "milestone",
       label: m.name,
-      subLabel: `${m.status} · ${m.due_date ?? ""}`.trim(),
+      subLabel: `${m.progress.toFixed(0)}% · ${m.due_date ?? ""}`.trim(),
       href: `/projects?tab=timeline&milestone=${encodeURIComponent(m.id)}`,
-      tone: toneFor(m.status),
       score: 0,
     };
     out.push({
       hit,
-      haystack: `${m.name}\n${m.description ?? ""}`.toLowerCase(),
+      haystack: `${m.name}`.toLowerCase(),
     });
   }
 
@@ -307,7 +318,7 @@ function buildIndex(): IndexEntry[] {
       id: `pullRequest:${pr.id}`,
       type: "pullRequest",
       label: `${pr.title} (#${pr.number})`,
-      subLabel: `${pr.source_branch} → ${pr.target} · ${pr.status}`,
+      subLabel: `${pr.source_branch} → ${pr.target_branch} · ${pr.status}`,
       href: `/scm?pr=${encodeURIComponent(pr.id)}`,
       tone: toneFor(pr.status),
       score: 0,
@@ -319,21 +330,21 @@ function buildIndex(): IndexEntry[] {
   }
 
   // Notifications
-  for (const n of notifications) {
-    const hit: SearchHit = {
-      id: `notification:${n.id}`,
-      type: "notification",
-      label: n.title,
-      subLabel: n.body.slice(0, 80),
-      href: `/inbox?selected=${encodeURIComponent(n.id)}`,
-      tone: toneFor(n.status),
-      score: 0,
-    };
-    out.push({
-      hit,
-      haystack: `${n.title}\n${n.body}`.toLowerCase(),
-    });
-  }
+for (const n of notifications) {
+  const hit: SearchHit = {
+    id: `notification:${n.id}`,
+    type: "notification",
+    label: n.subject,
+    subLabel: n.body.slice(0, 80),
+    href: `/inbox?selected=${encodeURIComponent(n.id)}`,
+    tone: toneFor(n.status),
+    score: 0,
+  };
+  out.push({
+    hit,
+    haystack: `${n.subject}\n${n.body}`.toLowerCase(),
+  });
+}
 
   // Comments
   for (const c of comments) {
@@ -413,7 +424,7 @@ export function searchAll(query: string, options: SearchOptions = {}): SearchRes
     // 给当前 entry 打分
     const weighted = entry.haystack
       .split("\n")
-      .map((line, i) => ({ line, weight: [10, 8, 6, 4, 3, 2][i] ?? 1 }));
+      .map((line, i) => ({ value: line, weight: [10, 8, 6, 4, 3, 2][i] ?? 1 }));
     const hit: SearchHit = { ...entry.hit, score: scoreHit(q, weighted) };
     hits.push(hit);
   }
