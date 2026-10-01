@@ -1003,12 +1003,18 @@ export function AgentCanvasView({
     );
   };
 
-  // minimap 计算
+  // minimap 计算 (per 任务 #7 — 把 annotation 也算到 minimap bbox)
   const { bbox } = useMemo(() => {
     const xs = canvas.nodes.map((n) => n.x);
     const ys = canvas.nodes.map((n) => n.y);
     const xe = canvas.nodes.map((n) => n.x + n.width);
     const ye = canvas.nodes.map((n) => n.y + n.height);
+    annotations.forEach((a) => {
+      xs.push(a.x);
+      ys.push(a.y);
+      xe.push(a.x + a.width);
+      ye.push(a.y + a.height);
+    });
     return {
       bbox: {
         minX: xs.length ? Math.min(...xs) - 60 : 0,
@@ -1017,7 +1023,7 @@ export function AgentCanvasView({
         maxY: ye.length ? Math.max(...ye) + 60 : 800,
       },
     };
-  }, [canvas.nodes]);
+  }, [canvas.nodes, annotations]);
 
   return (
     <div data-testid="agent-canvas-container" className="relative w-full h-full bg-[#080c14] overflow-hidden select-none">
@@ -1332,6 +1338,41 @@ export function AgentCanvasView({
               opacity={0.8}
             />
           ))}
+          {/* 用户 connector 信标 (per 任务 #7) */}
+          {freeConnectors.map((c) => {
+            const from = annotations.find((a) => a.id === c.fromAnnotationId);
+            const to = annotations.find((a) => a.id === c.toAnnotationId);
+            if (!from || !to) return null;
+            return (
+              <line
+                key={c.id}
+                x1={from.x + from.width / 2}
+                y1={from.y + from.height / 2}
+                x2={to.x + to.width / 2}
+                y2={to.y + to.height / 2}
+                stroke="#00f0ff"
+                strokeWidth={1}
+                opacity={0.6}
+              />
+            );
+          })}
+          {/* annotation 信标 (per 任务 #7) — sticky=圆, text=空心, shape=方形, path=随机点 */}
+          {annotations.map((a) => {
+            const cx = a.x + a.width / 2;
+            const cy = a.y + a.height / 2;
+            if (a.kind === "sticky_note") {
+              const fill = (a.content as { color?: string }).color ?? "#f9d77e";
+              return <circle key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} cx={cx} cy={cy} r={4} fill={fill} stroke="#000" strokeWidth={0.5} opacity={0.9} />;
+            }
+            if (a.kind === "text") {
+              return <rect key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} x={cx - 3} y={cy - 3} width={6} height={6} fill="none" stroke="#e6edf3" strokeWidth={1} opacity={0.8} />;
+            }
+            if (a.kind === "shape") {
+              return <rect key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} x={a.x} y={a.y} width={a.width} height={a.height} fill="none" stroke="#a5d6ff" strokeWidth={1} opacity={0.7} />;
+            }
+            // path
+            return <circle key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} cx={cx} cy={cy} r={2} fill={(a.content as { brush_color?: string }).brush_color ?? "#e6edf3"} opacity={0.9} />;
+          })}
         </svg>
       </div>
 
