@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.34 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.38
+> **文档版本**: v5.36 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.40
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.37》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.40》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4713,9 +4713,21 @@ Run 侧不读取或复制 tenant-wide Provider/Skill 全量目录，而只读取
 
 隔离 PostgreSQL 18 已验证该 migration 可重复应用、Provider 发布/关闭时 revision 与审计同步、capability_count 不匹配在提交前失败；Rust Domain 133/133、REST 118/118 tests 和 `cargo check -p star-api-rest --lib -j 4 --locked` 通过。Catalog publish/source mutation API、生产 Provider/Skill/Grant 数据装载、目标 DB/RLS grants 与 Runtime provisioner 尚未部署；`supports_current_execution_catalogs()` 与 Profile-bound Run capability 继续默认关闭，9E-4C3 Run/Profile/Hook/BI/resource writer 尚未开放。Hooks 配置仍在 Settings“高级设置”内容区，与 Skills/MCP/Plugins 并列；不属于 Worktree 子级导航。
 
+#### Phase 9E-4C4 双 Profile 一次性 Runtime spawn fence
+
+Run admission 与进程创建由同一 `TaskRunSpawnFence` 贯通。Runtime readiness 在无 DB 行锁的短调用中解析当前 Approved Launch Profile revision；REST 同时持有当前 verified AgentExecutionProfile、Arc-backed catalog snapshot、catalog revision tuple、effective HookSet 与 ResourceBudget。Runtime 返回 bounded fence：opaque fence UUID、expiry、双 Profile ID/version/digest、tenant/actor/Project/repository/Worktree/Task/Runtime/lifecycle、catalog revisions、HookSet、ResourceBudget、原客户端 request fingerprint 和 domain-separated binding digest。绑定对象仅包含 ID、digest、版本、revision tuple 与有界预算字段；不会克隆 Provider/Skill/catalog 目录。
+
+REST 逐字段重建期望 binding 并比较 Runtime 返回值，校验 launch Profile ID 与请求相同、两个 revision 均为正数且 digest 是 lowercase SHA-256，binding digest 与版本化 typed serialization 一致，Runtime 健康且 fence fresh/TTL bounded。最终短 REPEATABLE READ 事务再次授权 actor/GroupContext/Worktree/Task、重验 lifecycle/Profile/catalog/GrantSet/HookSet 和资源 quota，再写包含 Approved Launch Profile ID/version/digest、AgentExecutionProfile snapshot、ResourceBudget、Loop/Task/acceptance/Hook snapshots、binding digest 的不可变 Run，并与 pending reservation、Hook ledger、RunEvent 同事务提交。`task_execution_run` 迁移允许历史/pre-C4 行这些字段全 NULL；C4 writer 必须完整写入双身份与 binding digest，CHECK 禁止部分 tuple。
+
+Commit 后 REST 将同一 fence 对象交给 provisioner。Runtime 必须先用原子 compare-and-consume 把 fence 从 issued 改成 consumed，再以当前 actor ACL、exact scope/lifecycle、两个 Profile revision/digest、catalog 与 HookSet revisions、ResourceBudget 和 reservation 状态重验；所有检查通过后才创建 child process。消费结果、reservation activate/reject/release 与 Run 状态必须可观测且幂等；重复消费、错请求、过期、撤权、revision drift、quota 失败或进程授权错误不得 spawn。旧 idempotency replay 不带新 fence，只能返回/恢复已存在的 Run/session，不能触发新进程。
+
+客户端 request fingerprint 继续表示同一用户请求的幂等身份（包含两个选定 ID）；本轮新加的 `spawn_fence_binding_digest` 对 request fingerprint 与服务端解析的两个 Profile revision、scope、catalog、HookSet 和预算做 domain-separated SHA-256，表达可执行决策身份。Run Summary/Detail 返回两种 Profile 身份和 binding digest；数据库不持久化 opaque fence ID，避免将一次性 Runtime handle 扩散到 BI/API。
+
+Rust 条件式 REST contract、Run identity migration 与 list/detail 投影已实现。`domain-local-runtime::task_execution` 已有签名 grant、scope、Approved Launch Profile ID/字段约束、canonical checkout 和一次性 nonce 基础校验，但签名内容不含 Launch Profile version/digest，也不含 AgentExecutionProfile、catalog/HookSet/ResourceBudget 或 C4 fence binding；该 helper 尚未接入生产 provisioner/OS spawn，不能视为 C4 consumer。本仓仍无生产 Approved Launch Profile authority/provider、C4 fence store/consumer 或 OS spawn adapter；reservation activate/release、过期清理、target DB/RLS grants、真实 Auth/Project ACL、catalog publisher/data 与完整 Outbox/BI 也仍开放。因此 `supports_profile_bound_run_admission()` 与 current-catalog capability 必须默认 false。导航遵循 ULYS-235：Settings 主导航的“高级设置”是父入口，Hooks 规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab，不是独立主导航项或 Worktree 树节点。
+
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
-Phase 9D-5a 的 evaluator API v2 将 HookRule 与同步 HookPhase 绑定：当前 runtime contract 含 BeforeRunAdmission 和 BeforeWorktreeArchiveCleanup。未显式填写 phase 的旧规则保持 archive-only，v1 policy 继续按旧 canonical JSON/digest 验证且只可用于 archive；Run admission 仅接受 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy typed facts，其他 archive-only facts 在策略验证时拒绝。Phase 9D-5b 已增加条件式 Run admission REST producer：在数据库锁外最多 2 秒请求 readiness/fence，再于短事务内重授权、重读 Worktree/Task/lifecycle/策略并运行 Rust evaluator；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和 Run `hook_evaluated` 镜像，ledger 与 RunEvent 共享 `tenant_id + event_id`；Deny 只追加无 Task/Run FK 的 ledger，不创建 Run。fence 需 fresh ≤5 秒、保留 ≥5 秒提交余量、TTL ≤30 秒，并由 Runtime adapter 在 spawn 前消费和重校验。当前 `TaskCliSessionProvisioner` 默认 capability 关闭且没有已装配生产 adapter，因此 Project/Worktree publish/rollback 仍 fail closed，Hooks 高级设置 Builder 仍禁用 Run admission；API coverage 按服务端 producer capability 动态呈现。导航继续沿用 ULYS-235：Hooks 是 Settings 高级设置页面内容区与 Skills/MCP/Plugins 并列的标签，不新增主侧栏或 Worktree 树节点。
+Phase 9D-5a 的 evaluator API v2 将 HookRule 与同步 HookPhase 绑定：当前 runtime contract 含 BeforeRunAdmission 和 BeforeWorktreeArchiveCleanup。未显式填写 phase 的旧规则保持 archive-only，v1 policy 继续按旧 canonical JSON/digest 验证且只可用于 archive；Run admission 仅接受 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy typed facts，其他 archive-only facts 在策略验证时拒绝。Phase 9D-5b 已增加条件式 Run admission REST producer：在数据库锁外最多 2 秒请求 readiness/fence，再于短事务内重授权、重读 Worktree/Task/lifecycle/策略并运行 Rust evaluator；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和 Run `hook_evaluated` 镜像，ledger 与 RunEvent 共享 `tenant_id + event_id`；Deny 只追加无 Task/Run FK 的 ledger，不创建 Run。fence 需 fresh ≤5 秒、保留 ≥5 秒提交余量、TTL ≤30 秒，并由 Runtime adapter 在 spawn 前消费和重校验。当前 `TaskCliSessionProvisioner` 默认 capability 关闭且没有已装配生产 adapter，因此 Project/Worktree publish/rollback 仍 fail closed，Hooks 高级设置 Builder 仍禁用 Run admission；API coverage 按服务端 producer capability 动态呈现。导航继续沿用 ULYS-235：Settings 主导航的“高级设置”是父入口，Hooks 规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的标签；不新增独立主导航项或 Worktree 树节点。
 
 Hook Engine 是 Rust 执行核心的一部分，内置不可关闭的强制规则；用户配置的是 versioned HookSet/HookRule 数据，不是用户代码。Project HookSet 作为基线，Worktree 只能继承或追加限制，不能降低平台/租户/项目保护。Run admission 固定有效 HookSet/rule/evaluator version/hash。Hook 的同步 decision 仅为 allow/deny/require_human/defer；它可 veto 或请求人审，但不能授予 capability、修改目标/argv/Task Contract/验收事实。关键规则确定性执行，CPU/memory/time 有上限、无网络、无任意 native/plugin/script load；policy/evaluator/audit failure 或超时按操作风险 fail closed。非关键 after-commit event 由有界 Outbox consumer 处理，可重放，不回滚业务事实。Plugin hooks 最多提供隔离、受 grant 的 advisory/post-commit capability。
 
@@ -4809,3 +4821,5 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 
 | v5.33 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.37 与 Task DD v1.11；更正 9E-4C1/C2 当前实现边界，补记 database-side Skill capability 预载入预算 ≤384 KiB 与 Arc 共享；publisher、目标 DB/RLS、Runtime provisioner、Run snapshot/resource writer 仍是生产门；确认 ULYS-235 Hooks 位于既有 Advanced Settings tabs | 完成 C2 预载入内存预算与基本设计状态复核 |
 | v5.34 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.38 与 Task DD v1.12；补充 Phase 9E-4C3 Profile/Task/Hook/RunEvent/BI/resource reservation 的同事务边界、Project 跨 Worktree 聚合预算及 allocation epoch 对 REPEATABLE READ stale snapshot 的串行保护；记录 PG18/121 REST tests、最终 `cargo check` 和 LNK1104 复跑阻断，以及仍默认关闭的 production gates；明确 reservation 最大值不是观测值，epoch/reservation TTL 清理、Runtime activate/release、完整 BI/outbox 仍未接通；ULYS-235 Hooks 继续是 Advanced Settings 内容区并列 tab | 完成 C3 Run/resource writer 和并发风险修正 |
+| v5.35 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.39 与 Task DD v1.13；补充 9E-4C4 typed one-time dual-Profile spawn fence、versioned binding digest、Run 上的 Approved Launch Profile identity 与 Run Detail 投影；说明 C4 尚缺生产 Runtime consumer、Launch Profile authority、reservation lifecycle、target DB/Auth/RLS、catalog publisher 与完整 BI，producer capability 继续关闭；再次确认 Hooks 属 Advanced Settings 内容区并列 tab | 完成 9E-4C4 Rust fence contract 与 Run identity slice |
+| v5.36 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确区分 domain-local-runtime 的现存 grant/profile/path/nonce 基础校验与未装配的 C4 dual-profile fence consumer；将 ULYS-235 导航固定为 Settings → Advanced Settings → `/settings/advanced/hooks` 并列 tab | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |
