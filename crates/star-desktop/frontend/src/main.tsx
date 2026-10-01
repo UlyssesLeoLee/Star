@@ -13,6 +13,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
 import HomePage from './pages/HomePage';
 import WorktreePage from './pages/WorktreePage';
+import WorktreeVizPage from './pages/WorktreeVizPage';
 
 const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'worktree', element: <WorktreePage /> },
+      { path: 'viz', element: <WorktreeVizPage /> },
     ],
   },
 ]);

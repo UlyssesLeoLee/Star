@@ -13,9 +13,10 @@ export default function App() {
       <header className={styles.header}>
         <h1 className={styles.title}>🪐 Star Desktop (Tauri 2.0 + React 19)</h1>
         <nav className={styles.nav}>
-          <a href="/">Home</a>
-          <a href="/worktree">Worktree</a>
-        </nav>
+                  <a href="/">Home</a>
+                  <a href="/worktree">Worktree</a>
+                  <a href="/viz" data-testid="nav-viz">Worktree Viz</a>
+                </nav>
       </header>
       <main className={styles.main}>
         <Outlet />
