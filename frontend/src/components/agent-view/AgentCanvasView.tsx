@@ -29,7 +29,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import {
   Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, GitBranch, Skull, Coins,
-  StickyNote, Type, Square, Brush, Plus, Trash2,
+  StickyNote, Type, Square, Brush, Plus, Trash2, Eraser,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
@@ -72,7 +72,7 @@ export function AgentCanvasView({
   );
   const { colors, mode } = useAgentGameTheme();
   const [viewport, setViewport] = useState(canvas.viewport);
-  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "brush" | "connector" | "connect-source">("pan");
+  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "brush" | "connector" | "connect-source" | "eraser">("pan");
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   // 自由画笔 (per 2026-10-01 OOB 恢复无限画布画笔)
   const AGENT_BRUSH_PALETTE = ["#e6edf3", "#00f0ff", "#ffc400", "#ff184c", "#a5d6ff"]; // 主题色 (cyan/gold/red) + 中性
@@ -829,7 +829,7 @@ export function AgentCanvasView({
         setSelectedAnnotationId(a.id);
       }
     };
-    const baseCursor = tool === "connector" ? "crosshair" : isDragging ? "grabbing" : (tool === "select" && selectedAnnotationId === a.id) ? "grab" : "default";
+    const baseCursor = tool === "connector" || tool === "eraser" ? "crosshair" : isDragging ? "grabbing" : (tool === "select" && selectedAnnotationId === a.id) ? "grab" : "default";
   const onAnnotationDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (a.kind === "sticky_note" || a.kind === "text") {
@@ -1140,6 +1140,14 @@ export function AgentCanvasView({
               data-testid="agent-canvas-tool-connector"
             >
               <GitBranch size={13} />
+            </button>
+            <button
+              onClick={() => setTool("eraser")}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "eraser" ? "bg-[var(--cel-danger,#ff184c)] text-white" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:text-white"}`}
+              title="橡皮擦 — 点 annotation 即删 (per 任务 #6)"
+              data-testid="agent-canvas-tool-eraser"
+            >
+              <Eraser size={13} />
             </button>
             {(selectedAnnotationId || multiSelected.size > 0) && (
               <button
