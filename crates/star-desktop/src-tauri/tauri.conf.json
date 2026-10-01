@@ -3,6 +3,7 @@
   "productName": "star-desktop",
   "version": "0.1.0",
   "identifier": "ai.worktree.star.desktop",
+  "mainBinaryName": "star-desktop",
   "build": {
     "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:1420",

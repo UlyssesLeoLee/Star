@@ -35,6 +35,3 @@ const mockInvoke = vi.fn((cmd: string) => {
 globalThis.__TAURI_INTERNALS__ = {
   invoke: mockInvoke,
 };
-
-// Make vi globally available for vitest
-import { vi } from 'vitest';

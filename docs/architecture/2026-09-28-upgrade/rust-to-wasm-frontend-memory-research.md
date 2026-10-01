@@ -229,6 +229,9 @@ WASM linear memory: 100 × ~256 B/项 = 25.6 KB  (packed struct, 8x compact)
 - [`wasm-pack` docs](https://rustwasm.github.io/docs/wasm-pack/)
 - [Vite WASM plugin](https://github.com/Menci/vite-plugin-wasm)
 - [Memory Layout Trade-offs (Rust WASM)](https://rustwasm.github.io/docs/book/reference/types.html)
+- [PR #216 — feat(board): W/T/M swimlane + Rust→WASM research (实施 + 本报告)](https://github.com/UlyssesLeoLee/Star/pull/216)
+- [PR #219 — feat(wasm): layout-engine-wasm PoC (PR-216 §3.1 PR-1 落地)](https://github.com/UlyssesLeoLee/Star/pull/219)
+- [PR #230 — feat(wasm): query-engine-wasm PoC (PR-216 §3.1 PR-1 落地)](https://github.com/UlyssesLeoLee/Star/pull/230)
 
 ---
 
