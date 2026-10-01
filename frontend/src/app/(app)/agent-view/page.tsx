@@ -32,6 +32,15 @@ import type {
   AgentCanvasAnnotation,
   AgentCanvasFreeConnector,
 } from "@/lib/agent-view/types";
+import {
+  loadAgentAnnotations,
+  saveAgentAnnotations,
+} from "@/lib/agent-view/annotationApi";
+import {
+  initHistory, undo as undoStep, redo as redoStep,
+  commit as commitStep, canUndo, canRedo,
+  type AnnotationHistoryState,
+} from "@/lib/agent-view/annotationHistory";
 import { AgentCanvasView } from "@/components/agent-view/AgentCanvasView";
 import { AgentFilter } from "@/components/agent-view/AgentFilter";
 import { GameHUD } from "@/components/agent-game/GameHUD";
@@ -95,10 +104,38 @@ function AgentViewContent() {
         : "canvas",
   );
 
-  // 用户注释 / 自由连接 (per 2026-10-01 OOB 恢复无限画布画笔) - local-only state
+  // 用户注释 / 自由连接 (per 2026-10-01 OOB 恢复无限画布画笔) - local-only state + localStorage 持久化 + undo/redo
   const [localAnns, setLocalAnns] = useState<AgentCanvasAnnotation[]>([]);
   const [localConns, setLocalConns] = useState<AgentCanvasFreeConnector[]>([]);
   const [editMode, setEditMode] = useState(false);
+  /** undo/redo 历史栈 (per 任务 #5) */
+  const [history, setHistory] = useState<AnnotationHistoryState>(() => initHistory([], []));
+
+  // load on agentId 变化 (per 任务 #1 — localStorage 持久化) + 初始化 history (per 任务 #5)
+  const currentAgentId = resolution?.agentId ?? null;
+  useEffect(() => {
+    if (typeof window === "undefined" || !currentAgentId) return;
+    const persisted = loadAgentAnnotations(currentAgentId);
+    setLocalAnns(persisted.annotations);
+    setLocalConns(persisted.freeConnectors);
+    setHistory(initHistory(persisted.annotations, persisted.freeConnectors));
+  }, [currentAgentId]);
+
+  // commit wrapper — 更新 localAnns/localConns 同时记录 history (per 任务 #5)
+  const commitStateChange = useCallback(
+    (nextAnns: AgentCanvasAnnotation[], nextConns: AgentCanvasFreeConnector[]) => {
+      setLocalAnns(nextAnns);
+      setLocalConns(nextConns);
+      setHistory((h) => commitStep(h, { annotations: nextAnns, freeConnectors: nextConns }));
+    },
+    [],
+  );
+
+  // persist on change
+  useEffect(() => {
+    if (typeof window === "undefined" || !currentAgentId) return;
+    saveAgentAnnotations(currentAgentId, localAnns, localConns);
+  }, [currentAgentId, localAnns, localConns]);
 
   // Mount-gate for derivedAt 时间戳 (per 2026-09-06 19:42 JST hydration 修复):
   //   server render 时 derivedAt = null (避免 server t0 vs client t0+1s mismatch)
@@ -352,6 +389,42 @@ function AgentViewContent() {
               {editMode ? "✏️ Edit Mode" : "👁 View Mode"}
             </button>
             {editMode && (
+              <>
+                <button
+                  onClick={() => {
+                    const prev = undoStep(history);
+                    if (prev !== history) {
+                      setHistory(prev);
+                      setLocalAnns(prev.current.annotations);
+                      setLocalConns(prev.current.freeConnectors);
+                    }
+                  }}
+                  disabled={!canUndo(history)}
+                  data-testid="agent-view-undo"
+                  className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${canUndo(history) ? "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white" : "opacity-40 cursor-not-allowed bg-[var(--cel-surface-sub,#151c2c)] text-ink-mute"}`}
+                  title="撤销 (per 任务 #5)"
+                >
+                  ↶ Undo
+                </button>
+                <button
+                  onClick={() => {
+                    const next = redoStep(history);
+                    if (next !== history) {
+                      setHistory(next);
+                      setLocalAnns(next.current.annotations);
+                      setLocalConns(next.current.freeConnectors);
+                    }
+                  }}
+                  disabled={!canRedo(history)}
+                  data-testid="agent-view-redo"
+                  className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${canRedo(history) ? "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white" : "opacity-40 cursor-not-allowed bg-[var(--cel-surface-sub,#151c2c)] text-ink-mute"}`}
+                  title="重做 (per 任务 #5)"
+                >
+                  ↷ Redo
+                </button>
+              </>
+            )}
+            {editMode && (
               <span className="text-[10px] text-[var(--cel-cyan,#00f0ff)] font-mono">
                 编辑模式 — 选中工具后在画布上画/写。Annotations 暂存本地 (per 2026-10-01 OOB)。
               </span>
@@ -370,17 +443,32 @@ function AgentViewContent() {
                 freeConnectors={localConns}
                 onCreateAnnotation={async (body) => {
                   const id = body.id;
-                  setLocalAnns((arr) => [...arr, body]);
+                  commitStateChange([...localAnns, body], localConns);
                   return id;
                 }}
                 onDeleteAnnotation={async (id) => {
-                  setLocalAnns((arr) => arr.filter((a) => a.id !== id));
-                  setLocalConns((arr) => arr.filter((c) => c.fromAnnotationId !== id && c.toAnnotationId !== id));
+                  const nextAnns = localAnns.filter((a) => a.id !== id);
+                  const nextConns = localConns.filter((c) => c.fromAnnotationId !== id && c.toAnnotationId !== id);
+                  commitStateChange(nextAnns, nextConns);
                 }}
                 onCreateFreeConnector={async (body) => {
                   const id = `fc-local-${Math.random().toString(36).slice(2, 10)}`;
-                  setLocalConns((arr) => [...arr, { id, ...body }]);
+                  commitStateChange(localAnns, [...localConns, { id, ...body }]);
                   return id;
+                }}
+                onUpdateAnnotation={async (id, body) => {
+                  const next = localAnns.map((a) => a.id === id ? { ...a, ...body, content: { ...a.content, ...(body.content || {}) } } as AgentCanvasAnnotation : a);
+                  commitStateChange(next, localConns);
+                }}
+                onAnnotationPositionChange={async (body) => {
+                  const next = localAnns.map((a) => a.id === body.id ? { ...a, x: body.x, y: body.y } : a);
+                  commitStateChange(next, localConns);
+                }}
+                onBulkDeleteAnnotation={async (ids) => {
+                  const idSet = new Set(ids);
+                  const nextAnns = localAnns.filter((a) => !idSet.has(a.id));
+                  const nextConns = localConns.filter((c) => !idSet.has(c.fromAnnotationId) && !idSet.has(c.toAnnotationId));
+                  commitStateChange(nextAnns, nextConns);
                 }}
               />
             </div>

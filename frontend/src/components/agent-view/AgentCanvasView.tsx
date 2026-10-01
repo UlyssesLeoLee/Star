@@ -29,7 +29,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import {
   Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, GitBranch, Skull, Coins,
-  StickyNote, Type, Square, Brush, Plus, Trash2,
+  StickyNote, Type, Square, Brush, Plus, Trash2, Eraser,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
@@ -51,6 +51,10 @@ interface AgentCanvasViewProps {
   onAnnotationPositionChange?: (body: { id: string; x: number; y: number }) => Promise<void>;
   onCreateFreeConnector?: (body: Omit<AgentCanvasFreeConnector, "id">) => Promise<string | void>;
   onDeleteFreeConnector?: (id: string) => Promise<void>;
+  /** 注释更新回调 (per 任务 #2 — text edit mode) */
+  onUpdateAnnotation?: (id: string, body: Partial<AgentCanvasAnnotation>) => Promise<void>;
+  /** 注释批量删除回调 (per 任务 #4 — 多选/框选) */
+  onBulkDeleteAnnotation?: (ids: string[]) => Promise<void>;
 }
 
 export function AgentCanvasView({
@@ -58,7 +62,7 @@ export function AgentCanvasView({
   annotations = [], freeConnectors = [],
   readOnly = true,
   onCreateAnnotation, onDeleteAnnotation, onAnnotationPositionChange,
-  onCreateFreeConnector, onDeleteFreeConnector,
+  onCreateFreeConnector, onDeleteFreeConnector, onUpdateAnnotation, onBulkDeleteAnnotation,
 }: AgentCanvasViewProps) {
   const { t } = useTranslation();
   const workItems = useStore((s) => s.workItems);
@@ -68,7 +72,7 @@ export function AgentCanvasView({
   );
   const { colors, mode } = useAgentGameTheme();
   const [viewport, setViewport] = useState(canvas.viewport);
-  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "brush" | "connector" | "connect-source">("pan");
+  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "brush" | "connector" | "connect-source" | "eraser">("pan");
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   // 自由画笔 (per 2026-10-01 OOB 恢复无限画布画笔)
   const AGENT_BRUSH_PALETTE = ["#e6edf3", "#00f0ff", "#ffc400", "#ff184c", "#a5d6ff"]; // 主题色 (cyan/gold/red) + 中性
@@ -83,13 +87,54 @@ export function AgentCanvasView({
   const [annotationError, setAnnotationError] = useState<string | null>(null);
   const [annotationPending, setAnnotationPending] = useState(false);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  // 多选 (per 任务 #4): shift-click 加选 / marquee 框选
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(new Set());
+  // marquee 框选 (per 任务 #4)
+  const [marquee, setMarquee] = useState<{
+    startWorldX: number;
+    startWorldY: number;
+    endWorldX: number;
+    endWorldY: number;
+  } | null>(null);
+  // 编辑模式 — 点选 sticky_note/text 2 次进入 (per 任务 #2); 第一次=select, 第二次=edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState<string>("");
+
+  // 编辑生命周期 (per 任务 #2): commit 写在 onBlur / Enter, exit 写在 Esc / outside-click
+  const beginEditAnnotation = (a: AgentCanvasAnnotation) => {
+    if (a.kind !== "sticky_note" && a.kind !== "text") return;
+    const text = (a.content as { text?: string }).text ?? "";
+    setEditingId(a.id);
+    setEditText(text);
+  };
+  const commitEditAnnotation = async () => {
+    if (!editingId || !onUpdateAnnotation) return;
+    await onUpdateAnnotation(editingId, { content: { text: editText } } as Partial<AgentCanvasAnnotation>);
+    setEditingId(null);
+  };
+  const cancelEditAnnotation = () => {
+    setEditingId(null);
+    setEditText("");
+  };
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const dragState = useRef<{ type: "pan" | null; startX: number; startY: number; elX: number; elY: number }>({
-    type: null, startX: 0, startY: 0, elX: 0, elY: 0,
+  const dragState = useRef<{
+    type: "pan" | "annotation" | null;
+    startX: number;
+    startY: number;
+    /** pan: viewport.x at start; annotation: annotation.x at start */
+    elX: number;
+    /** pan: viewport.y at start; annotation: annotation.y at start */
+    elY: number;
+    /** annotation drag 专用 — annotation id */
+    annId: string | null;
+  }>({
+    type: null, startX: 0, startY: 0, elX: 0, elY: 0, annId: null,
   });
+  /** 拖拽中 — preview position (per 任务 #3: drag annotation) */
+  const [dragAnnPreview, setDragAnnPreview] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     setViewport(canvas.viewport);
@@ -211,12 +256,35 @@ export function AgentCanvasView({
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && tool === "pan") || e.shiftKey) {
-      dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y };
-    } else if (e.button === 0 && tool === "select") {
+      dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y, annId: null };
+      return;
+    }
+    if (e.button === 0 && tool === "select") {
+      // 拖拽已选 annotation (per 任务 #3: drag annotation)
+      if (selectedAnnotationId && !readOnly && onAnnotationPositionChange) {
+        const target = annotations.find((a) => a.id === selectedAnnotationId);
+        if (target) {
+          dragState.current = { type: "annotation", startX: e.clientX, startY: e.clientY, elX: target.x, elY: target.y, annId: target.id };
+          setDragAnnPreview({ id: target.id, x: target.x, y: target.y });
+          return;
+        }
+      }
+      // 没有点中 annotation → 进入 marquee 框选 (per 任务 #4)
+      if (!readOnly && (e.target as Element).tagName?.toLowerCase() === "svg") {
+        const wp = svgPointFromClient(e);
+        if (wp) {
+          setSelectedNodeId(null);
+          setSelectedAnnotationId(null);
+          if (!e.shiftKey) setMultiSelected(new Set());
+          setMarquee({ startWorldX: wp.x, startWorldY: wp.y, endWorldX: wp.x, endWorldY: wp.y });
+          return;
+        }
+      }
       setSelectedNodeId(null);
       setSelectedAnnotationId(null);
-    } else if (e.button === 0 && tool === "brush" && !readOnly) {
-      // 自由画笔 - 鼠标按下记录起点 (per 2026-10-01 OOB)
+      return;
+    }
+    if (e.button === 0 && tool === "brush" && !readOnly) {
       const svgPt = svgPointFromClient(e);
       if (!svgPt) return;
       setDrawingPath({ points: [svgPt], minX: svgPt.x, minY: svgPt.y, maxX: svgPt.x, maxY: svgPt.y });
@@ -229,6 +297,15 @@ export function AgentCanvasView({
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
       setViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
+    } else if (ds.type === "annotation" && ds.annId && dragAnnPreview) {
+      // 拖拽 annotation — 实时更新 preview (per 任务 #3)
+      const dx = (e.clientX - ds.startX) / viewport.zoom;
+      const dy = (e.clientY - ds.startY) / viewport.zoom;
+      setDragAnnPreview({ id: ds.annId, x: ds.elX + dx, y: ds.elY + dy });
+    } else if (marquee) {
+      // marquee 框选 (per 任务 #4)
+      const wp = svgPointFromClient(e);
+      if (wp) setMarquee({ ...marquee, endWorldX: wp.x, endWorldY: wp.y });
     } else if (drawingPath) {
       // 自由画笔 - 累积 path points (per 2026-10-01 OOB)
       const svgPt = svgPointFromClient(e);
@@ -247,7 +324,34 @@ export function AgentCanvasView({
   };
 
   const onMouseUp = () => {
-    dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0 };
+    const ds = dragState.current;
+    dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, annId: null };
+    // marquee 提交 (per 任务 #4)
+    if (marquee) {
+      const minX = Math.min(marquee.startWorldX, marquee.endWorldX);
+      const maxX = Math.max(marquee.startWorldX, marquee.endWorldX);
+      const minY = Math.min(marquee.startWorldY, marquee.endWorldY);
+      const maxY = Math.max(marquee.startWorldY, marquee.endWorldY);
+      const hits = annotations
+        .filter((a) => a.x + a.width >= minX && a.x <= maxX && a.y + a.height >= minY && a.y <= maxY)
+        .map((a) => a.id);
+      setMultiSelected((prev) => {
+        const next = new Set(prev);
+        hits.forEach((id) => next.add(id));
+        return next;
+      });
+      setMarquee(null);
+      return;
+    }
+    // 拖拽 annotation 提交 (per 任务 #3)
+    if (ds.type === "annotation" && ds.annId && dragAnnPreview && onAnnotationPositionChange) {
+      if (dragAnnPreview.x !== ds.elX || dragAnnPreview.y !== ds.elY) {
+        void onAnnotationPositionChange({ id: ds.annId, x: dragAnnPreview.x, y: dragAnnPreview.y });
+      }
+      setDragAnnPreview(null);
+      return;
+    }
+    setDragAnnPreview(null);
     // 自由画笔 - 抬起提交 (per 2026-10-01 OOB)
     if (drawingPath) {
       void createPathAnnotation(drawingPath);
@@ -694,13 +798,21 @@ export function AgentCanvasView({
    * - path: SVG path (相对 bbox 起点)
    */
   const renderAnnotation = (a: AgentCanvasAnnotation) => {
-    const sx = (a.x - viewport.x) * viewport.zoom;
-    const sy = (a.y - viewport.y) * viewport.zoom;
+    const isDragging = dragAnnPreview?.id === a.id;
+    const ax = isDragging ? dragAnnPreview.x : a.x;
+    const ay = isDragging ? dragAnnPreview.y : a.y;
+    const sx = (ax - viewport.x) * viewport.zoom;
+    const sy = (ay - viewport.y) * viewport.zoom;
     const w = a.width * viewport.zoom;
     const h = a.height * viewport.zoom;
     const isSelected = a.id === selectedAnnotationId;
+    const isMultiSelected = multiSelected.has(a.id);
     const isConnectSource = a.id === connectSourceId;
-    const outline = isConnectSource ? "var(--cel-gold,#ffc400)" : isSelected ? "var(--cel-cyan,#00f0ff)" : "var(--cel-ink,#30363d)";
+    const outline = isConnectSource
+      ? "var(--cel-gold,#ffc400)"
+      : isSelected || isMultiSelected
+        ? "var(--cel-cyan,#00f0ff)"
+        : "var(--cel-ink,#30363d)";
     const baseTestId = `annotation-${a.id}`;
     const onAnnotationClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -717,30 +829,102 @@ export function AgentCanvasView({
         setSelectedAnnotationId(a.id);
       }
     };
-    const baseCursor = tool === "connector" ? "crosshair" : "default";
+    const baseCursor = tool === "connector" || tool === "eraser" ? "crosshair" : isDragging ? "grabbing" : (tool === "select" && selectedAnnotationId === a.id) ? "grab" : "default";
+  const onAnnotationDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (a.kind === "sticky_note" || a.kind === "text") {
+      beginEditAnnotation(a);
+    }
+  };
+
     switch (a.kind) {
       case "sticky_note": {
         const fill = (a as { content: { color: string; text: string } }).content.color ?? "#f9d77e";
         const text = (a as { content: { color: string; text: string } }).content.text ?? "";
+        const isEditing = editingId === a.id;
         return (
-          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
-            <rect width={w} height={h} fill={fill} stroke={outline} strokeWidth={isSelected || isConnectSource ? 2 : 1} rx={2} />
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: isEditing ? "text" : baseCursor }} onClick={onAnnotationClick} onDoubleClick={onAnnotationDoubleClick}>
+            <rect width={w} height={h} fill={fill} stroke={outline} strokeWidth={isSelected || isConnectSource || isEditing ? 2 : 1} rx={2} />
             <foreignObject x={4} y={4} width={w - 8} height={h - 8}>
-              <div style={{ fontSize: 11 * viewport.zoom, color: "#0b0d10", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
-                {text}
-              </div>
+              {isEditing ? (
+                <textarea
+                  data-testid={`annotation-edit-${a.id}`}
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={() => void commitEditAnnotation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEditAnnotation();
+                    } else if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void commitEditAnnotation();
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    fontSize: 11 * viewport.zoom,
+                    color: "#0b0d10",
+                    lineHeight: 1.3,
+                    fontFamily: "system-ui",
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    resize: "none",
+                  }}
+                />
+              ) : (
+                <div style={{ fontSize: 11 * viewport.zoom, color: "#0b0d10", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", whiteSpace: "pre-wrap" }}>
+                  {text || (isSelected ? "(双击编辑)" : "")}
+                </div>
+              )}
             </foreignObject>
           </g>
         );
       }
       case "text": {
         const text = (a as { content: { text: string } }).content.text ?? "";
+        const isEditing = editingId === a.id;
         return (
-          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: isEditing ? "text" : baseCursor }} onClick={onAnnotationClick} onDoubleClick={onAnnotationDoubleClick}>
             <foreignObject width={w} height={h}>
-              <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary,#e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000" }}>
-                {text}
-              </div>
+              {isEditing ? (
+                <textarea
+                  data-testid={`annotation-edit-${a.id}`}
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={() => void commitEditAnnotation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEditAnnotation();
+                    } else if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void commitEditAnnotation();
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    fontSize: 14 * viewport.zoom,
+                    color: "var(--cel-text-primary,#e6edf3)",
+                    lineHeight: 1.3,
+                    fontFamily: "system-ui",
+                    background: "rgba(0,0,0,0.4)",
+                    border: "1px solid var(--cel-cyan,#00f0ff)",
+                    outline: "none",
+                    padding: 4,
+                    resize: "none",
+                  }}
+                />
+              ) : (
+                <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary,#e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000", whiteSpace: "pre-wrap" }}>
+                  {text || (isSelected ? "(双击编辑)" : "")}
+                </div>
+              )}
             </foreignObject>
           </g>
         );
@@ -819,12 +1003,18 @@ export function AgentCanvasView({
     );
   };
 
-  // minimap 计算
+  // minimap 计算 (per 任务 #7 — 把 annotation 也算到 minimap bbox)
   const { bbox } = useMemo(() => {
     const xs = canvas.nodes.map((n) => n.x);
     const ys = canvas.nodes.map((n) => n.y);
     const xe = canvas.nodes.map((n) => n.x + n.width);
     const ye = canvas.nodes.map((n) => n.y + n.height);
+    annotations.forEach((a) => {
+      xs.push(a.x);
+      ys.push(a.y);
+      xe.push(a.x + a.width);
+      ye.push(a.y + a.height);
+    });
     return {
       bbox: {
         minX: xs.length ? Math.min(...xs) - 60 : 0,
@@ -833,7 +1023,7 @@ export function AgentCanvasView({
         maxY: ye.length ? Math.max(...ye) + 60 : 800,
       },
     };
-  }, [canvas.nodes]);
+  }, [canvas.nodes, annotations]);
 
   return (
     <div data-testid="agent-canvas-container" className="relative w-full h-full bg-[#080c14] overflow-hidden select-none">
@@ -957,14 +1147,36 @@ export function AgentCanvasView({
             >
               <GitBranch size={13} />
             </button>
-            {selectedAnnotationId && (
+            <button
+              onClick={() => setTool("eraser")}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "eraser" ? "bg-[var(--cel-danger,#ff184c)] text-white" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:text-white"}`}
+              title="橡皮擦 — 点 annotation 即删 (per 任务 #6)"
+              data-testid="agent-canvas-tool-eraser"
+            >
+              <Eraser size={13} />
+            </button>
+            {(selectedAnnotationId || multiSelected.size > 0) && (
               <button
-                onClick={() => { void onDeleteAnnotation?.(selectedAnnotationId); setSelectedAnnotationId(null); }}
+                onClick={() => {
+                  const ids = new Set<string>(multiSelected);
+                  if (selectedAnnotationId) ids.add(selectedAnnotationId);
+                  if (ids.size === 0) return;
+                  if (ids.size === 1) {
+                    void onDeleteAnnotation?.([...ids][0]);
+                  } else {
+                    void onBulkDeleteAnnotation?.([...ids]);
+                  }
+                  setSelectedAnnotationId(null);
+                  setMultiSelected(new Set());
+                }}
                 className="px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:bg-[#ff184c] hover:text-white transition-all"
-                title="删除选中 annotation"
+                title={`删除选中 (${multiSelected.size + (selectedAnnotationId ? 1 : 0)}) annotation`}
                 data-testid="agent-canvas-tool-delete"
               >
                 <Trash2 size={13} />
+                {(multiSelected.size + (selectedAnnotationId ? 1 : 0)) > 1 && (
+                  <span className="text-[10px] font-mono">×{multiSelected.size + (selectedAnnotationId ? 1 : 0)}</span>
+                )}
               </button>
             )}
           </>
@@ -1045,6 +1257,28 @@ export function AgentCanvasView({
           </text>
         </g>
 
+        {/* marquee 框选 (per 任务 #4) */}
+        {marquee && (() => {
+          const minX = Math.min(marquee.startWorldX, marquee.endWorldX);
+          const maxX = Math.max(marquee.startWorldX, marquee.endWorldX);
+          const minY = Math.min(marquee.startWorldY, marquee.endWorldY);
+          const maxY = Math.max(marquee.startWorldY, marquee.endWorldY);
+          const sx = (minX - viewport.x) * viewport.zoom;
+          const sy = (minY - viewport.y) * viewport.zoom;
+          const w = (maxX - minX) * viewport.zoom;
+          const h = (maxY - minY) * viewport.zoom;
+          return (
+            <rect data-testid="agent-canvas-marquee"
+              x={sx} y={sy} width={w} height={h}
+              fill="rgba(0, 240, 255, 0.1)"
+              stroke="var(--cel-cyan,#00f0ff)"
+              strokeWidth={1}
+              strokeDasharray="4 4"
+              pointerEvents="none"
+            />
+          );
+        })()}
+
         {/* connectors (auto-laid, 节点之间的派生连线) */}
         {canvas.connectors.map(renderConnector)}
 
@@ -1104,6 +1338,41 @@ export function AgentCanvasView({
               opacity={0.8}
             />
           ))}
+          {/* 用户 connector 信标 (per 任务 #7) */}
+          {freeConnectors.map((c) => {
+            const from = annotations.find((a) => a.id === c.fromAnnotationId);
+            const to = annotations.find((a) => a.id === c.toAnnotationId);
+            if (!from || !to) return null;
+            return (
+              <line
+                key={c.id}
+                x1={from.x + from.width / 2}
+                y1={from.y + from.height / 2}
+                x2={to.x + to.width / 2}
+                y2={to.y + to.height / 2}
+                stroke="#00f0ff"
+                strokeWidth={1}
+                opacity={0.6}
+              />
+            );
+          })}
+          {/* annotation 信标 (per 任务 #7) — sticky=圆, text=空心, shape=方形, path=随机点 */}
+          {annotations.map((a) => {
+            const cx = a.x + a.width / 2;
+            const cy = a.y + a.height / 2;
+            if (a.kind === "sticky_note") {
+              const fill = (a.content as { color?: string }).color ?? "#f9d77e";
+              return <circle key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} cx={cx} cy={cy} r={4} fill={fill} stroke="#000" strokeWidth={0.5} opacity={0.9} />;
+            }
+            if (a.kind === "text") {
+              return <rect key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} x={cx - 3} y={cy - 3} width={6} height={6} fill="none" stroke="#e6edf3" strokeWidth={1} opacity={0.8} />;
+            }
+            if (a.kind === "shape") {
+              return <rect key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} x={a.x} y={a.y} width={a.width} height={a.height} fill="none" stroke="#a5d6ff" strokeWidth={1} opacity={0.7} />;
+            }
+            // path
+            return <circle key={a.id} data-testid={`agent-canvas-minimap-ann-${a.id}`} cx={cx} cy={cy} r={2} fill={(a.content as { brush_color?: string }).brush_color ?? "#e6edf3"} opacity={0.9} />;
+          })}
         </svg>
       </div>
 
