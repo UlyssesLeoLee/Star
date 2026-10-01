@@ -798,13 +798,150 @@ function fitToContentViewport(bbox: { minX: number; minY: number; maxX: number; 
 | # | 缺口 | 影响 | 后续 |
 |---|---|---|---|
 | G-1 | mock 数据 (跟全局一致); 真实后端 D.6+ 接入时改 store 即可, 组件不动 | 节点 / connector / status 都是 seed.ts 数据 | D.6+ 接入真实 data plane |
-| G-2 | 节点只读, 不能拖动 (派生视图; 拖动会跟 store 冲突) | 跟通用 CanvasView 区分; 用户编辑去 `/canvas/[id]` | Phase 2+ 看 DDD Review 拍板 |
+| G-2 | ~~节点只读, 不能拖动~~ — **v1.3 (2026-10-01) 节点本身仍只读 (派生), 用户注释层 annotation (sticky/text/shape/path) 可拖动/编辑/删除 (per SRS §13 + 设计 §7-UI 增量)** | 派生 vs 用户注释分层 | DDD Review 拍板 annotation backend 接入 |
 | G-3 | 不存到 store.canvasElements (避免污染; 用 derivedAt 时间戳触发重渲染) | F5 刷新会重派生 (~50ms) | 可接受 |
 | G-4 | 节点只显示 worktree_id 关联的 work-items, 不显示 assignee_id 关联 (per ids.ts schema 缺 `WorkItem.agent_session_id` 字段) | 当前 agent 跟 wi 是 worktree 中介关联 | DDD Review 拍板; 当前 schema gap |
 | G-5 | agent / worktree status 走 StatusPill 默认 prettify, 没有 i18n 字典 (StatusKind 只有 workItem / sprint / workItemKind / refactor 4 类) | 英文/日文显示会保留 snake_case | dictionary.ts v0.6+ 加 agent / worktree 状态表 |
-| G-6 | minimap 不支持点击跳转 (只是 viewport 可视化) | 用户 fit-to-content 用工具栏按钮代替 | P2 优化 |
+| G-6 | ~~minimap 不支持点击跳转~~ — **v1.3 (2026-10-01) minimap 现在还显示 5 种 annotation 信标 (sticky=圆/text=空心/shape=bbox/path=圆/free connector=连线)** | 全景可视化 + annotation 定位 | 点击跳转仍 P2 |
 
 **DDD Review 必查**: G-4 (schema gap) + G-5 (i18n) + G-2 (派生只读)
+
+---
+
+## 12.5 Miro-like 用户注释叠加层 (v1.3 增量)
+
+> 跟 §1-Scope + §12 G-2 配合. 派生节点保持只读; 用户写的 annotation 全可编辑.
+> 完整需求见 [SRS-AGENT-VIEW-001 §13](../requirements/SRS-AGENT-VIEW-001.md).
+
+### 12.5.1 アーキテクチャ概要
+
+```
+        /agent-view page
+              │
+              ▼
+        AgentCanvasView (readOnly=false)
+              │       │
+              │       ├─ readOnly: 派生节点 (agent/worktree/work_item) 只读
+              │       │           → 节点 onDoubleClick 跳详情 (跟 v1.0 一致)
+              │       │
+              │       └─ writeMode: 用户 annotation 自由编辑层 (v1.3 增量)
+                          ├─ sticky_note / text / shape / path (4 种 annotation)
+                          ├─ freeConnector (annotation 之间的用户连线)
+                          ├─ localStorage 持久化 (per agent-id)
+                          ├─ undo/redo (50 步)
+                          ├─ minimap 信标 (4 种 + connector)
+                          └─ 多选 / 框选 / eraser
+```
+
+### 12.5.2 データ設計 (增量)
+
+```ts
+// /lib/agent-view/types.ts
+export type AgentCanvasAnnotationKind = "sticky_note" | "text" | "shape" | "path";
+
+export interface AgentCanvasAnnotationBase {
+  id: string;
+  kind: AgentCanvasAnnotationKind;
+  x: number; y: number; width: number; height: number;
+  created_at: Iso8601;
+  created_by: Uuid;
+}
+
+export interface AgentCanvasStickyAnnotation extends AgentCanvasAnnotationBase {
+  kind: "sticky_note";
+  content: { color: string; text: string };
+}
+export interface AgentCanvasTextAnnotation extends AgentCanvasAnnotationBase {
+  kind: "text";
+  content: { text: string };
+}
+export interface AgentCanvasShapeAnnotation extends AgentCanvasAnnotationBase {
+  kind: "shape";
+  content: { shape: "rect" | "ellipse" };
+}
+export interface AgentCanvasPathAnnotation extends AgentCanvasAnnotationBase {
+  kind: "path";
+  content: { path_data: string; brush_size: number; brush_color: string };
+}
+
+export type AgentCanvasAnnotation =
+  | AgentCanvasStickyAnnotation
+  | AgentCanvasTextAnnotation
+  | AgentCanvasShapeAnnotation
+  | AgentCanvasPathAnnotation;
+
+export interface AgentCanvasFreeConnector {
+  id: string;
+  fromAnnotationId: string;
+  toAnnotationId: string;
+  color: string;
+  label?: string;
+}
+```
+
+### 12.5.3 モジュール設計 (增量)
+
+| ファイル | 役割 |
+|---|---|
+| `frontend/src/lib/agent-view/annotationApi.ts` | localStorage 读写 (load / save / clear / list) |
+| `frontend/src/lib/agent-view/annotationHistory.ts` | 纯函数 history (commit / undo / redo / canUndo / canRedo) |
+| `frontend/src/components/agent-view/AgentCanvasView.tsx` | 新增 props: `annotations` / `freeConnectors` / `onCreateAnnotation` / `onUpdateAnnotation` / `onDeleteAnnotation` / `onBulkDeleteAnnotation` / `onAnnotationPositionChange` / `onCreateFreeConnector` / `onDeleteFreeConnector` / `readOnly` |
+| `frontend/src/app/(app)/agent-view/page.tsx` | 接 localAnns / localConns / editMode / history 状态 + commitStateChange helper |
+
+### 12.5.4 動作設計 (增量)
+
+```
+[Edit Mode ON]
+  - toolbar 追加 5 创建工具 + 1 eraser
+  - 顶部追加 ↶ Undo / ↷ Redo
+  - cursor: select=default / pan=grab / drag=grabbing / connector/eraser=crosshair
+
+[Sticky tool active]
+  - SVG 空白 click → create sticky_note (180x100)
+  - 上文字 (双击) → 进入 textarea (foreignObject)
+  - Enter commit / Shift+Enter 多行 / Esc 取消 / blur auto-commit
+
+[Brush tool active]
+  - mousedown on SVG → start drawingPath
+  - mousemove → accumulate points (1.5 抖动阈值)
+  - mouseup → commit path annotation (bbox + 2x brush_size padding)
+
+[Connector tool active]
+  - click annotation A → connectSourceId=A (gold 高亮)
+  - click annotation B (≠ A) → create freeConnector (cyan)
+  - 切回 select tool
+
+[Drag selected annotation tool]
+  - mousedown on selected ann → dragState.type="annotation"
+  - mousemove → dragAnnPreview (实时)
+  - mouseup → if position changed, onAnnotationPositionChange(id, x, y)
+
+[Marquee select]
+  - mousedown on empty SVG (tool=select) → start marquee
+  - mousemove → 拉框 (cyan dashed)
+  - mouseup → AABB 命中 → multiSelected += hits
+  - Shift+框选 = 加选
+
+[Undo / Redo]
+  - ↶ click → undoStep(history) → setLocalAnns/Conns
+  - ↷ click → redoStep(history) → setLocalAnns/Conns
+  - 新操作 → 清空 future
+
+[Eraser tool active]
+  - click annotation → onDeleteAnnotation(id) → commitStateChange
+  - history 自动 record → Undo 可恢复
+
+[Minimap render]
+  - bbox = union(canvas.nodes, annotations)
+  - sticky → 4px 圆 / text → 6x6 空心 / shape → bbox / path → 2px 圆
+  - freeConnector → 端点中心连线 (1px cyan)
+```
+
+### 12.5.5 テスト設計
+
+- `annotationApi.test.ts` (6 case): 空/save/隔离/clear/损坏 fallback/list
+- `annotationHistory.test.ts` (9 case): init/commit/undo/redo/clear/limit/helper/no-op/connector
+- `AgentCanvasView.test.tsx` 增量: E~K (readOnly/tools/brush palette/annotation render/free connector/eraser/minimap)
 
 ---
 
@@ -828,6 +965,7 @@ function fitToContentViewport(bbox: { minX: number; minY: number; maxX: number; 
 |---|---|---|---|
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 14 段 (目的/范围/架构/機能/データ/動作/モジュール/画面+NFR/接口/守门/子代理/缺口/签字) | 2026-09-05 11:25 JST 用户发令 + 拍板 #1/#2/#3 + self-review 前置 |
 | v1.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | self-review fixes: (1) §12 编号重复 (缺口 §12 + 参考 §12) → 参考改为 §15, (2) §2.3 派生函数计数 (8 → 7 公开 + 2 内部 helper, 列 H-1/H-2), (3) §3.1 表格 F-AGV-N (本地) → FR-AGV-NNN (跟 SRS 一致) | 2026-09-05 self-review [PHASE-AGENT-VIEW-SELF-REVIEW.md](../reports/PHASE-AGENT-VIEW-SELF-REVIEW.md) v0.1 Finding #1 + #2 + #3 |
+| v1.3 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **Miro-like 注释叠加层**: §12.5 新增 (架构 + データ + モジュール + 動作 + テスト) 5 子节; §12 G-2/G-6 标记解决; 与 SRS-AGENT-VIEW-001 §13 同步 (FR-AGV-101~108 + NFR-AGV-ANN-PERSIST-001/HIST-002); PR #266 + #267 落地 | 2026-10-01 OOB 'miro的功能类似的都要的' + '按顺序都做' |
 
 ---
 

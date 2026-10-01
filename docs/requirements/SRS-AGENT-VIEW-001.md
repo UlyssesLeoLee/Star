@@ -18,6 +18,12 @@
 
 ## §0 文档信息 / 修订履历
 
+> 当前版本: **v1.3 (2026-10-01)** — Miro-like 用户注释叠加层 (per §13)
+> 上一版本: v1.1 (2026-09-05) — self-review fixes
+> 初版: v1.0 (2026-09-05)
+
+
+
 | 项目 | 内容 |
 |---|---|
 | 文书 ID | SRS-AGENT-VIEW-001 |
@@ -618,15 +624,154 @@ interface LayoutInput {
 | # | 风险 / 缺口 | 影响 | 缓解 / 后续 |
 |---|---|---|---|
 | 1 | mock 数据 (跟全局一致); 真实后端 D.6+ 接入时改 store 即可, 组件不动 | 节点 / connector / status 都是 seed.ts 数据 | D.6+ 接入真实 data plane; 现状不阻塞 UI 演示 |
-| 2 | 节点只读, 不能拖动 (派生视图; 拖动会跟 store 冲突) | 跟通用 CanvasView 区分; 用户编辑去 `/canvas/[id]` | Phase 2+ 看 DDD Review 拍板 |
+| 2 | ~~节点只读, 不能拖动 (派生视图; 拖动会跟 store 冲突)~~ — **v1.3 (2026-10-01) 用户注释层引入后, 节点本身仍只读, 但用户写的 annotation (sticky/text/shape/path/connector) 可拖动/编辑/删除, 详见 §13** | 跟通用 CanvasView 区分 (CanvasView 是完全自由的); annotation 走 §13 自己的 localStorage + undo/redo | D.6+ 后端接入时同步加 backend annotation 持久化 (替代 localStorage) |
 | 3 | 不存到 store.canvasElements (避免污染; 用 derivedAt 时间戳触发重渲染) | F5 刷新会重派生 (~50ms) | 可接受; 用户没要求 persist 派生视图 |
 | 4 | 节点只显示 worktree_id 关联的 work-items, 不显示 assignee_id 关联 (per ids.ts schema 缺 `WorkItem.agent_session_id` 字段) | 当前 agent 跟 wi 是 worktree 中介关联; 未来 DDD 加 `WorkItem.agent_session_id` 字段后可精确关联 | DDD Review 拍板; 当前 schema gap |
 | 5 | agent / worktree status 走 StatusPill 默认 prettify, 没有 i18n 字典 (StatusKind 只有 workItem / sprint / workItemKind / refactor 4 类) | 英文/日文显示会保留 snake_case (e.g. "awaiting_human" 而不是 "Awaiting Human") | dictionary.ts v0.6+ 加 agent / worktree 状态表 |
-| 6 | minimap 不支持点击跳转 (只是 viewport 可视化) | 用户 fit-to-content 用工具栏按钮代替 | P2 优化 |
+| 6 | ~~minimap 不支持点击跳转~~ — **v1.3 (2026-10-01) minimap 现在还显示 annotation 信标 (sticky=圆, text=空心, shape=bbox, path=圆, free connector=连线), 详见 §13 FR-13** | viewport 可视化 + annotation 全景 | 点击跳转仍 P2 backlog |
 | 7 | 当前 store 是 in-memory + zustand persist (localStorage); 多用户多 session 共享状态不可见 | 实际跨 session 协同走后端 (D.6+) | 当前 SPA 模式可接受 |
 | 8 | 5 域真人 Lead 到位前 Mavis 临时代签 | 真人到位后追溯签字覆盖 | per 9/3 19:35 JST 拍板 D 维持 |
+| 9 | annotation 当前走 localStorage, 不进 backend (per §13 FR-1 + §13 NFR-1) | 多用户/多 session 不共享 annotation | D.6+ 后端 annotationApi 拍板; 当前 SPA 单机演示可接受 |
 
 **DDD Review 必查**: 缺口 #4 (schema gap) + #5 (i18n) + #2 (派生只读)
+
+---
+
+## §13 Miro-like 用户注释叠加层 (per 2026-10-01 OOB 拍板)
+
+> 背景: 派生节点 (agent/worktree/work-item) 保持只读 (per §3.1 + 已知缺口 #2);
+> 但用户应能在画布上自由写注释 (便利贴 / 文字 / 图形 / 画笔 / 连线),
+> 类似 Miro / tldraw / excalidraw 体验。本节是新增 7 个 FR + 1 个 NFR 块。
+
+### 13.1 功能需求 (Functional Requirements)
+
+#### 13.1.1 FR-AGV-101 Annotation 持久化
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-101 |
+| 描述 | 系统应将用户的 annotation (sticky_note/text/shape/path) + free connector 在浏览器本地持久化 |
+| 存储 | localStorage, key = `star-agent-view-annotations:<agent-id>` |
+| 数据 shape | `{ annotations: AgentCanvasAnnotation[], freeConnectors: AgentCanvasFreeConnector[], savedAt: Iso8601 }` |
+| 行为 | agentId 变化 → load; annotations/connectors 变化 → save (debounce 不用, 直接同步写) |
+| 降级 | localStorage 不可用 (quota / private mode) → UI 仍可工作, 静默失败 |
+| 错误恢复 | JSON 损坏 / 异常 shape → fallback 空 state |
+| 优先级 | P0 (2026-10-01 PR #267) |
+
+#### 13.1.2 FR-AGV-102 Annotation 创建工具
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-102 |
+| 描述 | 系统应在 Edit Mode 下提供 5 个 annotation 创建工具: sticky / text / shape / brush / connector |
+| 行为 | 选 sticky tool → SVG 空白区点击 → 180x100 便利贴; 选 text → 200x60 文本框; 选 shape → 120x120 矩形; 选 brush → 拖动绘制 path (鼠标轨迹 → SVG `d` 属性); 选 connector → 点 annotation A → 点 annotation B → 自动连线 |
+| 调色板 (brush) | 5 主题色 + 4 档笔刷大小 (2/4/8/12 px) |
+| 优先级 | P0 (PR #266) |
+
+#### 13.1.3 FR-AGV-103 Annotation 文本编辑
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-103 |
+| 描述 | 系统应支持 annotation 文本内联编辑 (sticky_note + text 类型) |
+| 触发 | 双击 / 选同一 annotation 二次单击 |
+| 行为 | 编辑时渲染 `<textarea>` (foreignObject 内) 替代纯文本 |
+| 提交 | Enter / onBlur → 调 `onUpdateAnnotation` |
+| 多行 | Shift+Enter |
+| 取消 | Esc → 还原 |
+| 提示 | 空文本 + 选中状态显示 "(双击编辑)" 提示 |
+| 优先级 | P0 (PR #267 任务 #2) |
+
+#### 13.1.4 FR-AGV-104 Annotation 拖拽移动
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-104 |
+| 描述 | 系统应支持 annotation 拖拽移动 |
+| 交互 | 选中 annotation → cursor grab → 拖动 → 实时 preview (local state, 不重 commit) → 抬起 → 仅位置变化时调 `onAnnotationPositionChange` |
+| cursor | 选中 grab / 拖拽 grabbing |
+| 优先级 | P0 (PR #267 任务 #3) |
+
+#### 13.1.5 FR-AGV-105 多选 / Marquee 框选 / 批量删除
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-105 |
+| 描述 | 系统应支持多选 + 框选 + 批量删除 |
+| 多选 | Shift + 单击 annotation = 加选 |
+| 框选 | SVG 空白处 mousedown + drag → cyan dashed 矩形 (testid=agent-canvas-marquee) → 抬起时 AABB 命中 |
+| 框选加选 | Shift + 框选 → 已有 multiSelected + 新命中 |
+| 删除 | 工具栏按钮: 1 个选中 → `onDeleteAnnotation`; 多选 → `onBulkDeleteAnnotation` (显示 ×N) |
+| 级联 | 删除 annotation → 关联 free connector (from/to 命中) 自动清 |
+| 优先级 | P0 (PR #267 任务 #4) |
+
+#### 13.1.6 FR-AGV-106 Undo / Redo
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-106 |
+| 描述 | 系统应支持 annotation 操作的 undo / redo |
+| 数据 | `AnnotationHistoryState { past, current, future }` (snapshot 数组) |
+| 上限 | 50 步 (防止内存膨胀) |
+| 行为 | commit 操作 → push past; undo → swap past ↔ future; 新 commit → 清空 redo stack |
+| 快捷 | 顶部 toolbar ↶ Undo / ↷ Redo 按钮 (Edit Mode 显示, canUndo/canRedo 状态禁用) |
+| no-op | 同 snapshot (same refs) commit 不入 history |
+| 优先级 | P0 (PR #267 任务 #5) |
+
+#### 13.1.7 FR-AGV-107 Eraser 橡皮擦
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-107 |
+| 描述 | 系统应提供橡皮擦工具 |
+| 交互 | 选 Eraser tool → cursor crosshair → 单击 annotation 即删 (含级联 free connector) |
+| 行为 | 走 `onDeleteAnnotation` (单一) → history commit → Undo 可恢复 |
+| 视觉 | 工具栏按钮 lucide-eraser, red danger 色 |
+| 优先级 | P0 (PR #267 任务 #6) |
+
+#### 13.1.8 FR-AGV-108 Annotation Minimap 信标
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-AGV-108 |
+| 描述 | minimap 应显示 annotation 信标 |
+| 视觉规范 | sticky_note: 4px 圆 (按 sticky color); text: 6x6 空心 rect; shape: bbox 空心 rect (cyan); path: 2px 圆 (按 brush_color); free connector: 1px cyan 半透线 (端点中心连线) |
+| bbox 自适应 | minimap viewBox 包含 nodes + annotations (per task #7 bbox memo) |
+| 优先级 | P0 (PR #267 任务 #7) |
+
+### 13.2 非功能需求
+
+#### 13.2.1 NFR-AGV-ANN-PERSIST-001 本地存储隔离
+
+| 项 | 内容 |
+|---|---|
+| ID | NFR-AGV-ANN-PERSIST-001 |
+| 指标 | annotation 不污染全局 store; 不同 agentId 的 annotation 互不干扰 |
+| 测试 | vitest annotationApi.test.ts (6 case) — 验证 key 隔离 / 降级 / clear / list |
+| 优先级 | P0 |
+
+#### 13.2.2 NFR-AGV-ANN-HIST-002 History 内存安全
+
+| 项 | 内容 |
+|---|---|
+| ID | NFR-AGV-ANN-HIST-002 |
+| 指标 | past 数组上限 50 (防止内存膨胀); 同 ref commit 是 no-op (防止无意义挂载) |
+| 测试 | vitest annotationHistory.test.ts (9 case) — 含 F (50 步上限) + H (no-op) |
+| 优先级 | P0 |
+
+### 13.3 验收标准增量
+
+| ID | 描述 | 验证 |
+|---|---|---|
+| AC-AGV-ANN-1 | Edit Mode toggle 在空白处可开/关 | 工具栏切换 + 仅 Edit Mode 显示新工具 |
+| AC-AGV-ANN-2 | 5 个创建工具 (sticky/text/shape/brush/connector) + 1 eraser 工具可点可生成 annotation | 浏览器实测; SVG 含 data-testid |
+| AC-AGV-ANN-3 | annotation 可双击进入 textarea, Enter commit, Esc 取消 | 浏览器实测 |
+| AC-AGV-ANN-4 | annotation 可拖动 (mousedown + mousemove + mouseup) | 浏览器实测 |
+| AC-AGV-ANN-5 | 框选 + 多选 + trash 显示 ×N | 浏览器实测 |
+| AC-AGV-ANN-6 | ↶ Undo / ↷ Redo 状态正确反映 canUndo/canRedo | 浏览器实测 |
+| AC-AGV-ANN-7 | Eraser 点 annotation 即删, Undo 恢复 | 浏览器实测 |
+| AC-AGV-ANN-8 | Minimap 含 5 种 annotation 信标 | 浏览器实测; minimap SVG 含对应 data-testid |
+| AC-AGV-ANN-9 | localStorage 数据持久化跨 reload | 浏览器实测 (F5 后 annotation 保留) |
 
 ---
 
@@ -650,3 +795,4 @@ interface LayoutInput {
 |---|---|---|---|
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 12 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/验收/风险/签字) | 2026-09-05 11:25 JST 用户发令 "需要一个以当前工作 agent 为筛选模式的 view 界面, 形式是无限画布, 这个 agent 会有和它关联的任务, 数据对应 kanban 等界面的情况, 界面名字就是 Agent" + ask_user 拍板 #1/#2/#3 |
 | v1.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | self-review fixes: (1) AC-D-3 (DD 詳細設計書) 删除 (用户只要求 2 份, 不在范围), AC-D-4 → AC-D-3, (2) §7.4 数据流图加 internal helper 提示 (compareByStartedDescThenIdAsc / compareWorkItems) | 2026-09-05 self-review [PHASE-AGENT-VIEW-SELF-REVIEW.md](../reports/PHASE-AGENT-VIEW-SELF-REVIEW.md) v0.1 Finding #4 + #5 |
+| v1.3 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **Miro-like 用户注释叠加层**: §13 加 FR-AGV-101~108 (8 个功能需求) + NFR-AGV-ANN-PERSIST-001/HIST-002 (2 个非功能需求); §10 已知缺口 #2/#6 标记解决 + 新增 #9 (annotation backend 待办); §13.3 加 9 条验收标准增量; PR #266 + #267 落地 (7 commit 序列) | 2026-10-01 OOB '我说的无限画布是agent总览...和miro的功能类似的都要的' + '按顺序都做, 没做完一个就做一个提交' |
