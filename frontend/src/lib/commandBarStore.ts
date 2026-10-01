@@ -3,14 +3,16 @@
 // =====================================================================
 // - 与 W5 store 同样的 zustand+persist 模式
 // - 单独文件避免与 W5 大 store 产生 merge 冲突 (per worker 并行实装规则)
-// - 部分持久化: 只持久化 recent (open/close/query 每次会话无关)
+// - 部分持久化: 只持久化 recent (open/close/query/filter 每次会话无关)
 // - localStorage key: "star-commandbar:v1"
 // - SSR-safe storage (per W5 store.ts 同款)
+// - filter 字段: 2026-10-01 OOB 强化, 微信式 type chip 过滤
 // =====================================================================
 "use client";
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import type { SearchType } from "@/lib/search/globalSearch";
 
 export type CommandBarItemType = "page" | "command";
 
@@ -25,11 +27,14 @@ export interface RecentItem {
 export interface CommandBarState {
   isOpen: boolean;
   query: string;
+  /** 微信式 type chip 过滤 (per 2026-10-01 OOB) */
+  filter: SearchType | "all";
   recent: RecentItem[];
   open: () => void;
   close: () => void;
   toggle: () => void;
   setQuery: (q: string) => void;
+  setFilter: (f: SearchType | "all") => void;
   pushRecent: (item: RecentItem) => void;
   clearRecent: () => void;
 }
@@ -67,11 +72,13 @@ export const useCommandBarStore = create<CommandBarState>()(
     (set) => ({
       isOpen: false,
       query: "",
+      filter: "all",
       recent: [],
-      open: () => set({ isOpen: true, query: "" }),
+      open: () => set({ isOpen: true, query: "", filter: "all" }),
       close: () => set({ isOpen: false, query: "" }),
-      toggle: () => set((s) => ({ isOpen: !s.isOpen, query: !s.isOpen ? "" : s.query })),
+      toggle: () => set((s) => ({ isOpen: !s.isOpen, query: !s.isOpen ? "" : s.query, filter: !s.isOpen ? "all" : s.filter })),
       setQuery: (q) => set({ query: q }),
+      setFilter: (f) => set({ filter: f }),
       pushRecent: (item) =>
         set((s) => {
           // 去重 + 最多 5 条 + 最新在前
@@ -83,9 +90,9 @@ export const useCommandBarStore = create<CommandBarState>()(
     {
       name: "star-commandbar:v1",
       storage: ssrSafeStorage,
-      // 只持久化 recent, isOpen/query 每次会话无关
+      // 只持久化 recent, isOpen/query/filter 每次会话无关
       partialize: (state) => ({ recent: state.recent }),
-      version: 1,
+      version: 2,
     }
   )
 );

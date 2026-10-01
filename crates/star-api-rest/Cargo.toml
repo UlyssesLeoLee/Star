@@ -84,6 +84,7 @@ domain-hook = { path = "../domain-hook" }
 star-webhook = { path = "../star-webhook" }
 # Context (P0-1 联动审计 ActorContext 共享, per AGENTS.md §4.1 v16)
 star-context = { path = "../star-context" }
+star-dto = { path = "../star-dto" }
 # 注意: star-mcp 只有 [[bin]] 无 [lib], 不可作 path dep;
 #       共享鉴权逻辑放 star-context (per P0-1 联动审计, AGENTS.md §4.1 v16)
 

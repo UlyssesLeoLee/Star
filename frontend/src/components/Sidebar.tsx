@@ -22,7 +22,9 @@ import {
   type SubNavEntry,
 } from "@/lib/nav/subNavRegistry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
-import { SidebarWorktreesCard } from "@/components/worktree-shared/SidebarWorktreesCard";
+import { ProjectWorktreeIndexLink } from "@/components/worktree-shared/ProjectWorktreeIndexLink";
+import { ProjectRunTree } from "@/components/run/ProjectRunTree";
+import { useRunDirectory } from "@/lib/run/runDirectorySession";
 
 // =====================================================================
 // Sidebar — 折叠 + scope toggle 双模态侧栏
@@ -59,6 +61,9 @@ export function Sidebar() {
   const setSidebarScope = useNavStore((s) => s.setSidebarScope);
   const toggleSidebarFold = useNavStore((s) => s.toggleSidebarFold);
   const setSidebarFold = useNavStore((s) => s.setSidebarFold);
+  const selectedProjectId = useNavStore((s) => s.selectedProjectId);
+  const { focus: runFocus } = useRunDirectory();
+  const projectIndexHint = runFocus?.run_context.project_id ?? selectedProjectId;
 
   useEffect(() => setMounted(true), []);
 
@@ -89,9 +94,15 @@ export function Sidebar() {
     () => (subNavGroup ? findActiveSubNavItem(subNavGroup, searchString) : null),
     [subNavGroup, searchString]
   );
-  // project scope 可用性: 仅在 /projects 路径下, 其他路径下灰显
-  // (per 拍板 #2: 项目专属导航条仅在选中项目时才有意义, 路径外不可达)
-  const isProjectScopeAvailable = pathname === "/projects" || pathname.startsWith("/projects/") || pathname.startsWith("/projects?");
+  // Project scope stays available in the Project workspace and the Project Worktree Index.
+  // A validated Run focus supplies the route hint; the Index still reloads its authorized directory.
+  const hasSelectedProject = projectIndexHint.trim().length > 0;
+  const isProjectWorkspacePath = pathname === "/projects" || pathname.startsWith("/projects/");
+  const isProjectWorktreePath = pathname === "/worktree" || pathname.startsWith("/worktree/");
+  const isProjectScopeAvailable =
+    hasSelectedProject ||
+    isProjectWorkspacePath ||
+    isProjectWorktreePath;
 
   // 键盘快捷键 Ctrl+B 折叠/展开 (per 守门 #11 缺标比错标: shortcut 是 power user
   // 必备延伸, 不强制; 这里落地)
@@ -107,8 +118,7 @@ export function Sidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebarFold]);
 
-  // 自动 fallback: pathname 离开 /projects 时, scope 强制回 main
-  // 防止用户折叠后忘了切回, 看到的是空 project scope
+  // 自动 fallback: 离开 Project pages 与 Worktree Index 后回到 main scope.
   useEffect(() => {
     if (sidebarScope === "project" && !isProjectScopeAvailable) {
       setSidebarScope("main");
@@ -169,7 +179,7 @@ export function Sidebar() {
                 </span>
               </div>
               <div className="text-[11px] font-mono tracking-wider text-[var(--cel-text-secondary,#94a3b8)] uppercase font-bold">
-                〔統制司令部〕
+                時の限界を打ち砕け！！
               </div>
             </div>
           )}
@@ -222,16 +232,27 @@ export function Sidebar() {
         )}
         aria-label={sidebarScope === "project" ? "Project Navigation" : "Main Navigation"}
       >
+        <ProjectRunTree collapsed={isCollapsed} />
         {sidebarScope === "project" ? (
-          subNavGroup ? (
-            <SubNavGroupList
-              group={subNavGroup}
-              activeId={activeSubNavId}
-              collapsed={isCollapsed}
-            />
-          ) : (
-            <EmptyProjectState collapsed={isCollapsed} />
-          )
+          <>
+            {isProjectWorkspacePath && subNavGroup && (
+              <SubNavGroupList
+                group={subNavGroup}
+                activeId={activeSubNavId}
+                collapsed={isCollapsed}
+              />
+            )}
+            {(isProjectWorkspacePath || hasSelectedProject || isProjectWorktreePath) && (
+              <ProjectWorktreeIndexLink
+                projectId={projectIndexHint}
+                active={pathname === "/worktree"}
+                collapsed={isCollapsed}
+              />
+            )}
+            {!isProjectWorkspacePath && !hasSelectedProject && !isProjectWorktreePath && (
+              <EmptyProjectState collapsed={isCollapsed} />
+            )}
+          </>
         ) : (
           <>
             {/* Core Workspaces (用户自定义定制列表) */}
@@ -303,15 +324,6 @@ export function Sidebar() {
           </>
         )}
       </nav>
-
-      {/* === Hidden Worktrees Card (ULYS-228 FR-ORCA-011 AC-2) ===
-          折叠态隐藏, 展开态显示在底部 footer 之前. 当前用 placeholder repo_id,
-          生产环境从 /projects/[id] 路由参数注入. */}
-      {!isCollapsed && sidebarScope === "project" && isProjectScopeAvailable && (
-        <div className="shrink-0 px-3 py-3">
-          <SidebarWorktreesCard repoId="00000000-0000-0000-0000-000000000001" />
-        </div>
-      )}
 
       {/* === Bottom Tactical HUD Footer (仅展开态可见) === */}
       {!isCollapsed && (

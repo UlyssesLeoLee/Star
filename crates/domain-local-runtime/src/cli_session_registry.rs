@@ -4,6 +4,10 @@
 //! CREATE (f:File {name:"cli_session_registry.rs",type:"file",language:"rust"}),(m:Module {name:"cli_session_registry",type:"module",language:"rust"}),(nonce_ledger:Class {name:"task_cli_grant_nonce_ledger",type:"class",classification:"work"}),(ticket_ledger:Class {name:"task_cli_attachment_ticket",type:"class",classification:"work"}),(binding:Class {name:"TaskCliAttachmentTicketBinding",type:"class",language:"rust"}),(consume_nonce:Function {name:"consume_task_grant_nonce",type:"function"}),(issue_ticket:Function {name:"issue_task_cli_attachment_ticket",type:"function"}),(consume_ticket:Function {name:"consume_task_cli_attachment_ticket",type:"function"}),(hash_ticket:Function {name:"hash_attachment_ticket",type:"function"}),(valid_binding:Function {name:"validate_attachment_binding",type:"function"}),(ttl:Variable {name:"ATTACHMENT_TICKET_MAX_TTL_SECONDS",type:"variable"}),(single_use_test:Function {name:"attachment_ticket_is_single_use_and_scope_bound",type:"function"}),(expiry_test:Function {name:"expired_attachment_ticket_is_rejected",type:"function"});
 //! CREATE (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(nonce_ledger),(m)-[:CONTAINS]->(ticket_ledger),(m)-[:CONTAINS]->(binding),(m)-[:CONTAINS]->(consume_nonce),(m)-[:CONTAINS]->(issue_ticket),(m)-[:CONTAINS]->(consume_ticket),(m)-[:CONTAINS]->(hash_ticket),(m)-[:CONTAINS]->(valid_binding),(m)-[:CONTAINS]->(ttl),(m)-[:CONTAINS]->(single_use_test),(m)-[:CONTAINS]->(expiry_test),(consume_nonce)-[:WRITES]->(nonce_ledger),(issue_ticket)-[:WRITES]->(ticket_ledger),(issue_ticket)-[:CALLS]->(hash_ticket),(issue_ticket)-[:CALLS]->(valid_binding),(issue_ticket)-[:USES]->(ttl),(consume_ticket)-[:WRITES]->(ticket_ledger),(consume_ticket)-[:CALLS]->(hash_ticket),(consume_ticket)-[:CALLS]->(valid_binding),(single_use_test)-[:CALLS]->(issue_ticket),(single_use_test)-[:CALLS]->(consume_ticket),(expiry_test)-[:CALLS]->(issue_ticket),(expiry_test)-[:CALLS]->(consume_ticket);
 //!
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_session_registry",type:"module",language:"rust"}),(registry:Class {name:"CliSessionRegistry",type:"class"}),(error:Enum {name:"CliSessionRegistryError",type:"enum"});
+//! CREATE (consume_fence:Function {name:"CliSessionRegistry::consume_task_run_spawn_fence",type:"function",language:"rust"}),(fence_ledger:Class {name:"task_run_spawn_fence_ledger",type:"class",language:"sqlite"}),(fence_replay:Logic {name:"spawn fence replay rollback",type:"logic",language:"rust"}),(fence_atomic_test:Function {name:"profile_bound_fence_and_nonce_consume_atomically",type:"function",language:"rust"}),(fence_capacity:Variable {name:"MAX_RUNTIME_SPAWN_FENCE_RECEIPTS",type:"variable",language:"rust"});
+//! CREATE (registry)-[:HAS_METHOD]->(consume_fence),(m)-[:CONTAINS]->(fence_ledger),(m)-[:CONTAINS]->(fence_replay),(m)-[:CONTAINS]->(fence_atomic_test),(m)-[:CONTAINS]->(fence_capacity),(consume_fence)-[:USES]->(fence_ledger),(consume_fence)-[:CALLS]->(fence_replay),(consume_fence)-[:USES]->(fence_capacity),(fence_replay)-[:USES]->(error),(fence_atomic_test)-[:CALLS]->(consume_fence);
 //! 实现 [ULYS-156](https://app.multica.ai/issue/01a0bf6b-486c-71b8-9bf4-92bde909c7f8)
 //! §A 单进程持久化层适配 路线下的 "cli_session_registry" 模块:
 //!
@@ -47,11 +51,13 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use chrono::{DateTime, TimeZone, Utc};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
+
+const MAX_RUNTIME_SPAWN_FENCE_RECEIPTS: i64 = 50_000;
 
 use super::cli_session::{CliSession, CliSessionState, CliSessionTransition};
 use super::{CliSessionId, TenantId, WorktreeId};
@@ -87,6 +93,12 @@ pub enum CliSessionRegistryError {
     /// 授权 nonce 已在此 Runtime 消费
     #[error("task execution grant nonce was already consumed")]
     GrantNonceReplay,
+    /// Profile-bound Runtime fence 已在此 Runtime 消费。
+    #[error("task Run spawn fence was already consumed")]
+    SpawnFenceReplay,
+    /// Bounded local replay receipt capacity is exhausted; admission must fail closed.
+    #[error("task Run spawn fence receipt capacity is exhausted")]
+    SpawnFenceLedgerFull,
     /// 授权 nonce 为空、租户为空或 grant 已过期/超出允许窗口
     #[error("task execution grant nonce or expiry is invalid")]
     InvalidGrantNonce,
@@ -213,6 +225,32 @@ impl CliSessionRegistry {
             );
             CREATE INDEX IF NOT EXISTS idx_task_cli_grant_nonce_tenant_expiry
                 ON task_cli_grant_nonce_ledger(tenant_id, expires_at_ms);
+            CREATE TABLE IF NOT EXISTS task_run_spawn_fence_ledger (
+                fence_id          TEXT PRIMARY KEY NOT NULL,
+                tenant_id         TEXT NOT NULL,
+                grant_nonce       TEXT NOT NULL UNIQUE,
+                binding_digest    BLOB NOT NULL CHECK (length(binding_digest) = 32),
+                expires_at_ms     INTEGER NOT NULL,
+                consumed_at_ms    INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_task_run_spawn_fence_expiry
+                ON task_run_spawn_fence_ledger(expires_at_ms);
+            CREATE TABLE IF NOT EXISTS task_run_spawn_fence_receipt_count (
+                singleton_id    INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+                retained_count  INTEGER NOT NULL CHECK (retained_count >= 0)
+            );
+            INSERT OR IGNORE INTO task_run_spawn_fence_receipt_count(singleton_id,retained_count)
+                SELECT 1, COUNT(*) FROM task_run_spawn_fence_ledger;
+            CREATE TRIGGER IF NOT EXISTS trg_task_run_spawn_fence_count_insert
+            AFTER INSERT ON task_run_spawn_fence_ledger BEGIN
+                UPDATE task_run_spawn_fence_receipt_count
+                SET retained_count = retained_count + 1 WHERE singleton_id = 1;
+            END;
+            CREATE TRIGGER IF NOT EXISTS trg_task_run_spawn_fence_count_delete
+            AFTER DELETE ON task_run_spawn_fence_ledger BEGIN
+                UPDATE task_run_spawn_fence_receipt_count
+                SET retained_count = retained_count - 1 WHERE singleton_id = 1;
+            END;
             CREATE TABLE IF NOT EXISTS task_cli_attachment_ticket (
                 ticket_hash    TEXT PRIMARY KEY NOT NULL,
                 tenant_id      TEXT NOT NULL,
@@ -260,10 +298,9 @@ impl CliSessionRegistry {
         let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         tx.execute(
             "DELETE FROM task_cli_grant_nonce_ledger WHERE expires_at_ms <= ?1",
-            params![
-                now.timestamp_millis()
-                    .saturating_sub(chrono::Duration::minutes(5).num_milliseconds())
-            ],
+            params![now
+                .timestamp_millis()
+                .saturating_sub(chrono::Duration::minutes(5).num_milliseconds())],
         )?;
         let inserted = tx.execute(
             r#"INSERT OR IGNORE INTO task_cli_grant_nonce_ledger
@@ -277,6 +314,85 @@ impl CliSessionRegistry {
         )?;
         if inserted != 1 {
             return Err(CliSessionRegistryError::GrantNonceReplay);
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Atomically consume a signed grant nonce and C4 Runtime fence under one SQLite transaction.
+    /// Both short-lived Work/replay receipts commit together or neither does.
+    pub fn consume_task_run_spawn_fence(
+        &self,
+        tenant_id: Uuid,
+        nonce: Uuid,
+        fence_id: Uuid,
+        binding_digest: [u8; 32],
+        expires_at: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Result<(), CliSessionRegistryError> {
+        if tenant_id.is_nil()
+            || nonce.is_nil()
+            || fence_id.is_nil()
+            || expires_at <= now
+            || expires_at > now + chrono::Duration::seconds(30)
+        {
+            return Err(CliSessionRegistryError::InvalidGrantNonce);
+        }
+
+        let mut conn = self
+            .grant_nonce_conn
+            .lock()
+            .expect("task grant nonce connection mutex poisoned");
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let retention_cutoff = now
+            .timestamp_millis()
+            .saturating_sub(chrono::Duration::minutes(5).num_milliseconds());
+        tx.execute(
+            "DELETE FROM task_cli_grant_nonce_ledger WHERE expires_at_ms <= ?1",
+            params![retention_cutoff],
+        )?;
+        tx.execute(
+            "DELETE FROM task_run_spawn_fence_ledger WHERE expires_at_ms <= ?1",
+            params![retention_cutoff],
+        )?;
+        let retained_fences: i64 = tx.query_row(
+            "SELECT retained_count FROM task_run_spawn_fence_receipt_count WHERE singleton_id = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        if retained_fences >= MAX_RUNTIME_SPAWN_FENCE_RECEIPTS {
+            return Err(CliSessionRegistryError::SpawnFenceLedgerFull);
+        }
+
+        let nonce_inserted = tx.execute(
+            r#"INSERT OR IGNORE INTO task_cli_grant_nonce_ledger
+               (nonce,tenant_id,expires_at_ms,consumed_at_ms) VALUES (?1,?2,?3,?4)"#,
+            params![
+                nonce.to_string(),
+                tenant_id.to_string(),
+                expires_at.timestamp_millis(),
+                now.timestamp_millis()
+            ],
+        )?;
+        if nonce_inserted != 1 {
+            return Err(CliSessionRegistryError::GrantNonceReplay);
+        }
+
+        let fence_inserted = tx.execute(
+            r#"INSERT OR IGNORE INTO task_run_spawn_fence_ledger
+               (fence_id,tenant_id,grant_nonce,binding_digest,expires_at_ms,consumed_at_ms)
+               VALUES (?1,?2,?3,?4,?5,?6)"#,
+            params![
+                fence_id.to_string(),
+                tenant_id.to_string(),
+                nonce.to_string(),
+                &binding_digest[..],
+                expires_at.timestamp_millis(),
+                now.timestamp_millis()
+            ],
+        )?;
+        if fence_inserted != 1 {
+            return Err(CliSessionRegistryError::SpawnFenceReplay);
         }
         tx.commit()?;
         Ok(())
@@ -685,6 +801,50 @@ mod tests {
 
     fn reg() -> CliSessionRegistry {
         CliSessionRegistry::in_memory().expect("in-memory sqlite")
+    }
+
+    #[test]
+    fn profile_bound_fence_and_nonce_consume_atomically() {
+        let registry = reg();
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let tenant_id = Uuid::new_v4();
+        let nonce = Uuid::new_v4();
+        let fence_id = Uuid::new_v4();
+
+        registry
+            .consume_task_run_spawn_fence(
+                tenant_id,
+                nonce,
+                fence_id,
+                [7; 32],
+                now + chrono::Duration::seconds(20),
+                now,
+            )
+            .unwrap();
+
+        let rolled_back_nonce = Uuid::new_v4();
+        assert!(matches!(
+            registry.consume_task_run_spawn_fence(
+                tenant_id,
+                rolled_back_nonce,
+                fence_id,
+                [7; 32],
+                now + chrono::Duration::seconds(20),
+                now,
+            ),
+            Err(CliSessionRegistryError::SpawnFenceReplay)
+        ));
+
+        registry
+            .consume_task_run_spawn_fence(
+                tenant_id,
+                rolled_back_nonce,
+                Uuid::new_v4(),
+                [8; 32],
+                now + chrono::Duration::seconds(20),
+                now,
+            )
+            .unwrap();
     }
 
     fn make_session(tenant: TenantId, worktree: WorktreeId) -> CliSession {

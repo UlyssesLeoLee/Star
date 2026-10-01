@@ -81,6 +81,10 @@
 //! MATCH (m:Module {name:"group_api",type:"module"});
 //! CREATE (xr:Module {name:"execution_resources",type:"module",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(xr);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"})
+//! CREATE (erun:Module {name:"engineering_runs",type:"module",language:"rust"}),(erouter:Function {name:"engineering_runs::router",type:"function",language:"rust"}),
+//! (m)-[:CONTAINS]->(erun),(b)-[:CALLS]->(erouter);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -107,6 +111,7 @@ use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
 mod canvas;
 mod cli_sessions;
+mod engineering_runs;
 mod execution_catalogs;
 mod execution_profile_admin;
 mod execution_profiles;
@@ -586,6 +591,7 @@ async fn active_binding(
         WHERE tenant_id = $1
           AND project_id = $2
           AND user_id = $3
+          AND valid_from <= now()
           AND valid_to IS NULL
         FOR SHARE
         "#,
@@ -640,6 +646,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
             get(resolve_worktree_context),
         )
         .merge(worktrees::router())
+        .merge(engineering_runs::router())
         .merge(worktree_lifecycle::router())
         .merge(work_items::router())
         .merge(cli_sessions::router())

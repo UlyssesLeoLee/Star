@@ -1,12 +1,12 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.14** (per 日本 IPA SEC 标准，补充双 Profile Runtime spawn fence、现存 Local Runtime 基础验证边界与高级设置导航层级)
+> **Multica Task Lifecycle 域 詳細設計書 v1.16** (per 日本 IPA SEC 标准，补充 Run-owned Work Item/BI 边界及 API-first service decomposition)
 >
-> - 状态: 🟡 Draft v1.14 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；9E-4C4 已有 typed dual-Profile fence、Run identity migration 与 Detail 投影切片，但 production Runtime consumer、reservation lifecycle、target DB/Auth/RLS grants、catalog publisher 与 BI/Outbox 仍开放)
+> - 状态: 🟡 Draft v1.16 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；9E-4C4 dual-Profile fence/Run 投影与 9E-4C5 shared DTO、签名 v2 和本地原子 consume foundation 已有代码切片；Run-owned Task/BI 数据范围与 API-first service boundary 已设计，仍未实施 Run registry/API migration；production provisioner、ACL/provider、reservation lifecycle、OS spawn adapter、target DB/Auth/RLS grants、catalog publisher 与 BI/Outbox 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.40 §50；`docs/basic-design.md` v5.36 §16.14-16.17
-> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.42 §50；`docs/basic-design.md` v5.39 §16.14-16.19
+> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.25；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.5
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
@@ -863,10 +863,11 @@ Phase 8A 已新增 additive migration `db/migrations/2026-09-30-worktree-task-ex
 
 | 方法 / 路径 | 行为与边界 |
 |---|---|
-| `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs?limit=&cursor_started_at=&cursor_run_id=` | 验证 Bearer Actor、`work-item:read`、tenant、当前 Project membership、Worktree binding 与 WorkItem/Worktree 归属；默认 20 条、最多 50 条；复合 `(started_at, run_id)` 倒序游标；返回最小 Run summary、独立状态维度和下一游标 |
-| `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs/{run_id}` | 使用相同 scope 授权并确认 Run 属于路径 Task；最多返回 100 个 Event 与 100 个 Evidence 的结构化 projection |
+| `GET /api/v1/engineering-runs/{engineering_run_id}/work-items/{work_item_id}/runs?limit=&cursor_started_at=&cursor_run_id=` | canonical Run-owned query；验证 Bearer Actor、`work-item:read`、Project/Branch/Run membership 与 WorkItem/Run 归属；默认 20 条、最多 50 条；复合 `(started_at, run_id)` 倒序游标；返回最小 Run summary、独立状态维度和下一游标 |
+| `GET /api/v1/engineering-runs/{engineering_run_id}/work-items/{work_item_id}/runs/{run_id}` | 使用相同 Run scope 授权并确认 TaskExecutionRun 属于路径 Task；最多返回 100 个 Event 与 100 个 Evidence 的结构化 projection |
+| `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs...` | 当前 Phase 8B 兼容实现；服务端验证 Worktree→Run binding 后代理至 canonical owner query，不构成 Worktree ownership |
 
-两个响应均 `Cache-Control: no-store`。读取层不序列化任意 Event `details`、artifact locator、文件正文、prompt、完整 transcript 或模型推理；敏感证据的正文/locator 需由另外的、逐次授权的 artifact API 提供。execution / verification / human acceptance 各自取对应字段最新的非空 Event，不能按整行最新事件把彼此状态覆盖。Task Card 的 Run History 面板只在认证 Group API provider 下出现，保留当前有界页面而不缓存整个历史；加载错误/身份变化必须清空数据，不回退本地 seed。该前端不增加 Worktree 导航层级。
+两个 canonical 响应均 `Cache-Control: no-store`。读取层不序列化任意 Event `details`、artifact locator、文件正文、prompt、完整 transcript 或模型推理；敏感证据的正文/locator 需由另外的、逐次授权的 artifact API 提供。execution / verification / human acceptance 各自取对应字段最新的非空 Event，不能按整行最新事件把彼此状态覆盖。Task Card 的 Run History 面板只在认证 Run API provider 下出现，保留当前有界页面而不缓存整个历史；加载错误/身份变化必须清空数据，不回退本地 seed。现有 Worktree route 与 UI 是 Phase 8B 条件式 compatibility slice；目标 DB/Run registry/RLS migration 与 canonical Run API 仍未完成。
 
 当前实现状态：list/detail 路由和 Task Card 条件式历史面板已落代码；查询边界由 actor/context/关联校验执行。单测与前端类型检查已通过。隔离 PostgreSQL migration 重放与 FORCE RLS 检查已通过，但 `localhost:5432` 目标开发库不可用，目标 DB/runtime grants 和 API 对真实 RLS 的端到端验收仍未完成。Task Contract 写命令、其余 Run Event/Evidence producer 与生产 Runtime 仍为未完成项。
 
@@ -880,7 +881,7 @@ REST 随后开短事务重新设置 tenant/actor scope，重验 membership、Wor
 
 ### 14.8 Project BI、Benchmark 与改进闭环
 
-BI 是 Run/Event/Evidence/Audit 的只读、可重建 Project projection，不产生第二套事实。每个 `metric_version` 固定 formula、numerator/denominator、unit、window、cohort、coverage 和 source event types；缺数据不补零。按 task type/complexity 分层，核心度量包括 acceptance、first-pass acceptance、rework、人工介入、cycle time、accepted-task cost，并下钻到 Task → Run → Evidence。项目导航只在 Project Worktree Index 提供 Quality & Improvement 入口；Worktree 内不添加“Run”导航层级，Run 留在 Task Card detail。
+Run BI/Benchmark 是 Engineering Run workspace 内与 Task Card/Canvas 同级的只读 App，分析 Run/Event/Evidence/Audit 且不产生第二套事实。Project Quality & Improvement 是跨 Branch/Run 的 aggregate view，可从 Project Worktree Index 或 Project summary 进入；它消费授权 Run projections 并下钻 Task → TaskExecutionRun → Evidence。每个 `metric_version` 固定 formula、numerator/denominator、unit、window、cohort、coverage 和 source event types；缺数据不补零。按 task type/complexity 分层，核心度量包括 acceptance、first-pass acceptance、rework、人工介入、cycle time、accepted-task cost。EngineeringRun 是 Work Item/Canvas/Workflow/BI 的范围；Worktree 是可选执行 checkout，与 `TaskExecutionRun` 区分。
 
 Benchmark 保存固定 task set/version、repository commit、运行环境、Task Contract、scoring rule 与隔离 replay receipt；tuning/holdout 分集并禁止候选策略查看 holdout 后回写标准。不可复现条件明确保存为 metadata。Improvement proposal 串起触发失败事件、假设、实验、benchmark 对比、授权采纳版本与 rollback 版本。Phase 10-11 尚无生产实现；schema、Metric API/UI、隔离 runner、approval policy 和 BI coverage 尚待各阶段完成。
 
@@ -1022,7 +1023,19 @@ Commit 后把同一 fence 对象交给 `TaskCliSessionProvisioner::start_task_cl
 
 幂等 `request_fingerprint` 与 `spawn_fence_binding_digest` 承担不同职责：前者以显式版本兼容旧 Run replay，表示客户端请求身份并固定所选 Profile IDs；后者额外绑定服务端解析到的 Profile versions/digests、catalog/HookSet revisions、资源预算和安全 scope，因此 catalog revision 改变不能沿用旧 fence，也不会把一次批准误作成功执行。Run Summary/Detail 返回两类 Profile identity 与 binding digest，不返回可重放 fence handle。
 
-9E-4C4 已交付 Rust REST typed contract/binding validator、`ExecutionCatalogRevisionFence::revisions()` 小型 revision 投影、dual Profile/binding digest Run migration、Run writer 与 Run list/detail projection。既有 `domain-local-runtime::task_execution` 只校验签名 grant、scope、Approved Launch Profile ID/字段、canonical checkout、有效期和一次性 nonce；签名 context 未绑定 Launch Profile version/digest、AgentExecutionProfile、catalog/HookSet/ResourceBudget 或 C4 fence digest，该 helper 也没有接入生产 provisioner/OS spawn，因此不构成 C4 Runtime consumer。当前仍缺生产 Approved Launch Profile authority/provider、真实 Runtime fence store/consumer、OS process adapter 或消费后 reservation lifecycle；目标 DB/RLS grants、真实 Auth/Project ACL、catalog publisher/source load、过期 reservation/epoch cleanup 与完整 Outbox/BI 仍开放。`supports_profile_bound_run_admission()` 和 current catalog capability 均保持默认 false，因此本切片不允许任何新 Profile-bound Run 真正 spawn。Hooks 仍按 ULYS-235 位于 Settings 主导航“高级设置”父入口下，规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab；不是独立主导航项或 Worktree 树节点。
+9E-4C4 已交付 REST typed contract/binding validator、Run identity migration/writer 与 Run list/detail projection。9E-4C5 将同一 strict fence wire type 提取到 `star-dto::task_run`，新增 grant signature v2 对完整 fence 的认证，同时保留缺省 fence 的 v1 序列化兼容；Local Runtime 新增 current-binding compare、Profile revision/digest 校验与 nonce+fence 同事务 one-time receipt consume helper，并为 receipt 设置 50,000 条硬上限及到期后 5 分钟清理窗口。该 helper 尚未由 `TaskCliSessionProvisioner` 调用，不具备实时 ACL/provider/catalog/HookSet/reservation authority，也不创建或监督 OS process，因此它是 consumer foundation，不是 production C4 consumer。Production Approved Launch Profile authority/provider、当前授权与依赖 source、target DB/RLS grants、catalog publisher、reservation activate/release、OS spawn/sandbox、Outcome event/BI 仍未接通；`supports_profile_bound_run_admission()` 与 current catalog capability 继续默认 false，不允许新 Profile-bound Run spawn。Hooks 仍按 ULYS-235 位于 Settings 主导航“高级设置”父入口下，规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab；不是独立主导航项或 Worktree 树节点。
+
+#### 14.11.12 Phase 9E-4C5 Runtime 双 Profile fence 消费基础设施
+
+REST 与 Local Runtime 共用 `star-dto::task_run` 中的 `TaskRunSpawnFenceBindingV1`。DTO 采用 `deny_unknown_fields`，字段为固定 UUID/整数/32-byte fingerprint、3 个 lowercase SHA-256 identity digest 和固定 ResourceBudget；不承载 Provider/Skill entries、prompt、CLI output、secret 或 Profile document。binding 字段顺序与 C4 REST contract 一致，`binding_digest()` 使用原 `star.task_run_spawn_fence.v1\0` domain separator，因此 C4 digest 格式保持稳定。Fence envelope 增加 `issued_at`；REST 要求 Runtime readiness timestamp 不早于 issue time、差值 ≤5 秒，并校验 expiry 给提交保留 ≥5 秒、总 TTL ≤30 秒。
+
+`TaskExecutionContext.spawn_fence` 是向后兼容的可选字段：None 使用原 `star.task-cli.execution-grant.v1\0` 并从 JSON 序列化中跳过，保留旧签名 payload；存在 fence 时签名 domain 升为 `star.task-cli.execution-grant.v2\0`，完整 fence、typed binding、expiry 与 digest 均受 Ed25519 签名覆盖。签名/验证前会校验 fence binding、固定 digest 长度、时限与 digest 一致性，避免异常超长字段进入序列化/hash 临时缓冲。只有新增 Profile-bound consume helper 接受该 fence；legacy prepare/consume helper 明确拒绝含 fence grant，不能绕过专用校验或隐式切换 producer capability。
+
+Runtime helper 在签名验证后校验 fence issue/expiry（最大 30 秒窗口）、当前批准的 launch Profile ID/version/digest、grant scope，并将收到的整个 binding 与调用方刚从当前 authority/source 重建的 `current_binding` 作精确相等比较，再重算 binding digest。调用方在调用前仍须完成实时 actor ACL、Worktree/Task/lifecycle、Runtime health、Profile/catalog/HookSet、Project reservation 状态检查；当前 binding 缺失或无法权威重建时必须拒绝。该函数仅产出有界 `PreparedTaskCliExecution` 与非秘密 digest 回执字段，不会创建 OS process；process create 之前 adapter 还要完成 Reservation 状态原子转换及 sandbox/child-process 监管。
+
+Local Runtime SQLite dedicated WAL connection 用 FULL synchronous 与 `BEGIN IMMEDIATE` 同事务写 nonce ledger 和 fence receipt ledger。先写入的一方遇到另一方 replay 时事务自动回滚；不同 nonce 重放同一 fence 返回 fence replay，且未留下 nonce receipt。Fence receipt 最多保留 50,000 条，cleanup 仅删除过期并跨过 5 分钟 clock-skew window 的记录；达到上限、存储故障、过期或 digest/scope/profile mismatch 均 fail closed。此本地 ledger 是短期 Work/replay protection，不替代 append-only Run/Hook/Runtime Outcome Transaction 或 BI。
+
+本阶段没有 production caller：approved launch profile authority、live ACL/catalog/HookSet adapters、Run/Reservation transaction writer、Runtime reservation activate/reject/release、OS process spawn/sandbox 与 Run outcome/Outbox/BI 均未连接。REST 的 `supports_profile_bound_run_admission()` 和 current-catalog capability 仍默认 false；必须在完整 adapter、单次消费并发/失败恢复、reservation 竞态、权限撤销与实际进程生命周期验收通过后才能开启。Memory 限制：Runtime fence 只持有固定大小 value fields；Profile/catalog snapshot 继续借用 Arc，不 clone 目录；receipt 容量是显式硬上限。
 
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
@@ -1033,6 +1046,14 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 每条 Hook event 关联 Project/Worktree/Task/Run/correlation ID 与 HookSet/rule/evaluator version/digest、phase、decision、reason class、latency、timeout/failure/override provenance，禁止存 Secret、raw prompt、完整 CLI output。BI 根据这些事件派生覆盖率、deny/人工处理、超时/故障、覆盖操作和 cleanup/claim/drain 与 validation/返工关系；漏数显式 unknown，不补零。引擎、设置 UI、Domain Command gate 和 BI consumer 均尚待 Phase 9-10 实装。
 
 ---
+
+### 14.13 Engineering Run 所有权、API 与服务边界
+
+`EngineeringRun` 是 Work Item、Task Card、Run Canvas、Workflow/LangGraph、Run BI/Benchmark 与 Run Plugin Apps 的协作 workspace。`TaskExecutionRun` 是单张 Task Card 的一次不可变执行尝试；一次尝试可绑定 0..1 个 Worktree/repository/ref snapshot，不拥有 Run workspace。Worktree 选择只设 focus/CLI/Git target，不改变 Task、Canvas、BI 或 Plugin 的 canonical owner scope。首期 Run-owned canonical API 使用 `/api/v1/engineering-runs/{engineering_run_id}/...`；Phase 8A/8B 的 `/api/v1/worktrees/{worktree_id}/...` 仍是兼容实现，必须解析当前 Run binding 后委托 domain owner。未创建 Run registry、未迁移表/RLS/API 前，不能宣称 Worktree-scoped schema 已变成 Run-owned。
+
+Task Contract/Lifecycle/Relation 由 Work Item owner；TaskExecutionRun/Event/Evidence 与调度准入由 Agent Runtime owner；Canvas Document/Element/EntityRef 由 Canvas owner；Metric/Benchmark/Proposal 由 BI owner。每个 owner 定义版本化 API/DTO、schema/table grants、RLS、SCD2/Audit 及独立配额。调用方不得直接写其它 owner 表。Stored procedure/function 仅由所属 owner API 调用，用于同域 transaction 内 CAS/行锁/RLS/原子多行更新；禁止将其当跨服务 RPC 或暴露浏览器。跨域同步 command 访问目标 owner API；owner transaction 与本地 Outbox 同提交；consumer 使用 Inbox/event ID 幂等更新可重建投影；Saga/Run coordinator 处理多 owner 流程，需可重放、可补偿、全链审计，不承诺跨域 ACID。
+
+当前事件传输沿用 PostgreSQL SoR + Transactional Outbox + NATS JetStream。Kafka/Fluvio 不是仓库 runtime dependency；当前不增加第二个 broker。未来若 BI connector/保留/replay SLO 促成 broker 替换，Kafka 优先 PoC（Connect/Streams 生态），Fluvio 仅作为经 RSS/恢复实测的资源敏感 Rust/Kubernetes 候选；决策和版本注意项见 requirements §50.8F / basic design §16.19。首期部署为 modular monolith，只有有 workload/故障域证据且授权、Outbox/Inbox、resource budget、migration/rollback 门齐全时才提取微服务。
 
 ## 附录 A-E
 
@@ -1070,3 +1091,5 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v1.12 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.10：定义 C3 final REPEATABLE READ transaction、Profile/ResourceBudget/Loop/Task/Hook/RunEvent/reservation 原子边界、Project 跨 Worktree aggregate quota 与 no-default policy；以 Project allocation epoch write 防止 waiter 使用旧快照超额预留，SQLSTATE 40001 映射冲突；说明 W/T/M、RLS、idempotent replay、reserved maxima 与 observed metrics 区分及尚未闭合的 publisher/Runtime/DB/BI/C4 gates；Hooks 仍是 Advanced Settings 内容区并列 tab | Phase 9E-4C3 Run/resource writer 与并发审查 |
 | v1.13 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.11：定义 typed dual-Profile one-time spawn fence、domain-separated binding digest、scope/catalog/HookSet/ResourceBudget 字段、final transaction Run identity 与 reservation 写入、Runtime 原子消费/重授权顺序、request fingerprint 与 fence digest 的不同职责、Run Detail 投影和 fail-closed capability；记录本轮 Rust/migration/projection slice 与未装配的 production Runtime/Auth/catalog/DB/BI 前置；Hooks 保持 ULYS-235 Advanced Settings 内容区并列 tab | 推进 Phase 9E-4C4 双 Profile Runtime spawn-fence contract |
 | v1.14 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 明确 `domain-local-runtime::task_execution` 现存签名授权、scope/profile/path/nonce 基础校验不包含 C4 双 Profile fence；将 ULYS-235 固定为 Settings 主导航“高级设置”父入口、`/settings/advanced/hooks` 页面并列 tab，并排除独立主导航/Worktree Group 节点 | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |
+| v1.15 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.12：共享 strict fence DTO、C4 signature v2/legacy v1 payload 兼容、Runtime current-binding recheck、nonce/fence SQLite 原子消费与 50,000 receipt cap；标注本地 foundation 不是生产 ACL/Reservation/OS spawn/BI consumer，capability 继续默认关闭；同步 requirements v5.41 与 basic design v5.37 | 推进 Phase 9E-4C5 Runtime fence consume foundation |
+| v1.16 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 将 Run BI/Benchmark 设为 Engineering Run 同级 App，Project BI 作为跨 Run aggregate；区分 EngineeringRun workspace 与 TaskExecutionRun attempt；新增 Run-owned API、owner service / stored procedure / Outbox-Inbox 边界及 NATS 当前基线、Kafka 优先 PoC 与 Fluvio 受限候选；明确现有 Worktree-scoped Run APIs 是兼容实现且 schema/RLS 迁移尚未完成 | 同步 requirements v5.42、basic design v5.39 与 Group DD v4.25 |

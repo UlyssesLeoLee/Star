@@ -148,4 +148,209 @@ describe("AgentCanvasView", () => {
     expect(statusbar.textContent).toContain("nodes 1");
     expect(statusbar.textContent).toContain("connectors 0");
   });
+
+
+describe("AgentCanvasView 注释层 (per 2026-10-01 OOB 恢复无限画布画笔)", () => {
+  const emptyCanvas: AgentCanvasType = {
+    agentId: "ag-001",
+    nodes: [
+      { id: "n-agent-ag-001", kind: "agent", x: 0, y: 0, width: 220, height: 110, ref: { kind: "agent", agentId: "ag-001" } },
+    ],
+    connectors: [],
+    viewport: { x: 0, y: 0, zoom: 1 },
+    derivedAt: "2026-10-01T00:00:00Z",
+  };
+  const noop = async () => undefined;
+
+  it("E. readOnly=true 默认无 sticky/text/shape/brush 按钮", () => {
+    renderWithI18n(<AgentCanvasView canvas={emptyCanvas} agent={baseAgent} worktree={null} />);
+    expect(screen.queryByTestId("agent-canvas-tool-sticky")).toBeNull();
+    expect(screen.queryByTestId("agent-canvas-tool-text")).toBeNull();
+    expect(screen.queryByTestId("agent-canvas-tool-shape")).toBeNull();
+    expect(screen.queryByTestId("agent-canvas-tool-brush")).toBeNull();
+    expect(screen.queryByTestId("agent-canvas-tool-connector")).toBeNull();
+  });
+
+  it("F. readOnly=false + 提供回调 时 sticky/text/shape/brush/connector 按钮出现", () => {
+    const noop = async () => undefined;
+    renderWithI18n(
+      <AgentCanvasView
+        canvas={emptyCanvas}
+        agent={baseAgent}
+        worktree={null}
+        readOnly={false}
+        onCreateAnnotation={noop}
+        onDeleteAnnotation={noop}
+        onCreateFreeConnector={noop}
+      />,
+    );
+    expect(screen.getByTestId("agent-canvas-tool-sticky")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-tool-text")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-tool-shape")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-tool-brush")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-tool-connector")).toBeTruthy();
+  });
+
+  it("G. brush tool 选中时 palette / size 控件展开", () => {
+    const noop = async () => undefined;
+    renderWithI18n(
+      <AgentCanvasView
+        canvas={emptyCanvas}
+        agent={baseAgent}
+        worktree={null}
+        readOnly={false}
+        onCreateAnnotation={noop}
+      />,
+    );
+    // Brush 工具未选时不应有 palette/size
+    expect(screen.queryByTestId("agent-canvas-brush-palette")).toBeNull();
+    expect(screen.queryByTestId("agent-canvas-brush-size")).toBeNull();
+  });
+
+  it("H. annotation 入参可被 SVG 渲染为 annotation 元素", () => {
+    const annotations = [
+      {
+        id: "ann-001",
+        kind: "sticky_note" as const,
+        x: 200,
+        y: 200,
+        width: 180,
+        height: 100,
+        created_at: "2026-10-01T00:00:00Z",
+        created_by: "usr-001",
+        content: { color: "#f9d77e", text: "Memo" },
+      },
+    ];
+    renderWithI18n(
+      <AgentCanvasView
+        canvas={emptyCanvas}
+        agent={baseAgent}
+        worktree={null}
+        annotations={annotations}
+      />,
+    );
+    expect(screen.getByTestId("annotation-ann-001")).toBeTruthy();
+  });
+
+  it("I. free connector 入参可被 SVG 渲染", () => {
+    const annotations = [
+      {
+        id: "ann-001",
+        kind: "sticky_note" as const,
+        x: 100,
+        y: 100,
+        width: 80,
+        height: 60,
+        created_at: "2026-10-01T00:00:00Z",
+        created_by: "usr-001",
+        content: { color: "#f9d77e", text: "" },
+      },
+      {
+        id: "ann-002",
+        kind: "sticky_note" as const,
+        x: 400,
+        y: 400,
+        width: 80,
+        height: 60,
+        created_at: "2026-10-01T00:00:00Z",
+        created_by: "usr-001",
+        content: { color: "#a3d9ff", text: "" },
+      },
+    ];
+    const freeConnectors = [
+      { id: "fc-001", fromAnnotationId: "ann-001", toAnnotationId: "ann-002", color: "#00f0ff" },
+    ];
+    renderWithI18n(
+      <AgentCanvasView
+        canvas={emptyCanvas}
+        agent={baseAgent}
+        worktree={null}
+        annotations={annotations}
+        freeConnectors={freeConnectors}
+      />,
+    );
+    expect(screen.getByTestId("agent-canvas-free-connector-fc-001")).toBeTruthy();
+  });
+});
+
+  it("J. minimap 显示 annotation 信标 (per 任务 #7)", () => {
+    const annotations = [
+      {
+        id: "ann-stick",
+        kind: "sticky_note" as const,
+        x: 100,
+        y: 100,
+        width: 80,
+        height: 60,
+        created_at: "2026-10-01T00:00:00Z",
+        created_by: "usr-001",
+        content: { color: "#f9d77e", text: "" },
+      },
+      {
+        id: "ann-text",
+        kind: "text" as const,
+        x: 400,
+        y: 400,
+        width: 100,
+        height: 40,
+        created_at: "2026-10-01T00:00:00Z",
+        created_by: "usr-001",
+        content: { text: "Note" },
+      },
+      {
+        id: "ann-path",
+        kind: "path" as const,
+        x: 200,
+        y: 300,
+        width: 60,
+        height: 40,
+        created_at: "2026-10-01T00:00:00Z",
+        created_by: "usr-001",
+        content: { path_data: "M 0 0 L 30 30", brush_size: 4, brush_color: "#00f0ff" },
+      },
+    ];
+    const canvas2: AgentCanvasType = {
+      agentId: "ag-002",
+      nodes: [
+        { id: "n-agent-ag-002", kind: "agent", x: 0, y: 0, width: 220, height: 110, ref: { kind: "agent", agentId: "ag-002" } },
+      ],
+      connectors: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      derivedAt: "2026-10-01T00:00:00Z",
+    };
+    renderWithI18n(
+      <AgentCanvasView
+        canvas={canvas2}
+        agent={baseAgent}
+        worktree={null}
+        annotations={annotations}
+      />,
+    );
+    expect(screen.getByTestId("agent-canvas-minimap-ann-ann-stick")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-minimap-ann-ann-text")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-minimap-ann-ann-path")).toBeTruthy();
+  });
+
+  it("K. eraser 工具按钮仅在 write mode + 有回调时显示 (per 任务 #6)", () => {
+    const canvas2: AgentCanvasType = {
+      agentId: "ag-003",
+      nodes: [
+        { id: "n-agent-ag-003", kind: "agent", x: 0, y: 0, width: 220, height: 110, ref: { kind: "agent", agentId: "ag-003" } },
+      ],
+      connectors: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      derivedAt: "2026-10-01T00:00:00Z",
+    };
+    renderWithI18n(
+      <AgentCanvasView
+        canvas={canvas2}
+        agent={baseAgent}
+        worktree={null}
+        readOnly={false}
+        onCreateAnnotation={async () => undefined}
+        onDeleteAnnotation={async () => undefined}
+      />,
+    );
+    expect(screen.getByTestId("agent-canvas-tool-eraser")).toBeTruthy();
+  });
 });

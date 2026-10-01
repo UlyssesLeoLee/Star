@@ -52,6 +52,8 @@ pub use star_context::ActorContext as DtoActorContext;
 /// - [`delta::PathError`] / [`delta::UnsafePathError`] / [`delta::DeltaError`] — 错误类型
 /// - [`delta::RESERVED_SEGMENTS`] / [`delta::is_reserved_segment`] / [`delta::assert_safe_path`] — 原型链污染防御
 pub mod delta;
+/// Compact, versioned Task Run fence DTOs shared by REST and Local Runtime.
+pub mod task_run;
 
 // =====================================================================
 // §1 M 类 (Master, SCD Type 2) — Identifier<T>
