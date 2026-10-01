@@ -744,7 +744,8 @@ export type CanvasElementKind =
   | "worktree_node"
   | "agent_cursor"
   | "automation_node"
-  | "comment_pin";
+  | "comment_pin"
+  | "path";
 
 /** Worktree Group Canvas reference to an entity owned by another domain. */
 export interface CanvasEntityRef {
@@ -776,6 +777,12 @@ export interface CanvasElement {
     agent_session_id?: Uuid;
     automation_id?: Uuid;
     comment_id?: Uuid;
+    /** Freehand path element (kind=path) - SVG path d attribute (rel coords in element bbox space). */
+    path_data?: string;
+    /** Brush stroke width in px. */
+    brush_size?: number;
+    /** Stroke colour (hex or rgba). */
+    brush_color?: string;
   };
   locked: boolean;
   hidden: boolean;
