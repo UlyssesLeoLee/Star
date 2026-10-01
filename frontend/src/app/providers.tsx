@@ -11,8 +11,9 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { RunDirectoryProvider, type RunDirectoryHostSession } from "@/lib/run/runDirectorySession";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children, runDirectorySession = null }: { children: React.ReactNode; runDirectorySession?: RunDirectoryHostSession | null }) {
   // useState 保证 QueryClient 在 React 生命周期内只创建 1 次
   const [client] = useState(
     () =>
@@ -31,7 +32,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider defaultTheme="light" themes={["light", "dark", "christmas", "charisma", "shanghai", "cel"]}>
       <QueryClientProvider client={client}>
-        {children}
+        <RunDirectoryProvider session={runDirectorySession}>{children}</RunDirectoryProvider>
         <Toaster
           position="top-right"
           toastOptions={{
