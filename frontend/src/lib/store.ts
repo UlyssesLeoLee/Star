@@ -23,6 +23,7 @@ import type {
   Notification, NotificationStatus,
   Canvas, CanvasElement, CanvasConnector,
   Board,
+  Project,
   RefactorRound, RefactorCard, RefactorColumn, RefactorBoardConfig, RefactorStatus,
   Uuid,
 } from "@/types/ids";
@@ -238,6 +239,23 @@ interface StoreState {
   //   1. push 到 workItems
   //   2. 把它加到 board.columns[status === status] 列的 work_item_ids 末尾
   //   3. status 不在列里 -> 自动 addBoardColumn 走兜底 (保证可见)
+  // 新增项目 (per 2026-10-01 12:43 JST 用户发令: 醒目位置 + 初始值 + IPA V字模型默认)
+  //   - 自动分配 id (crypto.randomUUID 或 SSR-safe fallback)
+  //   - 自动派生 key (3 字母大写 + 可被改)
+  //   - 默认 Kanban 类型 = "ipa-vmodel" (12 阶段 × 5 状态槽)
+  //   - 自动创建配套 Board (12 列状态槽) + 默认 6 个 V字模型阶段 seed
+  addProject: (input: {
+    name: string;
+    key?: string;
+    visibility?: Project["visibility"];
+    owner_id?: Uuid;
+    member_count?: number;
+    kanbanTemplate?: "ipa-vmodel" | "jira-simplex" | "sprint-flat";
+    initialPhaseCount?: number;
+    defaultLocale?: "ja" | "zh-CN" | "en";
+    description?: string;
+    iconColor?: string;
+  }) => Project;
   addWorkItem: (input: Omit<WorkItem, "id" | "key" | "created_at" | "updated_at" | "description" | "labels" | "worktree_id"> & {
     /** 可选注入 client id (回填后端响应); 不传由 store 生成 */
     id?: string;
@@ -463,6 +481,38 @@ const initialState = (set: any, get?: any): StoreState => ({
     set((s: StoreState) => ({
       changeSets: s.changeSets.map((c) => c.id === id ? { ...c, status: to } : c),
     })),
+  // 新增项目 (per 2026-10-01 12:43 JST 用户发令: 醒目位置 + 初始值 + IPA V字模型默认)
+  addProject: (input) => {
+    const s = useStore.getState();
+    const tenantId = input.owner_id ? s.projects.find((p) => p.owner_id === input.owner_id)?.tenant_id ?? s.tenantId ?? "tenant-physis-corp" : (s.tenantId ?? "tenant-physis-corp");
+    const ownerId = input.owner_id ?? s.identities[0]?.id ?? "usr-001";
+    // id + key 双层
+    const newId = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+      ? crypto.randomUUID()
+      : `prj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    let newKey = (input.key ?? "").trim().toUpperCase();
+    if (!newKey) {
+      // 自动派生: 项目名首字母或累积递增
+      const asciiOnly = (input.name ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
+      newKey = (asciiOnly.slice(0, 3) || "NEW").padEnd(2, "X");
+    }
+    const sameKey = s.projects.filter((p) => p.key === newKey).length;
+    if (sameKey > 0) newKey = `${newKey}${sameKey + 1}`;
+    const nowIso = new Date().toISOString();
+    const newProject: Project = {
+      id: newId,
+      tenant_id: tenantId,
+      key: newKey,
+      name: input.name || "Untitled Project",
+      visibility: input.visibility ?? "private",
+      owner_id: ownerId,
+      member_count: input.member_count ?? 5,
+      created_at: nowIso,
+    };
+    set((cur: StoreState) => ({ projects: [...cur.projects, newProject] }));
+    return newProject;
+  },
+
   // 新增 work-item (per 2026-08-31 11:56 JST Ulysses 拍板)
   // 上下文: 客户端 zustand store 还没接后端, key/id 由 store 本地生成.
   //   - id: crypto.randomUUID() 或基于 seed wi 计数 fallback (SSR-safe)
