@@ -231,7 +231,7 @@ hex = "0.4"
 regex = "1"
 
 # Serial test execution (per ULYS-194 9/24 rebase fix — env-var mutating tests 跨 #[tokio::test] 串行化)
-serial_test = "3"
+serial_test = "4"
 
 # Benchmark (per R9 阶段 3 5 milestone benchmark, per plan-032 §4.2)
 criterion = { version = "0.8", features = ["html_reports"] }
@@ -261,7 +261,7 @@ libgit2-sys = "0.18"
 # v10 API: process-session feature 提供 ProcessSession struct + pre_spawn hook
 process-wrap = { version = "10", default-features = false, features = ["std", "process-session", "tokio1"] }
 # nix: Unix-only safe wrapper for libc::killpg / libc::setsid / signal 0 探测
-nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
+nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
 # win32job: Windows Job Object safe API (CreateJobObjectW / AssignProcessToJobObject / terminate)
 win32job = "2"
 
@@ -270,7 +270,7 @@ win32job = "2"
 # 0.2.x 选型 (per session 内 PR #228 研究: 0.2.92+ 兼容 web-sys 0.3 + js-sys 0.3)
 wasm-bindgen = "0.2"
 # wasm-bindgen-test: 浏览器/wasm runtime 测试 (跑 `wasm-pack test --node`)
-wasm-bindgen-test = "0.2"
+wasm-bindgen-test = "0.3"
 # js-sys: Rust ↔ JS 互操作 (Array + Promise + etc., per wasm-bindgen convention)
 js-sys = "0.3"
 # serde-wasm-bindgen: 类型安全 JS↔Rust 传值 (本期未用, 但留作 layout-engine 二进制接口)
