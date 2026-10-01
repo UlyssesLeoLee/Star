@@ -120,7 +120,7 @@ function mapRun(value: unknown): EngineeringRun {
   const row = record(value);
   return {
     engineering_run_id: uuid(row.engineering_run_id), project_id: uuid(row.project_id),
-    repository_id: uuid(row.repository_id), branch_id: uuid(row.branch_id), title: boundedText(row.title),
+    repository_id: uuid(row.repository_id), branch_id: uuid(row.branch_id), title: boundedText(row.title, 500),
     state: boundedText(row.state, 64), owner_user_id: nullableUuid(row.owner_user_id), version: positiveVersion(row.version),
   };
 }
