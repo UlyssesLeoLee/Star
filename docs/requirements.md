@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.41）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.42）
 
 ## 0. 文档说明与前提
 
@@ -1478,12 +1478,12 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | DSG-002 | 系统必须支持将"关联 DesignArtifact 全部 APPROVED"设为既有 WorkItem 状态转换 Guard 的前置条件 | 第 8.2、8.3 章 | ARCH-OBL-DEV-001 |
 | TST-001 | 系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入），并按 Level 聚合测试覆盖 | 第 27.6 章 | ARCH-OBL-DEV-005 |
 | OPS-001 | 系统必须支持登记 IncidentRecord 并关联到修复 WorkItem，追溯"生产问题 → 根因 ChangeSet → 修复 → 验证证据" | 第 29.1 章 | ARCH-OBL-DEV-002/005 |
-| WTG-001 | 用户选择 Project 后，系统只展示当前 actor 可访问的 Worktree；展开任一 Worktree 后展示其 Worktree Group | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
-| WTG-002 | Worktree Group 下的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享不可伪造的 Tenant、Project、Repository、Worktree 上下文 | 第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
-| WTG-006 | Project Worktree Index 与 Worktree Group 必须可分别访问；Index 深链以 `project_id` 保留所选 Project，Group 深链以 `worktree_id` 保留所选 Worktree；Project Worktrees 视图须能进入 Index，Index 路由不得被通用任务列表路由替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
+| WTG-001 | 用户选择 Project 后，左侧依次展现该项目的 Cloud Branch、Engineering Run 与其 Worktree；见第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
+| WTG-002 | 点击 Run Worktree 后显示共享 Run Context 的 Inbox、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps；见第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
+| WTG-006 | Project Worktree Index 与 Engineering Run Shell 可分别访问；Index 深链以 `project_id` 保留 Project，Run deep link 保留 `project_id/branch_id/engineering_run_id` 并可附 `worktree_id` focus；旧 Worktree Group route 经兼容 adapter 解析 Run；Index 不得被通用任务列表替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | WTG-010 | Worktree Index 分开呈现当前 Git lock observation 与持久化 lock 标记；unknown 不得通过 cleanup guard | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
 | WTG-011 | Project Worktree Index 必须以 `project:read` + 当前 membership 查询脱敏的已绑定 Repository 清单（仅 ID/name/default branch，不含 URL/路径），并提供授权候选发现、创建与导入；仅接受 Project 已绑定 repository_id、经过 Git ref 校验的 branch/base_ref 或可信 Host Runtime opaque candidate_id；拒绝客户端路径、仓库 URL 和 Git 命令；副作用前重验 membership 与 Project-Repository binding，以 Idempotency-Key/correlation_id 幂等持久化 operation、Worktree projection、Audit/Outbox 后返回 202；缺少 provider 返回 503；Index UI 不得回退本地 seed，须验证 Project/Repository/candidate/receipt 关联并在受理后刷新 Index | 第 50.3.1 章 | ARCH-OBL-GRP-001 |
-| TCI-001 | Multica 生命周期、Jira 类 Board/Backlog/Sprint 与 Worktree 下直接访问的 Task Card 索引必须共用同一 WorkItem 事实源 | 第 50.3 章 | ARCH-OBL-GRP-001 |
+| TCI-001 | Multica、Jira 类视图与 Engineering Run 下直接访问的 Task Card 必须共用 Run-scoped WorkItem 事实源；见第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控交互式 PTY CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
 | TCI-006 | Task Card review gate 必须使用版本化、幂等且可审计的请求/通过/驳回命令，只有非提交者评审通过后才可完成 | 第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-007 | Task CLI 执行 grant 必须由受信任 API 私钥签发并带 key id；Local Runtime 只配置 issuer 公钥、验签后仍需重验当前 ACL 与 Runtime 状态，再消费单次 nonce | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
@@ -2220,30 +2220,32 @@ Star 倉 22 `domain-*` crate (per ADR-0040) + 25 MRU (per api-design.md §2.1) �
 
 ---
 
-## 50. 渡口 Project Worktree 管理与群组体验要求（v4.0）
+## 50. 渡口 Project / Branch / Run / Worktree 管理与群组体验要求（v4.1）
 
 ### 50.1 目的与产品树
 
-本节把 Star 的独特工作方式定义为 **Project → Worktree → Group Apps**：用户先选择 Project，再看到该 Project 的 Worktree 清单和管理状态；展开一个 Worktree 后，进入该 Worktree 的群组应用导航。它要解决多 Agent 并行开发时 Worktree 分散、归属不清、状态不可见、冲突和清理不可控的问题。CLI 和 Agent Session 从任务卡内打开。
+本节把 Star 的独特工作方式定义为 **Project → 云端 Branch → Engineering Run → 本地 Worktree**：用户先选择 Project，在左侧展开属于项目的远端 Branch，再展开该 Branch 下的 Engineering Run；Run 管理绑定该 Branch 的一个或多个本地 Worktree。点击 Run 内某个 Worktree 后，右侧才呈现该 Run 的 Inbox、工作项、Task Card、Canvas、Workflow、BI/Benchmark 和 Plugin tabs。它要解决多 Agent 并行开发时 worktree 分散、归属不清、Agent 分配/状态不可见、合并冲突和生命周期清理不可控的问题。CLI 和 Agent Session 从任务卡内打开。
 
-Tenant / Workspace / Project 继续承担归属、权限和安全边界。导航层级是 Project 选择器 → Project-scoped Worktree Index → 展开的 Worktree → 同级 Group Apps。Project 选择器负责限定列表范围，展开的 Worktree 是当前执行上下文；这不新增 ProjectGroup 或 WorktreeGroup 业务聚合，也不改变 `1 WorkItem → 0/1/N Worktrees`、`1 Worktree → N AgentSessions` 和 Worktree Status 独立于 WorkItem Status 的约束。
+Tenant / Workspace / Project 继续承担归属、权限和安全边界。Branch 表示云端分支目标，Engineering Run 是一次可协作、可观测并可做 Run 级分析的工作区；本地 Worktree 是绑定 Branch 的 checkout 及可选焦点/执行位置，不是 WorkItem 或 Run 的替代身份。Project Worktree Index 保留为跨 Branch/Run 的 Worktree 汇总和管理视图，不作为主导航的父层。该设计不新增 Git Worktree 或 WorkItem 的替代事实源；每个 Engineering Run 可管理多个 Worktree，但一个活跃 checkout 同时只能属于一个 active Run，历史 Run 仅保存可空 ID/ref snapshot。必须区分 `EngineeringRun` 与每次任务尝试的 `TaskExecutionRun`：前者承载 Run 工作区及跨 App 视图，后者是 Task Card 下的一次执行事实。
 
 ```text
-Tenant → Workspace → Project（用户先选择）
-                                  └─ Project Worktree Index（只列当前 Project 的 Worktree）
-                                     └─ Worktree（展开；显示分支 / 状态 / Agent / Runtime / PR / 风险 / 锁）
-                                        └─ Worktree Group Apps（由 worktree_id 标识）
-                                           ├─ Multica Task Lifecycle（执行生命周期 / claim / review / Agent）
-                                           ├─ Jira-class Work Management（Board / Backlog / Sprint / Relation）
-                                           ├─ Task Cards（同级；卡内可打开 CLI / Agent Session）
-                                           ├─ Infinite Canvas（同级；Miro 类无限画布）
-                                           ├─ Workflow / LangGraph（同级流程编排入口）
-                                           └─ 已启用的 Group App Plugins（同级扩展入口）
+Tenant → Workspace → Project（左侧第一级）
+                                  └─ Cloud Branch（云端合并目标 / branch_id）
+                                     └─ Engineering Run（Run 工作区 / engineering_run_id）
+                                        ├─ Worktree Set（Run 所管理的本地 checkout）
+                                        │  └─ Worktree（点击后成为 focus_worktree_id）
+                                        └─ Run App tabs（由 engineering_run_id 标识；选中 Worktree 后展示）
+                                           ├─ Inbox / Work Items（Multica + Jira 等价视图）
+                                           ├─ Task Cards（与 Canvas 同级；卡内打开 CLI/Agent）
+                                           ├─ Infinite Canvas（与 Task Cards 同级，可引用多个 Run Worktree）
+                                           ├─ Workflow / LangGraph
+                                           ├─ Run BI / Benchmark
+                                           └─ 已启用的 Run Plugin Apps
 
-展开 Worktree 后固定底栏 Chat Bar：GLOBAL 范围 ｜ 当前 WORKTREE 范围
+Run Shell 底栏 Chat Bar：GLOBAL 范围 ｜ 当前 WORKTREE 范围（后者绑定焦点 checkout）
 ```
 
-`Project Worktree Index` 是项目选择后的管理入口，聚合展示该项目已授权的 Worktree 事实和运行信号；它不是跨项目的平铺列表。Worktree 展开后显示该 Worktree 的同级 App 导航。`Worktree Group` 是围绕既有 `Worktree` 的应用上下文和导航投影，以 `worktree_id` 为身份；它不复制 Git Worktree、WorkItem 或 AgentSession 的业务事实。Project 范围的 Worktree Graph Overview 继续用于跨 Worktree 冲突、依赖与全景查看；群组内的 Infinite Canvas 用于当前 Worktree 的协作与编排，两者须在名称、路由和数据范围上明确区分。
+左侧主导航是 Project → Branch → Engineering Run → Worktree；Project Worktree Index 是可选的跨层汇总管理视图。Branch 下的 Run 管理与该远端 Branch 绑定的本地 Worktree，选中 Worktree 后打开其所属 Run 的右侧 tabs；除 CLI/Git 操作和显式焦点筛选外，Inbox、WorkItem、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin 的 canonical scope 是 `engineering_run_id`。`EngineeringRun` 不等于 `TaskExecutionRun`，后者仅表示某个 WorkItem 的单次执行。当前 `/worktree?.../group` 及 Worktree-scoped Group API 是迁移兼容路径，不改变 Run-owned 数据事实；Project 范围的 Worktree Graph Overview 继续用于跨 Branch/Run 冲突、依赖与全景查看，Run Infinite Canvas 用于跨该 Run 的协作，两类画布必须区分路由和数据范围。
 
 Index 是管理面而非仅供跳转的清单：必须汇总 owner、Agent Session、Runtime、分支、生命周期、PR、dirty/ahead/behind、健康/风险和锁状态，帮助用户发现多 Agent Worktree 的归属漂移与执行冲突。`git_lock { state, source, observed_at }` 专指 Git Worktree retention lock（保护 Git 管理记录免遭 prune，并影响 Git 对该 Worktree 的移动/删除）；它不是 Agent 活跃状态、文件编辑互斥锁或独占租约，`unlocked` 不表示没有 Agent/Session 正在工作。缺少 Runtime/observer、读取失败、时间戳缺失或观测超过 30 秒时为 `unknown`，不得从持久化 `locked` 字段推断当前 Git 保留锁状态。Index 对每页观测最多并发 8 个请求、单个 provider 最长等待 2 秒、总等待最多 3 秒；未按时返回的项目显示 `unknown`。`unknown` 与 `unlocked` 均不能证明 Agent 已停止；物理清理还须读取独立的 Agent/Session/Runtime 活跃状态，在 drain 后重新观测 Git 保留锁，并由 Repository/Runtime 执行器确认。生产视图必须以当前用户授权的服务端投影为准；请求失败时显示错误且不回退到本地 seed。归档/恢复必须先生成有版本条件的短时计划，再由用户二次确认并写入审计；归档不得被解释为删除本地 Git checkout。创建/导入、停止执行和物理清理继续走各自的授权 Runtime / Repository 生命周期接口。
 
@@ -2251,20 +2253,22 @@ Index 是管理面而非仅供跳转的清单：必须汇总 owner、Agent Sessi
 
 | 术语 | 定义 | 事实来源 |
 |---|---|---|
-| Worktree Group | 当前 Worktree 的应用容器，提供导航、授权上下文、跨 App 跳转和实时订阅 | 既有 `Worktree` + Group Context Projection |
+| Cloud Branch | Project 中的远端合并目标/分支身份，绑定仓库与 Git ref | Project / Repository / Branch registry |
+| Engineering Run | Branch 下的跨 App 工作区，归属 Run Apps、Work Item 视图、Canvas 与 Run BI；可管理多个绑定该 Branch 的本地 Worktree | Run Domain / `engineering_run_id` |
+| Worktree Group | 选中某个 Run Worktree 后显示的 Run Shell；Run 是授权及 App 数据所有者，Worktree 是焦点与本地 checkout | EngineeringRun + 可选 `focus_worktree_id` |
 | WorkItem | Jira 类业务任务，承载状态、负责人、Backlog、Sprint、关系和 Guard | `domain-work-item` |
-| Task Card | 直接挂在 Worktree 下的任务入口；由 Task Management 视图访问，并在卡内呈现 CLI 与 LangGraph L1 状态 | WorkItem / AgentSession / TaskCardManager 投影 |
+| Task Card | Engineering Run 下的任务入口；由 Run Task Management 视图访问，并在卡内呈现 CLI 与 Agent/LangGraph 状态 | Run-scoped WorkItem / TaskExecutionRun / AgentSession 投影 |
 | Canvas Element | Canvas 中的节点、连线、Frame 或绑定；可引用任务卡，但不成为第二套任务事实 | Canvas 聚合与实体链接 |
 | Task CLI Session | 从任务卡发起、绑定具体 Worktree 的受控本地命令会话 | Local Runtime / Agent Policy / Audit |
-| Group Context | `tenant_id / workspace_id / project_id / repository_id / worktree_id / actor_id` 的不可伪造上下文 | Application Authorization Layer |
+| Run Context | `tenant_id / workspace_id / project_id / branch_id / engineering_run_id / actor_id` 与可选 `focus_worktree_id` 的不可伪造上下文 | Application Authorization Layer |
 
-每个群组内的 App 必须先取得 Group Context，再查询、展示或执行命令。任一实体链接使用带类型的 `EntityRef`，至少支持 `work_item`、`task_card`、`agent_session`、`worktree`、`canvas_element`、`automation_flow`、`comment`、`relation` 和 `plugin_resource`。
+每个 Run App 必须先取得服务端解析的 Run Context，再读取 Run projection 或调用其事实所有者 API；Worktree/Git/CLI 命令还必须按选中 Worktree 单独授权。任一实体链接使用带类型的 `EntityRef`，至少支持 `branch`、`engineering_run`、`work_item`、`task_card`、`task_execution_run`、`agent_session`、`worktree`、`canvas_element`、`automation_flow`、`comment`、`relation` 和 `plugin_resource`。
 
 ### 50.3 同级应用、任务卡与单一任务事实源
 
 每张 Task Card 均可打开关联的受控 CLI / Agent Session 面板；会话归属该 Task Card 和明确选定的 Worktree，不作为 Worktree 导航树中的独立同级入口。
 
-Multica Task Lifecycle、Jira-class Work Management、Task Cards、Infinite Canvas 和 Group Plugin Apps 都是 Worktree Group 的同级能力入口。**Task Cards 与 Infinite Canvas 必须直接挂在 Worktree 下并列显示**；Task Card 可从 Multica 生命周期或 Jira 类 Board / Backlog / Sprint 打开，但不是其中任何 App 的私有子对象。Multica 提供 claim / execution / review gate / failed / poisoned-session 等执行生命周期能力；Jira 类提供 Board / Backlog / Sprint / Relation 管理能力；二者共用 WorkItem、Workflow、Planning、Relation 和 Audit 的事实来源。
+Inbox、Multica Task Lifecycle、Jira-class Work Management、Task Cards、Infinite Canvas、Workflow、Run BI/Benchmark 和 Run Plugin Apps 都是 Engineering Run 的同级 App 能力入口。**Task Cards 与 Infinite Canvas 必须在 Run tabs 同级显示**；Task Card 可从 Inbox、Multica 生命周期或 Jira 类 Board / Backlog / Sprint 打开，但不是其中任何 App 的私有子对象。点击 Worktree 只打开其所属 Run 并设置焦点；一个 Run Canvas 可引用该 Run 的多个 Worktree。Multica 提供 claim / execution / review gate / failed / poisoned-session 等执行生命周期能力；Jira 类提供 Board / Backlog / Sprint / Relation 管理能力；二者共用 Run-scoped WorkItem、Workflow、Planning、Relation 和 Audit 的事实来源。
 
 在线 Group UI 必须从 canonical lifecycle 状态、版本和 review state 计算可用动作；Multica、Jira 和 Task Card 操作同一 WorkItem。命令必须携带当前 `expected_version`、`Idempotency-Key` 与 `correlation_id`，经服务端 lifecycle guard、writer ACL 与事务审计。客户端成功或发生冲突后刷新授权投影；`pending_review` 不得被客户端绕过而标记为 `completed`。
 
@@ -2272,12 +2276,12 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 
 | ID | 要件 | 优先级 |
 |---|---|---|
-| WTG-001 | 用户选择 Project 后，系统只展示该 Project 中当前 actor 可访问的 Worktree；展开任一 Worktree 后显示其唯一 Group App 导航 | P0 |
-| WTG-002 | 展开的 Worktree 下，Multica、Jira 类管理、Task Card、Infinite Canvas、Workflow/LangGraph 与插件为同级入口，并共享 Group Context | P0 |
+| WTG-001 | 用户选择 Project 后，左侧第一级列出该 Project 当前 actor 可访问的 Cloud Branch；展开 Branch 显示该 Branch 下的 Engineering Run，再展开 Run 显示其绑定 Worktree | P0 |
+| WTG-002 | 点击 Run 内 Worktree 后才显示所属 Run 的 Inbox、Multica、Jira 类管理、Task Card、Infinite Canvas、Workflow/LangGraph、Run BI/Benchmark 与插件同级 tabs，并共享 Run Context | P0 |
 | WTG-003 | Worktree 归档、删除观察或失联后，群组资源必须保留可追溯关系并按 Project Policy 转为只读、恢复或归档状态 | P1 |
-| WTG-004 | Project Worktree Index 必须可比较各 Worktree 的 owner/Agent、branch、status、Runtime、PR、冲突/锁和最近活动，并从同一处进入受权管理动作 | P0 |
-| WTG-005 | Worktree 切换或展开时，应用、实体查询、底栏范围和订阅必须同步到该 Worktree；切换 Project 时不得泄漏上一 Project 的 Worktree 或任务 | P0 |
-| WTG-006 | Project Worktree Index 与 Worktree Group 必须可分别访问；Index 深链 `/worktree?project_id=...` 保留所选 Project，Group 深链以 `worktree_id` 保留所选 Worktree；缺少 Project 时先显示选择器，Project Worktrees 视图须传递 `project_id`，Index 不得被通用任务列表路由替代 | P0 |
+| WTG-004 | Project Worktree Index 必须可跨 Branch/Run 比较 Worktree owner/Agent、绑定 branch、状态、Runtime、PR、冲突/锁和最近活动，并从同一处进入受权管理动作 | P0 |
+| WTG-005 | Worktree 切换只更新当前 Engineering Run 的 focus/CLI checkout target；Run-owned App 数据仍按 `engineering_run_id` 查询；切换 Project/Branch/Run 时必须清除旧授权投影 | P0 |
+| WTG-006 | 主导航深链必须保留 Project/Branch/EngineeringRun/Worktree 身份；旧 `/worktree?project_id=...` 与 `/worktree/{id}/group` 在迁移期间仅作为可验证兼容路由，Index 不得被通用任务列表替代 | P0 |
 | WTG-007 | 已装配宿主认证时，Project Worktree Index 必须读取授权 API 投影并支持 owner/state/archive 筛选与稳定游标续页；401/403/网络错误不得混入本地 seed 作为生产结果 | P0 |
 | WTG-008 | Index 的归档/恢复操作必须使用当前 Worktree version 创建短时 plan 并二次确认；执行绑定未解除时归档必须失败；归档只改变平台可见状态，不删除 Git checkout | P0 |
 | WTG-009 | Worktree owner 必须可由有权管理员转派给当前 Project 的有效成员；候选人只能来自当前认证成员目录，转派使用 Worktree version、短时 plan、二次确认、幂等与审计；成员目录不可用时不得开放自由文本或 seed 转派 | P0 |
@@ -2289,10 +2293,12 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-015 | Run 事件必须分别记录执行器状态、Agent 声明、验证、人工接受/返工和集成状态；Evidence 只存脱敏 metadata/digest/受控 locator，不复制大日志、Secret、原始 transcript 或模型隐式推理；缺失值保持 unknown，实际成本与估算成本分开 | P0 |
 | WTG-016 | Project 级 Quality & Improvement 从 Run facts 派生 BI；每个指标记录公式、分子/分母、单位、时间窗、覆盖率和版本，并可下钻 Task/Run/Evidence；按类型/复杂度分层，禁止 LOC/commit/Agent 数作为生产力指标 | P1 |
 | WTG-017 | Benchmark 使用固定且版本化的 Task、repo、环境、验收标准和评分口径，隔离 tuning/holdout 并记录不可复现条件；改进 proposal 必须可追溯、可回滚，候选策略不得降低验收标准 | P2 |
-| TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 WorkItem；Task Card 索引作为 Worktree 下的平级入口访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
+| WTG-018 | `EngineeringRun` 必须与 Task 的 `TaskExecutionRun` 区分；EngineeringRun 汇总协作范围/Worktree set/App tabs/Run BI，TaskExecutionRun 记录一次执行尝试并保留可空 Worktree snapshot | P0 |
+| WTG-019 | 每个 Run App 必须声明 canonical owner scope、读写 API 和 capability；前端同级 App 不等于独立微服务；跨域写通过 owner API/领域事务/Outbox + 幂等 Inbox 投影，不共享表写入 | P0 |
+| TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
-| CAN-001 | Canvas 必须作为群组内同级 App，并能绑定、创建、定位和查看 WorkItem、Task Card、AgentSession、Relation 与自动化流程 | P0 |
+| CAN-001 | Canvas 必须作为 Engineering Run 内与 Task Card 同级 App，并能互动 Run 内 WorkItem、Task Card、AgentSession、多个 Worktree、Relation 与自动化流程 | P0 |
 | CAN-002 | Canvas 发起的任务写操作必须经过 Task Domain Command 与 Guard；结果由事件回写所有订阅 App | P0 |
 
 ### 50.3.1 Project scoped Worktree 创建与导入
@@ -2322,28 +2328,29 @@ CLI 由 Local Runtime 在目标 Worktree 中通过交互式 PTY 启动，并持�
 
 ### 50.5 Canvas 与任务、Jira 类能力的互动
 
-Canvas 为当前 Worktree 的任务编排和协作表面。任务卡可拖入 Canvas、从 Canvas 跳回 Board/Backlog/Sprint、在元素上显示任务状态和 Agent/CLI 摘要；Canvas 也可通过实体链接显示 Blocked、Dependency、Feedback、Review、Validation 与自动化 Flow。
+Run Canvas 是 Engineering Run 的任务编排和协作表面。任务卡可拖入 Canvas、从 Canvas 跳回 Inbox/Board/Backlog/Sprint、在元素上显示任务状态和 Agent/CLI 摘要；Canvas 可通过实体链接显示该 Run 下 Worktree、Blocked、Dependency、Feedback、Review、Validation 与自动化 Flow。Project Worktree Overview Graph 是另一项 Project 级聚合视图，不能与 Run Canvas 共用 owner 或 layout。
 
-在 Canvas 内创建任务时，系统先创建或关联真正的 WorkItem，再建立 Canvas Element Link。除新建任务外，用户也必须能把当前 Worktree 中尚未关联的已有 Task Card 放到 Canvas；创建 `work_item_card` Element 与 typed EntityRef 必须使用同一个认证、幂等命令，服务端原子校验当前 Worktree association 并写入，不能出现只有元素或只有关联的半成品。具备真实登录会话后，若当前 Worktree 尚无 Canvas，界面必须提供经认证、幂等的 Canvas 初始化命令；成功后刷新授权投影，再显示当前 Canvas。Canvas 加载后，界面必须提供经认证、幂等的任务创建入口；成功后刷新当前授权投影，并提供跳转到同一 canonical Task Card 的链接。任一创建命令失败不得在本地 seed 中模拟成功。实时 Canvas 必须支持将 viewport 的平移/缩放暂存并显式保存到 Worktree-scoped Document API，携带当前 expected version 与 idempotency key；冲突不得覆盖新版本。一个 Worktree 可以拥有多个 Canvas，Canvas 列表、选择状态与分享链接必须限定在当前 Worktree；`canvas_id` 只表示选择目标，不构成访问授权。新建 Canvas 后应切换到其 ID，并在刷新授权投影确认前保留同一幂等命令。请求的 Canvas 无效或不属于当前 Worktree 时，回退到服务端返回的有效 Canvas 或显示空态，不得读取其他 Worktree 或全局 seed。元素位置在 live Worktree Canvas 中可用拖动暂存并通过当前 Element 的 `expected_version` 与幂等键保存；位置命令只修改坐标，不改写任务、实体引用、内容或其它元素属性，冲突后刷新授权投影且不覆盖新版本。Frame/connector Document、便笺内容、Element 尺寸/旋转和删除各使用独立版本化写命令；Element 几何编辑不得改变实体关联或其它属性。删除 Canvas Element 只删除或归档画布表现，不会删除 WorkItem。Canvas Workflow 与 WorkItem Workflow 是不同概念：前者是自动化流程 / Flow，后者是任务状态流转；两者通过受控命令和事件连接。
+Run Canvas 在 Engineering Run 范围内创建或关联 WorkItem，再建立 Canvas Element Link。用户可以把该 Run 中尚未关联的 Task Card、AgentSession 和多个 Worktree 放到 Canvas；所有实体只以带类型的引用呈现。Canvas 的 canonical owner/API scope 是 `engineering_run_id`，Element 可选关联 `worktree_id`；具体 CLI/Git 操作必须显式解析当前 Worktree。当前 `/api/v1/worktrees/{worktree_id}/canvases...`、Canvas-Worktree 外键和单 Worktree Element relation 是兼容实现切片，迁移到 Run-owned Canvas Master、Run membership ACL/API 前不得宣称目标模型已实现。迁移期间，当前已实现的 CAS、幂等、审计、Outbox 与 fail-closed 要件继续有效；新 Run API 必须保留版本控制、审计、授权投影刷新与不回退 seed 的同等守门。
 
 | ID | 要件 | 优先级 |
 |---|---|---|
-| CAN-003 | 从 Canvas 创建或关联任务时，必须保留 `worktree_id`、`work_item_id`、`canvas_element_id` 与 `correlation_id` 的可追溯链接 | P0 |
+| CAN-003 | 从 Run Canvas 创建或关联任务时，必须保留 `engineering_run_id`、`work_item_id`、`canvas_element_id` 与 `correlation_id`；可选 Worktree 引用不改变 Run owner | P0 |
 | CAN-004 | Task Management 状态、Agent 进度、CLI 结果与 Validation 变化必须以实时投影更新 Canvas；Canvas 订阅失败后必须可重放 | P1 |
 | CAN-005 | Canvas、Board、Backlog 和 Sprint 对同一 WorkItem 的跳转必须保持同一实体引用与同一权限判定 | P0 |
-| CAN-006 | Canvas viewport、frames 与 visual connectors 必须作为 Worktree-scoped 版本化文档持久化；更新携带 expected version 与 idempotency key，冲突不得覆盖新版本；Frame / connector 只能引用当前 Canvas 的元素 | P0 |
-| CAN-007 | 多 Canvas 必须可在当前 Worktree 下列出、选择、新建和通过 `canvas_id` 分享深链；每次读取与写入仍须由服务端校验 actor、Worktree 与 Canvas 归属 | P0 |
-| CAN-008 | 用户必须能把当前 Worktree 未关联的 canonical Task Card 放到选定 Canvas；Element 与 typed EntityRef 在同一认证幂等事务内写入，并过滤已关联任务 | P0 |
-| CAN-009 | live Worktree Canvas 的元素位置可由用户拖动并通过 Worktree-scoped Element CAS 保存；请求使用 `update_mode=position` 且只允许提交坐标字段，服务端保留当前其它字段；携带 `expected_version`、`Idempotency-Key` 和 `correlation_id`；冲突不得覆盖新版本，且必须刷新授权投影 | P0 |
+| CAN-006 | Canvas viewport、frames 与 visual connectors 必须作为 EngineeringRun-scoped 版本化文档持久化；更新携带 expected version 与 idempotency key，冲突不得覆盖新版本；Frame / connector 只能引用当前 Canvas 的元素 | P0 |
+| CAN-007 | 多 Canvas 必须可在当前 Engineering Run 下列出、选择、新建和通过 `canvas_id` 分享深链；每次读取与写入仍须由服务端校验 actor、Run membership 与 Canvas 归属 | P0 |
+| CAN-008 | 用户必须能把当前 Engineering Run 未关联的 canonical Task Card 放到选定 Canvas；Element 与 typed EntityRef 在同一认证幂等事务内写入，并过滤已关联任务 | P0 |
+| CAN-009 | live Run Canvas 的元素位置可由用户拖动并通过 Run-scoped Element CAS 保存；请求使用 `update_mode=position` 且只允许提交坐标字段，服务端保留当前其它字段；携带 `expected_version`、`Idempotency-Key` 和 `correlation_id`；冲突不得覆盖新版本，且必须刷新授权投影 | P0 |
 | CAN-010 | live Canvas 可编辑 Frame 标题/几何/演示标记、连接线展示样式及无实体绑定的文本/便笺内容；删除 Element 必须用 Worktree scope、版本和幂等键，且在同一事务移除 Frame/connector 悬空引用，不删除 canonical WorkItem；locked Element 不允许修改或删除 | P0 |
 | CAN-011 | live Canvas 中未锁定 Element 的尺寸与旋转角度可单独编辑；请求使用 `update_mode=geometry` 且只允许提交宽、高、旋转字段，服务端保留位置、内容、实体引用及其它字段；携带 Element `expected_version`、幂等键和 `correlation_id`；冲突不得覆盖新版本，并须刷新授权投影 | P0 |
+| CAN-012 | 点击某个 Run Worktree 后显示所属 Engineering Run 的 Canvas App；Canvas 数据/API 由 `engineering_run_id` 授权，可引用 Run 中多个 Worktree；旧 Worktree-scoped Canvas 路由仅作兼容且不得作为新的事实所有者 | P0 |
 
 ### 50.6 固定底栏聊天与 LangGraph 范围
 
 App Shell 只提供一个固定底栏 Chat Bar。用户在发送前选择 `WORKTREE` 或 `GLOBAL` 范围，并可附加当前任务卡、Canvas Element 或其他 EntityRef。选择器必须始终可见，消息历史、checkpoint、工具调用和审计均记录范围。
 
-- `WORKTREE`：L0 只加载当前 Group Context、当前 Worktree 的任务/画布/运行时摘要和该范围内已授权工具；由此创建的 L1 Task Card 必须带相同 `worktree_id`。
-- `GLOBAL`：L0 用于跨 Worktree 统筹、规划、合并、拆分、依赖、批量操作和汇总。任何会写入数据或启动执行的指令必须显式列出目标 Worktree，系统对每个目标独立执行授权、状态和审计校验。
+- `WORKTREE`：L0 只加载当前 Run Context、当前 focus Worktree 的任务/画布/运行时摘要和该范围内已授权工具；由此创建的 L1 Task Card 归属当前 `engineering_run_id`，执行时显式绑定焦点 `worktree_id`。
+- `GLOBAL`：L0 用于跨 Project/Branch/Run/Worktree 统筹、规划、合并、拆分、依赖、批量操作和汇总。任何会写入数据或启动执行的指令必须显式列出目标 Project/Run/Worktree，系统对每个目标独立解析授权、状态和审计校验。
 - L1 Task Card Agent 保持任务卡级隔离。跨卡操作、Canvas 发起的编排和插件发起的任务操作由 L0 的 Task Operations Manager 协调，L1 之间不得直接通信。
 
 LangGraph checkpointer 只保存非敏感 workflow state 和服务端 thread/run 关联；不保存可复用的 `GroupContext`、JWT、permission snapshot 或 Plugin capability grant。thread ID 由服务端生成，并映射到 Chat Session；不得复用 WorkItem、Task Card 或 Agent Session ID。每次 start、resume、interrupt approval、从 checkpoint replay 与 capability/tool call 都必须重新解析当前 GroupContext、目标集合及 Plugin grant。LangGraph 节点可从 checkpoint 边界重新执行，所有外部副作用必须调用带稳定幂等身份的领域命令/outbox；不能把 checkpoint replay 当成“只执行尚未发生的代码”。
@@ -2451,17 +2458,20 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-CHAT-004 | `GET /api/v1/worktrees/{worktree_id}/chat/targets` 必须要求当前 Bearer actor 的 `chat:submit` scope，并在同一 Tenant-scoped transaction 中锁定并授权路径 Worktree 与当前 Project membership；只返回当前 actor 仍有效成员所属的非归档 Worktree ID、Project ID 和名称，游标稳定且 limit 为 1–100；不得返回 checkout 路径或以目录结果授权写入；GLOBAL 提交仍须逐个重新解析 GroupContext，越权时整批不派发 |
 | AC-CHAT-005 | 首次接受请求时 session/thread、user Transcript metadata 与受保护 payload、queued Run、幂等 receipt、dispatch event 与 Audit 必须同事务提交；同 actor/tenant/key 且 fingerprint 相同的 30 天内重放返回同 receipt 且不增加第二个 run/message/outbox；fingerprint 不同返回冲突且不写入；事务失败或 provider 未配置不得返回 202 |
 | AC-CHAT-006 | Transcript 正文只允许经受信任 protector 加密后写入 W payload，T metadata 不含正文；Project Policy 保留期可配置且默认最多 90 天；到期清理可验证，crypto-erasure 或物理删除不能破坏不含正文的 append-only Audit；必须验证授权导出/删除、密钥轮换、RLS 与日志/outbox/checkpoint 无正文；当前 migration 虽已改为 ciphertext/wrapped-key schema，缺少真实密钥服务/清理 worker/导出删除路径时仍不得用于生产 |
-| AC-PLG-001 | 服务端授权投影中的兼容、已启用插件作为 Worktree 下的同级 Group App 出现；停用或撤权后入口及新 capability 调用撤销，既有 Task、Canvas、CLI 审计和引用仍可读取；客户端预览开关不改变服务端启用或授权状态 |
-| AC-PLG-002 | `GET /api/v1/worktrees/{worktree_id}/group-apps` 只返回重新校验后的 active/compatible/authorized 最小导航投影；要求当前 Bearer actor 与 `worktree:read`，响应 `Cache-Control: no-store`，不得返回 secrets/capability grants/raw manifest；条目 ID 唯一、受限且稳定排序；provider 未配置或 Registry schema/read 不可用时返回非成功响应。PostgreSQL provider 复验 membership version、非归档 Worktree 的当前 Project binding、verified 当前 manifest、Host API compatibility 与 actor `group_app:open` grant。UI 验证 Worktree ID、UUID correlation ID、非负安全整数 Registry version、最多 100 条、受限且唯一的 plugin ID、受限且无控制字符的 manifest version/label、int32 sort order；服务端投影成为同级导航唯一来源，加载或错误时清除导航，错误可显式重试，不得回退预览；仅无 provider 时显示明确标记的原型预览 |
+| AC-PLG-001 | 当前 actor 可访问的 Engineering Run 中，服务端授权投影里的 active/compatible/authorized 插件作为 Run 同级 App 出现；撤权后移除入口并拒绝新 capability 调用，保留既有业务事实/引用；Worktree 只决定焦点和 CLI/Git 目标；本地预览开关不改变服务端状态 |
+| AC-PLG-002 | 目标 `GET /api/v1/engineering-runs/{engineering_run_id}/apps?focus_worktree_id=...` 返回重新校验后的 active/compatible/authorized 最小 Run App 投影；要求 Bearer actor、当前 Project/Branch/Run membership 与必要的 Worktree grant，响应 no-store，不返回 secrets/grants/raw manifest；Registry ID 唯一稳定；UI 在加载/错误/身份变化时清除旧项且不 fallback。旧 `/api/v1/worktrees/{worktree_id}/group-apps` 仅为兼容路由，provider/schema/read 不可用时不得伪装成功 |
 | AC-PLG-003 | Manifest、Registry revision、binding、grant 四类 Master 均有有效区间与 current-row 唯一约束；更新只允许关闭当前行并追加 successor，物理删除被数据库 trigger 拒绝；Registry Audit UPDATE/DELETE 被拒绝；五张表启用并 FORCE RLS。Migration 静态定义通过不代表已部署或真实 PostgreSQL RLS 已验收；manifest trust root/ingest、binding/grant lifecycle writes 与 capability gateway 仍须单独实现 |
 | AC-GRP-DB-001 | Group PostgreSQL 生产部署必须分别配置 migration owner 与运行时 service role；运行时角色仅获得各 adapter 所需的 schema `USAGE` 与逐表最小 SQL 权限，不得为 superuser、BYPASSRLS 或表 owner；RLS policy 本身不授予 SQL 权限。必须使用目标环境实际登录身份验证权限、tenant/actor 隔离、拒绝越权读写及 append-only 约束。迁移不得假定未声明的全局应用角色；角色名、成员关系和 grants 由受控部署/bootstrap 清单显式提供 |
 | AC-RUN-001 | 从 Task Card 发起的每次 CLI 执行都创建独立 `TaskExecutionRun`，启动幂等重放返回相同 Run；新的真实重试创建新 Run。Run 保存创建时的 Task/input/acceptance snapshot，并将 `run_id` 传给 Runtime；Worktree ID 是不阻止 Worktree 清理的历史快照 |
 | AC-RUN-002 | Run 的执行器状态、Agent 声明、验证、人工接受/返工和集成结果独立呈现；只有明确的 verifier/human/integration 事件可以推进对应维度；缺失值保持 unknown，不能将 Agent 自报完成显示为验收通过 |
 | AC-RUN-003 | Task Card 可按 Goal / Execution / Evidence / Feedback / Compare 浏览 Run 摘要与事件；每个 Evidence 只返回经过 ACL 校验的脱敏 metadata/digest/受控 locator，不返回 raw transcript、Secret、token 或完整 tool output |
-| AC-RUN-004 | Run 历史只能在当前 Worktree 下的 canonical Task Card 读取；`GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs` 与 `.../{run_id}` 每次重验当前 actor、`work-item:read`、tenant、Project membership、Worktree binding 与 Task 关联。列表默认 20、最大 50，使用 `(started_at, run_id)` 稳定复合游标并设置 `no-store`；详情分别最多返回 100 条 Event 与 Evidence，只返回结构化 allowlist，不返回任意 `details`、artifact locator、原文或大输出。执行器、验证、人工接受状态分别取各自最新的非空事件，不得用“最后一个事件”覆盖不同状态维度；UI 只在选中的 Task Card 内显示，并在认证 API 不可用时 fail closed |
+| AC-RUN-004 | TaskExecutionRun 历史在 canonical Task Card 内读取，并与 EngineeringRun 导航/身份分离；目标 Run-scoped API 每次重验当前 actor、tenant、Project/Branch/EngineeringRun membership、WorkItem grant 和可选 Worktree 关联，使用有界稳定游标、no-store 与字段 allowlist。现有 `/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs` 仅是 Worktree compatibility endpoint；详情限制 100 Event/100 Evidence，禁止返回任意 details、locator、原文或大输出；状态维度各自取最新非空事件，认证 API 不可用时 fail closed |
 | AC-WTG-010 | Project Worktree Index 可进入 Project 级 Quality & Improvement 视图；所有指标显示公式、分子/分母、单位、时间窗、coverage 与版本，并能下钻至授权 Task/Run/Evidence；unknown 数据不作为零计入分母，结果按 task type/complexity 分层 |
 | AC-WTG-011 | 固定 Benchmark 重放使用版本化 task/repo/environment/acceptance/scoring snapshots，并分离 tuning/holdout；候选策略不得改标准；proposal 经过隔离对比和授权采纳后可回滚，历史分数保持原口径 |
 | AC-TRACE-001 | 一次从 Canvas 或底栏聊天发起的任务操作，可由同一 `correlation_id` 串起 Worktree、WorkItem、TaskCard、TaskExecutionRun、CLI Session、Canvas Element、Plugin 调用与 Audit |
+| AC-ERUN-001 | Project → Branch → Engineering Run → Worktree 主导航保持身份与深链；点击 Run Worktree 后才加载所属 Run tabs，Worktree 只设 focus/CLI target；右侧 Task/Canvas/BI 数据按 Run 授权 | P0 |
+| AC-ERUN-002 | Run Context/API 对每个实体域复验 membership 与 capability；跨域命令调用 owner API，同 owner DB 事务使用 Outbox，消费者经 Inbox 幂等去重；前端不能跨域表写入或直接使用 stored procedure | P0 |
+| AC-EVENT-001 | 当前领域事件基线为 PostgreSQL SoR + Transactional Outbox + NATS JetStream；Kafka/Fluvio 不在运行依赖；新增 broker 前需经 ADR 和同 workload 的保留/回放/资源/恢复基准 | P1 |
 
 ### 50.8A 多 Agent 并行、资源预算与 Rust 桌面性能
 
@@ -2633,6 +2643,37 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | AC-HOOK-008 | Rust evaluator tests 验证 v1 policy 仅限 archive、未指定 phase 的 rule 不跨 phase 生效、Run admission 只接受允许的 typed facts；policy publish/rollback 在 producer 未就绪时拒绝该 phase，UI Builder 禁用配置 | 100% negative/compatibility cases pass；不可支持配置 fail closed |
 | AC-HOOK-009 | REST/DB 验收验证 Runtime readiness 不持有数据库锁；fence scope/freshness/TTL 与 spawn 消费绑定；Allow 的 Run、Hook ledger、RunEvent 和 HookSet snapshot 原子提交且共享 event_id；Deny 只追加无 Run FK 的 ledger；事件列表/summary coverage 与已装配 producer capability 一致 | 正/负路径和并发/idempotency 场景通过；当前未装配的 production adapter 不得报告为已启用 |
 
+### 50.8E 原子化领域边界与前后端服务拆分
+
+每个右侧 Run App 是独立产品能力入口，不自动等同独立微服务。后端按事实所有权拆分 bounded context；前端 App 通过稳定、版本化 API 消费授权投影并提交命令。第一阶段采用 Rust modular monolith，维持同进程部署、模块级依赖和独立 schema owner；只有当吞吐、可用性、发布节奏、团队 ownership 或故障隔离数据证明必要时，才提升某个 bounded context 为独立服务，避免每个 UI tab 增加常驻进程、内存与运维面。
+
+| 域 / 服务候选 | Canonical owner | 允许的职责 | 不允许 |
+|---|---|---|---|
+| Project / Branch / Worktree Control | Project、Branch binding、Worktree lifecycle、Git/Host Runtime projection | Project membership、远端 Branch 元数据、本地 checkout 绑定/锁/冲突、create/import/archive/cleanup commands | 写 WorkItem、Canvas 或 Run 业务事实 |
+| Work Item / Planning | WorkItem、Task Contract、Board/Backlog/Sprint/Relation | Inbox、Multica/Jira projections、版本化任务命令与 review gate | 私有化第二任务状态机或直接 spawn 进程 |
+| Engineering Run / Agent Runtime / Scheduler | EngineeringRun、TaskExecutionRun admission、resource reservation、Agent/Loop lifecycle | 版本快照、调度、公平配额、取消/drain、受控 Runtime bridge | 把 TaskExecutionRun 当 EngineeringRun，或绕过 Task/Hook/ACL owner |
+| Canvas | Run-owned Canvas、Document、Element、typed EntityRef | Run 范围布局与跨 Worktree 引用 | 复制 WorkItem 状态、直接写任务库 |
+| BI / Benchmark | 版本化 metric、cohort、coverage、Benchmark receipt、proposal projection | 只读消费 Run/Event/Evidence/Audit，授权下钻 | 修改源领域事实或把缺失数据补零 |
+| Plugin / Hook Control | Plugin Registry/capability 与 Rust-native Hook policy/evaluator | 校验、发布、撤权、调用隔离；安全 Hook fail-closed | 让插件覆盖或削弱原生 Hook |
+
+每个 bounded context 拥有自己的 schema/table 写权限和版本化 API；跨域读优先使用授权 projection/API，跨域写调用事实所有者命令。PostgreSQL stored procedure/function 只封装同一 owner 内需要数据库原子性、行锁、CAS 或 RLS 的规则，并由该 owner API 调用；禁止把 procedure 当跨服务 RPC、让一个域直接写另一个域的表，或把存储过程暴露给浏览器。跨域工作流由显式 Saga/Run coordinator 驱动，每一步使用稳定 command ID、幂等键和 append-only audit/outbox；可补偿，但不宣称分布式 ACID。
+
+异步事实采用 owner transaction 同写 Transactional Outbox；消费者在本地 Inbox/processed-event key 上幂等去重，再更新可重建 projection。NATS JetStream 是当前事件传输基线，Canvas realtime 或 BI read model 不能替代它。版本化事件至少携带 `event_id/schema_version/tenant_id/project_id/branch_id/engineering_run_id/可选 worktree_id/actor_id/correlation_id/causation_id`。前端只读取当前 Actor 有权看的最小字段并使用分页、虚拟化和 bounded cache；服务间授权、RLS、trace 和资源预算继续 fail closed。
+
+### 50.8F 事件流平台现状与 Kafka / Fluvio 评估
+
+截至 2026-10-01 的仓库架构/依赖检索，当前设计选择 PostgreSQL System of Record + Transactional Outbox + NATS JetStream；未发现 Kafka 或 Fluvio runtime dependency/部署配置。部分旧源文件注释把 Redis/Kafka 写作未来候选，Canvas 旧设计也存在 Redis Streams 选择；这些是需逐步统一的历史设计文本，不能解释为当前在用。当前不引入第二个 broker：业务事实继续由 PostgreSQL owner transaction 持有，NATS 承担版本化异步领域事件；BI/Benchmark 从受控 Outbox/RunEvent 构建可重放投影。只有实测保留、重放吞吐、connector 或查询隔离 SLO 无法满足时，才启动独立流平台 ADR。
+
+| 候选 | 与本项目匹配点 | 成本/风险 | 判断 |
+|---|---|---|---|
+| NATS JetStream（当前基线） | 仓库已有事件契约与 Outbox 设计；适合当前跨域通知与消费解耦，不增加第二套集群 | 需验证长期留存、大规模历史重放/connector 是否满足未来 BI SLO | 继续使用，当前最少运行部件 |
+| Apache Kafka | 官方 4.3 API 提供 Producer/Consumer/Streams/Connect/Admin；Connect 有预构建 connector，适合未来广泛 BI/数据系统集成、长期留存和独立分析消费者；非 Java client 由社区项目维护 | 引入会增加 broker/partition/replication/schema/consumer-group 与资源运维面；Streams 是 Java/Scala 应用库，4.3.0 曾披露 RocksDB native-memory leak，需使用修复版 4.3.1 并监控 RSS；Rust 桌面前端并不要求 broker 用 Rust | 若 NATS 无法满足经过量化的 connector、保留或回放 SLO，优先做 Kafka PoC/ADR；限定事件平台与 analytics consumer，不改变 PostgreSQL SoR |
+| Fluvio | Rust 实现、Kubernetes/edge 取向，并有 Rust client；官方称小内存占用，适合列入资源敏感 BI/replay PoC | 低内存优势是供应方陈述，尚无 Star workload 对比；官方 GitHub release 页面最新非预发布版本为 v0.18.1（2025-07-04），页面同时可见 2026 dev prerelease；必须核实支持周期、稳定版节奏、connector/托管及故障恢复能力 | 仅在相同负载基准证明 RSS/CPU 优势且稳定性、连接器和运维需求都达标时采用 |
+
+**选择结论**：Star 仓库当前没有 Kafka 或 Fluvio runtime dependency/deployment；当前方案是 PostgreSQL SoR + Transactional Outbox + NATS JetStream。现阶段继续用 NATS，不叠加第二套 broker。若未来经 SLO 与同负载基准确认必须在 Kafka/Fluvio 中选一个生产平台，优先选择 Kafka，理由是 Connect/Streams 与集成生态更贴合 Run BI/Benchmark 的外部数据接入和历史分析需求；接受其额外运维/内存成本，并只采用包含 Kafka 4.3.1 修复的版本。Fluvio 保留为资源敏感、Rust/Kubernetes 形态下的受限候选；只有 RSS/CPU/恢复实测明显占优且 release/support、connector 和托管能力达标才反转选择。基准须固定事件集、保留时长、吞吐、消费组数、consumer lag、故障恢复和部署资源，测峰值 RSS/CPU/存储与恢复时间，记录 workload/coverage。迁移只发生在 Outbox 后的 analytics/projection consumer，不改变 PostgreSQL SoR、owner API、Inbox 去重或事务写入边界。
+
+资料（官方，核对日期 2026-10-01）：[Kafka 4.3 API 与 Connect/Streams](https://kafka.apache.org/43/apis/)、[Kafka Streams 4.3 升级说明及 4.3.1 native-memory 修复](https://kafka.apache.org/43/streams/upgrade-guide/)、[Fluvio 0.17.2 架构/资源说明](https://www.fluvio.io/docs/0.17.2/fluvio/overview/)、[Fluvio 官方 release 状态](https://github.com/fluvio-community/fluvio/releases)。
+
 ### 50.9 追溯与后续专题同步
 
 本节为总要件基线。`SRS-MULTICA-TASK-001` 负责任务生命周期与 review gate，`SRS-MULTICA-HOOK-001` / `BD-MULTICA-HOOK-001` / `DD-MULTICA-HOOK-001` 负责高级设置 Hooks tab 的原生引擎、可视编辑、Worktree enforcement 与 Hook BI；`DD-MULTICA-TASK-001` §14.7-14.12 负责 Task Contract / Run / BI / Benchmark / Execution Profile / 双 Loop / Hook；`DD-WORKTREE-GROUP-001` §6.3-6.5 / §8.4-8.7 负责调度资源、扩展 Provider、Hook 与 CLI 边界；`DD-CANVAS-WORKFLOW-001` 的 Schedule Trigger 必须适配唯一 Automation occurrence source；`SRS-CANVAS-001` / `SRS-CANVAS-WORKFLOW-001` 负责画布与 Flow，`architecture/2026-09-03-langgraph/01-requirements.md` 负责 L0/L1 编排。`basic-design.md` §16.14-16.17 固定跨专题基本设计。后续专题文档必须继承 GroupContext、单一任务事实源、范围化聊天、Worktree-first 导航、可扩展 Agent Profile、原生 Hook、Loop、资源与跨 App 事件约束。
@@ -2714,3 +2755,4 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.38 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-AEC-017：C3 将 Run/Profile/Task/Hook/Event 与 Project-wide ResourceBudget reservation 原子提交；以 Project allocation epoch 序列化 REPEATABLE READ admissions，防止跨 Worktree 并发超额；幂等 replay 不重复预留；未接通 production catalog publisher、Runtime reservation lifecycle、目标 DB/Auth/RLS 与完整 BI 前仍 fail closed；Hooks 继续位于 ULYS-235 Advanced Settings 内容区并列标签 | 完成 Phase 9E-4C3 Run 与资源预留代码切片并修正并发快照风险 |
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-AEC-018：一次性 Runtime fence 绑定双 Profile revision、scope、catalog revisions、HookSet、ResourceBudget 与用户请求；Run 持久化 Approved Launch Profile identity 和版本化 binding digest，Run Detail 可追溯；opaque fence ID 不进 Run snapshot；说明 adapter 未装配前继续 fail closed，并明确原请求幂等 fingerprint 与 server-resolved fence digest 的不同职责；Hooks 保持 ULYS-235 Advanced Settings 内容区并列 tab | 完成 Phase 9E-4C4 双 Profile spawn-fence 与 Run 投影代码切片 |
 | v5.41 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-AEC-019：共享 typed dual-Profile fence DTO、C4 signature v2、Runtime binding recheck 与 grant nonce/fence 的原子一次性消费；规定 receipt 上限与 TTL cleanup，并明确该基础设施不等于生产 ACL/reservation/OS spawn/BI consumer，capability 继续关闭 | 推进 Phase 9E-4C5 Runtime fence consume foundation |
+| v5.42 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project → Cloud Branch → Engineering Run → Worktree 主导航和 Run-owned tabs/BI/Benchmark；Project Worktree Index 限定为 aggregate 管理视图；补充 owner API、同域存储过程、Outbox/Inbox、Rust 桌面资源边界与 NATS/Kafka/Fluvio 选择门；新增 AC-ERUN-001/002、AC-EVENT-001；明确未迁移 Run schema/API 仍保持未完成 | 用户澄清 Branch/Run/Worktree 层级并要求服务原子解耦及 Kafka/Fluvio 评估 |
