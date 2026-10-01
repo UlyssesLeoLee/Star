@@ -441,7 +441,7 @@ import type {
   WorktreeGroupApiClient,
 } from "@/lib/group/worktreeGroupApi";
 import { useStore } from "@/lib/store";
-import type { CanvasConnector, CanvasFrame, CanvasViewport, WorkItemStatus } from "@/types/ids";
+import type { CanvasConnector, CanvasElement, CanvasFrame, CanvasViewport, WorkItemStatus } from "@/types/ids";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -1291,7 +1291,55 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       }
     } finally {
       if (groupApiGeneration.current === requestGeneration) setCanvasTaskPending(false);
+  }
+  }
+
+  /**
+   * 新增通用 Canvas element (sticky / shape / 文本) — per 2026-10-01 OOB 恢复丢失的画笔/创建功能
+   * - 走 groupApi.createCanvasElement (跟现有的 saveCanvasElementPosition/deleteCanvasElements 对称)
+   * - 幂等性用 idempotencyKey + content JSON 缓存 (防止双击重复创建)
+   * - 失败 throw 给 CanvasView 走 catch
+   */
+  async function createCanvasElementAt(body: {
+    kind: CanvasElement["kind"];
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    z_index: number;
+    content: CanvasElement["content"];
+  }): Promise<{ id?: string } | void> {
+    if (groupProjection.mode !== "live" || !groupApi || !groupProjection.canvas) {
+      throw new Error("Worktree canvas 不可写");
     }
+    const intentKey = JSON.stringify([worktreeId, groupProjection.canvas.id, body.kind, body.x, body.y, body.width, body.height]);
+    let command = canvasElementLinkCommands.current.get(intentKey);
+    const requestBody = {
+      kind: body.kind,
+      x: body.x,
+      y: body.y,
+      width: body.width,
+      height: body.height,
+      rotation: 0,
+      z_index: body.z_index,
+      content: body.content,
+      locked: false,
+      hidden: false,
+    };
+    if (!command) {
+      command = { correlationId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), body: requestBody };
+      canvasElementLinkCommands.current.set(intentKey, command);
+    }
+    const response = await groupApi.createCanvasElement<{ element?: { element_id?: string }; canvas_element?: { element_id?: string } }>(
+      worktreeId,
+      groupProjection.canvas.id,
+      { ...requestBody, correlation_id: command.correlationId },
+      command.idempotencyKey,
+    );
+    canvasElementLinkCommands.current.delete(intentKey);
+    const id = response.element?.element_id ?? response.canvas_element?.element_id;
+    setProjectionRefreshKey((current) => current + 1);
+    return { id };
   }
 
   async function createWorktreeCanvas(title = "Worktree Canvas") {
@@ -2816,6 +2864,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                     onElementPositionChange={groupProjection.mode === "live" ? saveCanvasElementPosition : undefined}
                     onDeleteElements={groupProjection.mode === "live" ? deleteCanvasElements : undefined}
                     onSelectionChange={groupProjection.mode === "live" ? setSelectedCanvasElementIds : undefined}
+                    onCreateElement={groupProjection.mode === "live" ? createCanvasElementAt : undefined}
                   />
                   {canvasDocumentSavePending && <div className="absolute inset-0 z-30 grid place-items-center bg-bg/60 text-sm" role="status">正在保存 Canvas 文档…</div>}
                   {canvasElementMovePending && <div className="absolute inset-0 z-30 grid place-items-center bg-bg/60 text-sm" role="status">正在保存元素位置…</div>}
