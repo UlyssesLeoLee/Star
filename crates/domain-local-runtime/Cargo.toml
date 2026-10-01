@@ -31,6 +31,7 @@ tracing = { workspace = true }
 rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
 
 star-context = { path = "../star-context" }
+star-dto = { path = "../star-dto" }
 
 # ULYS-212 (A9 完善 — 真实 OS spawn 适配)
 # process-wrap: 跨平台 safe wrapper for setsid (Linux) / Job Object (Windows)
