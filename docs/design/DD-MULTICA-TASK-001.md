@@ -1,13 +1,13 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.12** (per 日本 IPA SEC 标准，补充 Run Profile 快照与 Project resource admission 原子写入)
+> **Multica Task Lifecycle 域 詳細設計書 v1.14** (per 日本 IPA SEC 标准，补充双 Profile Runtime spawn fence、现存 Local Runtime 基础验证边界与高级设置导航层级)
 >
-> - 状态: 🟡 Draft v1.12 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2 已有条件式代码/schema 切片或设计收口；9E-4C3 已有 Profile/Run/Project resource-reservation 原子写入代码切片与隔离 PG18 验证，但 catalog publisher/production Runtime reservation lifecycle、目标 DB/Auth/RLS grants、BI/Outbox 与 C4 spawn fence 仍开放)
+> - 状态: 🟡 Draft v1.14 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；9E-4C4 已有 typed dual-Profile fence、Run identity migration 与 Detail 投影切片，但 production Runtime consumer、reservation lifecycle、target DB/Auth/RLS grants、catalog publisher 与 BI/Outbox 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.38 §50；`docs/basic-design.md` v5.34 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.40 §50；`docs/basic-design.md` v5.36 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.3
+> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.5
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
@@ -1002,6 +1002,28 @@ REST 新 Run admission 在任何 readiness/preparation 前要求非空、非 nil
 
 Run insert、reservation、reservation Transaction event 与 `task_execution_run_event` 镜像共享事务；两种事件用相同 `event_id`、Run、WorkItem、actor、correlation 与 bounded details 建立 BI 关联。重复 idempotency key 先返回既有 Run，reservation 只在新 Run insert 成功后创建，因此 replay 不会二次占额。隔离 PostgreSQL 18 已验证 migration 两次应用、SCD2 quota/audit、Run Profile budget 与 Loop snapshot guard、reservation/RunEvent 同 event ID、RLS、append-only 和 reservation 状态转换。生产 catalog publisher/装载、目标 DB 与 runtime role grants、host Auth/ACL、epoch/reservation TTL maintenance、Runtime activate/release、Outbox/BI outcome join 及 C4 双身份 spawn fence 仍未完成；C3 的代码/迁移 slice 不代表生产 Run admission 已开启。
 
+#### 14.11.11 Phase 9E-4C4 双 Profile 一次性 Runtime spawn fence
+
+Run admission 和 Local Runtime process create 由一个 typed `TaskRunSpawnFence` contract 串联。Readiness 命令携带当前已授权的 tenant/actor/Project/repository/Worktree/Task/Runtime/lifecycle、请求 fingerprint、独立的 Approved Launch Profile ID，以及 `Arc<CurrentExecutionAdmissionSnapshot>`。Runtime readiness 在 DB 行锁外解析 Approved Launch Profile 的当前 revision，返回 fence UUID/expiry、binding 和 binding digest；该 readiness 仍须满足 observed age ≤5 秒、剩余 TTL >5 秒且 TTL ≤30 秒，Runtime health 必须为 healthy。
+
+`TaskRunSpawnFenceBinding` 是有界值对象，固定：
+
+- scope：tenant、actor、Project、repository、Worktree、WorkItem、Runtime 和 expected lifecycle version；
+- Approved Launch Profile 与 AgentExecutionProfile 各自独立的 ID/version/lowercase SHA-256 digest；
+- Provider catalog revision、Skill registry revision、GrantSet ID/version；
+- 当前 verified effective HookSet ID/version/digest；
+- Profile 中的 typed ResourceBudget 上限与客户端 request fingerprint。
+
+Catalog entries 不复制到 fence：readiness command 继续共享 Arc-backed snapshot，binding 只携带版本/revision tuple 与固定大小预算字段。`binding_digest` 使用 `star.task_run_spawn_fence.v1\0` domain separator 和 Rust typed struct 的版本化序列化，覆盖上述全部字段。REST 根据请求与已验证 execution snapshot 重建期望 binding，强制比较所有字段和 digest；Approved Launch Profile identity 必须由 Runtime 当前策略解析并 attestation，profile ID 必须与 request 相等，version/digest 必须非空、有效且为当前 revision。binding 不匹配、无效 digest、不可用 Runtime、观察过期、fence 缺失或不健康均 fail closed。
+
+Final transaction 在事务快照中重授权 GroupContext、actor membership、Worktree/Task/lifecycle 和 idempotency，锁定并重验 AgentExecutionProfile、catalog revisions、GrantSet、effective HookSet 与 quota/reservations；同时确认 fence binding 仍等于当前 readiness command、TTL 足够。新 Run 保存 AgentExecutionProfile document/version/digest、Approved Launch Profile ID/version/digest、`spawn_fence_binding_digest`、Task/acceptance/Hook/ResourceBudget/Loop snapshots；Run、Reservation、reservation ledger、Hook ledger 和共享 `event_id` RunEvent 按 C3 的事务边界提交。`task_execution_run` 的双 Profile fence tuple 为 all-null（legacy/pre-C4）或完整非空；opaque `fence_id` 只作为 Runtime/Reservation 内部关联值，不持久化到 Run Detail/API。
+
+Commit 后把同一 fence 对象交给 `TaskCliSessionProvisioner::start_task_cli_session`。任何支持 Profile-bound admission 的 Runtime adapter 必须使用原子 compare-and-consume 单次消费 issued fence；在 OS/process grant 前重验当前 actor ACL、scope/lifecycle、两份 Profile 的版本/digest、catalog revisions、HookSet 与 ResourceBudget/Project quota，并联动 reservation activate/reject/release。重复消费、错绑请求、profile/catalog/HookSet drift、ACL 撤回、预算不足、TTL 过期、reservation 状态不符或 runtime/store 故障时不 spawn。无 fence 的 idempotent replay 只能恢复已存在 Run/session，不得创建新进程。成功消费后的 Runtime receipt/state event 应携带非秘密 binding digest 与 Run ID 供 BI 去重；digest 表示决策绑定，只有 Runtime outcome event 能证明消费/启动结果。
+
+幂等 `request_fingerprint` 与 `spawn_fence_binding_digest` 承担不同职责：前者以显式版本兼容旧 Run replay，表示客户端请求身份并固定所选 Profile IDs；后者额外绑定服务端解析到的 Profile versions/digests、catalog/HookSet revisions、资源预算和安全 scope，因此 catalog revision 改变不能沿用旧 fence，也不会把一次批准误作成功执行。Run Summary/Detail 返回两类 Profile identity 与 binding digest，不返回可重放 fence handle。
+
+9E-4C4 已交付 Rust REST typed contract/binding validator、`ExecutionCatalogRevisionFence::revisions()` 小型 revision 投影、dual Profile/binding digest Run migration、Run writer 与 Run list/detail projection。既有 `domain-local-runtime::task_execution` 只校验签名 grant、scope、Approved Launch Profile ID/字段、canonical checkout、有效期和一次性 nonce；签名 context 未绑定 Launch Profile version/digest、AgentExecutionProfile、catalog/HookSet/ResourceBudget 或 C4 fence digest，该 helper 也没有接入生产 provisioner/OS spawn，因此不构成 C4 Runtime consumer。当前仍缺生产 Approved Launch Profile authority/provider、真实 Runtime fence store/consumer、OS process adapter 或消费后 reservation lifecycle；目标 DB/RLS grants、真实 Auth/Project ACL、catalog publisher/source load、过期 reservation/epoch cleanup 与完整 Outbox/BI 仍开放。`supports_profile_bound_run_admission()` 和 current catalog capability 均保持默认 false，因此本切片不允许任何新 Profile-bound Run 真正 spawn。Hooks 仍按 ULYS-235 位于 Settings 主导航“高级设置”父入口下，规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab；不是独立主导航项或 Worktree 树节点。
+
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
 Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，页面路由为 `/settings/advanced`；Hooks 规范路由为 `/settings/advanced/hooks`，位于页面内容区的 tabs，与 Skills/MCP/Plugins 并列。这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
@@ -1046,3 +1068,5 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 
 | v1.11 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 9E-4C2 当前 SQL adapter 与 production gates 描述；补充 Skill capability 在数据库侧先通过 ≤384 KiB 聚合 heap 预算再载入 labels，减少并发 admission 峰值内存；同步 requirements v5.37/basic design v5.33 并保留 `/settings/advanced/hooks` 为 Advanced Settings 并列 tab | 完成 Phase 9E-4C2 内存上限与文档状态自审 |
 | v1.12 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.10：定义 C3 final REPEATABLE READ transaction、Profile/ResourceBudget/Loop/Task/Hook/RunEvent/reservation 原子边界、Project 跨 Worktree aggregate quota 与 no-default policy；以 Project allocation epoch write 防止 waiter 使用旧快照超额预留，SQLSTATE 40001 映射冲突；说明 W/T/M、RLS、idempotent replay、reserved maxima 与 observed metrics 区分及尚未闭合的 publisher/Runtime/DB/BI/C4 gates；Hooks 仍是 Advanced Settings 内容区并列 tab | Phase 9E-4C3 Run/resource writer 与并发审查 |
+| v1.13 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.11：定义 typed dual-Profile one-time spawn fence、domain-separated binding digest、scope/catalog/HookSet/ResourceBudget 字段、final transaction Run identity 与 reservation 写入、Runtime 原子消费/重授权顺序、request fingerprint 与 fence digest 的不同职责、Run Detail 投影和 fail-closed capability；记录本轮 Rust/migration/projection slice 与未装配的 production Runtime/Auth/catalog/DB/BI 前置；Hooks 保持 ULYS-235 Advanced Settings 内容区并列 tab | 推进 Phase 9E-4C4 双 Profile Runtime spawn-fence contract |
+| v1.14 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 明确 `domain-local-runtime::task_execution` 现存签名授权、scope/profile/path/nonce 基础校验不包含 C4 双 Profile fence；将 ULYS-235 固定为 Settings 主导航“高级设置”父入口、`/settings/advanced/hooks` 页面并列 tab，并排除独立主导航/Worktree Group 节点 | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |

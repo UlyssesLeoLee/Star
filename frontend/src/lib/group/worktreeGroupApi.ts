@@ -54,6 +54,16 @@ CREATE
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (summary:Class {name:"TaskRunSummary",type:"interface"});
+CREATE (launchId:Variable {name:"approved_launch_profile_id",type:"variable",language:"typescript"}),
+       (launchVersion:Variable {name:"approved_launch_profile_version",type:"variable",language:"typescript"}),
+       (launchDigest:Variable {name:"approved_launch_profile_digest",type:"variable",language:"typescript"}),
+       (fenceDigest:Variable {name:"spawn_fence_binding_digest",type:"variable",language:"typescript"});
+CREATE (summary)-[:USES]->(launchId),(summary)-[:USES]->(launchVersion),(summary)-[:USES]->(launchDigest),(summary)-[:USES]->(fenceDigest);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
       (client:Class {name:"WorktreeGroupApiClient"}),
       (request:Function {name:"WorktreeGroupApiClient.request"});
 CREATE (groupApp:Class {name:"GroupAppNavigationEntry",type:"interface",language:"typescript",visibility:"public"}),
@@ -554,6 +564,10 @@ export interface TaskRunSummary {
   execution_profile_id: string | null;
   execution_profile_version: number | null;
   execution_profile_digest: string | null;
+  approved_launch_profile_id: string | null;
+  approved_launch_profile_version: number | null;
+  approved_launch_profile_digest: string | null;
+  spawn_fence_binding_digest: string | null;
   execution_state: string | null;
   verification_state: string | null;
   human_acceptance_state: string | null;

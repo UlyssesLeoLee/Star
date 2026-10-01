@@ -10,6 +10,12 @@ CREATE (file)-[:CONTAINS]->(panel),(file)-[:CONTAINS]->(refresh),(file)-[:CONTAI
        (panel)-[:USES]->(api),(panel)-[:CALLS]->(refresh),(panel)-[:CALLS]->(loadMore),(panel)-[:CALLS]->(openRun);
 */
 
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"TaskRunHistoryPanel.tsx"}),(panel:Function {name:"TaskRunHistoryPanel"});
+CREATE (profileSnapshot:Logic {name:"run_profile_snapshot_projection",type:"logic",language:"typescript"});
+CREATE (file)-[:CONTAINS]->(profileSnapshot),(panel)-[:USES]->(profileSnapshot);
+*/
+
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -185,6 +191,27 @@ export function TaskRunHistoryPanel({ worktreeId, workItemId, api }: TaskRunHist
           {detailError && <p role="alert" className="text-[10px] text-err">{detailError}</p>}
           {detail && (
             <>
+              <section className="rounded border border-line/70 p-2" aria-label="Run Profile 快照">
+                <h5 className="mb-1 text-[10px] font-semibold">Profile 与 spawn fence</h5>
+                <dl className="grid gap-x-3 gap-y-1 text-[10px] sm:grid-cols-[max-content_1fr]">
+                  <dt className="text-ink-mute">Approved Launch Profile</dt>
+                  <dd className="break-all font-mono">
+                    {detail.run.approved_launch_profile_id
+                      ? `${detail.run.approved_launch_profile_id} · v${detail.run.approved_launch_profile_version ?? "?"} · ${detail.run.approved_launch_profile_digest ?? "no digest"}`
+                      : "未记录（历史 Run）"}
+                  </dd>
+                  <dt className="text-ink-mute">Agent Execution Profile</dt>
+                  <dd className="break-all font-mono">
+                    {detail.run.execution_profile_id
+                      ? `${detail.run.execution_profile_id} · v${detail.run.execution_profile_version ?? "?"} · ${detail.run.execution_profile_digest ?? "no digest"}`
+                      : "未记录（历史 Run）"}
+                  </dd>
+                  <dt className="text-ink-mute">Spawn binding digest</dt>
+                  <dd className="break-all font-mono">
+                    {detail.run.spawn_fence_binding_digest ?? "未记录（历史 Run）"}
+                  </dd>
+                </dl>
+              </section>
               <ol className="max-h-64 space-y-1 overflow-auto rounded border border-line p-2">
                 {detail.events.map((event) => (
                   <li key={event.event_id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 py-1 text-[10px] last:border-0">

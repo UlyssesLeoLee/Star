@@ -17,6 +17,9 @@
 //!   (m)-[:CONTAINS]->(event),(m)-[:CONTAINS]->(evidence),
 //!   (list)-[:CALLS]->(authorize),(list)-[:CALLS]->(limit),(list)-[:CALLS]->(cursor),
 //!   (detail)-[:CALLS]->(authorize);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"task_runs",type:"module"}),(summary:Class {name:"TaskRunSummary",type:"class"});
+//! CREATE (launch_id:Variable {name:"approved_launch_profile_id",type:"variable",language:"rust"}),(launch_version:Variable {name:"approved_launch_profile_version",type:"variable",language:"rust"}),(launch_digest:Variable {name:"approved_launch_profile_digest",type:"variable",language:"rust"}),(summary_json:Function {name:"run_summary_json",type:"function",language:"rust"}),(m)-[:CONTAINS]->(summary_json),(summary)-[:USES]->(launch_id),(summary)-[:USES]->(launch_version),(summary)-[:USES]->(launch_digest),(summary_json)-[:CALLS]->(summary),(summary_json)-[:USES]->(launch_id),(summary_json)-[:USES]->(launch_version),(summary_json)-[:USES]->(launch_digest);
 
 use axum::{
     extract::{Path, Query, State},
@@ -74,6 +77,10 @@ struct TaskRunSummary {
     execution_profile_id: Option<Uuid>,
     execution_profile_version: Option<i64>,
     execution_profile_digest: Option<String>,
+    approved_launch_profile_id: Option<Uuid>,
+    approved_launch_profile_version: Option<i64>,
+    approved_launch_profile_digest: Option<String>,
+    spawn_fence_binding_digest: Option<String>,
     execution_state: Option<String>,
     verification_state: Option<String>,
     human_acceptance_state: Option<String>,
@@ -176,6 +183,9 @@ async fn list_task_runs(
                task_contract_version, agent_id, model_version, skill_version,
                orchestrator_version, strategy_version, execution_profile_id,
                execution_profile_version, execution_profile_digest,
+               approved_launch_profile_id, approved_launch_profile_version,
+               rtrim(approved_launch_profile_digest::text) AS approved_launch_profile_digest,
+               rtrim(spawn_fence_binding_digest::text) AS spawn_fence_binding_digest,
                (SELECT e.execution_state FROM multica.task_execution_run_event e
                 WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
                   AND e.execution_state IS NOT NULL
@@ -261,6 +271,9 @@ async fn get_task_run_detail(
                task_contract_version, agent_id, model_version, skill_version,
                orchestrator_version, strategy_version, execution_profile_id,
                execution_profile_version, execution_profile_digest,
+               approved_launch_profile_id, approved_launch_profile_version,
+               rtrim(approved_launch_profile_digest::text) AS approved_launch_profile_digest,
+               rtrim(spawn_fence_binding_digest::text) AS spawn_fence_binding_digest,
                (SELECT e.execution_state FROM multica.task_execution_run_event e
                 WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
                   AND e.execution_state IS NOT NULL
@@ -427,6 +440,10 @@ fn run_summary_json(run: TaskRunSummary) -> Value {
         "execution_profile_id": run.execution_profile_id,
         "execution_profile_version": run.execution_profile_version,
         "execution_profile_digest": run.execution_profile_digest,
+        "approved_launch_profile_id": run.approved_launch_profile_id,
+        "approved_launch_profile_version": run.approved_launch_profile_version,
+        "approved_launch_profile_digest": run.approved_launch_profile_digest,
+        "spawn_fence_binding_digest": run.spawn_fence_binding_digest,
         "execution_state": run.execution_state,
         "verification_state": run.verification_state,
         "human_acceptance_state": run.human_acceptance_state,

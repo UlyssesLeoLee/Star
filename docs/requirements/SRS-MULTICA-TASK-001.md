@@ -1,8 +1,8 @@
 # SRS-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域要件定義書 v0.3** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; 渡口 Worktree 群组集成补充)
+> **Multica Task Lifecycle 域要件定義書 v0.5** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; 渡口 Worktree 群组集成补充)
 >
-> - 状态: 🟡 Draft v0.3
+> - 状态: 🟡 Draft v0.5
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (留空, root 统一 commit 时填)
 > - 关联基本設計書: [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) v0.1
@@ -21,7 +21,7 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域要件定義書 (v33 候选对齐) |
-| 版本 | v0.3 |
+| 版本 | v0.4 |
 | 作成日 | 2026-09-11 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -232,6 +232,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | AC-11 | Task Card 索引与 Infinite Canvas 在 Worktree 群组中是同级入口; Canvas 写入通过领域命令和权限校验 |
 | AC-12 | 插件可声明范围及 capability 并热插拔注册群组入口; 卸载后其持有的任务事实仍由 Multica/WorkItem 域负责 |
 | AC-13 | Profile-bound Run 按 root requirements AC-AEC-017 执行：Run Profile/ResourceBudget/Loop/Task/Hook snapshot、Project-wide pending reservation、reservation audit 与同 `event_id` RunEvent 在一个事务提交；Project epoch 写冲突防止 REPEATABLE READ 并发超额；幂等 replay 不重复预留；quota/fence/scope/revision/capacity 任一检查失败则无 Run、无 spawn |
+| AC-14 | Run admission 生成有界 typed one-time Runtime fence，绑定 request fingerprint、scope/lifecycle、catalog revisions、HookSet、ResourceBudget 与 Approved Launch Profile/AgentExecutionProfile 两份当前 ID/version/digest；新 Run 保存 Approved Launch Profile identity 和 binding digest，Run Detail 可追溯；Runtime 必须在进程创建前重验授权/版本并原子 consume 一次；错绑、过期、重放或 reservation lifecycle 不可用时 fail closed，production consumer 未装配前不开放新 Run |
 
 ---
 
@@ -246,7 +247,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | #5 4 类 404 timestamp 跟 automation-design §3.4 横向 audit log 范式协调 | P1 | 不阻塞 | 复用现有 audit_log 字段 |
 | #6 状态机守门 "claimed 后 30s 必须 start" 跟守门 #9 v27 30s claim timeout 重复 | P1 | 不阻塞 | 复用同一 timeout 常量 |
 
-Phase 9E-4C3 已交付条件式 Rust/REST writer 与 PostgreSQL migration slice，但不表示生产 Profile-bound Run 已开放。Catalog publisher/production source、真实 Auth/Project ACL、目标数据库与 runtime role grants、allocation-epoch/reservation TTL maintenance、Runtime reservation activate/release、Outbox/完整 BI 与 9E-4C4 双 Profile spawn fence 仍未完成；相关 capability 保持 fail closed。Hooks 导航遵循 ULYS-235：Advanced Settings 内容区中与 Skills/MCP/Plugins 并列的 tab。
+Phase 9E-4C3 已交付条件式 Rust/REST writer 与 PostgreSQL migration slice；9E-4C4 已补上双 Profile 一次性 spawn-fence contract、Run identity migration 和 Run Detail 投影。这些不表示生产 Profile-bound Run 已开放。Local Runtime 既有 `domain-local-runtime::task_execution` 只验证签名 grant、scope、Approved Launch Profile ID/字段、canonical checkout、有效期和一次性 nonce；它未绑定 Launch Profile version/digest、AgentExecutionProfile、catalog/HookSet/ResourceBudget 或 C4 fence，也没有生产 provisioner/OS spawn 消费者。Catalog publisher/production source、Approved Launch Profile authority/provider、真实 Auth/Project ACL、目标数据库与 runtime role grants、allocation-epoch/reservation TTL maintenance、C4 Runtime fence consumer 与 reservation activate/release、Outbox/完整 BI 仍未完成；相关 capability 保持 fail closed。导航遵循 ULYS-235：Settings 主导航中的“高级设置”是父入口，Hooks 规范路由 `/settings/advanced/hooks` 是页面内容区与 Skills/MCP/Plugins 并列的 tab，不是 Worktree Group 子级。
 
 ---
 
@@ -283,3 +284,5 @@ Phase 9E-4C3 已交付条件式 Rust/REST writer 与 PostgreSQL migration slice�
 | v0.1 | 2026-09-11 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 初版（22 FR / 5 NFR / 6 已知缺口 + 5 角色签字栏） | 2026-09-11 20:43 JST ask_user 选项 form_opt2 |
 | v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加渡口 Worktree 群组集成边界与 AC-9..AC-12; 明确 Multica、Jira 等价视图、Task Card、Canvas 共用 WorkItem 身份、卡内 CLI 与插件注册边界；统一 6 态生命周期、独立 review_state 及 W/T/M 当前态投影/审计分类 | 用户要求按 Worktree 为顶层索引推进渡口需求与基本设计 |
 | v0.3 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加 AC-13 并引用 root AC-AEC-017；明确 Run/Profile/ResourceBudget/Loop/Task/Hook/BI/reservation 同事务边界、Project 跨 Worktree quota、REPEATABLE READ allocation epoch 防超额与 idempotency replay；列明 Runtime/DB/Auth/BI/C4 未闭合门；Hooks 维持 ULYS-235 Advanced Settings 并列 tab | Phase 9E-4C3 Run 与资源 reservation 代码切片完成 |
+| v0.4 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加 AC-14 并引用 root AC-AEC-018；规定双 Profile scope/revision/budget fence、一次消费、Run identity 与 binding digest 投影；记录 Rust/SQL/API type slice 已交付但 Approved Launch Profile authority、production Runtime consumer、reservation lifecycle 与目标环境仍未完成；Hooks 明确为 Advanced Settings 内容区并列 tab | 推进 Phase 9E-4C4 双 Profile fence 与审计投影 |
+| v0.5 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 补充 Local Runtime 基础 grant 校验已存在但不消费 C4 fence 的事实；明确 ULYS-235 的 Settings 主导航父入口、`/settings/advanced/hooks` 并列标签与 Worktree Group 排除规则 | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |

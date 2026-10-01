@@ -208,6 +208,9 @@
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (f:File {name:"execution_profile.rs",type:"file"}),(snapshot:Function {name:"CurrentExecutionCatalogSnapshot::for_profile",type:"function"}),(resolver:Function {name:"ExecutionProfileResolver::resolve_current_snapshot",type:"function"}),(validate_fence:Function {name:"ExecutionCatalogRevisionFence::validate_for",type:"function"}),(fixture:Function {name:"tests::valid_draft",type:"function"}),(catalogs:Function {name:"tests::catalogs_from",type:"function"});
 //! CREATE (tests:Module {name:"tests",type:"module",language:"rust"}),(test_admission:Function {name:"tests::current_catalog_snapshot_binds_profile_and_revisions",type:"function",language:"rust"}),(test_drift:Function {name:"tests::current_catalog_snapshot_rejects_drift_and_expiry",type:"function",language:"rust"}),(test_extras:Function {name:"tests::current_catalog_snapshot_rejects_unreferenced_entries",type:"function",language:"rust"}),(f)-[:CONTAINS]->(tests),(tests)-[:CONTAINS]->(test_admission),(tests)-[:CONTAINS]->(test_drift),(tests)-[:CONTAINS]->(test_extras),(test_admission)-[:CALLS]->(fixture),(test_admission)-[:CALLS]->(catalogs),(test_admission)-[:CALLS]->(snapshot),(test_admission)-[:CALLS]->(resolver),(test_drift)-[:CALLS]->(fixture),(test_drift)-[:CALLS]->(catalogs),(test_drift)-[:CALLS]->(snapshot),(test_drift)-[:CALLS]->(validate_fence),(test_extras)-[:CALLS]->(fixture),(test_extras)-[:CALLS]->(catalogs),(test_extras)-[:CALLS]->(snapshot);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (f:File {name:"execution_profile.rs",type:"file"}),(fence:Class {name:"ExecutionCatalogRevisionFence",type:"class"});
+//! CREATE (revisions:Function {name:"ExecutionCatalogRevisionFence::revisions",type:"function",language:"rust",visibility:"pub"}),(f)-[:CONTAINS]->(revisions),(fence)-[:HAS_METHOD]->(revisions);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! Immutable execution profile contract and bounded dependency resolver for Run admission.
 //! Registry persistence and Run writer integration are not implied by this domain slice.
@@ -743,6 +746,12 @@ fn catalog_entries_match_profile(
 }
 
 impl ExecutionCatalogRevisionFence {
+    /// Return the small revision tuple bound to this fence for Runtime handoff.
+    #[must_use]
+    pub fn revisions(&self) -> ExecutionCatalogRevisions {
+        self.revisions
+    }
+
     /// Verify exact request binding, live source revisions, and remaining transaction time.
     pub fn validate_for(
         &self,
