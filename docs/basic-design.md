@@ -3,6 +3,39 @@
 > **文档版本**: v5.41 (2026-10-02)
 > **上游要件定义书**: docs/requirements.md v5.44
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
+> **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
+
+---
+
+## § Index (目录, per PR-276)
+
+| § | 标题 | 行号 | 主要内容 |
+|---|---|---|---|
+| 0 | [文档说明](#0-文档说明) | 9 | 文档目的 / 读者 / 维护规则 |
+| 1 | [架构总览](#1-架构总览) | 84 | Star 5 大领域 / 模块依赖 / 数据流 |
+| 2 | [Domain / Module 划分](#2-domain--module-划分) | 279 | 27 域 + 23 service + 1 Tauri + 3 WASM (per PR-272 actualize) |
+| 3 | [Context Map](#3-context-mapdomain-间解耦) | 442 | Domain 间解耦 + ACL 边界 |
+| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 630 | canvas-game / canvas-engine / canvas-realtime / domain-canvas |
+| 5 | [数据架构](#5-数据架构) | 2254 | DB schema + 索引 + 备份 |
+| 6 | [安全边界](#6-安全边界) | 2418 | 认证 / 授权 / 加密 / 审计 |
+| 7 | [关键状态机](#7-关键状态机) | 2591 | Workflow / Canvas / Worktree / Run |
+| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2746 | k3s + 5 services + Service mesh |
+| 9 | [Traceability & AI Audit](#9-traceability--ai-audit) | 2928 | ADR ↔ SRS ↔ 代码追溯 |
+| 10 | [ADR 草案](#10-adr-草案对应-32-adr-016030) | 3068 | ADR-016 ~ ADR-030 |
+| 11 | [PoC 实施计划](#11-poc-实施计划对应-31-poc-016030) | 3296 | POC-016 ~ POC-030 |
+| 12 | [风险登记与缓解](#12-风险登记与缓解对应-33-risk-016030) | 3324 | RISK-016 ~ RISK-030 |
+| 13 | [MVP 范围裁剪](#13-mvp-范围裁剪对应-3026) | 3353 | 优先级 + 范围 + 验收 |
+| 14 | [决策继承表](#14-决策继承表46-决策表-a-o) | 3440 | 决策表 A-O |
+| 15 | [Open Issues](#15-open-issues继承-46-决策表-j--新增) | 3507 | 未决问题 + 待办 |
+| 附录 A | [关键状态机图](#附录-a关键状态机图) | 3536 | 状态机图 (Mermaid) |
+| 附录 B | [模块依赖图](#附录-b模块依赖图) | 3690 | 依赖图 (Mermaid) |
+| 附录 C | [数据所有权矩阵](#附录-c数据所有权矩阵) | 3775 | 模块 ↔ DB table 矩阵 |
+| 接口稳定承诺 | [接口稳定承诺](#接口稳定承诺给后续阶段) | 3826 | 给后续阶段承诺 |
+| 11.arch-agent | [arch-agent-graph-viewer 基本設計](#11-arch-agent-graph-viewer-基本設計-per-adr-0041-v01) | 3869 | arch-agent + graph viewer (ADR-0041) |
+| 12.onboarding | [onboarding-first-run 基本設計](#12-onboarding-first-run-基本設計-per-adr-0042-v01) | 4031 | onboarding first run (ADR-0042) |
+| 16.渡口 | [渡口 Worktree 群组基本设计](#16-渡口-worktree-群组基本设计requirements-50) | 4161 | 渡口 Worktree 群组 (requirements §50, DD-WORKTREE-GROUP-001) |
+
+> **说明**: 本 § Index 由 PR-276 添加 (per PR-272 docs 乖离 audit T3-2 follow-up)。每章节锚点基于现有 § 标题, 便于读者快速跳转 (替代拆分文件的高风险方案)。后续若 § 0-§16 章节独立化, 可拆分为 `docs/basic-design/chapter-XX-*.md` 子文件 (per IPA 风格), 留后续 issue 跟进。
 
 ---
 
