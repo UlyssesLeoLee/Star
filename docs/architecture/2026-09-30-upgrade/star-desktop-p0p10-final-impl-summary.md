@@ -2,10 +2,12 @@
 
 > **date**: 2026-09-30 JST
 > **author**: Ulysses (一人公司 12 角色 per DEC-008) — minimax-agent
-> **status**: **P0→P10 ALL DONE** (per PR #239-#258, 20 PRs 全合 main)
+> **status**: **P0→P10 + Session 增补 ALL DONE** (per PR #239-#271, 24 PRs 全合 main)
 > **trigger**: PR #259 final summary follow-up of PR #258
 
-## 1. Session 累计 20 PRs (PR #239-#258)
+## 1. Session 累计 24 PRs (PR #239-#258 + PR #260/#264/#269/#270/#271)
+
+> **2026-10-01 增补**: PR #260/#264/#269/#270/#271 是 session 后 Tauri PoC 后续 PR (PR-260 session memory protocol, PR-264 Tauri PoC index docs, PR-269/#270/#271 squash merged) — 完整时间线从 21 → 24。
 
 | 阶段 | PR | 内容 | commit |
 |---|---|---|---|
@@ -28,7 +30,10 @@
 | **P8** | #256 | signing + 公证 + auto-updater | `950fbfd0` |
 | **P9** | #257 | CI secrets + keygen script | `6c82af3b` |
 | **P10** | #258 | Sentry crash reporting + release 实战 | `2d6ac918` |
-| **P10 final** | **#259** | **本 PR: 全栈终极总结** | (本 commit) |
+| **P10 final** | #259 | P0→P10 final summary | `b3ebded2` |
+| **Session memory** | #269 | docs(session): 5 反复实证 workaround (per PR-260) | `f532fd73` |
+| **Tauri Viz** | #270 | feat(desktop): WorktreeVizPage — useLayoutEngine 120 nodes (per PR-265) | `dd045314` |
+| **PoC index** | #271 | docs(desktop): Tauri PoC index + 按角色阅读路径 (per PR-264) | `bd97197f` |
 
 ## 2. 8 Tauri IPC Commands (per PR #239-#245)
 
