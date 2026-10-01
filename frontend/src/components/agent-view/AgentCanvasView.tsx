@@ -159,7 +159,7 @@ export function AgentCanvasView({
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas.viewport]);
 
-  
+
   /**
    * 屏幕坐标 → 世界坐标 (考虑 viewport.zoom + viewport.x/y)
    * per 2026-10-01 OOB 自由画笔/创建功能 — 跟独立 CanvasView 公式一致
