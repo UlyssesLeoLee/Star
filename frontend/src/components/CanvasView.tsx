@@ -40,7 +40,7 @@ import type {
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "./StatusPill";
-import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
@@ -56,6 +56,20 @@ interface CanvasViewProps {
   onElementPositionChange?: (position: { elementId: string; x: number; y: number; expectedVersion: number }) => Promise<void>;
   onSelectionChange?: (elementIds: string[]) => void;
   onDeleteElements?: (elementIds: string[]) => Promise<void>;
+  /**
+   * 新增元素回调 (per 2026-10-01 OOB: 恢复丢失的画笔/创建功能).
+   * - element 字段按 CanvasElement 形状 (id/created_at/created_by 由后端生成)
+   * - worktree-id 通过 groupApi 上下文获取
+   */
+  onCreateElement?: (body: {
+    kind: CanvasElement["kind"];
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    z_index: number;
+    content: CanvasElement["content"];
+  }) => Promise<{ id?: string } | void>;
 }
 
 type CanvasElementView = Pick<CanvasElement,
@@ -67,12 +81,15 @@ type CanvasConnectorView = Pick<CanvasConnector,
 
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 
-export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, groupWorkItems, groupWorktrees, onOpenWorkItem, onViewportChange, onElementPositionChange, onSelectionChange, onDeleteElements }: CanvasViewProps) {
+export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, groupWorkItems, groupWorktrees, onOpenWorkItem, onViewportChange, onElementPositionChange, onSelectionChange, onDeleteElements, onCreateElement }: CanvasViewProps) {
   const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
   const [selected, setSelected] = useState<string[]>([]);
-  const [tool, setTool] = useState<"select" | "pan">("select");
+  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "frame-select">("select");
+  const [pendingFrameId, setPendingFrameId] = useState<string | null>(null);
+  const [createPending, setCreatePending] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragPreview, setDragPreview] = useState<{ elementId: string; x: number; y: number } | null>(null);
   const dragPreviewRef = useRef<{ elementId: string; x: number; y: number } | null>(null);
@@ -247,6 +264,45 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const displayElements = dragPreview
     ? elements.map((element) => element.id === dragPreview.elementId ? { ...element, x: dragPreview.x, y: dragPreview.y } : element)
     : elements;
+
+  /**
+   * 新增元素 (per 2026-10-01 OOB: 恢复丢失的画笔/创建功能)
+   * - sticky_note / text / shape 工具在 SVG 空白区点击时触发
+   * - worktree canvas 走 onCreateElement (group page 接到 groupApi.createCanvasElement)
+   * - 本地 store canvas (preview mode) 走 addCanvasElement 直接入 store
+   * - frame-select mode 已确定目标 frame 后创建
+   */
+  const createElementAt = async (
+    e: React.MouseEvent,
+    kind: "sticky_note" | "text" | "shape",
+    width: number,
+    height: number,
+    content: CanvasElement["content"] = {},
+  ) => {
+    if (readOnly || !onCreateElement || createPending) return;
+    const world = { x: e.clientX / viewport.zoom + viewport.x, y: e.clientY / viewport.zoom + viewport.y };
+    if (!world) return;
+    setCreateError(null);
+    setCreatePending(true);
+    try {
+      const result = await onCreateElement({
+        kind,
+        x: Math.round(world.x - width / 2),
+        y: Math.round(world.y - height / 2),
+        width,
+        height,
+        z_index: elements.length + 1,
+        content,
+      });
+      // 切回 select tool, 选中新建元素 (按 id 反馈)
+      if (result?.id) setSelected([result.id]);
+      setTool("select");
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create element");
+    } finally {
+      setCreatePending(false);
+    }
+  };
 
   // render element
   const renderElement = (el: CanvasElementView) => {
@@ -556,6 +612,39 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         <button onClick={() => setTool("pan")} className={`btn p-1.5 ${tool === "pan" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasPan}>
           <Hand size={14} />
         </button>
+        {/* 新增元素工具 (per 2026-10-01 OOB 恢复丢失的画笔/创建功能) - 仅 write mode 显示 */}
+        {!readOnly && onCreateElement && (
+          <>
+            <div className="w-px h-5 bg-line" />
+            <button
+              onClick={() => setTool("sticky")}
+              className={`btn p-1.5 ${tool === "sticky" ? "border-accent text-accent" : ""}`}
+              title="新增便利贴 (sticky note)"
+              data-testid="canvas-tool-sticky"
+            >
+              <StickyNote size={14} />
+            </button>
+            <button
+              onClick={() => setTool("text")}
+              className={`btn p-1.5 ${tool === "text" ? "border-accent text-accent" : ""}`}
+              title="新增文字 (text)"
+              data-testid="canvas-tool-text"
+            >
+              <Type size={14} />
+            </button>
+            <button
+              onClick={() => setTool("shape")}
+              className={`btn p-1.5 ${tool === "shape" ? "border-accent text-accent" : ""}`}
+              title="新增图形 (shape)"
+              data-testid="canvas-tool-shape"
+            >
+              <Square size={14} />
+            </button>
+            <button onClick={() => setTool("frame-select")} className={`btn p-1.5 ${tool === "frame-select" ? "border-accent text-accent" : ""}`} title="选中 frame 后插入 (下一阶段)" data-testid="canvas-tool-frame-select">
+              <Frame size={14} />
+            </button>
+          </>
+        )}
         <div className="w-px h-5 bg-line" />
         <button onClick={() => updateViewport({ ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
           <ZoomIn size={14} />
@@ -586,10 +675,24 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         className="w-full h-full"
         style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, #0b0d10)", backgroundImage: "radial-gradient(circle, var(--cel-ink, #21262d) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
         onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
+                onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
         onWheel={onWheel}
+        onClick={(e) => {
+          // 新增元素工具 (sticky / text / shape) 在 SVG 空白区点击触发
+          // - 仅 write mode (非 readOnly + 有 onCreateElement)
+          // - 仅 target=SVG 本身 (避免在元素上误触)
+          if (readOnly || !onCreateElement) return;
+          if ((e.target as Element).tagName?.toLowerCase() !== "svg") return;
+          if (tool === "sticky") {
+            void createElementAt(e, "sticky_note", 180, 100, { color: STICKY_PALETTE[0], text: "" });
+          } else if (tool === "text") {
+            void createElementAt(e, "text", 200, 60, { text: "" });
+          } else if (tool === "shape") {
+            void createElementAt(e, "shape", 120, 120, {});
+          }
+        }}
       >
         <defs>
           <marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
