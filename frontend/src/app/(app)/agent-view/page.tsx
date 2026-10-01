@@ -404,6 +404,9 @@ function AgentViewContent() {
                 onUpdateAnnotation={async (id, body) => {
                   setLocalAnns((arr) => arr.map((a) => a.id === id ? { ...a, ...body, content: { ...a.content, ...(body.content || {}) } } as AgentCanvasAnnotation : a));
                 }}
+                onAnnotationPositionChange={async (body) => {
+                  setLocalAnns((arr) => arr.map((a) => a.id === body.id ? { ...a, x: body.x, y: body.y } : a));
+                }}
               />
             </div>
           )}
