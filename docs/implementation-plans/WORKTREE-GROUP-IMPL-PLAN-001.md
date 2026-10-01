@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.51**
+> **渡口 Project Worktree 群组实施计划 v5.52**
 >
 > - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -873,6 +873,19 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 该切片完成 C2 migration/read/recheck 代码与隔离/包级验证，但不代表 catalog publishers、目标数据库授权或生产 Runtime 已部署，也不代表新 Profile-bound Run 已开放。Hooks 继续沿用用户既有高级设置并列 tab 需求。
 
+### 6.63 Phase 9E-4C3 Run/Profile snapshot 与 Project-wide resource reservation（2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Run snapshot writer | 🟢 条件式代码切片 | 新 Run 保存经验证的 AgentExecutionProfile ID/version/digest/document、ResourceBudget 与 Engineering Loop snapshot；兼容旧 Run snapshot 与既有 idempotency replay。Profile snapshot scope/digest 与最终 readiness fence 不符时回滚。 |
+| Project quota 与 admission | 🟢 migration/Rust slice 已实现 | Project quota 是无默认 seed 的 Master/SCD2 + append-only Audit。Admission 使用 checked integer conversion，同时验证 per-Run ceiling 与该 Project 所有 Worktree 下未过期 pending/active reservation 聚合；无 active quota、超额、算术边界错误或 fence 失效均 fail closed。 |
+| REPEATABLE READ 并发保护 | 🟢 allocation epoch 写入已加入 | 仅锁 quota/reservation 行无法刷新 waiter 的事务快照；因此在读取 usage 前按 tenant/Project 原子 upsert `project_execution_resource_admission_lock`。竞争事务的 stale snapshot 写入收到 SQLSTATE 40001 并映射到 conflict，必须整体重试。此锁表为 30 天过期的 W 状态，租户 maintenance cleanup 尚未装配。 |
+| 原子事件关联 | 🟢 代码/SQL slice 已实现 | Reservation pending row、append-only reservation event 与 `task_execution_run_event` 共用 `event_id`、Run/Task/actor/correlation 与受限 details，并与 Run snapshot 位于同一事务。reservation failure 回滚新 Run；命中已有 idempotency Run 时在 reservation 前返回，不会重复占额。reserved maxima 与 Runtime observed metrics 明确分开。 |
+| Run/Reservation lifecycle | 🟡 Runtime gate 未关闭 | pending lease 不晚于 readiness admission fence；迁移 guard 支持 pending→active→released 和 append-only transition ledger，但 production Runtime 尚未接 consume/reject fence、activation/release、expired lease reconciliation 与进程树回收。Profile-bound provisioner capability 仍默认 false。 |
+| W/T/M、RLS 与 schema | 🟢 隔离迁移与并发 smoke 已验证 | Quota Master、Quota Audit Transaction、Reservation Work、Reservation Event Transaction 与 Admission Lock Work 均启用 tenant FORCE RLS；无默认 quota。PG18 migration 重复应用及 Run budget/shared event/RLS/SCD2/append-only 检查通过；两个独立 `psql` REPEATABLE READ 会话竞争同一 allocation epoch，等待者收到 SQLSTATE 40001，只有 winner 的 epoch=1 提交。 |
+| 测试与编译 | 🟡 定向验证通过，最终复跑受 linker 阻断 | allocation epoch 加入后 `star-api-rest --lib` 121/121 tests 通过，含 3 个资源预算边界 tests；最终将 serialization error mapping 扩展至 quota/reservation statements 后，`cargo check -p star-api-rest --lib -j 4 --offline` 与 changed-file rustfmt 通过。再次运行 tests 时 Rust test crate 编译完成，但 `link.exe` 因 LNK1104 无法覆盖共享 target 下的 `star_api_rest-…exe`，故这次没有执行测试。临时移除 `star-desktop` workspace member 后原 Cargo.toml/Cargo.lock 均恢复；原 `--locked` workspace 解析仍有 Wry/objc2 冲突，本阶段不宣称 workspace 全量通过。 |
+| 生产 gate 与后续阶段 | 🟡 C3 代码完成，production 未完成 | Catalog publisher/生产 Provider-Skill-Grant 装载、Host Auth/Project ACL、目标 DB/runtime grants、epoch/reservation TTL cleanup、Runtime activation/release、Outbox/Run outcome BI 与真实 CLI provisioner 未连接，所以不能开启新的 Profile-bound Run。下一实现门为 9E-4C4 双 Approved Launch Profile + AgentExecutionProfile spawn fence；先完成本表所列生产前置与并发实测，再更新 capability gate。Hooks 导航继续按 ULYS-235 保留在 Settings → Advanced Settings → 内容区 Hooks tab。 |
+
 
 ## 修订履历
 
@@ -981,3 +994,4 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 
 | v5.51 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.37、basic v5.33、Task DD v1.11；补充 Skill capability rows 拉取前的数据库侧 ≤384 KiB heap 预算，并同步 current catalog reader、C1/C2 实现状态与 fail-closed production gates；沿用 ULYS-235 `/settings/advanced/hooks` 高级设置并列 tab | 收敛 Phase 9E-4C2 内存预算和导航文档状态 |
+| v5.52 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.38、basic design v5.34、Task SRS v0.3 与 DD v1.12；记录 C3 Run Profile/Task/Hook/RunEvent/BI/resource reservation 原子 writer、Project 跨 Worktree quota、REPEATABLE READ allocator epoch 并发保护、121 REST tests、最终 `cargo check` 与双会话 SQLSTATE 40001 smoke；说明最终测试复跑被 Windows linker LNK1104 阻断，以及仍关闭的 Runtime/catalog/Auth/target DB/BI gates；明确 maintenance cleanup 待装配、reservation maxima 不是实测值，并保留 ULYS-235 Advanced Settings Hooks tab | 完成 Phase 9E-4C3 Run 与资源 admission 代码切片 |

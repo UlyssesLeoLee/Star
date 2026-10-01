@@ -29,6 +29,10 @@
 //! CYPHER STRUCTURE MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(readiness:Class {name:"TaskRunAdmissionReadinessCommand",type:"class"}),(load:Function {name:"execution_catalogs::load_current_execution_admission_snapshot",type:"function"}),(recheck:Function {name:"execution_catalogs::recheck_current_execution_admission_snapshot",type:"function"}),(snapshot:Class {name:"CurrentExecutionAdmissionSnapshot",type:"class"});
 //! CREATE (readiness)-[:USES]->(snapshot),(st)-[:CALLS]->(load),(st)-[:CALLS]->(recheck),(m)-[:CONTAINS]->(snapshot);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (st:Function {name:"start_task_cli_session",type:"function"}),(record:Function {name:"record_cli_task_run",type:"function"}),(snapshot:Class {name:"CurrentExecutionAdmissionSnapshot",type:"class"}),(readiness:Class {name:"TaskRunAdmissionReadiness",type:"class"}),(resources:Module {name:"execution_resources",type:"module"});
+//! CREATE (reserve:Function {name:"execution_resources::reserve_project_execution_resources",type:"function",language:"rust"});
+//! CREATE (resources)-[:CONTAINS]->(reserve),(record)-[:CALLS]->(reserve),(reserve)-[:USES]->(snapshot),(reserve)-[:USES]->(readiness),(st)-[:USES]->(snapshot),(st)-[:USES]->(readiness);
 
 use async_trait::async_trait;
 use axum::{
@@ -206,8 +210,10 @@ pub trait TaskCliSessionProvisioner: Send + Sync {
         false
     }
 
-    /// Opt in only when the REST host also installs current Profile/catalog resolution and the
-    /// transactional Run snapshot writer. The Runtime fence must bind the same Profile identity.
+    /// Opt in only when the REST host also installs current Profile/catalog resolution, the
+    /// transactional Run snapshot writer, and Project-wide resource-quota reservations. The
+    /// Runtime fence must bind the same Profile identity and budget; Runtime must activate or
+    /// release the short-lived reservation as it consumes or rejects the fence.
     fn supports_profile_bound_run_admission(&self) -> bool {
         false
     }
@@ -627,6 +633,9 @@ async fn start_task_cli_session(
                     &idempotency_key,
                     &current.request_fingerprint,
                     &hook_snapshot,
+                    &execution_snapshot,
+                    admission_fence_id,
+                    readiness.admission_fence_expires_at,
                 )
                 .await?;
                 append_run_admission_hook_events(
@@ -1051,6 +1060,9 @@ async fn record_cli_task_run(
     idempotency_key: &str,
     request_hash: &[u8; 32],
     hook_set_snapshot: &serde_json::Value,
+    execution_snapshot: &super::CurrentExecutionAdmissionSnapshot,
+    admission_fence_id: Uuid,
+    admission_fence_expires_at: DateTime<Utc>,
 ) -> Result<Uuid, GroupApiError> {
     if let Some(run_id) =
         lookup_cli_task_run(tx, tenant_id, actor_id, idempotency_key, request_hash).await?
@@ -1059,12 +1071,32 @@ async fn record_cli_task_run(
     }
 
     let run_id = Uuid::new_v4();
+    let profile_document = execution_snapshot.verified_profile.document();
+    if execution_snapshot.profile_identity.content_digest != profile_document.content_digest
+        || execution_snapshot.scope.tenant_id != tenant_id
+        || execution_snapshot.scope.project_id != project_id
+        || execution_snapshot.scope.worktree_id != Some(worktree_id)
+    {
+        return Err(GroupApiError::conflict(
+            "execution_admission_snapshot_changed",
+        ));
+    }
+    let profile_version = i64::try_from(execution_snapshot.profile_identity.version)
+        .map_err(|_| GroupApiError::internal())?;
+    let profile_snapshot =
+        serde_json::to_value(profile_document).map_err(|_| GroupApiError::internal())?;
+    let resource_budget_snapshot = serde_json::to_value(&profile_document.profile.resource_budget)
+        .map_err(|_| GroupApiError::internal())?;
+    let loop_policy_snapshot = serde_json::to_value(&profile_document.profile.loop_budget)
+        .map_err(|_| GroupApiError::internal())?;
     let inserted = sqlx::query(
         r#"
         INSERT INTO multica.task_execution_run (
             run_id, tenant_id, project_id, work_item_id, initiated_by, execution_channel,
             worktree_id, repository_id, runtime_id, start_ref, task_contract_version,
-            task_snapshot, acceptance_snapshot, correlation_id, run_origin, hook_set_snapshot
+            task_snapshot, acceptance_snapshot, correlation_id, run_origin, hook_set_snapshot,
+            execution_profile_id, execution_profile_version, execution_profile_digest,
+            execution_profile_snapshot, resource_budget_snapshot, loop_policy_snapshot
         )
         SELECT $1, $2, $3, $4, $5, 'cli', $6, $7, $8, $9, c.version,
                jsonb_build_object(
@@ -1081,7 +1113,7 @@ async fn record_cli_task_run(
                    'dependencies', c.dependencies,
                    'acceptance_criteria', c.acceptance_criteria
                ) END,
-               $10, 'cli', $11
+               $10, 'cli', $11, $12, $13, $14, $15, $16, $17
         FROM multica.task_metadata m
         LEFT JOIN multica.task_contract c
           ON c.tenant_id = m.tenant_id AND c.project_id = m.project_id
@@ -1101,12 +1133,33 @@ async fn record_cli_task_run(
     .bind(start_ref)
     .bind(correlation_id)
     .bind(hook_set_snapshot)
+    .bind(execution_snapshot.profile_identity.profile_id)
+    .bind(profile_version)
+    .bind(&execution_snapshot.profile_identity.content_digest)
+    .bind(&profile_snapshot)
+    .bind(&resource_budget_snapshot)
+    .bind(&loop_policy_snapshot)
     .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
     if inserted.rows_affected() != 1 {
         return Err(GroupApiError::not_found());
     }
+
+    super::execution_resources::reserve_project_execution_resources(
+        tx,
+        tenant_id,
+        project_id,
+        worktree_id,
+        work_item_id,
+        run_id,
+        actor_id,
+        correlation_id,
+        admission_fence_id,
+        admission_fence_expires_at,
+        execution_snapshot,
+    )
+    .await?;
 
     sqlx::query(
         r#"
