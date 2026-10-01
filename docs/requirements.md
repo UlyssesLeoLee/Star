@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.43）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.44）
 
 ## 0. 文档说明与前提
 
@@ -2260,7 +2260,7 @@ Index 是管理面而非仅供跳转的清单：必须汇总 owner、Agent Sessi
 | Task Card | Engineering Run 下的任务入口；由 Run Task Management 视图访问，并在卡内呈现 CLI 与 Agent/LangGraph 状态 | Run-scoped WorkItem / TaskExecutionRun / AgentSession 投影 |
 | Canvas Element | Canvas 中的节点、连线、Frame 或绑定；可引用任务卡，但不成为第二套任务事实 | Canvas 聚合与实体链接 |
 | Task CLI Session | 从任务卡发起、绑定具体 Worktree 的受控本地命令会话 | Local Runtime / Agent Policy / Audit |
-| Run Context | `tenant_id / workspace_id / project_id / branch_id / engineering_run_id / actor_id` 与可选 `focus_worktree_id` 的不可伪造上下文 | Application Authorization Layer |
+| Run Context | `tenant_id / project_id / repository_id / branch_id / engineering_run_id / actor_id` 与独立 WorktreeFocus 的服务端授权上下文；checkout workspace 只属于 focus | Application Authorization Layer |
 
 每个 Run App 必须先取得服务端解析的 Run Context，再读取 Run projection 或调用其事实所有者 API；Worktree/Git/CLI 命令还必须按选中 Worktree 单独授权。任一实体链接使用带类型的 `EntityRef`，至少支持 `branch`、`engineering_run`、`work_item`、`task_card`、`task_execution_run`、`agent_session`、`worktree`、`canvas_element`、`automation_flow`、`comment`、`relation` 和 `plugin_resource`。
 
@@ -2296,6 +2296,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-018 | `EngineeringRun` 必须与 Task 的 `TaskExecutionRun` 区分；EngineeringRun 汇总协作范围/Worktree set/App tabs/Run BI，TaskExecutionRun 记录一次执行尝试并保留可空 Worktree snapshot | P0 |
 | WTG-019 | 每个 Run App 必须声明 canonical owner scope、读写 API 和 capability；前端同级 App 不等于独立微服务；跨域写通过 owner API/领域事务/Outbox + 幂等 Inbox 投影，不共享表写入 | P0 |
 | WTG-020 | Project 导航必须提供 Project Worktree Index 入口；客户端已选 `project_id` 仅是深链提示，目标页必须重新读取当前 actor 的 membership 并授权 Index；无有效项目时要求从服务端目录选择，禁止用固定 repository/worktree ID 或本地 seed 填充导航 | P0 |
+| WTG-021 | Project → Cloud Branch → Engineering Run → Worktree 目录按层懒加载并有界；Branch 来自可信 SCM 身份，不从 checkout 分支字符串归类生成；三层 current grant 每次重验；只有叶节点解析完整 Run/focus 后才建立执行焦点；缺会话或绑定时明确阻断 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
@@ -2472,6 +2473,7 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-TRACE-001 | 一次从 Canvas 或底栏聊天发起的任务操作，可由同一 `correlation_id` 串起 Worktree、WorkItem、TaskCard、TaskExecutionRun、CLI Session、Canvas Element、Plugin 调用与 Audit |
 | AC-ERUN-001 | Project → Branch → Engineering Run → Worktree 主导航保持身份与深链；点击 Run Worktree 后才加载所属 Run tabs，Worktree 只设 focus/CLI target；右侧 Task/Canvas/BI 数据按 Run 授权 | P0 |
 | AC-ERUN-002 | Run Context/API 对每个实体域复验 membership 与 capability；跨域命令调用 owner API，同 owner DB 事务使用 Outbox，消费者经 Inbox 幂等去重；前端不能跨域表写入或直接使用 stored procedure | P0 |
+| AC-ERUN-003 | 同一 Run 切换 Worktree 时 RunContext/context_version 保持 owner 与授权身份，workspace/checkout/binding version 在独立 focus/focus_version 中改变；撤销 Project、Branch 或 Run 任一 grant 后再次解析拒绝；列表不泄露路径，不自动选择首个 checkout | P0 |
 | AC-EVENT-001 | 当前领域事件基线为 PostgreSQL SoR + Transactional Outbox + NATS JetStream；Kafka/Fluvio 不在运行依赖；新增 broker 前需经 ADR 和同 workload 的保留/回放/资源/恢复基准 | P1 |
 
 ### 50.8A 多 Agent 并行、资源预算与 Rust 桌面性能
@@ -2758,3 +2760,4 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.41 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-AEC-019：共享 typed dual-Profile fence DTO、C4 signature v2、Runtime binding recheck 与 grant nonce/fence 的原子一次性消费；规定 receipt 上限与 TTL cleanup，并明确该基础设施不等于生产 ACL/reservation/OS spawn/BI consumer，capability 继续关闭 | 推进 Phase 9E-4C5 Runtime fence consume foundation |
 | v5.42 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project → Cloud Branch → Engineering Run → Worktree 主导航和 Run-owned tabs/BI/Benchmark；Project Worktree Index 限定为 aggregate 管理视图；补充 owner API、同域存储过程、Outbox/Inbox、Rust 桌面资源边界与 NATS/Kafka/Fluvio 选择门；新增 AC-ERUN-001/002、AC-EVENT-001；明确未迁移 Run schema/API 仍保持未完成 | 用户澄清 Branch/Run/Worktree 层级并要求服务原子解耦及 Kafka/Fluvio 评估 |
 | v5.43 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 WTG-020：Project 导航提供 Worktree Index 入口；本地 selected project 只能作为深链提示，目标页必须重新读取 membership 并授权，不能使用固定 Repository/Worktree ID 或 seed 填充导航；保留 Cloud Branch/Engineering Run 权威目录未实现的状态 | 移除 Project 侧栏中指向固定 repository ID 的旧 Worktree 卡片，并提供授权 Index 链接 |
+| v5.44 | 2026-10-02 | Ulysses（一人公司12角色 per DEC-008）— Mavis接手审核 | WTG-021/AC-ERUN-003：可信Branch/Run目录、三层current grant、owner/focus版本分离与有界懒树；同步方向指引与实际未完成门 | canonical目录与导航基础实施、独立源码review改进 |
