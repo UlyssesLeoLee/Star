@@ -53,6 +53,8 @@ interface AgentCanvasViewProps {
   onDeleteFreeConnector?: (id: string) => Promise<void>;
   /** 注释更新回调 (per 任务 #2 — text edit mode) */
   onUpdateAnnotation?: (id: string, body: Partial<AgentCanvasAnnotation>) => Promise<void>;
+  /** 注释批量删除回调 (per 任务 #4 — 多选/框选) */
+  onBulkDeleteAnnotation?: (ids: string[]) => Promise<void>;
 }
 
 export function AgentCanvasView({
@@ -60,7 +62,7 @@ export function AgentCanvasView({
   annotations = [], freeConnectors = [],
   readOnly = true,
   onCreateAnnotation, onDeleteAnnotation, onAnnotationPositionChange,
-  onCreateFreeConnector, onDeleteFreeConnector, onUpdateAnnotation,
+  onCreateFreeConnector, onDeleteFreeConnector, onUpdateAnnotation, onBulkDeleteAnnotation,
 }: AgentCanvasViewProps) {
   const { t } = useTranslation();
   const workItems = useStore((s) => s.workItems);
@@ -85,6 +87,15 @@ export function AgentCanvasView({
   const [annotationError, setAnnotationError] = useState<string | null>(null);
   const [annotationPending, setAnnotationPending] = useState(false);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  // 多选 (per 任务 #4): shift-click 加选 / marquee 框选
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(new Set());
+  // marquee 框选 (per 任务 #4)
+  const [marquee, setMarquee] = useState<{
+    startWorldX: number;
+    startWorldY: number;
+    endWorldX: number;
+    endWorldY: number;
+  } | null>(null);
   // 编辑模式 — 点选 sticky_note/text 2 次进入 (per 任务 #2); 第一次=select, 第二次=edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState<string>("");
@@ -258,6 +269,17 @@ export function AgentCanvasView({
           return;
         }
       }
+      // 没有点中 annotation → 进入 marquee 框选 (per 任务 #4)
+      if (!readOnly && (e.target as Element).tagName?.toLowerCase() === "svg") {
+        const wp = svgPointFromClient(e);
+        if (wp) {
+          setSelectedNodeId(null);
+          setSelectedAnnotationId(null);
+          if (!e.shiftKey) setMultiSelected(new Set());
+          setMarquee({ startWorldX: wp.x, startWorldY: wp.y, endWorldX: wp.x, endWorldY: wp.y });
+          return;
+        }
+      }
       setSelectedNodeId(null);
       setSelectedAnnotationId(null);
       return;
@@ -280,6 +302,10 @@ export function AgentCanvasView({
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
       setDragAnnPreview({ id: ds.annId, x: ds.elX + dx, y: ds.elY + dy });
+    } else if (marquee) {
+      // marquee 框选 (per 任务 #4)
+      const wp = svgPointFromClient(e);
+      if (wp) setMarquee({ ...marquee, endWorldX: wp.x, endWorldY: wp.y });
     } else if (drawingPath) {
       // 自由画笔 - 累积 path points (per 2026-10-01 OOB)
       const svgPt = svgPointFromClient(e);
@@ -300,6 +326,23 @@ export function AgentCanvasView({
   const onMouseUp = () => {
     const ds = dragState.current;
     dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, annId: null };
+    // marquee 提交 (per 任务 #4)
+    if (marquee) {
+      const minX = Math.min(marquee.startWorldX, marquee.endWorldX);
+      const maxX = Math.max(marquee.startWorldX, marquee.endWorldX);
+      const minY = Math.min(marquee.startWorldY, marquee.endWorldY);
+      const maxY = Math.max(marquee.startWorldY, marquee.endWorldY);
+      const hits = annotations
+        .filter((a) => a.x + a.width >= minX && a.x <= maxX && a.y + a.height >= minY && a.y <= maxY)
+        .map((a) => a.id);
+      setMultiSelected((prev) => {
+        const next = new Set(prev);
+        hits.forEach((id) => next.add(id));
+        return next;
+      });
+      setMarquee(null);
+      return;
+    }
     // 拖拽 annotation 提交 (per 任务 #3)
     if (ds.type === "annotation" && ds.annId && dragAnnPreview && onAnnotationPositionChange) {
       if (dragAnnPreview.x !== ds.elX || dragAnnPreview.y !== ds.elY) {
@@ -763,8 +806,13 @@ export function AgentCanvasView({
     const w = a.width * viewport.zoom;
     const h = a.height * viewport.zoom;
     const isSelected = a.id === selectedAnnotationId;
+    const isMultiSelected = multiSelected.has(a.id);
     const isConnectSource = a.id === connectSourceId;
-    const outline = isConnectSource ? "var(--cel-gold,#ffc400)" : isSelected ? "var(--cel-cyan,#00f0ff)" : "var(--cel-ink,#30363d)";
+    const outline = isConnectSource
+      ? "var(--cel-gold,#ffc400)"
+      : isSelected || isMultiSelected
+        ? "var(--cel-cyan,#00f0ff)"
+        : "var(--cel-ink,#30363d)";
     const baseTestId = `annotation-${a.id}`;
     const onAnnotationClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -1093,14 +1141,28 @@ export function AgentCanvasView({
             >
               <GitBranch size={13} />
             </button>
-            {selectedAnnotationId && (
+            {(selectedAnnotationId || multiSelected.size > 0) && (
               <button
-                onClick={() => { void onDeleteAnnotation?.(selectedAnnotationId); setSelectedAnnotationId(null); }}
+                onClick={() => {
+                  const ids = new Set<string>(multiSelected);
+                  if (selectedAnnotationId) ids.add(selectedAnnotationId);
+                  if (ids.size === 0) return;
+                  if (ids.size === 1) {
+                    void onDeleteAnnotation?.([...ids][0]);
+                  } else {
+                    void onBulkDeleteAnnotation?.([...ids]);
+                  }
+                  setSelectedAnnotationId(null);
+                  setMultiSelected(new Set());
+                }}
                 className="px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:bg-[#ff184c] hover:text-white transition-all"
-                title="删除选中 annotation"
+                title={`删除选中 (${multiSelected.size + (selectedAnnotationId ? 1 : 0)}) annotation`}
                 data-testid="agent-canvas-tool-delete"
               >
                 <Trash2 size={13} />
+                {(multiSelected.size + (selectedAnnotationId ? 1 : 0)) > 1 && (
+                  <span className="text-[10px] font-mono">×{multiSelected.size + (selectedAnnotationId ? 1 : 0)}</span>
+                )}
               </button>
             )}
           </>
@@ -1180,6 +1242,28 @@ export function AgentCanvasView({
             + [GRID 00:00:X]
           </text>
         </g>
+
+        {/* marquee 框选 (per 任务 #4) */}
+        {marquee && (() => {
+          const minX = Math.min(marquee.startWorldX, marquee.endWorldX);
+          const maxX = Math.max(marquee.startWorldX, marquee.endWorldX);
+          const minY = Math.min(marquee.startWorldY, marquee.endWorldY);
+          const maxY = Math.max(marquee.startWorldY, marquee.endWorldY);
+          const sx = (minX - viewport.x) * viewport.zoom;
+          const sy = (minY - viewport.y) * viewport.zoom;
+          const w = (maxX - minX) * viewport.zoom;
+          const h = (maxY - minY) * viewport.zoom;
+          return (
+            <rect data-testid="agent-canvas-marquee"
+              x={sx} y={sy} width={w} height={h}
+              fill="rgba(0, 240, 255, 0.1)"
+              stroke="var(--cel-cyan,#00f0ff)"
+              strokeWidth={1}
+              strokeDasharray="4 4"
+              pointerEvents="none"
+            />
+          );
+        })()}
 
         {/* connectors (auto-laid, 节点之间的派生连线) */}
         {canvas.connectors.map(renderConnector)}
