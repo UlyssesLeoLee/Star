@@ -252,7 +252,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const renderElement = (el: CanvasElementView) => {
     const isHighlighted = el.id === highlightElementId;
     const isSelected = selected.includes(el.id);
-    const stroke = isHighlighted ? "#2f81f7" : isSelected ? "#79c0ff" : "#30363d";
+    const stroke = isHighlighted ? "var(--cel-cyan, #2f81f7)" : isSelected ? "var(--cel-cyan, #79c0ff)" : "var(--cel-ink, #30363d)";
     const strokeWidth = isHighlighted || isSelected ? 2 : 1;
     const pos = worldToScreen(el.x, el.y);
     const w = el.width * viewport.zoom;
@@ -265,7 +265,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             <rect width={w} height={h} fill={color} stroke={stroke} strokeWidth={strokeWidth} rx={4} />
             <foreignObject x={6} y={6} width={w - 12} height={h - 12}>
-              <div style={{ fontSize: 11 * viewport.zoom, color: "#0b0d10", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
+              <div style={{ fontSize: 11 * viewport.zoom, color: "var(--cel-surface-stage, #0b0d10)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
                 {el.content.text}
               </div>
             </foreignObject>
@@ -276,7 +276,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             <foreignObject width={w} height={h}>
-              <div style={{ fontSize: 12 * viewport.zoom, color: "#e6edf3", lineHeight: 1.4, fontFamily: "system-ui" }}>
+              <div style={{ fontSize: 12 * viewport.zoom, color: "var(--cel-text-primary, #e6edf3)", lineHeight: 1.4, fontFamily: "system-ui" }}>
                 {el.content.text}
               </div>
             </foreignObject>
@@ -291,12 +291,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         if (!wi) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
-            <rect width={w} height={h} fill="#161b22" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
-            <text x={8} y={16 * viewport.zoom} fontSize={10 * viewport.zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
+            <rect width={w} height={h} fill="var(--cel-surface-card, #161b22)" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
+            <text x={8} y={16 * viewport.zoom} fontSize={10 * viewport.zoom} fill="var(--cel-text-secondary, #8b949e)" fontFamily="ui-monospace, monospace">
               {wi.key}
             </text>
             <foreignObject x={8} y={20 * viewport.zoom} width={w - 16} height={h - 30 * viewport.zoom}>
-              <div style={{ fontSize: 11 * viewport.zoom, color: "#e6edf3", lineHeight: 1.3, fontFamily: "system-ui", overflow: "hidden" }}>
+              <div style={{ fontSize: 11 * viewport.zoom, color: "var(--cel-text-primary, #e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", overflow: "hidden" }}>
                 {wi.title}
               </div>
             </foreignObject>
@@ -314,11 +314,11 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         if (!wt) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
-            <rect width={w} height={h} fill="#161b22" stroke={stroke} strokeWidth={strokeWidth} rx={20} />
-            <text x={12 * viewport.zoom} y={18 * viewport.zoom} fontSize={10 * viewport.zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
+            <rect width={w} height={h} fill="var(--cel-surface-card, #161b22)" stroke={stroke} strokeWidth={strokeWidth} rx={20} />
+            <text x={12 * viewport.zoom} y={18 * viewport.zoom} fontSize={10 * viewport.zoom} fill="var(--cel-text-secondary, #8b949e)" fontFamily="ui-monospace, monospace">
               worktree
             </text>
-            <text x={12 * viewport.zoom} y={34 * viewport.zoom} fontSize={12 * viewport.zoom} fill="#e6edf3" fontFamily="ui-monospace, monospace">
+            <text x={12 * viewport.zoom} y={34 * viewport.zoom} fontSize={12 * viewport.zoom} fill="var(--cel-text-primary, #e6edf3)" fontFamily="ui-monospace, monospace">
               {wt.branch}
             </text>
             <g transform={`translate(${w - 90 * viewport.zoom}, ${h - 22 * viewport.zoom})`}>
@@ -349,13 +349,14 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           : ag.agent_kind === "codex" ? "#0e7490"
           : "#1c2e6e";
         const isAlert = ag.status === "failed" || ag.status === "cancelled";
-        const cellSize = Math.max(2, Math.floor(Math.min(w, h) / 36));
-        const gridSize = 32; // 32x32 pixel grid
-        const gridOriginX = (w - cellSize * gridSize) / 2;
-        const gridOriginY = (h - cellSize * gridSize) / 2;
-        // 简化像素精灵 (16x16 镜像即可, 32x32 是放大后的)
+        // 16x16 像素精灵, 占 element 短边的 60% (per 2026-10-01 OOB: 角色外观不能太小)
+        const targetSize = Math.floor(Math.min(w, h) * 0.6);
+        const cellSize = Math.max(3, Math.floor(targetSize / 16));  // 每 pixel cell 实际渲染大小
+        const spriteSize = cellSize * 16;  // sprite 总尺寸 (16 unit grid)
+        const gridOriginX = (w - spriteSize) / 2;
+        const gridOriginY = (h - spriteSize) / 2;
+        // 简化像素精灵 (16x16)
         // 0 = 透明, 1 = outline, 2 = body, 3 = bodyDark, 4 = bodyLight, 5 = LED
-        // 16x16 像素精灵 (0=透明, 1=外框, 2=身体, 3=身体暗, 4=身体亮, 5=LED)
         // 造型: 双天线 + 头部-眼带 + 躯干-胸灯 + 腰甲 + 双脚
         const sprite: number[][] = [
           [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
@@ -387,14 +388,13 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         };
         const spriteRectX = gridOriginX;
         const spriteRectY = gridOriginY;
-        const spriteCell = cellSize * 2; // 16 cols * cellSize*2 = gridSize
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             {isAlert && <rect x={0} y={0} width={w} height={h} fill="#ff475722" rx={6} />}
             {/* 阴影 */}
             <ellipse cx={w / 2} cy={h - 4} rx={w / 2 - 6} ry={3} fill="rgba(0,0,0,0.25)" />
             {/* 像素精灵 */}
-            <g transform={`translate(${spriteRectX}, ${spriteRectY}) scale(${spriteCell / 16})`} shapeRendering="crispEdges">
+            <g transform={`translate(${spriteRectX}, ${spriteRectY}) scale(${cellSize})`} shapeRendering="crispEdges">
               {sprite.map((row, y) =>
                 row.map((cell, x) => {
                   const c = colorFor(cell);
@@ -403,7 +403,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
               )}
             </g>
             {/* name label */}
-            <text x={w / 2} y={h - Math.max(8, cellSize * 2)} textAnchor="middle" fontSize={Math.max(8, cellSize * 1.2)} fill="#e6edf3" fontFamily="ui-monospace, monospace" style={{ paintOrder: "stroke", stroke: "#0b0d10", strokeWidth: 2 }}>
+            <text x={w / 2} y={h - Math.max(8, cellSize * 2)} textAnchor="middle" fontSize={Math.max(8, cellSize * 1.2)} fill="var(--cel-text-primary, #e6edf3)" fontFamily="ui-monospace, monospace" style={{ paintOrder: "stroke", stroke: "var(--cel-surface-stage, #0b0d10)", strokeWidth: 2 }}>
               {ag.name}
             </text>
           </g>
@@ -419,7 +419,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
               rule
             </text>
             <foreignObject x={8} y={h / 2 - 2} width={w - 16} height={h / 2}>
-              <div style={{ fontSize: 10 * viewport.zoom, color: "#e6edf3", lineHeight: 1.2, fontFamily: "system-ui", textAlign: "center", overflow: "hidden" }}>
+              <div style={{ fontSize: 10 * viewport.zoom, color: "var(--cel-text-primary, #e6edf3)", lineHeight: 1.2, fontFamily: "system-ui", textAlign: "center", overflow: "hidden" }}>
                 {au.name}
               </div>
             </foreignObject>
@@ -429,8 +429,8 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       case "comment_pin": {
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)}>
-            <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2} fill="#79c0ff33" stroke={stroke} strokeWidth={strokeWidth} />
-            <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={10 * viewport.zoom} fill="#79c0ff" fontFamily="ui-monospace, monospace">
+            <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2} fill="rgba(121, 192, 255, 0.2)" stroke={stroke} strokeWidth={strokeWidth} />
+            <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={10 * viewport.zoom} fill="var(--cel-cyan, #79c0ff)" fontFamily="ui-monospace, monospace">
               💬
             </text>
           </g>
@@ -442,7 +442,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       default:
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`}>
-            <rect width={w} height={h} fill="#21262d" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
+            <rect width={w} height={h} fill="var(--cel-ink, #21262d)" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
           </g>
         );
     }
@@ -455,12 +455,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     const h = frame.height * viewport.zoom;
     return (
       <g key={frame.id} transform={`translate(${pos.x}, ${pos.y})`}>
-        <rect width={w} height={h} fill="#11151b1a" stroke="#21262d" strokeWidth={1} strokeDasharray="4 4" rx={6} />
-        <text x={10} y={16 * viewport.zoom} fontSize={11 * viewport.zoom} fill="#8b949e" fontFamily="system-ui">
+        <rect width={w} height={h} fill="color-mix(in srgb, var(--cel-surface-stage, #0b0d10) 10%, transparent)" stroke="var(--cel-ink, #21262d)" strokeWidth={1} strokeDasharray="4 4" rx={6} />
+        <text x={10} y={16 * viewport.zoom} fontSize={11 * viewport.zoom} fill="var(--cel-text-secondary, #8b949e)" fontFamily="system-ui">
           {frame.title}
         </text>
         {frame.is_slide && (
-          <text x={w - 30 * viewport.zoom} y={16 * viewport.zoom} fontSize={9 * viewport.zoom} fill="#6e7681" fontFamily="system-ui">
+          <text x={w - 30 * viewport.zoom} y={16 * viewport.zoom} fontSize={9 * viewport.zoom} fill="var(--cel-text-mute, #6e7681)" fontFamily="system-ui">
             [slide]
           </text>
         )}
@@ -528,7 +528,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         />
         {c.label && (
           <g transform={`translate(${midScreenX}, ${midScreenY})`}>
-            <rect x={-c.label.length * 3.5} y={-8} width={c.label.length * 7} height={14} fill="#0b0d10" stroke={c.color} rx={3} />
+            <rect x={-c.label.length * 3.5} y={-8} width={c.label.length * 7} height={14} fill="var(--cel-surface-stage, #0b0d10)" stroke={c.color} rx={3} />
             <text textAnchor="middle" y={3} fontSize={9} fill={c.color} fontFamily="ui-monospace, monospace">
               {c.label}
             </text>
@@ -584,7 +584,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         data-testid="canvas-svg"
         viewBox="0 0 1200 800"
         className="w-full h-full"
-        style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "#0b0d10", backgroundImage: "radial-gradient(circle, #21262d 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+        style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, #0b0d10)", backgroundImage: "radial-gradient(circle, var(--cel-ink, #21262d) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -628,7 +628,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             width={1200 / viewport.zoom}
             height={800 / viewport.zoom}
             fill="none"
-            stroke="#2f81f7"
+            stroke="var(--cel-cyan, #2f81f7)"
             strokeWidth={2}
           />
           {/* elements dots */}

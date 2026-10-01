@@ -107,6 +107,8 @@ export const ja: Dictionary = {
     recentCounter: "· 最近 {count} 件",
     ariaLabel: "コマンドバー",
     closeAria: "コマンドバーを閉じる (Esc)",
+    hitSuffix: "件",
+    filterAll: "全部",
   },
   pageHeader: {
     trackPill: "トラック {track}",

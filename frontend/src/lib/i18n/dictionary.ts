@@ -129,8 +129,9 @@ export interface Dictionary {
     };
   };
   commandBar: {
-    placeholder: string;           // "搜索 25+ 模块..."
-    emptyHint: string;             // "0 命中 — 按 Esc 退出"
+    placeholder: string;           // 搜索框 placeholder
+    emptyHint: string;             // 0 命中提示
+    hitSuffix: string;             // "hits" / "命中" / "件"
     hintNavigate: string;          // "navigate"
     hintOpen: string;              // "open"
     hintClose: string;             // "Esc close"
@@ -138,6 +139,7 @@ export interface Dictionary {
     recentCounter: string;         // "· {count} recent"
     ariaLabel: string;             // "Command bar"
     closeAria: string;             // "Close command bar (Esc)"
+    filterAll: string;             // "全部"
   };
   pageHeader: {
     trackPill: string;             // "Track {track}"
