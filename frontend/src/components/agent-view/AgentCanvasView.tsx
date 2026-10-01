@@ -14,7 +14,10 @@
 import type {
   AgentSession, Worktree, WorkItem, AgentStatus, WorkItemStatus,
 } from "@/types/ids";
-import type { AgentCanvas, AgentCanvasNode, AgentCanvasConnector } from "@/lib/agent-view/types";
+import type {
+  AgentCanvas, AgentCanvasNode, AgentCanvasConnector,
+  AgentCanvasAnnotation, AgentCanvasFreeConnector,
+} from "@/lib/agent-view/types";
 import type { AgentGameState } from "@/lib/agent-game/types";
 import { visualForLevel, MAX_HP } from "@/lib/agent-game/types";
 import { AgentCharacterSVG } from "@/lib/agent-game/characters";
@@ -26,6 +29,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import {
   Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, GitBranch, Skull, Coins,
+  StickyNote, Type, Square, Brush, Plus, Trash2,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
@@ -37,9 +41,25 @@ interface AgentCanvasViewProps {
   gameState: AgentGameState | null;
   /** 领奖回调 (work-item done + 未领奖时) */
   onClaim?: (workItemId: string) => void;
+  /** 用户注释 (per 2026-10-01 OOB 恢复无限画布画笔 - sticky/text/shape/path/connector */
+  annotations?: AgentCanvasAnnotation[];
+  freeConnectors?: AgentCanvasFreeConnector[];
+  /** 注释回调 (默认 read-only: 节点 + 注释都不编辑) */
+  readOnly?: boolean;
+  onCreateAnnotation?: (body: AgentCanvasAnnotation) => Promise<string | void>;
+  onDeleteAnnotation?: (id: string) => Promise<void>;
+  onAnnotationPositionChange?: (body: { id: string; x: number; y: number }) => Promise<void>;
+  onCreateFreeConnector?: (body: Omit<AgentCanvasFreeConnector, "id">) => Promise<string | void>;
+  onDeleteFreeConnector?: (id: string) => Promise<void>;
 }
 
-export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }: AgentCanvasViewProps) {
+export function AgentCanvasView({
+  canvas, agent, worktree, gameState, onClaim,
+  annotations = [], freeConnectors = [],
+  readOnly = true,
+  onCreateAnnotation, onDeleteAnnotation, onAnnotationPositionChange,
+  onCreateFreeConnector, onDeleteFreeConnector,
+}: AgentCanvasViewProps) {
   const { t } = useTranslation();
   const workItems = useStore((s) => s.workItems);
   const workItemById = useMemo(
@@ -48,7 +68,21 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
   );
   const { colors, mode } = useAgentGameTheme();
   const [viewport, setViewport] = useState(canvas.viewport);
-  const [tool, setTool] = useState<"select" | "pan">("pan");
+  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "brush" | "connector" | "connect-source">("pan");
+  const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
+  // 自由画笔 (per 2026-10-01 OOB 恢复无限画布画笔)
+  const AGENT_BRUSH_PALETTE = ["#e6edf3", "#00f0ff", "#ffc400", "#ff184c", "#a5d6ff"]; // 主题色 (cyan/gold/red) + 中性
+  const AGENT_BRUSH_SIZES = [2, 4, 8, 12];
+  const AGENT_STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
+  const [brushColor, setBrushColor] = useState<string>(AGENT_BRUSH_PALETTE[0]);
+  const [brushSize, setBrushSize] = useState<number>(AGENT_BRUSH_SIZES[1]);
+  const [drawingPath, setDrawingPath] = useState<{
+    points: Array<{ x: number; y: number }>;
+    minX: number; minY: number; maxX: number; maxY: number;
+  } | null>(null);
+  const [annotationError, setAnnotationError] = useState<string | null>(null);
+  const [annotationPending, setAnnotationPending] = useState(false);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -80,11 +114,112 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
     return () => window.removeEventListener("keydown", onKey);
   }, [canvas.viewport]);
 
+  
+  /**
+   * 屏幕坐标 → 世界坐标 (考虑 viewport.zoom + viewport.x/y)
+   * per 2026-10-01 OOB 自由画笔/创建功能 — 跟独立 CanvasView 公式一致
+   */
+  const svgPointFromClient = (e: React.MouseEvent | MouseEvent): { x: number; y: number } | null => {
+    if (!svgRef.current) return null;
+    const rect = svgRef.current.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / viewport.zoom + viewport.x,
+      y: (e.clientY - rect.top) / viewport.zoom + viewport.y,
+    };
+  };
+
+  /**
+   * 创建 sticky / text / shape annotation (per 2026-10-01 OOB 恢复无限画布画笔)
+   * - 鼠标在 SVG 空白区点击触发
+   * - 仅 write mode (非 readOnly + 有 onCreateAnnotation)
+   */
+  const createAnnotationAt = async (
+    e: React.MouseEvent,
+    kind: "sticky_note" | "text" | "shape",
+    width: number,
+    height: number,
+    content: AgentCanvasAnnotation["content"],
+  ) => {
+    if (readOnly || !onCreateAnnotation || annotationPending) return;
+    const world = svgPointFromClient(e);
+    if (!world) return;
+    setAnnotationError(null);
+    setAnnotationPending(true);
+    try {
+      const id = await onCreateAnnotation({
+        id: `ann-local-${Math.random().toString(36).slice(2, 10)}`,
+        kind,
+        x: Math.round(world.x - width / 2),
+        y: Math.round(world.y - height / 2),
+        width,
+        height,
+        created_at: new Date().toISOString(),
+        created_by: "usr-001",
+        content,
+      } as AgentCanvasAnnotation);
+      if (id) setSelectedAnnotationId(id);
+      setTool("select");
+    } catch (err) {
+      setAnnotationError(err instanceof Error ? err.message : "Failed to create annotation");
+    } finally {
+      setAnnotationPending(false);
+    }
+  };
+
+  /**
+   * 自由画笔 — 创建 path annotation
+   * - 鼠标按下记录起点, 拖动累积, 抬起 → 创建
+   */
+  const createPathAnnotation = async (path: NonNullable<typeof drawingPath>) => {
+    if (readOnly || !onCreateAnnotation || annotationPending) return;
+    if (path.points.length < 2) {
+      setDrawingPath(null);
+      return;
+    }
+    const PAD = Math.max(2, brushSize);
+    const x = path.minX - PAD;
+    const y = path.minY - PAD;
+    const width = Math.max(2, path.maxX - path.minX + PAD * 2);
+    const height = Math.max(2, path.maxY - path.minY + PAD * 2);
+    const pathData =
+      "M " + path.points.map((p) => `${(p.x - x).toFixed(1)} ${(p.y - y).toFixed(1)}`).join(" L ");
+    setAnnotationError(null);
+    setAnnotationPending(true);
+    try {
+      await onCreateAnnotation({
+        id: `ann-local-${Math.random().toString(36).slice(2, 10)}`,
+        kind: "path",
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.round(width),
+        height: Math.round(height),
+        created_at: new Date().toISOString(),
+        created_by: "usr-001",
+        content: {
+          path_data: pathData,
+          brush_size: brushSize,
+          brush_color: brushColor,
+        },
+      } as AgentCanvasAnnotation);
+    } catch (err) {
+      setAnnotationError(err instanceof Error ? err.message : "Failed to save brush stroke");
+    } finally {
+      setDrawingPath(null);
+      setAnnotationPending(false);
+    }
+  };
+
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && tool === "pan") || e.shiftKey) {
       dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y };
     } else if (e.button === 0 && tool === "select") {
       setSelectedNodeId(null);
+      setSelectedAnnotationId(null);
+    } else if (e.button === 0 && tool === "brush" && !readOnly) {
+      // 自由画笔 - 鼠标按下记录起点 (per 2026-10-01 OOB)
+      const svgPt = svgPointFromClient(e);
+      if (!svgPt) return;
+      setDrawingPath({ points: [svgPt], minX: svgPt.x, minY: svgPt.y, maxX: svgPt.x, maxY: svgPt.y });
     }
   };
 
@@ -94,11 +229,30 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
       setViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
+    } else if (drawingPath) {
+      // 自由画笔 - 累积 path points (per 2026-10-01 OOB)
+      const svgPt = svgPointFromClient(e);
+      if (!svgPt) return;
+      const last = drawingPath.points[drawingPath.points.length - 1];
+      const dist = Math.hypot(svgPt.x - last.x, svgPt.y - last.y);
+      if (dist < 1.5) return;
+      setDrawingPath({
+        points: [...drawingPath.points, svgPt],
+        minX: Math.min(drawingPath.minX, svgPt.x),
+        minY: Math.min(drawingPath.minY, svgPt.y),
+        maxX: Math.max(drawingPath.maxX, svgPt.x),
+        maxY: Math.max(drawingPath.maxY, svgPt.y),
+      });
     }
   };
 
   const onMouseUp = () => {
     dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0 };
+    // 自由画笔 - 抬起提交 (per 2026-10-01 OOB)
+    if (drawingPath) {
+      void createPathAnnotation(drawingPath);
+      return;
+    }
   };
 
   const onWheel = (e: React.WheelEvent) => {
@@ -532,6 +686,139 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
     return null;
   };
 
+  /**
+   * 渲染用户 annotation (per 2026-10-01 OOB 恢复无限画布画笔)
+   * - 节点坐标 → 屏幕坐标: (x - viewport.x) * viewport.zoom
+   * - sticky/text: SVG rect + text
+   * - shape: SVG rect
+   * - path: SVG path (相对 bbox 起点)
+   */
+  const renderAnnotation = (a: AgentCanvasAnnotation) => {
+    const sx = (a.x - viewport.x) * viewport.zoom;
+    const sy = (a.y - viewport.y) * viewport.zoom;
+    const w = a.width * viewport.zoom;
+    const h = a.height * viewport.zoom;
+    const isSelected = a.id === selectedAnnotationId;
+    const isConnectSource = a.id === connectSourceId;
+    const outline = isConnectSource ? "var(--cel-gold,#ffc400)" : isSelected ? "var(--cel-cyan,#00f0ff)" : "var(--cel-ink,#30363d)";
+    const baseTestId = `annotation-${a.id}`;
+    const onAnnotationClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (tool === "connector" && onCreateFreeConnector) {
+        if (!connectSourceId) {
+          setConnectSourceId(a.id);
+        } else if (connectSourceId !== a.id) {
+          void onCreateFreeConnector({ fromAnnotationId: connectSourceId, toAnnotationId: a.id, color: "#00f0ff" }).finally(() => {
+            setConnectSourceId(null);
+            setTool("select");
+          });
+        }
+      } else {
+        setSelectedAnnotationId(a.id);
+      }
+    };
+    const baseCursor = tool === "connector" ? "crosshair" : "default";
+    switch (a.kind) {
+      case "sticky_note": {
+        const fill = (a as { content: { color: string; text: string } }).content.color ?? "#f9d77e";
+        const text = (a as { content: { color: string; text: string } }).content.text ?? "";
+        return (
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
+            <rect width={w} height={h} fill={fill} stroke={outline} strokeWidth={isSelected || isConnectSource ? 2 : 1} rx={2} />
+            <foreignObject x={4} y={4} width={w - 8} height={h - 8}>
+              <div style={{ fontSize: 11 * viewport.zoom, color: "#0b0d10", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
+                {text}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      }
+      case "text": {
+        const text = (a as { content: { text: string } }).content.text ?? "";
+        return (
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
+            <foreignObject width={w} height={h}>
+              <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary,#e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000" }}>
+                {text}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      }
+      case "shape": {
+        const shape = (a as { content: { shape: "rect" | "ellipse" } }).content.shape ?? "rect";
+        return (
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
+            {shape === "rect" ? (
+              <rect width={w} height={h} fill="none" stroke={outline} strokeWidth={2} />
+            ) : (
+              <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} fill="none" stroke={outline} strokeWidth={2} />
+            )}
+          </g>
+        );
+      }
+      case "path": {
+        const c = a.content;
+        const bw = c.brush_size * viewport.zoom;
+        return (
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
+            <rect width={w} height={h} fill="transparent" />
+            <path
+              d={c.path_data}
+              stroke={c.brush_color}
+              strokeWidth={bw}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {(isSelected || isConnectSource) && (
+              <rect width={w} height={h} fill="none" stroke={outline} strokeWidth={1} strokeDasharray="4 4" />
+            )}
+          </g>
+        );
+      }
+      default:
+        return null;
+    }
+  };
+
+  /**
+   * 用户连接 annotation 之间的 connector (per 2026-10-01 OOB 恢复无限画布 connector)
+   * - 跟 nodes 派生 connector 区分: 用户连用 onCreateFreeConnector / onDeleteFreeConnector 管理
+   * - 配色沿用节点 connector 风格 (硬黑描边 + 内部高亮)
+   */
+  const renderFreeConnector = (c: AgentCanvasFreeConnector) => {
+    const from = annotations.find((a) => a.id === c.fromAnnotationId);
+    const to = annotations.find((a) => a.id === c.toAnnotationId);
+    if (!from || !to) return null;
+    const fx = (from.x + from.width / 2 - viewport.x) * viewport.zoom;
+    const fy = (from.y + from.height / 2 - viewport.y) * viewport.zoom;
+    const tx = (to.x + to.width / 2 - viewport.x) * viewport.zoom;
+    const ty = (to.y + to.height / 2 - viewport.y) * viewport.zoom;
+    const stroke = c.color ?? "#00f0ff";
+    return (
+      <g key={c.id} data-testid={`agent-canvas-free-connector-${c.id}`}>
+        <line x1={fx} y1={fy} x2={tx} y2={ty} stroke="#000" strokeWidth={4} />
+        <line x1={fx} y1={fy} x2={tx} y2={ty} stroke={stroke} strokeWidth={2} />
+        {c.label && (
+          <text
+            x={(fx + tx) / 2}
+            y={(fy + ty) / 2 - 4}
+            fill="#fff"
+            fontSize={10}
+            fontFamily="monospace"
+            textAnchor="middle"
+            stroke="#000"
+            strokeWidth={3}
+            paintOrder="stroke"
+          >
+            {c.label}
+          </text>
+        )}
+      </g>
+    );
+  };
+
   // minimap 计算
   const { bbox } = useMemo(() => {
     const xs = canvas.nodes.map((n) => n.x);
@@ -599,6 +886,89 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
         >
           <Maximize2 size={13} />
         </button>
+        <div className="w-[1.5px] h-5 bg-black mx-0.5" />
+        {!readOnly && onCreateAnnotation && (
+          <>
+            <button
+              onClick={() => setTool("sticky")}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "sticky" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              title="新增便利贴"
+              data-testid="agent-canvas-tool-sticky"
+            >
+              <StickyNote size={13} />
+            </button>
+            <button
+              onClick={() => setTool("text")}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "text" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              title="新增文字"
+              data-testid="agent-canvas-tool-text"
+            >
+              <Type size={13} />
+            </button>
+            <button
+              onClick={() => setTool("shape")}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "shape" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              title="新增图形"
+              data-testid="agent-canvas-tool-shape"
+            >
+              <Square size={13} />
+            </button>
+            <button
+              onClick={() => setTool("brush")}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "brush" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              title="自由画笔"
+              data-testid="agent-canvas-tool-brush"
+            >
+              <Brush size={13} />
+            </button>
+            {tool === "brush" && (
+              <>
+                <div className="w-[1.5px] h-5 bg-black mx-0.5" />
+                <div className="flex items-center gap-1" data-testid="agent-canvas-brush-palette">
+                  {AGENT_BRUSH_PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setBrushColor(c)}
+                      className={`w-4 h-4 border border-black ${brushColor === c ? "ring-2 ring-[var(--cel-cyan,#00f0ff)]" : ""}`}
+                      style={{ background: c }}
+                      aria-label={`brush color ${c}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-1" data-testid="agent-canvas-brush-size">
+                  {AGENT_BRUSH_SIZES.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setBrushSize(s)}
+                      className={`px-1.5 py-0.5 text-[10px] font-mono border border-black ${brushSize === s ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+                      aria-label={`brush size ${s}px`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <button
+              onClick={() => { setTool("connector"); setConnectSourceId(null); }}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "connector" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              title="连线 — 选 annotation A → 选 annotation B"
+              data-testid="agent-canvas-tool-connector"
+            >
+              <GitBranch size={13} />
+            </button>
+            {selectedAnnotationId && (
+              <button
+                onClick={() => { void onDeleteAnnotation?.(selectedAnnotationId); setSelectedAnnotationId(null); }}
+                className="px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:bg-[#ff184c] hover:text-white transition-all"
+                title="删除选中 annotation"
+                data-testid="agent-canvas-tool-delete"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+          </>
+        )}
         <span
           className="text-[11px] text-[var(--cel-cyan,#00f0ff)] font-mono font-bold px-2 tabular-nums"
           data-testid="agent-canvas-zoom"
@@ -622,6 +992,19 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
         onWheel={onWheel}
+        onClick={(e) => {
+          // 注释创建 (per 2026-10-01 OOB 恢复无限画布画笔)
+          // - sticky/text/shape: SVG 空白区点击
+          // - connect-source mode: 点已有 annotation 设置连接源端
+          if ((e.target as Element).tagName?.toLowerCase() !== "svg") return;
+          if (tool === "sticky") {
+            void createAnnotationAt(e, "sticky_note", 180, 100, { color: AGENT_STICKY_PALETTE[0], text: "" });
+          } else if (tool === "text") {
+            void createAnnotationAt(e, "text", 200, 60, { text: "" });
+          } else if (tool === "shape") {
+            void createAnnotationAt(e, "shape", 120, 120, { shape: "rect" });
+          }
+        }}
       >
         <defs>
           {/* 战术箭头标记 */}
@@ -662,9 +1045,29 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           </text>
         </g>
 
-        {/* connectors */}
+        {/* connectors (auto-laid, 节点之间的派生连线) */}
         {canvas.connectors.map(renderConnector)}
-        {/* nodes */}
+
+        {/* 用户注释 annotation (per 2026-10-01 OOB 恢复无限画布画笔 - sticky/text/shape/path + connector 用户连) */}
+        {annotations.map(renderAnnotation)}
+        {freeConnectors.map(renderFreeConnector)}
+
+        {/* 自由画笔 in-progress path (per 2026-10-01 OOB) */}
+        {drawingPath && drawingPath.points.length >= 2 && (() => {
+          const PAD = Math.max(2, brushSize);
+          const x = drawingPath.minX - PAD;
+          const y = drawingPath.minY - PAD;
+          const sx = (x - viewport.x) * viewport.zoom;
+          const sy = (y - viewport.y) * viewport.zoom;
+          const d = "M " + drawingPath.points.map((p) => `${(p.x - x).toFixed(1)} ${(p.y - y).toFixed(1)}`).join(" L ");
+          return (
+            <g transform={`translate(${sx}, ${sy})`} data-testid="agent-canvas-drawing-path" pointerEvents="none">
+              <path d={d} stroke={brushColor} strokeWidth={brushSize * viewport.zoom} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
+            </g>
+          );
+        })()}
+
+        {/* nodes (auto-laid, 只读派生 — 不可拖动, 不可删, 不可编辑) */}
         {canvas.nodes.map(renderNode)}
       </svg>
 
