@@ -109,9 +109,21 @@ export function AgentCanvasView({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const dragState = useRef<{ type: "pan" | null; startX: number; startY: number; elX: number; elY: number }>({
-    type: null, startX: 0, startY: 0, elX: 0, elY: 0,
+  const dragState = useRef<{
+    type: "pan" | "annotation" | null;
+    startX: number;
+    startY: number;
+    /** pan: viewport.x at start; annotation: annotation.x at start */
+    elX: number;
+    /** pan: viewport.y at start; annotation: annotation.y at start */
+    elY: number;
+    /** annotation drag 专用 — annotation id */
+    annId: string | null;
+  }>({
+    type: null, startX: 0, startY: 0, elX: 0, elY: 0, annId: null,
   });
+  /** 拖拽中 — preview position (per 任务 #3: drag annotation) */
+  const [dragAnnPreview, setDragAnnPreview] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     setViewport(canvas.viewport);
@@ -233,12 +245,24 @@ export function AgentCanvasView({
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && tool === "pan") || e.shiftKey) {
-      dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y };
-    } else if (e.button === 0 && tool === "select") {
+      dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y, annId: null };
+      return;
+    }
+    if (e.button === 0 && tool === "select") {
+      // 拖拽已选 annotation (per 任务 #3: drag annotation)
+      if (selectedAnnotationId && !readOnly && onAnnotationPositionChange) {
+        const target = annotations.find((a) => a.id === selectedAnnotationId);
+        if (target) {
+          dragState.current = { type: "annotation", startX: e.clientX, startY: e.clientY, elX: target.x, elY: target.y, annId: target.id };
+          setDragAnnPreview({ id: target.id, x: target.x, y: target.y });
+          return;
+        }
+      }
       setSelectedNodeId(null);
       setSelectedAnnotationId(null);
-    } else if (e.button === 0 && tool === "brush" && !readOnly) {
-      // 自由画笔 - 鼠标按下记录起点 (per 2026-10-01 OOB)
+      return;
+    }
+    if (e.button === 0 && tool === "brush" && !readOnly) {
       const svgPt = svgPointFromClient(e);
       if (!svgPt) return;
       setDrawingPath({ points: [svgPt], minX: svgPt.x, minY: svgPt.y, maxX: svgPt.x, maxY: svgPt.y });
@@ -251,6 +275,11 @@ export function AgentCanvasView({
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
       setViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
+    } else if (ds.type === "annotation" && ds.annId && dragAnnPreview) {
+      // 拖拽 annotation — 实时更新 preview (per 任务 #3)
+      const dx = (e.clientX - ds.startX) / viewport.zoom;
+      const dy = (e.clientY - ds.startY) / viewport.zoom;
+      setDragAnnPreview({ id: ds.annId, x: ds.elX + dx, y: ds.elY + dy });
     } else if (drawingPath) {
       // 自由画笔 - 累积 path points (per 2026-10-01 OOB)
       const svgPt = svgPointFromClient(e);
@@ -269,7 +298,17 @@ export function AgentCanvasView({
   };
 
   const onMouseUp = () => {
-    dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0 };
+    const ds = dragState.current;
+    dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, annId: null };
+    // 拖拽 annotation 提交 (per 任务 #3)
+    if (ds.type === "annotation" && ds.annId && dragAnnPreview && onAnnotationPositionChange) {
+      if (dragAnnPreview.x !== ds.elX || dragAnnPreview.y !== ds.elY) {
+        void onAnnotationPositionChange({ id: ds.annId, x: dragAnnPreview.x, y: dragAnnPreview.y });
+      }
+      setDragAnnPreview(null);
+      return;
+    }
+    setDragAnnPreview(null);
     // 自由画笔 - 抬起提交 (per 2026-10-01 OOB)
     if (drawingPath) {
       void createPathAnnotation(drawingPath);
@@ -716,8 +755,11 @@ export function AgentCanvasView({
    * - path: SVG path (相对 bbox 起点)
    */
   const renderAnnotation = (a: AgentCanvasAnnotation) => {
-    const sx = (a.x - viewport.x) * viewport.zoom;
-    const sy = (a.y - viewport.y) * viewport.zoom;
+    const isDragging = dragAnnPreview?.id === a.id;
+    const ax = isDragging ? dragAnnPreview.x : a.x;
+    const ay = isDragging ? dragAnnPreview.y : a.y;
+    const sx = (ax - viewport.x) * viewport.zoom;
+    const sy = (ay - viewport.y) * viewport.zoom;
     const w = a.width * viewport.zoom;
     const h = a.height * viewport.zoom;
     const isSelected = a.id === selectedAnnotationId;
@@ -739,7 +781,7 @@ export function AgentCanvasView({
         setSelectedAnnotationId(a.id);
       }
     };
-    const baseCursor = tool === "connector" ? "crosshair" : "default";
+    const baseCursor = tool === "connector" ? "crosshair" : isDragging ? "grabbing" : (tool === "select" && selectedAnnotationId === a.id) ? "grab" : "default";
   const onAnnotationDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (a.kind === "sticky_note" || a.kind === "text") {
