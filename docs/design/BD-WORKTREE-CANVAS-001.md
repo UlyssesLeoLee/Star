@@ -1,16 +1,17 @@
 # BD-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 基本設計書 v1.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **AI Worktree Graph Canvas — 基本設計書 v1.4** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟢 Draft v1.3 (Worktree 群组边界补充)
-> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.3 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)
-> - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.3 (Worktree Group 边界补充) + 实装代码
+> - 状态: 🟢 Draft v1.4 (Run 工作区与双 Canvas 边界补充)
+> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.4 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)
+> - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4 (Worktree Group 边界补充) + 实装代码
+> - Run App owner 边界: [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v4.25 §1 / §8.1；本 BD 中 Project Worktree Overview Graph 与 Run Infinite Canvas 是分离能力
 > - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档)
 > - 守门基线: 守门 #1+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29 共 14 项必过
 > - 平行参考: `docs/requirements/SRS-CANVAS-001.md` v1.4 (无限画布总册) + `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
-> - 日期: 2026-09-15 JST
+> - 日期: 2026-10-01 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
 
 ---
@@ -271,20 +272,19 @@ graph TB
 
 ---
 
-### 1.5 渡口 Worktree 群组与双 Canvas 边界 (v1.3 补充)
+### 1.5 渡口 Run 工作区与双 Canvas 边界 (v1.4 补充)
 
-本基本设计中的 AI Worktree Graph Canvas 继续作为 **Project/Repository 级 Worktree Overview Graph**：它聚合多个 Worktree 的 Git 状态、关系、风险与行动。渡口的 **Group Infinite Canvas** 属于单个 Worktree 群组，与 Task Card 索引、Multica、Jira 等价任务管理入口及插件应用同级；它不是本 Graph 的子视图或同一画布对象。
+本基本设计中的 AI Worktree Graph Canvas 继续作为 **Project/Repository 级 Worktree Overview Graph**：它聚合多个 Engineering Run 下的 Worktree Git 状态、关系、风险与行动。渡口的 **Group Infinite Canvas** 属于 Engineering Run 工作区，与 Run Task Card、Multica/Jira 等价任务管理入口及插件应用同级；选中某个 Worktree 只触发该 Run tabs，并设置 focus Worktree，不把 Canvas 限制为单 Worktree 所有。
 
 | 设计对象 | 所属层级 | 主职责 | 关联方式 |
 |---|---|---|---|
-| Worktree Overview Graph | Project / Repository | 跨 Worktree 状态、关系、风险与 Git 操作 | 以 `worktree_id` 链接至 Worktree 群组 |
-| Group Infinite Canvas | Worktree 群组同级应用 | 群组内协作、可视化任务与调用领域能力 | 保存类型化 `EntityRef`，经领域命令写入 |
-| Task Card Index | Worktree 群组同级入口 | 定位共用的 WorkItem 与执行卡 | `work_item_id` + `worktree_id` |
-| Multica / Jira 等价视图 | Worktree 群组同级应用 | 提供任务生命周期或看板视图 | 投影/命令均指向同一 WorkItem |
-| Plugin App Registry | Worktree 群组扩展入口 | 热插拔注册经过授权的同级应用 | manifest 声明 scope、capability、permission |
+| Worktree Overview Graph | Project / Repository | 跨 Run/Worktree 状态、关系、风险与 Git 操作 | 以 `engineering_run_id` / `worktree_id` 深链至 Run 工作区 |
+| Group Infinite Canvas | Engineering Run 同级 App | 可视化联动 Run 内多个 Worktree、Task、Agent 与 Evidence | 持久化 `engineering_run_id`，元素用 typed `EntityRef` 引用可选 Worktree |
+| Task Card Index | Engineering Run 同级 App | 定位共用 WorkItem 与执行卡 | `engineering_run_id`；CLI 启动时显式选择 `worktree_id` |
+| Multica / Jira 等价视图 | Engineering Run 同级 App | 提供任务生命周期或看板视图 | 投影/命令均指向 Run-owned canonical WorkItem |
+| Plugin App Registry | Run 工作区扩展入口 | 热插拔注册经过授权的同级应用 | manifest 声明 Run/Worktree scope、capability、permission |
 
-两类 Canvas 可互相深链，但各自拥有独立路由上下文、数据模型与布局状态。Project Graph 消费群组对象的引用和授权事件，不复制 WorkItem/Task Card 状态；Group Infinite Canvas 复用 Group Shell 底栏聊天，不嵌入第二条聊天栏。跨应用层级以 [`docs/requirements.md`](../requirements.md) §50 和 [`docs/basic-design.md`](../basic-design.md) §16 为准。
-
+两类 Canvas 可互相深链，但各自拥有独立路由上下文、数据模型与布局状态。Project Graph 消费 Run/Worktree 对象引用和授权事件，不复制 WorkItem/Task Card 状态；Run Canvas 复用 Run Shell 底栏聊天，不嵌入第二条聊天栏。跨应用层级以 [`docs/requirements.md`](../requirements.md) §50 和 [`docs/basic-design.md`](../basic-design.md) §16 为准。现有按 `worktree_id` 存储与访问的 Group Canvas API 是兼容实现切片，Run-owned schema/API 与历史归属迁移列入 Phase 2E。
 ## §2 模块边界 (14 模块, per SRS §二十四)
 
 ### 2.1 模块清单 + 职责
@@ -2054,7 +2054,7 @@ Unit Test (Rust cargo + TS vitest)
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 39 段 (目的/决策点/继承清单/架构/模块/组件/9 子模块/4 支撑层/数据模型/状态机/计算模型/Semantic Zoom/Focus/View/Inspector/API/Event/数据流/时序/异常/并发/性能/安全/可观测/测试/追踪/签字/修订), 14 模块, 4 大抽象 Trait, 15 决策点全部已拍板 (per §三十五 推荐方案明确), 11 Node + 13 Edge + 18 Action + 5 View + 6 Zoom + 7 State, 3 张时序图, 7 层性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
 | v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-04 修正) | 修正: §0.3 / §37 / §A.3 总数与 Trace §11 同步 126 唯一 ID (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
 | v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
-| v1.3 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Project Worktree Overview Graph 与 Worktree 群组同级 Infinite Canvas 的对象、入口及类型化引用边界 | 用户要求以 Worktree 为渡口顶层索引并将 Canvas 作为同级群组应用 |
+| v1.4 | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Group Infinite Canvas/Task Card 属 Engineering Run 同级 Apps；Worktree 是 focus 与 CLI checkout，不是 Canvas/WorkItem owner；补充旧 Worktree-scoped Canvas API 为兼容切片 | 用户明确选中 Run 内 Worktree 后出现的是属于该 Run 的右侧 tabs |
 
 ---
 
