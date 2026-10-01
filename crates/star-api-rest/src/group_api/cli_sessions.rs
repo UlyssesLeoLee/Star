@@ -23,30 +23,36 @@
 //! CYPHER STRUCTURE MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"}),(body:Class {name:"StartTaskCliSessionBody",type:"class"}),(readiness:Class {name:"TaskRunAdmissionReadinessCommand",type:"class"}),(sessionStart:Class {name:"TaskCliSessionStartCommand",type:"class"}),(fp:Function {name:"request_fingerprint",type:"function"}),(validate:Function {name:"validate_start_body",type:"function"});
 //! CREATE (capability:Function {name:"TaskCliSessionProvisioner::supports_profile_bound_run_admission",type:"function",language:"rust"}),(profileId:Variable {name:"execution_profile_id",type:"variable",language:"rust"});
+//! CREATE (catalogCapability:Function {name:"TaskCliSessionProvisioner::supports_current_execution_catalogs",type:"function",language:"rust"}),(capability)-[:REQUIRES]->(catalogCapability);
 //! CREATE (m)-[:CONTAINS]->(capability),(p)-[:HAS_METHOD]->(capability),(st)-[:CALLS]->(capability),(body)-[:USES]->(profileId),(readiness)-[:USES]->(profileId),(sessionStart)-[:USES]->(profileId),(fp)-[:USES]->(profileId),(validate)-[:USES]->(profileId);
+
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(readiness:Class {name:"TaskRunAdmissionReadinessCommand",type:"class"}),(load:Function {name:"execution_catalogs::load_current_execution_admission_snapshot",type:"function"}),(recheck:Function {name:"execution_catalogs::recheck_current_execution_admission_snapshot",type:"function"}),(snapshot:Class {name:"CurrentExecutionAdmissionSnapshot",type:"class"});
+//! CREATE (readiness)-[:USES]->(snapshot),(st)-[:CALLS]->(load),(st)-[:CALLS]->(recheck),(m)-[:CONTAINS]->(snapshot);
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::header,
     response::{IntoResponse, Response},
     routing::{get, post},
+    Json, Router,
 };
 use chrono::{DateTime, Duration, Utc};
 use domain_hook::{
-    EVENT_SCHEMA_VERSION, HookDecision, HookEventEnvelope, HookPhase, HookScope,
-    RetentionLockState, evaluate as evaluate_hook,
+    evaluate as evaluate_hook, HookDecision, HookEventEnvelope, HookPhase, HookScope,
+    RetentionLockState, EVENT_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Postgres, Row, Transaction};
+use std::sync::Arc;
 use uuid::Uuid;
 
 use super::{
-    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope,
-    set_tenant, validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
+    GroupApiError, GroupApiState,
 };
 
 /// A REST-authorized request for provisioning a Task Card CLI session in Local Runtime.
@@ -55,8 +61,9 @@ use super::{
 /// and policy immediately before grant issuance and spawn; persist
 /// TaskRun intent/result audit against the supplied correlation ID. This command is not itself
 /// an execution grant. For a new admitted Run, the provisioner must consume the supplied
-/// single-use admission fence and verify its full Task/Worktree/Runtime/profile/fingerprint scope
-/// before spawn; `None` is reserved for an already-admitted idempotent replay.
+/// single-use admission fence and verify its full Task/Worktree/Runtime/Profile/catalog-revision/
+/// fingerprint scope and catalog-fence expiry before spawn; `None` is reserved for an already-
+/// admitted idempotent replay.
 #[derive(Clone)]
 pub struct TaskCliSessionStartCommand {
     pub tenant_id: Uuid,
@@ -93,6 +100,8 @@ pub struct TaskRunAdmissionReadinessCommand {
     pub approved_launch_profile_id: Uuid,
     /// Agent Execution Profile identity, independent from the Approved Launch Profile.
     pub execution_profile_id: Option<Uuid>,
+    /// Authorized, reference-scoped Profile and current Provider/Skill/Grant facts.
+    pub execution_snapshot: Arc<super::CurrentExecutionAdmissionSnapshot>,
     pub correlation_id: Uuid,
     pub request_fingerprint: [u8; 32],
 }
@@ -191,6 +200,12 @@ pub trait TaskCliSessionProvisioner: Send + Sync {
         false
     }
 
+    /// Opt in only when current Provider, Skill, and Grant reads are authoritative, bounded,
+    /// revision-fenced, and rechecked inside the final admission transaction.
+    fn supports_current_execution_catalogs(&self) -> bool {
+        false
+    }
+
     /// Opt in only when the REST host also installs current Profile/catalog resolution and the
     /// transactional Run snapshot writer. The Runtime fence must bind the same Profile identity.
     fn supports_profile_bound_run_admission(&self) -> bool {
@@ -198,8 +213,9 @@ pub trait TaskCliSessionProvisioner: Send + Sync {
     }
 
     /// Establish a short-lived Worktree fence and report current Runtime health without holding a
-    /// database transaction. Implementations must bind the fence to every supplied identity and
-    /// request field, and consume/validate it in `start_task_cli_session` before spawn.
+    /// database transaction. Implementations must bind the fence to every supplied identity,
+    /// request field, and execution snapshot revision, then consume/validate it in
+    /// `start_task_cli_session` before spawn.
     async fn prepare_run_admission(
         &self,
         _command: TaskRunAdmissionReadinessCommand,
@@ -375,6 +391,10 @@ async fn start_task_cli_session(
         .begin()
         .await
         .map_err(|_| GroupApiError::internal())?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+        .execute(&mut *preflight_tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     let preflight = load_task_cli_start_context(
         &mut preflight_tx,
         &actor,
@@ -385,6 +405,41 @@ async fn start_task_cli_session(
         false,
     )
     .await?;
+    let execution_snapshot = if preflight.existing_run_id.is_some() {
+        None
+    } else {
+        if !provisioner.supports_run_admission() {
+            return Err(GroupApiError::feature_unavailable(
+                "run_admission_producer_unavailable",
+            ));
+        }
+        if !provisioner.supports_current_execution_catalogs() {
+            return Err(GroupApiError::feature_unavailable(
+                "execution_catalog_provider_unavailable",
+            ));
+        }
+        if !provisioner.supports_profile_bound_run_admission() {
+            return Err(GroupApiError::feature_unavailable(
+                "execution_profile_admission_unavailable",
+            ));
+        }
+        let execution_profile_id = body.execution_profile_id.ok_or_else(|| {
+            GroupApiError::feature_unavailable("execution_profile_selection_required")
+        })?;
+        if execution_profile_id.is_nil() {
+            return Err(GroupApiError::bad_request());
+        }
+        Some(
+            super::execution_catalogs::load_current_execution_admission_snapshot(
+                &mut preflight_tx,
+                actor.tenant_id,
+                preflight.worktree.project_id,
+                worktree_id,
+                execution_profile_id,
+            )
+            .await?,
+        )
+    };
     preflight_tx
         .commit()
         .await
@@ -400,22 +455,16 @@ async fn start_task_cli_session(
                 preflight.request_fingerprint,
             )
         } else {
-            if !provisioner.supports_run_admission() {
-                return Err(GroupApiError::feature_unavailable(
-                    "run_admission_producer_unavailable",
-                ));
-            }
             let execution_profile_id = body.execution_profile_id.ok_or_else(|| {
                 GroupApiError::feature_unavailable("execution_profile_selection_required")
             })?;
             if execution_profile_id.is_nil() {
                 return Err(GroupApiError::bad_request());
             }
-            if !provisioner.supports_profile_bound_run_admission() {
-                return Err(GroupApiError::feature_unavailable(
-                    "execution_profile_admission_unavailable",
-                ));
-            }
+            let execution_snapshot = execution_snapshot
+                .as_ref()
+                .cloned()
+                .ok_or_else(GroupApiError::internal)?;
             let readiness = tokio::time::timeout(
                 std::time::Duration::from_secs(2),
                 provisioner.prepare_run_admission(TaskRunAdmissionReadinessCommand {
@@ -429,6 +478,7 @@ async fn start_task_cli_session(
                     expected_lifecycle_version: body.expected_lifecycle_version,
                     approved_launch_profile_id: body.approved_launch_profile_id,
                     execution_profile_id: Some(execution_profile_id),
+                    execution_snapshot: Arc::clone(&execution_snapshot),
                     correlation_id: body.correlation_id,
                     request_fingerprint: preflight.request_fingerprint,
                 }),
@@ -447,6 +497,10 @@ async fn start_task_cli_session(
                 .resolver
                 .pool
                 .begin()
+                .await
+                .map_err(|_| GroupApiError::internal())?;
+            sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+                .execute(&mut *tx)
                 .await
                 .map_err(|_| GroupApiError::internal())?;
             let current = load_task_cli_start_context(
@@ -478,13 +532,26 @@ async fn start_task_cli_session(
                     return Err(GroupApiError::conflict("run_admission_context_changed"));
                 }
 
-                let policy = super::hook_policies::load_verified_effective_snapshot(
+                let Some((policy, current_hook_set)) =
+                    super::hook_policies::load_verified_effective_run_snapshot(
+                        &mut tx,
+                        actor.tenant_id,
+                        current.worktree.project_id,
+                        worktree_id,
+                    )
+                    .await?
+                else {
+                    return Err(GroupApiError::feature_unavailable(
+                        "execution_profile_hook_set_unavailable",
+                    ));
+                };
+                super::execution_catalogs::recheck_current_execution_admission_snapshot(
                     &mut tx,
-                    actor.tenant_id,
-                    current.worktree.project_id,
-                    worktree_id,
+                    &execution_snapshot,
+                    &current_hook_set,
                 )
                 .await?;
+                let policy = Some(policy);
                 let readiness_is_fresh = run_admission_readiness_is_fresh(&readiness);
                 let event = HookEventEnvelope {
                     event_id: Uuid::new_v4().into_bytes(),
@@ -1559,34 +1626,26 @@ mod tests {
             attachment_ticket_expires_at: expires_at,
         };
 
-        assert!(
-            validate_receipt(
-                &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
-                None,
-            )
-            .is_ok()
-        );
-        assert!(
-            validate_receipt(
-                &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
-                Some(session_id),
-            )
-            .is_ok()
-        );
-        assert!(
-            validate_receipt(
-                &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
-                Some(Uuid::new_v4()),
-            )
-            .is_err()
-        );
-        assert!(
-            validate_receipt(
-                &make_receipt(session_id, Utc::now() + Duration::seconds(61)),
-                None,
-            )
-            .is_err()
-        );
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+            None,
+        )
+        .is_ok());
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+            Some(session_id),
+        )
+        .is_ok());
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+            Some(Uuid::new_v4()),
+        )
+        .is_err());
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(61)),
+            None,
+        )
+        .is_err());
     }
 
     #[test]

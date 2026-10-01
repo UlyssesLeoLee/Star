@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.8** (per 日本 IPA SEC 标准，补充 Run Profile identity binding 契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.11** (per 日本 IPA SEC 标准，补充 Run Profile current catalog read/recheck 实装边界)
 >
-> - 状态: 🟡 Draft v1.8 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1 有条件式代码/schema 切片或设计收口，生产 Profile-bound Run writer 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.11 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1 有条件式代码/schema 切片或设计收口；9E-4C2 已有 bounded PostgreSQL catalog schema/read/recheck 代码切片与隔离 PG18 验证，但 catalog publisher/production Runtime adapter、目标 DB/RLS grants 和 Profile-bound Run writer 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.34 §50；`docs/basic-design.md` v5.30 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.37 §50；`docs/basic-design.md` v5.33 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -978,13 +978,23 @@ Group API 以 `POST /api/v1/projects/{project_id}/execution-profiles/{profile_id
 
 Phase 9E-4C1 已接入 Task Card 的 AgentExecutionProfile metadata picker，并将独立 `execution_profile_id` 传入 REST body、readiness command 与 CLI session start command。Profile 列表最多读取 50 项；客户端校验 ID、Project/Worktree scope、revision/schema version、digest 格式与重复项；无效列表、读取失败、空列表或存在下一页时均不提供默认 Profile 且不能启动。`approved_launch_profile_id` 与该字段在 UI 中分开选择、分别进入请求幂等键。带 Profile ID 的 request fingerprint 前置 `cli_session_start_v2` 版本标记；缺 Profile 字段的 body 使用 serde 跳过该字段并按原 tuple 编码，保持旧 Run fingerprint replay。
 
-REST 新 Run admission 在任何 readiness/preparation 前要求非空、非 nil 的 `execution_profile_id` 和 `supports_profile_bound_run_admission()`。该 capability 默认 false，且 `run_admission_producer_available` 同时要求 Run admission 与 Profile-bound capability；仓内目前无可证明已接入 authoritative Provider/Skill/Grant resolver 和 transactional Run snapshot writer 的生产 provisioner。因此本 slice 只保证身份请求边界与 fail-closed 保护，不能创建或 spawn 新 Profile-bound Run。既有 Run 状态读取与幂等重放继续兼容。
+REST 新 Run admission 在任何 readiness/preparation 前要求非空、非 nil 的 `execution_profile_id` 和 `supports_profile_bound_run_admission()`。`supports_current_execution_catalogs()` 与 Profile-bound capability 均默认 false；`run_admission_producer_available` 必须同时要求 Run admission、authoritative current-catalog adapter 与 Profile-bound snapshot writer。9E-4C2 已实现 current catalog schema/read/recheck 切片；catalog publisher、生产数据装载、目标 DB/RLS grants 与 Runtime provisioner 仍缺，因此相关 capability 默认关闭，该 slice 不能创建或 spawn 新 Profile-bound Run。既有 Run 状态读取与幂等重放继续兼容。
 
-仍待完成：9E-4C2 Provider/Skill/Grant current registry 与短时 revision fence；9E-4C3 resolver + Profile/Task/Hook/RunEvent/BI/resource reservation 原子 writer；9E-4C4 双 Profile identity 的一次性 Runtime spawn fence 与 Task Card/Run Detail 显示。Profile 65,536-byte envelope 与 resolver 的 Provider ≤256、Skill ≤4,096 项上限必须在读入前后均强制，避免并行 Run 按大 catalog 复制内存；resolver 继续使用借用式 verified snapshot。
+#### 14.11.9 Phase 9E-4C2 current catalog snapshot 与 revision fence
+
+执行时的 current catalog 不是租户全量目录副本。Adapter 先验证 Profile，再只查询其依赖引用：最多 5 个不同 Provider（Agent、Memory、Context、Validation、Loop roles）和最多 128 个 Skill，并读取精确的 current GrantSet；查询必须在数据源端按 profile 引用、scope 和 ID 过滤，再应用行数/字节上限，禁止先加载全量后在内存截断。Rust `CurrentExecutionCatalogSnapshot` 对 Provider/Skill 使用不可变 `Arc<[T]>`，上界分别为 5/128，估算载荷 ≤1 MiB；构造时校验 grant ID/version、字段 digest、canonical 顺序、重复项和边界。
+
+`ExecutionCatalogRevisionFence` 同时绑定 tenant/Project/Worktree scope、Profile ID/version/digest、Provider catalog revision、Skill registry revision、GrantSet ID/version 与 `observed_at/expires_at`。每次目录或 grant mutation 必须在其权威 source transaction 递增 revision。Fence TTL 最长 5 秒；进入最终 Run transaction 至少剩余 1 秒。事务中重授权并读取当前 revisions，任一 revision 变化、scope/Profile mismatch、观察来自未来或 fence 过期/余量不足均拒绝 admission；不在数据库锁内调用外部 Provider/CLI/Plugin。`ExecutionProfileResolver::resolve_current_snapshot` 先验证 fence 与已 verify Profile digest，再以 borrowed references 执行原始 resolver，不复制 Profile/catalog。
+
+9E-4C2 已增加 `db/migrations/2026-10-01-multica-agent-execution-catalog.sql`：Provider、Skill、GrantSet 为 Project-scoped Master/SCD2，能力关联分表存储，Provider/Skill revision 由 mutation trigger 单调递增，audit 为 append-only Transaction；FORCE RLS、SCD2/immutability、parent/child same-xid 与 deferred capability-count guard 防止跨事务或数量不一致的发布。隔离 PostgreSQL 18 验证迁移重复应用、Provider 发布/关闭时 revision 与 audit 增量，以及 capability_count 错误被拒绝。
+
+`star-api-rest::execution_catalogs` 在已授权 Worktree/Task transaction 中按 Profile 引用读取最多 5 个 Provider 和 128 个 Skill，查询其规范化能力行与 current GrantSet；载入 Skill capability label 前先以数据库聚合拒绝预计 heap 超过 384 KiB 的目录，避免超限 labels 先进入 Rust；Profile document 先经 Rust verifier，域对象再以 ≤1 MiB Arc-backed snapshot 绑定精确 scope/Profile/catalog/Grant revisions、GrantSet ID/version 和 ≤5 秒 fence。preflight 使用短 REPEATABLE READ transaction 并在 Runtime readiness 前释放；final admission transaction 重新锁定并核验当前 Profile、revision projection、GrantSet、effective HookSet 与至少 1 秒余量，再走 `ExecutionProfileResolver::resolve_current_snapshot`。该快照通过 Arc 传给 Runtime readiness adapter，不在 REST/Runtime 边界克隆每项目录实体。
+
+当前仍缺 Provider/Skill/Grant publisher/source mutation API、真实 catalog 装载、目标数据库 migration/RLS grants 验收与生产 `TaskCliSessionProvisioner`；`supports_current_execution_catalogs()` 与 Profile-bound Run capability 均保持默认 false，因此数据库切片不能被称为 production authorization source 或可运行 Profile-bound Run。`domain-llm::ProviderRegistry` 的 mock fallback 与 CLI-only `SkillRegistry` 不能绕过该 gate。后续 9E-4C3 原子写 Profile/Task/Hook/RunEvent/BI/resource reservation；9E-4C4 复验并消费双 Profile identity spawn fence。Hooks 设置入口继续位于 Settings“高级设置”内容区，和 Skills/MCP/Plugins 并列，不进入 Worktree 树。
 
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
-Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，Hooks 位于该页面内容区的 tabs，与 Skills/MCP/Plugins 并列；这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
+Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，页面路由为 `/settings/advanced`；Hooks 规范路由为 `/settings/advanced/hooks`，位于页面内容区的 tabs，与 Skills/MCP/Plugins 并列。这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
 
 安全关键 Hook evaluator 属于 Rust core，内置不可关闭规则并在 Run/tool/validation/review/archive/cleanup gate 执行；decision 仅限 allow/deny/require_human/defer，不可授予权限或修改 command/acceptance facts。policy/evaluator/audit 失败或超时 fail closed；插件 Hook 仅能在隔离、有 grant 的 advisory/post-commit 边界运行。Worktree archive/cleanup 在 Domain Command 前重验 actor ACL、lifecycle version、active Run/Agent/path claim、child process/handle drain 与新鲜 Git lock observation，再由 Domain Command 原子复查；旧 Python handler 不具有 Star 产品授权 authority。
 
@@ -1020,3 +1030,8 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v1.6 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.7：在同一授权事务中验证 Project baseline/Worktree overlay 继承，并将 effective policy 映射为 Profile HookSet ID/version/digest；保留 policy-only evaluator wrapper；明确此 seam 不创建 Run、不解析 catalogs、不做资源预约；Hooks 仍位于 Advanced Settings 并列 tab | Phase 9E-4B3 HookSet admission identity adapter 落地 |
 | v1.7 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.8，区分 Approved Launch Profile 与 AgentExecutionProfile，记录当前 CLI Run DTO/fingerprint/writer 的实际缺口，并拆分 Profile picker/idempotency、权威 catalogs、原子 snapshot/reservation writer 与双身份 Runtime fence 四个后续阶段；Hooks 仍是 Advanced Settings 内并列 tab | Run writer 复核发现 Launch Profile 不等同于 AgentExecutionProfile |
 | v1.8 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9E-4C1 Profile metadata picker、独立 CLI Run identity 输入、50 项上限与无 fallback、versioned request fingerprint 和 legacy replay 兼容；新 Run 仍要求默认关闭的 Profile-bound producer capability；C2-C4 与生产 Run/Profile snapshot writer、resource reservation、Runtime fence 保持开放；Hooks 沿用 ULYS-235 Advanced Settings 并列 tab | 将已实现的 Profile 选择/幂等身份 seam 与 fail-closed 限制同步入详细设计 |
+| v1.9 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §14.11.9 reference-scoped Arc current catalog snapshot、Provider ≤5/Skill ≤128/1 MiB 上限、revision fence 与 5 秒 TTL/1 秒事务余量；限制生产 Resolver 走 fenced snapshot 并新增默认关闭的 current-catalog capability；明确 Provider/Skill/Grant stores 与 SQL recheck adapter 缺失，故 C2 仍未完成；重申 ULYS-235 规范路由 `/settings/advanced/hooks` 位于高级设置内容区并列 tab | 推进 9E-4C2 Rust contract 并确认 Hook 设置导航沿用既有需求 |
+| v1.10 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §14.11.9 以覆盖 Project-scoped current catalog migration、normalized capability rows、SCD2/append-only audit/FORCE RLS/deferred count guard、Rust bounded reader 与 final transaction recheck；记录 PG18 migration 验证及 133/118 tests 与 REST lib check；明确 catalog publisher、target DB/RLS grants、Runtime adapter 与 C3 Run writer 尚未完成且 capability 默认关闭；Hooks 规范路由继续为 `/settings/advanced/hooks` 并列 tab | 完成 9E-4C2 当前 catalog 持久化与有界读/重验代码切片 |
+
+
+| v1.11 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 9E-4C2 当前 SQL adapter 与 production gates 描述；补充 Skill capability 在数据库侧先通过 ≤384 KiB 聚合 heap 预算再载入 labels，减少并发 admission 峰值内存；同步 requirements v5.37/basic design v5.33 并保留 `/settings/advanced/hooks` 为 Advanced Settings 并列 tab | 完成 Phase 9E-4C2 内存上限与文档状态自审 |

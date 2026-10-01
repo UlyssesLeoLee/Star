@@ -6,6 +6,10 @@
 //!   (verified:Class {name:"VerifiedAgentExecutionProfile",type:"class",language:"rust"}),
 //!   (provider_entry:Class {name:"ExecutionProviderCatalogEntry",type:"class",language:"rust"}),
 //!   (skill_entry:Class {name:"ExecutionSkillCatalogEntry",type:"class",language:"rust"}),
+//!   (catalog_snapshot:Class {name:"CurrentExecutionCatalogSnapshot",type:"class",language:"rust"}),
+//!   (catalog_fence:Class {name:"ExecutionCatalogRevisionFence",type:"class",language:"rust"}),
+//!   (catalog_revisions:Class {name:"ExecutionCatalogRevisions",type:"class",language:"rust"}),
+//!   (profile_revision:Class {name:"ExecutionProfileRevisionIdentity",type:"class",language:"rust"}),
 //!   (worktree_state:Class {name:"WorktreeRunState",type:"class",language:"rust"}),
 //!   (admission_facts:Class {name:"ExecutionProfileAdmissionFacts",type:"class",language:"rust"}),
 //!   (resolved:Class {name:"ResolvedAgentExecutionProfile",type:"class",language:"rust"}),
@@ -29,6 +33,9 @@
 //!   (document_ref:Function {name:"VerifiedAgentExecutionProfile::document",type:"function",language:"rust"}),
 //!   (scope_check:Function {name:"VerifiedAgentExecutionProfile::validate_for_scope",type:"function",language:"rust"}),
 //!   (resolve:Function {name:"ExecutionProfileResolver::resolve",type:"function",language:"rust"}),
+//!   (resolve_snapshot:Function {name:"ExecutionProfileResolver::resolve_current_snapshot",type:"function",language:"rust"}),
+//!   (validate_fence:Function {name:"ExecutionCatalogRevisionFence::validate_for",type:"function",language:"rust"}),
+//!   (snapshot_new:Function {name:"CurrentExecutionCatalogSnapshot::for_profile",type:"function",language:"rust"}),
 //!   (resolved_document:Function {name:"ResolvedAgentExecutionProfile::document",type:"function",language:"rust"}),
 //!   (resolved_digest:Function {name:"ResolvedAgentExecutionProfile::content_digest",type:"function",language:"rust"}),
 //!   (provider_catalog_check:Function {name:"validate_provider_catalog",type:"function",language:"rust"}),
@@ -63,6 +70,10 @@
 //!   (f)-[:CONTAINS]->(verified),
 //!   (f)-[:CONTAINS]->(provider_entry),
 //!   (f)-[:CONTAINS]->(skill_entry),
+//!   (f)-[:CONTAINS]->(catalog_snapshot),
+//!   (f)-[:CONTAINS]->(catalog_fence),
+//!   (f)-[:CONTAINS]->(catalog_revisions),
+//!   (f)-[:CONTAINS]->(profile_revision),
 //!   (f)-[:CONTAINS]->(worktree_state),
 //!   (f)-[:CONTAINS]->(admission_facts),
 //!   (f)-[:CONTAINS]->(resolved),
@@ -97,6 +108,9 @@
 //!   (f)-[:CONTAINS]->(test_memory_scope),
 //!   (f)-[:CONTAINS]->(test_canonical),
 //!   (f)-[:CONTAINS]->(resolve),
+//!   (f)-[:CONTAINS]->(resolve_snapshot),
+//!   (f)-[:CONTAINS]->(validate_fence),
+//!   (f)-[:CONTAINS]->(snapshot_new),
 //!   (f)-[:CONTAINS]->(resolved_document),
 //!   (f)-[:CONTAINS]->(resolved_digest),
 //!   (f)-[:CONTAINS]->(provider_catalog_check),
@@ -124,6 +138,10 @@
 //!   (verify)-[:CALLS]->(digest),
 //!   (decode)-[:CALLS]->(verify),
 //!   (resolve)-[:CALLS]->(scope_check),
+//!   (resolve_snapshot)-[:CALLS]->(validate_fence),
+//!   (resolve_snapshot)-[:CALLS]->(resolve),
+//!   (snapshot_new)-[:CALLS]->(provider_catalog_check),
+//!   (snapshot_new)-[:CALLS]->(skill_catalog_check),
 //!   (resolve)-[:CALLS]->(provider_catalog_check),
 //!   (resolve)-[:CALLS]->(skill_catalog_check),
 //!   (resolve)-[:CALLS]->(resolve_provider),
@@ -187,11 +205,16 @@
 //!   (test_catalog_bounds)-[:CALLS]->(fixture_provider),
 //!   (test_catalog_bounds)-[:CALLS]->(provider_catalog_check),
 //!   (test_catalog_bounds)-[:CALLS]->(skill_catalog_check);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (f:File {name:"execution_profile.rs",type:"file"}),(snapshot:Function {name:"CurrentExecutionCatalogSnapshot::for_profile",type:"function"}),(resolver:Function {name:"ExecutionProfileResolver::resolve_current_snapshot",type:"function"}),(validate_fence:Function {name:"ExecutionCatalogRevisionFence::validate_for",type:"function"}),(fixture:Function {name:"tests::valid_draft",type:"function"}),(catalogs:Function {name:"tests::catalogs_from",type:"function"});
+//! CREATE (tests:Module {name:"tests",type:"module",language:"rust"}),(test_admission:Function {name:"tests::current_catalog_snapshot_binds_profile_and_revisions",type:"function",language:"rust"}),(test_drift:Function {name:"tests::current_catalog_snapshot_rejects_drift_and_expiry",type:"function",language:"rust"}),(test_extras:Function {name:"tests::current_catalog_snapshot_rejects_unreferenced_entries",type:"function",language:"rust"}),(f)-[:CONTAINS]->(tests),(tests)-[:CONTAINS]->(test_admission),(tests)-[:CONTAINS]->(test_drift),(tests)-[:CONTAINS]->(test_extras),(test_admission)-[:CALLS]->(fixture),(test_admission)-[:CALLS]->(catalogs),(test_admission)-[:CALLS]->(snapshot),(test_admission)-[:CALLS]->(resolver),(test_drift)-[:CALLS]->(fixture),(test_drift)-[:CALLS]->(catalogs),(test_drift)-[:CALLS]->(snapshot),(test_drift)-[:CALLS]->(validate_fence),(test_extras)-[:CALLS]->(fixture),(test_extras)-[:CALLS]->(catalogs),(test_extras)-[:CALLS]->(snapshot);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! Immutable execution profile contract and bounded dependency resolver for Run admission.
 //! Registry persistence and Run writer integration are not implied by this domain slice.
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -222,6 +245,13 @@ const MAX_EVENT_BUFFER_BYTES: u32 = 16_777_216;
 const MAX_LABEL_BYTES: usize = 128;
 const MAX_PROVIDER_CATALOG_ENTRIES: usize = 256;
 const MAX_SKILL_CATALOG_ENTRIES: usize = 4_096;
+const MAX_PROFILE_PROVIDER_REFERENCES: usize = 5;
+const MAX_PROFILE_SKILL_REFERENCES: usize = MAX_SKILLS;
+const MAX_CURRENT_CATALOG_BYTES: usize = 1_048_576;
+/// Current catalog reads expire quickly so the final admission transaction can recheck revisions.
+pub const EXECUTION_CATALOG_FENCE_MAX_TTL_MS: u64 = 5_000;
+/// Minimum fence lifetime required before entering the final admission transaction.
+pub const EXECUTION_CATALOG_FENCE_MIN_REMAINING_MS: u64 = 1_000;
 
 /// Tenant, Project, and optional Worktree profile scope.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -481,6 +511,306 @@ pub struct ExecutionSkillCatalogEntry {
     pub available: bool,
 }
 
+/// Current persisted identity for the Profile selected by a Task Card.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExecutionProfileRevisionIdentity {
+    /// Stable Profile identity.
+    pub profile_id: Uuid,
+    /// Current immutable Profile revision.
+    pub version: u64,
+    /// Digest verified from the current Profile document.
+    pub content_digest: String,
+}
+
+/// Monotonic revisions captured from authoritative current execution registries.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExecutionCatalogRevisions {
+    /// Tenant/Project-visible Provider catalog revision.
+    pub provider_catalog_revision: u64,
+    /// Tenant/Project-visible Skill catalog revision.
+    pub skill_catalog_revision: u64,
+    /// Current capability GrantSet identity.
+    pub grant_set_id: Uuid,
+    /// Current capability GrantSet revision.
+    pub grant_set_version: u64,
+}
+
+/// Short-lived fence binding a bounded catalog read to one authorized Run request.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExecutionCatalogRevisionFence {
+    scope: ExecutionProfileScope,
+    profile: ExecutionProfileRevisionIdentity,
+    revisions: ExecutionCatalogRevisions,
+    observed_at_epoch_ms: u64,
+    expires_at_epoch_ms: u64,
+}
+
+/// Immutable, reference-scoped current execution facts. Arc-backed slices let concurrent
+/// admissions share one verified revision snapshot without cloning each catalog entry.
+#[derive(Clone, Debug)]
+pub struct CurrentExecutionCatalogSnapshot {
+    fence: ExecutionCatalogRevisionFence,
+    current_grants: GrantSnapshot,
+    providers: Arc<[ExecutionProviderCatalogEntry]>,
+    skills: Arc<[ExecutionSkillCatalogEntry]>,
+}
+
+impl CurrentExecutionCatalogSnapshot {
+    /// Build a bounded snapshot containing exactly the dependencies referenced by one verified Profile.
+    #[allow(clippy::too_many_arguments)]
+    pub fn for_profile(
+        scope: ExecutionProfileScope,
+        profile: ExecutionProfileRevisionIdentity,
+        verified_profile: &VerifiedAgentExecutionProfile,
+        revisions: ExecutionCatalogRevisions,
+        observed_at_epoch_ms: u64,
+        expires_at_epoch_ms: u64,
+        current_grants: GrantSnapshot,
+        providers: Arc<[ExecutionProviderCatalogEntry]>,
+        skills: Arc<[ExecutionSkillCatalogEntry]>,
+    ) -> Result<Self, ExecutionProfileError> {
+        if profile.content_digest != verified_profile.document().content_digest {
+            return Err(ExecutionProfileError::CatalogFenceMismatch);
+        }
+        verified_profile.validate_for_scope(&scope)?;
+        if !catalog_entries_match_profile(verified_profile.document(), &providers, &skills) {
+            return Err(ExecutionProfileError::InvalidCatalog);
+        }
+        Self::from_bounded_parts(
+            scope,
+            profile,
+            revisions,
+            observed_at_epoch_ms,
+            expires_at_epoch_ms,
+            current_grants,
+            providers,
+            skills,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_bounded_parts(
+        scope: ExecutionProfileScope,
+        profile: ExecutionProfileRevisionIdentity,
+        revisions: ExecutionCatalogRevisions,
+        observed_at_epoch_ms: u64,
+        expires_at_epoch_ms: u64,
+        current_grants: GrantSnapshot,
+        providers: Arc<[ExecutionProviderCatalogEntry]>,
+        skills: Arc<[ExecutionSkillCatalogEntry]>,
+    ) -> Result<Self, ExecutionProfileError> {
+        if scope.tenant_id.is_nil()
+            || scope.project_id.is_nil()
+            || scope
+                .worktree_id
+                .map_or(true, |worktree_id| worktree_id.is_nil())
+            || profile.profile_id.is_nil()
+            || profile.version == 0
+            || validate_digest(&profile.content_digest, "profile.content_digest").is_err()
+            || revisions.provider_catalog_revision == 0
+            || revisions.grant_set_id.is_nil()
+            || revisions.grant_set_version == 0
+            || current_grants.grant_set_id != revisions.grant_set_id
+            || current_grants.version != revisions.grant_set_version
+            || current_grants.expires_at_epoch_ms == 0
+            || observed_at_epoch_ms == 0
+            || expires_at_epoch_ms <= observed_at_epoch_ms
+            || expires_at_epoch_ms - observed_at_epoch_ms > EXECUTION_CATALOG_FENCE_MAX_TTL_MS
+            || providers.len() > MAX_PROFILE_PROVIDER_REFERENCES
+            || skills.len() > MAX_PROFILE_SKILL_REFERENCES
+        {
+            return Err(ExecutionProfileError::InvalidCatalog);
+        }
+        validate_labels(
+            &current_grants.capabilities,
+            MAX_CAPABILITIES,
+            "catalog.grant_capabilities",
+        )
+        .map_err(|_| ExecutionProfileError::InvalidCatalog)?;
+        validate_provider_catalog(&providers)?;
+        validate_skill_catalog(&skills)?;
+        if estimated_catalog_bytes(&providers, &skills, &current_grants) > MAX_CURRENT_CATALOG_BYTES
+        {
+            return Err(ExecutionProfileError::InvalidCatalog);
+        }
+
+        Ok(Self {
+            fence: ExecutionCatalogRevisionFence {
+                scope,
+                profile,
+                revisions,
+                observed_at_epoch_ms,
+                expires_at_epoch_ms,
+            },
+            current_grants,
+            providers,
+            skills,
+        })
+    }
+
+    /// Validate the fence after the writer has reread the current source revisions.
+    pub fn validate_for(
+        &self,
+        scope: &ExecutionProfileScope,
+        profile: &ExecutionProfileRevisionIdentity,
+        current_revisions: ExecutionCatalogRevisions,
+        now_epoch_ms: u64,
+        min_remaining_ms: u64,
+    ) -> Result<(), ExecutionProfileError> {
+        self.fence.validate_for(
+            scope,
+            profile,
+            current_revisions,
+            now_epoch_ms,
+            min_remaining_ms,
+        )
+    }
+
+    /// Return the current GrantSet verified with this catalog read.
+    #[must_use]
+    pub fn current_grants(&self) -> &GrantSnapshot {
+        &self.current_grants
+    }
+
+    /// Borrow the bounded Provider entries for this Profile only.
+    #[must_use]
+    pub fn providers(&self) -> &[ExecutionProviderCatalogEntry] {
+        &self.providers
+    }
+
+    /// Borrow the bounded Skill entries for this Profile only.
+    #[must_use]
+    pub fn skills(&self) -> &[ExecutionSkillCatalogEntry] {
+        &self.skills
+    }
+
+    /// Return the short-lived revision fence captured with the entries.
+    #[must_use]
+    pub fn fence(&self) -> &ExecutionCatalogRevisionFence {
+        &self.fence
+    }
+}
+
+fn catalog_entries_match_profile(
+    document: &AgentExecutionProfileDocument,
+    providers: &[ExecutionProviderCatalogEntry],
+    skills: &[ExecutionSkillCatalogEntry],
+) -> bool {
+    let draft = &document.profile;
+    let mut provider_keys = vec![
+        (
+            draft.agent_provider.provider_id.as_str(),
+            draft.agent_provider.version,
+        ),
+        (
+            draft.context.assembler.provider_id.as_str(),
+            draft.context.assembler.version,
+        ),
+        (
+            draft.validation.provider.provider_id.as_str(),
+            draft.validation.provider.version,
+        ),
+        (
+            draft.loop_budget.policy.provider_id.as_str(),
+            draft.loop_budget.policy.version,
+        ),
+    ];
+    if let MemoryPolicySnapshot::Enabled { provider, .. } = &draft.memory {
+        provider_keys.push((provider.provider_id.as_str(), provider.version));
+    }
+    provider_keys.sort_unstable();
+    provider_keys.dedup();
+
+    let mut skill_keys = draft
+        .skills
+        .iter()
+        .map(|skill| (skill.skill_id.as_str(), skill.version))
+        .collect::<Vec<_>>();
+    skill_keys.sort_unstable();
+    skill_keys.dedup();
+
+    provider_keys.len() == providers.len()
+        && provider_keys
+            .iter()
+            .zip(providers)
+            .all(|((id, version), entry)| {
+                *id == entry.provider.provider_id.as_str() && *version == entry.provider.version
+            })
+        && skill_keys.len() == skills.len()
+        && skill_keys.iter().zip(skills).all(|((id, version), entry)| {
+            *id == entry.skill.skill_id.as_str() && *version == entry.skill.version
+        })
+}
+
+impl ExecutionCatalogRevisionFence {
+    /// Verify exact request binding, live source revisions, and remaining transaction time.
+    pub fn validate_for(
+        &self,
+        scope: &ExecutionProfileScope,
+        profile: &ExecutionProfileRevisionIdentity,
+        current_revisions: ExecutionCatalogRevisions,
+        now_epoch_ms: u64,
+        min_remaining_ms: u64,
+    ) -> Result<(), ExecutionProfileError> {
+        if &self.scope != scope || &self.profile != profile {
+            return Err(ExecutionProfileError::CatalogFenceMismatch);
+        }
+        if self.revisions != current_revisions {
+            return Err(ExecutionProfileError::CatalogRevisionChanged);
+        }
+        if now_epoch_ms < self.observed_at_epoch_ms || now_epoch_ms >= self.expires_at_epoch_ms {
+            return Err(ExecutionProfileError::CatalogFenceExpired);
+        }
+        if self.expires_at_epoch_ms - now_epoch_ms < min_remaining_ms {
+            return Err(ExecutionProfileError::CatalogFenceInsufficientLifetime);
+        }
+        Ok(())
+    }
+}
+
+fn estimated_catalog_bytes(
+    providers: &[ExecutionProviderCatalogEntry],
+    skills: &[ExecutionSkillCatalogEntry],
+    grants: &GrantSnapshot,
+) -> usize {
+    let provider_bytes = providers.iter().fold(0usize, |total, entry| {
+        total
+            .saturating_add(std::mem::size_of::<ExecutionProviderCatalogEntry>())
+            .saturating_add(entry.provider.provider_id.len())
+            .saturating_add(entry.provider.implementation_digest.len())
+            .saturating_add(entry.provider.configuration_digest.len())
+            .saturating_add(
+                entry
+                    .provider
+                    .capabilities
+                    .iter()
+                    .fold(0usize, |sum, value| {
+                        sum.saturating_add(std::mem::size_of::<String>())
+                            .saturating_add(value.len())
+                    }),
+            )
+    });
+    let skill_bytes = skills.iter().fold(0usize, |total, entry| {
+        total
+            .saturating_add(std::mem::size_of::<ExecutionSkillCatalogEntry>())
+            .saturating_add(entry.skill.skill_id.len())
+            .saturating_add(entry.skill.content_digest.len())
+            .saturating_add(entry.skill.capabilities.iter().fold(0usize, |sum, value| {
+                sum.saturating_add(std::mem::size_of::<String>())
+                    .saturating_add(value.len())
+            }))
+    });
+    let grant_bytes = std::mem::size_of::<GrantSnapshot>().saturating_add(
+        grants.capabilities.iter().fold(0usize, |sum, value| {
+            sum.saturating_add(std::mem::size_of::<String>())
+                .saturating_add(value.len())
+        }),
+    );
+    provider_bytes
+        .saturating_add(skill_bytes)
+        .saturating_add(grant_bytes)
+}
+
 /// Current Worktree lifecycle state used by Run admission.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WorktreeRunState {
@@ -566,6 +896,18 @@ pub enum ExecutionProfileError {
     /// Provider or Skill catalog is oversized, unsorted, or duplicated.
     #[error("execution catalog is invalid")]
     InvalidCatalog,
+    /// Current catalog fence does not match this scope or Profile identity.
+    #[error("execution catalog fence does not match the admission request")]
+    CatalogFenceMismatch,
+    /// A Provider, Skill, or Grant revision changed after catalog prefetch.
+    #[error("execution catalog revision changed")]
+    CatalogRevisionChanged,
+    /// Current catalog fence expired or its observation is from the future.
+    #[error("execution catalog fence expired")]
+    CatalogFenceExpired,
+    /// The fence lacks the minimum remaining time for a short admission transaction.
+    #[error("execution catalog fence has insufficient remaining lifetime")]
+    CatalogFenceInsufficientLifetime,
 }
 
 impl AgentExecutionProfileDraft {
@@ -636,8 +978,46 @@ impl VerifiedAgentExecutionProfile {
 }
 
 impl ExecutionProfileResolver {
-    /// Resolve this Profile against current, already-authorized Worktree facts.
-    pub fn resolve<'a>(
+    /// Resolve through an immutable bounded snapshot after rechecking its live revisions.
+    #[allow(clippy::too_many_arguments)]
+    pub fn resolve_current_snapshot<'a>(
+        &self,
+        profile: &'a VerifiedAgentExecutionProfile,
+        profile_identity: &ExecutionProfileRevisionIdentity,
+        requested_scope: &ExecutionProfileScope,
+        current_revisions: ExecutionCatalogRevisions,
+        effective_hook_set: &HookSetSnapshot,
+        worktree_state: WorktreeRunState,
+        now_epoch_ms: u64,
+        snapshot: &'a CurrentExecutionCatalogSnapshot,
+    ) -> Result<ResolvedAgentExecutionProfile<'a>, ExecutionProfileError> {
+        if profile_identity.content_digest != profile.document().content_digest {
+            return Err(ExecutionProfileError::CatalogFenceMismatch);
+        }
+        snapshot.validate_for(
+            requested_scope,
+            profile_identity,
+            current_revisions,
+            now_epoch_ms,
+            EXECUTION_CATALOG_FENCE_MIN_REMAINING_MS,
+        )?;
+        self.resolve(
+            profile,
+            &ExecutionProfileAdmissionFacts {
+                requested_scope,
+                now_epoch_ms,
+                current_grants: snapshot.current_grants(),
+                providers: snapshot.providers(),
+                skills: snapshot.skills(),
+                effective_hook_set,
+                worktree_state,
+            },
+        )
+    }
+
+    /// Resolve against current, already-authorized facts. Production admission must use the
+    /// revision-fenced snapshot entry point above.
+    fn resolve<'a>(
         &self,
         profile: &'a VerifiedAgentExecutionProfile,
         facts: &ExecutionProfileAdmissionFacts<'_>,
@@ -1603,6 +1983,217 @@ mod tests {
             validate_skill_catalog(&oversized_skills),
             Err(ExecutionProfileError::InvalidCatalog)
         );
+    }
+
+    #[test]
+    fn current_catalog_snapshot_binds_profile_and_revisions() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let identity = ExecutionProfileRevisionIdentity {
+            profile_id: Uuid::from_u128(7),
+            version: 3,
+            content_digest: verified.document().content_digest.clone(),
+        };
+        let revisions = ExecutionCatalogRevisions {
+            provider_catalog_revision: 11,
+            skill_catalog_revision: 8,
+            grant_set_id: draft.grants.grant_set_id,
+            grant_set_version: draft.grants.version,
+        };
+        let (providers, skills) = catalogs_from(&draft);
+        let snapshot = CurrentExecutionCatalogSnapshot::for_profile(
+            scope.clone(),
+            identity.clone(),
+            &verified,
+            revisions,
+            1_000,
+            6_000,
+            draft.grants.clone(),
+            Arc::from(providers),
+            Arc::from(skills),
+        )
+        .expect("exact bounded current catalog snapshot");
+
+        snapshot
+            .validate_for(
+                &scope,
+                &identity,
+                revisions,
+                5_000,
+                EXECUTION_CATALOG_FENCE_MIN_REMAINING_MS,
+            )
+            .expect("one second remains at the boundary");
+        let resolved = ExecutionProfileResolver
+            .resolve_current_snapshot(
+                &verified,
+                &identity,
+                &scope,
+                revisions,
+                &draft.hook_set,
+                WorktreeRunState::Active,
+                4_000,
+                &snapshot,
+            )
+            .expect("current fenced dependencies resolve");
+        assert_eq!(
+            resolved.content_digest(),
+            verified.document().content_digest
+        );
+        assert_eq!(snapshot.providers().len(), 4);
+        assert_eq!(snapshot.skills().len(), 1);
+    }
+
+    #[test]
+    fn current_catalog_snapshot_rejects_drift_and_expiry() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let identity = ExecutionProfileRevisionIdentity {
+            profile_id: Uuid::from_u128(7),
+            version: 3,
+            content_digest: verified.document().content_digest.clone(),
+        };
+        let revisions = ExecutionCatalogRevisions {
+            provider_catalog_revision: 11,
+            skill_catalog_revision: 8,
+            grant_set_id: draft.grants.grant_set_id,
+            grant_set_version: draft.grants.version,
+        };
+        let (providers, skills) = catalogs_from(&draft);
+        let snapshot = CurrentExecutionCatalogSnapshot::for_profile(
+            scope.clone(),
+            identity.clone(),
+            &verified,
+            revisions,
+            1_000,
+            6_000,
+            draft.grants.clone(),
+            Arc::from(providers),
+            Arc::from(skills),
+        )
+        .expect("exact bounded current catalog snapshot");
+
+        assert_eq!(
+            snapshot.validate_for(
+                &scope,
+                &identity,
+                ExecutionCatalogRevisions {
+                    provider_catalog_revision: revisions.provider_catalog_revision + 1,
+                    ..revisions
+                },
+                4_000,
+                EXECUTION_CATALOG_FENCE_MIN_REMAINING_MS,
+            ),
+            Err(ExecutionProfileError::CatalogRevisionChanged)
+        );
+        assert_eq!(
+            snapshot.validate_for(
+                &scope,
+                &identity,
+                revisions,
+                5_001,
+                EXECUTION_CATALOG_FENCE_MIN_REMAINING_MS,
+            ),
+            Err(ExecutionProfileError::CatalogFenceInsufficientLifetime)
+        );
+        assert_eq!(
+            snapshot.validate_for(&scope, &identity, revisions, 6_000, 0),
+            Err(ExecutionProfileError::CatalogFenceExpired)
+        );
+        assert_eq!(
+            snapshot.validate_for(&scope, &identity, revisions, 999, 0),
+            Err(ExecutionProfileError::CatalogFenceExpired)
+        );
+    }
+
+    #[test]
+    fn current_catalog_snapshot_rejects_unreferenced_entries() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let identity = ExecutionProfileRevisionIdentity {
+            profile_id: Uuid::from_u128(7),
+            version: 3,
+            content_digest: verified.document().content_digest.clone(),
+        };
+        let revisions = ExecutionCatalogRevisions {
+            provider_catalog_revision: 11,
+            skill_catalog_revision: 8,
+            grant_set_id: draft.grants.grant_set_id,
+            grant_set_version: draft.grants.version,
+        };
+        let (mut providers, skills) = catalogs_from(&draft);
+        providers.push(ExecutionProviderCatalogEntry {
+            provider: provider("unused.provider", &[]),
+            available: true,
+        });
+
+        assert_eq!(
+            CurrentExecutionCatalogSnapshot::for_profile(
+                scope,
+                identity,
+                &verified,
+                revisions,
+                1_000,
+                6_000,
+                draft.grants,
+                Arc::from(providers),
+                Arc::from(skills),
+            )
+            .unwrap_err(),
+            ExecutionProfileError::InvalidCatalog
+        );
+    }
+
+    #[test]
+    fn current_catalog_snapshot_accepts_never_mutated_empty_skill_catalog() {
+        let mut draft = valid_draft();
+        draft.skills.clear();
+        let verified = draft.clone().seal().expect("valid profile without Skills");
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let identity = ExecutionProfileRevisionIdentity {
+            profile_id: Uuid::from_u128(7),
+            version: 3,
+            content_digest: verified.document().content_digest.clone(),
+        };
+        let revisions = ExecutionCatalogRevisions {
+            provider_catalog_revision: 11,
+            skill_catalog_revision: 0,
+            grant_set_id: draft.grants.grant_set_id,
+            grant_set_version: draft.grants.version,
+        };
+        let (providers, skills) = catalogs_from(&draft);
+        let snapshot = CurrentExecutionCatalogSnapshot::for_profile(
+            scope,
+            identity,
+            &verified,
+            revisions,
+            1_000,
+            6_000,
+            draft.grants,
+            Arc::from(providers),
+            Arc::from(skills),
+        )
+        .expect("an empty catalog may remain at its initial revision");
+
+        assert!(snapshot.skills().is_empty());
     }
 
     #[test]
