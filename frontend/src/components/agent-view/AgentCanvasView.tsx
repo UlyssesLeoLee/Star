@@ -51,6 +51,8 @@ interface AgentCanvasViewProps {
   onAnnotationPositionChange?: (body: { id: string; x: number; y: number }) => Promise<void>;
   onCreateFreeConnector?: (body: Omit<AgentCanvasFreeConnector, "id">) => Promise<string | void>;
   onDeleteFreeConnector?: (id: string) => Promise<void>;
+  /** 注释更新回调 (per 任务 #2 — text edit mode) */
+  onUpdateAnnotation?: (id: string, body: Partial<AgentCanvasAnnotation>) => Promise<void>;
 }
 
 export function AgentCanvasView({
@@ -58,7 +60,7 @@ export function AgentCanvasView({
   annotations = [], freeConnectors = [],
   readOnly = true,
   onCreateAnnotation, onDeleteAnnotation, onAnnotationPositionChange,
-  onCreateFreeConnector, onDeleteFreeConnector,
+  onCreateFreeConnector, onDeleteFreeConnector, onUpdateAnnotation,
 }: AgentCanvasViewProps) {
   const { t } = useTranslation();
   const workItems = useStore((s) => s.workItems);
@@ -83,6 +85,26 @@ export function AgentCanvasView({
   const [annotationError, setAnnotationError] = useState<string | null>(null);
   const [annotationPending, setAnnotationPending] = useState(false);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  // 编辑模式 — 点选 sticky_note/text 2 次进入 (per 任务 #2); 第一次=select, 第二次=edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState<string>("");
+
+  // 编辑生命周期 (per 任务 #2): commit 写在 onBlur / Enter, exit 写在 Esc / outside-click
+  const beginEditAnnotation = (a: AgentCanvasAnnotation) => {
+    if (a.kind !== "sticky_note" && a.kind !== "text") return;
+    const text = (a.content as { text?: string }).text ?? "";
+    setEditingId(a.id);
+    setEditText(text);
+  };
+  const commitEditAnnotation = async () => {
+    if (!editingId || !onUpdateAnnotation) return;
+    await onUpdateAnnotation(editingId, { content: { text: editText } } as Partial<AgentCanvasAnnotation>);
+    setEditingId(null);
+  };
+  const cancelEditAnnotation = () => {
+    setEditingId(null);
+    setEditText("");
+  };
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -718,29 +740,101 @@ export function AgentCanvasView({
       }
     };
     const baseCursor = tool === "connector" ? "crosshair" : "default";
+  const onAnnotationDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (a.kind === "sticky_note" || a.kind === "text") {
+      beginEditAnnotation(a);
+    }
+  };
+
     switch (a.kind) {
       case "sticky_note": {
         const fill = (a as { content: { color: string; text: string } }).content.color ?? "#f9d77e";
         const text = (a as { content: { color: string; text: string } }).content.text ?? "";
+        const isEditing = editingId === a.id;
         return (
-          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
-            <rect width={w} height={h} fill={fill} stroke={outline} strokeWidth={isSelected || isConnectSource ? 2 : 1} rx={2} />
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: isEditing ? "text" : baseCursor }} onClick={onAnnotationClick} onDoubleClick={onAnnotationDoubleClick}>
+            <rect width={w} height={h} fill={fill} stroke={outline} strokeWidth={isSelected || isConnectSource || isEditing ? 2 : 1} rx={2} />
             <foreignObject x={4} y={4} width={w - 8} height={h - 8}>
-              <div style={{ fontSize: 11 * viewport.zoom, color: "#0b0d10", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
-                {text}
-              </div>
+              {isEditing ? (
+                <textarea
+                  data-testid={`annotation-edit-${a.id}`}
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={() => void commitEditAnnotation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEditAnnotation();
+                    } else if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void commitEditAnnotation();
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    fontSize: 11 * viewport.zoom,
+                    color: "#0b0d10",
+                    lineHeight: 1.3,
+                    fontFamily: "system-ui",
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    resize: "none",
+                  }}
+                />
+              ) : (
+                <div style={{ fontSize: 11 * viewport.zoom, color: "#0b0d10", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", whiteSpace: "pre-wrap" }}>
+                  {text || (isSelected ? "(双击编辑)" : "")}
+                </div>
+              )}
             </foreignObject>
           </g>
         );
       }
       case "text": {
         const text = (a as { content: { text: string } }).content.text ?? "";
+        const isEditing = editingId === a.id;
         return (
-          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: baseCursor }} onClick={onAnnotationClick}>
+          <g key={a.id} data-testid={baseTestId} transform={`translate(${sx}, ${sy})`} style={{ cursor: isEditing ? "text" : baseCursor }} onClick={onAnnotationClick} onDoubleClick={onAnnotationDoubleClick}>
             <foreignObject width={w} height={h}>
-              <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary,#e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000" }}>
-                {text}
-              </div>
+              {isEditing ? (
+                <textarea
+                  data-testid={`annotation-edit-${a.id}`}
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={() => void commitEditAnnotation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEditAnnotation();
+                    } else if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void commitEditAnnotation();
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    fontSize: 14 * viewport.zoom,
+                    color: "var(--cel-text-primary,#e6edf3)",
+                    lineHeight: 1.3,
+                    fontFamily: "system-ui",
+                    background: "rgba(0,0,0,0.4)",
+                    border: "1px solid var(--cel-cyan,#00f0ff)",
+                    outline: "none",
+                    padding: 4,
+                    resize: "none",
+                  }}
+                />
+              ) : (
+                <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary,#e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000", whiteSpace: "pre-wrap" }}>
+                  {text || (isSelected ? "(双击编辑)" : "")}
+                </div>
+              )}
             </foreignObject>
           </g>
         );
