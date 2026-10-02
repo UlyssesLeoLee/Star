@@ -11,7 +11,7 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 
 | 维度 | 数字 | 备注 |
 |---|---|---|
-| **工作空间** | 97 个 Rust crate + 1 个 npm frontend (496 个 .tsx/.ts) + 1391 篇设计文档 | `Cargo.toml` `members` + `find crates -name '*.rs'` + `find frontend/src` + `find docs -name '*.md'` |
+| **工作空间** | 105 个 Rust crate + 1 个 npm frontend (496 个 .tsx/.ts) + 1392 篇设计文档 | `Cargo.toml` `members` (per 2026-10-02 PR-277 follow-up audit, 105 unique workspace members, **PR-272 误记 97 → 修 105**) + `find crates -name '*.rs'` + `find frontend/src` + `find docs -name '*.md'` |
 | **后端实现度** | 大头收官，边界收敛中 | 见 §1 "已实现"与 §2 "待收敛" |
 | **文档体系** | 23 SRS + 8 BD + 40 DD/SRS-BD-DD 总计 (设计 40 篇) + 28 ADR | IPA 风格 (要件定義書 → 基本設計書 → 詳細設計書) |
 | **分支与 PR** | `main` 最新 `bd97197f` (Tauri PoC index PR-264 #271 merge), 最近 CI 部分 success (frontend/markdownlint/rust/tarpaulin 4 个 fail; smoke passes per PR-269 run) | 见 §3 |
@@ -26,10 +26,10 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 
 | 项 | 数值 | 证据 |
 |---|---|---|
-| Cargo workspace 成员 | 97 | `Cargo.toml` `[workspace] members` (per 2026-10-01 actualize) |
+| Cargo workspace 成员 | 105 | `Cargo.toml` `[workspace] members` (per 2026-10-01 actualize + 2026-10-02 PR-277 follow-up audit, 105 unique entries, line 126 multi-entry single line 含 5 duplicates, **PR-272 误记 97 → 修 105**) |
 | Rust 源文件 | 736 | `find crates -name '*.rs'` |
 | 前端源文件 | 496 | `find frontend/src -name '*.tsx' -o -name '*.ts'` |
-| 设计文档 (md) | 1391 | `find docs -name '*.md'` |
+| 设计文档 (md) | 1392 | `find docs -name '*.md'` (per 2026-10-02 PR-277 follow-up audit, **PR-272 误记 1391 → 修 1392**) |
 | 架构决策记录 | 28 篇 ADR | `docs/architecture/**/adr/` + `docs/wiki/pgwiki/30-architecture/adr/` |
 | CI workflow | 4+ job: rust-ci / e2e-integration / cross-platform / frontend-ci + star-desktop-build (PR-242, PR-255 multi-OS matrix ubuntu+windows+macos) | `.github/workflows/` |
 | 最近 PR CI | PR-269 session 内 4 fail (Frontend/Markdownlint/Rust/Tarpaulin) + 6 pass (smoke/bench/doc 等) | `gh pr checks 269` |
@@ -197,8 +197,8 @@ main HEAD: **`bd97197f`** (per 2026-10-01)
 
 **已经建成** (不可粉饰):
 
-- 97 个 Rust crate 的 workspace 骨架 + 完整 domain 域拆分 (27 域 + 23 service) + 1 Tauri desktop PoC (8 IPC, per PR-239-#259) + 3 WASM crates (per PR-219/#230/#235)
-- 1391 篇设计文档 (23 SRS + 8 BD + 40 DD + 28 ADR + 实施报告/复盘报告)
+- 105 个 Rust crate 的 workspace 骨架 + 完整 domain 域拆分 (27 域 + 23 service) + 1 Tauri desktop PoC (8 IPC, per PR-239-#259) + 3 WASM crates (per PR-219/#230/#235)
+- 1392 篇设计文档 (23 SRS + 8 BD + 40 DD + 28 ADR + 实施报告/复盘报告)
 - IPA 风格 V 模型 (要件 → 基本設計 → 詳細設計) 全程签字栏可追溯
 - 4+ job CI (rust / frontend / cross-platform / e2e-integration + star-desktop multi-OS) — PR-269 实证部分 check fail
 - 5 角色基本设计 (BD-CANVAS-WORKFLOW-001 v1.0.3) 已签字
