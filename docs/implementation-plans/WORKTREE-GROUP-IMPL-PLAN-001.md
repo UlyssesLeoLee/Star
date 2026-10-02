@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.61**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.65**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -87,7 +87,7 @@ Project（一级：选择项目与项目级权限边界）
 
 | Phase | 交付范围 | 依赖 | 完成门 |
 |---|---|---|---|
-| **0 设计基线** | 需求/基本/详细设计统一 Project → Cloud Branch → Engineering Run 主导航；Run 管理 Worktree；Run apps 以 owner API 协作；定义 Outbox/Inbox、性能与事件边界 | `requirements.md` v5.44 §50、`basic-design.md` v5.41 §16、`DD-WORKTREE-GROUP-001.md` v4.28 | 🟡 目标设计已同步；canonical schema/read API基础已实现，Run Apps归属迁移与真实运行验收仍未完成 |
+| **0 设计基线** | 需求/基本/详细设计统一 Project → Cloud Branch → Engineering Run 主导航；Run 管理 Worktree；Run apps 以 owner API 协作；定义 Outbox/Inbox、性能与事件边界 | `requirements.md` v5.48 §50、`basic-design.md` v5.45 §16、`DD-WORKTREE-GROUP-001.md` v4.32 | 🟡 目标设计已同步；canonical schema/read API基础已实现，Run Apps归属迁移与真实运行验收仍未完成 |
 | **1 Run Shell 原型** | Project/Branch/Run 左侧主树，Run 下选择本地 Worktree；右侧 Run tabs 展示 Inbox、Work Item、Task Card、Canvas、Workflow、BI/Benchmark、Plugin Apps；Task Card 内 CLI；底栏 WORKTREE/GLOBAL | 现有 Project nav、SCM、Worktree、frontend stores 与 app panels | 🟡 已有 Project Index 深链、canonical Branch/Run directory schema/read API 与条件式主树/context shell基础；宿主身份/可信写入与Run Apps迁移尚缺。原型/production provider 分开报告，不以 Index 或 seed 冒充 Branch/Run |
 | **2 安全上下文与 canonical 任务闭环** | 2A GroupContext / 跨 App 契约；2B 认证 Actor、Project/Worktree ACL、GroupContextResolver；2C Postgres canonical WorkItem + Multica 生命周期、review、版本/幂等/审计；2D Project 授权目录、Cursor Index、owner/archive/owner-transfer/create-import plan-confirm | 2A 设计基线；2B-2D migrations、membership provisioning、历史 reconciliation、ACL/RLS 与并发验收 | 🟡 `/api/v1/projects` 当前 actor membership 目录与生产 selector 分页/重试已实现，API session generation 切换时旧 Project/Index/member-role 投影立即隐藏；其余 Index、成员目录、归档/恢复/负责人转派、create/import 与 review command 有条件式切片；宿主 provider 未装配、DB 部署与 ACL/RLS 验收仍缺；Review Domain port、Jira sync、metadata update、Runtime/Git 状态接入仍是 blocker |
 | **3 Canvas 双向联动** | 3A UI Worktree scope guard / 旧 seed 隔离；3B Canvas/Element/EntityRef API；3C Canvas Document viewport/frames/connectors SCD2 + CAS；3D Canvas→WorkItem 原子创建命令；3E Group UI 认证/API 接线、多 Canvas 列表/选择/初始化、Task Card 新建/关联、viewport/Element 位置与几何 CAS、Frame 与视觉连线的 Document 编辑、Outbox consumer 和实时投影 | Phase 2B ACL + Phase 2C persistence / WorkItem API + Canvas migrations/API + GroupContext | 3A-3D、授权 Outbox API、JWT adapter、provider-backed projection、多 Canvas `canvas_id` 选择/新建、Canvas→Task Card 新建与既有任务卡原子 EntityRef 关联、viewport/Element 位置与几何 CAS、Frame 创建/删除/元素归属/展示属性、纯视觉连线创建/删除/样式、无实体引用便笺编辑、安全 Element 删除及本地持久游标 poller 已有条件式 UI/API 切片；其他 Element 内容、宿主 provider、目标 DB、服务端 durable offset/realtime 未完成；Canvas 不得直接写 Multica lifecycle；部署、membership、Canvas 历史冲突分类和 ACL/RLS 运行验收全过后才关闭 Phase 3 |
@@ -939,7 +939,7 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | 主树与 context shell | 条件式前端实现 | 独立RunDirectoryProvider、授权DTO client、Project/Branch/Run/Worktree懒树与canonical leaf shell；cache16、每父4页、请求2并发、等待队列16及DOM窗口；请求总deadline 15秒覆盖排队/token/body；登录会话缺失时禁用，未迁移旧Worktree Apps；类型/运行证据见本阶段报告。 |
 | 数据库检查 | 隔离DDL/catalog通过 | PG18临时loopback集群重复应用新migration，八表均FORCE RLS；旧migration外部audit_trigger_func用显式stand-in，未验证旧Audit、真实角色RLS/写命令/EXPLAIN；非目标库部署。 |
 | 生产与Phase 1完成门 | 未完成 | 真实宿主会话/反代、SCM Repository→Branch producer、初始grants与binding owner命令、目标DB/runtime grants、Run-owned Apps和执行准入尚缺。卡内CLI、Canvas、chat不能由目录接口宣称已形成Run闭环。 |
-| 文档与方向 | 已同步 | WTG-021/AC-ERUN-003、requirements v5.44/basic v5.41/Group DD v4.28；新增 DUKOU-ARCHITECTURE-DIRECTION-001；自动化§4.36、registry和阶段报告。 |
+| 文档与方向 | 已同步 | WTG-021/AC-ERUN-003、requirements v5.49/basic v5.46/Group DD v4.33/Infrastructure DD v0.4；维护 DUKOU-ARCHITECTURE-DIRECTION-001；自动化§4.36、registry和阶段报告。 |
 
 本阶段未新增/执行tests或浏览器/桌面运行验收。默认locked Cargo check发现现有锁文件需重新解析；临时允许解析的定向check通过并恢复原lock，不能作为committed lock可复现证据。schema/nav worker各有独立checkout，root串行审阅/cherry-pick；不使用dispatcher stub status冒充执行成功。
 
@@ -959,13 +959,24 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 ### 6.69 Rust Infrastructure / k3s 配套阶段（2026-10-02）
 
-按 DD-LOCAL-INFRASTRUCTURE-001 v0.2 实施 INFRA-1 许可证白名单/SBOM/活跃度/provider/profile/binding+真实 discover → INFRA-2 用户自有 Linux provider 生命周期/readiness（Windows WSL2 仅 PoC）→ INFRA-3 Run namespace/least-privilege/quota/Runtime 接线 → INFRA-4 macOS Lima/Linux Incus/remote cluster adapters、idle/drain/恢复/升级回滚 → INFRA-5 商用分发闭包、固定负载 RSS/p95/并行/故障验收。默认按需共享 environment；VM/cluster 不随 Worktree 数复制。K3s readiness 与安全 Agent 执行是不同门。
+按 DD-LOCAL-INFRASTRUCTURE-001 v0.4 实施 INFRA-1 license-obligation/SBOM/活跃社区/capability/provider/profile/binding+真实 discover → INFRA-2 Multipass 跨平台 lifecycle/readiness（现有 provider 探测、安装引导、符合许可义务后的受管安装/捆绑；按稳定版逐 OS capability，unsupported host 用 Podman/Incus/Lima/remote Linux adapter）→ INFRA-3 Run namespace/least-privilege/quota/Runtime wiring → INFRA-4 可替换 adapters → INFRA-5 商业发行义务履行、固定负载 RSS/p95/并行/故障验收。产品不按用途/行业/规模/席位/用量/商业 tier 封锁核心能力；CPU/内存配额仅用于实际宿主容量和安全准入，不是商业计划限制。基础设施按需共享，VM/control-plane 不随 Worktree 数复制。K3s readiness 与安全 Agent 执行是不同门。
 
-本轮为官方源核对与三层设计更新，未安装或运行 VM/k3s，也未验证 provider 实际依赖闭包、adapter、DB/RLS、Hook 和 RSS。需要对发行包、guest image、linked dependencies 做逐版本 SBOM；Windows K3s 原生支持不存在，Multipass GPL-3.0 排除默认安装/支持/分发，Cloud Hypervisor 仅作 Linux PoC。追踪 AC-INFRA-001，保留既有 Phase 完成定义和真实 CLI 闭环/Phase 12 性能门。
+本轮复核官方项目/许可证/社区并更新三层设计；未安装或运行 VM/K3s，未验证 provider 实际依赖闭包、adapter、DB/RLS、Hook 和 RSS。Multipass GPLv3 允许不限用途商业使用与销售，随产品发行时履行对应 GPL 条件，不能因此限制客户或强迫手工自装；Multipass 安全说明将其定位为 local dev/test，不独自提供恶意 Agent 的安全边界。K3s 不原生支持 Windows，只能运行在 Linux host/guest；截至本次审查 stable channel 为 v1.36.4+k3s1，1.37 系列仍为预发布。保留 AC-INFRA-001、真实 CLI 闭环与 Phase 12 性能门。
 
-### 6.70 宽松许可 provider 准入与社区维护门（2026-10-02）
+### 6.70 商业开源 provider 许可履约与社区维护门（2026-10-02）
 
-每版本锁定上游、digest、SPDX、依赖闭包 SBOM、NOTICE 和近 12 个月维护证据；不满足许可/活跃度门即阻止新准入和产品打包。Linux Incus 与 macOS Lima 作为外部 provider 候选；用户自有/远端 K3s 为 Linux 环境，Windows WSL2 限兼容 PoC。此阶段仍是设计/调查项；provider 接入前需为跨平台安装、恢复、取消、Run binding 和 Runtime sandbox 另立有证据的验收。
+每版本锁定上游、digest、SPDX、依赖闭包 SBOM、许可证履约路径和近 12 个月维护证据；商业用途、行业、部署规模、席位、用量与付费 tier 不得封锁核心能力。Multipass、Podman machine、Incus、Lima 和 existing/remote Linux K3s 是 capability-negotiated adapters，按 provider/OS/stable version 验收。产品可发现既有安装、引导安装，也可在履行相应发行条件后受管安装/捆绑；不得仅因 copyleft 把手工安装设为唯一路径。provider 接入前验证跨平台安装、恢复、取消、Run binding 与独立 Runtime sandbox。物理容量和租户安全准入按资源实况工作，不作为 commercial use quota。
+
+### 6.71 Task Card Run owner 与旧演示任务退役（2026-10-02）
+
+| 项目 | 实施状态 | 完成门与限制 |
+|---|---|---|
+| Canonical Task owner | 已加入 additive migration 草案 | 当前 Task metadata 使用完整 tenant/project/repository/branch/engineering_run tuple；SCD2 owner successor、同 Run Worktree association guard、并发 binding lock 与事务 Outbox。旧 owner-null 行保留只读，不从 Worktree 猜归属。迁移尚未在目标 DB 执行，PostgreSQL runtime role/grants 与 RLS 未验收。 |
+| Run Task APIs | 已实现代码切片并通过 REST lib compile | 新 Run-scoped bounded list；Worktree compatibility list、transition/review 按完整 tuple 过滤并双重校验 Project/Run role；Canvas create、CLI admission/attachment 和 TaskExecutionRun list/detail 复核 owner。Run Task Cards UI 与宿主 JWT/provider 仍未装配。 |
+| 历史 mock 任务退役 | 已从 runtime seed/MSW task history 移除 | 删除 seed 的 `wi-001`..`wi-030` 与任务专属本地关联；精确 ID localStorage migration 清理旧卡片和引用但保留其他 user rows；MSW validation/comment task history 改为空；测试专用 synthetic IDs 不再伪装为历史 Task Cards。 |
+| 验证与发布状态 | 局部通过、生产门未关闭 | `cargo check -p star-api-rest --lib -j 4` 曾在临时解析 Cargo.lock 后通过，原锁已恢复，locked/reproducible build 未验证；最终 diff `git diff --check` 通过。Frontend tests/typecheck 未运行（worktree 没有 `node_modules`），SQL migration 未执行；自动化分档与缺少 Task Owner 专用 runner 见 `docs/automation-design.md` §4.38；不能宣称 UI/DB/CLI 生产闭环完成。 |
+
+本轮删除范围仅为已确认的本地 demo Task IDs 与其纯演示关联；没有数据库目标或可核实 server row 时不发出全表 DELETE。生产数据库中尚未归属的历史 Task 维持 unknown/read-only，待受审计的 reconciliation 命令处理。Run API/provider、目标 DB/RLS、真实 Run Task UI、Runtime provisioner/OS sandbox 与独立 Validation result writer 仍是 release gates。
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1082,4 +1093,8 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | v5.58 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 requirements/basic/Group DD 引用至 v5.43/v5.40/v4.27；按 WTG-020 与实际 Sidebar 对照，新增 Project scope → 授权 Worktree Index 深链、移除固定 repository ID 的旧 Worktree 卡片；记录导航测试 9/9 与 typecheck 通过；纠正 Phase 1 状态为仍未具备 Branch/Run 主树和权威目录，不将 Index 链接误报成 Run Shell | 用户要求代码改进必须与需求、基本设计、详细设计和实施状态同步核对 |
 | v5.59 | 2026-10-02 | Ulysses（一人公司12角色 per DEC-008）— Mavis接手审核 | requirements v5.44/basic v5.41/Group DD v4.28；新增§6.67 canonical目录基础，分别记录compile/DDL/前端与生产完成门；综合方向指引和自动化§4.36 | Phase 1目录与RunContext实现、独立review改善 |
 | v5.61 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.46/basic v5.43/Group DD v4.30 与 DD-LOCAL-INFRASTRUCTURE v0.2；新增 §6.70 商用宽松许可证闭包 SBOM/NOTICE 与活跃社区准入，调整 Linux Incus/macOS Lima/远端 K3s/WSL2 PoC 顺序并排除 Multipass GPL 默认支持；当前仍未安装 provider | 用户明确拒绝商业用途/许可限制，要求社区活跃开源方案 |
+| v5.62 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.47/basic v5.44/Group DD v4.31 与 Infrastructure DD v0.3；纠正 copyleft 与商业使用关系，加入 Multipass/Podman machine 的跨平台本地 provider 组合、GPL 履约方式、provider capability fallback、活跃社区和 Runtime sandbox 边界 | 用户明确不接受商业用途限制，要求无限制商用、社区活跃的开源方案 |
+| v5.63 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.48/basic v5.45/Group DD v4.32/Infrastructure DD v0.4；移除 copyleft 对应的手工自装隐性门槛，要求 provider 探测、安装引导及合规受管交付；解释硬件资源准入不是商业用量配额；纠正 K3s stable channel 为 v1.36.4+k3s1 | 用户再次明确拒绝商业使用限制并要求活跃社区 |
+| v5.64 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49/basic v5.46/Group DD v4.33；记录 Task Card canonical Run owner、Outbox 与 Run/CLI/Canvas 归属复核、精确退役 30 条旧 mock 任务和 localStorage 迁移；保留目标 DB/RLS、Run UI/provider 与实际 CLI sandbox 未完成状态 | 用户确认旧任务均为 mock 并授权删除，要求实际实现与文档保持一致 |
+| v5.65 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账实施计划 §6.71 与 Automation Design §4.38 / registry v0.2；明确 Task Owner 专用自动化与 SQL/RLS 证据仍缺，并修正 Sprint/store 测试对旧 demo ID 的残留引用；没有把未执行的数据库/frontend 验证标为通过 | 清理旧 mock Task Card 后的文档/实现复核 |
 | v5.60 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Group DD v4.29/Task DD v1.17；新增 §6.68，记录 CLI canonical identity、strict SQL guard、V2 fence/signature v3、attachment 门与授权 Hooks 深链，保留 Run Apps/生产依赖开放；自动化 §4.37 | 用户要求子代理/worktree 并行处理、rebase 后 merge dev，并确保文档对账 |

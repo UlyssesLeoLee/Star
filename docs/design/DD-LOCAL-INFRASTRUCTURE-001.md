@@ -1,35 +1,37 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.2 · 2026-10-02 · Draft / 设计候选；provider 未安装或实现，兼容性与 RSS 均未验证。
+> v0.4 · 2026-10-02 · Draft / 设计候选；provider 未安装或实现，兼容性与 RSS 均未验证。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.45 / basic-design v5.42 §16.21 / Group DD v4.29 §8.8；实施计划 §6.69。
+> 上游：requirements v5.49 / basic-design v5.46 §16.22 / Group DD v4.33 §8.8-8.9；实施计划 §6.69-6.70。
 
 ## §0 目的与边界
 
-为渡口增加 provider-neutral 的 Rust Host Infrastructure Manager，管理本地或远端 Linux 计算环境、k3s readiness、资源预算与有界操作。平台路线候选为：Windows 使用 OS 提供的 WSL2 adapter 做 PoC；macOS 评估外部安装的 Lima；Linux 评估外部安装的 Incus；已有/远端 Linux k3s 可作为减少本机 RSS 的路线假设；k3d 仅复用既有 Docker 做开发/测试；Cloud Hypervisor 留作 Linux host 后续 PoC。以上均是拟议路线，不表示已支持或验证。K3s 承载 PostgreSQL/NATS/后端 App 和受控开发服务；Agent CLI 的 admission、native Hook、sandbox、取消、独立验证与结果写回仍属于 Runtime owner，安装集群不会自动满足这些门。
+为渡口增加 provider-neutral 的 Rust Host Infrastructure Manager，连接本地/远端 Linux 计算环境并管理 K3s readiness、资源预算和有界生命周期操作。provider adapter 按 capability 而非操作系统硬编码：Multipass 为跨 Windows/macOS/Linux 的本地 VM 首选候选；Podman machine 提供跨平台容器/VM 工作流候选；Linux shared/system VM 由 Incus 候选承载；Lima 作为 macOS/Linux 可替换 VM provider；已有/远端 Linux K3s 是低桌面驻留内存的集群路线。K3s 始终在 Linux host/guest/node 运行，不在 Windows 原生运行。以上均未完成 Star 适配或验收。Multipass 官方定位为开发、测试和本地环境，且 daemon 权限近似 host root，不能单独作为生产或不可信 Agent 安全边界；Runtime sandbox 与 Hook 仍独立验收。K3d 仅复用已有容器引擎做开发/测试；Cloud Hypervisor 保留为 Linux 后续 PoC。
 
 Infrastructure Environment 是 Host/Project 可绑定的计算环境，不成为 Project → Branch → Run → Worktree 主树的新层级。Run 固定 environment/profile/version/digest、namespace 和预算；WorktreeFocus 提供服务端验证的 checkout/workspace 映射。配置放 Advanced Settings 的 Infrastructure 内容 tab，Run 只展示授权后的有效环境、状态与资源，深链回配置。
 
 ## §1 选型、许可证与上游维护门
 
-Star 默认支持、默认安装或分发、打包进产品及加入核心依赖的组件，只允许 Apache-2.0、MIT、BSD-2-Clause、BSD-3-Clause、ISC、Zlib 等宽松且无使用限制的许可。必须保留各许可证要求的版权/许可声明；Apache-2.0 的 NOTICE（如适用）与专利许可/条件也须保留。项目根目录的许可证只说明该项目相应范围，不能代表其完整依赖、发行包或镜像。
+商业用途、行业、部署规模、席位及使用量均不得因组件或 Star 付费 tier 而设产品限制；选择的开源组件须允许不限上述范围的商业使用。GPL/AGPL/LGPL 允许商业使用和销售，copyleft 本身不是用途限制；修改、链接、bundling、installer、独立可执行文件交付与再分发按具体组合和交付形态履行对应源码、许可证、NOTICE、安装信息等义务。交付合规是发行义务，不得转化为功能、客户或付费限制；不得只因 copyleft 而要求用户必须自行安装。排除非商业、field-of-use、source-available 与实际禁止商业使用的许可。Apache-2.0、MIT、BSD、ISC、Zlib 可作为低互惠负担候选，但不是唯一商业方案。
 
-每个 Star 发布版本均须生成并审核完整 SPDX/SBOM，覆盖直接与传递依赖，以及实际随包、由 Star 默认下载/安装/缓存/转运的可执行文件、第三方工具、容器层与镜像、guest image、kernel、guest userspace packages、firmware 等，并将组件版本和内容 digest 绑定到证据。任何未知许可证或不在许可白名单内的出货项均阻断默认分发；不能只审核上游主仓库 LICENSE。仅外部安装且不由 Star 分发的 provider，不据此豁免集成版本/来源记录；其外部安装物只有进入 Star 管理或分发范围时才按对应 artifact 清单判定。
+每个 Star 发布版本均须生成并审核完整 SPDX/SBOM，覆盖直接与传递依赖，以及实际随包、由 Star 默认下载/安装/缓存/转运的可执行文件、第三方工具、容器层与镜像、guest image、kernel、guest userspace packages、firmware 等，并将组件版本和内容 digest 绑定到证据。未知许可或无法满足该交付形态所需义务的出货项阻断该打包形态，不能只审核上游主仓库 LICENSE。独立外部 provider 仍需记录版本、来源、许可与 capability，不因此免除集成审查；此许可机制不用于给 Star 核心功能添加席位/用量门。
 
-默认支持资格还须有可复核的上游活跃度证据：在评估日之前 12 个月内至少一项正式 release/维护记录，并且至少一个公开 issue、discussion、forum 或 support channel 有 12 个月内带日期的活动记录。每次支持/发行评审必须保存版本、日期和具体 permalink；channel 首页链接不能代替活动证据。以下是截至 2026-10-02 的官方快照示例，仅证明上游发布/公开协作信号，不证明 Star 集成或服务等级。
+默认支持资格还须有可复核的上游活跃度证据：在评估日之前 12 个月内至少一项正式 release/维护记录，并且至少一个公开 issue、discussion、forum 或 support channel 有 12 个月内带日期的活动记录。每次支持/发行评审必须保存版本、日期和具体 permalink；channel 首页链接不能代替活动证据。表格所列活动仅作为上游信号，不代表 Star 集成或服务等级。
 
 | 候选 | 平台与用途 | 上游许可证/近期证据（截至 2026-10-02） | 决策边界 |
 |---|---|---|---|
-| Incus | Linux host；外部安装 provider 候选 | 项目声明 Apache-2.0；[7.5.1 release，2026-09-25](https://github.com/lxc/incus/releases/)；公开 [issue #4102，2026-10-01](https://github.com/lxc/incus/issues/4102)，另有 [社区支持/发行公告](https://discuss.linuxcontainers.org/) | Linux 优先评估；不由 Star 静默安装或随包分发。仅候选，尚无 Star adapter/兼容性验证。 |
-| Lima | macOS host；外部安装 provider 候选 | 项目 [Apache-2.0](https://github.com/lima-vm/lima/blob/master/LICENSE)；[2.2.0 release，2026-07-21](https://github.com/lima-vm/lima/releases/)；公开 [issue #5552，2026-09-30](https://github.com/lima-vm/lima/issues/5552)。官方安装页列 macOS/Linux 为支持 host、Windows 为 untested；另有 [k3s 示例模板](https://lima-vm.io/docs/examples/containers/kubernetes/) | macOS 优先评估，外部安装；Windows 不列为支持路线。模板存在不表示 Star 集成或已测试。 |
-| 已有/远端 Linux K3s | Linux guest/node 或远端用户集群；候选用于降低本机驻留资源 | K3s 项目 [Apache-2.0](https://github.com/k3s-io/k3s/blob/main/LICENSE)；[v1.37.0+k3s1 release，2026-09-14](https://github.com/k3s-io/k3s/releases/)；公开 [issue #14723，2026-09-30](https://github.com/k3s-io/k3s/issues/14723)；[Windows FAQ](https://docs.k3s.io/faq) | 仅连接明确授权且归用户管理的集群。远端可以减少 Star 本机负载是设计推论，具体 RSS/网络代价未测。K3s 本身不原生支持 Windows；WSL2 PoC 中它运行在 Linux guest 内。镜像与发行 artifact 需单独 SBOM。 |
-| WSL2 | Windows OS 提供的 Linux adapter | [Microsoft WSL 配置文档](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)；WSL GitHub 的 MIT 只适用于该仓库代码，不代表 Windows、kernel、发行版或镜像的许可证 | 仅 Windows PoC，不作为 Star 分发的 provider。不得将 WSL 仓库许可证外推至其余 OS/guest 内容；全局资源与停机操作按 §2、§5。 |
+| Incus | Linux host/shared VM 与 system container provider 候选 | 项目声明 Apache-2.0；[7.5.1 release，2026-09-25](https://github.com/lxc/incus/releases/tag/v7.5.1)；公开 [issue #4102，2026-10-01](https://github.com/lxc/incus/issues/4102)，另有 [社区支持/发行公告](https://discuss.linuxcontainers.org/) | Linux server 优先评估；Windows/macOS client 可管理远端 Linux daemon。支持发现既有服务、安装向导或经 SBOM/许可审查的受管安装包；尚无 Star adapter/兼容性验证。 |
+| Lima | macOS/Linux 可替换 VM provider 候选 | 项目 [Apache-2.0](https://github.com/lima-vm/lima/blob/master/LICENSE)；[2.2.0 release，2026-07-21](https://github.com/lima-vm/lima/releases/tag/v2.2.0)；公开 [issue #5552，2026-09-30](https://github.com/lima-vm/lima/issues/5552)。官方安装页列 macOS/Linux 为支持 host、Windows 为 untested；另有 [k3s 示例模板](https://lima-vm.io/docs/examples/containers/kubernetes/) | macOS/Linux 补充选项，支持发现既有安装、安装向导或合规受管交付；Windows 按 capability probe 验收。模板存在不表示 Star 集成或已测试。 |
+| 已有/远端 Linux K3s | Linux guest/node 或远端用户集群；候选用于降低本机 RSS | K3s 项目 [Apache-2.0](https://github.com/k3s-io/k3s/blob/main/LICENSE)；stable channel 当前指向 [v1.36.4+k3s1](https://github.com/k3s-io/k3s/blob/main/channel.yaml)；[近期公开 issue #14601，2026-09-08](https://github.com/k3s-io/k3s/issues/14601)；[Windows FAQ](https://docs.k3s.io/faq)。1.37 仍为 release-candidate，不能当作 stable。 | 仅连接明确授权且归用户管理的 Linux 集群。远端可以减少 Star 本机负载是设计推论，具体 RSS/网络代价未测。K3s 不原生支持 Windows；Multipass/Podman/WSL guest 或远端 Linux 仅是宿主路线。镜像与发行 artifact 需单独 SBOM。 |
+| WSL2 | Windows OS 提供的可选 Linux guest adapter | [Microsoft WSL 配置文档](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)；WSL GitHub 的 MIT 只适用于该仓库代码，不代表 Windows、kernel、发行版或镜像的许可证 | 可作为 Windows fallback，不是唯一支持路径；全局资源与停机操作按 §2、§5。不得将 WSL 仓库许可证外推至其余 OS/guest 内容。 |
 | k3d | 复用用户已有 Docker engine | [MIT](https://github.com/k3d-io/k3d)；[5.8.3 stable release，2026-02-15](https://github.com/k3d-io/k3d/releases/)，另有 [5.9.0-rc.0 pre-release，2026-10-01](https://github.com/k3d-io/k3d/releases/)；公开 [issue #1696，2026-08-06](https://github.com/k3d-io/k3d/issues/1696) | 仅既有 Docker 上的开发/测试；不得自动安装 Docker 或作为生产环境推荐。k3d license 不覆盖 Docker、K3s 与镜像内容。 |
 | Rancher Desktop | macOS/Windows/Linux 桌面运行时，比较项 | 根 LICENSE 为 [Apache-2.0](https://github.com/rancher-sandbox/rancher-desktop/blob/main/LICENSE)；[1.24.0 release，2026-07-29](https://github.com/rancher-sandbox/rancher-desktop/releases/)；公开 [issue #11071，2026-10-01](https://github.com/rancher-sandbox/rancher-desktop/issues/11071) | 比较项，不作为默认依赖/分发。其发行包包含多种工具，必须对每项 bundled utility、依赖与镜像做完整 SBOM/SPDX 审核，根 Apache-2.0 不足以放行。 |
 | Cloud Hypervisor | Rust VMM；仅列 Linux host 后续 PoC | [v53.0 release，2026-07-12](https://github.com/cloud-hypervisor/cloud-hypervisor/releases/latest)；公开 [issue #8977，2026-09-30](https://github.com/cloud-hypervisor/cloud-hypervisor/issues/8977)；源码 per-file SPDX 示例为 [Apache-2.0 OR BSD-3-Clause](https://github.com/cloud-hypervisor/cloud-hypervisor/blob/main/hypervisor/src/lib.rs) 与 [Apache-2.0 AND BSD-3-Clause](https://github.com/cloud-hypervisor/cloud-hypervisor/blob/main/vm-allocator/src/system.rs) | 后续 Linux PoC；不得概括为单一 Apache-2.0，须逐文件 SPDX 并审核所有出货 artifact/依赖。支持 Windows guest 不等于支持 Windows host。 |
-| Multipass | Ubuntu VM manager | [GPLv3 LICENSE](https://github.com/canonical/multipass/blob/main/LICENSE)；[GNU FAQ](https://www.gnu.org/licenses/gpl-faq.en.html#DoesTheGPLAllowMoney) 明确 GPL 不禁止收费/商业分发，但分发者必须遵守相应 GPL 条件 | 因产品要求排除 copyleft/source-disclosure 义务，明确排除 Star 默认支持、默认安装、bundle 和核心依赖；此项政策选择不是声称 GPL 禁止商用。 |
+| Multipass | Windows/macOS/Linux 本地 VM provider，支持用 cloud-init 建 Linux guest | [GPL-3.0 LICENSE](https://github.com/canonical/multipass/blob/main/LICENSE)；GPL 明确允许商业销售/使用但再分发按 [GNU FAQ](https://www.gnu.org/licenses/gpl-faq.en.html#DoesTheGPLAllowMoney) 履约；当前 GitHub [latest stable 1.16.4，2026-09-08](https://github.com/canonical/multipass/releases/tag/v1.16.4)；上游 [PR #5202 merged，2026-09-04](https://github.com/canonical/multipass/pull/5202)；公开 [Discourse](https://discourse.ubuntu.com/c/multipass/13) 与 [Matrix](https://matrix.to/#/#multipass:ubuntu.com) 渠道 | 首选本地 VM provider 候选，产品可探测既有安装、提供向导或在履行 GPL 发行义务后管理安装/捆绑。通过版本化独立 adapter/external process 集成。上游 security 文档将其定位为开发/测试/本地环境；有权访问 daemon 者可控制实例、host mounts 与安全配置，因此不能替代不可信 Agent sandbox。Windows 兼容性按已安装稳定版本和 driver capability 动态判定。 |
+| Podman machine | Windows/macOS/Linux 本地 container/VM 管理候选；各 OS 使用各自 backend | [Podman Apache-2.0](https://github.com/podman-container-tools/podman)；[v6.1.3 release，2026-09-29](https://github.com/podman-container-tools/podman/releases/tag/v6.1.3)；官方列 Linux QEMU、macOS libkrun/AppleHV、Windows WSL/Hyper-V providers；[community meetings](https://podman.io/community) 有 2026-08-04 记录 | 产品可探测、引导安装，或履行逐项发行审查后采用受管安装/捆绑；Windows WSL/Hyper-V、macOS AppleHV 依赖宿主 OS facility。Podman machine 管理的默认 VM 并未证明 K3s readiness 或 Star Runtime sandbox，须单独 PoC。 |
 
-默认支持/分发审查必须再次核实当时的正式 release/维护记录和有日期的公开渠道活动；此处的上游快照不是 Star 适配器验证、性能结果或支持 SLA。若未来发现 artifact 不在白名单或 12 个月活跃度证据缺失，应暂停该 provider 的默认支持/出货，直至审计通过或替换路线。
+推荐组合：采用 Rust-native、版本化 InfrastructureProvider contract，不设用途、行业、席位、用量或商业 tier 限制。用户工作站优先评估 Multipass 本地 VM，在 guest 内运行 Linux K3s；Linux 多 Run/shared host 用 Incus 或既有 K3s；Podman machine 与 Lima 作为可切换 backend。按 operation/capability 公开 provider 差异并支持用户自有 provider，不因单个厂商/组件的许可分类锁定产品架构。产品应提供 provider 探测、安装/升级引导和多种合规交付形态；GPL 允许无限制商业使用，产品分发/修改/组合仍须按实际情形履行 GPLv3 义务。不得仅以 copyleft 为由把人工自装设为唯一可用路径。
+默认支持资格还须有可复核的上游活跃度证据：在评估日之前 12 个月内至少一项正式 release/维护记录，并且至少一个公开 issue、discussion、forum 或 support channel 有 12 个月内带日期的活动记录。每次支持/发行评审必须保存版本、日期和具体 permalink；channel 首页链接不能代替活动证据。
 
 ## §2 共享与隔离、资源公平
 
@@ -79,10 +81,10 @@ Rust manager 使用共享 Tokio executor、有界 per-host operation queue、公
 
 ## §7 Phase 与验收
 
-1. INFRA-1：冻结 provider/profile/binding schema、版本/许可与 SPDX/SBOM 清单、维护活跃度证据门和 operation/安全/资源能力矩阵；实现真实 discover/probe/readiness。
-2. INFRA-2：Windows WSL2 PoC（K3s 只运行在 Linux guest 内）；覆盖 create/start/stop/health、systemd/cgroup/network/readiness 与自有资源 ownership；任何全局配置/停机先经过显式授权门。
+1. INFRA-1：冻结 provider/profile/binding schema、operation/license-obligation record、完整 SPDX/SBOM 与近 12 个月社区活跃证据门；定义 capability negotiation；实现真实 provider discover/probe/readiness 和无付费 plan/seat gate。
+2. INFRA-2：实现 Multipass adapter 的跨平台 create/start/stop/health/restore 与 provider 探测；安装向导可使用既有安装、引导用户安装或执行通过分发审查的受管安装/捆绑。逐稳定版测 Linux/macOS/Windows backend；某宿主若不具备所需 capability，提供 Podman/Incus/Lima/remote Linux fallback，并展示具体环境能力，不把条件式支持写成全 OS 完成。K3s 只运行在 Linux guest 内。不得因 GPL 要求产品只允许手工自装。
 3. INFRA-3：Project/Run namespace、least-privilege、quotas/mount/network/credential owner；接 Runtime readiness 与生命周期，不借此宣称 CLI sandbox。
-4. INFRA-4：评估 Linux 外部安装 Incus、macOS 外部安装 Lima 与已有/远端 Linux K3s；评估已有 Docker 上的 k3d 开发/测试路径；Cloud Hypervisor 单独做 Linux host PoC 和逐文件 SPDX 审核；均不得写成已集成。
+4. INFRA-4：接入 Incus、Podman machine、Lima 和 existing/remote Linux K3s 可替换 adapters；k3d 若评估须复用已安装容器引擎；Cloud Hypervisor 单独做 Linux host PoC 和逐文件 SPDX 审核。每项均需 capability probe，不得写成未验证即已集成。
 5. INFRA-5：固定设备/workload 的 RSS/CPU/IO/p95、1–8 Agent 并行公平、崩溃/撤权/取消/断网/磁盘满/恢复验收，SBOM/source/notice 与商业分发审查。
 
 真实环境可创建/复用→绑定 Run→服务就绪→受控任务实际执行→取消/恢复→独立验证回写，且不会影响其他 user resources，才满足闭环。所有步骤目前仍开放；本次只修订设计与实施依赖，不安装宿主功能或改变已有集群。
@@ -93,3 +95,5 @@ Rust manager 使用共享 Tokio executor、有界 per-host operation queue、公
 |---|---|---|---|
 | v0.1 | 2026-10-02 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 用户要求适配 Rust 商业项目的 Multipass 类 k3s 配套；provider 路线、资源/Hook/Run 契约与真实未实现门 |
 | v0.2 | 2026-10-02 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 按商业 OSS 限制收敛许可证白名单与 provider 路线；补齐发行/社区证据门、WSL 全局资源授权、未知预算拒绝准入、Host/Guest target 区分及未验证状态；复核官方来源 |
+| v0.3 | 2026-10-02 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 依用户反馈移除“copyleft=不商用/一概排除”限制；将 Multipass 作为跨平台本地 VM 首选候选、补充 Podman machine 和 provider fallback；更新 GPLv3 履约形态、按版本 capability gate、Multipass 安全定位与活跃社区证据；provider 仍未安装/验收 | 用户要求不受商业用途限制且社区活跃的开源方案 |
+| v0.4 | 2026-10-02 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 明确 unlimited commercial use 不得转成 paid tier/use-case gate；删除 copyleft provider 只能手工自装的隐性限制；支持发现、引导及合规受管安装/捆绑；纠正 K3s stable channel 到 v1.36.4 并补充近期 release/社区活动证据 | 用户再次明确拒绝商业使用限制并要求活跃社区 |

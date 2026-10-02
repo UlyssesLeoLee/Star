@@ -1,6 +1,6 @@
 # 渡口架构与交付方向
 
-> v1.2 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.3 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 >
 > 对照：requirements §50、basic-design §16、DD-WORKTREE-GROUP-001、WORKTREE-GROUP-IMPL-PLAN-001。本指引安排交付顺序，不替代既有 Phase 完成门。源码、编译、数据库与产品运行证据分别记录。
 
@@ -99,8 +99,14 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 
 ## 8. 本地基础设施方向
 
-增加 Rust Host Infrastructure Manager，默认只连接经许可和依赖闭包审查的外部 provider：Linux Incus、macOS Lima、远端 Linux K3s；Windows WSL2 仅兼容性 PoC，K3s 不原生支持 Windows。只接受允许不限用途商业使用的宽松许可证；核对完整发行物 SBOM/NOTICE 和近 12 个月维护证据。Multipass GPL-3.0 不进入默认支持、安装或分发方案。每 Host/environment 按需共享基础设施，Project/Run 绑定 namespace、最小权限和预算；环境管理与实际 Agent sandbox 分开验收。Hook、lease/cancel/drain、可视化设置、BI 与固定负载性能仍须逐项通过。来源/实施门见 DD-LOCAL-INFRASTRUCTURE-001 v0.2 / 实施计划 §6.69-6.70；目前仅为设计候选，未验证 SBOM/provider/RSS。
+增加 Rust Host Infrastructure Manager，以 Rust provider contract 连接 Multipass 本地 VM、Podman machine、Linux Incus、Lima 和用户自有/远端 Linux K3s；不按用途、行业、部署规模、seat、用量或商业 tier 限制。K3s 运行在 Linux guest/node。GPL/AGPL/LGPL 允许商业使用与销售，不因 copyleft 排除；产品支持既有 provider 检测、安装引导及履行实际发行义务后的受管安装/捆绑，不得强制手工自装。逐版本审查发行 SBOM/NOTICE 与近 12 个月上游维护证据；法律发行义务不构成商业用途/客户/功能限制。Multipass 是本地开发/测试 VM 管理器，不能替代不可信 Agent Runtime sandbox；Hook、lease/cancel/drain、BI 与固定负载性能仍须逐项验收。见 DD-LOCAL-INFRASTRUCTURE-001 v0.4 / 实施计划 §6.69-6.70；当前未验证 Star provider、许可闭包、RSS 与安全隔离。
 
 ## 9. 商用开源基础设施
 
-基础设施选择以渡口自身 Rust provider contract 为主，按操作系统连接外部设施并保留可替换 backend。商业产品默认组件限于宽松许可和已审查的实际二进制/镜像依赖闭包；上游活跃度按版本周期复核。Apache/MIT/BSD 仍有应保留的版权、NOTICE 与专利义务，不承诺零合规义务。当前候选为 Linux Incus 与 macOS Lima；低桌面内存路径为远端 Linux K3s。Windows WSL2/K3s 暂属兼容性验证项。实际产品支持、安装包、资源成本与任务执行均未验收。
+基础设施选择以渡口自身 Rust provider contract 为主，按 OS 和已发现 capability 连接外部设施并保留可替换 backend；不因 copyleft 排除合法商业方案，也不设置用途、行业、seat、用量或付费 tier 限制。分发修改/组合组件时履行源码、NOTICE 等对应发行义务；产品提供检测、引导和履约后的受管安装/捆绑路径。Multipass 作为跨平台本地开发 VM 候选，Incus 负责 Linux shared VM/container，Podman machine/Lima 提供替换 backend，远端 Linux K3s 降低桌面常驻资源。K3s 不原生支持 Windows；各版本 capability、权限、完整依赖闭包、性能和任务执行需实测。资源准入按实际主机容量与安全策略工作，不映射为商业付费限制。
+
+## 修订历史
+
+| 版本 | 日期 | 修订内容 | 触发 |
+|---|---|---|---|
+| v1.3 | 2026-10-02 | 明确 unrestricted commercial use 与许可证发行义务的界线；加入 provider 检测、安装引导和合规受管安装/捆绑；明确硬件准入不是商业用途/用量限制；同步 Infrastructure DD v0.4 与最新 K3s stable channel | 用户要求不限商业使用并采用社区活跃的开源方案 |
