@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.41 (2026-10-02)
+> **文档版本**: v0.43 (2026-10-03)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v1.1 (§6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v1.3 (§6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -17,6 +17,8 @@
 新增 ERUN-P3 旧桌面任务退役：Tauri MockDb 四条 Task、browser-dev fallback 与 Canvas E2E 中已删除 Task 节点引用均已清理；desktop build/定向 fail-closed tests 可由同一 runner 运行（automation-design §4.40 / 实施计划 §6.73）。无既有 desktop node_modules 时只报 blocked，不自动安装；Rust crate 源格式/编译结果另行记录。
 
 新增 ERUN-P4 Schedule 9F2：[P] `scripts/automation/phase9f2_schedule_occurrence.py` 对 Rust domain contract 运行 rustfmt、默认 offline/可显式 online transient package tests、定向 Clippy 与 migration source-text check（automation-design §4.41 / 实施计划 §6.75）。仅在 Cargo.lock 与 HEAD 一致时运行 Cargo；online 模式允许临时依赖解析，最终精确恢复原字节；Clippy 只豁免三类已知旧 lint。它不执行 SQL，不代表 DDL、RLS、concurrency 或 worker 已验收。
+
+新增 ERUN-P4 Schedule 9F3：[P] `scripts/automation/phase9f3_schedule.py` 运行 pinned recurrence、domain/adapter Rust gates 与一次性 loopback PostgreSQL 实测（automation-design §4.42 / 实施计划 §6.76）。migration 双次 apply、5 张表 FORCE RLS catalog 检查、非 superuser tenant-scoped adapter tests；4 个 DB case 覆盖幂等/RLS/append-only、并发 claim/fencing/heartbeat、retry/exhaustion/deadline、TTL/reclaim；disabled Rule 双层 fail closed，lease-expired audit 固定旧 attempt/fencing generation，候选槽与 DST transition probe 各限 32,768 步，最新 domain release tests 26/26。最后一次 DB runner 在 DST probe bound 调整前运行，后续只改 domain materializer，adapter/migration 未变；不连目标 DB、不启 production worker，也不完成 Rule API 或 occurrence→Run/Outbox admission。
 
 新增 ERUN-P1：[P] `scripts/automation/engineering_run_directory.py`，调用方 `docs/automation-design.md §4.36` / `WORKTREE-GROUP-IMPL-PLAN-001 §6.67`。定向 Rust compile、frontend typecheck、仅 disposable loopback PostgreSQL DDL/catalog验证；临时依赖解析可选且恢复原lock；不跑tests/生产migration。状态为目录基础实现，生产身份/SCM ingest/运行验收待完成；证据见 `docs/reports/PHASE-ERUN-DIRECTORY-P1-REPORT.md`。
 
@@ -40,6 +42,7 @@
 | `scripts/automation/engineering_run_directory.py` | 定向compile/typecheck与隔离PostgreSQL目录DDL/catalog、可选 TaskRun identity/shape/FK guard；仅 --cli-tests 显式跑定向单测，可选 backend-only finally恢复manifest/lock；不跑生产migration；不覆盖 ERUN-P3 Task Owner/outbox migration | ERUN-P1/P2；automation-design §4.36/4.37 | 本次提交（见Git） | 🟡 目录基础已检查；ERUN-P3自动化和生产运行门未完成 |
 | `scripts/automation/erun_task_cards.py` | Run Task Cards TypeScript/Vitest gates 与 Tauri desktop build/聚焦测试 gates；输出写日志文件、900 秒超时，依赖未显式安装时返回 blocked；不自动下载依赖、不调用生产数据库 | ERUN-P3 Run Task Cards UI + legacy mock Task retirement；automation-design §4.39-4.40；实施计划 §6.72-6.73 | 本次提交（见Git） | 🟡 自动化脚本已落档；验证状态见阶段报告，不代表生产启用 |
 | `scripts/automation/phase9f2_schedule_occurrence.py` | Schedule 9F2 rustfmt、domain-automation tests、clippy 与 migration source-text contract；日志文件化/900 秒超时；Cargo.lock 干净时运行 Cargo 并精确恢复原字节；默认离线，可显式 --online；Clippy 仅豁免三类旧 lint；不执行 SQL | ERUN-P4 Schedule 9F2；automation-design §4.41；实施计划 §6.75 | 本次提交（见Git） | 🟡 领域与源码 gate；数据库/worker/Run admission 未验收 |
+| `scripts/automation/phase9f3_schedule.py` | Schedule 9F3 rustfmt、domain release tests 26/26、adapter all-targets check/Clippy、4 个 real PostgreSQL adapter cases；disabled Rule fail-closed、旧 attempt/fencing audit 与有界 transition scan 断言；日志文件化/900 秒步骤超时；独立 loopback disposable PG cluster、migration 双次 apply、五表 FORCE RLS 检查与 safe cleanup | ERUN-P4 Schedule 9F3；automation-design §4.42；实施计划 §6.76 | 本次提交（见Git） | 🟡 recurrence/lease substrate 与 disposable PG 已验收；最后一次 DB runner 早于 DST probe bound 的 domain-only 更新；Rule API/worker/Run admission/Auth/Outbox/BI/target DB 仍未完成 |
 | `scripts/automation/__init__.py` | 包初始化, 暴露 4 基类 + CLI | 全部 | TBD | 🟢 完成 |
 | `scripts/automation/dispatcher.py` | 子代理 dispatch 基类 (per §3.1 + §6.1) | H2-1/H2-2/H2-3/H2-4/H2-5 (refactor_template 调用) | TBD | 🟡 stub (invoke / verify / collect_output 待对接 Mavis task 调度) |
 | `scripts/automation/cli_helper/__init__.py` | cli_helper 子包初始化 | 全部 | TBD | 🟢 完成 |
@@ -112,12 +115,15 @@
 | v0.39 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | §0 增补 Run Task Cards 定向 automation 描述；§1 新增 `erun_task_cards.py` 脚本索引；本脚本日志文件化、900 秒超时且无 node_modules 时 fail/block，不做自动依赖下载；同步 automation-design §4.39 与实施计划 §6.72 | Run Task Cards UI/client 代码落地，需要可重放的 bounded frontend gates |
 | v0.40 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | erun_task_cards.py 增加 --desktop-build/--desktop-tests，可运行 provider fail-closed、KanbanCard fixture 与 BoardView error-state 定向测试；移除 Canvas E2E 对已退役 Task 节点的引用；同步 automation-design §4.40 与实施计划 §6.73 | 全仓审查发现旧 Tauri Task mock 与 Canvas E2E 仍引用已退役任务节点 |
 | v0.41 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 phase9f2_schedule_occurrence.py bounded runner；索引默认离线/显式在线临时解析 Rust tests、带三类旧 lint 豁免的 Clippy、rustfmt 与 migration source-text gate；验证后精确恢复 Cargo.lock；同步 automation-design §4.41 与实施计划 §6.75 | Phase 9F2 Schedule domain/schema substrate 交付 |
+| v0.42 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 phase9f3_schedule.py：pinned cron/tzdb materializer、PostgreSQL 18.6 disposable cluster、migration 双次应用、FORCE RLS catalog check、非 superuser runtime role 与 4 个 DB integration scenarios；登记 direct test harness、terminal/deadline sweep 与 cleanup contract；同步 automation-design §4.42 / 实施计划 §6.76 | Phase 9F3 adapter 与隔离 PostgreSQL 端到端验证通过 |
+| v0.43 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 Schedule 9F3 最终证据为 domain release tests 26/26 与候选/DST 探测各 32,768 步上限；登记 disabled Rule 双层 fail-closed 与 lease-expired 旧 attempt/fencing generation 断言；说明 DB runner 在 domain-only probe cap 修正前运行；关联 automation-design v1.3、实施计划 v5.77 | 最终自审更新 9F3 物化器边界及文档验收证据 |
 
 ---
 
 ## 4. 引用文档
 
 - `docs/automation-design.md` v0.1 (上游: 设计文档)
+- `docs/reports/PHASE-9F3-SCHEDULE-REPORT.md` v0.1 (Schedule recurrence / PostgreSQL adapter verification and production gaps)
 - `scripts/automation/smoke_test.py` (校验脚本, 跑通 4 case)
 - `scripts/automation/registry_check.py` (校验脚本, 索引一致性)
 - `AGENTS.md` §4.1 守门派生 v19/v20/v21 (待追加, per §5 守门基线)

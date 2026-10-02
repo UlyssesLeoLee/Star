@@ -237,7 +237,8 @@ CREATE TABLE IF NOT EXISTS automation.occurrence_event (
     occurrence_id UUID NOT NULL,
     event_type VARCHAR(24) NOT NULL CHECK (event_type IN (
         'materialized','lease_claimed','lease_expired','retry_scheduled',
-        'run_admitted','run_succeeded','run_failed','skipped','cancelled'
+        'run_admitted','run_succeeded','run_failed','dispatch_failed',
+        'deadline_expired','skipped','cancelled'
     )),
     attempt_no SMALLINT CHECK (attempt_no IS NULL OR attempt_no BETWEEN 0 AND 25),
     fencing_generation BIGINT CHECK (fencing_generation IS NULL OR fencing_generation > 0),
@@ -300,10 +301,10 @@ BEGIN
         RAISE EXCEPTION 'terminal automation occurrence dispatch cannot be rewritten';
     END IF;
     IF NEW.dispatch_state <> OLD.dispatch_state AND NOT (
-        (OLD.dispatch_state = 'pending' AND NEW.dispatch_state IN ('leased','skipped','cancelled'))
+        (OLD.dispatch_state = 'pending' AND NEW.dispatch_state IN ('leased','failed','skipped','cancelled'))
         OR (OLD.dispatch_state = 'leased' AND NEW.dispatch_state IN
             ('retry_wait','admitted','succeeded','failed','skipped','cancelled'))
-        OR (OLD.dispatch_state = 'retry_wait' AND NEW.dispatch_state IN ('leased','skipped','cancelled'))
+        OR (OLD.dispatch_state = 'retry_wait' AND NEW.dispatch_state IN ('leased','failed','skipped','cancelled'))
         OR (OLD.dispatch_state = 'admitted' AND NEW.dispatch_state IN ('succeeded','failed','cancelled'))
     ) THEN
         RAISE EXCEPTION 'invalid automation occurrence dispatch state transition';

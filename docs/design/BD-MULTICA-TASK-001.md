@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 基本設計書 v0.3**
+> **Multica Task Lifecycle 基本設計書 v0.5**
 >
-> - 状态: 🟡 Draft v0.3
+> - 状态: 🟡 Draft v0.5
 > - 日期: 2026-10-02 JST
-> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.10
+> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.12
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -142,7 +142,7 @@ stateDiagram-v2
 
 WBS row 可保留兼容字段和便于读取的 audit JSON projection；权威 Transaction 记录写入 `task_lifecycle_audit`。projection 可重建，不替代审计事实。混合字段到物理表的拆分属于详细设计确认项。
 
-Schedule rule/occurrence 的实体所有权在 `domain-automation`，迁移位于 `automation` schema；Run admission 仍由 Multica Run writer 在同一短事务重授权 target，并消费当前 generation。occurrence 不因 rule successor 改写；重复 materialization 由 tenant/rule/version/UTC slot 唯一约束收敛。Dispatch Work 表只表示可重建的当前派发状态，所有可审计转换写入 Transaction event。当前阶段仅提供版本化 domain contract 与 migration，cron/timezone 解析器、写 API、持久化 claim/recovery worker、Run/reservation/Outbox transaction 与 BI consumer 尚未装配，Schedule capability 不可用。
+Schedule rule/occurrence 的实体所有权在 `domain-automation`，迁移位于 `automation` schema；Run admission 仍由 Multica Run writer 在同一短事务重授权 target，并消费当前 generation。occurrence 不因 rule successor 改写；重复 materialization 由 tenant/rule/version/UTC slot 唯一约束收敛。Dispatch Work 表只表示可重建的当前派发状态，所有可审计转换写入 Transaction event。Phase 9F3 已实现版本固定的 cron/timezone materializer 与 PostgreSQL rule reader、occurrence persistence、bounded claim/reclaim、heartbeat/retry、deadline/exhaustion terminalization 和 TTL purge；候选槽与 DST transition 探测分别有 32,768 步上限；disabled Rule 在 materializer 与 adapter 两层 fail closed，lease-expired event 保留被回收的旧 attempt 与旧 fencing generation。该 slice 在 PostgreSQL 18.6 disposable cluster 中重复应用 migration 并通过 FORCE RLS/4 个 DB 场景、`domain-automation` release tests 26/26；它没有生产 Rule 写 API、常驻 clock/worker、Run/reservation/Outbox atomic admission、BI consumer 或目标 DB/Auth grants，Schedule producer capability 仍不可用。
 
 ---
 
@@ -219,7 +219,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | AC-10 | Task Card 启动 CLI 时 `worktree_id`、`work_item_id`、`task_card_id` 校验一致；Lifecycle enum 不因 CLI 扩展 |
 | AC-11 | Task Card Index 与 Group Infinite Canvas 是 Worktree 群组同级入口，任务写入经领域命令和 ACL |
 | AC-12 | 插件热插拔只改变入口/capability 暴露，不删除任务、审计和实体引用 |
-| AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、TTL/fencing/RLS 约束可验证；无 parser、worker、Run admission 与目标 DB 验收时不开放 Schedule execution |
+| AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、候选槽与 DST 探测各限 32,768 步、disabled Rule 拒绝物化、lease-expired event 记录旧 attempt/generation、TTL/fencing/RLS 约束可验证；9F3 parser/materializer/adapter 与 domain release 26/26 已通过隔离 PostgreSQL 验收；Rule 写 API、持续 worker、Run admission/Auth/Outbox/BI 与目标 DB 未验收时不开放 Schedule execution |
 
 ---
 
@@ -231,7 +231,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | GAP-2 | Task Card 与 WorkItem ID 的现存 schema 是否一对一，以及旧 WBS task_id 的迁移映射 | 詳細設計 / migration rehearsal |
 | GAP-3 | Runtime profile 对 Claude Code、Codex、OpenCode、Multica CLI 的 capability 映射 | Runtime 詳細設計 |
 | GAP-4 | Global 批量操作的部分成功 UI 与补偿策略 | LangGraph/TMO 詳細設計 |
-| GAP-5 | Schedule schema/domain contract 已落地，但 cron/tzdb parser、rule API、due materializer、lease claim/recovery、同事务 Run/resource reservation/Outbox 与目标 DB/RLS/grants 尚缺 | Phase 9F3+ / production integration |
+| GAP-5 | 9F3 的 pinned cron/tzdb parser、due materializer 与 PostgreSQL lease adapter 已在隔离 PG 验收；disabled Rule 双层 fail closed，lease-expired 审计包含旧 attempt/fence；parser/tzdb registry、Rule 写 API、常驻 worker、同事务 Run/resource reservation/RunEvent/Outbox、BI 与目标 DB/Auth/RLS/grants 尚缺 | Phase 9F4+ / production integration |
 
 ---
 
@@ -242,3 +242,5 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | v0.1 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初版；定义 Worktree 群组入口、生命周期所有权、Task Card 内 CLI、Canvas/插件交互、scope 授权及 W/T/M 数据分类 | 用户要求将渡口 Worktree 顶层树同步至 Multica 与相关基本设计 |
 | v0.2 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 Phase 9F2 Schedule/Occurrence 的 Automation owner、五表 W/T/M、immutable rule/target snapshot、UTC-slot idempotency、lease generation fencing 与未开放 production gates；同步 SRS v0.9、DD v1.22 和根设计 v5.50 | Phase 9F2 持久化 occurrence substrate 实现 |
 | v0.3 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确 occurrence tenant/rule/version/UTC-slot 复合身份；补充 active-lease 防抢占、单调 fencing/attempt、terminal-based TTL 与 migration trigger 不变量；上游同步 SRS v0.10 | Phase 9F2 实现与设计约束逐项对账 |
+| v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
+| v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |

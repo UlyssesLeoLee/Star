@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v1.1 (2026-10-02)
+> **文档版本**: v1.3 (2026-10-03)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1149,6 +1149,12 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 |---|---|---|---|
 | Agent Schedule rule revision / occurrence / lease contract | [P]（R/V/S/A） | `scripts/automation/phase9f2_schedule_occurrence.py --cargo <cargo.exe> --rustfmt <rustfmt.exe> [--online]`；日志落 `.cache/phase9f2-schedule-occurrence/`，每步最多运行 900 秒。默认离线；旧 workspace lock 与离线索引冲突时可显式 `--online`，临时解析/下载结束后精确恢复 `Cargo.lock`。运行 rustfmt、domain-automation library tests、定向 Clippy 和 migration source contract check。Clippy 用 `--no-deps -D warnings`，仅豁免既有 `derivable_impls`、`unnecessary_sort_by`、`bool_assert_comparison` 三类 lint，其余 warning 仍 fail。 | 本轮显式 `--online` 验证：20/20 library tests、rustfmt、定向 Clippy 与 migration source-text gate 通过，Cargo.lock 已还原。Domain tests 与 source-text 仅验证 Rust/迁移源码，不验证 PostgreSQL migration。Docker daemon 不可连接且无 psql/pg_ctl，因此本阶段没有 DDL、RLS、concurrency、TTL、lease fencing 或生产 API/worker 验收；完成状态仅为 domain/schema substrate。 |
 
+### 4.42 Phase 9F3 Schedule recurrence / PostgreSQL lease adapter（2026-10-03）
+
+| 任务卡 | 档位 | 脚本/执行 | 验证边界 |
+|---|---|---|---|
+| Agent Schedule recurrence/materializer 与 PostgreSQL occurrence/dispatch adapter | [P]（R/V/S/A） | `scripts/automation/phase9f3_schedule.py --cargo <cargo.exe> --rustfmt <rustfmt.exe> --postgres-bin-dir <postgres-bin>`；所有步骤写到 `.cache/phase9f3-schedule/`，单步超时 900 秒。依次执行 rustfmt、domain tests、adapter all-targets check、集成 harness `--no-run`、定向 Clippy；随后在该目录下创建随机命名、只监听 `127.0.0.1` 的 PostgreSQL cluster，migration 双次 apply、检查五表 FORCE RLS、建立非 superuser test role，并直接运行刚编译的 harness，最后核对停库成功才删除 cluster。 | PostgreSQL 18.6：domain release tests 26/26 + 上次 runner 4/4 disposable DB tests；验证 idempotency/tenant RLS/append-only、并发 claim/fencing/heartbeat、retry/attempt exhaustion/deadline、terminal TTL/reclaim；disabled Rule 在 materializer/adapter 双层 fail closed；lease-expired event 记录旧 attempt/fencing generation；候选槽和 DST transition probe 分别限制 32,768 步；migration 两次应用及 FORCE RLS catalog check 通过。新增 DST probe bound 后重新运行了 domain debug/release tests、focused rustfmt 与 Clippy，未重跑 PostgreSQL runner；该小修未变更 adapter/migration。生产 Rule write API、长期 worker、Auth/target DB/runtime grants、occurrence→Run/reservation/RunEvent/Outbox 与 BI 没有接入，不能开放生产 Schedule capability。Adapter Clippy 仅放行该 crate 既有四类 lint（empty doc/attribute lines、needless generic borrows、unit let）；新增 Schedule 源文件没有命中这些旧 lint，其它 warning 仍 deny。 |
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1513,6 +1519,8 @@ frontend/src/app/automation-debug/
 | v1.0 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.17 P-AUTO-WT-01 + P-AUTO-WT-02 双收官 增量** (per 2026-09-09 08:13 JST Ulysses "推进" 拍板): routes_tmo.py +150 行 POST /api/tmo/create 端点 (M-N8 HTTP 接入, CreateTaskRequestBody/Result/Response 3 pydantic model) + 修 pre-existing split_node stale import (路由层 4 常量本地化 DEFAULT/MIN/MAX/VALID_SPLIT_STRATEGIES, changelog 标注 per ADR-0049 修复); console_server.py mount_tmo_routes endpoint 列表 + start_print 加 M-N8; tests/e2e/python/test_uc14_auto_worktree.py (新, 5/5 维 E2E 全过: happy path 95ms / SA 映射 4 kind (bug→SA-04 / story→SA-02 / epic→SA-03 / task→SA-01) / human task 拒 400 / missing tenant 拒 422 pydantic 早于业务 / 1:1 attach 2 task → 2 distinct worktree); 守门 #9 v3 (subprocess 起 console_server 8083 + curl 端到端) + #19 v19 (Python 化) + #20 dispatcher brief 实证 + #22 (调试控制台不污染 main 编译) + #1 v3 (跨 sub-session 0 err 收敛) 联合实证; PHASE-AUTO-WORKTREE-IMPL-REPORT v0.2 同步, 3 已知缺口 #7 #8 #9 状态从 ⏳ 改 ✅; 累计 ~100K tokens (本期 v0.2 落档), 后续 G-WT-01 (DB 接入) + G-WT-02 (真 git CLI) 跨 session 续 | 2026-09-09 08:13 JST Ulysses "推进" 拍板 + 守门 #9 v3 + #20 + #21 实证 |
 
 | v1.1 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.41 与 Phase 9F2 专用 bounded runner；记录 source-level migration contract、domain tests、Clippy 和 PostgreSQL 未验收边界 | Phase 9F2 Schedule occurrence substrate 落地并完成代码/设计对账 |
+| v1.2 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.42 与 Phase 9F3 bounded runner、临时 PostgreSQL lifecycle/cleanup、direct compiled harness、4 个 DB scenarios 与精确 production blocker；登记 9F3 status 不代表 target DB/Run admission 已完成 | Phase 9F3 adapter 与 PostgreSQL 实证完成 |
+| v1.3 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §4.42 至 domain release 26/26、独立 32,768-step DST probe bound、disabled Rule 双层 fail-closed 与 lease-expired 旧 attempt/fencing generation 审计语义；注明 PostgreSQL 4/4 场景在 probe-bound 修正前运行且 adapter/migration 未变 | 最终自审修正 Schedule 停用规则、lease audit 关联和长窗口转换探测上限 |
 
 ---
 

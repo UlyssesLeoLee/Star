@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.51 (2026-10-02)
-> **上游要件定义书**: docs/requirements.md v5.54
+> **文档版本**: v5.53 (2026-10-03)
+> **上游要件定义书**: docs/requirements.md v5.56
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4714,7 +4714,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
 
-Schedule Loop 复用 `domain-automation` Rule/occurrence 架构：Phase 9F2 已定义 `AutomationScheduleRuleRevisionV1`、tenant-scoped `AutomationOccurrenceKey`、immutable target/profile/HookSet snapshot 与 lease-fence contract，并新增 automation schema 五表 W/T/M migration（rule SCD2、append-only audit/occurrence/event、带 terminal retention 的 dispatch Work）；唯一槽位键为 tenant/rule/version/UTC slot。数据库 trigger 约束连续 fencing generation、活动 lease 不可被盗、terminal TTL 与到期删除。Migration 尚未部署，Rust `AutomationTrigger` 仍是事件模型；当前无 cron/tzdb parser、rule persistence adapter/API、materializer 或生产 worker，因此不提供 Schedule execution。后续 occurrence 经当前 auth/target/quota admission 成功后才创建独立 Run 并固定 `schedule_rule_id/version/occurrence_id`。Workflow/LangGraph 编排已接受的 Run，不拥有第二份 schedule rule/timer source；`star-scheduler` 只处理 DAG 依赖 readiness、公平队列和 admission，不实现墙钟/Cron。
+Schedule Loop 复用 `domain-automation` Rule/occurrence 架构：Phase 9F2 定义 `AutomationScheduleRuleRevisionV1`、tenant-scoped `AutomationOccurrenceKey`、immutable target/profile/HookSet snapshot 与 lease-fence contract，并新增 automation schema 五表 W/T/M migration（rule SCD2、append-only audit/occurrence/event、带 terminal retention 的 dispatch Work）；唯一槽位键为 tenant/rule/version/UTC slot。Phase 9F3 加入固定版本 `cron 0.17.0`/`chrono-tz 0.10.4` parser、timezone-aware bounded materializer 与 PostgreSQL occurrence/dispatch adapter，覆盖幂等写入、`SKIP LOCKED` claim/reclaim、heartbeat、retry、deadline/attempt exhaustion finalization 和 TTL purge。候选槽扫描和 DST 转换探测分别最多 32,768 步，窗口过宽由调用方拆分并使用游标续页；disabled Rule 在 materializer 与 adapter 两层 fail closed；lease-expired audit event 保留被回收的旧 attempt 与旧 fencing generation。该实现已在 PostgreSQL 18.6 disposable loopback cluster 重复迁移、核对五表 FORCE RLS，并通过四个数据库集成场景，`domain-automation` 最终 release tests 26/26 通过；不表示目标数据库部署、生产 role grants、rule 写 API 或长期 worker 已就绪。Occurrence 仍须经当前 Auth/target/quota admission 后才能同事务创建独立 Run 并固定 `schedule_rule_id/version/occurrence_id`。Workflow/LangGraph 编排已接受的 Run，不拥有第二份 schedule rule/timer source；`star-scheduler` 只处理 DAG dependency readiness、公平队列和 admission，不实现墙钟/Cron。
 
 Engineering Loop 是单一 `TaskExecutionRun` 内受版本化 `LoopPolicy` 约束的有限周期：Plan → Act → Observe → Verify/Evaluate → Decision。每轮只记录可观察的输入摘要、工具类别、结果/证据引用、资源预算和 continue/review/complete/stop 决策；Task Contract/acceptance/profile snapshot 固定不变。stall、oscillation、iteration/time/provider/resource 上限、撤权/cancel/deadline 或 child 未 drain 都生成明确 stop reason。恢复只能从持久 loop boundary/checkpoint 开始并重新授权，不保存 chain-of-thought。
 
@@ -4951,3 +4951,5 @@ Run Workspace 默认选中同级 `Task Cards` tab。`RunTaskCardsPanel` 只调�
 | v5.49 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.52、Task DD v1.21 与 SRS v0.8；在 §16.16 记录 Phase 9F1 Run-local Rust Engineering Loop controller、预算与 drain 边界；明确无 Schedule/Run writer/Auth/CLI/Outbox/BI/跨 Run fair scheduler，Profile v1 成本上限与 retry/backoff 未实现 | 将 Engineering Loop 代码切片与架构要求及生产状态对账 |
 | v5.50 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.53、Task SRS v0.9/Task BD v0.2/DD v1.22；记录 Phase 9F2 版本化 Schedule rule/occurrence/fencing domain contract 与五表 W/T/M migration substrate；明确 migration 未部署、parser/adapter/worker/Run admission/Outbox/BI 与生产 Auth/DB 均开放，未把 schedule 写成可用能力 | 实现 Schedule/Occurrence schema slice 并与方向设计逐项对账 |
 | v5.51 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 requirements v5.54、Task SRS v0.10/Task BD v0.3/DD v1.23 与 Data Design v0.4；补充 tenant-scoped occurrence key、DB dispatch monotonic fencing、active lease 与 terminal TTL invariant；明确 migration/database 未验收 | Phase 9F2 源码自审加强持久化并发与保留边界 |
+| v5.52 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 requirements v5.55、Task SRS v0.11/BD v0.4/DD v1.24 与 Data Design v0.5；记录 9F3 pinned cron/tzdb bounded materializer、PostgreSQL lease adapter、deadline/exhaustion terminalization 与 disposable PostgreSQL 18.6 的重复 migration/FORCE RLS/4 场景验证；保留生产 rule API、Run/Auth/Outbox/BI/目标 DB 为 fail-closed blocker | Phase 9F3 实现和隔离 PostgreSQL 验收通过后同步基本设计 |
+| v5.53 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 requirements v5.56、Task SRS v0.12/BD v0.5/DD v1.25 与 Data Design v0.6；明确两项 32,768 扫描硬上限、disabled Rule 双层 fail-closed、lease-expired 审计的旧 attempt/fencing generation，并同步 domain release tests 26/26；保留 workspace release suite 无诊断 exit -1 与 9F4 生产门 | Phase 9F3 最终自审完成并同步 bounded scan 与 Schedule 安全/审计语义 |

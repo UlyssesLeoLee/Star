@@ -1,4 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// @cypher schema=1 source_sha256=3b1a72994f996119894e34e933aac8703d1f97ba7637f6529f4a76e5b9a9462a
+// MERGE (self:File {path:"crates/agent-bridge/src/sandbox.rs"})
+// MERGE (deny_list:Symbol {id:"crates/agent-bridge/src/sandbox.rs::deny_list",kind:"function"})
+// MERGE (is_denied:Symbol {id:"crates/agent-bridge/src/sandbox.rs::is_denied",kind:"function"})
+// MERGE (run:Symbol {id:"crates/agent-bridge/src/sandbox.rs::run",kind:"function"})
+// MERGE (denied:Type {id:"crates/agent-bridge/src/sandbox.rs::SandboxError"})
+// MERGE (config:Type {id:"crates/agent-bridge/src/sandbox.rs::SandboxConfig"})
+// MERGE (result:Type {id:"crates/agent-bridge/src/sandbox.rs::SandboxResult"})
+// MERGE (windows_shell:ExternalService {id:"windows.cmd.exe",name:"Windows command interpreter"})
+// MERGE (posix_shell:ExternalService {id:"posix.sh",name:"POSIX shell"})
+// MERGE (test_echo:Symbol {id:"crates/agent-bridge/src/sandbox.rs::tests.run_echo_succeeds",kind:"test"})
+// MERGE (self)-[:DEFINES]->(deny_list)
+// MERGE (self)-[:DEFINES]->(is_denied)
+// MERGE (self)-[:DEFINES]->(run)
+// MERGE (self)-[:DEFINES]->(denied)
+// MERGE (self)-[:DEFINES]->(config)
+// MERGE (self)-[:DEFINES]->(result)
+// MERGE (run)-[:CALLS]->(is_denied)
+// MERGE (run)-[:CALLS]->(windows_shell)
+// MERGE (run)-[:CALLS]->(posix_shell)
+// MERGE (is_denied)-[:CALLS]->(deny_list)
+// MERGE (run)-[:USES_TYPE]->(config)
+// MERGE (run)-[:USES_TYPE]->(result)
+// MERGE (run)-[:USES_TYPE]->(denied)
+// MERGE (test_echo)-[:TESTS]->(run)
+// @endcypher
 //! `crates/agent-bridge/src/sandbox.rs` -- ULYS-98-W4.1 Agent sandbox.
 //!
 //! Per `docs/briefs/ulys-98-star-cursor-min-v1.md` Sub-task 4.1.
@@ -102,8 +128,18 @@ pub async fn run(cmd: &str, cfg: &SandboxConfig) -> Result<SandboxResult, Sandbo
     }
 
     let started = std::time::Instant::now();
-    let mut command = Command::new("sh");
-    command.arg("-c").arg(cmd);
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("cmd.exe");
+        command.arg("/C").arg(cmd);
+        command
+    };
+    #[cfg(not(windows))]
+    let mut command = {
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(cmd);
+        command
+    };
     if let Some(wd) = &cfg.workdir {
         command.current_dir(wd);
     }

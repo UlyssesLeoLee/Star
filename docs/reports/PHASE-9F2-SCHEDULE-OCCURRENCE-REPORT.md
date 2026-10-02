@@ -86,3 +86,11 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F2 domain/schema substrate、online transient Rust 验证、Cargo.lock 恢复、CypherGraph Guardian 结果以及未完成的 PostgreSQL/worker/Run admission 门 | Phase 9F2 实现完成并与需求、基本设计和详细设计对账 |
+
+## §8 后续环境发现更正（2026-10-02）
+
+9F2 执行当时未发现可用的 `psql` / `pg_ctl`，因此没有执行该阶段 migration；上述判断准确描述 9F2 当时的运行环境与证据。9F3 后续在 `D:\PostgreSQL\18\bin` 发现 PostgreSQL 18.6 工具，并用独立 disposable loopback cluster 验证 9F3 schema 与 adapter。该新环境不追溯改变 9F2 的验证范围：9F2 migration 在 9F2 阶段仍未应用或执行；9F3 的四个数据库场景只验证当时迁移文件与 adapter 路径。
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1.1 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 保留 9F2 原始环境证据，并补充后来发现 PostgreSQL 18.6 及 9F3 实测的时间边界；不将 9F3 实测记作 9F2 验收 | Phase 9F3 发现本机 PostgreSQL 工具但不改变 9F2 当时证据 |

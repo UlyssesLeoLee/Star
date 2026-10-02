@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v0.4 (2026-10-02)
+> **文档版本**: v0.6 (2026-10-03)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -9,6 +9,8 @@
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 排期调整(V2 候选) / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
 > | v0.3 | 2026-10-02 | 增加 Phase 9F2 automation Schedule rule/occurrence durable substrate 与 W/T/M/RLS 实现对账；目标 DB migration 尚未部署 | Mavis 接手审核 |
 > | v0.4 | 2026-10-02 | 补充 occurrence tenant/rule/version/UTC-slot 复合唯一键、事件 project-scope FK、dispatch fencing/reclaim trigger 与 terminal-based TTL；强调仅源码/schema gate，目标 PostgreSQL/RLS/grants 尚未验收 | Mavis 接手审核 |
+> | v0.5 | 2026-10-02 | 对账 Phase 9F3 pinned cron/tzdb materializer、PostgreSQL persistence/lease adapter 与 disposable PostgreSQL 18.6 的重复 migration、五表 FORCE RLS、idempotency/concurrency/fencing/retry/deadline/TTL 实测；仍区分目标 DB 与生产 Auth/Run admission | Mavis 接手审核 |
+> | v0.6 | 2026-10-03 | 增加候选槽与 DST 转换探测各 32,768 步上限、disabled Rule 双层 fail-closed 与 lease-expired event 旧 attempt/fencing generation 语义；对齐 26/26 domain release tests 和最终验证边界 | Mavis 接手审核 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -1979,7 +1981,7 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 > **注**:`automation_trigger` / `automation_action` 子表本设计合并为 JSONB(§R-AUTO-001 不强制可视化配置器;MVP 简化为单表 JSONB)
 > V1 可考虑拆分(若需要 UI Builder)
 
-#### 4.13.2 Schedule rule revision、occurrence 与 dispatch history (Phase 9F2)
+#### 4.13.2 Schedule rule revision、occurrence 与 dispatch history (Phase 9F3)
 
 实体 owner 仍为 `domain-automation`，PostgreSQL owner schema 为 `automation`。当前增量 migration `db/migrations/2026-10-02-automation-schedule-occurrence.sql` 增加以下五张表：
 
@@ -1991,7 +1993,7 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 | `automation.occurrence_dispatch` | **Work** | attempt count、next attempt、lease owner/expiry、单调连续 fencing generation、occurrence deadline、retention/expiry；expiry = terminal_at + retention_period | tenant FORCE RLS；DB trigger 限制状态、lease fencing 与 terminal mutation；仅 terminal TTL 到期可删除，禁止 TRUNCATE |
 | `automation.occurrence_event` | **Transaction** | materialized/claimed/retry/run-linked/terminal fact、attempt、generation、run/correlation；tenant/Project/occurrence FK 一致 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
 
-重复 occurrence materialization 由 `(tenant_id, rule_id, rule_version, scheduled_for_utc)` 唯一键收敛；UTC instant 保留 DST fold 中两个同名本地时刻的区别。Rule successor 不得改写既有 occurrence。DB dispatch trigger 要求新 claim/reclaim 连续增加 generation 与 attempt，拒绝盗取未过期 lease；同 generation heartbeat 不得换 owner 或缩短 expiry。terminal retention 后才允许物理删除 Work row。当前只交付 domain DTO 和 SQL substrate；migration 未在本机目标 DB 应用，cron/IANA timezone parser、API/repository、worker/heartbeat/retry、同事务 TaskExecutionRun/reservation/Outbox 和生产 role grants/RLS 验收仍开放。
+重复 occurrence materialization 由 `(tenant_id, rule_id, rule_version, scheduled_for_utc)` 唯一键收敛；UTC instant 保留 DST fold 中两个同名本地时刻的区别。Rule successor 不得改写既有 occurrence。DB dispatch trigger 要求新 claim/reclaim 连续增加 generation 与 attempt，拒绝盗取未过期 lease；同 generation heartbeat 不得换 owner 或缩短 expiry。terminal retention 后才允许物理删除 Work row。9F3 以 `cron 0.17.0` + `chrono-tz 0.10.4` 实现固定 parser/tzdb identity、有界窗口物化与 DST/misfire 处理，候选槽与小时级 DST 转换探测各最多 32,768 步；disabled Rule 在 domain materializer 与 PostgreSQL adapter 均拒绝创建 occurrence。`star-pg-adapter` 实现 tenant-local RLS current-rule reader、idempotent occurrence/dispatch/event transaction、bounded `SKIP LOCKED` claim/reclaim、heartbeat/retry、deadline/attempt-exhaustion finalizer 与 Work TTL purge；lease-expired event 明确记录被回收前的 attempt_no 与 fencing_generation，而非新 claim 的身份。最终 domain release tests 26/26；migration 在 PostgreSQL 18.6 disposable loopback 集群重复应用两次，五表 FORCE RLS catalog 检查与非 superuser runtime role 的 4 个 integration scenarios 通过。目标 DB部署、生产 grants/Auth、Rule 写 API、长期 worker、Run/reservation/Outbox atomic admission、BI consumer 仍开放，producer fail closed。
 
 ---
 

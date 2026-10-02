@@ -1,4 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// @cypher schema=1 source_sha256=99620da9166a0879ee9992087d851ba4ff779cea8f30dded68da7fcb3f192586
+// MERGE (self:File {path:"crates/agent-bridge/src/tool.rs"})
+// MERGE (dispatch:Symbol {id:"crates/agent-bridge/src/tool.rs::dispatch",kind:"function"})
+// MERGE (call:Type {id:"crates/agent-bridge/src/tool.rs::ToolCall"})
+// MERGE (output:Type {id:"crates/agent-bridge/src/tool.rs::ToolOutput"})
+// MERGE (sandbox:File {path:"crates/agent-bridge/src/sandbox.rs"})
+// MERGE (sandbox_run:Symbol {id:"crates/agent-bridge/src/sandbox.rs::run",kind:"function"})
+// MERGE (run_test:Symbol {id:"crates/agent-bridge/src/tool.rs::tests.run_cmd_dispatch_echo",kind:"test"})
+// MERGE (self)-[:DEFINES]->(dispatch)
+// MERGE (self)-[:DEFINES]->(call)
+// MERGE (self)-[:DEFINES]->(output)
+// MERGE (self)-[:IMPORTS]->(sandbox)
+// MERGE (dispatch)-[:CALLS]->(sandbox_run)
+// MERGE (dispatch)-[:USES_TYPE]->(call)
+// MERGE (dispatch)-[:USES_TYPE]->(output)
+// MERGE (run_test)-[:TESTS]->(dispatch)
+// @endcypher
 //! `crates/agent-bridge/src/tool.rs` -- ULYS-98-W4.1 Tool calling primitives.
 //!
 //! Per Sub-task 4.1: 4 tools (read_file / edit_file / run_cmd / web_search).
@@ -10,7 +27,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::sandbox::{run as sandbox_run, SandboxConfig, SandboxError, SandboxResult};
+use crate::sandbox::{SandboxConfig, SandboxError, SandboxResult, run as sandbox_run};
 
 #[derive(Debug, Error)]
 pub enum ToolError {

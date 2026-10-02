@@ -68,7 +68,7 @@ members = [
     # Phase G.1 (L0 派发 PoC) 启动: 2026-09-04 注册 crates/star-dispatcher (L0 派发层 + InMemory TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, v0.0.1 PoC stub)
     "crates/star-dispatcher",
     # ULYS-239 (2026-09-30, per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2 P0): star-desktop Tauri 2.0 PoC P0 (Tauri 2.0 + 1 page board + 1 IPC command list_work_items, 守门 #7 0 unsafe + 守门 #19 0 动 V0.1 业务 logic)
-    "crates/star-desktop",
+    "crates/star-desktop/src-tauri",
     # Phase H.5 (Tree-sitter 引入) 启动: 2026-09-04 注册 crates/star-treesitter (5 语言 grammar + 符号提取, per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4, v0.0.1 PoC)
     "crates/star-treesitter",
     # Phase H.6 (Task ↔ Worktree 1:1 绑定 + react-flow) 启动: 2026-09-04 注册 crates/star-taskgraph (TaskCard + Worktree + 1:1 binding + react-flow JSON 渲染, v0.0.1 PoC)
@@ -212,6 +212,9 @@ anyhow = "1"
 # ID / 时间
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+# Schedule recurrence parser and bundled IANA timezone database are pinned for replay.
+cron = "=0.17.0"
+chrono-tz = "=0.10.4"
 
 # 数据库(Phase 2 使用,骨架阶段仅 workspace 声明,infrastructure crate 引用)
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }

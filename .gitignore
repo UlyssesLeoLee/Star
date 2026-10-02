@@ -108,6 +108,8 @@ __pycache__/
 # Runtime data (per 2026-09-09 散落 dirty 整理, 守门 #11 缺标比错标: 不入 git)
 /data/
 
+# Disposable Schedule 9F3 PostgreSQL clusters and validation logs.
+/.cache/phase9f3-schedule/
 
 
 # Transient v0.93 docs sync helper (per 守门 #5 v2 + 守门 #1 v19 batched approach)
@@ -153,3 +155,6 @@ coverage-*/
 /deploy/_local_*
 # Disposable Engineering Run directory compiler/DDL verification artifacts.
 /.cache/engineering-run-directory/
+
+# Tauri v2 generated JSON schemas (regenerated from app config/capabilities).
+/crates/star-desktop/src-tauri/gen/schemas/

@@ -29,6 +29,33 @@ See docs/automation-design.md sections 4.36 and 4.37. Optional Task Run DDL chec
 the new forward CLI identity gate and snapshot/FK constraints in the disposable cluster only.
 """
 
+# @cypher schema=1 source_sha256=d395dc6cd0b6de2f0e3e0f73c65d6b80eb9fa8ee3f26edf4250793e77ff682e9
+# MERGE (self:File {path:"scripts/automation/engineering_run_directory.py"})
+# MERGE (find_cargo:Symbol {id:"scripts/automation/engineering_run_directory.py::find_cargo",kind:"function"})
+# MERGE (run_step:Symbol {id:"scripts/automation/engineering_run_directory.py::run_step",kind:"function"})
+# MERGE (task_guard:Symbol {id:"scripts/automation/engineering_run_directory.py::task_run_identity_guard_sql",kind:"function"})
+# MERGE (validate_ddl:Symbol {id:"scripts/automation/engineering_run_directory.py::validate_postgres_ddl",kind:"function"})
+# MERGE (main:Symbol {id:"scripts/automation/engineering_run_directory.py::main",kind:"function"})
+# MERGE (root:Config {id:"scripts/automation/engineering_run_directory.py::ROOT"})
+# MERGE (process:ExternalService {id:"python.subprocess.run",name:"Python subprocess runner"})
+# MERGE (self)-[:DEFINES]->(find_cargo)
+# MERGE (self)-[:DEFINES]->(run_step)
+# MERGE (self)-[:DEFINES]->(task_guard)
+# MERGE (self)-[:DEFINES]->(validate_ddl)
+# MERGE (self)-[:DEFINES]->(main)
+# MERGE (self)-[:DEFINES]->(root)
+# MERGE (run_step)-[:CALLS]->(process)
+# MERGE (main)-[:CALLS]->(find_cargo)
+# MERGE (main)-[:CALLS]->(run_step)
+# MERGE (main)-[:CALLS]->(validate_ddl)
+# MERGE (validate_ddl)-[:CALLS]->(run_step)
+# MERGE (validate_ddl)-[:CALLS]->(task_guard)
+# MERGE (find_cargo)-[:USES_TYPE]->(root)
+# MERGE (run_step)-[:USES_TYPE]->(root)
+# MERGE (validate_ddl)-[:USES_TYPE]->(root)
+# MERGE (main)-[:USES_TYPE]->(root)
+# @endcypher
+
 from __future__ import annotations
 
 import argparse
@@ -303,7 +330,7 @@ def main() -> int:
         command = [str(cargo), "check", "-p", "star-api-rest", "--all-targets"] + cargo_options
         try:
             if options.backend_only:
-                candidate, count = re.subn(rb'(?m)^    "crates/star-desktop",\r?\n', b"", original_manifest)
+                candidate, count = re.subn(rb'(?m)^    "crates/star-desktop/src-tauri",\r?\n', b"", original_manifest)
                 if count != 1:
                     raise ValueError("Expected exactly one desktop workspace member")
                 manifest_path.write_bytes(candidate)

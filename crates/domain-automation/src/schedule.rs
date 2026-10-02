@@ -4,7 +4,7 @@
 //! It intentionally contains no in-memory scheduler or worker; materialization, claiming, and
 //! Run creation must be committed by the application layer against PostgreSQL.
 //!
-//! @cypher schema=1 source_sha256=226d2380bc53a0173347f8dc5e5ac0b4b862460468a9bab9677249f24ba5f6c8
+//! @cypher schema=1 source_sha256=58c06f99a2173e52b272891e66aa1e302bf96538185a80213273d0a6d84b477e
 //! MERGE (self:File {path:"crates/domain-automation/src/schedule.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-automation/src/schedule.rs::schedule",kind:"module"})
 //! MERGE (target:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1"})
@@ -55,12 +55,23 @@
 //! MERGE (occurrence_validate)-[:CALLS]->(rule_validate)
 //! @endcypher
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, LocalResult, NaiveDateTime, Offset, TimeZone, Utc};
+use chrono_tz::Tz;
+use cron::Schedule;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::RuleId;
+
+/// Exact cron parser build accepted for new Schedule materialization.
+pub const SCHEDULE_PARSER_VERSION: &str = "star-cron-compat-1+cron-0.17.0";
+/// Exact bundled IANA timezone-data provider build accepted for materialization.
+pub const SCHEDULE_TZDB_VERSION: &str = "chrono-tz-0.10.4";
+const MAX_SCHEDULE_SCAN_SLOTS: usize = 32_768;
+const MAX_TRANSITION_PROBE_SECONDS: i64 = 3_600;
+const MAX_TRANSITION_PROBES: usize = 32_768;
 
 /// A fully resolved Worktree-first target for one scheduled run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -438,6 +449,359 @@ pub enum ScheduleContractError {
     LeasePastDeadline,
 }
 
+/// Whether a materialized slot should be dispatched or retained as a skipped fact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleOccurrenceDispositionV1 {
+    /// The slot is eligible for a worker lease.
+    Pending,
+    /// The slot is retained for audit but must not start a Run.
+    Skipped,
+}
+
+/// One bounded, reproducible cron slot and its durable occurrence snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaterializedScheduleOccurrenceV1 {
+    /// Immutable identity, rule snapshot, local label, and offset for this UTC slot.
+    pub snapshot: AutomationOccurrenceSnapshotV1,
+    /// The initial dispatch state derived from the rule's misfire policy.
+    pub disposition: ScheduleOccurrenceDispositionV1,
+}
+
+/// A bounded materialization page. Continue after `resume_after_utc` when `has_more` is true.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleMaterializationBatchV1 {
+    /// Ordered occurrence snapshots and initial dispatch dispositions.
+    pub occurrences: Vec<MaterializedScheduleOccurrenceV1>,
+    /// Last emitted UTC slot; use as the exclusive lower bound for the next page.
+    pub resume_after_utc: Option<DateTime<Utc>>,
+    /// More matching slots exist in the requested interval.
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SlotCandidate {
+    scheduled_for_utc: DateTime<Utc>,
+    scheduled_local: NaiveDateTime,
+    utc_offset_seconds: i32,
+    shifted_from_gap: bool,
+}
+
+/// Stable failures from the pinned recurrence parser and timezone-aware materializer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum ScheduleMaterializationError {
+    /// The versioned Rule DTO itself is invalid.
+    #[error("schedule rule contract is invalid")]
+    InvalidRule,
+    /// This binary does not contain the parser release pinned by the Rule.
+    #[error("schedule cron parser version is not supported by this worker")]
+    UnsupportedParserVersion,
+    /// This binary does not contain the timezone-data build pinned by the Rule.
+    #[error("schedule timezone data version is not supported by this worker")]
+    UnsupportedTzdbVersion,
+    /// The cron expression is not accepted by the pinned parser.
+    #[error("schedule cron expression is invalid")]
+    InvalidCronExpression,
+    /// The named timezone is not in the pinned IANA database.
+    #[error("schedule timezone is not present in the pinned IANA database")]
+    UnknownTimeZone,
+    /// The materialization interval is empty, reversed, or has an invalid misfire cutoff.
+    #[error("schedule materialization interval is invalid")]
+    InvalidWindow,
+    /// The requested result page exceeds the explicit per-call bound.
+    #[error("schedule materialization page bound is invalid")]
+    InvalidPageLimit,
+    /// Candidate slots or timezone-transition probes exceed the bound; split into smaller windows.
+    #[error("schedule materialization window exceeds the bounded scan capacity")]
+    WindowTooDense,
+    /// A timestamp in the requested interval cannot be represented by Chrono.
+    #[error("schedule materialization timestamp is out of range")]
+    TimestampOutOfRange,
+}
+
+/// Resolve a versioned Rule into a bounded page of timezone-aware UTC occurrences.
+///
+/// `after_utc` is exclusive, `through_utc` is inclusive, and `misfire_cutoff_utc` is a
+/// caller-owned checkpoint boundary. Slots at or before that boundary follow the frozen
+/// Skip/CoalesceLatest/CatchUp policy. The caller must persist the returned page atomically
+/// before advancing its checkpoint.
+pub fn materialize_schedule_window(
+    rule: &AutomationScheduleRuleRevisionV1,
+    after_utc: DateTime<Utc>,
+    through_utc: DateTime<Utc>,
+    misfire_cutoff_utc: DateTime<Utc>,
+    materialized_at: DateTime<Utc>,
+    page_limit: usize,
+) -> Result<ScheduleMaterializationBatchV1, ScheduleMaterializationError> {
+    if !rule.enabled || rule.validate().is_err() {
+        return Err(ScheduleMaterializationError::InvalidRule);
+    }
+    if rule.parser_version != SCHEDULE_PARSER_VERSION {
+        return Err(ScheduleMaterializationError::UnsupportedParserVersion);
+    }
+    if rule.tzdb_version != SCHEDULE_TZDB_VERSION {
+        return Err(ScheduleMaterializationError::UnsupportedTzdbVersion);
+    }
+    if after_utc >= through_utc
+        || misfire_cutoff_utc > through_utc
+        || !(1..=256).contains(&page_limit)
+    {
+        return Err(if (1..=256).contains(&page_limit) {
+            ScheduleMaterializationError::InvalidWindow
+        } else {
+            ScheduleMaterializationError::InvalidPageLimit
+        });
+    }
+
+    let parser_expression = normalize_cron_expression(&rule.cron_expression);
+    let schedule = Schedule::from_str(&parser_expression)
+        .map_err(|_| ScheduleMaterializationError::InvalidCronExpression)?;
+    let timezone: Tz = rule
+        .time_zone
+        .parse()
+        .map_err(|_| ScheduleMaterializationError::UnknownTimeZone)?;
+    let mut candidates = Vec::new();
+    let start_local = after_utc.with_timezone(&timezone);
+
+    for scheduled_local in schedule
+        .after(&start_local)
+        .take(MAX_SCHEDULE_SCAN_SLOTS + 1)
+    {
+        let scheduled_for_utc = scheduled_local.with_timezone(&Utc);
+        if scheduled_for_utc > through_utc {
+            break;
+        }
+        if candidates.len() == MAX_SCHEDULE_SCAN_SLOTS {
+            return Err(ScheduleMaterializationError::WindowTooDense);
+        }
+        if fold_candidate_is_selected(&timezone, &scheduled_local, rule.dst_fold_policy) {
+            candidates.push(SlotCandidate {
+                scheduled_for_utc,
+                scheduled_local: scheduled_local.naive_local(),
+                utc_offset_seconds: scheduled_local.offset().fix().local_minus_utc(),
+                shifted_from_gap: false,
+            });
+        }
+    }
+
+    if rule.dst_gap_policy == ScheduleDstGapPolicyV1::ShiftForward {
+        append_shifted_gap_slots(
+            &schedule,
+            &timezone,
+            after_utc,
+            through_utc,
+            &mut candidates,
+        )?;
+    }
+
+    candidates.sort_by_key(|candidate| {
+        (
+            candidate.scheduled_for_utc,
+            candidate.shifted_from_gap,
+            candidate.scheduled_local,
+        )
+    });
+    candidates.dedup_by(|right, left| right.scheduled_for_utc == left.scheduled_for_utc);
+
+    let newest_misfire = candidates
+        .iter()
+        .filter(|slot| slot.scheduled_for_utc <= misfire_cutoff_utc)
+        .map(|slot| slot.scheduled_for_utc)
+        .max();
+    let catch_up_slots: Vec<DateTime<Utc>> = match rule.misfire_policy {
+        ScheduleMisfirePolicyV1::CatchUp { max_occurrences } => candidates
+            .iter()
+            .filter(|slot| slot.scheduled_for_utc <= misfire_cutoff_utc)
+            .rev()
+            .take(usize::from(max_occurrences))
+            .map(|slot| slot.scheduled_for_utc)
+            .collect(),
+        _ => Vec::new(),
+    };
+
+    let mut occurrences = Vec::with_capacity(page_limit.min(candidates.len()));
+    for candidate in candidates.iter().take(page_limit) {
+        let is_misfire = candidate.scheduled_for_utc <= misfire_cutoff_utc;
+        let disposition = if !is_misfire {
+            ScheduleOccurrenceDispositionV1::Pending
+        } else {
+            match rule.misfire_policy {
+                ScheduleMisfirePolicyV1::Skip => ScheduleOccurrenceDispositionV1::Skipped,
+                ScheduleMisfirePolicyV1::CoalesceLatest
+                    if Some(candidate.scheduled_for_utc) == newest_misfire =>
+                {
+                    ScheduleOccurrenceDispositionV1::Pending
+                }
+                ScheduleMisfirePolicyV1::CoalesceLatest => ScheduleOccurrenceDispositionV1::Skipped,
+                ScheduleMisfirePolicyV1::CatchUp { .. }
+                    if catch_up_slots.contains(&candidate.scheduled_for_utc) =>
+                {
+                    ScheduleOccurrenceDispositionV1::Pending
+                }
+                ScheduleMisfirePolicyV1::CatchUp { .. } => ScheduleOccurrenceDispositionV1::Skipped,
+            }
+        };
+        occurrences.push(MaterializedScheduleOccurrenceV1 {
+            snapshot: AutomationOccurrenceSnapshotV1 {
+                schema_version: 1,
+                occurrence_id: Uuid::new_v4(),
+                key: AutomationOccurrenceKey {
+                    tenant_id: rule.tenant_id,
+                    rule_id: rule.rule_id,
+                    rule_version: rule.rule_version,
+                    scheduled_for_utc: candidate.scheduled_for_utc,
+                },
+                rule_snapshot: rule.clone(),
+                scheduled_local_label: candidate
+                    .scheduled_local
+                    .format("%Y-%m-%dT%H:%M:%S")
+                    .to_string(),
+                utc_offset_seconds: candidate.utc_offset_seconds,
+                materialized_at,
+            },
+            disposition,
+        });
+    }
+
+    Ok(ScheduleMaterializationBatchV1 {
+        resume_after_utc: occurrences
+            .last()
+            .map(|occurrence| occurrence.snapshot.key.scheduled_for_utc),
+        has_more: candidates.len() > occurrences.len(),
+        occurrences,
+    })
+}
+
+fn normalize_cron_expression(expression: &str) -> String {
+    match expression.split_whitespace().count() {
+        5 => format!("0 {expression}"),
+        _ => expression.to_owned(),
+    }
+}
+
+fn fold_candidate_is_selected(
+    timezone: &Tz,
+    occurrence: &DateTime<Tz>,
+    policy: ScheduleDstFoldPolicyV1,
+) -> bool {
+    match timezone.from_local_datetime(&occurrence.naive_local()) {
+        LocalResult::Single(_) => true,
+        LocalResult::Ambiguous(first, second) => {
+            let (earlier, later) = if first.timestamp() <= second.timestamp() {
+                (first, second)
+            } else {
+                (second, first)
+            };
+            let selected = match policy {
+                ScheduleDstFoldPolicyV1::EarlierInstant => earlier,
+                ScheduleDstFoldPolicyV1::LaterInstant => later,
+            };
+            selected.timestamp() == occurrence.timestamp()
+        }
+        LocalResult::None => false,
+    }
+}
+
+fn append_shifted_gap_slots(
+    schedule: &Schedule,
+    timezone: &Tz,
+    after_utc: DateTime<Utc>,
+    through_utc: DateTime<Utc>,
+    candidates: &mut Vec<SlotCandidate>,
+) -> Result<(), ScheduleMaterializationError> {
+    let mut probe = after_utc.timestamp();
+    let end = through_utc.timestamp();
+    let mut probe_count = 0;
+    while probe < end {
+        probe_count += 1;
+        if probe_count > MAX_TRANSITION_PROBES {
+            return Err(ScheduleMaterializationError::WindowTooDense);
+        }
+        let next_probe = probe.saturating_add(MAX_TRANSITION_PROBE_SECONDS).min(end);
+        let old_offset = offset_at_utc_second(timezone, probe)?;
+        let new_offset = offset_at_utc_second(timezone, next_probe)?;
+        if new_offset > old_offset {
+            let transition_second =
+                locate_offset_transition(timezone, probe, next_probe, old_offset)?;
+            let transition = Utc
+                .timestamp_opt(transition_second, 0)
+                .single()
+                .ok_or(ScheduleMaterializationError::TimestampOutOfRange)?;
+            if transition > after_utc && transition <= through_utc {
+                let missing_local_start = naive_from_wall_second(
+                    transition_second.saturating_add(i64::from(old_offset)),
+                )?;
+                let missing_local_end = naive_from_wall_second(
+                    transition_second.saturating_add(i64::from(new_offset)),
+                )?;
+                let resolved_offset = offset_at_utc_second(timezone, transition_second)?;
+                let mut wall_time = missing_local_start;
+                while wall_time < missing_local_end {
+                    if schedule.includes(DateTime::<Utc>::from_naive_utc_and_offset(wall_time, Utc))
+                    {
+                        if candidates.len() == MAX_SCHEDULE_SCAN_SLOTS {
+                            return Err(ScheduleMaterializationError::WindowTooDense);
+                        }
+                        candidates.push(SlotCandidate {
+                            scheduled_for_utc: transition,
+                            scheduled_local: wall_time,
+                            utc_offset_seconds: resolved_offset,
+                            shifted_from_gap: true,
+                        });
+                    }
+                    wall_time = wall_time
+                        .checked_add_signed(Duration::seconds(1))
+                        .ok_or(ScheduleMaterializationError::TimestampOutOfRange)?;
+                }
+            }
+            probe = transition_second;
+        } else {
+            probe = next_probe;
+        }
+    }
+    Ok(())
+}
+
+fn offset_at_utc_second(
+    timezone: &Tz,
+    unix_second: i64,
+) -> Result<i32, ScheduleMaterializationError> {
+    let instant = Utc
+        .timestamp_opt(unix_second, 0)
+        .single()
+        .ok_or(ScheduleMaterializationError::TimestampOutOfRange)?;
+    Ok(timezone
+        .offset_from_utc_datetime(&instant.naive_utc())
+        .fix()
+        .local_minus_utc())
+}
+
+fn locate_offset_transition(
+    timezone: &Tz,
+    mut low: i64,
+    mut high: i64,
+    old_offset: i32,
+) -> Result<i64, ScheduleMaterializationError> {
+    while high - low > 1 {
+        let middle = low + (high - low) / 2;
+        if offset_at_utc_second(timezone, middle)? == old_offset {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    Ok(high)
+}
+
+fn naive_from_wall_second(unix_second: i64) -> Result<NaiveDateTime, ScheduleMaterializationError> {
+    Utc.timestamp_opt(unix_second, 0)
+        .single()
+        .map(|instant| instant.naive_utc())
+        .ok_or(ScheduleMaterializationError::TimestampOutOfRange)
+}
+
 fn is_lower_hex_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -452,9 +816,11 @@ mod tests {
 
     use super::{
         AutomationOccurrenceKey, AutomationOccurrenceLeaseFenceV1, AutomationOccurrenceSnapshotV1,
-        AutomationScheduleRuleRevisionV1, ScheduleContractError, ScheduleDstFoldPolicyV1,
-        ScheduleDstGapPolicyV1, ScheduleMisfirePolicyV1, ScheduleOverlapPolicyV1,
-        SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleTargetV1,
+        AutomationScheduleRuleRevisionV1, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
+        ScheduleContractError, ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1,
+        ScheduleMaterializationError, ScheduleMisfirePolicyV1, ScheduleOccurrenceDispositionV1,
+        ScheduleOverlapPolicyV1, SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleTargetV1,
+        materialize_schedule_window,
     };
     use crate::RuleId;
 
@@ -484,8 +850,8 @@ mod tests {
             project_id,
             cron_expression: "0 9 * * 1-5".to_owned(),
             time_zone: "Asia/Tokyo".to_owned(),
-            parser_version: "star-cron-v1".to_owned(),
-            tzdb_version: "2026a".to_owned(),
+            parser_version: SCHEDULE_PARSER_VERSION.to_owned(),
+            tzdb_version: SCHEDULE_TZDB_VERSION.to_owned(),
             dst_gap_policy: ScheduleDstGapPolicyV1::Skip,
             dst_fold_policy: ScheduleDstFoldPolicyV1::EarlierInstant,
             overlap_policy: ScheduleOverlapPolicyV1::QueueOne,
@@ -581,6 +947,194 @@ mod tests {
         assert_eq!(
             fence.validate(now),
             Err(ScheduleContractError::LeasePastDeadline)
+        );
+    }
+
+    fn utc(value: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(value)
+            .expect("fixed timestamp")
+            .with_timezone(&chrono::Utc)
+    }
+
+    #[test]
+    fn materializer_pins_parser_and_tzdb_and_emits_bounded_utc_slots() {
+        let mut rule = schedule_rule();
+        rule.cron_expression = "0 9 * * *".to_owned();
+        let batch = materialize_schedule_window(
+            &rule,
+            utc("2026-10-04T23:00:00Z"),
+            utc("2026-10-05T01:00:00Z"),
+            utc("2026-10-04T23:30:00Z"),
+            utc("2026-10-04T23:31:00Z"),
+            16,
+        )
+        .expect("valid UTC slot");
+        assert_eq!(batch.occurrences.len(), 1);
+        assert!(!batch.has_more);
+        assert_eq!(
+            batch.occurrences[0].snapshot.key.scheduled_for_utc,
+            utc("2026-10-05T00:00:00Z")
+        );
+        assert_eq!(
+            batch.occurrences[0].snapshot.scheduled_local_label,
+            "2026-10-05T09:00:00"
+        );
+        assert_eq!(batch.occurrences[0].snapshot.utc_offset_seconds, 32_400);
+        assert_eq!(
+            batch.occurrences[0].disposition,
+            ScheduleOccurrenceDispositionV1::Pending
+        );
+
+        rule.parser_version = "cron-unsupported".to_owned();
+        assert_eq!(
+            materialize_schedule_window(
+                &rule,
+                utc("2026-10-04T23:00:00Z"),
+                utc("2026-10-05T01:00:00Z"),
+                utc("2026-10-04T23:30:00Z"),
+                utc("2026-10-04T23:31:00Z"),
+                16,
+            ),
+            Err(ScheduleMaterializationError::UnsupportedParserVersion)
+        );
+    }
+
+    #[test]
+    fn disabled_rule_cannot_be_materialized() {
+        let mut rule = schedule_rule();
+        rule.enabled = false;
+        assert_eq!(
+            materialize_schedule_window(
+                &rule,
+                utc("2026-10-04T23:00:00Z"),
+                utc("2026-10-05T01:00:00Z"),
+                utc("2026-10-04T23:30:00Z"),
+                utc("2026-10-04T23:31:00Z"),
+                16,
+            ),
+            Err(ScheduleMaterializationError::InvalidRule)
+        );
+    }
+
+    #[test]
+    fn materializer_selects_the_configured_dst_fold_instant() {
+        let mut rule = schedule_rule();
+        rule.cron_expression = "0 30 1 * * *".to_owned();
+        rule.time_zone = "America/New_York".to_owned();
+        rule.misfire_policy = ScheduleMisfirePolicyV1::Skip;
+        rule.dst_fold_policy = ScheduleDstFoldPolicyV1::EarlierInstant;
+        let earlier = materialize_schedule_window(
+            &rule,
+            utc("2026-11-01T04:00:00Z"),
+            utc("2026-11-01T07:00:00Z"),
+            utc("2026-11-01T04:00:00Z"),
+            utc("2026-11-01T04:00:01Z"),
+            16,
+        )
+        .expect("earlier fold slot");
+        assert_eq!(earlier.occurrences.len(), 1);
+        assert_eq!(
+            earlier.occurrences[0].snapshot.key.scheduled_for_utc,
+            utc("2026-11-01T05:30:00Z")
+        );
+
+        rule.dst_fold_policy = ScheduleDstFoldPolicyV1::LaterInstant;
+        let later = materialize_schedule_window(
+            &rule,
+            utc("2026-11-01T04:00:00Z"),
+            utc("2026-11-01T07:00:00Z"),
+            utc("2026-11-01T04:00:00Z"),
+            utc("2026-11-01T04:00:01Z"),
+            16,
+        )
+        .expect("later fold slot");
+        assert_eq!(later.occurrences.len(), 1);
+        assert_eq!(
+            later.occurrences[0].snapshot.key.scheduled_for_utc,
+            utc("2026-11-01T06:30:00Z")
+        );
+    }
+
+    #[test]
+    fn materializer_skips_or_shifts_dst_gap_slots_and_records_the_local_label() {
+        let mut rule = schedule_rule();
+        rule.cron_expression = "0 30 2 * * *".to_owned();
+        rule.time_zone = "America/New_York".to_owned();
+        rule.misfire_policy = ScheduleMisfirePolicyV1::Skip;
+        rule.dst_gap_policy = ScheduleDstGapPolicyV1::Skip;
+        let skipped = materialize_schedule_window(
+            &rule,
+            utc("2026-03-08T06:00:00Z"),
+            utc("2026-03-08T08:00:00Z"),
+            utc("2026-03-08T06:00:00Z"),
+            utc("2026-03-08T06:00:01Z"),
+            16,
+        )
+        .expect("gap skip");
+        assert!(skipped.occurrences.is_empty());
+
+        rule.dst_gap_policy = ScheduleDstGapPolicyV1::ShiftForward;
+        let shifted = materialize_schedule_window(
+            &rule,
+            utc("2026-03-08T06:00:00Z"),
+            utc("2026-03-08T08:00:00Z"),
+            utc("2026-03-08T06:00:00Z"),
+            utc("2026-03-08T06:00:01Z"),
+            16,
+        )
+        .expect("gap shift");
+        assert_eq!(shifted.occurrences.len(), 1);
+        assert_eq!(
+            shifted.occurrences[0].snapshot.key.scheduled_for_utc,
+            utc("2026-03-08T07:00:00Z")
+        );
+        assert_eq!(
+            shifted.occurrences[0].snapshot.scheduled_local_label,
+            "2026-03-08T02:30:00"
+        );
+        assert_eq!(shifted.occurrences[0].snapshot.utc_offset_seconds, -14_400);
+    }
+
+    #[test]
+    fn materializer_applies_misfire_policy_and_returns_a_resume_cursor() {
+        let mut rule = schedule_rule();
+        rule.cron_expression = "0 9 * * *".to_owned();
+        rule.time_zone = "UTC".to_owned();
+        rule.misfire_policy = ScheduleMisfirePolicyV1::CatchUp { max_occurrences: 1 };
+        let batch = materialize_schedule_window(
+            &rule,
+            utc("2026-10-04T08:00:00Z"),
+            utc("2026-10-06T10:00:00Z"),
+            utc("2026-10-06T10:00:00Z"),
+            utc("2026-10-06T10:00:01Z"),
+            1,
+        )
+        .expect("bounded catch-up");
+        assert_eq!(batch.occurrences.len(), 1);
+        assert!(batch.has_more);
+        assert_eq!(batch.resume_after_utc, Some(utc("2026-10-04T09:00:00Z")));
+        assert_eq!(
+            batch.occurrences[0].disposition,
+            ScheduleOccurrenceDispositionV1::Skipped
+        );
+    }
+
+    #[test]
+    fn shift_forward_transition_scan_has_an_independent_window_bound() {
+        let mut rule = schedule_rule();
+        rule.cron_expression = "0 0 0 1 1 *".to_owned();
+        rule.time_zone = "America/New_York".to_owned();
+        rule.dst_gap_policy = ScheduleDstGapPolicyV1::ShiftForward;
+        assert_eq!(
+            materialize_schedule_window(
+                &rule,
+                utc("2026-01-01T00:00:00Z"),
+                utc("2036-01-01T00:00:00Z"),
+                utc("2026-01-01T00:00:00Z"),
+                utc("2026-01-01T00:00:01Z"),
+                16,
+            ),
+            Err(ScheduleMaterializationError::WindowTooDense)
         );
     }
 }

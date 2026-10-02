@@ -1,3 +1,28 @@
+/*
+@cypher schema=1 source_sha256=e68dd3ebc3f7ba01a4a1e755f91db09065e230b673bc4cd1b4692513e2256860
+MERGE (self:File {path:"crates/star-desktop/src-tauri/src/db_adapter.rs"})
+MERGE (error:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapterError"})
+MERGE (worktree:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbWorktree"})
+MERGE (canvas:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbCanvasEntity"})
+MERGE (adapter:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter"})
+MERGE (mock:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::MockDb"})
+MERGE (mock_new:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::MockDb.new",kind:"method"})
+MERGE (list_worktrees:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_worktrees",kind:"method"})
+MERGE (list_canvas:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_canvas_entities",kind:"method"})
+MERGE (self)-[:DEFINES]->(error)
+MERGE (self)-[:DEFINES]->(worktree)
+MERGE (self)-[:DEFINES]->(canvas)
+MERGE (self)-[:DEFINES]->(adapter)
+MERGE (self)-[:DEFINES]->(mock)
+MERGE (mock)-[:DEFINES]->(mock_new)
+MERGE (adapter)-[:DEFINES]->(list_worktrees)
+MERGE (adapter)-[:DEFINES]->(list_canvas)
+MERGE (mock)-[:IMPLEMENTS]->(adapter)
+MERGE (list_worktrees)-[:USES_TYPE]->(worktree)
+MERGE (list_canvas)-[:USES_TYPE]->(canvas)
+@endcypher
+*/
+//! Bounded data adapter for the legacy Worktree and Canvas shell projections.
 // crates/star-desktop/src-tauri/src/db_adapter.rs (NEW PR-245)
 // =====================================================================
 // Star Desktop — Tauri 2.0 PoC P4 DB Adapter skeleton
@@ -24,31 +49,49 @@ use thiserror::Error;
 pub enum DbAdapterError {
     /// 连接失败
     #[error("DB connection failed: {message}")]
-    ConnectionFailed { message: String },
+    ConnectionFailed {
+        /// Safe diagnostic detail for a connection failure.
+        message: String,
+    },
     /// 查询失败
     #[error("DB query failed: {message}")]
-    QueryFailed { message: String },
+    QueryFailed {
+        /// Safe diagnostic detail for a query failure.
+        message: String,
+    },
     /// 不支持的操作 (P4.1+ 才接真实 DB)
     #[error("Operation not yet implemented: {message}")]
-    NotImplemented { message: String },
+    NotImplemented {
+        /// Name of the operation that has no implementation yet.
+        message: String,
+    },
 }
 
 /// Domain-level Worktree (守门: 字段与 crates/domain-worktree Worktree struct 对齐, 但本 crate 自定义)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbWorktree {
+    /// Stable display identifier.
     pub id: String,
+    /// User-facing worktree name.
     pub name: String,
+    /// Branch display name.
     pub branch: String,
+    /// Bounded display status label.
     pub status: String, // WorktreeStatus snake_case
 }
 
 /// Domain-level CanvasEntity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbCanvasEntity {
+    /// Stable entity identifier.
     pub id: String,
+    /// Entity kind used by the Canvas renderer.
     pub kind: String,
+    /// User-facing entity label.
     pub title: String,
+    /// Horizontal canvas position.
     pub x: f64,
+    /// Vertical canvas position.
     pub y: f64,
 }
 
@@ -58,7 +101,9 @@ pub struct DbCanvasEntity {
 /// 当前 PR 提供 MockDb impl (4 demo worktrees + 4 demo canvas entities).
 /// Task Card 数据只能由 canonical Run-scoped backend 提供；此 adapter 不生成任务。
 pub trait DbAdapter: Send + Sync {
+    /// Return the currently available Worktree projection rows.
     fn list_worktrees(&self) -> Result<Vec<DbWorktree>, DbAdapterError>;
+    /// Return the currently available Canvas projection rows.
     fn list_canvas_entities(&self) -> Result<Vec<DbCanvasEntity>, DbAdapterError>;
 }
 
@@ -69,12 +114,14 @@ pub struct MockDb {
 }
 
 impl MockDb {
+    /// Create an in-memory fixture adapter with no recorded operations.
     pub fn new() -> Self {
         Self {
             operations: Mutex::new(0),
         }
     }
 
+    /// Return the number of fixture queries performed so far.
     pub fn operation_count(&self) -> u32 {
         *self.operations.lock().unwrap()
     }
@@ -146,7 +193,6 @@ impl DbAdapter for MockDb {
     }
 }
 
-
 // =====================================================================
 // Unit tests (MockDb + DbAdapterError)
 // =====================================================================
@@ -173,7 +219,6 @@ mod tests {
         assert_eq!(db.operation_count(), 1);
     }
 
-    #[test]
     #[test]
     fn mock_db_list_canvas_entities_returns_four() {
         let db = MockDb::new();

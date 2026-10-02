@@ -1,3 +1,21 @@
+/*
+@cypher schema=1 source_sha256=a1ba1a2b2fc90505fb9707a4c5336d1e069ef63491087f3ceb76c91f3101055f
+MERGE (self:File {path:"crates/star-desktop/src-tauri/src/ipc_adapter.rs"})
+MERGE (board_adapter:Type {id:"crates/star-desktop/src-tauri/src/ipc_adapter.rs::BoardAdapter"})
+MERGE (worktree_adapter:Type {id:"crates/star-desktop/src-tauri/src/ipc_adapter.rs::WorktreeAdapter"})
+MERGE (canvas_adapter:Type {id:"crates/star-desktop/src-tauri/src/ipc_adapter.rs::CanvasAdapter"})
+MERGE (board_kind:Type {id:"domain_board::BoardKind"})
+MERGE (swimlane:Type {id:"domain_board::SwimlaneGroupBy"})
+MERGE (worktree_status:Type {id:"domain_worktree::WorktreeStatus"})
+MERGE (self)-[:DEFINES]->(board_adapter)
+MERGE (self)-[:DEFINES]->(worktree_adapter)
+MERGE (self)-[:DEFINES]->(canvas_adapter)
+MERGE (self)-[:IMPORTS]->(board_kind)
+MERGE (self)-[:IMPORTS]->(swimlane)
+MERGE (self)-[:IMPORTS]->(worktree_status)
+@endcypher
+*/
+//! Small, typed compatibility projections used by the legacy Tauri shell.
 // crates/star-desktop/src-tauri/src/ipc_adapter.rs (NEW)
 // =====================================================================
 // Star Desktop — Tauri 2.0 PoC P2 IPC Adapter (PR-241 follow-up of PR #240)
@@ -16,7 +34,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
 use domain_board::{BoardKind, SwimlaneGroupBy};
+#[cfg(test)]
 use domain_worktree::WorktreeStatus;
 use serde::{Deserialize, Serialize};
 
@@ -70,7 +90,7 @@ impl BoardAdapter {
 pub struct WorktreeAdapter;
 
 impl WorktreeAdapter {
-    /// 6 WorktreeStatus variants (Active / Behind / Ahead / Conflicting / Stale / Merged) 守门
+    /// Six health display labels exposed by this compatibility projection.
     pub fn worktree_status_count() -> u32 {
         6
     }
@@ -192,8 +212,8 @@ mod tests {
 
     #[test]
     fn worktree_status_validate_real_enum() {
-        // 守门: domain_worktree::WorktreeStatus enum 真实存在
-        let _active = WorktreeStatus::Active;
+        // The canonical lifecycle enum contains Ready; health labels remain a separate projection.
+        let _ready = WorktreeStatus::Ready;
     }
 
     #[test]

@@ -14,11 +14,10 @@
 
 ```
 crates/star-desktop/
-├── Cargo.toml                  # Rust crate manifest (lib + bin)
 ├── README.md                   # 本文件 (per PR-274 actualize)
 ├── .gitignore                  # + keys/ + secrets/ (per PR-257)
 ├── src-tauri/
-│   ├── Cargo.toml              # Tauri binary manifest (per PR-239)
+│   ├── Cargo.toml              # Tauri lib + binary manifest (workspace member)
 │   ├── build.rs                # tauri-build (codegen)
 │   ├── tauri.conf.json         # Tauri app config (window + bundle + plugins.updater per PR-256)
 │   ├── capabilities/default.json # 默认权限 (core:default)
@@ -57,16 +56,16 @@ crates/star-desktop/
 
 | # | Command | 入参 | 出参 | 来源 | PR |
 |---|---|---|---|---|---|
-| 1 | `list_work_items` | 无 | `Vec<WorkItem>` (mock 4 items) | P0 mock → P4 MockDb | #239, #245 |
-| 2 | `list_worktree_groups` | 无 | `Vec<WorktreeGroup>` (mock 3 groups) | P1 mock → P4 MockDb | #240, #245 |
-| 3 | `list_canvas_entities` | 无 | `Vec<CanvasEntity>` (mock 4 entities) | P1 mock → P4 MockDb | #240, #245 |
+| 1 | `list_work_items` | 无 | `Result<Vec<WorkItem>, String>`（无 Run provider 时返回 unavailable） | 原 P0 demo Task 已退役；canonical Run provider 接入前 fail closed | #239, #245, Phase 9F |
+| 2 | `list_worktree_groups` | 无 | `Vec<WorktreeGroup>`（当前为 4 条 demo fixture） | P1 compatibility demo → P4 MockDb；不可作为 Project/Branch/Run 权威目录 | #240, #245 |
+| 3 | `list_canvas_entities` | 无 | `Vec<CanvasEntity>`（当前为 4 条 demo fixture） | P1 compatibility demo → P4 MockDb；不可作为 Run Canvas 持久化或权威读模型 | #240, #245 |
 | 4 | `get_app_version` | 无 | `String` (semver from `CARGO_PKG_VERSION`) | P1 env | #240 |
 | 5 | `get_keyboard_layout` | 无 | `KeyboardLayout` (W/T/M swimlane + 6 statuses) | P1 static | #240 |
 | 6 | `get_board_info` | 无 | `BoardInfo` (board_kind_count + swimlane_group_by_count + default_column_count) | P2 adapter | #241 |
 | 7 | `get_worktree_info` | 无 | `WorktreeInfo` (worktree_status_count + health_dimensions) | P2 adapter | #241 |
 | 8 | `get_canvas_info` | 无 | `CanvasInfo` (route_prefix + phase_count) | P2 adapter | #241 |
 
-**8 IPC commands 完整** — 不是 "1 IPC mock" (本 README 早期 version 描述已过时, per PR-274 actualize).
+**8 IPC commands 完整** — Task IPC 已 fail closed，不返回演示 Task；Worktree/Canvas IPC 仍只用于 legacy shell demo，不能冒充生产 Run 应用数据。
 
 ## 复用 crates (守门 #19: 0 改 V0.1 业务 logic)
 
@@ -83,7 +82,7 @@ Cargo.toml `[lints] workspace = true` 继承 workspace lint (`unsafe_code = "for
 
 - ❌ 实际 `cargo tauri dev` 跑起来 (需 Linux build host per PR-242, 或更大内存 Windows)
 - ❌ 实际 `cargo tauri build` 全 bundle build (per PR-253 P6 distribution)
-- ❌ 真实 DB 接入 (per PR-245, MockDb 现仅返 4 mock items; P4.1+ 接 crates/domain-board database)
+- ❌ 真实 Project/Branch/Run、Worktree 与 Canvas provider/DB 接入；当前 `MockDb` 只为 legacy demo 提供 Worktree/Canvas fixture，不包含 Task Card，也不是生产管理数据
 - ❌ Tauri 2.0 Windows build verification (STATUS_STACK_BUFFER_OVERRUN per PR-239 — 待 PR-242 Linux CI 触发)
 - ❌ Code signing + 公证 + auto-updater 实战 (per PR-256 P8, 待 cert + 12 secrets 配置)
 

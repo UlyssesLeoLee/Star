@@ -8,10 +8,13 @@ license.workspace = true
 repository.workspace = true
 description = "Star Desktop — Tauri 2.0 + 1 page board (PoC P0, per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)"
 
-# Tauri binary requires a binary target
+[lib]
+name = "star_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [[bin]]
 name = "star-desktop"
-path = "src-tauri/src/main.rs"
+path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -23,10 +26,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 # 复用现有 crates (守门 #19: 0 动业务 logic, 本 crate 新文件 adapter 仅用 enum/struct)
-domain-board = { path = "../../crates/domain-board" }
-domain-worktree = { path = "../../crates/domain-worktree" }
-canvas-engine = { path = "../../crates/canvas-engine" }
-relationship-engine-wasm = { path = "../../crates/relationship-engine-wasm" }
+domain-board = { path = "../../../crates/domain-board" }
+domain-worktree = { path = "../../../crates/domain-worktree" }
+canvas-engine = { path = "../../../crates/canvas-engine" }
+relationship-engine-wasm = { path = "../../../crates/relationship-engine-wasm" }
 
 [lints]
 workspace = true

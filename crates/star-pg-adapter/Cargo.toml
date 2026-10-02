@@ -21,6 +21,9 @@ sqlx = { workspace = true }
 # UUID + chrono (workspace 已有)
 uuid = { workspace = true }
 chrono = { workspace = true }
+domain-automation = { path = "../domain-automation" }
+sha2 = { workspace = true }
+hex = { workspace = true }
 # tracing
 tracing = "0.1"
 
