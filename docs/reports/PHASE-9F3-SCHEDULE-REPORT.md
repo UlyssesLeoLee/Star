@@ -1,6 +1,6 @@
 # PHASE-9F3 Schedule Recurrence / PostgreSQL Adapter 阶段报告
 
-> 版本：v0.1.4（2026-10-03）
+> 版本：v0.1.5（2026-10-03）
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > 状态：🟢 pinned recurrence 与 disposable PostgreSQL adapter substrate 完成；生产 Schedule capability 仍 fail closed
 
@@ -92,7 +92,7 @@
 | SRE Lead | Mavis 接手审核：disposable PG 成功；目标数据库 rollout、grants、worker 运维未验收 |
 | 平台 | Mavis 接手审核：current domain release 26/26、adapter/isolated PostgreSQL（DST probe cap 前）、focused rustfmt/Clippy、workspace all-targets check（-j 2）、Clippy/release build/rustdoc/bench compile 已通过；全量 workspace release test 最终复跑出现无诊断 exit -1，最新 bounded-scan 修正后未重跑；全仓 fmt drift 与既有 warnings 已披露 |
 | 评审主持 | Mavis 接手审核：人工复核 recurrence、tenant RLS/fencing、审计事实、disabled Rule fail-closed、desktop wiring 与文档差异；CodeRabbit 因 WSL permission denied 未完成 |
-| PM | Mavis 接手审核：9F3 targeted PostgreSQL 与 workspace check/build/doc/bench gates 完成；最终 bounded-scan 修正后的 domain debug/release tests 26/26、Clippy 与 focused rustfmt 通过；完整 workspace release test 受环境异常中断且未在最新小修后重跑；集成前核验后 rebase/fast-forward merge/push 到 dev，随后进入 9F4 Rule API、production worker 与 Run admission integration |
+| PM | Mavis 接手审核：9F3 targeted PostgreSQL 与 workspace check/build/doc/bench gates 完成；最终 bounded-scan 修正后的 domain debug/release tests 26/26、Clippy 与 focused rustfmt 通过；完整 workspace release test 受环境异常中断且未在最新小修后重跑；commit `4de395d4` 已快进集成到本地 `dev`，普通 `git push origin dev` 因 SSH `kex_exchange_identification: Connection closed by remote host` 失败，远端未确认更新；9F4 尚未开始 |
 
 ## §7 修订历史
 
@@ -103,3 +103,4 @@
 | v0.1.2 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 Tauri package/lib/bin/build wiring、icons 与 CI cache 路径；按平台修复 Windows agent shell 调用；记录 desktop/workspace tests、workspace check/Clippy/release tests/release build 通过，撤销 v0.1.1 已被实证推翻的 workspace 阻塞结论；保留全仓 fmt drift、CodeRabbit 不可用及 9F4 生产缺口 | 完成集成前 workspace/release gate 并复核既有 desktop scaffold |
 | v0.1.3 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 自审强化 disabled Rule materialization fail closed，并修正 lease-expired BI/audit event 的 attempt 与旧 fencing generation 对齐；domain release 25/25、4/4 isolated-PG 场景、workspace check/doc/benchmark compile 通过；如实记录全 workspace release test 最终复跑 exit -1、全仓 fmt drift 与 9F4 缺口 | 集成前复核发现 disabled Rule 执行风险和审计 attempt/fence 对应问题 |
 | v0.1.4 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加独立 DST transition probe 32,768 步上限与超限拆窗语义；最新 domain debug/release tests 26/26、Clippy/rustfmt 通过；透明记录 PostgreSQL 4/4 runner 在该 domain-only 修正前运行、完整 workspace suite 与 CodeRabbit 限制及 9F4 缺口 | 自审发现长窗口稀疏 Schedule 在 ShiftForward 策略下的时区探测 CPU 无独立上限 |
+| v0.1.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F3 commit `4de395d4` 已本地快进集成到 `dev`；push 因远端 SSH 连接关闭失败，明确远端尚未确认更新；9F4 保持未开始 | 完成本地 dev 集成并验证远端写入受网络连接阻塞 |
