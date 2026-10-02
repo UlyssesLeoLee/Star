@@ -1,6 +1,6 @@
 # 渡口架构与交付方向
 
-> v1.0 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.3 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 >
 > 对照：requirements §50、basic-design §16、DD-WORKTREE-GROUP-001、WORKTREE-GROUP-IMPL-PLAN-001。本指引安排交付顺序，不替代既有 Phase 完成门。源码、编译、数据库与产品运行证据分别记录。
 
@@ -93,4 +93,20 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 
 每个批次先记录修改的 owner/API/存储与验收条件，完成后对比需求、基本设计、详细设计和实施计划。代码改善了设计时，同步修订所有受影响层；仅有代码时标“实现”，有编译时标“编译”，数据库/部署/真实产品闭环分别追加证据。归属迁移、授权、资源上限与 cleanup 不允许用 mock 或 UI 标签代替。
 
-本轮改进：RunContext 与 WorktreeFocus 的版本分开；目录分页增加与 keyset 顺序一致的索引；强制策略与可卸载 App 边界分开。完整工程进度见实施计划 §6.67，不宣称所有 Phase 已完成。
+本轮改进：RunContext 与 WorktreeFocus 的版本分开；CLI 采用 server-resolved directory identity、strict immutable snapshot、V2 fence/signature v3 与 attachment 再授权门；Hooks 深链绑定当前会话和已授权目录。完整进度见实施计划 §6.67/§6.68 和阶段报告，不宣称所有 Phase 已完成。
+
+下一轮先复用三层 Run authority，建立 Task→EngineeringRun 的唯一 canonical owner 与可审计历史 reconciliation，再提供 Run Task API/独立 App 和 CLI owner/focus 一致校验；Canvas owner 和跨 App 引用随后迁移。真实身份、可信 SCM/grants 写入、目标数据库/RLS 与 production Runtime/sandbox/独立验证同时推进；未满足前继续显示可解释的阻断状态。Run Task 完成门是同 Run 切换 checkout 保留同一任务、跨 Run 拒绝读写、撤权/并发/幂等可审计，并由真实 CLI 验证写回形成闭环。
+
+## 8. 本地基础设施方向
+
+增加 Rust Host Infrastructure Manager，以 Rust provider contract 连接 Multipass 本地 VM、Podman machine、Linux Incus、Lima 和用户自有/远端 Linux K3s；不按用途、行业、部署规模、seat、用量或商业 tier 限制。K3s 运行在 Linux guest/node。GPL/AGPL/LGPL 允许商业使用与销售，不因 copyleft 排除；产品支持既有 provider 检测、安装引导及履行实际发行义务后的受管安装/捆绑，不得强制手工自装。逐版本审查发行 SBOM/NOTICE 与近 12 个月上游维护证据；法律发行义务不构成商业用途/客户/功能限制。Multipass 是本地开发/测试 VM 管理器，不能替代不可信 Agent Runtime sandbox；Hook、lease/cancel/drain、BI 与固定负载性能仍须逐项验收。见 DD-LOCAL-INFRASTRUCTURE-001 v0.4 / 实施计划 §6.69-6.70；当前未验证 Star provider、许可闭包、RSS 与安全隔离。
+
+## 9. 商用开源基础设施
+
+基础设施选择以渡口自身 Rust provider contract 为主，按 OS 和已发现 capability 连接外部设施并保留可替换 backend；不因 copyleft 排除合法商业方案，也不设置用途、行业、seat、用量或付费 tier 限制。分发修改/组合组件时履行源码、NOTICE 等对应发行义务；产品提供检测、引导和履约后的受管安装/捆绑路径。Multipass 作为跨平台本地开发 VM 候选，Incus 负责 Linux shared VM/container，Podman machine/Lima 提供替换 backend，远端 Linux K3s 降低桌面常驻资源。K3s 不原生支持 Windows；各版本 capability、权限、完整依赖闭包、性能和任务执行需实测。资源准入按实际主机容量与安全策略工作，不映射为商业付费限制。
+
+## 修订历史
+
+| 版本 | 日期 | 修订内容 | 触发 |
+|---|---|---|---|
+| v1.3 | 2026-10-02 | 明确 unrestricted commercial use 与许可证发行义务的界线；加入 provider 检测、安装引导和合规受管安装/捆绑；明确硬件准入不是商业用途/用量限制；同步 Infrastructure DD v0.4 与最新 K3s stable channel | 用户要求不限商业使用并采用社区活跃的开源方案 |

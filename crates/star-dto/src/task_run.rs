@@ -1,9 +1,9 @@
 //! CYPHER STRUCTURAL MANIFEST
 //! CREATE
 //!   (f:File {name:"task_run.rs",type:"file",language:"rust"}),(m:Module {name:"task_run",type:"module",language:"rust"}),
-//!   (profile:Class {name:"TaskRunProfileRevisionIdentity",type:"class",language:"rust"}),(catalog:Class {name:"TaskRunCatalogRevisionIdentity",type:"class",language:"rust"}),(hook:Class {name:"TaskRunHookSetIdentity",type:"class",language:"rust"}),(budget:Class {name:"TaskRunResourceBudget",type:"class",language:"rust"}),(binding:Class {name:"TaskRunSpawnFenceBindingV1",type:"class",language:"rust"}),(fence:Class {name:"TaskRunSpawnFence",type:"class",language:"rust"}),
-//!   (digest:Function {name:"TaskRunSpawnFenceBindingV1::binding_digest",type:"function",language:"rust"}),(binding_valid:Function {name:"TaskRunSpawnFenceBindingV1::is_valid",type:"function",language:"rust"}),(well_formed:Function {name:"TaskRunSpawnFence::is_well_formed",type:"function",language:"rust"}),(valid:Function {name:"TaskRunSpawnFence::is_valid_at",type:"function",language:"rust"}),(digest_valid:Function {name:"is_lower_hex_sha256_digest",type:"function",language:"rust"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(profile),(m)-[:CONTAINS]->(catalog),(m)-[:CONTAINS]->(hook),(m)-[:CONTAINS]->(budget),(m)-[:CONTAINS]->(binding),(m)-[:CONTAINS]->(fence),(binding)-[:HAS_METHOD]->(digest),(binding)-[:HAS_METHOD]->(binding_valid),(fence)-[:HAS_METHOD]->(well_formed),(fence)-[:HAS_METHOD]->(valid),(well_formed)-[:CALLS]->(binding_valid),(well_formed)-[:CALLS]->(digest),(valid)-[:CALLS]->(well_formed),(well_formed)-[:CALLS]->(digest_valid);
+//!   (profile:Class {name:"TaskRunProfileRevisionIdentity",type:"class",language:"rust"}),(catalog:Class {name:"TaskRunCatalogRevisionIdentity",type:"class",language:"rust"}),(hook:Class {name:"TaskRunHookSetIdentity",type:"class",language:"rust"}),(budget:Class {name:"TaskRunResourceBudget",type:"class",language:"rust"}),(identity:Class {name:"TaskRunEngineeringRunIdentityV1",type:"class",language:"rust"}),(binding:Class {name:"TaskRunSpawnFenceBindingV2",type:"class",language:"rust"}),(fence:Class {name:"TaskRunSpawnFence",type:"class",language:"rust"}),
+//!   (digest:Function {name:"TaskRunSpawnFenceBindingV2::binding_digest",type:"function",language:"rust"}),(binding_valid:Function {name:"TaskRunSpawnFenceBindingV2::is_valid",type:"function",language:"rust"}),(identity_valid:Function {name:"TaskRunEngineeringRunIdentityV1::is_valid",type:"function",language:"rust"}),(writer_valid:Function {name:"is_writer_role",type:"function",language:"rust"}),(well_formed:Function {name:"TaskRunSpawnFence::is_well_formed",type:"function",language:"rust"}),(valid:Function {name:"TaskRunSpawnFence::is_valid_at",type:"function",language:"rust"}),(digest_valid:Function {name:"is_lower_hex_sha256_digest",type:"function",language:"rust"}),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(profile),(m)-[:CONTAINS]->(catalog),(m)-[:CONTAINS]->(hook),(m)-[:CONTAINS]->(budget),(m)-[:CONTAINS]->(identity),(m)-[:CONTAINS]->(binding),(m)-[:CONTAINS]->(fence),(binding)-[:HAS_METHOD]->(digest),(binding)-[:HAS_METHOD]->(binding_valid),(identity)-[:HAS_METHOD]->(identity_valid),(identity_valid)-[:CALLS]->(writer_valid),(binding)-[:USES]->(identity),(fence)-[:HAS_METHOD]->(well_formed),(fence)-[:HAS_METHOD]->(valid),(well_formed)-[:CALLS]->(binding_valid),(well_formed)-[:CALLS]->(digest),(valid)-[:CALLS]->(well_formed),(well_formed)-[:CALLS]->(digest_valid),(binding_valid)-[:CALLS]->(identity_valid);
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -70,10 +70,79 @@ pub struct TaskRunResourceBudget {
     pub max_event_buffer_bytes: u32,
 }
 
+/// Server-resolved canonical directory, membership, and focus identities for one Task Run.
+/// The client supplies neither these IDs nor the permission snapshots. Every referenced
+/// revision/binding must be current in the admission transaction and rechecked before spawn.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskRunEngineeringRunIdentityV1 {
+    pub tenant_id: Uuid,
+    pub project_id: Uuid,
+    pub repository_id: Uuid,
+    pub branch_id: Uuid,
+    /// Exact current canonical Git branch ref, also checked against the checkout binding.
+    pub branch_full_ref: String,
+    pub engineering_run_id: Uuid,
+    pub worktree_id: Uuid,
+    pub work_item_id: Uuid,
+    pub worktree_project_binding_id: Uuid,
+    pub worktree_project_binding_version: i32,
+    pub project_role_binding_id: Uuid,
+    pub project_role_binding_version: i32,
+    pub project_role: String,
+    pub branch_revision_id: Uuid,
+    pub branch_revision_version: i32,
+    pub branch_role_binding_id: Uuid,
+    pub branch_role_binding_version: i32,
+    pub branch_role: String,
+    pub engineering_run_revision_id: Uuid,
+    pub engineering_run_revision_version: i32,
+    pub engineering_run_role_binding_id: Uuid,
+    pub engineering_run_role_binding_version: i32,
+    pub engineering_run_role: String,
+    pub engineering_run_worktree_binding_id: Uuid,
+    pub engineering_run_worktree_binding_version: i32,
+}
+
+impl TaskRunEngineeringRunIdentityV1 {
+    /// Require a complete tuple and writer grant at all three authorization scopes.
+    pub fn is_valid(&self) -> bool {
+        ![
+            self.tenant_id,
+            self.project_id,
+            self.repository_id,
+            self.branch_id,
+            self.engineering_run_id,
+            self.worktree_id,
+            self.work_item_id,
+            self.worktree_project_binding_id,
+            self.project_role_binding_id,
+            self.branch_revision_id,
+            self.branch_role_binding_id,
+            self.engineering_run_revision_id,
+            self.engineering_run_role_binding_id,
+            self.engineering_run_worktree_binding_id,
+        ]
+        .contains(&Uuid::nil())
+            && self.worktree_project_binding_version > 0
+            && self.project_role_binding_version > 0
+            && self.branch_revision_version > 0
+            && self.branch_role_binding_version > 0
+            && self.engineering_run_revision_version > 0
+            && self.engineering_run_role_binding_version > 0
+            && self.engineering_run_worktree_binding_version > 0
+            && self.branch_full_ref.starts_with("refs/heads/")
+            && (12..=512).contains(&self.branch_full_ref.len())
+            && is_writer_role(&self.project_role)
+            && is_writer_role(&self.branch_role)
+            && is_writer_role(&self.engineering_run_role)
+    }
+}
+
 /// Bounded, versioned cross-crate representation of all facts that authorize one Runtime spawn.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct TaskRunSpawnFenceBindingV1 {
+pub struct TaskRunSpawnFenceBindingV2 {
     /// Tenant scope.
     pub tenant_id: Uuid,
     /// Authenticated actor scope.
@@ -98,18 +167,20 @@ pub struct TaskRunSpawnFenceBindingV1 {
     pub catalog_revisions: TaskRunCatalogRevisionIdentity,
     /// Verified effective HookSet identity.
     pub hook_set: TaskRunHookSetIdentity,
+    /// Canonical Engineering Run directory identity and current Project/Branch/Run grants.
+    pub engineering_run: TaskRunEngineeringRunIdentityV1,
     /// Fixed resource ceilings for this Run.
     pub resource_budget: TaskRunResourceBudget,
     /// Original user request fingerprint used for idempotency.
     pub request_fingerprint: [u8; 32],
 }
 
-impl TaskRunSpawnFenceBindingV1 {
-    /// Hash this exact typed binding with the C4 domain separator used by REST and Runtime.
+impl TaskRunSpawnFenceBindingV2 {
+    /// Hash this exact typed binding with the C5 domain separator used by REST and Runtime.
     pub fn binding_digest(&self) -> Result<[u8; 32], serde_json::Error> {
         let encoded = serde_json::to_vec(self)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"star.task_run_spawn_fence.v1\0");
+        hasher.update(b"star.task_run_spawn_fence.v2\0");
         hasher.update(encoded);
         Ok(hasher.finalize().into())
     }
@@ -146,6 +217,12 @@ impl TaskRunSpawnFenceBindingV1 {
             && self.resource_budget.max_provider_calls > 0
             && self.resource_budget.max_output_bytes > 0
             && self.resource_budget.max_event_buffer_bytes > 0
+            && self.engineering_run.is_valid()
+            && self.engineering_run.tenant_id == self.tenant_id
+            && self.engineering_run.project_id == self.project_id
+            && self.engineering_run.repository_id == self.repository_id
+            && self.engineering_run.worktree_id == self.worktree_id
+            && self.engineering_run.work_item_id == self.work_item_id
     }
 }
 
@@ -160,9 +237,16 @@ pub struct TaskRunSpawnFence {
     /// Fence expiration time.
     pub expires_at: DateTime<Utc>,
     /// Exact bounded decision binding.
-    pub binding: TaskRunSpawnFenceBindingV1,
-    /// Digest of `binding` under the versioned C4 domain separator.
+    pub binding: TaskRunSpawnFenceBindingV2,
+    /// Digest of `binding` under the versioned V2 domain separator.
     pub binding_digest: [u8; 32],
+}
+
+fn is_writer_role(role: &str) -> bool {
+    matches!(
+        role,
+        "tenant_admin" | "project_admin" | "developer" | "agent"
+    )
 }
 
 impl TaskRunSpawnFence {

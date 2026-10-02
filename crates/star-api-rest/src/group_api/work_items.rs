@@ -9,6 +9,10 @@
 //! CREATE (rb:Class {name:"ReviewCommandBody",type:"class",language:"rust"}),(rv:Function {name:"review_work_item",type:"function",language:"rust"}),(vrb:Function {name:"validate_review_body",type:"function",language:"rust"}),(rr:Function {name:"require_task_reviewer",type:"function",language:"rust"});
 //! MATCH (m:Module {name:"work_items",type:"module",language:"rust"}),(rt:Function {name:"router",type:"function"}),(rv:Function {name:"review_work_item",type:"function",language:"rust"}),(rb:Class {name:"ReviewCommandBody",type:"class",language:"rust"}),(vrb:Function {name:"validate_review_body",type:"function",language:"rust"}),(rr:Function {name:"require_task_reviewer",type:"function",language:"rust"}),(hk:Function {name:"request_hash",type:"function"}),(lk:Function {name:"lookup_idempotency",type:"function"}),(sv:Function {name:"save_idempotency",type:"function"}),(ld:Function {name:"load_work_item",type:"function"});
 //! CREATE (m)-[:CONTAINS]->(rb),(m)-[:CONTAINS]->(rv),(m)-[:CONTAINS]->(vrb),(m)-[:CONTAINS]->(rr),(rt)-[:CALLS]->(rv),(rv)-[:USES]->(rb),(rv)-[:CALLS]->(vrb),(rv)-[:CALLS]->(rr),(rv)-[:CALLS]->(hk),(rv)-[:CALLS]->(lk),(rv)-[:CALLS]->(sv),(rv)-[:CALLS]->(ld);
+//! CYPHER STRUCTURE MANIFEST: Run-scoped Task Card reads and Worktree owner validation.
+//! CREATE (scope:Class {name:"RunTaskScope",type:"class",language:"rust"}),(runList:Function {name:"list_run_work_items",type:"function",language:"rust"}),(runAuthorize:Function {name:"authorize_task_run_for_worktree",type:"function",language:"rust"}),(runScopeAuthorize:Function {name:"authorize_run_task_scope",type:"function",language:"rust"}),(worktreeRunQuery:Function {name:"resolve_worktree_run",type:"function",language:"rust"});
+//! MATCH (m:Module {name:"work_items",type:"module",language:"rust"}),(rt:Function {name:"router",type:"function",language:"rust"}),(create:Function {name:"create_work_item",type:"function",language:"rust"}),(list:Function {name:"list_work_items",type:"function",language:"rust"}),(scope:Class {name:"RunTaskScope",type:"class",language:"rust"}),(runList:Function {name:"list_run_work_items",type:"function",language:"rust"}),(runAuthorize:Function {name:"authorize_task_run_for_worktree",type:"function",language:"rust"}),(runScopeAuthorize:Function {name:"authorize_run_task_scope",type:"function",language:"rust"}),(worktreeRunQuery:Function {name:"resolve_worktree_run",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(runList),(m)-[:CONTAINS]->(runAuthorize),(rt)-[:CALLS]->(runList),(create)-[:CALLS]->(runAuthorize),(list)-[:CALLS]->(runAuthorize),(runAuthorize)-[:CALLS]->(runScopeAuthorize),(runAuthorize)-[:CALLS]->(worktreeRunQuery),(runAuthorize)-[:RETURNS]->(scope),(runList)-[:USES]->(scope);
 
 use axum::{
     extract::{Path, Query, State},
@@ -66,6 +70,7 @@ pub(super) struct AiTaskData {
 #[derive(Debug, Deserialize)]
 struct WorkItemListQuery {
     limit: Option<i64>,
+    after: Option<Uuid>,
 }
 
 #[derive(Debug, FromRow)]
@@ -116,6 +121,10 @@ pub(super) fn router() -> Router<GroupApiState> {
             get(list_work_items).post(create_work_item),
         )
         .route(
+            "/api/v1/engineering-runs/{run_id}/work-items",
+            get(list_run_work_items),
+        )
+        .route(
             "/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}",
             get(get_work_item),
         )
@@ -148,9 +157,17 @@ async fn create_work_item(
         .begin()
         .await
         .map_err(|_| GroupApiError::internal())?;
+    sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+        .bind(actor.user_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let run_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
     let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     require_task_writer(&binding.role)?;
+    require_task_writer(&run_scope.role)?;
     validate_ai_task_scope(&body, worktree.repo_id)?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -160,17 +177,29 @@ async fn create_work_item(
     let work_item_id = Uuid::new_v4();
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
     sqlx::query(
+        "SELECT set_config('app.actor_id', $1, true), set_config('app.correlation_id', $2, true)",
+    )
+    .bind(actor.user_id.to_string())
+    .bind(correlation_id.to_string())
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
         r#"
         INSERT INTO multica.task_metadata
-            (work_item_id, tenant_id, workspace_id, project_id, item_type, title,
+            (work_item_id, tenant_id, workspace_id, project_id, repository_id, branch_id,
+             engineering_run_id, item_type, title,
              description, priority, labels, ai_task_data, reporter_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         "#,
     )
     .bind(work_item_id)
     .bind(actor.tenant_id)
     .bind(worktree.workspace_id)
     .bind(worktree.project_id)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
     .bind(&body.item_type)
     .bind(body.title.trim())
     .bind(&body.description)
@@ -258,6 +287,8 @@ async fn list_work_items(
         .await
         .map_err(|_| GroupApiError::internal())?;
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let run_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
     let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     let rows = sqlx::query_as::<_, WorkItemProjection>(
         r#"
@@ -268,28 +299,119 @@ async fn list_work_items(
         JOIN multica.task_metadata m
           ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
          AND m.project_id = l.project_id AND m.valid_to IS NULL
+        JOIN multica.engineering_run_worktree_binding run_binding
+          ON run_binding.tenant_id = l.tenant_id AND run_binding.project_id = l.project_id
+         AND run_binding.worktree_id = l.worktree_id AND run_binding.valid_to IS NULL
+         AND run_binding.repository_id = m.repository_id AND run_binding.branch_id = m.branch_id
+         AND run_binding.engineering_run_id = m.engineering_run_id
         JOIN multica.task_lifecycle_current c
           ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
         WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3 AND l.valid_to IS NULL
-        ORDER BY c.updated_at DESC, m.work_item_id DESC
-        LIMIT $4
+          AND m.repository_id = $4 AND m.branch_id = $5 AND m.engineering_run_id = $6
+          AND ($7::UUID IS NULL OR m.work_item_id < $7)
+        ORDER BY m.work_item_id DESC
+        LIMIT $8
         "#,
     )
     .bind(actor.tenant_id)
     .bind(worktree.project_id)
     .bind(worktree_id)
-    .bind(limit)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
+    .bind(query.after)
+    .bind(limit + 1)
     .fetch_all(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    let mut rows = rows;
+    let has_more = rows.len() > limit as usize;
+    if has_more {
+        rows.pop();
+    }
+    let next_after = has_more
+        .then(|| rows.last().map(|row| row.work_item_id))
+        .flatten();
     let items = rows.into_iter().map(project_work_item).collect::<Vec<_>>();
     Ok(Json(json!({
         "worktree_id": worktree_id,
+        "engineering_run_id": run_scope.engineering_run_id,
         "project_id": worktree.project_id,
         "role": binding.role,
         "permission_snapshot_ref": format!("{}:v{}", binding.id, binding.version),
+        "run_role": run_scope.role,
+        "run_permission_snapshot_ref": run_scope.permission_snapshot_ref,
         "limit": limit,
+        "next_after": next_after,
+        "work_items": items,
+    })))
+}
+
+async fn list_run_work_items(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(run_id): Path<String>,
+    Query(query): Query<WorkItemListQuery>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "work-item:read")?;
+    let run_id = parse_id(&run_id)?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    super::set_tenant(&mut tx, actor.tenant_id).await?;
+    let run_scope =
+        super::engineering_runs::authorize_run_task_scope(&mut tx, &actor, run_id).await?;
+    let rows = sqlx::query_as::<_, WorkItemProjection>(
+        r#"
+        SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
+               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id,
+               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
+        FROM multica.task_metadata m
+        JOIN multica.task_lifecycle_current c
+          ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
+        WHERE m.tenant_id = $1 AND m.project_id = $2 AND m.repository_id = $3
+          AND m.branch_id = $4 AND m.engineering_run_id = $5
+          AND m.valid_to IS NULL AND ($6::UUID IS NULL OR m.work_item_id < $6)
+        ORDER BY m.work_item_id DESC
+        LIMIT $7
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(run_scope.project_id)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
+    .bind(query.after)
+    .bind(limit + 1)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    let mut rows = rows;
+    let has_more = rows.len() > limit as usize;
+    if has_more {
+        rows.pop();
+    }
+    let next_after = has_more
+        .then(|| rows.last().map(|row| row.work_item_id))
+        .flatten();
+    let items = rows.into_iter().map(project_work_item).collect::<Vec<_>>();
+    Ok(Json(json!({
+        "engineering_run_id": run_scope.engineering_run_id,
+        "project_id": run_scope.project_id,
+        "repository_id": run_scope.repository_id,
+        "branch_id": run_scope.branch_id,
+        "role": run_scope.role,
+        "permission_snapshot_ref": run_scope.permission_snapshot_ref,
+        "limit": limit,
+        "next_after": next_after,
         "work_items": items,
     })))
 }
@@ -310,6 +432,8 @@ async fn get_work_item(
         .await
         .map_err(|_| GroupApiError::internal())?;
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let _run_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
     let _binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     let result = load_work_item(
         &mut tx,
@@ -344,8 +468,11 @@ async fn transition_work_item(
         .await
         .map_err(|_| GroupApiError::internal())?;
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let run_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
     let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     require_task_writer(&binding.role)?;
+    require_task_writer(&run_scope.role)?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(Json(response));
@@ -362,6 +489,7 @@ async fn transition_work_item(
           ON l.tenant_id = c.tenant_id AND l.work_item_id = c.work_item_id
          AND l.project_id = m.project_id AND l.worktree_id = $3 AND l.valid_to IS NULL
         WHERE c.tenant_id = $1 AND c.work_item_id = $2 AND m.project_id = $4
+          AND m.repository_id = $5 AND m.branch_id = $6 AND m.engineering_run_id = $7
         FOR UPDATE OF c
         "#,
     )
@@ -369,6 +497,9 @@ async fn transition_work_item(
     .bind(work_item_id)
     .bind(worktree_id)
     .bind(worktree.project_id)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
     .fetch_optional(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?
@@ -488,11 +619,15 @@ async fn review_work_item(
         .await
         .map_err(|_| GroupApiError::internal())?;
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let run_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
     let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     if body.action == "submit" {
         require_task_writer(&binding.role)?;
+        require_task_writer(&run_scope.role)?;
     } else {
         require_task_reviewer(&binding.role)?;
+        require_task_reviewer(&run_scope.role)?;
     }
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -510,6 +645,7 @@ async fn review_work_item(
           ON l.tenant_id = c.tenant_id AND l.work_item_id = c.work_item_id
          AND l.project_id = m.project_id AND l.worktree_id = $3 AND l.valid_to IS NULL
         WHERE c.tenant_id = $1 AND c.work_item_id = $2 AND m.project_id = $4
+          AND m.repository_id = $5 AND m.branch_id = $6 AND m.engineering_run_id = $7
         FOR UPDATE OF c
         "#,
     )
@@ -517,6 +653,9 @@ async fn review_work_item(
     .bind(work_item_id)
     .bind(worktree_id)
     .bind(worktree.project_id)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
     .fetch_optional(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?
@@ -623,6 +762,39 @@ async fn review_work_item(
     Ok(Json(response))
 }
 
+pub(super) async fn authorize_task_run_for_worktree(
+    tx: &mut Transaction<'_, sqlx::Postgres>,
+    actor: &super::AuthUser,
+    worktree_id: Uuid,
+    worktree: &WorktreeScope,
+) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
+    let (run_id, repository_id, branch_id) = sqlx::query_as::<_, (Uuid, Uuid, Uuid)>(
+        r#"
+        SELECT engineering_run_id, repository_id, branch_id
+        FROM multica.engineering_run_worktree_binding
+        WHERE tenant_id = $1 AND project_id = $2 AND worktree_id = $3 AND valid_to IS NULL
+        FOR SHARE
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(worktree_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+
+    let scope = super::engineering_runs::authorize_run_task_scope(tx, actor, run_id).await?;
+    if scope.repository_id != worktree.repo_id
+        || scope.repository_id != repository_id
+        || scope.branch_id != branch_id
+        || scope.project_id != worktree.project_id
+    {
+        return Err(GroupApiError::not_found());
+    }
+    Ok(scope)
+}
+
 pub(super) async fn authorize_worktree(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     actor: &super::AuthUser,
@@ -664,6 +836,11 @@ pub(super) async fn load_work_item(
         JOIN multica.task_metadata m
           ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
          AND m.project_id = l.project_id AND m.valid_to IS NULL
+        JOIN multica.engineering_run_worktree_binding run_binding
+          ON run_binding.tenant_id = l.tenant_id AND run_binding.project_id = l.project_id
+         AND run_binding.worktree_id = l.worktree_id AND run_binding.valid_to IS NULL
+         AND run_binding.repository_id = m.repository_id AND run_binding.branch_id = m.branch_id
+         AND run_binding.engineering_run_id = m.engineering_run_id
         JOIN multica.task_lifecycle_current c
           ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
         WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3

@@ -12,17 +12,24 @@
 //! MATCH (m:Module {name:"task_execution",type:"module",language:"rust"}),(pty:Module {name:"pty",type:"module",language:"rust"}) CREATE (m)-[:CONTAINS]->(pty);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"task_execution",type:"module",language:"rust"}),(ctx:Class {name:"TaskExecutionContext",type:"class"}),(profile:Class {name:"ApprovedTaskLaunchProfile",type:"class"}),(prepared:Class {name:"PreparedTaskCliExecution",type:"class"}),(nonce_store:Interface {name:"TaskExecutionNonceStore",type:"trait"}),(verify:Function {name:"Ed25519TaskExecutionGrantVerifier::verify",type:"function"}),(prepare:Function {name:"prepare_task_cli_execution",type:"function"}),(registry:Class {name:"CliSessionRegistry",type:"class"});
-//! CREATE (fence:Class {name:"TaskRunSpawnFence",type:"class",language:"rust"}),(fence_binding:Class {name:"TaskRunSpawnFenceBindingV1",type:"class",language:"rust"}),(prepare_fenced:Function {name:"prepare_and_consume_verified_task_run_spawn_fence",type:"function",language:"rust"}),(validate_fence:Function {name:"validate_profile_bound_fence",type:"function",language:"rust"}),(consume_profile:Function {name:"TaskExecutionNonceStore::consume_profile_bound",type:"function",language:"rust"}),(fence_id:Variable {name:"spawn_fence_id",type:"variable",language:"rust"}),(fence_digest:Variable {name:"spawn_fence_binding_digest",type:"variable",language:"rust"});
+//! CREATE (fence:Class {name:"TaskRunSpawnFence",type:"class",language:"rust"}),(fence_binding:Class {name:"TaskRunSpawnFenceBindingV2",type:"class",language:"rust"}),(prepare_fenced:Function {name:"prepare_and_consume_verified_task_run_spawn_fence",type:"function",language:"rust"}),(validate_fence:Function {name:"validate_profile_bound_fence",type:"function",language:"rust"}),(consume_profile:Function {name:"TaskExecutionNonceStore::consume_profile_bound",type:"function",language:"rust"}),(fence_id:Variable {name:"spawn_fence_id",type:"variable",language:"rust"}),(fence_digest:Variable {name:"spawn_fence_binding_digest",type:"variable",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(prepare_fenced),(m)-[:CONTAINS]->(validate_fence),(ctx)-[:USES]->(fence),(profile)-[:USES]->(fence_binding),(prepared)-[:USES]->(fence_id),(prepared)-[:USES]->(fence_digest),(prepare_fenced)-[:CALLS]->(verify),(prepare_fenced)-[:CALLS]->(validate_fence),(prepare_fenced)-[:CALLS]->(prepare),(prepare_fenced)-[:CALLS]->(consume_profile),(validate_fence)-[:CALLS]->(fence),(validate_fence)-[:USES]->(fence_binding),(consume_profile)-[:USES]->(fence_id),(consume_profile)-[:USES]->(fence_digest),(registry)-[:IMPLEMENTS]->(nonce_store);
 //! CREATE (fence_test:Function {name:"profile_bound_fence_rejects_binding_drift_and_stale_issue_time",type:"function",language:"rust"}),(signature_test:Function {name:"profile_bound_grant_signature_covers_fence",type:"function",language:"rust"}),(legacy_test:Function {name:"legacy_grant_signing_bytes_remain_v1_when_fence_absent",type:"function",language:"rust"}),(legacy_consumer_test:Function {name:"legacy_consumer_rejects_profile_bound_grant",type:"function",language:"rust"}),(bounded_payload_test:Function {name:"signed_fence_payload_rejects_unbounded_digest_before_serialization",type:"function",language:"rust"}),(prepare_fence_mode:Function {name:"prepare_task_cli_execution_with_fence_mode",type:"function",language:"rust"}),(fence_well_formed:Function {name:"TaskRunSpawnFence::is_well_formed",type:"function",language:"rust"}),(digest_valid:Function {name:"is_lower_hex_sha256_digest",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(fence_test),(m)-[:CONTAINS]->(signature_test),(m)-[:CONTAINS]->(legacy_test),(m)-[:CONTAINS]->(legacy_consumer_test),(m)-[:CONTAINS]->(bounded_payload_test),(m)-[:CONTAINS]->(prepare_fence_mode),(m)-[:CONTAINS]->(fence_well_formed),(m)-[:CONTAINS]->(digest_valid),(fence_test)-[:CALLS]->(validate_fence),(signature_test)-[:CALLS]->(sign),(signature_test)-[:CALLS]->(verify),(legacy_test)-[:CALLS]->(signing_bytes),(legacy_consumer_test)-[:CALLS]->(consume),(bounded_payload_test)-[:CALLS]->(signing_bytes),(signing_bytes)-[:CALLS]->(fence_well_formed),(prepare)-[:CALLS]->(prepare_fence_mode),(prepare_fenced)-[:CALLS]->(prepare_fence_mode),(prepare_fence_mode)-[:CALLS]->(validate_context),(validate_context)-[:USES]->(err),(validate_fence)-[:CALLS]->(digest_valid);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"task_execution",type:"module"}),(prepared:Class {name:"PreparedTaskCliExecution",type:"class"}),(consume:Function {name:"prepare_and_consume_verified_task_run_spawn_fence",type:"function"});
+//! CREATE (directory:Class {name:"TaskRunEngineeringRunIdentityV1",type:"class",language:"rust"}),(fixture:Function {name:"profile_bound_fence_tests::binding",type:"function",language:"rust"}),(m)-[:CONTAINS]->(fixture),(prepared)-[:USES]->(directory),(consume)-[:USES]->(directory),(fixture)-[:USES]->(directory);
+//! MATCH (signatureTest:Function {name:"profile_bound_grant_signature_covers_fence",type:"function"}),(consume:Function {name:"prepare_and_consume_verified_task_run_spawn_fence",type:"function"}),(registry:Class {name:"CliSessionRegistry",type:"class"});
+//! CREATE (openRegistry:Function {name:"CliSessionRegistry::open",type:"function",language:"rust"}),(signatureTest)-[:CALLS]->(consume),(signatureTest)-[:CALLS]->(openRegistry),(openRegistry)-[:USES]->(registry);
 
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use ring::signature::{self, Ed25519KeyPair, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
-use star_dto::task_run::{TaskRunSpawnFence, TaskRunSpawnFenceBindingV1};
+use star_dto::task_run::{
+    TaskRunEngineeringRunIdentityV1, TaskRunSpawnFence, TaskRunSpawnFenceBindingV2,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -60,7 +67,7 @@ pub struct TaskExecutionContext {
     pub expires_at: DateTime<Utc>,
     /// Unique grant nonce that the caller must consume exactly once.
     pub nonce: Uuid,
-    /// Optional C4 dual-Profile admission fence; absent only for legacy non-Run CLI grants.
+    /// Optional V2 directory/dual-Profile fence; absent only for legacy non-Run CLI grants.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spawn_fence: Option<TaskRunSpawnFence>,
 }
@@ -216,7 +223,7 @@ pub fn grant_signing_bytes(
         return Err(TaskExecutionGrantVerificationError::InvalidPayload);
     }
     let domain: &[u8] = if context.spawn_fence.is_some() {
-        b"star.task-cli.execution-grant.v2\0"
+        b"star.task-cli.execution-grant.v3\0"
     } else {
         b"star.task-cli.execution-grant.v1\0"
     };
@@ -285,6 +292,8 @@ pub struct ApprovedTaskLaunchProfile {
 /// Fully resolved CLI spawn request; `worktree_dir` comes only from the canonical binding.
 #[derive(Clone, Debug)]
 pub struct PreparedTaskCliExecution {
+    /// Verified canonical directory identity for a Task Run; absent for legacy non-Run grants.
+    pub engineering_run: Option<TaskRunEngineeringRunIdentityV1>,
     /// Authorized tenant.
     pub tenant_id: Uuid,
     /// Project containing the selected Worktree.
@@ -492,6 +501,7 @@ fn prepare_task_cli_execution_with_fence_mode(
     }
 
     Ok(PreparedTaskCliExecution {
+        engineering_run: None,
         tenant_id: context.tenant_id,
         project_id: context.project_id,
         repository_id: context.repository_id,
@@ -556,16 +566,17 @@ pub fn prepare_and_consume_verified_task_cli_execution(
     prepare_and_consume_task_cli_execution(&context, binding, profile, now, nonce_store)
 }
 
-/// Authenticate and atomically consume the C4 dual-Profile fence immediately before a future
+/// Authenticate and atomically consume the directory/dual-Profile fence before a future
 /// production spawn adapter. `current_binding` must be freshly rebuilt from authoritative ACL,
-/// Profile/catalog/HookSet sources and the committed ResourceBudget; this function does not itself
+/// active Project/Branch/Run grants and revisions, verified current Git checkout, Task/lifecycle,
+/// Profile/catalog/HookSet sources and committed ResourceBudget; this function does not itself
 /// provide those sources or create a process.
 pub fn prepare_and_consume_verified_task_run_spawn_fence(
     grant: &SignedTaskExecutionGrant,
     verifier: &impl TaskExecutionGrantVerifier,
     worktree_binding: &RuntimeWorktreeBinding,
     profile: &ApprovedTaskLaunchProfile,
-    current_binding: &TaskRunSpawnFenceBindingV1,
+    current_binding: &TaskRunSpawnFenceBindingV2,
     now: DateTime<Utc>,
     nonce_store: &impl TaskExecutionNonceStore,
 ) -> Result<PreparedTaskCliExecution, TaskExecutionError> {
@@ -605,6 +616,7 @@ pub fn prepare_and_consume_verified_task_run_spawn_fence(
         })?;
     prepared.spawn_fence_id = Some(fence.fence_id);
     prepared.spawn_fence_binding_digest = Some(binding_digest);
+    prepared.engineering_run = Some(fence.binding.engineering_run.clone());
     Ok(prepared)
 }
 
@@ -612,7 +624,7 @@ fn validate_profile_bound_fence(
     context: &TaskExecutionContext,
     profile: &ApprovedTaskLaunchProfile,
     fence: &TaskRunSpawnFence,
-    current_binding: &TaskRunSpawnFenceBindingV1,
+    current_binding: &TaskRunSpawnFenceBindingV2,
     now: DateTime<Utc>,
 ) -> Result<(), TaskExecutionError> {
     if fence.expires_at <= now {
@@ -788,14 +800,41 @@ mod profile_bound_fence_tests {
         }
     }
 
-    fn binding() -> TaskRunSpawnFenceBindingV1 {
-        TaskRunSpawnFenceBindingV1 {
+    fn binding() -> TaskRunSpawnFenceBindingV2 {
+        let engineering_run = TaskRunEngineeringRunIdentityV1 {
             tenant_id: Uuid::new_v4(),
-            actor_id: Uuid::new_v4(),
             project_id: Uuid::new_v4(),
             repository_id: Uuid::new_v4(),
+            branch_id: Uuid::new_v4(),
+            branch_full_ref: "refs/heads/dev".to_owned(),
+            engineering_run_id: Uuid::new_v4(),
             worktree_id: Uuid::new_v4(),
             work_item_id: Uuid::new_v4(),
+            worktree_project_binding_id: Uuid::new_v4(),
+            worktree_project_binding_version: 1,
+            project_role_binding_id: Uuid::new_v4(),
+            project_role_binding_version: 1,
+            project_role: "developer".to_owned(),
+            branch_revision_id: Uuid::new_v4(),
+            branch_revision_version: 1,
+            branch_role_binding_id: Uuid::new_v4(),
+            branch_role_binding_version: 1,
+            branch_role: "developer".to_owned(),
+            engineering_run_revision_id: Uuid::new_v4(),
+            engineering_run_revision_version: 1,
+            engineering_run_role_binding_id: Uuid::new_v4(),
+            engineering_run_role_binding_version: 1,
+            engineering_run_role: "agent".to_owned(),
+            engineering_run_worktree_binding_id: Uuid::new_v4(),
+            engineering_run_worktree_binding_version: 1,
+        };
+        TaskRunSpawnFenceBindingV2 {
+            tenant_id: engineering_run.tenant_id,
+            actor_id: Uuid::new_v4(),
+            project_id: engineering_run.project_id,
+            repository_id: engineering_run.repository_id,
+            worktree_id: engineering_run.worktree_id,
+            work_item_id: engineering_run.work_item_id,
             runtime_id: Uuid::new_v4(),
             expected_lifecycle_version: 1,
             approved_launch_profile: TaskRunProfileRevisionIdentity {
@@ -819,6 +858,7 @@ mod profile_bound_fence_tests {
                 version: 2,
                 effective_digest: "c".repeat(64),
             },
+            engineering_run,
             resource_budget: TaskRunResourceBudget {
                 max_rss_bytes: 1024,
                 max_cpu_ms: 1000,
@@ -877,6 +917,30 @@ mod profile_bound_fence_tests {
             validate_profile_bound_fence(&context, &profile, &fence, &drifted, now),
             Err(TaskExecutionError::SpawnFenceMismatch)
         );
+        for field in 0..10 {
+            let mut current = binding.clone();
+            match field {
+                0 => current.engineering_run.engineering_run_id = Uuid::new_v4(),
+                1 => current.engineering_run.branch_id = Uuid::new_v4(),
+                2 => {
+                    current
+                        .engineering_run
+                        .engineering_run_worktree_binding_version += 1
+                }
+                3 => current.engineering_run.branch_revision_version += 1,
+                4 => current.engineering_run.engineering_run_revision_version += 1,
+                5 => current.engineering_run.project_role_binding_version += 1,
+                6 => current.engineering_run.branch_role_binding_version += 1,
+                7 => current.engineering_run.engineering_run_role_binding_version += 1,
+                8 => current.engineering_run.engineering_run_role = "viewer".to_owned(),
+                _ => current.engineering_run.branch_full_ref = "refs/heads/other".to_owned(),
+            }
+            assert_eq!(
+                validate_profile_bound_fence(&context, &profile, &fence, &current, now),
+                Err(TaskExecutionError::SpawnFenceMismatch),
+                "directory/grant change {field} must fail closed"
+            );
+        }
         assert_eq!(
             validate_profile_bound_fence(
                 &context,
@@ -951,9 +1015,83 @@ mod profile_bound_fence_tests {
         .unwrap();
 
         assert!(verifier.verify(&grant).is_ok());
+        assert!(grant_signing_bytes("issuer-1", &grant.context)
+            .unwrap()
+            .starts_with(b"star.task-cli.execution-grant.v3\0"));
+        let checkout = tempfile::tempdir().unwrap();
+        let registry =
+            CliSessionRegistry::open(checkout.path().join("grant-receipts.sqlite")).unwrap();
+        let runtime_binding = RuntimeWorktreeBinding {
+            tenant_id: binding.tenant_id,
+            project_id: binding.project_id,
+            repository_id: binding.repository_id,
+            worktree_id: binding.worktree_id,
+            runtime_id: binding.runtime_id,
+            mounted_path: checkout.path().to_path_buf(),
+            canonical_checkout_path: checkout.path().to_path_buf(),
+        };
+        let profile = ApprovedTaskLaunchProfile {
+            id: binding.approved_launch_profile.profile_id,
+            version: 3,
+            content_digest: binding.approved_launch_profile.content_digest.clone(),
+            executable: std::env::current_exe().unwrap(),
+            args: Vec::new(),
+            static_environment: HashMap::new(),
+            max_runtime_seconds: 20,
+        };
+        let mut moved = binding.clone();
+        moved
+            .engineering_run
+            .engineering_run_worktree_binding_version += 1;
+        assert!(matches!(
+            prepare_and_consume_verified_task_run_spawn_fence(
+                &grant,
+                &verifier,
+                &runtime_binding,
+                &profile,
+                &moved,
+                now,
+                &registry,
+            ),
+            Err(TaskExecutionError::SpawnFenceMismatch)
+        ));
+        let prepared = prepare_and_consume_verified_task_run_spawn_fence(
+            &grant,
+            &verifier,
+            &runtime_binding,
+            &profile,
+            &binding,
+            now,
+            &registry,
+        )
+        .unwrap();
+        assert_eq!(
+            prepared.engineering_run.as_ref(),
+            Some(&binding.engineering_run)
+        );
+        assert!(matches!(
+            prepare_and_consume_verified_task_run_spawn_fence(
+                &grant,
+                &verifier,
+                &runtime_binding,
+                &profile,
+                &binding,
+                now,
+                &registry,
+            ),
+            Err(TaskExecutionError::GrantReplay)
+        ));
 
-        let mut tampered = grant;
+        let mut tampered = grant.clone();
         tampered.context.spawn_fence.as_mut().unwrap().fence_id = Uuid::new_v4();
+        assert!(matches!(
+            verifier.verify(&tampered),
+            Err(TaskExecutionGrantVerificationError::InvalidSignature)
+        ));
+        let mut tampered = grant;
+        let fence = tampered.context.spawn_fence.as_mut().unwrap();
+        fence.binding.engineering_run.engineering_run_id = Uuid::new_v4();
+        fence.binding_digest = fence.binding.binding_digest().unwrap();
         assert!(matches!(
             verifier.verify(&tampered),
             Err(TaskExecutionGrantVerificationError::InvalidSignature)

@@ -1,5 +1,5 @@
 // =====================================================================
-// Mock data store — 25 domain 全量 seed
+// Mock data store — non-task UI seed only
 // =====================================================================
 // 数据规模:每域 8-30 条;够真实感且不爆炸
 // 所有 ID 形如 "<prefix>-<n>" 便于人读
@@ -76,73 +76,18 @@ export const workspaces: Workspace[] = [
 ];
 
 // =====================================================================
-// work_items (30)
+// work_items
 // =====================================================================
-const workItem = (i: number, status: WorkItem["status"], kind: WorkItem["kind"], priority: WorkItem["priority"], title: string): WorkItem => ({
-  id: `wi-${i.toString().padStart(3, "0")}`,
-  tenant_id: TENANT_ID,
-  project_id: i < 20 ? PROJECT_ID : (i < 25 ? "prj-stargate" : "prj-mobile"),
-  key: i < 20 ? `PHYSIS-${i}` : (i < 25 ? `SG-${i - 19}` : `MOB-${i - 24}`),
-  title,
-  description: `Auto-generated seed for ${title}`,
-  kind,
-  status,
-  priority,
-  assignee_id: `usr-${((i % 10) + 1).toString().padStart(3, "0")}`,
-  reporter_id: "usr-001",
-  story_points: [1, 2, 3, 5, 8, 13][i % 6],
-  labels: [["backend"], ["backend", "perf"], ["frontend"], ["infra"], ["ai"], ["spec"]][i % 6],
-  sprint_id: i % 3 === 0 ? "spr-001" : (i % 3 === 1 ? "spr-002" : undefined),
-  workflow_id: "wf-default",
-  // W3 Calendar: 给每个 work-item 派 due_date, 散布在 [now-30d, now+30d] 区间内
-  // 用 i*2 - 30 天偏移 (i 偶正奇负交错) 让 calendar 有数据可显示
-  // per dynamic-interaction-design.md §5.2 月视图 "每格显示 due work-item 数"
-  due_date: ago(-60 * 24 * (i * 2 - 30)),
-  created_at: ago(60 * 24 * (30 - i)),
-  updated_at: ago(60 * (i * 2)),
-});
-export const workItems: WorkItem[] = [
-  workItem(1, "in_progress", "story", "p0", "Implement Worktree 17-state machine"),
-  workItem(2, "review", "story", "p0", "AgentSession 14 状态机 + 12 强制迁移"),
-  workItem(3, "done", "task", "p1", "Webhook Idempotency-Key for SCM integration"),
-  workItem(4, "todo", "story", "p0", "Cross-tenant audit (INV-AU-04)"),
-  workItem(5, "in_progress", "bug", "p1", "Feedback 状态机 reopen 不触发 PR"),
-  workItem(6, "blocked", "task", "p2", "ContextPacket priority p0 缓存命中率"),
-  workItem(7, "in_progress", "story", "p0", "Automation Rule executor (Rule + Trigger + Condition + Action)"),
-  workItem(8, "review", "task", "p1", "PermissionScheme rules-based RBAC"),
-  workItem(9, "done", "story", "p0", "ChangeSet 5 状态机 + INV-DEV-01~05"),
-  workItem(10, "in_progress", "spike", "p3", "Local Runtime 三重绑定 device/tenant/user"),
-  workItem(11, "todo", "story", "p1", "Search Projection tenant 隔离 (INV-SR-02)"),
-  workItem(12, "review", "task", "p1", "Notification INV-N-07 抑制策略"),
-  workItem(13, "done", "task", "p2", "Validation 7 实体 + 5 状态机"),
-  workItem(14, "in_progress", "story", "p0", "Relation graph BFS 性能"),
-  workItem(15, "todo", "bug", "p1", "Worktree sync loop on offline reconnect"),
-  workItem(16, "done", "task", "p2", "Workspace member role change audit"),
-  workItem(17, "in_progress", "story", "p0", "Planning Sprint burndown chart"),
-  workItem(18, "review", "story", "p0", "Board Kanban WIP limit"),
-  workItem(19, "wontfix", "task", "p3", "Mobile push notification 噪音抑制"),
-  workItem(20, "done", "task", "p2", "Audit append-only hash chain"),
-  workItem(21, "in_progress", "story", "p1", "Dashboard realtime work-item event"),
-  workItem(22, "review", "task", "p1", "Realtime cursor presence"),
-  workItem(23, "todo", "task", "p2", "Whiteboard snapshot export"),
-  workItem(24, "in_progress", "bug", "p1", "Linear integration loop protection"),
-  workItem(25, "todo", "story", "p1", "iOS companion: worktree quick switch"),
-  workItem(26, "in_progress", "task", "p2", "Android: agent session telemetry"),
-  workItem(27, "review", "task", "p2", "Mobile: offline feedback queue"),
-  workItem(28, "done", "task", "p3", "Mobile: deep link to work-item"),
-  workItem(29, "todo", "spike", "p3", "Mobile: secure enclave for local-runtime token"),
-  workItem(30, "in_progress", "task", "p1", "Mobile: feedback notification grouping"),
-];
+// Historical wi-001..wi-030 values were demo seed records, not user tasks.
+// New Work Items must arrive from the Run-scoped backend or an explicit user action.
+export const workItems: WorkItem[] = [];
 
 // =====================================================================
 // comments
 // =====================================================================
 export const comments: Comment[] = [
-  { id: "cm-001", tenant_id: TENANT_ID, target_kind: "work_item", target_id: "wi-001", author_id: "usr-001", body: "Worktree SM 已经过 §7.1 状态机评审, 17 个状态 + 4 个核心迁移。", mentions: ["usr-002"], created_at: ago(60 * 8) },
-  { id: "cm-002", tenant_id: TENANT_ID, target_kind: "work_item", target_id: "wi-001", author_id: "usr-002", body: "已合并 wt-1 → main. 14 状态机 + INV-WT-01~04 全绿。", mentions: [], created_at: ago(60 * 4) },
   { id: "cm-003", tenant_id: TENANT_ID, target_kind: "pr", target_id: "pr-001", author_id: "usr-003", body: "ci.yml 需要把 trunk-based feature flag 打开。", mentions: ["usr-004"], created_at: ago(60 * 2) },
   { id: "cm-004", tenant_id: TENANT_ID, target_kind: "agent_session", target_id: "ag-001", author_id: "usr-006", body: "Agent 进了 awaiting_human, 需要 decision 节点确认是否回滚 INV-AU-04 hotfix。", mentions: ["usr-001"], created_at: ago(30) },
-  { id: "cm-005", tenant_id: TENANT_ID, target_kind: "work_item", target_id: "wi-005", author_id: "usr-005", body: "Feedback reopen 状态机漏了 → 1.1 版本修复中", mentions: [], created_at: ago(15) },
   { id: "cm-006", tenant_id: TENANT_ID, target_kind: "context_packet", target_id: "ctx-001", author_id: "usr-002", body: "ContextPacket priority p0 cache miss 3 次, 走 context-engine 路径", mentions: [], created_at: ago(10) },
 ];
 
@@ -219,22 +164,9 @@ export const workflows: Workflow[] = [
 ];
 
 // =====================================================================
-// change_sets (12)
+// change_sets (no task-linked mock rows)
 // =====================================================================
-export const changeSets: ChangeSet[] = [
-  { id: "cs-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-001", author_id: "usr-002", worktree_id: "wt-001", title: "Worktree SM types",   diff_summary: "+342 / -18 / 4 files", status: "merged",    symbol_index: { added: 18, modified: 4, removed: 1 }, created_at: ago(60 * 30) },
-  { id: "cs-002", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-002", author_id: "usr-002", worktree_id: "wt-002", title: "Agent 14 state SM",     diff_summary: "+612 / -89 / 7 files", status: "merged",    symbol_index: { added: 22, modified: 7, removed: 3 }, created_at: ago(60 * 24) },
-  { id: "cs-003", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-007", author_id: "usr-003", worktree_id: "wt-003", title: "Automation executor",    diff_summary: "+880 / -23 / 11 files", status: "applied",  symbol_index: { added: 41, modified: 11, removed: 2 }, created_at: ago(60 * 12) },
-  { id: "cs-004", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-009", author_id: "usr-002", worktree_id: "wt-004", title: "ChangeSet 5 SM",         diff_summary: "+422 / -8 / 5 files",   status: "merged",   symbol_index: { added: 19, modified: 5, removed: 0 }, created_at: ago(60 * 36) },
-  { id: "cs-005", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-014", author_id: "usr-004", worktree_id: "wt-005", title: "Relation BFS v0",         diff_summary: "+210 / -12 / 3 files",  status: "draft",    symbol_index: { added: 12, modified: 3, removed: 0 }, created_at: ago(60 * 4) },
-  { id: "cs-006", tenant_id: TENANT_ID, project_id: "prj-stargate", work_item_id: "wi-021", author_id: "usr-005", worktree_id: "wt-006", title: "Realtime work-item event", diff_summary: "+156 / -3 / 2 files",   status: "applied",  symbol_index: { added: 7,  modified: 2, removed: 0 }, created_at: ago(60 * 8) },
-  { id: "cs-007", tenant_id: TENANT_ID, project_id: "prj-stargate", work_item_id: "wi-022", author_id: "usr-005", worktree_id: "wt-007", title: "Presence cursor",         diff_summary: "+98 / -0 / 1 files",    status: "draft",    symbol_index: { added: 4,  modified: 1, removed: 0 }, created_at: ago(60 * 2) },
-  { id: "cs-008", tenant_id: TENANT_ID, project_id: "prj-mobile", work_item_id: "wi-025", author_id: "usr-009", worktree_id: "wt-008", title: "iOS worktree switch",     diff_summary: "+234 / -8 / 4 files",   status: "draft",    symbol_index: { added: 9,  modified: 4, removed: 0 }, created_at: ago(60 * 6) },
-  { id: "cs-009", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-005", author_id: "usr-005", worktree_id: "wt-009", title: "Feedback reopen fix",     diff_summary: "+45 / -12 / 2 files",   status: "abandoned", symbol_index: { added: 2, modified: 2, removed: 0 }, created_at: ago(60 * 20) },
-  { id: "cs-010", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-006", author_id: "usr-002", worktree_id: "wt-010", title: "ContextPacket p0 cache",  diff_summary: "+310 / -2 / 3 files",   status: "reverted",  symbol_index: { added: 11, modified: 3, removed: 0 }, created_at: ago(60 * 16) },
-  { id: "cs-011", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-013", author_id: "usr-003", worktree_id: "wt-011", title: "Validation 7 entities",   diff_summary: "+512 / -28 / 6 files",  status: "merged",   symbol_index: { added: 23, modified: 6, removed: 1 }, created_at: ago(60 * 22) },
-  { id: "cs-012", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-008", author_id: "usr-003", worktree_id: "wt-012", title: "Permission rules RBAC",   diff_summary: "+410 / -5 / 8 files",   status: "applied",  symbol_index: { added: 17, modified: 8, removed: 0 }, created_at: ago(60 * 14) },
-];
+export const changeSets: ChangeSet[] = [];
 
 // =====================================================================
 // worktrees (12)
@@ -302,20 +234,9 @@ export const contextDecisions: ContextDecision[] = [
 ];
 
 // =====================================================================
-// validation (10)
+// validation (no task-linked mock rows)
 // =====================================================================
-export const validationCases: ValidationCase[] = [
-  { id: "vc-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-001", changeset_id: "cs-001", name: "Worktree SM unit",            kind: "unit",        result: "pass",              coverage: 0.96, executed_at: ago(60 * 30) },
-  { id: "vc-002", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-001", changeset_id: "cs-001", name: "Worktree SM invariant",       kind: "unit",        result: "pass",              coverage: 1.00, executed_at: ago(60 * 30) },
-  { id: "vc-003", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-002", changeset_id: "cs-002", name: "Agent 14 SM all transitions", kind: "unit",        result: "pass",              coverage: 0.94, executed_at: ago(60 * 25) },
-  { id: "vc-004", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-002", changeset_id: "cs-002", name: "Agent INV-AGT-N07",           kind: "unit",        result: "pass",              coverage: 1.00, executed_at: ago(60 * 25) },
-  { id: "vc-005", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-007", changeset_id: "cs-003", name: "Automation CEL compile",      kind: "unit",        result: "feedback_required",  coverage: 0.78, feedback_id: "fb-001", executed_at: ago(60 * 3) },
-  { id: "vc-006", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-009", changeset_id: "cs-004", name: "ChangeSet 5 SM",              kind: "unit",        result: "pass",              coverage: 1.00, executed_at: ago(60 * 36) },
-  { id: "vc-007", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-008", changeset_id: "cs-012", name: "Permission rule deny",        kind: "unit",        result: "feedback_required",  coverage: 0.85, feedback_id: "fb-002", executed_at: ago(60 * 0.4) },
-  { id: "vc-008", tenant_id: TENANT_ID, project_id: PROJECT_ID, work_item_id: "wi-013", changeset_id: "cs-011", name: "Validation 7 entity round-trip", kind: "integration", result: "pass",           coverage: 0.92, executed_at: ago(60 * 23) },
-  { id: "vc-009", tenant_id: TENANT_ID, project_id: "prj-stargate", work_item_id: "wi-021", changeset_id: "cs-006", name: "Realtime event timing",       kind: "e2e",         result: "pass",              coverage: 0.81, executed_at: ago(60 * 0.3) },
-  { id: "vc-010", tenant_id: TENANT_ID, project_id: "prj-mobile", work_item_id: "wi-025", changeset_id: "cs-008", name: "iOS switch policy",           kind: "policy",      result: "skipped",           coverage: 0.00, executed_at: ago(60 * 5) },
-];
+export const validationCases: ValidationCase[] = [];
 
 // =====================================================================
 // local runtimes (5)
@@ -372,10 +293,7 @@ export const notifications: Notification[] = [
 // search + saved
 // =====================================================================
 export const searchHits: SearchHit[] = [
-  { id: "wi-001",  kind: "work_item", tenant_id: TENANT_ID, title: "Implement Worktree 17-state machine",                          snippet: "Worktree SM 已经过 §7.1 状态机评审, 17 个状态 + 4 个核心迁移。",  score: 0.98 },
   { id: "wt-001",  kind: "worktree",  tenant_id: TENANT_ID, title: "feat/worktree-sm",                                              snippet: "Worktree SM types + 14 状态机",                                    score: 0.94 },
-  { id: "fb-001",  kind: "work_item", tenant_id: TENANT_ID, title: "AutomationRule cron 触发下是否启用 actor context?",            snippet: "Feedback fb-001 in_progress major",                                 score: 0.89 },
-  { id: "pr-003",  kind: "work_item", tenant_id: TENANT_ID, title: "PR #103 review required: Automation v2",                        snippet: "changes_requested",                                                 score: 0.81 },
 ];
 export const savedSearches: SavedSearch[] = [
   { id: "ss-001", tenant_id: TENANT_ID, name: "My work-items (in progress)",  query: "status:in_progress",          filters: { assignee: "me" },        created_by: "usr-001" },
@@ -423,9 +341,9 @@ export const canvases: Canvas[] = [
     ref_id: PROJECT_ID,
     viewport: { x: 0, y: 0, zoom: 1 },
     frames: [
-      { id: "frame-001", canvas_id: "canvas-001", title: "Worktree 状态",     x: 0,   y: 0,   width: 500, height: 360, element_ids: ["el-wi-001","el-wi-002","el-wt-001","el-wt-002","el-wt-003"], is_slide: true,  order: 0 },
+      { id: "frame-001", canvas_id: "canvas-001", title: "Worktree 状态",     x: 0,   y: 0,   width: 500, height: 360, element_ids: ["el-wt-001","el-wt-002","el-wt-003"], is_slide: true,  order: 0 },
       { id: "frame-002", canvas_id: "canvas-001", title: "Agent Session",      x: 600, y: 0,   width: 460, height: 360, element_ids: ["el-ag-001","el-ag-002","el-ag-003"],                          is_slide: true,  order: 1 },
-      { id: "frame-003", canvas_id: "canvas-001", title: "Feedback Inbox",     x: 0,   y: 460, width: 500, height: 300, element_ids: ["el-fb-001","el-fb-002","el-sn-001"],                            is_slide: false, order: 2 },
+      { id: "frame-003", canvas_id: "canvas-001", title: "Feedback Inbox",     x: 0,   y: 460, width: 500, height: 300, element_ids: ["el-fb-001","el-fb-002"],                            is_slide: false, order: 2 },
       { id: "frame-004", canvas_id: "canvas-001", title: "Automation Rules",   x: 600, y: 460, width: 460, height: 300, element_ids: ["el-au-001","el-au-002"],                                            is_slide: true,  order: 3 },
     ],
     creator_id: "usr-001",
@@ -452,8 +370,6 @@ export const canvases: Canvas[] = [
 // Canvas Element — 25-30 个,跨 7 种 kind,演示 25 module 联动
 export const canvasElements: CanvasElement[] = [
   // === Frame 1: Worktree 状态 ===
-  { id: "el-wi-001", canvas_id: "canvas-001", kind: "work_item_card", x: 30,  y: 50,  width: 200, height: 90,  rotation: 0, z_index: 1, content: { work_item_id: "wi-001", text: "Implement Worktree 17-state machine" }, locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
-  { id: "el-wi-002", canvas_id: "canvas-001", kind: "work_item_card", x: 30,  y: 180, width: 200, height: 90,  rotation: 0, z_index: 1, content: { work_item_id: "wi-002", text: "Agent 14 状态机 + 12 强制迁移" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
   { id: "el-wt-001", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 50,  width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-001", text: "feat/worktree-sm" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
   { id: "el-wt-002", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 140, width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-002", text: "feat/agent-14-sm" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
   { id: "el-wt-003", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 230, width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-003", text: "feat/automation-v2" },      locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
@@ -464,7 +380,6 @@ export const canvasElements: CanvasElement[] = [
   // === Frame 3: Feedback Inbox ===
   { id: "el-fb-001", canvas_id: "canvas-001", kind: "sticky_note",     x: 30,  y: 510, width: 140, height: 100, rotation: 0, z_index: 1, content: { text: "Need spec clarification on CEL guard scope", color: "#f9d77e" }, locked: false, hidden: false, created_by: "usr-005", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 3) },
   { id: "el-fb-002", canvas_id: "canvas-001", kind: "sticky_note",     x: 200, y: 510, width: 140, height: 100, rotation: 0, z_index: 1, content: { text: "Permission rule CEL 解析失败 fallback", color: "#ffb3c1" }, locked: false, hidden: false, created_by: "usr-005", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 0.4) },
-  { id: "el-sn-001", canvas_id: "canvas-001", kind: "comment_pin",     x: 370, y: 540, width: 90,  height: 60,  rotation: 0, z_index: 3, content: { comment_id: "cm-001", text: "3 comments" },          locked: false, hidden: false, created_by: "usr-002", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 6) },
   // === Frame 4: Automation Rules ===
   { id: "el-au-001", canvas_id: "canvas-001", kind: "automation_node", x: 630, y: 510, width: 200, height: 90,  rotation: 0, z_index: 2, content: { automation_id: "au-rule-001", text: "Auto-assign P0" }, locked: false, hidden: false, created_by: "usr-003", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 2) },
   { id: "el-au-002", canvas_id: "canvas-001", kind: "automation_node", x: 850, y: 510, width: 200, height: 90,  rotation: 0, z_index: 2, content: { automation_id: "au-rule-003", text: "Dispatch agent on PR review" }, locked: false, hidden: false, created_by: "usr-003", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 3) },
@@ -474,35 +389,27 @@ export const canvasElements: CanvasElement[] = [
 
 // Canvas Connector — 演示 Relation 域联动
 export const canvasConnectors: CanvasConnector[] = [
-  { id: "el-cn-001", canvas_id: "canvas-001", kind: "work_item_relation", from_element_id: "el-wi-001", to_element_id: "el-wt-001", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#2f81f7", width: 2, label: "parent_of",  relation_id: "rl-001" },
-  { id: "el-cn-002", canvas_id: "canvas-001", kind: "work_item_relation", from_element_id: "el-wi-002", to_element_id: "el-wt-002", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#2f81f7", width: 2, label: "parent_of",  relation_id: "rl-002" },
-  { id: "el-cn-003", canvas_id: "canvas-001", kind: "work_item_relation", from_element_id: "el-wi-001", to_element_id: "el-wi-002", routing: "curved",  arrow_start: true,  arrow_end: true,  color: "#d29922", width: 2, label: "duplicates", relation_id: "rl-005" },
   { id: "el-cn-004", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-001", to_element_id: "el-ag-001", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
   { id: "el-cn-005", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-002", to_element_id: "el-ag-002", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
   { id: "el-cn-006", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-003", to_element_id: "el-ag-003", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
-  { id: "el-cn-007", canvas_id: "canvas-001", kind: "free",               from_element_id: "el-fb-001", to_element_id: "el-wi-001", routing: "orthogonal", arrow_start: false, arrow_end: true, color: "#8b949e", width: 1, label: "blocks" },
-  { id: "el-cn-008", canvas_id: "canvas-001", kind: "dependency",         from_element_id: "el-au-001", to_element_id: "el-wi-001", routing: "straight", arrow_start: false, arrow_end: true,  color: "#d29922", width: 2, label: "triggers" },
 ];
 
 // =====================================================================
 // planning
 // =====================================================================
 export const sprints: Sprint[] = [
-  { id: "spr-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "Sprint 23 — Worktree SM", goal: "17 状态机 + INV-WT-01~04 全部合入", status: "active", start_date: ago(60 * 24 * 14), end_date: ago(-60 * 24 * 0), capacity_points: 60, committed_points: 55, completed_points: 41 },
+  { id: "spr-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "Sprint 23 — Worktree SM", goal: "17 状态机 + INV-WT-01~04 全部合入", status: "active", start_date: ago(60 * 24 * 14), end_date: ago(-60 * 24 * 0), capacity_points: 60, committed_points: 0, completed_points: 0 },
   { id: "spr-002", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "Sprint 24 — AI Auto-Approve", goal: "Automation + Permission + Validation", status: "planned", start_date: ago(-60 * 24 * 7), end_date: ago(-60 * 24 * 21), capacity_points: 55, committed_points: 0, completed_points: 0 },
-  { id: "spr-003", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "Sprint 22 — 已归档",         goal: "Worktree 17 SM 准备",             status: "completed", start_date: ago(60 * 24 * 28), end_date: ago(60 * 24 * 14), capacity_points: 50, committed_points: 48, completed_points: 48 },
-  { id: "spr-004", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "SG Sprint 5 — Realtime", goal: "Realtime work-item event",        status: "active",   start_date: ago(60 * 24 * 7),  end_date: ago(-60 * 24 * 7), capacity_points: 40, committed_points: 32, completed_points: 18 },
+  { id: "spr-003", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "Sprint 22 — 已归档",         goal: "Worktree 17 SM 准备",             status: "completed", start_date: ago(60 * 24 * 28), end_date: ago(60 * 24 * 14), capacity_points: 50, committed_points: 0, completed_points: 0 },
+  { id: "spr-004", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "SG Sprint 5 — Realtime", goal: "Realtime work-item event",        status: "active",   start_date: ago(60 * 24 * 7),  end_date: ago(-60 * 24 * 7), capacity_points: 40, committed_points: 0, completed_points: 0 },
 ];
 export const milestones: Milestone[] = [
-  { id: "ms-001", tenant_id: TENANT_ID, project_id: PROJECT_ID,    name: "MVP 0.5 — Worktree + Agent 全绿", due_date: ago(-60 * 24 * 7),  work_item_ids: ["wi-001","wi-002","wi-009","wi-013"], progress: 0.85 },
-  { id: "ms-002", tenant_id: TENANT_ID, project_id: PROJECT_ID,    name: "MVP 0.6 — Automation + Permission", due_date: ago(-60 * 24 * 30), work_item_ids: ["wi-007","wi-008"],                progress: 0.45 },
-  { id: "ms-003", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "Stargate Beta",                  due_date: ago(-60 * 24 * 14), work_item_ids: ["wi-021","wi-022"],                progress: 0.65 },
-  { id: "ms-004", tenant_id: TENANT_ID, project_id: "prj-mobile",  name: "iOS TestFlight",                 due_date: ago(-60 * 24 * 21), work_item_ids: ["wi-025","wi-026","wi-027"],     progress: 0.30 },
+  { id: "ms-001", tenant_id: TENANT_ID, project_id: PROJECT_ID,    name: "MVP 0.5 — Worktree + Agent 全绿", due_date: ago(-60 * 24 * 7),  work_item_ids: [], progress: 0 },
+  { id: "ms-002", tenant_id: TENANT_ID, project_id: PROJECT_ID,    name: "MVP 0.6 — Automation + Permission", due_date: ago(-60 * 24 * 30), work_item_ids: [], progress: 0 },
+  { id: "ms-003", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "Stargate Beta",                  due_date: ago(-60 * 24 * 14), work_item_ids: [], progress: 0 },
+  { id: "ms-004", tenant_id: TENANT_ID, project_id: "prj-mobile",  name: "iOS TestFlight",                 due_date: ago(-60 * 24 * 21), work_item_ids: [], progress: 0 },
 ];
-export const burndownSeries: BurndownPoint[] = Array.from({ length: 14 }, (_, i) => {
-  const remaining = Math.max(0, Math.round(55 - i * 4 - (i > 5 ? 2 : 0) - (i > 9 ? 1 : 0)));
-  return { date: ago(60 * 24 * (14 - i)), remaining_points: remaining, ideal_points: 55 - i * 4 };
-});
+export const burndownSeries: BurndownPoint[] = [];
 
 // =====================================================================
 // board
@@ -546,18 +453,11 @@ export const board: Board = {
 };
 
 // =====================================================================
-// relations (10)
+// relations (3 non-task mock rows)
 // =====================================================================
 export const relations: Relation[] = [
-  { id: "rl-001", tenant_id: TENANT_ID, from_kind: "work_item", from_id: "wi-001", to_kind: "worktree", to_id: "wt-001", kind: "parent_of", created_at: ago(60 * 35) },
-  { id: "rl-002", tenant_id: TENANT_ID, from_kind: "work_item", from_id: "wi-002", to_kind: "worktree", to_id: "wt-002", kind: "parent_of", created_at: ago(60 * 28) },
   { id: "rl-003", tenant_id: TENANT_ID, from_kind: "worktree", from_id: "wt-005", to_kind: "worktree", to_id: "wt-001", kind: "relates_to", created_at: ago(60 * 4) },
-  { id: "rl-004", tenant_id: TENANT_ID, from_kind: "work_item", from_id: "wi-007", to_kind: "work_item", to_id: "wi-008", kind: "blocks", created_at: ago(60 * 12) },
-  { id: "rl-005", tenant_id: TENANT_ID, from_kind: "work_item", from_id: "wi-005", to_kind: "work_item", to_id: "wi-002", kind: "duplicates", created_at: ago(60 * 20) },
-  { id: "rl-006", tenant_id: TENANT_ID, from_kind: "work_item", from_id: "wi-014", to_kind: "work_item", to_id: "wi-011", kind: "relates_to", created_at: ago(60 * 6) },
-  { id: "rl-007", tenant_id: TENANT_ID, from_kind: "work_item", from_id: "wi-021", to_kind: "work_item", to_id: "wi-022", kind: "blocks", created_at: ago(60 * 0.5) },
   { id: "rl-008", tenant_id: TENANT_ID, from_kind: "agent_session", from_id: "ag-005", to_kind: "worktree", to_id: "wt-005", kind: "parent_of", created_at: ago(60 * 0.5) },
-  { id: "rl-009", tenant_id: TENANT_ID, from_kind: "changeset", from_id: "cs-003", to_kind: "work_item", to_id: "wi-007", kind: "parent_of", created_at: ago(60 * 11) },
   { id: "rl-010", tenant_id: TENANT_ID, from_kind: "worktree", from_id: "wt-007", to_kind: "worktree", to_id: "wt-006", kind: "cloned_from", created_at: ago(60 * 1) },
 ];
 
@@ -566,8 +466,7 @@ export const relations: Relation[] = [
 // =====================================================================
 export const auditEvents: AuditEvent[] = [
   { id: "au-001", tenant_id: TENANT_ID, actor_id: "usr-001", category: "permission",    action: "scheme.update",       target_kind: "permission_scheme", target_id: "ps-strict", payload: { before: { rule_count: 6 }, after: { rule_count: 8 } }, prev_hash: "0x00", hash: "0xae3f", created_at: ago(60 * 24) },
-  { id: "au-002", tenant_id: TENANT_ID, actor_id: "usr-002", category: "data_access",   action: "workitem.read",       target_kind: "work_item",         target_id: "wi-001",   payload: { read_fields: ["title","description"] }, prev_hash: "0xae3f", hash: "0x11c2", created_at: ago(60 * 12) },
-  { id: "au-003", tenant_id: TENANT_ID, actor_id: "usr-002", category: "ai_decision",   action: "agent.decision",      target_kind: "context_decision",   target_id: "dec-001",  payload: { chosen: "initializing", rejected: ["active"] }, ai_metadata: { agent_session_id: "ag-001", prompt_hash: "sha256:ab12", decision_id: "dec-001", confidence: 0.92 }, prev_hash: "0x11c2", hash: "0x9f8a", created_at: ago(60 * 30) },
+  { id: "au-003", tenant_id: TENANT_ID, actor_id: "usr-002", category: "ai_decision",   action: "agent.decision",      target_kind: "context_decision",   target_id: "dec-001",  payload: { chosen: "initializing", rejected: ["active"] }, ai_metadata: { agent_session_id: "ag-001", prompt_hash: "sha256:ab12", decision_id: "dec-001", confidence: 0.92 }, prev_hash: "0xae3f", hash: "0x9f8a", created_at: ago(60 * 30) },
   { id: "au-004", tenant_id: TENANT_ID, actor_id: "usr-001", category: "config_change", action: "automation.toggle",   target_kind: "automation_rule",   target_id: "au-rule-007", payload: { enabled: false }, prev_hash: "0x9f8a", hash: "0x44e1", created_at: ago(60 * 8) },
   { id: "au-005", tenant_id: TENANT_ID, actor_id: "usr-002", category: "data_access",   action: "worktree.commit",     target_kind: "worktree",          target_id: "wt-001",   payload: { diff_summary: "+342 / -18 / 4 files" }, prev_hash: "0x44e1", hash: "0x77b2", created_at: ago(60 * 30) },
   { id: "au-006", tenant_id: TENANT_ID, actor_id: "usr-001", category: "auth",          action: "session.login",       target_kind: "identity",          target_id: "usr-001", payload: { provider: "github", ip: "10.0.0.4", ua: "Mozilla/5.0" }, prev_hash: "0x77b2", hash: "0xab33", created_at: ago(60 * 6) },

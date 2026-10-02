@@ -36,7 +36,6 @@ import {
   isWorkspace,
   isBillingEntry,
   isWorktreeSnapshot,
-  isComment,
   isTenant,
   isRbacRole,
 } from "@/mocks/schemas/five-domain";
@@ -62,10 +61,8 @@ describe("5-domain mock data integrity", () => {
     expect(projects.size).toBeGreaterThanOrEqual(3);
   });
 
-  it("social 域: MOCK_COMMENTS has ≥ 6 rows, spans ≥ 2 work_item_ids", () => {
-    expect(MOCK_COMMENTS.length).toBeGreaterThanOrEqual(6);
-    const workItems = new Set(MOCK_COMMENTS.map((c) => c.work_item_id));
-    expect(workItems.size).toBeGreaterThanOrEqual(2);
+  it("social 域: mock mode has no fabricated Task Card comments", () => {
+    expect(MOCK_COMMENTS).toEqual([]);
   });
 
   it("admin 域: MOCK_TENANTS has ≥ 2 rows, all 3 plans covered", () => {
@@ -98,9 +95,6 @@ describe("5-domain schema type guards", () => {
   });
   it("isWorktreeSnapshot accepts all MOCK_WORKTREES", () => {
     for (const w of MOCK_WORKTREES) expect(isWorktreeSnapshot(w)).toBe(true);
-  });
-  it("isComment accepts all MOCK_COMMENTS", () => {
-    for (const c of MOCK_COMMENTS) expect(isComment(c)).toBe(true);
   });
   it("isTenant accepts all MOCK_TENANTS", () => {
     for (const t of MOCK_TENANTS) expect(isTenant(t)).toBe(true);

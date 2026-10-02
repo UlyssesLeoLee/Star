@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v0.1 (2026-09-02)
+> **文档版本**: v0.2 (2026-10-02)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1116,6 +1116,20 @@ print(f"err_count={result.stderr.count('error[')}")
 | ERUN-P1 persisted directory / RunContext / lazy navigation | [P] | `scripts/automation/engineering_run_directory.py`；schema/nav/API review briefs 通过 dispatcher.brief 落地，native collaboration agents 在各自只读/独立写 worktree 工作 | `--rust` 定向 all-targets compile，默认 locked；`--allow-lock-resolution` 显式临时解析后恢复原lock；`--frontend` typecheck；`--postgres-ddl` 仅新建/停止/清理自有 loopback 临时集群，重复DDL和八表FORCE RLS catalog验证；不接受生产DB URL，不执行tests或生产migration |
 
 脚本以文件重定向后台 launcher 日志，避免 Windows server 继承 pipe 导致等待不结束；进程隐藏启动，停止成功后才清理经解析验证的自有目录。旧 Worktree migration 缺外部 `audit_trigger_func`，DDL sandbox明确使用 stand-in；不提供旧 Audit、真实角色RLS、目录写工作流、EXPLAIN或产品运行证据。首次临时集群已停止，目录删除被自动审批以 blocked by policy 拒绝，保留未重试。完整证据与缺口见 `PHASE-ERUN-DIRECTORY-P1-REPORT.md` 与实施计划 §6.67。
+
+### 4.37 Engineering Run execution identity / Hooks deep links（2026-10-02）
+
+| 任务卡 | 档位 | 脚本/brief 与执行 | 验证边界 |
+|---|---|---|---|
+| ERUN-P2 CLI / Hooks / root integration | [P] | 复用 `scripts/automation/engineering_run_directory.py`；CLI/Hook continuation 和 CLI independent review briefs 已落地，worker 使用独立 managed worktree，root scoped rebase 后串行 merge | `--task-run-ddl` 在自有 PG18 loopback cluster 验证 Phase 2C/Run prerequisites、新 migration 两次应用、legacy 保留、新 CLI NULL/不完整/超限/FK rejection；不接收生产 URL。worker 单测与 typecheck/compile 单独记录；`--rust --allow-lock-resolution --backend-only --offline --cli-tests --cargo-target-dir <owned-cache>` 显式运行定向后端 check/fence/CLI 单测并 finally 恢复原 manifest/lock，默认仍不跑 tests；summary 记录实际调用，不代报 workspace/release gate。 |
+
+Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run activity 的授权由 REST 两事务复核，production provider 在 fence consume/attachment 使用时还需实时复验。隔离 superuser DDL + 明示 legacy audit stand-in 不证明 target role RLS、生产 Audit 或正向 execution admission。完整结果、失败续做和缺口见 `PHASE-ERUN-DIRECTORY-P2-REPORT.md` / 实施计划 §6.68。
+
+### 4.38 Engineering Run Task owner tuple / mock Task Card retirement（2026-10-02）
+
+| 任务卡 | 档位 | 脚本/brief 与执行 | 验证边界 |
+|---|---|---|---|
+| ERUN-P3 TaskRun canonical owner、outbox 与退役旧演示 Task Card | [P]（R/V/S/A） | 本阶段改动见实施计划 §6.71；旧前端 `wi-001..wi-030` 演示记录和依赖的 Task Card 历史已从 runtime seed/MSW 移除，Zustand v2 对已存本地状态按精确 ID 清理；测试案例改用 `test-wi-*`。当前 `engineering_run_directory.py --task-run-ddl` 仅覆盖既有 TaskRun identity migration，**不覆盖** `2026-10-02-task-run-owner.sql`；Task Owner 专用自动化验证仍待补，不能将本条记为自动化或数据库验收完成。 | 本次定向 Rust check 曾在临时依赖解析下通过，随后恢复原 `Cargo.lock`，因此不代表 locked/reproducible build。前端依赖目录缺失，未执行 typecheck/tests；新 Owner/outbox migration 未在数据库应用或验证，target role RLS、真实 Audit、写入/重放语义与生产 Run Task UI 仍待闭环。仅可确认源码和文档已落档；完整阻塞见实施计划 §6.71。 |
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 

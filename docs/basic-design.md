@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.41 (2026-10-02)
-> **上游要件定义书**: docs/requirements.md v5.44
+> **文档版本**: v5.46 (2026-10-02)
+> **上游要件定义书**: docs/requirements.md v5.49
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -11,22 +11,22 @@
 
 | § | 标题 | 行号 | 主要内容 |
 |---|---|---|---|
-| 0 | [文档说明](#0-文档说明) | 9 | 文档目的 / 读者 / 维护规则 |
-| 1 | [架构总览](#1-架构总览) | 84 | Star 5 大领域 / 模块依赖 / 数据流 |
-| 2 | [Domain / Module 划分](#2-domain--module-划分) | 279 | 27 域 + 23 service + 1 Tauri + 3 WASM (per PR-272 actualize) |
-| 3 | [Context Map](#3-context-mapdomain-间解耦) | 442 | Domain 间解耦 + ACL 边界 |
-| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 630 | canvas-game / canvas-engine / canvas-realtime / domain-canvas |
-| 5 | [数据架构](#5-数据架构) | 2254 | DB schema + 索引 + 备份 |
-| 6 | [安全边界](#6-安全边界) | 2418 | 认证 / 授权 / 加密 / 审计 |
-| 7 | [关键状态机](#7-关键状态机) | 2591 | Workflow / Canvas / Worktree / Run |
-| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2746 | k3s + 5 services + Service mesh |
-| 9 | [Traceability & AI Audit](#9-traceability--ai-audit) | 2928 | ADR ↔ SRS ↔ 代码追溯 |
-| 10 | [ADR 草案](#10-adr-草案对应-32-adr-016030) | 3068 | ADR-016 ~ ADR-030 |
-| 11 | [PoC 实施计划](#11-poc-实施计划对应-31-poc-016030) | 3296 | POC-016 ~ POC-030 |
-| 12 | [风险登记与缓解](#12-风险登记与缓解对应-33-risk-016030) | 3324 | RISK-016 ~ RISK-030 |
-| 13 | [MVP 范围裁剪](#13-mvp-范围裁剪对应-3026) | 3353 | 优先级 + 范围 + 验收 |
-| 14 | [决策继承表](#14-决策继承表46-决策表-a-o) | 3440 | 决策表 A-O |
-| 15 | [Open Issues](#15-open-issues继承-46-决策表-j--新增) | 3507 | 未决问题 + 待办 |
+| 0 | [文档说明](#0-文档说明) | 42 | 文档目的 / 读者 / 维护规则 |
+| 1 | [架构总览](#1-架构总览) | 117 | Star 5 大领域 / 模块依赖 / 数据流 |
+| 2 | [Domain / Module 划分](#2-domain--module-划分) | 312 | 27 域 + 23 service + 1 Tauri + 3 WASM (per PR-272 actualize) |
+| 3 | [Context Map](#3-context-mapdomain-间解耦) | 475 | Domain 间解耦 + ACL 边界 |
+| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 663 | canvas-game / canvas-engine / canvas-realtime / domain-canvas |
+| 5 | [数据架构](#5-数据架构) | 2287 | DB schema + 索引 + 备份 |
+| 6 | [安全边界](#6-安全边界) | 2451 | 认证 / 授权 / 加密 / 审计 |
+| 7 | [关键状态机](#7-关键状态机) | 2624 | Workflow / Canvas / Worktree / Run |
+| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2779 | k3s + 5 services + Service mesh |
+| 9 | [Traceability & AI Audit](#9-traceability--ai-audit) | 2961 | ADR ↔ SRS ↔ 代码追溯 |
+| 10 | [ADR 草案](#10-adr-草案对应-32-adr-016030) | 3101 | ADR-016 ~ ADR-030 |
+| 11 | [PoC 实施计划](#11-poc-实施计划对应-31-poc-016030) | 3329 | POC-016 ~ POC-030 |
+| 12 | [风险登记与缓解](#12-风险登记与缓解对应-33-risk-016030) | 3357 | RISK-016 ~ RISK-030 |
+| 13 | [MVP 范围裁剪](#13-mvp-范围裁剪对应-3026) | 3386 | 优先级 + 范围 + 验收 |
+| 14 | [决策继承表](#14-决策继承表46-决策表-a-o) | 3473 | 决策表 A-O |
+| 15 | [Open Issues](#15-open-issues继承-46-决策表-j--新增) | 3540 | 未决问题 + 待办 |
 | 附录 A | [关键状态机图](#附录-a关键状态机图) | 3536 | 状态机图 (Mermaid) |
 | 附录 B | [模块依赖图](#附录-b模块依赖图) | 3690 | 依赖图 (Mermaid) |
 | 附录 C | [数据所有权矩阵](#附录-c数据所有权矩阵) | 3775 | 模块 ↔ DB table 矩阵 |
@@ -43,7 +43,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.44》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.45》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4589,6 +4589,8 @@ Chat Bar(scope, text, entity_refs)
 | GRP-DB-001 | §16.9-16.10 | AC-GRP-DB-001 |
 | LGS-001/002/003 | §16.7, §16.10, §16.11 C | AC-CHAT-002/003 |
 | ARCH-OBL-GRP-001 | §16.4-16.10 | AC-TRACE-001 |
+| AC-INFRA-001 | §16.21 / DD-LOCAL-INFRASTRUCTURE-001 | Rust provider/profile/Run binding、按需共享 k3s、商用许可与性能/隔离验收 |
+| AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4635,6 +4637,16 @@ Task 的 goal/scope/dependencies/acceptance criteria 是持续事实；TaskExecu
 `multica.group_chat_run` 继续作为 30 天的 Chat/LangGraph queue/work projection。它可以通过 `task_run_id` 关联某个 TaskExecutionRun，但二者的主键、状态和保留策略分离。EngineeringRun 是左侧 Branch 下的工作区层；TaskExecutionRun 仍是 Task Card 内的一次执行历史，二者不共用 ID 或生命周期。点击 Worktree 只是选择 focus/checkout target，不改变 EngineeringRun 的 canonical owner scope。
 
 #### Task Contract / Run 记录
+
+##### Task Card 的 Engineering Run 所有权与旧演示数据退役
+
+当前 `multica.task_metadata` 版本以完整 `(tenant_id, project_id, repository_id, branch_id, engineering_run_id)` 作为 canonical owner。`work_item_worktree` 只保留同一 Run 内的当前 checkout 关联；Task Card 可被 Run 内多个 Worktree 查看/执行，但不能通过关联把 owner 转移到另一 Run。当前 schema migration 为字段增加 all-null/all-present 约束与 canonical Run 外键；旧 current metadata 暂留全空 tuple，不能依 Worktree 关系隐式回填。新 metadata 版本必须由服务端授权命令写入明确 owner，owner 迁移使用 SCD2。
+
+数据库 guard 拒绝 current metadata 原位改 owner、跨 Run Task/Worktree 关联，以及仍有关联任务时重绑定 Worktree。Run Task list 和 Worktree compatibility list 都按完整 tuple 筛选；Worktree create/transition/review 必须同时通过 Project 与 Run grant。Canvas 创建 Task Card 写入相同 owner；Task CLI admission、Session attachment 和 TaskExecutionRun list/detail 重新比对 owner 与当前 checkout 所属 Run。任务 metadata insert 与 `multica.task_run_outbox` append-only Transaction event 同事务提交，使用 actor/correlation context，事件只保存身份/version/owner 的限长结构，不保存描述或执行输出。
+
+旧 UI seed 中 `wi-001` 至 `wi-030` 的演示卡片和仅服务于这些卡片的 sample comments、changesets、validation、search、Canvas links、relations 与聚合数已删除；MSW 运行时不再提供这些任务的 validation/comment 历史。浏览器持久化版本迁移只清理该精确 ID 集合及其 demo-only 引用；不按 ID 前缀删除其他本地任务，不执行数据库清理，也不自动认领服务器端 legacy Task。隔离测试可使用独立 `test-*` fixture，但不得流入产品 seed、MSW 任务历史或业务投影。
+
+本轮已编写 owner/outbox additive migration 并接入 Run/Worktree API、Canvas writer 和 Task CLI owner guard；定向 `cargo check -p star-api-rest --lib -j 4` 曾在临时解析更新 Cargo.lock 后通过，原始锁文件已恢复，因此不构成 locked/reproducible build 证据。目标数据库尚未应用/验证迁移，实际 runtime role grants/RLS 未验收，宿主 JWT provider 未装配，Run Workspace 的 Task Cards UI 尚未迁入。因此这是局部编译检查通过的后端切片，不代表 Task Card/CLI 的生产闭环已开放；缺少任一生产边界时仍 fail closed。
 
 Task Contract 作为 Master/SCD2 保存版本、goal、scope、dependencies、acceptance criteria、actor 与有效区间；更新在一个领域事务内关闭旧版本、追加新版本和 append-only `task_contract_change_audit`。本轮 additive migration `db/migrations/2026-09-30-worktree-task-execution-run.sql` 已定义这些表、Transaction 事件/evidence 表、30 天 Work idempotency mapping、tenant/actor RLS 与 append-only trigger。
 
@@ -4798,9 +4810,9 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 
 ### 16.18 Phase 9E-4C5 Runtime 双 Profile fence 消费基础设施
 
-REST 与 Local Runtime 共用 `star-dto::task_run` 的严格、固定结构 fence contract。Binding 只含 tenant/actor/Project/repository/Worktree/Task/Runtime/lifecycle、Approved Launch Profile 与 AgentExecutionProfile 的 ID/version/digest、catalog revision tuple、effective HookSet、ResourceBudget 与原始 request fingerprint；Provider/Skill 条目继续留在受限 Arc snapshot，不跨 Runtime fence 复制。`binding_digest` 由共享 DTO 以 `star.task_run_spawn_fence.v1\0` domain separator 计算，保持 C4 digest 格式一致。
+REST 与 Local Runtime 共用 `star-dto::task_run` 的严格、固定结构 fence contract。Binding 包含 server-resolved EngineeringRun directory identity 及 tenant/actor/Project/repository/Worktree/Task/Runtime/lifecycle、Approved Launch Profile 与 AgentExecutionProfile 的 ID/version/digest、catalog revision tuple、effective HookSet、ResourceBudget 与原始 request fingerprint；Provider/Skill 条目继续留在受限 Arc snapshot，不跨 Runtime fence 复制。`binding_digest` 由共享 DTO 以 `star.task_run_spawn_fence.v2\0` domain separator 计算（ERUN-P2 升级；旧 C4/C5 为 V1）。
 
-新的 Profile-bound `TaskExecutionContext` 在签名 grant 中承载完整 fence，使用 grant signature v2；旧 grant 缺少该字段时跳过序列化，保留 v1 签名 payload 与旧 grant 解码兼容。签名 builder 在序列化前验证 fence binding、定长 SHA-256 digest、时限和 digest 一致性，避免异常超长字段进入 JSON/hash 临时缓冲。旧版通用 CLI prepare/consume 入口遇到携带 fence 的 grant 会拒绝，避免绕过专用校验；只有 profile-bound consumer 可继续。Runtime 消费 helper 需要调用方刚完成实时 ACL/Worktree/Task/lifecycle 检查，并传入从当前权威 Profile/catalog/HookSet 与已提交 ResourceBudget 重建的完整 binding；helper 比较全部字段，校验 launch Profile revision、scope、issue/expiry 与 binding digest 后，才在同一 durable transaction 消费 nonce 和 fence。
+新的 Profile-bound `TaskExecutionContext` 在签名 grant 中承载完整 fence，使用 grant signature v3（ERUN-P2 V2 fence）；旧 grant 缺少该字段时跳过序列化，保留 v1 签名 payload 与旧 grant 解码兼容。签名 builder 在序列化前验证 fence binding、定长 SHA-256 digest、时限和 digest 一致性，避免异常超长字段进入 JSON/hash 临时缓冲。旧版通用 CLI prepare/consume 入口遇到携带 fence 的 grant 会拒绝，避免绕过专用校验；只有 profile-bound consumer 可继续。Runtime 消费 helper 需要调用方刚完成实时 ACL/Worktree/Task/lifecycle 检查，并传入从当前权威 Profile/catalog/HookSet 与已提交 ResourceBudget 重建的完整 binding；helper 比较全部字段，校验 launch Profile revision、scope、issue/expiry 与 binding digest 后，才在同一 durable transaction 消费 nonce 和 fence。
 
 本地 receipt ledger 使用 SQLite FULL-synchronous WAL、`BEGIN IMMEDIATE` 与同事务 nonce/fence 两表写入；重复 fence 导致整个事务回滚，已用 nonce 不会被孤立占用。短期 receipt 最多保留 50,000 条，过期并超过 5 分钟时钟偏差窗口后懒清理；容量满、数据库错误、错绑或重放均 fail closed。该 helper 只完成签名/绑定复验和一次性 consume，尚不创建 OS process，也不自行授予或重验实时 ACL、Project aggregate reservation、Reservation activation/release 或 BI outcome；生产 provisioner/current catalog/Run capability 保持默认关闭，必须等权威 Provider、目标 DB/RLS、reservation lifecycle、OS sandbox/spawn adapter 与 BI 回执全部装配并验收后才可开启。
 
@@ -4814,6 +4826,23 @@ owner command 在同一 owner 的 PostgreSQL transaction 内提交业务事实�
 
 Rust 桌面端保留轻量 client/query projection：按需加载 Run tabs，批量/游标拉取、虚拟化列表与 Canvas viewport culling；事件使用有界 channel、批处理、合并刷新与背压；长日志/Transcript/Benchmark artifact 按需读取且只持有摘要和窗口，按 Run/App 限制 LRU cache、subscription 和并行下载数。Worktree/Run/Agent/Plugin 各级 admission 继续使用公平 quota、cancel/drain 与 peak RSS/CPU/p95 telemetry；桌面 UI 不直连 broker、数据库或跨域 stored procedure。当前未锁定桌面目标设备与 workload，故本设计规定有界与观测机制，不编造绝对 RSS 数字；Phase 12 必须在目标设备上测量 idle、单 Run、最大授权并发和 Canvas/终端峰值，再固化进程总 RSS、增量 RSS、CPU、p95 更新延迟与帧时间门槛。未形成数值基线前不得关闭性能发布门。
 
+### 16.20 Canonical execution identity 与高级 Hooks 深链
+
+CLI compatibility endpoint 不接受浏览器提供的 EngineeringRun authority。服务端由当前 Worktree 的持久 binding 解析 Project/Repository/Branch/EngineeringRun/Worktree/Task tuple，固定 Project/Branch/Run grants 与 revisions；等待 Runtime readiness 后，在第二个短事务逐字段重验，再原子写入 TaskExecutionRun 的 immutable directory snapshot。V2 fence 将同一完整身份纳入 domain-separated digest；attachment 签发前重查 current grants 并比较 Session 对应的已存 snapshot，provider 仍需在使用时复核。Runtime consume 比较当前 authority binding，签名或 tuple 变化拒绝。新增字段及复合 FK 关联持久身份事实，不增加 TaskExecutionRun 对可清理物理 checkout 的依赖。INSERT-only guard 拒绝新的无归属 CLI；历史 NULL 及尚未迁移的非 CLI 记录不猜回填。此执行身份桥接不改变 Task 的旧 Project/Worktree ownership，Run-owned Task API 与真实 Runtime/独立验证仍有各自完成门。
+
+高级设置 Hooks 仅消费 Project/Worktree hint，按当前 authenticated API 分页解析授权目录。查找每页最多 200 项、最多 20 页，只保留首批目录和已确认 target；不能完整确认时 fail closed，并给出显式清除 hint 的入口。就绪状态绑定会话/API、Project、Worktree 和 scope；会话或 hint 变化停止后续分页、忽略迟到响应并隐藏旧事件，未确认前禁止策略读取、编辑、发布与回滚。异步 digest/写回也复核 scope generation。Hint 只选择范围，策略命令仍由服务端授权，导航继续是 Advanced Settings 同级 tab；这不证明已发送的 HTTP 已被底层传输取消。
+
+实现与验证状态见实施计划 §6.68 和 `PHASE-ERUN-DIRECTORY-P2-REPORT.md`；真实宿主认证、目标 DB、生产 provisioner/OS sandbox 和 Task owner migration 不由这两个切片宣称完成。
+
+### 16.21 Rust 本地基础设施与 k3s provider
+
+增加 Host Infrastructure Manager 与版本化 backend/profile/Run binding。支持 Multipass 本地 VM、Podman machine、Linux Incus、Lima 与用户自有/远端 Linux K3s 的可替换 provider adapter；K3s 仅运行于 Linux 节点/guest。核心功能不得按商业用途、行业、规模、席位、用量或付费计划封锁；GPL/AGPL/LGPL 可商用并可销售，修改/链接/捆绑/再分发时履行实际许可证义务。产品支持发现、引导和合规受管安装/分发，不因 copyleft 强制手工自装。Multipass 按官方本地开发/测试定位使用，不替代不可信 Agent Runtime sandbox。逐版本检查实际依赖、镜像和交付物 SBOM。短事务/CAS、native Hook、namespace/权限/预算、bootstrap trust 与五步验收见 DD-LOCAL-INFRASTRUCTURE-001 v0.4。这些仍是设计候选，尚未创建 VM/安装 provider。
+
+每 Host/environment 默认共享按需基础设施，Project/Run 绑定 namespace、ServiceAccount、quota/network/storage policy；Worktree 仅提供经过版本校验的执行目录映射。InfrastructureBackend 和 AgentRuntimeBackend 分开；k3s 不替代实际 CLI sandbox/独立验证。UI 只显示授权投影，设置属于 Advanced Settings Infrastructure tab，不改变 Project/Branch/Run/Worktree 主树。取消/drain、idle stop、image cache 与所有后台操作有界；用户全局 WSL 设置及非自有资源不得静默修改。K3s server 2 cores/2 GB 是官方最低要求且不包含 workload，产品 RSS/并行 p95 需固定负载实测。完整许可、依赖闭包与平台选择见 DD-LOCAL-INFRASTRUCTURE-001 v0.4。
+
+### 16.22 商用开源基础设施 provider
+
+默认支持/分发的基础设施 provider 必须允许不限用途、行业、部署规模、席位或用量的商业使用；不能把 copyleft 等同于禁止商用。GPL/AGPL/LGPL provider 可以商业部署、销售和采用；产品支持既有 provider 检测、安装引导和在履行发行义务后的受管安装/捆绑，不得仅因许可证类型把手工安装设为唯一入口。逐发布版本审查直接与传递依赖、guest image、kernel 和 installer 的 SPDX/SBOM、版权声明、NOTICE、专利与所需源码材料。候选为 Multipass 本地 VM、Podman machine、Linux Incus、macOS/Linux Lima 和远端 Linux K3s；按固定版本 capability 验证 Windows/macOS/Linux driver，K3s 不原生支持 Windows。活跃社区须满足近 12 个月有日期的 release/维护及公开支持渠道。K3s stable channel 当前为 v1.36.4+k3s1；1.37 系列仍为预发布。上游根许可证不等同于打包闭包审查；Star adapter、真实 readiness/RSS/并行和安装恢复仍未验收。详细候选见 DD-LOCAL-INFRASTRUCTURE-001 v0.4。
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -4901,3 +4930,8 @@ Rust 桌面端保留轻量 client/query projection：按需加载 Run tabs，批
 | v5.34 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.38 与 Task DD v1.12；补充 Phase 9E-4C3 Profile/Task/Hook/RunEvent/BI/resource reservation 的同事务边界、Project 跨 Worktree 聚合预算及 allocation epoch 对 REPEATABLE READ stale snapshot 的串行保护；记录 PG18/121 REST tests、最终 `cargo check` 和 LNK1104 复跑阻断，以及仍默认关闭的 production gates；明确 reservation 最大值不是观测值，epoch/reservation TTL 清理、Runtime activate/release、完整 BI/outbox 仍未接通；ULYS-235 Hooks 继续是 Advanced Settings 内容区并列 tab | 完成 C3 Run/resource writer 和并发风险修正 |
 | v5.35 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.39 与 Task DD v1.13；补充 9E-4C4 typed one-time dual-Profile spawn fence、versioned binding digest、Run 上的 Approved Launch Profile identity 与 Run Detail 投影；说明 C4 尚缺生产 Runtime consumer、Launch Profile authority、reservation lifecycle、target DB/Auth/RLS、catalog publisher 与完整 BI，producer capability 继续关闭；再次确认 Hooks 属 Advanced Settings 内容区并列 tab | 完成 9E-4C4 Rust fence contract 与 Run identity slice |
 | v5.36 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确区分 domain-local-runtime 的现存 grant/profile/path/nonce 基础校验与未装配的 C4 dual-profile fence consumer；将 ULYS-235 导航固定为 Settings → Advanced Settings → `/settings/advanced/hooks` 并列 tab | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |
+| v5.43 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.46；新增 §16.22 商用宽松许可证闭包、SBOM/NOTICE 和活跃社区准入，明确 Linux Incus/macOS Lima/远端 K3s、Windows WSL2 PoC 与 Multipass GPL 排除；所有平台/性能验证保持开放 | 用户要求不限用途商用且社区活跃的开源基础设施 |
+| v5.44 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更正基础设施商业 OSS policy 和 provider 组合：不因 copyleft 一概排除可商用方案，增加 Multipass/Podman machine 与履约方式，维持多 provider 和确切版本平台验收；同步 requirements v5.47 与 Infrastructure DD v0.3 | 用户明确要求不受商业用途限制、社区活跃的开源方案 |
+| v5.45 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 删除 provider 只能用户手工安装的隐性限制，明确检测、安装引导和履约后的受管安装/捆绑；将 unlimited commercial use 与许可发行义务区分；更正 K3s stable channel 为 v1.36.4+k3s1；同步 requirements v5.48、Group DD v4.32、Infrastructure DD v0.4 | 用户再次明确不接受商业使用限制并要求活跃社区 |
+| v5.42 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45；新增 §16.20，区分 EngineeringRun 与 TaskExecutionRun，更新 V2 fence/signature v3、strict 25-field snapshot、历史记录与 attachment 再授权边界；记录 Hooks authorized hint 与取消限制；保留 PR-276 Index/ADR 改动 | ERUN-P2 实现和文档逐项对账 |
+| v5.46 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49 与 Group DD v4.33；定义 Task Card 完整 Run owner tuple、同 Run Worktree 关系 guard、Outbox 与 Run/CLI 查询过滤；说明 30 条旧 mock seed 和精确 localStorage 历史迁移，保留 DB legacy row 不猜归属；明确目标 DB/RLS 与宿主认证/UI 尚未完成 | 用户授权清理旧 mock Task Card，并要求真实任务事实归属 Engineering Run |
