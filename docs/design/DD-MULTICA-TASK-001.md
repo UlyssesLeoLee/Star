@@ -1,12 +1,12 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.16** (per 日本 IPA SEC 标准，补充 Run-owned Work Item/BI 边界及 API-first service decomposition)
+> **Multica Task Lifecycle 域 詳細設計書 v1.18** (per 日本 IPA SEC 标准，补充 CLI admission 的 canonical Engineering Run 身份与消费边界)
 >
-> - 状态: 🟡 Draft v1.16 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；9E-4C4 dual-Profile fence/Run 投影与 9E-4C5 shared DTO、签名 v2 和本地原子 consume foundation 已有代码切片；Run-owned Task/BI 数据范围与 API-first service boundary 已设计，仍未实施 Run registry/API migration；production provisioner、ACL/provider、reservation lifecycle、OS spawn adapter、target DB/Auth/RLS grants、catalog publisher 与 BI/Outbox 仍开放)
+> - 状态: 🟡 Draft v1.18 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；ERUN-P2 CLI canonical identity、fence binding v2 / signature v3 与本地原子 consume foundation 已有代码切片；Engineering Run directory 已有条件式 schema/API，Task owner 的 Run 归属迁移仍未实施；production provisioner、ACL/provider、reservation lifecycle、OS spawn adapter、target DB/Auth/RLS grants、catalog publisher 与 BI/Outbox 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.42 §50；`docs/basic-design.md` v5.39 §16.14-16.19
-> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.25；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.46 §50；`docs/basic-design.md` v5.43 §16.14-16.22
+> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.30；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.5
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
@@ -27,7 +27,7 @@
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v0.4 |
+| 版本 | v1.18 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
 | 承認者 | Draft；v0.3 Run/Evidence 扩展待评审 |
@@ -1037,6 +1037,23 @@ Local Runtime SQLite dedicated WAL connection 用 FULL synchronous 与 `BEGIN IM
 
 本阶段没有 production caller：approved launch profile authority、live ACL/catalog/HookSet adapters、Run/Reservation transaction writer、Runtime reservation activate/reject/release、OS process spawn/sandbox 与 Run outcome/Outbox/BI 均未连接。REST 的 `supports_profile_bound_run_admission()` 和 current-catalog capability 仍默认 false；必须在完整 adapter、单次消费并发/失败恢复、reservation 竞态、权限撤销与实际进程生命周期验收通过后才能开启。Memory 限制：Runtime fence 只持有固定大小 value fields；Profile/catalog snapshot 继续借用 Arc，不 clone 目录；receipt 容量是显式硬上限。
 
+#### 14.11.13 ERUN-P2 CLI admission 的 canonical Engineering Run 身份
+
+本节定义当前 CLI admission 契约；§14.11.11-12 的 fence binding V1 / signature V2 格式被本节的 binding V2 / signature V3 替代。客户端仍仅提交 Task、Worktree、两份 Profile selection、lifecycle version 和 correlation/idempotency 输入；`StartTaskCliSessionBody` 拒绝额外的 `engineering_run_id`，不接受浏览器声明的 Run 授权。服务端从当前持久目录解析 `tenant/Project/Repository/Branch/EngineeringRun/Worktree/WorkItem`，其中 `TaskExecutionRun.run_id` 是执行尝试身份，不能复用 `EngineeringRun.engineering_run_id`。
+
+`TaskRunEngineeringRunIdentityV1` 由 REST 和 Runtime 共享，冻结上述 tuple、canonical `branch_full_ref`、Worktree→Project binding ID/version、Project writer grant ID/version/role、Branch active revision 与 writer grant ID/version、Engineering Run active revision 与 writer grant ID/version、EngineeringRun→Worktree binding ID/version。解析 query 必须连接同 tenant/Project/repository 的目录事实，验证所有 current SCD2 行 `valid_from <= now()`、`valid_to IS NULL`、Branch/Run state active、Worktree 非 archived，并将 Worktree 当前 branch 转为 full ref 后与 Branch revision 比较。Task→Worktree current relation、Task metadata 和 lifecycle 继续在同一事务校验；仅 `tenant_admin/project_admin/developer/agent` 可在三个授权 scope 写入。
+
+锁外 readiness 前的短事务与 admission 的最终 `REPEATABLE READ` 事务都读取该目录身份。两个事务间 tuple、grant ID/version/role、Branch/Run revision 或 binding version 改变，必须拒绝新的 admission；此复核与既有 Profile/catalog/HookSet/budget/resource reservation 校验同时生效。幂等映射命中时也重新解析当前目录/grants，并要求其与存储的完整 typed snapshot 相同；NULL legacy snapshot、失去 grant、已移动/archived Run 或 checkout 均不得用旧幂等键启动。无 fence 的已绑定 replay 只能返回同一既有 session；生产 adapter 不得据此创建进程。
+
+重新连接 attachment 也必须在 ticket 签发前复核。REST 在同一授权事务中读取当前目录/grants，并通过 server 写入的 `execution_state_changed.details.cli_session_id` receipt 关联存储的 CLI TaskExecutionRun；query 按 tenant/Project/repository/Worktree/Task/runtime/session/initiating actor 限定，partial index 支持 session lookup，最多取 2 个不同 Run 判定唯一性。缺失/歧义 receipt、legacy NULL snapshot、失去 grant、directory/revision/binding drift 均明确冲突拒绝，不退回旧 Project-only attach。仅当前 admission actor 且完整 grant snapshot 仍匹配可重新连接；provider 在事务提交后还须重验存储/current identity 与 session/runtime/actor 绑定。安全 status/cancel cleanup 保持当前 Project/Task 授权，不因 Branch/Run 撤权或归档阻止取消。此 receipt join 是现有兼容 seam；未实现独立的 durable session→TaskExecutionRun FK/production runtime adapter，不能据此宣称恢复闭环已完成。
+
+`TaskRunSpawnFenceBindingV2` 必须包含该目录身份并校验内部 scope 与外层 scope 相同；digest domain 为 `star.task_run_spawn_fence.v2\0`。携带 fence 的 `TaskExecutionContext` 签名 domain 为 `star.task-cli.execution-grant.v3\0`，完整目录/grant snapshot、fence ID、TTL 和 digest 均受 Ed25519 签名覆盖。无 fence 的 legacy non-Run grant 继续使用 V1 payload，但不能进入新 CLI TaskExecutionRun 的 admission。Runtime dedicated consumer 接受调用方从实时 authority、Git checkout、Task/lifecycle、Profile/catalog/HookSet 与 committed budget 重建的 `current_binding`，与 signed binding 精确比较，然后原子消费 nonce/fence；`PreparedTaskCliExecution` 保留已验证的 Engineering Run 身份供后续 audit。仅复制收到的 snapshot 不能算实时重授权。
+
+新增 `2026-10-02-task-run-engineering-run-binding.sql` 为 TaskExecutionRun 增加 nullable Branch、EngineeringRun、Project binding、Run/Worktree binding IDs 和 immutable JSON snapshot。完整 identity 用 composite FK 约束同一 tenant/Project/repository/Branch/Run/Worktree 及 Project binding fact，JSON tuple 必须与列一致且不超过 8 KiB。原生 insert gate 精确要求 shared DTO 的全部 25 字段，无 missing/unknown 字段：14 个非 nil UUID、7 个正 i32 integer version、3 个 writer role string 与有界 canonical full ref；拒绝仅写 tuple 而没有授权/revision 证据的行。新增 `BEFORE INSERT` gate 对新 CLI 行禁止全 NULL identity，现有 append-only guard 继续禁止重写历史；既存 NULL rows 保留且不猜测回填，bounded Run History read 仍可读取。非 CLI channel 的 NULL compatibility 没有在本阶段迁移。新 FK 指向目录/binding 持久事实，没有新增 TaskExecutionRun 到物理 checkout 的直接生命周期依赖；物理 checkout cleanup 与目录事实保留仍须遵循既有 Worktree cleanup 契约。
+
+同一幂等键的并发 admission 可能因 REPEATABLE READ 快照早于 advisory lock 等待而看不到获胜事务的 idempotency row。若 TaskRun 插入仅命中唯一约束 task_execution_run_idempotency_pkey 且 SQLSTATE=23505，REST 必须回滚整笔尝试事务，再以新 REPEATABLE READ transaction 重新读取当前 actor scope、Worktree/Task、工程目录 writer grants/revisions、完整 directory snapshot 与 request fingerprint。仅所有身份仍匹配且当前授权允许 replay 时返回 winner 的既有 TaskExecutionRun；不生成新 fence、不再次 spawn。请求内容/key 冲突、目录/grant/revision 漂移、撤权或 lifecycle 不可执行均拒绝；其它唯一冲突/数据库错误不得当作幂等成功。当前 Rust 切片处理了精确 constraint/SQLSTATE 分支与新快照重验；执行事务另设 3 秒 statement_timeout 和 1 秒 lock_timeout，但尚无 PostgreSQL 双会话 race integration test，生产 capability 继续关闭，须在启用前补测 winner/loser 并发、撤权及目录漂移。
+本阶段仅交付条件式 REST→shared DTO→Runtime consumer 契约。Task Contract/metadata/lifecycle/relation 仍为 Project/Worktree compatibility owner，尚未成为 Run-owned Task API。Production provisioner、真实 current grant/Git/profile/catalog sources、target DB/RLS grants、reservation activate/reject/release、OS spawn/sandbox、取消/恢复、独立验证及 Outcome/Outbox/BI 回写仍未闭合；相关 capability 默认 false。代码编译、签名/消费单测或隔离 DDL 验证不能代表生产 Task CLI 已可执行。
+
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
 Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，页面路由为 `/settings/advanced`；Hooks 规范路由为 `/settings/advanced/hooks`，位于页面内容区的 tabs，与 Skills/MCP/Plugins 并列。这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
@@ -1093,3 +1110,5 @@ Task Contract/Lifecycle/Relation 由 Work Item owner；TaskExecutionRun/Event/Ev
 | v1.14 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 明确 `domain-local-runtime::task_execution` 现存签名授权、scope/profile/path/nonce 基础校验不包含 C4 双 Profile fence；将 ULYS-235 固定为 Settings 主导航“高级设置”父入口、`/settings/advanced/hooks` 页面并列 tab，并排除独立主导航/Worktree Group 节点 | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |
 | v1.15 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.12：共享 strict fence DTO、C4 signature v2/legacy v1 payload 兼容、Runtime current-binding recheck、nonce/fence SQLite 原子消费与 50,000 receipt cap；标注本地 foundation 不是生产 ACL/Reservation/OS spawn/BI consumer，capability 继续默认关闭；同步 requirements v5.41 与 basic design v5.37 | 推进 Phase 9E-4C5 Runtime fence consume foundation |
 | v1.16 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 将 Run BI/Benchmark 设为 Engineering Run 同级 App，Project BI 作为跨 Run aggregate；区分 EngineeringRun workspace 与 TaskExecutionRun attempt；新增 Run-owned API、owner service / stored procedure / Outbox-Inbox 边界及 NATS 当前基线、Kafka 优先 PoC 与 Fluvio 受限候选；明确现有 Worktree-scoped Run APIs 是兼容实现且 schema/RLS 迁移尚未完成 | 同步 requirements v5.42、basic design v5.39 与 Group DD v4.25 |
+| v1.18 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确规定 same-key RR stale-snapshot race：仅 idempotency primary key + SQLSTATE 23505 回滚并在新快照下重新授权/核对 fingerprint 后返回 winner，其他错误不吞；记录 3s statement / 1s lock timeout 和待补的双会话 PG race integration test；同步 requirements v5.46/basic v5.43/Group DD v4.30 与 infrastructure v0.2，保持 production execution gates 开放 | 独立源码复核发现并修复幂等竞争边界；同步基础设施商用开源准入 |
+| v1.17 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.13：CLI 服务端 canonical EngineeringRun tuple、三层 current writer grants/revisions、双事务复核、binding V2/signature V3 与 Runtime consumer、immutable snapshot/composite FK、新 CLI NULL insert 拒绝及 legacy read compatibility；保持 Task owner 迁移与 production 执行闭环开放 | ERUN-P2-CLI-RUN-CONTINUE 接续实现并复核授权边界 |
