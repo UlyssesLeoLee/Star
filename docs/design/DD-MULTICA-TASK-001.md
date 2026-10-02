@@ -1,13 +1,13 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.20** (per 日本 IPA SEC 标准，补充 Run Task Cards bounded UI projection 与旧 Tauri Task mock retirement)
+> **Multica Task Lifecycle 域 詳細設計書 v1.21** (per 日本 IPA SEC 标准，补充 Run Task Cards bounded UI projection 与 Run-local Engineering Loop controller)
 >
-> - 状态: 🟡 Draft v1.20 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；ERUN-P2 CLI canonical identity、fence binding v2 / signature v3 与本地原子 consume foundation 已有代码切片；Engineering Run directory 已有条件式 schema/API，Run Task Cards bounded UI/client 已有条件式只读代码切片，旧 Tauri demo Task/fallback 已退役；宿主 Auth Provider、Task owner 的目标 DB/RLS、production provisioner、ACL/provider、reservation lifecycle、OS spawn adapter、catalog publisher 与 BI/Outbox 仍开放)
+> - 状态: 🟡 Draft v1.21 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 与 9F1 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、Schedule、BI 或跨 Run fair scheduler；Run Task Cards bounded UI/client 已有条件式只读代码切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/Outbox 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.51 §50；`docs/basic-design.md` v5.48 §16.14-16.23
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.52 §50；`docs/basic-design.md` v5.49 §16.14-16.23
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.35；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.7
+> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.8
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
@@ -27,12 +27,12 @@
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v1.18 |
+| 版本 | v1.21 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
 | 承認者 | Draft；v0.3 Run/Evidence 扩展待评审 |
 | 关联 commit | (待生成) |
-| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.2 + `BD-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
+| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.8 + `BD-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
 | 守门 | 19 项 + 26 派生规 跨域覆盖 |
 
@@ -905,6 +905,14 @@ Schedule Loop 的唯一规则与时间 occurrence owner 是 `domain-automation` 
 
 Engineering Loop 是 Run 内的 Plan/Act/Observe/Verify/Decision 次序。每轮引用固定 Task Contract、acceptance、AgentExecutionProfile、HookSet 与 Validation policy snapshot；循环不能自行修改这些基线。预算至少限制 iteration、wall-clock、peak RSS、CPU、child process、provider/tool concurrency 与累计调用成本；无进展/振荡、budget/deadline、撤权/cancel 均停止新动作并触发 child drain，最后写不可变 stop reason、验证结果与 drain outcome。进度采样可重建，停止/验收/Occurrence/Run facts 必须持久化。
 
+#### 14.10.1 Phase 9F1 Run-local Rust controller slice
+
+`domain-agent::engineering_loop` 提供纯域层控制器切片。构造需要 `VerifiedAgentExecutionProfile`，并固定 tenant/project/Run/Task/Worktree、Task Contract、acceptance、HookSet 与 Validation provider/suite/toolchain identities；每次 iteration begin/finish 重读调用方提供的当前快照并拒绝 identity 漂移。Profile provider 与独立 Validation provider 必须身份分离。控制器只维护有限 fingerprint history 和 digest-only 阶段 receipt，不缓存 prompt、reasoning、日志或未界定事件队列。
+
+Loop 与 Profile 两组预算共同约束 iteration、wall-clock、runtime、CPU、peak RSS、child process、provider calls、captured output、event-buffer 与本 Run tool concurrency。`ToolPermitPool` 使用原子计数和 RAII 归还 permit，满额直接返回 backpressure，不建立等待队列。budget/deadline/no-progress/oscillation/身份漂移等结果停止新工作并进入显式终态；validator 必须与 Agent provider 不同且精确匹配固定 suite/toolchain，验证成功只进入 `AwaitingReview`，Task/Run owner workflow 负责最终状态转换。
+
+Drain 结果以 bounded receipt 表示；只有已观察到的 child-process 数与已释放数一致才可标为 drained，deadline 或不一致必须保留 incomplete。当前切片未装配 Run admission 与 actor/grant recheck、真实 provider/CLI/OS child process、durable state/checkpoint/resume/Outbox、Schedule occurrence/worker、BI consumer、Project 聚合 quota 与跨 Run 公平调度。Profile v1 也没有累计成本预算，retry/backoff 未实现；因此这是受限 controller foundation，不构成生产 Engineering Loop 闭环。
+
 ### 14.11 Agent Execution Profile 与 Provider 扩展
 
 `AgentExecutionProfile` 固定组合 Agent、Memory、Skill、Context、Validation、Loop、HookSet 和资源策略的稳定 ID、schema/API version、implementation version、content digest、scope/capabilities、兼容性及 grant snapshot。每次 Run admission 解析并冻结实际选择；撤销、缺失或不兼容的 provider 不回退为更宽权限。Memory 需具来源、scope、ACL、TTL 与删除/保留声明；Skill manifest 含版本/digest/capability/resource budget；Context assembly 限定字节/token 预算、记录 source provenance 和压缩边界，不能静默截断权限、Task Contract 或验收条件；ValidationProvider 独立于 Agent 声明，保存输入/toolchain/rule digest、逐项覆盖、结果与 Evidence。ProjectEngineeringManifest 可按 repository commit 配置任务模板、已批准验证命令 ID、toolchain/env profile、fixtures 和 artifact/redaction 映射，仓库文本不可自行启用命令能力。
@@ -1120,3 +1128,4 @@ Run-scoped列表 API 是 UI 唯一任务读入口：`GET /api/v1/engineering-run
 | v1.19 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §14.13.1，规定 Run Task Cards 只读 UI 使用 canonical Run list API、完整 owner tuple 验证、有界内存/分页/取消及无 mock/Worktree 回退；记录宿主 session、服务端 capability、目标 DB/RLS、CLI Runtime 和验证回写仍为阻断门；同步 requirements v5.50/basic v5.47/Group DD v4.34/SRS v0.6 | 把 Task Cards UI/client 代码切片与详细设计及生产状态对账 |
 | v1.20 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 §14.13.1 与 AC-15：清除旧 Tauri MockDb Task 和 browser-dev fallback，provider 缺失时 fail closed，测试 fixture 使用 `test-*`；同步 requirements v5.51/basic v5.48/Group DD v4.35/SRS v0.7；不把未知服务器 owner 行按 mock 假设删除 | 全仓复核发现独立桌面端仍有旧演示 Task Card |
 | v1.17 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.13：CLI 服务端 canonical EngineeringRun tuple、三层 current writer grants/revisions、双事务复核、binding V2/signature V3 与 Runtime consumer、immutable snapshot/composite FK、新 CLI NULL insert 拒绝及 legacy read compatibility；保持 Task owner 迁移与 production 执行闭环开放 | ERUN-P2-CLI-RUN-CONTINUE 接续实现并复核授权边界 |
+| v1.21 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.10.1 Run-local Rust Engineering Loop controller slice：verified Profile 与 Run/Task/Worktree/Contract/Acceptance/Hook/Validation identities 固定、迭代快照重验、有界 fingerprint 与 digest-only receipt、Resource/Loop budget、原子 ToolPermitPool backpressure、独立 Validation gate 和严格 drain receipt；明确 Run admission/Auth、真实 CLI/provider/process、durable checkpoint/Outbox、Schedule、BI、跨 Run fairness、累计成本预算与 retry/backoff 仍缺；同步 requirements v5.52/basic v5.49/SRS v0.8 | Phase 9F1 受限 Loop controller 实现并完成设计对账 |

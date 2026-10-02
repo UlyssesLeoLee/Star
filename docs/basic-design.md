@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.48 (2026-10-02)
-> **上游要件定义书**: docs/requirements.md v5.51
+> **文档版本**: v5.49 (2026-10-02)
+> **上游要件定义书**: docs/requirements.md v5.52
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4709,7 +4709,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 | PAR-001..004 | §16.15 分层调度、quota、claims、coordinator event | AC-PAR-001..003 | Phase 9 |
 | PERF-001..004 | §16.15 Rust desktop memory/render/cache/plugin budget | AC-PERF-001..003 | Phase 12 |
 | Pi inspiration (no runtime dependency) | §16.15 Rust Agent core / branch history / compaction | AC-PAR / AC-AEC | Phase 9 / 12 |
-| LOOP-001..005 / AEC-001..017 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read/lifecycle、CLI Profile identity binding、current catalog fence 与 Run resource reservation | AC-LOOP-001..006 / AC-AEC-001..017 | Phase 9-11 |
+| LOOP-001..005 / AEC-001..017 | §16.16 Schedule/Engineering Loop、Phase 9F1 Rust bounded controller、versioned Provider/Profile、Profile read/lifecycle、CLI Profile identity binding、current catalog fence 与 Run resource reservation | AC-LOOP-001..006 / AC-AEC-001..017 | Phase 9-11；整体生产受入仍开放 |
 | HOOK-001..007 | §16.17 Rust-native Hook Engine、Advanced Settings Hooks tab、Worktree enforcement 与 BI | AC-HOOK-001..006 | Phase 9-12 |
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
@@ -4717,6 +4717,8 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 Schedule Loop 复用 `domain-automation` Rule/occurrence 架构：当前 Data/API Design 记录了 `Event / Schedule / Cron` trigger 候选，但 Rust `AutomationTrigger` 仍是事件模型，Schedule/Cron occurrence ledger 与生产 worker 尚未实现。`domain-automation` 持有 versioned rule 和 occurrence，发出有幂等键、lease 与 fencing token 的触发；资源 admission 成功后创建独立 Run 并固定 `schedule_rule_id/version/occurrence_id`。Workflow/LangGraph 编排已接受的 Run，不拥有第二份 schedule rule/timer source；`star-scheduler` 只处理 DAG 依赖 readiness、公平队列和 admission，不实现墙钟/Cron。
 
 Engineering Loop 是单一 `TaskExecutionRun` 内受版本化 `LoopPolicy` 约束的有限周期：Plan → Act → Observe → Verify/Evaluate → Decision。每轮只记录可观察的输入摘要、工具类别、结果/证据引用、资源预算和 continue/review/complete/stop 决策；Task Contract/acceptance/profile snapshot 固定不变。stall、oscillation、iteration/time/provider/resource 上限、撤权/cancel/deadline 或 child 未 drain 都生成明确 stop reason。恢复只能从持久 loop boundary/checkpoint 开始并重新授权，不保存 chain-of-thought。
+
+Phase 9F1 的 `domain-agent::engineering_loop` 提供 Run-local controller 代码切片：只接受经过验证的 Profile 和固定 Run/Task/Worktree binding；每次 begin/finish 重核 profile、contract、acceptance、HookSet 与 validation provider/suite/toolchain digest；固定大小的 fingerprint history 检测 no-progress/oscillation；每轮输出五阶段 digest-only receipt。ResourceBudget 与 LoopBudget 限制 iteration、wall time、CPU、peak RSS、child process、provider calls、captured output 和 event-buffer；原子 `ToolPermitPool` 在并发槽满时立即返回 backpressure、不排无界 waiter。验证通过仅到 AwaitingReview，Run/Task 状态仍由 owner workflow 决定。该 controller 不提供持久化、恢复、schedule occurrence、Run Auth recheck、跨 Run quota/fairness、真实 CLI/provider、outbox 或 BI；Profile v1 暂无累计成本上限，retry/backoff 也未实现。
 
 `AgentExecutionProfile` 是 versioned Master，组合 `AgentProvider`、`MemoryProvider`、`SkillRegistry`、`ContextAssembler`、`ValidationProvider`、`LoopPolicy`、HookSet 与层级资源预算。Provider contract 包含稳定 ID、API/implementation version、capability/scope、资源要求、可用状态和脱敏错误/evidence 映射。新增 provider 通过兼容 contract 注册，不改变 `work_item_id`、`run_id`、GroupContext 或 Worktree identity；未安装/不兼容显示 unavailable。每个 Run 保存不可变 provider/version/hash/grant snapshot，不存 Secret、raw prompt、完整日志或隐式推理；历史 provider 更新不回写。
 
@@ -4946,3 +4948,4 @@ Run Workspace 默认选中同级 `Task Cards` tab。`RunTaskCardsPanel` 只调�
 | v5.46 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49 与 Group DD v4.33；定义 Task Card 完整 Run owner tuple、同 Run Worktree 关系 guard、Outbox 与 Run/CLI 查询过滤；说明 30 条旧 mock seed 和精确 localStorage 历史迁移，保留 DB legacy row 不猜归属；明确目标 DB/RLS 与宿主认证/UI 尚未完成 | 用户授权清理旧 mock Task Card，并要求真实任务事实归属 Engineering Run |
 | v5.47 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50、Group DD v4.34、Task DD v1.19；记录 Run Task Cards 只读 bounded UI/API 代码切片、12 条/2 MiB/100 页限制与取消行为；明确宿主会话、服务端 capability、目标 DB/RLS 未就绪及 CLI 禁用门 | 把 Run Task Cards 前端实现与设计、生产启用条件对账 |
 | v5.48 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51、Group DD v4.35、Task DD v1.20、SRS v0.7；将独立 Tauri 的四条运行时 mock WorkItem、MockDb task rows 与 browser-dev fallback 标为已移除/未配置时 fail closed；说明测试 `test-*` fixture 与服务器未知行边界 | 用户确认旧 Task Card 全为 mock 并授权清理；全仓审查发现旧 Tauri 桌面端仍有演示记录 |
+| v5.49 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.52、Task DD v1.21 与 SRS v0.8；在 §16.16 记录 Phase 9F1 Run-local Rust Engineering Loop controller、预算与 drain 边界；明确无 Schedule/Run writer/Auth/CLI/Outbox/BI/跨 Run fair scheduler，Profile v1 成本上限与 retry/backoff 未实现 | 将 Engineering Loop 代码切片与架构要求及生产状态对账 |

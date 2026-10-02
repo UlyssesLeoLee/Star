@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.67**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.68**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -18,9 +18,9 @@
 > - Phase 9D-4/9D-5a/9D-5b 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；9D-5a 将原生 evaluator API 扩展为 phase-scoped v2，增加 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup，保留 v1 archive-only policy digest 兼容并拒绝 Run admission archive-only facts。9D-5b 增加条件式 Run admission producer seam：锁外 readiness/fencing，锁内最终重授权与 native Hook evaluation；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和共享 event_id 的 RunEvent；Deny 只写无 Run/Task FK 的 ledger。policy publish/rollback、Builder 和事件 coverage 共用服务端 producer capability；当前 production adapter 未装配，能力仍 false，不能宣称 Runtime spawn 已有 production Hook protection，见 §6.52。
 > - Phase 9E 更新：9E-1 Rust immutable Profile verifier、9E-2 bounded dependency resolver、9E-3 Profile Master/SCD2 + append-only Audit migration substrate 与 9E-4A Run/Profile guard migration 已交付并完成隔离 DB 验收；9E-4B1 已加入 Worktree-scoped bounded current Profile GET list/detail API 和 4 个 Rust 单测；9E-4B2 已加入 Project/Worktree Profile publish/disable/reenable/rollback 生命周期写 API 代码切片；9E-4B3 将 current verified Project/Worktree Hook policy 映射为 Profile admission 所需的 HookSet ID/version/digest；9E-4B4 明确双 Profile identity 与当前 Run writer 缺口；9E-4C1 已加入 Task Card Profile picker、request identity 与 versioned fingerprint/legacy replay 兼容；9E-4C2 已加入 Provider/Skill/GrantSet Master/SCD2 与 audit migration、reference-scoped SQL reader、Arc snapshot 传递和 final transaction fence recheck。隔离 PostgreSQL 18 与 targeted Rust 验证通过，但 catalog publisher/生产 Runtime provisioner、目标 DB/RLS grants 未部署；C3 atomic Run/resource writer 与 C4 Runtime fence 未接入，新 Run 继续 fail closed。occurrence/Loop runtime 仍开放，见 §6.54-§6.62。
 > - Phase 9E-4C5 更新：新增 `star-dto::task_run` strict fence DTO；Local Runtime 使用签名 v2 认证双 Profile fence，并提供 current-binding compare 与 nonce/fence 同事务一次性消费；WAL receipt 上限 50,000 条，过期超过 5 分钟窗口后清理。此为 Runtime consume foundation，不连接生产 ACL/authority/catalog/Reservation/OS spawn/BI；profile-bound producer capability 继续默认关闭，见 §6.65。
-> - 关联需求：docs/requirements.md v5.51 §50
-> - 关联基本设计：docs/basic-design.md v5.48 §16.1-16.23
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.34、docs/design/DD-MULTICA-TASK-001.md v1.19、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4
+> - 关联需求：docs/requirements.md v5.52 §50
+> - 关联基本设计：docs/basic-design.md v5.49 §16.1-16.23
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.35、docs/design/DD-MULTICA-TASK-001.md v1.21、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4
 
 ---
 
@@ -1002,6 +1002,18 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | 验证 | 主前端通过；Tauri focused tests 通过；全量 desktop build 未通过 | runner --typecheck --tests --desktop-tests：typecheck 通过，13 个 Vitest 文件/150 tests 通过；Tauri hook/card 8 tests 通过，BoardView fail-closed 单测 1 通过。npm run build 报告 legacy desktop 缺失 App.module.css 声明、常量未导出、Tauri 全局类型缺失等编译错误；Rust cargo/rustfmt 当前不可用，未声称 Rust crate 编译通过；Canvas E2E 未运行。 |
 
 本阶段修订 requirements AC-TASK-DATA-001/SRS AC-16 及 basic design、Group/Task detailed design，确保当前产品运行时没有已知旧演示 Task 记录；保留的测试 fixture 仅作验证数据，不能充当 Run-owned Task Card。
+
+### 6.74 Phase 9F1 Run-local Rust Engineering Loop controller（2026-10-02）
+
+| 面向 | 本阶段实现与验证 | 当前状态 / 未关闭门 |
+|---|---|---|
+| 身份与快照 | 新增 `domain-agent::engineering_loop`，构造绑定 verified AgentExecutionProfile、tenant/project/Run/Task/Worktree、Task Contract、acceptance、HookSet 与独立 Validation provider/suite/toolchain；iteration begin/finish 校验调用方提供的当前快照 | Rust 纯域层 controller slice；没有 Run admission/actor-grant recheck 与持久化身份快照 writer |
+| 有界循环与资源 | 限制 iteration、wall-clock/runtime、CPU、peak RSS、child process、provider calls、captured output、event buffer 和 per-Run tool concurrency；小型 fingerprint history 检测无进展/振荡，阶段 receipt 仅保存 digest 与 fixed-size summary | 原子 permit pool 在满额时立即 backpressure，无等待队列；真实跨 Run quota/fair scheduler 与实测 resource sampler 未接入 |
+| 验证与 drain | 仅接受与 Agent 身份独立且精确匹配固定 suite/toolchain 的 validator；验证通过进入 AwaitingReview；drain 只有观察到的 child 与 released 数相等时可报 drained | 不自动改 Task/Run 状态；真实 provider/CLI/OS child process、checkpoint/resume/Outbox、Schedule worker/occurrence 和 BI consumer 未接通 |
+| 安全预算 | 每轮重核 Profile/Contract/Acceptance/HookSet/Validation identity；stop reason 枚举化、receipt 不含 prompt/reasoning/log 内容 | Profile v1 无累计成本上限；retry/backoff 未实现；生产 Auth、Run owner API/RLS、resource reservation lifecycle 未接通 |
+| 定向验证 | `cargo test -p domain-agent --lib -j 4`：142/142 通过；`rustfmt --edition 2021 --check` 通过；经过 baseline-warning 明示例外的 crate-local `clippy --all-targets --no-deps -D warnings` 通过 | `--locked` 测试因仓库既有 Cargo.lock 与 workspace 解析不一致受阻；未声称 workspace/all-targets、桌面 runtime 或目标 DB 验收通过 |
+
+本阶段只把 controller 核心与可验证限制同步到 requirements AC-LOOP / AC-17、basic design §16.16、Task SRS AC-17 与 Task DD §14.10.1。Schedule/Engineering Loop 的生产闭环、Loop scheduler、Run Auth/持久化/恢复、OS sandbox、BI 及 Project 级公平调度仍是后续工作，不因本代码切片关闭 Phase 9。
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1124,4 +1136,5 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | v5.65 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账实施计划 §6.71 与 Automation Design §4.38 / registry v0.2；明确 Task Owner 专用自动化与 SQL/RLS 证据仍缺，并修正 Sprint/store 测试对旧 demo ID 的残留引用；没有把未执行的数据库/frontend 验证标为通过 | 清理旧 mock Task Card 后的文档/实现复核 |
 | v5.66 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50/basic v5.47/Group DD v4.34/Task DD v1.19/SRS v0.6；新增 §6.72 记录 Run Task Cards 只读 UI/client、bounded memory/cancellation、CLI disabled 和认证/capability/DB/RLS blockers；新增 automation §4.39 与 registry v0.39；记录定向 TypeScript/5 tests 通过、Node engine 警告、React Three Fiber/lockfile 兼容修复 | 完成 Task Cards UI 代码切片并与实现/设计逐项对账 |
 | v5.67 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51/basic v5.48/Group DD v4.35/Task DD v1.20/SRS v0.7；新增 §6.73 记录删除 Tauri MockDb 四条 Task、移除 Tauri/browser fallback、Canvas E2E 转用 Worktree fixture 与 test-* 隔离；主前端 13 files/150 tests、桌面 focused tests 9 tests 通过；全量 desktop build 报告 legacy compile errors，Rust cargo unavailable，Canvas E2E 未运行；未知服务器行保留 | 用户确认旧任务全是 mock 并授权清理；全仓复查发现独立 Tauri shell 与 E2E 仍引用已退役 Task |
+| v5.68 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.52/basic v5.49/Task DD v1.21/SRS v0.8；新增 §6.74 记录 Run-local Rust Engineering Loop controller 的身份快照、有界预算、独立验证、backpressure 与 drain receipt；列明 Run Auth/CLI/process、durability/checkpoint、Schedule、BI、跨 Run fairness、累计成本和 retry/backoff 缺口；如实记录 142/142 domain-agent 测试与受限 clippy/rustfmt 结果 | Phase 9F1 controller core 实现并与需求、设计和当前生产状态逐项对账 |
 | v5.60 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Group DD v4.29/Task DD v1.17；新增 §6.68，记录 CLI canonical identity、strict SQL guard、V2 fence/signature v3、attachment 门与授权 Hooks 深链，保留 Run Apps/生产依赖开放；自动化 §4.37 | 用户要求子代理/worktree 并行处理、rebase 后 merge dev，并确保文档对账 |

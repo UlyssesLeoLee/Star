@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.51）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.52）
 
 ## 0. 文档说明与前提
 
@@ -2545,6 +2545,8 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 | AC-LOOP-005 | Resume 从 loop boundary/checkpoint 续做时重新校验当前 actor、GroupContext、Worktree、Plugin capability 和 Task Contract/version；重放副作用仍由幂等 Domain Command 收敛 |
 | AC-LOOP-006 | BI 只按固定公式报告 scheduled success/misfire、loop acceptance、iteration-to-acceptance、stall/rework 与资源成本；unknown 有 coverage 标记且原始迭代数不是优化目标 |
 
+实施对账（2026-10-02）：Phase 9F1 已在 `domain-agent::engineering_loop` 提供 Run-local bounded controller 代码切片，固定 Profile/Task Contract/acceptance/HookSet/Validation identity，限制 iteration、wall-clock、CPU/RSS、child process、provider calls、output/event buffer 与 per-Run tool concurrency，并输出 digest-only receipt。验证通过只进入 AwaitingReview，不自动修改 Task 状态。该切片尚未接 Run admission/Auth recheck、CLI/OS process、durable checkpoint/Outbox、Schedule occurrence、BI 或跨 Run 公平调度；当前 Profile v1 没有累计成本预算字段，retry/backoff 也未实现，因此 LOOP-003/004/005 与 AC-LOOP-001..006 仍未整体通过。
+
 ### 50.8C 可扩展 Agent Execution Profile：Agent、Memory、Skill、Context、Validation
 
 Agent 执行能力按稳定契约组合，不把某个 CLI、模型、记忆实现、Skill 格式、上下文算法或验证器写死进 Task/Worktree 身份模型。`AgentExecutionProfile` 是版本化 Master，引用具名且版本固定的 `AgentProvider`、`MemoryProvider`、`SkillRegistry`、`ContextAssembler`、`ValidationProvider`、`LoopPolicy` 与资源预算；Provider 可由内建 Rust 实现或通过隔离 Plugin capability 提供。新增实现应只注册兼容 provider/version/manifest，不改变 `work_item_id`、`run_id`、Worktree 关系或已有历史 Run 语义。未支持的 provider/capability 必须显式标为 unavailable，不得用 mock 或空成功冒充。
@@ -2783,3 +2785,4 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.50 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-006：Run 默认 Task Cards 投影、认证 Run-scoped bounded list、单页内存与页数上限、无旧 Worktree/mock 回退，以及 CLI 生产闭环前禁用；列清前端代码切片与当前宿主 Provider、服务端 capability、目标 DB/RLS 门禁 | 将实际 Run Task Cards UI 代码与认证/数据库未就绪事实对账 |
 | v5.45 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-004：server-resolved directory identity、两事务重验、V2 fence/signature v3、严格完整快照与新 CLI NULL guard、attachment 再授权；扩展 AC-HOOK-001 的会话授权深链和有界查找 | 独立 worktree 并行实现 CLI 身份与 Hooks 深链、源码第二意见修正 |
 | v5.51 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 AC-TASK-DATA-001：清除独立 Tauri 桌面端的四条运行时演示 WorkItem，移除 MockDb 任务记录和 browser-dev fallback；缺少 canonical Run provider 时 IPC fail closed，测试 fixture 统一使用 `test-*`；不删除服务器端未知归属行 | 全仓审查发现旧 Tauri 桌面端仍暴露演示 Task Card |
+| v5.52 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 Schedule/Engineering Loop 增加 Phase 9F1 当前实现对账：Run-local Rust controller 已有 bounded iteration、Profile/Contract/Acceptance/Hook/Validation snapshot guard、预算 stop、进度检测、独立验证 gate、tool permit backpressure 与 drain receipt；明确成本预算字段、retry/backoff、Run admission/Auth、持久化、Schedule、BI 与公平调度仍缺，未将其写成生产闭环 | 实现受限 Engineering Loop 核心并同步验收范围 |
