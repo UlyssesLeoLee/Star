@@ -1,20 +1,20 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.21** (per 日本 IPA SEC 标准，补充 Run Task Cards bounded UI projection 与 Run-local Engineering Loop controller)
+> **Multica Task Lifecycle 域 詳細設計書 v1.23** (per 日本 IPA SEC 标准，补充 Run Task Cards bounded UI projection、Run-local Engineering Loop controller 与 Schedule fencing)
 >
-> - 状态: 🟡 Draft v1.21 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 与 9F1 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、Schedule、BI 或跨 Run fair scheduler；Run Task Cards bounded UI/client 已有条件式只读代码切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/Outbox 仍开放)
+> - 状态: 🟡 Draft v1.23 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3、9F1 与 9F2 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Schedule rule/occurrence 有 typed domain contract 和未部署 migration substrate，但无 parser/adapter/worker/Run admission；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、Schedule worker、BI 或跨 Run fair scheduler；Run Task Cards bounded UI/client 已有条件式只读代码切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/Outbox 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.52 §50；`docs/basic-design.md` v5.49 §16.14-16.23
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.54 §50；`docs/basic-design.md` v5.51 §16.14-16.23
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.35；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.8
-> - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
+> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.10
+> - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.3
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**`
 > - 审核: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核；v0.2 补充待评审
-> - 日期: 2026-09-28 JST
+> - 日期: 2026-10-02 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / アーキテクト / SRE / 5 域 Lead 真人
 > - dual-use 提醒: 本 DD 不引用 RGS 仓 + 不建立业务子域↔DDD 映射
 > - **本 DD 模板 1:1 派生自 `DD-AGENT-RELATIONSHIP-001.md` v0.1**
@@ -27,12 +27,12 @@
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v1.21 |
+| 版本 | v1.23 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
-| 承認者 | Draft；v0.3 Run/Evidence 扩展待评审 |
+| 承認者 | Draft；v1.23 Schedule substrate 与生产验收边界待评审 |
 | 关联 commit | (待生成) |
-| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.8 + `BD-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
+| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.10 + `BD-MULTICA-TASK-001.md` v0.3 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
 | 守门 | 19 项 + 26 派生规 跨域覆盖 |
 
@@ -901,7 +901,7 @@ Plugin 仅通过版本化 manifest/capability contract 接入 Rust core；运行
 
 ### 14.10 Schedule Loop 与 Engineering Loop
 
-Schedule Loop 的唯一规则与时间 occurrence owner 是 `domain-automation` 的版本化 `AutomationRule` / `AutomationOccurrence`。一次 occurrence 使用稳定 ID、幂等 dispatch、fencing lease，固定 trigger/timezone/target scope/concurrency/overlap/misfire/retry/deadline/pause policy，并在创建时绑定当时的 Task/Worktree/Profile/Hook policy 版本；规则后续修改不得回写既有 occurrence 或 Run。`star-scheduler` 只做 DAG 依赖 readiness，Workflow/LangGraph 只编排已触发的 Run，不创建第二套 Cron rule store 或时钟。现有 Schedule/Cron schema 仍为候选，生产 worker 与恢复逻辑尚未实现。
+Schedule Loop 的唯一规则与时间 occurrence owner 是 `domain-automation` 的版本化 `AutomationScheduleRuleRevisionV1` / `AutomationOccurrenceSnapshotV1`。一次 occurrence 由 tenant/rule/version/UTC slot 构成稳定幂等键，固定 trigger/timezone/parser/tzdb/target scope/concurrency/overlap/misfire/retry/deadline/pause policy，并保留 local-time/UTC offset 与创建时的 Task/Worktree/Profile/Hook identity；规则后续修改不得回写既有 occurrence 或 Run。`star-scheduler` 只做 DAG 依赖 readiness，Workflow/LangGraph 只编排已接受的 Run，不创建第二套 Cron rule store 或时钟。Phase 9F2 已增加 `automation.schedule_rule_revision`、`automation.schedule_rule_audit`、`automation.occurrence`、`automation.occurrence_dispatch`、`automation.occurrence_event` schema substrate；migration 尚未部署，cron/tzdb parser、persistence adapter、rule API、due materializer、claim/recovery worker 与 occurrence-to-Run admission 尚未实现。
 
 Engineering Loop 是 Run 内的 Plan/Act/Observe/Verify/Decision 次序。每轮引用固定 Task Contract、acceptance、AgentExecutionProfile、HookSet 与 Validation policy snapshot；循环不能自行修改这些基线。预算至少限制 iteration、wall-clock、peak RSS、CPU、child process、provider/tool concurrency 与累计调用成本；无进展/振荡、budget/deadline、撤权/cancel 均停止新动作并触发 child drain，最后写不可变 stop reason、验证结果与 drain outcome。进度采样可重建，停止/验收/Occurrence/Run facts 必须持久化。
 
@@ -912,6 +912,16 @@ Engineering Loop 是 Run 内的 Plan/Act/Observe/Verify/Decision 次序。每轮
 Loop 与 Profile 两组预算共同约束 iteration、wall-clock、runtime、CPU、peak RSS、child process、provider calls、captured output、event-buffer 与本 Run tool concurrency。`ToolPermitPool` 使用原子计数和 RAII 归还 permit，满额直接返回 backpressure，不建立等待队列。budget/deadline/no-progress/oscillation/身份漂移等结果停止新工作并进入显式终态；validator 必须与 Agent provider 不同且精确匹配固定 suite/toolchain，验证成功只进入 `AwaitingReview`，Task/Run owner workflow 负责最终状态转换。
 
 Drain 结果以 bounded receipt 表示；只有已观察到的 child-process 数与已释放数一致才可标为 drained，deadline 或不一致必须保留 incomplete。当前切片未装配 Run admission 与 actor/grant recheck、真实 provider/CLI/OS child process、durable state/checkpoint/resume/Outbox、Schedule occurrence/worker、BI consumer、Project 聚合 quota 与跨 Run 公平调度。Profile v1 也没有累计成本预算，retry/backoff 未实现；因此这是受限 controller foundation，不构成生产 Engineering Loop 闭环。
+
+#### 14.10.2 Phase 9F2 Schedule rule/occurrence durable substrate
+
+`domain-automation::schedule` 定义 `AutomationScheduleRuleRevisionV1`、`AutomationOccurrenceKey`、`AutomationOccurrenceSnapshotV1` 与 `AutomationOccurrenceLeaseFenceV1`。Rule revision 固定 tenant/Project、cron expression、timezone、recurrence parser/tzdb version、DST gap/fold、overlap、misfire、pause、retry/backoff、deadline，以及 Cloud Branch/EngineeringRun/repository/Worktree/Work Item/ExecutionProfile/HookSet identity。profile/hook digest 要求 lowercase SHA-256；Rule 必须完整绑定 Worktree-first target 且 target Project 与 rule Project 相同；overlap concurrency ≤64、catch-up ≤256、attempts ≤25、backoff/deadline ≤24 小时。当前 validator 对 cron/timezone 只做 bounded shape 验证，不解析 cron 文法或校验 IANA tzdb 存在性。
+
+Occurrence 的幂等键为 `(tenant_id, rule_id, rule_version, scheduled_for_utc)`；tenant 是身份的一部分，UTC instant 区分 DST fold 两个重复本地时刻，local label、UTC offset、parser version 与 tzdb version 用于解释 materialization。rule successor 不能修改旧 occurrence snapshot。每个 occurrence 的 Work dispatch row 保存 next attempt、attempt count、lease owner/expiry、deadline 与 monotonic fencing generation；过期重领必须在同一事务增 generation。数据库 trigger 限制 generation 连续递增、新 claim 同步增加 attempt、禁止盗取未过期 lease，并要求同 generation heartbeat 保留 owner 且不缩短 expiry；terminal row 不得改写，且只在 `terminal_at + retention_period` 到期后允许删除。Lease fence validator 检查 tenant/occurrence/owner/generation、当前 deadline 和 lease 不超过 occurrence deadline，但 writer 仍须在事务内比较数据库当前 generation。
+
+Migration `db/migrations/2026-10-02-automation-schedule-occurrence.sql` 定义五表并落实 W/T/M：schedule rule revision 为 close-only SCD2 Master；rule audit、immutable occurrence 和 occurrence event 为 append-only Transaction；dispatch state 为具显式 retention/expiry 的 Work。五表都用 `app.tenant_id` FORCE RLS；发生事实不可更新或删除；Master 可关闭一次但不得改写历史字段；Occurrence 按 tenant/rule/version/UTC slot 唯一；event 的 tenant/Project/occurrence tuple 必须匹配 owner occurrence；dispatch trigger enforce state transition、monotonic fencing、terminal TTL 与到期后删除。表只建立 schema substrate，没有 role grants、parser/catalog、写 adapter、due worker 或 migration deployment evidence。
+
+**验收边界**：9F2 domain tests 通过不表示 PostgreSQL schema、RLS 或生产调度已验收。Phase 9F3 必须增加 adapter/API 与可恢复 claim/heartbeat/retry/materializer；后续 Run admission 必须在同一最终事务中重授权 target、Profile/Hook/catalog 与 quota，校验当前 fencing generation，然后写 schedule-origin TaskExecutionRun、reservation、occurrence state/event 和 transactional outbox。Run 唯一 occurrence index 是第二道防线，不能代替 occurrence ledger。目标 DB/runtime grants/Auth provider/生产执行器未就绪时 Schedule producer capability 保持关闭。
 
 ### 14.11 Agent Execution Profile 与 Provider 扩展
 
@@ -1129,3 +1139,5 @@ Run-scoped列表 API 是 UI 唯一任务读入口：`GET /api/v1/engineering-run
 | v1.20 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 §14.13.1 与 AC-15：清除旧 Tauri MockDb Task 和 browser-dev fallback，provider 缺失时 fail closed，测试 fixture 使用 `test-*`；同步 requirements v5.51/basic v5.48/Group DD v4.35/SRS v0.7；不把未知服务器 owner 行按 mock 假设删除 | 全仓复核发现独立桌面端仍有旧演示 Task Card |
 | v1.17 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.13：CLI 服务端 canonical EngineeringRun tuple、三层 current writer grants/revisions、双事务复核、binding V2/signature V3 与 Runtime consumer、immutable snapshot/composite FK、新 CLI NULL insert 拒绝及 legacy read compatibility；保持 Task owner 迁移与 production 执行闭环开放 | ERUN-P2-CLI-RUN-CONTINUE 接续实现并复核授权边界 |
 | v1.21 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.10.1 Run-local Rust Engineering Loop controller slice：verified Profile 与 Run/Task/Worktree/Contract/Acceptance/Hook/Validation identities 固定、迭代快照重验、有界 fingerprint 与 digest-only receipt、Resource/Loop budget、原子 ToolPermitPool backpressure、独立 Validation gate 和严格 drain receipt；明确 Run admission/Auth、真实 CLI/provider/process、durable checkpoint/Outbox、Schedule、BI、跨 Run fairness、累计成本预算与 retry/backoff 仍缺；同步 requirements v5.52/basic v5.49/SRS v0.8 | Phase 9F1 受限 Loop controller 实现并完成设计对账 |
+| v1.22 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.10.2 与 Phase 9F2 对账：版本化 Automation Schedule rule/target/profile/hook/DST/overlap/misfire/retry/deadline contract、UTC-slot occurrence snapshot、TTL/fencing dispatch 与五表 W/T/M + FORCE RLS migration；明确 cron/tzdb validation/adapter/worker/Run transaction/Outbox/BI/目标 DB 仍未完成；同步 Task SRS v0.9/Task BD v0.2/根要求 v5.53/根设计 v5.50 | 交付 durable Schedule occurrence schema/domain slice |
+| v1.23 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确复合 occurrence key 为 tenant/rule/version/UTC slot；详细规定 terminal-based retention、单调连续 fence/attempt、过期 lease reclaim 与禁止抢占 active lease 的数据库触发器；同步 Task SRS v0.10、Task BD v0.3、根要求 v5.54、根设计 v5.51 与 Data Design v0.4 | Phase 9F2 migration/domain 约束对账与安全收紧 |

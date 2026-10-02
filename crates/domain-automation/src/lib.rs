@@ -1,3 +1,9 @@
+//! @cypher schema=1 source_sha256=9bc261e4aca0b10d6bc0937f1dd847fd1eb173680dd7cd29cda698b603585f90
+//! MERGE (self:File {path:"crates/domain-automation/src/lib.rs"})
+//! MERGE (schedule:Symbol {id:"crates/domain-automation/src/lib.rs::schedule",kind:"module"})
+//! MERGE (self)-[:DEFINES]->(schedule)
+//! @endcypher
+//!
 //! domain-automation crate
 //!
 //! 详细 spec: docs/specs/domain-automation-spec.md §11 (REQ-AUTO-001)
@@ -30,8 +36,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
 use thiserror::Error;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use uuid::Uuid;
+
+pub mod schedule;
 
 // =====================================================================
 // 强类型 ID 宏

@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.52）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.54）
 
 ## 0. 文档说明与前提
 
@@ -2520,7 +2520,7 @@ Evaluator API v2 为每条 HookRule 提供 phase scope。旧的无 phase 规则�
 
 渡口分别定义 **Schedule Loop**（何时/为何触发工作）和 **Engineering Loop**（一次 Run 如何逐轮推进工作）。二者共享授权、资源 admission、事件账本、cancel/deadline 和 drain 契约，但不得合并成单一“循环状态”。Schedule Loop definition 是带版本的配置事实；每次触发建立不可混淆的 `schedule_occurrence_id`，受租约、fencing token 与幂等键保护，只有 admission 成功后才创建独立 `TaskExecutionRun`。手动启动不伪装成 schedule occurrence。
 
-Schedule Loop 必须复用现有 Automation/Workflow 架构边界：`domain-automation` 的 Rule 是唯一可扩展的 schedule definition/occurrence source；Schedule/Cron trigger 仍属待实现的扩展类型，不能把 API/Data Design 中的候选契约当成现有生产能力。Workflow/LangGraph 消费已接受的 occurrence 并编排 Run 内步骤；`star-scheduler` 只负责依赖 DAG 就绪，不负责计时；Canvas Workflow 的 Schedule Trigger 作为 Automation adapter，不另建竞争的 rule store、cron daemon 或 occurrence identity。实现和迁移状态必须区分现有事件自动化、设计候选和真正可运行的 schedule worker。
+Schedule Loop 必须复用现有 Automation/Workflow 架构边界：`domain-automation` 的 versioned Rule 是唯一 schedule definition/occurrence source；Phase 9F2 已增加 Rule revision、occurrence snapshot 与五表 schema substrate，但未有生产 parser、persistence adapter、API 或 worker，不能把 DTO/DDL 当成可运行的 Schedule。Workflow/LangGraph 消费已接受的 occurrence 并编排 Run 内步骤；`star-scheduler` 只负责依赖 DAG 就绪，不负责计时；Canvas Workflow 的 Schedule Trigger 作为 Automation adapter，不另建竞争的 rule store、cron daemon 或 occurrence identity。实现和迁移状态必须区分现有事件自动化、代码/schema substrate 和真正可运行的 schedule worker。
 
 Schedule Loop 必须定义时区/事件触发、目标 Task 与 scope、pause/disable、最大并发、重叠策略、misfire 策略（skip/coalesce/受限 catch-up）、重试预算、退避/jitter、deadline 和告警。重复调度以 occurrence ID 去重；worker lease 到期可被重新领取，但旧 worker 的 fencing token 失效后不能写入结果。暂停阻止新 occurrence；取消当前 schedule 可按 policy 继续或取消已接受 Run，但行为必须显式且可审计。DST、系统重启和队列过载不能导致无界补跑。
 
@@ -2544,8 +2544,11 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 | AC-LOOP-004 | Task Card Run Detail 可显示各 loop iteration 的结构化摘要、工具类别、可观测结果、验证、耗时/预算和 stop reason；不暴露 chain-of-thought、Secret 或未脱敏大日志 |
 | AC-LOOP-005 | Resume 从 loop boundary/checkpoint 续做时重新校验当前 actor、GroupContext、Worktree、Plugin capability 和 Task Contract/version；重放副作用仍由幂等 Domain Command 收敛 |
 | AC-LOOP-006 | BI 只按固定公式报告 scheduled success/misfire、loop acceptance、iteration-to-acceptance、stall/rework 与资源成本；unknown 有 coverage 标记且原始迭代数不是优化目标 |
+| AC-LOOP-007 | Schedule rule Master/SCD2、append-only rule Audit/Occurrence/Event 和带 TTL 的 Work dispatch state 具备 tenant FORCE RLS；tenant/rule/version/UTC-slot 复合唯一键、target/Profile/HookSet snapshot、DST/timezone/policy version 与 monotonic lease generation 可被重复迁移及并发/replay 场景验证；只有 domain/schema 源码而未有 DB/RLS/worker/Run writer 验收时不得声称 AC-LOOP-001/002 通过 |
 
 实施对账（2026-10-02）：Phase 9F1 已在 `domain-agent::engineering_loop` 提供 Run-local bounded controller 代码切片，固定 Profile/Task Contract/acceptance/HookSet/Validation identity，限制 iteration、wall-clock、CPU/RSS、child process、provider calls、output/event buffer 与 per-Run tool concurrency，并输出 digest-only receipt。验证通过只进入 AwaitingReview，不自动修改 Task 状态。该切片尚未接 Run admission/Auth recheck、CLI/OS process、durable checkpoint/Outbox、Schedule occurrence、BI 或跨 Run 公平调度；当前 Profile v1 没有累计成本预算字段，retry/backoff 也未实现，因此 LOOP-003/004/005 与 AC-LOOP-001..006 仍未整体通过。
+
+实施对账（2026-10-02，Phase 9F2）：domain-automation::schedule 已加入版本化 Schedule rule/tenant-scoped target/Profile/HookSet contract、tenant + rule ID + rule version + UTC-slot occurrence key/snapshot、DST/overlap/misfire/pause/retry/deadline policy 和 lease-fence DTO；新增 automation schema 的 5 张 W/T/M 表、SCD2 close-only guard、append-only fact triggers、slot uniqueness、tenant FORCE RLS、DB-enforced monotonic/contiguous fencing 与 terminal TTL cleanup contract。domain-automation 20/20 tests 通过。当前 migration 未应用：本机 Docker daemon 不可用且未发现 psql/pg_ctl，因此 SQL/RLS/幂等/并发行为没有数据库实证；也没有 cron/tzdb parser/catalog、rule API、materializer/lease worker、Run/reservation/Outbox 同事务 writer、BI 或目标 DB grants/Auth。9F2 仅完成 domain/schema substrate；AC-LOOP-001/002 与 schedule runtime 仍未通过，生产 Schedule capability 必须关闭。
 
 ### 50.8C 可扩展 Agent Execution Profile：Agent、Memory、Skill、Context、Validation
 
@@ -2786,3 +2789,5 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.45 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-004：server-resolved directory identity、两事务重验、V2 fence/signature v3、严格完整快照与新 CLI NULL guard、attachment 再授权；扩展 AC-HOOK-001 的会话授权深链和有界查找 | 独立 worktree 并行实现 CLI 身份与 Hooks 深链、源码第二意见修正 |
 | v5.51 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 AC-TASK-DATA-001：清除独立 Tauri 桌面端的四条运行时演示 WorkItem，移除 MockDb 任务记录和 browser-dev fallback；缺少 canonical Run provider 时 IPC fail closed，测试 fixture 统一使用 `test-*`；不删除服务器端未知归属行 | 全仓审查发现旧 Tauri 桌面端仍暴露演示 Task Card |
 | v5.52 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 Schedule/Engineering Loop 增加 Phase 9F1 当前实现对账：Run-local Rust controller 已有 bounded iteration、Profile/Contract/Acceptance/Hook/Validation snapshot guard、预算 stop、进度检测、独立验证 gate、tool permit backpressure 与 drain receipt；明确成本预算字段、retry/backoff、Run admission/Auth、持久化、Schedule、BI 与公平调度仍缺，未将其写成生产闭环 | 实现受限 Engineering Loop 核心并同步验收范围 |
+| v5.53 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-LOOP-007 与 Phase 9F2 当前实现对账：versioned Automation rule/occurrence/lease fence domain contracts、five-table W/T/M + FORCE RLS migration substrate 和 20/20 domain tests；明确本机无 PostgreSQL/Docker daemon，SQL/RLS 未实证，parser/worker/API/Run admission/Outbox/BI/target DB 仍开放且 capability 关闭 | 推进 Schedule/Occurrence durable substrate 并对照需求和实现 |
+| v5.54 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加强 Phase 9F2 AC-LOOP-007 对账：occurrence key 明确为 tenant + rule ID + rule version + UTC slot；dispatch contract 记录 DB monotonic/contiguous fencing、active lease steal guard 与 terminal-based TTL；保持 DDL/target DB/runtime 验收未完成 | 自审发现 tenant 幂等键与 dispatch fencing/TTL 的 database invariant 需同步到需求 |

@@ -1,12 +1,14 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v0.2 (2026-08-26)
+> **文档版本**: v0.4 (2026-10-02)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 排期调整(V2 候选) / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
+> | v0.3 | 2026-10-02 | 增加 Phase 9F2 automation Schedule rule/occurrence durable substrate 与 W/T/M/RLS 实现对账；目标 DB migration 尚未部署 | Mavis 接手审核 |
+> | v0.4 | 2026-10-02 | 补充 occurrence tenant/rule/version/UTC-slot 复合唯一键、事件 project-scope FK、dispatch fencing/reclaim trigger 与 terminal-based TTL；强调仅源码/schema gate，目标 PostgreSQL/RLS/grants 尚未验收 | Mavis 接手审核 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -1976,6 +1978,20 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 
 > **注**:`automation_trigger` / `automation_action` 子表本设计合并为 JSONB(§R-AUTO-001 不强制可视化配置器;MVP 简化为单表 JSONB)
 > V1 可考虑拆分(若需要 UI Builder)
+
+#### 4.13.2 Schedule rule revision、occurrence 与 dispatch history (Phase 9F2)
+
+实体 owner 仍为 `domain-automation`，PostgreSQL owner schema 为 `automation`。当前增量 migration `db/migrations/2026-10-02-automation-schedule-occurrence.sql` 增加以下五张表：
+
+| 表 | W/T/M | 关键字段与约束 | RLS / retention |
+|---|---|---|---|
+| `automation.schedule_rule_revision` | **Master** | tenant/Project/rule/version、cron/timezone/parser/tzdb、DST/overlap/misfire/pause/retry/deadline 与 Branch/EngineeringRun/repository/Worktree/Work Item/Profile/HookSet target；唯一 current revision；SCD2 仅允许关闭当前行 | tenant FORCE RLS；不可 DELETE/TRUNCATE |
+| `automation.schedule_rule_audit` | **Transaction** | revision create/supersede actor、correlation、bounded metadata | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+| `automation.occurrence` | **Transaction** | tenant/rule-version + scheduled UTC unique slot、local label/UTC offset、parser/tzdb 与 immutable target snapshot/digest；tenant/Project/occurrence 复合唯一键供 event owner FK 校验 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+| `automation.occurrence_dispatch` | **Work** | attempt count、next attempt、lease owner/expiry、单调连续 fencing generation、occurrence deadline、retention/expiry；expiry = terminal_at + retention_period | tenant FORCE RLS；DB trigger 限制状态、lease fencing 与 terminal mutation；仅 terminal TTL 到期可删除，禁止 TRUNCATE |
+| `automation.occurrence_event` | **Transaction** | materialized/claimed/retry/run-linked/terminal fact、attempt、generation、run/correlation；tenant/Project/occurrence FK 一致 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+
+重复 occurrence materialization 由 `(tenant_id, rule_id, rule_version, scheduled_for_utc)` 唯一键收敛；UTC instant 保留 DST fold 中两个同名本地时刻的区别。Rule successor 不得改写既有 occurrence。DB dispatch trigger 要求新 claim/reclaim 连续增加 generation 与 attempt，拒绝盗取未过期 lease；同 generation heartbeat 不得换 owner 或缩短 expiry。terminal retention 后才允许物理删除 Work row。当前只交付 domain DTO 和 SQL substrate；migration 未在本机目标 DB 应用，cron/IANA timezone parser、API/repository、worker/heartbeat/retry、同事务 TaskExecutionRun/reservation/Outbox 和生产 role grants/RLS 验收仍开放。
 
 ---
 
@@ -5556,7 +5572,7 @@ erDiagram
 | 10 | search | search | `search_index` | UUID | ✅ | ✅ |
 | 11 | audit | audit | `audit_event`, `ai_audit_metadata`, `audit_event_outbox` | UUID | ✅ | ✅ |
 | 12 | integration | integration | `integration`, `integration_sync_state` | UUID | ✅ | ✅ |
-| 13 | automation | automation | `automation_rule` | UUID | ✅ | ✅ |
+| 13 | automation | automation | `automation_rule`, `schedule_rule_revision`, `schedule_rule_audit`, `occurrence`, `occurrence_dispatch`, `occurrence_event` | UUID | ✅ | ✅ |
 | 14 | identity | identity | `user`, `device`, `device_binding`, `credential`, `user_session` | UUID | ✅ | ✅ |
 | 15 | notification | notification | `notification_channel`, `notification_template`, `notification` | UUID | ✅ | ✅ |
 | 16 | permission | permission | `role`, `permission`, `permission_scheme` | UUID | ✅ | 部分(permission 无) |
@@ -5570,7 +5586,7 @@ erDiagram
 | 24 | validation | validation | `validation_result`, `validation_evidence`, `acceptance_coverage`, `validation_policy` | UUID | ✅ | ✅ |
 | 25 | local-runtime | local_runtime | `runtime`, `runtime_command`, `runtime_observation`, `reconciliation_report` | UUID | ✅ | ✅ |
 
-**总表数**:60+ 张 SoR 表(不含 7 张 Lookup Table / 物化视图 / 视图 / 触发器函数)
+**总表数**:65+ 张 SoR 表(不含 7 张 Lookup Table / 物化视图 / 视图 / 触发器函数)
 
 ---
 

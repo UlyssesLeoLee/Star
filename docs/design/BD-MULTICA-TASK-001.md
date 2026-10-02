@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 基本設計書 v0.1**
+> **Multica Task Lifecycle 基本設計書 v0.3**
 >
-> - 状态: 🟡 Draft v0.1
-> - 日期: 2026-09-28 JST
-> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
+> - 状态: 🟡 Draft v0.3
+> - 日期: 2026-10-02 JST
+> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.10
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -134,8 +134,15 @@ stateDiagram-v2
 | `task_lifecycle_audit` | **Transaction** | 状态转换、review 决策、派发验证、404 观测和 actor/correlation 事实 | append-only，不物理删除；按 Transaction 规则携带审计和 RLS |
 | `task_metadata` | **Master** | 人工维护的名称、优先级、标签、执行策略引用 | SCD Type 2；按 Master 规则携带 RLS |
 | `task_session_health` | **Transaction** | session poison 原因、fresh-session 决定及 Runtime 关联事实 | append-only 审计记录；可查询当前有效标记，但不覆盖历史事实 |
+| `automation.schedule_rule_revision` | **Master** | Automation owner 的版本化 schedule expression/timezone/parser+tzdb version、DST/overlap/misfire/pause/retry/deadline 与 canonical Run target/Profile/HookSet identity | SCD2，只允许关闭当前 revision；不得原位改写或物理删除；tenant FORCE RLS |
+| `automation.schedule_rule_audit` | **Transaction** | schedule rule 创建/替代的 actor、revision、correlation 与有界 metadata | append-only；tenant FORCE RLS |
+| `automation.occurrence` | **Transaction** | rule revision + UTC slot 幂等身份、local time/offset、parser/tzdb 与不可变 target snapshot | append-only；tenant FORCE RLS；unique (tenant, rule, revision, scheduled UTC) |
+| `automation.occurrence_dispatch` | **Work** | bounded attempt/next-attempt、lease owner/expiry、单调 fencing generation、deadline 与终态清理时间 | 显式 30 天 TTL/retention；租约到期可重新 claim，generation 必须递增；tenant FORCE RLS |
+| `automation.occurrence_event` | **Transaction** | occurrence materialization、lease、retry、Run admission/link 与 terminal outcome | append-only，携带 occurrence/run/correlation/fence identity；tenant FORCE RLS |
 
 WBS row 可保留兼容字段和便于读取的 audit JSON projection；权威 Transaction 记录写入 `task_lifecycle_audit`。projection 可重建，不替代审计事实。混合字段到物理表的拆分属于详细设计确认项。
+
+Schedule rule/occurrence 的实体所有权在 `domain-automation`，迁移位于 `automation` schema；Run admission 仍由 Multica Run writer 在同一短事务重授权 target，并消费当前 generation。occurrence 不因 rule successor 改写；重复 materialization 由 tenant/rule/version/UTC slot 唯一约束收敛。Dispatch Work 表只表示可重建的当前派发状态，所有可审计转换写入 Transaction event。当前阶段仅提供版本化 domain contract 与 migration，cron/timezone 解析器、写 API、持久化 claim/recovery worker、Run/reservation/Outbox transaction 与 BI consumer 尚未装配，Schedule capability 不可用。
 
 ---
 
@@ -212,6 +219,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | AC-10 | Task Card 启动 CLI 时 `worktree_id`、`work_item_id`、`task_card_id` 校验一致；Lifecycle enum 不因 CLI 扩展 |
 | AC-11 | Task Card Index 与 Group Infinite Canvas 是 Worktree 群组同级入口，任务写入经领域命令和 ACL |
 | AC-12 | 插件热插拔只改变入口/capability 暴露，不删除任务、审计和实体引用 |
+| AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、TTL/fencing/RLS 约束可验证；无 parser、worker、Run admission 与目标 DB 验收时不开放 Schedule execution |
 
 ---
 
@@ -223,6 +231,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | GAP-2 | Task Card 与 WorkItem ID 的现存 schema 是否一对一，以及旧 WBS task_id 的迁移映射 | 詳細設計 / migration rehearsal |
 | GAP-3 | Runtime profile 对 Claude Code、Codex、OpenCode、Multica CLI 的 capability 映射 | Runtime 詳細設計 |
 | GAP-4 | Global 批量操作的部分成功 UI 与补偿策略 | LangGraph/TMO 詳細設計 |
+| GAP-5 | Schedule schema/domain contract 已落地，但 cron/tzdb parser、rule API、due materializer、lease claim/recovery、同事务 Run/resource reservation/Outbox 与目标 DB/RLS/grants 尚缺 | Phase 9F3+ / production integration |
 
 ---
 
@@ -231,3 +240,5 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初版；定义 Worktree 群组入口、生命周期所有权、Task Card 内 CLI、Canvas/插件交互、scope 授权及 W/T/M 数据分类 | 用户要求将渡口 Worktree 顶层树同步至 Multica 与相关基本设计 |
+| v0.2 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 Phase 9F2 Schedule/Occurrence 的 Automation owner、五表 W/T/M、immutable rule/target snapshot、UTC-slot idempotency、lease generation fencing 与未开放 production gates；同步 SRS v0.9、DD v1.22 和根设计 v5.50 | Phase 9F2 持久化 occurrence substrate 实现 |
+| v0.3 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确 occurrence tenant/rule/version/UTC-slot 复合身份；补充 active-lease 防抢占、单调 fencing/attempt、terminal-based TTL 与 migration trigger 不变量；上游同步 SRS v0.10 | Phase 9F2 实现与设计约束逐项对账 |

@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.49 (2026-10-02)
-> **上游要件定义书**: docs/requirements.md v5.52
+> **文档版本**: v5.51 (2026-10-02)
+> **上游要件定义书**: docs/requirements.md v5.54
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4714,7 +4714,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
 
-Schedule Loop 复用 `domain-automation` Rule/occurrence 架构：当前 Data/API Design 记录了 `Event / Schedule / Cron` trigger 候选，但 Rust `AutomationTrigger` 仍是事件模型，Schedule/Cron occurrence ledger 与生产 worker 尚未实现。`domain-automation` 持有 versioned rule 和 occurrence，发出有幂等键、lease 与 fencing token 的触发；资源 admission 成功后创建独立 Run 并固定 `schedule_rule_id/version/occurrence_id`。Workflow/LangGraph 编排已接受的 Run，不拥有第二份 schedule rule/timer source；`star-scheduler` 只处理 DAG 依赖 readiness、公平队列和 admission，不实现墙钟/Cron。
+Schedule Loop 复用 `domain-automation` Rule/occurrence 架构：Phase 9F2 已定义 `AutomationScheduleRuleRevisionV1`、tenant-scoped `AutomationOccurrenceKey`、immutable target/profile/HookSet snapshot 与 lease-fence contract，并新增 automation schema 五表 W/T/M migration（rule SCD2、append-only audit/occurrence/event、带 terminal retention 的 dispatch Work）；唯一槽位键为 tenant/rule/version/UTC slot。数据库 trigger 约束连续 fencing generation、活动 lease 不可被盗、terminal TTL 与到期删除。Migration 尚未部署，Rust `AutomationTrigger` 仍是事件模型；当前无 cron/tzdb parser、rule persistence adapter/API、materializer 或生产 worker，因此不提供 Schedule execution。后续 occurrence 经当前 auth/target/quota admission 成功后才创建独立 Run 并固定 `schedule_rule_id/version/occurrence_id`。Workflow/LangGraph 编排已接受的 Run，不拥有第二份 schedule rule/timer source；`star-scheduler` 只处理 DAG 依赖 readiness、公平队列和 admission，不实现墙钟/Cron。
 
 Engineering Loop 是单一 `TaskExecutionRun` 内受版本化 `LoopPolicy` 约束的有限周期：Plan → Act → Observe → Verify/Evaluate → Decision。每轮只记录可观察的输入摘要、工具类别、结果/证据引用、资源预算和 continue/review/complete/stop 决策；Task Contract/acceptance/profile snapshot 固定不变。stall、oscillation、iteration/time/provider/resource 上限、撤权/cancel/deadline 或 child 未 drain 都生成明确 stop reason。恢复只能从持久 loop boundary/checkpoint 开始并重新授权，不保存 chain-of-thought。
 
@@ -4949,3 +4949,5 @@ Run Workspace 默认选中同级 `Task Cards` tab。`RunTaskCardsPanel` 只调�
 | v5.47 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50、Group DD v4.34、Task DD v1.19；记录 Run Task Cards 只读 bounded UI/API 代码切片、12 条/2 MiB/100 页限制与取消行为；明确宿主会话、服务端 capability、目标 DB/RLS 未就绪及 CLI 禁用门 | 把 Run Task Cards 前端实现与设计、生产启用条件对账 |
 | v5.48 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51、Group DD v4.35、Task DD v1.20、SRS v0.7；将独立 Tauri 的四条运行时 mock WorkItem、MockDb task rows 与 browser-dev fallback 标为已移除/未配置时 fail closed；说明测试 `test-*` fixture 与服务器未知行边界 | 用户确认旧 Task Card 全为 mock 并授权清理；全仓审查发现旧 Tauri 桌面端仍有演示记录 |
 | v5.49 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.52、Task DD v1.21 与 SRS v0.8；在 §16.16 记录 Phase 9F1 Run-local Rust Engineering Loop controller、预算与 drain 边界；明确无 Schedule/Run writer/Auth/CLI/Outbox/BI/跨 Run fair scheduler，Profile v1 成本上限与 retry/backoff 未实现 | 将 Engineering Loop 代码切片与架构要求及生产状态对账 |
+| v5.50 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.53、Task SRS v0.9/Task BD v0.2/DD v1.22；记录 Phase 9F2 版本化 Schedule rule/occurrence/fencing domain contract 与五表 W/T/M migration substrate；明确 migration 未部署、parser/adapter/worker/Run admission/Outbox/BI 与生产 Auth/DB 均开放，未把 schedule 写成可用能力 | 实现 Schedule/Occurrence schema slice 并与方向设计逐项对账 |
+| v5.51 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 requirements v5.54、Task SRS v0.10/Task BD v0.3/DD v1.23 与 Data Design v0.4；补充 tenant-scoped occurrence key、DB dispatch monotonic fencing、active lease 与 terminal TTL invariant；明确 migration/database 未验收 | Phase 9F2 源码自审加强持久化并发与保留边界 |
