@@ -55,7 +55,7 @@ const baseWorktree: Worktree = {
 
 const baseWorkItems: WorkItem[] = [
   {
-    id: "wi-001",
+    id: "test-wi-001",
     tenant_id: "ten-acme",
     project_id: "prj-physis",
     key: "PHYSIS-1",
@@ -104,11 +104,11 @@ describe("AgentCanvasView", () => {
       nodes: [
         { id: "n-agent-ag-001", kind: "agent", x: 0, y: 0, width: 220, height: 110, ref: { kind: "agent", agentId: "ag-001" } },
         { id: "n-wt-wt-001", kind: "worktree", x: 300, y: 0, width: 240, height: 80, ref: { kind: "worktree", worktreeId: "wt-001" } },
-        { id: "n-wi-wi-001", kind: "work_item", x: 100, y: 300, width: 180, height: 64, ref: { kind: "work_item", workItemId: "wi-001" } },
+        { id: "n-wi-test-wi-001", kind: "work_item", x: 100, y: 300, width: 180, height: 64, ref: { kind: "work_item", workItemId: "test-wi-001" } },
       ],
       connectors: [
         { id: "c1", fromNodeId: "n-agent-ag-001", toNodeId: "n-wt-wt-001", color: "#2f81f7", label: "executes on" },
-        { id: "c2", fromNodeId: "n-wt-wt-001", toNodeId: "n-wi-wi-001", color: "#2f81f7", label: "in_progress" },
+        { id: "c2", fromNodeId: "n-wt-wt-001", toNodeId: "n-wi-test-wi-001", color: "#2f81f7", label: "in_progress" },
       ],
       viewport: { x: 0, y: 0, zoom: 1 },
       derivedAt: "2026-09-05T11:00:00Z",
@@ -116,7 +116,7 @@ describe("AgentCanvasView", () => {
     renderWithI18n(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={baseWorktree} />);
     expect(screen.getByTestId("agent-canvas-node-n-agent-ag-001")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-node-n-wt-wt-001")).toBeTruthy();
-    expect(screen.getByTestId("agent-canvas-node-n-wi-wi-001")).toBeTruthy();
+    expect(screen.getByTestId("agent-canvas-node-n-wi-test-wi-001")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-connector-c1")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-connector-c2")).toBeTruthy();
   });

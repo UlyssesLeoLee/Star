@@ -24,11 +24,11 @@ const makeWi = (id: string, status: WorkItem["status"] = "todo"): WorkItem => ({
 });
 
 const wis: WorkItem[] = [
-  makeWi("wi-001"),
-  makeWi("wi-002"),
-  makeWi("wi-003"),
-  makeWi("wi-004"),
-  makeWi("wi-005"),
+  makeWi("test-wi-001"),
+  makeWi("test-wi-002"),
+  makeWi("test-wi-003"),
+  makeWi("test-wi-004"),
+  makeWi("test-wi-005"),
 ];
 
 describe("generateMap", () => {

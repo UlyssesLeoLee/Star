@@ -1,21 +1,22 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.33**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.35**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
 > - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B-3F 已有多项条件式 API/UI 切片；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 卡内 xterm ticket-first UI、status/cancel/reattach、bounded Session listing/recovery API seam 与手动 UI 已实现；Phase 5 有 scope-aware Chat 授权提交、GLOBAL 目标目录、多选 UI、加密 Transcript/Run/outbox persistence adapter，但 production main 未装 protector/L0；Phase 6 有五表 Registry migration、生产 main 装配的 PostgreSQL 只读 projection provider/API 与 Group UI live consumer；Phase 5/6 migrations 已在隔离库重复执行并验证 12 张 FORCE RLS、策略及 trigger（事务内临时授权已回滚），目标 DB/runtime role grants 未配置；manifest trust root/ingest、lifecycle writer、capability runtime/revocation、真实 PostgreSQL RLS 验收未完成。仍缺宿主认证 provider、目标 DB migration 部署与 ACL/RLS 运行验收、真实 CLI provisioner/OS sandbox/terminal sink/audit、LangGraph 部署版本/服务身份/权限 broker；Canvas 仍缺服务端 durable event offset/realtime；历史归属 reconciliation 与跨 App 生产验收未完成）
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
 > - Phase 9E-4C5 Runtime fence foundation：REST 与 Local Runtime 共用 `star-dto::task_run` strict DTO；ERUN-P2 带 V2 directory fence 的双 Profile grant 使用 signature v3（C5 基线为 v2），无 fence 的 legacy grant 保持 v1；Local Runtime 专用 consumer 完整比对当前 binding 并在 SQLite FULL WAL 单事务内消费 nonce/fence，receipt 上限 50,000 条并保留 5 分钟时钟偏差清理窗。该 helper 未接生产 provisioner，不负责实时 ACL/authority、reservation lifecycle、OS sandbox/spawn 或 BI outcome；producer capability 继续默认关闭，详见 §7.2。
+> - ERUN-P3 Run Task Cards 条件式 UI：默认 Task Cards tab 与 canonical Run list typed client 已有只读代码；实现 12 条/页、2 MiB response、最多 100 页、有界并发和取消。旧 Tauri desktop 任务 mock/fallback 已移除；根 Providers 未注入宿主 session，服务端 capability 固定 false，Task Owner 目标 DB/RLS 未验收，所以生产页面不呈现任务；CLI 保持禁用，详见 §10.0A-B。
 > - 日期：2026-10-02
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.49 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.46 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.18、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.51 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.48 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -581,9 +582,17 @@ Phase 2B-2D 与 Phase 3B migrations 按事实表分类；旧 `worktree_canvas_wo
 
 Task metadata 当前版本写入与 `multica.task_run_outbox` Transaction event 在同一 PostgreSQL 事务中提交；事件投影限于 owner tuple、metadata version、actor、correlation 和 schema version，不保存任务正文或凭据。Outbox 是给 BI/跨 App 消费者的事务边界，不等于 NATS delivery 或持久 Inbox 已落地。
 
-前端已移除 30 条 `wi-001`..`wi-030` mock seed Task Cards 及仅依赖它们的演示关联；Zustand version migration 只按精确已知 ID 清理历史浏览器数据。隔离测试可持有自有 fixtures；不清空服务器表、不按 ID 前缀批量删除，不从 Worktree 猜测遗留 owner。当前 migration 仍未在目标数据库执行，Group Host Provider 和 Run Workspace Task Cards UI 也未装配，故这里记录的是已实现/已知边界，不表示生产数据平移验收完成。
+产品 seed/MSW 已移除 `wi-001`..`wi-030` demo Task Cards；独立 Tauri `MockDb` 的四条 `wi-001`..`wi-004` 任务记录和 browser-dev mock fallback 也已删除。Tauri Task IPC 在 Run-scoped provider 未配置时返回明确错误，不假装成功返回空列表。Zustand migration 只按精确已知 ID 清理历史浏览器数据，测试 fixture 使用 `test-*`。不清空未知服务器行、不按 ID 前缀批量删除，也不从 Worktree 猜测遗留 owner。Task Cards UI/client 已有 §10.0B 条件式只读代码，但 Host Provider/capability 均关闭；Owner migration 仍未在目标数据库执行。以上不表示生产数据平移或页面读取验收完成。
 
 Phase 2 migrations 已逐表加入 tenant RLS；Master 表无 DELETE policy，Transaction 表仅有 SELECT/INSERT policy 且拒绝 UPDATE/DELETE，Work 表记录 retention。Phase 2 尚未完成 PostgreSQL 实例验证；Phase 5/6 的隔离库结果仅覆盖其各自新增 schema，不覆盖 Phase 2/3 表或生产角色。完整 RLS policy 分类与 Security release gate 仍未通过。
+
+### 10.0B Run Task Cards bounded UI projection
+
+Run Workspace 默认选择 `Task Cards` 同级 tab。前端 `RunDirectoryApiClient.listRunWorkItems(run, after, signal)` 请求 `GET /api/v1/engineering-runs/{engineering_run_id}/work-items?limit=12[&after=<uuid>]`，只读服务端 Run owner API；不调用 Worktree compatibility task list，不接受 seed/local mock 作为 fallback。客户端必须检查 response owner tuple 与当前 `EngineeringRun` 完全一致、每条 `task_card_id` 与 `work_item_id` 相等、UUID/cursor/时间/字段边界合法且页内无重复身份。
+
+UI 单页最多 12 条、解码响应最多 2 MiB、只保留当前页、最多 100 页；请求沿用 Run Directory client 的 15 秒 deadline、有界并发 (2 active + 16 queued)、fresh host Bearer token、`credentials: omit`、`no-store` 与 AbortSignal。Run 切换或卸载必须取消旧请求。视图只提供加载、错误/重试、空态、字段 allowlist 与分页，不变更任务事实；卡内 CLI 控件保持禁用直到 admission、OS sandbox、取消/恢复、独立验证和结果回写全部验收。
+
+当前应用根 `Providers` 未注入可信 `RunDirectoryHostSession`，RunContext `run_owned_apps_available=false`，且 Task Owner migration/目标应用角色 RLS 未验收，所以生产页面不会请求或呈现任务。状态应明示门控；不得把仅有组件与 API client 写成生产 Run Task UI 已启用。其它 Run Apps 和独立认证 provider 仍未迁移。
 
 ### 10.1 PostgreSQL 角色授权与 RLS 验收
 
@@ -603,7 +612,8 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | WTG-011 / AC-WTG-008 | §4、§6.1、§10、§11 A | Project Repository discovery + Index create/import UI；严格字段 allowlist、当前授权与 binding 复核，拒绝客户端路径/URL，持久化 operation/Audit/Outbox，provider 缺失返回 503 |
 | WTG-012 / AC-WTG-009 | §1.2、§2、§4.2、§11 | Project selector 来自当前用户 membership 目录；ID/role 最小投影、cursor/缓存边界、seed 不回退和无名称 SoR 时使用 UUID 标签 |
 | WTG-013/014/015 + TCI-013/014/015/016 / AC-RUN-001/002/003/004 | §7.1、§10、§11 | versioned Task Contract；Task→Run→optional Worktree；immutable Run/Event/Evidence；幂等 CLI start；Worktree-scoped compatibility list/detail 与稳定游标 |
-| AC-ERUN-005 / AC-TASK-DATA-001 | §7.1、§10.0A、§11 | 完整 Run owner tuple、同 Run 关联/CLI guard、Task outbox 与 exact-ID 旧 mock seed/localStorage 清理；目标 DB/RLS 和宿主 provider 仍为生产门 |
+| AC-ERUN-005 / AC-TASK-DATA-001 | §7.1、§10.0A、§11 | 完整 Run owner tuple、同 Run 关联/CLI guard、Task outbox 与精确旧 mock seed/Tauri Task 清理、fail-closed 桌面端和 localStorage 清理；目标 DB/RLS 和宿主 provider 仍为生产门 |
+| AC-ERUN-006 | §1.3、§4.2、§10.0B、§11 | 默认 Task Cards 同级入口、认证 Run-scoped bounded list、响应/分页/驻留上限、无 mock 回退与 CLI 禁用门 |
 | WTG-016/017 / AC-WTG-010/011 | §1.1、§7.1、§12 | Project Index 的 Quality & Improvement 入口；metric provenance/drilldown、固定 benchmark/holdout 与可回滚 proposal |
 | PAR-001..004 / AC-PAR-001..003 | §6.3、§9、§10 | DAG readiness、hierarchical quota/fairness、bounded queue/backpressure、独立 lease/claim/Git lock、可级联 cancel/drain |
 | LOOP-001..005 / AC-LOOP-001..006 | §6.4、§8.7、§12 | 唯一 Automation occurrence source、fencing/idempotent dispatch、单 Run Engineering Loop、budget/stop/drain |
@@ -754,3 +764,5 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.32 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 unlimited commercial use 不与主机容量/安全预算混为商业限制；去除 copyleft provider 手工自装门槛，加入发现/安装引导/合规受管分发；纠正 K3s stable channel 至 v1.36.4+k3s1；同步 requirements v5.48/basic v5.45/Infrastructure DD v0.4 | 用户再次明确拒绝商业使用限制并要求活跃社区 |
 | v4.29 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Task DD v1.17；新增 §7.3 canonical directory execution identity、strict snapshot/SQL guard/V2 fence/signature v3/attachment 再授权；§8.6 实施 authorized hint/session 门并明确底层 abort 限制 | ERUN-P2 并行实施、独立审阅和文档对账 |
 | v4.33 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49/basic v5.46；补入完整 Task Card Run owner、同 Run Worktree 约束、Run-scoped list API、Task Run Outbox 与 CLI/Canvas owner recheck；说明精确删除 30 条旧演示任务和本地引用，legacy DB 数据不猜归属；明确迁移/目标 DB/RLS、宿主 provider、Run Task UI 尚未生产验收 | 用户授权移除旧 mock 任务并要求以 Engineering Run 作为任务事实归属 |
+| v4.34 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50/basic v5.47/Task DD v1.19；规定 Run Task Cards UI/client 的 owner tuple 校验、有界分页/响应/并发/取消与 CLI disabled 状态；说明宿主 session、服务端 capability、目标 DB/RLS 门控仍关闭 | Run Task Cards 前端实现对账 |
+| v4.35 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51/basic v5.48/Task DD v1.20/SRS v0.7；补充退役 Tauri MockDb 任务记录和 browser-dev fallback、Run provider 缺失时 IPC fail closed、测试 `test-*` fixture；保留未知服务器 legacy 行边界 | 全仓审查发现独立 Tauri 桌面端仍显示旧演示 WorkItem |

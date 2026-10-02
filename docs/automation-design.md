@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v0.2 (2026-10-02)
+> **文档版本**: v0.4 (2026-10-02)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1130,6 +1130,18 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 | 任务卡 | 档位 | 脚本/brief 与执行 | 验证边界 |
 |---|---|---|---|
 | ERUN-P3 TaskRun canonical owner、outbox 与退役旧演示 Task Card | [P]（R/V/S/A） | 本阶段改动见实施计划 §6.71；旧前端 `wi-001..wi-030` 演示记录和依赖的 Task Card 历史已从 runtime seed/MSW 移除，Zustand v2 对已存本地状态按精确 ID 清理；测试案例改用 `test-wi-*`。当前 `engineering_run_directory.py --task-run-ddl` 仅覆盖既有 TaskRun identity migration，**不覆盖** `2026-10-02-task-run-owner.sql`；Task Owner 专用自动化验证仍待补，不能将本条记为自动化或数据库验收完成。 | 本次定向 Rust check 曾在临时依赖解析下通过，随后恢复原 `Cargo.lock`，因此不代表 locked/reproducible build。前端依赖目录缺失，未执行 typecheck/tests；新 Owner/outbox migration 未在数据库应用或验证，target role RLS、真实 Audit、写入/重放语义与生产 Run Task UI 仍待闭环。仅可确认源码和文档已落档；完整阻塞见实施计划 §6.71。 |
+
+### 4.39 Run-owned Task Cards read-only UI projection（2026-10-02）
+
+| 任务卡 | 档位 | 脚本/brief 与执行 | 验证边界 |
+|---|---|---|---|
+| ERUN-P3 Run Task Cards 页面与 bounded Run list client | [P]（R/V/S/A） | `scripts/automation/erun_task_cards.py --typecheck --tests`；日志写入 `.cache/engineering-run-task-cards/`，子进程输出直写文件且最多运行 900 秒；无既有 `frontend/node_modules` 时报告 blocked，不自动安装依赖；脚本索引见 `scripts/automation/registry.md`。Run Directory、Task Cards 与受旧 mock ID 命名影响的消费端测试由该 gate 聚焦运行。 | 只验证被选择的 TypeScript/Vitest 范围；不部署 Owner migration、不验证宿主 JWT/目标 RLS、不启用 `run_owned_apps_available`，也不声称 CLI Runtime/独立验证已完成。UI 每页 12 条/2 MiB、最多 100 页并只驻留一页；服务端拒绝或 capability 未开放时 fail closed。 |
+
+### 4.40 Tauri legacy Task mock retirement（2026-10-02）
+
+| 任务卡 | 档位 | 脚本/brief 与执行 | 验证边界 |
+|---|---|---|---|
+| ERUN-P3 移除旧桌面端演示 Task 与 browser fallback | [P]（R/V/S/A） | 复用 scripts/automation/erun_task_cards.py --desktop-build --desktop-tests；Desktop UI/API 不得再显示旧 Task，canonical Run provider 未装配时 Rust IPC 返回明确 unavailable 错误、browser-dev hook 清空任务并显示错误；Canvas E2E 改用现存非任务节点。Runner 不下载依赖；无既有 desktop node_modules 时记录 blocked。 | Desktop hook/card 与 BoardView error-state 定向测试通过；全量 desktop build 被 legacy 常量导出、CSS module 与 Tauri global types 等错误阻断；Rust crate 缺 cargo/rustfmt 工具链。未知服务器 legacy 行不通过本次代码删除。 |
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 

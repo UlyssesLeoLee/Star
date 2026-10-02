@@ -1,8 +1,8 @@
 # SRS-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域要件定義書 v0.5** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; 渡口 Worktree 群组集成补充)
+> **Multica Task Lifecycle 域要件定義書 v0.7** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; 渡口 Worktree 群组集成补充)
 >
-> - 状态: 🟡 Draft v0.5
+> - 状态: 🟡 Draft v0.7
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (留空, root 统一 commit 时填)
 > - 关联基本設計書: [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) v0.1
@@ -21,7 +21,7 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域要件定義書 (v33 候选对齐) |
-| 版本 | v0.4 |
+| 版本 | v0.7 |
 | 作成日 | 2026-09-11 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -233,6 +233,8 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | AC-12 | 插件可声明范围及 capability 并热插拔注册群组入口; 卸载后其持有的任务事实仍由 Multica/WorkItem 域负责 |
 | AC-13 | Profile-bound Run 按 root requirements AC-AEC-017 执行：Run Profile/ResourceBudget/Loop/Task/Hook snapshot、Project-wide pending reservation、reservation audit 与同 `event_id` RunEvent 在一个事务提交；Project epoch 写冲突防止 REPEATABLE READ 并发超额；幂等 replay 不重复预留；quota/fence/scope/revision/capacity 任一检查失败则无 Run、无 spawn |
 | AC-14 | Run admission 生成有界 typed one-time Runtime fence，绑定 request fingerprint、scope/lifecycle、catalog revisions、HookSet、ResourceBudget 与 Approved Launch Profile/AgentExecutionProfile 两份当前 ID/version/digest；新 Run 保存 Approved Launch Profile identity 和 binding digest，Run Detail 可追溯；Runtime 必须在进程创建前重验授权/版本并原子 consume 一次；错绑、过期、重放或 reservation lifecycle 不可用时 fail closed，production consumer 未装配前不开放新 Run |
+| AC-15 | Engineering Run 默认 Task Cards tab 只读取认证的 Run-scoped API；逐页最多 12 项、响应最多 2 MiB、最多浏览 100 页并只驻留当前页；服务端/宿主认证/capability 不可用时 fail closed，禁止 Worktree legacy、seed 或 mock 回退；卡内 CLI 在实际 admission、sandbox、取消/恢复、独立验证与结果回写全部验收前禁用 |
+| AC-16 | 移除产品运行时所有已知旧演示 Task Card 与 fallback，包括 Runtime seed/MSW 中 `wi-001..wi-030`、Tauri MockDb 的 `wi-001..wi-004` 和 browser-dev mock 列表；无 canonical Run provider 时返回明确 unavailable/error，不伪装空任务或本地数据。浏览器只迁移删除精确已知旧 ID 及其演示引用，不前缀清理未知本地/服务器行；测试 fixture 使用 `test-*`，不得进入产品投影 |
 
 ---
 
@@ -286,3 +288,5 @@ Phase 9E-4C3 已交付条件式 Rust/REST writer 与 PostgreSQL migration slice�
 | v0.3 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加 AC-13 并引用 root AC-AEC-017；明确 Run/Profile/ResourceBudget/Loop/Task/Hook/BI/reservation 同事务边界、Project 跨 Worktree quota、REPEATABLE READ allocation epoch 防超额与 idempotency replay；列明 Runtime/DB/Auth/BI/C4 未闭合门；Hooks 维持 ULYS-235 Advanced Settings 并列 tab | Phase 9E-4C3 Run 与资源 reservation 代码切片完成 |
 | v0.4 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加 AC-14 并引用 root AC-AEC-018；规定双 Profile scope/revision/budget fence、一次消费、Run identity 与 binding digest 投影；记录 Rust/SQL/API type slice 已交付但 Approved Launch Profile authority、production Runtime consumer、reservation lifecycle 与目标环境仍未完成；Hooks 明确为 Advanced Settings 内容区并列 tab | 推进 Phase 9E-4C4 双 Profile fence 与审计投影 |
 | v0.5 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 补充 Local Runtime 基础 grant 校验已存在但不消费 C4 fence 的事实；明确 ULYS-235 的 Settings 主导航父入口、`/settings/advanced/hooks` 并列标签与 Worktree Group 排除规则 | 用户重申 Hooks 属于高级设置选项卡，并要求保留既有导航层级与路径 |
+| v0.6 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加 AC-15：Run-scoped Task Cards bounded list、session/capability fail-closed、无 Worktree/mock 回退及 CLI 前置验收门；同步 Task DD v1.19 与 Group DD v4.34 | 将 Task Cards UI/client 实现及生产门控纳入 Multica Task 需求 |
+| v0.7 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加 AC-16：退役 Tauri desktop Task mock rows 与 browser-dev fallback；Run provider 未配置时 fail closed；限定 `test-*` fixtures 与精确本地清理范围，不清除未知服务器 owner 行；同步 Task DD v1.20、Group DD v4.35 与总要求 v5.51 | 全仓检查发现独立 Tauri 桌面端仍残留旧演示任务 |

@@ -11,19 +11,19 @@ import type { WorkItem, WorkItemStatus } from '../src/types/ids';
 
 const mockWorkItems: WorkItem[] = [
   {
-    id: 'wi-001', key: 'STAR-001', title: 'Story W', status: 'todo',
+    id: 'test-wi-001', key: 'TEST-001', title: 'Story W', status: 'todo',
     w_t_m: 'W', kind: 'story', priority: 'P1', story_points: 3,
   },
   {
-    id: 'wi-002', key: 'STAR-002', title: 'Task T', status: 'in_progress',
+    id: 'test-wi-002', key: 'TEST-002', title: 'Task T', status: 'in_progress',
     w_t_m: 'T', kind: 'task', priority: 'P2', story_points: 2,
   },
   {
-    id: 'wi-003', key: 'STAR-003', title: 'Spike M', status: 'done',
+    id: 'test-wi-003', key: 'TEST-003', title: 'Spike M', status: 'done',
     w_t_m: 'M', kind: 'spike', priority: 'P3', story_points: 1,
   },
   {
-    id: 'wi-004', key: 'STAR-004', title: 'Bug T', status: 'todo',
+    id: 'test-wi-004', key: 'TEST-004', title: 'Bug T', status: 'todo',
     w_t_m: 'T', kind: 'bug', priority: 'P0', story_points: 5,
   },
 ];
@@ -58,10 +58,10 @@ describe('KanbanBoard (PR-249)', () => {
     renderBoard();
     const wSwimlane = screen.getByTestId('kanban-column-todo')?.closest('[data-swimlane="W"]');
     expect(wSwimlane).toBeDefined();
-    // STAR-001 should be in W lane todo column
-    expect(screen.getByText('STAR-001')).toBeDefined();
-    expect(screen.getByText('STAR-002')).toBeDefined();
-    expect(screen.getByText('STAR-003')).toBeDefined();
+    // TEST-001 should be in W lane todo column
+    expect(screen.getByText('TEST-001')).toBeDefined();
+    expect(screen.getByText('TEST-002')).toBeDefined();
+    expect(screen.getByText('TEST-003')).toBeDefined();
   });
 
   it('marks fallback column (todo) as protected', () => {
@@ -72,7 +72,7 @@ describe('KanbanBoard (PR-249)', () => {
   it('handles drop zone visual state', () => {
     renderBoard();
     const column = screen.getByTestId('kanban-column-in_progress');
-    const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => 'wi-001'), dropEffect: '' };
+    const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => 'test-wi-001'), dropEffect: '' };
     fireEvent.dragOver(column, { dataTransfer });
     expect(column.className).toContain('border-blue-500');
     fireEvent.dragLeave(column, { dataTransfer });
@@ -82,14 +82,14 @@ describe('KanbanBoard (PR-249)', () => {
     const onTransition = vi.fn();
     renderBoard({ onTransition });
     const column = screen.getByTestId('kanban-column-review');
-    const dataTransfer = { getData: vi.fn(() => 'wi-001') };
+    const dataTransfer = { getData: vi.fn(() => 'test-wi-001') };
     fireEvent.drop(column, { dataTransfer });
-    expect(onTransition).toHaveBeenCalledWith('wi-001', 'review');
+    expect(onTransition).toHaveBeenCalledWith('test-wi-001', 'review');
   });
 
   it('shows WIP limit warning when exceeded', () => {
     const items = Array.from({ length: 6 }, (_, i) => ({
-      id: `wi-${i}`, key: `S-${i}`, title: `Item ${i}`, status: 'in_progress' as WorkItemStatus,
+      id: `test-wi-${i}`, key: `TEST-${i}`, title: `Item ${i}`, status: 'in_progress' as WorkItemStatus,
       w_t_m: 'W' as const, kind: 'task' as const, priority: 'P2' as const,
     }));
     renderBoard({ workItems: items });

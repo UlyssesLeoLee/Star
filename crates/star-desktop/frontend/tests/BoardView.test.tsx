@@ -10,15 +10,15 @@ import { BoardView } from '../src/components/BoardView';
 
 const mockWorkItems = [
   {
-    id: 'wi-001', key: 'STAR-001', title: 'Story', status: 'todo',
+    id: 'test-wi-001', key: 'TEST-001', title: 'Story', status: 'todo',
     w_t_m: 'W', kind: 'story', priority: 'P1',
   },
   {
-    id: 'wi-002', key: 'STAR-002', title: 'Bug', status: 'in_progress',
+    id: 'test-wi-002', key: 'TEST-002', title: 'Bug', status: 'in_progress',
     w_t_m: 'T', kind: 'bug', priority: 'P0',
   },
   {
-    id: 'wi-003', key: 'STAR-003', title: 'Spike', status: 'done',
+    id: 'test-wi-003', key: 'TEST-003', title: 'Spike', status: 'done',
     w_t_m: 'M', kind: 'spike', priority: 'P3',
   },
 ];
@@ -66,9 +66,9 @@ describe('BoardView (PR-252)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('kanban-board')).toBeDefined();
     });
-    expect(screen.getByText('STAR-001')).toBeDefined();
-    expect(screen.getByText('STAR-002')).toBeDefined();
-    expect(screen.getByText('STAR-003')).toBeDefined();
+    expect(screen.getByText('TEST-001')).toBeDefined();
+    expect(screen.getByText('TEST-002')).toBeDefined();
+    expect(screen.getByText('TEST-003')).toBeDefined();
   });
 
   it('changes algorithm when view mode changes', async () => {
@@ -96,13 +96,13 @@ describe('BoardView (PR-252)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('dsl-filter-input')).toBeDefined();
     });
-    // 'bug' 关键字 → 只显示 kind=bug (STAR-002)
+    // 'bug' 关键字 → 只显示 kind=bug (TEST-002)
     const input = screen.getByTestId('dsl-filter-input');
     fireEvent.change(input, { target: { value: 'bug' } });
     await waitFor(() => {
       expect(screen.getByTestId('board-meta').textContent).toMatch(/1 items/);
     });
-    expect(screen.queryByText('STAR-001')).toBeNull(); // story filtered out
+    expect(screen.queryByText('TEST-001')).toBeNull(); // story filtered out
   });
 
   it('refreshes work items on Refresh button click', async () => {
@@ -132,10 +132,10 @@ describe('BoardView (PR-252)', () => {
       expect(screen.getByTestId('kanban-column-review')).toBeDefined();
     });
     const reviewColumn = screen.getByTestId('kanban-column-review');
-    const dataTransfer = { getData: vi.fn(() => 'wi-001') };
+    const dataTransfer = { getData: vi.fn(() => 'test-wi-001') };
     fireEvent.drop(reviewColumn, { dataTransfer });
     await waitFor(() => {
-      // STAR-001 should now be in 'review' column
+      // TEST-001 should now be in 'review' column
       expect(screen.getByTestId('board-meta').textContent).toMatch(/3 items/);
     });
   });
@@ -151,9 +151,8 @@ describe('BoardView (PR-252)', () => {
         <BoardView />
       </MemoryRouter>,
     );
-    // Error fallback to mock in non-Tauri runtime, so should still render
     await waitFor(() => {
-      expect(screen.getByTestId('board-view-loading') || screen.getByTestId('board-view')).toBeDefined();
+      expect(screen.getByTestId('board-view-error')).toBeDefined();
     });
   });
 });

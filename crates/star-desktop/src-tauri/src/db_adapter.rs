@@ -4,7 +4,7 @@
 // Per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2 P4
 //
 // 阶段 P4: 真实 IPC 接 crates/* database (替换 mock data from PR #239/#240)
-// 本 PR: 仅定义 trait + MockDb impl + 3 IPC commands 切换到 MockDb
+// Task mock records are retired; this placeholder adapter only supplies demo Worktree/Canvas data.
 //        真实 DB impl (Postgres/SQLite) 留 P4.1+ (per 守门 #19 0 动 V0.1)
 // =====================================================================
 // 守门:
@@ -42,16 +42,6 @@ pub struct DbWorktree {
     pub status: String, // WorktreeStatus snake_case
 }
 
-/// Domain-level WorkItem (守门: 字段与 crates/domain-work-item WorkItem 对齐, 但本 crate 自定义)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DbWorkItem {
-    pub id: String,
-    pub title: String,
-    pub status: String, // WorkItemStatus snake_case
-    pub w_t_m: String,  // W/T/M swimlane
-    pub worktree_id: String,
-}
-
 /// Domain-level CanvasEntity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbCanvasEntity {
@@ -65,15 +55,14 @@ pub struct DbCanvasEntity {
 /// DB Adapter trait (P4 抽象层)
 ///
 /// 本 trait 抽象 3 类查询, P4.1+ 实现 PostgresDb, P4.2+ 实现 SqliteDb.
-/// 当前 PR 提供 MockDb impl (4 worktrees + 4 work items + 4 canvas entities)
-/// 与 PR #240 mock 数量对齐, 保证 frontend 行为一致.
+/// 当前 PR 提供 MockDb impl (4 demo worktrees + 4 demo canvas entities).
+/// Task Card 数据只能由 canonical Run-scoped backend 提供；此 adapter 不生成任务。
 pub trait DbAdapter: Send + Sync {
     fn list_worktrees(&self) -> Result<Vec<DbWorktree>, DbAdapterError>;
-    fn list_work_items(&self) -> Result<Vec<DbWorkItem>, DbAdapterError>;
     fn list_canvas_entities(&self) -> Result<Vec<DbCanvasEntity>, DbAdapterError>;
 }
 
-/// MockDb impl (per PR #240 数据集, 替换 list_work_items/list_canvas_entities/list_worktree_groups 内部 mock)
+/// MockDb impl (保留非任务 Worktree/Canvas demo fixture；不含 Task Card 数据)
 #[derive(Debug, Default)]
 pub struct MockDb {
     operations: Mutex<u32>, // 跟踪 invoke 调用次数 (test 验证)
@@ -122,40 +111,6 @@ impl DbAdapter for MockDb {
         ])
     }
 
-    fn list_work_items(&self) -> Result<Vec<DbWorkItem>, DbAdapterError> {
-        *self.operations.lock().unwrap() += 1;
-        Ok(vec![
-            DbWorkItem {
-                id: "wi-001".to_string(),
-                title: "feat(canvas): page W/T/M swimlane".to_string(),
-                status: "in_progress".to_string(),
-                w_t_m: "W".to_string(),
-                worktree_id: "wt-001".to_string(),
-            },
-            DbWorkItem {
-                id: "wi-002".to_string(),
-                title: "fix(canvas): bug #71".to_string(),
-                status: "review".to_string(),
-                w_t_m: "T".to_string(),
-                worktree_id: "wt-002".to_string(),
-            },
-            DbWorkItem {
-                id: "wi-003".to_string(),
-                title: "spike(wasm): layout-engine-wasm PoC".to_string(),
-                status: "done".to_string(),
-                w_t_m: "M".to_string(),
-                worktree_id: "wt-004".to_string(),
-            },
-            DbWorkItem {
-                id: "wi-004".to_string(),
-                title: "doc(arch): Tauri PoC research v0.1".to_string(),
-                status: "todo".to_string(),
-                w_t_m: "M".to_string(),
-                worktree_id: "wt-003".to_string(),
-            },
-        ])
-    }
-
     fn list_canvas_entities(&self) -> Result<Vec<DbCanvasEntity>, DbAdapterError> {
         *self.operations.lock().unwrap() += 1;
         Ok(vec![
@@ -193,7 +148,7 @@ impl DbAdapter for MockDb {
 
 
 // =====================================================================
-// Unit tests (PR-245: 8 tests for MockDb + DbAdapterError)
+// Unit tests (MockDb + DbAdapterError)
 // =====================================================================
 
 #[cfg(test)]
@@ -219,17 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn mock_db_list_work_items_returns_four_w_t_m() {
-        let db = MockDb::new();
-        let items = db.list_work_items().unwrap();
-        assert_eq!(items.len(), 4);
-        assert_eq!(items[0].w_t_m, "W");
-        assert_eq!(items[1].w_t_m, "T");
-        assert_eq!(items[2].w_t_m, "M");
-        assert_eq!(items[3].w_t_m, "M");
-        assert_eq!(db.operation_count(), 1);
-    }
-
     #[test]
     fn mock_db_list_canvas_entities_returns_four() {
         let db = MockDb::new();
@@ -245,9 +189,8 @@ mod tests {
     fn mock_db_operation_count_increments_per_call() {
         let db = MockDb::new();
         let _ = db.list_worktrees().unwrap();
-        let _ = db.list_work_items().unwrap();
         let _ = db.list_canvas_entities().unwrap();
-        assert_eq!(db.operation_count(), 3);
+        assert_eq!(db.operation_count(), 2);
     }
 
     #[test]

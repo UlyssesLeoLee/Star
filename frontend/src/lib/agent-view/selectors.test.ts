@@ -161,18 +161,18 @@ describe("pickAgentWorktree", () => {
 describe("pickAgentWorkItems", () => {
   it("按 worktree_id 过滤", () => {
     const wis = [
-      makeWi("wi-001", "wt-001"),
-      makeWi("wi-002", "wt-002"),
-      makeWi("wi-003", "wt-001"),
+      makeWi("test-wi-001", "wt-001"),
+      makeWi("test-wi-002", "wt-002"),
+      makeWi("test-wi-003", "wt-001"),
     ];
     const wt = makeWorktree("wt-001");
     const agent = makeAgent("ag-001", "executing", "2026-09-05T00:00:00Z", "wt-001");
     const result = pickAgentWorkItems(wis, agent, wt);
-    expect(result.map((w) => w.id).sort()).toEqual(["wi-001", "wi-003"]);
+    expect(result.map((w) => w.id).sort()).toEqual(["test-wi-001", "test-wi-003"]);
   });
 
   it("worktree 为 null → 返回空数组", () => {
-    const wis = [makeWi("wi-001", "wt-001")];
+    const wis = [makeWi("test-wi-001", "wt-001")];
     const agent = makeAgent("ag-001", "executing", "2026-09-05T00:00:00Z", "wt-001");
     expect(pickAgentWorkItems(wis, agent, null)).toEqual([]);
   });

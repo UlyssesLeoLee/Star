@@ -25,7 +25,7 @@ const makeWi = (id: string): WorkItem => ({
   updated_at: "2026-09-05T08:00:00Z",
 });
 
-const wis: WorkItem[] = [makeWi("wi-001"), makeWi("wi-002")];
+const wis: WorkItem[] = [makeWi("test-wi-001"), makeWi("test-wi-002")];
 
 describe("moveAgent", () => {
   it("无 map → no_map", () => {
@@ -149,7 +149,7 @@ function findCellOfType(m: GameMap, near: { x: number; y: number }, type: "blank
 
 describe("computeCellEffect", () => {
   it("enemy → kind: 'enemy'", () => {
-    const e = computeCellEffect({ x: 0, y: 0, type: "enemy", workItemId: "wi-001", emoji: "⚔️" });
+    const e = computeCellEffect({ x: 0, y: 0, type: "enemy", workItemId: "test-wi-001", emoji: "⚔️" });
     expect(e.kind).toBe("enemy");
   });
 

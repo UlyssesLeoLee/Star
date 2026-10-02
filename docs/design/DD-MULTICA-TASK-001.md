@@ -1,13 +1,13 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.18** (per 日本 IPA SEC 标准，补充 CLI admission 的 canonical Engineering Run 身份与消费边界)
+> **Multica Task Lifecycle 域 詳細設計書 v1.20** (per 日本 IPA SEC 标准，补充 Run Task Cards bounded UI projection 与旧 Tauri Task mock retirement)
 >
-> - 状态: 🟡 Draft v1.18 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；ERUN-P2 CLI canonical identity、fence binding v2 / signature v3 与本地原子 consume foundation 已有代码切片；Engineering Run directory 已有条件式 schema/API，Task owner 的 Run 归属迁移仍未实施；production provisioner、ACL/provider、reservation lifecycle、OS spawn adapter、target DB/Auth/RLS grants、catalog publisher 与 BI/Outbox 仍开放)
+> - 状态: 🟡 Draft v1.20 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3 已有条件式代码/schema 切片或设计收口；ERUN-P2 CLI canonical identity、fence binding v2 / signature v3 与本地原子 consume foundation 已有代码切片；Engineering Run directory 已有条件式 schema/API，Run Task Cards bounded UI/client 已有条件式只读代码切片，旧 Tauri demo Task/fallback 已退役；宿主 Auth Provider、Task owner 的目标 DB/RLS、production provisioner、ACL/provider、reservation lifecycle、OS spawn adapter、catalog publisher 与 BI/Outbox 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.46 §50；`docs/basic-design.md` v5.43 §16.14-16.22
-> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.30；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.5
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.51 §50；`docs/basic-design.md` v5.48 §16.14-16.23
+> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.35；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
+> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.7
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
@@ -1072,6 +1072,12 @@ Task Contract/Lifecycle/Relation 由 Work Item owner；TaskExecutionRun/Event/Ev
 
 当前事件传输沿用 PostgreSQL SoR + Transactional Outbox + NATS JetStream。Kafka/Fluvio 不是仓库 runtime dependency；当前不增加第二个 broker。未来若 BI connector/保留/replay SLO 促成 broker 替换，Kafka 优先 PoC（Connect/Streams 生态），Fluvio 仅作为经 RSS/恢复实测的资源敏感 Rust/Kubernetes 候选；决策和版本注意项见 requirements §50.8F / basic design §16.19。首期部署为 modular monolith，只有有 workload/故障域证据且授权、Outbox/Inbox、resource budget、migration/rollback 门齐全时才提取微服务。
 
+#### 14.13.1 Run Task Cards bounded projection UI
+
+Run-scoped列表 API 是 UI 唯一任务读入口：`GET /api/v1/engineering-runs/{engineering_run_id}/work-items?limit=12[&after=<uuid>]`。客户端以当前宿主 Bearer 会话发出 no-store 请求，并检查 Project/Repository/Branch/Run tuple、Task Card/WorkItem identity alias、field bounds、重复 ID 与稳定游标。UI 在 Run Workspace 默认选中 Task Cards tab，只保留当前最多 12 条结果，每页响应最多 2 MiB、浏览最多 100 页；请求使用 15 秒 deadline，Run/Worktree route 变化后取消在途请求。服务端拒绝、未配置 provider 或 capability false 时显示明确状态，禁止读取 Worktree 兼容列表、旧演示 seed/Tauri MockDb 或其他 Run 任务。Tauri/browser-dev 不得回退到本地任务数组；provider 未配置时返回阻断错误。隔离测试只用 `test-*` Task ID。
+
+当前实现只提供只读列表投影和 CLI disabled affordance，不实现任务编辑/创建。根 `Providers` 尚未传入可信 `RunDirectoryHostSession`，服务端 RunContext 将 `run_owned_apps_available` 与 `execution_admission_available` 固定为 false，Task Owner migration 与应用身份 RLS 也未在目标数据库验收；所以真实环境不会开放 Task Cards 请求。卡内 CLI 在 Runtime/OS sandbox、权限和资源复验、取消/恢复、独立验证与结果回写闭环完成前不得启用。
+
 ## 附录 A-E
 
 跟 DD-MULTICA-RUNTIME-001 模板同 (5 view / 派生规 / 拍板来源 / 签字栏 / 修订履历), 本 DD 略 (内容可参考模板)。
@@ -1111,4 +1117,6 @@ Task Contract/Lifecycle/Relation 由 Work Item owner；TaskExecutionRun/Event/Ev
 | v1.15 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.12：共享 strict fence DTO、C4 signature v2/legacy v1 payload 兼容、Runtime current-binding recheck、nonce/fence SQLite 原子消费与 50,000 receipt cap；标注本地 foundation 不是生产 ACL/Reservation/OS spawn/BI consumer，capability 继续默认关闭；同步 requirements v5.41 与 basic design v5.37 | 推进 Phase 9E-4C5 Runtime fence consume foundation |
 | v1.16 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 将 Run BI/Benchmark 设为 Engineering Run 同级 App，Project BI 作为跨 Run aggregate；区分 EngineeringRun workspace 与 TaskExecutionRun attempt；新增 Run-owned API、owner service / stored procedure / Outbox-Inbox 边界及 NATS 当前基线、Kafka 优先 PoC 与 Fluvio 受限候选；明确现有 Worktree-scoped Run APIs 是兼容实现且 schema/RLS 迁移尚未完成 | 同步 requirements v5.42、basic design v5.39 与 Group DD v4.25 |
 | v1.18 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确规定 same-key RR stale-snapshot race：仅 idempotency primary key + SQLSTATE 23505 回滚并在新快照下重新授权/核对 fingerprint 后返回 winner，其他错误不吞；记录 3s statement / 1s lock timeout 和待补的双会话 PG race integration test；同步 requirements v5.46/basic v5.43/Group DD v4.30 与 infrastructure v0.2，保持 production execution gates 开放 | 独立源码复核发现并修复幂等竞争边界；同步基础设施商用开源准入 |
+| v1.19 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §14.13.1，规定 Run Task Cards 只读 UI 使用 canonical Run list API、完整 owner tuple 验证、有界内存/分页/取消及无 mock/Worktree 回退；记录宿主 session、服务端 capability、目标 DB/RLS、CLI Runtime 和验证回写仍为阻断门；同步 requirements v5.50/basic v5.47/Group DD v4.34/SRS v0.6 | 把 Task Cards UI/client 代码切片与详细设计及生产状态对账 |
+| v1.20 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 §14.13.1 与 AC-15：清除旧 Tauri MockDb Task 和 browser-dev fallback，provider 缺失时 fail closed，测试 fixture 使用 `test-*`；同步 requirements v5.51/basic v5.48/Group DD v4.35/SRS v0.7；不把未知服务器 owner 行按 mock 假设删除 | 全仓复核发现独立桌面端仍有旧演示 Task Card |
 | v1.17 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008) — Mavis 接手审核 | 新增 §14.11.13：CLI 服务端 canonical EngineeringRun tuple、三层 current writer grants/revisions、双事务复核、binding V2/signature V3 与 Runtime consumer、immutable snapshot/composite FK、新 CLI NULL insert 拒绝及 legacy read compatibility；保持 Task owner 迁移与 production 执行闭环开放 | ERUN-P2-CLI-RUN-CONTINUE 接续实现并复核授权边界 |

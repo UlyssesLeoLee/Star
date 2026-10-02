@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.49）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.51）
 
 ## 0. 文档说明与前提
 
@@ -2481,7 +2481,8 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-INFRA-001 | 增加 Rust-native Infrastructure Manager 与 versioned backend/profile/binding 契约，支持用户自有或远端 Linux 环境，并为 K3s 提供受控 discover/provision/readiness/start/stop/drain/upgrade；默认按 Host/environment 共享按需基础设施、Project/Run 分配 namespace/权限/预算，不按每个 Worktree/Agent 复制 VM/控制面。Provider 不得以商业用途、席位或用量计划限制核心能力；版本准入按具体许可履约路径及完整 SPDX/SBOM 检查，活跃社区以近期发布/维护及公开渠道核验。Multipass、Podman machine、Incus、Lima 和 existing cluster 按 host capability 分平台验收；native Hook、租约/CAS、操作幂等和 BI 证据与现有体系一致。Namespace 不独自构成不可信 Agent sandbox，缺 execution capability 仍禁用；不得静默改变用户全局 WSL 配置或回收他人环境 | P0 |
 | AC-ERUN-004 | 新 CLI TaskExecutionRun 的 EngineeringRun 身份由服务端反查当前 Worktree binding，复验 Project/Branch/Run writer grants、当前 revisions、checkout 分支及 Task 关联；在准入短事务中再次核验完整快照，持久化独立 EngineeringRun ID 与精确 tuple，并绑定 V2 Runtime fence。旧无归属记录保留只读，不能猜回填或重复启动；新 CLI NULL 身份写入、snapshot 错配/超限、跨 scope FK 与 binding/grant 变化必须拒绝。CLI attachment 签发也须复核当前三层授权与该 Session 对应的已存身份；status/cancel 保留授权后的安全清理语义。Task 本身的 Run ownership、生产 provisioner/OS sandbox 与执行结果闭环另行验收 | P0 |
 | AC-ERUN-005 | 每张新 Task Card 必须写入完整 canonical Run owner tuple；Run 列表按完整 owner 身份分页，Worktree 兼容 API、Canvas Task Card 创建、CLI admission、Session attach 与 TaskExecutionRun list/detail 均校验当前 owner 和所选 Worktree 的 Run 一致；跨 Run 关联/重绑定必须拒绝。旧无 owner 记录不自动回填，须只读直到受审计的 SCD2 reconciliation；新 owner migration/outbox 在目标数据库与应用身份 RLS 验收前不算生产启用 | P0 |
-| AC-TASK-DATA-001 | Runtime seed 与 MSW 任务相关接口移除所有 30 条历史演示 Task Card (`wi-001`..`wi-030`) 及其演示专属关联；validation/comment mock endpoint 不得为这些 ID 返回历史数据。升级仅过滤精确已知 ID 的浏览器持久化数据并保留其他用户数据。不得用前缀清理数据库记录或把旧 ID 映射到 Canvas；隔离测试 fixture 仅能使用 `test-*` ID，不得进入产品 seed、MSW 任务历史或业务投影。服务器端旧行不按 mock 假设删除，未归属行保持 unknown/不可执行，直至显式 reconciliation | P0 |
+| AC-ERUN-006 | Engineering Run 默认打开同级 Task Cards App；列表只消费带当前宿主 Bearer 会话的 canonical Run-scoped API，逐页最多 12 条、响应最多 2 MiB、当前仅驻留一页并限制最多浏览 100 页；服务端未授权/未开放时显示明确阻断或错误状态，不得回退 Worktree 旧列表、seed 或浏览器演示任务。卡内 CLI 在执行准入、Runtime sandbox、取消/恢复、独立验证与结果回写闭环验收前必须禁用 | P0 |
+| AC-TASK-DATA-001 | 所有历史演示 Task Card (`wi-001`..`wi-030`，以及独立桌面端 `wi-001`..`wi-004`) 与其演示专属关联必须从产品运行时移除；Runtime seed/MSW task history 不提供这些任务，Tauri MockDb 不生成 WorkItem，Tauri/browser-dev 无本地 mock fallback，缺少 canonical Run provider 时 fail closed。validation/comment mock endpoint 不得为这些 ID 返回历史数据。升级仅过滤精确已知 ID 的浏览器持久化数据并保留其他用户数据。不得用前缀清理数据库记录或把旧 ID 映射到 Canvas；隔离测试 fixture 仅能使用 `test-*` ID，不得进入产品 seed、MSW 任务历史或业务投影。服务器端旧行不按 mock 假设删除，未归属行保持 unknown/不可执行，直至显式 reconciliation | P0 |
 | AC-EVENT-001 | 当前领域事件基线为 PostgreSQL SoR + Transactional Outbox + NATS JetStream；Kafka/Fluvio 不在运行依赖；新增 broker 前需经 ADR 和同 workload 的保留/回放/资源/恢复基准 | P1 |
 
 ### 50.8A 多 Agent 并行、资源预算与 Rust 桌面性能
@@ -2779,4 +2780,6 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.47 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 按用户澄清重写基础设施商业开源准入：商业用途不按席位/用量/行业封锁，copyleft 不等同于禁止商用，加入独立 provider 履约交付路径；推荐 Multipass 本地 VM + Linux K3s，并保留 Podman machine/Incus/Lima 替换 adapter 和确切平台能力验证 | 用户明确不接受商业用途限制并要求活跃社区开源方案 |
 | v5.48 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 移除“copyleft provider 只能手工自装”的隐性产品限制，要求发现、引导和合规受管安装/捆绑路径；澄清 unlimited commercial use 与 GPL 发行义务的区别，并纠正 K3s stable channel 版本；同步 basic design v5.45、Group DD v4.32、Infrastructure DD v0.4 | 用户再次明确拒绝商业用途限制，要求活跃社区开源方案 |
 | v5.49 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-005 与 AC-TASK-DATA-001：为当前 Task Card 固定完整 Run owner tuple、Outbox 与同 Run 读写/CLI/Canvas 校验；移除 30 条旧 mock seed 及其本地历史引用，并明确精确 localStorage 清理、保留测试 fixture、禁止按前缀删除真实数据库行；目标 DB/RLS 验收仍未完成 | 用户授权清理全部旧 mock 任务，并要求把 Run 层级作为真实任务归属 |
+| v5.50 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-006：Run 默认 Task Cards 投影、认证 Run-scoped bounded list、单页内存与页数上限、无旧 Worktree/mock 回退，以及 CLI 生产闭环前禁用；列清前端代码切片与当前宿主 Provider、服务端 capability、目标 DB/RLS 门禁 | 将实际 Run Task Cards UI 代码与认证/数据库未就绪事实对账 |
 | v5.45 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-004：server-resolved directory identity、两事务重验、V2 fence/signature v3、严格完整快照与新 CLI NULL guard、attachment 再授权；扩展 AC-HOOK-001 的会话授权深链和有界查找 | 独立 worktree 并行实现 CLI 身份与 Hooks 深链、源码第二意见修正 |
+| v5.51 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 AC-TASK-DATA-001：清除独立 Tauri 桌面端的四条运行时演示 WorkItem，移除 MockDb 任务记录和 browser-dev fallback；缺少 canonical Run provider 时 IPC fail closed，测试 fixture 统一使用 `test-*`；不删除服务器端未知归属行 | 全仓审查发现旧 Tauri 桌面端仍暴露演示 Task Card |

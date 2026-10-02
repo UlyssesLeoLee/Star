@@ -8,8 +8,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useTauriWorkItems } from '../src/hooks/useTauriWorkItems';
 
 const mockWorkItems = [
-  { id: 'wi-001', title: 'Item 1', status: 'todo', w_t_m: 'W' },
-  { id: 'wi-002', title: 'Item 2', status: 'done', w_t_m: 'T' },
+  { id: 'test-wi-001', title: 'Test Item 1', status: 'todo', w_t_m: 'W' },
+  { id: 'test-wi-002', title: 'Test Item 2', status: 'done', w_t_m: 'T' },
 ];
 
 describe('useTauriWorkItems (PR-250)', () => {
@@ -33,13 +33,12 @@ describe('useTauriWorkItems (PR-250)', () => {
     expect(typeof result.current.refetch).toBe('function');
   });
 
-  it('handles invoke error gracefully (non-Tauri runtime)', async () => {
+  it('fails closed without Tauri and does not create local mock tasks', async () => {
     // @ts-ignore — simulate non-Tauri runtime (no __TAURI_INTERNALS__)
     delete globalThis.__TAURI_INTERNALS__;
     const { result } = renderHook(() => useTauriWorkItems());
     await waitFor(() => expect(result.current.loading).toBe(false));
-    // Should fall back to mock data
-    expect(result.current.workItems.length).toBeGreaterThan(0);
-    expect(result.current.error).toBeNull();
+    expect(result.current.workItems).toEqual([]);
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });

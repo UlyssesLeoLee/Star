@@ -2,13 +2,13 @@
 CREATE (f:File {name:"frontend/src/components/run/RunWorkspaceShell.tsx",type:"file",language:"tsx"}),
  (route:Class {name:"RunWorkspaceRoute",type:"class"}),(load:Class {name:"ContextLoad",type:"class"}),
  (shell:Function {name:"RunWorkspaceShell",type:"function"}),(resolve:Function {name:"resolveCanonicalRunContext",type:"function"}),
- (detail:Function {name:"RunContextDetails",type:"function"}),(session:Function {name:"useRunDirectory",type:"function"}),
+ (detail:Function {name:"RunContextDetails",type:"function"}),(session:Function {name:"useRunDirectory",type:"function"}),(taskCards:Function {name:"RunTaskCardsPanel",type:"function"}),
  (href:Function {name:"canonicalRunWorktreeHref",type:"function"}),(context:Function {name:"RunDirectoryApiClient.getRunContext",type:"function"}),
- (error:Function {name:"directoryErrorMessage",type:"function"}),(tabs:Variable {name:"RUN_APP_TABS",type:"variable"}),
+ (error:Function {name:"directoryErrorMessage",type:"function"}),(tabs:Variable {name:"RUN_APP_TABS",type:"variable"}),(activeApp:Variable {name:"activeApp",type:"variable"}),
  (state:Function {name:"useState",type:"function"}),(effect:Function {name:"useEffect",type:"function"}),
  (f)-[:CONTAINS]->(route),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(shell),(f)-[:CONTAINS]->(detail),(f)-[:CONTAINS]->(tabs),
  (shell)-[:CONTAINS]->(resolve),(shell)-[:CALLS]->(session),(shell)-[:CALLS]->(href),(shell)-[:CALLS]->(state),(shell)-[:CALLS]->(effect),
- (shell)-[:CALLS]->(detail),(resolve)-[:CALLS]->(context),(resolve)-[:CALLS]->(error),(shell)-[:USES]->(tabs);
+ (shell)-[:CALLS]->(detail),(shell)-[:CALLS]->(taskCards),(resolve)-[:CALLS]->(context),(resolve)-[:CALLS]->(error),(shell)-[:USES]->(tabs),(shell)-[:USES]->(activeApp);
 */
 
 "use client";
@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { canonicalRunWorktreeHref, RunDirectoryError, type RunContextEnvelope, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
+import { RunTaskCardsPanel } from "@/components/run/RunTaskCardsPanel";
 
 export interface RunWorkspaceRoute { project_id: string; branch_id: string; engineering_run_id: string; worktree_id: string }
 type ContextLoad = { client: RunDirectoryApiClient; route: string; status: "ready"; envelope: RunContextEnvelope } |
@@ -29,6 +30,7 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   const [load, setLoad] = useState<ContextLoad | null>(null);
   const [retry, setRetry] = useState(0);
   const [chatScope, setChatScope] = useState<"WORKTREE" | "GLOBAL">("WORKTREE");
+  const [activeApp, setActiveApp] = useState<(typeof RUN_APP_TABS)[number]>("Task Cards");
   let href = "";
   try { href = canonicalRunWorktreeHref(route.project_id, route.branch_id, route.engineering_run_id, route.worktree_id); } catch { /* Invalid routes never reach the API. */ }
   const projectId = route.project_id.toLowerCase();
@@ -38,6 +40,7 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   useEffect(function resolveCanonicalRunContext() {
     clearFocus();
     setChatScope("WORKTREE");
+    setActiveApp("Task Cards");
     if (!client || !href || status !== "ready") return;
     const controller = new AbortController();
     void client.getRunContext(runId, worktreeId, controller.signal).then((envelope) => {
@@ -70,11 +73,14 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
       <p className="mt-2 text-xs text-ink-mute">协作、任务、Canvas、Workflow、分析与插件的工作区属于此 Engineering Run。Worktree 提供本地 checkout 焦点。</p>
     </header>
     <div role="tablist" aria-label="Engineering Run Apps" className="mt-4 flex flex-wrap gap-2">
-      {RUN_APP_TABS.map((tab) => <button role="tab" aria-selected={false} disabled type="button" key={tab} className="rounded border border-line px-3 py-2 text-xs text-ink-mute">{tab} · 待迁移</button>)}
+      {RUN_APP_TABS.map((tab) => <button role="tab" aria-selected={activeApp === tab} aria-controls="run-app-content" disabled={tab !== "Task Cards"} onClick={() => setActiveApp(tab)} type="button" key={tab} className={`rounded border border-line px-3 py-2 text-xs ${activeApp === tab ? "bg-accent/15 text-accent" : "text-ink-mute"}`}>{tab}{tab === "Task Cards" ? "" : " · 待迁移"}</button>)}
     </div>
-    <div role="status" className="my-4 rounded border border-line bg-bg-soft p-4 text-sm">
-      <p>{envelope.capabilities.run_owned_apps_available ? "此入口的 Run Apps 适配器尚未装配。" : "服务端尚未开放 Run 所有的 Apps。"} Task Cards 与 Canvas 为同级 App，当前仅提供已授权目录与 checkout 焦点。</p>
-      <p className="mt-2">{envelope.capabilities.execution_admission_available ? "此入口的任务执行适配器尚未装配。" : "服务端执行准入尚未开放。"} CLI 将从任务卡内打开；任务绑定、runtime、取消、独立验证和结果回写完成前，执行保持禁用。</p>
+    <div id="run-app-content" className="my-4">
+      {activeApp === "Task Cards" && <RunTaskCardsPanel key={runId} client={current.client} run={envelope.engineering_run} available={envelope.capabilities.run_owned_apps_available} />}
+    </div>
+    <div role="status" className="mb-4 rounded border border-line bg-bg-soft p-4 text-sm">
+      <p>{envelope.capabilities.run_owned_apps_available ? "Run-owned Apps 已开放；当前接入 Task Cards 只读视图。" : "服务端尚未开放 Run-owned Apps；Task Cards 页面保持禁用，不会回退到 Worktree 任务或演示数据。"} Canvas、Inbox、Workflow、BI/Benchmark 与插件仍是同级 Run App。</p>
+      <p className="mt-2">{envelope.capabilities.execution_admission_available ? "服务端执行准入已开放，但卡内 CLI Runtime 与结果验证界面尚未装配。" : "服务端执行准入尚未开放。"} CLI 将从任务卡内打开；Runtime、取消/恢复、独立验证和结果回写完成前，执行保持禁用。</p>
     </div>
     <RunContextDetails envelope={envelope} />
     <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">

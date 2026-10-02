@@ -8,12 +8,7 @@ import '@testing-library/react';
 const mockInvoke = vi.fn((cmd: string) => {
   switch (cmd) {
     case 'list_work_items':
-      return Promise.resolve([
-        { id: 'wi-001', title: 'feat(canvas): W/T/M swimlane', status: 'in_progress', w_t_m: 'W' },
-        { id: 'wi-002', title: 'fix(canvas): bug #71', status: 'review', w_t_m: 'T' },
-        { id: 'wi-003', title: 'spike(wasm): layout PoC', status: 'done', w_t_m: 'M' },
-        { id: 'wi-004', title: 'doc(arch): Tauri PoC', status: 'todo', w_t_m: 'M' },
-      ]);
+      return Promise.resolve([]);
     case 'list_worktree_groups':
       return Promise.resolve([
         { id: 'grp-001', name: 'core-canvas', worktree_count: 5, active: true },

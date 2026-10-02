@@ -367,7 +367,7 @@ export const canvases: Canvas[] = [
   },
 ];
 
-// Canvas Element — 25-30 个,跨 7 种 kind,演示 25 module 联动
+// Canvas Element — 11 个非任务演示节点；Run Task Cards 不作为本地 seed 注入
 export const canvasElements: CanvasElement[] = [
   // === Frame 1: Worktree 状态 ===
   { id: "el-wt-001", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 50,  width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-001", text: "feat/worktree-sm" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },

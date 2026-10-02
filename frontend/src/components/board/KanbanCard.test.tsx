@@ -25,7 +25,7 @@ function renderWithI18n(ui: ReactNode) {
 }
 
 const mockWorkItem: WorkItem = {
-  id: "wi-007",
+  id: "test-wi-007",
   tenant_id: "t-1",
   project_id: "p-1",
   key: "PHYSIS-7",
@@ -57,17 +57,17 @@ describe("KanbanCard", () => {
     );
 
     // 卡片可拖动
-    const cardEl = screen.getByTestId("kanban-card-wi-007");
+    const cardEl = screen.getByTestId("kanban-card-test-wi-007");
     expect(cardEl.getAttribute("draggable")).toBe("true");
-    expect(cardEl.getAttribute("data-issue-id")).toBe("wi-007");
+    expect(cardEl.getAttribute("data-issue-id")).toBe("test-wi-007");
 
     // 模拟 dragstart — 用 stub 跟踪 setData
     const setDataMock = vi.fn();
     const dataTransfer = { setData: setDataMock, effectAllowed: "" };
     fireEvent.dragStart(cardEl, { dataTransfer });
 
-    // 必须 setData("text/issue-id", "wi-007")
-    expect(setDataMock).toHaveBeenCalledWith("text/issue-id", "wi-007");
+    // 必须 setData("text/issue-id", "test-wi-007")
+    expect(setDataMock).toHaveBeenCalledWith("text/issue-id", "test-wi-007");
     // effectAllowed 设为 "move"
     expect(dataTransfer.effectAllowed).toBe("move");
     // 父组件 onDragStart 钩子也被调
@@ -80,7 +80,7 @@ describe("KanbanCard", () => {
       <KanbanCard workItem={mockWorkItem} isDragging={false} />
     );
 
-    const cardBefore = screen.getByTestId("kanban-card-wi-007");
+    const cardBefore = screen.getByTestId("kanban-card-test-wi-007");
     // 默认不透明
     expect(cardBefore.className).not.toMatch(/opacity-50/);
     expect(cardBefore.className).not.toMatch(/ring-2/);
@@ -91,7 +91,7 @@ describe("KanbanCard", () => {
         <KanbanCard workItem={mockWorkItem} isDragging={true} />
       </I18nProvider>
     );
-    const cardAfter = screen.getByTestId("kanban-card-wi-007");
+    const cardAfter = screen.getByTestId("kanban-card-test-wi-007");
     expect(cardAfter.className).toMatch(/opacity-50/);
     expect(cardAfter.className).toMatch(/ring-2/);
   });
@@ -104,7 +104,7 @@ describe("KanbanCard", () => {
     const { rerender } = renderWithI18n(
       <KanbanCard workItem={mockWorkItem} />
     );
-    expect(screen.queryByTestId("kanban-card-arch-wi-007")).toBeNull();
+    expect(screen.queryByTestId("kanban-card-arch-test-wi-007")).toBeNull();
 
     // 2) 传 onArchClick → 按钮渲染
     const onArchClick = vi.fn();
@@ -113,7 +113,7 @@ describe("KanbanCard", () => {
         <KanbanCard workItem={mockWorkItem} onArchClick={onArchClick} />
       </I18nProvider>
     );
-    const archBtn = screen.getByTestId("kanban-card-arch-wi-007");
+    const archBtn = screen.getByTestId("kanban-card-arch-test-wi-007");
     expect(archBtn).toBeTruthy();
     expect(archBtn.getAttribute("aria-label")).toContain("PHYSIS-7");
   });
@@ -130,12 +130,12 @@ describe("KanbanCard", () => {
       />,
     );
 
-    const archBtn = screen.getByTestId("kanban-card-arch-wi-007");
+    const archBtn = screen.getByTestId("kanban-card-arch-test-wi-007");
     fireEvent.click(archBtn);
 
     // onArchClick 必须被调, 传 workItem
     expect(onArchClick).toHaveBeenCalledTimes(1);
-    expect(onArchClick.mock.calls[0][0].id).toBe("wi-007");
+    expect(onArchClick.mock.calls[0][0].id).toBe("test-wi-007");
 
     // onClick 不应被调 (因 stopPropagation)
     expect(onClick).not.toHaveBeenCalled();

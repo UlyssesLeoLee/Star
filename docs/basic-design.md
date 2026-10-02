@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.46 (2026-10-02)
-> **上游要件定义书**: docs/requirements.md v5.49
+> **文档版本**: v5.48 (2026-10-02)
+> **上游要件定义书**: docs/requirements.md v5.51
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4591,6 +4591,7 @@ Chat Bar(scope, text, entity_refs)
 | ARCH-OBL-GRP-001 | §16.4-16.10 | AC-TRACE-001 |
 | AC-INFRA-001 | §16.21 / DD-LOCAL-INFRASTRUCTURE-001 | Rust provider/profile/Run binding、按需共享 k3s、商用许可与性能/隔离验收 |
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
+| AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4644,9 +4645,9 @@ Task 的 goal/scope/dependencies/acceptance criteria 是持续事实；TaskExecu
 
 数据库 guard 拒绝 current metadata 原位改 owner、跨 Run Task/Worktree 关联，以及仍有关联任务时重绑定 Worktree。Run Task list 和 Worktree compatibility list 都按完整 tuple 筛选；Worktree create/transition/review 必须同时通过 Project 与 Run grant。Canvas 创建 Task Card 写入相同 owner；Task CLI admission、Session attachment 和 TaskExecutionRun list/detail 重新比对 owner 与当前 checkout 所属 Run。任务 metadata insert 与 `multica.task_run_outbox` append-only Transaction event 同事务提交，使用 actor/correlation context，事件只保存身份/version/owner 的限长结构，不保存描述或执行输出。
 
-旧 UI seed 中 `wi-001` 至 `wi-030` 的演示卡片和仅服务于这些卡片的 sample comments、changesets、validation、search、Canvas links、relations 与聚合数已删除；MSW 运行时不再提供这些任务的 validation/comment 历史。浏览器持久化版本迁移只清理该精确 ID 集合及其 demo-only 引用；不按 ID 前缀删除其他本地任务，不执行数据库清理，也不自动认领服务器端 legacy Task。隔离测试可使用独立 `test-*` fixture，但不得流入产品 seed、MSW 任务历史或业务投影。
+旧 UI seed 中 `wi-001` 至 `wi-030`、独立 Tauri 桌面端 `wi-001` 至 `wi-004` 的演示 Task Card，以及仅服务于已知演示 ID 的关联已从产品运行时移除；Tauri MockDb 不再构造任务，Tauri/browser-dev 缺少 canonical Run provider 时 fail closed。MSW 运行时不为这些任务提供 validation/comment 历史。浏览器持久化迁移只清理该精确已知 ID 集合及其 demo-only 引用；不按 ID 前缀删除其他本地任务、不猜测性清理服务器行，也不自动认领 legacy Task。隔离测试 fixture 使用 `test-*` ID，不进入产品 seed、MSW 任务历史或业务投影。
 
-本轮已编写 owner/outbox additive migration 并接入 Run/Worktree API、Canvas writer 和 Task CLI owner guard；定向 `cargo check -p star-api-rest --lib -j 4` 曾在临时解析更新 Cargo.lock 后通过，原始锁文件已恢复，因此不构成 locked/reproducible build 证据。目标数据库尚未应用/验证迁移，实际 runtime role grants/RLS 未验收，宿主 JWT provider 未装配，Run Workspace 的 Task Cards UI 尚未迁入。因此这是局部编译检查通过的后端切片，不代表 Task Card/CLI 的生产闭环已开放；缺少任一生产边界时仍 fail closed。
+本轮已编写 owner/outbox additive migration 并接入 Run/Worktree API、Canvas writer 和 Task CLI owner guard；定向 `cargo check -p star-api-rest --lib -j 4` 曾在临时解析更新 Cargo.lock 后通过，原始锁文件已恢复，因此不构成 locked/reproducible build 证据。Run Task Cards 已有只读 UI/client 代码切片；目标数据库尚未应用/验证迁移，实际 runtime role grants/RLS 未验收，宿主 JWT provider 未装配且服务端 capability 关闭。因此代码切片不代表已读取生产 Task 数据，也不代表 Task Card/CLI 的生产闭环已开放；缺少任一生产边界时仍 fail closed。独立 Tauri 前端的旧假任务也已退役，其宿主 Run provider 尚未接入。
 
 Task Contract 作为 Master/SCD2 保存版本、goal、scope、dependencies、acceptance criteria、actor 与有效区间；更新在一个领域事务内关闭旧版本、追加新版本和 append-only `task_contract_change_audit`。本轮 additive migration `db/migrations/2026-09-30-worktree-task-execution-run.sql` 已定义这些表、Transaction 事件/evidence 表、30 天 Work idempotency mapping、tenant/actor RLS 与 append-only trigger。
 
@@ -4843,6 +4844,14 @@ CLI compatibility endpoint 不接受浏览器提供的 EngineeringRun authority�
 ### 16.22 商用开源基础设施 provider
 
 默认支持/分发的基础设施 provider 必须允许不限用途、行业、部署规模、席位或用量的商业使用；不能把 copyleft 等同于禁止商用。GPL/AGPL/LGPL provider 可以商业部署、销售和采用；产品支持既有 provider 检测、安装引导和在履行发行义务后的受管安装/捆绑，不得仅因许可证类型把手工安装设为唯一入口。逐发布版本审查直接与传递依赖、guest image、kernel 和 installer 的 SPDX/SBOM、版权声明、NOTICE、专利与所需源码材料。候选为 Multipass 本地 VM、Podman machine、Linux Incus、macOS/Linux Lima 和远端 Linux K3s；按固定版本 capability 验证 Windows/macOS/Linux driver，K3s 不原生支持 Windows。活跃社区须满足近 12 个月有日期的 release/维护及公开支持渠道。K3s stable channel 当前为 v1.36.4+k3s1；1.37 系列仍为预发布。上游根许可证不等同于打包闭包审查；Star adapter、真实 readiness/RSS/并行和安装恢复仍未验收。详细候选见 DD-LOCAL-INFRASTRUCTURE-001 v0.4。
+
+### 16.23 Run-owned Task Cards bounded UI 切片
+
+Run Workspace 默认选中同级 `Task Cards` tab。`RunTaskCardsPanel` 只调用 `RunDirectoryApiClient.listRunWorkItems`，目标为 `GET /api/v1/engineering-runs/{engineering_run_id}/work-items?limit=12[&after=<uuid>]`；客户端校验返回页的 Project/Repository/Branch/Run tuple、`task_card_id == work_item_id`、字段长度、重复 ID 与游标。请求使用当前宿主 Bearer token、`credentials: omit`、`cache: no-store`、15 秒 deadline 与 AbortSignal；客户端共用的并发上限为 2 个活动请求、16 个等待项。单次响应最多 2 MiB，UI 只保留当前 12 条，最多浏览 100 页；换 Run/卸载会取消在途页请求。
+
+该 App 当前是只读投影：提供加载、错误/重试、空状态、页内标签和任务详情；不写 WorkItem，不使用旧 Worktree Task API、seed 或浏览器 mock。任务卡的 `打开 CLI` 控件保持禁用，直至 Run execution admission、受限 Runtime/OS sandbox、取消/恢复、独立验证和结果回写均完成验收。其它 Run App tabs 保持为未迁移状态。
+
+生产启用仍受三道当前门控：根 `Providers` 尚未注入可信 `RunDirectoryHostSession`，RunContext 服务端 `run_owned_apps_available` 与 `execution_admission_available` 均固定为 false，Task Owner migration/应用身份 RLS 尚未在目标 DB 验收。因此当前可验证的是 UI/API 客户端代码与 fail-closed 行为，不能表述为已加载生产任务或已完成 Task Card/CLI 闭环。
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -4935,3 +4944,5 @@ CLI compatibility endpoint 不接受浏览器提供的 EngineeringRun authority�
 | v5.45 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 删除 provider 只能用户手工安装的隐性限制，明确检测、安装引导和履约后的受管安装/捆绑；将 unlimited commercial use 与许可发行义务区分；更正 K3s stable channel 为 v1.36.4+k3s1；同步 requirements v5.48、Group DD v4.32、Infrastructure DD v0.4 | 用户再次明确不接受商业使用限制并要求活跃社区 |
 | v5.42 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45；新增 §16.20，区分 EngineeringRun 与 TaskExecutionRun，更新 V2 fence/signature v3、strict 25-field snapshot、历史记录与 attachment 再授权边界；记录 Hooks authorized hint 与取消限制；保留 PR-276 Index/ADR 改动 | ERUN-P2 实现和文档逐项对账 |
 | v5.46 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49 与 Group DD v4.33；定义 Task Card 完整 Run owner tuple、同 Run Worktree 关系 guard、Outbox 与 Run/CLI 查询过滤；说明 30 条旧 mock seed 和精确 localStorage 历史迁移，保留 DB legacy row 不猜归属；明确目标 DB/RLS 与宿主认证/UI 尚未完成 | 用户授权清理旧 mock Task Card，并要求真实任务事实归属 Engineering Run |
+| v5.47 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50、Group DD v4.34、Task DD v1.19；记录 Run Task Cards 只读 bounded UI/API 代码切片、12 条/2 MiB/100 页限制与取消行为；明确宿主会话、服务端 capability、目标 DB/RLS 未就绪及 CLI 禁用门 | 把 Run Task Cards 前端实现与设计、生产启用条件对账 |
+| v5.48 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51、Group DD v4.35、Task DD v1.20、SRS v0.7；将独立 Tauri 的四条运行时 mock WorkItem、MockDb task rows 与 browser-dev fallback 标为已移除/未配置时 fail closed；说明测试 `test-*` fixture 与服务器未知行边界 | 用户确认旧 Task Card 全为 mock 并授权清理；全仓审查发现旧 Tauri 桌面端仍有演示记录 |

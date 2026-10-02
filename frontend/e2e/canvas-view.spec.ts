@@ -2,7 +2,7 @@
 //
 // 触发: 2026-09-04 19:14 JST Ulysses 拍板"无限画布后续做哪一块? e2e 守门补齐 (推荐)"
 // 范围: 守门 #1 v3 (check+fmt+clippy 不替代 e2e) 硬约束, 6 项 + 1 minimap
-// 数据: canvas-001 (per seed.ts:418) 25 elements + 8 connectors + 4 frames
+// 数据: canvas-001 (per seed.ts) 11 non-task elements + 3 connectors + 4 frames
 //
 // 守门:
 // - tsc --noEmit 0 错
@@ -32,21 +32,21 @@ async function readMinimapViewportRect(page: Page) {
   }));
 }
 
-test.describe('Miro 无限画布 e2e 守门 (canvas-001, 25 elements)', () => {
+test.describe('Miro 无限画布 e2e 守门 (canvas-001, 11 non-task elements)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(CANVAS_URL);
     // 等 CanvasView mount: 主 svg 出现 + 至少 1 element 渲染
     await expect(page.locator('[data-testid="canvas-svg"]')).toBeVisible();
-    await expect(page.locator('[data-testid="canvas-element-el-wi-001"]')).toBeVisible();
+    await expect(page.locator('[data-testid="canvas-element-el-wt-001"]')).toBeVisible();
   });
 
   // === 守门 1: 入口可用性 ===
-  test('1. /canvas/canvas-001 路由 200 + 14 element + 4 frame + minimap 渲染', async ({ page }) => {
+test('1. /canvas/canvas-001 路由 200 + 11 non-task element + 4 frame + minimap 渲染', async ({ page }) => {
     // Page header
     await expect(page.getByText('Physis Sprint 23 — Worktree + Agent 工作流')).toBeVisible();
-    // 14 elements (per seed.ts:453-473: 2 wi + 3 wt + 3 ag + 2 fb + 1 sn + 2 au + 1 tx = 14)
+    // 11 non-task elements (per seed.ts: 3 wt + 3 ag + 2 fb + 2 au + 1 tx = 11)
     const elementCount = await page.locator('[data-testid^="canvas-element-el-"]').count();
-    expect(elementCount).toBeGreaterThanOrEqual(14);
+    expect(elementCount).toBeGreaterThanOrEqual(11);
     // 4 frames (per seed.ts:425-429)
     await expect(page.locator('[data-testid="canvas-frame-frame-001"]')).toBeVisible();
     await expect(page.locator('[data-testid="canvas-frame-frame-002"]')).toBeVisible();
@@ -138,28 +138,28 @@ test.describe('Miro 无限画布 e2e 守门 (canvas-001, 25 elements)', () => {
   });
 
   // === 守门 5: ?highlight= URL 自动 pan/zoom (per CanvasView line 62-71 useEffect + design doc §3.5) ===
-  test('5. ?highlight=el-wi-002 URL: minimap viewport rect x 偏离 0 (useEffect auto-pan 触发)', async ({ page }) => {
-    // 直接 navigate with ?highlight=el-wi-002 (CanvasView line 62-71 自动 pan/zoom 到 element 中心)
-    await page.goto(CANVAS_URL + '?highlight=el-wi-002');
+  test('5. ?highlight=el-wt-002 URL: minimap viewport rect x 偏离 0 (useEffect auto-pan 触发)', async ({ page }) => {
+    // 直接 navigate with ?highlight=el-wt-002 (CanvasView line 62-71 自动 pan/zoom 到 element 中心)
+    await page.goto(CANVAS_URL + '?highlight=el-wt-002');
     await expect(page.locator('[data-testid="canvas-svg"]')).toBeVisible();
-    await expect(page.locator('[data-testid="canvas-element-el-wi-002"]')).toBeVisible();
+    await expect(page.locator('[data-testid="canvas-element-el-wt-002"]')).toBeVisible();
     // 默认 viewport=(0,0,1) 时 minimap viewport rect x=0. highlight 后 CanvasView useEffect
     //   setViewport({ x: targetX - 600/zoom/2, y: targetY - 400/zoom/2 })
-    //   el-wi-002 center = (30+100, 180+45) = (130, 225)
-    //   new viewport.x = 130 - 300 = -170
+    //   el-wt-002 center = (260+110, 140+35) = (370, 175)
+    //   new viewport.x = 370 - 300 = 70
     // 等 useEffect 跑完 (React 18 微任务, wait 500ms 余量)
     await page.waitForTimeout(500);
     const rect = await readMinimapViewportRect(page);
-    // viewport.x = -170, minimap rect 起点 = viewport.x
-    expect(rect.x).toBeLessThan(0);
+    // viewport.x = 70, minimap rect 起点 = viewport.x
+    expect(rect.x).toBeGreaterThan(0);
   });
 
   // === 守门 6: 选区删除 ===
   test('6. 选区删除: 选中 1 element + 工具栏 trash → store 0 该 id', async ({ page }) => {
-    const wiCard = page.locator('[data-testid="canvas-element-el-wi-001"]');
-    await expect(wiCard).toBeVisible();
+    const worktreeNode = page.locator('[data-testid="canvas-element-el-wt-001"]');
+    await expect(worktreeNode).toBeVisible();
     // 单击选中 (CanvasView line 117 setSelected([el.id]))
-    await wiCard.click();
+    await worktreeNode.click();
     // 工具栏出现 trash 按钮 (CanvasView line 396 conditional)
     const trashBtn = page.locator('[data-testid="canvas-toolbar"] button[title="Delete"]');
     await expect(trashBtn).toBeVisible();

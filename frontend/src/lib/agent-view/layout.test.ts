@@ -40,7 +40,7 @@ const baseWorktree: Worktree = {
 };
 
 const makeWi = (i: number, status: WorkItem["status"], due?: string): WorkItem => ({
-  id: `wi-${i.toString().padStart(3, "0")}`,
+  id: `test-wi-${i.toString().padStart(3, "0")}`,
   tenant_id: "ten-acme",
   project_id: "prj-physis",
   key: `PHYSIS-${i}`,
@@ -101,9 +101,9 @@ describe("layoutAgentCanvas", () => {
     const wiNodes = out.nodes.filter((n) => n.kind === "work_item");
     // 期望顺序 (按 status order ASC: in_progress=0, todo=3, done=4):
     //   in_progress (PHYSIS-2) → todo (PHYSIS-1) → done (PHYSIS-3)
-    expect(wiNodes[0].ref).toEqual({ kind: "work_item", workItemId: "wi-002" });
-    expect(wiNodes[1].ref).toEqual({ kind: "work_item", workItemId: "wi-001" });
-    expect(wiNodes[2].ref).toEqual({ kind: "work_item", workItemId: "wi-003" });
+    expect(wiNodes[0].ref).toEqual({ kind: "work_item", workItemId: "test-wi-002" });
+    expect(wiNodes[1].ref).toEqual({ kind: "work_item", workItemId: "test-wi-001" });
+    expect(wiNodes[2].ref).toEqual({ kind: "work_item", workItemId: "test-wi-003" });
   });
 
   it("相同输入永远出同样输出 (deterministic)", () => {

@@ -6,7 +6,7 @@
 import { Link } from 'react-router-dom';
 
 const IPC_COMMANDS = [
-  { id: 1, name: 'list_work_items', description: '4 mock work items (W/T/M)' },
+  { id: 1, name: 'list_work_items', description: 'Run-scoped provider required; fails closed when unavailable' },
   { id: 2, name: 'list_worktree_groups', description: '4 mock worktree groups' },
   { id: 3, name: 'list_canvas_entities', description: '4 mock canvas entities' },
   { id: 4, name: 'get_app_version', description: 'semver string from CARGO_PKG_VERSION' },

@@ -1,11 +1,11 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.65**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.67**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 日期：2026-10-02
-> - 本轮设计更新：主导航调整为 Project → Cloud Branch → Engineering Run；Run 管理分支内本地 Worktree，并提供 Inbox、Work Item/Multica/Jira、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps。选中 Worktree 只设置当前 focus/CLI checkout target；Run apps 的授权与数据 owner 由 RunContext 决定。新增面向 API-first bounded contexts、同域存储原子操作、跨域 Outbox/Inbox、可证据驱动服务提取、Kafka/Fluvio 评估及 Rust 桌面性能的实施边界；Phase 1已实施目录schema/read API与条件式主树/context shell基础；Run Apps迁移、生产闭环与服务提取仍待完成。
+> - 本轮设计更新：主导航调整为 Project → Cloud Branch → Engineering Run；Run 管理分支内本地 Worktree，并提供 Inbox、Work Item/Multica/Jira、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps。选中 Worktree 只设置当前 focus/CLI checkout target；Run apps 的授权与数据 owner 由 RunContext 决定。新增面向 API-first bounded contexts、同域存储原子操作、跨域 Outbox/Inbox、可证据驱动服务提取、Kafka/Fluvio 评估及 Rust 桌面性能的实施边界；Phase 1已实施目录schema/read API与条件式主树/context shell基础；Run Task Cards 有只读 UI/API client 代码切片；旧 Tauri 桌面端 Task mock/fallback 已退役。宿主 Auth Provider、服务端 capability、目标 DB/RLS 未就绪，其它 Run Apps/生产执行闭环与服务提取仍待完成。
 > - 本轮补充：生产 Project 选择通过当前 actor 的服务端 membership 目录加载；API session generation 切换时同步隐藏旧 Project/Index/member-role 投影；分页与深链权限状态均 fail closed，缺失 Project 名称 SoR 时不借本地 seed 补名。
 > - Phase 8 更新：Run migration 在隔离临时 PostgreSQL 重复应用并通过 6 张表 FORCE RLS 检查，目标 DB/runtime grants 未部署；CLI Run writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已形成条件式代码切片；Contract 写命令、完整事件/Evidence producer、真实 Runtime 与目标环境端到端验收仍未完成。
 > - Phase 9A 更新：新增 `domain-hook` bounded Rust evaluator core 和 8 个单测，仅覆盖 Worktree archive/cleanup gate；未接入 lifecycle Domain Command、HookSet 持久化/发布、Advanced Settings UI 或 RunEvent/BI，Phase 9 仍开放。定向 test/Clippy 使用临时解析后的 lock 通过；原始锁文件仍有既存 `objc2 0.6.3` 与 Wry `^0.6.4` 冲突，完整刷新会改动 240 个 package，未混入本阶段。使用刷新锁进行的 `cargo check --workspace --all-targets -j 4` 随后被既有 `star-desktop/src-tauri/src/main.rs` 截断占位阻断。
@@ -18,9 +18,9 @@
 > - Phase 9D-4/9D-5a/9D-5b 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；9D-5a 将原生 evaluator API 扩展为 phase-scoped v2，增加 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup，保留 v1 archive-only policy digest 兼容并拒绝 Run admission archive-only facts。9D-5b 增加条件式 Run admission producer seam：锁外 readiness/fencing，锁内最终重授权与 native Hook evaluation；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和共享 event_id 的 RunEvent；Deny 只写无 Run/Task FK 的 ledger。policy publish/rollback、Builder 和事件 coverage 共用服务端 producer capability；当前 production adapter 未装配，能力仍 false，不能宣称 Runtime spawn 已有 production Hook protection，见 §6.52。
 > - Phase 9E 更新：9E-1 Rust immutable Profile verifier、9E-2 bounded dependency resolver、9E-3 Profile Master/SCD2 + append-only Audit migration substrate 与 9E-4A Run/Profile guard migration 已交付并完成隔离 DB 验收；9E-4B1 已加入 Worktree-scoped bounded current Profile GET list/detail API 和 4 个 Rust 单测；9E-4B2 已加入 Project/Worktree Profile publish/disable/reenable/rollback 生命周期写 API 代码切片；9E-4B3 将 current verified Project/Worktree Hook policy 映射为 Profile admission 所需的 HookSet ID/version/digest；9E-4B4 明确双 Profile identity 与当前 Run writer 缺口；9E-4C1 已加入 Task Card Profile picker、request identity 与 versioned fingerprint/legacy replay 兼容；9E-4C2 已加入 Provider/Skill/GrantSet Master/SCD2 与 audit migration、reference-scoped SQL reader、Arc snapshot 传递和 final transaction fence recheck。隔离 PostgreSQL 18 与 targeted Rust 验证通过，但 catalog publisher/生产 Runtime provisioner、目标 DB/RLS grants 未部署；C3 atomic Run/resource writer 与 C4 Runtime fence 未接入，新 Run 继续 fail closed。occurrence/Loop runtime 仍开放，见 §6.54-§6.62。
 > - Phase 9E-4C5 更新：新增 `star-dto::task_run` strict fence DTO；Local Runtime 使用签名 v2 认证双 Profile fence，并提供 current-binding compare 与 nonce/fence 同事务一次性消费；WAL receipt 上限 50,000 条，过期超过 5 分钟窗口后清理。此为 Runtime consume foundation，不连接生产 ACL/authority/catalog/Reservation/OS spawn/BI；profile-bound producer capability 继续默认关闭，见 §6.65。
-> - 关联需求：docs/requirements.md v5.46 §50
-> - 关联基本设计：docs/basic-design.md v5.43 §16.1-16.22
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.30、docs/design/DD-MULTICA-TASK-001.md v1.18、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4
+> - 关联需求：docs/requirements.md v5.51 §50
+> - 关联基本设计：docs/basic-design.md v5.48 §16.1-16.23
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.34、docs/design/DD-MULTICA-TASK-001.md v1.19、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4
 
 ---
 
@@ -977,6 +977,31 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | 验证与发布状态 | 局部通过、生产门未关闭 | `cargo check -p star-api-rest --lib -j 4` 曾在临时解析 Cargo.lock 后通过，原锁已恢复，locked/reproducible build 未验证；最终 diff `git diff --check` 通过。Frontend tests/typecheck 未运行（worktree 没有 `node_modules`），SQL migration 未执行；自动化分档与缺少 Task Owner 专用 runner 见 `docs/automation-design.md` §4.38；不能宣称 UI/DB/CLI 生产闭环完成。 |
 
 本轮删除范围仅为已确认的本地 demo Task IDs 与其纯演示关联；没有数据库目标或可核实 server row 时不发出全表 DELETE。生产数据库中尚未归属的历史 Task 维持 unknown/read-only，待受审计的 reconciliation 命令处理。Run API/provider、目标 DB/RLS、真实 Run Task UI、Runtime provisioner/OS sandbox 与独立 Validation result writer 仍是 release gates。
+
+### 6.72 Run Task Cards bounded UI slice（2026-10-02）
+
+| 项目 | 实施状态 | 完成门与限制 |
+|---|---|---|
+| Run Task Cards view | 已新增条件式只读 UI | `/api/v1/engineering-runs/{engineering_run_id}/work-items` typed client 校验完整 owner tuple 与 Task Card ID alias；默认打开 Task Cards tab；只显示服务端投影，不回退 Worktree/mock；loading/error/empty/retry/pagination 已落代码。 |
+| 内存/并行约束 | 已编码有界读取 | 单页 12 项、响应上限 2 MiB、单次只保留当前页、最多 100 页；沿用 API client 2 active + 16 queued、15 秒 deadline、AbortSignal；UI route/unmount 取消请求。 |
+| CLI / 写入 | 明确禁用 | 本切片只读。即使 Task Cards API capability 开启，CLI 仍需 Runtime/OS sandbox、权限/预算 recheck、取消/恢复、独立验证和结果回写闭环。 |
+| 生产启用 | 未完成 | 根 `Providers` 未注入可信 `RunDirectoryHostSession`，RunContext `run_owned_apps_available` 与 `execution_admission_available` 均为 false，Owner migration 与目标应用角色 RLS 未验收；生产页面不会发出 Task list 请求。 |
+| 验证 | 定向通过 | 显式 `npm ci --no-audit --no-fund` 成功；`python scripts/automation/erun_task_cards.py --typecheck --tests` 的 TypeScript 0 错、Vitest 5/5 通过。Node v22.19.0 收到 jsdom 依赖要求 `^22.22.2` 的 EBADENGINE 警告，但当前两项门通过；不代表 build/E2E/生产门通过。 |
+| 前端 lockfile 修复 | 必要的验证前置修复 | 仓库原 `@react-three/fiber@9.7.0` peer 排除 React 19.3，阻断普通 `npm ci`；升至同一 v9 系列 `^9.8.1` 并重建 stale lock 后，fiber peer 包含 React 19.3，lock 中 Vite 也与 `package.json` 的 `^6.3.5` 一致。lockfile 还补齐已声明的 `monaco-editor`/Vite 根条目；此项纳入本阶段 diff，不用 `--legacy-peer-deps` 遮掩冲突。 |
+
+本阶段把 UI/client 代码交付视为可审阅的条件式切片，不等于生产可用。生产任务写入仍以 Task Owner migration、实际 host auth/session、应用身份 RLS、真实 Run data 与独立 CLI 执行闭环全部满足为前提；缺少任何一项保持 fail closed。
+
+### 6.73 旧 Tauri Task mock 退役与 fail-closed（2026-10-02）
+
+| 项目 | 实施状态 | 完成门与限制 |
+|---|---|---|
+| Tauri MockDb Task rows | 已删除 | 删除 `wi-001..wi-004` 四条 runtime WorkItem；DbAdapter 不再生成或返回本地 Task 假数据。非任务 Worktree/Canvas placeholder 不在本次删除范围。 |
+| Tauri/browser-dev fallback | 已移除 | Tauri `list_work_items` 在 canonical Run provider 未接入时返回明确不可用错误；浏览器无 Tauri IPC 时清空列表并展示错误，不再填充本地 mock。 |
+| 隔离测试数据 | 保留为测试专用 | Desktop task fixtures 改用 test-wi-* / TEST-*；主前端相关测试 fixture 中旧 demo wi-* 标识统一加 test-；Canvas E2E 改用仍存在的 el-wt-* 节点，不再假设已删除 Task 节点存在；fixture 不进入 seed、MSW 或产品投影。 |
+| 未知服务器历史 | 保持只读边界 | 不运行数据库删除，不按 ID 前缀清扫 unknown/legacy 行；既有 localStorage migration 仅按明示精确 ID 集合迁移。 |
+| 验证 | 主前端通过；Tauri focused tests 通过；全量 desktop build 未通过 | runner --typecheck --tests --desktop-tests：typecheck 通过，13 个 Vitest 文件/150 tests 通过；Tauri hook/card 8 tests 通过，BoardView fail-closed 单测 1 通过。npm run build 报告 legacy desktop 缺失 App.module.css 声明、常量未导出、Tauri 全局类型缺失等编译错误；Rust cargo/rustfmt 当前不可用，未声称 Rust crate 编译通过；Canvas E2E 未运行。 |
+
+本阶段修订 requirements AC-TASK-DATA-001/SRS AC-16 及 basic design、Group/Task detailed design，确保当前产品运行时没有已知旧演示 Task 记录；保留的测试 fixture 仅作验证数据，不能充当 Run-owned Task Card。
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1097,4 +1122,6 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | v5.63 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.48/basic v5.45/Group DD v4.32/Infrastructure DD v0.4；移除 copyleft 对应的手工自装隐性门槛，要求 provider 探测、安装引导及合规受管交付；解释硬件资源准入不是商业用量配额；纠正 K3s stable channel 为 v1.36.4+k3s1 | 用户再次明确拒绝商业使用限制并要求活跃社区 |
 | v5.64 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49/basic v5.46/Group DD v4.33；记录 Task Card canonical Run owner、Outbox 与 Run/CLI/Canvas 归属复核、精确退役 30 条旧 mock 任务和 localStorage 迁移；保留目标 DB/RLS、Run UI/provider 与实际 CLI sandbox 未完成状态 | 用户确认旧任务均为 mock 并授权删除，要求实际实现与文档保持一致 |
 | v5.65 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账实施计划 §6.71 与 Automation Design §4.38 / registry v0.2；明确 Task Owner 专用自动化与 SQL/RLS 证据仍缺，并修正 Sprint/store 测试对旧 demo ID 的残留引用；没有把未执行的数据库/frontend 验证标为通过 | 清理旧 mock Task Card 后的文档/实现复核 |
+| v5.66 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50/basic v5.47/Group DD v4.34/Task DD v1.19/SRS v0.6；新增 §6.72 记录 Run Task Cards 只读 UI/client、bounded memory/cancellation、CLI disabled 和认证/capability/DB/RLS blockers；新增 automation §4.39 与 registry v0.39；记录定向 TypeScript/5 tests 通过、Node engine 警告、React Three Fiber/lockfile 兼容修复 | 完成 Task Cards UI 代码切片并与实现/设计逐项对账 |
+| v5.67 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51/basic v5.48/Group DD v4.35/Task DD v1.20/SRS v0.7；新增 §6.73 记录删除 Tauri MockDb 四条 Task、移除 Tauri/browser fallback、Canvas E2E 转用 Worktree fixture 与 test-* 隔离；主前端 13 files/150 tests、桌面 focused tests 9 tests 通过；全量 desktop build 报告 legacy compile errors，Rust cargo unavailable，Canvas E2E 未运行；未知服务器行保留 | 用户确认旧任务全是 mock 并授权清理；全仓复查发现独立 Tauri shell 与 E2E 仍引用已退役 Task |
 | v5.60 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Group DD v4.29/Task DD v1.17；新增 §6.68，记录 CLI canonical identity、strict SQL guard、V2 fence/signature v3、attachment 门与授权 Hooks 深链，保留 Run Apps/生产依赖开放；自动化 §4.37 | 用户要求子代理/worktree 并行处理、rebase 后 merge dev，并确保文档对账 |

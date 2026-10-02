@@ -1,13 +1,8 @@
 // crates/star-desktop/src-tauri/src/lib.rs
 // =====================================================================
-// Star Desktop lib — Tauri 2.0 PoC P1 (per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)
-// 扩 IPC commands (从 PR #239 mock 1 → 5 commands):
-//   - list_work_items:       复 P0 (mock data)
-//   - list_worktree_groups:  新增 (mock 3 groups, 守门 #19 0 动 V0.1 业务 logic)
-//   - list_canvas_entities:  新增 (mock 4 entities, 守门 #19 0 动 V0.1)
-//   - get_app_version:       新增 (返回 star-desktop 版本号)
-//   - get_keyboard_layout:   新增 (返回 W/T/M swimlane 列配置)
-// 5 IPC commands 都用 mock data; P2 才接 crates/domain-board + crates/canvas-engine
+// Star Desktop — Tauri 2.0 shell (per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)
+// Task IPC fails closed until the canonical Run-scoped provider is connected.
+// Worktree and Canvas placeholder records remain separate from Task Card data.
 // =====================================================================
 // 守门:
 //   - #7 `unsafe_code = "forbid"` (workspace lint, Cargo.toml `[lints] workspace = true` 继承)
@@ -19,18 +14,23 @@
 
 pub mod db_adapter; // PR-245 新增: DB Adapter trait + MockDb impl + 8 unit tests
 pub mod ipc_adapter; // PR-241 新增: 3 adapter 子模块 (Board + Worktree + Canvas)
-use crate::db_adapter::{DbAdapter, DbAdapterError, DbCanvasEntity, DbWorkItem, DbWorktree, MockDb};
+use crate::db_adapter::{DbAdapter, DbCanvasEntity, DbWorktree, MockDb};
 use crate::ipc_adapter::{BoardAdapter, CanvasAdapter, WorktreeAdapter};
 
-/// Mock WorkItem for IPC #1 (list_work_items).
-///
-/// P2 实战: 接 crates/domain-work-item + crates/star-workflow.
+/// Run-owned WorkItem projection returned by the legacy IPC contract.
+/// The provider stays unavailable until canonical Run authentication and ownership checks are wired.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkItem {
     pub id: String,
     pub title: String,
     pub status: String,
     pub w_t_m: String,
+}
+
+/// IPC #1: list Run-owned Work Items. No demo or local fallback is permitted.
+#[tauri::command]
+fn list_work_items() -> Result<Vec<WorkItem>, String> {
+    Err("Run-scoped Task provider is not configured; Task Cards are unavailable.".to_string())
 }
 
 /// Mock WorktreeGroup for IPC #2 (list_worktree_groups).
@@ -207,7 +207,7 @@ pub fn run() {
 }
 
 // =====================================================================
-// Unit tests (5 IPC commands × 5 mock data assertions)
+// Unit tests (Tauri IPC boundary assertions)
 // =====================================================================
 
 #[cfg(test)]
@@ -215,11 +215,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn list_work_items_returns_four_mock_items() {
-        let items = list_work_items();
-        assert_eq!(items.len(), 4);
-        assert_eq!(items[0].id, "wi-001");
-        assert_eq!(items[0].w_t_m, "W");
+    fn list_work_items_fails_closed_without_run_provider() {
+        let error = list_work_items().expect_err("missing Run provider must not return demo tasks");
+        assert!(error.contains("Run-scoped Task provider is not configured"));
     }
 
     #[test]
