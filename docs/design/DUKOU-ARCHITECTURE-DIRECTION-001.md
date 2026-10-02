@@ -1,6 +1,6 @@
 # 渡口架构与交付方向
 
-> v1.0 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.2 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 >
 > 对照：requirements §50、basic-design §16、DD-WORKTREE-GROUP-001、WORKTREE-GROUP-IMPL-PLAN-001。本指引安排交付顺序，不替代既有 Phase 完成门。源码、编译、数据库与产品运行证据分别记录。
 
@@ -93,4 +93,14 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 
 每个批次先记录修改的 owner/API/存储与验收条件，完成后对比需求、基本设计、详细设计和实施计划。代码改善了设计时，同步修订所有受影响层；仅有代码时标“实现”，有编译时标“编译”，数据库/部署/真实产品闭环分别追加证据。归属迁移、授权、资源上限与 cleanup 不允许用 mock 或 UI 标签代替。
 
-本轮改进：RunContext 与 WorktreeFocus 的版本分开；目录分页增加与 keyset 顺序一致的索引；强制策略与可卸载 App 边界分开。完整工程进度见实施计划 §6.67，不宣称所有 Phase 已完成。
+本轮改进：RunContext 与 WorktreeFocus 的版本分开；CLI 采用 server-resolved directory identity、strict immutable snapshot、V2 fence/signature v3 与 attachment 再授权门；Hooks 深链绑定当前会话和已授权目录。完整进度见实施计划 §6.67/§6.68 和阶段报告，不宣称所有 Phase 已完成。
+
+下一轮先复用三层 Run authority，建立 Task→EngineeringRun 的唯一 canonical owner 与可审计历史 reconciliation，再提供 Run Task API/独立 App 和 CLI owner/focus 一致校验；Canvas owner 和跨 App 引用随后迁移。真实身份、可信 SCM/grants 写入、目标数据库/RLS 与 production Runtime/sandbox/独立验证同时推进；未满足前继续显示可解释的阻断状态。Run Task 完成门是同 Run 切换 checkout 保留同一任务、跨 Run 拒绝读写、撤权/并发/幂等可审计，并由真实 CLI 验证写回形成闭环。
+
+## 8. 本地基础设施方向
+
+增加 Rust Host Infrastructure Manager，默认只连接经许可和依赖闭包审查的外部 provider：Linux Incus、macOS Lima、远端 Linux K3s；Windows WSL2 仅兼容性 PoC，K3s 不原生支持 Windows。只接受允许不限用途商业使用的宽松许可证；核对完整发行物 SBOM/NOTICE 和近 12 个月维护证据。Multipass GPL-3.0 不进入默认支持、安装或分发方案。每 Host/environment 按需共享基础设施，Project/Run 绑定 namespace、最小权限和预算；环境管理与实际 Agent sandbox 分开验收。Hook、lease/cancel/drain、可视化设置、BI 与固定负载性能仍须逐项通过。来源/实施门见 DD-LOCAL-INFRASTRUCTURE-001 v0.2 / 实施计划 §6.69-6.70；目前仅为设计候选，未验证 SBOM/provider/RSS。
+
+## 9. 商用开源基础设施
+
+基础设施选择以渡口自身 Rust provider contract 为主，按操作系统连接外部设施并保留可替换 backend。商业产品默认组件限于宽松许可和已审查的实际二进制/镜像依赖闭包；上游活跃度按版本周期复核。Apache/MIT/BSD 仍有应保留的版权、NOTICE 与专利义务，不承诺零合规义务。当前候选为 Linux Incus 与 macOS Lima；低桌面内存路径为远端 Linux K3s。Windows WSL2/K3s 暂属兼容性验证项。实际产品支持、安装包、资源成本与任务执行均未验收。

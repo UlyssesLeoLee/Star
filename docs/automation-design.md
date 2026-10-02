@@ -1117,6 +1117,14 @@ print(f"err_count={result.stderr.count('error[')}")
 
 脚本以文件重定向后台 launcher 日志，避免 Windows server 继承 pipe 导致等待不结束；进程隐藏启动，停止成功后才清理经解析验证的自有目录。旧 Worktree migration 缺外部 `audit_trigger_func`，DDL sandbox明确使用 stand-in；不提供旧 Audit、真实角色RLS、目录写工作流、EXPLAIN或产品运行证据。首次临时集群已停止，目录删除被自动审批以 blocked by policy 拒绝，保留未重试。完整证据与缺口见 `PHASE-ERUN-DIRECTORY-P1-REPORT.md` 与实施计划 §6.67。
 
+### 4.37 Engineering Run execution identity / Hooks deep links（2026-10-02）
+
+| 任务卡 | 档位 | 脚本/brief 与执行 | 验证边界 |
+|---|---|---|---|
+| ERUN-P2 CLI / Hooks / root integration | [P] | 复用 `scripts/automation/engineering_run_directory.py`；CLI/Hook continuation 和 CLI independent review briefs 已落地，worker 使用独立 managed worktree，root scoped rebase 后串行 merge | `--task-run-ddl` 在自有 PG18 loopback cluster 验证 Phase 2C/Run prerequisites、新 migration 两次应用、legacy 保留、新 CLI NULL/不完整/超限/FK rejection；不接收生产 URL。worker 单测与 typecheck/compile 单独记录；`--rust --allow-lock-resolution --backend-only --offline --cli-tests --cargo-target-dir <owned-cache>` 显式运行定向后端 check/fence/CLI 单测并 finally 恢复原 manifest/lock，默认仍不跑 tests；summary 记录实际调用，不代报 workspace/release gate。 |
+
+Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run activity 的授权由 REST 两事务复核，production provider 在 fence consume/attachment 使用时还需实时复验。隔离 superuser DDL + 明示 legacy audit stand-in 不证明 target role RLS、生产 Audit 或正向 execution admission。完整结果、失败续做和缺口见 `PHASE-ERUN-DIRECTORY-P2-REPORT.md` / 实施计划 §6.68。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)

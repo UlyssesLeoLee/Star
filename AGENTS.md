@@ -17,6 +17,8 @@
 
 **产品导航与 Worktree 管理硬约束**：左侧主导航按 Project → 云端 Branch → Engineering Run → 该 Run 管理的本地 Worktree 展开；必须以此解决多 Agent Worktree 归属、Branch/checkout 绑定、Agent/Runtime 生命周期、锁与冲突信号分散及内部变更不可控问题。Branch 是远端分支身份，Engineering Run 是协作、任务、Canvas 与分析的 canonical 工作区；Worktree 是绑定 Branch 的本地 checkout。选择 Run 内 Worktree 才打开该 Run 的右侧 App tabs，并将其设为当前焦点/CLI checkout 目标；Inbox、Work Item/Task Card、Canvas、Workflow/LangGraph、Run BI/Benchmark 与 Plugin Apps 属于 Run，Canvas 与 Task Card 同级，CLI 从任务卡内打开。Project Worktree Index 可汇总该 Project 的跨 Branch/Run/Worktree 状态，但不得取代 Branch → Run 主导航、使用通用任务列表或本地 seed 冒充生产管理。底栏聊天保留 WORKTREE/GLOBAL scope。Multica/Jira 类任务、Canvas、Agent/LangGraph 与插件通过同一 RunContext/授权边界协同。Hook 配置必须沿用既有“高级设置 → Hooks”选项卡（与 Skills/MCP/Plugins 并列），不得成为 Worktree 树节点；选项卡必须提供 typed、无代码可视化编辑。Worktree、Run Detail 与 BI 只显示有效策略/执行结果并深链回该选项卡。
 
+**商业开源依赖硬约束**：新引入、默认支持或随产品分发的第三方组件必须允许不受用途/行业限制的商业使用；优先限于 Apache-2.0、MIT、BSD-2/3-Clause、ISC、Zlib 等宽松许可，排除 copyleft、非商业、用途限制和 source-available 条款。评估要覆盖实际构建/分发闭包中的传递依赖、二进制、安装器、容器与 guest image；只核对上游仓库主许可证不足以放行。上游社区活跃度须以近 12 个月的发布/维护证据和公开维护渠道核验。保留许可证要求的版权、NOTICE 与专利声明；未经闭包审查不得宣称适合商业分发。
+
 **多代理并行与 Rust 桌面性能硬约束**：设计必须为 Project/Worktree/Run/Agent/Plugin 定义资源预算、公平调度、有界队列、背压、取消与 drain；Rust 桌面前端必须采用分页/虚拟化、按需加载和有界缓存，避免 UI 阻塞及无界日志驻留。Pi 仅作为小核心、组合扩展、事件生命周期、可分支历史与上下文压缩的设计参考；产品执行核心与性能敏感桌面界面以 Rust 实现，不引入 Pi/Node 运行时替代实现。Agent、Memory、Skill、Context、Validation、Loop 与项目工程规范必须提供版本化扩展契约，Run 固定 profile/version/digest 与资源预算；第一期可用受控 Rust CLI adapter 调用现有工具，但权限、scope、上下文组装、事件/证据记录与独立验证由 Star 控制，并保留后续 Rust-native provider 替换路径。插件必须有版本化 capability 边界和隔离运行时，禁止在主进程加载任意 native code。
 
 **原生 Hook 强约束**：安全关键 Hook 必须由 Rust 核心原生执行，fail-closed 且不可被插件替代或减弱；Project/Worktree 继承、Run 快照、生命周期门与 BI 事件使用同一版本化 HookSet 契约。旧 Python Hook handler 仅可作为显式非权威的兼容/观测输入，不得参与授权、命令放行或验收决策。

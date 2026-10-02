@@ -10,6 +10,8 @@
 
 ## 0. 索引说明
 
+新增 ERUN-P2：[P] 复用 `engineering_run_directory.py --task-run-ddl`，automation-design §4.37 / 实施计划 §6.68；仅自有 disposable cluster 的 forward identity/shape/FK guard 验证。独立 worktree 的 CLI/Hook 与审阅 briefs、compile/tests/typecheck 结果见 `PHASE-ERUN-DIRECTORY-P2-REPORT.md`；生产身份/Run Apps/Runtime 仍开放。
+
 新增 ERUN-P1：[P] `scripts/automation/engineering_run_directory.py`，调用方 `docs/automation-design.md §4.36` / `WORKTREE-GROUP-IMPL-PLAN-001 §6.67`。定向 Rust compile、frontend typecheck、仅 disposable loopback PostgreSQL DDL/catalog验证；临时依赖解析可选且恢复原lock；不跑tests/生产migration。状态为目录基础实现，生产身份/SCM ingest/运行验收待完成；证据见 `docs/reports/PHASE-ERUN-DIRECTORY-P1-REPORT.md`。
 
 本索引跟踪 `scripts/automation/` 下所有 python 脚本的:
@@ -29,7 +31,7 @@
 
 | 脚本路径 | 用途 | 调用方 | 末次 commit | 状态 |
 |---|---|---|---|---|
-| `scripts/automation/engineering_run_directory.py` | 定向compile/typecheck与隔离PostgreSQL目录DDL/catalog；不跑tests或生产migration | ERUN-P1；automation-design §4.36 | 本次提交（见Git） | 🟡 目录基础已检查；生产运行门未完成 |
+| `scripts/automation/engineering_run_directory.py` | 定向compile/typecheck与隔离PostgreSQL目录DDL/catalog、可选 TaskRun identity/shape/FK guard；仅 --cli-tests 显式跑定向单测，可选 backend-only finally恢复manifest/lock；不跑生产migration | ERUN-P1/P2；automation-design §4.36/4.37 | 本次提交（见Git） | 🟡 目录基础已检查；生产运行门未完成 |
 | `scripts/automation/__init__.py` | 包初始化, 暴露 4 基类 + CLI | 全部 | TBD | 🟢 完成 |
 | `scripts/automation/dispatcher.py` | 子代理 dispatch 基类 (per §3.1 + §6.1) | H2-1/H2-2/H2-3/H2-4/H2-5 (refactor_template 调用) | TBD | 🟡 stub (invoke / verify / collect_output 待对接 Mavis task 调度) |
 | `scripts/automation/cli_helper/__init__.py` | cli_helper 子包初始化 | 全部 | TBD | 🟢 完成 |

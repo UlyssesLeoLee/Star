@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.59**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v5.61**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -18,9 +18,9 @@
 > - Phase 9D-4/9D-5a/9D-5b 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；9D-5a 将原生 evaluator API 扩展为 phase-scoped v2，增加 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup，保留 v1 archive-only policy digest 兼容并拒绝 Run admission archive-only facts。9D-5b 增加条件式 Run admission producer seam：锁外 readiness/fencing，锁内最终重授权与 native Hook evaluation；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和共享 event_id 的 RunEvent；Deny 只写无 Run/Task FK 的 ledger。policy publish/rollback、Builder 和事件 coverage 共用服务端 producer capability；当前 production adapter 未装配，能力仍 false，不能宣称 Runtime spawn 已有 production Hook protection，见 §6.52。
 > - Phase 9E 更新：9E-1 Rust immutable Profile verifier、9E-2 bounded dependency resolver、9E-3 Profile Master/SCD2 + append-only Audit migration substrate 与 9E-4A Run/Profile guard migration 已交付并完成隔离 DB 验收；9E-4B1 已加入 Worktree-scoped bounded current Profile GET list/detail API 和 4 个 Rust 单测；9E-4B2 已加入 Project/Worktree Profile publish/disable/reenable/rollback 生命周期写 API 代码切片；9E-4B3 将 current verified Project/Worktree Hook policy 映射为 Profile admission 所需的 HookSet ID/version/digest；9E-4B4 明确双 Profile identity 与当前 Run writer 缺口；9E-4C1 已加入 Task Card Profile picker、request identity 与 versioned fingerprint/legacy replay 兼容；9E-4C2 已加入 Provider/Skill/GrantSet Master/SCD2 与 audit migration、reference-scoped SQL reader、Arc snapshot 传递和 final transaction fence recheck。隔离 PostgreSQL 18 与 targeted Rust 验证通过，但 catalog publisher/生产 Runtime provisioner、目标 DB/RLS grants 未部署；C3 atomic Run/resource writer 与 C4 Runtime fence 未接入，新 Run 继续 fail closed。occurrence/Loop runtime 仍开放，见 §6.54-§6.62。
 > - Phase 9E-4C5 更新：新增 `star-dto::task_run` strict fence DTO；Local Runtime 使用签名 v2 认证双 Profile fence，并提供 current-binding compare 与 nonce/fence 同事务一次性消费；WAL receipt 上限 50,000 条，过期超过 5 分钟窗口后清理。此为 Runtime consume foundation，不连接生产 ACL/authority/catalog/Reservation/OS spawn/BI；profile-bound producer capability 继续默认关闭，见 §6.65。
-> - 关联需求：docs/requirements.md v5.44 §50
-> - 关联基本设计：docs/basic-design.md v5.41 §16.1-16.19
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.28、docs/design/DD-MULTICA-TASK-001.md v1.16、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4
+> - 关联需求：docs/requirements.md v5.46 §50
+> - 关联基本设计：docs/basic-design.md v5.43 §16.1-16.22
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.30、docs/design/DD-MULTICA-TASK-001.md v1.18、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4
 
 ---
 
@@ -943,6 +943,29 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 本阶段未新增/执行tests或浏览器/桌面运行验收。默认locked Cargo check发现现有锁文件需重新解析；临时允许解析的定向check通过并恢复原lock，不能作为committed lock可复现证据。schema/nav worker各有独立checkout，root串行审阅/cherry-pick；不使用dispatcher stub status冒充执行成功。
 
+### 6.68 ERUN-P2 CLI identity / authorized Hooks deep link（2026-10-02）
+
+| 项目 | 实施状态 | 完成门与限制 |
+|---|---|---|
+| CLI directory identity | 两事务 server resolution 与 immutable TaskExecutionRun snapshot | Project/Repository/Branch/EngineeringRun/Worktree/Task、三层 writer grants/revisions、分支与 binding exact-match；REST 不接受浏览器 Run authority；replay 不猜 legacy NULL。 |
+| shared Runtime fence | V2 DTO/digest 与 fenced grant signature v3 | 完整 current identity 参与 compare/consume 与 prepared envelope；v1 无 fence legacy grant 解码保留；不提供 production authority 或 OS spawn。 |
+| persistence forward gate | additive columns、复合 FK、strict 25-field snapshot 与 INSERT-only CLI gate | 现存 NULL/非 CLI 记录保留；新 CLI NULL、缺键/未知键/错型/超限/错 tuple/FK 拒绝；不伪造 backfill，不把证据 FK 当物理 checkout 生命周期。 |
+| attachment authorization | stored/current identity 再授权边界 | 签发前以 server receipt 唯一定位 TaskExecutionRun、重查 current directory/grants；status/cancel 保留授权后的 cleanup；production adapter 在使用时须重验，不提前开启能力。 |
+| Hooks advanced tab | authorized Project/Worktree hint 与 session-safe 异步 UI | 每页≤200、≤20页；非法/越界/不完整/失败阻断；显式清除 hint，digest/write generation 复验，旧事件隐藏；不宣称已发 HTTP transport abort。 |
+| 验证 | 源码独立第二意见、定向 compile/test、disposable DDL | 精确结果见 PHASE-ERUN-DIRECTORY-P2-REPORT；编译、单测、隔离 SQL、目标环境与生产闭环分别计，不由契约推导运行成功。 |
+| 下一阶段 | 仍开放 | Run authority application port→canonical Task owner SCD2/reconciliation→Run Task read/write/API/UI→CLI owner/focus 一致门→Canvas Run owner/EntityRef→Outbox/Inbox。Task source 仍是旧 Project/Worktree owner；宿主身份/SCM ingest/grants、目标 DB、可信 Runtime/sandbox、独立验证写回未完成。 |
+
+两条 worker lane 使用独立 managed worktree；root 串行审阅、将各 lane 自已交付的 commit scoped rebase 到 dev 后 merge。远端历史调整时不能重放已交付旧链；不触碰用户其他 checkout/index。自动化复用 engineering_run_directory.py，§4.37/registry 记录；CodeRabbit 不可执行时不得代报审阅成功。
+
+### 6.69 Rust Infrastructure / k3s 配套阶段（2026-10-02）
+
+按 DD-LOCAL-INFRASTRUCTURE-001 v0.2 实施 INFRA-1 许可证白名单/SBOM/活跃度/provider/profile/binding+真实 discover → INFRA-2 用户自有 Linux provider 生命周期/readiness（Windows WSL2 仅 PoC）→ INFRA-3 Run namespace/least-privilege/quota/Runtime 接线 → INFRA-4 macOS Lima/Linux Incus/remote cluster adapters、idle/drain/恢复/升级回滚 → INFRA-5 商用分发闭包、固定负载 RSS/p95/并行/故障验收。默认按需共享 environment；VM/cluster 不随 Worktree 数复制。K3s readiness 与安全 Agent 执行是不同门。
+
+本轮为官方源核对与三层设计更新，未安装或运行 VM/k3s，也未验证 provider 实际依赖闭包、adapter、DB/RLS、Hook 和 RSS。需要对发行包、guest image、linked dependencies 做逐版本 SBOM；Windows K3s 原生支持不存在，Multipass GPL-3.0 排除默认安装/支持/分发，Cloud Hypervisor 仅作 Linux PoC。追踪 AC-INFRA-001，保留既有 Phase 完成定义和真实 CLI 闭环/Phase 12 性能门。
+
+### 6.70 宽松许可 provider 准入与社区维护门（2026-10-02）
+
+每版本锁定上游、digest、SPDX、依赖闭包 SBOM、NOTICE 和近 12 个月维护证据；不满足许可/活跃度门即阻止新准入和产品打包。Linux Incus 与 macOS Lima 作为外部 provider 候选；用户自有/远端 K3s 为 Linux 环境，Windows WSL2 限兼容 PoC。此阶段仍是设计/调查项；provider 接入前需为跨平台安装、恢复、取消、Run binding 和 Runtime sandbox 另立有证据的验收。
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1058,3 +1081,5 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | v5.57 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 按实现对照 requirements v5.42 §50 AC-AEC-019、basic design v5.39 §16.18、Group DD v4.26 与本计划 §6.65：双 Profile fence DTO、v2/legacy v1 签名、SQLite nonce/fence 原子消费、容量/TTL 与生产 fail-closed 边界一致；修正本计划当前详细设计指针和 Phase 0 表格的 v4.25 过期引用。保留 v5.56 历史记录，不把本次同步记作新的 Runtime 功能 | 用户要求每轮实施后与文档对照，并在实现优于设计时同步更新文档 |
 | v5.58 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 requirements/basic/Group DD 引用至 v5.43/v5.40/v4.27；按 WTG-020 与实际 Sidebar 对照，新增 Project scope → 授权 Worktree Index 深链、移除固定 repository ID 的旧 Worktree 卡片；记录导航测试 9/9 与 typecheck 通过；纠正 Phase 1 状态为仍未具备 Branch/Run 主树和权威目录，不将 Index 链接误报成 Run Shell | 用户要求代码改进必须与需求、基本设计、详细设计和实施状态同步核对 |
 | v5.59 | 2026-10-02 | Ulysses（一人公司12角色 per DEC-008）— Mavis接手审核 | requirements v5.44/basic v5.41/Group DD v4.28；新增§6.67 canonical目录基础，分别记录compile/DDL/前端与生产完成门；综合方向指引和自动化§4.36 | Phase 1目录与RunContext实现、独立review改善 |
+| v5.61 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.46/basic v5.43/Group DD v4.30 与 DD-LOCAL-INFRASTRUCTURE v0.2；新增 §6.70 商用宽松许可证闭包 SBOM/NOTICE 与活跃社区准入，调整 Linux Incus/macOS Lima/远端 K3s/WSL2 PoC 顺序并排除 Multipass GPL 默认支持；当前仍未安装 provider | 用户明确拒绝商业用途/许可限制，要求社区活跃开源方案 |
+| v5.60 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Group DD v4.29/Task DD v1.17；新增 §6.68，记录 CLI canonical identity、strict SQL guard、V2 fence/signature v3、attachment 门与授权 Hooks 深链，保留 Run Apps/生产依赖开放；自动化 §4.37 | 用户要求子代理/worktree 并行处理、rebase 后 merge dev，并确保文档对账 |

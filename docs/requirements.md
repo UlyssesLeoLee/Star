@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.44）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.46）
 
 ## 0. 文档说明与前提
 
@@ -2474,6 +2474,8 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-ERUN-001 | Project → Branch → Engineering Run → Worktree 主导航保持身份与深链；点击 Run Worktree 后才加载所属 Run tabs，Worktree 只设 focus/CLI target；右侧 Task/Canvas/BI 数据按 Run 授权 | P0 |
 | AC-ERUN-002 | Run Context/API 对每个实体域复验 membership 与 capability；跨域命令调用 owner API，同 owner DB 事务使用 Outbox，消费者经 Inbox 幂等去重；前端不能跨域表写入或直接使用 stored procedure | P0 |
 | AC-ERUN-003 | 同一 Run 切换 Worktree 时 RunContext/context_version 保持 owner 与授权身份，workspace/checkout/binding version 在独立 focus/focus_version 中改变；撤销 Project、Branch 或 Run 任一 grant 后再次解析拒绝；列表不泄露路径，不自动选择首个 checkout | P0 |
+| AC-INFRA-001 | 增加 Rust-native Infrastructure Manager 与 versioned backend/profile/binding 契约，为 k3s 提供受控 discover/provision/readiness/start/stop/drain/upgrade；默认按 Host/environment 共享按需基础设施、Project/Run 分配 namespace/权限/预算，不按每个 Worktree/Agent 复制 VM/控制面。冻结组件/guest image 版本与商用许可/SBOM，WSL2/Lima/native/existing cluster 分平台验收；native Hook、租约/CAS、操作幂等和 BI 证据与现有体系一致。Namespace 不独自构成不可信 Agent sandbox，缺 execution capability 仍禁用；不得静默改变用户全局 WSL 配置或回收他人环境 | P0 |
+| AC-ERUN-004 | 新 CLI TaskExecutionRun 的 EngineeringRun 身份由服务端反查当前 Worktree binding，复验 Project/Branch/Run writer grants、当前 revisions、checkout 分支及 Task 关联；在准入短事务中再次核验完整快照，持久化独立 EngineeringRun ID 与精确 tuple，并绑定 V2 Runtime fence。旧无归属记录保留只读，不能猜回填或重复启动；新 CLI NULL 身份写入、snapshot 错配/超限、跨 scope FK 与 binding/grant 变化必须拒绝。CLI attachment 签发也须复核当前三层授权与该 Session 对应的已存身份；status/cancel 保留授权后的安全清理语义。Task 本身的 Run ownership、生产 provisioner/OS sandbox 与执行结果闭环另行验收 | P0 |
 | AC-EVENT-001 | 当前领域事件基线为 PostgreSQL SoR + Transactional Outbox + NATS JetStream；Kafka/Fluvio 不在运行依赖；新增 broker 前需经 ADR 和同 workload 的保留/回放/资源/恢复基准 | P1 |
 
 ### 50.8A 多 Agent 并行、资源预算与 Rust 桌面性能
@@ -2604,7 +2606,7 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AC-AEC-016 | 目录快照只含所选 Profile 引用且满足 Provider ≤5、Skill ≤128、估算载荷 ≤1 MiB；Skill capability labels 载入 Rust heap 前执行 ≤384 KiB 数据库聚合预算；Fence 精确绑定 tenant/Project/Worktree、Profile ID/version/digest、Provider/Skill revision 与 GrantSet ID/version，TTL ≤5 秒；最终事务剩余 <1 秒、revision drift、Scope mismatch、失效或权威 adapter 缺失时拒绝 admission 且无 Run/spawn |
 | AC-AEC-017 | C3 最终 REPEATABLE READ admission 必须先原子写入 Project allocation epoch，再读取配额和跨该 Project 全部 Worktree 的 pending/active reservation；并发写冲突必须 fail closed，不能以旧快照超额预留。每 Run 的 RSS/CPU/runtime/process/tool/provider/output/event-buffer maxima 与 Project 聚合的 active-run/RSS/process/tool/provider/output/event-buffer ceilings 均通过后，Run 的 Profile/ResourceBudget/Loop snapshot、pending reservation、reservation ledger 与共享 `event_id` 的 RunEvent 在同一事务提交；任何缺配额、过期 fence、revision/scope drift、容量不足或写入失败均不建 Run、不 spawn。相同 idempotency replay 不得重复 reservation；Runtime activate/release 与实时 BI 未接通前，producer capability 继续默认关闭 |
 | AC-AEC-018 | C4 的 typed one-time Runtime fence 必须将用户请求 fingerprint 与 tenant/actor/Project/repository/Worktree/Task/Runtime/lifecycle、Approved Launch Profile 与 AgentExecutionProfile 的当前 ID/version/digest、catalog revisions、effective HookSet 和 ResourceBudget 绑定进 domain-separated digest；Run 保存两份 Profile identity 与绑定 digest，不持久化 opaque fence ID。Runtime 在 process create 前重验当前 ACL/scope/version/catalog/HookSet/budget 并原子消费一次，随后同步 reservation lifecycle；缺失/错绑/过期/重放或消费、reservation transition 失败均 fail closed。Run list/detail 投影两类 Profile identity；production consumer/部署未完成前 capability 保持关闭 |
-| AC-AEC-019 | C5 Runtime consume foundation 必须在共享 `star-dto::task_run` 提供拒绝未知字段、定长 digest 校验的 bounded fence DTO；签名 v2 在序列化/哈希前先校验字段与 digest 长度，legacy CLI consumer 必须拒绝携带 fence 的 grant，只有 dedicated profile-bound consumer 可继续。Runtime 在消费前将 grant/fence 与刚重读的当前完整双 Profile、scope/lifecycle、catalog、HookSet 和 ResourceBudget binding 逐字段比较并重算 digest；在同一个 durable transaction 中一次性消费 grant nonce 与 fence ID，重复、过期、错绑、容量耗尽或 store 故障均拒绝且不能 spawn。Fence receipt store 有界（最多保留 50,000 条，过期 5 分钟偏差窗口后清理），catalog entries 不复制入 fence。此基础 helper 不替代实时 ACL、reservation lifecycle、生产 Provider/OS spawn 与 BI；这些 adapter 安装并通过验收前 producer capability 保持关闭 | P0 |
+| AC-AEC-019 | C5 Runtime consume foundation 必须在共享 `star-dto::task_run` 提供拒绝未知字段、定长 digest 校验的 bounded fence DTO；ERUN-P2 带 V2 directory fence 的 grant 使用签名 v3（C5 基线为 v2），在序列化/哈希前先校验字段与 digest 长度，legacy CLI consumer 必须拒绝携带 fence 的 grant，只有 dedicated profile-bound consumer 可继续。Runtime 在消费前将 grant/fence 与刚重读的当前完整双 Profile、scope/lifecycle、catalog、HookSet 和 ResourceBudget binding 逐字段比较并重算 digest；在同一个 durable transaction 中一次性消费 grant nonce 与 fence ID，重复、过期、错绑、容量耗尽或 store 故障均拒绝且不能 spawn。Fence receipt store 有界（最多保留 50,000 条，过期 5 分钟偏差窗口后清理），catalog entries 不复制入 fence。此基础 helper 不替代实时 ACL、reservation lifecycle、生产 Provider/OS spawn 与 BI；这些 adapter 安装并通过验收前 producer capability 保持关闭 | P0 |
 
 Phase 9E-4B1 增加 Worktree-scoped current Profile 只读 API：列表默认 20、上限 50、使用 UUID keyset cursor 且只返回 profile metadata；详情重新运行 Rust decode/digest/schema/scope verifier；两类响应均 `no-store`。Phase 9E-4B2 增加 Project/Worktree Profile 生命周期写 API：采用有界 tagged typed request、`execution-profile:publish` 与当前 Project admin membership；expected-current-version CAS 后，以同一短事务关闭 current revision、插入新 SCD2 revision 和 append-only Audit。Publish、disable、reenable、rollback 均通过 successor 表达；rollback 重用已验证的历史 document 并创建新的 active revision。请求最多 67,584 bytes，响应仅返回小型 receipt 且禁止缓存。API 不解析当前 Provider/Skill/Grant、不创建 Run、不预约资源。目标 DB/RLS/grants、真实 Auth Provider、Run writer 和资源 admission 仍开放；恢复或创建 Run 仍需外层重新完成 actor ACL/GroupContext 授权。9E-4B4 另要求 CLI approved launch profile 与 AgentExecutionProfile 分开绑定，当前接口尚未承载 AgentExecutionProfile identity。验收以 AC-AEC-011/012/013/014/015/016 为准。ULYS-235 Hooks 仍为 Settings“高级设置”内容区与 Skills/MCP/Plugins 并列标签。
 
@@ -2636,7 +2638,7 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 
 | 验收 ID | 受入基准 |
 |---|---|
-| AC-HOOK-001 | Settings 主导航中的“高级设置”作为父入口，规范路由为 `/settings/advanced`；Hooks 规范路由为 `/settings/advanced/hooks`，位于该页内容区并与 Skills/MCP/Plugins 并列，不是独立主导航项或 Worktree 节点；Hooks 可用可视化表单创建、比较、模拟、审批和回滚 typed rule，普通规则配置无须写代码，无法输入可执行脚本/native code |
+| AC-HOOK-001 | Settings 主导航中的“高级设置”作为父入口，规范路由为 `/settings/advanced`；Hooks 规范路由为 `/settings/advanced/hooks`，位于该页内容区并与 Skills/MCP/Plugins 并列；可视化表单创建、比较、模拟、审批和回滚 typed rule，无须写代码。Run 深链中的 Project/Worktree 仅作 hint，必须经当前会话授权目录确认；pending/非法/越界/目录不完整/会话替换时关闭策略、事件读取和写操作，不静默切到其他项目；用户可显式清除 hint 后手动选择。深链不授予权限，不进入策略写 body |
 | AC-HOOK-002 | Project 基线与 Worktree policy 合并后只能等强或更严格；Run 和 Worktree 命令可回看命中的版本、规则、decision 与理由 |
 | AC-HOOK-003 | Hook 缺失、超时、版本不兼容或 audit 无法持久化时，关键 Run/tool/Worktree cleanup 命令阻断；非关键通知任务可按有界重试重放 |
 | AC-HOOK-004 | 过期 lock observation、活跃 Run/Agent lease/file claim/子进程阻止 Worktree archive/cleanup；drain + 新鲜重检后才允许继续，重复请求不重复执行 |
@@ -2676,6 +2678,12 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 **选择结论**：Star 仓库当前没有 Kafka 或 Fluvio runtime dependency/deployment；当前方案是 PostgreSQL SoR + Transactional Outbox + NATS JetStream。现阶段继续用 NATS，不叠加第二套 broker。若未来经 SLO 与同负载基准确认必须在 Kafka/Fluvio 中选一个生产平台，优先选择 Kafka，理由是 Connect/Streams 与集成生态更贴合 Run BI/Benchmark 的外部数据接入和历史分析需求；接受其额外运维/内存成本，并只采用包含 Kafka 4.3.1 修复的版本。Fluvio 保留为资源敏感、Rust/Kubernetes 形态下的受限候选；只有 RSS/CPU/恢复实测明显占优且 release/support、connector 和托管能力达标才反转选择。基准须固定事件集、保留时长、吞吐、消费组数、consumer lag、故障恢复和部署资源，测峰值 RSS/CPU/存储与恢复时间，记录 workload/coverage。迁移只发生在 Outbox 后的 analytics/projection consumer，不改变 PostgreSQL SoR、owner API、Inbox 去重或事务写入边界。
 
 资料（官方，核对日期 2026-10-01）：[Kafka 4.3 API 与 Connect/Streams](https://kafka.apache.org/43/apis/)、[Kafka Streams 4.3 升级说明及 4.3.1 native-memory 修复](https://kafka.apache.org/43/streams/upgrade-guide/)、[Fluvio 0.17.2 架构/资源说明](https://www.fluvio.io/docs/0.17.2/fluvio/overview/)、[Fluvio 官方 release 状态](https://github.com/fluvio-community/fluvio/releases)。
+
+### 50.8G 商业开源基础设施与许可证标准
+
+Rust Host Infrastructure Manager 默认支持或随产品分发的组件必须允许商业使用、修改和再分发，不得附加用途或行业限制；默认许可限于 Apache-2.0、MIT、BSD-2/3-Clause、ISC、Zlib 等 OSI 宽松许可证。排除 copyleft、非商业、field-of-use、source-available 和额外商业限制组件作为内置 provider、安装器、容器/guest image 或分发依赖。每个版本检查实际构建/打包闭包的 SPDX/SBOM，不能只凭上游仓库根许可证放行；按适用许可证保留版权、NOTICE 与专利声明。
+
+社区活跃度以评估日前 12 个月的维护提交或正式发布、公开维护/安全渠道、明确维护者与升级策略复核。平台候选为 Linux Incus、macOS Lima 与用户自有/远端 Linux K3s；Windows WSL2 仅属兼容 PoC，K3s 不原生支持 Windows。Multipass GPL-3.0 虽允许商业使用，但不符合渡口默认组件的宽松许可政策，因此排除默认支持、安装、分发及核心架构依赖。候选来源、许可证和未验证范围见 DD-LOCAL-INFRASTRUCTURE-001 v0.2。
 
 ### 50.9 追溯与后续专题同步
 
@@ -2761,3 +2769,5 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.42 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project → Cloud Branch → Engineering Run → Worktree 主导航和 Run-owned tabs/BI/Benchmark；Project Worktree Index 限定为 aggregate 管理视图；补充 owner API、同域存储过程、Outbox/Inbox、Rust 桌面资源边界与 NATS/Kafka/Fluvio 选择门；新增 AC-ERUN-001/002、AC-EVENT-001；明确未迁移 Run schema/API 仍保持未完成 | 用户澄清 Branch/Run/Worktree 层级并要求服务原子解耦及 Kafka/Fluvio 评估 |
 | v5.43 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 WTG-020：Project 导航提供 Worktree Index 入口；本地 selected project 只能作为深链提示，目标页必须重新读取 membership 并授权，不能使用固定 Repository/Worktree ID 或 seed 填充导航；保留 Cloud Branch/Engineering Run 权威目录未实现的状态 | 移除 Project 侧栏中指向固定 repository ID 的旧 Worktree 卡片，并提供授权 Index 链接 |
 | v5.44 | 2026-10-02 | Ulysses（一人公司12角色 per DEC-008）— Mavis接手审核 | WTG-021/AC-ERUN-003：可信Branch/Run目录、三层current grant、owner/focus版本分离与有界懒树；同步方向指引与实际未完成门 | canonical目录与导航基础实施、独立源码review改进 |
+| v5.46 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §50.8G 商用宽松许可和活跃社区准入门，明确 Incus/Lima/K3s/WSL2/Multipass 边界及实际分发依赖 SBOM/NOTICE 检查 | 用户明确要求不限用途商用且社区活跃的开源方案 |
+| v5.45 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 AC-ERUN-004：server-resolved directory identity、两事务重验、V2 fence/signature v3、严格完整快照与新 CLI NULL guard、attachment 再授权；扩展 AC-HOOK-001 的会话授权深链和有界查找 | 独立 worktree 并行实现 CLI 身份与 Hooks 深链、源码第二意见修正 |
