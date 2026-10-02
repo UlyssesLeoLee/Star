@@ -49,9 +49,9 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{
-    authorize_worktree, idempotency_key, load_work_item, lookup_idempotency, parse_id,
-    request_hash, require_task_writer, save_idempotency, validate_ai_task_scope,
-    validate_create_body, AiTaskData, CreateWorkItemBody, WorktreeScope,
+    authorize_task_run_for_worktree, authorize_worktree, idempotency_key, load_work_item,
+    lookup_idempotency, parse_id, request_hash, require_task_writer, save_idempotency,
+    validate_ai_task_scope, validate_create_body, AiTaskData, CreateWorkItemBody, WorktreeScope,
 };
 use super::{
     active_binding, require_scope, validate_actor, AuthUser, AuthenticatedUser, GroupApiError,
@@ -425,6 +425,7 @@ async fn create_work_item_on_canvas(
 
     let (mut tx, scope) =
         authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let run_scope = authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &scope).await?;
     validate_ai_task_scope(&item_for_validation, scope.repo_id)?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
@@ -435,15 +436,24 @@ async fn create_work_item_on_canvas(
     let work_item_id = Uuid::new_v4();
     let element_id = Uuid::new_v4();
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    sqlx::query("SELECT set_config('app.correlation_id', $1, true)")
+        .bind(correlation_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     sqlx::query(
         r#"INSERT INTO multica.task_metadata
-           (work_item_id,tenant_id,workspace_id,project_id,item_type,title,description,priority,labels,ai_task_data,reporter_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"#,
+           (work_item_id,tenant_id,workspace_id,project_id,repository_id,branch_id,engineering_run_id,
+            item_type,title,description,priority,labels,ai_task_data,reporter_user_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)"#,
     )
     .bind(work_item_id)
     .bind(actor.tenant_id)
     .bind(scope.workspace_id)
     .bind(scope.project_id)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
     .bind(&body.item_type)
     .bind(body.title.trim())
     .bind(&body.description)
@@ -1540,9 +1550,16 @@ async fn authorize_group_scope<'a>(
 ) -> Result<(Transaction<'a, Postgres>, WorktreeScope), GroupApiError> {
     let mut tx = pool.begin().await.map_err(|_| GroupApiError::internal())?;
     let scope = authorize_worktree(&mut tx, actor, worktree_id).await?;
+    sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+        .bind(actor.user_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     let binding = active_binding(&mut tx, actor, scope.project_id).await?;
+    let run_scope = authorize_task_run_for_worktree(&mut tx, actor, worktree_id, &scope).await?;
     if write {
         require_task_writer(&binding.role)?;
+        require_task_writer(&run_scope.role)?;
     }
     sqlx::query("SELECT set_config('app.worktree_id', $1, true)")
         .bind(worktree_id.to_string())

@@ -55,14 +55,38 @@ vi.mock("next/navigation", () => ({
 // 引入真实 store 即可, store 是单例 zustand; 我们 reset 状态
 import { useStore } from "@/lib/store";
 import * as seed from "@/lib/seed";
+import type { WorkItem } from "@/types/ids";
+
+const testWorkItems: WorkItem[] = [{
+  id: "test-wi-001",
+  tenant_id: "test-tenant",
+  project_id: "test-project",
+  key: "TEST-1",
+  title: "Test issue",
+  description: "",
+  kind: "task",
+  status: "todo",
+  priority: "p2",
+  reporter_id: "test-user",
+  labels: [],
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+}];
+const testBoard = {
+  ...seed.board,
+  columns: seed.board.columns.map((column) => ({
+    ...column,
+    work_item_ids: testWorkItems.filter((item) => item.status === column.status).map((item) => item.id),
+  })),
+};
 
 const resetStore = () => {
   if (typeof window !== "undefined") {
     window.localStorage.clear();
   }
   useStore.setState({
-    workItems: seed.workItems,
-    board: seed.board,
+    workItems: testWorkItems,
+    board: testBoard,
     sprints: seed.sprints,
     identities: seed.identities,
   } as any);
@@ -168,8 +192,8 @@ describe("IssuesPage (U2)", () => {
     // 默认 detail sidebar 不在
     expect(screen.queryByTestId("issues-detail-sidebar")).toBeNull();
 
-    // 点击第一行 (wi-001 在 todo 列, 应该出现在 list 中)
-    const row = screen.getByTestId("issues-list-row-wi-001");
+    // 点击第一行 (test-wi-001 在 todo 列, 应该出现在 list 中)
+    const row = screen.getByTestId("issues-list-row-test-wi-001");
     fireEvent.click(row);
 
     // 详情侧栏出现 + 含 transition 按钮

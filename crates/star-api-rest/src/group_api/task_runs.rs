@@ -55,6 +55,8 @@ struct TaskRunListQuery {
 struct TaskRunScope {
     project_id: Uuid,
     repository_id: Uuid,
+    branch_id: Uuid,
+    engineering_run_id: Uuid,
 }
 
 #[derive(Debug, FromRow)]
@@ -201,15 +203,19 @@ async fn list_task_runs(
                started_at, correlation_id
         FROM multica.task_execution_run r
         WHERE tenant_id = $1 AND project_id = $2 AND worktree_id = $3 AND work_item_id = $4
-          AND ($5::timestamptz IS NULL OR (started_at, run_id) < ($5, $6::uuid))
+          AND repository_id = $5 AND branch_id = $6 AND engineering_run_id = $7
+          AND ($8::timestamptz IS NULL OR (started_at, run_id) < ($8, $9::uuid))
         ORDER BY started_at DESC, run_id DESC
-        LIMIT $7
+        LIMIT $10
         "#,
     )
     .bind(actor.tenant_id)
     .bind(scope.project_id)
     .bind(worktree_id)
     .bind(work_item_id)
+    .bind(scope.repository_id)
+    .bind(scope.branch_id)
+    .bind(scope.engineering_run_id)
     .bind(cursor.as_ref().map(|(started_at, _)| *started_at))
     .bind(cursor.as_ref().map(|(_, run_id)| *run_id))
     .bind(limit + 1)
@@ -289,7 +295,8 @@ async fn get_task_run_detail(
                started_at, correlation_id
         FROM multica.task_execution_run r
         WHERE tenant_id = $1 AND project_id = $2 AND worktree_id = $3
-          AND work_item_id = $4 AND run_id = $5
+          AND work_item_id = $4 AND run_id = $5 AND repository_id = $6
+          AND branch_id = $7 AND engineering_run_id = $8
         "#,
     )
     .bind(actor.tenant_id)
@@ -297,6 +304,9 @@ async fn get_task_run_detail(
     .bind(worktree_id)
     .bind(work_item_id)
     .bind(run_id)
+    .bind(scope.repository_id)
+    .bind(scope.branch_id)
+    .bind(scope.engineering_run_id)
     .fetch_optional(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?
@@ -376,47 +386,37 @@ async fn authorize_task_run_scope(
 ) -> Result<(TaskRunScope, super::ProjectBinding), GroupApiError> {
     let scope = sqlx::query_as::<_, TaskRunScope>(
         r#"
-        SELECT p.project_id, w.repo_id AS repository_id
+        SELECT p.project_id, w.repo_id AS repository_id, b.branch_id, b.engineering_run_id
         FROM worktree_canvas_worktree w
         JOIN multica.worktree_project_binding p
           ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
          AND p.project_id = w.project_id AND p.valid_to IS NULL
+        JOIN multica.engineering_run_worktree_binding b
+          ON b.tenant_id = w.tenant_id AND b.project_id = p.project_id
+         AND b.repository_id = w.repo_id AND b.worktree_id = w.id
+         AND b.project_binding_id = p.binding_id
+         AND b.valid_from <= now() AND b.valid_to IS NULL
+        JOIN multica.task_metadata m
+          ON m.tenant_id = b.tenant_id AND m.project_id = b.project_id
+         AND m.work_item_id = $3 AND m.valid_from <= now() AND m.valid_to IS NULL
+         AND m.repository_id = b.repository_id AND m.branch_id = b.branch_id
+         AND m.engineering_run_id = b.engineering_run_id
+        JOIN multica.work_item_worktree l
+          ON l.tenant_id = m.tenant_id AND l.project_id = m.project_id
+         AND l.work_item_id = m.work_item_id AND l.worktree_id = w.id
+         AND l.valid_from <= now() AND l.valid_to IS NULL
         WHERE w.id = $1 AND w.tenant_id = $2
-        FOR SHARE OF w, p
+        FOR SHARE OF w, p, b, m, l
         "#,
     )
     .bind(worktree_id)
     .bind(actor.tenant_id)
+    .bind(work_item_id)
     .fetch_optional(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?
     .ok_or_else(GroupApiError::not_found)?;
     let binding = active_binding(tx, actor, scope.project_id).await?;
-    let task_exists = sqlx::query_scalar::<_, i32>(
-        r#"
-        SELECT 1
-        FROM multica.work_item_worktree l
-        JOIN multica.task_metadata m
-          ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
-         AND m.project_id = l.project_id AND m.valid_to IS NULL
-        JOIN multica.task_lifecycle_current c
-          ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
-        WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3
-          AND l.work_item_id = $4 AND l.valid_to IS NULL
-        FOR SHARE OF l, m, c
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(scope.project_id)
-    .bind(worktree_id)
-    .bind(work_item_id)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .is_some();
-    if !task_exists {
-        return Err(GroupApiError::not_found());
-    }
     Ok((scope, binding))
 }
 

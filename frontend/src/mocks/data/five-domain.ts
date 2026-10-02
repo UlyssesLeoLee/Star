@@ -5,16 +5,13 @@
 //   MOCK_WORKSPACES     ≥ 3 条
 //   MOCK_BILLING        ≥ 4 条, 跨 3 个月
 //   MOCK_WORKTREES      ≥ 5 条, 跨 3 个 project_id
-//   MOCK_COMMENTS       ≥ 6 条, 跨 2 个 work_item_id
+//   MOCK_COMMENTS       0 rows; Task Card social history requires authorized Run data
 //   MOCK_TENANTS        ≥ 2 条, 含 plan = "starter" | "pro" | "enterprise"
 //   MOCK_RBAC_ROLES     ≥ 3 条, 覆盖 admin/member/viewer
-//
-// 种子: mulberry32(1) — deterministic, CI-stable (per mock-data-isolation.md §2.4)
 //
 // 5 域映射见 frontend/src/mocks/schemas/five-domain.ts 文件头注释 + 5 域映射表
 // 已知缺口: 5 域 Lead 真人 review §E.5/F.1 跟进 (per STAR-P3-WBS-001 §12.4 阻塞)
 
-import { mulberry32 } from "@/mocks/seed";
 import type {
   Workspace,
   BillingEntry,
@@ -214,38 +211,8 @@ export const SUPPORTED_TRANSITION_STATES: ReadonlyArray<WorktreeStatus> = [
   "merged",
 ];
 
-// =====================================================================
-// 4. social 域 — MOCK_COMMENTS (7 rows, 跨 2 个 work_item_id)
-// =====================================================================
-
-// 用 mulberry32(2) 选 (避免 hard-coded 看起来假) — 7 行跨 wi-001/wi-002
-const commentSeeds: ReadonlyArray<Omit<Comment, "id" | "created_at" | "deleted">> = [
-  { work_item_id: "wi-001", author_id: "ag-001", body: "Spec excerpt conflicts with INV-RT-03 — please confirm direction." },
-  { work_item_id: "wi-001", author_id: "ag-002", body: "Test:integration:rt_step failing 3/12 — investigating. Will push fix in 30m." },
-  { work_item_id: "wi-001", author_id: "ag-004", body: "ADR-0026 cross-ref sync done (per 2026-08-29 RGS-CROSS-REF-SYNC-REPORT)." },
-  { work_item_id: "wi-002", author_id: "ag-003", body: "5 tab 实装完成 (Kanban / Timeline / Backlog / Agents / Worktrees) per 7d85c34." },
-  { work_item_id: "wi-002", author_id: "ag-005", body: "CI typecheck green; waiting for review." },
-  { work_item_id: "wi-002", author_id: "ag-001", body: "Confirmed scope — merge approved." },
-  { work_item_id: "wi-001", author_id: "ag-002", body: "Fix pushed (commit sha visible in worktree log). Re-run CI." },
-];
-
-function buildComments(): ReadonlyArray<Comment> {
-  const rand = mulberry32(2);
-  return commentSeeds.map((seed, idx) => {
-    // mock 简化: created_at 在 2026-08-25 ~ 2026-08-31 之间均匀分布
-    const dayOffset = 1 + Math.floor(rand() * 7); // 1..7
-    const hour = Math.floor(rand() * 24);
-    const created = new Date(Date.UTC(2026, 7, 25 - dayOffset + 7, hour, 0, 0));
-    return {
-      id: `cm-${String(idx + 1).padStart(3, "0")}`,
-      ...seed,
-      created_at: created.toISOString(),
-      deleted: false,
-    };
-  });
-}
-
-export const MOCK_COMMENTS: ReadonlyArray<Comment> = buildComments();
+// Work Item social history is loaded from the authorized Run backend.
+export const MOCK_COMMENTS: ReadonlyArray<Comment> = [];
 
 // =====================================================================
 // 5. admin 域 — MOCK_TENANTS (3 rows, 含 plan = starter/pro/enterprise) +

@@ -1676,8 +1676,83 @@ export const useStore = create<StoreState>()(
         const { canvasElements, ...rest } = state;
         return rest as StoreState;
       },
-      // 持久化版本号 — 升 schema 时改 version + 加 migrate
-      version: 1,
+      // 清除历史 mock task 卡片及其本地 UI 引用；真实 Run 数据由后端查询加载。
+      version: 2,
+      migrate: (persistedState, version) => {
+        if (version >= 2 || persistedState == null || typeof persistedState !== "object") {
+          return persistedState as StoreState;
+        }
+
+        const stored = persistedState as Partial<StoreState>;
+        const legacyTaskIds = new Set(
+          Array.from({ length: 30 }, (_, index) => `wi-${String(index + 1).padStart(3, "0")}`),
+        );
+        const legacySprintIds = new Set(["spr-001", "spr-002", "spr-003", "spr-004"]);
+        const legacyMilestoneIds = new Set(["ms-001", "ms-002", "ms-003", "ms-004"]);
+        const legacyCanvasTaskNodeIds = new Set(["el-wi-001", "el-wi-002"]);
+        const storedBurndown = stored.burndownSeries ?? [];
+        const legacyBurndown =
+          storedBurndown.length === 14 &&
+          storedBurndown.every((point, index) => {
+            const remaining = Math.max(0, Math.round(55 - index * 4 - (index > 5 ? 2 : 0) - (index > 9 ? 1 : 0)));
+            return point.remaining_points === remaining && point.ideal_points === 55 - index * 4;
+          });
+        const withoutTask = <T extends { work_item_id?: string }>(items: T[] | undefined) =>
+          (items ?? []).filter((item) => !item.work_item_id || !legacyTaskIds.has(item.work_item_id));
+
+        return {
+          ...stored,
+          workItems: (stored.workItems ?? []).filter((item) => !legacyTaskIds.has(item.id)),
+          comments: (stored.comments ?? []).filter(
+            (comment) => comment.target_kind !== "work_item" || !legacyTaskIds.has(comment.target_id),
+          ),
+          changeSets: withoutTask(stored.changeSets),
+          validationCases: withoutTask(stored.validationCases),
+          searchHits: (stored.searchHits ?? []).filter(
+            (hit) => hit.kind !== "work_item" || !legacyTaskIds.has(hit.id),
+          ),
+          canvases: (stored.canvases ?? []).map((canvas) => ({
+            ...canvas,
+            frames: canvas.frames.map((frame) => ({
+              ...frame,
+              element_ids: frame.element_ids.filter((id) => !legacyCanvasTaskNodeIds.has(id)),
+            })),
+          })),
+          canvasConnectors: (stored.canvasConnectors ?? []).filter(
+            (connector) =>
+              !legacyCanvasTaskNodeIds.has(connector.from_element_id) &&
+              !legacyCanvasTaskNodeIds.has(connector.to_element_id),
+          ),
+          milestones: (stored.milestones ?? []).map((milestone) => ({
+            ...milestone,
+            work_item_ids: milestone.work_item_ids.filter((id) => !legacyTaskIds.has(id)),
+            progress: legacyMilestoneIds.has(milestone.id) ? 0 : milestone.progress,
+          })),
+          sprints: (stored.sprints ?? []).map((sprint) =>
+            legacySprintIds.has(sprint.id)
+              ? { ...sprint, committed_points: 0, completed_points: 0 }
+              : sprint,
+          ),
+          burndownSeries: legacyBurndown ? [] : storedBurndown,
+          board: stored.board
+            ? {
+                ...stored.board,
+                columns: stored.board.columns.map((column) => ({
+                  ...column,
+                  work_item_ids: column.work_item_ids.filter((id) => !legacyTaskIds.has(id)),
+                })),
+              }
+            : stored.board,
+          relations: (stored.relations ?? []).filter(
+            (relation) =>
+              (relation.from_kind !== "work_item" || !legacyTaskIds.has(relation.from_id)) &&
+              (relation.to_kind !== "work_item" || !legacyTaskIds.has(relation.to_id)),
+          ),
+          auditEvents: (stored.auditEvents ?? []).filter(
+            (event) => event.target_kind !== "work_item" || !legacyTaskIds.has(event.target_id ?? ""),
+          ),
+        } as StoreState;
+      },
       // hydrate 完成后跑一次 board reconcile (per 2026-08-31 11:24 JST 拍板):
       //   老 localStorage 数据 / seed 跟 workItems.status 错位 / 11:24 前删除列的脏数据
       //   都能在启动时一次性修复, 避免每个 action 各自去 catch 漂移

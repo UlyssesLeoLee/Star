@@ -976,6 +976,8 @@ async fn load_task_cli_start_context(
     let engineering_run =
         load_current_task_run_directory_binding(tx, actor, &worktree, work_item_id, &binding)
             .await?;
+    let engineering_run = engineering_run
+        .ok_or_else(|| GroupApiError::conflict("engineering_run_binding_or_grants_required"))?;
     let request_fingerprint = request_fingerprint(
         actor.tenant_id,
         actor.user_id,
@@ -995,7 +997,7 @@ async fn load_task_cli_start_context(
     )
     .await?;
     let existing_run_id = existing_run
-        .map(|record| idempotent_task_run_id(record, engineering_run.as_ref()))
+        .map(|record| idempotent_task_run_id(record, Some(&engineering_run)))
         .transpose()?;
     let lifecycle = sqlx::query_as::<_, TaskCliLifecycle>(
         r#"
@@ -1008,7 +1010,8 @@ async fn load_task_cli_start_context(
           ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
         WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3
           AND l.work_item_id = $4 AND l.valid_from <= now() AND l.valid_to IS NULL
-          AND m.valid_from <= now()
+          AND m.valid_from <= now() AND m.repository_id = $5 AND m.branch_id = $6
+          AND m.engineering_run_id = $7
         FOR SHARE OF l, m, c
         "#,
     )
@@ -1016,6 +1019,9 @@ async fn load_task_cli_start_context(
     .bind(worktree.project_id)
     .bind(worktree_id)
     .bind(work_item_id)
+    .bind(engineering_run.repository_id)
+    .bind(engineering_run.branch_id)
+    .bind(engineering_run.engineering_run_id)
     .fetch_optional(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?
@@ -1040,7 +1046,7 @@ async fn load_task_cli_start_context(
         lifecycle,
         request_fingerprint,
         existing_run_id,
-        engineering_run,
+        engineering_run: Some(engineering_run),
     })
 }
 
@@ -1106,6 +1112,13 @@ async fn load_current_task_run_directory_binding(
                b.binding_id AS engineering_run_worktree_binding_id,
                b.version AS engineering_run_worktree_binding_version
         FROM multica.engineering_run_worktree_binding b
+        JOIN multica.task_metadata task_owner
+          ON task_owner.tenant_id = b.tenant_id AND task_owner.project_id = b.project_id
+         AND task_owner.work_item_id = $4 AND task_owner.valid_from <= now()
+         AND task_owner.valid_to IS NULL
+         AND task_owner.repository_id = b.repository_id
+         AND task_owner.branch_id = b.branch_id
+         AND task_owner.engineering_run_id = b.engineering_run_id
         JOIN multica.engineering_run r
           ON r.tenant_id = b.tenant_id AND r.project_id = b.project_id
          AND r.repository_id = b.repository_id AND r.branch_id = b.branch_id
@@ -1140,7 +1153,7 @@ async fn load_current_task_run_directory_binding(
                                ELSE 'refs/heads/' || w.branch END
         WHERE b.tenant_id = $1 AND b.project_id = $3 AND b.worktree_id = $6
           AND b.valid_from <= now() AND b.valid_to IS NULL
-        FOR SHARE OF b, r, cb, bv, rv, p, pg, bg, rg, w
+        FOR SHARE OF b, task_owner, r, cb, bv, rv, p, pg, bg, rg, w
         "#,
     )
     .bind(actor.tenant_id)
@@ -1653,7 +1666,8 @@ async fn record_cli_task_run(
           ON c.tenant_id = m.tenant_id AND c.project_id = m.project_id
          AND c.work_item_id = m.work_item_id AND c.valid_to IS NULL
         WHERE m.tenant_id = $2 AND m.project_id = $3 AND m.work_item_id = $4
-          AND m.valid_to IS NULL
+          AND m.valid_to IS NULL AND m.repository_id = $7
+          AND m.branch_id = $22 AND m.engineering_run_id = $23
         "#,
     )
     .bind(run_id)
@@ -1860,10 +1874,10 @@ async fn set_actor_scope(
         "SELECT set_config('app.actor_id', $1, true), \
          set_config('statement_timeout', '3s', true), set_config('lock_timeout', '1s', true)",
     )
-        .bind(actor_id.to_string())
-        .execute(&mut **tx)
-        .await
-        .map_err(|_| GroupApiError::internal())?;
+    .bind(actor_id.to_string())
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
     Ok(())
 }
 
@@ -2025,6 +2039,11 @@ async fn authorize_task_cli_session_parent(
         JOIN multica.task_metadata m
           ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
          AND m.project_id = l.project_id AND m.valid_to IS NULL
+        JOIN multica.engineering_run_worktree_binding b
+          ON b.tenant_id = l.tenant_id AND b.project_id = l.project_id
+         AND b.worktree_id = l.worktree_id AND b.valid_from <= now() AND b.valid_to IS NULL
+         AND b.repository_id = m.repository_id AND b.branch_id = m.branch_id
+         AND b.engineering_run_id = m.engineering_run_id
         JOIN multica.task_lifecycle_current c
           ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
         WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3
