@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.38**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.42**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -345,6 +345,8 @@ Schedule Loop 的唯一规则/occurrence owner 是 `domain-automation` 的版本
 
 Phase 9F2/9F3 已提供 Rule/Occurrence schema、版本固定的 bounded materializer 与 PostgreSQL lease/dispatch adapter；本地 disposable PostgreSQL 验证不等于目标库部署。Phase 9F4A 增加嵌套于 Project→Engineering Run 的 Rule API，写事务验证当前 Project/Run/Worktree/Task/Profile/Provider/Skill/Grant catalog/HookSet 并原子写 Rule revision、Audit、Outbox 与 24 小时幂等记录。current selection 同时要求 `valid_from <= now()` 和 `valid_to IS NULL`；Outbox 以复合 FK 固定 Rule version 与 Run，SCD2 close/successor 使用同一 transaction timestamp，expired replay key 可先精确清除后复用。工作区显式选择 `jsonwebtoken` RustCrypto 作为唯一 RS256 backend。Focused Rust compile/module tests、production `build_group_router` 上四种未认证请求（401）、四种签名 token 缺 scope 请求（403，DB begin 前拒绝）、有效 write-scope 超限 body 请求（413），以及 disposable PostgreSQL 18.6 repeat-migration、RLS/constraint checks 已通过；拒绝响应均带私有缓存响应头。该 HTTP evidence 不覆盖成功授权的 role/Run/Project ACL、目标绑定、分页、并发 CAS/replay 与目标 DB/runtime grants；API 整体仍未验收。尚无已启用 worker、occurrence→TaskExecutionRun/Reservation/RunEvent admission 或 BI consumer。逐路由与事务细节见 [`DD-AUTOMATION-SCHEDULE-API-001`](DD-AUTOMATION-SCHEDULE-API-001.md)，完整 Schedule 闭环保持 fail closed。
 
+Phase 9F4B 将 Rule 创建者固定为创建时已授权的用户 actor。每个 `schedule_rule_revision` 都保存同一个 `run_as_actor_id`；API 创建时从认证 actor 派生，revision 时从锁定的当前行继承，request body 不接受该字段；Rule trigger 对 revision insert 串行化并拒绝首版 creator 伪造和 successor 身份变化。Materializer 将 run-as 单独复制到 `AutomationOccurrenceSnapshotV1`；adapter 写入 `automation.occurrence.run_as_actor_id` 专列，occurrence trigger 校验其与精确 pinned Rule revision 一致；`changed_by` 继续独立追踪编辑者。完整 Phase runner 在 Docker PostgreSQL 18.6 上通过三段 migration 双次应用、七表 FORCE RLS、五个 adapter 场景及 legacy backfill fixture；fixture 用不同编辑者的两版历史 Rule 和已存在 occurrence 验证首版 `changed_by` 回填与 exact-version 身份继承。Migration 仅在一个事务持有 DDL 锁时由 schema owner 临时解除其自身 FORCE RLS 并停用回填冲突的既有 SCD2/append-only guard，回填后恢复两者再提交；目标库 migration principal/grants 仍未验收。每次定时触发、重试和恢复仍必须重新校验该 actor 的当前 Project binding、Engineering Run grant 与执行 capability，撤权/授权服务失败时 occurrence 不得创建 Run。当前只有身份契约与 migration，不含 worker/Run admission；Launch Profile resolver、目标库/RLS/grants、atomic reservation/RunEvent、Outbox consumer 与 BI 仍未闭合。
+
 Engineering Loop 是单一 `TaskExecutionRun` 内版本化、预算受限的 Plan/Act/Observe/Verify/Decision 周期。每轮追加 Loop event 和必要 Evidence；不得改写 Run 的 Task Contract/acceptance/profile/HookSet 快照。达到迭代、deadline、CPU/RSS、子进程或 provider 请求上限，检测到无进展/振荡，或发生撤权/cancel 时停止接收新动作、取消并 drain child，再记录 stop reason 和 drain 结果。循环度量来自 durable occurrence/RunEvent/Evidence/Audit；单纯增加轮数或调用量不算成功。
 
 ## §7 Task Card、CLI 与 Multica/Jira 联动
@@ -504,7 +506,7 @@ Rust builtin Hook Engine 在 Run admission、tool、validation/review 和 Worktr
 
 ### 8.7 Automation 与 Workflow 的 Schedule adapter
 
-`DD-CANVAS-WORKFLOW-001` 中的 Schedule Trigger 只能消费 `domain-automation` 创建的 occurrence ID/version/fencing token，并经授权创建/恢复目标 Run；不得运行第二套 CronScheduler 或维护并行规则表。`ExecutionScheduler` 仅负责 Workflow 内节点依赖 DAG ready-state。Occurrence 到 Run 的 dispatch 必须幂等，resume 时复验 Project/Worktree/Task/Hook/profile 授权，撤销旧 fencing token 后拒绝迟到 worker。当前相关实现仍未完成。
+`DD-CANVAS-WORKFLOW-001` 中的 Schedule Trigger 只能消费 `domain-automation` 创建的 occurrence ID/version/fencing token，并经授权创建/恢复目标 Run；不得运行第二套 CronScheduler 或维护并行规则表。`ExecutionScheduler` 仅负责 Workflow 内节点依赖 DAG ready-state。Occurrence 到 Run 的 dispatch 必须幂等，resume 时复验固定 `run_as_actor_id` 的当前 Project binding、Run grant、Worktree/Task/Hook/profile 与 capability；撤权、授权源不可用或旧 fencing token 均拒绝 Run 创建/迟到写入。Rule revision 与独立 occurrence 身份列及 Rule/occurrence DB immutable triggers 已在 9F4B 落地，实际每次触发的授权/Run admission 尚未实现，Schedule 保持 fail closed。
 
 ### 8.8 Infrastructure 与 Run/Runtime 分离
 
@@ -772,3 +774,6 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.37 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F4A 审查修复和 focused Rust/isolated PostgreSQL 证据；补充 future-current 排除、Run FK、SCD2/TTL/cache 边界，保持 route、target DB、worker、admission 与 BI 关闭 | 9F4A 验证后同步详细设计 |
 | v4.38 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录生产 `build_group_router` 四种未认证请求的挂载/拒绝/私有响应头验证；将 valid-auth scope/ACL、目标数据库和 Schedule execution/BI 门明确保持开放 | Schedule API 增补 request-level route 验证后同步详细设计 |
 | v4.39 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Schedule API v0.5，记录 RustCrypto RS256 provider、signed-token scope rejects 和 16 KiB body cap 的 request-level 证据；保留成功授权、Run/Project ACL、target DB、worker 与 BI 开放状态 | 修复 JWT provider 缺省并对齐详细设计和阶段报告 |
+| v4.40 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Schedule API v0.6 与 requirements v5.61；增加规则创建者 run-as 的不可变身份、DB trigger、occurrence 继承及每次触发授权复验/fail-closed 契约；明确 worker、Run admission 和目标部署仍开放 | 用户确定 Schedule 创建者固定为 run-as 且撤权后停止派发 |
+| v4.41 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.62 与 Schedule API v0.7；补充首版 DB creator/run-as 相等约束、occurrence 独立主体列与 exact-Rule trigger，并记录 PostgreSQL 18.6 三 migration 双次应用、七表 FORCE RLS、五场景验证；worker 实时授权与 Run admission 仍开放 | Phase 9F4B 完整 runner 和 Rule/occurrence 身份负例通过 |
+| v4.42 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.63/basic v5.60/Data Design v1.1；补充历史 Rule/Occurrence 回填 fixture、事务表锁、schema-owner 暂时恢复 owner RLS bypass 和在提交前恢复 append-only/SCD2 guard 与 FORCE RLS；注明目标 migration principal 未验收，worker 实时授权与 Run admission 仍开放 | legacy fixture 暴露既有 guard/RLS 对身份字段回填的阻断并验证受控迁移修复 |

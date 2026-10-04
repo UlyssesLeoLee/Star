@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v0.8 (2026-10-04)
+> **文档版本**: v1.1 (2026-10-04)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -13,6 +13,9 @@
 > | v0.6 | 2026-10-03 | 增加候选槽与 DST 转换探测各 32,768 步上限、disabled Rule 双层 fail-closed 与 lease-expired event 旧 attempt/fencing generation 语义；对齐 26/26 domain release tests 和最终验证边界 | Mavis 接手审核 |
 > | v0.7 | 2026-10-03 | 新增 9F4A Rule API 存储分类：Rule display name 延续 Master/SCD2，Outbox 为 append-only Transaction，24h command replay 为受限 Work；记录当前 migration、RLS 与 runtime grants 尚未验证 | Schedule Rule API 增量落库并同步 W/T/M 分类 |
 > | v0.8 | 2026-10-04 | 对账 9F4A 迁移重复应用与隔离 PostgreSQL 约束/RLS证据：Outbox 以复合 FK 固定 Run，幂等记录先删除过期同键再进行有界 stale cleanup，SCD2 successor 使用同一 transaction timestamp；目标库/grants仍开放 | 修复审查发现并同步已验证实现 |
+> | v0.9 | 2026-10-04 | 增加 `run_as_actor_id` 为 Schedule Rule Master 身份列，定义历史 backfill、不可替换的 successor trigger、与 `changed_by` 的区分及 occurrence worker 每次触发再授权约束；目标身份服务和 worker 仍未验收 | 用户选择规则创建者固定 run-as 且撤权后拒绝触发 |
+> | v1.0 | 2026-10-04 | 明确首版 Rule 必须满足 `run_as_actor_id = changed_by`，occurrence 必须固定复制并匹配精确 Rule revision 主体；登记 9F4B Docker PostgreSQL 18.6 重复迁移、7 表 FORCE RLS 和 5 个 adapter 场景通过；worker 实时授权和目标生产 grants 仍开放 | 完成 Rule/occurrence 主体伪造数据库负例验证 |
+> | v1.1 | 2026-10-04 | 细化 legacy identity backfill 事务：schema owner 在 DDL 锁内暂时恢复 owner RLS bypass、停用仅阻断新增列回填的既有 Rule/Occurrence guard，完成回填后恢复 guard 与 FORCE RLS 再提交；记录双 revision/不同编辑者和旧 occurrence fixture 验证，明确目标库 migration owner/grants 尚未验收 | 历史 fixture 暴露既有 append-only/SCD2 guard 阻止合法迁移回填，修复并实测后对齐数据详细设计 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -1989,9 +1992,9 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 
 | 表 | W/T/M | 关键字段与约束 | RLS / retention |
 |---|---|---|---|
-| `automation.schedule_rule_revision` | **Master** | tenant/Project/rule/version、cron/timezone/parser/tzdb、DST/overlap/misfire/pause/retry/deadline 与 Branch/EngineeringRun/repository/Worktree/Work Item/Profile/HookSet target；唯一 current revision；SCD2 仅允许关闭当前行 | tenant FORCE RLS；不可 DELETE/TRUNCATE |
+| `automation.schedule_rule_revision` | **Master** | tenant/Project/rule/version、immutable `run_as_actor_id`、cron/timezone/parser/tzdb、DST/overlap/misfire/pause/retry/deadline 与 Branch/EngineeringRun/repository/Worktree/Work Item/Profile/HookSet target；唯一 current revision；SCD2 仅允许关闭当前行 | tenant FORCE RLS；不可 DELETE/TRUNCATE |
 | `automation.schedule_rule_audit` | **Transaction** | revision create/supersede actor、correlation、bounded metadata | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
-| `automation.occurrence` | **Transaction** | tenant/rule-version + scheduled UTC unique slot、local label/UTC offset、parser/tzdb 与 immutable target snapshot/digest；tenant/Project/occurrence 复合唯一键供 event owner FK 校验 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+| `automation.occurrence` | **Transaction** | tenant/rule-version + scheduled UTC unique slot、immutable `run_as_actor_id` copied from the exact Rule revision、local label/UTC offset、parser/tzdb 与 immutable target snapshot/digest；tenant/Project/occurrence 复合唯一键供 event owner FK 校验 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
 | `automation.occurrence_dispatch` | **Work** | attempt count、next attempt、lease owner/expiry、单调连续 fencing generation、occurrence deadline、retention/expiry；expiry = terminal_at + retention_period | tenant FORCE RLS；DB trigger 限制状态、lease fencing 与 terminal mutation；仅 terminal TTL 到期可删除，禁止 TRUNCATE |
 | `automation.occurrence_event` | **Transaction** | materialized/claimed/retry/run-linked/terminal fact、attempt、generation、run/correlation；tenant/Project/occurrence FK 一致 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
 
@@ -2010,6 +2013,10 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 | `automation.schedule_rule_command_idempotency` | **Work** | actor/project/operation scoped key hash + request hash + bounded replay response；同 key 不同请求冲突；24 小时 TTL | tenant FORCE RLS；先精确删除匹配的过期 key，再最多清理 64 条其他过期记录；不存原始 idempotency key |
 
 API、Audit、Outbox 与幂等记录在单个事务提交或回滚；授权必须在每次请求和写入事务内读取 `valid_from <= now()` 且 `valid_to IS NULL` 的当前 Project/Run/Worktree/Task/Profile/Catalog/HookSet 事实。2026-10-04 的 disposable PostgreSQL 18.6 验证已重复应用 9F2/9F4A migration，并验证新表 FORCE RLS、tenant isolation、Outbox Run FK、append-only guard、过期 key reuse 与 SCD2 边界；目标库 grants 和生产 API 仍未验收。
+
+#### 4.13.4 Schedule run-as principal（Phase 9F4B）
+
+`db/migrations/2026-10-04-schedule-run-as-actor.sql` 在现有 Master revision 上增加 `run_as_actor_id UUID NOT NULL`，并为 `automation.occurrence` 增加相同身份的专用列。既有 Rule 以 `rule_version` 最小的 revision `changed_by` 回填所有历史行，既有 occurrence 从其复合外键指向的精确 Rule revision 回填；新 Rule 的首版必须满足 `run_as_actor_id = changed_by`，successor 从锁定的当前 revision 复制，不接受请求指定。为保持历史数据 append-only/SCD2 guard，同时完成列回填，该 migration 在单个事务取得两表 DDL 锁后，由 schema owner 临时对两表执行 `NO FORCE ROW LEVEL SECURITY`，并仅停用会阻止这次新增身份字段 UPDATE 的 Rule close-only 与 Occurrence append-only trigger；只更新新增身份列，完成 `NOT NULL` 后立即恢复 triggers 和 `FORCE ROW LEVEL SECURITY`，然后创建身份 insert guard 并提交。事务中止会回滚 guard/RLS 状态。应用角色不获得该绕过；部署 migration 的角色必须拥有相关表的 ALTER/TRIGGER 权限，目标环境的 migration principal/grants 尚未验证。若任一旧 occurrence 无法匹配精确 Rule revision，主体保持 NULL，`SET NOT NULL` 使整个事务失败，不会以默认主体继续。`automation.guard_schedule_rule_run_as_identity()` 对同一 Rule 的 revision insert 获取 transaction advisory lock 后验证主体稳定；occurrence insert guard 再验证存储主体与 pinned Rule revision 一致；非 nil 是数据库不变量。`changed_by` 继续表示本次版本的编辑者，run-as 是未来无人值守执行身份，两者可不同。身份列不对 identity 表设 FK，因此账户停用/删除不会抹掉审计主体；worker 必须在每次触发时实时复验 Project binding、Engineering Run grant 和执行 capability，无法读取或已撤权时不创建 Run。Docker PostgreSQL 18.6 disposable runner 双次应用完整 9F2/9F4A/9F4B migration chain，并用不同 editor 的两 revision Rule + 旧 occurrence 验证 historical backfill；最终七张 Schedule 表 FORCE RLS，五个 adapter 场景通过。此身份是 Master 的 immutable policy fact；当前未实现 worker，所以自动复验尚未验收。
 
 ### 4.14 Module: domain-identity(`identity` schema)
 

@@ -4,7 +4,7 @@
 //! It intentionally contains no in-memory scheduler or worker; materialization, claiming, and
 //! Run creation must be committed by the application layer against PostgreSQL.
 //!
-//! @cypher schema=1 source_sha256=58c06f99a2173e52b272891e66aa1e302bf96538185a80213273d0a6d84b477e
+//! @cypher schema=1 source_sha256=dd55a3b46c7a35d339a1c6de8395789f9d881fe26dd258e4d78acb9c88f65955
 //! MERGE (self:File {path:"crates/domain-automation/src/schedule.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-automation/src/schedule.rs::schedule",kind:"module"})
 //! MERGE (target:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1"})
@@ -15,8 +15,10 @@
 //! MERGE (fold:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleDstFoldPolicyV1"})
 //! MERGE (pause:Type {id:"crates/domain-automation/src/schedule.rs::SchedulePausePolicyV1"})
 //! MERGE (rule:Type {id:"crates/domain-automation/src/schedule.rs::AutomationScheduleRuleRevisionV1"})
+//! MERGE (run_as_actor:Symbol {id:"crates/domain-automation/src/schedule.rs::AutomationScheduleRuleRevisionV1.run_as_actor_id",kind:"field"})
 //! MERGE (key:Type {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceKey"})
 //! MERGE (occurrence:Type {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceSnapshotV1"})
+//! MERGE (occurrence_run_as:Symbol {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceSnapshotV1.run_as_actor_id",kind:"field"})
 //! MERGE (fence:Type {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceLeaseFenceV1"})
 //! MERGE (error:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleContractError"})
 //! MERGE (tests:Symbol {id:"crates/domain-automation/src/schedule.rs::tests",kind:"module"})
@@ -36,8 +38,10 @@
 //! MERGE (self)-[:DEFINES]->(fold)
 //! MERGE (self)-[:DEFINES]->(pause)
 //! MERGE (self)-[:DEFINES]->(rule)
+//! MERGE (rule)-[:CONTAINS]->(run_as_actor)
 //! MERGE (self)-[:DEFINES]->(key)
 //! MERGE (self)-[:DEFINES]->(occurrence)
+//! MERGE (occurrence)-[:CONTAINS]->(occurrence_run_as)
 //! MERGE (self)-[:DEFINES]->(fence)
 //! MERGE (self)-[:DEFINES]->(error)
 //! MERGE (self)-[:DEFINES]->(tests)
@@ -226,6 +230,8 @@ pub struct AutomationScheduleRuleRevisionV1 {
     pub rule_id: RuleId,
     /// Positive SCD2 revision number.
     pub rule_version: u64,
+    /// Immutable user principal that created the rule and is reauthorized for every scheduled Run.
+    pub run_as_actor_id: Uuid,
     /// Whether this revision is eligible for new occurrences.
     pub enabled: bool,
     /// Owning Project.
@@ -262,6 +268,7 @@ impl AutomationScheduleRuleRevisionV1 {
         if self.tenant_id.is_nil()
             || self.project_id.is_nil()
             || self.rule_id.as_uuid().is_nil()
+            || self.run_as_actor_id.is_nil()
             || self.rule_version == 0
             || self.deadline_seconds == 0
             || self.deadline_seconds > 86_400
@@ -339,6 +346,8 @@ pub struct AutomationOccurrenceSnapshotV1 {
     pub occurrence_id: Uuid,
     /// Stable rule-version/UTC-slot idempotency key.
     pub key: AutomationOccurrenceKey,
+    /// Immutable creator/run-as principal copied into this materialized occurrence.
+    pub run_as_actor_id: Uuid,
     /// Immutable rule and target snapshot used for materialization.
     pub rule_snapshot: AutomationScheduleRuleRevisionV1,
     /// Local-time label retained for DST auditability.
@@ -359,6 +368,8 @@ impl AutomationOccurrenceSnapshotV1 {
             || self.key.tenant_id != self.rule_snapshot.tenant_id
             || self.key.rule_id != self.rule_snapshot.rule_id
             || self.key.rule_version != self.rule_snapshot.rule_version
+            || self.run_as_actor_id.is_nil()
+            || self.run_as_actor_id != self.rule_snapshot.run_as_actor_id
             || self.scheduled_local_label.trim().is_empty()
             || self.scheduled_local_label.len() > 64
             || self.scheduled_local_label.chars().any(char::is_control)
@@ -653,6 +664,7 @@ pub fn materialize_schedule_window(
                     rule_version: rule.rule_version,
                     scheduled_for_utc: candidate.scheduled_for_utc,
                 },
+                run_as_actor_id: rule.run_as_actor_id,
                 rule_snapshot: rule.clone(),
                 scheduled_local_label: candidate
                     .scheduled_local
@@ -846,6 +858,7 @@ mod tests {
             tenant_id: Uuid::new_v4(),
             rule_id: RuleId::new(),
             rule_version: 1,
+            run_as_actor_id: Uuid::new_v4(),
             enabled: true,
             project_id,
             cron_expression: "0 9 * * 1-5".to_owned(),
@@ -870,6 +883,10 @@ mod tests {
     #[test]
     fn schedule_revision_requires_pinned_target_and_bounded_policies() {
         assert!(schedule_rule().validate().is_ok());
+
+        let mut invalid = schedule_rule();
+        invalid.run_as_actor_id = Uuid::nil();
+        assert_eq!(invalid.validate(), Err(ScheduleContractError::InvalidRule));
 
         let mut invalid = schedule_rule();
         invalid.overlap_policy = ScheduleOverlapPolicyV1::AllowBounded { max_active: 65 };
@@ -901,12 +918,20 @@ mod tests {
                 rule_version: rule.rule_version,
                 scheduled_for_utc,
             },
+            run_as_actor_id: rule.run_as_actor_id,
             rule_snapshot: rule,
             scheduled_local_label: "2026-10-05T09:00:00".to_owned(),
             utc_offset_seconds: 32_400,
             materialized_at: scheduled_for_utc - Duration::minutes(1),
         };
         assert!(snapshot.validate().is_ok());
+
+        let mut wrong_run_as = snapshot.clone();
+        wrong_run_as.run_as_actor_id = Uuid::new_v4();
+        assert_eq!(
+            wrong_run_as.validate(),
+            Err(ScheduleContractError::InvalidOccurrenceSnapshot)
+        );
 
         let mut wrong_tenant = snapshot.clone();
         wrong_tenant.key.tenant_id = Uuid::new_v4();

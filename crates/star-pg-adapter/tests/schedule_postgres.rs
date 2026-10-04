@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c2f28dbeb4d6418dfee81a3e4b03089fdeda28c8f0ab262428177f295c993e5f
+@cypher schema=1 source_sha256=4d19e82b6ce897605a59b5166b2e40db02d9ff62e636f0786ada74439fdac6e5
 MERGE (self:File {path:"crates/star-pg-adapter/tests/schedule_postgres.rs"})
 MERGE (fixture:Type {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture"})
 MERGE (connect:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::connect_pools",kind:"function"})
@@ -8,11 +8,14 @@ MERGE (seed_occurrence:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgre
 MERGE (test_materialize:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::materialization_is_idempotent_and_tenant_scoped",kind:"test"})
 MERGE (test_claim:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::concurrent_claims_and_fencing_are_database_authoritative",kind:"test"})
 MERGE (test_retry:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::retry_terminal_ttl_and_expired_lease_reclaim_are_durable",kind:"test"})
+MERGE (test_run_as:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::schedule_rule_run_as_actor_cannot_change_between_revisions",kind:"test"})
 MERGE (adapter:ExternalService {id:"star-pg-adapter.PgAutomationScheduleRepository",kind:"type"})
 MERGE (sqlx:ExternalService {id:"sqlx.PgPool",kind:"type"})
 MERGE (occurrence:Table {id:"automation.occurrence"})
+MERGE (occurrence_run_as_actor:Column {id:"automation.occurrence.run_as_actor_id"})
 MERGE (dispatch:Table {id:"automation.occurrence_dispatch"})
 MERGE (event:Table {id:"automation.occurrence_event"})
+MERGE (schedule_rule:Table {id:"automation.schedule_rule_revision"})
 MERGE (self)-[:DEFINES]->(fixture)
 MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(seed_rule)
@@ -20,6 +23,8 @@ MERGE (self)-[:DEFINES]->(seed_occurrence)
 MERGE (self)-[:DEFINES]->(test_materialize)
 MERGE (self)-[:DEFINES]->(test_claim)
 MERGE (self)-[:DEFINES]->(test_retry)
+MERGE (self)-[:DEFINES]->(test_run_as)
+MERGE (self)-[:DEFINES]->(occurrence_run_as_actor)
 MERGE (connect)-[:CALLS]->(sqlx)
 MERGE (seed_rule)-[:WRITES]->(occurrence)
 MERGE (seed_occurrence)-[:WRITES]->(dispatch)
@@ -31,6 +36,9 @@ MERGE (test_claim)-[:TESTS]->(dispatch)
 MERGE (test_retry)-[:CALLS]->(adapter)
 MERGE (test_retry)-[:TESTS]->(dispatch)
 MERGE (test_retry)-[:TESTS]->(event)
+MERGE (test_run_as)-[:TESTS]->(schedule_rule)
+MERGE (test_run_as)-[:TESTS]->(occurrence)
+MERGE (test_run_as)-[:TESTS]->(occurrence_run_as_actor)
 @endcypher
 */
 
@@ -106,9 +114,9 @@ async fn seed_rule(admin: &PgPool, max_attempts: i16) -> Fixture {
              retry_max_attempts, retry_initial_backoff_seconds, retry_max_backoff_seconds, deadline_seconds, \
              branch_id, engineering_run_id, repository_id, worktree_id, work_item_id, \
              execution_profile_id, execution_profile_version, execution_profile_digest, \
-             hook_set_version, hook_set_digest, changed_by) \
+             hook_set_version, hook_set_digest, run_as_actor_id, changed_by) \
          VALUES ($1,$2,$3,1,true,'0 * * * * *','UTC',$4,$5,'skip','earlier_instant', \
-                 'queue_one',1,'skip',1,'skip_elapsed',$6,1,1,600,$7,$8,$9,$10,$11,$12,1,$13,1,$14,$15)",
+                 'queue_one',1,'skip',1,'skip_elapsed',$6,1,1,600,$7,$8,$9,$10,$11,$12,1,$13,1,$14,$15,$15)",
     )
     .bind(fixture.tenant_id)
     .bind(fixture.project_id)
@@ -149,15 +157,16 @@ async fn seed_pending_occurrence_with_deadline(
     let scheduled_for = Utc::now() - Duration::seconds(5);
     sqlx::query(
         "INSERT INTO automation.occurrence \
-            (occurrence_id, tenant_id, project_id, rule_id, rule_version, scheduled_for_utc, \
+            (occurrence_id, tenant_id, project_id, rule_id, rule_version, run_as_actor_id, scheduled_for_utc, \
              scheduled_local_label, utc_offset_seconds, parser_version, tzdb_version, target_snapshot, \
              target_snapshot_digest, materialized_at) \
-         VALUES ($1,$2,$3,$4,1,$5,'2026-10-02T12:00:00',0,$6,$7,$8,$9,clock_timestamp())",
+         VALUES ($1,$2,$3,$4,1,$5,$6,'2026-10-02T12:00:00',0,$7,$8,$9,$10,clock_timestamp())",
     )
     .bind(occurrence_id)
     .bind(fixture.tenant_id)
     .bind(fixture.project_id)
     .bind(fixture.rule_id)
+    .bind(fixture.actor_id)
     .bind(scheduled_for)
     .bind(SCHEDULE_PARSER_VERSION)
     .bind(SCHEDULE_TZDB_VERSION)
@@ -180,6 +189,97 @@ async fn seed_pending_occurrence_with_deadline(
     .await
     .expect("seed due dispatch Work row");
     occurrence_id
+}
+
+#[tokio::test]
+#[ignore = "requires the phase9f3_schedule.py disposable PostgreSQL runner"]
+async fn schedule_rule_run_as_actor_cannot_change_between_revisions() {
+    let (admin, runtime) = connect_pools().await;
+    let fixture = seed_rule(&admin, 3).await;
+    let original_creator = sqlx::query_scalar::<_, Uuid>(
+        "SELECT changed_by FROM automation.schedule_rule_revision \
+         WHERE tenant_id=$1 AND rule_id=$2 AND valid_to IS NULL",
+    )
+    .bind(fixture.tenant_id)
+    .bind(fixture.rule_id)
+    .fetch_one(&admin)
+    .await
+    .expect("the seed rule retains its original creator");
+    let replacement_actor = Uuid::new_v4();
+    assert_ne!(replacement_actor, original_creator);
+    let mismatched_occurrence_error = sqlx::query(
+        "INSERT INTO automation.occurrence \
+            (occurrence_id, tenant_id, project_id, rule_id, rule_version, run_as_actor_id, \
+             scheduled_for_utc, scheduled_local_label, utc_offset_seconds, parser_version, \
+             tzdb_version, target_snapshot, target_snapshot_digest, materialized_at) \
+         VALUES ($1,$2,$3,$4,1,$5,now(),'2026-10-04T12:00:00',0,$6,$7,$8,$9,now())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.tenant_id)
+    .bind(fixture.project_id)
+    .bind(fixture.rule_id)
+    .bind(replacement_actor)
+    .bind(SCHEDULE_PARSER_VERSION)
+    .bind(SCHEDULE_TZDB_VERSION)
+    .bind(json!({ "fixture": true }))
+    .bind("d".repeat(64))
+    .execute(&admin)
+    .await
+    .expect_err("an occurrence must retain the pinned Rule revision's run-as principal");
+    assert!(
+        mismatched_occurrence_error
+            .to_string()
+            .contains("occurrence run-as identity differs from pinned Rule revision")
+    );
+
+    let initial_rule_id = Uuid::new_v4();
+    let initial_error = sqlx::query(
+        "INSERT INTO automation.schedule_rule_revision \
+         SELECT (jsonb_populate_record(NULL::automation.schedule_rule_revision, \
+           to_jsonb(rule) || jsonb_build_object(\
+             'rule_id', $2, \
+             'run_as_actor_id', $3, \
+             'rule_version', 1, \
+             'valid_from', now(), \
+             'valid_to', NULL\
+           ))).* \
+         FROM automation.schedule_rule_revision rule \
+         WHERE rule.tenant_id = $1 AND rule.rule_id = $4 AND rule.valid_to IS NULL",
+    )
+    .bind(fixture.tenant_id)
+    .bind(initial_rule_id)
+    .bind(replacement_actor)
+    .bind(fixture.rule_id)
+    .execute(&admin)
+    .await
+    .expect_err("an initial run-as principal must be the authenticated creator");
+    assert!(
+        initial_error
+            .to_string()
+            .contains("initial automation schedule run-as identity must match its creator")
+    );
+
+    let error = sqlx::query(
+        "INSERT INTO automation.schedule_rule_revision \
+         SELECT (jsonb_populate_record(NULL::automation.schedule_rule_revision, \
+           to_jsonb(rule) || jsonb_build_object(\
+             'rule_version', 2, \
+             'run_as_actor_id', $2, \
+             'valid_from', now() - interval '2 seconds', \
+             'valid_to', now() - interval '1 second'\
+           ))).* \
+         FROM automation.schedule_rule_revision rule \
+         WHERE rule.tenant_id = $1 AND rule.rule_id = $3 AND rule.valid_to IS NULL",
+    )
+    .bind(fixture.tenant_id)
+    .bind(replacement_actor)
+    .bind(fixture.rule_id)
+    .execute(&admin)
+    .await
+    .expect_err("a successor revision cannot replace the original run-as principal");
+    assert!(error.to_string().contains("run-as identity is immutable"));
+    admin.close().await;
+    runtime.close().await;
 }
 
 #[tokio::test]
@@ -233,6 +333,16 @@ async fn materialization_is_idempotent_and_tenant_scoped() {
         .execute(&mut *scoped)
         .await
         .expect("set current tenant");
+    let persisted_run_as: Uuid = sqlx::query_scalar(
+        "SELECT run_as_actor_id FROM automation.occurrence \
+         WHERE tenant_id=$1 AND occurrence_id=$2",
+    )
+    .bind(fixture.tenant_id)
+    .bind(inserted[0])
+    .fetch_one(&mut *scoped)
+    .await
+    .expect("the occurrence persists its immutable run-as snapshot");
+    assert_eq!(persisted_run_as, rule.run_as_actor_id);
     let own_rows: i64 = sqlx::query_scalar("SELECT count(*) FROM automation.occurrence")
         .fetch_one(&mut *scoped)
         .await

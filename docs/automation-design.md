@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v1.7 (2026-10-04)
+> **文档版本**: v2.0 (2026-10-04)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1153,7 +1153,7 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 
 | 任务卡 | 档位 | 脚本/执行 | 验证边界 |
 |---|---|---|---|
-| Agent Schedule recurrence/materializer 与 PostgreSQL occurrence/dispatch adapter | [P]（R/V/S/A） | `scripts/automation/phase9f3_schedule.py --cargo <cargo.exe> --rustfmt <rustfmt.exe> --postgres-bin-dir <postgres-bin>`；所有步骤写到 `.cache/phase9f3-schedule/`，单步超时 900 秒。依次执行 rustfmt、domain tests、adapter all-targets check、集成 harness `--no-run`、定向 Clippy；随后在该目录下创建随机命名、只监听 `127.0.0.1` 的 PostgreSQL cluster，migration 双次 apply、检查五表 FORCE RLS、建立非 superuser test role，并直接运行刚编译的 harness，最后核对停库成功才删除 cluster。 | PostgreSQL 18.6：domain release tests 26/26 + 上次 runner 4/4 disposable DB tests；验证 idempotency/tenant RLS/append-only、并发 claim/fencing/heartbeat、retry/attempt exhaustion/deadline、terminal TTL/reclaim；disabled Rule 在 materializer/adapter 双层 fail closed；lease-expired event 记录旧 attempt/fencing generation；候选槽和 DST transition probe 分别限制 32,768 步；migration 两次应用及 FORCE RLS catalog check 通过。新增 DST probe bound 后重新运行了 domain debug/release tests、focused rustfmt 与 Clippy，未重跑 PostgreSQL runner；该小修未变更 adapter/migration。Run-scoped Rule write API 与 transactional audit/outbox substrate 已落地（§4.44）；HTTP route integration、长期 worker、Auth/target DB/runtime grants、occurrence→Run/reservation/RunEvent/Outbox admission 与 BI 尚未接入，不能开放生产 Schedule capability。Adapter Clippy 仅放行该 crate 既有四类 lint（empty doc/attribute lines、needless generic borrows、unit let）；新增 Schedule 源文件没有命中这些旧 lint，其它 warning 仍 deny。 |
+| Agent Schedule recurrence/materializer 与 PostgreSQL occurrence/dispatch adapter | [P]（R/V/S/A） | `scripts/automation/phase9f3_schedule.py --cargo <cargo.exe> --rustfmt <rustfmt.exe> [--postgres-bin-dir <postgres-bin>] [--postgres-docker-image postgres:18.6 --docker <docker.exe>]`；所有步骤写到 `.cache/phase9f3-schedule/`，单步超时 900 秒。依次执行 rustfmt、domain tests、adapter/API all-targets check、集成 harness `--no-run`、定向 Clippy；随后以本机工具或 disposable container 双次 apply migration 并运行真实 adapter harness。Docker 后端使用随机容器名和随机端口，只发布至 `127.0.0.1`，最后只删除本 runner 创建的容器。 | PostgreSQL 18.6：domain release tests 26/26；9F3 原始四个与 9F4B 五个 disposable DB cases 分别记录；验证 idempotency/tenant RLS/append-only、并发 claim/fencing/heartbeat、retry/attempt exhaustion/deadline、terminal TTL/reclaim；disabled Rule 在 materializer/adapter 双层 fail closed；lease-expired event 记录旧 attempt/fencing generation；候选槽和 DST transition probe 分别限制 32,768 步。9F4B 完整 9F2/9F4A/9F4B migration chain 双次应用、七表 FORCE RLS 和 run-as Rule/occurrence 身份负例通过。Run-scoped Rule API substrate 已落地（§4.44/4.45）；accepted ACL matrix、长期 worker、Auth/target DB/runtime grants、occurrence→Run/reservation/RunEvent/Outbox admission 与 BI 尚未接入，不能开放生产 Schedule capability。Adapter Clippy 仅放行该 crate 既有四类 lint，其它 warning 仍 deny。 |
 
 ### 4.43 本地分支收敛与冲突审计（2026-10-04）
 
@@ -1167,6 +1167,12 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 | 任务卡 | 档位 | 实现/验证 | 验证边界 |
 |---|---|---|---|
 | 持久 Schedule Rule create/list/detail/CAS-revise、绑定校验、事务内 Audit/Outbox 与 24h 幂等回放 | [P]（R/V/S/A） | Rust 1.98.1 `star-api-rest --all-targets` check exit 0；6 个 Schedule Rule 模块测试含 production `build_group_router` 四方法未认证 401、四方法 signed-token scope rejection 403、有效 write-scope body cap 413；fresh PostgreSQL 18.6 disposable database 将 occurrence 与 Rule migrations 各运行两遍，RLS、错误 Run 五列 FK、Outbox immutability、过期 same-key replay/64-row cleanup 与 SCD2 clock boundary 场景通过。RustCrypto JWT backend 已显式选择。证据见 `docs/reports/PHASE-9F4A-SCHEDULE-RULE-API-REPORT.md`。 | 成功授权 role/Project/Run ACL、target binding、并发 CAS/replay、分页边界、target grants/Auth 与 production database 未验收。Execution worker、occurrence→Run/reservation/RunEvent/Outbox consumer、BI/Benchmark 未接入，Rule 不触发 Agent/CLI；Phase 9F4A 整体保持未关闭。 |
+
+### 4.45 Phase 9F4B immutable Schedule run-as principal（2026-10-04）
+
+| 任务卡 | 档位 | 实现/验证 | 验证边界 |
+|---|---|---|---|
+| 将 Schedule Rule creator 固定为 run-as actor，并保证 revision/occurrence 身份一致 | [P]（R/V/S/A） | `AutomationScheduleRuleRevisionV1` 与 `AutomationOccurrenceSnapshotV1` 都携带非空 `run_as_actor_id`；API create 从已授权 actor 派生，CAS revision 锁当前行并继承身份，body 严格拒绝 caller identity；adapter 将身份写入 Rule 和独立 occurrence 列。Migration 从最早 revision `changed_by` 与精确 pinned Rule 分别回填，并以 Rule/occurrence trigger 拒绝 creator、successor 或 occurrence identity 不一致；schema owner 在单个 DDL-lock transaction 内仅为新增身份字段 backfill 暂停既有 SCD2/append-only guards 和自身 FORCE RLS，然后恢复后提交。Legacy fixture 验证不同 editor 的两版 Rule 与旧 occurrence 回填。Docker bounded runner：Rust checks/tests/clippy、三 migration 双次 apply、7 表 FORCE RLS 与 5 个 PostgreSQL adapter scenarios 全通过。详见 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。 | 只固定执行身份，并不授予未来执行权。每次触发/retry/resume 对当前 Project binding、Run grant 和执行 capability 的重新授权仍需 worker；身份目录、Launch Profile authority、Run/reservation/RunEvent atomic admission、target DB migration grants、Outbox consumer、BI/Benchmark 未接入，Schedule 继续 fail closed。 |
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
@@ -1537,6 +1543,9 @@ frontend/src/app/automation-debug/
 | v1.5 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.44 Run-scoped Schedule Rule persistence/API slice，记录 Rust 与 disposable PostgreSQL 验证并保留 route/worker/Run admission/BI gates；修正 §4.42 对 Rule API 的阶段性陈述 | 9F4A Rule API 代码/迁移完成并通过隔离验证后合并到本地 dev |
 | v1.6 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §4.44，记录 production `build_group_router` 四方法未认证请求和私有响应头验证；更正 routes 已挂载的事实，同时保留有效身份/ACL/target、目标 DB、worker、Run admission 与 BI 验收门 | 9F4A route request smoke test 落地并对齐实施证据 |
 | v1.7 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §4.44，记录显式 RustCrypto RS256 backend、签名 JWT scope 拒绝及 write-scope body-cap 路由证据；保留 accepted-access、DB、worker/admission 与 BI 门 | 修复 JWT provider 缺省并同步新增 route validation evidence |
+| v1.8 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.45，登记 Schedule creator/run-as 不可变身份、历史回填、SCD2 trigger、API/domain/adapter 联动和每次触发重授权契约；明确 worker 和 Run admission 仍未实现 | 用户确认 Schedule creator-as-run-as 并继续 Phase 9F4 |
+| v1.9 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 9F4B occurrence 专用 run-as 持久列与 Rule revision trigger，并将 phase9f3_schedule.py 扩展为可选择本机 PostgreSQL 工具或 loopback Docker backend；记录完整 migration/RLS/五场景证据和未实现 worker 门禁 | 自审补齐 occurrence 快照缺失并将验证 runner 适配当前 Windows 环境 |
+| v2.0 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在 §4.45/runner 对账 legacy Rule/Occurrence backfill fixture；修复既有 SCD2/append-only guards 与 FORCE RLS 阻止 migration 回填的问题，记录事务内 schema-owner unlock/backfill/restore 语义和 full runner 通过；保留 worker/Auth/Run admission/target migration grants/BI 未完成门禁 | 自审增加真实旧数据夹具后发现并修复 migration backfill 阻断 |
 
 ---
 

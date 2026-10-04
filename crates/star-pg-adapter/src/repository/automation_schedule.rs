@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7f281dc13a35ff72f970c3909fb30162e00acc9b0dde5c2ee2f74ed86fb6a405
+@cypher schema=1 source_sha256=378a0074dfc83681a470742384a3188e3345f1385deb6523b38754e36c6e5b8f
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (repo:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository"})
 MERGE (error:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::ScheduleRepositoryError"})
@@ -18,7 +18,9 @@ MERGE (rule_match:Symbol {id:"crates/star-pg-adapter/src/repository/automation_s
 MERGE (pool:ExternalService {id:"sqlx.PgPool",kind:"type"})
 MERGE (transaction:ExternalService {id:"sqlx.Transaction",kind:"type"})
 MERGE (schedule_rule:Table {id:"automation.schedule_rule_revision"})
+MERGE (run_as_actor:Column {id:"automation.schedule_rule_revision.run_as_actor_id"})
 MERGE (occurrence:Table {id:"automation.occurrence"})
+MERGE (occurrence_run_as_actor:Column {id:"automation.occurrence.run_as_actor_id"})
 MERGE (dispatch:Table {id:"automation.occurrence_dispatch"})
 MERGE (event:Table {id:"automation.occurrence_event"})
 MERGE (self)-[:DEFINES]->(repo)
@@ -34,6 +36,8 @@ MERGE (self)-[:DEFINES]->(terminalize)
 MERGE (self)-[:DEFINES]->(purge)
 MERGE (self)-[:DEFINES]->(tenant)
 MERGE (self)-[:DEFINES]->(decode)
+MERGE (self)-[:DEFINES]->(run_as_actor)
+MERGE (self)-[:DEFINES]->(occurrence_run_as_actor)
 MERGE (self)-[:DEFINES]->(rule_match)
 MERGE (repo)-[:USES_TYPE]->(pool)
 MERGE (persist)-[:CALLS]->(set_tenant_scope)
@@ -43,6 +47,8 @@ MERGE (persist)-[:WRITES]->(event)
 MERGE (load)-[:CALLS]->(set_tenant_scope)
 MERGE (load)-[:CALLS]->(decode)
 MERGE (load)-[:READS]->(schedule_rule)
+MERGE (decode)-[:READS]->(run_as_actor)
+MERGE (persist)-[:WRITES]->(occurrence_run_as_actor)
 MERGE (claim)-[:CALLS]->(set_tenant_scope)
 MERGE (claim)-[:READS]->(schedule_rule)
 MERGE (claim)-[:WRITES]->(dispatch)
@@ -195,10 +201,10 @@ impl PgAutomationScheduleRepository {
             let key = &occurrence.snapshot.key;
             let inserted_id = sqlx::query_scalar::<_, Uuid>(
                 "INSERT INTO automation.occurrence \
-                    (occurrence_id, tenant_id, project_id, rule_id, rule_version, \
+                    (occurrence_id, tenant_id, project_id, rule_id, rule_version, run_as_actor_id, \
                      scheduled_for_utc, scheduled_local_label, utc_offset_seconds, \
                      parser_version, tzdb_version, target_snapshot, target_snapshot_digest, materialized_at) \
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) \
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) \
                  ON CONFLICT (tenant_id, rule_id, rule_version, scheduled_for_utc) DO NOTHING \
                  RETURNING occurrence_id",
             )
@@ -207,6 +213,7 @@ impl PgAutomationScheduleRepository {
             .bind(rule.project_id)
             .bind(key.rule_id.as_uuid())
             .bind(i64::try_from(key.rule_version).map_err(|_| ScheduleRepositoryError::InvalidOccurrence)?)
+            .bind(occurrence.snapshot.run_as_actor_id)
             .bind(key.scheduled_for_utc)
             .bind(&occurrence.snapshot.scheduled_local_label)
             .bind(occurrence.snapshot.utc_offset_seconds)
@@ -733,7 +740,8 @@ async fn persisted_rule_matches(
            AND branch_id = $21 AND engineering_run_id = $22 AND repository_id = $23 \
            AND worktree_id = $24 AND work_item_id = $25 AND execution_profile_id = $26 \
            AND execution_profile_version = $27 AND execution_profile_digest = $28 \
-           AND hook_set_version = $29 AND hook_set_digest = $30)",
+           AND hook_set_version = $29 AND hook_set_digest = $30 \
+           AND run_as_actor_id = $31)",
     )
     .bind(rule.tenant_id)
     .bind(rule.project_id)
@@ -783,6 +791,7 @@ async fn persisted_rule_matches(
             .map_err(|_| ScheduleRepositoryError::InvalidInput)?,
     )
     .bind(&rule.target.hook_set_digest)
+    .bind(rule.run_as_actor_id)
     .fetch_one(&mut **tx)
     .await?;
     Ok(matched)
@@ -847,6 +856,7 @@ fn decode_rule(row: &PgRow) -> Result<AutomationScheduleRuleRevisionV1, Schedule
         rule_id: RuleId::from_uuid(row.try_get("rule_id")?),
         rule_version: u64::try_from(row.try_get::<i64, _>("rule_version")?)
             .map_err(|_| ScheduleRepositoryError::CorruptRule)?,
+        run_as_actor_id: row.try_get("run_as_actor_id")?,
         enabled: row.try_get("enabled")?,
         project_id: row.try_get("project_id")?,
         cron_expression: row.try_get("cron_expression")?,

@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.60）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.63）
 
 ## 0. 文档说明与前提
 
@@ -2545,6 +2545,7 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 | AC-LOOP-005 | Resume 从 loop boundary/checkpoint 续做时重新校验当前 actor、GroupContext、Worktree、Plugin capability 和 Task Contract/version；重放副作用仍由幂等 Domain Command 收敛 |
 | AC-LOOP-006 | BI 只按固定公式报告 scheduled success/misfire、loop acceptance、iteration-to-acceptance、stall/rework 与资源成本；unknown 有 coverage 标记且原始迭代数不是优化目标 |
 | AC-LOOP-007 | Schedule rule Master/SCD2、append-only rule Audit/Occurrence/Event 和带 TTL 的 Work dispatch state 具备 tenant FORCE RLS；tenant/rule/version/UTC-slot 复合唯一键、target/Profile/HookSet snapshot、DST/timezone/policy version 与 monotonic lease generation 可被重复迁移及并发/replay 场景验证；只有 domain/schema/dispatch substrate 而未完成生产 rule API、Run writer/Auth/Outbox/BI 时不得声称 AC-LOOP-001/002 通过 |
+| AC-LOOP-008 | 首版 Rule 的 `run_as_actor_id` 必须等于已授权创建者，所有后续版本和 occurrence snapshot 身份一致；数据库拒绝伪造初始主体、替换 successor run-as 或伪造 occurrence 身份；worker 每次触发读取实时 Project/Run 授权并记录拒绝原因，撤权、目录/权限服务不可用或身份不完整时 occurrence 不得产生 TaskExecutionRun |
 
 实施对账（2026-10-02）：Phase 9F1 已在 `domain-agent::engineering_loop` 提供 Run-local bounded controller 代码切片，固定 Profile/Task Contract/acceptance/HookSet/Validation identity，限制 iteration、wall-clock、CPU/RSS、child process、provider calls、output/event buffer 与 per-Run tool concurrency，并输出 digest-only receipt。验证通过只进入 AwaitingReview，不自动修改 Task 状态。该切片尚未接 Run admission/Auth recheck、CLI/OS process、durable checkpoint/Outbox、Schedule occurrence、BI 或跨 Run 公平调度；当前 Profile v1 没有累计成本预算字段，retry/backoff 也未实现，因此 LOOP-003/004/005 与 AC-LOOP-001..006 仍未整体通过。
 
@@ -2554,9 +2555,15 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 实施对账（2026-10-04，Phase 9F4A）：新增 Run-scoped Schedule Rule list/get/create/revise API；每次请求复验 Project binding 与 Run grant，写事务重新验证当前 Run-owned Worktree、Task link、Profile、Provider/Skill/Grant catalog 和有效 HookSet，并排除 future-dated facts。CAS successor revision 使用同一 transaction timestamp 收口 SCD2 边界；过期幂等 key 先精确删除再执行至多 64 条其他 stale cleanup；Outbox 的复合 FK 固定其 Run 与 Rule revision 一致。显式启用 `jsonwebtoken` RustCrypto，修复原依赖只含 PEM 解析、没有 RS256 crypto provider 的运行时配置缺口。Focused Rust check、6 个 Schedule Rule 模块测试和 PostgreSQL 18.6 disposable 重复迁移/RLS/约束场景已通过；production `build_group_router` 的四种未认证请求均返回 401，四种签名 JWT 缺少所需 scope 时均返回 403，携有效写 scope 的超限 body 返回 413，拒绝响应含 `private, no-store` / `Vary: Authorization`。scope/body-bound 请求用 lazy pool，不进入 PostgreSQL；仍未覆盖成功授权的 role/Project/Run ACL、target binding、page bounds、并发 CAS/replay 或目标 PostgreSQL/RLS/grants。worker、occurrence producer、TaskExecutionRun/reservation/RunEvent admission 与 BI consumer 仍开放，不得声称 Schedule Loop 已生产可用。逐项合同见 [SRS](requirements/SRS-AUTOMATION-SCHEDULE-API-001.md)、[基本设计](design/BD-AUTOMATION-SCHEDULE-API-001.md)、[详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md) 和阶段报告。
 
+实施对账（2026-10-04，Phase 9F4B）：Rule 创建者作为 run-as principal 写入每个版本化 Schedule Rule revision；API 只从已授权创建者取得该主体，successor 复用第一版本身份，DB trigger 禁止伪造初始 creator、替换后续身份，并校验 occurrence 与精确 pinned Rule revision 身份一致；domain 与 PostgreSQL occurrence snapshot 均持久携带主体。Disposable PostgreSQL 18.6 fixture 用历史两版 Rule（首版创建者与 successor 编辑者不同）和旧 occurrence 验证历史回填；迁移在一个事务持有 DDL 表锁时由 schema owner 暂时越过自身 FORCE RLS、停用仅阻断回填的旧 guard，随后恢复所有 guard/FORCE RLS。验证通过 Domain 26/26、API 身份拒绝 1/1、五个 PostgreSQL adapter scenarios；目标 DB migration principal/grants 未验收。后续 worker 每次无人值守触发必须重新读取该主体当前 Project binding 与 Engineering Run grant；撤权或无法确认 ACL 时不得创建 Run。该 phase 尚未实现 worker/Run admission，故 AC-LOOP-008 尚未整体通过；Launch Profile 权威 resolver、目标数据库/RLS/grants、最终 quota/Auth/target recheck、Reservation/TaskExecutionRun/RunEvent、Outbox consumer 与 BI 仍开放。
+
 #### Phase 9F4A Rule API acceptance gate
 
 `SCHED-API-001..010` 的详细要求及验收证据由 `SRS-AUTOMATION-SCHEDULE-API-001` 维护。阶段关闭前须通过目标 Run/Project 授权正负例、Worktree/Task/Profile/HookSet 解绑与漂移拒绝、并发 CAS、相同/冲突幂等键、Audit/Outbox rollback、FORCE RLS 与 runtime grants 验证；代码存在或 source-text 检查不视为通过。API 子集通过也不等于 Schedule occurrence→Run 的 AC-LOOP-001/002 生产闭环通过。
+
+#### Phase 9F4B immutable run-as identity acceptance gate
+
+创建者由创建请求中已通过当前 Project/Run 写授权的 actor 确定；请求 body 不接受 `run_as_actor_id`。迁移按每个 Rule 最早 revision 的 `changed_by` 回填历史行，首版必须满足 run-as 等于 creator，之后数据库检查 successor 保持同一主体；每个 occurrence 将主体复制进专用快照列，并由数据库确认其与精确 pinned Rule revision 一致。occurrence worker 必须在每次新触发、重试与恢复前，以该主体复验有效 Project membership、Run grant 与当前执行 capability；撤权、身份目录不可用或 ACL 事实不能确认时，occurrence 记为拒绝且不得产生 TaskExecutionRun。当前仅实现身份存储和不变式，未启用 worker；Schedule execution 必须 fail closed。
 
 ### 50.8C 可扩展 Agent Execution Profile：Agent、Memory、Skill、Context、Validation
 
@@ -2805,3 +2812,6 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.58 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F4A 独立审查与验证：future-dated currentness 过滤、Run-consistent Outbox FK、SCD2 transaction boundary、expired-key reuse 和私有响应缓存；记录 focused Rust/isolated PostgreSQL 证据，保持 route/target DB/worker/BI 门开放 | 修复实现后同步需求与验收证据 |
 | v5.59 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录通过生产 `build_group_router` 的四方法未认证请求覆盖及私有响应头断言；明确它只验证路由接线/认证拒绝路径，不关闭有效身份、scope/role、Run ACL、target、数据库、worker、admission 或 BI 验收门 | 补充 Schedule route-level 验证后对齐需求与实现状态 |
 | v5.60 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录确定性 RustCrypto RS256 后端及 production router 的签名 JWT scope 拒绝/body 上限测试；精确保留成功授权、DB ACL、分页、CAS/replay 和执行闭环为未验收 | 修复 JWT 测试发现的缺失 crypto provider 并同步实际 HTTP 证据 |
+| v5.61 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 AC-LOOP-008：固定 Schedule 创建者 run-as、数据库禁止 successor 更换主体，并要求每次触发复验 Project/Run 权限，撤权即拒绝创建 Run；明确当前实现不含 worker/Run admission | 用户选定规则创建者为 run-as 且撤权后 fail closed |
+| v5.62 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加强 AC-LOOP-008：首版数据库写入必须证明 run-as 等于创建者，且 occurrence 必须匹配精确 Rule revision；登记 9F4B PostgreSQL 18.6 重复 migration、FORCE RLS 与 5 个真实 adapter 场景验证，同时保留 worker 实时授权与 Run admission 未实现门禁 | Rule/occurrence 身份 guard 与完整 Schedule phase runner 验证完成后对账 |
+| v5.63 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 9F4B 历史双 revision/不同编辑者与旧 occurrence 的 backfill fixture、schema-owner migration 事务边界和验证数量；明确目标 DB grants、worker ACL recheck、Run admission 与 BI 未验收 | 自审发现空库 migration 未覆盖已有 Rule/Occurrence 身份回填，补齐夹具并修复 guard/RLS 阻断 |

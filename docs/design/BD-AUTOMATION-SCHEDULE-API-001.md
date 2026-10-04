@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Verified design/implementation slice; production enablement remains open.
-> Version: 0.4 | Date: 2026-10-04
+> Version: 0.7 | Date: 2026-10-04
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -14,11 +14,13 @@ Schedule Rules are an Automation capability owned by an Engineering Run. The API
 
 Create and revise each run in one PostgreSQL transaction. The transaction sets tenant/actor context, verifies current Project and Run grants, locks the idempotency key, resolves the target and policy snapshot, writes the Master revision and audit/Outbox facts, saves the replay response, then commits. Any error rolls the whole operation back. No handler launches a worker or creates a TaskExecutionRun.
 
+Create derives immutable `run_as_actor_id` from the authenticated actor after Project/Run write authorization. The initial revision binds that identity to `changed_by`; each successor stores the same principal while `changed_by` separately records the editor. Historical rows backfill from the earliest Rule revision's `changed_by`; database guards reject both an initial mismatch and a changed successor principal. Every occurrence persists the identity in its own immutable column, and an insert guard compares it with the exact pinned Rule revision. The 9F4B runner passed on disposable PostgreSQL 18.6: all three migrations applied twice, seven Schedule tables retained FORCE RLS, and five adapter integration cases passed, including mismatched occurrence identity rejection. The future worker must recheck current Project membership, Run grant, and execution capability on every trigger, retry, and resume; revoked or unavailable ACL facts reject the occurrence without creating a Run.
+
 ## 3. W/T/M data classification
 
 | Table | Class | Retention / mutation |
 |---|---|---|
-| `automation.schedule_rule_revision` | Master | Close-only SCD2 revisions; FORCE RLS; no delete/truncate. |
+| `automation.schedule_rule_revision` | Master | Close-only SCD2 revisions with immutable `run_as_actor_id`; FORCE RLS; no delete/truncate. |
 | `automation.schedule_rule_audit` | Transaction | Append-only actor facts; FORCE RLS. |
 | `automation.schedule_rule_outbox` | Transaction | Append-only delivery facts written atomically with the revision; a composite foreign key binds its Run to the revision's Run; FORCE RLS. Consumer delivery state is a later bounded Work concern. |
 | `automation.schedule_rule_command_idempotency` | Work | 24-hour replay TTL, exact expired-key deletion before reuse plus a 64-row stale cleanup budget, FORCE RLS. |
@@ -36,3 +38,5 @@ The current capability is only Rule management. A Rule cannot execute until Phas
 | v0.3 | 2026-10-04 | Align Rule-revision currentness with the current-fact contract and evidence. |
 | v0.4 | 2026-10-04 | Record production REST-router wiring and unauthenticated route test evidence; keep authorization and target-environment gates open. |
 | v0.5 | 2026-10-04 | Pin the JWT crypto backend and record signed-token scope rejection and authenticated body-cap request tests; keep accepted-access and database gates open. |
+| v0.6 | 2026-10-04 | Add immutable run-as principal storage/backfill/guard and future per-trigger current-ACL recheck; keep worker, Launch Profile provider, target DB, and Run admission gates open. |
+| v0.7 | 2026-10-04 | Record the first-revision creator equality and occurrence/pinned-rule identity guards, plus complete 9F4B PostgreSQL 18.6 validation while retaining worker/admission production gates. |

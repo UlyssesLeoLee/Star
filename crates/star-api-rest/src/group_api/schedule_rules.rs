@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=942c9c6b174c9b59f40e5d6bf33d1188bfaab05fb3e63838acf255f3888e2f95
+//! @cypher schema=1 source_sha256=43c229b40796f13ab4d8d2af7f80a2714bad15d8862f0f0b432b75e8c7bb222f
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -34,6 +34,7 @@
 //! MERGE (query:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleListQuery",kind:"struct"})
 //! MERGE (target_input:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleTargetInput",kind:"struct"})
 //! MERGE (write_body:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleWriteBody",kind:"struct"})
+//! MERGE (run_as_actor:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::run_as_actor_id",kind:"field"})
 //! MERGE (json_row:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleJsonRow",kind:"struct"})
 //! MERGE (target_row:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::AuthorizedTargetRow",kind:"struct"})
 //! MERGE (replay:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::IdempotencyReplay",kind:"struct"})
@@ -45,6 +46,7 @@
 //! MERGE (route_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_routes_are_mounted_and_require_authentication",kind:"test"})
 //! MERGE (scope_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_routes_reject_missing_scopes_before_database_access",kind:"test"})
 //! MERGE (body_limit_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_write_body_limit_is_enforced",kind:"test"})
+//! MERGE (run_as_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_request_cannot_select_run_as_actor",kind:"test"})
 //! MERGE (jwt_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_jwt_config",kind:"function"})
 //! MERGE (token_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_token",kind:"function"})
 //! MERGE (body_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_body",kind:"function"})
@@ -58,6 +60,7 @@
 //! MERGE (admission_snapshot:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_current_execution_admission_snapshot",kind:"function"})
 //! MERGE (materializer:Symbol {id:"crates/domain-automation/src/schedule.rs::materialize_schedule_window",kind:"function"})
 //! MERGE (rules:Table {id:"automation.schedule_rule_revision"})
+//! MERGE (run_as_column:Column {id:"automation.schedule_rule_revision.run_as_actor_id"})
 //! MERGE (audit:Table {id:"automation.schedule_rule_audit"})
 //! MERGE (outbox:Table {id:"automation.schedule_rule_outbox"})
 //! MERGE (idempotency:Table {id:"automation.schedule_rule_command_idempotency"})
@@ -178,9 +181,14 @@
 //! MERGE (body_limit_test)-[:CALLS]->(token_fixture)
 //! MERGE (scope_test)-[:CALLS]->(jwt_fixture)
 //! MERGE (body_limit_test)-[:CALLS]->(jwt_fixture)
+//! MERGE (tests)-[:DEFINES]->(run_as_test)
+//! MERGE (run_as_test)-[:TESTS]->(write_body)
 //! MERGE (token_fixture)-[:CALLS]->(issue_token)
 //! MERGE (persist)-[:WRITES]->(rules)
+//! MERGE (persist)-[:WRITES]->(run_as_column)
 //! MERGE (revise)-[:WRITES]->(rules)
+//! MERGE (revise)-[:READS]->(run_as_column)
+//! MERGE (prepare)-[:CONFIGURES]->(run_as_column)
 //! MERGE (record_event)-[:WRITES]->(audit)
 //! MERGE (record_event)-[:WRITES]->(outbox)
 //! MERGE (list)-[:READS]->(rules)
@@ -387,6 +395,7 @@ async fn create_rule(
         run_id,
         &run_scope,
         &body,
+        actor.user_id,
         Uuid::new_v4(),
         1,
     )
@@ -448,8 +457,8 @@ async fn revise_rule(
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(private_json(replay.status, replay.body));
     }
-    let current_version = sqlx::query_scalar::<_, i64>(
-        r#"SELECT rule_version FROM automation.schedule_rule_revision
+    let (current_version, run_as_actor_id) = sqlx::query_as::<_, (i64, Uuid)>(
+        r#"SELECT rule_version, run_as_actor_id FROM automation.schedule_rule_revision
            WHERE tenant_id=$1 AND project_id=$2 AND engineering_run_id=$3
               AND rule_id=$4 AND valid_from<=now() AND valid_to IS NULL FOR UPDATE"#,
     )
@@ -474,6 +483,7 @@ async fn revise_rule(
         run_id,
         &run_scope,
         &body,
+        run_as_actor_id,
         rule_id,
         next_version as u64,
     )
@@ -573,6 +583,7 @@ async fn prepare_rule(
     run_id: Uuid,
     run_scope: &super::engineering_runs::RunTaskScope,
     body: &RuleWriteBody,
+    run_as_actor_id: Uuid,
     rule_id: Uuid,
     rule_version: u64,
 ) -> Result<(AutomationScheduleRuleRevisionV1, ScheduleTargetV1), GroupApiError> {
@@ -641,6 +652,7 @@ async fn prepare_rule(
         tenant_id: actor.tenant_id,
         rule_id: RuleId::from_uuid(rule_id),
         rule_version,
+        run_as_actor_id,
         enabled: body.enabled,
         project_id,
         cron_expression: body.cron_expression.trim().to_owned(),
@@ -693,9 +705,10 @@ async fn persist_revision(
             misfire_policy,misfire_max_occurrences,pause_policy,retry_max_attempts,
             retry_initial_backoff_seconds,retry_max_backoff_seconds,deadline_seconds,branch_id,
             engineering_run_id,repository_id,worktree_id,work_item_id,execution_profile_id,
-            execution_profile_version,execution_profile_digest,hook_set_version,hook_set_digest,changed_by)
+            execution_profile_version,execution_profile_digest,hook_set_version,hook_set_digest,
+            run_as_actor_id,changed_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-                   $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)"#,
+                   $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)"#,
     )
     .bind(rule.tenant_id).bind(rule.project_id).bind(rule.rule_id.as_uuid())
     .bind(i64::try_from(rule.rule_version).map_err(|_| GroupApiError::internal())?)
@@ -713,7 +726,7 @@ async fn persist_revision(
     .bind(i64::try_from(target.execution_profile_version).map_err(|_| GroupApiError::internal())?)
     .bind(&target.execution_profile_digest)
     .bind(i64::try_from(target.hook_set_version).map_err(|_| GroupApiError::internal())?)
-    .bind(&target.hook_set_digest).bind(actor.user_id)
+    .bind(&target.hook_set_digest).bind(rule.run_as_actor_id).bind(actor.user_id)
     .execute(&mut **tx).await.map_err(|_| GroupApiError::internal())?;
     Ok(())
 }
@@ -756,7 +769,10 @@ async fn record_rule_event(
     .bind(version)
     .bind(actor.user_id)
     .bind(correlation_id)
-    .bind(json!({"enabled": rule.enabled, "engineering_run_id": rule.target.engineering_run_id}))
+    .bind(
+        json!({"enabled": rule.enabled, "engineering_run_id": rule.target.engineering_run_id,
+                 "run_as_actor_id": rule.run_as_actor_id}),
+    )
     .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
@@ -768,6 +784,7 @@ async fn record_rule_event(
         "rule_id": rule_id,
         "rule_version": version,
         "changed_by": actor.user_id,
+        "run_as_actor_id": rule.run_as_actor_id,
     });
     sqlx::query(
         r#"INSERT INTO automation.schedule_rule_outbox
@@ -1107,6 +1124,14 @@ mod tests {
             },
         };
         serde_json::to_string(&body).expect("route test request body should serialize")
+    }
+
+    #[test]
+    fn schedule_rule_request_cannot_select_run_as_actor() {
+        let mut body: Value = serde_json::from_str(&route_test_body(None))
+            .expect("valid schedule write body should parse");
+        body["run_as_actor_id"] = json!(Uuid::new_v4());
+        assert!(serde_json::from_value::<RuleWriteBody>(body).is_err());
     }
 
     #[test]
