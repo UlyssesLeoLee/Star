@@ -98,7 +98,8 @@
         "path": "docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md",
         "sha256": "fcdc4f171a6480f2301f62334f27ac659d92ac2624af85a2bcb0094044d367f0"
       }
-    ]
+    ],
+    "commit": "cce89d360d125e48de54c2e0c7918bdac0b1c764"
   },
   "source_validation_evidence": {
     "rust": "Worker report: Rust 1.98.1 cargo --offline check --locked -p star-api-rest --all-targets -j 4 exit 0; three schedule_rules tests passed; owned-source rustfmt check passed.",
@@ -117,6 +118,10 @@
     "BI/Benchmark projection"
   ],
   "dev_update": {
-    "strategy": "fast-forward-only after the candidate commit; no push"
+    "strategy": "fast-forward-only",
+    "from": "3e57012964ba738cf91098e83be11d22b89f3a26",
+    "includes_merge_commit": "cce89d360d125e48de54c2e0c7918bdac0b1c764",
+    "verified": true,
+    "push": "not performed"
   }
 }

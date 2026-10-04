@@ -181,7 +181,14 @@
       "excluded_dirty_paths": [
         "crates/star-api-rest/src/group_api/execution_profile_admin.rs",
         "crates/star-api-rest/src/group_api/execution_profiles.rs"
-      ]
+      ],
+      "merge_commit": "cce89d360d125e48de54c2e0c7918bdac0b1c764",
+      "dev_fast_forward": {
+        "from": "3e57012964ba738cf91098e83be11d22b89f3a26",
+        "includes_merge_commit": "cce89d360d125e48de54c2e0c7918bdac0b1c764",
+        "verified": true,
+        "push": "not performed"
+      }
     }
   ]
 }

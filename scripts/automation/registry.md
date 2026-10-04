@@ -124,7 +124,7 @@
 | v0.42 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 phase9f3_schedule.py：pinned cron/tzdb materializer、PostgreSQL 18.6 disposable cluster、migration 双次应用、FORCE RLS catalog check、非 superuser runtime role 与 4 个 DB integration scenarios；登记 direct test harness、terminal/deadline sweep 与 cleanup contract；同步 automation-design §4.42 / 实施计划 §6.76 | Phase 9F3 adapter 与隔离 PostgreSQL 端到端验证通过 |
 | v0.43 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 Schedule 9F3 最终证据为 domain release tests 26/26 与候选/DST 探测各 32,768 步上限；登记 disabled Rule 双层 fail-closed 与 lease-expired 旧 attempt/fencing generation 断言；说明 DB runner 在 domain-only probe cap 修正前运行；关联 automation-design v1.3、实施计划 v5.77 | 最终自审更新 9F3 物化器边界及文档验收证据 |
 | v0.44 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 `scripts/automation/dev_converge.py` 与 DEV-CONVERGE；增加冻结 source/ref、逐路径理由与 SHA-256 审计产物索引；不将本地收敛描述成 push/生产 phase 完成 | 完成 dev 本地分支收敛并同步 [P] 自动化索引 |
-| v0.45 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 Phase 9F4A Run-scoped Schedule Rule API/persistence slice 的 Rust 与 disposable PostgreSQL 证据及 route/worker/Run admission/BI 未完成门禁；依赖 automation-design v1.5 | 9F4A Rule API 已提交并纳入本地 dev 候选 |
+| v0.45 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 Phase 9F4A Run-scoped Schedule Rule API/persistence slice 的 Rust 与 disposable PostgreSQL 证据及 route/worker/Run admission/BI 未完成门禁；依赖 automation-design v1.5 | 9F4A Rule API 已提交并纳入本地 dev |
 
 ---
 
