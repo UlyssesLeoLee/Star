@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=13b9ec390dea22c022861312cc1e78c135d8ac11ed0c760990fd3ea52aaade72
+//! @cypher schema=1 source_sha256=942c9c6b174c9b59f40e5d6bf33d1188bfaab05fb3e63838acf255f3888e2f95
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -42,6 +42,14 @@
 //! MERGE (policy_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::overlap_and_misfire_policies_map_to_database_columns",kind:"test"})
 //! MERGE (role_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::task_execution_rules_do_not_grant_agent_role_schedule_authority",kind:"test"})
 //! MERGE (response_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_responses_are_private",kind:"test"})
+//! MERGE (route_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_routes_are_mounted_and_require_authentication",kind:"test"})
+//! MERGE (scope_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_routes_reject_missing_scopes_before_database_access",kind:"test"})
+//! MERGE (body_limit_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_write_body_limit_is_enforced",kind:"test"})
+//! MERGE (jwt_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_jwt_config",kind:"function"})
+//! MERGE (token_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_token",kind:"function"})
+//! MERGE (body_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_body",kind:"function"})
+//! MERGE (build_router:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
+//! MERGE (issue_token:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token",kind:"function"})
 //! MERGE (active_binding:Symbol {id:"crates/star-api-rest/src/group_api.rs::active_binding",kind:"function"})
 //! MERGE (require_scope:Symbol {id:"crates/star-api-rest/src/group_api.rs::require_scope",kind:"function"})
 //! MERGE (set_tenant:Symbol {id:"crates/star-api-rest/src/group_api.rs::set_tenant",kind:"function"})
@@ -95,6 +103,12 @@
 //! MERGE (tests)-[:DEFINES]->(policy_test)
 //! MERGE (tests)-[:DEFINES]->(role_test)
 //! MERGE (tests)-[:DEFINES]->(response_test)
+//! MERGE (tests)-[:DEFINES]->(route_test)
+//! MERGE (tests)-[:DEFINES]->(scope_test)
+//! MERGE (tests)-[:DEFINES]->(body_limit_test)
+//! MERGE (tests)-[:DEFINES]->(jwt_fixture)
+//! MERGE (tests)-[:DEFINES]->(token_fixture)
+//! MERGE (tests)-[:DEFINES]->(body_fixture)
 //! MERGE (router)-[:USES]->(response_middleware)
 //! MERGE (router)-[:CALLS]->(list)
 //! MERGE (router)-[:CALLS]->(get)
@@ -156,6 +170,15 @@
 //! MERGE (role_test)-[:CALLS]->(writer)
 //! MERGE (response_test)-[:CALLS]->(response)
 //! MERGE (response_test)-[:CALLS]->(response_middleware)
+//! MERGE (route_test)-[:CALLS]->(build_router)
+//! MERGE (scope_test)-[:CALLS]->(build_router)
+//! MERGE (scope_test)-[:CALLS]->(token_fixture)
+//! MERGE (scope_test)-[:CALLS]->(body_fixture)
+//! MERGE (body_limit_test)-[:CALLS]->(build_router)
+//! MERGE (body_limit_test)-[:CALLS]->(token_fixture)
+//! MERGE (scope_test)-[:CALLS]->(jwt_fixture)
+//! MERGE (body_limit_test)-[:CALLS]->(jwt_fixture)
+//! MERGE (token_fixture)-[:CALLS]->(issue_token)
 //! MERGE (persist)-[:WRITES]->(rules)
 //! MERGE (revise)-[:WRITES]->(rules)
 //! MERGE (record_event)-[:WRITES]->(audit)
@@ -1033,6 +1056,58 @@ fn pause_name(policy: SchedulePausePolicyV1) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+
+    fn route_test_jwt_config() -> Arc<crate::auth::JwtConfig> {
+        Arc::new(crate::auth::JwtConfig {
+            private_key_pem: include_str!("../../tests/fixtures/schedule-route-test-private.pem")
+                .to_owned(),
+            public_key_pem: include_str!("../../tests/fixtures/schedule-route-test-public.pem")
+                .to_owned(),
+            issuer: "https://api.star.local".to_owned(),
+            audience: "star-api-rest".to_owned(),
+            ttl_seconds: 3600,
+        })
+    }
+
+    fn route_test_token(config: &crate::auth::JwtConfig, scope: &str) -> String {
+        crate::auth::issue_token(
+            config,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            vec!["developer".to_owned()],
+            scope.to_owned(),
+        )
+        .expect("fixed test-only RSA key should sign route test tokens")
+        .0
+    }
+
+    fn route_test_body(expected_current_version: Option<i64>) -> String {
+        let body = RuleWriteBody {
+            expected_current_version,
+            display_name: "route-test".to_owned(),
+            enabled: true,
+            cron_expression: "0 * * * *".to_owned(),
+            time_zone: "UTC".to_owned(),
+            dst_gap_policy: ScheduleDstGapPolicyV1::Skip,
+            dst_fold_policy: ScheduleDstFoldPolicyV1::EarlierInstant,
+            overlap_policy: ScheduleOverlapPolicyV1::Skip,
+            misfire_policy: ScheduleMisfirePolicyV1::Skip,
+            pause_policy: SchedulePausePolicyV1::SkipElapsed,
+            retry_policy: ScheduleRetryPolicyV1 {
+                max_attempts: 1,
+                initial_backoff_seconds: 1,
+                max_backoff_seconds: 1,
+            },
+            deadline_seconds: 60,
+            target: RuleTargetInput {
+                worktree_id: Uuid::new_v4(),
+                work_item_id: Uuid::new_v4(),
+                execution_profile_id: Uuid::new_v4(),
+            },
+        };
+        serde_json::to_string(&body).expect("route test request body should serialize")
+    }
 
     #[test]
     fn overlap_and_misfire_policies_map_to_database_columns() {
@@ -1074,6 +1149,162 @@ mod tests {
         );
         assert_eq!(
             error.headers().get(header::VARY).unwrap(),
+            &HeaderValue::from_static("Authorization")
+        );
+    }
+
+    #[tokio::test]
+    async fn schedule_rule_routes_are_mounted_and_require_authentication() {
+        use axum::{
+            body::Body,
+            http::{header, Method, Request},
+        };
+        use sqlx::postgres::PgPoolOptions;
+        use tower::ServiceExt;
+
+        let jwt = Arc::new(crate::auth::JwtConfig {
+            private_key_pem: String::new(),
+            public_key_pem: String::new(),
+            issuer: "https://api.star.local".to_owned(),
+            audience: "star-api-rest".to_owned(),
+            ttl_seconds: 3600,
+        });
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://localhost/unavailable-for-schedule-route-test")
+            .expect("lazy test pool configuration should parse");
+        let app = super::super::build_group_router(super::super::GroupApiState::new(jwt, pool));
+        let collection = "/api/v1/projects/00000000-0000-0000-0000-000000000001/engineering-runs/00000000-0000-0000-0000-000000000002/automation/schedule-rules";
+        let item = format!("{collection}/00000000-0000-0000-0000-000000000003");
+        let cases = [
+            (Method::GET, collection.to_owned(), false),
+            (Method::GET, item.clone(), false),
+            (Method::POST, collection.to_owned(), true),
+            (Method::PUT, item, true),
+        ];
+
+        for (method, path, has_json_body) in cases {
+            let mut request = Request::builder().method(method).uri(path);
+            let body = if has_json_body {
+                request = request.header(header::CONTENT_TYPE, "application/json");
+                Body::from("{}")
+            } else {
+                Body::empty()
+            };
+            let response = app
+                .clone()
+                .oneshot(request.body(body).unwrap())
+                .await
+                .unwrap();
+
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+            assert_eq!(
+                response.headers().get(header::CACHE_CONTROL).unwrap(),
+                &HeaderValue::from_static("private, no-store")
+            );
+            assert_eq!(
+                response.headers().get(header::VARY).unwrap(),
+                &HeaderValue::from_static("Authorization")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn schedule_rule_routes_reject_missing_scopes_before_database_access() {
+        use axum::{
+            body::Body,
+            http::{header, Method, Request},
+        };
+        use sqlx::postgres::PgPoolOptions;
+        use tower::ServiceExt;
+
+        let jwt = route_test_jwt_config();
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://localhost/unavailable-for-schedule-route-test")
+            .expect("lazy test pool configuration should parse");
+        let app =
+            super::super::build_group_router(super::super::GroupApiState::new(jwt.clone(), pool));
+        let collection = "/api/v1/projects/00000000-0000-0000-0000-000000000001/engineering-runs/00000000-0000-0000-0000-000000000002/automation/schedule-rules";
+        let item = format!("{collection}/00000000-0000-0000-0000-000000000003");
+        let cases = [
+            (Method::GET, collection.to_owned(), false, None),
+            (Method::GET, item.clone(), false, None),
+            (Method::POST, collection.to_owned(), true, None),
+            (Method::PUT, item, true, Some(1)),
+        ];
+
+        for (method, path, has_json_body, expected_version) in cases {
+            let token_scope = if has_json_body {
+                "work-item:read"
+            } else {
+                "work-item:write"
+            };
+            let token = route_test_token(&jwt, token_scope);
+            let mut request = Request::builder()
+                .method(method)
+                .uri(path)
+                .header(header::AUTHORIZATION, format!("Bearer {token}"));
+            let body = if has_json_body {
+                request = request
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header("Idempotency-Key", "route-test-scope-denied");
+                Body::from(route_test_body(expected_version))
+            } else {
+                Body::empty()
+            };
+            let response = app
+                .clone()
+                .oneshot(request.body(body).unwrap())
+                .await
+                .unwrap();
+
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+            assert_eq!(
+                response.headers().get(header::CACHE_CONTROL).unwrap(),
+                &HeaderValue::from_static("private, no-store")
+            );
+            assert_eq!(
+                response.headers().get(header::VARY).unwrap(),
+                &HeaderValue::from_static("Authorization")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn schedule_rule_write_body_limit_is_enforced() {
+        use axum::{
+            body::Body,
+            http::{header, Request},
+        };
+        use sqlx::postgres::PgPoolOptions;
+        use tower::ServiceExt;
+
+        let jwt = route_test_jwt_config();
+        let token = route_test_token(&jwt, "work-item:write");
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://localhost/unavailable-for-schedule-route-test")
+            .expect("lazy test pool configuration should parse");
+        let app = super::super::build_group_router(super::super::GroupApiState::new(jwt, pool));
+        let body = vec![b'x'; 16 * 1024 + 1];
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/projects/00000000-0000-0000-0000-000000000001/engineering-runs/00000000-0000-0000-0000-000000000002/automation/schedule-rules")
+                    .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            &HeaderValue::from_static("private, no-store")
+        );
+        assert_eq!(
+            response.headers().get(header::VARY).unwrap(),
             &HeaderValue::from_static("Authorization")
         );
     }

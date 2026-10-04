@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.37**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.38**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -343,7 +343,7 @@ Run budget 至少包括 memory/RSS、CPU 并发、wall-clock deadline、子进�
 
 Schedule Loop 的唯一规则/occurrence owner 是 `domain-automation` 的版本化 `AutomationScheduleRuleRevisionV1` / `AutomationOccurrence`；Group/Workflow 只接收已物化 occurrence 并为目标 Task 派生 Run，不另存 Cron 表或自行计时。`star-scheduler` 只解析依赖 DAG 的 ready 节点，不是 wall-clock scheduler；LangGraph/Workflow 负责已启动 Run 内的编排，不是第二个 schedule owner。Rule 保存 timezone、并发/overlap、misfire、retry、deadline、pause 与目标 scope；每个 occurrence 有稳定 ID、fencing lease、幂等分发和可审计 stop reason。
 
-Phase 9F2/9F3 已提供 Rule/Occurrence schema、版本固定的 bounded materializer 与 PostgreSQL lease/dispatch adapter；本地 disposable PostgreSQL 验证不等于目标库部署。Phase 9F4A 增加嵌套于 Project→Engineering Run 的 Rule API，写事务验证当前 Project/Run/Worktree/Task/Profile/Provider/Skill/Grant catalog/HookSet 并原子写 Rule revision、Audit、Outbox 与 24 小时幂等记录。current selection 同时要求 `valid_from <= now()` 和 `valid_to IS NULL`；Outbox 以复合 FK 固定 Rule version 与 Run，SCD2 close/successor 使用同一 transaction timestamp，expired replay key 可先精确清除后复用。Focused Rust compile/three unit tests 和 disposable PostgreSQL 18.6 repeat-migration、RLS/constraint checks 已通过。API 集成、目标 DB/RLS 与 runtime grant 验证尚未执行，故 API 未验收；尚无已启用 worker、occurrence→TaskExecutionRun/Reservation/RunEvent admission 或 BI consumer。逐路由与事务细节见 [`DD-AUTOMATION-SCHEDULE-API-001`](DD-AUTOMATION-SCHEDULE-API-001.md)，完整 Schedule 闭环保持 fail closed。
+Phase 9F2/9F3 已提供 Rule/Occurrence schema、版本固定的 bounded materializer 与 PostgreSQL lease/dispatch adapter；本地 disposable PostgreSQL 验证不等于目标库部署。Phase 9F4A 增加嵌套于 Project→Engineering Run 的 Rule API，写事务验证当前 Project/Run/Worktree/Task/Profile/Provider/Skill/Grant catalog/HookSet 并原子写 Rule revision、Audit、Outbox 与 24 小时幂等记录。current selection 同时要求 `valid_from <= now()` 和 `valid_to IS NULL`；Outbox 以复合 FK 固定 Rule version 与 Run，SCD2 close/successor 使用同一 transaction timestamp，expired replay key 可先精确清除后复用。工作区显式选择 `jsonwebtoken` RustCrypto 作为唯一 RS256 backend。Focused Rust compile/module tests、production `build_group_router` 上四种未认证请求（401）、四种签名 token 缺 scope 请求（403，DB begin 前拒绝）、有效 write-scope 超限 body 请求（413），以及 disposable PostgreSQL 18.6 repeat-migration、RLS/constraint checks 已通过；拒绝响应均带私有缓存响应头。该 HTTP evidence 不覆盖成功授权的 role/Run/Project ACL、目标绑定、分页、并发 CAS/replay 与目标 DB/runtime grants；API 整体仍未验收。尚无已启用 worker、occurrence→TaskExecutionRun/Reservation/RunEvent admission 或 BI consumer。逐路由与事务细节见 [`DD-AUTOMATION-SCHEDULE-API-001`](DD-AUTOMATION-SCHEDULE-API-001.md)，完整 Schedule 闭环保持 fail closed。
 
 Engineering Loop 是单一 `TaskExecutionRun` 内版本化、预算受限的 Plan/Act/Observe/Verify/Decision 周期。每轮追加 Loop event 和必要 Evidence；不得改写 Run 的 Task Contract/acceptance/profile/HookSet 快照。达到迭代、deadline、CPU/RSS、子进程或 provider 请求上限，检测到无进展/振荡，或发生撤权/cancel 时停止接收新动作、取消并 drain child，再记录 stop reason 和 drain 结果。循环度量来自 durable occurrence/RunEvent/Evidence/Audit；单纯增加轮数或调用量不算成功。
 
@@ -770,3 +770,5 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.35 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51/basic v5.48/Task DD v1.20/SRS v0.7；补充退役 Tauri MockDb 任务记录和 browser-dev fallback、Run provider 缺失时 IPC fail closed、测试 `test-*` fixture；保留未知服务器 legacy 行边界 | 全仓审查发现独立 Tauri 桌面端仍显示旧演示 WorkItem |
 | v4.36 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §6.4 为版本化 Schedule Rule/Occurrence owner；记录 9F2/9F3 substrate 与 9F4A Run-scoped Rule API 边界，链接 Schedule API 详细增量设计，并明确 Cargo/目标 DB/RLS/grants 未验证以及 worker/Run admission/BI 尚未启用 | 9F4A 实施切片与整体 Schedule Loop 设计同步 |
 | v4.37 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F4A 审查修复和 focused Rust/isolated PostgreSQL 证据；补充 future-current 排除、Run FK、SCD2/TTL/cache 边界，保持 route、target DB、worker、admission 与 BI 关闭 | 9F4A 验证后同步详细设计 |
+| v4.38 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录生产 `build_group_router` 四种未认证请求的挂载/拒绝/私有响应头验证；将 valid-auth scope/ACL、目标数据库和 Schedule execution/BI 门明确保持开放 | Schedule API 增补 request-level route 验证后同步详细设计 |
+| v4.39 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Schedule API v0.5，记录 RustCrypto RS256 provider、signed-token scope rejects 和 16 KiB body cap 的 request-level 证据；保留成功授权、Run/Project ACL、target DB、worker 与 BI 开放状态 | 修复 JWT provider 缺省并对齐详细设计和阶段报告 |

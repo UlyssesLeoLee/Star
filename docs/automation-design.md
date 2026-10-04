@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v1.3 (2026-10-03)
+> **文档版本**: v1.7 (2026-10-04)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1166,7 +1166,7 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 
 | 任务卡 | 档位 | 实现/验证 | 验证边界 |
 |---|---|---|---|
-| 持久 Schedule Rule create/list/detail/CAS-revise、绑定校验、事务内 Audit/Outbox 与 24h 幂等回放 | [P]（R/V/S/A） | Rust 1.98.1 star-api-rest all-targets exit 0，schedule_rules tests 3/3，owner files rustfmt check；fresh PostgreSQL 18.6 disposable database 将 occurrence 与 Rule migrations 各运行两遍，RLS、错误 Run 五列 FK、Outbox immutability、过期 same-key replay/64-row cleanup 与 SCD2 clock boundary 场景通过。证据见 docs/reports/PHASE-9F4A-SCHEDULE-RULE-API-REPORT.md。 | 本地持久化/API slice 已验收，但该路径尚未挂载到 production HTTP router；target grants/Auth 与 production database 未验收。Execution worker、occurrence→Run/reservation/RunEvent/Outbox consumer、BI/Benchmark 未接入，Rule 不触发 Agent/CLI；Phase 9F4A 整体保持未关闭。 |
+| 持久 Schedule Rule create/list/detail/CAS-revise、绑定校验、事务内 Audit/Outbox 与 24h 幂等回放 | [P]（R/V/S/A） | Rust 1.98.1 `star-api-rest --all-targets` check exit 0；6 个 Schedule Rule 模块测试含 production `build_group_router` 四方法未认证 401、四方法 signed-token scope rejection 403、有效 write-scope body cap 413；fresh PostgreSQL 18.6 disposable database 将 occurrence 与 Rule migrations 各运行两遍，RLS、错误 Run 五列 FK、Outbox immutability、过期 same-key replay/64-row cleanup 与 SCD2 clock boundary 场景通过。RustCrypto JWT backend 已显式选择。证据见 `docs/reports/PHASE-9F4A-SCHEDULE-RULE-API-REPORT.md`。 | 成功授权 role/Project/Run ACL、target binding、并发 CAS/replay、分页边界、target grants/Auth 与 production database 未验收。Execution worker、occurrence→Run/reservation/RunEvent/Outbox consumer、BI/Benchmark 未接入，Rule 不触发 Agent/CLI；Phase 9F4A 整体保持未关闭。 |
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
@@ -1535,6 +1535,8 @@ frontend/src/app/automation-debug/
 | v1.2 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.42 与 Phase 9F3 bounded runner、临时 PostgreSQL lifecycle/cleanup、direct compiled harness、4 个 DB scenarios 与精确 production blocker；登记 9F3 status 不代表 target DB/Run admission 已完成 | Phase 9F3 adapter 与 PostgreSQL 实证完成 |
 | v1.4 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.43 本地分支收敛工作流，记录冻结 refs、逐路径证据与普通 merge 审计文件 | 用户要求按 Codex/Worktree 设计原则完成 dev 分支本地收敛 |
 | v1.5 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.44 Run-scoped Schedule Rule persistence/API slice，记录 Rust 与 disposable PostgreSQL 验证并保留 route/worker/Run admission/BI gates；修正 §4.42 对 Rule API 的阶段性陈述 | 9F4A Rule API 代码/迁移完成并通过隔离验证后合并到本地 dev |
+| v1.6 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §4.44，记录 production `build_group_router` 四方法未认证请求和私有响应头验证；更正 routes 已挂载的事实，同时保留有效身份/ACL/target、目标 DB、worker、Run admission 与 BI 验收门 | 9F4A route request smoke test 落地并对齐实施证据 |
+| v1.7 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §4.44，记录显式 RustCrypto RS256 backend、签名 JWT scope 拒绝及 write-scope body-cap 路由证据；保留 accepted-access、DB、worker/admission 与 BI 门 | 修复 JWT provider 缺省并同步新增 route validation evidence |
 
 ---
 
