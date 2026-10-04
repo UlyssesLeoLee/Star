@@ -6233,6 +6233,7 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "domain-agent",
+ "domain-automation",
  "domain-batch",
  "domain-cli",
  "domain-comment",

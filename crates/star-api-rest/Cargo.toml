@@ -79,6 +79,7 @@ domain-search = { path = "../domain-search" }
 domain-scm = { path = "../domain-scm" }
 domain-validation = { path = "../domain-validation" }
 domain-hook = { path = "../domain-hook" }
+domain-automation = { path = "../domain-automation" }
 
 # Webhook 出站 (复用 star-webhook DeliveryStore/RetryPolicy, per spec §7.3)
 star-webhook = { path = "../star-webhook" }

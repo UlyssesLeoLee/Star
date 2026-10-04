@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v0.6 (2026-10-03)
+> **文档版本**: v0.8 (2026-10-04)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -11,6 +11,8 @@
 > | v0.4 | 2026-10-02 | 补充 occurrence tenant/rule/version/UTC-slot 复合唯一键、事件 project-scope FK、dispatch fencing/reclaim trigger 与 terminal-based TTL；强调仅源码/schema gate，目标 PostgreSQL/RLS/grants 尚未验收 | Mavis 接手审核 |
 > | v0.5 | 2026-10-02 | 对账 Phase 9F3 pinned cron/tzdb materializer、PostgreSQL persistence/lease adapter 与 disposable PostgreSQL 18.6 的重复 migration、五表 FORCE RLS、idempotency/concurrency/fencing/retry/deadline/TTL 实测；仍区分目标 DB 与生产 Auth/Run admission | Mavis 接手审核 |
 > | v0.6 | 2026-10-03 | 增加候选槽与 DST 转换探测各 32,768 步上限、disabled Rule 双层 fail-closed 与 lease-expired event 旧 attempt/fencing generation 语义；对齐 26/26 domain release tests 和最终验证边界 | Mavis 接手审核 |
+> | v0.7 | 2026-10-03 | 新增 9F4A Rule API 存储分类：Rule display name 延续 Master/SCD2，Outbox 为 append-only Transaction，24h command replay 为受限 Work；记录当前 migration、RLS 与 runtime grants 尚未验证 | Schedule Rule API 增量落库并同步 W/T/M 分类 |
+> | v0.8 | 2026-10-04 | 对账 9F4A 迁移重复应用与隔离 PostgreSQL 约束/RLS证据：Outbox 以复合 FK 固定 Run，幂等记录先删除过期同键再进行有界 stale cleanup，SCD2 successor 使用同一 transaction timestamp；目标库/grants仍开放 | 修复审查发现并同步已验证实现 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -1996,6 +1998,18 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 重复 occurrence materialization 由 `(tenant_id, rule_id, rule_version, scheduled_for_utc)` 唯一键收敛；UTC instant 保留 DST fold 中两个同名本地时刻的区别。Rule successor 不得改写既有 occurrence。DB dispatch trigger 要求新 claim/reclaim 连续增加 generation 与 attempt，拒绝盗取未过期 lease；同 generation heartbeat 不得换 owner 或缩短 expiry。terminal retention 后才允许物理删除 Work row。9F3 以 `cron 0.17.0` + `chrono-tz 0.10.4` 实现固定 parser/tzdb identity、有界窗口物化与 DST/misfire 处理，候选槽与小时级 DST 转换探测各最多 32,768 步；disabled Rule 在 domain materializer 与 PostgreSQL adapter 均拒绝创建 occurrence。`star-pg-adapter` 实现 tenant-local RLS current-rule reader、idempotent occurrence/dispatch/event transaction、bounded `SKIP LOCKED` claim/reclaim、heartbeat/retry、deadline/attempt-exhaustion finalizer 与 Work TTL purge；lease-expired event 明确记录被回收前的 attempt_no 与 fencing_generation，而非新 claim 的身份。最终 domain release tests 26/26；migration 在 PostgreSQL 18.6 disposable loopback 集群重复应用两次，五表 FORCE RLS catalog 检查与非 superuser runtime role 的 4 个 integration scenarios 通过。目标 DB部署、生产 grants/Auth、Rule 写 API、长期 worker、Run/reservation/Outbox atomic admission、BI consumer 仍开放，producer fail closed。
 
 ---
+
+#### 4.13.3 Run-scoped Rule API command records与 transactional outbox（Phase 9F4A）
+
+`db/migrations/2026-10-03-automation-schedule-rule-api.sql` 为 9F4A API 增补以下 storage contract。它不启用调度器或 Run producer；runtime role grants 和目标数据库应用状态需单独部署、验证。
+
+| 表/变更 | W/T/M | 字段、所有权与约束 | RLS / retention |
+|---|---|---|---|
+| `automation.schedule_rule_revision.display_name` | **Master** | 每个不可变 Rule revision 的显示名，长度 1–120；跟随现有 Rule SCD2 successor，不在 API 外单独更新 | 沿用 Rule 表 tenant FORCE RLS；仅 `valid_to` 可变更 |
+| `automation.schedule_rule_outbox` | **Transaction** | 与 Rule revision 同事务写入的 `created`/`revised` 事件，包含 Run、Rule/version、correlation 与 bounded payload；五列复合 FK 绑定同一 Rule revision 与 Engineering Run | tenant FORCE RLS；append-only、禁止 UPDATE/DELETE/TRUNCATE；未来 consumer 的 delivery state 不写入此表 |
+| `automation.schedule_rule_command_idempotency` | **Work** | actor/project/operation scoped key hash + request hash + bounded replay response；同 key 不同请求冲突；24 小时 TTL | tenant FORCE RLS；先精确删除匹配的过期 key，再最多清理 64 条其他过期记录；不存原始 idempotency key |
+
+API、Audit、Outbox 与幂等记录在单个事务提交或回滚；授权必须在每次请求和写入事务内读取 `valid_from <= now()` 且 `valid_to IS NULL` 的当前 Project/Run/Worktree/Task/Profile/Catalog/HookSet 事实。2026-10-04 的 disposable PostgreSQL 18.6 验证已重复应用 9F2/9F4A migration，并验证新表 FORCE RLS、tenant isolation、Outbox Run FK、append-only guard、过期 key reuse 与 SCD2 边界；目标库 grants 和生产 API 仍未验收。
 
 ### 4.14 Module: domain-identity(`identity` schema)
 
@@ -5574,7 +5588,7 @@ erDiagram
 | 10 | search | search | `search_index` | UUID | ✅ | ✅ |
 | 11 | audit | audit | `audit_event`, `ai_audit_metadata`, `audit_event_outbox` | UUID | ✅ | ✅ |
 | 12 | integration | integration | `integration`, `integration_sync_state` | UUID | ✅ | ✅ |
-| 13 | automation | automation | `automation_rule`, `schedule_rule_revision`, `schedule_rule_audit`, `occurrence`, `occurrence_dispatch`, `occurrence_event` | UUID | ✅ | ✅ |
+| 13 | automation | automation | `automation_rule`, `schedule_rule_revision`, `schedule_rule_audit`, `schedule_rule_outbox`, `schedule_rule_command_idempotency`, `occurrence`, `occurrence_dispatch`, `occurrence_event` | UUID | ✅ | ✅ |
 | 14 | identity | identity | `user`, `device`, `device_binding`, `credential`, `user_session` | UUID | ✅ | ✅ |
 | 15 | notification | notification | `notification_channel`, `notification_template`, `notification` | UUID | ✅ | ✅ |
 | 16 | permission | permission | `role`, `permission`, `permission_scheme` | UUID | ✅ | 部分(permission 无) |

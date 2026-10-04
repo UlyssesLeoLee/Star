@@ -1,3 +1,17 @@
+//! @cypher schema=1 source_sha256=1d15a589c3559610fb0b20739e061017d7824ab218abc7ed40951020592dfef5
+//! MERGE (self:File {path:"crates/star-api-rest/src/group_api/hook_policies.rs"})
+//! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/hook_policies.rs::module",kind:"module"})
+//! MERGE (load:Symbol {id:"crates/star-api-rest/src/group_api/hook_policies.rs::load_current_policy",kind:"function"})
+//! MERGE (effective:Symbol {id:"crates/star-api-rest/src/group_api/hook_policies.rs::load_verified_effective_run_snapshot",kind:"function"})
+//! MERGE (snapshot:Symbol {id:"crates/star-api-rest/src/group_api/hook_policies.rs::execution_profile_hook_set_snapshot",kind:"function"})
+//! MERGE (self)-[:DEFINES]->(module)
+//! MERGE (module)-[:DEFINES]->(load)
+//! MERGE (module)-[:DEFINES]->(effective)
+//! MERGE (module)-[:DEFINES]->(snapshot)
+//! MERGE (effective)-[:CALLS]->(load)
+//! MERGE (effective)-[:CALLS]->(snapshot)
+//! @endcypher
+
 //! CYPHER STRUCTURE MANIFEST
 //! CREATE
 //!   (f:File {name:"hook_policies.rs",type:"file",language:"rust"}),
@@ -114,24 +128,24 @@
 //! CREATE (admission:Type {name:"EffectiveHookAdmissionSnapshot",type:"type_alias",language:"rust"}),(profileHookSet:Function {name:"execution_profile_hook_set_snapshot",type:"function",language:"rust",visibility:"private"}),(loadAdmission:Function {name:"load_verified_effective_run_snapshot",type:"function",language:"rust",visibility:"pub(super)"});
 //! CREATE (m)-[:CONTAINS]->(admission),(m)-[:CONTAINS]->(profileHookSet),(m)-[:CONTAINS]->(loadAdmission),(loadAdmission)-[:CALLS]->(load),(loadAdmission)-[:CALLS]->(profileHookSet),(tests)-[:CONTAINS]->(hookSetTest),(hookSetTest)-[:CALLS]->(profileHookSet);
 use axum::{
-    Json, Router,
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Query, State},
     http::header::{CACHE_CONTROL, VARY},
     routing::{get, post, put},
+    Json, Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Duration, Utc};
 use domain_agent::execution_profile::HookSetSnapshot;
 use domain_hook::{HookPhase, HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor, work_items::authorize_worktree,
+    active_binding, require_scope, set_tenant, validate_actor, work_items::authorize_worktree,
+    AuthenticatedUser, GroupApiError, GroupApiState,
 };
 
 // Each batch holds at most 16 verified 64 KiB policy documents in Rust memory.
@@ -1931,7 +1945,8 @@ async fn load_current_policy(
                   inherited_project_policy_set_id, valid_to
            FROM multica.hook_policy_set
            WHERE tenant_id = $1 AND project_id = $2 AND scope_kind = $3
-             AND worktree_id IS NOT DISTINCT FROM $4 AND valid_to IS NULL {lock}"#
+             AND worktree_id IS NOT DISTINCT FROM $4
+             AND valid_from <= now() AND valid_to IS NULL {lock}"#
     );
     sqlx::query_as::<_, PolicyRow>(&query)
         .bind(tenant_id)
@@ -2259,13 +2274,11 @@ mod tests {
 
     #[test]
     fn hook_event_query_rejects_unknown_fields() {
-        assert!(
-            serde_json::from_value::<HookEventsQuery>(json!({
-                "limit": 25,
-                "offset": 100
-            }))
-            .is_err()
-        );
+        assert!(serde_json::from_value::<HookEventsQuery>(json!({
+            "limit": 25,
+            "offset": 100
+        }))
+        .is_err());
     }
 
     fn policy_document(
@@ -2389,18 +2402,16 @@ mod tests {
         );
 
         let overlay = policy_document(tenant_id, project_id, Some(worktree_id), 1, Some(1));
-        assert!(
-            normalize_worktree_document(
-                overlay,
-                tenant_id,
-                project_id,
-                worktree_id,
-                &baseline,
-                2,
-                false,
-            )
-            .is_err()
-        );
+        assert!(normalize_worktree_document(
+            overlay,
+            tenant_id,
+            project_id,
+            worktree_id,
+            &baseline,
+            2,
+            false,
+        )
+        .is_err());
     }
 
     #[test]

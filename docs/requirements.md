@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.56）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.58）
 
 ## 0. 文档说明与前提
 
@@ -2552,6 +2552,12 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 实施对账（2026-10-03，Phase 9F3）：加入固定版本的 `cron 0.17.0` + `chrono-tz 0.10.4` recurrence parser、DST gap/fold 与 misfire/cursor bounded materializer，以及 PostgreSQL current-rule reader、occurrence idempotent persistence、`SKIP LOCKED` claim/reclaim、heartbeat、retry/exhaustion、deadline finalization、terminal transition 与 Work TTL purge。disabled Rule 在 materializer 和 adapter 两层 fail closed；lease-expired audit event 记录被回收的旧 attempt 与旧 fencing generation。候选槽扫描与 DST 转换探测各有 32,768 次硬上限；窗口过宽时调用方必须拆分后续页。PostgreSQL 18.6 disposable loopback cluster 中 migration 重复应用两次、五张表 FORCE RLS catalog check 通过；非 superuser runtime role 实跑 4 个 integration tests（RLS/idempotency、并发 claim/fencing、retry/TTL/reclaim、deadline/exhausted lease），最终 domain release tests 26/26 通过。此为本地 disposable DB 证据，不是目标库部署/grants。生产 rule API、clock/worker、occurrence→Run/reservation/RunEvent/Outbox 原子 admission、BI/Auth/target DB 仍开放；production Schedule capability 继续关闭，AC-LOOP-001/002 未整体通过。
 
+实施对账（2026-10-04，Phase 9F4A）：新增 Run-scoped Schedule Rule list/get/create/revise API；每次请求复验 Project binding 与 Run grant，写事务重新验证当前 Run-owned Worktree、Task link、Profile、Provider/Skill/Grant catalog 和有效 HookSet，并排除 future-dated facts。CAS successor revision 使用同一 transaction timestamp 收口 SCD2 边界；过期幂等 key 先精确删除再执行至多 64 条其他 stale cleanup；Outbox 的复合 FK 固定其 Run 与 Rule revision 一致。Focused Rust check 与三项单测、PostgreSQL 18.6 disposable 重复迁移/RLS/约束场景已通过。路由集成、目标 PostgreSQL/RLS/grants、worker、occurrence producer、TaskExecutionRun/reservation/RunEvent admission 与 BI consumer 仍开放，不得声称 Schedule Loop 已生产可用。逐项合同见 [SRS](requirements/SRS-AUTOMATION-SCHEDULE-API-001.md)、[基本设计](design/BD-AUTOMATION-SCHEDULE-API-001.md)、[详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md) 和阶段报告。
+
+#### Phase 9F4A Rule API acceptance gate
+
+`SCHED-API-001..010` 的详细要求及验收证据由 `SRS-AUTOMATION-SCHEDULE-API-001` 维护。阶段关闭前须通过目标 Run/Project 授权正负例、Worktree/Task/Profile/HookSet 解绑与漂移拒绝、并发 CAS、相同/冲突幂等键、Audit/Outbox rollback、FORCE RLS 与 runtime grants 验证；代码存在或 source-text 检查不视为通过。API 子集通过也不等于 Schedule occurrence→Run 的 AC-LOOP-001/002 生产闭环通过。
+
 ### 50.8C 可扩展 Agent Execution Profile：Agent、Memory、Skill、Context、Validation
 
 Agent 执行能力按稳定契约组合，不把某个 CLI、模型、记忆实现、Skill 格式、上下文算法或验证器写死进 Task/Worktree 身份模型。`AgentExecutionProfile` 是版本化 Master，引用具名且版本固定的 `AgentProvider`、`MemoryProvider`、`SkillRegistry`、`ContextAssembler`、`ValidationProvider`、`LoopPolicy` 与资源预算；Provider 可由内建 Rust 实现或通过隔离 Plugin capability 提供。新增实现应只注册兼容 provider/version/manifest，不改变 `work_item_id`、`run_id`、Worktree 关系或已有历史 Run 语义。未支持的 provider/capability 必须显式标为 unavailable，不得用 mock 或空成功冒充。
@@ -2795,3 +2801,5 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.54 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加强 Phase 9F2 AC-LOOP-007 对账：occurrence key 明确为 tenant + rule ID + rule version + UTC slot；dispatch contract 记录 DB monotonic/contiguous fencing、active lease steal guard 与 terminal-based TTL；保持 DDL/target DB/runtime 验收未完成 | 自审发现 tenant 幂等键与 dispatch fencing/TTL 的 database invariant 需同步到需求 |
 | v5.55 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Phase 9F3 recurrence materializer、PostgreSQL occurrence/lease adapter 与 disposable PostgreSQL 18.6 的 migration/FORCE RLS/4 场景证据；说明生产 rule API、Run admission/Auth/Outbox/BI 与目标 DB 仍开放 | 实现 9F3 adapter 并完成需求/实现/数据库验证对账 |
 | v5.56 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 收紧 9F3 Schedule 验收：disabled Rule 必须在物化层 fail closed；lease-expired audit event 固定记录旧 attempt 与旧 fencing generation；候选槽及 DST 探测均受 32,768 上限约束，domain release tests 26/26；保持 9F4 生产闭环门开放 | 最终自审发现停用规则、lease 审计对应关系和 DST 转换扫描预算需明确入规 |
+| v5.57 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在 §50.8B 记录 9F4A Run-scoped Rule API 的授权、目标快照、CAS/幂等、Audit/Outbox 原子性与验证边界；明确 worker/Run admission/BI 仍未实现 | 将 Rule API 切片及其开放验收门同步到正式需求 |
+| v5.58 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F4A 独立审查与验证：future-dated currentness 过滤、Run-consistent Outbox FK、SCD2 transaction boundary、expired-key reuse 和私有响应缓存；记录 focused Rust/isolated PostgreSQL 证据，保持 route/target DB/worker/BI 门开放 | 修复实现后同步需求与验收证据 |
