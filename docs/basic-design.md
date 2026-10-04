@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.61 (2026-10-05)
-> **上游要件定义书**: docs/requirements.md v5.64
+> **文档版本**: v5.63 (2026-10-05)
+> **上游要件定义书**: docs/requirements.md v5.66
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4871,6 +4871,10 @@ Run Workspace 默认选中同级 `Task Cards` tab。`RunTaskCardsPanel` 只调�
 Schedule admission 的事实链仍属于 Project → Branch → Engineering Run → Worktree 下的 Run Automation/Workflow 能力，不新增导航节点。数据库为 `automation.occurrence_dispatch` 增加 `admitted_run_id`，仅允许 dispatch 在 `leased → admitted` 时绑定 schedule-origin 的 TaskExecutionRun；trigger 约束状态转换及 fencing/attempt 序列，但不验证 worker 提交的当前 lease owner/generation。未来 writer 必须以条件更新校验当前 owner、generation、lease expiry 与 occurrence deadline，并从 canonical TaskExecutionRun 重新确认 Worktree/Task binding。FK/trigger 固定 tenant/Project/Engineering Run/Task、occurrence、精确 Rule revision、agent channel 和 immutable run-as 的一致性；本 migration 的 Run/Outbox 记录没有独立 `worktree_id` 约束。成功 admission 后 Run ID 不可替换。独立 `automation.schedule_run_outbox` 是 append-only Transaction，按 occurrence/event type 去重，并用复合 FK 固定 tenant/Project/Run/Rule revision/occurrence/TaskExecutionRun。
 
 Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应用、八张 Schedule 表 FORCE RLS、匹配身份的 admitted Run/Outbox 写入、run-as mismatch、已绑定 Run 替换拒绝、Outbox UPDATE 拒绝和非 superuser tenant 隔离；Outbox 的 DELETE/TRUNCATE trigger 与其它 source/channel negative cases 尚未由该 runner 单独覆盖。该证据只覆盖 DB persistence contract，不证明 application admission writer 已把实时 Project/Run 授权、Worktree/Task/Profile/HookSet/target/quota 复验、Reservation、TaskExecutionRun、RunEvent 与 Outbox 原子提交。生产 worker 与 writer 未接入前保持 Schedule capability 关闭；撤权或 ACL 源不可用必须 fail closed。
+
+### 16.25 Phase 9F4C-B Rule enable-time run-as authorization
+
+规则管理员与无人值守执行主体分开授权。创建启用 Rule 时使用创建者派生的固定 `run_as_actor_id`；重新启用 successor 时使用锁定 revision 中的原主体。写事务锁定并检查 run-as 当前 Project/Run writer bindings、Branch 当前 grant 与 Engineering Run `active` 状态。编辑者另行通过自己的 Rule 管理权限；停用不要求创建者仍有权限，从而能在撤权后停止 Rule。此逻辑已在 API 源码接入并通过定向 crate all-targets check、rustfmt 和纯角色策略 helper 单测 1/1（tenant_admin/developer/project_admin 接受，viewer/agent/空角色拒绝）；该单测不覆盖数据库授权查询，但实际 authorization SQL 尚未由带 canonical Directory grants fixtures 的 disposable PostgreSQL 集成验证。worker 每次新 occurrence、retry 和 resume 的当前身份/执行能力检查仍未实现，Schedule 继续 fail closed。
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -4978,3 +4982,5 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 | v5.59 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.62 与 Schedule API v0.7；记录首版 creator/run-as 数据库等值校验、successor 替换拒绝、完整 9F2/9F4A/9F4B PostgreSQL runner 证据及仍未实现的 worker/Run admission | 9F4B 完整 runner 通过并补齐首版身份负例 |
 | v5.60 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.63 与 Data Design v1.1；补充历史 Rule/Occurrence 回填 fixture 证据及 schema-owner migration 锁/RLS/guard 恢复边界；保留目标 DB migration grants、worker reauthorization 与 Run admission 开放状态 | 自审发现空数据库 runner 未覆盖 legacy identity backfill，修正 migration 后补测并对齐基本设计 |
 | v5.61 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.64；增加 9F4C-A admitted Run 不可变关联、schedule Run Outbox、8 表 FORCE RLS 与隔离 PostgreSQL 验证边界；明确生产 admission writer、实时 run-as/target/quota recheck、Reservation/RunEvent、consumer 和 BI 未完成 | 用户确认 creator-as-run-as 撤权 fail-closed 并继续 Schedule admission persistence |
+| v5.62 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.65 与 Schedule API v0.9；定义规则 editor/run-as 双身份、启用时当前 Project/Run 权限复验以及撤权后停用路径，保留 per-trigger worker 与 SQL integration test 门 | 用户明确规则创建者固定 run-as、每次触发复验且撤权 fail closed |
+| v5.63 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.66 与 Schedule API v0.10；记录 9F4C-B all-targets/rustfmt 及纯角色策略单测 1/1，明确新授权 SQL 无 disposable Directory ACL fixture、per-trigger worker 与 admission 仍未实现 | 完成 API enable gate 的隔离链接验证并复核实现边界 |

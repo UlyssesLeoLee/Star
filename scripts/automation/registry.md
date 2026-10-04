@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.51 (2026-10-05)
+> **文档版本**: v0.54 (2026-10-05)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.1 (§4.46 Schedule admission persistence + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.4 (§4.46 Schedule admission persistence、§4.48 enable-time authorization + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -28,6 +28,8 @@
 
 新增 Schedule 9F4C-A：`phase9f3_schedule.py` 扩展为四段 migration chain runner，验证 `leased → admitted` dispatch transition 的 immutable `admitted_run_id`、schedule-origin Run/occurrence/Rule revision/run-as/channel DB guards、append-only `automation.schedule_run_outbox`、8 张 Schedule 表 FORCE RLS 与非 superuser tenant isolation。runner 断言合法绑定、run-as mismatch、Run link mutation 与 Outbox UPDATE refusal；DB trigger 要求状态/fencing 序列，但不校验当前 worker lease owner/generation，未来 writer 必须条件更新复验 owner/generation/expiry/deadline。PostgreSQL 18.6 disposable 验证及五个 adapter scenarios 通过；当前没有 production admission writer/worker、实时授权/target/profile/HookSet/quota recheck、Reservation/RunEvent 原子写入、Outbox consumer 或 BI，Schedule capability 保持关闭。调用与阶段边界见 automation-design §4.46、实施计划 §6.79 与阶段报告。
 
+新增 Schedule 9F4C-B API authorization gate：启用 Rule create/revision 在与 revision 写相同的事务中调用 run-as grant query，锁定当前 Project/Branch/Run 和 Project/Run grants；editor 单独通过规则写授权，撤权后的 editor 可停用，但 enabled 版本必须由不可变 creator 当前权限继续授权。Rust all-targets check、rustfmt 与纯角色策略 helper 单测 1/1 通过；`phase9f3_schedule.py` 现包含 run-as 请求不可自选和角色策略两个定向 test steps，可通过隔离 `CARGO_TARGET_DIR` 复跑。runner 未加载 canonical Directory ACL migrations/fixtures，故新增 ACL SQL 的成功、撤权、暂停与并发 grant mutation 场景尚未实测；trigger/retry/resume worker 与 admission 继续 fail closed（automation-design §4.48 / 实施计划 §6.80）。
+
 本索引跟踪 `scripts/automation/` 下所有 python 脚本的:
 - **路径**: 相对仓库根的路径
 - **用途**: 1 行简述
@@ -48,7 +50,7 @@
 | `scripts/automation/engineering_run_directory.py` | 定向compile/typecheck与隔离PostgreSQL目录DDL/catalog、可选 TaskRun identity/shape/FK guard；仅 --cli-tests 显式跑定向单测，可选 backend-only finally恢复manifest/lock；不跑生产migration；不覆盖 ERUN-P3 Task Owner/outbox migration | ERUN-P1/P2；automation-design §4.36/4.37 | 本次提交（见Git） | 🟡 目录基础已检查；ERUN-P3自动化和生产运行门未完成 |
 | `scripts/automation/erun_task_cards.py` | Run Task Cards TypeScript/Vitest gates 与 Tauri desktop build/聚焦测试 gates；输出写日志文件、900 秒超时，依赖未显式安装时返回 blocked；不自动下载依赖、不调用生产数据库 | ERUN-P3 Run Task Cards UI + legacy mock Task retirement；automation-design §4.39-4.40；实施计划 §6.72-6.73 | 本次提交（见Git） | 🟡 自动化脚本已落档；验证状态见阶段报告，不代表生产启用 |
 | `scripts/automation/phase9f2_schedule_occurrence.py` | Schedule 9F2 rustfmt、domain-automation tests、clippy 与 migration source-text contract；日志文件化/900 秒超时；Cargo.lock 干净时运行 Cargo 并精确恢复原字节；默认离线，可显式 --online；Clippy 仅豁免三类旧 lint；不执行 SQL | ERUN-P4 Schedule 9F2；automation-design §4.41；实施计划 §6.75 | 本次提交（见Git） | 🟡 领域与源码 gate；数据库/worker/Run admission 未验收 |
-| `scripts/automation/phase9f3_schedule.py` | Schedule 9F3/9F4B/9F4C rustfmt、domain tests、adapter/API all-target checks、Clippy、9F3 adapter cases + 9F4B creator/occurrence negative coverage、9F4C admitted Run/Outbox fixture、run-as mismatch、Run link mutation 与 Outbox UPDATE refusal；legacy backfill fixture 验证不同 editor 的两版 Rule 与旧 occurrence 身份继承；完整四 migration chain 双次 apply、8 表 FORCE RLS、非 superuser runtime role、file-backed logs/900s timeout；本机 PostgreSQL bin dir 或 Docker image runner（loopback publish、精确容器 cleanup） | ERUN-P4 Schedule 9F3/9F4B/9F4C；automation-design §4.42/4.45/4.46；实施计划 §6.76/6.78/6.79 | 本次提交（见Git） | 🟡 recurrence/lease、immutable run-as 与 admission persistence contract 验证；per-trigger auth worker、Launch Profile provider、实时 Auth/target/quota recheck、atomic Reservation/TaskExecutionRun/RunEvent writer、Outbox consumer/BI/target migration grants 仍未完成 |
+| `scripts/automation/phase9f3_schedule.py` | Schedule 9F3/9F4B/9F4C rustfmt、domain tests、adapter/API all-target checks、Clippy、9F3 adapter cases + 9F4B creator/occurrence negative coverage、9F4C admitted Run/Outbox fixture、run-as mismatch、Run link mutation 与 Outbox UPDATE refusal；9F4C-B creator-selection 和角色授权 helper 两个独立 API tests；legacy backfill fixture 验证不同 editor 的两版 Rule 与旧 occurrence 身份继承；完整四 migration chain 双次 apply、8 表 FORCE RLS、非 superuser runtime role、file-backed logs/900s timeout；本机 PostgreSQL bin dir 或 Docker image runner（loopback publish、精确容器 cleanup） | ERUN-P4 Schedule 9F3/9F4B/9F4C；automation-design §4.42/4.45/4.46/4.48；实施计划 §6.76/6.78-6.80 | 本次提交（见Git） | 🟡 recurrence/lease、immutable run-as、admission persistence 与 Rule enable-time source wiring 检查；新增目录 ACL SQL 未做 DB fixture；per-trigger auth worker、Launch Profile provider、实时 Auth/target/quota recheck、atomic Reservation/TaskExecutionRun/RunEvent writer、Outbox consumer/BI/target migration grants 仍未完成 |
 | `scripts/automation/__init__.py` | 包初始化, 暴露 4 基类 + CLI | 全部 | TBD | 🟢 完成 |
 | `scripts/automation/dispatcher.py` | 子代理 dispatch 基类 (per §3.1 + §6.1) | H2-1/H2-2/H2-3/H2-4/H2-5 (refactor_template 调用) | TBD | 🟡 stub (invoke / verify / collect_output 待对接 Mavis task 调度) |
 | `scripts/automation/cli_helper/__init__.py` | cli_helper 子包初始化 | 全部 | TBD | 🟢 完成 |
@@ -133,6 +135,9 @@
 | v0.49 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 9F4B 的主体复制到 PostgreSQL occurrence 专列并加入精确 Rule-version trigger 与 mismatch negative assertion；登记 runner Docker backend 在 PostgreSQL 18.6 上的全阶段成功证据和 5 个 adapter 场景；同步 automation-design v1.9 与计划 v5.84 | 自审确认 occurrence snapshot 的 domain/DB 字段需显式持久化后修复 |
 | v0.50 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 Schedule 9F4B legacy backfill fixture、migration 临时恢复 schema-owner RLS bypass/停用旧 guards 并恢复 FORCE RLS 的事务边界；同步 automation-design v2.0、计划 v5.85、Group DD v4.42 与 Data Design v1.1；明确 target migration grants 和每触发 worker reauthorization 未验收 | 空数据库 runner 无法验证历史 Rule/Occurrence identity backfill，扩展后发现 migration guard blocker 并修复 |
 | v0.51 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 `phase9f3_schedule.py` 为四 migration admission runner，登记 immutable admitted Run、schedule Run Outbox、8 表 FORCE RLS 和 runtime tenant isolation；同步 automation-design v2.1、计划 v5.86、Group DD v4.43、Data Design v1.2；明确仅 DB contract 已验证，worker/atomic writer/consumer/BI 仍开放 | Phase 9F4C-A admission persistence slice 完成并对齐自动化追踪 |
+| v0.52 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 索引 Schedule 9F4C-B enable-time run-as ACL gate，记录 editor/creator 权限分离、enable 同事务校验、撤权后可 disable、all-targets check/rustfmt 与 canonical ACL SQL fixture 缺失；明确 per-trigger worker/admission 不在本 slice 内 | 用户确认创建者为固定 run-as 并要求每次触发重验，API enable path 增加对应权限门 |
+| v0.53 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 Schedule 9F4C-B 纯角色策略 helper 单测 1/1、registry_check 0 errors/191 warnings；将 canonical Directory ACL SQL fixture 明确标为缺失，并保留 worker/admission 未实现状态  | 本阶段聚焦链接测试完成后补录证据与剩余 worker/ACL 门禁 |
+| v0.54 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 `phase9f3_schedule.py` runner，将 9F4C-B run-as creator-selection 与角色授权 helper 两个 Rust test steps 纳入可重放 Schedule gate；同步 automation-design v2.4 和阶段报告；SQL ACL fixture 与 per-trigger worker/admission 缺口保持显式 | 提交前对照自动化 runner/阶段报告时发现已通过的角色 helper test 未入 runner |
 
 ---
 

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.1 (2026-10-05)
+> **文档版本**: v2.4 (2026-10-05)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1184,6 +1184,14 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 
 先接入可信身份和 target/Profile/HookSet/quota authority，在短事务边界内锁定 occurrence 的有效 fencing generation，重新验证规则固定的 run-as 当前 Project binding/Engineering Run grant，并幂等提交 Reservation、TaskExecutionRun、RunEvent、dispatch admitted link 与 schedule Run Outbox。任一 ACL、target、budget 或 insert 失败都回滚且不产生孤儿 Run；撤权与身份目录不可用按可审计拒绝收敛。随后实现有界 lease worker/recovery 与 Outbox consumer，并用目标数据库角色和真实 provider 验收；达到门槛前 Schedule 保持关闭。
 
+### 4.48 Phase 9F4C-B Rule enable-time run-as authorization（2026-10-05）
+
+| 任务卡 | 档位 | 实现/验证 | 验证边界 |
+|---|---|---|---|
+| Enabled Rule 必须由固定创建者当前身份继续授权 | [P]（R/V/S/A） | `schedule_rules.rs` 将 editor Project/Run writer 检查与 run-as execution identity 分开；创建 enabled Rule 时由派生 creator 作第二次检查，启用 successor 时读取锁定 Rule 的 immutable `run_as_actor_id`；查询锁定当前 Project/Branch/Run directory 与 grant row，要求 Project/Run writer、Branch binding 存在且 Run active。disabled 写入不要求 creator 仍授权，使管理者可在撤权后停用。检查与 Rule revision/Audit/Outbox 共用事务。`phase9f3_schedule.py` 加入 run-as 请求不可自选与角色策略 helper 两个独立 Rust test steps | Rust `cargo check --locked -p star-api-rest --all-targets -j 4`、focused rustfmt 和纯角色策略 helper 单测 1/1 通过；该 helper step 已登记在 Schedule runner，可用 `CARGO_TARGET_DIR` 指向隔离链接目录复跑。执行路径 SQL 尚未通过 canonical directory ACL PostgreSQL fixture。每次触发/retry/resume 的 worker 重授权、execution capability、target/Profile/HookSet/quota、lease owner/generation 与原子 Run admission 仍待 9F4C-C+，Schedule 保持 fail closed。详见 9F4C 报告 |
+
+此 gate 只决定用户提交的 enabled Rule 是否可写入，不缓存授权结果，也不为未来 occurrence 授权。admission transaction 必须重新读取固定 run-as 身份的当前 Project/Run grant；撤权或授权目录不可用时不得创建 TaskExecutionRun。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1557,6 +1565,9 @@ frontend/src/app/automation-debug/
 | v1.9 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 9F4B occurrence 专用 run-as 持久列与 Rule revision trigger，并将 phase9f3_schedule.py 扩展为可选择本机 PostgreSQL 工具或 loopback Docker backend；记录完整 migration/RLS/五场景证据和未实现 worker 门禁 | 自审补齐 occurrence 快照缺失并将验证 runner 适配当前 Windows 环境 |
 | v2.0 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在 §4.45/runner 对账 legacy Rule/Occurrence backfill fixture；修复既有 SCD2/append-only guards 与 FORCE RLS 阻止 migration 回填的问题，记录事务内 schema-owner unlock/backfill/restore 语义和 full runner 通过；保留 worker/Auth/Run admission/target migration grants/BI 未完成门禁 | 自审增加真实旧数据夹具后发现并修复 migration backfill 阻断 |
 | v2.1 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.46 的 9F4C-A admission persistence gate 与 §4.47 下一阶段 worker/writer 边界；对账完整 migration chain、8 表 FORCE RLS、run-as mismatch、Run link mutation、Outbox UPDATE refusal 与 runtime tenant 隔离；明确 DB contract 不代表应用原子写入/实时授权/BI 完成 | 用户确认 creator-as-run-as 撤权 fail closed 后继续 admission persistence |
+| v2.2 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.48 Rule create/enable 的事务内固定 run-as Project/Run 当前权限检查、撤权后的 disable 管理路径与验证缺口；下一阶段仍要求每次 occurrence admission 重授权 | 用户明确 run-as 创建者身份和实时撤权门，并确认采用创建者作为 run-as |
+| v2.3 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 9F4C-B 纯角色策略 helper 单测 1/1 通过，区分 helper 结果与未覆盖的目录 ACL SQL；登记 registry_check 0 errors/191 warnings，并保留每次触发 reauth 的 worker 缺口 | 完成本阶段最后一次隔离链接验证并同步证据边界 |
+| v2.4 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 9F4C-B 纯角色策略 helper 单测纳入 `phase9f3_schedule.py` 的可重放 cargo gate，并补齐 registry/report/实施计划追溯；run-as 创建者权限仅在 Rule enable 写入时验证，per-trigger/retry/resume 重授权仍等待 worker | 提交前自审发现已通过的角色策略测试尚未接入仓库 [P] runner |
 
 ---
 

@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Verified design/implementation slice; production enablement remains open.
-> Version: 0.8 | Date: 2026-10-05
+> Version: 0.10 | Date: 2026-10-05
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -35,7 +35,11 @@ The current capability is only Rule management. A Rule cannot execute until Phas
 
 The migration does not create a dispatcher, authorize the stored run-as actor, reserve quota, write a RunEvent, or admit a TaskExecutionRun. A later short transaction must revalidate current identity/ACL/target/profile/HookSet/quota and lease owner+generation, then write Run, reservation, RunEvent, dispatch link, occurrence event, and this Outbox atomically. Historical dispatches without a provable matching Run remain nullable/unresolved; migration does not infer or backfill a Run identity. The chain requires the canonical TaskExecutionRun migration to be installed first. PostgreSQL 18.6 disposable validation applied the Schedule chain twice and tested positive/negative linkage, immutable identity, Outbox append-only behavior, tenant FORCE RLS, and non-superuser tenant isolation; it does not verify target DB grants or the later transaction writer.
 
-## 6. Revision history
+## 6. 9F4C-B Rule enable authorization
+
+Rule management identity and unattended execution identity are separate. Each write first authorizes the authenticated editor against current Project/Run writer grants. Creating an enabled Rule then checks its derived creator run-as actor; revising an enabled Rule checks the immutable run-as actor loaded from the locked current revision. The check requires current Project and Run writer grants, the current Branch binding, and an active Engineering Run, and it shares the rule-write transaction so a failed check cannot persist the enabled revision. A manager can disable a Rule after creator revocation, provided the manager still has current rule-write access. The pure role-policy helper matrix test passes 1/1; this only proves the role allowlist and does not exercise the SQL authorization path, which has no disposable PostgreSQL ACL fixture yet. This is only an enable-time guard; each trigger, retry, and resume still requires the same recheck in the not-yet-implemented admission transaction.
+
+## 7. Revision history
 
 | Version | Date | Change |
 |---|---|---|
@@ -47,3 +51,5 @@ The migration does not create a dispatcher, authorize the stored run-as actor, r
 | v0.6 | 2026-10-04 | Add immutable run-as principal storage/backfill/guard and future per-trigger current-ACL recheck; keep worker, Launch Profile provider, target DB, and Run admission gates open. |
 | v0.7 | 2026-10-04 | Record the first-revision creator equality and occurrence/pinned-rule identity guards, plus complete 9F4B PostgreSQL 18.6 validation while retaining worker/admission production gates. |
 | v0.8 | 2026-10-05 | Define 9F4C-A's fenced occurrence-to-Run persistence link and separate append-only Schedule Run Outbox; record repeated disposable PostgreSQL validation and retain all authorization/atomic-writer/worker gates. |
+| v0.9 | 2026-10-05 | Define create/enable-time run-as reauthorization separately from editor authorization; permit authorized managers to disable after creator revocation; retain the per-trigger worker gate and disclose missing ACL query integration coverage. |
+| v0.10 | 2026-10-05 | Record the 1/1 pure role-policy helper test and clarify that it is not database ACL integration evidence; keep SQL fixture and per-trigger authorization gates open. |

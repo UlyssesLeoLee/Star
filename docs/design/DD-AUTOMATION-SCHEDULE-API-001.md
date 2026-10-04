@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
 > Status: 🟡 Verified implementation slice; route and target-environment verification remain open.
-> Version: 0.8 | Date: 2026-10-05
+> Version: 0.10 | Date: 2026-10-05
 
 ## 1. Routes
 
@@ -26,11 +26,11 @@ The fully resolved `AutomationScheduleRuleRevisionV1` passes its domain validati
 
 1. Validate Actor, scope, bounded request, route UUIDs, and idempotency header.
 2. Begin a PostgreSQL transaction; set `app.tenant_id` and `app.actor_id`; apply statement and lock timeouts.
-3. Check active Project binding and authorize the Engineering Run and role.
+3. Authorize the authenticated editor against current Project and Engineering Run writer grants; the current Branch binding must also exist.
 4. Lock a deterministic transaction advisory key derived from tenant, Project, actor, operation, and SHA-256 of the idempotency key.
 5. Delete an expired record for the exact key before reuse, then delete at most 64 unrelated expired replay rows visible to that actor/Project. If a live replay exists, return the saved status/body when the request hash matches; otherwise return `409 idempotency_key_reused`.
-6. Resolve/lock current Worktree, Task link, Profile, catalog, and HookSet facts.
-7. For revision, lock the current rule revision including `run_as_actor_id`, compare `expected_current_version`, and copy that identity unchanged; close the old `valid_to` with transaction `now()` and insert `version+1` with the same boundary. The SCD2 guard rejects other history mutation, and the run-as trigger serializes inserts for the Rule and rejects a changed actor.
+6. For an enabled create, recheck the creator-derived `run_as_actor_id` against current Project/Run writer grants and require the Run to be active. For an enabled revision, first lock the current Rule row and compare `expected_current_version`, then perform the same recheck against the immutable actor from that row. These grant/directory rows are locked in the write transaction. A disabled revision skips the creator recheck so an authorized manager can stop a rule after creator revocation.
+7. Resolve/lock current Worktree, Task link, Profile, catalog, and HookSet facts. For revision, copy the locked `run_as_actor_id` unchanged; close the old `valid_to` with transaction `now()` and insert `version+1` with the same boundary. The SCD2 guard rejects other history mutation, and the run-as trigger serializes inserts for the Rule and rejects a changed actor.
 8. Insert actor audit facts and a Run-consistent `schedule_rule.created`/`schedule_rule.revised` Outbox record. Save the 24-hour idempotency response.
 9. Commit. Any failure before commit rolls back Master, Audit, Outbox, and replay state together.
 
@@ -38,13 +38,14 @@ The fully resolved `AutomationScheduleRuleRevisionV1` passes its domain validati
 
 Missing/foreign Project, Run, Worktree, Task, or Rule returns not-found to avoid revealing cross-scope resource existence. Missing scope/role returns forbidden. Version mismatch returns `409 schedule_rule_version_conflict`. Database/provider failures fail closed. The API does not start an occurrence or TaskExecutionRun; consumers and Run admission remain separate phase gates.
 
-`run_as_actor_id` is the fixed identity for future unattended work, not a durable authorization grant. Each occurrence dispatch, retry, and resume must resolve the actor's current Project binding, Run grant, and execution capability. Revocation or ACL lookup failure rejects dispatch without creating a Run. Regranting does not change the creator identity; replacing the owner requires a new Rule. The worker and this authorization transition remain unimplemented.
+`run_as_actor_id` is the fixed identity for future unattended work, not a durable authorization grant. The create/enable API gate now checks the actor's current Project/Run writer grants and active Run state; it does not enable a worker. Each occurrence dispatch, retry, and resume must repeat the authorization check in the admission transaction and resolve current target/profile/HookSet/quota and execution capability. Revocation or ACL lookup failure rejects dispatch without creating a Run. Regranting does not change the creator identity; replacing the owner requires a new Rule. The worker and admission transition remain unimplemented, and the new directory-ACL SQL has not yet been exercised by a disposable PostgreSQL fixture.
 
 ## 5. Verification required before phase closure
 
 - Re-run focused `rustfmt` and `cargo check --all-targets` after any change to this slice (the 2026-10-04 direct-toolchain checks passed).
 - Completed: unauthenticated requests to collection GET/POST and item GET/PUT return 401; signed tokens missing the required scope return 403 before database access; a valid write-scope token with an oversized body returns 413. Rejection responses carry private/no-store headers.
-- Still required: role matrix, Run/Project mismatch, target ownership, version conflict, page bounds, and authenticated no-store behavior on success and application errors.
+- Completed after 9F4C-B: the pure role-policy helper matrix test passed 1/1 for accepted writer roles and viewer/agent/empty-role denial. This unit test does not exercise the new SQL grant query.
+- Still required: SQL-backed role matrix for accepted/revoked/paused grants, including the 9F4C-B canonical Project/Branch/Run ACL query, Run/Project mismatch, target ownership, version conflict, page bounds, and authenticated no-store behavior on success and application errors.
 - Idempotency tests for replay, mismatched key reuse, concurrent same-key create, and concurrent CAS revision.
 - Completed in the bounded runner with disposable PostgreSQL 18.6: apply the 9F2/9F4A/9F4B migration chain twice; assert all seven Schedule tables use FORCE RLS; exercise tenant isolation, Run-consistent Outbox, append-only mutation rejection, SCD2 boundary, exact-key TTL replay reuse, initial creator/run-as equality, immutable run-as successor behavior, and occurrence-to-pinned-Rule identity equality.
 - Compare actual migration privileges with target production database/runtime role grants; until confirmed, keep that release gate open.
@@ -71,3 +72,5 @@ The updated bounded runner passed on a disposable PostgreSQL 18.6 instance: four
 | v0.6 | 2026-10-04 | Specify non-client-controlled run-as identity, stable SCD2 inheritance, DB guard behavior, and mandatory per-trigger reauthorization while retaining the unimplemented worker/admission boundary. |
 | v0.7 | 2026-10-04 | Specify DB creator binding and occurrence-to-rule identity invariants and record the completed three-migration/five-case PostgreSQL runner; retain production ACL/worker gates. |
 | v0.8 | 2026-10-05 | Specify fenced Run linkage and Schedule Run Outbox DB invariants; record repeated disposable PostgreSQL checks and keep worker authorization, quota, atomic writer, target DB and BI gates open. |
+| v0.9 | 2026-10-05 | Specify editor/run-as separation, transactional authorization on enabled Rule writes, disable-after-revocation behavior, and the still-open per-trigger worker gate. |
+| v0.10 | 2026-10-05 | Record the pure role-policy helper test separately from route/SQL authorization evidence; keep canonical ACL fixtures and per-trigger worker/admission verification open. |

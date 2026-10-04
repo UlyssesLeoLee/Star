@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=545fb1f35f217e39742a2844f404d5eee38126c0a0973378e41ed55ac5a2e1fb
+# @cypher schema=1 source_sha256=22ee22897a8a006e0938942111008634bb7016c3f232b5db900a266903f92381
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -753,7 +753,11 @@ def main() -> int:
         ),
         (
             "schedule-rule-api-run-as-test",
-        [str(cargo), "test", "--locked", "-p", "star-api-rest", "--lib", "schedule_rule_request_cannot_select_run_as_actor", "-j", "1"],
+            [str(cargo), "test", "--locked", "-p", "star-api-rest", "--lib", "schedule_rule_request_cannot_select_run_as_actor", "-j", "1"],
+        ),
+        (
+            "schedule-rule-api-authorization-role-test",
+            [str(cargo), "test", "--locked", "-p", "star-api-rest", "--lib", "task_execution_rules_do_not_grant_agent_role_schedule_authority", "-j", "1"],
         ),
         (
             "schedule-integration-test-compile",
