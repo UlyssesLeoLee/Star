@@ -256,8 +256,8 @@
     "frontend/src/app/(app)/agents/page.tsx": {
       "action": "manual",
       "reason": "Preserve current page and add missing cel-azure picker entry supported by existing renderer.",
-      "evidence": "c6593258:AnimeCelShaderCanvas.tsx CelPalette:27, PALETTE_CONFIGS:307; frozen shell source palette delta",
-      "result_sha256": "b8918f824413b5525c63c3c294ae50c405badab69a5ddd0e15670e99a5d699fc"
+      "evidence": "c6593258:AnimeCelShaderCanvas.tsx CelPalette:27, PALETTE_CONFIGS:307; frozen shell source palette delta; Cypher header accurately records existing CelPalette imports/types; guardian stamped after reviewed picker addition",
+      "result_sha256": "174ed4ca6547c8b30ac1d77131868c72b910b508475d69a12d057b633198c848"
     },
     "frontend/src/app/(app)/projects/ProjectsClient.tsx": {
       "action": "current",

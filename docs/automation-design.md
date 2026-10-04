@@ -1155,6 +1155,12 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 |---|---|---|---|
 | Agent Schedule recurrence/materializer 与 PostgreSQL occurrence/dispatch adapter | [P]（R/V/S/A） | `scripts/automation/phase9f3_schedule.py --cargo <cargo.exe> --rustfmt <rustfmt.exe> --postgres-bin-dir <postgres-bin>`；所有步骤写到 `.cache/phase9f3-schedule/`，单步超时 900 秒。依次执行 rustfmt、domain tests、adapter all-targets check、集成 harness `--no-run`、定向 Clippy；随后在该目录下创建随机命名、只监听 `127.0.0.1` 的 PostgreSQL cluster，migration 双次 apply、检查五表 FORCE RLS、建立非 superuser test role，并直接运行刚编译的 harness，最后核对停库成功才删除 cluster。 | PostgreSQL 18.6：domain release tests 26/26 + 上次 runner 4/4 disposable DB tests；验证 idempotency/tenant RLS/append-only、并发 claim/fencing/heartbeat、retry/attempt exhaustion/deadline、terminal TTL/reclaim；disabled Rule 在 materializer/adapter 双层 fail closed；lease-expired event 记录旧 attempt/fencing generation；候选槽和 DST transition probe 分别限制 32,768 步；migration 两次应用及 FORCE RLS catalog check 通过。新增 DST probe bound 后重新运行了 domain debug/release tests、focused rustfmt 与 Clippy，未重跑 PostgreSQL runner；该小修未变更 adapter/migration。生产 Rule write API、长期 worker、Auth/target DB/runtime grants、occurrence→Run/reservation/RunEvent/Outbox 与 BI 没有接入，不能开放生产 Schedule capability。Adapter Clippy 仅放行该 crate 既有四类 lint（empty doc/attribute lines、needless generic borrows、unit let）；新增 Schedule 源文件没有命中这些旧 lint，其它 warning 仍 deny。 |
 
+### 4.43 本地分支收敛与冲突审计（2026-10-04）
+
+| 任务卡 | 档位 | 脚本/执行 | 验证边界 |
+|---|---|---|---|
+| Worktree-first 分支快照、逐路径决策审计及普通 merge 收敛 | [P]（R/V/S/A） | `scripts/automation/dev_converge.py` 在隔离候选 worktree 冻结本地 ref/tip、merge-base、source path 与 `merge-tree` 投影；每个变更路径必须提供决策、理由和源码证据，输出包含结果 SHA-256 的 JSON 审计；只用普通 `git merge --no-ff --no-commit` 和普通提交，不执行 push、reset 或分支删除。冻结计划、实际纳入方式及逐来源审计见 `docs/reports/dev-converge-20261004/`。 | 以 dev `c6593258` 为基线，9 个独立来源使用直接普通 merge；native-runtime-fence 来源由首个 worktree-group-docs merge 带入；另 11 个来源（含 main）起初已在目标祖先链。旧来源冲突逐路径保留当前更完整的 Run/Hook/CLI 安全语义，只恢复缺失的两条文档历史行和 Agent palette 入口；SRS 已含对应 v1.3 历史记录。此次是本地 refs 收敛，不是远端发布；未合并的运行时能力继续按 owner/provider/database 验收门禁标记。 |
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1520,7 +1526,7 @@ frontend/src/app/automation-debug/
 
 | v1.1 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.41 与 Phase 9F2 专用 bounded runner；记录 source-level migration contract、domain tests、Clippy 和 PostgreSQL 未验收边界 | Phase 9F2 Schedule occurrence substrate 落地并完成代码/设计对账 |
 | v1.2 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.42 与 Phase 9F3 bounded runner、临时 PostgreSQL lifecycle/cleanup、direct compiled harness、4 个 DB scenarios 与精确 production blocker；登记 9F3 status 不代表 target DB/Run admission 已完成 | Phase 9F3 adapter 与 PostgreSQL 实证完成 |
-| v1.3 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §4.42 至 domain release 26/26、独立 32,768-step DST probe bound、disabled Rule 双层 fail-closed 与 lease-expired 旧 attempt/fencing generation 审计语义；注明 PostgreSQL 4/4 场景在 probe-bound 修正前运行且 adapter/migration 未变 | 最终自审修正 Schedule 停用规则、lease audit 关联和长窗口转换探测上限 |
+| v1.4 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.43 本地分支收敛工作流，记录冻结 refs、逐路径证据与普通 merge 审计文件 | 用户要求按 Codex/Worktree 设计原则完成 dev 分支本地收敛 |
 
 ---
 

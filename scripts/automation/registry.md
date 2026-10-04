@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.43 (2026-10-03)
+> **文档版本**: v0.44 (2026-10-04)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v1.3 (§6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v1.4 (§6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -21,6 +21,8 @@
 新增 ERUN-P4 Schedule 9F3：[P] `scripts/automation/phase9f3_schedule.py` 运行 pinned recurrence、domain/adapter Rust gates 与一次性 loopback PostgreSQL 实测（automation-design §4.42 / 实施计划 §6.76）。migration 双次 apply、5 张表 FORCE RLS catalog 检查、非 superuser tenant-scoped adapter tests；4 个 DB case 覆盖幂等/RLS/append-only、并发 claim/fencing/heartbeat、retry/exhaustion/deadline、TTL/reclaim；disabled Rule 双层 fail closed，lease-expired audit 固定旧 attempt/fencing generation，候选槽与 DST transition probe 各限 32,768 步，最新 domain release tests 26/26。最后一次 DB runner 在 DST probe bound 调整前运行，后续只改 domain materializer，adapter/migration 未变；不连目标 DB、不启 production worker，也不完成 Rule API 或 occurrence→Run/Outbox admission。
 
 新增 ERUN-P1：[P] `scripts/automation/engineering_run_directory.py`，调用方 `docs/automation-design.md §4.36` / `WORKTREE-GROUP-IMPL-PLAN-001 §6.67`。定向 Rust compile、frontend typecheck、仅 disposable loopback PostgreSQL DDL/catalog验证；临时依赖解析可选且恢复原lock；不跑tests/生产migration。状态为目录基础实现，生产身份/SCM ingest/运行验收待完成；证据见 `docs/reports/PHASE-ERUN-DIRECTORY-P1-REPORT.md`。
+
+新增 DEV-CONVERGE：[P] `scripts/automation/dev_converge.py` 冻结本地 ref/tip、merge-base 和 merge-tree 投影；逐个冲突路径必须留决策、理由、来源证据及结果 SHA-256，随后以普通 no-ff merge 落地。计划与逐来源报告位于 `docs/reports/dev-converge-20261004/`；脚本不 push、reset 或删除 refs/worktrees。
 
 本索引跟踪 `scripts/automation/` 下所有 python 脚本的:
 - **路径**: 相对仓库根的路径
@@ -76,6 +78,8 @@
 
 ---
 
+| `scripts/automation/dev_converge.py` | 冻结本地 refs 并逐路径审计冲突后执行普通 no-ff merge，记录 plan 与 SHA-256 决策 | DEV-CONVERGE；automation-design §4.43 | 本次提交（见 Git） | 🟢 本地 dev 来源已收敛；不含 push/cleanup，运行时/DB 阶段按独立 gate 跟踪 |
+
 ## 2. 子代理任务索引 (per dispatcher.py 落档)
 
 | task_id | brief 路径 | output 路径 | status.json 路径 | 调用方 |
@@ -117,6 +121,7 @@
 | v0.41 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 phase9f2_schedule_occurrence.py bounded runner；索引默认离线/显式在线临时解析 Rust tests、带三类旧 lint 豁免的 Clippy、rustfmt 与 migration source-text gate；验证后精确恢复 Cargo.lock；同步 automation-design §4.41 与实施计划 §6.75 | Phase 9F2 Schedule domain/schema substrate 交付 |
 | v0.42 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 phase9f3_schedule.py：pinned cron/tzdb materializer、PostgreSQL 18.6 disposable cluster、migration 双次应用、FORCE RLS catalog check、非 superuser runtime role 与 4 个 DB integration scenarios；登记 direct test harness、terminal/deadline sweep 与 cleanup contract；同步 automation-design §4.42 / 实施计划 §6.76 | Phase 9F3 adapter 与隔离 PostgreSQL 端到端验证通过 |
 | v0.43 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 Schedule 9F3 最终证据为 domain release tests 26/26 与候选/DST 探测各 32,768 步上限；登记 disabled Rule 双层 fail-closed 与 lease-expired 旧 attempt/fencing generation 断言；说明 DB runner 在 domain-only probe cap 修正前运行；关联 automation-design v1.3、实施计划 v5.77 | 最终自审更新 9F3 物化器边界及文档验收证据 |
+| v0.44 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 `scripts/automation/dev_converge.py` 与 DEV-CONVERGE；增加冻结 source/ref、逐路径理由与 SHA-256 审计产物索引；不将本地收敛描述成 push/生产 phase 完成 | 完成 dev 本地分支收敛并同步 [P] 自动化索引 |
 
 ---
 

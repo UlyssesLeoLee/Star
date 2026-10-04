@@ -1,0 +1,170 @@
+{
+  "target": "dev",
+  "target_start": "c6593258ce647c0ac0ad0b14eba812b1afc9c3a8",
+  "candidate": "codex/dev-converge-reconcile-20261004",
+  "candidate_head_after_frozen_sources": "07a2cae5cb5d5250404053696774c373b65ff15e",
+  "main_unchanged": "06952d78af51e8d52db29c753dc1a380344d9c7a",
+  "remote_push": "not performed",
+  "direct_merge_count": 9,
+  "transitive_merge_count": 1,
+  "precontained_count": 11,
+  "sources": [
+    {
+      "branch": "main",
+      "frozen_sha": "06952d78af51e8d52db29c753dc1a380344d9c7a",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/worktree-group-docs-dev",
+      "frozen_sha": "b3c025dfdfa98744a45b48e15034c5f557219a2e",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "cfa549ddd4eef9485079eb6828d96a3ae9223f61",
+      "merge_commit": "cfa549ddd4eef9485079eb6828d96a3ae9223f61"
+    },
+    {
+      "branch": "codex/agent-closed-loop-20261001",
+      "frozen_sha": "3966dab74f6af157e25b12f205f50bbd8966f861",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "5e13c6f55d6103c889bc39fb7b3d287128975725",
+      "merge_commit": "5e13c6f55d6103c889bc39fb7b3d287128975725"
+    },
+    {
+      "branch": "codex/engineering-run-pre-rebase-20261002",
+      "frozen_sha": "e37c24ce2fb96c792fd7a7e3d000c028a6a44446",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "adc41e4adce328adeee3dacd4796c27942695b21",
+      "merge_commit": "adc41e4adce328adeee3dacd4796c27942695b21"
+    },
+    {
+      "branch": "codex/run-docs-dev-candidate-20261001",
+      "frozen_sha": "6ad216427c73eb07ac80877db70215f9799f86e9",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "4bc23127b948ddb3af3dbd6ab0dd133fbdb5cea7",
+      "merge_commit": "4bc23127b948ddb3af3dbd6ab0dd133fbdb5cea7"
+    },
+    {
+      "branch": "codex/worktree-run-design-docs-20261001",
+      "frozen_sha": "e9c20149f75504971dc029d69c8bbfbbf6868bec",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "10d481492658ce5c24b04a8fe21e27f74d556207",
+      "merge_commit": "10d481492658ce5c24b04a8fe21e27f74d556207"
+    },
+    {
+      "branch": "codex/engineering-run-nav-20261001",
+      "frozen_sha": "335b0c32cc7991b130ee971562c5f2abda7733f1",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "a00d77c1b3c7615f60821c8c94116e82aa3faafd",
+      "merge_commit": "a00d77c1b3c7615f60821c8c94116e82aa3faafd"
+    },
+    {
+      "branch": "codex/engineering-run-schema-20261001",
+      "frozen_sha": "da4d3cfb5e76ed0af7ef86b425f617e194eb2c37",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "68f4ff52d8586743e759415c7a2be3754262f915",
+      "merge_commit": "68f4ff52d8586743e759415c7a2be3754262f915"
+    },
+    {
+      "branch": "codex/worktree-group-shell-mvp",
+      "frozen_sha": "bf76a0c44fd0a094e61536365c0049e172b857e7",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "e753bc9edf4d90f0870fbe13ea7eab8d7f8b56c3",
+      "merge_commit": "e753bc9edf4d90f0870fbe13ea7eab8d7f8b56c3"
+    },
+    {
+      "branch": "codex/native-runtime-fence-c5",
+      "frozen_sha": "e19a66894dc3f008383bc55c721d8316aadc89f1",
+      "initial_plan_status": "MERGE",
+      "execution": "INCLUDED_TRANSITIVELY",
+      "through": "codex/worktree-group-docs-dev",
+      "merge_commit": "cfa549ddd4eef9485079eb6828d96a3ae9223f61"
+    },
+    {
+      "branch": "codex/worktree-lifecycle-20260930",
+      "frozen_sha": "b52e6d1fa888d22b244312c458479e156896b3b1",
+      "initial_plan_status": "MERGE",
+      "execution": "MERGED_DIRECTLY",
+      "through": "07a2cae5cb5d5250404053696774c373b65ff15e",
+      "merge_commit": "07a2cae5cb5d5250404053696774c373b65ff15e"
+    },
+    {
+      "branch": "codex/engineering-loop-runtime-20261002",
+      "frozen_sha": "e794d834498533176498cb0b649152ef2c64116e",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/erun-p2-cli-run-link",
+      "frozen_sha": "ab037da28d1d8f29678a6a3d6e67d3a543e76a09",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/erun-p2-hook-deep-link",
+      "frozen_sha": "00e2aaed523206231dfcbc316fe07fd83cffdb72",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/erun-p2-integration",
+      "frozen_sha": "14e9324b3a1ecc0e034484f83bff5ac1b7600545",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/erun-p3-run-apps-20261002",
+      "frozen_sha": "2f7ac2a36117fe7af688092542cd90c4c2e38666",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/infra-commercial-open-source-20261002",
+      "frozen_sha": "8a21c5591a4c8dd96ad98d63839fddb85e7b83d8",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/phase9f2-schedule-audit-20261002",
+      "frozen_sha": "e794d834498533176498cb0b649152ef2c64116e",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/schedule-occurrence-core-20261002",
+      "frozen_sha": "4de395d4cce3e8f993b0e9c104ca7ab6e3164139",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/schedule-production-9f4-20261003",
+      "frozen_sha": "c6593258ce647c0ac0ad0b14eba812b1afc9c3a8",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    },
+    {
+      "branch": "codex/task-owner-schema-20261002",
+      "frozen_sha": "9db93e9d8e07a11ad591331cae94b826cf5be7ee",
+      "initial_plan_status": "CONTAINED",
+      "execution": "ALREADY_CONTAINED",
+      "through": "frozen target c6593258"
+    }
+  ]
+}
