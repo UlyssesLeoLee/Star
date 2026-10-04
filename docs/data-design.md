@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v1.1 (2026-10-04)
+> **文档版本**: v1.2 (2026-10-05)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -16,6 +16,7 @@
 > | v0.9 | 2026-10-04 | 增加 `run_as_actor_id` 为 Schedule Rule Master 身份列，定义历史 backfill、不可替换的 successor trigger、与 `changed_by` 的区分及 occurrence worker 每次触发再授权约束；目标身份服务和 worker 仍未验收 | 用户选择规则创建者固定 run-as 且撤权后拒绝触发 |
 > | v1.0 | 2026-10-04 | 明确首版 Rule 必须满足 `run_as_actor_id = changed_by`，occurrence 必须固定复制并匹配精确 Rule revision 主体；登记 9F4B Docker PostgreSQL 18.6 重复迁移、7 表 FORCE RLS 和 5 个 adapter 场景通过；worker 实时授权和目标生产 grants 仍开放 | 完成 Rule/occurrence 主体伪造数据库负例验证 |
 > | v1.1 | 2026-10-04 | 细化 legacy identity backfill 事务：schema owner 在 DDL 锁内暂时恢复 owner RLS bypass、停用仅阻断新增列回填的既有 Rule/Occurrence guard，完成回填后恢复 guard 与 FORCE RLS 再提交；记录双 revision/不同编辑者和旧 occurrence fixture 验证，明确目标库 migration owner/grants 尚未验收 | 历史 fixture 暴露既有 append-only/SCD2 guard 阻止合法迁移回填，修复并实测后对齐数据详细设计 |
+> | v1.2 | 2026-10-05 | 增加 9F4C-A admission persistence：dispatch admitted_run_id 的 fenced transition/不可变 Run binding，以及 tenant FORCE RLS、append-only schedule_run_outbox 与复合关系约束；记录 PostgreSQL 18.6 双次迁移、8 表 RLS 和正反例 evidence；生产 atomic writer/worker/consumer/target grants 仍未验收 | 用户确认 creator-as-run-as、撤权 fail closed 后继续 Schedule admission persistence |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -2017,6 +2018,17 @@ API、Audit、Outbox 与幂等记录在单个事务提交或回滚；授权必�
 #### 4.13.4 Schedule run-as principal（Phase 9F4B）
 
 `db/migrations/2026-10-04-schedule-run-as-actor.sql` 在现有 Master revision 上增加 `run_as_actor_id UUID NOT NULL`，并为 `automation.occurrence` 增加相同身份的专用列。既有 Rule 以 `rule_version` 最小的 revision `changed_by` 回填所有历史行，既有 occurrence 从其复合外键指向的精确 Rule revision 回填；新 Rule 的首版必须满足 `run_as_actor_id = changed_by`，successor 从锁定的当前 revision 复制，不接受请求指定。为保持历史数据 append-only/SCD2 guard，同时完成列回填，该 migration 在单个事务取得两表 DDL 锁后，由 schema owner 临时对两表执行 `NO FORCE ROW LEVEL SECURITY`，并仅停用会阻止这次新增身份字段 UPDATE 的 Rule close-only 与 Occurrence append-only trigger；只更新新增身份列，完成 `NOT NULL` 后立即恢复 triggers 和 `FORCE ROW LEVEL SECURITY`，然后创建身份 insert guard 并提交。事务中止会回滚 guard/RLS 状态。应用角色不获得该绕过；部署 migration 的角色必须拥有相关表的 ALTER/TRIGGER 权限，目标环境的 migration principal/grants 尚未验证。若任一旧 occurrence 无法匹配精确 Rule revision，主体保持 NULL，`SET NOT NULL` 使整个事务失败，不会以默认主体继续。`automation.guard_schedule_rule_run_as_identity()` 对同一 Rule 的 revision insert 获取 transaction advisory lock 后验证主体稳定；occurrence insert guard 再验证存储主体与 pinned Rule revision 一致；非 nil 是数据库不变量。`changed_by` 继续表示本次版本的编辑者，run-as 是未来无人值守执行身份，两者可不同。身份列不对 identity 表设 FK，因此账户停用/删除不会抹掉审计主体；worker 必须在每次触发时实时复验 Project binding、Engineering Run grant 和执行 capability，无法读取或已撤权时不创建 Run。Docker PostgreSQL 18.6 disposable runner 双次应用完整 9F2/9F4A/9F4B migration chain，并用不同 editor 的两 revision Rule + 旧 occurrence 验证 historical backfill；最终七张 Schedule 表 FORCE RLS，五个 adapter 场景通过。此身份是 Master 的 immutable policy fact；当前未实现 worker，所以自动复验尚未验收。
+
+#### 4.13.5 Schedule occurrence→Run admission persistence（Phase 9F4C-A）
+
+`db/migrations/2026-10-04-schedule-run-admission.sql` 为已有 dispatch 和 canonical `multica.task_execution_run` 增加受约束的 admitted-Run 关联，并创建 `automation.schedule_run_outbox`。本 migration 只增加持久化不变量，不提供 production worker 或应用层 admission command。
+
+| 表/字段 | W/T/M 主分类 | 关键关系与不变量 | RLS/保留 |
+|---|---|---|---|
+| `automation.occurrence_dispatch.admitted_run_id` | Work | nullable additive link；复合 `(tenant_id, admitted_run_id)` FK 到 canonical TaskExecutionRun；只允许 `leased → admitted` 时写入并受状态/fencing/attempt 序列 trigger 保护；DB trigger 不验证 worker 提交的当前 lease owner/generation，未来 writer 还必须条件更新校验 owner、generation、lease expiry、occurrence deadline；Run 必须匹配相同 occurrence 与 schedule 来源，Outbox trigger 进一步校验 Rule revision、tenant/Project/Engineering Run/Task、agent channel 与 immutable run-as；本 migration 不存储或直接验证 Worktree ID；绑定后不可清除或替换 | 继续受 occurrence_dispatch tenant FORCE RLS 与既有 dispatch/terminal TTL 守卫约束 |
+| `automation.schedule_run_outbox` | Transaction | 每条记录以复合外键关联同一 tenant/Project/Engineering Run/Task、精确 Rule revision、occurrence 与 TaskExecutionRun；每 occurrence/event type 唯一；数据库 trigger 拒绝 run-as、schedule origin/channel 或 dispatch link 不一致；不持有独立 Worktree ID | tenant FORCE RLS；append-only，禁止 UPDATE/DELETE/TRUNCATE；consumer offset/投影在其 owner domain 独立管理 |
+
+Migration 在 disposable PostgreSQL 18.6 中对完整 chain 双次应用；8 张 Schedule 表的 `relforcerowsecurity` 均为 true。runner 验证合法 admitted Run/Outbox、已绑定 Run 替换拒绝、run-as mismatch、Outbox UPDATE 拒绝和非 superuser runtime tenant 隔离；source/channel 其它 mismatch 与 Outbox DELETE/TRUNCATE 由 SQL guard 实现但未被本 runner 单独覆盖。该验证不包含目标数据库 migration role/grants，也不代表 production writer 已在同一事务里提交 Reservation、TaskExecutionRun、RunEvent 与 Outbox。未来 admission 必须先实时复验 run-as 当前 Project/Run 权限、target/Profile/HookSet 与资源预算；任何 revoke、读取失败、版本漂移或预算超限都不得创建 Run。
 
 ### 4.14 Module: domain-identity(`identity` schema)
 
@@ -5595,7 +5607,7 @@ erDiagram
 | 10 | search | search | `search_index` | UUID | ✅ | ✅ |
 | 11 | audit | audit | `audit_event`, `ai_audit_metadata`, `audit_event_outbox` | UUID | ✅ | ✅ |
 | 12 | integration | integration | `integration`, `integration_sync_state` | UUID | ✅ | ✅ |
-| 13 | automation | automation | `automation_rule`, `schedule_rule_revision`, `schedule_rule_audit`, `schedule_rule_outbox`, `schedule_rule_command_idempotency`, `occurrence`, `occurrence_dispatch`, `occurrence_event` | UUID | ✅ | ✅ |
+| 13 | automation | automation | `automation_rule`, `schedule_rule_revision`, `schedule_rule_audit`, `schedule_rule_outbox`, `schedule_rule_command_idempotency`, `occurrence`, `occurrence_dispatch`, `occurrence_event`, `schedule_run_outbox` | UUID | ✅ | ✅ |
 | 14 | identity | identity | `user`, `device`, `device_binding`, `credential`, `user_session` | UUID | ✅ | ✅ |
 | 15 | notification | notification | `notification_channel`, `notification_template`, `notification` | UUID | ✅ | ✅ |
 | 16 | permission | permission | `role`, `permission`, `permission_scheme` | UUID | ✅ | 部分(permission 无) |

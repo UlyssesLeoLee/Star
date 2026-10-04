@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.42**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.43**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -14,9 +14,9 @@
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.58 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.55 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.64 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.61 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.8、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -515,6 +515,12 @@ Run 固定授权 environment/profile/version/digest、namespace 和资源租约�
 ### 8.9 商用开源基础设施准入
 
 InfrastructureBackend 必须连接允许无限制商业使用的 provider，不得加入按用途、行业、部署规模、席位、用量或付费 tier 的产品封锁；copyleft 许可证不等于不能商用，修改、链接、捆绑和分发按实际许可义务审查。完整 artifact SBOM/SPDX、源码/NOTICE/安装信息和近 12 个月上游维护证据均按版本保存；Star 不得误报许可证分类，也不得将发行履约义务变成产品限制。支持既有 provider 检测、安装引导及合规后的受管安装/捆绑。候选组合为 Multipass 本地 VM、Podman machine、Linux Incus、macOS/Linux Lima 和远端 Linux K3s；K3s stable channel 当前为 v1.36.4+k3s1，1.37 系列仍处于预发布；K3s 只在 Linux host/guest，Multipass daemon 不能视为安全 sandbox。执行身份与 Runtime sandbox 仍单独授权；接入 provider 不自动开放 CLI。详细来源与未验证状态见 DD-LOCAL-INFRASTRUCTURE-001 v0.4。
+### 8.10 Schedule occurrence admission persistence（Phase 9F4C-A）
+
+Schedule 是 Run Automation/Workflow 能力，不作为 Worktree 导航树节点。occurrence 只有在未来 worker 完成 run-as 当前授权、Run target/Profile/HookSet 与资源预算复验后，才能由 admission writer 创建 schedule-origin TaskExecutionRun。9F4C-A 仅落数据库约束：`occurrence_dispatch.admitted_run_id` 通过 `(tenant_id, admitted_run_id)` 复合外键指向 canonical TaskExecutionRun；trigger 只允许 `leased → admitted` 跳转绑定 Run，并检查 dispatch 状态及 fencing/attempt 序列不变量，但不验证 worker 提交的当前 lease owner/generation。应用 writer 必须用条件更新校验当前 owner、generation、lease expiry 和 occurrence deadline，并从 canonical TaskExecutionRun 复验当前 Worktree/Task binding。Outbox/Run trigger 校验 tenant/Project/Engineering Run/Task、occurrence、exact Rule revision、run-as、schedule origin 与 agent channel 一致；本 migration 不存储独立 Worktree ID，也不直接校验 Run/Worktree binding。admitted Run ID 绑定后不可更新或清空。
+
+`automation.schedule_run_outbox` 是单独的 append-only Transaction，复合 FK 将事件固定到同一 tenant/Project/Engineering Run/Task、Rule revision、occurrence 与 TaskExecutionRun，且每个 occurrence/event type 唯一；它没有独立 Worktree ID。9F4C-A 的 disposable PostgreSQL 18.6 验证覆盖双次 migration、8 张 Schedule 表 FORCE RLS、合法绑定、run-as mismatch、已绑定 Run 替换拒绝、Outbox UPDATE 拒绝与非 superuser tenant 隔离；其它 source/channel mismatch 与 DELETE/TRUNCATE negatives 未由 runner 单独验证。当前没有生产 worker 或 application admission writer；不能据此宣称实时 ACL recheck、Reservation/RunEvent/Outbox 的同事务提交、失败回滚、consumer 或 BI 已实现。权限撤销或 ACL 状态不可读取时，触发必须 fail closed。
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -604,6 +610,16 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 运行验收使用应用实际连接身份（包含连接池 `SET ROLE` 后的有效角色），验证 schema access、各 endpoint 所需 SQL 操作、tenant/actor/worktree RLS 正反向隔离、无 policy 写入被拒、append-only trigger、并发/幂等行为。Phase 5/6 当前只在隔离库做过临时 grant + `SET ROLE star_app` 的策略测试；临时权限和 fixture 已回滚。该库中的 `star_app` 不是经确认的生产服务身份，亦未证明 `star_app_role` 存在；生产角色及 grants 仍是 release blocker。
 
+### 10.2 Schedule admission persistence 的 W/T/M 与闭环验收
+
+| 表/事实 | 主分类 | 保留与守门 | Phase 9F4C-A 状态 |
+|---|---|---|---|
+| `automation.occurrence_dispatch.admitted_run_id` | Work | 属于受租约/fencing 管理的 dispatch 状态；Run 引用不可变，terminal TTL 规则仍适用 | nullable additive column、复合 tenant FK 与状态 trigger 已在 disposable PostgreSQL 验证 |
+| `automation.schedule_run_outbox` | Transaction | append-only、tenant FORCE RLS、Run/occurrence/Rule revision 复合 FK；禁止 UPDATE/DELETE/TRUNCATE | migration 和隔离角色 tenant RLS/负例已验证；生产服务 grants 与 consumer 未验收 |
+| `TaskExecutionRun` / Reservation / RunEvent | Transaction | 仍由其 canonical owner 管理；admission 必须与 Outbox 同原子边界或由具备等价恢复协议的事务 inbox/outbox 衔接 | 此 phase 未写入这些事实，未证明 admission 原子 writer |
+
+验收前必须覆盖：撤权、ACL 读取失败、target/Profile/HookSet revision 漂移、资源超限、并发重复 occurrence、fencing 过期、TaskExecutionRun/Outbox 任一 insert 失败及事务回滚；拒绝原因需形成可审计状态且不得产生孤儿 Run。consumer 以 occurrence/event identity 幂等回放，BI 对未知覆盖率保留 null/partial 标记。当前已验证的仅为 DB schema persistence guard 与 disposable PostgreSQL 隔离测试。
+
 ## §11 关键验收映射
 
 | Requirement / AC | 详细设计落点 | 服务端验收重点 |
@@ -620,7 +636,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | AC-ERUN-006 | §1.3、§4.2、§10.0B、§11 | 默认 Task Cards 同级入口、认证 Run-scoped bounded list、响应/分页/驻留上限、无 mock 回退与 CLI 禁用门 |
 | WTG-016/017 / AC-WTG-010/011 | §1.1、§7.1、§12 | Project Index 的 Quality & Improvement 入口；metric provenance/drilldown、固定 benchmark/holdout 与可回滚 proposal |
 | PAR-001..004 / AC-PAR-001..003 | §6.3、§9、§10 | DAG readiness、hierarchical quota/fairness、bounded queue/backpressure、独立 lease/claim/Git lock、可级联 cancel/drain |
-| LOOP-001..005 / AC-LOOP-001..006 | §6.4、§8.7、§12 | 唯一 Automation occurrence source、fencing/idempotent dispatch、单 Run Engineering Loop、budget/stop/drain |
+| LOOP-001..005 / AC-LOOP-001..009 | §6.4、§8.7-§8.10、§10.2、§12 | 唯一 Automation occurrence source、Schedule storage/RLS、immutable creator-as-run-as、current ACL fail-closed contract、admitted Run/Outbox persistence；worker lease-owner check、atomic writer、consumer/BI 仍开放 |
 | AEC-001..008 / AC-AEC-001..007 | §8.5、§7 | 版本化 Profile/Provider、Rust CLI adapter、独立 Validation、Project Engineering Manifest、BI/Benchmark 可复现 |
 | HOOK-001..007 / AC-HOOK-001..006 | §8.6、§9、§10 | Rust-native fail-closed guard、Advanced Settings Hooks tab、Worktree lifecycle gate、append-only Run/BI evidence |
 | PERF-001..004 / AC-PERF-001..003 | §8.4、§11、§12 | Rust desktop 虚拟列表/viewport culling/有界缓存与测量门；隔离 Plugin 热插拔；Pi 只作设计参考 |
@@ -777,3 +793,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.40 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Schedule API v0.6 与 requirements v5.61；增加规则创建者 run-as 的不可变身份、DB trigger、occurrence 继承及每次触发授权复验/fail-closed 契约；明确 worker、Run admission 和目标部署仍开放 | 用户确定 Schedule 创建者固定为 run-as 且撤权后停止派发 |
 | v4.41 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.62 与 Schedule API v0.7；补充首版 DB creator/run-as 相等约束、occurrence 独立主体列与 exact-Rule trigger，并记录 PostgreSQL 18.6 三 migration 双次应用、七表 FORCE RLS、五场景验证；worker 实时授权与 Run admission 仍开放 | Phase 9F4B 完整 runner 和 Rule/occurrence 身份负例通过 |
 | v4.42 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.63/basic v5.60/Data Design v1.1；补充历史 Rule/Occurrence 回填 fixture、事务表锁、schema-owner 暂时恢复 owner RLS bypass 和在提交前恢复 append-only/SCD2 guard 与 FORCE RLS；注明目标 migration principal 未验收，worker 实时授权与 Run admission 仍开放 | legacy fixture 暴露既有 guard/RLS 对身份字段回填的阻断并验证受控迁移修复 |
+| v4.43 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.64/basic v5.61/Data Design v1.2；新增 9F4C-A 的 fenced dispatch→admitted Run 不可变关联与 schedule Run append-only Outbox；记录 8 表 FORCE RLS 与隔离 PostgreSQL 正反例，明确 admission writer/实时授权与预算/Reservation/RunEvent/consumer/BI 未验收 | 用户确认 Schedule run-as 权限撤销 fail closed 并继续 admission persistence slice |

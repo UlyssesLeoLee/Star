@@ -1,6 +1,6 @@
-"""Run Schedule 9F3/9F4B Rust checks and isolated-PostgreSQL invariants."""
+"""Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=6ad374cb719e1d030772fb13bcabddf458a63ff56c63ddadd0d1cff881737951
+# @cypher schema=1 source_sha256=545fb1f35f217e39742a2844f404d5eee38126c0a0973378e41ed55ac5a2e1fb
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -13,6 +13,9 @@
 # MERGE (docker_service:ExternalService {id:"docker.run_exec_cp_rm",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test_clippy_check",kind:"command"})
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
+# MERGE (migrations:Config {id:"scripts/automation/phase9f3_schedule.py::MIGRATIONS"})
+# MERGE (task_run_schema:Config {id:"scripts/automation/phase9f3_schedule.py::TASK_RUN_SCHEMA_FIXTURE_SQL"})
+# MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
 # MERGE (legacy_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::LEGACY_BACKFILL_FIXTURE_SQL"})
 # MERGE (legacy_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::LEGACY_BACKFILL_ASSERTION_SQL"})
 # MERGE (self)-[:DEFINES]->(main)
@@ -31,6 +34,9 @@
 # MERGE (postgres)-[:CALLS]->(scope)
 # MERGE (postgres)-[:READS]->(legacy_fixture)
 # MERGE (postgres)-[:READS]->(legacy_assertion)
+# MERGE (postgres)-[:READS]->(migrations)
+# MERGE (postgres)-[:READS]->(task_run_schema)
+# MERGE (postgres)-[:READS]->(admission_fixture)
 # @endcypher
 
 from __future__ import annotations
@@ -53,7 +59,112 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-02-automation-schedule-occurrence.sql",
     ROOT / "db" / "migrations" / "2026-10-03-automation-schedule-rule-api.sql",
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-as-actor.sql",
+    ROOT / "db" / "migrations" / "2026-10-04-schedule-run-admission.sql",
 )
+TASK_RUN_SCHEMA_FIXTURE_SQL = """\
+CREATE SCHEMA IF NOT EXISTS multica;
+CREATE TABLE IF NOT EXISTS multica.task_execution_run (
+    run_id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    project_id UUID NOT NULL,
+    work_item_id UUID NOT NULL,
+    engineering_run_id UUID NOT NULL,
+    initiated_by UUID NOT NULL,
+    execution_channel VARCHAR(24) NOT NULL,
+    run_origin VARCHAR(16) NOT NULL,
+    automation_rule_id UUID,
+    automation_rule_version BIGINT,
+    automation_occurrence_id UUID,
+    UNIQUE (tenant_id, run_id),
+    UNIQUE (tenant_id, project_id, work_item_id, run_id)
+);"""
+SCHEDULE_ADMISSION_FIXTURE_SQL = """\
+INSERT INTO automation.occurrence_dispatch (
+    tenant_id, occurrence_id, dispatch_state, attempt_count, next_attempt_at,
+    fencing_generation, lease_owner_id, lease_expires_at, occurrence_deadline_at
+) VALUES (
+    '10000000-0000-4000-8000-000000000001',
+    'c0000000-0000-4000-8000-000000000001', 'leased', 1, now(), 1,
+    'd0000000-0000-4000-8000-000000000001', now() + interval '5 minutes',
+    now() + interval '1 hour'
+);
+INSERT INTO multica.task_execution_run (
+    run_id, tenant_id, project_id, work_item_id, engineering_run_id, initiated_by,
+    execution_channel, run_origin, automation_rule_id, automation_rule_version,
+    automation_occurrence_id
+) VALUES (
+    'e0000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    '80000000-0000-4000-8000-000000000001',
+    '50000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001', 'agent', 'schedule',
+    '30000000-0000-4000-8000-000000000001', 2,
+    'c0000000-0000-4000-8000-000000000001'
+);
+UPDATE automation.occurrence_dispatch
+   SET dispatch_state = 'admitted', admitted_run_id = 'e0000000-0000-4000-8000-000000000001',
+       lease_owner_id = NULL, lease_expires_at = NULL, updated_at = now()
+ WHERE tenant_id = '10000000-0000-4000-8000-000000000001'
+   AND occurrence_id = 'c0000000-0000-4000-8000-000000000001';
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO automation.schedule_run_outbox (
+        tenant_id, project_id, engineering_run_id, rule_id, rule_version, occurrence_id,
+        work_item_id, run_id, run_as_actor_id, event_type, correlation_id, payload
+    ) VALUES (
+        '10000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        '50000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000001', 2,
+        'c0000000-0000-4000-8000-000000000001',
+        '80000000-0000-4000-8000-000000000001',
+        'e0000000-0000-4000-8000-000000000001',
+        'b0000000-0000-4000-8000-000000000002', 'schedule_run.admitted',
+        'f0000000-0000-4000-8000-000000000002', '{"schema_version":1}'::jsonb
+    );
+    RAISE EXCEPTION 'mismatched run-as Outbox insert unexpectedly succeeded';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'Schedule Run Outbox does not match the admitted occurrence and Run' THEN
+      RAISE;
+    END IF;
+  END;
+END $$;
+INSERT INTO automation.schedule_run_outbox (
+    tenant_id, project_id, engineering_run_id, rule_id, rule_version, occurrence_id,
+    work_item_id, run_id, run_as_actor_id, event_type, correlation_id, payload
+) VALUES (
+    '10000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    '50000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001', 2,
+    'c0000000-0000-4000-8000-000000000001',
+    '80000000-0000-4000-8000-000000000001',
+    'e0000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001', 'schedule_run.admitted',
+    'f0000000-0000-4000-8000-000000000001', '{"schema_version":1}'::jsonb
+);
+DO $$
+BEGIN
+  BEGIN
+    UPDATE automation.schedule_run_outbox
+       SET payload = '{"mutated":true}'::jsonb
+     WHERE event_id = (SELECT min(event_id) FROM automation.schedule_run_outbox);
+    RAISE EXCEPTION 'Schedule Run Outbox mutation unexpectedly succeeded';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'Schedule Run Outbox mutation unexpectedly succeeded' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE automation.occurrence_dispatch
+       SET admitted_run_id = 'e0000000-0000-4000-8000-000000000002'
+     WHERE tenant_id = '10000000-0000-4000-8000-000000000001'
+       AND occurrence_id = 'c0000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'admitted Run identity mutation unexpectedly succeeded';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'admitted Run identity mutation unexpectedly succeeded' THEN RAISE; END IF;
+  END;
+END $$;"""
 LEGACY_BACKFILL_FIXTURE_SQL = """\
 INSERT INTO automation.schedule_rule_revision (
     tenant_id, project_id, rule_id, rule_version, cron_expression, time_zone,
@@ -283,10 +394,12 @@ class DisposablePostgres:
         role_sql = """CREATE ROLE schedule_runtime LOGIN NOSUPERUSER NOBYPASSRLS;
 GRANT USAGE ON SCHEMA automation TO schedule_runtime;
 GRANT SELECT ON automation.schedule_rule_revision, automation.schedule_rule_audit,
-  automation.occurrence, automation.occurrence_dispatch, automation.occurrence_event
+  automation.occurrence, automation.occurrence_dispatch, automation.occurrence_event,
+  automation.schedule_run_outbox
   TO schedule_runtime;
 GRANT INSERT ON automation.schedule_rule_audit, automation.occurrence,
-  automation.occurrence_dispatch, automation.occurrence_event TO schedule_runtime;
+  automation.occurrence_dispatch, automation.occurrence_event,
+  automation.schedule_run_outbox TO schedule_runtime;
 GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;"""
         fixture = OUTPUT_DIR / "runtime-role.sql"
         fixture.write_text(role_sql, encoding="utf-8")
@@ -347,6 +460,8 @@ class DisposableDockerPostgres:
             self.name,
             "psql",
             "-X",
+            "-h",
+            "127.0.0.1",
             "-U",
             user,
             "-d",
@@ -423,10 +538,12 @@ class DisposableDockerPostgres:
         role_sql = """CREATE ROLE schedule_runtime LOGIN NOSUPERUSER NOBYPASSRLS;
 GRANT USAGE ON SCHEMA automation TO schedule_runtime;
 GRANT SELECT ON automation.schedule_rule_revision, automation.schedule_rule_audit,
-  automation.occurrence, automation.occurrence_dispatch, automation.occurrence_event
+  automation.occurrence, automation.occurrence_dispatch, automation.occurrence_event,
+  automation.schedule_run_outbox
   TO schedule_runtime;
 GRANT INSERT ON automation.schedule_rule_audit, automation.occurrence,
-  automation.occurrence_dispatch, automation.occurrence_event TO schedule_runtime;
+  automation.occurrence_dispatch, automation.occurrence_event,
+  automation.schedule_run_outbox TO schedule_runtime;
 GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;"""
         fixture = OUTPUT_DIR / "runtime-role.sql"
         fixture.write_text(role_sql, encoding="utf-8")
@@ -470,7 +587,24 @@ def run_isolated_postgres(
         steps.extend(cluster.create_and_start())
         if not cluster.started:
             return steps
+        steps.append(
+            run_step(
+                "postgres-schedule-task-run-schema-fixture",
+                [*cluster.psql("schedule_admin"), "-c", TASK_RUN_SCHEMA_FIXTURE_SQL],
+            )
+        )
+        if steps[-1]["status"] != "passed":
+            return steps
         for pass_name in ("first", "repeat"):
+            if pass_name == "repeat":
+                steps.append(
+                    run_step(
+                        "postgres-schedule-run-admission-link-fixture",
+                        [*cluster.psql("schedule_admin"), "-c", SCHEDULE_ADMISSION_FIXTURE_SQL],
+                    )
+                )
+                if steps[-1]["status"] != "passed":
+                    return steps
             for index, migration in enumerate(MIGRATIONS, start=1):
                 if pass_name == "first" and index == 3:
                     steps.append(
@@ -519,9 +653,9 @@ BEGIN
   WHERE n.nspname = 'automation'
     AND c.relname IN ('schedule_rule_revision','schedule_rule_audit','occurrence',
                       'occurrence_dispatch','occurrence_event','schedule_rule_outbox',
-                      'schedule_rule_command_idempotency')
+                      'schedule_rule_command_idempotency','schedule_run_outbox')
     AND c.relrowsecurity AND c.relforcerowsecurity;
-  IF forced_count <> 7 THEN RAISE EXCEPTION 'expected seven FORCE RLS Schedule tables'; END IF;
+  IF forced_count <> 8 THEN RAISE EXCEPTION 'expected eight FORCE RLS Schedule tables'; END IF;
 END $$;"""
         steps.append(
             run_step(
@@ -532,6 +666,27 @@ END $$;"""
         if steps[-1]["status"] != "passed":
             return steps
         steps.append(cluster.install_runtime_role())
+        if steps[-1]["status"] != "passed":
+            return steps
+
+        outbox_rls_sql = """DO $$
+DECLARE own_rows integer;
+DECLARE foreign_rows integer;
+BEGIN
+  PERFORM set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
+  SELECT count(*) INTO own_rows FROM automation.schedule_run_outbox;
+  PERFORM set_config('app.tenant_id', '11000000-0000-4000-8000-000000000002', true);
+  SELECT count(*) INTO foreign_rows FROM automation.schedule_run_outbox;
+  IF own_rows <> 1 OR foreign_rows <> 0 THEN
+    RAISE EXCEPTION 'Schedule Run Outbox tenant RLS isolation failed';
+  END IF;
+END $$;"""
+        steps.append(
+            run_step(
+                "postgres-schedule-run-outbox-tenant-rls",
+                [*cluster.psql("schedule_runtime"), "-c", outbox_rls_sql],
+            )
+        )
         if steps[-1]["status"] != "passed":
             return steps
 

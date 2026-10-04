@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.0 (2026-10-04)
+> **文档版本**: v2.1 (2026-10-05)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1174,6 +1174,16 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 |---|---|---|---|
 | 将 Schedule Rule creator 固定为 run-as actor，并保证 revision/occurrence 身份一致 | [P]（R/V/S/A） | `AutomationScheduleRuleRevisionV1` 与 `AutomationOccurrenceSnapshotV1` 都携带非空 `run_as_actor_id`；API create 从已授权 actor 派生，CAS revision 锁当前行并继承身份，body 严格拒绝 caller identity；adapter 将身份写入 Rule 和独立 occurrence 列。Migration 从最早 revision `changed_by` 与精确 pinned Rule 分别回填，并以 Rule/occurrence trigger 拒绝 creator、successor 或 occurrence identity 不一致；schema owner 在单个 DDL-lock transaction 内仅为新增身份字段 backfill 暂停既有 SCD2/append-only guards 和自身 FORCE RLS，然后恢复后提交。Legacy fixture 验证不同 editor 的两版 Rule 与旧 occurrence 回填。Docker bounded runner：Rust checks/tests/clippy、三 migration 双次 apply、7 表 FORCE RLS 与 5 个 PostgreSQL adapter scenarios 全通过。详见 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。 | 只固定执行身份，并不授予未来执行权。每次触发/retry/resume 对当前 Project binding、Run grant 和执行 capability 的重新授权仍需 worker；身份目录、Launch Profile authority、Run/reservation/RunEvent atomic admission、target DB migration grants、Outbox consumer、BI/Benchmark 未接入，Schedule 继续 fail closed。 |
 
+### 4.46 Phase 9F4C-A Schedule occurrence admission persistence（2026-10-05）
+
+| 任务卡 | 档位 | 实现/验证 | 验证边界 |
+|---|---|---|---|
+| Schedule dispatch admitted Run 与 Outbox schema gate | [P]（R/V/S/A） | 扩展 `scripts/automation/phase9f3_schedule.py`，执行 9F2/9F4A/9F4B/9F4C migrations 两次；验证 `admitted_run_id` FK、`leased → admitted` state transition、dispatch 状态/fencing/attempt 序列守卫、same occurrence/tenant/Project/Run/Task/Rule revision/run-as/source/channel guards 与绑定不可变、schedule Run Outbox append-only、复合 FK/唯一键、八张 Schedule 表 FORCE RLS，以及非 superuser runtime role 的 tenant 隔离；Worktree binding 由 future writer 对 canonical TaskExecutionRun 复验，本 migration 不保留独立 `worktree_id` | DB trigger 不校验 worker 提交的当前 lease owner/generation；future writer 必须条件更新复验 owner、generation、lease expiry 与 occurrence deadline。runner 具体断言为合法关联、run-as mismatch、Run link mutation 与 Outbox UPDATE 拒绝；其它 source/channel mismatch、DELETE/TRUNCATE trigger 尚未单独测试。当前只验证 disposable PostgreSQL persistence contract；不连接目标库或启动 worker。实时 run-as Project/Run reauthorization、target/Profile/HookSet/quota admission、Reservation/TaskExecutionRun/RunEvent/Outbox 同事务 writer、consumer 幂等和 BI/Benchmark 未实现；缺失时 production capability 必须 fail closed。报告见 `docs/reports/PHASE-9F4C-SCHEDULE-ADMISSION-REPORT.md`。 |
+
+### 4.47 下一阶段：Schedule admission application writer 与 worker
+
+先接入可信身份和 target/Profile/HookSet/quota authority，在短事务边界内锁定 occurrence 的有效 fencing generation，重新验证规则固定的 run-as 当前 Project binding/Engineering Run grant，并幂等提交 Reservation、TaskExecutionRun、RunEvent、dispatch admitted link 与 schedule Run Outbox。任一 ACL、target、budget 或 insert 失败都回滚且不产生孤儿 Run；撤权与身份目录不可用按可审计拒绝收敛。随后实现有界 lease worker/recovery 与 Outbox consumer，并用目标数据库角色和真实 provider 验收；达到门槛前 Schedule 保持关闭。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1546,6 +1556,7 @@ frontend/src/app/automation-debug/
 | v1.8 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.45，登记 Schedule creator/run-as 不可变身份、历史回填、SCD2 trigger、API/domain/adapter 联动和每次触发重授权契约；明确 worker 和 Run admission 仍未实现 | 用户确认 Schedule creator-as-run-as 并继续 Phase 9F4 |
 | v1.9 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 9F4B occurrence 专用 run-as 持久列与 Rule revision trigger，并将 phase9f3_schedule.py 扩展为可选择本机 PostgreSQL 工具或 loopback Docker backend；记录完整 migration/RLS/五场景证据和未实现 worker 门禁 | 自审补齐 occurrence 快照缺失并将验证 runner 适配当前 Windows 环境 |
 | v2.0 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在 §4.45/runner 对账 legacy Rule/Occurrence backfill fixture；修复既有 SCD2/append-only guards 与 FORCE RLS 阻止 migration 回填的问题，记录事务内 schema-owner unlock/backfill/restore 语义和 full runner 通过；保留 worker/Auth/Run admission/target migration grants/BI 未完成门禁 | 自审增加真实旧数据夹具后发现并修复 migration backfill 阻断 |
+| v2.1 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §4.46 的 9F4C-A admission persistence gate 与 §4.47 下一阶段 worker/writer 边界；对账完整 migration chain、8 表 FORCE RLS、run-as mismatch、Run link mutation、Outbox UPDATE refusal 与 runtime tenant 隔离；明确 DB contract 不代表应用原子写入/实时授权/BI 完成 | 用户确认 creator-as-run-as 撤权 fail closed 后继续 admission persistence |
 
 ---
 

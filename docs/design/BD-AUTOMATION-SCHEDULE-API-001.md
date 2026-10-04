@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Verified design/implementation slice; production enablement remains open.
-> Version: 0.7 | Date: 2026-10-04
+> Version: 0.8 | Date: 2026-10-05
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -29,7 +29,13 @@ Create derives immutable `run_as_actor_id` from the authenticated actor after Pr
 
 The current capability is only Rule management. A Rule cannot execute until Phase 9F later stages connect recurrence materialization, fenced leasing, current ACL/target rechecks, capacity reservation, atomic TaskExecutionRun/RunEvent admission, and Outbox consumers. Existing disabled-rule checks remain in both domain materialization and persistence adapters. The implementation now filters future-dated Project bindings, Profile/Catalog entries, HookSets, and Rule revisions from current resolution. Production target database migration and service-role grants remain unverified.
 
-## 5. Revision history
+## 5. 9F4C-A admission persistence foundation
+
+`2026-10-04-schedule-run-admission.sql` adds nullable `automation.occurrence_dispatch.admitted_run_id` with a tenant-scoped FK to the canonical TaskExecutionRun. Dispatch history may set this field only in the `leased → admitted` transition; the DB guard confirms that the referenced Run is `run_origin='schedule'` and names the same occurrence. Once set, the Run identity cannot change. A dedicated append-only `automation.schedule_run_outbox` binds Rule revision, occurrence, Engineering Run, Task, and TaskExecutionRun through composite FKs; its insert trigger checks `execution_channel='agent'`, schedule origin/rule/version/occurrence, and `initiated_by=run_as_actor_id`. This Outbox is separate from Rule-change and Task-metadata Outboxes.
+
+The migration does not create a dispatcher, authorize the stored run-as actor, reserve quota, write a RunEvent, or admit a TaskExecutionRun. A later short transaction must revalidate current identity/ACL/target/profile/HookSet/quota and lease owner+generation, then write Run, reservation, RunEvent, dispatch link, occurrence event, and this Outbox atomically. Historical dispatches without a provable matching Run remain nullable/unresolved; migration does not infer or backfill a Run identity. The chain requires the canonical TaskExecutionRun migration to be installed first. PostgreSQL 18.6 disposable validation applied the Schedule chain twice and tested positive/negative linkage, immutable identity, Outbox append-only behavior, tenant FORCE RLS, and non-superuser tenant isolation; it does not verify target DB grants or the later transaction writer.
+
+## 6. Revision history
 
 | Version | Date | Change |
 |---|---|---|
@@ -40,3 +46,4 @@ The current capability is only Rule management. A Rule cannot execute until Phas
 | v0.5 | 2026-10-04 | Pin the JWT crypto backend and record signed-token scope rejection and authenticated body-cap request tests; keep accepted-access and database gates open. |
 | v0.6 | 2026-10-04 | Add immutable run-as principal storage/backfill/guard and future per-trigger current-ACL recheck; keep worker, Launch Profile provider, target DB, and Run admission gates open. |
 | v0.7 | 2026-10-04 | Record the first-revision creator equality and occurrence/pinned-rule identity guards, plus complete 9F4B PostgreSQL 18.6 validation while retaining worker/admission production gates. |
+| v0.8 | 2026-10-05 | Define 9F4C-A's fenced occurrence-to-Run persistence link and separate append-only Schedule Run Outbox; record repeated disposable PostgreSQL validation and retain all authorization/atomic-writer/worker gates. |

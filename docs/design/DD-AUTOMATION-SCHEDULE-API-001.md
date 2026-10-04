@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
 > Status: 🟡 Verified implementation slice; route and target-environment verification remain open.
-> Version: 0.7 | Date: 2026-10-04
+> Version: 0.8 | Date: 2026-10-05
 
 ## 1. Routes
 
@@ -49,7 +49,17 @@ Missing/foreign Project, Run, Worktree, Task, or Rule returns not-found to avoid
 - Completed in the bounded runner with disposable PostgreSQL 18.6: apply the 9F2/9F4A/9F4B migration chain twice; assert all seven Schedule tables use FORCE RLS; exercise tenant isolation, Run-consistent Outbox, append-only mutation rejection, SCD2 boundary, exact-key TTL replay reuse, initial creator/run-as equality, immutable run-as successor behavior, and occurrence-to-pinned-Rule identity equality.
 - Compare actual migration privileges with target production database/runtime role grants; until confirmed, keep that release gate open.
 
-## 6. Revision history
+## 6. 9F4C-A persistence invariants
+
+The new migration has an explicit prerequisite: the canonical `multica.task_execution_run` schema, including its tenant/run and tenant/project/task/run unique keys, must already be installed. It adds `admitted_run_id` to the Work-class dispatch row and an FK to `(tenant_id, run_id)`. The dispatch guard requires a non-null Run link for a new `leased → admitted` transition, checks the referenced TaskExecutionRun uses `run_origin='schedule'` and the same `automation_occurrence_id`, and makes the link immutable. Legacy admitted/terminal rows may remain null when no exact Run can be proven; no identity is guessed.
+
+`automation.schedule_run_outbox` is a Transaction table with tenant FORCE RLS, append-only UPDATE/DELETE/TRUNCATE guards, and unique `(tenant_id, occurrence_id, event_type)`. Composite FKs pin its Rule revision and Engineering Run, occurrence and Project, and TaskExecutionRun and Task. An insert trigger verifies the Run is schedule-origin/agent-channel, has the same Engineering Run, rule/version/occurrence and `initiated_by`, and that the occurrence's immutable `run_as_actor_id` matches. The Outbox is distinct from `schedule_rule_outbox` (Rule changes) and `multica.task_run_outbox` (Task metadata changes).
+
+The database layer permits setting the link only in the fenced state transition, but it does not itself know the worker's supplied lease owner/generation. The future application transaction must include both values and require current owner, generation, lease expiry, and occurrence deadline in its conditional update. It must also reauthorize the stored run-as identity and current Run/Worktree/Task/Profile/HookSet facts before writing Run, resource reservation, `run_started`/`schedule_occurrence_linked` RunEvents, occurrence `run_admitted` event, dispatch transition, and Schedule Run Outbox in one transaction. No production capability is connected yet.
+
+The updated bounded runner passed on a disposable PostgreSQL 18.6 instance: four migrations applied twice, eight Schedule tables had FORCE RLS, an admitted Run/Outbox pair passed the identity constraints, mismatched run-as and identity mutation were rejected, Outbox UPDATE was rejected, and a `NOSUPERUSER NOBYPASSRLS` role observed only its tenant's row. This did not exercise the target production DB, migration grants, worker reauthorization, transaction rollback, concurrency, quota reservation, or a Rust admission service.
+
+## 7. Revision history
 
 | Version | Date | Change |
 |---|---|---|
@@ -60,3 +70,4 @@ Missing/foreign Project, Run, Worktree, Task, or Rule returns not-found to avoid
 | v0.5 | 2026-10-04 | Select the RustCrypto JWT backend and document authenticated scope/body-cap route evidence while retaining database and accepted-access gates. |
 | v0.6 | 2026-10-04 | Specify non-client-controlled run-as identity, stable SCD2 inheritance, DB guard behavior, and mandatory per-trigger reauthorization while retaining the unimplemented worker/admission boundary. |
 | v0.7 | 2026-10-04 | Specify DB creator binding and occurrence-to-rule identity invariants and record the completed three-migration/five-case PostgreSQL runner; retain production ACL/worker gates. |
+| v0.8 | 2026-10-05 | Specify fenced Run linkage and Schedule Run Outbox DB invariants; record repeated disposable PostgreSQL checks and keep worker authorization, quota, atomic writer, target DB and BI gates open. |

@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.63）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.64）
 
 ## 0. 文档说明与前提
 
@@ -2546,6 +2546,7 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 | AC-LOOP-006 | BI 只按固定公式报告 scheduled success/misfire、loop acceptance、iteration-to-acceptance、stall/rework 与资源成本；unknown 有 coverage 标记且原始迭代数不是优化目标 |
 | AC-LOOP-007 | Schedule rule Master/SCD2、append-only rule Audit/Occurrence/Event 和带 TTL 的 Work dispatch state 具备 tenant FORCE RLS；tenant/rule/version/UTC-slot 复合唯一键、target/Profile/HookSet snapshot、DST/timezone/policy version 与 monotonic lease generation 可被重复迁移及并发/replay 场景验证；只有 domain/schema/dispatch substrate 而未完成生产 rule API、Run writer/Auth/Outbox/BI 时不得声称 AC-LOOP-001/002 通过 |
 | AC-LOOP-008 | 首版 Rule 的 `run_as_actor_id` 必须等于已授权创建者，所有后续版本和 occurrence snapshot 身份一致；数据库拒绝伪造初始主体、替换 successor run-as 或伪造 occurrence 身份；worker 每次触发读取实时 Project/Run 授权并记录拒绝原因，撤权、目录/权限服务不可用或身份不完整时 occurrence 不得产生 TaskExecutionRun |
+| AC-LOOP-009 | Run admission 必须将通过实时 run-as 授权、target/profile/hookset/预算复验的 schedule occurrence 与唯一 TaskExecutionRun、Reservation、RunEvent 和 append-only Outbox 在一致性边界内关联；被接受的 dispatch 固定且不可替换 `admitted_run_id`，只有对应 occurrence 的 schedule-origin Run 可关联，重复 admission 幂等；撤权、授权源不可用、target 漂移、预算不足或关联不一致时不得创建 Run；仅有数据库关联约束而没有生产 admission writer/consumer 不得判为通过 |
 
 实施对账（2026-10-02）：Phase 9F1 已在 `domain-agent::engineering_loop` 提供 Run-local bounded controller 代码切片，固定 Profile/Task Contract/acceptance/HookSet/Validation identity，限制 iteration、wall-clock、CPU/RSS、child process、provider calls、output/event buffer 与 per-Run tool concurrency，并输出 digest-only receipt。验证通过只进入 AwaitingReview，不自动修改 Task 状态。该切片尚未接 Run admission/Auth recheck、CLI/OS process、durable checkpoint/Outbox、Schedule occurrence、BI 或跨 Run 公平调度；当前 Profile v1 没有累计成本预算字段，retry/backoff 也未实现，因此 LOOP-003/004/005 与 AC-LOOP-001..006 仍未整体通过。
 
@@ -2557,6 +2558,8 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 实施对账（2026-10-04，Phase 9F4B）：Rule 创建者作为 run-as principal 写入每个版本化 Schedule Rule revision；API 只从已授权创建者取得该主体，successor 复用第一版本身份，DB trigger 禁止伪造初始 creator、替换后续身份，并校验 occurrence 与精确 pinned Rule revision 身份一致；domain 与 PostgreSQL occurrence snapshot 均持久携带主体。Disposable PostgreSQL 18.6 fixture 用历史两版 Rule（首版创建者与 successor 编辑者不同）和旧 occurrence 验证历史回填；迁移在一个事务持有 DDL 表锁时由 schema owner 暂时越过自身 FORCE RLS、停用仅阻断回填的旧 guard，随后恢复所有 guard/FORCE RLS。验证通过 Domain 26/26、API 身份拒绝 1/1、五个 PostgreSQL adapter scenarios；目标 DB migration principal/grants 未验收。后续 worker 每次无人值守触发必须重新读取该主体当前 Project binding 与 Engineering Run grant；撤权或无法确认 ACL 时不得创建 Run。该 phase 尚未实现 worker/Run admission，故 AC-LOOP-008 尚未整体通过；Launch Profile 权威 resolver、目标数据库/RLS/grants、最终 quota/Auth/target recheck、Reservation/TaskExecutionRun/RunEvent、Outbox consumer 与 BI 仍开放。
 
+实施对账（2026-10-05，Phase 9F4C-A）：新增 `occurrence_dispatch.admitted_run_id` 复合 tenant FK 和数据库状态迁移守卫，只允许 dispatch 从 `leased` 进入 `admitted` 时绑定 Run，且已绑定 Run 不可替换；DB trigger 不知道 worker 提交的当前 lease owner/generation，未来 writer 必须在条件更新中校验 owner、generation、lease expiry 与 occurrence deadline。Run 必须来自同一 tenant、Project、Run scope、原 occurrence、固定 run-as 和 schedule-origin agent channel。新增 tenant FORCE RLS、append-only `automation.schedule_run_outbox`，以复合 FK 固定 occurrence、Rule revision 与 TaskExecutionRun，insert trigger 校验主体/来源。Disposable PostgreSQL 18.6 runner 双次应用完整 migration chain，验证 8 张 Schedule 表 FORCE RLS、admission 正向关联、run-as 错配、已绑定 Run 替换与 Outbox UPDATE 拒绝，以及非 superuser tenant 隔离；runner 未单独测试其它 source/channel mismatch 或 DELETE/TRUNCATE 拒绝。既有五个 adapter 场景通过。此切片只建立数据库持久化约束；当前尚无生产 admission writer、触发时 Project/Run ACL 与 target/profile/quota 最终复验、Reservation/RunEvent 同事务写入、Outbox consumer 或 BI/Benchmark 投影。因此 AC-LOOP-009 未通过，Schedule production capability 继续关闭。
+
 #### Phase 9F4A Rule API acceptance gate
 
 `SCHED-API-001..010` 的详细要求及验收证据由 `SRS-AUTOMATION-SCHEDULE-API-001` 维护。阶段关闭前须通过目标 Run/Project 授权正负例、Worktree/Task/Profile/HookSet 解绑与漂移拒绝、并发 CAS、相同/冲突幂等键、Audit/Outbox rollback、FORCE RLS 与 runtime grants 验证；代码存在或 source-text 检查不视为通过。API 子集通过也不等于 Schedule occurrence→Run 的 AC-LOOP-001/002 生产闭环通过。
@@ -2564,6 +2567,10 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 #### Phase 9F4B immutable run-as identity acceptance gate
 
 创建者由创建请求中已通过当前 Project/Run 写授权的 actor 确定；请求 body 不接受 `run_as_actor_id`。迁移按每个 Rule 最早 revision 的 `changed_by` 回填历史行，首版必须满足 run-as 等于 creator，之后数据库检查 successor 保持同一主体；每个 occurrence 将主体复制进专用快照列，并由数据库确认其与精确 pinned Rule revision 一致。occurrence worker 必须在每次新触发、重试与恢复前，以该主体复验有效 Project membership、Run grant 与当前执行 capability；撤权、身份目录不可用或 ACL 事实不能确认时，occurrence 记为拒绝且不得产生 TaskExecutionRun。当前仅实现身份存储和不变式，未启用 worker；Schedule execution 必须 fail closed。
+
+#### Phase 9F4C-A Schedule Run admission persistence acceptance gate
+
+数据库仅允许 `leased → admitted` 转换时绑定不可变的 `admitted_run_id`，并检查 dispatch 状态及 fencing/attempt 序列不变量；trigger 不验证 worker 提交的当前 lease owner/generation。应用层必须通过条件更新校验当前 owner、generation、lease expiry 与 occurrence deadline。Run、occurrence、Rule revision、tenant/Project/Engineering Run、schedule 来源、agent channel 与 run-as 必须一致。schedule Run Outbox 使用 append-only、tenant FORCE RLS 与复合 FK，且每个 occurrence/event type 唯一。此迁移与 disposable PostgreSQL 负例验证不等同于应用层原子 writer：AC-LOOP-009 关闭前，还需生产 worker 在同一 admission transaction 完成当前授权与 target/profile/HookSet/quota 复验、Reservation/TaskExecutionRun/RunEvent/Outbox 写入，并验收失败回滚、并发重放、目标数据库 grants、consumer 幂等与 BI coverage。
 
 ### 50.8C 可扩展 Agent Execution Profile：Agent、Memory、Skill、Context、Validation
 
@@ -2815,3 +2822,4 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.61 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 AC-LOOP-008：固定 Schedule 创建者 run-as、数据库禁止 successor 更换主体，并要求每次触发复验 Project/Run 权限，撤权即拒绝创建 Run；明确当前实现不含 worker/Run admission | 用户选定规则创建者为 run-as 且撤权后 fail closed |
 | v5.62 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加强 AC-LOOP-008：首版数据库写入必须证明 run-as 等于创建者，且 occurrence 必须匹配精确 Rule revision；登记 9F4B PostgreSQL 18.6 重复 migration、FORCE RLS 与 5 个真实 adapter 场景验证，同时保留 worker 实时授权与 Run admission 未实现门禁 | Rule/occurrence 身份 guard 与完整 Schedule phase runner 验证完成后对账 |
 | v5.63 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 9F4B 历史双 revision/不同编辑者与旧 occurrence 的 backfill fixture、schema-owner migration 事务边界和验证数量；明确目标 DB grants、worker ACL recheck、Run admission 与 BI 未验收 | 自审发现空库 migration 未覆盖已有 Rule/Occurrence 身份回填，补齐夹具并修复 guard/RLS 阻断 |
+| v5.64 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 AC-LOOP-009 Schedule occurrence→Run admission 不变量；记录 9F4C-A 的不可变 admitted Run 关联、schedule Run Outbox、8 表 FORCE RLS 与 PostgreSQL 负例证据；明确 admission writer、实时授权/预算复验、Reservation/RunEvent、consumer 与 BI 未验收 | 用户确定 immutable run-as 撤权 fail-closed 后继续 Schedule Run admission persistence 阶段 |
