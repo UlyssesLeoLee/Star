@@ -2,6 +2,11 @@
 name = "agent-domain"
 version = "0.1.0"
 edition = "2021"
+# 2026-10-04 (per cargo-deny 实跑): 补 license 继承。此前本 crate 缺 license 声明,
+# 被 cargo-deny 判为 unlicensed 而阻断门禁 (per AGENTS.md §0 商业开源依赖硬约束)。
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
 [dependencies]
 serde = { workspace = true }

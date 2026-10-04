@@ -1,0 +1,125 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Argo CD 调谐入口 — 指向仓库内既有 deploy/ 目录
+#
+# 选型依据: ADR-0054 (per 2026-10-04 21:04 JST 拍板)
+# 版本: Argo CD v3.5.3 (Apache-2.0, 实测 2026-10-04)
+#
+# 设计要点: **不重写既有 manifest**。本文件只声明"哪个 Git 路径 → 哪个集群的哪个
+# namespace", 实际清单仍由仓库内既有的 kustomize / helm chart 提供:
+#   - deploy/k3s-local/          (kustomize, 含 envoy 独立 deployment + bff)
+#   - deploy/helm/star/          (helm chart)
+#
+# ⚠️ 未实跑验证声明 (per 守门 #11 缺标比错标安全):
+#   编写时本机 argocd / argocd CLI 均未安装, 本文件未经过
+#   `argocd app diff` 或真机 reconcile 校验。首次落地须实跑校验。
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: star-gitops
+  labels:
+    app.kubernetes.io/part-of: star-gitops
+---
+# 授权边界: 限定本 Project 只能在 star-* namespace 内操作, 且只允许白名单资源类型。
+# 防止 GitOps 凭据被越权用于其他 namespace (per fail-closed 原则)
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: star
+  namespace: argocd
+  annotations:
+    # 供 Argo CD UI 显示用途, 避免误用
+    argocd.argoproj.io/description: |
+      Star 仓 GitOps 调谐范围。仅允许 star-* namespace, 供本机 k3s 单集群使用。
+spec:
+  sourceRepos:
+    - https://github.com/UlyssesLeoLee/Star
+  destinations:
+    - namespace: star-dev
+      server: https://kubernetes.default.svc
+    - namespace: star-staging
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    # 显式空数组 = 禁止本 Project 创建任何 cluster-scoped 资源。
+    # namespace 本身由上面的 Namespace 清单在首次引导时手动创建。
+    group: ""
+    kind: ""
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Application: dev 环境 (kustomize)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: star-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: star
+  source:
+    repoURL: https://github.com/UlyssesLeoLee/Star
+    targetRevision: dev
+    path: deploy/k3s-local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: star-dev
+  syncPolicy:
+    automated:
+      # selfHeal: 手工 kubectl 改动将被自动还原 (Git 是唯一真相)
+      selfHeal: true
+      # 待办: 确认无误后开启 prune。prune=true 的已知风险是 Git 中误删 manifest
+      # 目录会直接删除集群资源, 需配合 PruneLast=true 与 allowEmpty=false。
+      # (per 2026-10-04 实跑记录, 开启前须在 staging 验证)
+      prune: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Application: staging 环境 (helm chart, 手动同步 — 晋级由 Kargo 驱动)
+#
+# 刻意**不设** automated: Kargo 的 git-write 机制负责把版本写入 staging 分支后
+# 提交 PR, 合并才触发同步。若这里开 automated, 会绕过 Kargo 的审批与审计,
+# 造成"晋级链路形同虚设" (per ADR-0054 §3 晋级层职责单一原则)。
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: star-staging
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: star
+  source:
+    repoURL: https://github.com/UlyssesLeoLee/Star
+    targetRevision: deploy/staging
+    path: deploy/helm/star
+    helm:
+      releaseName: star
+      # 待办: values 文件名与仓库内实际布局对齐后填入
+      # valueFiles:
+      #   - values-staging.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: star-staging
+  # 刻意**不设** automated。Kargo 的 git-write 机制负责把版本写入 staging 分支后
+  # 提交 PR, 人工合并才触发同步。若此处开 automated, 会绕过 Kargo 的审批与审计,
+  # 造成"晋级链路形同虚设" (per ADR-0054 §3 晋级层职责单一原则)。
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

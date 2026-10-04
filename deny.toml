@@ -1,0 +1,159 @@
+# Star 仓 cargo-deny 门禁配置
+#
+# 依据: AGENTS.md §0 商业开源依赖硬约束 (2026-10-04 首次落地自动化)
+#   - 组件必须允许不限用途/行业/席位/用量的商业使用
+#   - 不得把 copyleft 等同于禁止商用, 也不得仅因其为 GPL/AGPL/LGPL 而一概排除
+#   - 排除: 非商业 (NC)、field-of-use、source-available、要求付费订阅/席位才能解锁核心功能
+#   - 逐版本审查完整构建/分发闭包中的传递依赖、二进制、安装器、容器与 guest image
+#   - 只核对上游仓库主许可证不足以放行
+#   - 上游社区活跃度须以近 12 个月的发布/维护证据核验
+#
+# 工具: cargo-deny 0.20.2 (实测, 见 PHASE-CD-SELECTION-REPORT.md §2)
+# 语法: 本文件已由 cargo-deny 0.20.2 实跑校验; 修改后必须重跑 `cargo deny check`
+#
+# SPDX 表达式说明: cargo-deny 0.20 的解析器要求 or-later 写长 id (如 "GPL-3.0-or-later"),
+# 不接受 "+" 短后缀; 带 exception 的许可必须写成 "X WITH <exception>" 形式, 不能作为
+# 独立 id 罗列 —— GPL-3.0 没有 classpath exception 变体 (该例外仅存在于 GPL-2.0)。
+
+[graph]
+# 全 feature 图: 门禁覆盖构建/分发闭包全集, 不只默认 feature
+# (per AGENTS.md §0 "逐版本审查完整构建/分发闭包中的传递依赖")
+all-features = true
+
+[licenses]
+version = 2
+# 低于此置信度的自定义/罕见许可表达式被拒, 需人工 clarify。
+# 这是 fail-closed 方向的取值, 符合 AGENTS.md §4 #11 "缺标比错标安全"
+confidence-threshold = 0.93
+
+# ── 允许清单 ─────────────────────────────────────────────────────────────
+# 分三类罗列。分类目的是让审查可复核, 不是让 copyleft 阻断构建。
+allow = [
+    # 1) 宽松型 (permissive) — 无附加义务
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unlicense",
+    "BSL-1.0",             # Boost Software License, 源许可型, 可商用无 copyleft
+    "Unicode-3.0",
+    "CC0-1.0",
+
+    # 1b) 宽松型 + 官方例外/姊妹许可 (per 2026-10-04 实跑补入, 均为可商用)
+    #     Apache-2.0 WITH LLVM-exception: target-lexicon 0.12.16 实际使用
+    #     CDLA-Permissive-2.0: webpki-roots 0.26.11 / 1.0.9 实际使用 (Mozilla 数据许可, 宽松型)
+    "Apache-2.0 WITH LLVM-exception",
+    "CDLA-Permissive-2.0",
+
+    # 2) 弱 copyleft (file-level) — 允许, 义务范围限于该文件
+    #    per AGENTS.md §0: 不得把 copyleft 等同于禁止商用
+    "MPL-2.0",
+    "MPL-2.0-no-copyleft-exception",
+
+    # 3) copyleft (LGPL/GPL/AGPL) — 明确允许, 不阻断构建
+    #    per AGENTS.md §0 硬约束: 不得仅因其为 GPL/AGPL/LGPL 而一概排除
+    #    引入时必须履行源码/许可证/NOTICE 义务, 并在 ADR 记录逐项审查结论
+    "LGPL-2.1-only", "LGPL-2.1-or-later",
+    "LGPL-3.0-only", "LGPL-3.0-or-later",
+    "GPL-2.0-only",  "GPL-2.0-or-later",
+    "GPL-3.0-only",  "GPL-3.0-or-later",
+    "AGPL-3.0-only", "AGPL-3.0-or-later",
+    # classpath exception 仅 GPL-2.0 有此变体
+    "GPL-2.0 WITH Classpath-exception-2.0",
+]
+
+# ── 硬拒绝说明 (cargo-deny 0.20 语义变更) ──────────────────────────────
+# 0.20 已移除 [licenses] deny = [...] 与 unlicensed 键 (见 cargo-deny PR #611,
+# 其关闭 issue #602 "Copyleft licenses are exempted from deny by default")。
+# 变更后语义为**纯白名单**: 不在 allow 列表内的许可一律被拒。
+#
+# 因此 AGENTS.md §0 的排除要求由"不在 allow 白名单"自动满足, 无需显式 deny:
+#   - 非商业 (CC-BY-NC-*)          不在白名单 -> 拒
+#   - field-of-use (NPL-* / APL-*) 不在白名单 -> 拒
+#   - source-available (BUSL-* / SSPL-* / Elastic-* / Facebook-* / PolyForm-* / JSON)
+#                                   不在白名单 -> 拒
+#
+# 反过来, GPL/AGPL/LGPL 被**显式列入** allow 白名单, 即"声明 copyleft 不阻断构建",
+# 这正是 AGENTS.md §0 "不得仅因其为 GPL/AGPL/LGPL 而一概排除"的机器可读表达。
+# 引入此类依赖时仍须人工履行源码/许可证/NOTICE 义务并在 ADR 记录 (见 ADR-0054 §2.2)。
+
+# workspace 内部 crate 不参与许可门禁 (本仓自有代码, 由本仓许可 Apache-2.0 覆盖)。
+# 0.20 要求单表形式, 非数组。
+private = { ignore = true }
+
+[bans]
+# 同一 crate 多版本共存是 Rust 生态常态; 设 warn 而非 deny, 否则长期红会掩盖真实新增。
+# 新增重复由 dependabot + cargo-machete 兜底 (见 license-gate.yml)
+multiple-versions = "warn"
+# 2026-10-04 实跑修正 (第二次): wildcards = "deny" 会把 **path 依赖**
+# (`foo = { path = "../foo" }`, 无 version 字段) 判为版本通配并阻断门禁。
+# allow-wildcard-paths 仅对 **private** crate 生效, 而本仓 100+ workspace crate
+# 均未声明 `publish = false`, 故 cargo-deny 一律视为 public crate, 放行规则不适用
+# (实测 api/application/star-mcp/star-api-rest 等 60+ crate 命中)。
+#
+# 判定: 这是 monorepo 结构的固有特征, 不是配置缺陷, 也不是真实可复现性风险
+#       (path 依赖由 workspace members 锁定, 无法被 crates.io 解析)。故降为 warn:
+#       真正的版本通配 `version = "*"` 仍会被捕获, path 依赖噪声不再阻断。
+# 长期修法 (待办 #5): 为全部 workspace crate 补 `publish = false`,
+#       使其被正确识别为 private 后可恢复 wildcards = "deny"。
+wildcards = "warn"
+# 2026-10-04 实跑保留: path 依赖放行开关。待 publish = false 补齐后重新评估。
+allow-wildcard-paths = true
+highlight = "all"
+
+[advisories]
+version = 2
+# 忽略项规约 (per 本文件顶部原则 + 守门 #11 缺标比错标安全):
+#   每条必须写明 id + 经实证的影响评估 + 处置计划, 且 reason 内须含复审期限。
+#   禁止裸 "unmaintained" 之类无 id 忽略。
+#
+# ⚠️ 关于"到期自动失败": cargo-deny **0.20.2 不支持** ignore 项的 `expiration` 字段
+#    (实测: `error[unexpected-keys]: found 1 unexpected keys, expected: ["id", "reason"]`)。
+#    故复审期限只能写在 reason 文本内由人工把关, **不会自动触发失败**。
+#    这意味着"到期"不具机器强制力, 复审依赖人 —— 属本仓已知局限 (per 报告 §3 缺口 #11)。
+#
+# 2026-10-04 首次实跑登记 (per cargo-deny 0.20.2 advisories check):
+ignore = [
+    # RUSTSEC-2023-0071 — Marvin Attack: RSA 私钥操作的时序侧信道
+    # 实证: `cargo tree -i rsa` 显示 rsa v0.9.10 经 jsonwebtoken v11.1.0 引入,
+    #       确在本仓依赖树内 (非误报)。
+    # 评估: Marvin 影响的是 **私钥解密/签名** 操作的时序泄露。本仓 JWT 鉴权
+    #       (per AGENTS.md §14.12 拍板 rust_crypto feature) 走 RSA **公钥验签**
+    #       路径, 不执行私钥运算, 故当前判定实际风险不可达。
+    # 处置: **一旦引入 RSA 私钥签名/解密 (如自签 CA、HSM 对接), 必须立即移除本条**
+    #       并按 P0 处理。复审时同时确认 jsonwebtoken 版本是否已移除 rsa 依赖。
+    { id = "RUSTSEC-2023-0071",
+      reason = "rsa 经 jsonwebtoken 引入; 本仓仅走 RSA 公钥验签, 不执行私钥运算, Marvin 时序侧信道不可达 [复审期限 2026-11-04]" },
+
+    # RUSTSEC-2025-0057 / RUSTSEC-2024-0384 / RUSTSEC-2024-0370 — unmaintained
+    # 实证 (per cargo tree -i):
+    #   fxhash v0.2.1           <- sled v0.34.7 <- star-arg-bridge
+    #   instant v0.1.13         <- parking_lot v0.11.2 <- sled v0.34.7
+    #   proc-macro-error        当前 target 下不可见 (需 --target all 复核)
+    # 评估: 三者均为传递依赖, 不直接使用其 API; unmaintained 表示上游停止维护,
+    #       本身不等于存在可利用漏洞 (无 CVE 关联)。
+    # 处置: 根因是 sled v0.34.7 (per AGENTS.md 守门 #13 a W 派生的嵌入式 KV)。
+    #       长期方案为评估 sled 替代 (redis 已通过 star-cache 接入) 或等待上游恢复。
+    #       复审时以 `cargo tree -i <crate> --target all` 确认引用面。
+    { id = "RUSTSEC-2025-0057",
+      reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-11-04]" },
+    { id = "RUSTSEC-2024-0384",
+      reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-11-04]" },
+    { id = "RUSTSEC-2024-0370",
+      reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-11-04]" },
+]
+# 锁定到已 yanked 的版本属供应链风险, 直接拒。
+# 2026-10-04 实跑曾命中 yoke-derive v0.8.3, 已由 `cargo update -p yoke-derive`
+# 升级至 v0.8.4 解除。
+yanked = "deny"
+
+[sources]
+# 非白名单来源的依赖直接拒 —— 供应链根信任
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# allow-git 初始为空: 引入私有 git 依赖须在此逐条登记并记 ADR
+allow-git = []

@@ -1,0 +1,97 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Kargo 晋级链路骨架 — dev → staging (本机 k3s 单集群)
+#
+# 选型依据: ADR-0054 (per 2026-10-04 21:04 JST 拍板)
+# 版本: Kargo v1.12.1 (Apache-2.0, 实测 2026-10-04)
+#
+# ⚠️ 未实跑验证声明 (per 守门 #11 缺标比错标安全):
+#   本文件为**骨架**, 编写时本机未安装 kargo, k3s 集群内亦未部署 kargo/argocd,
+#   因此 CRD 字段未经 `kubectl apply --dry-run=server` 或真机 reconcile 校验。
+#   首次落地须按 §验证清单 逐项实跑, 通过后更新本声明。
+#
+# 与既有 deploy/ 目录的关系:
+#   - Argo CD Application 指向既有 deploy/k3s-local/ (kustomize), 无需重写
+#   - 本目录只承载"晋级编排" (Kargo), 不承载"实际调谐" (Argo CD)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: star
+  namespace: kargo
+spec:
+  # Project 划定授权边界: 同一 namespace 内的 Stage/Warehouse 只能操作
+  # 本项目显式授权的 PromotionTask / ClusterPromotionTask
+  promotionPolicies:
+    - context:
+        project: star
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Warehouse: 监听 GHCR 上的服务镜像新版本, 产出 Freight (不可变的版本单元)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: star-services
+  namespace: kargo
+spec:
+  subscriptions:
+    - repository: ghcr.io/ulyssesleolee/star
+      # 待办: 实际镜像名与 registry 需与 CI 推送目标对齐后再启用本订阅。
+      # 当前以注释形式保留, 避免写出未经核实的仓库坐标导致门禁误报。
+      # interval: 5m
+      # tagSelection:
+      #   method: semver
+      #   allowTags: '^\d+\.\d+\.\d+$'
+      # 新增订阅时必须同时:
+      #   1) 确认该镜像的 SPDX 许可闭包 (per AGENTS.md §0)
+      #   2) 确认 cosign 签名策略 (per ADR-0054 §5.1 服务链)
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: dev — 自动晋级, 无审批
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: dev
+  namespace: kargo
+spec:
+  # 自动晋级: dev 环境无审批, 但保留 requiredSoak 观察期
+  requiredFreight:
+    origin: Warehouse
+    name: star-services
+  promotionTemplate:
+    mechanism: git-write
+    gitWrite:
+      repoURL: https://github.com/UlyssesLeoLee/Star
+      branch: deploy/dev
+      # 待办: 目标路径需与仓库内实际布局对齐 (预期 deploy/k3s-local/ 下的版本文件)
+      path: deploy/k3s-local
+  verification:
+    # 观察期: 避免刚晋级就判定成功
+    requiredSoakTime: 5m
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: staging — 需人工审批 (per ADR-0054 §3 第一阶段范围)
+#
+# 第二阶段扩展 (dev → staging → prod) 时, 在此追加:
+#   - 需审批: auto: false
+#   - Argo Rollouts Analysis 门禁 (指标不达标自动回滚)
+#   - 参考 ADR-0054 §6.2 待办 #4
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: staging
+  namespace: kargo
+spec:
+  requiredFreight:
+    origin: Stage
+    name: dev
+  promotionTemplate:
+    mechanism: git-write
+    gitWrite:
+      repoURL: https://github.com/UlyssesLeoLee/Star
+      branch: deploy/staging
+      path: deploy/k3s-local
+  verification:
+    requiredSoakTime: 15m
