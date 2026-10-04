@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Verified design/implementation slice; production enablement remains open.
-> Version: 0.3 | Date: 2026-10-04
+> Version: 0.4 | Date: 2026-10-04
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -10,7 +10,7 @@ Schedule Rules are an Automation capability owned by an Engineering Run. The API
 
 ## 2. Components and transaction boundary
 
-`star-api-rest::group_api::schedule_rules` is the authenticated REST boundary. It composes existing Project binding, Engineering Run authorization, Worktree/Task ownership checks, execution Profile resolution, and effective HookSet verification. `domain-automation::schedule` validates the pinned recurrence contract. PostgreSQL stores the immutable rule revision, append-only audit fact, append-only event Outbox record, and short-lived command replay record.
+`star-api-rest::group_api::schedule_rules` is the authenticated REST boundary and is merged into `build_group_router`, which the REST binary uses. The workspace explicitly selects `jsonwebtoken`'s RustCrypto backend for deterministic RS256 signing/verification. Request-level tests run all four methods through the production router: missing credentials return 401, signed JWTs with insufficient scope return 403 before database access, and an oversized write body with a valid write scope returns 413; rejection responses carry private/no-store headers. These tests prove route wiring, token validation, scope rejection, and the body cap, but do not validate accepted Project/Run access, role grants, target ownership, or deployment. The boundary composes Project binding, Engineering Run authorization, Worktree/Task ownership checks, execution Profile resolution, and effective HookSet verification. `domain-automation::schedule` validates the pinned recurrence contract. PostgreSQL stores the immutable rule revision, append-only audit fact, append-only event Outbox record, and short-lived command replay record.
 
 Create and revise each run in one PostgreSQL transaction. The transaction sets tenant/actor context, verifies current Project and Run grants, locks the idempotency key, resolves the target and policy snapshot, writes the Master revision and audit/Outbox facts, saves the replay response, then commits. Any error rolls the whole operation back. No handler launches a worker or creates a TaskExecutionRun.
 
@@ -34,3 +34,5 @@ The current capability is only Rule management. A Rule cannot execute until Phas
 | v0.1 | 2026-10-03 | Define the initial Run-scoped component and storage boundary. |
 | v0.2 | 2026-10-04 | Record the reviewed persistence and cache-safety repair set. |
 | v0.3 | 2026-10-04 | Align Rule-revision currentness with the current-fact contract and evidence. |
+| v0.4 | 2026-10-04 | Record production REST-router wiring and unauthenticated route test evidence; keep authorization and target-environment gates open. |
+| v0.5 | 2026-10-04 | Pin the JWT crypto backend and record signed-token scope rejection and authenticated body-cap request tests; keep accepted-access and database gates open. |

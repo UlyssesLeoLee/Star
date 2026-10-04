@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
 > Status: 🟡 Verified implementation slice; route and target-environment verification remain open.
-> Version: 0.3 | Date: 2026-10-04
+> Version: 0.4 | Date: 2026-10-04
 
 ## 1. Routes
 
@@ -12,7 +12,7 @@
 | GET | collection + `/{rule_id}` | `work-item:read` | Read current revision only. |
 | PUT | collection + `/{rule_id}` | `work-item:write` | CAS successor revision; requires `expected_current_version` and `Idempotency-Key`. |
 
-All route handlers cap JSON bodies at 16 KiB and return authenticated JSON with `Cache-Control: private, no-store` and `Vary: Authorization`. No DELETE route exists: disabling a rule is a new immutable revision with `enabled=false`.
+The router configures a 16 KiB JSON body cap and private response headers (`Cache-Control: private, no-store`, `Vary: Authorization`). The workspace explicitly enables `jsonwebtoken` RustCrypto, providing one deterministic backend for the existing RS256 issuer/verifier. Request-level tests run all four methods through production `build_group_router`: missing credentials produce 401; correctly signed JWTs missing the required read/write scope produce 403 before DB access; and a signed write-scope POST exceeding 16 KiB produces 413. Rejection responses carry both private headers. This is not evidence for accepted role/Project/Run authorization or persistence. No DELETE route exists: disabling a rule is a new immutable revision with `enabled=false`.
 
 ## 2. Write contract
 
@@ -41,7 +41,8 @@ Missing/foreign Project, Run, Worktree, Task, or Rule returns not-found to avoid
 ## 5. Verification required before phase closure
 
 - Re-run focused `rustfmt` and `cargo check --all-targets` after any change to this slice (the 2026-10-04 direct-toolchain checks passed).
-- Route tests for scope/role, Run/Project mismatch, target ownership, version conflict, request bound, and no-store headers.
+- Completed: unauthenticated requests to collection GET/POST and item GET/PUT return 401; signed tokens missing the required scope return 403 before database access; a valid write-scope token with an oversized body returns 413. Rejection responses carry private/no-store headers.
+- Still required: role matrix, Run/Project mismatch, target ownership, version conflict, page bounds, and authenticated no-store behavior on success and application errors.
 - Idempotency tests for replay, mismatched key reuse, concurrent same-key create, and concurrent CAS revision.
 - Disposable PostgreSQL repeat application of the 9F2 and 9F4A migrations; assert the two new API tables use FORCE RLS; exercise tenant isolation, Run-consistent Outbox, append-only mutation rejection, SCD2 boundary, and exact-key TTL replay reuse.
 - Compare actual migration privileges with target production database/runtime role grants; until confirmed, keep that release gate open.
@@ -53,3 +54,5 @@ Missing/foreign Project, Run, Worktree, Task, or Rule returns not-found to avoid
 | v0.1 | 2026-10-03 | Define routes, transaction sequence, and production closure gates. |
 | v0.2 | 2026-10-04 | Record reviewed cache, TTL, SCD2, and Outbox persistence safety changes. |
 | v0.3 | 2026-10-04 | Make the Rule-revision currentness predicate explicit and align validation evidence. |
+| v0.4 | 2026-10-04 | Add request-level route-mount/error-header evidence and separate it from valid-auth and PostgreSQL authorization gates. |
+| v0.5 | 2026-10-04 | Select the RustCrypto JWT backend and document authenticated scope/body-cap route evidence while retaining database and accepted-access gates. |
