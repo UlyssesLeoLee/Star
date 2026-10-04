@@ -273,6 +273,7 @@ export default function AgentsPage() {
                       { id: "christmas-noel", label: "🎄 圣夜红 (毛玻璃)" },
                       { id: "christmas-pine", label: "🎄 松针绿" },
                       { id: "manga-vermilion", label: "☀️ 宣纸红 (Light)" },
+                      { id: "cel-azure", label: "🎞️ 赛璐璐蓝 (Cel)" },
                     ] as const
                   ).map((item) => (
                     <button

@@ -1,0 +1,293 @@
+{
+  "source": {
+    "branch": "codex/worktree-group-shell-mvp",
+    "sha": "bf76a0c44fd0a094e61536365c0049e172b857e7",
+    "status": "MERGE",
+    "unique_count": 18,
+    "commits": [
+      "bf76a0c44fd0a094e61536365c0049e172b857e7 Merge remote-tracking branch 'origin/dev' into codex/worktree-group-shell-mvp",
+      "0317731c94645e8646da98a25359783eac37296f feat(worktree-group): add worktree-scoped canvas persistence API",
+      "96bf44d947e9919fb7ae37e9cb04aa4f0c4b021b feat(theme): add 6th theme — Japanese Cel Animation (日式经典手绘赛璐璐)",
+      "13f717dc6d069b6ae4f91c5b8e798700df7d1cab Merge remote-tracking branch 'origin/dev' into codex/worktree-group-shell-mvp",
+      "9f42a0b01451bb8cec6ec073fa37651cb8893a87 feat(worktree-group): isolate group canvas by worktree scope",
+      "65458e26baf078492f21b9c51a92d0f5ef35f438 feat(agents/3d): embed TacticalCore3D and support all 5-theme Cel palettes in Agent Command Hub",
+      "c7a88d506425d2db026106ef49d892fb890cc8aa merge(dev): sync latest dev with worktree group phases",
+      "782dc74aa31b6817081fd41e6e620d25eadc2faa feat(worktree-group): implement phases 2b-2d API slices",
+      "5e95ce4208d04af14e0a43da882290c8a8e6cd92 feat(theme/3d): extend 5-theme Cel palette — AnimeCelShaderCanvas + TacticalCore3D full 5-theme morph",
+      "9fb40c4b709d5d261618386b85ccd683a3a3b76a docs(worktree): detail group context and project index route",
+      "38831306d903849ea75885e85b30f274c6286f9c feat(worktree): add project-scoped group workspace shell",
+      "ca0809906103389fd593e67cd2ecf009822b5f2d feat(theme): add Old Shanghai Yuefenpai vintage theme & fix showcase switching",
+      "65ab57c7fe4d017da98675e570005712f877b3f4 merge(theme-4paradigms): merge 16-bit HD-2D Charisma & frosted glass Christmas refinements into dev",
+      "53e943e6fb624d7979a8983fc61c87e60d790680 feat(theme): refine 4-paradigm aesthetic — 16-bit HD-2D console exclusive for Charisma, frosted glass for Christmas, 3-to-2 preserved for dark/light",
+      "ee364b53c549fcbf7f059da06c7ca0b9e737afdf merge(charisma-pixel): merge Charisma Pixel HD-2D theme (极魅像素) into dev",
+      "cfa40f714ec14d0787e78ed1adf610f71e748250 feat(theme): add Charisma Pixel theme (极魅像素) — 歧路旅人 HD-2D 神恩紫红金纯像素第4套主题",
+      "627a132d24ec94f97836f0d15b99540c47370457 docs: align detailed design with Worktree group baseline",
+      "69c98f8be548f0a731cbd69201039f7c27027b79 chore(.gitignore): ignore session 内 worktree artifacts (k3s rollout + workflow run)"
+    ],
+    "merge_base": "254275de004ca96777740816a4674a718c84ae7e",
+    "source_paths": [
+      ".gitignore",
+      "AGENTS.md",
+      "crates/domain-theme/src/lib.rs",
+      "crates/domain-theme/src/value_object.rs",
+      "crates/star-api-rest/Cargo.toml",
+      "crates/star-api-rest/src/auth/mod.rs",
+      "crates/star-api-rest/src/auth/oauth/middleware.rs",
+      "crates/star-api-rest/src/group_api.rs",
+      "crates/star-api-rest/src/group_api/canvas.rs",
+      "crates/star-api-rest/src/group_api/work_items.rs",
+      "crates/star-api-rest/src/group_api/worktrees.rs",
+      "crates/star-api-rest/src/lib.rs",
+      "crates/star-api-rest/src/main.rs",
+      "db/migrations/2026-09-29-worktree-group-phase-2b.sql",
+      "db/migrations/2026-09-29-worktree-group-phase-2c.sql",
+      "db/migrations/2026-09-29-worktree-group-phase-2d.sql",
+      "db/migrations/2026-09-29-worktree-group-phase-3-canvas.sql",
+      "docs/architecture/2026-09-03-langgraph/01-requirements.md",
+      "docs/architecture/2026-09-03-langgraph/02-basic-design.md",
+      "docs/architecture/2026-09-03-langgraph/03-detailed-design.md",
+      "docs/basic-design.md",
+      "docs/design/BD-WORKTREE-CANVAS-001.md",
+      "docs/design/DD-CANVAS-001.md",
+      "docs/design/DD-CANVAS-WORKFLOW-001.md",
+      "docs/design/DD-MULTICA-TASK-001.md",
+      "docs/design/DD-SHARED-TASK-001.md",
+      "docs/design/DD-WORKTREE-CANVAS-001.md",
+      "docs/design/DD-WORKTREE-GROUP-001.md",
+      "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+      "docs/requirements.md",
+      "docs/requirements/SRS-WORKTREE-CANVAS-001.md",
+      "frontend/e2e/redirects.spec.ts",
+      "frontend/public/fonts/kenpixel.ttf",
+      "frontend/src/app/(app)/agents/page.tsx",
+      "frontend/src/app/(app)/projects/ProjectsClient.tsx",
+      "frontend/src/app/globals.css",
+      "frontend/src/app/providers.tsx",
+      "frontend/src/app/worktree/[id]/group/page.tsx",
+      "frontend/src/app/worktree/page.tsx",
+      "frontend/src/components/CanvasView.tsx",
+      "frontend/src/components/effects/AnimeCelShaderCanvas.tsx",
+      "frontend/src/components/effects/TacticalCore3D.tsx",
+      "frontend/src/components/theme/ThemeProvider.tsx",
+      "frontend/src/components/theme/ThemeSwitcher.tsx",
+      "frontend/src/lib/agent-game/theme-tokens.test.ts",
+      "frontend/src/lib/agent-game/theme-tokens.ts",
+      "frontend/src/lib/agent-game/theme.test.ts",
+      "frontend/src/lib/agent-game/theme.ts",
+      "frontend/src/lib/redirects.shim.cjs",
+      "frontend/src/lib/redirects.ts",
+      "frontend/src/lib/theme/__tests__/types.test.ts",
+      "frontend/src/lib/theme/types.ts",
+      "frontend/src/mocks/handlers/index.ts",
+      "frontend/src/styles/theme.css",
+      "frontend/src/types/ids.ts"
+    ],
+    "predicted_conflict": true,
+    "projected_tree": "2de361c9b0919126d87b822d8a26d29c862d9345",
+    "projected_paths": [
+      ".gitignore",
+      "AGENTS.md",
+      "crates/star-api-rest/src/group_api.rs",
+      "crates/star-api-rest/src/group_api/canvas.rs",
+      "crates/star-api-rest/src/group_api/work_items.rs",
+      "crates/star-api-rest/src/group_api/worktrees.rs",
+      "crates/star-api-rest/src/main.rs",
+      "docs/basic-design.md",
+      "docs/design/BD-WORKTREE-CANVAS-001.md",
+      "docs/design/DD-CANVAS-WORKFLOW-001.md",
+      "docs/design/DD-MULTICA-TASK-001.md",
+      "docs/design/DD-WORKTREE-CANVAS-001.md",
+      "docs/design/DD-WORKTREE-GROUP-001.md",
+      "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+      "docs/requirements.md",
+      "docs/requirements/SRS-WORKTREE-CANVAS-001.md",
+      "frontend/src/app/(app)/agents/page.tsx",
+      "frontend/src/app/(app)/projects/ProjectsClient.tsx",
+      "frontend/src/app/worktree/[id]/group/page.tsx",
+      "frontend/src/app/worktree/page.tsx",
+      "frontend/src/components/CanvasView.tsx",
+      "frontend/src/types/ids.ts"
+    ]
+  },
+  "before": "68f4ff52d8586743e759415c7a2be3754262f915",
+  "paths": [
+    ".gitignore",
+    "AGENTS.md",
+    "crates/star-api-rest/src/group_api.rs",
+    "crates/star-api-rest/src/group_api/canvas.rs",
+    "crates/star-api-rest/src/group_api/work_items.rs",
+    "crates/star-api-rest/src/group_api/worktrees.rs",
+    "crates/star-api-rest/src/main.rs",
+    "docs/basic-design.md",
+    "docs/design/BD-WORKTREE-CANVAS-001.md",
+    "docs/design/DD-CANVAS-WORKFLOW-001.md",
+    "docs/design/DD-MULTICA-TASK-001.md",
+    "docs/design/DD-WORKTREE-CANVAS-001.md",
+    "docs/design/DD-WORKTREE-GROUP-001.md",
+    "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+    "docs/requirements.md",
+    "docs/requirements/SRS-WORKTREE-CANVAS-001.md",
+    "frontend/src/app/(app)/agents/page.tsx",
+    "frontend/src/app/(app)/projects/ProjectsClient.tsx",
+    "frontend/src/app/worktree/[id]/group/page.tsx",
+    "frontend/src/app/worktree/page.tsx",
+    "frontend/src/components/CanvasView.tsx",
+    "frontend/src/types/ids.ts"
+  ],
+  "conflicts": [
+    ".gitignore",
+    "crates/star-api-rest/src/group_api.rs",
+    "crates/star-api-rest/src/group_api/canvas.rs",
+    "crates/star-api-rest/src/group_api/work_items.rs",
+    "crates/star-api-rest/src/group_api/worktrees.rs",
+    "crates/star-api-rest/src/main.rs",
+    "docs/basic-design.md",
+    "docs/design/BD-WORKTREE-CANVAS-001.md",
+    "docs/design/DD-CANVAS-WORKFLOW-001.md",
+    "docs/design/DD-MULTICA-TASK-001.md",
+    "docs/design/DD-WORKTREE-CANVAS-001.md",
+    "docs/design/DD-WORKTREE-GROUP-001.md",
+    "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+    "docs/requirements.md",
+    "docs/requirements/SRS-WORKTREE-CANVAS-001.md",
+    "frontend/src/app/(app)/agents/page.tsx",
+    "frontend/src/app/(app)/projects/ProjectsClient.tsx",
+    "frontend/src/app/worktree/[id]/group/page.tsx",
+    "frontend/src/app/worktree/page.tsx",
+    "frontend/src/components/CanvasView.tsx"
+  ],
+  "decisions": {
+    ".gitignore": {
+      "action": "current",
+      "reason": "Current exclusions cover Schedule clusters, directory validation, session artifacts and generated Tauri schemas; preserve all and add bounded integration cache exclusion.",
+      "evidence": "c6593258:.gitignore; source diffs remove current exclusions",
+      "result_sha256": "647fe84a37896a6f199efe2a83c71858d824b7bf5ba174d4a98d18d1cd5389e8"
+    },
+    "AGENTS.md": {
+      "action": "current",
+      "reason": "Preserve canonical Project/Branch/Run/Worktree, native Hook, commercial OSS and Rust performance constraints.",
+      "evidence": "c6593258:AGENTS.md §0; current user architecture",
+      "result_sha256": "a5f9e1d1d7c8d34f36e785775b1f60cfb957f188bf37a73c623346445d2994c3"
+    },
+    "crates/star-api-rest/src/group_api.rs": {
+      "action": "current",
+      "reason": "Preserve current lifecycle providers, chat/app registry and Engineering Run/Profile/Hook router wiring.",
+      "evidence": "c6593258:GroupApiState:258, build_group_router:642",
+      "result_sha256": "a60612d840c9c80785bd74c30a7bfb2b0db6be54980178f64fad1bf5925ae07f"
+    },
+    "crates/star-api-rest/src/group_api/canvas.rs": {
+      "action": "current",
+      "reason": "Preserve atomic Canvas-to-Task, typed references, CAS, audit and transactional Outbox.",
+      "evidence": "c6593258:create_work_item_on_canvas:390, update_document:667, set_entity_ref:1170, append_event:1658",
+      "result_sha256": "e732e43c7de64fa3553b919523a06a3678602f11dbf3bb05b2838d1b74e04583"
+    },
+    "crates/star-api-rest/src/group_api/work_items.rs": {
+      "action": "current",
+      "reason": "Preserve repository/branch/Run owner tuple and Run-filtered pagination and checkout validation.",
+      "evidence": "c6593258:create_work_item:141, list_run_work_items:351, authorize_task_run_for_worktree:765",
+      "result_sha256": "3e7c914a907b893f025e09eba510309f1f7cf60f4d4a86a9003ebcce355c7605"
+    },
+    "crates/star-api-rest/src/group_api/worktrees.rs": {
+      "action": "current",
+      "reason": "Preserve native Hook, verified policy and lock freshness, drain and readiness fencing.",
+      "evidence": "c6593258:lock_management_confirmation_context:859, prepare_archive_gate_facts:939, evaluate_archive_gate:1053, archive_gate_facts_are_fresh:1177",
+      "result_sha256": "d26ab591405f0a90a3e9c762cd4d6868ee9029cc2da2a3a29fff43ee38f26caf"
+    },
+    "crates/star-api-rest/src/main.rs": {
+      "action": "current",
+      "reason": "Preserve actual PostgreSQL app registry provider wiring; source disables it.",
+      "evidence": "c6593258:PgGroupAppRegistryProvider::new, with_group_app_registry",
+      "result_sha256": "257d7af29792bcbc4cd4815cb4d75856f6d059cbb54d52c79c62decc77333768"
+    },
+    "docs/basic-design.md": {
+      "action": "current",
+      "reason": "Preserve canonical Run owner, separate focus, V2 fence and signature v3, bounded UI and 9F3 adapter.",
+      "evidence": "c6593258 v5.53 §16.2, §16.14–16.23",
+      "result_sha256": "3bd88432c7e00fd6b11a7cab1ec5ab060cfeb32ce5704a0f75b7bb07b61d33a6"
+    },
+    "docs/design/BD-WORKTREE-CANVAS-001.md": {
+      "action": "current",
+      "reason": "Preserve Run-owned Canvas/Task peers; recover only exact source v1.3 history row.",
+      "evidence": "c6593258 v1.4 §1.5; f84d0c2bf4e2 historical row",
+      "result_sha256": "de5413432fb1c82af70b192aaeaf64f9446c9d0352814dd0772b0ce163d28b0c"
+    },
+    "docs/design/DD-CANVAS-WORKFLOW-001.md": {
+      "action": "current",
+      "reason": "Preserve domain-automation as single schedule owner; source reintroduces obsolete CronScheduler.",
+      "evidence": "c6593258 v1.0.3 §7, §17 TriggerDispatcher/fire_schedule_occurrence",
+      "result_sha256": "8d0924fcc48e3e69c7c9de3d5738065f9c7c0dc45eb5255c3a8edeb49912d167"
+    },
+    "docs/design/DD-MULTICA-TASK-001.md": {
+      "action": "current",
+      "reason": "Preserve versioned Loop/Schedule, V2 binding/signature v3 and real CLI production gates.",
+      "evidence": "c6593258 v1.25 §14.10, §14.11.13, §14.13",
+      "result_sha256": "90ff7060cafe885e0ad97d7377bd980c18f8e71c7aebb5d505beefcca1dd5fe1"
+    },
+    "docs/design/DD-WORKTREE-CANVAS-001.md": {
+      "action": "current",
+      "reason": "Preserve canonical Run ownership and optional focus; recover only exact v1.3 source history row.",
+      "evidence": "c6593258 v1.4 §50.1; b3c025df historical row",
+      "result_sha256": "87884d48a851957b01fbcce3f945c917b20a376252e6cd7f65965a7d7a550a3b"
+    },
+    "docs/design/DD-WORKTREE-GROUP-001.md": {
+      "action": "current",
+      "reason": "Preserve Branch/Run tree, owner/focus separation, directory execution identity, authorized Hook hints and mock retirement.",
+      "evidence": "c6593258 v4.35 §0, §1, §3, §7.3, §8.6, §10.0A-B",
+      "result_sha256": "7be652f2c595ca6ef536918d1c80ea4b5b7296c7fd8e3877fa6eaac908db4b9f"
+    },
+    "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md": {
+      "action": "current",
+      "reason": "Preserve ERUN-P2/P3 and 9F1–9F3 implementation evidence and uncompleted 9F4+ gates.",
+      "evidence": "c6593258 v5.78",
+      "result_sha256": "97c81ded343b0f081f3281ce1a32c869a62a89b81f45b6647d04293c30b8a83d"
+    },
+    "docs/requirements.md": {
+      "action": "current",
+      "reason": "Preserve latest hierarchy, owner, controlled task CLI, no mock fallback, performance and Schedule acceptance gates.",
+      "evidence": "c6593258 v5.56 §50.1/50.2; AC-ERUN-001–006, AC-LOOP-007",
+      "result_sha256": "d62e1c3051210c69ab7777d21baa7fd674ba6ecdde43bba89878f687d232cad4"
+    },
+    "docs/requirements/SRS-WORKTREE-CANVAS-001.md": {
+      "action": "current",
+      "reason": "Preserve Project Graph/Run Canvas distinct objects and Run owner; recover only exact v1.3 historical row.",
+      "evidence": "c6593258 v1.4 §1.6; f84d0c2bf4e2 historical row",
+      "result_sha256": "715dd8650eddc27360fca3a4d5340c0804c2bf95d6f2d5a8f3517969e8d7df65"
+    },
+    "frontend/src/app/(app)/agents/page.tsx": {
+      "action": "manual",
+      "reason": "Preserve current page and add missing cel-azure picker entry supported by existing renderer.",
+      "evidence": "c6593258:AnimeCelShaderCanvas.tsx CelPalette:27, PALETTE_CONFIGS:307; frozen shell source palette delta",
+      "result_sha256": "b8918f824413b5525c63c3c294ae50c405badab69a5ddd0e15670e99a5d699fc"
+    },
+    "frontend/src/app/(app)/projects/ProjectsClient.tsx": {
+      "action": "current",
+      "reason": "Preserve actual create-project dialog and blocked Kanban column; target Worktree page loads authorized directory.",
+      "evidence": "c6593258:CreateProjectDialog; authorized /worktree destination",
+      "result_sha256": "5a2984e39705effe07fdd4b627f4ae2e1089fb1f492ab1444795e846a23a3686"
+    },
+    "frontend/src/app/worktree/[id]/group/page.tsx": {
+      "action": "current",
+      "reason": "Preserve API-owned tasks, real controlled CLI, reattach/cancel, atomic Canvas-to-Task and CAS.",
+      "evidence": "c6593258:groupApi:726, task CLI:1844/1887, reattach:1995, cancel:2051, CanvasTask:1276, position:1613",
+      "result_sha256": "7ccd2f0d0fc471648f80e9bd21443d96630311a4c3091a8a10e02d2e872c330c"
+    },
+    "frontend/src/app/worktree/page.tsx": {
+      "action": "current",
+      "reason": "Preserve authorized project selection and real paginated/filterable worktree lifecycle.",
+      "evidence": "c6593258:AuthorizedProjectSelector, ProjectWorktreeLifecycleControls, listProjectWorktrees, listProjectMembers",
+      "result_sha256": "6cb782f2ae810befa4ae3b686171b50566c5e12d2da198771516a55ce0c5b305"
+    },
+    "frontend/src/components/CanvasView.tsx": {
+      "action": "current",
+      "reason": "Preserve API callbacks, CAS expectedVersion, group references, brush and theme support.",
+      "evidence": "c6593258:onCreateElement, onElementPositionChange, onDeleteElements, onViewportChange, groupWorkItems/groupWorktrees",
+      "result_sha256": "ca63438c927d7a23e1893fa818e70fb28bee86ffe7b2b67f68b104db22a8c102"
+    },
+    "frontend/src/types/ids.ts": {
+      "action": "current",
+      "reason": "Preserve W/T/M mapping and Canvas path/brush DTOs.",
+      "evidence": "c6593258:WtmCategory, WT_M_FROM_KIND, WT_M_ORDER, WT_M_LABELS, WorkItem.w_t_m",
+      "result_sha256": "1723307dcc237495db20f3bbdaa2c736e4c5c7829f58f0bb53696eed923a0140"
+    }
+  }
+}
