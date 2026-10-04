@@ -132,7 +132,7 @@ export function Sidebar() {
       data-scope={sidebarScope}
       // 桌面: 256/64 sticky; <768px: 隐藏 (由 MobileBottomNav + AppMatrixDrawer 抽屉替代, per 2026-09-01 PHASE-MOBILE-PWA)
       className={clsx(
-        "hidden md:flex shrink-0 border-r-2 border-black bg-bg-soft/95 cel-shadow backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-20 transition-all duration-200 ease-out",
+        "hidden md:flex shrink-0 border-r-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))]/95 cel-shadow backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-20 transition-all duration-200 ease-out text-[var(--cel-text-primary,var(--color-text))]",
         SIDEBAR_WIDTH[sidebarFold]
       )}
     >
@@ -140,7 +140,7 @@ export function Sidebar() {
       <div
         data-testid="sidebar-brand-block"
         className={clsx(
-          "border-b-2 border-black shrink-0 flex items-center bg-[var(--cel-surface-card,#0f1422)]",
+          "border-b-2 border-[var(--cel-ink,var(--color-border))] shrink-0 flex items-center bg-[var(--cel-surface-card,var(--color-surface-2))]",
           isCollapsed ? "justify-center px-2 py-4 flex-col gap-3" : "justify-between px-4 py-4"
         )}
       >
@@ -155,7 +155,7 @@ export function Sidebar() {
         >
           <div
             aria-hidden="true"
-            className="size-9 overflow-hidden border-2 border-black cel-shadow shrink-0 transition-transform duration-200 group-hover:scale-105 bg-black"
+            className="size-9 overflow-hidden border-2 border-[var(--cel-ink,var(--color-border))] cel-shadow shrink-0 transition-transform duration-200 group-hover:scale-105 bg-black"
           >
             <img
               src="/sidebar-icon.png"
@@ -170,11 +170,11 @@ export function Sidebar() {
               <div className="flex items-center gap-1.5">
                 <span className={clsx(
                   "text-base font-black tracking-wider uppercase italic transition-colors",
-                  isDark ? "text-white group-hover:text-[var(--cel-cyan,#00f0ff)]" : "text-black group-hover:text-[var(--cel-crimson,#ff184c)]"
+                  isDark ? "text-white group-hover:text-[var(--cel-cyan,#00f0ff)]" : "text-[var(--cel-text-primary,#0d1117)] group-hover:text-[var(--cel-crimson,#e8295a)]"
                 )}>
                   STAR
                 </span>
-                <span className="font-mono text-[10px] font-black px-1.5 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black italic">
+                <span className="font-mono text-[10px] font-black px-1.5 py-0.5 bg-[var(--cel-crimson,var(--color-secondary,#ff184c))] text-[var(--color-on-primary,#ffffff)] border border-[var(--cel-ink,var(--color-border))] italic">
                   CEL-NPR
                 </span>
               </div>
