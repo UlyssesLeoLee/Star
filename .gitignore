@@ -158,3 +158,6 @@ coverage-*/
 
 # Tauri v2 generated JSON schemas (regenerated from app config/capabilities).
 /crates/star-desktop/src-tauri/gen/schemas/
+
+# Isolated, bounded merge review scratch data
+/.cache/dev-converge-20261004/
