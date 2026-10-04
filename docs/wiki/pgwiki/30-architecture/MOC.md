@@ -1,20 +1,51 @@
 ---
 title: "Architecture MOC"
-generated: "2026-09-06T04:43:04Z"
+generated: "2026-10-04T20:31:00+09:00"
 node_type: "moc"
+view_count: 14
 ---
 
 # Architecture MOC
 
 # Architecture 总览
 
-## 5 大架构 view (per AGENTS.md §6.1)
+## 16 个架构 view (per AGENTS.md §6.1)
 
-- [[view-2026-08-26-upgrade]] — `2026-08-26-upgrade`
-- [[view-2026-09-02-upgrade]] — `2026-09-02-upgrade`
-- [[view-2026-09-03-agent-runtime]] — `2026-09-03-agent-runtime`
-- [[view-2026-09-03-langgraph]] — `2026-09-03-langgraph`
-- [[view-2026-09-03-treesitter-worktree-graph]] — `2026-09-03-treesitter-worktree-graph`
+索引于 2026-10-04 补齐。此前只列 5 个（截至 2026-09-03），而 `docs/architecture/` 下实际已有 14 个 view 目录 —— 缺的是索引，不是文档。
+
+### 基础 view
+
+- [[view-2026-08-26-upgrade]] — `2026-08-26-upgrade` · 114 篇 · ADR 0021-0053 + 20 域 spec
+
+### 编排与运行时
+
+- [[view-2026-09-02-upgrade]] — `2026-09-02-upgrade` · 1 篇 · Flutter MVP
+- [[view-2026-09-03-agent-runtime]] — `2026-09-03-agent-runtime` · 2 篇 · ECS 运行时
+- [[view-2026-09-03-langgraph]] — `2026-09-03-langgraph` · 4 篇 · L0/L1 两级编排
+- [[view-2026-09-03-arg]] — `2026-09-03-arg` · 14 篇 · 唯一完整 SRS→DD→RACI→分阶段实现
+- [[view-2026-09-03-treesitter-worktree-graph]] — `2026-09-03-treesitter-worktree-graph` · 2 篇 · 代码图
+
+### 核心机制
+
+- [[view-2026-09-07-exclusion-idempotency]] — `2026-09-07-exclusion-idempotency` · 3 篇
+- [[view-2026-09-09-subtask-binding]] — `2026-09-09-subtask-binding` · 3 篇
+
+### 契约与开关
+
+- [[view-2026-09-22-aci-mock-interface]] — `2026-09-22-aci-mock-interface` · 1 篇
+- [[view-2026-09-22-mock-switches]] — `2026-09-22-mock-switches` · 1 篇
+
+### 桌面端 Rust→WASM
+
+- [[view-2026-09-28-upgrade]] — `2026-09-28-upgrade` · 1 篇 · 前端内存研究
+- [[view-2026-09-29-upgrade]] — `2026-09-29-upgrade` · 2 篇 · 端侧研究 + WASM P0P1
+- [[view-2026-09-30-upgrade]] — `2026-09-30-upgrade` · 9 篇 · Tauri 全链路 P0–P10
+
+### 协议与实测基线
+
+- [[view-2026-10-01-upgrade]] — `2026-10-01-upgrade` · 2 篇 · Session Memory 协议 + Tauri PoC 索引
+- [[view-2026-10-04-dev-baseline]] — `2026-10-04-dev-baseline` · 实测基线 `dev@c1ce1630` + Automation Schedule 剖析
+- [[view-2026-10-02-engineering-run-directory]] — `2026-10-02-engineering-run-directory` · 四层导航代码落点 + 硬编码关闭清单
 
 ## 27 份 ADR
 - [[adr-0021-zero-vendor-cooperation]] — ADR-0021 zero-vendor-cooperation
