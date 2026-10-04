@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.35**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.37**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -8,14 +8,14 @@
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
 > - Phase 9E-4C5 Runtime fence foundation：REST 与 Local Runtime 共用 `star-dto::task_run` strict DTO；ERUN-P2 带 V2 directory fence 的双 Profile grant 使用 signature v3（C5 基线为 v2），无 fence 的 legacy grant 保持 v1；Local Runtime 专用 consumer 完整比对当前 binding 并在 SQLite FULL WAL 单事务内消费 nonce/fence，receipt 上限 50,000 条并保留 5 分钟时钟偏差清理窗。该 helper 未接生产 provisioner，不负责实时 ACL/authority、reservation lifecycle、OS sandbox/spawn 或 BI outcome；producer capability 继续默认关闭，详见 §7.2。
 > - ERUN-P3 Run Task Cards 条件式 UI：默认 Task Cards tab 与 canonical Run list typed client 已有只读代码；实现 12 条/页、2 MiB response、最多 100 页、有界并发和取消。旧 Tauri desktop 任务 mock/fallback 已移除；根 Providers 未注入宿主 session，服务端 capability 固定 false，Task Owner 目标 DB/RLS 未验收，所以生产页面不呈现任务；CLI 保持禁用，详见 §10.0A-B。
-> - 日期：2026-10-02
+> - 日期：2026-10-04
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.51 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.48 §16
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.58 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.55 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -341,7 +341,9 @@ Run budget 至少包括 memory/RSS、CPU 并发、wall-clock deadline、子进�
 
 ### 6.4 Schedule Loop 与 Engineering Loop
 
-Schedule Loop 的唯一计划定义与 occurrence source 是 `domain-automation` 的版本化 `AutomationRule` / `AutomationOccurrence`；Group/Workflow 只接收已创建的 occurrence 并为目标 Task 派生 Run，不另存 Cron 表或自行计时。`star-scheduler` 只解析依赖 DAG 的 ready 节点，不是 wall-clock scheduler；LangGraph/Workflow 负责已启动 Run 内的编排，不是第二个 schedule owner。规则保存 timezone、并发/overlap、misfire、retry、deadline、pause 与目标 scope；每个 occurrence 有稳定 ID、fencing lease、幂等分发和可审计 stop reason。当前 Schedule/Cron 仍是候选契约，尚未形成生产定义或 worker。
+Schedule Loop 的唯一规则/occurrence owner 是 `domain-automation` 的版本化 `AutomationScheduleRuleRevisionV1` / `AutomationOccurrence`；Group/Workflow 只接收已物化 occurrence 并为目标 Task 派生 Run，不另存 Cron 表或自行计时。`star-scheduler` 只解析依赖 DAG 的 ready 节点，不是 wall-clock scheduler；LangGraph/Workflow 负责已启动 Run 内的编排，不是第二个 schedule owner。Rule 保存 timezone、并发/overlap、misfire、retry、deadline、pause 与目标 scope；每个 occurrence 有稳定 ID、fencing lease、幂等分发和可审计 stop reason。
+
+Phase 9F2/9F3 已提供 Rule/Occurrence schema、版本固定的 bounded materializer 与 PostgreSQL lease/dispatch adapter；本地 disposable PostgreSQL 验证不等于目标库部署。Phase 9F4A 增加嵌套于 Project→Engineering Run 的 Rule API，写事务验证当前 Project/Run/Worktree/Task/Profile/Provider/Skill/Grant catalog/HookSet 并原子写 Rule revision、Audit、Outbox 与 24 小时幂等记录。current selection 同时要求 `valid_from <= now()` 和 `valid_to IS NULL`；Outbox 以复合 FK 固定 Rule version 与 Run，SCD2 close/successor 使用同一 transaction timestamp，expired replay key 可先精确清除后复用。Focused Rust compile/three unit tests 和 disposable PostgreSQL 18.6 repeat-migration、RLS/constraint checks 已通过。API 集成、目标 DB/RLS 与 runtime grant 验证尚未执行，故 API 未验收；尚无已启用 worker、occurrence→TaskExecutionRun/Reservation/RunEvent admission 或 BI consumer。逐路由与事务细节见 [`DD-AUTOMATION-SCHEDULE-API-001`](DD-AUTOMATION-SCHEDULE-API-001.md)，完整 Schedule 闭环保持 fail closed。
 
 Engineering Loop 是单一 `TaskExecutionRun` 内版本化、预算受限的 Plan/Act/Observe/Verify/Decision 周期。每轮追加 Loop event 和必要 Evidence；不得改写 Run 的 Task Contract/acceptance/profile/HookSet 快照。达到迭代、deadline、CPU/RSS、子进程或 provider 请求上限，检测到无进展/振荡，或发生撤权/cancel 时停止接收新动作、取消并 drain child，再记录 stop reason 和 drain 结果。循环度量来自 durable occurrence/RunEvent/Evidence/Audit；单纯增加轮数或调用量不算成功。
 
@@ -766,3 +768,5 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.33 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.49/basic v5.46；补入完整 Task Card Run owner、同 Run Worktree 约束、Run-scoped list API、Task Run Outbox 与 CLI/Canvas owner recheck；说明精确删除 30 条旧演示任务和本地引用，legacy DB 数据不猜归属；明确迁移/目标 DB/RLS、宿主 provider、Run Task UI 尚未生产验收 | 用户授权移除旧 mock 任务并要求以 Engineering Run 作为任务事实归属 |
 | v4.34 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.50/basic v5.47/Task DD v1.19；规定 Run Task Cards UI/client 的 owner tuple 校验、有界分页/响应/并发/取消与 CLI disabled 状态；说明宿主 session、服务端 capability、目标 DB/RLS 门控仍关闭 | Run Task Cards 前端实现对账 |
 | v4.35 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.51/basic v5.48/Task DD v1.20/SRS v0.7；补充退役 Tauri MockDb 任务记录和 browser-dev fallback、Run provider 缺失时 IPC fail closed、测试 `test-*` fixture；保留未知服务器 legacy 行边界 | 全仓审查发现独立 Tauri 桌面端仍显示旧演示 WorkItem |
+| v4.36 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §6.4 为版本化 Schedule Rule/Occurrence owner；记录 9F2/9F3 substrate 与 9F4A Run-scoped Rule API 边界，链接 Schedule API 详细增量设计，并明确 Cargo/目标 DB/RLS/grants 未验证以及 worker/Run admission/BI 尚未启用 | 9F4A 实施切片与整体 Schedule Loop 设计同步 |
+| v4.37 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F4A 审查修复和 focused Rust/isolated PostgreSQL 证据；补充 future-current 排除、Run FK、SCD2/TTL/cache 边界，保持 route、target DB、worker、admission 与 BI 关闭 | 9F4A 验证后同步详细设计 |

@@ -10,6 +10,7 @@
 |---|---|---|
 | 源 refs 快照与 merge-tree 投影 | 完成；冻结计划记录开始 dev SHA、每个 source SHA、merge-base、source/projected paths 与提交清单 | [plan.json](dev-converge-20261004/plan.json) |
 | 非祖先来源 | 9 个普通 no-ff merge commits；native-runtime-fence 由首个 Worktree Group merge 带入；另 11 个来源（含 main）本来已包含 | 逐来源 JSON 与 [execution.json](dev-converge-20261004/execution.json)：区分直接 merge、传递纳入及起初已包含 |
+| 9F4A 后续提交 | 冻结的 21-source 计划之后，独立审阅并将 `f4bb0269ca29adbc1234eb44c507cbbb6b6769ad`（16 个文件）无冲突 no-ff 合入候选；原冻结计划保持不变 | [9f4a-rule-api.json](dev-converge-20261004/9f4a-rule-api.json)、[execution.json](dev-converge-20261004/execution.json) |
 | 冲突 | 所有改动路径都逐项登记 decision/reason/evidence/result SHA-256；当前新设计与安全实现优先 | 逐来源审计 JSON |
 | 经核实补齐 | 恢复 BD/DD 两行有 Git 来源证明的修订历史；为既有 cel-azure 渲染配色增加选择入口 | `docs/design/BD-WORKTREE-CANVAS-001.md`、`docs/design/DD-WORKTREE-CANVAS-001.md`、`frontend/src/app/(app)/agents/page.tsx` |
 | 自动化与文档 | 增加隔离候选 ref 快照、审计、冲突决策和普通 merge 的 runner；同步 §4.43、registry §1/v0.44 | `scripts/automation/dev_converge.py`、`docs/automation-design.md`、`scripts/automation/registry.md` |
@@ -28,12 +29,12 @@
 | Frontend typecheck | 阻断：当前复用的 frontend node_modules 缺少 package 中声明的 `monaco-editor`；由此产生 5 项相连隐式 any。不是这次合并触及的文件 |
 | Rust workspace all-targets | 未完成：启动后 Cargo 报共享 package-cache file lock 等待；锁由另一工作树正在运行的 workspace 测试持有。为避免干扰该运行已中断本次全仓 check，没有编译通过结论。9F4A worker 的 star-api-rest all-targets 为单独 gate |
 | CypherGraph Guardian | `--stamp` 检查本次两个源码文件，通过 |
-| PostgreSQL / Schedule 9F4A | 由其独立 worktree 的 runner 验收；不把本次历史 merge 当 Schedule production 验收 |
+| PostgreSQL / Schedule 9F4A | worker 在 fresh disposable PostgreSQL 18.6 环境将 9F2/9F4A migrations 各应用两次，并验证 tenant RLS、Run 五列 FK、append-only Outbox、幂等 key reuse/TTL cleanup 与 SCD2 边界；Rust all-targets 编译、3 个 Schedule Rule 单测和 owned-source rustfmt 通过 | [9F4A 阶段报告](PHASE-9F4A-SCHEDULE-RULE-API-REPORT.md)；这不是目标环境或 production runtime 验收 |
 
 ## §3 已知缺口
 
 - 不 push。远端 `origin/dev` 仍是先前快照，未声称远端包含本次提交。
-- 9F4A Rule API、长期 worker、Run admission、reservation/RunEvent/Outbox consumer、BI/Benchmark、目标环境权限仍按实际验收状态管理。
+- 9F4A Rule API/persistence slice 已进入本地 dev；生产 HTTP route integration、API-role grants/Auth/目标数据库、长期 worker、occurrence→Run/reservation/RunEvent/Outbox consumer 与 BI/Benchmark 仍未完成，因此 Schedule capability 仍 fail closed，Phase 9F4A 整体未关闭。
 - 当前 Run shell 并未开放所有 App；尚不可把全套 Worktree/Group Apps 阶段标成完成。
 - 前端 typecheck 需要复原完整、与 lockfile 一致的依赖安装后再运行；本轮不因缓存缺包改变 manifests/lockfile。
 - 清理或删除仍有 owner/dirty worktree 的分支不属于本阶段。活动 worktree 与 dirty 用户内容均保留。
@@ -41,12 +42,12 @@
 ## §4 子代理失败接手清单
 
 - 文档与代码只读审阅均覆盖其冻结范围并返回逐路径证据；根代理按证据建立审计决策。
-- Schedule 9F4A worker 在独立 worktree 修复 API 并通过 star-api-rest 编译及源码 rustfmt；容器在 DB runner 前消失后正创建 fresh disposable PostgreSQL 18.6 环境重跑场景。此报告阶段时尚未提交，不能说其 DB/Run/BI 闭环已验收或并入 dev。
+- Schedule 9F4A worker 提交 `f4bb0269`（16 个文件）；定向 all-targets 编译、3 个 Rule API 单测、owned-source rustfmt 和 fresh disposable PostgreSQL 验证均有独立报告。其 source worktree 中两个无关 execution-profile 文件仍为 dirty，未纳入提交、未清理；Run/worker/BI 不在本次 API slice 验收范围。
 - CodeRabbit 执行器启动失败（本机包装脚本报告 Permission denied）；以两份独立只读对比、冲突审计、定向测试和根代理自审接手。不声称 CodeRabbit 已 review。
 
 ## §5 守门规则
 
-1. 冻结的 21 个源 ref 均保留在计划中；检查过程中源 SHA 不移动。
+1. 冻结的 21 个源 ref 均保留在计划中；检查过程中源 SHA 不移动。之后到达的 9F4A `f4bb0269` 作为单独 follow-up 审计，不改写原计划。
 2. main、dev 和用户工作树不 reset；dev 只从基线 fast-forward 到候选最终 SHA。
 3. 每个 merge source 依据实际代码/文档，不批量接受 ours/theirs。
 4. 历史源路径版本较旧；不能用旧文件的删除量作为设计要求。
@@ -70,3 +71,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冻结来源并逐路径审阅、合并到本地 dev；登记验证与未完成能力 | 用户授权 `$git-converge dev --apply` 并要求按当前 Codex/Worktree 设计智能处置 |
+| v0.2 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 追加 9F4A API 独立集成审计与 PostgreSQL/Rust 验证证据；更新 follow-up 状态和生产闭环缺口，保留活动/dirty Codex Worktree | worker 提交 `f4bb0269` 后继续收敛至本地 dev |

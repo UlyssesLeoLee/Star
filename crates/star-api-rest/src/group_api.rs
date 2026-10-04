@@ -103,6 +103,19 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+// @cypher schema=1 source_sha256=50bbb4af07adf1c5535dc6759ab5f81a68fae4b0bbcc5d348df991d95847a907
+// MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
+// MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
+// MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
+// MERGE (schedules:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
+// MERGE (schedule_router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
+// MERGE (self)-[:DEFINES]->(api)
+// MERGE (api)-[:DEFINES]->(build)
+// MERGE (api)-[:DEFINES]->(schedules)
+// MERGE (self)-[:CALLS]->(schedule_router)
+// MERGE (build)-[:CALLS]->(schedule_router)
+// @endcypher
+
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -118,6 +131,7 @@ mod execution_profiles;
 mod execution_resources;
 mod group_apps;
 pub(super) mod hook_policies;
+mod schedule_rules;
 mod scoped_chat;
 mod scoped_chat_store;
 mod task_runs;
@@ -653,6 +667,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(execution_profiles::router())
         .merge(execution_profile_admin::router())
         .merge(task_runs::router())
+        .merge(schedule_rules::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
         .merge(group_apps::router())

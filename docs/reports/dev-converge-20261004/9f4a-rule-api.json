@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "purpose": "Follow-up integration after the frozen 21-source dev convergence plan.",
+  "source": {
+    "branch": "codex/schedule-production-9f4-20261003",
+    "sha": "f4bb0269ca29adbc1234eb44c507cbbb6b6769ad",
+    "parent": "c6593258ce647c0ac0ad0b14eba812b1afc9c3a8"
+  },
+  "target": {
+    "branch": "dev",
+    "frozen_start_sha": "c6593258ce647c0ac0ad0b14eba812b1afc9c3a8",
+    "candidate_branch": "codex/dev-converge-reconcile-20261004",
+    "candidate_before_followup_sha": "3e57012964ba738cf91098e83be11d22b89f3a26"
+  },
+  "merge": {
+    "strategy": "ordinary no-ff merge",
+    "conflicts": [],
+    "projected_tree_before_document_sync": "4ee16266835d997875d25eb9eac98feaf1867542",
+    "changed_path_count": 16,
+    "paths": [
+      {
+        "status": "M",
+        "path": "Cargo.lock",
+        "sha256": "51241cd0a134e221763faf908a6b9c7d6010442410d1c99f971828481bb46c65"
+      },
+      {
+        "status": "M",
+        "path": "crates/star-api-rest/Cargo.toml",
+        "sha256": "96ae53aea49574816eee6ac66148d25d9f53f5b5226ba08f9c05227f3d93aa52"
+      },
+      {
+        "status": "M",
+        "path": "crates/star-api-rest/src/group_api.rs",
+        "sha256": "b1e47602109148e6c5f7761290a4b10ed36427c1c82d843f821b6d4fab7e228f"
+      },
+      {
+        "status": "M",
+        "path": "crates/star-api-rest/src/group_api/execution_catalogs.rs",
+        "sha256": "abed9b40cd4a79681bbdc7151d349ab99ad224b8fcd6120b83b17316125910a0"
+      },
+      {
+        "status": "M",
+        "path": "crates/star-api-rest/src/group_api/hook_policies.rs",
+        "sha256": "dc15c89ae4bb15e9843f2548672f7ae3a3ed8c6943f575e210852c527519869c"
+      },
+      {
+        "status": "A",
+        "path": "crates/star-api-rest/src/group_api/schedule_rules.rs",
+        "sha256": "fa375e374253cb08e797133d007ea43482a32bbc0738efa09a53242efb350b0e"
+      },
+      {
+        "status": "A",
+        "path": "db/migrations/2026-10-03-automation-schedule-rule-api.sql",
+        "sha256": "441581189aa1695c02f7ad2d8ac680cee832241c3fa81924b2ad8f811eec5fb8"
+      },
+      {
+        "status": "M",
+        "path": "docs/basic-design.md",
+        "sha256": "9c230627a198b6ce05ecc98f2f95f8b327a41e20bfb730484ec92b9dfd73fccb"
+      },
+      {
+        "status": "M",
+        "path": "docs/data-design.md",
+        "sha256": "0f78c772ef12dc99203f18595ae577d9111afd6cf0f987902a21d8780f373dc3"
+      },
+      {
+        "status": "A",
+        "path": "docs/design/BD-AUTOMATION-SCHEDULE-API-001.md",
+        "sha256": "acc01c0023f85699505122221dcf4ee1e250ce3a2e3836932b2f7a2cbf5a5c1e"
+      },
+      {
+        "status": "A",
+        "path": "docs/design/DD-AUTOMATION-SCHEDULE-API-001.md",
+        "sha256": "dbf3b155dad2afc75138d4143f9044632d1c3c1ff1e2a9cb7328a7552e0087be"
+      },
+      {
+        "status": "M",
+        "path": "docs/design/DD-WORKTREE-GROUP-001.md",
+        "sha256": "6cfc7c080ca3b9d4d3aa3821422079d74bd65c26af2dd65a0a535ac90950807d"
+      },
+      {
+        "status": "M",
+        "path": "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+        "sha256": "781897decb45588eeb835a1b284775d5dcd5de8a4012139a93a35d0e2a12eb05"
+      },
+      {
+        "status": "A",
+        "path": "docs/reports/PHASE-9F4A-SCHEDULE-RULE-API-REPORT.md",
+        "sha256": "92283b80208f631b167a3ea9d82a71525e752094c6a4dfe6117c059531dc37bb"
+      },
+      {
+        "status": "M",
+        "path": "docs/requirements.md",
+        "sha256": "a89e8655e33438a15bc343ded899b7bf03a8618dd200f5bcd2e5d5a7358766a4"
+      },
+      {
+        "status": "A",
+        "path": "docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md",
+        "sha256": "fcdc4f171a6480f2301f62334f27ac659d92ac2624af85a2bcb0094044d367f0"
+      }
+    ]
+  },
+  "source_validation_evidence": {
+    "rust": "Worker report: Rust 1.98.1 cargo --offline check --locked -p star-api-rest --all-targets -j 4 exit 0; three schedule_rules tests passed; owned-source rustfmt check passed.",
+    "postgresql": "Worker report: fresh disposable PostgreSQL 18.6; 9F2 and 9F4A migrations each applied twice; tenant RLS, Run-consistent five-column Outbox FK, append-only guard, expired idempotency-key reuse and 64-row cleanup, and SCD2 boundary checks passed.",
+    "scope": "These checks do not validate the target database, production route/auth grants, execution worker, Run admission, Outbox consumer, or BI/Benchmark."
+  },
+  "excluded_source_worktree_changes": [
+    "crates/star-api-rest/src/group_api/execution_profile_admin.rs",
+    "crates/star-api-rest/src/group_api/execution_profiles.rs"
+  ],
+  "followup_gates": [
+    "production HTTP route integration",
+    "target database grants and Auth verification",
+    "execution worker and occurrence-to-Run admission",
+    "reservation/RunEvent/Outbox consumer",
+    "BI/Benchmark projection"
+  ],
+  "dev_update": {
+    "strategy": "fast-forward-only after the candidate commit; no push"
+  }
+}
