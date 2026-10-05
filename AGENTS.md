@@ -19,6 +19,8 @@
 
 **商业开源依赖硬约束**：新引入、默认支持或随产品分发的第三方组件必须允许不限用途、行业、席位或用量的商业使用；不得把 copyleft 许可证等同于禁止商用，也不得仅因其为 GPL/AGPL/LGPL 而一概排除。对修改、链接、捆绑、安装和再分发逐项审查并履行相应源码、许可证、NOTICE、安装信息等义务；无法满足义务时调整交付形态或替换组件，不把许可义务误写为商业用途禁令。排除非商业、field-of-use、source-available 或要求付费订阅/席位才能解锁核心功能的组件。逐版本审查完整构建/分发闭包中的传递依赖、二进制、安装器、容器与 guest image，并生成 SPDX/SBOM；只核对上游仓库主许可证不足以放行。上游社区活跃度须以近 12 个月的发布/维护证据和公开维护渠道核验；保留各许可证要求的版权、NOTICE 与专利声明。
 
+**本地/CI K3s 虚拟机管理约束**：Multipass 是本地/CI Linux guest VM 的首选管理 provider，K3s 在 Linux guest 内运行；生产或远端 K3s 使用独立 provider。默认按需共享 Host/environment VM 与 control plane，并以 Project/Run scope、RBAC、quota 和 network policy 隔离，不为每个 Worktree/Agent 复制 VM。仅可信 Rust Host Infrastructure Manager 可调用受限 Multipass adapter；不得向 Agent、Plugin 或任务卡 CLI 暴露 Multipass daemon/socket、任意宿主 shell 或默认可写宿主挂载。Worktree 内容只能经显式、限路径且可审计的 bridge 传入 guest；VM/K3s 就绪不得替代 Runtime sandbox、原生 Hook、取消恢复与独立验证门，未验收前保持任务执行关闭。对账实现时必须区分宿主级实验部署/GitOps 证据与 Star 原生 provider、Run 绑定、Agent sandbox 和性能验收；前者不得代替后者。
+
 **多代理并行与 Rust 桌面性能硬约束**：设计必须为 Project/Worktree/Run/Agent/Plugin 定义资源预算、公平调度、有界队列、背压、取消与 drain；Rust 桌面前端必须采用分页/虚拟化、按需加载和有界缓存，避免 UI 阻塞及无界日志驻留。Pi 仅作为小核心、组合扩展、事件生命周期、可分支历史与上下文压缩的设计参考；产品执行核心与性能敏感桌面界面以 Rust 实现，不引入 Pi/Node 运行时替代实现。Agent、Memory、Skill、Context、Validation、Loop 与项目工程规范必须提供版本化扩展契约，Run 固定 profile/version/digest 与资源预算；第一期可用受控 Rust CLI adapter 调用现有工具，但权限、scope、上下文组装、事件/证据记录与独立验证由 Star 控制，并保留后续 Rust-native provider 替换路径。插件必须有版本化 capability 边界和隔离运行时，禁止在主进程加载任意 native code。
 
 **原生 Hook 强约束**：安全关键 Hook 必须由 Rust 核心原生执行，fail-closed 且不可被插件替代或减弱；Project/Worktree 继承、Run 快照、生命周期门与 BI 事件使用同一版本化 HookSet 契约。旧 Python Hook handler 仅可作为显式非权威的兼容/观测输入，不得参与授权、命令放行或验收决策。

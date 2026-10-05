@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.5 (2026-10-05)
+> **文档版本**: v2.7 (2026-10-05)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1200,6 +1200,16 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 
 此验证只关闭 enable-time SQL helper 的 canonical ACL 基础证据，不代表完整 Rule write route 或无人值守执行授权已验收。创建者仍固定为 immutable run-as；每次 trigger/retry/resume 必须由未来 admission transaction 重新授权。worker、execution capability、target/Profile/HookSet/quota、lease-owner/generation、原子 Run admission、Outbox consumer、BI 与目标 DB grants 未完成前，Schedule 保持 fail closed。
 >
+
+### 4.50 Phase 9F4C-C Schedule run-as ACL mutation serialization（2026-10-05）
+
+| 任务卡 | 档位 | 实现/验证 | 验证边界 |
+|---|---|---|---|
+| Schedule enable-time run-as 授权必须与 Project/Branch/Run 撤权确定排序 | [P]（R/V/S/A） | 新增 `2026-10-05-schedule-run-as-acl-lock.sql`：checked helper 验证 tenant/actor context 与 canonical Run/Project/current grants 后，获取 tenant+Project transaction advisory lock；API 在下一条 SQL statement 重新读取 ACL。Project/Branch/Engineering Run grant INSERT/UPDATE/DELETE BEFORE triggers 解析 OLD/NEW 对应 Project 并取相同锁；跨 Project update 按 UUID 顺序锁定。runtime role 仍只有 ACL SELECT 和显式 helper EXECUTE | 完整 Schedule runner 在 disposable PostgreSQL 18.6 双次 apply 五个 Schedule migrations。Project、Branch、Run 三类双连接撤权分别等候授权事务锁；授权提交后撤权完成，下一次授权 fail closed。测试 role 没有 ACL UPDATE 权限。目标 DB function/trigger owner 与 role grants、完整 REST rollback、worker/admission、consumer/BI 仍开放 |
+
+此门关闭 API Rule enable-time authorization 与 canonical grant mutation 的并发先后不确定性；不代表 worker 每次 trigger/retry/resume 已接线。固定 creator run-as 策略沿用：创建者是执行身份，每次真实触发仍必须复验当前 Project/Run 权限；撤权或事实不可用时 fail closed。
+本节的撤权竞态验证已补齐 §4.48 与 §4.49 当时列出的 API enable-time grant serialization 缺口；其中旧状态描述保留为对应阶段的历史快照。worker 每次触发重授权、原子 Run admission、目标库 grants、Outbox consumer 与 BI 仍未完成。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1577,6 +1587,8 @@ frontend/src/app/automation-debug/
 | v2.3 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 9F4C-B 纯角色策略 helper 单测 1/1 通过，区分 helper 结果与未覆盖的目录 ACL SQL；登记 registry_check 0 errors/191 warnings，并保留每次触发 reauth 的 worker 缺口 | 完成本阶段最后一次隔离链接验证并同步证据边界 |
 | v2.4 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 9F4C-B 纯角色策略 helper 单测纳入 `phase9f3_schedule.py` 的可重放 cargo gate，并补齐 registry/report/实施计划追溯；run-as 创建者权限仅在 Rule enable 写入时验证，per-trigger/retry/resume 重授权仍等待 worker | 提交前自审发现已通过的角色策略测试尚未接入仓库 [P] runner |
 | v2.5 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.49 canonical Project/Branch/Run ACL disposable fixture、只读 runtime role 下实际 SQL helper 的 active/revoked/paused cases；明确查询不序列化并发撤权并保留 full-route/worker/target DB gates | 修复 9F4C-B ACL runner 权限边界并完成完整 Schedule runner |
+| v2.6 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.50：以 Project-scoped transaction advisory lock 和三类 Directory grant mutation triggers 序列化 9F4C-C 授权/撤权；记录 PostgreSQL 18.6 三类并发撤权测试，保留 production grants、worker/admission 与 BI 缺口 | 9F4C-C 双连接 ACL 撤权竞态门通过后同步自动化追踪 |
+| v2.7 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 §4.50 已关闭 §4.48/§4.49 当时记载的 enable-time grant mutation serialization 缺口；保留 worker/per-trigger 重授权、Run admission、consumer、BI 与目标 grants 为未完成 | 收敛 Schedule 多阶段文档内的历史状态与当前实现边界 |
 
 ---
 

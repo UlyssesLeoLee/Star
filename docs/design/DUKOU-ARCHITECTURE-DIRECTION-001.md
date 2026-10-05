@@ -1,6 +1,6 @@
 # 渡口架构与交付方向
 
-> v1.3 · 2026-10-02 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.5 · 2026-10-05 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 >
 > 对照：requirements §50、basic-design §16、DD-WORKTREE-GROUP-001、WORKTREE-GROUP-IMPL-PLAN-001。本指引安排交付顺序，不替代既有 Phase 完成门。源码、编译、数据库与产品运行证据分别记录。
 
@@ -99,14 +99,18 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 
 ## 8. 本地基础设施方向
 
-增加 Rust Host Infrastructure Manager，以 Rust provider contract 连接 Multipass 本地 VM、Podman machine、Linux Incus、Lima 和用户自有/远端 Linux K3s；不按用途、行业、部署规模、seat、用量或商业 tier 限制。K3s 运行在 Linux guest/node。GPL/AGPL/LGPL 允许商业使用与销售，不因 copyleft 排除；产品支持既有 provider 检测、安装引导及履行实际发行义务后的受管安装/捆绑，不得强制手工自装。逐版本审查发行 SBOM/NOTICE 与近 12 个月上游维护证据；法律发行义务不构成商业用途/客户/功能限制。Multipass 是本地开发/测试 VM 管理器，不能替代不可信 Agent Runtime sandbox；Hook、lease/cancel/drain、BI 与固定负载性能仍须逐项验收。见 DD-LOCAL-INFRASTRUCTURE-001 v0.4 / 实施计划 §6.69-6.70；当前未验证 Star provider、许可闭包、RSS 与安全隔离。
+本地与 CI 的首选路径确定为 Multipass 管理 Linux VM，在 guest 内运行 K3s；Podman machine、Incus、Lima 是 capability-negotiated fallback，生产/远端 Linux K3s 使用独立 provider。默认按 Host/environment 共享按需 VM 与 K3s control plane，通过 Project/Run namespace、RBAC、quota 和 network policy 隔离工作，不按 Worktree/Agent 复制 VM。Rust Host Infrastructure Manager 是唯一 Multipass adapter caller；GUI 保持普通用户权限，Agent/Plugin/Task CLI 不获得 daemon/socket、任意 host shell 或未经授权 mount。Worktree 内容经 scope/revision 校验的 workspace bridge 输入 guest；缺少实际 Runtime sandbox、Hook、取消/恢复与独立验证时，CLI 仍禁用。资源未知/不足时拒绝新 VM/Agent admission，并以桌面进程树、VM、K3s、Agent 的固定负载实测内存和并行能力。
+
+不按用途、行业、部署规模、seat、用量或商业 tier 限制。GPL/AGPL/LGPL 允许商业使用与销售，不因 copyleft 排除；产品支持既有 provider 检测、安装引导及履行实际发行义务后的受管安装/捆绑，不得强制手工自装。逐版本审查完整发行 SBOM/NOTICE 与近 12 个月上游维护证据；法律发行义务不构成商业用途/客户/功能限制。Multipass 官方定位是本地开发/测试工具，并且 daemon/mount 位于宿主高权限边界，不能替代不可信 Agent Runtime sandbox。dev 上已有 Windows HCS + Multipass 1.17.0-rc1 + Ubuntu/K3s 与 19/19 GitOps Pod Running 实跑证据，但这不是 Star 原生 provider/Run binding/sandbox 的验收，也没有桌面/Agent RSS 基准。具体契约与后续门见 DD-LOCAL-INFRASTRUCTURE-001 v0.6 和实施计划 §6.83。
 
 ## 9. 商用开源基础设施
 
-基础设施选择以渡口自身 Rust provider contract 为主，按 OS 和已发现 capability 连接外部设施并保留可替换 backend；不因 copyleft 排除合法商业方案，也不设置用途、行业、seat、用量或付费 tier 限制。分发修改/组合组件时履行源码、NOTICE 等对应发行义务；产品提供检测、引导和履约后的受管安装/捆绑路径。Multipass 作为跨平台本地开发 VM 候选，Incus 负责 Linux shared VM/container，Podman machine/Lima 提供替换 backend，远端 Linux K3s 降低桌面常驻资源。K3s 不原生支持 Windows；各版本 capability、权限、完整依赖闭包、性能和任务执行需实测。资源准入按实际主机容量与安全策略工作，不映射为商业付费限制。
+基础设施选择以渡口自身 Rust provider contract 为主，按 OS 和已发现 capability 连接外部设施并保留可替换 backend；不因 copyleft 排除合法商业方案，也不设置用途、行业、seat、用量或付费 tier 限制。分发修改/组合组件时履行源码、NOTICE 等对应发行义务；产品提供检测、引导和履约后的受管安装/捆绑路径。Multipass 是首选本地/CI VM provider；Incus 负责 Linux shared VM/container fallback，Podman machine/Lima 提供替换 backend，远端 Linux K3s 用于用户管理的独立环境/生产路径。K3s 不原生支持 Windows；各版本 capability、权限、完整依赖闭包、桌面/VM 内存、并行和任务执行需实测。资源准入按实际主机容量与安全策略工作，不映射为商业付费限制。
 
 ## 修订历史
 
 | 版本 | 日期 | 修订内容 | 触发 |
 |---|---|---|---|
 | v1.3 | 2026-10-02 | 明确 unrestricted commercial use 与许可证发行义务的界线；加入 provider 检测、安装引导和合规受管安装/捆绑；明确硬件准入不是商业用途/用量限制；同步 Infrastructure DD v0.4 与最新 K3s stable channel | 用户要求不限商业使用并采用社区活跃的开源方案 |
+| v1.4 | 2026-10-05 | 将 Multipass 从本地 VM 候选提升为本地/CI K3s guest 的首选管理路径；明确 Host/environment VM 共享、Run scope 配额、Rust Manager/daemon 信任边界、Worktree workspace bridge、未实现状态与资源验收顺序；同步 requirements v5.69/basic v5.66/Infrastructure DD v0.5/实施计划 §6.83 | 用户明确后续使用 Multipass 管理虚拟机里的 K3s，并要求纳入总体架构方向 |
+| v1.5 | 2026-10-05 | 在 Multipass 首选架构中纳入 dev 已有 Windows HCS/Linux guest K3s/GitOps 19/19 实跑证据；明确这只关闭宿主 PoC，不代表 Star Rust provider、Run binding、Agent sandbox、跨平台或 RSS 门完成；同步 requirements v5.70/basic v5.67/Infrastructure DD v0.6/实施计划 v5.93 | 对照 dev 最新实现后完善 Multipass/K3s 架构状态 |

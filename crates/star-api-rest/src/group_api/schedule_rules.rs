@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=46871b38410fcca82c658125f9e219bcfbaca3cbe7c36a6d7ee22d09d8fc136c
+//! @cypher schema=1 source_sha256=3c1336cce4697aa7c9200371375e6476123a0ffc58aaaf09e99da0f74ad4fc53
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -61,6 +61,7 @@
 //! MERGE (materializer:Symbol {id:"crates/domain-automation/src/schedule.rs::materialize_schedule_window",kind:"function"})
 //! MERGE (authorize_principal:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::authorize_run_principal",kind:"function"})
 //! MERGE (authorize_run_as:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::authorize_schedule_run_as",kind:"function"})
+//! MERGE (lock_authorization:Function {id:"multica.lock_schedule_run_as_authorization"})
 //! MERGE (authorization_row:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::ScheduleRunAuthorizationRow",kind:"struct"})
 //! MERGE (rules:Table {id:"automation.schedule_rule_revision"})
 //! MERGE (run_as_column:Column {id:"automation.schedule_rule_revision.run_as_actor_id"})
@@ -178,6 +179,7 @@
 //! MERGE (authorize_run_as)-[:CALLS]->(authorize_principal)
 //! MERGE (authorize_principal)-[:CALLS]->(writer)
 //! MERGE (authorize_principal)-[:CALLS]->(set_tenant)
+//! MERGE (authorize_principal)-[:CALLS]->(lock_authorization)
 //! MERGE (authorize_principal)-[:READS]->(project_grants)
 //! MERGE (authorize_principal)-[:READS]->(branch_grants)
 //! MERGE (authorize_principal)-[:READS]->(run_grants)
@@ -629,10 +631,11 @@ async fn authorize_run(
 
 /// Recheck the scheduled execution principal's current Project, Branch and Engineering Run grants.
 /// The caller must run this inside the same transaction that enables a rule or admits a scheduled
-/// Run; an absent row or database error is a fail-closed result. This read does not serialize a
-/// concurrent grant revocation; that race remains a separate admission/release gate. This checks
-/// directory authorization only: current target/Profile/HookSet/quota and Runtime fence checks
-/// remain separate gates.
+/// Run; an absent row or database error is a fail-closed result. The checked helper takes the
+/// Project-scoped transaction advisory lock before this function reads canonical grants, and ACL
+/// mutation triggers take the same lock. This serializes grant revocation with this authorization
+/// read. Directory authorization only is checked here: current target/Profile/HookSet/quota and
+/// Runtime fence checks remain separate gates.
 pub(super) async fn authorize_schedule_run_as(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
@@ -665,6 +668,21 @@ async fn authorize_run_principal(
         return Err(GroupApiError::not_found());
     }
     set_tenant(tx, tenant_id).await?;
+    if require_active_run {
+        let locked = sqlx::query_scalar::<_, bool>(
+            "SELECT multica.lock_schedule_run_as_authorization($1,$2,$3,$4)",
+        )
+        .bind(tenant_id)
+        .bind(actor_id)
+        .bind(project_id)
+        .bind(run_id)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+        if !locked {
+            return Err(GroupApiError::not_found());
+        }
+    }
     let authorization_sql = schedule_run_authorization_sql();
     let authority = sqlx::query_as::<_, ScheduleRunAuthorizationRow>(&authorization_sql)
         .bind(tenant_id)
@@ -1329,6 +1347,18 @@ mod tests {
             .connect(&database_url)
             .await
             .expect("the disposable canonical ACL database must be reachable");
+        let admin_database_url = std::env::var("STAR_SCHEDULE_ADMIN_DATABASE_URL")
+            .expect("the Schedule runner must provide its disposable ACL admin database URL");
+        assert!(
+            admin_database_url.starts_with("postgresql://schedule_admin@127.0.0.1:")
+                && admin_database_url.ends_with("/postgres"),
+            "the ACL concurrency test only permits the runner's loopback schedule_admin database"
+        );
+        let admin_pool = PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&admin_database_url)
+            .await
+            .expect("the disposable canonical ACL admin database must be reachable");
         let has_directory_update_privileges = sqlx::query_scalar::<_, bool>(
                 r#"SELECT has_any_column_privilege(current_user, 'permission.project_role_binding', 'UPDATE')
                        OR has_any_column_privilege(current_user, 'permission.cloud_branch_role_binding', 'UPDATE')
@@ -1470,7 +1500,156 @@ mod tests {
                 .await
                 .expect("release isolated ACL scenario locks");
         }
+
+        let concurrent_revoke_cases = [
+            (
+                "Project",
+                "UPDATE permission.project_role_binding SET valid_to=statement_timestamp() WHERE tenant_id=$1 AND project_id=$2 AND user_id=$3 AND valid_to IS NULL",
+                "INSERT INTO permission.project_role_binding (tenant_id,project_id,user_id,role,granted_by,valid_from,version) VALUES ($1,$2,$3,'developer',$4,statement_timestamp(),2)",
+            ),
+            (
+                "Branch",
+                "UPDATE permission.cloud_branch_role_binding SET valid_to=statement_timestamp() WHERE tenant_id=$1 AND branch_id=$2 AND user_id=$3 AND valid_to IS NULL",
+                "INSERT INTO permission.cloud_branch_role_binding (tenant_id,branch_id,user_id,role,granted_by,valid_from,version) VALUES ($1,$2,$3,'developer',$4,statement_timestamp(),2)",
+            ),
+            (
+                "Engineering Run",
+                "UPDATE permission.engineering_run_role_binding SET valid_to=statement_timestamp() WHERE tenant_id=$1 AND engineering_run_id=$2 AND user_id=$3 AND valid_to IS NULL",
+                "INSERT INTO permission.engineering_run_role_binding (tenant_id,engineering_run_id,user_id,role,granted_by,valid_from,version) VALUES ($1,$2,$3,'developer',$4,statement_timestamp(),2)",
+            ),
+        ];
+        let project_id = Uuid::parse_str("23000000-0000-4000-8000-000000000001").unwrap();
+        let run_id = Uuid::parse_str("25000000-0000-4000-8000-000000000001").unwrap();
+        let branch_id = Uuid::parse_str("24000000-0000-4000-8000-000000000001").unwrap();
+        let admin_actor_id = Uuid::parse_str("22000000-0000-4000-8000-000000000002").unwrap();
+        for (index, (scope_name, revoke_sql, restore_sql)) in
+            concurrent_revoke_cases.into_iter().enumerate()
+        {
+            let mut tx = pool
+                .begin()
+                .await
+                .expect("begin authorization-lock transaction");
+            set_tenant(&mut tx, tenant_id)
+                .await
+                .expect("set tenant for authorization-lock transaction");
+            sqlx::query("SELECT set_config('app.actor_id',$1,true)")
+                .bind(actor_id.to_string())
+                .execute(&mut *tx)
+                .await
+                .expect("set run-as actor for authorization-lock transaction");
+            let authorized =
+                authorize_schedule_run_as(&mut tx, tenant_id, actor_id, project_id, run_id)
+                    .await
+                    .expect("active run-as ACL should acquire its Project-scoped lock");
+            assert_eq!(authorized.project_id, project_id);
+            assert_eq!(authorized.engineering_run_id, run_id);
+
+            let scope_id = match index {
+                0 => project_id,
+                1 => branch_id,
+                _ => run_id,
+            };
+            let admin_pool_for_revoke = admin_pool.clone();
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let revoke_task = tokio::spawn(async move {
+                let mut connection = admin_pool_for_revoke.acquire().await?;
+                sqlx::query("SET application_name = 'schedule-acl-revoke-race'")
+                    .execute(&mut *connection)
+                    .await?;
+                sqlx::query("SELECT set_config('app.tenant_id',$1,false), set_config('app.actor_id',$2,false), set_config('app.correlation_id',$3,false)")
+                    .bind(tenant_id.to_string())
+                    .bind(admin_actor_id.to_string())
+                    .bind(Uuid::new_v4().to_string())
+                    .execute(&mut *connection)
+                    .await?;
+                let _ = started_tx.send(());
+                sqlx::query(revoke_sql)
+                    .bind(tenant_id)
+                    .bind(scope_id)
+                    .bind(actor_id)
+                    .execute(&mut *connection)
+                    .await?;
+                Ok::<(), sqlx::Error>(())
+            });
+            started_rx
+                .await
+                .expect("the concurrent ACL revocation task should start");
+
+            let lock_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+            let mut revoke_waited_for_project_lock = false;
+            while tokio::time::Instant::now() < lock_deadline {
+                let waiting = sqlx::query_scalar::<_, bool>(
+                    "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity WHERE application_name='schedule-acl-revoke-race' AND wait_event_type='Lock' AND wait_event='advisory')",
+                )
+                .fetch_one(&admin_pool)
+                .await
+                .expect("admin should be able to observe its disposable PostgreSQL session");
+                if waiting {
+                    revoke_waited_for_project_lock = true;
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+            }
+
+            tx.commit()
+                .await
+                .expect("release the run-as authorization Project lock");
+            revoke_task
+                .await
+                .expect("concurrent ACL revocation task should finish")
+                .expect("canonical ACL revocation should succeed");
+            assert!(
+                revoke_waited_for_project_lock,
+                "{scope_name} ACL revocation must wait while Schedule authorization is held"
+            );
+
+            let mut revoked_tx = pool
+                .begin()
+                .await
+                .expect("begin post-revocation authorization");
+            set_tenant(&mut revoked_tx, tenant_id)
+                .await
+                .expect("set tenant for post-revocation authorization");
+            sqlx::query("SELECT set_config('app.actor_id',$1,true)")
+                .bind(actor_id.to_string())
+                .execute(&mut *revoked_tx)
+                .await
+                .expect("set run-as actor for post-revocation authorization");
+            assert!(
+                authorize_schedule_run_as(&mut revoked_tx, tenant_id, actor_id, project_id, run_id)
+                    .await
+                    .is_err(),
+                "a committed {scope_name} revocation must fail closed on the next authorization"
+            );
+            revoked_tx
+                .rollback()
+                .await
+                .expect("release post-revocation authorization transaction");
+
+            if index < 2 {
+                let mut connection = admin_pool
+                    .acquire()
+                    .await
+                    .expect("acquire admin connection to restore the next fixture grant");
+                sqlx::query("SELECT set_config('app.tenant_id',$1,false), set_config('app.actor_id',$2,false), set_config('app.correlation_id',$3,false)")
+                    .bind(tenant_id.to_string())
+                    .bind(admin_actor_id.to_string())
+                    .bind(Uuid::new_v4().to_string())
+                    .execute(&mut *connection)
+                    .await
+                    .expect("set admin context to restore the next fixture grant");
+                sqlx::query(restore_sql)
+                    .bind(tenant_id)
+                    .bind(scope_id)
+                    .bind(actor_id)
+                    .bind(admin_actor_id)
+                    .execute(&mut *connection)
+                    .await
+                    .expect("restore a versioned fixture grant for the next lock case");
+            }
+        }
         pool.close().await;
+        admin_pool.close().await;
     }
 
     #[tokio::test]

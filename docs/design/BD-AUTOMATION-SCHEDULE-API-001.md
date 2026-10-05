@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Verified design/implementation slice; production enablement remains open.
-> Version: 0.11 | Date: 2026-10-05
+> Version: 0.12 | Date: 2026-10-05
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -37,7 +37,9 @@ The migration does not create a dispatcher, authorize the stored run-as actor, r
 
 ## 6. 9F4C-B Rule enable authorization
 
-Rule management identity and unattended execution identity are separate. Each write first authorizes the authenticated editor against current Project/Run writer grants. Creating an enabled Rule then checks its derived creator run-as actor; revising an enabled Rule checks the immutable run-as actor loaded from the locked current revision. The check requires current Project and Run writer grants, the current Branch binding, and an active Engineering Run, and it shares the rule-write transaction so a failed check cannot persist the enabled revision. A manager can disable a Rule after creator revocation, provided the manager still has current rule-write access. Disposable PostgreSQL 18.6 now executes the canonical authorization helper with a runtime role that has SELECT but no UPDATE privilege on directory ACL tables: active grants authorize, and revoked Project/Branch/Run grants plus a paused Run fail closed. The check reads ACL state within the write transaction but does not serialize an overlapping grant revocation; that race remains open. Each trigger, retry, and resume still requires the same current-state recheck in the not-yet-implemented admission transaction.
+Rule management identity and unattended execution identity are separate. Each write first authorizes the authenticated editor against current Project/Run writer grants. Creating an enabled Rule then checks its derived creator run-as actor; revising an enabled Rule checks the immutable run-as actor loaded from the locked current revision. The check requires current Project and Run writer grants, the current Branch binding, and an active Engineering Run, and it shares the rule-write transaction so a failed check cannot persist the enabled revision. A manager can disable a Rule after creator revocation, provided the manager still has current rule-write access. The authorization helper verifies the tenant/actor transaction context and canonical Run/Project/grants, then obtains a tenant+Project transaction advisory lock before the API re-reads current ACL facts in a subsequent SQL statement. BEFORE triggers on Project, Branch, and Engineering Run grant INSERT/UPDATE/DELETE acquire the same lock; updates moving a binding between Projects acquire both Project locks in deterministic UUID order. Disposable PostgreSQL 18.6 tests with a SELECT-only directory runtime role prove active grants authorize, revoked Project/Branch/Run grants and a paused Run fail closed, and each of the three revocations waits for the overlapping authorization transaction and becomes visible to the next authorization after commit. Each trigger, retry, and resume still requires the same current-state recheck in the not-yet-implemented admission transaction.
+
+The lock is transaction-scoped and Project-local; a hash collision may add waiting but cannot grant access. ACL mutation triggers resolve the canonical Project from the affected binding/Branch/Run, and fail closed if that scope cannot be resolved. Runtime API roles do not gain directory ACL UPDATE privileges. Disposable test-role helper execution grants must be provisioned after the role exists; production target role/schema grants remain an independent deployment gate.
 
 ## 7. Revision history
 
@@ -54,3 +56,4 @@ Rule management identity and unattended execution identity are separate. Each wr
 | v0.9 | 2026-10-05 | Define create/enable-time run-as reauthorization separately from editor authorization; permit authorized managers to disable after creator revocation; retain the per-trigger worker gate and disclose missing ACL query integration coverage. |
 | v0.10 | 2026-10-05 | Record the 1/1 pure role-policy helper test and clarify that it is not database ACL integration evidence; keep SQL fixture and per-trigger authorization gates open. |
 | v0.11 | 2026-10-05 | Add disposable PostgreSQL canonical ACL fixture results under a read-only directory runtime role; retain concurrent revocation serialization, full route transaction, worker/admission, and target DB gates. |
+| v0.12 | 2026-10-05 | Define Project-scoped advisory-lock ordering and canonical ACL mutation triggers; record Project/Branch/Run concurrent revoke serialization while retaining worker/admission and target database gates. |
