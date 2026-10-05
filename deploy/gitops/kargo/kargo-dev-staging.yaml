@@ -9,8 +9,11 @@
 #             + Kargo v1.12.1 (Helm chart, deployed)
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# 📌 修正史 —— 本文件 7 处错误全部由 live CRD 与 admission webhook 抓出,
-#    离线 schema 校验一个都没抓到。原因见文末「为什么离线校验没抓到」。
+# 📌 修正史 —— 本文件共 7 处错误:
+#    其中 1-6 由 live CRD / admission webhook 抓出, 离线 schema 校验一个都没抓到
+#    (原因见文末「为什么离线 schema 校验一个都没抓到」);
+#    第 7 处 (镜像坐标) 连 webhook 都没放过 —— 它**结构完全合法**,
+#    是靠运行时的**控制器日志**才暴露的。三层门禁各管一段, 缺一层就漏一类。
 #
 # v0.2 修正 4 处:
 #   1) subscriptions 写成 `image: <字符串>` + `tagSelection` —— 错。
@@ -39,18 +42,18 @@
 #   6) Warehouse / Stage 必须放在**与 Project 同名**的 ns (即 `star`),
 #      不能放 `kargo` 控制面 ns。
 #
-# v0.4 修正 1 处 —— **镜像坐标, 此前是按惯例推断的值**:
+# v0.4 修正 1 处 —— **镜像坐标, 此前是按惯例推断的值** (已被 v0.5 取代,
+#   保留作审计线索; 当前生效坐标见 subscriptions 处 v0.5 标注):
 #   7) subscriptions 的 `repoURL` 原写 `ghcr.io/ulyssesleolee/star`。
 #      推断依据是 "ghcr.io/<owner>/<repo>" 这个惯例, 而**惯例不是证据**:
-#      - owner 错: CI 的 `IMAGE_OWNER` 是 `SayAtelier`, 不是 `ulyssesleolee`
 #      - 粒度错: CI 推的是 **4 个独立仓库** `star-{canvas-engine,domain-canvas,
 #        canvas-realtime,canvas-game}`, 不是单个 `star`
-#      两处都错的后果相同且静默: Warehouse 订阅永不匹配 → 永不产出 Freight →
+#      - owner 也错: 当时按 CI 的 IMAGE_OWNER 取值, 但那个值本身有问题
+#        (v0.5 才对齐到真实归属)
+#      后果相同且静默: Warehouse 订阅永不匹配 → 永不产出 Freight →
 #      Stage 没有 Freight 可晋级 → 晋级链路形同不存在, 但 apply 一直 exit 0。
 #      这是**结构性校验与存在性校验正交**的又一例 (同 deny.toml 只能校验许可证
 #      结构、查不出 URL 404): 结构对 ≠ 地址存在。
-#      判据: publish-canvas-game.yml (env.IMAGE_OWNER + matrix) 与
-#            canvas-game-k3s.yaml (4 处 image: 字段) 两处独立证据互相印证。
 #
 # 为什么离线 schema 校验一个都没抓到 (per 2026-10-05 复盘):
 #   - `Warehouse.spec.subscriptions.items` 标了
@@ -67,14 +70,16 @@
 #     server dry-run 同样校验不到 —— 这是本文件**唯一**残留的结构不确定面。
 #
 # 🟡 实跑阻塞 (per 2026-10-05 20:52 JST 实测, kargo-controller 日志):
-#   镜像坐标修正后 Warehouse **仍在失败**, 但错误性质变了 —— 这证明修正方向正确,
-#   同时暴露了第二个独立阻塞:
-#     修正前: ghcr.io/ulyssesleolee/star
-#             → DENIED: requested access to the resource is denied
-#                (该路径不存在)
-#     修正后: ghcr.io/sayatelier/star-canvas-engine
-#             → UNAUTHORIZED: authentication required
-#                (仓库存在, 但是私有的; Kargo 无凭据无法匿名轮询)
+#   坐标修正后 Warehouse **仍在失败**, 但错误性质变了 —— 这证明修正方向正确,
+#   同时暴露了第二个独立阻塞。两次探测的原坐标不同, 此处如实标注, 勿混为一谈:
+#     第一轮 (坐标改为 sayatelier 时) 实测:
+#       ghcr.io/ulyssesleolee/star (旧值)
+#         → DENIED: requested access to the resource is denied  (路径不存在)
+#       ghcr.io/sayatelier/star-canvas-engine
+#         → UNAUTHORIZED: authentication required (仓库存在但私有, 无凭据)
+#     第二轮 (归属改到本账号后, v0.5) 实测: 仍 403, 见下方「凭据本身的阻塞点」。
+#   ⚠️ 错误从 DENIED 变成 UNAUTHORIZED 只说明"换个坐标后服务端换了种方式拒绝",
+#     **不等于**该坐标就是对的 —— 归属最终由人工拍板确定, 不是由错误措辞推断。
 #   对照组证明这不是本机网络/请求写法问题: 同法匿名拉
 #     ghcr.io/fluxcd/source-controller → OK (100 tags)
 #     ghcr.io/actions/actions-runner  → OK (73 tags)
@@ -91,29 +96,29 @@
 #     - 本机 GHCR_PAT 是有效的 **fine-grained PAT**: 用正确流程
 #       (Basic(user:PAT) 换 registry token 再作 Bearer) 读公开仓库
 #       ghcr.io/fluxcd/source-controller → OK, 100 tags。
-#     - 但同一把凭据读 `sayatelier/star-*` → **403**(已认证但未授权),
-#       读 `ulyssesleolee/star-canvas-engine` 同样 403, 而
-#       `ulyssesleolee/star` / `/bff` → **404**(确定不存在)。
-#     → 结论: **当前账号对任何候选镜像坐标都没有读权限**, 镜像归属哪个
-#       namespace 是**归属/授权问题**, 不是本机配置问题, 需人工确认后再注入。
-#     → 因此**未创建**任何 Secret: 注入一把已证明读不到目标的凭据只会让
+#     - 但同一把凭据读 `ulyssesleolee/star-canvas-*` → **403**(已认证但未授权),
+#       而 `ulyssesleolee/star` / `/bff` → **404**(确定不存在)。
+#       403 与 404 不同: 403 = 仓库存在但无权限, 404 = 仓库不存在。
+#     → 结论: 剩余阻塞收敛为**这把 fine-grained PAT 缺 Packages 读权限**
+#       (或包尚未推送)。这属于**凭据权限**问题, 不是本机配置问题 ——
+#       PAT 的权限只能由持有者在 GitHub 侧授予, 无法由本流程创建或提升。
+#     → 因此**仍未创建**任何 Secret: 注入一把已证明读不到目标的凭据只会让
 #       Warehouse 继续静默失败, 属于"配置做了"而非"配置生效"。
 #     → 方法学留档: 早期一版探测把 PAT 直接当 Bearer 塞进 /v2/<repo>/tags/list,
 #       得到"所有仓库一律 403"并据此错判为"令牌类型不对"。是**对照组**
-#       (公开仓库匿名可拉 OK) 把它揪出来的 —— 真实凭据与伪造垃圾串返回完全
+#       (公开仓库可拉 OK) 把它揪出来的 —— 真实凭据与伪造垃圾串返回完全
 #       相同的结果, 本该当时就存疑。**测不通时先怀疑量具, 再怀疑被测物。**
 #
 #   → 另注: 该错误自 2026-10-05 11:00Z 起每个 reconcile 周期复现一次, 而
 #     `kubectl apply` 始终 exit 0、Project 状态始终 "ready" —— 即**静默失效**。
 #     判"配置生效"不能只看 apply 返回码, 必须读控制器日志或 Warehouse.status。
 #
-# ✅ deploy/dev 与 deploy/staging **本地分支已创建** (2026-10-05:
-#     deploy/dev 起自 main 06952d78, deploy/staging 起自 deploy/dev, 二者同点)。
-#     🟡 但**尚未推送 origin**, Kargo 的 git-push step 连的是
-#     https://github.com/UlyssesLeoLee/Star —— 分支不在远端时首次晋级会失败。
-#     (Kargo git-clone 对不存在的远端分支会自行 checkout -B, 但首次 push
-#      是否被接收取决于远端是否允许该 refspec, 未经实跑验证。)
-#   - 镜像坐标 ghcr.io/ulyssesleolee/star 为推测值, 须与 CI 实际推送目标核对。
+# ✅ deploy/dev 与 deploy/staging 分支**已创建并推送 origin** (2026-10-05):
+#     deploy/dev 起自 main 06952d78, deploy/staging 起自 deploy/dev, 二者同点;
+#     远端 refs/heads/deploy/{dev,staging} 已确认指向 06952d78。
+#     Kargo 的 git-push step 连的是 https://github.com/UlyssesLeoLee/Star,
+#     分支已就位。(Kargo git-clone 对不存在的远端分支会自行 checkout -B,
+#      但首次 push 是否被远端接受取决于 refspec 策略, 该点仍未实跑验证。)
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Project
@@ -139,21 +144,33 @@ metadata:
 spec:
   interval: 5m
   subscriptions:
-    # v0.3 修正: 镜像坐标不再是推测值 —— 与 CI 实际推送目标逐字核对 (原写
-    # `ghcr.io/ulyssesleolee/star` 是按 "ghcr.io/<owner>/<repo>" 惯例**推断**的,
-    # owner 与镜像名粒度双错, Warehouse 会静默永不产出 Freight)。
+    # v0.5 订正: 镜像坐标与 CI / 部署清单**逐字一致**, 三处同一事实源。
     #
-    # 判据 (两处独立证据互相印证):
+    # 坐标演进 (保留供审计, 均为实测, 非推断):
+    #   v0.1  ghcr.io/ulyssesleolee/star        <- 按 "ghcr.io/<owner>/<repo>"
+    #                                              惯例**推断**, owner 与粒度双错
+    #   v0.3  ghcr.io/sayatelier/star-*  (4 个)  <- 按 CI 当时写的 IMAGE_OWNER
+    #   v0.5  ghcr.io/ulyssesleolee/star-* (4 个) <- 归属改到本账号 (人工拍板)
+    #
+    # 判据 (两处独立证据 + 一处人工拍板, 三者必须同时成立):
     #   1) .github/workflows/publish-canvas-game.yml
-    #        env.IMAGE_OWNER: SayAtelier
-    #        images: ghcr.io/${{ IMAGE_OWNER }}/star-${{ matrix.image }}
+    #        env.IMAGE_NAMESPACE: ulyssesleolee   <- 镜像路径 (全小写, OCI 规范)
+    #        env.IMAGE_OWNER:    UlyssesLeoLee    <- 登录用户名 (大小写原样)
+    #        images: ghcr.io/${{ IMAGE_NAMESPACE }}/star-${{ matrix.image }}
     #        matrix.image = [canvas-engine, domain-canvas, canvas-realtime, canvas-game]
     #        -> 是 **4 个独立仓库**, 不是单个 `star`
-    #        (同文件 L42-43 注释: IMAGE_OWNER 必须是 GitHub username 大小写原样,
-    #         lowercase 会触发 not_found —— 故此处按 CI 原样写 SayAtelier,
-    #         实际请求路径大小写不敏感, 与 canvas-game-k3s.yaml 的 sayatelier 等价)
-    #   2) deploy/canvas-game-k3s.yaml L147/202/257/315 引用
-    #        ghcr.io/sayatelier/star-canvas-engine:dev 等 4 个 —— 与 CI 一一对应
+    #        ⚠️ IMAGE_OWNER 与 IMAGE_NAMESPACE 是**两个变量, 方向相反的要求**:
+    #           登录要 camelCase, 镜像路径要全小写。此前两者共用 IMAGE_OWNER,
+    #           改一边必然破坏另一边 —— 已拆分, 别再合回去。
+    #   2) deploy/canvas-game-k3s.yaml 4 处 image: 字段
+    #        ghcr.io/ulyssesleolee/star-canvas-engine:dev 等 —— 与 CI 一一对应
+    #   3) 镜像归属 namespace: 人工拍板 = 本账号 UlyssesLeoLee (原 SayAtelier
+    #      对本账号无 Packages 读权限: 匿名 401, 本机 PAT 403 已认证未授权)
+    #
+    # 教训留档: 该 workflow 头注释长期写 `starghorg`, 而 env 写 `SayAtelier`,
+    #   而真实归属又是第三个值 —— **同一文件三处三个值**, 且注释不参与执行,
+    #   没有任何门禁会为它报错。读注释无法发现, 只能靠"以 env 为唯一事实源"
+    #   逐字核对。
     #
     # tag 策略兼容性: CI 的 metadata-action 同时产出
     #   type=ref,event=branch | type=ref,event=pr | type=semver,pattern={{version}}
@@ -166,7 +183,7 @@ spec:
     #    代价: main/dev 分支的自动构建不会自动进 Kargo 晋级链, 需打 v* tag。
     - name: star-canvas-engine
       image:
-        repoURL: ghcr.io/sayatelier/star-canvas-engine
+        repoURL: ghcr.io/ulyssesleolee/star-canvas-engine
         # SemVer 是默认策略; constraint 支持 ^ / ~ / 范围表达式
         imageSelectionStrategy: SemVer
         constraint: '>=0.1.0'
@@ -176,21 +193,21 @@ spec:
           - '^\d+\.\d+\.\d+$'
     - name: star-domain-canvas
       image:
-        repoURL: ghcr.io/sayatelier/star-domain-canvas
+        repoURL: ghcr.io/ulyssesleolee/star-domain-canvas
         imageSelectionStrategy: SemVer
         constraint: '>=0.1.0'
         allowTagsRegexes:
           - '^\d+\.\d+\.\d+$'
     - name: star-canvas-realtime
       image:
-        repoURL: ghcr.io/sayatelier/star-canvas-realtime
+        repoURL: ghcr.io/ulyssesleolee/star-canvas-realtime
         imageSelectionStrategy: SemVer
         constraint: '>=0.1.0'
         allowTagsRegexes:
           - '^\d+\.\d+\.\d+$'
     - name: star-canvas-game
       image:
-        repoURL: ghcr.io/sayatelier/star-canvas-game
+        repoURL: ghcr.io/ulyssesleolee/star-canvas-game
         imageSelectionStrategy: SemVer
         constraint: '>=0.1.0'
         allowTagsRegexes:

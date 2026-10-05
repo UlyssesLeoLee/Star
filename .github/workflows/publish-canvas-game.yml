@@ -8,11 +8,16 @@
 # 凭据: GHCR_TOKEN (classic PAT with packages:write scope, per star-release-workflow 守门 #5 env 安全)
 #       跟现有 Coverage workflow 同样用 secrets.GHCR_TOKEN
 #
-# 镜像目标:
-#   ghcr.io/starghorg/star-canvas-engine
-#   ghcr.io/starghorg/star-domain-canvas
-#   ghcr.io/starghorg/star-canvas-realtime
-#   ghcr.io/starghorg/star-canvas-game
+# 镜像目标 (2026-10-05 订正):
+#   ghcr.io/ulyssesleolee/star-canvas-engine
+#   ghcr.io/ulyssesleolee/star-domain-canvas
+#   ghcr.io/ulyssesleolee/star-canvas-realtime
+#   ghcr.io/ulyssesleolee/star-canvas-game
+#   注: 本注释此前写的是 `starghorg`, 而 env 里的 IMAGE_OWNER 却是 `SayAtelier` ——
+#   **同一文件内三处三个值** (注释/登录名/真实归属), 且注释从未被验证。
+#   这类"注释与实现各说各话"的漂移正是坐标错配的根因: 读注释的人无法发现,
+#   也没有任何门禁会报错 —— 注释不参与执行。现已与 env 逐字对齐,
+#   真实归属以 env.IMAGE_NAMESPACE 为唯一事实源。
 #
 # 守门:
 #   - #1 cargo check --workspace --all-targets + cargo test 单 crate
@@ -39,9 +44,16 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # IMAGE_OWNER 必须是 GitHub username camel case (per PR #168 followup fix: GHCR namespace
-  # 必须跟 GitHub username 完全匹配, lowercase 'starghorg' 会触发 not_found)
-  IMAGE_OWNER: SayAtelier
+  # IMAGE_OWNER 用于 **docker/login-action 的 username**, 必须是 GitHub username
+  # 大小写原样 (per PR #168 followup fix: GHCR namespace 必须跟 GitHub username
+  # 完全匹配, lowercase 'starghorg' 会触发 not_found)
+  IMAGE_OWNER: UlyssesLeoLee
+  # IMAGE_NAMESPACE 用于 **镜像路径**, 必须是全小写 —— OCI 引用规范要求 repository
+  # 路径小写。这跟登录用的 camelCase 不是同一个值, 所以拆成两个变量: 此前两者
+  # 共用 IMAGE_OWNER, 登录要求与路径要求方向相反, 任何一次改动都会破坏另一侧。
+  # 2026-10-05 实测: 原 IMAGE_OWNER=SayAtelier 对当前账号无 Packages 读权限
+  # (匿名 401 / 本机 PAT 403 已认证未授权), 镜像归属改到本账号命名空间。
+  IMAGE_NAMESPACE: ulyssesleolee
   # 4 crate 镜像名 (per deploy/canvas-game-k3s.yaml image: 字段)
   IMAGES: >-
     canvas-engine
@@ -95,7 +107,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/star-${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/star-${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -120,4 +132,4 @@ jobs:
       - name: Image digest
         id: digest
         run: |
-          echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/star-${{ matrix.image }}:${{ inputs.tag || 'latest' }})" >> $GITHUB_OUTPUT
+          echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/star-${{ matrix.image }}:${{ inputs.tag || 'latest' }})" >> $GITHUB_OUTPUT
