@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=942c9c6b174c9b59f40e5d6bf33d1188bfaab05fb3e63838acf255f3888e2f95
+//! @cypher schema=1 source_sha256=46871b38410fcca82c658125f9e219bcfbaca3cbe7c36a6d7ee22d09d8fc136c
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -34,6 +34,7 @@
 //! MERGE (query:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleListQuery",kind:"struct"})
 //! MERGE (target_input:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleTargetInput",kind:"struct"})
 //! MERGE (write_body:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleWriteBody",kind:"struct"})
+//! MERGE (run_as_actor:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::run_as_actor_id",kind:"field"})
 //! MERGE (json_row:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::RuleJsonRow",kind:"struct"})
 //! MERGE (target_row:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::AuthorizedTargetRow",kind:"struct"})
 //! MERGE (replay:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::IdempotencyReplay",kind:"struct"})
@@ -45,19 +46,31 @@
 //! MERGE (route_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_routes_are_mounted_and_require_authentication",kind:"test"})
 //! MERGE (scope_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_routes_reject_missing_scopes_before_database_access",kind:"test"})
 //! MERGE (body_limit_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_write_body_limit_is_enforced",kind:"test"})
+//! MERGE (run_as_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_rule_request_cannot_select_run_as_actor",kind:"test"})
+//! MERGE (acl_database_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_run_as_authorization_rechecks_canonical_directory_grants",kind:"test"})
 //! MERGE (jwt_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_jwt_config",kind:"function"})
 //! MERGE (token_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_token",kind:"function"})
 //! MERGE (body_fixture:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::route_test_body",kind:"function"})
 //! MERGE (build_router:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
 //! MERGE (issue_token:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token",kind:"function"})
-//! MERGE (active_binding:Symbol {id:"crates/star-api-rest/src/group_api.rs::active_binding",kind:"function"})
 //! MERGE (require_scope:Symbol {id:"crates/star-api-rest/src/group_api.rs::require_scope",kind:"function"})
 //! MERGE (set_tenant:Symbol {id:"crates/star-api-rest/src/group_api.rs::set_tenant",kind:"function"})
 //! MERGE (validate_actor:Symbol {id:"crates/star-api-rest/src/group_api.rs::validate_actor",kind:"function"})
-//! MERGE (run_scope:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::authorize_run_task_scope",kind:"function"})
+//! MERGE (run_scope:Type {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::RunTaskScope"})
 //! MERGE (admission_snapshot:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_current_execution_admission_snapshot",kind:"function"})
 //! MERGE (materializer:Symbol {id:"crates/domain-automation/src/schedule.rs::materialize_schedule_window",kind:"function"})
+//! MERGE (authorize_principal:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::authorize_run_principal",kind:"function"})
+//! MERGE (authorize_run_as:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::authorize_schedule_run_as",kind:"function"})
+//! MERGE (authorization_row:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::ScheduleRunAuthorizationRow",kind:"struct"})
 //! MERGE (rules:Table {id:"automation.schedule_rule_revision"})
+//! MERGE (run_as_column:Column {id:"automation.schedule_rule_revision.run_as_actor_id"})
+//! MERGE (project_grants:Table {id:"permission.project_role_binding"})
+//! MERGE (branch_grants:Table {id:"permission.cloud_branch_role_binding"})
+//! MERGE (run_grants:Table {id:"permission.engineering_run_role_binding"})
+//! MERGE (run_directory:Table {id:"multica.engineering_run"})
+//! MERGE (run_revisions:Table {id:"multica.engineering_run_revision"})
+//! MERGE (branch_directory:Table {id:"scm.cloud_branch"})
+//! MERGE (branch_revisions:Table {id:"scm.cloud_branch_revision"})
 //! MERGE (audit:Table {id:"automation.schedule_rule_audit"})
 //! MERGE (outbox:Table {id:"automation.schedule_rule_outbox"})
 //! MERGE (idempotency:Table {id:"automation.schedule_rule_command_idempotency"})
@@ -69,6 +82,9 @@
 //! MERGE (module)-[:DEFINES]->(revise)
 //! MERGE (module)-[:DEFINES]->(begin)
 //! MERGE (module)-[:DEFINES]->(authorize)
+//! MERGE (module)-[:DEFINES]->(authorize_principal)
+//! MERGE (module)-[:DEFINES]->(authorize_run_as)
+//! MERGE (module)-[:DEFINES]->(authorization_row)
 //! MERGE (module)-[:DEFINES]->(writer)
 //! MERGE (module)-[:DEFINES]->(prepare)
 //! MERGE (module)-[:DEFINES]->(validate_recurrence)
@@ -153,12 +169,27 @@
 //! MERGE (revise)-[:CALLS]->(record_event)
 //! MERGE (revise)-[:CALLS]->(save)
 //! MERGE (revise)-[:CALLS]->(response)
-//! MERGE (authorize)-[:CALLS]->(writer)
+//! MERGE (create)-[:CALLS]->(authorize_run_as)
+//! MERGE (revise)-[:CALLS]->(authorize_run_as)
 //! MERGE (begin)-[:CALLS]->(validate_actor)
 //! MERGE (begin)-[:CALLS]->(require_scope)
 //! MERGE (begin)-[:CALLS]->(set_tenant)
-//! MERGE (authorize)-[:CALLS]->(active_binding)
-//! MERGE (authorize)-[:CALLS]->(run_scope)
+//! MERGE (authorize)-[:CALLS]->(authorize_principal)
+//! MERGE (authorize_run_as)-[:CALLS]->(authorize_principal)
+//! MERGE (authorize_principal)-[:CALLS]->(writer)
+//! MERGE (authorize_principal)-[:CALLS]->(set_tenant)
+//! MERGE (authorize_principal)-[:READS]->(project_grants)
+//! MERGE (authorize_principal)-[:READS]->(branch_grants)
+//! MERGE (authorize_principal)-[:READS]->(run_grants)
+//! MERGE (authorize_principal)-[:READS]->(run_directory)
+//! MERGE (authorize_principal)-[:READS]->(run_revisions)
+//! MERGE (authorize_principal)-[:READS]->(branch_directory)
+//! MERGE (authorize_principal)-[:READS]->(branch_revisions)
+//! MERGE (authorize_principal)-[:USES_TYPE]->(authorization_row)
+//! MERGE (authorize_principal)-[:USES_TYPE]->(run_scope)
+//! MERGE (authorization_row)-[:USES_TYPE]->(project_grants)
+//! MERGE (authorization_row)-[:USES_TYPE]->(branch_grants)
+//! MERGE (authorization_row)-[:USES_TYPE]->(run_grants)
 //! MERGE (prepare)-[:CALLS]->(admission_snapshot)
 //! MERGE (validate_recurrence)-[:CALLS]->(materializer)
 //! MERGE (list)-[:USES]->(page_limit)
@@ -178,9 +209,16 @@
 //! MERGE (body_limit_test)-[:CALLS]->(token_fixture)
 //! MERGE (scope_test)-[:CALLS]->(jwt_fixture)
 //! MERGE (body_limit_test)-[:CALLS]->(jwt_fixture)
+//! MERGE (tests)-[:DEFINES]->(run_as_test)
+//! MERGE (run_as_test)-[:TESTS]->(write_body)
+//! MERGE (tests)-[:DEFINES]->(acl_database_test)
+//! MERGE (acl_database_test)-[:TESTS]->(authorize_run_as)
 //! MERGE (token_fixture)-[:CALLS]->(issue_token)
 //! MERGE (persist)-[:WRITES]->(rules)
+//! MERGE (persist)-[:WRITES]->(run_as_column)
 //! MERGE (revise)-[:WRITES]->(rules)
+//! MERGE (revise)-[:READS]->(run_as_column)
+//! MERGE (prepare)-[:CONFIGURES]->(run_as_column)
 //! MERGE (record_event)-[:WRITES]->(audit)
 //! MERGE (record_event)-[:WRITES]->(outbox)
 //! MERGE (list)-[:READS]->(rules)
@@ -215,8 +253,8 @@ use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
-    GroupApiError, GroupApiState,
+    require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser, GroupApiError,
+    GroupApiState,
 };
 
 const MAX_RULE_PAGE: i64 = 100;
@@ -267,6 +305,19 @@ struct AuthorizedTargetRow {
     branch_id: Uuid,
     engineering_run_id: Uuid,
     worktree_archived: bool,
+}
+
+#[derive(FromRow)]
+struct ScheduleRunAuthorizationRow {
+    engineering_run_id: Uuid,
+    project_id: Uuid,
+    repository_id: Uuid,
+    branch_id: Uuid,
+    run_state: String,
+    project_role: String,
+    run_role: String,
+    run_grant_binding_id: Uuid,
+    run_grant_version: i32,
 }
 
 pub(super) fn router() -> Router<GroupApiState> {
@@ -380,6 +431,11 @@ async fn create_rule(
         return Ok(private_json(replay.status, replay.body));
     }
 
+    if body.enabled {
+        authorize_schedule_run_as(&mut tx, actor.tenant_id, actor.user_id, project_id, run_id)
+            .await?;
+    }
+
     let (rule, target) = prepare_rule(
         &mut tx,
         &actor,
@@ -387,6 +443,7 @@ async fn create_rule(
         run_id,
         &run_scope,
         &body,
+        actor.user_id,
         Uuid::new_v4(),
         1,
     )
@@ -448,8 +505,8 @@ async fn revise_rule(
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(private_json(replay.status, replay.body));
     }
-    let current_version = sqlx::query_scalar::<_, i64>(
-        r#"SELECT rule_version FROM automation.schedule_rule_revision
+    let (current_version, run_as_actor_id) = sqlx::query_as::<_, (i64, Uuid)>(
+        r#"SELECT rule_version, run_as_actor_id FROM automation.schedule_rule_revision
            WHERE tenant_id=$1 AND project_id=$2 AND engineering_run_id=$3
               AND rule_id=$4 AND valid_from<=now() AND valid_to IS NULL FOR UPDATE"#,
     )
@@ -464,6 +521,16 @@ async fn revise_rule(
     if Some(current_version) != body.expected_current_version {
         return Err(GroupApiError::conflict("schedule_rule_version_conflict"));
     }
+    if body.enabled {
+        authorize_schedule_run_as(
+            &mut tx,
+            actor.tenant_id,
+            run_as_actor_id,
+            project_id,
+            run_id,
+        )
+        .await?;
+    }
     let next_version = current_version
         .checked_add(1)
         .ok_or_else(|| GroupApiError::conflict("schedule_rule_version_exhausted"))?;
@@ -474,6 +541,7 @@ async fn revise_rule(
         run_id,
         &run_scope,
         &body,
+        run_as_actor_id,
         rule_id,
         next_version as u64,
     )
@@ -547,16 +615,112 @@ async fn authorize_run(
     run_id: Uuid,
     write: bool,
 ) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
-    let project_binding = active_binding(tx, actor, project_id).await?;
-    let run_scope = super::engineering_runs::authorize_run_task_scope(tx, actor, run_id).await?;
-    if run_scope.project_id != project_id {
+    authorize_run_principal(
+        tx,
+        actor.tenant_id,
+        actor.user_id,
+        project_id,
+        run_id,
+        write,
+        false,
+    )
+    .await
+}
+
+/// Recheck the scheduled execution principal's current Project, Branch and Engineering Run grants.
+/// The caller must run this inside the same transaction that enables a rule or admits a scheduled
+/// Run; an absent row or database error is a fail-closed result. This read does not serialize a
+/// concurrent grant revocation; that race remains a separate admission/release gate. This checks
+/// directory authorization only: current target/Profile/HookSet/quota and Runtime fence checks
+/// remain separate gates.
+pub(super) async fn authorize_schedule_run_as(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    run_as_actor_id: Uuid,
+    project_id: Uuid,
+    run_id: Uuid,
+) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
+    authorize_run_principal(
+        tx,
+        tenant_id,
+        run_as_actor_id,
+        project_id,
+        run_id,
+        true,
+        true,
+    )
+    .await
+}
+
+async fn authorize_run_principal(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    actor_id: Uuid,
+    project_id: Uuid,
+    run_id: Uuid,
+    require_writer: bool,
+    require_active_run: bool,
+) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
+    if tenant_id.is_nil() || actor_id.is_nil() || project_id.is_nil() || run_id.is_nil() {
         return Err(GroupApiError::not_found());
     }
-    if write {
-        require_schedule_writer(&project_binding.role)?;
-        require_schedule_writer(&run_scope.role)?;
+    set_tenant(tx, tenant_id).await?;
+    let authorization_sql = schedule_run_authorization_sql();
+    let authority = sqlx::query_as::<_, ScheduleRunAuthorizationRow>(&authorization_sql)
+        .bind(tenant_id)
+        .bind(actor_id)
+        .bind(project_id)
+        .bind(run_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?
+        .ok_or_else(GroupApiError::not_found)?;
+
+    if require_active_run && authority.run_state != "active" {
+        return Err(GroupApiError::conflict("engineering_run_not_active"));
     }
-    Ok(run_scope)
+    if require_writer {
+        require_schedule_writer(&authority.project_role)?;
+        require_schedule_writer(&authority.run_role)?;
+    }
+    Ok(super::engineering_runs::RunTaskScope {
+        engineering_run_id: authority.engineering_run_id,
+        project_id: authority.project_id,
+        repository_id: authority.repository_id,
+        branch_id: authority.branch_id,
+        role: authority.run_role,
+        permission_snapshot_ref: format!(
+            "{}:v{}",
+            authority.run_grant_binding_id, authority.run_grant_version
+        ),
+    })
+}
+
+fn schedule_run_authorization_sql() -> &'static str {
+    r#"SELECT r.engineering_run_id,r.project_id,r.repository_id,r.branch_id,
+                  rv.state AS run_state,p.role AS project_role,
+                  rg.role AS run_role,
+                  rg.binding_id AS run_grant_binding_id,rg.version AS run_grant_version
+           FROM multica.engineering_run r
+           JOIN multica.engineering_run_revision rv
+             ON rv.tenant_id=r.tenant_id AND rv.engineering_run_id=r.engineering_run_id
+            AND rv.valid_from<=now() AND rv.valid_to IS NULL AND rv.state<>'archived'
+           JOIN scm.cloud_branch b
+             ON b.tenant_id=r.tenant_id AND b.branch_id=r.branch_id
+            AND b.project_id=r.project_id AND b.repository_id=r.repository_id
+           JOIN scm.cloud_branch_revision bv
+             ON bv.tenant_id=b.tenant_id AND bv.branch_id=b.branch_id
+            AND bv.valid_from<=now() AND bv.valid_to IS NULL AND bv.state='active'
+           JOIN permission.project_role_binding p
+             ON p.tenant_id=r.tenant_id AND p.project_id=r.project_id AND p.user_id=$2
+            AND p.valid_from<=now() AND p.valid_to IS NULL
+           JOIN permission.cloud_branch_role_binding bg
+             ON bg.tenant_id=b.tenant_id AND bg.branch_id=b.branch_id AND bg.user_id=$2
+            AND bg.valid_from<=now() AND bg.valid_to IS NULL
+           JOIN permission.engineering_run_role_binding rg
+             ON rg.tenant_id=r.tenant_id AND rg.engineering_run_id=r.engineering_run_id
+            AND rg.user_id=$2 AND rg.valid_from<=now() AND rg.valid_to IS NULL
+           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4"#
 }
 
 fn require_schedule_writer(role: &str) -> Result<(), GroupApiError> {
@@ -573,6 +737,7 @@ async fn prepare_rule(
     run_id: Uuid,
     run_scope: &super::engineering_runs::RunTaskScope,
     body: &RuleWriteBody,
+    run_as_actor_id: Uuid,
     rule_id: Uuid,
     rule_version: u64,
 ) -> Result<(AutomationScheduleRuleRevisionV1, ScheduleTargetV1), GroupApiError> {
@@ -641,6 +806,7 @@ async fn prepare_rule(
         tenant_id: actor.tenant_id,
         rule_id: RuleId::from_uuid(rule_id),
         rule_version,
+        run_as_actor_id,
         enabled: body.enabled,
         project_id,
         cron_expression: body.cron_expression.trim().to_owned(),
@@ -693,9 +859,10 @@ async fn persist_revision(
             misfire_policy,misfire_max_occurrences,pause_policy,retry_max_attempts,
             retry_initial_backoff_seconds,retry_max_backoff_seconds,deadline_seconds,branch_id,
             engineering_run_id,repository_id,worktree_id,work_item_id,execution_profile_id,
-            execution_profile_version,execution_profile_digest,hook_set_version,hook_set_digest,changed_by)
+            execution_profile_version,execution_profile_digest,hook_set_version,hook_set_digest,
+            run_as_actor_id,changed_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,
-                   $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)"#,
+                   $22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)"#,
     )
     .bind(rule.tenant_id).bind(rule.project_id).bind(rule.rule_id.as_uuid())
     .bind(i64::try_from(rule.rule_version).map_err(|_| GroupApiError::internal())?)
@@ -713,7 +880,7 @@ async fn persist_revision(
     .bind(i64::try_from(target.execution_profile_version).map_err(|_| GroupApiError::internal())?)
     .bind(&target.execution_profile_digest)
     .bind(i64::try_from(target.hook_set_version).map_err(|_| GroupApiError::internal())?)
-    .bind(&target.hook_set_digest).bind(actor.user_id)
+    .bind(&target.hook_set_digest).bind(rule.run_as_actor_id).bind(actor.user_id)
     .execute(&mut **tx).await.map_err(|_| GroupApiError::internal())?;
     Ok(())
 }
@@ -756,7 +923,10 @@ async fn record_rule_event(
     .bind(version)
     .bind(actor.user_id)
     .bind(correlation_id)
-    .bind(json!({"enabled": rule.enabled, "engineering_run_id": rule.target.engineering_run_id}))
+    .bind(
+        json!({"enabled": rule.enabled, "engineering_run_id": rule.target.engineering_run_id,
+                 "run_as_actor_id": rule.run_as_actor_id}),
+    )
     .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
@@ -768,6 +938,7 @@ async fn record_rule_event(
         "rule_id": rule_id,
         "rule_version": version,
         "changed_by": actor.user_id,
+        "run_as_actor_id": rule.run_as_actor_id,
     });
     sqlx::query(
         r#"INSERT INTO automation.schedule_rule_outbox
@@ -1110,6 +1281,14 @@ mod tests {
     }
 
     #[test]
+    fn schedule_rule_request_cannot_select_run_as_actor() {
+        let mut body: Value = serde_json::from_str(&route_test_body(None))
+            .expect("valid schedule write body should parse");
+        body["run_as_actor_id"] = json!(Uuid::new_v4());
+        assert!(serde_json::from_value::<RuleWriteBody>(body).is_err());
+    }
+
+    #[test]
     fn overlap_and_misfire_policies_map_to_database_columns() {
         assert_eq!(
             overlap_columns(ScheduleOverlapPolicyV1::AllowBounded { max_active: 8 }),
@@ -1125,9 +1304,173 @@ mod tests {
 
     #[test]
     fn task_execution_rules_do_not_grant_agent_role_schedule_authority() {
+        assert!(require_schedule_writer("tenant_admin").is_ok());
         assert!(require_schedule_writer("developer").is_ok());
         assert!(require_schedule_writer("project_admin").is_ok());
+        assert!(require_schedule_writer("viewer").is_err());
         assert!(require_schedule_writer("agent").is_err());
+        assert!(require_schedule_writer("").is_err());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires the disposable canonical directory ACL fixture from phase9f3_schedule.py"]
+    async fn schedule_run_as_authorization_rechecks_canonical_directory_grants() {
+        use sqlx::postgres::PgPoolOptions;
+
+        let database_url = std::env::var("STAR_SCHEDULE_ACL_DATABASE_URL")
+            .expect("the Schedule runner must provide its disposable ACL database URL");
+        assert!(
+            database_url.starts_with("postgresql://schedule_runtime@127.0.0.1:")
+                && database_url.ends_with("/postgres"),
+            "the ACL test only permits the runner's loopback schedule_runtime database"
+        );
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&database_url)
+            .await
+            .expect("the disposable canonical ACL database must be reachable");
+        let has_directory_update_privileges = sqlx::query_scalar::<_, bool>(
+                r#"SELECT has_any_column_privilege(current_user, 'permission.project_role_binding', 'UPDATE')
+                       OR has_any_column_privilege(current_user, 'permission.cloud_branch_role_binding', 'UPDATE')
+                       OR has_any_column_privilege(current_user, 'permission.engineering_run_role_binding', 'UPDATE')
+                       OR has_any_column_privilege(current_user, 'scm.cloud_branch', 'UPDATE')
+                       OR has_any_column_privilege(current_user, 'scm.cloud_branch_revision', 'UPDATE')
+                       OR has_any_column_privilege(current_user, 'multica.engineering_run', 'UPDATE')
+                       OR has_any_column_privilege(current_user, 'multica.engineering_run_revision', 'UPDATE')"#,
+            )
+            .fetch_one(&pool)
+            .await
+            .expect("runtime role column privileges should be queryable");
+        assert!(
+            !has_directory_update_privileges,
+            "runtime role must be read-only on canonical directory authorization tables"
+        );
+        let tenant_id = Uuid::parse_str("21000000-0000-4000-8000-000000000001").unwrap();
+        let actor_id = Uuid::parse_str("22000000-0000-4000-8000-000000000001").unwrap();
+        let cases = [
+            (
+                "active grants",
+                "23000000-0000-4000-8000-000000000001",
+                "25000000-0000-4000-8000-000000000001",
+                true,
+            ),
+            (
+                "revoked Project grant",
+                "23000000-0000-4000-8000-000000000002",
+                "25000000-0000-4000-8000-000000000002",
+                false,
+            ),
+            (
+                "revoked Branch grant",
+                "23000000-0000-4000-8000-000000000003",
+                "25000000-0000-4000-8000-000000000003",
+                false,
+            ),
+            (
+                "revoked Run grant",
+                "23000000-0000-4000-8000-000000000004",
+                "25000000-0000-4000-8000-000000000004",
+                false,
+            ),
+            (
+                "paused Engineering Run",
+                "23000000-0000-4000-8000-000000000005",
+                "25000000-0000-4000-8000-000000000005",
+                false,
+            ),
+        ];
+        let mut tx = pool.begin().await.expect("begin ACL test transaction");
+        set_tenant(&mut tx, tenant_id)
+            .await
+            .expect("set tenant for fixture visibility assertions");
+        sqlx::query("SELECT set_config('app.actor_id',$1,true)")
+            .bind(actor_id.to_string())
+            .execute(&mut *tx)
+            .await
+            .expect("set actor for fixture visibility assertions");
+        let visible_authority_parts = sqlx::query_scalar::<_, Vec<bool>>(
+            r#"SELECT ARRAY[
+                   EXISTS (SELECT 1 FROM multica.engineering_run r
+                           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4),
+                   EXISTS (SELECT 1 FROM multica.engineering_run r
+                           JOIN multica.engineering_run_revision rv
+                             ON rv.tenant_id=r.tenant_id AND rv.engineering_run_id=r.engineering_run_id
+                            AND rv.valid_from<=now() AND rv.valid_to IS NULL AND rv.state<>'archived'
+                           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4),
+                   EXISTS (SELECT 1 FROM multica.engineering_run r
+                           JOIN scm.cloud_branch b
+                             ON b.tenant_id=r.tenant_id AND b.branch_id=r.branch_id
+                            AND b.project_id=r.project_id AND b.repository_id=r.repository_id
+                           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4),
+                   EXISTS (SELECT 1 FROM multica.engineering_run r
+                           JOIN scm.cloud_branch b
+                             ON b.tenant_id=r.tenant_id AND b.branch_id=r.branch_id
+                            AND b.project_id=r.project_id AND b.repository_id=r.repository_id
+                           JOIN scm.cloud_branch_revision bv
+                             ON bv.tenant_id=b.tenant_id AND bv.branch_id=b.branch_id
+                            AND bv.valid_from<=now() AND bv.valid_to IS NULL AND bv.state='active'
+                           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4),
+                   EXISTS (SELECT 1 FROM permission.project_role_binding p
+                           WHERE p.tenant_id=$1 AND p.project_id=$3 AND p.user_id=$2
+                             AND p.valid_from<=now() AND p.valid_to IS NULL),
+                   EXISTS (SELECT 1 FROM multica.engineering_run r
+                           JOIN scm.cloud_branch b
+                             ON b.tenant_id=r.tenant_id AND b.branch_id=r.branch_id
+                            AND b.project_id=r.project_id AND b.repository_id=r.repository_id
+                           JOIN permission.cloud_branch_role_binding bg
+                             ON bg.tenant_id=b.tenant_id AND bg.branch_id=b.branch_id
+                            AND bg.user_id=$2 AND bg.valid_from<=now() AND bg.valid_to IS NULL
+                           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4),
+                   EXISTS (SELECT 1 FROM permission.engineering_run_role_binding rg
+                           WHERE rg.tenant_id=$1 AND rg.engineering_run_id=$4 AND rg.user_id=$2
+                             AND rg.valid_from<=now() AND rg.valid_to IS NULL)
+               ]"#,
+        )
+        .bind(tenant_id)
+        .bind(actor_id)
+        .bind(Uuid::parse_str(cases[0].1).unwrap())
+        .bind(Uuid::parse_str(cases[0].2).unwrap())
+        .fetch_one(&mut *tx)
+        .await
+        .expect("canonical authorization fixture rows should be queryable");
+        assert_eq!(
+            visible_authority_parts,
+            vec![true; 7],
+            "active ACL fixture components should all be visible to the runtime role"
+        );
+        tx.rollback()
+            .await
+            .expect("release canonical query diagnostic locks");
+        for (scenario, project_id, run_id, should_authorize) in cases {
+            let project_id = Uuid::parse_str(project_id).unwrap();
+            let run_id = Uuid::parse_str(run_id).unwrap();
+            let mut tx = pool.begin().await.expect("begin isolated ACL scenario");
+            set_tenant(&mut tx, tenant_id)
+                .await
+                .expect("set tenant for isolated ACL scenario");
+            sqlx::query("SELECT set_config('app.actor_id',$1,true)")
+                .bind(actor_id.to_string())
+                .execute(&mut *tx)
+                .await
+                .expect("set actor for isolated ACL scenario");
+            let result =
+                authorize_schedule_run_as(&mut tx, tenant_id, actor_id, project_id, run_id).await;
+            assert_eq!(
+                result.is_ok(),
+                should_authorize,
+                "canonical run-as authorization mismatch for {scenario}: {:?}",
+                result.as_ref().err()
+            );
+            if should_authorize {
+                let scope = result.expect("active current grants should authorize run-as");
+                assert_eq!(scope.project_id, project_id);
+                assert_eq!(scope.engineering_run_id, run_id);
+            }
+            tx.rollback()
+                .await
+                .expect("release isolated ACL scenario locks");
+        }
+        pool.close().await;
     }
 
     #[tokio::test]
