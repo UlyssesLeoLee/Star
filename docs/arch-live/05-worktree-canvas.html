@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 05 Canvas 与 ARG</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 05 · 子系统</div>
+    <h1>Worktree 图谱、Canvas 与 Agent 关系</h1>
+    <p class="lead">三块相对独立的子系统：<b>worktree-canvas</b>（14 个同级 crate）把 Git 现场变成可交互图谱；
+      <b>ARG</b>（3 层）管 Agent 之间的关系与效果；<b>Canvas/终端</b>（4 个独立进程）提供实时协作与终端体验。
+      它们互相不直接依赖，只通过 facade 与 REST 交汇。</p>
+  </section>
+
+  <h2 class="sec">01 worktree-canvas · 14 个同级 crate</h2>
+  <p><code>worktree-canvas</code> 本身是 <b>facade</b>：只做 re-export，不含实现。真正的实现在 14 个 sibling crate 里。
+      外部只应 <code>use worktree_canvas::*</code>，不要绕过 facade 直接依赖某个 sibling。</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>crate</th><th>职责</th><th>关键设计点</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">graph-core</td><td>图仓库抽象 + 11 类节点 / 13 类边</td><td>GraphRepository trait，Neo4j / Memory 双 adapter</td></tr>
+      <tr><td class="mono">git-adapter</td><td>GitProvider trait</td><td>libgit2 为主，CLI fallback 兜底</td></tr>
+      <tr><td class="mono">git-observer</td><td>监听 Git 事件</td><td>fsnotify + <b>100ms debounce</b>，15 类 GitEvent</td></tr>
+      <tr><td class="mono">worktree-service</td><td>Worktree 状态机</td><td>8 态 + ahead/behind + dirty + Provisioning 态</td></tr>
+      <tr><td class="mono">worktree-shared-dir</td><td>共享目录解析</td><td>3 个 Source（per-user / workspace / FileBacked）+ 5 种 MountStrategy + 优先级 1-3</td></tr>
+      <tr><td class="mono">risk-engine</td><td>冲突风险评估</td><td>V1 Git 冲突 + V2 Diff 重叠，11 类风险</td></tr>
+      <tr><td class="mono">health-engine</td><td>健康度打分</td><td>13 个指标加权 → 0-100 分</td></tr>
+      <tr><td class="mono">agent-bridge</td><td>对接 Agent 运行时</td><td>Multica adapter，11 字段 AgentSession</td></tr>
+      <tr><td class="mono">relationship-engine</td><td>边关系运算</td><td>13 类边操作 + 关系遍历</td></tr>
+      <tr><td class="mono">canvas-renderer</td><td>渲染适配</td><td>CanvasRenderer trait → React-Flow 11.x；<b>LOD 3 级 + Viewport 虚拟化 + 5 种视图模式 + N-hop 聚焦</b></td></tr>
+      <tr><td class="mono">layout-engine</td><td>布局算法</td><td>3 种（dagre / d3-force / ELK）+ 阈值切换 + <code>visualDistance = log(n+1)*30</code> + 增量布局</td></tr>
+      <tr><td class="mono">query-engine</td><td>图查询</td><td>DSL 6 关键字 parser + 自然语言翻译 → Cypher + cypher guard</td></tr>
+      <tr><td class="mono">action-engine</td><td>图上动作</td><td>18 个 Action / 3 类别 + 二次确认 + <b>幂等 24h</b> + 审计 SCD2 + RBAC 5 角色 + Retry 3 档</td></tr>
+      <tr><td class="mono">event-bus</td><td>事件分发</td><td>15 类 Event + 4 个消费者（Graph / UI / Risk / Notification）+ 100ms 防抖 + Redis Streams 抽象</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>数据流：从 git 事件到屏幕像素</h3>
+  <div class="figure rv">
+    <svg viewBox="0 0 1040 190" role="img" aria-label="worktree-canvas 数据流">
+      <g class="node g" style="animation-delay:.05s">
+        <rect x="20" y="60" width="110" height="70" rx="9" fill="rgba(52,211,153,.12)" stroke="#34d399" stroke-opacity=".5"/>
+        <text x="34" y="84">.git/</text><text class="sub2" x="34" y="102">fsnotify</text>
+      </g>
+      <g class="node g" style="animation-delay:.15s">
+        <rect x="160" y="60" width="110" height="70" rx="9" fill="rgba(52,211,153,.12)" stroke="#34d399" stroke-opacity=".5"/>
+        <text x="174" y="84">git-observer</text><text class="sub2" x="174" y="102">100ms 去抖</text>
+      </g>
+      <g class="node g" style="animation-delay:.25s">
+        <rect x="300" y="60" width="110" height="70" rx="9" fill="rgba(56,225,255,.12)" stroke="#38e1ff" stroke-opacity=".5"/>
+        <text x="314" y="84">graph-core</text><text class="sub2" x="314" y="102">11 节点/13 边</text>
+      </g>
+      <g class="node g" style="animation-delay:.35s">
+        <rect x="440" y="60" width="110" height="70" rx="9" fill="rgba(167,139,250,.12)" stroke="#a78bfa" stroke-opacity=".5"/>
+        <text x="454" y="84">layout</text><text class="sub2" x="454" y="102">3 算法切换</text>
+      </g>
+      <g class="node g" style="animation-delay:.45s">
+        <rect x="580" y="60" width="110" height="70" rx="9" fill="rgba(167,139,250,.12)" stroke="#a78bfa" stroke-opacity=".5"/>
+        <text x="594" y="84">risk/health</text><text class="sub2" x="594" y="102">冲突 + 评分</text>
+      </g>
+      <g class="node g" style="animation-delay:.55s">
+        <rect x="720" y="60" width="110" height="70" rx="9" fill="rgba(91,140,255,.14)" stroke="#5b8cff" stroke-opacity=".55"/>
+        <text x="734" y="84">event-bus</text><text class="sub2" x="734" y="102">15 事件</text>
+      </g>
+      <g class="node g" style="animation-delay:.65s">
+        <rect x="860" y="60" width="160" height="70" rx="9" fill="rgba(244,114,182,.12)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="874" y="84">canvas-renderer</text><text class="sub2" x="874" y="102">LOD + 虚拟化 → React-Flow</text>
+      </g>
+      <path d="M70 95 L910 95" stroke="#2b3a63" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M70 95 L910 95" fill="none" stroke="#38e1ff" stroke-width="1.6" stroke-dasharray="5 6">
+        <animateMotion dur="9s" repeatCount="indefinite" path="M70 95 L910 95"/>
+      </path>
+    </svg>
+  </div>
+  <div class="note">
+    <b>为什么 debounce 是 100ms 而不是"实时"：</b><code>git checkout</code> 一次会产生上百个文件事件。
+    不过滤的话，图谱会疯狂重建，UI 卡死。100ms 是"合并一次操作"与"保持手感"之间的折中——这是性能约束，不是实现偷懒。
+  </div>
+
+  <h2 class="sec">02 三个 WASM 桥 <span class="badge b-wasm">同一算法不写两遍</span></h2>
+  <p>有些计算在服务端和浏览器都要跑（布局、查询解析、边校验）。做法不是"写两遍"，而是把 Rust 纯函数编译成 WASM 暴露给前端：</p>
+  <div class="grid g3 rv">
+    <div class="card">
+      <h4><span class="badge b-wasm">wasm</span> layout-engine-wasm</h4>
+      <p style="font-size:12.6px">暴露 <code>pick_algorithm</code> 与 <code>visual_distance</code>。前端本地试算布局，不等服务端往返。</p>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-wasm">wasm</span> query-engine-wasm</h4>
+      <p style="font-size:12.6px">暴露 <code>parse_dsl</code> / <code>validate_dsl</code> + 6 个关键字工具函数。输入框里实时提示语法错误。</p>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-wasm">wasm</span> relationship-engine-wasm</h4>
+      <p style="font-size:12.6px">暴露 <code>edge_kind_count</code> / <code>edge_kind_at</code> / <code>validate_edge_kind</code>。图例统计与边合法性校验本地完成。</p>
+    </div>
+  </div>
+  <div class="note ok">
+    <b>收益：</b>一致性由编译期保证，而不是靠"两边记得同步"。三个 crate 都是 <code>cdylib + rlib</code> 双输出——
+    服务端继续用 rlib，浏览器用 cdylib，<b>同一份源码</b>。
+  </div>
+
+  <h2 class="sec">03 ARG 三层 <span class="badge b-wasm">Agent Relationship Graph</span></h2>
+  <p>ARG 回答"Agent 之间是什么关系、这次动作对别的 Agent 意味着什么"。分三层，单向依赖：</p>
+  <div class="stack rv">
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-domain)"></span>
+      <div class="lh"><span class="lname">arg</span><span class="badge b-domain">Data Tier · 40 .rs</span><span class="lmeta">图数据与查询</span></div>
+      <div class="lbody">本仓最厚的 domain crate 之一。存 Agent 关系图并提供查询能力。数据层不关心"关系要怎么用"，只关心关系本身。</div>
+    </div>
+    <div class="arrowdown">▼</div>
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-wasm)"></span>
+      <div class="lh"><span class="lname">arg-bridge</span><span class="badge b-wasm">Bridge Tier · 14 .rs</span><span class="lmeta">状态同步</span></div>
+      <div class="lbody">四个组件：<b>MemgraphEventListener</b>（监听图变更）→ <b>LangGraphStateUpdater</b>（同步到 LangGraph 状态）→ <b>PeriodFlushWorker</b>（周期刷盘）→ <b>OfflineQueue</b>（离线补偿）。断线不丢数据。</div>
+    </div>
+    <div class="arrowdown">▼</div>
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-star)"></span>
+      <div class="lh"><span class="lname">arg-effect</span><span class="badge b-star">Effect Tier · 20 .rs</span><span class="lmeta">效果派发</span></div>
+      <div class="lbody">五个引擎：ARGDispatchRouter（派发）· ARGContextInjector（上下文注入）· ARGTrustEngine（信任度）· ARGOutputEvaluator（输出评估）· ARGAchievementEngine（成就）。另含 10 套 challenges prompt + 8 拓扑 Cypher。</div>
+    </div>
+  </div>
+  <div class="note warn">
+    <b>跨域边必须带 consults：</b>ARG 触碰其他 domain 的边时，强制要求声明 <code>consults</code>（咨询了谁）。
+    目的是让"A 域为什么能读 B 域的数据"在代码里可查，而不是靠口头约定。
+  </div>
+
+  <h2 class="sec">04 Canvas 四进程 + 端口</h2>
+  <p>这 4 个 crate 各自带 axum server，<b>独立 Deployment</b>，与主 web 进程物理隔离。镜像来自 GHCR（owner <code>SayAtelier</code>，tag <code>:dev</code>）。</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>进程</th><th>端口</th><th>镜像</th><th>职责</th><th>阶段</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">canvas-engine</td><td class="mono">8080</td><td class="mono">ghcr.io/sayatelier/star-canvas-engine:dev</td><td>Canvas 引擎（共享能力）</td><td>阶段 1 骨架：<code>/healthz</code> <code>/ready</code> <code>/version</code></td></tr>
+      <tr><td class="mono">domain-canvas</td><td class="mono">8081</td><td class="mono">ghcr.io/sayatelier/star-domain-canvas:dev</td><td>Canvas 业务域（26 表 W/T/M + 5 角色 CRUD）</td><td>阶段 1 骨架：<code>/api/v1/canvas</code> 占位</td></tr>
+      <tr><td class="mono">canvas-realtime</td><td class="mono">8082 + 8083 WSS</td><td class="mono">ghcr.io/sayatelier/star-canvas-realtime:dev</td><td>实时协作</td><td>阶段 1：WSS echo；阶段 2 接 Yjs/yrs CRDT</td></tr>
+      <tr><td class="mono">canvas-game</td><td class="mono">8084</td><td class="mono">ghcr.io/sayatelier/star-canvas-game:dev</td><td>Canvas 上的游戏层</td><td>阶段 1 骨架：<code>/api/v1/gameplay</code> 占位</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note err">
+    <b>重要提醒：这 4 个进程目前都是骨架。</b>只有 <code>canvas-realtime</code> 的 WSS echo 端点是真实可交互的，
+    其余端点是 health/version 占位。<strong>不要把"端口通"当成"Canvas 功能可用"</strong>——这正是仓库
+    "仅有 UI、mock、seed、预览适配器或 REST 契约不得标为可用闭环"约束要防的事。
+  </div>
+
+  <h2 class="sec">05 终端栈与凭证库</h2>
+  <div class="grid g2 rv">
+    <div class="card">
+      <h4><span class="badge b-canvas">13 .rs</span> terminal-stack</h4>
+      <p style="font-size:12.8px">数据层实现：<code>ScrollbackBuffer</code>（环形缓冲，防无界内存增长）+ <code>SplitTree</code>（分屏树结构）。
+        MVP v0 = 内存 + JSON 序列化；<b>持久化与前端 UI 留 P1 followup</b>。</p>
+      <p style="font-size:12.6px;margin-top:8px">配套 <code>terminal-protocol</code>：OSC 52（剪贴板）+ Kitty Keyboard Protocol。
+        协议层与终端栈选型<b>解耦</b>，OSC 解析复用既有实现。</p>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-canvas">3 .rs</span> ai-vault</h4>
+      <p style="font-size:12.8px">桌面端索引控制：<code>SearchPolicy</code> + <code>clear_search_index</code>。
+        MVP v0 = local-only settings + 幂等清空。</p>
+      <p style="font-size:12.6px;margin-top:8px">相关：<code>star-credential</code> 走"用户设置 UI 自填 → KMS 加密存储 → 运行时解密"，
+        密钥不经环境变量（守门 #5 env 安全硬约束）。</p>
+    </div>
+  </div>
+
+  <details class="ev">
+    <summary>证据：本页每条设计数字的出处</summary>
+    <div class="evbody">
+      <ul>
+        <li>14 crate 职责表：直接摘自 <code>crates/worktree-canvas/src/lib.rs</code> 头部的模块清单表（含 DD 章节号与不变量编号）。</li>
+        <li>WASM 暴露的函数名：来自 <code>Cargo.toml</code> members 段三个 <code>*-wasm</code> 条目的注释（标注 ULYS-228/229/235）。</li>
+        <li>ARG 三层组件名：<code>Cargo.toml</code> 中 <code>arg</code> / <code>arg-bridge</code> / <code>arg-effect</code> 三条注册注释。</li>
+        <li>Canvas 4 进程端口与镜像：<code>deploy/canvas-game-k3s.yaml</code> 头部说明块（GHCR owner、tag、端口一一对应）。</li>
+        <li>terminal-stack / ai-vault 范围：<code>Cargo.toml</code> 中 ULYS-200 / ULYS-157 注册注释（明示 P1 followup 边界）。</li>
+        <li>端口发布 workflow：<code>.github/workflows/publish-canvas-game.yml</code>。</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 05 Canvas 与 ARG · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>下一册：<a href="06-data-model.html">数据模型</a>。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

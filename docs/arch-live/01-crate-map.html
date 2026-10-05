@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 01 Crate 地图</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 01 · 代码归属</div>
+    <h1>105 个 crate，各归其位</h1>
+    <p class="lead">这页回答一个具体问题：<strong>我要写的这段逻辑，应该放进哪个 crate？</strong>
+      下面每个色块是一个真实存在的 crate，数字是它的 <code>.rs</code> 文件数（实现度代理指标）。输入框可搜索，点击家族按钮可高亮。</p>
+  </section>
+
+  <h2 class="sec">01 家族总览</h2>
+  <p>8 个家族。分族的依据不是"感觉上像一类"，而是 <b>依赖方向</b>：上层可以依赖下层，下层不得反向 import 上层。</p>
+  <div class="tbl-wrap rv">
+  <table class="tbl">
+    <thead><tr><th>家族</th><th>数量</th><th>职责</th><th>允许依赖谁</th><th>代表 crate</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-domain">DDD bounded context</span></td><td class="mono">40</td>
+        <td>业务规则所在：实体、值对象、领域服务、领域事件。business decision only。</td>
+        <td><code>star-context</code> + 同层兄弟（受依赖图约束）</td>
+        <td class="mono">work-item / worktree / identity / hook / llm / scm</td></tr>
+      <tr><td><span class="badge b-star">平台能力 star-*</span></td><td class="mono">31</td>
+        <td>跨域公共机制：锁、事件总线、缓存、任务队列、计量、CLI、MCP、门禁治理。</td>
+        <td><code>star-context</code>；<b>禁止</b>依赖任何 domain-*</td>
+        <td class="mono">star-mutex / star-eventbus / star-taskqueue / star-telemetry</td></tr>
+      <tr><td><span class="badge b-domain">worktree-canvas</span></td><td class="mono">14</td>
+        <td>Worktree 图谱子域：图仓库、Git 适配与观察、风险/健康度、布局/渲染/查询、动作与事件。</td>
+        <td>彼此可依赖，外部只经 <code>worktree-canvas</code> facade</td>
+        <td class="mono">graph-core / git-observer / risk-engine / action-engine</td></tr>
+      <tr><td><span class="badge b-infra">多视图 / 任务统一</span></td><td class="mono">11</td>
+        <td>同一 Task 的 5 种视图（task / workflow / canvas / scheduler / game）+ 共享 schema + 5 角色签字。</td>
+        <td><code>shared-task</code> 为中枢；各 view crate 通过 From/Into 互转</td>
+        <td class="mono">star-task / star-workflow / star-canvas / star-scheduler / shared-task / leads</td></tr>
+      <tr><td><span class="badge b-wasm">ARG 三层</span></td><td class="mono">3</td>
+        <td>Agent 关系图：Data（数据层）→ Bridge（状态同步）→ Effect（效果派发）。</td>
+        <td>arg ← arg-bridge ← arg-effect，单向三层</td>
+        <td class="mono">arg (40 rs) / arg-bridge / arg-effect</td></tr>
+      <tr><td><span class="badge b-wasm">WASM 桥</span></td><td class="mono">3</td>
+        <td>把 Rust 纯函数暴露给浏览器，避免"同一算法写两遍"。</td>
+        <td>只允许依赖对应的 <code>*-engine</code> 纯函数</td>
+        <td class="mono">layout-engine-wasm / query-engine-wasm / relationship-engine-wasm</td></tr>
+      <tr><td><span class="badge b-infra">支撑层</span></td><td class="mono">3</td>
+        <td>Gateway Port trait、DTO、持久化 adapter 注册表。</td>
+        <td>可依赖 domain-*（这是它的职责）</td>
+        <td class="mono">api / application / infrastructure</td></tr>
+      <tr><td><span class="badge b-canvas">进程面</span></td><td class="mono">4</td>
+        <td>可独立部署的进程：Canvas 引擎/实时/游戏、终端栈、凭证库、桌面壳。</td>
+        <td>自有 axum server / trait，不复用 web 进程</td>
+        <td class="mono">canvas-engine / canvas-realtime / terminal-stack / ai-vault</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>关键不变量：</b><code>star-*</code> 平台 crate <b>不得</b> <code>use</code> 任何 <code>domain-*</code>。
+    这条是整个仓库能加到 105 个 crate 而不塌成一团的原因——一旦平台层开始 import 业务层，依赖方向就不可逆了。
+    <a href="08-guardrails.html">守门与 CI</a> 记录了用 lint 强制它的做法。
+  </div>
+
+  <h2 class="sec">02 交互式 crate 墙</h2>
+  <p class="sub">共 <strong data-shown>105</strong> 个 crate 与当前筛选匹配。悬停看文件数。</p>
+  <div class="rv" style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <input id="crateFilter" type="search" placeholder="搜索 crate 名，如 work / hook / star-" autocomplete="off"
+           style="flex:1 1 240px;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font:13px var(--mono)">
+    <button class="btn ghost" data-family="domain-" aria-pressed="false">DDD 域</button>
+    <button class="btn ghost" data-family="star-" aria-pressed="false">平台 star-*</button>
+    <button class="btn ghost" data-family="canvas" aria-pressed="false">Canvas</button>
+    <button class="btn ghost" data-family="arg" aria-pressed="false">ARG</button>
+    <button class="btn ghost" data-family="wasm" aria-pressed="false">WASM</button>
+    <button class="btn ghost" data-family="view" aria-pressed="false">任务视图</button>
+  </div>
+  <div class="card rv" data-cratewall>
+    <div class="cratewall">
+<div class="famgroup" data-family-group="domain">
+<div class="famlabel"><span class="badge k-domain">DDD bounded context · 40</span><span class="sub"> · 40 crate</span></div>
+<div class="cratewall">
+<div class="chip k-domain" data-name="domain-agent" title="domain-agent - 6 rust files" style="animation-delay:0ms">domain-agent<span style="opacity:.55"> ·6</span></div>
+<div class="chip k-domain" data-name="domain-agent-windows" title="domain-agent-windows - 3 rust files" style="animation-delay:0ms">domain-agent-windows<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-domain" data-name="domain-ai" title="domain-ai - 1 rust files" style="animation-delay:0ms">domain-ai<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-audit" title="domain-audit - 1 rust files" style="animation-delay:0ms">domain-audit<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-automation" title="domain-automation - 3 rust files" style="animation-delay:0ms">domain-automation<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-domain" data-name="domain-batch" title="domain-batch - 6 rust files" style="animation-delay:0ms">domain-batch<span style="opacity:.55"> ·6</span></div>
+<div class="chip k-domain" data-name="domain-board" title="domain-board - 3 rust files" style="animation-delay:0ms">domain-board<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-domain" data-name="domain-canvas" title="domain-canvas - 3 rust files" style="animation-delay:0ms">domain-canvas<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-domain" data-name="domain-cli" title="domain-cli - 12 rust files" style="animation-delay:0ms">domain-cli<span style="opacity:.55"> ·12</span></div>
+<div class="chip k-domain" data-name="domain-collaboration" title="domain-collaboration - 1 rust files" style="animation-delay:0ms">domain-collaboration<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-comment" title="domain-comment - 10 rust files" style="animation-delay:0ms">domain-comment<span style="opacity:.55"> ·10</span></div>
+<div class="chip k-domain" data-name="domain-context" title="domain-context - 1 rust files" style="animation-delay:0ms">domain-context<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-dashboard" title="domain-dashboard - 1 rust files" style="animation-delay:0ms">domain-dashboard<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-development" title="domain-development - 1 rust files" style="animation-delay:0ms">domain-development<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-feedback" title="domain-feedback - 9 rust files" style="animation-delay:0ms">domain-feedback<span style="opacity:.55"> ·9</span></div>
+<div class="chip k-domain" data-name="domain-form" title="domain-form - 1 rust files" style="animation-delay:0ms">domain-form<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-hook" title="domain-hook - 1 rust files" style="animation-delay:0ms">domain-hook<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-identity" title="domain-identity - 1 rust files" style="animation-delay:0ms">domain-identity<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-integration" title="domain-integration - 11 rust files" style="animation-delay:0ms">domain-integration<span style="opacity:.55"> ·11</span></div>
+<div class="chip k-domain" data-name="domain-kms" title="domain-kms - 1 rust files" style="animation-delay:0ms">domain-kms<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-llm" title="domain-llm - 13 rust files" style="animation-delay:0ms">domain-llm<span style="opacity:.55"> ·13</span></div>
+<div class="chip k-domain" data-name="domain-local-runtime" title="domain-local-runtime - 24 rust files" style="animation-delay:0ms">domain-local-runtime<span style="opacity:.55"> ·24</span></div>
+<div class="chip k-domain" data-name="domain-mcp" title="domain-mcp - 1 rust files" style="animation-delay:0ms">domain-mcp<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-notification" title="domain-notification - 2 rust files" style="animation-delay:0ms">domain-notification<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-permission" title="domain-permission - 2 rust files" style="animation-delay:0ms">domain-permission<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-planning" title="domain-planning - 2 rust files" style="animation-delay:0ms">domain-planning<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-project" title="domain-project - 2 rust files" style="animation-delay:0ms">domain-project<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-relation" title="domain-relation - 1 rust files" style="animation-delay:0ms">domain-relation<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-report" title="domain-report - 31 rust files" style="animation-delay:0ms">domain-report<span style="opacity:.55"> ·31</span></div>
+<div class="chip k-domain" data-name="domain-scm" title="domain-scm - 4 rust files" style="animation-delay:0ms">domain-scm<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-domain" data-name="domain-search" title="domain-search - 2 rust files" style="animation-delay:0ms">domain-search<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-task" title="domain-task - 1 rust files" style="animation-delay:0ms">domain-task<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-tenant" title="domain-tenant - 1 rust files" style="animation-delay:0ms">domain-tenant<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-theme" title="domain-theme - 11 rust files" style="animation-delay:0ms">domain-theme<span style="opacity:.55"> ·11</span></div>
+<div class="chip k-domain" data-name="domain-tool" title="domain-tool - 2 rust files" style="animation-delay:0ms">domain-tool<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-validation" title="domain-validation - 10 rust files" style="animation-delay:0ms">domain-validation<span style="opacity:.55"> ·10</span></div>
+<div class="chip k-domain" data-name="domain-work-item" title="domain-work-item - 3 rust files" style="animation-delay:0ms">domain-work-item<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-domain" data-name="domain-workflow" title="domain-workflow - 2 rust files" style="animation-delay:0ms">domain-workflow<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-workspace" title="domain-workspace - 2 rust files" style="animation-delay:0ms">domain-workspace<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-domain" data-name="domain-worktree" title="domain-worktree - 3 rust files" style="animation-delay:0ms">domain-worktree<span style="opacity:.55"> ·3</span></div>
+</div></div>
+<div class="famgroup" data-family-group="star">
+<div class="famlabel"><span class="badge k-star">平台能力 star-* · 31</span><span class="sub"> · 23 crate</span></div>
+<div class="cratewall">
+<div class="chip k-star" data-name="star-api-rest" title="star-api-rest - 60 rust files" style="animation-delay:40ms">star-api-rest<span style="opacity:.55"> ·60</span></div>
+<div class="chip k-star" data-name="star-cache" title="star-cache - 5 rust files" style="animation-delay:40ms">star-cache<span style="opacity:.55"> ·5</span></div>
+<div class="chip k-star" data-name="star-cli" title="star-cli - 18 rust files" style="animation-delay:40ms">star-cli<span style="opacity:.55"> ·18</span></div>
+<div class="chip k-star" data-name="star-context" title="star-context - 4 rust files" style="animation-delay:40ms">star-context<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-star" data-name="star-context-tiering" title="star-context-tiering - 2 rust files" style="animation-delay:40ms">star-context-tiering<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-star" data-name="star-credential" title="star-credential - 5 rust files" style="animation-delay:40ms">star-credential<span style="opacity:.55"> ·5</span></div>
+<div class="chip k-star" data-name="star-dispatcher" title="star-dispatcher - 5 rust files" style="animation-delay:40ms">star-dispatcher<span style="opacity:.55"> ·5</span></div>
+<div class="chip k-star" data-name="star-dto" title="star-dto - 3 rust files" style="animation-delay:40ms">star-dto<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-star" data-name="star-eventbus" title="star-eventbus - 5 rust files" style="animation-delay:40ms">star-eventbus<span style="opacity:.55"> ·5</span></div>
+<div class="chip k-star" data-name="star-mcp" title="star-mcp - 59 rust files" style="animation-delay:40ms">star-mcp<span style="opacity:.55"> ·59</span></div>
+<div class="chip k-star" data-name="star-memory" title="star-memory - 4 rust files" style="animation-delay:40ms">star-memory<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-star" data-name="star-mutex" title="star-mutex - 6 rust files" style="animation-delay:40ms">star-mutex<span style="opacity:.55"> ·6</span></div>
+<div class="chip k-star" data-name="star-ops" title="star-ops - 26 rust files" style="animation-delay:40ms">star-ops<span style="opacity:.55"> ·26</span></div>
+<div class="chip k-star" data-name="star-pg-adapter" title="star-pg-adapter - 15 rust files" style="animation-delay:40ms">star-pg-adapter<span style="opacity:.55"> ·15</span></div>
+<div class="chip k-star" data-name="star-quota" title="star-quota - 3 rust files" style="animation-delay:40ms">star-quota<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-star" data-name="star-sa" title="star-sa - 7 rust files" style="animation-delay:40ms">star-sa<span style="opacity:.55"> ·7</span></div>
+<div class="chip k-star" data-name="star-saga" title="star-saga - 15 rust files" style="animation-delay:40ms">star-saga<span style="opacity:.55"> ·15</span></div>
+<div class="chip k-star" data-name="star-sse" title="star-sse - 3 rust files" style="animation-delay:40ms">star-sse<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-star" data-name="star-taskqueue" title="star-taskqueue - 4 rust files" style="animation-delay:40ms">star-taskqueue<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-star" data-name="star-telemetry" title="star-telemetry - 4 rust files" style="animation-delay:40ms">star-telemetry<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-star" data-name="star-treesitter" title="star-treesitter - 4 rust files" style="animation-delay:40ms">star-treesitter<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-star" data-name="star-vcs" title="star-vcs - 2 rust files" style="animation-delay:40ms">star-vcs<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-star" data-name="star-webhook" title="star-webhook - 3 rust files" style="animation-delay:40ms">star-webhook<span style="opacity:.55"> ·3</span></div>
+</div></div>
+<div class="famgroup" data-family-group="canvas">
+<div class="famlabel"><span class="badge k-canvas">worktree-canvas 14 crate</span><span class="sub"> · 14 crate</span></div>
+<div class="cratewall">
+<div class="chip k-canvas" data-name="action-engine" title="action-engine - 10 rust files" style="animation-delay:80ms">action-engine<span style="opacity:.55"> ·10</span></div>
+<div class="chip k-canvas" data-name="agent-bridge" title="agent-bridge - 6 rust files" style="animation-delay:80ms">agent-bridge<span style="opacity:.55"> ·6</span></div>
+<div class="chip k-canvas" data-name="canvas-renderer" title="canvas-renderer - 8 rust files" style="animation-delay:80ms">canvas-renderer<span style="opacity:.55"> ·8</span></div>
+<div class="chip k-canvas" data-name="event-bus" title="event-bus - 7 rust files" style="animation-delay:80ms">event-bus<span style="opacity:.55"> ·7</span></div>
+<div class="chip k-canvas" data-name="git-adapter" title="git-adapter - 6 rust files" style="animation-delay:80ms">git-adapter<span style="opacity:.55"> ·6</span></div>
+<div class="chip k-canvas" data-name="git-observer" title="git-observer - 9 rust files" style="animation-delay:80ms">git-observer<span style="opacity:.55"> ·9</span></div>
+<div class="chip k-canvas" data-name="graph-core" title="graph-core - 9 rust files" style="animation-delay:80ms">graph-core<span style="opacity:.55"> ·9</span></div>
+<div class="chip k-canvas" data-name="health-engine" title="health-engine - 4 rust files" style="animation-delay:80ms">health-engine<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-canvas" data-name="layout-engine" title="layout-engine - 6 rust files" style="animation-delay:80ms">layout-engine<span style="opacity:.55"> ·6</span></div>
+<div class="chip k-canvas" data-name="query-engine" title="query-engine - 7 rust files" style="animation-delay:80ms">query-engine<span style="opacity:.55"> ·7</span></div>
+<div class="chip k-canvas" data-name="relationship-engine" title="relationship-engine - 5 rust files" style="animation-delay:80ms">relationship-engine<span style="opacity:.55"> ·5</span></div>
+<div class="chip k-canvas" data-name="risk-engine" title="risk-engine - 8 rust files" style="animation-delay:80ms">risk-engine<span style="opacity:.55"> ·8</span></div>
+<div class="chip k-canvas" data-name="worktree-service" title="worktree-service - 13 rust files" style="animation-delay:80ms">worktree-service<span style="opacity:.55"> ·13</span></div>
+<div class="chip k-canvas" data-name="worktree-shared-dir" title="worktree-shared-dir - 10 rust files" style="animation-delay:80ms">worktree-shared-dir<span style="opacity:.55"> ·10</span></div>
+</div></div>
+<div class="famgroup" data-family-group="views">
+<div class="famlabel"><span class="badge k-infra">多视图 / 任务统一层</span><span class="sub"> · 11 crate</span></div>
+<div class="cratewall">
+<div class="chip k-infra" data-name="agent-domain" title="agent-domain - 13 rust files" style="animation-delay:120ms">agent-domain<span style="opacity:.55"> ·13</span></div>
+<div class="chip k-infra" data-name="canvas-collab" title="canvas-collab - 7 rust files" style="animation-delay:120ms">canvas-collab<span style="opacity:.55"> ·7</span></div>
+<div class="chip k-infra" data-name="leads" title="leads - 1 rust files" style="animation-delay:120ms">leads<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-infra" data-name="shared-task" title="shared-task - 1 rust files" style="animation-delay:120ms">shared-task<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-infra" data-name="star-canvas" title="star-canvas - 2 rust files" style="animation-delay:120ms">star-canvas<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-infra" data-name="star-game" title="star-game - 3 rust files" style="animation-delay:120ms">star-game<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-infra" data-name="star-registry" title="star-registry - 2 rust files" style="animation-delay:120ms">star-registry<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-infra" data-name="star-scheduler" title="star-scheduler - 2 rust files" style="animation-delay:120ms">star-scheduler<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-infra" data-name="star-task" title="star-task - 2 rust files" style="animation-delay:120ms">star-task<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-infra" data-name="star-taskgraph" title="star-taskgraph - 2 rust files" style="animation-delay:120ms">star-taskgraph<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-infra" data-name="star-workflow" title="star-workflow - 1 rust files" style="animation-delay:120ms">star-workflow<span style="opacity:.55"> ·1</span></div>
+</div></div>
+<div class="famgroup" data-family-group="arg">
+<div class="famlabel"><span class="badge k-wasm">ARG 三层</span><span class="sub"> · 3 crate</span></div>
+<div class="cratewall">
+<div class="chip k-wasm" data-name="arg" title="arg - 40 rust files" style="animation-delay:160ms">arg<span style="opacity:.55"> ·40</span></div>
+<div class="chip k-wasm" data-name="arg-bridge" title="arg-bridge - 14 rust files" style="animation-delay:160ms">arg-bridge<span style="opacity:.55"> ·14</span></div>
+<div class="chip k-wasm" data-name="arg-effect" title="arg-effect - 20 rust files" style="animation-delay:160ms">arg-effect<span style="opacity:.55"> ·20</span></div>
+</div></div>
+<div class="famgroup" data-family-group="wasm">
+<div class="famlabel"><span class="badge k-wasm">浏览器 WASM 桥 · 3</span><span class="sub"> · 3 crate</span></div>
+<div class="cratewall">
+<div class="chip k-wasm" data-name="layout-engine-wasm" title="layout-engine-wasm - 1 rust files" style="animation-delay:200ms">layout-engine-wasm<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-wasm" data-name="query-engine-wasm" title="query-engine-wasm - 1 rust files" style="animation-delay:200ms">query-engine-wasm<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-wasm" data-name="relationship-engine-wasm" title="relationship-engine-wasm - 1 rust files" style="animation-delay:200ms">relationship-engine-wasm<span style="opacity:.55"> ·1</span></div>
+</div></div>
+<div class="famgroup" data-family-group="support">
+<div class="famlabel"><span class="badge k-infra">支撑层 (gateway / DTO / adapter)</span><span class="sub"> · 3 crate</span></div>
+<div class="cratewall">
+<div class="chip k-infra" data-name="api" title="api - 22 rust files" style="animation-delay:240ms">api<span style="opacity:.55"> ·22</span></div>
+<div class="chip k-infra" data-name="application" title="application - 3 rust files" style="animation-delay:240ms">application<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-infra" data-name="infrastructure" title="infrastructure - 3 rust files" style="animation-delay:240ms">infrastructure<span style="opacity:.55"> ·3</span></div>
+</div></div>
+<div class="famgroup" data-family-group="surface">
+<div class="famlabel"><span class="badge k-canvas">终端 / Canvas / 桌面 进程面</span><span class="sub"> · 8 crate</span></div>
+<div class="cratewall">
+<div class="chip k-canvas" data-name="ai-vault" title="ai-vault - 3 rust files" style="animation-delay:280ms">ai-vault<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-canvas" data-name="canvas-engine" title="canvas-engine - 3 rust files" style="animation-delay:280ms">canvas-engine<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-canvas" data-name="canvas-game" title="canvas-game - 3 rust files" style="animation-delay:280ms">canvas-game<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-canvas" data-name="canvas-realtime" title="canvas-realtime - 3 rust files" style="animation-delay:280ms">canvas-realtime<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-canvas" data-name="star-desktop" title="star-desktop - 5 rust files" style="animation-delay:280ms">star-desktop<span style="opacity:.55"> ·5</span></div>
+<div class="chip k-canvas" data-name="terminal-protocol" title="terminal-protocol - 4 rust files" style="animation-delay:280ms">terminal-protocol<span style="opacity:.55"> ·4</span></div>
+<div class="chip k-canvas" data-name="terminal-stack" title="terminal-stack - 13 rust files" style="animation-delay:280ms">terminal-stack<span style="opacity:.55"> ·13</span></div>
+<div class="chip k-canvas" data-name="worktree-canvas" title="worktree-canvas - 1 rust files" style="animation-delay:280ms">worktree-canvas<span style="opacity:.55"> ·1</span></div>
+</div></div>
+
+    </div>
+  </div>
+
+  <h2 class="sec">03 实装度分布 <span class="badge b-warn">别被数量误导</span></h2>
+  <p>这是本页最该看的一张图。<strong>105 个 crate 里有大量 1–3 文件的骨架</strong>；真正厚的 crate 集中在
+    <code>star-api-rest</code>、<code>star-mcp</code>、<code>arg</code>、<code>domain-report</code> 这几处。</p>
+  <div class="card rv rowlist">
+<div class="row"><div class="rn"><span class="badge b-star">star-api-rest</span></div><div class="bar" data-fill="100"><i></i></div><div class="rv">60 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-star">star-mcp</span></div><div class="bar" data-fill="98"><i></i></div><div class="rv">59 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-mute">arg</span></div><div class="bar" data-fill="67"><i></i></div><div class="rv">40 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-domain">domain-report</span></div><div class="bar" data-fill="52"><i></i></div><div class="rv">31 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-star">star-ops</span></div><div class="bar" data-fill="43"><i></i></div><div class="rv">26 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-domain">domain-local-runtime</span></div><div class="bar" data-fill="40"><i></i></div><div class="rv">24 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-infra">api</span></div><div class="bar" data-fill="37"><i></i></div><div class="rv">22 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-mute">arg-effect</span></div><div class="bar" data-fill="33"><i></i></div><div class="rv">20 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-star">star-cli</span></div><div class="bar" data-fill="30"><i></i></div><div class="rv">18 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-star">star-pg-adapter</span></div><div class="bar" data-fill="25"><i></i></div><div class="rv">15 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-star">star-saga</span></div><div class="bar" data-fill="25"><i></i></div><div class="rv">15 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-mute">arg-bridge</span></div><div class="bar" data-fill="23"><i></i></div><div class="rv">14 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-mute">agent-domain</span></div><div class="bar" data-fill="22"><i></i></div><div class="rv">13 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-domain">domain-llm</span></div><div class="bar" data-fill="22"><i></i></div><div class="rv">13 .rs</div></div>
+<div class="row"><div class="rn"><span class="badge b-mute">terminal-stack</span></div><div class="bar" data-fill="22"><i></i></div><div class="rv">13 .rs</div></div>
+  </div>
+  <div class="note warn">
+    <b>怎么用这张图：</b>判断"这个能力做完了吗"，看的是 <b>某个具体 crate 的文件数 + 是否有真实 adapter</b>，
+    不是"workspace 有多少个 crate"。一个 1 文件的 <code>domain-audit</code> 只声明了 Port trait，不含任何业务实现；
+    <code>star-api-rest</code> 的 60 个文件里才有 OAuth2、RBAC、限流、审计中间件与 16 个路由组的真实 handler。
+  </div>
+
+  <h2 class="sec">04 放置决策树</h2>
+  <div class="grid g2 rv">
+    <div class="card">
+      <h4>判断顺序（自上而下，命中即停）</h4>
+      <p class="mono" style="font-size:11.5px;line-height:2">
+        1. 是"业务规则/状态机"吗 → 归到已有 <code>domain-*</code>；没有合适 bounded context 才新建<br>
+        2. 是"跨域机制"吗（锁/事件/缓存/队列/计量）→ <code>star-*</code><br>
+        3. 是"Worktree 图谱"吗 → 14 个 canvas crate 之一<br>
+        4. 是"同一 Task 的另一种视图"吗 → 5 个 view crate + <code>shared-task</code><br>
+        5. 是"Agent 关系"吗 → ARG 三层<br>
+        6. 是"纯函数且前端也要用"吗 → 加 <code>-wasm</code> 桥<br>
+        7. 是"要独立起进程"吗 → 进程面 crate（自带 axum server）<br>
+        8. 以上都不是 → 先别建 crate，放进最接近的既有 crate
+      </p>
+    </div>
+    <div class="card">
+      <h4>三条硬约束</h4>
+      <p style="font-size:12.8px">
+        <b>① 依赖单向。</b>上层可依赖下层，反向禁止。<br><br>
+        <b>② 跨域只能经由显式契约。</b>不要在 <code>star-*</code> 里 <code>use domain_work_item::…</code>；
+        要协作就走事件（<code>star-eventbus</code>）或 saga 的显式流程。<br><br>
+        <b>③ 新 crate 的默认命运是骨架。</b>新 crate 多数只含 Port trait + 实体 + 少量 UT；
+        "有 crate" 不等于 "有实现"，判断实装度请看第 03 节。
+      </p>
+    </div>
+  </div>
+
+  <details class="ev">
+    <summary>证据：家族划分依据与逐族清单</summary>
+    <div class="evbody">
+      <ul>
+        <li>家族清单由 <code>python scripts/automation/arch_live_doc_check.py --emit-chips</code> 从 <code>crates/</code> 目录实扫生成，不是手写维护的列表。</li>
+        <li><code>worktree-canvas</code> 的 14 个成员表直接来自 <code>crates/worktree-canvas/src/lib.rs</code> 的模块清单（facade re-export 14 个 sibling crate）。</li>
+        <li>ARG 三层与 5 视图的定位来自 <code>Cargo.toml</code> members 段的注释（每个 member 注册时都写明 per 哪份设计文档与哪条守门）。</li>
+        <li>支撑层的 Port trait 形态见 <code>crates/api/src/lib.rs</code>：<code>pub trait ApiGateway</code> / <code>pub trait ApiQuery</code>。</li>
+      </ul>
+      <p style="margin-top:8px">重新生成方式：<code>--emit-chips</code> / <code>--emit-bars</code>，输出直接替换本页的 <code>&lt;!--CHIPS--&gt;</code> 与 <code>&lt;!--BARS--&gt;</code> 占位段。</p>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 01 Crate 地图 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>本页列表由脚本生成；数字漂移会被 <code>arch_live_doc_check.py</code> 判红。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

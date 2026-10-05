@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 07 部署拓扑</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 07 · 运行环境</div>
+    <h1>k3s 上的三个 namespace 与一条边缘</h1>
+    <p class="lead">本地部署是 k3s + kustomize：<code>star-system</code> 跑业务服务，<code>star</code> 跑 BFF 边缘，
+      另有 <code>star-system</code> 内的 canvas 四进程。边缘统一用 <b>envoy 独立 Deployment</b>，
+      不用 nginx、不用 istio sidecar。</p>
+  </section>
+
+  <h2 class="sec">01 拓扑</h2>
+  <div class="figure rv">
+    <svg viewBox="0 0 1040 430" role="img" aria-label="k3s 部署拓扑">
+      <!-- client -->
+      <g class="node g" style="animation-delay:.05s">
+        <rect x="20" y="30" width="120" height="46" rx="8" fill="rgba(244,114,182,.14)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="36" y="58">浏览器 / CLI</text>
+      </g>
+
+      <!-- edge namespace -->
+      <rect x="160" y="14" width="860" height="150" rx="12" fill="rgba(251,191,36,.05)" stroke="#fbbf24" stroke-opacity=".3" stroke-dasharray="6 5"/>
+      <text class="title" x="176" y="34">ns: star-system (edge 部分)</text>
+      <g class="node g" style="animation-delay:.15s">
+        <rect x="176" y="48" width="200" height="96" rx="9" fill="rgba(251,191,36,.14)" stroke="#fbbf24" stroke-opacity=".6"/>
+        <text x="192" y="70">envoy (边缘)</text>
+        <text class="sub2" x="192" y="88">8443 TLS · 15090 ready</text>
+        <text class="sub2" x="192" y="104">15001 admin</text>
+        <text class="sub2" x="192" y="120">TLS cert ← SDS</text>
+        <text class="sub2" x="192" y="136">runAsNonRoot 65532</text>
+      </g>
+
+      <!-- app services -->
+      <rect x="400" y="180" width="620" height="140" rx="12" fill="rgba(56,225,255,.04)" stroke="#38e1ff" stroke-opacity=".25" stroke-dasharray="6 5"/>
+      <text class="title" x="416" y="200">ns: star-system (业务)</text>
+      <g class="node g" style="animation-delay:.25s">
+        <rect x="416" y="212" width="180" height="88" rx="9" fill="rgba(91,140,255,.16)" stroke="#5b8cff" stroke-opacity=".6"/>
+        <text x="432" y="234">star-api-rest</text>
+        <text class="sub2" x="432" y="252">:8081 · NodePort 30081</text>
+        <text class="sub2" x="432" y="268">readiness/liveness TCP</text>
+        <text class="sub2" x="432" y="284">50 路由 / 16 组</text>
+      </g>
+      <g class="node g" style="animation-delay:.35s">
+        <rect x="608" y="212" width="180" height="88" rx="9" fill="rgba(91,140,255,.16)" stroke="#5b8cff" stroke-opacity=".6"/>
+        <text x="624" y="234">star-mcp</text>
+        <text class="sub2" x="624" y="252">16 tools · 22 handlers</text>
+        <text class="sub2" x="624" y="268">stdio / streamable HTTP</text>
+        <text class="sub2" x="624" y="284">4 resources · 5 prompts</text>
+      </g>
+      <g class="node g" style="animation-delay:.45s">
+        <rect x="800" y="212" width="204" height="88" rx="9" fill="rgba(91,140,255,.16)" stroke="#5b8cff" stroke-opacity=".6"/>
+        <text x="816" y="234">star-ops</text>
+        <text class="sub2" x="816" y="252">:8082 · /actuator/*</text>
+        <text class="sub2" x="816" y="268">ops_cluster / ops_log</text>
+        <text class="sub2" x="816" y="284">ops_metrics</text>
+      </g>
+
+      <!-- bff namespace -->
+      <rect x="160" y="340" width="400" height="76" rx="12" fill="rgba(167,139,250,.05)" stroke="#a78bfa" stroke-opacity=".3" stroke-dasharray="6 5"/>
+      <text class="title" x="176" y="360">ns: star</text>
+      <g class="node g" style="animation-delay:.55s">
+        <rect x="176" y="368" width="170" height="40" rx="8" fill="rgba(167,139,250,.16)" stroke="#a78bfa" stroke-opacity=".6"/>
+        <text x="192" y="393">bff-envoy :8080</text>
+      </g>
+      <g class="node g" style="animation-delay:.6s">
+        <rect x="360" y="368" width="180" height="40" rx="8" fill="rgba(91,140,255,.16)" stroke="#5b8cff" stroke-opacity=".6"/>
+        <text x="376" y="393">bff (rust) :3000</text>
+      </g>
+
+      <!-- canvas -->
+      <rect x="580" y="340" width="440" height="76" rx="12" fill="rgba(244,114,182,.05)" stroke="#f472b6" stroke-opacity=".3" stroke-dasharray="6 5"/>
+      <text class="title" x="596" y="360">ns: star-system (canvas)</text>
+      <text class="sub2" x="596" y="382">engine 8080 · domain-canvas 8081 · realtime 8082 + WSS 8083 · game 8084</text>
+      <text class="sub2" x="596" y="402">istio-injection: disabled（显式禁用）</text>
+
+      <g>
+        <path class="edge" d="M140 53 L176 96"/>
+        <path class="edge" d="M276 144 L506 144 L506 212"/>
+        <path class="edge" d="M276 144 L698 144 L698 212"/>
+        <path class="edge" d="M276 144 L902 144 L902 212"/>
+        <path class="edge" d="M261 388 L360 388"/>
+      </g>
+    </svg>
+    <div class="legend">
+      <span><i style="background:#fbbf24"></i>边缘（envoy 独立 Deployment）</span>
+      <span><i style="background:#5b8cff"></i>业务服务</span>
+      <span><i style="background:#a78bfa"></i>BFF</span>
+      <span><i style="background:#f472b6"></i>Canvas / 客户端</span>
+    </div>
+  </div>
+
+  <h2 class="sec">02 envoy 的 5 条业务路由</h2>
+  <p>边缘不做业务判断，只做前缀分流。<b>不在白名单的一律 404</b>，没有隐式兜底——这条让"某个前缀配错了"变成显式故障，
+    而不是悄悄穿透到某个不该暴露的服务。</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>前缀</th><th>目标 cluster</th><th>超时</th><th>额外策略</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">/api/v1/</td><td class="mono">star_api_rest_cluster :8081</td><td class="mono">30s</td>
+        <td>重试 <code>5xx,reset,connect-failure</code> × 3，per-try 5s；熔断 1024 连接/请求/挂起</td></tr>
+      <tr><td class="mono">/oauth/</td><td class="mono">star_api_rest_cluster :8081</td><td class="mono">10s</td><td>授权流程短超时</td></tr>
+      <tr><td class="mono">/mcp/</td><td class="mono">star_mcp_cluster</td><td class="mono">60s</td><td>MCP 调用长超时</td></tr>
+      <tr><td class="mono">/ws/</td><td class="mono">star_api_rest_cluster :8081</td><td class="mono">0s</td><td>WebSocket upgrade，长连接不设超时</td></tr>
+      <tr><td class="mono">/actuator/</td><td class="mono">star_ops_cluster :8082</td><td class="mono">5s</td><td>健康与指标，短超时</td></tr>
+      <tr><td class="mono">/</td><td class="mono">—</td><td>—</td><td><b>catch-all 404</b>（Not Found）</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note ok">
+    <b>TLS 走 SDS 自动轮换：</b>证书由 cert-manager 签发，envoy 通过 <code>sds_cluster</code>（gRPC，:8081）拉取，
+    配置里不落盘任何证书或密钥——符合"配置不存 secret"的硬约束。
+  </div>
+  <div class="note err">
+    <b>已发现的不一致（建议修）：</b>envoy 的 <code>star_mcp_cluster</code> 指向 <strong>port 3000</strong>，
+    而 <code>star-mcp</code> 二进制自己的默认 bind 是 <code>127.0.0.1:8080</code>（可用 <code>STAR_MCP_BIND_ADDR</code> 覆盖）。
+    两者只有在部署时显式把 <code>STAR_MCP_BIND_ADDR</code> 设成 <code>:3000</code> 才能对上；
+    现有 k3s-local 资源里<b>没有</b>为 star-mcp 提供 Deployment，因此这条路由当前无后端。
+    这类"配置与代码默认值不一致"的点，光看任一侧都发现不了——两处必须一起看。
+  </div>
+
+  <h2 class="sec">03 端口全表</h2>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>组件</th><th>namespace</th><th>端口</th><th>类型</th><th>健康检查</th><th>来源</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">envoy (边缘)</td><td class="mono">star-system</td><td class="mono">8443 / 15090 / 15001</td><td>ClusterIP</td><td>direct_response /ready + /healthz</td><td>envoy/deployment.yaml</td></tr>
+      <tr><td class="mono">star-api-rest</td><td class="mono">star-system</td><td class="mono">8081（NodePort 30081）</td><td>NodePort</td><td>TCP 8081，2s 起 / 5s 周期</td><td>star-api-rest-deploy.yaml</td></tr>
+      <tr><td class="mono">star-mcp</td><td class="mono">—</td><td class="mono">8080 默认 / 3000 集群</td><td>—</td><td><code>/ready</code></td><td>main.rs + envoy configmap</td></tr>
+      <tr><td class="mono">star-ops</td><td class="mono">star-system</td><td class="mono">8082</td><td>—</td><td><code>/ready</code></td><td>envoy configmap cluster</td></tr>
+      <tr><td class="mono">bff</td><td class="mono">star</td><td class="mono">3000（Service 80→3000）</td><td>ClusterIP</td><td>TCP 3000，2s 起 / 5s；liveness 5s / 10s</td><td>bff-deployment.yaml</td></tr>
+      <tr><td class="mono">bff-envoy</td><td class="mono">star</td><td class="mono">8080（Service 80→8080）</td><td>ClusterIP</td><td>admin 9901</td><td>bff-deployment.yaml</td></tr>
+      <tr><td class="mono">canvas-engine</td><td class="mono">star-system</td><td class="mono">8080</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
+      <tr><td class="mono">domain-canvas</td><td class="mono">star-system</td><td class="mono">8081</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
+      <tr><td class="mono">canvas-realtime</td><td class="mono">star-system</td><td class="mono">8082 + 8083 (WSS)</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
+      <tr><td class="mono">canvas-game</td><td class="mono">star-system</td><td class="mono">8084</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
+      <tr><td class="mono">canvas-game</td><td class="mono">gm (其他)</td><td class="mono">8787 / 5173 / 4173</td><td>NodePort</td><td>—</td><td>canvas-game-k3s.yaml</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 class="sec">04 容器安全基线</h2>
+  <p>所有 Deployment 统一施加的 <code>securityContext</code>，这是可验证的安全下界：</p>
+  <div class="grid g2 rv">
+    <div class="card">
+      <h4>四个强制项</h4>
+      <p class="mono" style="font-size:12.5px;line-height:2.1">
+        allowPrivilegeEscalation: <b>false</b><br>
+        readOnlyRootFilesystem: <b>true</b><br>
+        runAsNonRoot: <b>true</b> · runAsUser: <b>65532</b><br>
+        capabilities.drop: <b>ALL</b>
+      </p>
+    </div>
+    <div class="card">
+      <h4>资源与显式声明</h4>
+      <p class="mono" style="font-size:12.5px;line-height:2.1">
+        requests: 100m CPU / 128Mi<br>
+        limits: 500m CPU / 512Mi<br>
+        istio sidecar: <b>sidecar.istio.io/inject: "false"</b><br>
+        镜像: canvas 走 GHCR :dev；本地服务走 :local + Never
+      </p>
+    </div>
+  </div>
+  <div class="note">
+    <b>为什么显式写 <code>istio-injection: false</code>：</b>namespace 层的 <code>istio-injection: disabled</code> 标注在 canvas yaml 里已存在，
+    但 Deployment 上再显式声明一次，可以避免"后来有人给 namespace 打开了注入"导致所有容器被塞进 sidecar。
+    架构决策（envoy 独立 Deployment，不用 sidecar）应该写在<b>每个 Deployment 上</b>，而不只写在文档里。
+  </div>
+
+  <h2 class="sec">05 Helm chart 的真实状态</h2>
+  <div class="note warn">
+    <b>不要把 <code>deploy/helm/star</code> 当成可用发布路径。</b>该 chart 目前只有少量模板
+    （<code>NOTES.txt</code> / <code>_helpers.tpl</code> / <code>secret.yaml</code> 等占位），
+    <b>8 个服务里只有 star-api-rest 有真实可运行的 manifest</b>。其余 crate 多数只有 <code>lib.rs</code> 没有 <code>main.rs</code>
+    （context / sa / sse / webhook / cache / saga），<code>star-cli</code> 与 <code>star-ops</code> 是 CLI / 运维入口而非常驻服务，
+    所以没有对应 Deployment。<b>当前唯一诚实的部署路径是 <code>deploy/k3s-local</code>（kustomize）。</b>
+  </div>
+
+  <h2 class="sec">06 本地拉起顺序 <span class="badge b-warn">有顺序要求</span></h2>
+  <div class="stepwrap" data-stepper data-interval="2600" tabindex="0" aria-label="本地拉起顺序">
+    <div class="stepbar">
+      <button class="btn" data-prev>←</button><button class="btn" data-next>→</button>
+      <button class="btn ghost" data-play>▶ 自动播放</button>
+      <div class="progress" data-progress><i></i></div>
+      <span class="sub mono" data-label>1 / 6</span>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="sh"><span class="idx">1</span> 检查 container runtime 就绪</div>
+        <div class="sd">apply 任何 yaml 之前，先确认 k3s 没有持续输出 "Skipping pod sync"。非 0 就先 <code>restart k3s</code>。容器运行时就绪前 apply 的 pod 会 100% 卡 Pending（与 namespace 无关）。</div></div>
+      <div class="step"><div class="sh"><span class="idx">2</span> 重启后等 60s</div>
+        <div class="sd">k3s 拉起后 kubelet 子组件异步就绪。立即 apply 会撞上 30-60s 窗口期，表现为"所有 pod 都 Pending"。</div></div>
+      <div class="step"><div class="sh"><span class="idx">3</span> 先 disable port-forward 服务</div>
+        <div class="sd"><code>Restart=on-failure</code> 的 systemd user service 会在 pod 未 Ready 时以 5s 周期疯狂重启，并刷出大量 "no route to host" 502 噪音。apply deployment 前先 <code>disable</code>。</div></div>
+      <div class="step"><div class="sh"><span class="idx">4</span> 安装 sealed secrets</div>
+        <div class="sd">用 <code>install-sealed-secrets.sh</code> 装控制器与证书，再解封 secret。仓库里不提交明文 secret。</div></div>
+      <div class="step"><div class="sh"><span class="idx">5</span> kustomize build + apply</div>
+        <div class="sd"><code>deploy/k3s-local/kustomization.yaml</code> 聚合 3 个资源：bff-deployment / star-api-rest-deploy / envoy/。注意它<b>刻意跨两个 namespace</b>，没有 base overlay。</div></div>
+      <div class="step"><div class="sh"><span class="idx">6</span> 验证后再 enable port-forward</div>
+        <div class="sd">pod Ready 之后再 <code>enable --now</code>，然后按端口表逐个探活：8443 → 8081 → 3000 → 8080。</div></div>
+    </div>
+  </div>
+
+  <details class="ev">
+    <summary>证据：拓扑、端口与顺序的出处</summary>
+    <div class="evbody">
+      <ul>
+        <li>envoy 路由 / cluster / 超时 / 熔断 / SDS：<code>deploy/k3s-local/envoy/configmap.yaml</code>。</li>
+        <li>star-api-rest Deployment + Service + NodePort：<code>deploy/k3s-local/star-api-rest-deploy.yaml</code>（含 namespace <code>star-system</code>）。</li>
+        <li>BFF + bff-envoy + 显式 <code>sidecar.istio.io/inject: "false"</code>：<code>deploy/k3s-local/bff-deployment.yaml</code>（ns <code>star</code>）。</li>
+        <li>canvas 四进程端口与镜像：<code>deploy/canvas-game-k3s.yaml</code>。</li>
+        <li>Helm chart 现状：<code>deploy/helm/star/templates</code> 实际内容 + <code>star-api-rest-deploy.yaml</code> 头部注释（明写 chart 为 stub）。</li>
+        <li>拉起顺序：本地实证得出的 3 条防御（container runtime 检查 / 60s 等待 / port-forward 先 disable），已固化进 <code>docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md</code>。</li>
+        <li>star-mcp 默认 bind：<code>crates/star-mcp/src/main.rs</code>（<code>--bind-addr</code> 默认 <code>127.0.0.1:8080</code>，env <code>STAR_MCP_BIND_ADDR</code>）。</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 07 部署拓扑 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>下一册：<a href="08-guardrails.html">守门与 CI</a>。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

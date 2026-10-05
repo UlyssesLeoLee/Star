@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 总览</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <div class="eyebrow">arch-live · 动态架构文档</div>
+    <h1>Star 是怎么被构造出来的</h1>
+    <p class="lead">这套文档不描述"应该是什么样"，只描述<strong>此刻代码里真实是什么样</strong>：每一张图都可以点开看证据文件，
+      每个数字都来自仓库扫描。数据基线：<code>commit 9e25f6b5</code>（<code>dev</code> 分支，2026-10-05 20:52 JST 快照）。</p>
+    <p class="lead sub">读法建议：先看本页全景 → 用「Crate 地图」确认代码归属 → 用「请求生命周期」和「Agent 闭环」看运行时怎么跑 →
+      涉及数据/部署/守门时再跳对应页。每页底部都有 <span class="badge b-mute">证据</span> 折叠块，可核对到 file:line。</p>
+  </section>
+
+  <!-- ============ 数字墙 ============ -->
+  <h2 class="sec">01 规模基线 <span class="badge b-ok">实测扫描</span></h2>
+  <p class="sub">下列数字由 <code>docs/arch-live/README.md</code> 记录的扫描命令产出，并由 <code>scripts/automation/arch_live_doc_check.py</code> 在 CI 前做漂移校验。</p>
+  <div class="grid g4 rv">
+    <div class="stat"><span class="dot"></span><div class="n" data-count="105" data-fact="crates_total">105</div><div class="k">Rust crate（workspace member 目录）</div><div class="m">crates/*</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="40" data-fact="domain_crates">40</div><div class="k">DDD bounded context（domain-*）</div><div class="m">domain-*</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="31" data-fact="star_crates">31</div><div class="k">平台能力 crate（star-*）</div><div class="m">star-*</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="3" data-fact="wasm_crates">3</div><div class="k">WASM 桥（前端复用 Rust 纯函数）</div><div class="m">*-wasm</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="741" data-fact="rust_files">741</div><div class="k">Rust 源文件</div><div class="m">*.rs</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="251311" data-fact="rust_loc">251311</div><div class="k">Rust 代码行（含空行）</div><div class="m">crates/**/*.rs</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="43" data-fact="migrations">43</div><div class="k">DB migration 文件</div><div class="m">db/migrations/*.sql</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="150" data-fact="db_tables">150</div><div class="k">CREATE TABLE</div><div class="m">6 schema</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="525" data-fact="db_policies">525</div><div class="k">CREATE POLICY（RLS）</div><div class="m">行级安全</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="50" data-fact="rest_routes">50</div><div class="k">REST 路由模板（生产路由组）</div><div class="m">star-api-rest</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="16" data-fact="mcp_tools">16</div><div class="k">MCP tool</div><div class="m">JSON-RPC 2.0</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="57" data-fact="fe_pages">57</div><div class="k">前端 page.tsx</div><div class="m">Next.js App Router</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="11" data-fact="ci_workflows">11</div><div class="k">CI workflow</div><div class="m">.github/workflows</div></div>
+  </div>
+
+  <div class="note warn" style="margin-top:14px">
+    <b>读到数字先看这条：</b>本仓有大量「阶段 1 骨架 / PoC stub」crate（源码 1–3 个文件）。<span class="badge b-warn">40 domain-*</span> 里
+    既有 <code>domain-report</code>（31 文件）这种实装较厚的，也有 <code>domain-audit</code> / <code>domain-ai</code> 这种 1 文件骨架。
+    文件数分布见 <a href="01-crate-map.html">Crate 地图</a>，<b>不要用 crate 数量代表实现度</b>。
+  </div>
+
+  <!-- ============ 全景图 ============ -->
+  <h2 class="sec">02 系统全景 <span class="badge b-mute">悬停任一节点看细节</span></h2>
+  <p>六层从上到下：<b>交互面 → 边缘代理 → 服务进程 → 适配层 → crate 层 → 数据面</b>。虚线箭头表示调用/依赖方向（永远向下，领域层不反向依赖服务层）。</p>
+
+  <div class="figure rv">
+    <svg viewBox="0 0 1060 660" role="img" aria-label="Star 六层架构全景图">
+      <defs>
+        <linearGradient id="gfe" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#38e1ff" stop-opacity=".22"/><stop offset="1" stop-color="#f472b6" stop-opacity=".12"/>
+        </linearGradient>
+        <linearGradient id="gedge" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#fbbf24" stop-opacity=".24"/><stop offset="1" stop-color="#fb7185" stop-opacity=".10"/>
+        </linearGradient>
+        <linearGradient id="gsvc" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#5b8cff" stop-opacity=".22"/><stop offset="1" stop-color="#a78bfa" stop-opacity=".12"/>
+        </linearGradient>
+        <linearGradient id="gdom" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#38e1ff" stop-opacity=".16"/><stop offset="1" stop-color="#34d399" stop-opacity=".10"/>
+        </linearGradient>
+        <linearGradient id="gdata" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#34d399" stop-opacity=".18"/><stop offset="1" stop-color="#fbbf24" stop-opacity=".10"/>
+        </linearGradient>
+      </defs>
+
+      <!-- 层标签 -->
+      <g>
+        <text class="lbl" x="8" y="66">交互面</text>
+        <text class="lbl" x="8" y="186">边缘</text>
+        <text class="lbl" x="8" y="300">服务进程</text>
+        <text class="lbl" x="8" y="404">适配</text>
+        <text class="lbl" x="8" y="500">crate</text>
+        <text class="lbl" x="8" y="600">数据面</text>
+      </g>
+      <g stroke="#24304f" stroke-dasharray="2 6">
+        <line x1="92" y1="20" x2="92" y2="640"/>
+      </g>
+
+      <!-- L1 交互面 -->
+      <g class="node g" style="animation-delay:.05s">
+        <rect x="120" y="40" width="290" height="52" rx="9" fill="url(#gfe)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="136" y="62">Next.js 16 · App Router</text>
+        <text class="sub2" x="136" y="80">57 page.tsx · 205 component files</text>
+      </g>
+      <g class="node g" style="animation-delay:.12s">
+        <rect x="430" y="40" width="250" height="52" rx="9" fill="url(#gfe)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="446" y="62">Tauri 2.0 桌面 PoC</text>
+        <text class="sub2" x="446" y="80">crates/star-desktop/src-tauri</text>
+      </g>
+      <g class="node g" style="animation-delay:.19s">
+        <rect x="700" y="40" width="350" height="52" rx="9" fill="url(#gfe)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="716" y="62">Git worktree · 一 lane 一 branch</text>
+        <text class="sub2" x="716" y="80">.worktrees/ · Agent 直接 checkout 到 task</text>
+      </g>
+
+      <!-- L2 边缘 -->
+      <g class="node g" style="animation-delay:.26s">
+        <rect x="120" y="150" width="930" height="56" rx="9" fill="url(#gedge)" stroke="#fbbf24" stroke-opacity=".55"/>
+        <text x="136" y="172">envoy 边缘（独立 Deployment，0 istio sidecar）</text>
+        <text class="sub2" x="136" y="190">8443 TLS 业务 listener · 15090 /healthz /ready · 15001 admin · 5 前缀路由 · catch-all 404</text>
+      </g>
+
+      <!-- L3 服务 -->
+      <g class="node g" style="animation-delay:.33s">
+        <rect x="120" y="256" width="220" height="58" rx="9" fill="url(#gsvc)" stroke="#5b8cff" stroke-opacity=".55"/>
+        <text x="134" y="278">star-api-rest :8081</text>
+        <text class="sub2" x="134" y="296">50 路由 / 16 路由组 / OAuth2+PKCE</text>
+      </g>
+      <g class="node g" style="animation-delay:.40s">
+        <rect x="356" y="256" width="220" height="58" rx="9" fill="url(#gsvc)" stroke="#5b8cff" stroke-opacity=".55"/>
+        <text x="370" y="278">bff :3000</text>
+        <text class="sub2" x="370" y="296">worktree_canvas · collaboration WSS</text>
+      </g>
+      <g class="node g" style="animation-delay:.47s">
+        <rect x="592" y="256" width="220" height="58" rx="9" fill="url(#gsvc)" stroke="#5b8cff" stroke-opacity=".55"/>
+        <text x="606" y="278">star-mcp</text>
+        <text class="sub2" x="606" y="296">16 tools · 22 handlers · stdio/http</text>
+      </g>
+      <g class="node g" style="animation-delay:.54s">
+        <rect x="828" y="256" width="222" height="58" rx="9" fill="url(#gsvc)" stroke="#5b8cff" stroke-opacity=".55"/>
+        <text x="842" y="278">star-ops :8082</text>
+        <text class="sub2" x="842" y="296">/actuator/* · ops metrics</text>
+      </g>
+
+      <!-- L4 适配 -->
+      <g class="node g" style="animation-delay:.61s">
+        <rect x="120" y="360" width="930" height="56" rx="9" fill="url(#gdom)" stroke="#38e1ff" stroke-opacity=".5"/>
+        <text x="136" y="382">api gateway crate（ApiGateway / ApiQuery Port trait） + infrastructure adapters</text>
+        <text class="sub2" x="136" y="400">chat · completion · metering · agent_run · arg · canvas_collab · diff_annotation · PgAdapter 池</text>
+      </g>
+
+      <!-- L5 crate -->
+      <g class="node g" style="animation-delay:.68s">
+        <rect x="120" y="456" width="455" height="60" rx="9" fill="url(#gdom)" stroke="#38e1ff" stroke-opacity=".5"/>
+        <text x="136" y="478">40 × domain-* （DDD bounded context）</text>
+        <text class="sub2" x="136" y="496">work-item / worktree / identity / project / hook / llm / scm / …</text>
+      </g>
+      <g class="node g" style="animation-delay:.75s">
+        <rect x="595" y="456" width="455" height="60" rx="9" fill="url(#gdom)" stroke="#34d399" stroke-opacity=".5"/>
+        <text x="611" y="478">31 × star-* （平台能力）</text>
+        <text class="sub2" x="611" y="496">context / mutex / eventbus / taskqueue / saga / telemetry</text>
+      </g>
+
+      <!-- L6 数据 -->
+      <g class="node g" style="animation-delay:.82s">
+        <rect x="120" y="560" width="300" height="58" rx="9" fill="url(#gdata)" stroke="#34d399" stroke-opacity=".55"/>
+        <text x="134" y="582">PostgreSQL</text>
+        <text class="sub2" x="134" y="600">6 schema · 150 表 · 525 RLS</text>
+      </g>
+      <g class="node g" style="animation-delay:.89s">
+        <rect x="436" y="560" width="300" height="58" rx="9" fill="url(#gdata)" stroke="#34d399" stroke-opacity=".55"/>
+        <text x="450" y="582">SQLite WAL</text>
+        <text class="sub2" x="450" y="600">star-taskqueue 任务队列</text>
+      </g>
+      <g class="node g" style="animation-delay:.96s">
+        <rect x="752" y="560" width="298" height="58" rx="9" fill="url(#gdata)" stroke="#34d399" stroke-opacity=".55"/>
+        <text x="766" y="582">Redis Streams / file_system</text>
+        <text class="sub2" x="766" y="600">event-bus 抽象 · 事件 outbox</text>
+      </g>
+
+      <!-- 跨层箭头 -->
+      <g>
+        <path class="edge" d="M265 92 L265 150"/>
+        <path class="edge" d="M555 92 L555 150"/>
+        <path class="edge" d="M875 92 L875 150"/>
+        <path class="edge" d="M230 206 L230 256"/>
+        <path class="edge" d="M466 206 L466 256"/>
+        <path class="edge" d="M702 206 L702 256"/>
+        <path class="edge" d="M938 206 L938 256"/>
+        <path class="edge" d="M585 314 L585 360"/>
+        <path class="edge" d="M347 416 L347 456"/>
+        <path class="edge" d="M822 416 L822 456"/>
+        <path class="edge" d="M270 516 L270 560"/>
+        <path class="edge" d="M822 516 L822 560"/>
+        <path class="edge" d="M900 516 L900 560"/>
+      </g>
+    </svg>
+    <div class="legend">
+      <span><i style="background:#f472b6"></i>交互面</span>
+      <span><i style="background:#fbbf24"></i>边缘代理</span>
+      <span><i style="background:#5b8cff"></i>服务进程</span>
+      <span><i style="background:#38e1ff"></i>领域 / 适配</span>
+      <span><i style="background:#34d399"></i>数据面</span>
+      <span><i style="border-top:2px dashed #35507f;width:22px;height:0;border-radius:0;vertical-align:3px"></i>调用方向（单向向下）</span>
+    </div>
+  </div>
+
+  <!-- ============ 构造链 ============ -->
+  <h2 class="sec">03 一次动作是怎么被"构造"出来的</h2>
+  <p>整条链路是同一条，不因入口不同而变——这是本仓最重要的结构事实：<b>UI、CLI、MCP 三个入口共用同一套 domain service 与同一张表</b>。</p>
+
+  <div class="stepwrap" data-stepper data-interval="2400" tabindex="0" aria-label="请求生命周期步骤">
+    <div class="stepbar">
+      <button class="btn" data-prev>← 上一步</button>
+      <button class="btn" data-next>下一步 →</button>
+      <button class="btn ghost" data-play>▶ 自动播放</button>
+      <div class="progress" data-progress><i></i></div>
+      <span class="sub mono" data-label>1 / 7</span>
+    </div>
+
+    <div class="steps">
+    <div class="step">
+      <div class="sh"><span class="idx">1</span> 触发：三个入口之一 <span class="badge b-fe">Next.js</span> <span class="badge b-star">star-cli</span> <span class="badge b-star">star-mcp</span></div>
+      <div class="sd">同一个业务动作（例：把 Work Item 推进到 review）可以由页面点击、CLI 子命令、或 MCP tool 触发。三者只负责"把意图翻译成协议"，不含业务判断。</div>
+      <div class="sf">frontend/src/app/(app)/.../work-items/ · crates/star-cli/src/commands/task.rs · crates/star-mcp/src/tools/</div>
+    </div>
+    <div class="step">
+      <div class="sh"><span class="idx">2</span> 边缘路由：envoy 按前缀分流</div>
+      <div class="sd">5 条前缀规则决定落到哪个进程；带重试策略与熔断阈值；不在白名单的一律 404，不做隐式兜底。</div>
+      <div class="sf">deploy/k3s-local/envoy/configmap.yaml → /api/v1/ /oauth/ /ws/ → star_api_rest · /mcp/ → star_mcp · /actuator/ → star_ops</div>
+    </div>
+    <div class="step">
+      <div class="sh"><span class="idx">3</span> 鉴权：OAuth2 + PKCE → AuthUser</div>
+      <div class="sd">校验通过后产出 <code>AuthUser { tenant_id, user_id, scope }</code>；每个 handler 还要再做 <code>require_scope()</code> 与 actor 有效性检查。scope 缺失直接 403。</div>
+      <div class="sf">crates/star-api-rest/src/auth/oauth/{middleware,pkce,keypair}.rs · src/group_api.rs:629 require_scope</div>
+    </div>
+    <div class="step">
+      <div class="sh"><span class="idx">4</span> 权限：RLS 前置绑定 tenant</div>
+      <div class="sd">请求进入事务后第一条 SQL 就是 <code>set_config('app.tenant_id', …)</code>，之后所有查询自动被行级安全策略过滤。租户隔离不是应用层约定，是数据库强制的。</div>
+      <div class="sf">crates/star-api-rest/src/group_api.rs:584 set_tenant · db/migrations/*-rls-*.sql（525 条 POLICY）</div>
+    </div>
+    <div class="step">
+      <div class="sh"><span class="idx">5</span> 角色绑定：project_role_binding 复核</div>
+      <div class="sd">校验 <code>(tenant, project, user)</code> 是否存在有效绑定（<code>valid_from ≤ now() AND valid_to IS NULL</code>），拿不到即 404。权限 = OAuth scope ∩ 项目绑定 ∩ RLS 策略，三层同时成立。</div>
+      <div class="sf">crates/star-api-rest/src/group_api.rs:596 active_binding · permission.project_role_binding</div>
+    </div>
+    <div class="step">
+      <div class="sh"><span class="idx">6</span> 领域服务 + 事务 + outbox</div>
+      <div class="sd">domain-* crate 执行业务规则；写操作在单事务内落"当前态表 + 审计表 + outbox 表"，保证"状态变了但事件丢了"不会发生。</div>
+      <div class="sf">multica.task_lifecycle_current / _audit / task_run_outbox · star-mutex DomainMutex + VersionCAS</div>
+    </div>
+    <div class="step">
+      <div class="sh"><span class="idx">7</span> 回流：SSE / WS 推给所有订阅方</div>
+      <div class="sd">响应体立即返回；变化通过 SSE hub 或 WebSocket 广播，Canvas、BI、审计视图被动更新，无需轮询。UI 因此是"事件驱动"而不是"定时刷新"。</div>
+      <div class="sf">crates/api/src/arg/sse_hub.rs · bff/src/collaboration/wss_hub.rs · crates/api/src/chat.rs</div>
+    </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>为什么这条链重要：</b>它是"多入口一致性"的物理保证。任何绕过第 3–5 步（鉴权 / 权限 / RLS）直接写表的代码，都会同时破坏租户隔离和审计完整性。
+    <a href="08-guardrails.html">守门与 CI</a> 里列了防止这类旁路的规则。
+  </div>
+
+  <!-- ============ 页面索引 ============ -->
+  <h2 class="sec">04 分册索引</h2>
+  <div class="grid gauto rv">
+    <a class="card" href="01-crate-map.html" style="text-decoration:none">
+      <h4>01 · Crate 地图 <span class="badge b-domain">105</span></h4>
+      <p>105 个 crate 按 7 个家族分组，可搜索/按家族过滤，附每个家族的文件数与代表 crate。回答"这段逻辑该写在哪"。</p>
+    </a>
+    <a class="card" href="02-navigation-model.html" style="text-decoration:none">
+      <h4>02 · 导航模型 <span class="badge b-star">Project → Run → Worktree</span></h4>
+      <p>主导航层级、前端路由树、16 个 REST 路由组逐组展开。回答"一个页面/一个接口该挂在哪"。</p>
+    </a>
+    <a class="card" href="03-request-lifecycle.html" style="text-decoration:none">
+      <h4>03 · 请求生命周期 <span class="badge b-infra">逐步动画</span></h4>
+      <p>13 步完整链路：边缘分流 → OAuth2 → RLS → 领域规则 → 锁 → 事务 → outbox → SSE。附真实 SQL 与错误码。</p>
+    </a>
+    <a class="card" href="04-agent-runtime.html" style="text-decoration:none">
+      <h4>04 · Agent 执行闭环 <span class="badge b-wasm">Run 快照 → 证据</span></h4>
+      <p>Engineering Run 固定 profile/digest、Hook 门、CLI session、task run 状态机、资源预算与取消。回答"Agent 到底被什么约束"。</p>
+    </a>
+    <a class="card" href="05-worktree-canvas.html" style="text-decoration:none">
+      <h4>05 · Canvas / ARG <span class="badge b-edge">14 + 3 + 3</span></h4>
+      <p>worktree-canvas 14 个同级 crate、3 个 WASM 桥、ARG 三层（Data/Bridge/Effect）、canvas 四进程端口图。</p>
+    </a>
+    <a class="card" href="06-data-model.html" style="text-decoration:none">
+      <h4>06 · 数据模型 <span class="badge b-infra">150 表</span></h4>
+      <p>6 个 schema 逐表统计，W/T/M 三类横展、审计与 SCD 策略、幂等表族。回答"这张表为什么长这样"。</p>
+    </a>
+    <a class="card" href="07-deploy-topology.html" style="text-decoration:none">
+      <h4>07 · 部署拓扑 <span class="badge b-edge">k3s + envoy</span></h4>
+      <p>namespace / Deployment / Service / 端口 / envoy 路由与熔断参数，附已发现的配置不一致点。</p>
+    </a>
+    <a class="card" href="08-guardrails.html" style="text-decoration:none">
+      <h4>08 · 守门与 CI <span class="badge b-err">fail-closed</span></h4>
+      <p>workspace lint 强制项、AGENTS 守门条款、10 个 workflow 的 8 个 job、每条门禁的实测判据。</p>
+    </a>
+  </div>
+
+  <details class="ev">
+    <summary>本页数字的采集命令（可复制复跑）</summary>
+    <div class="evbody">
+      <pre data-copy># crate 家族
+(Get-ChildItem crates -Directory).Count                                    # 105
+(Get-ChildItem crates -Directory | ? Name -like 'domain-*').Count          # 40
+(Get-ChildItem crates -Recurse -Filter *.rs -File).Count                    # 741
+# 数据面
+(Get-ChildItem db/migrations -Filter *.sql -File).Count                     # 43
+(Select-String db/migrations/*.sql -Pattern 'CREATE TABLE' -AllMatches).Count  # 150
+(Select-String db/migrations/*.sql -Pattern 'CREATE POLICY' -AllMatches).Count # 525
+# 路由 / 工具 / 前端
+(Select-String crates/star-api-rest/src/group_api/*.rs -Pattern '"/api/v1/').Count   # 50
+(Get-ChildItem crates/star-mcp/src/tools -Filter *.rs | ? Name -ne mod.rs).Count   # 16
+(Get-ChildItem frontend/src/app -Recurse -Filter page.tsx).Count             # 57
+(Get-ChildItem .github/workflows -File).Count                               # 10</pre>
+      <p>等价的一次性校验：<code>pwsh scripts/automation/arch_live_doc_check.py</code>（或 <code>python scripts/automation/arch_live_doc_check.py</code>）。</p>
+    </div>
+  </details>
+
+  <details class="ev">
+    <summary>证据：本页全景图每个节点对应的源文件</summary>
+    <div class="evbody">
+      <ul>
+        <li>交互面 — <code>frontend/package.json</code>（next 16.3.5 / react 19.3）、<code>crates/star-desktop/src-tauri</code>、<code>.worktrees/</code></li>
+        <li>边缘 — <code>deploy/k3s-local/envoy/{configmap,deployment,service}.yaml</code></li>
+        <li>服务进程 — <code>crates/star-api-rest/src/main.rs</code>（<code>STAR_API_REST_BIND_ADDR</code>）、<code>bff/</code>、<code>crates/star-mcp/src/main.rs</code>、<code>crates/star-ops/src/ops_api.rs</code></li>
+        <li>适配 — <code>crates/api/src/lib.rs</code>（<code>ApiGateway</code>/<code>ApiQuery</code> Port trait）、<code>crates/infrastructure/src/registry_real_pg.rs</code></li>
+        <li>crate — <code>Cargo.toml</code> members 段（105 member）</li>
+        <li>数据面 — <code>db/migrations/</code>、<code>crates/star-taskqueue/</code>、<code>crates/event-bus/src/</code>（Redis Streams abstraction）</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 动态架构文档 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>本套页面为纯静态 HTML + CSS + 原生 JS，零外部依赖，可离线 <code>file://</code> 打开。数字若与代码不符，说明文档已漂移——跑 <code>scripts/automation/arch_live_doc_check.py</code> 定位。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

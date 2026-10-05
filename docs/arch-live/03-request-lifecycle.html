@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 03 请求生命周期</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 03 · 运行时</div>
+    <h1>一个请求从边缘走到数据库，再走回来</h1>
+    <p class="lead">这页把一条写操作拆成 <strong>13 步</strong>，每步都标出对应的源文件、真实 SQL 与错误码。
+      点"自动播放"看它跑一遍；也可以用方向键（← →）逐步走。</p>
+  </section>
+
+  <h2 class="sec">01 全链路一图</h2>
+  <p class="sub">青色圆点是一个请求包，沿路径循环流动。三条横向泳道分别是<b>信任边界</b>。</p>
+  <div class="figure rv">
+    <svg viewBox="0 0 1040 330" role="img" aria-label="请求生命周期泳道图">
+      <text class="lbl" x="12" y="66">公网 / 客户端</text>
+      <text class="lbl" x="12" y="146">服务内（受信）</text>
+
+      <g class="node g" style="animation-delay:.05s">
+        <rect x="20" y="40" width="80" height="46" rx="8" fill="rgba(244,114,182,.14)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="34" y="68">UI/CLI</text>
+      </g>
+      <g class="node g" style="animation-delay:.15s">
+        <rect x="210" y="40" width="80" height="46" rx="8" fill="rgba(251,191,36,.16)" stroke="#fbbf24" stroke-opacity=".6"/>
+        <text x="224" y="68">envoy</text>
+      </g>
+      <g class="node g" style="animation-delay:.25s">
+        <rect x="390" y="40" width="80" height="46" rx="8" fill="rgba(91,140,255,.18)" stroke="#5b8cff" stroke-opacity=".6"/>
+        <text x="404" y="68">handler</text>
+      </g>
+      <g class="node g" style="animation-delay:.35s">
+        <rect x="570" y="40" width="80" height="46" rx="8" fill="rgba(56,225,255,.16)" stroke="#38e1ff" stroke-opacity=".6"/>
+        <text x="584" y="68">domain</text>
+      </g>
+      <g class="node g" style="animation-delay:.45s">
+        <rect x="750" y="40" width="80" height="46" rx="8" fill="rgba(52,211,153,.16)" stroke="#34d399" stroke-opacity=".6"/>
+        <text x="764" y="68">事务</text>
+      </g>
+      <g class="node g" style="animation-delay:.55s">
+        <rect x="930" y="40" width="90" height="46" rx="8" fill="rgba(52,211,153,.16)" stroke="#34d399" stroke-opacity=".6"/>
+        <text x="944" y="68">PG/RLS</text>
+      </g>
+
+      <g class="node g" style="animation-delay:.65s">
+        <rect x="120" y="120" width="130" height="60" rx="8" fill="rgba(24,35,66,.92)" stroke="#38e1ff" stroke-opacity=".45"/>
+        <text x="134" y="142">鉴权 · scope</text><text class="sub2" x="134" y="160">OAuth2 → AuthUser</text>
+      </g>
+      <g class="node g" style="animation-delay:.75s">
+        <rect x="300" y="120" width="130" height="60" rx="8" fill="rgba(24,35,66,.92)" stroke="#38e1ff" stroke-opacity=".45"/>
+        <text x="314" y="142">权限 · 绑定</text><text class="sub2" x="314" y="160">project_role_binding</text>
+      </g>
+      <g class="node g" style="animation-delay:.85s">
+        <rect x="480" y="120" width="130" height="60" rx="8" fill="rgba(24,35,66,.92)" stroke="#a78bfa" stroke-opacity=".5"/>
+        <text x="494" y="142">锁 · 幂等</text><text class="sub2" x="494" y="160">DomainMutex / CAS</text>
+      </g>
+      <g class="node g" style="animation-delay:.95s">
+        <rect x="660" y="120" width="130" height="60" rx="8" fill="rgba(24,35,66,.92)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="674" y="142">审计 · outbox</text><text class="sub2" x="674" y="160">单事务写入</text>
+      </g>
+      <g class="node g" style="animation-delay:1.05s">
+        <rect x="840" y="120" width="160" height="60" rx="8" fill="rgba(24,35,66,.92)" stroke="#38e1ff" stroke-opacity=".45"/>
+        <text x="854" y="142">SSE / WS 广播</text><text class="sub2" x="854" y="160">事件驱动刷新</text>
+      </g>
+
+      <path d="M60 70 L60 150 L250 150 L250 70 L430 70 L430 150 L610 150 L610 70 L790 70 L790 150 L980 150"
+            fill="none" stroke="#2b3a63" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M60 70 L60 150 L250 150 L250 70 L430 70 L430 150 L610 150 L610 70 L790 70 L790 150 L980 150"
+            fill="none" stroke="#38e1ff" stroke-width="1.6" stroke-dasharray="5 6" opacity=".85">
+        <animateMotion dur="11s" repeatCount="indefinite"
+          path="M60 70 L60 150 L250 150 L250 70 L430 70 L430 150 L610 150 L610 70 L790 70 L790 150 L980 150"/>
+      </path>
+    </svg>
+    <div class="legend">
+      <span><i style="background:#f472b6"></i>不可信输入（公网）</span>
+      <span><i style="background:#5b8cff"></i>应用进程</span>
+      <span><i style="background:#38e1ff"></i>安全/一致性关卡</span>
+      <span><i style="background:#34d399"></i>数据面</span>
+    </div>
+  </div>
+
+  <h2 class="sec">02 逐步演示</h2>
+  <div class="stepwrap" data-stepper data-interval="3000" tabindex="0" aria-label="请求生命周期 13 步">
+    <div class="stepbar">
+      <button class="btn" data-prev>← 上一步</button>
+      <button class="btn" data-next>下一步 →</button>
+      <button class="btn ghost" data-play>▶ 自动播放</button>
+      <div class="progress" data-progress><i></i></div>
+      <span class="sub mono" data-label>1 / 13</span>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="sh"><span class="idx">1</span> 入口收敛 <span class="badge b-warn">信任边界 ①</span></div>
+        <div class="sd">请求可能来自浏览器、CLI、MCP、Webhook。此时它<strong>完全不可信</strong>：没有解析出合法 bearer token 之前，handler 代码一行都不该跑。</div>
+        <div class="sf">envoy 只按 5 条前缀路由，不做业务判断；不在白名单的一律 404（无隐式兜底）</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">2</span> 边缘分流 + 重试</div>
+        <div class="sd">按前缀落到对应进程。<code>/api/v1/</code> 有重试策略：<code>retry_on 5xx,reset,connect-failure</code>，3 次，每次 5s 超时；该 cluster 还配了熔断阈值（max_connections / pending / requests = 1024）。</div>
+        <div class="sf">deploy/k3s-local/envoy/configmap.yaml · cluster star_api_rest_cluster</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">3</span> OAuth2 校验 → Claims → AuthUser</div>
+        <div class="sd">校验 bearer token（本地 keypair 验签，授权流程走 PKCE）。通过后从 Claims 构造 <code>AuthUser</code>，字段只有 4 个：<code>user_id</code>、<code>tenant_id</code>、<code>roles</code>、<code>scope</code>。</div>
+        <div class="sf">crates/star-api-rest/src/auth/oauth/{middleware,keypair,pkce}.rs · auth/mod.rs:From&lt;Claims&gt;</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">4</span> axum extractor 注入 actor</div>
+        <div class="sd">handler 签名里出现 <code>AuthenticatedUser(actor): AuthenticatedUser</code>，就意味着<strong>没有合法 token 的请求根本进不到这个函数</strong>。这是编译期保证，不是运行时约定。</div>
+        <div class="sf">pub struct AuthenticatedUser(pub AuthUser)  // axum FromRequestParts extractor</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">5</span> scope 与 role 校验 <span class="badge b-err">403</span></div>
+        <div class="sd"><code>require_scope(user, "worktree:read")</code> 按空白切分比对，缺任一即 403，并带 <code>WWW-Authenticate: Bearer … error="insufficient_scope"</code>。另有 <code>require_role()</code>。空 scope 拒绝一切（已有单测锁定该行为）。</div>
+        <div class="sf">auth/oauth/middleware.rs:629 require_scope · require_scope_with_empty_scope_denies_all</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">6</span> actor 有效性 <span class="badge b-err">401</span></div>
+        <div class="sd"><code>validate_actor()</code> 拒绝 nil 的 <code>user_id</code> 或 <code>tenant_id</code>。这一步存在的原因：nil UUID 能通过大部分类型检查，却会击穿所有按 tenant 过滤的查询——必须在入口拦住。</div>
+        <div class="sf">group_api.rs:622 validate_actor → GroupApiError::unauthorized()</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">7</span> 事务开始 + RLS 前置 <span class="badge b-infra">隔离点</span></div>
+        <div class="sd">进入事务后的第一条 SQL 就是把租户写进会话变量。<code>true</code> 表示事务局部（提交即失效，不污染连接池）。此后所有查询被行级安全策略强制过滤——租户隔离由数据库保证，不靠应用层自觉。</div>
+        <div class="sf"><code>SELECT set_config('app.tenant_id', $1, true)</code> — group_api.rs:584 set_tenant</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">8</span> 项目角色绑定复核 <span class="badge b-err">404</span></div>
+        <div class="sd">查 <code>permission.project_role_binding</code>，要求 <code>valid_from ≤ now() AND valid_to IS NULL</code>，并用 <code>FOR SHARE</code> 拿行锁防止并发改绑。查不到返回 <strong>404 而不是 403</strong>——避免通过状态码探测资源是否存在。</div>
+        <div class="sf">group_api.rs:596 active_binding · permission.project_role_binding</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">9</span> 领域规则执行</div>
+        <div class="sd">业务规则在 <code>domain-*</code> crate 内，通过 Port trait 调用；具体实现（InMemory / PG）由 <code>infrastructure</code> 的 registry 提供。状态机非法迁移在这里被拒，不会到 SQL 层。</div>
+        <div class="sf">ApiGateway / ApiQuery Port trait · crates/infrastructure/src/registry_real_pg.rs</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">10</span> 并发控制 <span class="badge b-wasm">多 Agent 关键</span></div>
+        <div class="sd">同一 Worktree 可能被多个 Agent 同时操作。三种手段并存：<code>DomainMutex</code> 语义锁、<code>VersionCAS</code> 乐观锁（版本号不匹配即冲突）、<code>PgAdvisoryLock</code> 数据库锁。所有获取都写 <code>LockAuditLogger</code>，冲突可事后复盘。</div>
+        <div class="sf">crates/star-mutex/src/ · worktree 响应含 <code>locked</code> / <code>git_lock.state</code> / <code>version</code> 字段</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">11</span> 单事务写三张表 <span class="badge b-infra">一致性</span></div>
+        <div class="sd">写操作在一个事务里落三样东西：<b>当前态</b>（如 <code>task_lifecycle_current</code>）、<b>审计</b>（<code>task_lifecycle_audit</code>）、<b>outbox</b>（<code>task_run_outbox</code>）。这样"状态改了但事件丢了"不可能发生——事件与状态同生共死。</div>
+        <div class="sf">multica.task_lifecycle_current / _audit / task_run_outbox · canvas_group_outbox · schedule_rule_outbox</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">12</span> 幂等键去重 <span class="badge b-warn">重放防护</span></div>
+        <div class="sd">重复提交由 command idempotency 表挡住：同 key 直接返回首次结果，不重复执行副作用。SCM 侧还区分了 <code>IdempotencyConflict</code>（同 key 不同内容 → 冲突错误），不是简单吞掉。</div>
+        <div class="sf">multica.task_command_idempotency · task_execution_run_idempotency · group_chat_idempotency</div>
+      </div>
+      <div class="step">
+        <div class="sh"><span class="idx">13</span> 返回 + 事件广播</div>
+        <div class="sd">响应体立即返回（Worktree 列表一次返回 human_state / machine_state / ahead / behind / dirty / health_score / risk_count / test_state / locked / archived / version 等字段）。变化通过 SSE / WS 推给订阅方，前端被动更新。</div>
+        <div class="sf">group_api.rs:540-582 响应映射 · crates/api/src/arg/sse_hub.rs · bff/src/collaboration/wss_hub.rs</div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">03 错误码语义 <span class="badge b-star">领域错误统一映射</span></h2>
+  <p>领域 crate 抛自己的错误类型，API 层统一映射成 <code>(code, source, retriable)</code> 三元组。
+    客户端应该看 <code>code</code>，不要匹配 HTTP 状态做业务分支。</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>code</th><th>source</th><th>retriable</th><th>典型来源</th><th>客户端应该做什么</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">POLICY_DENIED</td><td class="mono">Policy</td><td>否</td><td>PermissionDenied（5 个 domain 共用）</td><td>停止重试，提示权限不足</td></tr>
+      <tr><td class="mono">SCM_CONFLICT</td><td class="mono">External</td><td>否</td><td>ScmError::Conflict / IdempotencyConflict</td><td>提示同 key 内容不一致</td></tr>
+      <tr><td class="mono">SCM_PROVIDER_ERROR</td><td class="mono">External</td><td><b>是</b></td><td>外部 Git Provider 故障</td><td>可退避重试</td></tr>
+      <tr><td class="mono">WORKTREE_CONFLICT</td><td class="mono">External</td><td>否</td><td>WorktreeError::Conflict</td><td>提示 checkout 冲突</td></tr>
+      <tr><td class="mono">VL_CONFLICT / VALIDATION_FAILED</td><td class="mono">External / Validation</td><td>否</td><td>validation / search 域</td><td>修正输入</td></tr>
+      <tr><td class="mono">*_NOT_FOUND</td><td class="mono">Validation</td><td>否</td><td>各域 NotFound（SCM / FB / RESOURCE…）</td><td>不重试</td></tr>
+      <tr><td class="mono">INTERNAL</td><td class="mono">Internal</td><td><b>是</b></td><td>各域 Internal（6 处统一映射）</td><td>可重试，但应上报</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 class="sec">04 真实 SQL <span class="badge b-mute">源码原样</span></h2>
+  <div class="grid g2 rv">
+    <div>
+      <h3>租户注入（第 7 步）</h3>
+      <pre data-copy>sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
+    .bind(tenant_id.to_string())
+    .execute(&amp;mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;</pre>
+    </div>
+    <div>
+      <h3>项目角色绑定复核（第 8 步）</h3>
+      <pre data-copy>sqlx::query_as::&lt;_, ProjectBinding&gt;(
+    r#"
+    SELECT id, role, version
+    FROM permission.project_role_binding
+    WHERE tenant_id = $1
+      AND project_id = $2
+      AND user_id = $3
+      AND valid_from &lt;= now()
+      AND valid_to IS NULL
+    FOR SHARE
+    "#,
+)</pre>
+    </div>
+  </div>
+
+  <h2 class="sec">05 现状与计划 <span class="badge b-err">别把 stub 当实装</span></h2>
+  <p>这一节是本页最重要的诚实标注。<code>middleware/</code> 下三个中间件在源码注释里明确写着
+    <strong>MVP 阶段 no-op，且尚未组装进 Router</strong>：</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>模块</th><th>当前状态（源码原文）</th><th>计划实现内容</th><th>影响面</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">middleware/auth.rs</td><td><span class="badge b-warn">no-op stub</span> AuthLayer 未注册</td>
+        <td>解析 <code>Authorization: Bearer &lt;api_key&gt;</code>、查 <code>api_keys</code>（M 类 / SCD Type 2）、校验 active 状态、bcrypt/Argon2id、签发 scope、IP 白名单、注入 ActorContext</td>
+        <td>API key 直连调用方</td></tr>
+      <tr><td class="mono">middleware/rate_limit.rs</td><td><span class="badge b-warn">no-op stub</span> RateLimitLayer 未注册</td>
+        <td>60 req/min + 1000 req/hour per key、burst 2× token bucket、429 + <code>Retry-After</code>、MVP in-memory → Phase 2+ Redis</td>
+        <td>过载保护</td></tr>
+      <tr><td class="mono">middleware/audit.rs</td><td><span class="badge b-warn">no-op stub</span> 未注册</td>
+        <td>请求级审计（当前审计靠各域的 <code>*_audit</code> 表落库，不是中间件）</td>
+        <td>审计覆盖面</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note ok">
+    <b>与之相对，已经实装的是 OAuth2 路径：</b>生产路由 <code>build_group_router</code> 的 handler 使用
+    <code>AuthenticatedUser</code> extractor + <code>require_scope()</code> + <code>set_tenant()</code> + <code>active_binding()</code>，
+    这四步都是真实代码。<b>所以"OAuth2 已实装" 与 "API key 中间件未实装" 同时成立</b>，不要混为一谈。
+  </div>
+  <div class="note warn">
+    <b>另一个容易误读的命名：</b><code>rbac.rs</code> 里的 <code>BusinessDomain { player, economy, match, social, admin }</code>
+    是 <strong>RGS 仓的 5 域历史治理命名</strong>，不是 Star 的 22 DDD bounded context，也不与 domain-* crate 建立映射。
+    看权限模型请以 <code>permission.*</code> 表 + <code>ActorContext.roles</code>（5 个合法值）为准。
+  </div>
+
+  <details class="ev">
+    <summary>证据：本页每一步的源码位置</summary>
+    <div class="evbody">
+      <ul>
+        <li>路由组合：<code>crates/star-api-rest/src/group_api.rs:656</code></li>
+        <li>OAuth2：<code>src/auth/oauth/{middleware,pkce,keypair,handlers}.rs</code>；<code>AuthenticatedUser</code> extractor + <code>BearerError</code>（含 <code>WWW-Authenticate</code> 组装）</li>
+        <li>租户与绑定：<code>group_api.rs:584 set_tenant</code>、<code>:596 active_binding</code>、<code>:622 validate_actor</code>、<code>:629 require_scope</code></li>
+        <li>错误映射：<code>src/error.rs</code>（6 个 domain 的 From impl + (code, source, retriable) 三元组）</li>
+        <li>中间件 stub 声明：<code>src/middleware/{mod,auth,rate_limit,audit}.rs</code> 头部注释</li>
+        <li>并发控制：<code>crates/star-mutex/src/</code>（DomainMutex / VersionCAS / PgAdvisoryLock / LockAuditLogger）</li>
+        <li>envoy 路由与重试/熔断：<code>deploy/k3s-local/envoy/configmap.yaml</code></li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 03 请求生命周期 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>下一册：<a href="04-agent-runtime.html">Agent 闭环</a> 看这条链被 Agent 调用时的额外约束。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

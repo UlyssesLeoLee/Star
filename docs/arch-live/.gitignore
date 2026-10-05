@@ -1,0 +1,6 @@
+# arch-live 的可重建产物 (不进版本库)
+#
+# .preview/*.png 由 `python scripts/automation/arch_live_shot.py` 生成,
+# 9 页整页截图约 6.8 MB, 随时可重建, 且会随 CSS/JS/内容变化而过期。
+# 提交它们只会让 diff 变成一堆二进制噪音, 所以按 README 的说法真的忽略掉。
+/.preview/

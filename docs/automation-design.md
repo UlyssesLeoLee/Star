@@ -1168,6 +1168,7 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 |---|---|---|---|
 | 持久 Schedule Rule create/list/detail/CAS-revise、绑定校验、事务内 Audit/Outbox 与 24h 幂等回放 | [P]（R/V/S/A） | Rust 1.98.1 `star-api-rest --all-targets` check exit 0；6 个 Schedule Rule 模块测试含 production `build_group_router` 四方法未认证 401、四方法 signed-token scope rejection 403、有效 write-scope body cap 413；fresh PostgreSQL 18.6 disposable database 将 occurrence 与 Rule migrations 各运行两遍，RLS、错误 Run 五列 FK、Outbox immutability、过期 same-key replay/64-row cleanup 与 SCD2 clock boundary 场景通过。RustCrypto JWT backend 已显式选择。证据见 `docs/reports/PHASE-9F4A-SCHEDULE-RULE-API-REPORT.md`。 | 成功授权 role/Project/Run ACL、target binding、并发 CAS/replay、分页边界、target grants/Auth 与 production database 未验收。Execution worker、occurrence→Run/reservation/RunEvent/Outbox consumer、BI/Benchmark 未接入，Rule 不触发 Agent/CLI；Phase 9F4A 整体保持未关闭。 |
 
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -2496,3 +2497,37 @@ frontend/src/app/automation-debug/
 - 后续 P3-D.6 阶段 2 业务 任务 2.1-2.5 跨 session 续做估 **~4.0M tokens / 3.33 SRE·周** (3.1x 校准)
 - 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装 跨 session 续做估 **~6.0M tokens / 5.00 SRE·周** (3.1x 校准)
 - **P3-D.6 完整 5 阶段 重新估时 ~14.6M tokens / 12.17 SRE·周** (2.9x 实施计划 5.0M 估, 校准因子 = 实际 OLU / 实施计划估)
+
+### 4.34.7 ARCH-LIVE docs/arch-live/ 9 页动态架构文档站 + 4 个 fail-closed 门禁脚本（per 2026-10-05 arch-live 实测）
+新增 **9 页纯静态 HTML 文档站**（`docs/arch-live/index.html` + `01..08-*.html`），零外部依赖、
+无 ES module / 无 fetch，`file://` 双击可开、离线可用；内容全部对着仓库实测数字写成
+（105 crate / 40 domain / 31 star-* / 43 migration / 150 CREATE TABLE / 525 RLS / 50 REST 路由 /
+16 MCP tool / 57 page.tsx / 11 CI workflow），每个数字带 `data-fact` 声明交由脚本核对，
+每页底部有 `证据` 折叠块列到 `file:line`；`已实装` 与 `仅骨架 / no-op stub` 显式分标。
+
+**4 个门禁脚本**（守门 #1 v19：agent 与外部交互必走 `scripts/automation/`）：
+
+| 脚本 | 档 | 守门 | 实跑结果 |
+|---|---|---|---|
+| `arch_live_doc_check.py` | [P] | #1 v19 / v21 / v30 | PASS（23 data-fact + 29 种子值 + `node --check`）；`--self-test` 变异=1 / 对照=0 / 全零反例=1 且报 PARSE-FAIL |
+| `arch_live_interact_check.py` | [P] | #1 v19 / v21 / v30 | 28/28 PASS；`--mutate` 对照组 28/28 绿 + 8/8 变异抓到 |
+| `arch_live_shot.py` | [P] | #1 v19 / v21 | 9/9 页 exit 0 |
+| `agents_guard_v30.py` | [P] | #1 v19 / v30 | v30 + 修订历史 v0.82 落库，`--check` exit 0 |
+
+**门禁自身抓出的 5 个真 bug**（截图永远拍不到，全靠交互自检暴露）：
+① crate 计数器 `[data-shown]` 是墙的兄弟节点，`wall.querySelector` 永远拿不到；
+② 标签页选择器落在 `[data-tabgroup]` 包裹层（它没有 `data-tab`），`null !== 'l2'` 恒真 →
+整个容器被藏起来，子面板一个没切；③ `data-count` 初始文本写死 `0`，无 JS 时数字墙全是 0；
+④ 复制按钮 `appendChild` 到末尾而清理正则按行首锚定，复制出的代码尾部多一行「复制」；
+⑤ 块注释里原样引用行首锚点正则，星号斜杠序列当场结束注释 → 整份 `arch.js` SyntaxError →
+全站交互静默失效。
+
+**由此激活守门 #1 §4.1 派生规 v30**（Ulysses 2026-10-05 10:31 JST ask_user 拍板选项 1）：
+门禁必须有变异测试（含对照组）、退出码区分「确实有问题」与「没测到」、
+只比较最终状态的断言必须配「机器真的启动过」的独立证据。
+
+**已知缺口（如实记录）**：Mavis 内置浏览器（FilePanel，1280×720）里首屏以下的控件点不动
+（顶部 `#themeBtn` 正常），页面有白色合成层覆盖块且滚动失效；判定为内置浏览器局限而非页面缺陷，
+依据是 Playwright 真实点击 28/28 通过 + 视口外点击的对照现象，未在内置浏览器内复现交互。
+
+---
