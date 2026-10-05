@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.71）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.72）
 
 ## 0. 文档说明与前提
 
@@ -2728,7 +2728,7 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 
 Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业用途、行业、部署规模、席位、用量或付费 tier 设产品限制。GPL/AGPL/LGPL 允许商业使用和销售，copyleft 不构成用途限制；每种修改、链接、捆绑、安装与再分发形态须按实际组合履行对应源码、许可证、NOTICE、安装信息等义务。履约方式应支持上游分发、符合要求的受管安装/捆绑和独立 provider 交付；不得仅因 copyleft 强制用户手工自装。排除非商业、field-of-use、source-available 和实际禁止商业使用的组件。每个版本检查实际构建/交付闭包的 SPDX/SBOM，不能只凭上游仓库根许可证放行；按适用许可证保留版权、NOTICE 与专利声明。
 
-社区活跃度以评估日前 12 个月的维护提交或正式发布、公开维护/安全渠道、明确维护者与升级策略复核。Multipass 是本地/CI Linux VM 与 K3s guest 的首选管理路径；Podman machine、Linux Incus、macOS/Linux Lima 与用户自有/远端 Linux K3s 是 capability-negotiated fallback 或独立环境 adapter。产品须支持发现既有 provider、引导安装和履行许可义务后的受管安装/捆绑；不得因 copyleft 把手工安装设为唯一入口，也不按席位、用量或用途收费封锁。Multipass GPL-3.0 允许商业使用；随产品分发时履行 GPL 义务。其官方定位是本地开发/测试，daemon 权限可管理实例和 host mounts，因此只由受限可信 Manager 操作，不得作为不可信 Agent sandbox。K3s 运行在 Linux 节点/guest，不原生支持 Windows。Windows、macOS 与 Linux backend 以每个已验收版本的 capability probe 判定；K3s stable channel 于 2026-10-05 复核为 v1.36.5+k3s1，部署仍须按产品批准的版本/digest 固定。宿主 PoC 与产品集成状态见 DD-LOCAL-INFRASTRUCTURE-001 v0.6。
+社区活跃度以评估日前 12 个月的维护提交或正式发布、公开维护/安全渠道、明确维护者与升级策略复核。Multipass 是本地/CI Linux VM 与 K3s guest 的首选管理路径；Podman machine、Linux Incus、macOS/Linux Lima 与用户自有/远端 Linux K3s 是 capability-negotiated fallback 或独立环境 adapter。产品须支持发现既有 provider、引导安装和履行许可义务后的受管安装/捆绑；不得因 copyleft 把手工安装设为唯一入口，也不按席位、用量或用途收费封锁。Multipass GPL-3.0 允许商业使用；随产品分发时履行 GPL 义务。其官方定位是本地开发/测试，daemon 权限可管理实例和 host mounts，因此只由受限可信 Manager 操作，不得作为不可信 Agent sandbox。K3s 运行在 Linux 节点/guest，不原生支持 Windows。Windows、macOS 与 Linux backend 以每个已验收版本的 capability probe 判定；K3s stable channel 于 2026-10-05 复核为 v1.36.5+k3s1，部署仍须按产品批准的版本/digest 固定。宿主 PoC 与产品集成状态见 DD-LOCAL-INFRASTRUCTURE-001 v0.8。
 
 ### 50.8H Multipass 管理的本地 K3s VM
 
@@ -2859,3 +2859,4 @@ Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权�
 | v5.69 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Multipass 从本地 VM 首选候选提升为本地/CI Linux guest 与 K3s 的首选管理路径；新增 Host-shared VM/K3s、受限 Rust Manager、Worktree workspace bridge、资源预算、隔离边界与分平台验收要求；复核 K3s stable channel 为 v1.36.5+k3s1；同步基本设计与 Infrastructure DD | 用户明确后续将用 Multipass 管理虚拟机中的 K3s，要求反映重大架构调整 |
 | v5.70 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 dev 已有 Multipass 1.17.0-rc1/HCS + Ubuntu/K3s + 19/19 GitOps Pod 实跑登记为宿主 PoC；明确它不等价于 Star provider、Run/workspace binding、Agent sandbox、跨平台 capability 或 RSS 验收；同步 basic v5.67 与 Infrastructure DD v0.6 | 代码/文档对账发现 dev 已有宿主层实跑记录，需要避免把“尚未实现”与“已有 PoC”混为一谈 |
 | v5.71 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Multipass daemon wait-ready、单 VM、K3s 与 Agent Runtime sandbox readiness 分层；固定仅对精确 owner instance 执行 delete --purge，并禁止全局 purge/delete --all 与任意 exec；同步 basic v5.68、Infrastructure DD v0.7 与实施计划 v5.94 | 按官方 Multipass CLI 语义校准 provider 生命周期和安全验收契约 |
+| v5.72 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Multipass 商业开源与社区准入段的 Infrastructure DD 引用同步到现行 v0.8；同步 basic v5.69、实施计划 v5.95 和 Infrastructure DD v0.8 的版本指针；不改变实现状态或验收结论 | 文档一致性复核发现活动正文保留过期的 v0.6 引用 |

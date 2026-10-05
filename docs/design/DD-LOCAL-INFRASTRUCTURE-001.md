@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.7 · 2026-10-05 · Draft / 已有一组宿主 Multipass/HCS + Linux guest K3s/GitOps 实跑；Star 原生 Multipass adapter、Run 绑定、跨平台能力与 RSS 仍未验收。
+> v0.8 · 2026-10-05 · Draft / 已有一组宿主 Multipass/HCS + Linux guest K3s/GitOps 实跑；Star 原生 Multipass adapter、Run 绑定、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.71 §50.8G-50.8H / basic-design v5.68 §8.1、§16.21-16.22 / 实施计划 v5.94 §6.83。
+> 上游：requirements v5.72 §50.8G-50.8H / basic-design v5.69 §8.1、§16.21-16.22 / 实施计划 v5.95 §6.83。
 
 ## §0 目的与边界
 
@@ -127,3 +127,4 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 | v0.5 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 将 Multipass 固定为本地/CI Linux VM 与 guest K3s 的首选管理路径，区分生产/远端 provider；增加共享 HostEnvironment、restricted Rust adapter/CLI allowlist、Worktree guest workspace bridge、资源准入和真实验收分期；引用 Multipass/K3s 官方安全、driver、cloud-init、资源与拓扑资料；复核 K3s stable channel 为 v1.36.5+k3s1；所有功能仍未实现或验收 | 用户明确后续会用 Multipass 管理虚拟机中的 K3s，要求将重大架构变化纳入设计 |
 | v0.6 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 对账 dev 已有 Windows 11 Home + Multipass 1.17.0-rc1/HCS + Ubuntu guest K3s v1.36.5 + 19/19 GitOps Pod 运行证据；将其定位为宿主层 PoC，不外推为 Star Rust Manager/Run binding/sandbox/RSS 已实现；补充真实 VM 配置与 INFRA-2 复用/集成门 | 将 dev 上已提交的宿主层实跑报告纳入本地基础设施详细设计 |
 | v0.7 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 依据 Canonical CLI reference 澄清 wait-ready 只代表 daemon ready；将 VM/K3s/Runtime sandbox 列为独立 readiness 层；只允许固定 profile guest probe 走 Multipass exec，并将永久删除限定为精确 owner 的 delete --purge，禁止全局 purge/delete --all | 官方 CLI 核验发现 daemon readiness、guest/K3s readiness 与实例回收有不同语义 |
+| v0.8 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 同步 requirements v5.72、basic design v5.69 和实施计划 v5.95 的上游版本指针；不改变 provider 行为、生命周期契约或验收结论 | 文档版本一致性复核 |
