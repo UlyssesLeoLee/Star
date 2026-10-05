@@ -269,8 +269,58 @@ Project.status                  → True / "Project is synced and ready for use"
 - **AGENTS.md §0 商业开源依赖硬约束**：三件套均为 Apache-2.0 实测；新增组件须逐版本审查完整构建/分发闭包，仅核对上游主许可证**不足以放行**
 - **提交信息**：branch 相关内容用 Star 版本号（v0.X）+ 5 角色；RGS 仓内容用 v3.X + 5 域 Lead
 
-## §9 修订历史
+## §9 附录：dirty worktree 收编结果（2026-10-05 22:00 JST）
+
+per 用户拍板「只并 4 个 dirty worktree，stash 全留」，实际执行结果**只并了 1 个**，另 3 个经核验后判定不应并入。
+
+| worktree | 判定 | 依据 |
+|---|---|---|
+| `erun-p3-run-apps` | ✅ **已并入 dev** 并推 `origin/dev` | 2 文件，逐块核对为**纯 rustfmt**（import 重排 + 折行），零语义改动 |
+| `D:/Star` | ⏭️ 不并 | ①`AGENTS.md` 会**回退** dev（dev 901 行 > 该处 895 行，dev 已含该政策段）②5 份 ERUN brief **内容冗余**（逐行差异 0，SHA256 差异仅因换行符：dev 全 LF / 该处全 CRLF）③`frontend/capture_final.js` 硬编码 `C:/Users/leo19/.gemini/antigravity/brain/…` 的一次性截图脚本 |
+| `worktree-group-shell` | ⏭️ 不并（见 §9.1） | 分支落后 dev **294 提交**，半数文件已被 dev 超越 |
+| `schedule-9f4c-admission` | 🚫 不碰 | 正处**交互式 rebase 中途**（rebase 到 `0f4cb886`，卡 `docs/automation-design.md`），`a3328687` 未并入 dev；用户确认**该 session 仍在跑** |
+
+改动已安全保存为分支 **`codex/worktree-group-shell-mvp` @ `373259dc`**（20 文件，+926/−140），未推 origin，未并入 dev。**工作不会丢。**
+
+### 9.1 为什么 worktree-group-shell 不能直接合
+
+`373259dc` 相对 dev **ahead=1 / behind=294**。逐文件实测（行数，dev vs 分支）：
+
+| 文件 | dev | 分支 | 判定 |
+|---|---|---|---|
+| `crates/domain-local-runtime/src/task_execution.rs` | **1138** | 251 | dev 更完整 |
+| `crates/star-api-rest/src/group_api/canvas.rs` | **1959** | 1713 | dev 更完整 |
+| `crates/star-api-rest/src/group_api/work_items.rs` | **1022** | 675 | dev 更完整 |
+| `frontend/src/components/CanvasView.tsx` | **888** | 541 | dev 更完整 |
+| `docs/design/DD-WORKTREE-GROUP-001.md` | **557** | 277 | dev 更完整 |
+| `db/migrations/…canvas-document.sql` | 44 | **84** | 分支更大 |
+| `db/migrations/…canvas-outbox-offset.sql` | **缺** | 18 | 分支新增 |
+| `frontend/src/lib/group-api/canvas.ts` | **缺** | 426 | 分支新增 |
+| `frontend/src/lib/group-api/group-context.ts` | **缺** | 233 | 分支新增 |
+| `frontend/src/app/api/group/[...path]/route.ts` | **缺** | 216 | 分支新增 |
+| `frontend/src/components/AuthenticatedGroupWorkspace.tsx` | **缺** | 495 | 分支新增 |
+| `frontend/src/components/AuthenticatedWorktreeIndex.tsx` | **缺** | 171 | 分支新增 |
+
+**不能「挑着合」**：那 5 个分支新增的前端文件是**对着分支里旧版 `canvas.rs`（1713 行）写的 API 客户端**，而 dev 的 `canvas.rs` 已经前进到 1959 行。把它们挑到 dev 上，API 契约大概率对不上——这不是挑文件能解决的，须在 dev 现行代码基础上重做。
+
+> 后端 `worktree-group` 的完整版已由 `c90313ea feat(worktree-group): complete cross-app contract slices` 带进 dev。**缺的只是前端 API 接入层**（`group-api/*` + `app/api/group/[...path]` 代理 + 2 个 `Authenticated*` 组件），建议由正在推进该特性的 session 在当前 dev 上重做，而非从落后 294 提交的分支回捞。
+
+### 9.2 本轮门禁的实证：`-j 4` 在本机不可用
+
+守门 #1 派生规 v19 规定 `cargo check --workspace --all-targets -j 4`。本机实测：
+
+| 参数 | 结果 |
+|---|---|
+| `-j 4` | `EXITCODE = 1`，97.3s，日志 765 行**在 `star-saga` warning 中途戛然而止**，无任何 error、无 `Finished` → **进程被外部终止（内存）** |
+| `-j 2` | **`EXITCODE = 0`**，63.4s，`error` 行 0，出现 `Finished \`dev\` profile … in 1m 02s` ✅ |
+
+**判「通过」的三条判据（本轮确立，缺一不可）**：真实退出码 = 0 ∧ 出现 `Finished` 行（正向证据）∧ 输出非空。当天 5 次尝试中有 4 次是「空错误集 + 非零退出码」——那都**不是通过**，是没跑成。
+
+同时另有一条独立阻塞：下午时段本机 `CARGO_HOME=E:\DevCache\cargo` 为**全机共享**，同时有 7 个其他项目的 cargo（`ada-billing` / `ada-m13-api-gateway` / `sakura-rs` 等）争抢同一 `registry` 包缓存锁，`cargo check` 全程打印 `Blocking waiting for file lock on package cache` 直到被中断。`--offline` **绕不开**（cargo 仍需 registry 锁）。22:00 后该竞争消失、门禁方通过。
+
+## §10 修订历史
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：CD 交付栈实跑现状 + 8 项剩余工作清单 + 5 条方法学留档 | 用户指令「剩余内容记入 handoff」 |
+| v0.2 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 追加 §9 附录：dirty worktree 收编结果（4 个中仅 1 个并入，另 3 个给出不并的逐项依据）、`worktree-group-shell` 落后 294 提交的逐文件对比表、门禁 `-j 4` vs `-j 2` 实证与「判通过三判据」 | 用户指令「所有内容反映到本地 dev」→ 拍板「只并 4 个 dirty worktree」 |
