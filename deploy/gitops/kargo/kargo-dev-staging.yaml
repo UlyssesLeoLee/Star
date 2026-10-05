@@ -78,9 +78,31 @@
 #   对照组证明这不是本机网络/请求写法问题: 同法匿名拉
 #     ghcr.io/fluxcd/source-controller → OK (100 tags)
 #     ghcr.io/actions/actions-runner  → OK (73 tags)
-#   → **仍需**: 给 Kargo 配置 GHCR 读凭据 (Kargo 的 image credentials /
-#     Secret), 否则 Warehouse 永不产出 Freight。凭据按守门 #5 只走运行时注入,
-#     **不入库、不入本文件、不进 log**。
+#   → **仍需**: 给 Kargo 配置 GHCR 读凭据。Kargo 不通过 CRD 字段引用凭据, 而是
+#     按约定发现**特殊标注的 Secret** (per 官方 docs "Managing Credentials" v1.x):
+#         metadata.labels: { kargo.akuity.io/cred-type: image }
+#         stringData: { repoURL, username, password }
+#     必须放在 **Project 自己的 namespace** (即 `star`), 名字任意 ——
+#     Kargo 按标签+repoURL 匹配发现, 精确匹配优先、其后正则匹配。
+#     注入脚本: scripts/automation/kargo_image_credential.ps1 (建前强制验权,
+#     fail closed; 凭据只从 GHCR_PAT 环境变量读, 不打印/不落盘/不入库, 守门 #5)。
+#
+#   🟡 凭据本身的阻塞点 (per 2026-10-05 实测, 已用对照组排除工具误判):
+#     - 本机 GHCR_PAT 是有效的 **fine-grained PAT**: 用正确流程
+#       (Basic(user:PAT) 换 registry token 再作 Bearer) 读公开仓库
+#       ghcr.io/fluxcd/source-controller → OK, 100 tags。
+#     - 但同一把凭据读 `sayatelier/star-*` → **403**(已认证但未授权),
+#       读 `ulyssesleolee/star-canvas-engine` 同样 403, 而
+#       `ulyssesleolee/star` / `/bff` → **404**(确定不存在)。
+#     → 结论: **当前账号对任何候选镜像坐标都没有读权限**, 镜像归属哪个
+#       namespace 是**归属/授权问题**, 不是本机配置问题, 需人工确认后再注入。
+#     → 因此**未创建**任何 Secret: 注入一把已证明读不到目标的凭据只会让
+#       Warehouse 继续静默失败, 属于"配置做了"而非"配置生效"。
+#     → 方法学留档: 早期一版探测把 PAT 直接当 Bearer 塞进 /v2/<repo>/tags/list,
+#       得到"所有仓库一律 403"并据此错判为"令牌类型不对"。是**对照组**
+#       (公开仓库匿名可拉 OK) 把它揪出来的 —— 真实凭据与伪造垃圾串返回完全
+#       相同的结果, 本该当时就存疑。**测不通时先怀疑量具, 再怀疑被测物。**
+#
 #   → 另注: 该错误自 2026-10-05 11:00Z 起每个 reconcile 周期复现一次, 而
 #     `kubectl apply` 始终 exit 0、Project 状态始终 "ready" —— 即**静默失效**。
 #     判"配置生效"不能只看 apply 返回码, 必须读控制器日志或 Warehouse.status。
