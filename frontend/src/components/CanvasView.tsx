@@ -1,3 +1,51 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/components/CanvasView.tsx",type:"file",language:"tsx"}),
+  (workItemSummary:Class {name:"CanvasViewWorkItemSummary",type:"class"}),
+  (worktreeSummary:Class {name:"CanvasViewWorktreeSummary",type:"class"}),
+  (viewCanvas:Class {name:"CanvasViewCanvas",type:"class"}),
+  (props:Class {name:"CanvasViewProps",type:"class"}),
+  (palette:Variable {name:"STICKY_PALETTE",type:"variable",language:"typescript"}),
+  (workItems:Variable {name:"workItemSummaries",type:"variable",language:"typescript"}),
+  (worktrees:Variable {name:"worktreeSummaries",type:"variable",language:"typescript"}),
+  (openWorkItem:Variable {name:"onOpenWorkItem",type:"variable",language:"typescript"}),
+  (viewportChange:Variable {name:"onViewportChange",type:"variable",language:"typescript"}),
+  (storedAgents:Variable {name:"storeAgentSessions",type:"variable",language:"typescript"}),
+  (storedAutomations:Variable {name:"storeAutomationRules",type:"variable",language:"typescript"}),
+  (resolvedAgents:Variable {name:"agentSessions",type:"variable",language:"typescript"}),
+  (resolvedAutomations:Variable {name:"automationRules",type:"variable",language:"typescript"}),
+  (view:Function {name:"CanvasView",type:"function",signature:"CanvasView(props: CanvasViewProps): JSX.Element",visibility:"public",complexity:"complex"}),
+  (screenToWorld:Function {name:"screenToWorld",type:"function",signature:"screenToWorld(sx: number, sy: number)",visibility:"private",complexity:"simple"}),
+  (worldToScreen:Function {name:"worldToScreen",type:"function",signature:"worldToScreen(wx: number, wy: number)",visibility:"private",complexity:"simple"}),
+  (onMouseDown:Function {name:"onMouseDown",type:"function",signature:"onMouseDown(event: React.MouseEvent): void",visibility:"private",complexity:"moderate"}),
+  (onMouseMove:Function {name:"onMouseMove",type:"function",signature:"onMouseMove(event: React.MouseEvent): void",visibility:"private",complexity:"complex"}),
+  (onMouseUp:Function {name:"onMouseUp",type:"function",signature:"onMouseUp(): void",visibility:"private",complexity:"simple"}),
+  (onWheel:Function {name:"onWheel",type:"function",signature:"onWheel(event: React.WheelEvent): void",visibility:"private",complexity:"moderate"}),
+  (onElementMouseDown:Function {name:"onElementMouseDown",type:"function",signature:"onElementMouseDown(event: React.MouseEvent, element: CanvasElement): void",visibility:"private",complexity:"moderate"}),
+  (onElementDoubleClick:Function {name:"onElementDoubleClick",type:"function",signature:"onElementDoubleClick(element: CanvasElement): void",visibility:"private",complexity:"moderate"}),
+  (renderElement:Function {name:"renderElement",type:"function",signature:"renderElement(element: CanvasElement): React.ReactNode",visibility:"private",complexity:"complex"}),
+  (renderFrame:Function {name:"renderFrame",type:"function",signature:"renderFrame(frame: CanvasViewCanvas['frames'][number]): React.ReactNode",visibility:"private",complexity:"simple"}),
+  (renderConnector:Function {name:"renderConnector",type:"function",signature:"renderConnector(connector: CanvasConnector): React.ReactNode",visibility:"private",complexity:"moderate"}),
+  (file)-[:CONTAINS]->(workItemSummary),(file)-[:CONTAINS]->(worktreeSummary),(file)-[:CONTAINS]->(viewCanvas),(file)-[:CONTAINS]->(props),
+  (file)-[:CONTAINS]->(palette),(file)-[:CONTAINS]->(storedAgents),(file)-[:CONTAINS]->(storedAutomations),
+  (file)-[:CONTAINS]->(resolvedAgents),(file)-[:CONTAINS]->(resolvedAutomations),(file)-[:CONTAINS]->(view),
+  (view)-[:HAS_METHOD]->(screenToWorld),(view)-[:HAS_METHOD]->(worldToScreen),
+  (view)-[:HAS_METHOD]->(onMouseDown),(view)-[:HAS_METHOD]->(onMouseMove),(view)-[:HAS_METHOD]->(onMouseUp),
+  (view)-[:HAS_METHOD]->(onWheel),(view)-[:HAS_METHOD]->(onElementMouseDown),
+  (view)-[:HAS_METHOD]->(onElementDoubleClick),(view)-[:HAS_METHOD]->(renderElement),
+  (view)-[:HAS_METHOD]->(renderFrame),(view)-[:HAS_METHOD]->(renderConnector),
+  (view)-[:USES]->(workItems),(view)-[:USES]->(worktrees),(view)-[:USES]->(openWorkItem),(view)-[:USES]->(viewportChange),(view)-[:USES]->(palette),
+  (view)-[:USES]->(storedAgents),(view)-[:USES]->(storedAutomations),
+  (view)-[:CALLS]->(onMouseDown),(view)-[:CALLS]->(onMouseMove),(view)-[:CALLS]->(onMouseUp),
+  (view)-[:CALLS]->(onWheel),(view)-[:CALLS]->(renderElement),(view)-[:CALLS]->(renderFrame),(view)-[:CALLS]->(renderConnector),
+  (renderElement)-[:CALLS]->(worldToScreen),(renderElement)-[:CALLS]->(onElementMouseDown),
+  (renderElement)-[:CALLS]->(onElementDoubleClick),(renderFrame)-[:CALLS]->(worldToScreen),
+  (renderConnector)-[:CALLS]->(worldToScreen),(onWheel)-[:CALLS]->(screenToWorld),
+  (onElementDoubleClick)-[:USES]->(openWorkItem),(onElementDoubleClick)-[:USES]->(worktrees),(renderElement)-[:USES]->(resolvedAgents),
+  (renderElement)-[:USES]->(resolvedAutomations),(renderElement)-[:USES]->(workItems),(renderElement)-[:USES]->(worktrees);
+*/
+
 "use client";
 
 /**
@@ -7,32 +55,47 @@
  * - 无限世界坐标,viewport 转换
  * - 7 种 element 渲染
  * - Bezier connector(复用 StateMachineDiagram 算法)
- * - worktree_node 状态色码走 StatusPill 60+ 同步(联动 3)
+ * - Group 预览将状态作为普通标签展示，不伪造未知状态的配色
  * - work_item_card 双击跳详情(联动 2)
  * - frame 分区(可作 slide)
  */
 
-import type {
-  Canvas, CanvasElement, CanvasConnector, Worktree, AgentSession, AutomationRule, Feedback,
-} from "@/types/ids";
+import type { Canvas, CanvasElement, CanvasConnector } from "@/types/ids";
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
-import { StatusPill } from "./StatusPill";
 import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
-  canvas: Canvas;
+  canvas: CanvasViewCanvas;
   elements: CanvasElement[];
   connectors: CanvasConnector[];
+  workItemSummaries?: CanvasViewWorkItemSummary[];
+  worktreeSummaries?: CanvasViewWorktreeSummary[];
   highlightElementId?: string;
   readOnly?: boolean;
+  onViewportChange?: (viewport: Canvas["viewport"]) => void;
   onOpenWorkItem?: (workItemId: string, worktreeId?: string) => void;
+}
+
+export type CanvasViewCanvas = Pick<Canvas, "viewport" | "frames">;
+
+export interface CanvasViewWorkItemSummary {
+  id: string;
+  key: string;
+  title: string;
+  status: string;
+}
+
+export interface CanvasViewWorktreeSummary {
+  id: string;
+  branch: string;
+  status: string;
 }
 
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 
-export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, onOpenWorkItem }: CanvasViewProps) {
+export function CanvasView({ canvas, elements, connectors, workItemSummaries, worktreeSummaries, highlightElementId, readOnly = false, onViewportChange, onOpenWorkItem }: CanvasViewProps) {
   const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
@@ -43,12 +106,20 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null,
   });
 
-  const worktrees = useStore((s) => s.worktrees);
-  const agentSessions = useStore((s) => s.agentSessions);
-  const automationRules = useStore((s) => s.automationRules);
-  const feedbacks = useStore((s) => s.feedbacks);
+  const storeWorktrees = useStore((s) => s.worktrees);
+  const storeWorkItems = useStore((s) => s.workItems);
+  const storeAgentSessions = useStore((s) => s.agentSessions);
+  const storeAutomationRules = useStore((s) => s.automationRules);
+  const resolvedWorktrees = worktreeSummaries ?? storeWorktrees;
+  const resolvedWorkItems = workItemSummaries ?? storeWorkItems;
+  const agentSessions = worktreeSummaries === undefined ? storeAgentSessions : [];
+  const automationRules = worktreeSummaries === undefined ? storeAutomationRules : [];
   const moveCanvasElement = useStore((s) => s.moveCanvasElement);
   const deleteCanvasElement = useStore((s) => s.deleteCanvasElement);
+
+  useEffect(() => {
+    setViewport(canvas.viewport);
+  }, [canvas.viewport.x, canvas.viewport.y, canvas.viewport.zoom]);
 
   // 屏幕坐标 → 世界坐标
   const screenToWorld = useCallback((sx: number, sy: number) => ({
@@ -95,7 +166,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   };
 
   const onMouseUp = () => {
+    const wasPanning = dragState.current.type === "pan";
     dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null };
+    if (wasPanning) onViewportChange?.(viewport);
   };
 
   // 滚轮 zoom
@@ -110,7 +183,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       const sy = e.clientY - rect.top;
       const wx = sx / viewport.zoom + viewport.x;
       const wy = sy / viewport.zoom + viewport.y;
-      setViewport({ x: wx - sx / newZoom, y: wy - sy / newZoom, zoom: newZoom });
+      const nextViewport = { x: wx - sx / newZoom, y: wy - sy / newZoom, zoom: newZoom };
+      setViewport(nextViewport);
+      onViewportChange?.(nextViewport);
     }
   };
 
@@ -138,6 +213,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       onOpenWorkItem(workItemId, el.entity_ref?.worktree_id);
       return;
     }
+
+    // Group Canvas only follows WorkItem links that the scoped parent has authorized.
+    if (worktreeSummaries !== undefined) return;
 
     // 联动 2:work_item_card / worktree_node / agent_cursor / automation_node → 跳详情
     const ref = el.entity_ref
@@ -197,7 +275,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         const workItemId = el.entity_ref
           ? el.entity_ref.ref_type === "work_item" ? el.entity_ref.ref_id : undefined
           : el.content.work_item_id;
-        const wi = useStore.getState().workItems.find((w) => w.id === workItemId);
+        const wi = resolvedWorkItems.find((w) => w.id === workItemId);
         if (!wi) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
@@ -210,9 +288,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
                 {wi.title}
               </div>
             </foreignObject>
-            <g transform={`translate(8, ${h - 24 * viewport.zoom})`}>
-              <StatusPill value={wi.status} size="xs" />
-            </g>
+            <text x={8} y={h - 8 * viewport.zoom} fontSize={9 * viewport.zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
+              {wi.status}
+            </text>
           </g>
         );
       }
@@ -220,7 +298,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         const worktreeId = el.entity_ref
           ? el.entity_ref.ref_type === "worktree" ? el.entity_ref.ref_id : undefined
           : el.content.worktree_id;
-        const wt = worktrees.find((w) => w.id === worktreeId);
+        const wt = resolvedWorktrees.find((w) => w.id === worktreeId);
         if (!wt) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
@@ -231,9 +309,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             <text x={12 * viewport.zoom} y={34 * viewport.zoom} fontSize={12 * viewport.zoom} fill="#e6edf3" fontFamily="ui-monospace, monospace">
               {wt.branch}
             </text>
-            <g transform={`translate(${w - 90 * viewport.zoom}, ${h - 22 * viewport.zoom})`}>
-              <StatusPill value={wt.status} size="xs" />
-            </g>
+            <text x={w - 90 * viewport.zoom} y={h - 8 * viewport.zoom} fontSize={9 * viewport.zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
+              {wt.status}
+            </text>
           </g>
         );
       }
@@ -403,15 +481,17 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           <Hand size={14} />
         </button>
         <div className="w-px h-5 bg-line" />
-        <button onClick={() => setViewport({ ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
+        <button onClick={() => { const next = { ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) }; setViewport(next); onViewportChange?.(next); }} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
           <ZoomIn size={14} />
         </button>
-        <button onClick={() => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomOut}>
+        <button onClick={() => { const next = { ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) }; setViewport(next); onViewportChange?.(next); }} className="btn p-1.5" title={t.ariaLabels.canvasZoomOut}>
           <ZoomOut size={14} />
         </button>
         <button onClick={() => {
           // fit to content
-          setViewport({ x: minX, y: minY, zoom: Math.min(1200 / (maxX - minX), 800 / (maxY - minY), 1) });
+          const next = { x: minX, y: minY, zoom: Math.min(1200 / (maxX - minX), 800 / (maxY - minY), 1) };
+          setViewport(next);
+          onViewportChange?.(next);
         }} className="btn p-1.5" title={t.ariaLabels.canvasFit}>
           <Maximize2 size={14} />
         </button>

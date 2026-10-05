@@ -5,6 +5,7 @@ CREATE
   (page:Function {name:"GroupWorkspacePage", type:"function", signature:"GroupWorkspacePage(props: PageProps): JSX.Element", visibility:"public", complexity:"complex"}),
   (apps:Variable {name:"GROUP_APPS", type:"variable", language:"typescript"}),
   (pluginPreview:Variable {name:"PLUGIN_PREVIEW", type:"variable", language:"typescript"}),
+  (authenticatedGroup:Function {name:"AuthenticatedGroupWorkspace",type:"function",signature:"AuthenticatedGroupWorkspace({worktreeId})",visibility:"public",complexity:"complex"}),
   (statusOptions:Variable {name:"STATUS_OPTIONS", type:"variable", language:"typescript"}),
   (appType:Variable {name:"AppId", type:"variable", language:"typescript"}),
   (scopeType:Variable {name:"ChatScope", type:"variable", language:"typescript"}),
@@ -42,6 +43,7 @@ CREATE
   (file)-[:CONTAINS]->(isAppId),
   (page)-[:USES]->(apps),
   (page)-[:USES]->(pluginPreview),
+  (page)-[:USES]->(authenticatedGroup),
   (page)-[:USES]->(statusOptions),
   (page)-[:USES]->(scope),
   (page)-[:USES]->(enabledPlugins),
@@ -55,6 +57,7 @@ CREATE
   (page)-[:USES]->(worktree),
   (page)-[:USES]->(project),
   (page)-[:CALLS]->(isAppId),
+  (page)-[:CALLS]->(authenticatedGroup),
   (page)-[:CONTAINS]->(taskHref),
   (page)-[:CONTAINS]->(appHref),
   (page)-[:CONTAINS]->(changeScope),
@@ -104,6 +107,7 @@ import {
 } from "lucide-react";
 
 import { CanvasView } from "@/components/CanvasView";
+import { AuthenticatedGroupWorkspace } from "@/components/AuthenticatedGroupWorkspace";
 import { StatusPill } from "@/components/StatusPill";
 import { TerminalStackContainer } from "@/components/terminal/TerminalStackContainer";
 import { useStore } from "@/lib/store";
@@ -226,6 +230,10 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     }
     setCanvasLinkError(null);
     router.push(taskHref(workItemId));
+  }
+
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(worktreeId)) {
+    return <AuthenticatedGroupWorkspace worktreeId={worktreeId} />;
   }
 
   if (!worktree) {
@@ -429,7 +437,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
             <div className="space-y-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div><h2 className="text-lg font-semibold">Infinite Canvas · Miro 等价入口</h2><p className="text-xs text-ink-mute">Canvas 与 Task Card 同级；typed EntityRef 指向当前 Worktree 内的 canonical WorkItem。</p></div>
-                <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">Worktree scope · 持久化 API 未接</span>
+                <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">Worktree scope · 本地预览，登录会话未接</span>
               </div>
               {canvasLinkError && <p role="alert" className="rounded border border-warning/30 bg-warning/5 p-3 text-xs text-warning">{canvasLinkError}</p>}
               {groupCanvas ? (
@@ -446,7 +454,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
               ) : (
                 <div className="card flex min-h-56 flex-col items-center justify-center gap-2 px-6 text-center">
                   <p className="text-sm text-ink-dim">当前 Worktree 没有显式绑定的 Group Canvas。</p>
-                  <p className="max-w-xl text-xs leading-relaxed text-ink-mute">旧 Project / Free Canvas 不会自动继承到这里；绑定创建、元素保存和 EntityRef API 尚未接通，因此不会用全局 seed 冒充当前 Worktree 画布。</p>
+                  <p className="max-w-xl text-xs leading-relaxed text-ink-mute">旧 Project / Free Canvas 不会自动继承到这里。同源 Group BFF 已就位，但统一登录尚未签发安全会话 Cookie，且页面尚未接入 Canvas API；当前空状态不会用全局 seed 冒充当前 Worktree 画布。</p>
                 </div>
               )}
             </div>

@@ -122,7 +122,7 @@ async fn list_project_worktrees(
     let binding = active_binding(&mut tx, &actor, project_id).await?;
     let mut rows = sqlx::query_as::<_, WorktreeIndexRow>(
         r#"
-        SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.path, w.parent_id,
+        SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.parent_id,
                w.owner_user_id, w.work_item_id, w.agent_id, w.agent_session_id, w.runtime_id,
                w.branch, w.human_state, w.machine_state, w.ahead, w.behind, w.dirty, w.health_score,
                w.last_activity, w.test_state, w.risk_count, w.locked, w.archived, w.version,

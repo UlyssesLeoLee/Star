@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v0.5 (2026-09-29)
-> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.4(下文以 §N 引用)
+> **文档版本**: v1.0 (2026-09-29)
+> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.8(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v2.3》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v2.7》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4241,6 +4241,10 @@ Global scope 的可见 Worktree 集合由 actor permissions 计算；Global 不�
 
 `EntityRef` 是跨 App 的稳定 typed reference，至少包含 `entity_type / entity_id / tenant_id / project_id / worktree_id? / version?`。引用只负责寻址，不授予读取或写入权限；被引用对象每次打开和变更时仍需校验权限与版本。
 
+Group Canvas 的所有实体跳转由当前 GroupContext 和授权 projection 驱动。客户端不得因当前投影缺失而回退到不带 `worktree_id` 的旧全局路由；未解析或越界引用在当前画布中拒绝跳转。Canvas Document 的 viewport、frames、connectors 与元素版本都属于持久化内容，不能用客户端默认值冒充服务端已保存状态。
+
+Canvas Document 整体通过单调递增的 `document_version` 保存；读投影包含 viewport、frames、connectors。更新请求携带 `expected_version`、`Idempotency-Key` 和 `correlation_id`，并在同一事务中完成 SCD2 历史、Audit 与 Outbox。版本冲突返回 409，调用方需刷新 canonical Document 后再提交。Frame 与 Connector 的 Element 引用由服务端校验在同一 Canvas 当前有效；画布 connector 仅是可视关系，不等价于 Multica WorkItem dependency。
+
 ### 16.5 App 命令、Outbox 事件与投影
 
 跨 App 修改走已存在的事务边界：
@@ -4257,6 +4261,8 @@ Task / Canvas / Chat / Plugin UI
 ```
 
 领域事件沿用 CloudEvents 1.0 与 §4.12 契约，新增或补足字段：`schema_version`、`tenant_id`、`project_id`、适用时的 `repository_id` / `worktree_id`、`actor_id`、`event_id`、`causation_id`、`correlation_id`、`idempotency_key`、`occurred_at` 和 typed payload。NATS JetStream 是领域事件权威；Canvas WS/SSE、浏览器状态和插件订阅是可重建投影，不能产生第二份业务真相。
+
+Canvas 文档布局变更以 `CanvasDocumentUpdated` 领域更新通知为入口；Group API 先在 PostgreSQL 同一事务保存 SCD2 文档版本并追加 Audit / Outbox。connector 只能引用当前 Canvas 的 Element；Task dependency 的创建和变更仍走 Multica Domain Command。Canvas Outbox 消费、checkpoint 与实时推送恢复仍属于后续实施门。
 
 首批事件扩展：
 
@@ -4304,6 +4310,8 @@ REQUESTED → AUTHORIZED → STARTING → ATTACHED → RUNNING
 
 切换 Worktree 仅解除当前 UI attachment，不会把运行会话改绑到另一 Worktree。用户需显式结束会话或打开其原 Group；Scope 切换后，旧 Session 的流不得被转送到新 Worktree 面板。命令摘要、策略拒绝、退出状态与验证结果投影回 Task Card 和关联 Canvas Element；敏感输出进入 Context 前应用 Secret Redaction，并按 Untrusted Content 处理。
 
+Local Runtime 的 Phase 4 实现从服务端解析的 TaskExecutionContext 开始：绑定 Actor、Project、Worktree、WorkItem、Runtime、授权版本、短期过期时间与 approved launch profile；启动前重新校验时效、Runtime/profile 匹配，并 canonicalize checkout 与 working directory 后拒绝越界路径。该边界尚未替代一次性签名 session grant、PTY attach/reconnect、策略撤权通知和会话审计。
+
 ### 16.7 底栏 Chat Scope 与 LangGraph 路由
 
 `BottomChatBar` 在所有 Worktree Group App 中固定显示，提供 `WORKTREE` 和 `GLOBAL` 两个显式 Scope。`ScopedChatRouter` 将 scope 与目标实体写入 L0 State，并在执行前再次调用 `GroupContextResolver`；UI 当前选中 App 或 EntityRef 不能隐式扩大权限。
@@ -4338,10 +4346,11 @@ REGISTERED → VALIDATING → CONFIGURING → ACTIVE ↔ DEGRADED
 | Group Context 当前选择 / 活跃 App | Work (W) | 前端状态 / Valkey projection | 显式 `retention_period` 与过期清理，不作为业务事实 |
 | Group chat presence / canvas cursor / terminal attachment lease | Work (W) | Realtime projection / Valkey | 短 TTL + heartbeat，超时自动释放 |
 | LangGraph 执行中状态、可恢复 checkpoint 和工作队列指针 | Work (W) | 已选 CheckpointStore / Local Runtime | 通过 Agent Policy 定义保留期、加密、清除与恢复边界 |
-| Canvas Document 当前结构、元素布局、跨域 EntityRef | Master (M) | PostgreSQL SoR + Canvas Projection | tenant/project/worktree RLS；版本化/SCD Type 2；删除关系需审计 |
+| Canvas Document 当前结构、viewport/frames/connectors、元素布局、跨域 EntityRef | Master (M) | PostgreSQL SoR + Canvas Projection | tenant/project/worktree RLS；版本化/SCD Type 2；删除关系需审计；缺失的布局字段不得显示为已持久化 |
 | Group App 排序、固定 App、插件绑定与启用设置 | Master (M) | PostgreSQL SoR | RLS；配置版本历史/SCD Type 2 |
 | Plugin Manifest、兼容性、Capability Schema、批准 Launch Profile | Master (M) | Registry SoR | RLS；版本不可变，升级产生新版本 |
 | Plugin 权限授予、Scope 与 Group 绑定 | Master (M) | PostgreSQL SoR / Permission | RLS + SCD Type 2；撤权事件即时传播 |
+| Canvas Document viewport / frames / visual connectors | Master (M) | `canvas.canvas_document_state` PostgreSQL SoR | Worktree RLS；整体 `document_version` + SCD Type 2；Frame/Connector 只能引用同 Canvas 当前 Element；Connector 不作为 WorkItem dependency SoR |
 | Canvas Element 与 WorkItem / TaskCard 的当前绑定 | Master (M) | PostgreSQL SoR | RLS；typed ref；绑定历史 SCD Type 2 |
 | CLI Session 生命周期和 TaskCard 命令记录 | Transaction (T) | PostgreSQL SoR + Audit | Append-only 审计；终端输出全文依 retention policy 单独保存/脱敏 |
 | Plugin 注册/启停/撤权/迁移记录 | Transaction (T) | PostgreSQL Audit / Event | Append-only；包含 actor、reason、plugin/version 和 correlation_id |
@@ -4362,6 +4371,12 @@ REGISTERED → VALIDATING → CONFIGURING → ACTIVE ↔ DEGRADED
 | Context ingestion | Canvas 文本、插件结果、CLI 输出均标 Untrusted Content，走 Injection 检查与 Secret Redaction | 来源类型、内容引用和策略结果，不默认记全文 |
 
 切换到新 Worktree 时，前端清除上一个 Group 的 entity selection、订阅和未发送上下文；建立新的授权凭据/Realtime subscription。任何被撤销的权限对已有 WebSocket、Plugin capability 和 CLI command token 都须传播撤销，不能只隐藏导航入口。
+
+浏览器通过同源 Group BFF 调用 Group API。BFF 从由认证流程签发的 HttpOnly 会话 Cookie 读取短期 access token，仅在服务端向 Group API 发送 Bearer；写请求校验 Origin，未认证、跨源或上游不可用均明确拒绝。BFF 不是授权层：Group API 仍须验证 JWT、Project membership、Worktree 归属和每项 capability。Cookie 的签发、轮换与撤销由统一身份接入负责。
+
+底栏 Chat/LangGraph 只允许经 Group Chat 认证入口处理：每次发送、start/resume、interrupt approval 与 tool call 都从当前认证请求重新解析 GroupContext 和目标 ACL。现有独立 Chat API 接收调用方 `user_id` 且将 session 保存在进程内；TMO automation 使用 asyncio/TypedDict，均不是 Group-scoped LangGraph runtime，也不能作为产品授权入口。Chat message、LangGraph run 与 checkpoint 分开持久化；checkpoint 只恢复计算状态，不恢复旧授权。
+
+Group App Registry 是 Worktree 下同级应用入口和 capability binding 的事实所有者，必须与 LangGraph `SubAgentRegistry` 和 LLM `ProviderRegistry` 分离。Group 页面当前的插件开关只属于本地 preview，不代表注册、启用或授权。生产热插拔须经受信 manifest/version 校验、服务端 capability grant、调用拦截和撤权传播；在途调用按明确的 cancel/drain 策略结束，禁用后拒绝新调用并保留既有业务事实。
 
 ### 16.11 关键交互流程
 
@@ -4418,8 +4433,9 @@ Chat Bar(scope, text, entity_refs)
 | WTG-006 | §16.1-16.2 | AC-WTG-004 |
 | TCI-001 | §16.2-16.3 | AC-WTG-001 |
 | TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
-| CAN-001/002/003/004/005 | §16.2, §16.5, §16.11 B | AC-CAN-001 |
+| CAN-001/002/003/004/005/006/007 | §16.2, §16.4-16.5, §16.11 B | AC-CAN-001/002 |
 | CHAT-001/002 | §16.4, §16.7, §16.11 C | AC-CHAT-001 |
+| CHAT-003 / PLG-004 | §16.3, §16.7, §16.10 | AC-CHAT-003 / AC-PLG-002 |
 | PLG-001/002/003 | §16.3, §16.8, §16.10 | AC-PLG-001 |
 | LGS-001/002 | §16.7, §16.11 C | AC-CHAT-002 |
 | ARCH-OBL-GRP-001 | §16.4-16.10 | AC-TRACE-001 |
@@ -4443,3 +4459,8 @@ Chat Bar(scope, text, entity_refs)
 | v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 导航明确为 Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Group Apps；将多 Agent Worktree owner/Runtime/PR/冲突/锁可视与受控管理纳入核心职责 | 用户澄清产品要解决多 Agent Worktree 混乱及内部管理不可控 |
 | v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project Worktree Index 与 Worktree Group 的 canonical route；Project Worktrees 视图提供管理入口，Worktree 路由不再落入 Sprint 树视图 | 浏览器验收发现 `/worktree` 曾被重定向到 Sprint |
 | v0.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Index 的 Project 选择编码进 `project_id` deep link；缺少/无效项目时禁止静默回退；Project 页入口与 Group 返回 Index 均保留项目范围 | Project Worktree Index 与 Group 路由详细设计收口 |
+| v0.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v2.5；规定同源 Group BFF、HttpOnly 会话凭据、写请求 Origin 校验及 Group API 二次授权边界 | Phase 3C 接线审计确认浏览器无安全 token provider，新增 BFF 代码切片 |
+| v0.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 TaskExecutionContext 的 Worktree checkout 路径约束、授权过期复核与 Runtime/profile 绑定，并列明尚未完成的交互式会话边界 | Phase 4 首个 Local Runtime 授权门实现并通过 crate 编译 |
+| v0.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v2.6 / Group 详细设计 v0.11；补充 legacy Chat/TMO 不得绕过 GroupContext、checkpoint 不恢复旧授权，以及 Group App Registry 与 SubAgent/Provider registry 分离的生产边界 | Phase 5/6 代码盘点发现现有 Chat/TMO 和插件开关均未接入 Worktree Group |
+| v0.9 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v2.7；规定 Group Canvas 实体跳转不得回退到无 scope 的全局路由，并将 viewport、frames、connectors 纳入 Canvas Document 持久化状态 | Group 页面 API 接线复核发现 Canvas 客户端仍使用临时 viewport，且 legacy fallback 可离开 Group scope |
+| v1.0 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v2.8；固定 Canvas Document 整体版本、幂等 + expected_version、SCD2/Audit/Outbox 原子更新和 canvas-local connector 引用边界 | Phase 3C 实装需要冻结画布并发写和画布连线与任务依赖的事实所有权 |

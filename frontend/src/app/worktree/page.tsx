@@ -6,6 +6,7 @@ CREATE
   (row:Function {name:"Row", type:"function", signature:"Row(props: { label: string; value: React.ReactNode }): JSX.Element", visibility:"private", complexity:"simple"}),
   (apps:Variable {name:"WORKTREE_GROUP_APPS", type:"variable", language:"typescript"}),
   (editor:Variable {name:"MonacoEditor", type:"variable", language:"typescript"}),
+  (productionIndex:Variable {name:"AuthenticatedWorktreeIndex", type:"variable", language:"typescript"}),
   (projects:Variable {name:"projects", type:"variable", language:"typescript"}),
   (agentSessions:Variable {name:"agentSessions", type:"variable", language:"typescript"}),
   (localRuntimes:Variable {name:"localRuntimes", type:"variable", language:"typescript"}),
@@ -33,6 +34,7 @@ CREATE
   (file)-[:CONTAINS]->(row),
   (file)-[:CONTAINS]->(apps),
   (file)-[:CONTAINS]->(editor),
+  (file)-[:CONTAINS]->(productionIndex),
   (file)-[:CONTAINS]->(projectSelectionGate),
   (page)-[:USES]->(projects),
   (page)-[:USES]->(agentSessions),
@@ -64,8 +66,8 @@ CREATE
   (syncProjectSelection)-[:USES]->(persistedProject),
   (syncProjectSelection)-[:USES]->(project),
   (page)-[:CALLS]->(row),
-  (page)-[:USES]->(apps),
-  (page)-[:USES]->(editor);
+  (page)-[:USES]->(apps),(page)-[:USES]->(editor),(page)-[:USES]->(productionIndex),
+  (page)-[:CALLS]->(productionIndex);
 */
 
 "use client";
@@ -82,6 +84,7 @@ import { WORKTREE_SM, type Worktree, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
+import { AuthenticatedWorktreeIndex } from "@/components/AuthenticatedWorktreeIndex";
 import dynamic from "next/dynamic";
 
 function formatTimestamp(value: string): string {
@@ -163,6 +166,10 @@ export default function WorktreePage() {
         WORKTREE_SM.transitions.filter((t) => t.from === wt.status).map((t) => t.to),
       ))
     : [];
+
+  if (requestedProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedProjectId)) {
+    return <AuthenticatedWorktreeIndex projectId={requestedProjectId} />;
+  }
 
   return (
     <div className="max-w-7xl">

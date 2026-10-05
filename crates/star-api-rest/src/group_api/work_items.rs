@@ -2,10 +2,10 @@
 //! CREATE
 //!   (f:File {name:"work_items.rs",type:"file",language:"rust"}),(m:Module {name:"work_items",type:"module",language:"rust"}),
 //!   (c:Class {name:"CreateWorkItemBody",type:"class"}),(t:Class {name:"LifecycleTransitionBody",type:"class"}),(a:Class {name:"AiTaskData",type:"class"}),(x:Class {name:"WorkItemListQuery",type:"class"}),(s:Class {name:"WorktreeScope",type:"class"}),(l:Class {name:"CurrentLifecycle",type:"class"}),(i:Class {name:"IdempotencyRow",type:"class"}),(p:Class {name:"WorkItemProjection",type:"class"}),
-//!   (rt:Function {name:"router",type:"function"}),(cr:Function {name:"create_work_item",type:"function"}),(li:Function {name:"list_work_items",type:"function"}),(ge:Function {name:"get_work_item",type:"function"}),(tr:Function {name:"transition_work_item",type:"function"}),(au:Function {name:"authorize_worktree",type:"function"}),(ld:Function {name:"load_work_item",type:"function"}),(lk:Function {name:"lookup_idempotency",type:"function"}),(sv:Function {name:"save_idempotency",type:"function"}),(hk:Function {name:"idempotency_key",type:"function"}),(rh:Function {name:"request_hash",type:"function"}),(pi:Function {name:"parse_id",type:"function"}),(vc:Function {name:"validate_create_body",type:"function"}),(ais:Function {name:"validate_ai_task_scope",type:"function"}),(vtb:Function {name:"validate_transition_body",type:"function"}),(vt:Function {name:"valid_transition",type:"function"}),(pr:Function {name:"project_work_item",type:"function"}),(dp:Function {name:"default_priority",type:"function"}),(rw:Function {name:"require_task_writer",type:"function"}),
+//!   (rt:Function {name:"router",type:"function"}),(cr:Function {name:"create_work_item",type:"function"}),(cwr:Function {name:"create_work_item_records",type:"function"}),(li:Function {name:"list_work_items",type:"function"}),(ge:Function {name:"get_work_item",type:"function"}),(tr:Function {name:"transition_work_item",type:"function"}),(au:Function {name:"authorize_worktree",type:"function"}),(ld:Function {name:"load_work_item",type:"function"}),(lk:Function {name:"lookup_idempotency",type:"function"}),(sv:Function {name:"save_idempotency",type:"function"}),(hk:Function {name:"idempotency_key",type:"function"}),(rh:Function {name:"request_hash",type:"function"}),(pi:Function {name:"parse_id",type:"function"}),(vc:Function {name:"validate_create_body",type:"function"}),(ais:Function {name:"validate_ai_task_scope",type:"function"}),(vtb:Function {name:"validate_transition_body",type:"function"}),(vt:Function {name:"valid_transition",type:"function"}),(pr:Function {name:"project_work_item",type:"function"}),(dp:Function {name:"default_priority",type:"function"}),(rw:Function {name:"require_task_writer",type:"function"}),
 //!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(c),(m)-[:CONTAINS]->(t),(m)-[:CONTAINS]->(a),(m)-[:CONTAINS]->(x),(m)-[:CONTAINS]->(s),(m)-[:CONTAINS]->(l),(m)-[:CONTAINS]->(i),(m)-[:CONTAINS]->(p),
-//!   (m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(cr),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(ge),(m)-[:CONTAINS]->(tr),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(ld),(m)-[:CONTAINS]->(lk),(m)-[:CONTAINS]->(sv),(m)-[:CONTAINS]->(hk),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(pi),(m)-[:CONTAINS]->(vc),(m)-[:CONTAINS]->(ais),(m)-[:CONTAINS]->(vtb),(m)-[:CONTAINS]->(vt),(m)-[:CONTAINS]->(pr),(m)-[:CONTAINS]->(dp),(m)-[:CONTAINS]->(rw),
-//!   (rt)-[:CALLS]->(cr),(rt)-[:CALLS]->(li),(rt)-[:CALLS]->(ge),(rt)-[:CALLS]->(tr),(cr)-[:CALLS]->(vc),(cr)-[:CALLS]->(au),(cr)-[:CALLS]->(rw),(cr)-[:CALLS]->(ais),(cr)-[:CALLS]->(pi),(cr)-[:CALLS]->(hk),(cr)-[:CALLS]->(rh),(cr)-[:CALLS]->(lk),(cr)-[:CALLS]->(sv),(cr)-[:CALLS]->(ld),(li)-[:CALLS]->(au),(li)-[:CALLS]->(pr),(ge)-[:CALLS]->(au),(ge)-[:CALLS]->(ld),(tr)-[:CALLS]->(vtb),(tr)-[:CALLS]->(au),(tr)-[:CALLS]->(rw),(tr)-[:CALLS]->(pi),(tr)-[:CALLS]->(hk),(tr)-[:CALLS]->(rh),(tr)-[:CALLS]->(lk),(tr)-[:CALLS]->(vt),(tr)-[:CALLS]->(sv),(tr)-[:CALLS]->(ld),(ld)-[:CALLS]->(pr),(vc)-[:CALLS]->(dp);
+//!   (m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(cr),(m)-[:CONTAINS]->(cwr),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(ge),(m)-[:CONTAINS]->(tr),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(ld),(m)-[:CONTAINS]->(lk),(m)-[:CONTAINS]->(sv),(m)-[:CONTAINS]->(hk),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(pi),(m)-[:CONTAINS]->(vc),(m)-[:CONTAINS]->(ais),(m)-[:CONTAINS]->(vtb),(m)-[:CONTAINS]->(vt),(m)-[:CONTAINS]->(pr),(m)-[:CONTAINS]->(dp),(m)-[:CONTAINS]->(rw),
+//!   (rt)-[:CALLS]->(cr),(rt)-[:CALLS]->(li),(rt)-[:CALLS]->(ge),(rt)-[:CALLS]->(tr),(cr)-[:CALLS]->(vc),(cr)-[:CALLS]->(au),(cr)-[:CALLS]->(rw),(cr)-[:CALLS]->(ais),(cr)-[:CALLS]->(pi),(cr)-[:CALLS]->(hk),(cr)-[:CALLS]->(rh),(cr)-[:CALLS]->(lk),(cr)-[:CALLS]->(sv),(cr)-[:CALLS]->(cwr),(li)-[:CALLS]->(au),(li)-[:CALLS]->(pr),(ge)-[:CALLS]->(au),(ge)-[:CALLS]->(ld),(tr)-[:CALLS]->(vtb),(tr)-[:CALLS]->(au),(tr)-[:CALLS]->(rw),(tr)-[:CALLS]->(pi),(tr)-[:CALLS]->(hk),(tr)-[:CALLS]->(rh),(tr)-[:CALLS]->(lk),(tr)-[:CALLS]->(vt),(tr)-[:CALLS]->(sv),(tr)-[:CALLS]->(ld),(cwr)-[:CALLS]->(ld),(ld)-[:CALLS]->(pr),(vc)-[:CALLS]->(dp);
 
 use axum::{
     extract::{Path, Query, State},
@@ -16,7 +16,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, Transaction};
+use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
@@ -25,17 +25,17 @@ use super::{
 };
 
 #[derive(Debug, Deserialize, Serialize)]
-struct CreateWorkItemBody {
-    item_type: String,
-    title: String,
+pub(super) struct CreateWorkItemBody {
+    pub(super) item_type: String,
+    pub(super) title: String,
     #[serde(default)]
-    description: String,
+    pub(super) description: String,
     #[serde(default = "default_priority")]
-    priority: String,
+    pub(super) priority: String,
     #[serde(default)]
-    labels: Vec<String>,
-    ai_task_data: Option<AiTaskData>,
-    correlation_id: Option<Uuid>,
+    pub(super) labels: Vec<String>,
+    pub(super) ai_task_data: Option<AiTaskData>,
+    pub(super) correlation_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -47,9 +47,9 @@ struct LifecycleTransitionBody {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct AiTaskData {
-    objective: String,
-    repository_scope: Vec<Uuid>,
+pub(super) struct AiTaskData {
+    pub(super) objective: String,
+    pub(super) repository_scope: Vec<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -136,14 +136,41 @@ async fn create_work_item(
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
     let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     require_task_writer(&binding.role)?;
-    validate_ai_task_scope(&body, worktree.repo_id)?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(Json(response));
     }
 
-    let work_item_id = Uuid::new_v4();
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let (_, response) = create_work_item_records(
+        &mut tx,
+        &actor,
+        worktree_id,
+        &worktree,
+        &body,
+        &key,
+        correlation_id,
+        "task_card",
+    )
+    .await?;
+    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(response))
+}
+
+pub(super) async fn create_work_item_records(
+    tx: &mut Transaction<'_, Postgres>,
+    actor: &super::AuthUser,
+    worktree_id: Uuid,
+    worktree: &WorktreeScope,
+    body: &CreateWorkItemBody,
+    idempotency_key: &str,
+    correlation_id: Uuid,
+    source: &str,
+) -> Result<(Uuid, Value), GroupApiError> {
+    validate_create_body(body)?;
+    validate_ai_task_scope(body, worktree.repo_id)?;
+    let work_item_id = Uuid::new_v4();
     sqlx::query(
         r#"
         INSERT INTO multica.task_metadata
@@ -163,67 +190,59 @@ async fn create_work_item(
     .bind(&body.labels)
     .bind(body.ai_task_data.as_ref().map(|value| json!(value)))
     .bind(actor.user_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
 
     sqlx::query(
-        r#"
-        INSERT INTO multica.task_lifecycle_current (work_item_id, tenant_id, status, version)
-        VALUES ($1, $2, 'pending', 1)
-        "#,
+        r#"INSERT INTO multica.task_lifecycle_current (work_item_id, tenant_id, status, version)
+           VALUES ($1, $2, 'pending', 1)"#,
     )
     .bind(work_item_id)
     .bind(actor.tenant_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
 
     sqlx::query(
-        r#"
-        INSERT INTO multica.work_item_worktree (tenant_id, project_id, work_item_id, worktree_id)
-        VALUES ($1, $2, $3, $4)
-        "#,
+        r#"INSERT INTO multica.work_item_worktree (tenant_id, project_id, work_item_id, worktree_id)
+           VALUES ($1, $2, $3, $4)"#,
     )
     .bind(actor.tenant_id)
     .bind(worktree.project_id)
     .bind(work_item_id)
     .bind(worktree_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
 
     sqlx::query(
-        r#"
-        INSERT INTO multica.task_lifecycle_audit
-            (tenant_id, project_id, worktree_id, work_item_id, task_card_id,
-             to_status, event_type, actor_id, idempotency_key, correlation_id, details)
-        VALUES ($1, $2, $3, $4, $4, 'pending', 'created', $5, $6, $7, $8)
-        "#,
+        r#"INSERT INTO multica.task_lifecycle_audit
+           (tenant_id, project_id, worktree_id, work_item_id, task_card_id,
+            to_status, event_type, actor_id, idempotency_key, correlation_id, details)
+           VALUES ($1, $2, $3, $4, $4, 'pending', 'created', $5, $6, $7, $8)"#,
     )
     .bind(actor.tenant_id)
     .bind(worktree.project_id)
     .bind(worktree_id)
     .bind(work_item_id)
     .bind(actor.user_id)
-    .bind(&key)
+    .bind(idempotency_key)
     .bind(correlation_id)
-    .bind(json!({ "source": "task_card" }))
-    .execute(&mut *tx)
+    .bind(json!({ "source": source }))
+    .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
 
-    let response = load_work_item(
-        &mut tx,
+    let projection = load_work_item(
+        tx,
         actor.tenant_id,
         worktree.project_id,
         worktree_id,
         work_item_id,
     )
     .await?;
-    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
-    tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+    Ok((work_item_id, projection))
 }
 
 async fn list_work_items(
@@ -590,7 +609,7 @@ pub(super) fn parse_id(value: &str) -> Result<Uuid, GroupApiError> {
     Uuid::parse_str(value).map_err(|_| GroupApiError::bad_request())
 }
 
-fn validate_create_body(body: &CreateWorkItemBody) -> Result<(), GroupApiError> {
+pub(super) fn validate_create_body(body: &CreateWorkItemBody) -> Result<(), GroupApiError> {
     const TYPES: &[&str] = &["epic", "story", "task", "bug", "subtask", "ai_task"];
     const PRIORITIES: &[&str] = &["low", "medium", "high", "urgent"];
     if !TYPES.contains(&body.item_type.as_str())
@@ -613,7 +632,7 @@ fn validate_create_body(body: &CreateWorkItemBody) -> Result<(), GroupApiError> 
     Ok(())
 }
 
-fn validate_ai_task_scope(
+pub(super) fn validate_ai_task_scope(
     body: &CreateWorkItemBody,
     repository_id: Uuid,
 ) -> Result<(), GroupApiError> {

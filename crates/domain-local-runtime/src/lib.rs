@@ -1640,6 +1640,10 @@ pub mod spawn_upload_integration;
 pub mod cli_session;
 pub mod cli_session_lock;
 pub mod cli_session_registry;
+pub mod task_execution;
+pub use task_execution::{
+    TaskCliLaunchProfile, TaskExecutionContext, TaskExecutionError, spawn_authorized_cli,
+};
 pub mod graceful_shutdown;
 pub mod health_self_test;
 pub mod process_supervisor;
