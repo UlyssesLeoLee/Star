@@ -152,9 +152,12 @@ export function GasParticlesField(props: ParticleFieldProps) {
   return (
     <Canvas
       camera={{ position: [0, 0, 1], fov: 50 }}
-      gl={{ alpha: true, antialias: true, powerPreference: "low-power" }}
+      gl={{ alpha: true, antialias: true, powerPreference: "low-power", premultipliedAlpha: false }}
       dpr={[1, 1.5]}
       style={{ background: "transparent" }}
+      onCreated={({ gl }) => {
+        gl.setClearColor(0x000000, 0);
+      }}
     >
       <ParticleField {...props} />
     </Canvas>
