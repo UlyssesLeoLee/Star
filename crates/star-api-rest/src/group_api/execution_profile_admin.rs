@@ -59,23 +59,23 @@
 //!   (state_test)-[:CALLS]->(plan),(rollback_test)-[:CALLS]->(plan),(plan)-[:USES]->(action);
 
 use axum::{
-    Json, Router,
     body::Bytes,
     extract::{DefaultBodyLimit, Path, State},
-    http::{HeaderValue, header},
+    http::{header, HeaderValue},
     middleware::map_response,
     response::{IntoResponse, Response},
     routing::post,
+    Json, Router,
 };
 use domain_agent::execution_profile::{AgentExecutionProfileDocument, MAX_EXECUTION_PROFILE_BYTES};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::FromRow;
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
+    GroupApiState,
 };
 
 const MAX_PROFILE_MUTATION_REQUEST_BYTES: usize = MAX_EXECUTION_PROFILE_BYTES + 2_048;
@@ -666,16 +666,14 @@ mod tests {
         )
         .expect("current active profile can publish a successor");
         assert_eq!(successor.next_version, 5);
-        assert!(
-            plan_profile_transition(
-                ProfileMutationAction::Publish,
-                3,
-                Some(4),
-                Some("active"),
-                None,
-            )
-            .is_err()
-        );
+        assert!(plan_profile_transition(
+            ProfileMutationAction::Publish,
+            3,
+            Some(4),
+            Some("active"),
+            None,
+        )
+        .is_err());
     }
 
     #[test]
@@ -690,16 +688,14 @@ mod tests {
         .expect("active profile can be disabled");
         assert_eq!(disabled.next_version, 3);
         assert_eq!(disabled.lifecycle_state, "disabled");
-        assert!(
-            plan_profile_transition(
-                ProfileMutationAction::Disable,
-                3,
-                Some(3),
-                Some("disabled"),
-                None,
-            )
-            .is_err()
-        );
+        assert!(plan_profile_transition(
+            ProfileMutationAction::Disable,
+            3,
+            Some(3),
+            Some("disabled"),
+            None,
+        )
+        .is_err());
 
         let reenabled = plan_profile_transition(
             ProfileMutationAction::Reenable,
@@ -727,15 +723,13 @@ mod tests {
         assert_eq!(rollback.lifecycle_state, "active");
         assert_eq!(rollback.event_type, "profile_rolled_back");
         assert_eq!(rollback.source_profile_version, Some(3));
-        assert!(
-            plan_profile_transition(
-                ProfileMutationAction::Rollback,
-                7,
-                Some(7),
-                Some("active"),
-                Some(7),
-            )
-            .is_err()
-        );
+        assert!(plan_profile_transition(
+            ProfileMutationAction::Rollback,
+            7,
+            Some(7),
+            Some("active"),
+            Some(7),
+        )
+        .is_err());
     }
 }
