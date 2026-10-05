@@ -9,9 +9,16 @@
 #   - deploy/k3s-local/          (kustomize, 含 envoy 独立 deployment + bff)
 #   - deploy/helm/star/          (helm chart)
 #
-# ⚠️ 未实跑验证声明 (per 守门 #11 缺标比错标安全):
-#   编写时本机 argocd / argocd CLI 均未安装, 本文件未经过
-#   `argocd app diff` 或真机 reconcile 校验。首次落地须实跑校验。
+# ✅ 校验方式 (2026-10-05 实测):
+#   kubectl apply --dry-run=server -f deploy/gitops/argocd/   → exit 0
+#   验证环境: Multipass 1.17.0-rc1 (hcs) + Ubuntu 24.04.5 + k3s v1.36.5+k3s1
+#             + Argo CD v3.5.3 (官方 install.yaml, 7/7 pod Running)
+#
+# 📌 namespace 修正 (v0.2): 本文件原写 `namespace: argocd`, 但 Argo CD 官方
+#   `manifests/install.yaml` **不带 namespace 字段**, 资源实际落在 `default`。
+#   live 集群实测 (kubectl get deploy -A | grep argocd) 全部在 default ns。
+#   server dry-run 最初报 `namespaces "argocd" not found` 抓出此错。
+#   若日后改用 helm chart 装到显式 argocd ns, 须同步改回。
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Namespace
@@ -26,7 +33,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: star
-  namespace: argocd
+  namespace: default
   annotations:
     # 供 Argo CD UI 显示用途, 避免误用
     argocd.argoproj.io/description: |
@@ -52,7 +59,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: star-dev
-  namespace: argocd
+  namespace: default
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -93,7 +100,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: star-staging
-  namespace: argocd
+  namespace: default
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

@@ -1,6 +1,6 @@
 # ADR-0054: 自动部署体系选型 — Argo CD + Kargo + Argo Rollouts
 
-> **状态**：✅ Accepted v0.2 (per 2026-10-05 10:15 JST `ask_6da0b2511bcee76deccb5b21` mp_route_opt1 拍板宿主层, 守门 #10 + #14 v4 Mavis 审核)
+> **状态**：✅ Accepted v0.3（per 2026-10-05 19:58 JST 实跑验证 + 8 处缺陷修正，守门 #10 + #14 v4 Mavis 审核）
 > **日期**：2026-10-04
 > **决策人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签字**：✅ Mavis 接手终审 (per 2026-08-27 19:39 + 21:59 JST 用户三次授权"允许你代签" + 2026-09-11 23:11 JST"真人的内容由 agent 决定")
@@ -181,13 +181,31 @@ Multipass 许可为 **GPL-3.0**（1.16 起 Windows/macOS 部分亦完全开源�
 | 磁盘 28 GB 是否够 k3s + 三件套 + 业务镜像 | 🟡 实跑验证（本机仅余 35.9 GB，刻意留 7.9 GB 给宿主） |
 | rc1 → GA 升级路径 | 🟢 同版本线平滑，升级后重跑 `multipass set local.driver=hcs` 即可 |
 
-### 4.4.5 落地物
+### 4.4.5 落地物与实跑结论（2026-10-05 实跑后更新）
 
 - 安装介质 SHA256 **实测校验通过**：`80d0dbf94f8219b6b9d4d9cdf4ab2020e240772610c62407b544b23a4cd63d87`（78,188,079 bytes，期望值取自 GitHub Releases API `v1.17.0-rc1` asset `digest` 字段）
-- cloud-init 引导：`deploy/multipass/cloud-init-k3s-gitops.yaml`（9 阶段，逐段落 `DONE:`/`FAIL:` 标记）
-- 自动化脚本：`scripts/automation/multipass_k3s_gitops.ps1`（Stage 0 预检 / Stage 1 建 VM / Stage 2 mount / Stage 3 取 kubeconfig）
+- cloud-init 引导：`deploy/multipass/cloud-init-k3s-gitops.yaml`（9 阶段，逐段落 `DONE:`/`FAIL:` 标记）+ 修复引导 `cloud-init-fix-gitops.yaml`
+- 自动化脚本：`scripts/automation/multipass_k3s_gitops.ps1`（预检/建 VM/mount/取 kubeconfig）、`deploy/multipass/fix-rollouts-ns.sh`、`deploy/multipass/install-kargo.sh`
 - 密钥门禁：`scripts/automation/cloudinit_secret_scan.py` + `cloudinit_secret_scan_mutation.py`（6 用例，含对照组与反例守卫）
-- 说明文档：`deploy/multipass/README.md`（含完整未验证清单）
+- 说明文档：`deploy/multipass/README.md`
+
+**✅ 实跑结论（2026-10-05 19:32–19:58 JST）**：
+
+| 项 | 实测 |
+|---|---|
+| `local.driver` | **`hcs`** — 4.4.2 的推断成立，Canonical 宣称的 Home 支持在 Windows 11 家庭版中国区**确实可用** |
+| VM | `star-k3s` Running `10.97.0.116`（Ubuntu 24.04.5 LTS） |
+| 集群 | k3s `v1.36.5+k3s1`，节点 Ready，allocatable 26.6 GB |
+| 三件套 | cert-manager 3/3、Argo CD 7/7、Argo Rollouts 1/1、Kargo 5/5，**合计 19/19 Running，0 重启**，29 CRD |
+| GitOps 资源 | `kubectl apply -f deploy/gitops/{kargo,argocd}/` 均 **exit 0** |
+
+**实跑修正了 4.4 选型阶段无法验证的 3 处假设**（详见 `PHASE-MULTIPASS-K3S-GITOPS-REPORT.md` §2.5）：
+
+1. **Kargo 无 `install.yaml`**（选型阶段写的 URL 实测 404），官方为 OCI Helm chart `oci://ghcr.io/akuity/kargo-charts/kargo`，且 `api.adminAccount.passwordHash` / `tokenSigningKey` 无默认值必须显式提供。
+2. **Argo Rollouts 官方 `install.yaml` 不含 namespaced RBAC**，装到非 `argo-rollouts` 的 namespace 会直接 `CrashLoopBackOff`。
+3. **Argo CD 官方 `install.yaml` 不带 `namespace` 字段**，资源落在 `default`，而非社区文档常见的 `argocd`。
+
+**🟡 残留缺口**：`Kargo promotionTemplate` 各 step 的 `config` **内部**字段名未经官方文档核对 —— CRD schema 与 admission webhook **都只校验到 steps 数组层**，校验不到 step 内部键名。详见报告 §3.2 缺口 #1。
 
 ## 5. Rust 项目特有的两个约束
 
@@ -229,3 +247,4 @@ Multipass 许可为 **GPL-3.0**（1.16 起 Windows/macOS 部分亦完全开源�
 |---|---|---|---|---|
 | v0.1 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：Argo CD 三件套选型 + Spinnaker/Flux 排除实证 + deny.toml 闭合许可门禁缺口 | 2026-10-04 20:50 JST 用户需求 + 21:04 JST `ask_72c00a6f28daadd5538fa004` 拍板 |
 | v0.2 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 新增 §4.4 宿主层选型：Multipass 1.17.0-rc1 + hcs 驱动（本机 Win11 家庭版无完整 Hyper-V 角色，vmms 未装）；落 cloud-init 9 阶段引导 + pwsh 自动化脚本 + cloud-init 密钥扫描门禁（6 用例变异测试）。排除 1.16.4+VirtualBox（NEM 慢速 / deprecated 无迁移 / PUEL 双许可面） | 2026-10-05 ask_6da0b2511bcee76deccb5b21 mp_route_opt1 + install_auth_opt1 |
+| v0.3 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §4.4.5 补实跑结论：`local.driver=hcs` 在 Win11 家庭版中国区**已验证可用**；三件套 19/19 Pod Running；GitOps 资源 `kubectl apply` 双 exit 0。同时记录实跑修正的 3 处上游假设（Kargo 无 install.yaml / Rollouts install.yaml 无 namespaced RBAC / Argo CD install.yaml 无 namespace 字段） | 实跑 2026-10-05 19:32–19:58 JST |

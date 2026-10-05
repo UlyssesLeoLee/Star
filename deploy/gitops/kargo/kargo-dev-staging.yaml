@@ -1,55 +1,103 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Kargo v1.12.1 晋级链路骨架 — dev → staging (本机 k3s 单集群)
+# Kargo v1.12.1 晋级链路 — dev → staging (本机 k3s 单集群)
 #
 # 选型依据: ADR-0054 (per 2026-10-04 21:04 JST 拍板)
-# 校验方式: scripts/automation/validate_gitops_crds.py
-#           (用上游 kargo v1.12.1 CRD 的 openAPIV3Schema 离线校验, exit 0 才算通过)
 #
-# ⚠️ 校验边界 (per 守门 #11 缺标比错标安全):
-#   本文件**结构**已通过 Kargo v1.12.1 官方 CRD schema 校验 (2026-10-05 实测)。
-#   但以下部分**未经运行时验证**, schema 校验无法覆盖:
-#     1) promotionTemplate.spec.steps 为空 —— 内置 promotion step 的准确名称
-#        (如 kargo.akuity.io/git-clone / git-push) 须查 Kargo v1.12 官方文档确认,
-#        本文件刻意留空而非猜测, 避免写入可能错误的 step 名 (缺标比错标安全)。
-#     2) Warehouse subscriptions 为空 —— 镜像坐标须与 CI 实际推送目标对齐后填充。
-#     3) requestedFreight 的 origin/sources 关联关系未经真机 reconcile 验证。
-#   本机 k3s 不可达 (172.28.176.169:6443 connection refused, 2026-10-05 实测),
-#   故无法做 kubectl apply --dry-run=server 或真机 reconcile。
+# ✅ 校验方式 (2026-10-05 实测, 全部经**集群内 live CRD / admission webhook** 确认):
+#   kubectl apply --dry-run=server -f deploy/gitops/kargo/   → exit 0
+#   验证环境: Multipass 1.17.0-rc1 (hcs) + Ubuntu 24.04.5 + k3s v1.36.5+k3s1
+#             + Kargo v1.12.1 (Helm chart, deployed)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 📌 修正史 —— 本文件 6 处错误全部由 live CRD 与 admission webhook 抓出,
+#    离线 schema 校验一个都没抓到。原因见文末「为什么离线校验没抓到」。
+#
+# v0.2 修正 4 处:
+#   1) subscriptions 写成 `image: <字符串>` + `tagSelection` —— 错。
+#      正确结构是 `- image: { repoURL, constraint, ... }`, image 是**对象**。
+#      (admission webhook: "must have exactly one top-level field naming its
+#       type, apart from an optional name field")
+#   2) 字段名是 `constraint`, 不是 `semverConstraint` (v1.x 已改)。
+#   3) 字段名是 `allowTagsRegexes` 且为**数组**, 不是 `allowTags` 字符串。
+#      (webhook: "cannot unmarshal string into Go struct field
+#       Warehouse.spec.image.allowTagsRegexes of type []string")
+#   4) promotionTemplate step 参数字段是 **`config`**, 不是 `with`。
+#      (live CRD: steps.items.properties = as/config/continueOnError/if/
+#       retry/task/uses/vars)
+#
+# v0.3 修正 2 处 —— **namespace 语义, 此前完全搞错**:
+#   5) `Project` 是 **Cluster-scoped**, 且它的 reconcile **会自动创建一个同名
+#      namespace**。官方原文: "Reconciliation of such a resource effects all
+#      boilerplate project initialization, **including the creation of a
+#      specially-labeled Namespace with the same name as the Project**."
+#      所以本文件**不声明任何 Namespace 资源**, 也**不用自己打标签** ——
+#      apply `Project: star` 后 Kargo 自动建 `star` ns。
+#      (v0.2 曾手写 `Namespace: star-kargo` + 臆造的标签
+#       `kargo.akuity.io/project-name: star`, webhook 报
+#       'namespace "star-kargo" is not a project'。真标签是
+#       `kargo.akuity.io/project: "true"`, 且仅用于"纳管预先存在的 ns"这一用途。)
+#   6) Warehouse / Stage 必须放在**与 Project 同名**的 ns (即 `star`),
+#      不能放 `kargo` 控制面 ns。
+#
+# 为什么离线 schema 校验一个都没抓到 (per 2026-10-05 复盘):
+#   - `Warehouse.spec.subscriptions.items` 标了
+#     `x-kubernetes-preserve-unknown-fields: true` (live CRD 实测),
+#     意味着 **CRD 层面完全不管这个结构**, 只有 admission webhook 管。
+#   - `Project` CRD 的 root properties 只有 apiVersion/kind/metadata/status,
+#     **没有 spec** —— 我 v0.1 臆造过 spec.promotionPolicies, 离线校验同样查不出。
+#   → 结论: **结构正确性必须由 server dry-run + admission webhook 判定,
+#     离线 JSON Schema 校验对这些字段是无效的。**
+#
+# ⚠️ 仍未运行时验证 (per 守门 #11 缺标比错标安全):
+#   - promotionTemplate 各 step 的 `config` **内部**字段名未经官方 promotion step
+#     参考表逐项核对; CRD schema 只校验到 steps 数组层, 到不了 step 内部键名。
+#     server dry-run 同样校验不到 —— 这是本文件**唯一**残留的不确定面。
+#   - deploy/dev 与 deploy/staging 分支尚未创建 (git-push 会失败)。
+#   - 镜像坐标 ghcr.io/ulyssesleolee/star 为推测值, 须与 CI 实际推送目标核对。
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Project
 metadata:
   name: star
-  namespace: kargo
-# 注意: Kargo v1.12.1 的 Project CRD **无 spec 字段** (root properties 仅
-# apiVersion/kind/metadata/status, 实测自官方 CRD schema)。v0.x 时期的
-# spec.promotionPolicies 在本版本不存在, 故此处不写。
+# Kargo v1.12.1 的 Project CRD **无 spec 字段** (live CRD 实测: root properties
+# 仅 apiVersion/kind/metadata/status)。promotionPolicies 已迁移到同 ns 内的
+# ProjectConfig (namespaced), 需要时再加本文件末尾的资源。
+# apply 后 Kargo 自动创建同名 `star` namespace —— 下面所有资源都放那里。
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Warehouse: 监听镜像仓库, 按 interval 轮询产出 Freight (不可变版本单元)
-# required: interval, subscriptions  (per CRD schema 实测)
+# required: interval, subscriptions
+#
+# subscriptions 每项: 恰好一个"类型字段"(image / git / chart) + 可选 name。
+# 注意 items 标了 x-kubernetes-preserve-unknown-fields, 结构错只有 webhook 拦。
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Warehouse
 metadata:
   name: star-services
-  namespace: kargo
+  namespace: star
 spec:
   interval: 5m
-  # ⚠️ 镜像坐标为**推测值**, 须与 CI 实际推送目标核对后修正。
-  #    依据: workspace.package.repository = github.com/UlyssesLeoLee/Star,
-  #    故按 GitHub Container Registry 惯例推断为 ghcr.io/<owner>/<repo>。
-  #    若 CI 实际推到其他 registry, 此处订阅将永不产出 Freight (静默失效)。
   subscriptions:
-    - image: ghcr.io/ulyssesleolee/star
-      tagSelection:
-        method: semver
-        allowTags: '^\d+\.\d+\.\d+$'
+    # ⚠️ 镜像坐标为**推测值**, 须与 CI 实际推送目标核对后修正。
+    #    依据: workspace.package.repository = github.com/UlyssesLeoLee/Star,
+    #    故按 GitHub Container Registry 惯例推断为 ghcr.io/<owner>/<repo>。
+    #    若 CI 实际推到其他 registry, 此处订阅将永不产出 Freight (静默失效)。
+    - name: star-images
+      image:
+        repoURL: ghcr.io/ulyssesleolee/star
+        # SemVer 是默认策略; constraint 支持 ^ / ~ / 范围表达式
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        # 仅接受严格三段式版本 tag (x.y.z), 排除 latest / 分支名 / 短 sha
+        # 数组类型 (v0.2 实测: []string)
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage: dev — 自动晋级, 带观察期
 # required: requestedFreight (数组, per CRD schema 实测)
-#   每项结构: { origin: {kind, name}, sources: {requiredSoakTime, ...} }
+#   每项结构: { origin: {kind, name}, sources: {requiredSoakTime, stages} }
 #   ⚠️ origin.kind **只能是 Warehouse** (per CRD enum 实测) —— Stage 之间的
 #      晋级不是靠 origin.kind: Stage, 而是靠本 Stage 的 sources.stages 声明
 #      "只接受来自哪个上游 Stage 的 Freight" (Freight 传递链模型)。
@@ -58,7 +106,7 @@ apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
   name: dev
-  namespace: kargo
+  namespace: star
 spec:
   requestedFreight:
     - origin:
@@ -71,39 +119,48 @@ spec:
     spec:
       # 内置 step 名称依据 kargo v1.12.1 源码树反推 (git_cloner.go / git_commiter.go /
       # git_pusher.go -> git-clone / git-commit / git-push), 非猜测。
-      # ⚠️ 各 step 的 `with` 字段名**未经官方文档逐项核对**, 首次部署前须对照
-      #    https://docs.kargo.io/ 的 promotion step 参考表确认 (缺口见报告 §3 缺口 #12)。
+      # ⚠️ 各 step 的 `config` **内部**字段名未经官方 promotion step 参考表逐项核对
+      #    (见文末「唯一残留的不确定面」)。server dry-run 校验不到这一层。
       steps:
         - uses: kargo.akuity.io/git-clone
-          with:
+          config:
             repoURL: https://github.com/UlyssesLeoLee/Star
             checkout:
-              - branch: dev
+              - branch: deploy/dev
                 fromBranch: main
             path: ./.kargo
         - uses: kargo.akuity.io/git-commit
-          with:
-            path: ./.kargo/dev
+          config:
+            path: ./.kargo
             message: "chore(kargo): promote freight to dev"
         - uses: kargo.akuity.io/git-push
-          with:
+          config:
             remote: origin
             branch: deploy/dev
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage: staging — 从 dev 订阅, 需人工审批
 #
-# 第二阶段扩展 (staging → prod) 时, 在此追加:
-#   - 需审批: 通过 Project 级 PromotionPolicy 或 approval 步骤实现
-#   - Argo Rollouts Analysis 门禁 (指标不达标自动回滚)
-#     挂载点: spec.verification.analysisTemplates (per CRD schema 实测存在该字段)
-#   - 参考 ADR-0054 §6.2 待办 #4
+# 第二阶段扩展 (staging → prod) 时, 在 `star` ns 内加同名的 ProjectConfig
+# (名字须与 Project 一致):
+#   apiVersion: kargo.akuity.io/v1alpha1
+#   kind: ProjectConfig
+#   metadata: { name: star, namespace: star }
+#   spec:
+#     promotionPolicies:
+#       - stageSelector: { name: dev }
+#         autoPromotionEnabled: true
+#       - stageSelector: { name: staging }
+#         autoPromotionEnabled: false        # 人工审批
+#   以及 Argo Rollouts Analysis 门禁
+#   (挂载点: Stage.spec.verification.analysisTemplates, per CRD schema 实测)
+#   参考 ADR-0054 §6.2 待办 #4
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
   name: staging
-  namespace: kargo
+  namespace: star
 spec:
   requestedFreight:
     - origin:
@@ -119,17 +176,17 @@ spec:
     spec:
       steps:
         - uses: kargo.akuity.io/git-clone
-          with:
+          config:
             repoURL: https://github.com/UlyssesLeoLee/Star
             checkout:
-              - branch: staging
-                fromBranch: deploy/staging
+              - branch: deploy/staging
+                fromBranch: deploy/dev
             path: ./.kargo
         - uses: kargo.akuity.io/git-commit
-          with:
-            path: ./.kargo/staging
+          config:
+            path: ./.kargo
             message: "chore(kargo): promote freight to staging"
         - uses: kargo.akuity.io/git-push
-          with:
+          config:
             remote: origin
             branch: deploy/staging

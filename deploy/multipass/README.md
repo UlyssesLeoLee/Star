@@ -1,6 +1,6 @@
 # Multipass 宿主层 — k3s + Argo CD 三件套本机集群
 
-> **落地日期**: 2026-10-05
+> **落地日期**: 2026-10-05 ｜ **实跑**: ✅ 2026-10-05 19:58 JST 三件套 19/19 Pod 跑通（见 §6）
 > **拍板**: per `ask_6da0b2511bcee76deccb5b21` — `mp_route_opt1`（1.17.0-rc1 + hcs 驱动）+ `install_auth_opt1`（用户手动装 MSI）
 > **选型依据**: [ADR-0054](../../../docs/architecture/2026-08-26-upgrade/adr/0054-cd-delivery-stack-argocd-kargo-rollouts.md)（三件套选型）+ 本文 §2（宿主层选型）
 > **许可**: Multipass GPL-3.0 / k3s Apache-2.0 / Argo CD Apache-2.0 / Kargo Apache-2.0 / Argo Rollouts Apache-2.0 / cert-manager Apache-2.0
@@ -131,31 +131,55 @@ pwsh -File scripts/automation/multipass_k3s_gitops.ps1 -Stage all
 **为何要 DONE/FAIL 标记**：cloud-init `runcmd` 全部"尝试过"不等于全部成功。引导脚本
 逐段统计 `FAIL:` 标记而非只看退出码 —— 这与 2026-10-04「CI 报绿 ≠ 门禁跑过」是同族教训。
 
-## 6. ⚠️ 未实跑验证声明
+## 6. ✅ 实跑结果与残留缺口
 
-per 守门 #11「缺标比错标安全」——本目录**尚未实跑**，以下全部为 🟡：
+**本目录已于 2026-10-05 19:32–19:58 JST 实跑。** 19 个 Pod 全部 Running、0 重启。
 
-| 项 | 状态 | 首次落地须做 |
+### 6.1 已验证
+
+| 项 | 实测结果 |
+|---|---|
+| Multipass 1.17.0-rc1 hcs 在 Win11 家庭版中国区 | ✅ `local.driver = hcs`，VM 正常出 IP |
+| 集群网络 | ✅ VM 内 `10.97.0.116`，SSH / k3s 全通 |
+| cloud-init 9 阶段 | ✅ 完成（4 个 FAIL 中 3 个是超时误报，见 §8） |
+| Kargo CRD 字段 | ✅ `kubectl apply` **exit 0**（修正 4 处字段错误后） |
+| Argo CD AppProject / Application | ✅ `kubectl apply` **exit 0**（修正 1 处 namespace 后） |
+| 磁盘 28G 够不够 | ✅ allocatable `ephemeral-storage: 26,603,356,140` |
+| Pod 健康 | ✅ 19/19 Running，29 个 CRD |
+
+### 6.2 仍为 🟡（per 守门 #11 缺标比错标安全）
+
+| 项 | 影响 | 须做 |
 |---|---|---|
-| Multipass 1.17.0-rc1 hcs 在 Win11 家庭版中国区的实际行为 | 🟡 未实跑 | `multipass launch` 后核对 |
-| hcs 驱动的网络/端口转发能力 | 🟡 未实跑 | 验证 `kubectl get nodes` 从 Windows 侧可达 |
-| cloud-init 9 阶段全部通过 | 🟡 未实跑 | 核对 `sudo cat /var/log/star-cloud-init.log` 无 `FAIL:` |
-| Kargo CRD 字段（`kargo.akuity.io/v1alpha1`） | 🟡 未实跑 | `kubectl apply --dry-run=server -f deploy/gitops/kargo/` |
-| Argo CD AppProject / Application 字段 | 🟡 未实跑 | `argocd app diff` |
-| envoy 独立 deployment 能否正常调谐 | 🟡 未实跑 | `kubectl -n star-system get deploy envoy` |
-| Kargo promotion step 的 `with` 字段名 | 🟡 未核对官方文档 | 见 `HANDOFF-SEC-LICENSE-001.md` |
-| 磁盘 28G 是否够 k3s + 三件套 + 业务镜像 | 🟡 未实跑 | `kubectl get nodes -o jsonpath='{.items[*].status.allocatable}'` |
+| Kargo promotion step 的 **`config` 内部字段名** | CRD 与 webhook 都校验不到 step 内部键名，晋级时可能失败 | 查 Kargo v1.12 promotion step 参考表 |
+| `deploy/dev` / `deploy/staging` 分支不存在 | `git-push` step 必失败 | `git branch deploy/dev deploy/staging` |
+| 镜像坐标 `ghcr.io/ulyssesleolee/star` 是推测值 | 不准则 Warehouse 永不产出 Freight | 与 CI 实际推送目标核对 |
+| Windows 侧 `kubectl` 直连 6443 | 当前须 `multipass exec` 进 VM 操作 | 配 kubeconfig / port-forward |
+| `multipass mount` 未启用 | 仓库同步走 `transfer -r` | 管理员 `multipass set local.privileged-mounts=true` |
+| 密钥扫描门禁未接 CI | CI 无门禁 | 挂 `.github/workflows/` |
+| rc1 → GA 升级路径 | 1.17 正式版未发布 | 正式版发布后重跑驱动设置 |
+| envoy 独立 deployment 未调谐验证 | `deploy/k3s-local/` 未 apply | `kubectl -k deploy/k3s-local`（需先有业务镜像） |
 
-YAML **语法**已通过校验（2026-10-05，`yaml.safe_load_all` 通过）。
+> ⚠️ **两个刻意不追求"看起来全绿"的状态**（它们是正确行为，不是缺陷）：
+> `stage/*` 报 `0/1 Fulfilled` + `Stage has no current Freight`（镜像坐标待核对）；
+> `application/star-dev` 报 `Sync=Unknown`（GitHub 上尚无 `dev` 分支）。
 
 ## 7. 故障排查
 
 | 症状 | 处置 |
 |---|---|
 | `multipass set local.driver=hcs` 报错 | hcs 驱动是 1.17 才有，确认 `multipass version` |
-| VM 起来了但 cloud-init 卡住 | `multipass exec star-k3s -- sudo cat /var/log/star-cloud-init.log` |
+| **VM 起来了但 cloud-init 卡住** | `multipass exec star-k3s -- sudo cat /var/log/star-cloud-init.log` |
+| **`multipass exec vm -- 'a; b; c'` 报 `No such file or directory`** | 整串被当成单个文件名。复杂逻辑写成 `.sh` → `transfer` → `bash`，并先在 VM 内 `bash -n` |
+| **`multipass transfer -r` 后文件没更新** | 目标目录已存在时**不覆盖**子文件。先 `rm -rf` 再传，并用 `stat -c %s` vs `Get-Item .Length` 做**字节数 parity 校验** |
+| **`argo-rollouts` CrashLoopBackOff + `configmaps ... is forbidden`** | 装到 `default` ns 导致 namespaced RBAC 失效。装到 `argo-rollouts` ns，见 `fix-rollouts-ns.sh` |
+| **Kargo 安装 URL 404** | Kargo **无 `install.yaml`**，用 Helm chart `oci://ghcr.io/akuity/kargo-charts/kargo`，见 `install-kargo.sh` |
+| **Helm 报 `Kubernetes cluster unreachable: localhost:8080`** | 未设 kubeconfig。加 `--kubeconfig /etc/rancher/k3s/k3s.yaml` 或用 `k3s kubectl` |
+| **Kargo 报 `namespace "x" is not a project`** | 别手写 Namespace/标签。apply `Project` 让 Kargo 自动创建同名 ns（它会打 `kargo.akuity.io/project=true`） |
+| **Argo CD 资源报 `namespaces "argocd" not found`** | 官方 `install.yaml` 不带 namespace，资源落在 `default` |
+| 镜像哈希不匹配 `Hash of ... does not match` | `multipass find --force-update` 清 Qt 陈旧缓存（issue #1714），再 launch |
 | `mount` 失败 | Windows 上 mount 默认关，需管理员跑 `multipass set local.privileged-mounts=true` |
-| Windows 侧 `kubectl` 连不上 6443 | hcs 驱动端口转发能力待验证（§6 🟡） |
+| Windows 侧 `kubectl` 连不上 6443 | 🟡 未验证，见 §6.2 |
 
 ## 8. 与 WSL k3s 的关系
 
