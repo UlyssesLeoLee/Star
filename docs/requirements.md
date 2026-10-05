@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.67）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.72）
 
 ## 0. 文档说明与前提
 
@@ -2478,7 +2478,8 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-ERUN-001 | Project → Branch → Engineering Run → Worktree 主导航保持身份与深链；点击 Run Worktree 后才加载所属 Run tabs，Worktree 只设 focus/CLI target；右侧 Task/Canvas/BI 数据按 Run 授权 | P0 |
 | AC-ERUN-002 | Run Context/API 对每个实体域复验 membership 与 capability；跨域命令调用 owner API，同 owner DB 事务使用 Outbox，消费者经 Inbox 幂等去重；前端不能跨域表写入或直接使用 stored procedure | P0 |
 | AC-ERUN-003 | 同一 Run 切换 Worktree 时 RunContext/context_version 保持 owner 与授权身份，workspace/checkout/binding version 在独立 focus/focus_version 中改变；撤销 Project、Branch 或 Run 任一 grant 后再次解析拒绝；列表不泄露路径，不自动选择首个 checkout | P0 |
-| AC-INFRA-001 | 增加 Rust-native Infrastructure Manager 与 versioned backend/profile/binding 契约，支持用户自有或远端 Linux 环境，并为 K3s 提供受控 discover/provision/readiness/start/stop/drain/upgrade；默认按 Host/environment 共享按需基础设施、Project/Run 分配 namespace/权限/预算，不按每个 Worktree/Agent 复制 VM/控制面。Provider 不得以商业用途、席位或用量计划限制核心能力；版本准入按具体许可履约路径及完整 SPDX/SBOM 检查，活跃社区以近期发布/维护及公开渠道核验。Multipass、Podman machine、Incus、Lima 和 existing cluster 按 host capability 分平台验收；native Hook、租约/CAS、操作幂等和 BI 证据与现有体系一致。Namespace 不独自构成不可信 Agent sandbox，缺 execution capability 仍禁用；不得静默改变用户全局 WSL 配置或回收他人环境 | P0 |
+| AC-INFRA-001 | 增加 Rust-native Infrastructure Manager 与 versioned backend/profile/binding 契约，支持用户自有或远端 Linux 环境，并为 K3s 提供受控 discover/provision/readiness/start/stop/drain/upgrade；默认按 Host/environment 共享按需基础设施、Project/Run 分配 namespace/权限/预算，不按每个 Worktree/Agent 复制 VM/控制面。Provider 不得以商业用途、席位或用量计划限制核心能力；版本准入按具体许可履约路径及完整 SPDX/SBOM 检查，活跃社区以近期发布/维护及公开渠道核验。Multipass 是本地/CI Linux VM 与 K3s guest 的首选管理路径，其它 provider 是经 capability 协商的 fallback/远端路径；native Hook、租约/CAS、操作幂等和 BI 证据与现有体系一致。Namespace 不独自构成不可信 Agent sandbox，缺 execution capability 仍禁用；不得静默改变用户全局 WSL 配置或回收他人环境 | P0 |
+| AC-INFRA-002 | Rust Host Infrastructure Manager 通过受限 Multipass adapter 管理本地/CI Linux guest 中的 K3s；标准本地 profile 复用 Host/environment 级 VM 与 K3s control plane，再以 Project/Run namespace、ServiceAccount、quota 与网络策略隔离工作，不按 Worktree/Agent 复制整套 VM。VM image、cloud-init、K3s 版本/digest、CPU/内存/磁盘、操作 owner 和状态版本必须固定并审计；资源预算未知或不足时拒绝创建/扩容。只有可信 Manager 可调用 Multipass daemon；Task CLI、Agent 与 Plugin 不得获得 daemon/socket、任意 Multipass 子命令、任意宿主 shell 或未审核 host mount。Worktree 内容通过显式授权、路径校验和有界的 guest workspace bridge 暴露；Guest ready 不等同于 Agent sandbox ready；生产/远端集群保留独立 provider。设置在 Advanced Settings → Infrastructure；导航仍为 Project → Cloud Branch → Engineering Run → Worktree focus | P0 |
 | AC-ERUN-004 | 新 CLI TaskExecutionRun 的 EngineeringRun 身份由服务端反查当前 Worktree binding，复验 Project/Branch/Run writer grants、当前 revisions、checkout 分支及 Task 关联；在准入短事务中再次核验完整快照，持久化独立 EngineeringRun ID 与精确 tuple，并绑定 V2 Runtime fence。旧无归属记录保留只读，不能猜回填或重复启动；新 CLI NULL 身份写入、snapshot 错配/超限、跨 scope FK 与 binding/grant 变化必须拒绝。CLI attachment 签发也须复核当前三层授权与该 Session 对应的已存身份；status/cancel 保留授权后的安全清理语义。Task 本身的 Run ownership、生产 provisioner/OS sandbox 与执行结果闭环另行验收 | P0 |
 | AC-ERUN-005 | 每张新 Task Card 必须写入完整 canonical Run owner tuple；Run 列表按完整 owner 身份分页，Worktree 兼容 API、Canvas Task Card 创建、CLI admission、Session attach 与 TaskExecutionRun list/detail 均校验当前 owner 和所选 Worktree 的 Run 一致；跨 Run 关联/重绑定必须拒绝。旧无 owner 记录不自动回填，须只读直到受审计的 SCD2 reconciliation；新 owner migration/outbox 在目标数据库与应用身份 RLS 验收前不算生产启用 | P0 |
 | AC-ERUN-006 | Engineering Run 默认打开同级 Task Cards App；列表只消费带当前宿主 Bearer 会话的 canonical Run-scoped API，逐页最多 12 条、响应最多 2 MiB、当前仅驻留一页并限制最多浏览 100 页；服务端未授权/未开放时显示明确阻断或错误状态，不得回退 Worktree 旧列表、seed 或浏览器演示任务。卡内 CLI 在执行准入、Runtime sandbox、取消/恢复、独立验证与结果回写闭环验收前必须禁用 | P0 |
@@ -2576,7 +2577,11 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 #### Phase 9F4C-B Rule enable-time run-as authorization acceptance gate
 
-创建启用 Rule 或将 disabled Rule 重新启用时，API 必须在写事务内读取并复验固定 run-as actor 的 current Project/Run writer grants 与 active Run；current Branch grant 必须存在。修改规则的编辑者仍单独通过当前 Project/Run 管理授权。目录 ACL runtime role 只取得 SELECT 权限。停用 Rule 不依赖 run-as actor 仍有权限，使管理员在撤权后可以安全停止后续计划。Disposable PostgreSQL 18.6 canonical ACL fixture 已覆盖 active developer authorization、Project/Branch/Run 任一撤权和 paused Run 拒绝。授权查询未锁定 grant 行，因此与并发撤权的严格串行化尚未实现，完整 create/revise rollback、grant mutation race、生产 target grants 仍待验证。该 API gate 不满足无人值守的每次触发要求；新触发/retry/resume 仍须由同事务 admission writer 重验权限与 execution capability。
+创建启用 Rule 或将 disabled Rule 重新启用时，API 必须在写事务内读取并复验固定 run-as actor 的 current Project/Run writer grants 与 active Run；current Branch grant 必须存在。修改规则的编辑者仍单独通过当前 Project/Run 管理授权。目录 ACL runtime role 对授权表只取得 SELECT 权限，并可执行受 tenant/actor/scope 检查的授权锁 helper。停用 Rule 不依赖 run-as actor 仍有权限，使管理员在撤权后可以安全停止后续计划。Disposable PostgreSQL 18.6 canonical ACL fixture 覆盖 active developer authorization、Project/Branch/Run 任一撤权和 paused Run 拒绝；Phase 9F4C-C 验收这些 ACL 撤权与 Rule enable-time authorization 的项目级事务锁排序。完整 create/revise rollback 与生产 target grants 仍待验证。该 API gate 不满足无人值守的每次触发要求；新触发/retry/resume 仍须由同一 admission transaction 重验权限与 execution capability。
+
+#### Phase 9F4C-C Schedule run-as ACL mutation serialization acceptance gate
+
+启用 Rule 的 run-as 授权事务与该 Project 的 Project、Branch、Engineering Run grant 插入/更新/撤销必须持有同一项目范围事务 advisory lock。授权事务在确认当前租户、actor、Project、Run 与 ACL bindings 后先取锁，再用后续 SQL statement 读取当前授权；grant mutation trigger 也须先取得同一把锁。撤权先提交时，新授权必须读到已撤权并 fail closed；授权事务先取锁时，重叠撤权必须等待至 Rule 写事务提交，再对后续授权请求生效。锁按 Project 隔离，不应把不同 Project 的 Schedule 授权全局串行化；运行角色不得获得 canonical ACL 表 UPDATE 权限。Disposable PostgreSQL 18.6 双连接测试必须分别覆盖 Project、Branch、Run grant 撤权等待与撤权提交后的拒绝。此门只证明 Rule 写授权和 grant mutation 的竞态顺序，不代表无人值守 worker 已经接线；每次触发/retry/resume 的实时 run-as、target、Profile、HookSet、quota 重验以及原子 Run admission 仍须 fail closed 直至实现。
 
 ### 50.8C 可扩展 Agent Execution Profile：Agent、Memory、Skill、Context、Validation
 
@@ -2723,7 +2728,25 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 
 Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业用途、行业、部署规模、席位、用量或付费 tier 设产品限制。GPL/AGPL/LGPL 允许商业使用和销售，copyleft 不构成用途限制；每种修改、链接、捆绑、安装与再分发形态须按实际组合履行对应源码、许可证、NOTICE、安装信息等义务。履约方式应支持上游分发、符合要求的受管安装/捆绑和独立 provider 交付；不得仅因 copyleft 强制用户手工自装。排除非商业、field-of-use、source-available 和实际禁止商业使用的组件。每个版本检查实际构建/交付闭包的 SPDX/SBOM，不能只凭上游仓库根许可证放行；按适用许可证保留版权、NOTICE 与专利声明。
 
-社区活跃度以评估日前 12 个月的维护提交或正式发布、公开维护/安全渠道、明确维护者与升级策略复核。建议 provider 组合为本地 VM 的 Multipass、容器/VM workflow 的 Podman machine、Linux shared VM/container 的 Incus、macOS/Linux 的 Lima，以及用户自有/远端 Linux K3s；它们是可替换 adapter 候选。产品须支持发现既有 provider、引导安装和履行许可义务后的受管安装/捆绑；不得因 copyleft 把手工安装设为唯一入口，也不按席位、用量或用途收费封锁。Multipass GPL-3.0 允许商业使用；随产品分发时履行 GPL 义务。上游将其定位于本地开发/测试环境，daemon 控制权不能单独构成不可信 Agent sandbox。K3s 运行在 Linux 节点/guest，不原生支持 Windows。Windows、macOS 与 Linux backend 以每个已验收版本的 capability probe 判定；截至本次审查 K3s stable channel 指向 v1.36.4+k3s1，1.37 系列仍为预发布。候选来源、许可义务及未验证范围见 DD-LOCAL-INFRASTRUCTURE-001 v0.4。
+社区活跃度以评估日前 12 个月的维护提交或正式发布、公开维护/安全渠道、明确维护者与升级策略复核。Multipass 是本地/CI Linux VM 与 K3s guest 的首选管理路径；Podman machine、Linux Incus、macOS/Linux Lima 与用户自有/远端 Linux K3s 是 capability-negotiated fallback 或独立环境 adapter。产品须支持发现既有 provider、引导安装和履行许可义务后的受管安装/捆绑；不得因 copyleft 把手工安装设为唯一入口，也不按席位、用量或用途收费封锁。Multipass GPL-3.0 允许商业使用；随产品分发时履行 GPL 义务。其官方定位是本地开发/测试，daemon 权限可管理实例和 host mounts，因此只由受限可信 Manager 操作，不得作为不可信 Agent sandbox。K3s 运行在 Linux 节点/guest，不原生支持 Windows。Windows、macOS 与 Linux backend 以每个已验收版本的 capability probe 判定；K3s stable channel 于 2026-10-05 复核为 v1.36.5+k3s1，部署仍须按产品批准的版本/digest 固定。宿主 PoC 与产品集成状态见 DD-LOCAL-INFRASTRUCTURE-001 v0.8。
+
+### 50.8H Multipass 管理的本地 K3s VM
+
+本地与 CI 开发环境以 Multipass 管理 Linux guest，并在 guest 内运行 K3s。默认按 Host/environment 共享一套按需 VM/K3s server；Worktree、Agent 与 Task 绑定到 Run 工作空间，不复制 VM 或控制面。标准 profile 从单 server 节点开始，可在显式资源准入后增加 K3s agent 节点；本地开发 profile 不承诺 HA，生产控制面使用单独评审的远端/生产 provider。K3s 官方资源表来自特定硬件和 workload，且不含管理、日志、镜像和应用负载开销，因此产品不得将上游最低值直接当作桌面可承载并发数；必须先扣除宿主 reserve、Multipass 已分配实例和非渡口负载，实测后才制定 profile 上限。
+
+当前宿主级验证记录在 [`PHASE-MULTIPASS-K3S-GITOPS-REPORT.md`](reports/PHASE-MULTIPASS-K3S-GITOPS-REPORT.md)：Windows 11 Home 的 Multipass 1.17.0-rc1/HCS VM 内运行 Ubuntu 24.04.5、K3s v1.36.5+k3s1，GitOps 基础设施组件共 19/19 Pod Running。它验证的是一次本机 host/bootstrap/GitOps PoC；Star 应用内 provider lifecycle、Run 绑定、workspace bridge、Agent sandbox、跨 OS driver 与桌面/RSS 性能仍须独立实现和验收。
+
+Multipass daemon/CLI 按宿主高权限边界处理。Rust Infrastructure Manager 是唯一允许调用 Multipass 的产品组件，使用 argv 参数数组、有界 deadline/output、固定子命令 allowlist、版本化 instance ownership tag 与幂等 operation receipt；不通过 shell 拼接命令，不向插件、Task CLI、Agent 或 K3s workload 暴露 daemon 访问凭据。只允许依据 owner ledger 精确匹配 instance 的 start/stop；永久回收仅允许在 drain、租约释放、保留期及再次授权通过后对单一自有 instance 执行 `delete --purge <instance>`，禁止无参数全局 `purge`、`delete --all`、未归属实例操作、静默切换 Multipass driver 或改变全局宿主设置。cloud-init、guest image、K3s 与安装脚本固定版本/digest；若已安装版本声明支持 Multipass `wait-ready --timeout`，它仅判定 daemon 已初始化并可接受命令；VM 以单实例 `info/list` 状态另判，guest 与 K3s readiness 必须通过固定 profile probe、API 可达、节点 Ready 与 CRI 检查后分别记录，任一未知不得宣称可执行。
+
+Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权目录 resolver 生成窄路径映射，拒绝符号链接越界；首选受控文件同步/guest checkout bridge。确需挂载时必须是受 Hook 策略保护、范围最小且可审计的显式能力；不支持所需隔离能力的 Multipass driver 禁用挂载执行，不能降级为挂载整个用户目录。K3s namespace、Pod Security、NetworkPolicy 与 ResourceQuota 仍不等同于完整不可信代码隔离；Agent CLI 必须等待单独的 Runtime sandbox、Hook、取消/恢复与独立验证验收。管理 UI 在 Advanced Settings → Infrastructure，按 Run 投影展示绑定 VM、K3s readiness、预算和错误，不增加主导航层级。
+
+| 验收 ID | 受入基准 |
+|---|---|
+| AC-INFRA-002-A | 首选 Multipass 的 host capability probe 能识别版本/driver/资源；固定 image/cloud-init/K3s digest 可重放；异常和未知输出 fail closed |
+| AC-INFRA-002-B | 多 Run/Worktree 共用 Host/environment VM 与 K3s；Project/Run quota 与 reservation 可观测，容量不足/未知时拒绝准入；不会按 Agent/Worktree 数量复制 control plane |
+| AC-INFRA-002-C | 仅可信 Infrastructure Manager 可执行受限、无 shell 的 Multipass lifecycle；仅可操作 owner ledger 精确匹配的 VM；全局 `purge`、`delete --all`、任意 guest `exec`、越权子命令、未经授权 mount 与静默宿主变更均被拒绝并产生审计证据；单实例永久删除须通过 drain、租约释放、保留期、Hook 与二次授权门 |
+| AC-INFRA-002-D | Worktree guest workspace 映射绑定当前 Worktree/Run revision 并通过路径越界负例；daemon、VM、K3s API/node/CRI 与 Agent Runtime sandbox 就绪状态分层记录；无受控 bridge 或所需 sandbox 时 CLI 保持禁用 |
+| AC-INFRA-002-E | Linux/macOS/Windows 按实际 Multipass driver capability 分别验收；固定负载记录桌面/VM/K3s/Agent 峰值 RSS、CPU、IO、冷启动、取消/drain 和并行公平性；无实测不宣称性能目标已达成 |
 
 ### 50.9 追溯与后续专题同步
 
@@ -2832,3 +2855,8 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 | v5.65 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 9F4C-B Rule create/enable 的 run-as 当前 Project/Run writer 与 active Run 检查、撤权后可停用契约；明确这不替代每次触发授权，也不关闭 Schedule worker/admission/BI 门 | 用户确认 Schedule creator 固定 run-as、每次触发复验且撤权 fail closed，并继续落实 API enable gate |
 | v5.66 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F4C-B 的纯角色策略 helper 单测 1/1 通过，并把 SQL ACL fixture 缺失与 trigger/retry/resume worker 未实现作为独立缺口；保持 AC-LOOP-008/009 未通过 | 补充最终隔离 target 链接测试结果并复核文档不得将 enable-time gate 记作执行时授权 |
 | v5.67 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F4C-B canonical PostgreSQL ACL helper 在只读 directory runtime role 下的 active/revoked/paused 实测；明确并发撤权未串行化，保留完整写事务回滚、per-trigger worker、Run admission、目标 grants、BI 与 AC-LOOP-008/009 开放状态 | 完成 ACL runner 修复并通过 PostgreSQL 18.6 验证后对齐需求状态 |
+| v5.68 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 9F4C-C：Project/Branch/Run ACL mutation 与 Rule run-as 授权共用 Project-scoped transaction advisory lock；记录只读 runtime role 下三类并发撤权均等待授权事务提交、之后 fail closed；明确生产 grants、worker 每触发重授权、Run admission、consumer 和 BI 仍开放 | 完成授权/撤权竞态序列化 migration 与 PostgreSQL 18.6 双连接验收后对齐要求 |
+| v5.69 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Multipass 从本地 VM 首选候选提升为本地/CI Linux guest 与 K3s 的首选管理路径；新增 Host-shared VM/K3s、受限 Rust Manager、Worktree workspace bridge、资源预算、隔离边界与分平台验收要求；复核 K3s stable channel 为 v1.36.5+k3s1；同步基本设计与 Infrastructure DD | 用户明确后续将用 Multipass 管理虚拟机中的 K3s，要求反映重大架构调整 |
+| v5.70 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 dev 已有 Multipass 1.17.0-rc1/HCS + Ubuntu/K3s + 19/19 GitOps Pod 实跑登记为宿主 PoC；明确它不等价于 Star provider、Run/workspace binding、Agent sandbox、跨平台 capability 或 RSS 验收；同步 basic v5.67 与 Infrastructure DD v0.6 | 代码/文档对账发现 dev 已有宿主层实跑记录，需要避免把“尚未实现”与“已有 PoC”混为一谈 |
+| v5.71 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Multipass daemon wait-ready、单 VM、K3s 与 Agent Runtime sandbox readiness 分层；固定仅对精确 owner instance 执行 delete --purge，并禁止全局 purge/delete --all 与任意 exec；同步 basic v5.68、Infrastructure DD v0.7 与实施计划 v5.94 | 按官方 Multipass CLI 语义校准 provider 生命周期和安全验收契约 |
+| v5.72 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Multipass 商业开源与社区准入段的 Infrastructure DD 引用同步到现行 v0.8；同步 basic v5.69、实施计划 v5.95 和 Infrastructure DD v0.8 的版本指针；不改变实现状态或验收结论 | 文档一致性复核发现活动正文保留过期的 v0.6 引用 |
