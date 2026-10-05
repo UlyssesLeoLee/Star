@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.63 (2026-10-05)
-> **上游要件定义书**: docs/requirements.md v5.66
+> **文档版本**: v5.64 (2026-10-05)
+> **上游要件定义书**: docs/requirements.md v5.67
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4874,7 +4874,7 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 
 ### 16.25 Phase 9F4C-B Rule enable-time run-as authorization
 
-规则管理员与无人值守执行主体分开授权。创建启用 Rule 时使用创建者派生的固定 `run_as_actor_id`；重新启用 successor 时使用锁定 revision 中的原主体。写事务锁定并检查 run-as 当前 Project/Run writer bindings、Branch 当前 grant 与 Engineering Run `active` 状态。编辑者另行通过自己的 Rule 管理权限；停用不要求创建者仍有权限，从而能在撤权后停止 Rule。此逻辑已在 API 源码接入并通过定向 crate all-targets check、rustfmt 和纯角色策略 helper 单测 1/1（tenant_admin/developer/project_admin 接受，viewer/agent/空角色拒绝）；该单测不覆盖数据库授权查询，但实际 authorization SQL 尚未由带 canonical Directory grants fixtures 的 disposable PostgreSQL 集成验证。worker 每次新 occurrence、retry 和 resume 的当前身份/执行能力检查仍未实现，Schedule 继续 fail closed。
+规则管理员与无人值守执行主体分开授权。创建启用 Rule 时使用创建者派生的固定 `run_as_actor_id`；重新启用 successor 时使用锁定 revision 中的原主体。Rule 写事务读取并检查 run-as 当前 Project/Run writer grants、Branch 当前 grant 与 Engineering Run `active` 状态；目录 ACL 表对 runtime role 只读。编辑者另行通过自己的 Rule 管理权限；停用不要求创建者仍有权限，从而能在撤权后停止 Rule。Disposable PostgreSQL 18.6 的 canonical Directory ACL fixture 已调用实际授权 helper：active developer grants 通过，Project/Branch/Run 任一撤权和 paused Run 均 fail closed。授权查询不锁 grant 行，因此尚未证明与同时发生的撤权严格串行；完整 API create/revise rollback、并发授权变更与生产 grants 仍未验证。该 gate 只保护 Rule enable 操作；worker 每次新 occurrence、retry 和 resume 的当前身份/执行能力检查仍未实现，Schedule 继续 fail closed。
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -4984,3 +4984,4 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 | v5.61 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.64；增加 9F4C-A admitted Run 不可变关联、schedule Run Outbox、8 表 FORCE RLS 与隔离 PostgreSQL 验证边界；明确生产 admission writer、实时 run-as/target/quota recheck、Reservation/RunEvent、consumer 和 BI 未完成 | 用户确认 creator-as-run-as 撤权 fail-closed 并继续 Schedule admission persistence |
 | v5.62 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.65 与 Schedule API v0.9；定义规则 editor/run-as 双身份、启用时当前 Project/Run 权限复验以及撤权后停用路径，保留 per-trigger worker 与 SQL integration test 门 | 用户明确规则创建者固定 run-as、每次触发复验且撤权 fail closed |
 | v5.63 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.66 与 Schedule API v0.10；记录 9F4C-B all-targets/rustfmt 及纯角色策略单测 1/1，明确新授权 SQL 无 disposable Directory ACL fixture、per-trigger worker 与 admission 仍未实现 | 完成 API enable gate 的隔离链接验证并复核实现边界 |
+| v5.64 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.67 与 Schedule API v0.11；记录只读 runtime role 下 canonical PostgreSQL ACL active/revoked/paused 实测，明确授权读取与并发撤权未串行化，保留完整 API transaction、worker/admission 和生产 grants 门 | 修复 Directory ACL runner 后完成隔离 PostgreSQL 18.6 验证并更新基本设计 |

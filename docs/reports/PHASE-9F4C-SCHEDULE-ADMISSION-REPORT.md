@@ -2,7 +2,7 @@
 
 > 状态：🟡 9F4C-A 数据持久化与 9F4C-B API enable-time 授权切片已实现并验证；生产 Schedule execution 未开放。
 > 日期：2026-10-05
-> 版本：v0.4
+> 版本：v0.5
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 
 ## §0 目的
@@ -15,31 +15,31 @@
 
 | 范围 | 结果 | 验收/文档 |
 |---|---|---|
-| Dispatch → Run | 新增 nullable `occurrence_dispatch.admitted_run_id`，tenant/run 复合 FK；只允许 `leased → admitted` 时绑定，绑定不可清空/替换；数据库核对 schedule-origin 与 occurrence 一致 | requirements AC-LOOP-009；Schedule API SRS/BD/DD v0.10 |
-| Schedule Run Outbox | 新增 tenant-scoped append-only Outbox；复合 FK 固定 Rule revision、occurrence、Run/Task/Project；检查 schedule origin、agent channel、run-as 与 dispatch link；每 occurrence/event type 唯一 | Data Design v1.2 §4.13.5；Group DD v4.45 §8.10/§10.2 |
-| Rule enable-time run-as authorization | editor 与执行身份分离；enabled create/revision 在写事务复验固定 run-as actor 的当前 Project/Run writer grant 与 active Run，保留当前 Branch binding 检查；管理员撤权后仍可停用 | requirements v5.66/SRS v0.10、basic v5.63/BD v0.10、Group DD v4.45、API source |
+| Dispatch → Run | 新增 nullable `occurrence_dispatch.admitted_run_id`，tenant/run 复合 FK；只允许 `leased → admitted` 时绑定，绑定不可清空/替换；数据库核对 schedule-origin 与 occurrence 一致 | requirements AC-LOOP-009；Schedule API SRS/BD/DD v0.11 |
+| Schedule Run Outbox | 新增 tenant-scoped append-only Outbox；复合 FK 固定 Rule revision、occurrence、Run/Task/Project；检查 schedule origin、agent channel、run-as 与 dispatch link；每 occurrence/event type 唯一 | Data Design v1.3 §4.13.5；Group DD v4.46 §8.10/§10.2 |
+| Rule enable-time run-as authorization | editor 与执行身份分离；enabled create/revision 在写事务复验固定 run-as actor 的当前 Project/Run writer grant 与 active Run，保留当前 Branch binding 检查；管理员撤权后仍可停用 | requirements v5.67/SRS v0.11、basic v5.64/BD v0.11、Group DD v4.46、API source |
 | Runtime DB boundary | 新增表启用并强制 tenant RLS；runner 以非 superuser runtime role 验证 tenant 隔离 | disposable PostgreSQL 18.6 |
-| Automation runner | 将 admission migration 纳入四 migration chain，增加合法关联、run-as mismatch、Run link immutable、Outbox UPDATE refusal 与 tenant isolation assertions；将 9F4C-B creator-selection 和角色授权 helper 两个 Rust API tests 纳入 runner | `scripts/automation/phase9f3_schedule.py`；automation-design v2.4 §4.46/§4.48；registry v0.54 |
-| 设计与计划 | 同步主需求、基本设计、详细设计、数据设计、Schedule API addenda、Worktree Group 实施计划及阶段报告 | requirements v5.66；basic v5.63；Group DD v4.45；Data Design v1.2；plan v5.88；Schedule API SRS/BD/DD v0.10 |
+| Automation runner | 将 admission migration 纳入四 migration chain，增加合法关联、run-as mismatch、Run link immutable、Outbox UPDATE refusal 与 tenant isolation assertions；纳入 9F4C-B Rust helpers，并加入 canonical Project/Branch/Run ACL PostgreSQL fixture | `scripts/automation/phase9f3_schedule.py`；automation-design v2.5 §4.49；registry v0.55 |
+| 设计与计划 | 同步主需求、基本设计、详细设计、数据设计、Schedule API addenda、Worktree Group 实施计划及阶段报告 | requirements v5.67；basic v5.64；Group DD v4.46；Data Design v1.3；plan v5.90；Schedule API SRS/BD/DD v0.11 |
 
 ## §2 验证摘要
 
 | 验证 | 结果 |
 |---|---|
 | `python -m py_compile scripts/automation/phase9f3_schedule.py` | exit 0 |
-| `scripts/automation/phase9f3_schedule.py` 完整 runner（显式 Rust 1.98.1 cargo/rustfmt 与 Docker PostgreSQL 18.6） | 修正后的最终完整执行 overall `passed`；focused rustfmt、domain tests、API/adapter all-target checks、targeted Clippy 与 PostgreSQL integration harness compile 通过；四 migration chain 在同一 disposable DB 中双次应用 |
+| `scripts/automation/phase9f3_schedule.py` 完整 runner（显式 Rust 1.98.1 cargo/rustfmt 与 Docker PostgreSQL 18.6） | 最终执行 overall `passed`；focused rustfmt、domain tests、API/adapter all-target checks、targeted Clippy 与 PostgreSQL integration harness compile 通过；四 migration chain 在同一 disposable DB 中双次应用 |
 | PostgreSQL migration chain | 9F2、9F4A、9F4B、9F4C-A 完整链重复应用；8 张 Schedule 表均启用 `FORCE ROW LEVEL SECURITY` |
 | DB admission assertions | 合法 schedule-origin Run/dispatch/Outbox 通过；run-as mismatch、已绑定 Run 替换与 Outbox UPDATE 被拒。SQL guard 也拒绝 Outbox DELETE/TRUNCATE 和其它 source/channel mismatch，但当前 runner 未单独覆盖这些负例 |
 | runtime tenant isolation | `NOSUPERUSER NOBYPASSRLS` fixture role 仅读取自己的 tenant Outbox row |
 | 既有 adapter cases | 五个 ignored PostgreSQL adapter scenarios 全通过 |
 | 应用层 admission | 未实现、未验证；没有 production worker/writer，也未测试 reservation transaction rollback/concurrent admission |
-| 9F4C-B API authorization | `cargo check --locked -p star-api-rest --all-targets -j 4` 与 focused rustfmt 通过；`cargo test --locked -p star-api-rest --lib task_execution_rules_do_not_grant_agent_role_schedule_authority -j 4 --target-dir E:\DevCache\cargo\target-schedule-auth-20261005` 1 passed/130 filtered。新 ACL SQL 没有 canonical Project/Branch/Run grant disposable PostgreSQL fixture，不能据此声称成功/撤权 SQL 运行路径已验证 |
-| 可复跑 API 授权测试 | `phase9f3_schedule.py` 已登记 creator-selection 与 role-policy helper 两个 Cargo test steps；本次独立 target 下 role-policy test 1/1 通过。完整 runner 未为本次复核再次运行，且现有 runner不加载 canonical Directory ACL fixture |
-| 链接与追溯守门 | 最终 focused API helper test 使用独立 Cargo target 链接成功；`registry_check.py` exit 0、0 errors、191 warnings；`git diff --check`、focused rustfmt 与 CGG freshness check 通过 |
+| 9F4C-B API authorization | Full runner 编译并执行授权 helper；canonical disposable PostgreSQL fixture 1/1 通过，覆盖 active developer grants、Project/Branch/Run 分别撤权及 paused Run 拒绝 |
+| 授权 SQL 权限边界 | canonical ACL helper 以 directory ACL 表只读 runtime role 通过 active/revoked/paused 场景；helper 在 Rule 写事务内读取当前 ACL，但不锁定 grant 行，并发撤权串行化仍开放 |
+| 链接与追溯守门 | `registry_check.py` exit 0、0 errors、191 warnings；最终 `git diff --check`、focused rustfmt 与 CGG freshness check 通过 |
 | 目标环境 | 未连接；目标 migration principal、database grants 与生产 RLS 尚未验收 |
 
 Docker runner 使用 disposable PostgreSQL 18.6、loopback-only port mapping 和本次创建的精确容器名；容器由 runner 清理。它不修改目标数据库。
-9F4C-B focused test 首次使用共享 Cargo target 时遇到 `LNK1104`，独立 `--target-dir` 重跑后 1/1 通过；报告只将最终隔离 target 成功计为测试证据。纯角色策略 helper 单测不执行新增授权 SQL。
+9F4C-B focused test 首次使用共享 Cargo target 时遇到 `LNK1104`，曾使用独立 target 隔离验证。该早期测试不执行授权 SQL；本轮最终完整 runner 已另行通过 canonical PostgreSQL ACL fixture，报告以该数据库用例作为授权 SQL 证据。
 
 
 自审发现原 run-as mismatch fixture 与合法 Outbox 共用 occurrence/event 唯一键，可能只触发唯一约束；已将负例移至合法 Outbox 插入前，并要求命中精确的 trigger error。随后首次重跑暴露容器内 `psql` 走默认 socket 的 runner 连接错误；改为容器内 `127.0.0.1` TCP 后，完整 runner 最终通过。报告只计入修正后的最终成功证据。
@@ -56,7 +56,7 @@ Docker runner 使用 disposable PostgreSQL 18.6、loopback-only port mapping 和
 8. 目标环境 migration owner、runtime role、schema/table grants、RLS 与权限矩阵未验证。
 9. BI/Benchmark 还未消费 admission Outbox，也未验证 coverage、拒绝原因、misfire 或 schedule success 的正式投影。
 10. 旧 dispatch 行不回填猜测的 Run；无精确证据时 `admitted_run_id` 保持 NULL，历史状态不被伪造成已关联。
-11. 9F4C-B 新增授权 SQL 尚无带 canonical `permission.project_role_binding`、`permission.cloud_branch_role_binding`、`permission.engineering_run_role_binding` 的 disposable fixture；success/revoked/paused/concurrent grant-change SQL path 未验证。
+11. 尚未验证完整 REST create/revise 事务回滚、Run/Project mismatch、完整角色矩阵、target/profile 当前性、并发授权变更及生产目标 grants；本轮只验证 enable-time authorization helper 的 canonical active/revoked/paused SQL 路径。生产 worker 触发、retry、resume reauthorization 仍未实现。
 
 ## §4 子代理失败接手清单
 
@@ -81,15 +81,15 @@ Docker runner 使用 disposable PostgreSQL 18.6、loopback-only port mapping 和
 | 13 | 生产授权不得继承 migration owner 或超权角色 | 目标 grants 未知，尚未验收 |
 | 14 | worker/queue 必须有界、可取消、可恢复并尊重资源预算 | 本阶段未创建 worker，后续阶段必验 |
 | 15 | Outbox consumer 与 BI 必须幂等且显式报告 partial/unknown coverage | consumer/BI 未实现 |
-| 16 | enabled Rule 写入只验证当下固定 run-as 权限，不能替代每次 trigger/retry/resume 重新授权 | API enable gate 已实现；纯角色 helper 1/1；SQL ACL 集成未验证，worker per-trigger gate 未实现 |
+| 16 | enabled Rule 写入只验证当下固定 run-as 权限，不能替代每次 trigger/retry/resume 重新授权 | API enable gate 与 canonical SQL active/revoked/paused fixture 已验证；worker per-trigger gate 未实现 |
 
 ## §6 签字栏
 
 | 角色 | 结论 | 审核者 |
 |---|---|---|
-| 架构 | 通过已验证的 DB persistence 与 API enable-time authorization 切片审查；SQL ACL 集成和 per-trigger reauthorization 未关闭，不批准生产 execution capability | 架构师（Mavis 接手 agent per DEC-008） |
-| SRE Lead | PostgreSQL 18.6 persistence evidence 与 Rust role-helper 1/1 通过；API ACL SQL fixture、目标 DB/grants 仍开放 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
-| 平台 | 4 migration chain、8 表 FORCE RLS 隔离 fixture 与 focused API helper test 通过；API ACL SQL fixture 缺失 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
+| 架构 | 通过已验证的 DB persistence 与 API enable-time authorization 切片审查；完整 REST 事务、grant race 和 per-trigger reauthorization 未关闭，不批准生产 execution capability | 架构师（Mavis 接手 agent per DEC-008） |
+| SRE Lead | PostgreSQL 18.6 migration/RLS 与 canonical ACL active/revoked/paused evidence 通过；目标 DB/grants、写事务与并发撤权仍开放 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
+| 平台 | 4 migration chain、8 表 FORCE RLS、canonical directory ACL fixture 与 focused runner 通过；生产 grants 和 Schedule worker 未验收 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
 | 评审主持 | 运行态边界与未实现项已分开记录，未把 DB guard 误报为 lease-owner admission | 架构师（Mavis 接手 agent per DEC-008） |
 | PM | 本阶段可进入后续 writer/worker 阶段；Schedule 对用户仍不可用 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
 
@@ -101,3 +101,4 @@ Docker runner 使用 disposable PostgreSQL 18.6、loopback-only port mapping 和
 | v0.2 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 run-as mismatch fixture 的唯一键误判风险，改为精确验证 trigger 错误；将 Docker `psql` 改为容器内 loopback TCP；记录修正后的最终全量 runner 通过，早期失效/不完整证据不计为成功 | 提交前自审发现负例被唯一键遮蔽并复跑发现 Docker socket 连接问题 |
 | v0.3 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 9F4C-B enable-time run-as reauthorization、纯角色 helper 1/1 链接测试与独立 target 证据；明确新增 ACL SQL fixture 和 per-trigger worker/admission 仍缺，Schedule execution 不开放 | 用户确认创建者固定为 run-as、每次触发重验且撤权 fail closed；完成 API enable gate 实装及最终验证 |
 | v0.4 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将已通过的 9F4C-B role-policy helper test 纳入 Schedule 自动化 runner；同步 runner、registry、automation-design 与实施计划证据，明确完整 runner 未在本次复核重跑 | 提交前自审发现 focused role-policy test 尚未纳入 [P] runner |
+| v0.5 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将只读 ACL runtime role 下 canonical PostgreSQL Project/Branch/Run active/revoked/paused 结果与最终完整 runner 证据纳入报告；明确授权读取未串行化并发撤权，仍将 API 全事务/竞态、worker/admission、consumer/BI 与目标 grants 列为未完成 | ACL SQL runner 修复后以 disposable PostgreSQL 18.6 完成最终验证 |

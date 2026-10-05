@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.45**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.46**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -347,7 +347,7 @@ Phase 9F2/9F3 已提供 Rule/Occurrence schema、版本固定的 bounded materia
 
 Phase 9F4B 将 Rule 创建者固定为创建时已授权的用户 actor。每个 `schedule_rule_revision` 都保存同一个 `run_as_actor_id`；API 创建时从认证 actor 派生，revision 时从锁定的当前行继承，request body 不接受该字段；Rule trigger 对 revision insert 串行化并拒绝首版 creator 伪造和 successor 身份变化。Materializer 将 run-as 单独复制到 `AutomationOccurrenceSnapshotV1`；adapter 写入 `automation.occurrence.run_as_actor_id` 专列，occurrence trigger 校验其与精确 pinned Rule revision 一致；`changed_by` 继续独立追踪编辑者。完整 Phase runner 在 Docker PostgreSQL 18.6 上通过三段 migration 双次应用、七表 FORCE RLS、五个 adapter 场景及 legacy backfill fixture；fixture 用不同编辑者的两版历史 Rule 和已存在 occurrence 验证首版 `changed_by` 回填与 exact-version 身份继承。Migration 仅在一个事务持有 DDL 锁时由 schema owner 临时解除其自身 FORCE RLS 并停用回填冲突的既有 SCD2/append-only guard，回填后恢复两者再提交；目标库 migration principal/grants 仍未验收。每次定时触发、重试和恢复仍必须重新校验该 actor 的当前 Project binding、Engineering Run grant 与执行 capability，撤权/授权服务失败时 occurrence 不得创建 Run。当前只有身份契约与 migration，不含 worker/Run admission；Launch Profile resolver、目标库/RLS/grants、atomic reservation/RunEvent、Outbox consumer 与 BI 仍未闭合。
 
-Phase 9F4C-B 在 Rule create/enable API 加入独立 run-as 检查：当前 editor 自己必须有 Project/Run writer 授权；创建 enabled Rule 时检查派生 creator，启用 successor 时检查锁定 revision 的原始 creator；二者都要求当前 Project/Run writer、有效 Branch grant 与 active Run，且与 Rule 写入处于同一 PostgreSQL transaction。停用只要求 editor 当前仍能管理 Rule，因此 run-as 撤权后仍可停止该规则。源码已接线并通过定向 all-targets compile、rustfmt 及纯角色策略 helper 单测 1/1；该单测不验证授权 SQL；授权 SQL 尚无 canonical Directory ACL PostgreSQL fixture。这个 enable-time 门不替代 trigger/retry/resume 的执行前实时授权；worker、Launch Profile/provider、原子 admission 和 BI 仍保持 fail closed。
+Phase 9F4C-B 在 Rule create/enable API 加入独立 run-as 检查：当前 editor 自己必须有 Project/Run writer 授权；创建 enabled Rule 时检查派生 creator，启用 successor 时检查锁定 revision 的原始 creator；二者都要求当前 Project/Run writer、有效 Branch grant 与 active Run，且与 Rule 写入处于同一 PostgreSQL transaction。停用只要求 editor 当前仍能管理 Rule，因此 run-as 撤权后仍可停止该规则。源码已接线并通过定向 all-targets compile、rustfmt、纯角色策略 helper 单测 1/1 和 disposable PostgreSQL canonical Directory ACL fixture；active grant 通过，Project/Branch/Run 分别撤权及 paused Run 均 fail closed。目录 ACL 查询为只读，未证明其与并发撤权严格串行。这个 enable-time 门不替代 trigger/retry/resume 的执行前实时授权；worker、Launch Profile/provider、原子 admission 和 BI 仍保持 fail closed。
 
 Engineering Loop 是单一 `TaskExecutionRun` 内版本化、预算受限的 Plan/Act/Observe/Verify/Decision 周期。每轮追加 Loop event 和必要 Evidence；不得改写 Run 的 Task Contract/acceptance/profile/HookSet 快照。达到迭代、deadline、CPU/RSS、子进程或 provider 请求上限，检测到无进展/振荡，或发生撤权/cancel 时停止接收新动作、取消并 drain child，再记录 stop reason 和 drain 结果。循环度量来自 durable occurrence/RunEvent/Evidence/Audit；单纯增加轮数或调用量不算成功。
 
@@ -525,7 +525,7 @@ Schedule 是 Run Automation/Workflow 能力，不作为 Worktree 导航树节点
 
 ### 8.11 Schedule Rule enable-time run-as authorization（Phase 9F4C-B）
 
-创建者与规则编辑者可不同。每次 create/revise 写操作先授权当前 editor；仅当新版本 `enabled=true` 时，在相同事务按不可变 `run_as_actor_id` 锁定并重读 Project/Run writer grants、当前 Branch binding 与 Engineering Run active revision。查询无匹配 grant、Run 不 active 或数据库状态不可读时回滚整个 Rule 写入。`enabled=false` 不要求原创建者仍可执行，确保保有管理权限的人能够撤权后停用 Rule。当前代码 compile/rustfmt 与纯角色策略 helper 单测 1/1 通过（仅角色 helper，不是 SQL ACL 测试）；新目录授权 SQL 的正向、撤权和并发 grant-change 尚未在隔离 DB 覆盖。无人值守每次 trigger/retry/resume 的复验仍须由未来 admission transaction 执行，不能沿用创建时权限快照。
+创建者与规则编辑者可不同。每次 create/revise 写操作先授权当前 editor；仅当新版本 `enabled=true` 时，在相同事务按不可变 `run_as_actor_id` 读取并复验 Project/Run writer grants、当前 Branch binding 与 Engineering Run active revision。查询无匹配 grant、Run 不 active 或数据库状态不可读时回滚整个 Rule 写入。`enabled=false` 不要求原创建者仍可执行，确保保有管理权限的人能够撤权后停用 Rule。Disposable PostgreSQL 18.6 canonical Directory fixture 现在执行实际授权 helper：active developer grant 通过，revoked Project/Branch/Run grant 与 paused Run 均 fail closed。测试 runtime role 对 canonical Directory ACL 表只有 SELECT 权限；授权查询不锁 grant 行，完整 REST create/revise rollback、并发 grant mutation 与目标数据库 grants 尚未覆盖。无人值守每次 trigger/retry/resume 的复验仍须由未来 admission transaction 执行，不能沿用创建时权限快照。
 
 ## §9 跨 App 事件与一致性
 
@@ -802,3 +802,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.43 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.64/basic v5.61/Data Design v1.2；新增 9F4C-A 的 fenced dispatch→admitted Run 不可变关联与 schedule Run append-only Outbox；记录 8 表 FORCE RLS 与隔离 PostgreSQL 正反例，明确 admission writer/实时授权与预算/Reservation/RunEvent/consumer/BI 未验收 | 用户确认 Schedule run-as 权限撤销 fail closed 并继续 admission persistence slice |
 | v4.44 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.65/basic v5.62/Schedule API v0.9；明确 enabled Rule 写入复验固定 run-as 的 Project/Run grant 和 active Run、编辑者与执行主体分离及撤权后停用能力；记录授权 SQL 缺少目录 ACL 集成夹具，保留每触发 worker/admission/BI 门 | 用户确认不可变 creator-as-run-as、每次触发实时授权、撤权后 fail closed |
 | v4.45 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.66/basic v5.63/Schedule API v0.10；记录纯角色策略 helper 单测 1/1 与 SQL ACL fixture 缺失，明确 run-as 每次执行复验仍待 worker/admission | 完成 9F4C-B 最终验证并对齐阶段报告 |
+| v4.46 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.67/basic v5.64/Schedule API v0.11/Data Design v1.3；补录只读 runtime role 下 canonical PostgreSQL ACL active/revoked/paused 结果；并发撤权串行化、完整写事务、per-trigger worker/admission 与生产 grants 仍开放 | 修复 ACL fixture 的列级 UPDATE 权限边界并通过完整 Schedule runner |

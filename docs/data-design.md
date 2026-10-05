@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v1.2 (2026-10-05)
+> **文档版本**: v1.3 (2026-10-05)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -17,6 +17,7 @@
 > | v1.0 | 2026-10-04 | 明确首版 Rule 必须满足 `run_as_actor_id = changed_by`，occurrence 必须固定复制并匹配精确 Rule revision 主体；登记 9F4B Docker PostgreSQL 18.6 重复迁移、7 表 FORCE RLS 和 5 个 adapter 场景通过；worker 实时授权和目标生产 grants 仍开放 | 完成 Rule/occurrence 主体伪造数据库负例验证 |
 > | v1.1 | 2026-10-04 | 细化 legacy identity backfill 事务：schema owner 在 DDL 锁内暂时恢复 owner RLS bypass、停用仅阻断新增列回填的既有 Rule/Occurrence guard，完成回填后恢复 guard 与 FORCE RLS 再提交；记录双 revision/不同编辑者和旧 occurrence fixture 验证，明确目标库 migration owner/grants 尚未验收 | 历史 fixture 暴露既有 append-only/SCD2 guard 阻止合法迁移回填，修复并实测后对齐数据详细设计 |
 > | v1.2 | 2026-10-05 | 增加 9F4C-A admission persistence：dispatch admitted_run_id 的 fenced transition/不可变 Run binding，以及 tenant FORCE RLS、append-only schedule_run_outbox 与复合关系约束；记录 PostgreSQL 18.6 双次迁移、8 表 RLS 和正反例 evidence；生产 atomic writer/worker/consumer/target grants 仍未验收 | 用户确认 creator-as-run-as、撤权 fail closed 后继续 Schedule admission persistence |
+> | v1.3 | 2026-10-05 | 增加 Schedule enable-time ACL 只读查询设计；记录 PostgreSQL 18.6 active/revoked/paused ACL 验证、runtime role 无 directory UPDATE 权限，并保留并发撤权串行化缺口 | 修复 canonical ACL fixture 的目录锁权限边界并通过隔离数据库验证 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -2029,6 +2030,12 @@ API、Audit、Outbox 与幂等记录在单个事务提交或回滚；授权必�
 | `automation.schedule_run_outbox` | Transaction | 每条记录以复合外键关联同一 tenant/Project/Engineering Run/Task、精确 Rule revision、occurrence 与 TaskExecutionRun；每 occurrence/event type 唯一；数据库 trigger 拒绝 run-as、schedule origin/channel 或 dispatch link 不一致；不持有独立 Worktree ID | tenant FORCE RLS；append-only，禁止 UPDATE/DELETE/TRUNCATE；consumer offset/投影在其 owner domain 独立管理 |
 
 Migration 在 disposable PostgreSQL 18.6 中对完整 chain 双次应用；8 张 Schedule 表的 `relforcerowsecurity` 均为 true。runner 验证合法 admitted Run/Outbox、已绑定 Run 替换拒绝、run-as mismatch、Outbox UPDATE 拒绝和非 superuser runtime tenant 隔离；source/channel 其它 mismatch 与 Outbox DELETE/TRUNCATE 由 SQL guard 实现但未被本 runner 单独覆盖。该验证不包含目标数据库 migration role/grants，也不代表 production writer 已在同一事务里提交 Reservation、TaskExecutionRun、RunEvent 与 Outbox。未来 admission 必须先实时复验 run-as 当前 Project/Run 权限、target/Profile/HookSet 与资源预算；任何 revoke、读取失败、版本漂移或预算超限都不得创建 Run。
+
+#### 4.13.6 Schedule run-as enable-time ACL read boundary（Phase 9F4C-B）
+
+本阶段不新增表；现有 Project role binding、Cloud Branch revision/grant 与 Engineering Run revision/grant 仍按各自目录定义归类为 Master/SCD2 current facts。授权查询将 `scm.cloud_branch` 与 `multica.engineering_run` identity 当作不可变 Master 只读 join，并在 Rule 写事务内读取当前 Branch/Run revision 与 Project/Branch/Run grants。Disposable runtime role 对这些目录 ACL 表只有 SELECT 权限，不获 UPDATE grant 或 revision 列权限。由于查询不锁 ACL 行，若授权检查与撤权事务重叠，本阶段未建立确定的提交先后；该并发撤权串行化仍是未关闭的验收门。
+
+测试覆盖 active developer grant、Project/Branch/Run 分别撤权、paused Run 和运行角色缺少 directory UPDATE privileges；尚未覆盖并发 revoke race、完整 REST transaction rollback 或目标环境 grants。
 
 ### 4.14 Module: domain-identity(`identity` schema)
 

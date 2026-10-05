@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=22ee22897a8a006e0938942111008634bb7016c3f232b5db900a266903f92381
+# @cypher schema=1 source_sha256=2ef674bf71280e68ab69aba3bd6142d351db305eb8d6c3b2a075ef69cf40e870
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -18,6 +18,10 @@
 # MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
 # MERGE (legacy_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::LEGACY_BACKFILL_FIXTURE_SQL"})
 # MERGE (legacy_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::LEGACY_BACKFILL_ASSERTION_SQL"})
+# MERGE (directory_migrations:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_MIGRATIONS"})
+# MERGE (directory_prerequisite:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUDIT_PREREQUISITE_SQL"})
+# MERGE (directory_acl_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUTH_FIXTURE_SQL"})
+# MERGE (acl_rust_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_run_as_authorization_rechecks_canonical_directory_grants",kind:"test"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(postgres)
@@ -37,6 +41,10 @@
 # MERGE (postgres)-[:READS]->(migrations)
 # MERGE (postgres)-[:READS]->(task_run_schema)
 # MERGE (postgres)-[:READS]->(admission_fixture)
+# MERGE (postgres)-[:READS]->(directory_migrations)
+# MERGE (postgres)-[:READS]->(directory_prerequisite)
+# MERGE (postgres)-[:READS]->(directory_acl_fixture)
+# MERGE (postgres)-[:TESTS]->(acl_rust_test)
 # @endcypher
 
 from __future__ import annotations
@@ -61,6 +69,14 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-as-actor.sql",
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-admission.sql",
 )
+DIRECTORY_MIGRATIONS = (
+    ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
+    ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2b.sql",
+    ROOT / "db" / "migrations" / "2026-10-01-engineering-run-directory.sql",
+)
+DIRECTORY_AUDIT_PREREQUISITE_SQL = """\
+CREATE OR REPLACE FUNCTION public.audit_trigger_func()
+RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN COALESCE(NEW, OLD); END $$;"""
 TASK_RUN_SCHEMA_FIXTURE_SQL = """\
 CREATE SCHEMA IF NOT EXISTS multica;
 CREATE TABLE IF NOT EXISTS multica.task_execution_run (
@@ -226,6 +242,105 @@ BEGIN
         RAISE EXCEPTION 'legacy occurrence did not inherit its exact Rule creator';
     END IF;
 END $$;"""
+DIRECTORY_AUTH_FIXTURE_SQL = """\
+BEGIN;
+SELECT set_config('app.tenant_id', '21000000-0000-4000-8000-000000000001', true);
+SELECT set_config('app.actor_id', '22000000-0000-4000-8000-000000000002', true);
+SELECT set_config('app.correlation_id', '22000000-0000-4000-8000-000000000003', true);
+
+INSERT INTO permission.project_role_binding
+    (tenant_id, project_id, user_id, role, granted_by, valid_from, version)
+VALUES
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000002', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000002', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000003', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000003', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+
+INSERT INTO scm.cloud_branch
+    (branch_id, tenant_id, project_id, repository_id, remote_identity)
+VALUES
+    ('24000000-0000-4000-8000-000000000001', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000001', '26000000-0000-4000-8000-000000000001', 'schedule-acl-fixture:branch-1'),
+    ('24000000-0000-4000-8000-000000000002', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000002', '26000000-0000-4000-8000-000000000001', 'schedule-acl-fixture:branch-2'),
+    ('24000000-0000-4000-8000-000000000003', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000003', '26000000-0000-4000-8000-000000000001', 'schedule-acl-fixture:branch-3'),
+    ('24000000-0000-4000-8000-000000000004', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '26000000-0000-4000-8000-000000000001', 'schedule-acl-fixture:branch-4'),
+    ('24000000-0000-4000-8000-000000000005', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '26000000-0000-4000-8000-000000000001', 'schedule-acl-fixture:branch-5');
+
+INSERT INTO scm.cloud_branch_revision
+    (tenant_id, branch_id, name, full_ref, state, changed_by, valid_from, version)
+VALUES
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000001', 'auth-1', 'refs/heads/auth-1', 'active', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000002', 'auth-2', 'refs/heads/auth-2', 'active', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000003', 'auth-3', 'refs/heads/auth-3', 'active', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000004', 'auth-4', 'refs/heads/auth-4', 'active', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000005', 'auth-5', 'refs/heads/auth-5', 'active', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+
+INSERT INTO permission.cloud_branch_role_binding
+    (tenant_id, branch_id, user_id, role, granted_by, valid_from, version)
+VALUES
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000002', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000003', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+
+INSERT INTO multica.engineering_run
+    (engineering_run_id, tenant_id, project_id, repository_id, branch_id)
+VALUES
+    ('25000000-0000-4000-8000-000000000001', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000001', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000001'),
+    ('25000000-0000-4000-8000-000000000002', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000002', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000002'),
+    ('25000000-0000-4000-8000-000000000003', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000003', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000003'),
+    ('25000000-0000-4000-8000-000000000004', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000004'),
+    ('25000000-0000-4000-8000-000000000005', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000005');
+
+INSERT INTO multica.engineering_run_revision
+    (tenant_id, engineering_run_id, title, state, owner_user_id, changed_by, valid_from, version)
+VALUES
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000001', 'Schedule ACL active 1', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000002', 'Schedule ACL revoked project', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000003', 'Schedule ACL revoked branch', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000004', 'Schedule ACL revoked run', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000005', 'Schedule ACL paused run', 'paused', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+
+INSERT INTO permission.engineering_run_role_binding
+    (tenant_id, engineering_run_id, user_id, role, granted_by, valid_from, version)
+VALUES
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000002', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000003', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+
+DO $$
+DECLARE closed_rows integer;
+BEGIN
+    UPDATE permission.project_role_binding SET valid_to = statement_timestamp()
+     WHERE tenant_id = '21000000-0000-4000-8000-000000000001'
+       AND project_id = '23000000-0000-4000-8000-000000000002'
+       AND user_id = '22000000-0000-4000-8000-000000000001' AND valid_to IS NULL;
+    GET DIAGNOSTICS closed_rows = ROW_COUNT;
+    IF closed_rows <> 1 THEN RAISE EXCEPTION 'Project revoke fixture did not close one grant'; END IF;
+
+    UPDATE permission.cloud_branch_role_binding SET valid_to = statement_timestamp()
+     WHERE tenant_id = '21000000-0000-4000-8000-000000000001'
+       AND branch_id = '24000000-0000-4000-8000-000000000003'
+       AND user_id = '22000000-0000-4000-8000-000000000001' AND valid_to IS NULL;
+    GET DIAGNOSTICS closed_rows = ROW_COUNT;
+    IF closed_rows <> 1 THEN RAISE EXCEPTION 'Branch revoke fixture did not close one grant'; END IF;
+
+    UPDATE permission.engineering_run_role_binding SET valid_to = statement_timestamp()
+     WHERE tenant_id = '21000000-0000-4000-8000-000000000001'
+       AND engineering_run_id = '25000000-0000-4000-8000-000000000004'
+       AND user_id = '22000000-0000-4000-8000-000000000001' AND valid_to IS NULL;
+    GET DIAGNOSTICS closed_rows = ROW_COUNT;
+    IF closed_rows <> 1 THEN RAISE EXCEPTION 'Run revoke fixture did not close one grant'; END IF;
+END $$;
+COMMIT;"""
 RUST_FILES = (
     "crates/domain-automation/src/lib.rs",
     "crates/domain-automation/src/schedule.rs",
@@ -392,7 +507,7 @@ class DisposablePostgres:
 
     def install_runtime_role(self) -> dict[str, object]:
         role_sql = """CREATE ROLE schedule_runtime LOGIN NOSUPERUSER NOBYPASSRLS;
-GRANT USAGE ON SCHEMA automation TO schedule_runtime;
+GRANT USAGE ON SCHEMA automation, permission, scm, multica TO schedule_runtime;
 GRANT SELECT ON automation.schedule_rule_revision, automation.schedule_rule_audit,
   automation.occurrence, automation.occurrence_dispatch, automation.occurrence_event,
   automation.schedule_run_outbox
@@ -400,7 +515,10 @@ GRANT SELECT ON automation.schedule_rule_revision, automation.schedule_rule_audi
 GRANT INSERT ON automation.schedule_rule_audit, automation.occurrence,
   automation.occurrence_dispatch, automation.occurrence_event,
   automation.schedule_run_outbox TO schedule_runtime;
-GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;"""
+GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;
+GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_binding,
+  permission.engineering_run_role_binding, scm.cloud_branch, scm.cloud_branch_revision,
+  multica.engineering_run, multica.engineering_run_revision TO schedule_runtime;"""
         fixture = OUTPUT_DIR / "runtime-role.sql"
         fixture.write_text(role_sql, encoding="utf-8")
         return run_step("postgres-runtime-role", [*self.psql("schedule_admin"), "-f", str(fixture)])
@@ -512,6 +630,8 @@ class DisposableDockerPostgres:
                     "exec",
                     self.name,
                     "pg_isready",
+                    "-h",
+                    "127.0.0.1",
                     "-U",
                     "schedule_admin",
                     "-d",
@@ -536,7 +656,7 @@ class DisposableDockerPostgres:
 
     def install_runtime_role(self) -> dict[str, object]:
         role_sql = """CREATE ROLE schedule_runtime LOGIN NOSUPERUSER NOBYPASSRLS;
-GRANT USAGE ON SCHEMA automation TO schedule_runtime;
+GRANT USAGE ON SCHEMA automation, permission, scm, multica TO schedule_runtime;
 GRANT SELECT ON automation.schedule_rule_revision, automation.schedule_rule_audit,
   automation.occurrence, automation.occurrence_dispatch, automation.occurrence_event,
   automation.schedule_run_outbox
@@ -544,7 +664,10 @@ GRANT SELECT ON automation.schedule_rule_revision, automation.schedule_rule_audi
 GRANT INSERT ON automation.schedule_rule_audit, automation.occurrence,
   automation.occurrence_dispatch, automation.occurrence_event,
   automation.schedule_run_outbox TO schedule_runtime;
-GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;"""
+GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;
+GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_binding,
+  permission.engineering_run_role_binding, scm.cloud_branch, scm.cloud_branch_revision,
+  multica.engineering_run, multica.engineering_run_revision TO schedule_runtime;"""
         fixture = OUTPUT_DIR / "runtime-role.sql"
         fixture.write_text(role_sql, encoding="utf-8")
         copied = self.copy_file(fixture, "/tmp/runtime-role.sql", "postgres-docker-copy-runtime-role")
@@ -571,11 +694,12 @@ GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;"""
 
 
 def run_isolated_postgres(
+    cargo: Path,
     bin_dir: Path | None = None,
     docker_executable: Path | None = None,
     docker_image: str | None = None,
 ) -> list[dict[str, object]]:
-    """Apply the Schedule migration chain twice and run real role/RLS/concurrency adapter tests."""
+    """Apply canonical directory and Schedule migrations, then run ACL/RLS/adapter tests."""
     if bin_dir is not None:
         cluster: DisposablePostgres | DisposableDockerPostgres = DisposablePostgres(bin_dir)
     elif docker_executable is not None and docker_image is not None:
@@ -587,6 +711,35 @@ def run_isolated_postgres(
         steps.extend(cluster.create_and_start())
         if not cluster.started:
             return steps
+        steps.append(
+            run_step(
+                "postgres-directory-audit-prerequisite",
+                [*cluster.psql("schedule_admin"), "-c", DIRECTORY_AUDIT_PREREQUISITE_SQL],
+            )
+        )
+        if steps[-1]["status"] != "passed":
+            return steps
+        for index, migration in enumerate(DIRECTORY_MIGRATIONS, start=1):
+            if isinstance(cluster, DisposableDockerPostgres):
+                copied = cluster.copy_file(
+                    migration,
+                    f"/tmp/{migration.name}",
+                    f"postgres-docker-copy-directory-{index}",
+                )
+                steps.append(copied)
+                if copied["status"] != "passed":
+                    return steps
+                migration_path = f"/tmp/{migration.name}"
+            else:
+                migration_path = str(migration)
+            steps.append(
+                run_step(
+                    f"postgres-directory-migration-{index}",
+                    [*cluster.psql("schedule_admin"), "-f", migration_path],
+                )
+            )
+            if steps[-1]["status"] != "passed":
+                return steps
         steps.append(
             run_step(
                 "postgres-schedule-task-run-schema-fixture",
@@ -669,6 +822,42 @@ END $$;"""
         if steps[-1]["status"] != "passed":
             return steps
 
+        steps.append(
+            run_step(
+                "postgres-schedule-run-as-directory-acl-fixture",
+                [*cluster.psql("schedule_admin"), "-c", DIRECTORY_AUTH_FIXTURE_SQL],
+            )
+        )
+        if steps[-1]["status"] != "passed":
+            return steps
+
+        runtime_env = os.environ.copy()
+        runtime_env["STAR_SCHEDULE_ADMIN_DATABASE_URL"] = cluster.connection_url("schedule_admin")
+        runtime_env["STAR_SCHEDULE_TEST_DATABASE_URL"] = cluster.connection_url("schedule_runtime")
+        runtime_env["STAR_SCHEDULE_ACL_DATABASE_URL"] = cluster.connection_url("schedule_runtime")
+        steps.append(
+            run_step(
+                "postgres-schedule-run-as-directory-acl-rust-test",
+                [
+                    str(cargo),
+                    "test",
+                    "--locked",
+                    "-p",
+                    "star-api-rest",
+                    "--lib",
+                    "schedule_run_as_authorization_rechecks_canonical_directory_grants",
+                    "-j",
+                    "1",
+                    "--",
+                    "--ignored",
+                    "--nocapture",
+                ],
+                env=runtime_env,
+            )
+        )
+        if steps[-1]["status"] != "passed":
+            return steps
+
         outbox_rls_sql = """DO $$
 DECLARE own_rows integer;
 DECLARE foreign_rows integer;
@@ -690,9 +879,6 @@ END $$;"""
         if steps[-1]["status"] != "passed":
             return steps
 
-        runtime_env = os.environ.copy()
-        runtime_env["STAR_SCHEDULE_ADMIN_DATABASE_URL"] = cluster.connection_url("schedule_admin")
-        runtime_env["STAR_SCHEDULE_TEST_DATABASE_URL"] = cluster.connection_url("schedule_runtime")
         test_binary = schedule_test_binary()
         if test_binary is None:
             steps.append(
@@ -719,7 +905,7 @@ END $$;"""
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run real Schedule 9F3 Rust and isolated PostgreSQL gates."
+        description="Run Schedule 9F3 Rust, canonical ACL, and isolated PostgreSQL gates."
     )
     parser.add_argument("--cargo", required=True, help="Cargo executable path")
     parser.add_argument("--rustfmt", required=True, help="rustfmt executable path")
@@ -732,8 +918,10 @@ def main() -> int:
     rustfmt = Path(args.rustfmt).resolve()
     postgres_bin = Path(args.postgres_bin_dir).resolve() if args.postgres_bin_dir else None
     results: list[dict[str, object]] = []
-    if not cargo.is_file() or not rustfmt.is_file() or not all(path.is_file() for path in MIGRATIONS):
-        print(json.dumps({"status": "blocked", "reason": "required Rust tool or Schedule migration is unavailable"}, indent=2))
+    if not cargo.is_file() or not rustfmt.is_file() or not all(
+        path.is_file() for path in (*DIRECTORY_MIGRATIONS, *MIGRATIONS)
+    ):
+        print(json.dumps({"status": "blocked", "reason": "required Rust tool or directory/Schedule migration is unavailable"}, indent=2))
         return 2
 
     rustfmt_command = [str(rustfmt), "--check", "--edition", "2024", *RUST_FILES]
@@ -810,7 +998,7 @@ def main() -> int:
     if results and all(result["status"] == "passed" for result in results):
         if postgres_bin is not None:
             if all((postgres_bin / f"{name}{'.exe' if os.name == 'nt' else ''}").is_file() for name in ("initdb", "pg_ctl", "psql")):
-                results.extend(run_isolated_postgres(bin_dir=postgres_bin))
+                results.extend(run_isolated_postgres(cargo=cargo, bin_dir=postgres_bin))
             else:
                 results.append({"name": "postgres-tools", "status": "blocked", "reason": "initdb/pg_ctl/psql not found in supplied directory"})
         elif args.postgres_docker_image:
@@ -820,6 +1008,7 @@ def main() -> int:
             else:
                 results.extend(
                     run_isolated_postgres(
+                        cargo=cargo,
                         docker_executable=Path(docker_executable),
                         docker_image=args.postgres_docker_image,
                     )
