@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=2ef674bf71280e68ab69aba3bd6142d351db305eb8d6c3b2a075ef69cf40e870
+# @cypher schema=1 source_sha256=365e84b4a27103cd6526aca588364719a423c3d8f1967df4c8b1fcb9f432c70e
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -14,6 +14,7 @@
 # MERGE (cargo:ExternalService {id:"cargo.test_clippy_check",kind:"command"})
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
 # MERGE (migrations:Config {id:"scripts/automation/phase9f3_schedule.py::MIGRATIONS"})
+# MERGE (run_as_acl_lock_migration:File {path:"db/migrations/2026-10-05-schedule-run-as-acl-lock.sql"})
 # MERGE (task_run_schema:Config {id:"scripts/automation/phase9f3_schedule.py::TASK_RUN_SCHEMA_FIXTURE_SQL"})
 # MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
 # MERGE (legacy_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::LEGACY_BACKFILL_FIXTURE_SQL"})
@@ -39,6 +40,7 @@
 # MERGE (postgres)-[:READS]->(legacy_fixture)
 # MERGE (postgres)-[:READS]->(legacy_assertion)
 # MERGE (postgres)-[:READS]->(migrations)
+# MERGE (postgres)-[:READS]->(run_as_acl_lock_migration)
 # MERGE (postgres)-[:READS]->(task_run_schema)
 # MERGE (postgres)-[:READS]->(admission_fixture)
 # MERGE (postgres)-[:READS]->(directory_migrations)
@@ -68,6 +70,7 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-03-automation-schedule-rule-api.sql",
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-as-actor.sql",
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-admission.sql",
+    ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
 )
 DIRECTORY_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
@@ -519,6 +522,7 @@ GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;
 GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_binding,
   permission.engineering_run_role_binding, scm.cloud_branch, scm.cloud_branch_revision,
   multica.engineering_run, multica.engineering_run_revision TO schedule_runtime;"""
+        role_sql += "\nGRANT EXECUTE ON FUNCTION multica.lock_schedule_run_as_authorization(uuid,uuid,uuid,uuid) TO schedule_runtime;"
         fixture = OUTPUT_DIR / "runtime-role.sql"
         fixture.write_text(role_sql, encoding="utf-8")
         return run_step("postgres-runtime-role", [*self.psql("schedule_admin"), "-f", str(fixture)])
@@ -668,6 +672,7 @@ GRANT UPDATE, DELETE ON automation.occurrence_dispatch TO schedule_runtime;
 GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_binding,
   permission.engineering_run_role_binding, scm.cloud_branch, scm.cloud_branch_revision,
   multica.engineering_run, multica.engineering_run_revision TO schedule_runtime;"""
+        role_sql += "\nGRANT EXECUTE ON FUNCTION multica.lock_schedule_run_as_authorization(uuid,uuid,uuid,uuid) TO schedule_runtime;"
         fixture = OUTPUT_DIR / "runtime-role.sql"
         fixture.write_text(role_sql, encoding="utf-8")
         copied = self.copy_file(fixture, "/tmp/runtime-role.sql", "postgres-docker-copy-runtime-role")
