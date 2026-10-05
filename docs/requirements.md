@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.70）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.71）
 
 ## 0. 文档说明与前提
 
@@ -2736,7 +2736,7 @@ Rust Host Infrastructure Manager 与其所支持的开源组件不得因商业�
 
 当前宿主级验证记录在 [`PHASE-MULTIPASS-K3S-GITOPS-REPORT.md`](reports/PHASE-MULTIPASS-K3S-GITOPS-REPORT.md)：Windows 11 Home 的 Multipass 1.17.0-rc1/HCS VM 内运行 Ubuntu 24.04.5、K3s v1.36.5+k3s1，GitOps 基础设施组件共 19/19 Pod Running。它验证的是一次本机 host/bootstrap/GitOps PoC；Star 应用内 provider lifecycle、Run 绑定、workspace bridge、Agent sandbox、跨 OS driver 与桌面/RSS 性能仍须独立实现和验收。
 
-Multipass daemon/CLI 按宿主高权限边界处理。Rust Infrastructure Manager 是唯一允许调用 Multipass 的产品组件，使用 argv 参数数组、有界 deadline/output、固定子命令 allowlist、版本化 instance ownership tag 与幂等 operation receipt；不通过 shell 拼接命令，不向插件、Task CLI、Agent 或 K3s workload 暴露 daemon 访问凭据。禁止全局 purge、未归属 VM 的 start/stop/delete、静默切换 Multipass driver 或改变全局宿主设置。cloud-init、guest image、K3s 与安装脚本固定版本/digest；guest provisioning 完成后做 API/server/node/CRI/readiness 探测。
+Multipass daemon/CLI 按宿主高权限边界处理。Rust Infrastructure Manager 是唯一允许调用 Multipass 的产品组件，使用 argv 参数数组、有界 deadline/output、固定子命令 allowlist、版本化 instance ownership tag 与幂等 operation receipt；不通过 shell 拼接命令，不向插件、Task CLI、Agent 或 K3s workload 暴露 daemon 访问凭据。只允许依据 owner ledger 精确匹配 instance 的 start/stop；永久回收仅允许在 drain、租约释放、保留期及再次授权通过后对单一自有 instance 执行 `delete --purge <instance>`，禁止无参数全局 `purge`、`delete --all`、未归属实例操作、静默切换 Multipass driver 或改变全局宿主设置。cloud-init、guest image、K3s 与安装脚本固定版本/digest；若已安装版本声明支持 Multipass `wait-ready --timeout`，它仅判定 daemon 已初始化并可接受命令；VM 以单实例 `info/list` 状态另判，guest 与 K3s readiness 必须通过固定 profile probe、API 可达、节点 Ready 与 CRI 检查后分别记录，任一未知不得宣称可执行。
 
 Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权目录 resolver 生成窄路径映射，拒绝符号链接越界；首选受控文件同步/guest checkout bridge。确需挂载时必须是受 Hook 策略保护、范围最小且可审计的显式能力；不支持所需隔离能力的 Multipass driver 禁用挂载执行，不能降级为挂载整个用户目录。K3s namespace、Pod Security、NetworkPolicy 与 ResourceQuota 仍不等同于完整不可信代码隔离；Agent CLI 必须等待单独的 Runtime sandbox、Hook、取消/恢复与独立验证验收。管理 UI 在 Advanced Settings → Infrastructure，按 Run 投影展示绑定 VM、K3s readiness、预算和错误，不增加主导航层级。
 
@@ -2744,8 +2744,8 @@ Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权�
 |---|---|
 | AC-INFRA-002-A | 首选 Multipass 的 host capability probe 能识别版本/driver/资源；固定 image/cloud-init/K3s digest 可重放；异常和未知输出 fail closed |
 | AC-INFRA-002-B | 多 Run/Worktree 共用 Host/environment VM 与 K3s；Project/Run quota 与 reservation 可观测，容量不足/未知时拒绝准入；不会按 Agent/Worktree 数量复制 control plane |
-| AC-INFRA-002-C | 仅可信 Infrastructure Manager 可执行受限、无 shell 的 Multipass lifecycle；越权子命令、他人 VM、全局 purge、未经授权 mount 与静默宿主变更均被拒绝并产生审计证据 |
-| AC-INFRA-002-D | Worktree guest workspace 映射绑定当前 Worktree/Run revision 并通过路径越界负例；无受控 bridge 或所需 sandbox 时 CLI 保持禁用 |
+| AC-INFRA-002-C | 仅可信 Infrastructure Manager 可执行受限、无 shell 的 Multipass lifecycle；仅可操作 owner ledger 精确匹配的 VM；全局 `purge`、`delete --all`、任意 guest `exec`、越权子命令、未经授权 mount 与静默宿主变更均被拒绝并产生审计证据；单实例永久删除须通过 drain、租约释放、保留期、Hook 与二次授权门 |
+| AC-INFRA-002-D | Worktree guest workspace 映射绑定当前 Worktree/Run revision 并通过路径越界负例；daemon、VM、K3s API/node/CRI 与 Agent Runtime sandbox 就绪状态分层记录；无受控 bridge 或所需 sandbox 时 CLI 保持禁用 |
 | AC-INFRA-002-E | Linux/macOS/Windows 按实际 Multipass driver capability 分别验收；固定负载记录桌面/VM/K3s/Agent 峰值 RSS、CPU、IO、冷启动、取消/drain 和并行公平性；无实测不宣称性能目标已达成 |
 
 ### 50.9 追溯与后续专题同步
@@ -2858,3 +2858,4 @@ Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权�
 | v5.68 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 9F4C-C：Project/Branch/Run ACL mutation 与 Rule run-as 授权共用 Project-scoped transaction advisory lock；记录只读 runtime role 下三类并发撤权均等待授权事务提交、之后 fail closed；明确生产 grants、worker 每触发重授权、Run admission、consumer 和 BI 仍开放 | 完成授权/撤权竞态序列化 migration 与 PostgreSQL 18.6 双连接验收后对齐要求 |
 | v5.69 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Multipass 从本地 VM 首选候选提升为本地/CI Linux guest 与 K3s 的首选管理路径；新增 Host-shared VM/K3s、受限 Rust Manager、Worktree workspace bridge、资源预算、隔离边界与分平台验收要求；复核 K3s stable channel 为 v1.36.5+k3s1；同步基本设计与 Infrastructure DD | 用户明确后续将用 Multipass 管理虚拟机中的 K3s，要求反映重大架构调整 |
 | v5.70 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 dev 已有 Multipass 1.17.0-rc1/HCS + Ubuntu/K3s + 19/19 GitOps Pod 实跑登记为宿主 PoC；明确它不等价于 Star provider、Run/workspace binding、Agent sandbox、跨平台 capability 或 RSS 验收；同步 basic v5.67 与 Infrastructure DD v0.6 | 代码/文档对账发现 dev 已有宿主层实跑记录，需要避免把“尚未实现”与“已有 PoC”混为一谈 |
+| v5.71 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Multipass daemon wait-ready、单 VM、K3s 与 Agent Runtime sandbox readiness 分层；固定仅对精确 owner instance 执行 delete --purge，并禁止全局 purge/delete --all 与任意 exec；同步 basic v5.68、Infrastructure DD v0.7 与实施计划 v5.94 | 按官方 Multipass CLI 语义校准 provider 生命周期和安全验收契约 |

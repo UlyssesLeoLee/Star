@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.6 · 2026-10-05 · Draft / 已有一组宿主 Multipass/HCS + Linux guest K3s/GitOps 实跑；Star 原生 Multipass adapter、Run 绑定、跨平台能力与 RSS 仍未验收。
+> v0.7 · 2026-10-05 · Draft / 已有一组宿主 Multipass/HCS + Linux guest K3s/GitOps 实跑；Star 原生 Multipass adapter、Run 绑定、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.70 §50.8G-50.8H / basic-design v5.67 §8.1、§16.21-16.22 / 实施计划 §6.83。
+> 上游：requirements v5.71 §50.8G-50.8H / basic-design v5.68 §8.1、§16.21-16.22 / 实施计划 v5.94 §6.83。
 
 ## §0 目的与边界
 
@@ -70,9 +70,9 @@ K3s 基线复用其 containerd；增加 Docker/第二个 containerd/第二个 br
 
 InfrastructureBackendV1 提供 typed discover/probe/plan/create/start/stop/inspect/delete，以及可选 suspend/resume、image import/export 能力。每次返回 capability/version/digest；未知或不支持的操作明确禁用。Executable 与 argv 由 verified profile 构造，路径/镜像/端口由受权 registry 解析；UI 不能提交任意 shell、宿主路径或 kube context。
 
-`MultipassAdapterV1` 为该契约的首个本地实现，结构化输入 `environment_id`、期望 VM state revision、profile revision/digest、guest image alias+digest、cloud-init digest、资源 reservation、operation/idempotency/correlation IDs、actor 与 deadline；不接受裸命令字符串。子进程只能以 argv 数组启动并复核可执行文件路径/版本；stdout/stderr bytes、运行时长、并发 operation 与 result retention 均有界，超时/取消终止子进程并写入终态 receipt。`list --format json` 必须做 schema/version/size/state 校验。命令 allowlist 仅覆盖 capability 已声明的 `version/list/info/launch/start/stop/wait-ready` 和 profile 生成的 guest readiness probe；`delete` 只可对当前 owner ledger 精确确认的 instance 执行，`purge`、任意 `shell`、任意 `mount`、任意 guest `exec` 与更改全局 driver/settings 默认拒绝。必要 guest setup 命令由固定 cloud-init payload 完成，不由 Agent 注入。
+`MultipassAdapterV1` 为该契约的首个本地实现，结构化输入 `environment_id`、期望 VM state revision、profile revision/digest、guest image alias+digest、cloud-init digest、资源 reservation、operation/idempotency/correlation IDs、actor 与 deadline；不接受裸命令字符串。子进程只能以 argv 数组启动并复核可执行文件路径/版本；stdout/stderr bytes、运行时长、并发 operation 与 result retention 均有界，超时/取消终止子进程并写入终态 receipt。`list --format json` 必须做 schema/version/size/state 校验。命令 allowlist 仅覆盖由已安装版本 capability probe 确认的 `version/list/info/launch/start/stop/wait-ready`；Multipass 的 [`wait-ready`](https://canonical.com/multipass/docs/latest/reference/command-line-interface/wait-ready/) 只等待 daemon 初始化并可接受请求，不代表 VM 或 K3s readiness。单实例永久回收仅允许 `delete --purge <exact-owned-instance>`，必须与 owner ledger 精确匹配且通过 drain、lease release、retention、Hook 和二次授权；无参数全局 `purge` 与 `delete --all` 永不允许（见官方 [`delete`](https://canonical.com/multipass/docs/latest/reference/command-line-interface/delete/)）。VM Running 由单实例 `info/list` 核验；guest/K3s readiness 通过有版本和 digest 的固定 profile probe 检查 API endpoint、node Ready、CRI 与必要 system workload。若支持 guest probe 的版本提供 `multipass exec`，它只可调用预置固定 executable `/usr/local/libexec/star/guest-ready`，其 argv/env/cwd/输出上限均由 profile 固定；任意用户/Task/Agent 命令不得借用 Infrastructure Adapter 的 exec 权限，实际 Task 命令只经独立 AgentRuntimeProvider 与 sandbox。`shell`、任意 `mount`、任意 `exec`、全局 purge、未授权实例操作与更改全局 driver/settings 默认拒绝。必要 guest setup 命令由固定 cloud-init payload 完成，不由 Agent 注入。
 
-每个 create/upgrade `plan` 显示宿主/VM 资源增量、image/guest/K3s digest、网络/数据面变化、workspace access 和 rollback/删除范围；native Hook 根据 Project/Worktree effective policy 与 User confirmation gate 给出 Allow/Deny/RequireHuman。长操作使用短事务创建 operation lease，锁外等待 Multipass/K3s readiness，完成后短事务重授权/CAS 与写 Audit/Outbox；不在 DB transaction 中等待 VM 启动。Manager 持久化 operation owner 与 generation，掉电恢复时 reconcile 只对账/接管自己拥有的实例。
+每个 create/upgrade `plan` 显示宿主/VM 资源增量、image/guest/K3s digest、网络/数据面变化、workspace access 和 rollback/删除范围；native Hook 根据 Project/Worktree effective policy 与 User confirmation gate 给出 Allow/Deny/RequireHuman。长操作使用短事务创建 operation lease，锁外等待 Multipass/K3s readiness，完成后短事务重授权/CAS 与写 Audit/Outbox；不在 DB transaction 中等待 VM 启动。Readiness 分为 Multipass daemon、单一 VM、K3s control plane/node/CRI、Agent Runtime sandbox 四个带时间戳的独立事实，不得由 daemon `wait-ready` 或 VM Running 推断更高层就绪。Manager 持久化 operation owner 与 generation，掉电恢复时 reconcile 只对账/接管自己拥有的实例。
 
 InfrastructureProfileV1 分开固定 host_executable_os/arch 与 guest_os/arch，另固定 backend/version、guest image/kernel/k3s/container runtime digest、所需 capabilities、CPU/memory/disk/IO/network budgets、mount/network/retention policy。宿主可执行文件必须匹配 Host OS/architecture；Guest command/payload 由已验证的 guest agent/SSH/Kubernetes API 在匹配 Guest OS/architecture 的环境执行。host_worktree_path → guest_workdir 必须经 Worktree owner 校验并版本化；cwd 使用 guest 内规范路径，不能假定 host 与 guest 路径相同。target、映射或 backend capability 不符时拒绝。
 
@@ -80,7 +80,7 @@ RunInfrastructureBindingV1 固定 tenant/Project/Branch/Run/environment、profil
 
 ## §4 生命周期、Hook、Loop 与 BI
 
-状态目标为 absent → provisioning → stopped → starting → ready → draining → stopped，错误进入带 reason 的 degraded/failed；suspend 只对声明并验收 capability 的 backend 开放。创建/升级/网络/mount/删除均经 native Hook、plan、授权和最终复核；插件只能建议，不可绕过安全门。
+状态目标为 absent → provisioning → stopped → starting → ready → draining → stopped → deleting → absent，错误进入带 reason 的 degraded/failed；永久删除仅在独立确认/保留门后触发，suspend 只对声明并验收 capability 的 backend 开放。创建/升级/网络/mount/删除均经 native Hook、plan、授权和最终复核；插件只能建议，不可绕过安全门。
 
 按需启动与 idle stop 受 durable lease、Agent/Task/Loop/DB/Outbox 活动和 checkpoint/备份状态控制。停止前拒绝新准入并 drain 当前操作；活跃或 unknown 不能自动销毁。Schedule Loop 使用唯一 occurrence/租约机制，不另建 cron owner；重启恢复幂等 command 并重验 scope/fence。Upgrade 固定版本、迁移/备份与 rollback receipt；不能假定跨 hypervisor 版本 snapshot 可恢复。
 
@@ -126,3 +126,4 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 | v0.4 | 2026-10-02 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 明确 unlimited commercial use 不得转成 paid tier/use-case gate；删除 copyleft provider 只能手工自装的隐性限制；支持发现、引导及合规受管安装/捆绑；纠正 K3s stable channel 到 v1.36.4 并补充近期 release/社区活动证据 | 用户再次明确拒绝商业使用限制并要求活跃社区 |
 | v0.5 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 将 Multipass 固定为本地/CI Linux VM 与 guest K3s 的首选管理路径，区分生产/远端 provider；增加共享 HostEnvironment、restricted Rust adapter/CLI allowlist、Worktree guest workspace bridge、资源准入和真实验收分期；引用 Multipass/K3s 官方安全、driver、cloud-init、资源与拓扑资料；复核 K3s stable channel 为 v1.36.5+k3s1；所有功能仍未实现或验收 | 用户明确后续会用 Multipass 管理虚拟机中的 K3s，要求将重大架构变化纳入设计 |
 | v0.6 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 对账 dev 已有 Windows 11 Home + Multipass 1.17.0-rc1/HCS + Ubuntu guest K3s v1.36.5 + 19/19 GitOps Pod 运行证据；将其定位为宿主层 PoC，不外推为 Star Rust Manager/Run binding/sandbox/RSS 已实现；补充真实 VM 配置与 INFRA-2 复用/集成门 | 将 dev 上已提交的宿主层实跑报告纳入本地基础设施详细设计 |
+| v0.7 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 依据 Canonical CLI reference 澄清 wait-ready 只代表 daemon ready；将 VM/K3s/Runtime sandbox 列为独立 readiness 层；只允许固定 profile guest probe 走 Multipass exec，并将永久删除限定为精确 owner 的 delete --purge，禁止全局 purge/delete --all | 官方 CLI 核验发现 daemon readiness、guest/K3s readiness 与实例回收有不同语义 |
