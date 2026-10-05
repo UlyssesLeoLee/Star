@@ -41,9 +41,9 @@ spec:
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     # 显式空数组 = 禁止本 Project 创建任何 cluster-scoped 资源。
-    # namespace 本身由上面的 Namespace 清单在首次引导时手动创建。
-    group: ""
-    kind: ""
+    # 类型必须是**数组** (per Argo CD v3.5.3 CRD schema 实测: 该字段 type=array);
+    # 写成 map 会校验失败。namespace 本身由上面的 Namespace 清单在首次引导时手动创建。
+    []
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Application: dev 环境 (kustomize)

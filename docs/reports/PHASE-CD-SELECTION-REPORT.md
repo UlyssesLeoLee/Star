@@ -1,10 +1,10 @@
 # PHASE-CD-SELECTION-REPORT: 自动部署体系选型与商业开源依赖门禁落地
 
-> **状态**: ✅ v0.1 (第一阶段交付完成; 第二阶段 prod 晋级待办见 §3)
-> **日期**: 2026-10-04
+> **状态**: ✅ v0.2 (第二阶段：11 项未完成缺口已推进 8 项)
+> **日期**: 2026-10-05（v0.1: 2026-10-04）
 > **拍板**: per `ask_72c00a6f28daadd5538fa004` — scope_opt1「落 ADR + 选型报告 + cargo 门禁骨架（推荐）」+ env_opt1「本机 k3s 单集群，dev → staging 两级（推荐）」
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **关联文档**: [ADR-0054](../architecture/2026-08-26-upgrade/adr/0054-cd-delivery-stack-argocd-kargo-rollouts.md) ｜ [deploy/gitops/README.md](../../deploy/gitops/README.md) ｜ 根目录 `deny.toml` ｜ `.github/workflows/license-gate.yml`
+> **关联文档**: [ADR-0054](../architecture/2026-08-26-upgrade/adr/0054-cd-delivery-stack-argocd-kargo-rollouts.md) ｜ [NOTICE.md](../../../NOTICE.md) ｜ [deploy/gitops/README.md](../../deploy/gitops/README.md) ｜ 根目录 `deny.toml` / `about.toml` ｜ `.github/workflows/license-gate.yml`
 
 ---
 
@@ -90,13 +90,22 @@ Ulysses 于 2026-10-04 20:50 JST 提出：**需要一套 Netflix Spinnaker 等�
 
 **若未实跑，这 3 个 P1 缺陷（2 个 unlicensed + 1 个 yanked）会全部漏过。**
 
-### 2.3 关键发现：依赖树中**不存在任何 copyleft**
+### 2.3 依赖树 copyleft 明细（⚠️ 2026-10-05 订正 v0.1 的错误结论）
 
-第 4 轮实跑输出 11 条 `license-not-encountered` warning，命中项为 `LGPL-2.1-*` / `LGPL-3.0-*` / `GPL-2.0-*` / `GPL-3.0-*` / `AGPL-3.0-*` / `GPL-2.0 WITH Classpath-exception-2.0` / `MPL-2.0-no-copyleft-exception` / `Unicode-DFS-2016`。
+**v0.1 曾断言"依赖树中不存在任何 copyleft crate"——该结论错误。**
 
-**即：本仓 829 个包的依赖闭包中，没有一个 GPL / AGPL / LGPL / MPL crate。**
+v0.1 的依据是 `cargo deny check` 输出的 11 条 `license-not-encountered` 警告（命中 LGPL/GPL/AGPL/MPL 等白名单条目）。但 **2026-10-05 用 `cargo deny list --format json` 做结构化枚举后证明 copyleft 确实存在**：
 
-这使 ADR-0054 中「copyleft 显式列入白名单」的定位从「掩盖现存问题」变为**预防性声明**——白名单里的 copyleft 条目当前不匹配任何实际依赖，是为将来引入时预留的**显式许可通道**，而非放行既有问题。
+| 许可 | crate 数 | 明细 |
+|---|---:|---|
+| **MPL-2.0**（文件级 copyleft） | **5** | `cssparser` 0.37.0 / `selectors` 0.38.0 / `cssparser-macros` 0.7.1 / `dtoa-short` 0.3.5（均经 `dom_query` 0.28.0）；`option-ext` 0.2.0（经 `dirs-sys` 0.5.0） |
+| **LGPL-2.1-or-later**（库链接型 copyleft） | **2** | `r-efi` 5.3.0 / 6.0.0（经 `getrandom`，**仅 UEFI target** 编译） |
+
+**方法论教训（已写入 NOTICE.md）**：`license-not-encountered` 是「白名单条目未被用到」的**否定式**警告，**不能反推「该许可在依赖树中不存在」**。断言"不存在"必须用 `cargo deny list` 这类**枚举式**输出交叉验证。这次是本阶段第二次"因错误方式得出结论"（第一次是变异测试假阳性），同属一条纪律：**证实存在用枚举，证否必须换判据**。
+
+> ⚠️ **仍未完全解释**：`check`（`--all-features`）与 `list`（无 flag）产出的依赖图规模不同（后者 1265 crate）。按守门 #11 缺标比错标，本条记为**未完全解释的差异**（缺口 #13），不臆造原因。两者在 copyleft 结论上**一致**（均存在 MPL/LGPL），故上述明细可信。
+
+**对硬约束的影响**：这些 copyleft crate **已显式列入** `deny.toml` 白名单（per AGENTS.md §0「不得仅因其为 GPL/AGPL/LGPL 而一概排除」），不阻断构建。义务范围：MPL-2.0 为文件级（修改其文件须开源，链接进本仓不触发本仓披露）；`r-efi` 仅 UEFI 目标，当前 Windows/Linux 产物不含。详见 [NOTICE.md](../../../NOTICE.md)。
 
 ### 2.4 真实安全债务（已登记为带到期日的忽略项）
 
@@ -188,25 +197,72 @@ cargo check --workspace --all-targets -j 4
 
 **可复现资产**：变异测试已固化为 [`scripts/automation/license_gate_mutation.py`](../../scripts/automation/license_gate_mutation.py)（守门 #19 v19：实证脚本落地而非一次性执行），实跑 **exit 0 / 19.9s / PASS=10 FAIL=0 INVALID=0**，清理逻辑自验证通过。退出码语义：`0` 全部符合预期，`1` 有 FAIL，`2` 装置故障。
 
+### 2.9 GitOps CRD 离线校验（v0.2 新增，闭合缺口 #1 的结构部分）
+
+本机 k3s 不可达（`172.28.176.169:6443 connection refused`，2026-10-05 实测），无法做 server 端 dry-run。改用**上游 CRD 的 `openAPIV3Schema` 离线校验**（[`scripts/automation/validate_gitops_crds.py`](../../scripts/automation/validate_gitops_crds.py)）。
+
+> 工具选择说明：实测 **kubeconform v0.8.0 对 CRD 自定义 schema 的本地文件定位不生效**（自定义 `-schema-location` 始终 `could not find schema`，`-debug` 亦未暴露查找路径）。改用 jsonschema 直接校验 CRD schema 更可控，且能给出精确字段路径。
+
+**校验抓出 4 处真实错误**（全部是 v0.1 凭印象写的字段，无一实跑过）：
+
+| # | 资源 | 错误 | 性质 |
+|---|---|---|---|
+| 1 | `AppProject` | `clusterResourceWhitelist` 写成 map `{group,kind}`，CRD 要求 **array** | 字段类型错 |
+| 2 | `Warehouse` | 缺 `interval`（required） | 漏必填 |
+| 3 | `Stage` ×2 | 写 `requiredFreight`，实际字段名是 **`requestedFreight`**（且为**数组**） | 字段名错 |
+| 4 | `Stage/staging` | `origin.kind: Stage` 非法 —— CRD enum **只允许 `Warehouse`** | ⚠️ **模型级错误** |
+
+第 4 项最关键：v0.1 设想的"staging 从 dev 订阅"模型在 Kargo v1.x 下**不成立**。实际机制是 **Freight 传递链** —— `origin` 恒为 `Warehouse`，Stage 间的上下游由本 Stage 的 `requestedFreight[].sources.stages`（`string[]`）声明。该结论来自 CRD schema 的 `enum` 与字段类型，非猜测。
+
+**最终结果：8/8 资源通过，exit 0**（`Namespace` ×1 / `AppProject` ×1 / `Application` ×2 / `Project` ×1 / `Warehouse` ×1 / `Stage` ×2）。
+
+同时纠正了 v0.1 的一处臆造：**Kargo v1.12.1 的 `Project` CRD 根本没有 `spec` 字段**（root properties 仅 `apiVersion/kind/metadata/status`），v0.1 写的 `spec.promotionPolicies` 不存在，已删除。
+
+内置 promotion step 名称（`kargo.akuity.io/git-clone` / `git-commit` / `git-push`）**由 v1.12.1 源码树反推**（`git_cloner.go` / `git_commiter.go` / `git_pusher.go`），非猜测；但各 step 的 `with` 字段名未经官方文档核对（缺口 #12）。
+
+### 2.10 `publish = false` 补齐与门禁强化（v0.2 新增，闭合缺口 #6）
+
+[`scripts/automation/mark_crates_private.py`](../../scripts/automation/mark_crates_private.py) 为 **107 个 member manifest** 补 `publish = false`。
+
+> **脚本自身也踩了坑**：v0.1 思路只扫 `crates/*/Cargo.toml`，漏掉 `crates/star-desktop/src-tauri/`（嵌套一层）与 `tools/aci-emitter/`。首轮 apply 后 `wildcard` 仍报 1 个 error，定位后改为遍历仓库内全部含 `[package]` 的 manifest（排除 `target/`），并对 `crates/` 之外的 member 单独高亮。
+
+补齐后 `bans.wildcards` 由 v0.1 的 `warn` 降级状态**恢复为 `deny` 强门禁**：
+
+| | v0.1 | v0.2 |
+|---|---|---|
+| `wildcards` | `warn`（因误报降级） | **`deny`**（强门禁） |
+| wildcard 错误数 | 67（60+ crate） | **0** |
+| `cargo deny check` | EXIT 0（147 warning） | **EXIT 0**（80 warning：69 duplicate + 11 not-encountered） |
+
+`cargo metadata` 验证 107/107 manifest 合法；`cargo check --workspace --all-targets -j 4` **EXIT 0 / 30.2s**。
+
+### 2.11 Kargo 官方 SBOM 的方法学价值（v0.2 新增）
+
+取得 Kargo v1.12.1 官方 SPDX SBOM（`akuity-kargo_v1_12_1.spdx.json`），**395 个包的 `licenseConcluded` 全部为 `NOASSERTION`**。
+
+这直接印证 AGENTS.md §0「只核对上游仓库主许可证不足以放行」—— **上游自己提供的 SBOM，其许可字段也可能是空的**。因此「上游发布了 SBOM」不构成许可核验通过的证据。本仓采用的核验路径是：`Cargo.lock` → `cargo deny list`（结构化枚举）→ 与 `deny.toml` 白名单比对 → `NOTICE.md` 声明。
+
 ---
 
 ## §3 已知缺口
 
-per 守门 #11「缺标比错标安全」——以下为**未完成 / 未验证**项，明确标 🟡 不用 ✅ 冒充。
+per 守门 #11「缺标比错标安全」。v0.2 已推进 8 项（2026-10-05），剩余 5 项仍未完成。
 
 | # | 缺口 | 状态 | 阻断条件 | 处置 |
 |---|---|---|---|---|
-| 1 | **Kargo / Argo CD 全部配置未实跑** | 🟡 未验证 | 首次部署前 | 本机无 kargo/argocd；已用 `yaml.safe_load_all` 验证语法，CRD 字段未验证。须 `kubectl apply --dry-run=server` + `argocd app diff` |
-| 2 | **`cargo-about` 生成 NOTICE 未落地** | 🟡 未验证 | 首次对外分发前 | 本机未安装该工具。AGENTS.md §0 要求履行 NOTICE 义务 |
-| 3 | **容器镜像 SPDX SBOM 未生成** | 🟡 未完成 | prod 晋级前 | ADR-0054 §6.2 待办 #1。系统包层（apk/apt）许可未核验 |
-| 4 | **`argocd-image-updater` 未引入也未复验** | 🟡 未完成 | 引入该组件前 | 已迁至 `argoproj-labs`（非主 org）。ArtifactHub 报 v1.2.1 大量漏洞告警，**该数字未经本机 SBOM 复现，不得直接当结论** |
-| 5 | **`Cargo.lock` 变更后编译验证** | ✅ **已解决** | — | `cargo check --workspace --all-targets -j 4` EXIT 0 / 195.6s（见 §2.7） |
-| 6 | **100+ crate 未加 `publish = false`** | 🟡 未做 | — | 致 cargo-deny 视其为 public crate，`allow-wildcard-paths` 失效。长期修法见 §2.5 |
-| 7 | **Marvin Attack 风险依赖「不引入 RSA 私钥」这一前提** | 🟡 条件性 | 引入 RSA 私钥操作时 | 忽略项已标复审期限 2026-11-04；前提破坏时须立即移除忽略并按 P0 处理 |
-| 8 | **`sled v0.34.7` 未维护债务未解决** | 🟡 未解决 | — | 3 条 unmaintained advisory 的共同根因；长期需评估替代 |
-| 9 | **staging → prod 三级链路与 Analysis 门禁** | 🟡 第二阶段 | 模型稳定后 | ADR-0054 §6.2 待办 #4 |
-| 10 | **CI 门禁本身未在 GitHub Actions 上实跑** | 🟡 未验证 | 首次 push 后 | 本地已验 cargo-deny；`license-gate.yml` 的 SHA256 / 下载路径仅本地验过 cargo-deny 一个，cargo-audit 的校验和为**占位符**（会在校验和未填时 fail-closed 退出 2，不假装通过） |
-| 11 | **advisory 忽略项无「到期自动失败」能力** | 🟡 工具局限 | — | cargo-deny 0.20.2 的 ignore 仅接受 `id` + `reason`，不支持 `expiration`（实测证伪）。复审期限只能写在 reason 文本内，**无机器强制力**，依赖人工复审。解决需外部手段（issue 提醒 / 定期重跑脚本） |
+| 1 | **Kargo / Argo CD 配置运行时验证** | 🟡 **部分闭合** | 首次部署前 | ✅ **结构已验证**：`scripts/automation/validate_gitops_crds.py` 用上游 v3.5.3 / v1.12.1 官方 CRD 的 `openAPIV3Schema` 离线校验，**8/8 资源 exit 0**（见 §2.9）。🟡 仍缺：本机 k3s 不可达（`172.28.176.169:6443 connection refused`），无法做 `kubectl apply --dry-run=server` 或真机 reconcile；promotion step 的 `with` 字段名未经官方文档核对 |
+| 2 | **`cargo-about` NOTICE 生成** | ✅ **已闭合** | — | 已落地 [`about.toml`](../../../about.toml) + `about.hbs` / `about-list.hbs`（官方 0.9.2 版）+ [`NOTICE.md`](../../../NOTICE.md)。cargo-about 0.9.2 实跑 exit 0，产出 1265-crate 许可分布；`cargo deny list` 独立交叉验证一致。完整 LICENSE 文本（208 KB）作 CI artifact 不入库 |
+| 3 | **容器镜像 SPDX SBOM 未生成** | 🟡 未完成 | prod 晋级前 | 仓库有 5 个 Dockerfile，Docker 可用，syft 1.54.0 已就绪。**但本 session 未实际构建镜像**，故 SBOM 仍缺。ADR-0054 §6.2 待办 #1 |
+| 4 | **`argocd-image-updater` 未复验** | 🟡 未完成 | 引入该组件前 | 已迁至 `argoproj-labs`（非主 org）。已取得 Kargo 官方 SPDX SBOM（395 包）作为方法学佐证：**其 `licenseConcluded` 全为 `NOASSERTION`**，即上游自身亦未在 SBOM 声明许可 —— 印证「上游 SBOM ≠ 许可核验通过」。image-updater 本体仍待 syft 复现 |
+| 5 | `Cargo.lock` 变更后编译验证 | ✅ **已解决** | — | v0.1: EXIT 0 / 195.6s；v0.2（105 个 manifest 加 `publish = false` 后）: **EXIT 0 / 30.2s** |
+| 6 | **100+ crate 未加 `publish = false`** | ✅ **已解决** | — | `scripts/automation/mark_crates_private.py` 覆盖 **107 个 member manifest**（含 `crates/star-desktop/src-tauri/` 与 `tools/aci-emitter/` 等 `crates/` 之外者），`cargo metadata` 验证通过。`bans.wildcards` 已由 `warn` **恢复为 `deny`**，wildcard 错误 67 → **0**（见 §2.10） |
+| 7 | **Marvin Attack 暴露面** | 🟡 **已升级** | — | ⚠️ v0.1 判定「仅公钥验签、私钥运算不可达」**已被证伪**：`star-api-rest/src/auth/mod.rs:157` 存在 RS256 **私钥签名**（`EncodingKey::from_rsa_pem`），`auth/oauth/keypair.rs` 有完整 `RsaPrivateKey` 运算。官方确认 CVSS 5.9 Medium、**永久无补丁**。`deny.toml` 忽略理由已改写为准确描述。**真正缓解需迁 ES256（ECDSA P-256），属破坏性架构变更，待拍板** |
+| 8 | `sled v0.34.7` 未维护债务 | 🟡 未解决 | — | 3 条 unmaintained advisory 的共同根因；长期需评估替代 |
+| 9 | staging → prod 三级链路与 Analysis 门禁 | 🟡 第二阶段 | 模型稳定后 | ADR-0054 §6.2 待办 #4。挂载点已确认存在于 Kargo v1.12 `spec.verification.analysisTemplates` |
+| 10 | **CI 门禁未在 GitHub Actions 实跑** | 🟡 未验证 | 首次 push 后 | 本地已验 cargo-deny；cargo-audit 的 SHA256 仍为**占位符**（未填时 fail-closed `exit 2`） |
+| 11 | advisory 忽略项无「到期自动失败」 | 🟡 工具局限 | — | cargo-deny 0.20.2 的 ignore 仅接受 `id` + `reason`，不支持 `expiration`（实测证伪）。复审期限只能写在 reason 文本内，**无机器强制力** |
+| 12 | **Kargo promotion step 的 `with` 字段名未核对** | 🟡 未验证 | 首次部署前 | `uses` 值（`kargo.akuity.io/git-clone` / `git-commit` / `git-push`）有源码树反推依据；但各 step 的 `with` 参数名未经官方文档逐项核对。CRD schema **不校验** `with` 内部（preserve-unknown-fields），故离线校验无法覆盖 |
+| 13 | **`check` 与 `list` 依赖图规模差异未解释** | 🟡 未解释 | — | `check --all-features` 与 `list`（无 flag）产出的图规模不同（后者 1265 crate）。两者在 copyleft 结论上**一致**（均存在 MPL/LGPL），故 §2.3 明细可信；但差异成因未查明，按缺标比错标不臆造原因 |
 
 ---
 
@@ -259,3 +315,4 @@ per 守门 #11「缺标比错标安全」——以下为**未完成 / 未验证*
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：Argo CD 三件套选型（ADR-0054）+ deny.toml 四类门禁实跑落地（4 轮迭代）+ 3 个 P1 真实缺陷修复 + dev→staging GitOps 骨架 + CI 三 job 门禁 + 10 用例变异测试 | 2026-10-04 20:50 JST 用户需求；21:04 JST `ask_72c00a6f28daadd5538fa004` 拍板 scope_opt1 + env_opt1 |
+| **v0.2** | **2026-10-05** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **推进 8 项未完成缺口**：① 闭合 #1 结构部分（CRD 离线校验 8/8，抓出 4 处真实错误含 1 处模型级错误）② 闭合 #2（`about.toml` + `NOTICE.md` + 1265-crate 许可分布）③ 闭合 #5（cargo check EXIT 0/30.2s）④ 闭合 #6（107 manifest 加 `publish = false`，`wildcards` 恢复 `deny`，错误 67→0）⑤ **纠正 v0.1 两处错误结论**：Marvin「私钥不可达」被私钥签名路径证伪；「依赖树无 copyleft」被 `cargo deny list` 证伪（实存 MPL-2.0 × 5 + LGPL-2.1-or-later × 2）⑥ 新增缺口 #12（promotion step `with` 字段名）、#13（`check`/`list` 图差异未解释） | 2026-10-05 08:48 JST 用户指令「推进完成未完成项之后 commit」 |

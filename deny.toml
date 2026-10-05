@@ -88,19 +88,17 @@ private = { ignore = true }
 # 同一 crate 多版本共存是 Rust 生态常态; 设 warn 而非 deny, 否则长期红会掩盖真实新增。
 # 新增重复由 dependabot + cargo-machete 兜底 (见 license-gate.yml)
 multiple-versions = "warn"
-# 2026-10-04 实跑修正 (第二次): wildcards = "deny" 会把 **path 依赖**
-# (`foo = { path = "../foo" }`, 无 version 字段) 判为版本通配并阻断门禁。
-# allow-wildcard-paths 仅对 **private** crate 生效, 而本仓 100+ workspace crate
-# 均未声明 `publish = false`, 故 cargo-deny 一律视为 public crate, 放行规则不适用
-# (实测 api/application/star-mcp/star-api-rest 等 60+ crate 命中)。
+# 禁版本通配 (`version = "*"`) 与无 version 的 path 依赖 —— 破坏可复现构建。
 #
-# 判定: 这是 monorepo 结构的固有特征, 不是配置缺陷, 也不是真实可复现性风险
-#       (path 依赖由 workspace members 锁定, 无法被 crates.io 解析)。故降为 warn:
-#       真正的版本通配 `version = "*"` 仍会被捕获, path 依赖噪声不再阻断。
-# 长期修法 (待办 #5): 为全部 workspace crate 补 `publish = false`,
-#       使其被正确识别为 private 后可恢复 wildcards = "deny"。
-wildcards = "warn"
-# 2026-10-04 实跑保留: path 依赖放行开关。待 publish = false 补齐后重新评估。
+# 2026-10-04 实跑曾降级为 warn, 因当时 100+ crate 未声明 publish, cargo-deny 一律
+# 视为 public crate, 使 allow-wildcard-paths 失效, path 依赖被误判为通配 (60+ crate 报错)。
+# 2026-10-05 已由 scripts/automation/mark_crates_private.py 为全部 crate 补
+# `publish = false` (**107 个 member manifest**, cargo metadata 验证通过),
+# 故恢复 deny。其中 crates/star-desktop/src-tauri/ 与 tools/aci-emitter/
+# 位于 crates/ 之外, 脚本已单独覆盖 (见脚本内 outside crates/ 高亮)。
+wildcards = "deny"
+# path 依赖放行: 本仓 monorepo 结构下 path 依赖由 workspace members 锁定,
+# 无法被 crates.io 解析, 不构成可复现性风险。依赖上一条的 private 判定才生效。
 allow-wildcard-paths = true
 highlight = "all"
 
@@ -117,16 +115,35 @@ version = 2
 #
 # 2026-10-04 首次实跑登记 (per cargo-deny 0.20.2 advisories check):
 ignore = [
-    # RUSTSEC-2023-0071 — Marvin Attack: RSA 私钥操作的时序侧信道
-    # 实证: `cargo tree -i rsa` 显示 rsa v0.9.10 经 jsonwebtoken v11.1.0 引入,
-    #       确在本仓依赖树内 (非误报)。
-    # 评估: Marvin 影响的是 **私钥解密/签名** 操作的时序泄露。本仓 JWT 鉴权
-    #       (per AGENTS.md §14.12 拍板 rust_crypto feature) 走 RSA **公钥验签**
-    #       路径, 不执行私钥运算, 故当前判定实际风险不可达。
-    # 处置: **一旦引入 RSA 私钥签名/解密 (如自签 CA、HSM 对接), 必须立即移除本条**
-    #       并按 P0 处理。复审时同时确认 jsonwebtoken 版本是否已移除 rsa 依赖。
+    # RUSTSEC-2023-0071 (CVE-2023-49092) — Marvin Attack: RSA 私钥操作时序侧信道
+    #
+    # 官方事实 (per rustsec.org, 2026-10-05 实测复核):
+    #   - CVSS 5.9 MEDIUM; **无补丁** (`patched = [] is intentional`)
+    #   - rsa 0.9.10 (本仓版本) 与 0.10.0-rc.18 截至 2026-09-12 仍受影响, 升级无法解决
+    #   - 官方 workaround: "避免在攻击者可观测时序的场景使用 rsa crate, 例如经网络;
+    #                      本机非失陷环境使用则无碍"
+    #
+    # 暴露面实证 (per 2026-10-05 grep + 读码, 修正 v0.1 的错误判定):
+    #   crates/star-api-rest/src/auth/mod.rs:157
+    #     `EncodingKey::from_rsa_pem(private_key_pem)` + `encode()`  => RS256 **私钥签名**
+    #   crates/star-api-rest/src/auth/oauth/keypair.rs
+    #     完整 `RsaPrivateKey` 生成 / pkcs8 解析 (RsaPrivateKey::new, from_pkcs8_pem)
+    #
+    #   ⚠️ v0.1 曾判定"本仓仅走 RSA 公钥验签, 不执行私钥运算, Marvin 不可达" —— **该判定错误**,
+    #      已被上述私钥签名路径证伪。issue_token 是服务端网络路径, 攻击者可反复调用并
+    #      测量响应耗时, 符合官方所述"attacker can observe timing over the network"前提。
+    #
+    # 保留忽略的理由 (非"不可达", 而是"无可用修复"):
+    #   1. 无补丁可升级 (rsa 上游 padding 仍非 constant-time, 见 RustCrypto/RSA#626)
+    #   2. CVSS Medium, AC:H (攻击复杂度高), 需高精度时序测量
+    #   3. 移除忽略只会让门禁永久红, 而无任何可执行的修复动作 -> 属"已知且无解",
+    #      显式登记优于隐藏
+    #
+    # 真正的缓解方向 (需架构拍板, 尚未实施):
+    #   JWT 算法 RS256 -> ES256 (ECDSA P-256), 彻底移出 rsa crate 依赖树。
+    #   属破坏性变更 (影响已签发 token 与密钥分发), 已提请拍板, 见报告 §3 缺口 #7。
     { id = "RUSTSEC-2023-0071",
-      reason = "rsa 经 jsonwebtoken 引入; 本仓仅走 RSA 公钥验签, 不执行私钥运算, Marvin 时序侧信道不可达 [复审期限 2026-11-04]" },
+      reason = "rsa v0.9.10 经 jsonwebtoken 引入; 上游永久无补丁 (patched=[] is intentional), CVSS 5.9 Medium/AC:H。**已修正 v0.1 错误判定**: star-api-rest/auth/mod.rs:157 存在 RS256 私钥签名路径, 符合官方'网络可观测时序'威胁模型。缓解方向为迁 ES256, 待架构拍板 [复审期限 2026-11-04]" },
 
     # RUSTSEC-2025-0057 / RUSTSEC-2024-0384 / RUSTSEC-2024-0370 — unmaintained
     # 实证 (per cargo tree -i):

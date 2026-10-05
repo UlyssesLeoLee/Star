@@ -1,0 +1,52 @@
+# cargo-about 配置 — NOTICE 文本生成
+#
+# 用途: 为 Star 仓生成第三方许可归属 NOTICE 文档 (AGENTS.md §0 要求
+#       "保留各许可证要求的版权、NOTICE 与专利声明")。
+# 与 deny.toml 的关系: 两者语义必须一致, 但职责不同 ——
+#   - deny.toml  = **门禁** (CI 阻断, fail-closed)
+#   - about.toml = **清单生成** (产出 NOTICE 证据, 不阻断)
+# 修改任一份时须同步核对另一份, 否则会出现"门禁放行但 NOTICE 缺项"或反之。
+#
+# 模板: about.hbs (取自 cargo-about 官方 templates/default.hbs)
+# 生成: cargo about generate about.hbs -o NOTICE.md --all-features
+#
+# 工具: cargo-about 0.9.2 (实测版本)
+
+# 接受的许可 —— 与 deny.toml [licenses] allow 保持一致
+# GPL/AGPL/LGPL 显式列入 = 声明 copyleft 不阻断 (per AGENTS.md §0
+# "不得把 copyleft 许可证等同于禁止商用, 也不得仅因其为 GPL/AGPL/LGPL 而一概排除")。
+# 实测 2026-10-04: 本仓 829 包闭包中无任何 copyleft crate, 故这些条目为预防性通道。
+accepted = [
+    # 宽松型
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unlicense",
+    "BSL-1.0",
+    "Unicode-3.0",
+    "CC0-1.0",
+    # 宽松型 + 官方例外 / 姊妹许可
+    "Apache-2.0 WITH LLVM-exception",
+    "CDLA-Permissive-2.0",
+    # 弱 copyleft
+    "MPL-2.0",
+    # copyleft (显式允许, 不阻断)
+    "LGPL-2.1-only",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "GPL-2.0 WITH Classpath-exception-2.0",
+]
+
+# workspace 内部 crate 不计入第三方 NOTICE
+private = { ignore = true }

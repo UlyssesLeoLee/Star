@@ -64,6 +64,14 @@ Ulysses 于 2026-10-04 20:50 JST 提出需求：**需要一套 Netflix Spinnaker
 
 > ⚠️ **本 ADR 的闭包核验范围**：覆盖主仓库 `go.mod` 声明的模块集合与两个关键一手许可文件。**容器镜像内 `apk`/`apt` 系统包层未纳入本次核验**，落地时须按 §6 待办补 `syft`/`trivy` 生成的 SPDX SBOM 复验。
 
+### 2.3 Rust 侧依赖闭包核验（2026-10-05 补）
+
+本仓自身 107 个 member 的第三方依赖闭包（1265 crate）由 `deny.toml` + `cargo deny list` 核验，明细见 [NOTICE.md](../../../NOTICE.md) 与 [PHASE-CD-SELECTION-REPORT §2.3](../../../reports/PHASE-CD-SELECTION-REPORT.md)。
+
+核验结论：**无任何** 非商业（NC）、field-of-use 或 source-available 许可；存在 **MPL-2.0 × 5**（`dom_query` / `dirs-sys` 传递引入）与 **LGPL-2.1-or-later × 2**（`r-efi`，仅 UEFI target 编译），二者均**显式列入** `deny.toml` 白名单 —— per AGENTS.md §0「不得把 copyleft 等同于禁止商用，也不得仅因其为 GPL/AGPL/LGPL 而一概排除」。
+
+> **方法学要点**：核验时发现 `cargo deny check` 的 `license-not-encountered` 是**否定式**警告（白名单条目未被用到），**不能反推"该许可不存在"**。必须用 `cargo deny list` 这类枚举式输出做交叉验证。同理，Kargo 官方 SPDX SBOM 的 395 个包 `licenseConcluded` 全为 `NOASSERTION`，说明**上游发布了 SBOM 也不等于许可核验通过**。
+
 ## 3. 决策
 
 **采纳 Argo CD 三件套作为 Star 仓自动部署体系**：

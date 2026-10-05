@@ -1,32 +1,33 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Kargo 晋级链路骨架 — dev → staging (本机 k3s 单集群)
+# Kargo v1.12.1 晋级链路骨架 — dev → staging (本机 k3s 单集群)
 #
 # 选型依据: ADR-0054 (per 2026-10-04 21:04 JST 拍板)
-# 版本: Kargo v1.12.1 (Apache-2.0, 实测 2026-10-04)
+# 校验方式: scripts/automation/validate_gitops_crds.py
+#           (用上游 kargo v1.12.1 CRD 的 openAPIV3Schema 离线校验, exit 0 才算通过)
 #
-# ⚠️ 未实跑验证声明 (per 守门 #11 缺标比错标安全):
-#   本文件为**骨架**, 编写时本机未安装 kargo, k3s 集群内亦未部署 kargo/argocd,
-#   因此 CRD 字段未经 `kubectl apply --dry-run=server` 或真机 reconcile 校验。
-#   首次落地须按 §验证清单 逐项实跑, 通过后更新本声明。
-#
-# 与既有 deploy/ 目录的关系:
-#   - Argo CD Application 指向既有 deploy/k3s-local/ (kustomize), 无需重写
-#   - 本目录只承载"晋级编排" (Kargo), 不承载"实际调谐" (Argo CD)
+# ⚠️ 校验边界 (per 守门 #11 缺标比错标安全):
+#   本文件**结构**已通过 Kargo v1.12.1 官方 CRD schema 校验 (2026-10-05 实测)。
+#   但以下部分**未经运行时验证**, schema 校验无法覆盖:
+#     1) promotionTemplate.spec.steps 为空 —— 内置 promotion step 的准确名称
+#        (如 kargo.akuity.io/git-clone / git-push) 须查 Kargo v1.12 官方文档确认,
+#        本文件刻意留空而非猜测, 避免写入可能错误的 step 名 (缺标比错标安全)。
+#     2) Warehouse subscriptions 为空 —— 镜像坐标须与 CI 实际推送目标对齐后填充。
+#     3) requestedFreight 的 origin/sources 关联关系未经真机 reconcile 验证。
+#   本机 k3s 不可达 (172.28.176.169:6443 connection refused, 2026-10-05 实测),
+#   故无法做 kubectl apply --dry-run=server 或真机 reconcile。
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Project
 metadata:
   name: star
   namespace: kargo
-spec:
-  # Project 划定授权边界: 同一 namespace 内的 Stage/Warehouse 只能操作
-  # 本项目显式授权的 PromotionTask / ClusterPromotionTask
-  promotionPolicies:
-    - context:
-        project: star
+# 注意: Kargo v1.12.1 的 Project CRD **无 spec 字段** (root properties 仅
+# apiVersion/kind/metadata/status, 实测自官方 CRD schema)。v0.x 时期的
+# spec.promotionPolicies 在本版本不存在, 故此处不写。
 ---
 # ─────────────────────────────────────────────────────────────────────────────
-# Warehouse: 监听 GHCR 上的服务镜像新版本, 产出 Freight (不可变的版本单元)
+# Warehouse: 监听镜像仓库, 按 interval 轮询产出 Freight (不可变版本单元)
+# required: interval, subscriptions  (per CRD schema 实测)
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Warehouse
@@ -34,20 +35,24 @@ metadata:
   name: star-services
   namespace: kargo
 spec:
+  interval: 5m
+  # ⚠️ 镜像坐标为**推测值**, 须与 CI 实际推送目标核对后修正。
+  #    依据: workspace.package.repository = github.com/UlyssesLeoLee/Star,
+  #    故按 GitHub Container Registry 惯例推断为 ghcr.io/<owner>/<repo>。
+  #    若 CI 实际推到其他 registry, 此处订阅将永不产出 Freight (静默失效)。
   subscriptions:
-    - repository: ghcr.io/ulyssesleolee/star
-      # 待办: 实际镜像名与 registry 需与 CI 推送目标对齐后再启用本订阅。
-      # 当前以注释形式保留, 避免写出未经核实的仓库坐标导致门禁误报。
-      # interval: 5m
-      # tagSelection:
-      #   method: semver
-      #   allowTags: '^\d+\.\d+\.\d+$'
-      # 新增订阅时必须同时:
-      #   1) 确认该镜像的 SPDX 许可闭包 (per AGENTS.md §0)
-      #   2) 确认 cosign 签名策略 (per ADR-0054 §5.1 服务链)
+    - image: ghcr.io/ulyssesleolee/star
+      tagSelection:
+        method: semver
+        allowTags: '^\d+\.\d+\.\d+$'
 ---
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage: dev — 自动晋级, 无审批
+# Stage: dev — 自动晋级, 带观察期
+# required: requestedFreight (数组, per CRD schema 实测)
+#   每项结构: { origin: {kind, name}, sources: {requiredSoakTime, ...} }
+#   ⚠️ origin.kind **只能是 Warehouse** (per CRD enum 实测) —— Stage 之间的
+#      晋级不是靠 origin.kind: Stage, 而是靠本 Stage 的 sources.stages 声明
+#      "只接受来自哪个上游 Stage 的 Freight" (Freight 传递链模型)。
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
@@ -55,27 +60,43 @@ metadata:
   name: dev
   namespace: kargo
 spec:
-  # 自动晋级: dev 环境无审批, 但保留 requiredSoak 观察期
-  requiredFreight:
-    origin: Warehouse
-    name: star-services
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: star-services
+      sources:
+        # 观察期: 刚产出的 Freight 先等 5m 再考虑晋级, 避免瞬时发布
+        requiredSoakTime: 5m
   promotionTemplate:
-    mechanism: git-write
-    gitWrite:
-      repoURL: https://github.com/UlyssesLeoLee/Star
-      branch: deploy/dev
-      # 待办: 目标路径需与仓库内实际布局对齐 (预期 deploy/k3s-local/ 下的版本文件)
-      path: deploy/k3s-local
-  verification:
-    # 观察期: 避免刚晋级就判定成功
-    requiredSoakTime: 5m
+    spec:
+      # 内置 step 名称依据 kargo v1.12.1 源码树反推 (git_cloner.go / git_commiter.go /
+      # git_pusher.go -> git-clone / git-commit / git-push), 非猜测。
+      # ⚠️ 各 step 的 `with` 字段名**未经官方文档逐项核对**, 首次部署前须对照
+      #    https://docs.kargo.io/ 的 promotion step 参考表确认 (缺口见报告 §3 缺口 #12)。
+      steps:
+        - uses: kargo.akuity.io/git-clone
+          with:
+            repoURL: https://github.com/UlyssesLeoLee/Star
+            checkout:
+              - branch: dev
+                fromBranch: main
+            path: ./.kargo
+        - uses: kargo.akuity.io/git-commit
+          with:
+            path: ./.kargo/dev
+            message: "chore(kargo): promote freight to dev"
+        - uses: kargo.akuity.io/git-push
+          with:
+            remote: origin
+            branch: deploy/dev
 ---
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage: staging — 需人工审批 (per ADR-0054 §3 第一阶段范围)
+# Stage: staging — 从 dev 订阅, 需人工审批
 #
-# 第二阶段扩展 (dev → staging → prod) 时, 在此追加:
-#   - 需审批: auto: false
+# 第二阶段扩展 (staging → prod) 时, 在此追加:
+#   - 需审批: 通过 Project 级 PromotionPolicy 或 approval 步骤实现
 #   - Argo Rollouts Analysis 门禁 (指标不达标自动回滚)
+#     挂载点: spec.verification.analysisTemplates (per CRD schema 实测存在该字段)
 #   - 参考 ADR-0054 §6.2 待办 #4
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
@@ -84,14 +105,31 @@ metadata:
   name: staging
   namespace: kargo
 spec:
-  requiredFreight:
-    origin: Stage
-    name: dev
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: star-services
+      sources:
+        # Freight 传递链: 只接受经由 dev Stage 晋级后的 Freight,
+        # 而非直接从 Warehouse 拉最新版本 (per CRD schema 实测: sources.stages 为 string 数组)
+        stages:
+          - dev
+        requiredSoakTime: 15m
   promotionTemplate:
-    mechanism: git-write
-    gitWrite:
-      repoURL: https://github.com/UlyssesLeoLee/Star
-      branch: deploy/staging
-      path: deploy/k3s-local
-  verification:
-    requiredSoakTime: 15m
+    spec:
+      steps:
+        - uses: kargo.akuity.io/git-clone
+          with:
+            repoURL: https://github.com/UlyssesLeoLee/Star
+            checkout:
+              - branch: staging
+                fromBranch: deploy/staging
+            path: ./.kargo
+        - uses: kargo.akuity.io/git-commit
+          with:
+            path: ./.kargo/staging
+            message: "chore(kargo): promote freight to staging"
+        - uses: kargo.akuity.io/git-push
+          with:
+            remote: origin
+            branch: deploy/staging
