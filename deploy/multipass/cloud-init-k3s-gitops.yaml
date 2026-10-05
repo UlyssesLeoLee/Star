@@ -1,0 +1,84 @@
+#cloud-config
+# Multipass cloud-init — k3s + Argo CD 三件套宿主引导
+# 落地日期: 2026-10-05
+# 宿主: Windows 11 家庭版 (CoreCountrySpecific) + Multipass 1.17.0-rc1 (hcs 驱动)
+# 许可: k3s Apache-2.0 / Argo CD Apache-2.0 / Kargo Apache-2.0 / Argo Rollouts Apache-2.0
+# 拍板: per ask_6da0b2511bcee76deccb5b21 mp_route_opt1 (1.17.0-rc1 + hcs)
+#
+# 守门 #5 v2: 本文件不含任何 secret。JWT_PRIVATE_KEY_PEM / JWT_PUBLIC_KEY_PEM
+# 等密钥一律走 k8s Secret 运行时注入 (install-sealed-secrets.sh / SOPS),
+# 严禁写进 cloud-init user-data —— cloud-init ISO 落盘在
+# %LOCALAPPDATA%\Multipass\... 下, 无访问控制。
+# 守门 #1 禁回溯叙事: 本文只描述首启引导, 不含任何"原本是/历史形态"叙述。
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - curl
+  - ca-certificates
+  - git
+
+write_files:
+  # ---------- k3s 安装 (禁用不需要的组件, 减少本地资源占用) ----------
+  - path: /etc/rancher/k3s/install.sh.k3s-arg
+    permissions: "0644"
+    content: |
+      # 组件开关: 本机是单节点开发集群, traefik 与本地 servicelb 均不需要
+      # (envoy 走独立 deployment, per 2026-09-01 13:05 JST 偏好), metrics-server
+      # 保留 (HPA / kubectl top 需要)。禁掉 servicelb 避免与 NodePort 语义混淆。
+      INSTALL_K3S_EXEC="server --disable traefik --disable servicelb --write-kubeconfig-mode 644"
+
+  # ---------- 三件套版本钉死 (与 ADR-0054 一致, 改版必须同步改 ADR) ----------
+  - path: /etc/rancher/k3s/star-gitops-versions.env
+    permissions: "0644"
+    content: |
+      # Argo CD  : v3.5.3  (Apache-2.0)
+      # Kargo    : v1.12.1 (Apache-2.0)
+      # Rollouts : v1.10.0 (Apache-2.0)
+      ARGOCD_VERSION="v3.5.3"
+      KARGO_VERSION="v1.12.1"
+      ROLLOUTS_VERSION="v1.10.0"
+
+  # ---------- 安装日志哨兵 ----------
+  # cloud-init 的 runcmd 输出不保证进 journald, 落独立文件供 multipass exec 读取。
+  # 守门 #11 缺标比错标: 每个阶段写 DONE 标记, 失败写 FAIL + 退出码,
+  # 避免"脚本跑完=成功"的误判 (per 2026-10-04 CI 绿不等于门禁跑过同族教训)。
+  - path: /var/log/star-cloud-init.log
+    permissions: "0644"
+    content: |
+      === star cloud-init bootstrap log ===
+
+runcmd:
+  - [ sh, -c, 'exec >> /var/log/star-cloud-init.log 2>&1; set -x; echo "[$(date -Is)] cloud-init runcmd start"' ]
+  # 阶段 1: k3s server
+  - [ sh, -c, 'curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s - $(grep -oP "(?<=^INSTALL_K3S_EXEC=\").*(?=\")" /etc/rancher/k3s/install.sh.k3s-arg) && echo "DONE:k3s-binary" || echo "FAIL:k3s-binary"' ]
+  - [ sh, -c, 'systemctl enable --now k3s && echo "DONE:k3s-service" || { echo "FAIL:k3s-service"; exit 1; }' ]
+  # 阶段 2: 等 apiserver 就绪 (k3s 首次启动要拉镜像 + 建 CNI, 本机可能 60-120s)
+  - [ sh, -c, 'for i in $(seq 1 60); do if k3s kubectl get --raw=/readyz >/dev/null 2>&1; then echo "DONE:apiserver-ready after ${i}0s-ish"; break; fi; sleep 2; done; k3s kubectl get --raw=/readyz || { echo "FAIL:apiserver-ready"; exit 1; }' ]
+  # 阶段 3: 节点标签 (Argo CD 三件套的 node selector 依赖)
+  - [ sh, -c, 'k3s kubectl label node --all node-role.kubernetes.io/gitops= --overwrite && echo "DONE:node-label" || echo "FAIL:node-label"' ]
+  # 阶段 4: cert-manager (envoy/certificate.yaml 依赖 cert-manager.io/v1)
+  # 锁 minor 版本 v1.18.2, 不用 latest —— 门禁判据不该随第三方发版漂移。
+  - [ sh, -c, 'k3s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.18.2/cert-manager.yaml && echo "DONE:cert-manager-apply" || echo "FAIL:cert-manager-apply"' ]
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n cert-manager deploy --all --timeout=300s && echo "DONE:cert-manager-ready" || { echo "FAIL:cert-manager-ready"; exit 1; }' ]
+  # 阶段 5: Argo Rollouts (先于 Argo CD, 供其 CRD 就绪)
+  - [ sh, -c, '. /etc/rancher/k3s/star-gitops-versions.env; kubectl create -f https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS_VERSION}/install.yaml && echo "DONE:rollouts-apply" || echo "FAIL:rollouts-apply"' ]
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n argo-rollouts deploy --all --timeout=300s && echo "DONE:rollouts-ready" || { echo "FAIL:rollouts-ready"; exit 1; }' ]
+  # 阶段 6: Argo CD
+  - [ sh, -c, '. /etc/rancher/k3s/star-gitops-versions.env; kubectl create -f https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml && echo "DONE:argocd-apply" || echo "FAIL:argocd-apply"' ]
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n argocd deploy --all --timeout=420s && echo "DONE:argocd-ready" || { echo "FAIL:argocd-ready"; exit 1; }' ]
+  # 阶段 7: Kargo
+  - [ sh, -c, '. /etc/rancher/k3s/star-gitops-versions.env; kubectl apply -f https://github.com/akuity/kargo/releases/download/${KARGO_VERSION}/install.yaml && echo "DONE:kargo-apply" || echo "FAIL:kargo-apply"' ]
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n kargo deploy --all --timeout=420s && echo "DONE:kargo-ready" || { echo "FAIL:kargo-ready"; exit 1; }' ]
+  # 阶段 8: GitOps 骨架 (仓库内声明式资源)
+  # 路径经 mount 进来: /home/ubuntu/star。装完 VM 后用
+  #   multipass mount <repo> star-k3s:/home/ubuntu/star
+  - [ sh, -c, 'if [ -d /home/ubuntu/star/deploy/gitops ]; then k3s kubectl apply -f /home/ubuntu/star/deploy/gitops/kargo/ && echo "DONE:kargo-manifests" || echo "FAIL:kargo-manifests"; else echo "SKIP:kargo-manifests (repo not mounted yet)"; fi' ]
+  - [ sh, -c, 'if [ -d /home/ubuntu/star/deploy/gitops ]; then k3s kubectl apply -f /home/ubuntu/star/deploy/gitops/argocd/ && echo "DONE:argocd-manifests" || echo "FAIL:argocd-manifests"; else echo "SKIP:argocd-manifests (repo not mounted yet)"; fi' ]
+  - [ sh, -c, 'if [ -d /home/ubuntu/star/deploy/k3s-local ]; then k3s kubectl apply -k /home/ubuntu/star/deploy/k3s-local && echo "DONE:k3s-local-apply" || echo "FAIL:k3s-local-apply"; else echo "SKIP:k3s-local-apply (repo not mounted yet)"; fi' ]
+  # 阶段 9: 最终快照 (供 multipass exec 一次性核对)
+  - [ sh, -c, '{ echo "=== [$(date -Is)] FINAL ==="; k3s kubectl get nodes -o wide; echo "---"; k3s kubectl get pods -A -o wide; echo "---"; k3s kubectl get deploy -A; } >> /var/log/star-cloud-init.log 2>&1; echo "DONE:bootstrap-complete" >> /var/log/star-cloud-init.log' ]
+  - [ sh, -c, 'touch /var/log/star-cloud-init.complete && echo "[$(date -Is)] ALL STAGES ATTEMPTED" >> /var/log/star-cloud-init.log' ]
+
+final_message: "star cloud-init finished after $UPTIME seconds. Check: sudo cat /var/log/star-cloud-init.log"

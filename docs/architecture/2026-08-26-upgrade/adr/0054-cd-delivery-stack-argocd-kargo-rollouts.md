@@ -1,6 +1,6 @@
 # ADR-0054: 自动部署体系选型 — Argo CD + Kargo + Argo Rollouts
 
-> **状态**：✅ Accepted v0.1 (per 2026-10-04 21:04 JST `ask_72c00a6f28daadd5538fa004` scope_opt1 拍板, 守门 #10 + #14 v4 Mavis 审核)
+> **状态**：✅ Accepted v0.2 (per 2026-10-05 10:15 JST `ask_6da0b2511bcee76deccb5b21` mp_route_opt1 拍板宿主层, 守门 #10 + #14 v4 Mavis 审核)
 > **日期**：2026-10-04
 > **决策人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签字**：✅ Mavis 接手终审 (per 2026-08-27 19:39 + 21:59 JST 用户三次授权"允许你代签" + 2026-09-11 23:11 JST"真人的内容由 agent 决定")
@@ -131,6 +131,64 @@ Flagger 实测**仍处活跃维护**（v1.45.0，2026-09-01 发布，2026-09-21 
 
 **未选原因不是维护状态，而是功能重叠**：Argo Rollouts 已覆盖 Flagger 的 canary / 蓝绿 / A-B 能力且与 Argo CD 同一 UI 与同一许可族；同时引入两者会形成两套渐进式发布控制器并存的运维面。**本条写入是为纠正"Flagger 已弃用"的错误认知**——它没有弃用，只是在本选型中不构成增量。
 
+## 4.4 宿主层选型：Multipass 1.17.0-rc1 + hcs 驱动（2026-10-05 追加）
+
+> 本节为 §2 三件套选型的**宿主承载层**决策。三件套装在哪台机器上跑，与三件套本身选谁是正交问题，但同样受 §1 的两条硬约束支配。
+
+WSL 发行版内的 k3s 已不可用（`kubectl` 连 `172.28.176.169:6443` connection refused），用户诉求是**解决 k3s 跑不稳**，方向为真 VM 而非容器化集群（k3d 已排除）。
+
+### 4.4.1 宿主事实（2026-10-05 实测）
+
+| 项 | 实测值 | 取证命令 |
+|---|---|---|
+| Windows 版本 | `EditionID=CoreCountrySpecific`，build 26200.9550 | `HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion` |
+| 完整 Hyper-V 角色 | **未安装**（`vmms` 服务 NOT PRESENT） | `Get-Service vmms` |
+| `HypervisorPresent` | `True` | `Get-CimInstance Win32_ComputerSystem` |
+| `vmcompute` / `HvHost` | **Running** | `Get-Service vmcompute,HvHost` |
+| Hyper-V Administrators 组 | 0 成员 | `net localgroup "Hyper-V Administrators"` |
+| 内存 / CPU | 31.8 GB / i7-13700F 16C24T | `Win32_ComputerSystem` / `Win32_Processor` |
+| C: 剩余空间 | **35.9 GB** | `Get-PSDrive C` |
+
+### 4.4.2 决策：必须用 1.17 的 hcs 驱动
+
+本机是 **Windows 11 家庭版**，不含完整 Hyper-V 角色，且该排除是版本级的，注册表无法绕过。这直接决定 Multipass 的可用驱动：
+
+| Multipass 版本 | Windows 驱动 | 家庭版可用 | 结论 |
+|---|---|---|---|
+| 1.16.4（当时最新稳定） | `hyperv` | ❌ 无此角色 | 不可用 |
+| 1.16.4 | `virtualbox` | ⚠️ 可用但强制 NEM 慢速模式 | **排除**，见 4.4.3 |
+| **1.17.0-rc1** | **`hcs`**（原生 HCS API） | ✅ Canonical release notes 明示 "works on all editions of Windows, **including Windows Home**" | **采纳** |
+
+Multipass 许可为 **GPL-3.0**（1.16 起 Windows/macOS 部分亦完全开源），内部自用**零 copyleft 义务**，仅对外分发才触发；本方案属内部开发环境，不分发，符合 §1 硬约束。
+
+### 4.4.3 为何排除 1.16.4 + VirtualBox
+
+三条**独立**理由，任一成立即足以排除：
+
+1. **性能**：本机 `HypervisorPresent=True`（VBS/WSL2 的 hypervisor 已占住 VT-x），VirtualBox 被强制走 NEM 兼容模式（绿乌龟图标），官方与社区一致记载 10-30%+ 损耗，偶有 `WHvSetupPartition failed` / `VERR_NEM_NOT_AVAILABLE`。本机要承载 k3s + 三件套三个常驻 controller，NEM 损耗会直接压垮该负载。
+2. **前向性**：官方文档已声明 VirtualBox 驱动自 1.17 起 **deprecated** 且**不提供迁移路径**（`move-from-virtualbox-to-another-driver` 明示 "no migration is planned"）。走此路等于建在死路上。
+3. **许可面更宽**：VirtualBox **基础包**为 GPL-3.0（可商用，per Oracle 官方 Licensing FAQ 自 7.1 起），但 **Extension Pack 是 PUEL**，明文排除任何商业用途，Enterprise 授权 100 席起售。虽不强制要求 Extension Pack，但引入"基础包/扩展包"双许可会徒增 §1 硬约束的合规审查面。
+
+> 同族排除结论：VirtualBox **Extension Pack**（PUEL，非商用）、Vagrant（BUSL，source-available）均已在 §2 结论外排除；本节不重复论证。
+
+### 4.4.4 rc1 的已知风险（显式登记，非隐藏）
+
+| 风险 | 状态 |
+|---|---|
+| rc1 状态，仅发布 1 天，下载量 1，未过社区验证 | 🟡 接受 — 本地开发/测试集群，非生产 |
+| Canonical 宣称的 Home 支持未经第三方交叉验证 | 🟡 实跑 `multipass launch` 后确认 |
+| hcs 驱动对中国区 Windows 11 家庭版的实际行为 | 🟡 实跑验证 |
+| 磁盘 28 GB 是否够 k3s + 三件套 + 业务镜像 | 🟡 实跑验证（本机仅余 35.9 GB，刻意留 7.9 GB 给宿主） |
+| rc1 → GA 升级路径 | 🟢 同版本线平滑，升级后重跑 `multipass set local.driver=hcs` 即可 |
+
+### 4.4.5 落地物
+
+- 安装介质 SHA256 **实测校验通过**：`80d0dbf94f8219b6b9d4d9cdf4ab2020e240772610c62407b544b23a4cd63d87`（78,188,079 bytes，期望值取自 GitHub Releases API `v1.17.0-rc1` asset `digest` 字段）
+- cloud-init 引导：`deploy/multipass/cloud-init-k3s-gitops.yaml`（9 阶段，逐段落 `DONE:`/`FAIL:` 标记）
+- 自动化脚本：`scripts/automation/multipass_k3s_gitops.ps1`（Stage 0 预检 / Stage 1 建 VM / Stage 2 mount / Stage 3 取 kubeconfig）
+- 密钥门禁：`scripts/automation/cloudinit_secret_scan.py` + `cloudinit_secret_scan_mutation.py`（6 用例，含对照组与反例守卫）
+- 说明文档：`deploy/multipass/README.md`（含完整未验证清单）
+
 ## 5. Rust 项目特有的两个约束
 
 ### 5.1 Tauri 桌面产物不在 k8s 内
@@ -170,3 +228,4 @@ Flagger 实测**仍处活跃维护**（v1.45.0，2026-09-01 发布，2026-09-21 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：Argo CD 三件套选型 + Spinnaker/Flux 排除实证 + deny.toml 闭合许可门禁缺口 | 2026-10-04 20:50 JST 用户需求 + 21:04 JST `ask_72c00a6f28daadd5538fa004` 拍板 |
+| v0.2 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 新增 §4.4 宿主层选型：Multipass 1.17.0-rc1 + hcs 驱动（本机 Win11 家庭版无完整 Hyper-V 角色，vmms 未装）；落 cloud-init 9 阶段引导 + pwsh 自动化脚本 + cloud-init 密钥扫描门禁（6 用例变异测试）。排除 1.16.4+VirtualBox（NEM 慢速 / deprecated 无迁移 / PUEL 双许可面） | 2026-10-05 ask_6da0b2511bcee76deccb5b21 mp_route_opt1 + install_auth_opt1 |
