@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.68 (2026-10-05)
-> **上游要件定义书**: docs/requirements.md v5.71
+> **文档版本**: v5.72 (2026-10-05)
+> **上游要件定义书**: docs/requirements.md v5.75
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4351,9 +4351,11 @@ Task Card review gate 的 canonical API 为 `POST /api/v1/engineering-runs/{engi
 
 每个命令通过 Application API 执行，成功后才由 Outbox 发布事件。事件消费者需幂等；失败时按 Outbox/NATS retry/DLQ 恢复。高频 presence、光标和 CLI token stream 属 Realtime Observed State，不进入业务事务事件流。
 
-Phase 3E 的 Canvas 事件读取先提供受保护的有界轮询契约：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，按 `(occurred_at,event_id)` 复合游标读取最多 200 条（默认 100）。响应只含刷新 projection 所需的事件元数据，不返回 payload 或 EntityRef 目标；客户端收到后再调用当前已授权的 Canvas / Element API 取投影。该读取端点是 Outbox 到实时消费路径接通前的查询接口，不替代 NATS JetStream consumer、consumer offset、SSE/WebSocket 推送或跨 App 实时验收。
+Phase 3E 保留受保护的单 Canvas 兼容事件读取：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，以 `(occurred_at,event_id)` 复合游标返回最多 200 条（默认 100）。新增 Worktree 级 `GET /api/v1/worktrees/{worktree_id}/canvas-events`，供多个 Canvas 共用一个按 Worktree 隔离的顺序流；PostgreSQL identity `stream_offset` 由 tenant/worktree 事务 advisory lock 串行分配并持锁到提交，避免并发事务提交顺序与游标顺序相反。Canvas API 将数据库 statement timeout 限制为 5s、lock timeout 限制为 1s。新接口使用非负 `i64` offset、默认 50/最多 100 条，以十进制字符串编码 64 位值，并只返回 event/canvas/type/time 元数据，不返回 payload 或 EntityRef 目标。该读取端点是 Outbox 到 realtime/consumer 交付路径接通前的查询接口，不替代服务端 durable consumer acknowledgement、NATS JetStream、SSE/WebSocket 推送或跨 App 实时验收。
 
-浏览器 `CanvasOutboxPoller` 使用按 Worktree/Canvas scope 隔离的本地复合游标作为可丢弃恢复提示；页面重载后先恢复并校验游标，每个事件页仍通过 Bearer API 重新授权，且仅在当前授权 projection 刷新成功后写入下一游标。存储不可用或内容损坏时从头 at-least-once 重放；本地游标不包含身份凭据，不授予访问权，不是服务端 durable consumer offset，也不代表 NATS / SSE / WebSocket 实时链路完成。
+浏览器 `CanvasOutboxPoller` 使用按 Worktree scope 隔离的本地十进制 `stream_offset` 作为可丢弃恢复提示；每页仍通过 Bearer API 重新授权，先刷新当前授权 projection，再写入下一 offset。客户端拒绝畸形页、空页游标不一致、offset 非单调或超出 PostgreSQL `BIGINT` 范围的结果；存储不可用/损坏时从 offset 0 at-least-once 重放。本地游标不包含身份凭据、不授予访问权、不是服务端 acknowledgement/checkpoint，也不代表 NATS / SSE / WebSocket 实时链路完成。
+
+当前实现的隔离验证证据：Canvas base migration 与 stream-offset migration 在 disposable PostgreSQL 18.6 fixture 上各自可重复应用；既有 Outbox 行完成 identity offset 回填；FORCE RLS scope、append-only UPDATE 拒绝、advisory lock 等待顺序及 1s lock timeout fail-closed 均有验证。该 fixture 使用测试角色和临时授权，不代表目标数据库 migration、正式应用角色 grants、执行计划或生产消费者已验收。
 
 浏览器 Group API adapter (`frontend/src/lib/group/worktreeGroupApi.ts`) 接受宿主注入的 `GroupAccessTokenProvider`，每次请求动态取得当前用户 access JWT，再添加 `Authorization: Bearer`；宿主同时提供非敏感 `sessionKey`，并在 principal 或登录会话切换时更新它，使 Group 页面立即卸载旧 API client、清空旧身份 projection 并重新加载。该 key 不作授权凭据、不持久化、不发送给 API。adapter 封装 Project Worktree Index/filter、owner/archive plan-confirm、GroupContext、WorkItem 查询与 lifecycle transition、Canvas/Element/Outbox、Canvas 初始化、Canvas Document CAS 和 Canvas→WorkItem API。adapter 不读写 token 存储、不持有 refresh token、不使用 `NEXT_PUBLIC_API_KEY`、不把 token 暴露在 URL/终端 WebSocket，并设置 `credentials: omit` 与 `cache: no-store`；远程 API origin 必须使用 HTTPS，仅 loopback 开发地址允许 HTTP；缺 token 在发网络请求前失败，401/403 向宿主会话层传播。
 
@@ -5003,3 +5005,6 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 | v5.67 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 dev 已有 Multipass 1.17.0-rc1/HCS + Ubuntu guest K3s + 19/19 GitOps Pod 实跑；将宿主 PoC 与 Star Rust Manager/provider、Run binding、Agent sandbox、跨平台支持及 RSS 验收分开陈述；同步 requirements v5.70、Infrastructure DD v0.6 和实施计划 v5.93 | 按用户要求把 Multipass 纳入架构并对照 dev 现有宿主层实现，修正文档状态边界 |
 | v5.68 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 与 requirements v5.71、Infrastructure DD v0.7、实施计划 v5.94 同步 Multipass CLI 真实 readiness/删除语义；区分 daemon、VM、K3s 和 Agent sandbox 状态，限制 guest probe 与单实例永久回收 | 按官方 Multipass CLI 语义校准基础设施接口及 Run 执行安全边界 |
 | v5.69 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.72、Infrastructure DD v0.8 与实施计划 v5.95 的交叉引用；Multipass 架构与尚未验收范围保持不变 | 文档版本一致性复核 |
+| v5.70 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 Phase 3C Canvas Outbox Worktree stream API、BIGINT-safe local cursor、commit-ordered offset allocation 与 1s/5s lock/statement deadlines；保留旧单 Canvas compatibility API，并明确 durable consumer、realtime 和目标 DB 部署仍未验收；同步 requirements v5.73 与 Group DD v4.47 | Worktree event stream 实现切片改变了 Canvas outbox cursor 和消费者作用域 |
+| v5.71 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账当前 Worktree Canvas API/前端 slice 的 workspace all-targets 编译、cursor Rust 定向测试 3/3、定向 rustfmt 与前端测试结果；同步 Data Design v1.5 五表 W/T/M 分类；明确 migration/RLS/并发顺序和全仓既有格式差异仍开放；同步 requirements v5.74、Group DD v4.48 与阶段报告 v0.2 | Rust 工具链通过明确路径恢复后补跑 phase 编译门禁 |
+| v5.72 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将上游需求指针更新到 v5.75，并补录 disposable PostgreSQL 18.6 Canvas migration/backfill、FORCE RLS scope、append-only、advisory lock 顺序及 1s fail-closed 验证；明确目标 DB/runtime grants/query plan 和生产消费者仍未验收；同步 Data Design v1.6、Group DD v4.49、实施计划 v5.98 与报告 v0.3 | PostgreSQL 18.6 隔离验证补齐后同步架构证据边界 |

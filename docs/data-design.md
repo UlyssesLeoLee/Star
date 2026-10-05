@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v1.4 (2026-10-05)
+> **文档版本**: v1.6 (2026-10-05)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -19,6 +19,8 @@
 > | v1.2 | 2026-10-05 | 增加 9F4C-A admission persistence：dispatch admitted_run_id 的 fenced transition/不可变 Run binding，以及 tenant FORCE RLS、append-only schedule_run_outbox 与复合关系约束；记录 PostgreSQL 18.6 双次迁移、8 表 RLS 和正反例 evidence；生产 atomic writer/worker/consumer/target grants 仍未验收 | 用户确认 creator-as-run-as、撤权 fail closed 后继续 Schedule admission persistence |
 > | v1.3 | 2026-10-05 | 增加 Schedule enable-time ACL 只读查询设计；记录 PostgreSQL 18.6 active/revoked/paused ACL 验证、runtime role 无 directory UPDATE 权限，并保留并发撤权串行化缺口 | 修复 canonical ACL fixture 的目录锁权限边界并通过隔离数据库验证 |
 > | v1.4 | 2026-10-05 | 增加 9F4C-C Project-scoped transaction advisory lock 与 Project/Branch/Run grant mutation triggers；记录三类并发撤权排序测试和 transient Work coordination 分类，并保留目标 grants/worker 缺口 | Mavis 接手审核 |
+> | v1.5 | 2026-10-05 | 纳入 Worktree Group Canvas 现行五表 W/T/M 分类、FORCE RLS scope、append-only/commit-ordered Outbox cursor 与未验收边界；明确 Document 字段扩展在现有 registry，不接受平行 document aggregate | Phase 3C Canvas stream slice 与当前 Group DD 对账 |
+> | v1.6 | 2026-10-05 | 补录 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -4402,6 +4404,22 @@ CREATE POLICY tenant_isolation_policy ON local_runtime.reconciliation_report
   USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
 ```
+
+---
+
+### 4.26 Run App schema extension: Worktree Group Canvas (`canvas`)
+
+Canvas 是 Run 下与 Task Card 同级的 App。当前兼容实现仍以 Worktree ID 作为 API 路由和数据库 scope；目标 canonical owner 迁移到 Engineering Run，不能将下表解释为 Run ownership 已完成。详细字段、命令和迁移契约见 `DD-WORKTREE-GROUP-001 §8.1`。
+
+| 表 | W/T/M 分类 | 当前记录与约束 | 隔离/保留 |
+|---|---|---|---|
+| `canvas.group_canvas_registry` | Master / SCD2 | Canvas identity/title 与同一版本序列中的 `viewport`、`frames`、`connectors`；唯一当前 owner 为 tenant+Worktree+Canvas | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_elements_backend` | Master / SCD2 | Element layout/content、current version 与历史版本；实体状态不复制到 Canvas | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_entity_ref` | Master / SCD2 | 带类型的 entity binding；不持有 WorkItem lifecycle 状态副本 | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_group_audit` | Transaction / append-only | Canvas 命令审计事实；UPDATE/DELETE 由 trigger 与 RLS guard 拒绝 | tenant+Worktree FORCE RLS；不物理删除 |
+| `canvas.canvas_group_outbox` | Transaction / append-only | 事件事实及 payload；`stream_offset BIGINT GENERATED ALWAYS AS IDENTITY`，唯一键 `(tenant_id, worktree_id, stream_offset)`；writer 按 tenant+Worktree transaction advisory lock 持锁至提交，保证提交可见顺序 | tenant+Worktree FORCE RLS；不物理删除。Worktree metadata API 不返回 payload |
+
+这些对象通过 Canvas app 所属 schema 管理，不改变原 25 个核心 domain module 列表。现行 document migration 在 `group_canvas_registry` 上扩列；另建 `canvas.canvas_document_state` 会形成平行 Master aggregate，与当前 DD 决策冲突，未纳入此数据模型。Canvas base migration 与 stream-offset migration 已在 disposable PostgreSQL 18.6 fixture 上各执行两次；identity 为 `YES ALWAYS BIGINT`，两条既有 Outbox fixture 行获得两个不同 offset；唯一索引存在，表启用并强制 RLS。临时 no-login 测试角色在手工授予查询权限后只能读取匹配 scope，未设置 scope 时返回零行；append-only UPDATE 被 trigger 拒绝。两连接测试观察到 advisory lock 等待，提交后的 offset 按锁取得顺序排列；在 API 使用的 1s `lock_timeout` 下，竞争 writer 被数据库超时取消并失败关闭。以上是 disposable fixture 证据，不代表目标数据库、正式 runtime grants、实际服务身份或 query plan 已验收；这些仍是开放门禁。
 
 ---
 
