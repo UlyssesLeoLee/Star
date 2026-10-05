@@ -9,7 +9,7 @@
 #             + Kargo v1.12.1 (Helm chart, deployed)
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# 📌 修正史 —— 本文件 6 处错误全部由 live CRD 与 admission webhook 抓出,
+# 📌 修正史 —— 本文件 7 处错误全部由 live CRD 与 admission webhook 抓出,
 #    离线 schema 校验一个都没抓到。原因见文末「为什么离线校验没抓到」。
 #
 # v0.2 修正 4 处:
@@ -39,6 +39,19 @@
 #   6) Warehouse / Stage 必须放在**与 Project 同名**的 ns (即 `star`),
 #      不能放 `kargo` 控制面 ns。
 #
+# v0.4 修正 1 处 —— **镜像坐标, 此前是按惯例推断的值**:
+#   7) subscriptions 的 `repoURL` 原写 `ghcr.io/ulyssesleolee/star`。
+#      推断依据是 "ghcr.io/<owner>/<repo>" 这个惯例, 而**惯例不是证据**:
+#      - owner 错: CI 的 `IMAGE_OWNER` 是 `SayAtelier`, 不是 `ulyssesleolee`
+#      - 粒度错: CI 推的是 **4 个独立仓库** `star-{canvas-engine,domain-canvas,
+#        canvas-realtime,canvas-game}`, 不是单个 `star`
+#      两处都错的后果相同且静默: Warehouse 订阅永不匹配 → 永不产出 Freight →
+#      Stage 没有 Freight 可晋级 → 晋级链路形同不存在, 但 apply 一直 exit 0。
+#      这是**结构性校验与存在性校验正交**的又一例 (同 deny.toml 只能校验许可证
+#      结构、查不出 URL 404): 结构对 ≠ 地址存在。
+#      判据: publish-canvas-game.yml (env.IMAGE_OWNER + matrix) 与
+#            canvas-game-k3s.yaml (4 处 image: 字段) 两处独立证据互相印证。
+#
 # 为什么离线 schema 校验一个都没抓到 (per 2026-10-05 复盘):
 #   - `Warehouse.spec.subscriptions.items` 标了
 #     `x-kubernetes-preserve-unknown-fields: true` (live CRD 实测),
@@ -51,8 +64,33 @@
 # ⚠️ 仍未运行时验证 (per 守门 #11 缺标比错标安全):
 #   - promotionTemplate 各 step 的 `config` **内部**字段名未经官方 promotion step
 #     参考表逐项核对; CRD schema 只校验到 steps 数组层, 到不了 step 内部键名。
-#     server dry-run 同样校验不到 —— 这是本文件**唯一**残留的不确定面。
-#   - deploy/dev 与 deploy/staging 分支尚未创建 (git-push 会失败)。
+#     server dry-run 同样校验不到 —— 这是本文件**唯一**残留的结构不确定面。
+#
+# 🟡 实跑阻塞 (per 2026-10-05 20:52 JST 实测, kargo-controller 日志):
+#   镜像坐标修正后 Warehouse **仍在失败**, 但错误性质变了 —— 这证明修正方向正确,
+#   同时暴露了第二个独立阻塞:
+#     修正前: ghcr.io/ulyssesleolee/star
+#             → DENIED: requested access to the resource is denied
+#                (该路径不存在)
+#     修正后: ghcr.io/sayatelier/star-canvas-engine
+#             → UNAUTHORIZED: authentication required
+#                (仓库存在, 但是私有的; Kargo 无凭据无法匿名轮询)
+#   对照组证明这不是本机网络/请求写法问题: 同法匿名拉
+#     ghcr.io/fluxcd/source-controller → OK (100 tags)
+#     ghcr.io/actions/actions-runner  → OK (73 tags)
+#   → **仍需**: 给 Kargo 配置 GHCR 读凭据 (Kargo 的 image credentials /
+#     Secret), 否则 Warehouse 永不产出 Freight。凭据按守门 #5 只走运行时注入,
+#     **不入库、不入本文件、不进 log**。
+#   → 另注: 该错误自 2026-10-05 11:00Z 起每个 reconcile 周期复现一次, 而
+#     `kubectl apply` 始终 exit 0、Project 状态始终 "ready" —— 即**静默失效**。
+#     判"配置生效"不能只看 apply 返回码, 必须读控制器日志或 Warehouse.status。
+#
+# ✅ deploy/dev 与 deploy/staging **本地分支已创建** (2026-10-05:
+#     deploy/dev 起自 main 06952d78, deploy/staging 起自 deploy/dev, 二者同点)。
+#     🟡 但**尚未推送 origin**, Kargo 的 git-push step 连的是
+#     https://github.com/UlyssesLeoLee/Star —— 分支不在远端时首次晋级会失败。
+#     (Kargo git-clone 对不存在的远端分支会自行 checkout -B, 但首次 push
+#      是否被接收取决于远端是否允许该 refspec, 未经实跑验证。)
 #   - 镜像坐标 ghcr.io/ulyssesleolee/star 为推测值, 须与 CI 实际推送目标核对。
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: kargo.akuity.io/v1alpha1
@@ -79,18 +117,60 @@ metadata:
 spec:
   interval: 5m
   subscriptions:
-    # ⚠️ 镜像坐标为**推测值**, 须与 CI 实际推送目标核对后修正。
-    #    依据: workspace.package.repository = github.com/UlyssesLeoLee/Star,
-    #    故按 GitHub Container Registry 惯例推断为 ghcr.io/<owner>/<repo>。
-    #    若 CI 实际推到其他 registry, 此处订阅将永不产出 Freight (静默失效)。
-    - name: star-images
+    # v0.3 修正: 镜像坐标不再是推测值 —— 与 CI 实际推送目标逐字核对 (原写
+    # `ghcr.io/ulyssesleolee/star` 是按 "ghcr.io/<owner>/<repo>" 惯例**推断**的,
+    # owner 与镜像名粒度双错, Warehouse 会静默永不产出 Freight)。
+    #
+    # 判据 (两处独立证据互相印证):
+    #   1) .github/workflows/publish-canvas-game.yml
+    #        env.IMAGE_OWNER: SayAtelier
+    #        images: ghcr.io/${{ IMAGE_OWNER }}/star-${{ matrix.image }}
+    #        matrix.image = [canvas-engine, domain-canvas, canvas-realtime, canvas-game]
+    #        -> 是 **4 个独立仓库**, 不是单个 `star`
+    #        (同文件 L42-43 注释: IMAGE_OWNER 必须是 GitHub username 大小写原样,
+    #         lowercase 会触发 not_found —— 故此处按 CI 原样写 SayAtelier,
+    #         实际请求路径大小写不敏感, 与 canvas-game-k3s.yaml 的 sayatelier 等价)
+    #   2) deploy/canvas-game-k3s.yaml L147/202/257/315 引用
+    #        ghcr.io/sayatelier/star-canvas-engine:dev 等 4 个 —— 与 CI 一一对应
+    #
+    # tag 策略兼容性: CI 的 metadata-action 同时产出
+    #   type=ref,event=branch | type=ref,event=pr | type=semver,pattern={{version}}
+    #   | type=semver,pattern={{major}}.{{minor}} | type=sha,format=short
+    #   | type=raw,value=latest,enable=is_default_branch
+    # 且 on.push.tags 含 'v*', 故 `v1.2.3` 推送会产出三段式 tag `1.2.3`,
+    # 与下面 allowTagsRegexes 的 ^\d+\.\d+\.\d+$ 兼容。
+    # 🟡 已知缺口: 分支 ref tag (`dev` / `main` / 短 sha) 被 allowTagsRegexes 挡在
+    #    外 —— 这是刻意选择 (Freight 应是不可变版本, 而非会移动的分支指针)。
+    #    代价: main/dev 分支的自动构建不会自动进 Kargo 晋级链, 需打 v* tag。
+    - name: star-canvas-engine
       image:
-        repoURL: ghcr.io/ulyssesleolee/star
+        repoURL: ghcr.io/sayatelier/star-canvas-engine
         # SemVer 是默认策略; constraint 支持 ^ / ~ / 范围表达式
         imageSelectionStrategy: SemVer
         constraint: '>=0.1.0'
         # 仅接受严格三段式版本 tag (x.y.z), 排除 latest / 分支名 / 短 sha
         # 数组类型 (v0.2 实测: []string)
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+    - name: star-domain-canvas
+      image:
+        repoURL: ghcr.io/sayatelier/star-domain-canvas
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+    - name: star-canvas-realtime
+      image:
+        repoURL: ghcr.io/sayatelier/star-canvas-realtime
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+    - name: star-canvas-game
+      image:
+        repoURL: ghcr.io/sayatelier/star-canvas-game
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
         allowTagsRegexes:
           - '^\d+\.\d+\.\d+$'
 ---
