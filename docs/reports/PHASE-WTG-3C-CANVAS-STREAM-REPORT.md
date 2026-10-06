@@ -1,10 +1,10 @@
 # PHASE-WTG-3C-CANVAS-STREAM-REPORT
 
 > **Phase**: Worktree Group Phase 3C/3E — Worktree-scoped Canvas Outbox cursor slice
-> **Version**: v0.8 · 2026-10-06 · 🟡 Implementation slice; phase closure gates remain open
+> **Version**: v0.9 · 2026-10-06 · 🟡 Implementation slice; phase closure gates remain open
 > **Author**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > **Source**: Canvas stream candidate `codex/phase3c-dev-integration-20261005`; conflict source `codex/worktree-group-shell-mvp`
-> **Design baseline**: requirements v5.79 · basic design v5.76 · Data Design v1.7 · Group DD v4.54 · implementation plan v6.07
+> **Design baseline**: requirements v5.80 · basic design v5.77 · Data Design v1.7 · Group DD v4.55 · implementation plan v6.08
 
 ## §0 目的
 
@@ -22,7 +22,7 @@
 | requirements/basic/Data Design/Group DD/implementation plan | 保留旧单 Canvas composite cursor；添加 Worktree ordered cursor、commit ordering、deadline、W/T/M 分类与未完成边界 | 五层版本及引用已同步 |
 | `frontend/src/app/api/group/[...path]/route.ts`、`AuthenticatedWorktreeIndex.tsx`、`group-context.ts` | Project Index 接入 same-origin cookie-backed BFF；Bearer 仅从 HttpOnly cookie 在服务端转发，限制 path/method、同源写入、body 和响应头 | host cookie issuer、生产 API base 与目标 DB/RLS 未接通；不宣称生产授权已启用 |
 | `group_api.rs` / `group_api/worktrees.rs` | Project Worktree 投影停止序列化主机 checkout path | WTG-022 / AC-WTG-012 已同步需求和设计；内部 checkout path 仍由受信任 Host/Repository 层解析 |
-| `codex/worktree-group-shell-mvp` 冲突对账 | 逐项检查并解决 11 个冲突；保留当前签名 Run fence、Canvas stream 与 `group_canvas_registry` Document 版本设计；去掉旧未调用 CLI helper、平行 `canvas_document_state` Master migration、重复 stream offset migration 和孤立 Canvas client | 旧 Task Card CLI 未接生产 grant/provisioner/PTY/sandbox，继续禁用；Phase 3/Run Apps 未关闭 |
+| `codex/worktree-group-shell-mvp` 冲突对账 | 逐项检查并解决 11 个冲突；保留当前签名 Run fence、Canvas stream 与 `group_canvas_registry` Document 版本设计；去掉旧未调用 CLI helper、平行 `canvas_document_state` Master migration、重复 stream offset migration 和孤立 Canvas client；本地 merge commit `f4430beb` 已落在 dev | 旧 Task Card CLI 未接生产 grant/provisioner/PTY/sandbox，继续禁用；Phase 3/Run Apps 未关闭 |
 
 ## §2 验证摘要
 
@@ -59,7 +59,7 @@
 2. 仅 disposable PostgreSQL 18.6 fixture 验证了 migration/backfill/RLS/append-only 与锁行为；目标数据库 migration、正式 runtime grants、应用角色授权、query plan 及完整 API→DB end-to-end 尚未验收。
 3. Worktree offset 是读取 cursor，不是 consumer acknowledgement/checkpoint；没有 NATS JetStream、SSE/WebSocket 或跨 App realtime。
 4. 宿主 JWT provider、目标库部署、Canvas/Jira relation 与 Phase 3 整体验收仍开放。
-5. `373259dc` 的 11 个冲突已经按当前 dev 的授权、Run fence、Canvas cursor 与 schema 事实逐文件审查并解决；当前 merge tree 的 workspace all-targets check 通过，改动 Rust 文件 rustfmt 通过，focused frontend tests 38/38。前端 typecheck 因本地缺少已在 manifest/lockfile 声明的 `monaco-editor` 未完成。此时尚未生成 merge commit，也未 push；合并后仍需做 fresh GitConverge preview。
+5. `373259dc` 的 11 个冲突已经按当前 dev 的授权、Run fence、Canvas cursor 与 schema 事实逐文件审查并解决，并以本地 merge commit `f4430beb` 集成。目标提交 `05075980` 在此 merge 前已是 dev 祖先。workspace all-targets check、改动 Rust 文件 rustfmt 和 focused frontend tests 38/38 通过；前端 typecheck 因本地缺少已在 manifest/lockfile 声明的 `monaco-editor` 未完成。没有 push；本地 remote-tracking refs 未刷新。
 6. 旧 shell lane 的未调用 `spawn_authorized_cli` 缺少当前签名 Run fence；不带入该执行路径。旧 `canvas_document_state` 平行 Master 表与已采纳的 `group_canvas_registry` Document 版本字段冲突，重复 `stream_offset` migration 与 2026-10-05 migration 重复，均不带入。保留 same-origin BFF / Project Index UI 代码切片与脱敏 Index projection；cookie issuer、Group Shell provider、DB/RLS 和 Task CLI 生产执行闭环仍开放。
 
 ## §4 子代理失败接手清单
@@ -97,4 +97,5 @@
 | v0.5 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 targeted strict Clippy 被 `star-context` 既有 lint 阻断；确认 Multipass/Linux guest/K3s 共享控制面为 dev 设计基线，Star provider/bridge 仍未验收；同步 implementation plan v6.01 | 将 Clippy 实测与最新架构边界写入验证状态 |
 | v0.6 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录候选代码 commit `85d792c1` 已 rebase 到本地 `dev` `31b7589c`，但仍待 fresh GitConverge apply；加入 post-rebase workspace check 与 runner 复跑证据；标记旧 shell lane predicted conflict；Multipass VM/K3s 架构保持为已合入设计基线，Star provider/bridge 未验收 | 纠正 rebase 后报告仍称代码未提交的状态差异 |
 | v0.7 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Project Index cookie-backed BFF 与 checkout path 脱敏实现；同步 WTG-022 / AC-WTG-012、需求 v5.78、基本设计 v5.75、详细设计 v4.53 和计划 v6.06；逐项解决 `373259dc` 的 11 个冲突并排除不符合当前 Run fence/Canvas schema 的旧执行与重复 migration；登记当前 merge tree 的 focused tests、typecheck 环境缺口和 workspace 检查状态；本地合并与 fresh preview 待完成 | 用户选择先解决冲突，再重新预览并合并到 dev |
-| v0.8 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复核 merge tree workspace all-targets check exit 0（Rust 1.98.1、5m17s）、定向 Rust format、38/38 Group/Worktree focused tests、CypherGraph Guardian 7 源码检查和 diff checks；准确保留缺失 `monaco-editor` 导致当前 frontend typecheck 未完成；同步 implementation plan v6.07，仍未生成本地 merge commit或 push | 完成合并前验证并按当前工作树证据更新状态 |
+| v0.8 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复核 merge tree workspace all-targets check exit 0（Rust 1.98.1、5m17s）、定向 Rust format、38/38 Group/Worktree focused tests、CypherGraph Guardian 7 源码检查和 diff checks；准确保留缺失 `monaco-editor` 导致当前 frontend typecheck 未完成；同步 implementation plan v6.07，尚未生成本地 merge commit | 完成合并前验证并按当前工作树证据更新状态 |
+| v0.9 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 `codex/worktree-group-shell-mvp` 以本地 merge commit `f4430beb` 集成；确认 `05075980` 已在 dev 祖先链而无需重复合并；同步 requirements v5.80/basic v5.77/Group DD v4.55/plan v6.08；保留无 push、remote-tracking refs 未刷新和前端 typecheck 依赖缺口；Multipass/Linux guest/K3s 架构与 Star provider 未验收边界不变 | 用户授权解决旧 branch 冲突后完成本地 merge 并更新跨层文档 |

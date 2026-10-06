@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.76 (2026-10-06)
-> **上游要件定义书**: docs/requirements.md v5.79
+> **文档版本**: v5.77 (2026-10-06)
+> **上游要件定义书**: docs/requirements.md v5.80
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5033,3 +5033,4 @@ Index projection 只返回 Worktree/Project/Repository 等 opaque identity、授
 | v5.74 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 `domain-infrastructure` 的 v1 Run binding/Host demand typed contract、输入边界、摘要与 occurrence 幂等键；明确其为无授权和持久化副作用的领域基础，不改变 fail-closed 执行状态 | Phase 9F4D 首个领域实现切片通过 crate 定向 gates 后同步设计 |
 | v5.75 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.78 / Group DD v4.53 / implementation plan v6.06；定义 Project Worktree Index 的 cookie-backed same-origin BFF、服务端 token 边界、请求大小与响应头限制，并禁止 Index projection 暴露 checkout path；明确宿主 cookie issuer/API 配置和 Group Shell provider 仍未验收 | WTG merge reconciliation 接入认证 Index/BFF 与服务端路径脱敏切片 |
 | v5.76 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.79、Group DD v4.54、implementation plan v6.07 和 WTG report v0.8；Multipass 管理 Linux guest 内 K3s 的设计基线与未验收 provider 状态保持不变 | 合并前质量门完成后同步跨层文档版本指针 |
+| v5.77 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 `codex/worktree-group-shell-mvp` 以本地 merge commit `f4430beb` 集成至 dev；确认 `05075980` 在集成前已为 dev 祖先；同步 requirements v5.80、Group DD v4.55、implementation plan v6.08 与 report v0.9；保留 Multipass guest K3s 架构和 provider 未验收边界 | 完成本地冲突合并并同步阶段报告 |

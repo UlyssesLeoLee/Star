@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.54**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.55**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -14,8 +14,8 @@
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.79 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.76 §16
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.80 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.77 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.14、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.10、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -834,3 +834,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.52 | 2026-10-06 | 对齐 Phase 9F4D 的 Rust `domain-infrastructure` binding/demand v1 契约及定向 gates；记录确定性摘要不是授权、固定 run-as 每次触发仍待 recheck，并保留 owner persistence、worker、Multipass Manager/provider、目标 DB/RLS 的 fail-closed 状态 | 9F4D 首个双 owner 消息契约代码切片落地后逐项对照详细设计 |
 | v4.53 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 WTG conflict reconciliation：Project Index 接入同源 cookie-backed BFF 与当前认证 Index UI；服务端保持 HttpOnly Bearer、HTTPS upstream、同源写保护、有界请求体和 no-store；移除 WorktreeIndex API 对浏览器暴露的主机 checkout path；明确旧 CLI/平行 Canvas migration 未被采纳及生产 issuer/provider/DB/RLS 仍开放；同步 requirements v5.78/basic v5.75/plan v6.06 与报告 v0.7 | 解决旧 WTG shell lane 与最新 dev 的设计/API/UI/schema 冲突并重新对账实现边界 |
 | v4.54 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐上位 requirements v5.79、basic v5.76、implementation plan v6.07 与 WTG phase report v0.8；保持 Multipass/Linux guest/K3s 的已确认架构决策，不把宿主验证误报为 Star provider 验收 | 合并前质量门完成后统一跨层文档版本引用 |
+| v4.55 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Worktree Group Shell lane 本地集成 commit `f4430beb`、`05075980` 已是 dev 祖先和冲突解决边界；同步 requirements v5.80/basic v5.77/plan v6.08/report v0.9；Multipass Linux guest 内 K3s 的设计和 Star provider 未验收状态不变 | 完成本地冲突合并并更新集成状态 |

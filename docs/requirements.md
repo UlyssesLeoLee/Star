@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.79）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.80）
 
 ## 0. 文档说明与前提
 
@@ -2885,3 +2885,4 @@ Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权�
 | v5.77 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 `domain-infrastructure` v1 Run binding/Host demand 领域契约及真实验证边界；区分确定性 digest 与授权，明确 run-as 每次触发复验仍待 admission writer | Phase 9F4D 首个 Rust 领域契约切片已实现，需要同步需求而不把 worker/provider 写成已完成 |
 | v5.78 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Project Worktree Index 与 Run directory projection 不暴露主机 checkout 路径，并要求路径解析只留在受信任 Host/Repository capability 或受控 Runtime bridge；同步 basic v5.75、Group DD v4.53 与 implementation plan v6.06 | 合并 Project Index cookie-backed BFF 切片并将已实现的路径脱敏提升为可验收需求 |
 | v5.79 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步基本设计 v5.76、Group DD v4.54、implementation plan v6.07 与 WTG phase report v0.8 的版本指针；不改变已确立的 Multipass/Linux guest/K3s 架构及功能验收结论 | 合并前完成阶段验证后统一跨层文档版本引用 |
+| v5.80 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Worktree Group Shell lane 本地 merge commit `f4430beb` 与 `05075980` 已在 dev 的祖先关系；同步 basic v5.77、Group DD v4.55、implementation plan v6.08 和 WTG report v0.9；Multipass/Linux guest/K3s 设计基线不变且无 push | 冲突解决并完成本地 dev 集成后同步阶段结果 |
