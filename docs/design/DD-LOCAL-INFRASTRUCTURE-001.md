@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.10 · 2026-10-06 · Draft / 加入 Rust v1 Run binding/Host demand 领域类型与定向验证；owner persistence、provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.11 · 2026-10-06 · Draft / 加入 Rust v1 Host reservation/readiness evidence validator；owner persistence、provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.77 §50.8G-50.8I / basic-design v5.74 §8.1、§16.21-16.28 / 实施计划 §6.83-6.86。
+> 上游：requirements v5.81 §50.8G-50.8I / basic-design v5.78 §8.1、§16.21-16.30 / 实施计划 §6.83-6.88。
 
 ## §0 目的与边界
 
@@ -131,6 +131,14 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 
 真实环境可创建/复用→绑定 Run→服务就绪→受控任务实际执行→取消/恢复→独立验证回写，且不会影响其他 user resources，才满足闭环。上述完整闭环仍未完成。
 
+### §7.2 Phase 9F4D-1：Host/provider 分层 readiness gate
+
+要求有效 Host reservation 与 Schedule deadline、精确 scope/binding digest/Host generation，以及不早于 acceptance、不晚于当前时刻且不超过 30 秒的新鲜 observation。Multipass 默认路径需有受信任 Manager operation receipt、Multipass daemon 与被拥有 Linux guest VM 的独立 Ready 事实；Remote K3s 对 daemon/guest 两层显式标记 NotApplicable。两种 provider 都必须有 K3s API、达到 profile 要求的 Ready node 数、CRI、独立 Agent Runtime sandbox 和 Worktree workspace bridge。Run owner start/resume transaction 仍须复验固定 creator 实时 Project/Run ACL、lease/fence、quota 和 current binding。此纯函数不授权、不持久化、不调用 provider、不启动 executor。 Acceptance/evidence 精确绑定 demand event、tenant/Project/Branch/Engineering Run、TaskExecutionRun、Schedule Rule revision、occurrence、binding id/revision/digest、HostEnvironment generation、reservation id/lease；拒绝未知 schema、nil identity、到期 lease/deadline、current binding drift、generation/scope 错配、acceptance 前/未来/超过 30 秒的观测。
+
+Multipass 首选路径明确分开 Manager operation receipt、Multipass daemon readiness、单一 owned Linux guest VM readiness、K3s API/node/CRI、Agent Runtime sandbox 和 Worktree workspace bridge。只有 Manager 可生成受信任 receipt；wait-ready 只代表 Multipass daemon 可接受请求，不能替代 VM Running/guest probe；Task/Agent/Plugin 仍无 daemon/socket、宿主 shell 或 guest 任意 exec 权限。Remote K3s profile 对 Multipass daemon/guest 两层必须显式 not_applicable，其它 K3s/CRI/sandbox/workspace readiness 仍全部要求 Ready。
+
+本阶段 7 个 readiness tests + crate 原有 tests 合计 15/15 通过；rustfmt 对 lib.rs/readiness.rs、package all-target check、warnings-as-errors Clippy 均通过。首次使用 worktree 内 target 的 test link 遇 Windows MSVC LNK1104；改到短 target C:\\t\\star9f4d-20261006 重跑四 gates 全通过。此证据只验证 Rust 类型/纯函数，不证明 owner store、Outbox/Inbox、Manager/provider readiness producer、VM/K3s、目标 DB/RLS、CLI sandbox、BI 或桌面 RSS/公平性已实现。
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -144,3 +152,4 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 | v0.7 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 依据 Canonical CLI reference 澄清 wait-ready 只代表 daemon ready；将 VM/K3s/Runtime sandbox 列为独立 readiness 层；只允许固定 profile guest probe 走 Multipass exec，并将永久删除限定为精确 owner 的 delete --purge，禁止全局 purge/delete --all | 官方 CLI 核验发现 daemon readiness、guest/K3s readiness 与实例回收有不同语义 |
 | v0.9 | 2026-10-06 | Split Project/Run execution reservation from Infrastructure-owned Host capacity reservation and its Inbox/Outbox lifecycle; distinguish existing Run-owned storage from planned Infrastructure storage, disclose unverified admission-lock pruning and reservation cleanup, and retain all provider/runtime gates as unresolved. |
 | v0.10 | 2026-10-06 | Record the tested Rust v1 provider/binding/budget/Host-demand domain contract and its exact boundary; keep owner persistence, current authorization resolution, Run admission, Multipass Manager/provider, readiness, cross-platform and RSS gates open. |
+| v0.11 | 2026-10-06 | Add the tested typed acceptance/readiness validator with Manager receipt and separate Multipass daemon/guest facts, remote-provider NotApplicable behavior, exact scope/generation and 30-second freshness; record 15/15 crate tests and keep provider producers, owner persistence, production admission, cross-platform and RSS gates open. | Phase 9F4D-1 made the user-selected Multipass guest K3s architecture an explicit readiness contract

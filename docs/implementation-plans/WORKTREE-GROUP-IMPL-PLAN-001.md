@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.08**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.09**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -24,10 +24,10 @@
 > - Phase 9F4B 状态：规则创建者固定为 `run_as_actor_id`，认证创建者派生身份且所有 successor revision 继承；additive migration 对历史行按最早版本 `changed_by` 回填，并以数据库 trigger 防止身份替换；domain occurrence snapshot 随规则快照携带该主体。每次定时触发/重试/恢复仍须由未来 worker 复验该主体当前 Project binding 与 Engineering Run grant，撤权或 ACL 不可确认时 fail closed。此阶段没有启用 worker、Run admission 或 Launch Profile authority；详见 §6.78 和 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。
 > - Phase 9F4B 状态：规则创建者固定为 `run_as_actor_id`，认证创建者派生身份且所有 successor revision 继承；additive migration 对历史行按最早版本 `changed_by` 回填，并以数据库 trigger 防止身份替换；domain occurrence snapshot 随规则快照携带该主体。每次定时触发/重试/恢复仍须由未来 worker 复验该主体当前 Project binding 与 Engineering Run grant，撤权或 ACL 不可确认时 fail closed。此阶段没有启用 worker、Run admission 或 Launch Profile authority；详见 §6.78 和 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。
 > - Phase 9F4C 状态：9F4C-B Rule enable-time 授权已由 SCHED-API-015 / 9F4C-C 补上 Project-scoped transaction lock：授权 helper 获锁后，API 下一 SQL statement 重读 Project/Branch/Run grants；对应 grant mutation triggers 共用锁。PostgreSQL 18.6 双连接测试证明三类撤权等待已持锁授权事务，授权提交后撤权完成且后续授权 fail closed。完整 REST write rollback 与 target grants仍未完成；worker 每次 trigger/retry/resume reauthorization、原子 Run admission 保持 fail closed，见 §6.82。
-> - Phase 9F4D 状态：双 owner 事务边界仍为设计要求；`domain-infrastructure` 已提供并定向验证 v1 binding/demand、预算/label/deadline/scope 校验、全字段 binding digest 与 occurrence idempotency key。它不解析实时 ACL/Run binding，不持久化 owner reservation，不连接 Inbox/Outbox、worker 或 Multipass Manager；执行保持 fail closed，见 §6.85-§6.86。
-> - 关联需求：docs/requirements.md v5.80 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.14（9F4A/9F4B/9F4C/9F4D 增量）。
-> - 关联基本设计：docs/basic-design.md v5.77 §8.1、§16.1-16.29；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.14（9F4D 增量）。
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.55、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.14、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.10；Data Design v1.7。
+> - Phase 9F4D 状态：双 owner 事务边界仍为设计要求；`domain-infrastructure` 已提供并定向验证 v1 binding/demand 与 Host reservation/readiness gate，并通过 Rust 1.98.1 focused gates（15/15 tests）。Gate 绑定 Manager receipt、Multipass daemon/owned guest（remote K3s 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge、Host generation 和 30 秒新鲜度；它不解析实时 ACL/Run binding、不持久化 owner reservation、不连接 Inbox/Outbox、worker 或真实 Multipass Manager/provider；执行保持 fail closed，见 §6.85-§6.88。
+> - 关联需求：docs/requirements.md v5.81 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.15（9F4A/9F4B/9F4C/9F4D 增量）。
+> - 关联基本设计：docs/basic-design.md v5.78 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.15（9F4D 增量）。
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.56、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.15、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.11；Data Design v1.7。
 
 ---
 
@@ -1175,6 +1175,15 @@ dev 已有的宿主 Multipass/K3s/GitOps 实跑见 `docs/reports/PHASE-MULTIPASS
 
 阶段证据：[`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md)。
 
+### 6.88 Phase 9F4D-1 Host/provider readiness evidence gate（2026-10-06）
+
+| 项目 | 结果 |
+|---|---|
+| 代码 | domain-infrastructure::readiness 新增版本化 Host reservation acceptance、Manager operation receipt 与 readiness evidence；精确校验 Run/Task/Schedule/occurrence/binding/digest/Host generation/reservation scope、lease/deadline 和 ≤30 秒 freshness。Multipass path 独立校验 daemon + owned guest；Remote K3s 显式 NotApplicable；两者共同校验 K3s API/node/CRI、Agent Runtime sandbox、Worktree bridge。 |
+| 证据 | Rust 1.98.1 focused runner：rustfmt（lib.rs + readiness.rs）、cargo check --all-targets -j 4、warnings-as-errors Clippy 与测试均通过，15/15 crate tests。首次 worktree target 出现 MSVC LNK1104；短 target C:\\t\\star9f4d-20261006 重跑通过。 |
+| 文档 | 同步 requirements v5.81、basic v5.78、Group DD v4.56、Schedule SRS/BD/DD v0.15、Infrastructure DD v0.11、Automation Design v2.11、registry v0.61 与本报告。 |
+| 未完成 | 没有 provider evidence producer、Multipass adapter/manager、owner reservation store/Inbox/Outbox consumer、Run admission/start writer、current ACL resolver、目标 DB/RLS、worker、BI 或生产 executor；Schedule 保持 fail closed。基础设施 DB cleanup/reconciliation、VM/K3s 真实启动与性能/并行公平验收未关闭。 |
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1340,3 +1349,4 @@ dev 已有的宿主 Multipass/K3s/GitOps 实跑见 `docs/reports/PHASE-MULTIPASS
 | v5.68 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.52/basic v5.49/Task DD v1.21/SRS v0.8；新增 §6.74 记录 Run-local Rust Engineering Loop controller 的身份快照、有界预算、独立验证、backpressure 与 drain receipt；列明 Run Auth/CLI/process、durability/checkpoint、Schedule、BI、跨 Run fairness、累计成本和 retry/backoff 缺口；如实记录 142/142 domain-agent 测试与受限 clippy/rustfmt 结果 | Phase 9F1 controller core 实现并与需求、设计和当前生产状态逐项对账 |
 | v5.69 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.53/basic v5.50/Task SRS v0.9/Task BD v0.2/Task DD v1.22/Data Design v0.3；新增 §6.75 记录 Schedule rule/occurrence/fence domain contract、五表 W/T/M migration、20/20 domain tests 与 DDL/worker/Run admission 未验收门；记录 Docker/PostgreSQL 与 dispatcher artifact blocker、拆分 9F3 materializer/lease worker 与 9F4 atomic Run admission | Phase 9F2 durable Schedule substrate 实现并完成文档对账 |
 | v5.60 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Group DD v4.29/Task DD v1.17；新增 §6.68，记录 CLI canonical identity、strict SQL guard、V2 fence/signature v3、attachment 门与授权 Hooks 深链，保留 Run Apps/生产依赖开放；自动化 §4.37 | 用户要求子代理/worktree 并行处理、rebase 后 merge dev，并确保文档对账 |
+| v6.09 | 2026-10-06 | 新增 §6.88 Phase 9F4D-1 typed readiness gate 与 15/15 focused tests；同步 SRS/BD/DD、Multipass Infrastructure DD、registry 与阶段报告；保持 provider、owner persistence、worker、生产授权与目标环境 gates open | 将 Multipass daemon、owned guest VM、K3s 与独立 sandbox/readiness 作为 executor 准入的分层证据

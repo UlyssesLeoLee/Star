@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.77 (2026-10-06)
-> **上游要件定义书**: docs/requirements.md v5.80
+> **文档版本**: v5.78 (2026-10-06)
+> **上游要件定义书**: docs/requirements.md v5.81
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4603,7 +4603,7 @@ Chat Bar(scope, text, entity_refs)
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
-| AC-LOOP-010 | §16.27 / Schedule API DD v0.13 | Run owner 仅原子预留 Project/Run 预算并写入自身 Host-demand Outbox；Infrastructure owner 独立事务预留 Host capacity，再由唯一 Rust Infrastructure Manager 异步操作 Multipass/K3s；执行等待 Host reservation、K3s API/node/CRI 与独立 AgentRuntime sandbox readiness，并重验 ACL/binding；Host reservation schema 与 worker 尚未实现 |
+| AC-LOOP-010 | §16.27、§16.30 / Schedule API DD v0.15 | Run owner 仅原子预留 Project/Run 预算并写入自身 Host-demand Outbox；Infrastructure owner 独立事务预留 Host capacity，再由唯一 Rust Infrastructure Manager 异步操作 Multipass/K3s；executor 前须通过精确 reservation/Manager receipt、Multipass daemon+owned guest（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/binding/lease/quota；owner store 与 production worker 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4897,19 +4897,23 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 
 Schedule Rule 不保存 VM/Multipass instance 身份。每个 trigger/retry/resume 在 Project/Branch/Run 权限及 Worktree/Task/Profile/HookSet 复验后，重新读取有效 RunInfrastructureBinding 与 provider/profile revision。Run/Execution owner 在本 owner 的短事务内复验 Project/Run 配额，创建非执行态 TaskExecutionRun、Project/Run Reservation、RunEvents、occurrence fencing link、Schedule Run Outbox 与幂等 Host demand Outbox；Run owner 事务不得宣称或直接预留 HostEnvironment 容量。Infrastructure owner 经自己的 Inbox/事务核验并预留 Host capacity，再委托 Rust Host Infrastructure Manager 异步操作共享 VM/K3s。两个 owner 不直接写对方表、不使用分布式数据库事务，数据库锁不跨越 VM 操作。
 
-TaskExecutionRun 可处于 awaiting_infrastructure；只有 Infrastructure owner 已确认 Host reservation，且当前绑定 VM、K3s API/node/CRI readiness 与所选 Agent Runtime sandbox 均有证据时才可启动 executor。Run owner 在启动/恢复前重新核验授权、lease/fence、binding revision 与 Project/Run reservation；Infrastructure owner 容量未知/不足或 readiness 未达成时不得执行，并通过幂等 owner event 记录拒绝/重试或释放 Run reservation。共享 Host/environment VM/control plane 不按 Worktree/Agent 数复制，Run namespace/RBAC/quota/network/storage policy 与各 owner reservation 分别承担隔离和公平。
+TaskExecutionRun 可处于 awaiting_infrastructure；只有 Infrastructure owner 已确认 Host reservation、trusted Manager operation receipt 有效，且绑定 provider 的全部 readiness 均有证据时才可启动 executor。Multipass 路径分别验证 daemon 与精确 owned Linux guest VM；remote K3s 将这两项显式记为 NotApplicable；两者均验证 K3s API/node/CRI、独立 Agent Runtime sandbox 与 Worktree workspace bridge。Run owner 在启动/恢复前重新核验授权、lease/fence、binding revision 与 Project/Run reservation；Infrastructure owner 容量未知/不足或 readiness 未达成时不得执行，并通过幂等 owner event 记录拒绝/重试或释放 Run reservation。共享 Host/environment VM/control plane 不按 Worktree/Agent 数复制，Run namespace/RBAC/quota/network/storage policy 与各 owner reservation 分别承担隔离和公平。
 
 ### 16.28 Phase 9F4D Rust infrastructure binding contract
 
 `domain-infrastructure` 提供纯领域层 `RunInfrastructureBindingSnapshotV1` 与 `HostInfrastructureDemandV1`，两者带显式 wire `schema_version=1` 并拒绝未知版本。binding snapshot 将 Project/Branch/Engineering Run、共享 HostEnvironment、provider/profile/runtime profile 版本及摘要、Kubernetes namespace/service account 和资源预算固定为一个可散列的不可变输入；provider 初始区分 Multipass 管理的 guest K3s 与独立 remote K3s。Host demand 携带同一 owner scope、admitted TaskExecutionRun、Schedule Rule revision、occurrence 和 deadline，并以 `(tenant_id, occurrence_id)` 作为 Inbox 的幂等键。输入验证覆盖非空 identity、正 revision、DNS label、预算/期限与 binding scope；稳定 SHA-256 digest 仅做内容指纹，不代表当前授权或 provider readiness。
 
-该 crate 不查询目录 ACL、Run binding 或 profile，不持久化 reservation，不调用 Multipass/K3s，也不开放 executor。每次 admission 仍须把 Schedule 创建者固定的 `run_as_actor_id` 作为执行主体重新检查当前 Project/Run 权限；撤权或 ACL 不可用即 fail closed。实现与 focused gates 见 Schedule SRS/BD/DD v0.14 和 Phase 9F4D infrastructure contract report；Host owner store/Inbox、Run admission writer、Manager/provider 与目标数据库验收仍未关闭。
+该 crate 不查询目录 ACL、Run binding 或 profile，不持久化 reservation，不调用 Multipass/K3s，也不开放 executor。每次 admission 仍须把 Schedule 创建者固定的 `run_as_actor_id` 作为执行主体重新检查当前 Project/Run 权限；撤权或 ACL 不可用即 fail closed。实现与 focused gates 见 Schedule SRS/BD/DD v0.15、Infrastructure DD v0.11 和 Phase 9F4D-1 report；Host owner store/Inbox、Run admission writer、Manager/provider evidence producer 与目标数据库验收仍未关闭。
 
 ### 16.29 Project Worktree Index 的 cookie-backed BFF 与路径脱敏
 
 `/worktree?project_id=...` 的认证 Index 通过同源 Next.js BFF `/api/group/[...path]` 访问 Project Worktree Index 与 Worktree 管理 API。BFF 仅在服务端读取受宿主会话签发的 HttpOnly access-token cookie，并从服务端 `GROUP_API_BASE_URL` 连接 Group API；生产 upstream 必须使用 HTTPS。路径和 HTTP method 按 Group API allowlist 校验，写请求要求同源 `Origin`，请求体限制 2,000,000 bytes，响应不缓存、不跟随 redirect，并剥离 hop-by-hop 与 `Set-Cookie` 响应头。Bearer 不进入浏览器 JavaScript、URL、终端或日志。
 
 Index projection 只返回 Worktree/Project/Repository 等 opaque identity、授权管理字段和状态，不返回主机绝对 checkout path 或可反推出主机目录的 locator。Repository/Host capability 才能在受控服务端或 Runtime bridge 内解析 checkout 位置。当前 BFF 与 Index UI 已形成代码切片，但 cookie issuer、生产 API base 配置和宿主会话集成未验收；缺 cookie/config/API 时必须显示认证或连接错误，不回退为 seed。该 BFF 仅服务 Project Index compatibility route，不改变 `WorktreeGroupApiClient` 的逐请求 Bearer provider 契约，也不代表 Group Shell/Run Apps 已接通。
+
+### 16.30 Phase 9F4D-1 Host/provider readiness evidence gate
+
+Readiness evidence 必须匹配当前 demand、Reservation、Run binding revision/digest、Host generation 和固定 Schedule occurrence；错配、过期、未来时间戳、Unknown/Failed、capacity lease 到期或 deadline 到期一律拒绝。该 Rust gate 仅是可独立测试的领域校验函数，不是 producer、授权决策或 process launcher；worker、Run admission writer、PostgreSQL owner store、Multipass Manager/provider、真实 VM/K3s probe 与 BI 仍开放。Rust 1.98.1 focused format/check/Clippy/all-target tests 通过，crate tests 15/15。
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -5034,3 +5038,4 @@ Index projection 只返回 Worktree/Project/Repository 等 opaque identity、授
 | v5.75 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.78 / Group DD v4.53 / implementation plan v6.06；定义 Project Worktree Index 的 cookie-backed same-origin BFF、服务端 token 边界、请求大小与响应头限制，并禁止 Index projection 暴露 checkout path；明确宿主 cookie issuer/API 配置和 Group Shell provider 仍未验收 | WTG merge reconciliation 接入认证 Index/BFF 与服务端路径脱敏切片 |
 | v5.76 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.79、Group DD v4.54、implementation plan v6.07 和 WTG report v0.8；Multipass 管理 Linux guest 内 K3s 的设计基线与未验收 provider 状态保持不变 | 合并前质量门完成后同步跨层文档版本指针 |
 | v5.77 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 `codex/worktree-group-shell-mvp` 以本地 merge commit `f4430beb` 集成至 dev；确认 `05075980` 在集成前已为 dev 祖先；同步 requirements v5.80、Group DD v4.55、implementation plan v6.08 与 report v0.9；保留 Multipass guest K3s 架构和 provider 未验收边界 | 完成本地冲突合并并同步阶段报告 |
+| v5.78 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.81、Group DD v4.56、Schedule SRS/BD/DD v0.15、Infrastructure DD v0.11 与实施计划 v6.09；新增 §16.30 typed readiness gate，分开记录 Multipass daemon/guest、Manager receipt、K3s、CRI、sandbox 与 workspace bridge；完整生产 admission/provider 仍 fail closed | Phase 9F4D-1 Rust readiness evidence contract 实现并通过 crate focused gates
