@@ -1,4 +1,18 @@
 /*
+@cypher schema=1 source_sha256=e3c24e33419c8ea163c34717546dd107605119d160c3e7ebca3407f1a0b65a95
+MERGE (self:File {path:"frontend/src/lib/group/groupProjection.tsx"})
+MERGE (projection:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupProjection",kind:"function"})
+MERGE (load:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::loadProjection",kind:"function"})
+MERGE (poller:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller",kind:"class"})
+MERGE (run:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.run",kind:"method"})
+MERGE (self)-[:DEFINES]->(projection)
+MERGE (self)-[:DEFINES]->(load)
+MERGE (projection)-[:CALLS]->(load)
+MERGE (projection)-[:CREATES]->(poller)
+MERGE (projection)-[:CALLS]->(run)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/lib/group/groupProjection.tsx",type:"file",language:"tsx"}),
@@ -155,7 +169,6 @@ export function useWorktreeGroupProjection(
       const poller = new CanvasOutboxPoller(
         client,
         worktreeId,
-        projection.canvas.id,
         async () => { await refresh(); },
       );
       void poller.run(controller.signal, (error) => {

@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v1.4 (2026-10-05)
+> **文档版本**: v1.7 (2026-10-06)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -19,6 +19,9 @@
 > | v1.2 | 2026-10-05 | 增加 9F4C-A admission persistence：dispatch admitted_run_id 的 fenced transition/不可变 Run binding，以及 tenant FORCE RLS、append-only schedule_run_outbox 与复合关系约束；记录 PostgreSQL 18.6 双次迁移、8 表 RLS 和正反例 evidence；生产 atomic writer/worker/consumer/target grants 仍未验收 | 用户确认 creator-as-run-as、撤权 fail closed 后继续 Schedule admission persistence |
 > | v1.3 | 2026-10-05 | 增加 Schedule enable-time ACL 只读查询设计；记录 PostgreSQL 18.6 active/revoked/paused ACL 验证、runtime role 无 directory UPDATE 权限，并保留并发撤权串行化缺口 | 修复 canonical ACL fixture 的目录锁权限边界并通过隔离数据库验证 |
 > | v1.4 | 2026-10-05 | 增加 9F4C-C Project-scoped transaction advisory lock 与 Project/Branch/Run grant mutation triggers；记录三类并发撤权排序测试和 transient Work coordination 分类，并保留目标 grants/worker 缺口 | Mavis 接手审核 |
+> | v1.5 | 2026-10-05 | 纳入 Worktree Group Canvas 现行五表 W/T/M 分类、FORCE RLS scope、append-only/commit-ordered Outbox cursor 与未验收边界；明确 Document 字段扩展在现有 registry，不接受平行 document aggregate | Phase 3C Canvas stream slice 与当前 Group DD 对账 |
+> | v1.7 | 2026-10-06 | 将现有 Project/Run resource quota、reservation、admission lock 与审计事件补入 W/T/M 设计；区分 Infrastructure owner 尚未创建的 Host capacity reservation、demand/outbox 与 Inbox Work 状态，并标明现有 Run Reservation 删除/retention 缺口 | 9F4D owner-boundary 自审发现容量状态与 Multipass Host reservation 必须分属不同 SoR |
+> | v1.6 | 2026-10-05 | 纳入 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -2039,6 +2042,25 @@ Migration 在 disposable PostgreSQL 18.6 中对完整 chain 双次应用；8 张
 #### 4.13.7 Schedule ACL serialization lock classification
 
 advisory lock 是 transaction-scoped 的 Work coordination primitive，不形成 Master、Transaction 或长期审计记录，也不增加业务持久表；Project grants、Branch grants、Run grants 的现有 SCD2 数据仍属于各自 owner 的 Master/current-fact 表。锁 key 使用 tenant 与 canonical Project identity，故正常情况下 Schedule 授权只在同一 Project 内串行；64-bit hash collision 可能多等候一个无关 Project，但不能扩大授权。Grant triggers 对无法解析 canonical tenant/Project 的 mutation fail closed。Runner 中的 disposable `schedule_runtime` 在角色创建后才取得锁 helper 的 EXECUTE；生产 DB owner/function grants、trigger deployment 与 target runtime role grants仍需按环境确认。此验证仅关闭 API Rule enable-time authorization 与 ACL mutation 的并发顺序门，不能替代 worker admission 时的 run-as 重授权或目标 DB 验收。
+
+#### 4.13.8 Run quota 与 Infrastructure Host capacity owner boundary（Phase 9F4D）
+
+迁移 2026-10-01-multica-run-resource-reservations.sql 已有 Project/Run execution quota 与 Reservation 表；这些记录属于 Run/Execution owner，只能表达 Project/Run 的软件执行预算，不能代表 Multipass VM、Host RAM 或 K3s capacity reservation。
+
+| 现有/规划对象 | W/T/M | 持久化边界与限制 |
+|---|---|---|
+| multica.project_execution_resource_quota | Master | Project-scoped SCD2 execution limits; 不得物理删除。 |
+| multica.project_execution_resource_quota_audit_event | Transaction | quota revision actor/correlation fact; append-only、tenant FORCE RLS。 |
+| multica.project_execution_resource_admission_lock | Work | Project admission epoch/coordination state; 30-day expiry and an expiry index exist, but a tenant-scoped pruning worker has not been verified and remains a retention gate. |
+| multica.project_execution_resource_reservation | Work | Run-owned pending/active/released execution-budget lease，保存 lease_expires_at 与 Run/Project/Worktree/quota identity。pending lease 到期不可激活；当前 DELETE guard 禁止物理删除，terminal retention 依赖 parent Run，但完整 parent retention/cleanup path 未验证，属于 CW-07 已知缺口。 |
+| multica.project_execution_resource_reservation_event | Transaction | reserved/activated/released ledger; 与当前 Reservation/Run 一致，append-only、tenant FORCE RLS。 |
+| Infrastructure-owned Host capacity reservation（planned） | Work | 独立 Host/environment SoR 中的有界 Host 资源租约；需明确定期、释放、owner/generation、公平准入与 reaper。当前没有已创建表或已接通 writer。 |
+| Infrastructure demand / operation / readiness / audit Outbox event（planned） | Transaction | Infrastructure owner 与 Run owner 通过版本化幂等 event 通信，记录 binding revision 与资源摘要，不含 secret；分别由各 owner 的事务写入。 |
+| Infrastructure Inbox deduplication / retry state（planned） | Work | Infrastructure owner 的短期幂等接收与 retry state，必须有 TTL、bounded cleanup 与 tenant/scope RLS；不可替代 append-only demand/operation facts。 |
+
+9F4D 的两个事务不能合并：Run/Execution owner 在自身 admission transaction 中对 Project/Run quota 做最后检查并创建非执行态 TaskExecutionRun、Run Reservation、Run facts 与 Schedule Outbox，同时写自己的 Host-demand Outbox；Infrastructure owner 的 Inbox transaction 再检查共享 Host headroom 并创建/拒绝其 Host reservation。任何 owner 不直接修改另一个 owner 的表，也不保持 DB transaction 等待 VM/K3s 启动。Host reservation 成功后由 Rust Host Infrastructure Manager 执行异步生命周期；返回的 owner receipt 与 K3s/runtime readiness 经版本化事件反馈。Run 启动前重新验证权限、binding revision、Run reservation、Host reservation 与 Agent Runtime sandbox。Host capacity unknown/insufficient 时不启动；失败/撤权/过期通过幂等 owner command 释放对应 owner reservation。
+
+物理 Host reservation schema、Infrastructure demand 的实际 Outbox table/API、Inbox retention、role grants、RLS 与 Run 侧异步状态机仍待 INFRA-1/9F4D DDD Review 与目标环境验证。这里分类的是方案，不宣称已实现；当前 multica Run Reservation 物理删除 guard 与 CW-07 还未闭合，admission-lock pruning worker 也尚未验证。
 
 ### 4.14 Module: domain-identity(`identity` schema)
 
@@ -4402,6 +4424,22 @@ CREATE POLICY tenant_isolation_policy ON local_runtime.reconciliation_report
   USING (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
 ```
+
+---
+
+### 4.26 Run App schema extension: Worktree Group Canvas (`canvas`)
+
+Canvas 是 Run 下与 Task Card 同级的 App。当前兼容实现仍以 Worktree ID 作为 API 路由和数据库 scope；目标 canonical owner 迁移到 Engineering Run，不能将下表解释为 Run ownership 已完成。详细字段、命令和迁移契约见 `DD-WORKTREE-GROUP-001 §8.1`。
+
+| 表 | W/T/M 分类 | 当前记录与约束 | 隔离/保留 |
+|---|---|---|---|
+| `canvas.group_canvas_registry` | Master / SCD2 | Canvas identity/title 与同一版本序列中的 `viewport`、`frames`、`connectors`；唯一当前 owner 为 tenant+Worktree+Canvas | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_elements_backend` | Master / SCD2 | Element layout/content、current version 与历史版本；实体状态不复制到 Canvas | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_entity_ref` | Master / SCD2 | 带类型的 entity binding；不持有 WorkItem lifecycle 状态副本 | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_group_audit` | Transaction / append-only | Canvas 命令审计事实；UPDATE/DELETE 由 trigger 与 RLS guard 拒绝 | tenant+Worktree FORCE RLS；不物理删除 |
+| `canvas.canvas_group_outbox` | Transaction / append-only | 事件事实及 payload；`stream_offset BIGINT GENERATED ALWAYS AS IDENTITY`，唯一键 `(tenant_id, worktree_id, stream_offset)`；writer 按 tenant+Worktree transaction advisory lock 持锁至提交，保证提交可见顺序 | tenant+Worktree FORCE RLS；不物理删除。Worktree metadata API 不返回 payload |
+
+这些对象通过 Canvas app 所属 schema 管理，不改变原 25 个核心 domain module 列表。现行 document migration 在 `group_canvas_registry` 上扩列；另建 `canvas.canvas_document_state` 会形成平行 Master aggregate，与当前 DD 决策冲突，未纳入此数据模型。Canvas base migration 与 stream-offset migration 已在 disposable PostgreSQL 18.6 fixture 上各执行两次；identity 为 `YES ALWAYS BIGINT`，两条既有 Outbox fixture 行获得两个不同 offset；唯一索引存在，表启用并强制 RLS。临时 no-login 测试角色在手工授予查询权限后只能读取匹配 scope，未设置 scope 时返回零行；append-only UPDATE 被 trigger 拒绝。两连接测试观察到 advisory lock 等待，提交后的 offset 按锁取得顺序排列；在 API 使用的 1s `lock_timeout` 下，竞争 writer 被数据库超时取消并失败关闭。以上是 disposable fixture 证据，不代表目标数据库、正式 runtime grants、实际服务身份或 query plan 已验收；这些仍是开放门禁。
 
 ---
 

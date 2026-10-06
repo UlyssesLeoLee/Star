@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.7 (2026-10-05)
+> **文档版本**: v2.10 (2026-10-06)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1210,6 +1210,20 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 此门关闭 API Rule enable-time authorization 与 canonical grant mutation 的并发先后不确定性；不代表 worker 每次 trigger/retry/resume 已接线。固定 creator run-as 策略沿用：创建者是执行身份，每次真实触发仍必须复验当前 Project/Run 权限；撤权或事实不可用时 fail closed。
 本节的撤权竞态验证已补齐 §4.48 与 §4.49 当时列出的 API enable-time grant serialization 缺口；其中旧状态描述保留为对应阶段的历史快照。worker 每次触发重授权、原子 Run admission、目标库 grants、Outbox consumer 与 BI 仍未完成。
 
+### 4.51 Worktree Group Phase 3C Canvas ordered event cursor（2026-10-05）
+
+| 任务卡 | 档位 | 实现/验证 | 验证边界 |
+|---|---|---|---|
+| Worktree-scoped Canvas Outbox cursor slice | **[P]（R/V/A）** | `scripts/automation/wtg_canvas_stream.py` 校验 API/SQL/frontend/test source contract，运行 Canvas 定向 Rust test、Group API Vitest、frontend typecheck、diff check 与 automation registry check；要求 `--audit-log` 输出 JSONL 步骤证据。代码变更跨 Rust API、PostgreSQL migration、frontend poller/tests 与 requirements/basic/data/detail/phase report，变更量满足 Volume 阈值 | Runner 不安装依赖、不部署 migration、不连接目标 DB，也不复现 disposable PostgreSQL fixture。PostgreSQL 18.6 migration/backfill/RLS/append-only/advisory lock 与 timeout 证据由阶段报告记录；正式 runtime grants、目标 DB、query plan、durable consumer/realtime 和 Phase 3 closure 仍未完成。当前 CodeRabbit CLI shim 无法启动，独立审查未运行 |
+
+此 runner 只复现可重复的源码契约与 focused code gates；数据库隔离 fixture 是单独的有界实验，不得把 runner exit 0 解读为数据库或生产验收。
+
+### 4.52 Phase 9F4D-0 Run binding / Host demand domain contract gates（2026-10-06）
+
+`scripts/automation/phase9f4d_infrastructure_contract.py` 为 `domain-infrastructure` 提供可重放的 Rust slice runner：格式检查、`cargo check --all-targets`、warnings-as-errors Clippy 和 all-target tests；支持显式 Rust toolchain bin，步骤超时 900 秒，按 UTF-8 replacement 规则读取工具输出，并将 stdout/stderr 与逐步结果写为文件及 JSONL audit。日志与 audit 写入 worktree `target/phase9f4d-infrastructure-contract`；Cargo artifacts 默认写到较短的 `target/9f4d-cargo-target`，可通过 `--target-dir` 覆写。Windows MSVC 在更深的 worktree target 路径下曾报 LNK1104，改用较短路径的复跑通过。当前 Rust 1.98.1 本机 run 为 8/8 单测与四 gates 通过。
+
+它只验证纯领域值对象，不启动 PostgreSQL、不部署 migration、不检验 Run owner/Infrastructure owner 的 transaction、Inbox/Outbox 或 RLS，不启动 Schedule worker 或 Multipass/K3s，也不验收 Agent sandbox、BI、桌面内存或并行公平性。runner 通过不改变生产执行 fail-closed 状态。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1589,6 +1603,9 @@ frontend/src/app/automation-debug/
 | v2.5 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.49 canonical Project/Branch/Run ACL disposable fixture、只读 runtime role 下实际 SQL helper 的 active/revoked/paused cases；明确查询不序列化并发撤权并保留 full-route/worker/target DB gates | 修复 9F4C-B ACL runner 权限边界并完成完整 Schedule runner |
 | v2.6 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.50：以 Project-scoped transaction advisory lock 和三类 Directory grant mutation triggers 序列化 9F4C-C 授权/撤权；记录 PostgreSQL 18.6 三类并发撤权测试，保留 production grants、worker/admission 与 BI 缺口 | 9F4C-C 双连接 ACL 撤权竞态门通过后同步自动化追踪 |
 | v2.7 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 §4.50 已关闭 §4.48/§4.49 当时记载的 enable-time grant mutation serialization 缺口；保留 worker/per-trigger 重授权、Run admission、consumer、BI 与目标 grants 为未完成 | 收敛 Schedule 多阶段文档内的历史状态与当前实现边界 |
+| v2.8 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.51 Worktree Canvas stream [P] runner `wtg_canvas_stream.py`，登记源码契约、focused Rust/frontend/registry gates 与 JSONL audit log；明确隔离 PostgreSQL fixture 不由 runner 复现，目标 DB/runtime grants 和 durable consumer 仍开放 | Worktree Canvas ordered cursor 切片跨层实现达到可复跑与审计留痕门槛 |
+| v2.9 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.52 Phase 9F4D-0 Rust infrastructure contract runner 与可重放格式/check/Clippy/tests/file logs；明确它不验证数据库、双 owner 事务、worker、Multipass provider 或 production admission | 双 owner binding/demand 类型落地，需要把 focused crate quality gate 纳入自动化追溯 |
+| v2.10 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 调整 §4.52 runner 默认 Cargo target 到较短的 `target/9f4d-cargo-target`，保留日志/audit 在 `target/phase9f4d-infrastructure-contract`；记录 Windows MSVC LNK1104 观察与较短路径 8/8 复跑结果 | 默认深层 worktree target 路径遇到 LNK1104，需让标准 runner 使用已复验路径 |
 
 ---
 
