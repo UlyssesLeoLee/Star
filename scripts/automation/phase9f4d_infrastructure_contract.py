@@ -1,6 +1,6 @@
 """Run reproducible focused gates for the 9F4D infrastructure contract slice."""
 
-# @cypher schema=1 source_sha256=f5cd7f48954cfe512c58bdc8e32f8b098e939f7c1f988452ab9d284147a2782b
+# @cypher schema=1 source_sha256=b02eed9bb906e478037c268cf00f5f79ad5a0f96db0baf8767fc1fde968ea942
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_contract.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::run_step",kind:"function"})
@@ -16,6 +16,7 @@
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
 # MERGE (audit:Config {id:"scripts/automation/phase9f4d_infrastructure_contract.py::audit.jsonl"})
 # MERGE (source:File {path:"crates/domain-infrastructure/src/lib.rs"})
+# MERGE (readiness_source:File {path:"crates/domain-infrastructure/src/readiness.rs"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(write_text)
@@ -35,6 +36,7 @@
 # MERGE (run_step)-[:CONFIGURES]->(cargo)
 # MERGE (run_step)-[:CONFIGURES]->(cargo_clippy)
 # MERGE (run_step)-[:CONFIGURES]->(rustfmt)
+# MERGE (main)-[:CONFIGURES]->(readiness_source)
 # MERGE (run_step)-[:WRITES]->(audit)
 # @endcypher
 
@@ -50,6 +52,7 @@ from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path("crates/domain-infrastructure/src/lib.rs")
+READINESS_SOURCE = Path("crates/domain-infrastructure/src/readiness.rs")
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-contract"
 DEFAULT_CARGO_TARGET_DIR = ROOT / "target" / "9f4d-cargo-target"
 MAX_STEP_SECONDS = 900
@@ -138,7 +141,7 @@ def main() -> int:
     target_dir = (arguments.target_dir or DEFAULT_CARGO_TARGET_DIR).resolve()
     environment["CARGO_TARGET_DIR"] = str(target_dir)
     commands = (
-        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE)]),
+        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE)]),
         ("check", [cargo, "check", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4"]),
         ("clippy", [cargo_clippy, "clippy", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4", "--", "-D", "warnings"]),
         ("test", [cargo, "test", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4"]),

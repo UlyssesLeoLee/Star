@@ -1,10 +1,16 @@
-//! @cypher schema=1 source_sha256=5346750da31e4cdf4f8a4f9956a7cb1642071dcef59b9e070dd0944fe90c2381
+//! @cypher schema=1 source_sha256=50a640bc928c2561f439dc18e2d7fa6951f87a1e6bb5926307395796efd5531e
 //! MERGE (self:File {path:"crates/domain-infrastructure/src/lib.rs"})
 //! MERGE (provider:Type {id:"crates/domain-infrastructure/src/lib.rs::ProviderKind",kind:"enum"})
 //! MERGE (label:Type {id:"crates/domain-infrastructure/src/lib.rs::KubernetesDnsLabel",kind:"struct"})
 //! MERGE (budget:Type {id:"crates/domain-infrastructure/src/lib.rs::ExecutionResourceBudgetV1",kind:"struct"})
 //! MERGE (binding:Type {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1",kind:"struct"})
 //! MERGE (demand:Type {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV1",kind:"struct"})
+//! MERGE (readiness_module:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::module",kind:"module"})
+//! MERGE (readiness_state:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessStateV1",kind:"enum"})
+//! MERGE (reservation_acceptance:Type {id:"crates/domain-infrastructure/src/readiness.rs::HostCapacityReservationAcceptanceV1",kind:"struct"})
+//! MERGE (readiness_evidence:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV1",kind:"struct"})
+//! MERGE (readiness_error:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessError",kind:"enum"})
+//! MERGE (readiness_gate:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::validate_infrastructure_execution_readiness",kind:"function"})
 //! MERGE (error:Type {id:"crates/domain-infrastructure/src/lib.rs::InfrastructureContractError",kind:"enum"})
 //! MERGE (binding_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V1",kind:"constant"})
 //! MERGE (demand_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V1",kind:"constant"})
@@ -38,6 +44,14 @@
 //! MERGE (self)-[:DEFINES]->(budget)
 //! MERGE (self)-[:DEFINES]->(binding)
 //! MERGE (self)-[:DEFINES]->(demand)
+//! MERGE (self)-[:DEFINES]->(readiness_module)
+//! MERGE (self)-[:IMPORTS]->(readiness_module)
+//! MERGE (self)-[:EXPOSES]->(readiness_gate)
+//! MERGE (readiness_module)-[:DEFINES]->(readiness_state)
+//! MERGE (readiness_module)-[:DEFINES]->(reservation_acceptance)
+//! MERGE (readiness_module)-[:DEFINES]->(readiness_evidence)
+//! MERGE (readiness_module)-[:DEFINES]->(readiness_error)
+//! MERGE (readiness_module)-[:DEFINES]->(readiness_gate)
 //! MERGE (self)-[:DEFINES]->(error)
 //! MERGE (self)-[:DEFINES]->(binding_schema_version)
 //! MERGE (self)-[:DEFINES]->(demand_schema_version)
@@ -111,6 +125,12 @@
 //! MERGE (binding)-[:USES_TYPE]->(budget)
 //! MERGE (demand)-[:USES_TYPE]->(binding)
 //! MERGE (demand)-[:USES_TYPE]->(budget)
+//! MERGE (readiness_gate)-[:CALLS]->(demand_validate)
+//! MERGE (readiness_gate)-[:CALLS]->(binding_validate)
+//! MERGE (readiness_gate)-[:CALLS]->(binding_digest)
+//! MERGE (readiness_gate)-[:USES_TYPE]->(readiness_state)
+//! MERGE (readiness_gate)-[:USES_TYPE]->(reservation_acceptance)
+//! MERGE (readiness_gate)-[:USES_TYPE]->(readiness_evidence)
 //! @endcypher
 
 //! Versioned domain contracts for shared Host/K3s infrastructure admission.
@@ -124,6 +144,14 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
+
+mod readiness;
+
+pub use readiness::{
+    validate_infrastructure_execution_readiness, HostCapacityReservationAcceptanceV1,
+    InfrastructureReadinessError, InfrastructureReadinessEvidenceV1,
+    InfrastructureReadinessStateV1,
+};
 
 const MAX_KUBERNETES_DNS_LABEL_BYTES: usize = 63;
 

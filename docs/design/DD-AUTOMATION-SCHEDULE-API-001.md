@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API and typed infrastructure contract slice verified; admission writer, worker, provider, and target-environment verification remain open.
-> Version: 0.14 | Date: 2026-10-06
+> Status: 🟡 Rule API plus typed binding/demand/readiness contracts verified; admission writer, owner stores, worker, provider evidence producer, and target-environment verification remain open.
+> Version: 0.15 | Date: 2026-10-06
 
 ## 1. Routes
 
@@ -80,6 +80,14 @@ The focused crate runner passes formatting, all-target check, Clippy with warnin
 
 Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md).
 
+### 6.4 Host reservation and provider-specific readiness evidence
+
+The Infrastructure owner emits a versioned acceptance bound to the exact demand event, tenant/Project/Branch/Engineering Run, TaskExecutionRun, Rule revision, occurrence, binding identity/revision/digest, HostEnvironment generation, reservation lease and expiry. Its separate readiness event binds the same scope and references a non-nil Manager operation receipt. validate_infrastructure_execution_readiness rejects unsupported schema, nil identity, expired reservation/deadline, current-binding drift, cross-scope IDs, generation mismatch, evidence before acceptance, future evidence, or observations older than 30 seconds.
+
+For MultipassK3sGuest, Manager operation, Multipass daemon, and the exact owned guest VM each require Ready evidence; this keeps daemon wait-ready, VM state, and guest K3s checks separate. For RemoteK3s, Multipass daemon and guest VM must be explicitly not_applicable. Both providers require K3s API readiness, at least the profile-required Ready-node count, CRI readiness, independently enforced Agent Runtime sandbox readiness, and the scoped Worktree workspace bridge. Unknown, Failed, wrong-provider NotApplicable, or missing facts block execution.
+
+This pure validator is not an authorization oracle: before the TaskExecutionRun enters running, Run owner must recheck the fixed creator run_as_actor_id grants, current binding, occurrence lease/fence, and Project/Run quota in its own transaction. Infrastructure acceptance/evidence persistence and Manager production remain Infrastructure-owner responsibilities. The Rust 1.98.1 focused runner passed format/check/Clippy and 15/15 tests; no Schedule worker, owner DB, provider adapter, target DB/RLS, or executor is enabled.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -98,3 +106,4 @@ Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-
 | v0.12 | 2026-10-05 | Specify the shared Project lock and separate-statement ACL reread; record five-migration repeated application, and Project/Branch/Run revoke-wait tests while preserving worker/admission and target-grant gates. |
 | v0.13 | 2026-10-06 | Correct the 9F4D data boundary: Run owner atomically holds only Project/Run reservation and emits demand; Infrastructure owner reserves Host capacity independently before asynchronous Multipass/K3s work; executor remains blocked until owner acknowledgments and current authorization/readiness checks. |
 | v0.14 | 2026-10-06 | Specify the implemented typed Run binding/Host demand contract and record its focused Rust gates; explicitly keep current-state resolver, persistent owner stores, admission writer, worker, Manager/provider, and execution readiness gates open. |
+| v0.15 | 2026-10-06 | Define versioned owner acceptance and provider-aware readiness evidence, exact Host-generation/binding scope, freshness/deadline rules and run-as recheck boundary; record focused Rust 1.98.1 gates and 15/15 tests while retaining production worker/provider/store blockers. |

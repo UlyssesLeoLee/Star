@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API and infrastructure domain contract slice verified; production execution remains fail-closed.
-> Version: 0.14 | Date: 2026-10-06
+> Status: 🟡 Rule API and typed binding/demand/readiness gate slices verified; production execution remains fail-closed.
+> Version: 0.15 | Date: 2026-10-06
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -55,6 +55,10 @@ This is a compile-time/data-shape foundation only. It has no ACL resolver, datab
 
 Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md).
 
+### 6.3 Provider-aware infrastructure readiness gate
+
+要求有效 Host reservation 与 Schedule deadline、精确 scope/binding digest/Host generation，以及不早于 acceptance、不晚于当前时刻且不超过 30 秒的新鲜 observation。Multipass 默认路径需有受信任 Manager operation receipt、Multipass daemon 与被拥有 Linux guest VM 的独立 Ready 事实；Remote K3s 对 daemon/guest 两层显式标记 NotApplicable。两种 provider 都必须有 K3s API、达到 profile 要求的 Ready node 数、CRI、独立 Agent Runtime sandbox 和 Worktree workspace bridge 证据。此纯函数不授权 run-as、不持久化 owner reservation、不调用 Multipass/K3s、不启动 executor。Run owner 在 start/resume 事务仍须复验固定 creator 的实时 Project/Run ACL、lease/fence、quota 和 current binding。 Run owner start/resume must independently reauthorize the immutable Rule creator and recheck occurrence lease/fence, quota, and current binding in its own transaction. Infrastructure owner persists and produces acceptance/evidence in its own store; this validator does not cross owner boundaries or launch an executor. Missing or stale evidence keeps TaskExecutionRun non-executing.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -73,3 +77,4 @@ Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-
 | v0.12 | 2026-10-05 | Define Project-scoped advisory-lock ordering and canonical ACL mutation triggers; record Project/Branch/Run concurrent revoke serialization while retaining worker/admission and target database gates. |
 | v0.13 | 2026-10-06 | Separate Run-owned Project/Run resource reservation from Infrastructure-owned Host reservation, and define the asynchronous Inbox/Outbox handoff and non-executing state while Host capacity/readiness is pending. |
 | v0.14 | 2026-10-06 | Add the implemented Rust v1 binding/demand contract and record that it is a pure typed foundation without persistence, current-ACL resolution, provider execution, or production admission. |
+| v0.15 | 2026-10-06 | Add the typed Host reservation/readiness gate and map evidence to the Worktree-first Infrastructure owner boundary; retain current ACL reauthorization and all persistence/worker/provider execution gates. |
