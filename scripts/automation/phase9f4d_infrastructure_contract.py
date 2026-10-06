@@ -1,6 +1,6 @@
 """Run reproducible focused gates for the 9F4D infrastructure contract slice."""
 
-# @cypher schema=1 source_sha256=b02eed9bb906e478037c268cf00f5f79ad5a0f96db0baf8767fc1fde968ea942
+# @cypher schema=1 source_sha256=287421ae456c918653019c0f8c6b5cd02a228f9f2958a0404befd06f126d9024
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_contract.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::run_step",kind:"function"})
@@ -17,6 +17,7 @@
 # MERGE (audit:Config {id:"scripts/automation/phase9f4d_infrastructure_contract.py::audit.jsonl"})
 # MERGE (source:File {path:"crates/domain-infrastructure/src/lib.rs"})
 # MERGE (readiness_source:File {path:"crates/domain-infrastructure/src/readiness.rs"})
+# MERGE (capacity_source:File {path:"crates/domain-infrastructure/src/capacity.rs"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(write_text)
@@ -37,6 +38,7 @@
 # MERGE (run_step)-[:CONFIGURES]->(cargo_clippy)
 # MERGE (run_step)-[:CONFIGURES]->(rustfmt)
 # MERGE (main)-[:CONFIGURES]->(readiness_source)
+# MERGE (main)-[:CONFIGURES]->(capacity_source)
 # MERGE (run_step)-[:WRITES]->(audit)
 # @endcypher
 
@@ -53,6 +55,7 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path("crates/domain-infrastructure/src/lib.rs")
 READINESS_SOURCE = Path("crates/domain-infrastructure/src/readiness.rs")
+CAPACITY_SOURCE = Path("crates/domain-infrastructure/src/capacity.rs")
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-contract"
 DEFAULT_CARGO_TARGET_DIR = ROOT / "target" / "9f4d-cargo-target"
 MAX_STEP_SECONDS = 900
@@ -100,13 +103,21 @@ def run_step(
     stderr_path = output_dir / f"{name}.stderr.log"
     write_text(stdout_path, stdout)
     write_text(stderr_path, stderr)
+    try:
+        stdout_log = str(stdout_path.relative_to(ROOT))
+    except ValueError:
+        stdout_log = str(stdout_path)
+    try:
+        stderr_log = str(stderr_path.relative_to(ROOT))
+    except ValueError:
+        stderr_log = str(stderr_path)
     event = {
         "step": name,
         "command": list(command),
         "exit_code": exit_code,
         "timed_out": timed_out,
-        "stdout_log": str(stdout_path.relative_to(ROOT)),
-        "stderr_log": str(stderr_path.relative_to(ROOT)),
+        "stdout_log": stdout_log,
+        "stderr_log": stderr_log,
     }
     with (output_dir / "audit.jsonl").open("a", encoding="utf-8") as audit_log:
         audit_log.write(json.dumps(event, sort_keys=True) + "\n")
@@ -121,9 +132,10 @@ def main() -> int:
     parser.add_argument("--rustfmt", default="rustfmt", help="rustfmt executable or command name")
     parser.add_argument("--toolchain-bin", type=Path, help="Optional Rust toolchain bin directory")
     parser.add_argument("--target-dir", type=Path, help="Optional Cargo target directory")
+    parser.add_argument("--output-dir", type=Path, help="Optional log directory; may be outside the repository")
     arguments = parser.parse_args()
 
-    output_dir = OUTPUT_DIR
+    output_dir = arguments.output_dir.resolve() if arguments.output_dir else OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     environment = os.environ.copy()
     if arguments.toolchain_bin:
@@ -141,7 +153,7 @@ def main() -> int:
     target_dir = (arguments.target_dir or DEFAULT_CARGO_TARGET_DIR).resolve()
     environment["CARGO_TARGET_DIR"] = str(target_dir)
     commands = (
-        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE)]),
+        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE), str(CAPACITY_SOURCE)]),
         ("check", [cargo, "check", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4"]),
         ("clippy", [cargo_clippy, "clippy", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4", "--", "-D", "warnings"]),
         ("test", [cargo, "test", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4"]),

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.11 (2026-10-06)
+> **文档版本**: v2.14 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1228,6 +1228,12 @@ Snapshot strict shape/FK 只是数据库证据门；current grants/revisions/Run
 
 phase9f4d_infrastructure_contract.py 扩展覆盖 domain-infrastructure readiness module；format step 对 lib.rs 与 readiness.rs 执行 rustfmt check，随后按 -j 4 执行 package --all-targets check、warnings-as-errors Clippy 和 tests。Rust 1.98.1 短 target C:\\t\\star9f4d-20261006 的本轮结果：四项 gates 通过，crate tests 15/15（含 7 项 readiness contract tests）。worktree 内 target 首次链接触发 MSVC LNK1104，切换短 target 后已复验通过。
 
+### 4.54 Phase 9F4D-2 multi-cluster capacity contract（2026-10-07）
+Final contract delta: runner covers the typed placement policy/digest and separate Host/cluster reservation IDs through format, all-target check, warnings-as-errors Clippy, and 27/27 crate tests. Rust tests do not start VMs. This test phase caps the total registered Multipass inventory at two, counting stopped/recoverable entries. The Multipass bootstrap script uses a host-local exclusive file lock around inventory check plus launch, refuses a third instance or an unparseable response, and never automatically recovers or purges instances. All live test launches must use this path; direct Multipass CLI calls can bypass the script-level guard.
+
+
+`phase9f4d_infrastructure_contract.py` 现对 `lib.rs`、`readiness.rs` 与 `capacity.rs` 执行 rustfmt，并运行 `domain-infrastructure` all-target check、warnings-as-errors Clippy 和 tests。V2 合同固定 Run 的 K3s cluster ID/generation，评估 Host 与目标 cluster 两级容量/余量，并对双层 reservation 的 Readiness scope 做精确绑定。该 runner 只执行 Rust 类型/纯函数 tests，不调用 Multipass。本次多集群测试阶段已登记实例总数最多 2 个，包括 Stopped/Deleted 记录；`multipass_k3s_gitops.ps1` 用 host-local 独占文件锁覆盖完整 JSON inventory 检查和 launch，达到上限或解析失败时拒绝创建，不自动 recover/purge。所有真实测试必须经此受控路径，直接 CLI/其他 bootstrap 仍可绕过脚本 guard；后续调整上限必须有新的阶段决策和磁盘预算证据。Runner 不实现 placement resolver、owner reservation persistence、VM/K3s provider 或执行能力。
+
 此 runner 只验证纯领域 contract；不验证当前 run-as ACL resolver、双 owner 数据库事务、Host capacity ledger、Inbox/Outbox、Multipass subprocess/VM、K3s readiness producer、Agent sandbox implementation、workspace bridge、目标 DB/RLS、BI、桌面 RSS 或生产执行。不得把 runner 通过解读为 Schedule/Loop 已可用。
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
@@ -1613,6 +1619,9 @@ frontend/src/app/automation-debug/
 | v2.9 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §4.52 Phase 9F4D-0 Rust infrastructure contract runner 与可重放格式/check/Clippy/tests/file logs；明确它不验证数据库、双 owner 事务、worker、Multipass provider 或 production admission | 双 owner binding/demand 类型落地，需要把 focused crate quality gate 纳入自动化追溯 |
 | v2.10 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 调整 §4.52 runner 默认 Cargo target 到较短的 `target/9f4d-cargo-target`，保留日志/audit 在 `target/phase9f4d-infrastructure-contract`；记录 Windows MSVC LNK1104 观察与较短路径 8/8 复跑结果 | 默认深层 worktree target 路径遇到 LNK1104，需让标准 runner 使用已复验路径 |
 | v2.11 | 2026-10-06 | 增加 Phase 9F4D-1 readiness evidence gate 的 runner/结果与 LNK1104 短路径复验记录；rustfmt 范围覆盖 readiness.rs，focused crate tests 15/15；provider/worker/persistence gates 保持开放 |
+| v2.12 | 2026-10-07 | 增加 Phase 9F4D-2 多集群 V2 capacity contract runner 追踪；扩展 rustfmt 范围到 capacity.rs；记录真实 Multipass 测试同时最多 2 个实例，Rust 契约 tests 不启动 VM，并保留 provider/worker/persistence 未实现门 |
+| v2.13 | 2026-10-07 | Record typed placement digest coverage, separate Host/cluster reservation IDs, and final 4-gate/27-test evidence under the two-instance live-test cap. |
+| v2.14 | 2026-10-07 | Clarify the test limit as two registered Multipass instances total, including stopped/recoverable entries; record the host-local locked fail-closed pre-launch inventory guard and no-auto-purge behavior. |
 
 ---
 

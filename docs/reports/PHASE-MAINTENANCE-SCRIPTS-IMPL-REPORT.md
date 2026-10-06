@@ -5,6 +5,7 @@
 > **Branch**: `feat/auto-20260906-3b4aed04`
 > **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`, `c9c36dc`, `a35eb94`, `7035b85`, `e026a20`, `a7e6f47`, `fc075fd`, `ea945e9`, `d2048b7`, `bffb9ff` (merge main), `58d0f97` (cherry-pick ux-cel-depth), `281dcb7`, `1172683`, `ef37633` (G12), `5ecdd24` (start-k3s-backend), `aab46a8` (CRLF 修复), `2f21a49` (G3 WSL wrapper)
 > **Status**: 🟢 Phase Closed (4/4 套脚本 + 3 个 hydration bug + G10 nav 统一 2/30 page + G11 k3s 端 OK + G12 crash pod 诊断 + CRLF 致命 bug 修 + G3 WSL wrapper 实证)
+> **当前环境说明（2026-10-07）**：此历史报告里的容器/WSL 调试痕迹不是产品部署前提。用户本地/CI 架构基线为 Multipass 管理多个 Linux guest/K3s；用户不使用 Docker Desktop。
 
 ---
 

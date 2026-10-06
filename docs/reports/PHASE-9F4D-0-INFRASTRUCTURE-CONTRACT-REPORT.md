@@ -4,6 +4,7 @@
 > **状态**：🟡 当前 Rust 领域契约切片完成；Phase 9F4D 及 Schedule 生产执行仍开放
 > **范围**：RunInfrastructureBinding / Host demand v1 typed contract 与其 focused quality gates
 > **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> **架构更正（2026-10-07）**：本报告记录的是 V1 契约与当时的 guest/provider 设计快照；当前产品设计已升级为 Multipass 多实例/多 K3s cluster、Run 精确 pin cluster ID/generation、Host+cluster 双层容量，见 [`PHASE-9F4D-MULTICLUSTER-CAPACITY-REPORT.md`](PHASE-9F4D-MULTICLUSTER-CAPACITY-REPORT.md)。历史验证事实保留，但 V1 不再是当前活动 wire schema。
 
 ## §0 目的
 

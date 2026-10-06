@@ -4,6 +4,7 @@
 > **状态**：🟢 typed readiness gate 与 focused Rust gates 完成；Phase 9F4D 生产 admission/provider 仍开放并 fail-closed
 > **范围**：Host reservation acceptance、Manager receipt 与 Multipass/K3s/runtime/workspace readiness evidence
 > **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> **架构更正（2026-10-07）**：本报告记录的是 V1/单 guest readiness 切片当时的验证快照；当前产品设计已更正为 Multipass 多实例/多 K3s cluster、Run 精确 pin cluster ID/generation、Host+cluster 双层容量，见 [`PHASE-9F4D-MULTICLUSTER-CAPACITY-REPORT.md`](PHASE-9F4D-MULTICLUSTER-CAPACITY-REPORT.md)。本报告不再代表当前 wire schema 或拓扑基线。
 
 ## §0 目的
 

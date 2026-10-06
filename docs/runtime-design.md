@@ -1,12 +1,13 @@
 # Star 平台《Runtime Design》(Local Daemon 详细设计)
 
-> **文档版本**: v0.2 (2026-08-26)
+> **文档版本**: v0.3 (2026-10-07)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(Gitea/Forgejo Adapter 排期预留为 V2 候选,8 种白名单命令不变) | — |
+> | v0.3 | 2026-10-07 | 明确 Docker Desktop 不属于用户的部署前提；Runner Container backend 按 provider capability 选择，Multipass-managed Linux guest/K3s 路径可独立工作 | 用户确认以 Multipass 管理多个 guest 内 K3s，不使用 Docker Desktop |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(Rust Local Daemon 二进制 crate)、Operation(Self-hosted Runner / Cloud Workspace 部署)
 > **文档定位**: 本文档定义 **Local Daemon 二进制进程** 的内部架构与外部契约。**不**讨论服务器侧 `domain-local-runtime` crate(后者见《Basic Design》§4.6)。
@@ -1829,7 +1830,7 @@ sequenceDiagram
 
 - **Runtime-J.1**:是否需要支持 Local Daemon 完全离线模式(无 SaaS 连接)?当前设计强制 WSS 持续连接,离线场景需缓存所有 Command + Observation,等重连后批量同步。**默认否**;若用户强烈要求,需补充 Conflict Resolution 策略。
 - **Runtime-J.2**:是否需要支持 `git worktree add --detach` 用于 Agent 自管理临时 Worktree?当前设计禁止。**待 Implementation 阶段评估**(可能增加安全风险,需谨慎)。
-- **Runtime-J.3**:Build Runner Container 模式是否需要支持 rootless Docker?macOS 上 Docker Desktop 默认 rootful,需要配置。**默认支持,文档需说明配置步骤**。
+- **Runtime-J.3**:Build Runner Container 模式是否需要支持 rootless Docker?这是可选的 runner/provider capability；Docker Desktop 不是安装前提、默认 provider 或用户当前环境基线。Multipass 管理的 Linux guest/K3s 必须可独立使用，其他 container engine 按显式安装和 capability probe 选择。**rootless 仍作为 provider capability 验收项**。
 - **Runtime-J.4**:Secret Manager 是否需要支持 HSM(硬件安全模块)?当前只支持 OS Keychain。企业场景需要 HSM。**V1 候选**。
 - **Runtime-J.5**:Agent Adapter 是否需要支持自定义协议(用户自行开发 Adapter)?当前只支持 5 种内置。**待 Integration Design 阶段评估**。
 - **Runtime-J.6**:Crash Report 是否需要支持自动上传(Sentry 类)?当前默认关闭,需用户显式同意。**V1 候选**。

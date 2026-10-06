@@ -1,21 +1,21 @@
-//! @cypher schema=1 source_sha256=52f2a0a1522715826821a35939307ca90d4d5127209c07bdc017decfc25d0d4b
+//! @cypher schema=1 source_sha256=c6f5fb76331536224893d6cc9108daa96b2b760b2db9c7e6184b923757b2882d
 //! MERGE (self:File {path:"crates/domain-infrastructure/src/readiness.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::module",kind:"module"})
 //! MERGE (state:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessStateV1",kind:"enum"})
-//! MERGE (acceptance:Type {id:"crates/domain-infrastructure/src/readiness.rs::HostCapacityReservationAcceptanceV1",kind:"struct"})
-//! MERGE (evidence:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV1",kind:"struct"})
+//! MERGE (acceptance:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureCapacityReservationAcceptanceV2",kind:"struct"})
+//! MERGE (evidence:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV2",kind:"struct"})
 //! MERGE (error:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessError",kind:"enum"})
-//! MERGE (schema_version:Variable {id:"crates/domain-infrastructure/src/readiness.rs::INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V1",kind:"constant"})
+//! MERGE (schema_version:Variable {id:"crates/domain-infrastructure/src/readiness.rs::INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V2",kind:"constant"})
 //! MERGE (gate:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::validate_infrastructure_execution_readiness",kind:"function"})
-//! MERGE (acceptance_matches:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::HostCapacityReservationAcceptanceV1.matches_demand",kind:"method"})
-//! MERGE (evidence_matches:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV1.matches_demand",kind:"method"})
-//! MERGE (provider_layers_match:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV1.provider_layers_match",kind:"method"})
+//! MERGE (acceptance_matches:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureCapacityReservationAcceptanceV2.matches_demand",kind:"method"})
+//! MERGE (evidence_matches:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV2.matches_demand",kind:"method"})
+//! MERGE (provider_layers_match:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV2.provider_layers_match",kind:"method"})
 //! MERGE (readiness_age:Variable {id:"crates/domain-infrastructure/src/readiness.rs::MAX_READINESS_AGE_SECONDS",kind:"constant"})
-//! MERGE (binding:Type {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1",kind:"struct"})
-//! MERGE (demand:Type {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV1",kind:"struct"})
-//! MERGE (binding_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1.validate",kind:"method"})
-//! MERGE (binding_digest:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1.digest",kind:"method"})
-//! MERGE (demand_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV1.validate",kind:"method"})
+//! MERGE (binding:Type {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2",kind:"struct"})
+//! MERGE (demand:Type {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV2",kind:"struct"})
+//! MERGE (binding_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2.validate",kind:"method"})
+//! MERGE (binding_digest:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2.digest",kind:"method"})
+//! MERGE (demand_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV2.validate",kind:"method"})
 //! MERGE (tests:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests",kind:"module"})
 //! MERGE (fixture:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::ready_fixture",kind:"function"})
 //! MERGE (id:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::id",kind:"function"})
@@ -24,7 +24,8 @@
 //! MERGE (reservation_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::expired_or_mismatched_host_reservation_fails_closed",kind:"test"})
 //! MERGE (readiness_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::every_readiness_layer_must_be_ready",kind:"test"})
 //! MERGE (stale_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::stale_or_future_readiness_evidence_fails_closed",kind:"test"})
-//! MERGE (scope_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::readiness_evidence_must_match_host_generation_and_run",kind:"test"})
+//! MERGE (scope_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::readiness_evidence_must_match_host_and_cluster_generations_and_run",kind:"test"})
+//! MERGE (dual_reservation_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::readiness_evidence_must_match_both_capacity_reservations",kind:"test"})
 //! MERGE (remote_test:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::tests::remote_provider_marks_multipass_layers_not_applicable",kind:"test"})
 //! MERGE (self)-[:DEFINES]->(module)
 //! MERGE (module)-[:DEFINES]->(state)
@@ -45,6 +46,7 @@
 //! MERGE (tests)-[:DEFINES]->(readiness_test)
 //! MERGE (tests)-[:DEFINES]->(stale_test)
 //! MERGE (tests)-[:DEFINES]->(scope_test)
+//! MERGE (tests)-[:DEFINES]->(dual_reservation_test)
 //! MERGE (tests)-[:DEFINES]->(remote_test)
 //! MERGE (gate)-[:CALLS]->(acceptance_matches)
 //! MERGE (gate)-[:CALLS]->(evidence_matches)
@@ -70,6 +72,8 @@
 //! MERGE (stale_test)-[:CALLS]->(gate)
 //! MERGE (scope_test)-[:CALLS]->(fixture)
 //! MERGE (scope_test)-[:CALLS]->(gate)
+//! MERGE (dual_reservation_test)-[:CALLS]->(fixture)
+//! MERGE (dual_reservation_test)-[:CALLS]->(gate)
 //! MERGE (remote_test)-[:CALLS]->(fixture)
 //! MERGE (remote_test)-[:CALLS]->(gate)
 //! MERGE (fixture)-[:CALLS]->(id)
@@ -96,10 +100,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{HostInfrastructureDemandV1, ProviderKind, RunInfrastructureBindingSnapshotV1};
+use crate::{HostInfrastructureDemandV2, ProviderKind, RunInfrastructureBindingSnapshotV2};
 
 /// Wire schema version for Host reservation and readiness evidence.
-const INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V1: u16 = 1;
+const INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V2: u16 = 2;
 const MAX_READINESS_AGE_SECONDS: i64 = 30;
 
 /// A provider observation; unknown and failed block execution, and not-applicable is provider-specific.
@@ -119,7 +123,7 @@ pub enum InfrastructureReadinessStateV1 {
 /// Infrastructure-owner receipt for a Host/environment capacity reservation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct HostCapacityReservationAcceptanceV1 {
+pub struct InfrastructureCapacityReservationAcceptanceV2 {
     /// Explicit wire schema version.
     pub schema_version: u16,
     /// Demand Outbox event this receipt acknowledges.
@@ -146,12 +150,18 @@ pub struct HostCapacityReservationAcceptanceV1 {
     pub binding_id: Uuid,
     /// Monotonic binding revision.
     pub binding_revision: i64,
-    /// Shared Host/environment identity.
+    /// HostEnvironment identity.
     pub host_environment_id: Uuid,
+    /// Exact K3s cluster reserved for this Run.
+    pub k3s_cluster_id: Uuid,
     /// Owned Host generation used for the reservation.
     pub host_generation: i64,
-    /// Infrastructure-owner reservation identity.
-    pub reservation_id: Uuid,
+    /// Generation of the exact K3s cluster.
+    pub k3s_cluster_generation: i64,
+    /// Infrastructure-owner HostEnvironment capacity reservation identity.
+    pub host_capacity_reservation_id: Uuid,
+    /// Infrastructure-owner exact-cluster capacity reservation identity.
+    pub cluster_capacity_reservation_id: Uuid,
     /// Binding digest acknowledged by Infrastructure.
     pub binding_digest: [u8; 32],
     /// Acceptance timestamp.
@@ -160,10 +170,10 @@ pub struct HostCapacityReservationAcceptanceV1 {
     pub expires_at: DateTime<Utc>,
 }
 
-impl HostCapacityReservationAcceptanceV1 {
+impl InfrastructureCapacityReservationAcceptanceV2 {
     fn matches_demand(
         &self,
-        demand: &HostInfrastructureDemandV1,
+        demand: &HostInfrastructureDemandV2,
         expected_binding_digest: [u8; 32],
     ) -> bool {
         self.demand_event_id == demand.event_id
@@ -178,6 +188,8 @@ impl HostCapacityReservationAcceptanceV1 {
             && self.binding_id == demand.binding.binding_id
             && self.binding_revision == demand.binding.binding_revision
             && self.host_environment_id == demand.binding.host_environment_id
+            && self.k3s_cluster_id == demand.binding.k3s_cluster_id
+            && self.k3s_cluster_generation == demand.binding.k3s_cluster_generation
             && self.binding_digest == expected_binding_digest
     }
 }
@@ -185,7 +197,7 @@ impl HostCapacityReservationAcceptanceV1 {
 /// Fresh provider and runtime observations tied to one accepted Host generation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct InfrastructureReadinessEvidenceV1 {
+pub struct InfrastructureReadinessEvidenceV2 {
     /// Explicit wire schema version.
     pub schema_version: u16,
     /// Infrastructure-owner evidence event identity.
@@ -206,16 +218,22 @@ pub struct InfrastructureReadinessEvidenceV1 {
     pub schedule_rule_version: i64,
     /// Schedule occurrence that produced the demand.
     pub occurrence_id: Uuid,
-    /// Accepted reservation being observed.
-    pub reservation_id: Uuid,
+    /// Accepted HostEnvironment reservation being observed.
+    pub host_capacity_reservation_id: Uuid,
+    /// Accepted exact-cluster reservation being observed.
+    pub cluster_capacity_reservation_id: Uuid,
     /// Current binding identity and revision.
     pub binding_id: Uuid,
     /// Monotonic binding revision.
     pub binding_revision: i64,
-    /// Shared Host/environment identity.
+    /// HostEnvironment identity.
     pub host_environment_id: Uuid,
+    /// Exact K3s cluster whose readiness is observed.
+    pub k3s_cluster_id: Uuid,
     /// Owned Host generation used for the reservation and readiness checks.
     pub host_generation: i64,
+    /// Generation of the exact K3s cluster observed.
+    pub k3s_cluster_generation: i64,
     /// Current Run binding digest observed by Infrastructure.
     pub binding_digest: [u8; 32],
     /// Trusted Manager operation receipt identity for this Host generation.
@@ -224,7 +242,7 @@ pub struct InfrastructureReadinessEvidenceV1 {
     pub manager_operation: InfrastructureReadinessStateV1,
     /// Multipass daemon readiness; must be NotApplicable for a remote K3s provider.
     pub multipass_daemon: InfrastructureReadinessStateV1,
-    /// Bound Linux guest readiness; must be NotApplicable for a remote K3s provider.
+    /// Aggregate readiness of all owned Linux guests backing this cluster; NotApplicable remotely.
     pub guest_vm: InfrastructureReadinessStateV1,
     /// Time at which the complete readiness snapshot was observed.
     pub observed_at: DateTime<Utc>,
@@ -242,11 +260,12 @@ pub struct InfrastructureReadinessEvidenceV1 {
     pub workspace_bridge: InfrastructureReadinessStateV1,
 }
 
-impl InfrastructureReadinessEvidenceV1 {
+impl InfrastructureReadinessEvidenceV2 {
     fn matches_demand(
         &self,
-        demand: &HostInfrastructureDemandV1,
-        reservation_id: Uuid,
+        demand: &HostInfrastructureDemandV2,
+        host_capacity_reservation_id: Uuid,
+        cluster_capacity_reservation_id: Uuid,
         expected_binding_digest: [u8; 32],
     ) -> bool {
         self.tenant_id == demand.tenant_id
@@ -257,16 +276,19 @@ impl InfrastructureReadinessEvidenceV1 {
             && self.schedule_rule_id == demand.schedule_rule_id
             && self.schedule_rule_version == demand.schedule_rule_version
             && self.occurrence_id == demand.occurrence_id
-            && self.reservation_id == reservation_id
+            && self.host_capacity_reservation_id == host_capacity_reservation_id
+            && self.cluster_capacity_reservation_id == cluster_capacity_reservation_id
             && self.binding_id == demand.binding.binding_id
             && self.binding_revision == demand.binding.binding_revision
             && self.host_environment_id == demand.binding.host_environment_id
+            && self.k3s_cluster_id == demand.binding.k3s_cluster_id
+            && self.k3s_cluster_generation == demand.binding.k3s_cluster_generation
             && self.binding_digest == expected_binding_digest
     }
 
     fn provider_layers_match(&self, provider: ProviderKind) -> bool {
         match provider {
-            ProviderKind::MultipassK3sGuest => {
+            ProviderKind::MultipassK3sCluster => {
                 self.multipass_daemon == InfrastructureReadinessStateV1::Ready
                     && self.guest_vm == InfrastructureReadinessStateV1::Ready
             }
@@ -283,10 +305,10 @@ impl InfrastructureReadinessEvidenceV1 {
 /// The result is evidence validation only. A caller still needs the current authorization, lease,
 /// Project/Run quota, and binding checks in the same Run-owner transaction that records start.
 pub fn validate_infrastructure_execution_readiness(
-    demand: &HostInfrastructureDemandV1,
-    current_binding: &RunInfrastructureBindingSnapshotV1,
-    reservation: &HostCapacityReservationAcceptanceV1,
-    evidence: &InfrastructureReadinessEvidenceV1,
+    demand: &HostInfrastructureDemandV2,
+    current_binding: &RunInfrastructureBindingSnapshotV2,
+    reservation: &InfrastructureCapacityReservationAcceptanceV2,
+    evidence: &InfrastructureReadinessEvidenceV2,
     now: DateTime<Utc>,
 ) -> Result<(), InfrastructureReadinessError> {
     demand
@@ -309,8 +331,8 @@ pub fn validate_infrastructure_execution_readiness(
     {
         return Err(InfrastructureReadinessError::BindingChanged);
     }
-    if reservation.schema_version != INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V1
-        || evidence.schema_version != INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V1
+    if reservation.schema_version != INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V2
+        || evidence.schema_version != INFRASTRUCTURE_READINESS_SCHEMA_VERSION_V2
     {
         return Err(InfrastructureReadinessError::UnsupportedSchemaVersion);
     }
@@ -326,13 +348,16 @@ pub fn validate_infrastructure_execution_readiness(
         reservation.occurrence_id,
         reservation.binding_id,
         reservation.host_environment_id,
-        reservation.reservation_id,
+        reservation.k3s_cluster_id,
+        reservation.host_capacity_reservation_id,
+        reservation.cluster_capacity_reservation_id,
     ]
     .iter()
     .any(Uuid::is_nil)
         || reservation.binding_revision <= 0
         || reservation.schedule_rule_version <= 0
         || reservation.host_generation <= 0
+        || reservation.k3s_cluster_generation <= 0
         || reservation.accepted_at < demand.requested_at
         || reservation.accepted_at > now
         || reservation.expires_at <= reservation.accepted_at
@@ -355,21 +380,29 @@ pub fn validate_infrastructure_execution_readiness(
         evidence.task_execution_run_id,
         evidence.schedule_rule_id,
         evidence.occurrence_id,
-        evidence.reservation_id,
+        evidence.host_capacity_reservation_id,
+        evidence.cluster_capacity_reservation_id,
         evidence.binding_id,
         evidence.host_environment_id,
+        evidence.k3s_cluster_id,
     ]
     .iter()
     .any(Uuid::is_nil)
         || evidence.binding_revision <= 0
         || evidence.schedule_rule_version <= 0
         || evidence.host_generation <= 0
+        || evidence.k3s_cluster_generation <= 0
         || evidence.required_node_count == 0
     {
         return Err(InfrastructureReadinessError::InvalidReadinessEvidence);
     }
-    if !evidence.matches_demand(demand, reservation.reservation_id, expected_binding_digest)
-        || evidence.host_generation != reservation.host_generation
+    if !evidence.matches_demand(
+        demand,
+        reservation.host_capacity_reservation_id,
+        reservation.cluster_capacity_reservation_id,
+        expected_binding_digest,
+    ) || evidence.host_generation != reservation.host_generation
+        || evidence.k3s_cluster_generation != reservation.k3s_cluster_generation
     {
         return Err(InfrastructureReadinessError::ScopeMismatch);
     }
@@ -434,13 +467,13 @@ pub enum InfrastructureReadinessError {
 #[cfg(test)]
 mod tests {
     use super::{
-        validate_infrastructure_execution_readiness, HostCapacityReservationAcceptanceV1,
-        InfrastructureReadinessError, InfrastructureReadinessEvidenceV1,
+        validate_infrastructure_execution_readiness, InfrastructureCapacityReservationAcceptanceV2,
+        InfrastructureReadinessError, InfrastructureReadinessEvidenceV2,
         InfrastructureReadinessStateV1,
     };
     use crate::{
-        ExecutionResourceBudgetV1, HostInfrastructureDemandV1, KubernetesDnsLabel, ProviderKind,
-        RunInfrastructureBindingSnapshotV1,
+        ClusterPlacementPolicyV1, ExecutionResourceBudgetV1, HostInfrastructureDemandV2,
+        KubernetesDnsLabel, ProviderKind, RunInfrastructureBindingSnapshotV2,
     };
     use chrono::{Duration, TimeZone, Utc};
     use uuid::Uuid;
@@ -450,13 +483,13 @@ mod tests {
     }
 
     fn ready_fixture() -> (
-        HostInfrastructureDemandV1,
-        RunInfrastructureBindingSnapshotV1,
-        HostCapacityReservationAcceptanceV1,
-        InfrastructureReadinessEvidenceV1,
+        HostInfrastructureDemandV2,
+        RunInfrastructureBindingSnapshotV2,
+        InfrastructureCapacityReservationAcceptanceV2,
+        InfrastructureReadinessEvidenceV2,
     ) {
-        let binding = RunInfrastructureBindingSnapshotV1 {
-            schema_version: 1,
+        let binding = RunInfrastructureBindingSnapshotV2 {
+            schema_version: 2,
             tenant_id: id(1),
             project_id: id(2),
             branch_id: id(3),
@@ -464,7 +497,10 @@ mod tests {
             binding_id: id(5),
             binding_revision: 1,
             host_environment_id: id(6),
-            provider: ProviderKind::MultipassK3sGuest,
+            k3s_cluster_id: id(18),
+            k3s_cluster_generation: 3,
+            cluster_placement_policy: ClusterPlacementPolicyV1::SharedPool,
+            provider: ProviderKind::MultipassK3sCluster,
             provider_profile_id: id(7),
             provider_profile_revision: 3,
             provider_profile_digest: [0x11; 32],
@@ -486,8 +522,8 @@ mod tests {
         };
         let requested_at = Utc.timestamp_opt(1_791_300_000, 0).unwrap();
         let deadline_at = requested_at + Duration::minutes(10);
-        let demand = HostInfrastructureDemandV1 {
-            schema_version: 1,
+        let demand = HostInfrastructureDemandV2 {
+            schema_version: 2,
             event_id: id(9),
             correlation_id: id(10),
             tenant_id: id(1),
@@ -504,8 +540,8 @@ mod tests {
             deadline_at,
         };
         let now = requested_at + Duration::seconds(100);
-        let reservation = HostCapacityReservationAcceptanceV1 {
-            schema_version: 1,
+        let reservation = InfrastructureCapacityReservationAcceptanceV2 {
+            schema_version: 2,
             demand_event_id: demand.event_id,
             acceptance_event_id: id(14),
             tenant_id: demand.tenant_id,
@@ -519,14 +555,17 @@ mod tests {
             binding_id: binding.binding_id,
             binding_revision: binding.binding_revision,
             host_environment_id: binding.host_environment_id,
+            k3s_cluster_id: binding.k3s_cluster_id,
             host_generation: 2,
-            reservation_id: id(15),
+            k3s_cluster_generation: binding.k3s_cluster_generation,
+            host_capacity_reservation_id: id(15),
+            cluster_capacity_reservation_id: id(19),
             binding_digest: binding.digest().unwrap(),
             accepted_at: now - Duration::seconds(10),
             expires_at: now + Duration::minutes(5),
         };
-        let evidence = InfrastructureReadinessEvidenceV1 {
-            schema_version: 1,
+        let evidence = InfrastructureReadinessEvidenceV2 {
+            schema_version: 2,
             event_id: id(16),
             tenant_id: demand.tenant_id,
             project_id: demand.project_id,
@@ -536,11 +575,14 @@ mod tests {
             schedule_rule_id: demand.schedule_rule_id,
             schedule_rule_version: demand.schedule_rule_version,
             occurrence_id: demand.occurrence_id,
-            reservation_id: reservation.reservation_id,
+            host_capacity_reservation_id: reservation.host_capacity_reservation_id,
+            cluster_capacity_reservation_id: reservation.cluster_capacity_reservation_id,
             binding_id: binding.binding_id,
             binding_revision: binding.binding_revision,
             host_environment_id: binding.host_environment_id,
+            k3s_cluster_id: binding.k3s_cluster_id,
             host_generation: reservation.host_generation,
+            k3s_cluster_generation: reservation.k3s_cluster_generation,
             binding_digest: binding.digest().unwrap(),
             manager_operation_receipt_id: id(17),
             manager_operation: InfrastructureReadinessStateV1::Ready,
@@ -757,10 +799,51 @@ mod tests {
     }
 
     #[test]
-    fn readiness_evidence_must_match_host_generation_and_run() {
+    fn readiness_evidence_must_match_host_and_cluster_generations_and_run() {
         let (demand, binding, reservation, mut evidence) = ready_fixture();
         let now = evidence.observed_at + Duration::seconds(2);
         evidence.host_generation += 1;
+        assert_eq!(
+            validate_infrastructure_execution_readiness(
+                &demand,
+                &binding,
+                &reservation,
+                &evidence,
+                now,
+            ),
+            Err(InfrastructureReadinessError::ScopeMismatch)
+        );
+        evidence.host_generation = reservation.host_generation;
+        evidence.k3s_cluster_generation += 1;
+        assert_eq!(
+            validate_infrastructure_execution_readiness(
+                &demand,
+                &binding,
+                &reservation,
+                &evidence,
+                now,
+            ),
+            Err(InfrastructureReadinessError::ScopeMismatch)
+        );
+    }
+
+    #[test]
+    fn readiness_evidence_must_match_both_capacity_reservations() {
+        let (demand, binding, reservation, mut evidence) = ready_fixture();
+        let now = evidence.observed_at + Duration::seconds(2);
+        evidence.host_capacity_reservation_id = id(99);
+        assert_eq!(
+            validate_infrastructure_execution_readiness(
+                &demand,
+                &binding,
+                &reservation,
+                &evidence,
+                now,
+            ),
+            Err(InfrastructureReadinessError::ScopeMismatch)
+        );
+        evidence.host_capacity_reservation_id = reservation.host_capacity_reservation_id;
+        evidence.cluster_capacity_reservation_id = id(98);
         assert_eq!(
             validate_infrastructure_execution_readiness(
                 &demand,
