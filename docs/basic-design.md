@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.74 (2026-10-06)
-> **上游要件定义书**: docs/requirements.md v5.77
+> **文档版本**: v5.76 (2026-10-06)
+> **上游要件定义书**: docs/requirements.md v5.79
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4571,6 +4571,7 @@ Chat Bar(scope, text, entity_refs)
 | WTG-007/008/009 | §16.2、§16.10-16.11 | AC-WTG-005/006/007 |
 | WTG-011 | §16.2、§16.10-16.11 | AC-WTG-008 |
 | WTG-012 | §16.2、§16.10-16.11 | AC-WTG-009 |
+| WTG-022 | §16.29 | AC-WTG-012 |
 | TCI-001 | §16.2-16.3 | AC-WTG-001 |
 | TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
 | CAN-001/002/003/004/005 | §16.2, §16.5, §16.9, §16.11 B | AC-CAN-001/002 |
@@ -4904,6 +4905,12 @@ TaskExecutionRun 可处于 awaiting_infrastructure；只有 Infrastructure owner
 
 该 crate 不查询目录 ACL、Run binding 或 profile，不持久化 reservation，不调用 Multipass/K3s，也不开放 executor。每次 admission 仍须把 Schedule 创建者固定的 `run_as_actor_id` 作为执行主体重新检查当前 Project/Run 权限；撤权或 ACL 不可用即 fail closed。实现与 focused gates 见 Schedule SRS/BD/DD v0.14 和 Phase 9F4D infrastructure contract report；Host owner store/Inbox、Run admission writer、Manager/provider 与目标数据库验收仍未关闭。
 
+### 16.29 Project Worktree Index 的 cookie-backed BFF 与路径脱敏
+
+`/worktree?project_id=...` 的认证 Index 通过同源 Next.js BFF `/api/group/[...path]` 访问 Project Worktree Index 与 Worktree 管理 API。BFF 仅在服务端读取受宿主会话签发的 HttpOnly access-token cookie，并从服务端 `GROUP_API_BASE_URL` 连接 Group API；生产 upstream 必须使用 HTTPS。路径和 HTTP method 按 Group API allowlist 校验，写请求要求同源 `Origin`，请求体限制 2,000,000 bytes，响应不缓存、不跟随 redirect，并剥离 hop-by-hop 与 `Set-Cookie` 响应头。Bearer 不进入浏览器 JavaScript、URL、终端或日志。
+
+Index projection 只返回 Worktree/Project/Repository 等 opaque identity、授权管理字段和状态，不返回主机绝对 checkout path 或可反推出主机目录的 locator。Repository/Host capability 才能在受控服务端或 Runtime bridge 内解析 checkout 位置。当前 BFF 与 Index UI 已形成代码切片，但 cookie issuer、生产 API base 配置和宿主会话集成未验收；缺 cookie/config/API 时必须显示认证或连接错误，不回退为 seed。该 BFF 仅服务 Project Index compatibility route，不改变 `WorktreeGroupApiClient` 的逐请求 Bearer provider 契约，也不代表 Group Shell/Run Apps 已接通。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5024,3 +5031,5 @@ TaskExecutionRun 可处于 awaiting_infrastructure；只有 Infrastructure owner
 | v5.72 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将上游需求指针更新到 v5.75，并补录 disposable PostgreSQL 18.6 Canvas migration/backfill、FORCE RLS scope、append-only、advisory lock 顺序及 1s fail-closed 验证；明确目标 DB/runtime grants/query plan 和生产消费者仍未验收；同步 Data Design v1.6、Group DD v4.49、实施计划 v5.98 与报告 v0.3 | PostgreSQL 18.6 隔离验证补齐后同步架构证据边界 |
 | v5.73 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 9F4D Run 与 Infrastructure owner 容量边界；Run owner 持 Project/Run reservation，Infrastructure owner 独立持 Host reservation，扩展 Data Design v1.7 分类和清理缺口；更新 AC-LOOP-010 | 细化 Multipass/K3s demand 的 owner-local 事务与异步受理设计 |
 | v5.74 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 `domain-infrastructure` 的 v1 Run binding/Host demand typed contract、输入边界、摘要与 occurrence 幂等键；明确其为无授权和持久化副作用的领域基础，不改变 fail-closed 执行状态 | Phase 9F4D 首个领域实现切片通过 crate 定向 gates 后同步设计 |
+| v5.75 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.78 / Group DD v4.53 / implementation plan v6.06；定义 Project Worktree Index 的 cookie-backed same-origin BFF、服务端 token 边界、请求大小与响应头限制，并禁止 Index projection 暴露 checkout path；明确宿主 cookie issuer/API 配置和 Group Shell provider 仍未验收 | WTG merge reconciliation 接入认证 Index/BFF 与服务端路径脱敏切片 |
+| v5.76 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.79、Group DD v4.54、implementation plan v6.07 和 WTG report v0.8；Multipass 管理 Linux guest 内 K3s 的设计基线与未验收 provider 状态保持不变 | 合并前质量门完成后同步跨层文档版本指针 |

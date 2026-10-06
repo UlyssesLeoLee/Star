@@ -1,13 +1,15 @@
 /*
+@cypher schema=1 source_sha256=b1105f830bc4a31c9cd489af6bf8d7aad4e10782beff42df8fee2abf65a64878
 CYPHER STRUCTURE MANIFEST
+MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
-  (file:File {name:"frontend/src/app/worktree/page.tsx", type:"file", language:"tsx"}),
   (page:Function {name:"WorktreePage", type:"function", signature:"WorktreePage(): JSX.Element", visibility:"public", complexity:"complex"}),
   (lifecycleControls:Function {name:"ProjectWorktreeLifecycleControls",type:"function",language:"tsx",visibility:"public",complexity:"complex"}),
   (authorizedSelector:Function {name:"AuthorizedProjectSelector",type:"function",language:"tsx",visibility:"public",complexity:"complex"}),
   (row:Function {name:"Row", type:"function", signature:"Row(props: { label: string; value: React.ReactNode }): JSX.Element", visibility:"private", complexity:"simple"}),
   (apps:Variable {name:"WORKTREE_GROUP_APPS", type:"variable", language:"typescript"}),
   (editor:Variable {name:"MonacoEditor", type:"variable", language:"typescript"}),
+  (productionIndex:Variable {name:"AuthenticatedWorktreeIndex", type:"variable", language:"typescript"}),
   (projects:Variable {name:"projects", type:"variable", language:"typescript"}),
   (agentSessions:Variable {name:"agentSessions", type:"variable", language:"typescript"}),
   (localRuntimes:Variable {name:"localRuntimes", type:"variable", language:"typescript"}),
@@ -31,15 +33,16 @@ CREATE
   (runtimeForWorktree:Function {name:"runtimeForWorktree", type:"function", signature:"localRuntimes.find(runtime => runtime.id === worktree.local_runtime_id)", visibility:"private", complexity:"simple"}),
   (formatTimestamp:Function {name:"formatTimestamp", type:"function", signature:"formatTimestamp(value: string): string", visibility:"private", complexity:"simple"}),
   (deriveTransitions:Function {name:"deriveTransitions", type:"function", signature:"WORKTREE_SM.transitions.filter(...).map(...)", visibility:"private", complexity:"simple"}),
-  (file)-[:CONTAINS]->(page),
-  (file)-[:CONTAINS]->(lifecycleControls),
-  (file)-[:CONTAINS]->(authorizedSelector),
+  (self)-[:CONTAINS]->(page),
+  (self)-[:CONTAINS]->(lifecycleControls),
+  (self)-[:CONTAINS]->(authorizedSelector),
   (page)-[:CALLS]->(lifecycleControls),
   (page)-[:CALLS]->(authorizedSelector),
-  (file)-[:CONTAINS]->(row),
-  (file)-[:CONTAINS]->(apps),
-  (file)-[:CONTAINS]->(editor),
-  (file)-[:CONTAINS]->(projectSelectionGate),
+  (self)-[:CONTAINS]->(row),
+  (self)-[:CONTAINS]->(apps),
+  (self)-[:CONTAINS]->(editor),
+  (self)-[:CONTAINS]->(productionIndex),
+  (self)-[:CONTAINS]->(projectSelectionGate),
   (page)-[:USES]->(projects),
   (page)-[:USES]->(agentSessions),
   (page)-[:USES]->(localRuntimes),
@@ -70,8 +73,9 @@ CREATE
   (syncProjectSelection)-[:USES]->(persistedProject),
   (syncProjectSelection)-[:USES]->(project),
   (page)-[:CALLS]->(row),
-  (page)-[:USES]->(apps),
-  (page)-[:USES]->(editor);
+  (page)-[:USES]->(apps),(page)-[:USES]->(editor),(page)-[:USES]->(productionIndex),
+  (page)-[:CALLS]->(productionIndex);
+@endcypher
 */
 
 "use client";
@@ -90,6 +94,7 @@ import { WORKTREE_SM, type Worktree, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
+import { AuthenticatedWorktreeIndex } from "@/components/AuthenticatedWorktreeIndex";
 import dynamic from "next/dynamic";
 import { ProjectWorktreeLifecycleControls } from "./ProjectWorktreeLifecycleControls";
 import { AuthorizedProjectSelector, type AuthorizedProjectDirectoryState } from "./AuthorizedProjectSelector";
@@ -507,6 +512,10 @@ export default function WorktreePage() {
         WORKTREE_SM.transitions.filter((t) => t.from === wt.status).map((t) => t.to),
       ))
     : [];
+
+  if (requestedProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedProjectId)) {
+    return <AuthenticatedWorktreeIndex projectId={requestedProjectId} />;
+  }
 
   return (
     <div className="max-w-7xl">

@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.76）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.79）
 
 ## 0. 文档说明与前提
 
@@ -1482,6 +1482,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | WTG-002 | 点击 Run Worktree 后显示共享 Run Context 的 Inbox、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps；见第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
 | WTG-006 | Project Worktree Index 与 Engineering Run Shell 可分别访问；Index 深链以 `project_id` 保留 Project，Run deep link 保留 `project_id/branch_id/engineering_run_id` 并可附 `worktree_id` focus；旧 Worktree Group route 经兼容 adapter 解析 Run；Index 不得被通用任务列表替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | WTG-010 | Worktree Index 分开呈现当前 Git lock observation 与持久化 lock 标记；unknown 不得通过 cleanup guard | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
+| WTG-022 | Project Index 与 Run directory projection 禁止泄露主机 checkout path；解析只在受信任 Host/Repository capability 内进行 | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
 | WTG-011 | Project Worktree Index 必须以 `project:read` + 当前 membership 查询脱敏的已绑定 Repository 清单（仅 ID/name/default branch，不含 URL/路径），并提供授权候选发现、创建与导入；仅接受 Project 已绑定 repository_id、经过 Git ref 校验的 branch/base_ref 或可信 Host Runtime opaque candidate_id；拒绝客户端路径、仓库 URL 和 Git 命令；副作用前重验 membership 与 Project-Repository binding，以 Idempotency-Key/correlation_id 幂等持久化 operation、Worktree projection、Audit/Outbox 后返回 202；缺少 provider 返回 503；Index UI 不得回退本地 seed，须验证 Project/Repository/candidate/receipt 关联并在受理后刷新 Index | 第 50.3.1 章 | ARCH-OBL-GRP-001 |
 | TCI-001 | Multica、Jira 类视图与 Engineering Run 下直接访问的 Task Card 必须共用 Run-scoped WorkItem 事实源；见第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控交互式 PTY CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
@@ -2282,7 +2283,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-004 | Project Worktree Index 必须可跨 Branch/Run 比较 Worktree owner/Agent、绑定 branch、状态、Runtime、PR、冲突/锁和最近活动，并从同一处进入受权管理动作 | P0 |
 | WTG-005 | Worktree 切换只更新当前 Engineering Run 的 focus/CLI checkout target；Run-owned App 数据仍按 `engineering_run_id` 查询；切换 Project/Branch/Run 时必须清除旧授权投影 | P0 |
 | WTG-006 | 主导航深链必须保留 Project/Branch/EngineeringRun/Worktree 身份；旧 `/worktree?project_id=...` 与 `/worktree/{id}/group` 在迁移期间仅作为可验证兼容路由，Index 不得被通用任务列表替代 | P0 |
-| WTG-007 | 已装配宿主认证时，Project Worktree Index 必须读取授权 API 投影并支持 owner/state/archive 筛选与稳定游标续页；401/403/网络错误不得混入本地 seed 作为生产结果 | P0 |
+| WTG-007 | 已装配宿主认证时，Project Worktree Index 必须读取授权 API 投影并支持 owner/state/archive 筛选与稳定游标续页；响应不得暴露主机 checkout path；401/403/网络错误不得混入本地 seed 作为生产结果 | P0 |
 | WTG-008 | Index 的归档/恢复操作必须使用当前 Worktree version 创建短时 plan 并二次确认；执行绑定未解除时归档必须失败；归档只改变平台可见状态，不删除 Git checkout | P0 |
 | WTG-009 | Worktree owner 必须可由有权管理员转派给当前 Project 的有效成员；候选人只能来自当前认证成员目录，转派使用 Worktree version、短时 plan、二次确认、幂等与审计；成员目录不可用时不得开放自由文本或 seed 转派 | P0 |
 | WTG-010 | Project Worktree Index 必须分开呈现持久化 `locked` 标记与 Host Runtime 实时 Git Worktree retention lock observation；该 Git 锁只保护 Git 管理记录，不能表示 Agent 活跃或文件编辑互斥；缺少 provider/runtime、失败、超时、无效或超过 30 秒的观测为 `unknown`；unknown/unlocked 均不能证明 Agent 已停止，物理清理须检查独立活跃状态并在 drain 后重新观测 | P0 |
@@ -2297,6 +2298,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-019 | 每个 Run App 必须声明 canonical owner scope、读写 API 和 capability；前端同级 App 不等于独立微服务；跨域写通过 owner API/领域事务/Outbox + 幂等 Inbox 投影，不共享表写入 | P0 |
 | WTG-020 | Project 导航必须提供 Project Worktree Index 入口；客户端已选 `project_id` 仅是深链提示，目标页必须重新读取当前 actor 的 membership 并授权 Index；无有效项目时要求从服务端目录选择，禁止用固定 repository/worktree ID 或本地 seed 填充导航 | P0 |
 | WTG-021 | Project → Cloud Branch → Engineering Run → Worktree 目录按层懒加载并有界；Branch 来自可信 SCM 身份，不从 checkout 分支字符串归类生成；三层 current grant 每次重验；只有叶节点解析完整 Run/focus 后才建立执行焦点；缺会话或绑定时明确阻断 | P0 |
+| WTG-022 | Project Worktree Index 与 Run directory API 不得向浏览器返回主机绝对 checkout path 或可反推出主机目录的 locator；checkout 解析仅由受信任 Host/Repository capability 在服务端或受控 Runtime bridge 内完成 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
@@ -2474,6 +2476,7 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-RUN-004 | TaskExecutionRun 历史在 canonical Task Card 内读取，并与 EngineeringRun 导航/身份分离；目标 Run-scoped API 每次重验当前 actor、tenant、Project/Branch/EngineeringRun membership、WorkItem grant 和可选 Worktree 关联，使用有界稳定游标、no-store 与字段 allowlist。现有 `/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs` 仅是 Worktree compatibility endpoint；详情限制 100 Event/100 Evidence，禁止返回任意 details、locator、原文或大输出；状态维度各自取最新非空事件，认证 API 不可用时 fail closed |
 | AC-WTG-010 | Project Worktree Index 可进入 Project 级 Quality & Improvement 视图；所有指标显示公式、分子/分母、单位、时间窗、coverage 与版本，并能下钻至授权 Task/Run/Evidence；unknown 数据不作为零计入分母，结果按 task type/complexity 分层 |
 | AC-WTG-011 | 固定 Benchmark 重放使用版本化 task/repo/environment/acceptance/scoring snapshots，并分离 tuning/holdout；候选策略不得改标准；proposal 经过隔离对比和授权采纳后可回滚，历史分数保持原口径 |
+| AC-WTG-012 | Project Worktree Index 与 Run/Worktree directory projection 只返回最小脱敏身份/状态字段，不包含主机绝对 checkout path 或可反推出主机目录的 locator；浏览器无法提交路径覆盖可信绑定；仅受信任 Host/Repository capability 或受控 Runtime bridge 可解析 checkout 位置 |
 | AC-TRACE-001 | 一次从 Canvas 或底栏聊天发起的任务操作，可由同一 `correlation_id` 串起 Worktree、WorkItem、TaskCard、TaskExecutionRun、CLI Session、Canvas Element、Plugin 调用与 Audit |
 | AC-ERUN-001 | Project → Branch → Engineering Run → Worktree 主导航保持身份与深链；点击 Run Worktree 后才加载所属 Run tabs，Worktree 只设 focus/CLI target；右侧 Task/Canvas/BI 数据按 Run 授权 | P0 |
 | AC-ERUN-002 | Run Context/API 对每个实体域复验 membership 与 capability；跨域命令调用 owner API，同 owner DB 事务使用 Outbox，消费者经 Inbox 幂等去重；前端不能跨域表写入或直接使用 stored procedure | P0 |
@@ -2880,3 +2883,5 @@ Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权�
 | v5.75 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 Canvas stream migration 在 disposable PostgreSQL 18.6 fixture 双次应用、既有 Outbox identity backfill、FORCE RLS scope 与 append-only 负例；记录双连接 advisory wait/offset 顺序和 1s lock timeout fail-closed 实测。目标数据库、正式 runtime grants、query plan 与完整实时消费者仍未验收，Phase 3 维持开放；同步 basic v5.72、Data Design v1.6、Group DD v4.49、实施计划 v5.98 与报告 v0.3 | 找到可用 PostgreSQL 18.6 本地二进制后完成隔离数据库验证并按证据更新文档 |
 | v5.76 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 9F4D 双 owner 容量边界：Run owner 原子预留 Project/Run 预算并发出 demand，Infrastructure owner 在自己的事务内预留 Host 容量；补充 multica Reservation W/T 分类与现有清理缺口，Schedule 保持 fail closed | 自审发现将 Host reservation 写进 Run owner 事务会违反 owner 边界，且必须补齐现有预算表的数据分类 |
 | v5.77 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 `domain-infrastructure` v1 Run binding/Host demand 领域契约及真实验证边界；区分确定性 digest 与授权，明确 run-as 每次触发复验仍待 admission writer | Phase 9F4D 首个 Rust 领域契约切片已实现，需要同步需求而不把 worker/provider 写成已完成 |
+| v5.78 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Project Worktree Index 与 Run directory projection 不暴露主机 checkout 路径，并要求路径解析只留在受信任 Host/Repository capability 或受控 Runtime bridge；同步 basic v5.75、Group DD v4.53 与 implementation plan v6.06 | 合并 Project Index cookie-backed BFF 切片并将已实现的路径脱敏提升为可验收需求 |
+| v5.79 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步基本设计 v5.76、Group DD v4.54、implementation plan v6.07 与 WTG phase report v0.8 的版本指针；不改变已确立的 Multipass/Linux guest/K3s 架构及功能验收结论 | 合并前完成阶段验证后统一跨层文档版本引用 |

@@ -103,7 +103,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=50bbb4af07adf1c5535dc6759ab5f81a68fae4b0bbcc5d348df991d95847a907
+// @cypher schema=1 source_sha256=68d800d67dcb9568d3b7b58364e43b23fccc14f79bf8ee1d50cdcbf4102e3b5e
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -382,7 +382,7 @@ impl GroupContextResolver {
         set_tenant(&mut tx, actor.tenant_id).await?;
         let worktree = sqlx::query_as::<_, WorktreeIndexRow>(
             r#"
-            SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.path, w.parent_id,
+            SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.parent_id,
                    w.owner_user_id, w.work_item_id, w.agent_id, w.agent_session_id, w.runtime_id,
                    w.branch, w.human_state, w.machine_state,
                    w.ahead, w.behind, w.dirty, w.health_score, w.last_activity, w.test_state,
@@ -518,7 +518,6 @@ struct WorktreeIndexRow {
     repo_id: Uuid,
     workspace_id: Uuid,
     project_id: Uuid,
-    path: String,
     parent_id: Option<Uuid>,
     owner_user_id: Option<Uuid>,
     work_item_id: Option<Uuid>,
@@ -550,7 +549,6 @@ fn worktree_projection(row: WorktreeIndexRow, git_lock: WorktreeGitLockObservati
         "repository_id": row.repo_id,
         "workspace_id": row.workspace_id,
         "project_id": row.project_id,
-        "path": row.path,
         "parent_id": row.parent_id,
         "owner_user_id": row.owner_user_id,
         "work_item_id": row.work_item_id,

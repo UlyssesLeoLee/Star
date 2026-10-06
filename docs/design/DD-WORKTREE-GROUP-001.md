@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.52**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.54**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -14,8 +14,8 @@
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.77 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.74 §16
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.79 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.76 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.14、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.10、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -33,7 +33,7 @@
 4. 创建、归属调整、归档和清理 Worktree 可审计、并发安全，并能处理运行中 Agent、CLI 与 Git 锁。
 5. 需求 §50 的 AC-ERUN、AC-EVENT、AC-WTG、AC-WTI、AC-TCI、AC-CAN、AC-CHAT、AC-PLG 与 AC-TRACE 均通过服务端集成验收。
 
-Group Shell 当前仍是浏览器 seed 预览。Project Worktree Index 已有条件式授权 API 投影与 archive/restore plan-confirm UI 接线，但应用路由树尚未安装宿主 provider，因此运行时仍是 preview。生产 Group API 已有认证、Project ACL、WorkItem 持久化/生命周期和 Worktree Index/管理命令代码；target migration、membership provisioning/reconciliation 与 ACL/RLS 负向集成验收仍未完成，因此这些接口尚不可作为已启用生产能力。
+Group Shell 当前仍是浏览器 seed 预览。Project Worktree Index 已接入 cookie-backed BFF、授权 API 投影与 archive/restore plan-confirm UI；宿主 cookie issuer、生产 API base 配置、target migration、membership provisioning/reconciliation 与 ACL/RLS 负向集成验收仍未完成，因此 Index 不能标为已启用生产能力。BFF 缺 cookie/config/upstream 时保持错误态，不回退 seed。生产 Group API 已有认证、Project ACL、WorkItem 持久化/生命周期和 Worktree Index/管理命令代码；这些接口尚不可作为已启用生产能力。
 
 ## §1 范围与导航契约
 
@@ -101,6 +101,12 @@ Run 查询路由固定为 `GET /api/v1/worktrees/{worktree_id}/work-items/{work_
 | Group Apps | 原生 App 本地路由；有 API provider 时读取服务端授权 projection 并清空 stale/error 导航；无 provider 时仅显示标记的本地预览 | 服务端 App Registry + 当前 GroupContext + 共享实体引用；Plugin Gateway/runtime 与热撤权仍需部署 |
 | Chat / CLI / Plugin | Chat 发送禁用；CLI 等待 Session API；Plugin 入口/能力只做本地预览 | 授权 API、真实 PTY Runtime、Plugin Registry/Gateway 与即时撤权 |
 
+### 1.5 Project Worktree Index 的同源 BFF
+
+`AuthenticatedWorktreeIndex` 使用独立的 `GroupContextApiClient`，请求 `/api/group/api/v1/...`；Next.js catch-all BFF 仅允许 Project Worktree Index 与 Worktree resource 路径，使用服务端 `GROUP_API_BASE_URL`，并从宿主签发的 HttpOnly cookie 读取 access token 后向 Group API 添加 Bearer。BFF 必须拒绝非法 method/path、cookie 名或上游 URL，生产远程 upstream 强制 HTTPS；写操作校验同源 `Origin`，请求体上限 2,000,000 bytes，禁缓存和 redirect，过滤 hop-by-hop/`Set-Cookie` 响应头。access token 不进入浏览器 JavaScript、URL、日志或终端。
+
+该传输只为 Project Worktree Index compatibility route 提供服务，不改变 `WorktreeGroupApiClient` 的 provider 注入/逐请求 Bearer 契约，也不代表 Group Shell 获得宿主身份。cookie issuer、生产 API base 与部署配置仍需接通；缺失时 Index 明确显示未认证/不可用，不使用 seed。Project Index API 的 `WorktreeIndexItem` 与 Run/Worktree directory projection 都不包含主机 checkout path 或可反推出 host path 的 locator；底层 `worktree.path` 只可由受信任 Host/Repository capability 或 Runtime bridge 解析，不能返回浏览器。
+
 ## §2 模块与责任边界
 
 | 模块 | 输入 | 责任 | 不负责 |
@@ -128,7 +134,7 @@ Engineering Run Domain 持有 Run membership 与 App context；Worktree Domain �
 ```text
 WorktreeIndexItem {
   worktree_id, project_id, workspace_id, repository_id,
-  name, path, parent_id?, branch, human_state, machine_state,
+  name, parent_id?, branch, human_state, machine_state,
   owner_user_id?, work_item_id?, agent_id?, agent_session_id?, runtime_id?,
   ahead, behind, dirty, health_score, test_state, risk_count,
   locked, git_lock { state, source, observed_at },
@@ -136,11 +142,13 @@ WorktreeIndexItem {
 }
 ```
 
+该 API DTO 不序列化主机 `worktree.path`；原始 checkout locator 仅保留在受信任 Host/Repository 层，不能通过 Project Index、Run directory、浏览器 API 或深链泄露。
+
 `locked` 是 Worktree current projection 中的持久化兼容字段，可能由管理命令或历史 Git 导入写入，不能作为当前 Git 锁事实。`git_lock` 是独立 Host Runtime observation：`state ∈ {locked, unlocked, unknown}`，`source ∈ {host_runtime, unavailable}`，并带 `observed_at?`。这里的 Git 锁专指 [`git worktree lock`](https://git-scm.com/docs/git-worktree) retention lock：阻止 Git prune Worktree 管理记录，并限制 Git 对该 Worktree 的移动/删除；它不报告 Agent/Session 活跃状态，也不是共享文件编辑锁或租约。API 仅在可信 observer 返回时间戳、时间戳不晚于当前时刻且年龄不超过 30 秒时保留确定的 locked/unlocked；浏览器消费端再次要求 `source=host_runtime` 且时间戳可解析、未超前并在 30 秒内，否则一律显示 unknown；缺少 Worktree Runtime binding、observer 未装配、调用失败、无时间戳、过期或未来时间戳都归一为 unknown。列表读取仅在 actor、Project membership 与 Worktree binding 已验证后调用 observer；query 同时绑定 tenant/project/repository/worktree/runtime，避免跨 Runtime 查错对象。每页最多并发 8 项、单项 provider 等待上限 2 秒、整页等待上限 3 秒，超出等待时间的项目保持 unknown。`unknown` 或 `unlocked` 均不能证明 Agent 已停止；`owner_user_id` 表示人类责任归属；`agent_session_id` 表示会话关联，二者不得互相替代。缺失字段显示“未绑定/未知”，不得根据分支名或运行进程推断 owner。
 
 `unknown` 既不表示 unlocked，也不能用来通过归档/清理 guard；fresh `unlocked` 只说明 Git retention lock 未设置，不表示无 Agent 在工作。`git_lock` 是管理面信号，不是物理删除授权：未来 cleanup plan/confirm 必须读取独立 Agent/Session/Runtime 活跃状态，先停止并 drain Agent/Session，再对同一 Repository/Worktree 实时复验 Git retention lock、dirty state 和 Runtime 状态，最后由授权 Repository/Runtime lifecycle executor 执行；本 observer 接口本身不执行 Git 命令或删除。
 
-Index UI 通过 `WorktreeGroupApiClient.listProjectWorktrees` 请求当前 Project 的认证投影；校验 envelope 与每行的 `project_id` 后映射 owner、执行绑定、生命周期、PR、dirty/ahead/behind、health/risk、lock 与 version。页面只持有当前 Project 的游标分页结果，并把 owner UUID、human state、archived 筛选传给服务端，不把本地 seed 拼进 API 投影。宿主 provider 尚未安装时明确进入 preview；已配置 provider 后遇到 401/403、网络或 schema 错误则显示错误且不回退 seed。API 未返回 owner / Agent / Runtime 展示名称时，UI 显示 ID 或“未绑定”，不得从本地 seed 补名称。
+Project Index compatibility 页面通过 `GroupContextApiClient.listProjectWorktrees` 请求当前 Project 的认证投影，调用 same-origin cookie BFF；校验 envelope 与每行的 `project_id` 后映射 owner、执行绑定、生命周期、PR、dirty/ahead/behind、health/risk、lock 与 version。页面只持有当前 Project 的游标分页结果，并把 owner UUID、human state、archived 筛选传给服务端，不把本地 seed 拼进 API 投影。缺少宿主 cookie、BFF config/upstream 或遇到 401/403、网络/schema 错误时显示错误且不回退 seed。API 未返回 owner / Agent / Runtime 展示名称时，UI 显示 ID 或“未绑定”，不得从本地 seed 补名称。Group Shell 的 `WorktreeGroupApiClient` 仍需宿主 Bearer provider，未装配时继续显示带标记的 preview。
 
 Index 行上的状态由独立字段组成：Worktree lifecycle、健康探测、Agent Session、Runtime、Git 冲突、Git lock 与 PR 状态。不得将 WorkItem status 当成 Worktree status，也不得把没有冲突证据显示成“无冲突”。
 
@@ -651,6 +659,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | WTG-010 / AC-WTI-001 | §3.1、§4、§5、§12 | Git retention lock 与持久化 `locked` 分离，且不代表 Agent 活跃/互斥；unknown/unlocked 不表示空闲；cleanup 需独立活跃状态、drain 和最终重观测 |
 | WTG-011 / AC-WTG-008 | §4、§6.1、§10、§11 A | Project Repository discovery + Index create/import UI；严格字段 allowlist、当前授权与 binding 复核，拒绝客户端路径/URL，持久化 operation/Audit/Outbox，provider 缺失返回 503 |
 | WTG-012 / AC-WTG-009 | §1.2、§2、§4.2、§11 | Project selector 来自当前用户 membership 目录；ID/role 最小投影、cursor/缓存边界、seed 不回退和无名称 SoR 时使用 UUID 标签 |
+| WTG-022 / AC-WTG-012 | §1.5、§3.1、§4、§5、§11 | Index 与 Run directory 响应禁止暴露主机 checkout path；同源 BFF 只在服务端读取 HttpOnly token，缺宿主 issuer/config 时保持错误态 |
 | WTG-013/014/015 + TCI-013/014/015/016 / AC-RUN-001/002/003/004 | §7.1、§10、§11 | versioned Task Contract；Task→Run→optional Worktree；immutable Run/Event/Evidence；幂等 CLI start；Worktree-scoped compatibility list/detail 与稳定游标 |
 | AC-ERUN-005 / AC-TASK-DATA-001 | §7.1、§10.0A、§11 | 完整 Run owner tuple、同 Run 关联/CLI guard、Task outbox 与精确旧 mock seed/Tauri Task 清理、fail-closed 桌面端和 localStorage 清理；目标 DB/RLS 和宿主 provider 仍为生产门 |
 | AC-ERUN-006 | §1.3、§4.2、§10.0B、§11 | 默认 Task Cards 同级入口、认证 Run-scoped bounded list、响应/分页/驻留上限、无 mock 回退与 CLI 禁用门 |
@@ -823,3 +832,5 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.50 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Multipass 首选的 HostEnvironment/RunInfrastructureBinding 拓扑、Worktree guest workspace bridge 与 daemon/VM/K3s/sandbox 分层 readiness；标明宿主 PoC 与 Star 产品集成边界；将过期 Infrastructure DD v0.4/K3s v1.36.4 引用收敛到 DD-LOCAL-INFRASTRUCTURE-001 v0.8 / 实施计划 §6.83，并同步上位 requirements v5.75/basic v5.72 | 用户要求把 Multipass 管理 VM 内 K3s 的重大架构决策落实到当前设计 |
 | v4.51 | 2026-10-06 | 修正 Schedule/Infrastructure 双 owner reservation 边界：Run owner 原子持有 Project/Run 预算并发出 Host demand；Infrastructure owner 以 Inbox/本地事务持有 Host capacity，再启动共享 Multipass/K3s 生命周期；对齐 Data Design v1.7 与 Infrastructure DD v0.9，仍明确未实现 | 自审发现 Run owner 事务预留 Host capacity 会越过 owner 边界 |
 | v4.52 | 2026-10-06 | 对齐 Phase 9F4D 的 Rust `domain-infrastructure` binding/demand v1 契约及定向 gates；记录确定性摘要不是授权、固定 run-as 每次触发仍待 recheck，并保留 owner persistence、worker、Multipass Manager/provider、目标 DB/RLS 的 fail-closed 状态 | 9F4D 首个双 owner 消息契约代码切片落地后逐项对照详细设计 |
+| v4.53 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 WTG conflict reconciliation：Project Index 接入同源 cookie-backed BFF 与当前认证 Index UI；服务端保持 HttpOnly Bearer、HTTPS upstream、同源写保护、有界请求体和 no-store；移除 WorktreeIndex API 对浏览器暴露的主机 checkout path；明确旧 CLI/平行 Canvas migration 未被采纳及生产 issuer/provider/DB/RLS 仍开放；同步 requirements v5.78/basic v5.75/plan v6.06 与报告 v0.7 | 解决旧 WTG shell lane 与最新 dev 的设计/API/UI/schema 冲突并重新对账实现边界 |
+| v4.54 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐上位 requirements v5.79、basic v5.76、implementation plan v6.07 与 WTG phase report v0.8；保持 Multipass/Linux guest/K3s 的已确认架构决策，不把宿主验证误报为 Star provider 验收 | 合并前质量门完成后统一跨层文档版本引用 |
