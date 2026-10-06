@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.50**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.51**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -14,9 +14,9 @@
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.75 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.72 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.8、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.76 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.73 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.13、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -521,10 +521,10 @@ Rust builtin Hook Engine 在 Run admission、tool、validation/review 和 Worktr
 
 ### 8.8 Infrastructure 与 Run/Runtime 分离
 
-Run 的基础设施归属由 HostEnvironment 与 RunInfrastructureBinding 表达。Multipass 是本地/CI Linux guest VM 的首选管理 provider，K3s 在 guest 内运行；同一 Host/environment 按需共享 VM 与 control plane，Run 通过独立 namespace、ServiceAccount/RBAC、quota、NetworkPolicy、storage policy、Runtime profile 和 reservation 隔离，不随 Worktree/Agent 数量复制 VM。生产或远端 Linux K3s 使用独立 provider。Rust Host Infrastructure Manager 是唯一 Multipass adapter caller，以 argv allowlist、bounded IO/deadline、ownership ledger、幂等 operation 和 native Hook/CAS 管理 VM；Agent、Plugin、Task CLI 与 guest workload 不得直接访问 daemon/socket、任意 host shell 或任意 guest exec。VM image、cloud-init、K3s 和 profile 均固定版本/digest；daemon readiness、VM running、K3s API/node/CRI readiness 与 Runtime sandbox readiness 分层记录，wait-ready 不等于 guest 或 K3s 就绪。WorktreeFocus 只提供可信 checkout 映射；workspace bridge 绑定当前 Project/Branch/Run/Worktree/binding revision/TaskExecutionRun，操作前后复验 ACL 与路径边界，默认使用受控同步或 guest checkout，不默认使用可写 host mount。资源未知或不足时拒绝 provision；用户全局环境及 owner 不明实例不可静默修改或回收。宿主 Multipass/K3s/GitOps PoC 不代表 Star provider、Run binding、workspace bridge 或 Agent sandbox 已完成。完整 provider、生命周期、低内存与验收契约见 DD-LOCAL-INFRASTRUCTURE-001 v0.8 §§1–7 及实施计划 §6.83。
+Run 的基础设施归属由 HostEnvironment 与 RunInfrastructureBinding 表达。Multipass 是本地/CI Linux guest VM 的首选管理 provider，K3s 在 guest 内运行；同一 Host/environment 按需共享 VM 与 control plane，Run 通过独立 namespace、ServiceAccount/RBAC、quota、NetworkPolicy、storage policy、Runtime profile 和 reservation 隔离，不随 Worktree/Agent 数量复制 VM。生产或远端 Linux K3s 使用独立 provider。Rust Host Infrastructure Manager 是唯一 Multipass adapter caller，以 argv allowlist、bounded IO/deadline、ownership ledger、幂等 operation 和 native Hook/CAS 管理 VM；Agent、Plugin、Task CLI 与 guest workload 不得直接访问 daemon/socket、任意 host shell 或任意 guest exec。VM image、cloud-init、K3s 和 profile 均固定版本/digest；daemon readiness、VM running、K3s API/node/CRI readiness 与 Runtime sandbox readiness 分层记录，wait-ready 不等于 guest 或 K3s 就绪。WorktreeFocus 只提供可信 checkout 映射；workspace bridge 绑定当前 Project/Branch/Run/Worktree/binding revision/TaskExecutionRun，操作前后复验 ACL 与路径边界，默认使用受控同步或 guest checkout，不默认使用可写 host mount。资源未知或不足时拒绝 provision；用户全局环境及 owner 不明实例不可静默修改或回收。宿主 Multipass/K3s/GitOps PoC 不代表 Star provider、Run binding、workspace bridge 或 Agent sandbox 已完成。完整 provider、生命周期、低内存与验收契约见 DD-LOCAL-INFRASTRUCTURE-001 v0.9 §§1–7 及实施计划 §6.83。
 ### 8.9 商用开源基础设施准入
 
-InfrastructureBackend 与其分发闭包必须允许不限用途、行业、部署规模、席位或用量的商业使用；copyleft 不等于禁止商用，修改、链接、捆绑和再分发须逐版本履行对应许可义务。保存完整 artifact SPDX/SBOM、源码/NOTICE/安装材料及近 12 个月维护证据，并提供 provider 检测、安装引导和合规后的受管安装/捆绑。Multipass 是本地/CI Linux guest VM 的首选管理 provider；Podman machine、Incus、Lima 与远端 Linux K3s 按 capability 作为备用或独立 provider，不能把候选列表误读成同级首选。K3s 只运行在 Linux host/guest；Multipass daemon 不是 Agent sandbox。生产 CLI 仍须单独通过 Run 权限、workspace bridge、native Hook、Runtime sandbox、取消/恢复与独立验证门后才可启用。具体许可、社区、版本、host/guest 生命周期与未验收状态以 DD-LOCAL-INFRASTRUCTURE-001 v0.8 为准；Infrastructure acceptance criteria 为 AC-INFRA-002。
+InfrastructureBackend 与其分发闭包必须允许不限用途、行业、部署规模、席位或用量的商业使用；copyleft 不等于禁止商用，修改、链接、捆绑和再分发须逐版本履行对应许可义务。保存完整 artifact SPDX/SBOM、源码/NOTICE/安装材料及近 12 个月维护证据，并提供 provider 检测、安装引导和合规后的受管安装/捆绑。Multipass 是本地/CI Linux guest VM 的首选管理 provider；Podman machine、Incus、Lima 与远端 Linux K3s 按 capability 作为备用或独立 provider，不能把候选列表误读成同级首选。K3s 只运行在 Linux host/guest；Multipass daemon 不是 Agent sandbox。生产 CLI 仍须单独通过 Run 权限、workspace bridge、native Hook、Runtime sandbox、取消/恢复与独立验证门后才可启用。具体许可、社区、版本、host/guest 生命周期与未验收状态以 DD-LOCAL-INFRASTRUCTURE-001 v0.9 为准；Infrastructure acceptance criteria 为 AC-INFRA-002。
 ### 8.10 Schedule occurrence admission persistence（Phase 9F4C-A）
 
 Schedule 是 Run Automation/Workflow 能力，不作为 Worktree 导航树节点。occurrence 只有在未来 worker 完成 run-as 当前授权、Run target/Profile/HookSet 与资源预算复验后，才能由 admission writer 创建 schedule-origin TaskExecutionRun。9F4C-A 仅落数据库约束：`occurrence_dispatch.admitted_run_id` 通过 `(tenant_id, admitted_run_id)` 复合外键指向 canonical TaskExecutionRun；trigger 只允许 `leased → admitted` 跳转绑定 Run，并检查 dispatch 状态及 fencing/attempt 序列不变量，但不验证 worker 提交的当前 lease owner/generation。应用 writer 必须用条件更新校验当前 owner、generation、lease expiry 和 occurrence deadline，并从 canonical TaskExecutionRun 复验当前 Worktree/Task binding。Outbox/Run trigger 校验 tenant/Project/Engineering Run/Task、occurrence、exact Rule revision、run-as、schedule origin 与 agent channel 一致；本 migration 不存储独立 Worktree ID，也不直接校验 Run/Worktree binding。admitted Run ID 绑定后不可更新或清空。
@@ -534,6 +534,12 @@ Schedule 是 Run Automation/Workflow 能力，不作为 Worktree 导航树节点
 ### 8.11 Schedule Rule enable-time run-as authorization（Phase 9F4C-B）
 
 创建者与规则编辑者可不同。每次 create/revise 写操作先授权当前 editor；仅当新版本 `enabled=true` 时，在相同事务按不可变 `run_as_actor_id` 读取并复验 Project/Run writer grants、当前 Branch binding 与 Engineering Run active revision。查询无匹配 grant、Run 不 active 或数据库状态不可读时回滚整个 Rule 写入。`enabled=false` 不要求原创建者仍可执行，确保保有管理权限的人能够撤权后停用 Rule。Disposable PostgreSQL 18.6 canonical Directory fixture 现在执行实际授权 helper：active developer grant 通过，revoked Project/Branch/Run grant 与 paused Run 均 fail closed。测试 runtime role 对 canonical Directory ACL 表只有 SELECT 权限；授权查询不锁 grant 行，完整 REST create/revise rollback、并发 grant mutation 与目标数据库 grants 尚未覆盖。无人值守每次 trigger/retry/resume 的复验仍须由未来 admission transaction 执行，不能沿用创建时权限快照。
+
+### 8.12 Schedule admission 继承 RunInfrastructureBinding（Phase 9F4D 设计）
+
+每次 Schedule trigger/retry/resume 都重新解析并授权当前 RunInfrastructureBinding 与 provider/profile revision；Schedule Rule 不 pin 某台 Multipass VM。Run/Execution owner 在本 owner 的短事务内预留 Project/Run execution capacity，原子写入 non-executing TaskExecutionRun、RunReservation、occurrence link、Run events、Schedule Run Outbox 与 idempotent Host-capacity demand Outbox；该事务不声称预留 Host VM/K3s 容量。Infrastructure owner 经自己的 Inbox/事务核验并预留共享 Host capacity，再异步委托 Rust Host Infrastructure Manager。无跨 owner 写表、分布式事务或持有数据库锁等待 Multipass。Schedule worker 与 Agent/Task runtime 不可访问 Multipass daemon/socket、host shell 或 guest exec。
+
+Infrastructure owner 的 reservation acceptance、Manager operation receipt、owned VM、K3s API/node/CRI readiness 与 Agent Runtime sandbox readiness 是分层事实。Run 在 Host capacity 与 readiness 未确认时保持非执行态；run_started 之前重新验证 run-as ACL、occurrence fence 与 binding revision。Host headroom unknown/不足时 Infrastructure owner 不 provision，Run owner 按 idempotent response 释放 Project/Run reservation 或进入受限 retry/failure。所有资源按 Run quota/Run reservation 与 Host reservation 的 owner 边界公平分配，不得每个 Worktree/Agent 新建 VM/control plane。AC-LOOP-010、Data Design v1.7 与 Infrastructure DD v0.9 是验收来源；当前 worker、Host reservation store/consumer、provider 与目标 DB/RLS 均未完成，9F4D 仍为设计要求。
 
 ## §9 跨 App 事件与一致性
 
@@ -815,3 +821,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.48 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 workspace all-targets Rust compile、Canvas cursor 定向 Rust tests 3/3、Worktree Canvas 定向 rustfmt 与前端 25 项测试/typecheck；将 target PostgreSQL migration/RLS/并发顺序、完整 unit suite 与 realtime 继续标为未验收；同步 Data Design v1.5、requirements v5.74/basic v5.71/implementation plan v5.97 与阶段报告 v0.2 | 恢复本机 Rust 工具链调用后完成编译门禁，并校正实际验证状态 |
 | v4.49 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 disposable PostgreSQL 18.6 fixture 中 Canvas migrations 双次应用、identity backfill、FORCE RLS scope、append-only trigger、两连接 advisory wait/offset 顺序及 1s fail-closed 超时结果；目标 DB、正式 runtime grants、query plan、durable consumer 与 realtime 仍开放；同步 requirements v5.75/basic v5.72/Data Design v1.6/implementation plan v5.98/report v0.3 | 根据新增本地 PostgreSQL 18.6 实测校准 Canvas 数据库验证状态 |
 | v4.50 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Multipass 首选的 HostEnvironment/RunInfrastructureBinding 拓扑、Worktree guest workspace bridge 与 daemon/VM/K3s/sandbox 分层 readiness；标明宿主 PoC 与 Star 产品集成边界；将过期 Infrastructure DD v0.4/K3s v1.36.4 引用收敛到 DD-LOCAL-INFRASTRUCTURE-001 v0.8 / 实施计划 §6.83，并同步上位 requirements v5.75/basic v5.72 | 用户要求把 Multipass 管理 VM 内 K3s 的重大架构决策落实到当前设计 |
+| v4.51 | 2026-10-06 | 修正 Schedule/Infrastructure 双 owner reservation 边界：Run owner 原子持有 Project/Run 预算并发出 Host demand；Infrastructure owner 以 Inbox/本地事务持有 Host capacity，再启动共享 Multipass/K3s 生命周期；对齐 Data Design v1.7 与 Infrastructure DD v0.9，仍明确未实现 | 自审发现 Run owner 事务预留 Host capacity 会越过 owner 边界 |

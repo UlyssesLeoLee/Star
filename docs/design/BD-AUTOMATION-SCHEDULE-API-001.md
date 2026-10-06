@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Verified design/implementation slice; production enablement remains open.
-> Version: 0.12 | Date: 2026-10-05
+> Version: 0.13 | Date: 2026-10-06
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -41,6 +41,12 @@ Rule management identity and unattended execution identity are separate. Each wr
 
 The lock is transaction-scoped and Project-local; a hash collision may add waiting but cannot grant access. ACL mutation triggers resolve the canonical Project from the affected binding/Branch/Run, and fail closed if that scope cannot be resolved. Runtime API roles do not gain directory ACL UPDATE privileges. Disposable test-role helper execution grants must be provisioned after the role exists; production target role/schema grants remain an independent deployment gate.
 
+### 6.1 9F4D Schedule admission inherits the Run infrastructure binding
+
+Schedule Rules do not own or pin a Multipass instance. For each trigger, retry, or resume, Run/Execution re-resolves and authorizes the current RunInfrastructureBinding and provider/profile revision. Its own transaction rechecks the run-as actor, occurrence fence, target/Profile/HookSet and Project/Run quota, then atomically records the non-executing TaskExecutionRun, Project/Run resource reservation, Run events, occurrence link, Schedule Run Outbox, and idempotent Host-demand event in the Run owner Outbox. This local reservation is not a Host VM/K3s reservation.
+
+The Infrastructure owner consumes the demand through its own idempotent Inbox and transaction, which checks and reserves shared Host/environment capacity in Infrastructure-owned state. It then delegates VM lifecycle work asynchronously to the Rust Host Infrastructure Manager. There are no cross-owner writes or distributed transactions. The Schedule worker and Task/Agent runtime never invoke Multipass, its daemon/socket, host shell, or guest exec.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -57,3 +63,4 @@ The lock is transaction-scoped and Project-local; a hash collision may add waiti
 | v0.10 | 2026-10-05 | Record the 1/1 pure role-policy helper test and clarify that it is not database ACL integration evidence; keep SQL fixture and per-trigger authorization gates open. |
 | v0.11 | 2026-10-05 | Add disposable PostgreSQL canonical ACL fixture results under a read-only directory runtime role; retain concurrent revocation serialization, full route transaction, worker/admission, and target DB gates. |
 | v0.12 | 2026-10-05 | Define Project-scoped advisory-lock ordering and canonical ACL mutation triggers; record Project/Branch/Run concurrent revoke serialization while retaining worker/admission and target database gates. |
+| v0.13 | 2026-10-06 | Separate Run-owned Project/Run resource reservation from Infrastructure-owned Host reservation, and define the asynchronous Inbox/Outbox handoff and non-executing state while Host capacity/readiness is pending. |

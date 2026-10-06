@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.8 · 2026-10-05 · Draft / 已有一组宿主 Multipass/HCS + Linux guest K3s/GitOps 实跑；Star 原生 Multipass adapter、Run 绑定、跨平台能力与 RSS 仍未验收。
+> v0.9 · 2026-10-06 · Draft / 明确 Run owner 的 Project/Run reservation 与 Infrastructure owner 的 Host capacity reservation 分属独立事务；Star 原生 provider、Run 绑定、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.72 §50.8G-50.8H / basic-design v5.69 §8.1、§16.21-16.22 / 实施计划 v5.95 §6.83。
+> 上游：requirements v5.76 §50.8G-50.8H / basic-design v5.73 §8.1、§16.21-16.27 / 实施计划 v6.03 §6.83-6.85。
 
 ## §0 目的与边界
 
@@ -96,13 +96,20 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 
 ## §6 持久化分类与后续 schema 门
 
-以下为**拟分类与设计要求**，尚未创建表或宣称 RLS 已实现：
+以下按数据 owner 分类。标为 Existing 的 Project/Run 行已由 Run/Execution migrations 建表；Infrastructure 行均为规划对象，尚无 Host reservation、Infrastructure demand/Inbox 的物理 schema、writer 或目标 RLS 验收。分类不把现有 Run 表误作 Host capacity，也不把宿主 PoC 当作产品存储实现。
 
 | 拟分类对象 | 初步分类 | 设计要求 |
 |---|---|---|
-| Profile/backend trust、VM image/cloud-init/K3s catalog、HostEnvironment、Multipass owned-instance ledger 与 Project/Run binding | Master | SCD2/version/digest、no physical delete、instance owner/generation 明确、独立 role/policy/capability 分类；目标库完整 RLS 与 audit |
-| Provision/upgrade/resource reservation、workspace bridge transfer、Hook/backup receipts、Audit/Outbox events | Transaction | append-only 或版本化 CAS、scope/audit/retention 与完整 RLS；evidence 不保存凭据/源文件内容 |
-| Operation/lease/queue、health observation/log window、provider inventory cache、bootstrap cache | Work | 显式短 TTL/retention、bounded cache/queue、可清理；不得成为授权来源；inventory unknown 不触发生命周期副作用 |
+| Profile/backend trust、VM image/cloud-init/K3s catalog、HostEnvironment、Multipass owned-instance ledger 与 Project/Run binding | Master (planned) | SCD2/version/digest、no physical delete、instance owner/generation 明确、独立 role/policy/capability 分类；目标库完整 RLS 与 audit |
+| Project/Run execution quota revision | Master | Existing Run/Execution owner SCD2 limit; no physical delete, audited revision and tenant RLS. |
+| Project/Run quota audit and reservation lifecycle events | Transaction | Existing immutable, tenant-scoped facts; append-only audit and reservation lifecycle evidence. |
+| Project execution admission lock | Work | Existing short coordination state with 30-day expiry/index; tenant-scoped pruning worker is not located or verified and remains a retention gate. |
+| Project/Run resource reservation | Work | Existing Run-owned bounded lease, with pending/active/released states and lease_expires_at; not Host VM/K3s capacity. Current DELETE guard and parent-Run retention leave terminal physical cleanup unresolved. |
+| Host capacity reservation | Work (planned) | Infrastructure owner’s bounded lease for shared Host/environment resources; explicit expiry, release, reaper and fair allocation are required before implementation. No physical table is claimed yet. |
+| Infrastructure demand, operation/readiness/audit Outbox facts | Transaction (planned) | Owner-scoped versioned facts with append-only evidence and idempotency; no cross-owner transaction or secret payload. |
+| Infrastructure Inbox/idempotency and operation lease | Work (planned) | Bounded delivery/retry state with TTL and cleanup; separate from immutable event evidence. |
+| Workspace bridge transfer, Hook/backup receipts | Transaction (planned) | Owner-scoped operation/evidence facts with audit and complete RLS; no credentials or source-file content. |
+| Provider inventory/cache, bootstrap cache, and bounded health/log window | Work (planned) | Explicit TTL and bounded memory/queue; caches never grant authority, and unknown inventory never triggers lifecycle mutation. |
 
 启动目标 PostgreSQL 之前的 bootstrap trust/inventory/audit 如何持久化仍需单独 schema/安全设计：不能循环依赖未启动 DB，也不能把本地 cache 当 Master authority。SQLite 没有 PostgreSQL 原生 RLS，若采用本地持久 substrate，必须明确逻辑 scope enforcement/加密/不可变证据及与仓库完整 RLS 规则的差距；未关闭前不启用持久 writer。下一阶段对实际每张表完成 W/T/M 100% 分类、13类 scope 评审和运行角色验收。
 
@@ -127,4 +134,4 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 | v0.5 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 将 Multipass 固定为本地/CI Linux VM 与 guest K3s 的首选管理路径，区分生产/远端 provider；增加共享 HostEnvironment、restricted Rust adapter/CLI allowlist、Worktree guest workspace bridge、资源准入和真实验收分期；引用 Multipass/K3s 官方安全、driver、cloud-init、资源与拓扑资料；复核 K3s stable channel 为 v1.36.5+k3s1；所有功能仍未实现或验收 | 用户明确后续会用 Multipass 管理虚拟机中的 K3s，要求将重大架构变化纳入设计 |
 | v0.6 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 对账 dev 已有 Windows 11 Home + Multipass 1.17.0-rc1/HCS + Ubuntu guest K3s v1.36.5 + 19/19 GitOps Pod 运行证据；将其定位为宿主层 PoC，不外推为 Star Rust Manager/Run binding/sandbox/RSS 已实现；补充真实 VM 配置与 INFRA-2 复用/集成门 | 将 dev 上已提交的宿主层实跑报告纳入本地基础设施详细设计 |
 | v0.7 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 依据 Canonical CLI reference 澄清 wait-ready 只代表 daemon ready；将 VM/K3s/Runtime sandbox 列为独立 readiness 层；只允许固定 profile guest probe 走 Multipass exec，并将永久删除限定为精确 owner 的 delete --purge，禁止全局 purge/delete --all | 官方 CLI 核验发现 daemon readiness、guest/K3s readiness 与实例回收有不同语义 |
-| v0.8 | 2026-10-05 | 架构师（Mavis 接手 agent per DEC-008）；Ulysses（一人公司 12 角色）— Mavis 接手审核 | 同步 requirements v5.72、basic design v5.69 和实施计划 v5.95 的上游版本指针；不改变 provider 行为、生命周期契约或验收结论 | 文档版本一致性复核 |
+| v0.9 | 2026-10-06 | Split Project/Run execution reservation from Infrastructure-owned Host capacity reservation and its Inbox/Outbox lifecycle; distinguish existing Run-owned storage from planned Infrastructure storage, disclose unverified admission-lock pruning and reservation cleanup, and retain all provider/runtime gates as unresolved. |
