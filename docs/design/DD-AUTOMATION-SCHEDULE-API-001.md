@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Verified implementation slice; route and target-environment verification remain open.
-> Version: 0.13 | Date: 2026-10-06
+> Status: 🟡 Rule API and typed infrastructure contract slice verified; admission writer, worker, provider, and target-environment verification remain open.
+> Version: 0.14 | Date: 2026-10-06
 
 ## 1. Routes
 
@@ -72,6 +72,14 @@ The Schedule Rule pins its Worktree, Task, execution Profile, HookSet, and immut
 
 The Infrastructure owner consumes demand through its own idempotent Inbox and transaction, verifies Host headroom, and creates/updates its Host-capacity reservation and operation receipt in its own storage. Unknown/insufficient capacity rejects or defers the demand without starting an executor. Only after owner acceptance does the Rust Host Infrastructure Manager asynchronously reconcile its owned shared VM/K3s environment. The Schedule worker cannot call Multipass or guest exec. A Run may remain awaiting_infrastructure, but run_started/executor launch waits for current authorization and binding recheck, acknowledged Host reservation, owner receipt for the bound VM, K3s API/node/CRI readiness, and the separately selected AgentRuntime sandbox. No Host owner performs cross-owner writes or a distributed DB transaction. A stale lease/fence/binding, revoked ACL, or failed/unknown readiness causes an idempotent retry/failure event and release through owner commands; no task process starts.
 
+### 6.3 Implemented `domain-infrastructure` contract surface
+
+`crates/domain-infrastructure/src/lib.rs` defines `ProviderKind::{MultipassK3sGuest, RemoteK3s}`, `KubernetesDnsLabel`, `ExecutionResourceBudgetV1`, `RunInfrastructureBindingSnapshotV1`, and `HostInfrastructureDemandV1`. Both wire structs include explicit `schema_version=1`; validators reject unknown versions. The binding validator requires non-nil Tenant/Project/Branch/Engineering Run/binding/HostEnvironment/profile identities and positive revisions; validates the resource budget and Kubernetes DNS labels; and `digest()` emits a version-domain-separated SHA-256 over the wire version, binding identity, provider/profile/runtime revisions and digests, namespace/service account, and all budget fields. Host-demand validation checks its wire version, IDs, Rule revision, deadline, embedded binding and budget, and exact Tenant/Project/Branch/Engineering Run/budget match. `deduplication_key()` returns the pair `(tenant_id, occurrence_id)`.
+
+The focused crate runner passes formatting, all-target check, Clippy with warnings denied, and all 8 unit tests. These tests validate the Rust value contract only. They do not prove that the snapshot came from current ACL/provider/profile state, that any Outbox/Inbox is committed, or that VM/K3s/sandbox readiness exists. No SQL persistence or service call is added by this slice; the caller must retain the fixed creator `run_as_actor_id` and independently reauthorize it on every trigger/retry/resume.
+
+Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md).
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -89,3 +97,4 @@ The Infrastructure owner consumes demand through its own idempotent Inbox and tr
 | v0.11 | 2026-10-05 | Record disposable PostgreSQL Project/Branch/Run ACL cases under a read-only directory runtime role; keep full API transaction, concurrent revocation serialization, worker, and target-environment gates open. |
 | v0.12 | 2026-10-05 | Specify the shared Project lock and separate-statement ACL reread; record five-migration repeated application, and Project/Branch/Run revoke-wait tests while preserving worker/admission and target-grant gates. |
 | v0.13 | 2026-10-06 | Correct the 9F4D data boundary: Run owner atomically holds only Project/Run reservation and emits demand; Infrastructure owner reserves Host capacity independently before asynchronous Multipass/K3s work; executor remains blocked until owner acknowledgments and current authorization/readiness checks. |
+| v0.14 | 2026-10-06 | Specify the implemented typed Run binding/Host demand contract and record its focused Rust gates; explicitly keep current-state resolver, persistent owner stores, admission writer, worker, Manager/provider, and execution readiness gates open. |

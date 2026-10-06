@@ -14,6 +14,7 @@ members = [
     "crates/domain-development",
     "crates/domain-feedback",
     "crates/domain-identity",
+    "crates/domain-infrastructure",
     "crates/domain-integration",
     "crates/domain-kms",
     "crates/domain-local-runtime",

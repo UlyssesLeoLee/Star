@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.58 (2026-10-05)
+> **文档版本**: v0.60 (2026-10-06)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.8 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.10 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52 9F4D infrastructure contract + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -27,6 +27,8 @@
 新增 Schedule 9F4A：Run-scoped Schedule Rule create/list/detail/CAS-revise 与事务内 Audit/Outbox、24 小时幂等回放已通过定向 Rust 和 disposable PostgreSQL 验证；`jsonwebtoken` 显式启用 RustCrypto，生产 `build_group_router` 测试覆盖四方法未认证 401、signed-token missing-scope 403 与有效 write-scope body-cap 413，并断言拒绝响应私有头。成功 role/Run/Project ACL、target binding、page bounds、并发 CAS/replay、目标 DB grants/Auth、worker、Run admission 与 BI/Benchmark 仍未完成；不得将此 API slice 标记为完整 Schedule 执行能力。
 
 新增 WTG-3C Canvas ordered cursor slice：`wtg_canvas_stream.py` 用必填 JSONL audit log 可重跑 source-contract、Canvas 定向 Rust test、Group API Vitest、frontend typecheck、diff check 与 registry check（automation-design §4.51 / Worktree Group 实施计划 §6.84）。disposable PostgreSQL 18.6 fixture 的 migration/RLS/并发证据单独记录于阶段报告；runner 不连接目标库、不创建 runtime grants，也不表示 consumer/realtime/Phase 3 已完成。
+
+新增 Schedule 9F4D-0：`scripts/automation/phase9f4d_infrastructure_contract.py` 为纯 Rust `domain-infrastructure` v1 binding/demand contract 运行 rustfmt、all-target check、warnings-as-errors Clippy 与 tests；逐步日志和 JSONL audit 写入 `target/phase9f4d-infrastructure-contract`，Cargo artifacts 默认写入较短的 `target/9f4d-cargo-target`（可覆写），已针对 Windows MSVC 下观察到的 LNK1104 路径问题复验。8/8 定向单测仅证明类型/校验契约；不部署 schema、不运行 Inbox/Outbox/worker、不操作 Multipass/K3s；Schedule production execution 继续 fail closed（automation-design §4.52 / 实施计划 §6.86 / 阶段报告）。
 
 新增 Schedule 9F4C-A：`phase9f3_schedule.py` 扩展为四段 migration chain runner，验证 `leased → admitted` dispatch transition 的 immutable `admitted_run_id`、schedule-origin Run/occurrence/Rule revision/run-as/channel DB guards、append-only `automation.schedule_run_outbox`、8 张 Schedule 表 FORCE RLS 与非 superuser tenant isolation。runner 断言合法绑定、run-as mismatch、Run link mutation 与 Outbox UPDATE refusal；DB trigger 要求状态/fencing 序列，但不校验当前 worker lease owner/generation，未来 writer 必须条件更新复验 owner/generation/expiry/deadline。PostgreSQL 18.6 disposable 验证及五个 adapter scenarios 通过；当前没有 production admission writer/worker、实时授权/target/profile/HookSet/quota recheck、Reservation/RunEvent 原子写入、Outbox consumer 或 BI，Schedule capability 保持关闭。调用与阶段边界见 automation-design §4.46、实施计划 §6.79 与阶段报告。
 
@@ -58,6 +60,7 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 | `scripts/automation/phase9f2_schedule_occurrence.py` | Schedule 9F2 rustfmt、domain-automation tests、clippy 与 migration source-text contract；日志文件化/900 秒超时；Cargo.lock 干净时运行 Cargo 并精确恢复原字节；默认离线，可显式 --online；Clippy 仅豁免三类旧 lint；不执行 SQL | ERUN-P4 Schedule 9F2；automation-design §4.41；实施计划 §6.75 | 本次提交（见Git） | 🟡 领域与源码 gate；数据库/worker/Run admission 未验收 |
 | `scripts/automation/phase9f3_schedule.py` | Schedule 9F3/9F4B/9F4C rustfmt、domain tests、adapter/API all-target checks、Clippy、9F3 adapter cases + 9F4B creator/occurrence negative coverage、9F4C admitted Run/Outbox fixture、run-as mismatch、Run link mutation 与 Outbox UPDATE refusal；9F4C-B creator-selection、角色授权与 canonical Directory ACL SQL tests；9F4C-C Project/Branch/Run revoke-lock races；legacy backfill fixture；完整 migration chain 双次 apply、8 表 FORCE RLS、非 superuser runtime role、file-backed logs/900s timeout；本机 PostgreSQL bin dir 或 Docker image runner（loopback publish、精确容器 cleanup） | ERUN-P4 Schedule 9F3/9F4B/9F4C；automation-design §4.42/4.45/4.46/4.48/4.49/4.50；实施计划 §6.76/6.78-6.82 | 本次提交（见 Git） | 🟡 recurrence/lease、immutable run-as、admission persistence、Rule enable-time authorization 与 canonical ACL revocation serialization 验证；per-trigger auth worker、Launch Profile provider、实时 Auth/target/quota recheck、atomic Reservation/TaskExecutionRun/RunEvent writer、Outbox consumer/BI/target migration grants 仍未完成 |
 | `scripts/automation/wtg_canvas_stream.py` | Canvas Worktree cursor source contract、focused Rust unit tests、Group API Vitest、frontend typecheck、diff check 与 registry check；必填 JSONL audit log；不执行 SQL、不部署目标 DB | Worktree Group Phase 3C；automation-design §4.51；实施计划 §6.84；阶段报告 | 本次提交（见Git） | 🟡 代码与focused gates可重放；disposable PG fixture 结果单独记录；目标 grants/query plan/consumer/realtime 未验收 |
+| `scripts/automation/phase9f4d_infrastructure_contract.py` | `domain-infrastructure` Rust v1 binding/demand slice: rustfmt、`cargo check --all-targets`、warnings-as-errors Clippy、all-target tests；900 秒超时；日志在 `target/phase9f4d-infrastructure-contract`、Cargo artifacts 默认在短路径 `target/9f4d-cargo-target`；stdout/stderr file logs + JSONL audit；可指定 toolchain bin/target dir；不运行 SQL/DB、owner Inbox/Outbox/worker、Multipass/K3s/provider 或 production admission | Schedule Phase 9F4D-0；automation-design §4.52；实施计划 §6.86；Phase report | 本次提交（见 Git） | 🟡 8/8 crate tests 与 focused gates 通过；resolver/store/worker/provider/target DB 与真实执行门仍开放 |
 | `scripts/automation/__init__.py` | 包初始化, 暴露 4 基类 + CLI | 全部 | TBD | 🟢 完成 |
 | `scripts/automation/dispatcher.py` | 子代理 dispatch 基类 (per §3.1 + §6.1) | H2-1/H2-2/H2-3/H2-4/H2-5 (refactor_template 调用) | TBD | 🟡 stub (invoke / verify / collect_output 待对接 Mavis task 调度) |
 | `scripts/automation/cli_helper/__init__.py` | cli_helper 子包初始化 | 全部 | TBD | 🟢 完成 |
@@ -154,6 +157,8 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 | v0.56 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记第五个 Schedule migration 和 Project/Branch/Run 双连接撤权锁测试；同步 automation-design v2.6、计划 §6.82 与报告 v0.6，保留 worker/admission/consumer/BI/target-grant 缺口 | 9F4C-C ACL 撤权与 Rule 授权序列化在 PostgreSQL 18.6 runner 中通过 |
 | v0.57 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 automation-design v2.7：标记 §4.48/§4.49 的未串行化描述为历史阶段快照，并指向 §4.50 中已通过的三类并发撤权排序证据；不改变 worker、Run admission、consumer、BI 或目标 grants 状态 | 收敛 Schedule 9F4C-C 后的历史状态表达 |
 | v0.58 | 2026-10-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 WTG-3C Canvas ordered cursor runner `wtg_canvas_stream.py`，同步 automation-design v2.8、实施计划 §6.84 与阶段报告；明确 runner 不执行 SQL、disposable PostgreSQL fixture 结果不代表目标库/production grants | Canvas stream 跨层切片达到需要可重放验证与审计留痕的档位 |
+| v0.59 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记 `phase9f4d_infrastructure_contract.py` 与 §4.52 focused Rust gates、8 个契约测试、文件日志/JSONL audit；同步实施计划 §6.86 与 Phase report；明确无 SQL/worker/provider/production execution 验收 | 9F4D-0 领域契约代码需要有界、可重放的独立验证入口 |
+| v0.60 | 2026-10-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F4D runner 的短 Cargo target 默认路径与 Windows MSVC LNK1104 复验，更新自动化设计 v2.10 和阶段报告链接；8/8 focused crate tests 保持通过，provider/admission 缺口不变 | 默认 runner 深层 Cargo target path 曾出现 LNK1104，调整为已复验短路径 |
 
 ---
 
