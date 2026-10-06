@@ -1,31 +1,42 @@
-//! @cypher schema=1 source_sha256=50a640bc928c2561f439dc18e2d7fa6951f87a1e6bb5926307395796efd5531e
+//! @cypher schema=1 source_sha256=385011e83241ec5cda254e5e0bc7f5a3b80270ad929d26ccd08c55fc22155528
 //! MERGE (self:File {path:"crates/domain-infrastructure/src/lib.rs"})
 //! MERGE (provider:Type {id:"crates/domain-infrastructure/src/lib.rs::ProviderKind",kind:"enum"})
+//! MERGE (placement:Type {id:"crates/domain-infrastructure/src/lib.rs::ClusterPlacementPolicyV1",kind:"enum"})
 //! MERGE (label:Type {id:"crates/domain-infrastructure/src/lib.rs::KubernetesDnsLabel",kind:"struct"})
 //! MERGE (budget:Type {id:"crates/domain-infrastructure/src/lib.rs::ExecutionResourceBudgetV1",kind:"struct"})
-//! MERGE (binding:Type {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1",kind:"struct"})
-//! MERGE (demand:Type {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV1",kind:"struct"})
+//! MERGE (binding:Type {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2",kind:"struct"})
+//! MERGE (demand:Type {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV2",kind:"struct"})
 //! MERGE (readiness_module:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::module",kind:"module"})
+//! MERGE (capacity_module:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::module",kind:"module"})
 //! MERGE (readiness_state:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessStateV1",kind:"enum"})
-//! MERGE (reservation_acceptance:Type {id:"crates/domain-infrastructure/src/readiness.rs::HostCapacityReservationAcceptanceV1",kind:"struct"})
-//! MERGE (readiness_evidence:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV1",kind:"struct"})
+//! MERGE (reservation_acceptance:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureCapacityReservationAcceptanceV2",kind:"struct"})
+//! MERGE (readiness_evidence:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessEvidenceV2",kind:"struct"})
 //! MERGE (readiness_error:Type {id:"crates/domain-infrastructure/src/readiness.rs::InfrastructureReadinessError",kind:"enum"})
 //! MERGE (readiness_gate:Symbol {id:"crates/domain-infrastructure/src/readiness.rs::validate_infrastructure_execution_readiness",kind:"function"})
+//! MERGE (capacity_evaluator:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::evaluate_infrastructure_capacity_candidate",kind:"function"})
+//! MERGE (capacity_snapshot:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureCapacitySnapshotV2",kind:"struct"})
+//! MERGE (capacity_request:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureCapacityRequestV2",kind:"struct"})
+//! MERGE (capacity_vector:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureResourceVectorV1",kind:"struct"})
+//! MERGE (capacity_candidate:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureCapacityCandidateV2",kind:"struct"})
+//! MERGE (capacity_error:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureCapacityEvaluationError",kind:"enum"})
+//! MERGE (capacity_add:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureResourceVectorV1::checked_add",kind:"function"})
+//! MERGE (capacity_sub:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureResourceVectorV1::checked_sub",kind:"function"})
 //! MERGE (error:Type {id:"crates/domain-infrastructure/src/lib.rs::InfrastructureContractError",kind:"enum"})
-//! MERGE (binding_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V1",kind:"constant"})
-//! MERGE (demand_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V1",kind:"constant"})
+//! MERGE (binding_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V2",kind:"constant"})
+//! MERGE (demand_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V2",kind:"constant"})
 //! MERGE (label_limit:Variable {id:"crates/domain-infrastructure/src/lib.rs::MAX_KUBERNETES_DNS_LABEL_BYTES",kind:"constant"})
 //! MERGE (hex_alphabet:Variable {id:"crates/domain-infrastructure/src/lib.rs::hex_bytes::HEX",kind:"constant"})
 //! MERGE (provider_wire:Symbol {id:"crates/domain-infrastructure/src/lib.rs::ProviderKind.wire_value",kind:"method"})
+//! MERGE (placement_wire:Symbol {id:"crates/domain-infrastructure/src/lib.rs::ClusterPlacementPolicyV1.wire_value",kind:"method"})
 //! MERGE (label_new:Symbol {id:"crates/domain-infrastructure/src/lib.rs::KubernetesDnsLabel.new",kind:"method"})
 //! MERGE (label_as_str:Symbol {id:"crates/domain-infrastructure/src/lib.rs::KubernetesDnsLabel.as_str",kind:"method"})
 //! MERGE (label_try_from:Symbol {id:"crates/domain-infrastructure/src/lib.rs::KubernetesDnsLabel.try_from",kind:"method"})
 //! MERGE (label_into_string:Symbol {id:"crates/domain-infrastructure/src/lib.rs::String.from",kind:"method"})
 //! MERGE (budget_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::ExecutionResourceBudgetV1.validate",kind:"method"})
-//! MERGE (binding_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1.validate",kind:"method"})
-//! MERGE (binding_digest:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV1.digest",kind:"method"})
-//! MERGE (demand_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV1.validate",kind:"method"})
-//! MERGE (dedupe_key:Symbol {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV1.deduplication_key",kind:"method"})
+//! MERGE (binding_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2.validate",kind:"method"})
+//! MERGE (binding_digest:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2.digest",kind:"method"})
+//! MERGE (demand_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV2.validate",kind:"method"})
+//! MERGE (dedupe_key:Symbol {id:"crates/domain-infrastructure/src/lib.rs::HostInfrastructureDemandV2.deduplication_key",kind:"method"})
 //! MERGE (hex_bytes:Symbol {id:"crates/domain-infrastructure/src/lib.rs::hex_bytes",kind:"function"})
 //! MERGE (test_id:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::id",kind:"function"})
 //! MERGE (valid_budget:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::valid_budget",kind:"function"})
@@ -36,28 +47,42 @@
 //! MERGE (binding_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::binding_requires_complete_non_nil_scope_and_revision",kind:"test"})
 //! MERGE (digest_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::binding_digest_changes_when_any_pinned_revision_changes",kind:"test"})
 //! MERGE (digest_stability_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::binding_digest_is_stable_and_covers_profile_digest_namespace_and_budget",kind:"test"})
+//! MERGE (placement_digest_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::binding_digest_covers_cluster_placement_policy",kind:"test"})
 //! MERGE (demand_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::demand_scope_and_budget_must_match_the_binding",kind:"test"})
 //! MERGE (idempotency_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::schedule_occurrence_is_the_idempotency_scope",kind:"test"})
 //! MERGE (schema_version_test:Symbol {id:"crates/domain-infrastructure/src/lib.rs::tests::contract_versions_are_explicit_and_reject_unknown_values",kind:"test"})
 //! MERGE (self)-[:DEFINES]->(provider)
+//! MERGE (self)-[:DEFINES]->(placement)
 //! MERGE (self)-[:DEFINES]->(label)
 //! MERGE (self)-[:DEFINES]->(budget)
 //! MERGE (self)-[:DEFINES]->(binding)
 //! MERGE (self)-[:DEFINES]->(demand)
 //! MERGE (self)-[:DEFINES]->(readiness_module)
+//! MERGE (self)-[:DEFINES]->(capacity_module)
 //! MERGE (self)-[:IMPORTS]->(readiness_module)
+//! MERGE (self)-[:IMPORTS]->(capacity_module)
 //! MERGE (self)-[:EXPOSES]->(readiness_gate)
+//! MERGE (self)-[:EXPOSES]->(capacity_evaluator)
 //! MERGE (readiness_module)-[:DEFINES]->(readiness_state)
 //! MERGE (readiness_module)-[:DEFINES]->(reservation_acceptance)
 //! MERGE (readiness_module)-[:DEFINES]->(readiness_evidence)
 //! MERGE (readiness_module)-[:DEFINES]->(readiness_error)
 //! MERGE (readiness_module)-[:DEFINES]->(readiness_gate)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_evaluator)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_snapshot)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_request)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_vector)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_candidate)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_error)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_add)
+//! MERGE (capacity_module)-[:DEFINES]->(capacity_sub)
 //! MERGE (self)-[:DEFINES]->(error)
 //! MERGE (self)-[:DEFINES]->(binding_schema_version)
 //! MERGE (self)-[:DEFINES]->(demand_schema_version)
 //! MERGE (self)-[:DEFINES]->(label_limit)
 //! MERGE (self)-[:DEFINES]->(hex_alphabet)
 //! MERGE (self)-[:DEFINES]->(provider_wire)
+//! MERGE (self)-[:DEFINES]->(placement_wire)
 //! MERGE (self)-[:DEFINES]->(label_new)
 //! MERGE (self)-[:DEFINES]->(label_as_str)
 //! MERGE (self)-[:DEFINES]->(label_try_from)
@@ -85,8 +110,10 @@
 //! MERGE (binding_digest)-[:CALLS]->(hex_bytes)
 //! MERGE (binding_digest)-[:CALLS]->(label_as_str)
 //! MERGE (binding_digest)-[:CALLS]->(provider_wire)
+//! MERGE (binding_digest)-[:CALLS]->(placement_wire)
 //! MERGE (demand_validate)-[:CALLS]->(binding_validate)
 //! MERGE (demand_validate)-[:CALLS]->(budget_validate)
+//! MERGE (binding)-[:USES_TYPE]->(placement)
 //! MERGE (binding_validate)-[:USES]->(binding_schema_version)
 //! MERGE (demand_validate)-[:USES]->(demand_schema_version)
 //! MERGE (valid_binding)-[:CALLS]->(label_new)
@@ -104,6 +131,8 @@
 //! MERGE (digest_test)-[:CALLS]->(valid_binding)
 //! MERGE (digest_stability_test)-[:CALLS]->(binding_digest)
 //! MERGE (digest_stability_test)-[:CALLS]->(valid_binding)
+//! MERGE (placement_digest_test)-[:CALLS]->(binding_digest)
+//! MERGE (placement_digest_test)-[:CALLS]->(valid_binding)
 //! MERGE (demand_test)-[:CALLS]->(valid_demand)
 //! MERGE (demand_test)-[:CALLS]->(demand_validate)
 //! MERGE (idempotency_test)-[:CALLS]->(valid_demand)
@@ -131,9 +160,20 @@
 //! MERGE (readiness_gate)-[:USES_TYPE]->(readiness_state)
 //! MERGE (readiness_gate)-[:USES_TYPE]->(reservation_acceptance)
 //! MERGE (readiness_gate)-[:USES_TYPE]->(readiness_evidence)
+//! MERGE (capacity_evaluator)-[:CALLS]->(demand_validate)
+//! MERGE (capacity_evaluator)-[:CALLS]->(capacity_add)
+//! MERGE (capacity_evaluator)-[:CALLS]->(capacity_sub)
+//! MERGE (capacity_evaluator)-[:USES_TYPE]->(capacity_snapshot)
+//! MERGE (capacity_evaluator)-[:USES_TYPE]->(capacity_request)
+//! MERGE (capacity_evaluator)-[:USES_TYPE]->(capacity_candidate)
+//! MERGE (capacity_evaluator)-[:USES_TYPE]->(capacity_error)
+//! MERGE (capacity_snapshot)-[:USES_TYPE]->(capacity_vector)
+//! MERGE (capacity_request)-[:USES_TYPE]->(capacity_vector)
+//! MERGE (capacity_candidate)-[:USES_TYPE]->(capacity_vector)
 //! @endcypher
 
-//! Versioned domain contracts for shared Host/K3s infrastructure admission.
+//! Versioned Run binding, demand, readiness, and capacity contracts for Multipass-managed
+//! multi-cluster K3s infrastructure admission.
 //!
 //! These types contain only authorization-scoped identifiers, pinned revisions,
 //! bounded resource values, and readiness-independent demand facts. They do not
@@ -145,27 +185,33 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
+mod capacity;
 mod readiness;
 
+pub use capacity::{
+    evaluate_infrastructure_capacity_candidate, InfrastructureCapacityCandidateV2,
+    InfrastructureCapacityEvaluationError, InfrastructureCapacityRequestV2,
+    InfrastructureCapacitySnapshotV2, InfrastructureResourceVectorV1,
+};
 pub use readiness::{
-    validate_infrastructure_execution_readiness, HostCapacityReservationAcceptanceV1,
-    InfrastructureReadinessError, InfrastructureReadinessEvidenceV1,
+    validate_infrastructure_execution_readiness, InfrastructureCapacityReservationAcceptanceV2,
+    InfrastructureReadinessError, InfrastructureReadinessEvidenceV2,
     InfrastructureReadinessStateV1,
 };
 
 const MAX_KUBERNETES_DNS_LABEL_BYTES: usize = 63;
 
 /// Wire schema version for the Run infrastructure binding snapshot.
-pub const RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V1: u16 = 1;
+pub const RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V2: u16 = 2;
 /// Wire schema version for Host infrastructure demand events.
-pub const HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V1: u16 = 1;
+pub const HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V2: u16 = 2;
 
 /// A provider profile supported by the versioned infrastructure contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderKind {
-    /// A shared Linux guest managed by Multipass with K3s running inside it.
-    MultipassK3sGuest,
+    /// A K3s cluster whose one or more Linux guest nodes are managed by Multipass.
+    MultipassK3sCluster,
     /// A separately configured remote Linux K3s provider.
     RemoteK3s,
 }
@@ -173,8 +219,30 @@ pub enum ProviderKind {
 impl ProviderKind {
     fn wire_value(self) -> &'static str {
         match self {
-            Self::MultipassK3sGuest => "multipass_k3s_guest",
+            Self::MultipassK3sCluster => "multipass_k3s_cluster",
             Self::RemoteK3s => "remote_k3s",
+        }
+    }
+}
+
+/// Profile strategy used to resolve the exact K3s cluster pinned by a Run binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterPlacementPolicyV1 {
+    /// Select an eligible cluster from a configured shared pool.
+    SharedPool,
+    /// Allocate a cluster dedicated to the Run.
+    RunDedicated,
+    /// Use the exact cluster selected by the profile.
+    PinnedCluster,
+}
+
+impl ClusterPlacementPolicyV1 {
+    fn wire_value(self) -> &'static str {
+        match self {
+            Self::SharedPool => "shared_pool",
+            Self::RunDedicated => "run_dedicated",
+            Self::PinnedCluster => "pinned_cluster",
         }
     }
 }
@@ -270,7 +338,7 @@ impl ExecutionResourceBudgetV1 {
 /// Immutable Run-scoped infrastructure identity captured during admission.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RunInfrastructureBindingSnapshotV1 {
+pub struct RunInfrastructureBindingSnapshotV2 {
     /// Explicit wire schema version; readers reject values they do not support.
     pub schema_version: u16,
     /// Tenant that owns this binding.
@@ -285,8 +353,14 @@ pub struct RunInfrastructureBindingSnapshotV1 {
     pub binding_id: Uuid,
     /// Monotonic binding revision.
     pub binding_revision: i64,
-    /// Shared HostEnvironment identity; this is not a Multipass instance name.
+    /// HostEnvironment identity; this is not a Multipass instance or K3s cluster identity.
     pub host_environment_id: Uuid,
+    /// Exact K3s cluster selected by the resolved Infrastructure Profile.
+    pub k3s_cluster_id: Uuid,
+    /// Provider-owned generation of that cluster; replacement/rebuild invalidates the binding.
+    pub k3s_cluster_generation: i64,
+    /// Explicit profile strategy that resolved the exact cluster above.
+    pub cluster_placement_policy: ClusterPlacementPolicyV1,
     /// Provider selected by the current binding.
     pub provider: ProviderKind,
     /// Immutable provider-profile identity and revision.
@@ -309,10 +383,10 @@ pub struct RunInfrastructureBindingSnapshotV1 {
     pub resource_budget: ExecutionResourceBudgetV1,
 }
 
-impl RunInfrastructureBindingSnapshotV1 {
+impl RunInfrastructureBindingSnapshotV2 {
     /// Validate the complete tenant/Project/Branch/Run and provider snapshot.
     pub fn validate(&self) -> Result<(), InfrastructureContractError> {
-        if self.schema_version != RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V1 {
+        if self.schema_version != RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V2 {
             return Err(InfrastructureContractError::UnsupportedSchemaVersion);
         }
         if [
@@ -322,12 +396,14 @@ impl RunInfrastructureBindingSnapshotV1 {
             self.engineering_run_id,
             self.binding_id,
             self.host_environment_id,
+            self.k3s_cluster_id,
             self.provider_profile_id,
             self.runtime_profile_id,
         ]
         .iter()
         .any(Uuid::is_nil)
             || self.binding_revision <= 0
+            || self.k3s_cluster_generation <= 0
             || self.provider_profile_revision <= 0
             || self.runtime_profile_revision <= 0
         {
@@ -348,6 +424,9 @@ impl RunInfrastructureBindingSnapshotV1 {
             self.binding_id.to_string(),
             self.binding_revision.to_string(),
             self.host_environment_id.to_string(),
+            self.k3s_cluster_id.to_string(),
+            self.k3s_cluster_generation.to_string(),
+            self.cluster_placement_policy.wire_value().to_owned(),
             self.provider.wire_value().to_owned(),
             self.provider_profile_id.to_string(),
             self.provider_profile_revision.to_string(),
@@ -367,7 +446,7 @@ impl RunInfrastructureBindingSnapshotV1 {
             self.resource_budget.max_event_buffer_bytes.to_string(),
         ];
         let mut hasher = Sha256::new();
-        hasher.update(b"star.run-infrastructure-binding.v1");
+        hasher.update(b"star.run-infrastructure-binding.v2");
         hasher.update([0]);
         for field in fields {
             hasher.update((field.len() as u64).to_be_bytes());
@@ -377,10 +456,10 @@ impl RunInfrastructureBindingSnapshotV1 {
     }
 }
 
-/// Versioned Run-owner event asking Infrastructure to reserve shared Host capacity.
+/// Versioned Run-owner event asking Infrastructure to reserve the bound Host and cluster capacity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct HostInfrastructureDemandV1 {
+pub struct HostInfrastructureDemandV2 {
     /// Explicit wire schema version; consumers reject values they do not support.
     pub schema_version: u16,
     /// Unique Outbox event identity.
@@ -404,7 +483,7 @@ pub struct HostInfrastructureDemandV1 {
     /// Occurrence identity; (tenant_id, occurrence_id) is the consumer idempotency scope.
     pub occurrence_id: Uuid,
     /// Immutable binding selected for this trigger/retry/resume.
-    pub binding: RunInfrastructureBindingSnapshotV1,
+    pub binding: RunInfrastructureBindingSnapshotV2,
     /// Requested and reserved Run-scoped capacity.
     pub resource_budget: ExecutionResourceBudgetV1,
     /// Time this owner committed the demand.
@@ -413,10 +492,10 @@ pub struct HostInfrastructureDemandV1 {
     pub deadline_at: DateTime<Utc>,
 }
 
-impl HostInfrastructureDemandV1 {
+impl HostInfrastructureDemandV2 {
     /// Validate scope, idempotency identity, immutable binding, and deadline.
     pub fn validate(&self) -> Result<(), InfrastructureContractError> {
-        if self.schema_version != HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V1 {
+        if self.schema_version != HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V2 {
             return Err(InfrastructureContractError::UnsupportedSchemaVersion);
         }
         if [
@@ -492,8 +571,9 @@ fn hex_bytes(value: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecutionResourceBudgetV1, HostInfrastructureDemandV1, InfrastructureContractError,
-        KubernetesDnsLabel, ProviderKind, RunInfrastructureBindingSnapshotV1,
+        ClusterPlacementPolicyV1, ExecutionResourceBudgetV1, HostInfrastructureDemandV2,
+        InfrastructureContractError, KubernetesDnsLabel, ProviderKind,
+        RunInfrastructureBindingSnapshotV2,
     };
     use chrono::{Duration, TimeZone, Utc};
     use uuid::Uuid;
@@ -515,9 +595,9 @@ mod tests {
         }
     }
 
-    fn valid_binding() -> RunInfrastructureBindingSnapshotV1 {
-        RunInfrastructureBindingSnapshotV1 {
-            schema_version: 1,
+    fn valid_binding() -> RunInfrastructureBindingSnapshotV2 {
+        RunInfrastructureBindingSnapshotV2 {
+            schema_version: 2,
             tenant_id: id(1),
             project_id: id(2),
             branch_id: id(3),
@@ -525,7 +605,10 @@ mod tests {
             binding_id: id(5),
             binding_revision: 1,
             host_environment_id: id(6),
-            provider: ProviderKind::MultipassK3sGuest,
+            k3s_cluster_id: id(14),
+            k3s_cluster_generation: 2,
+            cluster_placement_policy: ClusterPlacementPolicyV1::SharedPool,
+            provider: ProviderKind::MultipassK3sCluster,
             provider_profile_id: id(7),
             provider_profile_revision: 3,
             provider_profile_digest: [0x11; 32],
@@ -538,9 +621,9 @@ mod tests {
         }
     }
 
-    fn valid_demand() -> HostInfrastructureDemandV1 {
-        HostInfrastructureDemandV1 {
-            schema_version: 1,
+    fn valid_demand() -> HostInfrastructureDemandV2 {
+        HostInfrastructureDemandV2 {
+            schema_version: 2,
             event_id: id(9),
             correlation_id: id(10),
             tenant_id: id(1),
@@ -615,6 +698,18 @@ mod tests {
             binding.validate(),
             Err(InfrastructureContractError::InvalidBindingIdentity)
         );
+        binding = valid_binding();
+        binding.k3s_cluster_id = Uuid::nil();
+        assert_eq!(
+            binding.validate(),
+            Err(InfrastructureContractError::InvalidBindingIdentity)
+        );
+        binding = valid_binding();
+        binding.k3s_cluster_generation = 0;
+        assert_eq!(
+            binding.validate(),
+            Err(InfrastructureContractError::InvalidBindingIdentity)
+        );
     }
 
     #[test]
@@ -623,6 +718,14 @@ mod tests {
         let original = binding.digest().unwrap();
         let mut changed = binding;
         changed.provider_profile_revision += 1;
+        assert_ne!(original, changed.digest().unwrap());
+        let binding = valid_binding();
+        let original = binding.digest().unwrap();
+        let mut changed = binding.clone();
+        changed.k3s_cluster_id = id(99);
+        assert_ne!(original, changed.digest().unwrap());
+        let mut changed = binding;
+        changed.k3s_cluster_generation += 1;
         assert_ne!(original, changed.digest().unwrap());
     }
 
@@ -642,6 +745,15 @@ mod tests {
 
         let mut changed = binding;
         changed.resource_budget.max_output_bytes += 1;
+        assert_ne!(original, changed.digest().unwrap());
+    }
+
+    #[test]
+    fn binding_digest_covers_cluster_placement_policy() {
+        let binding = valid_binding();
+        let original = binding.digest().unwrap();
+        let mut changed = binding;
+        changed.cluster_placement_policy = ClusterPlacementPolicyV1::PinnedCluster;
         assert_ne!(original, changed.digest().unwrap());
     }
 
@@ -677,18 +789,18 @@ mod tests {
     #[test]
     fn contract_versions_are_explicit_and_reject_unknown_values() {
         let mut binding = valid_binding();
-        assert_eq!(binding.schema_version, 1);
+        assert_eq!(binding.schema_version, 2);
         assert!(binding.validate().is_ok());
-        binding.schema_version = 2;
+        binding.schema_version = 1;
         assert_eq!(
             binding.validate(),
             Err(InfrastructureContractError::UnsupportedSchemaVersion)
         );
 
         let mut demand = valid_demand();
-        assert_eq!(demand.schema_version, 1);
+        assert_eq!(demand.schema_version, 2);
         assert!(demand.validate().is_ok());
-        demand.schema_version = 2;
+        demand.schema_version = 1;
         assert_eq!(
             demand.validate(),
             Err(InfrastructureContractError::UnsupportedSchemaVersion)

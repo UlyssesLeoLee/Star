@@ -1,11 +1,11 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.09**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.14**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 日期：2026-10-06
-> - 基础设施架构决策与实现边界：Multipass 为本地/CI Linux guest 与 guest K3s 的首选 VM 管理路径；Host/environment 共享 VM/control plane，Rust Infrastructure Manager 独占受限 provider adapter；Worktree 通过显式、受授权 workspace bridge 进入 guest。`domain-infrastructure` 已实现 Run binding/Host demand 的纯 Rust v1 领域契约；权威 resolver、owner persistence、VM/K3s provider、sandbox、运行性能仍未实现或验收。
+> - 日期：2026-10-07
+> - 基础设施架构决策与实现边界：Multipass 为本地/CI 多 Linux guest 与 K3s cluster 的首选 VM 管理路径；HostEnvironment/instance/cluster/node 分层，Run 绑定精确 cluster ID/generation，placement 与 Host/cluster 双容量由版本化 Infrastructure Profile/owner ledger 决定；当前测试阶段已登记实例总数上限为 2，含 Stopped/Deleted 记录。测试 bootstrap 用 host-local 独占锁串行化 inventory 检查与 launch；权威 Rust Manager/provider 尚未实现，因此 live test 创建必须走该受控路径。Rust Infrastructure Manager 独占受限 provider adapter；Worktree 通过显式、受授权 workspace bridge 进入 guest。`domain-infrastructure` 已实现 Run binding/demand/readiness/capacity 的纯 Rust v2 contracts；权威 resolver、owner persistence、VM/K3s provider、sandbox、运行性能仍未实现或验收。
 > - 本轮设计更新：主导航调整为 Project → Cloud Branch → Engineering Run；Run 管理分支内本地 Worktree，并提供 Inbox、Work Item/Multica/Jira、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps。选中 Worktree 只设置当前 focus/CLI checkout target；Run apps 的授权与数据 owner 由 RunContext 决定。新增面向 API-first bounded contexts、同域存储原子操作、跨域 Outbox/Inbox、可证据驱动服务提取、Kafka/Fluvio 评估及 Rust 桌面性能的实施边界；Phase 1已实施目录schema/read API与条件式主树/context shell基础；Run Task Cards 有只读 UI/API client 代码切片；旧 Tauri 桌面端 Task mock/fallback 已退役。宿主 Auth Provider、服务端 capability、目标 DB/RLS 未就绪，其它 Run Apps/生产执行闭环与服务提取仍待完成。
 > - 本轮补充：生产 Project 选择通过当前 actor 的服务端 membership 目录加载；API session generation 切换时同步隐藏旧 Project/Index/member-role 投影；分页与深链权限状态均 fail closed，缺失 Project 名称 SoR 时不借本地 seed 补名。
 > - Phase 8 更新：Run migration 在隔离临时 PostgreSQL 重复应用并通过 6 张表 FORCE RLS 检查，目标 DB/runtime grants 未部署；CLI Run writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已形成条件式代码切片；Contract 写命令、完整事件/Evidence producer、真实 Runtime 与目标环境端到端验收仍未完成。
@@ -24,10 +24,10 @@
 > - Phase 9F4B 状态：规则创建者固定为 `run_as_actor_id`，认证创建者派生身份且所有 successor revision 继承；additive migration 对历史行按最早版本 `changed_by` 回填，并以数据库 trigger 防止身份替换；domain occurrence snapshot 随规则快照携带该主体。每次定时触发/重试/恢复仍须由未来 worker 复验该主体当前 Project binding 与 Engineering Run grant，撤权或 ACL 不可确认时 fail closed。此阶段没有启用 worker、Run admission 或 Launch Profile authority；详见 §6.78 和 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。
 > - Phase 9F4B 状态：规则创建者固定为 `run_as_actor_id`，认证创建者派生身份且所有 successor revision 继承；additive migration 对历史行按最早版本 `changed_by` 回填，并以数据库 trigger 防止身份替换；domain occurrence snapshot 随规则快照携带该主体。每次定时触发/重试/恢复仍须由未来 worker 复验该主体当前 Project binding 与 Engineering Run grant，撤权或 ACL 不可确认时 fail closed。此阶段没有启用 worker、Run admission 或 Launch Profile authority；详见 §6.78 和 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。
 > - Phase 9F4C 状态：9F4C-B Rule enable-time 授权已由 SCHED-API-015 / 9F4C-C 补上 Project-scoped transaction lock：授权 helper 获锁后，API 下一 SQL statement 重读 Project/Branch/Run grants；对应 grant mutation triggers 共用锁。PostgreSQL 18.6 双连接测试证明三类撤权等待已持锁授权事务，授权提交后撤权完成且后续授权 fail closed。完整 REST write rollback 与 target grants仍未完成；worker 每次 trigger/retry/resume reauthorization、原子 Run admission 保持 fail closed，见 §6.82。
-> - Phase 9F4D 状态：双 owner 事务边界仍为设计要求；`domain-infrastructure` 已提供并定向验证 v1 binding/demand 与 Host reservation/readiness gate，并通过 Rust 1.98.1 focused gates（15/15 tests）。Gate 绑定 Manager receipt、Multipass daemon/owned guest（remote K3s 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge、Host generation 和 30 秒新鲜度；它不解析实时 ACL/Run binding、不持久化 owner reservation、不连接 Inbox/Outbox、worker 或真实 Multipass Manager/provider；执行保持 fail closed，见 §6.85-§6.88。
-> - 关联需求：docs/requirements.md v5.81 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.15（9F4A/9F4B/9F4C/9F4D 增量）。
-> - 关联基本设计：docs/basic-design.md v5.78 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.15（9F4D 增量）。
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.56、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.15、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.11；Data Design v1.7。
+> - Phase 9F4D 状态：双 owner 事务边界仍为设计要求；`domain-infrastructure` 已提供并定向验证 V2 binding/demand/capacity/readiness contracts 与 Host reservation/readiness gate，并通过 Rust 1.98.1 focused gates（27/27 tests）。Gate 绑定 Manager receipt、Multipass daemon/owned guest（remote K3s 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge、Host generation 和 30 秒新鲜度；它不解析实时 ACL/Run binding、不持久化 owner reservation、不连接 Inbox/Outbox、worker 或真实 Multipass Manager/provider；执行保持 fail closed，见 §6.85-§6.89。
+> - 关联需求：docs/requirements.md v5.84 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.18（9F4A/9F4B/9F4C/9F4D 增量）。
+> - 关联基本设计：docs/basic-design.md v5.82 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.18（9F4D 增量）。
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.58、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.18、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.14；Data Design v1.7。
 
 ---
 
@@ -966,7 +966,7 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 ### 6.69 Rust Infrastructure / k3s 配套阶段（2026-10-02）
 
-本节保留当日的初始方案与版本快照；当前首选架构、实施拆分、证据与验收状态以 §6.83 与 DD-LOCAL-INFRASTRUCTURE-001 v0.10 为准。
+本节保留当日的初始方案与版本快照；当前首选架构、实施拆分、证据与验收状态以 §6.83 与 DD-LOCAL-INFRASTRUCTURE-001 v0.14 为准。
 
 按 DD-LOCAL-INFRASTRUCTURE-001 v0.4 实施 INFRA-1 license-obligation/SBOM/活跃社区/capability/provider/profile/binding+真实 discover → INFRA-2 Multipass 跨平台 lifecycle/readiness（现有 provider 探测、安装引导、符合许可义务后的受管安装/捆绑；按稳定版逐 OS capability，unsupported host 用 Podman/Incus/Lima/remote Linux adapter）→ INFRA-3 Run namespace/least-privilege/quota/Runtime wiring → INFRA-4 可替换 adapters → INFRA-5 商业发行义务履行、固定负载 RSS/p95/并行/故障验收。产品不按用途/行业/规模/席位/用量/商业 tier 封锁核心能力；CPU/内存配额仅用于实际宿主容量和安全准入，不是商业计划限制。基础设施按需共享，VM/control-plane 不随 Worktree 数复制。K3s readiness 与安全 Agent 执行是不同门。
 
@@ -1123,7 +1123,7 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | 工作项 | 设计决定 | 后续实现/验收门 | 当前状态 |
 |---|---|---|---|
 | 首选 VM provider | Multipass 管理本地和 CI Linux guest；K3s 在 guest 内运行。Podman machine/Incus/Lima 是 capability-negotiated fallback，用户自有/远端 K3s 是独立 provider | 逐 OS、Multipass stable version 与实际 driver probe；安装/升级必须履行完整依赖 SBOM 和对应 GPLv3 发行义务 | 🟡 宿主 PoC 已在 Windows 11 Home + Multipass 1.17.0-rc1/HCS + Ubuntu/K3s 验证；Star adapter/通用 provider API 未实现 |
-| Worktree/Run 拓扑 | 每 Host/environment 默认共享一套按需 VM 与 K3s server；Project/Run 用 namespace、身份、quota/network policy 隔离；不按 Worktree/Agent 复制 VM/control plane | Host reserve、Multipass 已分配值与外部负载参与 admission；capacity unknown/不足时拒绝；扩展 K3s agent 节点必须由 profile 和预算明确授权 | 🟡 目标架构；没有 reservation/provisioner/runtime evidence |
+| Worktree/Run 拓扑 | Host/environment 可共享按需 Multipass VM 和宿主容量；K3s cluster 数量与 Run placement 由版本化 Profile 显式决定，不预设单共享 cluster；Project/Run 使用 namespace、identity、quota/network policy 隔离；VM 不按 Worktree/Agent 复制 | Host reserve、Multipass 已分配值与外部负载参与 admission；capacity unknown/不足时拒绝；扩展 K3s agent 节点必须由 profile 和预算明确授权 | 🟡 目标架构；没有 reservation/provisioner/runtime evidence |
 | Manager/信任边界 | Rust Host Infrastructure Manager 是唯一 Multipass adapter caller，以 argv allowlist、bounded process IO/deadline、ownership ledger、typed IPC 与幂等 operation receipt 管理实例；GUI 不提权，Plugin/Agent/Task CLI 不得获得 daemon/socket/host shell | 固定命令/schema allowlist、external instance negative tests、ACL/revocation/native Hook/audit/outbox；只允许固定 guest readiness probe 调用；支持该命令的 Multipass 版本中，`wait-ready` 仅表示 daemon 可接收命令；禁止任意 shell/mount/exec、全局 `purge` / `delete --all`，单实例 `delete --purge` 须精确 owner 匹配并通过 drain/lease/retention/Hook/二次授权 | 🟡 安全设计已确定；管理权限与 adapter 未实现 |
 | Worktree guest workspace | Worktree focus 经当前 authorization/owner resolver 生成窄 workspace bridge，首选有界文件同步或 guest checkout；默认不使用可写 host mount | 验收真实路径/symlink 越界、scope revision 变化、取消与导出；无满足 trust capability 时卡内 CLI fail closed | 🟡 设计已加入；未实现 bridge 或 sandbox |
 | 资源/性能 | 测量桌面进程树、Multipass VM、K3s/containerd、Agent workload、CPU/IO/存储、冷启动与多 Agent 公平性；K3s upstream profile 不直接当商业产品预算 | 固定设备/负载的 RSS/p95 基线、背压/公平 admission、取消/drain、磁盘满/断网恢复以及 CI 与用户环境隔离 | 🟡 未运行 VM 或性能基准；profile 上限仍 TBD-MEASURE |
@@ -1141,17 +1141,17 @@ dev 已有的宿主 Multipass/K3s/GitOps 实跑见 `docs/reports/PHASE-MULTIPASS
 
 此次 stream cursor 同步 requirements v5.75、basic design v5.72、Data Design v1.6、Group DD v4.50 与本节；阶段验证摘要见 [`PHASE-WTG-3C-CANVAS-STREAM-REPORT.md`](../reports/PHASE-WTG-3C-CANVAS-STREAM-REPORT.md)。并发顺序依赖唯一 Outbox writer 全部经 `append_event` 并取得同一 transaction advisory lock；当前源码检查到该写入口仅一处，disposable PostgreSQL 18.6 双连接 fixture 已验证 advisory wait/offset 顺序及 1s lock timeout fail-closed。目标数据库、正式 runtime 权限和真实服务链仍未验收。
 
-### 6.85 Phase 9F4D Schedule admission 继承 Multipass/K3s Run binding 与双 owner reservation（2026-10-06）
+### 6.85 Phase 9F4D Schedule admission 继承 Multipass/K3s Run binding 与双 owner reservation（2026-10-06 historical v1 design snapshot; superseded by §6.89）
 
 | 工作项 | 设计与实施边界 | 后续实现/验收门 | 当前状态 |
 |---|---|---|---|
 | Run 基础设施绑定 | 每次 trigger/retry/resume 从 canonical Project/Branch/Engineering Run 解析当前 `RunInfrastructureBinding` 与 provider/profile revision；Schedule Rule 不 pin VM。v1 typed snapshot 已含 scope、binding/profile/runtime revisions/digests、namespace/service account 与预算，并提供全字段确定性 digest | 需 authoritative binding resolver、当前 run-as/target/Profile/HookSet recheck、schema 与 TaskExecutionRun canonical writer；binding 变更/撤销与重放测试 | 🟡 纯 Rust 契约完成；实时解析、授权与持久化未实现 |
 | admission 与容量 | Run/Execution owner 最后复验 creator run-as ACL、target/Profile/HookSet、RunInfrastructureBinding、occurrence fence 与 Project/Run quota；同事务创建 non-executing TaskExecutionRun、Project/Run Reservation、RunEvents、occurrence link 与 Schedule Run Outbox，并在自身 Outbox 发 Host demand | rollback/replay 只覆盖一个 owner transaction；Run owner 不预留 Infrastructure Host capacity，不跨 owner 写表 | 🔴 writer 和真实 DB grant/并发用例未实现，Schedule capability 关闭 |
-| Multipass 与 K3s handoff | Infrastructure owner 经自己的 Inbox/owner transaction 幂等检查共享 Host headroom，持有/拒绝 Host capacity reservation，再异步把操作交给可信 Rust Host Infrastructure Manager | 不共用 Run DB transaction；记录 reservation/operation receipt/outbox，并通过 owner event 回传结果；未知/不足容量不启动 executor | 🔴 Host reservation store、Inbox consumer、Manager/provider 与目标 DB/RLS 未实现 |
-| 执行启动门 | Run 可处于 awaiting_infrastructure；启动前再验证 ACL、binding revision、Project/Run reservation、Infra owner Host reservation acceptance、owned VM、K3s API/node/CRI 和独立 AgentRuntime sandbox | 释放 DB locks 后执行 VM lifecycle；处理 stale response、撤权、取消/drain、capacity unknown、lease/deadline 与 owner-side reservation cleanup | 🔴 worker/runtime 尚未连接，Schedule capability 关闭 |
-| 文档同步 | requirements v5.77 AC-LOOP-010/§50.8I、basic v5.74 §16.28、Group DD v4.52 §8.12、Schedule API SRS/BD/DD v0.14、Data Design v1.7 与 Infrastructure DD v0.10 | 对账两个 reservation owner、Outbox/Inbox、W/T/M、现有 Project Reservation terminal cleanup gap 与未验证的 admission-lock pruning worker；实现和目标环境验收未完成 | 🟡 领域契约已与需求/基本/详细设计同步；owner stores、worker/provider 和目标门仍开放 |
+| Multipass 与 K3s handoff | Infrastructure owner 经自己的 Inbox/owner transaction 幂等检查 Host 与被选中 K3s cluster headroom，持有/拒绝两级 capacity reservations，再异步把操作交给可信 Rust Host Infrastructure Manager | 不共用 Run DB transaction；记录双 reservation/operation receipt/outbox，并通过 owner event 回传结果；任一层未知/不足不启动 executor | 🔴 Host/cluster reservation stores、Inbox consumer、Manager/provider 与目标 DB/RLS 未实现 |
+| 执行启动门 | Run 可处于 awaiting_infrastructure；启动前再验证 ACL、placement、binding/cluster generation、Project/Run reservation、Infra owner 双 reservation acceptance、目标 cluster 全部 owned guests、K3s API/node/CRI 和独立 AgentRuntime sandbox | 释放 DB locks 后执行 VM lifecycle；处理 stale response、撤权、取消/drain、任一层 capacity unknown、lease/deadline 与 owner-side reservation cleanup | 🔴 worker/runtime 尚未连接，Schedule capability 关闭 |
+| 文档同步 | 该阶段原始记录基于 requirements v5.77/基本设计 v5.74/Group DD v4.52/Schedule API v0.14/Infrastructure DD v0.10；当前验收版本以实施计划 v6.12、requirements v5.84、basic v5.81、Schedule API v0.18、Group DD v4.58 与 Infrastructure DD v0.14 为准 | 对账两个 owner、Outbox/Inbox、W/T/M、现有 Project Reservation terminal cleanup gap 与未验证 admission-lock pruning worker；实现和目标环境验收未完成 | 🟡 typed contracts 已与当前需求/设计同步；owner stores、worker/provider 和目标门仍开放 |
 
-### 6.86 Phase 9F4D-0 Rust Run binding / Host demand domain contract（2026-10-06）
+### 6.86 Phase 9F4D-0 Rust Run binding / Host demand domain contract（2026-10-06 historical v1 snapshot; superseded by §6.89）
 
 | 工作项 | 实施内容与验证 | 尚未关闭的门 | 当前状态 |
 |---|---|---|---|
@@ -1173,9 +1173,11 @@ dev 已有的宿主 Multipass/K3s/GitOps 实跑见 `docs/reports/PHASE-MULTIPASS
 
 本次实现的是双 owner 通信契约基础，不实现 occurrence worker、Run writer、Infrastructure consumer、Multipass provider 或性能验收，也不改变宿主 VM/K3s。工程执行仍保持 fail closed。
 
+此表保留该阶段当时 v1 wire contract 的验证事实；多集群方向确定后，活动契约已升级为 V2 并 pin exact cluster ID/generation，历史 v1 描述不得作为当前 topology 或 wire schema。
+
 阶段证据：[`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md)。
 
-### 6.88 Phase 9F4D-1 Host/provider readiness evidence gate（2026-10-06）
+### 6.88 Phase 9F4D-1 Host/provider readiness evidence gate（2026-10-06 historical snapshot）
 
 | 项目 | 结果 |
 |---|---|
@@ -1183,6 +1185,18 @@ dev 已有的宿主 Multipass/K3s/GitOps 实跑见 `docs/reports/PHASE-MULTIPASS
 | 证据 | Rust 1.98.1 focused runner：rustfmt（lib.rs + readiness.rs）、cargo check --all-targets -j 4、warnings-as-errors Clippy 与测试均通过，15/15 crate tests。首次 worktree target 出现 MSVC LNK1104；短 target C:\\t\\star9f4d-20261006 重跑通过。 |
 | 文档 | 同步 requirements v5.81、basic v5.78、Group DD v4.56、Schedule SRS/BD/DD v0.15、Infrastructure DD v0.11、Automation Design v2.11、registry v0.61 与本报告。 |
 | 未完成 | 没有 provider evidence producer、Multipass adapter/manager、owner reservation store/Inbox/Outbox consumer、Run admission/start writer、current ACL resolver、目标 DB/RLS、worker、BI 或生产 executor；Schedule 保持 fail closed。基础设施 DB cleanup/reconciliation、VM/K3s 真实启动与性能/并行公平验收未关闭。 |
+
+### 6.89 Phase 9F4D-2 Multipass multi-cluster binding 与双层容量（2026-10-07）
+Completion correction: binding V2 now carries ClusterPlacementPolicyV1 and includes it in the digest; Host and selected-cluster reservations have distinct IDs that readiness evidence must match exactly. The test-phase cap is two registered Multipass instances total, including stopped/recoverable records; the bootstrap uses a host-local exclusive lock around inventory check plus launch, and never auto-purges. Four Rust gates and 27/27 tests pass, while resolver, owner ledgers, worker, provider, and production execution remain open.
+
+
+| 工作项 | 本阶段基线/实现 | 验收与未关闭门 | 状态 |
+|---|---|---|---|
+| 拓扑和 placement | HostEnvironment → Multipass instances → K3s clusters → Kubernetes nodes；Infrastructure Profile 显式选择 shared pool、Run dedicated 或 pinned cluster；无策略 fail closed。Run binding/demand/readiness 精确固定 cluster ID/generation。 | 多实例属于管理拓扑，单个 cluster 可跨多个 owned guests/nodes；不得把 Docker Desktop、默认单共享 cluster 或每 Run 一个 VM 当产品前提。 | 🟡 V2 typed contract 已实现；Profile resolver/owner ledger/Manager 未实现 |
+| Capacity and readiness | Host plus exact-cluster snapshot/request/candidate evaluates both ledgers; exact target generations are pinned. | Pure candidate is advisory only; Infrastructure owner persistence and provider remain open. | 🟢 Four focused Rust gates and 27/27 crate tests. |
+| 测试资源限制 | 本多集群测试阶段最多保留 2 个已登记 Multipass instance，包含 Stopped/Deleted 记录；契约单测不启动 VM。 | Bootstrap 以 host-local 独占锁覆盖完整 inventory 检查和 launch；达到上限或解析失败时拒绝创建，不自动 recover/purge。其他 live test launch 必须走此受控路径；此 cap 是临时测试磁盘约束，不是客户环境 topology 上限。 | 🔒 阶段硬上限；未创建或变更任何 VM |
+| Cross-layer documents | requirements v5.85; basic v5.82; Group DD v4.59; DUKOU direction v1.7; Schedule SRS/BD/DD v0.18; Infrastructure DD v0.14; Automation Design v2.14; registry v0.63; phase report linked. | Active design references are current; history notes preserve earlier architecture facts. | 🟢 Four focused Rust gates/27 tests and the offline mocked PowerShell launch-guard smoke verified. |
+阶段记录：[`PHASE-9F4D-MULTICLUSTER-CAPACITY-REPORT.md`](../reports/PHASE-9F4D-MULTICLUSTER-CAPACITY-REPORT.md)。当前阶段的结论不关闭 Schedule worker、owner stores、Multipass provider、目标 DB/RLS、Agent sandbox、BI/Benchmark 或桌面 RSS/公平性验收。
 
 ## 修订履历
 
@@ -1350,3 +1364,8 @@ dev 已有的宿主 Multipass/K3s/GitOps 实跑见 `docs/reports/PHASE-MULTIPASS
 | v5.69 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.53/basic v5.50/Task SRS v0.9/Task BD v0.2/Task DD v1.22/Data Design v0.3；新增 §6.75 记录 Schedule rule/occurrence/fence domain contract、五表 W/T/M migration、20/20 domain tests 与 DDL/worker/Run admission 未验收门；记录 Docker/PostgreSQL 与 dispatcher artifact blocker、拆分 9F3 materializer/lease worker 与 9F4 atomic Run admission | Phase 9F2 durable Schedule substrate 实现并完成文档对账 |
 | v5.60 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.45/basic v5.42/Group DD v4.29/Task DD v1.17；新增 §6.68，记录 CLI canonical identity、strict SQL guard、V2 fence/signature v3、attachment 门与授权 Hooks 深链，保留 Run Apps/生产依赖开放；自动化 §4.37 | 用户要求子代理/worktree 并行处理、rebase 后 merge dev，并确保文档对账 |
 | v6.09 | 2026-10-06 | 新增 §6.88 Phase 9F4D-1 typed readiness gate 与 15/15 focused tests；同步 SRS/BD/DD、Multipass Infrastructure DD、registry 与阶段报告；保持 provider、owner persistence、worker、生产授权与目标环境 gates open | 将 Multipass daemon、owned guest VM、K3s 与独立 sandbox/readiness 作为 executor 准入的分层证据
+| v6.10 | 2026-10-07 | 新增 §6.89 多 K3s cluster V2 binding/readiness/capacity；Run pin exact cluster ID/generation，profile 显式 placement，capacity 按 Host+cluster 双层校验；本测试阶段 Multipass instances 同时最多 2 个；对齐 requirements/basic/Schedule/Infrastructure/automation 文档并记录未实现生产边界 | 用户明确 Multipass 管理多个 K3s 且测试阶段磁盘资源限制为最多两个实例 |
+| v6.11 | 2026-10-07 | Complete the typed placement-policy digest and dual reservation-ID evidence contract; synchronize 27/27 focused Rust tests and preserve the two-instance test-phase cap and fail-closed production boundary. |
+| v6.12 | 2026-10-07 | Clarify the test cap over total registered Multipass instances, including stopped/recoverable entries; serialize bootstrap inventory check and launch with a host-local lock, verify the fail-closed guard, synchronize current design pointers, and retain the no-auto-purge and VM-free contract-test boundaries. |
+| v6.13 | 2026-10-07 | Align the active requirements/basic/Group DD references, remove the default single-shared-cluster assumption in the active architecture records, and record the passing offline Multipass cap smoke (both inventory formats, malformed input, two-instance refusal, second-slot creation, Deleted target, and cross-process lock contention); no VM was launched. | Close the final evidence and cross-layer reference audit for Phase 9F4D-2. |
+| v6.14 | 2026-10-07 | Mavis review | Align requirements v5.86, basic design v5.83, Group DD v4.60, DUKOU v1.7, Schedule contracts v0.18, Infrastructure DD v0.14, and Phase 9F4D report v0.5 after correcting active multi-cluster paragraphs; keep the temporary two-instance test cap and verified fail-closed boundaries explicit. | Final audit found stale active Group DD and Infrastructure snapshot pointers. |

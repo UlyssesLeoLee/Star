@@ -22,6 +22,8 @@
   守门 #11 缺标比错标: 每个阶段输出 DONE/FAIL 标记, 不以"命令返回 0"当作成功。
   守门 #5 v2: 本脚本不含任何 secret。kubeconfig 属凭据 —— 写到仓库外目录,
              路径经 -KubeconfigOut 参数显式指定, 默认落 $env:LOCALAPPDATA\Star\kubeconfig。
+  磁盘保护: 本测试阶段最多保留 2 个 Multipass 实例；Stopped/Deleted 记录也占名额，
+             创建前按机器可读 inventory 计数，达到上限或 inventory 无法验证时 fail closed。
 
 .PARAMETER Stage
   要执行的阶段: 0(预检) / 1(建 VM) / all(0→3)
@@ -58,6 +60,99 @@ param(
   [string]$KubeconfigOut = (Join-Path $env:LOCALAPPDATA 'Star\kubeconfig')
 )
 
+# @cypher schema=1 source_sha256=cf92cc1066cfc22be2e0d6d30f9db7ebbd52a952f123fea4d15594fb4d537cfc
+# MERGE (self:File {path:"scripts/automation/multipass_k3s_gitops.ps1"})
+# MERGE (write_stage:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Write-Stage",kind:"function"})
+# MERGE (write_done:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Write-Done",kind:"function"})
+# MERGE (write_fail:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Write-Fail",kind:"function"})
+# MERGE (write_info:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Write-Info",kind:"function"})
+# MERGE (preflight:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Invoke-Preflight",kind:"function"})
+# MERGE (parse_inventory:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::ConvertFrom-MultipassInstanceInventory",kind:"function"})
+# MERGE (get_inventory:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Get-MultipassInstanceInventory",kind:"function"})
+# MERGE (enter_cap_lock:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Enter-MultipassInstanceCapLock",kind:"function"})
+# MERGE (create_vm:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Invoke-CreateVm",kind:"function"})
+# MERGE (mount_repo:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Invoke-MountRepo",kind:"function"})
+# MERGE (export_kubeconfig:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Invoke-ExportKubeconfig",kind:"function"})
+# MERGE (main:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::main",kind:"script_entry"})
+# MERGE (instance_cap:Config {id:"scripts/automation/multipass_k3s_gitops.ps1::MaxTestPhaseInstances",value:2})
+# MERGE (cap_lock:Config {id:"%LOCALAPPDATA%/Star/multipass-instance-cap.lock",kind:"exclusive_file_lock"})
+# MERGE (instance_name:Variable {id:"scripts/automation/multipass_k3s_gitops.ps1::InstanceName",kind:"parameter"})
+# MERGE (pwsh:ExternalService {id:"powershell.core_cmdlets",kind:"runtime"})
+# MERGE (json_parser:ExternalService {id:"powershell.ConvertFrom-Json",kind:"cmdlet"})
+# MERGE (multipass_list:ExternalService {id:"multipass.list_json",kind:"command"})
+# MERGE (multipass_wait_ready:ExternalService {id:"multipass.wait-ready",kind:"command"})
+# MERGE (multipass_version:ExternalService {id:"multipass.version",kind:"command"})
+# MERGE (multipass_get:ExternalService {id:"multipass.get",kind:"command"})
+# MERGE (multipass_launch:ExternalService {id:"multipass.launch",kind:"command"})
+# MERGE (multipass_exec:ExternalService {id:"multipass.exec",kind:"command"})
+# MERGE (multipass_mount:ExternalService {id:"multipass.mount",kind:"command"})
+# MERGE (multipass_set:ExternalService {id:"multipass.set",kind:"command"})
+# MERGE (self)-[:DEFINES]->(write_stage)
+# MERGE (self)-[:DEFINES]->(write_done)
+# MERGE (self)-[:DEFINES]->(write_fail)
+# MERGE (self)-[:DEFINES]->(write_info)
+# MERGE (self)-[:DEFINES]->(preflight)
+# MERGE (self)-[:DEFINES]->(parse_inventory)
+# MERGE (self)-[:DEFINES]->(get_inventory)
+# MERGE (self)-[:DEFINES]->(enter_cap_lock)
+# MERGE (self)-[:DEFINES]->(create_vm)
+# MERGE (self)-[:DEFINES]->(mount_repo)
+# MERGE (self)-[:DEFINES]->(export_kubeconfig)
+# MERGE (self)-[:DEFINES]->(main)
+# MERGE (self)-[:DEFINES]->(instance_cap)
+# MERGE (self)-[:DEFINES]->(cap_lock)
+# MERGE (self)-[:DEFINES]->(instance_name)
+# MERGE (write_stage)-[:DEPENDS_ON]->(pwsh)
+# MERGE (write_done)-[:DEPENDS_ON]->(pwsh)
+# MERGE (write_fail)-[:DEPENDS_ON]->(pwsh)
+# MERGE (write_info)-[:DEPENDS_ON]->(pwsh)
+# MERGE (preflight)-[:CALLS]->(write_stage)
+# MERGE (preflight)-[:CALLS]->(write_fail)
+# MERGE (preflight)-[:CALLS]->(write_info)
+# MERGE (preflight)-[:CALLS]->(write_done)
+# MERGE (preflight)-[:CALLS]->(pwsh)
+# MERGE (preflight)-[:CALLS]->(multipass_wait_ready)
+# MERGE (preflight)-[:CALLS]->(multipass_version)
+# MERGE (preflight)-[:CALLS]->(multipass_get)
+# MERGE (parse_inventory)-[:CALLS]->(json_parser)
+# MERGE (parse_inventory)-[:CALLS]->(pwsh)
+# MERGE (get_inventory)-[:CALLS]->(multipass_list)
+# MERGE (get_inventory)-[:CALLS]->(parse_inventory)
+# MERGE (enter_cap_lock)-[:CALLS]->(pwsh)
+# MERGE (create_vm)-[:CALLS]->(get_inventory)
+# MERGE (create_vm)-[:CALLS]->(enter_cap_lock)
+# MERGE (create_vm)-[:CALLS]->(write_stage)
+# MERGE (create_vm)-[:CALLS]->(write_fail)
+# MERGE (create_vm)-[:CALLS]->(write_info)
+# MERGE (create_vm)-[:CALLS]->(write_done)
+# MERGE (create_vm)-[:CALLS]->(multipass_launch)
+# MERGE (create_vm)-[:CALLS]->(multipass_exec)
+# MERGE (create_vm)-[:CALLS]->(pwsh)
+# MERGE (create_vm)-[:USES]->(instance_cap)
+# MERGE (create_vm)-[:USES]->(cap_lock)
+# MERGE (create_vm)-[:USES]->(instance_name)
+# MERGE (mount_repo)-[:CALLS]->(write_stage)
+# MERGE (mount_repo)-[:CALLS]->(write_fail)
+# MERGE (mount_repo)-[:CALLS]->(write_done)
+# MERGE (mount_repo)-[:CALLS]->(multipass_set)
+# MERGE (mount_repo)-[:CALLS]->(multipass_mount)
+# MERGE (mount_repo)-[:CALLS]->(pwsh)
+# MERGE (export_kubeconfig)-[:CALLS]->(write_stage)
+# MERGE (export_kubeconfig)-[:CALLS]->(write_fail)
+# MERGE (export_kubeconfig)-[:CALLS]->(write_info)
+# MERGE (export_kubeconfig)-[:CALLS]->(write_done)
+# MERGE (export_kubeconfig)-[:CALLS]->(multipass_exec)
+# MERGE (export_kubeconfig)-[:CALLS]->(pwsh)
+# MERGE (main)-[:CALLS]->(preflight)
+# MERGE (main)-[:CALLS]->(create_vm)
+# MERGE (main)-[:CALLS]->(mount_repo)
+# MERGE (main)-[:CALLS]->(export_kubeconfig)
+# MERGE (main)-[:CALLS]->(write_info)
+# MERGE (main)-[:CALLS]->(write_fail)
+# MERGE (main)-[:CALLS]->(pwsh)
+# MERGE (main)-[:USES]->(instance_name)
+# @endcypher
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -70,6 +165,7 @@ $ExpectedDriver = 'hcs'
 $ExpectedMinVersion = '1.17.0'
 $LogFile = '/var/log/star-cloud-init.log'
 $CompleteFlag = '/var/log/star-cloud-init.complete'
+$MaxTestPhaseInstances = 2
 
 function Write-Stage { param([string]$Msg) Write-Host "==> $Msg" }
 function Write-Done  { param([string]$Msg) Write-Host "    DONE: $Msg" -ForegroundColor Green }
@@ -156,27 +252,131 @@ function Invoke-Preflight {
 # ============================================================================
 # Stage 1 — 建 VM
 # ============================================================================
+function ConvertFrom-MultipassInstanceInventory {
+  param([Parameter(Mandatory)][string]$Json)
+
+  $document = ConvertFrom-Json -InputObject $Json -AsHashtable -ErrorAction Stop
+  if ($document -isnot [System.Collections.IDictionary]) {
+    throw 'Multipass JSON inventory must be an object.'
+  }
+
+  $instances = [System.Collections.Generic.List[object]]::new()
+  if ($document.Contains('list')) {
+    foreach ($item in @($document['list'])) {
+      if ($item -isnot [System.Collections.IDictionary] -or
+          -not $item.Contains('name') -or -not $item.Contains('state')) {
+        throw 'Multipass JSON list entries must contain name and state.'
+      }
+      $instances.Add([pscustomobject]@{
+        Name  = [string]$item['name']
+        State = [string]$item['state']
+      })
+    }
+  } else {
+    # Multipass also emits the YAML/JSON map form: instance name -> state record list.
+    foreach ($name in $document.Keys) {
+      foreach ($item in @($document[$name])) {
+        if ($item -isnot [System.Collections.IDictionary] -or -not $item.Contains('state')) {
+          throw "Multipass JSON inventory entry '$name' has no state record."
+        }
+        $instances.Add([pscustomobject]@{
+          Name  = [string]$name
+          State = [string]$item['state']
+        })
+      }
+    }
+  }
+
+  $names = @($instances | ForEach-Object { $_.Name })
+  if ($instances | Where-Object {
+      [string]::IsNullOrWhiteSpace($_.Name) -or [string]::IsNullOrWhiteSpace($_.State)
+    }) {
+    throw 'Multipass JSON inventory contains an empty instance name or state.'
+  }
+  if (($names | Sort-Object -Unique).Count -ne $names.Count) {
+    throw 'Multipass JSON inventory contains duplicate instance names.'
+  }
+  return $instances.ToArray()
+}
+
+function Get-MultipassInstanceInventory {
+  $json = (& multipass list --format json 2>&1) -join "`n"
+  if ($LASTEXITCODE -ne 0) {
+    throw "multipass list --format json failed (exit $LASTEXITCODE)."
+  }
+  return ConvertFrom-MultipassInstanceInventory -Json $json
+}
+
+function Enter-MultipassInstanceCapLock {
+  if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+    throw 'LOCALAPPDATA is not set; cannot coordinate the test-instance cap.'
+  }
+
+  $lockDirectory = Join-Path $env:LOCALAPPDATA 'Star'
+  if (-not (Test-Path -LiteralPath $lockDirectory)) {
+    New-Item -ItemType Directory -Force -Path $lockDirectory | Out-Null
+  }
+  $lockPath = Join-Path $lockDirectory 'multipass-instance-cap.lock'
+  return [System.IO.File]::Open(
+    $lockPath,
+    [System.IO.FileMode]::OpenOrCreate,
+    [System.IO.FileAccess]::ReadWrite,
+    [System.IO.FileShare]::None
+  )
+}
+
 function Invoke-CreateVm {
   Write-Stage "Stage 1: create instance '$InstanceName'"
 
-  # 幂等: 已存在则跳过创建, 直接报出状态
-  $existing = (& multipass list 2>&1) -join "`n"
-  if ($existing -match [regex]::Escape($InstanceName)) {
-    Write-Info "instance '$InstanceName' already exists — skipping launch (idempotent)"
-  } else {
-    $args = @(
-      'launch', '24.04',
-      '--name',    $InstanceName,
-      '--cpus',    "$Cpus",
-      '--memory',  $Memory,
-      '--disk',    $Disk,
-      '--cloud-init', $CloudInit
-    )
-    Write-Info "multipass $($args -join ' ')"
-    & multipass @args 2>&1 | ForEach-Object { Write-Info $_ }
-    if ($LASTEXITCODE -ne 0) {
-      Write-Fail "multipass launch failed (exit $LASTEXITCODE)"
+  # 计数全部登记实例，包含 Stopped/Suspended/Deleted，避免关闭 VM 后仍持续占用磁盘。
+  # 独占锁覆盖 inventory 检查与 launch，避免两个本脚本并发越过上限；不自动 recover/purge。
+  $capLock = $null
+  try {
+    try {
+      $capLock = Enter-MultipassInstanceCapLock
+    } catch {
+      Write-Fail "cannot acquire Multipass test-instance cap lock: $($_.Exception.Message)"
       return $false
+    }
+
+    try {
+      $instances = @(Get-MultipassInstanceInventory)
+    } catch {
+      Write-Fail "cannot verify Multipass instance inventory: $($_.Exception.Message)"
+      return $false
+    }
+
+    $existing = $instances | Where-Object { $_.Name -ceq $InstanceName } | Select-Object -First 1
+    if ($existing) {
+      if ($existing.State -eq 'Deleted') {
+        Write-Fail "instance '$InstanceName' is Deleted and still occupies the test-phase inventory cap. No automatic recover or purge was attempted."
+        return $false
+      }
+      Write-Info "instance '$InstanceName' already exists — skipping launch (idempotent)"
+    } else {
+      if ($instances.Count -ge $MaxTestPhaseInstances) {
+        Write-Fail "refusing to launch '$InstanceName': $($instances.Count) Multipass instance(s) are already registered; test-phase maximum is $MaxTestPhaseInstances, including stopped or Deleted instances."
+        Write-Info 'Resolve inventory/storage ownership explicitly before creating another instance; this script never purges automatically.'
+        return $false
+      }
+      $args = @(
+        'launch', '24.04',
+        '--name',    $InstanceName,
+        '--cpus',    "$Cpus",
+        '--memory',  $Memory,
+        '--disk',    $Disk,
+        '--cloud-init', $CloudInit
+      )
+      Write-Info "multipass $($args -join ' ')"
+      & multipass @args 2>&1 | ForEach-Object { Write-Info $_ }
+      if ($LASTEXITCODE -ne 0) {
+        Write-Fail "multipass launch failed (exit $LASTEXITCODE)"
+        return $false
+      }
+    }
+  } finally {
+    if ($null -ne $capLock) {
+      $capLock.Dispose()
     }
   }
   Write-Done 'instance exists'
