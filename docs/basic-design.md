@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.92 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.95
+> **文档版本**: v5.93 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.96
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4976,6 +4976,14 @@ Infrastructure owner 提供仅处理自身 admission holds 的过期原语。调
 
 该能力是可调用的 owner-store primitive，不包含 timer、跨 tenant worker、Outbox 投递 consumer、active Runtime lease renewal、Multipass 实例回收或 K3s 集群销毁。架构仍由 Multipass 管理一个或多个 Linux guests 并在 guest 内运行 K3s，不要求 Docker Desktop。当前没有生产 actor 装配，公共执行仍关闭。Rust 与 disposable PostgreSQL 验证不创建 VM；测试 Multipass inventory 仍最多登记 2 条（Stopped/Deleted 也计入）。
 
+### 16.38 Phase 9F4D-3D3 Infrastructure owner Outbox delivery state machine
+
+`PostgresInfrastructureOwnerOutboxDelivery` 复用已登记的 `capacity_outbox_delivery` Work 与不可变 `capacity_owner_outbox` Transaction 表，不新增 schema 或改变累计 10 表 W/T/M 分类。Infrastructure owner 事务先激活受限 owner role 并设置 tenant RLS scope，再以 `clock_timestamp()`、稳定 due 顺序和 `FOR UPDATE SKIP LOCKED` 批量 claim；批大小最多 64、租约最长 300 秒。每个 claim 携带 immutable envelope 与递增 `attempt_count` fence，包含 tenant/event/type/schema/idempotency/correlation/payload 和 lease deadline。
+
+Ack/失败回写必须符合未过期的 owner + attempt fence。Transient failure 采用首轮 1 秒、指数增长且不超过 3600 秒的 retry；Permanent failure 或 attempt 达到 12 次时写入 `dead`。若第 12 次 lease worker crash，后续 claim 事务将过期 lease 直接 dead-letter，避免产生第 13 次发送。Delivered/dead 都服从现有 24–25 小时 terminal retention guard；错误原文不持久化。Claim 返回不超过 16 KiB/event 的原始 UTF-8 JSON 文本而不展开为 `serde_json::Value`，所以序列化 payload bytes 每批最多 1 MiB（64 × 16 KiB）；这不等于 heap/RSS 上限，后续 consumer 必须单独限制解码并发与内存预算。
+
+这是 store/state-machine primitive，不是 publisher、owner Inbox consumer、polling service、target DB activation 或 production executor。Outbox event 仍留在数据库，不能据此声称 Run/Execution 已消费 capacity fact。当前验证为 Rust 与 disposable PostgreSQL、0 VM；测试 Multipass inventory 仍最多登记 2 条且不得自动 purge，Schedule/Task Card CLI 继续 fail-closed。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5114,3 +5122,4 @@ Infrastructure owner 提供仅处理自身 admission holds 的过期原语。调
 | v5.90 | 2026-10-07 | Mavis review | Align the current requirements pointer to v5.93, Infrastructure DD to v0.20 and implementation plan to v6.22; qualify AC-INFRA-002-H with Profile-table read-only grants and the cumulative eight-table gate while retaining the original 3B1 evidence as historical. Preserve the two-instance disk cap and all production fail-closed boundaries. | Final cross-layer grant and version-reference audit. |
 | v5.91 | 2026-10-07 | Mavis review | Align requirements v5.94, Infrastructure DD v0.21, implementation plan v6.23, W/T/M v0.5 and Automation Design v2.20; add §16.36 for global physical Host/cluster reservations, owner-only FORCE RLS, sorted/deduplicated cross-tenant locks, atomic lifecycle events, and 21/21 PostgreSQL runner / 6/6 SQLx evidence. Preserve the two-record disk cap and all production execution blockers. | Phase 9F4D-3D1 implemented and verified the global capacity-ledger seam without Multipass VM creation. |
 | v5.92 | 2026-10-07 | Mavis review | Align requirements v5.95 and Infrastructure DD v0.22; add §16.37 for the bounded database-clock expiry primitive, per-pair revalidation and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts. Clarify that Schedule occurrence outcomes belong to Run/Execution consumers and that active Runtime lease renewal, production worker and VM lifecycle remain open. Preserve the two-record Multipass inventory cap. | Phase 9F4D-3D2 expiry implementation and disposable PostgreSQL verification. |
+| v5.93 | 2026-10-07 | Mavis review | Align requirements v5.96 and Infrastructure DD v0.23; add §16.38 for PostgreSQL Outbox claim/lease fencing/ack/retry/dead-letter, bounded batch and retry policy. Distinguish the state-machine store from broker publisher, Run consumer, production worker and target DB activation; preserve the two-instance disk cap and fail-closed execution. | Phase 9F4D-3D3 adds and verifies the owner-side delivery-state primitive without a broker or VM. |

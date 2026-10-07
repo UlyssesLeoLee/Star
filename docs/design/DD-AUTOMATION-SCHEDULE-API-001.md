@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission and persisted Provider Profile source are verified; trusted resolver, cross-tenant allocator, target migration/app identity, Inbox/Outbox consumer, worker, provider evidence producer, and production execution remain open.
-> Version: 0.23 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source and Outbox delivery-state store are verified; trusted resolver, cross-tenant allocator, target migration/app identity, broker publisher, Run-owner Inbox consumer, production worker, provider evidence producer, and execution remain open.
+> Version: 0.24 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -138,6 +138,16 @@ The admission transaction reads the exact profile id/revision from the persisted
 
 The disposable PostgreSQL 18.6 runner applies schema, grant and profile migrations twice each and verifies tenant isolation, owner read-only profile grants, one-time SCD2 closure, append-only events, and 8/8 Infrastructure FORCE RLS tables. Its five SQLx cases pass, including stored-digest mismatch rejection. The temporary database stops and cleans up; no Multipass instance is started, and live test inventory remains capped at two registered records total, including stopped/deleted records, due to disk capacity. This does not implement the production profile editor/current resolver, trusted Run-binding/provider observation, global cross-tenant allocator, target DB provisioning, Inbox/Outbox consumer, Manager/provider, readiness producer, BI/Benchmark, sandbox/workspace bridge, or Schedule executor.
 
+## 6.10 9F4D-3D3 Infrastructure Outbox delivery state machine
+
+`PostgresInfrastructureOwnerOutboxDelivery` operates on the existing immutable `capacity_owner_outbox` event and its `capacity_outbox_delivery` Work row. The store opens one transaction per claim/ack/failure call, performs `SET LOCAL ROLE star_infrastructure_owner`, and sets transaction-local `app.tenant_id`. The role uses its existing SELECT access to Transaction rows and UPDATE access to Work rows under FORCE RLS; no additional grant or migration is required.
+
+`claim_due` validates non-nil tenant and lease-owner UUIDs, `max_items ∈ [1,64]`, and `lease_seconds ∈ [1,300]` before opening the database transaction. It first terminalizes a bounded number of expired attempt-12 leases as `dead`, then selects due pending/retry or non-exhausted expired leases ordered by database time with `FOR UPDATE SKIP LOCKED`. The update increments `attempt_count`, assigns owner and lease expiry using `clock_timestamp()`, and returns the immutable typed event envelope. It casts each JSONB body to its bounded text representation and returns `payload_json: String` without decoding to `serde_json::Value`; raw serialized payload bytes are at most 1 MiB per maximum batch. This is not an RSS guarantee: consumer-side decoding requires its own memory and parallelism budget.
+
+`mark_delivered` and `record_failure` compare tenant, event, owner, attempt and current unexpired lease in the UPDATE predicate. A zero-row update returns `LeaseLost`; no stale worker may mutate a reclaimed event. Transient retry delay is exponential from 1 second to a maximum of 3600 seconds. Permanent failures and transient failure on attempt 12 become `dead`; a crashed final attempt is dead-lettered after lease expiry without an attempt 13. Delivered/dead transitions set terminal timestamp and the schema-bounded 24-hour cleanup horizon. The API intentionally does not persist arbitrary error text.
+
+SQLx integration verifies competing claimers return one claim total, lease expiry increments the fence and rejects stale acknowledgement, transient retry schedules a future due time, permanent failure becomes dead, and an expired final-attempt lease is dead-lettered. This proves the database state machine only: there is no transport publisher, polling/retry process, production application identity/target migration, Run/Execution owner Inbox consumer, or execution enablement. The tests run against disposable PostgreSQL with zero Multipass VMs; registered Multipass inventory remains limited to two records total including stopped/deleted.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -165,3 +175,4 @@ The disposable PostgreSQL 18.6 runner applies schema, grant and profile migratio
 | v0.21 | 2026-10-07 | Add detailed 9F4D-3C1 receive transaction, idempotency/conflict behavior, and explicit resolver/authorization/freshness limitations; preserve fail-closed admission and execution. |
 | v0.22 | 2026-10-07 | Specify 9F4D-3C2 tenant-scoped capacity admission, ordered locks, recomputed unexpired ledger, atomic paired reservation and terminal Outbox facts; record concurrent/expiry/replay PostgreSQL evidence; disclose cross-tenant allocator and production consumer/provider gaps. |
 | v0.23 | 2026-10-07 | Specify the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted-digest checks and profile-derived capacity requests; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases while keeping production resolver, target DB, allocator, provider, consumer and execution gates open. |
+| v0.24 | 2026-10-07 | Add §6.10 for the bounded tenant-scoped Outbox delivery state machine, exact lease fencing, attempt exhaustion, retry backoff and terminal retention. Record PostgreSQL integration coverage; distinguish database state transitions from broker publisher, Run consumer, production worker, target DB and execution gates. Preserve the two-instance test cap. |

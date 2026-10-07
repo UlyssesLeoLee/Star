@@ -1,6 +1,6 @@
 """Run reproducible focused gates for the 9F4D infrastructure contract slice."""
 
-# @cypher schema=1 source_sha256=5b8985c77fcdd93ac83e90b06775a9ffbd1c352857dea9875031de9e17936835
+# @cypher schema=1 source_sha256=1a4054b717d5abf0dfad3b845fc15fde6516123ad3db6d29e68538957afac824
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_contract.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::run_step",kind:"function"})
@@ -20,6 +20,7 @@
 # MERGE (capacity_source:File {path:"crates/domain-infrastructure/src/capacity.rs"})
 # MERGE (owner_inbox_source:File {path:"crates/infrastructure/src/infrastructure_owner_inbox.rs"})
 # MERGE (owner_admission_source:File {path:"crates/infrastructure/src/infrastructure_owner_admission.rs"})
+# MERGE (owner_outbox_delivery_source:File {path:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs"})
 # MERGE (owner_admission_test_source:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
@@ -44,6 +45,7 @@
 # MERGE (main)-[:CONFIGURES]->(capacity_source)
 # MERGE (main)-[:CONFIGURES]->(owner_inbox_source)
 # MERGE (main)-[:CONFIGURES]->(owner_admission_source)
+# MERGE (main)-[:CONFIGURES]->(owner_outbox_delivery_source)
 # MERGE (main)-[:CONFIGURES]->(owner_admission_test_source)
 # MERGE (run_step)-[:WRITES]->(audit)
 # @endcypher
@@ -64,6 +66,7 @@ READINESS_SOURCE = Path("crates/domain-infrastructure/src/readiness.rs")
 CAPACITY_SOURCE = Path("crates/domain-infrastructure/src/capacity.rs")
 OWNER_INBOX_SOURCE = Path("crates/infrastructure/src/infrastructure_owner_inbox.rs")
 OWNER_ADMISSION_SOURCE = Path("crates/infrastructure/src/infrastructure_owner_admission.rs")
+OWNER_OUTBOX_DELIVERY_SOURCE = Path("crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs")
 OWNER_ADMISSION_TEST_SOURCE = Path("crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs")
 PACKAGES = ["-p", "domain-infrastructure", "-p", "infrastructure"]
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-contract"
@@ -163,7 +166,7 @@ def main() -> int:
     target_dir = (arguments.target_dir or DEFAULT_CARGO_TARGET_DIR).resolve()
     environment["CARGO_TARGET_DIR"] = str(target_dir)
     commands = (
-        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE), str(CAPACITY_SOURCE), str(OWNER_INBOX_SOURCE), str(OWNER_ADMISSION_SOURCE), str(OWNER_ADMISSION_TEST_SOURCE)]),
+        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE), str(CAPACITY_SOURCE), str(OWNER_INBOX_SOURCE), str(OWNER_ADMISSION_SOURCE), str(OWNER_OUTBOX_DELIVERY_SOURCE), str(OWNER_ADMISSION_TEST_SOURCE)]),
         ("check", [cargo, "check", "--locked", *PACKAGES, "--all-targets", "-j", "4"]),
         ("clippy", [cargo_clippy, "clippy", "--locked", "--no-deps", *PACKAGES, "--all-targets", "-j", "4", "--", "-D", "warnings", "-A", "clippy::empty_line_after_doc_comments", "-A", "clippy::unwrap_or_default"]),
         ("test", [cargo, "test", "--locked", *PACKAGES, "--all-targets", "-j", "1"]),

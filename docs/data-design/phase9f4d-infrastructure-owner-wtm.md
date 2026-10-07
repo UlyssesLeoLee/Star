@@ -1,8 +1,8 @@
 # Phase 9F4D-3A — Infrastructure owner W/T/M classification
 
-> Version: v0.6 · 2026-10-07
+> Version: v0.7 · 2026-10-07
 > Scope: additive schemas in `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql`, `db/migrations/2026-10-09-infrastructure-provider-profile-master.sql`, and `db/migrations/2026-10-10-infrastructure-physical-capacity-ledger.sql`
-> Boundary: preserve the original six-table 3A classification, add the two 3C3 profile tables and two 3D1 global physical ledger tables; 3D2 expiry reuses the existing Work/Transaction tables and trigger, adds no schema objects, and does not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
+> Boundary: preserve the original six-table 3A classification, add the two 3C3 profile tables and two 3D1 global physical ledger tables; 3D2 expiry and 3D3 Outbox delivery reuse existing Work/Transaction tables and triggers, add no schema objects, and do not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
 
 ## §0 Purpose and ownership
 
@@ -14,7 +14,7 @@ Classify every physical table introduced by the 9F4D-3A migration. The Infrastru
 |---|---|---|---|---|
 | `infrastructure.capacity_demand_inbox` | Work (W) | Idempotent source-event/occurrence receipt, bounded retry state and processing lease | Starts `received`; may transition under the guard to leased/retry/rejected/accepted; terminal transition must be current and carries a 24–25 hour retention window; DELETE is denied before expiry | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
 | `infrastructure.capacity_reservation_bundle` | Work (W) | One atomic owner-local row pairing distinct Host and exact K3s cluster reservation IDs, generations, budget and lease facts | Starts `held`; only held→released/expired terminal transition; a current terminal timestamp and 24–25 hour retention window are required before DELETE | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
-| `infrastructure.capacity_outbox_delivery` | Work (W) | Independent pending/lease/retry/delivered/dead state for an immutable owner Outbox event | Starts `pending`; valid pending→leased→retry/delivered/dead flow; a current terminal timestamp and 24–25 hour retention window are required before DELETE | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
+| `infrastructure.capacity_outbox_delivery` | Work (W) | Independent pending/lease/retry/delivered/dead delivery state for an immutable owner Outbox event | Starts `pending`; bounded PostgreSQL claim, lease fence, retry/dead-letter transition; a current terminal timestamp and 24–25 hour retention window are required before DELETE | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
 | `infrastructure.capacity_demand_receipt` | Transaction (T) | Durable idempotency fact for the final accepted/rejected result of a source demand | Append-only; UPDATE, DELETE and TRUNCATE rejected by database triggers | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
 | `infrastructure.capacity_reservation_event` | Transaction (T) | Append-only held/released/expired fact binding both reservation IDs and owner scope | Append-only; UPDATE, DELETE and TRUNCATE rejected by database triggers | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
 | `infrastructure.capacity_owner_outbox` | Transaction (T) | Immutable versioned owner-to-owner acceptance/rejection/release/expiry event | Append-only; UPDATE, DELETE and TRUNCATE rejected by database triggers; delivery retry state is in the separate Work table above | `tenant_id`, ENABLE + FORCE RLS, `app.tenant_id` policy |
@@ -59,6 +59,8 @@ The 3D2 expiry primitive reuses these rows without a new migration or classifica
 
 This evidence does not add a production expiry scheduler, cross-tenant scan coordinator, Outbox delivery consumer or Run/Execution outcome consumer. Expiration applies only to Infrastructure admission holds, not active Runtime leases or VM/K3s resources. No Multipass instance is started; the disk-constrained test inventory limit remains two registered records including Stopped/Deleted.
 
+The 3D3 PostgreSQL delivery adapter reuses the same Work row with bounded `SKIP LOCKED` claim, 300-second maximum lease, incrementing attempt fence, exponential transient retry, permanent/exhausted dead-letter and terminal retention. It changes no W/T/M count and publishes no event to a broker; the Run/Execution consumer and production polling worker remain open. The Rust runner passed 4/4 gates; PostgreSQL passed 21/21 steps, 10/10 FORCE RLS and 10/10 SQLx cases. The gate creates zero Multipass VMs and leaves the registered-instance cap at two records.
+
 ## §4 Revision history
 
 | Version | Date | Revision | Trigger |
@@ -69,3 +71,4 @@ This evidence does not add a production expiry scheduler, cross-tenant scan coor
 | v0.4 | 2026-10-07 | Mavis review | Correct 3A-only six-table statements in §§1–3 to distinguish them from cumulative 3C3 schema; classify cumulative 8/8 table RLS and profile read-only owner boundary. Preserve original 3A/3B1 gate evidence as historical. |
 | v0.5 | 2026-10-07 | Mavis review | Add §1.2 for the no-tenant global physical Work/Transaction ledger; classify cumulative 10/10 tables as 4 W / 5 T / 1 M, distinguish tenant and owner-only FORCE RLS, and record atomic lifecycle-event plus 21/21 PG runner and 6/6 SQLx evidence. Preserve the two-record Multipass disk cap and production worker/provider/execution gaps. |
 | v0.6 | 2026-10-07 | Mavis review | Record that 9F4D-3D2 reuses the existing paired Work ledgers, Transaction tables and lifecycle trigger for atomic expiry; add no schema object and make no W/T/M count change. Capture 7/7 SQLx expiry evidence while keeping production scheduler/consumer, active Runtime lease and VM lifecycle out of scope. Preserve the two-record Multipass disk cap. |
+| v0.7 | 2026-10-07 | Mavis review | Record 9F4D-3D3's bounded Outbox delivery claim/lease/ack/retry/dead-letter state machine on the existing Work row; add no table or classification change, keep broker publisher/Run consumer/worker open, and preserve the two-instance disk cap. |
