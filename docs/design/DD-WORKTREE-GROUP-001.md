@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.65**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.66**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -8,7 +8,7 @@
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
 > - Phase 9E-4C5 Runtime fence foundation：REST 与 Local Runtime 共用 `star-dto::task_run` strict DTO；ERUN-P2 带 V2 directory fence 的双 Profile grant 使用 signature v3（C5 基线为 v2），无 fence 的 legacy grant 保持 v1；Local Runtime 专用 consumer 完整比对当前 binding 并在 SQLite FULL WAL 单事务内消费 nonce/fence，receipt 上限 50,000 条并保留 5 分钟时钟偏差清理窗。该 helper 未接生产 provisioner，不负责实时 ACL/authority、reservation lifecycle、OS sandbox/spawn 或 BI outcome；producer capability 继续默认关闭，详见 §7.2。
 > - ERUN-P3 Run Task Cards 条件式 UI：默认 Task Cards tab 与 canonical Run list typed client 已有只读代码；实现 12 条/页、2 MiB response、最多 100 页、有界并发和取消。旧 Tauri desktop 任务 mock/fallback 已移除；根 Providers 未注入宿主 session，服务端 capability 固定 false，Task Owner 目标 DB/RLS 未验收，所以生产页面不呈现任务；CLI 保持禁用，详见 §10.0A-B。
-> - 日期：2026-10-07
+> - 日期：2026-10-08
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
@@ -570,6 +570,10 @@ Poison-message receipt is a Platform Messaging/Ingress responsibility, separate 
 
 The consumer can Term-ack only after receipt plus the selected retention action commit. Any DB, quota, key, digest conflict, unknown source identity, or uncertain fault classification remains pending. `InvalidStoredDemand` remains an unacknowledged owner-data integrity failure until its handling is explicitly specified. Quarantine never changes TaskExecutionRun, Schedule, BI/RunEvent, reservations, readiness, or execution. The Run Apps navigation remains Project → Cloud Branch → Engineering Run → focused Worktree; quarantine is a platform service and does not become a Run navigation node. Test infrastructure continues to cap all registered Multipass instances at two including Stopped/Deleted, with zero VMs required for DB/NATS contract tests.
 
+### 8.16 Phase INFRA-2A Rust read-only Multipass inventory adapter
+
+`multipass-adapter` 提供 Host 侧只读 `list --format json` observation，固定 argv、绝对可执行文件路径、进程级 single-flight、bounded output/deadline，不暴露 Multipass lifecycle/guest exec。解析器接收 name-keyed state-record arrays 与非空 row-list compatibility fixture，保留 Stopped/Deleted rows 并逐条计数；重复 JSON key、空 records/list、重复名称及 malformed output fail closed。该数据不证明 owner、Host/cluster binding、capacity、daemon/guest/K3s/Runtime readiness，也不授权 Run 或 CLI 执行。完整接口与 limits 见 [DD-LOCAL-INFRASTRUCTURE-001 v0.26 §7.12](DD-LOCAL-INFRASTRUCTURE-001.md) 和 [INFRA-2A report](../reports/PHASE-INFRA-2A-MULTIPASS-INVENTORY-REPORT.md)。当前测试仍最多两条已登记实例，未运行 live Multipass/VM。
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -866,3 +870,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.63 | 2026-10-07 | Align requirements v5.90, basic design v5.87, Schedule SRS/BD/DD v0.21/v0.20/v0.21, Infrastructure DD v0.17 and plan v6.18; add the 9F4D-3C1 Inbox receive boundary while preserving Run authorization and execution gates. |
 | v4.64 | 2026-10-07 | Mavis review | Add §8.14 for the Run-owner result Inbox and caller-transaction validation of scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation; record exact result scope, bounded durable pull and commit-before-ack. Preserve no TaskExecutionRun/BI mutation and production-disabled poison/release boundaries; align requirements/basic design and phase evidence. | Phase 9F4D-3D5 adds the result-side Run-owner contract. |
 | v4.65 | 2026-10-08 | Mavis review | Add §8.15 for a separate Platform Messaging/Ingress quarantine owner, trusted JetStream source identity, immutable receipt, optional encrypted TTL Work payload and commit-before-Term invariant; keep user retention selection, fault taxonomy, owner migration/grants and production ACK wiring open. Preserve Worktree-first Run navigation and the two-record Multipass test limit. | Phase 9F4D-3D6 design boundary review. |
+| v4.66 | 2026-10-08 | Mavis review | Add §8.16 for the bounded Rust read-only Multipass inventory adapter; support name-keyed state-record map, row-list fixture and process-wide single-flight, align requirements v6.00, basic design v5.97, Infrastructure DD v0.26 and plan v6.29. Explicitly distinguish CLI inventory from owner ledger, capacity, readiness, Manager lifecycle and task execution; preserve the two-instance disk cap and record direct rustc/Cargo verification limits. | INFRA-2A delivers a safe observation-only implementation slice; self-review corrects CLI JSON format and concurrency boundaries. |
