@@ -23,6 +23,7 @@
 
 - Rust 定向 runner：`py -3 scripts/automation/phase9f4d_infrastructure_contract.py --toolchain-bin C:\Users\leo19\.rustup\toolchains\1.98.1-x86_64-pc-windows-msvc\bin --target-dir E:\t\s9f4d3c2 --output-dir target\phase9f4d-infrastructure-contract-3c2-e`。format、`cargo check --all-targets`、warnings-as-errors Clippy 与 all-target tests 均通过；`domain-infrastructure` 27 tests、`infrastructure` 47 tests 通过，测试串行运行。Rust runner 中 4 个需 DB 的 SQLx cases 按设计标记 ignored，并由下方 PostgreSQL runner 实际执行。
 - PostgreSQL runner：`py -3 scripts/automation/phase9f4d_infrastructure_owner_schema.py --pg-bin D:\PostgreSQL\18\bin --toolchain-bin C:\Users\leo19\.rustup\toolchains\1.98.1-x86_64-pc-windows-msvc\bin --target-dir E:\t\s9f4d3c2 --output-dir target\phase9f4d-owner-admission-3c2`。PostgreSQL 18.6 disposable loopback runner 共 15 steps 全部通过：schema/grants gates、6/6 FORCE RLS、tenant isolation、privilege/WORM/retention checks，以及 4/4 SQLx Inbox/admission tests；临时 PostgreSQL 正常停止并清理自身数据库目录。
+- 合并到 `dev` 后重新运行同一 Rust runner：`E:\t\s9f4d3c2-postmerge` 独立 target 下 format/check/Clippy/tests 4 steps 全通过；重复 disposable PostgreSQL runner 15/15 steps 通过，4/4 SQLx cases 通过，临时服务正常停止。第一次在复用 target 的 post-merge 尝试遇到 `link.exe LNK1104`、无法打开测试 exe；没有 Rust source diagnostic。隔离到新 target 后完整复验成功，故以该成功 run 作为集成证据并保留本次环境异常记录。
 - CypherGraph Guardian：`cgg_guard.py --changed --stamp`，5 个 Rust 源文件通过。
 - `git diff --check`：通过。未运行 workspace-wide Cargo gates；本阶段使用两个受影响 crate 的定向 all-target gates。
 - CodeRabbit CLI 检查未能启动：执行环境返回 `/root/.local/bin/coderabbit: Permission denied`；因此没有外发 diff，CodeRabbit review 不构成通过证据。本地代码和文档自查继续完成。
@@ -77,3 +78,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初版记录 9F4D-3C2 tenant-scoped owner admission、实际 Rust/PG 证据、两实例硬盘上限和未完成生产门 | 定向 Rust 与 disposable PostgreSQL gates 全部完成 |
+| v0.2 | 2026-10-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 fast-forward 到 dev 后 Rust 与 PostgreSQL 复验结果；透明记录共享 target 上的单次 LNK1104 及隔离 target 重跑成功 | 集成后门禁完成 |
