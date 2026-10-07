@@ -6,6 +6,7 @@ publish = false
 name = "star-arg-effect"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "STAR Agent Relationship Graph (ARG) Effect Tier — per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1 §3.1 + docs/architecture/2026-09-03-arg/07-arg-03-5-sa-impl.md v0.50"

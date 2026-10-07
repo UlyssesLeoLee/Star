@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           toolchain: 1.99.0
 
@@ -70,7 +70,7 @@ jobs:
 
       - name: cargo fmt -p terminal-stack (per AC-8)
         working-directory: .
-        run: cargo +stable fmt -p terminal-stack -- --check
+        run: cargo fmt -p terminal-stack -- --check
 
       - name: cargo bench -p terminal-stack --no-run (per AC-5)
         working-directory: .
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           toolchain: 1.99.0
 

@@ -27,7 +27,7 @@
 ## 1. wasm-pack 安装
 
 ### 1.1 系统要求
-- Rust 1.75+ (per workspace rust-version)
+- Rust 1.99.0 (per workspace rust-version)
 - Node.js 18+ (per frontend/package.json "node": 26.6.1)
 - wasm32 target: `rustup target add wasm32-unknown-unknown`
 
