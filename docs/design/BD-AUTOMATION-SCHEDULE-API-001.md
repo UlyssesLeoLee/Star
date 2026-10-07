@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API, typed v2 multi-cluster contracts, and the 9F4D-3C1 Inbox receive adapter verified; production execution remains fail-closed.
-> Version: 0.20 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed v2 multi-cluster contracts, 9F4D-3C1 Inbox receive, and the 9F4D-3C2 tenant-scoped admission transaction are verified in focused/disposable gates; trusted resolver, production consumers and execution remain fail-closed.
+> Version: 0.21 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -71,7 +71,15 @@ Disposable PostgreSQL 18.6 verified duplicate apply and the complete role/privil
 
 The Infrastructure owner stores the incoming versioned demand in its own PostgreSQL Inbox. The adapter receives typed V2 demand plus a current binding snapshot supplied by the trusted owner boundary, checks digest/generation/deadline, and writes under transaction-scoped star_infrastructure_owner role plus tenant RLS. It returns only Enqueued, DuplicatePending, or AlreadyTerminal; an event/occurrence collision with different content is an idempotency conflict.
 
-This is an Inbox receive adapter, not the consumer/admission transaction. It does not resolve source identity, reserve Host or cluster capacity, append a terminal receipt, publish an owner Outbox event, invoke Multipass/K3s Manager, or start TaskExecutionRun. Trusted resolver, reservation writer, worker, readiness and execution gates remain independently required and fail-closed. The PostgreSQL gate does not consume a Multipass instance; the test inventory cap remains two registered instances total because of host disk capacity.
+This is an Inbox receive adapter, not the consumer/admission transaction implemented in the later 3C2 slice. At the 3C1 boundary it did not resolve source identity, reserve Host or cluster capacity, append a terminal receipt, publish an owner Outbox event, invoke Multipass/K3s Manager, or start TaskExecutionRun. The separate owner-admission primitive is specified below; trusted resolver, production consumer, worker, readiness and execution gates remain independently required and fail-closed. The PostgreSQL gate does not consume a Multipass instance; the test inventory cap remains two registered instances total because of host disk capacity.
+
+### 6.6 9F4D-3C2 Infrastructure-owner paired-capacity admission
+
+The internal owner-store primitive accepts a previously persisted Inbox item, a fresh provider observation and a profile-derived resource request. It starts one Infrastructure-owner transaction, applies tenant RLS, acquires deterministic tenant+Host and tenant+exact-cluster advisory locks, and then locks/revalidates the Inbox identity, canonical demand payload, deadline and provider generation. It recomputes active reservations from the tenant's own ledger using `held` rows whose `lease_expires_at` is later than the transaction time; provider-supplied active-reservation totals are not authoritative. The V2 evaluator then checks exact scope, binding digest, freshness and both resource vectors.
+
+On acceptance, one transaction writes distinct Host/cluster reservation IDs, the paired bundle, append-only lifecycle and demand receipt facts, terminal Inbox state, immutable owner Outbox and separate delivery Work row. Unknown/stale/insufficient observations schedule bounded retry without a reservation. Permanent scope/generation mismatches produce a terminal rejection. Disposable PostgreSQL tests verify one winner and one retry under contention, exact replay, generation rejection and capacity reuse after a lease expires.
+
+This implementation is scoped to the tenant RLS ledger. It cannot account for another tenant's claims on a physical Host or cluster; cross-tenant shared placement must remain disabled until a global allocator and ledger exist. Provider/profile resolution, current ACL/binding serialization, Inbox/Outbox consumer, target DB role provisioning, Manager/provider, readiness and task executor are still absent. This slice starts no VM and leaves Schedule/CLI execution disabled.
 
 ## 7. Revision history
 
@@ -97,3 +105,4 @@ This is an Inbox receive adapter, not the consumer/admission transaction. It doe
 | v0.18 | 2026-10-07 | Define the test limit over all registered Multipass instances, including stopped/recoverable records, and record the locked fail-closed bootstrap creation guard without changing production topology. |
 | v0.19 | 2026-10-07 | Add the Infrastructure-owner NOLOGIN role, least-privilege W/T grants and separate login/role-activation boundary; record the isolated PostgreSQL 18.6 grant-matrix evidence and keep production identity, migration caller, writer/consumer and execution gates open. |
 | v0.20 | 2026-10-07 | Add the 9F4D-3C1 owner Inbox receive design and idempotency outcomes; distinguish receiving from the later capacity consumer/reservation transaction and keep execution disabled. |
+| v0.21 | 2026-10-07 | Add the 9F4D-3C2 Infrastructure-owner admission primitive, deterministic dual-resource lock order, recomputed unexpired reservation ledger, atomic paired reservation/receipt/Outbox behavior, PostgreSQL concurrency/expiry evidence, and explicit tenant-only accounting boundary; keep resolver, consumer, provider and execution fail-closed. |

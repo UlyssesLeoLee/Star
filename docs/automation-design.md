@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.17 (2026-10-07)
+> **文档版本**: v2.18 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1644,6 +1644,7 @@ frontend/src/app/automation-debug/
 ---
 
 | v2.17 | 2026-10-07 | Add the 9F4D-3C1 reproducible Rust and disposable PostgreSQL Inbox integration gate; record serial infrastructure-crate tests, baseline lint allowances, and the exact fail-closed boundary. |
+| v2.18 | 2026-10-07 | Add §4.59 for the 9F4D-3C2 owner-admission Rust/PostgreSQL gates; include `infrastructure_owner_admission.rs` in explicit rustfmt inputs and record atomic reservation concurrency/replay/expiry cases, tenant-only capacity scope, zero VM use, and open production integration gates. |
 
 ## 11. 引用文档
 
@@ -2644,3 +2645,14 @@ frontend/src/app/automation-debug/
 - 2026-10-07 evidence: Rust runner format/check/Clippy/tests passed; PostgreSQL runner passed schema/grants checks plus the actual Inbox integration test and cleaned its own temporary database. No Multipass VM was created.
 - This gate proves Inbox receipt/idempotency only. It does not prove resolver trust/currentness, capacity reservation, owner Outbox delivery, consumer, target DB deployment, Manager/provider, or execution. Keep Schedule fail-closed.
 - The test environment remains capped at two registered Multipass instances total, including stopped/deleted records, due to disk capacity; this runner uses zero instances.
+
+### 4.59 Phase 9F4D-3C2 Infrastructure-owner admission verification
+
+**自动化档：[P]** — reuse the bounded Infrastructure Rust runner and disposable PostgreSQL schema/grants runner. The Rust runner explicitly formats `infrastructure_owner_admission.rs`, checks both changed crates across all targets, runs targeted Clippy with the documented baseline allowances, and executes crate tests serially to avoid MSVC linker contention. The PostgreSQL runner starts only its loopback temporary PostgreSQL cluster and runs every ignored SQLx owner integration case after the migration/grants gates.
+
+- The SQLx cases prove tenant-scoped owner transaction behavior: concurrent demands on one Host/cluster yield one paired reservation and one retry; exact accepted receipt replay is idempotent; provider generation mismatch is terminal; a held reservation stops consuming ledger headroom after its lease expires.
+- The capacity snapshot and profile request are trusted-boundary inputs. No current production provider/profile resolver, canonical Run binding resolver, current ACL fence, inbox consumer, Outbox delivery worker, target DB identity or task executor is wired.
+- Reservation aggregation and advisory lock keys are tenant-qualified because the owner tables enforce tenant FORCE RLS. Cross-tenant sharing of one physical Host/cluster must stay disabled until a global allocator/ledger can observe and serialize every tenant reservation.
+- This gate starts zero Multipass instances. Any live Multipass test remains limited to two total registered inventory entries, including stopped/Deleted records, because of host disk capacity; the locked launcher fails closed and never purges automatically.
+- This evidence closes only the persistence/admission transaction primitive. It does not enable Schedule or Task Card CLI execution.
+- Phase evidence: [`PHASE-9F4D-3C2-INFRASTRUCTURE-OWNER-ADMISSION-REPORT.md`](reports/PHASE-9F4D-3C2-INFRASTRUCTURE-OWNER-ADMISSION-REPORT.md).

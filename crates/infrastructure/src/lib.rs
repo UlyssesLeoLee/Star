@@ -6,10 +6,12 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
-//! @cypher schema=1 source_sha256=508b0960344dd98a6ed618fff49f1516272f69eb06b204bc13bef09c2aae27c5
+//! @cypher schema=1 source_sha256=03674794b6ad44b9a6b9c53833a74827cbf07f5bedba736673ac111fee5094b6
 //! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
 //! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
+//! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
 //! MERGE (self)-[:DEFINES]->(ownerInbox)
+//! MERGE (self)-[:DEFINES]->(ownerAdmission)
 //! @endcypher
 //!
 //! ## 职责
@@ -380,6 +382,7 @@ mod tests {
     }
 }
 
+pub mod infrastructure_owner_admission;
 pub mod infrastructure_owner_inbox;
 pub mod registry;
 pub mod registry_real_pg;

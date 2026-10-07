@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=b5fb2f8e1e9a8fc11a0527696b12b8cf6aca3c1a3099236ca9725ffe49674292
+//! @cypher schema=1 source_sha256=3ff7e1b13bcfe674f0b9361c5b6b7e52113063f36f3e108f77a4987729c10323
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_inbox.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_inbox.rs::module",kind:"module"})
 //! MERGE (binding:Type {id:"crates/infrastructure/src/infrastructure_owner_inbox.rs::CurrentInfrastructureBindingV2",kind:"struct"})
@@ -225,7 +225,7 @@ fn verify_current_binding(
 }
 
 /// Serialize the typed event as canonical JSON and bind it to its wire-contract version.
-fn payload_digest(
+pub(crate) fn payload_digest(
     demand: &HostInfrastructureDemandV2,
 ) -> Result<(Value, [u8; 32]), InfrastructureOwnerInboxError> {
     let payload = serde_json::to_value(demand)?;
@@ -311,7 +311,7 @@ async fn read_pending_duplicate(
     }
 }
 
-async fn set_tenant_scope(
+pub(crate) async fn set_tenant_scope(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
 ) -> Result<(), sqlx::Error> {
@@ -322,14 +322,14 @@ async fn set_tenant_scope(
     Ok(())
 }
 
-fn provider_kind_value(provider: ProviderKind) -> &'static str {
+pub(crate) fn provider_kind_value(provider: ProviderKind) -> &'static str {
     match provider {
         ProviderKind::MultipassK3sCluster => "multipass_k3s_cluster",
         ProviderKind::RemoteK3s => "remote_k3s",
     }
 }
 
-fn placement_policy_value(policy: ClusterPlacementPolicyV1) -> &'static str {
+pub(crate) fn placement_policy_value(policy: ClusterPlacementPolicyV1) -> &'static str {
     match policy {
         ClusterPlacementPolicyV1::SharedPool => "shared_pool",
         ClusterPlacementPolicyV1::RunDedicated => "run_dedicated",

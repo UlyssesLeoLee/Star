@@ -1,6 +1,9 @@
-//! @cypher schema=1 source_sha256=93c6248496d8a5b6f7cc91ed148c6733b32247f33278fd16f355ec86024ca5e8
+//! @cypher schema=1 source_sha256=31fbd324585d82564969a38836ed757ae420f8f7eff908186a2e4d5bfcf1c3a1
 //! MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 //! MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_inbox_is_idempotent_and_honors_terminal_receipts",kind:"test"})
+//! MERGE (admission_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_serializes_host_and_cluster_reservations",kind:"test"})
+//! MERGE (rejection_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_rejects_provider_generation_mismatch",kind:"test"})
+//! MERGE (expiry_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_ignores_expired_capacity_holds",kind:"test"})
 //! MERGE (binding:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::binding",kind:"function"})
 //! MERGE (demand:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::demand",kind:"function"})
 //! MERGE (payload_digest:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::payload_digest",kind:"function"})
@@ -9,6 +12,11 @@
 //! MERGE (pg_pool:Type {id:"sqlx::PgPool",kind:"external_type"})
 //! MERGE (inbox:Table {id:"infrastructure.capacity_demand_inbox"})
 //! MERGE (receipt:Table {id:"infrastructure.capacity_demand_receipt"})
+//! MERGE (reservation:Table {id:"infrastructure.capacity_reservation_bundle"})
+//! MERGE (reservation_event:Table {id:"infrastructure.capacity_reservation_event"})
+//! MERGE (owner_outbox:Table {id:"infrastructure.capacity_owner_outbox"})
+//! MERGE (delivery:Table {id:"infrastructure.capacity_outbox_delivery"})
+//! MERGE (admission:Type {id:"infrastructure::PostgresInfrastructureOwnerAdmission",kind:"external_type"})
 //! MERGE (self)-[:DEFINES]->(test)
 //! MERGE (self)-[:DEFINES]->(binding)
 //! MERGE (self)-[:DEFINES]->(demand)
@@ -23,12 +31,38 @@
 //! MERGE (insert_receipt)-[:CALLS]->(payload_digest)
 //! MERGE (insert_receipt)-[:WRITES]->(receipt)
 //! MERGE (test)-[:USES_TYPE]->(pg_pool)
+//! MERGE (admission_test)-[:CALLS]->(binding)
+//! MERGE (admission_test)-[:CALLS]->(demand)
+//! MERGE (admission_test)-[:CALLS]->(store)
+//! MERGE (admission_test)-[:CALLS]->(admission)
+//! MERGE (admission_test)-[:READS]->(reservation)
+//! MERGE (admission_test)-[:READS]->(receipt)
+//! MERGE (admission_test)-[:READS]->(reservation_event)
+//! MERGE (admission_test)-[:READS]->(owner_outbox)
+//! MERGE (admission_test)-[:READS]->(delivery)
+//! MERGE (rejection_test)-[:CALLS]->(binding)
+//! MERGE (rejection_test)-[:CALLS]->(demand)
+//! MERGE (rejection_test)-[:CALLS]->(store)
+//! MERGE (rejection_test)-[:CALLS]->(admission)
+//! MERGE (rejection_test)-[:READS]->(reservation)
+//! MERGE (rejection_test)-[:READS]->(receipt)
+//! MERGE (expiry_test)-[:CALLS]->(binding)
+//! MERGE (expiry_test)-[:CALLS]->(demand)
+//! MERGE (expiry_test)-[:CALLS]->(store)
+//! MERGE (expiry_test)-[:CALLS]->(admission)
+//! MERGE (expiry_test)-[:READS]->(reservation)
+//! MERGE (expiry_test)-[:WRITES]->(reservation)
 //! @endcypher
 
 use chrono::{Duration, Utc};
 use domain_infrastructure::{
     ClusterPlacementPolicyV1, ExecutionResourceBudgetV1, HostInfrastructureDemandV2,
-    KubernetesDnsLabel, ProviderKind, RunInfrastructureBindingSnapshotV2,
+    InfrastructureCapacityRequestV2, InfrastructureCapacitySnapshotV2,
+    InfrastructureResourceVectorV1, KubernetesDnsLabel, ProviderKind,
+    RunInfrastructureBindingSnapshotV2,
+};
+use infrastructure::infrastructure_owner_admission::{
+    InfrastructureOwnerAdmissionOutcome, PostgresInfrastructureOwnerAdmission,
 };
 use infrastructure::infrastructure_owner_inbox::{
     CurrentInfrastructureBindingV2, InboxReceiveOutcome, PostgresInfrastructureOwnerInbox,
@@ -96,6 +130,63 @@ fn demand(binding: RunInfrastructureBindingSnapshotV2) -> HostInfrastructureDema
         binding,
         requested_at: now,
         deadline_at: now + Duration::minutes(5),
+    }
+}
+
+fn resource(cpu_millicores: u64, memory_bytes: u64) -> InfrastructureResourceVectorV1 {
+    InfrastructureResourceVectorV1 {
+        cpu_millicores,
+        memory_bytes,
+        ephemeral_storage_bytes: 0,
+        gpu_units: 0,
+    }
+}
+
+fn capacity_snapshot(demand: &HostInfrastructureDemandV2) -> InfrastructureCapacitySnapshotV2 {
+    InfrastructureCapacitySnapshotV2 {
+        schema_version: 2,
+        host_environment_id: demand.binding.host_environment_id,
+        host_generation: 1,
+        k3s_cluster_id: demand.binding.k3s_cluster_id,
+        k3s_cluster_generation: demand.binding.k3s_cluster_generation,
+        provider: demand.binding.provider,
+        observed_at: Utc::now(),
+        total: Some(resource(1_200, 4 * 1024 * 1024 * 1024)),
+        os_base_reserve: Some(resource(100, 256 * 1024 * 1024)),
+        host_safety_reserve: Some(resource(100, 256 * 1024 * 1024)),
+        unmanaged_commitments: Some(resource(0, 0)),
+        active_reservations: Some(resource(0, 0)),
+        cluster_allocatable: Some(resource(1_000, 4 * 1024 * 1024 * 1024)),
+        cluster_safety_reserve: Some(resource(0, 0)),
+        cluster_unmanaged_commitments: Some(resource(0, 0)),
+        cluster_active_reservations: Some(resource(0, 0)),
+    }
+}
+
+fn capacity_request(demand: &HostInfrastructureDemandV2) -> InfrastructureCapacityRequestV2 {
+    InfrastructureCapacityRequestV2 {
+        schema_version: 2,
+        binding_digest: demand.binding.digest().expect("valid binding has a digest"),
+        host_resources: resource(600, 512 * 1024 * 1024),
+        cluster_resources: resource(600, 512 * 1024 * 1024),
+    }
+}
+
+async fn enqueue_demand(
+    store: &PostgresInfrastructureOwnerInbox,
+    item: &HostInfrastructureDemandV2,
+) -> Uuid {
+    let current = CurrentInfrastructureBindingV2 {
+        binding: item.binding.clone(),
+        host_generation: 1,
+    };
+    match store
+        .receive_demand(item, &current)
+        .await
+        .expect("receive capacity demand")
+    {
+        InboxReceiveOutcome::Enqueued { inbox_id } => inbox_id,
+        other => panic!("expected demand to enqueue, received {other:?}"),
     }
 }
 
@@ -184,5 +275,240 @@ async fn postgres_inbox_is_idempotent_and_honors_terminal_receipts() {
             outcome: TerminalDemandOutcome::Accepted
         }
     );
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_admission_serializes_host_and_cluster_reservations() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let inbox_store = PostgresInfrastructureOwnerInbox::new(pool.clone());
+    let admission_store =
+        PostgresInfrastructureOwnerAdmission::new(pool.clone(), Uuid::new_v4(), Uuid::new_v4())
+            .expect("owner identities are present");
+
+    let first = demand(binding());
+    let second = demand(first.binding.clone());
+    let first_id = enqueue_demand(&inbox_store, &first).await;
+    let second_id = enqueue_demand(&inbox_store, &second).await;
+    let snapshot = capacity_snapshot(&first);
+    let request = capacity_request(&first);
+
+    let (first_result, second_result) = tokio::join!(
+        admission_store.admit_inbox(first.tenant_id, first_id, &snapshot, &request),
+        admission_store.admit_inbox(second.tenant_id, second_id, &snapshot, &request),
+    );
+    let first_result = first_result.expect("first admission transaction");
+    let second_result = second_result.expect("second admission transaction");
+    let (accepted_inbox_id, accepted) = match (first_result, second_result) {
+        (
+            accepted @ InfrastructureOwnerAdmissionOutcome::Accepted { .. },
+            InfrastructureOwnerAdmissionOutcome::RetryScheduled { .. },
+        ) => (first_id, accepted),
+        (
+            InfrastructureOwnerAdmissionOutcome::RetryScheduled { .. },
+            accepted @ InfrastructureOwnerAdmissionOutcome::Accepted { .. },
+        ) => (second_id, accepted),
+        pair => panic!("expected one accepted pair and one retry, received {pair:?}"),
+    };
+
+    let InfrastructureOwnerAdmissionOutcome::Accepted {
+        reservation_bundle_id,
+        host_capacity_reservation_id,
+        cluster_capacity_reservation_id,
+        replayed: false,
+    } = accepted
+    else {
+        panic!("first accepted result must be new");
+    };
+    assert_ne!(
+        host_capacity_reservation_id,
+        cluster_capacity_reservation_id
+    );
+    assert!(matches!(
+        admission_store
+            .admit_inbox(first.tenant_id, accepted_inbox_id, &snapshot, &request)
+            .await
+            .expect("replay accepted admission"),
+        InfrastructureOwnerAdmissionOutcome::Accepted {
+            reservation_bundle_id: replayed_bundle_id,
+            replayed: true,
+            ..
+        } if replayed_bundle_id == reservation_bundle_id
+    ));
+
+    let (bundles, receipts, events, outbox, deliveries): (i64, i64, i64, i64, i64) =
+        sqlx::query_as(
+            "SELECT \
+                (SELECT count(*) FROM infrastructure.capacity_reservation_bundle WHERE tenant_id = $1), \
+                (SELECT count(*) FROM infrastructure.capacity_demand_receipt WHERE tenant_id = $1), \
+                (SELECT count(*) FROM infrastructure.capacity_reservation_event WHERE tenant_id = $1), \
+                (SELECT count(*) FROM infrastructure.capacity_owner_outbox WHERE tenant_id = $1), \
+                (SELECT count(*) FROM infrastructure.capacity_outbox_delivery WHERE tenant_id = $1)",
+        )
+        .bind(first.tenant_id)
+        .fetch_one(&pool)
+        .await
+        .expect("read atomic owner admission facts");
+    assert_eq!(
+        (bundles, receipts, events, outbox, deliveries),
+        (1, 1, 1, 1, 1)
+    );
+
+    let saved_ids: Option<(Uuid, Uuid)> = sqlx::query_as(
+        "SELECT host_capacity_reservation_id, cluster_capacity_reservation_id \
+         FROM infrastructure.capacity_reservation_bundle \
+         WHERE tenant_id = $1 AND reservation_bundle_id = $2",
+    )
+    .bind(first.tenant_id)
+    .bind(reservation_bundle_id)
+    .fetch_optional(&pool)
+    .await
+    .expect("read saved paired reservation");
+    assert_eq!(
+        saved_ids,
+        Some((
+            host_capacity_reservation_id,
+            cluster_capacity_reservation_id
+        ))
+    );
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_admission_rejects_provider_generation_mismatch() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let inbox_store = PostgresInfrastructureOwnerInbox::new(pool.clone());
+    let admission_store =
+        PostgresInfrastructureOwnerAdmission::new(pool.clone(), Uuid::new_v4(), Uuid::new_v4())
+            .expect("owner identities are present");
+    let item = demand(binding());
+    let current = CurrentInfrastructureBindingV2 {
+        binding: item.binding.clone(),
+        host_generation: 1,
+    };
+    let inbox_id = match inbox_store
+        .receive_demand(&item, &current)
+        .await
+        .expect("receive capacity demand")
+    {
+        InboxReceiveOutcome::Enqueued { inbox_id } => inbox_id,
+        other => panic!("expected demand to enqueue, received {other:?}"),
+    };
+    let mut snapshot = capacity_snapshot(&item);
+    snapshot.host_generation += 1;
+    let request = capacity_request(&item);
+    assert_eq!(
+        admission_store
+            .admit_inbox(item.tenant_id, inbox_id, &snapshot, &request)
+            .await
+            .expect("record generation mismatch rejection"),
+        InfrastructureOwnerAdmissionOutcome::Rejected {
+            reason_code: "provider_generation_or_scope_mismatch".to_owned(),
+            replayed: false,
+        }
+    );
+    assert_eq!(
+        admission_store
+            .admit_inbox(
+                item.tenant_id,
+                inbox_id,
+                &capacity_snapshot(&item),
+                &request,
+            )
+            .await
+            .expect("replay terminal rejection"),
+        InfrastructureOwnerAdmissionOutcome::Rejected {
+            reason_code: "provider_generation_or_scope_mismatch".to_owned(),
+            replayed: true,
+        }
+    );
+    let (bundles, receipts, outbox): (i64, i64, i64) = sqlx::query_as(
+        "SELECT \
+            (SELECT count(*) FROM infrastructure.capacity_reservation_bundle WHERE tenant_id = $1), \
+            (SELECT count(*) FROM infrastructure.capacity_demand_receipt WHERE tenant_id = $1), \
+            (SELECT count(*) FROM infrastructure.capacity_owner_outbox WHERE tenant_id = $1)",
+    )
+    .bind(item.tenant_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read rejected owner facts");
+    assert_eq!((bundles, receipts, outbox), (0, 1, 1));
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_admission_ignores_expired_capacity_holds() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let inbox_store = PostgresInfrastructureOwnerInbox::new(pool.clone());
+    let admission_store =
+        PostgresInfrastructureOwnerAdmission::new(pool.clone(), Uuid::new_v4(), Uuid::new_v4())
+            .expect("owner identities are present");
+    let first = demand(binding());
+    let second = demand(first.binding.clone());
+    let first_id = enqueue_demand(&inbox_store, &first).await;
+    let second_id = enqueue_demand(&inbox_store, &second).await;
+    let snapshot = capacity_snapshot(&first);
+    let request = capacity_request(&first);
+    let accepted = admission_store
+        .admit_inbox(first.tenant_id, first_id, &snapshot, &request)
+        .await
+        .expect("reserve initial Host and cluster capacity");
+    let InfrastructureOwnerAdmissionOutcome::Accepted {
+        reservation_bundle_id,
+        replayed: false,
+        ..
+    } = accepted
+    else {
+        panic!("initial demand must be accepted");
+    };
+
+    sqlx::query(
+        "UPDATE infrastructure.capacity_reservation_bundle \
+         SET lease_expires_at = clock_timestamp() + interval '2 seconds' \
+         WHERE tenant_id = $1 AND reservation_bundle_id = $2",
+    )
+    .bind(first.tenant_id)
+    .bind(reservation_bundle_id)
+    .execute(&pool)
+    .await
+    .expect("shorten the test lease while retaining the reservation");
+    tokio::time::sleep(std::time::Duration::from_millis(2_100)).await;
+
+    assert!(matches!(
+        admission_store
+            .admit_inbox(
+                second.tenant_id,
+                second_id,
+                &capacity_snapshot(&second),
+                &capacity_request(&second),
+            )
+            .await
+            .expect("expired hold no longer consumes capacity"),
+        InfrastructureOwnerAdmissionOutcome::Accepted {
+            replayed: false,
+            ..
+        }
+    ));
     pool.close().await;
 }

@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.87 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.90
+> **文档版本**: v5.88 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.91
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4605,7 +4605,7 @@ Chat Bar(scope, text, entity_refs)
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
-| AC-LOOP-010 | §16.27-16.33 / Schedule API DD v0.21 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 独立事务解析 profile placement 并预留 Host+精确 K3s cluster 双层 capacity，再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster；executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；owner store 与 production worker 仍未实现 |
+| AC-LOOP-010 | §16.27-16.34 / Schedule API DD v0.22 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 现有 tenant-scoped admission primitive 在独立事务内评估 Host+精确 K3s cluster 双层 capacity 并原子写 reservation bundle/receipt/event/Outbox，但尚无可信 profile/provider resolver 或 production consumer；再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster。executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；跨租户共享资源需全局 allocator，worker/BI/production execution 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4939,6 +4939,14 @@ PostgresInfrastructureOwnerInbox::receive_demand 接收 Run/Execution owner 已�
 
 Rust focused runner 覆盖 domain-infrastructure 与 infrastructure 两个 crate；isolated PostgreSQL 18.6 runner 在 schema/grants gates 后运行真实 SQLx Inbox 集成用例，覆盖首次写入、重复、冲突与 terminal receipt replay。此门不启动 Multipass VM；测试阶段仍以磁盘容量为约束最多 2 个已登记实例（含停止记录）。
 
+### 16.34 Phase 9F4D-3C2 Infrastructure owner 原子双层容量准入
+
+`PostgresInfrastructureOwnerAdmission::admit_inbox` 是 Infrastructure owner 内部的 PostgreSQL adapter，不是公开 route 或已运行的 Inbox consumer。它锁定 demand 对应的 tenant-scoped Host 与精确 K3s cluster，按 advisory key 确定性排序后加锁，再锁定/重读 Inbox，校验 canonical V2 payload、摘要、deadline、Host/cluster identity 与 generation。容量计算不信任调用方提供的 active-reservation 数值：在同一事务中从本 tenant 的 owner ledger 聚合 `reservation_state='held' AND lease_expires_at > now`，再由纯容量 evaluator 检查新鲜 provider observation、双层预算和资源余量。
+
+容量可接受时，同一 owner transaction 写入一个包含不同 Host/cluster reservation ID 的 bundle、append-only `held` lifecycle fact、terminal demand receipt、Inbox accepted 状态、owner Outbox 与 delivery Work row；任何写入失败均整体回滚。容量未知/过期/不足时只安排有界退避重试，不产生 bundle；binding/generation 不匹配或永久无效输入记录终态拒绝。终态按 source-event/occurrence 与 digest 校验后重放。PostgreSQL 18.6 并发用例证明两条竞争 demand 只有一条取得双 reservation，另一条可重试；额外用例覆盖已过期 capacity hold 不继续占用后续准入。
+
+此 schema 采用 tenant FORCE RLS，当前聚合边界因此仅涵盖同一 tenant 的 Host/cluster reservation。跨租户共享的物理 Host 或 cluster 必须由未来 system-wide allocator/全局容量 ledger 统一串行化和核算；在其存在前不得把跨租户共享池接入此 adapter。当前没有 trusted Run binding/placement resolver、provider snapshot producer、consumer/outbox delivery、target database provisioning、admission reaper、Manager/provider 或 executor。该代码切片不使 TaskExecutionRun 进入执行态；Schedule、CLI 继续 fail-closed。测试使用 disposable PostgreSQL，不启动 Multipass，测试 inventory 上限仍为 2 个登记项以控制硬盘占用。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5072,3 +5080,4 @@ Rust focused runner 覆盖 domain-infrastructure 与 infrastructure 两个 crate
 | v5.85 | 2026-10-07 | Mavis review | Synchronize requirements v5.88, Schedule SRS/DD v0.19, and Infrastructure DD v0.15 in all active acceptance rows and infrastructure references; retain the 2-instance test inventory cap and fail-closed production gates. | Cross-layer audit corrected active current-section pointers after the 9F4D-3A schema substrate update. |
 | v5.86 | 2026-10-07 | Mavis review | Align requirements v5.89, Schedule SRS/BD/DD v0.20/v0.19/v0.20, Infrastructure DD v0.16, Group DD v4.62 and implementation plan v6.17; add Section 16.32 for the Infrastructure-owner NOLOGIN grant group, W/T privilege matrix and separate application login boundary; record isolated PostgreSQL 18.6 14/14 evidence and keep production deployment/open owner gates explicit. | Phase 9F4D-3B1 grant contract was implemented and independently exercised in a disposable database. |
 | v5.87 | 2026-10-07 | Mavis review | Align requirements v5.90, Schedule SRS/BD/DD v0.21/v0.20/v0.21, Infrastructure DD v0.17, Group DD v4.63, DUKOU v1.10 and plan v6.18; add §16.33 for the 9F4D-3C1 Inbox receive adapter and its role/RLS/idempotency contract; keep resolver, capacity admission, Outbox delivery, provider, worker and execution open. Preserve the two-instance disk cap. | Rust and isolated PostgreSQL receive gates passed; production integration remains fail-closed. |
+| v5.88 | 2026-10-07 | Mavis review | Align requirements v5.91, Schedule SRS/DD v0.22, Infrastructure DD v0.18, and implementation plan v6.19; add §16.34 for tenant-scoped atomic dual Host/cluster admission, unexpired reservation aggregation, concurrent admission evidence, and explicit cross-tenant allocator gap. Preserve the two-instance disk cap and Schedule/CLI fail-closed boundary. | Phase 9F4D-3C2 PostgreSQL owner admission integration passed without Multipass. |

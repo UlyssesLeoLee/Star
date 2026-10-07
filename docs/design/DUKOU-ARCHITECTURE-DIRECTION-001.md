@@ -1,6 +1,6 @@
 # 渡口架构与交付方向
 
-> v1.10 · 2026-10-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.11 · 2026-10-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 >
 > 对照：requirements §50、basic-design §16、DD-WORKTREE-GROUP-001、WORKTREE-GROUP-IMPL-PLAN-001。本指引安排交付顺序，不替代既有 Phase 完成门。源码、编译、数据库与产品运行证据分别记录。
 
@@ -99,11 +99,11 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 
 ## 8. 本地基础设施方向
 
-本地与 CI 的首选路径确定为 Multipass 管理 Linux VM，在 guest 内运行 K3s；Podman machine、Incus、Lima 是 capability-negotiated fallback，生产/远端 Linux K3s 使用独立 provider。Host/environment 可共享按需 Multipass VM 与宿主容量；K3s cluster 数量和 Run placement 由版本化 Infrastructure Profile 显式决定（shared_pool、run_dedicated、pinned_cluster），不预设单一共享 cluster。Project/Run 以 namespace、RBAC、quota 和 network policy 隔离，不按 Worktree/Agent 复制 VM。Rust Host Infrastructure Manager 是唯一 Multipass adapter caller；GUI 保持普通用户权限，Agent/Plugin/Task CLI 不获得 daemon/socket、任意 host shell 或未经授权 mount。Worktree 内容经 scope/revision 校验的 workspace bridge 输入 guest；缺少实际 Runtime sandbox、Hook、取消/恢复与独立验证时，CLI 仍禁用。资源未知/不足时拒绝新 VM/Agent admission，并以桌面进程树、VM、K3s、Agent 的固定负载实测内存和并行能力。
+本地与 CI 的首选路径确定为 Multipass 管理 Linux VM，在 guest 内运行 K3s；Podman machine、Incus、Lima 是 capability-negotiated fallback，生产/远端 Linux K3s 使用独立 provider。Host/environment 可共享按需 Multipass VM 与宿主容量；K3s cluster 数量和 Run placement 由版本化 Infrastructure Profile 显式决定（shared_pool、run_dedicated、pinned_cluster），不预设单一共享 cluster。当前 owner capacity ledger 使用 tenant FORCE RLS 与 tenant-qualified reservation locks，只能安全核算同一 tenant 的 Host/cluster；跨租户共享物理资源须等待 system-wide allocator/ledger，不能借用 tenant-scoped admission primitive。Project/Run 以 namespace、RBAC、quota 和 network policy 隔离，不按 Worktree/Agent 复制 VM。Rust Host Infrastructure Manager 是唯一 Multipass adapter caller；GUI 保持普通用户权限，Agent/Plugin/Task CLI 不获得 daemon/socket、任意 host shell 或未经授权 mount。Worktree 内容经 scope/revision 校验的 workspace bridge 输入 guest；缺少实际 Runtime sandbox、Hook、取消/恢复与独立验证时，CLI 仍禁用。资源未知/不足时拒绝新 VM/Agent admission，并以桌面进程树、VM、K3s、Agent 的固定负载实测内存和并行能力。
 
-不按用途、行业、部署规模、seat、用量或商业 tier 限制。GPL/AGPL/LGPL 允许商业使用与销售，不因 copyleft 排除；产品支持既有 provider 检测、安装引导及履行实际发行义务后的受管安装/捆绑，不得强制手工自装。逐版本审查完整发行 SBOM/NOTICE 与近 12 个月上游维护证据；法律发行义务不构成商业用途/客户/功能限制。Multipass 官方定位是本地开发/测试工具，并且 daemon/mount 位于宿主高权限边界，不能替代不可信 Agent Runtime sandbox。dev 上已有 Windows HCS + Multipass 1.17.0-rc1 + Ubuntu/K3s 与 19/19 GitOps Pod Running 实跑证据，但这不是 Star 原生 provider/Run binding/sandbox 的验收，也没有桌面/Agent RSS 基准。具体契约与后续门见 DD-LOCAL-INFRASTRUCTURE-001 v0.16 和实施计划 §6.83/§6.91。
+不按用途、行业、部署规模、seat、用量或商业 tier 限制。GPL/AGPL/LGPL 允许商业使用与销售，不因 copyleft 排除；产品支持既有 provider 检测、安装引导及履行实际发行义务后的受管安装/捆绑，不得强制手工自装。逐版本审查完整发行 SBOM/NOTICE 与近 12 个月上游维护证据；法律发行义务不构成商业用途/客户/功能限制。Multipass 官方定位是本地开发/测试工具，并且 daemon/mount 位于宿主高权限边界，不能替代不可信 Agent Runtime sandbox。dev 上已有 Windows HCS + Multipass 1.17.0-rc1 + Ubuntu/K3s 与 19/19 GitOps Pod Running 实跑证据，但这不是 Star 原生 provider/Run binding/sandbox 的验收，也没有桌面/Agent RSS 基准。具体契约与后续门见 DD-LOCAL-INFRASTRUCTURE-001 v0.18 和实施计划 §6.83/§6.93。
 
-9F4D-3C1 将 Run owner 的版本化 infrastructure demand 接入 Infrastructure owner 的 PostgreSQL Inbox，验证 scope/binding digest、tenant RLS 与幂等 replay。它只是跨 owner 消息的接收面，不是容量接受、reservation 或执行能力。受磁盘空间约束，测试阶段最多保留两条已登记 Multipass instance；该 gate 不启动 VM。下一个交付门应实现可信 resolver 与 owner-local Host/cluster 双 reservation，再推进 Outbox delivery、Manager/provider 和 readiness/runtime 闭环。
+9F4D-3C1 将 Run owner 的版本化 infrastructure demand 接入 Infrastructure owner 的 PostgreSQL Inbox，验证 scope/binding digest、tenant RLS 与幂等 replay。3C2 在此基础上新增 tenant-scoped owner admission transaction：它对 Host 与精确 cluster 获取确定顺序锁、重算未过期 reservation，并原子写入不同 ID 的双 reservation、terminal receipt、lifecycle event 与 owner Outbox；隔离 PostgreSQL 验证并发竞争、幂等回放、generation 拒绝及过期容量释放。它仍是 store primitive，不含可信 binding/profile/provider resolver、生产 Inbox/Outbox consumer、跨租户全局容量账本、Manager/provider 或 task executor；Schedule/CLI 保持 fail-closed。因 tenant RLS 的可见范围，跨租户共享同一物理 Host/cluster 暂不允许。测试阶段最多保留两条 Multipass 登记记录（含停止/Deleted），受磁盘空间限制，所有测试均未启动 VM。下一阶段补齐 trusted resolver、target DB 身份/迁移、consumer/delivery 与全局 allocator 边界，再推进 provider、readiness 和 runtime。
 
 ## 9. 商用开源基础设施
 
@@ -121,3 +121,4 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 | v1.8 | 2026-10-07 | Update current infrastructure contract pointers to DD v0.15 and implementation plan §6.83/§6.90 after the six-table owner schema substrate; preserve the temporary two-instance Multipass test cap and the production fail-closed boundary. | Phase 9F4D-3A implementation and final document-reference audit. |
 | v1.9 | 2026-10-07 | Update infrastructure pointers to DD v0.16 and plan §6.91; distinguish an isolated 14/14 runtime-grants contract gate from target DB identity provisioning and production owner execution. Retain the temporary two-instance test cap. | Phase 9F4D-3B1 grants migration and privilege matrix were verified in disposable PostgreSQL. |
 | v1.10 | 2026-10-07 | Record the 9F4D-3C1 owner Inbox receive slice, its non-admission boundary, the two-instance disk cap, and the next owner-reservation/delivery gates. |
+| v1.11 | 2026-10-07 | Record the 9F4D-3C2 tenant-scoped Infrastructure-owner admission primitive and its concurrency/expiry PostgreSQL evidence; make the cross-tenant allocator gap and remaining trusted resolver/consumer/provider/runtime phases explicit; keep the two-instance disk cap and fail-closed execution boundary. |
