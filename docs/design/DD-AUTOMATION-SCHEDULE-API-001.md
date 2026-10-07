@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, and bounded JetStream publisher are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production Run-owner consumer provisioning/quarantine, production worker, provider evidence producer, and execution remain open.
-> Version: 0.27 | Date: 2026-10-08
+> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, bounded JetStream publisher, and 3D6 quarantine persistence/consumer hook are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production consumer provisioning, production worker, provider evidence producer, and execution remain open.
+> Version: 0.28 | Date: 2026-10-08
 
 ## 1. Routes
 
@@ -188,7 +188,25 @@ Only after the quarantine owner transaction commits the receipt and the selected
 
 The quarantine service is a Platform app boundary connected through versioned API/owner commands and its own transactional store; it is not a Run app or a Worktree tree node. Operations should be visible from the relevant Run result event by authorized deep link, while platform-level access is audited and does not expose body content to Task Card CLI, Agent, Plugin, or Canvas. No Multipass VM is required for DB/NATS contract tests; the live test inventory remains at most two registered Multipass records including Stopped/Deleted entries, with no auto-purge.
 
-Acceptance requires duplicate-identical and duplicate-conflicting source identities, malformed/unmatched messages, permanent versus transient fault mapping, commit-before-Term, storage/key/quota outage redelivery, exact wire digest, body size/TTL/encryption policy, no untrusted tenant scope, no body logging, append-only/RLS/grant checks, and zero Run/BI/reservation/readiness/execution mutation. Until the user selects the body-retention policy and these gates pass, the existing Run-owner consumer remains production-disabled.
+Acceptance requires duplicate-identical and duplicate-conflicting source identities, malformed/unmatched messages, permanent versus transient fault mapping, commit-before-Term, storage/key/quota outage redelivery, exact wire digest, body size/TTL/encryption policy, no untrusted tenant scope, no body logging, append-only/RLS/grant checks, and zero Run/BI/reservation/readiness/execution mutation. The schema/owner-hook substrate is implemented and has focused Rust/PostgreSQL evidence; production consumption remains disabled pending KMS, login/stream provisioning, target rollout and full redelivery/operator gates.
+
+### 6.14 Phase 9F4D-3D6 implemented persistence and consumer hook
+
+`platform-messaging-runtime` owns the three physical relations defined by migration `2026-10-08-platform-poison-quarantine.sql`:
+
+| Relation | W/T/M | Contract |
+|---|---|---|
+| `platform_messaging.poison_quarantine_receipt` | Transaction | Append-only trusted source key, allowlisted fault, parser/classifier version, exact wire length/SHA-256, retention policy and timestamp. |
+| `platform_messaging.poison_quarantine_payload_work` | Work | Optional encrypted replay envelope, at most 204,800 bytes per row, exact 24-hour expiry, and a 4 MiB per-deployment live-byte ceiling enforced by a database trigger as well as Rust preflight. Expired rows continue consuming quota until audited purge. |
+| `platform_messaging.poison_quarantine_payload_purge_audit` | Transaction | Append-only proof of matching TTL-expired payload deletion; a separate NOLOGIN purger role can read receipt/work and insert audit before deleting Work in one transaction. |
+
+All three tables use ENABLE + FORCE RLS scoped only by trusted `app.platform_deployment_id`. `star_platform_ingress_owner` has only schema USAGE and SELECT/INSERT on receipt and payload; `star_platform_quarantine_purger` has SELECT on receipt/payload, DELETE on payload and INSERT on purge audit. Both are NOLOGIN, NOSUPERUSER, NOBYPASSRLS and NOINHERIT; deployment login provisioning and transaction-local role membership remain external gates. No Master table is added. Metadata-only and encrypted-24-hour policies are explicit configuration choices, with no `Default`; encrypted mode fails closed unless injected KMS health is non-mock and reports the configured scope/DEK. The present `domain-kms` provider is LocalMock-only, so no real encrypted production deployment is enabled.
+
+When encrypted replay is configured, the Rust encoder copies no more than 16 `Nats-Msg-Id` values or 8 KiB of aggregate value bytes. It checks both before allocating copied strings, so repeated empty headers cannot evade the byte cap.
+
+`RunOwnerCapacityResultConsumer::with_quarantine` accepts a Platform quarantine service explicitly. Only `InvalidEvent`, malformed JSON and `IdempotencyConflict` are routed as stable permanent-fault codes; owner stored-demand corruption, DB/KMS/quota failures and all other errors stay unacknowledged. The Platform owner commits receipt plus its selected payload action before sending `double_ack_with(AckKind::Term)` and awaiting broker confirmation. Missing quarantine service keeps permanent malformed events pending. This is a persistence/consumer-hook slice, not production NATS consumer composition, trusted stream provisioning, dead-letter operator UI/replay, Run/BI projection, or Schedule execution.
+
+Evidence: Rust 1.99.0 `cargo fmt --check`, focused `cargo check`, 16/16 library tests and targeted Clippy passed. A disposable PostgreSQL 18.6 instance applied the migration twice and passed schema, FORCE RLS, least-privilege, append-only, metadata-only, payload retention, TTL/purge and database quota-rejection assertions. This gate used zero Multipass VMs; live tests remain limited to two registered Multipass records total including Stopped/Deleted. The disposable PostgreSQL data directory was preserved after the environment rejected recursive cleanup; the server is stopped and this does not affect Multipass inventory.
 
 ## 7. Revision history
 
@@ -221,3 +239,4 @@ Acceptance requires duplicate-identical and duplicate-conflicting source identit
 | v0.25 | 2026-10-07 | Add section 6.11 for the 9F4D-3D4 publisher API, bounds, event allowlist, PubAck/timeout semantics and real loopback NATS/PostgreSQL integration. Clarify at-least-once delivery and durable Run Inbox dedupe; keep polling, target DB, Run consumer, provider, production broker configuration and execution open. | The bounded JetStream publisher passed its focused transport integration gate. |
 | v0.26 | 2026-10-07 | Add section 6.12 for caller-transaction TaskExecutionRun rule/revision/occurrence/correlation validation, durable explicit-ack pull, one-message byte/time bounds, immutable demand matching, Run-owner transaction, exact replay and the no-quarantine production block. | Phase 9F4D-3D5 verifies Run-owned result persistence and acknowledgement ordering. |
 | v0.27 | 2026-10-08 | Add section 6.13 for separate Platform Messaging/Ingress quarantine ownership, trusted JetStream deployment/stream-generation/sequence identity, immutable receipt and optional encrypted TTL Work body, permanent-fault classification, commit-before-Term, failure backpressure, and Run/BI isolation. Keep retention policy, taxonomy, migration, grants and production consumer open. | Phase 9F4D-3D6 design audit. |
+| v0.28 | 2026-10-08 | Add §6.14 for the implemented Platform owner tables/roles/RLS/quota/purge, explicit retention, 16-value/8-KiB replay-header cap and confirmed Term acknowledgement; document the three classified Run-owner routing cases, record Rust 1.99.0 and disposable PostgreSQL 18.6 evidence, and keep real KMS, production DB/NATS identities, operator access, redelivery integration and Schedule execution open. | 9F4D-3D6 implementation and bounded-memory review passed focused verification. |

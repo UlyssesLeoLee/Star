@@ -13,6 +13,7 @@ async-nats = { workspace = true }
 chrono = { workspace = true }
 domain-infrastructure = { path = "../domain-infrastructure" }
 futures-util = { workspace = true }
+platform-messaging-runtime = { path = "../platform-messaging-runtime" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

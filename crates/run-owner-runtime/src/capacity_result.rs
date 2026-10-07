@@ -1,16 +1,16 @@
 //! Bounded JetStream consumer for Infrastructure-owned capacity result facts.
 /*
-@cypher schema=1 source_sha256=da9ab9f55f13a682d278894a2f20242a89403480e3230828bd960489b0ead302
+@cypher schema=1 source_sha256=5a6c66ea6814d5b8b31e83dd46d66f704bcc1271a1505f4375f95156fcd74f1b
 MERGE (self:File {path:"crates/run-owner-runtime/src/capacity_result.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::capacity_result",kind:"module"})
-MERGE (consumer:Type {id:"run_owner_runtime::RunOwnerCapacityResultConsumer",kind:"struct"})
-MERGE (outcome:Type {id:"run_owner_runtime::CapacityResultConsumeOutcome",kind:"enum"})
-MERGE (error:Type {id:"run_owner_runtime::CapacityResultError",kind:"enum"})
-MERGE (envelope:Type {id:"run_owner_runtime::InfrastructureResultEnvelope",kind:"struct"})
-MERGE (accepted:Type {id:"run_owner_runtime::AcceptedPayload",kind:"struct"})
-MERGE (rejected:Type {id:"run_owner_runtime::RejectedPayload",kind:"struct"})
-MERGE (expired:Type {id:"run_owner_runtime::ExpiredPayload",kind:"struct"})
-MERGE (validated:Type {id:"run_owner_runtime::ValidatedCapacityResult",kind:"struct"})
+MERGE (consumer:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer",kind:"struct"})
+MERGE (outcome:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::CapacityResultConsumeOutcome",kind:"enum"})
+MERGE (error:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::CapacityResultError",kind:"enum"})
+MERGE (envelope:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::InfrastructureResultEnvelope",kind:"struct"})
+MERGE (accepted:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::AcceptedPayload",kind:"struct"})
+MERGE (rejected:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::RejectedPayload",kind:"struct"})
+MERGE (expired:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::ExpiredPayload",kind:"struct"})
+MERGE (validated:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::ValidatedCapacityResult",kind:"struct"})
 MERGE (new_consumer:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.new",kind:"method"})
 MERGE (consume:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.consume_one",kind:"method"})
 MERGE (persist_ack_method:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.persist_then_ack",kind:"method"})
@@ -46,10 +46,18 @@ MERGE (scope_test:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::t
 MERGE (bounds_test:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::tests.payload_and_envelope_byte_bounds_are_enforced",kind:"test"})
 MERGE (ack_test:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::tests.acknowledgement_is_after_commit_and_never_runs_after_store_failure",kind:"test"})
 MERGE (replay_test:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::tests.ack_failure_leaves_committed_event_safe_for_duplicate_redelivery",kind:"test"})
+MERGE (quarantine:Type {id:"crates/platform-messaging-runtime/src/lib.rs::PlatformPoisonQuarantine",kind:"struct"})
+MERGE (fault:Type {id:"crates/platform-messaging-runtime/src/lib.rs::PermanentPoisonFault",kind:"enum"})
+MERGE (quarantine_method:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.with_quarantine",kind:"method"})
+MERGE (quarantine_error:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.quarantine_or_return",kind:"method"})
+MERGE (classify_fault:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::permanent_poison_fault",kind:"function"})
+MERGE (quarantine_test:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::tests.run_owner_data_errors_never_enter_poison_quarantine",kind:"test"})
+MERGE (platform_file:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (demand:Table {id:"multica.infrastructure_capacity_demand_outbox"})
 MERGE (inbox:Table {id:"multica.infrastructure_capacity_result_inbox"})
 MERGE (topic:Topic {id:"star.infrastructure.v2.capacity_*"})
-MERGE (jetstream:Type {id:"async_nats::jetstream::consumer::PullConsumer",kind:"external_type"})
+MERGE (message:Type {id:"external::async_nats::jetstream::Message",kind:"external_type"})
+MERGE (jetstream:Type {id:"external::async_nats::jetstream::consumer::PullConsumer",kind:"external_type"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:DEFINES]->(consumer)
 MERGE (module)-[:DEFINES]->(outcome)
@@ -91,15 +99,27 @@ MERGE (module)-[:DEFINES]->(scope_test)
 MERGE (module)-[:DEFINES]->(bounds_test)
 MERGE (module)-[:DEFINES]->(ack_test)
 MERGE (module)-[:DEFINES]->(replay_test)
+MERGE (module)-[:DEFINES]->(quarantine_method)
+MERGE (module)-[:DEFINES]->(quarantine_error)
+MERGE (module)-[:DEFINES]->(classify_fault)
+MERGE (module)-[:DEFINES]->(quarantine_test)
+MERGE (module)-[:IMPORTS]->(platform_file)
 MERGE (consumer)-[:DEFINES]->(new_consumer)
 MERGE (consumer)-[:DEFINES]->(consume)
 MERGE (consumer)-[:DEFINES]->(persist_ack_method)
-MERGE (persist_ack_method)-[:CALLS]->(persist_ack)
 MERGE (consume)-[:CALLS]->(persist_ack_method)
 MERGE (consume)-[:USES_TYPE]->(jetstream)
-MERGE (consume)-[:CALLS]->(parse)
-MERGE (consume)-[:SUBSCRIBES]->(topic)
-MERGE (persist_ack)-[:CALLS]->(record)
+MERGE (persist_ack_method)-[:USES_TYPE]->(message)
+MERGE (persist_ack_method)-[:CALLS]->(parse)
+MERGE (persist_ack_method)-[:CALLS]->(record)
+MERGE (persist_ack_method)-[:CALLS]->(quarantine_error)
+MERGE (quarantine_error)-[:USES_TYPE]->(message)
+MERGE (quarantine_method)-[:USES_TYPE]->(quarantine)
+MERGE (quarantine_error)-[:CALLS]->(classify_fault)
+MERGE (classify_fault)-[:USES_TYPE]->(fault)
+MERGE (quarantine_error)-[:CALLS]->(record_poison:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::PlatformPoisonQuarantine.record_message",kind:"method"})
+MERGE (quarantine_test)-[:TESTS]->(classify_fault)
+MERGE (parse)-[:HANDLES]->(topic)
 MERGE (record)-[:CALLS]->(load)
 MERGE (record)-[:CALLS]->(verify_duplicate)
 MERGE (record)-[:CALLS]->(bind_scope)
@@ -129,7 +149,9 @@ MERGE (replay_test)-[:CALLS]->(persist_ack)
 @endcypher
 */
 
-use std::{future::Future, time::Duration};
+#[cfg(test)]
+use std::future::Future;
+use std::time::Duration;
 
 use async_nats::jetstream::{
     consumer::{AckPolicy, PullConsumer},
@@ -157,6 +179,7 @@ const MAX_FETCH_BYTES: usize = MAX_ENVELOPE_BYTES + 4 * 1024;
 const MAX_FETCH_MESSAGES: usize = 1;
 const MAX_FETCH_EXPIRY: Duration = Duration::from_secs(2);
 const DEMAND_SCHEMA_VERSION: i16 = 2;
+const CAPACITY_RESULT_PARSER_VERSION: i16 = 1;
 
 /// Result of one bounded JetStream pull attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,6 +197,13 @@ pub enum CapacityResultConsumeOutcome {
     Duplicate {
         /// Infrastructure-owner event identity.
         event_id: Uuid,
+    },
+    /// A permanent malformed event receipt committed and the source delivery was acknowledged.
+    Quarantined {
+        /// Server-assigned source stream sequence.
+        stream_sequence: i64,
+        /// True when the same source event had already been quarantined.
+        duplicate: bool,
     },
 }
 
@@ -213,6 +243,9 @@ pub enum CapacityResultError {
     /// The bounded JetStream pull stream ended with an error.
     #[error("JetStream capacity result fetch failed")]
     Fetch(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// The platform quarantine owner could not commit or acknowledge a permanent poison event.
+    #[error(transparent)]
+    Quarantine(#[from] platform_messaging_runtime::QuarantineError),
 }
 
 /// A single-message, bounded consumer supplied with an existing durable PullConsumer.
@@ -220,10 +253,10 @@ pub enum CapacityResultError {
 /// It does not create streams/consumers, configure credentials, change Run execution state, or
 /// drain a shared NATS client. It records owner-scoped result facts and only double-acks after
 /// the PostgreSQL transaction has committed.
-#[derive(Debug)]
 pub struct RunOwnerCapacityResultConsumer {
     store: PostgresRunOwnerCapacityStore,
     consumer: PullConsumer,
+    quarantine: Option<platform_messaging_runtime::PlatformPoisonQuarantine>,
 }
 
 impl RunOwnerCapacityResultConsumer {
@@ -239,7 +272,23 @@ impl RunOwnerCapacityResultConsumer {
         {
             return Err(CapacityResultError::InvalidConsumer);
         }
-        Ok(Self { store, consumer })
+        Ok(Self {
+            store,
+            consumer,
+            quarantine: None,
+        })
+    }
+
+    /// Attach an explicitly configured Platform Messaging quarantine owner.
+    ///
+    /// Without this owner, permanent malformed messages remain unacknowledged. This method does
+    /// not select a body-retention policy; that policy was required when constructing the service.
+    pub fn with_quarantine(
+        mut self,
+        quarantine: platform_messaging_runtime::PlatformPoisonQuarantine,
+    ) -> Self {
+        self.quarantine = Some(quarantine);
+        self
     }
 
     /// Pull and persist at most one result message, stopping on cancellation without acking it.
@@ -293,29 +342,85 @@ impl RunOwnerCapacityResultConsumer {
         &self,
         message: Message,
     ) -> Result<CapacityResultConsumeOutcome, CapacityResultError> {
-        let result = parse_capacity_result_message(
+        let result = match parse_capacity_result_message(
             message.subject.as_str(),
             message.headers.as_ref(),
             &message.payload,
-        )?;
-        let event_id = result.event_id;
-        let persist = self.store.record_capacity_result(result);
-        let ack = async {
-            message
-                .double_ack()
-                .await
-                .map_err(CapacityResultError::JetStream)
+        ) {
+            Ok(result) => result,
+            Err(error) => return self.quarantine_or_return(message, error).await,
         };
-        persist_then_ack(persist, ack).await.map(|stored| {
-            if stored {
-                CapacityResultConsumeOutcome::Stored { event_id }
-            } else {
-                CapacityResultConsumeOutcome::Duplicate { event_id }
+        let event_id = result.event_id;
+        let stored = match self.store.record_capacity_result(result).await {
+            Ok(stored) => stored,
+            Err(error) => return self.quarantine_or_return(message, error).await,
+        };
+        message
+            .double_ack()
+            .await
+            .map_err(CapacityResultError::JetStream)?;
+        Ok(if stored {
+            CapacityResultConsumeOutcome::Stored { event_id }
+        } else {
+            CapacityResultConsumeOutcome::Duplicate { event_id }
+        })
+    }
+
+    async fn quarantine_or_return(
+        &self,
+        message: Message,
+        error: CapacityResultError,
+    ) -> Result<CapacityResultConsumeOutcome, CapacityResultError> {
+        let Some(fault) = permanent_poison_fault(&error) else {
+            return Err(error);
+        };
+        let Some(quarantine) = &self.quarantine else {
+            return Err(error);
+        };
+        let outcome = quarantine
+            .record_message(&message, fault, CAPACITY_RESULT_PARSER_VERSION)
+            .await?;
+        message
+            .double_ack_with(async_nats::jetstream::AckKind::Term)
+            .await
+            .map_err(CapacityResultError::JetStream)?;
+        Ok(match outcome {
+            platform_messaging_runtime::QuarantineRecordOutcome::Stored {
+                stream_sequence, ..
+            } => CapacityResultConsumeOutcome::Quarantined {
+                stream_sequence,
+                duplicate: false,
+            },
+            platform_messaging_runtime::QuarantineRecordOutcome::Duplicate { stream_sequence } => {
+                CapacityResultConsumeOutcome::Quarantined {
+                    stream_sequence,
+                    duplicate: true,
+                }
             }
         })
     }
 }
 
+fn permanent_poison_fault(
+    error: &CapacityResultError,
+) -> Option<platform_messaging_runtime::PermanentPoisonFault> {
+    use platform_messaging_runtime::PermanentPoisonFault;
+    match error {
+        CapacityResultError::InvalidEvent => Some(PermanentPoisonFault::InvalidCapacityResultEvent),
+        CapacityResultError::Json(_) => Some(PermanentPoisonFault::MalformedCapacityResultJson),
+        CapacityResultError::IdempotencyConflict => {
+            Some(PermanentPoisonFault::CapacityResultEventIdConflict)
+        }
+        // InvalidStoredDemand is a Run-owner fact-integrity failure, not a message poison code.
+        // Unknown demand may be delivery-order/consistency related; transient failures likewise
+        // remain unacknowledged for owner repair or redelivery.
+        _ => None,
+    }
+}
+
+// This helper remains for unit coverage of strict commit-before-ACK ordering. The live consumer
+// uses the same ordering directly and routes only permanent wire faults to the platform owner.
+#[cfg(test)]
 async fn persist_then_ack<T, P, A>(persist: P, ack: A) -> Result<T, CapacityResultError>
 where
     P: Future<Output = Result<T, CapacityResultError>>,
@@ -827,9 +932,9 @@ fn validate_payload_matches_demand(
 #[cfg(test)]
 mod tests {
     use super::{
-        bind_result_scope_from_demand, parse_capacity_result_message, persist_then_ack,
-        validate_payload_matches_demand, CapacityResultError, MAX_ENVELOPE_BYTES, MAX_FETCH_BYTES,
-        MAX_FETCH_EXPIRY, MAX_FETCH_MESSAGES, MAX_PAYLOAD_BYTES,
+        bind_result_scope_from_demand, parse_capacity_result_message, permanent_poison_fault,
+        persist_then_ack, validate_payload_matches_demand, CapacityResultError, MAX_ENVELOPE_BYTES,
+        MAX_FETCH_BYTES, MAX_FETCH_EXPIRY, MAX_FETCH_MESSAGES, MAX_PAYLOAD_BYTES,
     };
     use async_nats::HeaderMap;
     use chrono::{TimeZone, Utc};
@@ -1251,5 +1356,37 @@ mod tests {
         .unwrap();
         assert!(!replay);
         assert_eq!(*persisted_count.lock().unwrap(), 1);
+    }
+
+    #[test]
+    fn run_owner_data_errors_never_enter_poison_quarantine() {
+        use platform_messaging_runtime::PermanentPoisonFault;
+
+        assert_eq!(
+            permanent_poison_fault(&CapacityResultError::InvalidEvent),
+            Some(PermanentPoisonFault::InvalidCapacityResultEvent)
+        );
+        assert_eq!(
+            permanent_poison_fault(&CapacityResultError::Json(
+                serde_json::from_str::<serde_json::Value>("{").unwrap_err()
+            )),
+            Some(PermanentPoisonFault::MalformedCapacityResultJson)
+        );
+        assert_eq!(
+            permanent_poison_fault(&CapacityResultError::IdempotencyConflict),
+            Some(PermanentPoisonFault::CapacityResultEventIdConflict)
+        );
+        assert_eq!(
+            permanent_poison_fault(&CapacityResultError::UnknownDemand),
+            None
+        );
+        assert_eq!(
+            permanent_poison_fault(&CapacityResultError::InvalidStoredDemand),
+            None
+        );
+        assert_eq!(
+            permanent_poison_fault(&CapacityResultError::ReleasedContractUnavailable),
+            None
+        );
     }
 }
