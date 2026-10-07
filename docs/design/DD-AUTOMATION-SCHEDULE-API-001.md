@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
 > Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, and bounded JetStream publisher are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production Run-owner consumer provisioning/quarantine, production worker, provider evidence producer, and execution remain open.
-> Version: 0.26 | Date: 2026-10-07
+> Version: 0.27 | Date: 2026-10-08
 
 ## 1. Routes
 
@@ -164,6 +164,32 @@ The Run-owner demand append adapter accepts the caller's existing transaction an
 
 The SQL transaction owns tenant RLS scope, deduplication and immutable replay comparison. Commit precedes Message::double_ack(); an error before commit leaves the delivery unacknowledged. Only accepted/rejected/expired producer contracts are consumed; released is explicitly unsupported. No TaskExecutionRun/Schedule mutation or BI event is emitted. Bad messages remain unacknowledged until a separately durable quarantine contract is implemented; production consumer deployment stays disabled.
 
+### 6.13 Phase 9F4D-3D6 quarantine owner and permanent-fault disposition
+
+#### Ownership and trusted source identity
+
+Malformed results cannot be written to `multica.infrastructure_capacity_result_inbox`: their tenant claim may be absent or hostile, and that Inbox's FORCE RLS boundary exists to protect valid Run-owned facts. Add a distinct Platform Messaging/Ingress quarantine owner with a dedicated migration/runtime role and transaction. It stores no authoritative tenant or Run scope derived from message content and performs no cross-owner write. Broker authentication and the deployed stream subscription remain provisioned by trusted platform configuration, not by a payload.
+
+Define `trusted_source_key = (deployment_identity, configured_stream_generation, server_stream_name, server_stream_sequence)`. The deployment identity and monotonically changed stream generation are trusted configuration; `server_stream_name` and `server_stream_sequence` come from JetStream message metadata. Envelope `tenant_id`, `event_id`, `Nats-Msg-Id`, and subject are untrusted diagnostics and do not form the receipt primary key. Subject and selected headers are stored only after allowlist/length validation.
+
+#### Receipt and optional body storage
+
+The quarantine receipt is an append-only Transaction fact with unique trusted source key, received timestamp, fixed allowlisted `fault_code`, parser/schema version, bounded subject and selected broker metadata, wire byte length, and SHA-256 of the exact received bytes. Identical source key/digest/fault replays are idempotent. A source-key collision with different digest or fault metadata is an integrity conflict: emit bounded operator telemetry, retain the delivery unacknowledged, and do not overwrite the first receipt.
+
+The raw body policy is a release-blocking user decision: encrypted retention for 24 hours or metadata plus digest only. If retention is selected, exact bytes live in a separate encrypted Work store, with a hard per-message byte cap no greater than the 132 KiB consumer fetch limit, total byte quota, TTL deletion, separate key/access policy, and no payload in logs, traces, SQL errors, metrics labels, or BI. If digest-only is selected, no body bytes are persisted or replayed. Neither choice may silently default. Receipt retention is Transaction policy and cannot be physically deleted without an approved audit/legal retention decision; any payload Work record must have explicit TTL and purge evidence.
+
+#### Fault classification and acknowledgement
+
+Before entering quarantine, a versioned classifier must distinguish a permanent message fault from a transient or owner-data fault. Malformed JSON, unsupported wire version, invalid bounded headers, and a conclusively unmatched source event may be candidates for the allowlist, but exact codes and retryability remain to be finalized and tested. `InvalidStoredDemand` indicates invalid/corrupt Run-owner source data and remains unacknowledged with an operator signal until an explicit DDD decision; it is not made terminal merely to unblock the consumer. Database errors, missing encryption keys, quota exhaustion, stale/unknown broker metadata, digest conflicts, and unclassified errors stay unacknowledged and trigger bounded backpressure/retry.
+
+Only after the quarantine owner transaction commits the receipt and the selected body action may the consumer call `double_ack_with(AckKind::Term)`. Transaction failure or uncertain classification MUST NOT Term. Repeated ACK failure is safe because JetStream redelivery resolves through the trusted source key and immutable equality check. Quarantine does not update TaskExecutionRun, Schedule occurrence, RunEvent/BI, Run or Infrastructure reservations, readiness, or executor state. Release producer support, production stream/durable provisioning, target database identity, and consumer lifecycle remain separate gates.
+
+#### Worktree-first infrastructure and verification boundary
+
+The quarantine service is a Platform app boundary connected through versioned API/owner commands and its own transactional store; it is not a Run app or a Worktree tree node. Operations should be visible from the relevant Run result event by authorized deep link, while platform-level access is audited and does not expose body content to Task Card CLI, Agent, Plugin, or Canvas. No Multipass VM is required for DB/NATS contract tests; the live test inventory remains at most two registered Multipass records including Stopped/Deleted entries, with no auto-purge.
+
+Acceptance requires duplicate-identical and duplicate-conflicting source identities, malformed/unmatched messages, permanent versus transient fault mapping, commit-before-Term, storage/key/quota outage redelivery, exact wire digest, body size/TTL/encryption policy, no untrusted tenant scope, no body logging, append-only/RLS/grant checks, and zero Run/BI/reservation/readiness/execution mutation. Until the user selects the body-retention policy and these gates pass, the existing Run-owner consumer remains production-disabled.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -194,3 +220,4 @@ The SQL transaction owns tenant RLS scope, deduplication and immutable replay co
 | v0.24 | 2026-10-07 | Add §6.10 for the bounded tenant-scoped Outbox delivery state machine, exact lease fencing, attempt exhaustion, retry backoff and terminal retention. Record PostgreSQL integration coverage; distinguish database state transitions from broker publisher, Run consumer, production worker, target DB and execution gates. Preserve the two-instance test cap. |
 | v0.25 | 2026-10-07 | Add section 6.11 for the 9F4D-3D4 publisher API, bounds, event allowlist, PubAck/timeout semantics and real loopback NATS/PostgreSQL integration. Clarify at-least-once delivery and durable Run Inbox dedupe; keep polling, target DB, Run consumer, provider, production broker configuration and execution open. | The bounded JetStream publisher passed its focused transport integration gate. |
 | v0.26 | 2026-10-07 | Add section 6.12 for caller-transaction TaskExecutionRun rule/revision/occurrence/correlation validation, durable explicit-ack pull, one-message byte/time bounds, immutable demand matching, Run-owner transaction, exact replay and the no-quarantine production block. | Phase 9F4D-3D5 verifies Run-owned result persistence and acknowledgement ordering. |
+| v0.27 | 2026-10-08 | Add section 6.13 for separate Platform Messaging/Ingress quarantine ownership, trusted JetStream deployment/stream-generation/sequence identity, immutable receipt and optional encrypted TTL Work body, permanent-fault classification, commit-before-Term, failure backpressure, and Run/BI isolation. Keep retention policy, taxonomy, migration, grants and production consumer open. | Phase 9F4D-3D6 design audit. |

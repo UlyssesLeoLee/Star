@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.64**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.65**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -564,6 +564,12 @@ The demand Outbox append also validates the referenced TaskExecutionRun inside t
 
 This Inbox is a durable event fact, not a TaskExecutionRun/Schedule state projection and not a BI/RunEvent producer. Accepted capacity does not mean current reservations or K3s/Runtime readiness. The upstream capacity_released producer is unavailable, and invalid/unmatched messages are left unacknowledged without a durable quarantine table. Therefore the consumer remains production-disabled until producer, quarantine, consumer provisioning/identity, authorization/binding revalidation, and owner projection contracts are completed. The test uses no VM; Multipass inventory remains capped at two registered records.
 
+### 8.15 Phase 9F4D-3D6 Platform Messaging/Ingress poison quarantine design
+
+Poison-message receipt is a Platform Messaging/Ingress responsibility, separate from Run-owned result Inbox and Infrastructure-owned capacity Outbox/Inbox. The platform receipt must use trusted configured broker deployment and stream generation plus server stream name/sequence; untrusted envelope tenant/Run claims and `Nats-Msg-Id` cannot select an owner or establish dedupe identity. A dedicated platform transaction stores an append-only receipt with a versioned allowlisted fault, bounded diagnostics, exact wire length and SHA-256. Optional raw bytes are a separate encrypted TTL Work record; whether to retain them for 24 hours or keep only metadata and digest is still awaiting user selection, so no migration/writer/ACK behavior is claimed.
+
+The consumer can Term-ack only after receipt plus the selected retention action commit. Any DB, quota, key, digest conflict, unknown source identity, or uncertain fault classification remains pending. `InvalidStoredDemand` remains an unacknowledged owner-data integrity failure until its handling is explicitly specified. Quarantine never changes TaskExecutionRun, Schedule, BI/RunEvent, reservations, readiness, or execution. The Run Apps navigation remains Project → Cloud Branch → Engineering Run → focused Worktree; quarantine is a platform service and does not become a Run navigation node. Test infrastructure continues to cap all registered Multipass instances at two including Stopped/Deleted, with zero VMs required for DB/NATS contract tests.
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -859,3 +865,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.62 | 2026-10-07 | Mavis review | Align requirements v5.89/basic v5.86, Schedule SRS/DD v0.20, Infrastructure DD v0.16, DUKOU v1.9 and plan v6.17; record the 9F4D-3B1 restricted role/grant matrix and 14/14 isolated PostgreSQL evidence while keeping target identity/provisioning and production owners open. Preserve the two-instance test cap. | The repeatable runtime-grants migration passed its disposable database gate. |
 | v4.63 | 2026-10-07 | Align requirements v5.90, basic design v5.87, Schedule SRS/BD/DD v0.21/v0.20/v0.21, Infrastructure DD v0.17 and plan v6.18; add the 9F4D-3C1 Inbox receive boundary while preserving Run authorization and execution gates. |
 | v4.64 | 2026-10-07 | Mavis review | Add §8.14 for the Run-owner result Inbox and caller-transaction validation of scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation; record exact result scope, bounded durable pull and commit-before-ack. Preserve no TaskExecutionRun/BI mutation and production-disabled poison/release boundaries; align requirements/basic design and phase evidence. | Phase 9F4D-3D5 adds the result-side Run-owner contract. |
+| v4.65 | 2026-10-08 | Mavis review | Add §8.15 for a separate Platform Messaging/Ingress quarantine owner, trusted JetStream source identity, immutable receipt, optional encrypted TTL Work payload and commit-before-Term invariant; keep user retention selection, fault taxonomy, owner migration/grants and production ACK wiring open. Preserve Worktree-first Run navigation and the two-record Multipass test limit. | Phase 9F4D-3D6 design boundary review. |

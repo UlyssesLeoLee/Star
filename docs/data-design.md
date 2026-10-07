@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v1.8 (2026-10-07)
+> **文档版本**: v1.9 (2026-10-08)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -22,6 +22,7 @@
 > | v1.5 | 2026-10-05 | 纳入 Worktree Group Canvas 现行五表 W/T/M 分类、FORCE RLS scope、append-only/commit-ordered Outbox cursor 与未验收边界；明确 Document 字段扩展在现有 registry，不接受平行 document aggregate | Phase 3C Canvas stream slice 与当前 Group DD 对账 |
 > | v1.7 | 2026-10-06 | 将现有 Project/Run resource quota、reservation、admission lock 与审计事件补入 W/T/M 设计；区分 Infrastructure owner 尚未创建的 Host capacity reservation、demand/outbox 与 Inbox Work 状态，并标明现有 Run Reservation 删除/retention 缺口 | 9F4D owner-boundary 自审发现容量状态与 Multipass Host reservation 必须分属不同 SoR |
 > | v1.8 | 2026-10-07 | Add §4.13.9 and the Phase 9F4D-3D5 W/T/M appendix: classify the Run demand Outbox and result Inbox as append-only Transaction facts, define tenant FORCE RLS/least privilege and Run-owner schedule demand identity checks, preserve global event identity, and prohibit cleanup absent an approved retention rule. | The Run owner now stores the infrastructure result fact in its own schema boundary. |
+> | v1.9 | 2026-10-08 | Add §4.13.10 as a proposed W/T/M classification for 9F4D-3D6: platform quarantine receipt is Transaction, optional raw payload is separate TTL Work; no migration/table is claimed, and retention selection, receipt access/retention policy, fault taxonomy and owner grants remain open. | Poison-message design must not put untrusted scope claims into the Run-owner tenant Inbox. |
 > | v1.6 | 2026-10-05 | 纳入 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
@@ -2073,6 +2074,15 @@ Migration: db/migrations/2026-10-07-run-owner-infrastructure-capacity-result.sql
 | multica.infrastructure_capacity_result_inbox | T — Transaction | Run/Execution owner; immutable Infrastructure result, replay digest and event_id deduplication fact | Append-only; UPDATE/DELETE/TRUNCATE rejected; no TTL or physical deletion | ENABLE + FORCE RLS on tenant_id; star_multica_run_owner SELECT/INSERT only |
 
 W contains no table in this migration; M contains no table in this migration. The Outbox is an immutable business/integration fact, not a short-lived delivery lease table. Broker delivery state remains owned by Infrastructure. Before appending a scheduled demand, Rust verifies the existing TaskExecutionRun's origin, Rule ID/revision, occurrence and correlation within the caller-owned transaction. The FK ties each result to the exact source demand and canonical scope; the global event_id unique constraint prevents cross-tenant identity reuse while RLS restricts visibility. Rust verifies stored demand JSON against typed V2 demand before accepting results. Runtime code does not mutate TaskExecutionRun/Schedule or release reservations. Both tables have no cleanup policy until a reviewed legal/audit retention rule exists.
+
+### 4.13.10 Phase 9F4D-3D6 Platform ingress quarantine (proposed, not migrated)
+
+| Proposed record | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| platform.messaging_ingress_quarantine_receipt | T — Transaction | Platform Messaging/Ingress owner; immutable receipt keyed by trusted JetStream deployment identity, configured stream generation, server stream and stream sequence; includes allowlisted fault/parser version, exact wire length and SHA-256 | Append-only; no UPDATE/DELETE/TRUNCATE. Physical deletion requires a separately approved audit/legal retention rule. | Dedicated platform owner role and platform-scoped policy; never RLS-scope from an untrusted tenant claim. Exact grants and policy are open. |
+| platform.messaging_ingress_quarantine_payload (conditional) | W — Work | Optional encrypted raw-wire bytes referenced by a receipt, available only if user selects body retention | Separate bounded bytes, hard quota, explicit TTL and verified physical purge; retention duration is undecided. If metadata-plus-digest-only is selected, this record does not exist. | Separate encrypted storage/key boundary and audited operator access; no Task Card CLI, Agent, Plugin, Canvas, or general Run app read. Exact policy is open. |
+
+These are conceptual classifications only: no migration, table, role, writer, or retention job exists. The receipt is a platform Transaction fact and must not be stored in the Run-owner result Inbox because malformed messages may lack trustworthy tenant scope. The optional payload is Work, not part of the immutable receipt; the user decision between encrypted 24-hour retention and digest-only storage is a prerequisite for physical design. A Term acknowledgement may follow only after the receipt and selected payload action commit. Unknown fault classification, digest conflict, unavailable DB/key/quota, and `InvalidStoredDemand` remain unacknowledged; the last is an owner-data integrity error until separately classified. No Run/Schedule/reservation/readiness/BI/execution mutation is allowed.
 
 ### 4.14 Module: domain-identity(`identity` schema)
 

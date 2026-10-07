@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication and real PubAck integration are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, production consumers and execution remain fail-closed.
-> Version: 0.26 | Date: 2026-10-07
+> Version: 0.27 | Date: 2026-10-08
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -115,6 +115,14 @@ The Run-owner demand Outbox append accepts the caller's transaction and validate
 
 No Run/Schedule state update, RunEvent/BI emission, reservation mutation, readiness, or execution is part of this slice. Because invalid messages have no durable quarantine and the release producer is unavailable, this consumer is implemented as a fail-closed adapter and is not production deployable. Rust minimum is 1.99.0; isolated PG/NATS verification uses zero Multipass instances and retains the two-entry cap.
 
+### 6.12 Phase 9F4D-3D6 Platform ingress quarantine design
+
+Malformed capacity-result messages cross the Run-owner boundary only to a separate Platform Messaging/Ingress owner. That owner uses a platform-scoped transaction and dedicated least-privilege role; it does not accept tenant or Run identity from the message for authorization or RLS. The stable quarantine key is the configured JetStream deployment identity and stream generation plus server stream name and stream sequence. `Nats-Msg-Id` and payload event IDs are bounded diagnostics, not authority.
+
+The append-only quarantine receipt is Transaction data containing the trusted source key, allowlisted fault code and parser/schema version, exact wire byte length and SHA-256, bounded observed subject/broker metadata, and receipt time. If exact bytes are retained, they are a separate encrypted, size-bounded Work record with explicit TTL, quota and access policy. The user has not selected encrypted 24-hour body retention or metadata-plus-digest-only storage, so this design does not create a table, migration, writer or retention behavior.
+
+The consumer may send `double_ack_with(AckKind::Term)` only after the receipt and selected payload policy commit. Exact duplicate source key plus equal digest/fault metadata is idempotent; a conflicting digest is an integrity alarm and remains pending. Database, quota, key, unknown-fault, and other transient/uncertain errors leave the delivery unacknowledged. `InvalidStoredDemand` is an owner-data integrity error and stays unacknowledged until a reviewed, versioned classifier says otherwise. Run/Schedule, BI, reservation, readiness and execution state remain untouched. Production consumer enablement remains blocked pending the storage decision and implementation gates.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -145,3 +153,4 @@ No Run/Schedule state update, RunEvent/BI emission, reservation mutation, readin
 | v0.24 | 2026-10-07 | Add §6.9 for tenant-scoped Infrastructure Outbox claims, lease fencing, bounded retry/dead-letter behavior and terminal retention; distinguish the verified state machine from broker publishing, production polling, Run-owner consumption and executor readiness. Preserve the two-instance disk cap and fail-closed execution. |
 | v0.25 | 2026-10-07 | Add section 6.10 for serial bounded JetStream publication, injected authenticated context, allowlisted event contract, payload/envelope limits, stable Nats-Msg-Id, PubAck-before-delivered and durable Run Inbox dedupe. Record 9F4D-3D4 loopback NATS/PostgreSQL evidence and preserve production worker/consumer/execution gates. | The owner Outbox delivery state machine gained a bounded transport adapter. |
 | v0.26 | 2026-10-07 | Add section 6.11 for caller-transaction TaskExecutionRun scope validation and the Run-owner result consumer's transaction/ack/fail-closed boundary; synchronize SRS v0.27, DD v0.26, requirements v5.98 and basic design v5.95. | Phase 9F4D-3D5 adds a verified result Inbox slice without enabling production execution. |
+| v0.27 | 2026-10-08 | Add section 6.12 for Platform Messaging/Ingress quarantine ownership, trusted JetStream source identity, receipt and optional Work payload classification, and commit-before-Term semantics. Record that retention selection and all storage/consumer implementation remain open. | Phase 9F4D-3D6 establishes the design boundary without enabling poison-message ACKs. |

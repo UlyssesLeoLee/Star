@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.27**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.28**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1333,6 +1333,18 @@ Phase report: PHASE-9F4D-3D4-JETSTREAM-PUBLISHER-REPORT.md.
 
 Phase report: PHASE-9F4D-3D5-RUN-OWNER-CONSUMER-REPORT.md.
 
+### 6.101 Phase 9F4D-3D6 Platform poison quarantine design gate（2026-10-08）
+
+| 工作项 | 本阶段设计 | 验收与未关闭门 | 状态 |
+|---|---|---|---|
+| Quarantine owner | Separate Platform Messaging/Ingress owner, schema/transaction/role; never place malformed or untrusted-scope messages in Run-owner Inbox or Infrastructure-owner facts. | Trusted configured deployment identity + stream generation + server stream + sequence; fixed fault/parser version; bounded metadata, exact wire length and SHA-256; append-only receipt. | Design specified; no migration/writer |
+| Payload policy | Receipt is Transaction; optional exact body is separate encrypted, capped Work with TTL/quota/access/purge evidence. | User choice remains open: encrypted retention for 24 hours or metadata plus digest only. No default, schema, or body retention is implemented. | Blocked on user selection |
+| Fault and ACK | Term only after receipt plus selected payload action commit; exact source-key replay is idempotent, changed digest conflicts; transient/unknown/storage/key/quota failures remain unacknowledged. | `InvalidStoredDemand` remains an owner-data integrity error, not automatically terminal; finish versioned permanent-fault classifier and redelivery/failure tests. | Design specified; implementation open |
+| Product gates | Keep Run/Schedule/BI/reservation/readiness/execution unchanged; quarantine is a platform service, not a Run navigation node. | Production stream/consumer provisioning, target DB identity/grants/RLS, owner writer, consumer wiring and operator access remain fail-closed. Test cap remains two registered Multipass records (including Stopped/Deleted), with zero VMs for DB/NATS tests. | Open |
+| Documents | SRS v0.28, requirements v5.99, Schedule basic/detail v0.27, Group DD v4.65, Data Design v1.9 and this plan. | Phase report records a design increment only; it does not close 3D6 or production consumption. | Updated |
+
+Phase report: [`PHASE-9F4D-3D6-QUARANTINE-DESIGN-REPORT.md`](../reports/PHASE-9F4D-3D6-QUARANTINE-DESIGN-REPORT.md).
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1517,3 +1529,4 @@ Phase report: PHASE-9F4D-3D5-RUN-OWNER-CONSUMER-REPORT.md.
 | v6.25 | 2026-10-07 | Mavis review | Add §6.98 for 9F4D-3D3 tenant-scoped Outbox delivery claim/fencing/ack/retry/dead-letter on the existing Work row; synchronize requirements/basic/Schedule/Infrastructure/W-T/M/automation/registry/report, preserve the two-instance cap and zero-VM testing, and keep broker publisher, Run consumer, production worker, target DB identity and execution fail-closed. | Phase 9F4D-3D3 completes a bounded Infrastructure owner delivery-state primitive without a broker or VM. |
 | v6.26 | 2026-10-07 | Mavis review | Add section 6.99 for bounded JetStream publication; record real loopback NATS/PostgreSQL PubAck evidence, Rust 1.99.0 gates, documentation synchronization, zero Multipass VMs and the two-record cap. Keep production polling, target DB identity, Run Inbox consumer, provider/Manager and execution fail-closed. | The Infrastructure Outbox state machine gained its verified bounded transport adapter. |
 | v6.27 | 2026-10-07 | Mavis review | Add §6.100 for Phase 9F4D-3D5, including bounded consumer, caller-transaction TaskExecutionRun identity validation, append-only Run Inbox, owner W/T/M classification, 9/9 unit tests, 20/20 disposable runner steps and remaining production gates; align the requirements and design chain. | The Run owner now has an explicit result-side Inbox slice. |
+| v6.28 | 2026-10-08 | Mavis review | Add §6.101 for the 9F4D-3D6 quarantine design gate; define a separate Platform Messaging/Ingress owner, trusted JetStream source identity, immutable Transaction receipt, conditional TTL Work payload and commit-before-Term boundary; record unresolved user payload-retention choice, `InvalidStoredDemand` classification, no migration/writer/ACK implementation, and two-record Multipass cap. Synchronize requirements/basic/detail/data design references. | The Run-owner Inbox cannot safely quarantine malformed messages under an untrusted tenant claim. |

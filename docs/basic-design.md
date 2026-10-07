@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.95 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.98
+> **文档版本**: v5.96 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v5.99
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5004,6 +5004,20 @@ Within the Run-owner database boundary, it appends one result Inbox fact and com
 |---|---|
 | AC-INFRA-002-P | §16.40；caller transaction 内校验 TaskExecutionRun 的 schedule origin、Rule ID/revision、occurrence 和 correlation 后写 demand Outbox；durable explicit-ack PullConsumer，单条/132 KiB/2 秒；以不可变 demand row 派生结果 scope；Run-owner Transaction Inbox commit 后 double-ack；严格 duplicate replay；invalid/unmatched 不 ACK；no quarantine/producer contract 时 production disabled；不改变 Run/Schedule/readiness/execution。 |
 
+### 16.41 Phase 9F4D-3D6 Platform ingress poison quarantine design
+
+无效 capacity-result 消息不能写入 Run-owner 的 tenant FORCE RLS Inbox，因为坏消息的 tenant/Run claim 不可信或可能缺失。将隔离职责分给独立 Platform Messaging/Ingress owner，使用专用 transaction/role，不跨 owner 写表。幂等身份使用受信 JetStream deployment identity、配置的 stream generation，以及服务端 `Message::info()` 提供的 stream name/sequence；`Nats-Msg-Id`、envelope tenant、event ID 和 subject 不作为授权或主键。
+
+Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/parser/schema version、选定的 broker 元数据、wire 长度与精确 wire SHA-256。若保留原文，则单独写入加密、有硬大小上限和 quota 的 Work 存储，并配明确 TTL、独立密钥/访问策略和物理清理证据。原文方案尚未决定（加密留存 24 小时或仅留元数据与 digest），因此本版仅冻结 owner/身份/ACK 约束，不创建 migration、表、writer 或 ACK handler。
+
+只有 receipt 与用户选定的 payload 处置在 quarantine owner 事务中提交后才可 `double_ack_with(AckKind::Term)`。相同 source key 和 digest/故障信息按幂等 replay；相同 source key 不同 digest 是完整性冲突，保持 unacked 并告警。数据库、quota、密钥、broker metadata 或故障分类未知均保持 unacked 并背压。`InvalidStoredDemand` 属于 owner 存储事实完整性问题，不自动当作 poison；必须由版本化分类器和 DDD 决定后才可终结。隔离不更新 TaskExecutionRun、Schedule、RunEvent/BI、两方 reservation、readiness 或 executor；production consumer 继续关闭。
+
+验收要求覆盖：永久/暂时故障分类、duplicate 与 digest 冲突、commit-before-Term、存储/密钥/quota 故障重投、wire 大小与 bounded memory、RLS/grants/WORM、无 payload 日志、无不可信 tenant scope 传播和零 Run/BI/reservation/readiness/execution mutation。DB/NATS contract tests 不创建 Multipass VM；任何 live test 仍遵守最多 2 个登记实例（含 Stopped/Deleted）且不自动 purge。
+
+| 验收 ID | 对应设计与当前边界 |
+|---|---|
+| AC-INFRA-002-Q | §16.41；独立 Platform Messaging/Ingress owner；可信 broker source tuple 为 `(deployment, stream_generation, stream, stream_sequence)`；append-only receipt/digest；可选加密 TTL Work payload；完成事务后才 Term；错误与不确定 fault 保持 unacked；不变更 Run/BI/Reservation/Readiness/Execution。用户 payload retention 决策、故障分类、schema/grants/writer 和生产 consumer 尚未完成。 |
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5145,3 +5159,4 @@ Within the Run-owner database boundary, it appends one result Inbox fact and com
 | v5.93 | 2026-10-07 | Mavis review | Align requirements v5.96 and Infrastructure DD v0.23; add §16.38 for PostgreSQL Outbox claim/lease fencing/ack/retry/dead-letter, bounded batch and retry policy. Distinguish the state-machine store from broker publisher, Run consumer, production worker and target DB activation; preserve the two-instance disk cap and fail-closed execution. | Phase 9F4D-3D3 adds and verifies the owner-side delivery-state primitive without a broker or VM. |
 | v5.94 | 2026-10-07 | Mavis review | Add section 16.39 for injected-context, serial bounded JetStream publication; specify event allowlist, payload/envelope bounds, stable Nats-Msg-Id, PubAck-before-ack and at-least-once Run Inbox dedupe; synchronize requirements v5.97 and Schedule/Infrastructure design; record Rust 1.99.0 and loopback NATS/PostgreSQL evidence while preserving open production gates and the two-instance, zero-VM test limit. | Phase 9F4D-3D4 verified transport publication without changing owner persistence or execution boundaries. |
 | v5.95 | 2026-10-07 | Mavis review | Add §16.40 for the Run-owner result Inbox and validate scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation within its caller transaction; synchronize requirements v5.98, Group DD v4.64, Schedule contracts, Infrastructure DD v0.25 and Data Design v1.8. Record exact demand-derived result scope, commit-before-double-ack, no state projection, fail-closed poison/release gaps, Rust 1.99.0 and zero-VM/two-record test boundary. | Phase 9F4D-3D5 implements the result consumer slice. |
+| v5.96 | 2026-10-08 | Mavis review | Add §16.41 for separate Platform Messaging/Ingress poison quarantine ownership, trusted JetStream source identity, append-only Transaction receipt, conditional encrypted TTL Work payload and commit-before-Term; synchronize requirements v5.99, Schedule SRS/BD/DD v0.28/v0.27/v0.27, Group DD v4.65, Data Design v1.9 and plan v6.28. Record that payload policy, fault taxonomy, migration/grants/writer and ACK implementation remain open; preserve two-record Multipass cap. | Phase 9F4D-3D6 design increment isolates untrusted-message handling from the Run-owner Inbox. |
