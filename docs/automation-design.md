@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.16 (2026-10-07)
+> **文档版本**: v2.17 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1643,6 +1643,8 @@ frontend/src/app/automation-debug/
 
 ---
 
+| v2.17 | 2026-10-07 | Add the 9F4D-3C1 reproducible Rust and disposable PostgreSQL Inbox integration gate; record serial infrastructure-crate tests, baseline lint allowances, and the exact fail-closed boundary. |
+
 ## 11. 引用文档
 
 - `AGENTS.md` v0.15+ (守门 #1 派生 v1-v18 + 守门 #9 + 守门 #12 + 守门 #13)
@@ -2633,3 +2635,12 @@ frontend/src/app/automation-debug/
 依据是 Playwright 真实点击 28/28 通过 + 视口外点击的对照现象，未在内置浏览器内复现交互。
 
 ---
+### 4.58 Phase 9F4D-3C1 Infrastructure-owner Inbox verification
+
+**自动化档：[P]** — the runner verifies Rust formatting, all-target check, targeted Clippy and tests for domain-infrastructure plus infrastructure, then uses the disposable PostgreSQL schema/grants runner to execute the ignored SQLx Inbox integration case.
+
+- phase9f4d_infrastructure_contract.py includes the Inbox adapter and both crates. Tests run with -j 1 to avoid Windows MSVC linker contention. --no-deps keeps Clippy scoped to changed crates; clippy::empty_line_after_doc_comments and clippy::unwrap_or_default are explicit existing crate baseline allowances, and the new module must pass the remaining warnings-as-errors gate.
+- phase9f4d_infrastructure_owner_schema.py accepts explicit Cargo/toolchain/short target paths and, only after disposable schema/grants gates pass, invokes the infrastructure_owner_inbox_pg ignored test against the same temporary loopback PostgreSQL instance.
+- 2026-10-07 evidence: Rust runner format/check/Clippy/tests passed; PostgreSQL runner passed schema/grants checks plus the actual Inbox integration test and cleaned its own temporary database. No Multipass VM was created.
+- This gate proves Inbox receipt/idempotency only. It does not prove resolver trust/currentness, capacity reservation, owner Outbox delivery, consumer, target DB deployment, Manager/provider, or execution. Keep Schedule fail-closed.
+- The test environment remains capped at two registered Multipass instances total, including stopped/deleted records, due to disk capacity; this runner uses zero instances.

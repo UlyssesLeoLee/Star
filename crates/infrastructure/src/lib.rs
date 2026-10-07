@@ -6,6 +6,12 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
+//! @cypher schema=1 source_sha256=508b0960344dd98a6ed618fff49f1516272f69eb06b204bc13bef09c2aae27c5
+//! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
+//! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
+//! MERGE (self)-[:DEFINES]->(ownerInbox)
+//! @endcypher
+//!
 //! ## 职责
 //!
 //! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
@@ -297,7 +303,6 @@ pub trait AdapterQuery: Send + Sync {
 /// P2 阶段 worker 子代理实装时按 "use domain_xxx::*;" 引用替换 (派前必先
 /// `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`, per AGENTS.md §4 #20 守门派生).
 /// 当前保留为 P2 阶段前置可编译骨架 (守门 #1 v6 单 crate 100% pass 实证).
-
 /// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
 /// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
 
@@ -375,5 +380,6 @@ mod tests {
     }
 }
 
+pub mod infrastructure_owner_inbox;
 pub mod registry;
 pub mod registry_real_pg;

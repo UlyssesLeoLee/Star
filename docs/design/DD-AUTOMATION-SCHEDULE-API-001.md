@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness contracts, and an isolated Infrastructure-owner schema substrate are verified; admission writer/consumer, target migration grants, worker, provider evidence producer, and production execution remain open.
-> Version: 0.20 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed binding/demand/readiness contracts, and an isolated Infrastructure-owner schema substrate are verified; Inbox receive adapter only, admission writer/consumer, target migration grants, worker, provider evidence producer, and production execution remain open.
+> Version: 0.21 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -106,6 +106,20 @@ Migration db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql is or
 
 A deployment-managed application login and credential are separate from this group. Production must provision membership and use transaction-scoped SET LOCAL ROLE star_infrastructure_owner; pool reset/rollback must discard the role on all success and error paths. The disposable runner proves migration repeatability and catalog privileges, not pool behavior, target migration loading, or real app identity. No production caller, target login, owner writer/consumer, capacity admission, worker, Manager/provider, or execution is implemented. Test-phase Multipass inventory remains capped at two registered instances; this gate starts none.
 
+## 6.7 9F4D-3C1 PostgreSQL Inbox receive
+
+PostgresInfrastructureOwnerInbox::receive_demand follows this transaction order:
+
+1. Validate HostInfrastructureDemandV2, the supplied current binding snapshot, matching deterministic binding digest, positive Host generation and future deadline.
+2. Begin the PostgreSQL transaction; execute SET LOCAL ROLE star_infrastructure_owner, then set app.tenant_id for FORCE RLS.
+3. Read immutable terminal receipt by tenant plus source event/occurrence. Return AlreadyTerminal only for one exact scope and payload digest; malformed or colliding receipt state is an idempotency conflict.
+4. Insert into infrastructure.capacity_demand_inbox with conflict-safe uniqueness. Return Enqueued for a new row; on conflict reread terminal receipt, then verify a pending row's complete identity and canonical payload before returning DuplicatePending.
+5. Commit before returning. SQL, role, RLS, validation, and conflicting replay errors propagate; no branch treats an Inbox row as admitted capacity.
+
+Payload digest is SHA-256 over serialized typed V2 JSON with a domain/version prefix. The append-only receipt is read only in this slice; the adapter does not create it or lock it for share because the role has no receipt UPDATE grant. Terminal replay therefore proves deduplication against an existing owner fact, not that this adapter performed acceptance.
+
+The CurrentInfrastructureBindingV2 argument is a typed handoff expected from a trusted resolver, but the concrete resolver is not wired here; validation occurs before beginning the Inbox transaction. Do not expose this adapter as a public acceptance endpoint until resolver provenance, authorization, binding-currentness serialization and target role activation are implemented and tested. No Host/cluster reservation, Outbox consumer, retry scheduler, worker, Manager/provider or executor is present.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -130,3 +144,4 @@ A deployment-managed application login and credential are separate from this gro
 | v0.18 | 2026-10-07 | Clarify the two-instance cap as a total registered-inventory limit including stopped/recoverable records; specify the locked pre-launch fail-closed guard and no automatic purge behavior. |
 | v0.19 | 2026-10-07 | Record the tested 9F4D-3A Infrastructure-owner persistence substrate and exact Work/Transaction boundary, while keeping production migration/grants, writer/consumer, worker, provider and Schedule execution gates open. |
 | v0.20 | 2026-10-07 | Define the idempotent runtime-grants migration, least-privilege W/T matrix and separate secret-provisioned login with transaction-scoped role activation; record 14/14 isolated PostgreSQL gates without claiming target deployment or production writer/consumer completion. |
+| v0.21 | 2026-10-07 | Add detailed 9F4D-3C1 receive transaction, idempotency/conflict behavior, and explicit resolver/authorization/freshness limitations; preserve fail-closed admission and execution. |

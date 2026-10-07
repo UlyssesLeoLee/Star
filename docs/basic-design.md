@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.86 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.89
+> **文档版本**: v5.87 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.90
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4605,7 +4605,7 @@ Chat Bar(scope, text, entity_refs)
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
-| AC-LOOP-010 | §16.27-16.32 / Schedule API DD v0.20 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 独立事务解析 profile placement 并预留 Host+精确 K3s cluster 双层 capacity，再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster；executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；owner store 与 production worker 仍未实现 |
+| AC-LOOP-010 | §16.27-16.33 / Schedule API DD v0.21 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 独立事务解析 profile placement 并预留 Host+精确 K3s cluster 双层 capacity，再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster；executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；owner store 与 production worker 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4931,6 +4931,14 @@ Migration db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql provi
 
 The actual application login remains a separately provisioned identity. Deployment must create that login through the secret/bootstrap system, grant membership, and activate the group within each owner transaction; the migration contains no credentials. The PostgreSQL 18.6 disposable runner applies both migrations twice and checks role attributes and the complete six-table privilege matrix. It does not prove target DB migration loading, production login membership/role activation, or an owner writer/consumer. The temporary test-phase Multipass cap remains two registered instances including stopped/recoverable records; this gate starts no VM.
 
+### 16.33 Phase 9F4D-3C1 Infrastructure owner Inbox receive adapter
+
+PostgresInfrastructureOwnerInbox::receive_demand 接收 Run/Execution owner 已发布的 V2 demand，并将其幂等写入 Infrastructure owner 的 capacity_demand_inbox。当前绑定快照由上游 trusted resolver 传入；adapter 校验 typed demand、binding digest、正数 Host generation 与 deadline。它不自行解析权限目录，也不构成 resolver 的真实性证明；生产调用方、目录解析、授权复验与 binding 变更串行化仍未交付。
+
+数据库写入在单一 owner 事务内执行 SET LOCAL ROLE star_infrastructure_owner 与 tenant RLS scope，先读取 append-only terminal receipt，再尝试幂等插入；同 event/occurrence/payload 返回 pending duplicate 或 terminal outcome，身份或 payload 冲突失败关闭。该切片不写 reservation、terminal receipt 或 Infrastructure Outbox，不消费/确认容量 demand，不启动 worker/Manager/Multipass/K3s，不开放 TaskExecutionRun。
+
+Rust focused runner 覆盖 domain-infrastructure 与 infrastructure 两个 crate；isolated PostgreSQL 18.6 runner 在 schema/grants gates 后运行真实 SQLx Inbox 集成用例，覆盖首次写入、重复、冲突与 terminal receipt replay。此门不启动 Multipass VM；测试阶段仍以磁盘容量为约束最多 2 个已登记实例（含停止记录）。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5063,3 +5071,4 @@ The actual application login remains a separately provisioned identity. Deployme
 | v5.84 | 2026-10-07 | Mavis review | Synchronize requirements v5.87 and Infrastructure DD v0.15; add §16.31 for the six-table Infrastructure owner persistence substrate, W/T classification, 24–25-hour terminal retention, isolated PostgreSQL 18.6 evidence, and the still-open production migration/grants/worker/provider gates. | Phase 9F4D-3A schema verification passed without launching any Multipass instance. |
 | v5.85 | 2026-10-07 | Mavis review | Synchronize requirements v5.88, Schedule SRS/DD v0.19, and Infrastructure DD v0.15 in all active acceptance rows and infrastructure references; retain the 2-instance test inventory cap and fail-closed production gates. | Cross-layer audit corrected active current-section pointers after the 9F4D-3A schema substrate update. |
 | v5.86 | 2026-10-07 | Mavis review | Align requirements v5.89, Schedule SRS/BD/DD v0.20/v0.19/v0.20, Infrastructure DD v0.16, Group DD v4.62 and implementation plan v6.17; add Section 16.32 for the Infrastructure-owner NOLOGIN grant group, W/T privilege matrix and separate application login boundary; record isolated PostgreSQL 18.6 14/14 evidence and keep production deployment/open owner gates explicit. | Phase 9F4D-3B1 grant contract was implemented and independently exercised in a disposable database. |
+| v5.87 | 2026-10-07 | Mavis review | Align requirements v5.90, Schedule SRS/BD/DD v0.21/v0.20/v0.21, Infrastructure DD v0.17, Group DD v4.63, DUKOU v1.10 and plan v6.18; add §16.33 for the 9F4D-3C1 Inbox receive adapter and its role/RLS/idempotency contract; keep resolver, capacity admission, Outbox delivery, provider, worker and execution open. Preserve the two-instance disk cap. | Rust and isolated PostgreSQL receive gates passed; production integration remains fail-closed. |

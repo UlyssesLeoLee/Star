@@ -1,6 +1,6 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.16 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts、六表 schema substrate 与 NOLOGIN runtime grant contract 已通过 PG18.6 隔离验证，目标 DB 身份与迁移装配、owner writer/consumer、provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.17 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts、六表 schema substrate、NOLOGIN runtime grant contract 与 3C1 Inbox receive adapter 已通过 PostgreSQL 18.6 隔离验证，目标 DB 身份与迁移装配、owner writer/consumer、provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > 上游：requirements v5.89 §50.8G-50.8J / basic-design v5.86 §8.1、§16.21-16.32 / 实施计划 §6.83-6.91。
 
@@ -163,6 +163,12 @@ The V2 multi-cluster Rust contract passed four focused gates and 27/27 tests; th
 
 PG18.6 disposable runner verified twice-applied migration, six tenant FORCE RLS tables, positive and negative tenant visibility/insertion, append-only Transaction rows, valid/invalid Work state transitions, terminal retention bounds, and deletion rejection before expiry. It starts zero Multipass instances, so the current inventory cap of two remains unchanged. This closes only the physical schema/guard substrate. Production migration callsite, target database owner/runtime grants, Infrastructure demand consumer and atomic capacity writer, duplicate/concurrent admission, reconciliation/reaper, BI/Benchmark, Manager/provider/readiness producer, Runtime sandbox/workspace bridge, and end-to-end Schedule execution remain open. See [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md).
 
+### §7.4 Phase 9F4D-3C1：Infrastructure-owner Inbox receive
+
+The Rust adapter writes typed V2 Run-owner demand into capacity_demand_inbox under the restricted Infrastructure-owner role and tenant RLS. It compares the event binding digest with a caller-supplied current owner snapshot, checks positive Host generation and deadline, then returns an idempotent receive outcome. Same-content pending replay and exact terminal receipt replay are distinguished; a reused event/occurrence key with changed payload fails closed.
+
+This proves durable receipt only. A concrete trusted binding/placement resolver, same-transaction freshness fence, actor authorization, Host and exact-cluster capacity reservation bundle, terminal processing receipt writer, owner Outbox delivery, retries/reaper/reconciliation, Multipass Manager/provider, BI and Schedule executor remain unimplemented. The public runtime path must stay disabled until those owners and integration boundaries are verified. The isolated runner used disposable PostgreSQL 18.6 and zero Multipass instances; the test inventory remains capped at two registered instances due to disk capacity.
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -182,3 +188,4 @@ PG18.6 disposable runner verified twice-applied migration, six tenant FORCE RLS 
 | v0.14 | 2026-10-07 | Define the test cap over the total registered Multipass inventory, including stopped/recoverable records; document the locked pre-launch inventory guard, fail-closed parse behavior, no-auto-purge policy, and unchanged product topology. | User clarified that stopped instances still consume disk. |
 | v0.15 | 2026-10-07 | Add the tested six-table Infrastructure-owner PostgreSQL schema substrate, exact W/T split, FORCE RLS, guarded 24–25-hour Work retention, append-only Transaction facts and phase runner; keep production migration provisioning/grants, owner writers/consumers, provider and Schedule execution open. | Phase 9F4D-3A completed disposable PostgreSQL 18.6 schema verification without Multipass. |
 | v0.16 | 2026-10-07 | Add the NOLOGIN Infrastructure-owner grant group and exact W/T privilege matrix; distinguish the verified repeatable isolated grants migration from unverified target DB provisioning, application login membership/activation and owner writer/consumer. Retain the two-instance test cap and fail-closed execution boundary. | Phase 9F4D-3B1 PostgreSQL role-grant verification. |
+| v0.17 | 2026-10-07 | Add Phase 9F4D-3C1 PostgreSQL owner Inbox receive behavior and evidence; disclose the unimplemented trusted resolver/freshness fence and admission/provider/execution gaps. Preserve the two-instance disk cap. |

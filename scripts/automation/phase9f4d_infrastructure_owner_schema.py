@@ -1,6 +1,6 @@
 """Verify 9F4D-3A owner schema and 9F4D-3B1 runtime grants in disposable PostgreSQL."""
 
-# @cypher schema=1 source_sha256=8eed58f8f6c985a5812c7577b191a0165efdb83df2caacf55e498ce739081063
+# @cypher schema=1 source_sha256=9957ce2d2470127b76f9c984b008a35d24421a959fd1e87deb4e7da33ae6a7b7
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_owner_schema.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::main",kind:"function"})
 # MERGE (grants_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::GRANTS_MIGRATION",kind:"constant"})
@@ -13,6 +13,8 @@
 # MERGE (run_sql:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::run_sql",kind:"function"})
 # MERGE (root:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::ROOT",kind:"constant"})
 # MERGE (migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::MIGRATION",kind:"constant"})
+# MERGE (cargo_test:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::owner_inbox_pg_test",kind:"step"})
+# MERGE (integration_source:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 # MERGE (output:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OUTPUT_DIR",kind:"constant"})
 # MERGE (pg:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
@@ -38,6 +40,8 @@
 # MERGE (main)-[:USES]->(grants_migration)
 # MERGE (main)-[:USES]->(owner_probe_sql)
 # MERGE (main)-[:USES]->(owner_privileges_sql)
+# MERGE (main)-[:CALLS]->(cargo_test)
+# MERGE (cargo_test)-[:CONFIGURES]->(integration_source)
 # MERGE (main)-[:USES]->(output)
 # MERGE (main)-[:CONFIGURES]->(pg)
 # MERGE (run_step)-[:CALLS]->(subprocess)
@@ -512,6 +516,9 @@ def run_sql(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-bin", type=Path, required=True, help="PostgreSQL bin directory with initdb, pg_ctl, and psql")
+    parser.add_argument("--cargo", default="cargo", help="Cargo executable or command name")
+    parser.add_argument("--toolchain-bin", type=Path, help="Optional Rust toolchain bin directory")
+    parser.add_argument("--target-dir", type=Path, help="Optional short Cargo target directory")
     parser.add_argument("--output-dir", type=Path, help="Optional report directory")
     arguments = parser.parse_args()
 
@@ -541,6 +548,15 @@ def main() -> int:
     import os
 
     env.update(os.environ)
+    if arguments.toolchain_bin:
+        toolchain_bin = arguments.toolchain_bin.resolve()
+        env["PATH"] = str(toolchain_bin) + os.pathsep + env.get("PATH", "")
+        env["RUSTC"] = str(toolchain_bin / ("rustc.exe" if os.name == "nt" else "rustc"))
+        cargo = str(toolchain_bin / ("cargo.exe" if os.name == "nt" else "cargo"))
+    else:
+        cargo = shutil.which(arguments.cargo) or arguments.cargo
+    if arguments.target_dir:
+        env["CARGO_TARGET_DIR"] = str(arguments.target_dir.resolve())
     psql_base = [
         str(executables["psql"]), "-X", "-h", "127.0.0.1", "-p", str(port),
         "-U", "star_infrastructure_admin", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
@@ -585,19 +601,30 @@ def main() -> int:
                 results.append(run_sql(name, psql_base, sql, env))
                 if results[-1]["status"] != "passed":
                     break
-            if all(item["status"] == "passed" for item in results):
-                results.append(run_sql(
-                    "force-rls-count",
-                    [*psql_base, "-At", "-c", "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='infrastructure' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity;"],
-                    None,
-                    env,
-                ))
-                log_path = OUTPUT_DIR / "force-rls-count.stdout.log"
-                count = log_path.read_text(encoding="utf-8").strip() if log_path.exists() else ""
-                results[-1]["expected_value"] = "6"
-                results[-1]["actual_value"] = count
-                if count != "6":
-                    results[-1]["status"] = "failed"
+        if all(item["status"] == "passed" for item in results):
+            results.append(run_sql(
+                "force-rls-count",
+                [*psql_base, "-At", "-c", "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='infrastructure' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity;"],
+                None,
+                env,
+            ))
+            log_path = OUTPUT_DIR / "force-rls-count.stdout.log"
+            count = log_path.read_text(encoding="utf-8").strip() if log_path.exists() else ""
+            results[-1]["expected_value"] = "6"
+            results[-1]["actual_value"] = count
+            if count != "6":
+                results[-1]["status"] = "failed"
+        if all(item["status"] == "passed" for item in results):
+            test_env = env.copy()
+            test_env["STAR_INFRA_OWNER_TEST_DATABASE_URL"] = (
+                f"postgresql://star_infrastructure_admin@127.0.0.1:{port}/postgres"
+            )
+            results.append(run_step(
+                "owner-inbox-postgres-integration",
+                [cargo, "test", "--locked", "-p", "infrastructure", "--test", "infrastructure_owner_inbox_pg", "-j", "1", "--", "--ignored"],
+                ROOT,
+                test_env,
+            ))
         if all(item["status"] == "passed" for item in results):
             exit_code = 0
     finally:

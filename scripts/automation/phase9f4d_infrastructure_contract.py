@@ -1,6 +1,6 @@
 """Run reproducible focused gates for the 9F4D infrastructure contract slice."""
 
-# @cypher schema=1 source_sha256=287421ae456c918653019c0f8c6b5cd02a228f9f2958a0404befd06f126d9024
+# @cypher schema=1 source_sha256=37b6a4b5dd860f13e3862d7539548f388fb70a2543745b43786550775a1a7136
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_contract.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_infrastructure_contract.py::run_step",kind:"function"})
@@ -18,6 +18,7 @@
 # MERGE (source:File {path:"crates/domain-infrastructure/src/lib.rs"})
 # MERGE (readiness_source:File {path:"crates/domain-infrastructure/src/readiness.rs"})
 # MERGE (capacity_source:File {path:"crates/domain-infrastructure/src/capacity.rs"})
+# MERGE (owner_inbox_source:File {path:"crates/infrastructure/src/infrastructure_owner_inbox.rs"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(write_text)
@@ -39,6 +40,7 @@
 # MERGE (run_step)-[:CONFIGURES]->(rustfmt)
 # MERGE (main)-[:CONFIGURES]->(readiness_source)
 # MERGE (main)-[:CONFIGURES]->(capacity_source)
+# MERGE (main)-[:CONFIGURES]->(owner_inbox_source)
 # MERGE (run_step)-[:WRITES]->(audit)
 # @endcypher
 
@@ -56,6 +58,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path("crates/domain-infrastructure/src/lib.rs")
 READINESS_SOURCE = Path("crates/domain-infrastructure/src/readiness.rs")
 CAPACITY_SOURCE = Path("crates/domain-infrastructure/src/capacity.rs")
+OWNER_INBOX_SOURCE = Path("crates/infrastructure/src/infrastructure_owner_inbox.rs")
+PACKAGES = ["-p", "domain-infrastructure", "-p", "infrastructure"]
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-contract"
 DEFAULT_CARGO_TARGET_DIR = ROOT / "target" / "9f4d-cargo-target"
 MAX_STEP_SECONDS = 900
@@ -153,10 +157,10 @@ def main() -> int:
     target_dir = (arguments.target_dir or DEFAULT_CARGO_TARGET_DIR).resolve()
     environment["CARGO_TARGET_DIR"] = str(target_dir)
     commands = (
-        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE), str(CAPACITY_SOURCE)]),
-        ("check", [cargo, "check", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4"]),
-        ("clippy", [cargo_clippy, "clippy", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4", "--", "-D", "warnings"]),
-        ("test", [cargo, "test", "--locked", "-p", "domain-infrastructure", "--all-targets", "-j", "4"]),
+        ("format", [rustfmt, "--edition", "2021", "--check", str(SOURCE), str(READINESS_SOURCE), str(CAPACITY_SOURCE), str(OWNER_INBOX_SOURCE)]),
+        ("check", [cargo, "check", "--locked", *PACKAGES, "--all-targets", "-j", "4"]),
+        ("clippy", [cargo_clippy, "clippy", "--locked", "--no-deps", *PACKAGES, "--all-targets", "-j", "4", "--", "-D", "warnings", "-A", "clippy::empty_line_after_doc_comments", "-A", "clippy::unwrap_or_default"]),
+        ("test", [cargo, "test", "--locked", *PACKAGES, "--all-targets", "-j", "1"]),
     )
     (output_dir / "audit.jsonl").write_text("", encoding="utf-8")
     results = [run_step(name, command, environment, output_dir) for name, command in commands]

@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API and typed v2 multi-cluster binding/demand/capacity/readiness gate slices verified; production execution remains fail-closed.
-> Version: 0.19 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed v2 multi-cluster contracts, and the 9F4D-3C1 Inbox receive adapter verified; production execution remains fail-closed.
+> Version: 0.20 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -67,6 +67,12 @@ The migration 2026-10-08-infrastructure-owner-runtime-grants.sql creates or repa
 
 Disposable PostgreSQL 18.6 verified duplicate apply and the complete role/privilege matrix. The migration-provisioning callsite, target DB role membership/activation, Infrastructure owner writer/consumer, and production admission remain open. The test cap is two registered Multipass instances including stopped/recoverable entries; this role-contract test does not create a VM.
 
+### 6.5 9F4D-3C1 Infrastructure-owner Inbox receive boundary
+
+The Infrastructure owner stores the incoming versioned demand in its own PostgreSQL Inbox. The adapter receives typed V2 demand plus a current binding snapshot supplied by the trusted owner boundary, checks digest/generation/deadline, and writes under transaction-scoped star_infrastructure_owner role plus tenant RLS. It returns only Enqueued, DuplicatePending, or AlreadyTerminal; an event/occurrence collision with different content is an idempotency conflict.
+
+This is an Inbox receive adapter, not the consumer/admission transaction. It does not resolve source identity, reserve Host or cluster capacity, append a terminal receipt, publish an owner Outbox event, invoke Multipass/K3s Manager, or start TaskExecutionRun. Trusted resolver, reservation writer, worker, readiness and execution gates remain independently required and fail-closed. The PostgreSQL gate does not consume a Multipass instance; the test inventory cap remains two registered instances total because of host disk capacity.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -90,3 +96,4 @@ Disposable PostgreSQL 18.6 verified duplicate apply and the complete role/privil
 | v0.17 | 2026-10-07 | Make the binding placement strategy part of the digest and name the distinct Host/cluster reservation IDs required by readiness; record 27/27 focused Rust tests while retaining owner/provider production gates. |
 | v0.18 | 2026-10-07 | Define the test limit over all registered Multipass instances, including stopped/recoverable records, and record the locked fail-closed bootstrap creation guard without changing production topology. |
 | v0.19 | 2026-10-07 | Add the Infrastructure-owner NOLOGIN role, least-privilege W/T grants and separate login/role-activation boundary; record the isolated PostgreSQL 18.6 grant-matrix evidence and keep production identity, migration caller, writer/consumer and execution gates open. |
+| v0.20 | 2026-10-07 | Add the 9F4D-3C1 owner Inbox receive design and idempotency outcomes; distinguish receiving from the later capacity consumer/reservation transaction and keep execution disabled. |

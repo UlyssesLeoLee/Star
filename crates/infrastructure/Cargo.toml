@@ -14,16 +14,19 @@ repository.workspace = true
 [dependencies]
 # 基础依赖(全部 crate 共享)
 serde = { workspace = true }
+serde_json = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+sha2 = { workspace = true }
 tracing = "0.1"
 
 # v0.72 P0-4 Stage 2: RealPostgresAdapterRegistry 骨架
 # - star-pg-adapter 提供 healthcheck() 用于真实 PG 健康检查
 # - sqlx 提供 PgPool 类型 (connect_lazy 用于测试无需真 PG)
 star-context = { path = "../star-context" }
+domain-infrastructure = { path = "../domain-infrastructure" }
 star-pg-adapter = { path = "../star-pg-adapter" }
 sqlx = { workspace = true }
 
