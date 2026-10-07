@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.29 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 在既有 5 张 SCD2 Master + catalog event 上增加 Ed25519 Rust Manager receipt 与 SQLx owner registration writer，并要求 receipt/Master/event 原子提交、签名先于 DB 校验、精确幂等回放与 unsigned legacy refusal。PostgreSQL 18.6 cumulative chain 当前增加到 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、inventory reconciliation、生命周期 writer、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
+> v0.30 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 建立 Ed25519 Rust Manager signed registration，INFRA-2C3 在不改 registration V1 签名格式且不增表的前提下增加 lifecycle-specific signature、active/draining/retired 写入及延迟 Master-close 约束。PostgreSQL 18.6 cumulative chain 仍为 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、inventory reconciliation、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v6.04 §50.8G-50.8U / basic-design v6.01 §8.1、§16.21-16.45 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.26 / W/T/M v0.9 / 实施计划 §6.83-6.105。
+> 上游：requirements v6.05 §50.8G-50.8V / basic-design v6.02 §8.1、§16.21-16.46 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.27 / W/T/M v0.10 / 实施计划 §6.83-6.106。
 
 ## §0 目的与边界
 
@@ -299,6 +299,30 @@ This stage does not provision production owner login/membership, distribute Mana
 |---|---|
 | AC-INFRA-002-U | §7.15.1–7.15.3; Ed25519 verification before DB access, bound manager/key identity, exact-idempotent owner transaction, signed receipt/Master/event atomicity, no unsigned adoption, WORM/RLS and zero-VM PG18.6 gate. |
 
+### §7.16 INFRA-2C3 signed Manager resource lifecycle
+
+#### §7.16.1 Versioned command and signature
+
+Lifecycle reuses the trusted `(manager_id, manager_key_id)` public-key allow-list but has a separate `star.infrastructure.resource-catalog.manager-lifecycle.v1` signature domain. `InfrastructureManagerResourceLifecycleOperationV1` binds schema version, operation/receipt/correlation/actor/Manager IDs, observation time, exact resource kind/ID/generation and target state. This separation preserves the existing registration V1 signing bytes. Unknown key, invalid signature, nil IDs, nonpositive generation and unsupported schema fail before opening a DB transaction.
+
+#### §7.16.2 Serialized transition and atomic owner facts
+
+The writer first takes the operation-id advisory lock and checks the immutable receipt. Exact replay returns the original result before reading the resource's later state; any mismatch in receipt, Manager/key, resource tuple, transition, actor/correlation, digest or signature is an idempotency conflict. For new operations it takes the exact resource-kind/ID/generation advisory lock also used by the `resource_catalog_event` trigger, then reads the latest event joined to the one current Master generation.
+
+The allowed transitions are `active → draining`, `draining → active`, `active → retired` and `draining → retired`. Same-state changes, stale/noncurrent generations and transitions out of `retired` fail closed. One transaction inserts the append-only Manager receipt and matching immutable event. For `retired`, it then updates only `valid_to` on the exact Master identity/generation; the existing Master trigger requires the retired Transaction fact first and prevents every other Master mutation. State changes do not rewrite Master business fields.
+
+#### §7.16.3 Deferred retirement invariant and gates
+
+Migration `2026-10-08-infrastructure-resource-catalog-lifecycle.sql` adds a deferred constraint trigger over `resource_catalog_event`. At commit it checks that each `retired` event's exact Master generation exists with non-null `valid_to`, so a signed event cannot commit while the generation remains open. The reverse direction is already guarded: a Master close is accepted only after the latest event is `retired`. This adds no physical table; the cumulative schema remains 17 tables / 4 W / 7 T / 6 M with 17/17 FORCE RLS.
+
+The Rust 1.99.0 SQLx integration covers all five resource Master types, signature-before-DB rejection, stale generations, exact replay after later state, conflicting replay, active/draining reactivation, same-state rejection, concurrent duplicate target serialization, terminal retirement, and rollback of a structurally matching retired receipt/event that omits the Master close. Fifteen accepted receipt/event facts leave five exact Master generations closed. The cumulative PostgreSQL 18.6 runner applied each migration twice and passed 28/28 steps, including WORM/RLS and post-fact migration replay; SQLx passed 1/1 and 17/17 tables had FORCE RLS. PostgreSQL stopped cleanly, and only its runner-owned data directory was removed. The runner created zero VMs and changed no Multipass inventory; the live test cap remains two records total including Stopped/Deleted, with no auto-purge.
+
+This slice still does not reconcile provider inventory, provision/rotate production Manager keys or owner login, deploy target DB migrations, run a Manager process, operate Multipass/K3s, allocate Host/cluster capacity, bind a Run, prove readiness, emit BI/Benchmark, or enable Task Card CLI/Schedule execution.
+
+| Requirement | Detailed design and verification |
+|---|---|
+| AC-INFRA-002-V | §7.16.1–7.16.3; distinct signed lifecycle domain; exact resource-generation serialization; bounded transition matrix; idempotent receipt/event facts; retired Master close in the same transaction and deferred database enforcement; all five Master tables; passed Rust 1.99.0 SQLx 1/1 and PG18.6 28/28 runner, 17/17 FORCE RLS, zero VMs. |
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -331,3 +355,4 @@ This stage does not provision production owner login/membership, distribute Mana
 | v0.27 | 2026-10-08 | Mavis review | Add §7.13 for fixed Multipass CLI/daemon version, configured driver and Rust host-target observations; bound each read-only command to 5 seconds and 4 KiB streams, share fail-fast single-flight, preserve unknown driver values, and prohibit compatibility/readiness/authorization inference. Align requirements v6.01, basic design v5.98, Group DD v4.67 and plan v6.30; keep provider lifecycle and execution closed. | User selected Rust 1.99.0; INFRA-2B extends the bounded host observation layer without changing VM state. |
 | v0.28 | 2026-10-08 | Mavis review | Add §7.14 for the cumulative global Host/Multipass/K3s identity catalog: five SCD2 Master tables, one append-only Transaction event table, deferred atomic registration, composite generation FKs, one-current-membership/node-name constraints, serialized events and owner-only FORCE RLS/grants. Align requirements v6.02, basic design v5.99, Group DD v4.68, W/T/M v0.8 and plan v6.33; record 29/29 PG18.6 steps, 16/16 FORCE RLS and zero VM use. Preserve owner writer/reconciliation, target deployment, Manager/provider/readiness/BI and execution gaps. | INFRA-2C1 added and verified only the resource identity persistence substrate. |
 | v0.29 | 2026-10-08 | Mavis review | Add §7.15 for Rust Ed25519 Manager receipt verification before DB access and atomic signed receipt/Master/event registration; define operation-id replay, conflict rejection, signed-only migration upgrade, append-only global receipt Transaction, event binding and deferred no-orphan commit. Align requirements v6.04, basic v6.01, Group DD v4.70, W/T/M v0.9, automation v2.26 and plan v6.37; record Rust 1.99.0 and the 17-table cumulative gate while keeping inventory reconciliation, lifecycle writer, production keys/target DB, Manager readiness, BI and execution open. | INFRA-2C2 provides the first Rust owner writer without enabling Multipass or Run execution. |
+| v0.30 | 2026-10-08 | Mavis review | Add §7.16 for a lifecycle-specific signed V1 operation without changing registration V1; define operation/resource-generation advisory locks, exact replay/conflict, active↔draining and retirement transitions, atomic receipt/event/Master close, and deferred commit enforcement. Align requirements v6.05, basic design v6.02, Group DD v4.71, W/T/M v0.10, automation v2.27 and plan v6.38; record Rust 1.99.0, passed 28/28 cumulative runner, SQLx 1/1, 17/17 FORCE RLS, zero VMs and the unchanged two-record cap; retain production and execution gaps. | INFRA-2C3 adds signed lifecycle writes over the existing catalog. |

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.26 (2026-10-08)
+> **文档版本**: v2.27 (2026-10-08)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1282,6 +1282,14 @@ The runner's Rust 1.99.0 SQLx integration test signs and registers real typed te
 
 - Phase report: [`PHASE-INFRA-2C2-MANAGER-RESOURCE-WRITER-REPORT.md`](reports/PHASE-INFRA-2C2-MANAGER-RESOURCE-WRITER-REPORT.md).
 
+### 4.68 Phase INFRA-2C3 signed Manager resource lifecycle writer
+
+Run the cumulative extension with `python scripts/automation/phase_infra2c2_resource_writer.py --phase c3 --pg-bin <PostgreSQL-18.6-bin> --cargo-bin <Cargo-1.99.0>`. The `c3` mode uses separate `.cache/phase-infra2c3-resource-lifecycle` and `target/phase-infra2c3-resource-lifecycle` paths, adds the lifecycle migration to the 3A/3B1/3C3/3D1/2C1/2C2 chain, applies every migration twice, runs the lifecycle-specific ignored Rust SQLx test, and checks the cumulative 17/17 FORCE RLS count. It owns only the unique loopback PostgreSQL data directory and process it starts; uncertain stop status preserves the data. It never calls Multipass, accesses a target DB, reads/writes user inventory, or starts a VM.
+
+The Rust test registers the five resource kinds, then verifies the lifecycle-specific signature domain, exact replay/conflict, active/draining/reactivation/retirement transitions, stale generation rejection, same-state concurrency serialization, terminal retired behavior and signature-before-DB rejection. A database-only negative transaction proves the deferred constraint rejects a matching retired receipt/event if the exact Master generation is not closed. Fifteen accepted receipt/event facts leave all five Master generations closed. The disposable PostgreSQL 18.6 gate passed 28/28 runner steps and 17/17 FORCE RLS; the Rust SQLx lifecycle integration passed 1/1. The PostgreSQL process stopped and its owned data directory was removed. This slice adds no table and does not complete production key/login provisioning, inventory reconciliation, Manager/provider, Run binding/capacity/readiness, BI/Benchmark or Schedule/Task execution.
+
+- Phase report: [`PHASE-INFRA-2C3-RESOURCE-LIFECYCLE-REPORT.md`](reports/PHASE-INFRA-2C3-RESOURCE-LIFECYCLE-REPORT.md).
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1683,6 +1691,7 @@ frontend/src/app/automation-debug/
 | v2.24 | 2026-10-07 | Add §4.65 and register the idempotent guarded documentation sync; record Phase 9F4D-3D5 result-consumer bounds, caller-transaction TaskExecutionRun scope check, commit-before-ack order, 9/9 unit tests and 20/20 disposable runner steps; retain fail-closed quarantine/release boundary, Rust 1.99.0, zero Multipass VMs and two-record cap. | The Run-owner result Inbox consumer slice reached its focused verification gate. |
 | v2.25 | 2026-10-08 | Add §4.66 and register guarded resource-catalog documentation sync plus disposable PostgreSQL runner; apply the 3A/3B1/3C3/3D1/INFRA-2C1 chain twice, record 29/29 runner steps and 16/16 FORCE RLS, and keep live Multipass inventory unchanged at the two-record cap. | INFRA-2C1 adds owner-scoped Host/cluster identity persistence without a VM or production executor. |
 | v2.26 | 2026-10-08 | Add §4.67 and register the cumulative INFRA-2C2 runner plus real Rust SQLx writer integration; verify all five resource types, exact replay/conflict, invalid-signature rejection before DB access, transactional rollback, receipt/event digest binding, orphan/WORM/RLS rejection, post-data migration reapplication and 17/17 FORCE RLS in 26/26 disposable PostgreSQL 18.6 steps. Preserve Rust 1.99.0, zero VM use and the two-record inventory cap. | INFRA-2C2 adds signed Rust Manager ownership evidence while provider lifecycle and execution remain closed. |
+| v2.27 | 2026-10-08 | Add §4.68 for the cumulative INFRA-2C3 lifecycle mode; record a separate output/data path, lifecycle migration applied twice, Rust SQLx state-machine and deferred retirement-close tests, passed 28/28 C3 and 26/26 C2-default PostgreSQL 18.6 runners, SQLx 1/1 and unchanged 17/17 FORCE RLS. Preserve Rust 1.99.0, zero VM use, the two-record inventory cap and production/execution fail-closed boundaries. | INFRA-2C3 adds signed owner lifecycle transitions without adding tables or operating Multipass. |
 
 ### 4.64 Phase 9F4D-3D4 Infrastructure Outbox JetStream publisher
 
