@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.93）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.94）
 
 ## 0. 文档说明与前提
 
@@ -2788,6 +2788,18 @@ Infrastructure owner admission loads the exact profile revision pinned by immuta
 
 The PostgreSQL 18.6 disposable runner applied schema, grant and profile migrations twice each, verified tenant isolation, owner read-only grants, SCD2 closure, append-only events and 8/8 FORCE RLS; all 17 runner steps and 5/5 SQLx cases passed. This gate used no Multipass instance. During the test phase the full registered Multipass inventory is limited to two records including Stopped/Deleted because of host disk capacity; a full or invalid inventory fails closed without automatic purge. Production profile editor/current resolver, trusted Run binding/provider observation, system-wide allocator, target DB identity/provisioning, owner delivery consumer, Manager/provider, readiness, sandbox/workspace bridge, BI/Benchmark and Schedule executor remain open.
 
+### 50.8L Phase 9F4D-3D1 跨租户物理容量台账
+
+共享物理 Host 与精确 K3s cluster 的容量必须由 Infrastructure owner 的全局物理容量台账串行化核算，不能依赖 tenant FORCE RLS 下的租户内 reservation 汇总。新增的 Work reservation 与 append-only Transaction event 均不存 `tenant_id`；两表启用 FORCE RLS，策略只允许受限 `star_infrastructure_owner` 角色访问。租户 Inbox、bundle、receipt、event 与 Outbox 继续保留 tenant scope。
+
+准入事务同时取得 tenant 与物理 Host/cluster advisory locks，按 key 排序并去重后再逐一取得，避免跨租户竞争和锁 key 碰撞遗漏；它从全局台账聚合仍 held 且 lease 未过期的 reservation。接受时同一 Infrastructure owner 事务同时写全局物理 reservation/event 与既有租户 reservation/receipt/event/Outbox。全局 reservation 的 release/expiry 状态变化由数据库 trigger 同事务追加事件。并发验收分别覆盖跨租户共享 Host、跨 Host 共享 cluster，确保每种物理资源竞争均只接受一个 reservation。
+
+该 slice 是可验证的数据库/owner-admission substrate，不等于生产全局 allocator 已部署。可信 Run binding/placement resolver、provider observation producer、目标 DB migration 与真实应用登录/role activation、Inbox/Outbox worker、双 ledger release/reaper/reconciliation、Manager/provider/readiness、sandbox 与 Schedule/Task Card CLI 执行仍须分别完成并 fail closed。验证只使用 Rust 与 disposable PostgreSQL；不创建 Multipass VM。测试阶段总登记 inventory 上限仍为 2 条记录（含 Stopped/Deleted），原因是宿主硬盘容量。
+
+| 验收 ID | 受入基准 |
+|---|---|
+| AC-INFRA-002-L | 跨租户共享物理 Host/cluster 必须通过无 `tenant_id` 的全局 Infrastructure owner Work/T 台账核算；仅 `star_infrastructure_owner` 可通过 FORCE RLS 访问。锁按 tenant 与物理资源 key 全排序、去重后持有；接受事务原子写 tenant/global reservation facts。release/expiry transition 必须原子追加 global T event。PostgreSQL 18.6 runner 必须重复应用迁移，验证 10/10 FORCE RLS、全局表 tenant 字段缺失、owner-only policy、tenant role 不可见/不可写、WORM 与 transition event；SQLx 并发场景分别共享 Host 和共享 cluster，均只能接受一个 reservation。此 slice 不证明 production resolver、target DB provisioning、consumer/reaper/provider 或执行可用。测试不创建 VM；Multipass 测试阶段 inventory 总量最多 2 条（含 Stopped/Deleted）。 | P0 |
+
 ### 50.9 追溯与后续专题同步
 
 本节为总要件基线。`SRS-MULTICA-TASK-001` 负责任务生命周期与 review gate，`SRS-MULTICA-HOOK-001` / `BD-MULTICA-HOOK-001` / `DD-MULTICA-HOOK-001` 负责高级设置 Hooks tab 的原生引擎、可视编辑、Worktree enforcement 与 Hook BI；`DD-MULTICA-TASK-001` §14.7-14.12 负责 Task Contract / Run / BI / Benchmark / Execution Profile / 双 Loop / Hook；`DD-WORKTREE-GROUP-001` §6.3-6.5 / §8.4-8.7 负责调度资源、扩展 Provider、Hook 与 CLI 边界；`DD-CANVAS-WORKFLOW-001` 的 Schedule Trigger 必须适配唯一 Automation occurrence source；`SRS-CANVAS-001` / `SRS-CANVAS-WORKFLOW-001` 负责画布与 Flow，`architecture/2026-09-03-langgraph/01-requirements.md` 负责 L0/L1 编排。`basic-design.md` §16.14-16.17 固定跨专题基本设计。后续专题文档必须继承 GroupContext、单一任务事实源、范围化聊天、Worktree-first 导航、可扩展 Agent Profile、原生 Hook、Loop、资源与跨 App 事件约束。
@@ -2921,3 +2933,4 @@ The PostgreSQL 18.6 disposable runner applied schema, grant and profile migratio
 | v5.91 | 2026-10-07 | Mavis review | Add AC-INFRA-002-J for the Infrastructure-owner atomic Host/cluster capacity-admission adapter; specify resource lock order, unexpired-ledger aggregation, bounded capacity retry, immutable terminal facts, concurrency/idempotency evidence, and the current tenant-scoped allocator boundary. Keep trusted resolver, cross-tenant allocation, consumer/provider and execution open; preserve the disk-bound two-instance test cap. | Phase 9F4D-3C2 verified paired reservations and owner facts in an isolated PostgreSQL integration gate without starting Multipass. |
 | v5.92 | 2026-10-07 | Mavis review | Add AC-INFRA-002-K and §50.8K for the tenant-scoped SCD2 Provider Profile Master, append-only revision facts, stored-digest checks and profile-derived admission; align Schedule SRS v0.23/BD v0.22/DD v0.23 and Infrastructure DD v0.19; record 17/17 disposable PostgreSQL steps and 5/5 SQLx cases. Keep the disk-based two-entry Multipass test cap and production resolver/allocator/target DB/provider/consumer/execution fail-closed. | Phase 9F4D-3C3 added and verified the persisted capacity-profile source without starting Multipass. |
 | v5.93 | 2026-10-07 | Mavis review | Qualify AC-INFRA-002-G as the original 3A six-table scope, update AC-INFRA-002-H for read-only access to the two Provider Profile tables, and distinguish the 3B1 six-table historical grant result from the current 3C3 eight-table/17-step gate. Keep the two-record Multipass test cap and production fail-closed boundaries explicit. | Final consistency audit found the cumulative profile-table grants were not represented in the active grant acceptance wording. |
+| v5.94 | 2026-10-07 | Mavis review | Add §50.8L and AC-INFRA-002-L for the global physical Host/exact-cluster capacity ledger, cross-tenant lock ordering, atomic tenant/global reservation facts, owner-only FORCE RLS, and lifecycle event trigger; record 21/21 isolated runner steps, 10/10 FORCE RLS, and 6/6 SQLx cases while keeping production integration fail-closed. Preserve the disk-bound two-record Multipass test cap. | Phase 9F4D-3D1 closes the tenant-scoped overbooking gap for the Infrastructure-owner admission substrate without creating a VM. |

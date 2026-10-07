@@ -1,11 +1,13 @@
 """Verify 9F4D Infrastructure owner schema, grants, profile Master, and admission in disposable PostgreSQL."""
 
-# @cypher schema=1 source_sha256=da06eb4ca4cf2edce302be5646571560d7e283e5a6a261fa7d1cf9d7ea69d98d
+# @cypher schema=1 source_sha256=bdbefd09153d22afd8af7587182f5f4b75eebbea5452c2ceb64177310f707a51
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_owner_schema.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::main",kind:"function"})
 # MERGE (grants_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::GRANTS_MIGRATION",kind:"constant"})
 # MERGE (owner_probe_sql:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OWNER_RUNTIME_ROLE_SQL",kind:"constant"})
 # MERGE (owner_privileges_sql:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OWNER_PRIVILEGE_ASSERTIONS_SQL",kind:"constant"})
+# MERGE (physical_rls_sql:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::PHYSICAL_RLS_ASSERTIONS_SQL",kind:"constant"})
+# MERGE (physical_mutation_sql:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::PHYSICAL_MUTATION_ASSERTIONS_SQL",kind:"constant"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::run_step",kind:"function"})
 # MERGE (write_text:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::write_text",kind:"function"})
 # MERGE (is_contained:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::is_contained",kind:"function"})
@@ -14,6 +16,7 @@
 # MERGE (root:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::ROOT",kind:"constant"})
 # MERGE (migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::MIGRATION",kind:"constant"})
 # MERGE (profile_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::PROFILE_MIGRATION",kind:"constant"})
+# MERGE (global_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::GLOBAL_MIGRATION",kind:"constant"})
 # MERGE (cargo_test:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::owner_inbox_pg_test",kind:"step"})
 # MERGE (integration_source:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 # MERGE (output:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OUTPUT_DIR",kind:"constant"})
@@ -23,6 +26,8 @@
 # MERGE (self)-[:DEFINES]->(grants_migration)
 # MERGE (self)-[:DEFINES]->(owner_probe_sql)
 # MERGE (self)-[:DEFINES]->(owner_privileges_sql)
+# MERGE (self)-[:DEFINES]->(physical_rls_sql)
+# MERGE (self)-[:DEFINES]->(physical_mutation_sql)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(write_text)
 # MERGE (self)-[:DEFINES]->(is_contained)
@@ -31,6 +36,7 @@
 # MERGE (self)-[:DEFINES]->(root)
 # MERGE (self)-[:DEFINES]->(migration)
 # MERGE (self)-[:DEFINES]->(profile_migration)
+# MERGE (self)-[:DEFINES]->(global_migration)
 # MERGE (self)-[:DEFINES]->(output)
 # MERGE (main)-[:CALLS]->(run_step)
 # MERGE (main)-[:CALLS]->(write_text)
@@ -40,9 +46,12 @@
 # MERGE (main)-[:USES]->(root)
 # MERGE (main)-[:USES]->(migration)
 # MERGE (main)-[:USES]->(profile_migration)
+# MERGE (main)-[:USES]->(global_migration)
 # MERGE (main)-[:USES]->(grants_migration)
 # MERGE (main)-[:USES]->(owner_probe_sql)
 # MERGE (main)-[:USES]->(owner_privileges_sql)
+# MERGE (main)-[:USES]->(physical_rls_sql)
+# MERGE (main)-[:USES]->(physical_mutation_sql)
 # MERGE (main)-[:CALLS]->(cargo_test)
 # MERGE (cargo_test)-[:CONFIGURES]->(integration_source)
 # MERGE (main)-[:USES]->(output)
@@ -68,6 +77,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql"
 GRANTS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql"
 PROFILE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-infrastructure-provider-profile-master.sql"
+GLOBAL_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-infrastructure-physical-capacity-ledger.sql"
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-owner-schema"
 DATA_PARENT = ROOT / ".cache" / "phase9f4d-infrastructure-owner-schema"
 MAX_STEP_SECONDS = 900
@@ -97,6 +107,36 @@ BEGIN
     IF has_schema_privilege('star_infrastructure_owner', 'infrastructure', 'CREATE') THEN
         RAISE EXCEPTION 'Infrastructure owner role can create schema objects';
     END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns AS c
+         WHERE c.table_schema = 'infrastructure'
+           AND c.table_name IN ('capacity_physical_reservation', 'capacity_physical_reservation_event')
+           AND c.column_name = 'tenant_id'
+    ) THEN
+        RAISE EXCEPTION 'global physical capacity facts must not carry tenant identity';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'infrastructure'
+           AND c.relname IN ('capacity_physical_reservation', 'capacity_physical_reservation_event')
+           AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity)
+    ) THEN
+        RAISE EXCEPTION 'global physical capacity tables require ENABLE and FORCE RLS';
+    END IF;
+    IF (SELECT count(*) FROM pg_policies
+         WHERE schemaname = 'infrastructure'
+           AND tablename IN ('capacity_physical_reservation', 'capacity_physical_reservation_event')) <> 2
+       OR EXISTS (
+            SELECT 1 FROM pg_policies
+             WHERE schemaname = 'infrastructure'
+               AND tablename IN ('capacity_physical_reservation', 'capacity_physical_reservation_event')
+               AND (roles <> ARRAY['star_infrastructure_owner']::name[]
+                    OR coalesce(qual, '') <> 'true'
+                    OR coalesce(with_check, '') <> 'true')
+       ) THEN
+        RAISE EXCEPTION 'global physical capacity RLS must expose only the Infrastructure owner';
+    END IF;
     IF NOT EXISTS (
         SELECT 1 FROM pg_roles
          WHERE rolname = 'infrastructure_owner_runtime_probe'
@@ -105,7 +145,8 @@ BEGIN
         RAISE EXCEPTION 'Infrastructure owner runtime probe has unsafe role attributes';
     END IF;
     FOREACH table_name IN ARRAY ARRAY[
-        'capacity_demand_inbox', 'capacity_reservation_bundle', 'capacity_outbox_delivery'
+        'capacity_demand_inbox', 'capacity_reservation_bundle', 'capacity_outbox_delivery',
+        'capacity_physical_reservation'
     ] LOOP
         IF NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'SELECT')
            OR NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'INSERT')
@@ -118,7 +159,8 @@ BEGIN
         END IF;
     END LOOP;
     FOREACH table_name IN ARRAY ARRAY[
-        'capacity_demand_receipt', 'capacity_reservation_event', 'capacity_owner_outbox'
+        'capacity_demand_receipt', 'capacity_reservation_event', 'capacity_owner_outbox',
+        'capacity_physical_reservation_event'
     ] LOOP
         IF NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'SELECT')
            OR NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'INSERT')
@@ -168,6 +210,33 @@ INSERT INTO infrastructure.provider_profile_revision (
     '10000000-0000-4000-8000-000000000001', '15000000-0000-4000-8000-000000000001', 1, 1,
     'multipass_k3s_cluster', 'shared_pool', 1000, 1048576, 0, 0, 1000, 1048576, 0, 0,
     decode(repeat('d', 64), 'hex'), '12000000-0000-4000-8000-000000000001'
+);
+INSERT INTO infrastructure.capacity_physical_reservation (
+    reservation_bundle_id, host_capacity_reservation_id, host_environment_id, host_generation,
+    host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes, host_gpu_units,
+    cluster_capacity_reservation_id, k3s_cluster_id, k3s_cluster_generation,
+    cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units,
+    capacity_snapshot_digest, capacity_observed_at, lease_expires_at
+) VALUES (
+    'd0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001', 1, 1000, 1048576, 0, 0,
+    'f0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+    1, 1000, 1048576, 0, 0, decode(repeat('c', 64), 'hex'),
+    clock_timestamp(), clock_timestamp() + interval '1 hour'
+);
+INSERT INTO infrastructure.capacity_physical_reservation_event (
+    reservation_bundle_id, event_type, host_capacity_reservation_id, host_environment_id,
+    host_generation, host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes,
+    host_gpu_units, cluster_capacity_reservation_id, k3s_cluster_id, k3s_cluster_generation,
+    cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units,
+    capacity_snapshot_digest, capacity_observed_at, lease_expires_at, actor_id
+) VALUES (
+    'd0000000-0000-4000-8000-000000000001', 'held', 'e0000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001', 1, 1000, 1048576, 0, 0,
+    'f0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+    1, 1000, 1048576, 0, 0, decode(repeat('c', 64), 'hex'),
+    clock_timestamp(), clock_timestamp() + interval '1 hour',
+    '12000000-0000-4000-8000-000000000001'
 );
 BEGIN;
 SET LOCAL ROLE infrastructure_owner_runtime_probe;
@@ -262,6 +331,10 @@ BEGIN
     IF row_count <> 1 THEN RAISE EXCEPTION 'tenant A provider profile is not visible'; END IF;
     SELECT count(*) INTO row_count FROM infrastructure.provider_profile_revision_event;
     IF row_count <> 1 THEN RAISE EXCEPTION 'tenant A provider profile event is not visible'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.capacity_physical_reservation;
+    IF row_count <> 1 THEN RAISE EXCEPTION 'Infrastructure owner cannot read the global physical reservation'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.capacity_physical_reservation_event;
+    IF row_count <> 1 THEN RAISE EXCEPTION 'Infrastructure owner cannot read the global physical event'; END IF;
 END $$;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000002', true);
 DO $$
@@ -283,6 +356,8 @@ BEGIN
     IF row_count <> 0 THEN RAISE EXCEPTION 'tenant B can read tenant A provider profile'; END IF;
     SELECT count(*) INTO row_count FROM infrastructure.provider_profile_revision_event;
     IF row_count <> 0 THEN RAISE EXCEPTION 'tenant B can read tenant A provider profile event'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.capacity_physical_reservation;
+    IF row_count <> 1 THEN RAISE EXCEPTION 'physical ledger unexpectedly depends on tenant scope'; END IF;
     BEGIN
         INSERT INTO infrastructure.capacity_demand_inbox (
             tenant_id, source_event_id, occurrence_id, project_id, branch_id,
@@ -301,6 +376,38 @@ BEGIN
             decode(repeat('c', 64), 'hex'), clock_timestamp() + interval '1 hour'
         );
         RAISE EXCEPTION 'cross-tenant INSERT was not rejected';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+END $$;
+ROLLBACK;
+"""
+
+PHYSICAL_RLS_ASSERTIONS_SQL = """\
+BEGIN;
+SET LOCAL ROLE infrastructure_worm_guard_probe;
+SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
+DO $$
+DECLARE row_count INTEGER;
+BEGIN
+    SELECT count(*) INTO row_count FROM infrastructure.capacity_physical_reservation;
+    IF row_count <> 0 THEN RAISE EXCEPTION 'tenant-scoped probe can read the global physical reservation'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.capacity_physical_reservation_event;
+    IF row_count <> 0 THEN RAISE EXCEPTION 'tenant-scoped probe can read the global physical event'; END IF;
+    BEGIN
+        INSERT INTO infrastructure.capacity_physical_reservation (
+            reservation_bundle_id, host_capacity_reservation_id, host_environment_id, host_generation,
+            host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes, host_gpu_units,
+            cluster_capacity_reservation_id, k3s_cluster_id, k3s_cluster_generation,
+            cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units,
+            capacity_snapshot_digest, capacity_observed_at, lease_expires_at
+        ) VALUES (
+            'd1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000001',
+            'a0000000-0000-4000-8000-000000000001', 1, 1, 1, 0, 0,
+            'f1000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001',
+            1, 1, 1, 0, 0, decode(repeat('c', 64), 'hex'), clock_timestamp(),
+            clock_timestamp() + interval '1 hour'
+        );
+        RAISE EXCEPTION 'tenant-scoped probe inserted into the global physical reservation';
     EXCEPTION WHEN insufficient_privilege THEN NULL;
     END;
 END $$;
@@ -520,6 +627,65 @@ END $$;
 ROLLBACK;
 """
 
+PHYSICAL_MUTATION_ASSERTIONS_SQL = """\
+BEGIN;
+SELECT set_config('app.actor_id', '12000000-0000-4000-8000-000000000002', true);
+DO $$
+DECLARE denied BOOLEAN;
+BEGIN
+    denied := FALSE;
+    BEGIN
+        UPDATE infrastructure.capacity_physical_reservation
+           SET host_memory_bytes = host_memory_bytes + 1;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'physical reservation identity/resource rewrite was not blocked'; END IF;
+
+    denied := FALSE;
+    BEGIN
+        UPDATE infrastructure.capacity_physical_reservation_event SET event_type = 'released';
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'physical capacity Transaction rewrite was not blocked'; END IF;
+
+    denied := FALSE;
+    BEGIN
+        DELETE FROM infrastructure.capacity_physical_reservation_event;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'physical capacity Transaction delete was not blocked'; END IF;
+
+    denied := FALSE;
+    BEGIN
+        TRUNCATE TABLE infrastructure.capacity_physical_reservation_event;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'physical capacity Transaction truncate was not blocked'; END IF;
+
+    denied := FALSE;
+    BEGIN
+        DELETE FROM infrastructure.capacity_physical_reservation;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'active physical capacity reservation cleanup was not blocked'; END IF;
+
+    UPDATE infrastructure.capacity_physical_reservation
+       SET reservation_state = 'released',
+           terminal_at = clock_timestamp(),
+           retention_expires_at = clock_timestamp() + interval '24 hours',
+           updated_at = clock_timestamp();
+    IF NOT FOUND THEN RAISE EXCEPTION 'valid physical reservation release transition was rejected'; END IF;
+    IF (SELECT count(*) FROM infrastructure.capacity_physical_reservation_event
+        WHERE reservation_bundle_id = 'd0000000-0000-4000-8000-000000000001') <> 2
+       OR (SELECT count(*) FROM infrastructure.capacity_physical_reservation_event
+           WHERE reservation_bundle_id = 'd0000000-0000-4000-8000-000000000001'
+             AND event_type = 'released') <> 1 THEN
+        RAISE EXCEPTION 'physical reservation transition was not appended atomically';
+    END IF;
+END $$;
+ROLLBACK;
+"""
+
 
 def write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -613,7 +779,7 @@ def main() -> int:
         return 2
     missing_migrations = [
         str(path)
-        for path in (MIGRATION, GRANTS_MIGRATION, PROFILE_MIGRATION)
+        for path in (MIGRATION, GRANTS_MIGRATION, PROFILE_MIGRATION, GLOBAL_MIGRATION)
         if not path.is_file()
     ]
     if missing_migrations:
@@ -670,6 +836,7 @@ def main() -> int:
             migration_sql = MIGRATION.read_text(encoding="utf-8")
             grants_migration_sql = GRANTS_MIGRATION.read_text(encoding="utf-8")
             profile_migration_sql = PROFILE_MIGRATION.read_text(encoding="utf-8")
+            global_migration_sql = GLOBAL_MIGRATION.read_text(encoding="utf-8")
             for name, sql in (
                 ("migration-apply-1", migration_sql),
                 ("migration-apply-2", migration_sql),
@@ -677,12 +844,16 @@ def main() -> int:
                 ("runtime-grants-migration-apply-2", grants_migration_sql),
                 ("provider-profile-migration-apply-1", profile_migration_sql),
                 ("provider-profile-migration-apply-2", profile_migration_sql),
+                ("physical-capacity-migration-apply-1", global_migration_sql),
+                ("physical-capacity-migration-apply-2", global_migration_sql),
                 ("owner-runtime-probe-role", OWNER_RUNTIME_ROLE_SQL),
                 ("owner-runtime-privilege-matrix", OWNER_PRIVILEGE_ASSERTIONS_SQL),
                 ("runtime-role", RUNTIME_ROLE_SQL),
                 ("runtime-fixture", RUNTIME_FIXTURE_SQL),
                 ("runtime-tenant-isolation", RUNTIME_ASSERTIONS_SQL),
+                ("physical-capacity-rls-isolation", PHYSICAL_RLS_ASSERTIONS_SQL),
                 ("immutable-and-retention-guards", MUTATION_ASSERTIONS_SQL),
+                ("physical-capacity-worm-guards", PHYSICAL_MUTATION_ASSERTIONS_SQL),
             ):
                 results.append(run_sql(name, psql_base, sql, env))
                 if results[-1]["status"] != "passed":
@@ -696,9 +867,9 @@ def main() -> int:
             ))
             log_path = OUTPUT_DIR / "force-rls-count.stdout.log"
             count = log_path.read_text(encoding="utf-8").strip() if log_path.exists() else ""
-            results[-1]["expected_value"] = "8"
+            results[-1]["expected_value"] = "10"
             results[-1]["actual_value"] = count
-            if count != "8":
+            if count != "10":
                 results[-1]["status"] = "failed"
         if all(item["status"] == "passed" for item in results):
             test_env = env.copy()

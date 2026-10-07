@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.20 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts、owner schema/grants、3C1 Inbox receive、3C2 tenant-scoped admission 和 3C3 persisted Provider Profile source 已通过 focused/PG18.6 隔离验证。可信 resolver/provider、跨租户 allocator、目标 DB 装配、owner consumer/outbox delivery、provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.21 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile 与 3D1 跨租户物理容量 ledger 已通过 focused/PG18.6 隔离验证。production resolver/provider、目标 DB 装配、owner consumer/reaper、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.93 §50.8G-50.8K / basic-design v5.90 §8.1、§16.21-16.35 / Schedule SRS v0.23 / Schedule BD v0.22 / Schedule DD v0.23 / 实施计划 §6.83-6.95。
+> 上游：requirements v5.94 §50.8G-50.8L / basic-design v5.91 §8.1、§16.21-16.36 / Schedule SRS v0.23 / Schedule BD v0.22 / Schedule DD v0.23 / 实施计划 §6.83-6.96。
 
 ## §0 目的与边界
 
@@ -189,6 +189,16 @@ The disposable PostgreSQL 18.6 runner now applies the schema, grants and profile
 
 This closes only the persisted profile source and derivation boundary for the existing tenant-scoped admission primitive. The profile editor/current-profile resolver, immutable Run binding resolver, provider observation producer, production ACL/currentness fence, global cross-tenant allocator, target DB provisioning/login activation, durable Inbox/Outbox consumer, retry/reaper/reconciliation, Manager/provider, readiness producer, BI/Benchmark, Runtime sandbox/workspace bridge and Schedule executor remain open. Do not enable a worker, TaskExecutionRun or Task Card CLI execution from this slice.
 
+### §7.7 Phase 9F4D-3D1：Global physical Host and exact-cluster capacity ledger
+
+The tenant-scoped reservation bundle cannot prevent two tenants from oversubscribing one physical Host or one exact K3s cluster. Migration `2026-10-10-infrastructure-physical-capacity-ledger.sql` adds `capacity_physical_reservation` (Work) and `capacity_physical_reservation_event` (Transaction). These global rows deliberately omit `tenant_id`; both tables use ENABLE + FORCE RLS with exactly the restricted `star_infrastructure_owner` policy. Existing tenant Inbox, paired bundle, receipt, audit facts and Outbox retain tenant FORCE RLS.
+
+`admit_inbox` takes tenant Host/cluster keys and physical Host/cluster keys in one deterministic sorted/deduplicated order before it reloads and evaluates the demand. The global Work table is the source for held, unexpired physical reservation aggregation. Admission writes the global reservation and `held` event in the same Infrastructure-owner transaction as the tenant bundle, tenant event, receipt, Inbox transition and Outbox/delivery facts. A database AFTER-trigger appends a physical Transaction event atomically for each valid `held → released/expired` Work transition; the trigger requires `app.actor_id` and the owner transaction sets it from the Infrastructure service actor. Terminal Work cleanup remains bounded by the 24–25 hour retention guard.
+
+The PostgreSQL 18.6 disposable runner applies schema/grants/profile/global migrations twice, checks the global tables have no tenant column and only the owner RLS policy, verifies a tenant-scoped probe cannot read or insert global facts, validates WORM and atomic lifecycle-event behavior, and confirms 10/10 Infrastructure FORCE RLS tables. The SQLx suite passes 6/6 cases; the cross-tenant case separately contends on a shared Host and on a shared cluster, and each pair produces exactly one accepted reservation and one retry. Total runner result is 21/21 steps. No Multipass VM is started; the host-disk test cap remains two registered inventory records including Stopped/Deleted.
+
+This is not a production global allocator deployment. Trusted current Run binding/placement resolution, provider observation, target DB migration/login/role activation, actual Inbox/Outbox worker, tenant/global dual-ledger release/reaper/reconciliation, Manager/provider/readiness, BI/Benchmark, sandbox/workspace bridge and Schedule/Task Card execution remain fail-closed. No live resource is created or launched by this slice.
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -212,3 +222,4 @@ This closes only the persisted profile source and derivation boundary for the ex
 | v0.18 | 2026-10-07 | Add the tenant-scoped 3C2 owner admission transaction, deterministic Host/cluster locks, current unexpired-ledger aggregation, atomic paired reservation/receipt/event/Outbox facts, and disposable PostgreSQL concurrency/expiry evidence. Explicitly prohibit cross-tenant shared capacity until a global allocator exists; preserve all resolver, consumer, provider, execution and two-instance disk-cap boundaries. |
 | v0.19 | 2026-10-07 | Add the tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity requests from the exact profile inside the owner transaction; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases; keep production resolver, allocator, target DB, consumer, provider and execution gates open. |
 | v0.20 | 2026-10-07 | Mavis review | Align active upstream pointers to requirements v5.93/basic v5.90/implementation plan §6.95 and clarify that the historical six-table 3A schema/grant evidence is extended by the 3C3 Profile Master and event tables; cumulative gate is 8/8 FORCE RLS with Profile tables SELECT-only for Infrastructure owner. Preserve the disk-based two-instance test limit and fail-closed execution boundary. | Final cross-layer acceptance and W/T/M scope review. |
+| v0.21 | 2026-10-07 | Mavis review | Add §7.7 and synchronize requirements v5.94/basic v5.91/implementation plan §6.96/W-T-M v0.5; specify the no-tenant global physical Work/Transaction ledger, owner-only FORCE RLS, ordered/deduplicated physical locks, atomic tenant/global admission, transition event trigger, 21/21 disposable runner and 6/6 SQLx evidence. Retain release/reaper, production resolver/provider and execution gates; preserve the two-record disk cap. | Phase 9F4D-3D1 closes the cross-tenant physical Host/cluster overbooking gap at the admission substrate layer. |
