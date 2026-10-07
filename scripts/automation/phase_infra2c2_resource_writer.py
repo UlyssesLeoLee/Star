@@ -1,6 +1,6 @@
-"""Verify the INFRA-2C2 Rust writer and schema in disposable PostgreSQL."""
+"""Verify the INFRA-2C2 registration or cumulative INFRA-2C3 lifecycle writer in disposable PostgreSQL."""
 
-# @cypher schema=1 source_sha256=aaff2266e1650bf7ff18b8b629d1e127aba171e79be3de68f21499f88da1328f
+# @cypher schema=1 source_sha256=a7867c312e6644e68c07f78b7dd0095d4e88aac60efa65e473d52236c7fdcbcd
 # MERGE (self:File {path:"scripts/automation/phase_infra2c2_resource_writer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::main",kind:"function"})
 # MERGE (contained:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::is_contained",kind:"function"})
@@ -8,9 +8,11 @@
 # MERGE (run_step:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::run_step",kind:"function"})
 # MERGE (postgres_status:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::postgres_status",kind:"function"})
 # MERGE (run_writer_test:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::run_writer_test",kind:"function"})
+# MERGE (run_lifecycle_test:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::run_lifecycle_test",kind:"function"})
 # MERGE (write_sql:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::write_sql",kind:"function"})
 # MERGE (run_sql:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::run_sql",kind:"function"})
 # MERGE (migrations:Config {id:"db/migrations/2026-10-08-infrastructure-resource-manager-receipts.sql"})
+# MERGE (lifecycle_migration:Config {id:"db/migrations/2026-10-08-infrastructure-resource-catalog-lifecycle.sql"})
 # MERGE (base_schema:Config {id:"db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql"})
 # MERGE (runtime_grants:Config {id:"db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql"})
 # MERGE (provider_profile:Config {id:"db/migrations/2026-10-09-infrastructure-provider-profile-master.sql"})
@@ -18,6 +20,8 @@
 # MERGE (catalog_schema:Config {id:"db/migrations/2026-10-08-infrastructure-resource-master-catalog.sql"})
 # MERGE (output:Config {id:"target/phase-infra2c2-resource-writer"})
 # MERGE (data:Config {id:".cache/phase-infra2c2-resource-writer"})
+# MERGE (lifecycle_output:Config {id:"target/phase-infra2c3-resource-lifecycle"})
+# MERGE (lifecycle_data:Config {id:".cache/phase-infra2c3-resource-lifecycle"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test",kind:"command"})
 # MERGE (process:ExternalService {id:"python.subprocess",kind:"module"})
@@ -27,6 +31,7 @@
 # MERGE (main)-[:CALLS]->(run_step)
 # MERGE (main)-[:CALLS]->(run_sql)
 # MERGE (main)-[:READS]->(migrations)
+# MERGE (main)-[:READS]->(lifecycle_migration)
 # MERGE (main)-[:READS]->(base_schema)
 # MERGE (main)-[:READS]->(runtime_grants)
 # MERGE (main)-[:READS]->(provider_profile)
@@ -34,16 +39,21 @@
 # MERGE (main)-[:READS]->(catalog_schema)
 # MERGE (main)-[:CONFIGURES]->(output)
 # MERGE (main)-[:CONFIGURES]->(data)
+# MERGE (main)-[:CONFIGURES]->(lifecycle_output)
+# MERGE (main)-[:CONFIGURES]->(lifecycle_data)
 # MERGE (main)-[:CONFIGURES]->(postgres)
 # MERGE (main)-[:VERIFIES_STOPPED]->(postgres)
 # MERGE (reserve_port)-[:CALLS]->(socket)
 # MERGE (run_step)-[:CALLS]->(process)
 # MERGE (run_writer_test)-[:CALLS]->(run_step)
 # MERGE (run_writer_test)-[:CONFIGURES]->(cargo)
+# MERGE (run_lifecycle_test)-[:CALLS]->(run_step)
+# MERGE (run_lifecycle_test)-[:CONFIGURES]->(cargo)
 # MERGE (run_sql)-[:CALLS]->(write_sql)
 # MERGE (run_sql)-[:CALLS]->(run_step)
 # MERGE (main)-[:CALLS]->(postgres_status)
 # MERGE (main)-[:CALLS]->(run_writer_test)
+# MERGE (main)-[:CALLS]->(run_lifecycle_test)
 # MERGE (postgres_status)-[:CALLS]->(process)
 # @endcypher
 
@@ -72,6 +82,7 @@ MIGRATION_NAMES = (
     "2026-10-08-infrastructure-resource-master-catalog.sql",
     "2026-10-08-infrastructure-resource-manager-receipts.sql",
 )
+LIFECYCLE_MIGRATION = "2026-10-08-infrastructure-resource-catalog-lifecycle.sql"
 
 MISMATCHED_EVENT_SQL = r"""
 SET ROLE star_infrastructure_owner;
@@ -127,6 +138,34 @@ BEGIN
        OR (SELECT count(*) FROM infrastructure.k3s_cluster_instance_membership) <> 1
        OR (SELECT count(*) FROM infrastructure.kubernetes_node_catalog) <> 1 THEN
         RAISE EXCEPTION 'signed registration facts were not committed atomically';
+    END IF;
+END;
+$$;
+"""
+
+LIFECYCLE_SECURITY_ASSERTIONS_SQL = r"""
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'infrastructure'
+           AND c.relname = 'resource_catalog_manager_receipt'
+           AND c.relrowsecurity AND c.relforcerowsecurity
+    ) THEN RAISE EXCEPTION 'Manager receipt table must use FORCE RLS'; END IF;
+    IF NOT has_table_privilege('star_infrastructure_owner',
+        'infrastructure.resource_catalog_manager_receipt', 'SELECT,INSERT')
+       OR has_table_privilege('star_infrastructure_owner',
+        'infrastructure.resource_catalog_manager_receipt', 'UPDATE,DELETE,TRUNCATE') THEN
+        RAISE EXCEPTION 'Manager receipt grants exceed append-only owner scope';
+    END IF;
+    IF (SELECT count(*) FROM infrastructure.resource_catalog_manager_receipt) <> 15
+       OR (SELECT count(*) FROM infrastructure.resource_catalog_event) <> 15
+       OR (SELECT count(*) FROM infrastructure.host_environment_catalog WHERE valid_to IS NOT NULL) <> 1
+       OR (SELECT count(*) FROM infrastructure.multipass_instance_catalog WHERE valid_to IS NOT NULL) <> 1
+       OR (SELECT count(*) FROM infrastructure.k3s_cluster_catalog WHERE valid_to IS NOT NULL) <> 1
+       OR (SELECT count(*) FROM infrastructure.k3s_cluster_instance_membership WHERE valid_to IS NOT NULL) <> 1
+       OR (SELECT count(*) FROM infrastructure.kubernetes_node_catalog WHERE valid_to IS NOT NULL) <> 1 THEN
+        RAISE EXCEPTION 'signed lifecycle receipt/event/master close facts were not committed atomically';
     END IF;
 END;
 $$;
@@ -217,18 +256,43 @@ def run_writer_test(cargo_bin: Path, port: int) -> dict[str, object]:
     )
 
 
+def run_lifecycle_test(cargo_bin: Path, port: int) -> dict[str, object]:
+    environment = os.environ.copy()
+    environment["STAR_INFRASTRUCTURE_RESOURCE_WRITER_TEST_DATABASE_URL"] = (
+        f"postgres://star_infra_test@127.0.0.1:{port}/postgres"
+    )
+    return run_step(
+        "rust-lifecycle-postgres-integration",
+        [
+            str(cargo_bin), "test", "--manifest-path", str(ROOT / "Cargo.toml"),
+            "-p", "infrastructure", "--test", "infrastructure_resource_catalog_lifecycle_pg",
+            "--offline", "-j", "4", "--", "--ignored", "--nocapture",
+        ],
+        ROOT,
+        env=environment,
+    )
+
+
 def main() -> int:
+    global OUTPUT_DIR, DATA_PARENT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-bin", type=Path, required=True, help="PostgreSQL 18.6 bin directory")
     parser.add_argument("--cargo-bin", type=Path, default=None, help="Cargo executable (defaults to PATH)")
+    parser.add_argument("--phase", choices=("c2", "c3"), default="c2", help="schema/writer slice to verify")
     args = parser.parse_args()
+    if args.phase == "c3":
+        OUTPUT_DIR = ROOT / "target" / "phase-infra2c3-resource-lifecycle"
+        DATA_PARENT = ROOT / ".cache" / "phase-infra2c3-resource-lifecycle"
+        migration_names = (*MIGRATION_NAMES, LIFECYCLE_MIGRATION)
+    else:
+        migration_names = MIGRATION_NAMES
     pg_bin = args.pg_bin.resolve()
     cargo_bin = args.cargo_bin.resolve() if args.cargo_bin else Path(shutil.which("cargo") or "")
     executables = {name: pg_bin / f"{name}.exe" for name in ("initdb", "pg_ctl", "psql", "postgres")}
     missing = [str(path) for path in executables.values() if not path.is_file()]
     if not cargo_bin.is_file():
         missing.append(str(cargo_bin) if str(cargo_bin) else "cargo executable")
-    migrations = [ROOT / "db" / "migrations" / name for name in MIGRATION_NAMES]
+    migrations = [ROOT / "db" / "migrations" / name for name in migration_names]
     missing.extend(str(path) for path in migrations if not path.is_file())
     if missing:
         print(json.dumps({"status": "blocked", "missing": missing}, indent=2))
@@ -266,10 +330,13 @@ def main() -> int:
             if results[-1]["status"] != "passed":
                 break
         if all(item["status"] == "passed" for item in results):
-            results.append(run_writer_test(cargo_bin, port))
+            if args.phase == "c3":
+                results.append(run_lifecycle_test(cargo_bin, port))
+            else:
+                results.append(run_writer_test(cargo_bin, port))
         if results and all(item["status"] == "passed" for item in results):
             checks = (
-                ("security-and-positive-facts", SECURITY_ASSERTIONS_SQL, True),
+                ("security-and-positive-facts", LIFECYCLE_SECURITY_ASSERTIONS_SQL if args.phase == "c3" else SECURITY_ASSERTIONS_SQL, True),
                 ("reject-event-receipt-mismatch", MISMATCHED_EVENT_SQL, False),
                 ("reject-orphan-manager-receipt", ORPHAN_RECEIPT_SQL, False),
                 ("reject-receipt-update", "SET ROLE star_infrastructure_owner; UPDATE infrastructure.resource_catalog_manager_receipt SET recorded_at = clock_timestamp() WHERE receipt_id = '51000000-0000-0000-0000-000000000001';", False),
