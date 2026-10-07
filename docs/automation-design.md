@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.24 (2026-10-07)
+> **文档版本**: v2.25 (2026-10-08)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1263,6 +1263,17 @@ PG18.6 证据位于 `target/phase9f4d-infrastructure-owner-grants-final/audit.js
 - Documentation automation: scripts/automation/phase9f4d3d5_sync.py is idempotent, guarded by exact anchors, registered in scripts/automation/registry.md, and must be run twice with the second pass producing no changes.
 - Phase report: docs/reports/PHASE-9F4D-3D5-RUN-OWNER-CONSUMER-REPORT.md.
 
+### 4.66 Phase INFRA-2C1 resource identity catalog
+
+**自动化档：[P]** — `phase_infra2c_resource_catalog_sync.py` performs guarded, idempotent design synchronization; `phase_infra2c_resource_catalog.py` owns only a disposable loopback PostgreSQL cluster and its logs/data.
+
+- Runner applies 9F4D-3A schema, 3B1 runtime grants, 3C3 profile, 3D1 global physical ledger and INFRA-2C1 resource catalog migrations twice each. PostgreSQL 18.6 evidence: 29/29 steps, 16/16 FORCE RLS, owner-only catalog policies, exact catalog grants, atomic Master registration, orphan-Master/identity/state rejection, WORM rejection and valid SCD2 generation replacement.
+- Runner uses a unique randomly named private database directory, loopback-only listener and file-backed logs; it stops PostgreSQL before removing only its own directory. It creates zero Multipass VMs and does not read, mutate or purge live Multipass inventory.
+- Migration adds five global Master tables plus one Transaction table. It proves only the catalog persistence boundary, not owner command/reconciliation, production target DB, manager, provider readiness, capacity admission, BI, or execution.
+- Current live/test Multipass inventory limit remains two registered records total including Stopped/Deleted, enforced by the separate locked launcher. This test limit is not a customer topology limit and no automatic purge is permitted.
+- Documentation sync script is exact-anchor guarded and idempotent; run it twice and confirm the second pass reports no file changes. Index both scripts and the phase report in `scripts/automation/registry.md`.
+- Phase report: [`PHASE-INFRA-2C1-RESOURCE-CATALOG-REPORT.md`](reports/PHASE-INFRA-2C1-RESOURCE-CATALOG-REPORT.md).
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1662,6 +1673,7 @@ frontend/src/app/automation-debug/
 | v2.22 | 2026-10-07 | Add §4.63 for 9F4D-3D3 Outbox delivery claim/lease/ack/retry/dead-letter; extend the focused Rust runner and disposable PostgreSQL SQLx suite; record 4/4 Rust gates, 21/21 PostgreSQL steps, 10/10 FORCE RLS and 10/10 SQLx cases with zero VM use. Preserve the two-instance cap and open publisher/Run consumer/production worker/target DB/execution gates. |
 | v2.23 | 2026-10-07 | Add section 4.64 for bounded Rust JetStream publication and the repeatable loopback PostgreSQL/NATS runner; record Rust 1.99.0 focused gates, real PubAck/delivered-state integration, zero Multipass VMs, durable Run Inbox dedupe and open production consumer/worker/execution gates. | Phase 9F4D-3D4 completed the transport publisher slice. |
 | v2.24 | 2026-10-07 | Add §4.65 and register the idempotent guarded documentation sync; record Phase 9F4D-3D5 result-consumer bounds, caller-transaction TaskExecutionRun scope check, commit-before-ack order, 9/9 unit tests and 20/20 disposable runner steps; retain fail-closed quarantine/release boundary, Rust 1.99.0, zero Multipass VMs and two-record cap. | The Run-owner result Inbox consumer slice reached its focused verification gate. |
+| v2.25 | 2026-10-08 | Add §4.66 and register guarded resource-catalog documentation sync plus disposable PostgreSQL runner; apply the 3A/3B1/3C3/3D1/INFRA-2C1 chain twice, record 29/29 runner steps and 16/16 FORCE RLS, and keep live Multipass inventory unchanged at the two-record cap. | INFRA-2C1 adds owner-scoped Host/cluster identity persistence without a VM or production executor. |
 
 ### 4.64 Phase 9F4D-3D4 Infrastructure Outbox JetStream publisher
 

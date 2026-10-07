@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.67**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.68**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -15,9 +15,9 @@
 > - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.01 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.98 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.27、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.103 v6.30
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.02 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.99 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.28、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.104 v6.33
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -574,6 +574,16 @@ The consumer can Term-ack only after receipt plus the selected retention action 
 
 `multipass-adapter` 提供 Host 侧只读 `list --format json` observation，固定 argv、绝对可执行文件路径、进程级 single-flight、bounded output/deadline，不暴露 Multipass lifecycle/guest exec。解析器接收 name-keyed state-record arrays 与非空 row-list compatibility fixture，保留 Stopped/Deleted rows 并逐条计数；重复 JSON key、空 records/list、重复名称及 malformed output fail closed。该数据不证明 owner、Host/cluster binding、capacity、daemon/guest/K3s/Runtime readiness，也不授权 Run 或 CLI 执行。完整接口与 limits 见 [DD-LOCAL-INFRASTRUCTURE-001 v0.26 §7.12](DD-LOCAL-INFRASTRUCTURE-001.md) 和 [INFRA-2A report](../reports/PHASE-INFRA-2A-MULTIPASS-INVENTORY-REPORT.md)。当前测试仍最多两条已登记实例，未运行 live Multipass/VM。
 
+### 8.17 Phase INFRA-2C1 Resource identity catalog
+
+HostEnvironment、Multipass guest、K3s cluster、cluster membership 与 Kubernetes Node 是不同的 Infrastructure-owner 身份，持久化为全局 Master SCD2 rows 和 append-only Transaction events；每个新 Master generation 必须与 `registered/active` Transaction 在同一事务提交。一个 Host 可以容纳多个 Multipass instance 和多个独立 K3s cluster；每个当前 guest membership 固定到一个精确 cluster generation，RunInfrastructureBinding 仍固定 cluster identity/generation。目录行和 provider name 不能由 Run、插件、任务卡 CLI 或只读 `multipass list` 自行创建，也不能充当 ownership/readiness/capacity proof。
+
+本 slice 仅提供经过 owner-only FORCE RLS 的 PostgreSQL schema/grant/state guards。它不改 Project → Branch → Engineering Run → local Worktree 导航，不将 Host/VM/cluster 加成左侧 Run App，也不创建跨 owner 写事务。只有之后的 Infrastructure owner command、授权 resolver、Run binding、Host+精确 cluster reservation、Manager 操作证据、guest/K3s/CRI readiness、独立 Agent Runtime sandbox 和 Worktree bridge 全部成立，Run Task Card CLI 才可启用。当前 BI/Benchmark 不消费这些 Master/Transaction rows；必须由版本化 owner event projection 与覆盖率审计后才能展示。验证在 disposable PostgreSQL 18.6 中两次应用累计 16 表迁移、16/16 FORCE RLS，不启动 Multipass；live 测试记录仍最多 2 条，含 Stopped/Deleted。
+
+| Acceptance ID | Group boundary |
+|---|---|
+| AC-INFRA-002-T | Infrastructure DD §7.14；验证 catalog identity、generation、owner RLS/WORM、deferred-trigger orphan-Master rejection 与数据库边界。此阶段不创建 Run/Task/BI 事实、不启动 VM，Task Card CLI 保持关闭。 |
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -678,6 +688,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | Requirement / AC | 详细设计落点 | 服务端验收重点 |
 |---|---|---|
 | AC-INFRA-001 | §8.8 / DD-LOCAL-INFRASTRUCTURE-001 | environment 与 Run binding/Runtime 区分、资源与生命周期、native Hook/BI 和真实平台验收 |
+| AC-INFRA-002-T | §8.17 / DD-LOCAL-INFRASTRUCTURE-001 §7.14 | Host/guest/cluster/node 精确身份 catalog 与 owner-only schema；不把目录存在误判为 capacity/readiness/Run binding/CLI authority |
 | AC-ERUN-004 / AC-HOOK-001 | §7.3、§8.6 | server-resolved current tuple、strict immutable snapshot、V2 fence/signature v3、attachment 再授权及深链会话隔离 |
 | WTG-001 / AC-WTG-001 | §1-§5 | Project membership 限定 Index；同级 App 树与唯一 GroupContext |
 | WTG-004 / AC-WTG-003 | §3、§6 | owner、Agent、Runtime、PR、冲突/锁和最近活动来自有版本的服务端投影；操作有授权与 Audit |
@@ -872,3 +883,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.65 | 2026-10-08 | Mavis review | Add §8.15 for a separate Platform Messaging/Ingress quarantine owner, trusted JetStream source identity, immutable receipt, optional encrypted TTL Work payload and commit-before-Term invariant; keep user retention selection, fault taxonomy, owner migration/grants and production ACK wiring open. Preserve Worktree-first Run navigation and the two-record Multipass test limit. | Phase 9F4D-3D6 design boundary review. |
 | v4.66 | 2026-10-08 | Mavis review | Add §8.16 for the bounded Rust read-only Multipass inventory adapter; support name-keyed state-record map, row-list fixture and process-wide single-flight, align requirements v6.00, basic design v5.97, Infrastructure DD v0.26 and plan v6.29. Explicitly distinguish CLI inventory from owner ledger, capacity, readiness, Manager lifecycle and task execution; preserve the two-instance disk cap and record direct rustc/Cargo verification limits. | INFRA-2A delivers a safe observation-only implementation slice; self-review corrects CLI JSON format and concurrency boundaries. |
 | v4.67 | 2026-10-08 | Mavis review | Align upstream pointers to requirements v6.01/basic design v5.98/Infrastructure DD v0.27/implementation plan v6.30 after INFRA-2B adds bounded Multipass CLI version, daemon version, local driver and Rust host-target observations. Preserve Worktree-first Group ownership and explicitly keep those facts separate from provider readiness, VM ownership and execution. | User selected Rust 1.99.0 and the read-only host probe gained a second bounded observation slice. |
+| v4.68 | 2026-10-08 | Mavis review | Add §8.17 for INFRA-2C1 global resource identity catalog and cross-link requirements v6.02/basic design v5.99/Infrastructure DD v0.28/W-T-M v0.8/plan v6.33; preserve Project→Branch→Run→Worktree navigation and exact Run cluster binding; keep owner commands, Manager/readiness, BI and Task Card CLI gated. Record 29/29 PostgreSQL steps, 16/16 FORCE RLS and zero VM use; retain two registered Multipass records for live tests and no auto-purge. | Infrastructure identity persistence is verified without claiming a usable VM provider or execution loop. |

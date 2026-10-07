@@ -1,12 +1,12 @@
 # Phase 9F4D-3A — Infrastructure owner W/T/M classification
 
-> Version: v0.7 · 2026-10-07
-> Scope: additive schemas in `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql`, `db/migrations/2026-10-09-infrastructure-provider-profile-master.sql`, and `db/migrations/2026-10-10-infrastructure-physical-capacity-ledger.sql`
-> Boundary: preserve the original six-table 3A classification, add the two 3C3 profile tables and two 3D1 global physical ledger tables; 3D2 expiry and 3D3 Outbox delivery reuse existing Work/Transaction tables and triggers, add no schema objects, and do not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
+> Version: v0.8 · 2026-10-08
+> Scope: cumulative Infrastructure-owner schemas in 3A, 3C3, 3D1, and `db/migrations/2026-10-08-infrastructure-resource-master-catalog.sql`
+> Boundary: preserve phase-scoped 3A/3C3/3D1 snapshots and add the INFRA-2C1 global resource identity catalog; 3D2 expiry and 3D3 delivery reuse existing tables. Do not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
 
 ## §0 Purpose and ownership
 
-Classify every physical table introduced by the 9F4D-3A migration. The Infrastructure owner receives versioned capacity demand from the Run/Execution owner, admits both Host and exact-cluster capacity in its own transaction, and publishes immutable owner facts. No cross-owner write or distributed database transaction is permitted. The schema is not a production writer, consumer, provider, or executor.
+Classify every physical table in the cumulative Infrastructure-owner persistence chain. Run/Execution and Infrastructure retain independent owners and transactions; cross-owner facts flow through versioned Outbox/Inbox events, not direct writes or a distributed transaction. The schemas are persistence substrates, not proof of production deployment or execution.
 
 ## §1 Complete table classification
 
@@ -37,7 +37,22 @@ Classify every physical table introduced by the 9F4D-3A migration. The Infrastru
 | `infrastructure.capacity_physical_reservation` | Work (W) | Global Infrastructure-owner ledger for one paired Host and exact K3s cluster reservation; no tenant/Run payload | Starts `held`; only held→released/expired transition; current terminal timestamp and 24–25 hour retention required before DELETE | No `tenant_id`; ENABLE + FORCE RLS; one owner-only policy for `star_infrastructure_owner` |
 | `infrastructure.capacity_physical_reservation_event` | Transaction (T) | Global append-only Host/cluster physical reservation lifecycle fact; no tenant identity | Append-only; UPDATE/DELETE/TRUNCATE rejected; Work terminal transition appends an event in the same DB transaction | No `tenant_id`; ENABLE + FORCE RLS; one owner-only policy for `star_infrastructure_owner` |
 
-**Current cumulative coverage:** 10/10 tables across 3A, 3C3 and 3D1 have one primary class: 4 W, 5 T, 1 M. Eight tenant-owned tables retain tenant FORCE RLS; two global physical tables omit `tenant_id` and are visible only to the restricted Infrastructure owner. The owner writes global physical facts atomically with tenant admission facts. This establishes the cross-tenant physical ledger seam, not a production global allocator or release/reaper worker.
+**3D1 cumulative snapshot:** 10/10 tables across 3A, 3C3 and 3D1 had one primary class: 4 W, 5 T, 1 M. Eight tenant-owned tables retain tenant FORCE RLS; two global physical tables omit `tenant_id` and are visible only to the restricted Infrastructure owner. The owner writes global physical facts atomically with tenant admission facts. This establishes the cross-tenant physical ledger seam, not a production global allocator or release/reaper worker.
+
+### §1.3 Phase INFRA-2C1 global resource Master and Transaction
+
+| Physical table | Class | Row purpose | Retention / deletion | Tenant isolation |
+|---|---|---|---|---|
+| `infrastructure.host_environment_catalog` | Master (M) | Stable HostEnvironment identity and provider/OS/architecture attributes with exact generation | SCD2; immutable business fields, one-time close after a retired event; physical DELETE prohibited | No `tenant_id`; ENABLE + FORCE RLS; owner-only `star_infrastructure_owner` policy |
+| `infrastructure.multipass_instance_catalog` | Master (M) | Multipass instance UUID, exact Host generation and provider instance name | SCD2; instance name is not ownership proof; physical DELETE prohibited | No `tenant_id`; ENABLE + FORCE RLS; owner-only `star_infrastructure_owner` policy |
+| `infrastructure.k3s_cluster_catalog` | Master (M) | K3s cluster UUID/generation, Host identity, provider kind, identity digest and pinned K3s version | SCD2; exact cluster generation is what Run binding must pin; physical DELETE prohibited | No `tenant_id`; ENABLE + FORCE RLS; owner-only `star_infrastructure_owner` policy |
+| `infrastructure.k3s_cluster_instance_membership` | Master (M) | Exact cluster-to-Multipass guest membership and server/agent role | SCD2; each current guest maps to at most one current cluster; physical DELETE prohibited | No `tenant_id`; ENABLE + FORCE RLS; owner-only `star_infrastructure_owner` policy |
+| `infrastructure.kubernetes_node_catalog` | Master (M) | Kubernetes Node UID/name and exact membership, cluster, instance and Host generations | SCD2; unique current node name per exact cluster generation; physical DELETE prohibited | No `tenant_id`; ENABLE + FORCE RLS; owner-only `star_infrastructure_owner` policy |
+| `infrastructure.resource_catalog_event` | Transaction (T) | Immutable register, active/draining transition, and retirement facts keyed by resource kind/identity/generation | Append-only; UPDATE/DELETE/TRUNCATE rejected; no TTL purge | No `tenant_id`; ENABLE + FORCE RLS; owner-only `star_infrastructure_owner` policy |
+
+**Current cumulative classification:** 16/16 tables across 9F4D-3A, 3C3, 3D1 and INFRA-2C1 have exactly one primary class: 4 Work (W), 6 Transaction (T), and 6 Master (M). Eight tenant-owned rows retain tenant FORCE RLS; eight global rows have no tenant column and are limited by owner-only RLS. The 3D2 expiry and 3D3 delivery state reuse existing Work/Transaction tables and add no classification. The INFRA-2C1 runner applied all five migrations in this cumulative schema chain twice and verified 16/16 FORCE RLS tables, including deferred orphan-Master rejection at transaction completion; it did not create a Multipass VM.
+
+**Owner and scope:** only trusted Infrastructure owner commands can populate or change the global catalog. Every new Master generation and its `registered/active` Transaction fact must commit in the same transaction; the deferred constraint trigger rejects orphan-Master commits. This appendix does not equate VM provider names with ownership, or catalog identity with capacity, Run binding, readiness, authorization, BI completeness, or execution. The live/test launcher continues to fail closed at two registered Multipass records including Stopped/Deleted, with no auto-purge.
 
 ## §2 Constraints and owner boundary
 
@@ -45,7 +60,7 @@ Classify every physical table introduced by the 9F4D-3A migration. The Infrastru
 - The Infrastructure owner validates demand idempotency and fresh dual-capacity admission in its own transaction. A schema row alone does not prove current ACL, Run binding, profile placement, capacity, provider readiness, or admission.
 - Work rows can only be inserted in their initial state. Terminal timestamps cannot be backdated or materially future-dated. Retention must be between 24 and 25 hours from a current terminal transition, and cleanup is rejected until expiry.
 - Transaction facts are immutable through UPDATE/DELETE row triggers and TRUNCATE statement triggers. No credential, source file, or arbitrary provider output belongs in these payloads.
-- The eight tenant-owned tables across 3A and 3C3 use tenant FORCE RLS; the two 3D1 global physical tables use a role-only owner policy and deliberately have no tenant column. All ten tables use FORCE RLS. FORCE does not substitute for a non-superuser, `NOBYPASSRLS` production role and explicit target-environment grants; neither production role provisioning nor target DB deployment is included here.
+- At the 3D1 snapshot, eight tenant-owned tables across 3A/3C3 and two global physical tables had FORCE RLS. INFRA-2C1 adds six global owner-only catalog tables; the current 16-table classification and isolation boundaries are listed in §1.3. FORCE RLS does not substitute for a non-superuser, `NOBYPASSRLS` production role and target-environment grants; production identity provisioning and target DB deployment remain open.
 
 ## §3 Verification evidence and open items
 
@@ -61,6 +76,8 @@ This evidence does not add a production expiry scheduler, cross-tenant scan coor
 
 The 3D3 PostgreSQL delivery adapter reuses the same Work row with bounded `SKIP LOCKED` claim, 300-second maximum lease, incrementing attempt fence, exponential transient retry, permanent/exhausted dead-letter and terminal retention. It changes no W/T/M count and publishes no event to a broker; the Run/Execution consumer and production polling worker remain open. The Rust runner passed 4/4 gates; PostgreSQL passed 21/21 steps, 10/10 FORCE RLS and 10/10 SQLx cases. The gate creates zero Multipass VMs and leaves the registered-instance cap at two records.
 
+**INFRA-2C1 current evidence:** `phase_infra2c_resource_catalog.py` applied the 3A schema, 3B1 grants, 3C3 Provider Profile, 3D1 physical-capacity ledger and INFRA-2C1 catalog migrations twice each in disposable PostgreSQL 18.6. It passed 29/29 runner steps and 16/16 FORCE RLS. The catalog Master tables are global owner-only; existing capacity inbox/profile tables retain tenant or global policies from their own migrations. The runner does not deploy to a target database, create a Multipass VM, or verify production identity/owner commands. The test inventory cap remains two registered Multipass records including Stopped/Deleted, with no automatic purge.
+
 ## §4 Revision history
 
 | Version | Date | Revision | Trigger |
@@ -72,3 +89,4 @@ The 3D3 PostgreSQL delivery adapter reuses the same Work row with bounded `SKIP 
 | v0.5 | 2026-10-07 | Mavis review | Add §1.2 for the no-tenant global physical Work/Transaction ledger; classify cumulative 10/10 tables as 4 W / 5 T / 1 M, distinguish tenant and owner-only FORCE RLS, and record atomic lifecycle-event plus 21/21 PG runner and 6/6 SQLx evidence. Preserve the two-record Multipass disk cap and production worker/provider/execution gaps. |
 | v0.6 | 2026-10-07 | Mavis review | Record that 9F4D-3D2 reuses the existing paired Work ledgers, Transaction tables and lifecycle trigger for atomic expiry; add no schema object and make no W/T/M count change. Capture 7/7 SQLx expiry evidence while keeping production scheduler/consumer, active Runtime lease and VM lifecycle out of scope. Preserve the two-record Multipass disk cap. |
 | v0.7 | 2026-10-07 | Mavis review | Record 9F4D-3D3's bounded Outbox delivery claim/lease/ack/retry/dead-letter state machine on the existing Work row; add no table or classification change, keep broker publisher/Run consumer/worker open, and preserve the two-instance disk cap. |
+| v0.8 | 2026-10-08 | Mavis review | Add §1.3 and current cumulative coverage for the six-table INFRA-2C1 resource catalog: five global SCD2 Master tables plus one append-only Transaction table; require deferred atomic registration; classify 16 total tables as 4 W / 6 T / 6 M, preserve earlier phase snapshots, and record 29/29 PG18.6 steps, 16/16 FORCE RLS, two-instance test cap and zero VM use. | INFRA-2C1 resource identity schema and cumulative runner passed. |
