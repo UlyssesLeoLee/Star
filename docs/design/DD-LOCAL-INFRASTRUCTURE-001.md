@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.27 · 2026-10-08 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox/admission、persisted Profile、global physical capacity ledger、reservation expiry、Outbox publisher 与 Run-owner result consumer 有 focused/PG18.6 隔离证据；新增 Rust 只读 Multipass inventory 与 capability-facts adapter。production resolver/provider、Platform quarantine choice/writer/ACK、目标 DB 装配、Manager/provider lifecycle、daemon/guest/K3s readiness、跨平台能力与 RSS 仍未验收。
+> v0.28 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C1 增加 HostEnvironment、Multipass instance、K3s cluster、membership、Kubernetes node 五张 SCD2 Master 和 append-only Transaction catalog，并由延迟约束触发器强制 Master 与 registered Transaction 同事务提交。累计 16 张表在 PostgreSQL 18.6 isolated chain 中 16/16 FORCE RLS、29/29 runner steps 通过；target DB、owner writer/reconciliation、Manager/provider/readiness、BI/RSS 与执行仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v6.01 §50.8G-50.8S / basic-design v5.98 §8.1、§16.21-16.43 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.24 / 实施计划 §6.83-6.103。
+> 上游：requirements v6.02 §50.8G-50.8T / basic-design v5.99 §8.1、§16.21-16.44 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.25 / W/T/M v0.8 / 实施计划 §6.83-6.104。
 
 ## §0 目的与边界
 
@@ -251,6 +251,28 @@ Rust 1.99.0 direct rustc test harness 为 12/12；覆盖官方 name-keyed map fi
 
 该观察不证明 Multipass daemon 健康或对某个版本/driver 的兼容性，不解析或修改 Multipass 配置，不证明实例属于本产品，也不产生 Host/cluster 容量、Linux guest、K3s API/node/CRI、独立 Agent Runtime sandbox、授权或可执行状态。未知/未来 driver 必须保持 unknown，而不能按名称推断可启动。Fixture tests 不运行 Multipass、不创建 VM；两条注册记录的测试磁盘上限继续包含 Stopped/Deleted 项。本切片不得接通 Schedule/Task CLI execution。
 
+### §7.14 INFRA-2C1：Host / Multipass / K3s resource identity catalog
+
+#### 7.14.1 Schema and ownership
+
+Migration `2026-10-08-infrastructure-resource-master-catalog.sql` adds five global Infrastructure-owner Master tables: `host_environment_catalog`, `multipass_instance_catalog`, `k3s_cluster_catalog`, `k3s_cluster_instance_membership`, and `kubernetes_node_catalog`; it adds the append-only Transaction table `resource_catalog_event`. Each Master row is keyed by `(resource_id, generation)` with a one-current-generation index. Exact-generation composite foreign keys connect Multipass instances and clusters to their HostEnvironment, memberships to both exact cluster and instance on the same Host, and Kubernetes nodes to one exact membership. The constraints permit at most one current cluster membership per guest and one current node name per exact cluster generation.
+
+The catalog deliberately has no tenant identity. All six tables use ENABLE + FORCE RLS and an owner-only policy for the restricted `star_infrastructure_owner` NOLOGIN role. Master privileges are SELECT/INSERT/UPDATE, with a trigger restricting UPDATE to a single `valid_to` closure after the corresponding generation has a committed `retired` event; DELETE/TRUNCATE are denied. The Transaction role can SELECT/INSERT only, and row/statement triggers reject UPDATE/DELETE/TRUNCATE. Event transitions use a transaction-scoped advisory lock derived from resource kind, identity and generation before reading the prior state, so concurrent lifecycle commands cannot both validate from a stale predecessor.
+
+#### 7.14.2 Authority and temporal rules
+
+Only a trusted Infrastructure owner command may register catalog identity. `multipass list` results, CLI names and provider facts remain observations; they cannot create or prove owner registration. Master changes create a new generation after retirement and one-time closure of the prior row. Events start with `registered/active`, allow only active↔draining state changes, and end terminally at `retired/retired`. A retired generation cannot receive another event. Catalog identity is separate from Host/cluster capacity ledger facts, `RunInfrastructureBinding`, guest/K3s/CRI/Runtime readiness, and execution authorization.
+
+#### 7.14.3 Verification and open gates
+
+`phase_infra2c_resource_catalog.py --pg-bin <PostgreSQL-18-bin>` applies the existing 3A schema, 3B1 grants, 3C3 profile, 3D1 physical ledger, and INFRA-2C1 catalog migrations twice each to a private loopback PostgreSQL 18.6 cluster. It verifies 16/16 FORCE RLS tables; catalog-only owner policies and grants; orphan-Master commit rejection by the deferred trigger; unprivileged-read, wrong-host, duplicate-membership, duplicate-node-name, invalid-transition and WORM rejection; successful generation replacement; and expected audit facts. The database stops before the runner removes only its uniquely created temporary data directory. The gate creates zero Multipass instances.
+
+This phase does not deploy to a target DB and does not add a Rust owner writer, inventory-to-identity reconciler, production owner login/membership, cross-tenant global allocator, current Run binding resolver, Manager/Multipass lifecycle, guest/K3s readiness, independent Agent Runtime sandbox, BI/Benchmark projection, or Schedule/Task Card executor. The test inventory remains capped at two registered Multipass records total including Stopped/Deleted; no auto-purge is permitted. Those conditions stay fail-closed until their own authorization, capacity, recovery, and end-to-end gates pass.
+
+| Requirement | Detailed design and verification |
+|---|---|
+| AC-INFRA-002-T | §7.14.1–7.14.3; five M + one T catalog tables, exact generation references, RLS/grants/WORM, per-resource event serialization, two-apply cumulative migration and no-VM PostgreSQL evidence. |
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -281,3 +303,4 @@ Rust 1.99.0 direct rustc test harness 为 12/12；覆盖官方 name-keyed map fi
 | v0.25 | 2026-10-07 | Add §7.11 for TaskExecutionRun-validated scheduled demand append, the Run-owner capacity result consumer and append-only tenant Inbox; record exact demand-derived scope, commit-before-double-ack, no mutable Run projection, no quarantine/release contract, zero-VM test and two-record cap. | Phase 9F4D-3D5 adds the result-side owner boundary. |
 | v0.26 | 2026-10-08 | Mavis review | Add §7.12 for the bounded Rust read-only Multipass JSON inventory adapter; support name-keyed state-record mappings and row-list compatibility, enforce process-wide single-flight, reject duplicate keys and preserve Stopped/Deleted-inclusive counts. Record 12/12 direct rustc tests, clippy-driver/rustfmt, Cargo rerun blockage, zero live CLI/VM use, and the disk-based two-instance test cap; update requirements/basic/Group DD and implementation-plan pointers. | INFRA-2A implements a safe observation-only starting point; self-review corrects CLI JSON format and concurrency boundaries. |
 | v0.27 | 2026-10-08 | Mavis review | Add §7.13 for fixed Multipass CLI/daemon version, configured driver and Rust host-target observations; bound each read-only command to 5 seconds and 4 KiB streams, share fail-fast single-flight, preserve unknown driver values, and prohibit compatibility/readiness/authorization inference. Align requirements v6.01, basic design v5.98, Group DD v4.67 and plan v6.30; keep provider lifecycle and execution closed. | User selected Rust 1.99.0; INFRA-2B extends the bounded host observation layer without changing VM state. |
+| v0.28 | 2026-10-08 | Mavis review | Add §7.14 for the cumulative global Host/Multipass/K3s identity catalog: five SCD2 Master tables, one append-only Transaction event table, deferred atomic registration, composite generation FKs, one-current-membership/node-name constraints, serialized events and owner-only FORCE RLS/grants. Align requirements v6.02, basic design v5.99, Group DD v4.68, W/T/M v0.8 and plan v6.33; record 29/29 PG18.6 steps, 16/16 FORCE RLS and zero VM use. Preserve owner writer/reconciliation, target deployment, Manager/provider/readiness/BI and execution gaps. | INFRA-2C1 added and verified only the resource identity persistence substrate. |

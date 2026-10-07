@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.32**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.33**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1371,6 +1371,18 @@ Phase report: [`PHASE-9F4D-3D6-QUARANTINE-DESIGN-REPORT.md`](../reports/PHASE-9F
 
 阶段报告：[`PHASE-INFRA-2B-MULTIPASS-CAPABILITY-REPORT.md`](../reports/PHASE-INFRA-2B-MULTIPASS-CAPABILITY-REPORT.md)。
 
+### 6.104 INFRA-2C1 Host / Multipass / K3s resource identity catalog（2026-10-08）
+
+| 工作项 | 实施结果 | 当前门/状态 |
+|---|---|---|
+| Resource Master catalog | 新增五张 global SCD2 Master：HostEnvironment、Multipass instance、K3s cluster、cluster-instance membership、Kubernetes node；精确 generation FK 固定 Host/cluster/guest/node 归属。增加 append-only `resource_catalog_event` Transaction，并要求 Master 与 registered 事实同事务提交。 | Catalog 不含 tenant_id；仅受限 Infrastructure owner NOLOGIN role 可读写。CLI inventory/name 仍非所有权凭据。 |
+| Integrity/security | Master 只允许退休事件后的单次 `valid_to` 闭合；事件状态按资源 advisory lock 串行化；每个 guest 至多一个 current cluster membership，每个精确 cluster generation 的 node name 唯一；六表 ENABLE + FORCE RLS。 | Owner Master SELECT/INSERT/guarded UPDATE，Transaction SELECT/INSERT；物理删除、WORM mutation、未授权读取均拒绝。 |
+| Verification | PostgreSQL 18.6 disposable loopback runner 将 3A schema、3B1 grants、3C3 profile、3D1 physical ledger、2C1 catalog 五 migration 各应用两次；通过 29/29 runner steps、16/16 FORCE RLS、least-privilege catalog grants、deferred orphan-Master commit rejection plus invalid scope, identity, and WORM negative cases 与 SCD2 replacement。 | PostgreSQL 正常停止并仅删除 runner 自己的数据目录；0 Multipass VM，未接触用户 test inventory。 |
+| Cross-layer sync | requirements v6.02 §50.8T / AC-INFRA-002-T；basic design v5.99 §16.44；Infrastructure DD v0.28 §7.14；Group DD v4.68 §8.17；W/T/M v0.8；本计划 v6.33。 | 此 slice 无 Rust source、无 live provider、无 Product UI、无容量/Run/readiness/BI/执行状态变更。 |
+| Remaining INFRA-2 | Owner command/writer 与 inventory reconciliation、production login/membership/target grants、Run binding resolver、global allocator、Manager IPC/receipts、provider lifecycle/readiness、Agent Runtime sandbox/Worktree bridge、install/license UX、BI/Benchmark、RSS/并行与 Schedule/Task CLI e2e 均未关闭。 | TaskExecutionRun remains non-executable; Multipass 测试实例仍最多 2 条记录（含 Stopped/Deleted），禁止自动 purge。 |
+
+阶段报告：[`PHASE-INFRA-2C1-RESOURCE-CATALOG-REPORT.md`](../reports/PHASE-INFRA-2C1-RESOURCE-CATALOG-REPORT.md)。
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1560,3 +1572,4 @@ Phase report: [`PHASE-9F4D-3D6-QUARANTINE-DESIGN-REPORT.md`](../reports/PHASE-9F
 | v6.30 | 2026-10-08 | Mavis review | Add §6.103 for INFRA-2B read-only Multipass version/driver/host-target facts; pin fixed argv, 4 KiB output bounds, 5-second per-command deadline, fail-fast shared single-flight, unknown-driver preservation and non-authority boundary; synchronize requirements v6.01/basic v5.98/Group DD v4.67/Infrastructure DD v0.27 and the focused phase report. Preserve the two-record test cap and all owner/Manager/provider/readiness/execution gates. | User selected the released Rust 1.99.0 baseline and the next safe Infrastructure slice is capability observation only. |
 | v6.31 | 2026-10-08 | Mavis review | Replace the INFRA-2B pending verification placeholder with measured Rust 1.99.0 adapter test, strict Clippy, rustfmt, diff and CypherGraph results; retain explicit workspace/live-provider/performance limitations and sync the phase report. | Final evidence review before local dev integration found stale pending labels after the focused gates had completed. |
 | v6.32 | 2026-10-08 | Mavis review | Record successful no-FF local `dev` integration at `24a4e94219d71fc41059ec8c013abe584e793402`, rerun focused tests/Clippy/rustfmt/diff-check after merge, and keep all Codex/Orca active-owner branches/worktrees. No push or branch/worktree deletion. | User asked to merge the completed Multipass/Rust 1.99.0 result into dev after correcting the infrastructure direction. |
+| v6.33 | 2026-10-08 | Mavis review | Add §6.104 for INFRA-2C1's Host/Multipass/K3s identity catalog; sync requirements v6.02, basic design v5.99, Infrastructure DD v0.28, Group DD v4.68, W/T/M v0.8, automation-design v2.25 and registry v0.72. Record 29/29 disposable PostgreSQL steps, 16/16 FORCE RLS and zero VM use; preserve the two-record registered-instance cap, no-auto-purge rule and all production owner/provider/readiness/BI/execution gates. | The cumulative resource identity persistence slice passed its isolated database gate. |
