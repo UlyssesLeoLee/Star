@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=385011e83241ec5cda254e5e0bc7f5a3b80270ad929d26ccd08c55fc22155528
+//! @cypher schema=1 source_sha256=c1a155235ecf6c019e49cb61ae8bc9ce4b918c6060619c364a4d2e5667ca8e76
 //! MERGE (self:File {path:"crates/domain-infrastructure/src/lib.rs"})
 //! MERGE (provider:Type {id:"crates/domain-infrastructure/src/lib.rs::ProviderKind",kind:"enum"})
 //! MERGE (placement:Type {id:"crates/domain-infrastructure/src/lib.rs::ClusterPlacementPolicyV1",kind:"enum"})
@@ -21,6 +21,8 @@
 //! MERGE (capacity_error:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureCapacityEvaluationError",kind:"enum"})
 //! MERGE (capacity_add:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureResourceVectorV1::checked_add",kind:"function"})
 //! MERGE (capacity_sub:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureResourceVectorV1::checked_sub",kind:"function"})
+//! MERGE (provider_profile:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileRevisionV1",kind:"struct"})
+//! MERGE (provider_profile_error:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileError",kind:"enum"})
 //! MERGE (error:Type {id:"crates/domain-infrastructure/src/lib.rs::InfrastructureContractError",kind:"enum"})
 //! MERGE (binding_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::RUN_INFRASTRUCTURE_BINDING_SCHEMA_VERSION_V2",kind:"constant"})
 //! MERGE (demand_schema_version:Variable {id:"crates/domain-infrastructure/src/lib.rs::HOST_INFRASTRUCTURE_DEMAND_SCHEMA_VERSION_V2",kind:"constant"})
@@ -76,6 +78,10 @@
 //! MERGE (capacity_module)-[:DEFINES]->(capacity_error)
 //! MERGE (capacity_module)-[:DEFINES]->(capacity_add)
 //! MERGE (capacity_module)-[:DEFINES]->(capacity_sub)
+//! MERGE (capacity_module)-[:DEFINES]->(provider_profile)
+//! MERGE (capacity_module)-[:DEFINES]->(provider_profile_error)
+//! MERGE (self)-[:EXPOSES]->(provider_profile)
+//! MERGE (self)-[:EXPOSES]->(provider_profile_error)
 //! MERGE (self)-[:DEFINES]->(error)
 //! MERGE (self)-[:DEFINES]->(binding_schema_version)
 //! MERGE (self)-[:DEFINES]->(demand_schema_version)
@@ -191,7 +197,8 @@ mod readiness;
 pub use capacity::{
     evaluate_infrastructure_capacity_candidate, InfrastructureCapacityCandidateV2,
     InfrastructureCapacityEvaluationError, InfrastructureCapacityRequestV2,
-    InfrastructureCapacitySnapshotV2, InfrastructureResourceVectorV1,
+    InfrastructureCapacitySnapshotV2, InfrastructureProviderProfileError,
+    InfrastructureProviderProfileRevisionV1, InfrastructureResourceVectorV1,
 };
 pub use readiness::{
     validate_infrastructure_execution_readiness, InfrastructureCapacityReservationAcceptanceV2,

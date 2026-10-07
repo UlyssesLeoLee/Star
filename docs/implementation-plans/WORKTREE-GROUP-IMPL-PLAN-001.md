@@ -1,12 +1,13 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.19**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.22**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 日期：2026-10-07
 > - 基础设施架构决策与实现边界：Multipass 为本地/CI 多 Linux guest 与 K3s cluster 的首选 VM 管理路径；HostEnvironment/instance/cluster/node 分层，Run 绑定精确 cluster ID/generation，placement 与 Host/cluster 双容量由版本化 Infrastructure Profile/owner ledger 决定；当前测试阶段已登记实例总数上限为 2，含 Stopped/Deleted 记录，原因是宿主硬盘容量。测试 bootstrap 用 host-local 独占锁串行化 inventory 检查与 launch；权威 Rust Manager/provider 尚未实现，因此 live test 创建必须走该受控路径。Rust Infrastructure Manager 独占受限 provider adapter；Worktree 通过显式、受授权 workspace bridge 进入 guest。`domain-infrastructure` 已实现 Run binding/demand/readiness/capacity 的纯 Rust v2 contracts，3A 已验证六表 schema substrate，3B1 已验证受限 NOLOGIN role grant matrix，3C1 已验证 Inbox receive，3C2 已验证 tenant-scoped 双 reservation admission store primitive 与隔离 PostgreSQL 并发/expiry 用例；它们都不代表 trusted resolver/provider、production consumer 或 Schedule execution 已接通。目标 DB 应用身份/装配、跨租户 allocator、权威 resolver、owner delivery/consumer、VM/K3s provider、sandbox 与运行性能仍未实现或验收。
 > - Phase 9F4D-3A 更新：新增 Infrastructure-owner 六表 PostgreSQL schema 与可重放本机 runner；PG18.6 disposable 验证双次 migration、6/6 FORCE RLS、NOBYPASSRLS tenant 隔离、append-only Transaction facts、Work state/24–25h retention guards 均通过，零 Multipass instance。schema 不等价于生产 migration provisioning/grants 或 owner writer/consumer；Schedule worker、Manager/provider、sandbox、BI 与执行能力继续 fail closed。
+> - Phase 9F4D-3C3 更新：新增 tenant-scoped SCD2 Provider Profile Master/append-only revision events；owner admission 在事务中读取 binding 固定版本、验证持久化 digest 并派生容量请求；17/17 disposable PostgreSQL runner、8/8 FORCE RLS、5/5 SQLx 和 Rust 定向 gates 通过。没有创建 Multipass VM；测试登记实例上限保持 2（含 Stopped/Deleted）。生产 resolver、跨租户 allocator、target DB provisioning、provider、consumer、sandbox 与执行仍 fail-closed。
 > - 本轮设计更新：主导航调整为 Project → Cloud Branch → Engineering Run；Run 管理分支内本地 Worktree，并提供 Inbox、Work Item/Multica/Jira、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps。选中 Worktree 只设置当前 focus/CLI checkout target；Run apps 的授权与数据 owner 由 RunContext 决定。新增面向 API-first bounded contexts、同域存储原子操作、跨域 Outbox/Inbox、可证据驱动服务提取、Kafka/Fluvio 评估及 Rust 桌面性能的实施边界；Phase 1已实施目录schema/read API与条件式主树/context shell基础；Run Task Cards 有只读 UI/API client 代码切片；旧 Tauri 桌面端 Task mock/fallback 已退役。宿主 Auth Provider、服务端 capability、目标 DB/RLS 未就绪，其它 Run Apps/生产执行闭环与服务提取仍待完成。
 > - 本轮补充：生产 Project 选择通过当前 actor 的服务端 membership 目录加载；API session generation 切换时同步隐藏旧 Project/Index/member-role 投影；分页与深链权限状态均 fail closed，缺失 Project 名称 SoR 时不借本地 seed 补名。
 > - Phase 8 更新：Run migration 在隔离临时 PostgreSQL 重复应用并通过 6 张表 FORCE RLS 检查，目标 DB/runtime grants 未部署；CLI Run writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已形成条件式代码切片；Contract 写命令、完整事件/Evidence producer、真实 Runtime 与目标环境端到端验收仍未完成。
@@ -967,7 +968,7 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 ### 6.69 Rust Infrastructure / k3s 配套阶段（2026-10-02）
 
-本节保留当日的初始方案与版本快照；当前首选架构、实施拆分、证据与验收状态以 §6.83 与 DD-LOCAL-INFRASTRUCTURE-001 v0.15 为准。
+本节保留当日的初始方案与版本快照；当前首选架构、实施拆分、证据与验收状态以 §6.95 与 DD-LOCAL-INFRASTRUCTURE-001 v0.20 为准。
 
 按 DD-LOCAL-INFRASTRUCTURE-001 v0.4 实施 INFRA-1 license-obligation/SBOM/活跃社区/capability/provider/profile/binding+真实 discover → INFRA-2 Multipass 跨平台 lifecycle/readiness（现有 provider 探测、安装引导、符合许可义务后的受管安装/捆绑；按稳定版逐 OS capability，unsupported host 用 Podman/Incus/Lima/remote Linux adapter）→ INFRA-3 Run namespace/least-privilege/quota/Runtime wiring → INFRA-4 可替换 adapters → INFRA-5 商业发行义务履行、固定负载 RSS/p95/并行/故障验收。产品不按用途/行业/规模/席位/用量/商业 tier 封锁核心能力；CPU/内存配额仅用于实际宿主容量和安全准入，不是商业计划限制。基础设施按需共享，VM/control-plane 不随 Worktree 数复制。K3s readiness 与安全 Agent 执行是不同门。
 
@@ -1245,6 +1246,27 @@ Completion correction: binding V2 now carries ClusterPlacementPolicyV1 and inclu
 
 阶段报告：[`PHASE-9F4D-3C2-INFRASTRUCTURE-OWNER-ADMISSION-REPORT.md`](../reports/PHASE-9F4D-3C2-INFRASTRUCTURE-OWNER-ADMISSION-REPORT.md)。
 
+### 6.94 Phase 9F4D-3C3 Infrastructure Provider Profile Master and derived capacity（2026-10-07）
+
+| 工作项 | 本阶段实现 | 验收与未关闭门 | 状态 |
+|---|---|---|---|
+| Persisted profile source | 新增 tenant-scoped SCD2 `provider_profile_revision` Master 和 append-only `provider_profile_revision_event` Transaction migration；profile 主体含 provider、placement、Host/cluster 资源向量与确定性 digest。 | 两张表 ENABLE + FORCE RLS；Infrastructure owner 只读；当前 profile editor/authoring 和 target DB migration provisioning 未实现。 | 🟢 Disposable schema gate |
+| Profile-derived admission | `admit_inbox` 不接受调用方容量向量；owner transaction 读取 demand 指定的 tenant/profile/revision，重算并核对存储 digest，再核对 binding identity/provider/placement/digest 并从 profile 生成容量请求。 | 存储 digest 不符时终态拒绝，写 receipt/Outbox 且无 reservation；现有 Host+cluster admission ledger 仍只对 tenant 可见。 | 🟢 Profile input boundary |
+| Database verification | 重复应用 schema/grants/profile 三个 migration；owner grant、tenant隔离、SCD2 仅一次关闭、revision event WORM、8/8 FORCE RLS；5 个 ignored SQLx 用例。 | 17/17 runner steps 与 5/5 SQLx 用例通过；临时 PG 停止并清理。没有 Multipass VM。 | 🟢 PostgreSQL 18.6 |
+| Production gates | profile editor/current resolver、canonical Run binding resolver、provider observation producer、current ACL/fence、global cross-tenant allocator、production owner consumer/outbox delivery、target DB identity/provisioning、Manager/provider/readiness、sandbox/workspace bridge、BI/Benchmark、Schedule/Task CLI execution。 | 未实现部分保持 fail-closed；不能将内部 profile/admission primitive 标记为生产闭环。 | 🔒 执行关闭 |
+| Test resource guard | 本阶段仅使用 Rust 与本机 loopback disposable PostgreSQL，未创建 Multipass VM。 | Multipass 测试 inventory 总量最多 2 条登记记录（包括 Stopped/Deleted），由带跨进程锁的受控脚本执行；满额或 inventory 无效时 fail closed，不自动 purge，原因是磁盘容量。 | 🔒 2 条硬上限 |
+| Cross-layer documents | requirements v5.93; basic design v5.90; Schedule SRS v0.23; Schedule BD v0.22; Schedule DD v0.23; Infrastructure DD v0.20; W/T/M v0.4; Automation Design v2.19; registry; phase report. | 区分 3A 六表历史切片和 3C3 累计八表授权/RLS 状态，保留 profile persistence vs production resolver/execution 的差异。 | 🟢 同步完成 |
+
+阶段报告：[`PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md`](../reports/PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md)。
+
+### 6.95 Phase 9F4D-3C3 final review and cross-layer closure record（2026-10-07）
+
+最终审查将 W/T/M 文档限定语修正为“3A 六表”与“3C3 新增两表”，避免 3C3 后仍称没有 Master；累计口径为 8 张表：3 W、4 T、1 M，8/8 tenant FORCE RLS。当前实现仅将 owner admission 的 capacity request 收敛到持久化、digest 校验且与 Run binding 匹配的 Provider Profile revision。它没有解析当前 Run 授权、跨租户物理资源、真实 provider/K3s observation 或创建/启动执行环境。最终活动文档指针为 requirements v5.93、basic design v5.90、Infrastructure DD v0.20、W/T/M v0.4 与本计划 v6.22。
+
+当前两条 Multipass inventory cap 是测试主机的磁盘容量限制：按全部已登记记录计算，包括 Stopped/Deleted；达到 2 条、inventory 不可解析或锁无法取得时，受控 launcher 必须拒绝 launch，不自动 purge。契约与 disposable PostgreSQL/Rust gates 均不创建 VM，本切片没有触及现有实例。
+
+阶段报告：[`PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md`](../reports/PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md)。最终审查验证命令及当前主机限制见报告 §2；下一阶段继续 9F4D owner delivery/consumer 与跨租户 allocator 的架构门，在这些门闭合前 Schedule/Task Card CLI 不进入执行态。
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1421,3 +1443,6 @@ Completion correction: binding V2 now carries ClusterPlacementPolicyV1 and inclu
 | v6.17 | 2026-10-07 | Mavis review | Add §6.91 for the restricted Infrastructure-owner NOLOGIN role and exact W/T grant matrix; record the 14/14 isolated PostgreSQL 18.6 grants/schema gates; synchronize requirements/basic/Group DD/DUKOU/Schedule/Infrastructure/W-T/automation/registry references; retain target identity, production owner/provider/executor and two-instance test-cap boundaries. | Phase 9F4D-3B1 runtime-grants migration verification. |
 | v6.18 | 2026-10-07 | Add Phase 9F4D-3C1 owner Inbox adapter and disposable PostgreSQL integration evidence; define 9F4D-3C2 as trusted resolver plus owner-local Host/cluster reservation, with execution still fail-closed. Preserve the two-instance disk cap. |
 | v6.19 | 2026-10-07 | Add §6.93 for the 9F4D-3C2 tenant-scoped owner admission transaction, exact Host/cluster lock order, unexpired reservation recomputation, atomic paired reservation and terminal facts; record concurrent/replay/generation/expiry PG evidence; explicitly hold cross-tenant shared capacity, trusted resolver/provider, production consumer and execution open. Preserve the disk-cap guard of two registered Multipass instances. |
+| v6.20 | 2026-10-07 | Add §6.94 for the 9F4D-3C3 tenant-scoped SCD2 Provider Profile source and profile-derived capacity admission; record persisted-digest rejection, 17/17 disposable PostgreSQL steps, 8/8 FORCE RLS and 5/5 SQLx cases; synchronize SRS/BD/DD/W-T/automation/report and keep production resolver, global allocator, target DB, provider, consumer and execution fail-closed. Preserve the two-record Multipass inventory cap due to disk capacity. |
+| v6.21 | 2026-10-07 | Add §6.95 final-review record and the 9F4D-3C3 report; correct cumulative W/T/M wording to distinguish the original 3A six-table slice from the added Profile Master/Transaction pair; record the exact disk-constrained two-record Multipass test cap and final review evidence while preserving production fail-closed boundaries. |
+| v6.22 | 2026-10-07 | Mavis review | Reconcile active requirements/basic/Infrastructure DD pointers to v5.93/v5.90/v0.20; extend the active owner-role acceptance wording with Profile-table SELECT-only access and cumulative 8-table RLS/grant evidence; bump W/T/M to v0.4 and retain the original 3A/3B1 six-table observations as historical. Preserve the two-record disk cap and all open production execution gates. | Final requirements-to-design-to-evidence audit found stale cumulative grant wording. |

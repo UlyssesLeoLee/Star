@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=b538b6b170bfb5bed2e601b5edd39c0c07a9a337ecfdc06d99e2a3819fb8aefc
+//! @cypher schema=1 source_sha256=99155b8eb584b18f4e374c32ead638aa808ed3f6976e3226d5ed6db4eb8bb5f0
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_admission.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::module",kind:"module"})
 //! MERGE (store:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission",kind:"struct"})
@@ -9,13 +9,17 @@
 //! MERGE (aggregate:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::read_active_reservations",kind:"function"})
 //! MERGE (accept:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::record_accepted",kind:"function"})
 //! MERGE (reject:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::record_rejected",kind:"function"})
+//! MERGE (read_profile:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::read_provider_profile_revision",kind:"function"})
+//! MERGE (loaded_profile:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::LoadedProviderProfileRevision",kind:"struct"})
 //! MERGE (inbox:Table {id:"infrastructure.capacity_demand_inbox"})
 //! MERGE (bundle:Table {id:"infrastructure.capacity_reservation_bundle"})
 //! MERGE (receipt:Table {id:"infrastructure.capacity_demand_receipt"})
 //! MERGE (reservation_event:Table {id:"infrastructure.capacity_reservation_event"})
 //! MERGE (outbox:Table {id:"infrastructure.capacity_owner_outbox"})
 //! MERGE (delivery:Table {id:"infrastructure.capacity_outbox_delivery"})
+//! MERGE (provider_profile:Table {id:"infrastructure.provider_profile_revision",class:"Master"})
 //! MERGE (evaluator:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::evaluate_infrastructure_capacity_candidate",kind:"function"})
+//! MERGE (derive_request:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileRevisionV1.capacity_request_for_binding",kind:"method"})
 //! MERGE (pg_pool:Type {id:"sqlx::PgPool",kind:"external_type"})
 //! MERGE (self)-[:DEFINES]->(module)
 //! MERGE (module)-[:DEFINES]->(store)
@@ -25,9 +29,13 @@
 //! MERGE (module)-[:DEFINES]->(aggregate)
 //! MERGE (module)-[:DEFINES]->(accept)
 //! MERGE (module)-[:DEFINES]->(reject)
+//! MERGE (module)-[:DEFINES]->(read_profile)
+//! MERGE (module)-[:DEFINES]->(loaded_profile)
 //! MERGE (store)-[:USES_TYPE]->(pg_pool)
 //! MERGE (admit)-[:CALLS]->(locks)
 //! MERGE (admit)-[:CALLS]->(aggregate)
+//! MERGE (admit)-[:CALLS]->(read_profile)
+//! MERGE (admit)-[:CALLS]->(derive_request)
 //! MERGE (admit)-[:CALLS]->(evaluator)
 //! MERGE (admit)-[:CALLS]->(accept)
 //! MERGE (admit)-[:CALLS]->(reject)
@@ -38,6 +46,9 @@
 //! MERGE (admit)-[:WRITES]->(reservation_event)
 //! MERGE (admit)-[:WRITES]->(outbox)
 //! MERGE (admit)-[:WRITES]->(delivery)
+//! MERGE (admit)-[:USES_TYPE]->(loaded_profile)
+//! MERGE (read_profile)-[:READS]->(provider_profile)
+//! MERGE (read_profile)-[:USES_TYPE]->(loaded_profile)
 //! @endcypher
 
 //! Infrastructure-owner admission for one already received Run-owner demand.
@@ -49,9 +60,10 @@
 
 use chrono::{DateTime, Duration, Utc};
 use domain_infrastructure::{
-    evaluate_infrastructure_capacity_candidate, InfrastructureCapacityEvaluationError,
-    InfrastructureCapacityRequestV2, InfrastructureCapacitySnapshotV2,
-    InfrastructureResourceVectorV1,
+    evaluate_infrastructure_capacity_candidate, ClusterPlacementPolicyV1,
+    InfrastructureCapacityEvaluationError, InfrastructureCapacityRequestV2,
+    InfrastructureCapacitySnapshotV2, InfrastructureProviderProfileError,
+    InfrastructureProviderProfileRevisionV1, InfrastructureResourceVectorV1, ProviderKind,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -137,15 +149,15 @@ impl PostgresInfrastructureOwnerAdmission {
 
     /// Admit a persisted Inbox item against a trusted, fresh provider observation.
     ///
-    /// The snapshot and resource request must come from the Infrastructure-owned provider and
-    /// versioned profile resolver. No public API route currently wires those producers; until
-    /// they do, Schedule execution remains fail-closed.
+    /// The provider snapshot must come from trusted Infrastructure observation. The capacity
+    /// request is derived from the tenant-scoped persisted profile revision inside this owner
+    /// transaction; it is never caller supplied. Neither producer is wired to a public API or
+    /// consumer, so Schedule execution remains fail-closed.
     pub async fn admit_inbox(
         &self,
         tenant_id: Uuid,
         inbox_id: Uuid,
         observed_snapshot: &InfrastructureCapacitySnapshotV2,
-        request: &InfrastructureCapacityRequestV2,
     ) -> Result<InfrastructureOwnerAdmissionOutcome, InfrastructureOwnerAdmissionError> {
         if tenant_id.is_nil() || inbox_id.is_nil() {
             return Err(InfrastructureOwnerAdmissionError::InvalidInboxIdentity);
@@ -222,6 +234,47 @@ impl PostgresInfrastructureOwnerAdmission {
         .execute(&mut *tx)
         .await?;
 
+        let Some(profile) = read_provider_profile_revision(
+            &mut tx,
+            tenant_id,
+            demand.binding.provider_profile_id,
+            demand.binding.provider_profile_revision,
+        )
+        .await?
+        else {
+            let reason_code = "provider_profile_not_found";
+            record_rejected(&mut tx, tenant_id, &row, &demand, reason_code, now).await?;
+            tx.commit().await?;
+            return Ok(InfrastructureOwnerAdmissionOutcome::Rejected {
+                reason_code: reason_code.to_owned(),
+                replayed: false,
+            });
+        };
+        if !profile.persisted_digest_matches {
+            let reason_code = "provider_profile_digest_mismatch";
+            record_rejected(&mut tx, tenant_id, &row, &demand, reason_code, now).await?;
+            tx.commit().await?;
+            return Ok(InfrastructureOwnerAdmissionOutcome::Rejected {
+                reason_code: reason_code.to_owned(),
+                replayed: false,
+            });
+        }
+        let request = match profile
+            .profile
+            .capacity_request_for_binding(&demand.binding)
+        {
+            Ok(request) => request,
+            Err(error) => {
+                let reason_code = provider_profile_error_code(error);
+                record_rejected(&mut tx, tenant_id, &row, &demand, reason_code, now).await?;
+                tx.commit().await?;
+                return Ok(InfrastructureOwnerAdmissionOutcome::Rejected {
+                    reason_code: reason_code.to_owned(),
+                    replayed: false,
+                });
+            }
+        };
+
         if observed_snapshot.host_environment_id != row.host_environment_id
             || observed_snapshot.host_generation != row.host_generation
             || observed_snapshot.k3s_cluster_id != row.k3s_cluster_id
@@ -260,7 +313,7 @@ impl PostgresInfrastructureOwnerAdmission {
             .await?,
         );
 
-        match evaluate_infrastructure_capacity_candidate(&demand, &snapshot, request, now) {
+        match evaluate_infrastructure_capacity_candidate(&demand, &snapshot, &request, now) {
             Ok(candidate) => {
                 let lease_expires_at =
                     match demand
@@ -288,7 +341,7 @@ impl PostgresInfrastructureOwnerAdmission {
                         row: &row,
                         demand: &demand,
                         snapshot: &snapshot,
-                        request,
+                        request: &request,
                         candidate: &candidate,
                         lease_expires_at,
                         now,
@@ -519,6 +572,109 @@ fn verify_inbox_demand(
         return Err(InfrastructureOwnerAdmissionError::InboxPayloadMismatch);
     }
     Ok(demand)
+}
+
+async fn read_provider_profile_revision(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    profile_id: Uuid,
+    revision: i64,
+) -> Result<Option<LoadedProviderProfileRevision>, InfrastructureOwnerAdmissionError> {
+    let Some(row) = sqlx::query(
+        "SELECT schema_version, tenant_id, profile_id, revision, provider_kind, placement_policy, \
+                host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes, host_gpu_units, \
+                cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units, \
+                profile_digest \
+         FROM infrastructure.provider_profile_revision \
+         WHERE tenant_id = $1 AND profile_id = $2 AND revision = $3 \
+           AND valid_from <= transaction_timestamp()",
+    )
+    .bind(tenant_id)
+    .bind(profile_id)
+    .bind(revision)
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(None);
+    };
+
+    let provider: String = row.try_get("provider_kind")?;
+    let provider = match provider.as_str() {
+        "multipass_k3s_cluster" => ProviderKind::MultipassK3sCluster,
+        "remote_k3s" => ProviderKind::RemoteK3s,
+        _ => return Err(InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord),
+    };
+    let placement_policy: String = row.try_get("placement_policy")?;
+    let placement_policy = match placement_policy.as_str() {
+        "shared_pool" => ClusterPlacementPolicyV1::SharedPool,
+        "run_dedicated" => ClusterPlacementPolicyV1::RunDedicated,
+        "pinned_cluster" => ClusterPlacementPolicyV1::PinnedCluster,
+        _ => return Err(InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord),
+    };
+    let resource_vector = |cpu: i64, memory: i64, storage: i64, gpu: i32| {
+        Ok::<_, InfrastructureOwnerAdmissionError>(InfrastructureResourceVectorV1 {
+            cpu_millicores: u64::try_from(cpu)
+                .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?,
+            memory_bytes: u64::try_from(memory)
+                .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?,
+            ephemeral_storage_bytes: u64::try_from(storage)
+                .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?,
+            gpu_units: u32::try_from(gpu)
+                .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?,
+        })
+    };
+
+    let profile = InfrastructureProviderProfileRevisionV1 {
+        schema_version: u16::try_from(row.try_get::<i16, _>("schema_version")?)
+            .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?,
+        tenant_id: row.try_get("tenant_id")?,
+        profile_id: row.try_get("profile_id")?,
+        revision: row.try_get("revision")?,
+        provider,
+        placement_policy,
+        host_resources: resource_vector(
+            row.try_get("host_cpu_millicores")?,
+            row.try_get("host_memory_bytes")?,
+            row.try_get("host_ephemeral_storage_bytes")?,
+            row.try_get("host_gpu_units")?,
+        )?,
+        cluster_resources: resource_vector(
+            row.try_get("cluster_cpu_millicores")?,
+            row.try_get("cluster_memory_bytes")?,
+            row.try_get("cluster_ephemeral_storage_bytes")?,
+            row.try_get("cluster_gpu_units")?,
+        )?,
+    };
+    let persisted_digest: Vec<u8> = row.try_get("profile_digest")?;
+    let persisted_digest: [u8; 32] = persisted_digest
+        .try_into()
+        .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?;
+    let persisted_digest_matches = profile
+        .digest()
+        .map_err(|_| InfrastructureOwnerAdmissionError::InvalidProviderProfileRecord)?
+        == persisted_digest;
+
+    Ok(Some(LoadedProviderProfileRevision {
+        profile,
+        persisted_digest_matches,
+    }))
+}
+
+struct LoadedProviderProfileRevision {
+    profile: InfrastructureProviderProfileRevisionV1,
+    persisted_digest_matches: bool,
+}
+
+fn provider_profile_error_code(error: InfrastructureProviderProfileError) -> &'static str {
+    match error {
+        InfrastructureProviderProfileError::UnsupportedSchemaVersion => {
+            "provider_profile_schema_unsupported"
+        }
+        InfrastructureProviderProfileError::InvalidIdentity
+        | InfrastructureProviderProfileError::InvalidResources => "provider_profile_invalid",
+        InfrastructureProviderProfileError::BindingMismatch => "provider_profile_binding_mismatch",
+        InfrastructureProviderProfileError::DigestMismatch => "provider_profile_digest_mismatch",
+    }
 }
 
 async fn read_active_reservations(
@@ -1048,6 +1204,9 @@ pub enum InfrastructureOwnerAdmissionError {
     /// A trusted profile request cannot be stored in PostgreSQL's bounded integer units.
     #[error("Infrastructure capacity request exceeds the supported persistence range")]
     InvalidCapacityRequest,
+    /// A persisted provider profile contains a discriminator or resource value the owner cannot decode.
+    #[error("Infrastructure provider-profile revision contains invalid persisted values")]
+    InvalidProviderProfileRecord,
     /// Attempt counter can no longer be increased without overflow.
     #[error("Infrastructure admission attempt counter overflow")]
     AttemptCounterOverflow,

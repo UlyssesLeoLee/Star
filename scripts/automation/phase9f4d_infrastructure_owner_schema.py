@@ -1,6 +1,6 @@
-"""Verify 9F4D-3A owner schema and 9F4D-3B1 runtime grants in disposable PostgreSQL."""
+"""Verify 9F4D Infrastructure owner schema, grants, profile Master, and admission in disposable PostgreSQL."""
 
-# @cypher schema=1 source_sha256=9957ce2d2470127b76f9c984b008a35d24421a959fd1e87deb4e7da33ae6a7b7
+# @cypher schema=1 source_sha256=da06eb4ca4cf2edce302be5646571560d7e283e5a6a261fa7d1cf9d7ea69d98d
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_owner_schema.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::main",kind:"function"})
 # MERGE (grants_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::GRANTS_MIGRATION",kind:"constant"})
@@ -13,6 +13,7 @@
 # MERGE (run_sql:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::run_sql",kind:"function"})
 # MERGE (root:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::ROOT",kind:"constant"})
 # MERGE (migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::MIGRATION",kind:"constant"})
+# MERGE (profile_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::PROFILE_MIGRATION",kind:"constant"})
 # MERGE (cargo_test:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::owner_inbox_pg_test",kind:"step"})
 # MERGE (integration_source:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 # MERGE (output:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OUTPUT_DIR",kind:"constant"})
@@ -29,6 +30,7 @@
 # MERGE (self)-[:DEFINES]->(run_sql)
 # MERGE (self)-[:DEFINES]->(root)
 # MERGE (self)-[:DEFINES]->(migration)
+# MERGE (self)-[:DEFINES]->(profile_migration)
 # MERGE (self)-[:DEFINES]->(output)
 # MERGE (main)-[:CALLS]->(run_step)
 # MERGE (main)-[:CALLS]->(write_text)
@@ -37,6 +39,7 @@
 # MERGE (main)-[:CALLS]->(run_sql)
 # MERGE (main)-[:USES]->(root)
 # MERGE (main)-[:USES]->(migration)
+# MERGE (main)-[:USES]->(profile_migration)
 # MERGE (main)-[:USES]->(grants_migration)
 # MERGE (main)-[:USES]->(owner_probe_sql)
 # MERGE (main)-[:USES]->(owner_privileges_sql)
@@ -64,6 +67,7 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql"
 GRANTS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql"
+PROFILE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-infrastructure-provider-profile-master.sql"
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-owner-schema"
 DATA_PARENT = ROOT / ".cache" / "phase9f4d-infrastructure-owner-schema"
 MAX_STEP_SECONDS = 900
@@ -126,6 +130,20 @@ BEGIN
             RAISE EXCEPTION 'Infrastructure owner Transaction-table privileges are not append-only';
         END IF;
     END LOOP;
+    IF NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision', 'SELECT')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision', 'INSERT')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision', 'UPDATE')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision', 'DELETE')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision', 'TRUNCATE') THEN
+        RAISE EXCEPTION 'Infrastructure owner profile Master privileges are not read-only';
+    END IF;
+    IF NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision_event', 'SELECT')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision_event', 'INSERT')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision_event', 'UPDATE')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision_event', 'DELETE')
+       OR has_table_privilege('star_infrastructure_owner', 'infrastructure.provider_profile_revision_event', 'TRUNCATE') THEN
+        RAISE EXCEPTION 'Infrastructure owner profile Transaction privileges are not read-only';
+    END IF;
 END $$;
 """
 
@@ -139,6 +157,18 @@ GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA infrastru
 """
 
 RUNTIME_FIXTURE_SQL = """\
+SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', false);
+SELECT set_config('app.actor_id', '12000000-0000-4000-8000-000000000001', false);
+INSERT INTO infrastructure.provider_profile_revision (
+    tenant_id, profile_id, revision, schema_version, provider_kind, placement_policy,
+    host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes, host_gpu_units,
+    cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units,
+    profile_digest, changed_by
+) VALUES (
+    '10000000-0000-4000-8000-000000000001', '15000000-0000-4000-8000-000000000001', 1, 1,
+    'multipass_k3s_cluster', 'shared_pool', 1000, 1048576, 0, 0, 1000, 1048576, 0, 0,
+    decode(repeat('d', 64), 'hex'), '12000000-0000-4000-8000-000000000001'
+);
 BEGIN;
 SET LOCAL ROLE infrastructure_owner_runtime_probe;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
@@ -228,6 +258,10 @@ BEGIN
     IF row_count <> 1 THEN RAISE EXCEPTION 'tenant A owner Outbox row is not visible'; END IF;
     SELECT count(*) INTO row_count FROM infrastructure.capacity_outbox_delivery;
     IF row_count <> 1 THEN RAISE EXCEPTION 'tenant A Outbox delivery row is not visible'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.provider_profile_revision;
+    IF row_count <> 1 THEN RAISE EXCEPTION 'tenant A provider profile is not visible'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.provider_profile_revision_event;
+    IF row_count <> 1 THEN RAISE EXCEPTION 'tenant A provider profile event is not visible'; END IF;
 END $$;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000002', true);
 DO $$
@@ -245,6 +279,10 @@ BEGIN
     IF row_count <> 0 THEN RAISE EXCEPTION 'tenant B can read tenant A reservation event'; END IF;
     SELECT count(*) INTO row_count FROM infrastructure.capacity_outbox_delivery;
     IF row_count <> 0 THEN RAISE EXCEPTION 'tenant B can read tenant A delivery row'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.provider_profile_revision;
+    IF row_count <> 0 THEN RAISE EXCEPTION 'tenant B can read tenant A provider profile'; END IF;
+    SELECT count(*) INTO row_count FROM infrastructure.provider_profile_revision_event;
+    IF row_count <> 0 THEN RAISE EXCEPTION 'tenant B can read tenant A provider profile event'; END IF;
     BEGIN
         INSERT INTO infrastructure.capacity_demand_inbox (
             tenant_id, source_event_id, occurrence_id, project_id, branch_id,
@@ -273,6 +311,7 @@ MUTATION_ASSERTIONS_SQL = """\
 BEGIN;
 SET LOCAL ROLE infrastructure_worm_guard_probe;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
+SELECT set_config('app.actor_id', '12000000-0000-4000-8000-000000000002', true);
 DO $$
 DECLARE denied BOOLEAN;
 BEGIN
@@ -437,6 +476,46 @@ BEGIN
     EXCEPTION WHEN raise_exception THEN denied := TRUE;
     END;
     IF NOT denied THEN RAISE EXCEPTION 'Outbox delivery cleanup before terminal retention was not blocked'; END IF;
+    denied := FALSE;
+    BEGIN
+        UPDATE infrastructure.provider_profile_revision
+           SET host_cpu_millicores = host_cpu_millicores + 1;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'Provider profile content rewrite was not blocked'; END IF;
+    denied := FALSE;
+    BEGIN
+        DELETE FROM infrastructure.provider_profile_revision;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'Provider profile physical delete was not blocked'; END IF;
+    denied := FALSE;
+    BEGIN
+        UPDATE infrastructure.provider_profile_revision_event SET event_type = 'superseded';
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'Provider profile Transaction rewrite was not blocked'; END IF;
+    denied := FALSE;
+    BEGIN
+        TRUNCATE TABLE infrastructure.provider_profile_revision_event;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'Provider profile Transaction truncate was not blocked'; END IF;
+    UPDATE infrastructure.provider_profile_revision
+       SET valid_to = transaction_timestamp()
+     WHERE tenant_id = '10000000-0000-4000-8000-000000000001'
+       AND profile_id = '15000000-0000-4000-8000-000000000001' AND revision = 1;
+    denied := FALSE;
+    BEGIN
+        UPDATE infrastructure.provider_profile_revision SET valid_to = NULL;
+    EXCEPTION WHEN raise_exception THEN denied := TRUE;
+    END;
+    IF NOT denied THEN RAISE EXCEPTION 'Closed provider profile revision was reopened'; END IF;
+    IF (SELECT count(*) FROM infrastructure.provider_profile_revision_event
+        WHERE tenant_id = '10000000-0000-4000-8000-000000000001'
+          AND profile_id = '15000000-0000-4000-8000-000000000001') <> 2 THEN
+        RAISE EXCEPTION 'Provider profile revision events do not record create and supersede';
+    END IF;
 END $$;
 ROLLBACK;
 """
@@ -532,7 +611,11 @@ def main() -> int:
     if missing:
         print(json.dumps({"result": "blocked", "missing_tools": missing}))
         return 2
-    missing_migrations = [str(path) for path in (MIGRATION, GRANTS_MIGRATION) if not path.is_file()]
+    missing_migrations = [
+        str(path)
+        for path in (MIGRATION, GRANTS_MIGRATION, PROFILE_MIGRATION)
+        if not path.is_file()
+    ]
     if missing_migrations:
         print(json.dumps({"result": "blocked", "missing_migrations": missing_migrations}))
         return 2
@@ -586,11 +669,14 @@ def main() -> int:
         if started:
             migration_sql = MIGRATION.read_text(encoding="utf-8")
             grants_migration_sql = GRANTS_MIGRATION.read_text(encoding="utf-8")
+            profile_migration_sql = PROFILE_MIGRATION.read_text(encoding="utf-8")
             for name, sql in (
                 ("migration-apply-1", migration_sql),
                 ("migration-apply-2", migration_sql),
                 ("runtime-grants-migration-apply-1", grants_migration_sql),
                 ("runtime-grants-migration-apply-2", grants_migration_sql),
+                ("provider-profile-migration-apply-1", profile_migration_sql),
+                ("provider-profile-migration-apply-2", profile_migration_sql),
                 ("owner-runtime-probe-role", OWNER_RUNTIME_ROLE_SQL),
                 ("owner-runtime-privilege-matrix", OWNER_PRIVILEGE_ASSERTIONS_SQL),
                 ("runtime-role", RUNTIME_ROLE_SQL),
@@ -610,9 +696,9 @@ def main() -> int:
             ))
             log_path = OUTPUT_DIR / "force-rls-count.stdout.log"
             count = log_path.read_text(encoding="utf-8").strip() if log_path.exists() else ""
-            results[-1]["expected_value"] = "6"
+            results[-1]["expected_value"] = "8"
             results[-1]["actual_value"] = count
-            if count != "6":
+            if count != "8":
                 results[-1]["status"] = "failed"
         if all(item["status"] == "passed" for item in results):
             test_env = env.copy()

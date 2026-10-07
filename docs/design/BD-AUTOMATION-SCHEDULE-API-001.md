@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API, typed v2 multi-cluster contracts, 9F4D-3C1 Inbox receive, and the 9F4D-3C2 tenant-scoped admission transaction are verified in focused/disposable gates; trusted resolver, production consumers and execution remain fail-closed.
-> Version: 0.21 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission transaction and persisted Provider Profile source are verified in focused/disposable gates; trusted resolver, production consumers and execution remain fail-closed.
+> Version: 0.22 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -81,6 +81,12 @@ On acceptance, one transaction writes distinct Host/cluster reservation IDs, the
 
 This implementation is scoped to the tenant RLS ledger. It cannot account for another tenant's claims on a physical Host or cluster; cross-tenant shared placement must remain disabled until a global allocator and ledger exist. Provider/profile resolution, current ACL/binding serialization, Inbox/Outbox consumer, target DB role provisioning, Manager/provider, readiness and task executor are still absent. This slice starts no VM and leaves Schedule/CLI execution disabled.
 
+### 6.7 9F4D-3C3 Persisted Provider Profile source for capacity admission
+
+`infrastructure.provider_profile_revision` is the tenant-scoped SCD2 Master for the exact provider, placement policy and Host/cluster resource vectors pinned by a RunInfrastructureBinding. Its deterministic `profile_digest` covers the schema version, identity, provider, placement and resource dimensions. Infrastructure owner admission reads the exact `(tenant_id, profile_id, revision)` under its owner transaction, recomputes and compares the stored digest, then derives the capacity request from the stored row; no caller-supplied vector is accepted. A mismatch or unsupported record is terminally rejected before reservation. `provider_profile_revision_event` records creation and supersession as append-only Transaction facts. Both tables use FORCE RLS; the Infrastructure owner has read-only grants.
+
+The disposable PostgreSQL runner applies the profile migration twice, checks both tables' tenant isolation, owner read-only privileges, one-time current-revision closure and immutable events, and executes five SQLx admission cases including digest-mismatch rejection without reservation. This adds a persisted source primitive, not a production profile editor/resolver or currentness fence. Cross-tenant shared capacity, target DB provisioning, consumer/delivery, provider/Manager and Schedule execution remain fail-closed. The test phase remains limited to two registered Multipass instances total, including stopped/deleted records; this gate starts zero VMs.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -106,3 +112,4 @@ This implementation is scoped to the tenant RLS ledger. It cannot account for an
 | v0.19 | 2026-10-07 | Add the Infrastructure-owner NOLOGIN role, least-privilege W/T grants and separate login/role-activation boundary; record the isolated PostgreSQL 18.6 grant-matrix evidence and keep production identity, migration caller, writer/consumer and execution gates open. |
 | v0.20 | 2026-10-07 | Add the 9F4D-3C1 owner Inbox receive design and idempotency outcomes; distinguish receiving from the later capacity consumer/reservation transaction and keep execution disabled. |
 | v0.21 | 2026-10-07 | Add the 9F4D-3C2 Infrastructure-owner admission primitive, deterministic dual-resource lock order, recomputed unexpired reservation ledger, atomic paired reservation/receipt/Outbox behavior, PostgreSQL concurrency/expiry evidence, and explicit tenant-only accounting boundary; keep resolver, consumer, provider and execution fail-closed. |
+| v0.22 | 2026-10-07 | Add the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity vectors inside owner admission; record 17/17 disposable PostgreSQL steps and 5/5 SQLx cases while preserving target DB, production resolver, cross-tenant allocator, provider and execution gates. |

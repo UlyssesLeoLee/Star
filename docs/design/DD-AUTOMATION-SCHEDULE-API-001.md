@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, and tenant-scoped dual-capacity admission transaction are verified; trusted resolver, cross-tenant allocator, target migration/app identity, Inbox/Outbox consumer, worker, provider evidence producer, and production execution remain open.
-> Version: 0.22 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission and persisted Provider Profile source are verified; trusted resolver, cross-tenant allocator, target migration/app identity, Inbox/Outbox consumer, worker, provider evidence producer, and production execution remain open.
+> Version: 0.23 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -130,6 +130,14 @@ The PostgreSQL integration tests exercise two concurrent demands for the same te
 
 The caller-supplied provider snapshot/request are trusted-boundary inputs; no concrete provider/profile resolver, per-trigger ACL/current binding fence, owner Inbox consumer, Outbox delivery loop, target DB/application login, lease reaper, Manager, Multipass/K3s lifecycle or task executor is wired. No route exposes this method, and TaskExecutionRun remains non-executing. Test runners use zero VMs; any live Multipass testing remains capped at two registered instances because of disk capacity.
 
+## 6.9 9F4D-3C3 persisted Provider Profile and profile-derived request
+
+`infrastructure.provider_profile_revision` is the tenant-scoped SCD2 Master for the exact provider, placement policy, and Host/cluster resource vectors pinned by a Run binding. Its content digest deterministically covers the schema version, tenant/profile/revision identity, provider, placement, and both resource vectors. A current revision may be closed once when superseded; business fields are immutable and physical deletion is forbidden. `provider_profile_revision_event` is the append-only Transaction record for creation and supersession. Both tables use tenant FORCE RLS; the Infrastructure-owner role has read-only access.
+
+The admission transaction reads the exact profile id/revision from the persisted Inbox demand, reconstructs the typed profile, recomputes its digest, compares it with the database `profile_digest`, and verifies the binding's exact tenant/profile/revision/provider/placement/digest before deriving the capacity request. The admission API does not accept a caller-supplied resource vector. Missing/unsupported/invalid records or digest mismatch fail closed before reservation; a stored-digest mismatch produces a terminal rejection fact and no reservation.
+
+The disposable PostgreSQL 18.6 runner applies schema, grant and profile migrations twice each and verifies tenant isolation, owner read-only profile grants, one-time SCD2 closure, append-only events, and 8/8 Infrastructure FORCE RLS tables. Its five SQLx cases pass, including stored-digest mismatch rejection. The temporary database stops and cleans up; no Multipass instance is started, and live test inventory remains capped at two registered records total, including stopped/deleted records, due to disk capacity. This does not implement the production profile editor/current resolver, trusted Run-binding/provider observation, global cross-tenant allocator, target DB provisioning, Inbox/Outbox consumer, Manager/provider, readiness producer, BI/Benchmark, sandbox/workspace bridge, or Schedule executor.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -156,3 +164,4 @@ The caller-supplied provider snapshot/request are trusted-boundary inputs; no co
 | v0.20 | 2026-10-07 | Define the idempotent runtime-grants migration, least-privilege W/T matrix and separate secret-provisioned login with transaction-scoped role activation; record 14/14 isolated PostgreSQL gates without claiming target deployment or production writer/consumer completion. |
 | v0.21 | 2026-10-07 | Add detailed 9F4D-3C1 receive transaction, idempotency/conflict behavior, and explicit resolver/authorization/freshness limitations; preserve fail-closed admission and execution. |
 | v0.22 | 2026-10-07 | Specify 9F4D-3C2 tenant-scoped capacity admission, ordered locks, recomputed unexpired ledger, atomic paired reservation and terminal Outbox facts; record concurrent/expiry/replay PostgreSQL evidence; disclose cross-tenant allocator and production consumer/provider gaps. |
+| v0.23 | 2026-10-07 | Specify the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted-digest checks and profile-derived capacity requests; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases while keeping production resolver, target DB, allocator, provider, consumer and execution gates open. |

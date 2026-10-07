@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=a5e7066983f6a026219610a9e4e4f98045ddf8987621a59bbbf0dbfb567cba04
+//! @cypher schema=1 source_sha256=796c88bd4b09c95a2dff20634f1c6adfb7f2cee1ff6a0aae55abc0198b90295b
 //! MERGE (self:File {path:"crates/domain-infrastructure/src/capacity.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::module",kind:"module"})
 //! MERGE (vector:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureResourceVectorV1",kind:"struct"})
@@ -12,6 +12,12 @@
 //! MERGE (valid_request:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureCapacityRequestV2.validate",kind:"method"})
 //! MERGE (binding_digest:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2.digest",kind:"method"})
 //! MERGE (placement:Type {id:"crates/domain-infrastructure/src/lib.rs::ClusterPlacementPolicyV1",kind:"enum"})
+//! MERGE (provider:Type {id:"crates/domain-infrastructure/src/lib.rs::ProviderKind",kind:"enum"})
+//! MERGE (profile:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileRevisionV1",kind:"struct"})
+//! MERGE (profile_error:Type {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileError",kind:"enum"})
+//! MERGE (profile_validate:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileRevisionV1.validate",kind:"method"})
+//! MERGE (profile_digest:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileRevisionV1.digest",kind:"method"})
+//! MERGE (profile_capacity_request:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::InfrastructureProviderProfileRevisionV1.capacity_request_for_binding",kind:"method"})
 //! MERGE (fixture:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::capacity_fixture",kind:"function"})
 //! MERGE (matching_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::fresh_capacity_returns_remaining_headroom",kind:"test"})
 //! MERGE (unknown_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::unknown_measurement_fails_closed",kind:"test"})
@@ -23,9 +29,12 @@
 //! MERGE (deadline_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::expired_demand_fails_closed",kind:"test"})
 //! MERGE (request_binding_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::request_must_match_binding_and_memory_budget",kind:"test"})
 //! MERGE (arithmetic_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::unrepresentable_capacity_arithmetic_fails_closed",kind:"test"})
+//! MERGE (profile_digest_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::provider_profile_digest_binds_resources_and_derives_the_request",kind:"test"})
+//! MERGE (profile_binding_test:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::provider_profile_must_match_pinned_tenant_identity_and_placement",kind:"test"})
 //! MERGE (test_id:Symbol {id:"crates/domain-infrastructure/src/capacity.rs::tests::id",kind:"function"})
 //! MERGE (self)-[:DEFINES]->(module)
 //! MERGE (self)-[:IMPORTS]->(placement)
+//! MERGE (self)-[:IMPORTS]->(provider)
 //! MERGE (module)-[:DEFINES]->(vector)
 //! MERGE (module)-[:DEFINES]->(snapshot)
 //! MERGE (module)-[:DEFINES]->(request)
@@ -33,6 +42,22 @@
 //! MERGE (module)-[:DEFINES]->(error)
 //! MERGE (module)-[:DEFINES]->(evaluate)
 //! MERGE (module)-[:DEFINES]->(valid_request)
+//! MERGE (module)-[:DEFINES]->(profile)
+//! MERGE (module)-[:DEFINES]->(profile_error)
+//! MERGE (profile)-[:DEFINES]->(profile_validate)
+//! MERGE (profile)-[:DEFINES]->(profile_digest)
+//! MERGE (profile)-[:DEFINES]->(profile_capacity_request)
+//! MERGE (profile)-[:USES_TYPE]->(vector)
+//! MERGE (profile)-[:USES_TYPE]->(placement)
+//! MERGE (profile)-[:USES_TYPE]->(provider)
+//! MERGE (profile_validate)-[:USES_TYPE]->(profile_error)
+//! MERGE (profile_digest)-[:CALLS]->(profile_validate)
+//! MERGE (profile_capacity_request)-[:CALLS]->(profile_validate)
+//! MERGE (profile_capacity_request)-[:CALLS]->(profile_digest)
+//! MERGE (profile_capacity_request)-[:CALLS]->(binding_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2.validate",kind:"method"})
+//! MERGE (profile_capacity_request)-[:CALLS]->(binding_digest)
+//! MERGE (profile_capacity_request)-[:USES_TYPE]->(request)
+//! MERGE (profile_capacity_request)-[:USES_TYPE]->(profile_error)
 //! MERGE (module)-[:DEFINES]->(fixture)
 //! MERGE (module)-[:DEFINES]->(test_id)
 //! MERGE (vector)-[:DEFINES]->(capacity_add)
@@ -69,6 +94,11 @@
 //! MERGE (request_binding_test)-[:CALLS]->(evaluate)
 //! MERGE (arithmetic_test)-[:CALLS]->(fixture)
 //! MERGE (arithmetic_test)-[:CALLS]->(evaluate)
+//! MERGE (profile_digest_test)-[:CALLS]->(fixture)
+//! MERGE (profile_digest_test)-[:CALLS]->(profile_digest)
+//! MERGE (profile_digest_test)-[:CALLS]->(profile_capacity_request)
+//! MERGE (profile_binding_test)-[:CALLS]->(fixture)
+//! MERGE (profile_binding_test)-[:CALLS]->(profile_capacity_request)
 //! MERGE (fixture)-[:CALLS]->(test_id)
 //! MERGE (evaluate)-[:CALLS]->(valid_request)
 //! @endcypher
@@ -82,11 +112,16 @@
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{HostInfrastructureDemandV2, ProviderKind};
+use crate::{
+    ClusterPlacementPolicyV1, HostInfrastructureDemandV2, ProviderKind,
+    RunInfrastructureBindingSnapshotV2,
+};
 
+const INFRASTRUCTURE_PROVIDER_PROFILE_SCHEMA_VERSION_V1: u16 = 1;
 const INFRASTRUCTURE_CAPACITY_SNAPSHOT_SCHEMA_VERSION_V2: u16 = 2;
 const INFRASTRUCTURE_CAPACITY_REQUEST_SCHEMA_VERSION_V2: u16 = 2;
 const INFRASTRUCTURE_CAPACITY_CANDIDATE_SCHEMA_VERSION_V2: u16 = 2;
@@ -128,6 +163,124 @@ impl InfrastructureResourceVectorV1 {
             gpu_units: self.gpu_units.checked_sub(other.gpu_units)?,
         })
     }
+}
+
+/// Immutable Infrastructure-owner profile revision that bounds a Run's capacity request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InfrastructureProviderProfileRevisionV1 {
+    /// Explicit profile schema version.
+    pub schema_version: u16,
+    /// Tenant that owns the profile revision.
+    pub tenant_id: Uuid,
+    /// Stable provider-profile identity.
+    pub profile_id: Uuid,
+    /// Immutable profile revision.
+    pub revision: i64,
+    /// Provider to which this profile applies.
+    pub provider: ProviderKind,
+    /// Placement policy allowed by this profile.
+    pub placement_policy: ClusterPlacementPolicyV1,
+    /// Maximum capacity charged against the physical Host for one admitted Run.
+    pub host_resources: InfrastructureResourceVectorV1,
+    /// Maximum capacity charged against the exact K3s cluster for one admitted Run.
+    pub cluster_resources: InfrastructureResourceVectorV1,
+}
+
+impl InfrastructureProviderProfileRevisionV1 {
+    /// Reject unsupported revisions, invalid identity, or capacity outside persisted ranges.
+    pub fn validate(&self) -> Result<(), InfrastructureProviderProfileError> {
+        if self.schema_version != INFRASTRUCTURE_PROVIDER_PROFILE_SCHEMA_VERSION_V1 {
+            return Err(InfrastructureProviderProfileError::UnsupportedSchemaVersion);
+        }
+        if self.tenant_id.is_nil() || self.profile_id.is_nil() || self.revision <= 0 {
+            return Err(InfrastructureProviderProfileError::InvalidIdentity);
+        }
+        for resources in [self.host_resources, self.cluster_resources] {
+            if resources.cpu_millicores == 0
+                || resources.memory_bytes == 0
+                || resources.cpu_millicores > i64::MAX as u64
+                || resources.memory_bytes > i64::MAX as u64
+                || resources.ephemeral_storage_bytes > i64::MAX as u64
+                || resources.gpu_units > i32::MAX as u32
+            {
+                return Err(InfrastructureProviderProfileError::InvalidResources);
+            }
+        }
+        Ok(())
+    }
+
+    /// Compute a stable digest over every profile field that affects placement admission.
+    pub fn digest(&self) -> Result<[u8; 32], InfrastructureProviderProfileError> {
+        self.validate()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"star.infrastructure-provider-profile.v1\0");
+        hasher.update(self.schema_version.to_be_bytes());
+        hasher.update(self.tenant_id.as_bytes());
+        hasher.update(self.profile_id.as_bytes());
+        hasher.update(self.revision.to_be_bytes());
+        hasher.update(self.provider.wire_value().as_bytes());
+        hasher.update([0]);
+        hasher.update(self.placement_policy.wire_value().as_bytes());
+        for resources in [self.host_resources, self.cluster_resources] {
+            hasher.update(resources.cpu_millicores.to_be_bytes());
+            hasher.update(resources.memory_bytes.to_be_bytes());
+            hasher.update(resources.ephemeral_storage_bytes.to_be_bytes());
+            hasher.update(resources.gpu_units.to_be_bytes());
+        }
+        Ok(hasher.finalize().into())
+    }
+
+    /// Derive the only admissible capacity request for a binding pinned to this revision.
+    pub fn capacity_request_for_binding(
+        &self,
+        binding: &RunInfrastructureBindingSnapshotV2,
+    ) -> Result<InfrastructureCapacityRequestV2, InfrastructureProviderProfileError> {
+        self.validate()?;
+        binding
+            .validate()
+            .map_err(|_| InfrastructureProviderProfileError::BindingMismatch)?;
+        if self.tenant_id != binding.tenant_id
+            || self.profile_id != binding.provider_profile_id
+            || self.revision != binding.provider_profile_revision
+            || self.provider != binding.provider
+            || self.placement_policy != binding.cluster_placement_policy
+        {
+            return Err(InfrastructureProviderProfileError::BindingMismatch);
+        }
+        if self.digest()? != binding.provider_profile_digest {
+            return Err(InfrastructureProviderProfileError::DigestMismatch);
+        }
+        let binding_digest = binding
+            .digest()
+            .map_err(|_| InfrastructureProviderProfileError::BindingMismatch)?;
+        Ok(InfrastructureCapacityRequestV2 {
+            schema_version: INFRASTRUCTURE_CAPACITY_REQUEST_SCHEMA_VERSION_V2,
+            binding_digest,
+            host_resources: self.host_resources,
+            cluster_resources: self.cluster_resources,
+        })
+    }
+}
+
+/// Fail-closed validation errors for a persisted provider-profile revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum InfrastructureProviderProfileError {
+    /// The row uses a schema version this binary does not understand.
+    #[error("unsupported Infrastructure provider-profile schema version")]
+    UnsupportedSchemaVersion,
+    /// The tenant, profile identity, or revision is invalid.
+    #[error("invalid Infrastructure provider-profile identity")]
+    InvalidIdentity,
+    /// A resource quantity is zero where required or cannot be persisted safely.
+    #[error("invalid Infrastructure provider-profile resource vector")]
+    InvalidResources,
+    /// The row does not match the Run binding's pinned profile identity or policy.
+    #[error("Infrastructure provider-profile does not match the Run binding")]
+    BindingMismatch,
+    /// The stored binding digest does not match the immutable profile contents.
+    #[error("Infrastructure provider-profile digest does not match the Run binding")]
+    DigestMismatch,
 }
 
 /// Fresh Host and exact-cluster observations used only to assess one placement candidate.
@@ -425,7 +578,7 @@ mod tests {
     use super::{
         evaluate_infrastructure_capacity_candidate, InfrastructureCapacityEvaluationError,
         InfrastructureCapacityRequestV2, InfrastructureCapacitySnapshotV2,
-        InfrastructureResourceVectorV1,
+        InfrastructureProviderProfileRevisionV1, InfrastructureResourceVectorV1,
     };
     use crate::{
         ClusterPlacementPolicyV1, ExecutionResourceBudgetV1, HostInfrastructureDemandV2,
@@ -455,6 +608,22 @@ mod tests {
             max_output_bytes: 1_048_576,
             max_event_buffer_bytes: 262_144,
         };
+        let vector = |cpu, memory, storage, gpu| InfrastructureResourceVectorV1 {
+            cpu_millicores: cpu,
+            memory_bytes: memory,
+            ephemeral_storage_bytes: storage,
+            gpu_units: gpu,
+        };
+        let profile = InfrastructureProviderProfileRevisionV1 {
+            schema_version: 1,
+            tenant_id: id(1),
+            profile_id: id(7),
+            revision: 3,
+            provider: ProviderKind::MultipassK3sCluster,
+            placement_policy: ClusterPlacementPolicyV1::SharedPool,
+            host_resources: vector(1_000, 1024_u64.pow(3), 10 * 1024_u64.pow(3), 0),
+            cluster_resources: vector(1_000, 1024_u64.pow(3), 10 * 1024_u64.pow(3), 0),
+        };
         let binding = RunInfrastructureBindingSnapshotV2 {
             schema_version: 2,
             tenant_id: id(1),
@@ -470,7 +639,7 @@ mod tests {
             provider: ProviderKind::MultipassK3sCluster,
             provider_profile_id: id(7),
             provider_profile_revision: 3,
-            provider_profile_digest: [0x11; 32],
+            provider_profile_digest: profile.digest().unwrap(),
             namespace: KubernetesDnsLabel::new("run-04").unwrap(),
             service_account: KubernetesDnsLabel::new("agent-runtime").unwrap(),
             runtime_profile_id: id(8),
@@ -494,12 +663,6 @@ mod tests {
             resource_budget: budget,
             requested_at: now - Duration::seconds(60),
             deadline_at: now + Duration::minutes(10),
-        };
-        let vector = |cpu, memory, storage, gpu| InfrastructureResourceVectorV1 {
-            cpu_millicores: cpu,
-            memory_bytes: memory,
-            ephemeral_storage_bytes: storage,
-            gpu_units: gpu,
         };
         let snapshot = InfrastructureCapacitySnapshotV2 {
             schema_version: 2,
@@ -534,12 +697,9 @@ mod tests {
                 1,
             )),
         };
-        let request = InfrastructureCapacityRequestV2 {
-            schema_version: 2,
-            binding_digest: demand.binding.digest().unwrap(),
-            host_resources: vector(1_000, 1024_u64.pow(3), 10 * 1024_u64.pow(3), 0),
-            cluster_resources: vector(1_000, 1024_u64.pow(3), 10 * 1024_u64.pow(3), 0),
-        };
+        let request = profile
+            .capacity_request_for_binding(&demand.binding)
+            .unwrap();
         (demand, snapshot, request, now)
     }
 
@@ -786,6 +946,60 @@ mod tests {
         assert_eq!(
             evaluate_infrastructure_capacity_candidate(&demand, &snapshot, &request, now),
             Err(InfrastructureCapacityEvaluationError::RequestBelowRunMemoryBudget)
+        );
+    }
+
+    #[test]
+    fn provider_profile_digest_binds_resources_and_derives_the_request() {
+        let (demand, _, request, _) = capacity_fixture();
+        let profile = InfrastructureProviderProfileRevisionV1 {
+            schema_version: 1,
+            tenant_id: demand.tenant_id,
+            profile_id: demand.binding.provider_profile_id,
+            revision: demand.binding.provider_profile_revision,
+            provider: demand.binding.provider,
+            placement_policy: demand.binding.cluster_placement_policy,
+            host_resources: request.host_resources,
+            cluster_resources: request.cluster_resources,
+        };
+
+        assert_eq!(
+            profile.digest().unwrap(),
+            demand.binding.provider_profile_digest
+        );
+        assert_eq!(
+            profile
+                .capacity_request_for_binding(&demand.binding)
+                .unwrap(),
+            request
+        );
+
+        let mut changed = profile;
+        changed.host_resources.cpu_millicores += 1;
+        assert_eq!(
+            changed.capacity_request_for_binding(&demand.binding),
+            Err(super::InfrastructureProviderProfileError::DigestMismatch)
+        );
+    }
+
+    #[test]
+    fn provider_profile_must_match_pinned_tenant_identity_and_placement() {
+        let (demand, _, request, _) = capacity_fixture();
+        let mut profile = InfrastructureProviderProfileRevisionV1 {
+            schema_version: 1,
+            tenant_id: demand.tenant_id,
+            profile_id: demand.binding.provider_profile_id,
+            revision: demand.binding.provider_profile_revision,
+            provider: demand.binding.provider,
+            placement_policy: demand.binding.cluster_placement_policy,
+            host_resources: request.host_resources,
+            cluster_resources: request.cluster_resources,
+        };
+
+        profile.tenant_id = id(99);
+        assert_eq!(
+            profile.capacity_request_for_binding(&demand.binding),
+            Err(super::InfrastructureProviderProfileError::BindingMismatch)
         );
     }
 

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.18 (2026-10-07)
+> **文档版本**: v2.19 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1244,7 +1244,7 @@ PG18.6 本机实测 runner 全部 10 步通过：migration 重复应用、fixtur
 
 ### 4.56 Phase 9F4D-3A schema W/T classification artifact
 
-`docs/data-design/phase9f4d-infrastructure-owner-wtm.md` 对 migration 六张表逐一给出唯一 W/T/M 分类：3 张 Work、3 张 Transaction、0 张 Master；按主分类覆盖，不改历史全仓 100-table baseline。基础设计和 Infrastructure DD 均链接此清单，任何新增 Infrastructure 表都要随 DDL 更新此逐表索引及 retention/RLS 验收边界。
+`docs/data-design/phase9f4d-infrastructure-owner-wtm.md` 对 3A schema 的六张表给出 3 W/3 T/0 M 分类，并在 3C3 扩展中将两张 Provider Profile 表分类为 1 M/1 T；累计 8 张表为 3 W/4 T/1 M。按主分类覆盖，不改历史全仓 100-table baseline。基础设计和 Infrastructure DD 均链接此清单，任何新增 Infrastructure 表都要随 DDL 更新此逐表索引及 retention/RLS 验收边界。
 
 ### 4.57 Phase 9F4D-3B1 Infrastructure owner runtime grants gate
 
@@ -1645,6 +1645,7 @@ frontend/src/app/automation-debug/
 
 | v2.17 | 2026-10-07 | Add the 9F4D-3C1 reproducible Rust and disposable PostgreSQL Inbox integration gate; record serial infrastructure-crate tests, baseline lint allowances, and the exact fail-closed boundary. |
 | v2.18 | 2026-10-07 | Add §4.59 for the 9F4D-3C2 owner-admission Rust/PostgreSQL gates; include `infrastructure_owner_admission.rs` in explicit rustfmt inputs and record atomic reservation concurrency/replay/expiry cases, tenant-only capacity scope, zero VM use, and open production integration gates. |
+| v2.19 | 2026-10-07 | Add §4.60 for the 9F4D-3C3 persisted Provider Profile Master and profile-derived admission; record repeat migration, 8/8 FORCE RLS, owner read-only/WORM checks, 5/5 SQLx cases and zero Multipass use; preserve the disk-based two-entry cap and all production resolver/provider/execution blockers. |
 
 ## 11. 引用文档
 
@@ -2656,3 +2657,14 @@ frontend/src/app/automation-debug/
 - This gate starts zero Multipass instances. Any live Multipass test remains limited to two total registered inventory entries, including stopped/Deleted records, because of host disk capacity; the locked launcher fails closed and never purges automatically.
 - This evidence closes only the persistence/admission transaction primitive. It does not enable Schedule or Task Card CLI execution.
 - Phase evidence: [`PHASE-9F4D-3C2-INFRASTRUCTURE-OWNER-ADMISSION-REPORT.md`](reports/PHASE-9F4D-3C2-INFRASTRUCTURE-OWNER-ADMISSION-REPORT.md).
+
+### 4.60 Phase 9F4D-3C3 persisted Provider Profile and derived capacity admission
+
+**自动化档：[P]** — the focused Rust runner checks/formats the changed domain and Infrastructure crates; the bounded PostgreSQL runner applies the owner schema, grants, and Provider Profile Master migrations twice each, validates RLS/privilege/WORM guards, then runs the ignored SQLx cases on the same temporary loopback cluster.
+
+- `infrastructure.provider_profile_revision` is a tenant-scoped SCD2 Master and `provider_profile_revision_event` is an append-only Transaction table. The owner role has SELECT-only grants on both; the mutation/editor path is not part of this slice.
+- Admission reads the exact profile id/revision referenced by persisted demand, recomputes `profile_digest`, compares the persisted digest, checks the binding's profile digest and provider/placement, and derives resource vectors from the stored row. Callers cannot supply the capacity request. Digest mismatch is terminal and creates no reservation.
+- Evidence: schema/grants/profile migrations were each applied twice; 8/8 Infrastructure tables passed FORCE RLS count; tenant visibility, read-only grants, SCD2 closure and WORM assertions passed; all 5 ignored SQLx cases passed. The runner stops and removes its uniquely scoped temporary PostgreSQL data directory.
+- The gate creates zero Multipass instances. Any live VM test remains capped at two registered inventory records total, including stopped/deleted records, because of host disk capacity; malformed inventory and a full cap fail closed without automatic purge.
+- This is a profile persistence/derivation primitive only. Trusted current-profile and Run-binding resolvers, provider observation, cross-tenant allocator, target DB identity/provisioning, Inbox/Outbox consumer, Manager/provider/readiness producer, sandbox/workspace bridge, BI/Benchmark and Schedule executor remain open; execution stays fail-closed.
+- Phase evidence: [`PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md`](reports/PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md).

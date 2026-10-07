@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.18 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts、六表 schema、NOLOGIN grants、3C1 Inbox receive 与 3C2 tenant-scoped owner admission transaction 已通过 PostgreSQL 18.6 隔离验证。可信 resolver/provider、跨租户 allocator、目标 DB 装配、owner consumer/outbox delivery、provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.20 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts、owner schema/grants、3C1 Inbox receive、3C2 tenant-scoped admission 和 3C3 persisted Provider Profile source 已通过 focused/PG18.6 隔离验证。可信 resolver/provider、跨租户 allocator、目标 DB 装配、owner consumer/outbox delivery、provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.91 §50.8G-50.8J / basic-design v5.88 §8.1、§16.21-16.34 / 实施计划 §6.83-6.93。
+> 上游：requirements v5.93 §50.8G-50.8K / basic-design v5.90 §8.1、§16.21-16.35 / Schedule SRS v0.23 / Schedule BD v0.22 / Schedule DD v0.23 / 实施计划 §6.83-6.95。
 
 ## §0 目的与边界
 
@@ -179,6 +179,16 @@ The transaction is tenant-scoped because all six owner tables use FORCE RLS. Its
 
 This is not a production consumer or execution path. The trusted binding/placement resolver, provider observation producer, per-trigger ACL/currentness fence, target DB provisioning/login activation, durable owner Inbox/Outbox worker, retry/reaper/reconciliation, Manager/Multipass/K3s lifecycle, BI/Benchmark, Runtime sandbox/workspace bridge and Schedule executor remain open. No public admission endpoint is mounted, no TaskExecutionRun is started, and the current Multipass inventory cap remains two registered instances total due to disk capacity; this integration gate starts zero VMs.
 
+### §7.6 Phase 9F4D-3C3：Persisted Provider Profile and profile-derived capacity request
+
+`infrastructure.provider_profile_revision` is the Infrastructure owner's tenant-scoped Master source for a versioned provider profile. Each revision fixes `schema_version`, tenant/profile/revision identity, provider kind, placement policy, Host capacity vector, exact-cluster capacity vector, deterministic `profile_digest`, validity interval and actor. Revisions are SCD2: a current row may be closed exactly once by the current tenant actor, but its business content cannot be edited and the row cannot be physically deleted. `provider_profile_revision_event` is a separate append-only Transaction table for `created` and `superseded` facts. Both tables use ENABLE + FORCE RLS on `tenant_id`; the restricted owner role can read both and cannot mutate either.
+
+`PostgresInfrastructureOwnerAdmission::admit_inbox` no longer accepts a caller-supplied `InfrastructureCapacityRequestV2`. Inside the existing owner transaction and tenant RLS scope it loads the exact profile revision referenced by the persisted demand, decodes bounded DB values into the typed profile, recomputes the deterministic profile digest, and compares it with the stored digest. It then checks tenant/profile/revision/provider/placement and the Run binding's pinned digest before deriving both resource vectors. Missing profiles, invalid DB rows, unsupported schema, binding mismatch or a persisted digest mismatch fail closed before any reservation. Persisted digest mismatch is a terminal rejection with receipt/Outbox and no reservation.
+
+The disposable PostgreSQL 18.6 runner now applies the schema, grants and profile migrations twice each; verifies 8/8 Infrastructure tables FORCE RLS, tenant isolation, owner read-only profile grants, one-time SCD2 closure, append-only audit events and all five SQLx admission cases (including digest mismatch). All 17 runner steps passed and the temporary cluster stopped and was cleaned. No Multipass instance was started; the inventory cap remains two registered entries total because of disk capacity.
+
+This closes only the persisted profile source and derivation boundary for the existing tenant-scoped admission primitive. The profile editor/current-profile resolver, immutable Run binding resolver, provider observation producer, production ACL/currentness fence, global cross-tenant allocator, target DB provisioning/login activation, durable Inbox/Outbox consumer, retry/reaper/reconciliation, Manager/provider, readiness producer, BI/Benchmark, Runtime sandbox/workspace bridge and Schedule executor remain open. Do not enable a worker, TaskExecutionRun or Task Card CLI execution from this slice.
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -200,3 +210,5 @@ This is not a production consumer or execution path. The trusted binding/placeme
 | v0.16 | 2026-10-07 | Add the NOLOGIN Infrastructure-owner grant group and exact W/T privilege matrix; distinguish the verified repeatable isolated grants migration from unverified target DB provisioning, application login membership/activation and owner writer/consumer. Retain the two-instance test cap and fail-closed execution boundary. | Phase 9F4D-3B1 PostgreSQL role-grant verification. |
 | v0.17 | 2026-10-07 | Add Phase 9F4D-3C1 PostgreSQL owner Inbox receive behavior and evidence; disclose the unimplemented trusted resolver/freshness fence and admission/provider/execution gaps. Preserve the two-instance disk cap. |
 | v0.18 | 2026-10-07 | Add the tenant-scoped 3C2 owner admission transaction, deterministic Host/cluster locks, current unexpired-ledger aggregation, atomic paired reservation/receipt/event/Outbox facts, and disposable PostgreSQL concurrency/expiry evidence. Explicitly prohibit cross-tenant shared capacity until a global allocator exists; preserve all resolver, consumer, provider, execution and two-instance disk-cap boundaries. |
+| v0.19 | 2026-10-07 | Add the tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity requests from the exact profile inside the owner transaction; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases; keep production resolver, allocator, target DB, consumer, provider and execution gates open. |
+| v0.20 | 2026-10-07 | Mavis review | Align active upstream pointers to requirements v5.93/basic v5.90/implementation plan §6.95 and clarify that the historical six-table 3A schema/grant evidence is extended by the 3C3 Profile Master and event tables; cumulative gate is 8/8 FORCE RLS with Profile tables SELECT-only for Infrastructure owner. Preserve the disk-based two-instance test limit and fail-closed execution boundary. | Final cross-layer acceptance and W/T/M scope review. |
