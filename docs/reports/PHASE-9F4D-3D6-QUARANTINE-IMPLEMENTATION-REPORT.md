@@ -2,7 +2,9 @@
 
 > Status: 🟡 Platform quarantine schema and opt-in Run-owner hook implemented and verified; production consumer and Schedule execution remain disabled.
 > Date: 2026-10-08
-> Base: local `dev` at `5b7f86968117c6ab75435fe042df0ef1e7e16a6c`
+> Pre-merge base: local `dev` at `5b7f86968117c6ab75435fe042df0ef1e7e16a6c`
+> Source commit: `b421c2951f9d13771354206f46080b6bd853da3e`
+> Local `dev` integration: no-FF merge `79574a1b5aaa97f97656b9e5939436adcd20647a`; clean after merge, no push, `main` unchanged.
 > Lane: `UlyssesLeoLee/phase9f4d3d6-quarantine`
 
 ## 0. Purpose
@@ -26,6 +28,7 @@ Implement the 9F4D-3D6 quarantine substrate for permanently malformed capacity-r
 - `cargo check -p platform-messaging-runtime -p run-owner-runtime --lib -j 4 --offline --locked`: passed. It reports three existing `domain-kms` deprecation warnings for `Nonce::from_slice`.
 - `cargo test -p platform-messaging-runtime -p run-owner-runtime --lib -j 4 --offline --locked`: passed, 6/6 + 10/10 tests.
 - Targeted `cargo clippy -p platform-messaging-runtime -p run-owner-runtime --lib -j 4 --offline --locked --no-deps -- -D warnings`: passed; same dependency deprecation warnings are outside the changed crates.
+- Local `dev` integration used a no-FF merge from the recorded source commit; conflict prediction and merge succeeded, and `git diff --check HEAD^1 HEAD` passed. Post-merge Rust gates could not be rerun in the current environment because `cargo` is unavailable in PowerShell and the Ubuntu WSL distribution; the Rust results above are pre-merge source-lane evidence, not post-merge evidence. The `dev` worktree is clean and is 40 commits ahead of `origin/dev`; nothing was pushed and `main` was not changed.
 - PostgreSQL 18.6 disposable loopback cluster on port 55312: the migration applied twice; `db/tests/platform-poison-quarantine-schema.sql` passed FORCE RLS, least privilege, WORM, metadata-only, TTL/purge audit and quota-overflow assertions. This used synthetic ciphertext bytes and is not evidence of real KMS encryption.
 - PostgreSQL server was stopped and `pg_ctl status` confirmed no server running. Its 42 MiB owned data directory remains under this lane's `target/phase9f4d3d6-pg-3c11e76e8c18415dace3c215435dbc00/data`; recursive cleanup was rejected by the environment policy, so no bypass was attempted.
 - No Multipass VM, NATS server, target database, or Docker Desktop was used for this slice. NATS redelivery was not exercised in this turn.
@@ -83,4 +86,4 @@ Implement the 9F4D-3D6 quarantine substrate for permanently malformed capacity-r
 
 | Version | Date | Editor | Change | Trigger |
 |---|---|---|---|---|
-| v0.1 | 2026-10-08 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record Platform quarantine schema/runtime implementation, database-enforced quota, 16-value/8-KiB replay-header bound, confirmed commit-before-Term hook, focused Rust/PostgreSQL evidence, remaining production gates and the retained stopped disposable data directory. | Phase 9F4D-3D6 implementation and bounded-memory review. |
+| v0.1 | 2026-10-08 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record Platform quarantine schema/runtime implementation, database-enforced quota, 16-value/8-KiB replay-header bound, confirmed commit-before-Term hook, focused Rust/PostgreSQL evidence, local `dev` merge identity, post-merge Cargo limitation, remaining production gates and the retained stopped disposable data directory. | Phase 9F4D-3D6 implementation, bounded-memory review and subsequent local `dev` convergence. |
