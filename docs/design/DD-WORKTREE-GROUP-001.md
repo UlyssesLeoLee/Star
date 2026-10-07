@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.66**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.67**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -15,9 +15,9 @@
 > - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.89 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.86 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.16、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.01 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.98 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.27、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.103 v6.30
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -871,3 +871,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.64 | 2026-10-07 | Mavis review | Add §8.14 for the Run-owner result Inbox and caller-transaction validation of scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation; record exact result scope, bounded durable pull and commit-before-ack. Preserve no TaskExecutionRun/BI mutation and production-disabled poison/release boundaries; align requirements/basic design and phase evidence. | Phase 9F4D-3D5 adds the result-side Run-owner contract. |
 | v4.65 | 2026-10-08 | Mavis review | Add §8.15 for a separate Platform Messaging/Ingress quarantine owner, trusted JetStream source identity, immutable receipt, optional encrypted TTL Work payload and commit-before-Term invariant; keep user retention selection, fault taxonomy, owner migration/grants and production ACK wiring open. Preserve Worktree-first Run navigation and the two-record Multipass test limit. | Phase 9F4D-3D6 design boundary review. |
 | v4.66 | 2026-10-08 | Mavis review | Add §8.16 for the bounded Rust read-only Multipass inventory adapter; support name-keyed state-record map, row-list fixture and process-wide single-flight, align requirements v6.00, basic design v5.97, Infrastructure DD v0.26 and plan v6.29. Explicitly distinguish CLI inventory from owner ledger, capacity, readiness, Manager lifecycle and task execution; preserve the two-instance disk cap and record direct rustc/Cargo verification limits. | INFRA-2A delivers a safe observation-only implementation slice; self-review corrects CLI JSON format and concurrency boundaries. |
+| v4.67 | 2026-10-08 | Mavis review | Align upstream pointers to requirements v6.01/basic design v5.98/Infrastructure DD v0.27/implementation plan v6.30 after INFRA-2B adds bounded Multipass CLI version, daemon version, local driver and Rust host-target observations. Preserve Worktree-first Group ownership and explicitly keep those facts separate from provider readiness, VM ownership and execution. | User selected Rust 1.99.0 and the read-only host probe gained a second bounded observation slice. |

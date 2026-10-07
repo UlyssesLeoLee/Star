@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.97 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v6.00
+> **文档版本**: v5.98 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v6.01
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5022,11 +5022,21 @@ Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/pa
 
 新增 `multipass-adapter` Rust crate，作为未来可信 Host Infrastructure Manager 的只读 process-adapter 起点。它仅接受受信绝对可执行文件路径，固定以 argv 调用 `list --format json`，stdin 关闭，stdout/stderr 上限分别为 128 KiB/4 KiB，进程内所有 probe 共用 single-flight 门，并在 5 秒 deadline 内结束；取消、超时、命令失败、解析错误、重复名称/JSON 键、空 mapping record 或 row list、无效字段及行数/输出超限均 fail closed，错误不保留原始输出。解析器支持 Multipass 的 name→state-record array machine-readable mapping 和带 name/state 的非空 row-list 兼容形态；保留 Stopped 与 Deleted 行，并由 `registered_count` 对所有行计数，未知状态只记录为未分类状态。
 
-该 crate 不具备 ownership ledger、Manager 权限、Host/cluster identity、容量预留、Multipass daemon readiness、guest/K3s/Runtime readiness、provider capability、生命周期命令或 authorization。它没有被 Run/Schedule/Task CLI 调用，也不触发 VM 改动。当前测试阶段最多两条注册实例（含 Stopped/Deleted）的限制仍由带 host-local 独占锁的受控 PoC bootstrap 路径落实，不是产品拓扑限制；直接调用 Multipass CLI 可以绕过该 PoC guard。12 项 fixture/有界读取/path validation tests 经 Rust 1.99.0 direct rustc harness 通过，clippy-driver `-D warnings` 与 rustfmt 通过；因本机 Cargo registry 离线缺 `async-stream` 且在线 crates.io 索引遇 TLS close_notify，本轮未能用 Cargo 重跑。未运行 live Multipass probe、workspace 全量测试、RSS/并发性能或真实 K3s 验收。
+`list_instances` inventory API 不具备 ownership ledger、Manager 权限、Host/cluster identity、容量预留、Multipass daemon readiness、guest/K3s/Runtime readiness、provider capability classification、生命周期命令或 authorization；§16.43 的 CLI/driver 字段仍是原始观察。它没有被 Run/Schedule/Task CLI 调用，也不触发 VM 改动。当前测试阶段最多两条注册实例（含 Stopped/Deleted）的限制仍由带 host-local 独占锁的受控 PoC bootstrap 路径落实，不是产品拓扑限制；直接调用 Multipass CLI 可以绕过该 PoC guard。12 项 fixture/有界读取/path validation tests 经 Rust 1.99.0 direct rustc harness 通过，clippy-driver `-D warnings` 与 rustfmt 通过；因本机 Cargo registry 离线缺 `async-stream` 且在线 crates.io 索引遇 TLS close_notify，本轮未能用 Cargo 重跑。未运行 live Multipass probe、workspace 全量测试、RSS/并发性能或真实 K3s 验收。
 
 | 验收 ID | 对应设计与当前边界 |
 |---|---|
 | AC-INFRA-002-R | §16.42；验证固定 `multipass list --format json` 命令、绝对路径、单飞、有界 IO/deadline、Stopped/Deleted 保留与解析 fail-closed；fixture 单测无 VM。它不建立所有权、容量/readiness 或 lifecycle authority。 |
+
+### 16.43 Phase INFRA-2B Rust read-only Multipass capability facts
+
+Host Infrastructure Manager 后续使用同一个 `multipass-adapter` 观察 CLI/daemon 版本、`local.driver`、Rust target OS 与 architecture。adapter 只按固定 argv 顺序调用 `multipass version` 与 `multipass get local.driver`，共用 inventory 的受信绝对 executable path 与进程级 single-flight semaphore；每条命令的 stdout/stderr 上限各 4 KiB，单命令 deadline 5 秒，因此两条串行命令最多占用 10 秒，竞争请求即时返回 busy，不形成等待队列。版本输出要求 client 与 daemon 各唯一一行；driver 是单 token，未知值原样返回供未来 versioned provider resolver 判定。
+
+此观察不证明 daemon 可用、版本兼容、Multipass instance 所有权、Host/cluster 容量、guest/K3s/CRI、独立 Runtime sandbox 或授权。它不执行安装、配置修改、VM 生命周期、mount 或 guest command，也不接入 UI、Schedule worker 或 Task Card CLI。单元 fixture 不创建 VM；测试阶段两条 registered instance 上限（含 Stopped/Deleted）保持不变。Rust workspace/toolchain 基线固定为 1.99.0。
+
+| 验收 ID | 对应设计与当前边界 |
+|---|---|
+| AC-INFRA-002-S | §16.43；验证固定 version/driver argv、有界输出、deadline、共用 fail-fast single-flight、malformed-output rejection 与 unknown-driver preservation；不把观察升级成 provider compatibility/readiness 或执行授权。 |
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -5171,3 +5181,4 @@ Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/pa
 | v5.95 | 2026-10-07 | Mavis review | Add §16.40 for the Run-owner result Inbox and validate scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation within its caller transaction; synchronize requirements v5.98, Group DD v4.64, Schedule contracts, Infrastructure DD v0.25 and Data Design v1.8. Record exact demand-derived result scope, commit-before-double-ack, no state projection, fail-closed poison/release gaps, Rust 1.99.0 and zero-VM/two-record test boundary. | Phase 9F4D-3D5 implements the result consumer slice. |
 | v5.96 | 2026-10-08 | Mavis review | Add §16.41 for separate Platform Messaging/Ingress poison quarantine ownership, trusted JetStream source identity, append-only Transaction receipt, conditional encrypted TTL Work payload and commit-before-Term; synchronize requirements v5.99, Schedule SRS/BD/DD v0.28/v0.27/v0.27, Group DD v4.65, Data Design v1.9 and plan v6.28. Record that payload policy, fault taxonomy, migration/grants/writer and ACK implementation remain open; preserve two-record Multipass cap. | Phase 9F4D-3D6 design increment isolates untrusted-message handling from the Run-owner Inbox. |
 | v5.97 | 2026-10-08 | Mavis review | Add §16.42 for the bounded Rust read-only Multipass JSON inventory adapter; align requirements v6.00, Infrastructure DD v0.26, Group DD v4.66 and plan v6.29. Support name-keyed state-record maps and row-list compatibility, enforce process-wide single-flight; record 12/12 direct rustc tests, clippy-driver/rustfmt, Cargo rerun limitation, no live Multipass call, and absence of ownership/lifecycle/readiness/capacity/execution authority. Preserve the two-instance test limit. | INFRA-2A adds the first host-side process observation slice; self-review corrects JSON format and concurrency boundaries. |
+| v5.98 | 2026-10-08 | Mavis review | Add §16.43 / AC-INFRA-002-S for Multipass CLI/daemon version, local driver and host target facts; preserve unknown values, fixed read-only argv, shared fail-fast single-flight, 4 KiB output caps and 5-second per-command deadline (10 seconds worst-case sequentially). Align requirements v6.01, Group DD v4.67, Infrastructure DD v0.27 and plan v6.30; keep provider, ownership, readiness and execution gates open. | User selected the released Rust 1.99.0 baseline and INFRA-2B adds only bounded read-only host observations. |
