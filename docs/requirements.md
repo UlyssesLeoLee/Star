@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.88）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.89）
 
 ## 0. 文档说明与前提
 
@@ -2769,6 +2769,7 @@ Worktree workspace 不默认使用可写 host mount。Worktree focus 由授权�
 | AC-INFRA-002-E | Linux/macOS/Windows 按实际 Multipass driver capability 分别验收；固定负载记录桌面/VM/K3s/Agent 峰值 RSS、CPU、IO、冷启动、取消/drain 和并行公平性；无实测不宣称性能目标已达成 |
 | AC-INFRA-002-F | 当前多集群测试阶段登记的 Multipass instance 总数不超过 2 个，Stopped/Deleted 记录也计入，防止关机实例仍占用磁盘；bootstrap 使用 host-local 独占锁串行化完整 inventory 检查与 launch，达到上限或无法解析时拒绝创建且不自动 purge；所有 live test launch 必须经此受控路径，契约单测不启动 VM。此为本阶段硬件/磁盘测试上限，不是产品运行时拓扑或客户环境配额 |
 | AC-INFRA-002-G | Infrastructure owner 的容量 demand Inbox、Host+精确 cluster 双 reservation、处理 receipt 与 owner Outbox 持久化由同一 owner 事务/版本化幂等键约束；6 张表全部 tenant FORCE RLS，W 表只允许初态插入、受限状态迁移及 terminal 后 24–25 小时清理，T 表拒绝 UPDATE/DELETE/TRUNCATE；PostgreSQL 18.6 隔离库双次迁移、NOBYPASSRLS 跨 tenant 正反例及 W/T 约束通过。此项仅验收 schema substrate；owner writer/consumer、生产 migration provisioning/grants、capacity admission、Manager/provider 和 Schedule 执行仍是独立门禁 |
+| AC-INFRA-002-H | Infrastructure runtime grants MUST use a separate star_infrastructure_owner NOLOGIN/NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS/NOINHERIT privilege group. Grant only schema USAGE, W-table SELECT/INSERT/UPDATE/DELETE, and Transaction-table SELECT/INSERT; never grant schema CREATE, TRUNCATE, REFERENCES, or TRIGGER. The application login is a separately secret-provisioned principal with explicit membership and transaction-scoped role activation; credentials are not stored in migrations. Target DB migration loading, actual login membership/activation, and owner writer/consumer remain open and fail-closed. | Disposable PostgreSQL 18.6 applied schema and grants migrations twice; role attribute and six-table privilege matrix passed in 14/14 runner gates. | P0 |
 
 ### 50.8J Infrastructure owner 容量持久化边界
 
@@ -2904,3 +2905,4 @@ Run/Execution owner 仅在自身事务内复验 Project/Run 配额并向自己�
 | v5.86 | 2026-10-07 | Mavis review | Align basic design v5.83, Group DD v4.60, Schedule contracts v0.18, Infrastructure DD v0.14, and implementation plan v6.14; preserve the two-instance test cap and fail-closed execution boundary. | Review found a current section still linked to an obsolete infrastructure-design snapshot. |
 | v5.87 | 2026-10-07 | Mavis review | Add AC-INFRA-002-G and §50.8J for the six-table Infrastructure-owner PostgreSQL persistence substrate; classify three Work and three Transaction tables, specify 24–25-hour terminal retention and keep production writer/consumer, migration provisioning, grants, provider and execution gates open. | Phase 9F4D-3A passed isolated PostgreSQL 18.6 persistence-contract verification; the two-instance Multipass test cap remains unchanged. |
 | v5.88 | 2026-10-07 | Mavis review | Synchronize active Schedule SRS/DD and Infrastructure DD references to v0.19/v0.15 after adding the Infrastructure-owner schema substrate; keep the two-instance registered Multipass test cap and all production execution gates explicit. | Final cross-document audit found current requirements sections still pointed to older design revisions. |
+| v5.89 | 2026-10-07 | Mavis review | Add AC-INFRA-002-H for a restricted NOLOGIN Infrastructure-owner privilege group, W/T least-privilege matrix, and separate application login provisioning; record isolated PostgreSQL grants-migration evidence while keeping target DB deployment and owner writer/consumer open. Preserve the temporary two-instance Multipass test cap. | Phase 9F4D-3B1 implemented and passed the isolated role/privilege gate. |

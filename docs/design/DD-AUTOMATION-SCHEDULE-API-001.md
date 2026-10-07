@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
 > Status: 🟡 Rule API, typed binding/demand/readiness contracts, and an isolated Infrastructure-owner schema substrate are verified; admission writer/consumer, target migration grants, worker, provider evidence producer, and production execution remain open.
-> Version: 0.19 | Date: 2026-10-07
+> Version: 0.20 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -100,6 +100,12 @@ Disposable PostgreSQL 18.6 validated duplicate migration application, all six te
 
 Evidence: [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md).
 
+## 6.6 9F4D-3B1 runtime grant migration and principal boundary
+
+Migration db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql is ordered after the six-table Infrastructure schema migration. It idempotently creates/alters star_infrastructure_owner as a NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOBYPASSRLS, NOINHERIT role group; revokes prior/PUBLIC schema and table grants; grants schema USAGE; grants SELECT/INSERT/UPDATE/DELETE only on capacity_demand_inbox, capacity_reservation_bundle, and capacity_outbox_delivery; and grants SELECT/INSERT only on capacity_demand_receipt, capacity_reservation_event, and capacity_owner_outbox. It grants no schema CREATE, TRUNCATE, REFERENCES, or TRIGGER.
+
+A deployment-managed application login and credential are separate from this group. Production must provision membership and use transaction-scoped SET LOCAL ROLE star_infrastructure_owner; pool reset/rollback must discard the role on all success and error paths. The disposable runner proves migration repeatability and catalog privileges, not pool behavior, target migration loading, or real app identity. No production caller, target login, owner writer/consumer, capacity admission, worker, Manager/provider, or execution is implemented. Test-phase Multipass inventory remains capped at two registered instances; this gate starts none.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -123,3 +129,4 @@ Evidence: [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHA
 | v0.17 | 2026-10-07 | Pin the typed placement policy in the binding digest and require two separately matched reservation IDs; update focused evidence to four passing gates and 27/27 tests. |
 | v0.18 | 2026-10-07 | Clarify the two-instance cap as a total registered-inventory limit including stopped/recoverable records; specify the locked pre-launch fail-closed guard and no automatic purge behavior. |
 | v0.19 | 2026-10-07 | Record the tested 9F4D-3A Infrastructure-owner persistence substrate and exact Work/Transaction boundary, while keeping production migration/grants, writer/consumer, worker, provider and Schedule execution gates open. |
+| v0.20 | 2026-10-07 | Define the idempotent runtime-grants migration, least-privilege W/T matrix and separate secret-provisioned login with transaction-scoped role activation; record 14/14 isolated PostgreSQL gates without claiming target deployment or production writer/consumer completion. |

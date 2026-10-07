@@ -1,6 +1,6 @@
 # Phase 9F4D-3A — Infrastructure owner W/T/M classification
 
-> Version: v0.1 · 2026-10-07
+> Version: v0.2 · 2026-10-07
 > Scope: additive schema in `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql`
 > Boundary: six Infrastructure-owner tables only; this extension does not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
 
@@ -31,12 +31,13 @@ Classify every physical table introduced by the 9F4D-3A migration. The Infrastru
 
 ## §3 Verification evidence and open items
 
-`scripts/automation/phase9f4d_infrastructure_owner_schema.py --pg-bin <PostgreSQL-18-bin>` was run with PostgreSQL 18.6. It applied the migration twice to an isolated loopback-only cluster, created a disposable `NOBYPASSRLS` runtime role with explicit test-only TRUNCATE privilege, verified positive and negative visibility across all six tables, cross-tenant write rejection, append-only UPDATE/DELETE/TRUNCATE rejection, allowed/blocked Work lifecycle transitions, retention limits, pre-expiry deletion rejection, and 6/6 FORCE RLS. The disposable database stopped successfully and its unique temporary data directory was removed. No Multipass instance was started; this gate consumed zero of the two registered-instance test cap.
+`scripts/automation/phase9f4d_infrastructure_owner_schema.py --pg-bin <PostgreSQL-18-bin>` was run with PostgreSQL 18.6. It applied the schema and grants migrations twice to an isolated loopback-only cluster; checked the NOLOGIN/NOSUPERUSER/NOBYPASSRLS/NOINHERIT role attributes, schema USAGE, and exact W/T table privileges; verified positive/negative visibility across all six tables, cross-tenant write rejection, append-only UPDATE/DELETE/TRUNCATE rejection, Work lifecycle/retention guards, and 6/6 FORCE RLS. The grant contract gives the 3 Work tables SELECT/INSERT/UPDATE/DELETE and the 3 Transaction tables SELECT/INSERT only, with no schema CREATE or table TRUNCATE/REFERENCES/TRIGGER. A separate overprivileged disposable role is used only to prove WORM triggers reject forbidden mutations; it is not the production role. The temporary database stopped successfully and its unique temporary data directory was removed. The audit records 14/14 steps passed. No Multipass instance was started; this gate consumed zero of the two registered-instance test cap.
 
-The runner invokes `psql` directly. The migration has not been deployed to the target DB and has no current production migration-provisioning caller. Open items include schema-owner/runtime grants, actual Inbox consumer and atomic reservation writer, concurrency/idempotency under competing admissions, release/reaper/reconciliation worker, Manager/provider/readiness producer, production BI/Benchmark linkage, sandbox/workspace bridge, and Schedule execution. Keep executor launch disabled until those gates pass.
+The runner invokes `psql` directly. The grants migration has not been deployed to the target DB and has no current production migration-provisioning caller. The restricted NOLOGIN group is separate from the application login/secret; real membership and transaction-scoped `SET LOCAL ROLE` activation/reset remain unverified. Open items include target schema-owner/runtime provisioning, actual Inbox consumer and atomic reservation writer, concurrency/idempotency under competing admissions, release/reaper/reconciliation worker, Manager/provider/readiness producer, production BI/Benchmark linkage, sandbox/workspace bridge, and Schedule execution. Keep executor launch disabled until those gates pass.
 
 ## §4 Revision history
 
 | Version | Date | Revision | Trigger |
 |---|---|---|---|
 | v0.1 | 2026-10-07 | Mavis review | Classify the six 9F4D-3A Infrastructure-owner tables and record PostgreSQL 18.6 isolated evidence; retain production ownership, grants, provider and execution gaps. |
+| v0.2 | 2026-10-07 | Mavis review | Add the 9F4D-3B1 least-privilege W/T grant matrix and separate NOLOGIN group/application identity boundary; record 14/14 isolated PostgreSQL evidence and keep target DB provisioning and runtime activation open. |

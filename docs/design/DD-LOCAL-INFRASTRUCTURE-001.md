@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.15 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts 与六表 Infrastructure owner schema substrate 已实现并通过 PG18.6 隔离验证，owner writer/consumer、生产 migration/grants、provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.16 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts、六表 schema substrate 与 NOLOGIN runtime grant contract 已通过 PG18.6 隔离验证，目标 DB 身份与迁移装配、owner writer/consumer、provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.87 §50.8G-50.8J / basic-design v5.84 §8.1、§16.21-16.31 / 实施计划 §6.83-6.90。
+> 上游：requirements v5.89 §50.8G-50.8J / basic-design v5.86 §8.1、§16.21-16.32 / 实施计划 §6.83-6.91。
 
 ## §0 目的与边界
 
@@ -125,6 +125,12 @@ Migration `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql` �
 
 隔离 runner `scripts/automation/phase9f4d_infrastructure_owner_schema.py` 使用显式 PostgreSQL binary 目录及 loopback-only disposable PostgreSQL 18.6，migration 双次应用成功；仅 fixture `NOBYPASSRLS` runtime role 用于验证六表 tenant isolation、事实不可变、Work lifecycle/retention guards 与 6/6 FORCE RLS。该 SQL 尚未加入任何 production startup migration callsite，也未执行目标 DB/RLS/role grant 检查；runner 使用 `psql` 直接执行 SQL，不能当成应用迁移部署证据。尚无 owner writer/consumer、retry/reaper、capacity conflict/fairness、Manager/provider 或 Run admission；本 schema 不会启动 executor，所有现存 fail-closed gate 保持生效。
 
+### §6.2 Phase 9F4D-3B1 runtime role grant contract
+
+Migration db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql provisions a capability-limited NOLOGIN group, not an application identity. It revokes PUBLIC and prior group grants for the Infrastructure schema/tables, grants schema USAGE, Work-table SELECT/INSERT/UPDATE/DELETE and append-only Transaction-table SELECT/INSERT, and excludes schema CREATE, TRUNCATE, REFERENCES and TRIGGER. The role is NOLOGIN/NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS/NOINHERIT.
+
+The deployment layer must provision a distinct login and secret, grant its membership, and activate the group with transaction-scoped SET LOCAL ROLE; transaction completion must discard the role. The migration is repeatable and passed isolated PostgreSQL 18.6 privilege-matrix checks. There is still no production migration loader/caller or target database identity evidence. This gate starts no Multipass instance; the temporary test inventory cap remains two registered instances, including stopped/recoverable entries.
+
 ## §7 Phase 与验收
 
 1. INFRA-1：冻结 provider/profile/binding schema、HostEnvironment/owner/generation lifecycle、operation/license-obligation record、完整 SPDX/SBOM 与近 12 个月社区活跃证据门；定义 capability negotiation 与真实 discover/probe/readiness contract。
@@ -153,6 +159,8 @@ The V2 multi-cluster Rust contract passed four focused gates and 27/27 tests; th
 
 ### §7.3 Phase 9F4D-3A：Infrastructure owner schema contract
 
+9F4D-3B1 adds the explicit runtime grant contract in db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql; the disposable PostgreSQL runner applies both schema and grants migrations twice and validates group-role attributes plus exact W/T privileges (14/14 gates overall). The grant migration exists, but target DB migration provisioning, deployment login/membership/transaction activation, production writer/consumer and owner admission remain open. Do not label production grants complete.
+
 PG18.6 disposable runner verified twice-applied migration, six tenant FORCE RLS tables, positive and negative tenant visibility/insertion, append-only Transaction rows, valid/invalid Work state transitions, terminal retention bounds, and deletion rejection before expiry. It starts zero Multipass instances, so the current inventory cap of two remains unchanged. This closes only the physical schema/guard substrate. Production migration callsite, target database owner/runtime grants, Infrastructure demand consumer and atomic capacity writer, duplicate/concurrent admission, reconciliation/reaper, BI/Benchmark, Manager/provider/readiness producer, Runtime sandbox/workspace bridge, and end-to-end Schedule execution remain open. See [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md).
 
 ## §8 审阅与修订历史
@@ -173,3 +181,4 @@ PG18.6 disposable runner verified twice-applied migration, six tenant FORCE RLS 
 | v0.13 | 2026-10-07 | Close the typed placement/digest and dual reservation identity gaps; record four passing focused gates and 27/27 tests, with two-instance maximum for live Multipass tests and production/provider gates still open. |
 | v0.14 | 2026-10-07 | Define the test cap over the total registered Multipass inventory, including stopped/recoverable records; document the locked pre-launch inventory guard, fail-closed parse behavior, no-auto-purge policy, and unchanged product topology. | User clarified that stopped instances still consume disk. |
 | v0.15 | 2026-10-07 | Add the tested six-table Infrastructure-owner PostgreSQL schema substrate, exact W/T split, FORCE RLS, guarded 24–25-hour Work retention, append-only Transaction facts and phase runner; keep production migration provisioning/grants, owner writers/consumers, provider and Schedule execution open. | Phase 9F4D-3A completed disposable PostgreSQL 18.6 schema verification without Multipass. |
+| v0.16 | 2026-10-07 | Add the NOLOGIN Infrastructure-owner grant group and exact W/T privilege matrix; distinguish the verified repeatable isolated grants migration from unverified target DB provisioning, application login membership/activation and owner writer/consumer. Retain the two-instance test cap and fail-closed execution boundary. | Phase 9F4D-3B1 PostgreSQL role-grant verification. |

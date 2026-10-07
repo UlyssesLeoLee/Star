@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.61**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.62**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -12,12 +12,12 @@
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
-> - Phase 9F4D-3A 状态：新增六表 Infrastructure owner schema substrate（3 Work + 3 Transaction），PG18.6 隔离库重复迁移、tenant FORCE RLS 与状态/不可变性/retention guards 验证通过；生产 migration provisioning/grants、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现。该 gate 未启动 Multipass，当前测试阶段仍最多登记 2 个实例。
+> - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.88 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.85 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.19、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.15、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.89 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.86 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.16、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -842,3 +842,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.59 | 2026-10-07 | Mavis review | Align requirements v5.85, basic design v5.82, DUKOU direction v1.7, Schedule API v0.18, Infrastructure DD v0.14, implementation plan v6.13, and Phase 9F4D report v0.4; retain the temporary two-registered-instance test cap, explicit multi-cluster profile placement, and production fail-closed boundaries. | Final reference audit and offline mocked launch-guard verification. |
 | v4.60 | 2026-10-07 | Mavis review | Correct the active Infrastructure sections to HostEnvironment-managed multiple clusters, profile-controlled placement, exact Run cluster identity/generation, and separate Host/cluster capacity; synchronize requirements v5.86, basic design v5.83, DUKOU v1.7, Schedule contracts v0.18, Infrastructure DD v0.14, implementation plan v6.14, and Phase 9F4D report v0.5. | Cross-layer audit found the current Run Infrastructure section still described a shared control plane. |
 | v4.61 | 2026-10-07 | Mavis review | Align current Run Apps infrastructure references to Infrastructure DD v0.15, Schedule SRS/DD v0.19, and requirements/basic v5.88/v5.85; record the isolated owner schema substrate without changing the registered two-instance test cap or claiming provider/executor completion. | Phase 9F4D-3A owner persistence schema was validated and cross-document current pointers were audited. |
+| v4.62 | 2026-10-07 | Mavis review | Align requirements v5.89/basic v5.86, Schedule SRS/DD v0.20, Infrastructure DD v0.16, DUKOU v1.9 and plan v6.17; record the 9F4D-3B1 restricted role/grant matrix and 14/14 isolated PostgreSQL evidence while keeping target identity/provisioning and production owners open. Preserve the two-instance test cap. | The repeatable runtime-grants migration passed its disposable database gate. |

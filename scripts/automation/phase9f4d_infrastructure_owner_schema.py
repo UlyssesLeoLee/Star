@@ -1,8 +1,11 @@
-"""Verify the 9F4D-3A Infrastructure owner schema in disposable local PostgreSQL."""
+"""Verify 9F4D-3A owner schema and 9F4D-3B1 runtime grants in disposable PostgreSQL."""
 
-# @cypher schema=1 source_sha256=e36ab96c626fa7f8106ec51d8d7c540f811d0655ce12c1f0900fbf8a6c3fc3b4
+# @cypher schema=1 source_sha256=8eed58f8f6c985a5812c7577b191a0165efdb83df2caacf55e498ce739081063
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_owner_schema.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::main",kind:"function"})
+# MERGE (grants_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::GRANTS_MIGRATION",kind:"constant"})
+# MERGE (owner_probe_sql:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OWNER_RUNTIME_ROLE_SQL",kind:"constant"})
+# MERGE (owner_privileges_sql:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OWNER_PRIVILEGE_ASSERTIONS_SQL",kind:"constant"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::run_step",kind:"function"})
 # MERGE (write_text:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::write_text",kind:"function"})
 # MERGE (is_contained:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::is_contained",kind:"function"})
@@ -14,6 +17,9 @@
 # MERGE (pg:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
 # MERGE (self)-[:DEFINES]->(main)
+# MERGE (self)-[:DEFINES]->(grants_migration)
+# MERGE (self)-[:DEFINES]->(owner_probe_sql)
+# MERGE (self)-[:DEFINES]->(owner_privileges_sql)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(write_text)
 # MERGE (self)-[:DEFINES]->(is_contained)
@@ -29,6 +35,9 @@
 # MERGE (main)-[:CALLS]->(run_sql)
 # MERGE (main)-[:USES]->(root)
 # MERGE (main)-[:USES]->(migration)
+# MERGE (main)-[:USES]->(grants_migration)
+# MERGE (main)-[:USES]->(owner_probe_sql)
+# MERGE (main)-[:USES]->(owner_privileges_sql)
 # MERGE (main)-[:USES]->(output)
 # MERGE (main)-[:CONFIGURES]->(pg)
 # MERGE (run_step)-[:CALLS]->(subprocess)
@@ -50,20 +59,84 @@ from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql"
+GRANTS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql"
 OUTPUT_DIR = ROOT / "target" / "phase9f4d-infrastructure-owner-schema"
 DATA_PARENT = ROOT / ".cache" / "phase9f4d-infrastructure-owner-schema"
 MAX_STEP_SECONDS = 900
 
+OWNER_RUNTIME_ROLE_SQL = """\
+CREATE ROLE infrastructure_owner_runtime_probe NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+GRANT star_infrastructure_owner TO infrastructure_owner_runtime_probe;
+"""
+
+OWNER_PRIVILEGE_ASSERTIONS_SQL = """\
+DO $$
+DECLARE
+    table_name TEXT;
+    role_is_restricted BOOLEAN;
+BEGIN
+    SELECT NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+           AND NOT rolreplication AND NOT rolbypassrls AND NOT rolinherit
+      INTO role_is_restricted
+      FROM pg_roles
+     WHERE rolname = 'star_infrastructure_owner';
+    IF role_is_restricted IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION 'Infrastructure owner privilege group has unsafe role attributes';
+    END IF;
+    IF NOT has_schema_privilege('star_infrastructure_owner', 'infrastructure', 'USAGE') THEN
+        RAISE EXCEPTION 'Infrastructure owner role cannot use its schema';
+    END IF;
+    IF has_schema_privilege('star_infrastructure_owner', 'infrastructure', 'CREATE') THEN
+        RAISE EXCEPTION 'Infrastructure owner role can create schema objects';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_roles
+         WHERE rolname = 'infrastructure_owner_runtime_probe'
+           AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcanlogin
+    ) THEN
+        RAISE EXCEPTION 'Infrastructure owner runtime probe has unsafe role attributes';
+    END IF;
+    FOREACH table_name IN ARRAY ARRAY[
+        'capacity_demand_inbox', 'capacity_reservation_bundle', 'capacity_outbox_delivery'
+    ] LOOP
+        IF NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'SELECT')
+           OR NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'INSERT')
+           OR NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'UPDATE')
+           OR NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'DELETE')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'TRUNCATE')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'REFERENCES')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'TRIGGER') THEN
+            RAISE EXCEPTION 'Infrastructure owner Work-table privileges are not least-privilege';
+        END IF;
+    END LOOP;
+    FOREACH table_name IN ARRAY ARRAY[
+        'capacity_demand_receipt', 'capacity_reservation_event', 'capacity_owner_outbox'
+    ] LOOP
+        IF NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'SELECT')
+           OR NOT has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'INSERT')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'UPDATE')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'DELETE')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'TRUNCATE')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'REFERENCES')
+           OR has_table_privilege('star_infrastructure_owner', 'infrastructure.' || table_name, 'TRIGGER') THEN
+            RAISE EXCEPTION 'Infrastructure owner Transaction-table privileges are not append-only';
+        END IF;
+    END LOOP;
+END $$;
+"""
+
 RUNTIME_ROLE_SQL = """\
-CREATE ROLE infrastructure_schema_runtime LOGIN NOSUPERUSER NOBYPASSRLS;
-GRANT USAGE ON SCHEMA infrastructure TO infrastructure_schema_runtime;
+-- Deliberately overprivileged test-only probe to prove database WORM triggers also reject
+-- mutations when SQL privileges would otherwise permit them. Never grant this role in production.
+CREATE ROLE infrastructure_worm_guard_probe LOGIN NOSUPERUSER NOBYPASSRLS;
+GRANT USAGE ON SCHEMA infrastructure TO infrastructure_worm_guard_probe;
 GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA infrastructure
-    TO infrastructure_schema_runtime;
+    TO infrastructure_worm_guard_probe;
 """
 
 RUNTIME_FIXTURE_SQL = """\
 BEGIN;
-SET LOCAL ROLE infrastructure_schema_runtime;
+SET LOCAL ROLE infrastructure_owner_runtime_probe;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
 INSERT INTO infrastructure.capacity_demand_inbox (
     tenant_id, source_event_id, occurrence_id, project_id, branch_id,
@@ -134,7 +207,7 @@ COMMIT;
 
 RUNTIME_ASSERTIONS_SQL = """\
 BEGIN;
-SET LOCAL ROLE infrastructure_schema_runtime;
+SET LOCAL ROLE infrastructure_owner_runtime_probe;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
 DO $$
 DECLARE row_count INTEGER;
@@ -194,7 +267,7 @@ ROLLBACK;
 
 MUTATION_ASSERTIONS_SQL = """\
 BEGIN;
-SET LOCAL ROLE infrastructure_schema_runtime;
+SET LOCAL ROLE infrastructure_worm_guard_probe;
 SELECT set_config('app.tenant_id', '10000000-0000-4000-8000-000000000001', true);
 DO $$
 DECLARE denied BOOLEAN;
@@ -452,8 +525,9 @@ def main() -> int:
     if missing:
         print(json.dumps({"result": "blocked", "missing_tools": missing}))
         return 2
-    if not MIGRATION.is_file():
-        print(json.dumps({"result": "blocked", "missing_migration": str(MIGRATION)}))
+    missing_migrations = [str(path) for path in (MIGRATION, GRANTS_MIGRATION) if not path.is_file()]
+    if missing_migrations:
+        print(json.dumps({"result": "blocked", "missing_migrations": missing_migrations}))
         return 2
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -495,9 +569,14 @@ def main() -> int:
             started = results[-1]["status"] == "passed"
         if started:
             migration_sql = MIGRATION.read_text(encoding="utf-8")
+            grants_migration_sql = GRANTS_MIGRATION.read_text(encoding="utf-8")
             for name, sql in (
                 ("migration-apply-1", migration_sql),
                 ("migration-apply-2", migration_sql),
+                ("runtime-grants-migration-apply-1", grants_migration_sql),
+                ("runtime-grants-migration-apply-2", grants_migration_sql),
+                ("owner-runtime-probe-role", OWNER_RUNTIME_ROLE_SQL),
+                ("owner-runtime-privilege-matrix", OWNER_PRIVILEGE_ASSERTIONS_SQL),
                 ("runtime-role", RUNTIME_ROLE_SQL),
                 ("runtime-fixture", RUNTIME_FIXTURE_SQL),
                 ("runtime-tenant-isolation", RUNTIME_ASSERTIONS_SQL),

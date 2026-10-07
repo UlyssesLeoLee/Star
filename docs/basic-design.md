@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.85 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.88
+> **文档版本**: v5.86 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.89
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4601,10 +4601,11 @@ Chat Bar(scope, text, entity_refs)
 | AC-INFRA-001 | §16.21 / DD-LOCAL-INFRASTRUCTURE-001 | Rust provider/profile/Run binding、显式多集群 placement、商用许可与性能/隔离验收 |
 | AC-INFRA-002 | §8.1 / §16.21-16.22 / DD-LOCAL-INFRASTRUCTURE-001 | Multipass 多 K3s cluster 管理、可信 Manager、Worktree bridge、Host+cluster 双层资源与安全门 |
 | AC-INFRA-002-G | §16.31 / DD-LOCAL-INFRASTRUCTURE-001 §6.1 / Phase 9F4D-3A | Infrastructure owner 六表 W/T persistence substrate、tenant FORCE RLS、24–25 小时 terminal retention 与独立 owner 边界；生产 writer/grants/provider 仍开放 |
+| AC-INFRA-002-H | §16.32 / Schedule API DD §6.6 / Infrastructure DD §6.2 / Phase 9F4D-3B1 | NOLOGIN group role、W/T 表最小权限、独立应用登录身份与未关闭的目标环境 grant provisioning |
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
-| AC-LOOP-010 | §16.27-16.31 / Schedule API DD v0.19 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 独立事务解析 profile placement 并预留 Host+精确 K3s cluster 双层 capacity，再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster；executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；owner store 与 production worker 仍未实现 |
+| AC-LOOP-010 | §16.27-16.32 / Schedule API DD v0.20 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 独立事务解析 profile placement 并预留 Host+精确 K3s cluster 双层 capacity，再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster；executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；owner store 与 production worker 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4924,6 +4925,12 @@ Readiness evidence 必须匹配当前 demand、Host/cluster reservations、Run b
 
 `scripts/automation/phase9f4d_infrastructure_owner_schema.py` 使用显式 PostgreSQL bin 路径启动 loopback-only disposable PostgreSQL 18.6，双次应用 migration，创建仅供 fixture 的 `NOBYPASSRLS` runtime role，检查 6 张表 tenant 隔离、append-only、状态/保留 guard 与 FORCE RLS 数量，确认后停止并清理自己的临时 data directory。该迁移目前未接入生产迁移 provisioning/role grants；当前 `star-pg-adapter::apply_migrations` 也没有本迁移调用方，不能把该 runner 的 `psql` 证据称为应用部署证据。Infrastructure owner writer/Inbox consumer、跨 owner Outbox consumer、admission/lease/quota recheck、capacity conflict/fairness、reaper/reconciliation、Multipass Manager/provider、BI 与 Schedule 执行仍未实现；没有这些环节时 executor 必须保持关闭。整个 schema gate 使用零 Multipass instance，现有测试阶段全局上限仍为 2 个已登记实例。
 
+### 16.32 Phase 9F4D-3B1 Infrastructure owner runtime grants
+
+Migration db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql provisions only the star_infrastructure_owner NOLOGIN privilege group. The group is restricted (NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOBYPASSRLS, NOINHERIT) and receives USAGE on the Infrastructure schema, SELECT/INSERT/UPDATE/DELETE on the three Work tables, and SELECT/INSERT on the three append-only Transaction tables. It receives no schema CREATE, table TRUNCATE, REFERENCES, or TRIGGER privileges.
+
+The actual application login remains a separately provisioned identity. Deployment must create that login through the secret/bootstrap system, grant membership, and activate the group within each owner transaction; the migration contains no credentials. The PostgreSQL 18.6 disposable runner applies both migrations twice and checks role attributes and the complete six-table privilege matrix. It does not prove target DB migration loading, production login membership/role activation, or an owner writer/consumer. The temporary test-phase Multipass cap remains two registered instances including stopped/recoverable records; this gate starts no VM.
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5055,3 +5062,4 @@ Readiness evidence 必须匹配当前 demand、Host/cluster reservations、Run b
 | v5.83 | 2026-10-07 | Mavis review | Align requirements v5.86, Group DD v4.60, DUKOU direction v1.7, Schedule contracts v0.18, Infrastructure DD v0.14, implementation plan v6.14, and the Phase 9F4D report v0.5; keep explicit profile-controlled placement and the test cap consistent. | The Group DD current-section audit corrected a stale shared-control-plane assumption. |
 | v5.84 | 2026-10-07 | Mavis review | Synchronize requirements v5.87 and Infrastructure DD v0.15; add §16.31 for the six-table Infrastructure owner persistence substrate, W/T classification, 24–25-hour terminal retention, isolated PostgreSQL 18.6 evidence, and the still-open production migration/grants/worker/provider gates. | Phase 9F4D-3A schema verification passed without launching any Multipass instance. |
 | v5.85 | 2026-10-07 | Mavis review | Synchronize requirements v5.88, Schedule SRS/DD v0.19, and Infrastructure DD v0.15 in all active acceptance rows and infrastructure references; retain the 2-instance test inventory cap and fail-closed production gates. | Cross-layer audit corrected active current-section pointers after the 9F4D-3A schema substrate update. |
+| v5.86 | 2026-10-07 | Mavis review | Align requirements v5.89, Schedule SRS/BD/DD v0.20/v0.19/v0.20, Infrastructure DD v0.16, Group DD v4.62 and implementation plan v6.17; add Section 16.32 for the Infrastructure-owner NOLOGIN grant group, W/T privilege matrix and separate application login boundary; record isolated PostgreSQL 18.6 14/14 evidence and keep production deployment/open owner gates explicit. | Phase 9F4D-3B1 grant contract was implemented and independently exercised in a disposable database. |

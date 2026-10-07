@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.15 (2026-10-07)
+> **文档版本**: v2.16 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1246,6 +1246,12 @@ PG18.6 本机实测 runner 全部 10 步通过：migration 重复应用、fixtur
 
 `docs/data-design/phase9f4d-infrastructure-owner-wtm.md` 对 migration 六张表逐一给出唯一 W/T/M 分类：3 张 Work、3 张 Transaction、0 张 Master；按主分类覆盖，不改历史全仓 100-table baseline。基础设计和 Infrastructure DD 均链接此清单，任何新增 Infrastructure 表都要随 DDL 更新此逐表索引及 retention/RLS 验收边界。
 
+### 4.57 Phase 9F4D-3B1 Infrastructure owner runtime grants gate
+
+复用 `phase9f4d_infrastructure_owner_schema.py` 在 `--pg-bin` 指定的 PostgreSQL 18.6 loopback-only disposable cluster 中依次重复应用 3A schema migration 与 3B1 runtime-grants migration。Runner 检查 `star_infrastructure_owner` 的受限 NOLOGIN/NOSUPERUSER/NOBYPASSRLS/NOINHERIT 属性、schema 仅 USAGE，以及每张 W/T 表的精确 SELECT/INSERT/UPDATE/DELETE grants；禁止 CREATE/TRUNCATE/REFERENCES/TRIGGER。一个单独的 disposable runtime probe 用于确认 membership 下 `SET LOCAL ROLE` 的测试路径；另一个故意 overprivileged 的 probe 只用于验证 Transaction WORM trigger，禁止部署。
+
+PG18.6 证据位于 `target/phase9f4d-infrastructure-owner-grants-final/audit.jsonl`：14/14 steps 通过，重复迁移与权限断言完成，临时 PostgreSQL 正常停止。该 gate 没有启动 Multipass；测试 inventory 总上限仍为 2 个注册实例（包括停止/可恢复记录），也不授权第三个实例。目标 DB migration caller、实际 app login/secret/membership、连接池 transaction-scoped role activation/reset、owner stores/writer/consumer 与 Schedule executor 均未验收；不得将该 gate解释成生产执行闭环。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1633,6 +1639,7 @@ frontend/src/app/automation-debug/
 | v2.13 | 2026-10-07 | Record typed placement digest coverage, separate Host/cluster reservation IDs, and final 4-gate/27-test evidence under the two-instance live-test cap. |
 | v2.14 | 2026-10-07 | Clarify the test limit as two registered Multipass instances total, including stopped/recoverable entries; record the host-local locked fail-closed pre-launch inventory guard and no-auto-purge behavior. |
 | v2.15 | 2026-10-07 | Add Phase 9F4D-3A disposable PostgreSQL 18.6 owner-schema runner with 10 passing gates, file-backed logs/audit, safe temporary DB cleanup, and a six-table W/T classification link; retain the two-instance Multipass test cap and open production migration/grants/writer/consumer/provider gates. |
+| v2.16 | 2026-10-07 | Add §4.57 for 9F4D-3B1 repeatable runtime-grants verification; record 14/14 disposable PostgreSQL 18.6 steps, the exact NOLOGIN W/T privilege matrix, separate test-only WORM probe, no Multipass use, and open target identity/provisioning and owner execution gates. |
 
 ---
 

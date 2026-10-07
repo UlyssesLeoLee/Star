@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Rule API and typed v2 multi-cluster binding/demand/capacity/readiness gate slices verified; production execution remains fail-closed.
-> Version: 0.18 | Date: 2026-10-07
+> Version: 0.19 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -61,6 +61,12 @@ Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-
 
 要求 Host 与精确目标 cluster reservations、Schedule deadline、scope/binding digest、Host generation 和 cluster ID/generation 均有效，并有不早于 acceptance、不晚于当前时刻且不超过 30 秒的新鲜 observation。Multipass 默认路径需有受信任 Manager receipt、Multipass daemon 与组成目标 cluster 的全部 owned guest aggregate Ready 事实；Remote K3s 对 daemon/guest 两层显式标记 NotApplicable。两种 provider 都必须有 K3s API、profile 所需 Ready node 数、CRI、独立 Agent Runtime sandbox 和 Worktree workspace bridge 证据。此纯函数不授权 run-as、不持久化 owner reservation、不调用 Multipass/K3s、不启动 executor。Run owner 在 start/resume 事务仍须复验固定 creator 的实时 Project/Run ACL、lease/fence、quota 和 current binding；Infrastructure owner 在自己的 store 持久化 acceptance/evidence。Missing 或 stale evidence keeps TaskExecutionRun non-executing。当前测试阶段最多登记 2 个 Multipass 实例，Stopped/Deleted 记录也计入；bootstrap 以 host-local exclusive lock 串行化完整 inventory 检查和 launch，达到上限或无法解析时 fail closed，不自动 purge；所有 live test launch 必须经受控路径。契约测试不创建 VM。
 
+### 6.4 Infrastructure-owner runtime role separation
+
+The migration 2026-10-08-infrastructure-owner-runtime-grants.sql creates or repairs a star_infrastructure_owner NOLOGIN privilege group. It has no elevated role attributes and receives schema USAGE, Work-table SELECT/INSERT/UPDATE/DELETE, and Transaction-table SELECT/INSERT only. Schema CREATE, TRUNCATE, REFERENCES, and TRIGGER are denied. The application login is a separate principal provisioned by deployment secrets/bootstrap; membership and SET LOCAL ROLE activation must be verified in the production pool transaction. No password or login is created by this SQL migration.
+
+Disposable PostgreSQL 18.6 verified duplicate apply and the complete role/privilege matrix. The migration-provisioning callsite, target DB role membership/activation, Infrastructure owner writer/consumer, and production admission remain open. The test cap is two registered Multipass instances including stopped/recoverable entries; this role-contract test does not create a VM.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -83,3 +89,4 @@ Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-
 | v0.16 | 2026-10-07 | Model multiple Multipass-managed K3s clusters, explicit profile placement, exact Run cluster generation, dual Host/cluster capacity, V2 typed contracts, and the temporary two-instance test limit; retain production fail-closed gates. |
 | v0.17 | 2026-10-07 | Make the binding placement strategy part of the digest and name the distinct Host/cluster reservation IDs required by readiness; record 27/27 focused Rust tests while retaining owner/provider production gates. |
 | v0.18 | 2026-10-07 | Define the test limit over all registered Multipass instances, including stopped/recoverable records, and record the locked fail-closed bootstrap creation guard without changing production topology. |
+| v0.19 | 2026-10-07 | Add the Infrastructure-owner NOLOGIN role, least-privilege W/T grants and separate login/role-activation boundary; record the isolated PostgreSQL 18.6 grant-matrix evidence and keep production identity, migration caller, writer/consumer and execution gates open. |
