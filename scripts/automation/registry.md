@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.63 (2026-10-07)
+> **文档版本**: v0.64 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.14 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.54 9F4D infrastructure/readiness/capacity contracts + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.15 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.56 9F4D infrastructure/readiness/capacity/schema gates + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -102,6 +102,8 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 
 | `scripts/automation/dev_converge.py` | 冻结本地 refs 并逐路径审计冲突后执行普通 no-ff merge，记录 plan 与 SHA-256 决策 | DEV-CONVERGE；automation-design §4.43 | 本次提交（见 Git） | 🟢 本地 dev 来源已收敛；不含 push/cleanup，运行时/DB 阶段按独立 gate 跟踪 |
 
+| `scripts/automation/phase9f4d_infrastructure_owner_schema.py` | Phase 9F4D-3A disposable PostgreSQL schema runner: explicit `--pg-bin`, loopback-only temporary PostgreSQL 18.6, duplicate migration apply, disposable NOBYPASSRLS role, six-table tenant RLS/WORM/Work retention assertions, file-backed logs + JSONL audit, safe stop/cleanup; does not call Multipass, production migration provisioning/grants, owner writers/consumers, or executor | Schedule Phase 9F4D-3A; automation-design §4.55; W/T index §4.56; implementation plan §6.90; phase report | 本次提交（见 Git） | 🟢 PG18.6 isolated gate passed, 10/10 steps; production DB/grants/provider remain open |
+
 ## 2. 子代理任务索引 (per dispatcher.py 落档)
 
 | task_id | brief 路径 | output 路径 | status.json 路径 | 调用方 |
@@ -163,6 +165,7 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 | **v0.61** | **2026-10-06** | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 9F4D runner 到 Phase 9F4D-1：rustfmt 覆盖 readiness.rs，Rust 1.98.1 四 gates 与 15/15 tests 通过；登记短 target 缓解 MSVC LNK1104；保持纯 contract 与 fail-closed 边界 | 新增 Multipass/K3s readiness evidence validator，需要可重放 focused verification
 | **v0.62** | **2026-10-07** | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 9F4D runner 覆盖 V2 binding/readiness/capacity，rustfmt 包含 capacity.rs；明确 runner 不启动 VM，真实 Multipass 测试同一阶段最多两个 instance；状态不宣称 provider/owner stores/worker/生产执行完成 | 用户纠正多 K3s 架构并设定测试阶段磁盘上限 |
 | **v0.63** | **2026-10-07** | Mavis review | Define the test limit as two registered Multipass instances total, including stopped/recoverable entries; add a fail-closed bootstrap inventory guard and record that it never auto-purges. | User clarified that stopped instances can continue to consume disk. |
+| **v0.64** | **2026-10-07** | Mavis review | Register `phase9f4d_infrastructure_owner_schema.py` and the 9F4D-3A schema migration; record PG18.6 duplicate-apply/RLS/tenant/WORM/retention evidence, no Multipass use, and still-open production provisioning, grants and owner writer/consumer gates. | The Infrastructure owner gained a separately verifiable persistence-schema substrate. |
 
 ---
 
