@@ -1,7 +1,7 @@
 # PHASE-INFRA-2B — Multipass read-only capability facts
 
 > 日期：2026-10-08
-> 状态：🟢 本切片实现与定向门禁完成；INFRA-2 后续阶段仍开放
+> 状态：🟢 本切片实现已合入本地 `dev`；INFRA-2 后续阶段仍开放
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 
 ## §0 目的
@@ -17,7 +17,8 @@ Rust 1.99.0 已于 2026-10-01 正式发布：[Rust 1.99.0 announcement](https://
 | Rust adapter | 增加 `MultipassCapabilityProbe` 和 `MultipassCapabilityObservation`；固定 `version`、`get local.driver` 两条只读 argv；记录 client/daemon version、driver、host OS/arch。 | 共用 inventory 的 absolute executable 与 fail-fast single-flight；每条命令 deadline 5 秒，stdout/stderr 各 4 KiB，串行 command budget ≤10 秒。 |
 | 输出解析 | 要求 `multipass` 与 `multipassd` 各出现且只出现一次；driver 仅接受一行 bounded token，未知值原样保留。 | 不判定版本兼容性、driver 可用性、daemon readiness 或任何授权/容量事实。 |
 | 测试 | 增加固定 argv/限额、版本格式、重复/缺失/畸形版本、未知 driver、畸形 driver 与 capability/inventory 共用 single-flight 测试。 | 所有测试为本地 fixtures，不运行 Multipass，不创建或修改 VM。 |
-| 文档 | 同步 requirements v6.01、basic design v5.98、Infrastructure DD v0.27、Group DD v4.67、implementation plan v6.31，并新增本阶段报告。 | 无 DB migration、W/T/M 分类或产品导航改变。 |
+| 文档 | 同步 requirements v6.01、basic design v5.98、Infrastructure DD v0.27、Group DD v4.67、implementation plan v6.32，并新增本阶段报告。 | 无 DB migration、W/T/M 分类或产品导航改变。 |
+| dev integration | No-FF 合入本地 `dev`：`24a4e94219d71fc41059ec8c013abe584e793402`；merge source 为 `44c4de6e4e51f65910569f5d162583611336440f`。 | 未 push；其余 20 个非 main 源分支已 contained，main 是 dev 祖先并保持不动。所有 21 个非 main source worktrees 都有 active-owner blocker，故未删除任何 branch/worktree。 |
 
 ## §2 验证摘要
 
@@ -30,6 +31,7 @@ Rust 1.99.0 已于 2026-10-01 正式发布：[Rust 1.99.0 announcement](https://
 | `rustfmt --edition 2021 --check crates/multipass-adapter/src/lib.rs` | Rust 1.99.0 formatter 检查通过 |
 | `git diff --check` | 通过 |
 | `cgg_guard.py --root . --changed --stamp` | 通过；1 个 source file checked |
+| Post-merge rerun on `dev` | `cargo test` 17/17、严格 Clippy、rustfmt 与 `git diff --check` 全部通过 |
 | CodeRabbit review | 未能运行：本机 CLI 启动返回 `/root/.local/bin/coderabbit: Permission denied`；已完成本地 diff/source 自审，不将其视为独立审查通过 |
 
 本报告不声称 workspace-wide build/test、生产 Multipass daemon/driver、跨平台 provider、虚拟机/K3s readiness、桌面 RSS 或性能测试通过。
@@ -88,3 +90,4 @@ Rust 1.99.0 已于 2026-10-01 正式发布：[Rust 1.99.0 announcement](https://
 |---|---|---|---|---|
 | v0.1 | 2026-10-08 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 INFRA-2B 只读 Multipass capability-facts 实现、Rust 1.99.0 定向验证、跨层文档同步与未验收边界；初始验证占位项须在阶段收口前替换为实测结果。 | 用户选择 Rust 1.99.0，继续推进 Multipass/K3s 基础设施架构。 |
 | v0.2 | 2026-10-08 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 以实测 Rust 1.99.0 结果替换 rustfmt/CypherGraph 待执行项；记录 CodeRabbit CLI 权限错误与本地自审边界；同步实现计划验证状态，并核对需求/基本/详细设计及计划版本链。 | 合并前差异审查发现阶段报告仍保留过时的 pending 验证项。 |
+| v0.3 | 2026-10-08 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 INFRA-2B no-FF 合入本地 `dev` 的 merge commit 与 source commit；确认 post-merge Rust 1.99.0 focused tests、Clippy、rustfmt、diff-check 通过；未 push，active-owner worktrees 保留。 | 用户要求将完成结果合入 dev 并继续后续阶段。 |
