@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.28 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C1 增加 HostEnvironment、Multipass instance、K3s cluster、membership、Kubernetes node 五张 SCD2 Master 和 append-only Transaction catalog，并由延迟约束触发器强制 Master 与 registered Transaction 同事务提交。累计 16 张表在 PostgreSQL 18.6 isolated chain 中 16/16 FORCE RLS、29/29 runner steps 通过；target DB、owner writer/reconciliation、Manager/provider/readiness、BI/RSS 与执行仍未验收。
+> v0.29 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 在既有 5 张 SCD2 Master + catalog event 上增加 Ed25519 Rust Manager receipt 与 SQLx owner registration writer，并要求 receipt/Master/event 原子提交、签名先于 DB 校验、精确幂等回放与 unsigned legacy refusal。PostgreSQL 18.6 cumulative chain 当前增加到 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、inventory reconciliation、生命周期 writer、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v6.02 §50.8G-50.8T / basic-design v5.99 §8.1、§16.21-16.44 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.25 / W/T/M v0.8 / 实施计划 §6.83-6.104。
+> 上游：requirements v6.04 §50.8G-50.8U / basic-design v6.01 §8.1、§16.21-16.45 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.26 / W/T/M v0.9 / 实施计划 §6.83-6.105。
 
 ## §0 目的与边界
 
@@ -273,6 +273,32 @@ This phase does not deploy to a target DB and does not add a Rust owner writer, 
 |---|---|
 | AC-INFRA-002-T | §7.14.1–7.14.3; five M + one T catalog tables, exact generation references, RLS/grants/WORM, per-resource event serialization, two-apply cumulative migration and no-VM PostgreSQL evidence. |
 
+### §7.15 INFRA-2C2 signed Manager receipt-backed resource registration
+
+#### §7.15.1 Signed operation contract
+
+The trusted Rust Infrastructure Manager emits one bounded V1 registration operation per resource identity. The signed body binds schema version, unique `operation_id`, `receipt_id`, `correlation_id`, actor ID, Manager ID, observation time, resource kind, stable identity, SCD2 generation, and the bounded provider facts required by the existing Master schema. Supported identities are HostEnvironment, Multipass instance, K3s cluster, cluster-instance membership, and Kubernetes node. Exact parent IDs and generations remain subject to the composite foreign keys from §7.14.
+
+The detached Ed25519 signature covers a domain-separated message containing the stable serialized V1 body and the `manager_key_id`. The verifier accepts only an explicit deployment-configured `(manager_id, manager_key_id) → public key` tuple, validates schema/resource bounds and signature length, and verifies the signature before opening a SQLx transaction. Unknown key, bad signature, unsupported schema, nil identity, invalid token or malformed hierarchy fails closed. The database stores the key identifier, manager identity, signed digest, signature, observation time and correlation facts only; private keys, raw CLI/JSON output, credentials, host paths and tenant claims are excluded.
+
+#### §7.15.2 Owner-local persistence and replay
+
+`PostgresInfrastructureResourceCatalogWriter` begins one transaction, assumes `star_infrastructure_owner` with `SET LOCAL ROLE`, and takes a transaction advisory lock keyed by the operation ID. If the operation ID already exists, replay succeeds only when receipt ID, Manager/key identity, exact resource tuple, correlation/actor, digest and signature all match; any changed fact returns an idempotency conflict. A new operation inserts the append-only `resource_catalog_manager_receipt`, exactly one appropriate Master row, and a `registered/active` `resource_catalog_event` referencing that receipt. All three facts commit or roll back together.
+
+Migration `2026-10-08-infrastructure-resource-manager-receipts.sql` adds an append-only global Transaction table, a required event receipt reference, a trigger that binds each event's operation/resource/generation/type/state/correlation/actor/digest to the receipt, and a deferred constraint trigger that rejects an orphan receipt at commit. The table has ENABLE + FORCE RLS and owner-only SELECT/INSERT. Receipt and event UPDATE/DELETE/TRUNCATE are rejected. The migration is idempotent before and after signed registrations. It deliberately refuses to attach itself to pre-existing unsigned Master/event facts; a separately authorized signed import is required before such an upgrade can proceed.
+
+The Rust writer currently supports registration only. The receipt schema allows the existing event-state vocabulary for forward compatibility, but signed `active ↔ draining → retired` writer operations, inventory-to-identity reconciliation and a periodic reconciler are not implemented by this slice. Read-only Multipass inventory remains observation and cannot register identity. The two-record test-stage Multipass cap still counts Stopped/Deleted entries and forbids auto-purge; this writer gate creates no VM and does not alter inventory.
+
+#### §7.15.3 Verification and implementation gates
+
+Rust package formatting, `infrastructure` library check/tests/Clippy and the CypherGraph Guardian must run with the workspace's Rust 1.99.0 minimum. The disposable PostgreSQL 18.6 runner applies the cumulative owner schema twice and invokes a targeted ignored Rust SQLx integration test through the actual writer for all five resource identities. It verifies exact replay, conflict rejection, invalid-signature rejection before DB access, rollback for a missing parent generation, atomic receipt/Master/event facts, matching-field rejection, orphan-receipt rejection, WORM and unprivileged-read denial, then reapplies the migration after valid facts exist and counts 17/17 FORCE RLS tables. Only the orphan-receipt negative SQL case uses a fixed structurally valid signature to reach the deferred database constraint; it does not claim cryptographic validity. The 26/26 runner passed with zero Multipass VMs. The runner owns only its loopback PostgreSQL process and uniquely created data directory; it deletes that directory only after `pg_ctl status` confirms the server is stopped.
+
+This stage does not provision production owner login/membership, distribute Manager keys, deploy to a target DB, reconcile provider inventory, perform lifecycle operations, resolve a current Run binding, reserve capacity, establish guest/K3s/CRI/Runtime sandbox readiness, emit BI/Benchmark facts, or enable Schedule/Task Card execution. All of these remain fail-closed.
+
+| Requirement | Detailed design and verification |
+|---|---|
+| AC-INFRA-002-U | §7.15.1–7.15.3; Ed25519 verification before DB access, bound manager/key identity, exact-idempotent owner transaction, signed receipt/Master/event atomicity, no unsigned adoption, WORM/RLS and zero-VM PG18.6 gate. |
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -304,3 +330,4 @@ This phase does not deploy to a target DB and does not add a Rust owner writer, 
 | v0.26 | 2026-10-08 | Mavis review | Add §7.12 for the bounded Rust read-only Multipass JSON inventory adapter; support name-keyed state-record mappings and row-list compatibility, enforce process-wide single-flight, reject duplicate keys and preserve Stopped/Deleted-inclusive counts. Record 12/12 direct rustc tests, clippy-driver/rustfmt, Cargo rerun blockage, zero live CLI/VM use, and the disk-based two-instance test cap; update requirements/basic/Group DD and implementation-plan pointers. | INFRA-2A implements a safe observation-only starting point; self-review corrects CLI JSON format and concurrency boundaries. |
 | v0.27 | 2026-10-08 | Mavis review | Add §7.13 for fixed Multipass CLI/daemon version, configured driver and Rust host-target observations; bound each read-only command to 5 seconds and 4 KiB streams, share fail-fast single-flight, preserve unknown driver values, and prohibit compatibility/readiness/authorization inference. Align requirements v6.01, basic design v5.98, Group DD v4.67 and plan v6.30; keep provider lifecycle and execution closed. | User selected Rust 1.99.0; INFRA-2B extends the bounded host observation layer without changing VM state. |
 | v0.28 | 2026-10-08 | Mavis review | Add §7.14 for the cumulative global Host/Multipass/K3s identity catalog: five SCD2 Master tables, one append-only Transaction event table, deferred atomic registration, composite generation FKs, one-current-membership/node-name constraints, serialized events and owner-only FORCE RLS/grants. Align requirements v6.02, basic design v5.99, Group DD v4.68, W/T/M v0.8 and plan v6.33; record 29/29 PG18.6 steps, 16/16 FORCE RLS and zero VM use. Preserve owner writer/reconciliation, target deployment, Manager/provider/readiness/BI and execution gaps. | INFRA-2C1 added and verified only the resource identity persistence substrate. |
+| v0.29 | 2026-10-08 | Mavis review | Add §7.15 for Rust Ed25519 Manager receipt verification before DB access and atomic signed receipt/Master/event registration; define operation-id replay, conflict rejection, signed-only migration upgrade, append-only global receipt Transaction, event binding and deferred no-orphan commit. Align requirements v6.04, basic v6.01, Group DD v4.70, W/T/M v0.9, automation v2.26 and plan v6.37; record Rust 1.99.0 and the 17-table cumulative gate while keeping inventory reconciliation, lifecycle writer, production keys/target DB, Manager readiness, BI and execution open. | INFRA-2C2 provides the first Rust owner writer without enabling Multipass or Run execution. |

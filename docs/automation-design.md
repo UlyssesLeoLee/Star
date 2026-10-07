@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.25 (2026-10-08)
+> **文档版本**: v2.26 (2026-10-08)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1274,6 +1274,14 @@ PG18.6 证据位于 `target/phase9f4d-infrastructure-owner-grants-final/audit.js
 - Documentation sync script is exact-anchor guarded and idempotent; run it twice and confirm the second pass reports no file changes. Index both scripts and the phase report in `scripts/automation/registry.md`.
 - Phase report: [`PHASE-INFRA-2C1-RESOURCE-CATALOG-REPORT.md`](reports/PHASE-INFRA-2C1-RESOURCE-CATALOG-REPORT.md).
 
+### 4.67 Phase INFRA-2C2 signed Manager resource registration writer
+
+`scripts/automation/phase_infra2c2_resource_writer.py --pg-bin <PostgreSQL-18.6-bin> --cargo-bin <Cargo-1.99.0>` owns one uniquely named loopback PostgreSQL data directory under `.cache/phase-infra2c2-resource-writer`, file-backed logs under `target/phase-infra2c2-resource-writer`, a fixed 900-second command timeout, and only the process/paths it creates. It applies the cumulative 3A/3B1/3C3/3D1/2C1/2C2 migration chain twice, runs the targeted ignored Rust SQLx integration test through the real writer for all five resource identities, checks exact replay/conflict, invalid-signature rejection before DB access and rollback after invalid parent references, rejects mismatched/orphan receipts, checks append-only and unprivileged-read boundaries, re-applies 2C2 after signed facts exist, and verifies 17/17 FORCE RLS. It confirms PostgreSQL is stopped before deleting only its contained temporary data directory; if process state is unknown it preserves the data. It never calls Multipass, starts a VM, accesses a target DB or reads/writes user inventory.
+
+The runner's Rust 1.99.0 SQLx integration test signs and registers real typed test operations for HostEnvironment, Multipass instance, K3s cluster, membership and node through the production writer module. The orphan-receipt negative SQL case has a structurally valid dummy signature solely to reach the deferred database constraint; it is not presented as cryptographic verification. This gate passed 26/26 runner steps, including the real Rust writer test and 17/17 FORCE RLS. The runner adds no production key provisioning, inventory reconciliation, signed lifecycle writer, Manager process, Run readiness, BI/Benchmark or Schedule/Task CLI enablement. It creates zero Multipass VMs and leaves the test inventory capped at two records including Stopped/Deleted, with no auto-purge.
+
+- Phase report: [`PHASE-INFRA-2C2-MANAGER-RESOURCE-WRITER-REPORT.md`](reports/PHASE-INFRA-2C2-MANAGER-RESOURCE-WRITER-REPORT.md).
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1674,6 +1682,7 @@ frontend/src/app/automation-debug/
 | v2.23 | 2026-10-07 | Add section 4.64 for bounded Rust JetStream publication and the repeatable loopback PostgreSQL/NATS runner; record Rust 1.99.0 focused gates, real PubAck/delivered-state integration, zero Multipass VMs, durable Run Inbox dedupe and open production consumer/worker/execution gates. | Phase 9F4D-3D4 completed the transport publisher slice. |
 | v2.24 | 2026-10-07 | Add §4.65 and register the idempotent guarded documentation sync; record Phase 9F4D-3D5 result-consumer bounds, caller-transaction TaskExecutionRun scope check, commit-before-ack order, 9/9 unit tests and 20/20 disposable runner steps; retain fail-closed quarantine/release boundary, Rust 1.99.0, zero Multipass VMs and two-record cap. | The Run-owner result Inbox consumer slice reached its focused verification gate. |
 | v2.25 | 2026-10-08 | Add §4.66 and register guarded resource-catalog documentation sync plus disposable PostgreSQL runner; apply the 3A/3B1/3C3/3D1/INFRA-2C1 chain twice, record 29/29 runner steps and 16/16 FORCE RLS, and keep live Multipass inventory unchanged at the two-record cap. | INFRA-2C1 adds owner-scoped Host/cluster identity persistence without a VM or production executor. |
+| v2.26 | 2026-10-08 | Add §4.67 and register the cumulative INFRA-2C2 runner plus real Rust SQLx writer integration; verify all five resource types, exact replay/conflict, invalid-signature rejection before DB access, transactional rollback, receipt/event digest binding, orphan/WORM/RLS rejection, post-data migration reapplication and 17/17 FORCE RLS in 26/26 disposable PostgreSQL 18.6 steps. Preserve Rust 1.99.0, zero VM use and the two-record inventory cap. | INFRA-2C2 adds signed Rust Manager ownership evidence while provider lifecycle and execution remain closed. |
 
 ### 4.64 Phase 9F4D-3D4 Infrastructure Outbox JetStream publisher
 
