@@ -13,6 +13,46 @@
 //!
 //! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
+//!
+//! @cypher schema=1 source_sha256=8580dfb81706d334ab8529eaf2f0b7708a834e3f49b9e36858f1f733a6f166f7
+//! MERGE (self:File {path:"crates/infrastructure/src/registry.rs"})
+//! MERGE (registry:Type {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry",kind:"struct"})
+//! MERGE (kind:Type {id:"crates/infrastructure/src/registry.rs::AdapterKind",kind:"enum"})
+//! MERGE (as_str:Symbol {id:"crates/infrastructure/src/registry.rs::AdapterKind.as_str",kind:"method"})
+//! MERGE (register:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.register",kind:"method"})
+//! MERGE (register_postgres:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.register_postgres_adapter",kind:"method"})
+//! MERGE (register_nats:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.register_nats_adapter",kind:"method"})
+//! MERGE (register_object_storage:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.register_object_storage_adapter",kind:"method"})
+//! MERGE (register_scm:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.register_scm_adapter",kind:"method"})
+//! MERGE (register_agent:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.register_agent_adapter",kind:"method"})
+//! MERGE (list_registered:Symbol {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.list_registered_adapters",kind:"method"})
+//! MERGE (state:Variable {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry.state",kind:"field"})
+//! MERGE (descriptor:Type {id:"crates/infrastructure/src/lib.rs::AdapterDescriptor",kind:"struct"})
+//! MERGE (adapter_registry:Trait {id:"crates/infrastructure/src/lib.rs::AdapterRegistry",kind:"trait"})
+//! MERGE (adapter_query:Trait {id:"crates/infrastructure/src/lib.rs::AdapterQuery",kind:"trait"})
+//! MERGE (self)-[:DEFINES]->(registry)
+//! MERGE (self)-[:DEFINES]->(kind)
+//! MERGE (self)-[:DEFINES]->(as_str)
+//! MERGE (self)-[:DEFINES]->(register)
+//! MERGE (self)-[:DEFINES]->(register_postgres)
+//! MERGE (self)-[:DEFINES]->(register_nats)
+//! MERGE (self)-[:DEFINES]->(register_object_storage)
+//! MERGE (self)-[:DEFINES]->(register_scm)
+//! MERGE (self)-[:DEFINES]->(register_agent)
+//! MERGE (self)-[:DEFINES]->(list_registered)
+//! MERGE (self)-[:DEFINES]->(state)
+//! MERGE (registry)-[:IMPLEMENTS]->(adapter_registry)
+//! MERGE (registry)-[:IMPLEMENTS]->(adapter_query)
+//! MERGE (register)-[:CALLS]->(as_str)
+//! MERGE (register)-[:WRITES]->(state)
+//! MERGE (register)-[:CREATES]->(descriptor)
+//! MERGE (register_postgres)-[:CALLS]->(register)
+//! MERGE (register_nats)-[:CALLS]->(register)
+//! MERGE (register_object_storage)-[:CALLS]->(register)
+//! MERGE (register_scm)-[:CALLS]->(register)
+//! MERGE (register_agent)-[:CALLS]->(register)
+//! MERGE (list_registered)-[:READS]->(state)
+//! @endcypher
 
 use crate::{
     AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError, RegisterAgentAdapterCmd,
@@ -90,7 +130,7 @@ impl InMemoryAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(kind.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }

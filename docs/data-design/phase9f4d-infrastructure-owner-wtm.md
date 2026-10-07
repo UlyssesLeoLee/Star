@@ -2,7 +2,7 @@
 
 > Version: v0.8 · 2026-10-08
 > Scope: cumulative Infrastructure-owner schemas in 3A, 3C3, 3D1, and `db/migrations/2026-10-08-infrastructure-resource-master-catalog.sql`
-> Boundary: preserve phase-scoped 3A/3C3/3D1 snapshots and add the INFRA-2C1 global resource identity catalog; 3D2 expiry and 3D3 delivery reuse existing tables. Do not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
+> Boundary: preserve phase-scoped 3A/3C3/3D1 and INFRA-2C1 snapshots; add the INFRA-2C2 global signed Manager receipt Transaction. 3D2 expiry and 3D3 delivery reuse existing tables. Do not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
 
 ## §0 Purpose and ownership
 
@@ -52,6 +52,14 @@ Classify every physical table in the cumulative Infrastructure-owner persistence
 
 **Current cumulative classification:** 16/16 tables across 9F4D-3A, 3C3, 3D1 and INFRA-2C1 have exactly one primary class: 4 Work (W), 6 Transaction (T), and 6 Master (M). Eight tenant-owned rows retain tenant FORCE RLS; eight global rows have no tenant column and are limited by owner-only RLS. The 3D2 expiry and 3D3 delivery state reuse existing Work/Transaction tables and add no classification. The INFRA-2C1 runner applied all five migrations in this cumulative schema chain twice and verified 16/16 FORCE RLS tables, including deferred orphan-Master rejection at transaction completion; it did not create a Multipass VM.
 
+### §1.4 Phase INFRA-2C2 signed Manager receipt Transaction
+
+| Table | Class | Owner/scope | Retention and integrity boundary |
+|---|---|---|---|
+| `infrastructure.resource_catalog_manager_receipt` | Transaction (T) | Global Infrastructure owner; no tenant ID; owner-only FORCE RLS | Append-only Ed25519 receipt evidence binds Manager/key ID, operation/receipt/correlation/actor IDs, exact resource generation, signed digest/signature and observation time. No private key, raw Multipass output, credentials, host path or tenant claims. Every new catalog event references its receipt, and receipt plus event must commit together. |
+
+**Current cumulative classification after INFRA-2C2:** 17/17 tables have exactly one primary class: 4 Work (W), 7 Transaction (T), and 6 Master (M). Eight tenant-owned tables retain tenant-scoped FORCE RLS; nine global tables omit tenant ID and use the relevant owner-only policy. The previous 16/16 count remains the INFRA-2C1 snapshot. INFRA-2C2 adds exactly one global Transaction table and does not alter the historical 100-table index or Run/Execution ownership.
+
 **Owner and scope:** only trusted Infrastructure owner commands can populate or change the global catalog. Every new Master generation and its `registered/active` Transaction fact must commit in the same transaction; the deferred constraint trigger rejects orphan-Master commits. This appendix does not equate VM provider names with ownership, or catalog identity with capacity, Run binding, readiness, authorization, BI completeness, or execution. The live/test launcher continues to fail closed at two registered Multipass records including Stopped/Deleted, with no auto-purge.
 
 ## §2 Constraints and owner boundary
@@ -76,7 +84,9 @@ This evidence does not add a production expiry scheduler, cross-tenant scan coor
 
 The 3D3 PostgreSQL delivery adapter reuses the same Work row with bounded `SKIP LOCKED` claim, 300-second maximum lease, incrementing attempt fence, exponential transient retry, permanent/exhausted dead-letter and terminal retention. It changes no W/T/M count and publishes no event to a broker; the Run/Execution consumer and production polling worker remain open. The Rust runner passed 4/4 gates; PostgreSQL passed 21/21 steps, 10/10 FORCE RLS and 10/10 SQLx cases. The gate creates zero Multipass VMs and leaves the registered-instance cap at two records.
 
-**INFRA-2C1 current evidence:** `phase_infra2c_resource_catalog.py` applied the 3A schema, 3B1 grants, 3C3 Provider Profile, 3D1 physical-capacity ledger and INFRA-2C1 catalog migrations twice each in disposable PostgreSQL 18.6. It passed 29/29 runner steps and 16/16 FORCE RLS. The catalog Master tables are global owner-only; existing capacity inbox/profile tables retain tenant or global policies from their own migrations. The runner does not deploy to a target database, create a Multipass VM, or verify production identity/owner commands. The test inventory cap remains two registered Multipass records including Stopped/Deleted, with no automatic purge.
+**INFRA-2C1 historical evidence:** `phase_infra2c_resource_catalog.py` applied the 3A schema, 3B1 grants, 3C3 Provider Profile, 3D1 physical-capacity ledger and INFRA-2C1 catalog migrations twice each in disposable PostgreSQL 18.6. It passed 29/29 runner steps and 16/16 FORCE RLS. This remains the 2C1 snapshot and did not deploy to a target database, create a Multipass VM, or verify production identity/owner commands.
+
+**INFRA-2C2 current evidence:** `phase_infra2c2_resource_writer.py` applies the same cumulative chain plus the signed Manager receipt migration twice, then runs the Rust 1.99.0 SQLx integration test against that disposable PostgreSQL 18.6 database. The actual writer signs and registers all five resource identities; the test checks exact replay, conflict, invalid-signature rejection before DB access, and rollback on a missing parent. The runner passes 26/26 steps, checks receipt/event binding, deferred no-orphan enforcement, append-only behavior, unprivileged-read denial, post-registration migration reapplication and 17/17 FORCE RLS. The orphan-receipt negative SQL case uses a fixed structurally valid signature only to reach the deferred DB constraint and does not claim cryptographic validity. This gate creates no Multipass VM and does not inspect or modify the test inventory. The live test cap remains two records including Stopped/Deleted, with no automatic purge.
 
 ## §4 Revision history
 
@@ -90,3 +100,4 @@ The 3D3 PostgreSQL delivery adapter reuses the same Work row with bounded `SKIP 
 | v0.6 | 2026-10-07 | Mavis review | Record that 9F4D-3D2 reuses the existing paired Work ledgers, Transaction tables and lifecycle trigger for atomic expiry; add no schema object and make no W/T/M count change. Capture 7/7 SQLx expiry evidence while keeping production scheduler/consumer, active Runtime lease and VM lifecycle out of scope. Preserve the two-record Multipass disk cap. |
 | v0.7 | 2026-10-07 | Mavis review | Record 9F4D-3D3's bounded Outbox delivery claim/lease/ack/retry/dead-letter state machine on the existing Work row; add no table or classification change, keep broker publisher/Run consumer/worker open, and preserve the two-instance disk cap. |
 | v0.8 | 2026-10-08 | Mavis review | Add §1.3 and current cumulative coverage for the six-table INFRA-2C1 resource catalog: five global SCD2 Master tables plus one append-only Transaction table; require deferred atomic registration; classify 16 total tables as 4 W / 6 T / 6 M, preserve earlier phase snapshots, and record 29/29 PG18.6 steps, 16/16 FORCE RLS, two-instance test cap and zero VM use. | INFRA-2C1 resource identity schema and cumulative runner passed. |
+| v0.9 | 2026-10-08 | Mavis review | Add §1.4 for `resource_catalog_manager_receipt`; classify it as one global append-only Transaction row, update cumulative coverage to 17/17 tables = 4 W / 7 T / 6 M and eight tenant/nine global rows, preserve 2C1's 16-table snapshot, and record signed receipt/event binding plus the two-record, zero-VM gate. | INFRA-2C2 adds signed Manager evidence for resource owner registration. |

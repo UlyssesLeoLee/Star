@@ -3523,6 +3523,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-infrastructure",
+ "ring",
  "serde",
  "serde_json",
  "sha2 0.11.0",

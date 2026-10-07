@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.00 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v6.03
+> **文档版本**: v6.01 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v6.04
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5054,6 +5054,18 @@ This remains an owner persistence substrate: read-only `multipass list` observat
 |---|---|
 | AC-INFRA-002-T | §16.44 and Infrastructure DD §7.14; verify cumulative schema reapplication, 16 FORCE RLS tables, exact catalog grants, owner-only visibility, composite identities, serialized lifecycle events, deferred-trigger orphan-Master rejection, SCD2 close and append-only events. No Multipass or VM operation; production owner/reconciliation and execution remain closed. |
 
+### 16.45 Phase INFRA-2C2 Signed Manager receipt-backed catalog writer
+
+`infrastructure_resource_catalog_writer` accepts a typed V1 resource registration signed by an explicitly trusted Rust Infrastructure Manager key. The Ed25519 verifier binds both `manager_id` and `manager_key_id`, signs a domain-separated stable serialization, validates resource bounds and rejects unknown keys or altered facts before any PostgreSQL access. The SQLx writer then scopes one transaction to `star_infrastructure_owner`, locks the operation identity, and writes the immutable signed receipt, one exact-generation Master row, and its matching registration event atomically. Same-operation/same-facts replay returns the existing receipt; a conflicting replay fails closed.
+
+The additive migration attaches each event to an append-only receipt, validates every event field and digest against that receipt, requires the receipt to have a matching event at commit, applies owner-only FORCE RLS and SELECT/INSERT grants, and rejects unsigned legacy catalog facts rather than silently claiming them. It is repeatable both before and after valid signed registrations. Key provisioning/rotation remains external trusted configuration. This is a registration writer only; it does not turn `multipass list` into ownership, reconcile inventory, write lifecycle transitions, provision production identities, run a Manager/provider, launch K3s, resolve a Run binding, produce BI, or enable Task Card CLI/Schedule execution.
+
+The Rust package gates use the workspace minimum toolchain Rust 1.99.0. A disposable PostgreSQL 18.6 runner applies the cumulative schema twice and invokes the real Rust SQLx writer against it for all five resource identities. The integration test covers exact replay, conflicting replay, invalid-signature rejection before DB access, and rollback when a referenced parent generation is missing. The runner then checks receipt/event consistency, orphan rejection, WORM, owner visibility and 17/17 FORCE RLS, and re-applies the migration after signed facts exist. It creates no VM and does not inspect or change the two-record Multipass test inventory (Stopped/Deleted records count; automatic purge remains forbidden).
+
+| Acceptance ID | Design mapping and boundary |
+|---|---|
+| AC-INFRA-002-U | §16.45 and Infrastructure DD §7.15; Rust 1.99.0 verification-before-DB, exact Manager/key allow-list, idempotent owner transaction, receipt/Master/event atomicity, safe additive migration and the PG18.6 Rust SQLx integration + WORM/RLS gates. No production key material, inventory reconciliation, lifecycle changes, VM, BI or execution. |
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5200,3 +5212,4 @@ This remains an owner persistence substrate: read-only `multipass list` observat
 | v5.98 | 2026-10-08 | Mavis review | Add §16.43 / AC-INFRA-002-S for Multipass CLI/daemon version, local driver and host target facts; preserve unknown values, fixed read-only argv, shared fail-fast single-flight, 4 KiB output caps and 5-second per-command deadline (10 seconds worst-case sequentially). Align requirements v6.01, Group DD v4.67, Infrastructure DD v0.27 and plan v6.30; keep provider, ownership, readiness and execution gates open. | User selected the released Rust 1.99.0 baseline and INFRA-2B adds only bounded read-only host observations. |
 | v5.99 | 2026-10-08 | Mavis review | Add §16.44 for INFRA-2C1's five global SCD2 Master identities and append-only Transaction catalog; define exact-generation relationships, per-resource event locks, owner-only FORCE RLS/grants and two-record VM test boundary. Align requirements v6.02, Group DD v4.68, Infrastructure DD v0.28, W/T/M v0.8 and plan v6.33; record 29/29 disposable PostgreSQL steps and 16/16 FORCE RLS. Keep owner writer, provider/readiness, BI and Task CLI gates open. | The infrastructure identity catalog schema passed its cumulative isolated database gate. |
 | v6.00 | 2026-10-08 | Mavis review | Update §16.41 from design-only to verified 9F4D-3D6 persistence and consumer-hook substrate; add exact per-item/per-deployment quota, 16-value/8-KiB replay-header bounds, explicit retention, TTL/purge audit, confirmed Term ACK, FORCE RLS/owner roles and Rust/PostgreSQL evidence. Synchronize requirements v6.03, Schedule SRS/BD/DD v0.29/v0.28/v0.28, Group DD v4.69, Data Design v2.0, implementation plan v6.34 and phase report; preserve the two-record Multipass cap and production fail-closed boundary. | Implementation, bounded-memory review and disposable schema gates passed. |
+| v6.01 | 2026-10-08 | Mavis review | Add §16.45 / AC-INFRA-002-U for the Rust 1.99.0 Ed25519 receipt verifier and SQLx owner writer; describe atomic receipt/Master/event registration, replay identity, migration refusal of unsigned legacy facts, immutable DB binding, production key/reconciliation/lifecycle gaps, and the 17-table cumulative W/T/M gate. Align requirements v6.04, Infrastructure DD v0.29, Group DD v4.70, W/T/M v0.9 and plan v6.37; preserve the two-record Multipass limit and disabled execution. | INFRA-2C2 implements signed resource registration while keeping VM and Run execution closed. |

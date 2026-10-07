@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.69**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.70**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -586,6 +586,18 @@ HostEnvironment、Multipass guest、K3s cluster、cluster membership 与 Kuberne
 |---|---|
 | AC-INFRA-002-T | Infrastructure DD §7.14；验证 catalog identity、generation、owner RLS/WORM、deferred-trigger orphan-Master rejection 与数据库边界。此阶段不创建 Run/Task/BI 事实、不启动 VM，Task Card CLI 保持关闭。 |
 
+### 8.18 Phase INFRA-2C2 Signed Manager resource registration
+
+The Infrastructure owner receives only a typed V1 registration operation emitted by the trusted Rust Host Infrastructure Manager. An Ed25519 signature binds the Manager ID, deployment key ID, operation/receipt/correlation IDs, actor, observation time, exact resource identity/generation and bounded identity facts. The Rust verifier resolves an explicit trusted `(manager_id, manager_key_id)` key and rejects tampered, malformed or unsupported inputs before any database access; provider CLI inventory, VM name, Task Card or Plugin input cannot impersonate Manager ownership.
+
+The SQLx owner writer establishes a transaction-local Infrastructure role and makes the signed receipt, one resource Master row and the matching catalog registration event atomic. Exact operation replay is idempotent; same operation ID with changed receipt/resource/digest/signature is a hard conflict. The database requires an immutable receipt reference on every new catalog event, checks all event identity/state/actor/digest fields against the receipt, rejects orphan receipt commits, applies owner-only FORCE RLS, and denies mutation/truncation. The migration rejects unsigned legacy rows and can be reapplied after valid signed facts exist.
+
+The delivered writer registers resources only. It does not reconcile raw inventory, emit signed lifecycle transitions, establish the production keyring/owner login/target database, start Multipass or K3s, resolve the current Run binding, reserve capacity, establish Runtime sandbox readiness, produce BI/Benchmark, or enable Task Card CLI/Schedule execution. These boundaries preserve the Project → Branch → Engineering Run → Worktree ownership model: the Run continues to pin exact cluster identity/generation, and Task CLI remains disabled until its separate execution gates pass. The Rust integration plus disposable PostgreSQL 18.6 runner passed 26/26 steps and verified 17/17 FORCE RLS; it creates zero VMs. Tests use at most two Multipass records total including Stopped/Deleted, and this phase did not inspect or mutate that inventory.
+
+| Acceptance ID | Implementation boundary |
+|---|---|
+| AC-INFRA-002-U | Infrastructure DD §7.15 / Basic Design §16.45；Rust 1.99.0 signature-before-DB, exact manager/key allow-list, real Rust SQLx all-five-resource registration/replay/rollback integration, receipt/Master/event atomicity, migration/WORM/RLS verification; no production keys, inventory reconciliation, VM, BI or executor. |
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -691,6 +703,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 |---|---|---|
 | AC-INFRA-001 | §8.8 / DD-LOCAL-INFRASTRUCTURE-001 | environment 与 Run binding/Runtime 区分、资源与生命周期、native Hook/BI 和真实平台验收 |
 | AC-INFRA-002-T | §8.17 / DD-LOCAL-INFRASTRUCTURE-001 §7.14 | Host/guest/cluster/node 精确身份 catalog 与 owner-only schema；不把目录存在误判为 capacity/readiness/Run binding/CLI authority |
+| AC-INFRA-002-U | §8.18 / DD-LOCAL-INFRASTRUCTURE-001 §7.15 | Signed Manager receipt-backed resource registration; exact atomic owner facts and idempotent replay; inventory/reconciliation and execution stay closed |
 | AC-ERUN-004 / AC-HOOK-001 | §7.3、§8.6 | server-resolved current tuple、strict immutable snapshot、V2 fence/signature v3、attachment 再授权及深链会话隔离 |
 | WTG-001 / AC-WTG-001 | §1-§5 | Project membership 限定 Index；同级 App 树与唯一 GroupContext |
 | WTG-004 / AC-WTG-003 | §3、§6 | owner、Agent、Runtime、PR、冲突/锁和最近活动来自有版本的服务端投影；操作有授权与 Audit |
@@ -887,3 +900,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.67 | 2026-10-08 | Mavis review | Align upstream pointers to requirements v6.01/basic design v5.98/Infrastructure DD v0.27/implementation plan v6.30 after INFRA-2B adds bounded Multipass CLI version, daemon version, local driver and Rust host-target observations. Preserve Worktree-first Group ownership and explicitly keep those facts separate from provider readiness, VM ownership and execution. | User selected Rust 1.99.0 and the read-only host probe gained a second bounded observation slice. |
 | v4.68 | 2026-10-08 | Mavis review | Add §8.17 for INFRA-2C1 global resource identity catalog and cross-link requirements v6.02/basic design v5.99/Infrastructure DD v0.28/W-T-M v0.8/plan v6.33; preserve Project→Branch→Run→Worktree navigation and exact Run cluster binding; keep owner commands, Manager/readiness, BI and Task Card CLI gated. Record 29/29 PostgreSQL steps, 16/16 FORCE RLS and zero VM use; retain two registered Multipass records for live tests and no auto-purge. | Infrastructure identity persistence is verified without claiming a usable VM provider or execution loop. |
 | v4.69 | 2026-10-08 | Mavis review | Update §8.15 from design-only to verified 9F4D-3D6 Platform quarantine schema/roles/RLS and Run-owner opt-in ACK hook; synchronize requirements v6.03, Basic Design v6.00, Schedule SRS/BD/DD v0.29/v0.28/v0.28, Data Design v2.0 and plan v6.34. Record 15/15 Rust tests, disposable PostgreSQL 18.6 duplicate migration and schema/quota checks; keep KMS, target DB/stream provisioning, operator workflow and production execution open. Preserve Worktree-first navigation and the two-record Multipass cap. | 9F4D-3D6 persistence slice passed focused verification without starting a VM. |
+| v4.70 | 2026-10-08 | Mavis review | Add §8.18 / AC-INFRA-002-U for trusted Rust Manager Ed25519 receipt verification and atomic owner registration of one exact resource Master generation plus its append-only event; specify idempotent replay, signed-only migration, receipt/event WORM/RLS and current Run/execution boundary. Align requirements v6.04/basic design v6.01/Infrastructure DD v0.29/W-T-M v0.9/plan v6.37. Preserve Worktree-first navigation, Rust 1.99.0 and the two-instance test cap; no VM or Run CLI execution is enabled. | INFRA-2C2 adds signed ownership evidence without implementing inventory reconciliation or lifecycle operations. |

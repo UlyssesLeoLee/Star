@@ -20,6 +20,7 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 sha2 = { workspace = true }
+ring = "0.17"
 tracing = "0.1"
 
 # v0.72 P0-4 Stage 2: RealPostgresAdapterRegistry 骨架
