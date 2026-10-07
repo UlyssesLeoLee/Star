@@ -10,6 +10,7 @@
 //! MERGE (claim_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_due",kind:"method"})
 //! MERGE (mark_delivered:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.mark_delivered",kind:"method"})
 //! MERGE (record_failure:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.record_failure",kind:"method"})
+//! MERGE (publish_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.publish_due_for_tenant",kind:"method"})
 //! MERGE (set_scope:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::set_owner_scope",kind:"function"})
 //! MERGE (delivery:Table {id:"infrastructure.capacity_outbox_delivery",class:"Work"})
 //! MERGE (outbox:Table {id:"infrastructure.capacity_owner_outbox",class:"Transaction"})
@@ -31,6 +32,9 @@
 //! MERGE (mark_delivered)-[:WRITES]->(delivery)
 //! MERGE (record_failure)-[:CALLS]->(set_scope)
 //! MERGE (record_failure)-[:WRITES]->(delivery)
+//! MERGE (publish_due)-[:CALLS]->(claim_due)
+//! MERGE (publish_due)-[:CALLS]->(mark_delivered)
+//! MERGE (publish_due)-[:CALLS]->(record_failure)
 //! @endcypher
 
 use sqlx::{postgres::PgRow, PgPool, Postgres, Row, Transaction};

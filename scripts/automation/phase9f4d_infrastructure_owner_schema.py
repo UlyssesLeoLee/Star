@@ -1,6 +1,6 @@
 """Verify 9F4D Infrastructure owner schema, grants, profile Master, and admission in disposable PostgreSQL."""
 
-# @cypher schema=1 source_sha256=bdbefd09153d22afd8af7587182f5f4b75eebbea5452c2ceb64177310f707a51
+# @cypher schema=1 source_sha256=4913d5bfc7ea839c5b071232aa7d8602b0266e14a47c47970ffc582ba0e2a341
 # MERGE (self:File {path:"scripts/automation/phase9f4d_infrastructure_owner_schema.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::main",kind:"function"})
 # MERGE (grants_migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::GRANTS_MIGRATION",kind:"constant"})
@@ -12,6 +12,11 @@
 # MERGE (write_text:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::write_text",kind:"function"})
 # MERGE (is_contained:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::is_contained",kind:"function"})
 # MERGE (reserve_port:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::reserve_port",kind:"function"})
+# MERGE (start_nats_server:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::start_nats_server",kind:"function"})
+# MERGE (stop_nats_server:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::stop_nats_server",kind:"function"})
+# MERGE (nats_server:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::nats_server",kind:"argument"})
+# MERGE (nats_data_dir:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::nats_data_dir",kind:"variable"})
+# MERGE (nats_process:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::nats_process",kind:"variable"})
 # MERGE (run_sql:Symbol {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::run_sql",kind:"function"})
 # MERGE (root:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::ROOT",kind:"constant"})
 # MERGE (migration:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::MIGRATION",kind:"constant"})
@@ -21,7 +26,9 @@
 # MERGE (integration_source:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 # MERGE (output:Variable {id:"scripts/automation/phase9f4d_infrastructure_owner_schema.py::OUTPUT_DIR",kind:"constant"})
 # MERGE (pg:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
-# MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
+# MERGE (subprocess:ExternalService {id:"python.subprocess",kind:"module"})
+# MERGE (socket:ExternalService {id:"python.socket",kind:"module"})
+# MERGE (time:ExternalService {id:"python.time",kind:"module"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(grants_migration)
 # MERGE (self)-[:DEFINES]->(owner_probe_sql)
@@ -42,6 +49,15 @@
 # MERGE (main)-[:CALLS]->(write_text)
 # MERGE (main)-[:CALLS]->(is_contained)
 # MERGE (main)-[:CALLS]->(reserve_port)
+# MERGE (main)-[:CALLS]->(start_nats_server)
+# MERGE (main)-[:CALLS]->(stop_nats_server)
+# MERGE (main)-[:USES]->(nats_server)
+# MERGE (main)-[:USES]->(nats_data_dir)
+# MERGE (main)-[:USES]->(nats_process)
+# MERGE (start_nats_server)-[:CALLS]->(subprocess)
+# MERGE (start_nats_server)-[:CALLS]->(socket)
+# MERGE (start_nats_server)-[:CALLS]->(time)
+# MERGE (stop_nats_server)-[:CALLS]->(subprocess)
 # MERGE (main)-[:CALLS]->(run_sql)
 # MERGE (main)-[:USES]->(root)
 # MERGE (main)-[:USES]->(migration)
@@ -69,6 +85,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Sequence
@@ -706,6 +723,48 @@ def reserve_port() -> int:
         return int(sock.getsockname()[1])
 
 
+def start_nats_server(
+    binary: Path, store_dir: Path, port: int, env: dict[str, str]
+) -> tuple[subprocess.Popen[bytes] | None, dict[str, object]]:
+    command = [str(binary), "-js", "-a", "127.0.0.1", "-p", str(port), "-sd", str(store_dir)]
+    log_path = OUTPUT_DIR / "nats-server.log"
+    try:
+        with log_path.open("wb") as log_file:
+            process = subprocess.Popen(
+                command, cwd=ROOT, env=env, stdout=log_file, stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+    except OSError as error:
+        return None, {"name": "nats-start", "status": "blocked", "reason": type(error).__name__}
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        return_code = process.poll()
+        if return_code is not None:
+            return process, {"name": "nats-start", "status": "failed", "exit_code": return_code, "command": command, "log": str(log_path)}
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.25):
+                return process, {"name": "nats-start", "status": "passed", "pid": process.pid, "command": command, "log": str(log_path)}
+        except OSError:
+            time.sleep(0.1)
+    return process, {"name": "nats-start", "status": "failed", "reason": "loopback listener did not become ready within 20 seconds", "pid": process.pid, "command": command, "log": str(log_path)}
+
+
+def stop_nats_server(process: subprocess.Popen[bytes]) -> dict[str, object]:
+    if process.poll() is not None:
+        return {"name": "nats-stop", "status": "passed", "already_exited": True, "exit_code": process.returncode}
+    try:
+        process.terminate()
+        process.wait(timeout=10)
+        return {"name": "nats-stop", "status": "passed", "termination_requested": True}
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=10)
+            return {"name": "nats-stop", "status": "passed", "termination_requested": True, "forced_after_timeout": True}
+        except subprocess.TimeoutExpired:
+            return {"name": "nats-stop", "status": "failed", "reason": "owned process could not be stopped"}
+
+
 def run_step(name: str, command: Sequence[str], cwd: Path, env: dict[str, str]) -> dict[str, object]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     stdout_path = OUTPUT_DIR / f"{name}.stdout.log"
@@ -765,6 +824,7 @@ def main() -> int:
     parser.add_argument("--toolchain-bin", type=Path, help="Optional Rust toolchain bin directory")
     parser.add_argument("--target-dir", type=Path, help="Optional short Cargo target directory")
     parser.add_argument("--output-dir", type=Path, help="Optional report directory")
+    parser.add_argument("--nats-server", type=Path, required=True, help="NATS Server binary for the real JetStream PubAck integration case")
     arguments = parser.parse_args()
 
     global OUTPUT_DIR
@@ -785,10 +845,14 @@ def main() -> int:
     if missing_migrations:
         print(json.dumps({"result": "blocked", "missing_migrations": missing_migrations}))
         return 2
+    if not arguments.nats_server.is_file():
+        print(json.dumps({"result": "blocked", "missing_nats_server": str(arguments.nats_server)}))
+        return 2
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     DATA_PARENT.mkdir(parents=True, exist_ok=True)
     data_dir = DATA_PARENT / f"postgres-{uuid.uuid4()}"
+    nats_data_dir = DATA_PARENT / f"nats-{uuid.uuid4()}"
     if not is_contained(data_dir, DATA_PARENT) or data_dir.exists():
         print(json.dumps({"result": "blocked", "reason": "unsafe or pre-existing data directory"}))
         return 2
@@ -801,6 +865,7 @@ def main() -> int:
         toolchain_bin = arguments.toolchain_bin.resolve()
         env["PATH"] = str(toolchain_bin) + os.pathsep + env.get("PATH", "")
         env["RUSTC"] = str(toolchain_bin / ("rustc.exe" if os.name == "nt" else "rustc"))
+        env["RUSTDOC"] = str(toolchain_bin / ("rustdoc.exe" if os.name == "nt" else "rustdoc"))
         cargo = str(toolchain_bin / ("cargo.exe" if os.name == "nt" else "cargo"))
     else:
         cargo = shutil.which(arguments.cargo) or arguments.cargo
@@ -811,6 +876,8 @@ def main() -> int:
         "-U", "star_infrastructure_admin", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
     ]
     results: list[dict[str, object]] = []
+    nats_process: subprocess.Popen[bytes] | None = None
+    nats_cleanup_confirmed = True
     server_attempted = False
     started = False
     stop_confirmed = False
@@ -876,15 +943,38 @@ def main() -> int:
             test_env["STAR_INFRA_OWNER_TEST_DATABASE_URL"] = (
                 f"postgresql://star_infrastructure_admin@127.0.0.1:{port}/postgres"
             )
-            results.append(run_step(
-                "owner-inbox-postgres-integration",
-                [cargo, "test", "--locked", "-p", "infrastructure", "--test", "infrastructure_owner_inbox_pg", "-j", "1", "--", "--ignored"],
-                ROOT,
-                test_env,
-            ))
+            test_env.pop("STAR_INFRA_OWNER_TEST_NATS_URL", None)
+            if not is_contained(nats_data_dir, DATA_PARENT) or nats_data_dir.exists():
+                results.append({"name": "nats-store-dir", "status": "blocked", "reason": "unsafe or pre-existing data directory"})
+            else:
+                nats_data_dir.mkdir(parents=True)
+                nats_port = reserve_port()
+                nats_process, nats_start = start_nats_server(
+                    arguments.nats_server.resolve(), nats_data_dir, nats_port, env
+                )
+                results.append(nats_start)
+                if nats_start["status"] == "passed":
+                    test_env["STAR_INFRA_OWNER_TEST_NATS_URL"] = f"nats://127.0.0.1:{nats_port}"
+            if all(item["status"] == "passed" for item in results):
+                results.append(run_step(
+                    "owner-inbox-postgres-jetstream-integration",
+                    [cargo, "test", "--locked", "-p", "infrastructure", "--test", "infrastructure_owner_inbox_pg", "-j", "1", "--", "--ignored"],
+                    ROOT,
+                    test_env,
+                ))
         if all(item["status"] == "passed" for item in results):
             exit_code = 0
     finally:
+        if nats_process is not None:
+            nats_stop = stop_nats_server(nats_process)
+            nats_cleanup_confirmed = nats_stop["status"] == "passed"
+            results.append(nats_stop)
+        if nats_data_dir.exists() and is_contained(nats_data_dir, DATA_PARENT):
+            if nats_cleanup_confirmed:
+                shutil.rmtree(nats_data_dir)
+            else:
+                print(json.dumps({"preserved_nats_data": str(nats_data_dir), "reason": "server stop could not be confirmed"}))
+                exit_code = 1
         if data_dir.exists() and is_contained(data_dir, DATA_PARENT):
             if server_attempted:
                 stop = run_step(

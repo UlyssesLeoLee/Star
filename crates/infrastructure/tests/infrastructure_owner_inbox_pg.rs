@@ -1,8 +1,9 @@
-//! @cypher schema=1 source_sha256=746ef21b6998527d6741142ab745b52ea3f5f025a32f8fc474598060631715bb
+//! @cypher schema=1 source_sha256=abafb5854022b442f8d1739b07982e87293dfb35b50ab7b6f0c5cba1efd888d8
 //! MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 //! MERGE (delivery_fence_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_delivery_reclaims_and_fences_stale_leases",kind:"test"})
 //! MERGE (delivery_retry_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_delivery_retries_then_dead_letters",kind:"test"})
 //! MERGE (delivery_exhausted_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_delivery_dead_letters_exhausted_crashed_lease",kind:"test"})
+//! MERGE (jetstream_delivery_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_jetstream_publishes_after_puback",kind:"test"})
 //! MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_inbox_is_idempotent_and_honors_terminal_receipts",kind:"test"})
 //! MERGE (admission_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_serializes_host_and_cluster_reservations",kind:"test"})
 //! MERGE (global_admission_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_serializes_physical_capacity_across_tenants",kind:"test"})
@@ -23,6 +24,7 @@
 //! MERGE (test_scope:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::set_delivery_test_scope",kind:"function"})
 //! MERGE (store:Type {id:"infrastructure::PostgresInfrastructureOwnerInbox",kind:"external_type"})
 //! MERGE (delivery_store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"external_type"})
+//! MERGE (jetstream_publisher:Type {id:"infrastructure::InfrastructureOwnerJetStreamPublisher",kind:"external_type"})
 //! MERGE (failure_kind:Type {id:"infrastructure::OutboxDeliveryFailureKind",kind:"external_type"})
 //! MERGE (pg_pool:Type {id:"sqlx::PgPool",kind:"external_type"})
 //! MERGE (inbox:Table {id:"infrastructure.capacity_demand_inbox"})
@@ -39,6 +41,7 @@
 //! MERGE (self)-[:DEFINES]->(delivery_fence_test)
 //! MERGE (self)-[:DEFINES]->(delivery_retry_test)
 //! MERGE (self)-[:DEFINES]->(delivery_exhausted_test)
+//! MERGE (self)-[:DEFINES]->(jetstream_delivery_test)
 //! MERGE (self)-[:DEFINES]->(accepted_event)
 //! MERGE (self)-[:DEFINES]->(test_scope)
 //! MERGE (delivery_fence_test)-[:CALLS]->(accepted_event)
@@ -57,6 +60,11 @@
 //! MERGE (delivery_exhausted_test)-[:CALLS]->(delivery_store)
 //! MERGE (delivery_exhausted_test)-[:READS]->(delivery)
 //! MERGE (delivery_exhausted_test)-[:WRITES]->(delivery)
+//! MERGE (jetstream_delivery_test)-[:CALLS]->(accepted_event)
+//! MERGE (jetstream_delivery_test)-[:CALLS]->(jetstream_publisher)
+//! MERGE (jetstream_delivery_test)-[:CALLS]->(test_scope)
+//! MERGE (jetstream_delivery_test)-[:READS]->(delivery)
+//! MERGE (jetstream_delivery_test)-[:WRITES]->(delivery)
 //! MERGE (accepted_event)-[:CALLS]->(enqueue_demand)
 //! MERGE (accepted_event)-[:CALLS]->(admit_inbox)
 //! MERGE (accepted_event)-[:READS]->(owner_outbox)
@@ -144,6 +152,7 @@ use infrastructure::infrastructure_owner_inbox::{
     CurrentInfrastructureBindingV2, InboxReceiveOutcome, PostgresInfrastructureOwnerInbox,
     TerminalDemandOutcome,
 };
+use infrastructure::infrastructure_owner_jetstream_publisher::InfrastructureOwnerJetStreamPublisher;
 use infrastructure::infrastructure_owner_outbox_delivery::{
     InfrastructureOwnerOutboxDeliveryError, OutboxDeliveryFailureKind,
     PostgresInfrastructureOwnerOutboxDelivery,
@@ -1223,5 +1232,70 @@ async fn postgres_outbox_delivery_dead_letters_exhausted_crashed_lease() {
     assert_eq!(state, "dead");
     assert_eq!(attempts, 12);
     assert!(terminal_retention_valid);
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires disposable PostgreSQL and a real JetStream-enabled NATS server"]
+async fn postgres_outbox_jetstream_publishes_after_puback() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let nats_url = std::env::var("STAR_INFRA_OWNER_TEST_NATS_URL")
+        .expect("the test runner must set the loopback NATS URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let (tenant_id, event_id) = accepted_owner_outbox_event(&pool).await;
+    let client = async_nats::connect(nats_url)
+        .await
+        .expect("connect to the loopback NATS server");
+    let jetstream = async_nats::jetstream::new(client);
+    let stream_name = format!("STAR_OWNER_OUTBOX_{}", Uuid::new_v4().simple());
+    jetstream
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec!["star.infrastructure.v2.>".to_owned()],
+            storage: async_nats::jetstream::stream::StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .expect("create an isolated JetStream stream for the versioned subjects");
+
+    let store = PostgresInfrastructureOwnerOutboxDelivery::new(pool.clone());
+    let publisher = InfrastructureOwnerJetStreamPublisher::new(store, jetstream.clone());
+    let outcome = publisher
+        .publish_due_for_tenant(tenant_id, Uuid::new_v4(), 1, 120)
+        .await
+        .expect("publish and await the durable JetStream PubAck");
+    assert_eq!(outcome.claimed, 1);
+    assert_eq!(outcome.delivered, 1);
+    assert_eq!(outcome.retry_scheduled, 0);
+    assert_eq!(outcome.dead_lettered, 0);
+
+    let mut tx = pool.begin().await.expect("begin delivery state check");
+    set_delivery_test_scope(&mut tx, tenant_id)
+        .await
+        .expect("set Infrastructure owner scope");
+    let state: String = sqlx::query_scalar(
+        "SELECT delivery_state FROM infrastructure.capacity_outbox_delivery \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(&mut *tx)
+    .await
+    .expect("read delivery state after PubAck");
+    tx.commit().await.expect("commit delivery state check");
+    assert_eq!(state, "delivered");
+
+    let replay = publisher
+        .publish_due_for_tenant(tenant_id, Uuid::new_v4(), 1, 120)
+        .await
+        .expect("a delivered Outbox row must not be claimed again");
+    assert_eq!(replay.claimed, 0);
+    assert_eq!(replay.delivered, 0);
+    let _ = jetstream.delete_stream(&stream_name).await;
     pool.close().await;
 }

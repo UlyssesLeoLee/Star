@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.68 (2026-10-07)
+> **文档版本**: v0.70 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.16 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.23 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -102,7 +102,9 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 
 | `scripts/automation/dev_converge.py` | 冻结本地 refs 并逐路径审计冲突后执行普通 no-ff merge，记录 plan 与 SHA-256 决策 | DEV-CONVERGE；automation-design §4.43 | 本次提交（见 Git） | 🟢 本地 dev 来源已收敛；不含 push/cleanup，运行时/DB 阶段按独立 gate 跟踪 |
 
-| `scripts/automation/phase9f4d_infrastructure_owner_schema.py` | Phase 9F4D-3A/3B1/3C1/3C2/3C3/3D1/3D2/3D3 disposable PostgreSQL runner: explicit `--pg-bin`, loopback-only temporary PostgreSQL 18.6, repeatable schema/grants/profile/global-ledger migration apply, restricted NOLOGIN/NOBYPASSRLS owner group, cumulative ten-table W/T/M assertions, owner-only global physical RLS, tenant-scoped denial, WORM/lifecycle-trigger checks, file logs + JSONL audit and safe stop/cleanup. After migration gates it runs all ignored SQLx Inbox/admission/expiry/Outbox-delivery cases, including digest mismatch, cross-tenant shared-Host/shared-cluster contention, atomic expiry replay, concurrent unique claim, stale-lease fence, retry/dead-letter and exhausted final lease. It never calls Multipass and does not deploy target login/resolver/broker publisher/Run consumer/provider/executor. | Schedule Phase 9F4D-3A/3B1/3C; automation-design §4.55/§4.57/§4.59-§4.63; W/T index §4.56; implementation plan §6.90-§6.98; [`PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md`](../../docs/reports/PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md) | 本次提交（见 Git） | 🟢 21/21 PostgreSQL steps, 10/10 Infrastructure FORCE RLS, and 10/10 SQLx cases passed; runner remains VM-free. Production tenant scheduler, broker publisher, Run consumer, target DB activation, Manager/provider, Runtime lease renewal and execution remain open. |
+| `scripts/automation/phase9f4d_infrastructure_owner_schema.py` | Phase 9F4D-3A/3B1/3C1/3C2/3C3/3D1/3D2/3D3/3D4 disposable PostgreSQL and JetStream runner: explicit --pg-bin and --nats-server; loopback-only PostgreSQL 18.6 and supplied NATS binary with unique stores; repeatable migrations/grants/profile/global-ledger assertions; restricted owner role, cumulative ten-table W/T/M checks, tenant/global RLS, WORM, lifecycle and retention. Runs every ignored SQLx owner case, including real JetStream publication/PubAck, delivered state and non-reclaim. It never calls Multipass or creates a VM. | Schedule Phase 9F4D-3A through 9F4D-3D4; automation-design §4.55/§4.57/§4.59-§4.64; implementation plan §6.90-§6.99; phase reports | 本次提交（见 Git） | 23/23 runner steps, 10/10 FORCE RLS and 11/11 ignored SQLx cases passed with PostgreSQL 18.6 and official NATS Server 2.15.0 on loopback; no VM. Production poller, Run consumer, target DB identity, provider/Manager and execution remain open; Multipass cap remains two. |
+
+| `scripts/automation/phase9f4d3d4_sync.py` | Idempotent guarded synchronization for the 9F4D-3D4 requirement, design, automation, plan, report and registry entries; validates exact anchors before writing. | automation-design §4.64; implementation plan §6.99 | 本次提交（见 Git） | Re-runnable; second execution is a no-op. |
 
 ## 2. 子代理任务索引 (per dispatcher.py 落档)
 
@@ -171,6 +173,7 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 | **v0.67** | **2026-10-07** | Mavis review | Register the 9F4D-3C2 owner admission primitive, add its Rust source to the explicit rustfmt runner input, and extend the disposable PostgreSQL runner entry to concurrent/replay/generation/expired-hold cases. Preserve zero-VM execution and the disk-bound two-instance cap; document the tenant-scoped allocator limitation. | Phase 9F4D-3C2 added an atomic owner admission transaction and PostgreSQL evidence. |
 | **v0.68** | **2026-10-07** | Mavis review | Extend the owner-schema runner and index to 9F4D-3D2 bounded paired-reservation expiry; record database-clock selection, full tenant/global row revalidation, atomic lifecycle/Outbox facts and 7/7 SQLx cases, without creating a VM or changing the two-record inventory cap. Keep production scheduler/consumer, active Runtime lease, Manager/provider and execution gates open. | The owner-store expiry primitive passed its disposable PostgreSQL integration case. |
 | **v0.69** | **2026-10-07** | Mavis review | Extend the owner-schema runner/index to 9F4D-3D3 tenant-scoped Outbox delivery claims, lease attempt fencing, retry/dead-letter state, and crashed final-lease terminalization; record 21/21 runner steps, 10/10 FORCE RLS and 10/10 SQLx cases, with zero VM use. Keep broker publisher, Run consumer, production worker, target DB and execution gates open; preserve the two-instance cap. | The Infrastructure owner delivery-state store and its concurrency/retry cases passed disposable PostgreSQL verification. |
+| **v0.70** | **2026-10-07** | Mavis review | Register the 9F4D-3D4 documentation sync and extend the Infrastructure owner runner with explicit loopback NATS integration; synchronize design pointers, preserve Rust 1.99.0, record 23/23 runner steps, 10/10 FORCE RLS, 11/11 SQLx cases and zero VM use. | Bounded JetStream publisher and real PubAck integration passed. |
 
 ---
 

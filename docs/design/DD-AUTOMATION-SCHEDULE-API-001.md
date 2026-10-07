@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source and Outbox delivery-state store are verified; trusted resolver, cross-tenant allocator, target migration/app identity, broker publisher, Run-owner Inbox consumer, production worker, provider evidence producer, and execution remain open.
-> Version: 0.24 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, and bounded JetStream publisher are verified; trusted resolver, cross-tenant allocator, target migration/app identity, Run-owner Inbox consumer, production worker, provider evidence producer, and execution remain open.
+> Version: 0.25 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -148,6 +148,16 @@ The disposable PostgreSQL 18.6 runner applies schema, grant and profile migratio
 
 SQLx integration verifies competing claimers return one claim total, lease expiry increments the fence and rejects stale acknowledgement, transient retry schedules a future due time, permanent failure becomes dead, and an expired final-attempt lease is dead-lettered. This proves the database state machine only: there is no transport publisher, polling/retry process, production application identity/target migration, Run/Execution owner Inbox consumer, or execution enablement. The tests run against disposable PostgreSQL with zero Multipass VMs; registered Multipass inventory remains limited to two records total including stopped/deleted.
 
+## 6.11 9F4D-3D4 bounded JetStream publisher
+
+Construct the publisher from an already authenticated async-nats JetStream context and PostgresInfrastructureOwnerOutboxDelivery. It does not own connection establishment, credentials, tenant discovery, stream provisioning, timers, or scheduling. publish_due_for_tenant validates non-nil tenant and lease owner IDs, batch size 1..8, and lease duration 120..300 seconds before its tenant-scoped database claim.
+
+For each claim, validate schema version 2, the four capacity event types, object-shaped JSON, a maximum 16 KiB source payload, and a maximum 128 KiB serialized envelope. Publish serially, set Nats-Msg-Id to the immutable event UUID, and wait up to 10 seconds for PubAck. Only a successful PubAck calls mark_delivered. Timeout or failure calls the existing transient failure path; because the server may already have persisted the message, retry keeps the same message ID. The durable Run/Execution Inbox remains authoritative for dedupe beyond JetStream's duplicate window.
+
+The focused integration launches NATS Server 2.15.0 on loopback with JetStream and the disposable PostgreSQL owner schema, publishes a real message, observes PubAck, verifies the database row is delivered, and verifies it is no longer claimable. The runner stops only the process it started and cleans its unique temporary store after stop. This is not production topology, failover, throughput, or end-to-end consumer evidence.
+
+Rust 1.99.0 focused gates passed: package fmt, infrastructure all-target check, 53 library tests, and targeted Clippy. The extended disposable PostgreSQL/NATS runner passed 23/23 steps, 10/10 FORCE RLS and 11/11 SQLx cases. Workspace-wide formatting reports unrelated baseline files and was not mass-formatted. No Multipass VMs were created; current test inventory stays at two registered instances total.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -176,3 +186,4 @@ SQLx integration verifies competing claimers return one claim total, lease expir
 | v0.22 | 2026-10-07 | Specify 9F4D-3C2 tenant-scoped capacity admission, ordered locks, recomputed unexpired ledger, atomic paired reservation and terminal Outbox facts; record concurrent/expiry/replay PostgreSQL evidence; disclose cross-tenant allocator and production consumer/provider gaps. |
 | v0.23 | 2026-10-07 | Specify the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted-digest checks and profile-derived capacity requests; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases while keeping production resolver, target DB, allocator, provider, consumer and execution gates open. |
 | v0.24 | 2026-10-07 | Add §6.10 for the bounded tenant-scoped Outbox delivery state machine, exact lease fencing, attempt exhaustion, retry backoff and terminal retention. Record PostgreSQL integration coverage; distinguish database state transitions from broker publisher, Run consumer, production worker, target DB and execution gates. Preserve the two-instance test cap. |
+| v0.25 | 2026-10-07 | Add section 6.11 for the 9F4D-3D4 publisher API, bounds, event allowlist, PubAck/timeout semantics and real loopback NATS/PostgreSQL integration. Clarify at-least-once delivery and durable Run Inbox dedupe; keep polling, target DB, Run consumer, provider, production broker configuration and execution open. | The bounded JetStream publisher passed its focused transport integration gate. |

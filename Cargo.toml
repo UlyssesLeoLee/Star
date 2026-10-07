@@ -177,7 +177,7 @@ unreachable_pub = "deny"  # T1.5 step 1/3 (per WBS-001-refactor.md §1 T1.5): ca
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.99.0"
 authors = ["Star Team"]
 license = "Apache-2.0"
 repository = "https://github.com/UlyssesLeoLee/Star"
@@ -185,6 +185,7 @@ repository = "https://github.com/UlyssesLeoLee/Star"
 [workspace.dependencies]
 # 异步运行时与异步 trait
 tokio = { version = "1.40", features = ["full"] }
+async-nats = { version = "0.50.0", default-features = false, features = ["jetstream", "ring"] }
 async-trait = "0.1"
 # WebSocket HTTP server (per ULYS-222 P1-C — terminal-stack WebSocket protocol layer 依赖)
 # 0.8 选型跟 crates/api 守门 #48 一致

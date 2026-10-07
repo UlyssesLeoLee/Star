@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.23 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile、3D1 跨租户物理容量 ledger、3D2 paired-reservation expiry 与 3D3 Outbox delivery state machine 已通过 focused/PG18.6 隔离验证。production resolver/provider、broker publisher/Run-owner Inbox consumer/scheduled reaper、目标 DB 装配、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.24 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile、3D1 跨租户物理容量 ledger、3D2 paired-reservation expiry 与 3D3 Outbox delivery state machine 与 3D4 bounded JetStream publisher 已通过 focused/PG18.6 隔离验证。production resolver/provider、Run-owner Inbox consumer/scheduled reaper、目标 DB 装配、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.96 §50.8G-50.8N / basic-design v5.93 §8.1、§16.21-16.38 / Schedule SRS v0.25 / Schedule BD v0.24 / Schedule DD v0.24 / 实施计划 §6.83-6.98。
+> 上游：requirements v5.97 §50.8G-50.8O / basic-design v5.94 §8.1、§16.21-16.39 / Schedule SRS v0.26 / Schedule BD v0.25 / Schedule DD v0.25 / Automation Design v2.23 / 实施计划 §6.83-6.99。
 
 ## §0 目的与边界
 
@@ -217,6 +217,14 @@ This is the Infrastructure owner database state machine only. It does not publis
 
 Verification evidence: the Rust runner passed 4/4 gates; disposable PostgreSQL passed 21/21 steps, 10/10 FORCE RLS and 10/10 ignored SQLx cases. The isolated database stopped and its unique data directory was removed.
 
+### §7.10 Phase 9F4D-3D4：Infrastructure Outbox 到 JetStream 的有界发布
+
+Rust publisher 从调用方接收已认证的 JetStream Context 与 Infrastructure owner delivery store，不负责建立连接、保管生产凭据、创建 stream、发现 tenant 或运行 polling loop。每次只处理一个 tenant 的 1..8 条 claim，lease 为 120..300 秒，并逐条等待 PubAck。
+
+发布契约只允许 schema v2 的 capacity_accepted、capacity_rejected、capacity_released、capacity_expired；主题限定在 star.infrastructure.v2，原始 JSON object 不超过 16 KiB，序列化 envelope 不超过 128 KiB，Nats-Msg-Id 固定为不可变 event_id。收到 PubAck 后才把 delivery Work row 标成 delivered。超时结果可能已被 broker 接收，因此走同 ID 重试；Run/Execution owner 仍必须通过持久化 Inbox 做长期去重。
+
+验证在 loopback NATS Server 2.15.0 与临时 PostgreSQL 18.6 上进行，检查真实 PubAck、数据库 delivered 状态以及后续 claim 不再返回该事件。该切片没有 production broker provisioning、服务循环、目标数据库身份、Run consumer、provider/Manager 或 executor，也不创建 Multipass VM。测试环境的 Multipass 注册实例上限仍为两条记录，包含 Stopped/Deleted 且禁止自动 purge。Rust 工具链基线为 1.99.0。
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -243,3 +251,4 @@ Verification evidence: the Rust runner passed 4/4 gates; disposable PostgreSQL p
 | v0.21 | 2026-10-07 | Mavis review | Add §7.7 and synchronize requirements v5.94/basic v5.91/implementation plan §6.96/W-T-M v0.5; specify the no-tenant global physical Work/Transaction ledger, owner-only FORCE RLS, ordered/deduplicated physical locks, atomic tenant/global admission, transition event trigger, 21/21 disposable runner and 6/6 SQLx evidence. Retain release/reaper, production resolver/provider and execution gates; preserve the two-record disk cap. | Phase 9F4D-3D1 closes the cross-tenant physical Host/cluster overbooking gap at the admission substrate layer. |
 | v0.22 | 2026-10-07 | Mavis review | Add §7.8 for the database-clock bounded expiry primitive, exact tenant/global pair revalidation, ordered locks and atomic `capacity_expired` Outbox facts; record 21/21 runner steps and 7/7 SQLx cases. Clarify that the primitive is not a production worker, Run/Schedule consumer, active Runtime lease protocol or VM lifecycle; preserve the two-record Multipass test cap. | Phase 9F4D-3D2 adds idempotent expiry for paired Infrastructure admission reservations. |
 | v0.23 | 2026-10-07 | Mavis review | Add §7.9 for tenant-scoped Outbox delivery claims, attempt fencing, retry/backoff, exhausted/permanent dead-letter handling and terminal retention. Record focused Rust/PostgreSQL evidence while keeping broker publisher, Run consumer, production worker, target DB, provider and execution open; preserve the two-record Multipass test cap. | Phase 9F4D-3D3 adds an owner-side delivery state machine without broker or VM integration. |
+| v0.24 | 2026-10-07 | Mavis review | Add section 7.10 for bounded Infrastructure Outbox JetStream publication; pin stable event ID, PubAck-before-delivery, same-ID retry and durable Run Inbox dedupe; record loopback NATS/PostgreSQL evidence and Rust 1.99.0 with zero VM use. Preserve the two-record Multipass cap and open production worker/consumer/provider/execution gates. | Phase 9F4D-3D4 added verified transport publication without enabling execution. |

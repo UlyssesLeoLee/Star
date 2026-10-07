@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.93 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.96
+> **文档版本**: v5.94 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.97
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4984,6 +4984,14 @@ Ack/失败回写必须符合未过期的 owner + attempt fence。Transient failu
 
 这是 store/state-machine primitive，不是 publisher、owner Inbox consumer、polling service、target DB activation 或 production executor。Outbox event 仍留在数据库，不能据此声称 Run/Execution 已消费 capacity fact。当前验证为 Rust 与 disposable PostgreSQL、0 VM；测试 Multipass inventory 仍最多登记 2 条且不得自动 purge，Schedule/Task Card CLI 继续 fail-closed。
 
+### 16.39 Phase 9F4D-3D4 bounded Infrastructure Outbox JetStream publisher
+
+The Infrastructure owner exposes a Rust adapter receiving an authenticated async-nats JetStream context and the existing PostgreSQL Outbox delivery store. It claims 1..8 rows for one tenant with a 120..300 second lease and publishes serially while awaiting each PubAck. It accepts only the four schema-v2 capacity facts, uses the fixed star.infrastructure.v2 subject namespace, bounds each event JSON to 16 KiB and each serialized envelope to 128 KiB, and sets Nats-Msg-Id to the immutable event UUID.
+
+The PostgreSQL delivery row is marked delivered only after PubAck. Timeout or transport errors are ambiguous and follow the existing transient retry/dead-letter policy with the same message ID; delivery is at least once. The Run/Execution owner needs a durable Inbox keyed by event_id because broker duplicate suppression has a finite window. This directly invoked API does not discover tenants, poll, configure the broker, provision production identities, consume events, or enable execution. No migration, W/T/M change, or Multipass VM is part of this slice.
+
+Verification used Rust 1.99.0, PostgreSQL 18.6, and official NATS Server 2.15.0 bound to loopback. The phase report records the exact focused gates and unrelated baseline workspace-format limitation.
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5123,3 +5131,4 @@ Ack/失败回写必须符合未过期的 owner + attempt fence。Transient failu
 | v5.91 | 2026-10-07 | Mavis review | Align requirements v5.94, Infrastructure DD v0.21, implementation plan v6.23, W/T/M v0.5 and Automation Design v2.20; add §16.36 for global physical Host/cluster reservations, owner-only FORCE RLS, sorted/deduplicated cross-tenant locks, atomic lifecycle events, and 21/21 PostgreSQL runner / 6/6 SQLx evidence. Preserve the two-record disk cap and all production execution blockers. | Phase 9F4D-3D1 implemented and verified the global capacity-ledger seam without Multipass VM creation. |
 | v5.92 | 2026-10-07 | Mavis review | Align requirements v5.95 and Infrastructure DD v0.22; add §16.37 for the bounded database-clock expiry primitive, per-pair revalidation and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts. Clarify that Schedule occurrence outcomes belong to Run/Execution consumers and that active Runtime lease renewal, production worker and VM lifecycle remain open. Preserve the two-record Multipass inventory cap. | Phase 9F4D-3D2 expiry implementation and disposable PostgreSQL verification. |
 | v5.93 | 2026-10-07 | Mavis review | Align requirements v5.96 and Infrastructure DD v0.23; add §16.38 for PostgreSQL Outbox claim/lease fencing/ack/retry/dead-letter, bounded batch and retry policy. Distinguish the state-machine store from broker publisher, Run consumer, production worker and target DB activation; preserve the two-instance disk cap and fail-closed execution. | Phase 9F4D-3D3 adds and verifies the owner-side delivery-state primitive without a broker or VM. |
+| v5.94 | 2026-10-07 | Mavis review | Add section 16.39 for injected-context, serial bounded JetStream publication; specify event allowlist, payload/envelope bounds, stable Nats-Msg-Id, PubAck-before-ack and at-least-once Run Inbox dedupe; synchronize requirements v5.97 and Schedule/Infrastructure design; record Rust 1.99.0 and loopback NATS/PostgreSQL evidence while preserving open production gates and the two-instance, zero-VM test limit. | Phase 9F4D-3D4 verified transport publication without changing owner persistence or execution boundaries. |

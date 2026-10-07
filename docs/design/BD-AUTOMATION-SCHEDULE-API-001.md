@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source and Infrastructure Outbox delivery-state primitive are verified in focused/disposable gates; trusted resolver, broker publisher, production consumers and execution remain fail-closed.
-> Version: 0.24 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication and real PubAck integration are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, production consumers and execution remain fail-closed.
+> Version: 0.25 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -103,6 +103,12 @@ Transient delivery failure is retried with exponential delay starting at one sec
 
 This implementation does not publish to a transport, run a polling loop, provision production credentials, consume the event in Run/Execution, or enable Schedule execution. It only makes the delivery row transitions durable and concurrency-safe. The PostgreSQL gate uses no Multipass VM; registered inventory remains capped at two entries including stopped/deleted records.
 
+### 6.10 9F4D-3D4 bounded JetStream publisher
+
+The publisher accepts an established authenticated JetStream context and tenant-scoped Infrastructure delivery store. It leases 1..8 claims for one tenant with a 120..300 second lease and serially awaits PubAck. The allowlist is capacity_accepted, capacity_rejected, capacity_released, and capacity_expired schema v2; each JSON object is at most 16 KiB, the envelope at most 128 KiB, the subject is under star.infrastructure.v2, and Nats-Msg-Id is immutable event_id.
+
+Only successful PubAck permits the PostgreSQL row to transition to delivered. Timeout and transport errors are ambiguous and use same-ID retry; delivery is at least once, so the future Run/Execution consumer must deduplicate with its durable Inbox. No broker setup, tenant poller, production DB identity, consumer, provider, or executor is included. The test runner uses an official NATS Server binary on loopback and creates no VM.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -131,3 +137,4 @@ This implementation does not publish to a transport, run a polling loop, provisi
 | v0.22 | 2026-10-07 | Add the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity vectors inside owner admission; record 17/17 disposable PostgreSQL steps and 5/5 SQLx cases while preserving target DB, production resolver, cross-tenant allocator, provider and execution gates. |
 | v0.23 | 2026-10-07 | Add §6.8 for the database-clock, bounded paired-reservation expiry primitive and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts; define Run/Execution consumer ownership and forbid expiry-driven implicit Schedule retry. Record 9F4D-3D2 focused Rust/PostgreSQL evidence while retaining production worker, active Runtime lease, provider and execution gates. Preserve the two-record Multipass inventory cap. |
 | v0.24 | 2026-10-07 | Add §6.9 for tenant-scoped Infrastructure Outbox claims, lease fencing, bounded retry/dead-letter behavior and terminal retention; distinguish the verified state machine from broker publishing, production polling, Run-owner consumption and executor readiness. Preserve the two-instance disk cap and fail-closed execution. |
+| v0.25 | 2026-10-07 | Add section 6.10 for serial bounded JetStream publication, injected authenticated context, allowlisted event contract, payload/envelope limits, stable Nats-Msg-Id, PubAck-before-delivered and durable Run Inbox dedupe. Record 9F4D-3D4 loopback NATS/PostgreSQL evidence and preserve production worker/consumer/execution gates. | The owner Outbox delivery state machine gained a bounded transport adapter. |

@@ -29,6 +29,8 @@ star-context = { path = "../star-context" }
 domain-infrastructure = { path = "../domain-infrastructure" }
 star-pg-adapter = { path = "../star-pg-adapter" }
 sqlx = { workspace = true }
+async-nats = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
 # v0.66 P0-4 InMemoryAdapterRegistry 测试用 (#[tokio::test] async test runner)
