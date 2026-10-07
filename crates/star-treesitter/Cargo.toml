@@ -6,6 +6,7 @@ publish = false
 name = "star-treesitter"
 version = "0.0.1"
 edition = "2021"
+rust-version.workspace = true
 description = "Star 仓 Tree-sitter 集成 (per P4-H.5, 守门 #19 [M] 拍板) — Rust + 4 语言 grammar"
 license = "MIT OR Apache-2.0"
 

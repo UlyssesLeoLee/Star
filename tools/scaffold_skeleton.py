@@ -7,6 +7,23 @@ Run from anywhere; the path is hardcoded to D:/Star-worktrees/dev-skeleton.
 """
 from __future__ import annotations
 
+# @cypher schema=1 source_sha256=76fc74c67727c5de897728e8f9b1f0227b788250d45e77976769d93b59feca8b
+# MERGE (self:File {path:"tools/scaffold_skeleton.py"})
+# MERGE (main:Symbol {id:"tools/scaffold_skeleton.py::main",kind:"function"})
+# MERGE (render_root:Symbol {id:"tools/scaffold_skeleton.py::render_root_cargo_toml",kind:"function"})
+# MERGE (render_cargo:Symbol {id:"tools/scaffold_skeleton.py::render_cargo_toml",kind:"function"})
+# MERGE (render_lib:Symbol {id:"tools/scaffold_skeleton.py::render_lib_rs",kind:"function"})
+# MERGE (path_write:ExternalService {id:"python.pathlib.Path.write_text",kind:"method"})
+# MERGE (self)-[:DEFINES]->(main)
+# MERGE (self)-[:DEFINES]->(render_root)
+# MERGE (self)-[:DEFINES]->(render_cargo)
+# MERGE (self)-[:DEFINES]->(render_lib)
+# MERGE (main)-[:CALLS]->(render_root)
+# MERGE (main)-[:CALLS]->(render_cargo)
+# MERGE (main)-[:CALLS]->(render_lib)
+# MERGE (main)-[:CALLS]->(path_write)
+# @endcypher
+
 import os
 from pathlib import Path
 from textwrap import dedent
@@ -1494,7 +1511,7 @@ def render_root_cargo_toml(crates: list[str]) -> str:
         "[workspace.package]\n"
         "version = \"0.1.0\"\n"
         "edition = \"2021\"\n"
-        "rust-version = \"1.75\"\n"
+        "rust-version = \"1.99.0\"\n"
         "authors = [\"Star Team\"]\n"
         "license = \"Apache-2.0\"\n"
         "repository = \"https://github.com/UlyssesLeoLee/Star\"\n"

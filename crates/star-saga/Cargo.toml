@@ -6,6 +6,7 @@ publish = false
 name = "star-saga"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "STAR Saga orchestrator (Phase G) — per spec/saga/01 + Q-003 跨域协调"

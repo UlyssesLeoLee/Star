@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   pull_request:
-    branches: [main]
+    branches: [dev, main]
 
 jobs:
   # ─────────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy, rustfmt
 
@@ -46,6 +46,34 @@ jobs:
         # 守门 #6 升级: 从 advisory 改 enforced, 0 diff 才能 merge
         run: cargo fmt --all -- --check
 
+  bff-ci:
+    name: BFF (Rust 1.99.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: rustfmt
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bff -> bff/target
+
+      - name: cargo check
+        working-directory: bff
+        run: cargo check --all-targets --all-features -j 4
+
+      - name: cargo test
+        working-directory: bff
+        run: cargo test --all-features -j 4
+
+      - name: cargo fmt --check
+        working-directory: bff
+        run: cargo fmt --all -- --check
+
   e2e-integration:
     name: e2e Integration (P3-A.5 / wt-w32)
     runs-on: ubuntu-latest
@@ -55,7 +83,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
@@ -78,7 +106,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
@@ -164,7 +192,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
@@ -189,7 +217,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt
 

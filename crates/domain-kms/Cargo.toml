@@ -2,6 +2,7 @@
 name = "domain-kms"
 version = "0.1.0"
 edition = "2021"
+rust-version.workspace = true
 description = "KMS 集成 (Vault / AWS KMS 凭证) — E.4 mock 备选 (per 29692a7 mock 备选路径)"
 license = "MIT OR Apache-2.0"
 publish = false

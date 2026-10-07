@@ -6,6 +6,7 @@ publish = false
 name = "star-arg"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "STAR Agent Relationship Graph (ARG) Data Tier — per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1"
