@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission transaction and persisted Provider Profile source are verified in focused/disposable gates; trusted resolver, production consumers and execution remain fail-closed.
-> Version: 0.22 | Date: 2026-10-07
+> Version: 0.23 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -87,6 +87,14 @@ This implementation is scoped to the tenant RLS ledger. It cannot account for an
 
 The disposable PostgreSQL runner applies the profile migration twice, checks both tables' tenant isolation, owner read-only privileges, one-time current-revision closure and immutable events, and executes five SQLx admission cases including digest-mismatch rejection without reservation. This adds a persisted source primitive, not a production profile editor/resolver or currentness fence. Cross-tenant shared capacity, target DB provisioning, consumer/delivery, provider/Manager and Schedule execution remain fail-closed. The test phase remains limited to two registered Multipass instances total, including stopped/deleted records; this gate starts zero VMs.
 
+### 6.8 9F4D-3D2 reservation expiry and Schedule owner boundary
+
+`PostgresInfrastructureOwnerAdmission::expire_due_reservations` scans only a caller-supplied tenant scope, rejects batches outside 1..64, orders candidates by PostgreSQL `clock_timestamp()` and processes each pair in its own transaction. The transaction takes the same sorted/deduplicated tenant and physical Host/cluster locks as admission, reloads both ledgers `FOR UPDATE`, and compares the complete reservation identity, generations, resource vectors, digests, observation time, lease and state. A changed or renewed candidate is an idempotent no-op; a mismatched pair aborts without partial mutation.
+
+For an expired held pair, both Work rows transition to `expired`; the tenant T lifecycle fact, trigger-written global physical T fact, immutable `capacity_expired` Infrastructure Outbox event and pending delivery row commit atomically. The database clock is authoritative for both owner admission deadline checks and expiry. The primitive consumes no Schedule occurrence lease and does not renew/cancel an active Agent Runtime lease.
+
+Infrastructure does not write Schedule occurrence, TaskExecutionRun or Run tables. The Run/Execution owner must consume the Outbox event through its own Inbox and then record its own result; Schedule retry/resume remains subject to the pinned run-as actor, current Project/Run authorization, occurrence fence and a fresh admission transaction. The 9F4D-3D2 method is not a scheduled worker or production consumer; active execution remains fail-closed until those owner paths are deployed and verified. Rust and disposable PostgreSQL gates use zero Multipass VMs, and the test inventory cap remains two registered instances total including Stopped/Deleted.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -113,3 +121,4 @@ The disposable PostgreSQL runner applies the profile migration twice, checks bot
 | v0.20 | 2026-10-07 | Add the 9F4D-3C1 owner Inbox receive design and idempotency outcomes; distinguish receiving from the later capacity consumer/reservation transaction and keep execution disabled. |
 | v0.21 | 2026-10-07 | Add the 9F4D-3C2 Infrastructure-owner admission primitive, deterministic dual-resource lock order, recomputed unexpired reservation ledger, atomic paired reservation/receipt/Outbox behavior, PostgreSQL concurrency/expiry evidence, and explicit tenant-only accounting boundary; keep resolver, consumer, provider and execution fail-closed. |
 | v0.22 | 2026-10-07 | Add the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity vectors inside owner admission; record 17/17 disposable PostgreSQL steps and 5/5 SQLx cases while preserving target DB, production resolver, cross-tenant allocator, provider and execution gates. |
+| v0.23 | 2026-10-07 | Add §6.8 for the database-clock, bounded paired-reservation expiry primitive and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts; define Run/Execution consumer ownership and forbid expiry-driven implicit Schedule retry. Record 9F4D-3D2 focused Rust/PostgreSQL evidence while retaining production worker, active Runtime lease, provider and execution gates. Preserve the two-record Multipass inventory cap. |

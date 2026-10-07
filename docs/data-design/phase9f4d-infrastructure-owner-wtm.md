@@ -1,8 +1,8 @@
 # Phase 9F4D-3A — Infrastructure owner W/T/M classification
 
-> Version: v0.5 · 2026-10-07
+> Version: v0.6 · 2026-10-07
 > Scope: additive schemas in `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql`, `db/migrations/2026-10-09-infrastructure-provider-profile-master.sql`, and `db/migrations/2026-10-10-infrastructure-physical-capacity-ledger.sql`
-> Boundary: preserve the original six-table 3A classification, add the two 3C3 profile tables and two 3D1 global physical ledger tables; this extension does not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
+> Boundary: preserve the original six-table 3A classification, add the two 3C3 profile tables and two 3D1 global physical ledger tables; 3D2 expiry reuses the existing Work/Transaction tables and trigger, adds no schema objects, and does not rewrite the historical 100-table index or reclassify Run/Execution-owned data.
 
 ## §0 Purpose and ownership
 
@@ -55,6 +55,10 @@ The runner invokes `psql` directly. The 3C3 profile migration adds two tables an
 
 The 3D1 runner applies the global physical ledger migration twice, asserts neither global table has `tenant_id`, checks that exactly two FORCE-RLS policies target `star_infrastructure_owner`, and proves a tenant-scoped NOBYPASSRLS probe cannot read or insert global rows. Its WORM gate verifies immutable resource identity, append-only global events, and an atomic `held → released` event. Current cumulative result is 10/10 FORCE RLS tables, 21/21 runner steps, and 6/6 ignored SQLx Inbox/admission cases. The new cross-tenant SQLx case separately contends on one shared Host and one shared K3s cluster; each contention pair produces one accepted reservation and one retry. The disposable PostgreSQL cluster stopped and cleaned successfully; no Multipass VM was started, leaving the test-phase inventory cap at two registered records including Stopped/Deleted. See [`PHASE-9F4D-3D1-GLOBAL-CAPACITY-REPORT.md`](../reports/PHASE-9F4D-3D1-GLOBAL-CAPACITY-REPORT.md). Target DB provisioning, production current-binding/provider observation, actual owner worker/outbox delivery, coordinated tenant/global release/reaper, Manager/provider/readiness, BI/Benchmark and Schedule execution remain open.
 
+The 3D2 expiry primitive reuses these rows without a new migration or classification change. It validates a caller-supplied tenant and a batch bound of 1..64, scans candidates using database time, then locks and revalidates the tenant bundle plus matching global reservation under the established tenant/physical lock order. Only a still-held, elapsed and exactly matching pair is transitioned. The tenant lifecycle event, trigger-generated global event, immutable `capacity_expired` Outbox event and pending delivery are committed atomically; replay is a no-op. The database schema's existing Work retention and Transaction immutability rules remain authoritative.
+
+This evidence does not add a production expiry scheduler, cross-tenant scan coordinator, Outbox delivery consumer or Run/Execution outcome consumer. Expiration applies only to Infrastructure admission holds, not active Runtime leases or VM/K3s resources. No Multipass instance is started; the disk-constrained test inventory limit remains two registered records including Stopped/Deleted.
+
 ## §4 Revision history
 
 | Version | Date | Revision | Trigger |
@@ -64,3 +68,4 @@ The 3D1 runner applies the global physical ledger migration twice, asserts neith
 | v0.3 | 2026-10-07 | Mavis review | Add 9F4D-3C3 Provider Profile Master and append-only revision-event Transaction classification; record cumulative 8-table classification, 8/8 FORCE RLS and digest-mismatch rejection evidence; keep profile editing/current resolution and production owner/provider/execution gates open. |
 | v0.4 | 2026-10-07 | Mavis review | Correct 3A-only six-table statements in §§1–3 to distinguish them from cumulative 3C3 schema; classify cumulative 8/8 table RLS and profile read-only owner boundary. Preserve original 3A/3B1 gate evidence as historical. |
 | v0.5 | 2026-10-07 | Mavis review | Add §1.2 for the no-tenant global physical Work/Transaction ledger; classify cumulative 10/10 tables as 4 W / 5 T / 1 M, distinguish tenant and owner-only FORCE RLS, and record atomic lifecycle-event plus 21/21 PG runner and 6/6 SQLx evidence. Preserve the two-record Multipass disk cap and production worker/provider/execution gaps. |
+| v0.6 | 2026-10-07 | Mavis review | Record that 9F4D-3D2 reuses the existing paired Work ledgers, Transaction tables and lifecycle trigger for atomic expiry; add no schema object and make no W/T/M count change. Capture 7/7 SQLx expiry evidence while keeping production scheduler/consumer, active Runtime lease and VM lifecycle out of scope. Preserve the two-record Multipass disk cap. |

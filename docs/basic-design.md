@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.91 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.94
+> **文档版本**: v5.92 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.95
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4608,7 +4608,7 @@ Chat Bar(scope, text, entity_refs)
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
-| AC-LOOP-010 | §16.27-16.35 / Schedule API DD v0.23 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 的 tenant-scoped admission primitive 从 exact persisted SCD2 Provider Profile 核验 digest 并派生 Host+精确 K3s cluster 双层容量请求，再原子写 reservation bundle/receipt/event/Outbox，但尚无可信 current-profile/Run-binding/provider resolver 或 production consumer；再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster。executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；跨租户共享资源需全局 allocator，worker/BI/production execution 仍未实现 |
+| AC-LOOP-010 | §16.27-16.37 / Schedule API SRS v0.24 / BD v0.23 / DD v0.23 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 的 tenant-scoped admission primitive 从 exact persisted SCD2 Provider Profile 核验 digest 并派生 Host+精确 K3s cluster 双层容量请求，再原子写 reservation bundle/receipt/event/Outbox，但尚无可信 current-profile/Run-binding/provider resolver 或 production consumer；再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster。executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；跨租户共享资源需全局 allocator，worker/BI/production execution 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4968,6 +4968,14 @@ PostgreSQL 18.6 disposable runner 重复应用 migration，验证 owner-only RLS
 
 这尚未部署 production global allocator：trusted Run binding/placement 与 provider observation producer、目标 DB identity/grants/role activation、真实 Inbox/Outbox worker、tenant/global 双 ledger release/reaper/reconciliation、Manager/provider/readiness、Runtime sandbox/workspace bridge 仍开放。Schedule 与 Task Card CLI 保持 fail-closed，不能从该数据库 substrate 推断任务可执行。
 
+### 16.37 Phase 9F4D-3D2 有界 paired reservation expiry
+
+Infrastructure owner 提供仅处理自身 admission holds 的过期原语。调用必须带受信 tenant scope 与 1..64 的批大小；候选按 PostgreSQL `clock_timestamp()` 和 lease 先后排序。已有 admission deadline 检查也使用该数据库时钟。每一条 reservation bundle 使用独立 transaction：按稳定排序去重的 tenant/physical locks 串行化竞争，锁住并重新检查 tenant bundle 与全局物理 reservation，核对 reservation pair 的全部资源身份、generation、向量、digest、observation 与 lease。只有一致且双方仍 held/已过期时，才一起转为 expired。
+
+同一 transaction 原子追加 tenant lifecycle event、数据库 trigger 产生的 global physical event、不可变 `capacity_expired` Outbox 和 pending delivery。数据库时钟是唯一过期判定时钟；已变化或 lease 延长的候选幂等跳过，不一致 pair 回滚并 fail closed。Schedule occurrence/TaskExecutionRun 的状态由 Run/Execution owner 消费该事实后更新，Infrastructure owner 不跨 owner 直接写；后续 retry/resume 必须进入 Schedule 当前 run-as/授权/fence 流程。
+
+该能力是可调用的 owner-store primitive，不包含 timer、跨 tenant worker、Outbox 投递 consumer、active Runtime lease renewal、Multipass 实例回收或 K3s 集群销毁。架构仍由 Multipass 管理一个或多个 Linux guests 并在 guest 内运行 K3s，不要求 Docker Desktop。当前没有生产 actor 装配，公共执行仍关闭。Rust 与 disposable PostgreSQL 验证不创建 VM；测试 Multipass inventory 仍最多登记 2 条（Stopped/Deleted 也计入）。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5105,3 +5113,4 @@ PostgreSQL 18.6 disposable runner 重复应用 migration，验证 owner-only RLS
 | v5.89 | 2026-10-07 | Mavis review | Align requirements v5.92, Schedule SRS v0.23/BD v0.22/DD v0.23, Infrastructure DD v0.19 and implementation plan v6.20; add §16.35 and AC-INFRA-002-K for persisted Provider Profile Master/Transaction, stored-digest validation and profile-derived Host/cluster request; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases. Preserve the disk-bound two-entry Multipass cap and fail-closed production boundary. | Phase 9F4D-3C3 profile source/admission derivation passed isolated PostgreSQL verification without Multipass. |
 | v5.90 | 2026-10-07 | Mavis review | Align the current requirements pointer to v5.93, Infrastructure DD to v0.20 and implementation plan to v6.22; qualify AC-INFRA-002-H with Profile-table read-only grants and the cumulative eight-table gate while retaining the original 3B1 evidence as historical. Preserve the two-instance disk cap and all production fail-closed boundaries. | Final cross-layer grant and version-reference audit. |
 | v5.91 | 2026-10-07 | Mavis review | Align requirements v5.94, Infrastructure DD v0.21, implementation plan v6.23, W/T/M v0.5 and Automation Design v2.20; add §16.36 for global physical Host/cluster reservations, owner-only FORCE RLS, sorted/deduplicated cross-tenant locks, atomic lifecycle events, and 21/21 PostgreSQL runner / 6/6 SQLx evidence. Preserve the two-record disk cap and all production execution blockers. | Phase 9F4D-3D1 implemented and verified the global capacity-ledger seam without Multipass VM creation. |
+| v5.92 | 2026-10-07 | Mavis review | Align requirements v5.95 and Infrastructure DD v0.22; add §16.37 for the bounded database-clock expiry primitive, per-pair revalidation and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts. Clarify that Schedule occurrence outcomes belong to Run/Execution consumers and that active Runtime lease renewal, production worker and VM lifecycle remain open. Preserve the two-record Multipass inventory cap. | Phase 9F4D-3D2 expiry implementation and disposable PostgreSQL verification. |

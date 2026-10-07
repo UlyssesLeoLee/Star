@@ -1,10 +1,12 @@
-//! @cypher schema=1 source_sha256=aa2c2f30464590f17ec4b8203d7f24b14ad748eaa6890b11cbac7ac16002497c
+//! @cypher schema=1 source_sha256=6fb46e4b478fef28f96d7c194d939596f82454b1d6f32bb4c2d159b19ffe2fad
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_admission.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::module",kind:"module"})
 //! MERGE (store:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission",kind:"struct"})
 //! MERGE (outcome:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::InfrastructureOwnerAdmissionOutcome",kind:"enum"})
 //! MERGE (error:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::InfrastructureOwnerAdmissionError",kind:"enum"})
 //! MERGE (admit:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission.admit_inbox",kind:"method"})
+//! MERGE (expire_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission.expire_due_reservations",kind:"method"})
+//! MERGE (expire_one:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission.expire_candidate",kind:"method"})
 //! MERGE (locks:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::lock_resource_scope",kind:"function"})
 //! MERGE (lock_keys:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::unique_sorted_lock_keys",kind:"function"})
 //! MERGE (aggregate:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::read_active_reservations",kind:"function"})
@@ -12,6 +14,14 @@
 //! MERGE (reject:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::record_rejected",kind:"function"})
 //! MERGE (read_profile:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::read_provider_profile_revision",kind:"function"})
 //! MERGE (loaded_profile:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::LoadedProviderProfileRevision",kind:"struct"})
+//! MERGE (expiry_candidate:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::ReservationExpiryCandidate",kind:"struct"})
+//! MERGE (lifecycle_row:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::ReservationLifecycleRow",kind:"struct"})
+//! MERGE (physical_row:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PhysicalReservationRow",kind:"struct"})
+//! MERGE (same_facts:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PhysicalReservationRow.matches",kind:"method"})
+//! MERGE (expiry_outbox:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::write_expiration_outbox",kind:"function"})
+//! MERGE (max_expiry_batch:Variable {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::MAX_EXPIRY_BATCH",kind:"constant"})
+//! MERGE (expiry_bound_test:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::tests.expiry_scan_rejects_invalid_scope_and_batch_before_database_access",kind:"test"})
+//! MERGE (set_tenant_scope:Symbol {id:"crates/infrastructure/src/infrastructure_owner_inbox.rs::set_tenant_scope",kind:"function"})
 //! MERGE (inbox:Table {id:"infrastructure.capacity_demand_inbox"})
 //! MERGE (bundle:Table {id:"infrastructure.capacity_reservation_bundle"})
 //! MERGE (physical:Table {id:"infrastructure.capacity_physical_reservation",class:"Work"})
@@ -35,6 +45,11 @@
 //! MERGE (module)-[:DEFINES]->(reject)
 //! MERGE (module)-[:DEFINES]->(read_profile)
 //! MERGE (module)-[:DEFINES]->(loaded_profile)
+//! MERGE (module)-[:DEFINES]->(expiry_candidate)
+//! MERGE (module)-[:DEFINES]->(lifecycle_row)
+//! MERGE (module)-[:DEFINES]->(physical_row)
+//! MERGE (module)-[:DEFINES]->(expiry_outbox)
+//! MERGE (module)-[:DEFINES]->(max_expiry_batch)
 //! MERGE (store)-[:USES_TYPE]->(pg_pool)
 //! MERGE (admit)-[:CALLS]->(locks)
 //! MERGE (admit)-[:CALLS]->(aggregate)
@@ -54,6 +69,31 @@
 //! MERGE (admit)-[:WRITES]->(outbox)
 //! MERGE (admit)-[:WRITES]->(delivery)
 //! MERGE (admit)-[:USES_TYPE]->(loaded_profile)
+//! MERGE (expire_due)-[:CALLS]->(set_tenant_scope)
+//! MERGE (expire_due)-[:CALLS]->(expire_one)
+//! MERGE (expire_due)-[:READS]->(bundle)
+//! MERGE (expire_due)-[:USES]->(max_expiry_batch)
+//! MERGE (expire_one)-[:CALLS]->(locks)
+//! MERGE (expire_one)-[:CALLS]->(set_tenant_scope)
+//! MERGE (expire_one)-[:CALLS]->(same_facts)
+//! MERGE (expire_one)-[:CALLS]->(expiry_outbox)
+//! MERGE (expire_due)-[:USES_TYPE]->(expiry_candidate)
+//! MERGE (expire_one)-[:USES_TYPE]->(expiry_candidate)
+//! MERGE (expire_one)-[:USES_TYPE]->(lifecycle_row)
+//! MERGE (expire_one)-[:USES_TYPE]->(physical_row)
+//! MERGE (expire_one)-[:READS]->(bundle)
+//! MERGE (expire_one)-[:READS]->(physical)
+//! MERGE (expire_one)-[:READS]->(outbox)
+//! MERGE (expire_one)-[:WRITES]->(bundle)
+//! MERGE (expire_one)-[:WRITES]->(physical)
+//! MERGE (expire_one)-[:WRITES]->(physical_event)
+//! MERGE (expire_one)-[:WRITES]->(reservation_event)
+//! MERGE (expire_one)-[:WRITES]->(outbox)
+//! MERGE (expire_one)-[:WRITES]->(delivery)
+//! MERGE (physical_row)-[:DEFINES]->(same_facts)
+//! MERGE (same_facts)-[:USES_TYPE]->(lifecycle_row)
+//! MERGE (expiry_outbox)-[:USES_TYPE]->(lifecycle_row)
+//! MERGE (expiry_bound_test)-[:CALLS]->(expire_due)
 //! MERGE (read_profile)-[:READS]->(provider_profile)
 //! MERGE (read_profile)-[:USES_TYPE]->(loaded_profile)
 //! @endcypher
@@ -67,12 +107,12 @@
 
 use chrono::{DateTime, Duration, Utc};
 use domain_infrastructure::{
-    ClusterPlacementPolicyV1, InfrastructureCapacityEvaluationError,
-    InfrastructureCapacityRequestV2, InfrastructureCapacitySnapshotV2,
-    InfrastructureProviderProfileError, InfrastructureProviderProfileRevisionV1,
-    InfrastructureResourceVectorV1, ProviderKind, evaluate_infrastructure_capacity_candidate,
+    evaluate_infrastructure_capacity_candidate, ClusterPlacementPolicyV1,
+    InfrastructureCapacityEvaluationError, InfrastructureCapacityRequestV2,
+    InfrastructureCapacitySnapshotV2, InfrastructureProviderProfileError,
+    InfrastructureProviderProfileRevisionV1, InfrastructureResourceVectorV1, ProviderKind,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use thiserror::Error;
@@ -88,6 +128,7 @@ const ADMISSION_LEASE_SECONDS: i64 = 30;
 const BASE_RETRY_SECONDS: i64 = 1;
 const MAX_RETRY_SECONDS: i64 = 30;
 const TERMINAL_RETENTION_HOURS: i64 = 24;
+const MAX_EXPIRY_BATCH: usize = 64;
 
 /// Idempotent result of processing one Infrastructure Inbox demand.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,7 +236,9 @@ impl PostgresInfrastructureOwnerAdmission {
             return Err(InfrastructureOwnerAdmissionError::MissingTerminalReceipt);
         }
 
-        let now = Utc::now();
+        let now: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+            .fetch_one(&mut *tx)
+            .await?;
         if demand.deadline_at <= now {
             let reason_code = "admission_deadline_expired";
             record_rejected(&mut tx, tenant_id, &row, &demand, reason_code, now).await?;
@@ -392,6 +435,327 @@ impl PostgresInfrastructureOwnerAdmission {
             }
         }
     }
+
+    /// Expire a bounded set of this tenant's elapsed admission holds.
+    ///
+    /// The caller must supply a tenant obtained from trusted owner scheduling. Each paired
+    /// tenant/global reservation transition commits atomically and publishes an immutable
+    /// Outbox fact. This primitive is not a Runtime lease-renewal protocol or a live worker.
+    pub async fn expire_due_reservations(
+        &self,
+        tenant_id: Uuid,
+        max_items: usize,
+    ) -> Result<usize, InfrastructureOwnerAdmissionError> {
+        if tenant_id.is_nil() {
+            return Err(InfrastructureOwnerAdmissionError::InvalidTenantIdentity);
+        }
+        if !(1..=MAX_EXPIRY_BATCH).contains(&max_items) {
+            return Err(InfrastructureOwnerAdmissionError::InvalidExpiryBatchSize);
+        }
+
+        let mut scan_tx = self.pool.begin().await?;
+        sqlx::query(OWNER_ROLE).execute(&mut *scan_tx).await?;
+        set_tenant_scope(&mut scan_tx, tenant_id).await?;
+        let candidates: Vec<ReservationExpiryCandidate> = sqlx::query_as(
+            "SELECT reservation_bundle_id, host_environment_id, k3s_cluster_id \
+             FROM infrastructure.capacity_reservation_bundle \
+             WHERE tenant_id = $1 AND reservation_state = 'held' \
+               AND lease_expires_at <= clock_timestamp() \
+             ORDER BY lease_expires_at, reservation_bundle_id LIMIT $2",
+        )
+        .bind(tenant_id)
+        .bind(max_items as i64)
+        .fetch_all(&mut *scan_tx)
+        .await?;
+        scan_tx.commit().await?;
+
+        let mut expired_count = 0;
+        for candidate in candidates {
+            if self.expire_candidate(tenant_id, &candidate).await? {
+                expired_count += 1;
+            }
+        }
+        Ok(expired_count)
+    }
+
+    async fn expire_candidate(
+        &self,
+        tenant_id: Uuid,
+        candidate: &ReservationExpiryCandidate,
+    ) -> Result<bool, InfrastructureOwnerAdmissionError> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(OWNER_ROLE).execute(&mut *tx).await?;
+        set_tenant_scope(&mut tx, tenant_id).await?;
+        sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+            .bind(self.actor_id.to_string())
+            .execute(&mut *tx)
+            .await?;
+        lock_resource_scope(
+            &mut tx,
+            tenant_id,
+            candidate.host_environment_id,
+            candidate.k3s_cluster_id,
+        )
+        .await?;
+
+        let row = sqlx::query_as::<_, ReservationLifecycleRow>(
+            "SELECT reservation_bundle_id, source_event_id, occurrence_id, task_execution_run_id, \
+                    binding_id, binding_revision, binding_digest, host_capacity_reservation_id, \
+                    host_environment_id, host_generation, host_cpu_millicores, host_memory_bytes, \
+                    host_ephemeral_storage_bytes, host_gpu_units, cluster_capacity_reservation_id, \
+                    k3s_cluster_id, k3s_cluster_generation, cluster_cpu_millicores, \
+                    cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units, \
+                    capacity_snapshot_digest, capacity_observed_at, lease_expires_at, reservation_state \
+             FROM infrastructure.capacity_reservation_bundle \
+             WHERE tenant_id = $1 AND reservation_bundle_id = $2 FOR UPDATE",
+        )
+        .bind(tenant_id)
+        .bind(candidate.reservation_bundle_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(InfrastructureOwnerAdmissionError::ReservationNotFound)?;
+        if row.host_environment_id != candidate.host_environment_id
+            || row.k3s_cluster_id != candidate.k3s_cluster_id
+        {
+            return Err(InfrastructureOwnerAdmissionError::ReservationPairInconsistent);
+        }
+
+        let now: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+            .fetch_one(&mut *tx)
+            .await?;
+        if row.reservation_state != "held" || row.lease_expires_at > now {
+            tx.commit().await?;
+            return Ok(false);
+        }
+
+        let physical = sqlx::query_as::<_, PhysicalReservationRow>(
+            "SELECT reservation_bundle_id, host_capacity_reservation_id, host_environment_id, \
+                    host_generation, host_cpu_millicores, host_memory_bytes, \
+                    host_ephemeral_storage_bytes, host_gpu_units, cluster_capacity_reservation_id, \
+                    k3s_cluster_id, k3s_cluster_generation, cluster_cpu_millicores, \
+                    cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units, \
+                    capacity_snapshot_digest, capacity_observed_at, lease_expires_at, reservation_state \
+             FROM infrastructure.capacity_physical_reservation \
+             WHERE reservation_bundle_id = $1 FOR UPDATE",
+        )
+        .bind(row.reservation_bundle_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(InfrastructureOwnerAdmissionError::ReservationPairInconsistent)?;
+        if !physical.matches(&row) || physical.reservation_state != "held" {
+            return Err(InfrastructureOwnerAdmissionError::ReservationPairInconsistent);
+        }
+
+        let correlation_id: Uuid = sqlx::query_scalar(
+            "SELECT correlation_id FROM infrastructure.capacity_owner_outbox \
+             WHERE tenant_id = $1 AND reservation_bundle_id = $2 \
+               AND event_type = 'capacity_accepted'",
+        )
+        .bind(tenant_id)
+        .bind(row.reservation_bundle_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(InfrastructureOwnerAdmissionError::MissingAcceptedOutbox)?;
+        let retention_expires_at = now + Duration::hours(TERMINAL_RETENTION_HOURS);
+
+        let physical_update = sqlx::query(
+            "UPDATE infrastructure.capacity_physical_reservation \
+             SET reservation_state = 'expired', terminal_at = $2, \
+                 retention_expires_at = $3, updated_at = $2 \
+             WHERE reservation_bundle_id = $1 AND reservation_state = 'held' \
+               AND lease_expires_at <= $2",
+        )
+        .bind(row.reservation_bundle_id)
+        .bind(now)
+        .bind(retention_expires_at)
+        .execute(&mut *tx)
+        .await?;
+        if physical_update.rows_affected() != 1 {
+            return Err(InfrastructureOwnerAdmissionError::ReservationPairInconsistent);
+        }
+
+        let tenant_update = sqlx::query(
+            "UPDATE infrastructure.capacity_reservation_bundle \
+             SET reservation_state = 'expired', terminal_at = $3, \
+                 retention_expires_at = $4, updated_at = $3 \
+             WHERE tenant_id = $1 AND reservation_bundle_id = $2 \
+               AND reservation_state = 'held' AND lease_expires_at <= $3",
+        )
+        .bind(tenant_id)
+        .bind(row.reservation_bundle_id)
+        .bind(now)
+        .bind(retention_expires_at)
+        .execute(&mut *tx)
+        .await?;
+        if tenant_update.rows_affected() != 1 {
+            return Err(InfrastructureOwnerAdmissionError::ReservationPairInconsistent);
+        }
+
+        sqlx::query(
+            "INSERT INTO infrastructure.capacity_reservation_event \
+             (tenant_id, reservation_bundle_id, event_type, host_capacity_reservation_id, \
+              cluster_capacity_reservation_id, actor_id, correlation_id, details) \
+             VALUES ($1,$2,'expired',$3,$4,$5,$6,$7)",
+        )
+        .bind(tenant_id)
+        .bind(row.reservation_bundle_id)
+        .bind(row.host_capacity_reservation_id)
+        .bind(row.cluster_capacity_reservation_id)
+        .bind(self.actor_id)
+        .bind(correlation_id)
+        .bind(json!({
+            "source_event_id": row.source_event_id,
+            "occurrence_id": row.occurrence_id,
+            "lease_expires_at": row.lease_expires_at,
+            "expired_at": now,
+        }))
+        .execute(&mut *tx)
+        .await?;
+        write_expiration_outbox(&mut tx, tenant_id, &row, correlation_id, now).await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct ReservationExpiryCandidate {
+    reservation_bundle_id: Uuid,
+    host_environment_id: Uuid,
+    k3s_cluster_id: Uuid,
+}
+
+#[derive(sqlx::FromRow)]
+struct ReservationLifecycleRow {
+    reservation_bundle_id: Uuid,
+    source_event_id: Uuid,
+    occurrence_id: Uuid,
+    task_execution_run_id: Uuid,
+    binding_id: Uuid,
+    binding_revision: i64,
+    binding_digest: Vec<u8>,
+    host_capacity_reservation_id: Uuid,
+    host_environment_id: Uuid,
+    host_generation: i64,
+    host_cpu_millicores: i64,
+    host_memory_bytes: i64,
+    host_ephemeral_storage_bytes: i64,
+    host_gpu_units: i32,
+    cluster_capacity_reservation_id: Uuid,
+    k3s_cluster_id: Uuid,
+    k3s_cluster_generation: i64,
+    cluster_cpu_millicores: i64,
+    cluster_memory_bytes: i64,
+    cluster_ephemeral_storage_bytes: i64,
+    cluster_gpu_units: i32,
+    capacity_snapshot_digest: Vec<u8>,
+    capacity_observed_at: DateTime<Utc>,
+    lease_expires_at: DateTime<Utc>,
+    reservation_state: String,
+}
+
+#[derive(sqlx::FromRow)]
+struct PhysicalReservationRow {
+    reservation_bundle_id: Uuid,
+    host_capacity_reservation_id: Uuid,
+    host_environment_id: Uuid,
+    host_generation: i64,
+    host_cpu_millicores: i64,
+    host_memory_bytes: i64,
+    host_ephemeral_storage_bytes: i64,
+    host_gpu_units: i32,
+    cluster_capacity_reservation_id: Uuid,
+    k3s_cluster_id: Uuid,
+    k3s_cluster_generation: i64,
+    cluster_cpu_millicores: i64,
+    cluster_memory_bytes: i64,
+    cluster_ephemeral_storage_bytes: i64,
+    cluster_gpu_units: i32,
+    capacity_snapshot_digest: Vec<u8>,
+    capacity_observed_at: DateTime<Utc>,
+    lease_expires_at: DateTime<Utc>,
+    reservation_state: String,
+}
+
+impl PhysicalReservationRow {
+    fn matches(&self, tenant: &ReservationLifecycleRow) -> bool {
+        self.reservation_bundle_id == tenant.reservation_bundle_id
+            && self.host_capacity_reservation_id == tenant.host_capacity_reservation_id
+            && self.host_environment_id == tenant.host_environment_id
+            && self.host_generation == tenant.host_generation
+            && self.host_cpu_millicores == tenant.host_cpu_millicores
+            && self.host_memory_bytes == tenant.host_memory_bytes
+            && self.host_ephemeral_storage_bytes == tenant.host_ephemeral_storage_bytes
+            && self.host_gpu_units == tenant.host_gpu_units
+            && self.cluster_capacity_reservation_id == tenant.cluster_capacity_reservation_id
+            && self.k3s_cluster_id == tenant.k3s_cluster_id
+            && self.k3s_cluster_generation == tenant.k3s_cluster_generation
+            && self.cluster_cpu_millicores == tenant.cluster_cpu_millicores
+            && self.cluster_memory_bytes == tenant.cluster_memory_bytes
+            && self.cluster_ephemeral_storage_bytes == tenant.cluster_ephemeral_storage_bytes
+            && self.cluster_gpu_units == tenant.cluster_gpu_units
+            && self.capacity_snapshot_digest == tenant.capacity_snapshot_digest
+            && self.capacity_observed_at == tenant.capacity_observed_at
+            && self.lease_expires_at == tenant.lease_expires_at
+    }
+}
+
+async fn write_expiration_outbox(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    row: &ReservationLifecycleRow,
+    correlation_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    let event_id = Uuid::new_v4();
+    let idempotency_key = format!("capacity_expired:{}", row.source_event_id);
+    let binding_digest = row
+        .binding_digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let payload = json!({
+        "schema_version": 2,
+        "source_event_id": row.source_event_id,
+        "occurrence_id": row.occurrence_id,
+        "task_execution_run_id": row.task_execution_run_id,
+        "binding_id": row.binding_id,
+        "binding_revision": row.binding_revision,
+        "binding_digest": binding_digest,
+        "reservation_bundle_id": row.reservation_bundle_id,
+        "host_capacity_reservation_id": row.host_capacity_reservation_id,
+        "cluster_capacity_reservation_id": row.cluster_capacity_reservation_id,
+        "host_environment_id": row.host_environment_id,
+        "host_generation": row.host_generation,
+        "k3s_cluster_id": row.k3s_cluster_id,
+        "k3s_cluster_generation": row.k3s_cluster_generation,
+        "lease_expires_at": row.lease_expires_at,
+        "expired_at": now,
+    });
+    sqlx::query(
+        "INSERT INTO infrastructure.capacity_owner_outbox \
+         (event_id, tenant_id, source_event_id, occurrence_id, reservation_bundle_id, \
+          event_type, schema_version, idempotency_key, correlation_id, payload) \
+         VALUES ($1,$2,$3,$4,$5,'capacity_expired',2,$6,$7,$8)",
+    )
+    .bind(event_id)
+    .bind(tenant_id)
+    .bind(row.source_event_id)
+    .bind(row.occurrence_id)
+    .bind(row.reservation_bundle_id)
+    .bind(idempotency_key)
+    .bind(correlation_id)
+    .bind(payload)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query(
+        "INSERT INTO infrastructure.capacity_outbox_delivery (tenant_id, event_id) \
+         VALUES ($1,$2)",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 struct DemandInboxRow {
@@ -492,13 +856,40 @@ async fn advisory_lock_key(
 
 #[cfg(test)]
 mod tests {
-    use super::unique_sorted_lock_keys;
+    use super::{
+        unique_sorted_lock_keys, InfrastructureOwnerAdmissionError,
+        PostgresInfrastructureOwnerAdmission,
+    };
+    use sqlx::postgres::PgPoolOptions;
+    use uuid::Uuid;
 
     #[test]
     fn lock_key_collisions_keep_every_distinct_resource_lock() {
         assert_eq!(unique_sorted_lock_keys([9, 9, 3, 5]), vec![3, 5, 9]);
         assert_eq!(unique_sorted_lock_keys([4, 4, 4, 4]), vec![4]);
         assert_eq!(unique_sorted_lock_keys([8, 1, 7, 2]), vec![1, 2, 7, 8]);
+    }
+
+    #[tokio::test]
+    async fn expiry_scan_rejects_invalid_scope_and_batch_before_database_access() {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgresql://localhost/unused")
+            .expect("valid lazy database URL");
+        let owner = PostgresInfrastructureOwnerAdmission::new(pool, Uuid::new_v4(), Uuid::new_v4())
+            .expect("non-nil owner identities");
+
+        assert!(matches!(
+            owner.expire_due_reservations(Uuid::nil(), 1).await,
+            Err(InfrastructureOwnerAdmissionError::InvalidTenantIdentity)
+        ));
+        assert!(matches!(
+            owner.expire_due_reservations(Uuid::new_v4(), 0).await,
+            Err(InfrastructureOwnerAdmissionError::InvalidExpiryBatchSize)
+        ));
+        assert!(matches!(
+            owner.expire_due_reservations(Uuid::new_v4(), 65).await,
+            Err(InfrastructureOwnerAdmissionError::InvalidExpiryBatchSize)
+        ));
     }
 }
 
@@ -1254,9 +1645,24 @@ pub enum InfrastructureOwnerAdmissionError {
     /// Tenant or Inbox identity was empty.
     #[error("Infrastructure Inbox identity is invalid")]
     InvalidInboxIdentity,
+    /// A tenant-scoped reservation lifecycle request used an empty tenant identity.
+    #[error("Infrastructure tenant identity is invalid")]
+    InvalidTenantIdentity,
+    /// A lifecycle scan requested no items or exceeded its hard memory/work bound.
+    #[error("Infrastructure reservation expiry batch must be between 1 and 64")]
+    InvalidExpiryBatchSize,
     /// The requested tenant-scoped Inbox row does not exist.
     #[error("Infrastructure demand Inbox row was not found")]
     InboxNotFound,
+    /// A previously listed reservation disappeared before its tenant-scoped transaction.
+    #[error("Infrastructure reservation bundle was not found")]
+    ReservationNotFound,
+    /// Tenant and global physical reservation facts do not describe the same held pair.
+    #[error("Infrastructure tenant and physical reservation ledgers are inconsistent")]
+    ReservationPairInconsistent,
+    /// The accepted immutable owner event needed to preserve the original correlation is absent.
+    #[error("accepted Infrastructure Outbox event is missing for the reservation")]
+    MissingAcceptedOutbox,
     /// The persisted Inbox payload is not a valid typed V2 demand.
     #[error("Infrastructure Inbox demand payload is invalid")]
     InvalidDemandPayload,
