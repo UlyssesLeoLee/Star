@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.99 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v6.02
+> **文档版本**: v6.00 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v6.03
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5004,19 +5004,23 @@ Within the Run-owner database boundary, it appends one result Inbox fact and com
 |---|---|
 | AC-INFRA-002-P | §16.40；caller transaction 内校验 TaskExecutionRun 的 schedule origin、Rule ID/revision、occurrence 和 correlation 后写 demand Outbox；durable explicit-ack PullConsumer，单条/132 KiB/2 秒；以不可变 demand row 派生结果 scope；Run-owner Transaction Inbox commit 后 double-ack；严格 duplicate replay；invalid/unmatched 不 ACK；no quarantine/producer contract 时 production disabled；不改变 Run/Schedule/readiness/execution。 |
 
-### 16.41 Phase 9F4D-3D6 Platform ingress poison quarantine design
+### 16.41 Phase 9F4D-3D6 Platform ingress poison quarantine
 
 无效 capacity-result 消息不能写入 Run-owner 的 tenant FORCE RLS Inbox，因为坏消息的 tenant/Run claim 不可信或可能缺失。将隔离职责分给独立 Platform Messaging/Ingress owner，使用专用 transaction/role，不跨 owner 写表。幂等身份使用受信 JetStream deployment identity、配置的 stream generation，以及服务端 `Message::info()` 提供的 stream name/sequence；`Nats-Msg-Id`、envelope tenant、event ID 和 subject 不作为授权或主键。
 
-Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/parser/schema version、选定的 broker 元数据、wire 长度与精确 wire SHA-256。若保留原文，则单独写入加密、有硬大小上限和 quota 的 Work 存储，并配明确 TTL、独立密钥/访问策略和物理清理证据。原文方案尚未决定（加密留存 24 小时或仅留元数据与 digest），因此本版仅冻结 owner/身份/ACK 约束，不创建 migration、表、writer 或 ACK handler。
+Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/parser/schema version、选定的 broker 元数据、wire 长度与精确 wire SHA-256。若保留原文，则单独写入加密、有硬大小上限和 quota 的 Work 存储，并配明确 TTL、独立密钥/访问策略和物理清理证据。运行配置必须明确选择 metadata-only 或 encrypted 24-hour；没有默认策略。`InvalidStoredDemand` 和所有未分类/暂时性故障都保持 unacked。
 
-只有 receipt 与用户选定的 payload 处置在 quarantine owner 事务中提交后才可 `double_ack_with(AckKind::Term)`。相同 source key 和 digest/故障信息按幂等 replay；相同 source key 不同 digest 是完整性冲突，保持 unacked 并告警。数据库、quota、密钥、broker metadata 或故障分类未知均保持 unacked 并背压。`InvalidStoredDemand` 属于 owner 存储事实完整性问题，不自动当作 poison；必须由版本化分类器和 DDD 决定后才可终结。隔离不更新 TaskExecutionRun、Schedule、RunEvent/BI、两方 reservation、readiness 或 executor；production consumer 继续关闭。
+只有 receipt 与配置的 payload 处置在 quarantine owner 事务中提交后才可 `double_ack_with(AckKind::Term)`。相同 source key 和 digest/故障信息按幂等 replay；相同 source key 不同 digest 是完整性冲突，保持 unacked 并告警。数据库、quota、密钥、broker metadata 或故障分类未知均保持 unacked 并背压。隔离不更新 TaskExecutionRun、Schedule、RunEvent/BI、两方 reservation、readiness 或 executor。
+
+Encrypted replay envelope 最多复制 16 个 `Nats-Msg-Id` 值，累计最多 8 KiB；在构造 envelope 时同时校验数量和字节数，超限保持 unacked，避免空值重复头突破只按字节数计算的内存上限。
 
 验收要求覆盖：永久/暂时故障分类、duplicate 与 digest 冲突、commit-before-Term、存储/密钥/quota 故障重投、wire 大小与 bounded memory、RLS/grants/WORM、无 payload 日志、无不可信 tenant scope 传播和零 Run/BI/reservation/readiness/execution mutation。DB/NATS contract tests 不创建 Multipass VM；任何 live test 仍遵守最多 2 个登记实例（含 Stopped/Deleted）且不自动 purge。
 
 | 验收 ID | 对应设计与当前边界 |
 |---|---|
-| AC-INFRA-002-Q | §16.41；独立 Platform Messaging/Ingress owner；可信 broker source tuple 为 `(deployment, stream_generation, stream, stream_sequence)`；append-only receipt/digest；可选加密 TTL Work payload；完成事务后才 Term；错误与不确定 fault 保持 unacked；不变更 Run/BI/Reservation/Readiness/Execution。用户 payload retention 决策、故障分类、schema/grants/writer 和生产 consumer 尚未完成。 |
+**实现状态**：`platform-messaging-runtime` 写入三张独立平台表：append-only Transaction receipt、encrypted 24-hour Work payload 和 append-only purge audit；数据库触发器对 encrypted Work 强制单条 ≤200 KiB、每 deployment ≤4 MiB。encrypted replay 的 `Nats-Msg-Id` 复制上限为 16 个值/8 KiB 总字节。三表启用 FORCE RLS；ingress 与 purger 使用分离的 NOLOGIN least-privilege roles。Run-owner consumer 的 opt-in quarantine hook 仅将三个显式永久 fault class 路由给 Platform owner；receipt/payload commit 后才发送并等待确认 `double_ack_with(AckKind::Term)`。metadata-only 和 encrypted retention 都要求调用方显式配置，不提供默认。Rust 16/16 tests 和 PostgreSQL 18.6 双次 migration、RLS/WORM/TTL/purge/quota SQL checks 通过。生产登录身份/role membership、可信 NATS stream 配置、真实 KMS、目标 DB rollout、operator UI、全链路 redelivery 和执行仍未验收，因此 production consumer 与 Schedule/Task CLI 保持关闭。
+
+| AC-INFRA-002-Q | §16.41；独立 Platform Messaging/Ingress owner；可信 broker source tuple 为 `(deployment, stream_generation, stream, stream_sequence)`；append-only receipt/digest；explicit metadata-only 或 encrypted TTL Work；≤200 KiB/item 与 4 MiB/deployment DB-enforced quota；encrypted replay header ≤16 values/8 KiB；commit 后确认式 `double_ack_with(AckKind::Term)`；未知/存储/冲突错误保持 unacked；不变更 Run/BI/Reservation/Readiness/Execution。Focused Rust 和 disposable PostgreSQL gates 通过；真实 KMS、production login/stream grants、target DB rollout、operator access 与生产消费仍关闭。 |
 
 ### 16.42 Phase INFRA-2A Rust read-only Multipass inventory adapter
 
@@ -5195,3 +5199,4 @@ This remains an owner persistence substrate: read-only `multipass list` observat
 | v5.97 | 2026-10-08 | Mavis review | Add §16.42 for the bounded Rust read-only Multipass JSON inventory adapter; align requirements v6.00, Infrastructure DD v0.26, Group DD v4.66 and plan v6.29. Support name-keyed state-record maps and row-list compatibility, enforce process-wide single-flight; record 12/12 direct rustc tests, clippy-driver/rustfmt, Cargo rerun limitation, no live Multipass call, and absence of ownership/lifecycle/readiness/capacity/execution authority. Preserve the two-instance test limit. | INFRA-2A adds the first host-side process observation slice; self-review corrects JSON format and concurrency boundaries. |
 | v5.98 | 2026-10-08 | Mavis review | Add §16.43 / AC-INFRA-002-S for Multipass CLI/daemon version, local driver and host target facts; preserve unknown values, fixed read-only argv, shared fail-fast single-flight, 4 KiB output caps and 5-second per-command deadline (10 seconds worst-case sequentially). Align requirements v6.01, Group DD v4.67, Infrastructure DD v0.27 and plan v6.30; keep provider, ownership, readiness and execution gates open. | User selected the released Rust 1.99.0 baseline and INFRA-2B adds only bounded read-only host observations. |
 | v5.99 | 2026-10-08 | Mavis review | Add §16.44 for INFRA-2C1's five global SCD2 Master identities and append-only Transaction catalog; define exact-generation relationships, per-resource event locks, owner-only FORCE RLS/grants and two-record VM test boundary. Align requirements v6.02, Group DD v4.68, Infrastructure DD v0.28, W/T/M v0.8 and plan v6.33; record 29/29 disposable PostgreSQL steps and 16/16 FORCE RLS. Keep owner writer, provider/readiness, BI and Task CLI gates open. | The infrastructure identity catalog schema passed its cumulative isolated database gate. |
+| v6.00 | 2026-10-08 | Mavis review | Update §16.41 from design-only to verified 9F4D-3D6 persistence and consumer-hook substrate; add exact per-item/per-deployment quota, 16-value/8-KiB replay-header bounds, explicit retention, TTL/purge audit, confirmed Term ACK, FORCE RLS/owner roles and Rust/PostgreSQL evidence. Synchronize requirements v6.03, Schedule SRS/BD/DD v0.29/v0.28/v0.28, Group DD v4.69, Data Design v2.0, implementation plan v6.34 and phase report; preserve the two-record Multipass cap and production fail-closed boundary. | Implementation, bounded-memory review and disposable schema gates passed. |

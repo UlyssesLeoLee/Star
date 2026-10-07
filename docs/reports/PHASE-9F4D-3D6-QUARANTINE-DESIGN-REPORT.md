@@ -1,5 +1,7 @@
 # PHASE-9F4D-3D6-QUARANTINE-DESIGN-REPORT
 
+> Historical checkpoint: this document records the design-only state at its original review. Current implementation and verification status is in [`PHASE-9F4D-3D6-QUARANTINE-IMPLEMENTATION-REPORT.md`](PHASE-9F4D-3D6-QUARANTINE-IMPLEMENTATION-REPORT.md).
+
 > Status: 🟡 Design increment recorded; implementation and production enablement are open.
 > Date: 2026-10-08
 > Base: local `dev` at `5577e3b1358f7f214f8838f17c8faba4ebecc171`
