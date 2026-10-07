@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=b40fc1df5e0a38682bb7aa4a150f0a3c3cd16b660504cec37490185b29fc3f2a
+//! @cypher schema=1 source_sha256=acf8b5c1adc9222dd5a1d51fd922b94d714a75cc7fd79af76a50c5bc7d3198d2
 //! MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
 //! MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_inbox_is_idempotent_and_honors_terminal_receipts",kind:"test"})
 //! MERGE (admission_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_serializes_host_and_cluster_reservations",kind:"test"})
@@ -6,6 +6,11 @@
 //! MERGE (rejection_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_rejects_provider_generation_mismatch",kind:"test"})
 //! MERGE (profile_digest_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_rejects_a_profile_digest_mismatch",kind:"test"})
 //! MERGE (expiry_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_ignores_expired_capacity_holds",kind:"test"})
+//! MERGE (reservation_expiry_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_reservation_expiry_releases_both_ledgers_atomically",kind:"test"})
+//! MERGE (enqueue_demand:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::enqueue_demand",kind:"function"})
+//! MERGE (capacity_snapshot:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::capacity_snapshot",kind:"function"})
+//! MERGE (admit_inbox:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission.admit_inbox",kind:"method"})
+//! MERGE (expire_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission.expire_due_reservations",kind:"method"})
 //! MERGE (binding:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::binding",kind:"function"})
 //! MERGE (demand:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::demand",kind:"function"})
 //! MERGE (payload_digest:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::payload_digest",kind:"function"})
@@ -76,6 +81,20 @@
 //! MERGE (expiry_test)-[:CALLS]->(admission)
 //! MERGE (expiry_test)-[:READS]->(reservation)
 //! MERGE (expiry_test)-[:WRITES]->(reservation)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(binding)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(demand)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(enqueue_demand)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(admission)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(capacity_snapshot)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(admit_inbox)
+//! MERGE (reservation_expiry_test)-[:CALLS]->(expire_due)
+//! MERGE (reservation_expiry_test)-[:READS]->(reservation)
+//! MERGE (reservation_expiry_test)-[:WRITES]->(reservation)
+//! MERGE (reservation_expiry_test)-[:READS]->(physical_reservation)
+//! MERGE (reservation_expiry_test)-[:READS]->(physical_event)
+//! MERGE (reservation_expiry_test)-[:READS]->(reservation_event)
+//! MERGE (reservation_expiry_test)-[:READS]->(owner_outbox)
+//! MERGE (reservation_expiry_test)-[:READS]->(delivery)
 //! @endcypher
 
 use chrono::{Duration, Utc};
@@ -94,7 +113,7 @@ use infrastructure::infrastructure_owner_inbox::{
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use uuid::Uuid;
 
 fn budget() -> ExecutionResourceBudgetV1 {
@@ -762,5 +781,127 @@ async fn postgres_admission_ignores_expired_capacity_holds() {
             ..
         }
     ));
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_reservation_expiry_releases_both_ledgers_atomically() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let inbox_store = PostgresInfrastructureOwnerInbox::new(pool.clone());
+    let admission_store =
+        PostgresInfrastructureOwnerAdmission::new(pool.clone(), Uuid::new_v4(), Uuid::new_v4())
+            .expect("owner identities are present");
+    let item = demand(binding());
+    let inbox_id = enqueue_demand(&pool, &inbox_store, &item).await;
+    let accepted = admission_store
+        .admit_inbox(item.tenant_id, inbox_id, &capacity_snapshot(&item))
+        .await
+        .expect("admit the paired Host and exact-cluster reservation");
+    let InfrastructureOwnerAdmissionOutcome::Accepted {
+        reservation_bundle_id,
+        replayed: false,
+        ..
+    } = accepted
+    else {
+        panic!("demand must be accepted before testing expiry");
+    };
+
+    assert_eq!(
+        admission_store
+            .expire_due_reservations(item.tenant_id, 1)
+            .await
+            .expect("a live reservation is not expired"),
+        0
+    );
+    let expiring_lease: chrono::DateTime<Utc> =
+        sqlx::query_scalar("SELECT clock_timestamp() + interval '200 milliseconds'")
+            .fetch_one(&pool)
+            .await
+            .expect("read one future lease for both ledgers");
+    sqlx::query(
+        "UPDATE infrastructure.capacity_reservation_bundle \
+         SET lease_expires_at = $3 \
+         WHERE tenant_id = $1 AND reservation_bundle_id = $2",
+    )
+    .bind(item.tenant_id)
+    .bind(reservation_bundle_id)
+    .bind(expiring_lease)
+    .execute(&pool)
+    .await
+    .expect("expire the tenant reservation lease in the disposable fixture");
+    sqlx::query(
+        "UPDATE infrastructure.capacity_physical_reservation \
+         SET lease_expires_at = $2 \
+         WHERE reservation_bundle_id = $1",
+    )
+    .bind(reservation_bundle_id)
+    .bind(expiring_lease)
+    .execute(&pool)
+    .await
+    .expect("expire the matching global reservation lease in the disposable fixture");
+    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+
+    assert_eq!(
+        admission_store
+            .expire_due_reservations(item.tenant_id, 1)
+            .await
+            .expect("expire both ledgers in one transaction"),
+        1
+    );
+    assert_eq!(
+        admission_store
+            .expire_due_reservations(item.tenant_id, 1)
+            .await
+            .expect("repeat expiry without duplicating lifecycle facts"),
+        0
+    );
+
+    let (tenant_state, physical_state, tenant_events, physical_events, outbox_events, pending_delivery): (
+        String,
+        String,
+        i64,
+        i64,
+        i64,
+        i64,
+    ) = sqlx::query_as(
+        "SELECT \
+            (SELECT reservation_state FROM infrastructure.capacity_reservation_bundle \
+              WHERE tenant_id = $1 AND reservation_bundle_id = $2), \
+            (SELECT reservation_state FROM infrastructure.capacity_physical_reservation \
+              WHERE reservation_bundle_id = $2), \
+            (SELECT count(*) FROM infrastructure.capacity_reservation_event \
+              WHERE tenant_id = $1 AND reservation_bundle_id = $2 AND event_type = 'expired'), \
+            (SELECT count(*) FROM infrastructure.capacity_physical_reservation_event \
+              WHERE reservation_bundle_id = $2 AND event_type = 'expired'), \
+            (SELECT count(*) FROM infrastructure.capacity_owner_outbox \
+              WHERE tenant_id = $1 AND reservation_bundle_id = $2 AND event_type = 'capacity_expired'), \
+            (SELECT count(*) FROM infrastructure.capacity_outbox_delivery d \
+              JOIN infrastructure.capacity_owner_outbox o USING (tenant_id, event_id) \
+              WHERE d.tenant_id = $1 AND o.reservation_bundle_id = $2 \
+                AND o.event_type = 'capacity_expired' AND d.delivery_state = 'pending')",
+    )
+    .bind(item.tenant_id)
+    .bind(reservation_bundle_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read paired reservation expiry facts");
+    assert_eq!(
+        (
+            tenant_state.as_str(),
+            physical_state.as_str(),
+            tenant_events,
+            physical_events,
+            outbox_events,
+            pending_delivery,
+        ),
+        ("expired", "expired", 1, 1, 1, 1)
+    );
     pool.close().await;
 }

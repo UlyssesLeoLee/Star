@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.21 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile 与 3D1 跨租户物理容量 ledger 已通过 focused/PG18.6 隔离验证。production resolver/provider、目标 DB 装配、owner consumer/reaper、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.22 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile、3D1 跨租户物理容量 ledger 与 3D2 paired-reservation expiry primitive 已通过 focused/PG18.6 隔离验证。production resolver/provider、目标 DB 装配、owner consumer/scheduled reaper、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.94 §50.8G-50.8L / basic-design v5.91 §8.1、§16.21-16.36 / Schedule SRS v0.23 / Schedule BD v0.22 / Schedule DD v0.23 / 实施计划 §6.83-6.96。
+> 上游：requirements v5.95 §50.8G-50.8M / basic-design v5.92 §8.1、§16.21-16.37 / Schedule SRS v0.24 / Schedule BD v0.23 / Schedule DD v0.23 / 实施计划 §6.83-6.97。
 
 ## §0 目的与边界
 
@@ -199,6 +199,14 @@ The PostgreSQL 18.6 disposable runner applies schema/grants/profile/global migra
 
 This is not a production global allocator deployment. Trusted current Run binding/placement resolution, provider observation, target DB migration/login/role activation, actual Inbox/Outbox worker, tenant/global dual-ledger release/reaper/reconciliation, Manager/provider/readiness, BI/Benchmark, sandbox/workspace bridge and Schedule/Task Card execution remain fail-closed. No live resource is created or launched by this slice.
 
+### §7.8 Phase 9F4D-3D2：bounded paired reservation expiry
+
+`PostgresInfrastructureOwnerAdmission::expire_due_reservations` is a tenant-scoped owner-store primitive with `1..=64` maximum batch size. It scans held tenant bundles whose lease is elapsed according to PostgreSQL `clock_timestamp()`, orders them deterministically, and processes each candidate in a separate transaction. Each transaction acquires the same globally sorted and deduplicated tenant/physical Host/exact-cluster locks used by admission, reloads the tenant bundle and global physical row `FOR UPDATE`, and verifies every reservation ID, Host/cluster identity, generation, resource vector, capacity digest, observation timestamp, lease timestamp and state before mutation.
+
+Only a consistent pair that is still held and expired transitions to `expired`. The same transaction updates both Work ledgers, inserts the tenant lifecycle Transaction, lets the existing database trigger append the global physical Transaction, and writes one immutable `capacity_expired` owner Outbox event with its pending delivery row. A candidate whose lease was renewed or whose state changed is skipped idempotently. A missing or mismatched physical pair aborts the transaction; the two ledgers cannot diverge through this operation. PostgreSQL time is authoritative for both admission deadline and expiry decisions, avoiding application/DB clock skew.
+
+This adds no table or migration and does not change the cumulative 10-table W/T/M classification. It does not change the selected topology: Multipass manages one or more Linux guests running K3s, with no Docker Desktop prerequisite. It is not a scheduled worker, cross-tenant scanner, Outbox delivery consumer, Run/Execution outcome consumer, active Agent Runtime lease-renewal protocol, VM stop/delete operation or K3s cluster lifecycle. The current integration suite starts zero Multipass instances; test inventory remains limited to two registered instances total, including Stopped/Deleted. Schedule retry/resume and TaskExecutionRun transitions remain owned by their existing Run/Schedule owners and stay fail-closed until those consumers are implemented.
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -223,3 +231,4 @@ This is not a production global allocator deployment. Trusted current Run bindin
 | v0.19 | 2026-10-07 | Add the tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity requests from the exact profile inside the owner transaction; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases; keep production resolver, allocator, target DB, consumer, provider and execution gates open. |
 | v0.20 | 2026-10-07 | Mavis review | Align active upstream pointers to requirements v5.93/basic v5.90/implementation plan §6.95 and clarify that the historical six-table 3A schema/grant evidence is extended by the 3C3 Profile Master and event tables; cumulative gate is 8/8 FORCE RLS with Profile tables SELECT-only for Infrastructure owner. Preserve the disk-based two-instance test limit and fail-closed execution boundary. | Final cross-layer acceptance and W/T/M scope review. |
 | v0.21 | 2026-10-07 | Mavis review | Add §7.7 and synchronize requirements v5.94/basic v5.91/implementation plan §6.96/W-T-M v0.5; specify the no-tenant global physical Work/Transaction ledger, owner-only FORCE RLS, ordered/deduplicated physical locks, atomic tenant/global admission, transition event trigger, 21/21 disposable runner and 6/6 SQLx evidence. Retain release/reaper, production resolver/provider and execution gates; preserve the two-record disk cap. | Phase 9F4D-3D1 closes the cross-tenant physical Host/cluster overbooking gap at the admission substrate layer. |
+| v0.22 | 2026-10-07 | Mavis review | Add §7.8 for the database-clock bounded expiry primitive, exact tenant/global pair revalidation, ordered locks and atomic `capacity_expired` Outbox facts; record 21/21 runner steps and 7/7 SQLx cases. Clarify that the primitive is not a production worker, Run/Schedule consumer, active Runtime lease protocol or VM lifecycle; preserve the two-record Multipass test cap. | Phase 9F4D-3D2 adds idempotent expiry for paired Infrastructure admission reservations. |

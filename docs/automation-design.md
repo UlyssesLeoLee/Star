@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.20 (2026-10-07)
+> **文档版本**: v2.21 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1647,6 +1647,7 @@ frontend/src/app/automation-debug/
 | v2.18 | 2026-10-07 | Add §4.59 for the 9F4D-3C2 owner-admission Rust/PostgreSQL gates; include `infrastructure_owner_admission.rs` in explicit rustfmt inputs and record atomic reservation concurrency/replay/expiry cases, tenant-only capacity scope, zero VM use, and open production integration gates. |
 | v2.19 | 2026-10-07 | Add §4.60 for the 9F4D-3C3 persisted Provider Profile Master and profile-derived admission; record repeat migration, 8/8 FORCE RLS, owner read-only/WORM checks, 5/5 SQLx cases and zero Multipass use; preserve the disk-based two-entry cap and all production resolver/provider/execution blockers. |
 | v2.20 | 2026-10-07 | Add §4.61 for the 9F4D-3D1 global physical capacity ledger; record repeat migration, owner-only global FORCE RLS, tenant/global isolation, atomic lifecycle event trigger, shared-Host/shared-cluster cross-tenant SQLx contention, 21/21 runner steps, 10/10 RLS tables, 6/6 SQLx cases and zero Multipass use. Preserve the two-record disk cap and all production resolver/worker/provider/execution blockers. |
+| v2.21 | 2026-10-07 | Add §4.62 for the bounded 9F4D-3D2 paired-reservation expiry primitive; record database-clock scanning, ordered locks, full pair verification, atomic tenant/global lifecycle and `capacity_expired` Outbox facts, 21/21 runner steps, 10/10 FORCE RLS, 7/7 SQLx cases and zero VM use. Preserve the two-record Multipass cap and open production scheduler/consumer/Runtime/VM/execution gates. |
 
 ## 11. 引用文档
 
@@ -2680,3 +2681,14 @@ frontend/src/app/automation-debug/
 - The runner stopped and cleaned its unique temporary PostgreSQL cluster. This phase creates zero Multipass instances; live Multipass tests remain limited to two total registered inventory records, including Stopped/Deleted, due to host disk capacity. Full or malformed inventory remains fail-closed, without auto-purge.
 - This adds the verified global ledger seam but does not provision a production allocator. Trusted Run binding/provider resolvers, target DB login/grants/role activation, actual owner Inbox/Outbox worker, coordinated dual-ledger release/reaper, Manager/provider/readiness, Runtime sandbox/workspace bridge, BI/Benchmark and Schedule/Task Card execution remain open; execution remains disabled.
 - Phase evidence: [`PHASE-9F4D-3D1-GLOBAL-CAPACITY-REPORT.md`](reports/PHASE-9F4D-3D1-GLOBAL-CAPACITY-REPORT.md).
+
+### 4.62 Phase 9F4D-3D2 bounded paired-reservation expiry
+
+**自动化档：[P]** — extend the existing explicit rustfmt, focused Rust all-target, Clippy and package-test runner to cover the expiry primitive and its SQLx case; then run the disposable PostgreSQL 18.6 owner-schema runner. The runner remains scoped to loopback disposable DB and starts zero Multipass/K3s VMs.
+
+- Expiry accepts a tenant scope and `1..=64` item bound. Candidate selection uses PostgreSQL `clock_timestamp()` and stable lease ordering; each pair gets a separate transaction and the same sorted/deduplicated tenant/physical Host/exact-cluster locks as admission.
+- Under the locks, the transaction rereads both rows `FOR UPDATE` and compares all reservation IDs, resource identities, generations, capacity vectors, digests, observation time, lease and state. Only a matching pair still held and expired is changed; a renewed/changed candidate is an idempotent no-op, while pair drift aborts.
+- One transaction expires both Work rows, appends the tenant lifecycle fact, invokes the existing global physical lifecycle-event trigger, and writes one immutable versioned `capacity_expired` Infrastructure Outbox event plus pending delivery. No schema change or W/T/M count change is introduced.
+- Verification passed: 21/21 PostgreSQL runner steps, 10/10 Infrastructure FORCE RLS tables and 7/7 ignored SQLx cases. Rust focused gates include the invalid tenant/batch-before-database unit case. The disposable DB stopped and cleaned; no Multipass instance was created.
+- This is an owner-store primitive, not a production tenant sweep scheduler, Outbox delivery consumer, Run/Execution result consumer, active Agent Runtime lease renewal, Multipass Manager/VM lifecycle, K3s provider or Schedule executor. Expiration does not mutate Schedule occurrence or trigger automatic retry. The current test inventory cap remains two registered Multipass records including Stopped/Deleted; no automatic purge is allowed.
+- Phase evidence: [`PHASE-9F4D-3D2-RESERVATION-EXPIRY-REPORT.md`](reports/PHASE-9F4D-3D2-RESERVATION-EXPIRY-REPORT.md).

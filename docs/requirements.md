@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.94）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.95）
 
 ## 0. 文档说明与前提
 
@@ -2800,6 +2800,18 @@ The PostgreSQL 18.6 disposable runner applied schema, grant and profile migratio
 |---|---|
 | AC-INFRA-002-L | 跨租户共享物理 Host/cluster 必须通过无 `tenant_id` 的全局 Infrastructure owner Work/T 台账核算；仅 `star_infrastructure_owner` 可通过 FORCE RLS 访问。锁按 tenant 与物理资源 key 全排序、去重后持有；接受事务原子写 tenant/global reservation facts。release/expiry transition 必须原子追加 global T event。PostgreSQL 18.6 runner 必须重复应用迁移，验证 10/10 FORCE RLS、全局表 tenant 字段缺失、owner-only policy、tenant role 不可见/不可写、WORM 与 transition event；SQLx 并发场景分别共享 Host 和共享 cluster，均只能接受一个 reservation。此 slice 不证明 production resolver、target DB provisioning、consumer/reaper/provider 或执行可用。测试不创建 VM；Multipass 测试阶段 inventory 总量最多 2 条（含 Stopped/Deleted）。 | P0 |
 
+### 50.8M Phase 9F4D-3D2 有界过期 reservation 回收
+
+Infrastructure owner 必须提供 tenant-scoped、有界的 admission-reservation 过期原语。每次调用最多处理 64 个候选，按 PostgreSQL 权威时钟与 lease 到期时间稳定扫描；admission deadline 判断与 expiry transition 使用相同数据库时钟。每个 Host/精确 K3s cluster reservation pair 独立提交，取得已排序去重的 tenant/physical locks 后重新读取并锁定双方台账，完整比对 reservation ID、resource identity、generation、capacity vector、digest、observation time、lease 与 state。只有两侧仍为同一 held pair 且 lease 已到期时才可转为 expired；状态已改变或 lease 延长时幂等跳过，台账不一致时 fail closed。
+
+双台账状态转换、租户生命周期事实、由数据库 trigger 生成的全局物理 Transaction 事实、不可变 `capacity_expired` Infrastructure Outbox 与 pending delivery 必须在同一个 Infrastructure-owner 数据库事务内原子提交。重入不得重复产生生命周期事实。Schedule occurrence 与 Run/Execution 数据不由 Infrastructure owner 直接更新；Run/Execution owner 通过其 Inbox 消费事实并决定后续状态，Schedule 的 retry/resume 仍须经过既有 run-as、授权、occurrence fence 与新一轮 reservation 流程。
+
+该原语仅回收已到期的 admission reservation，不是正在执行的 Agent Runtime lease renewal、VM 自动销毁或生产定时 worker。它不改变 Multipass 管理一个或多个 Linux guest、guest 内运行 K3s 的既定拓扑，也不引入 Docker Desktop 前置条件。目标 DB、跨 tenant 扫描调度、Outbox delivery consumer、Run/Execution outcome consumer、Manager/provider 与执行闭环仍未完成时，Schedule 与任务卡 CLI 保持 fail closed。测试阶段最多保留 2 条登记的 Multipass instance 记录（包括 Stopped/Deleted），本阶段不得为 PostgreSQL/Rust 验证创建 VM。
+
+| 验收 ID | 受入基准 |
+|---|---|
+| AC-INFRA-002-M | expiry primitive 必须拒绝 nil tenant 和 1..64 之外的批大小；按数据库时钟读取至多指定数量的过期 held tenant bundles，并为每个 pair 独立获得全排序去重的 tenant/Host/cluster locks，重读与锁定 tenant/global rows，严格核对所有身份及容量事实。仅在双方均 held 且已到期时原子置为 expired，并写 tenant T event、triggered global T event、唯一 `capacity_expired` Outbox 和 pending delivery；重复调用不得产生重复事实，不一致数据不得被部分修改。必须有 disposable PostgreSQL 的 live-lease/expired-pair/replay/atomicity 覆盖和 Rust bound-validation 覆盖。该 primitive 不等同于生产 worker、active Runtime lease renewal、VM lifecycle 或 Schedule retry consumer；这些缺口保持 fail closed。验证期间 Multipass 登记总量上限为 2（含 Stopped/Deleted），Rust/DB runner 使用 0 VM。 | P0 |
+
 ### 50.9 追溯与后续专题同步
 
 本节为总要件基线。`SRS-MULTICA-TASK-001` 负责任务生命周期与 review gate，`SRS-MULTICA-HOOK-001` / `BD-MULTICA-HOOK-001` / `DD-MULTICA-HOOK-001` 负责高级设置 Hooks tab 的原生引擎、可视编辑、Worktree enforcement 与 Hook BI；`DD-MULTICA-TASK-001` §14.7-14.12 负责 Task Contract / Run / BI / Benchmark / Execution Profile / 双 Loop / Hook；`DD-WORKTREE-GROUP-001` §6.3-6.5 / §8.4-8.7 负责调度资源、扩展 Provider、Hook 与 CLI 边界；`DD-CANVAS-WORKFLOW-001` 的 Schedule Trigger 必须适配唯一 Automation occurrence source；`SRS-CANVAS-001` / `SRS-CANVAS-WORKFLOW-001` 负责画布与 Flow，`architecture/2026-09-03-langgraph/01-requirements.md` 负责 L0/L1 编排。`basic-design.md` §16.14-16.17 固定跨专题基本设计。后续专题文档必须继承 GroupContext、单一任务事实源、范围化聊天、Worktree-first 导航、可扩展 Agent Profile、原生 Hook、Loop、资源与跨 App 事件约束。
@@ -2934,3 +2946,4 @@ The PostgreSQL 18.6 disposable runner applied schema, grant and profile migratio
 | v5.92 | 2026-10-07 | Mavis review | Add AC-INFRA-002-K and §50.8K for the tenant-scoped SCD2 Provider Profile Master, append-only revision facts, stored-digest checks and profile-derived admission; align Schedule SRS v0.23/BD v0.22/DD v0.23 and Infrastructure DD v0.19; record 17/17 disposable PostgreSQL steps and 5/5 SQLx cases. Keep the disk-based two-entry Multipass test cap and production resolver/allocator/target DB/provider/consumer/execution fail-closed. | Phase 9F4D-3C3 added and verified the persisted capacity-profile source without starting Multipass. |
 | v5.93 | 2026-10-07 | Mavis review | Qualify AC-INFRA-002-G as the original 3A six-table scope, update AC-INFRA-002-H for read-only access to the two Provider Profile tables, and distinguish the 3B1 six-table historical grant result from the current 3C3 eight-table/17-step gate. Keep the two-record Multipass test cap and production fail-closed boundaries explicit. | Final consistency audit found the cumulative profile-table grants were not represented in the active grant acceptance wording. |
 | v5.94 | 2026-10-07 | Mavis review | Add §50.8L and AC-INFRA-002-L for the global physical Host/exact-cluster capacity ledger, cross-tenant lock ordering, atomic tenant/global reservation facts, owner-only FORCE RLS, and lifecycle event trigger; record 21/21 isolated runner steps, 10/10 FORCE RLS, and 6/6 SQLx cases while keeping production integration fail-closed. Preserve the disk-bound two-record Multipass test cap. | Phase 9F4D-3D1 closes the tenant-scoped overbooking gap for the Infrastructure-owner admission substrate without creating a VM. |
+| v5.95 | 2026-10-07 | Mavis review | Add §50.8M and AC-INFRA-002-M for a database-clock, bounded tenant-scoped expiry primitive over paired tenant/global reservations; specify strict pair revalidation, atomic lifecycle/Outbox facts, idempotent reentry and the Run/Execution-to-Schedule owner boundary. Keep active Runtime lease renewal, production worker/consumer, VM lifecycle and CLI execution open; preserve the two-record Multipass disk cap. | Phase 9F4D-3D2 implements and verifies the reservation expiry primitive without creating a VM. |
