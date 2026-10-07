@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.25 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile、3D1 跨租户物理容量 ledger、3D2 paired-reservation expiry 与 3D3 Outbox delivery state machine 与 3D4 bounded JetStream publisher 已通过 focused/PG18.6 隔离验证。production resolver/provider、Run-owner consumer provisioning/quarantine/scheduled reaper、目标 DB 装配、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.26 · 2026-10-08 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox/admission、persisted Profile、global physical capacity ledger、reservation expiry、Outbox publisher 与 Run-owner result consumer 有 focused/PG18.6 隔离证据；新增 Rust 只读 Multipass inventory adapter。production resolver/provider、Platform quarantine choice/writer/ACK、目标 DB 装配、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.98 §50.8G-50.8P / basic-design v5.95 §8.1、§16.21-16.40 / Schedule SRS v0.27 / Schedule BD v0.26 / Schedule DD v0.26 / Automation Design v2.24 / 实施计划 §6.83-6.100。
+> 上游：requirements v6.00 §50.8G-50.8R / basic-design v5.97 §8.1、§16.21-16.42 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.24 / 实施计划 §6.83-6.102。
 
 ## §0 目的与边界
 
@@ -143,7 +143,7 @@ The deployment layer must provision a distinct login and secret, grant its membe
 
 `crates/domain-infrastructure` 已有纯 Rust V2 类型：Multipass-managed K3s cluster 与 remote K3s provider discriminant、Kubernetes DNS label、Run resource budget、不可变 `RunInfrastructureBindingSnapshotV2`（pin cluster ID/generation）、`HostInfrastructureDemandV2`、Host+cluster 双层 capacity snapshot/request/candidate，以及同时绑定 Host/cluster generation 的 acceptance/readiness evidence。绑定摘要覆盖新增 cluster identity；评估器对 Host 与目标 cluster 的 CPU/memory/storage/GPU headroom 进行 fail-closed 检查，并核对最大 Run RSS budget、scope、freshness 和 deadline。Demand 仍以 `(tenant_id, occurrence_id)` 去重。focused runner 对该 crate 执行格式、all-target check、warnings-as-errors Clippy 和测试。
 
-这是双 owner 通信值对象契约，不创建 DB schema、Inbox/Outbox producer/consumer、Host/cluster reservation ledger、Run admission writer、Multipass subprocess/provider 或 readiness adapter，也不查询 run-as ACL。digest 是内容指纹，不是授权证据；规则创建者固定为 `run_as_actor_id`，每次 trigger/retry/resume 的 Project/Run 权限复验仍由未来 admission writer 执行。该 V2 wire contract 当前无 production consumer；如发现已存 V1 payload，需实施显式版本迁移，禁止静默重解释。其余 INFRA-1~5 和 Schedule 执行闭环仍开放。本切片不安装宿主功能、不变更 VM/K3s 或现有集群。
+这是双 owner 通信值对象契约，不创建 DB schema、Inbox/Outbox producer/consumer、Host/cluster reservation ledger、Run admission writer、Multipass lifecycle provider 或 readiness adapter，也不查询 run-as ACL。后续 §7.12 新增的只读 `multipass-adapter` 仅获取 CLI inventory，不承担 provider/Manager authority。digest 是内容指纹，不是授权证据；规则创建者固定为 `run_as_actor_id`，每次 trigger/retry/resume 的 Project/Run 权限复验仍由未来 admission writer 执行。该 V2 wire contract 当前无 production consumer；如发现已存 V1 payload，需实施显式版本迁移，禁止静默重解释。其余 INFRA-1~5 和 Schedule 执行闭环仍开放。本切片不安装宿主功能、不变更 VM/K3s 或现有集群。
 
 实现和定向验证证据：[`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md)。
 
@@ -233,6 +233,16 @@ Before the caller-owned Run transaction appends a scheduled demand, the Run-owne
 
 Run-owned persistence is a separate append-only Inbox transaction under tenant FORCE RLS and the least-privilege Run-owner role. The adapter commits before double-ack and compares complete immutable facts on duplicate event ID. It records no mutable reservation projection, Run/Schedule transition, readiness, BI event, or execution authorization. capacity_released lacks an upstream producer contract. Malformed/unmatched deliveries are not acknowledged and no quarantine fact is persisted, so the consumer remains production-disabled. Isolated PostgreSQL 18.6 plus loopback NATS tests create zero Multipass VMs; the global test inventory cap remains two registered records including stopped/deleted instances.
 
+### 7.12 INFRA-2A Rust read-only Multipass inventory adapter
+
+新增 `crates/multipass-adapter`，提供 `MultipassInventoryProbe::list_instances` 单一只读入口。构造时必须传入受信配置解析出的绝对可执行文件路径；adapter 固定使用 `Command::arg` 传入 `list --format json`，关闭 stdin，不接受外部 argv，stdout 限 128 KiB、stderr 限 4 KiB、总 deadline 固定 5 秒，并通过同一进程共享的 single-flight semaphore 拒绝其他 probe 对象的并发调用；future 被取消时子进程设置 `kill_on_drop`。不调用 shell、`wait-ready`、`launch`、`exec`、`mount`、`stop`、`delete` 或 `purge`。
+
+解析器最大接受 512 行、最多 128-byte instance name 与 64-byte state label；空值、控制字符、duplicate name/JSON key、空 mapping record/row-list、JSON/schema 错误或任何限额超出均失败关闭。它支持 Multipass 的 name→state-record array machine-readable mapping，也保留带 name/state 的非空 row-list compatibility fixture。`Running`、`Stopped`、`Deleted` 有明确只读标签，未来未知状态保留为 `Other`，不会被解释为 ready。snapshot 的 `registered_count` 对全部行计数，不滤除 Stopped/Deleted，以便上层 test/bootstrap 审计磁盘占用；test cap=2 的策略仍由已有带锁 bootstrap guard 承担，并不写进 customer product topology。
+
+Multipass 官方 [list CLI reference](https://github.com/canonical/multipass/blob/main/docs/reference/command-line-interface/list.md) 说明命令列出已创建实例并支持 JSON 格式；官方 [tutorial](https://github.com/canonical/multipass/blob/main/docs/tutorial/index.md) 显示 recoverable `Deleted` 实例仍出现在列表中。该 crate 不认证 CLI binary、证明 daemon readiness、归属 HostEnvironment/cluster、解析 ownership ledger、采样 capacity、创建 operation receipt 或启动生命周期 command；调用方不得把 snapshot 当作授权、reservation 或 readiness 证据。数据库、owner consumer、trusted manager wiring 与生产执行仍保持关闭。
+
+Rust 1.99.0 direct rustc test harness 为 12/12；覆盖官方 name-keyed map fixture、row-list fixture、duplicate JSON key、跨 probe 对象 single-flight、Stopped/Deleted 计数、未知 state、超限数据、stdout/stderr byte bounds 与相对 executable path 拒绝。clippy-driver `--test -D warnings` 与 rustfmt 通过。Cargo 本轮因离线 registry 缺 `async-stream` 且 online crates.io 索引遇 TLS `close_notify` 未能重跑；旧 Cargo 9/9 结果对应 parser 修正前版本，不作为当前 parser 的 Cargo 证据。测试没有运行 Multipass CLI、启动/修改 VM 或 K3s。本阶段没有验证跨平台 driver、实际 daemon 观察、桌面 RSS 或并行公平性。
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -261,3 +271,4 @@ Run-owned persistence is a separate append-only Inbox transaction under tenant F
 | v0.23 | 2026-10-07 | Mavis review | Add §7.9 for tenant-scoped Outbox delivery claims, attempt fencing, retry/backoff, exhausted/permanent dead-letter handling and terminal retention. Record focused Rust/PostgreSQL evidence while keeping broker publisher, Run consumer, production worker, target DB, provider and execution open; preserve the two-record Multipass test cap. | Phase 9F4D-3D3 adds an owner-side delivery state machine without broker or VM integration. |
 | v0.24 | 2026-10-07 | Mavis review | Add section 7.10 for bounded Infrastructure Outbox JetStream publication; pin stable event ID, PubAck-before-delivery, same-ID retry and durable Run Inbox dedupe; record loopback NATS/PostgreSQL evidence and Rust 1.99.0 with zero VM use. Preserve the two-record Multipass cap and open production worker/consumer/provider/execution gates. | Phase 9F4D-3D4 added verified transport publication without enabling execution. |
 | v0.25 | 2026-10-07 | Add §7.11 for TaskExecutionRun-validated scheduled demand append, the Run-owner capacity result consumer and append-only tenant Inbox; record exact demand-derived scope, commit-before-double-ack, no mutable Run projection, no quarantine/release contract, zero-VM test and two-record cap. | Phase 9F4D-3D5 adds the result-side owner boundary. |
+| v0.26 | 2026-10-08 | Mavis review | Add §7.12 for the bounded Rust read-only Multipass JSON inventory adapter; support name-keyed state-record mappings and row-list compatibility, enforce process-wide single-flight, reject duplicate keys and preserve Stopped/Deleted-inclusive counts. Record 12/12 direct rustc tests, clippy-driver/rustfmt, Cargo rerun blockage, zero live CLI/VM use, and the disk-based two-instance test cap; update requirements/basic/Group DD and implementation-plan pointers. | INFRA-2A implements a safe observation-only starting point; self-review corrects CLI JSON format and concurrency boundaries. |

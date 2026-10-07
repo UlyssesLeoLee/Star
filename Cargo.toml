@@ -15,6 +15,8 @@ members = [
     "crates/domain-feedback",
     "crates/domain-identity",
     "crates/domain-infrastructure",
+    # Phase INFRA-2A: bounded read-only Multipass inventory probe; no lifecycle commands.
+    "crates/multipass-adapter",
     "crates/domain-integration",
     "crates/domain-kms",
     "crates/domain-local-runtime",

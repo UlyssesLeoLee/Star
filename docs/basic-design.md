@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.96 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v5.99
+> **文档版本**: v5.97 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v6.00
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5018,6 +5018,16 @@ Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/pa
 |---|---|
 | AC-INFRA-002-Q | §16.41；独立 Platform Messaging/Ingress owner；可信 broker source tuple 为 `(deployment, stream_generation, stream, stream_sequence)`；append-only receipt/digest；可选加密 TTL Work payload；完成事务后才 Term；错误与不确定 fault 保持 unacked；不变更 Run/BI/Reservation/Readiness/Execution。用户 payload retention 决策、故障分类、schema/grants/writer 和生产 consumer 尚未完成。 |
 
+### 16.42 Phase INFRA-2A Rust read-only Multipass inventory adapter
+
+新增 `multipass-adapter` Rust crate，作为未来可信 Host Infrastructure Manager 的只读 process-adapter 起点。它仅接受受信绝对可执行文件路径，固定以 argv 调用 `list --format json`，stdin 关闭，stdout/stderr 上限分别为 128 KiB/4 KiB，进程内所有 probe 共用 single-flight 门，并在 5 秒 deadline 内结束；取消、超时、命令失败、解析错误、重复名称/JSON 键、空 mapping record 或 row list、无效字段及行数/输出超限均 fail closed，错误不保留原始输出。解析器支持 Multipass 的 name→state-record array machine-readable mapping 和带 name/state 的非空 row-list 兼容形态；保留 Stopped 与 Deleted 行，并由 `registered_count` 对所有行计数，未知状态只记录为未分类状态。
+
+该 crate 不具备 ownership ledger、Manager 权限、Host/cluster identity、容量预留、Multipass daemon readiness、guest/K3s/Runtime readiness、provider capability、生命周期命令或 authorization。它没有被 Run/Schedule/Task CLI 调用，也不触发 VM 改动。当前测试阶段最多两条注册实例（含 Stopped/Deleted）的限制仍由带 host-local 独占锁的受控 PoC bootstrap 路径落实，不是产品拓扑限制；直接调用 Multipass CLI 可以绕过该 PoC guard。12 项 fixture/有界读取/path validation tests 经 Rust 1.99.0 direct rustc harness 通过，clippy-driver `-D warnings` 与 rustfmt 通过；因本机 Cargo registry 离线缺 `async-stream` 且在线 crates.io 索引遇 TLS close_notify，本轮未能用 Cargo 重跑。未运行 live Multipass probe、workspace 全量测试、RSS/并发性能或真实 K3s 验收。
+
+| 验收 ID | 对应设计与当前边界 |
+|---|---|
+| AC-INFRA-002-R | §16.42；验证固定 `multipass list --format json` 命令、绝对路径、单飞、有界 IO/deadline、Stopped/Deleted 保留与解析 fail-closed；fixture 单测无 VM。它不建立所有权、容量/readiness 或 lifecycle authority。 |
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5160,3 +5170,4 @@ Quarantine receipt 是 append-only Transaction fact，记录有界 fault code/pa
 | v5.94 | 2026-10-07 | Mavis review | Add section 16.39 for injected-context, serial bounded JetStream publication; specify event allowlist, payload/envelope bounds, stable Nats-Msg-Id, PubAck-before-ack and at-least-once Run Inbox dedupe; synchronize requirements v5.97 and Schedule/Infrastructure design; record Rust 1.99.0 and loopback NATS/PostgreSQL evidence while preserving open production gates and the two-instance, zero-VM test limit. | Phase 9F4D-3D4 verified transport publication without changing owner persistence or execution boundaries. |
 | v5.95 | 2026-10-07 | Mavis review | Add §16.40 for the Run-owner result Inbox and validate scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation within its caller transaction; synchronize requirements v5.98, Group DD v4.64, Schedule contracts, Infrastructure DD v0.25 and Data Design v1.8. Record exact demand-derived result scope, commit-before-double-ack, no state projection, fail-closed poison/release gaps, Rust 1.99.0 and zero-VM/two-record test boundary. | Phase 9F4D-3D5 implements the result consumer slice. |
 | v5.96 | 2026-10-08 | Mavis review | Add §16.41 for separate Platform Messaging/Ingress poison quarantine ownership, trusted JetStream source identity, append-only Transaction receipt, conditional encrypted TTL Work payload and commit-before-Term; synchronize requirements v5.99, Schedule SRS/BD/DD v0.28/v0.27/v0.27, Group DD v4.65, Data Design v1.9 and plan v6.28. Record that payload policy, fault taxonomy, migration/grants/writer and ACK implementation remain open; preserve two-record Multipass cap. | Phase 9F4D-3D6 design increment isolates untrusted-message handling from the Run-owner Inbox. |
+| v5.97 | 2026-10-08 | Mavis review | Add §16.42 for the bounded Rust read-only Multipass JSON inventory adapter; align requirements v6.00, Infrastructure DD v0.26, Group DD v4.66 and plan v6.29. Support name-keyed state-record maps and row-list compatibility, enforce process-wide single-flight; record 12/12 direct rustc tests, clippy-driver/rustfmt, Cargo rerun limitation, no live Multipass call, and absence of ownership/lifecycle/readiness/capacity/execution authority. Preserve the two-instance test limit. | INFRA-2A adds the first host-side process observation slice; self-review corrects JSON format and concurrency boundaries. |
