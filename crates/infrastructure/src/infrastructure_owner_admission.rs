@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=99155b8eb584b18f4e374c32ead638aa808ed3f6976e3226d5ed6db4eb8bb5f0
+//! @cypher schema=1 source_sha256=aa2c2f30464590f17ec4b8203d7f24b14ad748eaa6890b11cbac7ac16002497c
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_admission.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::module",kind:"module"})
 //! MERGE (store:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission",kind:"struct"})
@@ -6,6 +6,7 @@
 //! MERGE (error:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::InfrastructureOwnerAdmissionError",kind:"enum"})
 //! MERGE (admit:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::PostgresInfrastructureOwnerAdmission.admit_inbox",kind:"method"})
 //! MERGE (locks:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::lock_resource_scope",kind:"function"})
+//! MERGE (lock_keys:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::unique_sorted_lock_keys",kind:"function"})
 //! MERGE (aggregate:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::read_active_reservations",kind:"function"})
 //! MERGE (accept:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::record_accepted",kind:"function"})
 //! MERGE (reject:Symbol {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::record_rejected",kind:"function"})
@@ -13,8 +14,10 @@
 //! MERGE (loaded_profile:Type {id:"crates/infrastructure/src/infrastructure_owner_admission.rs::LoadedProviderProfileRevision",kind:"struct"})
 //! MERGE (inbox:Table {id:"infrastructure.capacity_demand_inbox"})
 //! MERGE (bundle:Table {id:"infrastructure.capacity_reservation_bundle"})
+//! MERGE (physical:Table {id:"infrastructure.capacity_physical_reservation",class:"Work"})
 //! MERGE (receipt:Table {id:"infrastructure.capacity_demand_receipt"})
 //! MERGE (reservation_event:Table {id:"infrastructure.capacity_reservation_event"})
+//! MERGE (physical_event:Table {id:"infrastructure.capacity_physical_reservation_event",class:"Transaction"})
 //! MERGE (outbox:Table {id:"infrastructure.capacity_owner_outbox"})
 //! MERGE (delivery:Table {id:"infrastructure.capacity_outbox_delivery"})
 //! MERGE (provider_profile:Table {id:"infrastructure.provider_profile_revision",class:"Master"})
@@ -26,6 +29,7 @@
 //! MERGE (module)-[:DEFINES]->(outcome)
 //! MERGE (module)-[:DEFINES]->(error)
 //! MERGE (module)-[:DEFINES]->(locks)
+//! MERGE (module)-[:DEFINES]->(lock_keys)
 //! MERGE (module)-[:DEFINES]->(aggregate)
 //! MERGE (module)-[:DEFINES]->(accept)
 //! MERGE (module)-[:DEFINES]->(reject)
@@ -41,7 +45,10 @@
 //! MERGE (admit)-[:CALLS]->(reject)
 //! MERGE (admit)-[:READS]->(inbox)
 //! MERGE (admit)-[:READS]->(bundle)
+//! MERGE (admit)-[:READS]->(physical)
 //! MERGE (admit)-[:WRITES]->(bundle)
+//! MERGE (admit)-[:WRITES]->(physical)
+//! MERGE (admit)-[:WRITES]->(physical_event)
 //! MERGE (admit)-[:WRITES]->(receipt)
 //! MERGE (admit)-[:WRITES]->(reservation_event)
 //! MERGE (admit)-[:WRITES]->(outbox)
@@ -53,19 +60,19 @@
 
 //! Infrastructure-owner admission for one already received Run-owner demand.
 //!
-//! This transaction serializes competing reservations for the tenant-scoped Host and exact
-//! K3s cluster, recomputes committed capacity from the Infrastructure ledger, and writes the
-//! paired reservation, receipt, audit fact, and owner Outbox atomically. It does not provision
-//! a Multipass instance, start a K3s workload, or enable a TaskExecutionRun.
+//! This transaction serializes competing reservations for the tenant and physical Host/exact
+//! K3s cluster scopes, recomputes capacity from the global physical ledger, and writes both
+//! ledgers plus receipt, audit facts, and owner Outbox atomically. It does not provision a VM,
+//! start a K3s workload, or enable a TaskExecutionRun.
 
 use chrono::{DateTime, Duration, Utc};
 use domain_infrastructure::{
-    evaluate_infrastructure_capacity_candidate, ClusterPlacementPolicyV1,
-    InfrastructureCapacityEvaluationError, InfrastructureCapacityRequestV2,
-    InfrastructureCapacitySnapshotV2, InfrastructureProviderProfileError,
-    InfrastructureProviderProfileRevisionV1, InfrastructureResourceVectorV1, ProviderKind,
+    ClusterPlacementPolicyV1, InfrastructureCapacityEvaluationError,
+    InfrastructureCapacityRequestV2, InfrastructureCapacitySnapshotV2,
+    InfrastructureProviderProfileError, InfrastructureProviderProfileRevisionV1,
+    InfrastructureResourceVectorV1, ProviderKind, evaluate_infrastructure_capacity_candidate,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use thiserror::Error;
@@ -166,6 +173,10 @@ impl PostgresInfrastructureOwnerAdmission {
         let mut tx = self.pool.begin().await?;
         sqlx::query(OWNER_ROLE).execute(&mut *tx).await?;
         set_tenant_scope(&mut tx, tenant_id).await?;
+        sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+            .bind(self.actor_id.to_string())
+            .execute(&mut *tx)
+            .await?;
 
         let Some((host_environment_id, k3s_cluster_id)) =
             read_inbox_lock_scope(&mut tx, tenant_id, inbox_id).await?
@@ -293,7 +304,6 @@ impl PostgresInfrastructureOwnerAdmission {
         snapshot.active_reservations = Some(
             read_active_reservations(
                 &mut tx,
-                tenant_id,
                 row.host_environment_id,
                 row.host_generation,
                 true,
@@ -304,7 +314,6 @@ impl PostgresInfrastructureOwnerAdmission {
         snapshot.cluster_active_reservations = Some(
             read_active_reservations(
                 &mut tx,
-                tenant_id,
                 row.k3s_cluster_id,
                 row.k3s_cluster_generation,
                 false,
@@ -445,39 +454,52 @@ async fn lock_resource_scope(
     host_environment_id: Uuid,
     k3s_cluster_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    let mut keys = [
-        advisory_lock_key(tx, "host", tenant_id, host_environment_id).await?,
-        advisory_lock_key(tx, "cluster", tenant_id, k3s_cluster_id).await?,
-    ];
-    keys.sort_unstable();
-    if keys[0] == keys[1] {
+    let tenant_scope = format!("tenant:{tenant_id}");
+    let keys = unique_sorted_lock_keys([
+        advisory_lock_key(tx, &format!("{tenant_scope}:host"), host_environment_id).await?,
+        advisory_lock_key(tx, &format!("{tenant_scope}:cluster"), k3s_cluster_id).await?,
+        advisory_lock_key(tx, "physical:host", host_environment_id).await?,
+        advisory_lock_key(tx, "physical:cluster", k3s_cluster_id).await?,
+    ]);
+    for key in keys {
         sqlx::query("SELECT pg_advisory_xact_lock($1)")
-            .bind(keys[0])
+            .bind(key)
             .execute(&mut **tx)
             .await?;
-    } else {
-        for key in keys {
-            sqlx::query("SELECT pg_advisory_xact_lock($1)")
-                .bind(key)
-                .execute(&mut **tx)
-                .await?;
-        }
     }
     Ok(())
 }
 
+fn unique_sorted_lock_keys(keys: [i64; 4]) -> Vec<i64> {
+    let mut keys = keys.into_iter().collect::<Vec<_>>();
+    keys.sort_unstable();
+    keys.dedup();
+    keys
+}
+
 async fn advisory_lock_key(
     tx: &mut Transaction<'_, Postgres>,
-    kind: &str,
-    tenant_id: Uuid,
+    scope: &str,
     resource_id: Uuid,
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar("SELECT hashtextextended($1, 0)")
         .bind(format!(
-            "star.infrastructure.capacity.{kind}:{tenant_id}:{resource_id}"
+            "star.infrastructure.capacity.{scope}:{resource_id}"
         ))
         .fetch_one(&mut **tx)
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unique_sorted_lock_keys;
+
+    #[test]
+    fn lock_key_collisions_keep_every_distinct_resource_lock() {
+        assert_eq!(unique_sorted_lock_keys([9, 9, 3, 5]), vec![3, 5, 9]);
+        assert_eq!(unique_sorted_lock_keys([4, 4, 4, 4]), vec![4]);
+        assert_eq!(unique_sorted_lock_keys([8, 1, 7, 2]), vec![1, 2, 7, 8]);
+    }
 }
 
 async fn read_inbox_for_update(
@@ -679,7 +701,6 @@ fn provider_profile_error_code(error: InfrastructureProviderProfileError) -> &'s
 
 async fn read_active_reservations(
     tx: &mut Transaction<'_, Postgres>,
-    tenant_id: Uuid,
     resource_id: Uuid,
     generation: i64,
     host_scope: bool,
@@ -691,11 +712,10 @@ async fn read_active_reservations(
                     COALESCE(SUM(host_memory_bytes), 0)::BIGINT, \
                     COALESCE(SUM(host_ephemeral_storage_bytes), 0)::BIGINT, \
                     COALESCE(SUM(host_gpu_units), 0)::BIGINT \
-             FROM infrastructure.capacity_reservation_bundle \
-             WHERE tenant_id = $1 AND host_environment_id = $2 AND host_generation = $3 \
-               AND reservation_state = 'held' AND lease_expires_at > $4",
+             FROM infrastructure.capacity_physical_reservation \
+             WHERE host_environment_id = $1 AND host_generation = $2 \
+               AND reservation_state = 'held' AND lease_expires_at > $3",
         )
-        .bind(tenant_id)
         .bind(resource_id)
         .bind(generation)
         .bind(now)
@@ -707,12 +727,11 @@ async fn read_active_reservations(
                     COALESCE(SUM(cluster_memory_bytes), 0)::BIGINT, \
                     COALESCE(SUM(cluster_ephemeral_storage_bytes), 0)::BIGINT, \
                     COALESCE(SUM(cluster_gpu_units), 0)::BIGINT \
-             FROM infrastructure.capacity_reservation_bundle \
-             WHERE tenant_id = $1 AND k3s_cluster_id = $2 \
-               AND k3s_cluster_generation = $3 AND reservation_state = 'held' \
-               AND lease_expires_at > $4",
+             FROM infrastructure.capacity_physical_reservation \
+             WHERE k3s_cluster_id = $1 \
+               AND k3s_cluster_generation = $2 AND reservation_state = 'held' \
+               AND lease_expires_at > $3",
         )
-        .bind(tenant_id)
         .bind(resource_id)
         .bind(generation)
         .bind(now)
@@ -840,6 +859,67 @@ async fn record_accepted(
         cluster_capacity_reservation_id = Uuid::new_v4();
     }
     let (snapshot_digest, host, cluster) = capacity_evidence(snapshot, request)?;
+
+    sqlx::query(
+        "INSERT INTO infrastructure.capacity_physical_reservation \
+         (reservation_bundle_id, host_capacity_reservation_id, host_environment_id, host_generation, \
+          host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes, host_gpu_units, \
+          cluster_capacity_reservation_id, k3s_cluster_id, k3s_cluster_generation, \
+          cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units, \
+          capacity_snapshot_digest, capacity_observed_at, lease_expires_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
+    )
+    .bind(reservation_bundle_id)
+    .bind(host_capacity_reservation_id)
+    .bind(candidate.host_environment_id)
+    .bind(candidate.host_generation)
+    .bind(host.cpu_millicores)
+    .bind(host.memory_bytes)
+    .bind(host.ephemeral_storage_bytes)
+    .bind(host.gpu_units)
+    .bind(cluster_capacity_reservation_id)
+    .bind(candidate.k3s_cluster_id)
+    .bind(candidate.k3s_cluster_generation)
+    .bind(cluster.cpu_millicores)
+    .bind(cluster.memory_bytes)
+    .bind(cluster.ephemeral_storage_bytes)
+    .bind(cluster.gpu_units)
+    .bind(snapshot_digest.as_slice())
+    .bind(candidate.observed_at)
+    .bind(lease_expires_at)
+    .execute(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO infrastructure.capacity_physical_reservation_event \
+         (reservation_bundle_id, event_type, host_capacity_reservation_id, host_environment_id, \
+          host_generation, host_cpu_millicores, host_memory_bytes, host_ephemeral_storage_bytes, \
+          host_gpu_units, cluster_capacity_reservation_id, k3s_cluster_id, k3s_cluster_generation, \
+          cluster_cpu_millicores, cluster_memory_bytes, cluster_ephemeral_storage_bytes, cluster_gpu_units, \
+          capacity_snapshot_digest, capacity_observed_at, lease_expires_at, actor_id) \
+         VALUES ($1,'held',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)",
+    )
+    .bind(reservation_bundle_id)
+    .bind(host_capacity_reservation_id)
+    .bind(candidate.host_environment_id)
+    .bind(candidate.host_generation)
+    .bind(host.cpu_millicores)
+    .bind(host.memory_bytes)
+    .bind(host.ephemeral_storage_bytes)
+    .bind(host.gpu_units)
+    .bind(cluster_capacity_reservation_id)
+    .bind(candidate.k3s_cluster_id)
+    .bind(candidate.k3s_cluster_generation)
+    .bind(cluster.cpu_millicores)
+    .bind(cluster.memory_bytes)
+    .bind(cluster.ephemeral_storage_bytes)
+    .bind(cluster.gpu_units)
+    .bind(snapshot_digest.as_slice())
+    .bind(candidate.observed_at)
+    .bind(lease_expires_at)
+    .bind(actor_id)
+    .execute(&mut **tx)
+    .await?;
 
     sqlx::query(
         "INSERT INTO infrastructure.capacity_reservation_bundle \

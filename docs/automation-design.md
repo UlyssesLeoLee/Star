@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.19 (2026-10-07)
+> **文档版本**: v2.20 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1646,6 +1646,7 @@ frontend/src/app/automation-debug/
 | v2.17 | 2026-10-07 | Add the 9F4D-3C1 reproducible Rust and disposable PostgreSQL Inbox integration gate; record serial infrastructure-crate tests, baseline lint allowances, and the exact fail-closed boundary. |
 | v2.18 | 2026-10-07 | Add §4.59 for the 9F4D-3C2 owner-admission Rust/PostgreSQL gates; include `infrastructure_owner_admission.rs` in explicit rustfmt inputs and record atomic reservation concurrency/replay/expiry cases, tenant-only capacity scope, zero VM use, and open production integration gates. |
 | v2.19 | 2026-10-07 | Add §4.60 for the 9F4D-3C3 persisted Provider Profile Master and profile-derived admission; record repeat migration, 8/8 FORCE RLS, owner read-only/WORM checks, 5/5 SQLx cases and zero Multipass use; preserve the disk-based two-entry cap and all production resolver/provider/execution blockers. |
+| v2.20 | 2026-10-07 | Add §4.61 for the 9F4D-3D1 global physical capacity ledger; record repeat migration, owner-only global FORCE RLS, tenant/global isolation, atomic lifecycle event trigger, shared-Host/shared-cluster cross-tenant SQLx contention, 21/21 runner steps, 10/10 RLS tables, 6/6 SQLx cases and zero Multipass use. Preserve the two-record disk cap and all production resolver/worker/provider/execution blockers. |
 
 ## 11. 引用文档
 
@@ -2668,3 +2669,14 @@ frontend/src/app/automation-debug/
 - The gate creates zero Multipass instances. Any live VM test remains capped at two registered inventory records total, including stopped/deleted records, because of host disk capacity; malformed inventory and a full cap fail closed without automatic purge.
 - This is a profile persistence/derivation primitive only. Trusted current-profile and Run-binding resolvers, provider observation, cross-tenant allocator, target DB identity/provisioning, Inbox/Outbox consumer, Manager/provider/readiness producer, sandbox/workspace bridge, BI/Benchmark and Schedule executor remain open; execution stays fail-closed.
 - Phase evidence: [`PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md`](reports/PHASE-9F4D-3C3-PROVIDER-PROFILE-REPORT.md).
+
+### 4.61 Phase 9F4D-3D1 global physical Host/cluster capacity ledger
+
+**自动化档：[P]** — the disposable PostgreSQL runner applies the owner schema, grants, Provider Profile and global physical-ledger migrations twice, checks role privileges/RLS/isolation/WORM/retention/transition-event behavior, then executes all ignored SQLx Inbox/admission cases against the same loopback-only cluster. No Multipass or K3s VM is started.
+
+- The global `capacity_physical_reservation` Work table and `capacity_physical_reservation_event` Transaction table omit `tenant_id`. Both enable and force RLS with a single policy for `star_infrastructure_owner`; the tenant-scoped probe has table grants for negative testing but cannot see or insert these global facts.
+- Owner admission sorts and de-duplicates all tenant and physical Host/cluster advisory lock keys before locking, then aggregates held/unexpired reservations from the global ledger. Acceptance writes the global and tenant reservation facts in one Infrastructure-owner transaction. A database trigger appends a physical lifecycle event atomically on valid terminal transitions.
+- Verification passed: 21/21 PostgreSQL runner steps, 10/10 Infrastructure FORCE RLS tables and 6/6 ignored SQLx cases. The SQLx contention case covers a shared Host across tenants and a shared K3s cluster across Hosts; each pair yields one Accepted and one Retry. The Rust lock-key helper test covers collision deduplication.
+- The runner stopped and cleaned its unique temporary PostgreSQL cluster. This phase creates zero Multipass instances; live Multipass tests remain limited to two total registered inventory records, including Stopped/Deleted, due to host disk capacity. Full or malformed inventory remains fail-closed, without auto-purge.
+- This adds the verified global ledger seam but does not provision a production allocator. Trusted Run binding/provider resolvers, target DB login/grants/role activation, actual owner Inbox/Outbox worker, coordinated dual-ledger release/reaper, Manager/provider/readiness, Runtime sandbox/workspace bridge, BI/Benchmark and Schedule/Task Card execution remain open; execution remains disabled.
+- Phase evidence: [`PHASE-9F4D-3D1-GLOBAL-CAPACITY-REPORT.md`](reports/PHASE-9F4D-3D1-GLOBAL-CAPACITY-REPORT.md).

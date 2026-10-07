@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.90 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.93
+> **文档版本**: v5.91 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.94
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4958,6 +4958,16 @@ Infrastructure owner admission 根据不可变 demand 加载 exact profile id/re
 
 此为 profile source 与 admission derivation substrate，不提供 profile editor/current resolver、trusted Run binding/provider observation、cross-tenant allocator、target DB provisioning、consumer/Manager/provider、BI/Benchmark 或 executor。所有这些门继续 fail-closed，Schedule 与 Task Card CLI 不可执行。测试阶段 Multipass inventory 的总登记数仍最多 2（包括 Stopped/Deleted），磁盘容量是该限制原因。
 
+### 16.36 Phase 9F4D-3D1 跨租户物理 Host/cluster 容量台账
+
+3C2 的 tenant-scoped bundle 汇总不能约束共享物理资源的跨租户总量。3D1 新增全局 Infrastructure owner `capacity_physical_reservation` Work 与 append-only `capacity_physical_reservation_event` Transaction；二者都不含 `tenant_id`，并通过 FORCE RLS 的 owner-only policy 限定可见/可写角色。累计 10 张 Infrastructure owner 表分类为 4 W / 5 T / 1 M；既有租户 Inbox、reservation bundle、receipt、audit 与 Outbox 仍保留 tenant RLS。
+
+`admit_inbox` 同一 owner transaction 取得 tenant Host/cluster 与全局物理 Host/cluster locks，所有 advisory keys 排序去重后逐个持有，再从全局 ledger 聚合 unexpired held reservations。接受时全局 Work/T 与租户 reservation/receipt/event/Outbox 同事务写入。数据库 lifecycle trigger 仅在物理 reservation 从 held 终态变化时追加同事务的全局 event。Integration case 分别模拟跨租户共享 Host、跨 Host 共享 cluster 并发；两类竞争均只有一方获得 reservation，另一方进入有界 retry。lock key 碰撞单测确认去重不会遗漏任何不同资源锁。
+
+PostgreSQL 18.6 disposable runner 重复应用 migration，验证 owner-only RLS policy、global table 不含 tenant key、tenant-scoped probe 无法读取/写入全局 ledger、WORM 与状态变更事件；10/10 Infrastructure 表 FORCE RLS，runner 21/21 steps、SQLx 6/6 cases 通过。整个 slice 不启动 Multipass VM，测试阶段仍最多保留 2 条已登记 Multipass inventory 记录（含 Stopped/Deleted），以控制宿主硬盘占用。
+
+这尚未部署 production global allocator：trusted Run binding/placement 与 provider observation producer、目标 DB identity/grants/role activation、真实 Inbox/Outbox worker、tenant/global 双 ledger release/reaper/reconciliation、Manager/provider/readiness、Runtime sandbox/workspace bridge 仍开放。Schedule 与 Task Card CLI 保持 fail-closed，不能从该数据库 substrate 推断任务可执行。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5094,3 +5104,4 @@ Infrastructure owner admission 根据不可变 demand 加载 exact profile id/re
 | v5.88 | 2026-10-07 | Mavis review | Align requirements v5.91, Schedule SRS/DD v0.22, Infrastructure DD v0.18, and implementation plan v6.19; add §16.34 for tenant-scoped atomic dual Host/cluster admission, unexpired reservation aggregation, concurrent admission evidence, and explicit cross-tenant allocator gap. Preserve the two-instance disk cap and Schedule/CLI fail-closed boundary. | Phase 9F4D-3C2 PostgreSQL owner admission integration passed without Multipass. |
 | v5.89 | 2026-10-07 | Mavis review | Align requirements v5.92, Schedule SRS v0.23/BD v0.22/DD v0.23, Infrastructure DD v0.19 and implementation plan v6.20; add §16.35 and AC-INFRA-002-K for persisted Provider Profile Master/Transaction, stored-digest validation and profile-derived Host/cluster request; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases. Preserve the disk-bound two-entry Multipass cap and fail-closed production boundary. | Phase 9F4D-3C3 profile source/admission derivation passed isolated PostgreSQL verification without Multipass. |
 | v5.90 | 2026-10-07 | Mavis review | Align the current requirements pointer to v5.93, Infrastructure DD to v0.20 and implementation plan to v6.22; qualify AC-INFRA-002-H with Profile-table read-only grants and the cumulative eight-table gate while retaining the original 3B1 evidence as historical. Preserve the two-instance disk cap and all production fail-closed boundaries. | Final cross-layer grant and version-reference audit. |
+| v5.91 | 2026-10-07 | Mavis review | Align requirements v5.94, Infrastructure DD v0.21, implementation plan v6.23, W/T/M v0.5 and Automation Design v2.20; add §16.36 for global physical Host/cluster reservations, owner-only FORCE RLS, sorted/deduplicated cross-tenant locks, atomic lifecycle events, and 21/21 PostgreSQL runner / 6/6 SQLx evidence. Preserve the two-record disk cap and all production execution blockers. | Phase 9F4D-3D1 implemented and verified the global capacity-ledger seam without Multipass VM creation. |
