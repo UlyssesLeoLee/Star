@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.96）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.97）
 
 ## 0. 文档说明与前提
 
@@ -2824,6 +2824,18 @@ Ack 与 failure transition 必须同时匹配 tenant、event、lease owner、att
 |---|---|
 | AC-INFRA-002-N | Rust store 必须提供 tenant-scoped bounded claim/ack/retry，使用 owner role、FORCE RLS 和数据库时钟；claim 通过 `SKIP LOCKED` 并发安全地领取 pending/retry 与可重领 lease，限制 64 条/批、300 秒 lease，expired exhausted lease 进入 dead。Ack/failure 以 owner+attempt+未过期 lease fence 更新，transient 按指数退避且上限 3600 秒，permanent 或第 12 次 attempt 进入 dead，终态 retention 满足数据库 24–25 小时 guard。SQLx 必须覆盖并发唯一领取、过期重领与 stale ack 拒绝、backoff 与 permanent dead、crashed final lease dead-letter。该 gate 不证明 broker 发布、consumer、worker 部署或生产目标 DB；运行期执行继续 fail closed。验证使用 0 VM，Multipass 登记总量最多 2。 | P0 |
 
+### 50.8O Phase 9F4D-3D4 bounded JetStream Outbox publisher
+
+Infrastructure Outbox delivery rows may be published to NATS JetStream only by an explicitly invoked Rust publisher receiving an already authenticated JetStream context and the tenant-scoped Infrastructure owner store. It MUST NOT discover tenants, start a polling worker, configure credentials or streams, or enable TaskExecutionRun execution. The publisher leases at most 8 rows per tenant, uses a 120..300 second lease, and serially waits for each PubAck.
+
+Only capacity_accepted, capacity_rejected, capacity_released, and capacity_expired schema-version-2 facts may be published under the fixed star.infrastructure.v2 subject prefix. The publisher MUST reject malformed/non-object JSON and payloads over 16 KiB, bound the serialized envelope to 128 KiB, set Nats-Msg-Id to the immutable event UUID, and mark PostgreSQL delivery as delivered only after PubAck. A timeout is ambiguous and MUST be retried with the same message ID. The Run/Execution owner MUST deduplicate event_id in its durable Inbox beyond the broker duplicate window.
+
+This slice verifies the Rust transport against loopback NATS Server 2.15.0 and the disposable PostgreSQL owner schema. It does not provision a production broker, add a poller, establish target DB roles, implement the Run/Execution consumer, or enable execution. It creates no Multipass VM; the test inventory remains capped at two registered records total, including stopped/deleted entries, with no automatic purge.
+
+| Acceptance ID | Acceptance criterion |
+|---|---|
+| AC-INFRA-002-O | Given a bounded tenant-scoped Infrastructure Outbox claim, the Rust adapter MUST publish only allowlisted schema-v2 capacity events using immutable event_id as Nats-Msg-Id, wait for PubAck before marking delivered, record ambiguous failures through bounded retry/dead-letter, and preserve durable Run-owner Inbox dedupe. It MUST use an injected authenticated context, remain serial and bounded, and MUST NOT create a worker, tenant scheduler, production broker configuration, target DB identity, consumer, or execution path. |
+
 ### 50.9 追溯与后续专题同步
 
 本节为总要件基线。`SRS-MULTICA-TASK-001` 负责任务生命周期与 review gate，`SRS-MULTICA-HOOK-001` / `BD-MULTICA-HOOK-001` / `DD-MULTICA-HOOK-001` 负责高级设置 Hooks tab 的原生引擎、可视编辑、Worktree enforcement 与 Hook BI；`DD-MULTICA-TASK-001` §14.7-14.12 负责 Task Contract / Run / BI / Benchmark / Execution Profile / 双 Loop / Hook；`DD-WORKTREE-GROUP-001` §6.3-6.5 / §8.4-8.7 负责调度资源、扩展 Provider、Hook 与 CLI 边界；`DD-CANVAS-WORKFLOW-001` 的 Schedule Trigger 必须适配唯一 Automation occurrence source；`SRS-CANVAS-001` / `SRS-CANVAS-WORKFLOW-001` 负责画布与 Flow，`architecture/2026-09-03-langgraph/01-requirements.md` 负责 L0/L1 编排。`basic-design.md` §16.14-16.17 固定跨专题基本设计。后续专题文档必须继承 GroupContext、单一任务事实源、范围化聊天、Worktree-first 导航、可扩展 Agent Profile、原生 Hook、Loop、资源与跨 App 事件约束。
@@ -2960,3 +2972,4 @@ Ack 与 failure transition 必须同时匹配 tenant、event、lease owner、att
 | v5.94 | 2026-10-07 | Mavis review | Add §50.8L and AC-INFRA-002-L for the global physical Host/exact-cluster capacity ledger, cross-tenant lock ordering, atomic tenant/global reservation facts, owner-only FORCE RLS, and lifecycle event trigger; record 21/21 isolated runner steps, 10/10 FORCE RLS, and 6/6 SQLx cases while keeping production integration fail-closed. Preserve the disk-bound two-record Multipass test cap. | Phase 9F4D-3D1 closes the tenant-scoped overbooking gap for the Infrastructure-owner admission substrate without creating a VM. |
 | v5.95 | 2026-10-07 | Mavis review | Add §50.8M and AC-INFRA-002-M for a database-clock, bounded tenant-scoped expiry primitive over paired tenant/global reservations; specify strict pair revalidation, atomic lifecycle/Outbox facts, idempotent reentry and the Run/Execution-to-Schedule owner boundary. Keep active Runtime lease renewal, production worker/consumer, VM lifecycle and CLI execution open; preserve the two-record Multipass disk cap. | Phase 9F4D-3D2 implements and verifies the reservation expiry primitive without creating a VM. |
 | v5.96 | 2026-10-07 | Mavis review | Add §50.8N / AC-INFRA-002-N for tenant-scoped PostgreSQL Outbox delivery claim, lease fencing, 12-attempt dead-letter, bounded exponential retry and 24–25-hour terminal retention; retain raw payload JSON with a 64 × 16-KiB serialized-byte cap and leave decoded heap/RSS to the future consumer budget. Distinguish the verified state machine from absent publisher, Run consumer, production worker, target DB identity and executor. Keep the two-instance disk cap and 0-VM test gate. | Phase 9F4D-3D3 adds the Infrastructure owner delivery-state persistence adapter without a broker or VM. |
+| v5.97 | 2026-10-07 | Mavis review | Add section 50.8O and AC-INFRA-002-O for bounded Rust JetStream publication; pin immutable event_id as Nats-Msg-Id, require PubAck before PostgreSQL delivered state, serial claims and durable Run Inbox dedupe; record real loopback NATS/PostgreSQL integration and Rust 1.99.0, zero Multipass VMs and open production consumer/worker/provider/execution gates. | The Infrastructure Outbox state machine gained a bounded transport adapter. |

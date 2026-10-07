@@ -1,8 +1,6 @@
 [toolchain]
-# Locked per 2026-09-05 升版: 1.98.0 → 1.98.1
-# 原因: Rust 1.98.1 修 vtable miscompilation UB (issue #161441)
-# 源: https://blog.rust-lang.org/2026/09/03/Rust-1.98.1/
-# 拍板: 2026-09-05 08:00 JST Mavis 接手代签 Ulysses, ask_user scope_opt1 (全局 + 锁仓 + 同步 CI) 拍板
-channel = "1.98.1"
+# Pin the repository workspace to the user-selected current stable compiler.
+# Rust 1.99.0 was released on 2026-10-01; async-nats 0.50 requires Rust 1.88.
+channel = "1.99.0"
 profile = "minimal"
 components = ["rustfmt", "clippy"]

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.22 (2026-10-07)
+> **文档版本**: v2.23 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1649,6 +1649,19 @@ frontend/src/app/automation-debug/
 | v2.20 | 2026-10-07 | Add §4.61 for the 9F4D-3D1 global physical capacity ledger; record repeat migration, owner-only global FORCE RLS, tenant/global isolation, atomic lifecycle event trigger, shared-Host/shared-cluster cross-tenant SQLx contention, 21/21 runner steps, 10/10 RLS tables, 6/6 SQLx cases and zero Multipass use. Preserve the two-record disk cap and all production resolver/worker/provider/execution blockers. |
 | v2.21 | 2026-10-07 | Add §4.62 for the bounded 9F4D-3D2 paired-reservation expiry primitive; record database-clock scanning, ordered locks, full pair verification, atomic tenant/global lifecycle and `capacity_expired` Outbox facts, 21/21 runner steps, 10/10 FORCE RLS, 7/7 SQLx cases and zero VM use. Preserve the two-record Multipass cap and open production scheduler/consumer/Runtime/VM/execution gates. |
 | v2.22 | 2026-10-07 | Add §4.63 for 9F4D-3D3 Outbox delivery claim/lease/ack/retry/dead-letter; extend the focused Rust runner and disposable PostgreSQL SQLx suite; record 4/4 Rust gates, 21/21 PostgreSQL steps, 10/10 FORCE RLS and 10/10 SQLx cases with zero VM use. Preserve the two-instance cap and open publisher/Run consumer/production worker/target DB/execution gates. |
+| v2.23 | 2026-10-07 | Add section 4.64 for bounded Rust JetStream publication and the repeatable loopback PostgreSQL/NATS runner; record Rust 1.99.0 focused gates, real PubAck/delivered-state integration, zero Multipass VMs, durable Run Inbox dedupe and open production consumer/worker/execution gates. | Phase 9F4D-3D4 completed the transport publisher slice. |
+
+### 4.64 Phase 9F4D-3D4 Infrastructure Outbox JetStream publisher
+
+**自动化档：[P]** — Rust 1.99.0 focused gates plus the disposable PostgreSQL owner-schema runner with an explicitly supplied NATS Server binary.
+
+- The publisher is a directly invoked Rust adapter. It receives an authenticated async-nats JetStream context and the existing owner delivery store; it does not configure credentials/streams, enumerate tenants, or start a background worker.
+- Each call claims one tenant's bounded 1..8 due events using a 120..300 second lease and publishes serially. Only schema-v2 capacity accepted/rejected/released/expired facts are accepted; body size is at most 16 KiB, envelope size at most 128 KiB, subject prefix is fixed, and Nats-Msg-Id equals immutable event_id.
+- PostgreSQL delivery is acknowledged only after PubAck. Timeout/transport failure is ambiguous, reuses the same ID on retry, and remains at-least-once. The Run/Execution consumer must keep durable event_id Inbox dedupe beyond the broker duplicate window.
+- The repeatable owner-schema runner requires --nats-server, starts only that supplied NATS binary on loopback with a unique temporary JetStream store, runs the real ignored SQLx publication case, stops the process it owns, and removes the store only after stop.
+- Verification: Rust 1.99.0 package fmt, infrastructure all-target check, 53 library tests and targeted Clippy passed; disposable PostgreSQL 18.6/NATS Server 2.15.0 passed 23/23 steps, 10/10 FORCE RLS and 11/11 ignored SQLx tests. No Multipass VM was created; inventory cap remains two.
+- This does not prove production broker credentials/streams, polling/tenant scheduling, target DB identity, Run-owner consumer, provider/Manager, failover, throughput, or execution readiness. Schedule and Task Card execution remain fail-closed.
+- Phase evidence: PHASE-9F4D-3D4-JETSTREAM-PUBLISHER-REPORT.md.
 
 ## 11. 引用文档
 
