@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.14 (2026-10-07)
+> **文档版本**: v2.15 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1236,6 +1236,16 @@ Final contract delta: runner covers the typed placement policy/digest and separa
 
 此 runner 只验证纯领域 contract；不验证当前 run-as ACL resolver、双 owner 数据库事务、Host capacity ledger、Inbox/Outbox、Multipass subprocess/VM、K3s readiness producer、Agent sandbox implementation、workspace bridge、目标 DB/RLS、BI、桌面 RSS 或生产执行。不得把 runner 通过解读为 Schedule/Loop 已可用。
 
+### 4.55 Phase 9F4D-3A Infrastructure owner schema persistence gate（2026-10-07）
+
+`scripts/automation/phase9f4d_infrastructure_owner_schema.py` 是 [P] PostgreSQL owner-schema runner：必须显式传入 `--pg-bin`，在本机 loopback-only disposable PostgreSQL 中以 900 秒步骤上限启动独立临时 cluster，执行 `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql` 两次，再创建仅供测试的 `NOSUPERUSER NOBYPASSRLS` runtime role。每步 stdout/stderr 保存到 `target/phase9f4d-infrastructure-owner-schema/`，结果写入 `audit.jsonl`；临时数据库只有在 `pg_ctl stop` 成功且最终路径仍处于仓库 `.cache/phase9f4d-infrastructure-owner-schema` 下时才删除，停止状态不能确认则保留现场并报告。
+
+PG18.6 本机实测 runner 全部 10 步通过：migration 重复应用、fixture 写入、六表跨 tenant 正反向读取/写入约束、W/T 不可变性、Work state transition 与 24–25 小时终态 retention、6/6 `FORCE ROW LEVEL SECURITY`。此项是 schema/trigger contract gate，不是生产迁移装配、target DB/runtime grant、应用 owner writer/consumer、并发 admission 或 provider 验收。runner 不启动 Multipass，因此对当前最多 2 条 Multipass inventory 上限不消耗预算。不得因此打开 Schedule executor。
+
+### 4.56 Phase 9F4D-3A schema W/T classification artifact
+
+`docs/data-design/phase9f4d-infrastructure-owner-wtm.md` 对 migration 六张表逐一给出唯一 W/T/M 分类：3 张 Work、3 张 Transaction、0 张 Master；按主分类覆盖，不改历史全仓 100-table baseline。基础设计和 Infrastructure DD 均链接此清单，任何新增 Infrastructure 表都要随 DDL 更新此逐表索引及 retention/RLS 验收边界。
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1622,6 +1632,7 @@ frontend/src/app/automation-debug/
 | v2.12 | 2026-10-07 | 增加 Phase 9F4D-2 多集群 V2 capacity contract runner 追踪；扩展 rustfmt 范围到 capacity.rs；记录真实 Multipass 测试同时最多 2 个实例，Rust 契约 tests 不启动 VM，并保留 provider/worker/persistence 未实现门 |
 | v2.13 | 2026-10-07 | Record typed placement digest coverage, separate Host/cluster reservation IDs, and final 4-gate/27-test evidence under the two-instance live-test cap. |
 | v2.14 | 2026-10-07 | Clarify the test limit as two registered Multipass instances total, including stopped/recoverable entries; record the host-local locked fail-closed pre-launch inventory guard and no-auto-purge behavior. |
+| v2.15 | 2026-10-07 | Add Phase 9F4D-3A disposable PostgreSQL 18.6 owner-schema runner with 10 passing gates, file-backed logs/audit, safe temporary DB cleanup, and a six-table W/T classification link; retain the two-instance Multipass test cap and open production migration/grants/writer/consumer/provider gates. |
 
 ---
 

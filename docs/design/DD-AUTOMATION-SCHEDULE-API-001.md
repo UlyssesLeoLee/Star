@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API plus typed binding/demand/readiness contracts verified; admission writer, owner stores, worker, provider evidence producer, and target-environment verification remain open.
-> Version: 0.18 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed binding/demand/readiness contracts, and an isolated Infrastructure-owner schema substrate are verified; admission writer/consumer, target migration grants, worker, provider evidence producer, and production execution remain open.
+> Version: 0.19 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -92,6 +92,14 @@ This pure validator is not an authorization oracle: before the TaskExecutionRun 
 
 `InfrastructureCapacitySnapshotV2` carries fresh Host totals/reserves/unmanaged commitments/active reservations and exact-cluster allocatable capacity/cluster reserves/unmanaged commitments/active reservations. `InfrastructureCapacityRequestV2` is bound to the V2 Run binding digest and provides separate physical Host and Kubernetes workload resource vectors. The evaluator rejects stale/future/unknown snapshots, wrong Host/provider/cluster generation, arithmetic underflow/overflow, expired demand, or a request below the pinned maximum RSS budget. It returns before/after headroom for both ledgers. This is a pure candidate calculation: Infrastructure owner must serialize against both reservation ledgers and re-evaluate inside its own transaction before reserving. No Multipass or K3s integration test is run by the focused contract suite. During this test phase, no more than two Multipass instances may remain registered in total; stopped or recoverable/deleted entries count toward the disk cap. The bootstrap script serializes its inventory check and launch with a host-local exclusive lock, then refuses a third instance or an unparseable inventory without purging anything; all live test launches must use that guarded path.
 
+## 6.5 9F4D-3A Infrastructure-owner storage handoff
+
+The Schedule/Run owner publishes an idempotent demand through its own Outbox. The new Infrastructure migration stores the receiving side in `infrastructure.capacity_demand_inbox`; it does not write `automation.occurrence_dispatch`, Run reservations, or Schedule Run Outbox rows. The Infrastructure owner’s schema pairs Host and exact-cluster capacity in one `capacity_reservation_bundle` row, records terminal demand outcomes in append-only `capacity_demand_receipt`, appends lifecycle facts to `capacity_reservation_event` and owner notifications to `capacity_owner_outbox`, and keeps delivery state separately in `capacity_outbox_delivery`.
+
+Disposable PostgreSQL 18.6 validated duplicate migration application, all six tenant FORCE RLS tables, `NOBYPASSRLS` tenant isolation, Work transition/24–25-hour terminal retention guards, and Transaction UPDATE/DELETE/TRUNCATE denial. The runner uses `psql` directly; target database owner/runtime grants and production migration loading are not verified. No API, Inbox consumer, dual-capacity admission transaction, Outbox consumer, worker, provider/Manager, or executor is connected. Run owner continues to own only Project/Run quota reservation and its own Outbox; cross-owner facts remain asynchronous.
+
+Evidence: [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md).
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -114,3 +122,4 @@ This pure validator is not an authorization oracle: before the TaskExecutionRun 
 | v0.16 | 2026-10-07 | Replace single/shared-cluster assumption with explicit profile placement, exact Run K3s cluster ID/generation, Host+cluster capacity contracts, V2 binding/demand/readiness schemas, aggregate Multipass guest readiness, and the temporary two-instance maximum for live tests; retain production fail-closed gates. |
 | v0.17 | 2026-10-07 | Pin the typed placement policy in the binding digest and require two separately matched reservation IDs; update focused evidence to four passing gates and 27/27 tests. |
 | v0.18 | 2026-10-07 | Clarify the two-instance cap as a total registered-inventory limit including stopped/recoverable records; specify the locked pre-launch fail-closed guard and no automatic purge behavior. |
+| v0.19 | 2026-10-07 | Record the tested 9F4D-3A Infrastructure-owner persistence substrate and exact Work/Transaction boundary, while keeping production migration/grants, writer/consumer, worker, provider and Schedule execution gates open. |

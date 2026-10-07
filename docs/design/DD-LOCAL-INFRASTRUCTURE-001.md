@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.14 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts 与测试期实例容量保护已实现，owner persistence、provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.15 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 typed contracts 与六表 Infrastructure owner schema substrate 已实现并通过 PG18.6 隔离验证，owner writer/consumer、生产 migration/grants、provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.86 §50.8G-50.8I / basic-design v5.83 §8.1、§16.21-16.30 / 实施计划 §6.83-6.89。
+> 上游：requirements v5.87 §50.8G-50.8J / basic-design v5.84 §8.1、§16.21-16.31 / 实施计划 §6.83-6.90。
 
 ## §0 目的与边界
 
@@ -100,7 +100,7 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 
 ## §6 持久化分类与后续 schema 门
 
-以下按数据 owner 分类。标为 Existing 的 Project/Run 行已由 Run/Execution migrations 建表；Infrastructure 行均为规划对象，尚无 Host reservation、Infrastructure demand/Inbox 的物理 schema、writer 或目标 RLS 验收。分类不把现有 Run 表误作 Host capacity，也不把宿主 PoC 当作产品存储实现。
+以下按数据 owner 分类。标为 Existing 的 Project/Run 行已由 Run/Execution migrations 建表；Infrastructure owner 六表 additive schema 已在本阶段创建并通过 disposable PostgreSQL 验证，但未部署到目标数据库且没有生产 writer/consumer/grants。其余 Host/instance/cluster master、Manager operation/readiness store 等仍为规划对象。分类不把现有 Run 表误作 Host capacity，也不把宿主 PoC 当作产品存储实现。
 
 | 拟分类对象 | 初步分类 | 设计要求 |
 |---|---|---|
@@ -109,13 +109,21 @@ Rust desktop UI 不直接持有 Multipass CLI session、VM logs 或 Kubernetes w
 | Project/Run quota audit and reservation lifecycle events | Transaction | Existing immutable, tenant-scoped facts; append-only audit and reservation lifecycle evidence. |
 | Project execution admission lock | Work | Existing short coordination state with 30-day expiry/index; tenant-scoped pruning worker is not located or verified and remains a retention gate. |
 | Project/Run resource reservation | Work | Existing Run-owned bounded lease, with pending/active/released states and lease_expires_at; not Host VM/K3s capacity. Current DELETE guard and parent-Run retention leave terminal physical cleanup unresolved. |
-| Host and cluster capacity reservations | Work (planned) | Infrastructure owner’s bounded Host lease plus exact-cluster lease; explicit expiry, atomic pair admission, release, reaper and fair allocation are required before implementation. No physical table is claimed yet. |
-| Infrastructure demand, operation/readiness/audit Outbox facts | Transaction (planned) | Owner-scoped versioned facts with append-only evidence and idempotency; no cross-owner transaction or secret payload. |
-| Infrastructure Inbox/idempotency and operation lease | Work (planned) | Bounded delivery/retry state with TTL and cleanup; separate from immutable event evidence. |
+| `infrastructure.capacity_reservation_bundle` Host + exact-cluster capacity reservation pair | Work (schema implemented) | One owner-local row atomically carries two distinct reservation IDs and exact generations; pending writer, fresh capacity recheck, fair allocation, lease reaper and target DB grants remain open. |
+| `infrastructure.capacity_demand_inbox` + `infrastructure.capacity_outbox_delivery` | Work (schema implemented) | Idempotent demand receipt/retry and separate delivery lease state; 24–25 hour terminal retention gate exists, production Inbox/Outbox consumer and cleanup worker remain open. |
+| `infrastructure.capacity_demand_receipt` + `infrastructure.capacity_reservation_event` + `infrastructure.capacity_owner_outbox` | Transaction (schema implemented) | Immutable tenant-scoped facts for demand outcome, paired-reservation lifecycle and owner-to-owner events; no secret payload or cross-owner DB transaction; actual writer/consumer remains open. |
+| Manager operation/readiness/audit evidence not listed above | Transaction (planned) | Add owner-scoped versioned facts with append-only evidence and idempotency; do not conflate these future provider facts with the three current Transaction tables. |
+| Infrastructure operation lease | Work (planned) | Bounded lease/attempt lifecycle with TTL and cleanup; separate from immutable event evidence. |
 | Workspace bridge transfer, Hook/backup receipts | Transaction (planned) | Owner-scoped operation/evidence facts with audit and complete RLS; no credentials or source-file content. |
 | Provider inventory/cache, bootstrap cache, and bounded health/log window | Work (planned) | Explicit TTL and bounded memory/queue; caches never grant authority, and unknown inventory never triggers lifecycle mutation. |
 
 启动目标 PostgreSQL 之前的 bootstrap trust/inventory/audit 如何持久化仍需单独 schema/安全设计：不能循环依赖未启动 DB，也不能把本地 cache 当 Master authority。SQLite 没有 PostgreSQL 原生 RLS，若采用本地持久 substrate，必须明确逻辑 scope enforcement/加密/不可变证据及与仓库完整 RLS 规则的差距；未关闭前不启用持久 writer。下一阶段对实际每张表完成 W/T/M 100% 分类、13类 scope 评审和运行角色验收。
+
+### §6.1 Phase 9F4D-3A Infrastructure owner schema substrate
+
+Migration `db/migrations/2026-10-07-infrastructure-capacity-owner-schema.sql` 为独立 `infrastructure` owner 新增且仅新增六张表：三张 Work (`capacity_demand_inbox`, `capacity_reservation_bundle`, `capacity_outbox_delivery`) 与三张 Transaction (`capacity_demand_receipt`, `capacity_reservation_event`, `capacity_owner_outbox`)，无 Master。每张表都有 `tenant_id`，RLS 均 ENABLE + FORCE；策略由事务内 `app.tenant_id` 驱动。W 行只可从 received/held/pending 初态插入，状态迁移受 trigger 约束，terminal 时间必须接近数据库当前时刻且保留窗口在 24–25 小时，清理 trigger 在窗口到期前拒绝 DELETE；T 行的 UPDATE/DELETE/TRUNCATE 均由 WORM trigger 拒绝。reservation pair 以一行防止 half-created 状态，并持有不同的 Host/cluster reservation IDs 和 generation。逐表分类、保留策略与验收证据见 [`phase9f4d-infrastructure-owner-wtm.md`](../data-design/phase9f4d-infrastructure-owner-wtm.md)。
+
+隔离 runner `scripts/automation/phase9f4d_infrastructure_owner_schema.py` 使用显式 PostgreSQL binary 目录及 loopback-only disposable PostgreSQL 18.6，migration 双次应用成功；仅 fixture `NOBYPASSRLS` runtime role 用于验证六表 tenant isolation、事实不可变、Work lifecycle/retention guards 与 6/6 FORCE RLS。该 SQL 尚未加入任何 production startup migration callsite，也未执行目标 DB/RLS/role grant 检查；runner 使用 `psql` 直接执行 SQL，不能当成应用迁移部署证据。尚无 owner writer/consumer、retry/reaper、capacity conflict/fairness、Manager/provider 或 Run admission；本 schema 不会启动 executor，所有现存 fail-closed gate 保持生效。
 
 ## §7 Phase 与验收
 
@@ -143,6 +151,10 @@ Multipass 首选路径明确分开 Manager operation receipt、Multipass daemon 
 
 The V2 multi-cluster Rust contract passed four focused gates and 27/27 tests; these tests start no VM. Live Multipass test work remains capped at two registered instances total, including stopped/recoverable records, to bound retained disk use; use the guarded bootstrap path for every live test launch. This verifies typed value and evidence validation only; owner stores, Outbox/Inbox, provider lifecycle, target DB/RLS, sandbox, BI, and desktop RSS/fairness remain open.
 
+### §7.3 Phase 9F4D-3A：Infrastructure owner schema contract
+
+PG18.6 disposable runner verified twice-applied migration, six tenant FORCE RLS tables, positive and negative tenant visibility/insertion, append-only Transaction rows, valid/invalid Work state transitions, terminal retention bounds, and deletion rejection before expiry. It starts zero Multipass instances, so the current inventory cap of two remains unchanged. This closes only the physical schema/guard substrate. Production migration callsite, target database owner/runtime grants, Infrastructure demand consumer and atomic capacity writer, duplicate/concurrent admission, reconciliation/reaper, BI/Benchmark, Manager/provider/readiness producer, Runtime sandbox/workspace bridge, and end-to-end Schedule execution remain open. See [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md).
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -160,3 +172,4 @@ The V2 multi-cluster Rust contract passed four focused gates and 27/27 tests; th
 | v0.12 | 2026-10-07 | Correct the topology to multiple Host-owned Multipass instances and K3s clusters; define profile-controlled placement, exact Run cluster ID/generation, dual Host/cluster reservations and capacity evaluation, aggregate guest readiness, V2 wire contracts, and a temporary maximum of two simultaneous Multipass instances for this test phase. Record current tests as VM-free and keep provider/store/worker/production gates open. | User clarified that Multipass manages multiple K3s environments and capped test instances to protect disk capacity |
 | v0.13 | 2026-10-07 | Close the typed placement/digest and dual reservation identity gaps; record four passing focused gates and 27/27 tests, with two-instance maximum for live Multipass tests and production/provider gates still open. |
 | v0.14 | 2026-10-07 | Define the test cap over the total registered Multipass inventory, including stopped/recoverable records; document the locked pre-launch inventory guard, fail-closed parse behavior, no-auto-purge policy, and unchanged product topology. | User clarified that stopped instances still consume disk. |
+| v0.15 | 2026-10-07 | Add the tested six-table Infrastructure-owner PostgreSQL schema substrate, exact W/T split, FORCE RLS, guarded 24–25-hour Work retention, append-only Transaction facts and phase runner; keep production migration provisioning/grants, owner writers/consumers, provider and Schedule execution open. | Phase 9F4D-3A completed disposable PostgreSQL 18.6 schema verification without Multipass. |
