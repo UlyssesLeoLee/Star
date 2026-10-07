@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission transaction and persisted Provider Profile source are verified in focused/disposable gates; trusted resolver, production consumers and execution remain fail-closed.
-> Version: 0.23 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source and Infrastructure Outbox delivery-state primitive are verified in focused/disposable gates; trusted resolver, broker publisher, production consumers and execution remain fail-closed.
+> Version: 0.24 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -95,6 +95,14 @@ For an expired held pair, both Work rows transition to `expired`; the tenant T l
 
 Infrastructure does not write Schedule occurrence, TaskExecutionRun or Run tables. The Run/Execution owner must consume the Outbox event through its own Inbox and then record its own result; Schedule retry/resume remains subject to the pinned run-as actor, current Project/Run authorization, occurrence fence and a fresh admission transaction. The 9F4D-3D2 method is not a scheduled worker or production consumer; active execution remains fail-closed until those owner paths are deployed and verified. Rust and disposable PostgreSQL gates use zero Multipass VMs, and the test inventory cap remains two registered instances total including Stopped/Deleted.
 
+### 6.9 9F4D-3D3 Infrastructure Outbox delivery state machine
+
+Infrastructure owner exposes a bounded PostgreSQL store API over immutable owner Outbox facts and their separate Work delivery rows. Each call activates the restricted owner role and tenant RLS scope. Claims use database time and `FOR UPDATE SKIP LOCKED`, cap the batch at 64 rows and leases at 300 seconds, and return a typed event envelope with a monotonically increasing attempt fence. Stale workers cannot ack or write failure outcomes after lease expiry or a later claim.
+
+Transient delivery failure is retried with exponential delay starting at one second and capped at one hour. Permanent failure and attempt exhaustion transition to `dead`; if the final lease expires after a worker crash, a later claim call terminalizes it instead of reissuing. Delivered/dead rows keep the schema's 24–25 hour cleanup retention. Claim returns the schema-bounded payload as raw UTF-8 JSON text (≤16 KiB/event), not an expanded JSON object graph; serialized payload bytes are at most 1 MiB per maximum batch. This does not claim a 1 MiB heap/RSS bound; a future consumer must budget parsing and parallelism separately.
+
+This implementation does not publish to a transport, run a polling loop, provision production credentials, consume the event in Run/Execution, or enable Schedule execution. It only makes the delivery row transitions durable and concurrency-safe. The PostgreSQL gate uses no Multipass VM; registered inventory remains capped at two entries including stopped/deleted records.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -122,3 +130,4 @@ Infrastructure does not write Schedule occurrence, TaskExecutionRun or Run table
 | v0.21 | 2026-10-07 | Add the 9F4D-3C2 Infrastructure-owner admission primitive, deterministic dual-resource lock order, recomputed unexpired reservation ledger, atomic paired reservation/receipt/Outbox behavior, PostgreSQL concurrency/expiry evidence, and explicit tenant-only accounting boundary; keep resolver, consumer, provider and execution fail-closed. |
 | v0.22 | 2026-10-07 | Add the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted digest verification and derive capacity vectors inside owner admission; record 17/17 disposable PostgreSQL steps and 5/5 SQLx cases while preserving target DB, production resolver, cross-tenant allocator, provider and execution gates. |
 | v0.23 | 2026-10-07 | Add §6.8 for the database-clock, bounded paired-reservation expiry primitive and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts; define Run/Execution consumer ownership and forbid expiry-driven implicit Schedule retry. Record 9F4D-3D2 focused Rust/PostgreSQL evidence while retaining production worker, active Runtime lease, provider and execution gates. Preserve the two-record Multipass inventory cap. |
+| v0.24 | 2026-10-07 | Add §6.9 for tenant-scoped Infrastructure Outbox claims, lease fencing, bounded retry/dead-letter behavior and terminal retention; distinguish the verified state machine from broker publishing, production polling, Run-owner consumption and executor readiness. Preserve the two-instance disk cap and fail-closed execution. |

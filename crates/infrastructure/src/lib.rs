@@ -6,12 +6,14 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
-//! @cypher schema=1 source_sha256=03674794b6ad44b9a6b9c53833a74827cbf07f5bedba736673ac111fee5094b6
+//! @cypher schema=1 source_sha256=9b7b40c9e5f2645d7039e3cba125f483d74d20d467fc079817aa2c7b817a0b89
 //! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
 //! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
 //! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
+//! MERGE (ownerOutboxDelivery:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_outbox_delivery",kind:"module"})
 //! MERGE (self)-[:DEFINES]->(ownerInbox)
 //! MERGE (self)-[:DEFINES]->(ownerAdmission)
+//! MERGE (self)-[:DEFINES]->(ownerOutboxDelivery)
 //! @endcypher
 //!
 //! ## 职责
@@ -384,5 +386,6 @@ mod tests {
 
 pub mod infrastructure_owner_admission;
 pub mod infrastructure_owner_inbox;
+pub mod infrastructure_owner_outbox_delivery;
 pub mod registry;
 pub mod registry_real_pg;

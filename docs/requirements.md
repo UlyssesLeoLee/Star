@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.95）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v5.96）
 
 ## 0. 文档说明与前提
 
@@ -2812,6 +2812,18 @@ Infrastructure owner 必须提供 tenant-scoped、有界的 admission-reservatio
 |---|---|
 | AC-INFRA-002-M | expiry primitive 必须拒绝 nil tenant 和 1..64 之外的批大小；按数据库时钟读取至多指定数量的过期 held tenant bundles，并为每个 pair 独立获得全排序去重的 tenant/Host/cluster locks，重读与锁定 tenant/global rows，严格核对所有身份及容量事实。仅在双方均 held 且已到期时原子置为 expired，并写 tenant T event、triggered global T event、唯一 `capacity_expired` Outbox 和 pending delivery；重复调用不得产生重复事实，不一致数据不得被部分修改。必须有 disposable PostgreSQL 的 live-lease/expired-pair/replay/atomicity 覆盖和 Rust bound-validation 覆盖。该 primitive 不等同于生产 worker、active Runtime lease renewal、VM lifecycle 或 Schedule retry consumer；这些缺口保持 fail closed。验证期间 Multipass 登记总量上限为 2（含 Stopped/Deleted），Rust/DB runner 使用 0 VM。 | P0 |
 
+### 50.8N Phase 9F4D-3D3 Infrastructure Outbox delivery state machine
+
+Infrastructure owner 必须通过独立 Work delivery row 投递不可变 `capacity_owner_outbox` event。Rust PostgreSQL store 按 tenant scope 使用数据库时钟与 `FOR UPDATE SKIP LOCKED` 原子领取 due event；批次限制为 1..64、lease 限制为 1..300 秒，过期 lease 重领时 attempt fence 单调增加。领取结果包含 event/type/schema/idempotency/correlation 元数据和不超过 16 KiB 的原始 UTF-8 JSON 文本 `payload_json`；claim store 不把 JSON 解码为 `Value`，因此每批序列化 payload bytes 上限为 1 MiB（64 × 16 KiB）。这不是 Rust heap/RSS 上限；任何后续 consumer 都必须在自己的并行度与内存预算内进行有界解码。
+
+Ack 与 failure transition 必须同时匹配 tenant、event、lease owner、attempt fence 和未过期数据库 lease；过期或重领后的旧 worker 必须 fail closed。Transient failure 使用有界指数退避（首次 1 秒、上限 3600 秒）；Permanent failure 或达到 12 次 delivery attempt 后转入 dead。若第 12 次 attempt 的 worker 崩溃，lease 到期后下一次 claim 调用须直接 dead-letter，不再发起第 13 次发送。Terminal Work row 保留 24–25 小时后才可清理，失败明文/secret 不写入 delivery row。
+
+本阶段只实现 owner-side PostgreSQL state machine，不发布到 Kafka/Fluvio/NATS，不实现 broker publisher、Run/Execution Inbox consumer、生产 polling worker、target DB identity/provisioning 或 cleanup/reaper。故 Outbox state machine 可被后续 publisher 接入，但不代表事件已离开数据库或 TaskExecutionRun 可执行；Schedule、Agent、VM 与 Task Card CLI 保持 fail closed。验证使用 disposable PostgreSQL，不创建 VM；Multipass 测试 inventory 上限保持 2 条登记实例（含 Stopped/Deleted），禁止自动 purge。
+
+| 验收 ID | 受入基准 |
+|---|---|
+| AC-INFRA-002-N | Rust store 必须提供 tenant-scoped bounded claim/ack/retry，使用 owner role、FORCE RLS 和数据库时钟；claim 通过 `SKIP LOCKED` 并发安全地领取 pending/retry 与可重领 lease，限制 64 条/批、300 秒 lease，expired exhausted lease 进入 dead。Ack/failure 以 owner+attempt+未过期 lease fence 更新，transient 按指数退避且上限 3600 秒，permanent 或第 12 次 attempt 进入 dead，终态 retention 满足数据库 24–25 小时 guard。SQLx 必须覆盖并发唯一领取、过期重领与 stale ack 拒绝、backoff 与 permanent dead、crashed final lease dead-letter。该 gate 不证明 broker 发布、consumer、worker 部署或生产目标 DB；运行期执行继续 fail closed。验证使用 0 VM，Multipass 登记总量最多 2。 | P0 |
+
 ### 50.9 追溯与后续专题同步
 
 本节为总要件基线。`SRS-MULTICA-TASK-001` 负责任务生命周期与 review gate，`SRS-MULTICA-HOOK-001` / `BD-MULTICA-HOOK-001` / `DD-MULTICA-HOOK-001` 负责高级设置 Hooks tab 的原生引擎、可视编辑、Worktree enforcement 与 Hook BI；`DD-MULTICA-TASK-001` §14.7-14.12 负责 Task Contract / Run / BI / Benchmark / Execution Profile / 双 Loop / Hook；`DD-WORKTREE-GROUP-001` §6.3-6.5 / §8.4-8.7 负责调度资源、扩展 Provider、Hook 与 CLI 边界；`DD-CANVAS-WORKFLOW-001` 的 Schedule Trigger 必须适配唯一 Automation occurrence source；`SRS-CANVAS-001` / `SRS-CANVAS-WORKFLOW-001` 负责画布与 Flow，`architecture/2026-09-03-langgraph/01-requirements.md` 负责 L0/L1 编排。`basic-design.md` §16.14-16.17 固定跨专题基本设计。后续专题文档必须继承 GroupContext、单一任务事实源、范围化聊天、Worktree-first 导航、可扩展 Agent Profile、原生 Hook、Loop、资源与跨 App 事件约束。
@@ -2947,3 +2959,4 @@ Infrastructure owner 必须提供 tenant-scoped、有界的 admission-reservatio
 | v5.93 | 2026-10-07 | Mavis review | Qualify AC-INFRA-002-G as the original 3A six-table scope, update AC-INFRA-002-H for read-only access to the two Provider Profile tables, and distinguish the 3B1 six-table historical grant result from the current 3C3 eight-table/17-step gate. Keep the two-record Multipass test cap and production fail-closed boundaries explicit. | Final consistency audit found the cumulative profile-table grants were not represented in the active grant acceptance wording. |
 | v5.94 | 2026-10-07 | Mavis review | Add §50.8L and AC-INFRA-002-L for the global physical Host/exact-cluster capacity ledger, cross-tenant lock ordering, atomic tenant/global reservation facts, owner-only FORCE RLS, and lifecycle event trigger; record 21/21 isolated runner steps, 10/10 FORCE RLS, and 6/6 SQLx cases while keeping production integration fail-closed. Preserve the disk-bound two-record Multipass test cap. | Phase 9F4D-3D1 closes the tenant-scoped overbooking gap for the Infrastructure-owner admission substrate without creating a VM. |
 | v5.95 | 2026-10-07 | Mavis review | Add §50.8M and AC-INFRA-002-M for a database-clock, bounded tenant-scoped expiry primitive over paired tenant/global reservations; specify strict pair revalidation, atomic lifecycle/Outbox facts, idempotent reentry and the Run/Execution-to-Schedule owner boundary. Keep active Runtime lease renewal, production worker/consumer, VM lifecycle and CLI execution open; preserve the two-record Multipass disk cap. | Phase 9F4D-3D2 implements and verifies the reservation expiry primitive without creating a VM. |
+| v5.96 | 2026-10-07 | Mavis review | Add §50.8N / AC-INFRA-002-N for tenant-scoped PostgreSQL Outbox delivery claim, lease fencing, 12-attempt dead-letter, bounded exponential retry and 24–25-hour terminal retention; retain raw payload JSON with a 64 × 16-KiB serialized-byte cap and leave decoded heap/RSS to the future consumer budget. Distinguish the verified state machine from absent publisher, Run consumer, production worker, target DB identity and executor. Keep the two-instance disk cap and 0-VM test gate. | Phase 9F4D-3D3 adds the Infrastructure owner delivery-state persistence adapter without a broker or VM. |

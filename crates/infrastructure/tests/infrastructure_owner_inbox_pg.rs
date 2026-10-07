@@ -1,5 +1,8 @@
-//! @cypher schema=1 source_sha256=acf8b5c1adc9222dd5a1d51fd922b94d714a75cc7fd79af76a50c5bc7d3198d2
+//! @cypher schema=1 source_sha256=746ef21b6998527d6741142ab745b52ea3f5f025a32f8fc474598060631715bb
 //! MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs"})
+//! MERGE (delivery_fence_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_delivery_reclaims_and_fences_stale_leases",kind:"test"})
+//! MERGE (delivery_retry_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_delivery_retries_then_dead_letters",kind:"test"})
+//! MERGE (delivery_exhausted_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_outbox_delivery_dead_letters_exhausted_crashed_lease",kind:"test"})
 //! MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_inbox_is_idempotent_and_honors_terminal_receipts",kind:"test"})
 //! MERGE (admission_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_serializes_host_and_cluster_reservations",kind:"test"})
 //! MERGE (global_admission_test:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::postgres_admission_serializes_physical_capacity_across_tenants",kind:"test"})
@@ -16,7 +19,11 @@
 //! MERGE (payload_digest:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::payload_digest",kind:"function"})
 //! MERGE (insert_receipt:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::insert_terminal_receipt",kind:"function"})
 //! MERGE (insert_profile:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::insert_provider_profile",kind:"function"})
+//! MERGE (accepted_event:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::accepted_owner_outbox_event",kind:"function"})
+//! MERGE (test_scope:Symbol {id:"crates/infrastructure/tests/infrastructure_owner_inbox_pg.rs::set_delivery_test_scope",kind:"function"})
 //! MERGE (store:Type {id:"infrastructure::PostgresInfrastructureOwnerInbox",kind:"external_type"})
+//! MERGE (delivery_store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"external_type"})
+//! MERGE (failure_kind:Type {id:"infrastructure::OutboxDeliveryFailureKind",kind:"external_type"})
 //! MERGE (pg_pool:Type {id:"sqlx::PgPool",kind:"external_type"})
 //! MERGE (inbox:Table {id:"infrastructure.capacity_demand_inbox"})
 //! MERGE (receipt:Table {id:"infrastructure.capacity_demand_receipt"})
@@ -29,6 +36,32 @@
 //! MERGE (provider_profile:Table {id:"infrastructure.provider_profile_revision",class:"Master"})
 //! MERGE (admission:Type {id:"infrastructure::PostgresInfrastructureOwnerAdmission",kind:"external_type"})
 //! MERGE (provider_profile_type:Type {id:"domain_infrastructure::InfrastructureProviderProfileRevisionV1",kind:"external_type"})
+//! MERGE (self)-[:DEFINES]->(delivery_fence_test)
+//! MERGE (self)-[:DEFINES]->(delivery_retry_test)
+//! MERGE (self)-[:DEFINES]->(delivery_exhausted_test)
+//! MERGE (self)-[:DEFINES]->(accepted_event)
+//! MERGE (self)-[:DEFINES]->(test_scope)
+//! MERGE (delivery_fence_test)-[:CALLS]->(accepted_event)
+//! MERGE (delivery_fence_test)-[:CALLS]->(test_scope)
+//! MERGE (delivery_fence_test)-[:CALLS]->(delivery_store)
+//! MERGE (delivery_fence_test)-[:READS]->(delivery)
+//! MERGE (delivery_fence_test)-[:WRITES]->(delivery)
+//! MERGE (delivery_retry_test)-[:CALLS]->(accepted_event)
+//! MERGE (delivery_retry_test)-[:CALLS]->(test_scope)
+//! MERGE (delivery_retry_test)-[:CALLS]->(delivery_store)
+//! MERGE (delivery_retry_test)-[:USES_TYPE]->(failure_kind)
+//! MERGE (delivery_retry_test)-[:READS]->(delivery)
+//! MERGE (delivery_retry_test)-[:WRITES]->(delivery)
+//! MERGE (delivery_exhausted_test)-[:CALLS]->(accepted_event)
+//! MERGE (delivery_exhausted_test)-[:CALLS]->(test_scope)
+//! MERGE (delivery_exhausted_test)-[:CALLS]->(delivery_store)
+//! MERGE (delivery_exhausted_test)-[:READS]->(delivery)
+//! MERGE (delivery_exhausted_test)-[:WRITES]->(delivery)
+//! MERGE (accepted_event)-[:CALLS]->(enqueue_demand)
+//! MERGE (accepted_event)-[:CALLS]->(admit_inbox)
+//! MERGE (accepted_event)-[:READS]->(owner_outbox)
+//! MERGE (accepted_event)-[:READS]->(delivery)
+//! MERGE (test_scope)-[:USES_TYPE]->(pg_pool)
 //! MERGE (self)-[:DEFINES]->(test)
 //! MERGE (self)-[:DEFINES]->(binding)
 //! MERGE (self)-[:DEFINES]->(demand)
@@ -111,9 +144,13 @@ use infrastructure::infrastructure_owner_inbox::{
     CurrentInfrastructureBindingV2, InboxReceiveOutcome, PostgresInfrastructureOwnerInbox,
     TerminalDemandOutcome,
 };
+use infrastructure::infrastructure_owner_outbox_delivery::{
+    InfrastructureOwnerOutboxDeliveryError, OutboxDeliveryFailureKind,
+    PostgresInfrastructureOwnerOutboxDelivery,
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{postgres::PgPoolOptions, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 fn budget() -> ExecutionResourceBudgetV1 {
@@ -311,6 +348,46 @@ async fn enqueue_demand(
         InboxReceiveOutcome::Enqueued { inbox_id } => inbox_id,
         other => panic!("expected demand to enqueue, received {other:?}"),
     }
+}
+
+async fn accepted_owner_outbox_event(pool: &PgPool) -> (Uuid, Uuid) {
+    let inbox_store = PostgresInfrastructureOwnerInbox::new(pool.clone());
+    let admission_store =
+        PostgresInfrastructureOwnerAdmission::new(pool.clone(), Uuid::new_v4(), Uuid::new_v4())
+            .expect("owner identities are present");
+    let item = demand(binding());
+    let inbox_id = enqueue_demand(pool, &inbox_store, &item).await;
+    assert!(matches!(
+        admission_store
+            .admit_inbox(item.tenant_id, inbox_id, &capacity_snapshot(&item))
+            .await
+            .expect("admit demand and write immutable owner Outbox event"),
+        InfrastructureOwnerAdmissionOutcome::Accepted { .. }
+    ));
+    let event_id: Uuid = sqlx::query_scalar(
+        "SELECT event_id FROM infrastructure.capacity_owner_outbox \
+         WHERE tenant_id = $1 AND source_event_id = $2 AND event_type = 'capacity_accepted'",
+    )
+    .bind(item.tenant_id)
+    .bind(item.event_id)
+    .fetch_one(pool)
+    .await
+    .expect("read accepted owner Outbox event");
+    (item.tenant_id, event_id)
+}
+
+async fn set_delivery_test_scope(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("SET LOCAL ROLE star_infrastructure_owner")
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
 }
 
 fn payload_digest(demand: &HostInfrastructureDemandV2) -> [u8; 32] {
@@ -903,5 +980,248 @@ async fn postgres_reservation_expiry_releases_both_ledgers_atomically() {
         ),
         ("expired", "expired", 1, 1, 1, 1)
     );
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_outbox_delivery_reclaims_and_fences_stale_leases() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let store = PostgresInfrastructureOwnerOutboxDelivery::new(pool.clone());
+    let (tenant_id, event_id) = accepted_owner_outbox_event(&pool).await;
+    let first_owner = Uuid::new_v4();
+    let second_owner = Uuid::new_v4();
+
+    let (first_claims, second_claims) = tokio::join!(
+        store.claim_due(tenant_id, first_owner, 8, 30),
+        store.claim_due(tenant_id, second_owner, 8, 30),
+    );
+    let first_claims = first_claims.expect("first concurrent claimer");
+    let second_claims = second_claims.expect("second concurrent claimer");
+    assert_eq!(first_claims.len() + second_claims.len(), 1);
+    let stale_claim = first_claims
+        .into_iter()
+        .chain(second_claims)
+        .next()
+        .expect("one concurrent owner receives the event");
+    assert_eq!(stale_claim.event_id, event_id);
+    assert_eq!(stale_claim.event_type, "capacity_accepted");
+    assert_eq!(stale_claim.schema_version, 2);
+    assert_eq!(stale_claim.attempt_count, 1);
+    assert!(stale_claim.payload_json.len() <= 16 * 1024);
+    assert!(serde_json::from_str::<Value>(&stale_claim.payload_json).is_ok());
+
+    let mut tx = pool.begin().await.expect("begin lease-expiry setup");
+    set_delivery_test_scope(&mut tx, tenant_id)
+        .await
+        .expect("set owner role and tenant scope");
+    sqlx::query(
+        "UPDATE infrastructure.capacity_outbox_delivery \
+         SET lease_expires_at = clock_timestamp() - interval '1 second' \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .execute(&mut *tx)
+    .await
+    .expect("expire prior lease for deterministic reclaim");
+    tx.commit().await.expect("commit lease-expiry setup");
+
+    let current_owner = Uuid::new_v4();
+    let reclaimed = store
+        .claim_due(tenant_id, current_owner, 8, 30)
+        .await
+        .expect("reclaim expired event")
+        .into_iter()
+        .next()
+        .expect("expired event is due");
+    assert_eq!(reclaimed.event_id, event_id);
+    assert_eq!(reclaimed.attempt_count, stale_claim.attempt_count + 1);
+    assert_ne!(reclaimed.lease_owner_id, stale_claim.lease_owner_id);
+    assert!(matches!(
+        store.mark_delivered(&stale_claim).await,
+        Err(InfrastructureOwnerOutboxDeliveryError::LeaseLost)
+    ));
+    store
+        .mark_delivered(&reclaimed)
+        .await
+        .expect("current lease can acknowledge delivery");
+
+    let (state, attempt_count, terminal_retention_valid): (String, i32, bool) = sqlx::query_as(
+        "SELECT delivery_state, attempt_count, \
+                terminal_at IS NOT NULL AND retention_expires_at >= terminal_at + interval '24 hours' \
+         FROM infrastructure.capacity_outbox_delivery WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read terminal delivery state");
+    assert_eq!(state, "delivered");
+    assert_eq!(attempt_count, 2);
+    assert!(terminal_retention_valid);
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_outbox_delivery_retries_then_dead_letters() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let store = PostgresInfrastructureOwnerOutboxDelivery::new(pool.clone());
+    let (tenant_id, event_id) = accepted_owner_outbox_event(&pool).await;
+    let owner_id = Uuid::new_v4();
+    let initial = store
+        .claim_due(tenant_id, owner_id, 8, 30)
+        .await
+        .expect("claim due event")
+        .into_iter()
+        .next()
+        .expect("accepted event has a pending delivery row");
+    store
+        .record_failure(&initial, OutboxDeliveryFailureKind::Transient)
+        .await
+        .expect("record transient failure and bounded retry");
+
+    let (state, attempt_count, backoff_scheduled): (String, i32, bool) = sqlx::query_as(
+        "SELECT delivery_state, attempt_count, next_attempt_at > clock_timestamp() \
+         FROM infrastructure.capacity_outbox_delivery WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read scheduled retry");
+    assert_eq!(state, "retry");
+    assert_eq!(attempt_count, 1);
+    assert!(backoff_scheduled);
+
+    let mut tx = pool.begin().await.expect("begin retry-due setup");
+    set_delivery_test_scope(&mut tx, tenant_id)
+        .await
+        .expect("set owner role and tenant scope");
+    sqlx::query(
+        "UPDATE infrastructure.capacity_outbox_delivery \
+         SET next_attempt_at = clock_timestamp() - interval '1 second' \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .execute(&mut *tx)
+    .await
+    .expect("make retry due without waiting on wall clock");
+    tx.commit().await.expect("commit retry-due setup");
+
+    let retry = store
+        .claim_due(tenant_id, owner_id, 8, 30)
+        .await
+        .expect("claim due retry")
+        .into_iter()
+        .next()
+        .expect("retry event is due");
+    assert_eq!(retry.attempt_count, initial.attempt_count + 1);
+    store
+        .record_failure(&retry, OutboxDeliveryFailureKind::Permanent)
+        .await
+        .expect("terminally dead-letter permanent failure");
+
+    let (state, attempts, terminal_retention_valid): (String, i32, bool) = sqlx::query_as(
+        "SELECT delivery_state, attempt_count, \
+                terminal_at IS NOT NULL AND retention_expires_at >= terminal_at + interval '24 hours' \
+         FROM infrastructure.capacity_outbox_delivery WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read dead-letter delivery state");
+    assert_eq!(state, "dead");
+    assert_eq!(attempts, 2);
+    assert!(terminal_retention_valid);
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL schema runner"]
+async fn postgres_outbox_delivery_dead_letters_exhausted_crashed_lease() {
+    let database_url = std::env::var("STAR_INFRA_OWNER_TEST_DATABASE_URL")
+        .expect("the disposable PostgreSQL runner must set the owner test database URL");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await
+        .expect("connect to disposable PostgreSQL");
+    let store = PostgresInfrastructureOwnerOutboxDelivery::new(pool.clone());
+    let (tenant_id, event_id) = accepted_owner_outbox_event(&pool).await;
+
+    let mut tx = pool.begin().await.expect("begin attempt-limit setup");
+    set_delivery_test_scope(&mut tx, tenant_id)
+        .await
+        .expect("set owner role and tenant scope");
+    sqlx::query(
+        "UPDATE infrastructure.capacity_outbox_delivery SET attempt_count = 11 \
+         WHERE tenant_id = $1 AND event_id = $2 AND delivery_state = 'pending'",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .execute(&mut *tx)
+    .await
+    .expect("place pending row at the final-attempt boundary");
+    tx.commit().await.expect("commit attempt-limit setup");
+
+    let final_attempt = store
+        .claim_due(tenant_id, Uuid::new_v4(), 8, 30)
+        .await
+        .expect("claim final permitted attempt")
+        .into_iter()
+        .next()
+        .expect("final attempt is due");
+    assert_eq!(final_attempt.attempt_count, 12);
+
+    let mut tx = pool.begin().await.expect("begin crashed-lease setup");
+    set_delivery_test_scope(&mut tx, tenant_id)
+        .await
+        .expect("set owner role and tenant scope");
+    sqlx::query(
+        "UPDATE infrastructure.capacity_outbox_delivery \
+         SET lease_expires_at = clock_timestamp() - interval '1 second' \
+         WHERE tenant_id = $1 AND event_id = $2 AND delivery_state = 'leased'",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .execute(&mut *tx)
+    .await
+    .expect("expire final lease to simulate a crashed worker");
+    tx.commit().await.expect("commit crashed-lease setup");
+
+    assert!(store
+        .claim_due(tenant_id, Uuid::new_v4(), 8, 30)
+        .await
+        .expect("claim call terminally handles exhausted lease")
+        .is_empty());
+    let (state, attempts, terminal_retention_valid): (String, i32, bool) = sqlx::query_as(
+        "SELECT delivery_state, attempt_count, \
+                terminal_at IS NOT NULL AND retention_expires_at >= terminal_at + interval '24 hours' \
+         FROM infrastructure.capacity_outbox_delivery WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await
+    .expect("read exhausted terminal delivery");
+    assert_eq!(state, "dead");
+    assert_eq!(attempts, 12);
+    assert!(terminal_retention_valid);
     pool.close().await;
 }
