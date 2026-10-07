@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.23 (2026-10-07)
+> **文档版本**: v2.24 (2026-10-07)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1252,6 +1252,17 @@ PG18.6 本机实测 runner 全部 10 步通过：migration 重复应用、fixtur
 
 PG18.6 证据位于 `target/phase9f4d-infrastructure-owner-grants-final/audit.jsonl`：14/14 steps 通过，重复迁移与权限断言完成，临时 PostgreSQL 正常停止。该 gate 没有启动 Multipass；测试 inventory 总上限仍为 2 个注册实例（包括停止/可恢复记录），也不授权第三个实例。目标 DB migration caller、实际 app login/secret/membership、连接池 transaction-scoped role activation/reset、owner stores/writer/consumer 与 Schedule executor 均未验收；不得将该 gate解释成生产执行闭环。
 
+### 4.65 Phase 9F4D-3D5 Run-owner capacity result consumer
+
+**自动化档：[P]** — a guarded documentation synchronization script plus the disposable PostgreSQL/NATS real consumer runner.
+
+- Run-owner Rust adapter wraps a supplied durable explicit-ack PullConsumer and fetches at most one message, 132 KiB, with 2-second expiry. It validates the versioned event contract and hydrates canonical scope from the exact stored demand row.
+- The result Inbox is a Run-owner append-only Transaction fact protected by tenant FORCE RLS. The transaction commits before double-ack; duplicates are accepted only on exact immutable replay. No TaskExecutionRun/Schedule state, BI/RunEvent, reservation, readiness or execution is changed.
+- The schema and integration runner use disposable PostgreSQL 18.6 and a loopback NATS Server; the runner owns and cleans only its own processes/data. No Multipass VM is created and the test inventory cap remains two registered instances.
+- Malformed/unmatched events are not acknowledged and no durable quarantine exists; capacity_released has no verified producer. The consumer is not production deployable, and production worker/credentials/stream/provisioning/provider/Manager/execution gates remain open.
+- Documentation automation: scripts/automation/phase9f4d3d5_sync.py is idempotent, guarded by exact anchors, registered in scripts/automation/registry.md, and must be run twice with the second pass producing no changes.
+- Phase report: docs/reports/PHASE-9F4D-3D5-RUN-OWNER-CONSUMER-REPORT.md.
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -1650,6 +1661,7 @@ frontend/src/app/automation-debug/
 | v2.21 | 2026-10-07 | Add §4.62 for the bounded 9F4D-3D2 paired-reservation expiry primitive; record database-clock scanning, ordered locks, full pair verification, atomic tenant/global lifecycle and `capacity_expired` Outbox facts, 21/21 runner steps, 10/10 FORCE RLS, 7/7 SQLx cases and zero VM use. Preserve the two-record Multipass cap and open production scheduler/consumer/Runtime/VM/execution gates. |
 | v2.22 | 2026-10-07 | Add §4.63 for 9F4D-3D3 Outbox delivery claim/lease/ack/retry/dead-letter; extend the focused Rust runner and disposable PostgreSQL SQLx suite; record 4/4 Rust gates, 21/21 PostgreSQL steps, 10/10 FORCE RLS and 10/10 SQLx cases with zero VM use. Preserve the two-instance cap and open publisher/Run consumer/production worker/target DB/execution gates. |
 | v2.23 | 2026-10-07 | Add section 4.64 for bounded Rust JetStream publication and the repeatable loopback PostgreSQL/NATS runner; record Rust 1.99.0 focused gates, real PubAck/delivered-state integration, zero Multipass VMs, durable Run Inbox dedupe and open production consumer/worker/execution gates. | Phase 9F4D-3D4 completed the transport publisher slice. |
+| v2.24 | 2026-10-07 | Add §4.65 and register the idempotent guarded documentation sync; record Phase 9F4D-3D5 result-consumer bounds, caller-transaction TaskExecutionRun scope check, commit-before-ack order, 9/9 unit tests and 20/20 disposable runner steps; retain fail-closed quarantine/release boundary, Rust 1.99.0, zero Multipass VMs and two-record cap. | The Run-owner result Inbox consumer slice reached its focused verification gate. |
 
 ### 4.64 Phase 9F4D-3D4 Infrastructure Outbox JetStream publisher
 

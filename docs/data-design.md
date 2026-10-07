@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v1.7 (2026-10-06)
+> **文档版本**: v1.8 (2026-10-07)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -21,6 +21,7 @@
 > | v1.4 | 2026-10-05 | 增加 9F4C-C Project-scoped transaction advisory lock 与 Project/Branch/Run grant mutation triggers；记录三类并发撤权排序测试和 transient Work coordination 分类，并保留目标 grants/worker 缺口 | Mavis 接手审核 |
 > | v1.5 | 2026-10-05 | 纳入 Worktree Group Canvas 现行五表 W/T/M 分类、FORCE RLS scope、append-only/commit-ordered Outbox cursor 与未验收边界；明确 Document 字段扩展在现有 registry，不接受平行 document aggregate | Phase 3C Canvas stream slice 与当前 Group DD 对账 |
 > | v1.7 | 2026-10-06 | 将现有 Project/Run resource quota、reservation、admission lock 与审计事件补入 W/T/M 设计；区分 Infrastructure owner 尚未创建的 Host capacity reservation、demand/outbox 与 Inbox Work 状态，并标明现有 Run Reservation 删除/retention 缺口 | 9F4D owner-boundary 自审发现容量状态与 Multipass Host reservation 必须分属不同 SoR |
+> | v1.8 | 2026-10-07 | Add §4.13.9 and the Phase 9F4D-3D5 W/T/M appendix: classify the Run demand Outbox and result Inbox as append-only Transaction facts, define tenant FORCE RLS/least privilege and Run-owner schedule demand identity checks, preserve global event identity, and prohibit cleanup absent an approved retention rule. | The Run owner now stores the infrastructure result fact in its own schema boundary. |
 > | v1.6 | 2026-10-05 | 纳入 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
@@ -2061,6 +2062,17 @@ advisory lock 是 transaction-scoped 的 Work coordination primitive，不形成
 9F4D 的两个事务不能合并：Run/Execution owner 在自身 admission transaction 中对 Project/Run quota 做最后检查并创建非执行态 TaskExecutionRun、Run Reservation、Run facts 与 Schedule Outbox，同时写自己的 Host-demand Outbox；Infrastructure owner 的 Inbox transaction 再检查共享 Host headroom 并创建/拒绝其 Host reservation。任何 owner 不直接修改另一个 owner 的表，也不保持 DB transaction 等待 VM/K3s 启动。Host reservation 成功后由 Rust Host Infrastructure Manager 执行异步生命周期；返回的 owner receipt 与 K3s/runtime readiness 经版本化事件反馈。Run 启动前重新验证权限、binding revision、Run reservation、Host reservation 与 Agent Runtime sandbox。Host capacity unknown/insufficient 时不启动；失败/撤权/过期通过幂等 owner command 释放对应 owner reservation。
 
 物理 Host reservation schema、Infrastructure demand 的实际 Outbox table/API、Inbox retention、role grants、RLS 与 Run 侧异步状态机仍待 INFRA-1/9F4D DDD Review 与目标环境验证。这里分类的是方案，不宣称已实现；当前 multica Run Reservation 物理删除 guard 与 CW-07 还未闭合，admission-lock pruning worker 也尚未验证。
+
+### 4.13.9 Phase 9F4D-3D5 Run-owner capacity facts（Transaction）
+
+Migration: db/migrations/2026-10-07-run-owner-infrastructure-capacity-result.sql.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| multica.infrastructure_capacity_demand_outbox | T — Transaction | Run/Execution owner; immutable, versioned infrastructure demand and canonical scope | Append-only; UPDATE/DELETE/TRUNCATE rejected; no TTL or physical deletion | ENABLE + FORCE RLS on tenant_id; star_multica_run_owner SELECT/INSERT only |
+| multica.infrastructure_capacity_result_inbox | T — Transaction | Run/Execution owner; immutable Infrastructure result, replay digest and event_id deduplication fact | Append-only; UPDATE/DELETE/TRUNCATE rejected; no TTL or physical deletion | ENABLE + FORCE RLS on tenant_id; star_multica_run_owner SELECT/INSERT only |
+
+W contains no table in this migration; M contains no table in this migration. The Outbox is an immutable business/integration fact, not a short-lived delivery lease table. Broker delivery state remains owned by Infrastructure. Before appending a scheduled demand, Rust verifies the existing TaskExecutionRun's origin, Rule ID/revision, occurrence and correlation within the caller-owned transaction. The FK ties each result to the exact source demand and canonical scope; the global event_id unique constraint prevents cross-tenant identity reuse while RLS restricts visibility. Rust verifies stored demand JSON against typed V2 demand before accepting results. Runtime code does not mutate TaskExecutionRun/Schedule or release reservations. Both tables have no cleanup policy until a reviewed legal/audit retention rule exists.
 
 ### 4.14 Module: domain-identity(`identity` schema)
 

@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.26**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.27**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase 2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1322,6 +1322,17 @@ Completion correction: binding V2 now carries ClusterPlacementPolicyV1 and inclu
 
 Phase report: PHASE-9F4D-3D4-JETSTREAM-PUBLISHER-REPORT.md.
 
+### 6.100 Phase 9F4D-3D5 Run-owner capacity result consumer（2026-10-07）
+
+| 工作项 | 本阶段实现 | 验收与未关闭门 | 状态 |
+|---|---|---|---|
+| Run-owner consumer | Rust wraps a pre-provisioned durable explicit-ack PullConsumer; fetch is one message, <=132 KiB and 2s. It validates schema-v2 results, hydrates canonical scope from immutable demand, appends the Run-owned Inbox fact, commits, then double-acks. Demand append also verifies schedule origin, rule/revision, occurrence and correlation against TaskExecutionRun inside the caller transaction. | PostgreSQL/NATS runner passed 20/20 steps; the real JetStream integration test passed insert, exact duplicate replay, DB rollback/no-ack, conflicting replay, scope checks, ACK ordering and bounds. | Passed: isolated gate |
+| Owner schema / WTM | Demand Outbox and result Inbox are append-only Transaction facts under tenant FORCE RLS; Run-owner is SELECT/INSERT only. The owner role has minimal SELECT on TaskExecutionRun identity columns for the caller-transaction check. | No Work or Master rows; no TTL/physical deletion. No TaskExecutionRun/Schedule/BI projection or reservation mutation. Schema reapply, role/RLS matrix and cross-tenant event-ID collision check passed on disposable PostgreSQL 18.6. | Passed: isolated schema gate |
+| Production boundary | No stream/consumer provisioning, broker identity deployment, poller, poison quarantine, release producer, provider/Manager, readiness or executor. | Bad messages remain unacknowledged. Capacity acceptance is not readiness. Zero Multipass VMs; two-record inventory cap remains. | Open |
+| Documents/tooling | Synchronize requirements v5.98, basic design v5.95, Group DD v4.64, Schedule SRS v0.27/BD-DD v0.26, Infrastructure DD v0.25, Data Design v1.8, Automation Design v2.24 and registry. | Rust minimum remains 1.99.0. The idempotent documentation sync script is registered; two consecutive runs returned no-op. | Synced and verified |
+
+Phase report: PHASE-9F4D-3D5-RUN-OWNER-CONSUMER-REPORT.md.
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1505,3 +1516,4 @@ Phase report: PHASE-9F4D-3D4-JETSTREAM-PUBLISHER-REPORT.md.
 | v6.24 | 2026-10-07 | Mavis review | Add §6.97 for 9F4D-3D2 bounded paired-reservation expiry using database time, ordered tenant/physical locks, full dual-ledger revalidation, atomic tenant/global lifecycle facts and idempotent `capacity_expired` Outbox delivery state; record 21/21 runner steps, 10/10 FORCE RLS, 7/7 SQLx cases and zero VM use. Align requirements v5.95/basic v5.92/Schedule SRS v0.24/BD v0.23/Infrastructure DD v0.22/W-T-M v0.6/Automation v2.21/registry v0.68. Preserve the two-record test cap and distinguish the primitive from production workers, active Runtime leases, VM lifecycle and execution. | Phase 9F4D-3D2 completed the Infrastructure admission-reservation expiry slice. |
 | v6.25 | 2026-10-07 | Mavis review | Add §6.98 for 9F4D-3D3 tenant-scoped Outbox delivery claim/fencing/ack/retry/dead-letter on the existing Work row; synchronize requirements/basic/Schedule/Infrastructure/W-T/M/automation/registry/report, preserve the two-instance cap and zero-VM testing, and keep broker publisher, Run consumer, production worker, target DB identity and execution fail-closed. | Phase 9F4D-3D3 completes a bounded Infrastructure owner delivery-state primitive without a broker or VM. |
 | v6.26 | 2026-10-07 | Mavis review | Add section 6.99 for bounded JetStream publication; record real loopback NATS/PostgreSQL PubAck evidence, Rust 1.99.0 gates, documentation synchronization, zero Multipass VMs and the two-record cap. Keep production polling, target DB identity, Run Inbox consumer, provider/Manager and execution fail-closed. | The Infrastructure Outbox state machine gained its verified bounded transport adapter. |
+| v6.27 | 2026-10-07 | Mavis review | Add §6.100 for Phase 9F4D-3D5, including bounded consumer, caller-transaction TaskExecutionRun identity validation, append-only Run Inbox, owner W/T/M classification, 9/9 unit tests, 20/20 disposable runner steps and remaining production gates; align the requirements and design chain. | The Run owner now has an explicit result-side Inbox slice. |

@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, and bounded JetStream publisher are verified; trusted resolver, cross-tenant allocator, target migration/app identity, Run-owner Inbox consumer, production worker, provider evidence producer, and execution remain open.
-> Version: 0.25 | Date: 2026-10-07
+> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, and bounded JetStream publisher are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production Run-owner consumer provisioning/quarantine, production worker, provider evidence producer, and execution remain open.
+> Version: 0.26 | Date: 2026-10-07
 
 ## 1. Routes
 
@@ -158,6 +158,12 @@ The focused integration launches NATS Server 2.15.0 on loopback with JetStream a
 
 Rust 1.99.0 focused gates passed: package fmt, infrastructure all-target check, 53 library tests, and targeted Clippy. The extended disposable PostgreSQL/NATS runner passed 23/23 steps, 10/10 FORCE RLS and 11/11 SQLx cases. Workspace-wide formatting reports unrelated baseline files and was not mass-formatted. No Multipass VMs were created; current test inventory stays at two registered instances total.
 
+### 6.12 Run-owner capacity result consumer
+
+The Run-owner demand append adapter accepts the caller's existing transaction and validates the referenced TaskExecutionRun as schedule-origin with matching rule ID/revision, occurrence ID and correlation ID before writing the typed demand Outbox fact. A mismatch aborts without an Outbox insert. The result adapter wraps a pre-created durable JetStream PullConsumer with AckPolicy::Explicit; it does not create streams, consumers, credentials, workers, or tenant polling. A pull uses max_messages=1, max_bytes=132 KiB, and expires=2 seconds. The consumer validates schema-v2 result envelopes and payloads, then hydrates the complete domain scope from the immutable demand row before inserting the Run-owner Inbox fact.
+
+The SQL transaction owns tenant RLS scope, deduplication and immutable replay comparison. Commit precedes Message::double_ack(); an error before commit leaves the delivery unacknowledged. Only accepted/rejected/expired producer contracts are consumed; released is explicitly unsupported. No TaskExecutionRun/Schedule mutation or BI event is emitted. Bad messages remain unacknowledged until a separately durable quarantine contract is implemented; production consumer deployment stays disabled.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -187,3 +193,4 @@ Rust 1.99.0 focused gates passed: package fmt, infrastructure all-target check, 
 | v0.23 | 2026-10-07 | Specify the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted-digest checks and profile-derived capacity requests; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases while keeping production resolver, target DB, allocator, provider, consumer and execution gates open. |
 | v0.24 | 2026-10-07 | Add §6.10 for the bounded tenant-scoped Outbox delivery state machine, exact lease fencing, attempt exhaustion, retry backoff and terminal retention. Record PostgreSQL integration coverage; distinguish database state transitions from broker publisher, Run consumer, production worker, target DB and execution gates. Preserve the two-instance test cap. |
 | v0.25 | 2026-10-07 | Add section 6.11 for the 9F4D-3D4 publisher API, bounds, event allowlist, PubAck/timeout semantics and real loopback NATS/PostgreSQL integration. Clarify at-least-once delivery and durable Run Inbox dedupe; keep polling, target DB, Run consumer, provider, production broker configuration and execution open. | The bounded JetStream publisher passed its focused transport integration gate. |
+| v0.26 | 2026-10-07 | Add section 6.12 for caller-transaction TaskExecutionRun rule/revision/occurrence/correlation validation, durable explicit-ack pull, one-message byte/time bounds, immutable demand matching, Run-owner transaction, exact replay and the no-quarantine production block. | Phase 9F4D-3D5 verifies Run-owned result persistence and acknowledgement ordering. |

@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication and real PubAck integration are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, production consumers and execution remain fail-closed.
-> Version: 0.25 | Date: 2026-10-07
+> Version: 0.26 | Date: 2026-10-07
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -109,6 +109,12 @@ The publisher accepts an established authenticated JetStream context and tenant-
 
 Only successful PubAck permits the PostgreSQL row to transition to delivered. Timeout and transport errors are ambiguous and use same-ID retry; delivery is at least once, so the future Run/Execution consumer must deduplicate with its durable Inbox. No broker setup, tenant poller, production DB identity, consumer, provider, or executor is included. The test runner uses an official NATS Server binary on loopback and creates no VM.
 
+### 6.11 Phase 9F4D-3D5 Run-owner result consumer
+
+The Run-owner demand Outbox append accepts the caller's transaction and validates the referenced TaskExecutionRun's schedule origin, Rule ID/revision, occurrence and correlation before insertion. The result consumer uses an existing provisioned durable explicit-ack pull consumer. Rust performs one bounded fetch (one message, 132 KiB, 2 seconds), validates the event contract and derives canonical scope from the exact immutable demand Outbox row. It records only an append-only result Inbox fact in the Run-owner transaction, then double-acks after commit. Exact duplicate replay is verified against stored scope/content; conflicts and DB failures are not acknowledged.
+
+No Run/Schedule state update, RunEvent/BI emission, reservation mutation, readiness, or execution is part of this slice. Because invalid messages have no durable quarantine and the release producer is unavailable, this consumer is implemented as a fail-closed adapter and is not production deployable. Rust minimum is 1.99.0; isolated PG/NATS verification uses zero Multipass instances and retains the two-entry cap.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -138,3 +144,4 @@ Only successful PubAck permits the PostgreSQL row to transition to delivered. Ti
 | v0.23 | 2026-10-07 | Add §6.8 for the database-clock, bounded paired-reservation expiry primitive and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts; define Run/Execution consumer ownership and forbid expiry-driven implicit Schedule retry. Record 9F4D-3D2 focused Rust/PostgreSQL evidence while retaining production worker, active Runtime lease, provider and execution gates. Preserve the two-record Multipass inventory cap. |
 | v0.24 | 2026-10-07 | Add §6.9 for tenant-scoped Infrastructure Outbox claims, lease fencing, bounded retry/dead-letter behavior and terminal retention; distinguish the verified state machine from broker publishing, production polling, Run-owner consumption and executor readiness. Preserve the two-instance disk cap and fail-closed execution. |
 | v0.25 | 2026-10-07 | Add section 6.10 for serial bounded JetStream publication, injected authenticated context, allowlisted event contract, payload/envelope limits, stable Nats-Msg-Id, PubAck-before-delivered and durable Run Inbox dedupe. Record 9F4D-3D4 loopback NATS/PostgreSQL evidence and preserve production worker/consumer/execution gates. | The owner Outbox delivery state machine gained a bounded transport adapter. |
+| v0.26 | 2026-10-07 | Add section 6.11 for caller-transaction TaskExecutionRun scope validation and the Run-owner result consumer's transaction/ack/fail-closed boundary; synchronize SRS v0.27, DD v0.26, requirements v5.98 and basic design v5.95. | Phase 9F4D-3D5 adds a verified result Inbox slice without enabling production execution. |

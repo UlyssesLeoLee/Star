@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.24 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile、3D1 跨租户物理容量 ledger、3D2 paired-reservation expiry 与 3D3 Outbox delivery state machine 与 3D4 bounded JetStream publisher 已通过 focused/PG18.6 隔离验证。production resolver/provider、Run-owner Inbox consumer/scheduled reaper、目标 DB 装配、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
+> v0.25 · 2026-10-07 · Draft / 将 Multipass 管理的多 K3s cluster、Run 目标绑定与 Host/cluster 双层容量固化为设计；Rust V2 contracts、owner schema/grants、Inbox receive、tenant admission、persisted Profile、3D1 跨租户物理容量 ledger、3D2 paired-reservation expiry 与 3D3 Outbox delivery state machine 与 3D4 bounded JetStream publisher 已通过 focused/PG18.6 隔离验证。production resolver/provider、Run-owner consumer provisioning/quarantine/scheduled reaper、目标 DB 装配、Manager/provider lifecycle、跨平台能力与 RSS 仍未验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v5.97 §50.8G-50.8O / basic-design v5.94 §8.1、§16.21-16.39 / Schedule SRS v0.26 / Schedule BD v0.25 / Schedule DD v0.25 / Automation Design v2.23 / 实施计划 §6.83-6.99。
+> 上游：requirements v5.98 §50.8G-50.8P / basic-design v5.95 §8.1、§16.21-16.40 / Schedule SRS v0.27 / Schedule BD v0.26 / Schedule DD v0.26 / Automation Design v2.24 / 实施计划 §6.83-6.100。
 
 ## §0 目的与边界
 
@@ -225,6 +225,14 @@ Rust publisher 从调用方接收已认证的 JetStream Context 与 Infrastructu
 
 验证在 loopback NATS Server 2.15.0 与临时 PostgreSQL 18.6 上进行，检查真实 PubAck、数据库 delivered 状态以及后续 claim 不再返回该事件。该切片没有 production broker provisioning、服务循环、目标数据库身份、Run consumer、provider/Manager 或 executor，也不创建 Multipass VM。测试环境的 Multipass 注册实例上限仍为两条记录，包含 Stopped/Deleted 且禁止自动 purge。Rust 工具链基线为 1.99.0。
 
+### 7.11 9F4D-3D5 Run-owner result consumer
+
+The Run/Execution owner accepts results through a supplied durable JetStream PullConsumer configured for explicit acknowledgements. Fetch concurrency is fixed at one message; request size is at most 132 KiB and request expiry is 2 seconds. Rust validates the message subject, event ID, schema/envelope, allowlisted type, idempotency and typed payload, then binds it to the matching immutable demand row to obtain canonical Project/Branch/Engineering Run/Task/occurrence scope.
+
+Before the caller-owned Run transaction appends a scheduled demand, the Run-owner store verifies that the referenced TaskExecutionRun is schedule-origin and matches the demand's Schedule Rule ID/revision, occurrence ID and correlation ID. A mismatch fails before the Outbox insert.
+
+Run-owned persistence is a separate append-only Inbox transaction under tenant FORCE RLS and the least-privilege Run-owner role. The adapter commits before double-ack and compares complete immutable facts on duplicate event ID. It records no mutable reservation projection, Run/Schedule transition, readiness, BI event, or execution authorization. capacity_released lacks an upstream producer contract. Malformed/unmatched deliveries are not acknowledged and no quarantine fact is persisted, so the consumer remains production-disabled. Isolated PostgreSQL 18.6 plus loopback NATS tests create zero Multipass VMs; the global test inventory cap remains two registered records including stopped/deleted instances.
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -252,3 +260,4 @@ Rust publisher 从调用方接收已认证的 JetStream Context 与 Infrastructu
 | v0.22 | 2026-10-07 | Mavis review | Add §7.8 for the database-clock bounded expiry primitive, exact tenant/global pair revalidation, ordered locks and atomic `capacity_expired` Outbox facts; record 21/21 runner steps and 7/7 SQLx cases. Clarify that the primitive is not a production worker, Run/Schedule consumer, active Runtime lease protocol or VM lifecycle; preserve the two-record Multipass test cap. | Phase 9F4D-3D2 adds idempotent expiry for paired Infrastructure admission reservations. |
 | v0.23 | 2026-10-07 | Mavis review | Add §7.9 for tenant-scoped Outbox delivery claims, attempt fencing, retry/backoff, exhausted/permanent dead-letter handling and terminal retention. Record focused Rust/PostgreSQL evidence while keeping broker publisher, Run consumer, production worker, target DB, provider and execution open; preserve the two-record Multipass test cap. | Phase 9F4D-3D3 adds an owner-side delivery state machine without broker or VM integration. |
 | v0.24 | 2026-10-07 | Mavis review | Add section 7.10 for bounded Infrastructure Outbox JetStream publication; pin stable event ID, PubAck-before-delivery, same-ID retry and durable Run Inbox dedupe; record loopback NATS/PostgreSQL evidence and Rust 1.99.0 with zero VM use. Preserve the two-record Multipass cap and open production worker/consumer/provider/execution gates. | Phase 9F4D-3D4 added verified transport publication without enabling execution. |
+| v0.25 | 2026-10-07 | Add §7.11 for TaskExecutionRun-validated scheduled demand append, the Run-owner capacity result consumer and append-only tenant Inbox; record exact demand-derived scope, commit-before-double-ack, no mutable Run projection, no quarantine/release contract, zero-VM test and two-record cap. | Phase 9F4D-3D5 adds the result-side owner boundary. |

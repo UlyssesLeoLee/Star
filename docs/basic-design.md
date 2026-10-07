@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.94 (2026-10-07)
-> **上游要件定义书**: docs/requirements.md v5.97
+> **文档版本**: v5.95 (2026-10-07)
+> **上游要件定义书**: docs/requirements.md v5.98
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4992,6 +4992,18 @@ The PostgreSQL delivery row is marked delivered only after PubAck. Timeout or tr
 
 Verification used Rust 1.99.0, PostgreSQL 18.6, and official NATS Server 2.15.0 bound to loopback. The phase report records the exact focused gates and unrelated baseline workspace-format limitation.
 
+### 16.40 Phase 9F4D-3D5 Run-owner capacity result consumer
+
+The Run-owner demand Outbox append receives the caller's existing Run transaction and validates that the referenced TaskExecutionRun is schedule-origin with matching rule ID/revision, occurrence ID and correlation ID before it appends the typed demand. A mismatch creates no Outbox fact.
+
+Run/Execution owner receives Infrastructure capacity events through a supplied, provisioned durable JetStream pull consumer. The Rust consumer is deliberately not a broker/credential/consumer provisioner: it validates explicit-ack configuration and performs a single-message pull bounded to 132 KiB and 2 seconds. It checks the wire contract and resolves canonical Project, Branch, Engineering Run, Work Item, TaskExecutionRun, and occurrence identity by matching the exact stored Run demand fact.
+
+Within the Run-owner database boundary, it appends one result Inbox fact and commits before double-ack. Duplicate event_id is accepted only when the previously persisted immutable scope and content match. No TaskExecutionRun/Schedule transition, RunEvent/BI projection, reservation release, readiness, or executor start occurs here. The upstream release producer contract and durable poison-message quarantine are absent; malformed messages remain unacknowledged, which blocks production deployment of this consumer. The exact rust-version is 1.99.0; disposable PostgreSQL/NATS verification creates no Multipass guest and keeps the two-record test cap.
+
+| 验收 ID | 对应设计与当前边界 |
+|---|---|
+| AC-INFRA-002-P | §16.40；caller transaction 内校验 TaskExecutionRun 的 schedule origin、Rule ID/revision、occurrence 和 correlation 后写 demand Outbox；durable explicit-ack PullConsumer，单条/132 KiB/2 秒；以不可变 demand row 派生结果 scope；Run-owner Transaction Inbox commit 后 double-ack；严格 duplicate replay；invalid/unmatched 不 ACK；no quarantine/producer contract 时 production disabled；不改变 Run/Schedule/readiness/execution。 |
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5132,3 +5144,4 @@ Verification used Rust 1.99.0, PostgreSQL 18.6, and official NATS Server 2.15.0 
 | v5.92 | 2026-10-07 | Mavis review | Align requirements v5.95 and Infrastructure DD v0.22; add §16.37 for the bounded database-clock expiry primitive, per-pair revalidation and atomic tenant/global lifecycle plus `capacity_expired` Outbox facts. Clarify that Schedule occurrence outcomes belong to Run/Execution consumers and that active Runtime lease renewal, production worker and VM lifecycle remain open. Preserve the two-record Multipass inventory cap. | Phase 9F4D-3D2 expiry implementation and disposable PostgreSQL verification. |
 | v5.93 | 2026-10-07 | Mavis review | Align requirements v5.96 and Infrastructure DD v0.23; add §16.38 for PostgreSQL Outbox claim/lease fencing/ack/retry/dead-letter, bounded batch and retry policy. Distinguish the state-machine store from broker publisher, Run consumer, production worker and target DB activation; preserve the two-instance disk cap and fail-closed execution. | Phase 9F4D-3D3 adds and verifies the owner-side delivery-state primitive without a broker or VM. |
 | v5.94 | 2026-10-07 | Mavis review | Add section 16.39 for injected-context, serial bounded JetStream publication; specify event allowlist, payload/envelope bounds, stable Nats-Msg-Id, PubAck-before-ack and at-least-once Run Inbox dedupe; synchronize requirements v5.97 and Schedule/Infrastructure design; record Rust 1.99.0 and loopback NATS/PostgreSQL evidence while preserving open production gates and the two-instance, zero-VM test limit. | Phase 9F4D-3D4 verified transport publication without changing owner persistence or execution boundaries. |
+| v5.95 | 2026-10-07 | Mavis review | Add §16.40 for the Run-owner result Inbox and validate scheduled demand against TaskExecutionRun rule/revision/occurrence/correlation within its caller transaction; synchronize requirements v5.98, Group DD v4.64, Schedule contracts, Infrastructure DD v0.25 and Data Design v1.8. Record exact demand-derived result scope, commit-before-double-ack, no state projection, fail-closed poison/release gaps, Rust 1.99.0 and zero-VM/two-record test boundary. | Phase 9F4D-3D5 implements the result consumer slice. |
