@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.04 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v6.07
+> **文档版本**: v6.05 (2026-10-09)
+> **上游要件定义书**: docs/requirements.md v6.08
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4607,6 +4607,7 @@ Chat Bar(scope, text, entity_refs)
 | AC-INFRA-002-K | §16.35 / Schedule API DD §6.9 / Infrastructure DD §7.6 / Phase 9F4D-3C3 | tenant-scoped SCD2 Provider Profile Master、append-only revision events、stored digest 核验与 owner transaction 派生容量请求；production profile resolver/allocator/provider 仍 fail-closed |
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
+| AC-ERUN-007 | §16.23 | 条件式 Task Card 创建、`work-item:write`、服务端 Run owner 推导、同事务 audit/idempotency/Outbox 与固定目标重试；未验收的 host/DB/RLS 和 CLI 门保持关闭 |
 | AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
 | AC-LOOP-010 | §16.27-16.37 / Schedule API SRS v0.24 / BD v0.23 / DD v0.23 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 的 tenant-scoped admission primitive 从 exact persisted SCD2 Provider Profile 核验 digest 并派生 Host+精确 K3s cluster 双层容量请求，再原子写 reservation bundle/receipt/event/Outbox，但尚无可信 current-profile/Run-binding/provider resolver 或 production consumer；再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster。executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；跨租户共享资源需全局 allocator，worker/BI/production execution 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
@@ -4878,7 +4879,9 @@ CLI compatibility endpoint 不接受浏览器提供的 EngineeringRun authority�
 
 Run Workspace 默认选中同级 `Task Cards` tab。`RunTaskCardsPanel` 只调用 `RunDirectoryApiClient.listRunWorkItems`，目标为 `GET /api/v1/engineering-runs/{engineering_run_id}/work-items?limit=12[&after=<uuid>]`；客户端校验返回页的 Project/Repository/Branch/Run tuple、`task_card_id == work_item_id`、字段长度、重复 ID 与游标。请求使用当前宿主 Bearer token、`credentials: omit`、`cache: no-store`、15 秒 deadline 与 AbortSignal；客户端共用的并发上限为 2 个活动请求、16 个等待项。单次响应最多 2 MiB，UI 只保留当前 12 条，最多浏览 100 页；换 Run/卸载会取消在途页请求。
 
-该 App 当前是只读投影：提供加载、错误/重试、空状态、页内标签和任务详情；不写 WorkItem，不使用旧 Worktree Task API、seed 或浏览器 mock。任务卡的 `打开 CLI` 控件保持禁用，直至 Run execution admission、受限 Runtime/OS sandbox、取消/恢复、独立验证和结果回写均完成验收。其它 Run App tabs 保持为未迁移状态。
+Task Cards 提供读取与一个受限创建入口。创建入口仅在 Run Apps capability 可用、当前 RunContext 授予 `work-item:write` 且当前 Project/Branch/Run/未归档 Worktree tuple 一致时启用；客户端经 `POST /api/v1/worktrees/{worktree_id}/work-items` 提交有界 title/description/priority、correlation ID 和 `Idempotency-Key`。服务端从当前 Worktree binding 推导 owner 并复验 actor、Worktree、Project/Run grants；在同一 PostgreSQL transaction 写 `task_metadata`、lifecycle、Worktree association、audit、idempotency response，owner migration trigger 同事务写 Run Outbox。客户端验证返回 Task Card identity；结果不确定时冻结 body/key/owner/Worktree target，同目标重试，焦点改变则禁止重放到另一 checkout。当前 pending body/key/target 仅保留在 Task Cards 面板内存；面板重挂载、Run 切换或页面 reload 后恢复未实现，不能视为跨会话可靠创建闭环。
+
+创建 UI/client 仍是条件式代码切片：根 `Providers` 尚未注入可信 `RunDirectoryHostSession`，RunContext `run_owned_apps_available=false`，Task Owner migration/目标应用身份 RLS 未在目标 DB 验收，所以生产界面不会开放读写。禁止旧 Worktree Task API、seed 或浏览器 mock fallback。任务卡的 `打开 CLI` 控件保持禁用，直至 Run execution admission、受限 Runtime/OS sandbox、取消/恢复、独立验证和结果回写均完成验收。其它 Run App tabs 保持为未迁移状态。
 
 生产启用仍受三道当前门控：根 `Providers` 尚未注入可信 `RunDirectoryHostSession`，RunContext 服务端 `run_owned_apps_available` 与 `execution_admission_available` 均固定为 false，Task Owner migration/应用身份 RLS 尚未在目标 DB 验收。因此当前可验证的是 UI/API 客户端代码与 fail-closed 行为，不能表述为已加载生产任务或已完成 Task Card/CLI 闭环。
 
@@ -5248,3 +5251,4 @@ The shared-subject integration target is serialized to avoid stream overlap. The
 | v6.02 | 2026-10-08 | Mavis review | Add §16.46 / AC-INFRA-002-V for the separate signed lifecycle command, current-generation advisory serialization, allowed active/draining/retired state machine, exact replay/conflict, and receipt/event/Master-close atomicity enforced by a deferred database trigger. Record the passed 28/28 PostgreSQL runner, SQLx 1/1 and 17/17 FORCE RLS. Align requirements v6.05, Infrastructure DD v0.30, Group DD v4.71, W/T/M v0.10 and plan v6.38; keep 17 tables, Rust 1.99.0, two Multipass records and execution disabled. | INFRA-2C3 implements signed lifecycle persistence over the existing owner catalog. |
 | v6.03 | 2026-10-08 | Mavis review | Add §16.47 / AC-INFRA-002-W for read-only exact Host-generation inventory reconciliation, valid empty snapshot handling and fail-closed malformed/stale catalog inputs; document independent control-plane PostgreSQL placement outside target K3s clusters. Record Rust 62/62 + 19/19, SQLx 1/1, PG18.6 28/28 and 17/17 FORCE RLS; preserve 17 tables, two records, zero VMs and disabled execution. | INFRA-2C4 adds projection only, with no schema/event mutation. |
 | v6.04 | 2026-10-08 | Mavis review | Add §16.48 / AC-SCHED-API-028 for database failure backpressure, real JetStream redelivery, confirmed Term ACK, exact duplicate replay after pre-ACK handle drop and no later delivery. Record 22/22 runner steps, 2/2 Rust integration tests, zero VM and unchanged Multipass inventory; production consumers and execution remain disabled. | 9F4D-3D7 verifies the existing quarantine seam without schema or navigation change. |
+| v6.05 | 2026-10-09 | Mavis review | Add AC-ERUN-007 and update §16.23 for bounded Task Card creation: write-scope/focus checks, same-target in-panel retry, existing Run owner transaction and Outbox trigger; state that pending recovery after remount/reload remains open; retain host/capability/target DB/RLS and CLI blockers. | Align detailed design with the implemented creation path without importing unrelated branch refactors. |

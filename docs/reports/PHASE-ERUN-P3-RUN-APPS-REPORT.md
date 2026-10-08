@@ -1,20 +1,21 @@
 # PHASE-ERUN-P3-RUN-APPS-REPORT
 
-> 状态：🟡 Run Task Cards 条件式 UI/client 与旧 Tauri mock Task 退役已交付；Run Apps/Task CLI 生产闭环仍未完成
-> 日期：2026-10-02 JST
-> 分支：`codex/erun-p3-run-apps-20261002`，基线 `origin/dev@9db93e9d8e07a11ad591331cae94b826cf5be7ee`
-> 对应实施计划：[`WORKTREE-GROUP-IMPL-PLAN-001.md`](../implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md) §6.72-§6.73
+> 状态：🟡 Run Task Cards 条件式 read/create UI/client 与旧 Tauri mock Task 退役已交付；Run Apps/Task CLI 生产闭环仍未完成
+> 日期：2026-10-09 JST
+> 原始分支：`codex/erun-p3-run-apps-20261002`，基线 `origin/dev@9db93e9d8e07a11ad591331cae94b826cf5be7ee`；创建切片续作分支：`codex/run-task-card-create-20261009`，基线 `dev@581f16002987033673dde8429ff460d84dbeac73`
+> 对应实施计划：[`WORKTREE-GROUP-IMPL-PLAN-001.md`](../implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md) §6.72-§6.73、§6.109
 
 ## §0 目的
 
-为已有 canonical Run-scoped Work Item API 接入只读 Run Task Cards，并移除独立旧 Tauri shell 中四条演示 Task 和 browser fallback；选中 Run Worktree 后默认展示 Task Cards 同级 App，严格维持 Run owner、宿主认证、数据库/RLS、执行 Runtime 未就绪时 fail-closed。本文只报告本阶段可验证交付，不把生产 Run App 或 CLI 标为完成。
+为已有 canonical Run-scoped Work Item API 接入 bounded Run Task Cards read/create UI/client，并移除独立旧 Tauri shell 中四条演示 Task 和 browser fallback；产品树遵循 Project → Cloud Branch → Engineering Run → Run Worktree，Task Cards 与 Canvas 等同属 Run。创建要求当前 write scope/focus tuple，并经现有服务端 owner transaction；宿主会话、capability、目标数据库/RLS 与执行 Runtime 未就绪时 fail closed。本文报告代码切片和实际验证，不把生产 Run Apps 或 CLI 标为完成。
 
 ## §1 改动矩阵
 
 | 范围 | 变更 | 状态 |
 |---|---|---|
-| Run Workspace | 默认选中 `Task Cards` tab；挂接只读 `RunTaskCardsPanel`，保留 Inbox/Canvas/Workflow/BI/Plugin 同级入口为待迁移状态 | 代码已落地；服务端 capability false 时显示明确阻断，不显示假任务 |
-| Run Directory API | 新增 typed `listRunWorkItems`，只访问 `/api/v1/engineering-runs/{id}/work-items`；核对 Project/Repository/Branch/Run 全 tuple、Task Card/WorkItem ID alias、字段、游标及重复 ID | 代码已落地；使用当前宿主 Bearer token、no-store、credentials omit、15 秒 deadline 和请求取消 |
+| Run Workspace | 默认选中 `Task Cards` tab；挂接 bounded read/create `RunTaskCardsPanel`，Inbox/Canvas/Workflow/BI/Plugin 仍为 Run 同级待迁移入口 | 代码已落地；capability false 时显示明确阻断，不显示或写入演示任务 |
+| Run Directory API | 保留 typed `listRunWorkItems`；新增 `createRunTaskCard`，通过 `/api/v1/worktrees/{id}/work-items` 发出 bounded POST；校验 RunContext `work-item:write` 与完整 owner/focus tuple，并验证返回 alias/type/title | 代码已落地；使用当前宿主 Bearer token、Idempotency-Key、no-store、credentials omit、15 秒 deadline 和请求取消 |
+| Create/retry safety | 服务端 owner API 重验 current actor/Worktree/Run grants，在一个事务写 metadata/lifecycle/Worktree association/audit/idempotency；Task Owner migration trigger 同事务写 Run Outbox。客户端保留 correlation/idempotency 与原 Project/Branch/Run/Worktree target | 代码路径已核对；目标 DB migration/grants/RLS 未验收。Worktree 目标改变后拒绝以旧请求重放到新 checkout |
 | 内存/并发 | 单页最多 12 条，Task response 解码上限 2 MiB，界面只保留当前页、单次浏览最多 100 页；复用 client 2 个活动请求/16 个排队请求 | 已落地；此为产品保护上限，不声称已做设备 RSS 基准 |
 | CLI | 卡内按钮明确禁用 | 等待执行 admission、Run/Profile/Hook/预算复验、实际 Runtime/OS sandbox、取消/恢复、独立验证与结果回写验收 |
 | 自动化/依赖 | 增加文件日志、有 900 秒上限的 `erun_task_cards.py`；更新锁文件，Fiber 升至 React 19.3 兼容的 9.8.1 | 已落地；依赖原本无法通过普通 `npm ci`，原因与 lock stale 见 §2 |
@@ -26,8 +27,9 @@
 
 | 命令 | 结果 | 证据与范围 |
 |---|---|---|
-| `npm ci --no-audit --no-fund` | 通过，exit 0 | 安装 329 个包。Node v22.19.0 对 jsdom/css-color/dom-selector 要求 `^22.22.2` 发出 EBADENGINE 警告；警告未阻断本阶段 typecheck/Vitest。 |
-| python scripts/automation/erun_task_cards.py --typecheck --tests | 通过，exit 0 | TypeScript tsc --noEmit 0 错；13 个 Vitest 文件、150/150 tests 通过。 |
+| `npm ci --no-audit --no-fund` | 通过，exit 0 | 本隔离工作树安装 329 个包。Node v22.19.0 对 jsdom/css-color/dom-selector 要求 `^22.22.2` 发出 EBADENGINE 警告；类型检查与 Vitest 实测仍通过。 |
+| `python scripts/automation/erun_task_cards.py --typecheck --tests` | 通过，exit 0 | TypeScript `tsc --noEmit` 0 错；13 个 Vitest 文件、157/157 tests 通过，含创建 scope、同 key/body 重试与 Worktree 焦点变化拒绝用例。 |
+| CypherGraph Guardian `cgg_guard.py --changed --stamp` | 通过，exit 0 | 5 个已改源码关系头通过校验并刷新 `source_sha256`。 |
 | python -m py_compile scripts/automation/erun_task_cards.py | 通过，exit 0 | 自动化脚本语法检查。 |
 | git diff --check | 通过，exit 0 | 改动 whitespace 检查。 |
 | Tauri focused tests | 通过，exit 0 | hook 与 KanbanCard 共 8/8 tests；BoardView fail-closed 单测 1/1 通过（同文件 7 项未执行）。 |
@@ -48,10 +50,11 @@
 2. `crates/star-api-rest/src/group_api/engineering_runs.rs` 当前固定返回 `run_owned_apps_available=false`、`execution_admission_available=false`。
 3. `db/migrations/2026-10-02-task-run-owner.sql` 存在代码，但未在目标数据库执行；实际应用服务身份、grants 与强制 RLS 尚未验收。
 4. 旧 owner-null Task 仍只读/unknown；没有审计 reconciliation 与真实 Run owner 数据验收。
-5. Task Card 编辑/创建、Inbox、Canvas、Workflow/LangGraph、BI/Benchmark、Plugin App 尚未在本阶段完成 Run UI/读写闭环。
+5. Task Card 编辑与生产创建开放、Inbox、Canvas、Workflow/LangGraph、BI/Benchmark、Plugin App 尚未完成 Run UI/读写闭环；本阶段只增加 capability 未开放时不可见/不可请求的条件式 create UI/client。
 6. 卡内 CLI 仍禁用；Run writer/Runtime provisioning、OS sandbox、实时 revoke/drain、独立 validation、证据/结果持久回写均未闭环。
 7. Node 22.19.0 低于当前若干前端测试依赖声明的最低补丁版本 22.22.2；本次针对性测试在现有 Node 上通过，但部署/CI 应统一 Node patch 基线。
 8. 本阶段没有设备矩阵、桌面 RSS/CPU、分页大数据或并发负载基准；2 MiB/12 条/100 页是硬上限，不是经过基准测定的最佳值。
+9. 创建失败不确定时的 body/key/target 仅保存在面板内存；Run 切换触发 remount 或页面 reload 后无法恢复待重试命令，跨重挂载的幂等恢复尚未实现。
 
 ## §4 子代理失败接手清单
 
@@ -71,7 +74,7 @@
 | 3 | 本地 code slice 与 production-ready 分开报告；缺认证、数据库或 Runtime 证据保持未完成。 |
 | 4 | 不覆盖或清理 D:\Star 主工作区及其他 worktree 的未提交更改。 |
 | 5 | 不把服务端 capability、JWT 或 owner tuple 降级为客户端自报值。 |
-| 6 | Run Task Cards 只消费 Run owner API；禁止回退 Worktree task list、seed 或 mock 历史。 |
+| 6 | Run Task Cards 读写均使用 canonical owner API；创建从服务端推导 Run owner，禁止回退 Worktree task list、seed 或 mock 历史。 |
 | 7 | 单页、响应字节数、请求并发、等待队列、deadline 和页数均有上限。 |
 | 8 | 路由变化/卸载取消在途请求，错误态不得保留或展示旧 Run 数据。 |
 | 9 | 未通过 admission、sandbox、取消/恢复、独立验证及回写闭环前禁用任务 CLI。 |
@@ -98,3 +101,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初版；记录 Run Task Cards bounded UI/API client、定向验证、依赖兼容修复及 Auth/DB/RLS/CLI 剩余门 | 推进 Engineering Run Task Cards 生产接入阶段 |
 | v0.2 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 legacy Tauri Task mock/fallback 退役、Canvas E2E 更新与 Desktop gates：focused 9 tests 通过，full desktop build 失败于独立 legacy compile errors，Rust 工具链不可用；未知服务器 Task 行不变更 | 全仓扫描发现旧 Tauri shell 与 E2E 仍引用演示 Task |
+| v0.3 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加条件式 Run Task Card 创建；校验 `work-item:write`、当前 focus owner tuple 和面板存活期间的固定目标重试；记录跨重挂载 pending recovery、现有服务端事务/Outbox trigger 与目标 DB 未验收门；13 个 Vitest 文件 157/157 通过、TypeScript 0 错。Node 22.19.0 低于部分依赖最低 patch，保留 EBADENGINE 限制；更新需求 v6.08、基本设计 v6.05、Task SRS/BD/DD v0.13/v0.6/v1.26、Group DD v4.74 和计划 §6.109 | 按 Project → Branch → Run → Worktree 设计补齐受限 create slice 并验证 |

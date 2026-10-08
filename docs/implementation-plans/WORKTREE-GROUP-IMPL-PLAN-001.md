@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.40**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.41**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1436,6 +1436,17 @@ Phase report: [`PHASE-9F4D-3D6-QUARANTINE-IMPLEMENTATION-REPORT.md`](../reports/
 
 阶段报告：[PHASE-9F4D-3D7-QUARANTINE-JETSTREAM-REPORT.md](../reports/PHASE-9F4D-3D7-QUARANTINE-JETSTREAM-REPORT.md)。
 
+### 6.109 Run Task Cards 条件式创建切片（2026-10-09）
+
+| Work item | Implementation result | Current gate/status |
+|---|---|---|
+| Run context and create permission | UI 与 API client 要求 RunContext `work-item:write`、当前 Project/Branch/Run tuple、未归档 focus Worktree；服务端仍重验当前主体、Worktree binding 与 Project/Run writer grants。 | 代码切片；Run Apps capability 与宿主 session 当前未在生产装配。 |
+| Create and retry | 复用现有 Worktree-scoped POST endpoint；提交 bounded title/description/priority、correlation ID 与 Idempotency-Key；失败不确定时冻结相同 body/key 和 owner/Worktree target，焦点切换时拒绝跨 target 重试；pending 命令仅存面板内存，Run remount/reload 后恢复尚未实现。 | 本地 API tests 与 TypeScript typecheck 已执行，见阶段报告；不构成跨重挂载恢复或生产闭环，不包含任务编辑。 |
+| Owner transaction | 现有服务端事务写 Task metadata/lifecycle/Worktree association/audit/idempotency；Task Owner migration 中的 trigger 在同一事务追加 Run Outbox。 | 目标 DB migration、应用身份 grants 与 RLS 尚未验收，生产 create 保持 fail closed。 |
+| Architecture and remaining scope | Task Cards/Canvas/Inbox/Workflow/BI/Plugin Apps 继续属于 Run；Worktree 只是 checkout/focus。 | CLI 继续关闭；其它 Run Apps、owner capability 和生产 host provider 不在此窄 slice。 |
+
+阶段报告：[PHASE-ERUN-P3-RUN-APPS-REPORT.md](../reports/PHASE-ERUN-P3-RUN-APPS-REPORT.md)。
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -1631,3 +1642,4 @@ Phase report: [`PHASE-9F4D-3D6-QUARANTINE-IMPLEMENTATION-REPORT.md`](../reports/
 | v6.38 | 2026-10-08 | Mavis review | Add §6.106 for INFRA-2C3 signed lifecycle transitions and atomic retired Master closure; synchronize requirements v6.05/basic v6.02/Infrastructure DD v0.30/Group DD v4.71/W-T-M v0.10/automation v2.27/registry v0.74. Record Rust 1.99.0 infrastructure tests 59/59, SQLx 1/1, PostgreSQL 28/28 and 17/17 FORCE RLS, plus the dependency strict-Clippy limitation. Preserve zero-VM/two-record constraints and production/provider/Run/BI/execution gates. | The cumulative Infrastructure resource lifecycle slice passed isolated verification. |
 | v6.39 | 2026-10-08 | Mavis review | Add §6.107 for INFRA-2C4 bounded empty inventory and exact Host-generation read-only catalog projection; sync requirements v6.06/basic v6.03/Infrastructure DD v0.31/Group DD v4.72/automation v2.28/registry v0.75. Record Rust 62/62 + 19/19, SQLx 1/1, PostgreSQL 28/28 and 17/17 FORCE RLS; preserve 17 tables, two-record cap, zero VM and no-auto-purge. Keep production control-plane placement and Manager/provider/Run/readiness/BI/execution gates open. | C4 verified a read-only reconciliation seam without adopting other branch refactors. |
 | v6.40 | 2026-10-08 | Mavis review | Add §6.108 for Phase 9F4D-3D7; synchronize requirements v6.07, basic v6.04, Schedule SRS/BD/DD v0.30/v0.29/v0.29, Group DD v4.73, Infrastructure DD v0.32, automation v2.29 and registry v0.76. Record real PostgreSQL/NATS 22/22 runner steps, 2/2 Rust integration tests, zero VM and unchanged inventory; no schema change. Keep production identities/KMS/operator/consumer and all Run/Schedule/Task execution gates open. | 3D7 closes the real JetStream redelivery/ACK-loss evidence gap only. |
+| v6.41 | 2026-10-09 | Mavis review | Add §6.109 for conditional Run Task Card creation; record write-scope/current-focus checks, exact-target idempotent retry, existing owner transaction/outbox seam and fail-closed production gates. Sync requirements v6.08, basic design v6.05, Task SRS/BD/DD v0.13/v0.6/v1.26 and Group DD v4.74; no unrelated branch refactor is carried forward. | Implement a small user-visible Run Task Card create slice consistent with the approved navigation tree. |
