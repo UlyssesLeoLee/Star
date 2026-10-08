@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.27 (2026-10-08)
+> **文档版本**: v2.28 (2026-10-08)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1290,6 +1290,13 @@ The Rust test registers the five resource kinds, then verifies the lifecycle-spe
 
 - Phase report: [`PHASE-INFRA-2C3-RESOURCE-LIFECYCLE-REPORT.md`](reports/PHASE-INFRA-2C3-RESOURCE-LIFECYCLE-REPORT.md).
 
+### 4.69 Phase INFRA-2C4 Multipass inventory reconciliation
+
+Run the cumulative read-only gate with python scripts/automation/phase_infra2c2_resource_writer.py --phase c4 --pg-bin <PostgreSQL-18.6-bin> --cargo-bin <Cargo-1.99.0>. C4 uses dedicated .cache/phase-infra2c4-inventory-reconciliation and target/phase-infra2c4-inventory-reconciliation paths, applies the existing seven-migration chain twice, runs the extended Rust SQLx integration, confirms 17/17 FORCE RLS, and stops/cleans only its owned disposable PostgreSQL process/data directory. It adds no migration/table and never invokes Multipass or creates a VM.
+
+The SQLx test supplies two catalog rows (Stopped managed and Deleted external), verifies an empty complete snapshot is classified missing, rejects a stale Host generation, and confirms event count is unchanged. The runner passed 28/28 steps; Rust library tests passed 62/62 for infrastructure and 19/19 for multipass-adapter, with SQLx 1/1 and 17/17 FORCE RLS. The two-record cap includes Stopped/Deleted, with no auto-purge. Production control-plane PostgreSQL placement outside target K3s clusters, target DB/login, live Manager/provider, UI/API, capacity/readiness, BI/Benchmark and Task/Schedule execution remain unverified and closed.
+
+- Phase report: [PHASE-INFRA-2C4-INVENTORY-RECONCILIATION-REPORT.md](reports/PHASE-INFRA-2C4-INVENTORY-RECONCILIATION-REPORT.md).
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -2761,3 +2768,4 @@ frontend/src/app/automation-debug/
 - The isolated runner starts zero Multipass VMs. Live test inventory remains capped at two registered records total, including Stopped/Deleted; no auto-purge.
 - Verification passed: focused Rust runner 4/4 gates; disposable PostgreSQL runner 21/21 steps, 10/10 FORCE RLS and all 10/10 ignored SQLx cases. PostgreSQL stopped and its unique data directory was removed; the runner used zero Multipass VMs.
 - Phase evidence: [`PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md`](reports/PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md).
+| v2.28 | 2026-10-08 | Add §4.69 for cumulative INFRA-2C4 verification; record empty-snapshot/stale-generation/event-count assertions, 28/28 steps, SQLx 1/1 and 17/17 FORCE RLS, separate C4 output/data paths and zero VM/live inventory. Keep two-record and production topology/provider/execution gates explicit. | INFRA-2C4 adds a read-only projection over existing tables. |

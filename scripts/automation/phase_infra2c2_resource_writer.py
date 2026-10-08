@@ -1,6 +1,6 @@
-"""Verify the INFRA-2C2 registration or cumulative INFRA-2C3 lifecycle writer in disposable PostgreSQL."""
+"""Verify INFRA-2C2 registration and cumulative INFRA-2C3/C4 PostgreSQL owner checks."""
 
-# @cypher schema=1 source_sha256=a7867c312e6644e68c07f78b7dd0095d4e88aac60efa65e473d52236c7fdcbcd
+# @cypher schema=1 source_sha256=cf178cddcca4aca7946e634d81813b071e2d47314281991ae217b43fa83c3202
 # MERGE (self:File {path:"scripts/automation/phase_infra2c2_resource_writer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::main",kind:"function"})
 # MERGE (contained:Symbol {id:"scripts/automation/phase_infra2c2_resource_writer.py::is_contained",kind:"function"})
@@ -22,6 +22,8 @@
 # MERGE (data:Config {id:".cache/phase-infra2c2-resource-writer"})
 # MERGE (lifecycle_output:Config {id:"target/phase-infra2c3-resource-lifecycle"})
 # MERGE (lifecycle_data:Config {id:".cache/phase-infra2c3-resource-lifecycle"})
+# MERGE (reconciliation_output:Config {id:"target/phase-infra2c4-inventory-reconciliation"})
+# MERGE (reconciliation_data:Config {id:".cache/phase-infra2c4-inventory-reconciliation"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test",kind:"command"})
 # MERGE (process:ExternalService {id:"python.subprocess",kind:"module"})
@@ -41,6 +43,8 @@
 # MERGE (main)-[:CONFIGURES]->(data)
 # MERGE (main)-[:CONFIGURES]->(lifecycle_output)
 # MERGE (main)-[:CONFIGURES]->(lifecycle_data)
+# MERGE (main)-[:CONFIGURES]->(reconciliation_output)
+# MERGE (main)-[:CONFIGURES]->(reconciliation_data)
 # MERGE (main)-[:CONFIGURES]->(postgres)
 # MERGE (main)-[:VERIFIES_STOPPED]->(postgres)
 # MERGE (reserve_port)-[:CALLS]->(socket)
@@ -278,11 +282,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-bin", type=Path, required=True, help="PostgreSQL 18.6 bin directory")
     parser.add_argument("--cargo-bin", type=Path, default=None, help="Cargo executable (defaults to PATH)")
-    parser.add_argument("--phase", choices=("c2", "c3"), default="c2", help="schema/writer slice to verify")
+    parser.add_argument(
+        "--phase",
+        choices=("c2", "c3", "c4"),
+        default="c2",
+        help="schema/writer slice to verify",
+    )
     args = parser.parse_args()
-    if args.phase == "c3":
-        OUTPUT_DIR = ROOT / "target" / "phase-infra2c3-resource-lifecycle"
-        DATA_PARENT = ROOT / ".cache" / "phase-infra2c3-resource-lifecycle"
+    if args.phase in {"c3", "c4"}:
+        phase_name = (
+            "phase-infra2c3-resource-lifecycle"
+            if args.phase == "c3"
+            else "phase-infra2c4-inventory-reconciliation"
+        )
+        OUTPUT_DIR = ROOT / "target" / phase_name
+        DATA_PARENT = ROOT / ".cache" / phase_name
         migration_names = (*MIGRATION_NAMES, LIFECYCLE_MIGRATION)
     else:
         migration_names = MIGRATION_NAMES

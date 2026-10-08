@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=09a76fd559d6808da77c255fa21d686aa76370f03644a7c331b9832c64d7f064
+@cypher schema=1 source_sha256=fc6774aabbe5c36e1d0533dfb2d126ff84123f3f67be5227ed75f40fcd8874b2
 MERGE (self:File {path:"crates/multipass-adapter/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/multipass-adapter/src/lib.rs::module", kind:"module"})
 MERGE (read_only_command:Type {id:"crates/multipass-adapter/src/lib.rs::MultipassReadOnlyCommand", kind:"enum"})
@@ -28,6 +28,7 @@ MERGE (local_driver:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassCa
 MERGE (host_os:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassCapabilityObservation.host_os", kind:"method"})
 MERGE (host_arch:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassCapabilityObservation.host_arch", kind:"method"})
 MERGE (snapshot_instances:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassInventorySnapshot.instances", kind:"method"})
+MERGE (snapshot_parse_json:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassInventorySnapshot.parse_json", kind:"method"})
 MERGE (registered_count:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassInventorySnapshot.registered_count", kind:"method"})
 MERGE (instance_name:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassInstance.name", kind:"method"})
 MERGE (instance_state:Symbol {id:"crates/multipass-adapter/src/lib.rs::MultipassInstance.state", kind:"method"})
@@ -71,6 +72,8 @@ MERGE (version_parse_test:Symbol {id:"crates/multipass-adapter/src/lib.rs::tests
 MERGE (version_invalid_test:Symbol {id:"crates/multipass-adapter/src/lib.rs::tests::malformed_or_ambiguous_version_output_fails_closed", kind:"test"})
 MERGE (driver_unknown_test:Symbol {id:"crates/multipass-adapter/src/lib.rs::tests::driver_probe_preserves_unknown_values_as_observations", kind:"test"})
 MERGE (driver_invalid_test:Symbol {id:"crates/multipass-adapter/src/lib.rs::tests::malformed_or_ambiguous_driver_output_fails_closed", kind:"test"})
+MERGE (empty_inventory_test:Symbol {id:"crates/multipass-adapter/src/lib.rs::tests::empty_inventory_is_a_valid_observation", kind:"test"})
+MERGE (oversized_json_test:Symbol {id:"crates/multipass-adapter/src/lib.rs::tests::public_inventory_parser_enforces_output_bound", kind:"test"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:DEFINES]->(read_only_command)
 MERGE (module)-[:DEFINES]->(probe)
@@ -118,6 +121,7 @@ MERGE (capability_observation)-[:DEFINES]->(local_driver)
 MERGE (capability_observation)-[:DEFINES]->(host_os)
 MERGE (capability_observation)-[:DEFINES]->(host_arch)
 MERGE (snapshot)-[:DEFINES]->(snapshot_instances)
+MERGE (snapshot)-[:DEFINES]->(snapshot_parse_json)
 MERGE (snapshot)-[:DEFINES]->(registered_count)
 MERGE (instance)-[:DEFINES]->(instance_name)
 MERGE (instance)-[:DEFINES]->(instance_state)
@@ -141,9 +145,13 @@ MERGE (tests)-[:DEFINES]->(version_parse_test)
 MERGE (tests)-[:DEFINES]->(version_invalid_test)
 MERGE (tests)-[:DEFINES]->(driver_unknown_test)
 MERGE (tests)-[:DEFINES]->(driver_invalid_test)
+MERGE (tests)-[:DEFINES]->(empty_inventory_test)
+MERGE (tests)-[:DEFINES]->(oversized_json_test)
 MERGE (list)-[:CALLS]->(acquire)
 MERGE (list)-[:CALLS]->(run_command)
 MERGE (list)-[:CALLS]->(parse)
+MERGE (list)-[:CALLS]->(snapshot_parse_json)
+MERGE (snapshot_parse_json)-[:CALLS]->(parse)
 MERGE (capability_run)-[:CALLS]->(acquire)
 MERGE (capability_run)-[:CALLS]->(run_command)
 MERGE (capability_run)-[:CALLS]->(parse_versions)
@@ -187,6 +195,8 @@ MERGE (version_parse_test)-[:CALLS]->(parse_versions)
 MERGE (version_invalid_test)-[:CALLS]->(parse_versions)
 MERGE (driver_unknown_test)-[:CALLS]->(parse_driver)
 MERGE (driver_invalid_test)-[:CALLS]->(parse_driver)
+MERGE (empty_inventory_test)-[:CALLS]->(snapshot_parse_json)
+MERGE (oversized_json_test)-[:CALLS]->(snapshot_parse_json)
 MERGE (single_flight_test)-[:CALLS]->(new)
 MERGE (single_flight_test)-[:CALLS]->(list)
 MERGE (single_flight_test)-[:CALLS]->(capability_new)
@@ -288,7 +298,7 @@ impl MultipassInventoryProbe {
         let _permit = acquire_probe_permit()?;
         let stdout =
             run_multipass_command(&self.executable, MultipassReadOnlyCommand::Inventory).await?;
-        parse_multipass_list_json(&stdout)
+        MultipassInventorySnapshot::parse_json(&stdout)
     }
 }
 
@@ -377,6 +387,17 @@ pub struct MultipassInventorySnapshot {
 }
 
 impl MultipassInventorySnapshot {
+    /// Parse a bounded Multipass JSON inventory without running a process.
+    ///
+    /// This validates the document shape and row bounds; it does not authenticate the source.
+    pub fn parse_json(bytes: &[u8]) -> Result<Self, MultipassInventoryError> {
+        if bytes.len() > MAX_STDOUT_BYTES {
+            return Err(MultipassInventoryError::StdoutLimitExceeded);
+        }
+
+        parse_multipass_list_json(bytes)
+    }
+
     /// Return all observed rows, including Stopped and Deleted entries.
     pub fn instances(&self) -> &[MultipassInstance] {
         &self.instances
@@ -538,12 +559,7 @@ fn parse_multipass_list_json(
     let document: MultipassListDocument =
         serde_json::from_slice(bytes).map_err(|_| MultipassInventoryError::InvalidJson)?;
     let rows = match document {
-        MultipassListDocument::Rows(rows) => {
-            if rows.list.is_empty() {
-                return Err(MultipassInventoryError::InvalidInstance);
-            }
-            rows.list
-        }
+        MultipassListDocument::Rows(rows) => rows.list,
         MultipassListDocument::Instances(MultipassNamedInstances(instances)) => {
             let mut rows = Vec::new();
             for (name, records) in instances {
@@ -769,8 +785,9 @@ mod tests {
     use super::{
         parse_multipass_driver, parse_multipass_list_json, parse_multipass_versions, read_bounded,
         MultipassCapabilityProbe, MultipassInstanceState, MultipassInventoryError,
-        MultipassInventoryProbe, MultipassReadOnlyCommand, MAX_CAPABILITY_OUTPUT_BYTES,
-        MAX_INVENTORY_ROWS, MULTIPASS_PROBE_SINGLE_FLIGHT,
+        MultipassInventoryProbe, MultipassInventorySnapshot, MultipassReadOnlyCommand,
+        MAX_CAPABILITY_OUTPUT_BYTES, MAX_INVENTORY_ROWS, MAX_STDOUT_BYTES,
+        MULTIPASS_PROBE_SINGLE_FLIGHT,
     };
     use tokio::io::{duplex, AsyncWriteExt};
 
@@ -812,6 +829,25 @@ mod tests {
     }
 
     #[test]
+    fn empty_inventory_is_a_valid_observation() {
+        let snapshot = MultipassInventorySnapshot::parse_json(br#"{"list":[]}"#)
+            .expect("an empty list is a valid zero-instance observation");
+
+        assert_eq!(snapshot.registered_count(), 0);
+        assert!(snapshot.instances().is_empty());
+    }
+
+    #[test]
+    fn public_inventory_parser_enforces_output_bound() {
+        let bytes = vec![b' '; MAX_STDOUT_BYTES + 1];
+
+        assert!(matches!(
+            MultipassInventorySnapshot::parse_json(&bytes),
+            Err(MultipassInventoryError::StdoutLimitExceeded)
+        ));
+    }
+
+    #[test]
     fn malformed_inventory_fails_closed() {
         assert!(matches!(
             parse_multipass_list_json(br#"{"instances":null}"#),
@@ -827,10 +863,6 @@ mod tests {
         ));
         assert!(matches!(
             parse_multipass_list_json(br#"{"vm":[]}"#),
-            Err(MultipassInventoryError::InvalidInstance)
-        ));
-        assert!(matches!(
-            parse_multipass_list_json(br#"{"list":[]}"#),
             Err(MultipassInventoryError::InvalidInstance)
         ));
     }

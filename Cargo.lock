@@ -3523,6 +3523,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-infrastructure",
+ "multipass-adapter",
  "ring",
  "serde",
  "serde_json",

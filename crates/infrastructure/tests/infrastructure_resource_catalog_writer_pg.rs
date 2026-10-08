@@ -1,10 +1,12 @@
-//! @cypher schema=1 source_sha256=f456a1a8020cc77695579022bbc99da60573cb095d2cafede106d247b9760604
+//! @cypher schema=1 source_sha256=772b24c81ad52d8ae7a368396b0031399441ce93f8e82c626c5da5ed1a5f900e
 //! MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_resource_catalog_writer_pg.rs"})
 //! MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_resource_catalog_writer_pg.rs::postgres_writer_registers_atomic_idempotent_signed_resource_facts",kind:"test"})
 //! MERGE (operation:Symbol {id:"crates/infrastructure/tests/infrastructure_resource_catalog_writer_pg.rs::operation",kind:"function"})
 //! MERGE (signed_receipt:Symbol {id:"crates/infrastructure/tests/infrastructure_resource_catalog_writer_pg.rs::signed_receipt",kind:"function"})
 //! MERGE (count:Symbol {id:"crates/infrastructure/tests/infrastructure_resource_catalog_writer_pg.rs::count",kind:"function"})
 //! MERGE (writer:Type {id:"infrastructure::PostgresInfrastructureResourceCatalogWriter",kind:"external_type"})
+//! MERGE (reconciler:Type {id:"infrastructure::PostgresMultipassInventoryReconciler",kind:"external_type"})
+//! MERGE (snapshot:Type {id:"multipass_adapter::MultipassInventorySnapshot",kind:"external_type"})
 //! MERGE (keypair:Type {id:"ring::signature::Ed25519KeyPair",kind:"external_type"})
 //! MERGE (pg_pool:Type {id:"sqlx::PgPool",kind:"external_type"})
 //! MERGE (receipt_table:Table {id:"infrastructure.resource_catalog_manager_receipt",class:"Transaction"})
@@ -21,6 +23,8 @@
 //! MERGE (test)-[:CALLS]->(operation)
 //! MERGE (test)-[:CALLS]->(signed_receipt)
 //! MERGE (test)-[:CALLS]->(writer)
+//! MERGE (test)-[:CALLS]->(reconciler)
+//! MERGE (test)-[:CALLS]->(snapshot)
 //! MERGE (test)-[:CALLS]->(pg_pool)
 //! MERGE (test)-[:CALLS]->(count)
 //! MERGE (signed_receipt)-[:CALLS]->(keypair)
@@ -34,12 +38,17 @@
 //! @endcypher
 
 use chrono::Utc;
+use infrastructure::infrastructure_multipass_inventory_reconciliation::{
+    CatalogOwnerState, InventoryReconciliationError, MultipassInventoryFinding,
+    PostgresMultipassInventoryReconciler,
+};
 use infrastructure::infrastructure_resource_catalog_writer::{
     Ed25519InfrastructureReceiptVerifier, InfrastructureManagerResourceOperationV1, K3sNodeRoleV1,
     ManagerResourceIdentityV1, PostgresInfrastructureResourceCatalogWriter,
     ResourceCatalogWriteError, SignedInfrastructureManagerReceiptV1,
     TrustedInfrastructureManagerKey,
 };
+use multipass_adapter::MultipassInventorySnapshot;
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use uuid::Uuid;
@@ -227,6 +236,61 @@ async fn postgres_writer_registers_atomic_idempotent_signed_resource_facts() {
         .register(&node)
         .await
         .expect("register Kubernetes node");
+
+    let reconciliation_before: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM infrastructure.resource_catalog_event")
+            .fetch_one(&pool)
+            .await
+            .expect("read event count before reconciliation");
+    let snapshot = MultipassInventorySnapshot::parse_json(
+        br#"{"list":[{"name":"ci-test-01","state":"Stopped"},{"name":"external-02","state":"Deleted"}]}"#,
+    )
+    .expect("bounded two-row inventory fixture parses");
+    let reconciler = PostgresMultipassInventoryReconciler::new(pool.clone());
+    let report = reconciler
+        .reconcile(host_id, 1, &snapshot)
+        .await
+        .expect("read-only reconciliation uses the current Host catalog");
+    assert_eq!(report.managed_present_count(), 1);
+    assert_eq!(report.managed_missing_count(), 0);
+    assert_eq!(report.external_observed_count(), 1);
+    assert!(matches!(
+        &report.findings()[0],
+        MultipassInventoryFinding::ManagedPresent {
+            resource_id,
+            generation: 1,
+            provider_instance_name,
+            owner_state: CatalogOwnerState::Active,
+            ..
+        } if *resource_id == instance_id && provider_instance_name == "ci-test-01"
+    ));
+    assert!(matches!(
+        &report.findings()[1],
+        MultipassInventoryFinding::ExternalObserved {
+            provider_instance_name,
+            ..
+        } if provider_instance_name == "external-02"
+    ));
+
+    let empty_snapshot = MultipassInventorySnapshot::parse_json(br#"{"list":[]}"#)
+        .expect("valid empty inventory parses as zero rows");
+    let absent_report = reconciler
+        .reconcile(host_id, 1, &empty_snapshot)
+        .await
+        .expect("missing entries are reported without a lifecycle write");
+    assert_eq!(absent_report.managed_present_count(), 0);
+    assert_eq!(absent_report.managed_missing_count(), 1);
+    assert_eq!(absent_report.external_observed_count(), 0);
+    assert!(matches!(
+        reconciler.reconcile(host_id, 2, &snapshot).await,
+        Err(InventoryReconciliationError::HostEnvironmentNotCurrent)
+    ));
+    let reconciliation_after: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM infrastructure.resource_catalog_event")
+            .fetch_one(&pool)
+            .await
+            .expect("read event count after reconciliation");
+    assert_eq!(reconciliation_before, reconciliation_after);
 
     assert!(
         writer

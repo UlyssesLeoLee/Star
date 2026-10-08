@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.02 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v6.05
+> **文档版本**: v6.03 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v6.06
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5078,6 +5078,16 @@ The cumulative disposable PostgreSQL 18.6 runner applied every migration twice a
 |---|---|
 | AC-INFRA-002-V | §16.46 and Infrastructure DD §7.16; lifecycle-specific signature, operation/resource-generation locks, strict transition matrix, idempotent receipt/event commit and atomic retirement close with deferred DB enforcement. Rust 1.99.0 + PG18.6, all five Master types, 17/17 FORCE RLS, zero VM; production identity/provider/Run/BI/execution gates remain open. |
 
+### 16.47 Phase INFRA-2C4 Multipass inventory reconciliation
+
+The Rust Multipass adapter exposes its bounded parser for complete list observations, including a valid zero-row list. PostgresMultipassInventoryReconciler compares it with current catalog identities for one exact HostEnvironment generation in a read-only repeatable-read owner transaction with bounded rows and a statement timeout. Results are managed-present, managed-missing, or external-observed; provider names are not ownership proof. Empty input may mark an identity missing in the projection but cannot update Master lifecycle or append Transaction facts. Invalid/ambiguous input, stale Host generation, unknown catalog state, and DB errors fail closed without cache fallback.
+
+Infrastructure control-plane PostgreSQL is placed outside target K3s clusters and must be independently available for bootstrap; C4 tests do not validate production deployment. Multipass, HostEnvironment, K3s cluster, and Kubernetes node remain separate identities. This change adds no table/event and provides no host authentication, production Manager/provider, readiness, capacity, Run binding, BI/Benchmark, or task execution. The 17-table W/T/M inventory, Rust 1.99.0 baseline, two-record cap and zero-VM test boundary are unchanged.
+
+| Acceptance ID | Design mapping and boundary |
+|---|---|
+| AC-INFRA-002-W | Requirements §50.8W; Infrastructure DD §7.17; bounded empty-snapshot parsing; exact Host-generation owner-scoped read; no registration, retirement, event, BI, capacity, readiness, or execution mutation; focused Rust tests 62/62 + 19/19, SQLx 1/1, PG18.6 runner 28/28, 17/17 FORCE RLS. Production control-plane placement remains a deployment gate. |
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5226,3 +5236,4 @@ The cumulative disposable PostgreSQL 18.6 runner applied every migration twice a
 | v6.00 | 2026-10-08 | Mavis review | Update §16.41 from design-only to verified 9F4D-3D6 persistence and consumer-hook substrate; add exact per-item/per-deployment quota, 16-value/8-KiB replay-header bounds, explicit retention, TTL/purge audit, confirmed Term ACK, FORCE RLS/owner roles and Rust/PostgreSQL evidence. Synchronize requirements v6.03, Schedule SRS/BD/DD v0.29/v0.28/v0.28, Group DD v4.69, Data Design v2.0, implementation plan v6.34 and phase report; preserve the two-record Multipass cap and production fail-closed boundary. | Implementation, bounded-memory review and disposable schema gates passed. |
 | v6.01 | 2026-10-08 | Mavis review | Add §16.45 / AC-INFRA-002-U for the Rust 1.99.0 Ed25519 receipt verifier and SQLx owner writer; describe atomic receipt/Master/event registration, replay identity, migration refusal of unsigned legacy facts, immutable DB binding, production key/reconciliation/lifecycle gaps, and the 17-table cumulative W/T/M gate. Align requirements v6.04, Infrastructure DD v0.29, Group DD v4.70, W/T/M v0.9 and plan v6.37; preserve the two-record Multipass limit and disabled execution. | INFRA-2C2 implements signed resource registration while keeping VM and Run execution closed. |
 | v6.02 | 2026-10-08 | Mavis review | Add §16.46 / AC-INFRA-002-V for the separate signed lifecycle command, current-generation advisory serialization, allowed active/draining/retired state machine, exact replay/conflict, and receipt/event/Master-close atomicity enforced by a deferred database trigger. Record the passed 28/28 PostgreSQL runner, SQLx 1/1 and 17/17 FORCE RLS. Align requirements v6.05, Infrastructure DD v0.30, Group DD v4.71, W/T/M v0.10 and plan v6.38; keep 17 tables, Rust 1.99.0, two Multipass records and execution disabled. | INFRA-2C3 implements signed lifecycle persistence over the existing owner catalog. |
+| v6.03 | 2026-10-08 | Mavis review | Add §16.47 / AC-INFRA-002-W for read-only exact Host-generation inventory reconciliation, valid empty snapshot handling and fail-closed malformed/stale catalog inputs; document independent control-plane PostgreSQL placement outside target K3s clusters. Record Rust 62/62 + 19/19, SQLx 1/1, PG18.6 28/28 and 17/17 FORCE RLS; preserve 17 tables, two records, zero VMs and disabled execution. | INFRA-2C4 adds projection only, with no schema/event mutation. |

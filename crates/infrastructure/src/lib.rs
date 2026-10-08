@@ -6,18 +6,20 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
-//! @cypher schema=1 source_sha256=309fca41b9b66ac238dfc97cd9cf8387be5eed98d560099aca32592f76a322c6
+//! @cypher schema=1 source_sha256=ffca571d010b99529f043fce0075146f07ab5ad463963ba4e70b713be655c78e
 //! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
 //! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
 //! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
 //! MERGE (ownerOutboxDelivery:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_outbox_delivery",kind:"module"})
 //! MERGE (ownerJetStreamPublisher:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
 //! MERGE (resourceCatalogWriter:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_resource_catalog_writer",kind:"module"})
+//! MERGE (multipassInventoryReconciliation:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_multipass_inventory_reconciliation",kind:"module"})
 //! MERGE (self)-[:DEFINES]->(ownerInbox)
 //! MERGE (self)-[:DEFINES]->(ownerAdmission)
 //! MERGE (self)-[:DEFINES]->(ownerOutboxDelivery)
 //! MERGE (self)-[:DEFINES]->(ownerJetStreamPublisher)
 //! MERGE (self)-[:DEFINES]->(resourceCatalogWriter)
+//! MERGE (self)-[:DEFINES]->(multipassInventoryReconciliation)
 //! @endcypher
 //!
 //! ## 职责
@@ -388,6 +390,7 @@ mod tests {
     }
 }
 
+pub mod infrastructure_multipass_inventory_reconciliation;
 pub mod infrastructure_owner_admission;
 pub mod infrastructure_owner_inbox;
 pub mod infrastructure_owner_jetstream_publisher;

@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.71**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.72**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -15,9 +15,9 @@
 > - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.02 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v6.00 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.28、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.104 v6.33
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.06 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v6.03 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.31、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.107 v6.39
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -610,6 +610,15 @@ The Rust 1.99.0 SQLx test exercises all five Master types, sequential reactivati
 |---|---|
 | AC-INFRA-002-V | Infrastructure DD §7.16 / Basic Design §16.46；separate lifecycle signature domain, exact generation lock, idempotent receipt/event, strict state machine, atomic retired Master close and deferred DB enforcement; all five Master types, PG18.6, 17/17 FORCE RLS, Rust 1.99.0, zero VMs; production and execution gates remain closed. |
 
+### 8.20 INFRA-2C4 read-only Worktree/Run infrastructure projection
+
+Multipass inventory reconciliation belongs to the Infrastructure owner and is scoped to one exact HostEnvironment generation. A future authorized Run App may present findings beside selected Run/Worktree context, but must label them as observed inventory only. ManagedMissing is not retirement; ExternalObserved is not registration; neither result establishes K3s readiness, Host/cluster capacity, Run binding, BI/Benchmark outcome, or Task Card/Schedule execution permission. The reconciliation endpoint, UI, production Manager and target-database identity are not implemented by this slice.
+
+The main tree remains Project → Cloud Branch → Engineering Run → that Run's local Worktrees. Selecting a Worktree sets focus/CLI checkout context; it does not move Infrastructure ownership into the Worktree or change Run Apps ownership. Infrastructure control-plane PostgreSQL must remain outside target K3s clusters and independently available for bootstrap. C4 introduces no Group schema, navigation node, or Run event.
+
+| Acceptance ID | Group design boundary |
+|---|---|
+| AC-INFRA-002-W | Infrastructure DD §7.17 / Basic Design §16.47; expose only an owner-authorized, read-only exact-Host-generation observation if a later Run App is built; never translate findings into ownership, retirement, readiness, capacity, BI, or execution state. Product UI/API wiring remains open. |
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -914,3 +923,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.69 | 2026-10-08 | Mavis review | Update §8.15 from design-only to verified 9F4D-3D6 Platform quarantine schema/roles/RLS and Run-owner opt-in ACK hook; synchronize requirements v6.03, Basic Design v6.00, Schedule SRS/BD/DD v0.29/v0.28/v0.28, Data Design v2.0 and plan v6.34. Record 15/15 Rust tests, disposable PostgreSQL 18.6 duplicate migration and schema/quota checks; keep KMS, target DB/stream provisioning, operator workflow and production execution open. Preserve Worktree-first navigation and the two-record Multipass cap. | 9F4D-3D6 persistence slice passed focused verification without starting a VM. |
 | v4.70 | 2026-10-08 | Mavis review | Add §8.18 / AC-INFRA-002-U for trusted Rust Manager Ed25519 receipt verification and atomic owner registration of one exact resource Master generation plus its append-only event; specify idempotent replay, signed-only migration, receipt/event WORM/RLS and current Run/execution boundary. Align requirements v6.04/basic design v6.01/Infrastructure DD v0.29/W-T-M v0.9/plan v6.37. Preserve Worktree-first navigation, Rust 1.99.0 and the two-instance test cap; no VM or Run CLI execution is enabled. | INFRA-2C2 adds signed ownership evidence without implementing inventory reconciliation or lifecycle operations. |
 | v4.71 | 2026-10-08 | Mavis review | Add §8.19 / AC-INFRA-002-V for lifecycle-specific signed Manager commands, exact-generation serialization, active/draining/reactivation/retirement transitions, atomic retired Master close and deferred DB enforcement. Record passed 28/28 PostgreSQL steps, SQLx 1/1 and 17/17 FORCE RLS. Align requirements v6.05/basic v6.02/Infrastructure DD v0.30/W-T/M v0.10/plan v6.38. Preserve Worktree-first ownership, Rust 1.99.0 and the two-record cap; create zero VMs and keep provider/Run/BI/execution gates open. | INFRA-2C3 adds a signed lifecycle writer over the existing owner catalog. |
+| v4.72 | 2026-10-08 | Mavis review | Add §8.20 / AC-INFRA-002-W for read-only exact-Host-generation projection; prevent Run/Worktree UI from treating findings as ownership, retirement, readiness, capacity, BI or execution state. Align requirements v6.06/basic v6.03/Infrastructure DD v0.31/plan §6.107 v6.39; preserve Project→Branch→Run→Worktree navigation and leave production UI/API wiring open. | INFRA-2C4 adds a cross-App contract without changing Group ownership or schema. |

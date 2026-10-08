@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.30 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 建立 Ed25519 Rust Manager signed registration，INFRA-2C3 在不改 registration V1 签名格式且不增表的前提下增加 lifecycle-specific signature、active/draining/retired 写入及延迟 Master-close 约束。PostgreSQL 18.6 cumulative chain 仍为 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、inventory reconciliation、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
+> v0.31 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 建立 Ed25519 Rust Manager signed registration，INFRA-2C3 在不改 registration V1 签名格式且不增表的前提下增加 lifecycle-specific signature、active/draining/retired 写入及延迟 Master-close 约束。PostgreSQL 18.6 cumulative chain 仍为 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、live inventory reconciliation wiring、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v6.05 §50.8G-50.8V / basic-design v6.02 §8.1、§16.21-16.46 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.27 / W/T/M v0.10 / 实施计划 §6.83-6.106。
+> 上游：requirements v6.06 §50.8G-50.8W / basic-design v6.03 §8.1、§16.21-16.47 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.28 / W/T/M v0.10 / 实施计划 §6.83-6.107。
 
 ## §0 目的与边界
 
@@ -323,6 +323,27 @@ This slice still does not reconcile provider inventory, provision/rotate product
 |---|---|
 | AC-INFRA-002-V | §7.16.1–7.16.3; distinct signed lifecycle domain; exact resource-generation serialization; bounded transition matrix; idempotent receipt/event facts; retired Master close in the same transaction and deferred database enforcement; all five Master tables; passed Rust 1.99.0 SQLx 1/1 and PG18.6 28/28 runner, 17/17 FORCE RLS, zero VMs. |
 
+### §7.17 INFRA-2C4 Multipass inventory reconciliation
+
+#### §7.17.1 Complete bounded observations
+
+The Rust adapter exposes MultipassInventorySnapshot::parse_json and accepts a valid empty list as a complete zero-instance observation. Existing stdout and row limits still apply. Malformed JSON, duplicate object keys or instance names, invalid rows and over-limit data are rejected. An empty result is meaningful only after the fixed read-only probe exited successfully and the full bounded payload parsed; process or parse failure is not an empty inventory.
+
+#### §7.17.2 Exact-generation read projection
+
+PostgresMultipassInventoryReconciler::reconcile opens a REPEATABLE READ, READ ONLY transaction, applies SET LOCAL ROLE star_infrastructure_owner, and uses a 5-second statement timeout. It verifies the exact current HostEnvironment ID and generation, loads only current Multipass identities for that pair with a bounded query, and requires a known latest lifecycle event for each row. Ambiguous names, duplicate catalog names, invalid identity/generation, stale Host generation, unknown lifecycle state, row overflow and any database error fail closed.
+
+The result contains only ManagedPresent, ManagedMissing, and ExternalObserved. Names compare byte-for-byte within the exact Host generation and are not durable identity or ownership evidence. A complete empty snapshot may yield ManagedMissing; it never closes a Master row, appends a lifecycle event, registers an external row, or changes capacity/readiness. This is an ephemeral read projection with no cache fallback, persisted report, schema change, owner event, or BI/Benchmark fact.
+
+#### §7.17.3 Topology and product boundary
+
+Infrastructure control-plane PostgreSQL must run outside target K3s clusters and remain independently available for bootstrap and inventory management; C4's disposable database does not verify production placement or availability. Multipass instance, HostEnvironment, K3s cluster, and Kubernetes node remain distinct identities. The catalog remains the owner Master; inventory does not prove Manager authorization, target-cluster capacity, guest/K3s/node/CRI health, Runtime sandbox readiness, Run binding, or execution permission.
+
+Rust 1.99.0 infrastructure and adapter library suites passed 62/62 and 19/19. The extended Rust SQLx integration covers two catalog fixtures (one Stopped managed row and one Deleted external row), including empty-snapshot/missing classification, stale Host generation rejection, and unchanged event count. The cumulative PostgreSQL 18.6 runner passed 28/28 steps and 17/17 FORCE RLS; it created no VM and changed no live inventory. The schema remains 17 tables / 4 W / 7 T / 6 M. The two-record test inventory cap and no-auto-purge rule remain in force.
+
+| Requirement | Detailed design and verification |
+|---|---|
+| AC-INFRA-002-W | §7.17.1–7.17.3; complete bounded empty observation; exact Host-generation REPEATABLE READ READ ONLY comparison under Infrastructure owner; fail-closed catalog/DB errors; no Master/event mutation or lifecycle/readiness/capacity/BI/execution claim; Rust 1.99.0, SQLx 1/1, PG18.6 runner 28/28, 17/17 FORCE RLS, zero VMs. Production control-plane DB placement and live Manager/provider integration remain open. |
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -356,3 +377,4 @@ This slice still does not reconcile provider inventory, provision/rotate product
 | v0.28 | 2026-10-08 | Mavis review | Add §7.14 for the cumulative global Host/Multipass/K3s identity catalog: five SCD2 Master tables, one append-only Transaction event table, deferred atomic registration, composite generation FKs, one-current-membership/node-name constraints, serialized events and owner-only FORCE RLS/grants. Align requirements v6.02, basic design v5.99, Group DD v4.68, W/T/M v0.8 and plan v6.33; record 29/29 PG18.6 steps, 16/16 FORCE RLS and zero VM use. Preserve owner writer/reconciliation, target deployment, Manager/provider/readiness/BI and execution gaps. | INFRA-2C1 added and verified only the resource identity persistence substrate. |
 | v0.29 | 2026-10-08 | Mavis review | Add §7.15 for Rust Ed25519 Manager receipt verification before DB access and atomic signed receipt/Master/event registration; define operation-id replay, conflict rejection, signed-only migration upgrade, append-only global receipt Transaction, event binding and deferred no-orphan commit. Align requirements v6.04, basic v6.01, Group DD v4.70, W/T/M v0.9, automation v2.26 and plan v6.37; record Rust 1.99.0 and the 17-table cumulative gate while keeping inventory reconciliation, lifecycle writer, production keys/target DB, Manager readiness, BI and execution open. | INFRA-2C2 provides the first Rust owner writer without enabling Multipass or Run execution. |
 | v0.30 | 2026-10-08 | Mavis review | Add §7.16 for a lifecycle-specific signed V1 operation without changing registration V1; define operation/resource-generation advisory locks, exact replay/conflict, active↔draining and retirement transitions, atomic receipt/event/Master close, and deferred commit enforcement. Align requirements v6.05, basic design v6.02, Group DD v4.71, W/T/M v0.10, automation v2.27 and plan v6.38; record Rust 1.99.0, passed 28/28 cumulative runner, SQLx 1/1, 17/17 FORCE RLS, zero VMs and the unchanged two-record cap; retain production and execution gaps. | INFRA-2C3 adds signed lifecycle writes over the existing catalog. |
+| v0.31 | 2026-10-08 | Mavis review | Add §7.17 for complete bounded empty inventory parsing and exact Host-generation owner-scoped read-only reconciliation; define fail-closed DB/catalog boundaries, non-authoritative provider-name matching and no lifecycle/event/BI/readiness/capacity mutation. Record Rust 62/62 + 19/19, SQLx 1/1, PG18.6 28/28 and 17/17 FORCE RLS; require independently available Infrastructure control-plane PostgreSQL outside target K3s clusters while leaving production placement open. | INFRA-2C4 adds inventory projection over the existing 17-table catalog. |
