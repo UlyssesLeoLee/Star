@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, bounded JetStream publisher, and 3D6 quarantine persistence/consumer hook are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production consumer provisioning, production worker, provider evidence producer, and execution remain open.
-> Version: 0.28 | Date: 2026-10-08
+> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, bounded JetStream publisher, 3D6 quarantine persistence/consumer hook and 3D7 real JetStream redelivery/duplicate ACK are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production consumer provisioning, production worker, provider evidence producer, and execution remain open.
+> Version: 0.29 | Date: 2026-10-08
 
 ## 1. Routes
 
@@ -208,6 +208,14 @@ When encrypted replay is configured, the Rust encoder copies no more than 16 `Na
 
 Evidence: Rust 1.99.0 `cargo fmt --check`, focused `cargo check`, 16/16 library tests and targeted Clippy passed. A disposable PostgreSQL 18.6 instance applied the migration twice and passed schema, FORCE RLS, least-privilege, append-only, metadata-only, payload retention, TTL/purge and database quota-rejection assertions. This gate used zero Multipass VMs; live tests remain limited to two registered Multipass records total including Stopped/Deleted. The disposable PostgreSQL data directory was preserved after the environment rejected recursive cleanup; the server is stopped and this does not affect Multipass inventory.
 
+### 6.15 Phase 9F4D-3D7 JetStream quarantine redelivery gate
+
+This gate exercises the existing `RunOwnerCapacityResultConsumer::with_quarantine` and `PlatformPoisonQuarantine` against a disposable PostgreSQL 18.6 database and real loopback JetStream 2.15.0. The configured source identity is trusted by the fixture and the retention policy is explicitly `MetadataOnly`; payload Work rows must remain absent.
+
+The fault-injection case installs a temporary trigger that rejects receipt insertion. The malformed source message remains ack-pending and no receipt exists. After removing the trigger and waiting past the short test AckWait, the actual redelivery stores exactly one receipt, leaves no payload row, waits for confirmed `double_ack_with(AckKind::Term)`, and is not delivered again. The pre-ACK handle-drop case directly commits the immutable receipt, drops the unacknowledged Message and fetch handles, waits past AckWait, and has real redelivery resolve as the exact duplicate outcome; confirmed Term ACK ends delivery and the receipt count remains one. This models consumer loss but does not kill or restart an OS process.
+
+The Rust integration target is serialized because both tests use the same JetStream subject. The focused target passed 2/2; the cumulative disposable PostgreSQL/NATS runner passed 22/22 steps, stopped both services, and removed its owned PostgreSQL data. It created zero VM and left Multipass inventory unchanged. No schema was added by this phase. This proves neither production database/NATS identity activation, real KMS, operator replay, nor production consumer rollout; Schedule/Task execution and all Run/BI/reservation/readiness changes remain disabled.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -240,3 +248,4 @@ Evidence: Rust 1.99.0 `cargo fmt --check`, focused `cargo check`, 16/16 library 
 | v0.26 | 2026-10-07 | Add section 6.12 for caller-transaction TaskExecutionRun rule/revision/occurrence/correlation validation, durable explicit-ack pull, one-message byte/time bounds, immutable demand matching, Run-owner transaction, exact replay and the no-quarantine production block. | Phase 9F4D-3D5 verifies Run-owned result persistence and acknowledgement ordering. |
 | v0.27 | 2026-10-08 | Add section 6.13 for separate Platform Messaging/Ingress quarantine ownership, trusted JetStream deployment/stream-generation/sequence identity, immutable receipt and optional encrypted TTL Work body, permanent-fault classification, commit-before-Term, failure backpressure, and Run/BI isolation. Keep retention policy, taxonomy, migration, grants and production consumer open. | Phase 9F4D-3D6 design audit. |
 | v0.28 | 2026-10-08 | Add §6.14 for the implemented Platform owner tables/roles/RLS/quota/purge, explicit retention, 16-value/8-KiB replay-header cap and confirmed Term acknowledgement; document the three classified Run-owner routing cases, record Rust 1.99.0 and disposable PostgreSQL 18.6 evidence, and keep real KMS, production DB/NATS identities, operator access, redelivery integration and Schedule execution open. | 9F4D-3D6 implementation and bounded-memory review passed focused verification. |
+| v0.29 | 2026-10-08 | Add §6.15 for real PostgreSQL/NATS failure, redelivery, committed-receipt duplicate and confirmed Term-ACK integration; specify metadata-only retention, no later delivery, serialized shared-subject tests, 22/22 runner steps and 2/2 integration tests. Keep production identity/KMS/operator/consumer and Schedule/Task execution disabled. | Phase 9F4D-3D7 closes only the disposable redelivery evidence gap. |

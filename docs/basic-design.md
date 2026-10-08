@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.03 (2026-10-08)
-> **上游要件定义书**: docs/requirements.md v6.06
+> **文档版本**: v6.04 (2026-10-08)
+> **上游要件定义书**: docs/requirements.md v6.07
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5088,6 +5088,16 @@ Infrastructure control-plane PostgreSQL is placed outside target K3s clusters an
 |---|---|
 | AC-INFRA-002-W | Requirements §50.8W; Infrastructure DD §7.17; bounded empty-snapshot parsing; exact Host-generation owner-scoped read; no registration, retirement, event, BI, capacity, readiness, or execution mutation; focused Rust tests 62/62 + 19/19, SQLx 1/1, PG18.6 runner 28/28, 17/17 FORCE RLS. Production control-plane placement remains a deployment gate. |
 
+### 16.48 Phase 9F4D-3D7 JetStream quarantine integration gate
+
+The existing Platform quarantine persistence and opt-in Run-owner hook are verified end to end for two recovery paths using a disposable PostgreSQL 18.6 database and loopback JetStream 2.15.0. Explicit metadata-only policy is used: injected receipt-write failure leaves the source delivery pending until the actual redelivery commits; the consumer then sends and awaits confirmed Term ACK. After committing the receipt, the test drops the unacknowledged Message and fetch handles and verifies exact redelivery is recognized as a duplicate and Term-acked. This models consumer loss without killing or restarting an OS process. Both paths assert no further redelivery.
+
+The shared-subject integration target is serialized to avoid stream overlap. The cumulative runner passed 22/22 steps and the ignored Rust target passed 2/2. The gate creates zero VMs and does not change Multipass inventory or schema. Production DB/NATS identities, real KMS, operator replay, production consumer composition, Schedule/Task CLI, readiness, Run BI and Benchmark remain closed.
+
+| Acceptance ID | Design mapping and boundary |
+|---|---|
+| AC-SCHED-API-028 | Requirements §50.8X; Schedule DD §6.15; database failure and actual redelivery, confirmed commit-before-Term ACK, exact duplicate after the pre-ACK handle-drop consumer-loss model (no OS process restart), and no subsequent delivery; metadata-only, zero VM and no inventory change. Production consumers and execution remain fail-closed. |
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.42；将主导航统一为 Project → Cloud Branch → Engineering Run → Run Worktree，并将 Inbox/Work Item/Task Card/Canvas/Workflow/BI/Plugin 归为 Run tabs、Worktree 仅作 focus/CLI target；定义 owner API + stored procedure 同域原子边界 + Outbox/Inbox 跨域通信、modular monolith 到有证据服务提取的路线；补充 NATS 当前基线及 Kafka 优先 PoC / Fluvio 受限候选决策和 Rust 桌面有界内存约束 | 用户明确 Branch/Run/Worktree 层级、服务原子解耦诉求并询问 Kafka 与 Fluvio 适配性 |
@@ -5237,3 +5247,4 @@ Infrastructure control-plane PostgreSQL is placed outside target K3s clusters an
 | v6.01 | 2026-10-08 | Mavis review | Add §16.45 / AC-INFRA-002-U for the Rust 1.99.0 Ed25519 receipt verifier and SQLx owner writer; describe atomic receipt/Master/event registration, replay identity, migration refusal of unsigned legacy facts, immutable DB binding, production key/reconciliation/lifecycle gaps, and the 17-table cumulative W/T/M gate. Align requirements v6.04, Infrastructure DD v0.29, Group DD v4.70, W/T/M v0.9 and plan v6.37; preserve the two-record Multipass limit and disabled execution. | INFRA-2C2 implements signed resource registration while keeping VM and Run execution closed. |
 | v6.02 | 2026-10-08 | Mavis review | Add §16.46 / AC-INFRA-002-V for the separate signed lifecycle command, current-generation advisory serialization, allowed active/draining/retired state machine, exact replay/conflict, and receipt/event/Master-close atomicity enforced by a deferred database trigger. Record the passed 28/28 PostgreSQL runner, SQLx 1/1 and 17/17 FORCE RLS. Align requirements v6.05, Infrastructure DD v0.30, Group DD v4.71, W/T/M v0.10 and plan v6.38; keep 17 tables, Rust 1.99.0, two Multipass records and execution disabled. | INFRA-2C3 implements signed lifecycle persistence over the existing owner catalog. |
 | v6.03 | 2026-10-08 | Mavis review | Add §16.47 / AC-INFRA-002-W for read-only exact Host-generation inventory reconciliation, valid empty snapshot handling and fail-closed malformed/stale catalog inputs; document independent control-plane PostgreSQL placement outside target K3s clusters. Record Rust 62/62 + 19/19, SQLx 1/1, PG18.6 28/28 and 17/17 FORCE RLS; preserve 17 tables, two records, zero VMs and disabled execution. | INFRA-2C4 adds projection only, with no schema/event mutation. |
+| v6.04 | 2026-10-08 | Mavis review | Add §16.48 / AC-SCHED-API-028 for database failure backpressure, real JetStream redelivery, confirmed Term ACK, exact duplicate replay after pre-ACK handle drop and no later delivery. Record 22/22 runner steps, 2/2 Rust integration tests, zero VM and unchanged Multipass inventory; production consumers and execution remain disabled. | 9F4D-3D7 verifies the existing quarantine seam without schema or navigation change. |

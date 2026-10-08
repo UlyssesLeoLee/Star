@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication and real PubAck integration are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, production consumers and execution remain fail-closed.
-> Version: 0.28 | Date: 2026-10-08
+> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication, real PubAck integration, and 3D7 redelivery/duplicate-ACK integration are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, production consumers and execution remain fail-closed.
+> Version: 0.29 | Date: 2026-10-08
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -129,6 +129,12 @@ The implemented substrate adds `platform_messaging.poison_quarantine_receipt` (T
 
 Focused Rust checks pass (16/16 unit tests, format and targeted Clippy). PostgreSQL 18.6 applied the migration twice and passed the RLS, WORM, TTL, purge-audit and over-quota SQL checks in a disposable loopback database. This does not prove production login membership/role activation, stream/deployment provisioning, target DB rollout, real KMS encryption (the current KMS implementation is LocalMock-only), operator access/replay, full NATS redelivery integration, or production consumer enablement. No Multipass instance or VM is required for these gates; test inventory remains capped at two registered instances including Stopped/Deleted.
 
+### 6.13 Phase 9F4D-3D7 redelivery and confirmed-Term verification
+
+The existing quarantine consumer hook is tested against real loopback JetStream and disposable PostgreSQL, not a mock broker. The first case injects a receipt INSERT failure and proves no receipt is committed while the source delivery remains ack-pending; after removing the fault, JetStream redelivers it and the Platform owner commits exactly one metadata-only receipt before the consumer awaits confirmed Term ACK. The second case records the receipt, drops the unacknowledged Message and fetch handles, and verifies exact duplicate recognition and Term ACK after real redelivery. This models consumer loss; it does not kill or restart an OS process. Each case checks zero later redelivery.
+
+The two tests share a subject and therefore run with `--test-threads=1`; the disposable runner passed 22/22 steps and the ignored Rust target passed 2/2. No migration, VM, or Multipass inventory change is part of this gate. Production broker/DB identity, KMS, operator replay and consumer enablement remain separate gates; Schedule and Task Card execution remain fail-closed.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -161,3 +167,4 @@ Focused Rust checks pass (16/16 unit tests, format and targeted Clippy). Postgre
 | v0.26 | 2026-10-07 | Add section 6.11 for caller-transaction TaskExecutionRun scope validation and the Run-owner result consumer's transaction/ack/fail-closed boundary; synchronize SRS v0.27, DD v0.26, requirements v5.98 and basic design v5.95. | Phase 9F4D-3D5 adds a verified result Inbox slice without enabling production execution. |
 | v0.27 | 2026-10-08 | Add section 6.12 for Platform Messaging/Ingress quarantine ownership, trusted JetStream source identity, receipt and optional Work payload classification, and commit-before-Term semantics. Record that retention selection and all storage/consumer implementation remain open. | Phase 9F4D-3D6 establishes the design boundary without enabling poison-message ACKs. |
 | v0.28 | 2026-10-08 | Record the implemented 9F4D-3D6 schema, RLS/role boundaries, explicit retention, database-enforced 200 KiB/4 MiB bounds, 16-value/8-KiB replay-header cap, confirmed Term acknowledgement, 24-hour purge audit and opt-in Run-owner hook; report focused Rust/PostgreSQL evidence and open production KMS, identity, stream, UI and rollout gates. Preserve the zero-VM/two-record Multipass test boundary. | Quarantine implementation, bounded-memory review and SQL schema/quota gates passed. |
+| v0.29 | 2026-10-08 | Add §6.13 for verified receipt-failure backpressure, actual JetStream redelivery, exact duplicate replay after the pre-ACK handle-drop consumer-loss model (no OS process restart), confirmed Term ACK and serial shared-subject tests; record 22/22 disposable runner steps and 2/2 Rust integration tests while leaving production consumer/KMS/identities and execution closed. | Phase 9F4D-3D7 verifies the existing Schedule/Platform boundary. |

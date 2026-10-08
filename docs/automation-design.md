@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.28 (2026-10-08)
+> **文档版本**: v2.29 (2026-10-08)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -1297,6 +1297,15 @@ Run the cumulative read-only gate with python scripts/automation/phase_infra2c2_
 The SQLx test supplies two catalog rows (Stopped managed and Deleted external), verifies an empty complete snapshot is classified missing, rejects a stale Host generation, and confirms event count is unchanged. The runner passed 28/28 steps; Rust library tests passed 62/62 for infrastructure and 19/19 for multipass-adapter, with SQLx 1/1 and 17/17 FORCE RLS. The two-record cap includes Stopped/Deleted, with no auto-purge. Production control-plane PostgreSQL placement outside target K3s clusters, target DB/login, live Manager/provider, UI/API, capacity/readiness, BI/Benchmark and Task/Schedule execution remain unverified and closed.
 
 - Phase report: [PHASE-INFRA-2C4-INVENTORY-RECONCILIATION-REPORT.md](reports/PHASE-INFRA-2C4-INVENTORY-RECONCILIATION-REPORT.md).
+
+### 4.70 Phase 9F4D-3D7 JetStream quarantine redelivery gate
+
+Run `python scripts/automation/phase9f4d_run_owner_consumer.py` with PostgreSQL 18.6, Rust/Cargo 1.99.0 and NATS Server 2.15.0. The runner applies the existing quarantine migration and schema assertions, runs the existing Run-owner RLS/result checks, then executes the ignored JetStream integration target. The two tests share a subject, so the runner uses `--test-threads=1` and writes audit/log artifacts to a new unique directory under `target/`.
+
+The 2026-10-08 gate passed 22/22 steps and both Rust integration tests. It verified receipt-insert-failure redelivery and exact duplicate redelivery after dropping the unacknowledged Message/fetch handles (consumer-loss model; no OS process restart), using explicit metadata-only retention; NATS and PostgreSQL stopped successfully, owned PostgreSQL data was removed, and zero VMs/Multipass inventory changes were recorded. This is test-only evidence: no schema or migration was added, and production identity/KMS/operator/consumer/Schedule/Task execution remains disabled.
+
+- Phase report: [`PHASE-9F4D-3D7-QUARANTINE-JETSTREAM-REPORT.md`](reports/PHASE-9F4D-3D7-QUARANTINE-JETSTREAM-REPORT.md).
+
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
 ### 5.1 4 步基线 (per WBS §12.6 / §14.5)
@@ -2769,3 +2778,4 @@ frontend/src/app/automation-debug/
 - Verification passed: focused Rust runner 4/4 gates; disposable PostgreSQL runner 21/21 steps, 10/10 FORCE RLS and all 10/10 ignored SQLx cases. PostgreSQL stopped and its unique data directory was removed; the runner used zero Multipass VMs.
 - Phase evidence: [`PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md`](reports/PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md).
 | v2.28 | 2026-10-08 | Add §4.69 for cumulative INFRA-2C4 verification; record empty-snapshot/stale-generation/event-count assertions, 28/28 steps, SQLx 1/1 and 17/17 FORCE RLS, separate C4 output/data paths and zero VM/live inventory. Keep two-record and production topology/provider/execution gates explicit. | INFRA-2C4 adds a read-only projection over existing tables. |
+| v2.29 | 2026-10-08 | Add §4.70 for the serialized shared-subject JetStream quarantine integration; register the idempotent cross-document sync script and record 22/22 runner steps, 2/2 Rust integration tests, successful service stop and owned PG cleanup, zero VM and unchanged Multipass inventory. Keep all production execution gates closed. | Phase 9F4D-3D7 verifies the broker recovery seam. |

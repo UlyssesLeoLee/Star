@@ -1,8 +1,8 @@
 # DD-LOCAL-INFRASTRUCTURE-001 — Rust 本地基础设施与 k3s
 
-> v0.31 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 建立 Ed25519 Rust Manager signed registration，INFRA-2C3 在不改 registration V1 签名格式且不增表的前提下增加 lifecycle-specific signature、active/draining/retired 写入及延迟 Master-close 约束。PostgreSQL 18.6 cumulative chain 仍为 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、live inventory reconciliation wiring、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
+> v0.32 · 2026-10-08 · Draft / 固化 Multipass 管理的多 K3s cluster、Run 精确目标绑定与 Host/cluster 双层容量；INFRA-2C2 建立 Ed25519 Rust Manager signed registration，INFRA-2C3 在不改 registration V1 签名格式且不增表的前提下增加 lifecycle-specific signature、active/draining/retired 写入及延迟 Master-close 约束。PostgreSQL 18.6 cumulative chain 仍为 17 张 FORCE RLS 表；目标 DB、trusted key provisioning/rotation、live inventory reconciliation wiring、Manager/provider/readiness、BI/RSS 与执行仍独立验收。
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 上游：requirements v6.06 §50.8G-50.8W / basic-design v6.03 §8.1、§16.21-16.47 / Schedule SRS v0.28 / Schedule BD v0.27 / Schedule DD v0.27 / Automation Design v2.28 / W/T/M v0.10 / 实施计划 §6.83-6.107。
+> 上游：requirements v6.07 §50.8G-50.8X / basic-design v6.04 §8.1、§16.21-16.48 / Schedule SRS v0.30 / Schedule BD v0.29 / Schedule DD v0.29 / Automation Design v2.29 / W/T/M v0.10 / 实施计划 §6.83-6.108。
 
 ## §0 目的与边界
 
@@ -344,6 +344,13 @@ Rust 1.99.0 infrastructure and adapter library suites passed 62/62 and 19/19. Th
 | Requirement | Detailed design and verification |
 |---|---|
 | AC-INFRA-002-W | §7.17.1–7.17.3; complete bounded empty observation; exact Host-generation REPEATABLE READ READ ONLY comparison under Infrastructure owner; fail-closed catalog/DB errors; no Master/event mutation or lifecycle/readiness/capacity/BI/execution claim; Rust 1.99.0, SQLx 1/1, PG18.6 runner 28/28, 17/17 FORCE RLS, zero VMs. Production control-plane DB placement and live Manager/provider integration remain open. |
+
+### §7.18 Phase 9F4D-3D7 external broker reliability gate
+
+The Schedule/Platform quarantine slice uses a disposable PostgreSQL control-plane fixture and a loopback NATS JetStream test server to verify receipt failure backpressure, real redelivery, exact duplicate replay after dropping the unacknowledged Message/fetch handles (consumer-loss model; no OS process restart), and confirmed Term ACK. This is an external messaging reliability test, not a Multipass or K3s provider operation. It creates no VM, reads or mutates no Multipass inventory, adds no Infrastructure catalog table/event, and does not prove Host/cluster capacity, target K3s health, Run binding, Agent sandbox, BI, or readiness.
+
+The Rust target passed 2/2 integration tests and the cumulative runner passed 22/22 steps. See Schedule DD §6.15 for the source identity and ack/receipt sequence. Production control-plane DB identity, broker identity, KMS and consumer deployment remain open and fail-closed.
+
 ## §8 审阅与修订历史
 
 | 版本 | 日期 | 审核/修订人 | 内容/触发 |
@@ -378,3 +385,4 @@ Rust 1.99.0 infrastructure and adapter library suites passed 62/62 and 19/19. Th
 | v0.29 | 2026-10-08 | Mavis review | Add §7.15 for Rust Ed25519 Manager receipt verification before DB access and atomic signed receipt/Master/event registration; define operation-id replay, conflict rejection, signed-only migration upgrade, append-only global receipt Transaction, event binding and deferred no-orphan commit. Align requirements v6.04, basic v6.01, Group DD v4.70, W/T/M v0.9, automation v2.26 and plan v6.37; record Rust 1.99.0 and the 17-table cumulative gate while keeping inventory reconciliation, lifecycle writer, production keys/target DB, Manager readiness, BI and execution open. | INFRA-2C2 provides the first Rust owner writer without enabling Multipass or Run execution. |
 | v0.30 | 2026-10-08 | Mavis review | Add §7.16 for a lifecycle-specific signed V1 operation without changing registration V1; define operation/resource-generation advisory locks, exact replay/conflict, active↔draining and retirement transitions, atomic receipt/event/Master close, and deferred commit enforcement. Align requirements v6.05, basic design v6.02, Group DD v4.71, W/T/M v0.10, automation v2.27 and plan v6.38; record Rust 1.99.0, passed 28/28 cumulative runner, SQLx 1/1, 17/17 FORCE RLS, zero VMs and the unchanged two-record cap; retain production and execution gaps. | INFRA-2C3 adds signed lifecycle writes over the existing catalog. |
 | v0.31 | 2026-10-08 | Mavis review | Add §7.17 for complete bounded empty inventory parsing and exact Host-generation owner-scoped read-only reconciliation; define fail-closed DB/catalog boundaries, non-authoritative provider-name matching and no lifecycle/event/BI/readiness/capacity mutation. Record Rust 62/62 + 19/19, SQLx 1/1, PG18.6 28/28 and 17/17 FORCE RLS; require independently available Infrastructure control-plane PostgreSQL outside target K3s clusters while leaving production placement open. | INFRA-2C4 adds inventory projection over the existing 17-table catalog. |
+| v0.32 | 2026-10-08 | Mavis review | Add §7.18 to classify 9F4D-3D7 as external broker/PostgreSQL reliability evidence only; record 22/22 runner steps, 2/2 integration tests, zero VM and unchanged Multipass inventory. Preserve the two-record/no-purge rule and state that no Host/cluster capacity, K3s readiness, Run binding, BI or execution is proved. Align requirements/basic/Schedule/Group/plan version references. | Phase 9F4D-3D7 adds no Infrastructure schema or provider operation. |

@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=8ef5decc4fb3b9470b19975bbaea90285d00db2eb1444a8557f8a9dc0d848d6c
+# @cypher schema=1 source_sha256=dfda123e200d28fc1575495a61b7d7e70d87f935ef44ecb1a637ff2522c03ca0
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -14,6 +14,8 @@
 # MERGE (rls_fixture:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::rls_fixture_sql",kind:"function"})
 # MERGE (migration:Config {id:"db/migrations/2026-10-07-run-owner-infrastructure-capacity-result.sql"})
 # MERGE (consumer_test:Config {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs"})
+# MERGE (quarantine_migration:Config {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql"})
+# MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (nats:ExternalService {id:"nats-server.jetstream",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test",kind:"command"})
@@ -50,6 +52,8 @@
 # MERGE (main)-[:CONFIGURES]->(nats)
 # MERGE (main)-[:CONFIGURES]->(cargo)
 # MERGE (main)-[:READS]->(migration)
+# MERGE (main)-[:READS]->(quarantine_migration)
+# MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:TESTS]->(consumer_test)
 # MERGE (run_sql)-[:CALLS]->(run_step)
 # MERGE (run_sql)-[:CALLS]->(write_text)
@@ -98,10 +102,12 @@ from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
 RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructure-capacity-result.sql"
+QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-schema.sql"
 PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
     ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql",
     ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql",
+    ROOT / "db" / "migrations" / "2026-10-08-platform-poison-quarantine.sql",
     ROOT / "db" / "migrations" / "2026-10-09-infrastructure-provider-profile-master.sql",
     ROOT / "db" / "migrations" / "2026-10-10-infrastructure-physical-capacity-ledger.sql",
 )
@@ -511,7 +517,11 @@ def main() -> int:
     if missing_tools:
         print(json.dumps({"result": "blocked", "missing_tools": missing_tools}))
         return 2
-    missing_migrations = [str(path) for path in (*PREREQUISITE_MIGRATIONS, RUN_MIGRATION) if not path.is_file()]
+    missing_migrations = [
+        str(path)
+        for path in (*PREREQUISITE_MIGRATIONS, RUN_MIGRATION, QUARANTINE_SCHEMA_TEST)
+        if not path.is_file()
+    ]
     if missing_migrations:
         print(json.dumps({"result": "blocked", "missing_migrations": missing_migrations}))
         return 2
@@ -618,6 +628,15 @@ def main() -> int:
         if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-owner-schema-assertions", psql_base, SCHEMA_ASSERTIONS_SQL, env))
         if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(
+                run_sql(
+                    "platform-poison-quarantine-schema",
+                    psql_base,
+                    QUARANTINE_SCHEMA_TEST.read_text(encoding="utf-8"),
+                    env,
+                )
+            )
+        if pg_started and all(item["status"] == "passed" for item in results):
             fixture_setup, tenant_b_visibility, cross_tenant_collision, fixture_ids = rls_fixture_sql()
             results.append(run_sql("run-owner-rls-fixture-and-tenant-a-write", psql_base, fixture_setup, env))
             if results[-1]["status"] == "passed":
@@ -669,7 +688,7 @@ def main() -> int:
                 test_env["STAR_RUN_OWNER_TEST_NATS_URL"] = f"nats://127.0.0.1:{nats_port}"
                 results.append(run_step(
                     "run-owner-capacity-result-postgres-jetstream-integration",
-                    [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "capacity_result_jetstream_pg", "-j", "1", "--", "--ignored"],
+                    [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "capacity_result_jetstream_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
                     ROOT,
                     test_env,
                 ))

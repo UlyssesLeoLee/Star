@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.72**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.73**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -15,9 +15,9 @@
 > - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；真实宿主会话、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见实施计划§6.67。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.06 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v6.03 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.20、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.31、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.107 v6.39
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.07 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v6.04 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.29、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.32、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 §6.108 v6.40
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -619,6 +619,17 @@ The main tree remains Project → Cloud Branch → Engineering Run → that Run'
 | Acceptance ID | Group design boundary |
 |---|---|
 | AC-INFRA-002-W | Infrastructure DD §7.17 / Basic Design §16.47; expose only an owner-authorized, read-only exact-Host-generation observation if a later Run App is built; never translate findings into ownership, retirement, readiness, capacity, BI, or execution state. Product UI/API wiring remains open. |
+
+### 8.21 Phase 9F4D-3D7 quarantine recovery evidence
+
+The disposable JetStream/PostgreSQL redelivery gate belongs to the Platform Messaging/Ingress and Run-owner reliability boundary. It does not add a Worktree/Run navigation node, change Project → Cloud Branch → Engineering Run → local Worktree ownership, or make a selected Worktree the owner of quarantine facts. The future Run Apps continue to use authorized RunContext projections; Worktree selection remains focus/CLI checkout context.
+
+The gate verified receipt failure backpressure, commit-before-confirmed-Term ACK, exact duplicate handling after the pre-ACK handle-drop consumer-loss model (no OS process restart) and no later delivery. Its 22/22 runner steps and 2/2 Rust integration tests used metadata-only retention, zero VMs and unchanged Multipass inventory. It does not establish production consumer/provider wiring, KMS, operator App, BI/Benchmark, Run readiness, Schedule or Task Card execution; those remain closed until their owner and authorization gates pass.
+
+| Acceptance ID | Group design boundary |
+|---|---|
+| AC-SCHED-API-028 | Schedule DD §6.15; verification evidence only for the existing Platform quarantine owner and Run-owner hook. Preserve Run/App ownership and Worktree focus semantics; no production execution or BI state is implied. |
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -924,3 +935,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.70 | 2026-10-08 | Mavis review | Add §8.18 / AC-INFRA-002-U for trusted Rust Manager Ed25519 receipt verification and atomic owner registration of one exact resource Master generation plus its append-only event; specify idempotent replay, signed-only migration, receipt/event WORM/RLS and current Run/execution boundary. Align requirements v6.04/basic design v6.01/Infrastructure DD v0.29/W-T-M v0.9/plan v6.37. Preserve Worktree-first navigation, Rust 1.99.0 and the two-instance test cap; no VM or Run CLI execution is enabled. | INFRA-2C2 adds signed ownership evidence without implementing inventory reconciliation or lifecycle operations. |
 | v4.71 | 2026-10-08 | Mavis review | Add §8.19 / AC-INFRA-002-V for lifecycle-specific signed Manager commands, exact-generation serialization, active/draining/reactivation/retirement transitions, atomic retired Master close and deferred DB enforcement. Record passed 28/28 PostgreSQL steps, SQLx 1/1 and 17/17 FORCE RLS. Align requirements v6.05/basic v6.02/Infrastructure DD v0.30/W-T/M v0.10/plan v6.38. Preserve Worktree-first ownership, Rust 1.99.0 and the two-record cap; create zero VMs and keep provider/Run/BI/execution gates open. | INFRA-2C3 adds a signed lifecycle writer over the existing owner catalog. |
 | v4.72 | 2026-10-08 | Mavis review | Add §8.20 / AC-INFRA-002-W for read-only exact-Host-generation projection; prevent Run/Worktree UI from treating findings as ownership, retirement, readiness, capacity, BI or execution state. Align requirements v6.06/basic v6.03/Infrastructure DD v0.31/plan §6.107 v6.39; preserve Project→Branch→Run→Worktree navigation and leave production UI/API wiring open. | INFRA-2C4 adds a cross-App contract without changing Group ownership or schema. |
+| v4.73 | 2026-10-08 | Mavis review | Add §8.21 / AC-SCHED-API-028 for the Platform/Run-owner quarantine recovery test boundary; preserve Project→Branch→Engineering Run→Worktree and Run App ownership, and state explicitly that broker reliability evidence adds no navigation node or execution/BI claim. Align requirements v6.07/basic v6.04/Schedule DD v0.29/Infrastructure DD v0.32/plan v6.40; record 22/22 runner steps, 2/2 Rust tests and zero VM. | 9F4D-3D7 verifies a cross-owner reliability seam without changing Group ownership. |

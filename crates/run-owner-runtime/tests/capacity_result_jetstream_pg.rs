@@ -1,6 +1,6 @@
 //! Disposable PostgreSQL + NATS JetStream verification for the Run-owner result Inbox.
 /*
-@cypher schema=1 source_sha256=f1f4e570f06b8c6160897111706e224500e6f6a132cb44174329a5eebf68a7df
+@cypher schema=1 source_sha256=eb6d31ebc499220b2ca1d3d1279143122b0aef39401711e77c92f2ceeae8b590
 MERGE (self:File {path:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::capacity_result_persist_replay_conflict_ack_and_rollback",kind:"test"})
 MERGE (seed:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::seed_demand",kind:"function"})
@@ -20,6 +20,24 @@ MERGE (nats:ExternalService {id:"NATS JetStream disposable test instance"})
 MERGE (inbox:Table {id:"multica.infrastructure_capacity_result_inbox"})
 MERGE (outbox:Table {id:"multica.infrastructure_capacity_demand_outbox"})
 MERGE (delete_stream:ExternalService {id:"async_nats::jetstream::Context.delete_stream",kind:"method"})
+MERGE (poison_test:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::poison_quarantine_failure_redelivery_commit_ack_loss_and_term",kind:"test"})
+MERGE (install_poison_fault:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::install_quarantine_receipt_fault",kind:"function"})
+MERGE (remove_poison_fault:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::remove_quarantine_receipt_fault",kind:"function"})
+MERGE (poison_receipt_count:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::quarantine_receipt_count",kind:"function"})
+MERGE (poison_payload_count:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::quarantine_payload_count",kind:"function"})
+MERGE (no_redelivery:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::assert_no_redelivery",kind:"function"})
+MERGE (quarantine_connect:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::PlatformPoisonQuarantine.connect",kind:"method"})
+MERGE (record_message:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::PlatformPoisonQuarantine.record_message",kind:"method"})
+MERGE (with_quarantine:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.with_quarantine",kind:"method"})
+MERGE (consume_one:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer.consume_one",kind:"method"})
+MERGE (platform_quarantine:Type {id:"platform_messaging_runtime::PlatformPoisonQuarantine",kind:"external_type"})
+MERGE (trusted_source:Type {id:"platform_messaging_runtime::TrustedJetStreamSource",kind:"external_type"})
+MERGE (retention_policy:Type {id:"platform_messaging_runtime::PayloadRetentionPolicy",kind:"external_type"})
+MERGE (poison_fault:Type {id:"platform_messaging_runtime::PermanentPoisonFault",kind:"external_type"})
+MERGE (poison_outcome:Type {id:"platform_messaging_runtime::QuarantineRecordOutcome",kind:"external_type"})
+MERGE (quarantine_receipt:Table {id:"platform_messaging.poison_quarantine_receipt"})
+MERGE (quarantine_payload:Table {id:"platform_messaging.poison_quarantine_payload_work"})
+MERGE (poison_consume_outcome:Type {id:"run_owner_runtime::CapacityResultConsumeOutcome",kind:"enum"})
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(seed)
 MERGE (self)-[:DEFINES]->(fixture)
@@ -50,6 +68,32 @@ MERGE (test)-[:TESTS]->(outbox)
 MERGE (test)-[:USES_TYPE]->(postgres)
 MERGE (test)-[:USES_TYPE]->(nats)
 MERGE (test)-[:CALLS]->(delete_stream)
+MERGE (self)-[:DEFINES]->(poison_test)
+MERGE (self)-[:DEFINES]->(install_poison_fault)
+MERGE (self)-[:DEFINES]->(remove_poison_fault)
+MERGE (self)-[:DEFINES]->(poison_receipt_count)
+MERGE (self)-[:DEFINES]->(poison_payload_count)
+MERGE (self)-[:DEFINES]->(no_redelivery)
+MERGE (poison_test)-[:CALLS]->(create_durable_ack)
+MERGE (poison_test)-[:CALLS]->(publish)
+MERGE (poison_test)-[:CALLS]->(quarantine_connect)
+MERGE (poison_test)-[:CALLS]->(record_message)
+MERGE (poison_test)-[:CALLS]->(with_quarantine)
+MERGE (poison_test)-[:CALLS]->(consume_one)
+MERGE (poison_test)-[:CALLS]->(install_poison_fault)
+MERGE (poison_test)-[:CALLS]->(remove_poison_fault)
+MERGE (poison_test)-[:CALLS]->(poison_receipt_count)
+MERGE (poison_test)-[:CALLS]->(poison_payload_count)
+MERGE (poison_test)-[:CALLS]->(no_redelivery)
+MERGE (poison_test)-[:USES_TYPE]->(platform_quarantine)
+MERGE (poison_test)-[:USES_TYPE]->(trusted_source)
+MERGE (poison_test)-[:USES_TYPE]->(retention_policy)
+MERGE (poison_test)-[:USES_TYPE]->(poison_fault)
+MERGE (poison_test)-[:USES_TYPE]->(poison_outcome)
+MERGE (poison_test)-[:USES_TYPE]->(poison_consume_outcome)
+MERGE (poison_test)-[:TESTS]->(quarantine_receipt)
+MERGE (poison_test)-[:TESTS]->(quarantine_payload)
+MERGE (poison_test)-[:CALLS]->(delete_stream)
 @endcypher
 */
 
@@ -64,6 +108,11 @@ use chrono::{Duration as ChronoDuration, Utc};
 use domain_infrastructure::{
     ClusterPlacementPolicyV1, ExecutionResourceBudgetV1, HostInfrastructureDemandV2,
     KubernetesDnsLabel, ProviderKind, RunInfrastructureBindingSnapshotV2,
+};
+use futures_util::StreamExt;
+use platform_messaging_runtime::{
+    PayloadRetentionPolicy, PermanentPoisonFault, PlatformPoisonQuarantine,
+    QuarantineRecordOutcome, TrustedJetStreamSource,
 };
 use run_owner_runtime::{
     CapacityDemandAppendOutcome, CapacityResultConsumeOutcome, CapacityResultError,
@@ -195,6 +244,136 @@ async fn capacity_result_persist_replay_conflict_ack_and_rollback(
     for stream_name in created_streams {
         jetstream.delete_stream(&stream_name).await?;
     }
+    pool.close().await;
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires the disposable PostgreSQL + NATS runner: scripts/automation/phase9f4d_run_owner_consumer.py"]
+async fn poison_quarantine_failure_redelivery_commit_ack_loss_and_term(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let database_url = std::env::var(DATABASE_URL_ENV)?;
+    let nats_url = std::env::var(NATS_URL_ENV)?;
+    let pool = PgPoolOptions::new()
+        .max_connections(8)
+        .connect(&database_url)
+        .await?;
+    let store = PostgresRunOwnerCapacityStore::new(pool.clone());
+    let client = async_nats::connect(nats_url).await?;
+    let jetstream = async_nats::jetstream::new(client);
+    let (_resume_tx, mut resume) = watch::channel(false);
+    let deployment_id = Uuid::new_v4();
+    let generation = Uuid::new_v4();
+    let malformed = b"{invalid-json";
+    let fault = PermanentPoisonFault::MalformedCapacityResultJson;
+
+    // A durable receipt insert failure must leave the source delivery pending. After the
+    // configured AckWait, the real JetStream redelivery must commit before the confirmed Term ACK.
+    let (stream_name, durable) =
+        create_durable_with_ack_wait(&jetstream, Duration::from_millis(300)).await?;
+    let event_id = Uuid::new_v4();
+    publish(&jetstream, SUBJECT, event_id, malformed).await?;
+    let source = TrustedJetStreamSource::new(deployment_id, generation, stream_name.clone())?;
+    let quarantine = PlatformPoisonQuarantine::connect(
+        pool.clone(),
+        source,
+        PayloadRetentionPolicy::MetadataOnly,
+        None,
+    )
+    .await?;
+    let mut consumer = RunOwnerCapacityResultConsumer::new(store.clone(), durable.clone())?
+        .with_quarantine(quarantine);
+    let (trigger, function) = install_quarantine_receipt_fault(&pool).await?;
+    assert!(matches!(
+        consumer.consume_one(&mut resume).await,
+        Err(CapacityResultError::Quarantine(_))
+    ));
+    assert_eq!(durable.get_info().await?.num_ack_pending, 1);
+    assert_eq!(
+        quarantine_receipt_count(&pool, deployment_id, generation, &stream_name).await?,
+        0
+    );
+    remove_quarantine_receipt_fault(&pool, &trigger, &function).await?;
+    tokio::time::sleep(Duration::from_millis(350)).await;
+
+    match consumer.consume_one(&mut resume).await? {
+        CapacityResultConsumeOutcome::Quarantined {
+            duplicate: false, ..
+        } => {}
+        other => return Err(format!("expected first quarantine commit, got {other:?}").into()),
+    }
+    assert_eq!(
+        quarantine_receipt_count(&pool, deployment_id, generation, &stream_name).await?,
+        1
+    );
+    assert_eq!(
+        quarantine_payload_count(&pool, deployment_id, generation, &stream_name).await?,
+        0
+    );
+    assert_eq!(durable.get_info().await?.num_ack_pending, 0);
+    assert_no_redelivery(&durable).await?;
+    jetstream.delete_stream(&stream_name).await?;
+
+    // Model consumer loss after the immutable receipt commit but before ACK by dropping both
+    // delivery handles. The source message is redelivered; exact replay must return Duplicate and
+    // still terminate redelivery. No OS process is killed or restarted here.
+    let (replay_stream, replay_durable) =
+        create_durable_with_ack_wait(&jetstream, Duration::from_millis(300)).await?;
+    let replay_event_id = Uuid::new_v4();
+    publish(&jetstream, SUBJECT, replay_event_id, malformed).await?;
+    let replay_source =
+        TrustedJetStreamSource::new(deployment_id, generation, replay_stream.clone())?;
+    let replay_quarantine = PlatformPoisonQuarantine::connect(
+        pool.clone(),
+        replay_source,
+        PayloadRetentionPolicy::MetadataOnly,
+        None,
+    )
+    .await?;
+    let mut first_delivery = replay_durable
+        .fetch()
+        .max_messages(1)
+        .expires(Duration::from_secs(2))
+        .messages()
+        .await?;
+    let message = tokio::time::timeout(Duration::from_secs(3), first_delivery.next())
+        .await?
+        .ok_or("expected published poison message")?
+        .map_err(|error| error.to_string())?;
+    let first_sequence = i64::try_from(
+        message
+            .info()
+            .map_err(|error| error.to_string())?
+            .stream_sequence,
+    )?;
+    assert_eq!(
+        replay_quarantine.record_message(&message, fault, 1).await?,
+        QuarantineRecordOutcome::Stored {
+            stream_sequence: first_sequence,
+            body_retained: false,
+        }
+    );
+    drop(message);
+    drop(first_delivery);
+    tokio::time::sleep(Duration::from_millis(350)).await;
+
+    let mut replay_consumer = RunOwnerCapacityResultConsumer::new(store, replay_durable.clone())?
+        .with_quarantine(replay_quarantine);
+    assert_eq!(
+        replay_consumer.consume_one(&mut resume).await?,
+        CapacityResultConsumeOutcome::Quarantined {
+            stream_sequence: first_sequence,
+            duplicate: true,
+        }
+    );
+    assert_eq!(
+        quarantine_receipt_count(&pool, deployment_id, generation, &replay_stream).await?,
+        1
+    );
+    assert_eq!(replay_durable.get_info().await?.num_ack_pending, 0);
+    assert_no_redelivery(&replay_durable).await?;
+    jetstream.delete_stream(&replay_stream).await?;
+
     pool.close().await;
     Ok(())
 }
@@ -408,6 +587,91 @@ async fn result_count_for_event(pool: &PgPool, event_id: Uuid) -> Result<i64, sq
     .bind(event_id)
     .fetch_one(pool)
     .await
+}
+
+async fn install_quarantine_receipt_fault(pool: &PgPool) -> Result<(String, String), sqlx::Error> {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let trigger_name = format!("zz_test_fail_quarantine_{suffix}");
+    let function_name = format!("test_fail_quarantine_{suffix}");
+    let function_sql = format!(
+        "CREATE FUNCTION platform_messaging.{function_name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected quarantine receipt failure' USING ERRCODE = '40001'; END $$"
+    );
+    sqlx::query(&function_sql).execute(pool).await?;
+    let trigger_sql = format!(
+        "CREATE TRIGGER {trigger_name} BEFORE INSERT ON platform_messaging.poison_quarantine_receipt FOR EACH ROW EXECUTE FUNCTION platform_messaging.{function_name}()"
+    );
+    sqlx::query(&trigger_sql).execute(pool).await?;
+    Ok((trigger_name, function_name))
+}
+
+async fn remove_quarantine_receipt_fault(
+    pool: &PgPool,
+    trigger_name: &str,
+    function_name: &str,
+) -> Result<(), sqlx::Error> {
+    let trigger_sql = format!(
+        "DROP TRIGGER IF EXISTS {trigger_name} ON platform_messaging.poison_quarantine_receipt"
+    );
+    sqlx::query(&trigger_sql).execute(pool).await?;
+    let function_sql = format!("DROP FUNCTION IF EXISTS platform_messaging.{function_name}()");
+    sqlx::query(&function_sql).execute(pool).await?;
+    Ok(())
+}
+
+async fn quarantine_receipt_count(
+    pool: &PgPool,
+    deployment_id: Uuid,
+    generation: Uuid,
+    stream_name: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        r#"SELECT count(*) FROM platform_messaging.poison_quarantine_receipt
+           WHERE deployment_id = $1 AND stream_generation = $2 AND stream_name = $3"#,
+    )
+    .bind(deployment_id)
+    .bind(generation)
+    .bind(stream_name)
+    .fetch_one(pool)
+    .await
+}
+
+async fn quarantine_payload_count(
+    pool: &PgPool,
+    deployment_id: Uuid,
+    generation: Uuid,
+    stream_name: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        r#"SELECT count(*) FROM platform_messaging.poison_quarantine_payload_work
+           WHERE deployment_id = $1 AND stream_generation = $2 AND stream_name = $3"#,
+    )
+    .bind(deployment_id)
+    .bind(generation)
+    .bind(stream_name)
+    .fetch_one(pool)
+    .await
+}
+
+async fn assert_no_redelivery(consumer: &PullConsumer) -> Result<(), Box<dyn std::error::Error>> {
+    let mut messages = consumer
+        .fetch()
+        .max_messages(1)
+        .expires(Duration::from_millis(250))
+        .messages()
+        .await?;
+    let result = tokio::time::timeout(Duration::from_secs(1), messages.next()).await?;
+    match result {
+        None => Ok(()),
+        Some(Ok(message)) => {
+            let info = message.info().map_err(|error| error.to_string())?;
+            Err(format!(
+                "JetStream redelivered stream sequence {} after Term ACK",
+                info.stream_sequence
+            )
+            .into())
+        }
+        Some(Err(error)) => Err(error.to_string().into()),
+    }
 }
 
 async fn install_result_insert_fault(
