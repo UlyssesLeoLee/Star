@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=dc8a9384fac08f8edb002a0f2b460cb93eb12c8194a73d02ad9b212a629af777
+MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.tsx"})
+MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
+MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
+MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
+MERGE (self)-[:DEFINES]->(shell)
+MERGE (shell)-[:CALLS]->(panel)
+MERGE (shell)-[:USES_TYPE]->(context)
+@endcypher
+*/
 /* CYPHER STRUCTURE MANIFEST
 CREATE (f:File {name:"frontend/src/components/run/RunWorkspaceShell.tsx",type:"file",language:"tsx"}),
  (route:Class {name:"RunWorkspaceRoute",type:"class"}),(load:Class {name:"ContextLoad",type:"class"}),
@@ -76,10 +87,10 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
       {RUN_APP_TABS.map((tab) => <button role="tab" aria-selected={activeApp === tab} aria-controls="run-app-content" disabled={tab !== "Task Cards"} onClick={() => setActiveApp(tab)} type="button" key={tab} className={`rounded border border-line px-3 py-2 text-xs ${activeApp === tab ? "bg-accent/15 text-accent" : "text-ink-mute"}`}>{tab}{tab === "Task Cards" ? "" : " · 待迁移"}</button>)}
     </div>
     <div id="run-app-content" className="my-4">
-      {activeApp === "Task Cards" && <RunTaskCardsPanel key={runId} client={current.client} run={envelope.engineering_run} available={envelope.capabilities.run_owned_apps_available} />}
+      {activeApp === "Task Cards" && <RunTaskCardsPanel key={runId} client={current.client} context={envelope} available={envelope.capabilities.run_owned_apps_available} />}
     </div>
     <div role="status" className="mb-4 rounded border border-line bg-bg-soft p-4 text-sm">
-      <p>{envelope.capabilities.run_owned_apps_available ? "Run-owned Apps 已开放；当前接入 Task Cards 只读视图。" : "服务端尚未开放 Run-owned Apps；Task Cards 页面保持禁用，不会回退到 Worktree 任务或演示数据。"} Canvas、Inbox、Workflow、BI/Benchmark 与插件仍是同级 Run App。</p>
+      <p>{envelope.capabilities.run_owned_apps_available ? "Run-owned Apps 已开放；Task Cards 提供受授权的读取与条件式创建入口。" : "服务端尚未开放 Run-owned Apps；Task Cards 页面保持禁用，不会回退到 Worktree 任务或演示数据。"} Canvas、Inbox、Workflow、BI/Benchmark 与插件仍是同级 Run App。</p>
       <p className="mt-2">{envelope.capabilities.execution_admission_available ? "服务端执行准入已开放，但卡内 CLI Runtime 与结果验证界面尚未装配。" : "服务端执行准入尚未开放。"} CLI 将从任务卡内打开；Runtime、取消/恢复、独立验证和结果回写完成前，执行保持禁用。</p>
     </div>
     <RunContextDetails envelope={envelope} />
