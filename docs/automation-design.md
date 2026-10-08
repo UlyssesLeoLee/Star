@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.29 (2026-10-08)
+> **文档版本**: v2.30 (2026-10-09)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -2779,3 +2779,17 @@ frontend/src/app/automation-debug/
 - Phase evidence: [`PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md`](reports/PHASE-9F4D-3D3-OUTBOX-DELIVERY-REPORT.md).
 | v2.28 | 2026-10-08 | Add §4.69 for cumulative INFRA-2C4 verification; record empty-snapshot/stale-generation/event-count assertions, 28/28 steps, SQLx 1/1 and 17/17 FORCE RLS, separate C4 output/data paths and zero VM/live inventory. Keep two-record and production topology/provider/execution gates explicit. | INFRA-2C4 adds a read-only projection over existing tables. |
 | v2.29 | 2026-10-08 | Add §4.70 for the serialized shared-subject JetStream quarantine integration; register the idempotent cross-document sync script and record 22/22 runner steps, 2/2 Rust integration tests, successful service stop and owned PG cleanup, zero VM and unchanged Multipass inventory. Keep all production execution gates closed. | Phase 9F4D-3D7 verifies the broker recovery seam. |
+
+### 4.71 Phase 9F4C-D versioned Schedule owner-message contract
+
+**自动化档：[P]** — `scripts/automation/phase9f4c_d_owner_protocol.py` is the bounded, replayable gate for the typed owner-message contract. It records each command, exit code, timeout, and file-backed stdout/stderr in a unique run directory. The runner can take explicit Cargo/Git executables, a Rust toolchain bin and an isolated target directory; use a short lane-unique Cargo target on Windows to avoid collisions with other active worktrees.
+
+- The gate runs `cargo fmt --check`, `cargo check --all-targets -j 4`, focused admission contract tests, the complete `domain-automation` package tests, Clippy with only the four observed baseline lint categories allowed, and `git diff --check`.
+- The protocol tests cover strict versioned Command/Result/Resolution JSON, occurrence and binding scope, digest matching, attempt/result linkage, accepted/rejected/compensation forms, unknown fields and the 16 KiB limit.
+- Verified with 6/6 runner gates; the three focused tests passed 3/3 and the complete `domain-automation` package passed 29/29. Rustfmt, package all-target check, focused Clippy and diff-check passed. One initial run using a shared target hit MSVC LNK1104; the final run used the isolated short target `E:\DevCache\phase9f4c-d-owner-contract`. Cargo used its explicit executable because `rtk` was unavailable. This is package-level evidence, not workspace-wide test evidence. Logs: `target/phase9f4c-d-owner-protocol/20261008T192724Z-80898675/`.
+- The runner creates no PostgreSQL database, broker, VM or Multipass instance and does not send or consume production messages. It does not prove Outbox persistence, trusted transport identity, tenant RLS setup, consumer behavior, Schedule linking, Run compensation, provider readiness, BI/Benchmark or task execution.
+- Rust 1.99.0 is the required workspace toolchain. The available `rtk` wrapper is not on PATH; the recorded invocation uses the direct Cargo executable and makes that tooling limitation explicit.
+
+| Version | Date | Change |
+|---|---|---|
+| v2.30 | 2026-10-09 | Add §4.71 and register the 9F4C-D focused Rust runner for owner-message DTO validation. Record 6/6 gates, 3/3 focused tests, 29/29 package tests, successful package all-target check and Clippy with four explicit pre-existing lint exceptions; keep all message consumers, production identity and execution gates open. | Freeze the typed owner protocol before implementing cross-owner consumers. |

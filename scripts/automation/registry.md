@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.76 (2026-10-08)
+> **文档版本**: v0.77 (2026-10-09)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.23 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.30 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract runner + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -55,6 +55,7 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 
 | 脚本路径 | 用途 | 调用方 | 末次 commit | 状态 |
 |---|---|---|---|---|
+| `scripts/automation/phase9f4c_d_owner_protocol.py` | Reproducible focused Rust gate for the versioned Schedule→Run Command/Result/Resolution DTOs: rustfmt, all-target package check, admission-specific and full package tests, bounded-baseline Clippy and diff-check; writes per-run JSONL audit and separate stdout/stderr files. Does not create DB/broker/VM or enable consumers. | 9F4C-D owner-message contract; automation-design §4.71; implementation plan §6.112; phase report | This phase | 🟢 6/6 gates; 3/3 focused tests and 29/29 package tests; consumers and execution remain fail-closed |
 | `scripts/automation/phase9f4d3d5_sync.py` | Idempotently sync Phase 9F4D-3D5 requirements/basic/detailed design, W/T/M appendix, and phase plan; exact-anchor guarded and safe to rerun | Phase 9F4D-3D5; automation-design §4.65 | This commit | 🟢 Ran twice; second pass no-op |
 | `scripts/automation/phase_infra2c_resource_catalog.py` | PostgreSQL 18.6 loopback disposable runner for 3A schema + 3B1 grants + 3C3 profile + 3D1 physical ledger + INFRA-2C1 resource catalog; applies each twice, checks 16 FORCE RLS tables, deferred orphan-Master rejection, catalog grants/RLS/WORM/identity/SCD2 and owns only temporary DB/logs; creates zero VMs. | INFRA-2C1; automation-design §4.66; plan §6.104; phase report | This commit | 🟢 29/29 runner steps including orphan-Master rejection; PostgreSQL stopped and owned data removed; inventory unchanged. |
 | `scripts/automation/phase_infra2c_resource_catalog_sync.py` | Exact-anchor guarded idempotent sync of INFRA-2C1 requirement/basic/detail/Group/W-T-M/plan/automation/registry versions and sections. | INFRA-2C1; automation-design §4.66; plan §6.104 | This commit | 🟢 Ran twice; second pass no-op. |
@@ -186,6 +187,7 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 | **v0.74** | **2026-10-08** | **Mavis review** | Extend the infrastructure resource-writer automation entry with `--phase c3`, lifecycle-specific disposable PostgreSQL verification and the new no-table migration; record 28/28 runner steps, SQLx 1/1 and 17/17 FORCE RLS while keeping C2 default/historical evidence intact. Preserve Rust 1.99.0, zero-VM and two-record limits. | INFRA-2C3 adds signed resource lifecycle persistence over the existing catalog. |
 | **v0.75** | **2026-10-08** | **Mavis review** | Extend the resource-writer runner entry with cumulative C4 read-only inventory reconciliation; record 28/28 steps, SQLx 1/1, 17/17 FORCE RLS, empty-snapshot/stale-generation/no-event-mutation assertions and zero VM/live inventory. Preserve C2/C3 modes, separate C4 paths, two-record cap and no-auto-purge. | INFRA-2C4 adds no database table or lifecycle authority. |
 | **v0.76** | **2026-10-08** | **Mavis review** | Register the exact-anchor 3D7 documentation sync script and update the disposable PostgreSQL/NATS runner entry for serial shared-subject integration; record 22/22 steps, 2/2 Rust tests, confirmed service stop/owned data cleanup, zero VMs and unchanged Multipass inventory. Preserve production KMS/identity/operator/consumer/execution gates. | Phase 9F4D-3D7 verifies failure redelivery and exact duplicate Term ACK. |
+| **v0.77** | **2026-10-09** | **Mavis review** | Register `phase9f4c_d_owner_protocol.py`, its six bounded Rust gates, isolated output/audit paths and explicit no-DB/no-broker/no-VM boundary; link automation-design §4.71 and plan §6.112. Keep all owner consumers and Schedule execution fail-closed. | Freeze and verify the typed 9F4C-D owner-message contract before consumer implementation. |
 ---
 
 ## 4. 引用文档

@@ -4,7 +4,7 @@
 //! It intentionally contains no in-memory scheduler or worker; materialization, claiming, and
 //! Run creation must be committed by the application layer against PostgreSQL.
 //!
-//! @cypher schema=1 source_sha256=dd55a3b46c7a35d339a1c6de8395789f9d881fe26dd258e4d78acb9c88f65955
+//! @cypher schema=1 source_sha256=c469db4cdc35638a3f25212a0c731e1eb773ef9f79c0ca96fbe88d08d7b995d0
 //! MERGE (self:File {path:"crates/domain-automation/src/schedule.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-automation/src/schedule.rs::schedule",kind:"module"})
 //! MERGE (target:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1"})
@@ -57,11 +57,104 @@
 //! MERGE (rule_validate)-[:CALLS]->(retry_validate)
 //! MERGE (occurrence_validate)-[:CALLS]->(key_validate)
 //! MERGE (occurrence_validate)-[:CALLS]->(rule_validate)
+//! MERGE (admission_command:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionCommandV1"})
+//! MERGE (admission_result:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResultV1"})
+//! MERGE (admission_outcome:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionOutcomeV1"})
+//! MERGE (admission_rejection:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleAdmissionRejectionCodeV1"})
+//! MERGE (admission_resolution:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1"})
+//! MERGE (resolution_kind:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleAdmissionResolutionKindV1"})
+//! MERGE (compensation_reason:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleAdmissionCompensationReasonV1"})
+//! MERGE (admission_error:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleAdmissionContractError"})
+//! MERGE (binding_snapshot:Type {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2"})
+//! MERGE (command_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionCommandV1::validate",kind:"method"})
+//! MERGE (command_encode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionCommandV1::encode_json",kind:"method"})
+//! MERGE (command_decode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionCommandV1::decode_json",kind:"method"})
+//! MERGE (command_binding_digest:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionCommandV1::binding_digest",kind:"method"})
+//! MERGE (binding_validate:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2::validate",kind:"method"})
+//! MERGE (binding_snapshot_digest:Symbol {id:"crates/domain-infrastructure/src/lib.rs::RunInfrastructureBindingSnapshotV2::digest",kind:"method"})
+//! MERGE (result_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResultV1::validate",kind:"method"})
+//! MERGE (result_encode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResultV1::encode_json",kind:"method"})
+//! MERGE (result_decode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResultV1::decode_json",kind:"method"})
+//! MERGE (result_match:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResultV1::validate_for_command",kind:"method"})
+//! MERGE (resolution_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::validate",kind:"method"})
+//! MERGE (resolution_match:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::validate_for_result",kind:"method"})
+//! MERGE (resolution_encode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::encode_json",kind:"method"})
+//! MERGE (resolution_decode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::decode_json",kind:"method"})
+//! MERGE (encode_bounded:Symbol {id:"crates/domain-automation/src/schedule.rs::encode_bounded",kind:"function"})
+//! MERGE (decode_bounded:Symbol {id:"crates/domain-automation/src/schedule.rs::decode_bounded",kind:"function"})
+//! MERGE (admission_command_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::admission_command_round_trips_and_pins_canonical_binding_scope",kind:"test"})
+//! MERGE (admission_result_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::admission_result_and_resolution_must_match_the_same_request_and_binding",kind:"test"})
+//! MERGE (admission_wire_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::admission_wire_rejects_unknown_fields_and_oversized_payloads",kind:"test"})
+//! MERGE (self)-[:DEFINES]->(admission_command)
+//! MERGE (self)-[:DEFINES]->(admission_result)
+//! MERGE (self)-[:DEFINES]->(admission_outcome)
+//! MERGE (self)-[:DEFINES]->(admission_rejection)
+//! MERGE (self)-[:DEFINES]->(admission_resolution)
+//! MERGE (self)-[:DEFINES]->(resolution_kind)
+//! MERGE (self)-[:DEFINES]->(compensation_reason)
+//! MERGE (self)-[:DEFINES]->(admission_error)
+//! MERGE (self)-[:DEFINES]->(command_validate)
+//! MERGE (self)-[:DEFINES]->(command_encode)
+//! MERGE (self)-[:DEFINES]->(command_decode)
+//! MERGE (self)-[:DEFINES]->(command_binding_digest)
+//! MERGE (self)-[:DEFINES]->(result_validate)
+//! MERGE (self)-[:DEFINES]->(result_encode)
+//! MERGE (self)-[:DEFINES]->(result_decode)
+//! MERGE (self)-[:DEFINES]->(result_match)
+//! MERGE (self)-[:DEFINES]->(resolution_validate)
+//! MERGE (self)-[:DEFINES]->(resolution_match)
+//! MERGE (self)-[:DEFINES]->(resolution_encode)
+//! MERGE (self)-[:DEFINES]->(resolution_decode)
+//! MERGE (self)-[:DEFINES]->(encode_bounded)
+//! MERGE (self)-[:DEFINES]->(decode_bounded)
+//! MERGE (tests)-[:DEFINES]->(admission_command_test)
+//! MERGE (tests)-[:DEFINES]->(admission_result_test)
+//! MERGE (tests)-[:DEFINES]->(admission_wire_test)
+//! MERGE (admission_command)-[:CONTAINS]->(occurrence)
+//! MERGE (admission_command)-[:USES_TYPE]->(binding_snapshot)
+//! MERGE (admission_result)-[:CONTAINS]->(admission_outcome)
+//! MERGE (admission_result)-[:CONTAINS]->(admission_rejection)
+//! MERGE (admission_resolution)-[:CONTAINS]->(resolution_kind)
+//! MERGE (admission_resolution)-[:CONTAINS]->(compensation_reason)
+//! MERGE (command_validate)-[:CALLS]->(occurrence_validate)
+//! MERGE (command_validate)-[:CALLS]->(binding_validate)
+//! MERGE (command_binding_digest)-[:CALLS]->(command_validate)
+//! MERGE (command_binding_digest)-[:CALLS]->(binding_snapshot_digest)
+//! MERGE (command_encode)-[:CALLS]->(command_validate)
+//! MERGE (command_encode)-[:CALLS]->(encode_bounded)
+//! MERGE (command_decode)-[:CALLS]->(decode_bounded)
+//! MERGE (command_decode)-[:CALLS]->(command_validate)
+//! MERGE (result_encode)-[:CALLS]->(result_validate)
+//! MERGE (result_encode)-[:CALLS]->(encode_bounded)
+//! MERGE (result_decode)-[:CALLS]->(decode_bounded)
+//! MERGE (result_decode)-[:CALLS]->(result_validate)
+//! MERGE (result_match)-[:CALLS]->(result_validate)
+//! MERGE (result_match)-[:CALLS]->(command_binding_digest)
+//! MERGE (resolution_match)-[:CALLS]->(resolution_validate)
+//! MERGE (resolution_match)-[:CALLS]->(result_validate)
+//! MERGE (resolution_encode)-[:CALLS]->(resolution_validate)
+//! MERGE (resolution_encode)-[:CALLS]->(encode_bounded)
+//! MERGE (resolution_decode)-[:CALLS]->(decode_bounded)
+//! MERGE (resolution_decode)-[:CALLS]->(resolution_validate)
+//! MERGE (admission_command_test)-[:TESTS]->(command_encode)
+//! MERGE (admission_command_test)-[:TESTS]->(command_decode)
+//! MERGE (admission_command_test)-[:TESTS]->(command_binding_digest)
+//! MERGE (admission_result_test)-[:TESTS]->(result_match)
+//! MERGE (admission_result_test)-[:TESTS]->(result_encode)
+//! MERGE (admission_result_test)-[:TESTS]->(result_decode)
+//! MERGE (admission_result_test)-[:TESTS]->(resolution_match)
+//! MERGE (admission_result_test)-[:TESTS]->(resolution_encode)
+//! MERGE (admission_result_test)-[:TESTS]->(resolution_decode)
+//! MERGE (admission_wire_test)-[:TESTS]->(command_encode)
+//! MERGE (admission_wire_test)-[:TESTS]->(command_decode)
+//! MERGE (self)-[:IMPORTS]->(:File {path:"crates/domain-infrastructure/src/lib.rs"})
 //! @endcypher
 
 use chrono::{DateTime, Duration, LocalResult, NaiveDateTime, Offset, TimeZone, Utc};
 use chrono_tz::Tz;
 use cron::Schedule;
+use domain_infrastructure::RunInfrastructureBindingSnapshotV2;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use thiserror::Error;
@@ -417,6 +510,382 @@ impl AutomationOccurrenceLeaseFenceV1 {
         }
         Ok(())
     }
+}
+
+/// Current protocol version for the owner-local Schedule→Run admission messages.
+pub const SCHEDULE_ADMISSION_SCHEMA_VERSION: u16 = 1;
+
+/// Maximum serialized JSON size accepted for one Schedule admission owner message.
+pub const MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES: usize = 16 * 1024;
+
+/// Immutable Schedule→Run request for one admission attempt.
+///
+/// The broker-authenticated Schedule service identity is outside this payload; tenant and
+/// run-as fields are scope claims, not proof of authorization. The request_id and resolved
+/// Infrastructure binding are persisted before publication and
+/// reused byte-for-byte for transport retries. Schedule lease fences stay in Schedule-owner
+/// state; they are deliberately excluded from this replay-stable request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleRunAdmissionCommandV1 {
+    /// Wire schema version.
+    pub schema_version: u16,
+    /// Tenant owning the Rule and occurrence.
+    pub tenant_id: Uuid,
+    /// Stable identity of this logical admission attempt and its Run-owner Inbox row.
+    pub request_id: Uuid,
+    /// Correlation shared by this Saga's owner messages.
+    pub correlation_id: Uuid,
+    /// Monotonic attempt number within the occurrence; transport redelivery does not increment it.
+    pub admission_attempt: u32,
+    /// Immutable Rule, creator, target, and UTC-slot snapshot.
+    pub occurrence: AutomationOccurrenceSnapshotV1,
+    /// Canonical Infrastructure binding resolved for this attempt.
+    pub infrastructure_binding: RunInfrastructureBindingSnapshotV2,
+}
+
+impl ScheduleRunAdmissionCommandV1 {
+    /// Validate message identity and ensure the pinned target and binding share one owner scope.
+    pub fn validate(&self) -> Result<(), ScheduleAdmissionContractError> {
+        if self.schema_version != SCHEDULE_ADMISSION_SCHEMA_VERSION {
+            return Err(ScheduleAdmissionContractError::UnsupportedSchemaVersion);
+        }
+        if self.tenant_id.is_nil()
+            || self.request_id.is_nil()
+            || self.correlation_id.is_nil()
+            || self.admission_attempt == 0
+        {
+            return Err(ScheduleAdmissionContractError::InvalidIdentity);
+        }
+        self.occurrence
+            .validate()
+            .map_err(|_| ScheduleAdmissionContractError::InvalidOccurrence)?;
+        self.infrastructure_binding
+            .validate()
+            .map_err(|_| ScheduleAdmissionContractError::InvalidInfrastructureBinding)?;
+
+        let target = &self.occurrence.rule_snapshot.target;
+        let binding = &self.infrastructure_binding;
+        if self.tenant_id != self.occurrence.key.tenant_id
+            || self.tenant_id != binding.tenant_id
+            || target.project_id != binding.project_id
+            || target.branch_id != binding.branch_id
+            || target.engineering_run_id != binding.engineering_run_id
+        {
+            return Err(ScheduleAdmissionContractError::ScopeMismatch);
+        }
+        Ok(())
+    }
+
+    /// Return the canonical digest that the Run result and Schedule confirmation must echo.
+    pub fn binding_digest(&self) -> Result<[u8; 32], ScheduleAdmissionContractError> {
+        self.validate()?;
+        self.infrastructure_binding
+            .digest()
+            .map_err(|_| ScheduleAdmissionContractError::InvalidInfrastructureBinding)
+    }
+
+    /// Serialize the validated message, rejecting payloads above the protocol bound.
+    pub fn encode_json(&self) -> Result<Vec<u8>, ScheduleAdmissionContractError> {
+        self.validate()?;
+        encode_bounded(self)
+    }
+
+    /// Decode a bounded, strict JSON payload and validate its cross-domain scope.
+    pub fn decode_json(payload: &[u8]) -> Result<Self, ScheduleAdmissionContractError> {
+        let message: Self = decode_bounded(payload)?;
+        message.validate()?;
+        Ok(message)
+    }
+}
+
+/// Whether the Run owner accepted a provisional Run or rejected admission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleRunAdmissionOutcomeV1 {
+    /// A non-executing TaskExecutionRun and Run-owner facts were committed.
+    Accepted,
+    /// Admission was terminally rejected without creating a TaskExecutionRun.
+    Rejected,
+}
+
+/// Stable, non-sensitive terminal rejection codes returned by the Run owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleAdmissionRejectionCodeV1 {
+    /// The fixed creator no longer has current Project/Run execution authorization.
+    RunAsUnauthorized,
+    /// The pinned Worktree, Task, Profile, or HookSet is no longer eligible.
+    TargetUnavailable,
+    /// The Project or Run execution budget does not permit admission.
+    QuotaExceeded,
+    /// The current policy rejects the requested admission.
+    PolicyRejected,
+    /// The exact pinned Infrastructure binding is no longer current.
+    BindingUnavailable,
+    /// The occurrence deadline has expired.
+    OccurrenceExpired,
+    /// The occurrence was cancelled before admission completed.
+    OccurrenceCancelled,
+}
+
+/// Run→Schedule result durably published after the Run owner transaction commits.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleRunAdmissionResultV1 {
+    /// Wire schema version.
+    pub schema_version: u16,
+    /// Tenant owning the Rule and occurrence.
+    pub tenant_id: Uuid,
+    /// Stable identity of this immutable Run-owner result fact.
+    pub result_id: Uuid,
+    /// Admission request being answered.
+    pub request_id: Uuid,
+    /// Attempt ordinal copied from the immutable Schedule request.
+    pub admission_attempt: u32,
+    /// Saga correlation identity.
+    pub correlation_id: Uuid,
+    /// Occurrence grouped by this admission attempt.
+    pub occurrence_id: Uuid,
+    /// Terminal outcome committed by the Run owner.
+    pub outcome: ScheduleRunAdmissionOutcomeV1,
+    /// Provisional non-executing Run ID when accepted.
+    pub task_execution_run_id: Option<Uuid>,
+    /// Stable rejection reason when rejected.
+    pub rejection_code: Option<ScheduleAdmissionRejectionCodeV1>,
+    /// Digest of the exact Infrastructure binding pinned by the request.
+    pub binding_digest: [u8; 32],
+}
+
+impl ScheduleRunAdmissionResultV1 {
+    /// Validate result identity and the mutually exclusive accepted/rejected payload.
+    pub fn validate(&self) -> Result<(), ScheduleAdmissionContractError> {
+        if self.schema_version != SCHEDULE_ADMISSION_SCHEMA_VERSION {
+            return Err(ScheduleAdmissionContractError::UnsupportedSchemaVersion);
+        }
+        if self.tenant_id.is_nil()
+            || self.result_id.is_nil()
+            || self.request_id.is_nil()
+            || self.admission_attempt == 0
+            || self.correlation_id.is_nil()
+            || self.occurrence_id.is_nil()
+        {
+            return Err(ScheduleAdmissionContractError::InvalidIdentity);
+        }
+        let accepted_payload = self
+            .task_execution_run_id
+            .is_some_and(|run_id| !run_id.is_nil())
+            && self.rejection_code.is_none();
+        let rejected_payload =
+            self.task_execution_run_id.is_none() && self.rejection_code.is_some();
+        match self.outcome {
+            ScheduleRunAdmissionOutcomeV1::Accepted if accepted_payload => Ok(()),
+            ScheduleRunAdmissionOutcomeV1::Rejected if rejected_payload => Ok(()),
+            _ => Err(ScheduleAdmissionContractError::InvalidResult),
+        }
+    }
+
+    /// Ensure the result answers exactly the persisted request and its binding snapshot.
+    pub fn validate_for_command(
+        &self,
+        command: &ScheduleRunAdmissionCommandV1,
+    ) -> Result<(), ScheduleAdmissionContractError> {
+        self.validate()?;
+        let binding_digest = command.binding_digest()?;
+        if self.tenant_id != command.tenant_id
+            || self.request_id != command.request_id
+            || self.admission_attempt != command.admission_attempt
+            || self.correlation_id != command.correlation_id
+            || self.occurrence_id != command.occurrence.occurrence_id
+            || self.binding_digest != binding_digest
+        {
+            return Err(ScheduleAdmissionContractError::ScopeMismatch);
+        }
+        Ok(())
+    }
+
+    /// Serialize the validated result, rejecting payloads above the protocol bound.
+    pub fn encode_json(&self) -> Result<Vec<u8>, ScheduleAdmissionContractError> {
+        self.validate()?;
+        encode_bounded(self)
+    }
+
+    /// Decode a bounded, strict JSON payload and validate its result shape.
+    pub fn decode_json(payload: &[u8]) -> Result<Self, ScheduleAdmissionContractError> {
+        let message: Self = decode_bounded(payload)?;
+        message.validate()?;
+        Ok(message)
+    }
+}
+
+/// Schedule's terminal decision for a successfully accepted Run-owner result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleAdmissionResolutionKindV1 {
+    /// Schedule linked the Run under the current lease fence and confirmed admission.
+    Confirm,
+    /// Schedule could not safely link the Run and requests owner-local compensation.
+    Compensate,
+}
+
+/// Stable compensation reasons understood by the Run owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleAdmissionCompensationReasonV1 {
+    /// The Schedule lease owner or generation changed before the result was linked.
+    ScheduleFenceLost,
+    /// The occurrence was cancelled before it could be linked.
+    OccurrenceCancelled,
+    /// The occurrence deadline expired before it could be linked.
+    OccurrenceExpired,
+    /// The Schedule owner detected a conflicting link.
+    ScheduleLinkConflict,
+}
+
+/// Schedule→Run confirmation or compensation command for one accepted result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleRunAdmissionResolutionV1 {
+    /// Wire schema version.
+    pub schema_version: u16,
+    /// Tenant owning the Rule and occurrence.
+    pub tenant_id: Uuid,
+    /// Stable identity of this immutable Schedule resolution fact.
+    pub resolution_id: Uuid,
+    /// Admission request being resolved.
+    pub request_id: Uuid,
+    /// Attempt ordinal copied from the immutable Schedule request.
+    pub admission_attempt: u32,
+    /// Run-owner result being confirmed or compensated.
+    pub result_id: Uuid,
+    /// Saga correlation identity.
+    pub correlation_id: Uuid,
+    /// Occurrence grouped by this admission attempt.
+    pub occurrence_id: Uuid,
+    /// Provisional Run accepted by the Run owner.
+    pub task_execution_run_id: Uuid,
+    /// Digest of the exact Infrastructure binding pinned by the request.
+    pub binding_digest: [u8; 32],
+    /// Schedule's owner-local terminal decision.
+    pub decision: ScheduleAdmissionResolutionKindV1,
+    /// Required only for a compensation command.
+    pub compensation_reason: Option<ScheduleAdmissionCompensationReasonV1>,
+}
+
+impl ScheduleRunAdmissionResolutionV1 {
+    /// Validate message identity and confirm/compensate shape.
+    pub fn validate(&self) -> Result<(), ScheduleAdmissionContractError> {
+        if self.schema_version != SCHEDULE_ADMISSION_SCHEMA_VERSION {
+            return Err(ScheduleAdmissionContractError::UnsupportedSchemaVersion);
+        }
+        if self.tenant_id.is_nil()
+            || self.resolution_id.is_nil()
+            || self.request_id.is_nil()
+            || self.admission_attempt == 0
+            || self.result_id.is_nil()
+            || self.correlation_id.is_nil()
+            || self.occurrence_id.is_nil()
+            || self.task_execution_run_id.is_nil()
+        {
+            return Err(ScheduleAdmissionContractError::InvalidIdentity);
+        }
+        let valid_decision = match self.decision {
+            ScheduleAdmissionResolutionKindV1::Confirm => self.compensation_reason.is_none(),
+            ScheduleAdmissionResolutionKindV1::Compensate => self.compensation_reason.is_some(),
+        };
+        if !valid_decision {
+            return Err(ScheduleAdmissionContractError::InvalidResolution);
+        }
+        Ok(())
+    }
+
+    /// Ensure this resolution matches the exact accepted Run-owner result.
+    pub fn validate_for_result(
+        &self,
+        result: &ScheduleRunAdmissionResultV1,
+    ) -> Result<(), ScheduleAdmissionContractError> {
+        self.validate()?;
+        result.validate()?;
+        if result.outcome != ScheduleRunAdmissionOutcomeV1::Accepted
+            || self.tenant_id != result.tenant_id
+            || self.request_id != result.request_id
+            || self.admission_attempt != result.admission_attempt
+            || self.result_id != result.result_id
+            || self.correlation_id != result.correlation_id
+            || self.occurrence_id != result.occurrence_id
+            || self.task_execution_run_id != result.task_execution_run_id.unwrap_or(Uuid::nil())
+            || self.binding_digest != result.binding_digest
+        {
+            return Err(ScheduleAdmissionContractError::ScopeMismatch);
+        }
+        Ok(())
+    }
+
+    /// Serialize the validated resolution, rejecting payloads above the protocol bound.
+    pub fn encode_json(&self) -> Result<Vec<u8>, ScheduleAdmissionContractError> {
+        self.validate()?;
+        encode_bounded(self)
+    }
+
+    /// Decode a bounded, strict JSON payload and validate its decision shape.
+    pub fn decode_json(payload: &[u8]) -> Result<Self, ScheduleAdmissionContractError> {
+        let message: Self = decode_bounded(payload)?;
+        message.validate()?;
+        Ok(message)
+    }
+}
+
+/// Stable contract validation failures for owner-local Schedule admission messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum ScheduleAdmissionContractError {
+    /// Message schema version is not supported.
+    #[error("unsupported Schedule admission schema version")]
+    UnsupportedSchemaVersion,
+    /// Required tenant or message identity is absent.
+    #[error("Schedule admission message identity is invalid")]
+    InvalidIdentity,
+    /// The embedded immutable occurrence snapshot is invalid.
+    #[error("Schedule admission occurrence snapshot is invalid")]
+    InvalidOccurrence,
+    /// The embedded canonical Infrastructure binding is invalid.
+    #[error("Schedule admission Infrastructure binding is invalid")]
+    InvalidInfrastructureBinding,
+    /// Related messages or embedded owner scopes do not match.
+    #[error("Schedule admission owner-message scope does not match")]
+    ScopeMismatch,
+    /// Accepted/rejected result fields are inconsistent.
+    #[error("Schedule admission result shape is invalid")]
+    InvalidResult,
+    /// Confirmation/compensation fields are inconsistent.
+    #[error("Schedule admission resolution shape is invalid")]
+    InvalidResolution,
+    /// Serialized message exceeds the protocol byte limit.
+    #[error("Schedule admission message exceeds the byte limit")]
+    MessageTooLarge,
+    /// JSON is malformed or contains fields unknown to this schema version.
+    #[error("Schedule admission JSON is malformed or contains unknown fields")]
+    InvalidJson,
+    /// A validated message could not be serialized.
+    #[error("Schedule admission message could not be serialized")]
+    SerializationFailed,
+}
+
+fn encode_bounded<T: Serialize>(message: &T) -> Result<Vec<u8>, ScheduleAdmissionContractError> {
+    let payload = serde_json::to_vec(message)
+        .map_err(|_| ScheduleAdmissionContractError::SerializationFailed)?;
+    if payload.len() > MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES {
+        return Err(ScheduleAdmissionContractError::MessageTooLarge);
+    }
+    Ok(payload)
+}
+
+fn decode_bounded<T: DeserializeOwned>(
+    payload: &[u8],
+) -> Result<T, ScheduleAdmissionContractError> {
+    if payload.len() > MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES {
+        return Err(ScheduleAdmissionContractError::MessageTooLarge);
+    }
+    serde_json::from_slice(payload).map_err(|_| ScheduleAdmissionContractError::InvalidJson)
 }
 
 /// Stable validation failures for schedule and occurrence contracts.
@@ -827,12 +1296,16 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        AutomationOccurrenceKey, AutomationOccurrenceLeaseFenceV1, AutomationOccurrenceSnapshotV1,
-        AutomationScheduleRuleRevisionV1, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
-        ScheduleContractError, ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1,
-        ScheduleMaterializationError, ScheduleMisfirePolicyV1, ScheduleOccurrenceDispositionV1,
-        ScheduleOverlapPolicyV1, SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleTargetV1,
-        materialize_schedule_window,
+        materialize_schedule_window, AutomationOccurrenceKey, AutomationOccurrenceLeaseFenceV1,
+        AutomationOccurrenceSnapshotV1, AutomationScheduleRuleRevisionV1,
+        ScheduleAdmissionCompensationReasonV1, ScheduleAdmissionContractError,
+        ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionResolutionKindV1, ScheduleContractError,
+        ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1, ScheduleMaterializationError,
+        ScheduleMisfirePolicyV1, ScheduleOccurrenceDispositionV1, ScheduleOverlapPolicyV1,
+        SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleRunAdmissionCommandV1,
+        ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResolutionV1,
+        ScheduleRunAdmissionResultV1, ScheduleTargetV1, MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES,
+        SCHEDULE_ADMISSION_SCHEMA_VERSION, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
     };
     use crate::RuleId;
 
@@ -1160,6 +1633,189 @@ mod tests {
                 16,
             ),
             Err(ScheduleMaterializationError::WindowTooDense)
+        );
+    }
+    fn admission_command() -> ScheduleRunAdmissionCommandV1 {
+        use domain_infrastructure::{
+            ClusterPlacementPolicyV1, ExecutionResourceBudgetV1, KubernetesDnsLabel, ProviderKind,
+            RunInfrastructureBindingSnapshotV2,
+        };
+
+        let rule = schedule_rule();
+        let scheduled_for_utc = utc("2026-10-05T00:00:00Z");
+        let occurrence_id = Uuid::new_v4();
+        let occurrence = AutomationOccurrenceSnapshotV1 {
+            schema_version: 1,
+            occurrence_id,
+            key: AutomationOccurrenceKey {
+                tenant_id: rule.tenant_id,
+                rule_id: rule.rule_id,
+                rule_version: rule.rule_version,
+                scheduled_for_utc,
+            },
+            run_as_actor_id: rule.run_as_actor_id,
+            rule_snapshot: rule.clone(),
+            scheduled_local_label: "2026-10-05T09:00:00".to_owned(),
+            utc_offset_seconds: 32_400,
+            materialized_at: scheduled_for_utc - Duration::minutes(1),
+        };
+        let binding = RunInfrastructureBindingSnapshotV2 {
+            schema_version: 2,
+            tenant_id: rule.tenant_id,
+            project_id: rule.project_id,
+            branch_id: rule.target.branch_id,
+            engineering_run_id: rule.target.engineering_run_id,
+            binding_id: Uuid::new_v4(),
+            binding_revision: 1,
+            host_environment_id: Uuid::new_v4(),
+            k3s_cluster_id: Uuid::new_v4(),
+            k3s_cluster_generation: 2,
+            cluster_placement_policy: ClusterPlacementPolicyV1::SharedPool,
+            provider: ProviderKind::MultipassK3sCluster,
+            provider_profile_id: Uuid::new_v4(),
+            provider_profile_revision: 1,
+            provider_profile_digest: [0x11; 32],
+            namespace: KubernetesDnsLabel::new("run-04").expect("valid namespace"),
+            service_account: KubernetesDnsLabel::new("agent-runtime").expect("valid account"),
+            runtime_profile_id: Uuid::new_v4(),
+            runtime_profile_revision: 1,
+            runtime_profile_digest: [0x22; 32],
+            resource_budget: ExecutionResourceBudgetV1 {
+                max_rss_bytes: 512 * 1024 * 1024,
+                max_cpu_ms: 60_000,
+                max_runtime_ms: 600_000,
+                max_child_processes: 8,
+                max_parallel_tools: 4,
+                max_provider_calls: 100,
+                max_output_bytes: 1_048_576,
+                max_event_buffer_bytes: 262_144,
+            },
+        };
+        ScheduleRunAdmissionCommandV1 {
+            schema_version: SCHEDULE_ADMISSION_SCHEMA_VERSION,
+            tenant_id: rule.tenant_id,
+            request_id: Uuid::new_v4(),
+            correlation_id: Uuid::new_v4(),
+            admission_attempt: 1,
+            occurrence,
+            infrastructure_binding: binding,
+        }
+    }
+
+    #[test]
+    fn admission_command_round_trips_and_pins_canonical_binding_scope() {
+        let command = admission_command();
+        let payload = command.encode_json().expect("encode valid command");
+        let decoded =
+            ScheduleRunAdmissionCommandV1::decode_json(&payload).expect("decode valid command");
+        assert_eq!(decoded, command);
+        assert_eq!(
+            command.binding_digest().expect("valid binding digest"),
+            command
+                .infrastructure_binding
+                .digest()
+                .expect("canonical binding digest")
+        );
+
+        let mut wrong_scope = command;
+        wrong_scope.infrastructure_binding.branch_id = Uuid::new_v4();
+        assert_eq!(
+            wrong_scope.validate(),
+            Err(ScheduleAdmissionContractError::ScopeMismatch)
+        );
+    }
+
+    #[test]
+    fn admission_result_and_resolution_must_match_the_same_request_and_binding() {
+        let command = admission_command();
+        let run_id = Uuid::new_v4();
+        let result = ScheduleRunAdmissionResultV1 {
+            schema_version: SCHEDULE_ADMISSION_SCHEMA_VERSION,
+            tenant_id: command.tenant_id,
+            result_id: Uuid::new_v4(),
+            request_id: command.request_id,
+            admission_attempt: command.admission_attempt,
+            correlation_id: command.correlation_id,
+            occurrence_id: command.occurrence.occurrence_id,
+            outcome: ScheduleRunAdmissionOutcomeV1::Accepted,
+            task_execution_run_id: Some(run_id),
+            rejection_code: None,
+            binding_digest: command.binding_digest().expect("binding digest"),
+        };
+        assert!(result.validate_for_command(&command).is_ok());
+        let result_payload = result.encode_json().expect("encode result");
+        assert_eq!(
+            ScheduleRunAdmissionResultV1::decode_json(&result_payload).expect("decode result"),
+            result
+        );
+
+        let resolution = ScheduleRunAdmissionResolutionV1 {
+            schema_version: SCHEDULE_ADMISSION_SCHEMA_VERSION,
+            tenant_id: result.tenant_id,
+            resolution_id: Uuid::new_v4(),
+            request_id: result.request_id,
+            admission_attempt: result.admission_attempt,
+            result_id: result.result_id,
+            correlation_id: result.correlation_id,
+            occurrence_id: result.occurrence_id,
+            task_execution_run_id: run_id,
+            binding_digest: result.binding_digest,
+            decision: ScheduleAdmissionResolutionKindV1::Confirm,
+            compensation_reason: None,
+        };
+        assert!(resolution.validate_for_result(&result).is_ok());
+        let resolution_payload = resolution.encode_json().expect("encode resolution");
+        assert_eq!(
+            ScheduleRunAdmissionResolutionV1::decode_json(&resolution_payload)
+                .expect("decode resolution"),
+            resolution
+        );
+
+        let compensation = ScheduleRunAdmissionResolutionV1 {
+            resolution_id: Uuid::new_v4(),
+            decision: ScheduleAdmissionResolutionKindV1::Compensate,
+            compensation_reason: Some(ScheduleAdmissionCompensationReasonV1::ScheduleFenceLost),
+            ..resolution.clone()
+        };
+        assert!(compensation.validate_for_result(&result).is_ok());
+
+        let rejected = ScheduleRunAdmissionResultV1 {
+            result_id: Uuid::new_v4(),
+            outcome: ScheduleRunAdmissionOutcomeV1::Rejected,
+            task_execution_run_id: None,
+            rejection_code: Some(ScheduleAdmissionRejectionCodeV1::RunAsUnauthorized),
+            ..result.clone()
+        };
+        assert!(rejected.validate_for_command(&command).is_ok());
+
+        let mut stale_resolution = resolution;
+        stale_resolution.binding_digest[0] ^= 0xff;
+        assert_eq!(
+            stale_resolution.validate_for_result(&result),
+            Err(ScheduleAdmissionContractError::ScopeMismatch)
+        );
+    }
+
+    #[test]
+    fn admission_wire_rejects_unknown_fields_and_oversized_payloads() {
+        let command = admission_command();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&command.encode_json().expect("encode command"))
+                .expect("parse command value");
+        value
+            .as_object_mut()
+            .expect("command object")
+            .insert("unexpected".to_owned(), serde_json::Value::Bool(true));
+        let unknown_field = serde_json::to_vec(&value).expect("serialize unknown field");
+        assert_eq!(
+            ScheduleRunAdmissionCommandV1::decode_json(&unknown_field),
+            Err(ScheduleAdmissionContractError::InvalidJson)
+        );
+
+        let oversized = vec![b' '; MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES + 1];
+        assert_eq!(
+            ScheduleRunAdmissionCommandV1::decode_json(&oversized),
+            Err(ScheduleAdmissionContractError::MessageTooLarge)
         );
     }
 }

@@ -23,6 +23,7 @@ cron = { workspace = true }
 chrono-tz = { workspace = true }
 tokio = { workspace = true }
 
+domain-infrastructure = { path = "../domain-infrastructure" }
 star-context = { path = "../star-context" }
 [dev-dependencies]
 tokio = { workspace = true }

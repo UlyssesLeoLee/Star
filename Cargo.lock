@@ -1652,6 +1652,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "cron",
+ "domain-infrastructure",
  "serde",
  "serde_json",
  "star-context",

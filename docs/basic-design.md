@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.07 (2026-10-09)
-> **上游要件定义书**: docs/requirements.md v6.10
+> **文档版本**: v6.08 (2026-10-09)
+> **上游要件定义书**: docs/requirements.md v6.11
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5112,6 +5112,15 @@ No executor starts until Schedule confirmation, current ACL/binding, both physic
 | Acceptance ID | Design mapping and boundary |
 |---|---|
 | AC-SCHED-API-029 | Requirements §50.8Y; Schedule SRS §SCHED-API-013/016; Schedule DD §6.16. Enforce owner-local admission/result, Schedule fenced link/confirmation, post-confirmation Infrastructure demand, idempotent lost-reply recovery, conflict rejection, owner-command compensation and fail-closed execution. |
+| AC-SCHED-API-030 | Requirements §50.8Y; Schedule SRS §SCHED-API-029; Schedule DD §6.17. Enforce strict versioned Command/Result/Resolution schemas, stable per-logical-attempt `request_id`, exact-byte transport replay, binding digest/scope matching, 16 KiB maximum, and authenticated tenant context outside the payload. This is a domain-contract slice only; no consumer or execution path is enabled. |
+
+### 16.50 Phase 9F4C-D versioned Schedule owner-message contract
+
+The canonical Schedule→Run protocol is a bounded typed Command/Result/Resolution contract. One logical attempt owns one persisted `request_id` and incrementing attempt ordinal; `occurrence_id` groups attempts but does not deduplicate a new logical attempt. Transport redelivery reuses the exact immutable Outbox payload bytes. A new attempt is created only after the prior attempt is terminal and uses a fresh `request_id`; Schedule keeps its lease owner/generation/expiry in its own state and rechecks them with a fenced compare-and-swap before linking any accepted Run.
+
+The Command contains the immutable occurrence snapshot and exact `RunInfrastructureBindingSnapshotV2`; validation checks tenant, Project, Cloud Branch and Engineering Run identity and computes the canonical binding digest. Result echoes request, attempt, correlation, occurrence and digest, with exactly one accepted Run ID or stable rejection code. Resolution references one accepted result and is either confirmation or a typed compensation reason. The JSON contract rejects unknown fields and payloads above 16 KiB. Broker/service identity is authenticated out of band; the payload's tenant field is a scope claim, never authorization evidence. The owner consumer must establish trusted tenant/RLS context independently.
+
+The Rust DTO contract and focused tests do not implement Outbox persistence, authenticated transport, owner Inbox, result linking, confirmation, compensation processing or production execution. These remain fail-closed gates for subsequent phases.
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -5266,3 +5275,4 @@ No executor starts until Schedule confirmation, current ACL/binding, both physic
 | v6.05 | 2026-10-09 | Mavis review | Add AC-ERUN-007 and update §16.23 for bounded Task Card creation: write-scope/focus checks, same-target in-panel retry, existing Run owner transaction and Outbox trigger; state that pending recovery after remount/reload remains open; retain host/capability/target DB/RLS and CLI blockers. | Align detailed design with the implemented creation path without importing unrelated branch refactors. |
 | v6.06 | 2026-10-09 | Mavis review | Extend AC-ERUN-007 and §16.23 with POST-before-save IndexedDB recovery, actor/Run scope, exact authorization/binding snapshot, 32-record cap and 29-day retry limit; require user reconciliation before discarding stale records and record local-data loss/privacy limits. Align requirements v6.09, Task SRS/BD/DD v0.14/v0.7/v1.27 and Group DD v4.75; preserve host/DB/RLS/CLI gates. | Implement cross-remount recovery as a narrow Task Card improvement. |
 | v6.07 | 2026-10-09 | Mavis review | Add §16.49 / AC-SCHED-API-029; correct §16.24/§16.27 and AC-LOOP-009 so Schedule, Run/Execution and Infrastructure each commit only owner-local facts, with confirmation before demand publication and owner-command compensation. Align requirements v6.10, Schedule SRS v0.31/BD v0.30/DD v0.30, Data Design v2.1, Infrastructure DD v0.33, Group DD v4.76 and plan v6.43; no worker or production execution is claimed. | Review found current Schedule admission wording violated the documented owner/API/Outbox boundary. |
+| v6.08 | 2026-10-09 | Mavis review | Add §16.50 / AC-SCHED-API-030 for strict typed Schedule Command/Result/Resolution, logical-attempt request identity, exact-byte transport replay, 16 KiB bounds, binding-digest checks and out-of-band owner authentication. Align requirements v6.11 and Schedule SRS/BD/DD v0.32/v0.31/v0.31; record focused package verification only and preserve production consumer/execution gates. | Freeze the owner-message contract before implementing cross-owner consumers. |
