@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.06 (2026-10-09)
-> **上游要件定义书**: docs/requirements.md v6.09
+> **文档版本**: v6.07 (2026-10-09)
+> **上游要件定义书**: docs/requirements.md v6.10
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4608,8 +4608,8 @@ Chat Bar(scope, text, entity_refs)
 | AC-ERUN-004 / AC-HOOK-001 | §16.20 | CLI directory identity、strict snapshot、V2 fence、attachment 再授权与 Hooks hint/session 门 |
 | AC-ERUN-006 | §16.23 | Run Task Cards bounded read projection、fail-closed provider/capability 状态、无 mock/Worktree 回退与 CLI 禁用 |
 | AC-ERUN-007 | §16.23 | 条件式 Task Card 创建、`work-item:write`、服务端 Run owner 推导、同事务 audit/idempotency/Outbox；IndexedDB 保存未决 body/key 与精确 target/auth snapshot，最多 32 条、29 天安全重试，人工核对/清除；本地存储不保证 exactly-once/跨设备，host/DB/RLS 和 CLI 门保持关闭 |
-| AC-LOOP-009 | §16.24 | admitted Run 不可变关联与 Schedule Run Outbox 的 DB persistence contract；worker 当前授权/lease owner/quota/target 复验、atomic writer/consumer/BI 未完成 |
-| AC-LOOP-010 | §16.27-16.37 / Schedule API SRS v0.24 / BD v0.23 / DD v0.23 | Run owner 仅原子预留 Project/Run 预算并写入自身 Infrastructure-demand Outbox；Infrastructure owner 的 tenant-scoped admission primitive 从 exact persisted SCD2 Provider Profile 核验 digest 并派生 Host+精确 K3s cluster 双层容量请求，再原子写 reservation bundle/receipt/event/Outbox，但尚无可信 current-profile/Run-binding/provider resolver 或 production consumer；再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster。executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；跨租户共享资源需全局 allocator，worker/BI/production execution 仍未实现 |
+| AC-LOOP-009 | §16.24 / §16.49 / Schedule API SRS v0.31 / BD v0.30 / DD v0.30 | Schedule owner 与 Run owner 通过稳定幂等命令、owner-local Inbox/Outbox、Run result、current-fence link 和 Schedule confirmation 形成可恢复 admission saga；生产消费者、owner grants、补偿、BI 与执行仍未验收 |
+| AC-LOOP-010 | §16.27-16.37 / Schedule API SRS v0.31 / BD v0.30 / DD v0.30 / Infrastructure DD v0.33 / Data Design v2.1 | Run owner 在本地事务内复验 Project/Run 预算；Schedule confirmation 消费后才写 Infrastructure-demand Outbox。Infrastructure owner 的 tenant-scoped admission primitive 从 exact persisted SCD2 Provider Profile 核验 digest 并派生 Host+精确 K3s cluster 双层容量请求，再原子写 reservation bundle/receipt/event/Outbox，但尚无可信 current-profile/Run-binding/provider resolver 或 production consumer；再由唯一 Rust Infrastructure Manager 异步协调所选 Multipass instances/cluster。executor 前须通过双 reservation/Manager receipt、Multipass daemon+目标 cluster 全部 owned guests（remote provider 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge 与新鲜度 gate，并在 Run owner start transaction 重验 ACL/placement/binding/lease/quota；跨租户共享资源需全局 allocator，worker/BI/production execution 仍未实现 |
 | AC-ERUN-002 / AC-EVENT-001 | §16.19 | Modular owner APIs, stored-procedure boundary, Outbox/Inbox, current NATS and broker decision |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4887,9 +4887,9 @@ Task Cards 提供读取与一个受限创建入口。创建入口仅在 Run Apps
 
 ### 16.24 Phase 9F4C-A Schedule admission persistence
 
-Schedule admission 的事实链仍属于 Project → Branch → Engineering Run → Worktree 下的 Run Automation/Workflow 能力，不新增导航节点。数据库为 `automation.occurrence_dispatch` 增加 `admitted_run_id`，仅允许 dispatch 在 `leased → admitted` 时绑定 schedule-origin 的 TaskExecutionRun；trigger 约束状态转换及 fencing/attempt 序列，但不验证 worker 提交的当前 lease owner/generation。未来 writer 必须以条件更新校验当前 owner、generation、lease expiry 与 occurrence deadline，并从 canonical TaskExecutionRun 重新确认 Worktree/Task binding。FK/trigger 固定 tenant/Project/Engineering Run/Task、occurrence、精确 Rule revision、agent channel 和 immutable run-as 的一致性；本 migration 的 Run/Outbox 记录没有独立 `worktree_id` 约束。成功 admission 后 Run ID 不可替换。独立 `automation.schedule_run_outbox` 是 append-only Transaction，按 occurrence/event type 去重，并用复合 FK 固定 tenant/Project/Run/Rule revision/occurrence/TaskExecutionRun。
+Schedule admission 的事实链仍属于 Project → Branch → Engineering Run → Worktree 下的 Run Automation/Workflow 能力，不新增导航节点。`automation.occurrence_dispatch`、lease/fence 与 `automation.schedule_run_outbox` 属于 Schedule owner；`multica.task_execution_run`、Project/Run reservation、RunEvents 与 Infrastructure demand Outbox 属于 Run/Execution owner。9F4C-A 的 `admitted_run_id`、FK 和 trigger 只校验已提交事实的一致性，不把两侧事实合并为一个事务。Schedule owner 先 claim occurrence 并发出稳定幂等 admission command；Run owner 在本地事务创建最多一个 provisional、non-executing Run 并写 result Outbox；Schedule owner 在本地 Inbox 事务复验当前 owner/generation/lease expiry/deadline，写 link/event/`schedule_run_outbox` 并发 confirmation；Run owner 消费 confirmation 后才发布 Infrastructure demand。丢失响应使用同一 occurrence/key/payload 重放，必须返回同一 Run ID；冲突 fail closed，过期/取消使用 owner command 补偿。现有同库复合 FK 可校验已提交 Run link；物理分库时须由 owner API/Inbox receipt 取代跨库 FK。所有 owner 边界与执行门保持独立。
 
-Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应用、八张 Schedule 表 FORCE RLS、匹配身份的 admitted Run/Outbox 写入、run-as mismatch、已绑定 Run 替换拒绝、Outbox UPDATE 拒绝和非 superuser tenant 隔离；Outbox 的 DELETE/TRUNCATE trigger 与其它 source/channel negative cases 尚未由该 runner 单独覆盖。该证据只覆盖 DB persistence contract，不证明 application admission writer 已把实时 Project/Run 授权、Worktree/Task/Profile/HookSet/target/quota 复验、Reservation、TaskExecutionRun、RunEvent 与 Outbox 原子提交。生产 worker 与 writer 未接入前保持 Schedule capability 关闭；撤权或 ACL 源不可用必须 fail closed。
+Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应用、八张 Schedule 表 FORCE RLS、匹配身份的 admitted Run/Outbox 写入、run-as mismatch、已绑定 Run 替换拒绝、Outbox UPDATE 拒绝和非 superuser tenant 隔离；Outbox 的 DELETE/TRUNCATE trigger 与其它 source/channel negative cases 尚未由该 runner 单独覆盖。该证据只覆盖 DB persistence contract，不证明任何 owner 的 admission consumer 已部署。生产实现必须分别验证 Run-owner authorization/target/quota/Run/result 事务、Schedule-owner fenced link/Outbox/confirmation 事务、Run-owner confirmation/demand 事务以及丢失响应和 owner-command 补偿；撤权或 ACL 源不可用必须 fail closed，所有生产消费者完成前 Schedule capability 关闭。
 
 ### 16.25 Phase 9F4C-B Rule enable-time run-as authorization
 
@@ -4903,7 +4903,7 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 
 ### 16.27 Phase 9F4D Schedule admission 与 Multipass/K3s Run binding
 
-Schedule Rule 不保存 VM/Multipass instance 身份。每个 trigger/retry/resume 在 Project/Branch/Run 权限及 Worktree/Task/Profile/HookSet 复验后，重新读取有效 RunInfrastructureBinding 与 provider/profile revision。Run/Execution owner 在本 owner 的短事务内复验 Project/Run 配额，创建非执行态 TaskExecutionRun、Project/Run Reservation、RunEvents、occurrence fencing link、Schedule Run Outbox 与幂等 Infrastructure demand Outbox；Run owner 事务不得宣称或直接预留 Host/cluster 容量。Infrastructure owner 经自己的 Inbox/事务核验 Run 当前绑定的 placement policy，并分别预留 HostEnvironment 与精确 K3s cluster capacity，再委托 Rust Host Infrastructure Manager 异步协调被选中的 instances/cluster。两个 owner 不直接写对方表、不使用分布式数据库事务，数据库锁不跨越 VM 操作。
+Schedule Rule 不保存 VM/Multipass instance 身份。每个 trigger/retry/resume 在 Project/Branch/Run 权限及 Worktree/Task/Profile/HookSet 复验后，重新读取有效 RunInfrastructureBinding 与 provider/profile revision。Run/Execution owner 在本 owner 的短事务内复验 Project/Run 配额并创建非执行态 TaskExecutionRun、Project/Run Reservation、RunEvents 与 admission-result Outbox；Schedule owner 在自己的事务内写 occurrence fencing link 与 Schedule Run Outbox。Run owner 在收到 Schedule confirmation 后，才在本 owner 事务内发布幂等 Infrastructure demand Outbox；该事务不得宣称或直接预留 Host/cluster 容量。Infrastructure owner 经自己的 Inbox/事务核验 Run 当前绑定的 placement policy，并分别预留 HostEnvironment 与精确 K3s cluster capacity，再委托 Rust Host Infrastructure Manager 异步协调被选中的 instances/cluster。三个 owner 不直接写对方表、不使用分布式数据库事务，数据库锁不跨越 owner API、broker 或 VM 操作。
 
 TaskExecutionRun 可处于 awaiting_infrastructure；只有 Infrastructure owner 已确认 Host 与目标 cluster reservations、trusted Manager operation receipt 有效，且绑定 provider 的全部 readiness 均有证据时才可启动 executor。Multipass 路径分别验证 daemon、所选 cluster 的全部 owned Linux guest aggregate readiness 与 K3s API/node/CRI；remote K3s 将 daemon/guest 两项显式记为 NotApplicable；两者均验证独立 Agent Runtime sandbox 与 Worktree workspace bridge。Run owner 在启动/恢复前重新核验授权、lease/fence、binding revision 与 Project/Run reservation；placement policy 缺失、binding/cluster generation 漂移、任一层容量未知/不足或 readiness 未达成时不得执行，并通过幂等 owner event 记录拒绝/重试或释放 Run reservation。共享池可以跨 Run 复用，Run dedicated 或 pinned cluster 由 profile 决定；namespace/RBAC/quota/network/storage policy 与 Host/cluster 各 owner reservations 分别承担隔离和公平。
 
@@ -4997,7 +4997,7 @@ Verification used Rust 1.99.0, PostgreSQL 18.6, and official NATS Server 2.15.0 
 
 ### 16.40 Phase 9F4D-3D5 Run-owner capacity result consumer
 
-The Run-owner demand Outbox append receives the caller's existing Run transaction and validates that the referenced TaskExecutionRun is schedule-origin with matching rule ID/revision, occurrence ID and correlation ID before it appends the typed demand. A mismatch creates no Outbox fact.
+The Run-owner demand Outbox append receives the caller's existing Run transaction and validates that the referenced TaskExecutionRun is schedule-origin with matching rule ID/revision, occurrence ID and correlation ID before it appends the typed demand. A mismatch creates no Outbox fact. This 3D5 primitive does not validate a Schedule confirmation receipt and is not production admission authority; Schedule-origin demand publication remains disabled until the Run owner consumes and persists the authenticated confirmation in the same transaction.
 
 Run/Execution owner receives Infrastructure capacity events through a supplied, provisioned durable JetStream pull consumer. The Rust consumer is deliberately not a broker/credential/consumer provisioner: it validates explicit-ack configuration and performs a single-message pull bounded to 132 KiB and 2 seconds. It checks the wire contract and resolves canonical Project, Branch, Engineering Run, Work Item, TaskExecutionRun, and occurrence identity by matching the exact stored Run demand fact.
 
@@ -5100,6 +5100,18 @@ The shared-subject integration target is serialized to avoid stream overlap. The
 | Acceptance ID | Design mapping and boundary |
 |---|---|
 | AC-SCHED-API-028 | Requirements §50.8X; Schedule DD §6.15; database failure and actual redelivery, confirmed commit-before-Term ACK, exact duplicate after the pre-ACK handle-drop consumer-loss model (no OS process restart), and no subsequent delivery; metadata-only, zero VM and no inventory change. Production consumers and execution remain fail-closed. |
+
+### 16.49 Phase 9F4C-D owner-local Schedule→Run admission saga
+
+Schedule occurrence claiming, fencing and `schedule_run_outbox` are Schedule-owner facts. TaskExecutionRun, Project/Run reservations, RunEvents and Infrastructure-demand Outbox are Run/Execution-owner facts. The Infrastructure owner independently receives the demand and owns physical Host/cluster reservations. Each owner commits only its own state and Outbox/Inbox receipt; the transaction sequence itself is the recoverable Saga.
+
+The Schedule owner emits a stable occurrence-scoped admission command. The Run owner consumes it idempotently, rechecks current run-as authorization, Worktree/Task/Profile/HookSet, binding and Project/Run quota, then creates at most one provisional non-executing Run and publishes the result. The Schedule owner rechecks the active lease/fence/deadline before linking the Run and writing its Schedule Run Outbox; it also emits confirmation. The Run owner consumes confirmation before publishing Infrastructure demand. Same command replay returns the same Run ID, changed payload fails closed, and lost replies recover by replay. Cancellation, stale claims and timeout use versioned owner commands for compensation. Existing same-database composite FKs validate an already committed Run; a future physically split store replaces that coupling with a typed owner receipt, never a distributed transaction.
+
+No executor starts until Schedule confirmation, current ACL/binding, both physical reservations, provider-specific K3s readiness, independent Agent Runtime sandbox, and the scoped Worktree bridge are verified. The command-authentication mechanism, trusted result/confirmation consumers, target roles and production admission writer remain open; the current phase is a design correction and claims no new production capability.
+
+| Acceptance ID | Design mapping and boundary |
+|---|---|
+| AC-SCHED-API-029 | Requirements §50.8Y; Schedule SRS §SCHED-API-013/016; Schedule DD §6.16. Enforce owner-local admission/result, Schedule fenced link/confirmation, post-confirmation Infrastructure demand, idempotent lost-reply recovery, conflict rejection, owner-command compensation and fail-closed execution. |
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -5253,3 +5265,4 @@ The shared-subject integration target is serialized to avoid stream overlap. The
 | v6.04 | 2026-10-08 | Mavis review | Add §16.48 / AC-SCHED-API-028 for database failure backpressure, real JetStream redelivery, confirmed Term ACK, exact duplicate replay after pre-ACK handle drop and no later delivery. Record 22/22 runner steps, 2/2 Rust integration tests, zero VM and unchanged Multipass inventory; production consumers and execution remain disabled. | 9F4D-3D7 verifies the existing quarantine seam without schema or navigation change. |
 | v6.05 | 2026-10-09 | Mavis review | Add AC-ERUN-007 and update §16.23 for bounded Task Card creation: write-scope/focus checks, same-target in-panel retry, existing Run owner transaction and Outbox trigger; state that pending recovery after remount/reload remains open; retain host/capability/target DB/RLS and CLI blockers. | Align detailed design with the implemented creation path without importing unrelated branch refactors. |
 | v6.06 | 2026-10-09 | Mavis review | Extend AC-ERUN-007 and §16.23 with POST-before-save IndexedDB recovery, actor/Run scope, exact authorization/binding snapshot, 32-record cap and 29-day retry limit; require user reconciliation before discarding stale records and record local-data loss/privacy limits. Align requirements v6.09, Task SRS/BD/DD v0.14/v0.7/v1.27 and Group DD v4.75; preserve host/DB/RLS/CLI gates. | Implement cross-remount recovery as a narrow Task Card improvement. |
+| v6.07 | 2026-10-09 | Mavis review | Add §16.49 / AC-SCHED-API-029; correct §16.24/§16.27 and AC-LOOP-009 so Schedule, Run/Execution and Infrastructure each commit only owner-local facts, with confirmation before demand publication and owner-command compensation. Align requirements v6.10, Schedule SRS v0.31/BD v0.30/DD v0.30, Data Design v2.1, Infrastructure DD v0.33, Group DD v4.76 and plan v6.43; no worker or production execution is claimed. | Review found current Schedule admission wording violated the documented owner/API/Outbox boundary. |
