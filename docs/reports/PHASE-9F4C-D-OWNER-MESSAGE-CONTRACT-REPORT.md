@@ -1,7 +1,7 @@
 # PHASE-9F4C-D Owner Message Contract Report
 
-> Status: 🟢 Domain contract slice verified; local `dev` integration pending at report creation.
-> Version: 0.1 | Date: 2026-10-09
+> Status: 🟢 Domain contract slice verified and fast-forward integrated into local `dev` at `f9cbf6c5` (2026-10-09); not pushed.
+> Version: 0.2 | Date: 2026-10-09
 > Scope: Schedule→Run owner-message DTO contract only. This is not completion of Phase 9F4C-D consumers or production Schedule execution.
 
 ## §0 Purpose
@@ -15,8 +15,8 @@ Freeze the bounded, versioned message contract needed to connect Schedule and Ru
 | Rust domain contract | Add strict v1 Schedule Admission Command, Result, Resolution, typed outcomes/rejection/compensation reasons, identity/scope validators, canonical infrastructure-binding digest match and 16 KiB encode/decode bound. | Implemented |
 | Idempotency | Distinguish one logical attempt (`request_id` + positive attempt ordinal) from transport redelivery; occurrence ID groups attempts. A new logical attempt uses a new ID after terminal resolution; transport redelivery reuses persisted payload bytes exactly. | Contract specified; Outbox persistence not implemented |
 | Trust boundary | Treat envelope `tenant_id` as a scope claim only. Receiving owner authenticates service identity out of band and establishes tenant/RLS scope independently. Schedule lease owner/generation/expiry remain Schedule-owned state and are not copied into the replay payload. | Contract/design specified; production identity mapping not implemented |
-| Branch intake | Rechecked local branch heads and the relevant active lanes. No committed unique candidate commit was found. The dirty 9F4D consumer lane was left intact; no whole-branch overlay or large refactor was copied. | Reviewed; no external lane content integrated |
-| Documentation | Updated requirements v6.11, basic design v6.08, Schedule SRS v0.32, BD v0.31, DD v0.31, automation design v2.30, registry v0.77, and plan v6.45. | Synchronized |
+| Branch intake | Reviewed the focused candidate `codex/schedule-run-admission-20261009` at `f9cbf6c5`; its 14-path DTO contract slice was fast-forward integrated into local `dev`. The dirty 9F4D consumer lane remains intact; no broad branch overlay or large refactor was copied. | Integrated selectively; other branch/worktree content was not adopted |
+| Documentation | Updated requirements v6.11, basic design v6.08, Schedule SRS v0.32, BD v0.31, DD v0.31, automation design v2.30, registry v0.77, and plan v6.46. | Synchronized; candidate commit `f9cbf6c5` fast-forwarded into local `dev`. |
 
 ## §2 Verification summary
 
@@ -87,3 +87,4 @@ No sub-agent was dispatched for this slice. No child-agent output was incorporat
 | Version | Date | Reviewer | Change | Trigger |
 |---|---|---|---|---|
 | 0.1 | 2026-10-09 | Mavis review | Add the 9F4C-D typed owner-message contract report, focused verification evidence, branch intake decision, and open production gates. | Freeze the Schedule→Run contract before implementing owner consumers. |
+| 0.2 | 2026-10-09 | Mavis review | Record the clean fast-forward of candidate `f9cbf6c5` into local `dev` from `ba09944f`; preserve the untracked `.codegraph/` database files and keep package-only verification limits explicit. No push or branch/worktree cleanup. | User approved the recommended local integration while preserving `.codegraph/`. |
