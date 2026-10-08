@@ -1,11 +1,11 @@
 # SRS-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域要件定義書 v0.13** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; Project/Branch/Run/Worktree 集成与条件式 Run Task Card 创建补充)
+> **Multica Task Lifecycle 域要件定義書 v0.14** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; Project/Branch/Run/Worktree 集成与可恢复 Run Task Card 创建补充)
 >
-> - 状态: 🟡 Draft v0.13
+> - 状态: 🟡 Draft v0.14
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联基本設計書: [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) v0.6
+> - 关联基本設計書: [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) v0.7
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2
 > - 关联 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 (v33 候选)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3)
@@ -21,7 +21,7 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域要件定義書 (v33 候选对齐) |
-| 版本 | v0.13 |
+| 版本 | v0.14 |
 | 作成日 | 2026-09-11 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -238,7 +238,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | AC-16 | 移除产品运行时所有已知旧演示 Task Card 与 fallback，包括 Runtime seed/MSW 中 `wi-001..wi-030`、Tauri MockDb 的 `wi-001..wi-004` 和 browser-dev mock 列表；无 canonical Run provider 时返回明确 unavailable/error，不伪装空任务或本地数据。浏览器只迁移删除精确已知旧 ID 及其演示引用，不前缀清理未知本地/服务器行；测试 fixture 使用 `test-*`，不得进入产品投影 |
 | AC-17 | 已接入的 Run-local Engineering Loop controller 只接受经验证且 scope 匹配的 Profile 与固定 Run/Task/Worktree binding；每轮复核 Contract/acceptance/HookSet/Validation identity，输出有界摘要与 stop/drain receipt；独立验证通过只进入 AwaitingReview，不能直接完成 Task。持久化、Run/Auth admission、Schedule、CLI process、Outbox/BI 与跨 Run 公平调度仍需单独验收 |
 | AC-18 | Schedule rule 以不可变版本保存 recurrence parser/tzdb、timezone/DST、目标 Project/Branch/EngineeringRun/Worktree/Task、Profile/HookSet identity、overlap/misfire/pause/retry/deadline policy；disabled Rule 必须在 materializer 与 adapter 两层拒绝 occurrence 创建。候选槽和 DST 转换探测各有 32,768 次硬上限，超限时调用方需拆分窗口并按游标续页。occurrence 以 tenant + rule ID + rule version + UTC slot 幂等，并保留 local-time/offset 与 target snapshot；dispatch state 使用 terminal_at + retention_period 驱动 TTL，DB trigger 强制单调连续 fencing、禁止盗取未过期 lease，并保留 append-only 事件；lease-expired event 记录被回收的旧 attempt_no 与旧 fencing_generation，所有表按 tenant RLS。Phase 9F3 的 pinned parser/materializer 与 PostgreSQL adapter 已在 disposable PostgreSQL 18.6 通过重复 migration、FORCE RLS catalog 和 4 个真实 DB integration 场景，domain release tests 26/26；这不等于生产 rule write API、持续 worker、Run admission/Auth/Outbox/BI 或目标 DB grants 已启用，缺少这些依赖时必须 fail closed（根要求 AC-LOOP-007） |
-| AC-19 | Run Task Cards 创建仅在当前 Run capability 可用、RunContext 含 `work-item:write` 且 Project/Branch/Run/Worktree 焦点 tuple 一致、Worktree 未归档时开放；客户端经现有 `POST /api/v1/worktrees/{worktree_id}/work-items` 提交 bounded Task payload 与 Idempotency-Key/correlation ID，服务端重新推导并验证 Run owner、当前授权后在同事务写入任务事实、Worktree 关联、审计、幂等回放和由 owner migration trigger 产生的 Outbox。结果不确定时只能以相同 body/key/Run/Worktree target 重试；服务端 capability、目标 DB/RLS 或宿主会话未通过时 fail closed，不得用 mock/seed 回退。此创建 UI 不开放任务 CLI；CLI 仍须满足 AC-15 的独立执行验收门 |
+| AC-19 | Run Task Cards 创建仅在当前 Run capability 可用、RunContext 含 `work-item:write` 且 Project/Branch/Run/Worktree 焦点 tuple 一致、Worktree 未归档时开放；客户端经现有 `POST /api/v1/worktrees/{worktree_id}/work-items` 提交 bounded Task payload 与 Idempotency-Key/correlation ID，服务端重新推导并验证 Run owner、当前授权后在同事务写入任务事实、Worktree 关联、审计、幂等回放和由 owner migration trigger 产生的 Outbox。POST 前客户端必须将完整 body/key 与 tenant/actor/Project/Run/Worktree、当前 authorization/binding IDs 和 versions、context/focus version 异步写入有界 IndexedDB；每个操作者/Run 最多一条未决命令，整个本地 store 最多 32 条，记录在 29 天后禁止重放（服务端 idempotency 表保留期为 30 天）。仅当当前焦点、授权和 binding 快照完全匹配时，才可用原 body/key 重试；目标不匹配或记录过期时先由用户核对 Run Task Cards 列表并显式清除。不得存储认证凭据；本地存储读写失败时 fail closed。任务正文/描述在本切片中未加密；浏览器/WebView 可能清理本地存储，记录缺失不能证明原请求未成功，因此该机制不承诺 exactly-once，也不是跨设备恢复。服务端 capability、目标 DB/RLS 或宿主会话未通过时 fail closed，不得用 mock/seed 回退。此创建 UI 不开放任务 CLI；CLI 仍须满足 AC-15 的独立执行验收门 |
 
 ---
 
@@ -303,3 +303,4 @@ Phase 9F2 交付版本化 rule/occurrence/fence contract 与五表 migration；P
 | v0.11 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 对账 Phase 9F3 pinned cron/tzdb materializer、PostgreSQL persistence/lease adapter、deadline/exhaustion finalizer 与隔离 PostgreSQL 18.6 migration/RLS/4 场景实测；保留 production API/worker/Run admission/Auth/Outbox/BI/target DB 阻断 | 9F3 验证结果需精确反映到 Schedule acceptance 与生产边界 |
 | v0.12 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 明确两个 32,768 扫描上限、disabled Rule 在物化与 adapter 两层 fail closed、lease-expired 审计保留旧 attempt/fencing generation；同步最终 domain release 26/26 与当前 9F4 生产 blockers | 最终源码自审修复安全执行条件、转换扫描预算与审计事件身份对应 |
 | v0.13 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将渡口产品层级统一为 Project → Cloud Branch → Engineering Run → Run Worktree；新增 AC-19 约束有写授权、固定 Worktree 重试目标、server-derived Run owner 和事务 Outbox 的条件式 Task Card 创建；保留 capability/DB/RLS/host session 与 CLI 阻断状态 | 用户要求以本对话确立的导航与 Worktree 归属设计筛选当前实现 |
+| v0.14 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 AC-19：在 POST 前写入按 tenant/actor/Project/Run 隔离的有界 IndexedDB pending command，固定当前授权/binding 快照，限制 32 条与 29 天重试窗口；明确本地存储失效、记录缺失、手动清除和非 exactly-once 边界；同步 Task BD/DD 与根要求/基本设计/Group DD/实施计划 | 补齐 Task Card create 在 remount/reload 后的本地恢复切片 |

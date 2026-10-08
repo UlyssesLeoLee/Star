@@ -1,22 +1,44 @@
 /*
-@cypher schema=1 source_sha256=1c7060cbb8510003939fd73157574d3c56b197a8a2fb57d78385a9c823c25475
+@cypher schema=1 source_sha256=d629ec24b1bf2cef9c44684e72d51eeb575ec268b65c0935b7583f6cf9eada32
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
 MERGE (submit:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::submitTaskCardCreate",kind:"function"})
-MERGE (target:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::taskCardCreateTarget",kind:"function"})
-MERGE (sameTarget:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::sameTaskCardCreateTarget",kind:"function"})
+MERGE (restore:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::restorePendingTaskCardCreate",kind:"effect"})
+MERGE (discard:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::discardPendingTaskCardCreate",kind:"function"})
+MERGE (scope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
+MERGE (target:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
+MERGE (sameTarget:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::sameTaskCardCreateRecoveryTarget",kind:"function"})
+MERGE (store:Type {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TaskCardCreateRecoveryStore",kind:"interface"})
+MERGE (loadStore:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TaskCardCreateRecoveryStore.load",kind:"method"})
+MERGE (saveStore:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TaskCardCreateRecoveryStore.saveIfAbsent",kind:"method"})
+MERGE (removeStore:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TaskCardCreateRecoveryStore.removeIfMatches",kind:"method"})
+MERGE (getStore:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::getTaskCardCreateRecoveryStore",kind:"function"})
+MERGE (recoveryFile:File {path:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts"})
 MERGE (api:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
 MERGE (input:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::CreateRunTaskCardInput",kind:"type"})
+MERGE (maxAge:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS",kind:"constant"})
 MERGE (self)-[:DEFINES]->(panel)
 MERGE (self)-[:DEFINES]->(submit)
-MERGE (self)-[:DEFINES]->(target)
-MERGE (self)-[:DEFINES]->(sameTarget)
 MERGE (panel)-[:USES_TYPE]->(context)
-MERGE (submit)-[:CALLS]->(target)
+MERGE (self)-[:IMPORTS]->(recoveryFile)
+MERGE (panel)-[:CALLS]->(scope)
+MERGE (panel)-[:CALLS]->(target)
+MERGE (panel)-[:CALLS]->(sameTarget)
+MERGE (panel)-[:CALLS]->(getStore)
+MERGE (panel)-[:USES_TYPE]->(store)
+MERGE (self)-[:DEFINES]->(restore)
+MERGE (self)-[:DEFINES]->(discard)
+MERGE (restore)-[:CALLS]->(loadStore)
+MERGE (restore)-[:READS]->(scope)
+MERGE (discard)-[:CALLS]->(removeStore)
+MERGE (discard)-[:READS]->(scope)
 MERGE (submit)-[:CALLS]->(sameTarget)
+MERGE (submit)-[:CALLS]->(saveStore)
+MERGE (submit)-[:CALLS]->(removeStore)
 MERGE (submit)-[:CALLS]->(api)
 MERGE (submit)-[:USES_TYPE]->(input)
+MERGE (submit)-[:READS]->(maxAge)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
@@ -44,11 +66,20 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.tsx",type:"f
 import { useEffect, useState, type FormEvent } from "react";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
 import {
+  getTaskCardCreateRecoveryStore,
+  sameTaskCardCreateRecoveryTarget,
+  taskCardCreateRecoveryScopeKey,
+  taskCardCreateRecoveryTarget,
+  TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS,
+  TaskCardCreateRecoveryError,
+  type PendingTaskCardCreate,
+  type TaskCardCreateRecoveryStore,
+} from "@/lib/run/taskCardCreateRecoveryStore";
+import {
   RUN_TASK_CARD_CREATE_DESCRIPTION_MAX_CHARS,
   RUN_TASK_CARD_CREATE_TITLE_MAX_CHARS,
   RUN_TASK_CARD_PAGE_SIZE,
   RUN_TASK_CARD_PRIORITIES,
-  type CreateRunTaskCardInput,
   type RunContextEnvelope,
   type RunDirectoryApiClient,
   type RunTaskCardPage,
@@ -59,42 +90,21 @@ interface RunTaskCardsPanelProps {
   client: RunDirectoryApiClient;
   context: RunContextEnvelope;
   available: boolean;
-}
-
-interface PendingTaskCardCreate {
-  input: CreateRunTaskCardInput;
-  idempotency_key: string;
-  target: {
-    project_id: string;
-    repository_id: string;
-    branch_id: string;
-    engineering_run_id: string;
-    worktree_id: string;
-  };
-}
-
-function taskCardCreateTarget(context: RunContextEnvelope): PendingTaskCardCreate["target"] | null {
-  const focus = context.focus;
-  if (!focus) return null;
-  return {
-    project_id: context.engineering_run.project_id,
-    repository_id: context.engineering_run.repository_id,
-    branch_id: context.engineering_run.branch_id,
-    engineering_run_id: context.engineering_run.engineering_run_id,
-    worktree_id: focus.worktree_id,
-  };
-}
-
-function sameTaskCardCreateTarget(left: PendingTaskCardCreate["target"], right: PendingTaskCardCreate["target"] | null): boolean {
-  return right !== null && left.project_id === right.project_id && left.repository_id === right.repository_id &&
-    left.branch_id === right.branch_id && left.engineering_run_id === right.engineering_run_id && left.worktree_id === right.worktree_id;
+  recoveryStore?: TaskCardCreateRecoveryStore;
 }
 
 const RUN_TASK_CARD_MAX_PAGE_COUNT = 100;
 
-export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPanelProps) {
+function taskCardCreateErrorMessage(reason: unknown): string {
+  return reason instanceof TaskCardCreateRecoveryError ? reason.message : directoryErrorMessage(reason);
+}
+
+export function RunTaskCardsPanel({ client, context, available, recoveryStore: suppliedRecoveryStore }: RunTaskCardsPanelProps) {
+  const recoveryStore = suppliedRecoveryStore ?? getTaskCardCreateRecoveryStore();
   const run = context.engineering_run;
   const focus = context.focus;
+  const recoveryScopeKey = taskCardCreateRecoveryScopeKey(context);
+  const currentRecoveryTarget = taskCardCreateRecoveryTarget(context);
   const [cursorStack, setCursorStack] = useState<Array<string | undefined>>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
   const [revision, setRevision] = useState(0);
@@ -106,6 +116,11 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState<PendingTaskCardCreate | null>(null);
+  const [recoveryState, setRecoveryState] = useState<{
+    scope_key: string | null;
+    phase: "loading" | "ready" | "error";
+    error: string | null;
+  }>({ scope_key: null, phase: "loading", error: null });
   const cursor = cursorStack[pageIndex];
   const runId = run.engineering_run_id;
   const canCreateTaskCard = Boolean(focus && !focus.archived &&
@@ -119,6 +134,32 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
     focus.repository_id === run.repository_id &&
     focus.engineering_run_id === runId &&
     context.run_context.granted_scopes.includes("work-item:write"));
+  const pendingTargetMatches = pendingCreate
+    ? sameTaskCardCreateRecoveryTarget(pendingCreate.target, currentRecoveryTarget)
+    : false;
+  const pendingAgeMs = pendingCreate ? Date.now() - pendingCreate.created_at_ms : 0;
+  const pendingRetryExpired = Boolean(pendingCreate && (pendingAgeMs < 0 || pendingAgeMs >= TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS));
+  const canRetryPendingCreate = Boolean(pendingCreate && pendingTargetMatches && !pendingRetryExpired);
+
+  useEffect(function restorePendingTaskCardCreate() {
+    let active = true;
+    setPendingCreate(null);
+    setCreateFormOpen(false);
+    setRecoveryState({ scope_key: recoveryScopeKey, phase: recoveryScopeKey ? "loading" : "ready", error: null });
+    if (!recoveryScopeKey) return () => { active = false; };
+
+    void recoveryStore.load(recoveryScopeKey).then((record) => {
+      if (!active) return;
+      setPendingCreate(record);
+      setCreateFormOpen(Boolean(record));
+      setCreateError(null);
+      setRecoveryState({ scope_key: recoveryScopeKey, phase: "ready", error: null });
+    }).catch((reason: unknown) => {
+      if (!active) return;
+      setRecoveryState({ scope_key: recoveryScopeKey, phase: "error", error: taskCardCreateErrorMessage(reason) });
+    });
+    return () => { active = false; };
+  }, [recoveryScopeKey, recoveryStore]);
 
   useEffect(function loadRunTaskPage() {
     if (!available) {
@@ -148,6 +189,8 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
   if (!available) return <section role="tabpanel" aria-label="Task Cards" className="rounded border border-line p-4">
     <h2 className="font-semibold">Task Cards</h2>
     <p className="mt-2 text-sm text-ink-mute">服务端尚未开放 Run-owned Apps。此处不会读取 Worktree 旧任务投影或本地演示数据；Owner migration、数据库角色与 RLS 验收完成后才会加载真实 Run 任务。</p>
+    {pendingCreate && <p className="mt-2 text-xs" role="status">已保留待确认创建“{pendingCreate.input.title}”，原目标 Worktree：{pendingCreate.target.worktree_id}。恢复服务端访问前不会重试或清除它。</p>}
+    {recoveryState.phase === "error" && <p className="mt-2 text-xs" role="alert">本地待恢复请求无法读取：{recoveryState.error} 创建入口保持关闭。</p>}
   </section>;
 
   const canGoNext = page?.next_after !== null && page?.next_after !== undefined && pageIndex + 1 < RUN_TASK_CARD_MAX_PAGE_COUNT;
@@ -160,6 +203,7 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
   function goPreviousTaskCardPage() { setPageIndex(Math.max(0, pageIndex - 1)); }
   function retryTaskCardPage() { setRevision(revision + 1); }
   function openTaskCardForm() {
+    if (recoveryState.phase !== "ready" || recoveryState.scope_key !== recoveryScopeKey || pendingCreate) return;
     setCreateFormOpen(true);
     setCreateError(null);
     setCreateSuccess(null);
@@ -169,10 +213,28 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
     setCreateFormOpen(false);
     setCreateError(null);
   }
+  async function discardPendingTaskCardCreate() {
+    if (!pendingCreate || !recoveryScopeKey || typeof globalThis.confirm !== "function") return;
+    const confirmed = globalThis.confirm("请先在当前 Run 的 Task Cards 列表中核对该任务是否已经创建。确认后将清除本地恢复记录，后续创建会使用新的幂等键。继续？");
+    if (!confirmed) return;
+    try {
+      await recoveryStore.removeIfMatches(recoveryScopeKey, pendingCreate.idempotency_key);
+      setPendingCreate(null);
+      setCreateFormOpen(false);
+      setCreateError(null);
+      setCreatePhase("idle");
+      setRecoveryState({ scope_key: recoveryScopeKey, phase: "ready", error: null });
+    } catch (reason: unknown) {
+      setCreateError(taskCardCreateErrorMessage(reason));
+      setCreatePhase("error");
+    }
+  }
   async function submitTaskCardCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canCreateTaskCard || createPhase === "submitting") return;
+    if (!canCreateTaskCard || createPhase === "submitting" || !recoveryScopeKey ||
+        recoveryState.phase !== "ready" || recoveryState.scope_key !== recoveryScopeKey) return;
     let command = pendingCreate;
+    let recordPersisted = Boolean(command);
     try {
       if (!command) {
         const form = new FormData(event.currentTarget);
@@ -184,13 +246,15 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
           setCreatePhase("error");
           return;
         }
-        const target = taskCardCreateTarget(context);
-        if (!target) {
+        if (!currentRecoveryTarget) {
           setCreateError("当前没有有效 Worktree 焦点，不能创建任务卡。");
           setCreatePhase("error");
           return;
         }
         command = {
+          schema_version: 1,
+          scope_key: recoveryScopeKey,
+          created_at_ms: Date.now(),
           input: {
             title,
             description,
@@ -198,17 +262,49 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
             correlation_id: globalThis.crypto.randomUUID(),
           },
           idempotency_key: globalThis.crypto.randomUUID(),
-          target,
+          target: currentRecoveryTarget,
         };
+        let stored: PendingTaskCardCreate | null;
+        try {
+          stored = await recoveryStore.saveIfAbsent(command);
+        } catch {
+          throw new TaskCardCreateRecoveryError("无法保存本地恢复记录，创建请求未发送。");
+        }
+        if (!stored) throw new TaskCardCreateRecoveryError("本地恢复记录未能保存，创建请求未发送。");
+        if (stored.idempotency_key !== command.idempotency_key) {
+          setPendingCreate(stored);
+          setCreateFormOpen(true);
+          setCreateError("此 Run 已有待确认的创建请求。已恢复原请求；请先处理它，再开始新的创建。");
+          setCreatePhase("error");
+          return;
+        }
+        command = stored;
+        recordPersisted = true;
         setPendingCreate(command);
-      } else if (!sameTaskCardCreateTarget(command.target, taskCardCreateTarget(context))) {
-        setCreateError("当前 Worktree 焦点已变化。请返回原目标 Run/Worktree，再使用相同请求重试。");
+      }
+      if (!sameTaskCardCreateRecoveryTarget(command.target, currentRecoveryTarget)) {
+        setCreateError("当前 Worktree、Run binding 或授权版本已变化。请恢复原目标与授权状态后，再使用相同请求重试。");
+        setCreatePhase("error");
+        return;
+      }
+      const ageMs = Date.now() - command.created_at_ms;
+      if (ageMs < 0 || ageMs >= TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS) {
+        setCreateError("此恢复请求已超过安全重试期限。请先在 Run Task Cards 列表核对结果，再清除恢复记录。");
         setCreatePhase("error");
         return;
       }
       setCreatePhase("submitting");
       setCreateError(null);
       await client.createRunTaskCard(context, command.input, command.idempotency_key);
+      try {
+        await recoveryStore.removeIfMatches(recoveryScopeKey, command.idempotency_key);
+      } catch {
+        setPendingCreate(command);
+        setCreatePhase("error");
+        setCreateSuccess("服务端已确认创建，但本地恢复记录未能清理。可使用同一请求安全重试并完成对账。");
+        setCreateError("本地恢复记录仍保留；请使用同一请求重试，勿开始新的创建。");
+        return;
+      }
       setPendingCreate(null);
       setCreatePhase("idle");
       setCreateFormOpen(false);
@@ -217,8 +313,8 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
       setPageIndex(0);
       setRevision((value) => value + 1);
     } catch (reason: unknown) {
-      if (command) setPendingCreate(command);
-      setCreateError(directoryErrorMessage(reason));
+      if (command && recordPersisted) setPendingCreate(command);
+      setCreateError(taskCardCreateErrorMessage(reason));
       setCreatePhase("error");
     }
   }
@@ -230,31 +326,40 @@ export function RunTaskCardsPanel({ client, context, available }: RunTaskCardsPa
         <p className="mt-1 text-xs text-ink-mute">按 Engineering Run 所有权列出。当前 Worktree 仅是 checkout 焦点。</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={!canCreateTaskCard || phase === "loading" || Boolean(pendingCreate)} onClick={openTaskCardForm} className="rounded border border-line px-3 py-1 text-xs disabled:opacity-50">新建 Task Card</button>
+        <button type="button" disabled={!canCreateTaskCard || phase === "loading" || Boolean(pendingCreate) || recoveryState.phase !== "ready" || recoveryState.scope_key !== recoveryScopeKey} onClick={openTaskCardForm} className="rounded border border-line px-3 py-1 text-xs disabled:opacity-50">新建 Task Card</button>
         <button type="button" disabled={phase === "loading"} onClick={retryTaskCardPage} className="rounded border border-line px-3 py-1 text-xs disabled:opacity-50">刷新</button>
       </div>
     </header>
 
     {!canCreateTaskCard && <p className="mt-3 text-xs text-ink-mute" role="note">需要当前 Run 中具有 work-item:write 授权且未归档的 Worktree 焦点才能创建任务卡。</p>}
+    {recoveryState.phase === "loading" && <p className="mt-3 text-xs text-ink-mute" role="status">正在检查本地待恢复请求；检查完成前创建入口保持关闭。</p>}
+    {recoveryState.phase === "error" && <p className="mt-3 text-xs" role="alert">本地待恢复请求无法读取：{recoveryState.error} 为避免丢失幂等键，创建入口保持关闭。</p>}
+    {pendingCreate && <div className="mt-3 rounded border border-amber-500/50 bg-amber-500/5 p-3 text-xs" role={pendingTargetMatches && !pendingRetryExpired ? "status" : "alert"}>
+      <p>发现待确认创建“{pendingCreate.input.title}”，原目标 Worktree：{pendingCreate.target.worktree_id}。</p>
+      {!pendingTargetMatches && <p className="mt-1">当前 Worktree、Run binding 或授权版本不同；不会向当前目标重放。请恢复原目标后重试。</p>}
+      {pendingRetryExpired && <p className="mt-1">该请求已超过安全重试期限；请先核对 Run Task Cards 列表，再清除恢复记录。</p>}
+      {pendingTargetMatches && !pendingRetryExpired && <p className="mt-1">请求正文与幂等键已从本地恢复；重试会使用原 Run/Worktree target。</p>}
+      <button type="button" onClick={discardPendingTaskCardCreate} disabled={createPhase === "submitting"} className="mt-2 rounded border border-line px-2 py-1 disabled:opacity-50">我已核对列表，清除恢复记录</button>
+    </div>}
     {createSuccess && <p className="mt-3 text-sm" role="status">{createSuccess}</p>}
     {createFormOpen && <form onSubmit={submitTaskCardCreate} className="mt-4 grid gap-3 rounded border border-line bg-bg-soft p-3">
-      <p className="text-xs text-ink-mute">新卡属于当前 Engineering Run；焦点 Worktree 只记录为初始 checkout 关联。</p>
-      <fieldset disabled={createPhase === "submitting" || Boolean(pendingCreate)} className="grid gap-3">
+      <p className="text-xs text-ink-mute">{pendingCreate ? "已恢复原请求；字段固定，不会生成新的请求正文或幂等键。" : "新卡属于当前 Engineering Run；焦点 Worktree 只记录为初始 checkout 关联。"}</p>
+      <fieldset disabled={createPhase === "submitting" || Boolean(pendingCreate) || !canCreateTaskCard} className="grid gap-3">
         <label className="grid gap-1 text-sm">标题
-          <input name="title" required maxLength={RUN_TASK_CARD_CREATE_TITLE_MAX_CHARS} autoFocus className="rounded border border-line bg-bg px-3 py-2" />
+          <input name="title" required maxLength={RUN_TASK_CARD_CREATE_TITLE_MAX_CHARS} defaultValue={pendingCreate?.input.title ?? ""} autoFocus className="rounded border border-line bg-bg px-3 py-2" />
         </label>
         <label className="grid gap-1 text-sm">描述
-          <textarea name="description" maxLength={RUN_TASK_CARD_CREATE_DESCRIPTION_MAX_CHARS} rows={4} className="rounded border border-line bg-bg px-3 py-2" />
+          <textarea name="description" maxLength={RUN_TASK_CARD_CREATE_DESCRIPTION_MAX_CHARS} defaultValue={pendingCreate?.input.description ?? ""} rows={4} className="rounded border border-line bg-bg px-3 py-2" />
         </label>
         <label className="grid gap-1 text-sm">优先级
-          <select name="priority" defaultValue="medium" className="rounded border border-line bg-bg px-3 py-2">
+          <select name="priority" defaultValue={pendingCreate?.input.priority ?? "medium"} className="rounded border border-line bg-bg px-3 py-2">
             <option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="urgent">紧急</option>
           </select>
         </label>
       </fieldset>
       {createError && <p className="text-sm" role="alert">{createError}</p>}
       <div className="flex gap-2">
-        <button type="submit" disabled={createPhase === "submitting"} className="rounded border border-line px-3 py-1 text-xs disabled:opacity-50">
+        <button type="submit" disabled={createPhase === "submitting" || !canCreateTaskCard || recoveryState.phase !== "ready" || (Boolean(pendingCreate) && !canRetryPendingCreate)} className="rounded border border-line px-3 py-1 text-xs disabled:opacity-50">
           {createPhase === "submitting" ? "正在创建…" : pendingCreate ? "使用同一请求重试" : "创建任务卡"}
         </button>
         {!pendingCreate && <button type="button" onClick={closeTaskCardForm} className="rounded border border-line px-3 py-1 text-xs">取消</button>}

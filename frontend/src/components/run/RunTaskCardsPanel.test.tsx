@@ -1,11 +1,22 @@
 /*
-@cypher schema=1 source_sha256=8fa25a8e86040bffd0775e65b1fa0fd58bf337bb03ced01124050a919b3d86da
+@cypher schema=1 source_sha256=bc640143e0de73d6f3ba2d1dee1a59a7c00bf1b6c37bcd662ea2535fe85cfdb9
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.test.tsx"})
 MERGE (create:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::creates a Run-owned Task Card against the current authorized focus and refreshes the Run list",kind:"test"})
 MERGE (retry:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::retries an uncertain create with the exact same idempotency key and body",kind:"test"})
 MERGE (scope:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::does not offer task creation without the current Run write scope",kind:"test"})
 MERGE (focus:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::blocks a retry if the focused Worktree changed after an uncertain create",kind:"test"})
+MERGE (remount:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::restores an uncertain request after panel remount and retries the exact body and key",kind:"test"})
+MERGE (actor:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::does not restore another actor's pending create in the same Run",kind:"test"})
+MERGE (binding:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::blocks a recovered retry when a Worktree binding or authorization version changed",kind:"test"})
+MERGE (storage:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::fails closed if the pending command cannot be saved before POST",kind:"test"})
+MERGE (discard:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::requires confirmation before deleting a pending recovery record",kind:"test"})
+MERGE (expired:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::does not retry an expired recovery record",kind:"test"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
+MERGE (storeTest:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::persists one pending command across store instances without replacing its idempotency key",kind:"test"})
+MERGE (boundedTest:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::rejects the 33rd unresolved command instead of growing without a bound",kind:"test"})
+MERGE (storeFactory:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::createTaskCardCreateRecoveryStore",kind:"function"})
+MERGE (storeScope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
+MERGE (storeTarget:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
 MERGE (api:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (self)-[:DEFINES]->(create)
 MERGE (self)-[:DEFINES]->(retry)
@@ -16,6 +27,19 @@ MERGE (create)-[:TESTS]->(api)
 MERGE (retry)-[:TESTS]->(panel)
 MERGE (scope)-[:TESTS]->(panel)
 MERGE (focus)-[:TESTS]->(panel)
+MERGE (remount)-[:TESTS]->(panel)
+MERGE (remount)-[:TESTS]->(api)
+MERGE (actor)-[:TESTS]->(panel)
+MERGE (binding)-[:TESTS]->(panel)
+MERGE (storage)-[:TESTS]->(panel)
+MERGE (discard)-[:TESTS]->(panel)
+MERGE (expired)-[:TESTS]->(panel)
+MERGE (self)-[:DEFINES]->(storeTest)
+MERGE (self)-[:DEFINES]->(boundedTest)
+MERGE (storeTest)-[:TESTS]->(storeFactory)
+MERGE (storeTest)-[:TESTS]->(storeScope)
+MERGE (storeTest)-[:TESTS]->(storeTarget)
+MERGE (boundedTest)-[:TESTS]->(storeFactory)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
@@ -32,9 +56,15 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.test.tsx",ty
  (contextFixture)-[:CALLS]->(runFixture),(clientFixture)-[:CALLS]->(cardFixture),(closedTest)-[:CALLS]->(contextFixture),(closedTest)-[:CALLS]->(clientFixture),(liveTest)-[:CALLS]->(contextFixture),(liveTest)-[:CALLS]->(cardFixture),(liveTest)-[:CALLS]->(clientFixture),(createTest)-[:CALLS]->(contextFixture),(createTest)-[:CALLS]->(clientFixture),(retryTest)-[:CALLS]->(contextFixture),(retryTest)-[:CALLS]->(clientFixture);
 */
 
+import "fake-indexeddb/auto";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RunTaskCardsPanel } from "./RunTaskCardsPanel";
+import {
+  createTaskCardCreateRecoveryStore,
+  taskCardCreateRecoveryScopeKey,
+  taskCardCreateRecoveryTarget,
+} from "@/lib/run/taskCardCreateRecoveryStore";
 import { RUN_TASK_CARD_PAGE_SIZE, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope, type RunDirectoryApiClient, type RunTaskCardPage } from "@/lib/run/runDirectoryApi";
 
 function runFixture(): EngineeringRun {
@@ -102,10 +132,20 @@ function clientFixture() {
   return { client: { listRunWorkItems, createRunTaskCard } as unknown as RunDirectoryApiClient, listRunWorkItems, createRunTaskCard };
 }
 
+function recoveryStoreFixture() {
+  return createTaskCardCreateRecoveryStore(`test-task-card-recovery-${globalThis.crypto.randomUUID()}`);
+}
+
+async function clickNewTaskCard() {
+  const button = await screen.findByRole("button", { name: "新建 Task Card" });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+}
+
 describe("RunTaskCardsPanel", () => {
   it("does not request or display tasks while Run Apps are unavailable", () => {
     const fixture = clientFixture();
-    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available={false} />);
+    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available={false} recoveryStore={recoveryStoreFixture()} />);
 
     expect(screen.getByText(/服务端尚未开放 Run-owned Apps/)).toBeInTheDocument();
     expect(fixture.listRunWorkItems).not.toHaveBeenCalled();
@@ -117,7 +157,7 @@ describe("RunTaskCardsPanel", () => {
     const fixture = clientFixture();
     const context = contextFixture();
     context.run_context.granted_scopes = ["work-item:read"];
-    render(<RunTaskCardsPanel client={fixture.client} context={context} available />);
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
 
     const create = await screen.findByRole("button", { name: "新建 Task Card" });
     expect(create).toBeDisabled();
@@ -127,7 +167,7 @@ describe("RunTaskCardsPanel", () => {
 
   it("renders authorized Run tasks while leaving task CLI disabled", async () => {
     const fixture = clientFixture();
-    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available />);
+    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available recoveryStore={recoveryStoreFixture()} />);
 
     expect(await screen.findByText("Real Run task")).toBeInTheDocument();
     expect(fixture.listRunWorkItems).toHaveBeenCalledOnce();
@@ -143,9 +183,9 @@ describe("RunTaskCardsPanel", () => {
     }));
     fixture.createRunTaskCard.mockImplementation(async () => { created = true; return createdCard; });
     const context = contextFixture();
-    render(<RunTaskCardsPanel client={fixture.client} context={context} available />);
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "新建 Task Card" }));
+    await clickNewTaskCard();
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Created from Run" } });
     fireEvent.change(screen.getByLabelText("描述"), { target: { value: "Run-owned" } });
     fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
@@ -163,8 +203,8 @@ describe("RunTaskCardsPanel", () => {
     const fixture = clientFixture();
     fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
     const context = contextFixture();
-    render(<RunTaskCardsPanel client={fixture.client} context={context} available />);
-    fireEvent.click(await screen.findByRole("button", { name: "新建 Task Card" }));
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+    await clickNewTaskCard();
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Retry safely" } });
     fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
 
@@ -178,18 +218,150 @@ describe("RunTaskCardsPanel", () => {
     const fixture = clientFixture();
     fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
     const context = contextFixture();
-    const view = render(<RunTaskCardsPanel client={fixture.client} context={context} available />);
-    fireEvent.click(await screen.findByRole("button", { name: "新建 Task Card" }));
+    const recoveryStore = recoveryStoreFixture();
+    const view = render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Retry safely" } });
     fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
     await screen.findByRole("button", { name: "使用同一请求重试" });
 
     const changed = contextFixture();
     changed.focus = { ...changed.focus!, worktree_id: "30000000-0000-4000-8000-000000000009" };
-    view.rerender(<RunTaskCardsPanel client={fixture.client} context={changed} available />);
+    view.rerender(<RunTaskCardsPanel client={fixture.client} context={changed} available recoveryStore={recoveryStore} />);
+
+    expect(await screen.findByText(/当前 Worktree、Run binding 或授权版本不同/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用同一请求重试" })).toBeDisabled();
+    expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
+  });
+
+  it("restores an uncertain request after panel remount and retries the exact body and key", async () => {
+    const fixture = clientFixture();
+    fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
+    const context = contextFixture();
+    const recoveryStore = recoveryStoreFixture();
+    const first = render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Restore after remount" } });
+    fireEvent.change(screen.getByLabelText("描述"), { target: { value: "Recover exact request" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+    await screen.findByRole("button", { name: "使用同一请求重试" });
+    const firstCall = fixture.createRunTaskCard.mock.calls[0];
+
+    first.unmount();
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    expect(await screen.findByText(/发现待确认创建“Restore after remount”/)).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "使用同一请求重试" }));
 
-    expect(await screen.findByText(/当前 Worktree 焦点已变化/)).toBeInTheDocument();
+    await waitFor(() => expect(fixture.createRunTaskCard).toHaveBeenCalledTimes(2));
+    expect(fixture.createRunTaskCard.mock.calls[1]).toEqual(firstCall);
+    await waitFor(() => expect(screen.queryByText(/发现待确认创建“Restore after remount”/)).not.toBeInTheDocument());
+  });
+
+  it("does not restore another actor's pending create in the same Run", async () => {
+    const fixture = clientFixture();
+    fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
+    const context = contextFixture();
+    const recoveryStore = recoveryStoreFixture();
+    const first = render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Private pending request" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+    await screen.findByRole("button", { name: "使用同一请求重试" });
+    first.unmount();
+
+    const otherActorContext = contextFixture();
+    otherActorContext.run_context.actor_id = "10000000-0000-4000-8000-000000000099";
+    render(<RunTaskCardsPanel client={fixture.client} context={otherActorContext} available recoveryStore={recoveryStore} />);
+
+    const create = await screen.findByRole("button", { name: "新建 Task Card" });
+    await waitFor(() => expect(create).toBeEnabled());
+    expect(screen.queryByText(/Private pending request/)).not.toBeInTheDocument();
+    expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
+  });
+
+  it("blocks a recovered retry when a Worktree binding or authorization version changed", async () => {
+    const fixture = clientFixture();
+    fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
+    const context = contextFixture();
+    const recoveryStore = recoveryStoreFixture();
+    const first = render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Binding must match" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+    await screen.findByRole("button", { name: "使用同一请求重试" });
+
+    const changedContext = contextFixture();
+    changedContext.focus!.binding_version += 1;
+    changedContext.run_context.authorization.engineering_run.version += 1;
+    first.rerender(<RunTaskCardsPanel client={fixture.client} context={changedContext} available recoveryStore={recoveryStore} />);
+
+    expect(await screen.findByText(/当前 Worktree、Run binding 或授权版本不同/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用同一请求重试" })).toBeDisabled();
+    expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed if the pending command cannot be saved before POST", async () => {
+    const fixture = clientFixture();
+    const recoveryStore = {
+      load: vi.fn(async () => null),
+      saveIfAbsent: vi.fn(async () => { throw new Error("storage quota exceeded"); }),
+      removeIfMatches: vi.fn(async () => undefined),
+    };
+    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Do not post without recovery" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(recoveryStore.saveIfAbsent).toHaveBeenCalledOnce();
+    expect(fixture.createRunTaskCard).not.toHaveBeenCalled();
+  });
+
+  it("requires confirmation before deleting a pending recovery record", async () => {
+    const fixture = clientFixture();
+    fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
+    const context = contextFixture();
+    const recoveryStore = recoveryStoreFixture();
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Reconcile before clearing" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+    await screen.findByText(/发现待确认创建“Reconcile before clearing”/);
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("confirm", confirm);
+    fireEvent.click(screen.getByRole("button", { name: "我已核对列表，清除恢复记录" }));
+
+    await waitFor(() => expect(screen.queryByText(/发现待确认创建“Reconcile before clearing”/)).not.toBeInTheDocument());
+    const scopeKey = taskCardCreateRecoveryScopeKey(context);
+    if (!scopeKey) throw new Error("fixture must contain recovery scope");
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(await recoveryStore.load(scopeKey)).toBeNull();
+    expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not retry an expired recovery record", async () => {
+    const fixture = clientFixture();
+    fixture.createRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
+    const context = contextFixture();
+    const recoveryStore = recoveryStoreFixture();
+    const first = render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Expired recovery" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+    await screen.findByRole("button", { name: "使用同一请求重试" });
+    first.unmount();
+
+    const scopeKey = taskCardCreateRecoveryScopeKey(context);
+    if (!scopeKey || !taskCardCreateRecoveryTarget(context)) throw new Error("fixture must contain recovery scope and target");
+    const record = await recoveryStore.load(scopeKey);
+    if (!record) throw new Error("pending request must persist before dispatch");
+    await recoveryStore.removeIfMatches(scopeKey, record.idempotency_key);
+    await recoveryStore.saveIfAbsent({ ...record, created_at_ms: Date.now() - 30 * 24 * 60 * 60 * 1000 });
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+
+    expect(await screen.findByText(/已超过安全重试期限/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用同一请求重试" })).toBeDisabled();
     expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
   });
 });

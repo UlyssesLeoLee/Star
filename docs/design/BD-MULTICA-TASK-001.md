@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 基本設計書 v0.6**
+> **Multica Task Lifecycle 基本設計書 v0.7**
 >
-> - 状态: 🟡 Draft v0.6
+> - 状态: 🟡 Draft v0.7
 > - 日期: 2026-10-02 JST
-> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.13
+> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.14
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -224,7 +224,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | AC-11 | Task Card Index 与 Group Infinite Canvas 是 Worktree 群组同级入口，任务写入经领域命令和 ACL |
 | AC-12 | 插件热插拔只改变入口/capability 暴露，不删除任务、审计和实体引用 |
 | AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、候选槽与 DST 探测各限 32,768 步、disabled Rule 拒绝物化、lease-expired event 记录旧 attempt/generation、TTL/fencing/RLS 约束可验证；9F3 parser/materializer/adapter 与 domain release 26/26 已通过隔离 PostgreSQL 验收；Rule 写 API、持续 worker、Run admission/Auth/Outbox/BI 与目标 DB 未验收时不开放 Schedule execution |
-| AC-19 | Task Card 创建仅在当前 Run capability 与 `work-item:write` 授权开放；服务端以当前 Worktree binding 推导 owner，并在同一事务持久化 metadata/lifecycle/worktree association/audit/idempotency，owner trigger 写 Run Outbox；不确定结果按同 body/key/Run/Worktree 重试；当前 body/key 仅保存在面板内存，Run remount/reload 后恢复尚未实现；目标 DB/RLS/宿主 provider 未验收时 UI 保持 fail closed，CLI 仍关闭 |
+| AC-19 | Task Card 创建仅在当前 Run capability 与 `work-item:write` 授权开放；服务端以当前 Worktree binding 推导 owner，并在同一事务持久化 metadata/lifecycle/worktree association/audit/idempotency，owner trigger 写 Run Outbox。客户端在 POST 前异步写入本机 IndexedDB，保存精确 body/key、tenant/actor/Project/Run scope 和 authorization/binding/focus 版本；每个操作者/Run 最多一条未决命令、总量 32 条、29 天后禁止重放。只有当前 target 与授权版本完全匹配才可重试，过期或不匹配需先由用户核对 Run Task Cards 列表后显式清除。不得持久化凭据；读写失败 fail closed。浏览器可清理本地记录，任务正文/描述在该切片中未加密，记录缺失也不证明原请求未成功，因此不承诺 exactly-once 或跨设备恢复。目标 DB/RLS/宿主 provider 未验收时 UI 保持 fail closed，CLI 仍关闭 |
 
 ---
 
@@ -237,7 +237,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | GAP-3 | Runtime profile 对 Claude Code、Codex、OpenCode、Multica CLI 的 capability 映射 | Runtime 詳細設計 |
 | GAP-4 | Global 批量操作的部分成功 UI 与补偿策略 | LangGraph/TMO 詳細設計 |
 | GAP-5 | 9F3 的 pinned cron/tzdb parser、due materializer 与 PostgreSQL lease adapter 已在隔离 PG 验收；disabled Rule 双层 fail closed，lease-expired 审计包含旧 attempt/fence；parser/tzdb registry、Rule 写 API、常驻 worker、同事务 Run/resource reservation/RunEvent/Outbox、BI 与目标 DB/Auth/RLS/grants 尚缺 | Phase 9F4+ / production integration |
-| GAP-6 | Task Card create UI/client 仅为条件式代码切片；不确定结果的 body/key/target 只在面板内存保留，Run remount/reload 后恢复尚未实现；宿主 `RunDirectoryHostSession`、服务端 capability、目标 Task Owner migration/应用身份 grants/RLS 部署与验证尚未完成；编辑、其它 Run Apps 和卡内 CLI 仍未闭环 | Run Apps 后续阶段 |
+| GAP-6 | Task Card create UI/client 与本地 pending recovery 为条件式代码切片；IndexedDB 支持 remount/reload 恢复，但本机浏览器数据可被清理，数据未加密，不构成 exactly-once 或跨设备保证；宿主 `RunDirectoryHostSession`、服务端 capability、目标 Task Owner migration/应用身份 grants/RLS 部署与验证尚未完成；编辑、其它 Run Apps 和卡内 CLI 仍未闭环 | Run Apps 后续阶段 |
 
 ---
 
@@ -251,3 +251,4 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.7 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Card pending request 改为 POST 前异步写入有界 IndexedDB；定义 tenant/actor/Run 隔离、精确授权/binding snapshot、32 条与 29 天重试边界、过期/不匹配人工对账和显式清除；记录本地数据未加密、浏览器清理风险与非 exactly-once/跨设备边界，保留生产 DB/RLS/host/CLI 阻断 | 实现 Task Card remount/reload recovery，并对齐 SRS v0.14 |
