@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=c492d88a252426dfebaac612fdab428424522af6ea0c9e8dbaa87c08a3fd4cc3
+@cypher schema=1 source_sha256=e2e1d7dea3ccfcb3de42f35da1dd81fabea0fa868d9596a888a2c07abf5a087b
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -15,6 +15,11 @@ MERGE (self)-[:DEFINES]->(store)
 MERGE (self)-[:DEFINES]->(session)
 MERGE (self)-[:DEFINES]->(begin)
 MERGE (self)-[:DEFINES]->(commit)
+MERGE (revalidate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_directory_and_binding",kind:"method"})
+MERGE (self)-[:DEFINES]->(revalidate)
+MERGE (revalidate)-[:CALLS]->(verify_directory:Symbol {id:"db/migrations/2026-10-10-run-owner-admission-currentness.sql::verify_schedule_run_as_current",kind:"function"})
+MERGE (revalidate)-[:CALLS]->(resolve_locked:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::resolve_current_binding_locked",kind:"function"})
+MERGE (revalidate)-[:CALLS]->(scope)
 MERGE (begin)-[:CALLS]->(scope)
 MERGE (begin)-[:CALLS]->(decode)
 MERGE (begin)-[:CALLS]->(match)
@@ -27,8 +32,8 @@ MERGE (commit)-[:WRITES]->(outbox)
 */
 
 use domain_automation::schedule::{
-    ScheduleAdmissionContractError, ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionOutcomeV1,
-    ScheduleRunAdmissionResultV1,
+    ScheduleAdmissionContractError, ScheduleAdmissionRejectionCodeV1,
+    ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResultV1,
 };
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction};
@@ -47,6 +52,12 @@ pub enum ScheduleAdmissionStoreError {
     /// A request identity was reused with different exact bytes or corrupt persisted facts.
     #[error("admission request replay conflicts with persisted facts")]
     ReplayConflict,
+    /// Current canonical directory or binding does not authorize this fresh attempt.
+    #[error("current admission prerequisite rejected: {0:?}")]
+    PrerequisiteRejected(ScheduleAdmissionRejectionCodeV1),
+    /// Run-owned persisted binding integrity or storage failed.
+    #[error(transparent)]
+    Binding(#[from] crate::RunInfrastructureBindingStoreError),
     /// Persistence failed; the owner transaction must not be acknowledged.
     #[error(transparent)]
     Database(#[from] sqlx::Error),
@@ -164,6 +175,66 @@ impl PostgresScheduleAdmissionStore {
 }
 
 impl ScheduleAdmissionTransaction {
+    /// Reauthorize the fixed creator and lock current directory/binding facts until commit.
+    ///
+    /// This is one prerequisite only. It checks current Project/Branch/Run membership,
+    /// Project/Run writer roles and exact active directory scope, then the complete
+    /// pinned infrastructure snapshot/digest. Task/Profile/Hook/quota/reservation,
+    /// transport authentication and Runtime readiness are still separate gates.
+    pub async fn revalidate_directory_and_binding(
+        &mut self,
+    ) -> Result<(), ScheduleAdmissionStoreError> {
+        let command = &self.command;
+        let target = &command.occurrence.rule_snapshot.target;
+        crate::outbox::set_run_owner_scope(&mut self.transaction, command.tenant_id).await?;
+        sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+            .bind(command.occurrence.run_as_actor_id.to_string())
+            .execute(&mut *self.transaction)
+            .await?;
+        let permitted: bool =
+            sqlx::query_scalar("SELECT multica.verify_schedule_run_as_current($1,$2,$3,$4,$5,$6)")
+                .bind(command.tenant_id)
+                .bind(command.occurrence.run_as_actor_id)
+                .bind(target.project_id)
+                .bind(target.branch_id)
+                .bind(target.engineering_run_id)
+                .bind(target.repository_id)
+                .fetch_one(&mut *self.transaction)
+                .await?;
+        if !permitted {
+            return Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+                ScheduleAdmissionRejectionCodeV1::RunAsUnauthorized,
+            ));
+        }
+        let scope = crate::RunInfrastructureBindingScope {
+            tenant_id: command.tenant_id,
+            project_id: target.project_id,
+            branch_id: target.branch_id,
+            engineering_run_id: target.engineering_run_id,
+        };
+        let current = match crate::run_infrastructure_binding::resolve_current_binding_locked(
+            &mut self.transaction,
+            scope,
+        )
+        .await
+        {
+            Ok(current) => current,
+            Err(crate::RunInfrastructureBindingStoreError::NotFound) => {
+                return Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+                    ScheduleAdmissionRejectionCodeV1::BindingUnavailable,
+                ));
+            }
+            Err(error) => return Err(error.into()),
+        };
+        if current.snapshot != command.infrastructure_binding
+            || current.digest != command.binding_digest()?
+        {
+            return Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+                ScheduleAdmissionRejectionCodeV1::BindingUnavailable,
+            ));
+        }
+        Ok(())
+    }
     /// The strict immutable command whose request is locked by this transaction.
     pub fn command(&self) -> &ScheduleRunAdmissionCommandV1 {
         &self.command

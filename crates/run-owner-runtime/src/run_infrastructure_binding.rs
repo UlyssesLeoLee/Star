@@ -1,6 +1,6 @@
 //! Run-owner persistence for immutable, versioned Run infrastructure bindings.
 /*
-@cypher schema=1 source_sha256=9418fa4f3018d1951ea51c5c3b68b7c880fa723ff39662dfce291ba7d1956063
+@cypher schema=1 source_sha256=1418819281d564101a59accd3cdec52843be7997ae0830e163984ed4f5797983
 MERGE (self:File {path:"crates/run-owner-runtime/src/run_infrastructure_binding.rs"})
 MERGE (scope:Type {id:"run_owner_runtime::RunInfrastructureBindingScope",kind:"struct"})
 MERGE (resolved:Type {id:"run_owner_runtime::ResolvedRunInfrastructureBinding",kind:"struct"})
@@ -10,6 +10,7 @@ MERGE (scope_validate:Symbol {id:"crates/run-owner-runtime/src/run_infrastructur
 MERGE (store_new:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::PostgresRunInfrastructureBindingStore.new",kind:"method"})
 MERGE (save_revision:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::PostgresRunInfrastructureBindingStore.save_revision",kind:"method"})
 MERGE (resolve_current:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::PostgresRunInfrastructureBindingStore.resolve_current",kind:"method"})
+MERGE (resolve_locked:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::resolve_current_binding_locked",kind:"function"})
 MERGE (set_actor_scope:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::set_run_binding_actor_scope",kind:"function"})
 MERGE (validate_record:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::validate_persisted_binding",kind:"function"})
 MERGE (unit_tests:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::tests",kind:"module"})
@@ -30,6 +31,7 @@ MERGE (self)-[:DEFINES]->(scope_validate)
 MERGE (self)-[:DEFINES]->(store_new)
 MERGE (self)-[:DEFINES]->(save_revision)
 MERGE (self)-[:DEFINES]->(resolve_current)
+MERGE (self)-[:DEFINES]->(resolve_locked)
 MERGE (self)-[:DEFINES]->(set_actor_scope)
 MERGE (self)-[:DEFINES]->(validate_record)
 MERGE (self)-[:DEFINES]->(unit_tests)
@@ -49,8 +51,10 @@ MERGE (save_revision)-[:WRITES]->(binding_event)
 MERGE (save_revision)-[:USES_TYPE]->(transaction_type)
 MERGE (resolve_current)-[:CALLS]->(scope_validate)
 MERGE (resolve_current)-[:CALLS]->(set_actor_scope)
-MERGE (resolve_current)-[:CALLS]->(validate_record)
-MERGE (resolve_current)-[:READS]->(binding_master)
+MERGE (resolve_current)-[:CALLS]->(resolve_locked)
+MERGE (resolve_locked)-[:CALLS]->(scope_validate)
+MERGE (resolve_locked)-[:CALLS]->(validate_record)
+MERGE (resolve_locked)-[:READS]->(binding_master)
 MERGE (resolve_current)-[:USES_TYPE]->(transaction_type)
 MERGE (validate_record)-[:CALLS]->(binding_validate)
 MERGE (validate_record)-[:CALLS]->(binding_digest)
@@ -253,37 +257,47 @@ impl PostgresRunInfrastructureBindingStore {
         scope.validate()?;
         let mut transaction = self.pool.begin().await?;
         set_run_binding_actor_scope(&mut transaction, scope.tenant_id, Uuid::nil()).await?;
-        let row = sqlx::query(
-            "SELECT binding_id, binding_revision, binding_snapshot, binding_digest \
+        let resolved = resolve_current_binding_locked(&mut transaction, scope).await?;
+        transaction.commit().await?;
+        Ok(resolved)
+    }
+}
+
+/// Keep the current Master revision stable through the caller's Run-owner transaction.
+pub(crate) async fn resolve_current_binding_locked(
+    transaction: &mut Transaction<'_, Postgres>,
+    scope: RunInfrastructureBindingScope,
+) -> Result<ResolvedRunInfrastructureBinding, RunInfrastructureBindingStoreError> {
+    scope.validate()?;
+    let row = sqlx::query(
+        "SELECT binding_id, binding_revision, binding_snapshot, binding_digest \
              FROM multica.run_infrastructure_binding_revision \
              WHERE tenant_id = $1 AND project_id = $2 AND branch_id = $3 \
-               AND engineering_run_id = $4 AND valid_to IS NULL",
-        )
-        .bind(scope.tenant_id)
-        .bind(scope.project_id)
-        .bind(scope.branch_id)
-        .bind(scope.engineering_run_id)
-        .fetch_optional(&mut *transaction)
-        .await?
-        .ok_or(RunInfrastructureBindingStoreError::NotFound)?;
+               AND engineering_run_id = $4 AND valid_to IS NULL FOR SHARE",
+    )
+    .bind(scope.tenant_id)
+    .bind(scope.project_id)
+    .bind(scope.branch_id)
+    .bind(scope.engineering_run_id)
+    .fetch_optional(&mut **transaction)
+    .await?
+    .ok_or(RunInfrastructureBindingStoreError::NotFound)?;
 
-        let binding_id: Uuid = row.try_get("binding_id")?;
-        let binding_revision: i64 = row.try_get("binding_revision")?;
-        let snapshot: Json<RunInfrastructureBindingSnapshotV2> = row.try_get("binding_snapshot")?;
-        let persisted_digest: Vec<u8> = row.try_get("binding_digest")?;
-        let digest = validate_persisted_binding(
-            scope,
-            binding_id,
-            binding_revision,
-            &persisted_digest,
-            &snapshot.0,
-        )?;
-        transaction.commit().await?;
-        Ok(ResolvedRunInfrastructureBinding {
-            snapshot: snapshot.0,
-            digest,
-        })
-    }
+    let binding_id: Uuid = row.try_get("binding_id")?;
+    let binding_revision: i64 = row.try_get("binding_revision")?;
+    let snapshot: Json<RunInfrastructureBindingSnapshotV2> = row.try_get("binding_snapshot")?;
+    let persisted_digest: Vec<u8> = row.try_get("binding_digest")?;
+    let digest = validate_persisted_binding(
+        scope,
+        binding_id,
+        binding_revision,
+        &persisted_digest,
+        &snapshot.0,
+    )?;
+    Ok(ResolvedRunInfrastructureBinding {
+        snapshot: snapshot.0,
+        digest,
+    })
 }
 
 async fn set_run_binding_actor_scope(

@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=779225b2047ffe9b78baa52feae2f7dd282ca548c46566b506bee92a9da9a99b
+@cypher schema=1 source_sha256=dffac9db9de734059dfd1812dba7efcc7f9deaf5bb8d635d2eb4ede0fef26c90
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -15,6 +15,11 @@ MERGE (result:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.r
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
 MERGE (self)-[:DEFINES]->(test)
+MERGE (directory_seed:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_directory",kind:"function"})
+MERGE (revalidate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_directory_and_binding",kind:"method"})
+MERGE (self)-[:DEFINES]->(directory_seed)
+MERGE (test)-[:CALLS]->(directory_seed)
+MERGE (test)-[:CALLS]->(revalidate)
 MERGE (self)-[:DEFINES]->(fixture)
 MERGE (self)-[:DEFINES]->(binding)
 MERGE (self)-[:DEFINES]->(result)
@@ -32,8 +37,8 @@ use domain_infrastructure::{
     RunInfrastructureBindingSnapshotV2,
 };
 use run_owner_runtime::{
-    PostgresScheduleAdmissionStore, ScheduleAdmissionSource, ScheduleAdmissionStart,
-    ScheduleAdmissionStoreError,
+    PostgresRunInfrastructureBindingStore, PostgresScheduleAdmissionStore, ScheduleAdmissionSource,
+    ScheduleAdmissionStart, ScheduleAdmissionStoreError,
 };
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use uuid::Uuid;
@@ -240,6 +245,131 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
     // Even the disposable admin cannot UPDATE an append-only processed receipt.
     assert!(sqlx::query("UPDATE multica.schedule_admission_inbox SET processed_at=clock_timestamp() WHERE request_id=$1")
         .bind(command.request_id).execute(&admin).await.is_err());
+    // Current directory/binding checks share the new admission transaction.
+    let missing = command_fixture();
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(missing.tenant_id), &missing.encode_json()?)
+        .await?
+    else {
+        panic!("new missing-directory request")
+    };
+    assert!(matches!(
+        pending.revalidate_directory_and_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::RunAsUnauthorized
+        ))
+    ));
+    drop(pending);
+    let current = command_fixture();
+    seed_directory(&admin, &current, "active").await?;
+    let binding_store = PostgresRunInfrastructureBindingStore::new(admin.clone());
+    binding_store
+        .save_revision(
+            current.occurrence.run_as_actor_id,
+            None,
+            &current.infrastructure_binding,
+        )
+        .await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(current.tenant_id), &current.encode_json()?)
+        .await?
+    else {
+        panic!("new current request")
+    };
+    pending.revalidate_directory_and_binding().await?;
+    // The read locks hold even against a disposable admin mutation that bypasses
+    // lifecycle triggers, proving neither canonical ACL nor binding can move.
+    for (table, predicate, identity) in [
+        (
+            "permission.project_role_binding",
+            "project_id",
+            current.occurrence.rule_snapshot.target.project_id,
+        ),
+        (
+            "multica.run_infrastructure_binding_revision",
+            "binding_id",
+            current.infrastructure_binding.binding_id,
+        ),
+    ] {
+        let mut mutate = admin.begin().await?;
+        sqlx::raw_sql(
+            "SET LOCAL lock_timeout='150ms'; SET LOCAL session_replication_role=replica;",
+        )
+        .execute(&mut *mutate)
+        .await?;
+        let error=sqlx::query(&format!("UPDATE {table} SET valid_to=clock_timestamp() WHERE {predicate}=$1 AND valid_to IS NULL"))
+            .bind(identity).execute(&mut *mutate).await.expect_err("currentness must remain locked");
+        assert_eq!(
+            error.as_database_error().and_then(|e| e.code()).as_deref(),
+            Some("55P03")
+        );
+        mutate.rollback().await?;
+    }
+    drop(pending);
+    let mut revoke = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *revoke)
+        .await?;
+    sqlx::query("UPDATE permission.project_role_binding SET valid_to=clock_timestamp() WHERE tenant_id=$1 AND project_id=$2 AND user_id=$3 AND valid_to IS NULL")
+        .bind(current.tenant_id).bind(current.occurrence.rule_snapshot.target.project_id).bind(current.occurrence.run_as_actor_id)
+        .execute(&mut *revoke).await?;
+    revoke.commit().await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(current.tenant_id), &current.encode_json()?)
+        .await?
+    else {
+        panic!("no admission committed")
+    };
+    assert!(matches!(
+        pending.revalidate_directory_and_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::RunAsUnauthorized
+        ))
+    ));
+    drop(pending);
+    let drift = command_fixture();
+    seed_directory(&admin, &drift, "active").await?;
+    binding_store
+        .save_revision(
+            drift.occurrence.run_as_actor_id,
+            None,
+            &drift.infrastructure_binding,
+        )
+        .await?;
+    let mut successor = drift.infrastructure_binding.clone();
+    successor.binding_revision = 2;
+    successor.k3s_cluster_generation = 2;
+    binding_store
+        .save_revision(drift.occurrence.run_as_actor_id, Some(1), &successor)
+        .await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(drift.tenant_id), &drift.encode_json()?)
+        .await?
+    else {
+        panic!("new drift request")
+    };
+    assert!(matches!(
+        pending.revalidate_directory_and_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::BindingUnavailable
+        ))
+    ));
+    drop(pending);
+    let paused = command_fixture();
+    seed_directory(&admin, &paused, "paused").await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(paused.tenant_id), &paused.encode_json()?)
+        .await?
+    else {
+        panic!("new paused request")
+    };
+    assert!(matches!(
+        pending.revalidate_directory_and_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::RunAsUnauthorized
+        ))
+    ));
+    drop(pending);
     let mut orphan = admin.begin().await?;
     sqlx::query("INSERT INTO multica.schedule_admission_inbox
        (tenant_id,request_id,result_id,project_id,branch_id,engineering_run_id,work_item_id,worktree_id,
@@ -414,5 +544,38 @@ async fn seed_provisional_run(
     .execute(admin)
     .await?;
 
+    Ok(())
+}
+
+async fn seed_directory(
+    admin: &sqlx::PgPool,
+    command: &ScheduleRunAdmissionCommandV1,
+    state: &str,
+) -> Result<(), sqlx::Error> {
+    assert!(matches!(state, "active" | "paused"));
+    let t = &command.occurrence.rule_snapshot.target;
+    let tenant = command.tenant_id;
+    let actor = command.occurrence.run_as_actor_id;
+    let project = t.project_id;
+    let branch = t.branch_id;
+    let run = t.engineering_run_id;
+    let repo = t.repository_id;
+    // Generated UUIDs and allowlisted state only; no external/user strings enter SQL.
+    sqlx::raw_sql(&format!("BEGIN; SET LOCAL session_replication_role=replica;
+        INSERT INTO scm.cloud_branch(branch_id,tenant_id,project_id,repository_id,remote_identity)
+        VALUES('{branch}','{tenant}','{project}','{repo}','test://admission-currentness');
+        INSERT INTO scm.cloud_branch_revision(tenant_id,branch_id,name,full_ref,state,changed_by,version)
+        VALUES('{tenant}','{branch}','dev','refs/heads/dev','active','{actor}',1);
+        INSERT INTO multica.engineering_run(engineering_run_id,tenant_id,project_id,repository_id,branch_id)
+        VALUES('{run}','{tenant}','{project}','{repo}','{branch}');
+        INSERT INTO multica.engineering_run_revision(tenant_id,engineering_run_id,title,state,changed_by,version)
+        VALUES('{tenant}','{run}','Admission fixture','{state}','{actor}',1);
+        INSERT INTO permission.project_role_binding(tenant_id,project_id,user_id,role,granted_by,version)
+        VALUES('{tenant}','{project}','{actor}','developer','{actor}',1);
+        INSERT INTO permission.cloud_branch_role_binding(tenant_id,branch_id,user_id,role,granted_by,version)
+        VALUES('{tenant}','{branch}','{actor}','developer','{actor}',1);
+        INSERT INTO permission.engineering_run_role_binding(tenant_id,engineering_run_id,user_id,role,granted_by,version)
+        VALUES('{tenant}','{run}','{actor}','developer','{actor}',1); COMMIT;"))
+        .execute(admin).await?;
     Ok(())
 }
