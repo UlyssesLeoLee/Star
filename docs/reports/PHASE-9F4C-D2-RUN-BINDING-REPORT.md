@@ -1,8 +1,8 @@
 # PHASE-9F4C-D2 Run Infrastructure Binding 阶段报告
 
-> 版本：v0.1（2026-10-10）
+> 版本：v0.1.1（2026-10-10）
 > 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 状态：🟡 Run-owned binding Master/schema slice 已验证，可选择性集成；Rust SQLx 数据库往返与生产 currentness/consumer/execution gates 仍未关闭
+> 状态：🟡 Run-owned binding Master/schema slice 已快进集成到本地 `dev`；Rust SQLx 数据库往返与生产 currentness/consumer/execution gates 仍未关闭
 
 ## §0 目的
 
@@ -70,10 +70,11 @@
 | SRE Lead | Mavis 接手审核：PostgreSQL 18.6 disposable runner 29/29 并完成自有资源清理；目标 DB 与生产角色未验收。 |
 | 平台 | Mavis 接手审核：Rust 1.99.0 focused tests、rustfmt、package Clippy 与 Cypher guard 的范围明确；更广 Clippy 两项既存错误已披露。 |
 | 评审主持 | Mavis 接手审核：直接事件伪造风险已通过权限与 trigger 边界收紧；CodeRabbit 因 shim permission denied 未完成。 |
-| PM | Mavis 接手审核：仅 D2 已验证切片准备合入本地 `dev`；SQLx database round-trip 和其余 9F4 生产闭环继续排在后续阶段；无 push。 |
+| PM | Mavis 接手审核：实现提交 `87929aa2` 已从候选 worktree fast-forward 到本地 `dev`，随后只同步阶段报告/计划；保留 `.codegraph` 三文件；未 push、未清理其他 worktree/分支；SQLx database round-trip 和其余 9F4 生产闭环继续排在后续阶段。 |
 
 ## §7 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Run binding Master/Transaction schema、触发器审计边界、Rust adapter、29/29 disposable PostgreSQL、Rust 1.99.0 package gates、已知缺口及 fail-closed 范围。 | Phase 9F4C-D2 集成前自审完成。 |
+| v0.1.1 | 2026-10-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录实现提交 `87929aa2` 已快进合入本地 `dev`；保留 `.codegraph` 与其他分支/worktree，不 push，并维持 Rust SQLx round-trip 和生产运行门为未关闭。 | 完成用户授权的选择性本地 dev 集成。 |
