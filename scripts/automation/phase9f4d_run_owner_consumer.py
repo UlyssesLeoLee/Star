@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=dfda123e200d28fc1575495a61b7d7e70d87f935ef44ecb1a637ff2522c03ca0
+# @cypher schema=1 source_sha256=939e15c5f71b5d9a0ecc678d4203fef3860c16603a754caa9daf6d3727151725
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -16,6 +16,8 @@
 # MERGE (consumer_test:Config {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs"})
 # MERGE (quarantine_migration:Config {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
+# MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
+# MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (nats:ExternalService {id:"nats-server.jetstream",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test",kind:"command"})
@@ -54,6 +56,8 @@
 # MERGE (main)-[:READS]->(migration)
 # MERGE (main)-[:READS]->(quarantine_migration)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
+# MERGE (main)-[:READS]->(admission_lifecycle)
+# MERGE (main)-[:TESTS]->(admission_lifecycle_test)
 # MERGE (main)-[:TESTS]->(consumer_test)
 # MERGE (run_sql)-[:CALLS]->(run_step)
 # MERGE (run_sql)-[:CALLS]->(write_text)
@@ -102,9 +106,12 @@ from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
 RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructure-capacity-result.sql"
+ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
 QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-schema.sql"
+ADMISSION_LIFECYCLE_TEST = ROOT / "db" / "tests" / "task-run-admission-attempt-lifecycle.sql"
 PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
+    ROOT / "db" / "migrations" / "2026-10-01-multica-run-resource-reservations.sql",
     ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql",
     ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql",
     ROOT / "db" / "migrations" / "2026-10-08-platform-poison-quarantine.sql",
@@ -157,7 +164,9 @@ BEGIN
        OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'work_item_id', 'SELECT')
        OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'run_id', 'SELECT')
        OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'automation_occurrence_id', 'SELECT')
-       OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'task_snapshot', 'SELECT')
+        OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'task_snapshot', 'SELECT')
+       OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'automation_admission_attempt', 'SELECT')
+       OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'started_at', 'SELECT')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run', 'INSERT')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run', 'UPDATE')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run', 'DELETE') THEN
@@ -168,6 +177,14 @@ BEGIN
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run_idempotency', 'SELECT')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run_idempotency', 'INSERT') THEN
         RAISE EXCEPTION 'Run owner role received unrelated Multica table privileges';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'multica.task_execution_run_event'::regclass
+           AND conname = 'ck_task_execution_run_event_type_v3'
+           AND contype = 'c'
+    ) THEN
+        RAISE EXCEPTION 'Run event vocabulary must include explicit admission confirmation and compensation';
     END IF;
 
     IF (SELECT count(*) FROM pg_class AS c
@@ -257,10 +274,10 @@ def rls_fixture_sql() -> tuple[str, str, str, dict[str, str]]:
         scope = scopes[label]
         setup.append(
             "INSERT INTO multica.task_execution_run (run_id, tenant_id, project_id, work_item_id, "
-            "initiated_by, execution_channel, task_snapshot, automation_occurrence_id, correlation_id) VALUES "
+            "initiated_by, execution_channel, task_snapshot, automation_occurrence_id, correlation_id, started_at) VALUES "
             f"('{scope['task_execution_run_id']}', '{scope['tenant_id']}', '{scope['project_id']}', "
             f"'{scope['work_item_id']}', '{scope['initiated_by']}', 'agent', '{{}}'::jsonb, "
-            f"'{scope['occurrence_id']}', '{scope['correlation_id']}');"
+            f"'{scope['occurrence_id']}', '{scope['correlation_id']}', clock_timestamp());"
         )
         setup.append(
             "INSERT INTO multica.infrastructure_capacity_demand_outbox (event_id, tenant_id, project_id, "
@@ -493,7 +510,7 @@ def main() -> int:
     parser.add_argument("--toolchain-bin", type=Path, help="Optional Rust toolchain bin directory")
     parser.add_argument("--target-dir", type=Path, help="Optional Cargo target directory")
     parser.add_argument("--output-dir", type=Path, help="Optional report directory under the repository target directory")
-    parser.add_argument("--nats-server", type=Path, required=True, help="NATS Server binary with JetStream support")
+    parser.add_argument("--nats-server", type=Path, help="NATS Server binary with JetStream support; not needed with --schema-only")
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
     arguments = parser.parse_args()
 
@@ -519,14 +536,25 @@ def main() -> int:
         return 2
     missing_migrations = [
         str(path)
-        for path in (*PREREQUISITE_MIGRATIONS, RUN_MIGRATION, QUARANTINE_SCHEMA_TEST)
+        for path in (
+            *PREREQUISITE_MIGRATIONS,
+            ADMISSION_LIFECYCLE_MIGRATION,
+            ADMISSION_LIFECYCLE_TEST,
+            RUN_MIGRATION,
+            QUARANTINE_SCHEMA_TEST,
+        )
         if not path.is_file()
     ]
     if missing_migrations:
         print(json.dumps({"result": "blocked", "missing_migrations": missing_migrations}))
         return 2
-    if not arguments.nats_server.is_file():
-        print(json.dumps({"result": "blocked", "missing_nats_server": str(arguments.nats_server)}))
+    if not arguments.schema_only and (
+        arguments.nats_server is None or not arguments.nats_server.is_file()
+    ):
+        print(json.dumps({
+            "result": "blocked",
+            "missing_nats_server": str(arguments.nats_server) if arguments.nats_server else None,
+        }))
         return 2
 
     cache_root = (ROOT / ".cache").resolve()
@@ -561,7 +589,9 @@ def main() -> int:
     else:
         cargo = shutil.which(arguments.cargo) or arguments.cargo
         version_steps.append(run_step("cargo-version", [cargo, "--version"], ROOT, env))
-    version_steps.append(run_step("nats-version", [str(arguments.nats_server.resolve()), "--version"], ROOT, env))
+    if not arguments.schema_only:
+        assert arguments.nats_server is not None
+        version_steps.append(run_step("nats-version", [str(arguments.nats_server.resolve()), "--version"], ROOT, env))
     if any(item["status"] != "passed" for item in version_steps):
         print(json.dumps({"result": "blocked", "reason": "a required tool version check failed", "steps": version_steps}, sort_keys=True))
         return 2
@@ -619,6 +649,21 @@ def main() -> int:
                 results.append(run_sql(f"apply-{migration.stem}", psql_base, migration.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
+        if pg_started and all(item["status"] == "passed" for item in results):
+            lifecycle_sql = ADMISSION_LIFECYCLE_MIGRATION.read_text(encoding="utf-8")
+            for attempt in (1, 2):
+                results.append(run_sql(f"admission-lifecycle-migration-apply-{attempt}", psql_base, lifecycle_sql, env))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(
+                run_sql(
+                    "admission-attempt-lifecycle-invariants",
+                    psql_base,
+                    ADMISSION_LIFECYCLE_TEST.read_text(encoding="utf-8"),
+                    env,
+                )
+            )
         if pg_started and all(item["status"] == "passed" for item in results):
             migration_sql = RUN_MIGRATION.read_text(encoding="utf-8")
             for attempt in (1, 2):

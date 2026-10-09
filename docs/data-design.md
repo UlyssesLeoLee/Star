@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.1 (2026-10-09)
+> **文档版本**: v2.2 (2026-10-09)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -25,6 +25,7 @@
 > | v1.9 | 2026-10-08 | Add §4.13.10 as a proposed W/T/M classification for 9F4D-3D6: platform quarantine receipt is Transaction, optional raw payload is separate TTL Work; no migration/table is claimed, and retention selection, receipt access/retention policy, fault taxonomy and owner grants remain open. | Poison-message design must not put untrusted scope claims into the Run-owner tenant Inbox. |
 > | v2.0 | 2026-10-08 | Replace the proposed 3D6 model with the implemented physical tables, dedicated roles, FORCE RLS, 200 KiB per-item and 4 MiB per-deployment quota, 24-hour Work expiry and append-only purge audit; record double-apply and disposable PostgreSQL schema/quota checks. Keep production login/stream provisioning, real KMS and target rollout open. | Phase 9F4D-3D6 persistence substrate passed isolated verification. |
 > | v2.1 | 2026-10-09 | Clarify that Schedule occurrence/link/Outbox, Run/Execution Run/reservation/events/demand, and Infrastructure Inbox/reservations are separate owner facts. Define the Schedule result/link/confirmation handshake and post-confirmation demand; same-database composite FKs validate committed references but do not imply one transaction. Keep confirmation receipt and production consumers as fail-closed gaps. | Correct the Schedule→Run owner transaction boundary. |
+> | v2.2 | 2026-10-09 | Classify the existing TaskExecutionRun and RunEvent lifecycle additions as append-oriented Transaction facts; specify no new Work/Master table, retention change, or role grant. Link `docs/data-design/phase9f4c-d-run-admission-wtm.md` and record disposable PostgreSQL evidence only. | Schedule admission attempts need immutable Run identity and separately auditable lifecycle facts. |
 > | v1.6 | 2026-10-05 | 纳入 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0

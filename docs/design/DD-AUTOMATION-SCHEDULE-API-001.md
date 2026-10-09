@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
 > Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, bounded JetStream publisher, 3D6 quarantine persistence/consumer hook, 3D7 real JetStream redelivery/duplicate ACK, and 9F4C-D typed wire DTOs are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production Schedule/Run consumers, production worker, provider evidence producer, and execution remain open.
-> Version: 0.31 | Date: 2026-10-09
+> Version: 0.32 | Date: 2026-10-09
 
 ## 1. Routes
 
@@ -239,6 +239,16 @@ The Rust domain contract exposes the following strict schema version 1 payloads.
 
 Transport redelivery reuses the exact persisted command bytes and the same request identity. A later logical attempt is a new command with fresh `request_id` and the next ordinal, created only after the previous attempt is terminal; an occurrence has at most one active attempt. Authentication is out of band: envelope tenant IDs are scope claims, while the receiving owner establishes service identity and RLS context from trusted transport credentials. The contract DTOs do not implement persistence, authentication, Outbox delivery, owner consumers, or execution.
 
+## 6.18 9F4C-D1 admission attempt schema and API projection
+
+The migration extends the existing `multica.task_execution_run` Transaction with `created_at` and `automation_admission_attempt`; it adds no table, owner role, or runtime grant. Existing Run rows are not backfilled or rewritten. New `created_at` values default to `clock_timestamp()`. `started_at` becomes nullable with no implicit default: non-Schedule rows still require an explicit start, while a provisional Schedule row requires a positive attempt ordinal and a NULL start.
+
+`uq_task_execution_run_schedule_occurrence_attempt` enforces one Run per tenant/occurrence/logical ordinal and maps a legacy NULL ordinal to one. The existing time indexes are rebuilt on `COALESCE(started_at, created_at)`. The append-only event allowlist gains `schedule_admission_confirmed` and `schedule_admission_compensated`; actual `run_started` remains an independent event.
+
+The API's list and detail read paths project `admission_attempt`, `created_at`, nullable `started_at`, and admission state from Run origin plus append-only events. Only `schedule_admission_confirmed` confirms Schedule admission; `schedule_occurrence_linked` is a Schedule-side link fact and does not prove the Run owner consumed confirmation. Cursor ordering and SQL comparison use the coalesced timestamp and Run ID; parser compatibility accepts the legacy `cursor_started_at` and the new `cursor_ordered_at`, rejecting conflicting aliases. The UI labels provisional/confirmed/compensated states and displays actual start only after start evidence.
+
+The disposable PostgreSQL 18.6 gate re-applies the migration and validates provisional attempts 1/2, duplicate ordinal rejection, legacy NULL-as-one collision, missing ordinal rejection, non-Schedule start requirement, and confirmation/compensation event acceptance. Runtime grants remain unchanged. This migration/API slice does not add the Schedule or Run owner consumers, confirmation receipt, Infrastructure demand writer, target-database rollout, BI/Benchmark, provider or execution; production stays fail-closed.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -274,3 +284,4 @@ Transport redelivery reuses the exact persisted command bytes and the same reque
 | v0.29 | 2026-10-08 | Add §6.15 for real PostgreSQL/NATS failure, redelivery, committed-receipt duplicate and confirmed Term-ACK integration; specify metadata-only retention, no later delivery, serialized shared-subject tests, 22/22 runner steps and 2/2 integration tests. Keep production identity/KMS/operator/consumer and Schedule/Task execution disabled. | Phase 9F4D-3D7 closes only the disposable redelivery evidence gap. |
 | v0.30 | 2026-10-09 | Add §6.16 and replace the single cross-owner admission transaction with separate Run admission/result, Schedule fenced link/confirmation, and post-confirmation Run demand transactions. Specify stable occurrence idempotency, current-fence CAS, compensation, authenticated owner messages, current same-database FK limitation and fail-closed production gates. | Correct the ownership conflict in the earlier Schedule→Run persistence wording. |
 | v0.31 | 2026-10-09 | Correct §6.16 to distinguish logical admission attempts from transport redelivery and add §6.17 wire tables for strict bounded Command/Result/Resolution DTOs, exact binding-digest matching and out-of-band owner authentication. Preserve local fence CAS, owner transaction boundaries and production fail-closed gates. | The Run-owner contract must not treat an occurrence ID or envelope tenant claim as authorization. |
+| v0.32 | 2026-10-09 | Add §6.18 for attempt lifecycle DDL, legacy ordinal mapping, event vocabulary, API cursor and Task Run UI; record repeated PostgreSQL 18.6 migration/invariant evidence and retain all production consumer, grants and execution gates. | Phase 9F4C-D1 implementation/design reconciliation. |

@@ -1,3 +1,42 @@
+/* @cypher schema=1 source_sha256=480bfdaa5fb620984d5f8b2ec055167d6da89564933e2c127fe16eae1410903e
+MERGE (self:File {path:"crates/star-api-rest/src/group_api/task_runs.rs"})
+MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/task_runs.rs::list_task_runs",kind:"function"})
+MERGE (detail:Symbol {id:"crates/star-api-rest/src/group_api/task_runs.rs::get_task_run_detail",kind:"function"})
+MERGE (parse_cursor:Symbol {id:"crates/star-api-rest/src/group_api/task_runs.rs::parse_run_cursor",kind:"function"})
+MERGE (admission_state:Symbol {id:"crates/star-api-rest/src/group_api/task_runs.rs::schedule_admission_state",kind:"function"})
+MERGE (summary:Type {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary",kind:"struct"})
+MERGE (cursor_test:Symbol {id:"crates/star-api-rest/src/group_api/task_runs.rs::run_cursor_accepts_equivalent_legacy_and_ordered_timestamps",kind:"test"})
+MERGE (admission_test:Symbol {id:"crates/star-api-rest/src/group_api/task_runs.rs::schedule_admission_state_requires_confirmation_event",kind:"test"})
+MERGE (attempt:Field {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary.admission_attempt"})
+MERGE (started_event:Field {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary.has_run_started"})
+MERGE (confirmed_event:Field {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary.has_schedule_admission_confirmed"})
+MERGE (compensated_event:Field {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary.has_schedule_admission_compensated"})
+MERGE (created_at:Field {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary.created_at"})
+MERGE (started_at:Field {id:"crates/star-api-rest/src/group_api/task_runs.rs::TaskRunSummary.started_at"})
+MERGE (run:Table {id:"multica.task_execution_run"})
+MERGE (event:Table {id:"multica.task_execution_run_event"})
+MERGE (self)-[:DEFINES]->(list)
+MERGE (self)-[:DEFINES]->(detail)
+MERGE (self)-[:DEFINES]->(parse_cursor)
+MERGE (self)-[:DEFINES]->(admission_state)
+MERGE (self)-[:DEFINES]->(summary)
+MERGE (self)-[:DEFINES]->(cursor_test)
+MERGE (self)-[:DEFINES]->(admission_test)
+MERGE (list)-[:READS]->(run)
+MERGE (list)-[:READS]->(event)
+MERGE (detail)-[:READS]->(run)
+MERGE (detail)-[:READS]->(event)
+MERGE (summary)-[:USES]->(attempt)
+MERGE (summary)-[:USES]->(started_event)
+MERGE (summary)-[:USES]->(confirmed_event)
+MERGE (summary)-[:USES]->(compensated_event)
+MERGE (summary)-[:USES]->(created_at)
+MERGE (summary)-[:USES]->(started_at)
+MERGE (list)-[:CALLS]->(parse_cursor)
+MERGE (cursor_test)-[:TESTS]->(parse_cursor)
+MERGE (admission_test)-[:TESTS]->(admission_state)
+@endcypher
+*/
 //! Cypher structural manifest.
 //! CREATE
 //!   (f:File {name:"task_runs.rs",type:"file",language:"rust"}),
@@ -20,6 +59,12 @@
 //! CYPHER STRUCTURE MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"task_runs",type:"module"}),(summary:Class {name:"TaskRunSummary",type:"class"});
 //! CREATE (launch_id:Variable {name:"approved_launch_profile_id",type:"variable",language:"rust"}),(launch_version:Variable {name:"approved_launch_profile_version",type:"variable",language:"rust"}),(launch_digest:Variable {name:"approved_launch_profile_digest",type:"variable",language:"rust"}),(summary_json:Function {name:"run_summary_json",type:"function",language:"rust"}),(m)-[:CONTAINS]->(summary_json),(summary)-[:USES]->(launch_id),(summary)-[:USES]->(launch_version),(summary)-[:USES]->(launch_digest),(summary_json)-[:CALLS]->(summary),(summary_json)-[:USES]->(launch_id),(summary_json)-[:USES]->(launch_version),(summary_json)-[:USES]->(launch_digest);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (summary:Class {name:"TaskRunSummary",type:"class"}),(list:Function {name:"list_task_runs",type:"function"}),(detail:Function {name:"get_task_run_detail",type:"function"});
+//! CREATE (admission_attempt:Variable {name:"admission_attempt",type:"variable",language:"rust"}),(has_run_started:Variable {name:"has_run_started",type:"variable",language:"rust"}),(has_admission_confirmed:Variable {name:"has_schedule_admission_confirmed",type:"variable",language:"rust"}),(has_admission_compensated:Variable {name:"has_schedule_admission_compensated",type:"variable",language:"rust"}),(created_at:Variable {name:"created_at",type:"variable",language:"rust"}),(started_at:Variable {name:"started_at",type:"variable",language:"rust"}),(ordered_at:Variable {name:"ordered_at",type:"variable",language:"rust"});
+//! CREATE (summary)-[:USES]->(admission_attempt),(summary)-[:USES]->(has_run_started),(summary)-[:USES]->(has_admission_confirmed),(summary)-[:USES]->(has_admission_compensated),(summary)-[:USES]->(created_at),(summary)-[:USES]->(started_at),(summary)-[:USES]->(ordered_at),(list)-[:READS]->(:Table {id:"multica.task_execution_run_event"}),(detail)-[:READS]->(:Table {id:"multica.task_execution_run_event"});
+//! MATCH (summary_json:Function {name:"run_summary_json",type:"function",language:"rust"}),(state:Function {name:"schedule_admission_state",type:"function",language:"rust"});
+//! CREATE (summary_json)-[:CALLS]->(state);
 
 use axum::{
     extract::{Path, Query, State},
@@ -48,6 +93,7 @@ const MAX_DETAIL_EVIDENCE: i64 = 100;
 struct TaskRunListQuery {
     limit: Option<i64>,
     cursor_started_at: Option<String>,
+    cursor_ordered_at: Option<String>,
     cursor_run_id: Option<String>,
 }
 
@@ -86,7 +132,13 @@ struct TaskRunSummary {
     execution_state: Option<String>,
     verification_state: Option<String>,
     human_acceptance_state: Option<String>,
-    started_at: DateTime<Utc>,
+    admission_attempt: Option<i32>,
+    has_run_started: bool,
+    has_schedule_admission_confirmed: bool,
+    has_schedule_admission_compensated: bool,
+    created_at: Option<DateTime<Utc>>,
+    started_at: Option<DateTime<Utc>>,
+    ordered_at: DateTime<Utc>,
     correlation_id: Uuid,
 }
 
@@ -167,7 +219,11 @@ async fn list_task_runs(
     let worktree_id = parse_id(&worktree_id)?;
     let work_item_id = parse_id(&work_item_id)?;
     let limit = validate_run_limit(query.limit)?;
-    let cursor = parse_run_cursor(query.cursor_started_at, query.cursor_run_id)?;
+    let cursor = parse_run_cursor(
+        query.cursor_started_at,
+        query.cursor_ordered_at,
+        query.cursor_run_id,
+    )?;
 
     let mut tx = state
         .resolver
@@ -200,12 +256,23 @@ async fn list_task_runs(
                 WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
                   AND e.human_acceptance_state IS NOT NULL
                 ORDER BY e.occurred_at DESC, e.event_id DESC LIMIT 1) AS human_acceptance_state,
-               started_at, correlation_id
+               automation_admission_attempt AS admission_attempt,
+               EXISTS (SELECT 1 FROM multica.task_execution_run_event e
+                       WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
+                         AND e.event_type = 'run_started') AS has_run_started,
+               EXISTS (SELECT 1 FROM multica.task_execution_run_event e
+                       WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
+                         AND e.event_type = 'schedule_admission_confirmed') AS has_schedule_admission_confirmed,
+               EXISTS (SELECT 1 FROM multica.task_execution_run_event e
+                       WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
+                         AND e.event_type = 'schedule_admission_compensated') AS has_schedule_admission_compensated,
+               created_at, started_at, COALESCE(started_at, created_at) AS ordered_at,
+               correlation_id
         FROM multica.task_execution_run r
         WHERE tenant_id = $1 AND project_id = $2 AND worktree_id = $3 AND work_item_id = $4
           AND repository_id = $5 AND branch_id = $6 AND engineering_run_id = $7
-          AND ($8::timestamptz IS NULL OR (started_at, run_id) < ($8, $9::uuid))
-        ORDER BY started_at DESC, run_id DESC
+          AND ($8::timestamptz IS NULL OR (COALESCE(started_at, created_at), run_id) < ($8, $9::uuid))
+        ORDER BY COALESCE(started_at, created_at) DESC, run_id DESC
         LIMIT $10
         "#,
     )
@@ -230,7 +297,8 @@ async fn list_task_runs(
     let next_cursor = if has_more {
         rows.last().map(|row| {
             json!({
-                "cursor_started_at": row.started_at,
+                "cursor_started_at": row.ordered_at,
+                "cursor_ordered_at": row.ordered_at,
                 "cursor_run_id": row.run_id,
             })
         })
@@ -292,7 +360,18 @@ async fn get_task_run_detail(
                 WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
                   AND e.human_acceptance_state IS NOT NULL
                 ORDER BY e.occurred_at DESC, e.event_id DESC LIMIT 1) AS human_acceptance_state,
-               started_at, correlation_id
+               automation_admission_attempt AS admission_attempt,
+               EXISTS (SELECT 1 FROM multica.task_execution_run_event e
+                       WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
+                         AND e.event_type = 'run_started') AS has_run_started,
+               EXISTS (SELECT 1 FROM multica.task_execution_run_event e
+                       WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
+                         AND e.event_type = 'schedule_admission_confirmed') AS has_schedule_admission_confirmed,
+               EXISTS (SELECT 1 FROM multica.task_execution_run_event e
+                       WHERE e.tenant_id = r.tenant_id AND e.run_id = r.run_id
+                         AND e.event_type = 'schedule_admission_compensated') AS has_schedule_admission_compensated,
+               created_at, started_at, COALESCE(started_at, created_at) AS ordered_at,
+               correlation_id
         FROM multica.task_execution_run r
         WHERE tenant_id = $1 AND project_id = $2 AND worktree_id = $3
           AND work_item_id = $4 AND run_id = $5 AND repository_id = $6
@@ -420,7 +499,30 @@ async fn authorize_task_run_scope(
     Ok((scope, binding))
 }
 
+fn schedule_admission_state(
+    run_origin: &str,
+    has_run_started: bool,
+    has_schedule_admission_confirmed: bool,
+    has_schedule_admission_compensated: bool,
+) -> &'static str {
+    if run_origin != "schedule" || has_run_started {
+        "started"
+    } else if has_schedule_admission_compensated {
+        "compensated"
+    } else if has_schedule_admission_confirmed {
+        "confirmed"
+    } else {
+        "provisional"
+    }
+}
+
 fn run_summary_json(run: TaskRunSummary) -> Value {
+    let admission_state = schedule_admission_state(
+        &run.run_origin,
+        run.has_run_started,
+        run.has_schedule_admission_confirmed,
+        run.has_schedule_admission_compensated,
+    );
     json!({
         "run_id": run.run_id,
         "worktree_id": run.worktree_id,
@@ -447,6 +549,9 @@ fn run_summary_json(run: TaskRunSummary) -> Value {
         "execution_state": run.execution_state,
         "verification_state": run.verification_state,
         "human_acceptance_state": run.human_acceptance_state,
+        "admission_attempt": run.admission_attempt,
+        "admission_state": admission_state,
+        "created_at": run.created_at,
         "started_at": run.started_at,
         "correlation_id": run.correlation_id,
     })
@@ -516,20 +621,34 @@ fn validate_run_limit(limit: Option<i64>) -> Result<i64, GroupApiError> {
 }
 
 fn parse_run_cursor(
-    started_at: Option<String>,
+    legacy_started_at: Option<String>,
+    ordered_at: Option<String>,
     run_id: Option<String>,
 ) -> Result<Option<(DateTime<Utc>, Uuid)>, GroupApiError> {
-    match (started_at, run_id) {
+    let parse_time = |value: String| {
+        DateTime::parse_from_rfc3339(&value)
+            .map(|parsed| parsed.with_timezone(&Utc))
+            .map_err(|_| GroupApiError::bad_request())
+    };
+    let legacy_time = legacy_started_at.map(parse_time).transpose()?;
+    let ordered_time = ordered_at.map(parse_time).transpose()?;
+    let cursor_time = match (legacy_time, ordered_time) {
+        (Some(legacy), Some(ordered)) if legacy != ordered => {
+            return Err(GroupApiError::bad_request());
+        }
+        (Some(legacy), _) => Some(legacy),
+        (_, Some(ordered)) => Some(ordered),
+        (None, None) => None,
+    };
+
+    match (cursor_time, run_id) {
         (None, None) => Ok(None),
-        (Some(started_at), Some(run_id)) => {
-            let started_at = DateTime::parse_from_rfc3339(&started_at)
-                .map_err(|_| GroupApiError::bad_request())?
-                .with_timezone(&Utc);
+        (Some(cursor_time), Some(run_id)) => {
             let run_id = Uuid::parse_str(&run_id).map_err(|_| GroupApiError::bad_request())?;
             if run_id.is_nil() {
                 return Err(GroupApiError::bad_request());
             }
-            Ok(Some((started_at, run_id)))
+            Ok(Some((cursor_time, run_id)))
         }
         _ => Err(GroupApiError::bad_request()),
     }
@@ -569,22 +688,71 @@ mod tests {
     }
 
     #[test]
+    fn schedule_admission_state_requires_confirmation_event() {
+        assert_eq!(
+            schedule_admission_state("schedule", false, false, false),
+            "provisional"
+        );
+        assert_eq!(
+            schedule_admission_state("schedule", false, true, false),
+            "confirmed"
+        );
+        assert_eq!(
+            schedule_admission_state("schedule", false, false, true),
+            "compensated"
+        );
+        assert_eq!(
+            schedule_admission_state("schedule", true, true, false),
+            "started"
+        );
+        assert_eq!(
+            schedule_admission_state("manual", false, false, false),
+            "started"
+        );
+    }
+
+    #[test]
     fn run_cursor_requires_a_valid_pair() {
         let run_id = Uuid::new_v4();
-        assert!(parse_run_cursor(None, None).unwrap().is_none());
+        assert!(parse_run_cursor(None, None, None).unwrap().is_none());
         assert!(parse_run_cursor(
             Some("2026-09-30T00:00:00Z".to_owned()),
+            None,
             Some(run_id.to_string()),
         )
         .unwrap()
         .is_some());
-        assert!(parse_run_cursor(Some("2026-09-30T00:00:00Z".to_owned()), None).is_err());
-        assert!(
-            parse_run_cursor(Some("no timestamp".to_owned()), Some(run_id.to_string())).is_err()
-        );
+        assert!(parse_run_cursor(Some("2026-09-30T00:00:00Z".to_owned()), None, None).is_err());
+        assert!(parse_run_cursor(
+            Some("no timestamp".to_owned()),
+            None,
+            Some(run_id.to_string())
+        )
+        .is_err());
         assert!(parse_run_cursor(
             Some("2026-09-30T00:00:00Z".to_owned()),
+            None,
             Some(Uuid::nil().to_string()),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn run_cursor_accepts_equivalent_legacy_and_ordered_timestamps() {
+        let run_id = Uuid::new_v4();
+        let cursor = parse_run_cursor(
+            Some("2026-09-30T00:00:00Z".to_owned()),
+            Some("2026-09-30T02:00:00+02:00".to_owned()),
+            Some(run_id.to_string()),
+        )
+        .unwrap()
+        .expect("matching cursor aliases should be accepted");
+
+        assert_eq!(cursor.1, run_id);
+        assert!(parse_run_cursor(
+            Some("2026-09-30T00:00:00Z".to_owned()),
+            Some("2026-09-30T00:00:01Z".to_owned()),
+            Some(run_id.to_string()),
         )
         .is_err());
     }

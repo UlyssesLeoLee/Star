@@ -1,3 +1,19 @@
+/* @cypher schema=1 source_sha256=3c4d708ab896bf99c5095c170d74f1c4227160fe4fbe9ee7a76529e67c95cc50
+MERGE (self:File {path:"crates/star-api-rest/src/group_api/cli_sessions.rs"})
+MERGE (start:Symbol {id:"crates/star-api-rest/src/group_api/cli_sessions.rs::start_task_cli_session",kind:"function"})
+MERGE (record:Symbol {id:"crates/star-api-rest/src/group_api/cli_sessions.rs::record_cli_task_run",kind:"function"})
+MERGE (append_event:Symbol {id:"crates/star-api-rest/src/group_api/cli_sessions.rs::append_cli_task_run_event",kind:"function"})
+MERGE (run:Table {id:"multica.task_execution_run"})
+MERGE (event:Table {id:"multica.task_execution_run_event"})
+MERGE (self)-[:DEFINES]->(start)
+MERGE (self)-[:DEFINES]->(record)
+MERGE (self)-[:DEFINES]->(append_event)
+MERGE (start)-[:CALLS]->(record)
+MERGE (start)-[:CALLS]->(append_event)
+MERGE (record)-[:WRITES]->(run)
+MERGE (append_event)-[:WRITES]->(event)
+@endcypher
+*/
 //! CYPHER STRUCTURAL MANIFEST
 //! CREATE
 //!   (f:File {name:"cli_sessions.rs",type:"file",language:"rust"}),(m:Module {name:"cli_sessions",type:"module",language:"rust"}),
@@ -49,6 +65,13 @@
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"cli_sessions",type:"module"}),(start:Function {name:"start_task_cli_session",type:"function"}),(loadContext:Function {name:"load_task_cli_start_context",type:"function"});
 //! CREATE (reloadReplay:Function {name:"reload_cli_task_run_replay",type:"function",language:"rust"}),(m)-[:CONTAINS]->(reloadReplay),(start)-[:CALLS]->(reloadReplay),(reloadReplay)-[:CALLS]->(loadContext);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MERGE (run_table:Table {id:"multica.task_execution_run"})
+//! MERGE (run_event_table:Table {id:"multica.task_execution_run_event"})
+//! MATCH (start:Function {name:"start_task_cli_session",type:"function",language:"rust"})
+//! MERGE (start)-[:WRITES]->(run_table)
+//! MERGE (start)-[:WRITES]->(run_event_table)
+
 use async_trait::async_trait;
 use axum::{
     extract::{Path, Query, State},
@@ -1642,7 +1665,7 @@ async fn record_cli_task_run(
             approved_launch_profile_id, approved_launch_profile_version,
             approved_launch_profile_digest, spawn_fence_binding_digest,
             branch_id, engineering_run_id, worktree_project_binding_id,
-            engineering_run_worktree_binding_id, engineering_run_snapshot
+            engineering_run_worktree_binding_id, engineering_run_snapshot, started_at
         )
         SELECT $1, $2, $3, $4, $5, 'cli', $6, $7, $8, $9, c.version,
                jsonb_build_object(
@@ -1660,7 +1683,7 @@ async fn record_cli_task_run(
                    'acceptance_criteria', c.acceptance_criteria
                ) END,
                $10, 'cli', $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21,
-               $22, $23, $24, $25, $26
+               $22, $23, $24, $25, $26, clock_timestamp()
         FROM multica.task_metadata m
         LEFT JOIN multica.task_contract c
           ON c.tenant_id = m.tenant_id AND c.project_id = m.project_id

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.30 (2026-10-09)
+> **文档版本**: v2.31 (2026-10-09)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -2790,6 +2790,13 @@ frontend/src/app/automation-debug/
 - The runner creates no PostgreSQL database, broker, VM or Multipass instance and does not send or consume production messages. It does not prove Outbox persistence, trusted transport identity, tenant RLS setup, consumer behavior, Schedule linking, Run compensation, provider readiness, BI/Benchmark or task execution.
 - Rust 1.99.0 is the required workspace toolchain. The available `rtk` wrapper is not on PATH; the recorded invocation uses the direct Cargo executable and makes that tooling limitation explicit.
 
+### 4.72 Phase 9F4C-D1 admission lifecycle schema gate
+
+**自动化档：[P]** — `scripts/automation/phase9f4d_run_owner_consumer.py` now includes the D1 attempt-lifecycle migration and SQL invariant fixture in its disposable PostgreSQL path. `--schema-only` requires no NATS server, applies the migration twice, checks owner grants/RLS and executes the lifecycle SQL cases. Pass `--cargo` explicitly when Cargo is not on PATH; the schema-only gate checks the declared Rust toolchain version but does not run the NATS/Rust integration target.
+
+`scripts/automation/phase9f4c_d1_sync.py --apply` synchronizes requirements, basic/detailed design, W/T/M, implementation plan, automation index and the phase report using exact anchors. Running it twice must make the second pass a no-op. PostgreSQL evidence is scoped to disposable schema/invariant verification; it does not prove production owner consumers, target database grants, Multipass/K3s providers, execution, BI or Benchmark.
+
 | Version | Date | Change |
 |---|---|---|
 | v2.30 | 2026-10-09 | Add §4.71 and register the 9F4C-D focused Rust runner for owner-message DTO validation. Record 6/6 gates, 3/3 focused tests, 29/29 package tests, successful package all-target check and Clippy with four explicit pre-existing lint exceptions; keep all message consumers, production identity and execution gates open. | Freeze the typed owner protocol before implementing cross-owner consumers. |
+| v2.31 | 2026-10-09 | Add §4.72 for the D1 lifecycle schema-only gate and exact-anchor idempotent cross-document synchronizer. Record repeated PostgreSQL 18.6 migration and owner/RLS invariant evidence; keep owner consumers, target DB identity/grants and execution fail-closed. | Phase 9F4C-D1 lifecycle schema/API projection. |

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fb5e63ba23f94029d79204300c930fe84525597586a31445ccdf2fa859716bd6
+@cypher schema=1 source_sha256=fb77e1744b4213499a233cea884f9fb34a157cdd73e2a6edb395b6e51245888a
 MERGE (self:File {path:"frontend/src/lib/group/worktreeGroupApi.ts"})
 MERGE (client:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient",kind:"class"})
 MERGE (request:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.request",kind:"method"})
@@ -47,6 +47,14 @@ MERGE (browserStore)-[:IMPLEMENTS]->(cursorStore)
 MERGE (loadCursor)-[:CALLS]->(validCursor)
 MERGE (validCursor)-[:CALLS]->(validateOffset)
 MERGE (validateEvent)-[:CALLS]->(validateOffset)
+MERGE (run_summary:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::TaskRunSummary",kind:"interface"})
+MERGE (run_admission_state:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::TaskRunAdmissionState",kind:"type"})
+MERGE (list_runs:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listTaskRuns",kind:"method"})
+MERGE (run_summary)-[:USES_TYPE]->(run_admission_state)
+MERGE (client)-[:CALLS]->(list_runs)
+MERGE (self)-[:DEFINES]->(run_summary)
+MERGE (self)-[:DEFINES]->(run_admission_state)
+MERGE (self)-[:DEFINES]->(list_runs)
 @endcypher
 */
 /*
@@ -277,6 +285,12 @@ CREATE (runSummary:Class {name:"TaskRunSummary",type:"interface",language:"types
        (getRun:Function {name:"WorktreeGroupApiClient.getTaskRunDetail",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
 CREATE (file)-[:CONTAINS]->(runSummary),(file)-[:CONTAINS]->(runPage),(file)-[:CONTAINS]->(runEvent),(file)-[:CONTAINS]->(runEvidence),(file)-[:CONTAINS]->(runDetail),
        (client)-[:HAS_METHOD]->(listRuns),(client)-[:HAS_METHOD]->(getRun),(listRuns)-[:CALLS]->(request),(getRun)-[:CALLS]->(request);
+CREATE (admissionAttempt:Variable {name:"TaskRunSummary.admission_attempt",type:"variable",language:"typescript"}),
+       (admissionState:Variable {name:"TaskRunSummary.admission_state",type:"variable",language:"typescript"}),
+       (createdAt:Variable {name:"TaskRunSummary.created_at",type:"variable",language:"typescript"}),
+       (startedAt:Variable {name:"TaskRunSummary.started_at",type:"variable",language:"typescript"});
+CREATE (runSummary)-[:USES]->(admissionAttempt),(runSummary)-[:USES]->(admissionState),
+       (runSummary)-[:USES]->(createdAt),(runSummary)-[:USES]->(startedAt);
 */
 
 export type ScopedChatScope = "WORKTREE" | "GLOBAL";
@@ -636,6 +650,8 @@ export interface WorktreeExecutionProfilePage {
   next_cursor: string | null;
 }
 
+export type TaskRunAdmissionState = "provisional" | "confirmed" | "compensated" | "started";
+
 export interface TaskRunSummary {
   run_id: string;
   worktree_id: string | null;
@@ -662,7 +678,10 @@ export interface TaskRunSummary {
   execution_state: string | null;
   verification_state: string | null;
   human_acceptance_state: string | null;
-  started_at: string;
+  admission_attempt: number | null;
+  admission_state: TaskRunAdmissionState;
+  created_at: string | null;
+  started_at: string | null;
   correlation_id: string;
 }
 
@@ -674,7 +693,7 @@ export interface TaskRunPage {
   permission_snapshot_ref: string;
   limit: number;
   runs: TaskRunSummary[];
-  next_cursor: { cursor_started_at: string; cursor_run_id: string } | null;
+  next_cursor: { cursor_started_at: string; cursor_ordered_at?: string; cursor_run_id: string } | null;
 }
 
 export interface TaskRunEvent {
@@ -922,7 +941,7 @@ export class WorktreeGroupApiClient {
     workItemId: string,
     query: {
       limit?: number;
-      cursor?: { cursor_started_at: string; cursor_run_id: string };
+      cursor?: { cursor_started_at: string; cursor_ordered_at?: string; cursor_run_id: string };
     } = {},
   ): Promise<TaskRunPage> {
     if (query.limit !== undefined && (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50)) {
@@ -932,6 +951,9 @@ export class WorktreeGroupApiClient {
     if (query.limit !== undefined) params.set("limit", String(query.limit));
     if (query.cursor) {
       params.set("cursor_started_at", query.cursor.cursor_started_at);
+      if (query.cursor.cursor_ordered_at) {
+        params.set("cursor_ordered_at", query.cursor.cursor_ordered_at);
+      }
       params.set("cursor_run_id", query.cursor.cursor_run_id);
     }
     const serialized = params.toString();

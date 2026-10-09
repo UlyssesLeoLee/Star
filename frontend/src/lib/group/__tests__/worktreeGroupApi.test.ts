@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8c03734282199c87441dfa4b49188f9dc056a4da5b523162d91f3058192192ee
+@cypher schema=1 source_sha256=4b038bfd68532ba27a2ed7f879fe6f44d6157caf05e9485866cbe4d62cdcf96a
 MERGE (self:File {path:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts"})
 MERGE (suite:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::worktreeGroupApi tests",kind:"suite"})
 MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
@@ -13,6 +13,11 @@ MERGE (streamTest)-[:CALLS]->(list)
 MERGE (malformedTest)-[:CALLS]->(pollOnce)
 MERGE (streamTest)-[:TESTS]->(list)
 MERGE (malformedTest)-[:TESTS]->(pollOnce)
+MERGE (taskRunListTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::Task Run list cursor case",kind:"test"})
+MERGE (runList:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listTaskRuns",kind:"method"})
+MERGE (suite)-[:DEFINES]->(taskRunListTest)
+MERGE (taskRunListTest)-[:CALLS]->(runList)
+MERGE (taskRunListTest)-[:TESTS]->(runList)
 @endcypher
 */
 /*
@@ -468,6 +473,7 @@ describe("WorktreeGroupApiClient", () => {
       limit: 20,
       cursor: {
         cursor_started_at: "2026-09-29T10:00:00Z",
+        cursor_ordered_at: "2026-09-29T10:00:00Z",
         cursor_run_id: "run-1",
       },
     });
@@ -477,6 +483,7 @@ describe("WorktreeGroupApiClient", () => {
     expect(url.pathname).toBe("/api/v1/worktrees/wt%20one/work-items/task%2Fone/runs");
     expect(url.searchParams.get("limit")).toBe("20");
     expect(url.searchParams.get("cursor_started_at")).toBe("2026-09-29T10:00:00Z");
+    expect(url.searchParams.get("cursor_ordered_at")).toBe("2026-09-29T10:00:00Z");
     expect(url.searchParams.get("cursor_run_id")).toBe("run-1");
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
     expect(init?.cache).toBe("no-store");

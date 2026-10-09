@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication, real PubAck integration, 3D7 redelivery/duplicate-ACK integration, and 9F4C-D typed owner-message DTOs are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, Schedule/Run consumers and execution remain fail-closed.
-> Version: 0.31 | Date: 2026-10-09
+> Version: 0.32 | Date: 2026-10-09
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -153,6 +153,16 @@ JSON decoding rejects unknown fields and bodies above 16 KiB. The command payloa
 
 The code slice is a typed domain contract only. It does not persist or publish messages, authenticate broker identity, consume an Inbox, link a Run, process compensation, or enable execution. Those remain future owner-local implementation gates.
 
+## 6.16 9F4C-D1 Schedule attempt and provisional Run persistence
+
+The Run persistence schema MUST distinguish durable admission from execution. `created_at` is the row creation time; nullable `started_at` is the actual start time. For new non-Schedule Run rows, `started_at` remains required and writers MUST set it explicitly. A provisional Schedule row MUST have `started_at IS NULL` and a positive `automation_admission_attempt`; its first persisted record sets `created_at`.
+
+Logical attempt uniqueness is `(tenant_id, automation_occurrence_id, COALESCE(automation_admission_attempt, 1))`, preserving legacy rows without updating them. A transport retry of the same logical attempt replays the same Run identity; a later attempt uses the next ordinal and a fresh request identity only after the previous attempt is terminal. Append-only RunEvents distinguish Run-owner Schedule confirmation, compensation and actual `run_started`; the Schedule-side `schedule_occurrence_linked` fact alone is not confirmation.
+
+The authenticated Run API returns the attempt ordinal, derived admission state, creation timestamp and nullable start timestamp. List ordering and cursor comparison use `COALESCE(started_at, created_at)` plus `run_id`; the old `cursor_started_at` query name is accepted and the response also carries `cursor_ordered_at`. CLI inserts explicitly record their actual start to preserve the tightened timestamp invariant.
+
+PostgreSQL 18.6 disposable verification applies this migration twice, runs the attempt/legacy/duplicate/event SQL cases, and asserts owner grants/RLS; the task-run API's focused cursor tests and `star-api-rest --all-targets` compile verify the read path. This does not implement a Schedule admission Inbox, Run confirmation/compensation consumer, production DB grants/identity, BI event pipeline, Infrastructure demand gate, or executor. Multipass inventory remains untouched and capped at two test records.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -188,3 +198,4 @@ The code slice is a typed domain contract only. It does not persist or publish m
 | v0.29 | 2026-10-08 | Add §6.13 for verified receipt-failure backpressure, actual JetStream redelivery, exact duplicate replay after the pre-ACK handle-drop consumer-loss model (no OS process restart), confirmed Term ACK and serial shared-subject tests; record 22/22 disposable runner steps and 2/2 Rust integration tests while leaving production consumer/KMS/identities and execution closed. | Phase 9F4D-3D7 verifies the existing Schedule/Platform boundary. |
 | v0.30 | 2026-10-09 | Add §6.14 and correct §6.1/§6.2 to separate the Schedule claim/command, Run provisional admission/result, Schedule fenced link/confirmation, and post-confirmation Run demand into owner-local transactions. Define stable idempotent recovery, authenticated service identity, stale-fence compensation and explicit fail-closed implementation gates; no production consumer is claimed. | Architecture review found that the previous Run transaction also wrote Schedule-owned occurrence and Outbox state. |
 | v0.31 | 2026-10-09 | Add §6.15 with strict typed Command/Result/Resolution contracts, 16 KiB body bound, canonical infrastructure-binding digest checks, per-logical-attempt request identity, exact-byte broker replay, and out-of-band tenant authentication. Keep worker/consumer/execution disabled. | Freeze the owner-message contract before consumer implementation. |
+| v0.32 | 2026-10-09 | Add §6.16 for the persisted attempt ordinal, provisional/start timestamp boundary, append-only lifecycle events and ordered Run API cursor; record disposable PostgreSQL and focused Rust evidence while keeping Schedule/Run consumers and execution fail-closed. | Phase 9F4C-D1 lifecycle implementation. |

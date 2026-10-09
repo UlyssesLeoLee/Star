@@ -1,6 +1,6 @@
 //! Disposable PostgreSQL + NATS JetStream verification for the Run-owner result Inbox.
 /*
-@cypher schema=1 source_sha256=eb6d31ebc499220b2ca1d3d1279143122b0aef39401711e77c92f2ceeae8b590
+@cypher schema=1 source_sha256=8810af028843802b1f443c9501ce56600070d342dd5e083f1adfa7718d0f3f01
 MERGE (self:File {path:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::capacity_result_persist_replay_conflict_ack_and_rollback",kind:"test"})
 MERGE (seed:Symbol {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs::seed_demand",kind:"function"})
@@ -38,6 +38,9 @@ MERGE (poison_outcome:Type {id:"platform_messaging_runtime::QuarantineRecordOutc
 MERGE (quarantine_receipt:Table {id:"platform_messaging.poison_quarantine_receipt"})
 MERGE (quarantine_payload:Table {id:"platform_messaging.poison_quarantine_payload_work"})
 MERGE (poison_consume_outcome:Type {id:"run_owner_runtime::CapacityResultConsumeOutcome",kind:"enum"})
+MERGE (task_run:Table {id:"multica.task_execution_run"})
+MERGE (task_run_event:Table {id:"multica.task_execution_run_event"})
+MERGE (admission_attempt:Field {id:"multica.task_execution_run.automation_admission_attempt"})
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(seed)
 MERGE (self)-[:DEFINES]->(fixture)
@@ -60,6 +63,9 @@ MERGE (test)-[:CALLS]->(install_fault)
 MERGE (test)-[:CALLS]->(remove_fault)
 MERGE (seed)-[:CALLS]->(fixture)
 MERGE (seed)-[:CALLS]->(append:Symbol {id:"crates/run-owner-runtime/src/outbox.rs::PostgresRunOwnerCapacityStore.append_capacity_demand",kind:"method"})
+MERGE (seed)-[:WRITES]->(task_run)
+MERGE (seed)-[:WRITES]->(task_run_event)
+MERGE (seed)-[:USES]->(admission_attempt)
 MERGE (create_durable)-[:CALLS]->(create_durable_ack)
 MERGE (test)-[:USES_TYPE]->(consumer)
 MERGE (test)-[:USES_TYPE]->(store)
@@ -389,8 +395,8 @@ async fn seed_demand(
         r#"INSERT INTO multica.task_execution_run
                (run_id, tenant_id, project_id, work_item_id, initiated_by, execution_channel,
                 task_snapshot, run_origin, automation_rule_id, automation_rule_version,
-                automation_occurrence_id, correlation_id)
-           VALUES ($1,$2,$3,$4,$5,'langgraph','{}'::jsonb,'schedule',$6,1,$7,$8)"#,
+                automation_occurrence_id, automation_admission_attempt, correlation_id)
+           VALUES ($1,$2,$3,$4,$5,'langgraph','{}'::jsonb,'schedule',$6,1,$7,1,$8)"#,
     )
     .bind(demand.task_execution_run_id)
     .bind(demand.tenant_id)
@@ -399,6 +405,18 @@ async fn seed_demand(
     .bind(Uuid::new_v4())
     .bind(demand.schedule_rule_id)
     .bind(demand.occurrence_id)
+    .bind(demand.correlation_id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        r#"INSERT INTO multica.task_execution_run_event
+               (tenant_id, project_id, run_id, work_item_id, event_type, correlation_id)
+           VALUES ($1, $2, $3, $4, 'schedule_admission_confirmed', $5)"#,
+    )
+    .bind(demand.tenant_id)
+    .bind(demand.project_id)
+    .bind(demand.task_execution_run_id)
+    .bind(work_item_id)
     .bind(demand.correlation_id)
     .execute(&mut *tx)
     .await?;
