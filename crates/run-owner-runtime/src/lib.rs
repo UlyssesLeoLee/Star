@@ -1,6 +1,6 @@
 //! Run-owner persistence and bounded Infrastructure result consumption.
 /*
-@cypher schema=1 source_sha256=42ecfcb036e3f19a675add97c52bbd2e00622592de1abae9619e991e68714367
+@cypher schema=1 source_sha256=e0d49527cd1a7198033de8bb79aeadb0eceb12d6ef9ed78a30dffd8f45782814
 MERGE (self:File {path:"crates/run-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/lib.rs::run_owner_runtime",kind:"module"})
 MERGE (binding_module:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::module",kind:"module"})
@@ -28,12 +28,19 @@ MERGE (module)-[:DEFINES]->(consume_error)
 MERGE (module)-[:IMPORTS]->(outbox_file:File {path:"crates/run-owner-runtime/src/outbox.rs"})
 MERGE (module)-[:IMPORTS]->(consumer_file:File {path:"crates/run-owner-runtime/src/capacity_result.rs"})
 MERGE (module)-[:IMPORTS]->(binding_file:File {path:"crates/run-owner-runtime/src/run_infrastructure_binding.rs"})
+MERGE (module)-[:IMPORTS]->(admission_file:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
+MERGE (module)-[:EXPOSES]->(admission_store:Type {id:"run_owner_runtime::PostgresScheduleAdmissionStore",kind:"struct"})
+MERGE (module)-[:EXPOSES]->(admission_tx:Type {id:"run_owner_runtime::ScheduleAdmissionTransaction",kind:"struct"})
+MERGE (module)-[:EXPOSES]->(admission_start:Type {id:"run_owner_runtime::ScheduleAdmissionStart",kind:"enum"})
+MERGE (module)-[:EXPOSES]->(admission_error:Type {id:"run_owner_runtime::ScheduleAdmissionStoreError",kind:"enum"})
+MERGE (module)-[:EXPOSES]->(admission_source:Type {id:"run_owner_runtime::ScheduleAdmissionSource",kind:"struct"})
 @endcypher
 */
 
 mod capacity_result;
 mod outbox;
 mod run_infrastructure_binding;
+mod schedule_admission;
 
 pub use capacity_result::{
     CapacityResultConsumeOutcome, CapacityResultError, RunOwnerCapacityResultConsumer,
@@ -44,4 +51,8 @@ pub use outbox::{
 pub use run_infrastructure_binding::{
     PostgresRunInfrastructureBindingStore, ResolvedRunInfrastructureBinding,
     RunInfrastructureBindingScope, RunInfrastructureBindingStoreError,
+};
+pub use schedule_admission::{
+    PostgresScheduleAdmissionStore, ScheduleAdmissionSource, ScheduleAdmissionStart,
+    ScheduleAdmissionStoreError, ScheduleAdmissionTransaction,
 };

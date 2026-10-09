@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 async-nats = { workspace = true }
 chrono = { workspace = true }
+domain-automation = { path = "../domain-automation" }
 domain-infrastructure = { path = "../domain-infrastructure" }
 futures-util = { workspace = true }
 platform-messaging-runtime = { path = "../platform-messaging-runtime" }

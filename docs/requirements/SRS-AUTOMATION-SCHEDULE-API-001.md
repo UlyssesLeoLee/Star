@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The disposable Rust SQLx save/resolve, CAS, rollback and digest integrity test passed 1/1 (runner 30/30); broader strict Clippy remains blocked by two existing `star-context` lints. Production KMS, login/stream provisioning, operator access, target DB rollout, Schedule/Run consumers, provider evidence producer, and execution remain open and fail-closed.
-> Version: 0.36 | Date: 2026-10-10
+> Status: 🟡 Run-owner binding and processed admission persistence primitives added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The disposable Rust SQLx save/resolve, CAS, rollback and digest integrity test passed 1/1 (runner 30/30); broader strict Clippy remains blocked by two existing `star-context` lints. Production KMS, login/stream provisioning, operator access, target DB rollout, Schedule/Run consumers, provider evidence producer, and execution remain open and fail-closed.
+> Version: 0.37 | Date: 2026-10-10
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -119,3 +119,18 @@ Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v0.36 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |
+
+
+## SCHED-API-033 owner-local admission receipt/result acceptance
+
+Phase 9F4C-D3 adds Run-owned processed admission Inbox and immutable result Outbox persistence, not a production consumer. `PostgresScheduleAdmissionStore.begin` strict-decodes at most 16 KiB, checks injected tenant/service scope, takes a transaction advisory request lock with 5-second lock and 10-second statement bounds, and returns an exact persisted result before any new Run writes. Changed exact bytes, digest or authenticated source service identity conflict. A new transaction is exposed only for Run-owned authorization, currentness, quota, Run/reservation/event work; dropping it rolls back. `commit_result` validates the typed result and atomically commits the Inbox/result pair with those caller-owned facts. A deferred FK forbids committed orphan receipts; unique tenant/occurrence/attempt prevents different requests claiming one attempt. Acceptance requires a matching schedule-origin, run-as, Task/Worktree/rule/occurrence/ordinal/correlation Run with NULL started_at and no run_started or execution-state event. Both relations are append-only Transaction facts with FORCE tenant RLS, bounded immutable bytes and no physical deletion; no Work or Master table is added. The trusted service source is injected by composition, not deserialized from the body, and its type constructor is not authentication evidence.
+
+Evidence: PostgreSQL 18.6 cumulative runner 33/33; binding SQLx 1/1 and admission SQLx 1/1 (0.52s), Rust 1.99.0 library regression 12/12 and focused strict package Clippy. Audit: `target/phase9f4d-run-owner-consumer/40a8dc35-d9a2-4a76-a944-bd39474d51ef/audit.jsonl`. Tests prove rollback/drop recovery, exact replay, altered-byte/scope/source rejection, concurrent new/replay serialization, different-request same-attempt rejection, result-insert rollback, missing paired-result commit rejection, accepted-result scope guard, prior-start rejection and append-only guard. The accepted Run is seeded only by the disposable admin to exercise storage: it does not prove a production Run writer, authorization or resource reservation. Initial verification exposed the deliberately narrow old grant assertion; it was extended only for four Run identity/start columns and four RunEvent identity/execution columns. An extracted fixture helper reference error was fixed; transient Windows LNK1104 occurred before the final successful isolated rerun. All owned PostgreSQL instances were stopped/removed; zero NATS and zero Multipass VMs were used.
+
+Open gates: real Schedule service authentication and credential lifecycle; target DB/login provisioning; current creator/run-as ACL, Task/Profile/Hook/binding authorization in this transaction; atomic Project/Run quota and Run/reservation writer; Schedule command producer and Run/Schedule/result/confirmation consumers; durable delivery/compensation; Infrastructure currentness and paired physical reservations; Multipass/K3s provider, sandbox, readiness, native Hook/verification, cancellation, BI/Benchmark and execution. No production Run INSERT or event INSERT grant was added. No cross-owner tables are read/written by this new storage module. Execution stays fail-closed.
+
+Gate command: `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests --admission-tests`, with PostgreSQL bin and pinned Rust toolchain/target arguments. [Phase report](../reports/PHASE-9F4C-D3-ADMISSION-PERSISTENCE-REPORT.md).
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.37 | 2026-10-10 | Ulysses — Mavis review | Verify owner-local admission persistence; retain every production authorization/reservation/consumer/execution gate. |

@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=764fc278eedf1978aa48ad62f52f4a9dcdf08fee58a4c0fc1ab3ceb6eb176a55
+# @cypher schema=1 source_sha256=ddc4a6bc244795bcf13c8066d34ae81c7ce90cf03b1d689451e0bb1414965eea
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -21,6 +21,8 @@
 # MERGE (run_binding:Config {id:"db/migrations/2026-10-10-multica-run-infrastructure-binding-master.sql"})
 # MERGE (run_binding_test:Config {id:"db/tests/run-infrastructure-binding-master.sql"})
 # MERGE (binding_sqlx_test:Config {id:"crates/run-owner-runtime/tests/run_infrastructure_binding_pg.rs"})
+# MERGE (admission_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-admission.sql"})
+# MERGE (admission_test:Config {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 # MERGE (legacy_audit_fixture:Config {id:"disposable-test-only::public.audit_trigger_func"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (nats:ExternalService {id:"nats-server.jetstream",kind:"command"})
@@ -65,6 +67,8 @@
 # MERGE (main)-[:READS]->(run_binding)
 # MERGE (main)-[:TESTS]->(run_binding_test)
 # MERGE (main)-[:TESTS]->(binding_sqlx_test)
+# MERGE (main)-[:READS]->(admission_migration)
+# MERGE (main)-[:TESTS]->(admission_test)
 # MERGE (main)-[:USES_TEST_FIXTURE]->(legacy_audit_fixture)
 # MERGE (main)-[:TESTS]->(consumer_test)
 # MERGE (run_sql)-[:CALLS]->(run_step)
@@ -116,6 +120,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructure-capacity-result.sql"
 ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-infrastructure-binding-master.sql"
+SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-admission.sql"
 QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-schema.sql"
 ADMISSION_LIFECYCLE_TEST = ROOT / "db" / "tests" / "task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_TEST = ROOT / "db" / "tests" / "run-infrastructure-binding-master.sql"
@@ -147,7 +152,9 @@ DECLARE
     role_is_restricted BOOLEAN;
     protected_tables TEXT[] := ARRAY[
         'multica.infrastructure_capacity_demand_outbox',
-        'multica.infrastructure_capacity_result_inbox'
+        'multica.infrastructure_capacity_result_inbox',
+        'multica.schedule_admission_inbox',
+        'multica.schedule_admission_result_outbox'
     ];
 BEGIN
     SELECT NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
@@ -181,8 +188,10 @@ BEGIN
        OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'run_id', 'SELECT')
        OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'automation_occurrence_id', 'SELECT')
         OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'task_snapshot', 'SELECT')
-       OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'automation_admission_attempt', 'SELECT')
-       OR has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'started_at', 'SELECT')
+       OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'automation_admission_attempt', 'SELECT')
+       OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'started_at', 'SELECT')
+       OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'initiated_by', 'SELECT')
+       OR NOT has_column_privilege('star_multica_run_owner', 'multica.task_execution_run', 'worktree_id', 'SELECT')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run', 'INSERT')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run', 'UPDATE')
        OR has_table_privilege('star_multica_run_owner', 'multica.task_execution_run', 'DELETE') THEN
@@ -201,6 +210,22 @@ BEGIN
            AND contype = 'c'
     ) THEN
         RAISE EXCEPTION 'Run event vocabulary must include explicit admission confirmation and compensation';
+    END IF;
+    IF (SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'multica' AND c.relname IN ('schedule_admission_inbox','schedule_admission_result_outbox')
+          AND c.relrowsecurity AND c.relforcerowsecurity) <> 2
+       OR (SELECT count(*) FROM pg_policies WHERE schemaname = 'multica'
+        AND tablename IN ('schedule_admission_inbox','schedule_admission_result_outbox')
+        AND qual ILIKE '%app.tenant_id%' AND with_check ILIKE '%app.tenant_id%') <> 2 THEN
+        RAISE EXCEPTION 'Admission facts require FORCE tenant RLS';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'multica.schedule_admission_inbox'::regclass
+          AND conname = 'schedule_admission_paired_result' AND condeferrable AND condeferred)
+       OR (SELECT count(*) FROM pg_trigger WHERE tgname = 'schedule_admission_worm'
+        AND tgrelid IN ('multica.schedule_admission_inbox'::regclass,'multica.schedule_admission_result_outbox'::regclass)
+        AND NOT tgisinternal) <> 2 THEN
+        RAISE EXCEPTION 'Admission pair commit/append-only guards are incomplete';
     END IF;
 
     IF (SELECT count(*) FROM pg_class AS c
@@ -529,6 +554,7 @@ def main() -> int:
     parser.add_argument("--nats-server", type=Path, help="NATS Server binary with JetStream support; not needed with --schema-only")
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
     parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
+    parser.add_argument("--admission-tests", action="store_true", help="Also run Rust SQLx owner-local admission receipt/result tests; --schema-only avoids NATS")
     arguments = parser.parse_args()
 
     global OUTPUT_DIR
@@ -558,6 +584,7 @@ def main() -> int:
             ADMISSION_LIFECYCLE_MIGRATION,
             ADMISSION_LIFECYCLE_TEST,
             RUN_BINDING_MIGRATION,
+            SCHEDULE_ADMISSION_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -705,6 +732,11 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):
+            for attempt in (1, 2):
+                results.append(run_sql(f"schedule-admission-migration-apply-{attempt}", psql_base, SCHEDULE_ADMISSION_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-owner-schema-assertions", psql_base, SCHEMA_ASSERTIONS_SQL, env))
         if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-binding-master-schema-and-lifecycle", psql_base, RUN_BINDING_TEST.read_text(encoding="utf-8"), env))
@@ -757,6 +789,18 @@ def main() -> int:
                 [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "run_infrastructure_binding_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
                 ROOT,
                 binding_env,
+            ))
+
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.admission_tests:
+            admission_env = env.copy()
+            admission_env["STAR_RUN_OWNER_TEST_DATABASE_URL"] = (
+                f"postgresql://star_run_owner_test_admin@127.0.0.1:{pg_port}/postgres"
+            )
+            results.append(run_step(
+                "schedule-admission-postgres-sqlx-integration",
+                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "schedule_admission_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
+                ROOT,
+                admission_env,
             ))
 
         if pg_started and all(item["status"] == "passed" for item in results) and not arguments.schema_only:
@@ -822,7 +866,7 @@ def main() -> int:
         write_text(OUTPUT_DIR / "audit.jsonl", "".join(json.dumps(item, sort_keys=True) + "\n" for item in results))
         print(json.dumps({
             "result": "passed" if exit_code == 0 and all(item["status"] == "passed" for item in results) else "failed",
-            "mode": ("postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration",
+            "mode": ("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration",
             "steps": results,
             "audit_path": str(OUTPUT_DIR / "audit.jsonl"),
             "multipass_instances_created": 0,
