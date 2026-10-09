@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=939e15c5f71b5d9a0ecc678d4203fef3860c16603a754caa9daf6d3727151725
+# @cypher schema=1 source_sha256=39fcb7370404012023e1fe70ca08df020f202ab57edf014b151d22cccf319e11
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -18,6 +18,9 @@
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
 # MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
+# MERGE (run_binding:Config {id:"db/migrations/2026-10-10-multica-run-infrastructure-binding-master.sql"})
+# MERGE (run_binding_test:Config {id:"db/tests/run-infrastructure-binding-master.sql"})
+# MERGE (legacy_audit_fixture:Config {id:"disposable-test-only::public.audit_trigger_func"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (nats:ExternalService {id:"nats-server.jetstream",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test",kind:"command"})
@@ -58,6 +61,9 @@
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
 # MERGE (main)-[:TESTS]->(admission_lifecycle_test)
+# MERGE (main)-[:READS]->(run_binding)
+# MERGE (main)-[:TESTS]->(run_binding_test)
+# MERGE (main)-[:USES_TEST_FIXTURE]->(legacy_audit_fixture)
 # MERGE (main)-[:TESTS]->(consumer_test)
 # MERGE (run_sql)-[:CALLS]->(run_step)
 # MERGE (run_sql)-[:CALLS]->(write_text)
@@ -107,9 +113,14 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructure-capacity-result.sql"
 ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
+RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-infrastructure-binding-master.sql"
 QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-schema.sql"
 ADMISSION_LIFECYCLE_TEST = ROOT / "db" / "tests" / "task-run-admission-attempt-lifecycle.sql"
+RUN_BINDING_TEST = ROOT / "db" / "tests" / "run-infrastructure-binding-master.sql"
 PREREQUISITE_MIGRATIONS = (
+    ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
+    ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2b.sql",
+    ROOT / "db" / "migrations" / "2026-10-01-engineering-run-directory.sql",
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
     ROOT / "db" / "migrations" / "2026-10-01-multica-run-resource-reservations.sql",
     ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql",
@@ -118,6 +129,9 @@ PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-09-infrastructure-provider-profile-master.sql",
     ROOT / "db" / "migrations" / "2026-10-10-infrastructure-physical-capacity-ledger.sql",
 )
+LEGACY_AUDIT_PREREQUISITE_SQL = """\
+CREATE OR REPLACE FUNCTION public.audit_trigger_func()
+RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN COALESCE(NEW, OLD); END $$;"""
 OUTPUT_ROOT = ROOT / "target" / "phase9f4d-run-owner-consumer"
 OUTPUT_DIR = OUTPUT_ROOT
 DATA_PARENT = ROOT / ".cache" / "phase9f4d-run-owner-consumer"
@@ -540,6 +554,8 @@ def main() -> int:
             *PREREQUISITE_MIGRATIONS,
             ADMISSION_LIFECYCLE_MIGRATION,
             ADMISSION_LIFECYCLE_TEST,
+            RUN_BINDING_MIGRATION,
+            RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
         )
@@ -645,6 +661,15 @@ def main() -> int:
             results.append(version_step)
 
         if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(
+                run_sql(
+                    "disposable-legacy-audit-prerequisite-fixture",
+                    psql_base,
+                    LEGACY_AUDIT_PREREQUISITE_SQL,
+                    env,
+                )
+            )
+        if pg_started and all(item["status"] == "passed" for item in results):
             for migration in PREREQUISITE_MIGRATIONS:
                 results.append(run_sql(f"apply-{migration.stem}", psql_base, migration.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
@@ -671,7 +696,15 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):
+            binding_sql = RUN_BINDING_MIGRATION.read_text(encoding="utf-8")
+            for attempt in (1, 2):
+                results.append(run_sql(f"run-binding-migration-apply-{attempt}", psql_base, binding_sql, env))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-owner-schema-assertions", psql_base, SCHEMA_ASSERTIONS_SQL, env))
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(run_sql("run-binding-master-schema-and-lifecycle", psql_base, RUN_BINDING_TEST.read_text(encoding="utf-8"), env))
         if pg_started and all(item["status"] == "passed" for item in results):
             results.append(
                 run_sql(

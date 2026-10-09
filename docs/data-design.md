@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.2 (2026-10-09)
+> **文档版本**: v2.4 (2026-10-10)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -26,6 +26,8 @@
 > | v2.0 | 2026-10-08 | Replace the proposed 3D6 model with the implemented physical tables, dedicated roles, FORCE RLS, 200 KiB per-item and 4 MiB per-deployment quota, 24-hour Work expiry and append-only purge audit; record double-apply and disposable PostgreSQL schema/quota checks. Keep production login/stream provisioning, real KMS and target rollout open. | Phase 9F4D-3D6 persistence substrate passed isolated verification. |
 > | v2.1 | 2026-10-09 | Clarify that Schedule occurrence/link/Outbox, Run/Execution Run/reservation/events/demand, and Infrastructure Inbox/reservations are separate owner facts. Define the Schedule result/link/confirmation handshake and post-confirmation demand; same-database composite FKs validate committed references but do not imply one transaction. Keep confirmation receipt and production consumers as fail-closed gaps. | Correct the Schedule→Run owner transaction boundary. |
 > | v2.2 | 2026-10-09 | Classify the existing TaskExecutionRun and RunEvent lifecycle additions as append-oriented Transaction facts; specify no new Work/Master table, retention change, or role grant. Link `docs/data-design/phase9f4c-d-run-admission-wtm.md` and record disposable PostgreSQL evidence only. | Schedule admission attempts need immutable Run identity and separately auditable lifecycle facts. |
+> | v2.3 | 2026-10-10 | Add §4.13.11, classifying the Run-owner binding SCD2 Master and append-only lifecycle Transaction with exact FORCE RLS/grants, bounded snapshot, canonical Engineering Run scope and Infrastructure-owner validation boundary; do not claim a Work table or production currentness verification. | Phase 9F4C-D2 establishes the Run-owned binding source of truth. |
+> | v2.4 | 2026-10-10 | Tighten the Run binding event boundary: the Run application role is read-only for the Transaction table, and a fixed-search-path SECURITY DEFINER trigger alone appends lifecycle facts; record direct-insert denial plus Rust 1.99.0 package gates. | Self-review found direct event INSERT could forge audit facts. |
 > | v1.6 | 2026-10-05 | 纳入 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
@@ -2087,6 +2089,19 @@ W contains no table in this migration; M contains no table in this migration. Th
 | `platform_messaging.poison_quarantine_payload_purge_audit` | T — Transaction | Append-only evidence that an expired encrypted Work payload was purged with matching source identity, digest and byte count. | Append-only; no UPDATE/DELETE/TRUNCATE. No TTL or physical deletion policy yet. | FORCE RLS on trusted deployment scope; purger role INSERT only; purge audit and Work deletion occur in one transaction. |
 
 Migration `2026-10-08-platform-poison-quarantine.sql` implements these tables and role grants. Metadata-only and encrypted 24-hour retention are explicit per-deployment configuration modes with no default; metadata-only records a receipt and creates no Work row. The current KMS provider is LocalMock-only, so encrypted production retention remains fail-closed. The receipt is a platform Transaction fact and must not be stored in the Run-owner result Inbox because malformed messages may lack trustworthy tenant scope. The payload is separate Work. A Term acknowledgement may follow only after the receipt and selected payload action commit. Unknown fault classification, digest conflict, unavailable DB/key/quota, and `InvalidStoredDemand` remain unacknowledged; the last is an owner-data integrity error. No Run/Schedule/reservation/readiness/BI/execution mutation is allowed. A disposable PostgreSQL 18.6 fixture applied the migration twice and passed RLS, role, append-only, TTL/purge and quota-overflow assertions; it does not establish target database deployment or production grants.
+
+### 4.13.11 Phase 9F4C-D2 Run Infrastructure Binding Master
+
+Migration: `db/migrations/2026-10-10-multica-run-infrastructure-binding-master.sql`.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `multica.run_infrastructure_binding_revision` | M — Master | Run/Execution owner; immutable V2 selection snapshot per canonical tenant/Project/Branch/Engineering Run, pinning exact HostEnvironment/K3s identity and generation plus profile/runtime revisions, namespace and resource budget. | SCD2; only `valid_to` may be closed once; physical delete forbidden. Snapshot and digest are immutable. No TTL or physical deletion. | ENABLE + FORCE RLS on tenant. `star_multica_run_owner` receives SELECT/INSERT and column-level UPDATE(valid_to); other owner roles denied. |
+| `multica.run_infrastructure_binding_event` | T — Transaction | Run/Execution owner; trigger-appended `created` and `superseded` facts with actor/scope/revision/digest. | Append-only; UPDATE/DELETE/TRUNCATE and application INSERT rejected; no TTL or physical deletion. | ENABLE + FORCE RLS on tenant. `star_multica_run_owner` receives SELECT only; a fixed-path SECURITY DEFINER trigger appends facts; other owner roles denied. |
+
+This migration has no Work table. The Master snapshot stores V2 JSON plus explicit scope/version columns; database checks match duplicated identity fields, enforce a 16 KiB JSONB text bound, and tie the canonical scope to `multica.engineering_run`. Rust strict deserialization and digest recomputation provide content-integrity verification; the digest is not authorization. CAS close/insert and lifecycle events occur in one Run-owner transaction. The Run owner does not read or write Infrastructure-owned Provider Profile, HostEnvironment, Multipass or K3s catalog tables. Infrastructure owner independently verifies those exact external revisions/generations and reserves Host plus selected-cluster capacity under its own transaction. Schema/Rust gates and target PostgreSQL/role provisioning are tracked separately; no binding record makes Schedule or Task execution available by itself.
+
+Verification: PostgreSQL 18.6 disposable schema-only runner passed 29/29 steps, including D2 migration idempotency, least-privilege grants, FORCE RLS, tenant isolation, revision lifecycle, WORM and direct event-insert denial; the cluster was stopped and its owned data removed. Rust 1.99.0 package tests passed 12/12, with focused rustfmt and package all-target warnings-as-errors Clippy passing. Broader strict Clippy remains blocked by two existing `star-context` lints. A Rust SQLx save/resolve round-trip is not yet tested. A no-op legacy Audit function existed only as an isolated prerequisite for older Worktree DDL; no production Audit/DB/role deployment, NATS, Multipass VM or inventory was tested or changed.
 
 ### 4.14 Module: domain-identity(`identity` schema)
 

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.31 (2026-10-09)
+> **文档版本**: v2.33 (2026-10-10)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -2796,7 +2796,19 @@ frontend/src/app/automation-debug/
 
 `scripts/automation/phase9f4c_d1_sync.py --apply` synchronizes requirements, basic/detailed design, W/T/M, implementation plan, automation index and the phase report using exact anchors. Running it twice must make the second pass a no-op. PostgreSQL evidence is scoped to disposable schema/invariant verification; it does not prove production owner consumers, target database grants, Multipass/K3s providers, execution, BI or Benchmark.
 
+### 4.73 Phase 9F4C-D2 Run Infrastructure Binding Master gate
+
+**自动化档：[P]** — extend the existing `scripts/automation/phase9f4d_run_owner_consumer.py` disposable PostgreSQL runner. In schema-only mode, apply the canonical Engineering Run prerequisite migrations, apply the Run binding Master migration twice, then run `db/tests/run-infrastructure-binding-master.sql`. Keep the Run-owner result/quarantine and D1 checks in the same disposable database so cumulative role grants, owner separation and RLS remain visible. This gate starts no NATS process and creates no Multipass/K3s VM.
+
+The SQL assertions cover the tenant-scoped SCD2 Master and append-only Transaction table, composite canonical Engineering Run FK, stable binding identity and revision history, one-current-revision constraint, limited `valid_to` update, FORCE RLS, Run-owner least privilege, denied direct event INSERT, other-owner denial, tenant isolation and WORM behavior. The event table is read-only to the Run application role; a fixed-search-path SECURITY DEFINER trigger appends lifecycle facts from guarded Master changes. Run `python -m py_compile` for the runner and keep stdout/stderr/audit in its unique output directory. The schema-only runner must stop and remove only its temporary PostgreSQL data directory; cleanup failure preserves the data and fails the gate.
+
+The Rust adapter gate is package-scoped: format `run-owner-runtime`, compile/test its library with the pinned Rust 1.99.0 toolchain, then run package all-target warnings-as-errors Clippy plus diff/Cypher checks. A strict Clippy pass that traverses workspace dependencies can still fail on pre-existing `star-context` lints; record those separately from the changed package. Migration success does not prove a Rust SQLx round-trip against the target DB, production role provisioning, target DB deployment, Infrastructure Profile/Host/cluster currentness, run-as reauthorization, owner-message trust/consumption, reservations, provider/readiness, BI/Benchmark or execution; these remain fail-closed.
+
+Executed evidence: the disposable PostgreSQL 18.6 schema-only runner passed 29/29 steps, including two D2 migration applications, direct-event-insert denial, Run-owner schema/grant assertions, binding lifecycle/WORM tests, tenant isolation and successful cluster stop/cleanup. The runner used a no-op `public.audit_trigger_func()` only to satisfy legacy Worktree DDL in the disposable database; it is not production Audit evidence. Python syntax passed. Rust 1.99.0 `run-owner-runtime --lib` tests passed 12/12; focused rustfmt and package all-target warnings-as-errors Clippy passed. Broader strict Clippy is blocked by two existing `star-context` lints. No NATS or VM was started.
+
 | Version | Date | Change |
 |---|---|---|
 | v2.30 | 2026-10-09 | Add §4.71 and register the 9F4C-D focused Rust runner for owner-message DTO validation. Record 6/6 gates, 3/3 focused tests, 29/29 package tests, successful package all-target check and Clippy with four explicit pre-existing lint exceptions; keep all message consumers, production identity and execution gates open. | Freeze the typed owner protocol before implementing cross-owner consumers. |
 | v2.31 | 2026-10-09 | Add §4.72 for the D1 lifecycle schema-only gate and exact-anchor idempotent cross-document synchronizer. Record repeated PostgreSQL 18.6 migration and owner/RLS invariant evidence; keep owner consumers, target DB identity/grants and execution fail-closed. | Phase 9F4C-D1 lifecycle schema/API projection. |
+| v2.32 | 2026-10-10 | Add §4.73 for the D2 Run-owner binding Master schema gate; record PostgreSQL 18.6 29/29 schema-runner evidence, provisional Rust 1.98.1 tests 12/12, Python syntax, the disposable-only legacy audit fixture and the still-open required Rust 1.99.0/production gates. | Establish a durable Run binding source before adding Schedule-to-Run consumers. |
+| v2.33 | 2026-10-10 | Harden §4.73 binding events as trigger-only append, record direct-insert denial and Rust 1.99.0 package gates, and clarify the broader dependency Clippy and target SQLx limitations. | Self-review found that application INSERT could forge lifecycle facts. |

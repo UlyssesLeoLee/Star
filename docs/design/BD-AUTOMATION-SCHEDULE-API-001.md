@@ -1,11 +1,13 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Rule API, typed v2 multi-cluster contracts, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Infrastructure Outbox delivery-state primitive, bounded JetStream publication, real PubAck integration, 3D7 redelivery/duplicate-ACK integration, and 9F4C-D typed owner-message DTOs are verified in focused/disposable gates; trusted resolver, production broker configuration/poller, Schedule/Run consumers and execution remain fail-closed.
-> Version: 0.32 | Date: 2026-10-09
+> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The Rust SQLx save/resolve round-trip is not yet tested; broader strict Clippy remains blocked by two existing `star-context` lints. Trusted Infrastructure currentness checks, production broker configuration/poller, Schedule/Run consumers and execution remain fail-closed.
+> Version: 0.34 | Date: 2026-10-10
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
 The immutable v2 binding explicitly stores ClusterPlacementPolicyV1 (shared_pool, run_dedicated, or pinned_cluster), and the deterministic digest covers that choice together with the resolved cluster ID/generation. The owner acceptance and readiness evidence use separate host_capacity_reservation_id and cluster_capacity_reservation_id; neither may stand in for the other.
+
+The D2 disposable PostgreSQL runner passed 29/29 steps, including repeated binding migration, canonical Run FK, revision lifecycle, grants, FORCE RLS, tenant isolation and WORM checks. It installed a no-op legacy Audit function only for older Worktree migration prerequisites; that fixture is not production Audit evidence. Rust `run-owner-runtime --lib` tests passed 12/12 with 1.98.1, which does not meet the required 1.99.0 gate.
 
 
 Schedule Rules are an Automation capability owned by an Engineering Run. The API is nested under Project → Engineering Run. A Schedule Rule references the Run's Branch, Repository, local Worktree, and Task Card; it does not create a separate workspace or bypass Run authorization. The UI may configure rules from the Run's Automation app. Selecting a Worktree remains the focus/CLI checkout decision and is not itself schedule authorization.
@@ -163,6 +165,14 @@ The authenticated Run API returns the attempt ordinal, derived admission state, 
 
 PostgreSQL 18.6 disposable verification applies this migration twice, runs the attempt/legacy/duplicate/event SQL cases, and asserts owner grants/RLS; the task-run API's focused cursor tests and `star-api-rest --all-targets` compile verify the read path. This does not implement a Schedule admission Inbox, Run confirmation/compensation consumer, production DB grants/identity, BI event pipeline, Infrastructure demand gate, or executor. Multipass inventory remains untouched and capped at two test records.
 
+### 6.19 9F4C-D2 Run-owner binding source
+
+The Run/Execution owner persists exactly one current infrastructure binding per canonical tenant/Project/Branch/Engineering Run. Each immutable `RunInfrastructureBindingSnapshotV2` revision pins the exact HostEnvironment and K3s cluster identity/generation, provider and runtime profile revisions/digests, namespace/service account, placement policy, and resource budget. Rust recomputes the versioned canonical digest when resolving a stored row and fails closed on malformed JSON, scope drift, binding ID/revision mismatch, or digest mismatch.
+
+The Run owner uses one transaction to compare the expected current revision, close it once and insert the next revision. The Master is SCD2 and deletion is forbidden; create/supersede facts are append-only Transaction events. Tenant FORCE RLS applies to both. The restricted NOLOGIN Run-owner role receives SELECT/INSERT plus UPDATE(valid_to) only on the Master and SELECT-only on lifecycle events. A fixed-search-path SECURITY DEFINER trigger appends events only after a guarded Master insert or supersession, and direct application INSERT is denied. Infrastructure and Automation owners receive no grants. A composite FK binds the stored tuple to `multica.engineering_run`.
+
+This resolver verifies stored Run-owner content integrity and the canonical Run scope; it does not prove run-as authorization or that Infrastructure-owned facts remain current. Infrastructure must independently load and verify the exact Provider Profile digest and Host/K3s identity generation in its own transaction before reserving capacity. No owner shares a write transaction. Rust SQLx save/resolve round-trip, Schedule/Run command consumers, target production DB role, reservations, readiness, Multipass/K3s Manager, BI/Benchmark and execution remain fail-closed.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -199,3 +209,5 @@ PostgreSQL 18.6 disposable verification applies this migration twice, runs the a
 | v0.30 | 2026-10-09 | Add §6.14 and correct §6.1/§6.2 to separate the Schedule claim/command, Run provisional admission/result, Schedule fenced link/confirmation, and post-confirmation Run demand into owner-local transactions. Define stable idempotent recovery, authenticated service identity, stale-fence compensation and explicit fail-closed implementation gates; no production consumer is claimed. | Architecture review found that the previous Run transaction also wrote Schedule-owned occurrence and Outbox state. |
 | v0.31 | 2026-10-09 | Add §6.15 with strict typed Command/Result/Resolution contracts, 16 KiB body bound, canonical infrastructure-binding digest checks, per-logical-attempt request identity, exact-byte broker replay, and out-of-band tenant authentication. Keep worker/consumer/execution disabled. | Freeze the owner-message contract before consumer implementation. |
 | v0.32 | 2026-10-09 | Add §6.16 for the persisted attempt ordinal, provisional/start timestamp boundary, append-only lifecycle events and ordered Run API cursor; record disposable PostgreSQL and focused Rust evidence while keeping Schedule/Run consumers and execution fail-closed. | Phase 9F4C-D1 lifecycle implementation. |
+| v0.33 | 2026-10-10 | Add §6.19 for Run-owner SCD2 binding persistence/resolution, digest validation, CAS revision, FORCE RLS and the explicit Infrastructure revalidation boundary; record PostgreSQL 18.6 29/29 and Rust 1.98.1 diagnostic tests 12/12; keep Rust 1.99.0, production identity, consumers, reservations, readiness and execution fail-closed. | The owner-message DTO had no authoritative persisted Run binding source. |
+| v0.34 | 2026-10-10 | Harden §6.19 audit writes so the application role cannot directly insert lifecycle events; record PostgreSQL 18.6 29/29 and Rust 1.99.0 package tests/rustfmt/targeted Clippy while retaining target DB, production identity, consumers, reservations, readiness and execution gates. | Self-review found that direct event-table INSERT could forge lifecycle facts. |

@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.09 (2026-10-09)
-> **上游要件定义书**: docs/requirements.md v6.12
+> **文档版本**: v6.11 (2026-10-10)
+> **上游要件定义书**: docs/requirements.md v6.14
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5114,6 +5114,7 @@ No executor starts until Schedule confirmation, current ACL/binding, both physic
 | AC-SCHED-API-029 | Requirements §50.8Y; Schedule SRS §SCHED-API-013/016; Schedule DD §6.16. Enforce owner-local admission/result, Schedule fenced link/confirmation, post-confirmation Infrastructure demand, idempotent lost-reply recovery, conflict rejection, owner-command compensation and fail-closed execution. |
 | AC-SCHED-API-030 | Requirements §50.8Y; Schedule SRS §SCHED-API-029; Schedule DD §6.17. Enforce strict versioned Command/Result/Resolution schemas, stable per-logical-attempt `request_id`, exact-byte transport replay, binding digest/scope matching, 16 KiB maximum, and authenticated tenant context outside the payload. This is a domain-contract slice only; no consumer or execution path is enabled. |
 | AC-SCHED-API-031 | Requirements §50.8Z; Schedule SRS §SCHED-API-031; Schedule BD §6.16; Schedule DD §6.18. Persist logical Schedule attempt ordinals and provisional Run timestamps, keep actual `run_started` separate, expose lifecycle state and stable ordered pagination. PostgreSQL schema/negative cases and focused API cursor tests are implementation evidence only; owner consumers and execution remain fail-closed. |
+| AC-SCHED-API-032 | Requirements §50.8AA; Schedule SRS §SCHED-API-032; Schedule BD/DD §6.19; Data Design §4.13.11. Run owner stores and resolves the canonical V2 binding through SCD2/CAS, FORCE RLS and digest validation; Infrastructure owner independently validates provider/resource identities. Neither path enables Run admission or execution. |
 
 ### 16.50 Phase 9F4C-D versioned Schedule owner-message contract
 
@@ -5128,6 +5129,20 @@ The Rust DTO contract and focused tests do not implement Outbox persistence, aut
 Schedule Run attempts are persisted as distinct immutable Run identities. `automation_admission_attempt` is positive for provisional Schedule admissions and unique with tenant plus occurrence; a legacy NULL maps to attempt 1 in the unique expression index. Provisional admissions set `created_at` and leave `started_at` NULL. Actual execution start remains a later RunEvent and timestamp. Manual/CLI Run creation keeps an explicit start time.
 
 Run list/detail derives `provisional`, `confirmed`, `compensated`, or `started` from RunEvents and distinguishes creation time from execution start. Only the Run-owner `schedule_admission_confirmed` event confirms admission; Schedule-side `schedule_occurrence_linked` is a link fact and cannot stand in for consuming that confirmation. Pagination sorts on `COALESCE(started_at, created_at)`, accepts `cursor_started_at` for older clients, and emits the ordered cursor alias. The D1 migration changes no owner grants and adds no consumer; same-transaction owner writes, Schedule confirmation, demand publication and all execution gates remain later work.
+
+### 16.52 Phase 9F4C-D2 Run Infrastructure Binding Master
+
+The Run/Execution owner owns `multica.run_infrastructure_binding_revision` (Master) and `multica.run_infrastructure_binding_event` (Transaction). A revision stores the full strict `RunInfrastructureBindingSnapshotV2` JSON, canonical digest, explicit tenant/Project/Branch/Engineering Run scope, stable binding ID, revision, actor and SCD2 validity. Database checks bind duplicated scope/version fields to the snapshot; Rust validates the typed contract and recomputes the digest on every resolution. The CAS writer closes only the expected current revision and writes its successor in the same Run-owner transaction. FORCE RLS, append-only lifecycle events and the restricted owner role protect the records.
+
+The binding Master is a Run-owned selection record, not an Infrastructure catalog. It does not create cross-owner foreign keys or grants to Infrastructure Provider Profile, HostEnvironment, Multipass instance or K3s cluster tables. The Infrastructure owner must independently revalidate the exact Provider Profile revision/digest and Host/K3s identity/generation before capacity admission; Run owner must independently recheck the fixed Rule creator's current Project/Run authorization, current target/Profile/HookSet, quota and Schedule fence. Missing binding, digest drift, revoked run-as access or any owner-side capacity/readiness gap keeps TaskExecutionRun non-executing. This phase adds no Schedule Inbox/Outbox consumer, BI/Benchmark event, VM operation, or executor.
+
+| Gate | Evidence / boundary |
+|---|---|
+| Binding storage | Repeated migration, canonical Engineering Run scope FK, one-current-revision constraint, CAS close/insert, trigger-only append-only created/superseded facts, denied direct event inserts, tenant isolation and owner least privilege. |
+| Binding resolver | Strict typed decode and canonical digest recomputation; exact request scope, binding ID and revision match or fail closed. |
+| Still closed | Rust SQLx save/resolve round-trip, creator run-as reauthorization, Schedule/Run message authentication and consumers, Infrastructure profile/catalog revalidation in target deployment, paired reservations, Multipass/K3s Manager, sandbox/readiness, BI/Benchmark and execution. |
+
+The disposable PostgreSQL 18.6 runner passed 29/29 steps for repeated migrations, owner grants, RLS/tenant isolation, trigger-only audit insertion and binding lifecycle/WORM assertions; its owned database stopped and was removed. It used a no-op legacy audit function only to satisfy older Worktree DDL in the isolated fixture. Rust 1.99.0 package tests passed 12/12; focused rustfmt and package all-target warnings-as-errors Clippy passed. Broader strict Clippy remains blocked by two existing `star-context` lints. No production database, NATS consumer, VM, or Multipass inventory was modified.
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -5284,3 +5299,5 @@ Run list/detail derives `provisional`, `confirmed`, `compensated`, or `started` 
 | v6.07 | 2026-10-09 | Mavis review | Add §16.49 / AC-SCHED-API-029; correct §16.24/§16.27 and AC-LOOP-009 so Schedule, Run/Execution and Infrastructure each commit only owner-local facts, with confirmation before demand publication and owner-command compensation. Align requirements v6.10, Schedule SRS v0.31/BD v0.30/DD v0.30, Data Design v2.1, Infrastructure DD v0.33, Group DD v4.76 and plan v6.43; no worker or production execution is claimed. | Review found current Schedule admission wording violated the documented owner/API/Outbox boundary. |
 | v6.08 | 2026-10-09 | Mavis review | Add §16.50 / AC-SCHED-API-030 for strict typed Schedule Command/Result/Resolution, logical-attempt request identity, exact-byte transport replay, 16 KiB bounds, binding-digest checks and out-of-band owner authentication. Align requirements v6.11 and Schedule SRS/BD/DD v0.32/v0.31/v0.31; record focused package verification only and preserve production consumer/execution gates. | Freeze the owner-message contract before implementing cross-owner consumers. |
 | v6.09 | 2026-10-09 | Mavis review | Add §16.51 / AC-SCHED-API-031 for the Schedule attempt lifecycle schema and API/UI projection. Align requirements v6.12, Schedule SRS/BD/DD v0.33/v0.32/v0.32 and Data Design v2.2; record PostgreSQL 18.6 and focused Rust evidence, with no owner consumer or execution enabled. | Prevent provisional admission from being presented as execution start. |
+| v6.10 | 2026-10-10 | Mavis review | Add §16.52 / AC-SCHED-API-032 for the Run-owner SCD2 infrastructure-binding Master, canonical Rust digest resolver, CAS revision transaction, W/T split and Infrastructure owner revalidation boundary. Record PostgreSQL 18.6 runner 29/29 and diagnostic Rust 1.98.1 tests 12/12; retain the required Rust 1.99.0, production identity, authorization, consumer, reservation, readiness, BI/Benchmark and execution gates. | The typed Schedule→Run contract lacked a persisted Run binding source of truth. |
+| v6.11 | 2026-10-10 | Mavis review | Refine §16.52 so the application role can read binding events but cannot forge them through direct INSERT; record Rust 1.99.0 package tests/rustfmt/targeted Clippy and the broader `star-context` strict-Clippy blocker. | Self-review strengthened the append-only audit writer boundary. |

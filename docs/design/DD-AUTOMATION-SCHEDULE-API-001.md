@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Rule API, typed binding/demand/readiness, isolated owner schema/grants, Inbox receive, profile-derived tenant-scoped admission, persisted Provider Profile source, Outbox delivery state store, bounded JetStream publisher, 3D6 quarantine persistence/consumer hook, 3D7 real JetStream redelivery/duplicate ACK, and 9F4C-D typed wire DTOs are verified; trusted resolver, cross-tenant allocator, target migration/app identity, production Schedule/Run consumers, production worker, provider evidence producer, and execution remain open.
-> Version: 0.32 | Date: 2026-10-09
+> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The Rust SQLx save/resolve round-trip is not yet tested; broader strict Clippy remains blocked by two existing `star-context` lints. Infrastructure currentness verification, cross-tenant allocator, target migration/app identity, production Schedule/Run consumers, worker and execution remain open.
+> Version: 0.34 | Date: 2026-10-10
 
 ## 1. Routes
 
@@ -249,6 +249,29 @@ The API's list and detail read paths project `admission_attempt`, `created_at`, 
 
 The disposable PostgreSQL 18.6 gate re-applies the migration and validates provisional attempts 1/2, duplicate ordinal rejection, legacy NULL-as-one collision, missing ordinal rejection, non-Schedule start requirement, and confirmation/compensation event acceptance. Runtime grants remain unchanged. This migration/API slice does not add the Schedule or Run owner consumers, confirmation receipt, Infrastructure demand writer, target-database rollout, BI/Benchmark, provider or execution; production stays fail-closed.
 
+## 6.19 9F4C-D2 Run Infrastructure Binding persistence and resolver
+
+Migration `2026-10-10-multica-run-infrastructure-binding-master.sql` adds two Run/Execution-owned relations:
+
+| Relation | W/T/M | Mutation and access contract |
+|---|---|---|
+| `multica.run_infrastructure_binding_revision` | Master | One current SCD2 revision per tenant/Project/Branch/Engineering Run. Snapshot content and digest are immutable; only one closure of `valid_to` is allowed. Physical delete is rejected. A composite FK proves the canonical Engineering Run tuple. |
+| `multica.run_infrastructure_binding_event` | Transaction | Trigger-appended `created` and `superseded` facts with actor, scope, revision and digest; application INSERT/UPDATE/DELETE/TRUNCATE are rejected. |
+
+The Master duplicates canonical scope, `binding_id`, `binding_revision` and `schema_version` beside a strict bounded JSON snapshot. SQL checks these identities against the JSON envelope and caps JSONB text at 16 KiB. The stored 32-byte digest is not self-authenticating: Rust recomputes `RunInfrastructureBindingSnapshotV2::digest()` on every read. Resolution checks supported schema v2, all non-nil IDs/revisions, exact lookup scope, stable binding ID/revision and digest equality before returning a snapshot.
+
+`PostgresRunInfrastructureBindingStore::save_revision` activates `star_multica_run_owner` and transaction-local tenant/actor settings, locks the current scope row, compares the expected revision, closes exactly that revision and inserts its successor atomically. Initial insert requires revision 1; successors preserve binding ID and increment by one. Unique-current and composite Engineering Run constraints protect races and foreign scopes. A losing CAS returns a conflict or database uniqueness error without committing a partial close.
+
+`resolve_current` uses the restricted owner role and tenant RLS, decodes the stored JSON, recomputes its digest, and verifies scope/identity/revision. It is a Run-owned source resolver only: it does not authorize fixed `run_as_actor_id`, validate current Task/Worktree/Profile/HookSet or Schedule fence, or verify Infrastructure-owned current Provider Profile/catalog generation. Infrastructure performs its own profile and exact Host/K3s identity/generation validation under its transaction. No cross-owner table grants/FKs/writes or distributed transaction are introduced.
+
+| Validation boundary | Required evidence |
+|---|---|
+| PostgreSQL | Apply the binding migration twice; assert canonical Engineering Run FK, one-current constraint, FORCE RLS, exact owner/other-owner grants, direct event INSERT denial, CAS revision/event facts, tenant isolation and WORM triggers. |
+| Rust | Validate typed contract and canonical digest; reject scope, identity, revision, malformed JSON and digest mismatches. |
+| Still fail-closed | Rust SQLx save/resolve round-trip, production DB identity, run-as authorization, Schedule/Run consumers, Infrastructure currentness/reservation/readiness, BI/Benchmark, sandbox and executor. PostgreSQL 18.6 disposable schema acceptance and focused Rust 1.99.0 package gates passed but are not target deployment evidence. |
+
+PostgreSQL 18.6 execution passed 29/29 disposable runner steps, including migration idempotency, owner schema/grants, tenant RLS, D2 revision lifecycle/WORM and direct-event-insert denial; PostgreSQL stopped and its owned data directory was removed. The disposable chain used a no-op legacy Audit function solely to permit the older Worktree DDL prerequisite. Rust 1.99.0 package unit tests passed 12/12; package rustfmt and all-target warnings-as-errors Clippy passed. Broader strict Clippy is blocked by two existing `star-context` lints. No target database was changed, no NATS process or Multipass VM was started, and no production currentness or execution capability is claimed.
+
 ## 7. Revision history
 
 | Version | Date | Change |
@@ -285,3 +308,5 @@ The disposable PostgreSQL 18.6 gate re-applies the migration and validates provi
 | v0.30 | 2026-10-09 | Add §6.16 and replace the single cross-owner admission transaction with separate Run admission/result, Schedule fenced link/confirmation, and post-confirmation Run demand transactions. Specify stable occurrence idempotency, current-fence CAS, compensation, authenticated owner messages, current same-database FK limitation and fail-closed production gates. | Correct the ownership conflict in the earlier Schedule→Run persistence wording. |
 | v0.31 | 2026-10-09 | Correct §6.16 to distinguish logical admission attempts from transport redelivery and add §6.17 wire tables for strict bounded Command/Result/Resolution DTOs, exact binding-digest matching and out-of-band owner authentication. Preserve local fence CAS, owner transaction boundaries and production fail-closed gates. | The Run-owner contract must not treat an occurrence ID or envelope tenant claim as authorization. |
 | v0.32 | 2026-10-09 | Add §6.18 for attempt lifecycle DDL, legacy ordinal mapping, event vocabulary, API cursor and Task Run UI; record repeated PostgreSQL 18.6 migration/invariant evidence and retain all production consumer, grants and execution gates. | Phase 9F4C-D1 implementation/design reconciliation. |
+| v0.33 | 2026-10-10 | Add §6.19 for Run-owner SCD2 binding Master/events, strict bounded snapshot, Rust digest resolver, CAS write transaction, tenant FORCE RLS/least privilege and the Infrastructure owner revalidation boundary. Record PostgreSQL 18.6 29/29 and Rust 1.98.1 diagnostic tests 12/12; retain the required Rust 1.99.0 and all authorization, production identity, consumer, reservation, readiness and execution gates. | The Run owner needed a persisted binding source before Schedule consumer implementation. |
+| v0.34 | 2026-10-10 | Record the D2 append-only event hardening, Rust 1.99.0 focused gates and 29/29 PostgreSQL evidence; retain broader strict-Clippy and all production authorization/consumer/provider/execution gaps. | Self-review found direct event-table INSERT could forge lifecycle facts. |
