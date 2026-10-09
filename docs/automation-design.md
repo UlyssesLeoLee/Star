@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.36 (2026-10-10)
+> **文档版本**: v2.37 (2026-10-10)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -2851,3 +2851,18 @@ Evidence: cumulative PostgreSQL18.6/Rust1.99.0 runner 36/36, binding/admission S
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v2.36 | 2026-10-10 | Ulysses — Mavis review | Add verified transactional directory/binding prerequisite; preserve remaining admission/execution gates. |
+
+
+## 4.77 D5 — owner task currentness gate
+
+Schedule 新尝试必须在 Run-owner 同一事务内复验 Task/Worktree 的当前 canonical 归属：tenant、Project、repository、Branch、Engineering Run、Task、Worktree 精确一致；Worktree 未归档且有效，Project binding、Run binding、Task metadata、Task–Worktree relation 均为当前有效行。`revalidate_task_binding` 先复验固定创建者及锁定的 infrastructure binding，再调用固定路径 native SQL capability，持有五张目标表的 FOR SHARE 直到事务结束。缺失、归档或解绑返回 TargetUnavailable；权限/binding 拒绝保留原 typed code，数据库错误不得放行。
+
+仅新增受限 EXECUTE 能力；SECURITY DEFINER 使用 search_path=pg_catalog、静态限定 schema，PUBLIC execute 撤销，runtime 无目标表写权限。目标环境 function owner/RLS/底层行锁权限仍须验收。Profile、原生 HookSet、任务生命周期可执行状态、预算/reservation、非执行态 Run writer、owner delivery/consumer、sandbox 与真正执行闭环仍未完成；primitive commit_result 不是完整准入入口，不启用执行。
+
+验证：PostgreSQL18.6/Rust1.99.0 runner 40/40，SQLx binding/admission targets2/2；库12/12、包级 all-targets/no-deps Clippy -D warnings、格式/Python/图头/diff 通过。实际覆盖目标缺失、Task 身份不匹配、当前有效、Worktree 归档、关联关闭以及五类目标行并发关闭 SQLSTATE55P03。Audit：`target/phase9f4d-run-owner-consumer/857a6fbe-6bc7-4978-b070-bab871067cf7/audit.jsonl`。隔离 admin fixture 跳过生命周期触发器，不作为生产授权写入/审计证据。零 VM；生产数据库未变。CodeRabbit 因 /root/.local/bin/coderabbit: Permission denied 无独立通过结果。
+
+关联脚本：`scripts/automation/phase9f4d_run_owner_consumer.py`；报告：[D5](reports/PHASE-9F4C-D5-TASK-CURRENTNESS-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.37 | 2026-10-10 | Ulysses — Mavis 接手审核 | 同步已验证的事务内任务归属门与剩余缺口。 | D5 实现与实测。 |

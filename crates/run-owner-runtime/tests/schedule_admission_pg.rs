@@ -1,11 +1,19 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=dffac9db9de734059dfd1812dba7efcc7f9deaf5bb8d635d2eb4ede0fef26c90
+@cypher schema=1 source_sha256=b1012909c9dbc8f8b289e1abb956cfb6a55020f36c68ccbebbb552e1bfc71b5f
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
 MERGE (binding:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::binding_fixture",kind:"function"})
 MERGE (source:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::source",kind:"function"})
+MERGE (test)-[:CALLS]->(task_seed:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_task_binding",kind:"function"})
+MERGE (self)-[:DEFINES]->(task_seed)
+MERGE (task_seed)-[:WRITES]->(w:Table {id:"public.worktree_canvas_worktree"})
+MERGE (task_seed)-[:WRITES]->(p:Table {id:"multica.worktree_project_binding"})
+MERGE (task_seed)-[:WRITES]->(b:Table {id:"multica.engineering_run_worktree_binding"})
+MERGE (task_seed)-[:WRITES]->(m:Table {id:"multica.task_metadata"})
+MERGE (task_seed)-[:WRITES]->(l:Table {id:"multica.work_item_worktree"})
+MERGE (test)-[:CALLS]->(task_check:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_task_binding",kind:"method"})
 MERGE (test)-[:CALLS]->(source)
 MERGE (self)-[:DEFINES]->(source)
 MERGE (seed:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_provisional_run",kind:"function"})
@@ -277,9 +285,29 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
         panic!("new current request")
     };
     pending.revalidate_directory_and_binding().await?;
+    assert!(matches!(
+        pending.revalidate_task_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    seed_task_binding(&admin, &current).await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(current.tenant_id), &current.encode_json()?)
+        .await?
+    else {
+        panic!("new task-binding request")
+    };
+    pending.revalidate_task_binding().await?;
     // The read locks hold even against a disposable admin mutation that bypasses
     // lifecycle triggers, proving neither canonical ACL nor binding can move.
     for (table, predicate, identity) in [
+        (
+            "public.worktree_canvas_worktree",
+            "id",
+            current.occurrence.rule_snapshot.target.worktree_id,
+        ),
         (
             "permission.project_role_binding",
             "project_id",
@@ -289,6 +317,26 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
             "multica.run_infrastructure_binding_revision",
             "binding_id",
             current.infrastructure_binding.binding_id,
+        ),
+        (
+            "multica.work_item_worktree",
+            "worktree_id",
+            current.occurrence.rule_snapshot.target.worktree_id,
+        ),
+        (
+            "multica.task_metadata",
+            "work_item_id",
+            current.occurrence.rule_snapshot.target.work_item_id,
+        ),
+        (
+            "multica.worktree_project_binding",
+            "worktree_id",
+            current.occurrence.rule_snapshot.target.worktree_id,
+        ),
+        (
+            "multica.engineering_run_worktree_binding",
+            "worktree_id",
+            current.occurrence.rule_snapshot.target.worktree_id,
         ),
     ] {
         let mut mutate = admin.begin().await?;
@@ -305,6 +353,64 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
         );
         mutate.rollback().await?;
     }
+    drop(pending);
+    let mut wrong_task = current.clone();
+    wrong_task.request_id = Uuid::new_v4();
+    wrong_task.occurrence.rule_snapshot.target.work_item_id = Uuid::new_v4();
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(wrong_task.tenant_id), &wrong_task.encode_json()?)
+        .await?
+    else {
+        panic!("wrong task identity")
+    };
+    assert!(matches!(
+        pending.revalidate_task_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    // Missing associations and archived checkouts must never reuse the earlier pass.
+    sqlx::query("UPDATE public.worktree_canvas_worktree SET archived=TRUE WHERE id=$1")
+        .bind(current.occurrence.rule_snapshot.target.worktree_id)
+        .execute(&admin)
+        .await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(current.tenant_id), &current.encode_json()?)
+        .await?
+    else {
+        panic!("new archived request")
+    };
+    assert!(matches!(
+        pending.revalidate_task_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    sqlx::query("UPDATE public.worktree_canvas_worktree SET archived=FALSE WHERE id=$1")
+        .bind(current.occurrence.rule_snapshot.target.worktree_id)
+        .execute(&admin)
+        .await?;
+    let mut close = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *close)
+        .await?;
+    sqlx::query("UPDATE multica.work_item_worktree SET valid_to=clock_timestamp() WHERE tenant_id=$1 AND work_item_id=$2 AND valid_to IS NULL")
+        .bind(current.tenant_id).bind(current.occurrence.rule_snapshot.target.work_item_id).execute(&mut *close).await?;
+    close.commit().await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(current.tenant_id), &current.encode_json()?)
+        .await?
+    else {
+        panic!("new closed association request")
+    };
+    assert!(matches!(
+        pending.revalidate_task_binding().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
     drop(pending);
     let mut revoke = admin.begin().await?;
     sqlx::query("SET LOCAL session_replication_role=replica")
@@ -576,6 +682,37 @@ async fn seed_directory(
         VALUES('{tenant}','{branch}','{actor}','developer','{actor}',1);
         INSERT INTO permission.engineering_run_role_binding(tenant_id,engineering_run_id,user_id,role,granted_by,version)
         VALUES('{tenant}','{run}','{actor}','developer','{actor}',1); COMMIT;"))
+        .execute(admin).await?;
+    Ok(())
+}
+
+async fn seed_task_binding(
+    admin: &sqlx::PgPool,
+    command: &ScheduleRunAdmissionCommandV1,
+) -> Result<(), sqlx::Error> {
+    let t = &command.occurrence.rule_snapshot.target;
+    let tenant = command.tenant_id;
+    let actor = command.occurrence.run_as_actor_id;
+    let project = t.project_id;
+    let branch = t.branch_id;
+    let run = t.engineering_run_id;
+    let repo = t.repository_id;
+    let worktree = t.worktree_id;
+    let task = t.work_item_id;
+    let project_binding = Uuid::new_v4();
+    let workspace = Uuid::new_v4();
+    // Disposable fixture only; generated UUIDs are the only interpolated values.
+    sqlx::raw_sql(&format!("BEGIN; SET LOCAL session_replication_role=replica;
+      INSERT INTO public.worktree_canvas_worktree(id,tenant_id,workspace_id,repo_id,project_id,name,branch,path)
+      VALUES('{worktree}','{tenant}','{workspace}','{repo}','{project}','fixture','dev','fixture://{worktree}');
+      INSERT INTO multica.worktree_project_binding(binding_id,tenant_id,project_id,worktree_id,assigned_by)
+      VALUES('{project_binding}','{tenant}','{project}','{worktree}','{actor}');
+      INSERT INTO multica.engineering_run_worktree_binding(tenant_id,project_id,repository_id,branch_id,engineering_run_id,worktree_id,project_binding_id,assigned_by,version)
+      VALUES('{tenant}','{project}','{repo}','{branch}','{run}','{worktree}','{project_binding}','{actor}',1);
+      INSERT INTO multica.task_metadata(tenant_id,workspace_id,project_id,repository_id,branch_id,engineering_run_id,work_item_id,item_type,title,reporter_user_id)
+      VALUES('{tenant}','{workspace}','{project}','{repo}','{branch}','{run}','{task}','task','Task fixture','{actor}');
+      INSERT INTO multica.work_item_worktree(tenant_id,project_id,work_item_id,worktree_id)
+      VALUES('{tenant}','{project}','{task}','{worktree}'); COMMIT;"))
         .execute(admin).await?;
     Ok(())
 }

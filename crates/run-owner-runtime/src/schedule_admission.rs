@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=e2e1d7dea3ccfcb3de42f35da1dd81fabea0fa868d9596a888a2c07abf5a087b
+@cypher schema=1 source_sha256=c009b9e7004c7b2155b36b27764b361b52eafb0a6f485cd4f7b46c8c340b6080
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -20,6 +20,10 @@ MERGE (self)-[:DEFINES]->(revalidate)
 MERGE (revalidate)-[:CALLS]->(verify_directory:Symbol {id:"db/migrations/2026-10-10-run-owner-admission-currentness.sql::verify_schedule_run_as_current",kind:"function"})
 MERGE (revalidate)-[:CALLS]->(resolve_locked:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::resolve_current_binding_locked",kind:"function"})
 MERGE (revalidate)-[:CALLS]->(scope)
+MERGE (task:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_task_binding",kind:"method"})
+MERGE (self)-[:DEFINES]->(task)
+MERGE (task)-[:CALLS]->(revalidate)
+MERGE (task)-[:CALLS]->(verify_task:Symbol {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql::verify_schedule_task_current",kind:"function"})
 MERGE (begin)-[:CALLS]->(scope)
 MERGE (begin)-[:CALLS]->(decode)
 MERGE (begin)-[:CALLS]->(match)
@@ -175,6 +179,32 @@ impl PostgresScheduleAdmissionStore {
 }
 
 impl ScheduleAdmissionTransaction {
+    /// Lock the current authorized canonical task/checkout scope in this transaction.
+    /// Profile, HookSet, quota and execution readiness remain separate prerequisites.
+    pub async fn revalidate_task_binding(&mut self) -> Result<(), ScheduleAdmissionStoreError> {
+        self.revalidate_directory_and_binding().await?;
+        let command = &self.command;
+        let target = &command.occurrence.rule_snapshot.target;
+        let permitted: bool = sqlx::query_scalar(
+            "SELECT multica.verify_schedule_task_current($1,$2,$3,$4,$5,$6,$7,$8)",
+        )
+        .bind(command.tenant_id)
+        .bind(command.occurrence.run_as_actor_id)
+        .bind(target.project_id)
+        .bind(target.branch_id)
+        .bind(target.engineering_run_id)
+        .bind(target.repository_id)
+        .bind(target.worktree_id)
+        .bind(target.work_item_id)
+        .fetch_one(&mut *self.transaction)
+        .await?;
+        if !permitted {
+            return Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+                ScheduleAdmissionRejectionCodeV1::TargetUnavailable,
+            ));
+        }
+        Ok(())
+    }
     /// Reauthorize the fixed creator and lock current directory/binding facts until commit.
     ///
     /// This is one prerequisite only. It checks current Project/Branch/Run membership,

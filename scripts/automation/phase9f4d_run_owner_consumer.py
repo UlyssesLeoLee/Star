@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=fb17a15d688da07b054dc81542976b2c5bdc0c1e87866ad21b5f3febc1e64f8b
+# @cypher schema=1 source_sha256=7d3f042a308cb3a8524f352b8825e90509a1e7e3733b0c4c40243a86656e4c9d
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -72,6 +72,7 @@
 # MERGE (main)-[:READS]->(admission_migration)
 # MERGE (main)-[:TESTS]->(admission_test)
 # MERGE (main)-[:READS]->(currentness)
+# MERGE (main)-[:READS]->(task_currentness:Config {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql"})
 # MERGE (main)-[:READS]->(acl_lock)
 # MERGE (main)-[:USES_TEST_FIXTURE]->(legacy_audit_fixture)
 # MERGE (main)-[:TESTS]->(consumer_test)
@@ -125,6 +126,7 @@ RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructur
 ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-infrastructure-binding-master.sql"
 SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-admission.sql"
+TASK_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-task-currentness.sql"
 ADMISSION_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-admission-currentness.sql"
 QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-schema.sql"
 ADMISSION_LIFECYCLE_TEST = ROOT / "db" / "tests" / "task-run-admission-attempt-lifecycle.sql"
@@ -132,7 +134,9 @@ RUN_BINDING_TEST = ROOT / "db" / "tests" / "run-infrastructure-binding-master.sq
 PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
     ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2b.sql",
+    ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2c.sql",
     ROOT / "db" / "migrations" / "2026-10-01-engineering-run-directory.sql",
+    ROOT / "db" / "migrations" / "2026-10-02-task-run-owner.sql",
     ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
     ROOT / "db" / "migrations" / "2026-10-01-multica-run-resource-reservations.sql",
@@ -188,7 +192,9 @@ BEGIN
     FOREACH table_name IN ARRAY ARRAY[
       'permission.project_role_binding','permission.cloud_branch_role_binding',
       'permission.engineering_run_role_binding','multica.engineering_run_revision',
-      'scm.cloud_branch_revision'
+      'scm.cloud_branch_revision','public.worktree_canvas_worktree',
+      'multica.worktree_project_binding','multica.engineering_run_worktree_binding',
+      'multica.task_metadata','multica.work_item_worktree'
     ] LOOP
         IF has_table_privilege('star_multica_run_owner',table_name,'INSERT')
            OR has_any_column_privilege('star_multica_run_owner',table_name,'UPDATE')
@@ -196,6 +202,17 @@ BEGIN
             RAISE EXCEPTION 'Native reader must not grant directory/ACL mutation to runtime';
         END IF;
     END LOOP;
+
+    IF NOT has_function_privilege('star_multica_run_owner',
+        'multica.verify_schedule_task_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid)', 'EXECUTE')
+       OR NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid =
+        'multica.verify_schedule_task_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid)'::regprocedure
+        AND prosecdef AND proconfig @> ARRAY['search_path=pg_catalog'])
+       OR EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) a
+        WHERE p.oid='multica.verify_schedule_task_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid)'::regprocedure
+          AND a.grantee=0 AND a.privilege_type='EXECUTE') THEN
+        RAISE EXCEPTION 'Task currentness must be fixed-path owner-only execution';
+    END IF;
 
     FOREACH table_name IN ARRAY protected_tables LOOP
         IF NOT has_table_privilege('star_multica_run_owner', table_name, 'SELECT')
@@ -613,6 +630,7 @@ def main() -> int:
             RUN_BINDING_MIGRATION,
             SCHEDULE_ADMISSION_MIGRATION,
             ADMISSION_CURRENTNESS_MIGRATION,
+            TASK_CURRENTNESS_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -767,6 +785,9 @@ def main() -> int:
         if pg_started and all(item["status"] == "passed" for item in results):
             for attempt in (1, 2):
                 results.append(run_sql(f"admission-currentness-migration-apply-{attempt}", psql_base, ADMISSION_CURRENTNESS_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+                results.append(run_sql(f"task-currentness-migration-apply-{attempt}", psql_base, TASK_CURRENTNESS_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):
