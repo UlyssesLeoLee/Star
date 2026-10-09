@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The Rust SQLx save/resolve round-trip is not yet tested; broader strict Clippy remains blocked by two existing `star-context` lints. Infrastructure currentness verification, cross-tenant allocator, target migration/app identity, production Schedule/Run consumers, worker and execution remain open.
-> Version: 0.34 | Date: 2026-10-10
+> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The disposable Rust SQLx save/resolve, CAS, rollback and digest integrity test passed 1/1 (runner 30/30); broader strict Clippy remains blocked by two existing `star-context` lints. Infrastructure currentness verification, cross-tenant allocator, target migration/app identity, production Schedule/Run consumers, worker and execution remain open.
+> Version: 0.35 | Date: 2026-10-10
 
 ## 1. Routes
 
@@ -310,3 +310,14 @@ PostgreSQL 18.6 execution passed 29/29 disposable runner steps, including migrat
 | v0.32 | 2026-10-09 | Add §6.18 for attempt lifecycle DDL, legacy ordinal mapping, event vocabulary, API cursor and Task Run UI; record repeated PostgreSQL 18.6 migration/invariant evidence and retain all production consumer, grants and execution gates. | Phase 9F4C-D1 implementation/design reconciliation. |
 | v0.33 | 2026-10-10 | Add §6.19 for Run-owner SCD2 binding Master/events, strict bounded snapshot, Rust digest resolver, CAS write transaction, tenant FORCE RLS/least privilege and the Infrastructure owner revalidation boundary. Record PostgreSQL 18.6 29/29 and Rust 1.98.1 diagnostic tests 12/12; retain the required Rust 1.99.0 and all authorization, production identity, consumer, reservation, readiness and execution gates. | The Run owner needed a persisted binding source before Schedule consumer implementation. |
 | v0.34 | 2026-10-10 | Record the D2 append-only event hardening, Rust 1.99.0 focused gates and 29/29 PostgreSQL evidence; retain broader strict-Clippy and all production authorization/consumer/provider/execution gaps. | Self-review found direct event-table INSERT could forge lifecycle facts. |
+
+
+## 6.20 D2 SQLx transaction verification
+
+D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.35 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |

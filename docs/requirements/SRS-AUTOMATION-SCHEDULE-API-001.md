@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The Rust SQLx save/resolve round-trip is not yet tested; broader strict Clippy remains blocked by two existing `star-context` lints. Production KMS, login/stream provisioning, operator access, target DB rollout, Schedule/Run consumers, provider evidence producer, and execution remain open and fail-closed.
-> Version: 0.35 | Date: 2026-10-10
+> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The disposable Rust SQLx save/resolve, CAS, rollback and digest integrity test passed 1/1 (runner 30/30); broader strict Clippy remains blocked by two existing `star-context` lints. Production KMS, login/stream provisioning, operator access, target DB rollout, Schedule/Run consumers, provider evidence producer, and execution remain open and fail-closed.
+> Version: 0.36 | Date: 2026-10-10
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -108,3 +108,14 @@ The 9F4D-3B1 runner passed 14/14 disposable PostgreSQL 18.6 gates, including rep
 | v0.33 | 2026-10-09 | Add SCHED-API-031 for immutable attempt ordinals, provisional versus started timestamps, lifecycle projection and compatible ordered pagination; record the repeated PostgreSQL lifecycle schema gate and focused API evidence without enabling owner consumers or execution. | Phase 9F4C-D1 separates Run admission from actual execution start. |
 | v0.34 | 2026-10-10 | Define SCHED-API-032 for the Run-owner SCD2 binding Master, canonical V2 digest verification, CAS updates, tenant RLS/least privilege and Infrastructure-owner currentness validation. Record PostgreSQL 18.6 29/29 and Rust 1.98.1 diagnostic tests 12/12; keep required Rust 1.99.0, authorization, consumers, target DB, reservations/readiness and execution evidence distinct. | The owner-message DTO had no authoritative persisted Run binding source. |
 | v0.35 | 2026-10-10 | Harden SCHED-API-032 so only the guarded Master trigger can append audit events; record PostgreSQL 18.6 29/29 and Rust 1.99.0 package tests/rustfmt/targeted Clippy. Preserve the broader `star-context` strict-Clippy finding and production authorization, consumer, target DB, reservation/readiness and execution gates. | Self-review found that direct event-table INSERT could forge lifecycle facts. |
+
+
+## SCHED-API-032 SQLx acceptance supplement
+
+D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.36 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |

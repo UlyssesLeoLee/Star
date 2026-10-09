@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.80 (2026-10-10)
+> **文档版本**: v0.81 (2026-10-10)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.33 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.34 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -480,3 +480,14 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 | **v0.67** | **2026-10-07** | Mavis review | Extend the Infrastructure owner schema runner to 9F4D-3D1; index the global no-tenant physical Work/Transaction ledger, owner-only FORCE RLS and tenant/global isolation/WORM checks, plus shared-Host/shared-cluster concurrency evidence (21/21 runner, 10/10 FORCE RLS, 6/6 SQLx). Keep the two-record Multipass disk cap and production resolver/worker/provider/execution gates explicit. |
 | **v0.79** | **2026-10-10** | **Mavis review** | Extend the existing Run-owner schema runner index to Phase 9F4C-D2; record canonical Engineering Run prerequisites, repeated binding Master migration, W/T/M/RLS/WORM lifecycle assertions, 29/29 disposable PostgreSQL 18.6 steps, provisional Rust 1.98.1 package tests 12/12, disposable-only legacy audit fixture, zero VM, successful cleanup and the still-open Rust 1.99.0/production gates. |
 | **v0.80** | **2026-10-10** | **Mavis review** | Record the D2 trigger-only append boundary and direct event insert denial, Rust 1.99.0 package tests/rustfmt/targeted Clippy, broad dependency Clippy findings and the still-open production/target DB gates. |
+
+
+## D2 SQLx gate index update
+
+D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.81 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |

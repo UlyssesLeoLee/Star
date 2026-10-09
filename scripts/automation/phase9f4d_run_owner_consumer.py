@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=39fcb7370404012023e1fe70ca08df020f202ab57edf014b151d22cccf319e11
+# @cypher schema=1 source_sha256=764fc278eedf1978aa48ad62f52f4a9dcdf08fee58a4c0fc1ab3ceb6eb176a55
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -20,6 +20,7 @@
 # MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
 # MERGE (run_binding:Config {id:"db/migrations/2026-10-10-multica-run-infrastructure-binding-master.sql"})
 # MERGE (run_binding_test:Config {id:"db/tests/run-infrastructure-binding-master.sql"})
+# MERGE (binding_sqlx_test:Config {id:"crates/run-owner-runtime/tests/run_infrastructure_binding_pg.rs"})
 # MERGE (legacy_audit_fixture:Config {id:"disposable-test-only::public.audit_trigger_func"})
 # MERGE (postgres:ExternalService {id:"postgres.initdb_pg_ctl_psql",kind:"command"})
 # MERGE (nats:ExternalService {id:"nats-server.jetstream",kind:"command"})
@@ -63,6 +64,7 @@
 # MERGE (main)-[:TESTS]->(admission_lifecycle_test)
 # MERGE (main)-[:READS]->(run_binding)
 # MERGE (main)-[:TESTS]->(run_binding_test)
+# MERGE (main)-[:TESTS]->(binding_sqlx_test)
 # MERGE (main)-[:USES_TEST_FIXTURE]->(legacy_audit_fixture)
 # MERGE (main)-[:TESTS]->(consumer_test)
 # MERGE (run_sql)-[:CALLS]->(run_step)
@@ -526,6 +528,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, help="Optional report directory under the repository target directory")
     parser.add_argument("--nats-server", type=Path, help="NATS Server binary with JetStream support; not needed with --schema-only")
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
+    parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
     arguments = parser.parse_args()
 
     global OUTPUT_DIR
@@ -744,6 +747,18 @@ def main() -> int:
                         collision_step["reason"] = "collision did not fail only on global event_id without tenant-scoped detail"
                 results.append(collision_step)
 
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.binding_tests:
+            binding_env = env.copy()
+            binding_env["STAR_RUN_OWNER_TEST_DATABASE_URL"] = (
+                f"postgresql://star_run_owner_test_admin@127.0.0.1:{pg_port}/postgres"
+            )
+            results.append(run_step(
+                "run-binding-postgres-sqlx-integration",
+                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "run_infrastructure_binding_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
+                ROOT,
+                binding_env,
+            ))
+
         if pg_started and all(item["status"] == "passed" for item in results) and not arguments.schema_only:
             nats_data.mkdir(parents=False)
             nats_data_owned = True
@@ -807,7 +822,7 @@ def main() -> int:
         write_text(OUTPUT_DIR / "audit.jsonl", "".join(json.dumps(item, sort_keys=True) + "\n" for item in results))
         print(json.dumps({
             "result": "passed" if exit_code == 0 and all(item["status"] == "passed" for item in results) else "failed",
-            "mode": "schema_only" if arguments.schema_only else "postgres_nats_rust_integration",
+            "mode": ("postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration",
             "steps": results,
             "audit_path": str(OUTPUT_DIR / "audit.jsonl"),
             "multipass_instances_created": 0,

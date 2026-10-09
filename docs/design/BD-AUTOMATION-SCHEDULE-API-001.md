@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The Rust SQLx save/resolve round-trip is not yet tested; broader strict Clippy remains blocked by two existing `star-context` lints. Trusted Infrastructure currentness checks, production broker configuration/poller, Schedule/Run consumers and execution remain fail-closed.
-> Version: 0.34 | Date: 2026-10-10
+> Status: 🟡 Run-owner binding Master/resolver slice added; PostgreSQL 18.6 disposable schema gate passed 29/29 runner steps and Rust 1.99.0 focused package tests passed 12/12 with focused rustfmt and warnings-as-errors Clippy. The disposable Rust SQLx save/resolve, CAS, rollback and digest integrity test passed 1/1 (runner 30/30); broader strict Clippy remains blocked by two existing `star-context` lints. Trusted Infrastructure currentness checks, production broker configuration/poller, Schedule/Run consumers and execution remain fail-closed.
+> Version: 0.35 | Date: 2026-10-10
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -211,3 +211,14 @@ This resolver verifies stored Run-owner content integrity and the canonical Run 
 | v0.32 | 2026-10-09 | Add §6.16 for the persisted attempt ordinal, provisional/start timestamp boundary, append-only lifecycle events and ordered Run API cursor; record disposable PostgreSQL and focused Rust evidence while keeping Schedule/Run consumers and execution fail-closed. | Phase 9F4C-D1 lifecycle implementation. |
 | v0.33 | 2026-10-10 | Add §6.19 for Run-owner SCD2 binding persistence/resolution, digest validation, CAS revision, FORCE RLS and the explicit Infrastructure revalidation boundary; record PostgreSQL 18.6 29/29 and Rust 1.98.1 diagnostic tests 12/12; keep Rust 1.99.0, production identity, consumers, reservations, readiness and execution fail-closed. | The owner-message DTO had no authoritative persisted Run binding source. |
 | v0.34 | 2026-10-10 | Harden §6.19 audit writes so the application role cannot directly insert lifecycle events; record PostgreSQL 18.6 29/29 and Rust 1.99.0 package tests/rustfmt/targeted Clippy while retaining target DB, production identity, consumers, reservations, readiness and execution gates. | Self-review found that direct event-table INSERT could forge lifecycle facts. |
+
+
+### 6.20 D2 SQLx verification boundary
+
+D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.35 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |

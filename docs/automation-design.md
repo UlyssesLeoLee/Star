@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.33 (2026-10-10)
+> **文档版本**: v2.34 (2026-10-10)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -2812,3 +2812,14 @@ Executed evidence: the disposable PostgreSQL 18.6 schema-only runner passed 29/2
 | v2.31 | 2026-10-09 | Add §4.72 for the D1 lifecycle schema-only gate and exact-anchor idempotent cross-document synchronizer. Record repeated PostgreSQL 18.6 migration and owner/RLS invariant evidence; keep owner consumers, target DB identity/grants and execution fail-closed. | Phase 9F4C-D1 lifecycle schema/API projection. |
 | v2.32 | 2026-10-10 | Add §4.73 for the D2 Run-owner binding Master schema gate; record PostgreSQL 18.6 29/29 schema-runner evidence, provisional Rust 1.98.1 tests 12/12, Python syntax, the disposable-only legacy audit fixture and the still-open required Rust 1.99.0/production gates. | Establish a durable Run binding source before adding Schedule-to-Run consumers. |
 | v2.33 | 2026-10-10 | Harden §4.73 binding events as trigger-only append, record direct-insert denial and Rust 1.99.0 package gates, and clarify the broader dependency Clippy and target SQLx limitations. | Self-review found that application INSERT could forge lifecycle facts. |
+
+
+## 4.74 D2 SQLx binding gate
+
+D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.34 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |
