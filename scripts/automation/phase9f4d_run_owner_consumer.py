@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=3fc41668f8e2711c03b03e97d3b58bdb907fffcfbda6a5e70c8202fd4cb1e13d
+# @cypher schema=1 source_sha256=73e027ef3134dbc1c8bf96cf2ae1ccf8c8eebaf62156fc465985f0e72cc85c76
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -107,6 +107,7 @@
 # MERGE (self)-[:IMPORTS]->(pathlib)
 # MERGE (self)-[:IMPORTS]->(typing)
 # MERGE (main)-[:READS]->(capacity_migration:Config {id:"db/migrations/2026-10-10-run-owner-project-capacity.sql"})
+# MERGE (main)-[:READS]->(preparation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-preparation.sql"})
 # @endcypher
 
 from __future__ import annotations
@@ -129,6 +130,7 @@ RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructur
 ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-infrastructure-binding-master.sql"
 SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-admission.sql"
+SCHEDULE_PREPARATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-preparation.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -149,6 +151,7 @@ PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
     ROOT / "db" / "migrations" / "2026-10-01-multica-run-resource-reservations.sql",
+    ROOT / "db" / "migrations" / "2026-10-02-task-run-engineering-run-binding.sql",
     ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql",
     ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql",
     ROOT / "db" / "migrations" / "2026-10-08-platform-poison-quarantine.sql",
@@ -271,6 +274,19 @@ BEGIN
         OR has_any_column_privilege('star_multica_run_owner','multica.' || table_name,'UPDATE')
         OR has_table_privilege('star_multica_run_owner','multica.' || table_name,'DELETE') THEN
          RAISE EXCEPTION 'Runtime must not directly mutate Project capacity %',table_name;
+      END IF;
+    END LOOP;
+
+    IF NOT has_function_privilege('star_multica_run_owner','multica.prepare_schedule_execution_run(bytea,text,uuid,uuid,uuid)','EXECUTE')
+      OR NOT EXISTS(SELECT 1 FROM pg_proc WHERE oid='multica.prepare_schedule_execution_run(bytea,text,uuid,uuid,uuid)'::regprocedure
+        AND prosecdef AND proconfig @> ARRAY['search_path=pg_catalog'])
+      OR EXISTS(SELECT 1 FROM pg_proc p,LATERAL aclexplode(p.proacl) a WHERE p.oid='multica.prepare_schedule_execution_run(bytea,text,uuid,uuid,uuid)'::regprocedure
+        AND a.grantee=0 AND a.privilege_type='EXECUTE') THEN RAISE EXCEPTION 'Preparation native capability invalid'; END IF;
+    FOREACH table_name IN ARRAY ARRAY['task_contract','task_lifecycle_current'] LOOP
+      IF has_table_privilege('star_multica_run_owner','multica.' || table_name,'INSERT')
+      OR has_any_column_privilege('star_multica_run_owner','multica.' || table_name,'UPDATE')
+      OR has_table_privilege('star_multica_run_owner','multica.' || table_name,'DELETE') THEN
+       RAISE EXCEPTION 'Preparation must not grant Task owner mutation %',table_name;
       END IF;
     END LOOP;
 
@@ -694,6 +710,7 @@ def main() -> int:
             POLICY_CURRENTNESS_MIGRATION,
             CATALOG_CURRENTNESS_MIGRATION,
             PROJECT_CAPACITY_MIGRATION,
+            SCHEDULE_PREPARATION_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -862,6 +879,11 @@ def main() -> int:
         if pg_started and all(item["status"] == "passed" for item in results):
             for attempt in (1, 2):
                 results.append(run_sql(f"project-capacity-migration-apply-{attempt}", psql_base, PROJECT_CAPACITY_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results):
+            for attempt in (1, 2):
+                results.append(run_sql(f"schedule-preparation-migration-apply-{attempt}", psql_base, SCHEDULE_PREPARATION_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):

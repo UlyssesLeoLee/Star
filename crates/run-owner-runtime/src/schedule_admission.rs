@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=7571e3224afb951d6248438065baade67710d2fabb06ff54e527b9143eaa0c71
+@cypher schema=1 source_sha256=af14b4e1409e16514235303777865356bfb7d3196362b93f43c720e400c2ee7c
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -44,6 +44,17 @@ MERGE (capacity:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::
 MERGE (self)-[:DEFINES]->(capacity)
 MERGE (capacity)-[:CALLS]->(catalog)
 MERGE (capacity)-[:CALLS]->(capacity_load:Symbol {id:"crates/run-owner-runtime/src/schedule_capacity.rs::load_current",kind:"function"})
+MERGE (prepare:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.prepare_and_commit",kind:"method"})
+MERGE (self)-[:DEFINES]->(prepare)
+MERGE (prepare)-[:CALLS]->(capacity)
+MERGE (prepare)-[:CALLS]->(commit)
+MERGE (result:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.preparation_result",kind:"method"})
+MERGE (time:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.validate_preparation_time",kind:"method"})
+MERGE (self)-[:DEFINES]->(result)
+MERGE (self)-[:DEFINES]->(time)
+MERGE (prepare)-[:CALLS]->(result)
+MERGE (prepare)-[:CALLS]->(time)
+MERGE (prepare)-[:CALLS]->(native_prepare:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-preparation.sql::prepare_schedule_execution_run",kind:"function"})
 @endcypher
 */
 
@@ -191,6 +202,106 @@ impl PostgresScheduleAdmissionStore {
 }
 
 impl ScheduleAdmissionTransaction {
+    /// Atomically create a non-executing Run, Project reservation/events and admission result.
+    /// Infrastructure demand must await a separate authenticated Schedule confirmation.
+    /// No Runtime, Task lifecycle claim, Hook execution or external-owner write occurs here.
+    pub async fn prepare_and_commit(
+        mut self,
+    ) -> Result<ScheduleRunAdmissionResultV1, ScheduleAdmissionStoreError> {
+        if let Err(ScheduleAdmissionStoreError::PrerequisiteRejected(code)) =
+            self.validate_preparation_time()
+        {
+            let result = self.preparation_result(None, Some(code))?;
+            self.commit_result(&result).await?;
+            return Ok(result);
+        }
+        let capacity = match self.revalidate_project_capacity().await {
+            Ok(value) => value,
+            Err(ScheduleAdmissionStoreError::PrerequisiteRejected(code)) => {
+                let result = self.preparation_result(None, Some(code))?;
+                self.commit_result(&result).await?;
+                return Ok(result);
+            }
+            Err(error) => return Err(error),
+        };
+        capacity.validate_lifetime()?;
+        let run_id = Uuid::new_v4();
+        let profile = serde_json::to_string(capacity.execution().policies().profile().document())
+            .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
+        let outcome: String =
+            sqlx::query_scalar("SELECT multica.prepare_schedule_execution_run($1,$2,$3,$4,$5)")
+                .bind(&self.wire)
+                .bind(profile)
+                .bind(run_id)
+                .bind(Uuid::new_v4())
+                .bind(Uuid::new_v4())
+                .fetch_one(&mut *self.transaction)
+                .await?;
+        let code = match outcome.as_str() {
+            "prepared" => None,
+            "target_unavailable" => Some(ScheduleAdmissionRejectionCodeV1::TargetUnavailable),
+            "binding_unavailable" => Some(ScheduleAdmissionRejectionCodeV1::BindingUnavailable),
+            "quota_exceeded" => Some(ScheduleAdmissionRejectionCodeV1::QuotaExceeded),
+            "occurrence_expired" => Some(ScheduleAdmissionRejectionCodeV1::OccurrenceExpired),
+            _ => return Err(ScheduleAdmissionStoreError::ReplayConflict),
+        };
+        // A late fence failure drops the whole transaction, including any staged Run/reservation.
+        // It must not commit a rejected result with newly staged accepted preparation facts.
+        capacity.validate_lifetime()?;
+        self.validate_preparation_time()?;
+        let result = self.preparation_result(code.is_none().then_some(run_id), code)?;
+        self.commit_result(&result).await?;
+        Ok(result)
+    }
+    fn validate_preparation_time(&self) -> Result<(), ScheduleAdmissionStoreError> {
+        let occurrence = &self.command.occurrence;
+        let now = chrono::Utc::now();
+        let deadline =
+            occurrence
+                .key
+                .scheduled_for_utc
+                .checked_add_signed(chrono::Duration::seconds(i64::from(
+                    occurrence.rule_snapshot.deadline_seconds,
+                )));
+        let code = if deadline.is_none_or(|deadline| deadline <= now) {
+            Some(ScheduleAdmissionRejectionCodeV1::OccurrenceExpired)
+        } else if occurrence.key.scheduled_for_utc > now {
+            Some(ScheduleAdmissionRejectionCodeV1::TargetUnavailable)
+        } else {
+            None
+        };
+        match code {
+            Some(code) => Err(ScheduleAdmissionStoreError::PrerequisiteRejected(code)),
+            None => Ok(()),
+        }
+    }
+    fn preparation_result(
+        &self,
+        run_id: Option<Uuid>,
+        code: Option<ScheduleAdmissionRejectionCodeV1>,
+    ) -> Result<ScheduleRunAdmissionResultV1, ScheduleAdmissionStoreError> {
+        let command = &self.command;
+        let result = ScheduleRunAdmissionResultV1 {
+            schema_version: 1,
+            tenant_id: command.tenant_id,
+            result_id: Uuid::new_v4(),
+            request_id: command.request_id,
+            admission_attempt: command.admission_attempt,
+            correlation_id: command.correlation_id,
+            occurrence_id: command.occurrence.occurrence_id,
+            outcome: if run_id.is_some() {
+                ScheduleRunAdmissionOutcomeV1::Accepted
+            } else {
+                ScheduleRunAdmissionOutcomeV1::Rejected
+            },
+            task_execution_run_id: run_id,
+            rejection_code: code,
+            binding_digest: command.binding_digest()?,
+        };
+        result.validate_for_command(command)?;
+        Ok(result)
+    }
+
     /// Serialize Project capacity against current Run ceilings in the owner transaction.
     /// This comparison creates neither a reservation nor a Run and cannot start execution.
     pub async fn revalidate_project_capacity(

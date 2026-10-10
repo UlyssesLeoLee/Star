@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=ee5f9dd3f5b6d379fbebc9809d39a94b4818dfee4e176805a92a6a4dfef8e232
+@cypher schema=1 source_sha256=b0336f1704f59f72286b7f2156ea5981267e2865a23ba0132c40d61cd21772d1
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -61,6 +61,14 @@ MERGE (capacity_test)-[:WRITES]->(allocation)
 MERGE (capacity_test)-[:WRITES]->(quota:Table {id:"multica.project_execution_resource_quota"})
 MERGE (capacity_test)-[:WRITES]->(reservation:Table {id:"multica.project_execution_resource_reservation"})
 MERGE (capacity_test)-[:CALLS]->(seed)
+MERGE (preparation_test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_schedule_preparation",kind:"function"})
+MERGE (self)-[:DEFINES]->(preparation_test)
+MERGE (capacity_test)-[:CALLS]->(preparation_test)
+MERGE (preparation_test)-[:TESTS]->(prepare:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.prepare_and_commit",kind:"method"})
+MERGE (preparation_test)-[:WRITES]->(task_lifecycle:Table {id:"multica.task_lifecycle_current"})
+MERGE (preparation_test)-[:WRITES]->(task_contract:Table {id:"multica.task_contract"})
+MERGE (preparation_test)-[:READS]->(run:Table {id:"multica.task_execution_run"})
+MERGE (preparation_test)-[:READS]->(reservation)
 @endcypher
 */
 use chrono::Utc;
@@ -74,6 +82,7 @@ use run_owner_runtime::{
     ScheduleAdmissionStart, ScheduleAdmissionStoreError,
 };
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::Row;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -1286,6 +1295,7 @@ async fn verify_project_capacity(
   if expected {assert!(result.is_ok());} else {assert!(matches!(result,Err(ScheduleAdmissionStoreError::PrerequisiteRejected(ScheduleAdmissionRejectionCodeV1::QuotaExceeded))));}
   drop(pending);
  }
+    verify_schedule_preparation(admin, store, command, parallel).await?;
     let mut change = admin.begin().await?;
     sqlx::query("SET LOCAL session_replication_role=replica")
         .execute(&mut *change)
@@ -1305,5 +1315,218 @@ async fn verify_project_capacity(
         ))
     ));
     drop(pending);
+    Ok(())
+}
+
+async fn verify_schedule_preparation(
+    admin: &sqlx::PgPool,
+    store: &PostgresScheduleAdmissionStore,
+    base: &ScheduleRunAdmissionCommandV1,
+    parallel: &ScheduleRunAdmissionCommandV1,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let t = &base.occurrence.rule_snapshot.target;
+    let fresh = || {
+        let mut cmd = base.clone();
+        cmd.request_id = Uuid::new_v4();
+        cmd.occurrence.occurrence_id = Uuid::new_v4();
+        cmd
+    };
+    // Missing lifecycle and contract are recorded as immutable rejected outcomes, never fake snapshots.
+    let missing = fresh();
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(missing.tenant_id), &missing.encode_json()?)
+        .await?
+    else {
+        panic!("missing lifecycle prep")
+    };
+    let result = pending.prepare_and_commit().await?;
+    assert_eq!(result.outcome, ScheduleRunAdmissionOutcomeV1::Rejected);
+    assert_eq!(
+        result.rejection_code,
+        Some(ScheduleAdmissionRejectionCodeV1::TargetUnavailable)
+    );
+    sqlx::query("INSERT INTO multica.task_lifecycle_current(work_item_id,tenant_id,active_worktree_id,status,claimed_by) VALUES($1,$2,$3,'in_progress',$4)")
+ .bind(t.work_item_id).bind(base.tenant_id).bind(t.worktree_id).bind(base.occurrence.run_as_actor_id).execute(admin).await?;
+    let missing = fresh();
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(missing.tenant_id), &missing.encode_json()?)
+        .await?
+    else {
+        panic!("missing contract prep")
+    };
+    assert_eq!(
+        pending.prepare_and_commit().await?.outcome,
+        ScheduleRunAdmissionOutcomeV1::Rejected
+    );
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query(r#"INSERT INTO multica.task_contract(tenant_id,project_id,work_item_id,version,goal,scope,acceptance_criteria,changed_by) VALUES($1,$2,$3,1,'verify actual task','{}','["ac-test"]',$4)"#)
+ .bind(base.tenant_id).bind(t.project_id).bind(t.work_item_id).bind(base.occurrence.run_as_actor_id).execute(&mut *fixture).await?;
+    fixture.commit().await?;
+    // Wrong lifecycle owner and pending human review remain ineligible.
+    for (sql,restore) in [
+ ("UPDATE multica.task_lifecycle_current SET claimed_by=gen_random_uuid() WHERE work_item_id=$1","UPDATE multica.task_lifecycle_current SET claimed_by=$2 WHERE work_item_id=$1"),
+ ("UPDATE multica.task_lifecycle_current SET review_state='pending_review' WHERE work_item_id=$1","UPDATE multica.task_lifecycle_current SET review_state='none' WHERE work_item_id=$1")
+ ] {
+  sqlx::query(sql).bind(t.work_item_id).execute(admin).await?;
+  let cmd=fresh();let ScheduleAdmissionStart::New(pending)=store.begin(source(cmd.tenant_id),&cmd.encode_json()?).await? else {panic!("invalid lifecycle prep")};
+  assert_eq!(pending.prepare_and_commit().await?.outcome,ScheduleRunAdmissionOutcomeV1::Rejected);
+  if restore.contains("$2") {sqlx::query(restore).bind(t.work_item_id).bind(base.occurrence.run_as_actor_id).execute(admin).await?;}
+  else {sqlx::query(restore).bind(t.work_item_id).execute(admin).await?;}
+ }
+    // Scope-valid but elapsed occurrence never creates a Run.
+    let mut expired = fresh();
+    expired.occurrence.key.scheduled_for_utc = Utc::now() - chrono::Duration::hours(2);
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(expired.tenant_id), &expired.encode_json()?)
+        .await?
+    else {
+        panic!("expired prep")
+    };
+    assert_eq!(
+        pending.prepare_and_commit().await?.rejection_code,
+        Some(ScheduleAdmissionRejectionCodeV1::OccurrenceExpired)
+    );
+    // Native preparation cannot commit without its paired admission receipt/result.
+    let orphan = fresh();
+    let orphan_id = Uuid::new_v4();
+    let profile: serde_json::Value = sqlx::query_scalar("SELECT profile_document FROM multica.agent_execution_profile WHERE tenant_id=$1 AND profile_id=$2 AND valid_to IS NULL")
+        .bind(base.tenant_id).bind(t.execution_profile_id).fetch_one(admin).await?;
+    let mut unpaired = admin.begin().await?;
+    sqlx::query("SET LOCAL ROLE star_multica_run_owner")
+        .execute(&mut *unpaired)
+        .await?;
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true),set_config('app.actor_id',$2,true)")
+        .bind(base.tenant_id.to_string())
+        .bind(base.occurrence.run_as_actor_id.to_string())
+        .execute(&mut *unpaired)
+        .await?;
+    let outcome: String =
+        sqlx::query_scalar("SELECT multica.prepare_schedule_execution_run($1,$2,$3,$4,$5)")
+            .bind(orphan.encode_json()?)
+            .bind(serde_json::to_string(&profile)?)
+            .bind(orphan_id)
+            .bind(Uuid::new_v4())
+            .bind(Uuid::new_v4())
+            .fetch_one(&mut *unpaired)
+            .await?;
+    assert_eq!(outcome, "prepared");
+    assert!(
+        unpaired.commit().await.is_err(),
+        "orphan Run/reservation must not commit"
+    );
+    let count: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run WHERE run_id=$1")
+            .bind(orphan_id)
+            .fetch_one(admin)
+            .await?;
+    assert_eq!(count, 0);
+    // Real time elapses after staging Run facts; the Rust catalog fence must abort all writes.
+    let late = fresh();
+    sqlx::raw_sql("CREATE FUNCTION multica.delay_d9_test_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(5.1); RETURN NEW; END $$; CREATE TRIGGER d9_test_delay AFTER INSERT ON multica.task_execution_run_event FOR EACH ROW EXECUTE FUNCTION multica.delay_d9_test_event()")
+        .execute(admin).await?;
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(late.tenant_id), &late.encode_json()?)
+        .await?
+    else {
+        panic!("late fence prep")
+    };
+    assert!(matches!(
+        pending.prepare_and_commit().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    sqlx::raw_sql("DROP TRIGGER d9_test_delay ON multica.task_execution_run_event; DROP FUNCTION multica.delay_d9_test_event()").execute(admin).await?;
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run WHERE tenant_id=$1 AND schedule_admission_request_id=$2")
+        .bind(late.tenant_id).bind(late.request_id).fetch_one(admin).await?;
+    assert_eq!(count, 0);
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.schedule_admission_inbox WHERE tenant_id=$1 AND request_id=$2")
+        .bind(late.tenant_id).bind(late.request_id).fetch_one(admin).await?;
+    assert_eq!(count, 0);
+    let cmd = fresh();
+    // Inject a result persistence failure after real owner Run/reservation writes, then retry exactly.
+    let function=format!("CREATE OR REPLACE FUNCTION multica.reject_d9_test_result() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.request_id='{}'::uuid THEN RAISE EXCEPTION 'd9 result failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER d9_test_result BEFORE INSERT ON multica.schedule_admission_result_outbox FOR EACH ROW EXECUTE FUNCTION multica.reject_d9_test_result()",cmd.request_id);
+    sqlx::raw_sql(&function).execute(admin).await?;
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(cmd.tenant_id), &cmd.encode_json()?)
+        .await?
+    else {
+        panic!("rollback prep")
+    };
+    assert!(pending.prepare_and_commit().await.is_err());
+    sqlx::raw_sql("DROP TRIGGER d9_test_result ON multica.schedule_admission_result_outbox; DROP FUNCTION multica.reject_d9_test_result()").execute(admin).await?;
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run WHERE tenant_id=$1 AND schedule_admission_request_id=$2")
+ .bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
+    assert_eq!(count, 0);
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(cmd.tenant_id), &cmd.encode_json()?)
+        .await?
+    else {
+        panic!("retry rolled-back prep")
+    };
+    let result = pending.prepare_and_commit().await?;
+    assert_eq!(result.outcome, ScheduleRunAdmissionOutcomeV1::Accepted);
+    let run_id = result.task_execution_run_id.unwrap();
+    let row=sqlx::query("SELECT r.started_at,r.execution_channel,r.task_contract_version,r.task_snapshot,r.acceptance_snapshot,r.execution_profile_snapshot,r.infrastructure_binding_snapshot,r.infrastructure_binding_digest,r.engineering_run_id,s.reservation_state,s.lease_expires_at, (SELECT count(*) FROM multica.task_execution_run_event e WHERE e.tenant_id=r.tenant_id AND e.run_id=r.run_id AND (e.event_type='run_started' OR e.execution_state IS NOT NULL)) AS execution_events FROM multica.task_execution_run r JOIN multica.project_execution_resource_reservation s ON s.tenant_id=r.tenant_id AND s.run_id=r.run_id WHERE r.run_id=$1")
+ .bind(run_id).fetch_one(admin).await?;
+    assert!(row
+        .try_get::<Option<chrono::DateTime<Utc>>, _>("started_at")?
+        .is_none());
+    assert_eq!(row.try_get::<String, _>("execution_channel")?, "agent");
+    assert_eq!(row.try_get::<i64, _>("task_contract_version")?, 1);
+    assert_eq!(
+        row.try_get::<serde_json::Value, _>("task_snapshot")?["lifecycle_status"],
+        "in_progress"
+    );
+    assert_eq!(
+        row.try_get::<serde_json::Value, _>("acceptance_snapshot")?["acceptance_criteria"],
+        serde_json::json!(["ac-test"])
+    );
+    assert!(
+        row.try_get::<serde_json::Value, _>("execution_profile_snapshot")?["content_digest"]
+            .is_string()
+    );
+    assert_eq!(
+        row.try_get::<serde_json::Value, _>("infrastructure_binding_snapshot")?,
+        serde_json::to_value(&cmd.infrastructure_binding)?
+    );
+    assert_eq!(
+        row.try_get::<Vec<u8>, _>("infrastructure_binding_digest")?,
+        cmd.binding_digest()?.to_vec()
+    );
+    assert_eq!(
+        row.try_get::<Uuid, _>("engineering_run_id")?,
+        t.engineering_run_id
+    );
+    assert_eq!(row.try_get::<String, _>("reservation_state")?, "pending");
+    assert!(row.try_get::<chrono::DateTime<Utc>, _>("lease_expires_at")? > Utc::now());
+    assert_eq!(row.try_get::<i64, _>("execution_events")?, 0);
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.infrastructure_capacity_demand_outbox WHERE tenant_id=$1 AND task_execution_run_id=$2")
+ .bind(cmd.tenant_id).bind(run_id).fetch_one(admin).await?;
+    assert_eq!(count, 0, "demand must await Schedule confirmation");
+    let ScheduleAdmissionStart::Replay(replay) = store
+        .begin(source(cmd.tenant_id), &cmd.encode_json()?)
+        .await?
+    else {
+        panic!("prepared result replay")
+    };
+    assert_eq!(replay, result);
+    // Other task receives an immutable quota rejection while the accepted pending reservation occupies the slot.
+    let mut other = parallel.clone();
+    other.request_id = Uuid::new_v4();
+    other.occurrence.occurrence_id = Uuid::new_v4();
+    let ScheduleAdmissionStart::New(pending) = store
+        .begin(source(other.tenant_id), &other.encode_json()?)
+        .await?
+    else {
+        panic!("occupied project prep")
+    };
+    assert_eq!(
+        pending.prepare_and_commit().await?.rejection_code,
+        Some(ScheduleAdmissionRejectionCodeV1::QuotaExceeded)
+    );
     Ok(())
 }

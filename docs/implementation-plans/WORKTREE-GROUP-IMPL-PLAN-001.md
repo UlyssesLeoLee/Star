@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.57**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.58**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1816,3 +1816,22 @@ reader SECURITY DEFINER固定search_path=pg_catalog，PUBLIC execute撤销，仅
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.57 | 2026-10-10 | Ulysses — Mavis接手审核 | 接入Schedule当前Project容量核算，保留原子Run/reservation写入与执行缺口。 | D8实现与隔离容量验证。 |
+
+
+## 6.123 Phase 9F4C-D9 — Atomic preparation before confirmation
+
+Schedule owner的fresh admission须经D4–D8当前授权、绑定、策略、目录和容量复验后，在Run owner本地事务原子创建非执行态TaskExecutionRun、pending Project reservation、成对reservation审计/RunEvent及处理后Inbox/admission-result Outbox。必须从canonical Task metadata、lifecycle和当前非空TaskContract读取有界完整快照，不接受调用者伪造任务内容。`started_at`与execution_state保持空，不产生run_started、VM请求或Task lifecycle写入；accepted只表示准备已登记。
+
+`ScheduleAdmissionTransaction.prepare_and_commit`消耗原事务，并复用`commit_result`的exact replay/pair持久化。当前准入拒绝可提交不可变rejected result；存储错误、写入后fence/deadline失效则整笔回滚，不把已暂存Run与rejected结果一起提交。受限native `prepare_schedule_execution_run`复验scope/当前Profile和binding、再次串行核算Project容量并拒绝同Task已有active/未过期pending reservation。Task eligibility与既有CLI一致：in_progress、固定run-as持有同Worktree且非pending_review；当前TaskContract必须存在且验收项非空。Task/验收快照各≤32KiB，描述≤16KiB、labels≤64、dependencies/验收项≤128；超限拒绝，不截断。完整typed Engineering Run snapshot保留全部25个identity/version/role/ref字段；Run另持久化不可变Infrastructure binding snapshot/digest和request关联。
+
+准备阶段的Outbox是Run→Schedule admission-result，不提前发布Infrastructure demand。Schedule owner必须消费结果、复验本owner lease/generation/deadline/cancellation，提交链接及confirmation；Run owner在下一独立事务消费可信confirmation、复验当前授权/绑定/Project reservation后才发布自己的Infrastructure demand Outbox。Host/cluster容量由Infrastructure owner自己的事务预留。这维持DD §6.2既有两owner确认协议，并明确D8“原子Run/reservation与Outbox”中的Outbox时点，不能用准备accepted绕过confirmation。Task owner的自动分配/claim/in_progress生产者仍需接入，Schedule不可跨owner篡改lifecycle。
+
+Project准备reservation的lease由数据库取min(occurrence deadline,当前时间+2分钟)，必须与目录5秒fence区分。等待确认期间预算已占用；超时/取消的补偿、release/expiry worker及后续激活仍开放，不把lease过期视作VM/Runtime已清理。新增W/T/M表0/0/0：现有reservation为W，Run/reservation events/RunEvent/Inbox/results为T，TaskContract与binding为M只读。新请求关联有deferred FK，native Run插入有deferred accepted-result/pending-reservation配对门，阻止孤立准备事实提交。SECURITY DEFINER固定search_path，PUBLIC execute撤销，仅可信Rust Run-owner角色EXECUTE，仍无直接Run/event/reservation/Task写权限。原生Hook实际求值、健康/sandbox/readiness、独立验证与executor门保持关闭；未把REST/UI或fixture作为生产闭环。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner 52/52，binding/admission SQLx targets 2/2，库测试15/15，包级all-targets check、Clippy、fmt、Python编译、Cypher图头及diff检查通过。Audit `target/phase9f4d-run-owner-consumer/00ff7b51-16c4-4a62-a776-121f6ef33a47/audit.jsonl`。实际覆盖受限owner角色写入、生命周期/TaskContract拒绝、deadline拒绝、延迟配对门拒绝孤立提交、写入后目录fence失效整笔回滚、结果持久化失败回滚及同命令重试、exact replay和容量占用；未产生execution事件或Infrastructure demand。隔离PostgreSQL已停止，零Multipass inventory和生产DB变更。未完成workspace/release/doc/bench、生产交付或性能验收。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D9 report](../reports/PHASE-9F4C-D9-SCHEDULE-PREPARATION-REPORT.md)。本阶段无新增第三方依赖或VM操作。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.58 | 2026-10-10 | Ulysses — Mavis接手审核 | 对账真实Run-owner准备写入；保持Schedule确认后才发布Infrastructure demand。 | D9实现及隔离SQLx事务验证。 |
