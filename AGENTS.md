@@ -17,6 +17,8 @@
 
 **产品导航与 Worktree 管理硬约束**：左侧主导航按 Project → 云端 Branch → Engineering Run → 该 Run 管理的本地 Worktree 展开；必须以此解决多 Agent Worktree 归属、Branch/checkout 绑定、Agent/Runtime 生命周期、锁与冲突信号分散及内部变更不可控问题。Branch 是远端分支身份，Engineering Run 是协作、任务、Canvas 与分析的 canonical 工作区；Worktree 是绑定 Branch 的本地 checkout。选择 Run 内 Worktree 才打开该 Run 的右侧 App tabs，并将其设为当前焦点/CLI checkout 目标；Inbox、Work Item/Task Card、Canvas、Workflow/LangGraph、Run BI/Benchmark 与 Plugin Apps 属于 Run，Canvas 与 Task Card 同级，CLI 从任务卡内打开。Project Worktree Index 可汇总该 Project 的跨 Branch/Run/Worktree 状态，但不得取代 Branch → Run 主导航、使用通用任务列表或本地 seed 冒充生产管理。底栏聊天保留 WORKTREE/GLOBAL scope。Multica/Jira 类任务、Canvas、Agent/LangGraph 与插件通过同一 RunContext/授权边界协同。Hook 配置必须沿用既有“高级设置 → Hooks”选项卡（与 Skills/MCP/Plugins 并列），不得成为 Worktree 树节点；选项卡必须提供 typed、无代码可视化编辑。Worktree、Run Detail 与 BI 只显示有效策略/执行结果并深链回该选项卡。
 
+**消息传输可替换约束**：用户自有 Rust 服务器是消息基础设施的最终替代方向；NATS 仅作为可移除的 transport adapter。业务事件、owner-local Outbox/Inbox、幂等身份、租约/重试/取消、持久化回执与 BI 契约不得依赖 NATS subject、JetStream stream/consumer 或 ACK API；这些细节只能由 adapter 映射。Rust-native provider 接入须版本化身份/授权、可靠投递、接收事务提交后确认、恢复和资源预算契约，复用相同验收套件；缺少实现或持久化证明时 fail closed，不得用内存队列或 socket 写入成功冒充 durable acceptance。
+
 **分支内容选择性收敛**：从其他分支引入改动时，先按本对话确认的产品架构逐项审阅其差异、依赖、验证和文档状态；只接纳必要且兼容的领先内容，不因分支存在或 `--apply` 就照单合入整分支或大型重构。架构偏离、依赖不清或验证不足的内容先隔离并说明；保留脏或仍由他人使用的 worktree/branch。
 
 **商业开源依赖硬约束**：新引入、默认支持或随产品分发的第三方组件必须允许不限用途、行业、席位或用量的商业使用；不得把 copyleft 许可证等同于禁止商用，也不得仅因其为 GPL/AGPL/LGPL 而一概排除。对修改、链接、捆绑、安装和再分发逐项审查并履行相应源码、许可证、NOTICE、安装信息等义务；无法满足义务时调整交付形态或替换组件，不把许可义务误写为商业用途禁令。排除非商业、field-of-use、source-available 或要求付费订阅/席位才能解锁核心功能的组件。逐版本审查完整构建/分发闭包中的传递依赖、二进制、安装器、容器与 guest image，并生成 SPDX/SBOM；只核对上游仓库主许可证不足以放行。上游社区活跃度须以近 12 个月的发布/维护证据和公开维护渠道核验；保留各许可证要求的版权、NOTICE 与专利声明。

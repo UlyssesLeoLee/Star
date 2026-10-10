@@ -1,6 +1,6 @@
 //! Platform-owned persistence for permanently malformed JetStream messages.
 /*
-@cypher schema=1 source_sha256=49b7ecb34a8c29d2311b6841b22d6a6a22956066b6e0dc58c9a6c162fc4b3456
+@cypher schema=1 source_sha256=68077332e782782d0de6dba5b71d7a5b1003762f6e820756ea0dd1c211466eed
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
 MERGE (source:Type {id:"crates/platform-messaging-runtime/src/lib.rs::TrustedJetStreamSource",kind:"struct"})
@@ -117,8 +117,11 @@ MERGE (test_digest)-[:TESTS]->(digest_fn)
 MERGE (test_policy)-[:TESTS]->(policy)
 MERGE (test_purge)-[:TESTS]->(purge_batch)
 MERGE (test_headers)-[:TESTS]->(replay_header_limits)
+MERGE (module)-[:IMPORTS]->(admission_delivery_file:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
 @endcypher
 */
+
+pub mod admission_delivery;
 
 use std::{sync::Arc, time::Duration};
 

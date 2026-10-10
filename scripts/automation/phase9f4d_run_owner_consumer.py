@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=40976ead52ad5ae9129e5505853bd6c6a12eed9cc270f5ec04fd95fa21dcfd05
+# @cypher schema=1 source_sha256=5fd74749836e9962a34a7f9d8778476f78b2942a9e7e908cd7b4979ec2c25da0
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -137,6 +137,7 @@ SCHEDULE_PREPARATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-ow
 SCHEDULE_COMPENSATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-compensation.sql"
 SCHEDULE_CONFIRMATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-confirmation.sql"
 SCHEDULE_HANDOFF_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-schedule-owner-admission-handoff.sql"
+ADMISSION_DELIVERY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-admission-owner-message-delivery.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -322,6 +323,18 @@ BEGIN
       OR has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'DELETE')
       OR has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'TRUNCATE')
       THEN RAISE EXCEPTION 'Schedule handoff is not bounded immutable FORCE RLS'; END IF;
+    END LOOP;
+    FOREACH role_name IN ARRAY ARRAY['star_automation_schedule_owner','star_multica_run_owner'] LOOP
+      FOREACH table_name IN ARRAY ARRAY[
+        CASE WHEN role_name='star_automation_schedule_owner' THEN 'automation.admission_message_delivery' ELSE 'multica.admission_message_delivery' END,
+        CASE WHEN role_name='star_automation_schedule_owner' THEN 'automation.admission_message_delivery_receipt' ELSE 'multica.admission_message_delivery_receipt' END
+      ] LOOP
+        IF NOT EXISTS(SELECT 1 FROM pg_class WHERE oid=table_name::regclass AND relrowsecurity AND relforcerowsecurity)
+        OR NOT has_table_privilege(role_name,table_name,'SELECT')
+        OR has_table_privilege(role_name,table_name,'INSERT') OR has_table_privilege(role_name,table_name,'UPDATE')
+        OR has_table_privilege(role_name,table_name,'DELETE') OR has_table_privilege(role_name,table_name,'TRUNCATE')
+        THEN RAISE EXCEPTION 'Admission delivery owner received raw mutation or lacks FORCE RLS'; END IF;
+      END LOOP;
     END LOOP;
     FOREACH table_name IN ARRAY ARRAY['multica.task_execution_run','multica.project_execution_resource_reservation','multica.infrastructure_capacity_demand_outbox'] LOOP
       IF has_table_privilege('star_automation_schedule_owner',table_name,'INSERT')
@@ -575,22 +588,40 @@ def run_step(name: str, command: Sequence[str], cwd: Path, env: dict[str, str]) 
         with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open(
             "w", encoding="utf-8"
         ) as stderr:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 list(command),
                 cwd=cwd,
                 env=env,
                 stdout=stdout,
                 stderr=stderr,
-                check=False,
-                timeout=MAX_STEP_SECONDS,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
             )
+            try:
+                process.wait(timeout=MAX_STEP_SECONDS)
+            except subprocess.TimeoutExpired:
+                # Kill only this still-owned child tree, before its parent exits.
+                # subprocess.run's timeout kills just cargo and can orphan rustc.
+                if sys.platform == "win32" and process.poll() is None:
+                    cleanup = subprocess.run(
+                        ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                        stdout=stderr,
+                        stderr=stderr,
+                        timeout=30,
+                        check=False,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
+                    if cleanup.returncode != 0 and process.poll() is None:
+                        raise RuntimeError("Owned process tree cleanup failed")
+                elif process.poll() is None:
+                    process.kill()
+                process.wait(timeout=30)
+                raise
         redact_urls(stdout_path)
         redact_urls(stderr_path)
         return {
             "name": name,
-            "status": "passed" if result.returncode == 0 else "failed",
-            "exit_code": result.returncode,
+            "status": "passed" if process.returncode == 0 else "failed",
+            "exit_code": process.returncode,
             "command": list(command),
             "stdout_log": str(stdout_path),
             "stderr_log": str(stderr_path),
@@ -598,7 +629,8 @@ def run_step(name: str, command: Sequence[str], cwd: Path, env: dict[str, str]) 
     except subprocess.TimeoutExpired:
         redact_urls(stdout_path)
         redact_urls(stderr_path)
-        return {"name": name, "status": "failed", "exit_code": 124, "reason": "timeout"}
+        return {"name": name, "status": "failed", "exit_code": 124, "reason": "timeout",
+                "stdout_log": str(stdout_path), "stderr_log": str(stderr_path)}
     except OSError as error:
         redact_urls(stdout_path)
         redact_urls(stderr_path)
@@ -715,7 +747,10 @@ def main() -> int:
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
     parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
     parser.add_argument("--admission-tests", action="store_true", help="Also run Rust SQLx owner-local admission receipt/result tests; --schema-only avoids NATS")
+    parser.add_argument("--admission-delivery-tests", action="store_true", help="Start isolated NATS before admission tests to verify owner delivery publisher and crash replay")
     arguments = parser.parse_args()
+    if arguments.admission_delivery_tests and not arguments.admission_tests:
+        parser.error("--admission-delivery-tests requires --admission-tests")
 
     global OUTPUT_DIR
     if arguments.output_dir:
@@ -754,6 +789,7 @@ def main() -> int:
             SCHEDULE_COMPENSATION_MIGRATION,
             SCHEDULE_CONFIRMATION_MIGRATION,
             SCHEDULE_HANDOFF_MIGRATION,
+            ADMISSION_DELIVERY_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -763,7 +799,7 @@ def main() -> int:
     if missing_migrations:
         print(json.dumps({"result": "blocked", "missing_migrations": missing_migrations}))
         return 2
-    if not arguments.schema_only and (
+    if (not arguments.schema_only or arguments.admission_delivery_tests) and (
         arguments.nats_server is None or not arguments.nats_server.is_file()
     ):
         print(json.dumps({
@@ -804,7 +840,7 @@ def main() -> int:
     else:
         cargo = shutil.which(arguments.cargo) or arguments.cargo
         version_steps.append(run_step("cargo-version", [cargo, "--version"], ROOT, env))
-    if not arguments.schema_only:
+    if not arguments.schema_only or arguments.admission_delivery_tests:
         assert arguments.nats_server is not None
         version_steps.append(run_step("nats-version", [str(arguments.nats_server.resolve()), "--version"], ROOT, env))
     if any(item["status"] != "passed" for item in version_steps):
@@ -938,6 +974,9 @@ def main() -> int:
                 results.append(run_sql(f"schedule-handoff-migration-apply-{attempt}", psql_base, SCHEDULE_HANDOFF_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
+                results.append(run_sql(f"admission-delivery-migration-apply-{attempt}", psql_base, ADMISSION_DELIVERY_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
         if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-owner-schema-assertions", psql_base, SCHEMA_ASSERTIONS_SQL, env))
         if pg_started and all(item["status"] == "passed" for item in results):
@@ -988,24 +1027,33 @@ def main() -> int:
             )
             results.append(run_step(
                 "run-binding-postgres-sqlx-integration",
-                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "run_infrastructure_binding_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
+                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "run_infrastructure_binding_pg", "-j", "4", "--", "--ignored", "--test-threads=1"],
                 ROOT,
                 binding_env,
             ))
+
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.admission_delivery_tests:
+            nats_data.mkdir(parents=False)
+            nats_data_owned = True
+            nats_port = reserve_port()
+            nats_process, nats_start = start_nats_server(arguments.nats_server.resolve(), nats_data, nats_port, f"star-admission-delivery-{uuid.uuid4().hex}", env)
+            results.append(nats_start)
 
         if pg_started and all(item["status"] == "passed" for item in results) and arguments.admission_tests:
             admission_env = env.copy()
             admission_env["STAR_RUN_OWNER_TEST_DATABASE_URL"] = (
                 f"postgresql://star_run_owner_test_admin@127.0.0.1:{pg_port}/postgres"
             )
+            if arguments.admission_delivery_tests:
+                admission_env["STAR_ADMISSION_DELIVERY_TEST_NATS_URL"] = f"nats://127.0.0.1:{nats_port}"
             results.append(run_step(
                 "schedule-admission-postgres-sqlx-integration",
-                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "schedule_admission_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
+                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "schedule_admission_pg", "-j", "4", "--", "--ignored", "--test-threads=1"],
                 ROOT,
                 admission_env,
             ))
 
-        if pg_started and all(item["status"] == "passed" for item in results) and not arguments.schema_only:
+        if pg_started and all(item["status"] == "passed" for item in results) and not arguments.schema_only and not arguments.admission_delivery_tests:
             nats_data.mkdir(parents=False)
             nats_data_owned = True
             nats_port = reserve_port()
@@ -1027,7 +1075,7 @@ def main() -> int:
                 test_env["STAR_RUN_OWNER_TEST_NATS_URL"] = f"nats://127.0.0.1:{nats_port}"
                 results.append(run_step(
                     "run-owner-capacity-result-postgres-jetstream-integration",
-                    [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "capacity_result_jetstream_pg", "-j", "1", "--", "--ignored", "--test-threads=1"],
+                    [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "capacity_result_jetstream_pg", "-j", "4", "--", "--ignored", "--test-threads=1"],
                     ROOT,
                     test_env,
                 ))
@@ -1068,7 +1116,7 @@ def main() -> int:
         write_text(OUTPUT_DIR / "audit.jsonl", "".join(json.dumps(item, sort_keys=True) + "\n" for item in results))
         print(json.dumps({
             "result": "passed" if exit_code == 0 and all(item["status"] == "passed" for item in results) else "failed",
-            "mode": ("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration",
+            "mode": "postgres_admission_delivery_integration" if arguments.admission_delivery_tests else (("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration"),
             "steps": results,
             "audit_path": str(OUTPUT_DIR / "audit.jsonl"),
             "multipass_instances_created": 0,

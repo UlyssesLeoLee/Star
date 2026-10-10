@@ -13,6 +13,7 @@ async-nats = { workspace = true }
 base64 = "0.23"
 chrono = { workspace = true }
 domain-kms = { path = "../domain-kms" }
+domain-automation = { path = "../domain-automation" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

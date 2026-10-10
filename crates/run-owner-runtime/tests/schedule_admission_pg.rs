@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=20082a1cb9de45727c339ba612b9ee8f35613ff00f527464b8950d148503d8d0
+@cypher schema=1 source_sha256=14cb8c9ccaed60476d4e41b0929008c448528b7153af30bf17f9bd0efbb32bb4
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -110,6 +110,18 @@ MERGE (schedule_retry)-[:CALLS]->(schedule_claim)
 MERGE (schedule_fence)-[:CALLS]->(schedule_queue)
 MERGE (schedule_fence)-[:CALLS]->(schedule_resolve)
 MERGE (schedule_fence)-[:CALLS]->(schedule_claim)
+MERGE (delivery_test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_admission_delivery",kind:"function"})
+MERGE (self)-[:DEFINES]->(delivery_test)
+MERGE (schedule_retry)-[:CALLS]->(delivery_test)
+MERGE (delivery_test)-[:USES_TYPE]->(delivery_store:Type {id:"platform_messaging_runtime::AdmissionDeliveryStore",kind:"struct"})
+MERGE (delivery_test)-[:USES_TYPE]->(delivery_publisher:Type {id:"platform_messaging_runtime::AdmissionJetStreamPublisher",kind:"struct"})
+MERGE (delivery_test)-[:WRITES]->(schedule_delivery:Table {id:"automation.admission_message_delivery"})
+MERGE (delivery_test)-[:WRITES]->(run_delivery:Table {id:"multica.admission_message_delivery"})
+MERGE (schedule_fence)-[:USES_TYPE]->(delivery_store)
+MERGE (schedule_fence)-[:USES_TYPE]->(delivery_publisher)
+MERGE (schedule_fence)-[:READS]->(schedule_delivery_receipt:Table {id:"automation.admission_message_delivery_receipt"})
+MERGE (delivery_test)-[:READS]->(schedule_delivery_receipt)
+MERGE (delivery_test)-[:READS]->(run_delivery_receipt:Table {id:"multica.admission_message_delivery_receipt"})
 @endcypher
 */
 use chrono::Utc;
@@ -1852,13 +1864,14 @@ async fn verify_schedule_confirmation(
     let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run_event WHERE tenant_id=$1 AND run_id=$2 AND (event_type='run_started' OR execution_state IS NOT NULL)")
         .bind(cmd.tenant_id).bind(run).fetch_one(admin).await?;
     assert_eq!(count, 0);
-    verify_schedule_rejection_retry(admin).await?;
+    verify_schedule_rejection_retry(admin, store).await?;
     Ok(())
 }
 
 /// Rejected-result supplier fixtures exercise Schedule's real retry and exhaustion writer.
 async fn verify_schedule_rejection_retry(
     admin: &sqlx::PgPool,
+    run_store: &PostgresScheduleAdmissionStore,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = command_fixture();
     cmd.occurrence.key.scheduled_for_utc =
@@ -1872,7 +1885,18 @@ async fn verify_schedule_rejection_retry(
         schedule
             .persist_admission_request(&fence, service, &cmd)
             .await?;
-        let result = rejected_result(&cmd)?.encode_json()?;
+        let typed_result = rejected_result(&cmd)?;
+        if attempt == 1 {
+            let ScheduleAdmissionStart::New(pending) = run_store
+                .begin(source(cmd.tenant_id), &cmd.encode_json()?)
+                .await?
+            else {
+                panic!("new delivery result")
+            };
+            pending.commit_result(&typed_result).await?;
+            verify_admission_delivery(admin, &cmd, &typed_result).await?;
+        }
+        let result = typed_result.encode_json()?;
         assert_eq!(
             schedule
                 .resolve_admission_result(cmd.tenant_id, service, &result)
@@ -1920,6 +1944,257 @@ async fn verify_schedule_rejection_retry(
             .await?;
     assert_eq!(invisible, 0);
     tx.rollback().await?;
+    Ok(())
+}
+
+async fn verify_admission_delivery(
+    admin: &sqlx::PgPool,
+    cmd: &ScheduleRunAdmissionCommandV1,
+    result: &ScheduleRunAdmissionResultV1,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use platform_messaging_runtime::admission_delivery::*;
+    sqlx::raw_sql("CREATE ROLE star_delivery_schedule_test_login LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS; GRANT star_automation_schedule_owner TO star_delivery_schedule_test_login").execute(admin).await?;
+    let options: PgConnectOptions = std::env::var("STAR_RUN_OWNER_TEST_DATABASE_URL")?.parse()?;
+    let schedule_pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(
+            options
+                .clone()
+                .username("star_delivery_schedule_test_login"),
+        )
+        .await?;
+    let run_pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(options.username("star_admission_test_login"))
+        .await?;
+    let schedule_delivery =
+        AdmissionDeliveryStore::new(schedule_pool.clone(), AdmissionDeliveryOwner::Schedule);
+    let run_delivery = AdmissionDeliveryStore::new(run_pool.clone(), AdmissionDeliveryOwner::Run);
+    let wrong_owner =
+        AdmissionDeliveryStore::new(run_pool.clone(), AdmissionDeliveryOwner::Schedule);
+    assert!(wrong_owner
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .await
+        .is_err());
+    assert!(schedule_delivery
+        .claim(cmd.tenant_id, Uuid::new_v4(), 9, 120)
+        .await
+        .is_err());
+    assert!(schedule_delivery
+        .claim(Uuid::nil(), Uuid::new_v4(), 1, 120)
+        .await
+        .is_err());
+    let first = schedule_delivery
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .await?
+        .pop()
+        .unwrap();
+    assert_eq!(first.wire, cmd.encode_json()?);
+    assert_eq!(first.message_id, cmd.request_id);
+    assert_eq!(first.message_kind, "request");
+    schedule_delivery
+        .settle(&first, AdmissionDeliveryAction::Retry)
+        .await?;
+    sqlx::query("UPDATE automation.admission_message_delivery SET next_attempt_at=clock_timestamp() WHERE tenant_id=$1 AND message_id=$2")
+        .bind(cmd.tenant_id).bind(first.message_id).execute(admin).await?;
+    let second = schedule_delivery
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .await?
+        .pop()
+        .unwrap();
+    assert_eq!(second.attempt_count, 2);
+    assert_eq!(second.wire, first.wire);
+    assert!(schedule_delivery
+        .settle(&first, AdmissionDeliveryAction::Retry)
+        .await
+        .is_err());
+    let mut tx = schedule_pool.begin().await?;
+    sqlx::query("SET LOCAL ROLE star_automation_schedule_owner")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
+        .bind(Uuid::new_v4().to_string())
+        .execute(&mut *tx)
+        .await?;
+    let hidden: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM automation.admission_message_delivery")
+            .fetch_one(&mut *tx)
+            .await?;
+    assert_eq!(hidden, 0);
+    tx.rollback().await?;
+    if let Ok(url) = std::env::var("STAR_ADMISSION_DELIVERY_TEST_NATS_URL") {
+        use async_nats::jetstream::{message::PublishMessage, stream};
+        let context = async_nats::jetstream::new(async_nats::connect(url).await?);
+        let name = format!("ADMISSION_{}", Uuid::new_v4().simple());
+        let stream = context
+            .create_stream(stream::Config {
+                name: name.clone(),
+                subjects: vec![
+                    format!("star.automation.admission.v1.{}.>", cmd.tenant_id),
+                    format!("star.multica.admission.v1.{}.>", cmd.tenant_id),
+                ],
+                max_bytes: 2 * 1024 * 1024,
+                max_messages: 100,
+                max_message_size: 16384,
+                duplicate_window: std::time::Duration::from_secs(600),
+                ..Default::default()
+            })
+            .await?;
+        // Simulate process loss after a real broker PubAck, before committing the owner receipt.
+        let subject = format!(
+            "star.automation.admission.v1.{}.{}.request",
+            cmd.tenant_id, second.target_service_id
+        );
+        let id = format!(
+            "admission.v1.automation.request.{}.{}",
+            cmd.tenant_id, second.message_id
+        );
+        let ack = context
+            .send_publish(
+                subject,
+                PublishMessage::build()
+                    .payload(second.wire.clone().into())
+                    .message_id(id)
+                    .expected_stream(&name),
+            )
+            .await?
+            .await?;
+        sqlx::query("UPDATE automation.admission_message_delivery SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE tenant_id=$1 AND message_id=$2")
+            .bind(cmd.tenant_id).bind(second.message_id).execute(admin).await?;
+        let publisher = AdmissionJetStreamPublisher::new(
+            schedule_delivery.clone(),
+            context.clone(),
+            name.clone(),
+            String::new(),
+        )?;
+        let (_cancel, active) = tokio::sync::watch::channel(false);
+        let delivered = publisher
+            .publish_due(cmd.tenant_id, Uuid::new_v4(), 1, &active)
+            .await?;
+        assert_eq!(delivered.delivered, 1);
+        let seq:i64=sqlx::query_scalar("SELECT broker_sequence FROM automation.admission_message_delivery_receipt WHERE tenant_id=$1 AND message_kind='request' AND message_id=$2")
+            .bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
+        assert_eq!(seq, i64::try_from(ack.sequence)?);
+        let info = stream.get_info().await?;
+        assert_eq!(
+            info.state.messages, 1,
+            "stable ID redelivery is duplicate within broker window"
+        );
+        let wrong_stream = AdmissionJetStreamPublisher::new(
+            run_delivery.clone(),
+            context.clone(),
+            "ABSENT_ADMISSION_STREAM".to_owned(),
+            String::new(),
+        )?;
+        assert_eq!(
+            wrong_stream
+                .publish_due(cmd.tenant_id, Uuid::new_v4(), 1, &active)
+                .await?
+                .retry_settlements,
+            1
+        );
+        sqlx::query("UPDATE multica.admission_message_delivery SET next_attempt_at=clock_timestamp() WHERE tenant_id=$1 AND message_id=$2")
+            .bind(cmd.tenant_id).bind(result.result_id).execute(admin).await?;
+        let run_publisher = AdmissionJetStreamPublisher::new(
+            run_delivery.clone(),
+            context.clone(),
+            name.clone(),
+            String::new(),
+        )?;
+        let (_cancel, cancelled) = tokio::sync::watch::channel(true);
+        assert!(
+            run_publisher
+                .publish_due(cmd.tenant_id, Uuid::new_v4(), 1, &cancelled)
+                .await?
+                .cancelled
+        );
+        assert_eq!(
+            run_publisher
+                .publish_due(cmd.tenant_id, Uuid::new_v4(), 1, &active)
+                .await?
+                .delivered,
+            1
+        );
+        assert_eq!(stream.get_info().await?.state.messages, 2);
+        context.delete_stream(name).await?;
+    } else {
+        // Schema-only mode supplies an explicit receipt fixture, never claimed as broker proof.
+        schedule_delivery
+            .settle(
+                &second,
+                AdmissionDeliveryAction::Delivered {
+                    stream: "ACK_FIXTURE".to_owned(),
+                    sequence: 42,
+                },
+            )
+            .await?;
+        let run_claim = run_delivery
+            .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+            .await?
+            .pop()
+            .unwrap();
+        assert_eq!(run_claim.wire, result.encode_json()?);
+        run_delivery
+            .settle(
+                &run_claim,
+                AdmissionDeliveryAction::Delivered {
+                    stream: "ACK_FIXTURE".to_owned(),
+                    sequence: 43,
+                },
+            )
+            .await?;
+    }
+    assert_eq!(schedule_delivery.reconcile(cmd.tenant_id, 8).await?, 0);
+    assert_eq!(run_delivery.reconcile(cmd.tenant_id, 8).await?, 0);
+    assert!(schedule_delivery
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .await?
+        .is_empty());
+    assert!(run_delivery
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .await?
+        .is_empty());
+    // Disposable metadata fixtures exercise native cleanup without inventing source messages.
+    for (schema, delivery, kind) in [
+        ("automation", &schedule_delivery, "request"),
+        ("multica", &run_delivery, "result"),
+    ] {
+        let tenant = Uuid::new_v4();
+        let expired = Uuid::new_v4();
+        let exhausted = Uuid::new_v4();
+        sqlx::query(&format!("INSERT INTO {schema}.admission_message_delivery(tenant_id,message_id,request_id,message_kind,created_at,expires_at) VALUES($1,$2,$2,$3,statement_timestamp()-interval '8 days',statement_timestamp()-interval '1 day')"))
+            .bind(tenant).bind(expired).bind(kind).execute(admin).await?;
+        sqlx::query(&format!("INSERT INTO {schema}.admission_message_delivery(tenant_id,message_id,request_id,message_kind,state,attempt_count,lease_owner_id,lease_expires_at) VALUES($1,$2,$2,$3,'leased',12,$4,clock_timestamp()-interval '1 second')"))
+            .bind(tenant).bind(exhausted).bind(kind).bind(Uuid::new_v4()).execute(admin).await?;
+        assert!(delivery
+            .claim(tenant, Uuid::new_v4(), 8, 120)
+            .await?
+            .is_empty());
+        let reasons: Vec<String> = sqlx::query_scalar(&format!("SELECT terminal_reason FROM {schema}.admission_message_delivery_receipt WHERE tenant_id=$1 ORDER BY terminal_reason"))
+            .bind(tenant).fetch_all(admin).await?;
+        assert_eq!(reasons, vec!["attempts_exhausted", "retention_elapsed"]);
+        let remaining: i64 = sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM {schema}.admission_message_delivery WHERE tenant_id=$1"
+        ))
+        .bind(tenant)
+        .fetch_one(admin)
+        .await?;
+        assert_eq!(remaining, 0);
+        // Even the disposable admin cannot mutate a terminal receipt through normal SQL.
+        assert!(sqlx::query(&format!(
+            "DELETE FROM {schema}.admission_message_delivery_receipt WHERE tenant_id=$1"
+        ))
+        .bind(tenant)
+        .execute(admin)
+        .await
+        .is_err());
+        let capped = Uuid::new_v4();
+        sqlx::query(&format!("INSERT INTO {schema}.admission_message_delivery(tenant_id,message_id,request_id,message_kind) SELECT $1,gen_random_uuid(),gen_random_uuid(),$2 FROM generate_series(1,1000)"))
+            .bind(capped).bind(kind).execute(admin).await?;
+        assert!(delivery.reconcile(capped, 8).await.is_err());
+    }
+    run_pool.close().await;
+    schedule_pool.close().await;
     Ok(())
 }
 
@@ -1976,6 +2251,45 @@ async fn verify_schedule_fence_compensation(
         resolution.compensation_reason,
         Some(ScheduleAdmissionCompensationReasonV1::ScheduleFenceLost)
     );
+    if let Ok(url) = std::env::var("STAR_ADMISSION_DELIVERY_TEST_NATS_URL") {
+        use platform_messaging_runtime::admission_delivery::{
+            AdmissionDeliveryOwner, AdmissionDeliveryStore, AdmissionJetStreamPublisher,
+        };
+        let context = async_nats::jetstream::new(async_nats::connect(url).await?);
+        let name = format!("RESOLUTION_{}", Uuid::new_v4().simple());
+        let stream = context
+            .create_stream(async_nats::jetstream::stream::Config {
+                name: name.clone(),
+                subjects: vec![format!("star.automation.admission.v1.{}.>", cmd.tenant_id)],
+                max_bytes: 2 * 1024 * 1024,
+                max_messages: 100,
+                max_message_size: 16384,
+                ..Default::default()
+            })
+            .await?;
+        // This pool is the disposable test admin; the adapter still pins the Schedule role.
+        // Restricted login/role membership is independently checked by verify_admission_delivery.
+        let delivery = AdmissionDeliveryStore::new(admin.clone(), AdmissionDeliveryOwner::Schedule);
+        let publisher = AdmissionJetStreamPublisher::new(
+            delivery,
+            context.clone(),
+            name.clone(),
+            String::new(),
+        )?;
+        let (_cancel, active) = tokio::sync::watch::channel(false);
+        assert_eq!(
+            publisher
+                .publish_due(cmd.tenant_id, Uuid::new_v4(), 8, &active)
+                .await?
+                .delivered,
+            2
+        );
+        assert_eq!(stream.get_info().await?.state.messages, 2);
+        let reason: String = sqlx::query_scalar("SELECT terminal_reason FROM automation.admission_message_delivery_receipt WHERE tenant_id=$1 AND message_kind='resolution' AND message_id=$2")
+            .bind(cmd.tenant_id).bind(resolution.resolution_id).fetch_one(admin).await?;
+        assert_eq!(reason, "broker_ack");
+        context.delete_stream(name).await?;
+    }
     store
         .compensate_admission(source(cmd.tenant_id), &resolution.encode_json()?)
         .await?;

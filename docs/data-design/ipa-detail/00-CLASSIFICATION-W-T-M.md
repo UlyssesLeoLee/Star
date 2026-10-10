@@ -708,3 +708,15 @@ CREATE POLICY observation_tenant_isolation ON local_runtime.runtime_observation
 | automation.run_admission_resolution_outbox | T | Append-only; no TTL/deletion; FORCE tenant RLS; paired confirm/compensate command |
 
 新增W/T/M=0/3/0，全部表独立分类。既有 occurrence/event/link 属于Schedule owner；Run/Infrastructure只在自己的事务处理消息。验证见PHASE-9F4C-D12-SCHEDULE-HANDOFF-REPORT.md；全局历史表索引总计未重新审计。
+
+
+## D13 — Admission owner delivery (2026-10-10)
+
+| Table | Class | Retention / protection |
+|---|---|---|
+| automation.admission_message_delivery | W | 7-day exact hard TTL; max1000/tenant; native bounded audited removal |
+| automation.admission_message_delivery_receipt | T | Immutable terminal receipt; no TTL/deletion; FORCE tenant RLS |
+| multica.admission_message_delivery | W | 7-day exact hard TTL; max1000/tenant; native bounded audited removal |
+| multica.admission_message_delivery_receipt | T | Immutable terminal receipt; no TTL/deletion; FORCE tenant RLS |
+
+新增W/T/M=2/2/0；source views引用既有T事实，不新增业务表或归类为M。两owner独立事务、role与队列；原始wire不在W重复存储。验证状态见D13报告，未声称重新审计整个历史表索引。
