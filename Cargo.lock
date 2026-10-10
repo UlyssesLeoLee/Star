@@ -5651,7 +5651,9 @@ version = "0.1.0"
 dependencies = [
  "async-nats",
  "chrono",
+ "domain-agent",
  "domain-automation",
+ "domain-hook",
  "domain-infrastructure",
  "futures-util",
  "platform-messaging-runtime",

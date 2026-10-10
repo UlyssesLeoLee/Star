@@ -1,11 +1,16 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=b1012909c9dbc8f8b289e1abb956cfb6a55020f36c68ccbebbb552e1bfc71b5f
+@cypher schema=1 source_sha256=0aaf8588f49bea5609cdcca377dd0c6cea8d91a2ca2dad8ca20fd64cb759f638
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
 MERGE (binding:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::binding_fixture",kind:"function"})
 MERGE (source:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::source",kind:"function"})
+MERGE (test)-[:CALLS]->(seed_policy:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_policy",kind:"function"})
+MERGE (self)-[:DEFINES]->(seed_policy)
+MERGE (seed_policy)-[:WRITES]->(profile_master:Table {id:"multica.agent_execution_profile"})
+MERGE (seed_policy)-[:WRITES]->(hook_master:Table {id:"multica.hook_policy_set"})
+MERGE (test)-[:CALLS]->(policy_gate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_profile_and_hooks",kind:"method"})
 MERGE (test)-[:CALLS]->(task_seed:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_task_binding",kind:"function"})
 MERGE (self)-[:DEFINES]->(task_seed)
 MERGE (task_seed)-[:WRITES]->(w:Table {id:"public.worktree_canvas_worktree"})
@@ -476,6 +481,186 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
         ))
     ));
     drop(pending);
+    let mut policies = command_fixture();
+    seed_directory(&admin, &policies, "active").await?;
+    seed_task_binding(&admin, &policies).await?;
+    let (profile_document, project_policy_id, hook_document) =
+        seed_policy(&admin, &mut policies).await?;
+    binding_store
+        .save_revision(
+            policies.occurrence.run_as_actor_id,
+            None,
+            &policies.infrastructure_binding,
+        )
+        .await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(policies.tenant_id), &policies.encode_json()?)
+        .await?
+    else {
+        panic!("new policy request")
+    };
+    let snapshot = pending.revalidate_profile_and_hooks().await?;
+    assert_eq!(snapshot.profile().document(), &profile_document);
+    assert_eq!(snapshot.hook_policy().digest(), hook_document.digest);
+    // The shared Project publication fence protects the absence of an overlay.
+    let mut overlay = hook_document.clone();
+    overlay.worktree_id = Some(
+        policies
+            .occurrence
+            .rule_snapshot
+            .target
+            .worktree_id
+            .into_bytes(),
+    );
+    overlay.worktree_version = Some(1);
+    overlay.digest = overlay.computed_digest().unwrap();
+    let mut publish = admin.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='150ms'")
+        .execute(&mut *publish)
+        .await?;
+    let error = sqlx::query("INSERT INTO multica.hook_policy_set(tenant_id,project_id,scope_kind,worktree_id,policy_version,schema_version,evaluator_api_version,digest,policy_document,inherited_project_policy_set_id,published_by) VALUES($1,$2,'worktree',$3,1,1,2,$4,$5,$6,$7)")
+        .bind(policies.tenant_id).bind(policies.occurrence.rule_snapshot.target.project_id)
+        .bind(policies.occurrence.rule_snapshot.target.worktree_id).bind(overlay.digest.as_slice())
+        .bind(serde_json::to_value(&overlay)?).bind(project_policy_id).bind(policies.occurrence.run_as_actor_id)
+        .execute(&mut *publish).await.expect_err("overlay publication must wait for current admission");
+    assert_eq!(
+        error.as_database_error().and_then(|e| e.code()).as_deref(),
+        Some("55P03")
+    );
+    publish.rollback().await?;
+    drop(pending);
+    // Publication after the reader ends must invalidate a baseline-pinned request.
+    let overlay_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO multica.hook_policy_set(policy_set_id,tenant_id,project_id,scope_kind,worktree_id,policy_version,schema_version,evaluator_api_version,digest,policy_document,inherited_project_policy_set_id,published_by) VALUES($1,$2,$3,'worktree',$4,1,1,2,$5,$6,$7,$8)")
+        .bind(overlay_id).bind(policies.tenant_id).bind(policies.occurrence.rule_snapshot.target.project_id)
+        .bind(policies.occurrence.rule_snapshot.target.worktree_id).bind(overlay.digest.as_slice())
+        .bind(serde_json::to_value(&overlay)?).bind(project_policy_id).bind(policies.occurrence.run_as_actor_id)
+        .execute(&admin).await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(policies.tenant_id), &policies.encode_json()?)
+        .await?
+    else {
+        panic!("new overlay drift")
+    };
+    assert!(matches!(
+        pending.revalidate_profile_and_hooks().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    let mut revised_draft = profile_document.profile.clone();
+    revised_draft.hook_set.hook_set_id = overlay_id;
+    revised_draft.hook_set.effective_digest =
+        overlay.digest.iter().map(|b| format!("{b:02x}")).collect();
+    let revised_profile = revised_draft.seal().unwrap();
+    let mut revise = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *revise)
+        .await?;
+    sqlx::query("UPDATE multica.agent_execution_profile SET profile_version=2,content_digest=$1,profile_document=$2 WHERE tenant_id=$3 AND profile_id=$4")
+        .bind(&revised_profile.document().content_digest).bind(serde_json::to_value(revised_profile.document())?)
+        .bind(policies.tenant_id).bind(policies.occurrence.rule_snapshot.target.execution_profile_id).execute(&mut *revise).await?;
+    revise.commit().await?;
+    policies.request_id = Uuid::new_v4();
+    policies
+        .occurrence
+        .rule_snapshot
+        .target
+        .execution_profile_version = 2;
+    policies
+        .occurrence
+        .rule_snapshot
+        .target
+        .execution_profile_digest = revised_profile.document().content_digest.clone();
+    policies.occurrence.rule_snapshot.target.hook_set_digest = revised_profile
+        .document()
+        .profile
+        .hook_set
+        .effective_digest
+        .clone();
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(policies.tenant_id), &policies.encode_json()?)
+        .await?
+    else {
+        panic!("new pinned overlay")
+    };
+    let snapshot = pending.revalidate_profile_and_hooks().await?;
+    assert_eq!(snapshot.hook_policy().digest(), overlay.digest);
+    drop(pending);
+    // A changed pinned Profile version is a new request and cannot use the earlier snapshot.
+    let mut wrong_version = policies.clone();
+    wrong_version.request_id = Uuid::new_v4();
+    wrong_version
+        .occurrence
+        .rule_snapshot
+        .target
+        .execution_profile_version = 3;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(
+            source(wrong_version.tenant_id),
+            &wrong_version.encode_json()?,
+        )
+        .await?
+    else {
+        panic!("new wrong version")
+    };
+    assert!(matches!(
+        pending.revalidate_profile_and_hooks().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    // Exact infrastructure binding is valid, but the verified Profile asks for a different budget.
+    let mut mismatched = policies.clone();
+    mismatched.request_id = Uuid::new_v4();
+    mismatched.infrastructure_binding.binding_revision = 2;
+    mismatched
+        .infrastructure_binding
+        .resource_budget
+        .max_rss_bytes += 1;
+    binding_store
+        .save_revision(
+            mismatched.occurrence.run_as_actor_id,
+            Some(1),
+            &mismatched.infrastructure_binding,
+        )
+        .await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(mismatched.tenant_id), &mismatched.encode_json()?)
+        .await?
+    else {
+        panic!("new budget mismatch")
+    };
+    assert!(matches!(
+        pending.revalidate_profile_and_hooks().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::BindingUnavailable
+        ))
+    ));
+    drop(pending);
+    // Digest tampering remains rejected even when columns still match the pinned identities.
+    let mut corrupt = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *corrupt)
+        .await?;
+    sqlx::query("UPDATE multica.agent_execution_profile SET profile_document=jsonb_set(profile_document,'{profile,resource_budget,max_cpu_ms}','1001') WHERE tenant_id=$1 AND profile_id=$2")
+        .bind(policies.tenant_id).bind(policies.occurrence.rule_snapshot.target.execution_profile_id).execute(&mut *corrupt).await?;
+    corrupt.commit().await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(mismatched.tenant_id), &mismatched.encode_json()?)
+        .await?
+    else {
+        panic!("new corrupt profile")
+    };
+    assert!(matches!(
+        pending.revalidate_profile_and_hooks().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
     let mut orphan = admin.begin().await?;
     sqlx::query("INSERT INTO multica.schedule_admission_inbox
        (tenant_id,request_id,result_id,project_id,branch_id,engineering_run_id,work_item_id,worktree_id,
@@ -715,4 +900,66 @@ async fn seed_task_binding(
       VALUES('{tenant}','{project}','{task}','{worktree}'); COMMIT;"))
         .execute(admin).await?;
     Ok(())
+}
+
+async fn seed_policy(
+    admin: &sqlx::PgPool,
+    command: &mut ScheduleRunAdmissionCommandV1,
+) -> Result<
+    (
+        domain_agent::execution_profile::AgentExecutionProfileDocument,
+        Uuid,
+        domain_hook::HookPolicyDocument,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    use domain_agent::execution_profile::AgentExecutionProfileDraft;
+    let tenant = command.tenant_id;
+    let actor = command.occurrence.run_as_actor_id;
+    let target = &command.occurrence.rule_snapshot.target;
+    let project = target.project_id;
+    let policy_id = Uuid::new_v4();
+    let mut hook = domain_hook::HookPolicyDocument {
+        schema_version: domain_hook::POLICY_SCHEMA_VERSION,
+        evaluator_api_version: domain_hook::EVALUATOR_API_VERSION,
+        tenant_id: tenant.into_bytes(),
+        project_id: project.into_bytes(),
+        worktree_id: None,
+        project_version: 1,
+        worktree_version: None,
+        digest: [0; 32],
+        project_rules: vec![],
+        worktree_rules: vec![],
+    };
+    hook.digest = hook.computed_digest().unwrap();
+    hook.clone().verify().unwrap();
+    let hook_digest: String = hook.digest.iter().map(|b| format!("{b:02x}")).collect();
+    let provider = |name: &str| serde_json::json!({"provider_id":name,"version":1,"implementation_digest":"a".repeat(64),"configuration_digest":"b".repeat(64),"capabilities":[]});
+    let budget = &command.infrastructure_binding.resource_budget;
+    let draft: AgentExecutionProfileDraft = serde_json::from_value(serde_json::json!({
+      "schema_version":1,"scope":{"tenant_id":tenant,"project_id":project,"worktree_id":null},
+      "agent_provider":provider("agent.local"),"memory":{"state":"disabled"},"skills":[],
+      "context":{"assembler":provider("context.local"),"max_input_bytes":4096,"max_input_tokens":1024,"max_sources":8,"compaction_policy_digest":"c".repeat(64),"preserve_task_contract":true,"preserve_acceptance_criteria":true,"preserve_authorization_scope":true},
+      "validation":{"provider":provider("validator.local"),"suite_digest":"d".repeat(64),"toolchain_digest":"e".repeat(64),"acceptance_criteria":["ac-test"]},
+      "loop_budget":{"policy":provider("loop.local"),"max_iterations":1,"max_no_progress_iterations":1,"max_wall_clock_ms":30000,"max_provider_calls":1},
+      "resource_budget":{"max_rss_bytes":budget.max_rss_bytes,"max_cpu_ms":budget.max_cpu_ms,"max_runtime_ms":budget.max_runtime_ms,"max_child_processes":budget.max_child_processes,"max_parallel_tools":budget.max_parallel_tools,"max_provider_calls":budget.max_provider_calls,"max_output_bytes":budget.max_output_bytes,"max_event_buffer_bytes":budget.max_event_buffer_bytes},
+      "hook_set":{"hook_set_id":policy_id,"version":1,"effective_digest":hook_digest},
+      "grants":{"grant_set_id":Uuid::new_v4(),"version":1,"capabilities":[],"expires_at_epoch_ms":1900000000000u64},"engineering_manifest":null
+    }))?;
+    let verified = draft.seal().unwrap();
+    let document = verified.document().clone();
+    let mut tx = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("INSERT INTO multica.hook_policy_set(policy_set_id,tenant_id,project_id,scope_kind,policy_version,schema_version,evaluator_api_version,digest,policy_document,published_by) VALUES($1,$2,$3,'project',1,1,2,$4,$5,$6)")
+        .bind(policy_id).bind(tenant).bind(project).bind(hook.digest.as_slice()).bind(serde_json::to_value(&hook)?).bind(actor).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO multica.agent_execution_profile(tenant_id,project_id,profile_id,scope_kind,profile_version,schema_version,content_digest,profile_document,changed_by) VALUES($1,$2,$3,'project',1,1,$4,$5,$6)")
+        .bind(tenant).bind(project).bind(target.execution_profile_id).bind(&document.content_digest).bind(serde_json::to_value(&document)?).bind(actor).execute(&mut *tx).await?;
+    tx.commit().await?;
+    let target = &mut command.occurrence.rule_snapshot.target;
+    target.execution_profile_digest = document.content_digest.clone();
+    target.hook_set_version = 1;
+    target.hook_set_digest = hook_digest;
+    Ok((document, policy_id, hook))
 }

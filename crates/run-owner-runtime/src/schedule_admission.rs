@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=c009b9e7004c7b2155b36b27764b361b52eafb0a6f485cd4f7b46c8c340b6080
+@cypher schema=1 source_sha256=628e7574475080ea780bdd22205ad19844cdc4973edb298aff0862c4b8a179d7
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -22,6 +22,10 @@ MERGE (revalidate)-[:CALLS]->(resolve_locked:Symbol {id:"crates/run-owner-runtim
 MERGE (revalidate)-[:CALLS]->(scope)
 MERGE (task:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_task_binding",kind:"method"})
 MERGE (self)-[:DEFINES]->(task)
+MERGE (policy:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_profile_and_hooks",kind:"method"})
+MERGE (self)-[:DEFINES]->(policy)
+MERGE (policy)-[:CALLS]->(task)
+MERGE (policy)-[:CALLS]->(load_policy:Symbol {id:"crates/run-owner-runtime/src/schedule_policy.rs::load_current",kind:"function"})
 MERGE (task)-[:CALLS]->(revalidate)
 MERGE (task)-[:CALLS]->(verify_task:Symbol {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql::verify_schedule_task_current",kind:"function"})
 MERGE (begin)-[:CALLS]->(scope)
@@ -179,6 +183,14 @@ impl PostgresScheduleAdmissionStore {
 }
 
 impl ScheduleAdmissionTransaction {
+    /// Verify current pinned Profile/effective HookSet and their binding resource budget.
+    /// Current catalogs, native Hook evaluation, quotas and execution remain separate gates.
+    pub async fn revalidate_profile_and_hooks(
+        &mut self,
+    ) -> Result<crate::SchedulePolicySnapshot, ScheduleAdmissionStoreError> {
+        self.revalidate_task_binding().await?;
+        crate::schedule_policy::load_current(&mut self.transaction, &self.command).await
+    }
     /// Lock the current authorized canonical task/checkout scope in this transaction.
     /// Profile, HookSet, quota and execution readiness remain separate prerequisites.
     pub async fn revalidate_task_binding(&mut self) -> Result<(), ScheduleAdmissionStoreError> {

@@ -11,6 +11,8 @@ repository.workspace = true
 [dependencies]
 async-nats = { workspace = true }
 chrono = { workspace = true }
+domain-agent = { path = "../domain-agent" }
+domain-hook = { path = "../domain-hook" }
 domain-automation = { path = "../domain-automation" }
 domain-infrastructure = { path = "../domain-infrastructure" }
 futures-util = { workspace = true }
