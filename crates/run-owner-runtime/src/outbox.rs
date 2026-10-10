@@ -1,6 +1,6 @@
 //! Transactional Run-owner capacity demand persistence.
 /*
-@cypher schema=1 source_sha256=de1671acc20863b01f3783676167025122550ff41942cba65f1f35ff21fbe088
+@cypher schema=1 source_sha256=e0e04b5cbc6b534ec11b109f278f92f4469a05730106f38f7a038bbc33c80a62
 MERGE (self:File {path:"crates/run-owner-runtime/src/outbox.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/outbox.rs::outbox",kind:"module"})
 MERGE (store:Type {id:"run_owner_runtime::PostgresRunOwnerCapacityStore",kind:"struct"})
@@ -102,9 +102,10 @@ impl PostgresRunOwnerCapacityStore {
     ///
     /// The method does not begin, commit, or roll back the transaction. The caller can therefore
     /// atomically commit Run-owner facts and this Run-owner Outbox row; it cannot commit Schedule-
-    /// owned occurrence/link/Outbox state. This primitive has no Schedule-confirmation receipt
-    /// gate and is not production Schedule admission authority. A scheduled production caller must
-    /// consume and validate that confirmation in its Run-owner transaction before calling this.
+    /// owned occurrence/link/Outbox state. For Runs with preparation lineage, the database also
+    /// requires a confirmation event, a live pending reservation and no compensation receipt.
+    /// This primitive does not authenticate or consume Schedule confirmation and is not production
+    /// admission authority. A scheduled caller must validate confirmation in its owner transaction.
     /// The stable key is tenant-scoped and occurrence-scoped; replay with changed content is a
     /// hard conflict.
     pub async fn append_capacity_demand(

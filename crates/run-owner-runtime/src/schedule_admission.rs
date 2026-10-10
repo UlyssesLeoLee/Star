@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=af14b4e1409e16514235303777865356bfb7d3196362b93f43c720e400c2ee7c
+@cypher schema=1 source_sha256=39759dcfc6675c6822b68c300903db3d5a5189226ad7b898d34ded8430960d0e
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -55,12 +55,23 @@ MERGE (self)-[:DEFINES]->(time)
 MERGE (prepare)-[:CALLS]->(result)
 MERGE (prepare)-[:CALLS]->(time)
 MERGE (prepare)-[:CALLS]->(native_prepare:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-preparation.sql::prepare_schedule_execution_run",kind:"function"})
+MERGE (compensate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.compensate_admission",kind:"method"})
+MERGE (self)-[:DEFINES]->(compensate)
+MERGE (compensate)-[:CALLS]->(scope)
+MERGE (compensate)-[:READS]->(inbox)
+MERGE (compensate)-[:READS]->(outbox)
+MERGE (compensate)-[:CALLS]->(resolution_decode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::decode_json",kind:"method"})
+MERGE (compensate)-[:CALLS]->(resolution_match:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::validate_for_result",kind:"method"})
+MERGE (compensate)-[:CALLS]->(decode)
+MERGE (compensate)-[:CALLS]->(match)
+MERGE (compensate)-[:CALLS]->(native_compensate:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-compensation.sql::compensate_schedule_preparation",kind:"function"})
 @endcypher
 */
 
 use domain_automation::schedule::{
     ScheduleAdmissionContractError, ScheduleAdmissionRejectionCodeV1,
-    ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResultV1,
+    ScheduleAdmissionResolutionKindV1, ScheduleRunAdmissionCommandV1,
+    ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1,
 };
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction};
@@ -125,6 +136,76 @@ pub struct ScheduleAdmissionTransaction {
 }
 
 impl PostgresScheduleAdmissionStore {
+    /// Atomically release a pending preparation before confirmation/infrastructure demand.
+    /// Returns true for a new release, false for exact immutable replay. The trusted receiving
+    /// deployment must authenticate the Schedule service; injected source is not authentication.
+    /// Cleanup uses the original receipt, so revoked run-as permissions cannot strand budgets.
+    pub async fn compensate_admission(
+        &self,
+        source: ScheduleAdmissionSource,
+        resolution_wire: &[u8],
+    ) -> Result<bool, ScheduleAdmissionStoreError> {
+        let resolution = ScheduleRunAdmissionResolutionV1::decode_json(resolution_wire)?;
+        if source.tenant_id.is_nil()
+            || source.schedule_service_id.is_nil()
+            || source.tenant_id != resolution.tenant_id
+        {
+            return Err(ScheduleAdmissionStoreError::UntrustedScope);
+        }
+        if resolution.decision != ScheduleAdmissionResolutionKindV1::Compensate {
+            return Err(ScheduleAdmissionContractError::InvalidResolution.into());
+        }
+        let mut tx = self.pool.begin().await?;
+        crate::outbox::set_run_owner_scope(&mut tx, source.tenant_id).await?;
+        sqlx::query("SET LOCAL lock_timeout = '5s'")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SET LOCAL statement_timeout = '10s'")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!(
+                "schedule-admission:{}:{}",
+                source.tenant_id, resolution.request_id
+            ))
+            .execute(&mut *tx)
+            .await?;
+        let row = sqlx::query(
+            "SELECT i.command_wire,i.source_schedule_service_id,o.result_wire
+          FROM multica.schedule_admission_inbox i JOIN multica.schedule_admission_result_outbox o
+          ON o.tenant_id=i.tenant_id AND o.request_id=i.request_id AND o.result_id=i.result_id
+          WHERE i.tenant_id=$1 AND i.request_id=$2",
+        )
+        .bind(source.tenant_id)
+        .bind(resolution.request_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(ScheduleAdmissionStoreError::ReplayConflict)?;
+        if row.try_get::<Uuid, _>("source_schedule_service_id")? != source.schedule_service_id {
+            return Err(ScheduleAdmissionStoreError::UntrustedScope);
+        }
+        let command = ScheduleRunAdmissionCommandV1::decode_json(
+            &row.try_get::<Vec<u8>, _>("command_wire")?,
+        )?;
+        let result =
+            ScheduleRunAdmissionResultV1::decode_json(&row.try_get::<Vec<u8>, _>("result_wire")?)?;
+        result.validate_for_command(&command)?;
+        resolution.validate_for_result(&result)?;
+        let outcome: String =
+            sqlx::query_scalar("SELECT multica.compensate_schedule_preparation($1,$2)")
+                .bind(resolution_wire)
+                .bind(source.schedule_service_id)
+                .fetch_one(&mut *tx)
+                .await?;
+        let inserted = match outcome.as_str() {
+            "released" => true,
+            "duplicate" => false,
+            _ => return Err(ScheduleAdmissionStoreError::ReplayConflict),
+        };
+        tx.commit().await?;
+        Ok(inserted)
+    }
+
     /// Construct a persistence store over the application's role-capable pool.
     pub fn new(pool: PgPool) -> Self {
         Self { pool }

@@ -116,3 +116,15 @@ Project准备reservation的lease由数据库取min(occurrence deadline,当前时
 | T | schedule_admission_inbox / schedule_admission_result_outbox | Atomic processed receipt/result pair. |
 | M | task_metadata / task_contract / directory / profiles / quota / binding revisions | Current facts locked/read; no mutation. |
 | W | task_lifecycle_current | Current eligible state locked/read; Task owner retains writes. |
+
+## D10 compensation write set
+
+| Class | Table | Retention / ownership |
+|---|---|---|
+| W | project_execution_resource_reservation | Existing pending to released transition; no physical deletion here. |
+| W | project_execution_resource_admission_lock | Existing allocation epoch, 30-day expiry; no cleanup here. |
+| T | schedule_compensation_inbox | New exact immutable receipt, no TTL/deletion, tenant FORCE RLS. |
+| T | reservation_event / task_execution_run_event | Paired append-only release audit and compensation fact. |
+| M | Task/policy/binding | No mutation. |
+
+New tables W/T/M=0/1/0. Infrastructure reservations are outside this write set.

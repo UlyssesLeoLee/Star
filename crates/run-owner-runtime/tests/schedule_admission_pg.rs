@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=b0336f1704f59f72286b7f2156ea5981267e2865a23ba0132c40d61cd21772d1
+@cypher schema=1 source_sha256=166a47f516d05c1db82de1361d71ce77b9502b780bd06d74fc62238a5f998e06
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -69,6 +69,14 @@ MERGE (preparation_test)-[:WRITES]->(task_lifecycle:Table {id:"multica.task_life
 MERGE (preparation_test)-[:WRITES]->(task_contract:Table {id:"multica.task_contract"})
 MERGE (preparation_test)-[:READS]->(run:Table {id:"multica.task_execution_run"})
 MERGE (preparation_test)-[:READS]->(reservation)
+MERGE (preparation_test)-[:CALLS]->(compensation_test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_schedule_compensation",kind:"function"})
+MERGE (self)-[:DEFINES]->(compensation_test)
+MERGE (compensation_test)-[:TESTS]->(compensate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.compensate_admission",kind:"method"})
+MERGE (compensation_test)-[:READS]->(reservation)
+MERGE (compensation_test)-[:READS]->(receipt:Table {id:"multica.schedule_compensation_inbox"})
+MERGE (compensation_test)-[:CALLS]->(append:Symbol {id:"crates/run-owner-runtime/src/outbox.rs::PostgresRunOwnerCapacityStore.append_capacity_demand",kind:"method"})
+MERGE (compensation_test)-[:WRITES]->(reservation)
+MERGE (compensation_test)-[:WRITES]->(events:Table {id:"multica.task_execution_run_event"})
 @endcypher
 */
 use chrono::Utc;
@@ -1528,5 +1536,192 @@ async fn verify_schedule_preparation(
         pending.prepare_and_commit().await?.rejection_code,
         Some(ScheduleAdmissionRejectionCodeV1::QuotaExceeded)
     );
+    verify_schedule_compensation(admin, store, &cmd, &result).await?;
+    Ok(())
+}
+
+async fn verify_schedule_compensation(
+    admin: &sqlx::PgPool,
+    store: &PostgresScheduleAdmissionStore,
+    cmd: &ScheduleRunAdmissionCommandV1,
+    result: &ScheduleRunAdmissionResultV1,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let resolution = ScheduleRunAdmissionResolutionV1 {
+        schema_version: 1,
+        tenant_id: result.tenant_id,
+        resolution_id: Uuid::new_v4(),
+        request_id: result.request_id,
+        admission_attempt: result.admission_attempt,
+        result_id: result.result_id,
+        correlation_id: result.correlation_id,
+        occurrence_id: result.occurrence_id,
+        task_execution_run_id: result.task_execution_run_id.unwrap(),
+        binding_digest: result.binding_digest,
+        decision: ScheduleAdmissionResolutionKindV1::Compensate,
+        compensation_reason: Some(ScheduleAdmissionCompensationReasonV1::ScheduleFenceLost),
+    };
+    let wire = resolution.encode_json()?;
+    let demand = domain_infrastructure::HostInfrastructureDemandV2 {
+        schema_version: 2,
+        event_id: Uuid::new_v4(),
+        correlation_id: cmd.correlation_id,
+        tenant_id: cmd.tenant_id,
+        project_id: cmd.occurrence.rule_snapshot.target.project_id,
+        branch_id: cmd.occurrence.rule_snapshot.target.branch_id,
+        engineering_run_id: cmd.occurrence.rule_snapshot.target.engineering_run_id,
+        task_execution_run_id: resolution.task_execution_run_id,
+        schedule_rule_id: cmd.occurrence.rule_snapshot.rule_id.as_uuid(),
+        schedule_rule_version: i64::try_from(cmd.occurrence.rule_snapshot.rule_version)?,
+        occurrence_id: cmd.occurrence.occurrence_id,
+        binding: cmd.infrastructure_binding.clone(),
+        resource_budget: cmd.infrastructure_binding.resource_budget,
+        requested_at: Utc::now(),
+        deadline_at: Utc::now() + chrono::Duration::seconds(60),
+    };
+    let capacity_store = run_owner_runtime::PostgresRunOwnerCapacityStore::new(admin.clone());
+    let mut tx = admin.begin().await?;
+    let error = capacity_store
+        .append_capacity_demand(
+            &mut tx,
+            cmd.occurrence.rule_snapshot.target.work_item_id,
+            &demand,
+        )
+        .await
+        .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("prepared Schedule demand requires confirmation"));
+    tx.rollback().await?;
+    let mut wrong_source = source(cmd.tenant_id);
+    wrong_source.schedule_service_id = Uuid::new_v4();
+    assert!(matches!(
+        store.compensate_admission(wrong_source, &wire).await,
+        Err(ScheduleAdmissionStoreError::UntrustedScope)
+    ));
+    assert!(store
+        .compensate_admission(source(Uuid::new_v4()), &wire)
+        .await
+        .is_err());
+    let mut mismatch = resolution.clone();
+    mismatch.binding_digest[0] ^= 1;
+    assert!(store
+        .compensate_admission(source(cmd.tenant_id), &mismatch.encode_json()?)
+        .await
+        .is_err());
+    let mut confirm = resolution.clone();
+    confirm.decision = ScheduleAdmissionResolutionKindV1::Confirm;
+    confirm.compensation_reason = None;
+    assert!(store
+        .compensate_admission(source(cmd.tenant_id), &confirm.encode_json()?)
+        .await
+        .is_err());
+    // Canonical state fixture only: compensation must refuse an active reservation.
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query("UPDATE multica.project_execution_resource_reservation SET reservation_state='active',activated_at=clock_timestamp() WHERE tenant_id=$1 AND run_id=$2")
+        .bind(cmd.tenant_id).bind(resolution.task_execution_run_id).execute(&mut *fixture).await?;
+    fixture.commit().await?;
+    assert!(store
+        .compensate_admission(source(cmd.tenant_id), &wire)
+        .await
+        .is_err());
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query("UPDATE multica.project_execution_resource_reservation SET reservation_state='pending',activated_at=NULL WHERE tenant_id=$1 AND run_id=$2")
+        .bind(cmd.tenant_id).bind(resolution.task_execution_run_id).execute(&mut *fixture).await?;
+    let confirmed = Uuid::new_v4();
+    sqlx::query("INSERT INTO multica.task_execution_run_event(event_id,tenant_id,project_id,run_id,work_item_id,event_type,actor_id,correlation_id,details) VALUES($1,$2,$3,$4,$5,'schedule_admission_confirmed',$6,$7,'{}')")
+        .bind(confirmed).bind(cmd.tenant_id).bind(cmd.occurrence.rule_snapshot.target.project_id)
+        .bind(resolution.task_execution_run_id).bind(cmd.occurrence.rule_snapshot.target.work_item_id)
+        .bind(cmd.occurrence.run_as_actor_id).bind(cmd.correlation_id).execute(&mut *fixture).await?;
+    fixture.commit().await?;
+    assert!(store
+        .compensate_admission(source(cmd.tenant_id), &wire)
+        .await
+        .is_err());
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query("DELETE FROM multica.task_execution_run_event WHERE event_id=$1")
+        .bind(confirmed)
+        .execute(&mut *fixture)
+        .await?;
+    fixture.commit().await?;
+    // Fail at the final receipt after staged release/audit writes: all owner facts must roll back.
+    sqlx::raw_sql("CREATE FUNCTION multica.reject_d10_receipt() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'd10 receipt failure'; END $$; CREATE TRIGGER d10_fail BEFORE INSERT ON multica.schedule_compensation_inbox FOR EACH ROW EXECUTE FUNCTION multica.reject_d10_receipt()").execute(admin).await?;
+    assert!(store
+        .compensate_admission(source(cmd.tenant_id), &wire)
+        .await
+        .is_err());
+    sqlx::raw_sql("DROP TRIGGER d10_fail ON multica.schedule_compensation_inbox; DROP FUNCTION multica.reject_d10_receipt()").execute(admin).await?;
+    let state:String=sqlx::query_scalar("SELECT reservation_state FROM multica.project_execution_resource_reservation WHERE tenant_id=$1 AND run_id=$2")
+        .bind(cmd.tenant_id).bind(resolution.task_execution_run_id).fetch_one(admin).await?;
+    assert_eq!(state, "pending");
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run_event WHERE tenant_id=$1 AND run_id=$2 AND event_type IN ('resource_reservation_released','schedule_admission_compensated')")
+        .bind(cmd.tenant_id).bind(resolution.task_execution_run_id).fetch_one(admin).await?;
+    assert_eq!(count, 0);
+    assert!(
+        store
+            .compensate_admission(source(cmd.tenant_id), &wire)
+            .await?
+    );
+    assert!(
+        !store
+            .compensate_admission(source(cmd.tenant_id), &wire)
+            .await?
+    );
+    let mut conflict = resolution.clone();
+    conflict.compensation_reason = Some(ScheduleAdmissionCompensationReasonV1::OccurrenceCancelled);
+    assert!(store
+        .compensate_admission(source(cmd.tenant_id), &conflict.encode_json()?)
+        .await
+        .is_err());
+    let state:String=sqlx::query_scalar("SELECT reservation_state FROM multica.project_execution_resource_reservation WHERE tenant_id=$1 AND run_id=$2")
+        .bind(cmd.tenant_id).bind(resolution.task_execution_run_id).fetch_one(admin).await?;
+    assert_eq!(state, "released");
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run_event WHERE tenant_id=$1 AND run_id=$2 AND event_type IN ('resource_reservation_released','schedule_admission_compensated')")
+        .bind(cmd.tenant_id).bind(resolution.task_execution_run_id).fetch_one(admin).await?;
+    assert_eq!(count, 2);
+    let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.schedule_compensation_inbox WHERE tenant_id=$1 AND request_id=$2")
+        .bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
+    assert_eq!(count, 1);
+    let mut tx = admin.begin().await?;
+    let error = capacity_store
+        .append_capacity_demand(
+            &mut tx,
+            cmd.occurrence.rule_snapshot.target.work_item_id,
+            &demand,
+        )
+        .await
+        .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("prepared Schedule demand requires confirmation"));
+    tx.rollback().await?;
+    let mut tx = admin.begin().await?;
+    sqlx::query("SET LOCAL ROLE star_multica_run_owner")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
+        .bind(Uuid::new_v4().to_string())
+        .execute(&mut *tx)
+        .await?;
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM multica.schedule_compensation_inbox")
+        .fetch_one(&mut *tx)
+        .await?;
+    assert_eq!(count, 0);
+    tx.rollback().await?;
+    let ScheduleAdmissionStart::Replay(replay) = store
+        .begin(source(cmd.tenant_id), &cmd.encode_json()?)
+        .await?
+    else {
+        panic!("historical accepted replay")
+    };
+    assert_eq!(replay, *result); // Historical accepted fact cannot reactivate the released reservation.
     Ok(())
 }
