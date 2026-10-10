@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=378a0074dfc83681a470742384a3188e3345f1385deb6523b38754e36c6e5b8f
+@cypher schema=1 source_sha256=7cc601e6726032d604df5f497e647c09cd764ec673a4d2b3f1522fb891172fdd
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (repo:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository"})
 MERGE (error:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::ScheduleRepositoryError"})
@@ -65,19 +65,34 @@ MERGE (terminalize)-[:WRITES]->(event)
 MERGE (purge)-[:CALLS]->(set_tenant_scope)
 MERGE (purge)-[:WRITES]->(dispatch)
 MERGE (rule_match)-[:READS]->(schedule_rule)
+MERGE (queue_admission:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::persist_admission_request",kind:"method"})
+MERGE (result_admission:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::resolve_admission_result",kind:"method"})
+MERGE (owner_scope:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::set_schedule_owner_scope",kind:"function"})
+MERGE (self)-[:DEFINES]->(queue_admission)
+MERGE (self)-[:DEFINES]->(result_admission)
+MERGE (self)-[:DEFINES]->(owner_scope)
+MERGE (queue_admission)-[:CALLS]->(owner_scope)
+MERGE (queue_admission)-[:CALLS]->(rule_match)
+MERGE (result_admission)-[:CALLS]->(owner_scope)
+MERGE (owner_scope)-[:CALLS]->(tenant)
+MERGE (queue_admission)-[:CALLS]->(native_queue:Symbol {id:"db/migrations/2026-10-10-schedule-owner-admission-handoff.sql::queue_run_admission",kind:"function"})
+MERGE (result_admission)-[:CALLS]->(native_result:Symbol {id:"db/migrations/2026-10-10-schedule-owner-admission-handoff.sql::resolve_run_admission",kind:"function"})
+MERGE (result_admission)-[:READS]->(request_outbox:Table {id:"automation.run_admission_request_outbox"})
 @endcypher
 */
 
 //! PostgreSQL persistence and fenced dispatch operations for Schedule occurrences.
 
 use chrono::{DateTime, Duration, Utc};
-use domain_automation::RuleId;
 use domain_automation::schedule::{
     AutomationOccurrenceLeaseFenceV1, AutomationScheduleRuleRevisionV1,
     MaterializedScheduleOccurrenceV1, ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1,
     ScheduleMaterializationBatchV1, ScheduleMisfirePolicyV1, ScheduleOccurrenceDispositionV1,
-    ScheduleOverlapPolicyV1, SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleTargetV1,
+    ScheduleOverlapPolicyV1, SchedulePausePolicyV1, ScheduleRetryPolicyV1,
+    ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1,
+    ScheduleTargetV1,
 };
+use domain_automation::RuleId;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::postgres::PgRow;
@@ -145,6 +160,97 @@ pub struct PgAutomationScheduleRepository {
 }
 
 impl PgAutomationScheduleRepository {
+    /// Persist a bounded immutable request under this worker's current Schedule lease.
+    /// The Run service identity comes from trusted deployment configuration, not the payload.
+    /// This records an Outbox fact; it neither publishes nor writes another owner's tables.
+    pub async fn persist_admission_request(
+        &self,
+        fence: &AutomationOccurrenceLeaseFenceV1,
+        run_service_id: Uuid,
+        command: &ScheduleRunAdmissionCommandV1,
+    ) -> Result<Vec<u8>, ScheduleRepositoryError> {
+        fence
+            .validate(Utc::now())
+            .map_err(|_| ScheduleRepositoryError::StaleFence)?;
+        if run_service_id.is_nil()
+            || fence.tenant_id != command.tenant_id
+            || fence.occurrence_id != command.occurrence.occurrence_id
+        {
+            return Err(ScheduleRepositoryError::InvalidInput);
+        }
+        let wire = command
+            .encode_json()
+            .map_err(|_| ScheduleRepositoryError::InvalidInput)?;
+        let generation = i64::try_from(fence.fencing_generation)
+            .map_err(|_| ScheduleRepositoryError::InvalidInput)?;
+        let mut tx = self.pool.begin().await?;
+        set_schedule_owner_scope(&mut tx, command.tenant_id).await?;
+        if !persisted_rule_matches(&mut tx, &command.occurrence.rule_snapshot).await? {
+            return Err(ScheduleRepositoryError::RuleRevisionMismatch);
+        }
+        let saved: Vec<u8> =
+            sqlx::query_scalar("SELECT automation.queue_run_admission($1,$2,$3,$4)")
+                .bind(&wire)
+                .bind(run_service_id)
+                .bind(fence.lease_owner_id)
+                .bind(generation)
+                .fetch_one(&mut *tx)
+                .await?;
+        if saved != wire {
+            return Err(ScheduleRepositoryError::InvalidOccurrence);
+        }
+        tx.commit().await?;
+        Ok(saved)
+    }
+
+    /// Consume an independently authenticated Run result in the Schedule owner's transaction.
+    /// Accepted results yield a durable confirm/compensate command; rejected results schedule
+    /// retry/failure only under the original live fence. Exact redelivery recovers the same fact.
+    /// A supplied service UUID is injected scope, not proof of broker authentication.
+    pub async fn resolve_admission_result(
+        &self,
+        tenant_id: Uuid,
+        run_service_id: Uuid,
+        result_wire: &[u8],
+    ) -> Result<Option<ScheduleRunAdmissionResolutionV1>, ScheduleRepositoryError> {
+        let result = ScheduleRunAdmissionResultV1::decode_json(result_wire)
+            .map_err(|_| ScheduleRepositoryError::InvalidInput)?;
+        if tenant_id.is_nil() || run_service_id.is_nil() || tenant_id != result.tenant_id {
+            return Err(ScheduleRepositoryError::InvalidInput);
+        }
+        let mut tx = self.pool.begin().await?;
+        set_schedule_owner_scope(&mut tx, tenant_id).await?;
+        let row=sqlx::query("SELECT command_wire,target_run_service_id FROM automation.run_admission_request_outbox WHERE tenant_id=$1 AND request_id=$2")
+            .bind(tenant_id).bind(result.request_id).fetch_optional(&mut *tx).await?
+            .ok_or(ScheduleRepositoryError::InvalidOccurrence)?;
+        if row.try_get::<Uuid, _>("target_run_service_id")? != run_service_id {
+            return Err(ScheduleRepositoryError::InvalidInput);
+        }
+        let command =
+            ScheduleRunAdmissionCommandV1::decode_json(&row.try_get::<Vec<u8>, _>("command_wire")?)
+                .map_err(|_| ScheduleRepositoryError::InvalidOccurrence)?;
+        result
+            .validate_for_command(&command)
+            .map_err(|_| ScheduleRepositoryError::InvalidInput)?;
+        let resolution_wire: Option<Vec<u8>> =
+            sqlx::query_scalar("SELECT automation.resolve_run_admission($1,$2)")
+                .bind(result_wire)
+                .bind(run_service_id)
+                .fetch_one(&mut *tx)
+                .await?;
+        let resolution = resolution_wire
+            .map(|wire| {
+                let r = ScheduleRunAdmissionResolutionV1::decode_json(&wire)
+                    .map_err(|_| ScheduleRepositoryError::InvalidOccurrence)?;
+                r.validate_for_result(&result)
+                    .map_err(|_| ScheduleRepositoryError::InvalidOccurrence)?;
+                Ok::<_, ScheduleRepositoryError>(r)
+            })
+            .transpose()?;
+        tx.commit().await?;
+        Ok(resolution)
+    }
+
     /// Construct an adapter over the application's shared bounded PostgreSQL pool.
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -622,6 +728,22 @@ impl PgAutomationScheduleRepository {
         tx.commit().await?;
         Ok(result.rows_affected())
     }
+}
+
+async fn set_schedule_owner_scope(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+) -> Result<(), ScheduleRepositoryError> {
+    sqlx::query("SET LOCAL ROLE star_automation_schedule_owner")
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("SET LOCAL lock_timeout = '5s'")
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout = '10s'")
+        .execute(&mut **tx)
+        .await?;
+    set_tenant_scope(tx, tenant_id).await
 }
 
 async fn set_tenant_scope(

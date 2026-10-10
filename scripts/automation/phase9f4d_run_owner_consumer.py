@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=40c223d6c9aecce5e4d15525f58de6cdb25f0caa00dba33e8aed4e7726aeebe3
+# @cypher schema=1 source_sha256=40976ead52ad5ae9129e5505853bd6c6a12eed9cc270f5ec04fd95fa21dcfd05
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -110,6 +110,7 @@
 # MERGE (main)-[:READS]->(preparation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-preparation.sql"})
 # MERGE (main)-[:READS]->(compensation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-compensation.sql"})
 # MERGE (main)-[:READS]->(confirmation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-confirmation.sql"})
+# MERGE (main)-[:READS]->(schedule_handoff_migration:Config {id:"db/migrations/2026-10-10-schedule-owner-admission-handoff.sql"})
 # @endcypher
 
 from __future__ import annotations
@@ -135,6 +136,7 @@ SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owne
 SCHEDULE_PREPARATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-preparation.sql"
 SCHEDULE_COMPENSATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-compensation.sql"
 SCHEDULE_CONFIRMATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-confirmation.sql"
+SCHEDULE_HANDOFF_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-schedule-owner-admission-handoff.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -156,6 +158,10 @@ PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
     ROOT / "db" / "migrations" / "2026-10-01-multica-run-resource-reservations.sql",
     ROOT / "db" / "migrations" / "2026-10-02-task-run-engineering-run-binding.sql",
+    ROOT / "db" / "migrations" / "2026-10-02-automation-schedule-occurrence.sql",
+    ROOT / "db" / "migrations" / "2026-10-03-automation-schedule-rule-api.sql",
+    ROOT / "db" / "migrations" / "2026-10-04-schedule-run-as-actor.sql",
+    ROOT / "db" / "migrations" / "2026-10-04-schedule-run-admission.sql",
     ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql",
     ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql",
     ROOT / "db" / "migrations" / "2026-10-08-platform-poison-quarantine.sql",
@@ -306,6 +312,22 @@ BEGIN
       OR has_table_privilege('star_multica_run_owner','multica.' || table_name,'DELETE') THEN
        RAISE EXCEPTION 'Preparation must not grant Task owner mutation %',table_name;
       END IF;
+    END LOOP;
+
+    FOREACH table_name IN ARRAY ARRAY['run_admission_request_outbox','run_admission_result_inbox','run_admission_resolution_outbox'] LOOP
+      IF NOT EXISTS(SELECT 1 FROM pg_class WHERE oid=('automation.'||table_name)::regclass AND relrowsecurity AND relforcerowsecurity)
+      OR NOT has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'SELECT')
+      OR has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'INSERT')
+      OR has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'UPDATE')
+      OR has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'DELETE')
+      OR has_table_privilege('star_automation_schedule_owner','automation.'||table_name,'TRUNCATE')
+      THEN RAISE EXCEPTION 'Schedule handoff is not bounded immutable FORCE RLS'; END IF;
+    END LOOP;
+    FOREACH table_name IN ARRAY ARRAY['multica.task_execution_run','multica.project_execution_resource_reservation','multica.infrastructure_capacity_demand_outbox'] LOOP
+      IF has_table_privilege('star_automation_schedule_owner',table_name,'INSERT')
+      OR has_any_column_privilege('star_automation_schedule_owner',table_name,'UPDATE')
+      OR has_table_privilege('star_automation_schedule_owner',table_name,'DELETE')
+      THEN RAISE EXCEPTION 'Schedule received another owner mutation privilege'; END IF;
     END LOOP;
 
     FOREACH table_name IN ARRAY protected_tables LOOP
@@ -731,6 +753,7 @@ def main() -> int:
             SCHEDULE_PREPARATION_MIGRATION,
             SCHEDULE_COMPENSATION_MIGRATION,
             SCHEDULE_CONFIRMATION_MIGRATION,
+            SCHEDULE_HANDOFF_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -910,6 +933,9 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
                 results.append(run_sql(f"schedule-confirmation-migration-apply-{attempt}", psql_base, SCHEDULE_CONFIRMATION_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+                results.append(run_sql(f"schedule-handoff-migration-apply-{attempt}", psql_base, SCHEDULE_HANDOFF_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):

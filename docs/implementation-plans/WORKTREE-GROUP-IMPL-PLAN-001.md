@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.60**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.61**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1877,3 +1877,22 @@ Schedule result/link/confirmation producer、confirmation消费与Infrastructure
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.60 | 2026-10-10 | Ulysses — Mavis接手审核 | Run-owner确认及demand事务写入对账。 | D11实现及隔离数据库验证。 |
+
+
+## 6.126 — Phase 9F4C-D12
+
+`PgAutomationScheduleRepository`沿用既有 occurrence/dispatch 和 lease 模型，增加 `persist_admission_request` 与 `resolve_admission_result`。请求固定原始 Schedule owner/generation、logical admission attempt、Run service identity 与精确有界 wire；提交前核验当前 canonical occurrence、完整 Rule snapshot 和未过期 lease/deadline。数据库 advisory lock 按 occurrence 串行请求与结果；重放相同字节恢复同一历史事实，不创建新 attempt。未处理请求或已经确认的请求阻断后续 logical attempt。
+
+Run 的结果严格匹配 request/attempt/result/correlation/occurrence/tenant/binding digest 与配置的 Run service identity。Schedule 在自己的事务复验 lease owner/generation、deadline、取消及既有 link；仍持有原始有效 lease 时原子写入 admitted link、occurrence event、Schedule Run Outbox、result Inbox 和 confirm resolution Outbox。失效 lease、过期、取消或 link 冲突生成 compensate resolution，不写新 link。accepted Inbox 与 resolution 使用 deferred paired FK；最后 Outbox 失败或事务末尾 lease/deadline 过期必须整笔回滚。Rejected result 在原始 live fence 下按有界指数退避进入 retry_wait，达到 Rule 上限/deadline 后 failed，TTL 用同一 terminal timestamp；过时结果不能改写当前 worker 的 dispatch。
+
+新增 W/T/M=0/3/0：`automation.run_admission_request_outbox`、`automation.run_admission_result_inbox`、`automation.run_admission_resolution_outbox`均为 T，append-only、tenant FORCE RLS、无 TTL/物理删除、wire≤16KiB。`star_automation_schedule_owner`只读 Rule/own receipts并执行两项受限 native capability，无 Run/Infrastructure mutation grants；Rust 事务设置 5秒 lock timeout、10秒 statement timeout，复用有界共享 pool。Schedule 只写 own facts，Run owner 单独消费 confirm/compensate 并复验其当前权限、策略和预算，Infrastructure owner 再独立预留 Host/cluster 容量。没有共享跨 owner 写事务、VM 操作或 executor 授权。
+
+验证状态：隔离PostgreSQL18.6/Rust1.99.0 runner 62/62通过（audit `target/phase9f4d-run-owner-consumer/0dcfeed4-74a6-433d-bc7f-a4cb4aec8b5c/audit.jsonl`）；两个包all-targets check通过，Run-owner strict Clippy通过，库测试Run-owner15/15、star-pg-adapter35/35通过，owned-file fmt、Python编译、Cypher图头及diff检查通过。Star-pg-adapter独立strict Clippy未通过：lib150、lib-test152项诊断来自11个未改动文件，Schedule adapter没有诊断；详见`target/phase9f4d-run-owner-consumer/d12-pg-strict-clippy.log`，不宣称整个包/仓库quality gates全绿。CodeRabbit权限拒绝，不计为独立审核通过。。隔离测试使用 canonical Rule/occurrence fixtures，真实 Schedule claim/request/result/link/resolution 与 Run preparation/confirmation/compensation；拒绝结果与时钟失效输入为明确 fixtures，不证明真实 broker producer/authentication 或生产 identity/grants。验收需覆盖 exact replay、来源/digest/tenant拒绝、最终 resolution insert 失败回滚、lease 接管后的真实 Run 补偿、拒绝重试与耗尽、RLS 和 owner grants。
+
+生产 Schedule request publisher/result receiver、认证 transport、durable Outbox delivery、全量取消/过期/release recovery、独立 DB owner receipts/projections、Infrastructure provider/reservations/readiness、native Hook 求值、Agent sandbox/独立验证、任务卡 CLI 执行闭环、BI/Benchmark 及规模性能仍开放。现有 shared-DB FK/trigger 的跨 owner只读约束不是物理数据库拆分实现；配置注入 UUID 不构成身份认证。Schedule materializer deadline 与 slot deadline 的策略对账仍需独立验收。不将 D12 局部验证写为所有 phase 完成。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；报告 `docs/reports/PHASE-9F4C-D12-SCHEDULE-HANDOFF-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.61 | 2026-10-10 | Ulysses — Mavis接手审核 | Schedule owner请求/结果/决议事务及验证对账。 | D12实现。 |

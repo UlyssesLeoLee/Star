@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=9d5ffe0daf998092c759f6a1edf3a1a4a7f03be3f638549770a9cbb9cc078098
+@cypher schema=1 source_sha256=20082a1cb9de45727c339ba612b9ee8f35613ff00f527464b8950d148503d8d0
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -87,6 +87,29 @@ MERGE (confirmation_test)-[:READS]->(confirmation_receipt:Table {id:"multica.sch
 MERGE (confirmation_test)-[:READS]->(demand_outbox:Table {id:"multica.infrastructure_capacity_demand_outbox"})
 MERGE (confirmation_test)-[:WRITES]->(project_grant:Table {id:"permission.project_role_binding"})
 MERGE (confirmation_test)-[:WRITES]->(quota)
+MERGE (schedule_seed:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_schedule_handoff",kind:"function"})
+MERGE (schedule_retry:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_schedule_rejection_retry",kind:"function"})
+MERGE (schedule_fence:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_schedule_fence_compensation",kind:"function"})
+MERGE (self)-[:DEFINES]->(schedule_seed)
+MERGE (self)-[:DEFINES]->(schedule_retry)
+MERGE (self)-[:DEFINES]->(schedule_fence)
+MERGE (confirmation_test)-[:CALLS]->(schedule_seed)
+MERGE (confirmation_test)-[:CALLS]->(schedule_retry)
+MERGE (confirmation_test)-[:CALLS]->(schedule_fence)
+MERGE (schedule_fence)-[:CALLS]->(schedule_seed)
+MERGE (schedule_retry)-[:CALLS]->(schedule_seed)
+MERGE (schedule_seed)-[:WRITES]->(schedule_rule:Table {id:"automation.schedule_rule_revision"})
+MERGE (schedule_seed)-[:WRITES]->(schedule_occurrence:Table {id:"automation.occurrence"})
+MERGE (schedule_seed)-[:WRITES]->(schedule_dispatch:Table {id:"automation.occurrence_dispatch"})
+MERGE (schedule_seed)-[:CALLS]->(schedule_claim:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::claim_due_occurrences",kind:"method"})
+MERGE (confirmation_test)-[:CALLS]->(schedule_queue:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::persist_admission_request",kind:"method"})
+MERGE (confirmation_test)-[:CALLS]->(schedule_resolve:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::resolve_admission_result",kind:"method"})
+MERGE (schedule_retry)-[:CALLS]->(schedule_queue)
+MERGE (schedule_retry)-[:CALLS]->(schedule_resolve)
+MERGE (schedule_retry)-[:CALLS]->(schedule_claim)
+MERGE (schedule_fence)-[:CALLS]->(schedule_queue)
+MERGE (schedule_fence)-[:CALLS]->(schedule_resolve)
+MERGE (schedule_fence)-[:CALLS]->(schedule_claim)
 @endcypher
 */
 use chrono::Utc;
@@ -1551,37 +1574,127 @@ async fn verify_schedule_preparation(
     Ok(())
 }
 
+/// Canonical Rule/occurrence fixtures; claiming and the admission handoff use real adapters.
+async fn seed_schedule_handoff(
+    admin: &sqlx::PgPool,
+    schedule: &star_pg_adapter::repository::PgAutomationScheduleRepository,
+    cmd: &ScheduleRunAdmissionCommandV1,
+) -> Result<domain_automation::schedule::AutomationOccurrenceLeaseFenceV1, Box<dyn std::error::Error>>
+{
+    use sha2::{Digest, Sha256};
+    let r = &cmd.occurrence.rule_snapshot;
+    let t = &r.target;
+    sqlx::query("INSERT INTO automation.schedule_rule_revision
+      (tenant_id,project_id,rule_id,rule_version,enabled,cron_expression,time_zone,parser_version,tzdb_version,
+       dst_gap_policy,dst_fold_policy,overlap_policy,overlap_max_active,misfire_policy,misfire_max_occurrences,
+       pause_policy,retry_max_attempts,retry_initial_backoff_seconds,retry_max_backoff_seconds,deadline_seconds,
+       branch_id,engineering_run_id,repository_id,worktree_id,work_item_id,execution_profile_id,
+       execution_profile_version,execution_profile_digest,hook_set_version,hook_set_digest,run_as_actor_id,changed_by)
+      VALUES($1,$2,$3,1,true,$4,$5,$6,$7,'skip','earlier_instant','queue_one',1,'catch_up',3,'coalesce_latest',3,5,300,3600,
+       $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$18) ON CONFLICT DO NOTHING")
+        .bind(cmd.tenant_id).bind(r.project_id).bind(r.rule_id.as_uuid())
+        .bind(&r.cron_expression).bind(&r.time_zone).bind(&r.parser_version).bind(&r.tzdb_version)
+        .bind(t.branch_id).bind(t.engineering_run_id).bind(t.repository_id).bind(t.worktree_id).bind(t.work_item_id)
+        .bind(t.execution_profile_id).bind(i64::try_from(t.execution_profile_version)?)
+        .bind(&t.execution_profile_digest).bind(i64::try_from(t.hook_set_version)?)
+        .bind(&t.hook_set_digest).bind(r.run_as_actor_id).execute(admin).await?;
+    let target = serde_json::to_value(t)?;
+    let digest: String = Sha256::digest(serde_json::to_vec(&target)?)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    sqlx::query("INSERT INTO automation.occurrence
+      (tenant_id,project_id,occurrence_id,rule_id,rule_version,run_as_actor_id,scheduled_for_utc,
+       scheduled_local_label,utc_offset_seconds,parser_version,tzdb_version,target_snapshot,target_snapshot_digest,materialized_at)
+      VALUES($1,$2,$3,$4,1,$5,$6,$7,$8,$9,$10,$11,$12,clock_timestamp())")
+        .bind(cmd.tenant_id).bind(r.project_id).bind(cmd.occurrence.occurrence_id).bind(r.rule_id.as_uuid())
+        .bind(r.run_as_actor_id).bind(cmd.occurrence.key.scheduled_for_utc)
+        .bind(&cmd.occurrence.scheduled_local_label).bind(cmd.occurrence.utc_offset_seconds)
+        .bind(&r.parser_version).bind(&r.tzdb_version).bind(target).bind(digest).execute(admin).await?;
+    sqlx::query("INSERT INTO automation.occurrence_dispatch
+      (tenant_id,occurrence_id,dispatch_state,next_attempt_at,occurrence_deadline_at,retention_period)
+      VALUES($1,$2,'pending',clock_timestamp(),$3+interval '1 hour',interval '1 day')")
+        .bind(cmd.tenant_id).bind(cmd.occurrence.occurrence_id).bind(cmd.occurrence.key.scheduled_for_utc)
+        .execute(admin).await?;
+    let mut fences = schedule
+        .claim_due_occurrences(cmd.tenant_id, Uuid::new_v4(), 60, 1)
+        .await?;
+    let fence = fences
+        .pop()
+        .expect("canonical pending occurrence is claimed");
+    assert_eq!(fence.occurrence_id, cmd.occurrence.occurrence_id);
+    Ok(fence)
+}
+
 async fn verify_schedule_confirmation(
     admin: &sqlx::PgPool,
     store: &PostgresScheduleAdmissionStore,
     previous: &ScheduleRunAdmissionCommandV1,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Finish compensation before the positive case retains its capacity demand/reservation.
+    verify_schedule_fence_compensation(admin, store, previous).await?;
     let mut cmd = previous.clone();
     cmd.request_id = Uuid::new_v4();
     cmd.occurrence.occurrence_id = Uuid::new_v4();
-    let ScheduleAdmissionStart::New(pending) = store
-        .begin(source(cmd.tenant_id), &cmd.encode_json()?)
-        .await?
+    // PostgreSQL timestamps have microsecond precision; the immutable wire uses that precision.
+    cmd.occurrence.key.scheduled_for_utc =
+        chrono::DateTime::from_timestamp_micros(Utc::now().timestamp_micros()).unwrap();
+    let schedule = star_pg_adapter::repository::PgAutomationScheduleRepository::new(admin.clone());
+    let run_service = Uuid::new_v4();
+    let fence = seed_schedule_handoff(admin, &schedule, &cmd).await?;
+    let request_wire = schedule
+        .persist_admission_request(&fence, run_service, &cmd)
+        .await?;
+    assert_eq!(
+        schedule
+            .persist_admission_request(&fence, run_service, &cmd)
+            .await?,
+        request_wire
+    );
+    let ScheduleAdmissionStart::New(pending) =
+        store.begin(source(cmd.tenant_id), &request_wire).await?
     else {
         panic!("new confirmation preparation")
     };
     let result = pending.prepare_and_commit().await?;
     assert_eq!(result.outcome, ScheduleRunAdmissionOutcomeV1::Accepted);
     let run = result.task_execution_run_id.unwrap();
-    let resolution = ScheduleRunAdmissionResolutionV1 {
-        schema_version: 1,
-        tenant_id: cmd.tenant_id,
-        resolution_id: Uuid::new_v4(),
-        request_id: cmd.request_id,
-        admission_attempt: result.admission_attempt,
-        result_id: result.result_id,
-        correlation_id: result.correlation_id,
-        occurrence_id: result.occurrence_id,
-        task_execution_run_id: run,
-        binding_digest: result.binding_digest,
-        decision: ScheduleAdmissionResolutionKindV1::Confirm,
-        compensation_reason: None,
-    };
+    let result_wire = result.encode_json()?;
+    assert!(schedule
+        .resolve_admission_result(cmd.tenant_id, Uuid::new_v4(), &result_wire)
+        .await
+        .is_err());
+    let mut wrong_result = result.clone();
+    wrong_result.binding_digest[0] ^= 1;
+    assert!(schedule
+        .resolve_admission_result(cmd.tenant_id, run_service, &wrong_result.encode_json()?)
+        .await
+        .is_err());
+    // The final Outbox insert must roll back the link, event and Inbox together.
+    sqlx::raw_sql("CREATE FUNCTION automation.fail_d12_resolution() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'D12 fault'; END $$; CREATE TRIGGER d12_fail BEFORE INSERT ON automation.run_admission_resolution_outbox FOR EACH ROW EXECUTE FUNCTION automation.fail_d12_resolution()").execute(admin).await?;
+    assert!(schedule
+        .resolve_admission_result(cmd.tenant_id, run_service, &result_wire)
+        .await
+        .is_err());
+    sqlx::raw_sql("DROP TRIGGER d12_fail ON automation.run_admission_resolution_outbox; DROP FUNCTION automation.fail_d12_resolution()").execute(admin).await?;
+    let linked: Option<Uuid> = sqlx::query_scalar("SELECT admitted_run_id FROM automation.occurrence_dispatch WHERE tenant_id=$1 AND occurrence_id=$2").bind(cmd.tenant_id).bind(cmd.occurrence.occurrence_id).fetch_one(admin).await?;
+    assert_eq!(linked, None);
+    let receipts: i64 = sqlx::query_scalar("SELECT count(*) FROM automation.run_admission_result_inbox WHERE tenant_id=$1 AND request_id=$2").bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
+    assert_eq!(receipts, 0);
+    let resolution = schedule
+        .resolve_admission_result(cmd.tenant_id, run_service, &result_wire)
+        .await?
+        .expect("live original Schedule fence confirms");
+    assert_eq!(
+        resolution.decision,
+        ScheduleAdmissionResolutionKindV1::Confirm
+    );
+    assert_eq!(
+        schedule
+            .resolve_admission_result(cmd.tenant_id, run_service, &result_wire)
+            .await?,
+        Some(resolution.clone())
+    );
     let wire = resolution.encode_json()?;
     let mut wrong_source = source(cmd.tenant_id);
     wrong_source.schedule_service_id = Uuid::new_v4();
@@ -1739,6 +1852,136 @@ async fn verify_schedule_confirmation(
     let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.task_execution_run_event WHERE tenant_id=$1 AND run_id=$2 AND (event_type='run_started' OR execution_state IS NOT NULL)")
         .bind(cmd.tenant_id).bind(run).fetch_one(admin).await?;
     assert_eq!(count, 0);
+    verify_schedule_rejection_retry(admin).await?;
+    Ok(())
+}
+
+/// Rejected-result supplier fixtures exercise Schedule's real retry and exhaustion writer.
+async fn verify_schedule_rejection_retry(
+    admin: &sqlx::PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = command_fixture();
+    cmd.occurrence.key.scheduled_for_utc =
+        chrono::DateTime::from_timestamp_micros(Utc::now().timestamp_micros()).unwrap();
+    let schedule = star_pg_adapter::repository::PgAutomationScheduleRepository::new(admin.clone());
+    let mut fence = seed_schedule_handoff(admin, &schedule, &cmd).await?;
+    let service = Uuid::new_v4();
+    for attempt in 1..=3 {
+        cmd.admission_attempt = attempt;
+        cmd.request_id = Uuid::new_v4();
+        schedule
+            .persist_admission_request(&fence, service, &cmd)
+            .await?;
+        let result = rejected_result(&cmd)?.encode_json()?;
+        assert_eq!(
+            schedule
+                .resolve_admission_result(cmd.tenant_id, service, &result)
+                .await?,
+            None
+        );
+        assert_eq!(
+            schedule
+                .resolve_admission_result(cmd.tenant_id, service, &result)
+                .await?,
+            None
+        );
+        let state: String = sqlx::query_scalar("SELECT dispatch_state FROM automation.occurrence_dispatch WHERE tenant_id=$1 AND occurrence_id=$2")
+            .bind(cmd.tenant_id).bind(cmd.occurrence.occurrence_id).fetch_one(admin).await?;
+        assert_eq!(state, if attempt < 3 { "retry_wait" } else { "failed" });
+        if attempt < 3 {
+            // Advance only the retry due time, preserving all production state guards.
+            sqlx::query("UPDATE automation.occurrence_dispatch SET next_attempt_at=clock_timestamp() WHERE tenant_id=$1 AND occurrence_id=$2")
+                .bind(cmd.tenant_id).bind(cmd.occurrence.occurrence_id).execute(admin).await?;
+            fence = schedule
+                .claim_due_occurrences(cmd.tenant_id, Uuid::new_v4(), 60, 1)
+                .await?
+                .pop()
+                .unwrap();
+        }
+    }
+    let receipts: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM automation.run_admission_result_inbox WHERE tenant_id=$1",
+    )
+    .bind(cmd.tenant_id)
+    .fetch_one(admin)
+    .await?;
+    assert_eq!(receipts, 3);
+    let mut tx = admin.begin().await?;
+    sqlx::query("SET LOCAL ROLE star_automation_schedule_owner")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
+        .bind(Uuid::new_v4().to_string())
+        .execute(&mut *tx)
+        .await?;
+    let invisible: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM automation.run_admission_result_inbox")
+            .fetch_one(&mut *tx)
+            .await?;
+    assert_eq!(invisible, 0);
+    tx.rollback().await?;
+    Ok(())
+}
+
+async fn verify_schedule_fence_compensation(
+    admin: &sqlx::PgPool,
+    store: &PostgresScheduleAdmissionStore,
+    previous: &ScheduleRunAdmissionCommandV1,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = previous.clone();
+    cmd.request_id = Uuid::new_v4();
+    cmd.occurrence.occurrence_id = Uuid::new_v4();
+    cmd.occurrence.key.scheduled_for_utc =
+        chrono::DateTime::from_timestamp_micros(Utc::now().timestamp_micros()).unwrap();
+    let schedule = star_pg_adapter::repository::PgAutomationScheduleRepository::new(admin.clone());
+    let fence = seed_schedule_handoff(admin, &schedule, &cmd).await?;
+    let run_service = Uuid::new_v4();
+    let wire = schedule
+        .persist_admission_request(&fence, run_service, &cmd)
+        .await?;
+    let ScheduleAdmissionStart::New(pending) = store.begin(source(cmd.tenant_id), &wire).await?
+    else {
+        panic!("new compensation preparation")
+    };
+    let result = pending.prepare_and_commit().await?;
+    assert_eq!(
+        result.outcome,
+        ScheduleRunAdmissionOutcomeV1::Accepted,
+        "{result:?}"
+    );
+    // Only the clock-expiry source is an admin fixture; reclaim is the actual adapter path.
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query("UPDATE automation.occurrence_dispatch SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE tenant_id=$1 AND occurrence_id=$2")
+        .bind(cmd.tenant_id).bind(cmd.occurrence.occurrence_id).execute(&mut *fixture).await?;
+    fixture.commit().await?;
+    let replacement = schedule
+        .claim_due_occurrences(cmd.tenant_id, Uuid::new_v4(), 60, 1)
+        .await?;
+    assert_eq!(
+        replacement[0].fencing_generation,
+        fence.fencing_generation + 1
+    );
+    let resolution = schedule
+        .resolve_admission_result(cmd.tenant_id, run_service, &result.encode_json()?)
+        .await?
+        .unwrap();
+    assert_eq!(
+        resolution.decision,
+        ScheduleAdmissionResolutionKindV1::Compensate
+    );
+    assert_eq!(
+        resolution.compensation_reason,
+        Some(ScheduleAdmissionCompensationReasonV1::ScheduleFenceLost)
+    );
+    store
+        .compensate_admission(source(cmd.tenant_id), &resolution.encode_json()?)
+        .await?;
+    let linked: Option<Uuid> = sqlx::query_scalar("SELECT admitted_run_id FROM automation.occurrence_dispatch WHERE tenant_id=$1 AND occurrence_id=$2")
+        .bind(cmd.tenant_id).bind(cmd.occurrence.occurrence_id).fetch_one(admin).await?;
+    assert_eq!(linked, None);
     Ok(())
 }
 

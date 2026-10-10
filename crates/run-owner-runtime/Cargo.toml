@@ -25,5 +25,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+star-pg-adapter = { path = "../star-pg-adapter" }
+
 [lints]
 workspace = true
