@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=25679eb64b4c6aa1e76e7146d5f83eff93c7ded1861cd5aed62766630c22c610
+@cypher schema=1 source_sha256=ee5f9dd3f5b6d379fbebc9809d39a94b4818dfee4e176805a92a6a4dfef8e232
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -52,6 +52,15 @@ MERGE (test)-[:CALLS]->(result)
 MERGE (test)-[:CALLS]->(begin)
 MERGE (test)-[:CALLS]->(commit)
 MERGE (fixture)-[:CALLS]->(binding)
+MERGE (capacity_test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_project_capacity",kind:"function"})
+MERGE (self)-[:DEFINES]->(capacity_test)
+MERGE (test)-[:CALLS]->(capacity_test)
+MERGE (capacity_test)-[:CALLS]->(capacity_gate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_project_capacity",kind:"method"})
+MERGE (capacity_test)-[:READS]->(allocation:Table {id:"multica.project_execution_resource_admission_lock"})
+MERGE (capacity_test)-[:WRITES]->(allocation)
+MERGE (capacity_test)-[:WRITES]->(quota:Table {id:"multica.project_execution_resource_quota"})
+MERGE (capacity_test)-[:WRITES]->(reservation:Table {id:"multica.project_execution_resource_reservation"})
+MERGE (capacity_test)-[:CALLS]->(seed)
 @endcypher
 */
 use chrono::Utc;
@@ -599,6 +608,7 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
         sqlx::query(restore).bind(policies.tenant_id).execute(&mut *change).await?;
         change.commit().await?;
     }
+    verify_project_capacity(&admin, &store, &policies, &parallel).await?;
     let ScheduleAdmissionStart::New(mut pending) = store
         .begin(source(policies.tenant_id), &policies.encode_json()?)
         .await?
@@ -1114,5 +1124,186 @@ async fn seed_catalogs(
         sqlx::query("INSERT INTO multica.agent_execution_grant_capability(tenant_id,entry_id,capability_code) VALUES($1,$2,$3)").bind(tenant).bind(entry).bind(label).execute(&mut *tx).await?;
     }
     tx.commit().await?;
+    Ok(())
+}
+
+// Current capacity fixtures do not prove the production quota publisher or Run writer.
+async fn verify_project_capacity(
+    admin: &sqlx::PgPool,
+    store: &PostgresScheduleAdmissionStore,
+    command: &ScheduleRunAdmissionCommandV1,
+    parallel: &ScheduleRunAdmissionCommandV1,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let t = &command.occurrence.rule_snapshot.target;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(command.tenant_id), &command.encode_json()?)
+        .await?
+    else {
+        panic!("missing quota request")
+    };
+    assert!(matches!(
+        pending.revalidate_project_capacity().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::QuotaExceeded
+        ))
+    ));
+    drop(pending);
+    let quota_id = Uuid::new_v4();
+    let b = &command.infrastructure_binding.resource_budget;
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query("INSERT INTO multica.project_execution_resource_quota(quota_revision_id,tenant_id,project_id,quota_version,max_active_runs,max_rss_bytes,max_cpu_ms_per_run,max_runtime_ms_per_run,max_child_processes,max_parallel_tools,max_provider_calls,max_output_bytes,max_event_buffer_bytes,changed_by) VALUES($1,$2,$3,1,1,$4,$5,$6,$7,$8,$9,$10,$11,$12)")
+ .bind(quota_id).bind(command.tenant_id).bind(t.project_id).bind(b.max_rss_bytes).bind(b.max_cpu_ms).bind(b.max_runtime_ms)
+ .bind(b.max_child_processes).bind(b.max_parallel_tools).bind(i32::try_from(b.max_provider_calls)?)
+ .bind(b.max_output_bytes).bind(b.max_event_buffer_bytes).bind(command.occurrence.run_as_actor_id).execute(&mut *fixture).await?;
+    fixture.commit().await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(command.tenant_id), &command.encode_json()?)
+        .await?
+    else {
+        panic!("exact capacity request")
+    };
+    let snapshot = pending.revalidate_project_capacity().await?;
+    assert_eq!(snapshot.quota_revision_id(), quota_id);
+    assert_eq!(snapshot.quota_version(), 1);
+    snapshot.validate_lifetime()?;
+    // A second scoped allocation must serialize, although read-only D7 preflights coexist.
+    let ScheduleAdmissionStart::New(mut second) = store
+        .begin(source(parallel.tenant_id), &parallel.encode_json()?)
+        .await?
+    else {
+        panic!("second capacity request")
+    };
+    sqlx::query("SET LOCAL lock_timeout='150ms'")
+        .execute(&mut **second.transaction())
+        .await?;
+    let err = second
+        .revalidate_project_capacity()
+        .await
+        .err()
+        .expect("allocation must serialize");
+    match err {
+        ScheduleAdmissionStoreError::Database(e) => assert_eq!(
+            e.as_database_error().and_then(|e| e.code()).as_deref(),
+            Some("55P03")
+        ),
+        _ => panic!("expected allocation lock timeout"),
+    };
+    drop(second);
+    // The existing manual allocation epoch uses the same lock, not a separate schedule mutex.
+    let mut mutation = admin.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='150ms'")
+        .execute(&mut *mutation)
+        .await?;
+    let err=sqlx::query("INSERT INTO multica.project_execution_resource_admission_lock(tenant_id,project_id,allocation_epoch) VALUES($1,$2,1) ON CONFLICT(tenant_id,project_id) DO UPDATE SET allocation_epoch=multica.project_execution_resource_admission_lock.allocation_epoch+1")
+ .bind(command.tenant_id).bind(t.project_id).execute(&mut *mutation).await.expect_err("manual allocation must serialize");
+    assert_eq!(
+        err.as_database_error().and_then(|e| e.code()).as_deref(),
+        Some("55P03")
+    );
+    mutation.rollback().await?;
+    let mut mutation = admin.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='150ms'")
+        .execute(&mut *mutation)
+        .await?;
+    let err=sqlx::query("UPDATE multica.project_execution_resource_quota SET valid_to=clock_timestamp() WHERE quota_revision_id=$1")
+ .bind(quota_id).execute(&mut *mutation).await.expect_err("quota publication must wait");
+    assert_eq!(
+        err.as_database_error().and_then(|e| e.code()).as_deref(),
+        Some("55P03")
+    );
+    mutation.rollback().await?;
+    drop(pending);
+    let epoch_count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.project_execution_resource_admission_lock WHERE tenant_id=$1 AND project_id=$2")
+ .bind(command.tenant_id).bind(t.project_id).fetch_one(admin).await?;
+    assert_eq!(
+        epoch_count, 0,
+        "dropped capacity observation rolls back Work epoch"
+    );
+    // A stale REPEATABLE READ snapshot must fail after a committed manual allocation epoch.
+    let mut stale = admin.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+        .execute(&mut *stale)
+        .await?;
+    sqlx::query("SET LOCAL ROLE star_multica_run_owner")
+        .execute(&mut *stale)
+        .await?;
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true),set_config('app.actor_id',$2,true)")
+        .bind(command.tenant_id.to_string())
+        .bind(command.occurrence.run_as_actor_id.to_string())
+        .execute(&mut *stale)
+        .await?;
+    sqlx::query("SELECT count(*) FROM multica.schedule_admission_inbox")
+        .execute(&mut *stale)
+        .await?;
+    sqlx::query("INSERT INTO multica.project_execution_resource_admission_lock(tenant_id,project_id,allocation_epoch) VALUES($1,$2,1)")
+        .bind(command.tenant_id).bind(t.project_id).execute(admin).await?;
+    let err = sqlx::query(
+        "SELECT multica.read_schedule_project_capacity_current($1,$2,$3,$4,$5,$6,$7,$8)",
+    )
+    .bind(command.tenant_id)
+    .bind(command.occurrence.run_as_actor_id)
+    .bind(t.project_id)
+    .bind(t.branch_id)
+    .bind(t.engineering_run_id)
+    .bind(t.repository_id)
+    .bind(t.worktree_id)
+    .bind(t.work_item_id)
+    .execute(&mut *stale)
+    .await
+    .expect_err("stale allocation snapshot must not pass");
+    assert_eq!(
+        err.as_database_error().and_then(|e| e.code()).as_deref(),
+        Some("40001")
+    );
+    stale.rollback().await?;
+    // Unstarted Run and reservation are disposable admin fixtures, never production writes.
+    let run_id = Uuid::new_v4();
+    seed_provisional_run(admin, command, run_id).await?;
+    let reservation_id = Uuid::new_v4();
+    let mut fixture = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *fixture)
+        .await?;
+    sqlx::query("INSERT INTO multica.project_execution_resource_reservation(reservation_id,tenant_id,project_id,work_item_id,worktree_id,run_id,quota_version,quota_revision_id,admission_fence_id,reserved_by,correlation_id,lease_expires_at,max_rss_bytes,max_cpu_ms,max_runtime_ms,max_child_processes,max_parallel_tools,max_provider_calls,max_output_bytes,max_event_buffer_bytes) VALUES($1,$2,$3,$4,$5,$6,1,$7,$8,$9,$10,clock_timestamp()+interval '1 hour',$11,$12,$13,$14,$15,$16,$17,$18)")
+ .bind(reservation_id).bind(command.tenant_id).bind(t.project_id).bind(t.work_item_id).bind(t.worktree_id).bind(run_id).bind(quota_id)
+ .bind(Uuid::new_v4()).bind(command.occurrence.run_as_actor_id).bind(command.correlation_id).bind(b.max_rss_bytes).bind(b.max_cpu_ms)
+ .bind(b.max_runtime_ms).bind(b.max_child_processes).bind(b.max_parallel_tools).bind(b.max_provider_calls)
+ .bind(b.max_output_bytes).bind(b.max_event_buffer_bytes).execute(&mut *fixture).await?;
+    fixture.commit().await?;
+    // Expired pending is ignored, expired active still occupies capacity, released is ignored.
+    for (sql,expected) in [
+ ("UPDATE multica.project_execution_resource_reservation SET lease_expires_at=clock_timestamp()+interval '1 hour' WHERE reservation_id=$1",false),
+ ("UPDATE multica.project_execution_resource_reservation SET created_at=clock_timestamp()-interval '2 hours',lease_expires_at=clock_timestamp()-interval '1 hour' WHERE reservation_id=$1",true),
+ ("UPDATE multica.project_execution_resource_reservation SET reservation_state='active',activated_at=clock_timestamp() WHERE reservation_id=$1",false),
+ ("UPDATE multica.project_execution_resource_reservation SET reservation_state='released',released_at=clock_timestamp() WHERE reservation_id=$1",true)] {
+  let mut change=admin.begin().await?; sqlx::query("SET LOCAL session_replication_role=replica").execute(&mut *change).await?;
+  sqlx::query(sql).bind(reservation_id).execute(&mut *change).await?; change.commit().await?;
+  let ScheduleAdmissionStart::New(mut pending)=store.begin(source(parallel.tenant_id),&parallel.encode_json()?).await? else {panic!("usage request")};
+  let result=pending.revalidate_project_capacity().await;
+  if expected {assert!(result.is_ok());} else {assert!(matches!(result,Err(ScheduleAdmissionStoreError::PrerequisiteRejected(ScheduleAdmissionRejectionCodeV1::QuotaExceeded))));}
+  drop(pending);
+ }
+    let mut change = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *change)
+        .await?;
+    sqlx::query("UPDATE multica.project_execution_resource_quota SET lifecycle_state='disabled' WHERE quota_revision_id=$1").bind(quota_id).execute(&mut *change).await?;
+    change.commit().await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(command.tenant_id), &command.encode_json()?)
+        .await?
+    else {
+        panic!("disabled quota request")
+    };
+    assert!(matches!(
+        pending.revalidate_project_capacity().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::QuotaExceeded
+        ))
+    ));
+    drop(pending);
     Ok(())
 }

@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=a14ce3482b98707929357e68fcc5e0a9faddc692c2cd1f0156612827b2ed805d
+@cypher schema=1 source_sha256=7571e3224afb951d6248438065baade67710d2fabb06ff54e527b9143eaa0c71
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -40,6 +40,10 @@ MERGE (begin)-[:READS]->(inbox)
 MERGE (begin)-[:READS]->(outbox)
 MERGE (commit)-[:WRITES]->(inbox)
 MERGE (commit)-[:WRITES]->(outbox)
+MERGE (capacity:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_project_capacity",kind:"method"})
+MERGE (self)-[:DEFINES]->(capacity)
+MERGE (capacity)-[:CALLS]->(catalog)
+MERGE (capacity)-[:CALLS]->(capacity_load:Symbol {id:"crates/run-owner-runtime/src/schedule_capacity.rs::load_current",kind:"function"})
 @endcypher
 */
 
@@ -187,6 +191,16 @@ impl PostgresScheduleAdmissionStore {
 }
 
 impl ScheduleAdmissionTransaction {
+    /// Serialize Project capacity against current Run ceilings in the owner transaction.
+    /// This comparison creates neither a reservation nor a Run and cannot start execution.
+    pub async fn revalidate_project_capacity(
+        &mut self,
+    ) -> Result<crate::ScheduleProjectCapacitySnapshot, ScheduleAdmissionStoreError> {
+        let execution = self.revalidate_execution_catalogs().await?;
+        crate::schedule_capacity::load_current(&mut self.transaction, &self.command, execution)
+            .await
+    }
+
     /// Verify current referenced Provider/Skill/Grant catalogs under the owner transaction.
     /// The short-lived result is not a Runtime, Hook evaluation or resource reservation permit.
     pub async fn revalidate_execution_catalogs(

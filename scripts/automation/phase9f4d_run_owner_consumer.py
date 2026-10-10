@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=5360b850b971167fb035b69e59e93254ca11e6047c8027f528c8a43b251f43ed
+# @cypher schema=1 source_sha256=3fc41668f8e2711c03b03e97d3b58bdb907fffcfbda6a5e70c8202fd4cb1e13d
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -106,6 +106,7 @@
 # MERGE (self)-[:IMPORTS]->(sys)
 # MERGE (self)-[:IMPORTS]->(pathlib)
 # MERGE (self)-[:IMPORTS]->(typing)
+# MERGE (main)-[:READS]->(capacity_migration:Config {id:"db/migrations/2026-10-10-run-owner-project-capacity.sql"})
 # @endcypher
 
 from __future__ import annotations
@@ -128,6 +129,7 @@ RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructur
 ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-infrastructure-binding-master.sql"
 SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-admission.sql"
+PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
 TASK_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-task-currentness.sql"
@@ -252,6 +254,25 @@ BEGIN
       OR position('pg_advisory_xact_lock_shared' IN pg_get_functiondef('multica.verify_schedule_run_as_current(uuid,uuid,uuid,uuid,uuid,uuid)'::regprocedure))=0 THEN
        RAISE EXCEPTION 'Catalog/parallel authorization capabilities invalid';
     END IF;
+
+    IF NOT has_function_privilege('star_multica_run_owner',
+      'multica.read_schedule_project_capacity_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
+      OR NOT EXISTS(SELECT 1 FROM pg_proc WHERE oid=
+        'multica.read_schedule_project_capacity_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid)'::regprocedure
+        AND prosecdef AND proconfig @> ARRAY['search_path=pg_catalog'])
+      OR EXISTS(SELECT 1 FROM pg_proc p,LATERAL aclexplode(p.proacl) a WHERE p.oid=
+        'multica.read_schedule_project_capacity_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid)'::regprocedure
+        AND a.grantee=0 AND a.privilege_type='EXECUTE') THEN
+       RAISE EXCEPTION 'Project capacity native capability invalid';
+    END IF;
+    FOREACH table_name IN ARRAY ARRAY['project_execution_resource_admission_lock',
+      'project_execution_resource_quota','project_execution_resource_reservation'] LOOP
+      IF has_table_privilege('star_multica_run_owner','multica.' || table_name,'INSERT')
+        OR has_any_column_privilege('star_multica_run_owner','multica.' || table_name,'UPDATE')
+        OR has_table_privilege('star_multica_run_owner','multica.' || table_name,'DELETE') THEN
+         RAISE EXCEPTION 'Runtime must not directly mutate Project capacity %',table_name;
+      END IF;
+    END LOOP;
 
     FOREACH table_name IN ARRAY protected_tables LOOP
         IF NOT has_table_privilege('star_multica_run_owner', table_name, 'SELECT')
@@ -672,6 +693,7 @@ def main() -> int:
             TASK_CURRENTNESS_MIGRATION,
             POLICY_CURRENTNESS_MIGRATION,
             CATALOG_CURRENTNESS_MIGRATION,
+            PROJECT_CAPACITY_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -835,6 +857,11 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
                 results.append(run_sql(f"catalog-currentness-migration-apply-{attempt}", psql_base, CATALOG_CURRENTNESS_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results):
+            for attempt in (1, 2):
+                results.append(run_sql(f"project-capacity-migration-apply-{attempt}", psql_base, PROJECT_CAPACITY_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):

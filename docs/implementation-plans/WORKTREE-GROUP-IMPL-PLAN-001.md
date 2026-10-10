@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.56**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.57**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1799,3 +1799,20 @@ Native read 与 Run-owner 授权复验使用共享 Project advisory locks；目�
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.56 | 2026-10-10 | Ulysses — Mavis 接手审核 | 对账有界当前目录与同Project预检并行；明确准备/实际执行Hook时点。 | D7实现与隔离并发验证。 |
+
+
+## 6.122 Phase 9F4C-D8 — Current Project capacity gate
+
+Schedule owner 必须在同一 owner 事务内完成固定 run-as 与 canonical Task/Worktree、Profile/Hook、Provider/Skill/Grant 及绑定复验，再比较当前 Project 配额与 Run 的全部八项 ResourceBudget 上限。不得以成功预检代替实际 reservation、非执行态 Run 创建或 executor 启动许可。缺失/禁用/未来生效配额、预算超限、计数/算术溢出与过期目录 fence 必须 fail closed。
+
+`revalidate_project_capacity` 使用 native `read_schedule_project_capacity_current`，复用手动 Run 分配路径的 Project allocation epoch（UPSERT 实际写入），串行同 Project 的容量分配。读取当前有效 quota，持有 quota publication 同键共享 advisory lock及quota行锁；REPEATABLE READ 下过时 epoch 必须产生40001而不能用旧 reservation 视图放行。统计同 Project 所有 active reservation，以及 lease 未过期的 pending reservation；过期 active 仍计数，released与过期 pending不计数。CPU/运行时长按单Run ceiling核对，RSS/子进程/并行工具/provider calls/输出/event buffer 按共享剩余总量核对，另核对Run数量。SQL仅返回一个≤4KiB envelope，Rust checked-add核算且在等待容量锁后重验5秒目录fence；无整表载入Rust缓存。数据库SUM仍需扫描Project相关ledger，未声称已验证最大规模查询/RSS性能。
+
+reader SECURITY DEFINER固定search_path=pg_catalog，PUBLIC execute撤销，仅Run owner受限EXECUTE；不授予runtime直接quota/epoch/reservation写权限。仅现有Work allocation epoch在本事务中变化，drop回滚；没有写入Run、reservation或容量审计事实，也不表示Project容量已预留。新增W/T/M表0/0/0；现有epoch保留30天TTL。未来Run/reservation writer必须在该仍存活事务内再次确认fence并原子写入Run、reservation及成对审计/Run事件和Infrastructure demand Outbox；Host/cluster容量仍由Infrastructure owner自己的事务预留。原生执行Hook、Runtime健康/沙箱、取消恢复与独立验证仍为实际executor门，不制造健康事实。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner49/49，binding/admission SQLx targets2/2、库15/15、包级all-targets check/Clippy与fmt、Python编译、图头和diff检查。Audit `target/phase9f4d-run-owner-consumer/d1e13219-1fbf-4f85-b7c1-e3604fa548d7/audit.jsonl`。实际覆盖缺失/禁用quota、精确预算匹配、同Project容量预检与正常手动epoch写入锁互斥（55P03）、quota关闭等待、drop回滚epoch、REPEATABLE READ过时allocation snapshot拒绝40001，以及未过期pending/过期pending/过期active/released计数。初始quota和reservation状态使用隔离admin/replica fixtures，不证明生产quota publisher、Run/reservation writer或真正executor并发。零VM/productionDB变更。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D8 report](../reports/PHASE-9F4C-D8-PROJECT-CAPACITY-REPORT.md)。本阶段无新增第三方依赖。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.57 | 2026-10-10 | Ulysses — Mavis接手审核 | 接入Schedule当前Project容量核算，保留原子Run/reservation写入与执行缺口。 | D8实现与隔离容量验证。 |
