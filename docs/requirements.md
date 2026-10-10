@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.26）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.27）
 
 ## 0. 文档说明与前提
 
@@ -3350,3 +3350,11 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+### 自有 Rust 服务端复用（v6.27）
+
+原生 provider 优先评估 AssetsLake、RustGameServer、ROPE_CS 的兼容模块；模块来源、实际文件 hash、许可和复用判定见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。要求稳定 typed identity、owner-local 事务、完整回执 deadline、有界队列/缓存与提交后确认；源项目 dry-run、Noop、内存入队或测试 fixture 不得计作持久化成功。此次已完成限定源码调查和设计更新，未迁移源码、未实现 native provider，D14/生产授权与执行门仍开放。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.27 | 2026-10-11 | Ulysses — Mavis接手审核 | 自有 Rust 服务模块复用、来源证据与验收边界 | 用户授权参考复用本机 Rust 服务器 |

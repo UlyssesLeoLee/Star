@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.23 (2026-10-10)
-> **上游要件定义书**: docs/requirements.md v6.26
+> **文档版本**: v6.24 (2026-10-11)
+> **上游要件定义书**: docs/requirements.md v6.27
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5511,3 +5511,11 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+### 自有 Rust 服务端复用（v6.24）
+
+采用模块级选择性适配，优先 RGS mTLS/timeout/retry 与 relay 指标模式；AssetsLake 事件信封/资源锁、ROPE 有界遥测只作受约束参考。保持业务 owner、native transport persistence、接收授权 verifier 三者边界；不引入整套源项目业务域或 Actix/Redis/Kafka/Wasm 栈作为前置条件。补完整回执 deadline、lease generation fence、持久化 quarantine、公平背压与 bounded key cardinality；Desktop 只消费分页投影。来源与逐模块缺口见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。本轮是设计选择，尚无 native server 交付声明。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.24 | 2026-10-11 | Ulysses — Mavis接手审核 | 模块复用与 native persistence/owner/verifier 分界 | 自有 Rust 服务器复用反馈 |

@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.76**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.77**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -945,3 +945,11 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v4.74 | 2026-10-09 | Mavis review | Extend §10.0B/AC-ERUN-007 with conditional Run Task Card creation, current write-scope/focus checks, server-derived Run owner, transaction audit/idempotency/triggered Outbox and same-target retry while the panel remains mounted; record cross-remount/reload pending recovery as open, and keep Host/capability/target DB/RLS and CLI gates open. Align SRS v0.13, Task BD v0.6/DD v1.26, requirements v6.08, basic design v6.05 and plan v6.41. | The Run Task Cards slice now includes a narrowly scoped create path consistent with Project → Branch → Run → Worktree ownership. |
 | v4.75 | 2026-10-09 | Mavis review | Update ERUN-P3/AC-ERUN-007 with bounded IndexedDB pending recovery before POST, actor/Run partitioning, exact binding/auth version checks, 32-record limit and 29-day client retry window; require manual reconciliation before clearing stale commands and document local-data privacy/loss and no exactly-once guarantee. Align Task SRS v0.14/BD v0.7/DD v1.27, requirements v6.09, basic design v6.06 and plan v6.42; keep host/target DB/RLS/CLI closed. | Cross-remount recovery is added as a small, architecture-aligned Task Card slice. |
 | v4.76 | 2026-10-09 | Mavis review | Update §8.12 and AC-SCHED-API-029 so Schedule, Run/Execution and Infrastructure use separate owner-local transactions connected by authenticated idempotent commands, result/confirmation and Outbox/Inbox; require fresh Schedule fence validation, post-confirmation demand, owner-command compensation, and no production admission claim. Align requirements v6.10, basic design v6.07, Schedule API SRS/BD/DD v0.31/v0.30/v0.30, Data Design v2.1, Infrastructure DD v0.33 and plan v6.43. | Correct the cross-owner single-transaction wording without importing unrelated branch changes. |
+
+### 自有 Rust 服务端复用（v4.77）
+
+模块证据、接入边界和 D14/native provider 验收以 [DD-RUST-SERVER-REUSE-001](DD-RUST-SERVER-REUSE-001.md) 为增量详细设计。接收 transport、当前授权 verifier 与 owner-local commit handler 分离，事务提交后且授权有效才确认；源模块需补 complete-ack deadline、lease fence、字节/基数预算及持久化 quarantine。此轮仅源码调查与设计，未复制源代码或改动执行路径。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v4.77 | 2026-10-11 | Ulysses — Mavis接手审核 | 自有服务端模块证据和接收/确认设计 | 用户授权参考复用本机 Rust 服务器 |
