@@ -76,3 +76,16 @@ D6 为 Schedule 增加 `revalidate_profile_and_hooks` 与私有字段 `ScheduleP
 Profile/Hook 当前事实保持 FOR SHARE 至事务结束；Project-scoped Hook 共享 advisory read fence 与 BEFORE publication 独占锁保护“当前没有 overlay”的读空隙，trigger 名称排序在现有继承 guard 之前。Native reader SECURITY DEFINER/search_path=pg_catalog，PUBLIC execute 撤销、仅 Run owner EXECUTE，不授予目录/任务/Profile/Hook 表写权限；目标部署须复核 function owner、RLS、底层读取/行锁权限与 migration 装配。此快照不是执行许可证：仍须当前 Provider/Skill/Grant catalog、任务生命周期、原生 Hook RunAdmission 求值与事实生产者、Project/Run quota/reservation、非执行态 Run writer、owner delivery/confirmation、Runtime sandbox 与独立验证。commit_result primitive 仍不是完整准入入口；执行保持关闭。
 
 验证：Rust1.99.0 包级 all-targets check、库12/12、all-targets/no-deps Clippy -D warnings、fmt/Python/图头/diff；隔离 PostgreSQL18.6 runner44/44、SQLx binding/admission targets2/2。Audit `target/phase9f4d-run-owner-consumer/2a610d58-4b81-43d6-bc8a-4e8dc0c3e793/audit.jsonl`。实际验证 baseline 成功、缺失 overlay 的正常发布被 55P03 阻挡、事务结束后的 overlay 发布使旧 pin 失效、新 overlay pin 成功、Profile 版本漂移、预算 mismatch 和摘要篡改拒绝。Fixtures 的初始注册与 Profile 修订由隔离 admin/replica 完成，不证明生产授权 publisher；overlay 并发 INSERT 使用正常 publication trigger。未创建 VM、未改变 Multipass inventory/生产 DB。
+
+
+## D7 — W/T/M 与 current catalog fence
+
+新表 Work0/Transaction0/Master0，覆盖100%；沿用七张既有 catalog/capability/Grant Master及其Transaction audit分类，catalog_revision保持既有并发Master projection定义；不改变SCD2/immutable/审计/retention契约。
+
+D7 增加 `ScheduleAdmissionTransaction.revalidate_execution_catalogs` 与私有 `ScheduleExecutionSnapshot`。同一 Run-owner 事务先通过 D4–D6 门，再由 native reader 仅读取 Profile 引用的当前 Provider/Skill 和当前 GrantSet：Provider≤5、Skill≤128、每项 capability≤64，Skill capability 预聚合预算384 KiB、返回 envelope≤512 KiB；Rust 复用 CurrentExecutionCatalogSnapshot/ExecutionProfileResolver，核对当前版本、摘要、availability、capability、完整 GrantSet 身份/版本/标签/到期时间，持有5秒目录 fence并在使用时要求至少1秒剩余。SQL 使用 C collation 对齐 Rust 的标识符排序。缺失、漂移、计数不一致、Grant变化或过期、fence到期均返回 TargetUnavailable，数据库失败不放行。
+
+Native read 与 Run-owner 授权复验使用共享 Project advisory locks；目录 parent publication 和 canonical ACL mutation 仍使用相同 scope 的独占写锁，并持有当前目录/Grant row locks直到事务结束。reader SECURITY DEFINER/search_path=pg_catalog、PUBLIC execute 撤销、仅 Run owner EXECUTE，无目录直接写权限。发布 trigger 排序早于既有 SCD2 guard；capability 保持既有 same-transaction birth/immutable/count 契约。Snapshot 的 lifetime 校验不能替代原 owner 事务存活或执行前重新读取。目标 DB/function owner/RLS/应用身份装配仍未验收；任务 lifecycle、Project/Run预算预留、非执行态Run writer、owner delivery/confirmation、Runtime sandbox与独立验证仍开放，执行保持关闭。
+
+调用时点须遵守已批准的基础设施准备模型：先创建等待基础设施预留的非执行态 Run，结果接受只表示准备请求已登记；实际启动/恢复 executor 前，必须复验 Host/cluster reservations与binding、当前权限/目录/策略，并以可信 Runtime health/readiness 和任务生命周期事实执行 Rust-native BeforeRunAdmission Hook。不得默认 health=true，不得以 UI health、VM/K3s就绪或仅文档校验代替 native Hook求值，也不新增弱化原生安全守门的 phase。当前本阶段未实现或声称通过该实际执行门。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner47/47，SQLx binding/admission targets2/2；包级all-targets check、库12/12、all-targets/no-deps Clippy -D warnings、包级fmt/Python/图头/diff。Audit `target/phase9f4d-run-owner-consumer/ee331ea1-5cde-4005-8f86-80cc630c1dce/audit.jsonl`。实际覆盖缺失目录、精确4 Provider/1 Skill/Grant、同Project两个不同Task/Worktree预检并行、正常ACL和目录publication55P03、Provider unavailable、Skill digest drift、Grant expiry drift、capability count mismatch及真实5秒fence到期拒绝。仅验证预检并行，不证明Run/executor并行吞吐；未测最大负载RSS/延迟。Fixtures初始注册/变异为隔离admin/replica，不证明生产publisher授权。零VM与生产DB变更。

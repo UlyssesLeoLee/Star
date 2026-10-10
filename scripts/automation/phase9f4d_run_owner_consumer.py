@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=d4dd3eaf2adec26fbef79394e4b9bb95cc25645d635261df305d4563dda05749
+# @cypher schema=1 source_sha256=5360b850b971167fb035b69e59e93254ca11e6047c8027f528c8a43b251f43ed
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -72,6 +72,7 @@
 # MERGE (main)-[:READS]->(admission_migration)
 # MERGE (main)-[:TESTS]->(admission_test)
 # MERGE (main)-[:READS]->(currentness)
+# MERGE (main)-[:READS]->(catalog_currentness:Config {id:"db/migrations/2026-10-10-run-owner-catalog-currentness.sql"})
 # MERGE (main)-[:READS]->(policy_currentness:Config {id:"db/migrations/2026-10-10-run-owner-policy-currentness.sql"})
 # MERGE (main)-[:READS]->(task_currentness:Config {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql"})
 # MERGE (main)-[:READS]->(acl_lock)
@@ -127,6 +128,7 @@ RUN_MIGRATION = ROOT / "db" / "migrations" / "2026-10-07-run-owner-infrastructur
 ADMISSION_LIFECYCLE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-09-task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-infrastructure-binding-master.sql"
 SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-admission.sql"
+CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
 TASK_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-task-currentness.sql"
 ADMISSION_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-admission-currentness.sql"
@@ -141,6 +143,7 @@ PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-02-task-run-owner.sql",
     ROOT / "db" / "migrations" / "2026-09-30-multica-hook-policy.sql",
     ROOT / "db" / "migrations" / "2026-10-01-multica-agent-execution-profile.sql",
+    ROOT / "db" / "migrations" / "2026-10-01-multica-agent-execution-catalog.sql",
     ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
     ROOT / "db" / "migrations" / "2026-09-30-worktree-task-execution-run.sql",
     ROOT / "db" / "migrations" / "2026-10-01-multica-run-resource-reservations.sql",
@@ -199,7 +202,11 @@ BEGIN
       'scm.cloud_branch_revision','public.worktree_canvas_worktree',
       'multica.worktree_project_binding','multica.engineering_run_worktree_binding',
       'multica.task_metadata','multica.work_item_worktree',
-      'multica.agent_execution_profile','multica.hook_policy_set'
+      'multica.agent_execution_profile','multica.hook_policy_set',
+      'multica.agent_execution_catalog_revision','multica.agent_execution_provider_catalog',
+      'multica.agent_execution_provider_capability','multica.agent_execution_skill_catalog',
+      'multica.agent_execution_skill_capability','multica.agent_execution_grant_set',
+      'multica.agent_execution_grant_capability'
     ] LOOP
         IF has_table_privilege('star_multica_run_owner',table_name,'INSERT')
            OR has_any_column_privilege('star_multica_run_owner',table_name,'UPDATE')
@@ -230,6 +237,20 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='multica.hook_policy_set'::regclass
         AND tgname='hook_policy_00_publication_lock' AND tgenabled='O') THEN
         RAISE EXCEPTION 'Policy reader/publication serialization capability invalid';
+    END IF;
+
+    IF NOT has_function_privilege('star_multica_run_owner',
+      'multica.read_schedule_catalog_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text[],text[])','EXECUTE')
+      OR NOT EXISTS(SELECT 1 FROM pg_proc WHERE oid=
+        'multica.read_schedule_catalog_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text[],text[])'::regprocedure
+        AND prosecdef AND proconfig @> ARRAY['search_path=pg_catalog'])
+      OR EXISTS(SELECT 1 FROM pg_proc p,LATERAL aclexplode(p.proacl) a WHERE p.oid=
+        'multica.read_schedule_catalog_current(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text[],text[])'::regprocedure
+        AND a.grantee=0 AND a.privilege_type='EXECUTE')
+      OR (SELECT count(*) FROM pg_trigger WHERE tgname='agent_execution_00_publication_lock' AND tgenabled='O'
+        AND tgrelid IN ('multica.agent_execution_provider_catalog'::regclass,'multica.agent_execution_skill_catalog'::regclass,'multica.agent_execution_grant_set'::regclass))<>3
+      OR position('pg_advisory_xact_lock_shared' IN pg_get_functiondef('multica.verify_schedule_run_as_current(uuid,uuid,uuid,uuid,uuid,uuid)'::regprocedure))=0 THEN
+       RAISE EXCEPTION 'Catalog/parallel authorization capabilities invalid';
     END IF;
 
     FOREACH table_name IN ARRAY protected_tables LOOP
@@ -650,6 +671,7 @@ def main() -> int:
             ADMISSION_CURRENTNESS_MIGRATION,
             TASK_CURRENTNESS_MIGRATION,
             POLICY_CURRENTNESS_MIGRATION,
+            CATALOG_CURRENTNESS_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -810,6 +832,9 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
                 results.append(run_sql(f"policy-currentness-migration-apply-{attempt}", psql_base, POLICY_CURRENTNESS_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+                results.append(run_sql(f"catalog-currentness-migration-apply-{attempt}", psql_base, CATALOG_CURRENTNESS_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):

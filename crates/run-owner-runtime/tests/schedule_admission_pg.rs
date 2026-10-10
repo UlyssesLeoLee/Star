@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=0aaf8588f49bea5609cdcca377dd0c6cea8d91a2ca2dad8ca20fd64cb759f638
+@cypher schema=1 source_sha256=25679eb64b4c6aa1e76e7146d5f83eff93c7ded1861cd5aed62766630c22c610
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -8,6 +8,17 @@ MERGE (binding:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.
 MERGE (source:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::source",kind:"function"})
 MERGE (test)-[:CALLS]->(seed_policy:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_policy",kind:"function"})
 MERGE (self)-[:DEFINES]->(seed_policy)
+MERGE (seed_catalog:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::seed_catalogs",kind:"function"})
+MERGE (self)-[:DEFINES]->(seed_catalog)
+MERGE (test)-[:CALLS]->(seed_catalog)
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_catalog_revision:Table {id:"multica.agent_execution_catalog_revision"})
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_provider_catalog:Table {id:"multica.agent_execution_provider_catalog"})
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_provider_capability:Table {id:"multica.agent_execution_provider_capability"})
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_skill_catalog:Table {id:"multica.agent_execution_skill_catalog"})
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_skill_capability:Table {id:"multica.agent_execution_skill_capability"})
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_grant_set:Table {id:"multica.agent_execution_grant_set"})
+MERGE (seed_catalog)-[:WRITES]->(agent_execution_grant_capability:Table {id:"multica.agent_execution_grant_capability"})
+MERGE (test)-[:CALLS]->(catalog_gate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_execution_catalogs",kind:"method"})
 MERGE (seed_policy)-[:WRITES]->(profile_master:Table {id:"multica.agent_execution_profile"})
 MERGE (seed_policy)-[:WRITES]->(hook_master:Table {id:"multica.hook_policy_set"})
 MERGE (test)-[:CALLS]->(policy_gate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_profile_and_hooks",kind:"method"})
@@ -499,6 +510,101 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
     else {
         panic!("new policy request")
     };
+    assert!(matches!(
+        pending.revalidate_execution_catalogs().await,
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    seed_catalogs(&admin, &policies, &profile_document).await?;
+    // A distinct task/checkout shares this Project/Run but has an independent request.
+    let mut parallel = policies.clone();
+    parallel.request_id = Uuid::new_v4();
+    parallel.occurrence.occurrence_id = Uuid::new_v4();
+    parallel.occurrence.rule_snapshot.target.work_item_id = Uuid::new_v4();
+    parallel.occurrence.rule_snapshot.target.worktree_id = Uuid::new_v4();
+    seed_task_binding(&admin, &parallel).await?;
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(policies.tenant_id), &policies.encode_json()?)
+        .await?
+    else {
+        panic!("new catalog request")
+    };
+    let snapshot = pending.revalidate_execution_catalogs().await?;
+    assert_eq!(snapshot.catalogs().providers().len(), 4);
+    assert_eq!(snapshot.catalogs().skills().len(), 1);
+    snapshot.validate_lifetime()?;
+    let ScheduleAdmissionStart::New(mut second) = store
+        .begin(source(parallel.tenant_id), &parallel.encode_json()?)
+        .await?
+    else {
+        panic!("parallel catalog request")
+    };
+    tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        second.revalidate_execution_catalogs(),
+    )
+    .await??;
+    drop(second);
+    // Normal ACL/capability publications must wait even without a conflicting target row.
+    let mut mutation = admin.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='150ms'")
+        .execute(&mut *mutation)
+        .await?;
+    let error=sqlx::query("INSERT INTO permission.project_role_binding(tenant_id,project_id,user_id,role,granted_by,version) VALUES($1,$2,$3,'developer',$4,1)")
+        .bind(policies.tenant_id).bind(policies.occurrence.rule_snapshot.target.project_id).bind(Uuid::new_v4()).bind(policies.occurrence.run_as_actor_id)
+        .execute(&mut *mutation).await.expect_err("ACL publication must wait for shared authorizers");
+    assert_eq!(
+        error.as_database_error().and_then(|e| e.code()).as_deref(),
+        Some("55P03")
+    );
+    mutation.rollback().await?;
+    let mut mutation = admin.begin().await?;
+    sqlx::query("SET LOCAL lock_timeout='150ms'")
+        .execute(&mut *mutation)
+        .await?;
+    let error=sqlx::query("INSERT INTO multica.agent_execution_provider_catalog(tenant_id,project_id,provider_id,provider_version,implementation_digest,configuration_digest,capability_count,published_by) VALUES($1,$2,'new.provider',1,$3,$4,0,$5)")
+        .bind(policies.tenant_id).bind(policies.occurrence.rule_snapshot.target.project_id).bind("a".repeat(64)).bind("b".repeat(64)).bind(policies.occurrence.run_as_actor_id)
+        .execute(&mut *mutation).await.expect_err("catalog publication must wait for shared readers");
+    assert_eq!(
+        error.as_database_error().and_then(|e| e.code()).as_deref(),
+        Some("55P03")
+    );
+    mutation.rollback().await?;
+    tokio::time::sleep(std::time::Duration::from_millis(5_001)).await;
+    assert!(matches!(
+        snapshot.validate_lifetime(),
+        Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::TargetUnavailable
+        ))
+    ));
+    drop(pending);
+    // Actual current facts, not sealed Profile declarations, govern later attempts.
+    for (sql,restore) in [
+      ("UPDATE multica.agent_execution_provider_catalog SET available=FALSE WHERE tenant_id=$1 AND provider_id='agent.local'","UPDATE multica.agent_execution_provider_catalog SET available=TRUE WHERE tenant_id=$1 AND provider_id='agent.local'"),
+      ("UPDATE multica.agent_execution_skill_catalog SET content_digest=repeat('f',64) WHERE tenant_id=$1","UPDATE multica.agent_execution_skill_catalog SET content_digest=repeat('a',64) WHERE tenant_id=$1"),
+      ("UPDATE multica.agent_execution_grant_set SET expires_at_epoch_ms=1 WHERE tenant_id=$1","UPDATE multica.agent_execution_grant_set SET expires_at_epoch_ms=1900000000000 WHERE tenant_id=$1"),
+      ("UPDATE multica.agent_execution_provider_catalog SET capability_count=0 WHERE tenant_id=$1 AND provider_id='agent.local'","UPDATE multica.agent_execution_provider_catalog SET capability_count=1 WHERE tenant_id=$1 AND provider_id='agent.local'")
+    ] {
+        let mut change=admin.begin().await?;
+        sqlx::query("SET LOCAL session_replication_role=replica").execute(&mut *change).await?;
+        sqlx::query(sql).bind(policies.tenant_id).execute(&mut *change).await?;
+        change.commit().await?;
+        let ScheduleAdmissionStart::New(mut attempt)=store.begin(source(policies.tenant_id),&policies.encode_json()?).await? else {panic!("catalog drift request")};
+        assert!(matches!(attempt.revalidate_execution_catalogs().await,Err(ScheduleAdmissionStoreError::PrerequisiteRejected(ScheduleAdmissionRejectionCodeV1::TargetUnavailable))));
+        drop(attempt);
+        let mut change=admin.begin().await?;
+        sqlx::query("SET LOCAL session_replication_role=replica").execute(&mut *change).await?;
+        sqlx::query(restore).bind(policies.tenant_id).execute(&mut *change).await?;
+        change.commit().await?;
+    }
+    let ScheduleAdmissionStart::New(mut pending) = store
+        .begin(source(policies.tenant_id), &policies.encode_json()?)
+        .await?
+    else {
+        panic!("restored policy request")
+    };
     let snapshot = pending.revalidate_profile_and_hooks().await?;
     assert_eq!(snapshot.profile().document(), &profile_document);
     assert_eq!(snapshot.hook_policy().digest(), hook_document.digest);
@@ -889,7 +995,7 @@ async fn seed_task_binding(
     // Disposable fixture only; generated UUIDs are the only interpolated values.
     sqlx::raw_sql(&format!("BEGIN; SET LOCAL session_replication_role=replica;
       INSERT INTO public.worktree_canvas_worktree(id,tenant_id,workspace_id,repo_id,project_id,name,branch,path)
-      VALUES('{worktree}','{tenant}','{workspace}','{repo}','{project}','fixture','dev','fixture://{worktree}');
+      VALUES('{worktree}','{tenant}','{workspace}','{repo}','{project}','fixture-{worktree}','dev','fixture://{worktree}');
       INSERT INTO multica.worktree_project_binding(binding_id,tenant_id,project_id,worktree_id,assigned_by)
       VALUES('{project_binding}','{tenant}','{project}','{worktree}','{actor}');
       INSERT INTO multica.engineering_run_worktree_binding(tenant_id,project_id,repository_id,branch_id,engineering_run_id,worktree_id,project_binding_id,assigned_by,version)
@@ -934,17 +1040,17 @@ async fn seed_policy(
     hook.digest = hook.computed_digest().unwrap();
     hook.clone().verify().unwrap();
     let hook_digest: String = hook.digest.iter().map(|b| format!("{b:02x}")).collect();
-    let provider = |name: &str| serde_json::json!({"provider_id":name,"version":1,"implementation_digest":"a".repeat(64),"configuration_digest":"b".repeat(64),"capabilities":[]});
+    let provider = |name: &str| serde_json::json!({"provider_id":name,"version":1,"implementation_digest":"a".repeat(64),"configuration_digest":"b".repeat(64),"capabilities":if name=="agent.local" {vec!["tool.read"]} else {vec![]}});
     let budget = &command.infrastructure_binding.resource_budget;
     let draft: AgentExecutionProfileDraft = serde_json::from_value(serde_json::json!({
       "schema_version":1,"scope":{"tenant_id":tenant,"project_id":project,"worktree_id":null},
-      "agent_provider":provider("agent.local"),"memory":{"state":"disabled"},"skills":[],
+      "agent_provider":provider("agent.local"),"memory":{"state":"disabled"},"skills":[{"skill_id":"review.rust","version":1,"content_digest":"a".repeat(64),"capabilities":["tool.read"]}],
       "context":{"assembler":provider("context.local"),"max_input_bytes":4096,"max_input_tokens":1024,"max_sources":8,"compaction_policy_digest":"c".repeat(64),"preserve_task_contract":true,"preserve_acceptance_criteria":true,"preserve_authorization_scope":true},
       "validation":{"provider":provider("validator.local"),"suite_digest":"d".repeat(64),"toolchain_digest":"e".repeat(64),"acceptance_criteria":["ac-test"]},
       "loop_budget":{"policy":provider("loop.local"),"max_iterations":1,"max_no_progress_iterations":1,"max_wall_clock_ms":30000,"max_provider_calls":1},
       "resource_budget":{"max_rss_bytes":budget.max_rss_bytes,"max_cpu_ms":budget.max_cpu_ms,"max_runtime_ms":budget.max_runtime_ms,"max_child_processes":budget.max_child_processes,"max_parallel_tools":budget.max_parallel_tools,"max_provider_calls":budget.max_provider_calls,"max_output_bytes":budget.max_output_bytes,"max_event_buffer_bytes":budget.max_event_buffer_bytes},
       "hook_set":{"hook_set_id":policy_id,"version":1,"effective_digest":hook_digest},
-      "grants":{"grant_set_id":Uuid::new_v4(),"version":1,"capabilities":[],"expires_at_epoch_ms":1900000000000u64},"engineering_manifest":null
+      "grants":{"grant_set_id":Uuid::new_v4(),"version":1,"capabilities":["tool.read"],"expires_at_epoch_ms":1900000000000u64},"engineering_manifest":null
     }))?;
     let verified = draft.seal().unwrap();
     let document = verified.document().clone();
@@ -962,4 +1068,51 @@ async fn seed_policy(
     target.hook_set_version = 1;
     target.hook_set_digest = hook_digest;
     Ok((document, policy_id, hook))
+}
+
+async fn seed_catalogs(
+    admin: &sqlx::PgPool,
+    command: &ScheduleRunAdmissionCommandV1,
+    document: &domain_agent::execution_profile::AgentExecutionProfileDocument,
+) -> Result<(), sqlx::Error> {
+    let tenant = command.tenant_id;
+    let project = command.occurrence.rule_snapshot.target.project_id;
+    let actor = command.occurrence.run_as_actor_id;
+    let draft = &document.profile;
+    let mut tx = admin.begin().await?;
+    sqlx::query("SET LOCAL session_replication_role=replica")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("INSERT INTO multica.agent_execution_catalog_revision(tenant_id,project_id,provider_catalog_revision,skill_catalog_revision) VALUES($1,$2,1,1)")
+  .bind(tenant).bind(project).execute(&mut *tx).await?;
+    for provider in [
+        &draft.agent_provider,
+        &draft.context.assembler,
+        &draft.validation.provider,
+        &draft.loop_budget.policy,
+    ] {
+        let entry = Uuid::new_v4();
+        sqlx::query("INSERT INTO multica.agent_execution_provider_catalog(entry_id,tenant_id,project_id,provider_id,provider_version,implementation_digest,configuration_digest,capability_count,published_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)")
+   .bind(entry).bind(tenant).bind(project).bind(&provider.provider_id).bind(i64::from(provider.version)).bind(&provider.implementation_digest).bind(&provider.configuration_digest).bind(i16::try_from(provider.capabilities.len()).unwrap()).bind(actor).execute(&mut *tx).await?;
+        for label in &provider.capabilities {
+            sqlx::query("INSERT INTO multica.agent_execution_provider_capability(tenant_id,entry_id,capability_code) VALUES($1,$2,$3)").bind(tenant).bind(entry).bind(label).execute(&mut *tx).await?;
+        }
+    }
+    for skill in &draft.skills {
+        let entry = Uuid::new_v4();
+        sqlx::query("INSERT INTO multica.agent_execution_skill_catalog(entry_id,tenant_id,project_id,skill_id,skill_version,content_digest,capability_count,published_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8)")
+   .bind(entry).bind(tenant).bind(project).bind(&skill.skill_id).bind(i64::from(skill.version)).bind(&skill.content_digest).bind(i16::try_from(skill.capabilities.len()).unwrap()).bind(actor).execute(&mut *tx).await?;
+        for label in &skill.capabilities {
+            sqlx::query("INSERT INTO multica.agent_execution_skill_capability(tenant_id,entry_id,capability_code) VALUES($1,$2,$3)").bind(tenant).bind(entry).bind(label).execute(&mut *tx).await?;
+        }
+    }
+    let grant = &draft.grants;
+    let entry = Uuid::new_v4();
+    sqlx::query("INSERT INTO multica.agent_execution_grant_set(entry_id,tenant_id,project_id,grant_set_id,grant_set_version,capability_count,expires_at_epoch_ms,published_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8)")
+  .bind(entry).bind(tenant).bind(project).bind(grant.grant_set_id).bind(i64::try_from(grant.version).unwrap()).bind(i16::try_from(grant.capabilities.len()).unwrap()).bind(i64::try_from(grant.expires_at_epoch_ms).unwrap()).bind(actor).execute(&mut *tx).await?;
+    for label in &grant.capabilities {
+        sqlx::query("INSERT INTO multica.agent_execution_grant_capability(tenant_id,entry_id,capability_code) VALUES($1,$2,$3)").bind(tenant).bind(entry).bind(label).execute(&mut *tx).await?;
+    }
+    tx.commit().await?;
+    Ok(())
 }

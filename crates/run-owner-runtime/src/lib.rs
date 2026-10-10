@@ -1,6 +1,6 @@
 //! Run-owner persistence and bounded Infrastructure result consumption.
 /*
-@cypher schema=1 source_sha256=9d8e5a410d570e751b7a011f5238ffc6b4e1bbc2508b30352cc4969e16560f97
+@cypher schema=1 source_sha256=59b006e3de3997336eeb102fe10a113aac02e1da2ce4a6f31bb68ee93554b75e
 MERGE (self:File {path:"crates/run-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/lib.rs::run_owner_runtime",kind:"module"})
 MERGE (binding_module:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::module",kind:"module"})
@@ -28,6 +28,8 @@ MERGE (module)-[:DEFINES]->(consume_error)
 MERGE (module)-[:IMPORTS]->(outbox_file:File {path:"crates/run-owner-runtime/src/outbox.rs"})
 MERGE (module)-[:IMPORTS]->(consumer_file:File {path:"crates/run-owner-runtime/src/capacity_result.rs"})
 MERGE (module)-[:IMPORTS]->(binding_file:File {path:"crates/run-owner-runtime/src/run_infrastructure_binding.rs"})
+MERGE (module)-[:IMPORTS]->(catalog_file:File {path:"crates/run-owner-runtime/src/schedule_catalog.rs"})
+MERGE (module)-[:EXPOSES]->(catalog_snapshot:Type {id:"run_owner_runtime::ScheduleExecutionSnapshot",kind:"struct"})
 MERGE (module)-[:IMPORTS]->(policy_file:File {path:"crates/run-owner-runtime/src/schedule_policy.rs"})
 MERGE (module)-[:EXPOSES]->(policy_snapshot:Type {id:"run_owner_runtime::SchedulePolicySnapshot",kind:"struct"})
 MERGE (module)-[:IMPORTS]->(admission_file:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
@@ -43,6 +45,7 @@ mod capacity_result;
 mod outbox;
 mod run_infrastructure_binding;
 mod schedule_admission;
+mod schedule_catalog;
 mod schedule_policy;
 
 pub use capacity_result::{
@@ -61,3 +64,5 @@ pub use schedule_admission::{
 };
 
 pub use schedule_policy::SchedulePolicySnapshot;
+
+pub use schedule_catalog::ScheduleExecutionSnapshot;

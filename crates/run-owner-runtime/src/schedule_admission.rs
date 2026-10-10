@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=628e7574475080ea780bdd22205ad19844cdc4973edb298aff0862c4b8a179d7
+@cypher schema=1 source_sha256=a14ce3482b98707929357e68fcc5e0a9faddc692c2cd1f0156612827b2ed805d
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -24,6 +24,10 @@ MERGE (task:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::Sche
 MERGE (self)-[:DEFINES]->(task)
 MERGE (policy:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_profile_and_hooks",kind:"method"})
 MERGE (self)-[:DEFINES]->(policy)
+MERGE (catalog:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_execution_catalogs",kind:"method"})
+MERGE (self)-[:DEFINES]->(catalog)
+MERGE (catalog)-[:CALLS]->(policy)
+MERGE (catalog)-[:CALLS]->(catalog_load:Symbol {id:"crates/run-owner-runtime/src/schedule_catalog.rs::load_current",kind:"function"})
 MERGE (policy)-[:CALLS]->(task)
 MERGE (policy)-[:CALLS]->(load_policy:Symbol {id:"crates/run-owner-runtime/src/schedule_policy.rs::load_current",kind:"function"})
 MERGE (task)-[:CALLS]->(revalidate)
@@ -183,6 +187,14 @@ impl PostgresScheduleAdmissionStore {
 }
 
 impl ScheduleAdmissionTransaction {
+    /// Verify current referenced Provider/Skill/Grant catalogs under the owner transaction.
+    /// The short-lived result is not a Runtime, Hook evaluation or resource reservation permit.
+    pub async fn revalidate_execution_catalogs(
+        &mut self,
+    ) -> Result<crate::ScheduleExecutionSnapshot, ScheduleAdmissionStoreError> {
+        let policies = self.revalidate_profile_and_hooks().await?;
+        crate::schedule_catalog::load_current(&mut self.transaction, &self.command, policies).await
+    }
     /// Verify current pinned Profile/effective HookSet and their binding resource budget.
     /// Current catalogs, native Hook evaluation, quotas and execution remain separate gates.
     pub async fn revalidate_profile_and_hooks(
