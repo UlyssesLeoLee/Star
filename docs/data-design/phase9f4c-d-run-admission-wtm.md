@@ -128,3 +128,15 @@ Project准备reservation的lease由数据库取min(occurrence deadline,当前时
 | M | Task/policy/binding | No mutation. |
 
 New tables W/T/M=0/1/0. Infrastructure reservations are outside this write set.
+
+## D11 confirmation write set
+
+| Class | Table | Ownership / retention |
+|---|---|---|
+| W | project_execution_resource_admission_lock | Existing 30-day allocation epoch. |
+| W | project_execution_resource_reservation | Existing pending row locked, not activated or extended. |
+| T | schedule_confirmation_inbox | New immutable exact-byte receipt; FK to own admission and demand; no TTL/deletion; FORCE tenant RLS. |
+| T | task_execution_run_event / infrastructure_capacity_demand_outbox | Atomic confirmation plus versioned demand; no execution event. |
+| M | Task/Profile/Hook/binding/catalog/quota | Current facts read and locked, no mutation. |
+
+New tables W/T/M=0/1/0. Host and cluster reservations are outside this owner transaction.

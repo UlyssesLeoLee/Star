@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=39759dcfc6675c6822b68c300903db3d5a5189226ad7b898d34ded8430960d0e
+@cypher schema=1 source_sha256=816a43c1243212b2dbdd721d5a0381d7d692c361f80246b77980a9caadadc889
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -65,6 +65,18 @@ MERGE (compensate)-[:CALLS]->(resolution_match:Symbol {id:"crates/domain-automat
 MERGE (compensate)-[:CALLS]->(decode)
 MERGE (compensate)-[:CALLS]->(match)
 MERGE (compensate)-[:CALLS]->(native_compensate:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-compensation.sql::compensate_schedule_preparation",kind:"function"})
+MERGE (confirm:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.confirm_admission",kind:"method"})
+MERGE (self)-[:DEFINES]->(confirm)
+MERGE (confirm)-[:CALLS]->(scope)
+MERGE (confirm)-[:CALLS]->(resolution_decode)
+MERGE (confirm)-[:CALLS]->(resolution_match)
+MERGE (confirm)-[:CALLS]->(catalog)
+MERGE (confirm)-[:CALLS]->(time)
+MERGE (confirm)-[:READS]->(inbox)
+MERGE (confirm)-[:READS]->(outbox)
+MERGE (confirm)-[:READS]->(confirmed:Table {id:"multica.schedule_confirmation_inbox"})
+MERGE (confirm)-[:USES_TYPE]->(demand_type:Type {id:"domain_infrastructure::HostInfrastructureDemandV2",kind:"external_type"})
+MERGE (confirm)-[:CALLS]->(native_confirm:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-confirmation.sql::confirm_schedule_preparation",kind:"function"})
 @endcypher
 */
 
@@ -136,6 +148,148 @@ pub struct ScheduleAdmissionTransaction {
 }
 
 impl PostgresScheduleAdmissionStore {
+    /// Consume trusted Schedule confirmation and commit a non-executing infrastructure demand.
+    /// Exact replay returns the historical demand, never permission to start or resume execution.
+    /// Source identity is injected by the independently authenticated receiving deployment.
+    pub async fn confirm_admission(
+        &self,
+        source: ScheduleAdmissionSource,
+        resolution_wire: &[u8],
+    ) -> Result<domain_infrastructure::HostInfrastructureDemandV2, ScheduleAdmissionStoreError>
+    {
+        let resolution = ScheduleRunAdmissionResolutionV1::decode_json(resolution_wire)?;
+        if source.tenant_id.is_nil()
+            || source.schedule_service_id.is_nil()
+            || source.tenant_id != resolution.tenant_id
+        {
+            return Err(ScheduleAdmissionStoreError::UntrustedScope);
+        }
+        if resolution.decision != ScheduleAdmissionResolutionKindV1::Confirm {
+            return Err(ScheduleAdmissionContractError::InvalidResolution.into());
+        }
+        let mut tx = self.pool.begin().await?;
+        crate::outbox::set_run_owner_scope(&mut tx, source.tenant_id).await?;
+        sqlx::query("SET LOCAL lock_timeout = '5s'")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SET LOCAL statement_timeout = '10s'")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!(
+                "schedule-admission:{}:{}",
+                source.tenant_id, resolution.request_id
+            ))
+            .execute(&mut *tx)
+            .await?;
+        let row = sqlx::query(
+            "SELECT i.command_wire,i.command_sha256,i.source_schedule_service_id,o.result_wire
+            FROM multica.schedule_admission_inbox i JOIN multica.schedule_admission_result_outbox o
+            ON o.tenant_id=i.tenant_id AND o.request_id=i.request_id AND o.result_id=i.result_id
+            WHERE i.tenant_id=$1 AND i.request_id=$2",
+        )
+        .bind(source.tenant_id)
+        .bind(resolution.request_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(ScheduleAdmissionStoreError::ReplayConflict)?;
+        if row.try_get::<Uuid, _>("source_schedule_service_id")? != source.schedule_service_id {
+            return Err(ScheduleAdmissionStoreError::UntrustedScope);
+        }
+        let wire: Vec<u8> = row.try_get("command_wire")?;
+        let wire_sha256: [u8; 32] = Sha256::digest(&wire).into();
+        if row.try_get::<Vec<u8>, _>("command_sha256")? != wire_sha256 {
+            return Err(ScheduleAdmissionStoreError::ReplayConflict);
+        }
+        let command = ScheduleRunAdmissionCommandV1::decode_json(&wire)?;
+        let result =
+            ScheduleRunAdmissionResultV1::decode_json(&row.try_get::<Vec<u8>, _>("result_wire")?)?;
+        result.validate_for_command(&command)?;
+        resolution.validate_for_result(&result)?;
+        if let Some(prior)=sqlx::query("SELECT c.resolution_wire,c.source_schedule_service_id,d.payload
+            FROM multica.schedule_confirmation_inbox c JOIN multica.infrastructure_capacity_demand_outbox d
+            ON d.tenant_id=c.tenant_id AND d.event_id=c.demand_event_id
+            WHERE c.tenant_id=$1 AND c.request_id=$2")
+            .bind(source.tenant_id).bind(resolution.request_id).fetch_optional(&mut *tx).await? {
+            if prior.try_get::<Vec<u8>,_>("resolution_wire")?!=resolution_wire
+                || prior.try_get::<Uuid,_>("source_schedule_service_id")?!=source.schedule_service_id {
+                return Err(ScheduleAdmissionStoreError::ReplayConflict);
+            }
+            let demand:domain_infrastructure::HostInfrastructureDemandV2=serde_json::from_value(prior.try_get("payload")?)
+                .map_err(|_|ScheduleAdmissionStoreError::ReplayConflict)?;
+            demand.validate().map_err(|_|ScheduleAdmissionStoreError::ReplayConflict)?;
+            if demand.task_execution_run_id!=resolution.task_execution_run_id
+                || demand.binding!=command.infrastructure_binding {
+                return Err(ScheduleAdmissionStoreError::ReplayConflict);
+            }
+            tx.commit().await?;
+            return Ok(demand);
+        }
+        let mut pending = ScheduleAdmissionTransaction {
+            transaction: tx,
+            command,
+            wire,
+            wire_sha256,
+            source_schedule_service_id: source.schedule_service_id,
+        };
+        pending.validate_preparation_time()?;
+        let execution = pending.revalidate_execution_catalogs().await?;
+        execution.validate_lifetime()?;
+        let command = &pending.command;
+        let target = &command.occurrence.rule_snapshot.target;
+        let deadline = command
+            .occurrence
+            .key
+            .scheduled_for_utc
+            .checked_add_signed(chrono::Duration::seconds(i64::from(
+                command.occurrence.rule_snapshot.deadline_seconds,
+            )))
+            .ok_or(ScheduleAdmissionStoreError::ReplayConflict)?;
+        let demand = domain_infrastructure::HostInfrastructureDemandV2 {
+            schema_version: 2,
+            event_id: Uuid::new_v4(),
+            correlation_id: command.correlation_id,
+            tenant_id: command.tenant_id,
+            project_id: target.project_id,
+            branch_id: target.branch_id,
+            engineering_run_id: target.engineering_run_id,
+            task_execution_run_id: resolution.task_execution_run_id,
+            schedule_rule_id: command.occurrence.rule_snapshot.rule_id.as_uuid(),
+            schedule_rule_version: i64::try_from(command.occurrence.rule_snapshot.rule_version)
+                .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?,
+            occurrence_id: command.occurrence.occurrence_id,
+            binding: command.infrastructure_binding.clone(),
+            resource_budget: command.infrastructure_binding.resource_budget,
+            requested_at: chrono::Utc::now(),
+            deadline_at: deadline,
+        };
+        demand
+            .validate()
+            .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
+        let profile = serde_json::to_string(execution.policies().profile().document())
+            .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
+        let payload = serde_json::to_string(&demand)
+            .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
+        let confirmed_wire: String =
+            sqlx::query_scalar("SELECT multica.confirm_schedule_preparation($1,$2,$3,$4)")
+                .bind(resolution_wire)
+                .bind(source.schedule_service_id)
+                .bind(profile)
+                .bind(payload)
+                .fetch_one(&mut *pending.transaction)
+                .await?;
+        let demand: domain_infrastructure::HostInfrastructureDemandV2 =
+            serde_json::from_str(&confirmed_wire)
+                .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
+        demand
+            .validate()
+            .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
+        execution.validate_lifetime()?;
+        pending.validate_preparation_time()?;
+        pending.transaction.commit().await?;
+        Ok(demand)
+    }
+
     /// Atomically release a pending preparation before confirmation/infrastructure demand.
     /// Returns true for a new release, false for exact immutable replay. The trusted receiving
     /// deployment must authenticate the Schedule service; injected source is not authentication.

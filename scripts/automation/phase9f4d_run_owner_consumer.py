@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=6030f8a7594d3e3bd4890fdf694bc9bb6859a31c3d48ef7399cfb2ddf0e283e8
+# @cypher schema=1 source_sha256=40c223d6c9aecce5e4d15525f58de6cdb25f0caa00dba33e8aed4e7726aeebe3
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -109,6 +109,7 @@
 # MERGE (main)-[:READS]->(capacity_migration:Config {id:"db/migrations/2026-10-10-run-owner-project-capacity.sql"})
 # MERGE (main)-[:READS]->(preparation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-preparation.sql"})
 # MERGE (main)-[:READS]->(compensation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-compensation.sql"})
+# MERGE (main)-[:READS]->(confirmation_migration:Config {id:"db/migrations/2026-10-10-run-owner-schedule-confirmation.sql"})
 # @endcypher
 
 from __future__ import annotations
@@ -133,6 +134,7 @@ RUN_BINDING_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-multica-run-inf
 SCHEDULE_ADMISSION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-admission.sql"
 SCHEDULE_PREPARATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-preparation.sql"
 SCHEDULE_COMPENSATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-compensation.sql"
+SCHEDULE_CONFIRMATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-confirmation.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -291,7 +293,14 @@ BEGIN
         AND a.grantee=0 AND a.privilege_type='EXECUTE')
       OR NOT EXISTS(SELECT 1 FROM pg_class WHERE oid='multica.schedule_compensation_inbox'::regclass AND relrowsecurity AND relforcerowsecurity)
       THEN RAISE EXCEPTION 'Compensation native capability or tenant RLS invalid'; END IF;
-    FOREACH table_name IN ARRAY ARRAY['task_contract','task_lifecycle_current','schedule_compensation_inbox'] LOOP
+    IF NOT has_function_privilege('star_multica_run_owner','multica.confirm_schedule_preparation(bytea,uuid,text,text)','EXECUTE')
+      OR NOT EXISTS(SELECT 1 FROM pg_proc WHERE oid='multica.confirm_schedule_preparation(bytea,uuid,text,text)'::regprocedure
+        AND prosecdef AND proconfig @> ARRAY['search_path=pg_catalog'])
+      OR EXISTS(SELECT 1 FROM pg_proc p,LATERAL aclexplode(p.proacl) a WHERE p.oid='multica.confirm_schedule_preparation(bytea,uuid,text,text)'::regprocedure
+        AND a.grantee=0 AND a.privilege_type='EXECUTE')
+      OR NOT EXISTS(SELECT 1 FROM pg_class WHERE oid='multica.schedule_confirmation_inbox'::regclass AND relrowsecurity AND relforcerowsecurity)
+      THEN RAISE EXCEPTION 'Confirmation native capability or RLS invalid'; END IF;
+    FOREACH table_name IN ARRAY ARRAY['task_contract','task_lifecycle_current','schedule_compensation_inbox','schedule_confirmation_inbox'] LOOP
       IF has_table_privilege('star_multica_run_owner','multica.' || table_name,'INSERT')
       OR has_any_column_privilege('star_multica_run_owner','multica.' || table_name,'UPDATE')
       OR has_table_privilege('star_multica_run_owner','multica.' || table_name,'DELETE') THEN
@@ -721,6 +730,7 @@ def main() -> int:
             PROJECT_CAPACITY_MIGRATION,
             SCHEDULE_PREPARATION_MIGRATION,
             SCHEDULE_COMPENSATION_MIGRATION,
+            SCHEDULE_CONFIRMATION_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -897,6 +907,9 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
                 results.append(run_sql(f"schedule-compensation-migration-apply-{attempt}", psql_base, SCHEDULE_COMPENSATION_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+                results.append(run_sql(f"schedule-confirmation-migration-apply-{attempt}", psql_base, SCHEDULE_CONFIRMATION_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):
