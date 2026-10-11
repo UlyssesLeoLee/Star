@@ -1,6 +1,6 @@
 //! Platform-owned persistence for permanently malformed JetStream messages.
 /*
-@cypher schema=1 source_sha256=68077332e782782d0de6dba5b71d7a5b1003762f6e820756ea0dd1c211466eed
+@cypher schema=1 source_sha256=bbd0cbda9cf95241db2af21bbc9bbcabc50e0279bb27fae74da44de9d9bf2431
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
 MERGE (source:Type {id:"crates/platform-messaging-runtime/src/lib.rs::TrustedJetStreamSource",kind:"struct"})
@@ -118,10 +118,16 @@ MERGE (test_policy)-[:TESTS]->(policy)
 MERGE (test_purge)-[:TESTS]->(purge_batch)
 MERGE (test_headers)-[:TESTS]->(replay_header_limits)
 MERGE (module)-[:IMPORTS]->(admission_delivery_file:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
+MERGE (receive_module:File {path:"crates/platform-messaging-runtime/src/admission_receive.rs"})
+MERGE (self)-[:IMPORTS]->(receive_module)
+MERGE (receive_jetstream_module:File {path:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs"})
+MERGE (self)-[:IMPORTS]->(receive_jetstream_module)
 @endcypher
 */
 
 pub mod admission_delivery;
+pub mod admission_receive;
+pub mod admission_receive_jetstream;
 
 use std::{sync::Arc, time::Duration};
 

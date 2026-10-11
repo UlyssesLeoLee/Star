@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.45 (2026-10-10)
+> **文档版本**: v2.46 (2026-10-10)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -2796,6 +2796,14 @@ frontend/src/app/automation-debug/
 
 `scripts/automation/phase9f4c_d1_sync.py --apply` synchronizes requirements, basic/detailed design, W/T/M, implementation plan, automation index and the phase report using exact anchors. Running it twice must make the second pass a no-op. PostgreSQL evidence is scoped to disposable schema/invariant verification; it does not prove production owner consumers, target database grants, Multipass/K3s providers, execution, BI or Benchmark.
 
+### 4.74 Phase 9F4C-D14 broker-neutral admission receiver gate
+
+#### D14 receiver owner-transaction and durable confirmation checks`; final tests use the flag alias and runner version update to verify pure core and PG/NATS. Deliverable: `docs/reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md`.
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.46 | 2026-10-11 | Ulysses — Mavis接手审核 | Add §4.74 for bounded broker-neutral receive, owner commit/ACK gates, real PG/NATS fault test runner and fixture-auth limitation. | D14 receiver integration. |
+
 ### 4.73 Phase 9F4C-D2 Run Infrastructure Binding Master gate
 
 **自动化档：[P]** — extend the existing `scripts/automation/phase9f4d_run_owner_consumer.py` disposable PostgreSQL runner. In schema-only mode, apply the canonical Engineering Run prerequisite migrations, apply the Run binding Master migration twice, then run `db/tests/run-infrastructure-binding-master.sql`. Keep the Run-owner result/quarantine and D1 checks in the same disposable database so cumulative role grants, owner separation and RLS remain visible. This gate starts no NATS process and creates no Multipass/K3s VM.
@@ -3022,3 +3030,12 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+
+### 4.86 Phase 9F4C-D14 admission receiver verification
+
+**自动化档：[P]** — extend scripts/automation/phase9f4d_run_owner_consumer.py with the --admission-receiver-tests alias for the same isolated PostgreSQL/JetStream test flow. Verify request/result/resolution owner commits, database-fault no-ACK, exact route/consumer policy and bounded receive cancellation/deadline using the registered Rust 1.99/PostgreSQL 18.6/NATS toolchain. Test authorization is fixture-only and never evidence of production identity. Record exact run evidence at 	arget/phase9f4d-run-owner-consumer/<run-id>/audit.jsonl, plus docs/reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md; do not turn on task execution from this gate.
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.46 | 2026-10-11 | Ulysses — Mavis接手审核 | Add §4.86 for bounded admission receive and owner commit-before-ACK integration. | D14 receiver implementation. |

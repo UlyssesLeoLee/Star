@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D13 owner-local transport-port publisher verified (67/67 steps). Rust-native provider, production identity/receivers/recovery, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.46 | Date: 2026-10-10
+> Status: 🟡 D14 Schedule/Run receivers verified with fixture identity (66/66 runner steps, one real PostgreSQL admission integration test); production identity, quarantine recovery, native provider, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.47 | Date: 2026-10-11
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -421,3 +421,12 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+
+## D14 接收实现增量
+
+AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB wire、完整 10秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。JetStream config 与 typed identity 每次复验，native provider 可替换 port；现有事实所有权/RLS/幂等保持。真实 broker/PG、故障和单位测试的最终状态见 ../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md；production identity/composition、durable poison quarantine、receiver recovery 和执行闭环仍未关闭。
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.47 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |

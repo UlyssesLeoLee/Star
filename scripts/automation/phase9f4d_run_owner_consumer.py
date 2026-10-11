@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=5fd74749836e9962a34a7f9d8778476f78b2942a9e7e908cd7b4979ec2c25da0
+# @cypher schema=1 source_sha256=70e0a6ada6faff1989f452f9d8b39af21b00f1908ee1ae2142fb108de045bcfe
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -747,7 +747,7 @@ def main() -> int:
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
     parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
     parser.add_argument("--admission-tests", action="store_true", help="Also run Rust SQLx owner-local admission receipt/result tests; --schema-only avoids NATS")
-    parser.add_argument("--admission-delivery-tests", action="store_true", help="Start isolated NATS before admission tests to verify owner delivery publisher and crash replay")
+    parser.add_argument("--admission-delivery-tests", "--admission-receiver-tests", dest="admission_delivery_tests", action="store_true", help="Start isolated NATS before admission tests to verify publisher replay, three owner receiver kinds and commit-before-ACK with a real database fault")
     arguments = parser.parse_args()
     if arguments.admission_delivery_tests and not arguments.admission_tests:
         parser.error("--admission-delivery-tests requires --admission-tests")

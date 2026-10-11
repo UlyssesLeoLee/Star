@@ -9,7 +9,8 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-async-nats = { workspace = true }
+async-nats = { workspace = true, features = ["server_2_10"] }
+futures-util = { workspace = true }
 base64 = "0.23"
 chrono = { workspace = true }
 domain-kms = { path = "../domain-kms" }

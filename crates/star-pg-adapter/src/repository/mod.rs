@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=282a001de747031314773f58f0fac0393346111b098bf8a40664e397a5c6315e
+@cypher schema=1 source_sha256=980712de6e67a7821c2fc117d2f7f058d57793906f3a0726ac28f55900667b18
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/mod.rs"})
 MERGE (schedule_module:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (terminal:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::OccurrenceTerminalOutcome"})
@@ -12,6 +12,8 @@ MERGE (self)-[:EXPOSES]->(terminal)
 MERGE (self)-[:EXPOSES]->(repository)
 MERGE (self)-[:EXPOSES]->(dispatch)
 MERGE (self)-[:EXPOSES]->(error)
+MERGE (receive_module:File {path:"crates/star-pg-adapter/src/repository/admission_receive.rs"})
+MERGE (self)-[:IMPORTS]->(receive_module)
 @endcypher
 */
 //! Repository 索引 (per WBS §14.10.4 缺口 #4 6 ops Repository + 4 OAuth Repository)
@@ -20,6 +22,7 @@ MERGE (self)-[:EXPOSES]->(error)
 //! 守门 #13 W/T/M 100% 覆盖: T=3 (ops_helm_release_state + ops_cluster_action_log + ops_log_query_log) + W=2 (ops_log_entry TTL 7d + ops_log_analysis TTL 30d) + M=1 (ops_metrics_config SCD2)
 
 pub mod automation_schedule;
+mod admission_receive;
 pub mod ops_cluster_action_log;
 pub mod ops_helm_release_state;
 pub mod ops_log_analysis;

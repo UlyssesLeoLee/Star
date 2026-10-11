@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=14cb8c9ccaed60476d4e41b0929008c448528b7153af30bf17f9bd0efbb32bb4
+@cypher schema=1 source_sha256=790e2bb787aea234f851d7cd49e779c55f3d7cffa446b5faac9611bedd3e4d05
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -122,6 +122,18 @@ MERGE (schedule_fence)-[:USES_TYPE]->(delivery_publisher)
 MERGE (schedule_fence)-[:READS]->(schedule_delivery_receipt:Table {id:"automation.admission_message_delivery_receipt"})
 MERGE (delivery_test)-[:READS]->(schedule_delivery_receipt)
 MERGE (delivery_test)-[:READS]->(run_delivery_receipt:Table {id:"multica.admission_message_delivery_receipt"})
+MERGE (d14_receive_fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::receive_admission_broker_fixture",kind:"function"})
+MERGE (d14_auth_fixture:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionAuthorizationFixture",kind:"struct"})
+MERGE (d14_verify_fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionAuthorizationFixture::verify",kind:"method"})
+MERGE (d14_positive:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_schedule_confirmation",kind:"function"})
+MERGE (self)-[:DEFINES]->(d14_receive_fixture)
+MERGE (self)-[:DEFINES]->(d14_auth_fixture)
+MERGE (self)-[:DEFINES]->(d14_verify_fixture)
+MERGE (d14_positive)-[:CALLS]->(d14_receive_fixture)
+MERGE (d14_receive_fixture)-[:TESTS]->(d14_consume:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver::consume_one",kind:"method"})
+MERGE (d14_receive_fixture)-[:CALLS]->(d14_consume)
+MERGE (d14_auth_fixture)-[:IMPLEMENTS]->(d14_auth:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization",kind:"trait"})
+MERGE (d14_receive_fixture)-[:CALLS]->(d14_transport_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionReceiveTransport::new",kind:"method"})
 @endcypher
 */
 use chrono::Utc;
@@ -1638,6 +1650,137 @@ async fn seed_schedule_handoff(
     Ok(fence)
 }
 
+struct AdmissionAuthorizationFixture {
+    scope: platform_messaging_runtime::admission_receive::AdmissionReceiveScope,
+    log: String,
+}
+
+impl platform_messaging_runtime::admission_receive::AdmissionReceiveAuthorization
+    for AdmissionAuthorizationFixture
+{
+    async fn verify(
+        &self,
+        origin: &platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin,
+        _: &[u8],
+    ) -> Result<(), platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
+        if origin.scope != self.scope
+            || origin.provider_identity != "ISOLATED_TEST_ONLY"
+            || origin.log_id != self.log
+        {
+            return Err(
+                platform_messaging_runtime::admission_receive::AdmissionReceiveError::Unauthorized,
+            );
+        }
+        Ok(()) // Explicit test fixture; neither credentials nor production authentication evidence.
+    }
+}
+
+#[allow(clippy::too_many_arguments)] // One bounded integration fixture for the three owner wire kinds.
+async fn receive_admission_broker_fixture<
+    H: platform_messaging_runtime::admission_receive::AdmissionReceiveHandler,
+>(
+    tenant: Uuid,
+    sender: Uuid,
+    recipient: Uuid,
+    kind: platform_messaging_runtime::admission_receive::AdmissionReceiveKind,
+    message_id: Uuid,
+    wire: &[u8],
+    handler: H,
+    fail_commit: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use async_nats::jetstream::{
+        consumer::{pull, AckPolicy},
+        message::PublishMessage,
+        stream,
+    };
+    use platform_messaging_runtime::{admission_receive::*, admission_receive_jetstream::*};
+    let Ok(url) = std::env::var("STAR_ADMISSION_DELIVERY_TEST_NATS_URL") else {
+        return Ok(());
+    };
+    let context = async_nats::jetstream::new(async_nats::connect(url).await?);
+    let scope = AdmissionReceiveScope {
+        tenant_id: tenant,
+        sender_service_id: sender,
+        recipient_service_id: recipient,
+        kind,
+    };
+    let (owner, wire_kind) = match kind {
+        AdmissionReceiveKind::Request => ("automation", "request"),
+        AdmissionReceiveKind::Result => ("multica", "result"),
+        AdmissionReceiveKind::Resolution => ("automation", "resolution"),
+    };
+    let subject = format!("star.{owner}.admission.v1.{tenant}.{recipient}.{wire_kind}");
+    let name = format!("RECEIVE_{}", Uuid::new_v4().simple());
+    let stream = context
+        .create_stream(stream::Config {
+            name: name.clone(),
+            subjects: vec![subject.clone()],
+            max_bytes: 65536,
+            max_messages: 8,
+            max_message_size: 16384,
+            ..Default::default()
+        })
+        .await?;
+    let consumer = stream
+        .create_consumer(pull::Config {
+            durable_name: Some("admission_fixture".into()),
+            filter_subject: subject.clone(),
+            ack_policy: AckPolicy::Explicit,
+            max_ack_pending: 1,
+            max_waiting: 1,
+            max_batch: 1,
+            max_bytes: 20480,
+            max_deliver: 12,
+            ack_wait: std::time::Duration::from_secs(20),
+            ..Default::default()
+        })
+        .await?;
+    let ack = context
+        .send_publish(
+            subject,
+            PublishMessage::build()
+                .payload(wire.to_vec().into())
+                .message_id(format!(
+                    "admission.v1.{owner}.{wire_kind}.{tenant}.{message_id}"
+                ))
+                .expected_stream(&name),
+        )
+        .await?
+        .await?;
+    assert_eq!(ack.stream, name);
+    let transport = JetStreamAdmissionReceiveTransport::new(
+        consumer,
+        scope,
+        name.clone(),
+        String::new(),
+        "ISOLATED_TEST_ONLY".into(),
+    )?;
+    let auth = AdmissionAuthorizationFixture {
+        scope,
+        log: name.clone(),
+    };
+    let mut receiver = AdmissionReceiver::new(transport, handler, auth, scope)?;
+    let (_control, mut cancellation) = tokio::sync::watch::channel(false);
+    let outcome = receiver.consume_one(&mut cancellation).await;
+    let mut observer: async_nats::jetstream::consumer::PullConsumer = stream
+        .get_consumer("admission_fixture")
+        .await
+        .map_err(|error| -> Box<dyn std::error::Error> { error })?;
+    if fail_commit {
+        assert_eq!(outcome, Err(AdmissionReceiveError::OwnerCommit));
+        assert_eq!(observer.info().await?.num_ack_pending, 1); // Real DB fault left delivery unconfirmed.
+    } else {
+        assert_eq!(outcome, Ok(Some(message_id)));
+        assert_eq!(observer.info().await?.num_ack_pending, 0);
+        assert_eq!(
+            observer.cached_info().ack_floor.stream_sequence,
+            ack.sequence
+        );
+    }
+    context.delete_stream(name).await?;
+    Ok(())
+}
+
 async fn verify_schedule_confirmation(
     admin: &sqlx::PgPool,
     store: &PostgresScheduleAdmissionStore,
@@ -1663,12 +1806,21 @@ async fn verify_schedule_confirmation(
             .await?,
         request_wire
     );
-    let ScheduleAdmissionStart::New(pending) =
-        store.begin(source(cmd.tenant_id), &request_wire).await?
-    else {
-        panic!("new confirmation preparation")
+    receive_admission_broker_fixture(
+        cmd.tenant_id,
+        source(cmd.tenant_id).schedule_service_id,
+        run_service,
+        platform_messaging_runtime::admission_receive::AdmissionReceiveKind::Request,
+        cmd.request_id,
+        &request_wire,
+        store.clone(),
+        false,
+    )
+    .await?;
+    let result = match store.begin(source(cmd.tenant_id), &request_wire).await? {
+        ScheduleAdmissionStart::New(pending) => pending.prepare_and_commit().await?,
+        ScheduleAdmissionStart::Replay(result) => result,
     };
-    let result = pending.prepare_and_commit().await?;
     assert_eq!(result.outcome, ScheduleRunAdmissionOutcomeV1::Accepted);
     let run = result.task_execution_run_id.unwrap();
     let result_wire = result.encode_json()?;
@@ -1684,6 +1836,17 @@ async fn verify_schedule_confirmation(
         .is_err());
     // The final Outbox insert must roll back the link, event and Inbox together.
     sqlx::raw_sql("CREATE FUNCTION automation.fail_d12_resolution() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'D12 fault'; END $$; CREATE TRIGGER d12_fail BEFORE INSERT ON automation.run_admission_resolution_outbox FOR EACH ROW EXECUTE FUNCTION automation.fail_d12_resolution()").execute(admin).await?;
+    receive_admission_broker_fixture(
+        cmd.tenant_id,
+        run_service,
+        source(cmd.tenant_id).schedule_service_id,
+        platform_messaging_runtime::admission_receive::AdmissionReceiveKind::Result,
+        result.result_id,
+        &result_wire,
+        schedule.clone(),
+        true,
+    )
+    .await?;
     assert!(schedule
         .resolve_admission_result(cmd.tenant_id, run_service, &result_wire)
         .await
@@ -1693,6 +1856,17 @@ async fn verify_schedule_confirmation(
     assert_eq!(linked, None);
     let receipts: i64 = sqlx::query_scalar("SELECT count(*) FROM automation.run_admission_result_inbox WHERE tenant_id=$1 AND request_id=$2").bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
     assert_eq!(receipts, 0);
+    receive_admission_broker_fixture(
+        cmd.tenant_id,
+        run_service,
+        source(cmd.tenant_id).schedule_service_id,
+        platform_messaging_runtime::admission_receive::AdmissionReceiveKind::Result,
+        result.result_id,
+        &result_wire,
+        schedule.clone(),
+        false,
+    )
+    .await?;
     let resolution = schedule
         .resolve_admission_result(cmd.tenant_id, run_service, &result_wire)
         .await?
@@ -1818,6 +1992,17 @@ async fn verify_schedule_confirmation(
     let count:i64=sqlx::query_scalar("SELECT count(*) FROM multica.schedule_confirmation_inbox WHERE tenant_id=$1 AND request_id=$2")
         .bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
     assert_eq!(count, 0);
+    receive_admission_broker_fixture(
+        cmd.tenant_id,
+        source(cmd.tenant_id).schedule_service_id,
+        run_service,
+        platform_messaging_runtime::admission_receive::AdmissionReceiveKind::Resolution,
+        resolution.resolution_id,
+        &wire,
+        store.clone(),
+        false,
+    )
+    .await?;
     let demand = store
         .confirm_admission(source(cmd.tenant_id), &wire)
         .await?;

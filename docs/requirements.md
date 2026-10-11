@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.27）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.28）
 
 ## 0. 文档说明与前提
 
@@ -3358,3 +3358,14 @@ Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.27 | 2026-10-11 | Ulysses — Mavis接手审核 | 自有 Rust 服务模块复用、来源证据与验收边界 | 用户授权参考复用本机 Rust 服务器 |
+
+
+### D14 admission receiver（v6.28）
+
+接收端新增 broker-neutral AdmissionReceiveTransport/Delivery、显式授权 verifier 和 owner-local commit handler；Run request/resolution 与 Schedule result 接到已有幂等持久化方法。单 receiver 通过可变借用串行处理一条消息，整个 pull/commit/ACK 10 秒 deadline，取消或控制通道关闭停止处理；typed wire ≤16KiB，路由/身份/日志 cursor 有界校验，提交前与 ACK 前复验授权，未提交/未知提交结果、撤权或无有效 receipt 均不确认。JetStream 仅 adapter 持有精确 subject/filter、Nats-Msg-Id、stream/domain/consumer 与 double-ACK；每次 pull 刷新配置，durable explicit ACK、pending/waiting/batch=1、bytes≤20KiB、ack_wait 20–120秒、max_deliver≤12，拒绝额外 filter/headers-only。启用现有 async-nats server_2_10 feature 以显式检查多过滤器，不新增第三方版本。
+
+本切片未接生产身份提供器/主进程装配；malformed/poison 暂保持不 ACK，durable quarantine、真正 ACK 丢失后的 receiver 恢复、native provider 和 Cargo provider 隔离仍开放。新增真实 DB/broker 测试覆盖新 request → accepted result → confirm demand 与事务故障不 ACK；最终验证状态由 docs/reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md 记录。测试授权 fixture 不证明生产身份，仍不允许 executor 启动。新增 DB 表 W/T/M=0/0/0，沿用现有 owner-local 事实与 Outbox/Inbox。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.28 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 接收/事务后确认实现和剩余缺口 | 推进全 phase 目标与自有 Rust server port |

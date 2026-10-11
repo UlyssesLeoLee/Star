@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.63**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.64**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1940,3 +1940,14 @@ Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.63 | 2026-10-11 | Ulysses — Mavis接手审核 | 自有 Rust 模块优先适配与后续验收顺序 | 用户复用反馈 |
+
+
+### D14 admission receiver（v6.64）
+
+接收端新增 broker-neutral AdmissionReceiveTransport/Delivery、显式授权 verifier 和 owner-local commit handler；Run request/resolution 与 Schedule result 接到已有幂等持久化方法。单 receiver 通过可变借用串行处理一条消息，整个 pull/commit/ACK 10 秒 deadline，取消或控制通道关闭停止处理；typed wire ≤16KiB，路由/身份/日志 cursor 有界校验，提交前与 ACK 前复验授权，未提交/未知提交结果、撤权或无有效 receipt 均不确认。JetStream 仅 adapter 持有精确 subject/filter、Nats-Msg-Id、stream/domain/consumer 与 double-ACK；每次 pull 刷新配置，durable explicit ACK、pending/waiting/batch=1、bytes≤20KiB、ack_wait 20–120秒、max_deliver≤12，拒绝额外 filter/headers-only。启用现有 async-nats server_2_10 feature 以显式检查多过滤器，不新增第三方版本。
+
+本切片未接生产身份提供器/主进程装配；malformed/poison 暂保持不 ACK，durable quarantine、真正 ACK 丢失后的 receiver 恢复、native provider 和 Cargo provider 隔离仍开放。新增真实 DB/broker 测试覆盖新 request → accepted result → confirm demand 与事务故障不 ACK；最终验证状态由 docs/reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md 记录。测试授权 fixture 不证明生产身份，仍不允许 executor 启动。新增 DB 表 W/T/M=0/0/0，沿用现有 owner-local 事实与 Outbox/Inbox。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.64 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 接收/事务后确认实现和剩余缺口 | 推进全 phase 目标与自有 Rust server port |

@@ -1,6 +1,6 @@
 //! Run-owner persistence and bounded Infrastructure result consumption.
 /*
-@cypher schema=1 source_sha256=062b8da99209d4c7f753c6d6a0ce9725c8f1a863f6634ab0781cb1f97b4b0d50
+@cypher schema=1 source_sha256=6f6701404d8f1e4d9ab9f129d9f100db3e89259ef900dd5da785cf35f01829a0
 MERGE (self:File {path:"crates/run-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/lib.rs::run_owner_runtime",kind:"module"})
 MERGE (binding_module:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::module",kind:"module"})
@@ -40,10 +40,13 @@ MERGE (module)-[:EXPOSES]->(admission_error:Type {id:"run_owner_runtime::Schedul
 MERGE (module)-[:EXPOSES]->(admission_source:Type {id:"run_owner_runtime::ScheduleAdmissionSource",kind:"struct"})
 MERGE (module)-[:IMPORTS]->(capacity_file:File {path:"crates/run-owner-runtime/src/schedule_capacity.rs"})
 MERGE (module)-[:EXPOSES]->(capacity_snapshot:Type {id:"run_owner_runtime::ScheduleProjectCapacitySnapshot",kind:"struct"})
+MERGE (receive_module:File {path:"crates/run-owner-runtime/src/admission_receive.rs"})
+MERGE (self)-[:IMPORTS]->(receive_module)
 @endcypher
 */
 
 mod capacity_result;
+mod admission_receive;
 mod outbox;
 mod run_infrastructure_binding;
 mod schedule_admission;

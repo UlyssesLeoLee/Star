@@ -1,6 +1,6 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.92 (2026-10-10)
+> **文档版本**: v0.93 (2026-10-11)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
 > **依赖**: `docs/automation-design.md` v2.45 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate + §6 基类骨架 + §6.8 索引)
@@ -681,7 +681,7 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
-| v0.92 | 2026-10-10 | Ulysses — Mavis接手审核 | D13交付/transport port验证、Rust-native替换准备及剩余缺口对账。 | 新owner消息交付实现。 |
+| v0.93 | 2026-10-10 | Ulysses — Mavis接手审核 | D13交付/transport port验证、Rust-native替换准备及剩余缺口对账。 | 新owner消息交付实现。 |
 
 ### Rust-native 消息服务器替换边界
 
@@ -690,3 +690,12 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+
+### v0.93 — D14 admission receiver verification
+
+Run scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --admission-tests --admission-receiver-tests with the pinned Rust, PostgreSQL and verified NATS binaries. This executes the isolated PG/NATS request/result/resolution receive tests, including a real database failure that must leave the delivery pending. The authorization is fixture-only. Results: 	arget/phase9f4d-run-owner-consumer/<run-id>/audit.jsonl and docs/reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md.
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v0.93 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 broker receiver verification runner and fixture-identity boundary. | D14 receiver implementation. |
