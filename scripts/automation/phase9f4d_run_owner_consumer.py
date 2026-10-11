@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=70e0a6ada6faff1989f452f9d8b39af21b00f1908ee1ae2142fb108de045bcfe
+# @cypher schema=1 source_sha256=1e755f89ec48e20b8335b361b852f4ab07aa68f93c89de31079d8b7a7403d6fd
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -15,6 +15,7 @@
 # MERGE (migration:Config {id:"db/migrations/2026-10-07-run-owner-infrastructure-capacity-result.sql"})
 # MERGE (consumer_test:Config {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs"})
 # MERGE (quarantine_migration:Config {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql"})
+# MERGE (admission_quarantine_migration:Config {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
 # MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
@@ -63,6 +64,7 @@
 # MERGE (main)-[:CONFIGURES]->(cargo)
 # MERGE (main)-[:READS]->(migration)
 # MERGE (main)-[:READS]->(quarantine_migration)
+# MERGE (main)-[:READS]->(admission_quarantine_migration)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
 # MERGE (main)-[:TESTS]->(admission_lifecycle_test)
@@ -166,6 +168,7 @@ PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-07-infrastructure-capacity-owner-schema.sql",
     ROOT / "db" / "migrations" / "2026-10-08-infrastructure-owner-runtime-grants.sql",
     ROOT / "db" / "migrations" / "2026-10-08-platform-poison-quarantine.sql",
+    ROOT / "db" / "migrations" / "2026-10-12-admission-receive-quarantine.sql",
     ROOT / "db" / "migrations" / "2026-10-09-infrastructure-provider-profile-master.sql",
     ROOT / "db" / "migrations" / "2026-10-10-infrastructure-physical-capacity-ledger.sql",
 )

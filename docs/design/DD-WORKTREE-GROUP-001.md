@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.78**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.79**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -964,3 +964,15 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v4.78 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 接收/事务后确认实现和剩余缺口 | 推进全 phase 目标与自有 Rust server port |
+
+### D16 admission quarantine 与本机 Rust 模块复用（v4.79）
+
+`platform-messaging-runtime` 增加 provider-neutral `AdmissionReceiveQuarantine` PostgreSQL writer；`durable-quarantine` 可在不启用 JetStream SDK 的构建组合中单独使用。receipt 只记录稳定 source identity、租户路由、fault/version、原 wire 长度和摘要，不保留 body。它不授权或认证消息来源，不证明 terminal ACK、生产组合、BI 分析或原生 Rust server 已交付；相应持久化与运行时门仍开放。
+
+本机 `E:/AssetsLake` 与其他 Rust 服务端模块可直接参考、适配和复用，源仓仍只读并按模块核对 HEAD/脏状态/hash、权属、许可义务、传递依赖及实现缺口。AGPL-3.0 不是商业用途禁令；需要履行具体分发/网络提供情形适用的源码与 NOTICE 义务。AssetsLake 当前 relay 缺少真实 Kafka 投递，因此不能作为生产 transport；其余独立模块不因此被排除。D16 未复制外部代码，保留 Star 自有 owner/RLS/idempotency/WORM 契约。
+
+Rust 1.98.1 `--ignore-rust-version` 下 feature package tests 16/16、all-targets check、Run-owner SQLx test target compile 与 no-NATS dependency tree 通过；Rust 1.99.0 正式验收及 live PostgreSQL migration/transaction/RLS/grants 尚未完成。阶段报告见 [PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT](../reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v4.79 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 provider-neutral quarantine 与本机 Rust 模块直接复用/许可边界；保留未通过的数据库和产品运行门 | D16 实现及用户明确复用反馈 |

@@ -10,7 +10,9 @@ repository.workspace = true
 
 [features]
 default = ["jetstream-adapter"]
+durable-quarantine = []
 jetstream-adapter = [
+    "durable-quarantine",
     "dep:async-nats",
     "dep:base64",
     "dep:domain-kms",

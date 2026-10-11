@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D15 profile pinning and provider-neutral receipt v2 have 22/22 package unit tests passing, a no-default all-targets check, Run-owner integration target compilation, and a no-default dependency tree without `async-nats`, under Rust 1.98.1 with `--ignore-rust-version`. Strict Clippy did not complete because the selected compiler encountered incompatible cached Rust artifacts; Rust 1.99.0 is unavailable. PostgreSQL execution of the new migration is blocked by missing server binaries. No native provider or production profile resolver is wired; D14 quarantine/replay and the full execution chain remain open.
-> Version: 0.53 | Date: 2026-10-12
+> Status: 🟡 D16 adds a PostgreSQL-backed provider-neutral metadata quarantine writer and standalone Cargo feature. The 16/16 package tests, no-NATS feature all-targets check and Run-owner SQLx target compilation pass under Rust 1.98.1 with `--ignore-rust-version`; PostgreSQL migration and transaction execution remain blocked by missing server binaries. No production verifier/composition, encrypted replay body, native provider/profile resolver or full execution chain is wired.
+> Version: 0.54 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -535,7 +535,7 @@ AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 
 
 ## 6.32 Local Rust service source adaptation decision
 
-The user authorizes module-level reference and code reuse from local Rust projects after checking license, rights, exact source state, dependency closure, and implementation gaps. The current reusable candidate is a RustGameServer mTLS/client helper under Apache-2.0, with its plaintext opt-out removed and transport identity bound to Star authorization. Its Outbox methods settle by bare message ID and its producer timeout does not cover the PubAck future, so neither is copied as-is. AssetsLake's AGPL-3.0 event envelope may inform field naming, but its relay's dry-run/no-broker path marks rows published and cannot be used as durable delivery; copying its code still requires Star to meet license obligations or obtain separate rights. ROPE_CS is proprietary/internal-use and is excluded absent explicit rights-holder permission; Ada has an added prior-written-consent condition; CATs has conflicting root/license declarations and only Kafka stubs. No code from those excluded sources enters Star.
+The user authorizes module-level reference, adaptation and direct code reuse from local Rust projects after checking license, rights, exact source state, dependency closure, and implementation gaps. The RustGameServer mTLS/client helper under Apache-2.0 is one candidate, with its plaintext opt-out removed and transport identity bound to Star authorization. Its Outbox methods settle by bare message ID and its producer timeout does not cover the PubAck future, so neither is copied as-is. AssetsLake and other local services are also direct reuse candidates module by module. AGPL-3.0 does not bar commercial use; before copying or distributing a module, determine the actual linking/deployment/network-delivery model and satisfy its applicable source, notice and dependency obligations. AssetsLake's current dry-run/no-broker relay marks rows published without real Kafka delivery, so that relay is unsuitable as production transport even though independent envelope/types or other compliant modules remain candidates. ROPE_CS is proprietary/internal-use and is excluded absent explicit rights-holder permission; Ada has an added prior-written-consent condition; CATs has conflicting root/license declarations and only Kafka stubs. No code from those excluded sources enters Star.
 
 Native replacement remains a Star-owned durable transport service with authenticated append/pull/ack, immutable log identity/cursor, tenant isolation, owner commit-before-ack, durable quarantine/replay, bounded memory/backpressure, and restart/failure proof. NATS stays behind the provider port until a native provider passes the same contract and deployment gates. See `DD-RUST-SERVER-REUSE-001.md` for exact source heads, permitted evidence, and hashes. The implementation worktree remains subject to the two-Multipass-instance test cap and no-Docker-Desktop policy.
 
@@ -582,3 +582,23 @@ Rust 1.98.1 diagnostic checks passed for 22/22 default-feature `platform-messagi
 |---|---|---|---|
 | 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Add profile-pinned claim/retry and provider-neutral durable receipt v2; record unverified PostgreSQL migration and pending native provider |
 | 0.53 | 2026-10-12 | Ulysses — Mavis接手审核 | Record 22/22 tests, no-default dependency-tree evidence, Clippy toolchain blocker and unapplied migration status |
+
+## D16 — Provider-neutral admission poison quarantine
+
+`PgAdmissionReceiveQuarantine` implements `AdmissionReceiveQuarantine` without depending on JetStream types. The trusted deployment ID comes from process composition; tenant scope comes from the already-verified `AdmissionReceiveOrigin`. A local PostgreSQL transaction sets `star_platform_ingress_owner`, deployment RLS scope and tenant RLS scope, then appends one immutable receipt. The idempotency key is `(deployment_id, provider_identity, log_generation, log_id, sequence)`; exact replay requires the same tenant, sender/recipient, message kind/ID, fault version, byte length and SHA-256. A hidden cross-tenant collision or any changed evidence returns the same fail-closed quarantine error.
+
+The receipt stores only route/source/fault metadata and SHA-256 of the exact source wire, up to the transport bound of 20 KiB. It does not retain malformed payload bytes, so this slice provides durable quarantine evidence but not a replay-body archive. The receiver still verifies source authorization before and after the receipt commit and only then asks the transport for terminal disposition. Database errors, uncertain commit, source revocation, missing provider or failed terminal disposition leave the delivery unconfirmed.
+
+### Database migration
+
+`2026-10-12-admission-receive-quarantine.sql` adds one append-only Transaction table with deployment and tenant FORCE RLS. `star_platform_ingress_owner` receives SELECT/INSERT only; UPDATE/DELETE/TRUNCATE are rejected by the shared append-only trigger. It does not add Work or Master rows, does not change the existing JetStream-specific `poison_quarantine_*` schema, and does not persist untrusted payload contents.
+
+The standalone `durable-quarantine` Cargo feature includes the PostgreSQL adapter without enabling `async-nats`; `jetstream-adapter` enables it for the existing default path. This is a crate-level feature boundary only. Full application dependency isolation, live SQL migration/grant/RLS tests, production source verifier/composition, retained encrypted replay, durable ACK-loss recovery, native server, and BI/Benchmark integration remain open.
+
+Rust 1.98.1 diagnostic evidence: `platform-messaging-runtime` no-default + durable-quarantine library tests 16/16, all-targets check passed, and the `run-owner-runtime` Schedule admission PostgreSQL test target compiled. The same feature dependency tree excludes `async-nats`. These commands used `--ignore-rust-version`; the workspace minimum remains Rust 1.99.0. The PG runner could not execute because the selected PostgreSQL installation lacks `initdb.exe`, `pg_ctl.exe`, and `psql.exe`. Do not claim the migration or durable DB behavior passed until the isolated runner completes.
+
+D16 relies on Star's existing Rust-owned PostgreSQL receipt semantics and copies no external source module. The next native provider phase may directly adapt any suitable, user-owned Rust module after checking the exact source file and dependency hashes; it must preserve owner-local transactions, RLS, idempotency, cancellation, bounded memory and the provider-neutral transport contract. AGPL commercial-use obligations are a compliance task, not a categorical reason to reject a useful module.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.54 | 2026-10-12 | Ulysses — Mavis接手审核 | Add provider-neutral PostgreSQL quarantine writer, tenant-scoped idempotency and no-NATS Cargo feature; record unverified migration/runtime behavior |

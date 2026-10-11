@@ -1,6 +1,6 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v0.5 · 2026-10-12 · Ulysses — Mavis 接手审核
+> v0.7 · 2026-10-12 · Ulysses — Mavis 接手审核
 > 状态：已完成有界来源/许可审查和模块选择；未迁移源码，未实现 native transport provider。
 
 ## 1. 范围与证据
@@ -9,7 +9,7 @@
 
 | 来源 | 当前 HEAD / 工作区 | 许可证与实际实现 | 决定 |
 |---|---|---|
-| `E:/AssetsLake` | `0156aca56c0d7364120d7389ebe1ccf0cb64b750`；17 个脏文件 | 根 LICENSE 为 AGPL-3.0。目标 `event_publisher_service.rs` 的 SHA-256 与本表一致；它有 envelope/outbox 字段，但当前 relay 无 Kafka client，dry-run 或未配置 broker 时会标记 published，且 stage 独立使用 pool，不能证明与业务写入同事务 | 仅参考事件字段；不直接复制。若以后引入源代码，须完成 AGPL 对 Star 分发/网络使用的履约与许可证兼容审查，或先取得单独授权 |
+| `E:/AssetsLake` | `0156aca56c0d7364120d7389ebe1ccf0cb64b750`；17 个脏文件 | 根 LICENSE 为 AGPL-3.0。目标 `event_publisher_service.rs` 的 SHA-256 与本表一致；它有 envelope/outbox 字段，但当前 relay 无 Kafka client，dry-run 或未配置 broker 时会标记 published，且 stage 独立使用 pool，不能证明与业务写入同事务 | 按模块允许参考、适配或直接复用；AGPL-3.0 不禁止商业使用，但需按具体链接/部署/网络提供方式履行源码、NOTICE 等义务并核验完整依赖闭包。该 relay 本身因未真实投递而不作为生产 transport；D16 未复制源码，因为本阶段只需 Star-owned PG receipt |
 | `D:/RustGameServer` | `89458d887e8bfddf6637f9d80ea65f2091e8b6f2`；干净 | Apache-2.0。已核对的 channel/outbox/relay/producer 文件 SHA-256 与下表一致。它是 gRPC 游戏服务端；channel 模块是 mTLS 客户端构造器，不是消息 broker | 唯一当前许可清晰的模块级代码候选；可适配 mTLS/超时/指标模式。须移除明文 opt-out，并修正 owner lease fence 与完整 ack deadline 后才能接入 |
 | `E:/ROPE_CS` | `3f4e54c595f3c486fd895b1a1456727b08931f86`；138 个脏文件 | `server/rope_server/LICENSE` 声明 proprietary/internal use，并禁止再分发或公开部署，除非获得 Say Co., Ltd. 明确许可 | 排除代码复制、改编和部署；先前候选结论由本版撤销。后续只有权利人明确书面授权后才能重新评估 |
 
@@ -47,7 +47,7 @@ AssetsLake、RustGameServer、Ada、CATs、GitGit、Physis 未发现 `.codegraph
 
 ## 3. 目标接入架构
 
-复用以独立模块为单位；用户授权本机 Rust 服务端可作为直接复用/适配来源，但逐项审查许可证、权属、源状态、依赖闭包和实现缺口仍是门槛。RustGameServer 的 Apache-2.0 通道代码是当前最明确的直接适配候选，但须删除明文 opt-out；AssetsLake 提供 envelope 字段参考，源代码只有在 Star 满足 AGPL/Star 许可证兼容要求或取得单独授权后才可迁移。ROPE_CS、Ada 与许可冲突的 CATs 不得进入构建或部署。现有 `PlatformPoisonQuarantine` 持久化实现被 `jetstream-adapter` feature 限定且接收 NATS `Message`/JetStream source identity；它可作为后续存储语义的实现参考。新的 provider-neutral receive origin 明确携带可信 `log_generation`，JetStream adapter 从受信配置固定该代次；该 port 尚未接到 durable writer，不得据此宣称通用 poison store 已上线。RustGameServer 本身不是通用消息 broker，Star 仍需实现自己的 Rust transport service。保持现有 `AdmissionTransport` 与 owner-local Outbox/Inbox；native 服务端仅拥有自身 transport persistence，不拥有 Schedule/Run 的业务写权限。不得跨 owner 共享写事务。
+复用以独立模块为单位；用户授权本机 Rust 服务端可作为直接复用/适配来源，逐项审查许可证、权属、源状态、依赖闭包和实现缺口仍是门槛。RustGameServer 的 Apache-2.0 通道代码是当前最明确的直接适配候选，但须删除明文 opt-out；AssetsLake 模块同样可以直接评估和复用，AGPL-3.0 本身不禁止商业使用，需按具体交付方式履行许可证义务并审查完整依赖闭包。AssetsLake 当前 relay 未真实投递且不能证明与业务写入同事务，所以它不是生产 transport；可复用的 envelope 或独立模块仍按源文件/依赖逐项选择。ROPE_CS、Ada 与许可冲突的 CATs 不得进入构建或部署。现有 `PlatformPoisonQuarantine` 保持 JetStream `Message`/source identity 专用；D16 新增独立 `PgAdmissionReceiveQuarantine`，通过 `durable-quarantine` feature 写入 provider-neutral、deployment/tenant RLS 保护的 metadata-only Transaction 收据。它复用 Star 自有 PostgreSQL owner-role、幂等和 WORM 机制，不从本机候选项目拷入消息逻辑，因为这段存储语义已由 Star 当前契约直接规定。来源 port 尚未接入生产 source verifier/composition，也不保留可重放原始 payload；不能据此宣称 native transport 或完整 poison recovery 上线。RustGameServer 本身不是通用消息 broker，Star 仍需实现自己的 Rust transport service。保持现有 `AdmissionTransport` 与 owner-local Outbox/Inbox；native 服务端仅拥有自身 transport persistence，不拥有 Schedule/Run 的业务写权限。不得跨 owner 共享写事务。
 
 版本化 TransportProfile 固定 provider/version/digest、endpoint/server identity、协议与权限范围。发布确认必须来自已持久化的日志及有效 receipt；接收确认必须晚于目标 owner 的 Inbox 与业务结果提交。确认丢失后以稳定 message identity 重放，不能重新执行业务副作用。provider cursor 不跨端点/generation 混用；不能为 native server 强制模拟 JetStream。
 
@@ -59,9 +59,9 @@ Multipass/K3s 和最多两个测试 inventory 实例约束不变；本轮没有�
 
 ## 4. 实施顺序和验收
 
-1. 完成 D14 接收闭环：broker-neutral durable quarantine/recovery、ACK 丢失后的幂等恢复、生产身份与授权复验、撤权/取消和 poison redelivery；测试授权 fixture 不替代生产身份提供器。
+1. D16 已加入 broker-neutral metadata receipt writer；继续完成 D14 接收闭环：生产 source identity/composition、source 授权复验、poison terminal disposition/redelivery 与 ACK 丢失后的幂等恢复。测试授权 fixture 不替代生产身份提供器；如需保留原始 wire replay，另需通过显式加密 retention/KMS 设计。
 2. 原生 server provider：按 Apache-2.0 要求从 RustGameServer 独立适配符合条件的 mTLS/client helper；补 authenticated durable append/pull/ack、租户隔离、重启恢复和持久化故障证明，执行同一 transport 契约套件。不得导入其游戏业务域、NATS producer 或未带 owner fence 的 Outbox 更新。
-3. provider 依赖隔离（部分完成）：`platform-messaging-runtime` 的 Cargo feature seam 已实现并通过 no-default package check；完整应用依赖闭包和 portable quarantine 仍待实现/核验。native 构建闭包最终不得要求 NATS，业务 ABI 和 owner 数据事实保持稳定。
+3. provider 依赖隔离（部分完成）：`jetstream-adapter` 已可与 `durable-quarantine` 分开构建；D16 的 no-default + durable-quarantine 包级依赖不引入 NATS。完整应用依赖闭包、capacity-result poison/quarantine 与生产装配仍待实现/核验。native 构建闭包最终不得要求 NATS，业务 ABI 和 owner 数据事实保持稳定。
 4. 故障/性能与商业分发验收：完整 ack deadline、租约接管 fence、容量拒绝、取消 drain、恢复后 cursor、资源/标签基数与并行公平性；生成实际分发闭包 SBOM/NOTICE。未通过前不得宣称原生服务器替换完成或任务执行可用。
 
 v0.2 审查只更新了设计与来源证据，没有新增运行时实现/测试通过声明；D13 已有验证不能代替 D14/native server 验收。v0.3 的 Cargo feature seam 属于后续独立实施增量。
@@ -70,7 +70,7 @@ v0.2 审查只更新了设计与来源证据，没有新增运行时实现/测�
 
 `platform-messaging-runtime` now has an optional `jetstream-adapter` feature, default-enabled for compatibility. JetStream publisher/receiver modules and JetStream-specific quarantine are gated by that feature; the provider-neutral admission ports remain available in a package build with `--no-default-features`. Rust 1.99.0 package checks passed with and without the default feature, the no-default dependency tree excludes `async-nats`, and package format check passed. The default build reports three deprecation warnings in unmodified `domain-kms`.
 
-This only establishes a crate-level compile seam. The NATS feature is still the default, other application crates may still pull NATS, and there is no native server provider or portable quarantine implementation yet. Do not remove the default adapter or claim replacement until the full application dependency closure and native provider contract are verified.
+This establishes crate-level compile seams only. The NATS feature is still default-enabled, other application crates may still pull NATS, and there is no native server provider. D16 supplies an admission poison metadata receipt, but not capacity-result quarantine, encrypted replay body retention, production source verification/composition or ACK-loss recovery. Do not remove the default adapter or claim replacement until the full application dependency closure and native provider contract are verified.
 
 ## 6. 修订历史
 
@@ -81,3 +81,5 @@ This only establishes a crate-level compile seam. The NATS feature is still the 
 | v0.3 | 2026-10-12 | Ulysses — Mavis 接手审核 | 实装 JetStream Cargo feature 隔离并记录 crate 级 no-default 构建证据及剩余 native/quarantine 缺口 |
 | v0.4 | 2026-10-12 | Ulysses — Mavis 接手审核 | 明确技术模块复用授权与业务域隔离边界；区分 JetStream-specific poison store 与新 provider-neutral receive quarantine port，并保留未接线缺口 |
 | v0.5 | 2026-10-12 | Ulysses — Mavis 接手审核 | 在通用来源身份中固定日志 generation，并明确 JetStream adapter 从可信配置接收该代次 |
+| v0.6 | 2026-10-12 | Ulysses — Mavis 接手审核 | Add D16 metadata-only PostgreSQL quarantine and standalone no-NATS feature; separate implemented receipt persistence from production wiring and encrypted replay gaps |
+| v0.7 | 2026-10-12 | Ulysses — Mavis 接手审核 | Clarify that AssetsLake and other local Rust modules may be directly reused after module-level license/ownership/dependency review; AGPL is not a commercial-use ban, while the current dry-run relay remains unsuitable as production transport |

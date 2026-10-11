@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=72fbf8bc66d7ec4aef871ecf569b360cca1c4ff92d8f4cb5215c3ad3ec2db83c
+@cypher schema=1 source_sha256=905a5d55131e41ffdc8a2cd8b4f039d21b7304f3a40873c9eb516b0e419c1147
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -131,15 +131,20 @@ MERGE (schedule_fence)-[:READS]->(schedule_delivery_receipt:Table {id:"automatio
 MERGE (delivery_test)-[:READS]->(schedule_delivery_receipt)
 MERGE (delivery_test)-[:READS]->(run_delivery_receipt:Table {id:"multica.admission_message_delivery_receipt"})
 MERGE (d14_receive_fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::receive_admission_broker_fixture",kind:"function"})
+MERGE (d14_quarantine_test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_admission_quarantine",kind:"function"})
 MERGE (d14_auth_fixture:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionAuthorizationFixture",kind:"struct"})
 MERGE (d14_verify_fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionAuthorizationFixture::verify",kind:"method"})
 MERGE (d14_positive:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_schedule_confirmation",kind:"function"})
 MERGE (self)-[:DEFINES]->(d14_receive_fixture)
+MERGE (self)-[:DEFINES]->(d14_quarantine_test)
 MERGE (self)-[:DEFINES]->(d14_auth_fixture)
 MERGE (self)-[:DEFINES]->(d14_verify_fixture)
 MERGE (d14_positive)-[:CALLS]->(d14_receive_fixture)
 MERGE (d14_receive_fixture)-[:TESTS]->(d14_consume:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver::consume_one",kind:"method"})
 MERGE (d14_receive_fixture)-[:CALLS]->(d14_consume)
+MERGE (test)-[:CALLS]->(d14_quarantine_test)
+MERGE (d14_quarantine_test)-[:USES_TYPE]->(quarantine_store:Type {id:"platform_messaging_runtime::PgAdmissionReceiveQuarantine",kind:"struct"})
+MERGE (d14_quarantine_test)-[:WRITES]->(quarantine_receipt:Table {id:"platform_messaging.admission_receive_quarantine_receipt"})
 MERGE (d14_auth_fixture)-[:IMPLEMENTS]->(d14_auth:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization",kind:"trait"})
 MERGE (d14_receive_fixture)-[:CALLS]->(d14_transport_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionReceiveTransport::new",kind:"method"})
 @endcypher
@@ -167,6 +172,7 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
         .max_connections(2)
         .connect(&url)
         .await?;
+    verify_admission_quarantine(&admin).await?;
     sqlx::raw_sql(
         "CREATE ROLE star_admission_test_login LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS;
         GRANT star_multica_run_owner TO star_admission_test_login;
@@ -883,6 +889,97 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
     assert_eq!(final_count, 1);
     pool.close().await;
     admin.close().await;
+    Ok(())
+}
+
+async fn verify_admission_quarantine(
+    admin: &sqlx::PgPool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use platform_messaging_runtime::admission_receive::{
+        AdmissionReceiveError, AdmissionReceiveKind, AdmissionReceiveOrigin,
+        AdmissionReceivePoisonFault, AdmissionReceiveQuarantine, AdmissionReceiveScope,
+    };
+    use platform_messaging_runtime::admission_quarantine_pg::PgAdmissionReceiveQuarantine;
+
+    sqlx::raw_sql(
+        "CREATE ROLE star_platform_ingress_test_login LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS;
+        GRANT star_platform_ingress_owner TO star_platform_ingress_test_login;
+        ALTER ROLE star_platform_ingress_test_login SET statement_timeout = '10s';",
+    )
+    .execute(admin)
+    .await?;
+    let options: PgConnectOptions = std::env::var("STAR_RUN_OWNER_TEST_DATABASE_URL")?.parse()?;
+    let pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(options.username("star_platform_ingress_test_login"))
+        .await?;
+    let deployment_id = Uuid::new_v4();
+    assert!(PgAdmissionReceiveQuarantine::new(pool.clone(), Uuid::nil()).is_err());
+    let quarantine = PgAdmissionReceiveQuarantine::new(pool.clone(), deployment_id)?;
+    let origin = AdmissionReceiveOrigin {
+        scope: AdmissionReceiveScope {
+            tenant_id: Uuid::new_v4(),
+            sender_service_id: Uuid::new_v4(),
+            recipient_service_id: Uuid::new_v4(),
+            kind: AdmissionReceiveKind::Request,
+        },
+        message_id: Uuid::nil(),
+        provider_identity: "nats-jetstream/v1".to_owned(),
+        log_id: "SCHEDULE_REQUESTS".to_owned(),
+        log_generation: Uuid::new_v4(),
+        sequence: 7,
+    };
+    let wire = b"{malformed";
+    quarantine
+        .record(&origin, wire, AdmissionReceivePoisonFault::MalformedWire)
+        .await?;
+    quarantine
+        .record(&origin, wire, AdmissionReceivePoisonFault::MalformedWire)
+        .await?;
+    assert!(matches!(
+        quarantine
+            .record(&origin, b"different exact wire", AdmissionReceivePoisonFault::MalformedWire)
+            .await,
+        Err(AdmissionReceiveError::Quarantine)
+    ));
+    let mut changed_fault = origin.clone();
+    changed_fault.message_id = Uuid::new_v4();
+    assert!(matches!(
+        quarantine
+            .record(
+                &changed_fault,
+                wire,
+                AdmissionReceivePoisonFault::IdentityMismatch,
+            )
+            .await,
+        Err(AdmissionReceiveError::Quarantine)
+    ));
+    let mut other_provider = origin.clone();
+    other_provider.provider_identity = "star-rust-log/v1".to_owned();
+    other_provider.message_id = Uuid::new_v4();
+    quarantine
+        .record(
+            &other_provider,
+            b"other provider source",
+            AdmissionReceivePoisonFault::MalformedWire,
+        )
+        .await?;
+    let mut cross_tenant = origin.clone();
+    cross_tenant.scope.tenant_id = Uuid::new_v4();
+    assert!(matches!(
+        quarantine
+            .record(&cross_tenant, wire, AdmissionReceivePoisonFault::MalformedWire)
+            .await,
+        Err(AdmissionReceiveError::Quarantine)
+    ));
+    let receipts: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM platform_messaging.admission_receive_quarantine_receipt WHERE deployment_id=$1",
+    )
+    .bind(deployment_id)
+    .fetch_one(admin)
+    .await?;
+    assert_eq!(receipts, 2, "exact replay adds no receipt; another provider has its own key");
+    pool.close().await;
     Ok(())
 }
 
