@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 The broker-neutral poison-quarantine port and failure-path fixtures pass targeted package checks/tests under Rust 1.98.1 with `--ignore-rust-version`; the required Rust 1.99.0 verification is unavailable on this host. Production identity, durable quarantine wiring/replay, native provider, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.51 | Date: 2026-10-12
+> Status: 🟡 D15 adds immutable profile pinning and provider-neutral v2 delivery proofs; 22/22 package unit tests, the no-default all-targets check and Run-owner integration target compilation passed under Rust 1.98.1 with `--ignore-rust-version`. The no-default dependency tree excludes `async-nats`. PostgreSQL migration/tests are blocked by missing server binaries, and Rust 1.99.0 is unavailable. Native provider, production profile resolver, durable quarantine/replay, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.53 | Date: 2026-10-12
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -418,9 +418,9 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 
 用户自有Rust服务器为最终替代方向，NATS仅为过渡transport adapter。`AdmissionTransport`接收owner、tenant、recipient、kind、message/request identity和原始wire；`AdmissionPublisher<T>`以静态派发调用该port，统一处理有界batch、超时、租约、取消、重试和owner receipt，核心不调用NATS API且不为每条消息装箱future。`JetStreamAdmissionTransport`独占subject、Nats-Msg-Id、expected-stream/domain、PubAck映射；兼容别名`AdmissionJetStreamPublisher`不作为产品领域模型。
 
-v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
+v1 D13/旧版 receipt 仅保存 durable log identity/cursor；新迁移将旧列保留为 `legacy_broker_*` 历史字段，并将新写入切到 v2 provider-neutral proof。每条 W delivery 在首次 claim 固定 provider/version/profile digest/endpoint identity；该 identity 在 retry/reclaim 时精确匹配，避免一条有歧义的消息跨 provider 重放。v2 T receipt 另存 profile、log ID、可信 log generation、opaque cursor 与原 wire SHA-256；cursor 只在同一 provider/profile/endpoint/generation 内解释。既不是 receiver Inbox 提交，也不是任务执行证据。JetStream subject、Nats-Msg-Id、stream/domain 与 PubAck 只存在 `JetStreamAdmissionTransport`，原生服务器无须实现 NATS ACK 语义。D15 代码和新 migration 已写入但尚未通过本机 PostgreSQL runner（缺少 `initdb`/`pg_ctl`/`psql`）；因此不能声称 schema/gates 已验收。当前仍无 native server adapter 或生产 profile resolver。
 
-Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的 `jetstream-adapter` feature 和 crate 级无默认 feature 构建缝隙；完整应用依赖闭包仍需按 provider 核验。现有 quarantine/capacity consumer 仍需抽出接收/确认/replay port，当前也不是已移除 NATS 的产品构建。
+Native 替换剩余实施：`platform-messaging-runtime` 已提供默认启用的 `jetstream-adapter` feature 和 crate 级无默认 feature 构建缝隙；完整应用依赖闭包仍需按 provider 核验。现有 quarantine/capacity consumer 仍需抽出接收/确认/replay port，旧领域事件仍有 NATS subject 命名，当前不是已移除 NATS 的产品构建。
 
 
 ## D14 接收实现增量
@@ -448,6 +448,22 @@ Selection evidence and per-file implementation gaps are maintained in `DD-RUST-S
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record Cargo provider boundary and bounded compile evidence |
 | 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the new receiver poison-quarantine port while preserving the missing durable-provider gap |
 | 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Pin trusted log generation in poison quarantine identity and idempotency key |
+
+
+## 6.34 Profile-pinned transport replacement design
+
+D15 verification addendum: `platform-messaging-runtime` has 22/22 unit tests passing; its no-default all-targets check and no-default dependency-tree isolation pass, with no `async-nats` in the tree. The Run-owner PostgreSQL target compiled but did not run. The migration remains unapplied because PostgreSQL server binaries are unavailable.
+
+Admission delivery has three layers. The business layer keeps the immutable typed wire and owner/kind/tenant/message identity. The owner Work queue pins a trusted transport profile on first claim and refuses claims under a different provider key, version, digest, or endpoint identity. The terminal Transaction receipt stores `receipt_version=2`, provider/profile/endpoint, log ID/generation, opaque cursor, and exact wire SHA-256. Existing v1 broker-specific receipt rows remain preserved as `receipt_version=1` legacy evidence with no guessed provider identity.
+
+`AdmissionTransportProfile` and `AdmissionTransportReceipt` are NATS-free Rust types. `AdmissionPublisher<T>` validates the receipt against the pinned claim and exact original wire before calling the owner-native settlement procedure. `JetStreamAdmissionTransport` alone maps the generic proof to a stream generation and big-endian sequence cursor; a future Star Rust provider may use another opaque cursor encoding while preserving the same owner/Outbox/Inbox contract. NATS remains the default compatibility feature until a versioned profile cutover passes the shared gate.
+
+Cutover order: resolve and freeze a versioned profile; keep existing profile workers available to drain or recover their pinned rows; enable the native provider for new profile-bound rows; verify durable replay, receiver commit-before-ack, quarantine/recovery, profile-mismatch behavior, bounded backpressure, restart and failure; compare BI facts; only then retire the JetStream feature and its other direct consumers. Do not compare cursors, NATS duplicate windows, or acknowledgements across providers. The current implementation has no production resolver, native provider, or portable capacity/quarantine receiver. The D15 PostgreSQL migration still needs live validation; default/no-default compilation does not prove it.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify profile-pinned delivery retries and provider-neutral durable receipt v2; retain DDL verification gap |
+| 0.53 | 2026-10-12 | Ulysses — Mavis接手审核 | Record focused tests, no-default dependency isolation, and unapplied migration status |
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|

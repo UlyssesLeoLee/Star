@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 The broker-neutral poison-quarantine port and failure-path fixtures pass targeted package checks/tests under Rust 1.98.1 with `--ignore-rust-version`; the required Rust 1.99.0 verification is unavailable on this host. Production identity, durable quarantine wiring/replay, native provider, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.51 | Date: 2026-10-12
+> Status: 🟡 D15 profile pinning and provider-neutral receipt v2 have 22/22 package unit tests passing, a no-default all-targets check, Run-owner integration target compilation, and a no-default dependency tree without `async-nats`, under Rust 1.98.1 with `--ignore-rust-version`. Strict Clippy did not complete because the selected compiler encountered incompatible cached Rust artifacts; Rust 1.99.0 is unavailable. PostgreSQL execution of the new migration is blocked by missing server binaries. No native provider or production profile resolver is wired; D14 quarantine/replay and the full execution chain remain open.
+> Version: 0.53 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -554,3 +554,31 @@ This is a package boundary only. It does not assert that other application crate
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Add optional JetStream feature boundary and package-scoped no-default build result |
 | 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the provider-neutral receiver quarantine port and that it is not connected to durable storage |
+
+
+## 6.34 D15: immutable transport profile and receipt v2
+
+### Rust API
+
+`AdmissionTransportProfile` contains `provider_id` (lowercase key, ≤64 ASCII bytes), `provider_version` (≤64 ASCII bytes), `profile_digest` (32-byte SHA-256), and a non-secret stable `endpoint_identity` (≤128 ASCII bytes; URLs and credentials are rejected). Trusted composition constructs this value. `AdmissionDeliveryStore::claim` sends the profile to `claim_admission_delivery_v2`; the first successful claim stores it on the bounded owner Work row and returns the pinned snapshot. Every retry/reclaim filters for an exact profile match. A worker with a replacement profile cannot claim a row already assigned to the old provider.
+
+`AdmissionTransport` exposes its immutable profile. `AdmissionTransportReceipt` records that profile, `log_id`, trusted non-nil `log_generation`, an opaque cursor of 1–128 bytes, and the SHA-256 of the exact original wire. The publisher compares receipt profile to the claimed snapshot and independently hashes the claimed wire before settlement. The owner store repeats validation and invokes `settle_admission_delivery_v2`; only the native procedure may append a v2 terminal receipt when profile/endpoint match the claim. Retry/dead settlements carry no transport proof. This receipt proves provider durable acceptance only.
+
+### Database migration
+
+`2026-10-12-admission-transport-profile-receipts.sql` applies independently to `automation` and `multica`. It preserves old broker-specific columns under `legacy_broker_stream` / `legacy_broker_sequence` and existing v1 rows; it does not invent a provider/profile for historical data. New Work rows have nullable provider/version/digest/endpoint fields until first claim and a partial all-or-none identity constraint. New T rows add `receipt_version`, provider/profile/endpoint, log identity/generation, opaque cursor and wire hash. v2 delivered receipts require the complete provider-neutral proof; legacy v1 delivered evidence remains readable. Old unversioned claim/settle procedures are removed so new application instances cannot write unpinned receipts. Owner-local v2 functions keep tenant RLS and the existing least-privilege role pattern.
+
+### JetStream adapter mapping
+
+`JetStreamAdmissionTransport` requires explicit trusted stream generation and a `nats-jetstream` profile. On successful PubAck it maps stream name to `log_id`, stream generation to `log_generation`, the positive stream sequence to an 8-byte big-endian opaque cursor, and SHA-256 of the original wire to `payload_sha256`. No generic layer reads subjects, Nats-Msg-Id, expected stream/domain, PubAck, or ACK APIs. A future Star Rust provider may return its own cursor bytes while satisfying the same exact-wire proof. The Cargo `jetstream-adapter` remains default-enabled until a versioned cutover passes.
+
+### Cutover behavior and verification status
+
+Do not switch the adapter for rows already pinned to JetStream. Keep the legacy provider worker available to drain and recover them; new work can use a new profile after the trusted profile resolver binds it. Never compare cursor bytes, duplicate windows, or ACK semantics across providers. Retiring NATS requires the shared authenticated append/pull/ack, restart/dedupe, owner commit-before-ack, durable quarantine/replay, bounded queue/backpressure, cancellation/failure/performance and BI suite, plus a dependency inventory covering `platform-messaging-runtime`, `run-owner-runtime`, `infrastructure`, and legacy NATS-named domain event contracts.
+
+Rust 1.98.1 diagnostic checks passed for 22/22 default-feature `platform-messaging-runtime` unit tests, its no-default all-targets check, and compilation of the `run-owner-runtime` Schedule admission test target. The PostgreSQL target was compiled, not executed. `cargo tree --offline --locked -p platform-messaging-runtime --no-default-features` confirmed that `async-nats` is absent from this crate's no-default dependency tree. The PostgreSQL runner reports that `initdb.exe`, `pg_ctl.exe`, and `psql.exe` are unavailable under the selected PostgreSQL installation, so D15 schema/grant/RLS behavior remains unverified. Strict Clippy did not complete because the selected compiler rejected cached Rust artifacts built by a different version (E0514); no source-lint result is claimed. Rust 1.99.0 acceptance is also pending. No native provider or production profile resolver is implemented.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Add profile-pinned claim/retry and provider-neutral durable receipt v2; record unverified PostgreSQL migration and pending native provider |
+| 0.53 | 2026-10-12 | Ulysses — Mavis接手审核 | Record 22/22 tests, no-default dependency-tree evidence, Clippy toolchain blocker and unapplied migration status |
