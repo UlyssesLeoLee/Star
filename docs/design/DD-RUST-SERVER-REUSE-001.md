@@ -1,6 +1,6 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v0.7 · 2026-10-12 · Ulysses — Mavis 接手审核
+> v0.8 · 2026-10-12 · Ulysses — Mavis 接手审核
 > 状态：已完成有界来源/许可审查和模块选择；未迁移源码，未实现 native transport provider。
 
 ## 1. 范围与证据
@@ -72,7 +72,22 @@ v0.2 审查只更新了设计与来源证据，没有新增运行时实现/测�
 
 This establishes crate-level compile seams only. The NATS feature is still default-enabled, other application crates may still pull NATS, and there is no native server provider. D16 supplies an admission poison metadata receipt, but not capacity-result quarantine, encrypted replay body retention, production source verification/composition or ACK-loss recovery. Do not remove the default adapter or claim replacement until the full application dependency closure and native provider contract are verified.
 
-## 6. 修订历史
+## 6. 本机候选扩展评估（v0.8）
+
+本轮扩大有界扫描，新增审查本机 E:/CATEST、E:/OpenAIActixMCP、E:/SandTree 与 E:/CATLLM。这不是对全盘 Rust 仓库的穷尽审计。源仓库保持只读，工作区状态与目标文件 SHA-256 按本轮实测记录；没有运行这些源项目的测试。
+
+| 来源 | HEAD / 工作区 | 相关模块与证据 | 复用决策 |
+|---|---|---|---|
+| E:/CATEST | 03d9364f6880d42dcbb48164dd6ea99066daa667；干净 | AGPL-3.0。crates/stream-events/src/producer.rs SHA-256 78A06DF9EFDABC12E53B844AAA41896326AA0B5306EB1ED2B143108F275B9ED1；consumer.rs SHA-256 098EA862D616A0981E933A4FDDF21F92708F8569E6D027D9EB811E5D65C78A17。Producer 使用 rdkafka 0.36、acks=1、5 秒发送等待；consumer 打开 enable.auto.commit=true，handler 失败只记录日志。workspace 还启用 cmake-build/ssl-vendored | 可参考 typed event/envelope 和 Kafka adapter 的薄封装。当前 producer/consumer 不满足 Star 的 owner commit-before-ACK、持久化回执、exact replay 与租户授权契约；不作为 native server 或生产接收器直接复用。AGPL-3.0 不禁止商业使用，若复制/链接/分发/网络提供须按适用方式履行许可证义务并审查 rdkafka/librdkafka 依赖闭包 |
+| E:/OpenAIActixMCP | 0818cc6cdf0243288cc50804cea2e75b21f8621c；干净 | Unlicense/public-domain 授权。src/main.rs SHA-256 052BB1BED126EBF844EA37B6A0D9B028BFD662053AF2C223054465BB6A75B213。Actix + rmcp 0.8 Streamable HTTP MCP 示例，含可选 bearer token、TLS 与本地 session manager；实际工具是 echo/UTC | 可参考 MCP HTTP/TLS 装配，不是 durable message server。Star 已有 star-mcp，不得无具体缺口再复制完整 MCP 服务或引入第二套 session owner |
+| E:/SandTree | 940edc3a8110d6edffc6224f1dbf044b6259d2cf；14 个工作区改动 | workspace manifest 声明 MIT OR Apache-2.0，本轮可见根级 LICENSE 为 Apache-2.0。crates/ipc/src/transport.rs 当前 SHA-256 4477C390BD4C719DBBC16A89C6C960D9F50D9459A3605C8AFC87F4E684765CFE 且文件有未提交改动。它实现带 framing、按 SID 命名/ACL 的 Windows named-pipe 本地 IPC，不包含跨主机 durable log/cursor | 可作为 Star desktop/host 与隔离 helper/plugin worker 间本地 IPC 的参考候选；不能替代 NATS 或跨 VM/Run transport。若复用，先固定并审阅精确 worktree hash/差异、license 文件和完整依赖；当前 source worktree 不改动 |
+| E:/CATLLM | d4f06e1fedf56f42fa463d6be44b2d50f7cb2c5e；Cargo manifest、Rust crates、lock 与部署文件均未跟踪 | 根目录有 Apache-2.0 LICENSE；当前 crates/gateway/src/main.rs SHA-256 4A5DE949F5EE145BF1549511607F1F3CDF919E826C5052ACE10B77F26FE44C2F，使用 rskafka producer，但其源代码和 manifest 尚无可审查的 Git 基线 | 仅供当前文件级阅读参考；不复制、不进入 Star 构建，不宣称完成许可闭包或验证。形成可复现提交、锁定依赖/完整传递许可证并通过对应测试后再评估 |
+
+本轮结论：CATEST 与 AssetsLake 都有可参考的事件 envelope/producer 经验，但都没有可直接替换 NATS 的 Star-compatible durable server；CATEST consumer 的自动提交尤其不能用于 Star owner transaction。OpenAIActixMCP 与 SandTree 分别服务于 MCP HTTP endpoint 和本机进程 IPC，属于独立 app/runtime 边界的素材，不属于消息 broker。RustGameServer 的 mTLS client helper仍是候选小模块，但该游戏服务端本身也不是通用 broker。Star native provider 仍需拥有自己的认证身份、durable append/pull、owner-independent cursor receipt、重试/恢复、资源限额与故障契约。
+
+CodeGraph 未能提供这些来源仓库的索引覆盖审计；本节结论来自当前源码与 Git 状态的定向核对，不代表全盘审计或测试通过。
+
+## 7. 修订历史
 
 | 版本 | 日期 | 修订人 | 改动 / 触发 |
 |---|---|---|---|
@@ -83,3 +98,4 @@ This establishes crate-level compile seams only. The NATS feature is still defau
 | v0.5 | 2026-10-12 | Ulysses — Mavis 接手审核 | 在通用来源身份中固定日志 generation，并明确 JetStream adapter 从可信配置接收该代次 |
 | v0.6 | 2026-10-12 | Ulysses — Mavis 接手审核 | Add D16 metadata-only PostgreSQL quarantine and standalone no-NATS feature; separate implemented receipt persistence from production wiring and encrypted replay gaps |
 | v0.7 | 2026-10-12 | Ulysses — Mavis 接手审核 | Clarify that AssetsLake and other local Rust modules may be directly reused after module-level license/ownership/dependency review; AGPL is not a commercial-use ban, while the current dry-run relay remains unsuitable as production transport |
+| v0.8 | 2026-10-12 | Ulysses — Mavis 接手审核 | 新增 CATEST、OpenAIActixMCP、SandTree、CATLLM 的有界候选审查；记录 Kafka ACK/auto-commit 缺口及本地 IPC/MCP 边界，明确无可直接替换 NATS 的现成服务 | 用户授权参考复用本机 Rust 服务端 |

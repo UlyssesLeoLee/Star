@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.29 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.31
+> **文档版本**: v6.30 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.32
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5573,3 +5573,11 @@ Rust 1.98.1 `--ignore-rust-version` 诊断下 package 单测 16/16、该 feature
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.29 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D16 持久化 quarantine、验证限制与本机 Rust 模块复用/许可证策略 | 用户授权参考复用本机 Rust 服务端；D16 实施 |
+
+### 本机 Rust 服务端候选扩展（v6.30）
+
+候选审查新增 CATEST、OpenAIActixMCP、SandTree 与 CATLLM。CATEST 的 producer/consumer 可参考薄 Kafka adapter 和 typed event 组织方式，但 acks=1 与 consumer 自动提交会在业务 handler 失败时丢失重放机会；不得直接复用为 Star owner receiver。SandTree named-pipe 是 desktop/helper 的本地 IPC 候选，OpenAIActixMCP 是 MCP Streamable HTTP 示例，均不能承担跨 VM durable broker 语义。CATLLM 当前相关文件未进入 Git 基线，先不迁入。没有候选服务可直接替代 Star 的 durable message server；新 provider 继续由 Star 固定 authorization、租户隔离、幂等日志、提交后确认、cursor generation、恢复与资源预算。源仓状态、hash 和许可/闭包边界见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)，所有源仓保持只读。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.30 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展本机 Rust 服务候选并明确 CATEST auto-commit、SandTree local IPC 与 MCP sample 的适用边界 | 用户授权参考复用本机 Rust 服务端 |

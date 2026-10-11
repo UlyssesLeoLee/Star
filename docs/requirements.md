@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.31）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.32）
 
 ## 0. 文档说明与前提
 
@@ -3400,3 +3400,11 @@ Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.31 | 2026-10-12 | Ulysses — Mavis接手审核 | 新增 D16 持久化 quarantine 契约、Cargo 隔离和本机 Rust 模块可复用/许可证边界；准确记录未运行的 DB 与 Rust 1.99.0 门禁 | 用户明确授权参考复用 E:/AssetsLake 与本机 Rust 服务端；D16 实施 |
+
+### 本机 Rust 服务端候选扩展（v6.32）
+
+除 AssetsLake 与 RustGameServer，本轮定向审查了 CATEST、OpenAIActixMCP、SandTree 与 CATLLM。CATEST 的真实 Kafka producer/consumer 可供事件 adapter 参考，但 producer 仅配置 acks=1，consumer 开启自动 offset commit 且 handler 失败只记日志，因此不能直接承接 Star 的 durable owner commit-before-ACK。SandTree 是本地 Windows IPC 候选；OpenAIActixMCP 是 MCP Streamable HTTP 示例；CATLLM 相关 Rust 文件尚未跟踪，不能作为可复现实现基线。当前未发现可直接替换 NATS 的 Star-compatible durable Rust message server；允许按模块复用仍以实际 source hash、工作区、权属/许可证和完整依赖闭包审查为前提。准确证据与选择见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。源仓库未修改，本轮没有运行源项目测试或声明 native provider 已实现。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.32 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展本机 Rust 服务候选审查；区分事件、MCP、IPC 与 durable transport 能力 | 用户授权参考复用 E:/AssetsLake 与其它 Rust 服务端 |

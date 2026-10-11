@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.64**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.68**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -1991,3 +1991,16 @@ D15 收尾验证补充：Rust 1.98.1 诊断运行的 `platform-messaging-runtime
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.67 | 2026-10-12 | Ulysses — Mavis接手审核 | D16 持久化 admission quarantine 切片、Rust 模块复用策略及未执行的 PostgreSQL/Rust 1.99.0 门禁 | 用户授权复用本机 Rust 服务端；完成 D16 实施 |
+
+## 6.130 — 本机 Rust 服务端复用候选扩展
+
+**状态：🟡 有界源代码/许可证/工作区审查已完成；没有迁入源码、没有运行源项目测试、没有 native provider 完成声明。**
+
+新增候选审查见 [DD-RUST-SERVER-REUSE-001](../design/DD-RUST-SERVER-REUSE-001.md)。CATEST 是当前干净 AGPL-3.0 仓库，producer 配置 acks=1，consumer enable.auto.commit=true 且 handler 错误只写日志；只参考 typed event/薄 adapter 结构，不复制其消息确认行为。SandTree named-pipe 可评估为 desktop↔helper/plugin worker 本机 IPC，不能取代跨 VM durable broker。OpenAIActixMCP 提供 MCP HTTP/TLS 参考，不引入第二个 MCP session owner。CATLLM 的 Rust 文件尚未跟踪；仅作阅读参考，禁止把未固定依赖闭包的代码加入 Star。
+
+下一步仍先补齐 Star native server 的明确 owner：transport service 的独立持久化日志与 cursor generation、服务身份/授权、append/pull/settle、幂等重放、取消/drain、限额和 crash recovery；producer 与 receiver 共用契约测试。能复用的局部模块以精确 hash、源 diff、许可证/NOTICE 和分发闭包审查后再选择性接入。当前未改变 NATS 依赖闭包或 Multipass/K3s 部署拓扑；未通过 native persistence、ack-loss、恢复、并行/背压、内存及商业分发验收前，NATS 不能移除，执行仍 fail closed。
+
+自动化档：[M]（R/V）；本轮仅文档与来源审查，没有触发 build/test。
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.68 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展 CATEST、OpenAIActixMCP、SandTree、CATLLM 来源核验并确定后续 native provider 仍需 Star-owned durable semantics | 用户授权参考复用本机 Rust 服务端 |

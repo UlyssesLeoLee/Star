@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.79**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.80**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -976,3 +976,11 @@ Rust 1.98.1 `--ignore-rust-version` 下 feature package tests 16/16、all-target
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v4.79 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 provider-neutral quarantine 与本机 Rust 模块直接复用/许可边界；保留未通过的数据库和产品运行门 | D16 实现及用户明确复用反馈 |
+
+### 本机 Rust 服务端候选扩展（v4.80）
+
+候选审查新增 CATEST、OpenAIActixMCP、SandTree 与 CATLLM。CATEST 当前 consumer 开启 Kafka auto commit，handler 错误仅记录日志，不满足 owner commit-before-ACK；SandTree named-pipe 只适用于本机隔离 helper/plugin IPC；OpenAIActixMCP 仅是 MCP Streamable HTTP 示例；CATLLM 相关源仍未进入 Git 基线。它们可按模块提供参考或复用候选，但没有一个可直接替代 NATS 的 durable message server。Star-owned provider 的日志持久化、授权、幂等、恢复与限额契约保持不变。精确来源状态、hash、许可证和未验证项见 [DD-RUST-SERVER-REUSE-001](DD-RUST-SERVER-REUSE-001.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v4.80 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展 Rust 服务来源审查并区分消息、MCP 与本机 IPC 能力 | 用户授权参考复用本机 Rust 服务端 |
