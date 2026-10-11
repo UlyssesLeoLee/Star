@@ -1,6 +1,6 @@
 # PHASE-9F4C-D17-TRANSPORT-PROFILE-REPORT
 
-> v0.2 · 2026-10-12 · Ulysses — Mavis 接手审核
+> v0.3 · 2026-10-12 · Ulysses — Mavis 接手审核
 > 状态：Transport Profile Master、revision publisher 与 uncached resolver 首片已实现；disposable PostgreSQL/SQLx gate 通过。D17 整体、native transport、Schedule/Run execution 和 Rust 1.99.0 正式工具链门仍开放。
 
 ## §0 目的
@@ -52,7 +52,7 @@
 
 ## §4 子代理失败接手清单
 
-本 D17 切片没有新派发子代理；无失败 RPC、遗失 worker patch 或待接手 branch。改动保持在隔离 worktree `codex/phase9f4c-admission-quarantine`，尚未提交/合并前不得将它描述为已进入 `dev`。本机来源仓 `E:/AssetsLake` 保持只读，D17 仅适配字段语义，没有源代码复制。
+本 D17 切片没有新派发子代理；无失败 RPC、遗失 worker patch 或待接手 branch。实现提交 `7ef61ee1` 在隔离 worktree `codex/phase9f4c-admission-quarantine` 完成审查，并已 fast-forward 集成到本地 `dev`；本报告只记录这笔定向集成，不代表其他本地分支已收敛。本机来源仓 `E:/AssetsLake` 保持只读，D17 仅适配字段语义，没有源代码复制。
 
 ## §5 守门规则
 
@@ -90,3 +90,4 @@
 |---|---|---|---|
 | v0.1 | 2026-10-12 | Ulysses — Mavis 接手审核 | 记录 D17 Transport Profile Master/resolver、AssetsLake metadata 适配、验证证据和生产闭环缺口。 |
 | v0.2 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 自审修正 Rust 与 PostgreSQL 标识字段首字符验证差异；复跑 default 27 项、durable-quarantine 21 项 crate unit tests、两种 all-target 配置及 71 步 disposable PostgreSQL/SQLx 验收，更新审计路径与文件扫描数。 |
+| v0.3 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录实现提交 `7ef61ee1` 已定向 fast-forward 到本地 `dev`；保留其他分支与 worktree 状态。 |
