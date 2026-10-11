@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.46 (2026-10-10)
+> **文档版本**: v2.47 (2026-10-12)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3039,3 +3039,15 @@ Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v2.46 | 2026-10-11 | Ulysses — Mavis接手审核 | Add §4.86 for bounded admission receive and owner commit-before-ACK integration. | D14 receiver implementation. |
+
+### 4.87 Phase 9F4C-D16 admission quarantine runner correction
+
+**自动化档：[P]** — `scripts/automation/phase9f4d_run_owner_consumer.py` must load `2026-10-12-admission-transport-profile-receipts.sql` before D16 SQLx admission tests, reapply both D16 quarantine migrations, and apply the D15 transport-profile migration twice. This protects the admission delivery function prerequisite and migration idempotency checks. Run `--schema-only --admission-tests` against disposable PostgreSQL 18.6; do not create Multipass instances.
+
+The first SQLx attempt failed with SQLSTATE 42883 because the disposable migration set omitted the D15 function migration. After correction, the final run passed 68/68 steps, including the SQLx `admission_receipt_replay_conflict_rollback_and_scope` test (1/1), both D16 quarantine migration reapplications, D15 migration double-apply, schema/RLS/WORM assertions, and PostgreSQL stop/data-directory removal. Final audit: `target/phase9f4d-run-owner-consumer/0f8b23cf-1901-4a76-804b-50123914320c/audit.jsonl`; initial failure: `target/phase9f4d-run-owner-consumer/2856e5d7-6b77-4cbc-94f9-8591f04036c7/audit.jsonl`.
+
+Cargo invoked local Rust 1.98.1 with `--ignore-rust-version` through a diagnostic shim. This is not Rust 1.99.0 acceptance; production roles/identity, receiver composition, native provider, recovery, BI/Benchmark, full execution, or workspace/release/doc/bench/performance gates remain open. The registry entry is `scripts/automation/registry.md` v0.94.
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.47 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.87 for D16 prerequisite migration repair, migration replay/idempotency checks, SQLx execution and exact audit evidence; keep Rust 1.99.0 and production gates open. | D16 PostgreSQL/SQLx runner correction |

@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D16 adds a PostgreSQL-backed provider-neutral metadata quarantine writer and standalone Cargo feature. The 16/16 package tests, no-NATS feature all-targets check and Run-owner SQLx target compilation pass under Rust 1.98.1 with `--ignore-rust-version`; PostgreSQL 18.6 disposable schema-only migration, RLS, role-grant and integrity-trigger assertions now pass. Rust 1.99.0 acceptance, SQLx transaction execution, production verifier/composition, encrypted replay body, native provider/profile resolver and full execution chain remain open.
-> Version: 0.55 | Date: 2026-10-12
+> Status: 🟡 D16 adds a PostgreSQL-backed provider-neutral metadata quarantine writer and standalone Cargo feature. The 16/16 package tests, no-NATS feature all-targets check and Run-owner SQLx target compile pass under Rust 1.98.1 with `--ignore-rust-version`; the disposable PostgreSQL 18.6 schema gate passes, D16 quarantine migrations reapply successfully, the D15 transport-profile migration applies twice, and the admission receipt SQLx transaction test passes 1/1. Rust 1.99.0 acceptance, production verifier/composition, encrypted replay body, native provider/profile resolver and full execution chain remain open.
+> Version: 0.56 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -605,3 +605,4 @@ D16 relies on Star's existing Rust-owned PostgreSQL receipt semantics and copies
 |---|---|---|---|
 | 0.54 | 2026-10-12 | Ulysses — Mavis接手审核 | Add provider-neutral PostgreSQL quarantine writer, tenant-scoped idempotency and no-NATS Cargo feature; record unverified migration/runtime behavior |
 | 0.55 | 2026-10-12 | Ulysses — Mavis接手审核 | Record PostgreSQL 18.6 disposable schema-only migration/RLS/grants/WORM assertions passing; disclose D16 migrations were applied once only; retain Rust 1.99.0, SQLx transaction and production integration gates |
+| 0.56 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the missing D15 prerequisite migration found by SQLx, the corrected 68-step disposable runner, D16 migration reapplication, D15 double-apply and 1/1 receipt SQLx result; retain Rust 1.99.0 and production gates |

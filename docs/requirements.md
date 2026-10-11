@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.33）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.34）
 
 ## 0. 文档说明与前提
 
@@ -3416,3 +3416,13 @@ PostgreSQL 18.6 disposable `schema-only` runner 已应用完整 migration chain�
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.33 | 2026-10-12 | Ulysses — Mavis接手审核 | 补记 D16 migration 与 PostgreSQL 18.6 disposable schema gate 通过；明确本次未重跑 D16 migrations、SQLx、Rust 1.99.0 和生产接线仍开放 | 修复 9F4D D16 quarantine trigger assertion 后重跑隔离 runner |
+
+### D16 验证与 runner 依赖修正（v6.34）
+
+首次执行 D16 SQLx admission 场景时，隔离数据库缺少定义 `automation.claim_admission_delivery_v2(...)` 的 D15 transport-profile migration，PostgreSQL 返回 SQLSTATE `42883`。runner 已纳入该 migration，并在 schema gate 后重跑两份 quarantine migration 及两次应用 D15 migration。修正后 PostgreSQL 18.6 disposable runner 68/68 steps 通过；SQLx `admission_receipt_replay_conflict_rollback_and_scope` 1/1 通过，D16 两份 migration 重跑与 D15 migration 双次应用均通过。首次失败审计为 `target/phase9f4d-run-owner-consumer/2856e5d7-6b77-4cbc-94f9-8591f04036c7/audit.jsonl`，最终审计为 `target/phase9f4d-run-owner-consumer/0f8b23cf-1901-4a76-804b-50123914320c/audit.jsonl`。
+
+Cargo SQLx 运行使用本机 Rust 1.98.1 诊断 shim 注入 `--ignore-rust-version`，不替代 workspace 要求的 Rust 1.99.0 正式验收。临时 PostgreSQL 已停止且数据目录已移除；Multipass inventory 未创建或修改。生产身份/grants、source verifier/receiver composition、terminal recovery、BI/Benchmark、native Rust provider 与完整执行闭环仍未验收。可参考或复用 `E:/AssetsLake` 和其它本机 Rust 服务的适用独立模块；每次迁入仍核对源状态、精确 hash、权属/许可证、依赖闭包和 Star 语义边界，不能把当前 dry-run relay 当成生产投递实现。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.34 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D16 SQLx runner 缺失 D15 prerequisite 的发现与修复、68/68 runner 和 1/1 SQLx 结果；保留 Rust 1.99.0 及生产集成缺口 | 首次 SQLx 执行发现 prerequisite migration 未加载，修复后重跑通过 |

@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=1e755f89ec48e20b8335b361b852f4ab07aa68f93c89de31079d8b7a7403d6fd
+# @cypher schema=1 source_sha256=df20264a407dbf4912eaf66e05566ac3b8aece3dd142788f8e1e0dc676a1ae18
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -16,6 +16,7 @@
 # MERGE (consumer_test:Config {id:"crates/run-owner-runtime/tests/capacity_result_jetstream_pg.rs"})
 # MERGE (quarantine_migration:Config {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql"})
 # MERGE (admission_quarantine_migration:Config {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql"})
+# MERGE (transport_profile_migration:Config {id:"db/migrations/2026-10-12-admission-transport-profile-receipts.sql"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
 # MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
@@ -65,6 +66,7 @@
 # MERGE (main)-[:READS]->(migration)
 # MERGE (main)-[:READS]->(quarantine_migration)
 # MERGE (main)-[:READS]->(admission_quarantine_migration)
+# MERGE (main)-[:READS]->(transport_profile_migration)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
 # MERGE (main)-[:TESTS]->(admission_lifecycle_test)
@@ -140,6 +142,7 @@ SCHEDULE_COMPENSATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-o
 SCHEDULE_CONFIRMATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-schedule-confirmation.sql"
 SCHEDULE_HANDOFF_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-schedule-owner-admission-handoff.sql"
 ADMISSION_DELIVERY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-admission-owner-message-delivery.sql"
+ADMISSION_TRANSPORT_PROFILE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-admission-transport-profile-receipts.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -793,6 +796,7 @@ def main() -> int:
             SCHEDULE_CONFIRMATION_MIGRATION,
             SCHEDULE_HANDOFF_MIGRATION,
             ADMISSION_DELIVERY_MIGRATION,
+            ADMISSION_TRANSPORT_PROFILE_MIGRATION,
             RUN_BINDING_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
@@ -913,6 +917,14 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):
+            for migration in (
+                ROOT / "db" / "migrations" / "2026-10-08-platform-poison-quarantine.sql",
+                ROOT / "db" / "migrations" / "2026-10-12-admission-receive-quarantine.sql",
+            ):
+                results.append(run_sql(f"reapply-{migration.stem}", psql_base, migration.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results):
             lifecycle_sql = ADMISSION_LIFECYCLE_MIGRATION.read_text(encoding="utf-8")
             for attempt in (1, 2):
                 results.append(run_sql(f"admission-lifecycle-migration-apply-{attempt}", psql_base, lifecycle_sql, env))
@@ -978,6 +990,9 @@ def main() -> int:
                 if results[-1]["status"] != "passed":
                     break
                 results.append(run_sql(f"admission-delivery-migration-apply-{attempt}", psql_base, ADMISSION_DELIVERY_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
+                results.append(run_sql(f"admission-transport-profile-migration-apply-{attempt}", psql_base, ADMISSION_TRANSPORT_PROFILE_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
         if pg_started and all(item["status"] == "passed" for item in results):

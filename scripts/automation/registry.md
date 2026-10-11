@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.93 (2026-10-11)
+> **文档版本**: v0.94 (2026-10-12)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.45 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.47 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate, §4.87 D16 admission quarantine verification + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -699,3 +699,15 @@ Run scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --admission
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.93 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 broker receiver verification runner and fixture-identity boundary. | D14 receiver implementation. |
+
+## D16 — Admission quarantine schema and SQLx verification
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --admission-tests` using the configured disposable PostgreSQL 18.6 flow. The runner includes the D15 `admission-transport-profile-receipts` prerequisite, reapplies both D16 quarantine migrations, and applies the D15 migration twice. It does not create Multipass instances.
+
+Final verification: 68/68 runner steps; the D16 quarantine migration replay and D15 double-apply pass; `schedule-admission-postgres-sqlx-integration` passes 1/1 (`admission_receipt_replay_conflict_rollback_and_scope`). Local Rust 1.98.1 plus `--ignore-rust-version` is diagnostic only, not the Rust 1.99.0 formal gate. The temporary PostgreSQL was stopped and its data directory removed; inventory unchanged. Final audit: `target/phase9f4d-run-owner-consumer/0f8b23cf-1901-4a76-804b-50123914320c/audit.jsonl`. The first SQLx attempt exposed a missing D15 prerequisite (SQLSTATE 42883) and is recorded at `target/phase9f4d-run-owner-consumer/2856e5d7-6b77-4cbc-94f9-8591f04036c7/audit.jsonl`.
+
+This verifies the disposable schema and targeted receipt transaction only. Production identity/grants, source verifier and receiver composition, terminal recovery, native Rust provider, BI/Benchmark, full execution, Rust 1.99.0 and workspace/release/doc/bench/performance gates remain open. Details: `docs/reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md`; automation contract: `docs/automation-design.md` §4.87.
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v0.94 | 2026-10-12 | Ulysses — Mavis接手审核 | Index D16 prerequisite fix, quarantine migration replay, D15 double-apply, the 1/1 SQLx result and remaining formal/production gates. | Corrected D16 disposable PostgreSQL runner |

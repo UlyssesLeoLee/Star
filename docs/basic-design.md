@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.31 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.33
+> **文档版本**: v6.32 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.34
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5589,3 +5589,13 @@ PostgreSQL 18.6 disposable `schema-only` runner 已应用完整 migration chain�
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.31 | 2026-10-12 | Ulysses — Mavis接手审核 | 对账 D16 migration、FORCE RLS、role grants 和 integrity trigger schema gate；标明未测重复应用幂等性，并保留 Rust 1.99.0、SQLx 与生产接线缺口 | 修复 quarantine schema fixture 并通过 PostgreSQL 18.6 disposable runner |
+
+### D16 SQLx 验证与 runner 修正（v6.32）
+
+首次 SQLx admission 测试发现 runner 漏载 D15 `admission-transport-profile-receipts` prerequisite migration，导致目标存储过程不存在（42883）。修正 runner 后，PostgreSQL 18.6 disposable gate 共 68/68 steps 通过：D16 两份 quarantine migrations 重跑成功、D15 migration 双次应用成功，quarantine schema assertions 全部通过；SQLx `admission_receipt_replay_conflict_rollback_and_scope` 1/1 通过。最终 audit：`target/phase9f4d-run-owner-consumer/0f8b23cf-1901-4a76-804b-50123914320c/audit.jsonl`。数据库已停止并移除，Multipass inventory 未变。
+
+SQLx 使用 Rust 1.98.1 诊断 shim 和 `--ignore-rust-version`；Rust 1.99.0 正式门、生产身份/目标库 grants、receiver composition、terminal recovery、BI/Benchmark、native Rust provider、完整执行链和规模/内存验收仍开放。E:/AssetsLake 与本机其它 Rust 服务继续作为可直接参考、评估和按模块复用的来源；须保留 Star owner/RLS/幂等/确认语义，逐模块核对源 hash、权属/许可证和依赖闭包。详情见 [D16 阶段报告](reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.32 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D16 prerequisite runner 修复、两类 migration 重放及 SQLx 事务场景 1/1 验证证据，保留正式工具链和生产集成缺口 | 修正 runner 后 D16 disposable PostgreSQL/SQLx gate 通过 |
