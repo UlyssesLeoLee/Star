@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.70**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.71**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -2019,3 +2019,15 @@ Cargo SQLx 是本机 Rust 1.98.1 `--ignore-rust-version` 诊断运行，不构�
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.70 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D16 runner prerequisite 修复、D16/D15 migration 重放及 PostgreSQL SQLx receipt transaction 1/1 通过，并保留未关闭的正式 Rust 与生产执行门 | disposable runner 的首次 SQLx 失败经修正后通过 |
+
+## 6.132 — D16 receiver rebase 复验与 Rust 模块复用候选
+
+合并时保留 `dev` 已完成的 D15 prerequisite、D16 migration replay 与 CATEST/OpenAIActixMCP/CATLLM/AssetsLake 等来源审查，并纳入本阶段新增的真实 `AdmissionReceiver`→PostgreSQL quarantine 测试路径及 SandTree EventRouter/Multipass、IDE1.0 CLI protocol 的文件级候选。复验采用 PostgreSQL 18.6 disposable runner，68/68 步骤通过；SQLx 1/1（21.37s）；审计路径 `target/phase9f4d-run-owner-consumer/047afcbd-8a6e-400b-9451-f80f9a16b651/audit.jsonl`。临时数据库已停止，未创建或修改 Multipass inventory。
+
+所有外部来源只读；可按模块直接参考、适配或复用，但迁入前须核实精确源文件 hash、HEAD/脏状态、权属/许可、NOTICE、依赖闭包和 Star 的 owner/Run/授权契约。AGPL-3.0 不等于禁止商业使用。当前 AssetsLake relay 不真实投递 Kafka；SandTree EventRouter 非持久、Multipass runner 同步且忽略 timeout，IDE1.0 subscriber 无界，均不得原样充当生产执行/传输实现。当前 Rust 1.98.1 `--ignore-rust-version` 不关闭 Rust 1.99.0 门禁；production verifier/composition、目标库部署、完整恢复、BI/Benchmark、性能/RSS 与 Schedule/Run executor 仍开放，执行保持 fail closed。
+
+自动化档：[P]（R/V/S）；runner 为 `scripts/automation/phase9f4d_run_owner_consumer.py`，与 [automation-design §4.87](../automation-design.md) 和 [registry D16](../../scripts/automation/registry.md) 对应。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.71 | 2026-10-12 | Ulysses — Mavis接手审核 | 合并 D16 receiver SQLx 复验和本机 Rust 模块可选择复用的扩展候选；保留授权、许可证、性能、正式工具链与产品执行缺口 | rebase 后 runner 68/68、SQLx 1/1 通过；用户明确本机 Rust server 可作为参考复用来源 |

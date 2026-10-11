@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=df20264a407dbf4912eaf66e05566ac3b8aece3dd142788f8e1e0dc676a1ae18
+# @cypher schema=1 source_sha256=d149b6fb48b5efd9c3069bd8bc12079943e5514277bd50db3262f2fcfe654bf8
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -753,6 +753,7 @@ def main() -> int:
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
     parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
     parser.add_argument("--admission-tests", action="store_true", help="Also run Rust SQLx owner-local admission receipt/result tests; --schema-only avoids NATS")
+    parser.add_argument("--ignore-rust-version", action="store_true", help="Run selected Cargo tests with --ignore-rust-version for diagnostics only; does not satisfy the workspace toolchain gate")
     parser.add_argument("--admission-delivery-tests", "--admission-receiver-tests", dest="admission_delivery_tests", action="store_true", help="Start isolated NATS before admission tests to verify publisher replay, three owner receiver kinds and commit-before-ACK with a real database fault")
     arguments = parser.parse_args()
     if arguments.admission_delivery_tests and not arguments.admission_tests:
@@ -1064,9 +1065,16 @@ def main() -> int:
             )
             if arguments.admission_delivery_tests:
                 admission_env["STAR_ADMISSION_DELIVERY_TEST_NATS_URL"] = f"nats://127.0.0.1:{nats_port}"
+            admission_test_command = [cargo, "test"]
+            if arguments.ignore_rust_version:
+                admission_test_command.append("--ignore-rust-version")
+            admission_test_command.extend([
+                "--offline", "--locked", "-p", "run-owner-runtime", "--test",
+                "schedule_admission_pg", "-j", "4", "--", "--ignored", "--test-threads=1",
+            ])
             results.append(run_step(
                 "schedule-admission-postgres-sqlx-integration",
-                [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "schedule_admission_pg", "-j", "4", "--", "--ignored", "--test-threads=1"],
+                admission_test_command,
                 ROOT,
                 admission_env,
             ))

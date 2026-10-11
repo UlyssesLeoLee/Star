@@ -1,6 +1,6 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v0.8 · 2026-10-12 · Ulysses — Mavis 接手审核
+> v0.9 · 2026-10-12 · Ulysses — Mavis 接手审核
 > 状态：已完成有界来源/许可审查和模块选择；未迁移源码，未实现 native transport provider。
 
 ## 1. 范围与证据
@@ -33,6 +33,10 @@ AssetsLake、RustGameServer、Ada、CATs、GitGit、Physis 未发现 `.codegraph
 | RustGameServer `crates/shared-platform/src/outbox.rs` | `43DA6FFDC5F1AFDAF892F1FF6D95DD01A0FBA699F9FB58289CC4DDD12040D274` |
 | RustGameServer `crates/shared-platform/src/outbox_relay.rs` | `71530C8E84B0698BA31AFC877533CEDF37696F810A19C57D318EADF3ECBF2F06` |
 | RustGameServer `crates/shared-platform/src/producer.rs` | `052EBBE4AB012E37F38DD32D9072F686FFE29E5B33071EDCD55ED39096131D53` |
+| SandTree `crates/event/src/router.rs` | `401B079ACCAB094B35EB22E6A250985F47215CC0235FA41883E90642170747A4` |
+| SandTree `plugins/provider-multipass/src/provider.rs` | `B6821B23392ED40FE09C42A4BA6963C9B6514A64EA4C54EEF5148800132BBCD6` |
+| SandTree `plugins/provider-multipass/src/cli.rs` | `922D6B89930DFE6F34F3113E80DEE61F2C8489036CEE861132047ADBE07ED542` |
+| IDE1.0 `crates/ide-shell-protocol/src/lib.rs` | `B2C3817C2BFD5046947F930DF35DEC2740D9D4B251AC62C0DBEE0BC0B45F616A` |
 
 ## 2. 模块选择与必须改进的语义
 
@@ -80,10 +84,14 @@ This establishes crate-level compile seams only. The NATS feature is still defau
 |---|---|---|---|
 | E:/CATEST | 03d9364f6880d42dcbb48164dd6ea99066daa667；干净 | AGPL-3.0。crates/stream-events/src/producer.rs SHA-256 78A06DF9EFDABC12E53B844AAA41896326AA0B5306EB1ED2B143108F275B9ED1；consumer.rs SHA-256 098EA862D616A0981E933A4FDDF21F92708F8569E6D027D9EB811E5D65C78A17。Producer 使用 rdkafka 0.36、acks=1、5 秒发送等待；consumer 打开 enable.auto.commit=true，handler 失败只记录日志。workspace 还启用 cmake-build/ssl-vendored | 可参考 typed event/envelope 和 Kafka adapter 的薄封装。当前 producer/consumer 不满足 Star 的 owner commit-before-ACK、持久化回执、exact replay 与租户授权契约；不作为 native server 或生产接收器直接复用。AGPL-3.0 不禁止商业使用，若复制/链接/分发/网络提供须按适用方式履行许可证义务并审查 rdkafka/librdkafka 依赖闭包 |
 | E:/OpenAIActixMCP | 0818cc6cdf0243288cc50804cea2e75b21f8621c；干净 | Unlicense/public-domain 授权。src/main.rs SHA-256 052BB1BED126EBF844EA37B6A0D9B028BFD662053AF2C223054465BB6A75B213。Actix + rmcp 0.8 Streamable HTTP MCP 示例，含可选 bearer token、TLS 与本地 session manager；实际工具是 echo/UTC | 可参考 MCP HTTP/TLS 装配，不是 durable message server。Star 已有 star-mcp，不得无具体缺口再复制完整 MCP 服务或引入第二套 session owner |
-| E:/SandTree | 940edc3a8110d6edffc6224f1dbf044b6259d2cf；14 个工作区改动 | workspace manifest 声明 MIT OR Apache-2.0，本轮可见根级 LICENSE 为 Apache-2.0。crates/ipc/src/transport.rs 当前 SHA-256 4477C390BD4C719DBBC16A89C6C960D9F50D9459A3605C8AFC87F4E684765CFE 且文件有未提交改动。它实现带 framing、按 SID 命名/ACL 的 Windows named-pipe 本地 IPC，不包含跨主机 durable log/cursor | 可作为 Star desktop/host 与隔离 helper/plugin worker 间本地 IPC 的参考候选；不能替代 NATS 或跨 VM/Run transport。若复用，先固定并审阅精确 worktree hash/差异、license 文件和完整依赖；当前 source worktree 不改动 |
+| E:/SandTree | 940edc3a8110d6edffc6224f1dbf044b6259d2cf；14 个工作区改动 | workspace manifest 声明 MIT OR Apache-2.0，本轮可见根级 LICENSE 为 Apache-2.0。`crates/ipc/src/transport.rs` 当前 SHA-256 `4477C390BD4C719DBBC16A89C6C960D9F50D9459A3605C8AFC87F4E684765CFE` 且文件有未提交改动。它实现带 framing、按 SID 命名/ACL 的 Windows named-pipe 本地 IPC，不包含跨主机 durable log/cursor | 可作为 Star desktop/host 与隔离 helper/plugin worker 间本地 IPC 的参考候选；不能替代 NATS 或跨 VM/Run transport。若复用，先固定并审阅精确 worktree hash/差异、license 文件和完整依赖；当前 source worktree 不改动 |
 | E:/CATLLM | d4f06e1fedf56f42fa463d6be44b2d50f7cb2c5e；Cargo manifest、Rust crates、lock 与部署文件均未跟踪 | 根目录有 Apache-2.0 LICENSE；当前 crates/gateway/src/main.rs SHA-256 4A5DE949F5EE145BF1549511607F1F3CDF919E826C5052ACE10B77F26FE44C2F，使用 rskafka producer，但其源代码和 manifest 尚无可审查的 Git 基线 | 仅供当前文件级阅读参考；不复制、不进入 Star 构建，不宣称完成许可闭包或验证。形成可复现提交、锁定依赖/完整传递许可证并通过对应测试后再评估 |
+| E:/SandTree (EventRouter/Multipass modules) | `940edc3a8110d6edffc6224f1dbf044b6259d2cf`；仓库其它路径有脏改动，以下目标文件干净 | workspace 声明 MIT OR Apache-2.0，已见根级 Apache-2.0 LICENSE。EventRouter 为有界进程内 fan-out；Multipass provider 使用 argv/name/output 限制，但同步 `Command::output()` 忽略传入 timeout | EventRouter 可参考为提交后易失 UI/投影通知，不提供 durable log、ACK、replay 或恢复；Multipass adapter 可复用校验模式，接入前需实现 deadline、取消、子进程回收，并沿用 Star Rust Host Manager、Run binding、双层 reservation 和两实例 inventory 上限 |
+| E:/IDE1.0 | `f44479f145248bad808ea04831bf4ff5c652501f`；`main` 落后 `origin/main` 38 commits，仓库有未跟踪 feedback 文档，目标文件干净 | workspace 声明 MIT OR Apache-2.0；`ide-shell-protocol` 提供 HTTP/WebSocket/stdio server，但 event subscribers 使用无界 Tokio channel | 可参考任务卡 CLI 的协议适配面；不能直接引入无界 channel，须提供 bounded stream/backpressure、Run/Worktree/Task 授权、cancel/recover 与 output cap |
 
 本轮结论：CATEST 与 AssetsLake 都有可参考的事件 envelope/producer 经验，但都没有可直接替换 NATS 的 Star-compatible durable server；CATEST consumer 的自动提交尤其不能用于 Star owner transaction。OpenAIActixMCP 与 SandTree 分别服务于 MCP HTTP endpoint 和本机进程 IPC，属于独立 app/runtime 边界的素材，不属于消息 broker。RustGameServer 的 mTLS client helper仍是候选小模块，但该游戏服务端本身也不是通用 broker。Star native provider 仍需拥有自己的认证身份、durable append/pull、owner-independent cursor receipt、重试/恢复、资源限额与故障契约。
+
+本轮再对 SandTree `EventRouter`、`provider-multipass` 与 IDE1.0 `ide-shell-protocol` 做文件级补充审查。EventRouter 默认每 subscriber queue 有界（256）并合并 `ResourceChanged`，只适合已提交事实之后可丢失的进程内通知。Multipass runner 同步阻塞且不执行传入 timeout，不能直接放进异步桌面/Host Manager 路径。IDE1.0 的多协议 CLI server 可参考协议形状，但无界 subscriber channel 不符合 Star 内存与背压预算。源文件哈希已记录；这些源仓仍只读，未运行源项目测试，未复制源码。未穷尽本机所有 Rust 项目；每次迁入仍须复核届时 HEAD、工作区、目标文件哈希、权属/许可证、NOTICE、传递依赖与产品语义。
 
 CodeGraph 未能提供这些来源仓库的索引覆盖审计；本节结论来自当前源码与 Git 状态的定向核对，不代表全盘审计或测试通过。
 
@@ -99,3 +107,4 @@ CodeGraph 未能提供这些来源仓库的索引覆盖审计；本节结论来�
 | v0.6 | 2026-10-12 | Ulysses — Mavis 接手审核 | Add D16 metadata-only PostgreSQL quarantine and standalone no-NATS feature; separate implemented receipt persistence from production wiring and encrypted replay gaps |
 | v0.7 | 2026-10-12 | Ulysses — Mavis 接手审核 | Clarify that AssetsLake and other local Rust modules may be directly reused after module-level license/ownership/dependency review; AGPL is not a commercial-use ban, while the current dry-run relay remains unsuitable as production transport |
 | v0.8 | 2026-10-12 | Ulysses — Mavis 接手审核 | 新增 CATEST、OpenAIActixMCP、SandTree、CATLLM 的有界候选审查；记录 Kafka ACK/auto-commit 缺口及本地 IPC/MCP 边界，明确无可直接替换 NATS 的现成服务 | 用户授权参考复用本机 Rust 服务端 |
+| v0.9 | 2026-10-12 | Ulysses — Mavis 接手审核 | 补充 SandTree 有界 EventRouter/Multipass provider 与 IDE1.0 CLI protocol 文件级审查及精确 hash；明确内存、阻塞/超时、授权和背压缺口，保留本机 Rust 服务可模块级参考/复用原则 | 用户再次明确 E:/AssetsLake 与本机其他 Rust 服务可直接作为参考和选择性复用来源 |

@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=905a5d55131e41ffdc8a2cd8b4f039d21b7304f3a40873c9eb516b0e419c1147
+@cypher schema=1 source_sha256=872105ee1e6512381a058fb3fa74e9dd7f6a21afa08886efea9013b7c5bbbb03
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -147,6 +147,27 @@ MERGE (d14_quarantine_test)-[:USES_TYPE]->(quarantine_store:Type {id:"platform_m
 MERGE (d14_quarantine_test)-[:WRITES]->(quarantine_receipt:Table {id:"platform_messaging.admission_receive_quarantine_receipt"})
 MERGE (d14_auth_fixture)-[:IMPLEMENTS]->(d14_auth:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization",kind:"trait"})
 MERGE (d14_receive_fixture)-[:CALLS]->(d14_transport_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionReceiveTransport::new",kind:"method"})
+MERGE (d16_receive_test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::verify_actual_quarantine_receiver",kind:"function"})
+MERGE (d16_state:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionQuarantineReceiveTestState",kind:"struct"})
+MERGE (d16_delivery:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionQuarantineReceiveTestDelivery",kind:"struct"})
+MERGE (d16_transport:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionQuarantineReceiveTestTransport",kind:"struct"})
+MERGE (d16_auth:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionQuarantineReceiveTestAuthorization",kind:"struct"})
+MERGE (d16_handler:Type {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::AdmissionQuarantineReceiveTestHandler",kind:"struct"})
+MERGE (self)-[:DEFINES]->(d16_receive_test)
+MERGE (self)-[:DEFINES]->(d16_state)
+MERGE (self)-[:DEFINES]->(d16_delivery)
+MERGE (self)-[:DEFINES]->(d16_transport)
+MERGE (self)-[:DEFINES]->(d16_auth)
+MERGE (self)-[:DEFINES]->(d16_handler)
+MERGE (d16_receive_test)-[:CALLS]->(receiver_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver::new",kind:"method"})
+MERGE (d16_receive_test)-[:CALLS]->(receiver_consume:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver::consume_one",kind:"method"})
+MERGE (d16_delivery)-[:IMPLEMENTS]->(receive_delivery:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceivedDelivery",kind:"trait"})
+MERGE (d16_transport)-[:IMPLEMENTS]->(receive_transport:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
+MERGE (d16_auth)-[:IMPLEMENTS]->(receive_auth:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization",kind:"trait"})
+MERGE (d16_handler)-[:IMPLEMENTS]->(receive_handler:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveHandler",kind:"trait"})
+MERGE (d16_delivery)-[:READS]->(quarantine_receipt)
+MERGE (d16_receive_test)-[:USES_TYPE]->(quarantine_store)
+MERGE (d16_receive_test)-[:READS]->(quarantine_receipt)
 @endcypher
 */
 use chrono::Utc;
@@ -979,7 +1000,228 @@ async fn verify_admission_quarantine(
     .fetch_one(admin)
     .await?;
     assert_eq!(receipts, 2, "exact replay adds no receipt; another provider has its own key");
+    let mut receiver_origin = origin.clone();
+    receiver_origin.sequence = 8;
+    verify_actual_quarantine_receiver(
+        admin.clone(),
+        quarantine,
+        deployment_id,
+        receiver_origin,
+        wire.to_vec(),
+    )
+    .await?;
     pool.close().await;
+    Ok(())
+}
+
+#[derive(Default)]
+struct AdmissionQuarantineReceiveTestState {
+    source_verifications: usize,
+    owner_handler_calls: usize,
+    terminal_dispositions: usize,
+    terminal_saw_committed_receipt: Vec<bool>,
+    acknowledgements: usize,
+}
+
+#[derive(Clone)]
+struct AdmissionQuarantineReceiveTestDelivery {
+    admin: sqlx::PgPool,
+    deployment_id: Uuid,
+    origin: platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin,
+    wire: Vec<u8>,
+    state: std::sync::Arc<std::sync::Mutex<AdmissionQuarantineReceiveTestState>>,
+}
+
+impl platform_messaging_runtime::admission_receive::AdmissionReceivedDelivery
+    for AdmissionQuarantineReceiveTestDelivery
+{
+    fn wire(&self) -> &[u8] {
+        &self.wire
+    }
+
+    fn origin(&self) -> &platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin {
+        &self.origin
+    }
+
+    async fn acknowledge(
+        &self,
+    ) -> Result<(), platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
+        self.state.lock().unwrap().acknowledgements += 1;
+        Ok(())
+    }
+
+    async fn terminate_permanently(
+        &self,
+    ) -> Result<(), platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
+        use platform_messaging_runtime::admission_receive::AdmissionReceiveError;
+
+        let committed: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM platform_messaging.admission_receive_quarantine_receipt
+             WHERE deployment_id=$1 AND provider_identity=$2 AND log_generation=$3
+               AND log_id=$4 AND sequence=$5",
+        )
+        .bind(self.deployment_id)
+        .bind(&self.origin.provider_identity)
+        .bind(self.origin.log_generation)
+        .bind(&self.origin.log_id)
+        .bind(self.origin.sequence)
+        .fetch_one(&self.admin)
+        .await
+        .map_err(|_| AdmissionReceiveError::Transport)?;
+        let mut state = self.state.lock().unwrap();
+        state.terminal_dispositions += 1;
+        state.terminal_saw_committed_receipt.push(committed == 1);
+        if committed != 1 || state.terminal_dispositions == 1 {
+            return Err(AdmissionReceiveError::Transport);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct AdmissionQuarantineReceiveTestTransport {
+    delivery: AdmissionQuarantineReceiveTestDelivery,
+}
+
+impl platform_messaging_runtime::admission_receive::AdmissionReceiveTransport
+    for AdmissionQuarantineReceiveTestTransport
+{
+    type Delivery = AdmissionQuarantineReceiveTestDelivery;
+
+    async fn pull_one(
+        &self,
+        _scope: platform_messaging_runtime::admission_receive::AdmissionReceiveScope,
+    ) -> Result<
+        Option<Self::Delivery>,
+        platform_messaging_runtime::admission_receive::AdmissionReceiveError,
+    > {
+        Ok(Some(self.delivery.clone()))
+    }
+}
+
+#[derive(Clone)]
+struct AdmissionQuarantineReceiveTestAuthorization {
+    state: std::sync::Arc<std::sync::Mutex<AdmissionQuarantineReceiveTestState>>,
+}
+
+impl platform_messaging_runtime::admission_receive::AdmissionReceiveAuthorization
+    for AdmissionQuarantineReceiveTestAuthorization
+{
+    async fn verify(
+        &self,
+        _origin: &platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin,
+        _wire: &[u8],
+    ) -> Result<(), platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
+        Ok(())
+    }
+
+    async fn verify_source(
+        &self,
+        _origin: &platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin,
+    ) -> Result<(), platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
+        self.state.lock().unwrap().source_verifications += 1;
+        Ok(())
+    }
+}
+
+struct AdmissionQuarantineReceiveTestHandler {
+    state: std::sync::Arc<std::sync::Mutex<AdmissionQuarantineReceiveTestState>>,
+}
+
+impl platform_messaging_runtime::admission_receive::AdmissionReceiveHandler
+    for AdmissionQuarantineReceiveTestHandler
+{
+    async fn commit(
+        &self,
+        _scope: platform_messaging_runtime::admission_receive::AdmissionReceiveScope,
+        _wire: &[u8],
+    ) -> Result<Uuid, platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
+        self.state.lock().unwrap().owner_handler_calls += 1;
+        Err(platform_messaging_runtime::admission_receive::AdmissionReceiveError::OwnerCommit)
+    }
+}
+
+async fn verify_actual_quarantine_receiver(
+    admin: sqlx::PgPool,
+    quarantine: platform_messaging_runtime::admission_quarantine_pg::PgAdmissionReceiveQuarantine,
+    deployment_id: Uuid,
+    origin: platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin,
+    wire: Vec<u8>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use platform_messaging_runtime::admission_receive::AdmissionReceiver;
+
+    let state = std::sync::Arc::new(std::sync::Mutex::new(
+        AdmissionQuarantineReceiveTestState::default(),
+    ));
+    let receipt_reader = admin.clone();
+    let delivery = AdmissionQuarantineReceiveTestDelivery {
+        admin,
+        deployment_id,
+        origin: origin.clone(),
+        wire,
+        state: state.clone(),
+    };
+    let transport = AdmissionQuarantineReceiveTestTransport { delivery };
+    let authorization = AdmissionQuarantineReceiveTestAuthorization {
+        state: state.clone(),
+    };
+    let handler = AdmissionQuarantineReceiveTestHandler {
+        state: state.clone(),
+    };
+    let mut receiver = AdmissionReceiver::new(transport, handler, authorization, origin.scope)?
+        .with_quarantine(std::sync::Arc::new(quarantine));
+    let (_cancel, mut cancellation) = tokio::sync::watch::channel(false);
+
+    assert!(matches!(
+        receiver.consume_one(&mut cancellation).await,
+        Err(platform_messaging_runtime::admission_receive::AdmissionReceiveError::Transport)
+    ));
+    {
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.source_verifications, 2,
+            "source is checked before and after receipt"
+        );
+        assert_eq!(
+            state.owner_handler_calls, 0,
+            "malformed poison never reaches owner handler"
+        );
+        assert_eq!(state.terminal_dispositions, 1);
+        assert_eq!(state.terminal_saw_committed_receipt, [true]);
+        assert_eq!(
+            state.acknowledgements, 0,
+            "poison uses terminal disposition, never ACK"
+        );
+    }
+
+    assert_eq!(receiver.consume_one(&mut cancellation).await?, None);
+    {
+        let state = state.lock().unwrap();
+        assert_eq!(
+            state.source_verifications, 4,
+            "replay rechecks source around the receipt"
+        );
+        assert_eq!(state.owner_handler_calls, 0);
+        assert_eq!(state.terminal_dispositions, 2);
+        assert_eq!(state.terminal_saw_committed_receipt, [true, true]);
+        assert_eq!(state.acknowledgements, 0);
+    }
+    let replayed_receipt: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM platform_messaging.admission_receive_quarantine_receipt
+         WHERE deployment_id=$1 AND provider_identity=$2 AND log_generation=$3
+           AND log_id=$4 AND sequence=$5",
+    )
+    .bind(deployment_id)
+    .bind(&origin.provider_identity)
+    .bind(origin.log_generation)
+    .bind(&origin.log_id)
+    .bind(origin.sequence)
+    .fetch_one(&receipt_reader)
+    .await?;
+    assert_eq!(
+        replayed_receipt, 1,
+        "same source delivery replays one durable receipt"
+    );
     Ok(())
 }
 

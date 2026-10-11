@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.32 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.34
+> **文档版本**: v6.33 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.35
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5599,3 +5599,13 @@ SQLx 使用 Rust 1.98.1 诊断 shim 和 `--ignore-rust-version`；Rust 1.99.0 �
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.32 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D16 prerequisite runner 修复、两类 migration 重放及 SQLx 事务场景 1/1 验证证据，保留正式工具链和生产集成缺口 | 修正 runner 后 D16 disposable PostgreSQL/SQLx gate 通过 |
+
+### 本机 Rust 模块复用与 D16 receiver 验收补充（v6.33）
+
+本机 `E:/AssetsLake` 与其他 Rust server 是可直接参考并按模块选择性复用的来源；源仓只读并固定目标文件 hash。许可证按具体交付形式审查，不把 AGPL-3.0 视作商业禁令。当前 AssetsLake dry-run relay 没有真实 Kafka 投递，不能作为生产 transport；独立 envelope 或其他模块仍可单独评估。SandTree EventRouter 的有界队列可供提交后易失通知参考，不替代 durable Outbox；其 Multipass runner 忽略 timeout 且同步阻塞，须先实现 deadline、取消和进程回收，并经 Star Host Manager 的 Run binding、reservation 与两实例上限约束。IDE1.0 CLI protocol 可作任务卡传输协议参考，但无界 subscriber 必须改为有界流/背压，且接入 Run/Worktree/Task 授权、cancel/recover 和输出上限。精确来源及 hash 见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。
+
+rebase 后复验 PostgreSQL 18.6 disposable runner 68/68 步骤通过；SQLx `schedule_admission_pg` 1/1（21.37s）覆盖真实 `AdmissionReceiver` 与 PostgreSQL quarantine writer，测试 doubles 验证来源前后复验、malformed poison 隔离、commit-before-terminal、terminal 首次失败后 exact replay 且不 ACK。audit 为 `target/phase9f4d-run-owner-consumer/047afcbd-8a6e-400b-9451-f80f9a16b651/audit.jsonl`。该验证采用 Rust 1.98.1 `--ignore-rust-version`，不替代 Rust 1.99.0 正式门禁；生产 verifier/composition、目标库 grants、broker/native provider、完整恢复、BI/Benchmark、内存/负载与执行闭环仍开放，执行保持 fail closed。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.33 | 2026-10-12 | Ulysses — Mavis接手审核 | 合并本机 Rust 模块复用意图和 SandTree/IDE1.0 的性能与接入限制；记录 rebase 后真实 receiver SQLx/68-step PostgreSQL 复验，保留正式 Rust/生产缺口 | 用户明确本机 Rust 服务可参考复用；D16 rebase 后复验通过 |

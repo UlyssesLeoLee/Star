@@ -1,7 +1,7 @@
 # PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT
 
-> v0.3 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：provider-neutral PostgreSQL metadata receipt 已实现；Rust 1.98.1 诊断测试与 PostgreSQL 18.6 disposable schema、migration replay 和 SQLx receipt transaction gate 通过。Rust 1.99.0、production DB credentials/grants、生产接线、原始 wire 恢复和完整 Schedule/Run execution 仍开放。
+> v0.4 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：provider-neutral PostgreSQL metadata receipt 与限定的真实 AdmissionReceiver→PostgreSQL quarantine 测试路径已实现；Rust 1.98.1 诊断测试及 PostgreSQL 18.6 disposable migration/schema/SQLx gate 通过。Rust 1.99.0、production DB credentials/grants、生产接线、原始 wire 恢复和完整 Schedule/Run execution 仍开放。
 
 ## §0 目的
 
@@ -14,7 +14,7 @@
 | Rust writer | 新增 `PgAdmissionReceiveQuarantine`，实现 `AdmissionReceiveQuarantine`；deployment/provider/log-generation/log/cursor 作稳定来源键；精确核对路由、fault、版本、wire bytes 与 SHA-256，精确重放幂等，冲突 fail closed |
 | Cargo boundary | 新增 `durable-quarantine` feature；`jetstream-adapter` 组合启用它，`--no-default-features --features durable-quarantine` 不包含 `async-nats` |
 | PostgreSQL | 新增 `platform_messaging.admission_receive_quarantine_receipt` append-only Transaction 表；W/T/M=0/1/0；deployment+tenant FORCE RLS、ingress owner SELECT/INSERT、WORM 更新/删除/截断保护 |
-| Integration target | 扩展 `schedule_admission_pg`，覆盖 exact replay、wire digest/fault conflict、不同 provider namespace、cross-tenant conflict 与 receipt cardinality；修复 runner prerequisite 后实际执行 `admission_receipt_replay_conflict_rollback_and_scope`，1/1 通过 |
+| Integration target | 扩展 `schedule_admission_pg`，覆盖 exact replay、wire digest/fault conflict、不同 provider namespace、cross-tenant conflict 与 receipt cardinality；真实 `AdmissionReceiver` 与 PostgreSQL writer 路径验证 malformed poison 不进 owner handler、source 前后复验、receipt commit-before-terminal、首轮 terminal 失败后 exact replay 且 ACK=0；1/1 通过 |
 | Schema test/runner | 增加 FORCE RLS、权限和 trigger assertions；runner 加载 D15 transport-profile prerequisite，重跑两份 D16 quarantine migrations，并双次应用 D15 migration |
 | 源模块复用 | 更新 `DD-RUST-SERVER-REUSE-001` 与上位需求/基本/详细设计：E:/AssetsLake 和其他本机 Rust 服务可按模块直接参考/适配/复用；AGPL-3.0 不等于商业使用禁令，须履行具体交付方式适用义务。AssetsLake 当前 dry-run relay 没有真实 Kafka 投递，不作为生产 transport。本 D16 receipt 未复制外部源码，因为其 RLS/idempotency/WORM 契约由 Star 所有 |
 
@@ -26,8 +26,8 @@
 | `cargo check --offline --locked --ignore-rust-version --no-default-features --features durable-quarantine -p platform-messaging-runtime --all-targets -j 4` | PASS；Rust 1.98.1 诊断运行 |
 | `cargo check --offline --locked --ignore-rust-version -p run-owner-runtime --test schedule_admission_pg --all-targets -j 4` | PASS，SQLx 测试目标编译；实际 PostgreSQL 执行结果见下表 |
 | `cargo tree --offline --locked -p platform-messaging-runtime --no-default-features --features durable-quarantine` | PASS；此 crate feature dependency tree 不含 `async-nats` |
-| `phase9f4d_run_owner_consumer.py --schema-only --admission-tests`（PostgreSQL 18.6 disposable loopback） | PASS，68/68 steps；D16 两份 quarantine migrations 重跑通过，D15 transport-profile migration 双次应用通过，RLS/ingress SELECT+INSERT/WORM/TRUNCATE 与 9 个 quarantine trigger assertions 通过。最终 audit `target/phase9f4d-run-owner-consumer/0f8b23cf-1901-4a76-804b-50123914320c/audit.jsonl`；实例已停止且数据目录移除，Multipass inventory 未改动 |
-| `schedule-admission-postgres-sqlx-integration` | PASS，`admission_receipt_replay_conflict_rollback_and_scope` 1/1；本机 Rust 1.98.1 诊断 shim 注入 `--ignore-rust-version`；不替代 Rust 1.99.0 正式验收 |
+| `phase9f4d_run_owner_consumer.py --schema-only --admission-tests --ignore-rust-version`（PostgreSQL 18.6 disposable loopback，rebase 后） | PASS，68/68 steps；D16 两份 quarantine migrations 重跑通过，D15 transport-profile migration 双次应用通过，RLS/ingress SELECT+INSERT/WORM/TRUNCATE 与 9 个 quarantine trigger assertions 通过。最终 audit `target/phase9f4d-run-owner-consumer/047afcbd-8a6e-400b-9451-f80f9a16b651/audit.jsonl`；实例已停止，未创建或修改 Multipass inventory |
+| `schedule-admission-postgres-sqlx-integration` | PASS，`admission_receipt_replay_conflict_rollback_and_scope` 1/1（21.37s）；真实 receiver 用 test-only transport/authorization/terminal doubles；Rust 1.98.1 `--ignore-rust-version` 诊断运行，不替代 Rust 1.99.0 正式验收 |
 | 首次 SQLx runner attempt | FAIL，audit `target/phase9f4d-run-owner-consumer/2856e5d7-6b77-4cbc-94f9-8591f04036c7/audit.jsonl`；缺少定义 `automation.claim_admission_delivery_v2(...)` 的 D15 prerequisite migration（SQLSTATE 42883）。修正 runner 后完整重跑通过 |
 | Rust 1.99.0 正式门禁 | 未运行；当前只能使用 Rust 1.98.1 并带 `--ignore-rust-version` |
 | Cypher graph guard | `cgg_guard.py --root <repo> --changed --stamp` PASS，runner Python source header 已刷新；SQL header 另以 skill validator 定向检查 3/3，因为原生 `--changed` 不包含 SQL 扩展 |
@@ -87,3 +87,4 @@
 | v0.1 | 2026-10-12 | Ulysses — Mavis 接手审核 | D16 provider-neutral PostgreSQL metadata quarantine、Cargo 隔离、源模块复用策略与未验收缺口 |
 | v0.2 | 2026-10-12 | Ulysses — Mavis 接手审核 | 修复 schema test 的 9-trigger assertion 并记录 PostgreSQL 18.6 disposable schema-only migration/RLS/role/WORM gate 通过；注明 D16 migrations 单次应用且未验证重跑幂等性；保留 SQLx transaction、Rust 1.99.0 与生产集成缺口 |
 | v0.3 | 2026-10-12 | Ulysses — Mavis 接手审核 | 修复 runner 缺失 D15 prerequisite migration；记录 68/68 PostgreSQL steps、D16 migrations reapply、D15 double-apply、SQLx receipt transaction 1/1 与清理证据；明确 1.98.1 diagnostic、Rust 1.99.0/生产门未关闭 |
+| v0.4 | 2026-10-12 | Ulysses — Mavis 接手审核 | 收敛到 dev 后重跑 68/68 gate；记录真实 AdmissionReceiver→PostgreSQL 路径、21.37s SQLx、audit 位置和零 Multipass 变更；继续明确正式工具链/生产闭环缺口 | 冲突解决后使用保留 migration replay 的 runner 重验 |

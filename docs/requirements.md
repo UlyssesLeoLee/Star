@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.34）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.35）
 
 ## 0. 文档说明与前提
 
@@ -3426,3 +3426,15 @@ Cargo SQLx 运行使用本机 Rust 1.98.1 诊断 shim 注入 `--ignore-rust-vers
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.34 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D16 SQLx runner 缺失 D15 prerequisite 的发现与修复、68/68 runner 和 1/1 SQLx 结果；保留 Rust 1.99.0 及生产集成缺口 | 首次 SQLx 执行发现 prerequisite migration 未加载，修复后重跑通过 |
+
+### D16 receiver 验收与本机 Rust 模块复用补充（v6.35）
+
+rebase 后使用含 D15 prerequisite、D16 quarantine migration 重放和 `--ignore-rust-version` 诊断开关的 runner 重跑 PostgreSQL 18.6 disposable gate：68/68 步骤通过，`schedule_admission_pg` SQLx integration 1/1（21.37s）。该用例使用真实 `AdmissionReceiver` 与 PostgreSQL quarantine writer，test-only transport/authorization/terminal doubles 验证 malformed poison 不进入 owner handler、source identity 在 receipt 前后复验、receipt commit 先于 terminal disposition、首次 terminal 失败后同源精确重放成功且 ACK 数为 0。审计文件：`target/phase9f4d-run-owner-consumer/047afcbd-8a6e-400b-9451-f80f9a16b651/audit.jsonl`；临时数据库已停止，没有创建或修改 Multipass inventory。
+
+本机 Rust 服务模块继续纳入选择性参考/复用范围。补充审查 SandTree 有界 EventRouter、Multipass adapter 和 IDE1.0 CLI protocol：EventRouter 只适合已提交事实后的易失通知；Multipass adapter 的同步 `Command::output()` 忽略 timeout，须先补真实 deadline/取消/子进程回收；IDE1.0 的无界 Tokio subscriber 不满足桌面内存与背压要求。来源仓只读；每个模块迁入前固定精确 hash、源工作区、权属/许可证、NOTICE 与完整传递依赖，并保留 Star 的 owner/Run 授权、持久化确认、资源预算和两实例测试上限。AGPL-3.0 不构成商业用途禁令，按实际修改、链接、部署或网络提供方式履行适用义务。详见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。
+
+Rust 1.98.1 `--ignore-rust-version` 是诊断运行，不替代 Rust 1.99.0 正式门禁；本结果不证明 production source verifier/composition、目标库 credentials/grants、broker/native-server e2e、完整崩溃恢复、BI/Benchmark 或执行闭环通过。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.35 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录真实 AdmissionReceiver→PostgreSQL quarantine SQLx 路径与 68/68 runner 复验；补充 SandTree/IDE1.0 模块级参考及超时、背压、授权与许可边界 | rebase 冲突收敛后重跑 D16；用户明确本机 Rust 服务可参考和选择性复用 |
