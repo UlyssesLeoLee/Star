@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b1eac6df8e53582b08bd4965eb7ff96e2f453e741a328422e7ec2542e961bcfd
+@cypher schema=1 source_sha256=d6797102ea85db1c2be927f8a810eef4abb63736d5cdceff4a16841d1e3a0803
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (store:Type {id:"platform_messaging_runtime::AdmissionDeliveryStore",kind:"struct"})
@@ -627,10 +627,13 @@ mod tests {
         assert!(validate_wire(AdmissionDeliveryOwner::Run, &c).is_err());
         c.wire = b"{}".to_vec();
         assert!(validate_wire(AdmissionDeliveryOwner::Run, &c).is_err());
-        assert!(valid_broker_name("ADMISSION_01"));
-        for name in ["", "a.>", "*", "a/b", "a b"] {
-            assert!(!valid_broker_name(name));
+        #[cfg(feature = "jetstream-adapter")]
+        {
+            assert!(valid_broker_name("ADMISSION_01"));
+            for name in ["", "a.>", "*", "a/b", "a b"] {
+                assert!(!valid_broker_name(name));
+            }
+            assert!(!valid_broker_name(&"a".repeat(129)));
         }
-        assert!(!valid_broker_name(&"a".repeat(129)));
     }
 }

@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D14 Schedule/Run receivers verified with fixture identity (66/66 runner steps, one real PostgreSQL admission integration test); production identity, quarantine recovery, native provider, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.47 | Date: 2026-10-11
+> Status: 🟡 The broker-neutral poison-quarantine port and failure-path fixtures pass targeted package checks/tests under Rust 1.98.1 with `--ignore-rust-version`; the required Rust 1.99.0 verification is unavailable on this host. Production identity, durable quarantine wiring/replay, native provider, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.51 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -524,16 +524,18 @@ Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的
 
 ## D14 接收实现增量
 
-AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB wire、完整 10秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。JetStream config 与 typed identity 每次复验，native provider 可替换 port；现有事实所有权/RLS/幂等保持。真实 broker/PG、故障和单位测试的最终状态见 ../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md；production identity/composition、durable poison quarantine、receiver recovery 和执行闭环仍未关闭。
+AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB typed-wire 上限、完整 10 秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。新增 poison 路径要求显式 source verifier/quarantine provider，记录提交后再次验证 source，成功后才调用 transport terminal disposition。`AdmissionReceiveOrigin` 固定可信配置的 `log_generation`；quarantine provider 必须以 `(provider_identity, log_generation, log_id, sequence)` 幂等，并对同键不同 digest/fault fail closed。同名 JetStream stream 重建必须更换 generation。JetStream 对 ≤20KiB 的原始投递保留 bounded adapter envelope；typed contract 超过 16KiB 时进入 malformed 分类。没有 provider、source authentication 失败、持久化错误、撤权或 terminal disposition 错误都不会 ACK/终结。20 个 package library tests、默认 feature 与 no-default all-targets checks，以及 package formatting 在 Rust 1.98.1 `--ignore-rust-version` 模式下通过；Rust 1.99.0 的目标版本验收仍未完成。目前没有连接通用 port 的 durable provider，故不宣称 quarantine/replay 已完成。
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.47 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |
+| 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify receiver poison-quarantine identity/idempotency and reauthorization ordering; record pending validation and no durable provider wiring |
+| 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Add trusted log generation to receive origin and quarantine idempotency to prevent stream recreation collisions |
 
 
 ## 6.32 Local Rust service source adaptation decision
 
-The current reusable source is limited to a candidate RustGameServer mTLS/client helper under Apache-2.0, with its plaintext opt-out removed and its transport identity bound to Star authorization. Its Outbox methods settle by bare message ID and its producer timeout does not cover the PubAck future, so neither is copied as-is. AssetsLake's AGPL-3.0 event envelope may inform field naming, but its relay's dry-run/no-broker path marks rows published and cannot be used as durable delivery. ROPE_CS is proprietary/internal-use and is excluded absent explicit rights-holder permission; Ada has an added prior-written-consent condition; CATs has conflicting root/license declarations and only Kafka stubs. No code from those excluded sources enters Star.
+The user authorizes module-level reference and code reuse from local Rust projects after checking license, rights, exact source state, dependency closure, and implementation gaps. The current reusable candidate is a RustGameServer mTLS/client helper under Apache-2.0, with its plaintext opt-out removed and transport identity bound to Star authorization. Its Outbox methods settle by bare message ID and its producer timeout does not cover the PubAck future, so neither is copied as-is. AssetsLake's AGPL-3.0 event envelope may inform field naming, but its relay's dry-run/no-broker path marks rows published and cannot be used as durable delivery; copying its code still requires Star to meet license obligations or obtain separate rights. ROPE_CS is proprietary/internal-use and is excluded absent explicit rights-holder permission; Ada has an added prior-written-consent condition; CATs has conflicting root/license declarations and only Kafka stubs. No code from those excluded sources enters Star.
 
 Native replacement remains a Star-owned durable transport service with authenticated append/pull/ack, immutable log identity/cursor, tenant isolation, owner commit-before-ack, durable quarantine/replay, bounded memory/backpressure, and restart/failure proof. NATS stays behind the provider port until a native provider passes the same contract and deployment gates. See `DD-RUST-SERVER-REUSE-001.md` for exact source heads, permitted evidence, and hashes. The implementation worktree remains subject to the two-Multipass-instance test cap and no-Docker-Desktop policy.
 
@@ -546,8 +548,9 @@ Native replacement remains a Star-owned durable transport service with authentic
 
 `platform-messaging-runtime/Cargo.toml` defines `jetstream-adapter` and enables it by default for existing deployments. `async-nats`, its JetStream publisher/receiver adapters, and JetStream-specific quarantine code are behind this feature. The static-dispatch `AdmissionTransport` and `AdmissionReceiveTransport` contracts remain in the crate's no-default-feature surface. Rust 1.99.0 compiled this crate with and without the default feature, and the no-default dependency tree excludes `async-nats`; package format check also passed. The default build reports three deprecation warnings in unmodified `domain-kms`.
 
-This is a package boundary only. It does not assert that other application crates no longer depend on NATS, and it does not supply the native provider. `PlatformPoisonQuarantine` remains JetStream-specific; malformed admission deliveries still lack a provider-neutral durable quarantine/replay path. Native service acceptance still requires authenticated durable append/pull/ack, bounded persistence and backpressure, stable provider generation/cursor, replay after process restart, owner commit-before-ack, and fault-injection evidence. Maintain the existing default feature until a deployed replacement passes the same transport contract and an explicit profile migration.
+This is a package boundary only. It does not assert that other application crates no longer depend on NATS, and it does not supply the native provider. `AdmissionReceiver` now exposes a provider-neutral poison-quarantine port, but `PlatformPoisonQuarantine` remains JetStream-specific and is not wired to that port; no portable durable quarantine/replay provider exists yet. Native service acceptance still requires authenticated durable append/pull/ack, bounded persistence and backpressure, stable provider generation/cursor, replay after process restart, owner commit-before-ack, and fault-injection evidence. Maintain the existing default feature until a deployed replacement passes the same transport contract and an explicit profile migration.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Add optional JetStream feature boundary and package-scoped no-default build result |
+| 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the provider-neutral receiver quarantine port and that it is not connected to durable storage |

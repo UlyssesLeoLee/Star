@@ -1,15 +1,17 @@
 /*
-@cypher schema=1 source_sha256=73b3290dccb6ddc39453157e98e249fa61a1c17f4582e59cf477e0dc889b53d3
+@cypher schema=1 source_sha256=2cbf8cc3af600540ffd8c1f250d7cfa9a25afa09fc04c5ef9dc11aa6d9a947c7
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs"})
 MERGE (transport:Type {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionReceiveTransport",kind:"struct"})
 MERGE (delivery:Type {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionDelivery",kind:"struct"})
 MERGE (pull:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionReceiveTransport::pull_one",kind:"method"})
 MERGE (ack:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionDelivery::acknowledge",kind:"method"})
+MERGE (terminate:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::JetStreamAdmissionDelivery::terminate_permanently",kind:"method"})
 MERGE (config:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs::validate_consumer",kind:"function"})
 MERGE (self)-[:DEFINES]->(transport)
 MERGE (self)-[:DEFINES]->(delivery)
 MERGE (self)-[:DEFINES]->(pull)
 MERGE (self)-[:DEFINES]->(ack)
+MERGE (self)-[:DEFINES]->(terminate)
 MERGE (self)-[:DEFINES]->(config)
 MERGE (transport)-[:IMPLEMENTS]->(port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
 MERGE (delivery)-[:IMPLEMENTS]->(delivery_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceivedDelivery",kind:"trait"})
@@ -31,7 +33,7 @@ use super::admission_receive::{
 };
 use async_nats::jetstream::{
     consumer::{AckPolicy, PullConsumer},
-    Message,
+    AckKind, Message,
 };
 use domain_automation::schedule::{
     ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1,
@@ -39,6 +41,7 @@ use domain_automation::schedule::{
 use futures_util::StreamExt;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 /// Bounded durable consumer pinned to a single logical owner route.
 pub struct JetStreamAdmissionReceiveTransport {
@@ -46,6 +49,7 @@ pub struct JetStreamAdmissionReceiveTransport {
     scope: AdmissionReceiveScope,
     subject: String,
     stream: String,
+    stream_generation: Uuid,
     domain: String,
     provider_identity: String,
 }
@@ -56,6 +60,7 @@ impl JetStreamAdmissionReceiveTransport {
         consumer: PullConsumer,
         scope: AdmissionReceiveScope,
         stream: String,
+        stream_generation: Uuid,
         domain: String,
         provider_identity: String,
     ) -> Result<Self, AdmissionReceiveError> {
@@ -66,6 +71,7 @@ impl JetStreamAdmissionReceiveTransport {
         );
         if stream.is_empty()
             || stream.len() > 128
+            || stream_generation.is_nil()
             || domain.len() > 128
             || provider_identity.is_empty()
             || provider_identity.len() > 128
@@ -78,6 +84,7 @@ impl JetStreamAdmissionReceiveTransport {
             scope,
             subject,
             stream,
+            stream_generation,
             domain,
             provider_identity,
         })
@@ -139,6 +146,12 @@ impl AdmissionReceivedDelivery for JetStreamAdmissionDelivery {
             .await
             .map_err(|_| AdmissionReceiveError::Transport)
     }
+    async fn terminate_permanently(&self) -> Result<(), AdmissionReceiveError> {
+        self.message
+            .double_ack_with(AckKind::Term)
+            .await
+            .map_err(|_| AdmissionReceiveError::Transport)
+    }
 }
 
 impl AdmissionReceiveTransport for JetStreamAdmissionReceiveTransport {
@@ -168,10 +181,7 @@ impl AdmissionReceiveTransport for JetStreamAdmissionReceiveTransport {
             return Ok(None);
         };
         let message = message.map_err(|_| AdmissionReceiveError::Transport)?;
-        if message.subject.as_str() != self.subject
-            || message.payload.is_empty()
-            || message.payload.len() > 16384
-        {
+        if message.subject.as_str() != self.subject || message.payload.len() > 20480 {
             return Err(AdmissionReceiveError::Contract);
         }
         let info = message
@@ -185,43 +195,49 @@ impl AdmissionReceiveTransport for JetStreamAdmissionReceiveTransport {
         }
         let sequence =
             i64::try_from(info.stream_sequence).map_err(|_| AdmissionReceiveError::Contract)?;
-        let (tenant, id) = match scope.kind {
+        let parsed = match scope.kind {
             AdmissionReceiveKind::Request => {
-                let m = ScheduleRunAdmissionCommandV1::decode_json(&message.payload)
-                    .map_err(|_| AdmissionReceiveError::Contract)?;
-                (m.tenant_id, m.request_id)
+                ScheduleRunAdmissionCommandV1::decode_json(&message.payload)
+                    .map(|m| (m.tenant_id, m.request_id))
             }
             AdmissionReceiveKind::Result => {
-                let m = ScheduleRunAdmissionResultV1::decode_json(&message.payload)
-                    .map_err(|_| AdmissionReceiveError::Contract)?;
-                (m.tenant_id, m.result_id)
+                ScheduleRunAdmissionResultV1::decode_json(&message.payload)
+                    .map(|m| (m.tenant_id, m.result_id))
             }
             AdmissionReceiveKind::Resolution => {
-                let m = ScheduleRunAdmissionResolutionV1::decode_json(&message.payload)
-                    .map_err(|_| AdmissionReceiveError::Contract)?;
-                (m.tenant_id, m.resolution_id)
+                ScheduleRunAdmissionResolutionV1::decode_json(&message.payload)
+                    .map(|m| (m.tenant_id, m.resolution_id))
             }
         };
-        let (schema, kind) = route(scope.kind);
-        let expected_id = format!("admission.v1.{schema}.{kind}.{tenant}.{id}");
-        if tenant != scope.tenant_id
-            || sequence <= 0
-            || message
-                .headers
-                .as_ref()
-                .and_then(|h| h.get("Nats-Msg-Id"))
-                .map(|v| v.as_str())
-                != Some(expected_id.as_str())
-        {
+        if sequence <= 0 {
             return Err(AdmissionReceiveError::Contract);
         }
+        let message_id = if let Ok((tenant, id)) = parsed {
+            if tenant == scope.tenant_id {
+                let (schema, kind) = route(scope.kind);
+                let expected_id = format!("admission.v1.{schema}.{kind}.{tenant}.{id}");
+                if message
+                    .headers
+                    .as_ref()
+                    .and_then(|h| h.get("Nats-Msg-Id"))
+                    .map(|v| v.as_str())
+                    != Some(expected_id.as_str())
+                {
+                    return Err(AdmissionReceiveError::Contract);
+                }
+            }
+            id
+        } else {
+            Uuid::nil()
+        };
         Ok(Some(JetStreamAdmissionDelivery {
             message,
             origin: AdmissionReceiveOrigin {
                 scope,
-                message_id: id,
+                message_id,
                 provider_identity: self.provider_identity.clone(),
                 log_id: self.stream.clone(),
+                log_generation: self.stream_generation,
                 sequence,
             },
         }))

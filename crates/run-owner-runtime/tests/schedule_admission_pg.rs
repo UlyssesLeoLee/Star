@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=790e2bb787aea234f851d7cd49e779c55f3d7cffa446b5faac9611bedd3e4d05
+@cypher schema=1 source_sha256=37373e38a90f3c0882761685b5ac69d0fee95175a60e6a8eb5f6d09f9492e1c9
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -1653,6 +1653,7 @@ async fn seed_schedule_handoff(
 struct AdmissionAuthorizationFixture {
     scope: platform_messaging_runtime::admission_receive::AdmissionReceiveScope,
     log: String,
+    log_generation: Uuid,
 }
 
 impl platform_messaging_runtime::admission_receive::AdmissionReceiveAuthorization
@@ -1666,6 +1667,7 @@ impl platform_messaging_runtime::admission_receive::AdmissionReceiveAuthorizatio
         if origin.scope != self.scope
             || origin.provider_identity != "ISOLATED_TEST_ONLY"
             || origin.log_id != self.log
+            || origin.log_generation != self.log_generation
         {
             return Err(
                 platform_messaging_runtime::admission_receive::AdmissionReceiveError::Unauthorized,
@@ -1748,16 +1750,19 @@ async fn receive_admission_broker_fixture<
         .await?
         .await?;
     assert_eq!(ack.stream, name);
+    let stream_generation = Uuid::new_v4();
     let transport = JetStreamAdmissionReceiveTransport::new(
         consumer,
         scope,
         name.clone(),
+        stream_generation,
         String::new(),
         "ISOLATED_TEST_ONLY".into(),
     )?;
     let auth = AdmissionAuthorizationFixture {
         scope,
         log: name.clone(),
+        log_generation: stream_generation,
     };
     let mut receiver = AdmissionReceiver::new(transport, handler, auth, scope)?;
     let (_control, mut cancellation) = tokio::sync::watch::channel(false);

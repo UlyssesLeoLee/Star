@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D14 Schedule/Run receivers verified with fixture identity (66/66 runner steps, one real PostgreSQL admission integration test); production identity, quarantine recovery, native provider, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.47 | Date: 2026-10-11
+> Status: 🟡 The broker-neutral poison-quarantine port and failure-path fixtures pass targeted package checks/tests under Rust 1.98.1 with `--ignore-rust-version`; the required Rust 1.99.0 verification is unavailable on this host. Production identity, durable quarantine wiring/replay, native provider, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.51 | Date: 2026-10-12
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -425,26 +425,29 @@ Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的
 
 ## D14 接收实现增量
 
-AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB wire、完整 10秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。JetStream config 与 typed identity 每次复验，native provider 可替换 port；现有事实所有权/RLS/幂等保持。真实 broker/PG、故障和单位测试的最终状态见 ../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md；production identity/composition、durable poison quarantine、receiver recovery 和执行闭环仍未关闭。
+AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB typed-wire 上限、完整 10 秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。新增 poison 路径要求显式 source verifier/quarantine provider，并在 quarantine commit 后重验 source 才能终止消息；provider 缺失、持久化失败、撤权和终止确认失败都保持未确认。来源身份及幂等键为 `(provider_identity, log_generation, log_id, sequence)`，generation 来自可信传输配置并随同名日志重建而变化；同键内容冲突须 fail closed。此改动只有 provider-neutral seam 和 fixture 逻辑，持久化 provider/replay 尚未实现，最新编译/测试状态见 D14 报告。
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.47 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |
+| 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Add explicit broker-neutral poison quarantine, post-commit source revalidation, and fail-closed disposition contract; preserve unverified implementation status |
 
 
 ## 6.32 Local Rust server reuse and provider composition
 
-Keep `AdmissionTransport`, owner-local Inbox/Outbox, and the authorization verifier as Star-owned contracts. RustGameServer is the only current direct source candidate: isolate its Apache-2.0 gRPC mTLS/client helper, remove its plaintext opt-out, and preserve license notices. Do not import its game-domain, NATS producer, or Outbox settlement lacking a Star owner lease fence. AssetsLake's AGPL-3.0 event envelope is reference-only unless license compatibility and obligations are resolved. ROPE_CS proprietary/internal-use, Ada's written-consent addendum, and CATs' manifest/LICENSE mismatch block current source reuse; stubs do not qualify as providers. The native Rust server remains a Star-owned transport persistence implementation, deployed through the fixed Multipass/K3s Run binding; test inventory remains capped at two instances.
+Keep `AdmissionTransport`, owner-local Inbox/Outbox, and the authorization verifier as Star-owned contracts. The user authorizes module-level code reuse from local Rust services, subject to the source/license review in `DD-RUST-SERVER-REUSE-001.md`. RustGameServer is the only current direct source candidate: isolate its Apache-2.0 gRPC mTLS/client helper, remove its plaintext opt-out, and preserve license notices. Do not import its game-domain, NATS producer, or Outbox settlement lacking a Star owner lease fence. AssetsLake's AGPL-3.0 event envelope is reference-only until license compatibility and obligations are resolved. ROPE_CS proprietary/internal-use, Ada's written-consent addendum, and CATs' manifest/LICENSE mismatch block current source reuse; stubs do not qualify as providers. The native Rust server remains a Star-owned transport persistence implementation, deployed through the fixed Multipass/K3s Run binding; test inventory remains capped at two instances.
 
 Selection evidence and per-file implementation gaps are maintained in `DD-RUST-SERVER-REUSE-001.md`. No source project was modified and no native server/provider is claimed delivered by this design update.
 
 ### 6.33 Provider Cargo isolation
 
-`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. The feature gates JetStream send/receive adapters and the JetStream-specific quarantine implementation; the provider-neutral admission publisher/receiver contracts remain available with `--no-default-features`. Default and no-default package checks and the package format check passed; the no-default package dependency tree excludes `async-nats`. The default build reports three deprecation warnings in unmodified `domain-kms`. This does not provide a native transport or portable poison store: capacity-result persistence/replay still needs a broker-neutral contract and an owner-controlled native implementation.
+`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. The feature gates JetStream send/receive adapters and the JetStream-specific quarantine implementation; the provider-neutral admission publisher/receiver contracts remain available with `--no-default-features`. Default and no-default package checks and the package format check passed; the no-default package dependency tree excludes `async-nats`. The default build reports three deprecation warnings in unmodified `domain-kms`. The admission receiver now defines a provider-neutral poison quarantine port, but no durable provider is connected to it. This does not provide a native transport or portable poison store: capacity-result persistence/replay still needs a broker-neutral contract and owner-controlled implementation.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record Cargo provider boundary and bounded compile evidence |
+| 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the new receiver poison-quarantine port while preserving the missing durable-provider gap |
+| 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Pin trusted log generation in poison quarantine identity and idempotency key |
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|

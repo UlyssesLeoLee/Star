@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 D14 Schedule/Run receivers verified with fixture identity (66/66 runner steps, one real PostgreSQL admission integration test); production identity, quarantine recovery, native provider, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.48 | Date: 2026-10-11
+> Status: 🟡 The broker-neutral poison-quarantine port and failure-path fixtures pass targeted package checks/tests under Rust 1.98.1 with `--ignore-rust-version`; the required Rust 1.99.0 verification is unavailable on this host. Production identity, durable quarantine wiring/replay, native provider, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.52 | Date: 2026-10-12
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -322,7 +322,7 @@ Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/
 
 ## D14 接收实现增量
 
-AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB wire、完整 10秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。JetStream config 与 typed identity 每次复验，native provider 可替换 port；现有事实所有权/RLS/幂等保持。真实 broker/PG、故障和单位测试的最终状态见 ../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md；production identity/composition、durable poison quarantine、receiver recovery 和执行闭环仍未关闭。
+AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB typed-wire 上限、完整 10 秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。新增的 poison 路径要求显式 source verifier 和 quarantine provider，写入后再次验证 source，成功后才终止投递；缺 provider、存储失败、身份撤销、终止确认失败均不终结。来源身份必须固定 `(provider_identity, log_generation, log_id, sequence)`；generation 来自可信传输配置，不能由消息体推导，同键 digest/fault 不一致必须失败关闭。此处只是 provider-neutral 接口和 fixture 路径，未接入持久化实现，也未证明 replay/restart。JetStream config 与 typed identity 每次复验，native provider 可替换 port；真实 broker/PG、故障和单位测试的最终状态见 ../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md；production identity/composition、durable poison store/replay、receiver recovery 和执行闭环仍未关闭。
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
@@ -331,11 +331,11 @@ AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 
 
 ## 6.32 — AC-SCHED-API-044: durable admission receiver and local code reuse
 
-The admission receiver shall separate broker pull/ack from current authorization verification and owner-local persistence. It shall bound each wire message to 16 KiB and each receive/commit/ack attempt to 10 seconds, validate typed route and identity, recheck authorization before commit and before ack, and acknowledge only after a durable owner receipt commits. A database failure, permission revocation, cancellation, unknown receipt, or uncertain commit result shall leave the broker delivery recoverable. Malformed or permanent poison messages require durable quarantine before terminal broker disposition; without a configured quarantine provider, the consumer shall remain fail-closed.
+The admission receiver shall separate broker pull/ack from current authorization verification and owner-local persistence. It shall bound typed wire messages to 16 KiB and each receive/commit/ack attempt to 10 seconds, validate typed route and identity, recheck authorization before commit and before ack, and acknowledge only after a durable owner receipt commits. A database failure, permission revocation, cancellation, unknown receipt, or uncertain commit result shall leave the broker delivery recoverable. Malformed or permanent poison messages require durable quarantine before terminal broker disposition; source authorization must be verified both before and after quarantine commit. The immutable source key shall be `(provider_identity, log_generation, log_id, sequence)`, where `log_generation` comes from trusted transport provisioning and changes when a same-named log is recreated. A replay with the same key but different digest or fault must fail closed. Without a configured durable quarantine provider, or if source verification, persistence, or terminal disposition fails, the consumer shall leave the delivery unconfirmed.
 
 The Rust-native message server is a future transport provider behind versioned `AdmissionTransport` and `TransportProfile`; NATS remains a replaceable adapter. Local Rust code may be reused only after its source license, ownership, exact source state, implementation status, and dependency closure are checked. RustGameServer's Apache-2.0 mTLS/client helper is a candidate for isolated adaptation after removing plaintext opt-out. AssetsLake's AGPL-3.0 event envelope is reference-only until Star's license obligations are resolved. Proprietary/internal-use and contradictory-license sources shall not be copied or deployed without rights-holder resolution. Source-project stubs, dry-runs, in-memory queues, and Noop paths do not satisfy durable acceptance.
 
-Current gate: D14 has a focused real PostgreSQL/NATS receiver slice, but production identity/composition, portable durable quarantine, confirmed ACK-loss recovery, full-application Cargo provider isolation (the crate-level feature seam is partial), native Rust provider, Run/task execution, and BI closure remain unverified or incomplete. Source survey: `../design/DD-RUST-SERVER-REUSE-001.md`; implementation evidence: `../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md`.
+Current gate: D14 has a focused real PostgreSQL/NATS receiver slice and a broker-neutral quarantine port with failure-path fixtures. The current patch passes package tests and all-targets checks under Rust 1.98.1 with `--ignore-rust-version`; this is diagnostic only because Cargo.toml requires Rust 1.99.0. The port has no durable provider or production wiring. Production identity/composition, durable quarantine/replay, confirmed ACK-loss recovery, full-application Cargo provider isolation (the crate-level feature seam is partial), native Rust provider, Run/task execution, and BI closure remain unverified or incomplete. Source survey: `../design/DD-RUST-SERVER-REUSE-001.md`; implementation evidence: `../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md`.
 
 The `platform-messaging-runtime` crate now exposes JetStream through the optional `jetstream-adapter` Cargo feature (enabled by default for current compatibility). Both default and no-default package checks passed on Rust 1.99.0; the no-default dependency tree contains no `async-nats`, and `cargo fmt -p platform-messaging-runtime -- --check` passed. The default check reports three deprecation warnings in unmodified `domain-kms`. This is package-scoped compile evidence only; portable poison quarantine/replay, a native provider, full-app dependency isolation, production identity, and ACK-loss recovery remain open.
 
@@ -343,3 +343,5 @@ The `platform-messaging-runtime` crate now exposes JetStream through the optiona
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D14 receiver requirements and local Rust server reuse/licensing gates |
 | 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record optional JetStream provider feature and package-scoped no-default build evidence |
+| 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify broker-neutral poison quarantine idempotency, source revalidation, and fail-closed terminal disposition; mark current implementation unverified |
+| 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Include trusted log generation in receiver source identity and poison idempotency to prevent same-name log recreation collisions |

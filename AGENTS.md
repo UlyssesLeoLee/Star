@@ -11,7 +11,7 @@
 
 ## 0. 一句话硬约束
 
-**自有 Rust 服务端复用**：设计原生服务端/provider 前，优先检查 `E:/AssetsLake` 及本机相关 Rust 项目的兼容模块。按模块记录来源 commit、工作文件 hash、许可/依赖和验收缺口，选择直接复用、适配或参考；保持 Star 的 owner/Run、授权、持久化确认与资源预算边界，不整仓搬迁，也不把源项目的 mock、dry-run 或内存入队成功作为生产证明。
+**本机 Rust 服务端按模块复用**：设计或实现 Star 服务端能力时，优先盘点 `E:/AssetsLake` 和本机相关 Rust 项目；逐模块核对源仓说明、HEAD/脏状态、工作文件 hash、许可证/权属、实现状态与依赖闭包，再选择直接复用、适配或参考。权利与许可允许时可复用源模块并保留版权/NOTICE；源仓有未提交改动时只读并固定实际文件 hash。不得整仓搬迁或导入源项目业务域、Docker/数据库栈；mock、Noop、stub、dry-run 或未验证的内存队列不作生产证明。许可/权属不清或禁止再分发/部署时，不复制或部署，先解决权利问题；Star 的 owner/Run、授权、持久化确认和资源预算边界保持由 Star 控制。
 
 > **可以代签 Ulysses，不可以编造历史。**
 >
@@ -32,8 +32,6 @@
 **多代理并行与 Rust 桌面性能硬约束**：设计必须为 Project/Worktree/Run/Agent/Plugin 定义资源预算、公平调度、有界队列、背压、取消与 drain；Rust 桌面前端必须采用分页/虚拟化、按需加载和有界缓存，避免 UI 阻塞及无界日志驻留。Pi 仅作为小核心、组合扩展、事件生命周期、可分支历史与上下文压缩的设计参考；产品执行核心与性能敏感桌面界面以 Rust 实现，不引入 Pi/Node 运行时替代实现。Agent、Memory、Skill、Context、Validation、Loop 与项目工程规范必须提供版本化扩展契约，Run 固定 profile/version/digest 与资源预算；第一期可用受控 Rust CLI adapter 调用现有工具，但权限、scope、上下文组装、事件/证据记录与独立验证由 Star 控制，并保留后续 Rust-native provider 替换路径。插件必须有版本化 capability 边界和隔离运行时，禁止在主进程加载任意 native code。
 
 **原生 Hook 强约束**：安全关键 Hook 必须由 Rust 核心原生执行，fail-closed 且不可被插件替代或减弱；Project/Worktree 继承、Run 快照、生命周期门与 BI 事件使用同一版本化 HookSet 契约。旧 Python Hook handler 仅可作为显式非权威的兼容/观测输入，不得参与授权、命令放行或验收决策。
-
-**本机 Rust 服务端复用**：设计或实现 Star 的服务端能力时，先盘点 `E:\AssetsLake` 和本机相关 Rust 项目中的可复用模块；逐项核对源仓库说明、当前 HEAD/脏状态、目标文件实现、许可证/权属和依赖闭包，再决定直接适配或仅参考。按模块复用并保留所需版权/NOTICE；不得把 mock、Noop、stub、dry-run 或未验证的队列当成生产实现，也不得把源仓库的 Docker/数据库/业务域栈带入 Star。源仓库有未提交改动时只读并以文件哈希固定实际证据；存在禁止再分发/部署或许可冲突时，先解决权利与许可，不复制代码或部署该服务。
 
 **Agent/Task CLI 闭环验收**：任何标为可用的 Agent 或任务卡 CLI 功能，必须贯通已授权的 Run/Worktree/Task 绑定、实际执行与可控工具调用、取消/恢复、独立验证、有限且可审计的输出/证据，以及结果回写；执行必须校验当前权限、策略版本和资源预算。仅有 UI、mock、seed、预览适配器或 REST 契约不得标为可用闭环。缺少 provider、sandbox、runtime 或持久化边界时，应显式禁用执行并说明阻断条件，不能降级为无约束任意 Shell。
 **Schedule run-as 授权**：Schedule Rule 创建时必须将创建者固化为不可变 `run_as_actor_id`；无人值守每次 trigger/retry/resume 均须按该身份实时复验当前 Project/Engineering Run 权限与 execution capability。撤权、授权目录不可用或授权事实不完整时 fail closed；Rule 创建/启用 API 的写入时检查不能替代执行前复验。
@@ -247,12 +245,12 @@ D:/Star                                       # 主仓 (per 当前 git worktree 
   ├── feature/ai-ide-compat                  # 8 个 fix/* merge + D.2-D.5+ + cleanup (D.2 8a7427d / D.3 0a148b8 / D.4 2a0a68c / cleanup 1274725 / D.5+ 2857e6b)
   └── wt-phase-d5-impl                       # Phase D.5+ Streamable HTTP wt (已 merge → feature/ai-ide-compat @ d0ed6d8)
 
-D:/RustGameServer                             # 独立仓 (Star 仓**不引用** RGS 仓代码, 见 §0 一句话硬约束 + §1.2 派生约束)
+D:/RustGameServer                             # 独立仓 (Star/RGS 业务域与数据模型独立；通用技术模块按 §0 逐项核验后可复用)
   ├── main                                   # 含 RGS 历史 200+ 份文档
   └── wt-plan-002-1-2week                    # 139b80a RGS 历史扩量 + 3bff9c6 跨引用同步 (commit author = Ulysses)
 ```
 
-> **硬约束 (per 2026-08-30 09:08 JST Ulysses 明确反馈)**: Star 仓 (`D:/Star`) 与 RGS 仓 (`D:/RustGameServer`) **完全独立**, 5 域 (player / economy / match / social / admin) 命名是 Star 仓**内部业务子域独立定义**, **不双向同步**, **不引用 RGS 仓代码**, **不引用 RGS 5 域镜像作为业务源头**. Star 仓 docs 不得写 "per RGS 5 域镜像" / "per RGS" 等隐含引用 RGS 作为命名来源的描述.
+> **业务域独立边界**: Star 仓 (`D:/Star`) 与 RGS 仓 (`D:/RustGameServer`) 的业务域、命名、模型和数据来源保持独立，不双向同步；Star 的 5 域 (player / economy / match / social / admin) 由 Star 内部定义，不以 RGS 5 域镜像为业务来源。此边界不禁止依照 §0 许可证/权属审查后，按模块复用通用技术实现；复用不得导入或耦合 RGS 业务域。Star 文档不得写 "per RGS 5 域镜像" / "per RGS" 等将 RGS 作为 Star 业务来源的描述.
 
 > **命名解读 disclaimer (per 2026-08-31 22:45 JST Q1-D 拍板 (a)+(c))**:
 > - **5 域 (player/economy/match/social/admin) 是历史治理命名**, 指 5 位真人 Lead 问责结构 (per 守门 #3 拍板)

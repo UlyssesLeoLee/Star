@@ -1,6 +1,6 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v0.2 · 2026-10-12 · Ulysses — Mavis 接手审核
+> v0.5 · 2026-10-12 · Ulysses — Mavis 接手审核
 > 状态：已完成有界来源/许可审查和模块选择；未迁移源码，未实现 native transport provider。
 
 ## 1. 范围与证据
@@ -47,7 +47,7 @@ AssetsLake、RustGameServer、Ada、CATs、GitGit、Physis 未发现 `.codegraph
 
 ## 3. 目标接入架构
 
-复用以独立模块为单位。RustGameServer 的 Apache-2.0 通道代码是目前可评估的直接适配来源，但其明文 opt-out 必须删除；AssetsLake 仅提供 envelope 字段参考，若迁移代码先满足 AGPL/Star 许可证兼容要求。ROPE_CS、Ada 与有许可证冲突的 CATs 不得进入构建或部署。RustGameServer 本身不是通用消息 broker，Star 仍需实现自己的 Rust transport service。保持现有 `AdmissionTransport` 与 owner-local Outbox/Inbox；native 服务端仅拥有自身 transport persistence，不拥有 Schedule/Run 的业务写权限。不得跨 owner 共享写事务。
+复用以独立模块为单位；用户授权本机 Rust 服务端可作为直接复用/适配来源，但逐项审查许可证、权属、源状态、依赖闭包和实现缺口仍是门槛。RustGameServer 的 Apache-2.0 通道代码是当前最明确的直接适配候选，但须删除明文 opt-out；AssetsLake 提供 envelope 字段参考，源代码只有在 Star 满足 AGPL/Star 许可证兼容要求或取得单独授权后才可迁移。ROPE_CS、Ada 与许可冲突的 CATs 不得进入构建或部署。现有 `PlatformPoisonQuarantine` 持久化实现被 `jetstream-adapter` feature 限定且接收 NATS `Message`/JetStream source identity；它可作为后续存储语义的实现参考。新的 provider-neutral receive origin 明确携带可信 `log_generation`，JetStream adapter 从受信配置固定该代次；该 port 尚未接到 durable writer，不得据此宣称通用 poison store 已上线。RustGameServer 本身不是通用消息 broker，Star 仍需实现自己的 Rust transport service。保持现有 `AdmissionTransport` 与 owner-local Outbox/Inbox；native 服务端仅拥有自身 transport persistence，不拥有 Schedule/Run 的业务写权限。不得跨 owner 共享写事务。
 
 版本化 TransportProfile 固定 provider/version/digest、endpoint/server identity、协议与权限范围。发布确认必须来自已持久化的日志及有效 receipt；接收确认必须晚于目标 owner 的 Inbox 与业务结果提交。确认丢失后以稳定 message identity 重放，不能重新执行业务副作用。provider cursor 不跨端点/generation 混用；不能为 native server 强制模拟 JetStream。
 
@@ -79,3 +79,5 @@ This only establishes a crate-level compile seam. The NATS feature is still the 
 | v0.1 | 2026-10-11 | Ulysses — Mavis 接手审核 | 用户授权参考复用本机 Rust 服务端；记录实际源版本、选择性适配与 D14/native 验收边界 |
 | v0.2 | 2026-10-12 | Ulysses — Mavis 接手审核 | 扩展本机候选审查；按实际许可证排除 ROPE_CS/Ada，标出 CATs 许可冲突和 stub，并刷新 RustGameServer/AssetsLake 当前状态 |
 | v0.3 | 2026-10-12 | Ulysses — Mavis 接手审核 | 实装 JetStream Cargo feature 隔离并记录 crate 级 no-default 构建证据及剩余 native/quarantine 缺口 |
+| v0.4 | 2026-10-12 | Ulysses — Mavis 接手审核 | 明确技术模块复用授权与业务域隔离边界；区分 JetStream-specific poison store 与新 provider-neutral receive quarantine port，并保留未接线缺口 |
+| v0.5 | 2026-10-12 | Ulysses — Mavis 接手审核 | 在通用来源身份中固定日志 generation，并明确 JetStream adapter 从可信配置接收该代次 |
