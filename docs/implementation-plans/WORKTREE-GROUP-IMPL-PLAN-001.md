@@ -1975,3 +1975,19 @@ D15 收尾验证补充：Rust 1.98.1 诊断运行的 `platform-messaging-runtime
 |---|---|---|---|---|
 | v6.65 | 2026-10-12 | Ulysses — Mavis接手审核 | D15 profile-pinned delivery与中立回执v2切片；记录PostgreSQL与Rust目标版本验证阻断，保留native provider/整体phase开放 | 用户确认自有 Rust server 最终替换 NATS |
 | v6.66 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D15 22/22 单测、no-default 依赖隔离、Clippy 阻断及 migration 未实跑状态 | 完成 D15 验证对账 |
+
+## 6.129 — Phase 9F4C-D16: durable admission quarantine receipt
+
+**状态：🟡 writer 与 migration 已编写；包级 Rust 诊断检查通过；PostgreSQL migration/transaction 尚未执行；不关闭 D14、native provider 或整体 9F4C。**
+
+实现 `PgAdmissionReceiveQuarantine` 并挂入 `durable-quarantine` feature。receipt 的 stable key 是 deployment/provider/log-generation/log/cursor；exact replay 核对 tenant/route/message/fault/parser/classifier/wire size/digest，冲突或隐藏的跨租户记录 fail closed。新 Transaction table W/T/M=0/1/0，dual-scope FORCE RLS、ingress owner SELECT/INSERT、WORM；不保存 payload body。Runner 将 D16 migration 排在共享 WORM 函数来源 migration 之后，SQLx target 增加 exact replay、digest/fault/tenant conflict 与 provider namespace 场景。
+
+本机 `E:/AssetsLake` 与其它 Rust 服务端可按模块直接参考、适配或复用，源仓只读；AGPL-3.0 不禁止商业用途，但要满足适用的源码/NOTICE 与依赖闭包义务。当前 AssetsLake relay 未真实投递 Kafka，不能作为生产 transport。D16 没复制代码，因为 Star 的 receipt/RLS/idempotency/WORM 契约需要在 Star owner 边界实现。
+
+验证：Rust 1.98.1 `--ignore-rust-version` 下 `platform-messaging-runtime` no-default + durable-quarantine tests 16/16、all-targets check、`run-owner-runtime` PostgreSQL target compile、该 feature dependency tree 排除 `async-nats`。当前 workspace 要求 Rust 1.99.0；live migration/SQLx test/RLS/grants 未运行（所选 PostgreSQL 安装缺少 `initdb.exe`、`pg_ctl.exe`、`psql.exe`），full app provider closure、production source verifier/composition、durable terminal disposition/recovery、BI projection/outbox、native server 与内存/负载验收都开放。详见 D16 report。
+
+自动化档：[P]（R/V/S）；复用 `scripts/automation/phase9f4d_run_owner_consumer.py` 和既有独占隔离数据库流程。不得以 package compile 或 fixture 代替 PostgreSQL owner-role 验收。源码复用必须核对精确 hash 与闭包，不得修改 E:/AssetsLake 等源仓。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.67 | 2026-10-12 | Ulysses — Mavis接手审核 | D16 持久化 admission quarantine 切片、Rust 模块复用策略及未执行的 PostgreSQL/Rust 1.99.0 门禁 | 用户授权复用本机 Rust 服务端；完成 D16 实施 |

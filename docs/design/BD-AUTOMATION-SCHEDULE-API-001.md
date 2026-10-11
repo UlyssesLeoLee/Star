@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D15 adds immutable profile pinning and provider-neutral v2 delivery proofs; 22/22 package unit tests, the no-default all-targets check and Run-owner integration target compilation passed under Rust 1.98.1 with `--ignore-rust-version`. The no-default dependency tree excludes `async-nats`. PostgreSQL migration/tests are blocked by missing server binaries, and Rust 1.99.0 is unavailable. Native provider, production profile resolver, durable quarantine/replay, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.53 | Date: 2026-10-12
+> Status: 🟡 D16 adds a provider-neutral PostgreSQL quarantine receipt and standalone `durable-quarantine` feature. Focused package tests and compile checks pass under Rust 1.98.1 with `--ignore-rust-version`; the migration and database transaction test remain unexecuted. The receipt is metadata-only and not production-wired. Native provider/profile resolver, encrypted replay, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.54 | Date: 2026-10-12
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -435,19 +435,20 @@ AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 
 
 ## 6.32 Local Rust server reuse and provider composition
 
-Keep `AdmissionTransport`, owner-local Inbox/Outbox, and the authorization verifier as Star-owned contracts. The user authorizes module-level code reuse from local Rust services, subject to the source/license review in `DD-RUST-SERVER-REUSE-001.md`. RustGameServer is the only current direct source candidate: isolate its Apache-2.0 gRPC mTLS/client helper, remove its plaintext opt-out, and preserve license notices. Do not import its game-domain, NATS producer, or Outbox settlement lacking a Star owner lease fence. AssetsLake's AGPL-3.0 event envelope is reference-only until license compatibility and obligations are resolved. ROPE_CS proprietary/internal-use, Ada's written-consent addendum, and CATs' manifest/LICENSE mismatch block current source reuse; stubs do not qualify as providers. The native Rust server remains a Star-owned transport persistence implementation, deployed through the fixed Multipass/K3s Run binding; test inventory remains capped at two instances.
+Keep `AdmissionTransport`, owner-local Inbox/Outbox, and the authorization verifier as Star-owned contracts. The user authorizes module-level code reuse from local Rust services, subject to the source/license review in `DD-RUST-SERVER-REUSE-001.md`. RustGameServer's Apache-2.0 gRPC mTLS/client helper is one direct source candidate; remove its plaintext opt-out and preserve license notices. Do not import its game-domain, NATS producer, or Outbox settlement lacking a Star owner lease fence. AssetsLake and other local Rust services are also eligible for module-level direct reuse. AGPL-3.0 does not prohibit commercial use; assess the actual modification/linking/deployment/network-delivery model, satisfy applicable source and notice duties, and audit the full dependency closure. AssetsLake's current event relay still cannot be used as production transport because its dry-run/no-broker path can mark work published without a real Kafka delivery. ROPE_CS proprietary/internal-use, Ada's written-consent addendum, and CATs' manifest/LICENSE mismatch block reuse under their current terms; stubs do not qualify as providers. The native Rust server remains a Star-owned transport persistence implementation, deployed through the fixed Multipass/K3s Run binding; test inventory remains capped at two instances.
 
 Selection evidence and per-file implementation gaps are maintained in `DD-RUST-SERVER-REUSE-001.md`. No source project was modified and no native server/provider is claimed delivered by this design update.
 
 ### 6.33 Provider Cargo isolation
 
-`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. The feature gates JetStream send/receive adapters and the JetStream-specific quarantine implementation; the provider-neutral admission publisher/receiver contracts remain available with `--no-default-features`. Default and no-default package checks and the package format check passed; the no-default package dependency tree excludes `async-nats`. The default build reports three deprecation warnings in unmodified `domain-kms`. The admission receiver now defines a provider-neutral poison quarantine port, but no durable provider is connected to it. This does not provide a native transport or portable poison store: capacity-result persistence/replay still needs a broker-neutral contract and owner-controlled implementation.
+`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. JetStream publisher/receiver and the legacy JetStream poison implementation remain behind it. D16 adds an independent `durable-quarantine` feature and `PgAdmissionReceiveQuarantine`, which implements the admission poison port without importing NATS. Its append-only Transaction receipt is deployment- and tenant-scoped, keyed by provider/log generation/log/cursor, and stores route identity, parser fault, exact wire length and SHA-256. It intentionally retains no untrusted body; no payload replay is claimed. The new feature combination passed package unit tests and an all-targets compile under Rust 1.98.1 with `--ignore-rust-version`, while the Run-owner PostgreSQL test target compiled. Rust 1.99.0 acceptance, actual migration/transaction verification, production composition and the full application dependency closure remain open.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record Cargo provider boundary and bounded compile evidence |
 | 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the new receiver poison-quarantine port while preserving the missing durable-provider gap |
 | 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Pin trusted log generation in poison quarantine identity and idempotency key |
+| 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify D16 provider-neutral PostgreSQL quarantine receipt, deployment/tenant RLS and metadata-only retention; mark migration and runtime verification open |
 
 
 ## 6.34 Profile-pinned transport replacement design

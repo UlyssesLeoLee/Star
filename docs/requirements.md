@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.28）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.31）
 
 ## 0. 文档说明与前提
 
@@ -3386,3 +3386,17 @@ Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.30 | 2026-10-12 | Ulysses — Mavis接手审核 | 为 platform-messaging-runtime 增加可选 JetStream provider feature 与无默认 feature 构建路径 | 用户要求为 Star 自有 Rust 消息服务器替代 NATS 做准备 |
+
+### D16：持久化 admission poison quarantine 与可复用 Rust 模块边界（v6.31）
+
+`PgAdmissionReceiveQuarantine` 实现 provider-neutral `AdmissionReceiveQuarantine`，按部署、provider identity、log generation、log ID 与正 cursor 建立不可变幂等身份；记录租户/发送方/接收方/消息种类、fault/parser/classifier 版本、原 wire 字节数与 SHA-256。新表 `platform_messaging.admission_receive_quarantine_receipt` 是 Transaction（W/T/M=0/1/0），部署与 tenant 双重 FORCE RLS、仅 ingress owner 可读写、WORM 禁止改删/截断。只保留精确 wire 摘要，不保存 payload body，也不声称可重放原始消息；无数据库提交、权限、大小或幂等冲突时 fail closed。
+
+`durable-quarantine` Cargo feature 可独立于 `jetstream-adapter` 构建；本机依赖树没有 `async-nats`。Rust 1.98.1 `--ignore-rust-version` 下该 feature 的 16 个 package unit tests、all-targets check 及 Run-owner PostgreSQL test target 编译通过。目标 Rust 1.99.0 未验收；PostgreSQL migration、RLS/grants/WORM 与 SQLx 路径未运行，生产 source verifier/composition、terminal disposition/recovery 和 BI 事件发布仍开放。因此本阶段仅交付 receipt writer，不关闭 poison-consumer 或 native server 替换。
+
+本机 `E:/AssetsLake` 与其它 Rust 服务端可以按模块直接参考、适配和复用，源仓只读。AGPL-3.0 不等于禁止商业使用；每个模块仍须核对权属、修改/链接/部署/网络提供方式、源码与 NOTICE 义务及传递依赖闭包。AssetsLake 当前 dry-run relay 未做真实 Kafka 投递，不能作为生产 transport；此判断不排除复用其独立 envelope 或其它经审查的模块。D16 没有复制其它项目源码，因为本阶段的 PostgreSQL receipt 需要精确实现 Star 已定义的 RLS、幂等与 WORM 契约。详情见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md) 与 [D16 阶段报告](reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
+
+本段修订了早期评估中“AssetsLake 仅作字段参考”的适用范围：不适用的是当前未真实投递 Kafka 的 relay 作为生产实现；它不构成对 AssetsLake 其他模块的复用禁令。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.31 | 2026-10-12 | Ulysses — Mavis接手审核 | 新增 D16 持久化 quarantine 契约、Cargo 隔离和本机 Rust 模块可复用/许可证边界；准确记录未运行的 DB 与 Rust 1.99.0 门禁 | 用户明确授权参考复用 E:/AssetsLake 与本机 Rust 服务端；D16 实施 |

@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.25 (2026-10-11)
-> **上游要件定义书**: docs/requirements.md v6.28
+> **文档版本**: v6.29 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.31
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5554,8 +5554,22 @@ RustGameServer 是当前适合按模块适配的 Apache-2.0 来源，不将整�
 
 D15 的 `platform-messaging-runtime` 单元测试 22/22 通过，no-default all-targets check 通过，Run-owner PostgreSQL target 编译通过但未运行；该 crate 的 no-default dependency tree 不含 `async-nats`。这些是本机 Rust 1.98.1 `--ignore-rust-version` 的诊断结果，Rust 1.99.0 验收未完成。Strict Clippy 因 E0514 工具链缓存产物不兼容未形成结果；PostgreSQL migration 因缺少 `initdb.exe`、`pg_ctl.exe`、`psql.exe` 未执行，schema/grants/RLS 尚未验证。未实现 production profile resolver 或 native provider，NATS 仍未从产品依赖闭包移除。完整逐项验收见 [PHASE-9F4C-D15-TRANSPORT-PROFILE-REPORT](reports/PHASE-9F4C-D15-TRANSPORT-PROFILE-REPORT.md)。
 
-本地 Rust 服务端仍按模块、源仓和许可逐项筛选复用：RustGameServer 可作为 Apache-2.0 mTLS/client 模块候选，但其 NATS producer 和缺少 Star lease fence 的 Outbox settlement 不直接迁移；AssetsLake 的 AGPL-3.0 envelope 只作字段参考，relay 没有真实 Kafka publisher。来源 hash、依赖闭包与其余候选缺口见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。本阶段未修改这些源项目。
+本地 Rust 服务端按模块、源仓和许可逐项筛选复用：RustGameServer 可作为 Apache-2.0 mTLS/client 模块候选，但其 NATS producer 和缺少 Star lease fence 的 Outbox settlement 不直接迁移；AssetsLake 与其他本机项目也可直接复用符合目标的独立模块，AGPL-3.0 不禁止商业使用，但必须履行按交付方式适用的许可证义务并审查传递依赖闭包。AssetsLake 当前 relay 没有真实 Kafka publisher，不能作为生产 transport。来源 hash、工作区状态与其余候选缺口见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。D16 未复制源代码，因为 quarantine receipt 必须实现 Star 的具体 RLS、幂等与 WORM 契约。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.28 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D15 profile-pinned receipt 设计、Rust provider 准备及验证缺口；补充本机服务端模块复用边界 | 完成 admission transport D15 切片 |
+
+### D16：provider-neutral admission quarantine receipt（v6.29）
+
+新增 `PgAdmissionReceiveQuarantine` 作为独立 `durable-quarantine` feature，避免其持久化实现依赖 JetStream SDK。PostgreSQL append-only Transaction receipt 以 deployment/provider/log-generation/log/cursor 唯一定位；严格核验租户与路由身份、fault/parser/classifier 版本、精确 wire 长度和摘要，exact replay 幂等，其它证据冲突 fail closed。RLS 同时约束 deployment 与 tenant，ingress owner 仅 SELECT/INSERT，WORM trigger 禁止 UPDATE/DELETE/TRUNCATE。payload body 不落库。
+
+Rust 1.98.1 `--ignore-rust-version` 诊断下 package 单测 16/16、该 feature 的 all-targets check、Run-owner PostgreSQL test target 编译与 `durable-quarantine` no-default Cargo tree（无 `async-nats`）通过；Rust 1.99.0、实际 PostgreSQL migration/SQLx/RLS/grants 和生产 wiring 未验收。阶段仍开放 source authentication、durable terminal disposition/replay、production composition、BI event path、完整应用 provider 闭包和独立恢复/性能门，不启动 executor。
+
+本机 `E:/AssetsLake` 和其它 Rust 服务端可以按模块直接参考、适配或复用；AGPL-3.0 不代表禁止商业使用，须逐项履行适用源码、NOTICE 与依赖许可义务。AssetsLake 当前 relay 未实际发布到 Kafka，因此不作为生产消息实现。D16 未搬运外部代码，因它要满足 Star-owned RLS、幂等与 WORM 语义。详细来源审查见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。
+
+本 D16 结论取代早期将 AssetsLake 限为“字段参考”的泛化措辞；不复用当前 relay 的原因是它未证明真实持久化投递，并非 AGPL-3.0 禁止商用或复用。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.29 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D16 持久化 quarantine、验证限制与本机 Rust 模块复用/许可证策略 | 用户授权参考复用本机 Rust 服务端；D16 实施 |

@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.15 (2026-10-10)
+> **文档版本**: v2.16 (2026-10-12)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -165,6 +165,7 @@
 
 | 事实类型 | 定义 | 存储位置 | 写入频率 | 本设计对应表 |
 |---|---|---|---|---|
+| v2.16 | 2026-10-12 | Add §4.13.23 for the provider-neutral admission quarantine Transaction receipt, W/T/M classification, deployment+tenant FORCE RLS, append-only grants, exact-wire digest, and unverified migration/runtime gates. | D16 adds durable poison metadata without retaining payload bodies. |
 | **Business Truth** | 业务事实,影响决策 | PostgreSQL(主事务表) | 低频,受事务约束 | `worktree.worktree`(Business 列), `agent_session.agent_session`, `feedback.feedback`, `validation_result.validation_result` 等 |
 | **Observed Runtime State** | 高频本地状态,非业务事实 | PostgreSQL(独立 Projection 表,与主表 1:N) | 高频,异步 | `worktree.worktree_status_observed`, `agent_session.agent_process_status_observed`, `validation_result.test_progress_observed` |
 | **SCM Truth** | Git 远端事实 | SCM Adapter 镜像 + 引用 | 中频 | `scm.commit`, `scm.pull_request`(镜像字段 + Object Storage Key) |
@@ -5949,6 +5950,22 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v2.15 | 2026-10-10 | Ulysses — Mavis接手审核 | D13交付/transport port验证、Rust-native替换准备及剩余缺口对账。 | 新owner消息交付实现。 |
+
+## 4.13.23 — D16 admission receive quarantine Transaction
+
+Migration: `db/migrations/2026-10-12-admission-receive-quarantine.sql`.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `platform_messaging.admission_receive_quarantine_receipt` | T | Platform ingress receipt for malformed or identity-mismatched admission source messages; keys a source by deployment/provider/log generation/log/cursor and stores tenant/route, message kind/id, fault/parser/classifier versions, exact wire byte length and SHA-256 | No TTL or physical delete; immutable append-only; wire body is not stored | FORCE RLS requires both configured deployment and quarantine tenant; `star_platform_ingress_owner` may SELECT/INSERT only; UPDATE/DELETE/TRUNCATE denied by grants and WORM triggers |
+
+D16 adds W/T/M=0/1/0. `PgAdmissionReceiveQuarantine` validates non-nil deployment, tenant, service identities and log generation, positive sequence, bounded provider/log names and wire size; the source key is idempotent only when every immutable route/fault/version/size/digest field matches. A duplicate with altered bytes, route or fault returns a quarantine error and remains unconfirmed. Missing/hidden conflict rows also fail closed. The exact source body is intentionally not retained; replay recovery through a stored body requires a separate encrypted, quota-bounded Work design. No new Master or queue table is introduced.
+
+The migration chains after `2026-10-08-platform-poison-quarantine.sql` to reuse its fixed-path WORM trigger function. It has been compiled into the runner and referenced by the PostgreSQL integration target, but no live migration, grants, FORCE RLS, trigger or transaction assertion has run because the selected PostgreSQL installation lacks server executables. Rust 1.98.1 diagnostic compile/tests do not close that gap or satisfy the workspace's Rust 1.99.0 requirement. There is no production source verifier/composition or BI outbox/projection wiring; those remain follow-up gates. Reusable local Rust modules may be adapted after exact license/rights/dependency review; the D16 receipt itself remains Star-owned because it implements this table's specific security contract.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.16 | 2026-10-12 | Ulysses — Mavis接手审核 | Classify D16 provider-neutral admission quarantine as an append-only T receipt with dual-scope FORCE RLS; record unverified database gates and direct local Rust module reuse policy |
 
 ### Rust-native 消息服务器替换边界
 

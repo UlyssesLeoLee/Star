@@ -3,11 +3,13 @@
 -- MERGE (receipt:Table {id:"platform_messaging.poison_quarantine_receipt"})
 -- MERGE (payload:Table {id:"platform_messaging.poison_quarantine_payload_work"})
 -- MERGE (audit:Table {id:"platform_messaging.poison_quarantine_payload_purge_audit"})
+-- MERGE (admission_receipt:Table {id:"platform_messaging.admission_receive_quarantine_receipt"})
 -- MERGE (ingress:DatabaseRole {id:"star_platform_ingress_owner"})
 -- MERGE (purger:DatabaseRole {id:"star_platform_quarantine_purger"})
 -- MERGE (self)-[:TESTS]->(receipt)
 -- MERGE (self)-[:TESTS]->(payload)
 -- MERGE (self)-[:TESTS]->(audit)
+-- MERGE (self)-[:TESTS]->(admission_receipt)
 -- MERGE (self)-[:TESTS]->(ingress)
 -- MERGE (self)-[:TESTS]->(purger)
 -- @endcypher
@@ -37,7 +39,8 @@ BEGIN
     FOREACH protected_table IN ARRAY ARRAY[
         'platform_messaging.poison_quarantine_receipt',
         'platform_messaging.poison_quarantine_payload_work',
-        'platform_messaging.poison_quarantine_payload_purge_audit'
+        'platform_messaging.poison_quarantine_payload_purge_audit',
+        'platform_messaging.admission_receive_quarantine_receipt'
     ] LOOP
         IF NOT (SELECT c.relrowsecurity AND c.relforcerowsecurity
                   FROM pg_class AS c WHERE c.oid = protected_table::regclass) THEN
@@ -80,11 +83,26 @@ BEGIN
                'poison_quarantine_payload_audit_worm',
                'poison_quarantine_payload_audit_truncate_guard',
                'poison_quarantine_payload_purge_matches_expired_work'
-           )) <> 7 THEN
+           )) <> 9 THEN
         RAISE EXCEPTION 'quarantine integrity triggers are incomplete';
     END IF;
 END
 $assertions$;
+
+DO $admission_permissions$
+BEGIN
+    IF NOT has_table_privilege('star_platform_ingress_owner',
+            'platform_messaging.admission_receive_quarantine_receipt', 'SELECT')
+       OR NOT has_table_privilege('star_platform_ingress_owner',
+            'platform_messaging.admission_receive_quarantine_receipt', 'INSERT')
+       OR has_table_privilege('star_platform_ingress_owner',
+            'platform_messaging.admission_receive_quarantine_receipt', 'UPDATE')
+       OR has_table_privilege('star_platform_ingress_owner',
+            'platform_messaging.admission_receive_quarantine_receipt', 'DELETE') THEN
+        RAISE EXCEPTION 'admission quarantine owner privileges exceed append-only scope';
+    END IF;
+END
+$admission_permissions$;
 
 BEGIN;
 SET LOCAL ROLE star_platform_ingress_owner;
