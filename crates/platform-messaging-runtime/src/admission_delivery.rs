@@ -1,6 +1,7 @@
 /*
-@cypher schema=1 source_sha256=5eb6eadfae65513100f184c912ea1e4b9a594ff3c067ecd9b232211f2bef8e48
+@cypher schema=1 source_sha256=b1eac6df8e53582b08bd4965eb7ff96e2f453e741a328422e7ec2542e961bcfd
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
+MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (store:Type {id:"platform_messaging_runtime::AdmissionDeliveryStore",kind:"struct"})
 MERGE (claim:Type {id:"platform_messaging_runtime::AdmissionDeliveryClaim",kind:"struct"})
 MERGE (owner:Type {id:"platform_messaging_runtime::AdmissionDeliveryOwner",kind:"enum"})
@@ -19,6 +20,7 @@ MERGE (transport_port:Symbol {id:"crates/platform-messaging-runtime/src/admissio
 MERGE (with_transport:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionPublisher::with_transport",kind:"method"})
 MERGE (receipt:Type {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportReceipt",kind:"struct"})
 MERGE (self)-[:DEFINES]->(transport)
+MERGE (self)-[:DEPENDS_ON]->(jetstream_feature)
 MERGE (self)-[:DEFINES]->(jetstream)
 MERGE (self)-[:DEFINES]->(transport_publish)
 MERGE (self)-[:DEFINES]->(transport_new)
@@ -95,6 +97,7 @@ MERGE (limits_test)-[:CALLS]->(test_fixture)
 
 use std::time::Duration;
 
+#[cfg(feature = "jetstream-adapter")]
 use async_nats::jetstream::{message::PublishMessage, Context};
 use chrono::{DateTime, Utc};
 use domain_automation::schedule::{
@@ -368,12 +371,14 @@ pub trait AdmissionTransport: Send + Sync {
 }
 
 /// Transitional JetStream adapter; all NATS subject/ID/header/PubAck mapping lives here.
+#[cfg(feature = "jetstream-adapter")]
 pub struct JetStreamAdmissionTransport {
     context: Context,
     stream: String,
     domain: String,
 }
 
+#[cfg(feature = "jetstream-adapter")]
 impl JetStreamAdmissionTransport {
     /// Pin the already-authenticated Context's expected stream/domain; no provisioning or drain.
     pub fn new(
@@ -392,6 +397,7 @@ impl JetStreamAdmissionTransport {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 impl AdmissionTransport for JetStreamAdmissionTransport {
     async fn publish(
         &self,
@@ -441,8 +447,10 @@ pub struct AdmissionPublisher<T: AdmissionTransport> {
 }
 
 /// Compatibility entry point for the transitional NATS provider.
+#[cfg(feature = "jetstream-adapter")]
 pub type AdmissionJetStreamPublisher = AdmissionPublisher<JetStreamAdmissionTransport>;
 
+#[cfg(feature = "jetstream-adapter")]
 impl AdmissionPublisher<JetStreamAdmissionTransport> {
     /// Construct the transitional adapter; owner-local delivery policy remains transport-neutral.
     pub fn new(
@@ -526,6 +534,7 @@ impl<T: AdmissionTransport> AdmissionPublisher<T> {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn valid_broker_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 128

@@ -327,3 +327,19 @@ AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.48 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |
+
+
+## 6.32 — AC-SCHED-API-044: durable admission receiver and local code reuse
+
+The admission receiver shall separate broker pull/ack from current authorization verification and owner-local persistence. It shall bound each wire message to 16 KiB and each receive/commit/ack attempt to 10 seconds, validate typed route and identity, recheck authorization before commit and before ack, and acknowledge only after a durable owner receipt commits. A database failure, permission revocation, cancellation, unknown receipt, or uncertain commit result shall leave the broker delivery recoverable. Malformed or permanent poison messages require durable quarantine before terminal broker disposition; without a configured quarantine provider, the consumer shall remain fail-closed.
+
+The Rust-native message server is a future transport provider behind versioned `AdmissionTransport` and `TransportProfile`; NATS remains a replaceable adapter. Local Rust code may be reused only after its source license, ownership, exact source state, implementation status, and dependency closure are checked. RustGameServer's Apache-2.0 mTLS/client helper is a candidate for isolated adaptation after removing plaintext opt-out. AssetsLake's AGPL-3.0 event envelope is reference-only until Star's license obligations are resolved. Proprietary/internal-use and contradictory-license sources shall not be copied or deployed without rights-holder resolution. Source-project stubs, dry-runs, in-memory queues, and Noop paths do not satisfy durable acceptance.
+
+Current gate: D14 has a focused real PostgreSQL/NATS receiver slice, but production identity/composition, portable durable quarantine, confirmed ACK-loss recovery, full-application Cargo provider isolation (the crate-level feature seam is partial), native Rust provider, Run/task execution, and BI closure remain unverified or incomplete. Source survey: `../design/DD-RUST-SERVER-REUSE-001.md`; implementation evidence: `../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md`.
+
+The `platform-messaging-runtime` crate now exposes JetStream through the optional `jetstream-adapter` Cargo feature (enabled by default for current compatibility). Both default and no-default package checks passed on Rust 1.99.0; the no-default dependency tree contains no `async-nats`, and `cargo fmt -p platform-messaging-runtime -- --check` passed. The default check reports three deprecation warnings in unmodified `domain-kms`. This is package-scoped compile evidence only; portable poison quarantine/replay, a native provider, full-app dependency isolation, production identity, and ACK-loss recovery remain open.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D14 receiver requirements and local Rust server reuse/licensing gates |
+| 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record optional JetStream provider feature and package-scoped no-default build evidence |

@@ -1,7 +1,8 @@
-//! Platform-owned persistence for permanently malformed JetStream messages.
+//! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=bbd0cbda9cf95241db2af21bbc9bbcabc50e0279bb27fae74da44de9d9bf2431
+@cypher schema=1 source_sha256=6e12ceab6e30aa2012ec1c9f8d04a1aea1edf90a9b6249fb19a6b6bb7e069c7b
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
+MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
 MERGE (source:Type {id:"crates/platform-messaging-runtime/src/lib.rs::TrustedJetStreamSource",kind:"struct"})
 MERGE (identity:Type {id:"crates/platform-messaging-runtime/src/lib.rs::JetStreamSourceIdentity",kind:"struct"})
@@ -37,6 +38,7 @@ MERGE (kms:Type {id:"crates/domain-kms/src/lib.rs::KmsClient",kind:"trait"})
 MERGE (kms_health:Symbol {id:"crates/domain-kms/src/lib.rs::KmsClient.health",kind:"method"})
 MERGE (kms_encrypt:Symbol {id:"crates/domain-kms/src/lib.rs::KmsClient.encrypt",kind:"method"})
 MERGE (self)-[:DEFINES]->(module)
+MERGE (self)-[:DEPENDS_ON]->(jetstream_feature)
 MERGE (module)-[:DEFINES]->(source)
 MERGE (module)-[:DEFINES]->(identity)
 MERGE (module)-[:DEFINES]->(fault)
@@ -127,33 +129,49 @@ MERGE (self)-[:IMPORTS]->(receive_jetstream_module)
 
 pub mod admission_delivery;
 pub mod admission_receive;
+#[cfg(feature = "jetstream-adapter")]
 pub mod admission_receive_jetstream;
 
+#[cfg(feature = "jetstream-adapter")]
 use std::{sync::Arc, time::Duration};
 
+#[cfg(feature = "jetstream-adapter")]
 use async_nats::jetstream::Message;
+#[cfg(feature = "jetstream-adapter")]
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+#[cfg(feature = "jetstream-adapter")]
 use domain_kms::{KeyId, KmsClient, KmsMode, TenantId};
+#[cfg(feature = "jetstream-adapter")]
 use serde::Serialize;
+#[cfg(feature = "jetstream-adapter")]
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use thiserror::Error;
 use uuid::Uuid;
 
+#[cfg(feature = "jetstream-adapter")]
 /// Hard upper bound for an original JetStream body accepted by quarantine.
 pub const MAX_SOURCE_PAYLOAD_BYTES: usize = 132 * 1024;
+#[cfg(feature = "jetstream-adapter")]
 /// Maximum `Nats-Msg-Id` bytes copied into an encrypted replay envelope.
 pub const MAX_REPLAY_HEADER_BYTES: usize = 8 * 1024;
+#[cfg(feature = "jetstream-adapter")]
 /// Maximum number of `Nats-Msg-Id` values copied from an untrusted message.
 pub const MAX_REPLAY_HEADER_COUNT: usize = 16;
+#[cfg(feature = "jetstream-adapter")]
 /// Maximum serialized KMS envelope stored for one quarantined message.
 pub const MAX_ENCRYPTED_BLOB_BYTES: usize = 200 * 1024;
+#[cfg(feature = "jetstream-adapter")]
 /// Hard total encrypted-payload quota per deployment; expired rows count until audited purge.
 pub const MAX_ENCRYPTED_QUARANTINE_BYTES: i64 = 4 * 1024 * 1024;
+#[cfg(feature = "jetstream-adapter")]
 const CLASSIFIER_VERSION: i16 = 1;
+#[cfg(feature = "jetstream-adapter")]
 const REPLAY_ENVELOPE_VERSION: u16 = 1;
+#[cfg(feature = "jetstream-adapter")]
 const KMS_ENCRYPT_TIMEOUT: Duration = Duration::from_secs(2);
 
+#[cfg(feature = "jetstream-adapter")]
 /// Trusted source identity pinned by deployment configuration, not message headers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrustedJetStreamSource {
@@ -162,6 +180,7 @@ pub struct TrustedJetStreamSource {
     stream_name: String,
 }
 
+#[cfg(feature = "jetstream-adapter")]
 impl TrustedJetStreamSource {
     /// Validate a configured deployment and the expected server-side stream identity.
     pub fn new(
@@ -179,6 +198,7 @@ impl TrustedJetStreamSource {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 /// Server-derived message identity combined with the trusted configured generation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JetStreamSourceIdentity {
@@ -192,6 +212,7 @@ pub struct JetStreamSourceIdentity {
     pub stream_sequence: i64,
 }
 
+#[cfg(feature = "jetstream-adapter")]
 /// Versioned permanent-fault reasons that may be quarantined and then acknowledged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PermanentPoisonFault {
@@ -203,6 +224,7 @@ pub enum PermanentPoisonFault {
     CapacityResultEventIdConflict,
 }
 
+#[cfg(feature = "jetstream-adapter")]
 impl PermanentPoisonFault {
     /// Stable database code for this classifier version.
     pub const fn code(self) -> &'static str {
@@ -214,6 +236,7 @@ impl PermanentPoisonFault {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 /// Explicit poison-body policy. There is intentionally no implicit `Default` policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PayloadRetentionPolicy {
@@ -228,6 +251,7 @@ pub enum PayloadRetentionPolicy {
     },
 }
 
+#[cfg(feature = "jetstream-adapter")]
 impl PayloadRetentionPolicy {
     const fn database_code(&self) -> &'static str {
         match self {
@@ -237,6 +261,7 @@ impl PayloadRetentionPolicy {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 /// Result of an append-only quarantine receipt write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuarantineRecordOutcome {
@@ -257,36 +282,50 @@ pub enum QuarantineRecordOutcome {
 /// Errors that must leave the source JetStream delivery unacknowledged.
 #[derive(Debug, Error)]
 pub enum QuarantineError {
+    /// A general platform quarantine or purge configuration is invalid.
+    #[error("invalid quarantine configuration")]
+    InvalidConfiguration,
+    #[cfg(feature = "jetstream-adapter")]
     /// Trusted deployment, stream generation, or stream name is invalid.
     #[error("invalid trusted JetStream source configuration")]
     InvalidSource,
+    #[cfg(feature = "jetstream-adapter")]
     /// Server metadata could not be extracted from the JetStream ACK reply subject.
     #[error("JetStream source identity metadata is unavailable")]
     SourceMetadata(#[source] async_nats::Error),
+    #[cfg(feature = "jetstream-adapter")]
     /// The message came from a different stream than the configured trusted stream.
     #[error("JetStream message stream does not match trusted stream configuration")]
     UnexpectedStream,
+    #[cfg(feature = "jetstream-adapter")]
     /// The message body exceeds the bounded quarantine source payload size.
     #[error("JetStream payload exceeds quarantine size limit")]
     PayloadTooLarge,
+    #[cfg(feature = "jetstream-adapter")]
     /// The parser version is not a positive supported version.
     #[error("quarantine parser version is invalid")]
     InvalidParserVersion,
+    #[cfg(feature = "jetstream-adapter")]
     /// NATS headers exceed the bounded replay-envelope header limit.
     #[error("JetStream headers exceed quarantine replay envelope limit")]
     HeadersTooLarge,
+    #[cfg(feature = "jetstream-adapter")]
     /// Encrypted retention requires a live configured KMS client and key.
     #[error("encrypted quarantine retention is unavailable")]
     EncryptionUnavailable,
+    #[cfg(feature = "jetstream-adapter")]
     /// The KMS request exceeded its fixed deadline.
     #[error("quarantine encryption exceeded its deadline")]
     EncryptionTimeout,
+    #[cfg(feature = "jetstream-adapter")]
     /// The KMS operation failed; the delivery remains unacknowledged.
     #[error("quarantine KMS operation failed")]
     Kms(#[source] domain_kms::KmsError),
+    #[cfg(feature = "jetstream-adapter")]
     /// Serialization of the versioned encrypted replay envelope failed.
     #[error("quarantine replay envelope serialization failed")]
     Json(#[from] serde_json::Error),
+    #[cfg(feature = "jetstream-adapter")]
     /// The configured per-deployment encrypted retention quota is exhausted.
     #[error("quarantine encrypted payload quota is exhausted")]
     QuotaExceeded,
@@ -296,9 +335,11 @@ pub enum QuarantineError {
     /// A locked expired Work row could not be deleted after its audit insert.
     #[error("quarantine TTL purge could not atomically delete its audited Work row")]
     PurgeInvariantViolation,
+    #[cfg(feature = "jetstream-adapter")]
     /// The source key already exists with different immutable receipt evidence.
     #[error("quarantine source identity conflicts with an existing receipt")]
     IdempotencyConflict,
+    #[cfg(feature = "jetstream-adapter")]
     /// The serialized encrypted payload exceeds its strict database storage bound.
     #[error("encrypted quarantine payload exceeds storage limit")]
     EncryptedBlobTooLarge,
@@ -307,6 +348,7 @@ pub enum QuarantineError {
     Database(#[from] sqlx::Error),
 }
 
+#[cfg(feature = "jetstream-adapter")]
 /// Platform Messaging owner service; uses a dedicated owner-role pool and trusted source config.
 pub struct PlatformPoisonQuarantine {
     pool: PgPool,
@@ -325,7 +367,7 @@ impl PlatformQuarantinePurger {
     /// Construct a purger using the dedicated `star_platform_quarantine_purger` pool.
     pub fn new(pool: PgPool, deployment_id: Uuid) -> Result<Self, QuarantineError> {
         if deployment_id.is_nil() {
-            return Err(QuarantineError::InvalidSource);
+            return Err(QuarantineError::InvalidConfiguration);
         }
         Ok(Self {
             pool,
@@ -394,6 +436,7 @@ impl PlatformQuarantinePurger {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 impl PlatformPoisonQuarantine {
     /// Connect the quarantine writer with an explicit policy; encrypted mode rejects LocalMock KMS.
     pub async fn connect(
@@ -605,6 +648,7 @@ impl PlatformPoisonQuarantine {
     }
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn validate_source(source: &TrustedJetStreamSource) -> Result<(), QuarantineError> {
     let name = source.stream_name.as_bytes();
     if source.deployment_id.is_nil()
@@ -627,6 +671,7 @@ fn validate_purge_batch(batch_limit: i64) -> Result<(), QuarantineError> {
     Ok(())
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn source_identity(
     source: &TrustedJetStreamSource,
     message: &Message,
@@ -644,11 +689,13 @@ fn source_identity(
     })
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn payload_digest(payload: &[u8]) -> [u8; 32] {
     Sha256::digest(payload).into()
 }
 
 #[derive(Serialize)]
+#[cfg(feature = "jetstream-adapter")]
 struct ReplayEnvelope<'a> {
     version: u16,
     deployment_id: Uuid,
@@ -662,6 +709,7 @@ struct ReplayEnvelope<'a> {
     payload_base64: String,
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn encode_replay_envelope(
     message: &Message,
     identity: &JetStreamSourceIdentity,
@@ -698,6 +746,7 @@ fn encode_replay_envelope(
     Ok(bytes)
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn validate_replay_header_limits(count: usize, total_bytes: usize) -> Result<(), QuarantineError> {
     if count > MAX_REPLAY_HEADER_COUNT || total_bytes > MAX_REPLAY_HEADER_BYTES {
         return Err(QuarantineError::HeadersTooLarge);
@@ -705,6 +754,7 @@ fn validate_replay_header_limits(count: usize, total_bytes: usize) -> Result<(),
     Ok(())
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn hex_digest(digest: &[u8; 32]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(64);
@@ -715,6 +765,7 @@ fn hex_digest(digest: &[u8; 32]) -> String {
     output
 }
 
+#[cfg(feature = "jetstream-adapter")]
 async fn set_platform_ingress_scope(
     tx: &mut Transaction<'_, Postgres>,
     deployment_id: Uuid,
@@ -746,6 +797,7 @@ async fn set_platform_deployment_id(
     Ok(())
 }
 
+#[cfg(feature = "jetstream-adapter")]
 async fn verify_existing_receipt(
     tx: &mut Transaction<'_, Postgres>,
     identity: &JetStreamSourceIdentity,
@@ -770,6 +822,7 @@ async fn verify_existing_receipt(
     verify_existing_row(&row, fault, parser_version, body_len, digest)
 }
 
+#[cfg(feature = "jetstream-adapter")]
 fn verify_existing_row(
     row: &sqlx::postgres::PgRow,
     fault: PermanentPoisonFault,
@@ -789,7 +842,7 @@ fn verify_existing_row(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "jetstream-adapter"))]
 mod tests {
     use super::*;
 

@@ -5510,11 +5510,11 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
-Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的 `jetstream-adapter` feature 和 crate 级无默认 feature 构建缝隙；完整应用依赖闭包仍需按 provider 核验。现有 quarantine/capacity consumer 仍需抽出接收/确认/replay port，当前也不是已移除 NATS 的产品构建。
 
 ### 自有 Rust 服务端复用（v6.24）
 
-采用模块级选择性适配，优先 RGS mTLS/timeout/retry 与 relay 指标模式；AssetsLake 事件信封/资源锁、ROPE 有界遥测只作受约束参考。保持业务 owner、native transport persistence、接收授权 verifier 三者边界；不引入整套源项目业务域或 Actix/Redis/Kafka/Wasm 栈作为前置条件。补完整回执 deadline、lease generation fence、持久化 quarantine、公平背压与 bounded key cardinality；Desktop 只消费分页投影。来源与逐模块缺口见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。本轮是设计选择，尚无 native server 交付声明。
+采用模块级选择性适配。RustGameServer 的 Apache-2.0 mTLS/client helper 是当前唯一直接代码候选，但明文 opt-out 必须移除，并补齐 Star 的 owner fence 与完整 receipt deadline；AssetsLake 的 AGPL-3.0 event envelope 仅作字段参考，源码迁入须先完成许可证兼容审查。ROPE_CS proprietary/internal-use、Ada 附加书面同意条款、CATs 许可冲突/stub 均排除代码迁移。保持业务 owner、native transport persistence、接收授权 verifier 三者边界；不引入整套源项目业务域或 Docker、Actix、Redis、Kafka、Wasm 栈作为前置条件。补完整回执 deadline、lease generation fence、持久化 quarantine、公平背压与 bounded key cardinality；Desktop 只消费分页投影。来源与逐模块缺口见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。本轮是设计选择，尚无 native server 交付声明。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
@@ -5530,3 +5530,20 @@ Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.25 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 接收/事务后确认实现和剩余缺口 | 推进全 phase 目标与自有 Rust server port |
+
+
+### 本机 Rust 服务端复用审查增量（v6.26）
+
+RustGameServer 是当前适合按模块适配的 Apache-2.0 来源，不将整个游戏服务栈纳入 Star；AssetsLake 的 outbox relay 因无真实 Kafka publisher 与 dry-run 完成语义而不作为生产实现。ROPE_CS proprietary/internal-use、Ada 附加许可、CATs license mismatch 等代码不迁入。Native Rust message server 必须由 Star 实现 transport persistence、认证、tenant isolation、持久化 cursor、ACK/replay/quarantine 和 bounded fairness；任何复用模块都要经过相同 transport contract tests。源仓库均保持只读，详细证据见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。这项设计不会改变 Multipass 管理 K3s、测试 inventory 上限 2、owner-local DB 事务或当前执行 fail-closed 状态。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.26 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐本机服务端代码复用选择及许可审查结论 | 用户授权参考和复用本机 Rust 服务端 |
+
+### Provider Cargo 隔离增量（v6.27）
+
+`platform-messaging-runtime` 已增加 `jetstream-adapter` feature：JetStream 收发模块、publisher 和 JetStream 专用 quarantine 代码由该 feature 控制；默认仍启用它以兼容当前装配。Rust-native provider 可从无默认 feature 的 transport core 开始实现。Rust 1.99.0 下该 crate 的 default 与 no-default `cargo check`、格式检查均通过；no-default 依赖树没有 `async-nats`。default 检查仍报告未修改 `domain-kms` 中 3 条弃用警告。这只证明本 crate 的 feature 边界可编译，不代表应用全量依赖、portable quarantine、native server 或端到端恢复已通过。capacity-result consumer 的 poison persistence/replay 仍需从 JetStream `Message` 解耦，并形成共享的受控 quarantine 契约。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.27 | 2026-10-12 | Ulysses — Mavis接手审核 | 为 NATS 可替换性增加 Cargo feature 边界与真实构建证据 | 用户确认未来以自有 Rust 服务替换 NATS |

@@ -420,7 +420,7 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
-Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的 `jetstream-adapter` feature 和 crate 级无默认 feature 构建缝隙；完整应用依赖闭包仍需按 provider 核验。现有 quarantine/capacity consumer 仍需抽出接收/确认/replay port，当前也不是已移除 NATS 的产品构建。
 
 
 ## D14 接收实现增量
@@ -430,3 +430,22 @@ AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.47 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |
+
+
+## 6.32 Local Rust server reuse and provider composition
+
+Keep `AdmissionTransport`, owner-local Inbox/Outbox, and the authorization verifier as Star-owned contracts. RustGameServer is the only current direct source candidate: isolate its Apache-2.0 gRPC mTLS/client helper, remove its plaintext opt-out, and preserve license notices. Do not import its game-domain, NATS producer, or Outbox settlement lacking a Star owner lease fence. AssetsLake's AGPL-3.0 event envelope is reference-only unless license compatibility and obligations are resolved. ROPE_CS proprietary/internal-use, Ada's written-consent addendum, and CATs' manifest/LICENSE mismatch block current source reuse; stubs do not qualify as providers. The native Rust server remains a Star-owned transport persistence implementation, deployed through the fixed Multipass/K3s Run binding; test inventory remains capped at two instances.
+
+Selection evidence and per-file implementation gaps are maintained in `DD-RUST-SERVER-REUSE-001.md`. No source project was modified and no native server/provider is claimed delivered by this design update.
+
+### 6.33 Provider Cargo isolation
+
+`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. The feature gates JetStream send/receive adapters and the JetStream-specific quarantine implementation; the provider-neutral admission publisher/receiver contracts remain available with `--no-default-features`. Default and no-default package checks and the package format check passed; the no-default package dependency tree excludes `async-nats`. The default build reports three deprecation warnings in unmodified `domain-kms`. This does not provide a native transport or portable poison store: capacity-result persistence/replay still needs a broker-neutral contract and an owner-controlled native implementation.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record Cargo provider boundary and bounded compile evidence |
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.48 | 2026-10-12 | Ulysses — Mavis接手审核 | Reconcile local server candidates, licensing, and native provider boundaries |

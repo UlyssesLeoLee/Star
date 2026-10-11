@@ -33,6 +33,8 @@
 
 **原生 Hook 强约束**：安全关键 Hook 必须由 Rust 核心原生执行，fail-closed 且不可被插件替代或减弱；Project/Worktree 继承、Run 快照、生命周期门与 BI 事件使用同一版本化 HookSet 契约。旧 Python Hook handler 仅可作为显式非权威的兼容/观测输入，不得参与授权、命令放行或验收决策。
 
+**本机 Rust 服务端复用**：设计或实现 Star 的服务端能力时，先盘点 `E:\AssetsLake` 和本机相关 Rust 项目中的可复用模块；逐项核对源仓库说明、当前 HEAD/脏状态、目标文件实现、许可证/权属和依赖闭包，再决定直接适配或仅参考。按模块复用并保留所需版权/NOTICE；不得把 mock、Noop、stub、dry-run 或未验证的队列当成生产实现，也不得把源仓库的 Docker/数据库/业务域栈带入 Star。源仓库有未提交改动时只读并以文件哈希固定实际证据；存在禁止再分发/部署或许可冲突时，先解决权利与许可，不复制代码或部署该服务。
+
 **Agent/Task CLI 闭环验收**：任何标为可用的 Agent 或任务卡 CLI 功能，必须贯通已授权的 Run/Worktree/Task 绑定、实际执行与可控工具调用、取消/恢复、独立验证、有限且可审计的输出/证据，以及结果回写；执行必须校验当前权限、策略版本和资源预算。仅有 UI、mock、seed、预览适配器或 REST 契约不得标为可用闭环。缺少 provider、sandbox、runtime 或持久化边界时，应显式禁用执行并说明阻断条件，不能降级为无约束任意 Shell。
 **Schedule run-as 授权**：Schedule Rule 创建时必须将创建者固化为不可变 `run_as_actor_id`；无人值守每次 trigger/retry/resume 均须按该身份实时复验当前 Project/Engineering Run 权限与 execution capability。撤权、授权目录不可用或授权事实不完整时 fail closed；Rule 创建/启用 API 的写入时检查不能替代执行前复验。
 

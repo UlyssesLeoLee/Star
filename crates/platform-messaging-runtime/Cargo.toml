@@ -8,16 +8,28 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = ["jetstream-adapter"]
+jetstream-adapter = [
+    "dep:async-nats",
+    "dep:base64",
+    "dep:domain-kms",
+    "dep:futures-util",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:sha2",
+]
+
 [dependencies]
-async-nats = { workspace = true, features = ["server_2_10"] }
-futures-util = { workspace = true }
-base64 = "0.23"
+async-nats = { workspace = true, optional = true, features = ["server_2_10"] }
+futures-util = { workspace = true, optional = true }
+base64 = { version = "0.23", optional = true }
 chrono = { workspace = true }
-domain-kms = { path = "../domain-kms" }
+domain-kms = { path = "../domain-kms", optional = true }
 domain-automation = { path = "../domain-automation" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

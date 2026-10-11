@@ -519,7 +519,7 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
-Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的 `jetstream-adapter` feature 和 crate 级无默认 feature 构建缝隙；完整应用依赖闭包仍需按 provider 核验。现有 quarantine/capacity consumer 仍需抽出接收/确认/replay port，当前也不是已移除 NATS 的产品构建。
 
 
 ## D14 接收实现增量
@@ -529,3 +529,25 @@ AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.47 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |
+
+
+## 6.32 Local Rust service source adaptation decision
+
+The current reusable source is limited to a candidate RustGameServer mTLS/client helper under Apache-2.0, with its plaintext opt-out removed and its transport identity bound to Star authorization. Its Outbox methods settle by bare message ID and its producer timeout does not cover the PubAck future, so neither is copied as-is. AssetsLake's AGPL-3.0 event envelope may inform field naming, but its relay's dry-run/no-broker path marks rows published and cannot be used as durable delivery. ROPE_CS is proprietary/internal-use and is excluded absent explicit rights-holder permission; Ada has an added prior-written-consent condition; CATs has conflicting root/license declarations and only Kafka stubs. No code from those excluded sources enters Star.
+
+Native replacement remains a Star-owned durable transport service with authenticated append/pull/ack, immutable log identity/cursor, tenant isolation, owner commit-before-ack, durable quarantine/replay, bounded memory/backpressure, and restart/failure proof. NATS stays behind the provider port until a native provider passes the same contract and deployment gates. See `DD-RUST-SERVER-REUSE-001.md` for exact source heads, permitted evidence, and hashes. The implementation worktree remains subject to the two-Multipass-instance test cap and no-Docker-Desktop policy.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.48 | 2026-10-12 | Ulysses — Mavis接手审核 | Add concrete source-reuse decision and native transport obligations |
+
+
+## 6.33 Provider Cargo feature boundary
+
+`platform-messaging-runtime/Cargo.toml` defines `jetstream-adapter` and enables it by default for existing deployments. `async-nats`, its JetStream publisher/receiver adapters, and JetStream-specific quarantine code are behind this feature. The static-dispatch `AdmissionTransport` and `AdmissionReceiveTransport` contracts remain in the crate's no-default-feature surface. Rust 1.99.0 compiled this crate with and without the default feature, and the no-default dependency tree excludes `async-nats`; package format check also passed. The default build reports three deprecation warnings in unmodified `domain-kms`.
+
+This is a package boundary only. It does not assert that other application crates no longer depend on NATS, and it does not supply the native provider. `PlatformPoisonQuarantine` remains JetStream-specific; malformed admission deliveries still lack a provider-neutral durable quarantine/replay path. Native service acceptance still requires authenticated durable append/pull/ack, bounded persistence and backpressure, stable provider generation/cursor, replay after process restart, owner commit-before-ack, and fault-injection evidence. Maintain the existing default feature until a deployed replacement passes the same transport contract and an explicit profile migration.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Add optional JetStream feature boundary and package-scoped no-default build result |
