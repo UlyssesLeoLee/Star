@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D16 adds a provider-neutral PostgreSQL quarantine receipt and standalone `durable-quarantine` feature. Focused package tests and compile checks pass under Rust 1.98.1 with `--ignore-rust-version`; the migration and database transaction test remain unexecuted. The receipt is metadata-only and not production-wired. Native provider/profile resolver, encrypted replay, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.54 | Date: 2026-10-12
+> Status: 🟡 D16 provider-neutral PostgreSQL quarantine is verified on a disposable PostgreSQL 18.6 runner (68/68), including D15 migration double-apply and the real receiver-to-quarantine SQLx scenario 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production profile resolver/service identity, native provider, encrypted replay, full app dependency closure, BI and execution remain open.
+> Version: 0.55 | Date: 2026-10-12
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -441,7 +441,7 @@ Selection evidence and per-file implementation gaps are maintained in `DD-RUST-S
 
 ### 6.33 Provider Cargo isolation
 
-`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. JetStream publisher/receiver and the legacy JetStream poison implementation remain behind it. D16 adds an independent `durable-quarantine` feature and `PgAdmissionReceiveQuarantine`, which implements the admission poison port without importing NATS. Its append-only Transaction receipt is deployment- and tenant-scoped, keyed by provider/log generation/log/cursor, and stores route identity, parser fault, exact wire length and SHA-256. It intentionally retains no untrusted body; no payload replay is claimed. The new feature combination passed package unit tests and an all-targets compile under Rust 1.98.1 with `--ignore-rust-version`, while the Run-owner PostgreSQL test target compiled. Rust 1.99.0 acceptance, actual migration/transaction verification, production composition and the full application dependency closure remain open.
+`platform-messaging-runtime` has an optional `jetstream-adapter` feature, enabled by default for the current deployment. JetStream publisher/receiver and the legacy JetStream poison implementation remain behind it. D16 adds an independent `durable-quarantine` feature and `PgAdmissionReceiveQuarantine`, which implements the admission poison port without importing NATS. Its append-only Transaction receipt is deployment- and tenant-scoped, keyed by provider/log generation/log/cursor, and stores route identity, parser fault, exact wire length and SHA-256. It intentionally retains no untrusted body; no payload replay is claimed. At the first D16 checkpoint the migration and SQLx persistence behavior were still open; the final disposable database evidence superseding that status is recorded below.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
@@ -449,6 +449,7 @@ Selection evidence and per-file implementation gaps are maintained in `DD-RUST-S
 | 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the new receiver poison-quarantine port while preserving the missing durable-provider gap |
 | 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Pin trusted log generation in poison quarantine identity and idempotency key |
 | 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify D16 provider-neutral PostgreSQL quarantine receipt, deployment/tenant RLS and metadata-only retention; mark migration and runtime verification open |
+| 0.55 | 2026-10-12 | Ulysses — Mavis接手审核 | Record final D16 disposable PostgreSQL 68/68, migration replay, D15 double-apply and SQLx receiver/quarantine 1/1; define D17 Transport Profile Master/resolver, trusted service identity and approved local module adaptation boundaries |
 
 
 ## 6.34 Profile-pinned transport replacement design
@@ -459,7 +460,7 @@ Admission delivery has three layers. The business layer keeps the immutable type
 
 `AdmissionTransportProfile` and `AdmissionTransportReceipt` are NATS-free Rust types. `AdmissionPublisher<T>` validates the receipt against the pinned claim and exact original wire before calling the owner-native settlement procedure. `JetStreamAdmissionTransport` alone maps the generic proof to a stream generation and big-endian sequence cursor; a future Star Rust provider may use another opaque cursor encoding while preserving the same owner/Outbox/Inbox contract. NATS remains the default compatibility feature until a versioned profile cutover passes the shared gate.
 
-Cutover order: resolve and freeze a versioned profile; keep existing profile workers available to drain or recover their pinned rows; enable the native provider for new profile-bound rows; verify durable replay, receiver commit-before-ack, quarantine/recovery, profile-mismatch behavior, bounded backpressure, restart and failure; compare BI facts; only then retire the JetStream feature and its other direct consumers. Do not compare cursors, NATS duplicate windows, or acknowledgements across providers. The current implementation has no production resolver, native provider, or portable capacity/quarantine receiver. The D15 PostgreSQL migration still needs live validation; default/no-default compilation does not prove it.
+Cutover order: resolve and freeze a versioned profile; keep existing profile workers available to drain or recover their pinned rows; enable the native provider for new profile-bound rows; verify durable replay, receiver commit-before-ack, quarantine/recovery, profile-mismatch behavior, bounded backpressure, restart and failure; compare BI facts; only then retire the JetStream feature and its other direct consumers. Do not compare cursors, NATS duplicate windows, or acknowledgements across providers. D16 later applied the D15 migration twice and passed a receiver-to-quarantine SQLx scenario in the disposable PostgreSQL chain; target database rollout, production grants, resolver, native provider, and portable capacity/quarantine receiver remain open. Default/no-default compilation does not prove those production gates.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
@@ -469,3 +470,17 @@ Cutover order: resolve and freeze a versioned profile; keep existing profile wor
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.48 | 2026-10-12 | Ulysses — Mavis接手审核 | Reconcile local server candidates, licensing, and native provider boundaries |
+
+### 6.35 D17 Transport Profile Master and trusted service identity
+
+D16 final verification: the PostgreSQL 18.6 disposable runner completed 68/68 steps, reapplied D16 migrations, applied the D15 transport-profile migration twice and passed the real `AdmissionReceiver`→PostgreSQL quarantine SQLx scenario 1/1 (21.37s). The Rust run used 1.98.1 `--ignore-rust-version`; required Rust 1.99.0 and production credentials/grants remain open. The disposable database was stopped and removed, with no Multipass inventory changes.
+
+D17 establishes the resolver and identity foundation before a native transport is connected. The Platform Messaging owner maintains tenant- and deployment-scoped Transport Profile revisions as SCD2 Master facts, append-only revision/audit events, and a versioned Outbox fact for BI consumers. Runtime readers receive only the exact active revision authorized for their trusted deployment/tenant context. Profile documents are bounded and deterministic; they store non-secret provider/version, protocol, endpoint identity, durable-log generation policy, capability scope and opaque secret-manager references. Credential material, private keys, full broker URLs and user-controlled routing values are never persisted in profile JSON or exposed in logs.
+
+The resolver returns a verified immutable snapshot only after checking tenant/deployment scope, lifecycle state, profile/schema version, canonical digest, provider/version, endpoint identity, service-identity binding and the allowed sender/recipient/message-kind tuple. The transport adapter still proves the remote peer using the configured credential/certificate; profile lookup alone does not authenticate a message. `AdmissionReceiveAuthorization` remains responsible for current policy checks before owner commit and before ACK, while the owner Inbox/receipt remains the business idempotency boundary. Unknown, revoked, expired, ambiguous or mismatched profile/identity state denies the operation.
+
+First claim continues to pin provider/version/digest/endpoint on each delivery Work row. Publishing a successor profile affects new claims only; retries remain on the old pinned profile until drained or explicitly reconciled. Log generation changes invalidate old cursors. No profile mutation may rewrite terminal receipts, infer identity from wire contents, or compare cursor/ACK behavior across provider generations.
+
+Reuse inputs are selected by function, not repository: AssetsLake event metadata (trace/causation/idempotency) can inform the typed envelope mapping, but its dry-run relay is excluded from durable delivery; RustGameServer's Apache-2.0 mTLS channel helper can inform a client connector after removal of plaintext opt-out; SandTree EventRouter is only for bounded ephemeral notifications after commit; IDE1.0's CLI protocol is reserved for the Task Card CLI phase and needs bounded channels, cancellation and Run/Worktree/Task authorization. Source repositories stay read-only and each imported file retains required notices and a reviewed dependency closure.
+
+D17 acceptance must include duplicate-safe migrations, SCD2/CAS and append-only audit, deployment+tenant RLS under the actual least-privilege roles, deterministic digest verification, exact identity/profile positive cases and stale/revoked/cross-scope negative cases, bounded resolver queries and cache lifetime, and outbox event evidence. The initial D17 slice does not enable a native provider or Schedule execution; Rust 1.99.0, production credential lifecycle, native append/pull/ack, durable replay, full application dependency closure, BI consumption, runtime sandbox and independent validation remain separate gates.

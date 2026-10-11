@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.80**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.81**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -971,7 +971,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 本机 `E:/AssetsLake` 与其他 Rust 服务端模块可直接参考、适配和复用，源仓仍只读并按模块核对 HEAD/脏状态/hash、权属、许可义务、传递依赖及实现缺口。AGPL-3.0 不是商业用途禁令；需要履行具体分发/网络提供情形适用的源码与 NOTICE 义务。AssetsLake 当前 relay 缺少真实 Kafka 投递，因此不能作为生产 transport；其余独立模块不因此被排除。D16 未复制外部代码，保留 Star 自有 owner/RLS/idempotency/WORM 契约。
 
-Rust 1.98.1 `--ignore-rust-version` 下 feature package tests 16/16、all-targets check、Run-owner SQLx test target compile 与 no-NATS dependency tree 通过；Rust 1.99.0 正式验收及 live PostgreSQL migration/transaction/RLS/grants 尚未完成。阶段报告见 [PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT](../reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
+本节记录 D16 首轮实现时的中间验证状态：Rust 1.98.1 `--ignore-rust-version` 下 feature package tests 16/16、all-targets check、Run-owner SQLx test target compile 与 no-NATS dependency tree 通过；当时 PostgreSQL migration/transaction 尚未执行。D16 rebase 后最终 disposable PostgreSQL/SQLx 证据见 §D16 rebase 后最终验证（v4.81）；Rust 1.99.0 正式验收、生产目标库/grants 与其余生产接线仍开放。阶段报告见 [PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT](../reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
@@ -984,3 +984,15 @@ Rust 1.98.1 `--ignore-rust-version` 下 feature package tests 16/16、all-target
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v4.80 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展 Rust 服务来源审查并区分消息、MCP 与本机 IPC 能力 | 用户授权参考复用本机 Rust 服务端 |
+
+### D16 rebase 后最终验证与本机模块复用映射（v4.81）
+
+D16 最终 PostgreSQL 18.6 disposable runner 为 68/68；两份 D16 quarantine migration 重跑通过，D15 transport-profile migration 双次应用通过，真实 `AdmissionReceiver`→PostgreSQL quarantine SQLx 场景 1/1（21.37s）。该用例通过 test-only transport/authorization/terminal doubles 验证 source 前后复验、quarantine commit-before-terminal、terminal 首次失败后 exact replay 与未成功前零 ACK。它在 Rust 1.98.1 `--ignore-rust-version` 下运行；Rust 1.99.0、生产 identity/grants、生产组合、encrypted replay、BI/Benchmark 与 native transport 仍未关闭。临时 PG 已停并移除；Multipass inventory 无变化。
+
+用户已明确 `E:/AssetsLake` 和本机其他 Rust server 可直接作为参考与模块复用来源。复核时 AssetsLake HEAD 为 `0156aca56c0d7364120d7389ebe1ccf0cb64b750`，仓库有 17 个脏路径，但候选 `backend/src/services/event_publisher_service.rs` 本身干净且 SHA-256 仍为 `3A2114863827CB8CE893AD5A24090D827F89B7752C6FF23546DBDB4DC3B8A4A5`。该 AGPL-3.0 模块可用于事件 envelope/trace/causation/idempotency 适配，商业使用需履行适用源码与 NOTICE 义务并核对依赖闭包；其中 dry-run relay 不能证明 Kafka durable delivery，故不作为生产 transport。RustGameServer mTLS channel helper、SandTree EventRouter/Multipass adapter 和 IDE1.0 CLI protocol 的用途与缺陷见 [DD-RUST-SERVER-REUSE-001](DD-RUST-SERVER-REUSE-001.md)。D16 本身未复制外部源码，保留 Star owner/RLS/idempotency/WORM 与 Worktree/Run 授权边界。
+
+下一阶段 D17 是 Transport Profile Master/resolver 与 trusted service identity：Profile 由 Platform Messaging owner 以 deployment+tenant 双 scope 管理 SCD2 revision、append-only audit/outbox；resolver 只接受可信部署身份并返回无秘密的验证快照；credential 仅用 opaque secret-manager reference；source verifier 独立绑定 provider、endpoint 与 durable-log generation。先以 RustGameServer mTLS helper 做小模块适配评估，并用 AssetsLake envelope metadata 作 typed event 映射参考；不得复制其 dry-run relay。D17 不打开 native delivery 或 Schedule execution。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v4.81 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 rebase 后 68/68 + SQLx 1/1 最终证据；更新 AssetsLake 候选文件状态/hash、模块复用适配映射与 D17 Profile/身份边界，保留生产及 native provider gates | D16 最终复验及用户再次明确本机 Rust 服务可复用 |

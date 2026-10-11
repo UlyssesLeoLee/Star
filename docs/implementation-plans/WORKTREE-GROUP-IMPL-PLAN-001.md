@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.71**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.72**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -37,9 +37,9 @@
 > - Phase 9F4B 状态：规则创建者固定为 `run_as_actor_id`，认证创建者派生身份且所有 successor revision 继承；additive migration 对历史行按最早版本 `changed_by` 回填，并以数据库 trigger 防止身份替换；domain occurrence snapshot 随规则快照携带该主体。每次定时触发/重试/恢复仍须由未来 worker 复验该主体当前 Project binding 与 Engineering Run grant，撤权或 ACL 不可确认时 fail closed。此阶段没有启用 worker、Run admission 或 Launch Profile authority；详见 §6.78 和 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。
 > - Phase 9F4C 状态：9F4C-B Rule enable-time 授权已由 SCHED-API-015 / 9F4C-C 补上 Project-scoped transaction lock：授权 helper 获锁后，API 下一 SQL statement 重读 Project/Branch/Run grants；对应 grant mutation triggers 共用锁。PostgreSQL 18.6 双连接测试证明三类撤权等待已持锁授权事务，授权提交后撤权完成且后续授权 fail closed。完整 REST write rollback 与 target grants仍未完成；worker 每次 trigger/retry/resume reauthorization、原子 Run admission 保持 fail closed，见 §6.82。
 > - Phase 9F4D 状态：双 owner 事务边界仍为设计要求；`domain-infrastructure` 已提供并定向验证 V2 binding/demand/capacity/readiness contracts 与 Host reservation/readiness gate，并通过 Rust 1.98.1 focused gates（27/27 tests）。Gate 绑定 Manager receipt、Multipass daemon/owned guest（remote K3s 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge、Host generation 和 30 秒新鲜度；它不解析实时 ACL/Run binding、不持久化 owner reservation、不连接 Inbox/Outbox、worker 或真实 Multipass Manager/provider；执行保持 fail closed，见 §6.85-§6.89。
-> - 关联需求：docs/requirements.md v5.84 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.18（9F4A/9F4B/9F4C/9F4D 增量）。
-> - 关联基本设计：docs/basic-design.md v5.82 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.18（9F4D 增量）。
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.58、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.18、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.14；Data Design v1.7。
+> - 关联需求：docs/requirements.md v6.35 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.56（9F4A/9F4B/9F4C/9F4D 增量）。
+> - 关联基本设计：docs/basic-design.md v6.33 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.55（9F4D 增量）。
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.81、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.57、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.14；Data Design v1.7。
 
 ---
 
@@ -2031,3 +2031,19 @@ Cargo SQLx 是本机 Rust 1.98.1 `--ignore-rust-version` 诊断运行，不构�
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.71 | 2026-10-12 | Ulysses — Mavis接手审核 | 合并 D16 receiver SQLx 复验和本机 Rust 模块可选择复用的扩展候选；保留授权、许可证、性能、正式工具链与产品执行缺口 | rebase 后 runner 68/68、SQLx 1/1 通过；用户明确本机 Rust server 可作为参考复用来源 |
+
+## 6.133 — Phase 9F4C-D17: Transport Profile Master/resolver 与可信服务身份
+
+**状态：🟡 设计已收口，实施未开始；D16 最终代码和数据库证据已同步到需求与详细设计。**
+
+D17 先建立 Platform Messaging owner 的 deployment+tenant-scoped Transport Profile SCD2 Master、append-only Audit/Transactional Outbox 与 Rust trusted resolver。Profile 固定 provider/version/schema/digest、endpoint、durable log generation policy、allowed sender/recipient/kind scope；只存 secret-manager opaque reference，不存 credential。Resolver 必须从已认证部署上下文取 profile，重新校验 lifecycle/scope/digest 和 identity binding；信任的 TLS/provider 身份与业务 ACL 分开验证。首次 claim pinning 继续生效，profile successor 只影响新 delivery；旧 profile delivery 必须 drain/reconcile，不能被新 provider 自动接管。
+
+本机模块接入选择：AssetsLake `event_publisher_service.rs` 只用于 typed envelope/trace/causation/idempotency 字段适配参考；当前文件工作副本干净、SHA-256 与调查表一致，但其 dry-run relay 不用于 durable transport。RustGameServer Apache-2.0 `channel.rs` 是后续 mTLS connector 的直接适配候选，必须移除明文 opt-out 并绑定 Star service identity；暂不迁入其 NATS producer/Outbox settlement。SandTree EventRouter 只可服务 committed fact 后的有界易失投影；IDE1.0 CLI protocol 留给 Task Card CLI phase，先解决无界 subscriber/backpressure 与 Run/Worktree/Task 授权。来源项目保持只读并保留许可通知；没有确认依赖闭包的代码不能引入。
+
+D17 验收必须包括 Rust 1.99.0 正式 gates、migration 重放、双 scope FORCE RLS + 实际 runtime grants、SCD2/CAS/append-only 与 Outbox、profile digest/schema/identity resolver 正负例、secret-free persistence/logging，以及 bounded query/cache。生产 credential lifecycle、native durable append/pull/ack、provider restart/replay/terminal ACK、full-app NATS dependency removal、BI consumer、RSS/并行/故障基准仍是后续阶段；D17 不启用 Run execution。
+
+自动化档：[P]（R/V/S）。实现前生成 D17 automation brief；按 owner/schema、Rust resolver、source module adapter 与 disposable PostgreSQL 验收拆成有界子阶段。报告需记录真实依赖/hash/许可义务与失败门，不将 profile DB 验收误写为 transport 或执行验收。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.72 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 最终结果，定义 D17 profile master/resolver 与 service identity 边界，明确 AssetsLake/RustGameServer/SandTree/IDE1.0 的模块适配范围与未验收门 | 用户重申可直接参考复用本机 Rust 服务；发现 Schedule SRS/BD 与 Group DD 尚有 D16 中间状态 |

@@ -1,7 +1,7 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v0.9 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：已完成有界来源/许可审查和模块选择；未迁移源码，未实现 native transport provider。
+> v1.0 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：已完成有界来源/许可审查和模块选择并复验 AssetsLake 候选文件；尚未迁移源码，未实现 native transport provider。
 
 ## 1. 范围与证据
 
@@ -108,3 +108,12 @@ CodeGraph 未能提供这些来源仓库的索引覆盖审计；本节结论来�
 | v0.7 | 2026-10-12 | Ulysses — Mavis 接手审核 | Clarify that AssetsLake and other local Rust modules may be directly reused after module-level license/ownership/dependency review; AGPL is not a commercial-use ban, while the current dry-run relay remains unsuitable as production transport |
 | v0.8 | 2026-10-12 | Ulysses — Mavis 接手审核 | 新增 CATEST、OpenAIActixMCP、SandTree、CATLLM 的有界候选审查；记录 Kafka ACK/auto-commit 缺口及本地 IPC/MCP 边界，明确无可直接替换 NATS 的现成服务 | 用户授权参考复用本机 Rust 服务端 |
 | v0.9 | 2026-10-12 | Ulysses — Mavis 接手审核 | 补充 SandTree 有界 EventRouter/Multipass provider 与 IDE1.0 CLI protocol 文件级审查及精确 hash；明确内存、阻塞/超时、授权和背压缺口，保留本机 Rust 服务可模块级参考/复用原则 | 用户再次明确 E:/AssetsLake 与本机其他 Rust 服务可直接作为参考和选择性复用来源 |
+| v1.0 | 2026-10-12 | Ulysses — Mavis 接手审核 | 复验 AssetsLake 候选 event publisher 文件在 dirty source repository 内仍未修改且 SHA-256 与记录一致；明确可择取其 typed event metadata 进行适配，同时排除 dry-run relay 的 durable delivery 声明；映射 D17 对 mTLS/profile identity 的小模块接入边界 | 用户再次确认 E:/AssetsLake 和本机其它 Rust server 可参考复用 |
+
+## 8. D17 source reuse recheck
+
+The read-only recheck on 2026-10-12 found AssetsLake at `0156aca56c0d7364120d7389ebe1ccf0cb64b750` with 17 dirty/untracked paths. The selected `backend/src/services/event_publisher_service.rs` itself was clean, and its SHA-256 remained `3A2114863827CB8CE893AD5A24090D827F89B7752C6FF23546DBDB4DC3B8A4A5`. It is eligible for selective adaptation of typed event metadata fields (schema version, trace, causation and idempotency); its separate-pool staging and dry-run/no-broker relay behavior remain unsuitable as Star owner Outbox or production durable transport. No source file was copied or changed in this recheck.
+
+The RustGameServer `channel.rs` candidate remains Apache-2.0 at SHA-256 `8949F57996706547BC8E60022101B8B4AB854D3D0B4AB07CB9BA4252A7433061`; its explicit `require_tls=false` plaintext branch must be removed before adapting the client connector. D17 may use this small helper for trusted transport authentication after retaining the applicable notice and wrapping the full publish/ack operation in Star's absolute deadline. It does not provide service authorization or a durable receipt. SandTree EventRouter, its blocking Multipass provider, and IDE1.0's unbounded CLI subscriber retain the v0.9 suitability limits.
+
+This recheck does not assert that all local Rust projects are audited, that AGPL obligations are already fulfilled for a hypothetical distribution, or that any external module is production-integrated. For each copied file, pin the exact source state, retain license/NOTICE, inspect the build and distribution dependency closure, adapt the code to Star's owner/Run authorization and bounded resource contracts, and record focused evidence.
