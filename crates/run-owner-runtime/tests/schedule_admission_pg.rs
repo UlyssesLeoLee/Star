@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=37373e38a90f3c0882761685b5ac69d0fee95175a60e6a8eb5f6d09f9492e1c9
+@cypher schema=1 source_sha256=72fbf8bc66d7ec4aef871ecf569b360cca1c4ff92d8f4cb5215c3ad3ec2db83c
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -115,10 +115,18 @@ MERGE (self)-[:DEFINES]->(delivery_test)
 MERGE (schedule_retry)-[:CALLS]->(delivery_test)
 MERGE (delivery_test)-[:USES_TYPE]->(delivery_store:Type {id:"platform_messaging_runtime::AdmissionDeliveryStore",kind:"struct"})
 MERGE (delivery_test)-[:USES_TYPE]->(delivery_publisher:Type {id:"platform_messaging_runtime::AdmissionJetStreamPublisher",kind:"struct"})
+MERGE (transport_profile:Type {id:"platform_messaging_runtime::AdmissionTransportProfile",kind:"struct"})
+MERGE (transport_receipt:Type {id:"platform_messaging_runtime::AdmissionTransportReceipt",kind:"struct"})
+MERGE (delivery_test)-[:USES_TYPE]->(transport_profile)
+MERGE (delivery_test)-[:USES_TYPE]->(transport_receipt)
+MERGE (delivery_test)-[:CALLS]->(profile_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportProfile::new",kind:"method"})
+MERGE (delivery_test)-[:CALLS]->(receipt_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportReceipt::new",kind:"method"})
 MERGE (delivery_test)-[:WRITES]->(schedule_delivery:Table {id:"automation.admission_message_delivery"})
 MERGE (delivery_test)-[:WRITES]->(run_delivery:Table {id:"multica.admission_message_delivery"})
 MERGE (schedule_fence)-[:USES_TYPE]->(delivery_store)
 MERGE (schedule_fence)-[:USES_TYPE]->(delivery_publisher)
+MERGE (schedule_fence)-[:USES_TYPE]->(transport_profile)
+MERGE (schedule_fence)-[:CALLS]->(profile_new)
 MERGE (schedule_fence)-[:READS]->(schedule_delivery_receipt:Table {id:"automation.admission_message_delivery_receipt"})
 MERGE (delivery_test)-[:READS]->(schedule_delivery_receipt)
 MERGE (delivery_test)-[:READS]->(run_delivery_receipt:Table {id:"multica.admission_message_delivery_receipt"})
@@ -2143,6 +2151,12 @@ async fn verify_admission_delivery(
     result: &ScheduleRunAdmissionResultV1,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use platform_messaging_runtime::admission_delivery::*;
+    let profile = AdmissionTransportProfile::new(
+        "nats-jetstream".to_owned(),
+        "2.12.14".to_owned(),
+        [9; 32],
+        "test-nats".to_owned(),
+    )?;
     sqlx::raw_sql("CREATE ROLE star_delivery_schedule_test_login LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS; GRANT star_automation_schedule_owner TO star_delivery_schedule_test_login").execute(admin).await?;
     let options: PgConnectOptions = std::env::var("STAR_RUN_OWNER_TEST_DATABASE_URL")?.parse()?;
     let schedule_pool = PgPoolOptions::new()
@@ -2163,19 +2177,19 @@ async fn verify_admission_delivery(
     let wrong_owner =
         AdmissionDeliveryStore::new(run_pool.clone(), AdmissionDeliveryOwner::Schedule);
     assert!(wrong_owner
-        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &profile)
         .await
         .is_err());
     assert!(schedule_delivery
-        .claim(cmd.tenant_id, Uuid::new_v4(), 9, 120)
+        .claim(cmd.tenant_id, Uuid::new_v4(), 9, 120, &profile)
         .await
         .is_err());
     assert!(schedule_delivery
-        .claim(Uuid::nil(), Uuid::new_v4(), 1, 120)
+        .claim(Uuid::nil(), Uuid::new_v4(), 1, 120, &profile)
         .await
         .is_err());
     let first = schedule_delivery
-        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &profile)
         .await?
         .pop()
         .unwrap();
@@ -2187,8 +2201,24 @@ async fn verify_admission_delivery(
         .await?;
     sqlx::query("UPDATE automation.admission_message_delivery SET next_attempt_at=clock_timestamp() WHERE tenant_id=$1 AND message_id=$2")
         .bind(cmd.tenant_id).bind(first.message_id).execute(admin).await?;
+    let replacement_profile = AdmissionTransportProfile::new(
+        "star-rust-log".to_owned(),
+        "1.0.0".to_owned(),
+        [10; 32],
+        "test-star-log".to_owned(),
+    )?;
+    assert!(schedule_delivery
+        .claim(
+            cmd.tenant_id,
+            Uuid::new_v4(),
+            1,
+            120,
+            &replacement_profile,
+        )
+        .await?
+        .is_empty());
     let second = schedule_delivery
-        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &profile)
         .await?
         .pop()
         .unwrap();
@@ -2256,15 +2286,18 @@ async fn verify_admission_delivery(
             context.clone(),
             name.clone(),
             String::new(),
+            Uuid::new_v4(),
+            profile.clone(),
         )?;
         let (_cancel, active) = tokio::sync::watch::channel(false);
         let delivered = publisher
             .publish_due(cmd.tenant_id, Uuid::new_v4(), 1, &active)
             .await?;
         assert_eq!(delivered.delivered, 1);
-        let seq:i64=sqlx::query_scalar("SELECT broker_sequence FROM automation.admission_message_delivery_receipt WHERE tenant_id=$1 AND message_kind='request' AND message_id=$2")
+        let cursor: Vec<u8> = sqlx::query_scalar("SELECT transport_cursor FROM automation.admission_message_delivery_receipt WHERE tenant_id=$1 AND message_kind='request' AND message_id=$2")
             .bind(cmd.tenant_id).bind(cmd.request_id).fetch_one(admin).await?;
-        assert_eq!(seq, i64::try_from(ack.sequence)?);
+        let sequence = i64::from_be_bytes(cursor.as_slice().try_into()?);
+        assert_eq!(sequence, i64::try_from(ack.sequence)?);
         let info = stream.get_info().await?;
         assert_eq!(
             info.state.messages, 1,
@@ -2275,6 +2308,8 @@ async fn verify_admission_delivery(
             context.clone(),
             "ABSENT_ADMISSION_STREAM".to_owned(),
             String::new(),
+            Uuid::new_v4(),
+            profile.clone(),
         )?;
         assert_eq!(
             wrong_stream
@@ -2290,6 +2325,8 @@ async fn verify_admission_delivery(
             context.clone(),
             name.clone(),
             String::new(),
+            Uuid::new_v4(),
+            profile.clone(),
         )?;
         let (_cancel, cancelled) = tokio::sync::watch::channel(true);
         assert!(
@@ -2313,13 +2350,18 @@ async fn verify_admission_delivery(
             .settle(
                 &second,
                 AdmissionDeliveryAction::Delivered {
-                    stream: "ACK_FIXTURE".to_owned(),
-                    sequence: 42,
+                    receipt: AdmissionTransportReceipt::new(
+                        profile.clone(),
+                        "ACK_FIXTURE".to_owned(),
+                        Uuid::new_v4(),
+                        42_i64.to_be_bytes().to_vec(),
+                        &second.wire,
+                    )?,
                 },
             )
             .await?;
         let run_claim = run_delivery
-            .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+            .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &profile)
             .await?
             .pop()
             .unwrap();
@@ -2328,8 +2370,13 @@ async fn verify_admission_delivery(
             .settle(
                 &run_claim,
                 AdmissionDeliveryAction::Delivered {
-                    stream: "ACK_FIXTURE".to_owned(),
-                    sequence: 43,
+                    receipt: AdmissionTransportReceipt::new(
+                        profile.clone(),
+                        "ACK_FIXTURE".to_owned(),
+                        Uuid::new_v4(),
+                        43_i64.to_be_bytes().to_vec(),
+                        &run_claim.wire,
+                    )?,
                 },
             )
             .await?;
@@ -2337,11 +2384,11 @@ async fn verify_admission_delivery(
     assert_eq!(schedule_delivery.reconcile(cmd.tenant_id, 8).await?, 0);
     assert_eq!(run_delivery.reconcile(cmd.tenant_id, 8).await?, 0);
     assert!(schedule_delivery
-        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &profile)
         .await?
         .is_empty());
     assert!(run_delivery
-        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120)
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &profile)
         .await?
         .is_empty());
     // Disposable metadata fixtures exercise native cleanup without inventing source messages.
@@ -2357,7 +2404,7 @@ async fn verify_admission_delivery(
         sqlx::query(&format!("INSERT INTO {schema}.admission_message_delivery(tenant_id,message_id,request_id,message_kind,state,attempt_count,lease_owner_id,lease_expires_at) VALUES($1,$2,$2,$3,'leased',12,$4,clock_timestamp()-interval '1 second')"))
             .bind(tenant).bind(exhausted).bind(kind).bind(Uuid::new_v4()).execute(admin).await?;
         assert!(delivery
-            .claim(tenant, Uuid::new_v4(), 8, 120)
+            .claim(tenant, Uuid::new_v4(), 8, 120, &profile)
             .await?
             .is_empty());
         let reasons: Vec<String> = sqlx::query_scalar(&format!("SELECT terminal_reason FROM {schema}.admission_message_delivery_receipt WHERE tenant_id=$1 ORDER BY terminal_reason"))
@@ -2444,7 +2491,14 @@ async fn verify_schedule_fence_compensation(
     if let Ok(url) = std::env::var("STAR_ADMISSION_DELIVERY_TEST_NATS_URL") {
         use platform_messaging_runtime::admission_delivery::{
             AdmissionDeliveryOwner, AdmissionDeliveryStore, AdmissionJetStreamPublisher,
+            AdmissionTransportProfile,
         };
+        let profile = AdmissionTransportProfile::new(
+            "nats-jetstream".to_owned(),
+            "2.12.14".to_owned(),
+            [9; 32],
+            "test-nats".to_owned(),
+        )?;
         let context = async_nats::jetstream::new(async_nats::connect(url).await?);
         let name = format!("RESOLUTION_{}", Uuid::new_v4().simple());
         let stream = context
@@ -2465,6 +2519,8 @@ async fn verify_schedule_fence_compensation(
             context.clone(),
             name.clone(),
             String::new(),
+            Uuid::new_v4(),
+            profile,
         )?;
         let (_cancel, active) = tokio::sync::watch::channel(false);
         assert_eq!(
@@ -2477,7 +2533,7 @@ async fn verify_schedule_fence_compensation(
         assert_eq!(stream.get_info().await?.state.messages, 2);
         let reason: String = sqlx::query_scalar("SELECT terminal_reason FROM automation.admission_message_delivery_receipt WHERE tenant_id=$1 AND message_kind='resolution' AND message_id=$2")
             .bind(cmd.tenant_id).bind(resolution.resolution_id).fetch_one(admin).await?;
-        assert_eq!(reason, "broker_ack");
+        assert_eq!(reason, "durable_acceptance");
         context.delete_stream(name).await?;
     }
     store

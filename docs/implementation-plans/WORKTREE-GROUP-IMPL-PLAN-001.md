@@ -1951,3 +1951,27 @@ Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.64 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 接收/事务后确认实现和剩余缺口 | 推进全 phase 目标与自有 Rust server port |
+
+
+## 6.128 — Phase 9F4C-D15: profile-pinned Rust-native replacement seam
+
+**状态：🟡 已实现代码切片，PostgreSQL migration/owner procedure 尚未运行验收；不关闭 D14 或 9F4C。**
+
+目标是把“自有 Rust 消息服务器最终替换 NATS”落实到持久化重试/回执契约，而不是只保留一个 Rust trait。`AdmissionTransportProfile` 记录 provider key/version/profile SHA-256 digest/非敏感 endpoint identity；每条 owner delivery Work row 首次 claim 时固定 profile，重试/lease reclaim 只能匹配原 profile。`AdmissionTransportReceipt`保存 provider/profile/endpoint、log ID/generation、opaque cursor 与 exact-wire SHA-256。新 v2 terminal receipt 不把 JetStream ACK 字段伪装成通用语义；旧 v1 broker receipt 列改名为 legacy 并保留既有数据，不推测或回填未知身份。未配置持久层 profile resolver 前，部署注入仍不是 production profile authorization。
+
+新增 `db/migrations/2026-10-12-admission-transport-profile-receipts.sql`，将旧 unversioned owner claim/settle procedures 换成 `claim_admission_delivery_v2` / `settle_admission_delivery_v2`。New claim 锁定 Work profile，错 profile不返回该行；settlement校验 receipt profile 与 pinned Work 一致并写不可变 v2 proof。新 migration 通过 `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only` 试跑时因给定 PostgreSQL 17 安装缺少 `initdb.exe`、`pg_ctl.exe` 与 `psql.exe` 阻断，故 SQL 语法、双次 apply、owner grants、RLS 和WORM均未实证；未借用其他进程的数据库实例。
+
+Rust 改动在 `platform-messaging-runtime::admission_delivery`：profile/cursor wire-format均 provider-neutral，JetStream adapter仅把 server sequence映射为 big-endian cursor；默认仍启用 JetStream 以兼容，no-default feature保留给 future provider。`schedule_admission_pg`新增 profile-mismatch及 v2 receipt断言，但本轮仅编译该 target，没有运行该 PostgreSQL test。当前直接 `async-nats` manifest边界仍覆盖 `platform-messaging-runtime`、`run-owner-runtime`、`infrastructure`；遗留 domain event subject命名及capacity/quarantine durable provider仍开放。没有实现或声明 Rust-native server。
+
+验证：Rust 1.98.1 `--ignore-rust-version` 下 `cargo check --offline --locked --no-default-features -p platform-messaging-runtime --all-targets -j 4`、同包 default all-targets check、`cargo check ... -p run-owner-runtime --test schedule_admission_pg --all-targets -j 4`通过；这是编译诊断，workspace要求 Rust 1.99.0，目标工具链仍未验收。`rtk` wrapper和本机 PostgreSQL server binaries不可用；CodeGraph项目索引已在隔离工作树建立，但 `check_index_coverage` MCP tool未提供，故未声称覆盖率完整。其余验证以阶段报告为准。
+
+后续依赖顺序： (1) 可用 PostgreSQL 18.6 disposable runner 双次 apply D15 migration并运行 owner role/RLS/WORM及 mismatch SQLx tests；(2) 复用 source survey 已批准且合规的模块，设计生产 Transport Profile master/resolver与服务身份；(3) 为 capacity-result、poison quarantine/replay、Infrastructure outbox分别收敛 provider-neutral receive/ack ports；(4) 接入自有 Rust provider；(5) 以同一故障/重启/背压/内存/性能/BI矩阵并行验收；(6) 才能逐服务切换并删除 NATS Cargo dependency。开始阶段(2)前应核对 `DD-RUST-SERVER-REUSE-001.md` 中 source head、许可、具体模块和依赖闭包；RustGameServer候选 client helper不代表其NATS/outbox可直接复用。
+
+自动化档：[P]（R/V/S）；复用 `scripts/automation/phase9f4d_run_owner_consumer.py` 做隔离 PostgreSQL migration/owner测试，不因本机缺二进制跳过或伪造结果。报告：`docs/reports/PHASE-9F4C-D15-TRANSPORT-PROFILE-REPORT.md`。
+
+D15 收尾验证补充：Rust 1.98.1 诊断运行的 `platform-messaging-runtime` unit tests 为 22/22；no-default all-targets check 与 no-default `cargo tree` 均通过，依赖树不含 `async-nats`；Run-owner PostgreSQL target 只编译未执行。Strict Clippy 在共享与专用 target 两次都因 Rust compiler metadata 不匹配而报 E0514；错误信息显示依赖产物为 Rust 1.98.1，而当前 Clippy 路径期待 Rust 1.99.0，未形成 lint 结论；没有清理共享 Cargo cache。PostgreSQL 17 bin 目录缺少 `initdb.exe`、`pg_ctl.exe`、`psql.exe`，迁移、owner grants、RLS、WORM 和 SQLx behavior 均未验证。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.65 | 2026-10-12 | Ulysses — Mavis接手审核 | D15 profile-pinned delivery与中立回执v2切片；记录PostgreSQL与Rust目标版本验证阻断，保留native provider/整体phase开放 | 用户确认自有 Rust server 最终替换 NATS |
+| v6.66 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D15 22/22 单测、no-default 依赖隔离、Clippy 阻断及 migration 未实跑状态 | 完成 D15 验证对账 |

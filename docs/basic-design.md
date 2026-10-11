@@ -5547,3 +5547,15 @@ RustGameServer 是当前适合按模块适配的 Apache-2.0 来源，不将整�
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.27 | 2026-10-12 | Ulysses — Mavis接手审核 | 为 NATS 可替换性增加 Cargo feature 边界与真实构建证据 | 用户确认未来以自有 Rust 服务替换 NATS |
+
+### D15：固定 transport profile 与 provider-neutral 回执（v6.28）
+
+每条 owner admission delivery 在首次 claim 固定 provider/version/profile digest/endpoint identity；重试和 lease reclaim 只接受同一 profile。终态 v2 receipt 记录 log ID、可信 log generation、opaque cursor 和原始 wire SHA-256，明确只证明 transport durable acceptance，不代替接收 owner Inbox commit 或任务执行结果。旧 v1 broker receipt 作为 legacy evidence 保留；JetStream adapter 独占 subject、Nats-Msg-Id 与 PubAck 映射。未来 Star Rust provider 可使用自己的 opaque cursor 与回执实现，不需要模拟 NATS。
+
+D15 的 `platform-messaging-runtime` 单元测试 22/22 通过，no-default all-targets check 通过，Run-owner PostgreSQL target 编译通过但未运行；该 crate 的 no-default dependency tree 不含 `async-nats`。这些是本机 Rust 1.98.1 `--ignore-rust-version` 的诊断结果，Rust 1.99.0 验收未完成。Strict Clippy 因 E0514 工具链缓存产物不兼容未形成结果；PostgreSQL migration 因缺少 `initdb.exe`、`pg_ctl.exe`、`psql.exe` 未执行，schema/grants/RLS 尚未验证。未实现 production profile resolver 或 native provider，NATS 仍未从产品依赖闭包移除。完整逐项验收见 [PHASE-9F4C-D15-TRANSPORT-PROFILE-REPORT](reports/PHASE-9F4C-D15-TRANSPORT-PROFILE-REPORT.md)。
+
+本地 Rust 服务端仍按模块、源仓和许可逐项筛选复用：RustGameServer 可作为 Apache-2.0 mTLS/client 模块候选，但其 NATS producer 和缺少 Star lease fence 的 Outbox settlement 不直接迁移；AssetsLake 的 AGPL-3.0 envelope 只作字段参考，relay 没有真实 Kafka publisher。来源 hash、依赖闭包与其余候选缺口见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。本阶段未修改这些源项目。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.28 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D15 profile-pinned receipt 设计、Rust provider 准备及验证缺口；补充本机服务端模块复用边界 | 完成 admission transport D15 切片 |

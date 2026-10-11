@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 The broker-neutral poison-quarantine port and failure-path fixtures pass targeted package checks/tests under Rust 1.98.1 with `--ignore-rust-version`; the required Rust 1.99.0 verification is unavailable on this host. Production identity, durable quarantine wiring/replay, native provider, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.52 | Date: 2026-10-12
+> Status: 🟡 D15 has 22/22 package unit tests passing, a successful no-default all-targets check, a compiled Run-owner integration target, and a no-default dependency tree without `async-nats`, all diagnostic under Rust 1.98.1 with `--ignore-rust-version`. PostgreSQL migration/owner tests are blocked by missing server binaries; Rust 1.99.0 is unavailable. Native server, production profile resolver, durable quarantine/replay, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.54 | Date: 2026-10-12
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -345,3 +345,16 @@ The `platform-messaging-runtime` crate now exposes JetStream through the optiona
 | 0.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Record optional JetStream provider feature and package-scoped no-default build evidence |
 | 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify broker-neutral poison quarantine idempotency, source revalidation, and fail-closed terminal disposition; mark current implementation unverified |
 | 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Include trusted log generation in receiver source identity and poison idempotency to prevent same-name log recreation collisions |
+| 0.53 | 2026-10-12 | Ulysses — Mavis接手审核 | Require immutable provider-profile pinning per admission delivery and v2 provider-neutral durable receipts; record PostgreSQL validation blocker and native-provider gap |
+| 0.54 | 2026-10-12 | Ulysses — Mavis接手审核 | Record D15 focused test/dependency-tree results and distinguish Rust compilation from the unapplied SQL migration |
+
+
+## 6.33 — AC-SCHED-API-045: Profile-pinned provider-neutral delivery proofs
+
+Every admission delivery Work row MUST pin its trusted transport profile on its first claim: provider key/version, immutable profile SHA-256 digest, and non-secret endpoint identity. Retry/reclaim MUST match that exact profile; a worker configured with another provider/profile MUST NOT receive the row. A v2 delivered Transaction receipt MUST persist the same provider/profile/endpoint identity plus log ID, trusted non-nil log generation, an opaque durable cursor (1–128 bytes), and SHA-256 of the exact original wire. The receipt MUST prove durable acceptance only, never receiver Inbox commit or execution. Existing v1 broker receipts remain explicitly versioned legacy evidence without fabricated provider identity; new receipts MUST NOT write JetStream semantics into legacy columns.
+
+Disposable PostgreSQL tests MUST prove first-claim profile pinning, no claim under a different profile, retry under the original profile, full v2 receipt persistence, legacy receipt preservation, immutability and owner/RLS isolation. Rust code compiles, but the SQL migration has not been applied and this new PostgreSQL gate is pending because server binaries are unavailable.
+
+Provider replacement MUST keep business event IDs, owner-local Outbox/Inbox, idempotency and BI facts stable. Cursor comparisons and retry dedupe MUST be scoped to the exact provider/profile/endpoint/log generation. A provider cutover MUST drain or explicitly reconcile old-profile Work before disabling its adapter; ambiguous durable acceptance MUST remain on the old profile until recovered or audited terminal. JetStream subjects, `Nats-Msg-Id`, PubAck/double-ACK and consumer configuration MUST remain inside the JetStream adapter. Native Rust service acceptance additionally requires authenticated append/pull/ack, restart-safe dedupe, owner commit-before-ack, poison quarantine/replay, backpressure, bounded memory, resource/performance evidence and a versioned deployment profile.
+
+Keep the native provider disabled until the shared acceptance suite passes. Inventory remaining direct NATS dependencies and legacy NATS event naming before product-wide removal; this slice does not claim NATS removal or native provider delivery.
