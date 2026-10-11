@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D16 adds a PostgreSQL-backed provider-neutral metadata quarantine writer and standalone Cargo feature. The 16/16 package tests, no-NATS feature all-targets check and Run-owner SQLx target compilation pass under Rust 1.98.1 with `--ignore-rust-version`; PostgreSQL migration and transaction execution remain blocked by missing server binaries. No production verifier/composition, encrypted replay body, native provider/profile resolver or full execution chain is wired.
-> Version: 0.54 | Date: 2026-10-12
+> Status: 🟡 D16 adds a PostgreSQL-backed provider-neutral metadata quarantine writer and standalone Cargo feature. The 16/16 package tests, no-NATS feature all-targets check and Run-owner SQLx target compilation pass under Rust 1.98.1 with `--ignore-rust-version`; PostgreSQL 18.6 disposable schema-only migration, RLS, role-grant and integrity-trigger assertions now pass. Rust 1.99.0 acceptance, SQLx transaction execution, production verifier/composition, encrypted replay body, native provider/profile resolver and full execution chain remain open.
+> Version: 0.55 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -593,12 +593,15 @@ The receipt stores only route/source/fault metadata and SHA-256 of the exact sou
 
 `2026-10-12-admission-receive-quarantine.sql` adds one append-only Transaction table with deployment and tenant FORCE RLS. `star_platform_ingress_owner` receives SELECT/INSERT only; UPDATE/DELETE/TRUNCATE are rejected by the shared append-only trigger. It does not add Work or Master rows, does not change the existing JetStream-specific `poison_quarantine_*` schema, and does not persist untrusted payload contents.
 
-The standalone `durable-quarantine` Cargo feature includes the PostgreSQL adapter without enabling `async-nats`; `jetstream-adapter` enables it for the existing default path. This is a crate-level feature boundary only. Full application dependency isolation, live SQL migration/grant/RLS tests, production source verifier/composition, retained encrypted replay, durable ACK-loss recovery, native server, and BI/Benchmark integration remain open.
+The standalone `durable-quarantine` Cargo feature includes the PostgreSQL adapter without enabling `async-nats`; `jetstream-adapter` enables it for the existing default path. This is a crate-level feature boundary only. The PostgreSQL 18.6 disposable schema-only gate applies the complete migration chain once and passes RLS, ingress privilege, WORM/TRUNCATE and nine-trigger assertions. D16 migrations were not reapplied in this run, so their reapplication idempotency is unverified. The gate does not run SQLx transaction scenarios or verify production credentials/grants. Full application dependency isolation, production source verifier/composition, retained encrypted replay, durable ACK-loss recovery, native server, and BI/Benchmark integration remain open.
 
-Rust 1.98.1 diagnostic evidence: `platform-messaging-runtime` no-default + durable-quarantine library tests 16/16, all-targets check passed, and the `run-owner-runtime` Schedule admission PostgreSQL test target compiled. The same feature dependency tree excludes `async-nats`. These commands used `--ignore-rust-version`; the workspace minimum remains Rust 1.99.0. The PG runner could not execute because the selected PostgreSQL installation lacks `initdb.exe`, `pg_ctl.exe`, and `psql.exe`. Do not claim the migration or durable DB behavior passed until the isolated runner completes.
+Rust 1.98.1 diagnostic evidence: `platform-messaging-runtime` no-default + durable-quarantine library tests 16/16, all-targets check passed, and the `run-owner-runtime` Schedule admission PostgreSQL test target compiled. The same feature dependency tree excludes `async-nats`. These commands used `--ignore-rust-version`; the workspace minimum remains Rust 1.99.0. PostgreSQL 18.6 disposable schema-only runner passed, including D16 migration reapplication and schema assertions. SQLx transaction scenarios and production credentials/grants are not verified by this gate.
+
+Schema evidence: `target/phase9f4d-run-owner-consumer/3c264b37-fd6f-479d-99f0-f6a97387ee12/audit.jsonl`. The temporary PostgreSQL instance was stopped and removed; no Multipass inventory was created or modified.
 
 D16 relies on Star's existing Rust-owned PostgreSQL receipt semantics and copies no external source module. The next native provider phase may directly adapt any suitable, user-owned Rust module after checking the exact source file and dependency hashes; it must preserve owner-local transactions, RLS, idempotency, cancellation, bounded memory and the provider-neutral transport contract. AGPL commercial-use obligations are a compliance task, not a categorical reason to reject a useful module.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.54 | 2026-10-12 | Ulysses — Mavis接手审核 | Add provider-neutral PostgreSQL quarantine writer, tenant-scoped idempotency and no-NATS Cargo feature; record unverified migration/runtime behavior |
+| 0.55 | 2026-10-12 | Ulysses — Mavis接手审核 | Record PostgreSQL 18.6 disposable schema-only migration/RLS/grants/WORM assertions passing; disclose D16 migrations were applied once only; retain Rust 1.99.0, SQLx transaction and production integration gates |

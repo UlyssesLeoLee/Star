@@ -1,4 +1,4 @@
--- @cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+-- @cypher schema=1 source_sha256=bc15de650773a059327d849e2ade5f38e144063ad5328f3c8db3b73239c07d08
 -- MERGE (self:File {path:"db/tests/platform-poison-quarantine-schema.sql"})
 -- MERGE (receipt:Table {id:"platform_messaging.poison_quarantine_receipt"})
 -- MERGE (payload:Table {id:"platform_messaging.poison_quarantine_payload_work"})
@@ -6,16 +6,35 @@
 -- MERGE (admission_receipt:Table {id:"platform_messaging.admission_receive_quarantine_receipt"})
 -- MERGE (ingress:DatabaseRole {id:"star_platform_ingress_owner"})
 -- MERGE (purger:DatabaseRole {id:"star_platform_quarantine_purger"})
+-- MERGE (receipt_worm:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_receipt_worm",kind:"trigger"})
+-- MERGE (receipt_truncate_guard:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_receipt_truncate_guard",kind:"trigger"})
+-- MERGE (payload_encrypted_guard:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_payload_requires_encrypted_receipt",kind:"trigger"})
+-- MERGE (payload_quota_guard:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_payload_quota_guard",kind:"trigger"})
+-- MERGE (payload_audit_worm:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_payload_audit_worm",kind:"trigger"})
+-- MERGE (payload_audit_truncate_guard:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_payload_audit_truncate_guard",kind:"trigger"})
+-- MERGE (payload_purge_guard:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::poison_quarantine_payload_purge_matches_expired_work",kind:"trigger"})
+-- MERGE (admission_worm:Symbol {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql::admission_receive_quarantine_worm",kind:"trigger"})
+-- MERGE (admission_truncate_guard:Symbol {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql::admission_receive_quarantine_truncate_guard",kind:"trigger"})
 -- MERGE (self)-[:TESTS]->(receipt)
 -- MERGE (self)-[:TESTS]->(payload)
 -- MERGE (self)-[:TESTS]->(audit)
 -- MERGE (self)-[:TESTS]->(admission_receipt)
 -- MERGE (self)-[:TESTS]->(ingress)
 -- MERGE (self)-[:TESTS]->(purger)
+-- MERGE (self)-[:TESTS]->(receipt_worm)
+-- MERGE (self)-[:TESTS]->(receipt_truncate_guard)
+-- MERGE (self)-[:TESTS]->(payload_encrypted_guard)
+-- MERGE (self)-[:TESTS]->(payload_quota_guard)
+-- MERGE (self)-[:TESTS]->(payload_audit_worm)
+-- MERGE (self)-[:TESTS]->(payload_audit_truncate_guard)
+-- MERGE (self)-[:TESTS]->(payload_purge_guard)
+-- MERGE (self)-[:TESTS]->(admission_worm)
+-- MERGE (self)-[:TESTS]->(admission_truncate_guard)
 -- @endcypher
 
 -- Run only against a disposable PostgreSQL database after applying
--- 2026-10-08-platform-poison-quarantine.sql. Synthetic ciphertext bytes below exercise schema
+-- 2026-10-08-platform-poison-quarantine.sql and
+-- 2026-10-12-admission-receive-quarantine.sql. Synthetic ciphertext bytes below exercise schema
 -- constraints only; they are not evidence of KMS encryption or production payload retention.
 
 DO $assertions$
@@ -82,7 +101,9 @@ BEGIN
                'poison_quarantine_payload_quota_guard',
                'poison_quarantine_payload_audit_worm',
                'poison_quarantine_payload_audit_truncate_guard',
-               'poison_quarantine_payload_purge_matches_expired_work'
+               'poison_quarantine_payload_purge_matches_expired_work',
+               'admission_receive_quarantine_worm',
+               'admission_receive_quarantine_truncate_guard'
            )) <> 9 THEN
         RAISE EXCEPTION 'quarantine integrity triggers are incomplete';
     END IF;

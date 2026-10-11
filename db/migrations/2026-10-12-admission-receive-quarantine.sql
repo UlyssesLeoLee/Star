@@ -1,4 +1,4 @@
--- @cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+-- @cypher schema=1 source_sha256=a102c3536067090e6bbaa35e2916bb13a9f09a82f614199065a0cc2c8125773f
 -- MERGE (self:File {path:"db/migrations/2026-10-12-admission-receive-quarantine.sql"})
 -- MERGE (schema:Database {id:"platform_messaging"})
 -- MERGE (ingress:DatabaseRole {id:"star_platform_ingress_owner"})
@@ -6,7 +6,14 @@
 -- MERGE (self)-[:CONFIGURES]->(schema)
 -- MERGE (self)-[:CONFIGURES]->(ingress)
 -- MERGE (self)-[:CONFIGURES]->(receipt)
--- MERGE (receipt)-[:USES]->(worm:Symbol {id:"platform_messaging.reject_quarantine_transaction_mutation",kind:"trigger_function"})
+-- MERGE (receipt_worm:Symbol {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql::admission_receive_quarantine_worm",kind:"trigger"})
+-- MERGE (receipt_truncate_guard:Symbol {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql::admission_receive_quarantine_truncate_guard",kind:"trigger"})
+-- MERGE (worm:Symbol {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql::reject_quarantine_transaction_mutation",kind:"function"})
+-- MERGE (receipt)-[:CALLS]->(worm)
+-- MERGE (self)-[:CREATES]->(receipt_worm)
+-- MERGE (self)-[:CREATES]->(receipt_truncate_guard)
+-- MERGE (receipt_worm)-[:CALLS]->(worm)
+-- MERGE (receipt_truncate_guard)-[:CALLS]->(worm)
 -- @endcypher
 
 -- Provider-neutral, metadata-only poison receipts. The source wire remains in the transport until

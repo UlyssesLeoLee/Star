@@ -1,7 +1,7 @@
 # PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT
 
-> v0.1 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：provider-neutral PostgreSQL metadata receipt 已实现并通过限定的 Rust 诊断测试；目标 Rust 1.99.0 与 PostgreSQL migration/transaction 门未通过验收，生产接线、原始 wire 恢复和完整 Schedule/Run execution 仍开放。
+> v0.2 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：provider-neutral PostgreSQL metadata receipt 已实现；Rust 1.98.1 诊断测试与 PostgreSQL 18.6 disposable schema-only migration/RLS/role/WORM gate 通过。Rust 1.99.0、SQLx transaction cases、production DB credentials/grants、生产接线、原始 wire 恢复和完整 Schedule/Run execution 仍开放。
 
 ## §0 目的
 
@@ -14,8 +14,8 @@
 | Rust writer | 新增 `PgAdmissionReceiveQuarantine`，实现 `AdmissionReceiveQuarantine`；deployment/provider/log-generation/log/cursor 作稳定来源键；精确核对路由、fault、版本、wire bytes 与 SHA-256，精确重放幂等，冲突 fail closed |
 | Cargo boundary | 新增 `durable-quarantine` feature；`jetstream-adapter` 组合启用它，`--no-default-features --features durable-quarantine` 不包含 `async-nats` |
 | PostgreSQL | 新增 `platform_messaging.admission_receive_quarantine_receipt` append-only Transaction 表；W/T/M=0/1/0；deployment+tenant FORCE RLS、ingress owner SELECT/INSERT、WORM 更新/删除/截断保护 |
-| Integration target | 扩展 `schedule_admission_pg`，包括 exact replay、wire digest/fault conflict、不同 provider namespace、cross-tenant conflict 与 receipt cardinality；本轮只编译 test target，未运行数据库测试 |
-| Schema test/runner | 增加 FORCE RLS、权限和 trigger presence assertions；隔离 runner 引入 D16 migration，并排在共享 WORM trigger function 的前置 migration 之后 |
+| Integration target | 扩展 `schedule_admission_pg`，包括 exact replay、wire digest/fault conflict、不同 provider namespace、cross-tenant conflict 与 receipt cardinality；本轮仅编译该 SQLx test target，未执行事务场景 |
+| Schema test/runner | 增加 FORCE RLS、权限和 trigger assertions；runner 在共享 WORM function migration 后应用 D16 migration，并对完整 migration chain 做 schema-only 验收 |
 | 源模块复用 | 更新 `DD-RUST-SERVER-REUSE-001` 与上位需求/基本/详细设计：E:/AssetsLake 和其他本机 Rust 服务可按模块直接参考/适配/复用；AGPL-3.0 不等于商业使用禁令，须履行具体交付方式适用义务。AssetsLake 当前 dry-run relay 没有真实 Kafka 投递，不作为生产 transport。本 D16 receipt 未复制外部源码，因为其 RLS/idempotency/WORM 契约由 Star 所有 |
 
 ## §2 验证摘要
@@ -26,7 +26,8 @@
 | `cargo check --offline --locked --ignore-rust-version --no-default-features --features durable-quarantine -p platform-messaging-runtime --all-targets -j 4` | PASS；Rust 1.98.1 诊断运行 |
 | `cargo check --offline --locked --ignore-rust-version -p run-owner-runtime --test schedule_admission_pg --all-targets -j 4` | PASS，测试目标编译；没有执行 PostgreSQL 测试 |
 | `cargo tree --offline --locked -p platform-messaging-runtime --no-default-features --features durable-quarantine` | PASS；此 crate feature dependency tree 不含 `async-nats` |
-| 新 `admission_receive_quarantine` migration/SQLx测试/owner grants/RLS/WORM | 未运行；本机所选 PostgreSQL 安装缺少 `initdb.exe`、`pg_ctl.exe`、`psql.exe` |
+| `phase9f4d_run_owner_consumer.py --schema-only`（PostgreSQL 18.6 disposable loopback） | PASS；完整 migration chain 已应用一次；D16 migration、RLS、ingress SELECT/INSERT 权限、WORM/TRUNCATE 与 9 个 quarantine trigger assertions 通过；D16 migrations 未在本次 runner 重复应用，幂等性未单独验证；audit `target/phase9f4d-run-owner-consumer/3c264b37-fd6f-479d-99f0-f6a97387ee12/audit.jsonl`；实例已停止清理，Multipass inventory 未改动 |
+| D16 SQLx transaction cases / production DB credentials and grants | 未运行/未验证；schema-only 只证明 disposable catalog/权限后置条件，不证明 adapter 事务、production identity 或目标库 provisioning |
 | Rust 1.99.0 正式门禁 | 未运行；当前只能使用 Rust 1.98.1 并带 `--ignore-rust-version` |
 | `check_index_coverage` | MCP 工具当前未提供；已定向查询 CodeGraph 并同步新增/修改代码索引，不宣称覆盖率完整 |
 | RTK wrapper / CodeRabbit | RTK 不在 PATH；CodeRabbit wrapper 既有调用失败为 Permission denied，未形成独立审查结果 |
@@ -43,6 +44,7 @@
 6. BI/Benchmark event projection/outbox 未接线；不要跨 owner 直接查询或修改业务表来替代授权接口/版本化事件。
 7. `durable-quarantine` 只证明 `platform-messaging-runtime` crate 组合隔离；full application 可能仍经其他 crate 依赖 NATS，NATS 仍是当前默认兼容 adapter。
 8. 本阶段不实现 native Rust provider、服务身份、生产 profile resolver、bounded multi-tenant fairness/throughput/RSS/内存预算实测、Multipass/K3s provider 或 executor readiness；Run execution 仍 fail closed。
+9. D16 migrations 在 schema-only runner 中各应用一次；迁移重跑幂等性和 D16 SQLx transaction scenarios 仍需单独验证。
 
 ## §4 子代理失败接手清单
 
@@ -58,7 +60,7 @@
 6. 元数据摘要不等于加密原始 payload，也不提供可重放 body。
 7. Source identity 必须由受信 verifier 独立认证，不能信任请求体或注入 UUID。
 8. 数据库错误、权限缺失和 commit 结果未知时，源 delivery 不 terminally disposition。
-9. PostgreSQL migration/SQLx 未运行前，不声明 grants、FORCE RLS、WORM 或数据库幂等测试通过。
+9. Disposable schema-only gate 通过仅证明已执行 migration 与 schema assertions；不得据此宣称 SQLx transaction cases、production credentials/grants 或目标库 rollout 通过。
 10. Rust 1.98.1 `--ignore-rust-version` 检查不替代 Rust 1.99.0 正式门禁。
 11. 单 crate Cargo tree 不含 NATS，不证明完整应用分发闭包不含 NATS。
 12. 本机 Rust 模块可直接复用，但先核验确切文件、源状态、权属/许可证、NOTICE、依赖闭包和语义差异；源工作区保持只读。
@@ -71,10 +73,10 @@
 
 | 角色 | 审核 |
 |---|---|
-| 架构 | Mavis：provider-neutral receipt、owner 与 transport 边界已按实际代码审核；数据库验证仍开放 |
-| SRE Lead | Mavis：有界 metadata-only 写入与冲突 fail-closed 已实现；恢复/容量/性能未验收 |
-| 平台 | Mavis：crate 级无 NATS feature 组合通过；生产授权、完整 app 闭包及 Rust 1.99.0 未验收 |
-| 评审主持 | Mavis：静态审查和限定 Cargo 检查完成；PG runner 与独立 CodeRabbit review 未通过/未形成结果 |
+| 架构 | Mavis：provider-neutral receipt、owner 与 transport 边界已按实际代码审核；disposable PostgreSQL schema gate 通过，production DB 接线仍开放 |
+| SRE Lead | Mavis：有界 metadata-only 写入与冲突 fail-closed 已实现；schema/WORM assertion 通过，恢复/容量/性能未验收 |
+| 平台 | Mavis：crate 级无 NATS feature 组合与 PostgreSQL schema-only gate 通过；生产授权、完整 app 闭包及 Rust 1.99.0 未验收 |
+| 评审主持 | Mavis：静态审查、限定 Cargo 检查及 PG schema-only runner 完成；SQLx transaction 与独立 CodeRabbit review 未通过/未形成结果 |
 | PM | Mavis：持续推进全部 Worktree-first 产品 phases，不缩减为 D16 |
 
 ## §7 修订历史
@@ -82,3 +84,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 / 触发 |
 |---|---|---|---|
 | v0.1 | 2026-10-12 | Ulysses — Mavis 接手审核 | D16 provider-neutral PostgreSQL metadata quarantine、Cargo 隔离、源模块复用策略与未验收缺口 |
+| v0.2 | 2026-10-12 | Ulysses — Mavis 接手审核 | 修复 schema test 的 9-trigger assertion 并记录 PostgreSQL 18.6 disposable schema-only migration/RLS/role/WORM gate 通过；注明 D16 migrations 单次应用且未验证重跑幂等性；保留 SQLx transaction、Rust 1.99.0 与生产集成缺口 |

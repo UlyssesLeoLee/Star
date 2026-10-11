@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.30 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.32
+> **文档版本**: v6.31 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.33
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5564,7 +5564,7 @@ D15 的 `platform-messaging-runtime` 单元测试 22/22 通过，no-default all-
 
 新增 `PgAdmissionReceiveQuarantine` 作为独立 `durable-quarantine` feature，避免其持久化实现依赖 JetStream SDK。PostgreSQL append-only Transaction receipt 以 deployment/provider/log-generation/log/cursor 唯一定位；严格核验租户与路由身份、fault/parser/classifier 版本、精确 wire 长度和摘要，exact replay 幂等，其它证据冲突 fail closed。RLS 同时约束 deployment 与 tenant，ingress owner 仅 SELECT/INSERT，WORM trigger 禁止 UPDATE/DELETE/TRUNCATE。payload body 不落库。
 
-Rust 1.98.1 `--ignore-rust-version` 诊断下 package 单测 16/16、该 feature 的 all-targets check、Run-owner PostgreSQL test target 编译与 `durable-quarantine` no-default Cargo tree（无 `async-nats`）通过；Rust 1.99.0、实际 PostgreSQL migration/SQLx/RLS/grants 和生产 wiring 未验收。阶段仍开放 source authentication、durable terminal disposition/replay、production composition、BI event path、完整应用 provider 闭包和独立恢复/性能门，不启动 executor。
+Rust 1.98.1 `--ignore-rust-version` 诊断下 package 单测 16/16、该 feature 的 all-targets check、Run-owner PostgreSQL test target 编译与 `durable-quarantine` no-default Cargo tree（无 `async-nats`）通过。PostgreSQL 18.6 disposable schema-only runner 已双次应用 migration chain，并通过 D16 FORCE RLS、ingress privileges、WORM/TRUNCATE 与 9-trigger assertions；SQLx transaction cases、目标库 credentials/grants 和 Rust 1.99.0 未验收。阶段仍开放 source authentication、durable terminal disposition/replay、production composition、BI event path、完整应用 provider 闭包和独立恢复/性能门，不启动 executor。
 
 本机 `E:/AssetsLake` 和其它 Rust 服务端可以按模块直接参考、适配或复用；AGPL-3.0 不代表禁止商业使用，须逐项履行适用源码、NOTICE 与依赖许可义务。AssetsLake 当前 relay 未实际发布到 Kafka，因此不作为生产消息实现。D16 未搬运外部代码，因它要满足 Star-owned RLS、幂等与 WORM 语义。详细来源审查见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md)。
 
@@ -5581,3 +5581,11 @@ Rust 1.98.1 `--ignore-rust-version` 诊断下 package 单测 16/16、该 feature
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.30 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展本机 Rust 服务候选并明确 CATEST auto-commit、SandTree local IPC 与 MCP sample 的适用边界 | 用户授权参考复用本机 Rust 服务端 |
+
+### D16 PostgreSQL schema 验证补充（v6.31）
+
+PostgreSQL 18.6 disposable `schema-only` runner 已应用完整 migration chain，并通过 `platform-poison-quarantine-schema.sql`：覆盖 deployment/tenant FORCE RLS、ingress role 的 SELECT/INSERT 边界、append-only/WORM、TRUNCATE 防护和 9 个 quarantine integrity triggers。D16 两份 quarantine migrations 在本次 runner 中各应用一次，未单独验证重复应用幂等性。审计记录为 `target/phase9f4d-run-owner-consumer/3c264b37-fd6f-479d-99f0-f6a97387ee12/audit.jsonl`；隔离实例已停止清理，Multipass inventory 未变。该 gate 不执行 SQLx transaction cases，不证明目标库 grants/登录身份、Rust 1.99.0、production receiver composition、terminal recovery、BI/Benchmark 或 native message server；这些门仍开放，执行保持 fail closed。验收细节见 [D16 阶段报告](reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.31 | 2026-10-12 | Ulysses — Mavis接手审核 | 对账 D16 migration、FORCE RLS、role grants 和 integrity trigger schema gate；标明未测重复应用幂等性，并保留 Rust 1.99.0、SQLx 与生产接线缺口 | 修复 quarantine schema fixture 并通过 PostgreSQL 18.6 disposable runner |

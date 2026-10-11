@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.32）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.33）
 
 ## 0. 文档说明与前提
 
@@ -3391,7 +3391,7 @@ Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的
 
 `PgAdmissionReceiveQuarantine` 实现 provider-neutral `AdmissionReceiveQuarantine`，按部署、provider identity、log generation、log ID 与正 cursor 建立不可变幂等身份；记录租户/发送方/接收方/消息种类、fault/parser/classifier 版本、原 wire 字节数与 SHA-256。新表 `platform_messaging.admission_receive_quarantine_receipt` 是 Transaction（W/T/M=0/1/0），部署与 tenant 双重 FORCE RLS、仅 ingress owner 可读写、WORM 禁止改删/截断。只保留精确 wire 摘要，不保存 payload body，也不声称可重放原始消息；无数据库提交、权限、大小或幂等冲突时 fail closed。
 
-`durable-quarantine` Cargo feature 可独立于 `jetstream-adapter` 构建；本机依赖树没有 `async-nats`。Rust 1.98.1 `--ignore-rust-version` 下该 feature 的 16 个 package unit tests、all-targets check 及 Run-owner PostgreSQL test target 编译通过。目标 Rust 1.99.0 未验收；PostgreSQL migration、RLS/grants/WORM 与 SQLx 路径未运行，生产 source verifier/composition、terminal disposition/recovery 和 BI 事件发布仍开放。因此本阶段仅交付 receipt writer，不关闭 poison-consumer 或 native server 替换。
+`durable-quarantine` Cargo feature 可独立于 `jetstream-adapter` 构建；本机依赖树没有 `async-nats`。Rust 1.98.1 `--ignore-rust-version` 下该 feature 的 16 个 package unit tests、all-targets check 及 Run-owner PostgreSQL test target 编译通过。PostgreSQL 18.6 disposable schema-only runner 已应用 migration chain，并通过 D16 FORCE RLS、ingress privileges、WORM/TRUNCATE 与 9-trigger assertions；D16 migrations 在本次 runner 中各应用一次，未单独验证重复应用幂等性。SQLx transaction cases 和目标库 credentials/grants 未验收。Rust 1.99.0、生产 source verifier/composition、terminal disposition/recovery 和 BI 事件发布仍开放。因此本阶段仅交付 receipt writer，不关闭 poison-consumer 或 native server 替换。
 
 本机 `E:/AssetsLake` 与其它 Rust 服务端可以按模块直接参考、适配和复用，源仓只读。AGPL-3.0 不等于禁止商业使用；每个模块仍须核对权属、修改/链接/部署/网络提供方式、源码与 NOTICE 义务及传递依赖闭包。AssetsLake 当前 dry-run relay 未做真实 Kafka 投递，不能作为生产 transport；此判断不排除复用其独立 envelope 或其它经审查的模块。D16 没有复制其它项目源码，因为本阶段的 PostgreSQL receipt 需要精确实现 Star 已定义的 RLS、幂等与 WORM 契约。详情见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md) 与 [D16 阶段报告](reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
 
@@ -3408,3 +3408,11 @@ Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.32 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展本机 Rust 服务候选审查；区分事件、MCP、IPC 与 durable transport 能力 | 用户授权参考复用 E:/AssetsLake 与其它 Rust 服务端 |
+
+### D16 PostgreSQL schema 验证补充（v6.33）
+
+PostgreSQL 18.6 disposable `schema-only` runner 已应用完整 migration chain，并通过 D16 quarantine schema assertions：deployment/tenant FORCE RLS、ingress role 权限、WORM/截断保护与 9 个 quarantine integrity triggers。D16 两份 quarantine migrations 在本次 runner 中各应用一次；未单独验证其重复应用幂等性。SQLx 事务行为测试未运行；Rust 1.99.0、production database credentials/grants、source verifier/receiver composition、terminal recovery、BI/Benchmark 与 native provider 仍未验收。临时数据库已停止清理；audit 保存在 `target/phase9f4d-run-owner-consumer/3c264b37-fd6f-479d-99f0-f6a97387ee12/audit.jsonl`。不得将 disposable schema 结果表述为生产部署或完整 DB/runtime 验收。详细证据见 [D16 阶段报告](reports/PHASE-9F4C-D16-ADMISSION-QUARANTINE-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.33 | 2026-10-12 | Ulysses — Mavis接手审核 | 补记 D16 migration 与 PostgreSQL 18.6 disposable schema gate 通过；明确本次未重跑 D16 migrations、SQLx、Rust 1.99.0 和生产接线仍开放 | 修复 9F4D D16 quarantine trigger assertion 后重跑隔离 runner |

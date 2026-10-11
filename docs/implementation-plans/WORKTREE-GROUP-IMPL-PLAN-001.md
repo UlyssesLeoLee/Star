@@ -1,10 +1,10 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.68**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.69**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 日期：2026-10-10
+> - 日期：2026-10-12
 > - 基础设施架构决策与实现边界：Multipass 为本地/CI 多 Linux guest 与 K3s cluster 的首选 VM 管理路径；HostEnvironment/instance/cluster/node 分层，Run 绑定精确 cluster ID/generation，placement 与 Host/cluster 双容量由版本化 Infrastructure Profile/owner ledger 决定；当前测试阶段已登记实例总数上限为 2，含 Stopped/Deleted 记录，原因是宿主硬盘容量。测试 bootstrap 用 host-local 独占锁串行化 inventory 检查与 launch；权威 Rust Manager/provider 尚未实现，因此 live test 创建必须走该受控路径。Rust Infrastructure Manager 独占受限 provider adapter；Worktree 通过显式、受授权 workspace bridge 进入 guest。`domain-infrastructure` 已实现 Run binding/demand/readiness/capacity 的纯 Rust v2 contracts，3A 已验证六表 schema substrate，3B1 已验证受限 NOLOGIN role grant matrix，3C1 已验证 Inbox receive，3C2 已验证 tenant-scoped 双 reservation admission store primitive 与隔离 PostgreSQL 并发/expiry 用例；它们都不代表 trusted resolver/provider、production consumer 或 Schedule execution 已接通。目标 DB 应用身份/装配、跨租户 allocator、权威 resolver、owner delivery/consumer、VM/K3s provider、sandbox 与运行性能仍未实现或验收。
 > - Phase 9F4D-3A 更新：新增 Infrastructure-owner 六表 PostgreSQL schema 与可重放本机 runner；PG18.6 disposable 验证双次 migration、6/6 FORCE RLS、NOBYPASSRLS tenant 隔离、append-only Transaction facts、Work state/24–25h retention guards 均通过，零 Multipass instance。schema 不等价于生产 migration provisioning/grants 或 owner writer/consumer；Schedule worker、Manager/provider、sandbox、BI 与执行能力继续 fail closed。
 > - Phase 9F4D-3C3 更新：新增 tenant-scoped SCD2 Provider Profile Master/append-only revision events；owner admission 在事务中读取 binding 固定版本、验证持久化 digest 并派生容量请求；17/17 disposable PostgreSQL runner、8/8 FORCE RLS、5/5 SQLx 和 Rust 定向 gates 通过。没有创建 Multipass VM；测试登记实例上限保持 2（含 Stopped/Deleted）。生产 resolver、跨租户 allocator、target DB provisioning、provider、consumer、sandbox 与执行仍 fail-closed。
@@ -1978,13 +1978,13 @@ D15 收尾验证补充：Rust 1.98.1 诊断运行的 `platform-messaging-runtime
 
 ## 6.129 — Phase 9F4C-D16: durable admission quarantine receipt
 
-**状态：🟡 writer 与 migration 已编写；包级 Rust 诊断检查通过；PostgreSQL migration/transaction 尚未执行；不关闭 D14、native provider 或整体 9F4C。**
+**状态：🟡 writer 与 migration 已编写；Rust 1.98.1 诊断检查及 PostgreSQL 18.6 disposable schema-only gate 通过；Rust 1.99.0 和 SQLx transaction/production DB gates 未关闭；不关闭 D14、native provider 或整体 9F4C。**
 
 实现 `PgAdmissionReceiveQuarantine` 并挂入 `durable-quarantine` feature。receipt 的 stable key 是 deployment/provider/log-generation/log/cursor；exact replay 核对 tenant/route/message/fault/parser/classifier/wire size/digest，冲突或隐藏的跨租户记录 fail closed。新 Transaction table W/T/M=0/1/0，dual-scope FORCE RLS、ingress owner SELECT/INSERT、WORM；不保存 payload body。Runner 将 D16 migration 排在共享 WORM 函数来源 migration 之后，SQLx target 增加 exact replay、digest/fault/tenant conflict 与 provider namespace 场景。
 
 本机 `E:/AssetsLake` 与其它 Rust 服务端可按模块直接参考、适配或复用，源仓只读；AGPL-3.0 不禁止商业用途，但要满足适用的源码/NOTICE 与依赖闭包义务。当前 AssetsLake relay 未真实投递 Kafka，不能作为生产 transport。D16 没复制代码，因为 Star 的 receipt/RLS/idempotency/WORM 契约需要在 Star owner 边界实现。
 
-验证：Rust 1.98.1 `--ignore-rust-version` 下 `platform-messaging-runtime` no-default + durable-quarantine tests 16/16、all-targets check、`run-owner-runtime` PostgreSQL target compile、该 feature dependency tree 排除 `async-nats`。当前 workspace 要求 Rust 1.99.0；live migration/SQLx test/RLS/grants 未运行（所选 PostgreSQL 安装缺少 `initdb.exe`、`pg_ctl.exe`、`psql.exe`），full app provider closure、production source verifier/composition、durable terminal disposition/recovery、BI projection/outbox、native server 与内存/负载验收都开放。详见 D16 report。
+验证：Rust 1.98.1 `--ignore-rust-version` 下 `platform-messaging-runtime` no-default + durable-quarantine tests 16/16、all-targets check、`run-owner-runtime` PostgreSQL target compile、该 feature dependency tree 排除 `async-nats`。PostgreSQL 18.6 disposable `schema-only` runner 应用完整 migration chain 一次并通过 RLS、ingress 权限、WORM/TRUNCATE 与 9-trigger assertions；D16 migrations 的重复应用幂等性未在本次 runner 验证。Audit 为 `target/phase9f4d-run-owner-consumer/3c264b37-fd6f-479d-99f0-f6a97387ee12/audit.jsonl`。临时数据库已停止清理，Multipass inventory 未变。当前 workspace 要求 Rust 1.99.0；SQLx transaction scenarios、production database credentials/grants、full app provider closure、production source verifier/composition、durable terminal disposition/recovery、BI projection/outbox、native server 与内存/负载验收仍开放。详见 D16 report。
 
 自动化档：[P]（R/V/S）；复用 `scripts/automation/phase9f4d_run_owner_consumer.py` 和既有独占隔离数据库流程。不得以 package compile 或 fixture 代替 PostgreSQL owner-role 验收。源码复用必须核对精确 hash 与闭包，不得修改 E:/AssetsLake 等源仓。
 
@@ -2004,3 +2004,4 @@ D15 收尾验证补充：Rust 1.98.1 诊断运行的 `platform-messaging-runtime
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.68 | 2026-10-12 | Ulysses — Mavis接手审核 | 扩展 CATEST、OpenAIActixMCP、SandTree、CATLLM 来源核验并确定后续 native provider 仍需 Star-owned durable semantics | 用户授权参考复用本机 Rust 服务端 |
+| v6.69 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D16 PostgreSQL 18.6 disposable schema-only gate 通过，注明本次迁移单次应用且未证明重跑幂等性，并保留 SQLx/Rust 1.99.0/生产接线剩余门 | quarantine schema fixture 修复后 runner 通过 |
