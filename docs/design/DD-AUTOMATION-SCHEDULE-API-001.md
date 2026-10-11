@@ -1,0 +1,531 @@
+# DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
+
+> Status: 🟡 D14 Schedule/Run receivers verified with fixture identity (66/66 runner steps, one real PostgreSQL admission integration test); production identity, quarantine recovery, native provider, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.47 | Date: 2026-10-11
+
+## 1. Routes
+
+| Method | Path | Scope | Behavior |
+|---|---|---|---|
+| GET | `/api/v1/projects/{project_id}/engineering-runs/{run_id}/automation/schedule-rules` | `work-item:read` | Keyset page of current revisions, `limit` 1–100. |
+| POST | same collection | `work-item:write` | Create version 1; requires `Idempotency-Key`. |
+| GET | collection + `/{rule_id}` | `work-item:read` | Read current revision only. |
+| PUT | collection + `/{rule_id}` | `work-item:write` | CAS successor revision; requires `expected_current_version` and `Idempotency-Key`. |
+
+The router configures a 16 KiB JSON body cap and private response headers (`Cache-Control: private, no-store`, `Vary: Authorization`). The workspace explicitly enables `jsonwebtoken` RustCrypto, providing one deterministic backend for the existing RS256 issuer/verifier. Request-level tests run all four methods through production `build_group_router`: missing credentials produce 401; correctly signed JWTs missing the required read/write scope produce 403 before DB access; and a signed write-scope POST exceeding 16 KiB produces 413. Rejection responses carry both private headers. This is not evidence for accepted role/Project/Run authorization or persistence. No DELETE route exists: disabling a rule is a new immutable revision with `enabled=false`.
+
+## 2. Write contract
+
+The strict body uses `deny_unknown_fields` and includes `display_name`, `enabled`, cron expression, IANA timezone, DST gap/fold policies, overlap and misfire policies, pause policy, bounded retry policy, deadline, and target Worktree/Task/Profile IDs. Create rejects an `expected_current_version`; revise requires a positive value equal to the locked current version. The body does not accept `run_as_actor_id`: create derives it from the authenticated actor after current authorization, and revise reads it from the locked current row. The database trigger also requires the initial revision's `run_as_actor_id` to equal its `changed_by`, protecting the creator binding from direct database writers outside the REST API.
+
+The server supplies parser/tzdb versions. It verifies the Run belongs to the route Project; then checks the active Worktree→Project/Run binding and active Task↔Worktree link. Every current-version predicate requires `valid_from <= now()` and `valid_to IS NULL`, including the Rule revision, Worktree Project binding, Profile, Provider, Skill, GrantSet, and HookSet. The server loads the current Worktree-scoped execution admission snapshot, including the verified Profile identity and effective HookSet digest. Caller-supplied digests or versions are never trusted.
+
+The fully resolved `AutomationScheduleRuleRevisionV1` passes its domain validation and bounded materializer parser probe before persistence. Disabled input is validated by a temporary enabled clone; only the original disabled revision is persisted. Invalid parser/timezone/policy input returns `422 invalid_schedule_recurrence` or `422 invalid_schedule_rule`. Materialization copies the Rule principal into `AutomationOccurrenceSnapshotV1.run_as_actor_id`; domain validation requires equality with the nested Rule snapshot, the adapter writes the dedicated occurrence column, and a PostgreSQL trigger rejects identity drift from the exact referenced Rule version.
+
+## 3. Transaction sequence
+
+1. Validate Actor, scope, bounded request, route UUIDs, and idempotency header.
+2. Begin a PostgreSQL transaction; set `app.tenant_id` and `app.actor_id`; apply statement and lock timeouts.
+3. Authorize the authenticated editor against current Project and Engineering Run writer grants; the current Branch binding must also exist.
+4. Lock a deterministic transaction advisory key derived from tenant, Project, actor, operation, and SHA-256 of the idempotency key.
+5. Delete an expired record for the exact key before reuse, then delete at most 64 unrelated expired replay rows visible to that actor/Project. If a live replay exists, return the saved status/body when the request hash matches; otherwise return `409 idempotency_key_reused`.
+6. For an enabled create, call `multica.lock_schedule_run_as_authorization(tenant_id, run_as_actor_id, project_id, run_id)`. For an enabled revision, first lock the current Rule row and compare `expected_current_version`, then call the helper with the immutable actor from that row. The helper verifies transaction tenant/actor GUCs and canonical Project/Branch/Run plus current grants, then takes a tenant+Project transaction advisory lock. Only after that call returns does the API issue the current ACL query as a separate SQL statement, requiring current Project/Run writer grants, current Branch binding, and active Run. `READ COMMITTED` therefore observes a revocation that acquired the lock first and committed while the helper waited. ACL BEFORE triggers for Project, Branch, and Run grant INSERT/UPDATE/DELETE take the same lock; moving a grant across Projects acquires both locks in UUID order. The runtime role has SELECT, but no UPDATE privilege, on the canonical ACL tables; the runner provisions EXECUTE on the helper after creating its runtime role. A disabled revision skips the creator recheck so an authorized manager can stop a rule after creator revocation.
+7. Resolve/lock current Worktree, Task link, Profile, catalog, and HookSet facts. For revision, copy the locked `run_as_actor_id` unchanged; close the old `valid_to` with transaction `now()` and insert `version+1` with the same boundary. The SCD2 guard rejects other history mutation, and the run-as trigger serializes inserts for the Rule and rejects a changed actor.
+8. Insert actor audit facts and a Run-consistent `schedule_rule.created`/`schedule_rule.revised` Outbox record. Save the 24-hour idempotency response.
+9. Commit. Any failure before commit rolls back Master, Audit, Outbox, and replay state together.
+
+## 4. Error and execution boundaries
+
+Missing/foreign Project, Run, Worktree, Task, or Rule returns not-found to avoid revealing cross-scope resource existence. Missing scope/role returns forbidden. Version mismatch returns `409 schedule_rule_version_conflict`. Database/provider failures fail closed. The API does not start an occurrence or TaskExecutionRun; consumers and Run admission remain separate phase gates.
+
+`run_as_actor_id` is the fixed identity for future unattended work, not a durable authorization grant. The create/enable API gate checks the actor's current Project/Run writer grants and active Run state; it does not enable a worker. Its exact SQL helper passes a disposable PostgreSQL 18.6 directory fixture: active grants authorize; revoked Project, Branch, or Run grants and a paused Run fail closed. The runtime role has no UPDATE privilege on canonical Directory ACL tables. Project, Branch, and Run grant-revocation races are serialized against the API authorization transaction by the shared Project lock; full API create/revise rollback remains untested. Each occurrence dispatch, retry, and resume must repeat the authorization check in the Run owner's provisional-admission transaction and resolve current target/profile/HookSet/quota and execution capability. Revocation or ACL lookup failure rejects dispatch without creating a Run. Regranting does not change the creator identity; replacing the owner requires a new Rule. The worker and admission transition remain unimplemented.
+
+## 5. Verification required before phase closure
+
+- Re-run focused `rustfmt` and `cargo check --all-targets` after any change to this slice (the 2026-10-04 direct-toolchain checks passed).
+- Completed: unauthenticated requests to collection GET/POST and item GET/PUT return 401; signed tokens missing the required scope return 403 before database access; a valid write-scope token with an oversized body returns 413. Rejection responses carry private/no-store headers.
+- Completed after 9F4C-B: the pure role-policy helper matrix test passed 1/1 for accepted writer roles and viewer/agent/empty-role denial. A separate disposable PostgreSQL 18.6 test invokes the exact canonical Project/Branch/Run authorization helper as a read-only directory runtime role and proves an active developer grant succeeds while each revoked grant and a paused Run fail closed.
+- Still required: SQL-backed coverage for the full accepted/denied role matrix, Run/Project mismatch, target ownership, version conflict, page bounds, create/revise rollback, concurrent CAS/replay, and authenticated no-store behavior on success and application errors.
+- Idempotency tests for replay, mismatched key reuse, concurrent same-key create, and concurrent CAS revision.
+- Completed in the bounded runner with disposable PostgreSQL 18.6: apply the 9F2/9F4A/9F4B/9F4C-A/9F4C-C migration chain twice; assert all eight Schedule tables use FORCE RLS; exercise tenant isolation, Run-consistent Outbox, append-only mutation rejection, SCD2 boundary, exact-key TTL replay reuse, initial creator/run-as equality, immutable run-as successor behavior, occurrence-to-pinned-Rule identity equality, and three concurrent ACL-revocation lock cases.
+- Compare actual migration privileges with target production database/runtime role grants; until confirmed, keep that release gate open.
+
+## 6. 9F4C-A persistence invariants
+
+The new migration has an explicit prerequisite: the canonical `multica.task_execution_run` schema, including its tenant/run and tenant/project/task/run unique keys, must already be installed. It adds `admitted_run_id` to the Work-class dispatch row and an FK to `(tenant_id, run_id)`. The dispatch guard requires a non-null Run link for a new `leased → admitted` transition, checks the referenced TaskExecutionRun uses `run_origin='schedule'` and the same `automation_occurrence_id`, and makes the link immutable. Legacy admitted/terminal rows may remain null when no exact Run can be proven; no identity is guessed.
+
+`automation.schedule_run_outbox` is a Transaction table with tenant FORCE RLS, append-only UPDATE/DELETE/TRUNCATE guards, and unique `(tenant_id, occurrence_id, event_type)`. Composite FKs pin its Rule revision and Engineering Run, occurrence and Project, and TaskExecutionRun and Task. An insert trigger verifies the Run is schedule-origin/agent-channel, has the same Engineering Run, rule/version/occurrence and `initiated_by`, and that the occurrence's immutable `run_as_actor_id` matches. The Outbox is distinct from `schedule_rule_outbox` (Rule changes) and `multica.task_run_outbox` (Task metadata changes).
+
+The database layer permits setting the link only in the fenced state transition, but it does not itself know the worker's supplied lease owner/generation. The Schedule-owner application transaction must include both values and require the current owner, generation, lease expiry, and occurrence deadline in its conditional update. The Run owner separately reauthorizes the stored run-as identity and current Run/Worktree/Task/Profile/HookSet facts before creating a provisional non-executing Run, quota reservation, RunEvents and admission-result Outbox. The Schedule owner then writes the admitted link, occurrence `run_admitted` event, `schedule_run_admitted`/`schedule_occurrence_linked` link facts, and Schedule Run Outbox only after consuming that result. It emits a confirmation command; the Run owner consumes that command in its own transaction before publishing Infrastructure demand. `run_started` is emitted only after the independent Runtime has passed readiness and actually starts execution. No production capability is connected yet.
+
+The updated bounded runner passed on disposable PostgreSQL 18.6: the five Schedule migrations applied twice, eight Schedule tables had FORCE RLS, the canonical ACL fixture passed active/revoked/paused authorization cases with a runtime role that has no UPDATE privilege on directory ACL tables, and Project, Branch, and Run grant revocations each waited for a concurrent authorization transaction's Project lock. Once authorization committed, revocation completed and a later authorization failed closed. An admitted Run/Outbox pair passed identity constraints, mismatched run-as and Run-link mutation were rejected, Outbox UPDATE was rejected, and a `NOSUPERUSER NOBYPASSRLS` role observed only its tenant's row. This does not exercise target production DB grants, full REST write rollback, worker reauthorization, quota reservation, or a Rust admission service.
+
+## 6.1 9F4C-C authorization and ACL mutation lock protocol
+
+`multica.lock_schedule_run_as_authorization` checks non-null scope and equality with `app.tenant_id`/`app.actor_id`, then resolves the canonical Engineering Run, Branch, and current Project/Branch/Run grants before taking `pg_advisory_xact_lock(hashtextextended('star.schedule.run-as.authorization:project:' || tenant_id || ':' || project_id, 741391))`. The API performs its authoritative active-Run and writer-grant query in the next SQL statement, so `READ COMMITTED` obtains a fresh statement snapshot after any lock wait. The Project/Branch/Run ACL mutation triggers derive all affected canonical Project IDs from OLD/NEW rows, sort UUIDs, then take the same lock for each Project before the row mutation proceeds. Unresolvable mutation scope raises an exception. The transaction lock disappears automatically at commit/rollback; it adds no persistent table or global Project serialization. A `hashtextextended` collision can only cause an unrelated transaction to wait.
+
+The runtime role has SELECT on canonical ACL tables and EXECUTE on the checked helper only; PUBLIC execution is revoked. The ACL mutation triggers run as the table's trigger execution context and do not grant the Schedule runtime role ACL writes. The runner grants helper EXECUTE only after creating its disposable role. Target database owner, trigger deployment, function ownership, and runtime grants remain to be verified. The race test proves API enable-time authorization versus grant mutation ordering; it does not test a future worker/admission transaction.
+
+## 6.2 9F4D admission and Multipass/K3s handoff
+
+The Schedule Rule pins its Worktree, Task, execution Profile, HookSet, and immutable run-as identity, but it does not pin a VM or Multipass instance. Each trigger/retry/resume resolves the current authorized RunInfrastructureBinding and explicit placement policy, then snapshots binding ID/revision, HostEnvironment, exact K3s cluster ID/generation, provider/profile digest, namespace/runtime identity, and budget reference. Run-owner admission rechecks current ACL, target/Profile/HookSet, binding and Project/Run quota in its own transaction; it creates the provisional non-executing TaskExecutionRun, Project/Run reservation, RunEvents and an admission-result Outbox. Schedule-owner result handling rechecks occurrence lease owner/generation/deadline and commits the occurrence link, Schedule Run Outbox and confirmation in its own transaction. Only after confirmation does the Run owner append a versioned/idempotent infrastructure-capacity demand to its own Outbox. No owner claims Host or cluster capacity has been reserved, calls Multipass, waits for VM work, or writes another owner's tables.
+
+The Infrastructure owner consumes demand through its own idempotent Inbox and transaction, resolves the explicit profile placement policy, checks fresh Host and exact-cluster headroom, and atomically creates both owner-local capacity reservations and an operation receipt. Unknown/insufficient capacity at either layer rejects or defers the demand without starting an executor. Only after owner acceptance does the Rust Host Infrastructure Manager asynchronously reconcile the selected owned instances/K3s cluster. The Schedule worker cannot call Multipass or guest exec. A Run may remain awaiting_infrastructure, but run_started/executor launch waits for current authorization and binding recheck, both acknowledged reservations, owner receipt for the bound Host/cluster generations, K3s API/node/CRI readiness, and the separately selected AgentRuntime sandbox. No owner performs cross-owner writes or a distributed DB transaction. A stale lease/fence/binding, revoked ACL, or failed/unknown readiness causes an idempotent retry/failure event and release through owner commands; no task process starts.
+
+### 6.3 Implemented `domain-infrastructure` V2 contract surface
+
+`crates/domain-infrastructure/src/lib.rs` defines `ProviderKind::{MultipassK3sCluster, RemoteK3s}`, `KubernetesDnsLabel`, `ExecutionResourceBudgetV1`, `RunInfrastructureBindingSnapshotV2`, and `HostInfrastructureDemandV2`. Binding and demand carry explicit `schema_version=2`; validators reject unknown versions. The binding pins non-nil Tenant/Project/Branch/Engineering Run/binding/HostEnvironment/K3s cluster/profile identities, positive revisions including exact cluster generation, typed ClusterPlacementPolicyV1, resource budget and DNS namespace/service account; `digest()` emits a v2-domain-separated SHA-256 over all pinned fields, including the placement-policy wire value. Demand validation checks IDs, Rule revision, deadline, embedded binding/budget, and exact owner scope. `deduplication_key()` remains `(tenant_id, occurrence_id)`. The capacity module adds versioned Host+cluster snapshot/request/candidate types and fail-closed dual headroom evaluation; assessment is advisory to the owner transaction and does not itself reserve capacity.
+
+The focused crate runner must pass formatting, all-target check, Clippy with warnings denied, and all crate tests for this revision. These tests validate Rust value contracts only. They do not prove that the snapshot came from current ACL/provider/profile placement, that any Outbox/Inbox is committed, or that VM/K3s/sandbox readiness exists. No SQL persistence or service call is added by this slice; the caller must retain the fixed creator `run_as_actor_id` and independently reauthorize it on every trigger/retry/resume. V2 has no production consumer yet; persisted V1 payloads require explicit migration.
+
+Implementation evidence and focused gate results: [`PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md`](../reports/PHASE-9F4D-0-INFRASTRUCTURE-CONTRACT-REPORT.md).
+
+### 6.4 Host reservation and provider-specific readiness evidence
+
+The Infrastructure owner emits a versioned acceptance bound to the exact demand event, tenant/Project/Branch/Engineering Run, TaskExecutionRun, Rule revision, occurrence, binding identity/revision/digest, HostEnvironment generation, exact K3s cluster ID/generation, both reservation leases and expiry. Its separate readiness event binds the same scope and references a non-nil Manager operation receipt. `validate_infrastructure_execution_readiness` rejects unsupported schema, nil identity, expired reservation/deadline, current-binding drift, cross-scope IDs, Host/cluster generation mismatch, evidence before acceptance, future evidence, or observations older than 30 seconds.
+
+For MultipassK3sCluster, Manager operation, Multipass daemon, and aggregate readiness for every owned guest backing the exact cluster require Ready evidence; this keeps daemon wait-ready, instance state, cluster membership, and K3s checks separate. For RemoteK3s, Multipass daemon and guest VM must be explicitly not_applicable. Both providers require K3s API readiness, at least the profile-required Ready-node count, CRI readiness, independently enforced Agent Runtime sandbox readiness, and the scoped Worktree workspace bridge. Acceptance/readiness bind Host and cluster generations plus the exact host_capacity_reservation_id and cluster_capacity_reservation_id; evidence that omits or mismatches either ID is rejected. Unknown, Failed, mismatched, wrong-provider NotApplicable, or missing facts block execution.
+
+This pure validator is not an authorization oracle: before the TaskExecutionRun enters running, Run owner must recheck the fixed creator run_as_actor_id grants, current binding, occurrence lease/fence, and Project/Run quota in its own transaction. Infrastructure acceptance/evidence persistence and Manager production remain Infrastructure-owner responsibilities. The Rust 1.98.1 focused runner passed format/check/Clippy and 27/27 tests (four focused gates); no Schedule worker, owner DB, provider adapter, target DB/RLS, or executor is enabled.
+
+### 6.5 Host and selected-cluster capacity candidate
+
+`InfrastructureCapacitySnapshotV2` carries fresh Host totals/reserves/unmanaged commitments/active reservations and exact-cluster allocatable capacity/cluster reserves/unmanaged commitments/active reservations. `InfrastructureCapacityRequestV2` is bound to the V2 Run binding digest and provides separate physical Host and Kubernetes workload resource vectors. The evaluator rejects stale/future/unknown snapshots, wrong Host/provider/cluster generation, arithmetic underflow/overflow, expired demand, or a request below the pinned maximum RSS budget. It returns before/after headroom for both ledgers. This is a pure candidate calculation: Infrastructure owner must serialize against both reservation ledgers and re-evaluate inside its own transaction before reserving. No Multipass or K3s integration test is run by the focused contract suite. During this test phase, no more than two Multipass instances may remain registered in total; stopped or recoverable/deleted entries count toward the disk cap. The bootstrap script serializes its inventory check and launch with a host-local exclusive lock, then refuses a third instance or an unparseable inventory without purging anything; all live test launches must use that guarded path.
+
+## 6.5 9F4D-3A Infrastructure-owner storage handoff
+
+The Schedule/Run owner publishes an idempotent demand through its own Outbox. The new Infrastructure migration stores the receiving side in `infrastructure.capacity_demand_inbox`; it does not write `automation.occurrence_dispatch`, Run reservations, or Schedule Run Outbox rows. The Infrastructure owner’s schema pairs Host and exact-cluster capacity in one `capacity_reservation_bundle` row, records terminal demand outcomes in append-only `capacity_demand_receipt`, appends lifecycle facts to `capacity_reservation_event` and owner notifications to `capacity_owner_outbox`, and keeps delivery state separately in `capacity_outbox_delivery`.
+
+At the close of 9F4D-3A, disposable PostgreSQL 18.6 had validated duplicate migration application, all six tenant FORCE RLS tables, `NOBYPASSRLS` tenant isolation, Work transition/24–25-hour terminal retention guards, and Transaction UPDATE/DELETE/TRUNCATE denial. The runner uses `psql` directly; target database owner/runtime grants and production migration loading were not verified at that stage. Later 3C2 adds an owner-store admission primitive (see §6.8); no production Inbox consumer, Outbox consumer, worker, provider/Manager, or executor is connected. Run owner continues to own only Project/Run quota reservation and its own Outbox; cross-owner facts remain asynchronous.
+
+Evidence: [`PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md`](../reports/PHASE-9F4D-3A-INFRASTRUCTURE-OWNER-SCHEMA-REPORT.md).
+
+## 6.6 9F4D-3B1 runtime grant migration and principal boundary
+
+Migration db/migrations/2026-10-08-infrastructure-owner-runtime-grants.sql is ordered after the six-table Infrastructure schema migration. It idempotently creates/alters star_infrastructure_owner as a NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOBYPASSRLS, NOINHERIT role group; revokes prior/PUBLIC schema and table grants; grants schema USAGE; grants SELECT/INSERT/UPDATE/DELETE only on capacity_demand_inbox, capacity_reservation_bundle, and capacity_outbox_delivery; and grants SELECT/INSERT only on capacity_demand_receipt, capacity_reservation_event, and capacity_owner_outbox. It grants no schema CREATE, TRUNCATE, REFERENCES, or TRIGGER.
+
+A deployment-managed application login and credential are separate from this group. Production must provision membership and use transaction-scoped SET LOCAL ROLE star_infrastructure_owner; pool reset/rollback must discard the role on all success and error paths. The disposable runner proves migration repeatability and catalog privileges, not pool behavior, target migration loading, or real app identity. At the 3B1 milestone, production callers and owner writer/consumer were absent; the later 3C2 store method is not a production consumer or route. Target login, delivery consumer, worker, Manager/provider and execution are still open. Test-phase Multipass inventory remains capped at two registered instances; this gate starts none.
+
+## 6.7 9F4D-3C1 PostgreSQL Inbox receive
+
+PostgresInfrastructureOwnerInbox::receive_demand follows this transaction order:
+
+1. Validate HostInfrastructureDemandV2, the supplied current binding snapshot, matching deterministic binding digest, positive Host generation and future deadline.
+2. Begin the PostgreSQL transaction; execute SET LOCAL ROLE star_infrastructure_owner, then set app.tenant_id for FORCE RLS.
+3. Read immutable terminal receipt by tenant plus source event/occurrence. Return AlreadyTerminal only for one exact scope and payload digest; malformed or colliding receipt state is an idempotency conflict.
+4. Insert into infrastructure.capacity_demand_inbox with conflict-safe uniqueness. Return Enqueued for a new row; on conflict reread terminal receipt, then verify a pending row's complete identity and canonical payload before returning DuplicatePending.
+5. Commit before returning. SQL, role, RLS, validation, and conflicting replay errors propagate; no branch treats an Inbox row as admitted capacity.
+
+Payload digest is SHA-256 over serialized typed V2 JSON with a domain/version prefix. The append-only receipt is read only in this slice; the adapter does not create it or lock it for share because the role has no receipt UPDATE grant. Terminal replay therefore proves deduplication against an existing owner fact, not that this adapter performed acceptance.
+
+The CurrentInfrastructureBindingV2 argument is a typed handoff expected from a trusted resolver, but the concrete resolver is not wired here; validation occurs before beginning the Inbox transaction. Do not expose this adapter as a public acceptance endpoint until resolver provenance, authorization, binding-currentness serialization and target role activation are implemented and tested. No Host/cluster reservation, Outbox consumer, retry scheduler, worker, Manager/provider or executor is present.
+
+## 6.8 9F4D-3C2 Infrastructure-owner atomic capacity admission
+
+The `PostgresInfrastructureOwnerAdmission::admit_inbox` primitive consumes one existing tenant-scoped Inbox row; no consumer loop calls it yet. Its transaction activates `star_infrastructure_owner`, sets tenant RLS scope, reads the immutable resource IDs, acquires sorted tenant+Host and tenant+cluster transaction advisory locks, and then locks/reloads the Inbox row. It verifies the canonical typed demand, immutable indexed fields and digests, processing state, retry time, lease and deadline. Existing active reservations are recomputed from `capacity_reservation_bundle` under the same transaction using `reservation_state='held' AND lease_expires_at > transaction_now`; caller-supplied active totals are discarded. The trusted provider observation and profile capacity request still pass through `evaluate_infrastructure_capacity_candidate`, including exact Host/cluster IDs and generations, binding digest, budget fit and maximum 30-second freshness.
+
+An accepted candidate writes, atomically: one bundle with distinct Host and cluster reservation IDs; one append-only held event; one append-only accepted demand receipt; terminal Inbox state; one versioned immutable owner Outbox event; and its separate Work delivery row. Exact event/occurrence/digest replay returns the persisted terminal outcome. Temporary unknown/stale/insufficient capacity is scheduled for bounded retry without a bundle. Invalid or mismatched provider generation/scope is recorded as a terminal rejection. Database errors roll back all writes.
+
+The PostgreSQL integration tests exercise two concurrent demands for the same tenant/Host/cluster (one accepted, one retry), accepted replay, provider-generation mismatch with terminal replay, and reuse of capacity after an earlier hold expires. These prove only the owner transaction in a disposable PostgreSQL 18.6 database. The current FORCE tenant RLS tables and tenant-qualified locks cannot aggregate or serialize reservations for a physical Host/cluster shared across tenants; such placement is unsupported until a system-wide allocator/ledger is added. Do not connect a cross-tenant shared pool to this adapter.
+
+The caller-supplied provider snapshot/request are trusted-boundary inputs; no concrete provider/profile resolver, per-trigger ACL/current binding fence, owner Inbox consumer, Outbox delivery loop, target DB/application login, lease reaper, Manager, Multipass/K3s lifecycle or task executor is wired. No route exposes this method, and TaskExecutionRun remains non-executing. Test runners use zero VMs; any live Multipass testing remains capped at two registered instances because of disk capacity.
+
+## 6.9 9F4D-3C3 persisted Provider Profile and profile-derived request
+
+`infrastructure.provider_profile_revision` is the tenant-scoped SCD2 Master for the exact provider, placement policy, and Host/cluster resource vectors pinned by a Run binding. Its content digest deterministically covers the schema version, tenant/profile/revision identity, provider, placement, and both resource vectors. A current revision may be closed once when superseded; business fields are immutable and physical deletion is forbidden. `provider_profile_revision_event` is the append-only Transaction record for creation and supersession. Both tables use tenant FORCE RLS; the Infrastructure-owner role has read-only access.
+
+The admission transaction reads the exact profile id/revision from the persisted Inbox demand, reconstructs the typed profile, recomputes its digest, compares it with the database `profile_digest`, and verifies the binding's exact tenant/profile/revision/provider/placement/digest before deriving the capacity request. The admission API does not accept a caller-supplied resource vector. Missing/unsupported/invalid records or digest mismatch fail closed before reservation; a stored-digest mismatch produces a terminal rejection fact and no reservation.
+
+The disposable PostgreSQL 18.6 runner applies schema, grant and profile migrations twice each and verifies tenant isolation, owner read-only profile grants, one-time SCD2 closure, append-only events, and 8/8 Infrastructure FORCE RLS tables. Its five SQLx cases pass, including stored-digest mismatch rejection. The temporary database stops and cleans up; no Multipass instance is started, and live test inventory remains capped at two registered records total, including stopped/deleted records, due to disk capacity. This does not implement the production profile editor/current resolver, trusted Run-binding/provider observation, global cross-tenant allocator, target DB provisioning, Inbox/Outbox consumer, Manager/provider, readiness producer, BI/Benchmark, sandbox/workspace bridge, or Schedule executor.
+
+## 6.10 9F4D-3D3 Infrastructure Outbox delivery state machine
+
+`PostgresInfrastructureOwnerOutboxDelivery` operates on the existing immutable `capacity_owner_outbox` event and its `capacity_outbox_delivery` Work row. The store opens one transaction per claim/ack/failure call, performs `SET LOCAL ROLE star_infrastructure_owner`, and sets transaction-local `app.tenant_id`. The role uses its existing SELECT access to Transaction rows and UPDATE access to Work rows under FORCE RLS; no additional grant or migration is required.
+
+`claim_due` validates non-nil tenant and lease-owner UUIDs, `max_items ∈ [1,64]`, and `lease_seconds ∈ [1,300]` before opening the database transaction. It first terminalizes a bounded number of expired attempt-12 leases as `dead`, then selects due pending/retry or non-exhausted expired leases ordered by database time with `FOR UPDATE SKIP LOCKED`. The update increments `attempt_count`, assigns owner and lease expiry using `clock_timestamp()`, and returns the immutable typed event envelope. It casts each JSONB body to its bounded text representation and returns `payload_json: String` without decoding to `serde_json::Value`; raw serialized payload bytes are at most 1 MiB per maximum batch. This is not an RSS guarantee: consumer-side decoding requires its own memory and parallelism budget.
+
+`mark_delivered` and `record_failure` compare tenant, event, owner, attempt and current unexpired lease in the UPDATE predicate. A zero-row update returns `LeaseLost`; no stale worker may mutate a reclaimed event. Transient retry delay is exponential from 1 second to a maximum of 3600 seconds. Permanent failures and transient failure on attempt 12 become `dead`; a crashed final attempt is dead-lettered after lease expiry without an attempt 13. Delivered/dead transitions set terminal timestamp and the schema-bounded 24-hour cleanup horizon. The API intentionally does not persist arbitrary error text.
+
+SQLx integration verifies competing claimers return one claim total, lease expiry increments the fence and rejects stale acknowledgement, transient retry schedules a future due time, permanent failure becomes dead, and an expired final-attempt lease is dead-lettered. This proves the database state machine only: there is no transport publisher, polling/retry process, production application identity/target migration, Run/Execution owner Inbox consumer, or execution enablement. The tests run against disposable PostgreSQL with zero Multipass VMs; registered Multipass inventory remains limited to two records total including stopped/deleted.
+
+## 6.11 9F4D-3D4 bounded JetStream publisher
+
+Construct the publisher from an already authenticated async-nats JetStream context and PostgresInfrastructureOwnerOutboxDelivery. It does not own connection establishment, credentials, tenant discovery, stream provisioning, timers, or scheduling. publish_due_for_tenant validates non-nil tenant and lease owner IDs, batch size 1..8, and lease duration 120..300 seconds before its tenant-scoped database claim.
+
+For each claim, validate schema version 2, the four capacity event types, object-shaped JSON, a maximum 16 KiB source payload, and a maximum 128 KiB serialized envelope. Publish serially, set Nats-Msg-Id to the immutable event UUID, and wait up to 10 seconds for PubAck. Only a successful PubAck calls mark_delivered. Timeout or failure calls the existing transient failure path; because the server may already have persisted the message, retry keeps the same message ID. The durable Run/Execution Inbox remains authoritative for dedupe beyond JetStream's duplicate window.
+
+The focused integration launches NATS Server 2.15.0 on loopback with JetStream and the disposable PostgreSQL owner schema, publishes a real message, observes PubAck, verifies the database row is delivered, and verifies it is no longer claimable. The runner stops only the process it started and cleans its unique temporary store after stop. This is not production topology, failover, throughput, or end-to-end consumer evidence.
+
+Rust 1.99.0 focused gates passed: package fmt, infrastructure all-target check, 53 library tests, and targeted Clippy. The extended disposable PostgreSQL/NATS runner passed 23/23 steps, 10/10 FORCE RLS and 11/11 SQLx cases. Workspace-wide formatting reports unrelated baseline files and was not mass-formatted. No Multipass VMs were created; current test inventory stays at two registered instances total.
+
+### 6.12 Run-owner capacity result consumer
+
+The Run-owner demand append adapter accepts the caller's existing transaction and validates the referenced TaskExecutionRun as schedule-origin with matching rule ID/revision, occurrence ID and correlation ID before writing the typed demand Outbox fact. A mismatch aborts without an Outbox insert. The result adapter wraps a pre-created durable JetStream PullConsumer with AckPolicy::Explicit; it does not create streams, consumers, credentials, workers, or tenant polling. A pull uses max_messages=1, max_bytes=132 KiB, and expires=2 seconds. The consumer validates schema-v2 result envelopes and payloads, then hydrates the complete domain scope from the immutable demand row before inserting the Run-owner Inbox fact.
+
+The SQL transaction owns tenant RLS scope, deduplication and immutable replay comparison. Commit precedes Message::double_ack(); an error before commit leaves the delivery unacknowledged. Only accepted/rejected/expired producer contracts are consumed; released is explicitly unsupported. No TaskExecutionRun/Schedule mutation or BI event is emitted. Bad messages remain unacknowledged until a separately durable quarantine contract is implemented; production consumer deployment stays disabled.
+
+### 6.13 Phase 9F4D-3D6 quarantine owner and permanent-fault disposition
+
+#### Ownership and trusted source identity
+
+Malformed results cannot be written to `multica.infrastructure_capacity_result_inbox`: their tenant claim may be absent or hostile, and that Inbox's FORCE RLS boundary exists to protect valid Run-owned facts. Add a distinct Platform Messaging/Ingress quarantine owner with a dedicated migration/runtime role and transaction. It stores no authoritative tenant or Run scope derived from message content and performs no cross-owner write. Broker authentication and the deployed stream subscription remain provisioned by trusted platform configuration, not by a payload.
+
+Define `trusted_source_key = (deployment_identity, configured_stream_generation, server_stream_name, server_stream_sequence)`. The deployment identity and monotonically changed stream generation are trusted configuration; `server_stream_name` and `server_stream_sequence` come from JetStream message metadata. Envelope `tenant_id`, `event_id`, `Nats-Msg-Id`, and subject are untrusted diagnostics and do not form the receipt primary key. Subject and selected headers are stored only after allowlist/length validation.
+
+#### Receipt and optional body storage
+
+The quarantine receipt is an append-only Transaction fact with unique trusted source key, received timestamp, fixed allowlisted `fault_code`, parser/schema version, bounded subject and selected broker metadata, wire byte length, and SHA-256 of the exact received bytes. Identical source key/digest/fault replays are idempotent. A source-key collision with different digest or fault metadata is an integrity conflict: emit bounded operator telemetry, retain the delivery unacknowledged, and do not overwrite the first receipt.
+
+The raw body policy is a release-blocking user decision: encrypted retention for 24 hours or metadata plus digest only. If retention is selected, exact bytes live in a separate encrypted Work store, with a hard per-message byte cap no greater than the 132 KiB consumer fetch limit, total byte quota, TTL deletion, separate key/access policy, and no payload in logs, traces, SQL errors, metrics labels, or BI. If digest-only is selected, no body bytes are persisted or replayed. Neither choice may silently default. Receipt retention is Transaction policy and cannot be physically deleted without an approved audit/legal retention decision; any payload Work record must have explicit TTL and purge evidence.
+
+#### Fault classification and acknowledgement
+
+Before entering quarantine, a versioned classifier must distinguish a permanent message fault from a transient or owner-data fault. Malformed JSON, unsupported wire version, invalid bounded headers, and a conclusively unmatched source event may be candidates for the allowlist, but exact codes and retryability remain to be finalized and tested. `InvalidStoredDemand` indicates invalid/corrupt Run-owner source data and remains unacknowledged with an operator signal until an explicit DDD decision; it is not made terminal merely to unblock the consumer. Database errors, missing encryption keys, quota exhaustion, stale/unknown broker metadata, digest conflicts, and unclassified errors stay unacknowledged and trigger bounded backpressure/retry.
+
+Only after the quarantine owner transaction commits the receipt and the selected body action may the consumer call `double_ack_with(AckKind::Term)`. Transaction failure or uncertain classification MUST NOT Term. Repeated ACK failure is safe because JetStream redelivery resolves through the trusted source key and immutable equality check. Quarantine does not update TaskExecutionRun, Schedule occurrence, RunEvent/BI, Run or Infrastructure reservations, readiness, or executor state. Release producer support, production stream/durable provisioning, target database identity, and consumer lifecycle remain separate gates.
+
+#### Worktree-first infrastructure and verification boundary
+
+The quarantine service is a Platform app boundary connected through versioned API/owner commands and its own transactional store; it is not a Run app or a Worktree tree node. Operations should be visible from the relevant Run result event by authorized deep link, while platform-level access is audited and does not expose body content to Task Card CLI, Agent, Plugin, or Canvas. No Multipass VM is required for DB/NATS contract tests; the live test inventory remains at most two registered Multipass records including Stopped/Deleted entries, with no auto-purge.
+
+Acceptance requires duplicate-identical and duplicate-conflicting source identities, malformed/unmatched messages, permanent versus transient fault mapping, commit-before-Term, storage/key/quota outage redelivery, exact wire digest, body size/TTL/encryption policy, no untrusted tenant scope, no body logging, append-only/RLS/grant checks, and zero Run/BI/reservation/readiness/execution mutation. The schema/owner-hook substrate is implemented and has focused Rust/PostgreSQL evidence; production consumption remains disabled pending KMS, login/stream provisioning, target rollout and full redelivery/operator gates.
+
+### 6.14 Phase 9F4D-3D6 implemented persistence and consumer hook
+
+`platform-messaging-runtime` owns the three physical relations defined by migration `2026-10-08-platform-poison-quarantine.sql`:
+
+| Relation | W/T/M | Contract |
+|---|---|---|
+| `platform_messaging.poison_quarantine_receipt` | Transaction | Append-only trusted source key, allowlisted fault, parser/classifier version, exact wire length/SHA-256, retention policy and timestamp. |
+| `platform_messaging.poison_quarantine_payload_work` | Work | Optional encrypted replay envelope, at most 204,800 bytes per row, exact 24-hour expiry, and a 4 MiB per-deployment live-byte ceiling enforced by a database trigger as well as Rust preflight. Expired rows continue consuming quota until audited purge. |
+| `platform_messaging.poison_quarantine_payload_purge_audit` | Transaction | Append-only proof of matching TTL-expired payload deletion; a separate NOLOGIN purger role can read receipt/work and insert audit before deleting Work in one transaction. |
+
+All three tables use ENABLE + FORCE RLS scoped only by trusted `app.platform_deployment_id`. `star_platform_ingress_owner` has only schema USAGE and SELECT/INSERT on receipt and payload; `star_platform_quarantine_purger` has SELECT on receipt/payload, DELETE on payload and INSERT on purge audit. Both are NOLOGIN, NOSUPERUSER, NOBYPASSRLS and NOINHERIT; deployment login provisioning and transaction-local role membership remain external gates. No Master table is added. Metadata-only and encrypted-24-hour policies are explicit configuration choices, with no `Default`; encrypted mode fails closed unless injected KMS health is non-mock and reports the configured scope/DEK. The present `domain-kms` provider is LocalMock-only, so no real encrypted production deployment is enabled.
+
+When encrypted replay is configured, the Rust encoder copies no more than 16 `Nats-Msg-Id` values or 8 KiB of aggregate value bytes. It checks both before allocating copied strings, so repeated empty headers cannot evade the byte cap.
+
+`RunOwnerCapacityResultConsumer::with_quarantine` accepts a Platform quarantine service explicitly. Only `InvalidEvent`, malformed JSON and `IdempotencyConflict` are routed as stable permanent-fault codes; owner stored-demand corruption, DB/KMS/quota failures and all other errors stay unacknowledged. The Platform owner commits receipt plus its selected payload action before sending `double_ack_with(AckKind::Term)` and awaiting broker confirmation. Missing quarantine service keeps permanent malformed events pending. This is a persistence/consumer-hook slice, not production NATS consumer composition, trusted stream provisioning, dead-letter operator UI/replay, Run/BI projection, or Schedule execution.
+
+Evidence: Rust 1.99.0 `cargo fmt --check`, focused `cargo check`, 16/16 library tests and targeted Clippy passed. A disposable PostgreSQL 18.6 instance applied the migration twice and passed schema, FORCE RLS, least-privilege, append-only, metadata-only, payload retention, TTL/purge and database quota-rejection assertions. This gate used zero Multipass VMs; live tests remain limited to two registered Multipass records total including Stopped/Deleted. The disposable PostgreSQL data directory was preserved after the environment rejected recursive cleanup; the server is stopped and this does not affect Multipass inventory.
+
+### 6.15 Phase 9F4D-3D7 JetStream quarantine redelivery gate
+
+This gate exercises the existing `RunOwnerCapacityResultConsumer::with_quarantine` and `PlatformPoisonQuarantine` against a disposable PostgreSQL 18.6 database and real loopback JetStream 2.15.0. The configured source identity is trusted by the fixture and the retention policy is explicitly `MetadataOnly`; payload Work rows must remain absent.
+
+The fault-injection case installs a temporary trigger that rejects receipt insertion. The malformed source message remains ack-pending and no receipt exists. After removing the trigger and waiting past the short test AckWait, the actual redelivery stores exactly one receipt, leaves no payload row, waits for confirmed `double_ack_with(AckKind::Term)`, and is not delivered again. The pre-ACK handle-drop case directly commits the immutable receipt, drops the unacknowledged Message and fetch handles, waits past AckWait, and has real redelivery resolve as the exact duplicate outcome; confirmed Term ACK ends delivery and the receipt count remains one. This models consumer loss but does not kill or restart an OS process.
+
+The Rust integration target is serialized because both tests use the same JetStream subject. The focused target passed 2/2; the cumulative disposable PostgreSQL/NATS runner passed 22/22 steps, stopped both services, and removed its owned PostgreSQL data. It created zero VM and left Multipass inventory unchanged. No schema was added by this phase. This proves neither production database/NATS identity activation, real KMS, operator replay, nor production consumer rollout; Schedule/Task execution and all Run/BI/reservation/readiness changes remain disabled.
+
+## 6.16 9F4C-D owner-local Schedule→Run admission protocol
+
+The current 9F4C-A composite foreign keys and triggers provide identity consistency for already committed facts. They do not authorize one service to write another owner's rows or require Schedule dispatch, TaskExecutionRun, Run reservation, RunEvents and both owners' Outboxes to share a transaction. The Schedule owner owns `automation.occurrence_dispatch`, `automation.occurrence_event` and `automation.schedule_run_outbox`; the Run/Execution owner owns TaskExecutionRun, quota/reservation, RunEvents, its admission Inbox/result Outbox and Infrastructure-demand Outbox.
+
+1. Schedule claims or reclaims one occurrence and commits its lease/fence state with an owner-local versioned admission command Outbox. `tenant_id + request_id` identifies one logical attempt; `occurrence_id` groups attempts but is not the admission Inbox idempotency key. The payload pins Rule revision, Project/Branch/Engineering Run, Worktree, Task, fixed run-as actor, immutable infrastructure binding and bounded deadline. Schedule lease owner/generation/expiry remain owner-local and are checked by CAS at result-link time; they are excluded from the replay-stable payload.
+2. Run owner authenticates the Schedule service identity out of band, derives tenant/RLS scope from that trusted context, deduplicates the command in its own Inbox, re-resolves current directory authorization/target/Profile/HookSet/binding, and checks Project/Run quota. In one Run-owner transaction it creates at most one provisional non-executing TaskExecutionRun, its reservation and RunEvents, and an admission-result Outbox. Exact transport replay of one `request_id` and payload returns the same Run ID; different content under that request is rejected. A new logical attempt gets a fresh request ID and incremented ordinal after the previous attempt is terminal. The Run owner does not assert that Schedule's lease remains current and does not write Schedule tables.
+3. Schedule owner consumes the Run result through its own Inbox/transaction. It performs a current lease-owner/generation/expiry/deadline compare-and-swap, then writes `admitted_run_id`, occurrence event, append-only `schedule_run_outbox`, and a confirmation command. A lost response is recovered by replaying the same command; a stale fence cannot link or confirm a Run.
+4. Run owner consumes confirmation through its own Inbox/transaction and only then writes the Infrastructure capacity demand Outbox. An expired/cancelled claim or a failed Schedule confirmation is compensated through idempotent owner commands. Infrastructure receives that demand in its own Inbox and owns both Host and exact-cluster reservations. All reservations/readiness remain separate gates before execution.
+
+The owner command, result and confirmation transport identities, bounded payload limits, retry/dead-letter policy and target DB grants must be fixed before enabling production consumers. Existing same-database FKs may prove that a Schedule link references a committed Run; after physical DB separation, replace cross-store FKs with typed owner receipts/local projections. No distributed transaction or direct cross-owner table write is allowed. Execution remains fail-closed until the whole flow is implemented and independently verified.
+
+## 6.17 9F4C-D versioned wire DTOs
+
+The Rust domain contract exposes the following strict schema version 1 payloads. All JSON bodies are capped at 16 KiB, reject unknown fields, and validate before serialization and after deserialization.
+
+| Message | Required identity and scope | Shape and owner behavior |
+|---|---|---|
+| `ScheduleRunAdmissionCommandV1` | `tenant_id`, `request_id`, `correlation_id`, positive `admission_attempt`, immutable occurrence snapshot, exact `RunInfrastructureBindingSnapshotV2` | One `request_id` represents one logical attempt. The binding is validated against tenant/Project/Branch/Engineering Run and its canonical SHA-256 digest is echoed in later messages. The command excludes Schedule lease owner/fence/expiry. |
+| `ScheduleRunAdmissionResultV1` | `tenant_id`, `result_id`, matching request/attempt/correlation/occurrence IDs, binding digest | Accepted requires one non-nil provisional `task_execution_run_id` and no rejection code. Rejected requires a stable rejection code and no Run ID. Run owner writes the result Outbox in the same transaction as its own admission facts. |
+| `ScheduleRunAdmissionResolutionV1` | `tenant_id`, `resolution_id`, matching request/attempt/result/correlation/occurrence/Run IDs and binding digest | Confirm has no compensation reason. Compensate requires a typed reason. Schedule emits only after its owner-local fenced link decision; Run owner consumes it before publishing Infrastructure demand. |
+
+Transport redelivery reuses the exact persisted command bytes and the same request identity. A later logical attempt is a new command with fresh `request_id` and the next ordinal, created only after the previous attempt is terminal; an occurrence has at most one active attempt. Authentication is out of band: envelope tenant IDs are scope claims, while the receiving owner establishes service identity and RLS context from trusted transport credentials. The contract DTOs do not implement persistence, authentication, Outbox delivery, owner consumers, or execution.
+
+## 6.18 9F4C-D1 admission attempt schema and API projection
+
+The migration extends the existing `multica.task_execution_run` Transaction with `created_at` and `automation_admission_attempt`; it adds no table, owner role, or runtime grant. Existing Run rows are not backfilled or rewritten. New `created_at` values default to `clock_timestamp()`. `started_at` becomes nullable with no implicit default: non-Schedule rows still require an explicit start, while a provisional Schedule row requires a positive attempt ordinal and a NULL start.
+
+`uq_task_execution_run_schedule_occurrence_attempt` enforces one Run per tenant/occurrence/logical ordinal and maps a legacy NULL ordinal to one. The existing time indexes are rebuilt on `COALESCE(started_at, created_at)`. The append-only event allowlist gains `schedule_admission_confirmed` and `schedule_admission_compensated`; actual `run_started` remains an independent event.
+
+The API's list and detail read paths project `admission_attempt`, `created_at`, nullable `started_at`, and admission state from Run origin plus append-only events. Only `schedule_admission_confirmed` confirms Schedule admission; `schedule_occurrence_linked` is a Schedule-side link fact and does not prove the Run owner consumed confirmation. Cursor ordering and SQL comparison use the coalesced timestamp and Run ID; parser compatibility accepts the legacy `cursor_started_at` and the new `cursor_ordered_at`, rejecting conflicting aliases. The UI labels provisional/confirmed/compensated states and displays actual start only after start evidence.
+
+The disposable PostgreSQL 18.6 gate re-applies the migration and validates provisional attempts 1/2, duplicate ordinal rejection, legacy NULL-as-one collision, missing ordinal rejection, non-Schedule start requirement, and confirmation/compensation event acceptance. Runtime grants remain unchanged. This migration/API slice does not add the Schedule or Run owner consumers, confirmation receipt, Infrastructure demand writer, target-database rollout, BI/Benchmark, provider or execution; production stays fail-closed.
+
+## 6.19 9F4C-D2 Run Infrastructure Binding persistence and resolver
+
+Migration `2026-10-10-multica-run-infrastructure-binding-master.sql` adds two Run/Execution-owned relations:
+
+| Relation | W/T/M | Mutation and access contract |
+|---|---|---|
+| `multica.run_infrastructure_binding_revision` | Master | One current SCD2 revision per tenant/Project/Branch/Engineering Run. Snapshot content and digest are immutable; only one closure of `valid_to` is allowed. Physical delete is rejected. A composite FK proves the canonical Engineering Run tuple. |
+| `multica.run_infrastructure_binding_event` | Transaction | Trigger-appended `created` and `superseded` facts with actor, scope, revision and digest; application INSERT/UPDATE/DELETE/TRUNCATE are rejected. |
+
+The Master duplicates canonical scope, `binding_id`, `binding_revision` and `schema_version` beside a strict bounded JSON snapshot. SQL checks these identities against the JSON envelope and caps JSONB text at 16 KiB. The stored 32-byte digest is not self-authenticating: Rust recomputes `RunInfrastructureBindingSnapshotV2::digest()` on every read. Resolution checks supported schema v2, all non-nil IDs/revisions, exact lookup scope, stable binding ID/revision and digest equality before returning a snapshot.
+
+`PostgresRunInfrastructureBindingStore::save_revision` activates `star_multica_run_owner` and transaction-local tenant/actor settings, locks the current scope row, compares the expected revision, closes exactly that revision and inserts its successor atomically. Initial insert requires revision 1; successors preserve binding ID and increment by one. Unique-current and composite Engineering Run constraints protect races and foreign scopes. A losing CAS returns a conflict or database uniqueness error without committing a partial close.
+
+`resolve_current` uses the restricted owner role and tenant RLS, decodes the stored JSON, recomputes its digest, and verifies scope/identity/revision. It is a Run-owned source resolver only: it does not authorize fixed `run_as_actor_id`, validate current Task/Worktree/Profile/HookSet or Schedule fence, or verify Infrastructure-owned current Provider Profile/catalog generation. Infrastructure performs its own profile and exact Host/K3s identity/generation validation under its transaction. No cross-owner table grants/FKs/writes or distributed transaction are introduced.
+
+| Validation boundary | Required evidence |
+|---|---|
+| PostgreSQL | Apply the binding migration twice; assert canonical Engineering Run FK, one-current constraint, FORCE RLS, exact owner/other-owner grants, direct event INSERT denial, CAS revision/event facts, tenant isolation and WORM triggers. |
+| Rust | Validate typed contract and canonical digest; reject scope, identity, revision, malformed JSON and digest mismatches. |
+| Still fail-closed | Rust SQLx save/resolve round-trip, production DB identity, run-as authorization, Schedule/Run consumers, Infrastructure currentness/reservation/readiness, BI/Benchmark, sandbox and executor. PostgreSQL 18.6 disposable schema acceptance and focused Rust 1.99.0 package gates passed but are not target deployment evidence. |
+
+PostgreSQL 18.6 execution passed 29/29 disposable runner steps, including migration idempotency, owner schema/grants, tenant RLS, D2 revision lifecycle/WORM and direct-event-insert denial; PostgreSQL stopped and its owned data directory was removed. The disposable chain used a no-op legacy Audit function solely to permit the older Worktree DDL prerequisite. Rust 1.99.0 package unit tests passed 12/12; package rustfmt and all-target warnings-as-errors Clippy passed. Broader strict Clippy is blocked by two existing `star-context` lints. No target database was changed, no NATS process or Multipass VM was started, and no production currentness or execution capability is claimed.
+
+## 7. Revision history
+
+| Version | Date | Change |
+|---|---|---|
+| v0.1 | 2026-10-03 | Define routes, transaction sequence, and production closure gates. |
+| v0.2 | 2026-10-04 | Record reviewed cache, TTL, SCD2, and Outbox persistence safety changes. |
+| v0.3 | 2026-10-04 | Make the Rule-revision currentness predicate explicit and align validation evidence. |
+| v0.4 | 2026-10-04 | Add request-level route-mount/error-header evidence and separate it from valid-auth and PostgreSQL authorization gates. |
+| v0.5 | 2026-10-04 | Select the RustCrypto JWT backend and document authenticated scope/body-cap route evidence while retaining database and accepted-access gates. |
+| v0.6 | 2026-10-04 | Specify non-client-controlled run-as identity, stable SCD2 inheritance, DB guard behavior, and mandatory per-trigger reauthorization while retaining the unimplemented worker/admission boundary. |
+| v0.7 | 2026-10-04 | Specify DB creator binding and occurrence-to-rule identity invariants and record the completed three-migration/five-case PostgreSQL runner; retain production ACL/worker gates. |
+| v0.8 | 2026-10-05 | Specify fenced Run linkage and Schedule Run Outbox DB invariants; record repeated disposable PostgreSQL checks and keep worker authorization, quota, atomic writer, target DB and BI gates open. |
+| v0.9 | 2026-10-05 | Specify editor/run-as separation, transactional authorization on enabled Rule writes, disable-after-revocation behavior, and the still-open per-trigger worker gate. |
+| v0.10 | 2026-10-05 | Record the pure role-policy helper test separately from route/SQL authorization evidence; keep canonical ACL fixtures and per-trigger worker/admission verification open. |
+| v0.11 | 2026-10-05 | Record disposable PostgreSQL Project/Branch/Run ACL cases under a read-only directory runtime role; keep full API transaction, concurrent revocation serialization, worker, and target-environment gates open. |
+| v0.12 | 2026-10-05 | Specify the shared Project lock and separate-statement ACL reread; record five-migration repeated application, and Project/Branch/Run revoke-wait tests while preserving worker/admission and target-grant gates. |
+| v0.13 | 2026-10-06 | Correct the 9F4D data boundary: Run owner atomically holds only Project/Run reservation and emits demand; Infrastructure owner reserves Host capacity independently before asynchronous Multipass/K3s work; executor remains blocked until owner acknowledgments and current authorization/readiness checks. |
+| v0.14 | 2026-10-06 | Specify the implemented typed Run binding/Host demand contract and record its focused Rust gates; explicitly keep current-state resolver, persistent owner stores, admission writer, worker, Manager/provider, and execution readiness gates open. |
+| v0.15 | 2026-10-06 | Define versioned owner acceptance and provider-aware readiness evidence, exact Host-generation/binding scope, freshness/deadline rules and run-as recheck boundary; record focused Rust 1.98.1 gates and 15/15 tests while retaining production worker/provider/store blockers. |
+| v0.16 | 2026-10-07 | Replace single/shared-cluster assumption with explicit profile placement, exact Run K3s cluster ID/generation, Host+cluster capacity contracts, V2 binding/demand/readiness schemas, aggregate Multipass guest readiness, and the temporary two-instance maximum for live tests; retain production fail-closed gates. |
+| v0.17 | 2026-10-07 | Pin the typed placement policy in the binding digest and require two separately matched reservation IDs; update focused evidence to four passing gates and 27/27 tests. |
+| v0.18 | 2026-10-07 | Clarify the two-instance cap as a total registered-inventory limit including stopped/recoverable records; specify the locked pre-launch fail-closed guard and no automatic purge behavior. |
+| v0.19 | 2026-10-07 | Record the tested 9F4D-3A Infrastructure-owner persistence substrate and exact Work/Transaction boundary, while keeping production migration/grants, writer/consumer, worker, provider and Schedule execution gates open. |
+| v0.20 | 2026-10-07 | Define the idempotent runtime-grants migration, least-privilege W/T matrix and separate secret-provisioned login with transaction-scoped role activation; record 14/14 isolated PostgreSQL gates without claiming target deployment or production writer/consumer completion. |
+| v0.21 | 2026-10-07 | Add detailed 9F4D-3C1 receive transaction, idempotency/conflict behavior, and explicit resolver/authorization/freshness limitations; preserve fail-closed admission and execution. |
+| v0.22 | 2026-10-07 | Specify 9F4D-3C2 tenant-scoped capacity admission, ordered locks, recomputed unexpired ledger, atomic paired reservation and terminal Outbox facts; record concurrent/expiry/replay PostgreSQL evidence; disclose cross-tenant allocator and production consumer/provider gaps. |
+| v0.23 | 2026-10-07 | Specify the 9F4D-3C3 tenant-scoped SCD2 Provider Profile Master and append-only revision events; require persisted-digest checks and profile-derived capacity requests; record 17/17 PostgreSQL runner steps, 8/8 FORCE RLS and 5/5 SQLx cases while keeping production resolver, target DB, allocator, provider, consumer and execution gates open. |
+| v0.24 | 2026-10-07 | Add §6.10 for the bounded tenant-scoped Outbox delivery state machine, exact lease fencing, attempt exhaustion, retry backoff and terminal retention. Record PostgreSQL integration coverage; distinguish database state transitions from broker publisher, Run consumer, production worker, target DB and execution gates. Preserve the two-instance test cap. |
+| v0.25 | 2026-10-07 | Add section 6.11 for the 9F4D-3D4 publisher API, bounds, event allowlist, PubAck/timeout semantics and real loopback NATS/PostgreSQL integration. Clarify at-least-once delivery and durable Run Inbox dedupe; keep polling, target DB, Run consumer, provider, production broker configuration and execution open. | The bounded JetStream publisher passed its focused transport integration gate. |
+| v0.26 | 2026-10-07 | Add section 6.12 for caller-transaction TaskExecutionRun rule/revision/occurrence/correlation validation, durable explicit-ack pull, one-message byte/time bounds, immutable demand matching, Run-owner transaction, exact replay and the no-quarantine production block. | Phase 9F4D-3D5 verifies Run-owned result persistence and acknowledgement ordering. |
+| v0.27 | 2026-10-08 | Add section 6.13 for separate Platform Messaging/Ingress quarantine ownership, trusted JetStream deployment/stream-generation/sequence identity, immutable receipt and optional encrypted TTL Work body, permanent-fault classification, commit-before-Term, failure backpressure, and Run/BI isolation. Keep retention policy, taxonomy, migration, grants and production consumer open. | Phase 9F4D-3D6 design audit. |
+| v0.28 | 2026-10-08 | Add §6.14 for the implemented Platform owner tables/roles/RLS/quota/purge, explicit retention, 16-value/8-KiB replay-header cap and confirmed Term acknowledgement; document the three classified Run-owner routing cases, record Rust 1.99.0 and disposable PostgreSQL 18.6 evidence, and keep real KMS, production DB/NATS identities, operator access, redelivery integration and Schedule execution open. | 9F4D-3D6 implementation and bounded-memory review passed focused verification. |
+| v0.29 | 2026-10-08 | Add §6.15 for real PostgreSQL/NATS failure, redelivery, committed-receipt duplicate and confirmed Term-ACK integration; specify metadata-only retention, no later delivery, serialized shared-subject tests, 22/22 runner steps and 2/2 integration tests. Keep production identity/KMS/operator/consumer and Schedule/Task execution disabled. | Phase 9F4D-3D7 closes only the disposable redelivery evidence gap. |
+| v0.30 | 2026-10-09 | Add §6.16 and replace the single cross-owner admission transaction with separate Run admission/result, Schedule fenced link/confirmation, and post-confirmation Run demand transactions. Specify stable occurrence idempotency, current-fence CAS, compensation, authenticated owner messages, current same-database FK limitation and fail-closed production gates. | Correct the ownership conflict in the earlier Schedule→Run persistence wording. |
+| v0.31 | 2026-10-09 | Correct §6.16 to distinguish logical admission attempts from transport redelivery and add §6.17 wire tables for strict bounded Command/Result/Resolution DTOs, exact binding-digest matching and out-of-band owner authentication. Preserve local fence CAS, owner transaction boundaries and production fail-closed gates. | The Run-owner contract must not treat an occurrence ID or envelope tenant claim as authorization. |
+| v0.32 | 2026-10-09 | Add §6.18 for attempt lifecycle DDL, legacy ordinal mapping, event vocabulary, API cursor and Task Run UI; record repeated PostgreSQL 18.6 migration/invariant evidence and retain all production consumer, grants and execution gates. | Phase 9F4C-D1 implementation/design reconciliation. |
+| v0.33 | 2026-10-10 | Add §6.19 for Run-owner SCD2 binding Master/events, strict bounded snapshot, Rust digest resolver, CAS write transaction, tenant FORCE RLS/least privilege and the Infrastructure owner revalidation boundary. Record PostgreSQL 18.6 29/29 and Rust 1.98.1 diagnostic tests 12/12; retain the required Rust 1.99.0 and all authorization, production identity, consumer, reservation, readiness and execution gates. | The Run owner needed a persisted binding source before Schedule consumer implementation. |
+| v0.34 | 2026-10-10 | Record the D2 append-only event hardening, Rust 1.99.0 focused gates and 29/29 PostgreSQL evidence; retain broader strict-Clippy and all production authorization/consumer/provider/execution gaps. | Self-review found direct event-table INSERT could forge lifecycle facts. |
+
+
+## 6.20 D2 SQLx transaction verification
+
+D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
+
+Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.35 | 2026-10-10 | Ulysses — Mavis review | Close disposable SQLx binding verification gap; preserve every production admission/execution gate. |
+
+
+## 6.21 D3 admission persistence and replay protocol
+
+Phase 9F4C-D3 adds Run-owned processed admission Inbox and immutable result Outbox persistence, not a production consumer. `PostgresScheduleAdmissionStore.begin` strict-decodes at most 16 KiB, checks injected tenant/service scope, takes a transaction advisory request lock with 5-second lock and 10-second statement bounds, and returns an exact persisted result before any new Run writes. Changed exact bytes, digest or authenticated source service identity conflict. A new transaction is exposed only for Run-owned authorization, currentness, quota, Run/reservation/event work; dropping it rolls back. `commit_result` validates the typed result and atomically commits the Inbox/result pair with those caller-owned facts. A deferred FK forbids committed orphan receipts; unique tenant/occurrence/attempt prevents different requests claiming one attempt. Acceptance requires a matching schedule-origin, run-as, Task/Worktree/rule/occurrence/ordinal/correlation Run with NULL started_at and no run_started or execution-state event. Both relations are append-only Transaction facts with FORCE tenant RLS, bounded immutable bytes and no physical deletion; no Work or Master table is added. The trusted service source is injected by composition, not deserialized from the body, and its type constructor is not authentication evidence.
+
+Evidence: PostgreSQL 18.6 cumulative runner 33/33; binding SQLx 1/1 and admission SQLx 1/1 (0.52s), Rust 1.99.0 library regression 12/12 and focused strict package Clippy. Audit: `target/phase9f4d-run-owner-consumer/40a8dc35-d9a2-4a76-a944-bd39474d51ef/audit.jsonl`. Tests prove rollback/drop recovery, exact replay, altered-byte/scope/source rejection, concurrent new/replay serialization, different-request same-attempt rejection, result-insert rollback, missing paired-result commit rejection, accepted-result scope guard, prior-start rejection and append-only guard. The accepted Run is seeded only by the disposable admin to exercise storage: it does not prove a production Run writer, authorization or resource reservation. Initial verification exposed the deliberately narrow old grant assertion; it was extended only for four Run identity/start columns and four RunEvent identity/execution columns. An extracted fixture helper reference error was fixed; transient Windows LNK1104 occurred before the final successful isolated rerun. All owned PostgreSQL instances were stopped/removed; zero NATS and zero Multipass VMs were used.
+
+Open gates: real Schedule service authentication and credential lifecycle; target DB/login provisioning; current creator/run-as ACL, Task/Profile/Hook/binding authorization in this transaction; atomic Project/Run quota and Run/reservation writer; Schedule command producer and Run/Schedule/result/confirmation consumers; durable delivery/compensation; Infrastructure currentness and paired physical reservations; Multipass/K3s provider, sandbox, readiness, native Hook/verification, cancellation, BI/Benchmark and execution. No production Run INSERT or event INSERT grant was added. No cross-owner tables are read/written by this new storage module. Execution stays fail-closed.
+
+Gate command: `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests --admission-tests`, with PostgreSQL bin and pinned Rust toolchain/target arguments. [Phase report](../reports/PHASE-9F4C-D3-ADMISSION-PERSISTENCE-REPORT.md).
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.36 | 2026-10-10 | Ulysses — Mavis review | Verify owner-local admission persistence; retain every production authorization/reservation/consumer/execution gate. |
+
+
+## 6.22 D4 directory and binding lock protocol
+
+D4 adds `ScheduleAdmissionTransaction.revalidate_directory_and_binding` inside the already locked admission transaction. It sets the fixed occurrence creator as transaction-local actor, invokes the native fixed-path `multica.verify_schedule_run_as_current` capability, and reads the current binding through `resolve_current_binding_locked` with FOR SHARE. The native capability checks tenant/actor GUCs, reuses the canonical Project ACL advisory lock, requires current Project/Branch/Run grants and exact active Branch/Run/repository scope, and holds row locks on identities, revisions and grants. Project/Run writer roles follow the existing Schedule policy; Branch requires membership. The full pinned V2 binding and digest must equal the current locked Master. Missing authorization/paused scope yields RunAsUnauthorized, missing/drifted binding yields BindingUnavailable; storage/integrity errors remain errors and must not be treated as authorization.
+
+The capability uses SECURITY DEFINER with search_path=pg_catalog and schema-qualified static SQL, PUBLIC execute revoked, and execute granted only to the Run owner. It grants no directory/ACL mutation to runtime. Explicit scope checks remain mandatory even when the migration owner bypasses RLS in a disposable test; target deployment must review function ownership, underlying read/row-lock permissions and policies. This capability is not broker identity authentication or complete admission authority. Current Task/Profile/HookSet, quota/reservation, Run writer, confirmation/delivery/compensation and execution remain open/fail-closed.
+
+Evidence: cumulative PostgreSQL18.6/Rust1.99.0 runner 36/36, binding/admission SQLx targets 2/2; audit `target/phase9f4d-run-owner-consumer/e516c503-832e-40b8-8d5e-a02bebb44f75/audit.jsonl`. Admission assertions prove missing directory, current scope success, 55P03 timeout for concurrent ACL and binding closure while the transaction holds locks, revoked Project grant rejection, paused Run rejection and exact binding generation/revision drift rejection. Dedicated final schema run 34/34 checks fixed search_path, SECURITY DEFINER, no PUBLIC execute and no runtime directory/ACL write grants; audit `target/phase9f4d-run-owner-consumer/66c2abdb-8bbb-472d-a440-28ce7d2a55db/audit.jsonl`. Fixture seeding and mutation bypass lifecycle triggers only in disposable admin transactions; row-lock behavior remains real PostgreSQL. A transient MSVC LNK1104 occurred before the successful rerun, with no live matching test process observed; root cause is not proven. No NATS, VM or production database was changed.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.37 | 2026-10-10 | Ulysses — Mavis review | Add verified transactional directory/binding prerequisite; preserve remaining admission/execution gates. |
+
+
+## 6.23 D5 — Task/checkout 锁协议
+
+Schedule 新尝试必须在 Run-owner 同一事务内复验 Task/Worktree 的当前 canonical 归属：tenant、Project、repository、Branch、Engineering Run、Task、Worktree 精确一致；Worktree 未归档且有效，Project binding、Run binding、Task metadata、Task–Worktree relation 均为当前有效行。`revalidate_task_binding` 先复验固定创建者及锁定的 infrastructure binding，再调用固定路径 native SQL capability，持有五张目标表的 FOR SHARE 直到事务结束。缺失、归档或解绑返回 TargetUnavailable；权限/binding 拒绝保留原 typed code，数据库错误不得放行。
+
+仅新增受限 EXECUTE 能力；SECURITY DEFINER 使用 search_path=pg_catalog、静态限定 schema，PUBLIC execute 撤销，runtime 无目标表写权限。目标环境 function owner/RLS/底层行锁权限仍须验收。Profile、原生 HookSet、任务生命周期可执行状态、预算/reservation、非执行态 Run writer、owner delivery/consumer、sandbox 与真正执行闭环仍未完成；primitive commit_result 不是完整准入入口，不启用执行。
+
+验证：PostgreSQL18.6/Rust1.99.0 runner 40/40，SQLx binding/admission targets2/2；库12/12、包级 all-targets/no-deps Clippy -D warnings、格式/Python/图头/diff 通过。实际覆盖目标缺失、Task 身份不匹配、当前有效、Worktree 归档、关联关闭以及五类目标行并发关闭 SQLSTATE55P03。Audit：`target/phase9f4d-run-owner-consumer/857a6fbe-6bc7-4978-b070-bab871067cf7/audit.jsonl`。隔离 admin fixture 跳过生命周期触发器，不作为生产授权写入/审计证据。零 VM；生产数据库未变。CodeRabbit 因 /root/.local/bin/coderabbit: Permission denied 无独立通过结果。
+
+关联脚本：`scripts/automation/phase9f4d_run_owner_consumer.py`；报告：[D5](../reports/PHASE-9F4C-D5-TASK-CURRENTNESS-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| Version: 0.38 | 2026-10-10 | Ulysses — Mavis 接手审核 | 同步已验证的事务内任务归属门与剩余缺口。 | D5 实现与实测。 |
+
+
+## 6.24 D6 — Profile/Hook 验证协议
+
+D6 为 Schedule 增加 `revalidate_profile_and_hooks` 与私有字段 `SchedulePolicySnapshot`：沿用 D4/D5 同事务授权、Binding 与任务归属门，原生固定路径 SQL reader 至多读取三份 72 KiB envelope；Rust 复用 domain-agent 的 Profile 校验和 domain-hook 的原生策略校验。精确核对 Profile ID/version/digest/schema/scope，Project baseline 与 Worktree overlay 的 ID、继承父版本和规则、有效 HookSet ID/version/digest，以及 Profile 与 RunInfrastructureBinding 的全部八项资源预算。缺失、版本/摘要/继承漂移或文档篡改返回 TargetUnavailable；预算与 binding 不一致返回 BindingUnavailable；存储异常不得放行。
+
+Profile/Hook 当前事实保持 FOR SHARE 至事务结束；Project-scoped Hook 共享 advisory read fence 与 BEFORE publication 独占锁保护“当前没有 overlay”的读空隙，trigger 名称排序在现有继承 guard 之前。Native reader SECURITY DEFINER/search_path=pg_catalog，PUBLIC execute 撤销、仅 Run owner EXECUTE，不授予目录/任务/Profile/Hook 表写权限；目标部署须复核 function owner、RLS、底层读取/行锁权限与 migration 装配。此快照不是执行许可证：仍须当前 Provider/Skill/Grant catalog、任务生命周期、原生 Hook RunAdmission 求值与事实生产者、Project/Run quota/reservation、非执行态 Run writer、owner delivery/confirmation、Runtime sandbox 与独立验证。commit_result primitive 仍不是完整准入入口；执行保持关闭。
+
+验证：Rust1.99.0 包级 all-targets check、库12/12、all-targets/no-deps Clippy -D warnings、fmt/Python/图头/diff；隔离 PostgreSQL18.6 runner44/44、SQLx binding/admission targets2/2。Audit `target/phase9f4d-run-owner-consumer/2a610d58-4b81-43d6-bc8a-4e8dc0c3e793/audit.jsonl`。实际验证 baseline 成功、缺失 overlay 的正常发布被 55P03 阻挡、事务结束后的 overlay 发布使旧 pin 失效、新 overlay pin 成功、Profile 版本漂移、预算 mismatch 和摘要篡改拒绝。Fixtures 的初始注册与 Profile 修订由隔离 admin/replica 完成，不证明生产授权 publisher；overlay 并发 INSERT 使用正常 publication trigger。未创建 VM、未改变 Multipass inventory/生产 DB。
+
+复用既有 Rust 领域类型，仅增加 workspace path 依赖 domain-agent/domain-hook，无第三方版本变化；不创建 LLM session、Provider 或无界缓存，端到端 RSS/吞吐尚未实测。脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D6 report](../reports/PHASE-9F4C-D6-POLICY-CURRENTNESS-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| Version: 0.39 | 2026-10-10 | Ulysses — Mavis 接手审核 | 同步已验证 Profile/Hook/budget 门与仍开放的执行门禁。 | D6 实现与隔离验证。 |
+
+
+## 6.25 D7 — Current catalog resolution protocol
+
+D7 增加 `ScheduleAdmissionTransaction.revalidate_execution_catalogs` 与私有 `ScheduleExecutionSnapshot`。同一 Run-owner 事务先通过 D4–D6 门，再由 native reader 仅读取 Profile 引用的当前 Provider/Skill 和当前 GrantSet：Provider≤5、Skill≤128、每项 capability≤64，Skill capability 预聚合预算384 KiB、返回 envelope≤512 KiB；Rust 复用 CurrentExecutionCatalogSnapshot/ExecutionProfileResolver，核对当前版本、摘要、availability、capability、完整 GrantSet 身份/版本/标签/到期时间，持有5秒目录 fence并在使用时要求至少1秒剩余。SQL 使用 C collation 对齐 Rust 的标识符排序。缺失、漂移、计数不一致、Grant变化或过期、fence到期均返回 TargetUnavailable，数据库失败不放行。
+
+Native read 与 Run-owner 授权复验使用共享 Project advisory locks；目录 parent publication 和 canonical ACL mutation 仍使用相同 scope 的独占写锁，并持有当前目录/Grant row locks直到事务结束。reader SECURITY DEFINER/search_path=pg_catalog、PUBLIC execute 撤销、仅 Run owner EXECUTE，无目录直接写权限。发布 trigger 排序早于既有 SCD2 guard；capability 保持既有 same-transaction birth/immutable/count 契约。Snapshot 的 lifetime 校验不能替代原 owner 事务存活或执行前重新读取。目标 DB/function owner/RLS/应用身份装配仍未验收；任务 lifecycle、Project/Run预算预留、非执行态Run writer、owner delivery/confirmation、Runtime sandbox与独立验证仍开放，执行保持关闭。
+
+调用时点须遵守已批准的基础设施准备模型：先创建等待基础设施预留的非执行态 Run，结果接受只表示准备请求已登记；实际启动/恢复 executor 前，必须复验 Host/cluster reservations与binding、当前权限/目录/策略，并以可信 Runtime health/readiness 和任务生命周期事实执行 Rust-native BeforeRunAdmission Hook。不得默认 health=true，不得以 UI health、VM/K3s就绪或仅文档校验代替 native Hook求值，也不新增弱化原生安全守门的 phase。当前本阶段未实现或声称通过该实际执行门。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner47/47，SQLx binding/admission targets2/2；包级all-targets check、库12/12、all-targets/no-deps Clippy -D warnings、包级fmt/Python/图头/diff。Audit `target/phase9f4d-run-owner-consumer/ee331ea1-5cde-4005-8f86-80cc630c1dce/audit.jsonl`。实际覆盖缺失目录、精确4 Provider/1 Skill/Grant、同Project两个不同Task/Worktree预检并行、正常ACL和目录publication55P03、Provider unavailable、Skill digest drift、Grant expiry drift、capability count mismatch及真实5秒fence到期拒绝。仅验证预检并行，不证明Run/executor并行吞吐；未测最大负载RSS/延迟。Fixtures初始注册/变异为隔离admin/replica，不证明生产publisher授权。零VM与生产DB变更。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D7 report](../reports/PHASE-9F4C-D7-CATALOG-CURRENTNESS-REPORT.md)。没有新增依赖或第三方版本。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| Version: 0.40 | 2026-10-10 | Ulysses — Mavis 接手审核 | 对账有界当前目录与同Project预检并行；明确准备/实际执行Hook时点。 | D7实现与隔离并发验证。 |
+
+
+## 6.26 D8 — Native quota observation and checked ceilings
+
+Schedule owner 必须在同一 owner 事务内完成固定 run-as 与 canonical Task/Worktree、Profile/Hook、Provider/Skill/Grant 及绑定复验，再比较当前 Project 配额与 Run 的全部八项 ResourceBudget 上限。不得以成功预检代替实际 reservation、非执行态 Run 创建或 executor 启动许可。缺失/禁用/未来生效配额、预算超限、计数/算术溢出与过期目录 fence 必须 fail closed。
+
+`revalidate_project_capacity` 使用 native `read_schedule_project_capacity_current`，复用手动 Run 分配路径的 Project allocation epoch（UPSERT 实际写入），串行同 Project 的容量分配。读取当前有效 quota，持有 quota publication 同键共享 advisory lock及quota行锁；REPEATABLE READ 下过时 epoch 必须产生40001而不能用旧 reservation 视图放行。统计同 Project 所有 active reservation，以及 lease 未过期的 pending reservation；过期 active 仍计数，released与过期 pending不计数。CPU/运行时长按单Run ceiling核对，RSS/子进程/并行工具/provider calls/输出/event buffer 按共享剩余总量核对，另核对Run数量。SQL仅返回一个≤4KiB envelope，Rust checked-add核算且在等待容量锁后重验5秒目录fence；无整表载入Rust缓存。数据库SUM仍需扫描Project相关ledger，未声称已验证最大规模查询/RSS性能。
+
+reader SECURITY DEFINER固定search_path=pg_catalog，PUBLIC execute撤销，仅Run owner受限EXECUTE；不授予runtime直接quota/epoch/reservation写权限。仅现有Work allocation epoch在本事务中变化，drop回滚；没有写入Run、reservation或容量审计事实，也不表示Project容量已预留。新增W/T/M表0/0/0；现有epoch保留30天TTL。未来Run/reservation writer必须在该仍存活事务内再次确认fence并原子写入Run、reservation及成对审计/Run事件和Infrastructure demand Outbox；Host/cluster容量仍由Infrastructure owner自己的事务预留。原生执行Hook、Runtime健康/沙箱、取消恢复与独立验证仍为实际executor门，不制造健康事实。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner49/49，binding/admission SQLx targets2/2、库15/15、包级all-targets check/Clippy与fmt、Python编译、图头和diff检查。Audit `target/phase9f4d-run-owner-consumer/d1e13219-1fbf-4f85-b7c1-e3604fa548d7/audit.jsonl`。实际覆盖缺失/禁用quota、精确预算匹配、同Project容量预检与正常手动epoch写入锁互斥（55P03）、quota关闭等待、drop回滚epoch、REPEATABLE READ过时allocation snapshot拒绝40001，以及未过期pending/过期pending/过期active/released计数。初始quota和reservation状态使用隔离admin/replica fixtures，不证明生产quota publisher、Run/reservation writer或真正executor并发。零VM/productionDB变更。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D8 report](../reports/PHASE-9F4C-D8-PROJECT-CAPACITY-REPORT.md)。本阶段无新增第三方依赖。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| 0.41 | 2026-10-10 | Ulysses — Mavis接手审核 | 接入Schedule当前Project容量核算，保留原子Run/reservation写入与执行缺口。 | D8实现与隔离容量验证。 |
+
+
+## 6.27 D9 — Preparation writer, deferred pairing and rollback
+
+Schedule owner的fresh admission须经D4–D8当前授权、绑定、策略、目录和容量复验后，在Run owner本地事务原子创建非执行态TaskExecutionRun、pending Project reservation、成对reservation审计/RunEvent及处理后Inbox/admission-result Outbox。必须从canonical Task metadata、lifecycle和当前非空TaskContract读取有界完整快照，不接受调用者伪造任务内容。`started_at`与execution_state保持空，不产生run_started、VM请求或Task lifecycle写入；accepted只表示准备已登记。
+
+`ScheduleAdmissionTransaction.prepare_and_commit`消耗原事务，并复用`commit_result`的exact replay/pair持久化。当前准入拒绝可提交不可变rejected result；存储错误、写入后fence/deadline失效则整笔回滚，不把已暂存Run与rejected结果一起提交。受限native `prepare_schedule_execution_run`复验scope/当前Profile和binding、再次串行核算Project容量并拒绝同Task已有active/未过期pending reservation。Task eligibility与既有CLI一致：in_progress、固定run-as持有同Worktree且非pending_review；当前TaskContract必须存在且验收项非空。Task/验收快照各≤32KiB，描述≤16KiB、labels≤64、dependencies/验收项≤128；超限拒绝，不截断。完整typed Engineering Run snapshot保留全部25个identity/version/role/ref字段；Run另持久化不可变Infrastructure binding snapshot/digest和request关联。
+
+准备阶段的Outbox是Run→Schedule admission-result，不提前发布Infrastructure demand。Schedule owner必须消费结果、复验本owner lease/generation/deadline/cancellation，提交链接及confirmation；Run owner在下一独立事务消费可信confirmation、复验当前授权/绑定/Project reservation后才发布自己的Infrastructure demand Outbox。Host/cluster容量由Infrastructure owner自己的事务预留。这维持DD §6.2既有两owner确认协议，并明确D8“原子Run/reservation与Outbox”中的Outbox时点，不能用准备accepted绕过confirmation。Task owner的自动分配/claim/in_progress生产者仍需接入，Schedule不可跨owner篡改lifecycle。
+
+Project准备reservation的lease由数据库取min(occurrence deadline,当前时间+2分钟)，必须与目录5秒fence区分。等待确认期间预算已占用；超时/取消的补偿、release/expiry worker及后续激活仍开放，不把lease过期视作VM/Runtime已清理。新增W/T/M表0/0/0：现有reservation为W，Run/reservation events/RunEvent/Inbox/results为T，TaskContract与binding为M只读。新请求关联有deferred FK，native Run插入有deferred accepted-result/pending-reservation配对门，阻止孤立准备事实提交。SECURITY DEFINER固定search_path，PUBLIC execute撤销，仅可信Rust Run-owner角色EXECUTE，仍无直接Run/event/reservation/Task写权限。原生Hook实际求值、健康/sandbox/readiness、独立验证与executor门保持关闭；未把REST/UI或fixture作为生产闭环。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner 52/52，binding/admission SQLx targets 2/2，库测试15/15，包级all-targets check、Clippy、fmt、Python编译、Cypher图头及diff检查通过。Audit `target/phase9f4d-run-owner-consumer/00ff7b51-16c4-4a62-a776-121f6ef33a47/audit.jsonl`。实际覆盖受限owner角色写入、生命周期/TaskContract拒绝、deadline拒绝、延迟配对门拒绝孤立提交、写入后目录fence失效整笔回滚、结果持久化失败回滚及同命令重试、exact replay和容量占用；未产生execution事件或Infrastructure demand。隔离PostgreSQL已停止，零Multipass inventory和生产DB变更。未完成workspace/release/doc/bench、生产交付或性能验收。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D9 report](../reports/PHASE-9F4C-D9-SCHEDULE-PREPARATION-REPORT.md)。本阶段无新增第三方依赖或VM操作。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| 0.42 | 2026-10-10 | Ulysses — Mavis接手审核 | 对账真实Run-owner准备写入；保持Schedule确认后才发布Infrastructure demand。 | D9实现及隔离SQLx事务验证。 |
+
+
+## 6.28 — Run-owner pre-infrastructure compensation
+
+Run owner提供`PostgresScheduleAdmissionStore.compensate_admission`，消费有界严格`ScheduleRunAdmissionResolutionV1`补偿命令。必须绑定原始Schedule service identity、tenant及不可变accepted result的request/attempt/result/correlation/occurrence/Run/binding digest；错误来源、跨租户、伪造digest、Confirm误投及冲突重放均拒绝。可信transport认证仍须由部署组合，调用者传入UUID不是认证证据。
+
+Native `compensate_schedule_preparation`在自身事务中串行原request及Project allocation epoch，仅对未确认、未执行、未发布Infrastructure demand且reservation仍pending的D9准备Run释放Project预算。它原子写入released状态、配对reservation/Run release audit、schedule_admission_compensated及exact-byte不可变receipt。最后receipt写入失败须回滚释放与全部事件。清理以原始owner事实为依据，不要求已撤权run-as重新授权；此权限不能创建或启动工作。历史accepted replay不改变released reservation。
+
+新`guard_prepared_schedule_demand`对带D9 preparation lineage的Run复用同Project epoch和Run行锁，要求确认事件、未补偿和有效pending reservation，避免低层Outbox primitive绕过确认或与补偿竞争；旧无preparation lineage的Run保持既有契约。REPEATABLE READ过时epoch必须由数据库拒绝，未以Rust无界缓存观察竞争状态。
+
+W/T/M新增0/1/0：`multica.schedule_compensation_inbox`为T（不可变exact-wire、无TTL/物理删除、FORCE tenant RLS）；既有reservation和allocation epoch为W，release/Run events及receipt为T；M只读。仅受限SECURITY DEFINER固定search_path capability执行写入，Run role无直接receipt/reservation/Task mutation。新表索引为tenant/request主键与唯一resolution身份，wire≤16KiB；函数有5秒lock/10秒statement timeout。
+
+验证：隔离PostgreSQL18.6/Rust1.99.0 runner 54/54，binding/admission SQLx targets 2/2，库15/15及包级all-targets check、strict Clippy、fmt、Python编译、Cypher图头与diff检查通过。Audit `target/phase9f4d-run-owner-consumer/67cccbc7-e28b-4984-bd14-920afbc329f5/audit.jsonl`。真实owner角色验证释放/配对审计/receipt、exact replay、冲突重放、来源/tenant/digest误配、Confirm误投、active/confirmed拒绝、最终receipt失败整笔回滚、跨tenant RLS与补偿前后demand拒绝。Active/confirmed输入为隔离admin/replica fixtures，不证明生产确认/激活producer；未验证新的跨进程并发/过时snapshot竞争或最大规模性能。隔离PostgreSQL已停止，零VM/生产DB操作。
+
+Schedule result/link/confirmation producer、confirmation消费与Infrastructure demand真正发布、全量超时release worker、跨Infrastructure owner补偿、生产service身份/DB grants、native Hook求值、Host/cluster reservations、Manager/sandbox/readiness、取消恢复及独立验证仍开放；本阶段不可宣称Agent/CLI闭环可用。零新依赖、零VM/生产DB操作。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；阶段报告 `docs/reports/PHASE-9F4C-D10-SCHEDULE-COMPENSATION-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| 0.43 | 2026-10-10 | Ulysses — Mavis接手审核 | 接入准备Run补偿和demand确认隔离门。 | D10实现与验证。 |
+
+
+## 6.29 — Run-owner confirmation transaction
+
+`PostgresScheduleAdmissionStore.confirm_admission`严格解码有界Schedule确认命令，核验原始Schedule service identity、tenant、accepted result及request/attempt/result/correlation/occurrence/Run/binding digest。它在同Run-owner事务复验当前Project/Branch/Run授权、Worktree/Task绑定、当前Infrastructure binding、Profile/Hook、Provider/Skill/Grant目录及5秒目录fence。确认不是executor许可证。部署必须独立认证service；注入UUID不是transport认证证据。
+
+受限native `confirm_schedule_preparation`串行request和既有Project allocation epoch；复核当前quota及全Project已占用总量，准备reservation已在总量中，不能重复加算其预算。它锁定未确认、未补偿、未执行Run与有效pending reservation，检查Task lifecycle仍in_progress、run-as/Worktree一致、非pending_review，当前metadata/TaskContract版本与准备快照相同，以及当前binding/Profile版本与有效Hook文档不变。原生Hook的实际执行、Runtime健康/sandbox与独立验证仍为后续门。
+
+确认RunEvent、typed V2 Infrastructure demand和不可变confirmation receipt在一个Run-owner事务提交。demand截止时间由DB钳制为min(occurrence deadline,Project reservation lease)，payload/receipt wire≤16KiB，Profile envelope≤72KiB；late fence/deadline或任何写入失败回滚全部事实。receipt引用其demand，tenant FORCE RLS且append-only，无直接receipt/Run/event/reservation写权限。请求精确重放返回同一历史demand/event identity，不重建demand或激活预算；不同resolution bytes拒绝。已确认/demand发布后不能再走D10本地补偿，后续必须通过跨owner释放协议处理。
+
+新增W/T/M表0/1/0：`multica.schedule_confirmation_inbox`为T，无TTL/物理删除；既有Project allocation epoch/reservation为W，RunEvent/demand为T；当前Task/Profile/Hook/binding/catalog为M只读。单事务复用有界快照和数据库锁，无跨owner写事务，无VM创建或宿主shell权限扩展；Host/cluster容量由Infrastructure owner另行核验/预留。
+
+验证：隔离PostgreSQL18.6/Rust1.99.0 runner 56/56，binding/admission SQLx targets 2/2，库15/15及包级all-targets check、strict Clippy、fmt、Python编译、Cypher图头和diff检查通过。Audit `target/phase9f4d-run-owner-consumer/b0a6e67a-47c9-4f05-86ce-aad4ae1292a8/audit.jsonl`。真实Run-owner路径验证当前授权撤销/预留过期/quota禁用拒绝、最后receipt失败整笔回滚、写入后目录fence失效回滚、成功确认及同一demand精确重放、冲突resolution拒绝、跨tenant RLS、确认后D10补偿拒绝，以及demand deadline钳制至reservation lease；只有一条demand且零执行事件。权限/quota/时钟失效来源仍为隔离admin/replica fixtures；未证明真实Schedule producer、认证transport、跨进程竞争或最大规模性能。隔离PostgreSQL已停止，零Multipass inventory/生产DB变更。
+
+本阶段关闭Run-owner本地确认+demand写入，不关闭Schedule owner的result Inbox、lease/generation/deadline/cancellation复验与link/confirmation producer、生产认证/角色配置、可靠Outbox交付、过期/取消/跨owner补偿、Host Manager/sandbox/readiness/native Hook求值/独立验证、Agent/任务卡CLI完整闭环及BI/Benchmark。仍无生产executor、无完整workspace/release/doc/bench或规模性能验收。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；报告 `docs/reports/PHASE-9F4C-D11-SCHEDULE-CONFIRMATION-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| 0.44 | 2026-10-10 | Ulysses — Mavis接手审核 | Run-owner确认及demand事务写入对账。 | D11实现及隔离数据库验证。 |
+
+
+## 6.30 — Schedule owner handoff persistence
+
+`PgAutomationScheduleRepository`沿用既有 occurrence/dispatch 和 lease 模型，增加 `persist_admission_request` 与 `resolve_admission_result`。请求固定原始 Schedule owner/generation、logical admission attempt、Run service identity 与精确有界 wire；提交前核验当前 canonical occurrence、完整 Rule snapshot 和未过期 lease/deadline。数据库 advisory lock 按 occurrence 串行请求与结果；重放相同字节恢复同一历史事实，不创建新 attempt。未处理请求或已经确认的请求阻断后续 logical attempt。
+
+Run 的结果严格匹配 request/attempt/result/correlation/occurrence/tenant/binding digest 与配置的 Run service identity。Schedule 在自己的事务复验 lease owner/generation、deadline、取消及既有 link；仍持有原始有效 lease 时原子写入 admitted link、occurrence event、Schedule Run Outbox、result Inbox 和 confirm resolution Outbox。失效 lease、过期、取消或 link 冲突生成 compensate resolution，不写新 link。accepted Inbox 与 resolution 使用 deferred paired FK；最后 Outbox 失败或事务末尾 lease/deadline 过期必须整笔回滚。Rejected result 在原始 live fence 下按有界指数退避进入 retry_wait，达到 Rule 上限/deadline 后 failed，TTL 用同一 terminal timestamp；过时结果不能改写当前 worker 的 dispatch。
+
+新增 W/T/M=0/3/0：`automation.run_admission_request_outbox`、`automation.run_admission_result_inbox`、`automation.run_admission_resolution_outbox`均为 T，append-only、tenant FORCE RLS、无 TTL/物理删除、wire≤16KiB。`star_automation_schedule_owner`只读 Rule/own receipts并执行两项受限 native capability，无 Run/Infrastructure mutation grants；Rust 事务设置 5秒 lock timeout、10秒 statement timeout，复用有界共享 pool。Schedule 只写 own facts，Run owner 单独消费 confirm/compensate 并复验其当前权限、策略和预算，Infrastructure owner 再独立预留 Host/cluster 容量。没有共享跨 owner 写事务、VM 操作或 executor 授权。
+
+验证状态：隔离PostgreSQL18.6/Rust1.99.0 runner 62/62通过（audit `target/phase9f4d-run-owner-consumer/0dcfeed4-74a6-433d-bc7f-a4cb4aec8b5c/audit.jsonl`）；两个包all-targets check通过，Run-owner strict Clippy通过，库测试Run-owner15/15、star-pg-adapter35/35通过，owned-file fmt、Python编译、Cypher图头及diff检查通过。Star-pg-adapter独立strict Clippy未通过：lib150、lib-test152项诊断来自11个未改动文件，Schedule adapter没有诊断；详见`target/phase9f4d-run-owner-consumer/d12-pg-strict-clippy.log`，不宣称整个包/仓库quality gates全绿。CodeRabbit权限拒绝，不计为独立审核通过。。隔离测试使用 canonical Rule/occurrence fixtures，真实 Schedule claim/request/result/link/resolution 与 Run preparation/confirmation/compensation；拒绝结果与时钟失效输入为明确 fixtures，不证明真实 broker producer/authentication 或生产 identity/grants。验收需覆盖 exact replay、来源/digest/tenant拒绝、最终 resolution insert 失败回滚、lease 接管后的真实 Run 补偿、拒绝重试与耗尽、RLS 和 owner grants。
+
+生产 Schedule request publisher/result receiver、认证 transport、durable Outbox delivery、全量取消/过期/release recovery、独立 DB owner receipts/projections、Infrastructure provider/reservations/readiness、native Hook 求值、Agent sandbox/独立验证、任务卡 CLI 执行闭环、BI/Benchmark 及规模性能仍开放。现有 shared-DB FK/trigger 的跨 owner只读约束不是物理数据库拆分实现；配置注入 UUID 不构成身份认证。Schedule materializer deadline 与 slot deadline 的策略对账仍需独立验收。不将 D12 局部验证写为所有 phase 完成。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；报告 `docs/reports/PHASE-9F4C-D12-SCHEDULE-HANDOFF-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v0.45 | 2026-10-10 | Ulysses — Mavis接手审核 | Schedule owner请求/结果/决议事务及验证对账。 | D12实现。 |
+
+
+## 6.31 — Delivery procedures and publisher
+
+D13为Schedule request/resolution与Run result补充owner-local交付状态。每个owner分别拥有`admission_message_delivery`（W）和`admission_message_delivery_receipt`（T），schema分别为`automation`与`multica`，新增W/T/M=2/2/0。W无第二份payload，引用既有不可变Outbox source view；每owner/tenant最多1000条，7天hard retention，终结先写永久T凭据再删除W。T无TTL/物理删除，tenant FORCE RLS、WORM；PK按tenant/kind/message命名空间区分，不能仅使用裸UUID。新Outbox同事务入队，queue预算不足回滚；历史backlog由owner-local bounded reconciliation逐页恢复，永久delivered/dead凭据阻止复活。
+
+Native procedures `claim_admission_delivery`、`settle_admission_delivery`、`reconcile_admission_delivery`只写本schema的队列/凭据，owner role仅有SELECT与特定EXECUTE，无raw INSERT/UPDATE/DELETE/TRUNCATE。Claim/reconcile每次1–8条，SKIP LOCKED、DB-clock lease和单调delivery attempt；delivery attempt与Schedule admission attempt独立。Lease30–300秒，最多12次transport尝试，指数退避上限300秒；失效fence不能settle，settlement末尾再次检查lease。过期/耗尽消息留下dead receipt，未投递终结必须纳入运维告警与恢复，不等同业务Run完成。
+
+`platform-messaging-runtime::admission_delivery`是供各owner进程复用的适配器库：构造时固定owner和该owner pool/role，每笔事务仅调用其allowlisted native capability，不是持有两边写权限的中央Platform服务。`AdmissionJetStreamPublisher`只接收已建立的Context，serial batch≤8、lease120秒、PubAck timeout10秒；按owner/kind/tenant/message设置稳定Nats-Msg-Id，发布精确原wire（≤16KiB），固定expected stream/domain并检查正sequence后写owner receipt。Broker接收后进程退出/receipt失败会用同ID/字节重放；broker dedup window不能取代下游永久Inbox。Cancellation只停止新publish，未开始的claims等待lease恢复，不drain共享client。
+
+D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server 2.12.14，最终transport-port回归67/67步骤通过；其中两个实际Rust/PostgreSQL集成测试通过，覆盖request/result/resolution broker投递、稳定ID重放去重、错误stream重试、取消前不claim、旧worker拒绝、租户隔离、两侧原生保留期/耗尽清理、回执WORM与reconcile容量拒绝。证据：`target/phase9f4d-run-owner-consumer/ee749003-f308-4a2c-bba5-eb18ccf09e85/audit.jsonl`。两个包all-targets check、strict Clippy --no-deps通过，单元测试23/23通过；owned timeout子进程树回收探针通过。Schema-only ACK_FIXTURE不计作真实broker或身份认证证据。首次900秒编译超时和两次LNK1104失败均保留日志；独立重跑通过，未确定链接器故障根因，未清空缓存或降低安全策略。CodeRabbit Permission denied，未获得独立review通过；没有全workspace/release/doc/bench验收声明。
+
+阶段仍开放：enqueue达到容量上限时原Outbox事务回滚、receipt插入故障回滚、并发争用、完整request/result/resolution consumer链、service身份/TLS/ACL/DB grants部署、source/subject/stream验证、commit-before-double-ack、poison隔离与受控恢复、delivery/Run取消过期release、全局公平调度和规模性能。Queue/receipt与PubAck均非executor许可证；Host/cluster容量、Runtime/sandbox/native Hook/独立验证及Agent/任务卡CLI闭环仍需后续门。Shared-DB source view只读本owner事实，不代替物理数据库拆分的API/receipt/projection契约。BI交付指标仍需受授权owner API/版本化事件接入，不能直接跨owner改表。
+
+接口依据：[async-nats PublishMessage](https://docs.rs/async-nats/0.50.0/async_nats/jetstream/message/struct.PublishMessage.html)；测试工具来源：[NATS官方发布](https://github.com/nats-io/nats-server/releases/tag/v2.12.14)。报告：`docs/reports/PHASE-9F4C-D13-ADMISSION-DELIVERY-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v0.46 | 2026-10-10 | Ulysses — Mavis接手审核 | D13交付/transport port验证、Rust-native替换准备及剩余缺口对账。 | 新owner消息交付实现。 |
+
+### Rust-native 消息服务器替换边界
+
+用户自有Rust服务器为最终替代方向，NATS仅为过渡transport adapter。`AdmissionTransport`接收owner、tenant、recipient、kind、message/request identity和原始wire；`AdmissionPublisher<T>`以静态派发调用该port，统一处理有界batch、超时、租约、取消、重试和owner receipt，核心不调用NATS API且不为每条消息装箱future。`JetStreamAdmissionTransport`独占subject、Nats-Msg-Id、expected-stream/domain、PubAck映射；兼容别名`AdmissionJetStreamPublisher`不作为产品领域模型。
+
+v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
+
+Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+
+## D14 接收实现增量
+
+AdmissionReceiver 通过 broker-neutral pull/ack、显式 current authorization 和 owner commit port 接入 Run request/resolution 与 Schedule result。单条串行、16KiB wire、完整 10秒 deadline、取消和提交后复验授权；业务提交成功才 double-ACK。JetStream config 与 typed identity 每次复验，native provider 可替换 port；现有事实所有权/RLS/幂等保持。真实 broker/PG、故障和单位测试的最终状态见 ../reports/PHASE-9F4C-D14-ADMISSION-RECEIVER-REPORT.md；production identity/composition、durable poison quarantine、receiver recovery 和执行闭环仍未关闭。
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.47 | 2026-10-11 | Ulysses — Mavis接手审核 | D14 receive/commit-before-ACK implementation and honest gaps |

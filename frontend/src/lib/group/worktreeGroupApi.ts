@@ -1,4 +1,63 @@
 /*
+@cypher schema=1 source_sha256=fb77e1744b4213499a233cea884f9fb34a157cdd73e2a6edb395b6e51245888a
+MERGE (self:File {path:"frontend/src/lib/group/worktreeGroupApi.ts"})
+MERGE (client:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient",kind:"class"})
+MERGE (request:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.request",kind:"method"})
+MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
+MERGE (poller:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller",kind:"class"})
+MERGE (pollOnce:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.pollOnce",kind:"method"})
+MERGE (cursorStore:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasEventCursorStore",kind:"interface"})
+MERGE (browserStore:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::BrowserCanvasEventCursorStore",kind:"class"})
+MERGE (loadCursor:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasEventCursorStore.load",kind:"method"})
+MERGE (saveCursor:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasEventCursorStore.save",kind:"method"})
+MERGE (validCursor:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::isWorktreeCanvasEventCursor",kind:"function"})
+MERGE (cursor:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanvasEventCursor",kind:"interface"})
+MERGE (event:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanvasOutboxEvent",kind:"interface"})
+MERGE (page:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanvasOutboxEventPage",kind:"interface"})
+MERGE (validateOffset:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::isValidStreamOffset",kind:"function"})
+MERGE (validateEvent:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::isWorktreeCanvasOutboxEvent",kind:"function"})
+MERGE (compareOffset:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::compareStreamOffsets",kind:"function"})
+MERGE (refresh:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.refreshProjection",kind:"field"})
+MERGE (self)-[:DEFINES]->(client)
+MERGE (self)-[:DEFINES]->(poller)
+MERGE (self)-[:DEFINES]->(cursorStore)
+MERGE (self)-[:DEFINES]->(browserStore)
+MERGE (self)-[:DEFINES]->(loadCursor)
+MERGE (self)-[:DEFINES]->(saveCursor)
+MERGE (self)-[:DEFINES]->(validCursor)
+MERGE (self)-[:DEFINES]->(cursor)
+MERGE (self)-[:DEFINES]->(event)
+MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:DEFINES]->(list)
+MERGE (self)-[:DEFINES]->(pollOnce)
+MERGE (self)-[:DEFINES]->(validateOffset)
+MERGE (self)-[:DEFINES]->(validateEvent)
+MERGE (self)-[:DEFINES]->(compareOffset)
+MERGE (client)-[:CALLS]->(request)
+MERGE (list)-[:CALLS]->(request)
+MERGE (pollOnce)-[:CALLS]->(list)
+MERGE (pollOnce)-[:USES_TYPE]->(page)
+MERGE (pollOnce)-[:CALLS]->(validateOffset)
+MERGE (pollOnce)-[:CALLS]->(validateEvent)
+MERGE (pollOnce)-[:CALLS]->(compareOffset)
+MERGE (pollOnce)-[:CALLS]->(refresh)
+MERGE (pollOnce)-[:CALLS]->(loadCursor)
+MERGE (pollOnce)-[:CALLS]->(saveCursor)
+MERGE (browserStore)-[:IMPLEMENTS]->(cursorStore)
+MERGE (loadCursor)-[:CALLS]->(validCursor)
+MERGE (validCursor)-[:CALLS]->(validateOffset)
+MERGE (validateEvent)-[:CALLS]->(validateOffset)
+MERGE (run_summary:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::TaskRunSummary",kind:"interface"})
+MERGE (run_admission_state:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::TaskRunAdmissionState",kind:"type"})
+MERGE (list_runs:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listTaskRuns",kind:"method"})
+MERGE (run_summary)-[:USES_TYPE]->(run_admission_state)
+MERGE (client)-[:CALLS]->(list_runs)
+MERGE (self)-[:DEFINES]->(run_summary)
+MERGE (self)-[:DEFINES]->(run_admission_state)
+MERGE (self)-[:DEFINES]->(list_runs)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts",type:"file",language:"typescript"}),
@@ -103,7 +162,7 @@ MATCH (poller:Class {name:"CanvasOutboxPoller"}),
       (cursorStore:Class {name:"BrowserCanvasEventCursorStore"}),
       (loadCursor:Function {name:"BrowserCanvasEventCursorStore.load"}),
       (saveCursor:Function {name:"BrowserCanvasEventCursorStore.save"}),
-      (validCursor:Function {name:"isCanvasEventCursor"});
+      (validCursor:Function {name:"isWorktreeCanvasEventCursor"});
 CREATE (poller)-[:USES]->(cursorStore),
        (cursorStore)-[:HAS_METHOD]->(loadCursor),
        (cursorStore)-[:HAS_METHOD]->(saveCursor),
@@ -149,6 +208,28 @@ CREATE (chatTarget:Class {name:"ScopedChatTarget",type:"interface",language:"typ
        (listChatTargets:Function {name:"WorktreeGroupApiClient.listGlobalChatTargets",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
 CREATE (file)-[:CONTAINS]->(chatTarget),(file)-[:CONTAINS]->(chatTargetPage),
        (client)-[:HAS_METHOD]->(listChatTargets),(listChatTargets)-[:CALLS]->(request);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"}),
+      (poller:Class {name:"CanvasOutboxPoller"}),
+      (pollOnce:Function {name:"CanvasOutboxPoller.pollOnce"}),
+      (refresh:Function {name:"projection refresh callback"}),
+      (cursorStore:Class {name:"BrowserCanvasEventCursorStore"});
+CREATE (worktreeEventCursor:Class {name:"WorktreeCanvasEventCursor",type:"interface",language:"typescript",visibility:"public"}),
+       (worktreeEvent:Class {name:"WorktreeCanvasOutboxEvent",type:"interface",language:"typescript",visibility:"public"}),
+       (worktreeEventPage:Class {name:"WorktreeCanvasOutboxEventPage",type:"interface",language:"typescript",visibility:"public"}),
+       (listWorktreeEvents:Function {name:"WorktreeGroupApiClient.listWorktreeCanvasEvents",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (validOffset:Function {name:"isValidStreamOffset",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+       (validEvent:Function {name:"isWorktreeCanvasOutboxEvent",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
+       (compareOffset:Function {name:"compareStreamOffsets",type:"function",language:"typescript",visibility:"private",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(worktreeEventCursor),(file)-[:CONTAINS]->(worktreeEvent),(file)-[:CONTAINS]->(worktreeEventPage),
+       (client)-[:HAS_METHOD]->(listWorktreeEvents),(listWorktreeEvents)-[:CALLS]->(request),
+       (poller)-[:USES]->(worktreeEventPage),(pollOnce)-[:CALLS]->(listWorktreeEvents),
+       (pollOnce)-[:USES]->(validOffset),(pollOnce)-[:USES]->(validEvent),(pollOnce)-[:USES]->(compareOffset),
+       (pollOnce)-[:USES]->(cursorStore),(pollOnce)-[:CALLS]->(refresh);
 */
 
 export type GroupAccessTokenProvider = () => Promise<string | null>;
@@ -204,6 +285,12 @@ CREATE (runSummary:Class {name:"TaskRunSummary",type:"interface",language:"types
        (getRun:Function {name:"WorktreeGroupApiClient.getTaskRunDetail",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
 CREATE (file)-[:CONTAINS]->(runSummary),(file)-[:CONTAINS]->(runPage),(file)-[:CONTAINS]->(runEvent),(file)-[:CONTAINS]->(runEvidence),(file)-[:CONTAINS]->(runDetail),
        (client)-[:HAS_METHOD]->(listRuns),(client)-[:HAS_METHOD]->(getRun),(listRuns)-[:CALLS]->(request),(getRun)-[:CALLS]->(request);
+CREATE (admissionAttempt:Variable {name:"TaskRunSummary.admission_attempt",type:"variable",language:"typescript"}),
+       (admissionState:Variable {name:"TaskRunSummary.admission_state",type:"variable",language:"typescript"}),
+       (createdAt:Variable {name:"TaskRunSummary.created_at",type:"variable",language:"typescript"}),
+       (startedAt:Variable {name:"TaskRunSummary.started_at",type:"variable",language:"typescript"});
+CREATE (runSummary)-[:USES]->(admissionAttempt),(runSummary)-[:USES]->(admissionState),
+       (runSummary)-[:USES]->(createdAt),(runSummary)-[:USES]->(startedAt);
 */
 
 export type ScopedChatScope = "WORKTREE" | "GLOBAL";
@@ -263,6 +350,10 @@ export interface CanvasEventCursor {
   cursor_event_id: string;
 }
 
+export interface WorktreeCanvasEventCursor {
+  after_offset: string;
+}
+
 export interface CanvasOutboxEventMetadata {
   event_id: string;
   occurred_at: string;
@@ -271,6 +362,20 @@ export interface CanvasOutboxEventMetadata {
 export interface CanvasOutboxEventPage {
   events: CanvasOutboxEventMetadata[];
   next_cursor: CanvasEventCursor | null;
+}
+
+export interface WorktreeCanvasOutboxEvent {
+  stream_offset: string;
+  event_id: string;
+  canvas_id: string;
+  event_type: string;
+  occurred_at: string;
+}
+
+export interface WorktreeCanvasOutboxEventPage {
+  events: WorktreeCanvasOutboxEvent[];
+  has_more: boolean;
+  next_offset: string;
 }
 
 export interface WorktreeIndexQuery {
@@ -545,6 +650,8 @@ export interface WorktreeExecutionProfilePage {
   next_cursor: string | null;
 }
 
+export type TaskRunAdmissionState = "provisional" | "confirmed" | "compensated" | "started";
+
 export interface TaskRunSummary {
   run_id: string;
   worktree_id: string | null;
@@ -571,7 +678,10 @@ export interface TaskRunSummary {
   execution_state: string | null;
   verification_state: string | null;
   human_acceptance_state: string | null;
-  started_at: string;
+  admission_attempt: number | null;
+  admission_state: TaskRunAdmissionState;
+  created_at: string | null;
+  started_at: string | null;
   correlation_id: string;
 }
 
@@ -583,7 +693,7 @@ export interface TaskRunPage {
   permission_snapshot_ref: string;
   limit: number;
   runs: TaskRunSummary[];
-  next_cursor: { cursor_started_at: string; cursor_run_id: string } | null;
+  next_cursor: { cursor_started_at: string; cursor_ordered_at?: string; cursor_run_id: string } | null;
 }
 
 export interface TaskRunEvent {
@@ -831,7 +941,7 @@ export class WorktreeGroupApiClient {
     workItemId: string,
     query: {
       limit?: number;
-      cursor?: { cursor_started_at: string; cursor_run_id: string };
+      cursor?: { cursor_started_at: string; cursor_ordered_at?: string; cursor_run_id: string };
     } = {},
   ): Promise<TaskRunPage> {
     if (query.limit !== undefined && (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50)) {
@@ -841,6 +951,9 @@ export class WorktreeGroupApiClient {
     if (query.limit !== undefined) params.set("limit", String(query.limit));
     if (query.cursor) {
       params.set("cursor_started_at", query.cursor.cursor_started_at);
+      if (query.cursor.cursor_ordered_at) {
+        params.set("cursor_ordered_at", query.cursor.cursor_ordered_at);
+      }
       params.set("cursor_run_id", query.cursor.cursor_run_id);
     }
     const serialized = params.toString();
@@ -1101,6 +1214,13 @@ export class WorktreeGroupApiClient {
     );
   }
 
+  listWorktreeCanvasEvents<T>(worktreeId: string, afterOffset: string, limit = 50): Promise<T> {
+    const query = new URLSearchParams({ after_offset: afterOffset, limit: String(limit) });
+    return this.request(
+      `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/canvas-events?${query}`,
+    );
+  }
+
   createWorkItemOnCanvas<T>(
     worktreeId: string,
     canvasId: string,
@@ -1119,31 +1239,31 @@ export class WorktreeGroupApiClient {
 }
 
 export interface CanvasOutboxPollerOptions {
-  initialCursor?: CanvasEventCursor;
+  initialCursor?: WorktreeCanvasEventCursor;
   intervalMs?: number;
   pageSize?: number;
   cursorStore?: CanvasEventCursorStore;
 }
 
 export interface CanvasEventCursorStore {
-  load(scopeKey: string): CanvasEventCursor | undefined;
-  save(scopeKey: string, cursor: CanvasEventCursor): void;
+  load(scopeKey: string): WorktreeCanvasEventCursor | undefined;
+  save(scopeKey: string, cursor: WorktreeCanvasEventCursor): void;
 }
 
 /** Stores an untrusted resume hint; authorization is checked on every poll. */
 export class BrowserCanvasEventCursorStore implements CanvasEventCursorStore {
-  load(scopeKey: string): CanvasEventCursor | undefined {
+  load(scopeKey: string): WorktreeCanvasEventCursor | undefined {
     try {
       const raw = globalThis.localStorage?.getItem(cursorStorageKey(scopeKey));
       if (!raw) return undefined;
       const parsed: unknown = JSON.parse(raw);
-      return isCanvasEventCursor(parsed) ? parsed : undefined;
+      return isWorktreeCanvasEventCursor(parsed) ? parsed : undefined;
     } catch {
       return undefined;
     }
   }
 
-  save(scopeKey: string, cursor: CanvasEventCursor): void {
+  save(scopeKey: string, cursor: WorktreeCanvasEventCursor): void {
     try {
       globalThis.localStorage?.setItem(cursorStorageKey(scopeKey), JSON.stringify(cursor));
     } catch {
@@ -1155,7 +1275,7 @@ export class BrowserCanvasEventCursorStore implements CanvasEventCursorStore {
 const browserCanvasEventCursorStore = new BrowserCanvasEventCursorStore();
 
 export class CanvasOutboxPoller {
-  private cursor?: CanvasEventCursor;
+  private cursor?: WorktreeCanvasEventCursor;
   private cursorLoaded: boolean;
   private readonly intervalMs: number;
   private readonly pageSize: number;
@@ -1165,17 +1285,16 @@ export class CanvasOutboxPoller {
   constructor(
     private readonly client: WorktreeGroupApiClient,
     private readonly worktreeId: string,
-    private readonly canvasId: string,
     private readonly refreshProjection: () => Promise<void>,
     options: CanvasOutboxPollerOptions = {},
   ) {
-    this.cursor = isCanvasEventCursor(options.initialCursor) ? options.initialCursor : undefined;
+    this.cursor = isWorktreeCanvasEventCursor(options.initialCursor) ? options.initialCursor : undefined;
     this.cursorLoaded = this.cursor !== undefined;
     this.intervalMs = options.intervalMs ?? 1_000;
     this.pageSize = options.pageSize ?? 100;
     this.cursorStore = options.cursorStore ?? browserCanvasEventCursorStore;
-    this.cursorScopeKey = `${worktreeId}:${canvasId}`;
-    if (this.intervalMs < 100 || this.intervalMs > 30_000 || this.pageSize < 1 || this.pageSize > 200) {
+    this.cursorScopeKey = worktreeId;
+    if (this.intervalMs < 100 || this.intervalMs > 30_000 || this.pageSize < 1 || this.pageSize > 100) {
       throw new RangeError("Canvas Outbox poll settings are outside the supported bounds.");
     }
   }
@@ -1183,24 +1302,51 @@ export class CanvasOutboxPoller {
   async pollOnce(): Promise<number> {
     if (!this.cursorLoaded) {
       const storedCursor = this.cursorStore.load(this.cursorScopeKey);
-      this.cursor = isCanvasEventCursor(storedCursor) ? storedCursor : undefined;
+      this.cursor = isWorktreeCanvasEventCursor(storedCursor) ? storedCursor : undefined;
       this.cursorLoaded = true;
     }
-    const page = await this.client.listCanvasEvents<CanvasOutboxEventPage>(
+    const currentOffset = this.cursor?.after_offset ?? "0";
+    const page = await this.client.listWorktreeCanvasEvents<WorktreeCanvasOutboxEventPage>(
       this.worktreeId,
-      this.canvasId,
-      this.cursor,
+      currentOffset,
       this.pageSize,
     );
-    if (page.events.length === 0) return 0;
+    if (
+      !page
+      || !Array.isArray(page.events)
+      || page.events.length > this.pageSize
+      || typeof page.has_more !== "boolean"
+      || !isValidStreamOffset(page.next_offset)
+    ) {
+      throw new Error("Canvas Outbox page has an invalid shape.");
+    }
+    if (page.events.length === 0) {
+      if (page.has_more || page.next_offset !== currentOffset) {
+        throw new Error("Empty Canvas Outbox page returned an inconsistent cursor.");
+      }
+      return 0;
+    }
+    if (page.has_more && page.events.length < this.pageSize) {
+      throw new Error("Canvas Outbox page has an inconsistent continuation flag.");
+    }
+
+    let previousOffset = currentOffset;
+    for (const event of page.events) {
+      if (
+        !isWorktreeCanvasOutboxEvent(event)
+        || compareStreamOffsets(event.stream_offset, previousOffset) <= 0
+      ) {
+        throw new Error("Canvas Outbox page contains a non-monotonic stream offset.");
+      }
+      previousOffset = event.stream_offset;
+    }
+    if (!isValidStreamOffset(page.next_offset) || page.next_offset !== previousOffset) {
+      throw new Error("Canvas Outbox page returned an invalid next offset.");
+    }
 
     // Refresh the current authorized projection before persisting or advancing the hint.
     await this.refreshProjection();
-    const lastEvent = page.events[page.events.length - 1];
-    const nextCursor = page.next_cursor ?? {
-      cursor_at: lastEvent.occurred_at,
-      cursor_event_id: lastEvent.event_id,
-    };
+    const nextCursor = { after_offset: page.next_offset };
     this.cursorStore.save(this.cursorScopeKey, nextCursor);
     this.cursor = nextCursor;
     return page.events.length;
@@ -1228,17 +1374,38 @@ export class CanvasOutboxPoller {
 }
 
 function cursorStorageKey(scopeKey: string): string {
-  return `star:worktree-group:canvas-outbox:v1:${encodeURIComponent(scopeKey)}`;
+  return `star:worktree-group:canvas-outbox:v2:${encodeURIComponent(scopeKey)}`;
 }
 
-function isCanvasEventCursor(value: unknown): value is CanvasEventCursor {
+function isWorktreeCanvasEventCursor(value: unknown): value is WorktreeCanvasEventCursor {
   if (!value || typeof value !== "object") return false;
-  const cursor = value as Partial<CanvasEventCursor>;
-  return typeof cursor.cursor_at === "string"
-    && Number.isFinite(Date.parse(cursor.cursor_at))
-    && Date.parse(cursor.cursor_at) <= Date.now() + 30_000
-    && typeof cursor.cursor_event_id === "string"
-    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cursor.cursor_event_id);
+  const cursor = value as Partial<WorktreeCanvasEventCursor>;
+  return typeof cursor.after_offset === "string" && isValidStreamOffset(cursor.after_offset);
+}
+
+function isValidStreamOffset(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]{0,18})$/.test(value)) return false;
+  return value.length < 19 || value <= "9223372036854775807";
+}
+
+function isWorktreeCanvasOutboxEvent(value: unknown): value is WorktreeCanvasOutboxEvent {
+  if (!value || typeof value !== "object") return false;
+  const event = value as Partial<WorktreeCanvasOutboxEvent>;
+  return isValidStreamOffset(event.stream_offset)
+    && typeof event.event_id === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(event.event_id)
+    && typeof event.canvas_id === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(event.canvas_id)
+    && typeof event.event_type === "string"
+    && event.event_type.length > 0
+    && event.event_type.length <= 128
+    && typeof event.occurred_at === "string"
+    && Number.isFinite(Date.parse(event.occurred_at));
+}
+
+function compareStreamOffsets(left: string, right: string): number {
+  if (left.length !== right.length) return left.length < right.length ? -1 : 1;
+  return left === right ? 0 : left < right ? -1 : 1;
 }
 
 async function readApiError(response: Response): Promise<GroupApiError> {

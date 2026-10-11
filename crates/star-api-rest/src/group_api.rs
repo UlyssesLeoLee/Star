@@ -103,6 +103,19 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+// @cypher schema=1 source_sha256=68d800d67dcb9568d3b7b58364e43b23fccc14f79bf8ee1d50cdcbf4102e3b5e
+// MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
+// MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
+// MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
+// MERGE (schedules:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
+// MERGE (schedule_router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
+// MERGE (self)-[:DEFINES]->(api)
+// MERGE (api)-[:DEFINES]->(build)
+// MERGE (api)-[:DEFINES]->(schedules)
+// MERGE (self)-[:CALLS]->(schedule_router)
+// MERGE (build)-[:CALLS]->(schedule_router)
+// @endcypher
+
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -118,6 +131,7 @@ mod execution_profiles;
 mod execution_resources;
 mod group_apps;
 pub(super) mod hook_policies;
+mod schedule_rules;
 mod scoped_chat;
 mod scoped_chat_store;
 mod task_runs;
@@ -368,7 +382,7 @@ impl GroupContextResolver {
         set_tenant(&mut tx, actor.tenant_id).await?;
         let worktree = sqlx::query_as::<_, WorktreeIndexRow>(
             r#"
-            SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.path, w.parent_id,
+            SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.parent_id,
                    w.owner_user_id, w.work_item_id, w.agent_id, w.agent_session_id, w.runtime_id,
                    w.branch, w.human_state, w.machine_state,
                    w.ahead, w.behind, w.dirty, w.health_score, w.last_activity, w.test_state,
@@ -504,7 +518,6 @@ struct WorktreeIndexRow {
     repo_id: Uuid,
     workspace_id: Uuid,
     project_id: Uuid,
-    path: String,
     parent_id: Option<Uuid>,
     owner_user_id: Option<Uuid>,
     work_item_id: Option<Uuid>,
@@ -536,7 +549,6 @@ fn worktree_projection(row: WorktreeIndexRow, git_lock: WorktreeGitLockObservati
         "repository_id": row.repo_id,
         "workspace_id": row.workspace_id,
         "project_id": row.project_id,
-        "path": row.path,
         "parent_id": row.parent_id,
         "owner_user_id": row.owner_user_id,
         "work_item_id": row.work_item_id,
@@ -653,6 +665,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(execution_profiles::router())
         .merge(execution_profile_admin::router())
         .merge(task_runs::router())
+        .merge(schedule_rules::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
         .merge(group_apps::router())

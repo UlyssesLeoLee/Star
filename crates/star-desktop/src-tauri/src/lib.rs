@@ -1,36 +1,111 @@
+/*
+@cypher schema=1 source_sha256=9375e85d33e874e8c56c7a93ce25afed371b946c85ca9aa32a957d033aefa349
+MERGE (self:File {path:"crates/star-desktop/src-tauri/src/lib.rs"})
+MERGE (db_module:File {path:"crates/star-desktop/src-tauri/src/db_adapter.rs"})
+MERGE (ipc_module:File {path:"crates/star-desktop/src-tauri/src/ipc_adapter.rs"})
+MERGE (run:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::run",kind:"function"})
+MERGE (items:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::list_work_items",kind:"function"})
+MERGE (groups:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::list_worktree_groups",kind:"function"})
+MERGE (entities:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::list_canvas_entities",kind:"function"})
+MERGE (app_version:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_app_version",kind:"function"})
+MERGE (keyboard:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_keyboard_layout",kind:"function"})
+MERGE (board_info:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_board_info",kind:"function"})
+MERGE (worktree_info:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_worktree_info",kind:"function"})
+MERGE (canvas_info:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_canvas_info",kind:"function"})
+MERGE (work_item:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::WorkItem"})
+MERGE (worktree_group:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::WorktreeGroup"})
+MERGE (canvas_entity:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::CanvasEntity"})
+MERGE (keyboard_layout:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::KeyboardLayout"})
+MERGE (board_type:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::BoardInfo"})
+MERGE (worktree_type:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::WorktreeInfo"})
+MERGE (canvas_type:Type {id:"crates/star-desktop/src-tauri/src/lib.rs::CanvasInfo"})
+MERGE (mock:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::MockDb"})
+MERGE (board_adapter:Type {id:"crates/star-desktop/src-tauri/src/ipc_adapter.rs::BoardAdapter"})
+MERGE (worktree_adapter:Type {id:"crates/star-desktop/src-tauri/src/ipc_adapter.rs::WorktreeAdapter"})
+MERGE (canvas_adapter:Type {id:"crates/star-desktop/src-tauri/src/ipc_adapter.rs::CanvasAdapter"})
+MERGE (mock_new:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::MockDb.new",kind:"method"})
+MERGE (list_worktrees:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_worktrees",kind:"method"})
+MERGE (list_canvas:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_canvas_entities",kind:"method"})
+MERGE (test_groups:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::tests.list_worktree_groups_returns_four_mock_groups",kind:"test"})
+MERGE (self)-[:IMPORTS]->(db_module)
+MERGE (self)-[:IMPORTS]->(ipc_module)
+MERGE (self)-[:DEFINES]->(run)
+MERGE (self)-[:DEFINES]->(items)
+MERGE (self)-[:DEFINES]->(groups)
+MERGE (self)-[:DEFINES]->(entities)
+MERGE (self)-[:DEFINES]->(app_version)
+MERGE (self)-[:DEFINES]->(keyboard)
+MERGE (self)-[:DEFINES]->(board_info)
+MERGE (self)-[:DEFINES]->(worktree_info)
+MERGE (self)-[:DEFINES]->(canvas_info)
+MERGE (self)-[:DEFINES]->(work_item)
+MERGE (self)-[:DEFINES]->(worktree_group)
+MERGE (self)-[:DEFINES]->(canvas_entity)
+MERGE (self)-[:DEFINES]->(keyboard_layout)
+MERGE (self)-[:DEFINES]->(board_type)
+MERGE (self)-[:DEFINES]->(worktree_type)
+MERGE (self)-[:DEFINES]->(canvas_type)
+MERGE (self)-[:DEFINES]->(test_groups)
+MERGE (run)-[:CALLS]->(items)
+MERGE (run)-[:CALLS]->(groups)
+MERGE (run)-[:CALLS]->(entities)
+MERGE (run)-[:CALLS]->(app_version)
+MERGE (run)-[:CALLS]->(keyboard)
+MERGE (run)-[:CALLS]->(board_info)
+MERGE (run)-[:CALLS]->(worktree_info)
+MERGE (run)-[:CALLS]->(canvas_info)
+MERGE (groups)-[:CALLS]->(mock_new)
+MERGE (groups)-[:CALLS]->(list_worktrees)
+MERGE (groups)-[:USES_TYPE]->(worktree_group)
+MERGE (entities)-[:CALLS]->(mock_new)
+MERGE (entities)-[:CALLS]->(list_canvas)
+MERGE (entities)-[:USES_TYPE]->(canvas_entity)
+MERGE (test_groups)-[:TESTS]->(groups)
+MERGE (board_info)-[:CALLS]->(board_adapter)
+MERGE (worktree_info)-[:CALLS]->(worktree_adapter)
+MERGE (canvas_info)-[:CALLS]->(canvas_adapter)
+@endcypher
+*/
+//! Star Desktop Tauri library and IPC command registry.
 // crates/star-desktop/src-tauri/src/lib.rs
 // =====================================================================
-// Star Desktop lib — Tauri 2.0 PoC P1 (per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)
-// 扩 IPC commands (从 PR #239 mock 1 → 5 commands):
-//   - list_work_items:       复 P0 (mock data)
-//   - list_worktree_groups:  新增 (mock 3 groups, 守门 #19 0 动 V0.1 业务 logic)
-//   - list_canvas_entities:  新增 (mock 4 entities, 守门 #19 0 动 V0.1)
-//   - get_app_version:       新增 (返回 star-desktop 版本号)
-//   - get_keyboard_layout:   新增 (返回 W/T/M swimlane 列配置)
-// 5 IPC commands 都用 mock data; P2 才接 crates/domain-board + crates/canvas-engine
+// Star Desktop — Tauri 2.0 shell (per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)
+// Task IPC fails closed until the canonical Run-scoped provider is connected.
+// Worktree and Canvas placeholder records remain separate from Task Card data.
 // =====================================================================
 // 守门:
 //   - #7 `unsafe_code = "forbid"` (workspace lint, Cargo.toml `[lints] workspace = true` 继承)
 //   - #19 0 动 V0.1 任何业务 logic (只用 mock data, 不调 crates/domain-*)
-//   - #11 缺标比错标: 所有 dep 来自 [dependencies] (不依赖 [workspace.dependencies] 因为本 crate 没注册该 section)
+//   - #11 缺标比错标: Tauri 使用直接依赖,共享 Serde / workspace lint 显式继承 workspace 配置
 // =====================================================================
 
 #![forbid(unsafe_code)] // 守门 #7
 
+/// Legacy Worktree/Canvas projection adapter; Task data remains fail-closed.
 pub mod db_adapter; // PR-245 新增: DB Adapter trait + MockDb impl + 8 unit tests
+/// Typed compatibility views for Board, Worktree health, and Canvas metadata.
 pub mod ipc_adapter; // PR-241 新增: 3 adapter 子模块 (Board + Worktree + Canvas)
-use crate::db_adapter::{DbAdapter, DbAdapterError, DbCanvasEntity, DbWorkItem, DbWorktree, MockDb};
+use crate::db_adapter::{DbAdapter, DbCanvasEntity, DbWorktree, MockDb};
 use crate::ipc_adapter::{BoardAdapter, CanvasAdapter, WorktreeAdapter};
 
-/// Mock WorkItem for IPC #1 (list_work_items).
-///
-/// P2 实战: 接 crates/domain-work-item + crates/star-workflow.
+/// Run-owned WorkItem projection returned by the legacy IPC contract.
+/// The provider stays unavailable until canonical Run authentication and ownership checks are wired.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkItem {
+    /// Canonical Work Item identifier.
     pub id: String,
+    /// Human-readable title.
     pub title: String,
+    /// Current lifecycle state label.
     pub status: String,
+    /// W/T/M swimlane label.
     pub w_t_m: String,
+}
+
+/// IPC #1: list Run-owned Work Items. No demo or local fallback is permitted.
+#[tauri::command]
+fn list_work_items() -> Result<Vec<WorkItem>, String> {
+    Err("Run-scoped Task provider is not configured; Task Cards are unavailable.".to_string())
 }
 
 /// Mock WorktreeGroup for IPC #2 (list_worktree_groups).
@@ -38,9 +113,13 @@ pub struct WorkItem {
 /// P2 实战: 接 crates/domain-worktree + crates/star-workflow.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorktreeGroup {
+    /// Group identifier.
     pub id: String,
+    /// Display name of the represented Worktree.
     pub name: String,
+    /// Number of Worktrees represented by this group.
     pub worktree_count: u32,
+    /// Whether the legacy projection marks the group active.
     pub active: bool,
 }
 
@@ -49,10 +128,15 @@ pub struct WorktreeGroup {
 /// P2 实战: 接 crates/canvas-engine + crates/star-canvas.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CanvasEntity {
+    /// Stable canvas entity identifier.
     pub id: String,
+    /// Entity kind, such as worktree, branch, agent, or file.
     pub kind: String, // "worktree" | "branch" | "agent" | "file"
+    /// Display title.
     pub title: String,
+    /// Horizontal canvas position.
     pub x: f64,
+    /// Vertical canvas position.
     pub y: f64,
 }
 
@@ -61,11 +145,11 @@ pub struct CanvasEntity {
 /// W/T/M swimlane + 6 status 列配置 (per docs/data-design/ipa-detail/tables/board_board_swimlane.md).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KeyboardLayout {
+    /// W/T/M swimlane labels in display order.
     pub swimlanes: Vec<String>,
+    /// Task status labels in display order.
     pub statuses: Vec<String>,
 }
-
-
 
 /// IPC #2: 列出 worktree groups (PR-245 从 MockDb.list_worktrees 转换, 4 worktrees → 4 groups 1:1)
 #[tauri::command]
@@ -169,22 +253,29 @@ fn get_canvas_info() -> CanvasInfo {
 /// IPC #6 payload: Board 信息
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BoardInfo {
+    /// Number of compatibility board kinds.
     pub board_kind_count: u32,
+    /// Number of compatibility swimlane grouping choices.
     pub swimlane_group_by_count: u32,
+    /// Default number of board columns.
     pub default_column_count: u32,
 }
 
 /// IPC #7 payload: Worktree 信息
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorktreeInfo {
+    /// Number of Worktree health labels in the compatibility projection.
     pub worktree_status_count: u32,
+    /// Number of health dimensions reported by the projection.
     pub health_dimensions: u32,
 }
 
 /// IPC #8 payload: Canvas 信息
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CanvasInfo {
+    /// Canvas API route prefix used by the legacy adapter.
     pub route_prefix: String,
+    /// Number of lifecycle phases exposed by the adapter.
     pub phase_count: u32,
 }
 
@@ -207,7 +298,7 @@ pub fn run() {
 }
 
 // =====================================================================
-// Unit tests (5 IPC commands × 5 mock data assertions)
+// Unit tests (Tauri IPC boundary assertions)
 // =====================================================================
 
 #[cfg(test)]
@@ -215,18 +306,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn list_work_items_returns_four_mock_items() {
-        let items = list_work_items();
-        assert_eq!(items.len(), 4);
-        assert_eq!(items[0].id, "wi-001");
-        assert_eq!(items[0].w_t_m, "W");
+    fn list_work_items_fails_closed_without_run_provider() {
+        let error = list_work_items().expect_err("missing Run provider must not return demo tasks");
+        assert!(error.contains("Run-scoped Task provider is not configured"));
     }
 
     #[test]
-    fn list_worktree_groups_returns_three_mock_groups() {
+    fn list_worktree_groups_returns_four_mock_groups() {
         let groups = list_worktree_groups();
-        assert_eq!(groups.len(), 3);
-        assert_eq!(groups[0].name, "core-canvas");
+        assert_eq!(groups.len(), 4);
+        assert_eq!(groups[0].name, "wt-canvas-game");
         assert!(groups[0].active);
         assert!(!groups[2].active);
     }

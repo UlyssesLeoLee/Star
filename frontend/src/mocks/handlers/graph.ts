@@ -12,7 +12,7 @@
 //   - tenant_id 必带 (per REQ-SEC-001, 13 类)
 //   - work_item_id 任意非空字符串均生成图 (per mocks/data/graph.ts
 //     buildMockGraphForWorkItem, 2026-09-16 review: 真实 Kanban 卡片 id 如
-//     wi-001 需要能拿到图, 不再局限于原固定 fixture wi-arch-001)
+//     任意已授权 Task Card ID 都使用生成图模板, 不依赖历史 demo task ID)
 //
 // 已知缺口 (per 缺标比错标, 8/26 JST 守门 #1):
 //   1. ensure-fresh 不会真触发后端 agent, mock 直接返 fresh

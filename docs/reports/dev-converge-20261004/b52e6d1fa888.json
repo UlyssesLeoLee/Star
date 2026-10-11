@@ -1,0 +1,120 @@
+{
+  "source": {
+    "branch": "codex/worktree-lifecycle-20260930",
+    "sha": "b52e6d1fa888d22b244312c458479e156896b3b1",
+    "status": "MERGE",
+    "unique_count": 1,
+    "commits": [
+      "b52e6d1fa888d22b244312c458479e156896b3b1 feat(worktree): add project lifecycle and authorized directory"
+    ],
+    "merge_base": "08346cb85eff171a288f8f44467f143c29b533ec",
+    "source_paths": [
+      "crates/star-api-rest/src/group_api.rs",
+      "crates/star-api-rest/src/group_api/worktree_lifecycle.rs",
+      "crates/star-api-rest/src/group_api/worktrees.rs",
+      "docs/basic-design.md",
+      "docs/design/DD-WORKTREE-GROUP-001.md",
+      "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+      "docs/requirements.md",
+      "frontend/src/app/worktree/AuthorizedProjectSelector.test.tsx",
+      "frontend/src/app/worktree/AuthorizedProjectSelector.tsx",
+      "frontend/src/app/worktree/ProjectWorktreeLifecycleControls.test.tsx",
+      "frontend/src/app/worktree/ProjectWorktreeLifecycleControls.tsx",
+      "frontend/src/app/worktree/page.tsx",
+      "frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts",
+      "frontend/src/lib/group/worktreeGroupApi.ts"
+    ],
+    "predicted_conflict": true,
+    "projected_tree": "ffbd5d551542fb2377a68dcde4e89699e5528422",
+    "projected_paths": [
+      "crates/star-api-rest/src/group_api.rs",
+      "crates/star-api-rest/src/group_api/worktree_lifecycle.rs",
+      "crates/star-api-rest/src/group_api/worktrees.rs",
+      "docs/basic-design.md",
+      "docs/design/DD-WORKTREE-GROUP-001.md",
+      "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+      "docs/requirements.md",
+      "frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts",
+      "frontend/src/lib/group/worktreeGroupApi.ts"
+    ]
+  },
+  "before": "e753bc9edf4d90f0870fbe13ea7eab8d7f8b56c3",
+  "paths": [
+    "crates/star-api-rest/src/group_api.rs",
+    "crates/star-api-rest/src/group_api/worktree_lifecycle.rs",
+    "crates/star-api-rest/src/group_api/worktrees.rs",
+    "docs/basic-design.md",
+    "docs/design/DD-WORKTREE-GROUP-001.md",
+    "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+    "docs/requirements.md",
+    "frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts",
+    "frontend/src/lib/group/worktreeGroupApi.ts"
+  ],
+  "conflicts": [
+    "crates/star-api-rest/src/group_api.rs",
+    "crates/star-api-rest/src/group_api/worktree_lifecycle.rs",
+    "crates/star-api-rest/src/group_api/worktrees.rs",
+    "docs/basic-design.md",
+    "docs/design/DD-WORKTREE-GROUP-001.md",
+    "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md",
+    "docs/requirements.md",
+    "frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts",
+    "frontend/src/lib/group/worktreeGroupApi.ts"
+  ],
+  "decisions": {
+    "crates/star-api-rest/src/group_api.rs": {
+      "action": "current",
+      "reason": "Preserve current lifecycle providers, chat/app registry and Engineering Run/Profile/Hook router wiring.",
+      "evidence": "c6593258:GroupApiState:258, build_group_router:642",
+      "result_sha256": "a60612d840c9c80785bd74c30a7bfb2b0db6be54980178f64fad1bf5925ae07f"
+    },
+    "crates/star-api-rest/src/group_api/worktree_lifecycle.rs": {
+      "action": "current",
+      "reason": "All source functionality already exists; source difference only import ordering.",
+      "evidence": "c6593258:list_project_worktree_repositories, list_import_candidates, create_project_worktree, import_project_worktree, validate_receipt",
+      "result_sha256": "9aa0dc6a4070c77f3ec22edc7fe6bf8a9310f1162be29af316c600b4eb936779"
+    },
+    "crates/star-api-rest/src/group_api/worktrees.rs": {
+      "action": "current",
+      "reason": "Preserve native Hook, verified policy and lock freshness, drain and readiness fencing.",
+      "evidence": "c6593258:lock_management_confirmation_context:859, prepare_archive_gate_facts:939, evaluate_archive_gate:1053, archive_gate_facts_are_fresh:1177",
+      "result_sha256": "d26ab591405f0a90a3e9c762cd4d6868ee9029cc2da2a3a29fff43ee38f26caf"
+    },
+    "docs/basic-design.md": {
+      "action": "current",
+      "reason": "Preserve canonical Run owner, separate focus, V2 fence and signature v3, bounded UI and 9F3 adapter.",
+      "evidence": "c6593258 v5.53 §16.2, §16.14–16.23",
+      "result_sha256": "3bd88432c7e00fd6b11a7cab1ec5ab060cfeb32ce5704a0f75b7bb07b61d33a6"
+    },
+    "docs/design/DD-WORKTREE-GROUP-001.md": {
+      "action": "current",
+      "reason": "Preserve Branch/Run tree, owner/focus separation, directory execution identity, authorized Hook hints and mock retirement.",
+      "evidence": "c6593258 v4.35 §0, §1, §3, §7.3, §8.6, §10.0A-B",
+      "result_sha256": "7be652f2c595ca6ef536918d1c80ea4b5b7296c7fd8e3877fa6eaac908db4b9f"
+    },
+    "docs/implementation-plans/WORKTREE-GROUP-IMPL-PLAN-001.md": {
+      "action": "current",
+      "reason": "Preserve ERUN-P2/P3 and 9F1–9F3 implementation evidence and uncompleted 9F4+ gates.",
+      "evidence": "c6593258 v5.78",
+      "result_sha256": "97c81ded343b0f081f3281ce1a32c869a62a89b81f45b6647d04293c30b8a83d"
+    },
+    "docs/requirements.md": {
+      "action": "current",
+      "reason": "Preserve latest hierarchy, owner, controlled task CLI, no mock fallback, performance and Schedule acceptance gates.",
+      "evidence": "c6593258 v5.56 §50.1/50.2; AC-ERUN-001–006, AC-LOOP-007",
+      "result_sha256": "d62e1c3051210c69ab7777d21baa7fd674ba6ecdde43bba89878f687d232cad4"
+    },
+    "frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts": {
+      "action": "current",
+      "reason": "Preserve existing hook policy/events and bounded Task Run list authentication/cursor tests.",
+      "evidence": "c6593258 tests; lifecycle source deletes later cases",
+      "result_sha256": "aa039d965e602e4617fdcf7d3662b1e2ddfde46f626bf1524373e63a227f997e"
+    },
+    "frontend/src/lib/group/worktreeGroupApi.ts": {
+      "action": "current",
+      "reason": "Preserve Hook policy draft/publish/rollback, Task Run list/detail and execution profile API.",
+      "evidence": "c6593258:getProjectHookPolicy, listHookEvents, listTaskRuns/getTaskRunDetail, listExecutionProfiles",
+      "result_sha256": "2d091eda5c8d95c7e8b18934a0a3d908f1ba0176c51501b867859720c49fff6b"
+    }
+  }
+}

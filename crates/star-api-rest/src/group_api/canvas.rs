@@ -1,3 +1,31 @@
+/*
+@cypher schema=1 source_sha256=f11e9254ae10537ee2e8f95bcef7b1a6d1df836c0a0b42961816528bf00fbdcf
+MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas.rs"})
+MERGE (route:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::router",kind:"function"})
+MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::list_worktree_canvas_events",kind:"function"})
+MERGE (validate:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::validated_worktree_cursor_and_limit",kind:"function"})
+MERGE (lock:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::lock_worktree_stream",kind:"function"})
+MERGE (append:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::append_event",kind:"function"})
+MERGE (query:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::WorktreeCanvasEventsQuery",kind:"struct"})
+MERGE (row:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::CanvasOutboxStreamRow",kind:"struct"})
+MERGE (scope:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::authorize_group_scope",kind:"function"})
+MERGE (worktree:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::request_worktree",kind:"function"})
+MERGE (outbox:Table {name:"canvas.canvas_group_outbox"})
+MERGE (advisory:Database {name:"PostgreSQL transaction advisory lock"})
+MERGE (self)-[:DEFINES]->(list)
+MERGE (self)-[:DEFINES]->(validate)
+MERGE (self)-[:DEFINES]->(lock)
+MERGE (self)-[:DEFINES]->(query)
+MERGE (self)-[:DEFINES]->(row)
+MERGE (route)-[:CALLS]->(list)
+MERGE (list)-[:CALLS]->(validate)
+MERGE (list)-[:CALLS]->(scope)
+MERGE (list)-[:CALLS]->(worktree)
+MERGE (list)-[:READS]->(outbox)
+MERGE (append)-[:CALLS]->(lock)
+MERGE (lock)-[:USES]->(advisory)
+@endcypher
+*/
 //! Cypher structural manifest.
 //! CREATE
 //!   (f:File {name:"canvas.rs",type:"file",language:"rust"}),(m:Module {name:"canvas",type:"module",language:"rust"}),
@@ -33,6 +61,22 @@
 //!       (validate:Function {name:"validate_element_body"});
 //! CREATE (m)-[:CONTAINS]->(mode),(body)-[:USES]->(mode),(update)-[:CALLS]->(lock),
 //!        (update)-[:CALLS]->(validate),(update)-[:VALIDATES_MODE]->(mode);
+//! Worktree-wide Canvas replay exposes event metadata only and allocates a commit-ordered cursor.
+//! CREATE (wq:Class {name:"WorktreeCanvasEventsQuery",type:"class"}),
+//!        (wsr:Class {name:"CanvasOutboxStreamRow",type:"class"}),
+//!        (wce:Function {name:"list_worktree_canvas_events",type:"function"}),
+//!        (vwce:Function {name:"validated_worktree_cursor_and_limit",type:"function"}),
+//!        (lwsl:Function {name:"lock_worktree_stream",type:"function"});
+//! MATCH (m:Module {name:"canvas",type:"module"}),(r:Function {name:"router",type:"function"}),
+//!       (authz:Function {name:"authorize_group_scope",type:"function"}),
+//!       (rw:Function {name:"request_worktree",type:"function"}),
+//!       (ae:Function {name:"append_event",type:"function"});
+//! CREATE (m)-[:CONTAINS]->(wq),(m)-[:CONTAINS]->(wsr),(m)-[:CONTAINS]->(wce),
+//!        (m)-[:CONTAINS]->(vwce),(m)-[:CONTAINS]->(lwsl),
+//!        (r)-[:CALLS]->(wce),(wce)-[:CALLS]->(vwce),(wce)-[:CALLS]->(authz),
+//!        (wce)-[:CALLS]->(rw),(ae)-[:CALLS]->(lwsl),
+//!        (wce)-[:READS]->(outbox:Table {name:"canvas.canvas_group_outbox",type:"table"}),
+//!        (lwsl)-[:USES]->(advisory:Database {name:"PostgreSQL transaction advisory lock",type:"database"});
 
 use std::collections::HashSet;
 
@@ -49,9 +93,9 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{
-    authorize_worktree, idempotency_key, load_work_item, lookup_idempotency, parse_id,
-    request_hash, require_task_writer, save_idempotency, validate_ai_task_scope,
-    validate_create_body, AiTaskData, CreateWorkItemBody, WorktreeScope,
+    authorize_task_run_for_worktree, authorize_worktree, idempotency_key, load_work_item,
+    lookup_idempotency, parse_id, request_hash, require_task_writer, save_idempotency,
+    validate_ai_task_scope, validate_create_body, AiTaskData, CreateWorkItemBody, WorktreeScope,
 };
 use super::{
     active_binding, require_scope, validate_actor, AuthUser, AuthenticatedUser, GroupApiError,
@@ -158,6 +202,12 @@ struct CanvasEventsQuery {
     limit: Option<i64>,
 }
 
+#[derive(Debug, Deserialize)]
+struct WorktreeCanvasEventsQuery {
+    after_offset: Option<i64>,
+    limit: Option<i64>,
+}
+
 #[derive(Debug, FromRow, Serialize)]
 struct CanvasOutboxEvent {
     event_id: Uuid,
@@ -169,6 +219,15 @@ struct CanvasOutboxEvent {
     aggregate_version: i64,
     actor_id: Uuid,
     correlation_id: Uuid,
+    occurred_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct CanvasOutboxStreamRow {
+    stream_offset: i64,
+    event_id: Uuid,
+    canvas_id: Uuid,
+    event_type: String,
     occurred_at: DateTime<Utc>,
 }
 
@@ -329,6 +388,10 @@ pub(super) fn router() -> Router<GroupApiState> {
             get(list_canvas_events),
         )
         .route(
+            "/api/v1/worktrees/{worktree_id}/canvas-events",
+            get(list_worktree_canvas_events),
+        )
+        .route(
             "/api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/work-items",
             post(create_work_item_on_canvas),
         )
@@ -371,6 +434,71 @@ async fn list_canvas_events(
         .last()
         .map(|event| json!({"cursor_at": event.occurred_at, "cursor_event_id": event.event_id}));
     Ok(Json(json!({"events": events, "next_cursor": next_cursor})))
+}
+
+async fn list_worktree_canvas_events(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(worktree_id): Path<String>,
+    Query(query): Query<WorktreeCanvasEventsQuery>,
+) -> Result<Json<Value>, GroupApiError> {
+    let worktree_id = request_worktree(&actor, &worktree_id, "canvas:read")?;
+    let (after_offset, limit) = validated_worktree_cursor_and_limit(query)?;
+    let (mut tx, _) =
+        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, false).await?;
+
+    let mut rows = sqlx::query_as::<_, CanvasOutboxStreamRow>(
+        r#"SELECT stream_offset,event_id,canvas_id,event_type,occurred_at
+           FROM canvas.canvas_group_outbox
+           WHERE tenant_id=$1 AND worktree_id=$2 AND stream_offset>$3
+           ORDER BY stream_offset
+           LIMIT $4"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(after_offset)
+    .bind(limit + 1)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let has_more = rows.len() > limit as usize;
+    rows.truncate(limit as usize);
+    let next_offset = rows
+        .last()
+        .map(|row| row.stream_offset)
+        .unwrap_or(after_offset);
+    let events = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "stream_offset": row.stream_offset.to_string(),
+                "event_id": row.event_id,
+                "canvas_id": row.canvas_id,
+                "event_type": row.event_type,
+                "occurred_at": row.occurred_at,
+            })
+        })
+        .collect::<Vec<_>>();
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    Ok(Json(json!({
+        "events": events,
+        "has_more": has_more,
+        "next_offset": next_offset.to_string(),
+    })))
+}
+
+fn validated_worktree_cursor_and_limit(
+    query: WorktreeCanvasEventsQuery,
+) -> Result<(i64, i64), GroupApiError> {
+    let after_offset = query.after_offset.unwrap_or(0);
+    let limit = query.limit.unwrap_or(50);
+    if after_offset < 0 || !(1..=100).contains(&limit) {
+        return Err(GroupApiError::invalid_request(
+            "invalid_canvas_event_cursor",
+        ));
+    }
+    Ok((after_offset, limit))
 }
 
 fn validated_cursor_and_limit(
@@ -425,6 +553,7 @@ async fn create_work_item_on_canvas(
 
     let (mut tx, scope) =
         authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let run_scope = authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &scope).await?;
     validate_ai_task_scope(&item_for_validation, scope.repo_id)?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
@@ -435,15 +564,24 @@ async fn create_work_item_on_canvas(
     let work_item_id = Uuid::new_v4();
     let element_id = Uuid::new_v4();
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    sqlx::query("SELECT set_config('app.correlation_id', $1, true)")
+        .bind(correlation_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     sqlx::query(
         r#"INSERT INTO multica.task_metadata
-           (work_item_id,tenant_id,workspace_id,project_id,item_type,title,description,priority,labels,ai_task_data,reporter_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"#,
+           (work_item_id,tenant_id,workspace_id,project_id,repository_id,branch_id,engineering_run_id,
+            item_type,title,description,priority,labels,ai_task_data,reporter_user_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)"#,
     )
     .bind(work_item_id)
     .bind(actor.tenant_id)
     .bind(scope.workspace_id)
     .bind(scope.project_id)
+    .bind(run_scope.repository_id)
+    .bind(run_scope.branch_id)
+    .bind(run_scope.engineering_run_id)
     .bind(&body.item_type)
     .bind(body.title.trim())
     .bind(&body.description)
@@ -1539,10 +1677,24 @@ async fn authorize_group_scope<'a>(
     write: bool,
 ) -> Result<(Transaction<'a, Postgres>, WorktreeScope), GroupApiError> {
     let mut tx = pool.begin().await.map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "SELECT set_config('statement_timeout', '5000', true), \
+         set_config('lock_timeout', '1000', true)",
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
     let scope = authorize_worktree(&mut tx, actor, worktree_id).await?;
+    sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+        .bind(actor.user_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     let binding = active_binding(&mut tx, actor, scope.project_id).await?;
+    let run_scope = authorize_task_run_for_worktree(&mut tx, actor, worktree_id, &scope).await?;
     if write {
         require_task_writer(&binding.role)?;
+        require_task_writer(&run_scope.role)?;
     }
     sqlx::query("SELECT set_config('app.worktree_id', $1, true)")
         .bind(worktree_id.to_string())
@@ -1650,6 +1802,7 @@ async fn append_event(
     aggregate_version: i64,
     details: Value,
 ) -> Result<(), GroupApiError> {
+    lock_worktree_stream(tx, actor.tenant_id, worktree_id).await?;
     sqlx::query(
         r#"INSERT INTO canvas.canvas_group_audit
            (tenant_id,project_id,worktree_id,canvas_id,element_id,event_type,actor_id,correlation_id,details)
@@ -1667,6 +1820,20 @@ async fn append_event(
     .bind(event_type).bind(aggregate_version).bind(actor.user_id).bind(correlation_id)
     .bind(json!({"details": details, "correlation_id": correlation_id}))
     .execute(&mut **tx).await.map_err(|_| GroupApiError::internal())?;
+    Ok(())
+}
+
+async fn lock_worktree_stream(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    worktree_id: Uuid,
+) -> Result<(), GroupApiError> {
+    let stream_lock_key = format!("{tenant_id}:{worktree_id}");
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(stream_lock_key)
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     Ok(())
 }
 
@@ -1955,9 +2122,49 @@ fn empty_object() -> Value {
 
 #[cfg(test)]
 mod canvas_events_tests {
-    use super::{validated_cursor_and_limit, CanvasEventsQuery};
+    use super::{
+        validated_cursor_and_limit, validated_worktree_cursor_and_limit, CanvasEventsQuery,
+        WorktreeCanvasEventsQuery,
+    };
     use chrono::{DateTime, Utc};
     use uuid::Uuid;
+
+    #[test]
+    fn worktree_canvas_event_cursor_is_nonnegative_and_page_bounded() {
+        assert_eq!(
+            validated_worktree_cursor_and_limit(WorktreeCanvasEventsQuery {
+                after_offset: None,
+                limit: None,
+            })
+            .expect("first page should be valid"),
+            (0, 50),
+        );
+        assert_eq!(
+            validated_worktree_cursor_and_limit(WorktreeCanvasEventsQuery {
+                after_offset: Some(i64::MAX),
+                limit: Some(100),
+            })
+            .expect("maximum signed offset and page size should be valid"),
+            (i64::MAX, 100),
+        );
+
+        for query in [
+            WorktreeCanvasEventsQuery {
+                after_offset: Some(-1),
+                limit: Some(1),
+            },
+            WorktreeCanvasEventsQuery {
+                after_offset: Some(0),
+                limit: Some(0),
+            },
+            WorktreeCanvasEventsQuery {
+                after_offset: Some(0),
+                limit: Some(101),
+            },
+        ] {
+            assert!(validated_worktree_cursor_and_limit(query).is_err());
+        }
+    }
 
     #[test]
     fn canvas_event_query_accepts_first_page_and_enforces_bounds() {

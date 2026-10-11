@@ -1,7 +1,7 @@
 /*
-CYPHER STRUCTURE MANIFEST
+@cypher schema=1 source_sha256=43dd95398e33d756b83923bdb67f24ab626064675a6934dd307aef9a92d78185
+MERGE (self:File {path:"frontend/src/lib/group/__tests__/groupProjection.test.tsx"});
 CREATE
-  (file:File {name:"frontend/src/lib/group/__tests__/groupProjection.test.tsx",type:"file",language:"tsx"}),
   (suite:Function {name:"group projection tests",type:"function",signature:"describe('Worktree Group projection', ...)",visibility:"private",complexity:"moderate"}),
   (previewCase:Function {name:"missing provider case",type:"function",signature:"it('uses preview mode only when no host provider is installed', ...)",visibility:"private",complexity:"simple"}),
   (liveCase:Function {name:"authorized projection case",type:"function",signature:"it('loads API projections through the host user token', ...)",visibility:"private",complexity:"moderate"}),
@@ -9,8 +9,9 @@ CREATE
   (failClosedCase:Function {name:"missing session case",type:"function",signature:"it('fails closed instead of displaying seed data when session is missing', ...)",visibility:"private",complexity:"moderate"}),
   (scopeCase:Function {name:"mismatched Project case",type:"function",signature:"it('rejects a GroupContext from another Project', ...)",visibility:"private",complexity:"moderate"}),
   (refreshCase:Function {name:"manual projection refresh case",type:"function",signature:"it('reloads the authorized projection when the refresh key changes', ...)",visibility:"private",complexity:"moderate"}),
-  (file)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(previewCase),(suite)-[:CONTAINS]->(liveCase),(suite)-[:CONTAINS]->(canvasCase),(suite)-[:CONTAINS]->(failClosedCase),(suite)-[:CONTAINS]->(scopeCase),(suite)-[:CONTAINS]->(refreshCase),
+  (self)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(previewCase),(suite)-[:CONTAINS]->(liveCase),(suite)-[:CONTAINS]->(canvasCase),(suite)-[:CONTAINS]->(failClosedCase),(suite)-[:CONTAINS]->(scopeCase),(suite)-[:CONTAINS]->(refreshCase),
   (previewCase)-[:CALLS]->(useProjection:Function {name:"useWorktreeGroupProjection",type:"function"}),(liveCase)-[:CALLS]->(provider:Function {name:"WorktreeGroupApiProvider",type:"function"}),(liveCase)-[:CALLS]->(useProjection),(canvasCase)-[:CALLS]->(provider),(canvasCase)-[:CALLS]->(useProjection),(failClosedCase)-[:CALLS]->(provider),(failClosedCase)-[:CALLS]->(useProjection),(scopeCase)-[:CALLS]->(provider),(scopeCase)-[:CALLS]->(useProjection),(refreshCase)-[:CALLS]->(provider),(refreshCase)-[:CALLS]->(useProjection);
+@endcypher
 */
 
 import { renderHook, waitFor } from "@testing-library/react";
@@ -113,8 +114,8 @@ describe("Worktree Group projection", () => {
           }],
         }), { status: 200 });
       }
-      if (path.endsWith("/events")) {
-        return new Response(JSON.stringify({ events: [], next_cursor: null }), { status: 200 });
+      if (path.endsWith("/canvas-events")) {
+        return new Response(JSON.stringify({ events: [], has_more: false, next_offset: "0" }), { status: 200 });
       }
       return new Response(JSON.stringify({ error: { code: "unexpected_route" } }), { status: 404 });
     });
@@ -124,7 +125,7 @@ describe("Worktree Group projection", () => {
 
     const { result } = renderHook(() => useWorktreeGroupProjection("wt-1", true, 0, "canvas-2"), { wrapper });
     await waitFor(() => expect(result.current.mode).toBe("live"));
-    await waitFor(() => expect(fetcher.mock.calls.some(([input]) => String(input).includes("/canvases/canvas-2/events"))).toBe(true));
+    await waitFor(() => expect(fetcher.mock.calls.some(([input]) => String(input).includes("/worktrees/wt-1/canvas-events"))).toBe(true));
 
     expect(result.current).toMatchObject({
       mode: "live",

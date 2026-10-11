@@ -20,8 +20,8 @@ import { describe, it, expect } from "vitest";
 import { checkAllArtifactsApproved } from "@/lib/workitem-guard";
 import type { DesignArtifact, Uuid } from "@/types/ids";
 
-const WI: Uuid = "wi-001";
-const OTHER_WI: Uuid = "wi-002";
+const WI: Uuid = "test-wi-001";
+const OTHER_WI: Uuid = "test-wi-002";
 const AUTHOR: Uuid = "u-author";
 
 const T = "2026-08-30T10:00:00Z";

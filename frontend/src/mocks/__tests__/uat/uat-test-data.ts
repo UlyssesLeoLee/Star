@@ -26,7 +26,7 @@ export const UAT_BUSINESS_FLOW = {
 export const UAT_FB_AGENT_SESSION = {
   tenant_id: "t-acme",
   project_id: "pr-uat-cross",
-  work_item_id: "wi-uat-fb-001",
+  work_item_id: "test-wi-uat-fb-001",
   agent_id: "ag-001", // 对应 MOCK_AGENTS[0]
   // INV-FB-07 验证: AI 提 Feedback 必带 author_agent_id, 不带 author_user_id
   feedback_payload: {

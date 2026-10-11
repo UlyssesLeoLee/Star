@@ -70,7 +70,7 @@ const MILESTONE_FIXTURES: Milestone[] = [
     project_id: "p1",
     name: "MVP 0.5",
     due_date: "2026-02-10T00:00:00Z",
-    work_item_ids: ["wi-001", "wi-002"],
+    work_item_ids: ["test-wi-001", "test-wi-002"],
     progress: 0.85, // not critical
   },
   {
@@ -79,14 +79,14 @@ const MILESTONE_FIXTURES: Milestone[] = [
     project_id: "p1",
     name: "MVP 0.6",
     due_date: "2026-02-25T00:00:00Z",
-    work_item_ids: ["wi-007", "wi-008"],
+    work_item_ids: ["test-wi-007", "test-wi-008"],
     progress: 0.3, // < 50% -> critical
   },
 ];
 
 const WORKITEM_FIXTURES: WorkItem[] = [
   {
-    id: "wi-001",
+    id: "test-wi-001",
     tenant_id: "t1",
     project_id: "p1",
     key: "PHYSIS-001",
@@ -102,7 +102,7 @@ const WORKITEM_FIXTURES: WorkItem[] = [
     updated_at: "2026-02-01T00:00:00Z",
   },
   {
-    id: "wi-002",
+    id: "test-wi-002",
     tenant_id: "t1",
     project_id: "p1",
     key: "PHYSIS-002",

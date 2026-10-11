@@ -19,11 +19,19 @@ CREATE
   (maxVisibleEvents:Variable {name:"MAX_VISIBLE_HOOK_EVENTS",type:"variable",language:"typescript"}),
   (newCondition:Function {name:"defaultCondition",type:"function",signature:"defaultCondition()",visibility:"private",complexity:"simple"}),
   (newRule:Function {name:"newRestrictiveRule",type:"function",signature:"newRestrictiveRule()",visibility:"private",complexity:"simple"}),
+  (ruleKey:Function {name:"ruleKey",type:"function",signature:"ruleKey(rule): string",visibility:"private",complexity:"simple"}),
+  (uuidBytes:Function {name:"uuidToBytes",type:"function",signature:"uuidToBytes(uuid): number[]",visibility:"private",complexity:"simple"}),
+  (bytesUuid:Function {name:"bytesToUuid",type:"function",signature:"bytesToUuid(bytes): string",visibility:"private",complexity:"simple"}),
+  (isProject:Function {name:"isProjectRow",type:"function",signature:"isProjectRow(value): value is ProjectRow",visibility:"private",complexity:"simple"}),
+  (isWorktree:Function {name:"isWorktreeRow",type:"function",signature:"isWorktreeRow(value): value is WorktreeRow",visibility:"private",complexity:"simple"}),
   (page)-[:CALLS]->(loadPolicy),(page)-[:CALLS]->(editorDocument),(page)-[:CALLS]->(digest),
-  (page)-[:CALLS]->(newRule),(page)-[:CALLS]->(reason),(page)-[:CALLS]->(formatError),(page)-[:CALLS]->(executionPanel),
+  (page)-[:CALLS]->(newRule),(ruleEditor)-[:CALLS]->(reason),(page)-[:CALLS]->(formatError),(page)-[:CALLS]->(executionPanel),
   (executionPanel)-[:CALLS]->(eventDecisionLabel),
-  (ruleEditor)-[:CALLS]->(conditionEditor),(conditionEditor)-[:CALLS]->(valueForCondition),
-  (conditionEditor)-[:CALLS]->(operators),(newRule)-[:CALLS]->(defaultCondition),
+  (ruleEditor)-[:CALLS]->(conditionEditor),(conditionEditor)-[:CALLS]->(conditionValue),
+  (conditionEditor)-[:CALLS]->(operators),(newRule)-[:CALLS]->(newCondition),
+  (page)-[:CALLS]->(ruleKey),(page)-[:CALLS]->(uuidBytes),(page)-[:CALLS]->(bytesUuid),
+  (newRule)-[:CALLS]->(uuidBytes),(editorDocument)-[:CALLS]->(uuidBytes),
+  (ruleEditor)-[:CALLS]->(ruleKey),(ruleEditor)-[:CALLS]->(bytesUuid),(ruleEditor)-[:CALLS]->(newCondition),
   (page)-[:USES]->(maxRules),
   (ruleEditor)-[:USES]->(hookPhaseOptions),
   (executionPanel)-[:USES]->(maxVisibleEvents),
@@ -31,12 +39,15 @@ CREATE
   (file)-[:CONTAINS]->(loadPolicy),(file)-[:CONTAINS]->(editorDocument),(file)-[:CONTAINS]->(digest),
   (file)-[:CONTAINS]->(formatError),(file)-[:CONTAINS]->(reason),(file)-[:CONTAINS]->(conditionValue),
   (file)-[:CONTAINS]->(operators),(file)-[:CONTAINS]->(newCondition),(file)-[:CONTAINS]->(newRule),
-  (file)-[:CONTAINS]->(executionPanel),(file)-[:CONTAINS]->(eventDecisionLabel);
+  (file)-[:CONTAINS]->(executionPanel),(file)-[:CONTAINS]->(eventDecisionLabel),
+  (file)-[:CONTAINS]->(ruleKey),(file)-[:CONTAINS]->(uuidBytes),(file)-[:CONTAINS]->(bytesUuid),
+  (file)-[:CONTAINS]->(isProject),(file)-[:CONTAINS]->(isWorktree);
 */
 
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, Check, CircleHelp, Clock3, FileClock, Plus, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 import {
@@ -61,6 +72,12 @@ type ProjectRow = { project_id: string; role: string };
 type WorktreeRow = { id: string; name?: string; branch?: string };
 type ProjectPage = { projects: ProjectRow[]; next_cursor: string | null };
 type WorktreePage = { worktrees: WorktreeRow[]; next_cursor: string | null };
+type HookDeepLinkHints =
+  | { kind: "none"; key: string }
+  | { kind: "invalid"; key: string; message: string }
+  | { kind: "valid"; key: string; projectId: string; worktreeId: string };
+type HookDeepLinkResolution = { key: string; status: "pending" | "ready" | "blocked"; message: string };
+type DirectoryLookup<T> = { rows: T[]; match: T | null; complete: boolean };
 
 const FACT_FIELDS: Array<{ id: HookFactField; label: string }> = [
   { id: "ActorAuthorized", label: "操作者已授权" },
@@ -85,16 +102,31 @@ const HOOK_PHASE_OPTIONS: Array<{ id: HookPhase; label: string; requiresRunAdmis
 ];
 const MAX_RULES_PER_SCOPE = 64;
 const MAX_VISIBLE_HOOK_EVENTS = 300;
+const AUTHORIZED_DIRECTORY_PAGE_SIZE = 200;
+const MAX_DEEP_LINK_LOOKUP_PAGES = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default function HookPolicyPage() {
   const api = useWorktreeGroupApi();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.toString();
+  const deepLinkHint = useMemo(() => parseHookDeepLinkHints(new URLSearchParams(searchQuery)), [searchQuery]);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [worktrees, setWorktrees] = useState<WorktreeRow[]>([]);
   const [projectId, setProjectId] = useState("");
   const [worktreeId, setWorktreeId] = useState("");
+  const [projectDirectoryClient, setProjectDirectoryClient] = useState<WorktreeGroupApiClient | null>(null);
+  const [worktreeDirectoryClient, setWorktreeDirectoryClient] = useState<WorktreeGroupApiClient | null>(null);
+  const [worktreeDirectoryProjectId, setWorktreeDirectoryProjectId] = useState("");
+  const [projectDirectoryHintKey, setProjectDirectoryHintKey] = useState("");
+  const [deepLinkResolution, setDeepLinkResolution] = useState<HookDeepLinkResolution>({ key: "", status: "pending", message: "" });
+  const [dismissedDeepLinkKey, setDismissedDeepLinkKey] = useState("");
   const [scope, setScope] = useState<PolicyScopeKind>("project");
   const [policy, setPolicy] = useState<HookPolicyResponse | null>(null);
+  const [loadedPolicyScope, setLoadedPolicyScope] = useState<{ api: WorktreeGroupApiClient; key: string } | null>(null);
+  const policyRequestGeneration = useRef(0);
   const [document, setDocument] = useState<HookPolicyDocument | null>(null);
   const [selectedRuleId, setSelectedRuleId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,69 +135,218 @@ export default function HookPolicyPage() {
   const [notice, setNotice] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [staleDraftRebased, setStaleDraftRebased] = useState(false);
+  const deepLinkActive = deepLinkHint.kind !== "none" && dismissedDeepLinkKey !== deepLinkHint.key;
+  const deepLinkSelectionReady = !deepLinkActive || (deepLinkHint.kind === "valid"
+    && deepLinkResolution.key === deepLinkHint.key && deepLinkResolution.status === "ready"
+    && projectDirectoryClient === api && worktreeDirectoryClient === api
+    && projectDirectoryHintKey === deepLinkHint.key
+    && projectId.toLowerCase() === deepLinkHint.projectId
+    && worktreeDirectoryProjectId.toLowerCase() === deepLinkHint.projectId
+    && worktreeId.toLowerCase() === deepLinkHint.worktreeId);
+  const projectSelectionReady = deepLinkSelectionReady && Boolean(api && projectDirectoryClient === api
+    && projects.some((project) => project.project_id === projectId));
+  const policySelectionReady = projectSelectionReady && (scope === "project" || (worktreeDirectoryClient === api
+    && worktreeDirectoryProjectId === projectId && worktrees.some((worktree) => worktree.id === worktreeId)));
+  const policyScopeKey = JSON.stringify([projectId, scope, scope === "worktree" ? worktreeId : ""]);
+  const policyReady = policySelectionReady && loadedPolicyScope?.api === api && loadedPolicyScope?.key === policyScopeKey;
+  const deepLinkMessage = deepLinkActive
+    ? deepLinkHint.kind === "invalid"
+      ? deepLinkHint.message
+      : deepLinkResolution.key === deepLinkHint.key && deepLinkResolution.status === "blocked"
+        ? deepLinkResolution.message
+        : "正在通过当前会话的授权目录验证 Project 与 Worktree；验证完成前不会读取或开放策略编辑。"
+    : "";
+
+  const clearDeepLinkHintsForSelection = useCallback(() => {
+    if (deepLinkHint.kind === "none") return;
+    setDismissedDeepLinkKey(deepLinkHint.key);
+    if (projects.length === 0) setProjectDirectoryClient(null);
+    const params = new URLSearchParams(searchQuery);
+    params.delete("project_id");
+    params.delete("worktree_id");
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
+  }, [deepLinkHint, pathname, projects.length, router, searchQuery]);
+
+  useEffect(() => {
+    if (deepLinkHint.kind === "none") setDismissedDeepLinkKey("");
+  }, [deepLinkHint]);
 
   useEffect(() => {
     let active = true;
+    if (!deepLinkActive && projectDirectoryClient === api) {
+      return () => { active = false; };
+    }
+    if (deepLinkActive && deepLinkHint.kind === "valid" && projectDirectoryClient === api
+      && projectDirectoryHintKey === deepLinkHint.key) {
+      return () => { active = false; };
+    }
     setProjects([]);
     setProjectId("");
     setWorktrees([]);
     setWorktreeId("");
+    setProjectDirectoryClient(null);
+    setWorktreeDirectoryClient(null);
+    setWorktreeDirectoryProjectId("");
+    setProjectDirectoryHintKey("");
     setPolicy(null);
     setDocument(null);
     setStaleDraftRebased(false);
-    if (!api) return () => { active = false; };
+    setDeepLinkResolution({ key: deepLinkHint.key, status: "pending", message: "" });
+    setError("");
+    setNotice("");
+    if (deepLinkActive && deepLinkHint.kind === "invalid") {
+      setDeepLinkResolution({ key: deepLinkHint.key, status: "blocked", message: deepLinkHint.message });
+      return () => { active = false; };
+    }
+    if (!api) {
+      if (deepLinkActive && deepLinkHint.kind === "valid") {
+        setDeepLinkResolution({ key: deepLinkHint.key, status: "blocked", message: "当前宿主认证会话不可用，无法验证深链授权范围。" });
+      }
+      return () => { active = false; };
+    }
 
-    api.listAuthorizedProjects<ProjectPage>({ limit: 200 }).then((result) => {
-      const rows = Array.isArray(result.projects) ? result.projects.filter(isProjectRow) : [];
+    void (async () => {
+      if (deepLinkActive && deepLinkHint.kind === "valid") {
+        const lookup = await findAuthorizedProject(api, deepLinkHint.projectId, () => active);
+        if (!active) return;
+        setProjects(lookup.rows);
+        setProjectDirectoryClient(api);
+        setProjectDirectoryHintKey(deepLinkHint.key);
+        if (!lookup.match) {
+          const message = lookup.complete
+            ? "该 Project 不在当前会话的授权目录中，深链范围已阻断。"
+            : "当前已加载的授权 Project 目录尚未覆盖此范围，无法确认权限；请清除深链后手动选择。";
+          setDeepLinkResolution({ key: deepLinkHint.key, status: "blocked", message });
+          setError(message);
+          return;
+        }
+        setProjectId(lookup.match.project_id);
+        return;
+      }
+
+      const result = await api.listAuthorizedProjects<ProjectPage>({ limit: AUTHORIZED_DIRECTORY_PAGE_SIZE });
+      const rows = readProjectRows(result);
       if (!active) return;
       setProjects(rows);
-      if (rows[0]) setProjectId(rows[0].project_id);
-    }).catch((cause: unknown) => {
-      if (active) setError(formatError(cause));
+      setProjectDirectoryClient(api);
+      setProjectDirectoryHintKey("");
+      setProjectId(rows[0]?.project_id ?? "");
+    })().catch((cause: unknown) => {
+      if (!active) return;
+      setError(formatError(cause));
+      if (deepLinkActive && deepLinkHint.kind === "valid") {
+        const message = `无法读取当前会话的授权 Project 目录：${formatError(cause)}`;
+        setProjectDirectoryClient(api);
+        setProjectDirectoryHintKey(deepLinkHint.key);
+        setDeepLinkResolution({ key: deepLinkHint.key, status: "blocked", message });
+      }
     });
     return () => { active = false; };
-  }, [api]);
+  }, [api, deepLinkHint, deepLinkActive]);
 
   useEffect(() => {
     let active = true;
+    if (deepLinkActive && deepLinkHint.kind === "valid" && deepLinkResolution.key === deepLinkHint.key
+      && deepLinkResolution.status === "blocked") {
+      return () => { active = false; };
+    }
+    if (deepLinkHint.kind === "valid" && deepLinkActive && deepLinkResolution.key === deepLinkHint.key
+      && deepLinkResolution.status === "ready" && worktreeDirectoryClient === api
+      && worktreeDirectoryProjectId.toLowerCase() === projectId.toLowerCase()
+      && worktreeId.toLowerCase() === deepLinkHint.worktreeId) {
+      return () => { active = false; };
+    }
+    if (!deepLinkActive && worktreeDirectoryClient === api
+      && worktreeDirectoryProjectId.toLowerCase() === projectId.toLowerCase()
+      && (worktreeId === ""
+        ? worktrees.length === 0
+        : worktrees.some((worktree) => worktree.id.toLowerCase() === worktreeId.toLowerCase()))) {
+      return () => { active = false; };
+    }
     setWorktrees([]);
     setWorktreeId("");
-    if (!api || !projectId) return () => { active = false; };
-    api.listProjectWorktrees<WorktreePage>(projectId, { limit: 200, include_archived: false }).then((result) => {
-      const rows = Array.isArray(result.worktrees) ? result.worktrees.filter(isWorktreeRow) : [];
+    setWorktreeDirectoryClient(null);
+    setWorktreeDirectoryProjectId("");
+    if (deepLinkHint.kind === "invalid" && deepLinkActive) return () => { active = false; };
+    if (!api || !projectId || projectDirectoryClient !== api) return () => { active = false; };
+
+    void (async () => {
+      if (deepLinkHint.kind === "valid" && deepLinkActive) {
+        if (projectId.toLowerCase() !== deepLinkHint.projectId || projectDirectoryHintKey !== deepLinkHint.key) return;
+        const lookup = await findAuthorizedWorktree(api, projectId, deepLinkHint.worktreeId, () => active);
+        if (!active) return;
+        setWorktrees(lookup.rows);
+        setWorktreeDirectoryClient(api);
+        setWorktreeDirectoryProjectId(projectId);
+        if (!lookup.match) {
+          const message = lookup.complete
+            ? "该 Worktree 不在此 Project 当前授权的 Worktree 目录中，深链范围已阻断。"
+            : "当前已加载的授权 Worktree 目录尚未覆盖此范围，无法确认权限；请清除深链后手动选择。";
+          setDeepLinkResolution({ key: deepLinkHint.key, status: "blocked", message });
+          setError(message);
+          return;
+        }
+        setWorktreeId(lookup.match.id);
+        setScope("worktree");
+        setDeepLinkResolution({ key: deepLinkHint.key, status: "ready", message: "" });
+        return;
+      }
+
+      const result = await api.listProjectWorktrees<WorktreePage>(projectId, {
+        limit: AUTHORIZED_DIRECTORY_PAGE_SIZE,
+        include_archived: false,
+      });
+      const rows = readWorktreeRows(result);
       if (!active) return;
       setWorktrees(rows);
-      if (rows[0]) setWorktreeId(rows[0].id);
-    }).catch((cause: unknown) => {
-      if (active) setError(formatError(cause));
+      setWorktreeDirectoryClient(api);
+      setWorktreeDirectoryProjectId(projectId);
+      setWorktreeId(rows[0]?.id ?? "");
+    })().catch((cause: unknown) => {
+      if (!active) return;
+      const errorMessage = formatError(cause);
+      setError(errorMessage);
+      if (deepLinkHint.kind === "valid" && deepLinkActive) {
+        const message = `无法读取此 Project 当前授权的 Worktree 目录：${errorMessage}`;
+        setDeepLinkResolution({ key: deepLinkHint.key, status: "blocked", message });
+      }
     });
     return () => { active = false; };
-  }, [api, projectId]);
+  }, [api, deepLinkActive, deepLinkHint, projectId, projectDirectoryClient, projectDirectoryHintKey]);
 
   useEffect(() => {
     let active = true;
+    const generation = ++policyRequestGeneration.current;
+    const cleanup = () => { active = false; policyRequestGeneration.current += 1; };
     setPolicy(null);
+    setLoadedPolicyScope(null);
     setDocument(null);
+    setBusy(false);
     setStaleDraftRebased(false);
     setSelectedRuleId("");
-    if (!api || !projectId || (scope === "worktree" && !worktreeId)) return () => { active = false; };
+    if (!policySelectionReady || !api) {
+      setLoading(false);
+      return cleanup;
+    }
     setLoading(true);
     setError("");
     loadHookPolicy(api, scope, projectId, worktreeId).then((result) => {
-      if (!active) return;
+      if (!active || policyRequestGeneration.current !== generation) return;
       const editorDocument = documentForEditor(result, scope, worktreeId);
       setPolicy(result);
+      setLoadedPolicyScope({ api, key: policyScopeKey });
       setDocument(editorDocument);
       setStaleDraftRebased(false);
       const rules = scope === "project" ? editorDocument?.project_rules : editorDocument?.worktree_rules;
       setSelectedRuleId(rules?.[0] ? ruleKey(rules[0]) : "");
     }).catch((cause: unknown) => {
-      if (active) setError(formatError(cause));
+      if (active && policyRequestGeneration.current === generation) setError(formatError(cause));
     }).finally(() => {
-      if (active) setLoading(false);
+      if (active && policyRequestGeneration.current === generation) setLoading(false);
     });
-    return () => { active = false; };
-  }, [api, projectId, scope, worktreeId, refreshKey]);
+    return cleanup;
+  }, [api, policySelectionReady, policyScopeKey, projectId, scope, worktreeId, refreshKey]);
 
   const currentRules = useMemo(() => {
     if (!document) return [];
@@ -173,8 +354,8 @@ export default function HookPolicyPage() {
   }, [document, scope]);
   const selectedRule = currentRules.find((rule) => ruleKey(rule) === selectedRuleId) ?? null;
   const activeProject = projects.find((project) => project.project_id === projectId) ?? null;
-  const canPublish = activeProject?.role === "tenant_admin" || activeProject?.role === "project_admin";
-  const canEdit = Boolean(api && policy && document && (!policy.draft?.is_stale || staleDraftRebased) && !busy);
+  const canPublish = policyReady && (activeProject?.role === "tenant_admin" || activeProject?.role === "project_admin");
+  const canEdit = Boolean(policyReady && api && policy && document && (!policy.draft?.is_stale || staleDraftRebased) && !busy);
 
   const updateRules = useCallback((next: HookRule[]) => {
     setDocument((current) => {
@@ -193,7 +374,8 @@ export default function HookPolicyPage() {
   };
 
   const saveDraft = async () => {
-    if (!api || !policy || !document || !projectId || (scope === "worktree" && !worktreeId)) return;
+    if (!canEdit || !api || !policy || !document || !projectId || (scope === "worktree" && !worktreeId)) return;
+    const generation = policyRequestGeneration.current;
     setBusy(true);
     setError("");
     setNotice("");
@@ -214,6 +396,7 @@ export default function HookPolicyPage() {
         nextDocument.project_rules = baseline.project_rules;
       }
       nextDocument.digest = await computePolicyDigest(nextDocument);
+      if (policyRequestGeneration.current !== generation) return;
       const body = {
         expected_draft_version: policy.draft?.draft_version ?? 0,
         expected_current_policy_set_id: policy.policy_set_id,
@@ -222,18 +405,20 @@ export default function HookPolicyPage() {
       };
       if (scope === "project") await api.saveProjectHookDraft(projectId, body);
       else await api.saveWorktreeHookDraft(worktreeId, body);
+      if (policyRequestGeneration.current !== generation) return;
       setStaleDraftRebased(false);
       setNotice("草稿已保存；当前生效策略未改变。发布前请检查差异并由管理员确认。");
       setRefreshKey((value) => value + 1);
     } catch (cause) {
-      setError(formatError(cause));
+      if (policyRequestGeneration.current === generation) setError(formatError(cause));
     } finally {
-      setBusy(false);
+      if (policyRequestGeneration.current === generation) setBusy(false);
     }
   };
 
   const publishDraft = async () => {
-    if (!api || !policy?.draft || !canPublish || policy.draft.is_stale) return;
+    if (!policyReady || !api || !policy?.draft || !canPublish || policy.draft.is_stale || busy) return;
+    const generation = policyRequestGeneration.current;
     setBusy(true);
     setError("");
     setNotice("");
@@ -241,17 +426,19 @@ export default function HookPolicyPage() {
       const body = { expected_draft_version: policy.draft.draft_version, correlation_id: crypto.randomUUID() };
       if (scope === "project") await api.publishProjectHookDraft(projectId, body);
       else await api.publishWorktreeHookDraft(worktreeId, body);
+      if (policyRequestGeneration.current !== generation) return;
       setNotice("新策略版本已发布。");
       setRefreshKey((value) => value + 1);
     } catch (cause) {
-      setError(formatError(cause));
+      if (policyRequestGeneration.current === generation) setError(formatError(cause));
     } finally {
-      setBusy(false);
+      if (policyRequestGeneration.current === generation) setBusy(false);
     }
   };
 
   const rollback = async (targetPolicySetId: string) => {
-    if (!api || !policy?.policy_set_id || !canPublish || !targetPolicySetId) return;
+    if (!policyReady || !api || !policy?.policy_set_id || !canPublish || !targetPolicySetId || busy) return;
+    const generation = policyRequestGeneration.current;
     setBusy(true);
     setError("");
     setNotice("");
@@ -263,12 +450,13 @@ export default function HookPolicyPage() {
       };
       if (scope === "project") await api.rollbackProjectHookPolicy(projectId, body);
       else await api.rollbackWorktreeHookPolicy(worktreeId, body);
+      if (policyRequestGeneration.current !== generation) return;
       setNotice("回滚已记录为新的不可变策略版本。");
       setRefreshKey((value) => value + 1);
     } catch (cause) {
-      setError(formatError(cause));
+      if (policyRequestGeneration.current === generation) setError(formatError(cause));
     } finally {
-      setBusy(false);
+      if (policyRequestGeneration.current === generation) setBusy(false);
     }
   };
 
@@ -291,32 +479,40 @@ export default function HookPolicyPage() {
         <div><h2 className="text-lg font-semibold text-ink">Worktree 生命周期 Hook 策略</h2><p className="text-xs text-ink-dim">可视化配置服务端已安装 producer 的 phase 限制规则；Rust 内置安全基线不可关闭、删除或放宽。</p></div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-ink-mute">策略范围
-            <select value={scope} onChange={(event) => setScope(event.target.value as PolicyScopeKind)} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink">
+            <select value={scope} onChange={(event) => setScope(event.target.value as PolicyScopeKind)} disabled={!deepLinkSelectionReady} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink disabled:opacity-50">
               <option value="project">Project 基线</option><option value="worktree">Worktree 限制覆盖</option>
             </select>
           </label>
           <label className="text-xs text-ink-mute">Project
-            <select value={projectId} onChange={(event) => { setWorktreeId(""); setPolicy(null); setDocument(null); setStaleDraftRebased(false); setProjectId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 font-mono text-ink" disabled={!projects.length}>
+            <select value={projectId} onChange={(event) => { clearDeepLinkHintsForSelection(); setWorktreeId(""); setPolicy(null); setDocument(null); setStaleDraftRebased(false); setProjectId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 font-mono text-ink" disabled={!deepLinkSelectionReady || !projects.length}>
               {projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.project_id} · {project.role}</option>)}
             </select>
           </label>
           {scope === "worktree" && <label className="text-xs text-ink-mute">Worktree
-            <select value={worktreeId} onChange={(event) => setWorktreeId(event.target.value)} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink" disabled={!worktrees.length}>
+            <select value={worktreeId} onChange={(event) => { clearDeepLinkHintsForSelection(); setWorktreeId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink" disabled={!deepLinkSelectionReady || !worktrees.length}>
               {worktrees.map((worktree) => <option key={worktree.id} value={worktree.id}>{worktree.name ?? worktree.branch ?? worktree.id}</option>)}
             </select>
           </label>}
         </div>
       </header>
 
+      {deepLinkActive && <div role={deepLinkSelectionReady ? "status" : deepLinkHint.kind === "invalid" || deepLinkResolution.status === "blocked" ? "alert" : "status"}
+        aria-live="polite" data-testid="hook-deep-link-scope" className={`rounded border px-3 py-2 text-sm ${deepLinkSelectionReady ? "border-blue-500/40 bg-blue-500/5 text-blue-800" : "border-amber-500/50 bg-amber-500/5 text-amber-800"}`}>
+        <p>{deepLinkSelectionReady && deepLinkHint.kind === "valid"
+          ? `已通过当前授权目录确认：Project ${projectId} / Worktree ${worktrees.find((worktree) => worktree.id.toLowerCase() === worktreeId.toLowerCase())?.name ?? worktreeId}。深链只选择范围，不授予策略权限。`
+          : deepLinkMessage}</p>
+        {(!deepLinkSelectionReady || deepLinkHint.kind !== "valid") && <button type="button" onClick={clearDeepLinkHintsForSelection} className="mt-2 rounded border border-current px-2 py-1 text-xs underline">清除深链并按授权目录手动选择</button>}
+      </div>}
       {error && <div role="alert" className="rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-sm text-red-600">{error}</div>}
       {notice && <div role="status" className="rounded border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700">{notice}</div>}
-      <HookExecutionEventPanel api={api} projectId={projectId} />
+      <HookExecutionEventPanel key={projectSelectionReady ? projectId : "hook-deep-link-blocked"} api={api} projectId={projectSelectionReady ? projectId : ""} />
+      {!deepLinkSelectionReady && <div role="status" className="card p-4 text-sm text-ink-mute">策略详情、执行事件与写操作均保持关闭，直到授权 Project 和 Worktree 范围验证完成。</div>}
       {loading && <div className="card p-4 text-sm text-ink-mute">正在加载服务端策略…</div>}
-      {!loading && !projects.length && <div className="card p-4 text-sm text-ink-dim">当前账号没有可读取的 Project，或授权目录尚不可用。</div>}
-      {!loading && scope === "worktree" && projectId && !worktrees.length && <div className="card p-4 text-sm text-ink-dim">所选 Project 暂无可管理 Worktree；Worktree 策略仅能增加 Project 基线之上的限制。</div>}
-      {!loading && policy && !document && <div className="card p-4 text-sm text-ink-dim">Project Hook 基线尚未 provision。创建第一条基线需要服务端初始化权限和 tenant scope，当前 UI 不会伪造租户身份或策略文档。</div>}
+      {deepLinkSelectionReady && !loading && !projects.length && <div className="card p-4 text-sm text-ink-dim">当前账号没有可读取的 Project，或授权目录尚不可用。</div>}
+      {deepLinkSelectionReady && !loading && scope === "worktree" && projectId && !worktrees.length && <div className="card p-4 text-sm text-ink-dim">所选 Project 暂无可管理 Worktree；Worktree 策略仅能增加 Project 基线之上的限制。</div>}
+      {deepLinkSelectionReady && !loading && policy && !document && <div className="card p-4 text-sm text-ink-dim">Project Hook 基线尚未 provision。创建第一条基线需要服务端初始化权限和 tenant scope，当前 UI 不会伪造租户身份或策略文档。</div>}
 
-      {policy && document && (
+      {policyReady && policy && document && (
         <>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1 rounded border border-line px-2 py-1 text-ink-dim"><ShieldCheck size={13} />Builtin baseline: enforced</span>
@@ -719,24 +915,24 @@ function ruleKey(rule: HookRule): string {
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"}),
       (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function"}),
-      (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function"});
+      (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function"})
 CREATE (executionPanel)-[:CALLS]->(listHookEvents),(executionPanel)-[:CALLS]->(getSummary);
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (panel:Function {name:"HookExecutionEventPanel",type:"function"}),
-      (summary:Class {name:"HookExecutionSummary",type:"interface"});
+      (summary:Class {name:"HookExecutionSummary",type:"interface"})
 CREATE (panel)-[:USES]->(summary);
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"}),
-      (panel:Function {name:"HookExecutionEventPanel",type:"function"});
+      (panel:Function {name:"HookExecutionEventPanel",type:"function"})
 CREATE (formatEntry:Function {name:"formatRunStateEntry",type:"function",signature:"formatRunStateEntry([state,count])",visibility:"private",complexity:"simple"}),
        (formatCounts:Function {name:"formatRunStateCounts",type:"function",signature:"formatRunStateCounts(counts)",visibility:"private",complexity:"simple"}),
        (objectEntries:Function {name:"Object.entries",type:"function",signature:"Object.entries(counts)",visibility:"public",complexity:"simple"}),
        (arrayMap:Function {name:"Array.map",type:"function",signature:"entries.map(formatRunStateEntry)",visibility:"public",complexity:"simple"}),
-       (arrayJoin:Function {name:"Array.join",type:"function",signature:"entries.join(separator)",visibility:"public",complexity:"simple"});
+       (arrayJoin:Function {name:"Array.join",type:"function",signature:"entries.join(separator)",visibility:"public",complexity:"simple"})
 CREATE (file)-[:CONTAINS]->(formatEntry),(file)-[:CONTAINS]->(formatCounts),
        (panel)-[:CALLS]->(formatCounts),(formatCounts)-[:CALLS]->(objectEntries),
        (formatCounts)-[:CALLS]->(arrayMap),(arrayMap)-[:CALLS]->(formatEntry),
@@ -745,14 +941,14 @@ CREATE (file)-[:CONTAINS]->(formatEntry),(file)-[:CONTAINS]->(formatCounts),
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"}),
-      (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"});
+      (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"})
 CREATE (summaryState:Variable {name:"summary",type:"variable",language:"typescript"}),
        (summaryProject:Variable {name:"summaryProjectId",type:"variable",language:"typescript"}),
        (summaryClient:Variable {name:"summaryClient",type:"variable",language:"typescript"}),
        (summaryWindow:Variable {name:"summaryWindowDays",type:"variable",language:"typescript"}),
        (summaryLoading:Variable {name:"summaryLoading",type:"variable",language:"typescript"}),
        (summaryError:Variable {name:"summaryError",type:"variable",language:"typescript"}),
-       (summaryGeneration:Variable {name:"summaryRequestGeneration",type:"variable",language:"typescript"});
+       (summaryGeneration:Variable {name:"summaryRequestGeneration",type:"variable",language:"typescript"})
 CREATE (file)-[:CONTAINS]->(summaryState),(file)-[:CONTAINS]->(summaryProject),
        (file)-[:CONTAINS]->(summaryClient),(file)-[:CONTAINS]->(summaryWindow),(file)-[:CONTAINS]->(summaryLoading),
        (file)-[:CONTAINS]->(summaryError),(file)-[:CONTAINS]->(summaryGeneration),
@@ -784,6 +980,179 @@ function isWorktreeRow(value: unknown): value is WorktreeRow {
   return typeof row.id === "string" && UUID_RE.test(row.id);
 }
 
+function parseHookDeepLinkHints(params: URLSearchParams): HookDeepLinkHints {
+  const projectIds = params.getAll("project_id");
+  const worktreeIds = params.getAll("worktree_id");
+  if (projectIds.length === 0 && worktreeIds.length === 0) return { kind: "none", key: "none" };
+  const key = JSON.stringify([projectIds, worktreeIds]);
+  if (projectIds.length !== 1 || worktreeIds.length !== 1) {
+    return { kind: "invalid", key, message: "Run 深链必须同时包含唯一的 Project 与 Worktree 标识；策略范围已阻断。" };
+  }
+  const projectId = projectIds[0].toLowerCase();
+  const worktreeId = worktreeIds[0].toLowerCase();
+  if (!UUID_RE.test(projectId) || !UUID_RE.test(worktreeId)) {
+    return { kind: "invalid", key, message: "Run 深链中的 Project 或 Worktree 标识格式无效；策略范围已阻断。" };
+  }
+  return { kind: "valid", key, projectId, worktreeId };
+}
+
+async function findAuthorizedProject(api: WorktreeGroupApiClient, projectId: string, isCurrent: () => boolean): Promise<DirectoryLookup<ProjectRow>> {
+  let cursor: string | undefined;
+  let firstPage: ProjectRow[] = [];
+  const seenCursors = new Set<string>();
+  for (let pageIndex = 0; pageIndex < MAX_DEEP_LINK_LOOKUP_PAGES; pageIndex += 1) {
+    if (!isCurrent()) return { rows: [], match: null, complete: false };
+    const result = await api.listAuthorizedProjects<ProjectPage>({ limit: AUTHORIZED_DIRECTORY_PAGE_SIZE, ...(cursor ? { cursor } : {}) });
+    if (!isCurrent()) return { rows: [], match: null, complete: false };
+    const rows = readProjectRows(result);
+    if (pageIndex === 0) firstPage = rows;
+    const match = rows.find((row) => row.project_id.toLowerCase() === projectId);
+    if (match) return { rows: pageIndex === 0 ? rows : appendUnique(firstPage, match, (row) => row.project_id), match, complete: true };
+    if (result.next_cursor === null) return { rows: firstPage, match: null, complete: true };
+    if (!result.next_cursor.trim() || seenCursors.has(result.next_cursor)) return { rows: firstPage, match: null, complete: false };
+    seenCursors.add(result.next_cursor);
+    cursor = result.next_cursor;
+  }
+  return { rows: firstPage, match: null, complete: false };
+}
+
+async function findAuthorizedWorktree(api: WorktreeGroupApiClient, projectId: string, worktreeId: string, isCurrent: () => boolean): Promise<DirectoryLookup<WorktreeRow>> {
+  let cursor: string | undefined;
+  let firstPage: WorktreeRow[] = [];
+  const seenCursors = new Set<string>();
+  for (let pageIndex = 0; pageIndex < MAX_DEEP_LINK_LOOKUP_PAGES; pageIndex += 1) {
+    if (!isCurrent()) return { rows: [], match: null, complete: false };
+    const result = await api.listProjectWorktrees<WorktreePage>(projectId, {
+      limit: AUTHORIZED_DIRECTORY_PAGE_SIZE,
+      include_archived: false,
+      ...(cursor ? { cursor } : {}),
+    });
+    if (!isCurrent()) return { rows: [], match: null, complete: false };
+    const rows = readWorktreeRows(result);
+    if (pageIndex === 0) firstPage = rows;
+    const match = rows.find((row) => row.id.toLowerCase() === worktreeId);
+    if (match) return { rows: pageIndex === 0 ? rows : appendUnique(firstPage, match, (row) => row.id), match, complete: true };
+    if (result.next_cursor === null) return { rows: firstPage, match: null, complete: true };
+    if (!result.next_cursor.trim() || seenCursors.has(result.next_cursor)) return { rows: firstPage, match: null, complete: false };
+    seenCursors.add(result.next_cursor);
+    cursor = result.next_cursor;
+  }
+  return { rows: firstPage, match: null, complete: false };
+}
+
+function readProjectRows(result: ProjectPage): ProjectRow[] {
+  if (!result || !Array.isArray(result.projects) || result.projects.length > AUTHORIZED_DIRECTORY_PAGE_SIZE || !isNullableCursor(result.next_cursor)
+    || result.projects.some((row) => !isProjectRow(row))) {
+    throw new Error("授权 Project 目录响应格式无效，无法验证深链范围。");
+  }
+  return result.projects;
+}
+
+function readWorktreeRows(result: WorktreePage): WorktreeRow[] {
+  if (!result || !Array.isArray(result.worktrees) || result.worktrees.length > AUTHORIZED_DIRECTORY_PAGE_SIZE || !isNullableCursor(result.next_cursor)
+    || result.worktrees.some((row) => !isWorktreeRow(row))) {
+    throw new Error("授权 Worktree 目录响应格式无效，无法验证深链范围。");
+  }
+  return result.worktrees;
+}
+
+function isNullableCursor(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && value.trim().length > 0);
+}
+
+function appendUnique<T>(rows: T[], row: T, key: (value: T) => string): T[] {
+  return rows.some((item) => key(item).toLowerCase() === key(row).toLowerCase()) ? rows : [...rows, row];
+}
+
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : "Group API 请求失败。";
 }
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"}),
+      (page:Function {name:"HookPolicyPage",type:"function"}),
+      (isProject:Function {name:"isProjectRow",type:"function"}),
+      (isWorktree:Function {name:"isWorktreeRow",type:"function"})
+CREATE (deepLinkType:Class {name:"HookDeepLinkHints",type:"class",language:"typescript"}),
+       (resolutionType:Class {name:"HookDeepLinkResolution",type:"class",language:"typescript"}),
+       (lookupType:Class {name:"DirectoryLookup",type:"class",language:"typescript"}),
+       (parseHints:Function {name:"parseHookDeepLinkHints",type:"function",signature:"parseHookDeepLinkHints(URLSearchParams): HookDeepLinkHints",visibility:"private",complexity:"moderate"}),
+       (findProject:Function {name:"findAuthorizedProject",type:"function",signature:"findAuthorizedProject(api, projectId, isCurrent): Promise<DirectoryLookup<ProjectRow>>",visibility:"private",complexity:"complex"}),
+       (findWorktree:Function {name:"findAuthorizedWorktree",type:"function",signature:"findAuthorizedWorktree(api, projectId, worktreeId, isCurrent): Promise<DirectoryLookup<WorktreeRow>>",visibility:"private",complexity:"complex"}),
+       (readProjects:Function {name:"readProjectRows",type:"function",signature:"readProjectRows(ProjectPage): ProjectRow[]",visibility:"private",complexity:"moderate"}),
+       (readWorktrees:Function {name:"readWorktreeRows",type:"function",signature:"readWorktreeRows(WorktreePage): WorktreeRow[]",visibility:"private",complexity:"moderate"}),
+       (nullableCursor:Function {name:"isNullableCursor",type:"function",signature:"isNullableCursor(unknown): value is string | null",visibility:"private",complexity:"simple"}),
+       (appendUnique:Function {name:"appendUnique",type:"function",signature:"appendUnique<T>(rows, row, key): T[]",visibility:"private",complexity:"simple"}),
+       (clearHints:Function {name:"clearDeepLinkHintsForSelection",type:"function",signature:"clearDeepLinkHintsForSelection(): void",visibility:"private",complexity:"moderate"}),
+       (searchQuery:Variable {name:"searchQuery",type:"variable",language:"typescript"}),
+       (deepLinkHint:Variable {name:"deepLinkHint",type:"variable",language:"typescript"}),
+       (deepLinkResolution:Variable {name:"deepLinkResolution",type:"variable",language:"typescript"}),
+       (deepLinkSelectionReady:Variable {name:"deepLinkSelectionReady",type:"variable",language:"typescript"}),
+       (deepLinkActive:Variable {name:"deepLinkActive",type:"variable",language:"typescript"}),
+       (dismissedHint:Variable {name:"dismissedDeepLinkKey",type:"variable",language:"typescript"}),
+       (projectDirectoryClient:Variable {name:"projectDirectoryClient",type:"variable",language:"typescript"}),
+       (worktreeDirectoryClient:Variable {name:"worktreeDirectoryClient",type:"variable",language:"typescript"}),
+       (directoryHintKey:Variable {name:"projectDirectoryHintKey",type:"variable",language:"typescript"}),
+       (routerApi:Function {name:"next.navigation.useRouter",type:"function",signature:"useRouter(): AppRouterInstance",visibility:"public",complexity:"simple"}),
+       (pathnameApi:Function {name:"next.navigation.usePathname",type:"function",signature:"usePathname(): string",visibility:"public",complexity:"simple"}),
+       (searchParamsApi:Function {name:"next.navigation.useSearchParams",type:"function",signature:"useSearchParams(): ReadonlyURLSearchParams",visibility:"public",complexity:"simple"}),
+       (listProjects:Function {name:"WorktreeGroupApiClient.listAuthorizedProjects",type:"function",signature:"listAuthorizedProjects<ProjectPage>(query): Promise<ProjectPage>",visibility:"public",complexity:"moderate"}),
+       (listWorktrees:Function {name:"WorktreeGroupApiClient.listProjectWorktrees",type:"function",signature:"listProjectWorktrees<WorktreePage>(projectId, query): Promise<WorktreePage>",visibility:"public",complexity:"moderate"}),
+       (deleteSearchParams:Function {name:"URLSearchParams.delete",type:"function",signature:"delete(name): void",visibility:"public",complexity:"simple"}),
+       (stringifySearchParams:Function {name:"URLSearchParams.toString",type:"function",signature:"toString(): string",visibility:"public",complexity:"simple"}),
+       (getAll:Function {name:"URLSearchParams.getAll",type:"function",signature:"getAll(name): string[]",visibility:"public",complexity:"simple"}),
+       (find:Function {name:"Array.find",type:"function",signature:"rows.find(predicate)",visibility:"public",complexity:"simple"}),
+       (some:Function {name:"Array.some",type:"function",signature:"rows.some(predicate)",visibility:"public",complexity:"simple"})
+CREATE (file)-[:CONTAINS]->(deepLinkType),(file)-[:CONTAINS]->(resolutionType),(file)-[:CONTAINS]->(lookupType),
+       (file)-[:CONTAINS]->(parseHints),(file)-[:CONTAINS]->(findProject),(file)-[:CONTAINS]->(findWorktree),
+       (file)-[:CONTAINS]->(readProjects),(file)-[:CONTAINS]->(readWorktrees),(file)-[:CONTAINS]->(nullableCursor),
+       (file)-[:CONTAINS]->(appendUnique),(file)-[:CONTAINS]->(clearHints),
+       (file)-[:CONTAINS]->(searchQuery),(file)-[:CONTAINS]->(deepLinkHint),(file)-[:CONTAINS]->(deepLinkResolution),
+       (file)-[:CONTAINS]->(deepLinkSelectionReady),(file)-[:CONTAINS]->(deepLinkActive),(file)-[:CONTAINS]->(dismissedHint),(file)-[:CONTAINS]->(projectDirectoryClient),
+       (file)-[:CONTAINS]->(worktreeDirectoryClient),(file)-[:CONTAINS]->(directoryHintKey),
+       (page)-[:CALLS]->(routerApi),(page)-[:CALLS]->(pathnameApi),(page)-[:CALLS]->(searchParamsApi),
+       (page)-[:CALLS]->(parseHints),(page)-[:CALLS]->(findProject),(page)-[:CALLS]->(findWorktree),
+       (page)-[:CALLS]->(clearHints),(page)-[:USES]->(deepLinkHint),(page)-[:USES]->(deepLinkResolution),
+       (page)-[:USES]->(deepLinkSelectionReady),(page)-[:USES]->(deepLinkActive),(page)-[:USES]->(dismissedHint),(page)-[:USES]->(projectDirectoryClient),
+       (page)-[:USES]->(worktreeDirectoryClient),(page)-[:USES]->(directoryHintKey),(page)-[:USES]->(searchQuery),
+       (parseHints)-[:CALLS]->(getAll),(findProject)-[:CALLS]->(listProjects),(findProject)-[:CALLS]->(readProjects),
+       (findProject)-[:CALLS]->(find),(findProject)-[:CALLS]->(appendUnique),
+       (findWorktree)-[:CALLS]->(listWorktrees),(findWorktree)-[:CALLS]->(readWorktrees),
+       (findWorktree)-[:CALLS]->(find),(findWorktree)-[:CALLS]->(appendUnique),
+       (readProjects)-[:CALLS]->(nullableCursor),(readProjects)-[:CALLS]->(isProject),
+       (readWorktrees)-[:CALLS]->(nullableCursor),(readWorktrees)-[:CALLS]->(isWorktree),
+       (appendUnique)-[:CALLS]->(some),(clearHints)-[:CALLS]->(deleteSearchParams),(clearHints)-[:CALLS]->(stringifySearchParams);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"}),
+      (page:Function {name:"HookPolicyPage",type:"function"}),
+      (digest:Function {name:"computePolicyDigest",type:"function"}),
+      (findProject:Function {name:"findAuthorizedProject",type:"function"}),
+      (findWorktree:Function {name:"findAuthorizedWorktree",type:"function"}),
+      (readProject:Function {name:"readProjectRows",type:"function"}),
+      (readWorktree:Function {name:"readWorktreeRows",type:"function"})
+CREATE (save:Function {name:"saveDraft",type:"function",signature:"saveDraft(): Promise<void>"}),
+       (publish:Function {name:"publishDraft",type:"function",signature:"publishDraft(): Promise<void>"}),
+       (rollback:Function {name:"rollback",type:"function",signature:"rollback(targetPolicySetId): Promise<void>"}),
+       (cleanup:Function {name:"cleanup",type:"function",signature:"cleanup(): void"}),
+       (projectReady:Variable {name:"projectSelectionReady",type:"variable"}),
+       (selectionReady:Variable {name:"policySelectionReady",type:"variable"}),
+       (policyReady:Variable {name:"policyReady",type:"variable"}),
+       (scopeKey:Variable {name:"policyScopeKey",type:"variable"}),
+       (loadedScope:Variable {name:"loadedPolicyScope",type:"variable"}),
+       (generation:Variable {name:"policyRequestGeneration",type:"variable"}),
+       (pageSize:Variable {name:"AUTHORIZED_DIRECTORY_PAGE_SIZE",type:"variable"}),
+       (maxPages:Variable {name:"MAX_DEEP_LINK_LOOKUP_PAGES",type:"variable"}),
+       (page)-[:CONTAINS]->(save),(page)-[:CONTAINS]->(publish),(page)-[:CONTAINS]->(rollback),(page)-[:CONTAINS]->(cleanup),
+       (file)-[:CONTAINS]->(projectReady),(file)-[:CONTAINS]->(selectionReady),(file)-[:CONTAINS]->(policyReady),
+       (file)-[:CONTAINS]->(scopeKey),(file)-[:CONTAINS]->(loadedScope),(file)-[:CONTAINS]->(generation),
+       (file)-[:CONTAINS]->(pageSize),(file)-[:CONTAINS]->(maxPages),
+       (page)-[:USES]->(projectReady),(page)-[:USES]->(selectionReady),(page)-[:USES]->(policyReady),
+       (page)-[:USES]->(scopeKey),(page)-[:USES]->(loadedScope),(page)-[:USES]->(generation),
+       (save)-[:CALLS]->(digest),(save)-[:USES]->(generation),(publish)-[:USES]->(generation),
+       (rollback)-[:USES]->(generation),(cleanup)-[:USES]->(generation),
+       (findProject)-[:USES]->(pageSize),(findProject)-[:USES]->(maxPages),
+       (findWorktree)-[:USES]->(pageSize),(findWorktree)-[:USES]->(maxPages),
+       (readProject)-[:USES]->(pageSize),(readWorktree)-[:USES]->(pageSize);
+*/

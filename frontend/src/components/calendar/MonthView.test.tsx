@@ -21,7 +21,7 @@ const today = new Date(2026, 7, 28); // 2026-08-28 (local)
 
 const sampleEvents: CalendarEvent[] = [
   { id: "ms-001", kind: "milestone", title: "MVP 0.5", start_date: "2026-08-15T00:00:00.000Z", color: "info", badge: "85%" },
-  { id: "wi-007", kind: "work_item", title: "PHYSIS-7 · Auto Rule", start_date: "2026-08-28T00:00:00.000Z", color: "err", badge: "P0" },
+  { id: "test-wi-007", kind: "work_item", title: "PHYSIS-7 · Auto Rule", start_date: "2026-08-28T00:00:00.000Z", color: "err", badge: "P0" },
 ];
 
 describe("MonthView", () => {
@@ -56,20 +56,20 @@ describe("MonthView", () => {
     const cell2026_08_30 = cells.find((c) => c.getAttribute("data-date") === "2026-08-30");
     expect(cell2026_08_30).toBeDefined();
 
-    // 模拟 drop wi-007 到 8/30
+    // 模拟 drop test-wi-007 到 8/30
     const dataTransfer = {
-      getData: (type: string) => (type === "text/plain" ? "wi-007" : ""),
+      getData: (type: string) => (type === "text/plain" ? "test-wi-007" : ""),
       types: ["text/plain"],
       dropEffect: "move",
     } as unknown as DataTransfer;
 
     fireEvent.drop(cell2026_08_30!, { dataTransfer });
-    expect(handleMove).toHaveBeenCalledWith("wi-007", "2026-08-30");
+    expect(handleMove).toHaveBeenCalledWith("test-wi-007", "2026-08-30");
   });
 
   it("renders event badges in cells with matching date", () => {
     render(<MonthView year={2026} month={7} events={sampleEvents} onEventMove={() => {}} />);
-    const wi7 = screen.getAllByTestId("day-event").find((b) => b.getAttribute("data-event-id") === "wi-007");
+    const wi7 = screen.getAllByTestId("day-event").find((b) => b.getAttribute("data-event-id") === "test-wi-007");
     expect(wi7).toBeDefined();
     expect(wi7!.getAttribute("data-event-kind")).toBe("work_item");
   });

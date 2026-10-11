@@ -1,10 +1,35 @@
+/*
+@cypher schema=1 source_sha256=e68dd3ebc3f7ba01a4a1e755f91db09065e230b673bc4cd1b4692513e2256860
+MERGE (self:File {path:"crates/star-desktop/src-tauri/src/db_adapter.rs"})
+MERGE (error:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapterError"})
+MERGE (worktree:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbWorktree"})
+MERGE (canvas:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbCanvasEntity"})
+MERGE (adapter:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter"})
+MERGE (mock:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::MockDb"})
+MERGE (mock_new:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::MockDb.new",kind:"method"})
+MERGE (list_worktrees:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_worktrees",kind:"method"})
+MERGE (list_canvas:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_canvas_entities",kind:"method"})
+MERGE (self)-[:DEFINES]->(error)
+MERGE (self)-[:DEFINES]->(worktree)
+MERGE (self)-[:DEFINES]->(canvas)
+MERGE (self)-[:DEFINES]->(adapter)
+MERGE (self)-[:DEFINES]->(mock)
+MERGE (mock)-[:DEFINES]->(mock_new)
+MERGE (adapter)-[:DEFINES]->(list_worktrees)
+MERGE (adapter)-[:DEFINES]->(list_canvas)
+MERGE (mock)-[:IMPLEMENTS]->(adapter)
+MERGE (list_worktrees)-[:USES_TYPE]->(worktree)
+MERGE (list_canvas)-[:USES_TYPE]->(canvas)
+@endcypher
+*/
+//! Bounded data adapter for the legacy Worktree and Canvas shell projections.
 // crates/star-desktop/src-tauri/src/db_adapter.rs (NEW PR-245)
 // =====================================================================
 // Star Desktop — Tauri 2.0 PoC P4 DB Adapter skeleton
 // Per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2 P4
 //
 // 阶段 P4: 真实 IPC 接 crates/* database (替换 mock data from PR #239/#240)
-// 本 PR: 仅定义 trait + MockDb impl + 3 IPC commands 切换到 MockDb
+// Task mock records are retired; this placeholder adapter only supplies demo Worktree/Canvas data.
 //        真实 DB impl (Postgres/SQLite) 留 P4.1+ (per 守门 #19 0 动 V0.1)
 // =====================================================================
 // 守门:
@@ -24,68 +49,79 @@ use thiserror::Error;
 pub enum DbAdapterError {
     /// 连接失败
     #[error("DB connection failed: {message}")]
-    ConnectionFailed { message: String },
+    ConnectionFailed {
+        /// Safe diagnostic detail for a connection failure.
+        message: String,
+    },
     /// 查询失败
     #[error("DB query failed: {message}")]
-    QueryFailed { message: String },
+    QueryFailed {
+        /// Safe diagnostic detail for a query failure.
+        message: String,
+    },
     /// 不支持的操作 (P4.1+ 才接真实 DB)
     #[error("Operation not yet implemented: {message}")]
-    NotImplemented { message: String },
+    NotImplemented {
+        /// Name of the operation that has no implementation yet.
+        message: String,
+    },
 }
 
 /// Domain-level Worktree (守门: 字段与 crates/domain-worktree Worktree struct 对齐, 但本 crate 自定义)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbWorktree {
+    /// Stable display identifier.
     pub id: String,
+    /// User-facing worktree name.
     pub name: String,
+    /// Branch display name.
     pub branch: String,
+    /// Bounded display status label.
     pub status: String, // WorktreeStatus snake_case
-}
-
-/// Domain-level WorkItem (守门: 字段与 crates/domain-work-item WorkItem 对齐, 但本 crate 自定义)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DbWorkItem {
-    pub id: String,
-    pub title: String,
-    pub status: String, // WorkItemStatus snake_case
-    pub w_t_m: String,  // W/T/M swimlane
-    pub worktree_id: String,
 }
 
 /// Domain-level CanvasEntity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbCanvasEntity {
+    /// Stable entity identifier.
     pub id: String,
+    /// Entity kind used by the Canvas renderer.
     pub kind: String,
+    /// User-facing entity label.
     pub title: String,
+    /// Horizontal canvas position.
     pub x: f64,
+    /// Vertical canvas position.
     pub y: f64,
 }
 
 /// DB Adapter trait (P4 抽象层)
 ///
 /// 本 trait 抽象 3 类查询, P4.1+ 实现 PostgresDb, P4.2+ 实现 SqliteDb.
-/// 当前 PR 提供 MockDb impl (4 worktrees + 4 work items + 4 canvas entities)
-/// 与 PR #240 mock 数量对齐, 保证 frontend 行为一致.
+/// 当前 PR 提供 MockDb impl (4 demo worktrees + 4 demo canvas entities).
+/// Task Card 数据只能由 canonical Run-scoped backend 提供；此 adapter 不生成任务。
 pub trait DbAdapter: Send + Sync {
+    /// Return the currently available Worktree projection rows.
     fn list_worktrees(&self) -> Result<Vec<DbWorktree>, DbAdapterError>;
-    fn list_work_items(&self) -> Result<Vec<DbWorkItem>, DbAdapterError>;
+    /// Return the currently available Canvas projection rows.
     fn list_canvas_entities(&self) -> Result<Vec<DbCanvasEntity>, DbAdapterError>;
 }
 
-/// MockDb impl (per PR #240 数据集, 替换 list_work_items/list_canvas_entities/list_worktree_groups 内部 mock)
+/// MockDb impl (保留非任务 Worktree/Canvas demo fixture；不含 Task Card 数据)
 #[derive(Debug, Default)]
 pub struct MockDb {
     operations: Mutex<u32>, // 跟踪 invoke 调用次数 (test 验证)
 }
 
 impl MockDb {
+    /// Create an in-memory fixture adapter with no recorded operations.
     pub fn new() -> Self {
         Self {
             operations: Mutex::new(0),
         }
     }
 
+    /// Return the number of fixture queries performed so far.
     pub fn operation_count(&self) -> u32 {
         *self.operations.lock().unwrap()
     }
@@ -118,40 +154,6 @@ impl DbAdapter for MockDb {
                 name: "wt-wasm-poc".to_string(),
                 branch: "feature/wasm".to_string(),
                 status: "ahead".to_string(),
-            },
-        ])
-    }
-
-    fn list_work_items(&self) -> Result<Vec<DbWorkItem>, DbAdapterError> {
-        *self.operations.lock().unwrap() += 1;
-        Ok(vec![
-            DbWorkItem {
-                id: "wi-001".to_string(),
-                title: "feat(canvas): page W/T/M swimlane".to_string(),
-                status: "in_progress".to_string(),
-                w_t_m: "W".to_string(),
-                worktree_id: "wt-001".to_string(),
-            },
-            DbWorkItem {
-                id: "wi-002".to_string(),
-                title: "fix(canvas): bug #71".to_string(),
-                status: "review".to_string(),
-                w_t_m: "T".to_string(),
-                worktree_id: "wt-002".to_string(),
-            },
-            DbWorkItem {
-                id: "wi-003".to_string(),
-                title: "spike(wasm): layout-engine-wasm PoC".to_string(),
-                status: "done".to_string(),
-                w_t_m: "M".to_string(),
-                worktree_id: "wt-004".to_string(),
-            },
-            DbWorkItem {
-                id: "wi-004".to_string(),
-                title: "doc(arch): Tauri PoC research v0.1".to_string(),
-                status: "todo".to_string(),
-                w_t_m: "M".to_string(),
-                worktree_id: "wt-003".to_string(),
             },
         ])
     }
@@ -191,9 +193,8 @@ impl DbAdapter for MockDb {
     }
 }
 
-
 // =====================================================================
-// Unit tests (PR-245: 8 tests for MockDb + DbAdapterError)
+// Unit tests (MockDb + DbAdapterError)
 // =====================================================================
 
 #[cfg(test)]
@@ -219,18 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn mock_db_list_work_items_returns_four_w_t_m() {
-        let db = MockDb::new();
-        let items = db.list_work_items().unwrap();
-        assert_eq!(items.len(), 4);
-        assert_eq!(items[0].w_t_m, "W");
-        assert_eq!(items[1].w_t_m, "T");
-        assert_eq!(items[2].w_t_m, "M");
-        assert_eq!(items[3].w_t_m, "M");
-        assert_eq!(db.operation_count(), 1);
-    }
-
-    #[test]
     fn mock_db_list_canvas_entities_returns_four() {
         let db = MockDb::new();
         let entities = db.list_canvas_entities().unwrap();
@@ -245,9 +234,8 @@ mod tests {
     fn mock_db_operation_count_increments_per_call() {
         let db = MockDb::new();
         let _ = db.list_worktrees().unwrap();
-        let _ = db.list_work_items().unwrap();
         let _ = db.list_canvas_entities().unwrap();
-        assert_eq!(db.operation_count(), 3);
+        assert_eq!(db.operation_count(), 2);
     }
 
     #[test]

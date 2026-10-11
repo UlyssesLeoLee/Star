@@ -697,3 +697,26 @@ CREATE POLICY observation_tenant_isolation ON local_runtime.runtime_observation
 | v0.3 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | OPT-ADR-28..31 4 混合表消解: workspace.workspace / planning.roadmap M/T → M; audit.audit_event_outbox / local_runtime.runtime_observation T/W → T. 新增 §10 (10.1 拍板表 + 10.2 派生累积规 + 10.3 SQL DDL 注释 + 10.4 守门 PASS 验证 + 10.5 已知缺口 + 10.6 修订历史). 守门 #13 100% W/T/M 覆盖 0 混合 (v0.2 6 混合 → v0.3 0 混合). | 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 守门 #13 W/T/M 横展開 + OPT-A3 §3.4 4 混合表 DDD Review 拍板 |
 | v0.2 | 2026-09-05 | (前修订人) | (历史 100 fixture 1:1 映射 + CW-01~10 派生守门 PASS) | 2026-09-05 06:50 JST P5 推進 |
 | v0.1 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 100 表格 W/T/M 业务分类索引 + 6 混合表 (M/T ×2 + T/W ×2) + §1-§8 完整 | 2026-09-01 18:30 JST 用户拍板 DB 三類横展開原则 |
+
+
+## D12 — Schedule admission handoff (2026-10-10)
+
+| Table | Class | Retention / protection |
+|---|---|---|
+| automation.run_admission_request_outbox | T | Append-only; no TTL/deletion; FORCE tenant RLS; bounded original request/fence |
+| automation.run_admission_result_inbox | T | Append-only; no TTL/deletion; FORCE tenant RLS; exact result receipt |
+| automation.run_admission_resolution_outbox | T | Append-only; no TTL/deletion; FORCE tenant RLS; paired confirm/compensate command |
+
+新增W/T/M=0/3/0，全部表独立分类。既有 occurrence/event/link 属于Schedule owner；Run/Infrastructure只在自己的事务处理消息。验证见PHASE-9F4C-D12-SCHEDULE-HANDOFF-REPORT.md；全局历史表索引总计未重新审计。
+
+
+## D13 — Admission owner delivery (2026-10-10)
+
+| Table | Class | Retention / protection |
+|---|---|---|
+| automation.admission_message_delivery | W | 7-day exact hard TTL; max1000/tenant; native bounded audited removal |
+| automation.admission_message_delivery_receipt | T | Immutable terminal receipt; no TTL/deletion; FORCE tenant RLS |
+| multica.admission_message_delivery | W | 7-day exact hard TTL; max1000/tenant; native bounded audited removal |
+| multica.admission_message_delivery_receipt | T | Immutable terminal receipt; no TTL/deletion; FORCE tenant RLS |
+
+新增W/T/M=2/2/0；source views引用既有T事实，不新增业务表或归类为M。两owner独立事务、role与队列；原始wire不在W重复存储。验证状态见D13报告，未声称重新审计整个历史表索引。

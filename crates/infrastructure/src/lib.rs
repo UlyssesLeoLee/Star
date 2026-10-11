@@ -6,6 +6,22 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
+//! @cypher schema=1 source_sha256=ffca571d010b99529f043fce0075146f07ab5ad463963ba4e70b713be655c78e
+//! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
+//! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
+//! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
+//! MERGE (ownerOutboxDelivery:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_outbox_delivery",kind:"module"})
+//! MERGE (ownerJetStreamPublisher:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
+//! MERGE (resourceCatalogWriter:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_resource_catalog_writer",kind:"module"})
+//! MERGE (multipassInventoryReconciliation:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_multipass_inventory_reconciliation",kind:"module"})
+//! MERGE (self)-[:DEFINES]->(ownerInbox)
+//! MERGE (self)-[:DEFINES]->(ownerAdmission)
+//! MERGE (self)-[:DEFINES]->(ownerOutboxDelivery)
+//! MERGE (self)-[:DEFINES]->(ownerJetStreamPublisher)
+//! MERGE (self)-[:DEFINES]->(resourceCatalogWriter)
+//! MERGE (self)-[:DEFINES]->(multipassInventoryReconciliation)
+//! @endcypher
+//!
 //! ## 职责
 //!
 //! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
@@ -297,7 +313,6 @@ pub trait AdapterQuery: Send + Sync {
 /// P2 阶段 worker 子代理实装时按 "use domain_xxx::*;" 引用替换 (派前必先
 /// `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`, per AGENTS.md §4 #20 守门派生).
 /// 当前保留为 P2 阶段前置可编译骨架 (守门 #1 v6 单 crate 100% pass 实证).
-
 /// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
 /// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
 
@@ -375,5 +390,11 @@ mod tests {
     }
 }
 
+pub mod infrastructure_multipass_inventory_reconciliation;
+pub mod infrastructure_owner_admission;
+pub mod infrastructure_owner_inbox;
+pub mod infrastructure_owner_jetstream_publisher;
+pub mod infrastructure_owner_outbox_delivery;
+pub mod infrastructure_resource_catalog_writer;
 pub mod registry;
 pub mod registry_real_pg;

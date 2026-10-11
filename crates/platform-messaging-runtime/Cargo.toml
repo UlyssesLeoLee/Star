@@ -1,0 +1,27 @@
+[package]
+publish = false
+name = "platform-messaging-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-nats = { workspace = true, features = ["server_2_10"] }
+futures-util = { workspace = true }
+base64 = "0.23"
+chrono = { workspace = true }
+domain-kms = { path = "../domain-kms" }
+domain-automation = { path = "../domain-automation" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

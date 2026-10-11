@@ -255,7 +255,7 @@ export const MOCK_GRAPH_EMPTY: GraphPayload = {
 
 /**
  * 为任意 work_item_id 生成图 (per 2026-09-16 review: Kanban 卡片真实 id
- * 如 wi-001 跟本 fixture 固定的 wi-arch-001 错开, 导致点 Arch 按钮总 404)。
+ * 固定模板节点 ID 与传入 Task Card ID 解耦, 避免历史 demo ID 影响查询。
  * 复用 PHYSIS-123 fixture 拓扑, 仅替换当前节点 id/label + 相关边的端点,
  * 让任何真实 work_item 都能拿到一份可视化的图 (per ADR-0041 §2.3.5 mock 阶段)。
  */

@@ -184,6 +184,15 @@ struct RunAuthority {
     run_grant: DirectoryGrant,
 }
 
+pub(super) struct RunTaskScope {
+    pub(super) engineering_run_id: Uuid,
+    pub(super) project_id: Uuid,
+    pub(super) repository_id: Uuid,
+    pub(super) branch_id: Uuid,
+    pub(super) role: String,
+    pub(super) permission_snapshot_ref: String,
+}
+
 #[derive(FromRow, Serialize)]
 struct RunWorktreeRow {
     worktree_id: Uuid,
@@ -310,6 +319,25 @@ async fn run_authority(
         project,
         branch_grant,
         run_grant,
+    })
+}
+
+pub(super) async fn authorize_run_task_scope(
+    tx: &mut Transaction<'_, Postgres>,
+    actor: &AuthUser,
+    run_id: Uuid,
+) -> Result<RunTaskScope, GroupApiError> {
+    let authority = run_authority(tx, actor, run_id).await?;
+    Ok(RunTaskScope {
+        engineering_run_id: authority.run.engineering_run_id,
+        project_id: authority.run.project_id,
+        repository_id: authority.run.repository_id,
+        branch_id: authority.run.branch_id,
+        role: authority.run_grant.role,
+        permission_snapshot_ref: format!(
+            "{}:v{}",
+            authority.run_grant.binding_id, authority.run_grant.version
+        ),
     })
 }
 

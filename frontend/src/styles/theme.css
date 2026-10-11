@@ -112,6 +112,25 @@
   --radius-md: 8px;
   --radius-lg: 13px;
   --radius-xl: 21px;
+
+  /* === CEL-SHADED / MANGA STUDIO ENGINE TOKENS === */
+  --cel-bg:               #f8fafc;
+  --cel-surface-card:     #ffffff;
+  --cel-surface-sub:      #f8fafd;
+  --cel-surface-stage:    #eff4fa;
+  --cel-card-ramp:        linear-gradient(145deg, #ffffff 0%, #f9fbfd 50%, #eff4fa 100%);
+  --cel-crimson:          #e8295a;
+  --cel-cyan:             #1a6cf6;
+  --cel-gold:             #d97706;
+  --cel-ink:              #1e293b;
+  --cel-text-primary:     #0d1117;
+  --cel-text-secondary:   #475569;
+  --cel-screentone-dot:   rgba(13, 17, 23, 0.035);
+  --cel-shadow-color:     #1e293b;
+  --cel-bevel-hi:         rgba(255, 255, 255, 0.95);
+  --cel-bevel-lo:         rgba(13, 17, 23, 0.08);
+  --cel-glint-color:      #ffffff;
+  --cel-glint-rim:        rgba(26, 108, 246, 0.20);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -182,6 +201,25 @@
   --shadow-lg: 0 16px 42px rgba(0, 0, 0, 0.90), 0 0 26px rgba(0, 240, 255, 0.10);
   --glow-accent:    0 0 21px rgba(0, 240, 255, 0.38), 0 0 42px rgba(168, 85, 247, 0.16);
   --glow-secondary: 0 0 21px rgba(255, 42, 133, 0.38);
+
+  /* === CEL-SHADED / CYBER OBSIDIAN ENGINE TOKENS === */
+  --cel-bg:               #07090e;
+  --cel-surface-card:     #0d1322;
+  --cel-surface-sub:      #131c2e;
+  --cel-surface-stage:    #090e18;
+  --cel-card-ramp:        linear-gradient(145deg, #18233c 0%, #121b2f 45%, #0c1220 100%);
+  --cel-crimson:          #ff184c;
+  --cel-cyan:             #00f0ff;
+  --cel-gold:             #ffc400;
+  --cel-ink:              #1e293b;
+  --cel-text-primary:     #ffffff;
+  --cel-text-secondary:   #94a3b8;
+  --cel-screentone-dot:   rgba(0, 240, 255, 0.10);
+  --cel-shadow-color:     #000000;
+  --cel-bevel-hi:         rgba(0, 240, 255, 0.25);
+  --cel-bevel-lo:         rgba(0, 0, 0, 0.70);
+  --cel-glint-color:      rgba(255, 255, 255, 0.35);
+  --cel-glint-rim:        rgba(0, 240, 255, 0.25);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -280,9 +318,28 @@ html.christmas,
   --radius-xl: 24px;
 
   /* === 毛玻璃 Glassmorphism 核心令牌 === */
-  --glass-blur: blur(14px);
-  --glass-bg: rgba(18, 32, 23, 0.65);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(16px);
+  --glass-bg: rgba(18, 36, 26, 0.78);
+  --glass-border: 1px solid rgba(248, 178, 41, 0.35);
+
+  /* === CEL-SHADED / FROST NOEL ENGINE TOKENS === */
+  --cel-bg:               #08100b;
+  --cel-surface-card:     rgba(18, 36, 26, 0.82);
+  --cel-surface-sub:      rgba(26, 52, 38, 0.88);
+  --cel-surface-stage:    #0c1811;
+  --cel-card-ramp:        linear-gradient(145deg, rgba(28, 54, 39, 0.88) 0%, rgba(16, 32, 23, 0.82) 50%, rgba(10, 20, 14, 0.88) 100%);
+  --cel-crimson:          #d42426;
+  --cel-cyan:             #165b33;
+  --cel-gold:             #f8b229;
+  --cel-ink:              #060b08;
+  --cel-text-primary:     #f5f8f5;
+  --cel-text-secondary:   #a3c2b1;
+  --cel-screentone-dot:   rgba(248, 178, 41, 0.08);
+  --cel-shadow-color:     #060b08;
+  --cel-bevel-hi:         rgba(248, 178, 41, 0.35);
+  --cel-bevel-lo:         rgba(6, 11, 8, 0.85);
+  --cel-glint-color:      rgba(255, 255, 255, 0.50);
+  --cel-glint-rim:        rgba(248, 178, 41, 0.30);
 }
 
 /* ─────────────────────────────────────────────────────────────────────

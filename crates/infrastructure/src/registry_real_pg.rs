@@ -47,6 +47,62 @@
 //!
 //! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
+//!
+//! @cypher schema=1 source_sha256=9e1a57eeea4bd61b14a2d3cb6b195a96c2f700d998c84570bcf238bb80b58a43
+//! MERGE (self:File {path:"crates/infrastructure/src/registry_real_pg.rs"})
+//! MERGE (registry:Type {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry",kind:"struct"})
+//! MERGE (new:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.new",kind:"method"})
+//! MERGE (verify_health:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.verify_health",kind:"method"})
+//! MERGE (register:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register",kind:"method"})
+//! MERGE (register_tenant_pool:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register_pg_pool_for_tenant",kind:"method"})
+//! MERGE (get_tenant_pool:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.get_pg_pool_for_tenant",kind:"method"})
+//! MERGE (register_postgres:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register_postgres_adapter",kind:"method"})
+//! MERGE (register_nats:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register_nats_adapter",kind:"method"})
+//! MERGE (register_object_storage:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register_object_storage_adapter",kind:"method"})
+//! MERGE (register_scm:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register_scm_adapter",kind:"method"})
+//! MERGE (register_agent:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.register_agent_adapter",kind:"method"})
+//! MERGE (list_registered:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.list_registered_adapters",kind:"method"})
+//! MERGE (state:Variable {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.state",kind:"field"})
+//! MERGE (tenant_pools:Variable {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.tenant_pools",kind:"field"})
+//! MERGE (pool:Variable {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.pool",kind:"field"})
+//! MERGE (descriptor:Type {id:"crates/infrastructure/src/lib.rs::AdapterDescriptor",kind:"struct"})
+//! MERGE (adapter_registry:Trait {id:"crates/infrastructure/src/lib.rs::AdapterRegistry",kind:"trait"})
+//! MERGE (adapter_query:Trait {id:"crates/infrastructure/src/lib.rs::AdapterQuery",kind:"trait"})
+//! MERGE (healthcheck:Symbol {id:"crates/star-pg-adapter/src/lib.rs::healthcheck",kind:"function"})
+//! MERGE (adapter_kind:Type {id:"crates/infrastructure/src/registry.rs::AdapterKind",kind:"enum"})
+//! MERGE (self)-[:DEFINES]->(registry)
+//! MERGE (self)-[:DEFINES]->(new)
+//! MERGE (self)-[:DEFINES]->(verify_health)
+//! MERGE (self)-[:DEFINES]->(register)
+//! MERGE (self)-[:DEFINES]->(register_tenant_pool)
+//! MERGE (self)-[:DEFINES]->(get_tenant_pool)
+//! MERGE (self)-[:DEFINES]->(register_postgres)
+//! MERGE (self)-[:DEFINES]->(register_nats)
+//! MERGE (self)-[:DEFINES]->(register_object_storage)
+//! MERGE (self)-[:DEFINES]->(register_scm)
+//! MERGE (self)-[:DEFINES]->(register_agent)
+//! MERGE (self)-[:DEFINES]->(list_registered)
+//! MERGE (self)-[:DEFINES]->(state)
+//! MERGE (self)-[:DEFINES]->(tenant_pools)
+//! MERGE (self)-[:DEFINES]->(pool)
+//! MERGE (registry)-[:IMPLEMENTS]->(adapter_registry)
+//! MERGE (registry)-[:IMPLEMENTS]->(adapter_query)
+//! MERGE (registry)-[:USES_TYPE]->(adapter_kind)
+//! MERGE (new)-[:CREATES]->(registry)
+//! MERGE (verify_health)-[:CALLS]->(healthcheck)
+//! MERGE (verify_health)-[:READS]->(pool)
+//! MERGE (register_tenant_pool)-[:WRITES]->(tenant_pools)
+//! MERGE (register_tenant_pool)-[:CALLS]->(register)
+//! MERGE (get_tenant_pool)-[:READS]->(tenant_pools)
+//! MERGE (register)-[:WRITES]->(state)
+//! MERGE (register)-[:CREATES]->(descriptor)
+//! MERGE (register_postgres)-[:CALLS]->(register)
+//! MERGE (register_nats)-[:CALLS]->(register)
+//! MERGE (register_object_storage)-[:CALLS]->(register)
+//! MERGE (register_scm)-[:CALLS]->(register)
+//! MERGE (register_agent)-[:CALLS]->(register)
+//! MERGE (list_registered)-[:READS]->(state)
+//! @endcypher
 
 use crate::registry::AdapterKind;
 use crate::{
@@ -152,7 +208,7 @@ impl RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::Postgres.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }
@@ -215,7 +271,7 @@ impl RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(kind.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }
@@ -299,7 +355,7 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::Postgres.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }
@@ -329,7 +385,7 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::Nats.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }
@@ -356,7 +412,7 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::ObjectStorage.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }
@@ -384,7 +440,7 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::Scm.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }
@@ -410,7 +466,7 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::Agent.as_str().to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(desc.clone());
         Ok(desc)
     }

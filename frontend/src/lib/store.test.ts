@@ -9,12 +9,46 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useStore } from "./store";
 import * as seed from "./seed";
+import type { WorkItem } from "@/types/ids";
+
+// Store behavior uses small synthetic cases; product startup no longer seeds demo tasks.
+const makeTestWorkItem = (id: string, status: WorkItem["status"]): WorkItem => ({
+  id,
+  tenant_id: "test-tenant",
+  project_id: "test-project",
+  key: id,
+  title: `Test work item ${id}`,
+  description: "",
+  kind: "task",
+  status,
+  priority: "p2",
+  reporter_id: "test-user",
+  labels: [],
+  workflow_id: "wf-default",
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+});
+const testWorkItems = [
+  makeTestWorkItem("test-wi-001", "in_progress"),
+  makeTestWorkItem("test-wi-002", "review"),
+  makeTestWorkItem("test-wi-004", "todo"),
+  makeTestWorkItem("test-wi-008", "review"),
+  makeTestWorkItem("test-wi-018", "review"),
+  makeTestWorkItem("test-wi-022", "review"),
+];
+const testBoard = {
+  ...seed.board,
+  columns: seed.board.columns.map((column) => ({
+    ...column,
+    work_item_ids: testWorkItems.filter((item) => item.status === column.status).map((item) => item.id),
+  })),
+};
 
 const resetStore = () => {
   // 直接调 useStore.setState 还原 seed (避免 re-import reset)
   useStore.setState({
-    board: seed.board,
-    workItems: seed.workItems,
+    board: testBoard,
+    workItems: testWorkItems,
     milestones: seed.milestones,
     sprints: seed.sprints,
   } as any);
@@ -38,22 +72,22 @@ describe("useStore (W5 基础层)", () => {
   // ---------- 1. persist roundtrip ----------
   it("persist roundtrip: 修改后 reload 能读回", async () => {
     const initialBoard = useStore.getState().board;
-    expect(initialBoard.columns[0].work_item_ids).toContain("wi-004");
+    expect(initialBoard.columns[0].work_item_ids).toContain("test-wi-004");
 
     // 改 store (触发 persist 写)
-    useStore.getState().transitionWorkItem("wi-004", "in_progress");
-    useStore.getState().transitionWorkItem("wi-004", "done");
+    useStore.getState().transitionWorkItem("test-wi-004", "in_progress");
+    useStore.getState().transitionWorkItem("test-wi-004", "done");
 
     // zustand v4 persist 是 microtask 异步写 — 等下一 tick
     await new Promise((r) => setTimeout(r, 0));
 
     // 模拟 "reload" — 重建 useStore 引用 (实际 import 是单例,改用 getState 重读)
-    const afterUpdate = useStore.getState().workItems.find((w) => w.id === "wi-004");
+    const afterUpdate = useStore.getState().workItems.find((w) => w.id === "test-wi-004");
     expect(afterUpdate?.status).toBe("done");
   });
 
   it("localStorage key = star-store:v1", async () => {
-    useStore.getState().transitionWorkItem("wi-001", "review");
+    useStore.getState().transitionWorkItem("test-wi-001", "review");
     await new Promise((r) => setTimeout(r, 0));
     if (typeof window !== "undefined") {
       const raw = window.localStorage.getItem("star-store:v1");
@@ -70,26 +104,26 @@ describe("useStore (W5 基础层)", () => {
   // ---------- 2. applyRemoteChange 覆盖本地 ----------
   it("applyRemoteChange: 远端 snapshot 覆盖本地 (last-write-wins)", () => {
     const before = useStore.getState().board.columns[0].work_item_ids;
-    expect(before).toContain("wi-004");
+    expect(before).toContain("test-wi-004");
 
     // 模拟远端推送:第 1 列多塞一项
     const remoteBoard = {
       ...useStore.getState().board,
       columns: useStore.getState().board.columns.map((c, i) =>
-        i === 0 ? { ...c, work_item_ids: [...c.work_item_ids, "wi-099"] } : c
+        i === 0 ? { ...c, work_item_ids: [...c.work_item_ids, "test-wi-099"] } : c
       ),
     };
     useStore.getState().applyRemoteChange({ board: remoteBoard });
 
     const after = useStore.getState().board.columns[0].work_item_ids;
-    expect(after).toContain("wi-099");
+    expect(after).toContain("test-wi-099");
   });
 
   it("applyRemoteChange: 接受 workItems 部分覆盖", () => {
     useStore.getState().applyRemoteChange({
       workItems: [
         {
-          id: "wi-001",
+          id: "test-wi-001",
           tenant_id: "ten-acme",
           project_id: "prj-physis",
           key: "PHYSIS-1",
@@ -105,19 +139,19 @@ describe("useStore (W5 基础层)", () => {
         },
       ],
     });
-    const w = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    const w = useStore.getState().workItems.find((x) => x.id === "test-wi-001");
     expect(w?.title).toBe("remote override");
     expect(w?.status).toBe("done");
   });
 
   // ---------- 3. transitionWorkItem ----------
   it("transitionWorkItem: 改 status + updated_at", () => {
-    const before = useStore.getState().workItems.find((w) => w.id === "wi-002");
+    const before = useStore.getState().workItems.find((w) => w.id === "test-wi-002");
     expect(before?.status).toBe("review");
 
-    useStore.getState().transitionWorkItem("wi-002", "in_progress");
+    useStore.getState().transitionWorkItem("test-wi-002", "in_progress");
 
-    const after = useStore.getState().workItems.find((w) => w.id === "wi-002");
+    const after = useStore.getState().workItems.find((w) => w.id === "test-wi-002");
     expect(after?.status).toBe("in_progress");
     expect(after?.updated_at).not.toBe(before?.updated_at);
   });
@@ -181,7 +215,7 @@ describe("useStore (Board 列管理 — 数据零丢失)", () => {
   });
 
   it("B. removeBoardColumn 非兜底列 → 列里 wi 状态改回 todo 并入 todo 列", () => {
-    // seed: review 列有 wi-002 / wi-008 / wi-018 / wi-022 (status=review)
+    // synthetic cases: review 列有 test-wi-002 / test-wi-008 / test-wi-018 / test-wi-022
     const before = useStore.getState().board;
     const reviewIds = before.columns.find((c) => c.status === "review")?.work_item_ids ?? [];
     expect(reviewIds.length).toBeGreaterThan(0);
@@ -209,30 +243,30 @@ describe("useStore (Board 列管理 — 数据零丢失)", () => {
   });
 
   it("C. addBoardColumn 回填 workItems.status 匹配的 wi", () => {
-    // 把 wi-001 (status=in_progress) 改成 done, 此时 done 列已存在, 测 add 一个新 status
-    // 先把 wi-001 改成 review
-    useStore.getState().transitionWorkItem("wi-001", "review");
-    // 此时 review 列应自动有 wi-001 (reconcile 副作用)
+    // 把 test-wi-001 (status=in_progress) 改成 done, 此时 done 列已存在, 测 add 一个新 status
+    // 先把 test-wi-001 改成 review
+    useStore.getState().transitionWorkItem("test-wi-001", "review");
+    // 此时 review 列应自动有 test-wi-001 (reconcile 副作用)
     let reviewIds = useStore.getState().board.columns.find((c) => c.status === "review")?.work_item_ids ?? [];
-    expect(reviewIds).toContain("wi-001");
+    expect(reviewIds).toContain("test-wi-001");
 
     // 现在删 review 列, 然后再加回来, 验证回填
     useStore.getState().removeBoardColumn("review");
-    // review 列已删, wi-001 状态应是 todo
-    expect(useStore.getState().workItems.find((w) => w.id === "wi-001")?.status).toBe("todo");
+    // review 列已删, test-wi-001 状态应是 todo
+    expect(useStore.getState().workItems.find((w) => w.id === "test-wi-001")?.status).toBe("todo");
 
-    // 把 wi-001 重新改成 review (此时 review 列不存在, wi 状态=review 但无列)
-    useStore.getState().transitionWorkItem("wi-001", "review");
+    // 把 test-wi-001 重新改成 review (此时 review 列不存在, wi 状态=review 但无列)
+    useStore.getState().transitionWorkItem("test-wi-001", "review");
     // 关键断言: transitionWorkItem 的 reconcile 不应自动加 review 列
     // (per reconcile 注释规则 3: 不存在的 status 不自动加列)
-    // 此时 wi-001 状态=review, 但 board 里没 review 列
-    expect(useStore.getState().workItems.find((w) => w.id === "wi-001")?.status).toBe("review");
+    // 此时 test-wi-001 状态=review, 但 board 里没 review 列
+    expect(useStore.getState().workItems.find((w) => w.id === "test-wi-001")?.status).toBe("review");
     expect(useStore.getState().board.columns.some((c) => c.status === "review")).toBe(false);
 
-    // 显式 addBoardColumn("review") → 必须回填 wi-001
+    // 显式 addBoardColumn("review") → 必须回填 test-wi-001
     useStore.getState().addBoardColumn("review");
     reviewIds = useStore.getState().board.columns.find((c) => c.status === "review")?.work_item_ids ?? [];
-    expect(reviewIds).toContain("wi-001");
+    expect(reviewIds).toContain("test-wi-001");
   });
 
   it("D. 反复删/加同一列, 数据零漂移 (修复前的 '删 todo → 加 todo 卡片消失' bug)", () => {
@@ -356,36 +390,36 @@ describe("useStore (Board 列管理 — 数据零丢失)", () => {
 
   // ---------- updateWorkItemField (per 2026-08-31 12:07 JST Drawer 拍板) ----------
   it("I. updateWorkItemField: 改 priority 不动 status / board", () => {
-    const w0 = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    const w0 = useStore.getState().workItems.find((x) => x.id === "test-wi-001");
     const origStatus = w0?.status;
     const origPriority = w0?.priority;
-    useStore.getState().updateWorkItemField("wi-001", "priority", "p0");
-    const w1 = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    useStore.getState().updateWorkItemField("test-wi-001", "priority", "p0");
+    const w1 = useStore.getState().workItems.find((x) => x.id === "test-wi-001");
     expect(w1?.priority).toBe("p0");
     expect(w1?.status).toBe(origStatus);
     // board columns 应保持不动
     const inStatusCol = useStore.getState().board.columns.find((c) => c.status === origStatus)?.work_item_ids ?? [];
-    expect(inStatusCol).toContain("wi-001");
+    expect(inStatusCol).toContain("test-wi-001");
     // 还原
-    useStore.getState().updateWorkItemField("wi-001", "priority", origPriority ?? "p2");
+    useStore.getState().updateWorkItemField("test-wi-001", "priority", origPriority ?? "p2");
   });
 
   it("J. updateWorkItemField: 改 status 走 reconcile, board.columns 同步", () => {
-    // 把 wi-001 (status=in_progress) 改成 review, 期望 board.review 列包含 wi-001
-    useStore.getState().updateWorkItemField("wi-001", "status", "review");
-    const w1 = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    // 把 test-wi-001 (status=in_progress) 改成 review, 期望 board.review 列包含该项
+    useStore.getState().updateWorkItemField("test-wi-001", "status", "review");
+    const w1 = useStore.getState().workItems.find((x) => x.id === "test-wi-001");
     expect(w1?.status).toBe("review");
     const reviewIds = useStore.getState().board.columns.find((c) => c.status === "review")?.work_item_ids ?? [];
-    expect(reviewIds).toContain("wi-001");
+    expect(reviewIds).toContain("test-wi-001");
     // 还原
-    useStore.getState().updateWorkItemField("wi-001", "status", "in_progress");
+    useStore.getState().updateWorkItemField("test-wi-001", "status", "in_progress");
   });
 
   it("K. updateWorkItemField: 改 worktree_id 关联 / 解绑", () => {
-    useStore.getState().updateWorkItemField("wi-001", "worktree_id", "wt-005");
-    expect(useStore.getState().workItems.find((x) => x.id === "wi-001")?.worktree_id).toBe("wt-005");
-    useStore.getState().updateWorkItemField("wi-001", "worktree_id", undefined);
-    expect(useStore.getState().workItems.find((x) => x.id === "wi-001")?.worktree_id).toBeUndefined();
+    useStore.getState().updateWorkItemField("test-wi-001", "worktree_id", "wt-005");
+    expect(useStore.getState().workItems.find((x) => x.id === "test-wi-001")?.worktree_id).toBe("wt-005");
+    useStore.getState().updateWorkItemField("test-wi-001", "worktree_id", undefined);
+    expect(useStore.getState().workItems.find((x) => x.id === "test-wi-001")?.worktree_id).toBeUndefined();
   });
 
   // ---------- removeWorkItem (per 2026-08-31 12:07 JST Drawer 拍板) ----------

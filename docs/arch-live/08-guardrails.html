@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 08 守门与 CI</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 08 · 约束系统</div>
+    <h1>哪些规则会真的拦住你</h1>
+    <p class="lead">分三层：<b>编译器强制</b>（workspace lint，绕不过）、<b>CI 强制</b>（红就合不进去）、
+      <b>流程约定</b>（AGENTS 守门，靠自觉）。分清这三层，才知道"我能不能先合了再说"。</p>
+  </section>
+
+  <h2 class="sec">01 编译器层 <span class="badge b-err">不可绕过</span></h2>
+  <p>这 4 条写在 workspace 根 <code>Cargo.toml</code> 的 <code>[workspace.lints.rust]</code>，
+    任何 crate 写 <code>[lints] workspace = true</code> 后自动继承，<b>编译不过就是编译不过</b>。</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>lint</th><th>级别</th><th>拦什么</th><th>代价</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">unsafe_code</td><td><span class="badge b-err">forbid</span></td><td>任何 <code>unsafe</code> 块</td><td>连 <code>unsafe fn</code> 都不行（forbid 比 deny 更严，不能用 <code>#[allow]</code> 解除）</td></tr>
+      <tr><td class="mono">missing_docs</td><td><span class="badge b-err">deny</span></td><td>公开项缺文档注释</td><td>从 warn 升到 deny 是刻意选择：公共 crate 的 API 应当自解释</td></tr>
+      <tr><td class="mono">unreachable_pub</td><td><span class="badge b-err">deny</span></td><td>crate 外无法访问却标 <code>pub</code> 的项</td><td>防止"看起来是公共 API 其实没人能用"，是 crate 边界卫生</td></tr>
+      <tr><td class="mono">rust_2018_idioms</td><td><span class="badge b-warn">deny</span></td><td>2018 之后遗留写法</td><td>纯现代化，无行为变化</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note ok">
+    <b>这 4 条的价值在于"无讨论空间"。</b>安全相关的规则最怕"这次赶时间先放开"。写成编译器 lint 之后，
+    放宽它需要改根 <code>Cargo.toml</code> 并留下 commit 记录——而不是靠一句"我本地能跑"。
+  </div>
+
+  <h2 class="sec">02 CI 层 <span class="badge b-star">11 workflow / ci.yml 8 job</span></h2>
+  <p>下表是 <code>ci.yml</code> 的<b>实际命令</b>，不是理想清单。注意 enforced 与 advisory 的区分：</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>Job</th><th>实际命令</th><th>强度</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">cargo check</td><td class="mono">cargo check --workspace --all-targets -j 4</td><td><span class="badge b-err">强制</span></td>
+        <td><code>-j 4</code> 不是可选优化：默认并行度在本机会触发 Windows 资源耗尽（进程级崩溃，不是编译错误）</td></tr>
+      <tr><td class="mono">cargo test</td><td class="mono">cargo test -p star-context --lib -j 4</td><td><span class="badge b-warn">单 crate</span></td>
+        <td><b>刻意只跑 star-context</b>：workspace 全量测试存在既有的并发顺序问题（19 处 panic），先保证一个绿基线</td></tr>
+      <tr><td class="mono">clippy</td><td class="mono">cargo clippy --workspace --all-targets -j 4</td><td><span class="badge b-mute">advisory</span></td>
+        <td>故意不 fail：存量 warning 太多，先观察不拦截</td></tr>
+      <tr><td class="mono">fmt</td><td class="mono">cargo fmt --all -- --check</td><td><span class="badge b-err">强制</span></td><td>唯一强制的代码风格门禁</td></tr>
+      <tr><td class="mono">e2e Integration</td><td class="mono">cargo test -p domain-local-runtime --lib e2e_integration -- --test-threads=1</td><td><span class="badge b-err">强制</span></td>
+        <td>串行执行（<code>--test-threads=1</code>）避免互相干扰</td></tr>
+      <tr><td class="mono">Cross-platform</td><td class="mono">cargo test -p domain-local-runtime --lib -- --skip e2e_integration</td><td><span class="badge b-err">强制</span></td><td>OS 矩阵，验证跨平台不变量</td></tr>
+      <tr><td class="mono">Frontend</td><td class="mono">npm ci → typecheck / test / build</td><td><span class="badge b-mute">advisory</span></td>
+        <td>与 clippy / cargo doc 同步降级为 advisory</td></tr>
+      <tr><td class="mono">markdownlint</td><td class="mono">markdownlint-cli2</td><td><span class="badge b-err">强制</span></td><td>文档也守门</td></tr>
+      <tr><td class="mono">cargo doc</td><td class="mono">cargo doc --workspace --no-deps</td><td><span class="badge b-mute">advisory</span></td><td>去掉了 <code>-D warnings</code></td></tr>
+      <tr><td class="mono">cargo bench</td><td class="mono">--no-run（仅编译）</td><td><span class="badge b-mute">advisory</span></td><td>只验证能编译，不跑基准</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn">
+    <b>诚实提示：</b><code>cargo test</code> 只跑 1 个 crate 意味着<b>大部分 crate 的测试当前不在 CI 保护范围内</b>。
+    这是一个已知的、显式的取舍（为了绕开既有的并发 panic），不是"全量测试已覆盖"。
+    读 CI 绿灯时必须知道这一点。
+  </div>
+  <p class="sub">其余 10 个 workflow：<code>coverage</code> · <code>license-gate</code> · <code>mock-switch-validate</code> ·
+    <code>p1e-integration</code> · <code>pre-tool-use-guard</code> · <code>publish-canvas-game</code> · <code>spawn-e2e</code> ·
+    <code>star-desktop-build</code> · <code>star-flash-mock-regression</code> · <code>wasm-build</code>。</p>
+
+  <h2 class="sec">03 流程层：AGENTS 守门条款</h2>
+  <p>这一层靠自觉，但条款本身有明确来源与触发记录。挑与架构最相关的：</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>#</th><th>约束</th><th>为什么存在（附实证）</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">1</td><td>push origin 有重试细则</td><td>401 认证失败不算超时，要跨 session 续；网络错误最多 2 次重试，不连续重试</td></tr>
+      <tr><td class="mono">5</td><td>环境变量安全</td><td>硬禁 <code>Get-ChildItem env:</code> / <code>cat .env</code> 等泄露 secret 的操作</td></tr>
+      <tr><td class="mono">7</td><td>0 unsafe</td><td>已升级为 workspace lint <code>forbid</code>，由编译器兜底</td></tr>
+      <tr><td class="mono">9</td><td>不 commit 散落子代理产出</td><td>实证：10 个 background task 报 succeeded 但 RPC 实际 <code>ERR_CONNECTION_CLOSED</code>。status 成功 ≠ 工作成功</td></tr>
+      <tr><td class="mono">11</td><td>缺标比错标安全</td><td>不确定就标缺，不要标错。本套文档多处"已知缺口"即此原则</td></tr>
+      <tr><td class="mono">12</td><td>AI 协作文档治理</td><td>禁回溯叙事；引 BAS 文档必须 <code>git log -p --follow</code> 实证</td></tr>
+      <tr><td class="mono">13</td><td>DB 三类横展（W/T/M）</td><td>见 <a href="06-data-model.html">分册 06</a>；100% 表覆盖，混合分类须显式列入缺口</td></tr>
+      <tr><td class="mono">19</td><td>agent 交互 Python 化</td><td>任何与外部交互的功能点强制走 <code>scripts/automation/&lt;purpose&gt;.py</code>，commit 引用脚本路径。本套文档的校验与截图脚本即按此落地</td></tr>
+      <tr><td class="mono">§4.1 v19</td><td>cargo 必须 <code>-j 4</code></td><td>实证：默认并行度在本机触发资源耗尽崩溃，且修正了此前"workspace 互锁"的误诊</td></tr>
+      <tr><td class="mono">§4.1 v25b</td><td>CI cargo test 改单 crate</td><td>实证：workspace 全量存在 19 处 panic（既有并发/顺序问题）</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 class="sec">04 门禁本身会骗人 <span class="badge b-err">四个真实陷阱</span></h2>
+  <p>这四条不是理论，是本仓在加固过程中<b>实际踩到并修掉</b>的。写新门禁前请先读完这节。</p>
+
+  <div class="grid g2 rv">
+    <div class="card" style="border-color:rgba(251,113,133,.45)">
+      <h4>① 报绿 ≠ 跑过</h4>
+      <p style="font-size:12.7px">某次 CI 4/4 全绿，但读日志发现 semgrep 门禁<b>一次都没真跑过</b>：前序 step 失败导致后续 step 被整体跳过，
+        而它用的第三方 action 在工具崩溃时<b>没有让 step 失败</b>。</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)"><b>怎么判：</b>先看该 job 实际执行过哪些 step（被跳过的根本不会出现），
+        再看工具自己的结论行（如 <code>Ran 725 rules on 358 files: 0 findings</code>）。<b>不要只看 job 的 success/failure。</b></p>
+    </div>
+    <div class="card" style="border-color:rgba(251,191,36,.45)">
+      <h4>② 文本解析门禁的 0 = 未知</h4>
+      <p style="font-size:12.7px">某命名门禁的表解析器漏了一种建表写法，从 39 个列名里静默抽出 <b>0 个</b>，
+        报告输出与"仓库完全干净"<b>完全无法区分</b>。</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)"><b>修法：</b>解析结果为 0 必须 fail-closed；
+        每个集合配一个<b>人工核对过的数量下限</b>；并且必须做<b>变异测试</b>——注入违规看它变红、
+        <b>不注入的对照组仍绿</b>，两者缺一就无法区分"门禁有牙"和"门禁没跑"。</p>
+    </div>
+    <div class="card" style="border-color:rgba(167,139,250,.45)">
+      <h4>③ 加严配置自身引入回归</h4>
+      <p style="font-size:12.7px">给脚本加 <code>set -euo pipefail</code> 后，原本正常的
+        <code>git log | head -30 || echo "N/A"</code> 变成在真实日志后<b>多打一个 N/A</b>
+        （head 先退出 → git log 收 SIGPIPE 非零 → pipefail 冒泡）。</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)"><b>做法：</b>给长期能跑的配置加严格开关时，
+        逐个审视 <code>||</code> / <code>&amp;&amp;</code> 兜底分支会不会被新语义误触发；安全类改动收尾必须<b>自审 diff</b>，
+        重点看"我为了让代码更严而加的那些东西"。</p>
+    </div>
+    <div class="card" style="border-color:rgba(96,165,250,.45)">
+      <h4>④ 修复会悄悄磨掉已有断言的牙</h4>
+      <p style="font-size:12.7px">本站点修「无 JS 时数字全显示 <code>0</code>」时，把
+        <code>data-count</code> 的<b>初始文本改成真实值</b>（改对了）。但这同时让
+        <code>textContent === data-count</code> 这条断言在<b>一个 JS 都没跑</b>的页面上也成立。
+        几小时后 <code>arch.js</code> 出了语法错误、整站交互全失效，而这条数字断言<b>依然全绿</b>。</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)"><b>规律：</b>只比较"最终状态"的断言，
+        原理上区分不了"跑完了且正确"和"一行都没跑"；而"把初始态改成等于终态"这种常见健壮性修复，
+        恰好抹掉唯一能作证的差异。<b>做法：</b>凡是靠 JS 产生最终态的断言，开头第一句先验
+        <code>html.anim</code>（由 <code>boot()</code> 添加）在不在，让"没跑"以可读字符串报出来；
+        往返类用例要在<b>中途</b>取快照并断言中途确实翻转过。<br>
+        <b>附带：</b>在 <code>/* */</code> 注释里原样引用一个正则，其中的星号斜杠序列会<b>当场结束注释</b>，
+        后面整段中文被当成 JS 解析 → 整份脚本 SyntaxError。这类错 <code>node --check</code> 一秒能判，
+        所以 <code>arch_live_doc_check.py</code> 把静态语法校验放在所有门禁最前面。</p>
+    </div>
+  </div>
+
+  <h2 class="sec">05 这套文档自己的门禁</h2>
+  <p>本套文档不是"写完就算数"。它带三个脚本，分别防<b>内容漂移</b>、<b>交互失效</b>、<b>渲染失效</b>：</p>
+  <div class="grid g3 rv">
+    <div class="card">
+      <h4><span class="badge b-infra">drift</span> arch_live_doc_check.py</h4>
+      <p style="font-size:12.8px">重新扫描仓库，把真实值与页面里 <code>data-fact</code> 声明的值逐条比对，
+        并核对 <code>data-count</code> 的初始文本（无 JS 时就显示这个值）。
+        运行前先 <code>node --check</code> 共享脚本，语法错直接 exit 1。</p>
+      <p class="mono" style="font-size:11.5px;margin-top:8px">python scripts/automation/arch_live_doc_check.py<br>python scripts/automation/arch_live_doc_check.py --self-test</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)">退出码：0 一致 / 1 漂移或资产语法错 / 2 无法解析（不等于"干净"）/ 3 路径缺失。
+        另有 <code>--sync-seed</code> 与 <code>--rebase-baseline</code> 两个修复入口。</p>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-infra">interact</span> arch_live_interact_check.py</h4>
+      <p style="font-size:12.8px">用 Playwright <b>真点按钮</b>并断言 DOM，覆盖 9 页共 28 项：
+        步进器往返/钳位/自动播放、标签页、crate 过滤联动、主题切换，
+        以及无 JS 与 <code>prefers-reduced-motion</code> 两条降级路径。</p>
+      <p class="mono" style="font-size:11.5px;margin-top:8px">python scripts/automation/arch_live_interact_check.py<br>python scripts/automation/arch_live_interact_check.py --mutate</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)"><code>--mutate</code> 把已知 bug 注入站点副本，
+        要求对应用例必须变红且对照组全绿——<b>没跑过红的门禁只是装饰</b>。实跑 8/8 变异被抓到。</p>
+    </div>
+    <div class="card">
+      <h4><span class="badge b-infra">render</span> arch_live_shot.py</h4>
+      <p style="font-size:12.8px">用仓库自带的 Playwright 对 9 个页面各生成一张整页 PNG，落到 <code>.preview/</code>
+        （已 <code>.gitignore</code>，可随时重建）。用来确认"页面真的渲染出来了"，而不是"HTML 写完了"。</p>
+      <p class="mono" style="font-size:11.5px;margin-top:8px">python scripts/automation/arch_live_shot.py<br>python scripts/automation/arch_live_shot.py --pages index.html</p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)">同样 fail-closed：页面数为 0、产物缺失或过小都 exit 2。</p>
+    </div>
+  </div>
+  <div class="note">
+    <b>为什么文档也要有门禁：</b>本仓最容易发生的失败模式不是"没写文档"，而是<b>文档比实现旧</b>——
+      架构文档写着某能力已实装，代码里还是骨架。上面的 <code>no-op stub</code> 标注就是靠这种对照才能发现。
+      数字能被机器核对的部分就交给机器；不能核对的（"已实装/仅骨架"）就在页面上显式标注证据路径。<br>
+      <b>本套文档自己也踩了这条：</b>第 05 节长期写着"它带两个脚本"，而实际已经有三个——
+      截图能证明"渲染出来了"，但<b>证明不了"点得动"</b>，所以必须再有第三个脚本。
+      补上之后它又跑出 4 个 bug（README bug 表里的 ①②④⑤；第 ③ 条种子值是读代码时发现的，
+      不是门禁抓的——这恰好说明机器能覆盖和只能靠人读的部分要分开记账）。
+  </div>
+
+  <details class="ev">
+    <summary>证据：CI 命令、lint 与脚本出处</summary>
+    <div class="evbody">
+      <ul>
+        <li>workspace lint：<code>Cargo.toml</code> <code>[workspace.lints.rust]</code> 段（<code>unsafe_code = "forbid"</code>、<code>missing_docs = "deny"</code>、<code>unreachable_pub = "deny"</code>）。</li>
+        <li>CI 命令：<code>.github/workflows/ci.yml</code> 各 <code>run:</code> 行原文。</li>
+        <li>workflow 清单：<code>.github/workflows/</code> 目录实扫（11 个）。</li>
+        <li>守门条款与派生规：<code>AGENTS.md</code> §4 与 §4.1（含 v19 <code>-j 4</code>、v25b 单 crate test 的实证出处）。</li>
+        <li>本套文档脚本：<code>scripts/automation/arch_live_doc_check.py</code>（数字漂移 + 资产语法）、<code>scripts/automation/arch_live_interact_check.py</code>（交互 + 降级路径）、<code>scripts/automation/arch_live_shot.py</code>（渲染）。</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 08 守门与 CI · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>回到 <a href="index.html">总览</a>。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

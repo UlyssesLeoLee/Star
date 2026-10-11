@@ -1,9 +1,11 @@
+//! @cypher schema=1 source_sha256=1d7b4565718ae38cfe56d4318e98fcc07a28c5e31b8b55e26f22ffec48353adb
 //! Cypher structural manifest.
+//! MERGE (self:File {path:"crates/star-api-rest/src/group_api/worktrees.rs"});
 //! CREATE
-//!   (f:File {name:"worktrees.rs",type:"file",language:"rust"}),(m:Module {name:"worktrees",type:"module",language:"rust"}),
+//!   (m:Module {name:"worktrees",type:"module",language:"rust"}),
 //!   (q:Class {name:"IndexQuery",type:"class"}),(c:Class {name:"IndexCursor",type:"class"}),(p:Class {name:"ManagementPlanBody",type:"class"}),(w:Class {name:"ManageWorktreeRow",type:"class"}),(i:Class {name:"PlanIdempotency",type:"class"}),(mp:Class {name:"ManagementPlanRow",type:"class"}),
 //!   (rt:Function {name:"router",type:"function"}),(li:Function {name:"list_project_worktrees",type:"function"}),(lm:Function {name:"list_project_members",type:"function"}),(pl:Function {name:"create_management_plan",type:"function"}),(co:Function {name:"confirm_management_plan",type:"function"}),(au:Function {name:"authorize_worktree",type:"function"}),(cu:Function {name:"decode_cursor",type:"function"}),(ec:Function {name:"encode_cursor",type:"function"}),(rh:Function {name:"request_hash",type:"function"}),(val:Function {name:"validate_plan",type:"function"}),(rm:Function {name:"require_manager_role",type:"function"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(q),(m)-[:CONTAINS]->(c),(m)-[:CONTAINS]->(p),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(i),(m)-[:CONTAINS]->(mp),(m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(lm),(m)-[:CONTAINS]->(pl),(m)-[:CONTAINS]->(co),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(cu),(m)-[:CONTAINS]->(ec),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(val),(m)-[:CONTAINS]->(rm),
+//!   (self)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(q),(m)-[:CONTAINS]->(c),(m)-[:CONTAINS]->(p),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(i),(m)-[:CONTAINS]->(mp),(m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(lm),(m)-[:CONTAINS]->(pl),(m)-[:CONTAINS]->(co),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(cu),(m)-[:CONTAINS]->(ec),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(val),(m)-[:CONTAINS]->(rm),
 //!   (rt)-[:CALLS]->(li),(rt)-[:CALLS]->(lm),(rt)-[:CALLS]->(pl),(rt)-[:CALLS]->(co),(li)-[:CALLS]->(au),(li)-[:CALLS]->(cu),(li)-[:CALLS]->(ec),(lm)-[:CALLS]->(au),(pl)-[:CALLS]->(au),(pl)-[:CALLS]->(val),(pl)-[:CALLS]->(rh),(pl)-[:CALLS]->(rm),(co)-[:CALLS]->(au),(co)-[:CALLS]->(rm);
 //! MATCH (lm:Function {name:"list_project_members"})
 //! CREATE (va:Function {name:"validate_actor",type:"function"}),(rs:Function {name:"require_scope",type:"function"}),(st:Function {name:"set_tenant",type:"function"}),(ab:Function {name:"active_binding",type:"function"}),
@@ -37,6 +39,7 @@
 //! CREATE (fenceMargin:Function {name:"archive_fence_has_commit_margin",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (fenceTest:Function {name:"admission_fence_requires_commit_margin",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (m)-[:CONTAINS]->(fenceMargin),(factsFresh)-[:CALLS]->(fenceMargin),(archiveTests)-[:CONTAINS]->(fenceTest),(fenceTest)-[:CALLS]->(fenceMargin);
+//! @endcypher
 
 use axum::{
     extract::{Path, Query, State},
@@ -259,7 +262,7 @@ async fn list_project_worktrees(
     let binding = active_binding(&mut tx, &actor, project_id).await?;
     let mut rows = sqlx::query_as::<_, WorktreeIndexRow>(
         r#"
-        SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.path, w.parent_id,
+        SELECT w.id, w.name, w.repo_id, w.workspace_id, p.project_id, w.parent_id,
                w.owner_user_id, w.work_item_id, w.agent_id, w.agent_session_id, w.runtime_id,
                w.branch, w.human_state, w.machine_state, w.ahead, w.behind, w.dirty, w.health_score,
                w.last_activity, w.test_state, w.risk_count, w.locked, w.archived, w.version,

@@ -1,12 +1,34 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v0.2 (2026-08-26)
+> **文档版本**: v2.15 (2026-10-10)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 排期调整(V2 候选) / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
+> | v0.3 | 2026-10-02 | 增加 Phase 9F2 automation Schedule rule/occurrence durable substrate 与 W/T/M/RLS 实现对账；目标 DB migration 尚未部署 | Mavis 接手审核 |
+> | v0.4 | 2026-10-02 | 补充 occurrence tenant/rule/version/UTC-slot 复合唯一键、事件 project-scope FK、dispatch fencing/reclaim trigger 与 terminal-based TTL；强调仅源码/schema gate，目标 PostgreSQL/RLS/grants 尚未验收 | Mavis 接手审核 |
+> | v0.5 | 2026-10-02 | 对账 Phase 9F3 pinned cron/tzdb materializer、PostgreSQL persistence/lease adapter 与 disposable PostgreSQL 18.6 的重复 migration、五表 FORCE RLS、idempotency/concurrency/fencing/retry/deadline/TTL 实测；仍区分目标 DB 与生产 Auth/Run admission | Mavis 接手审核 |
+> | v0.6 | 2026-10-03 | 增加候选槽与 DST 转换探测各 32,768 步上限、disabled Rule 双层 fail-closed 与 lease-expired event 旧 attempt/fencing generation 语义；对齐 26/26 domain release tests 和最终验证边界 | Mavis 接手审核 |
+> | v0.7 | 2026-10-03 | 新增 9F4A Rule API 存储分类：Rule display name 延续 Master/SCD2，Outbox 为 append-only Transaction，24h command replay 为受限 Work；记录当前 migration、RLS 与 runtime grants 尚未验证 | Schedule Rule API 增量落库并同步 W/T/M 分类 |
+> | v0.8 | 2026-10-04 | 对账 9F4A 迁移重复应用与隔离 PostgreSQL 约束/RLS证据：Outbox 以复合 FK 固定 Run，幂等记录先删除过期同键再进行有界 stale cleanup，SCD2 successor 使用同一 transaction timestamp；目标库/grants仍开放 | 修复审查发现并同步已验证实现 |
+> | v0.9 | 2026-10-04 | 增加 `run_as_actor_id` 为 Schedule Rule Master 身份列，定义历史 backfill、不可替换的 successor trigger、与 `changed_by` 的区分及 occurrence worker 每次触发再授权约束；目标身份服务和 worker 仍未验收 | 用户选择规则创建者固定 run-as 且撤权后拒绝触发 |
+> | v1.0 | 2026-10-04 | 明确首版 Rule 必须满足 `run_as_actor_id = changed_by`，occurrence 必须固定复制并匹配精确 Rule revision 主体；登记 9F4B Docker PostgreSQL 18.6 重复迁移、7 表 FORCE RLS 和 5 个 adapter 场景通过；worker 实时授权和目标生产 grants 仍开放 | 完成 Rule/occurrence 主体伪造数据库负例验证 |
+> | v1.1 | 2026-10-04 | 细化 legacy identity backfill 事务：schema owner 在 DDL 锁内暂时恢复 owner RLS bypass、停用仅阻断新增列回填的既有 Rule/Occurrence guard，完成回填后恢复 guard 与 FORCE RLS 再提交；记录双 revision/不同编辑者和旧 occurrence fixture 验证，明确目标库 migration owner/grants 尚未验收 | 历史 fixture 暴露既有 append-only/SCD2 guard 阻止合法迁移回填，修复并实测后对齐数据详细设计 |
+> | v1.2 | 2026-10-05 | 增加 9F4C-A admission persistence：dispatch admitted_run_id 的 fenced transition/不可变 Run binding，以及 tenant FORCE RLS、append-only schedule_run_outbox 与复合关系约束；记录 PostgreSQL 18.6 双次迁移、8 表 RLS 和正反例 evidence；生产 atomic writer/worker/consumer/target grants 仍未验收 | 用户确认 creator-as-run-as、撤权 fail closed 后继续 Schedule admission persistence |
+> | v1.3 | 2026-10-05 | 增加 Schedule enable-time ACL 只读查询设计；记录 PostgreSQL 18.6 active/revoked/paused ACL 验证、runtime role 无 directory UPDATE 权限，并保留并发撤权串行化缺口 | 修复 canonical ACL fixture 的目录锁权限边界并通过隔离数据库验证 |
+> | v1.4 | 2026-10-05 | 增加 9F4C-C Project-scoped transaction advisory lock 与 Project/Branch/Run grant mutation triggers；记录三类并发撤权排序测试和 transient Work coordination 分类，并保留目标 grants/worker 缺口 | Mavis 接手审核 |
+> | v1.5 | 2026-10-05 | 纳入 Worktree Group Canvas 现行五表 W/T/M 分类、FORCE RLS scope、append-only/commit-ordered Outbox cursor 与未验收边界；明确 Document 字段扩展在现有 registry，不接受平行 document aggregate | Phase 3C Canvas stream slice 与当前 Group DD 对账 |
+> | v1.7 | 2026-10-06 | 将现有 Project/Run resource quota、reservation、admission lock 与审计事件补入 W/T/M 设计；区分 Infrastructure owner 尚未创建的 Host capacity reservation、demand/outbox 与 Inbox Work 状态，并标明现有 Run Reservation 删除/retention 缺口 | 9F4D owner-boundary 自审发现容量状态与 Multipass Host reservation 必须分属不同 SoR |
+> | v1.8 | 2026-10-07 | Add §4.13.9 and the Phase 9F4D-3D5 W/T/M appendix: classify the Run demand Outbox and result Inbox as append-only Transaction facts, define tenant FORCE RLS/least privilege and Run-owner schedule demand identity checks, preserve global event identity, and prohibit cleanup absent an approved retention rule. | The Run owner now stores the infrastructure result fact in its own schema boundary. |
+> | v1.9 | 2026-10-08 | Add §4.13.10 as a proposed W/T/M classification for 9F4D-3D6: platform quarantine receipt is Transaction, optional raw payload is separate TTL Work; no migration/table is claimed, and retention selection, receipt access/retention policy, fault taxonomy and owner grants remain open. | Poison-message design must not put untrusted scope claims into the Run-owner tenant Inbox. |
+> | v2.0 | 2026-10-08 | Replace the proposed 3D6 model with the implemented physical tables, dedicated roles, FORCE RLS, 200 KiB per-item and 4 MiB per-deployment quota, 24-hour Work expiry and append-only purge audit; record double-apply and disposable PostgreSQL schema/quota checks. Keep production login/stream provisioning, real KMS and target rollout open. | Phase 9F4D-3D6 persistence substrate passed isolated verification. |
+> | v2.1 | 2026-10-09 | Clarify that Schedule occurrence/link/Outbox, Run/Execution Run/reservation/events/demand, and Infrastructure Inbox/reservations are separate owner facts. Define the Schedule result/link/confirmation handshake and post-confirmation demand; same-database composite FKs validate committed references but do not imply one transaction. Keep confirmation receipt and production consumers as fail-closed gaps. | Correct the Schedule→Run owner transaction boundary. |
+> | v2.2 | 2026-10-09 | Classify the existing TaskExecutionRun and RunEvent lifecycle additions as append-oriented Transaction facts; specify no new Work/Master table, retention change, or role grant. Link `docs/data-design/phase9f4c-d-run-admission-wtm.md` and record disposable PostgreSQL evidence only. | Schedule admission attempts need immutable Run identity and separately auditable lifecycle facts. |
+> | v2.3 | 2026-10-10 | Add §4.13.11, classifying the Run-owner binding SCD2 Master and append-only lifecycle Transaction with exact FORCE RLS/grants, bounded snapshot, canonical Engineering Run scope and Infrastructure-owner validation boundary; do not claim a Work table or production currentness verification. | Phase 9F4C-D2 establishes the Run-owned binding source of truth. |
+> | v2.4 | 2026-10-10 | Tighten the Run binding event boundary: the Run application role is read-only for the Transaction table, and a fixed-search-path SECURITY DEFINER trigger alone appends lifecycle facts; record direct-insert denial plus Rust 1.99.0 package gates. | Self-review found direct event INSERT could forge audit facts. |
+> | v1.6 | 2026-10-05 | 纳入 Canvas base/stream migration 在 disposable PostgreSQL 18.6 双次应用、既有 Outbox identity backfill、FORCE RLS scope、append-only 负例、advisory lock 顺序及 1s lock timeout fail-closed；目标 DB、正式 runtime grants 与 query plan 仍未验收 | 完成隔离 PostgreSQL 验证后同步数据设计证据边界 |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -1977,7 +1999,109 @@ CREATE POLICY tenant_isolation_policy ON automation.automation_rule
 > **注**:`automation_trigger` / `automation_action` 子表本设计合并为 JSONB(§R-AUTO-001 不强制可视化配置器;MVP 简化为单表 JSONB)
 > V1 可考虑拆分(若需要 UI Builder)
 
+#### 4.13.2 Schedule rule revision、occurrence 与 dispatch history (Phase 9F3)
+
+实体 owner 仍为 `domain-automation`，PostgreSQL owner schema 为 `automation`。当前增量 migration `db/migrations/2026-10-02-automation-schedule-occurrence.sql` 增加以下五张表：
+
+| 表 | W/T/M | 关键字段与约束 | RLS / retention |
+|---|---|---|---|
+| `automation.schedule_rule_revision` | **Master** | tenant/Project/rule/version、immutable `run_as_actor_id`、cron/timezone/parser/tzdb、DST/overlap/misfire/pause/retry/deadline 与 Branch/EngineeringRun/repository/Worktree/Work Item/Profile/HookSet target；唯一 current revision；SCD2 仅允许关闭当前行 | tenant FORCE RLS；不可 DELETE/TRUNCATE |
+| `automation.schedule_rule_audit` | **Transaction** | revision create/supersede actor、correlation、bounded metadata | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+| `automation.occurrence` | **Transaction** | tenant/rule-version + scheduled UTC unique slot、immutable `run_as_actor_id` copied from the exact Rule revision、local label/UTC offset、parser/tzdb 与 immutable target snapshot/digest；tenant/Project/occurrence 复合唯一键供 event owner FK 校验 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+| `automation.occurrence_dispatch` | **Work** | attempt count、next attempt、lease owner/expiry、单调连续 fencing generation、occurrence deadline、retention/expiry；expiry = terminal_at + retention_period | tenant FORCE RLS；DB trigger 限制状态、lease fencing 与 terminal mutation；仅 terminal TTL 到期可删除，禁止 TRUNCATE |
+| `automation.occurrence_event` | **Transaction** | materialized/claimed/retry/run-linked/terminal fact、attempt、generation、run/correlation；tenant/Project/occurrence FK 一致 | tenant FORCE RLS；append-only 且禁止 TRUNCATE |
+
+重复 occurrence materialization 由 `(tenant_id, rule_id, rule_version, scheduled_for_utc)` 唯一键收敛；UTC instant 保留 DST fold 中两个同名本地时刻的区别。Rule successor 不得改写既有 occurrence。DB dispatch trigger 要求新 claim/reclaim 连续增加 generation 与 attempt，拒绝盗取未过期 lease；同 generation heartbeat 不得换 owner 或缩短 expiry。terminal retention 后才允许物理删除 Work row。9F3 以 `cron 0.17.0` + `chrono-tz 0.10.4` 实现固定 parser/tzdb identity、有界窗口物化与 DST/misfire 处理，候选槽与小时级 DST 转换探测各最多 32,768 步；disabled Rule 在 domain materializer 与 PostgreSQL adapter 均拒绝创建 occurrence。`star-pg-adapter` 实现 tenant-local RLS current-rule reader、idempotent occurrence/dispatch/event transaction、bounded `SKIP LOCKED` claim/reclaim、heartbeat/retry、deadline/attempt-exhaustion finalizer 与 Work TTL purge；lease-expired event 明确记录被回收前的 attempt_no 与 fencing_generation，而非新 claim 的身份。最终 domain release tests 26/26；migration 在 PostgreSQL 18.6 disposable loopback 集群重复应用两次，五表 FORCE RLS catalog 检查与非 superuser runtime role 的 4 个 integration scenarios 通过。目标 DB部署、生产 grants/Auth、Rule 写 API、长期 worker、Run/reservation/Outbox atomic admission、BI consumer 仍开放，producer fail closed。
+
 ---
+
+#### 4.13.3 Run-scoped Rule API command records与 transactional outbox（Phase 9F4A）
+
+`db/migrations/2026-10-03-automation-schedule-rule-api.sql` 为 9F4A API 增补以下 storage contract。它不启用调度器或 Run producer；runtime role grants 和目标数据库应用状态需单独部署、验证。
+
+| 表/变更 | W/T/M | 字段、所有权与约束 | RLS / retention |
+|---|---|---|---|
+| `automation.schedule_rule_revision.display_name` | **Master** | 每个不可变 Rule revision 的显示名，长度 1–120；跟随现有 Rule SCD2 successor，不在 API 外单独更新 | 沿用 Rule 表 tenant FORCE RLS；仅 `valid_to` 可变更 |
+| `automation.schedule_rule_outbox` | **Transaction** | 与 Rule revision 同事务写入的 `created`/`revised` 事件，包含 Run、Rule/version、correlation 与 bounded payload；五列复合 FK 绑定同一 Rule revision 与 Engineering Run | tenant FORCE RLS；append-only、禁止 UPDATE/DELETE/TRUNCATE；未来 consumer 的 delivery state 不写入此表 |
+| `automation.schedule_rule_command_idempotency` | **Work** | actor/project/operation scoped key hash + request hash + bounded replay response；同 key 不同请求冲突；24 小时 TTL | tenant FORCE RLS；先精确删除匹配的过期 key，再最多清理 64 条其他过期记录；不存原始 idempotency key |
+
+API、Audit、Outbox 与幂等记录在单个事务提交或回滚；授权必须在每次请求和写入事务内读取 `valid_from <= now()` 且 `valid_to IS NULL` 的当前 Project/Run/Worktree/Task/Profile/Catalog/HookSet 事实。2026-10-04 的 disposable PostgreSQL 18.6 验证已重复应用 9F2/9F4A migration，并验证新表 FORCE RLS、tenant isolation、Outbox Run FK、append-only guard、过期 key reuse 与 SCD2 边界；目标库 grants 和生产 API 仍未验收。
+
+#### 4.13.4 Schedule run-as principal（Phase 9F4B）
+
+`db/migrations/2026-10-04-schedule-run-as-actor.sql` 在现有 Master revision 上增加 `run_as_actor_id UUID NOT NULL`，并为 `automation.occurrence` 增加相同身份的专用列。既有 Rule 以 `rule_version` 最小的 revision `changed_by` 回填所有历史行，既有 occurrence 从其复合外键指向的精确 Rule revision 回填；新 Rule 的首版必须满足 `run_as_actor_id = changed_by`，successor 从锁定的当前 revision 复制，不接受请求指定。为保持历史数据 append-only/SCD2 guard，同时完成列回填，该 migration 在单个事务取得两表 DDL 锁后，由 schema owner 临时对两表执行 `NO FORCE ROW LEVEL SECURITY`，并仅停用会阻止这次新增身份字段 UPDATE 的 Rule close-only 与 Occurrence append-only trigger；只更新新增身份列，完成 `NOT NULL` 后立即恢复 triggers 和 `FORCE ROW LEVEL SECURITY`，然后创建身份 insert guard 并提交。事务中止会回滚 guard/RLS 状态。应用角色不获得该绕过；部署 migration 的角色必须拥有相关表的 ALTER/TRIGGER 权限，目标环境的 migration principal/grants 尚未验证。若任一旧 occurrence 无法匹配精确 Rule revision，主体保持 NULL，`SET NOT NULL` 使整个事务失败，不会以默认主体继续。`automation.guard_schedule_rule_run_as_identity()` 对同一 Rule 的 revision insert 获取 transaction advisory lock 后验证主体稳定；occurrence insert guard 再验证存储主体与 pinned Rule revision 一致；非 nil 是数据库不变量。`changed_by` 继续表示本次版本的编辑者，run-as 是未来无人值守执行身份，两者可不同。身份列不对 identity 表设 FK，因此账户停用/删除不会抹掉审计主体；worker 必须在每次触发时实时复验 Project binding、Engineering Run grant 和执行 capability，无法读取或已撤权时不创建 Run。Docker PostgreSQL 18.6 disposable runner 双次应用完整 9F2/9F4A/9F4B migration chain，并用不同 editor 的两 revision Rule + 旧 occurrence 验证 historical backfill；最终七张 Schedule 表 FORCE RLS，五个 adapter 场景通过。此身份是 Master 的 immutable policy fact；当前未实现 worker，所以自动复验尚未验收。
+
+#### 4.13.5 Schedule occurrence→Run admission persistence（Phase 9F4C-A）
+
+`db/migrations/2026-10-04-schedule-run-admission.sql` 为已有 dispatch 和 canonical `multica.task_execution_run` 增加受约束的 admitted-Run 关联，并创建 `automation.schedule_run_outbox`。`occurrence_dispatch`、`occurrence_event` 与 `schedule_run_outbox` 归 Schedule owner；`task_execution_run` 与 Run quota/reservation/RunEvents 归 Run/Execution owner。迁移只约束已提交事实之间的引用，不提供 production worker 或应用层 admission command，也不要求两个 owner 共用事务。
+
+| 表/字段 | W/T/M 主分类 | 关键关系与不变量 | RLS/保留 |
+|---|---|---|---|
+| `automation.occurrence_dispatch.admitted_run_id` | Work | nullable additive link；复合 `(tenant_id, admitted_run_id)` FK 到 canonical TaskExecutionRun；只允许在 Schedule owner 的 `leased → admitted` 事务中写入，并受状态/fencing/attempt 序列 trigger 保护；DB trigger 不验证 worker 提交的当前 lease owner/generation，Schedule owner writer 仍须条件更新校验 owner、generation、lease expiry、occurrence deadline；Run 必须是已提交且匹配相同 occurrence 与 schedule 来源的记录；本 migration 不存储或直接验证 Worktree ID；绑定后不可清除或替换 | Schedule owner 的 tenant FORCE RLS 与既有 dispatch/terminal TTL 守卫约束 |
+| `automation.schedule_run_outbox` | Transaction | Schedule owner 写入其本地事务；每条记录以复合关系校验同一 tenant/Project/Engineering Run/Task、精确 Rule revision、occurrence 与已提交 TaskExecutionRun；每 occurrence/event type 唯一；数据库 trigger 拒绝 run-as、schedule origin/channel 或 dispatch link 不一致；不持有独立 Worktree ID；外键读取另一 owner 已提交的 Run 不代表由 Schedule owner 写 Run 表 | tenant FORCE RLS；append-only，禁止 UPDATE/DELETE/TRUNCATE；consumer offset/投影在其 owner domain 独立管理 |
+
+Migration 在 disposable PostgreSQL 18.6 中对完整 chain 双次应用；8 张 Schedule 表的 `relforcerowsecurity` 均为 true。runner 验证合法 admitted Run/Outbox、已绑定 Run 替换拒绝、run-as mismatch、Outbox UPDATE 拒绝和非 superuser runtime tenant 隔离；source/channel 其它 mismatch 与 DELETE/TRUNCATE 由 SQL guard 实现但未被本 runner 单独覆盖。该验证不包含目标数据库 migration role/grants，也不代表 production owner-local saga 已实现。Schedule owner 必须只在消费 Run admission result 后、并通过 current lease/fence/deadline CAS 后写入 link/event/Outbox；Run owner 另行消费 confirmation 后才可写 Infrastructure demand。授权撤销、读取失败、版本漂移、预算超限或 stale fence 必须 fail closed；任何 owner 都不得写另一 owner 的业务表。
+
+#### 4.13.6 Schedule run-as enable-time ACL boundary（Phase 9F4C-B/C）
+
+本阶段不新增持久表；现有 Project role binding、Cloud Branch revision/grant 与 Engineering Run revision/grant 仍按各自目录定义归类为 Master/SCD2 current facts。授权先调用 scope-checked `multica.lock_schedule_run_as_authorization`，该 helper 验证 `app.tenant_id`/`app.actor_id` 与 canonical Engineering Run、Branch 及当前 Project/Branch/Run grants，然后获取 tenant+Project 范围的 transaction advisory lock。API 必须在 helper 返回后用下一条 SQL statement 重新读取授权事实；在默认 `READ COMMITTED` 下，锁等待后可见先提交的撤权。Project、Branch、Engineering Run grant 的 INSERT/UPDATE/DELETE trigger 在目录 mutation 前取得相同锁；更新跨 Project 移动 grant 时按 Project UUID 顺序锁定旧/新 Project。Runtime API role 对目录 ACL 表仍只有 SELECT，不获得其 UPDATE 权限。Disposable PostgreSQL 18.6 的 Project、Branch、Run 三类双连接用例均观察到并发撤权等待已持有的 API 授权锁，授权提交后撤权完成，后续授权拒绝。
+
+#### 4.13.7 Schedule ACL serialization lock classification
+
+advisory lock 是 transaction-scoped 的 Work coordination primitive，不形成 Master、Transaction 或长期审计记录，也不增加业务持久表；Project grants、Branch grants、Run grants 的现有 SCD2 数据仍属于各自 owner 的 Master/current-fact 表。锁 key 使用 tenant 与 canonical Project identity，故正常情况下 Schedule 授权只在同一 Project 内串行；64-bit hash collision 可能多等候一个无关 Project，但不能扩大授权。Grant triggers 对无法解析 canonical tenant/Project 的 mutation fail closed。Runner 中的 disposable `schedule_runtime` 在角色创建后才取得锁 helper 的 EXECUTE；生产 DB owner/function grants、trigger deployment 与 target runtime role grants仍需按环境确认。此验证仅关闭 API Rule enable-time authorization 与 ACL mutation 的并发顺序门，不能替代 worker admission 时的 run-as 重授权或目标 DB 验收。
+
+#### 4.13.8 Run quota 与 Infrastructure Host capacity owner boundary（Phase 9F4D）
+
+迁移 2026-10-01-multica-run-resource-reservations.sql 已有 Project/Run execution quota 与 Reservation 表；这些记录属于 Run/Execution owner，只能表达 Project/Run 的软件执行预算，不能代表 Multipass VM、Host RAM 或 K3s capacity reservation。
+
+| 现有/规划对象 | W/T/M | 持久化边界与限制 |
+|---|---|---|
+| multica.project_execution_resource_quota | Master | Project-scoped SCD2 execution limits; 不得物理删除。 |
+| multica.project_execution_resource_quota_audit_event | Transaction | quota revision actor/correlation fact; append-only、tenant FORCE RLS。 |
+| multica.project_execution_resource_admission_lock | Work | Project admission epoch/coordination state; 30-day expiry and an expiry index exist, but a tenant-scoped pruning worker has not been verified and remains a retention gate. |
+| multica.project_execution_resource_reservation | Work | Run-owned pending/active/released execution-budget lease，保存 lease_expires_at 与 Run/Project/Worktree/quota identity。pending lease 到期不可激活；当前 DELETE guard 禁止物理删除，terminal retention 依赖 parent Run，但完整 parent retention/cleanup path 未验证，属于 CW-07 已知缺口。 |
+| multica.project_execution_resource_reservation_event | Transaction | reserved/activated/released ledger; 与当前 Reservation/Run 一致，append-only、tenant FORCE RLS。 |
+| Infrastructure-owned Host capacity reservation（planned） | Work | 独立 Host/environment SoR 中的有界 Host 资源租约；需明确定期、释放、owner/generation、公平准入与 reaper。当前没有已创建表或已接通 writer。 |
+| Infrastructure demand / operation / readiness / audit Outbox event（planned） | Transaction | Infrastructure owner 与 Run owner 通过版本化幂等 event 通信，记录 binding revision 与资源摘要，不含 secret；分别由各 owner 的事务写入。 |
+| Infrastructure Inbox deduplication / retry state（planned） | Work | Infrastructure owner 的短期幂等接收与 retry state，必须有 TTL、bounded cleanup 与 tenant/scope RLS；不可替代 append-only demand/operation facts。 |
+
+9F4D 及 Schedule admission 的 owner 事务不能合并：Run/Execution owner 的首个本地事务复验 Project/Run quota、创建非执行态 TaskExecutionRun、Run Reservation、Run facts 和 admission-result Outbox；Schedule owner 消费 result 后在自己的 Inbox/事务内 CAS 校验 occurrence fence 并创建 admitted link、Schedule Outbox 和 confirmation；Run owner 消费 confirmation 后在另一个本地事务写 Host-demand Outbox；Infrastructure owner 的 Inbox transaction 再检查 Host/精确 cluster headroom 并创建/拒绝物理 reservations。任何 owner 不直接修改另一个 owner 的业务表，也不保持 DB transaction 等待另一个 owner API、broker 或 VM/K3s 启动。Host/cluster reservation 成功后由 Rust Host Infrastructure Manager 执行异步生命周期；receipt 与 K3s/runtime readiness 经版本化事件反馈。Run 启动前重新验证权限、binding revision、Run reservation、双层物理 reservation 与 Agent Runtime sandbox。容量未知/不足、confirmation 缺失、撤权或过期时不启动；失败通过幂等 owner command 释放对应 owner reservation。
+
+物理 Host reservation schema、Infrastructure demand 的实际 Outbox table/API、Inbox retention、role grants、RLS 与 Run 侧异步状态机仍待 INFRA-1/9F4D DDD Review 与目标环境验证。这里分类的是方案，不宣称已实现；当前 multica Run Reservation 物理删除 guard 与 CW-07 还未闭合，admission-lock pruning worker 也尚未验证。
+
+### 4.13.9 Phase 9F4D-3D5 Run-owner capacity facts（Transaction）
+
+Migration: db/migrations/2026-10-07-run-owner-infrastructure-capacity-result.sql.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| multica.infrastructure_capacity_demand_outbox | T — Transaction | Run/Execution owner; immutable, versioned infrastructure demand and canonical scope | Append-only; UPDATE/DELETE/TRUNCATE rejected; no TTL or physical deletion | ENABLE + FORCE RLS on tenant_id; star_multica_run_owner SELECT/INSERT only |
+| multica.infrastructure_capacity_result_inbox | T — Transaction | Run/Execution owner; immutable Infrastructure result, replay digest and event_id deduplication fact | Append-only; UPDATE/DELETE/TRUNCATE rejected; no TTL or physical deletion | ENABLE + FORCE RLS on tenant_id; star_multica_run_owner SELECT/INSERT only |
+
+W contains no table in this migration; M contains no table in this migration. The Outbox is an immutable business/integration fact, not a short-lived delivery lease table. Broker delivery state remains owned by Infrastructure. Before production may append a scheduled demand, Run-owner Rust must verify both the existing TaskExecutionRun's origin, Rule ID/revision, occurrence and correlation and an authenticated immutable Schedule confirmation receipt in the caller-owned transaction. The current 3D5 writer validates Run scope but has no Schedule-confirmation receipt schema or consumer; it is not production admission authority, and Schedule-origin demand delivery stays disabled until that gate is implemented. The FK ties each result to the exact source demand and canonical scope; the global event_id unique constraint prevents cross-tenant identity reuse while RLS restricts visibility. Rust verifies stored demand JSON against typed V2 demand before accepting results. Runtime code does not mutate TaskExecutionRun/Schedule or release reservations. Both tables have no cleanup policy until a reviewed legal/audit retention rule exists.
+
+### 4.13.10 Phase 9F4D-3D6 Platform ingress quarantine (implemented schema)
+
+| Proposed record | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `platform_messaging.poison_quarantine_receipt` | T — Transaction | Platform Messaging/Ingress owner; immutable receipt keyed by trusted JetStream deployment identity, configured stream generation, server stream and sequence; records fault/parser version, exact wire length/SHA-256, selected retention policy and receipt time. | Append-only; no UPDATE/DELETE/TRUNCATE. Receipt retention/deletion policy remains open and has no automatic deletion. | FORCE RLS on trusted `app.platform_deployment_id`; ingress owner is NOLOGIN/NOSUPERUSER/NOBYPASSRLS/NOINHERIT with SELECT/INSERT only. |
+| `platform_messaging.poison_quarantine_payload_work` | W — Work | Optional encrypted replay envelope referenced by a receipt; only written in `encrypted_24h` mode. | At most 204,800 bytes per item and 4 MiB per deployment; exact 24-hour TTL. Expired rows continue to consume quota until the audited purge transaction deletes them. | FORCE RLS on trusted deployment scope; ingress owner SELECT/INSERT; separate purger role SELECT/DELETE. Real KMS and audited operator access remain open. |
+| `platform_messaging.poison_quarantine_payload_purge_audit` | T — Transaction | Append-only evidence that an expired encrypted Work payload was purged with matching source identity, digest and byte count. | Append-only; no UPDATE/DELETE/TRUNCATE. No TTL or physical deletion policy yet. | FORCE RLS on trusted deployment scope; purger role INSERT only; purge audit and Work deletion occur in one transaction. |
+
+Migration `2026-10-08-platform-poison-quarantine.sql` implements these tables and role grants. Metadata-only and encrypted 24-hour retention are explicit per-deployment configuration modes with no default; metadata-only records a receipt and creates no Work row. The current KMS provider is LocalMock-only, so encrypted production retention remains fail-closed. The receipt is a platform Transaction fact and must not be stored in the Run-owner result Inbox because malformed messages may lack trustworthy tenant scope. The payload is separate Work. A Term acknowledgement may follow only after the receipt and selected payload action commit. Unknown fault classification, digest conflict, unavailable DB/key/quota, and `InvalidStoredDemand` remain unacknowledged; the last is an owner-data integrity error. No Run/Schedule/reservation/readiness/BI/execution mutation is allowed. A disposable PostgreSQL 18.6 fixture applied the migration twice and passed RLS, role, append-only, TTL/purge and quota-overflow assertions; it does not establish target database deployment or production grants.
+
+### 4.13.11 Phase 9F4C-D2 Run Infrastructure Binding Master
+
+Migration: `db/migrations/2026-10-10-multica-run-infrastructure-binding-master.sql`.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `multica.run_infrastructure_binding_revision` | M — Master | Run/Execution owner; immutable V2 selection snapshot per canonical tenant/Project/Branch/Engineering Run, pinning exact HostEnvironment/K3s identity and generation plus profile/runtime revisions, namespace and resource budget. | SCD2; only `valid_to` may be closed once; physical delete forbidden. Snapshot and digest are immutable. No TTL or physical deletion. | ENABLE + FORCE RLS on tenant. `star_multica_run_owner` receives SELECT/INSERT and column-level UPDATE(valid_to); other owner roles denied. |
+| `multica.run_infrastructure_binding_event` | T — Transaction | Run/Execution owner; trigger-appended `created` and `superseded` facts with actor/scope/revision/digest. | Append-only; UPDATE/DELETE/TRUNCATE and application INSERT rejected; no TTL or physical deletion. | ENABLE + FORCE RLS on tenant. `star_multica_run_owner` receives SELECT only; a fixed-path SECURITY DEFINER trigger appends facts; other owner roles denied. |
+
+This migration has no Work table. The Master snapshot stores V2 JSON plus explicit scope/version columns; database checks match duplicated identity fields, enforce a 16 KiB JSONB text bound, and tie the canonical scope to `multica.engineering_run`. Rust strict deserialization and digest recomputation provide content-integrity verification; the digest is not authorization. CAS close/insert and lifecycle events occur in one Run-owner transaction. The Run owner does not read or write Infrastructure-owned Provider Profile, HostEnvironment, Multipass or K3s catalog tables. Infrastructure owner independently verifies those exact external revisions/generations and reserves Host plus selected-cluster capacity under its own transaction. Schema/Rust gates and target PostgreSQL/role provisioning are tracked separately; no binding record makes Schedule or Task execution available by itself.
+
+Verification: PostgreSQL 18.6 disposable schema-only runner passed 29/29 steps, including D2 migration idempotency, least-privilege grants, FORCE RLS, tenant isolation, revision lifecycle, WORM and direct event-insert denial; the cluster was stopped and its owned data removed. Rust 1.99.0 package tests passed 12/12, with focused rustfmt and package all-target warnings-as-errors Clippy passing. Broader strict Clippy remains blocked by two existing `star-context` lints. A Rust SQLx save/resolve round-trip is not yet tested. A no-op legacy Audit function existed only as an isolated prerequisite for older Worktree DDL; no production Audit/DB/role deployment, NATS, Multipass VM or inventory was tested or changed.
 
 ### 4.14 Module: domain-identity(`identity` schema)
 
@@ -4344,6 +4468,22 @@ CREATE POLICY tenant_isolation_policy ON local_runtime.reconciliation_report
 
 ---
 
+### 4.26 Run App schema extension: Worktree Group Canvas (`canvas`)
+
+Canvas 是 Run 下与 Task Card 同级的 App。当前兼容实现仍以 Worktree ID 作为 API 路由和数据库 scope；目标 canonical owner 迁移到 Engineering Run，不能将下表解释为 Run ownership 已完成。详细字段、命令和迁移契约见 `DD-WORKTREE-GROUP-001 §8.1`。
+
+| 表 | W/T/M 分类 | 当前记录与约束 | 隔离/保留 |
+|---|---|---|---|
+| `canvas.group_canvas_registry` | Master / SCD2 | Canvas identity/title 与同一版本序列中的 `viewport`、`frames`、`connectors`；唯一当前 owner 为 tenant+Worktree+Canvas | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_elements_backend` | Master / SCD2 | Element layout/content、current version 与历史版本；实体状态不复制到 Canvas | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_entity_ref` | Master / SCD2 | 带类型的 entity binding；不持有 WorkItem lifecycle 状态副本 | tenant+Worktree FORCE RLS；历史版本保留 |
+| `canvas.canvas_group_audit` | Transaction / append-only | Canvas 命令审计事实；UPDATE/DELETE 由 trigger 与 RLS guard 拒绝 | tenant+Worktree FORCE RLS；不物理删除 |
+| `canvas.canvas_group_outbox` | Transaction / append-only | 事件事实及 payload；`stream_offset BIGINT GENERATED ALWAYS AS IDENTITY`，唯一键 `(tenant_id, worktree_id, stream_offset)`；writer 按 tenant+Worktree transaction advisory lock 持锁至提交，保证提交可见顺序 | tenant+Worktree FORCE RLS；不物理删除。Worktree metadata API 不返回 payload |
+
+这些对象通过 Canvas app 所属 schema 管理，不改变原 25 个核心 domain module 列表。现行 document migration 在 `group_canvas_registry` 上扩列；另建 `canvas.canvas_document_state` 会形成平行 Master aggregate，与当前 DD 决策冲突，未纳入此数据模型。Canvas base migration 与 stream-offset migration 已在 disposable PostgreSQL 18.6 fixture 上各执行两次；identity 为 `YES ALWAYS BIGINT`，两条既有 Outbox fixture 行获得两个不同 offset；唯一索引存在，表启用并强制 RLS。临时 no-login 测试角色在手工授予查询权限后只能读取匹配 scope，未设置 scope 时返回零行；append-only UPDATE 被 trigger 拒绝。两连接测试观察到 advisory lock 等待，提交后的 offset 按锁取得顺序排列；在 API 使用的 1s `lock_timeout` 下，竞争 writer 被数据库超时取消并失败关闭。以上是 disposable fixture 证据，不代表目标数据库、正式 runtime grants、实际服务身份或 query plan 已验收；这些仍是开放门禁。
+
+---
+
 ## 5. Object Storage 边界
 
 > **继承 §5.1,§R-14,§R-59;§1.5 表已给出 Key 模板,本节展开 Lifecycle / Bucket Policy / Size 阈值**
@@ -5556,7 +5696,7 @@ erDiagram
 | 10 | search | search | `search_index` | UUID | ✅ | ✅ |
 | 11 | audit | audit | `audit_event`, `ai_audit_metadata`, `audit_event_outbox` | UUID | ✅ | ✅ |
 | 12 | integration | integration | `integration`, `integration_sync_state` | UUID | ✅ | ✅ |
-| 13 | automation | automation | `automation_rule` | UUID | ✅ | ✅ |
+| 13 | automation | automation | `automation_rule`, `schedule_rule_revision`, `schedule_rule_audit`, `schedule_rule_outbox`, `schedule_rule_command_idempotency`, `occurrence`, `occurrence_dispatch`, `occurrence_event`, `schedule_run_outbox` | UUID | ✅ | ✅ |
 | 14 | identity | identity | `user`, `device`, `device_binding`, `credential`, `user_session` | UUID | ✅ | ✅ |
 | 15 | notification | notification | `notification_channel`, `notification_template`, `notification` | UUID | ✅ | ✅ |
 | 16 | permission | permission | `role`, `permission`, `permission_scheme` | UUID | ✅ | 部分(permission 无) |
@@ -5570,7 +5710,7 @@ erDiagram
 | 24 | validation | validation | `validation_result`, `validation_evidence`, `acceptance_coverage`, `validation_policy` | UUID | ✅ | ✅ |
 | 25 | local-runtime | local_runtime | `runtime`, `runtime_command`, `runtime_observation`, `reconciliation_report` | UUID | ✅ | ✅ |
 
-**总表数**:60+ 张 SoR 表(不含 7 张 Lookup Table / 物化视图 / 视图 / 触发器函数)
+**总表数**:65+ 张 SoR 表(不含 7 张 Lookup Table / 物化视图 / 视图 / 触发器函数)
 
 ---
 
@@ -5618,3 +5758,202 @@ erDiagram
 ---
 
 *文档结束。本文档为详细设计阶段 Data Design 产出,Implementation / Runtime / Security / AI / Test / Operation Design 均可直接引用,无二次解读成本。*
+
+
+### 4.13.12 D3 processed admission data ownership
+
+Phase 9F4C-D3 adds Run-owned processed admission Inbox and immutable result Outbox persistence, not a production consumer. `PostgresScheduleAdmissionStore.begin` strict-decodes at most 16 KiB, checks injected tenant/service scope, takes a transaction advisory request lock with 5-second lock and 10-second statement bounds, and returns an exact persisted result before any new Run writes. Changed exact bytes, digest or authenticated source service identity conflict. A new transaction is exposed only for Run-owned authorization, currentness, quota, Run/reservation/event work; dropping it rolls back. `commit_result` validates the typed result and atomically commits the Inbox/result pair with those caller-owned facts. A deferred FK forbids committed orphan receipts; unique tenant/occurrence/attempt prevents different requests claiming one attempt. Acceptance requires a matching schedule-origin, run-as, Task/Worktree/rule/occurrence/ordinal/correlation Run with NULL started_at and no run_started or execution-state event. Both relations are append-only Transaction facts with FORCE tenant RLS, bounded immutable bytes and no physical deletion; no Work or Master table is added. The trusted service source is injected by composition, not deserialized from the body, and its type constructor is not authentication evidence.
+
+Evidence: PostgreSQL 18.6 cumulative runner 33/33; binding SQLx 1/1 and admission SQLx 1/1 (0.52s), Rust 1.99.0 library regression 12/12 and focused strict package Clippy. Audit: `target/phase9f4d-run-owner-consumer/40a8dc35-d9a2-4a76-a944-bd39474d51ef/audit.jsonl`. Tests prove rollback/drop recovery, exact replay, altered-byte/scope/source rejection, concurrent new/replay serialization, different-request same-attempt rejection, result-insert rollback, missing paired-result commit rejection, accepted-result scope guard, prior-start rejection and append-only guard. The accepted Run is seeded only by the disposable admin to exercise storage: it does not prove a production Run writer, authorization or resource reservation. Initial verification exposed the deliberately narrow old grant assertion; it was extended only for four Run identity/start columns and four RunEvent identity/execution columns. An extracted fixture helper reference error was fixed; transient Windows LNK1104 occurred before the final successful isolated rerun. All owned PostgreSQL instances were stopped/removed; zero NATS and zero Multipass VMs were used.
+
+Open gates: real Schedule service authentication and credential lifecycle; target DB/login provisioning; current creator/run-as ACL, Task/Profile/Hook/binding authorization in this transaction; atomic Project/Run quota and Run/reservation writer; Schedule command producer and Run/Schedule/result/confirmation consumers; durable delivery/compensation; Infrastructure currentness and paired physical reservations; Multipass/K3s provider, sandbox, readiness, native Hook/verification, cancellation, BI/Benchmark and execution. No production Run INSERT or event INSERT grant was added. No cross-owner tables are read/written by this new storage module. Execution stays fail-closed.
+
+Gate: `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests --admission-tests` with explicit PostgreSQL bin and Rust toolchain arguments.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.5 | 2026-10-10 | Ulysses — Mavis review | Verify owner-local admission persistence; retain every production authorization/reservation/consumer/execution gate. |
+
+
+### 4.13.13 D4 native authorization capability
+
+D4 adds `ScheduleAdmissionTransaction.revalidate_directory_and_binding` inside the already locked admission transaction. It sets the fixed occurrence creator as transaction-local actor, invokes the native fixed-path `multica.verify_schedule_run_as_current` capability, and reads the current binding through `resolve_current_binding_locked` with FOR SHARE. The native capability checks tenant/actor GUCs, reuses the canonical Project ACL advisory lock, requires current Project/Branch/Run grants and exact active Branch/Run/repository scope, and holds row locks on identities, revisions and grants. Project/Run writer roles follow the existing Schedule policy; Branch requires membership. The full pinned V2 binding and digest must equal the current locked Master. Missing authorization/paused scope yields RunAsUnauthorized, missing/drifted binding yields BindingUnavailable; storage/integrity errors remain errors and must not be treated as authorization.
+
+The capability uses SECURITY DEFINER with search_path=pg_catalog and schema-qualified static SQL, PUBLIC execute revoked, and execute granted only to the Run owner. It grants no directory/ACL mutation to runtime. Explicit scope checks remain mandatory even when the migration owner bypasses RLS in a disposable test; target deployment must review function ownership, underlying read/row-lock permissions and policies. This capability is not broker identity authentication or complete admission authority. Current Task/Profile/HookSet, quota/reservation, Run writer, confirmation/delivery/compensation and execution remain open/fail-closed.
+
+Evidence: cumulative PostgreSQL18.6/Rust1.99.0 runner 36/36, binding/admission SQLx targets 2/2; audit `target/phase9f4d-run-owner-consumer/e516c503-832e-40b8-8d5e-a02bebb44f75/audit.jsonl`. Admission assertions prove missing directory, current scope success, 55P03 timeout for concurrent ACL and binding closure while the transaction holds locks, revoked Project grant rejection, paused Run rejection and exact binding generation/revision drift rejection. Dedicated final schema run 34/34 checks fixed search_path, SECURITY DEFINER, no PUBLIC execute and no runtime directory/ACL write grants; audit `target/phase9f4d-run-owner-consumer/66c2abdb-8bbb-472d-a440-28ce7d2a55db/audit.jsonl`. Fixture seeding and mutation bypass lifecycle triggers only in disposable admin transactions; row-lock behavior remains real PostgreSQL. A transient MSVC LNK1104 occurred before the successful rerun, with no live matching test process observed; root cause is not proven. No NATS, VM or production database was changed.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.6 | 2026-10-10 | Ulysses — Mavis review | Add verified transactional directory/binding prerequisite; preserve remaining admission/execution gates. |
+
+
+## 4.13.14 D5 — 目标 currentness capability
+
+Schedule 新尝试必须在 Run-owner 同一事务内复验 Task/Worktree 的当前 canonical 归属：tenant、Project、repository、Branch、Engineering Run、Task、Worktree 精确一致；Worktree 未归档且有效，Project binding、Run binding、Task metadata、Task–Worktree relation 均为当前有效行。`revalidate_task_binding` 先复验固定创建者及锁定的 infrastructure binding，再调用固定路径 native SQL capability，持有五张目标表的 FOR SHARE 直到事务结束。缺失、归档或解绑返回 TargetUnavailable；权限/binding 拒绝保留原 typed code，数据库错误不得放行。
+
+仅新增受限 EXECUTE 能力；SECURITY DEFINER 使用 search_path=pg_catalog、静态限定 schema，PUBLIC execute 撤销，runtime 无目标表写权限。目标环境 function owner/RLS/底层行锁权限仍须验收。Profile、原生 HookSet、任务生命周期可执行状态、预算/reservation、非执行态 Run writer、owner delivery/consumer、sandbox 与真正执行闭环仍未完成；primitive commit_result 不是完整准入入口，不启用执行。
+
+验证：PostgreSQL18.6/Rust1.99.0 runner 40/40，SQLx binding/admission targets2/2；库12/12、包级 all-targets/no-deps Clippy -D warnings、格式/Python/图头/diff 通过。实际覆盖目标缺失、Task 身份不匹配、当前有效、Worktree 归档、关联关闭以及五类目标行并发关闭 SQLSTATE55P03。Audit：`target/phase9f4d-run-owner-consumer/857a6fbe-6bc7-4978-b070-bab871067cf7/audit.jsonl`。隔离 admin fixture 跳过生命周期触发器，不作为生产授权写入/审计证据。零 VM；生产数据库未变。CodeRabbit 因 /root/.local/bin/coderabbit: Permission denied 无独立通过结果。
+
+关联脚本：`scripts/automation/phase9f4d_run_owner_consumer.py`；报告：[D5](reports/PHASE-9F4C-D5-TASK-CURRENTNESS-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.7 | 2026-10-10 | Ulysses — Mavis 接手审核 | 同步已验证的事务内任务归属门与剩余缺口。 | D5 实现与实测。 |
+
+
+## 4.13.15 D6 — 策略读取与发布串行化
+
+D6 为 Schedule 增加 `revalidate_profile_and_hooks` 与私有字段 `SchedulePolicySnapshot`：沿用 D4/D5 同事务授权、Binding 与任务归属门，原生固定路径 SQL reader 至多读取三份 72 KiB envelope；Rust 复用 domain-agent 的 Profile 校验和 domain-hook 的原生策略校验。精确核对 Profile ID/version/digest/schema/scope，Project baseline 与 Worktree overlay 的 ID、继承父版本和规则、有效 HookSet ID/version/digest，以及 Profile 与 RunInfrastructureBinding 的全部八项资源预算。缺失、版本/摘要/继承漂移或文档篡改返回 TargetUnavailable；预算与 binding 不一致返回 BindingUnavailable；存储异常不得放行。
+
+Profile/Hook 当前事实保持 FOR SHARE 至事务结束；Project-scoped Hook 共享 advisory read fence 与 BEFORE publication 独占锁保护“当前没有 overlay”的读空隙，trigger 名称排序在现有继承 guard 之前。Native reader SECURITY DEFINER/search_path=pg_catalog，PUBLIC execute 撤销、仅 Run owner EXECUTE，不授予目录/任务/Profile/Hook 表写权限；目标部署须复核 function owner、RLS、底层读取/行锁权限与 migration 装配。此快照不是执行许可证：仍须当前 Provider/Skill/Grant catalog、任务生命周期、原生 Hook RunAdmission 求值与事实生产者、Project/Run quota/reservation、非执行态 Run writer、owner delivery/confirmation、Runtime sandbox 与独立验证。commit_result primitive 仍不是完整准入入口；执行保持关闭。
+
+验证：Rust1.99.0 包级 all-targets check、库12/12、all-targets/no-deps Clippy -D warnings、fmt/Python/图头/diff；隔离 PostgreSQL18.6 runner44/44、SQLx binding/admission targets2/2。Audit `target/phase9f4d-run-owner-consumer/2a610d58-4b81-43d6-bc8a-4e8dc0c3e793/audit.jsonl`。实际验证 baseline 成功、缺失 overlay 的正常发布被 55P03 阻挡、事务结束后的 overlay 发布使旧 pin 失效、新 overlay pin 成功、Profile 版本漂移、预算 mismatch 和摘要篡改拒绝。Fixtures 的初始注册与 Profile 修订由隔离 admin/replica 完成，不证明生产授权 publisher；overlay 并发 INSERT 使用正常 publication trigger。未创建 VM、未改变 Multipass inventory/生产 DB。
+
+复用既有 Rust 领域类型，仅增加 workspace path 依赖 domain-agent/domain-hook，无第三方版本变化；不创建 LLM session、Provider 或无界缓存，端到端 RSS/吞吐尚未实测。脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D6 report](reports/PHASE-9F4C-D6-POLICY-CURRENTNESS-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.8 | 2026-10-10 | Ulysses — Mavis 接手审核 | 同步已验证 Profile/Hook/budget 门与仍开放的执行门禁。 | D6 实现与隔离验证。 |
+
+
+## 4.13.16 D7 — 目录 reader/publication fence
+
+D7 增加 `ScheduleAdmissionTransaction.revalidate_execution_catalogs` 与私有 `ScheduleExecutionSnapshot`。同一 Run-owner 事务先通过 D4–D6 门，再由 native reader 仅读取 Profile 引用的当前 Provider/Skill 和当前 GrantSet：Provider≤5、Skill≤128、每项 capability≤64，Skill capability 预聚合预算384 KiB、返回 envelope≤512 KiB；Rust 复用 CurrentExecutionCatalogSnapshot/ExecutionProfileResolver，核对当前版本、摘要、availability、capability、完整 GrantSet 身份/版本/标签/到期时间，持有5秒目录 fence并在使用时要求至少1秒剩余。SQL 使用 C collation 对齐 Rust 的标识符排序。缺失、漂移、计数不一致、Grant变化或过期、fence到期均返回 TargetUnavailable，数据库失败不放行。
+
+Native read 与 Run-owner 授权复验使用共享 Project advisory locks；目录 parent publication 和 canonical ACL mutation 仍使用相同 scope 的独占写锁，并持有当前目录/Grant row locks直到事务结束。reader SECURITY DEFINER/search_path=pg_catalog、PUBLIC execute 撤销、仅 Run owner EXECUTE，无目录直接写权限。发布 trigger 排序早于既有 SCD2 guard；capability 保持既有 same-transaction birth/immutable/count 契约。Snapshot 的 lifetime 校验不能替代原 owner 事务存活或执行前重新读取。目标 DB/function owner/RLS/应用身份装配仍未验收；任务 lifecycle、Project/Run预算预留、非执行态Run writer、owner delivery/confirmation、Runtime sandbox与独立验证仍开放，执行保持关闭。
+
+调用时点须遵守已批准的基础设施准备模型：先创建等待基础设施预留的非执行态 Run，结果接受只表示准备请求已登记；实际启动/恢复 executor 前，必须复验 Host/cluster reservations与binding、当前权限/目录/策略，并以可信 Runtime health/readiness 和任务生命周期事实执行 Rust-native BeforeRunAdmission Hook。不得默认 health=true，不得以 UI health、VM/K3s就绪或仅文档校验代替 native Hook求值，也不新增弱化原生安全守门的 phase。当前本阶段未实现或声称通过该实际执行门。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner47/47，SQLx binding/admission targets2/2；包级all-targets check、库12/12、all-targets/no-deps Clippy -D warnings、包级fmt/Python/图头/diff。Audit `target/phase9f4d-run-owner-consumer/ee331ea1-5cde-4005-8f86-80cc630c1dce/audit.jsonl`。实际覆盖缺失目录、精确4 Provider/1 Skill/Grant、同Project两个不同Task/Worktree预检并行、正常ACL和目录publication55P03、Provider unavailable、Skill digest drift、Grant expiry drift、capability count mismatch及真实5秒fence到期拒绝。仅验证预检并行，不证明Run/executor并行吞吐；未测最大负载RSS/延迟。Fixtures初始注册/变异为隔离admin/replica，不证明生产publisher授权。零VM与生产DB变更。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D7 report](reports/PHASE-9F4C-D7-CATALOG-CURRENTNESS-REPORT.md)。没有新增依赖或第三方版本。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.9 | 2026-10-10 | Ulysses — Mavis 接手审核 | 对账有界当前目录与同Project预检并行；明确准备/实际执行Hook时点。 | D7实现与隔离并发验证。 |
+
+
+## 4.13.17 D8 — Existing Project W/M ledgers
+
+Schedule owner 必须在同一 owner 事务内完成固定 run-as 与 canonical Task/Worktree、Profile/Hook、Provider/Skill/Grant 及绑定复验，再比较当前 Project 配额与 Run 的全部八项 ResourceBudget 上限。不得以成功预检代替实际 reservation、非执行态 Run 创建或 executor 启动许可。缺失/禁用/未来生效配额、预算超限、计数/算术溢出与过期目录 fence 必须 fail closed。
+
+`revalidate_project_capacity` 使用 native `read_schedule_project_capacity_current`，复用手动 Run 分配路径的 Project allocation epoch（UPSERT 实际写入），串行同 Project 的容量分配。读取当前有效 quota，持有 quota publication 同键共享 advisory lock及quota行锁；REPEATABLE READ 下过时 epoch 必须产生40001而不能用旧 reservation 视图放行。统计同 Project 所有 active reservation，以及 lease 未过期的 pending reservation；过期 active 仍计数，released与过期 pending不计数。CPU/运行时长按单Run ceiling核对，RSS/子进程/并行工具/provider calls/输出/event buffer 按共享剩余总量核对，另核对Run数量。SQL仅返回一个≤4KiB envelope，Rust checked-add核算且在等待容量锁后重验5秒目录fence；无整表载入Rust缓存。数据库SUM仍需扫描Project相关ledger，未声称已验证最大规模查询/RSS性能。
+
+reader SECURITY DEFINER固定search_path=pg_catalog，PUBLIC execute撤销，仅Run owner受限EXECUTE；不授予runtime直接quota/epoch/reservation写权限。仅现有Work allocation epoch在本事务中变化，drop回滚；没有写入Run、reservation或容量审计事实，也不表示Project容量已预留。新增W/T/M表0/0/0；现有epoch保留30天TTL。未来Run/reservation writer必须在该仍存活事务内再次确认fence并原子写入Run、reservation及成对审计/Run事件和Infrastructure demand Outbox；Host/cluster容量仍由Infrastructure owner自己的事务预留。原生执行Hook、Runtime健康/沙箱、取消恢复与独立验证仍为实际executor门，不制造健康事实。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner49/49，binding/admission SQLx targets2/2、库15/15、包级all-targets check/Clippy与fmt、Python编译、图头和diff检查。Audit `target/phase9f4d-run-owner-consumer/d1e13219-1fbf-4f85-b7c1-e3604fa548d7/audit.jsonl`。实际覆盖缺失/禁用quota、精确预算匹配、同Project容量预检与正常手动epoch写入锁互斥（55P03）、quota关闭等待、drop回滚epoch、REPEATABLE READ过时allocation snapshot拒绝40001，以及未过期pending/过期pending/过期active/released计数。初始quota和reservation状态使用隔离admin/replica fixtures，不证明生产quota publisher、Run/reservation writer或真正executor并发。零VM/productionDB变更。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D8 report](reports/PHASE-9F4C-D8-PROJECT-CAPACITY-REPORT.md)。本阶段无新增第三方依赖。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.10 | 2026-10-10 | Ulysses — Mavis接手审核 | 接入Schedule当前Project容量核算，保留原子Run/reservation写入与执行缺口。 | D8实现与隔离容量验证。 |
+
+
+## 4.13.18 D9 — Immutable preparation snapshots and paired ledgers
+
+Schedule owner的fresh admission须经D4–D8当前授权、绑定、策略、目录和容量复验后，在Run owner本地事务原子创建非执行态TaskExecutionRun、pending Project reservation、成对reservation审计/RunEvent及处理后Inbox/admission-result Outbox。必须从canonical Task metadata、lifecycle和当前非空TaskContract读取有界完整快照，不接受调用者伪造任务内容。`started_at`与execution_state保持空，不产生run_started、VM请求或Task lifecycle写入；accepted只表示准备已登记。
+
+`ScheduleAdmissionTransaction.prepare_and_commit`消耗原事务，并复用`commit_result`的exact replay/pair持久化。当前准入拒绝可提交不可变rejected result；存储错误、写入后fence/deadline失效则整笔回滚，不把已暂存Run与rejected结果一起提交。受限native `prepare_schedule_execution_run`复验scope/当前Profile和binding、再次串行核算Project容量并拒绝同Task已有active/未过期pending reservation。Task eligibility与既有CLI一致：in_progress、固定run-as持有同Worktree且非pending_review；当前TaskContract必须存在且验收项非空。Task/验收快照各≤32KiB，描述≤16KiB、labels≤64、dependencies/验收项≤128；超限拒绝，不截断。完整typed Engineering Run snapshot保留全部25个identity/version/role/ref字段；Run另持久化不可变Infrastructure binding snapshot/digest和request关联。
+
+准备阶段的Outbox是Run→Schedule admission-result，不提前发布Infrastructure demand。Schedule owner必须消费结果、复验本owner lease/generation/deadline/cancellation，提交链接及confirmation；Run owner在下一独立事务消费可信confirmation、复验当前授权/绑定/Project reservation后才发布自己的Infrastructure demand Outbox。Host/cluster容量由Infrastructure owner自己的事务预留。这维持DD §6.2既有两owner确认协议，并明确D8“原子Run/reservation与Outbox”中的Outbox时点，不能用准备accepted绕过confirmation。Task owner的自动分配/claim/in_progress生产者仍需接入，Schedule不可跨owner篡改lifecycle。
+
+Project准备reservation的lease由数据库取min(occurrence deadline,当前时间+2分钟)，必须与目录5秒fence区分。等待确认期间预算已占用；超时/取消的补偿、release/expiry worker及后续激活仍开放，不把lease过期视作VM/Runtime已清理。新增W/T/M表0/0/0：现有reservation为W，Run/reservation events/RunEvent/Inbox/results为T，TaskContract与binding为M只读。新请求关联有deferred FK，native Run插入有deferred accepted-result/pending-reservation配对门，阻止孤立准备事实提交。SECURITY DEFINER固定search_path，PUBLIC execute撤销，仅可信Rust Run-owner角色EXECUTE，仍无直接Run/event/reservation/Task写权限。原生Hook实际求值、健康/sandbox/readiness、独立验证与executor门保持关闭；未把REST/UI或fixture作为生产闭环。
+
+验证：隔离 PostgreSQL18.6/Rust1.99.0 runner 52/52，binding/admission SQLx targets 2/2，库测试15/15，包级all-targets check、Clippy、fmt、Python编译、Cypher图头及diff检查通过。Audit `target/phase9f4d-run-owner-consumer/00ff7b51-16c4-4a62-a776-121f6ef33a47/audit.jsonl`。实际覆盖受限owner角色写入、生命周期/TaskContract拒绝、deadline拒绝、延迟配对门拒绝孤立提交、写入后目录fence失效整笔回滚、结果持久化失败回滚及同命令重试、exact replay和容量占用；未产生execution事件或Infrastructure demand。隔离PostgreSQL已停止，零Multipass inventory和生产DB变更。未完成workspace/release/doc/bench、生产交付或性能验收。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；[D9 report](reports/PHASE-9F4C-D9-SCHEDULE-PREPARATION-REPORT.md)。本阶段无新增第三方依赖或VM操作。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.11 | 2026-10-10 | Ulysses — Mavis接手审核 | 对账真实Run-owner准备写入；保持Schedule确认后才发布Infrastructure demand。 | D9实现及隔离SQLx事务验证。 |
+
+
+## 4.13.19 — Schedule compensation Inbox
+
+Run owner提供`PostgresScheduleAdmissionStore.compensate_admission`，消费有界严格`ScheduleRunAdmissionResolutionV1`补偿命令。必须绑定原始Schedule service identity、tenant及不可变accepted result的request/attempt/result/correlation/occurrence/Run/binding digest；错误来源、跨租户、伪造digest、Confirm误投及冲突重放均拒绝。可信transport认证仍须由部署组合，调用者传入UUID不是认证证据。
+
+Native `compensate_schedule_preparation`在自身事务中串行原request及Project allocation epoch，仅对未确认、未执行、未发布Infrastructure demand且reservation仍pending的D9准备Run释放Project预算。它原子写入released状态、配对reservation/Run release audit、schedule_admission_compensated及exact-byte不可变receipt。最后receipt写入失败须回滚释放与全部事件。清理以原始owner事实为依据，不要求已撤权run-as重新授权；此权限不能创建或启动工作。历史accepted replay不改变released reservation。
+
+新`guard_prepared_schedule_demand`对带D9 preparation lineage的Run复用同Project epoch和Run行锁，要求确认事件、未补偿和有效pending reservation，避免低层Outbox primitive绕过确认或与补偿竞争；旧无preparation lineage的Run保持既有契约。REPEATABLE READ过时epoch必须由数据库拒绝，未以Rust无界缓存观察竞争状态。
+
+W/T/M新增0/1/0：`multica.schedule_compensation_inbox`为T（不可变exact-wire、无TTL/物理删除、FORCE tenant RLS）；既有reservation和allocation epoch为W，release/Run events及receipt为T；M只读。仅受限SECURITY DEFINER固定search_path capability执行写入，Run role无直接receipt/reservation/Task mutation。新表索引为tenant/request主键与唯一resolution身份，wire≤16KiB；函数有5秒lock/10秒statement timeout。
+
+验证：隔离PostgreSQL18.6/Rust1.99.0 runner 54/54，binding/admission SQLx targets 2/2，库15/15及包级all-targets check、strict Clippy、fmt、Python编译、Cypher图头与diff检查通过。Audit `target/phase9f4d-run-owner-consumer/67cccbc7-e28b-4984-bd14-920afbc329f5/audit.jsonl`。真实owner角色验证释放/配对审计/receipt、exact replay、冲突重放、来源/tenant/digest误配、Confirm误投、active/confirmed拒绝、最终receipt失败整笔回滚、跨tenant RLS与补偿前后demand拒绝。Active/confirmed输入为隔离admin/replica fixtures，不证明生产确认/激活producer；未验证新的跨进程并发/过时snapshot竞争或最大规模性能。隔离PostgreSQL已停止，零VM/生产DB操作。
+
+Schedule result/link/confirmation producer、confirmation消费与Infrastructure demand真正发布、全量超时release worker、跨Infrastructure owner补偿、生产service身份/DB grants、native Hook求值、Host/cluster reservations、Manager/sandbox/readiness、取消恢复及独立验证仍开放；本阶段不可宣称Agent/CLI闭环可用。零新依赖、零VM/生产DB操作。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；阶段报告 `docs/reports/PHASE-9F4C-D10-SCHEDULE-COMPENSATION-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.12 | 2026-10-10 | Ulysses — Mavis接手审核 | 接入准备Run补偿和demand确认隔离门。 | D10实现与验证。 |
+
+
+## 4.13.20 — Schedule confirmation Inbox
+
+`PostgresScheduleAdmissionStore.confirm_admission`严格解码有界Schedule确认命令，核验原始Schedule service identity、tenant、accepted result及request/attempt/result/correlation/occurrence/Run/binding digest。它在同Run-owner事务复验当前Project/Branch/Run授权、Worktree/Task绑定、当前Infrastructure binding、Profile/Hook、Provider/Skill/Grant目录及5秒目录fence。确认不是executor许可证。部署必须独立认证service；注入UUID不是transport认证证据。
+
+受限native `confirm_schedule_preparation`串行request和既有Project allocation epoch；复核当前quota及全Project已占用总量，准备reservation已在总量中，不能重复加算其预算。它锁定未确认、未补偿、未执行Run与有效pending reservation，检查Task lifecycle仍in_progress、run-as/Worktree一致、非pending_review，当前metadata/TaskContract版本与准备快照相同，以及当前binding/Profile版本与有效Hook文档不变。原生Hook的实际执行、Runtime健康/sandbox与独立验证仍为后续门。
+
+确认RunEvent、typed V2 Infrastructure demand和不可变confirmation receipt在一个Run-owner事务提交。demand截止时间由DB钳制为min(occurrence deadline,Project reservation lease)，payload/receipt wire≤16KiB，Profile envelope≤72KiB；late fence/deadline或任何写入失败回滚全部事实。receipt引用其demand，tenant FORCE RLS且append-only，无直接receipt/Run/event/reservation写权限。请求精确重放返回同一历史demand/event identity，不重建demand或激活预算；不同resolution bytes拒绝。已确认/demand发布后不能再走D10本地补偿，后续必须通过跨owner释放协议处理。
+
+新增W/T/M表0/1/0：`multica.schedule_confirmation_inbox`为T，无TTL/物理删除；既有Project allocation epoch/reservation为W，RunEvent/demand为T；当前Task/Profile/Hook/binding/catalog为M只读。单事务复用有界快照和数据库锁，无跨owner写事务，无VM创建或宿主shell权限扩展；Host/cluster容量由Infrastructure owner另行核验/预留。
+
+验证：隔离PostgreSQL18.6/Rust1.99.0 runner 56/56，binding/admission SQLx targets 2/2，库15/15及包级all-targets check、strict Clippy、fmt、Python编译、Cypher图头和diff检查通过。Audit `target/phase9f4d-run-owner-consumer/b0a6e67a-47c9-4f05-86ce-aad4ae1292a8/audit.jsonl`。真实Run-owner路径验证当前授权撤销/预留过期/quota禁用拒绝、最后receipt失败整笔回滚、写入后目录fence失效回滚、成功确认及同一demand精确重放、冲突resolution拒绝、跨tenant RLS、确认后D10补偿拒绝，以及demand deadline钳制至reservation lease；只有一条demand且零执行事件。权限/quota/时钟失效来源仍为隔离admin/replica fixtures；未证明真实Schedule producer、认证transport、跨进程竞争或最大规模性能。隔离PostgreSQL已停止，零Multipass inventory/生产DB变更。
+
+本阶段关闭Run-owner本地确认+demand写入，不关闭Schedule owner的result Inbox、lease/generation/deadline/cancellation复验与link/confirmation producer、生产认证/角色配置、可靠Outbox交付、过期/取消/跨owner补偿、Host Manager/sandbox/readiness/native Hook求值/独立验证、Agent/任务卡CLI完整闭环及BI/Benchmark。仍无生产executor、无完整workspace/release/doc/bench或规模性能验收。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；报告 `docs/reports/PHASE-9F4C-D11-SCHEDULE-CONFIRMATION-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.13 | 2026-10-10 | Ulysses — Mavis接手审核 | Run-owner确认及demand事务写入对账。 | D11实现及隔离数据库验证。 |
+
+
+## 4.13.21 — Schedule admission request/result/resolution
+
+`PgAutomationScheduleRepository`沿用既有 occurrence/dispatch 和 lease 模型，增加 `persist_admission_request` 与 `resolve_admission_result`。请求固定原始 Schedule owner/generation、logical admission attempt、Run service identity 与精确有界 wire；提交前核验当前 canonical occurrence、完整 Rule snapshot 和未过期 lease/deadline。数据库 advisory lock 按 occurrence 串行请求与结果；重放相同字节恢复同一历史事实，不创建新 attempt。未处理请求或已经确认的请求阻断后续 logical attempt。
+
+Run 的结果严格匹配 request/attempt/result/correlation/occurrence/tenant/binding digest 与配置的 Run service identity。Schedule 在自己的事务复验 lease owner/generation、deadline、取消及既有 link；仍持有原始有效 lease 时原子写入 admitted link、occurrence event、Schedule Run Outbox、result Inbox 和 confirm resolution Outbox。失效 lease、过期、取消或 link 冲突生成 compensate resolution，不写新 link。accepted Inbox 与 resolution 使用 deferred paired FK；最后 Outbox 失败或事务末尾 lease/deadline 过期必须整笔回滚。Rejected result 在原始 live fence 下按有界指数退避进入 retry_wait，达到 Rule 上限/deadline 后 failed，TTL 用同一 terminal timestamp；过时结果不能改写当前 worker 的 dispatch。
+
+新增 W/T/M=0/3/0：`automation.run_admission_request_outbox`、`automation.run_admission_result_inbox`、`automation.run_admission_resolution_outbox`均为 T，append-only、tenant FORCE RLS、无 TTL/物理删除、wire≤16KiB。`star_automation_schedule_owner`只读 Rule/own receipts并执行两项受限 native capability，无 Run/Infrastructure mutation grants；Rust 事务设置 5秒 lock timeout、10秒 statement timeout，复用有界共享 pool。Schedule 只写 own facts，Run owner 单独消费 confirm/compensate 并复验其当前权限、策略和预算，Infrastructure owner 再独立预留 Host/cluster 容量。没有共享跨 owner 写事务、VM 操作或 executor 授权。
+
+验证状态：隔离PostgreSQL18.6/Rust1.99.0 runner 62/62通过（audit `target/phase9f4d-run-owner-consumer/0dcfeed4-74a6-433d-bc7f-a4cb4aec8b5c/audit.jsonl`）；两个包all-targets check通过，Run-owner strict Clippy通过，库测试Run-owner15/15、star-pg-adapter35/35通过，owned-file fmt、Python编译、Cypher图头及diff检查通过。Star-pg-adapter独立strict Clippy未通过：lib150、lib-test152项诊断来自11个未改动文件，Schedule adapter没有诊断；详见`target/phase9f4d-run-owner-consumer/d12-pg-strict-clippy.log`，不宣称整个包/仓库quality gates全绿。CodeRabbit权限拒绝，不计为独立审核通过。。隔离测试使用 canonical Rule/occurrence fixtures，真实 Schedule claim/request/result/link/resolution 与 Run preparation/confirmation/compensation；拒绝结果与时钟失效输入为明确 fixtures，不证明真实 broker producer/authentication 或生产 identity/grants。验收需覆盖 exact replay、来源/digest/tenant拒绝、最终 resolution insert 失败回滚、lease 接管后的真实 Run 补偿、拒绝重试与耗尽、RLS 和 owner grants。
+
+生产 Schedule request publisher/result receiver、认证 transport、durable Outbox delivery、全量取消/过期/release recovery、独立 DB owner receipts/projections、Infrastructure provider/reservations/readiness、native Hook 求值、Agent sandbox/独立验证、任务卡 CLI 执行闭环、BI/Benchmark 及规模性能仍开放。现有 shared-DB FK/trigger 的跨 owner只读约束不是物理数据库拆分实现；配置注入 UUID 不构成身份认证。Schedule materializer deadline 与 slot deadline 的策略对账仍需独立验收。不将 D12 局部验证写为所有 phase 完成。
+
+脚本 `scripts/automation/phase9f4d_run_owner_consumer.py`；报告 `docs/reports/PHASE-9F4C-D12-SCHEDULE-HANDOFF-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.14 | 2026-10-10 | Ulysses — Mavis接手审核 | Schedule owner请求/结果/决议事务及验证对账。 | D12实现。 |
+
+
+## 4.13.22 — Admission delivery Work/Transaction
+
+D13为Schedule request/resolution与Run result补充owner-local交付状态。每个owner分别拥有`admission_message_delivery`（W）和`admission_message_delivery_receipt`（T），schema分别为`automation`与`multica`，新增W/T/M=2/2/0。W无第二份payload，引用既有不可变Outbox source view；每owner/tenant最多1000条，7天hard retention，终结先写永久T凭据再删除W。T无TTL/物理删除，tenant FORCE RLS、WORM；PK按tenant/kind/message命名空间区分，不能仅使用裸UUID。新Outbox同事务入队，queue预算不足回滚；历史backlog由owner-local bounded reconciliation逐页恢复，永久delivered/dead凭据阻止复活。
+
+Native procedures `claim_admission_delivery`、`settle_admission_delivery`、`reconcile_admission_delivery`只写本schema的队列/凭据，owner role仅有SELECT与特定EXECUTE，无raw INSERT/UPDATE/DELETE/TRUNCATE。Claim/reconcile每次1–8条，SKIP LOCKED、DB-clock lease和单调delivery attempt；delivery attempt与Schedule admission attempt独立。Lease30–300秒，最多12次transport尝试，指数退避上限300秒；失效fence不能settle，settlement末尾再次检查lease。过期/耗尽消息留下dead receipt，未投递终结必须纳入运维告警与恢复，不等同业务Run完成。
+
+`platform-messaging-runtime::admission_delivery`是供各owner进程复用的适配器库：构造时固定owner和该owner pool/role，每笔事务仅调用其allowlisted native capability，不是持有两边写权限的中央Platform服务。`AdmissionJetStreamPublisher`只接收已建立的Context，serial batch≤8、lease120秒、PubAck timeout10秒；按owner/kind/tenant/message设置稳定Nats-Msg-Id，发布精确原wire（≤16KiB），固定expected stream/domain并检查正sequence后写owner receipt。Broker接收后进程退出/receipt失败会用同ID/字节重放；broker dedup window不能取代下游永久Inbox。Cancellation只停止新publish，未开始的claims等待lease恢复，不drain共享client。
+
+D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server 2.12.14，最终transport-port回归67/67步骤通过；其中两个实际Rust/PostgreSQL集成测试通过，覆盖request/result/resolution broker投递、稳定ID重放去重、错误stream重试、取消前不claim、旧worker拒绝、租户隔离、两侧原生保留期/耗尽清理、回执WORM与reconcile容量拒绝。证据：`target/phase9f4d-run-owner-consumer/ee749003-f308-4a2c-bba5-eb18ccf09e85/audit.jsonl`。两个包all-targets check、strict Clippy --no-deps通过，单元测试23/23通过；owned timeout子进程树回收探针通过。Schema-only ACK_FIXTURE不计作真实broker或身份认证证据。首次900秒编译超时和两次LNK1104失败均保留日志；独立重跑通过，未确定链接器故障根因，未清空缓存或降低安全策略。CodeRabbit Permission denied，未获得独立review通过；没有全workspace/release/doc/bench验收声明。
+
+阶段仍开放：enqueue达到容量上限时原Outbox事务回滚、receipt插入故障回滚、并发争用、完整request/result/resolution consumer链、service身份/TLS/ACL/DB grants部署、source/subject/stream验证、commit-before-double-ack、poison隔离与受控恢复、delivery/Run取消过期release、全局公平调度和规模性能。Queue/receipt与PubAck均非executor许可证；Host/cluster容量、Runtime/sandbox/native Hook/独立验证及Agent/任务卡CLI闭环仍需后续门。Shared-DB source view只读本owner事实，不代替物理数据库拆分的API/receipt/projection契约。BI交付指标仍需受授权owner API/版本化事件接入，不能直接跨owner改表。
+
+接口依据：[async-nats PublishMessage](https://docs.rs/async-nats/0.50.0/async_nats/jetstream/message/struct.PublishMessage.html)；测试工具来源：[NATS官方发布](https://github.com/nats-io/nats-server/releases/tag/v2.12.14)。报告：`docs/reports/PHASE-9F4C-D13-ADMISSION-DELIVERY-REPORT.md`。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.15 | 2026-10-10 | Ulysses — Mavis接手审核 | D13交付/transport port验证、Rust-native替换准备及剩余缺口对账。 | 新owner消息交付实现。 |
+
+### Rust-native 消息服务器替换边界
+
+用户自有Rust服务器为最终替代方向，NATS仅为过渡transport adapter。`AdmissionTransport`接收owner、tenant、recipient、kind、message/request identity和原始wire；`AdmissionPublisher<T>`以静态派发调用该port，统一处理有界batch、超时、租约、取消、重试和owner receipt，核心不调用NATS API且不为每条消息装箱future。`JetStreamAdmissionTransport`独占subject、Nats-Msg-Id、expected-stream/domain、PubAck映射；兼容别名`AdmissionJetStreamPublisher`不作为产品领域模型。
+
+v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
+
+Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。

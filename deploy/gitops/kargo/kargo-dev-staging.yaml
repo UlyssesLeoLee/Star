@@ -1,0 +1,311 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Kargo v1.12.1 晋级链路 — dev → staging (本机 k3s 单集群)
+#
+# 选型依据: ADR-0054 (per 2026-10-04 21:04 JST 拍板)
+#
+# ✅ 校验方式 (2026-10-05 实测, 全部经**集群内 live CRD / admission webhook** 确认):
+#   kubectl apply --dry-run=server -f deploy/gitops/kargo/   → exit 0
+#   验证环境: Multipass 1.17.0-rc1 (hcs) + Ubuntu 24.04.5 + k3s v1.36.5+k3s1
+#             + Kargo v1.12.1 (Helm chart, deployed)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 📌 修正史 —— 本文件共 7 处错误:
+#    其中 1-6 由 live CRD / admission webhook 抓出, 离线 schema 校验一个都没抓到
+#    (原因见文末「为什么离线 schema 校验一个都没抓到」);
+#    第 7 处 (镜像坐标) 连 webhook 都没放过 —— 它**结构完全合法**,
+#    是靠运行时的**控制器日志**才暴露的。三层门禁各管一段, 缺一层就漏一类。
+#
+# v0.2 修正 4 处:
+#   1) subscriptions 写成 `image: <字符串>` + `tagSelection` —— 错。
+#      正确结构是 `- image: { repoURL, constraint, ... }`, image 是**对象**。
+#      (admission webhook: "must have exactly one top-level field naming its
+#       type, apart from an optional name field")
+#   2) 字段名是 `constraint`, 不是 `semverConstraint` (v1.x 已改)。
+#   3) 字段名是 `allowTagsRegexes` 且为**数组**, 不是 `allowTags` 字符串。
+#      (webhook: "cannot unmarshal string into Go struct field
+#       Warehouse.spec.image.allowTagsRegexes of type []string")
+#   4) promotionTemplate step 参数字段是 **`config`**, 不是 `with`。
+#      (live CRD: steps.items.properties = as/config/continueOnError/if/
+#       retry/task/uses/vars)
+#
+# v0.3 修正 2 处 —— **namespace 语义, 此前完全搞错**:
+#   5) `Project` 是 **Cluster-scoped**, 且它的 reconcile **会自动创建一个同名
+#      namespace**。官方原文: "Reconciliation of such a resource effects all
+#      boilerplate project initialization, **including the creation of a
+#      specially-labeled Namespace with the same name as the Project**."
+#      所以本文件**不声明任何 Namespace 资源**, 也**不用自己打标签** ——
+#      apply `Project: star` 后 Kargo 自动建 `star` ns。
+#      (v0.2 曾手写 `Namespace: star-kargo` + 臆造的标签
+#       `kargo.akuity.io/project-name: star`, webhook 报
+#       'namespace "star-kargo" is not a project'。真标签是
+#       `kargo.akuity.io/project: "true"`, 且仅用于"纳管预先存在的 ns"这一用途。)
+#   6) Warehouse / Stage 必须放在**与 Project 同名**的 ns (即 `star`),
+#      不能放 `kargo` 控制面 ns。
+#
+# v0.4 修正 1 处 —— **镜像坐标, 此前是按惯例推断的值** (已被 v0.5 取代,
+#   保留作审计线索; 当前生效坐标见 subscriptions 处 v0.5 标注):
+#   7) subscriptions 的 `repoURL` 原写 `ghcr.io/ulyssesleolee/star`。
+#      推断依据是 "ghcr.io/<owner>/<repo>" 这个惯例, 而**惯例不是证据**:
+#      - 粒度错: CI 推的是 **4 个独立仓库** `star-{canvas-engine,domain-canvas,
+#        canvas-realtime,canvas-game}`, 不是单个 `star`
+#      - owner 也错: 当时按 CI 的 IMAGE_OWNER 取值, 但那个值本身有问题
+#        (v0.5 才对齐到真实归属)
+#      后果相同且静默: Warehouse 订阅永不匹配 → 永不产出 Freight →
+#      Stage 没有 Freight 可晋级 → 晋级链路形同不存在, 但 apply 一直 exit 0。
+#      这是**结构性校验与存在性校验正交**的又一例 (同 deny.toml 只能校验许可证
+#      结构、查不出 URL 404): 结构对 ≠ 地址存在。
+#
+# 为什么离线 schema 校验一个都没抓到 (per 2026-10-05 复盘):
+#   - `Warehouse.spec.subscriptions.items` 标了
+#     `x-kubernetes-preserve-unknown-fields: true` (live CRD 实测),
+#     意味着 **CRD 层面完全不管这个结构**, 只有 admission webhook 管。
+#   - `Project` CRD 的 root properties 只有 apiVersion/kind/metadata/status,
+#     **没有 spec** —— 我 v0.1 臆造过 spec.promotionPolicies, 离线校验同样查不出。
+#   → 结论: **结构正确性必须由 server dry-run + admission webhook 判定,
+#     离线 JSON Schema 校验对这些字段是无效的。**
+#
+# ⚠️ 仍未运行时验证 (per 守门 #11 缺标比错标安全):
+#   - promotionTemplate 各 step 的 `config` **内部**字段名未经官方 promotion step
+#     参考表逐项核对; CRD schema 只校验到 steps 数组层, 到不了 step 内部键名。
+#     server dry-run 同样校验不到 —— 这是本文件**唯一**残留的结构不确定面。
+#
+# 🟡 实跑阻塞 (per 2026-10-05 20:52 JST 实测, kargo-controller 日志):
+#   坐标修正后 Warehouse **仍在失败**, 但错误性质变了 —— 这证明修正方向正确,
+#   同时暴露了第二个独立阻塞。两次探测的原坐标不同, 此处如实标注, 勿混为一谈:
+#     第一轮 (坐标改为 sayatelier 时) 实测:
+#       ghcr.io/ulyssesleolee/star (旧值)
+#         → DENIED: requested access to the resource is denied  (路径不存在)
+#       ghcr.io/sayatelier/star-canvas-engine
+#         → UNAUTHORIZED: authentication required (仓库存在但私有, 无凭据)
+#     第二轮 (归属改到本账号后, v0.5) 实测: 仍 403, 见下方「凭据本身的阻塞点」。
+#   ⚠️ 错误从 DENIED 变成 UNAUTHORIZED 只说明"换个坐标后服务端换了种方式拒绝",
+#     **不等于**该坐标就是对的 —— 归属最终由人工拍板确定, 不是由错误措辞推断。
+#   对照组证明这不是本机网络/请求写法问题: 同法匿名拉
+#     ghcr.io/fluxcd/source-controller → OK (100 tags)
+#     ghcr.io/actions/actions-runner  → OK (73 tags)
+#   → **仍需**: 给 Kargo 配置 GHCR 读凭据。Kargo 不通过 CRD 字段引用凭据, 而是
+#     按约定发现**特殊标注的 Secret** (per 官方 docs "Managing Credentials" v1.x):
+#         metadata.labels: { kargo.akuity.io/cred-type: image }
+#         stringData: { repoURL, username, password }
+#     必须放在 **Project 自己的 namespace** (即 `star`), 名字任意 ——
+#     Kargo 按标签+repoURL 匹配发现, 精确匹配优先、其后正则匹配。
+#     注入脚本: scripts/automation/kargo_image_credential.ps1 (建前强制验权,
+#     fail closed; 凭据只从 GHCR_PAT 环境变量读, 不打印/不落盘/不入库, 守门 #5)。
+#
+#   🟡 凭据本身的阻塞点 (per 2026-10-05 实测, 已用对照组排除工具误判):
+#     - 本机 GHCR_PAT 是有效的 **fine-grained PAT**: 用正确流程
+#       (Basic(user:PAT) 换 registry token 再作 Bearer) 读公开仓库
+#       ghcr.io/fluxcd/source-controller → OK, 100 tags。
+#     - 但同一把凭据读 `ulyssesleolee/star-canvas-*` → **403**(已认证但未授权),
+#       而 `ulyssesleolee/star` / `/bff` → **404**(确定不存在)。
+#       403 与 404 不同: 403 = 仓库存在但无权限, 404 = 仓库不存在。
+#     → 结论: 剩余阻塞收敛为**这把 fine-grained PAT 缺 Packages 读权限**
+#       (或包尚未推送)。这属于**凭据权限**问题, 不是本机配置问题 ——
+#       PAT 的权限只能由持有者在 GitHub 侧授予, 无法由本流程创建或提升。
+#     → 因此**仍未创建**任何 Secret: 注入一把已证明读不到目标的凭据只会让
+#       Warehouse 继续静默失败, 属于"配置做了"而非"配置生效"。
+#     → 方法学留档: 早期一版探测把 PAT 直接当 Bearer 塞进 /v2/<repo>/tags/list,
+#       得到"所有仓库一律 403"并据此错判为"令牌类型不对"。是**对照组**
+#       (公开仓库可拉 OK) 把它揪出来的 —— 真实凭据与伪造垃圾串返回完全
+#       相同的结果, 本该当时就存疑。**测不通时先怀疑量具, 再怀疑被测物。**
+#
+#   → 另注: 该错误自 2026-10-05 11:00Z 起每个 reconcile 周期复现一次, 而
+#     `kubectl apply` 始终 exit 0、Project 状态始终 "ready" —— 即**静默失效**。
+#     判"配置生效"不能只看 apply 返回码, 必须读控制器日志或 Warehouse.status。
+#
+# ✅ deploy/dev 与 deploy/staging 分支**已创建并推送 origin** (2026-10-05):
+#     deploy/dev 起自 main 06952d78, deploy/staging 起自 deploy/dev, 二者同点;
+#     远端 refs/heads/deploy/{dev,staging} 已确认指向 06952d78。
+#     Kargo 的 git-push step 连的是 https://github.com/UlyssesLeoLee/Star,
+#     分支已就位。(Kargo git-clone 对不存在的远端分支会自行 checkout -B,
+#      但首次 push 是否被远端接受取决于 refspec 策略, 该点仍未实跑验证。)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: star
+# Kargo v1.12.1 的 Project CRD **无 spec 字段** (live CRD 实测: root properties
+# 仅 apiVersion/kind/metadata/status)。promotionPolicies 已迁移到同 ns 内的
+# ProjectConfig (namespaced), 需要时再加本文件末尾的资源。
+# apply 后 Kargo 自动创建同名 `star` namespace —— 下面所有资源都放那里。
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Warehouse: 监听镜像仓库, 按 interval 轮询产出 Freight (不可变版本单元)
+# required: interval, subscriptions
+#
+# subscriptions 每项: 恰好一个"类型字段"(image / git / chart) + 可选 name。
+# 注意 items 标了 x-kubernetes-preserve-unknown-fields, 结构错只有 webhook 拦。
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: star-services
+  namespace: star
+spec:
+  interval: 5m
+  subscriptions:
+    # v0.5 订正: 镜像坐标与 CI / 部署清单**逐字一致**, 三处同一事实源。
+    #
+    # 坐标演进 (保留供审计, 均为实测, 非推断):
+    #   v0.1  ghcr.io/ulyssesleolee/star        <- 按 "ghcr.io/<owner>/<repo>"
+    #                                              惯例**推断**, owner 与粒度双错
+    #   v0.3  ghcr.io/sayatelier/star-*  (4 个)  <- 按 CI 当时写的 IMAGE_OWNER
+    #   v0.5  ghcr.io/ulyssesleolee/star-* (4 个) <- 归属改到本账号 (人工拍板)
+    #
+    # 判据 (两处独立证据 + 一处人工拍板, 三者必须同时成立):
+    #   1) .github/workflows/publish-canvas-game.yml
+    #        env.IMAGE_NAMESPACE: ulyssesleolee   <- 镜像路径 (全小写, OCI 规范)
+    #        env.IMAGE_OWNER:    UlyssesLeoLee    <- 登录用户名 (大小写原样)
+    #        images: ghcr.io/${{ IMAGE_NAMESPACE }}/star-${{ matrix.image }}
+    #        matrix.image = [canvas-engine, domain-canvas, canvas-realtime, canvas-game]
+    #        -> 是 **4 个独立仓库**, 不是单个 `star`
+    #        ⚠️ IMAGE_OWNER 与 IMAGE_NAMESPACE 是**两个变量, 方向相反的要求**:
+    #           登录要 camelCase, 镜像路径要全小写。此前两者共用 IMAGE_OWNER,
+    #           改一边必然破坏另一边 —— 已拆分, 别再合回去。
+    #   2) deploy/canvas-game-k3s.yaml 4 处 image: 字段
+    #        ghcr.io/ulyssesleolee/star-canvas-engine:dev 等 —— 与 CI 一一对应
+    #   3) 镜像归属 namespace: 人工拍板 = 本账号 UlyssesLeoLee (原 SayAtelier
+    #      对本账号无 Packages 读权限: 匿名 401, 本机 PAT 403 已认证未授权)
+    #
+    # 教训留档: 该 workflow 头注释长期写 `starghorg`, 而 env 写 `SayAtelier`,
+    #   而真实归属又是第三个值 —— **同一文件三处三个值**, 且注释不参与执行,
+    #   没有任何门禁会为它报错。读注释无法发现, 只能靠"以 env 为唯一事实源"
+    #   逐字核对。
+    #
+    # tag 策略兼容性: CI 的 metadata-action 同时产出
+    #   type=ref,event=branch | type=ref,event=pr | type=semver,pattern={{version}}
+    #   | type=semver,pattern={{major}}.{{minor}} | type=sha,format=short
+    #   | type=raw,value=latest,enable=is_default_branch
+    # 且 on.push.tags 含 'v*', 故 `v1.2.3` 推送会产出三段式 tag `1.2.3`,
+    # 与下面 allowTagsRegexes 的 ^\d+\.\d+\.\d+$ 兼容。
+    # 🟡 已知缺口: 分支 ref tag (`dev` / `main` / 短 sha) 被 allowTagsRegexes 挡在
+    #    外 —— 这是刻意选择 (Freight 应是不可变版本, 而非会移动的分支指针)。
+    #    代价: main/dev 分支的自动构建不会自动进 Kargo 晋级链, 需打 v* tag。
+    - name: star-canvas-engine
+      image:
+        repoURL: ghcr.io/ulyssesleolee/star-canvas-engine
+        # SemVer 是默认策略; constraint 支持 ^ / ~ / 范围表达式
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        # 仅接受严格三段式版本 tag (x.y.z), 排除 latest / 分支名 / 短 sha
+        # 数组类型 (v0.2 实测: []string)
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+    - name: star-domain-canvas
+      image:
+        repoURL: ghcr.io/ulyssesleolee/star-domain-canvas
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+    - name: star-canvas-realtime
+      image:
+        repoURL: ghcr.io/ulyssesleolee/star-canvas-realtime
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+    - name: star-canvas-game
+      image:
+        repoURL: ghcr.io/ulyssesleolee/star-canvas-game
+        imageSelectionStrategy: SemVer
+        constraint: '>=0.1.0'
+        allowTagsRegexes:
+          - '^\d+\.\d+\.\d+$'
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: dev — 自动晋级, 带观察期
+# required: requestedFreight (数组, per CRD schema 实测)
+#   每项结构: { origin: {kind, name}, sources: {requiredSoakTime, stages} }
+#   ⚠️ origin.kind **只能是 Warehouse** (per CRD enum 实测) —— Stage 之间的
+#      晋级不是靠 origin.kind: Stage, 而是靠本 Stage 的 sources.stages 声明
+#      "只接受来自哪个上游 Stage 的 Freight" (Freight 传递链模型)。
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: dev
+  namespace: star
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: star-services
+      sources:
+        # 观察期: 刚产出的 Freight 先等 5m 再考虑晋级, 避免瞬时发布
+        requiredSoakTime: 5m
+  promotionTemplate:
+    spec:
+      # 内置 step 名称依据 kargo v1.12.1 源码树反推 (git_cloner.go / git_commiter.go /
+      # git_pusher.go -> git-clone / git-commit / git-push), 非猜测。
+      # ⚠️ 各 step 的 `config` **内部**字段名未经官方 promotion step 参考表逐项核对
+      #    (见文末「唯一残留的不确定面」)。server dry-run 校验不到这一层。
+      steps:
+        - uses: kargo.akuity.io/git-clone
+          config:
+            repoURL: https://github.com/UlyssesLeoLee/Star
+            checkout:
+              - branch: deploy/dev
+                fromBranch: main
+            path: ./.kargo
+        - uses: kargo.akuity.io/git-commit
+          config:
+            path: ./.kargo
+            message: "chore(kargo): promote freight to dev"
+        - uses: kargo.akuity.io/git-push
+          config:
+            remote: origin
+            branch: deploy/dev
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage: staging — 从 dev 订阅, 需人工审批
+#
+# 第二阶段扩展 (staging → prod) 时, 在 `star` ns 内加同名的 ProjectConfig
+# (名字须与 Project 一致):
+#   apiVersion: kargo.akuity.io/v1alpha1
+#   kind: ProjectConfig
+#   metadata: { name: star, namespace: star }
+#   spec:
+#     promotionPolicies:
+#       - stageSelector: { name: dev }
+#         autoPromotionEnabled: true
+#       - stageSelector: { name: staging }
+#         autoPromotionEnabled: false        # 人工审批
+#   以及 Argo Rollouts Analysis 门禁
+#   (挂载点: Stage.spec.verification.analysisTemplates, per CRD schema 实测)
+#   参考 ADR-0054 §6.2 待办 #4
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: staging
+  namespace: star
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: star-services
+      sources:
+        # Freight 传递链: 只接受经由 dev Stage 晋级后的 Freight,
+        # 而非直接从 Warehouse 拉最新版本 (per CRD schema 实测: sources.stages 为 string 数组)
+        stages:
+          - dev
+        requiredSoakTime: 15m
+  promotionTemplate:
+    spec:
+      steps:
+        - uses: kargo.akuity.io/git-clone
+          config:
+            repoURL: https://github.com/UlyssesLeoLee/Star
+            checkout:
+              - branch: deploy/staging
+                fromBranch: deploy/dev
+            path: ./.kargo
+        - uses: kargo.akuity.io/git-commit
+          config:
+            path: ./.kargo
+            message: "chore(kargo): promote freight to staging"
+        - uses: kargo.akuity.io/git-push
+          config:
+            remote: origin
+            branch: deploy/staging

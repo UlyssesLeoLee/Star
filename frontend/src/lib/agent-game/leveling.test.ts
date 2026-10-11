@@ -49,7 +49,7 @@ const baseAgent: AgentSession = {
 };
 
 const makeWi = (priority: WorkItem["priority"]): WorkItem => ({
-  id: "wi-001",
+  id: "test-wi-001",
   tenant_id: "ten-acme",
   project_id: "prj-physis",
   key: "PHYSIS-1",

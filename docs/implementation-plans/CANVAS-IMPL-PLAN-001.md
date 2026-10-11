@@ -386,7 +386,7 @@ cargo test -p <crate> --lib -j 4     # N/N PASS (单 crate 实证, per 守门 #1
 
 ### 7.4 关键依赖 (per 守门 #1 累积规 + 守门 #19 v19 累积规)
 
-- **rust toolchain**: 1.75+ (per Cargo.toml)
+- **rust toolchain**: 1.99.0 (per Cargo.toml)
 - **memgraph**: V0.1 + r2d2-memgraph crate 落地 (per ARG.10 G-1 v0.81 stub path)
 - **postgres**: star-pg-adapter 11 Repository (per v0.85 P0-4 Stage 3.2 收官)
 - **langgraph**: Python 3.11+ + PyO3 binding

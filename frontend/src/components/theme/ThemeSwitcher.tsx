@@ -64,7 +64,7 @@ export function ThemeSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="size-9 grid place-items-center text-base border-2 border-black bg-[var(--cel-surface-card,#0f1422)] hover:bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] transition-all cel-shadow shrink-0"
+        className="size-9 grid place-items-center text-base border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] hover:bg-[var(--cel-surface-sub,var(--color-surface))] text-[var(--cel-text-primary,var(--color-text))] transition-all cel-shadow shrink-0"
         aria-label="theme switcher"
         aria-expanded={open}
         title={`${current.displayName} (${current.id})`}
@@ -75,7 +75,7 @@ export function ThemeSwitcher() {
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 mt-2 w-48 border-2 border-black bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] cel-shadow-lg z-50 overflow-hidden"
+          className="absolute right-0 mt-2 w-52 border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] text-[var(--cel-text-primary,var(--color-text))] cel-shadow-lg z-50 overflow-hidden backdrop-blur-xl"
         >
           {THEMES.map((t) => (
             <button
@@ -86,16 +86,16 @@ export function ThemeSwitcher() {
                 setTheme(t.id as ThemeId);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--cel-surface-sub,#151c2c)] flex items-center justify-between border-b border-black/40 ${
-                t.id === theme ? "text-[var(--cel-cyan,#00f0ff)] bg-[var(--cel-surface-sub,#151c2c)]" : ""
+              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-[var(--cel-surface-sub,var(--color-surface))] flex items-center justify-between border-b border-[var(--cel-ink,var(--color-border))]/20 transition-colors ${
+                t.id === theme ? "text-[var(--cel-cyan,var(--color-primary))] bg-[var(--cel-surface-sub,var(--color-surface))] font-bold" : ""
               }`}
             >
-              <span className="flex items-center gap-2">
-                <span className="text-base">{getThemeIcon(t)}</span>
-                <span className="font-mono text-xs uppercase">{t.id}</span>
-                <span className="text-[11px] text-[var(--cel-text-secondary,#94a3b8)]">({t.displayName})</span>
+              <span className="flex items-center gap-2.5">
+                <span className="text-lg">{getThemeIcon(t)}</span>
+                <span className="font-mono text-xs uppercase font-bold tracking-wider">{t.id}</span>
+                <span className="text-xs text-[var(--cel-text-secondary,var(--color-text-dim))]">({t.displayName})</span>
               </span>
-              {t.id === theme && <span aria-hidden className="text-[var(--cel-cyan,#00f0ff)] font-black">✓</span>}
+              {t.id === theme && <span aria-hidden className="text-[var(--cel-cyan,var(--color-primary))] font-black">✓</span>}
             </button>
           ))}
         </div>

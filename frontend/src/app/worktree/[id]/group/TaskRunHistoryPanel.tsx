@@ -1,3 +1,15 @@
+/* @cypher schema=1 source_sha256=098b8b768920973acb1cd455732d8c4c282c86c32589792d538feb503f64339b
+MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/TaskRunHistoryPanel.tsx"})
+MERGE (panel:Symbol {id:"frontend/src/app/worktree/[id]/group/TaskRunHistoryPanel.tsx::TaskRunHistoryPanel",kind:"function"})
+MERGE (summary:Type {id:"frontend/src/lib/group/worktreeGroupApi.ts::TaskRunSummary",kind:"interface"})
+MERGE (self)-[:DEFINES]->(panel)
+MERGE (panel)-[:USES_TYPE]->(summary)
+MERGE (panel)-[:READS]->(:Field {id:"TaskRunSummary.admission_state"})
+MERGE (panel)-[:READS]->(:Field {id:"TaskRunSummary.admission_attempt"})
+MERGE (panel)-[:READS]->(:Field {id:"TaskRunSummary.created_at"})
+MERGE (panel)-[:READS]->(:Field {id:"TaskRunSummary.started_at"})
+@endcypher
+*/
 /* CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"TaskRunHistoryPanel.tsx",type:"file",language:"typescript"}),
@@ -14,6 +26,16 @@ CREATE (file)-[:CONTAINS]->(panel),(file)-[:CONTAINS]->(refresh),(file)-[:CONTAI
 MATCH (file:File {name:"TaskRunHistoryPanel.tsx"}),(panel:Function {name:"TaskRunHistoryPanel"});
 CREATE (profileSnapshot:Logic {name:"run_profile_snapshot_projection",type:"logic",language:"typescript"});
 CREATE (file)-[:CONTAINS]->(profileSnapshot),(panel)-[:USES]->(profileSnapshot);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (panel:Function {name:"TaskRunHistoryPanel"});
+CREATE (admissionState:Variable {name:"run.admission_state",type:"variable",language:"typescript"}),
+       (admissionAttempt:Variable {name:"run.admission_attempt",type:"variable",language:"typescript"}),
+       (createdAt:Variable {name:"run.created_at",type:"variable",language:"typescript"}),
+       (startedAt:Variable {name:"run.started_at",type:"variable",language:"typescript"});
+CREATE (panel)-[:USES]->(admissionState),(panel)-[:USES]->(admissionAttempt),
+       (panel)-[:USES]->(createdAt),(panel)-[:USES]->(startedAt);
 */
 
 "use client";
@@ -161,10 +183,32 @@ export function TaskRunHistoryPanel({ worktreeId, workItemId, api }: TaskRunHist
               >
                 <span className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono">{run.run_id}</span>
-                  <span className="rounded border border-line px-1.5 py-0.5">{run.execution_state ?? "unknown"}</span>
+                  <span className="rounded border border-line px-1.5 py-0.5">
+                    {run.admission_state === "provisional"
+                      ? "待 Schedule 确认"
+                      : run.admission_state === "confirmed"
+                        ? "已确认，待启动"
+                        : run.admission_state === "compensated"
+                          ? "已补偿"
+                          : run.execution_state ?? "unknown"}
+                  </span>
                 </span>
                 <span className="mt-1 block text-ink-mute">
-                  {run.run_origin} · {run.execution_channel} · {new Date(run.started_at).toLocaleString()}
+                  {run.run_origin} · {run.execution_channel} · {run.admission_state === "provisional"
+                    ? "Schedule 申请待确认"
+                    : run.admission_state === "confirmed"
+                      ? "Schedule 已确认，等待执行"
+                      : run.admission_state === "compensated"
+                        ? "Schedule 申请已补偿"
+                        : "已开始执行"}
+                  {run.run_origin === "schedule" && run.admission_attempt !== null
+                    ? ` · Schedule 尝试 ${run.admission_attempt}`
+                    : ""}
+                  {run.admission_state === "started" && run.started_at
+                    ? ` · ${new Date(run.started_at).toLocaleString()}`
+                    : run.created_at
+                      ? ` · 已创建 ${new Date(run.created_at).toLocaleString()}`
+                      : " · 时间未记录"}
                 </span>
                 <span className="mt-1 block text-ink-mute">
                   verify: {run.verification_state ?? "unknown"} · acceptance: {run.human_acceptance_state ?? "unknown"}

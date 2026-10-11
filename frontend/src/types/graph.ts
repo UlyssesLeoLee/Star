@@ -42,7 +42,7 @@ export interface GraphNodeStyle {
 }
 
 export interface GraphNode {
-  /** 内部 id, 格式 "{KIND_PREFIX}:{uuid_or_path}", e.g. "WI:wi-001" */
+  /** 内部 id, 格式 "{KIND_PREFIX}:{uuid_or_path}", e.g. "WI:<task-id>" */
   id: string;
   kind: GraphNodeKind;
   /** 节点显示文本 (key/title/name) */

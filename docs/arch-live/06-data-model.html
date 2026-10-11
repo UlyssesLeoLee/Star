@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 06 数据模型</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 06 · 持久化</div>
+    <h1>150 张表，三条分类轴</h1>
+    <p class="lead">数据层不是"随手加表"。它有<b>两套正交的分类</b>：按 schema 分（谁拥有这张表），
+      按 <b>W/T/M</b> 分（这张表怎么活、怎么死）。第二套才是决定表结构的真正约束。</p>
+  </section>
+
+  <h2 class="sec">01 schema 分布</h2>
+  <div class="grid g4 rv">
+    <div class="stat"><span class="dot"></span><div class="n" data-count="150" data-fact="db_tables">150</div><div class="k">CREATE TABLE 总数</div><div class="m">43 个 migration</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="46" data-fact="db_multica">46</div><div class="k">multica</div><div class="m">Run / Worktree / Task / Agent 执行</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="7" data-fact="db_automation">7</div><div class="k">automation</div><div class="m">排程与 occurrence</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="5" data-fact="db_canvas">5</div><div class="k">canvas</div><div class="m">元素 / 引用 / 文档</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="5" data-fact="db_plugin">5</div><div class="k">plugin</div><div class="m">插件注册</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="3" data-fact="db_permission">3</div><div class="k">permission</div><div class="m">角色绑定</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="2" data-fact="db_scm">2</div><div class="k">scm</div><div class="m">仓库与分支</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="6" data-fact="db_schemas">6</div><div class="k">显式 schema 数</div><div class="m">+ public 默认 schema</div></div>
+  </div>
+  <div class="note warn">
+    <b>统计口径提醒：</b>150 张表里只有 68 张带 schema 前缀，其余落在 <code>public</code>。
+    写脚本统计时<b>不能用 "schema.table" 形式的正则</b>，否则会把 82 张表漏掉——本页数字由脚本同时统计两类得出。
+  </div>
+
+  <h2 class="sec">02 multica 46 张表按主题</h2>
+  <p><code>multica</code> 是新架构的绝对重心（46 / 150 = 31%）。它不是"多 ICA 业务域"，而是
+    <b>多 Agent 协作的运行态存储</b>——Run、Worktree 归属、Task 生命周期、执行记录、Hook、资源预留、群聊，全部在这里。</p>
+  <div class="card rv">
+<div class="row"><div class="rn"><span class="badge b-domain">engineering_run</span></div><div class="bar" data-fill="40"><i></i></div><div class="rv">4 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>engineering_directory_event</code>, <code>engineering_run</code>, <code>engineering_run_revision</code>, <code>engineering_run_worktree_binding</code></div>
+<div class="row"><div class="rn"><span class="badge b-domain">worktree</span></div><div class="bar" data-fill="40"><i></i></div><div class="rv">4 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>worktree_management_audit</code>, <code>worktree_management_plan</code>, <code>worktree_owner_assignment</code>, <code>worktree_project_binding</code></div>
+<div class="row"><div class="rn"><span class="badge b-domain">task_lifecycle</span></div><div class="bar" data-fill="70"><i></i></div><div class="rv">7 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>task_command_idempotency</code>, <code>task_contract</code>, <code>task_contract_change_audit</code>, <code>task_lifecycle_audit</code> <span class='sub'>+3 张</span></div>
+<div class="row"><div class="rn"><span class="badge b-domain">execution_run</span></div><div class="bar" data-fill="40"><i></i></div><div class="rv">4 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>task_execution_evidence</code>, <code>task_execution_run</code>, <code>task_execution_run_event</code>, <code>task_execution_run_idempotency</code></div>
+<div class="row"><div class="rn"><span class="badge b-domain">execution_profile</span></div><div class="bar" data-fill="100"><i></i></div><div class="rv">10 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>agent_execution_catalog_audit_event</code>, <code>agent_execution_catalog_revision</code>, <code>agent_execution_grant_capability</code>, <code>agent_execution_grant_set</code> <span class='sub'>+6 张</span></div>
+<div class="row"><div class="rn"><span class="badge b-domain">resource</span></div><div class="bar" data-fill="50"><i></i></div><div class="rv">5 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>project_execution_resource_admission_lock</code>, <code>project_execution_resource_quota</code>, <code>project_execution_resource_quota_audit_event</code>, <code>project_execution_resource_reservation</code> <span class='sub'>+1 张</span></div>
+<div class="row"><div class="rn"><span class="badge b-domain">hook</span></div><div class="bar" data-fill="40"><i></i></div><div class="rv">4 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>hook_execution_event</code>, <code>hook_policy_audit_event</code>, <code>hook_policy_draft</code>, <code>hook_policy_set</code></div>
+<div class="row"><div class="rn"><span class="badge b-domain">group_chat</span></div><div class="bar" data-fill="70"><i></i></div><div class="rv">7 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>group_chat_audit_event</code>, <code>group_chat_dispatch_event</code>, <code>group_chat_idempotency</code>, <code>group_chat_message</code> <span class='sub'>+3 张</span></div>
+<div class="row"><div class="rn"><span class="badge b-domain">other</span></div><div class="bar" data-fill="10"><i></i></div><div class="rv">1 张</div></div><div class="sub" style="margin:-2px 0 8px"><code>work_item_worktree</code></div>
+  </div>
+  <div class="note">
+    <b>读表名的方法：</b>后缀即语义。<code>_audit</code> = 审计（只追加，禁删改）；<code>_revision</code> = 版本（不可变快照）；
+      <code>_idempotency</code> = 幂等键（去重）；<code>_event</code> = 事件（append-only）；<code>_outbox</code> = 事务性发件箱；
+      <code>_lock</code> = 互斥锁状态。前缀即归属域。看到后缀就能推断表的读写契约，不用翻设计文档。
+  </div>
+
+  <h2 class="sec">03 W/T/M 三类横展 <span class="badge b-infra">硬约束</span></h2>
+  <p>所有 DB 基本设计阶段<b>必须</b>把表分门别类到三类之一，100% 覆盖，禁止"混在一块列"：</p>
+  <div class="grid g3 rv">
+    <div class="card" style="border-color:rgba(251,191,36,.45)">
+      <h4><span class="badge b-warn">W</span> Work（作业中）</h4>
+      <p style="font-size:12.7px">流程中的临时态：session-bound，完成即清理。</p>
+      <p class="mono" style="font-size:11.5px;margin-top:8px;line-height:1.9">
+        物理删除：允许<br>
+        过期：定时器<br>
+        retention_period：<b>必填</b>
+      </p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)">例：CLI session、heartbeat 之外的临时缓存、排队中的 job</p>
+    </div>
+    <div class="card" style="border-color:rgba(56,225,255,.45)">
+      <h4><span class="badge b-domain">T</span> Transaction（业务事实）</h4>
+      <p style="font-size:12.7px">事件流水：append-only，是审计与复盘的依据。</p>
+      <p class="mono" style="font-size:11.5px;margin-top:8px;line-height:1.9">
+        物理删除：<b>禁止</b><br>
+        审计：<b>必填</b><br>
+        RLS 13 类：<b>必携</b>
+      </p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)">例：<code>task_lifecycle_audit</code>、<code>task_execution_run_event</code>、<code>hook_execution_event</code></p>
+    </div>
+    <div class="card" style="border-color:rgba(52,211,153,.45)">
+      <h4><span class="badge b-ok">M</span> Master（参考 / 设定）</h4>
+      <p style="font-size:12.7px">参考数据与慢变配置：变更要走历史版本。</p>
+      <p class="mono" style="font-size:11.5px;margin-top:8px;line-height:1.9">
+        物理删除：<b>禁止</b><br>
+        SCD：<b>Type 2</b><br>
+        RLS 13 类：<b>必携</b>
+      </p>
+      <p style="font-size:12.5px;margin-top:8px;color:var(--txt-3)">例：<code>project_role_binding</code>（valid_from/valid_to 生效期）、quota、profile catalog</p>
+    </div>
+  </div>
+  <div class="note err">
+    <b>混合分类的处理规则：</b>若一张表同时像 M 和 T（典型：带"当前态 + 历史"双表的模式），
+    <b>主分类单计</b>，并在"已知缺口"里显式列出待 DDD Review Lead 确认——不允许含糊带过。
+    其余多分类横展（status / role / permission / policy / event / tag / category…）按同一规则全部独立列举。
+  </div>
+
+  <h2 class="sec">04 SCD Type 2 的实际形态</h2>
+  <p>Master 类表不做 UPDATE 覆盖，而是"关掉旧行 + 插入新行"。这就是为什么权限查询长这样：</p>
+  <pre data-copy>SELECT id, role, version
+FROM permission.project_role_binding
+WHERE tenant_id = $1
+  AND project_id = $2
+  AND user_id = $3
+  AND valid_from &lt;= now()      -- 已生效
+  AND valid_to IS NULL            -- 未失效 = 当前版本
+FOR SHARE</pre>
+  <div class="grid g2 rv" style="margin-top:12px">
+    <div class="card">
+      <h4>为什么用 <code>valid_to IS NULL</code> 而不是 <code>valid_to &gt; now()</code></h4>
+      <p style="font-size:12.8px">后者需要"未来生效"的记录提前可见，权限就会提前泄漏。用 NULL 表示"尚未失效"，
+        配合 <code>valid_from ≤ now()</code>，任何时刻的权限集合都是<b>唯一且确定</b>的。
+        <code>FOR SHARE</code> 再保证读到的行不会在本事务中途被改掉。</p>
+    </div>
+    <div class="card">
+      <h4>回滚为什么也是"新增 revision"</h4>
+      <p style="font-size:12.8px">Hook 策略回滚不删记录，而是生成一个新 revision 指回旧内容。
+        这样"曾经发布过什么"永远可查——对安全策略来说，"能证明某时段用的是哪个版本"和策略本身同等重要。</p>
+    </div>
+  </div>
+
+  <h2 class="sec">05 幂等表族 <span class="badge b-star">多 Agent 的必需品</span></h2>
+  <p>多 Agent 并发下，同一个意图被提交两次是常态而不是异常。4 张幂等表覆盖 4 类可重放动作：</p>
+  <div class="tbl-wrap rv"><table class="tbl">
+    <thead><tr><th>表</th><th>防护对象</th><th>冲突语义</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">multica.task_command_idempotency</td><td>Task 状态迁移命令</td><td>同 key 同内容 → 返回首次结果；同 key 不同内容 → 冲突</td></tr>
+      <tr><td class="mono">multica.task_execution_run_idempotency</td><td>执行运行</td><td>防止 Agent 重启后重复执行同一轮</td></tr>
+      <tr><td class="mono">multica.group_chat_idempotency</td><td>聊天消息投递</td><td>断线重连后重发不产生重复消息</td></tr>
+      <tr><td class="mono">automation.schedule_rule_command_idempotency</td><td>排程规则变更</td><td>自动触发与人工触发撞车时不双写</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <b>关键区别：</b>"同 key 不同内容"必须<b>报冲突</b>，不能静默返回首次结果。
+    静默吞掉会掩盖真实 bug（调用方参数错了却以为成功了）。<code>ScmError::IdempotencyConflict</code> 就是为此存在。
+  </div>
+
+  <h2 class="sec">06 RLS 525 条策略</h2>
+  <div class="grid g3 rv">
+    <div class="stat"><div class="n" data-count="525" data-fact="db_policies">525</div><div class="k">CREATE POLICY 总数</div><div class="m">行级安全策略</div></div>
+    <div class="stat"><div class="n" data-count="150" data-fact="db_tables">150</div><div class="k">受保护表数</div><div class="m">平均 3.5 条/表</div></div>
+    <div class="stat"><div class="n">13</div><div class="k">每表必携策略维度</div><div class="m">tenant / project / role / …</div></div>
+  </div>
+  <p>RLS 的执行前提是<b>会话里已经设好 tenant</b>——这就是<a href="03-request-lifecycle.html">请求生命周期第 7 步</a>
+    必须在事务开头执行 <code>set_config('app.tenant_id', …)</code> 的原因。
+    漏掉这一步，RLS 不会报错，只会<b>静默地</b>按策略默认值返回空集或全部——这类 bug 极难发现，所以把它放在第一步而不是最后一步。</p>
+  <div class="note warn">
+    <b>运维提醒：</b>RLS 策略依赖会话变量，所以<b>直连 psql</b> 查询与走 API 查询的结果可能不同。
+    排查"API 查不到但表里有数据"时，先确认会话 tenant 是否设置——这是最常见的一类误判。
+  </div>
+
+  <details class="ev">
+    <summary>证据：数字与规则的出处</summary>
+    <div class="evbody">
+      <ul>
+        <li>表数 / 策略数 / schema 数：由 <code>arch_live_doc_check.py</code> 扫描 <code>db/migrations/*.sql</code> 实测，并做下限守卫。</li>
+        <li>W/T/M 规则：<code>AGENTS.md</code> §4 守门 #13；参考手册 <code>docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md</code> 与 <code>00-CLASSIFICATION-RULES.md</code>。</li>
+        <li>权限表查询形态：<code>crates/star-api-rest/src/group_api.rs:596 active_binding</code>。</li>
+        <li>RLS 批量迁移：<code>db/migrations/2026-09-10-rls-7policy-all-tables.sql</code>、<code>…-rls-7policy-p3d6.sql</code>、<code>…-rls-policies-tenant-pools.sql</code>。</li>
+        <li>表族条形图：<code>--emit-db</code> 输出，可重新生成。</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 06 数据模型 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>下一册：<a href="07-deploy-topology.html">部署拓扑</a>。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

@@ -34,6 +34,19 @@
 #   - #7 0 unsafe (workspace lint 继承)
 #   - #19 0 动 V0.1 业务 logic (本脚本仅构建, 不改源码)
 # =====================================================================
+# @cypher schema=1 source_sha256=3733e61fe0160aae328c5ee2cf899380dc30c815cd1198d41884dcc68b513f73
+# MERGE (self:File {path:"scripts/build-desktop.sh"})
+# MERGE (npm_install:ExternalService {id:"npm.install",name:"npm install"})
+# MERGE (npm_build:ExternalService {id:"npm.run.build",name:"npm run build"})
+# MERGE (tauri_build:ExternalService {id:"cargo.tauri.build",name:"cargo tauri build"})
+# MERGE (artifact_scan:ExternalService {id:"find.bundle.artifacts",name:"find release bundle artifacts"})
+# MERGE (target_dir:Config {id:"CARGO_TARGET_DIR"})
+# MERGE (self)-[:CALLS]->(npm_install)
+# MERGE (self)-[:CALLS]->(npm_build)
+# MERGE (self)-[:CALLS]->(tauri_build)
+# MERGE (self)-[:CALLS]->(artifact_scan)
+# MERGE (self)-[:CONFIGURES]->(target_dir)
+# @endcypher
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -99,6 +112,7 @@ cd ..
 
 # 3. cargo tauri build
 echo "=== Step 3: cargo tauri build ==="
+export CARGO_TARGET_DIR="$STAR_DESKTOP_DIR/src-tauri/target"
 if [ -n "$TARGET" ]; then
   echo "Target: $TARGET"
   cargo tauri build --target "$TARGET" || {

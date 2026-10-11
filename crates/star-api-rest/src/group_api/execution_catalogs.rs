@@ -1,3 +1,29 @@
+//! @cypher schema=1 source_sha256=82860c4f0b492261b7ea66bcdd2729e1eef184dc265d2b8a877a665d9fa5362a
+//! MERGE (self:File {path:"crates/star-api-rest/src/group_api/execution_catalogs.rs"})
+//! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::module",kind:"module"})
+//! MERGE (load:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_current_execution_admission_snapshot",kind:"function"})
+//! MERGE (recheck:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::recheck_current_execution_admission_snapshot",kind:"function"})
+//! MERGE (profile:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_verified_profile",kind:"function"})
+//! MERGE (providers:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_provider_entries",kind:"function"})
+//! MERGE (skills:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_skill_entries",kind:"function"})
+//! MERGE (grants:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_grant_snapshot",kind:"function"})
+//! MERGE (hooks:Symbol {id:"crates/star-api-rest/src/group_api/hook_policies.rs::load_verified_effective_run_snapshot",kind:"function"})
+//! MERGE (self)-[:DEFINES]->(module)
+//! MERGE (module)-[:DEFINES]->(load)
+//! MERGE (module)-[:DEFINES]->(recheck)
+//! MERGE (module)-[:DEFINES]->(profile)
+//! MERGE (module)-[:DEFINES]->(providers)
+//! MERGE (module)-[:DEFINES]->(skills)
+//! MERGE (module)-[:DEFINES]->(grants)
+//! MERGE (load)-[:CALLS]->(profile)
+//! MERGE (load)-[:CALLS]->(providers)
+//! MERGE (load)-[:CALLS]->(skills)
+//! MERGE (load)-[:CALLS]->(grants)
+//! MERGE (load)-[:CALLS]->(hooks)
+//! MERGE (recheck)-[:CALLS]->(profile)
+//! MERGE (recheck)-[:CALLS]->(grants)
+//! @endcypher
+
 //! CYPHER STRUCTURAL MANIFEST
 //! CREATE
 //!   (f:File {name:"execution_catalogs.rs",type:"file",language:"rust"}),
@@ -279,7 +305,7 @@ async fn load_verified_profile(
                rtrim(content_digest::text) AS content_digest, profile_document
         FROM multica.agent_execution_profile
         WHERE tenant_id = $1 AND project_id = $2 AND profile_id = $3
-          AND valid_to IS NULL AND lifecycle_state = 'active'
+          AND valid_from <= now() AND valid_to IS NULL AND lifecycle_state = 'active'
           AND (scope_kind = 'project' OR (scope_kind = 'worktree' AND worktree_id = $4))
         FOR SHARE
         "#,
@@ -390,7 +416,7 @@ async fn load_provider_entries(
                   capability_count, available
            FROM multica.agent_execution_provider_catalog
            WHERE tenant_id = $1 AND project_id = $2 AND provider_id::text = ANY($3::text[])
-             AND valid_to IS NULL
+             AND valid_from <= now() AND valid_to IS NULL
            ORDER BY provider_id"#,
     )
     .bind(tenant_id)
@@ -452,7 +478,7 @@ async fn load_skill_entries(
                   rtrim(content_digest::text) AS content_digest, capability_count, available
            FROM multica.agent_execution_skill_catalog
            WHERE tenant_id = $1 AND project_id = $2 AND skill_id::text = ANY($3::text[])
-             AND valid_to IS NULL
+             AND valid_from <= now() AND valid_to IS NULL
            ORDER BY skill_id"#,
     )
     .bind(tenant_id)
@@ -525,7 +551,8 @@ async fn load_grant_snapshot(
     let row = sqlx::query_as::<_, GrantCatalogRow>(
         r#"SELECT grant_set_id, grant_set_version, capability_count, expires_at_epoch_ms
            FROM multica.agent_execution_grant_set
-           WHERE tenant_id = $1 AND project_id = $2 AND valid_to IS NULL
+           WHERE tenant_id = $1 AND project_id = $2
+             AND valid_from <= now() AND valid_to IS NULL
            FOR SHARE"#,
     )
     .bind(tenant_id)
@@ -539,7 +566,8 @@ async fn load_grant_snapshot(
            FROM multica.agent_execution_grant_capability
            WHERE tenant_id = $1 AND entry_id = (
                 SELECT entry_id FROM multica.agent_execution_grant_set
-                WHERE tenant_id = $1 AND project_id = $2 AND valid_to IS NULL
+                WHERE tenant_id = $1 AND project_id = $2
+                  AND valid_from <= now() AND valid_to IS NULL
            )
            ORDER BY capability_code"#,
     )

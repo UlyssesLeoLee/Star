@@ -19,7 +19,7 @@
 // 已知缺口 (per 缺标比错标安全, 8/26 JST):
 //   1. POST 真实持久化 P3 — Phase F+ 后端就绪时
 //   2. coverage endpoint 仅按 work_item_id 查, 不支持 level 二次过滤 (per test-design §6.2.1 留 P2)
-//   3. MOCK_VALIDATION_RESULTS 与 MOCK_ACCEPTANCE_COVERAGE 数据联动派生 P2 (mock 用于展示形态)
+//   3. Mock mode returns no fabricated Task Card validation history.
 
 import { http, HttpResponse } from "msw";
 import {

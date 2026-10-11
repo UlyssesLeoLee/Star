@@ -28,22 +28,22 @@
 //! CREATE (m)-[:CONTAINS]->(tests),(tests)-[:CONTAINS]->(fixture),(tests)-[:CONTAINS]->(test_limits),(tests)-[:CONTAINS]->(test_cursor),(tests)-[:CONTAINS]->(test_verify),(tests)-[:CONTAINS]->(test_cache),(test_limits)-[:CALLS]->(limit),(test_cursor)-[:CALLS]->(cursor),(fixture)-[:CALLS]->(verify),(test_verify)-[:CALLS]->(fixture),(test_verify)-[:CALLS]->(verify),(test_cache)-[:CALLS]->(store),(router)-[:USES]->(response_middleware),(response_middleware)-[:CALLS]->(store);
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
-    http::{HeaderValue, header},
+    http::{header, HeaderValue},
     middleware::map_response,
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use domain_agent::execution_profile::{AgentExecutionProfileDocument, ExecutionProfileScope};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::FromRow;
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
+    GroupApiState,
 };
 
 const DEFAULT_PROFILE_LIMIT: i64 = 20;
@@ -318,9 +318,9 @@ async fn no_store_response(response: Response) -> Response {
 mod tests {
     use super::*;
     use domain_agent::execution_profile::{
-        AgentExecutionProfileDraft, ContextPolicySnapshot, EXECUTION_PROFILE_SCHEMA_VERSION,
-        GrantSnapshot, HookSetSnapshot, LoopBudgetSnapshot, MemoryPolicySnapshot,
-        ProviderReference, ResourceBudgetSnapshot, SkillBindingSnapshot, ValidationPolicySnapshot,
+        AgentExecutionProfileDraft, ContextPolicySnapshot, GrantSnapshot, HookSetSnapshot,
+        LoopBudgetSnapshot, MemoryPolicySnapshot, ProviderReference, ResourceBudgetSnapshot,
+        SkillBindingSnapshot, ValidationPolicySnapshot, EXECUTION_PROFILE_SCHEMA_VERSION,
     };
 
     fn digest(character: char) -> String {

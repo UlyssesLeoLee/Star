@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star 架构动态图谱 · 02 导航模型</title>
+<link rel="stylesheet" href="assets/arch.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <a class="brand" href="index.html"><span class="brand-mark"></span> Star 架构动态图谱</a>
+  <nav class="navlinks">
+    <a href="index.html">总览</a>
+    <a href="01-crate-map.html">Crate 地图</a>
+    <a href="02-navigation-model.html">导航模型</a>
+    <a href="03-request-lifecycle.html">请求生命周期</a>
+    <a href="04-agent-runtime.html">Agent 闭环</a>
+    <a href="05-worktree-canvas.html">Canvas / ARG</a>
+    <a href="06-data-model.html">数据模型</a>
+    <a href="07-deploy-topology.html">部署拓扑</a>
+    <a href="08-guardrails.html">守门与 CI</a>
+  </nav>
+  <button class="themebtn" id="themeBtn">☀ 亮色</button>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">分册 02 · 结构主轴</div>
+    <h1>Project → Branch → Run → Worktree</h1>
+    <p class="lead">这一条链是整个产品的<b>结构主轴</b>：左侧导航、REST 路由、数据库表、前端页面全部按它对齐。
+      理解了这条链，105 个 crate 和 150 张表就有了归属位置——不需要逐个读。</p>
+  </section>
+
+  <h2 class="sec">01 四级模型与各自的职责</h2>
+  <p>四个概念的身份不同，这是最容易混淆的地方：</p>
+
+  <div class="stack rv">
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-fe)"></span>
+      <div class="lh"><span class="lname">① Project</span><span class="badge b-mute">云端</span><span class="lmeta">跨仓库的归属边界 · 租户内隔离单元</span></div>
+      <div class="lbody">一个长期存在的项目容器。它持有成员（members）、仓库清单与角色绑定。所有 RLS 策略的 <code>project_id</code> 维度都指到这里。Project 本身不"干活"，它定义谁能在哪儿干。</div>
+    </div>
+    <div class="arrowdown">▼</div>
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-edge)"></span>
+      <div class="lh"><span class="lname">② Branch（云端分支身份）</span><span class="badge b-mute">远端</span><span class="lmeta">git 分支 · 远端身份而非本地 checkout</span></div>
+      <div class="lbody">远端分支的<b>身份</b>，不是本地目录。它是 Project 下的协作线，Run 挂在它身上。注意：分支存在 ≠ 有人在上面写代码。</div>
+    </div>
+    <div class="arrowdown">▼</div>
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-star)"></span>
+      <div class="lh"><span class="lname">③ Engineering Run</span><span class="badge b-star">协作工作区</span><span class="lmeta">canonical workspace · 任务/Canvas/分析的归属</span></div>
+      <div class="lbody"><b>Run 是"协作"的唯一归属地</b>：Work Item、Canvas、Workflow、BI/Benchmark、Plugin App、Agent/Runtime 生命周期都属于某个 Run。Run 固定 profile/version/digest 与资源预算，并持有 Run 快照（供 Hook 判定）。</div>
+    </div>
+    <div class="arrowdown">▼</div>
+    <div class="layer">
+      <span class="lbar" style="background:var(--c-domain)"></span>
+      <div class="lh"><span class="lname">④ Worktree</span><span class="badge b-domain">本地 checkout</span><span class="lmeta">绑定 Branch 的本地目录 · 一次可运行的工作面</span></div>
+      <div class="lbody">真正落盘、能跑 CLI/Agent 的本地 checkout。选中 Run 内的 Worktree 才打开右侧 App tabs，并把它设为当前焦点与 CLI checkout 目标——<b>焦点只有一个</b>。</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>选中的含义：</b>Project Worktree Index 可以汇总跨 Branch/Run/Worktree 的状态，但那是<b>只读汇总视图</b>，
+    不取代 Branch → Run 主导航。一旦用通用任务列表或本地 seed 冒充生产管理，就破坏了这条轴。
+  </div>
+
+  <h2 class="sec">02 前端路由树 <span class="badge b-fe">57 page.tsx</span></h2>
+  <p>主干链路在 <code>(app)</code> 路由组里，是动态段；其余是并列的领域页面。点击展开。</p>
+  <div class="grid g2 rv">
+    <div class="card">
+      <h4>主干（动态段，真实路径）</h4>
+      <div class="tree">
+        <details open><summary>(app) 主应用组</summary><div class="kids">
+          <div>/inbox</div>
+          <div>/projects</div>
+          <details open><summary>/projects/[project_id] <span class="badge b-mute tag">Project</span></summary><div class="kids">
+            <details open><summary>/branches/[branch_id] <span class="badge b-mute tag">Branch</span></summary><div class="kids">
+              <details open><summary>/runs/[engineering_run_id] <span class="badge b-star tag">Run</span></summary><div class="kids">
+                <details open><summary>/worktrees/[worktree_id] <span class="badge b-domain tag">Worktree</span></summary><div class="kids">
+                  <div>← 选中后才打开右侧 App tabs / CLI checkout</div>
+                </div></details>
+              </div></details>
+            </div></details>
+          </div></details>
+          <div>/analytics · /sprint · /agents</div>
+          <div>/agent-relationships · /agent-view · /agent-windows</div>
+        </div></details>
+      </div>
+    </div>
+    <div class="card">
+      <h4>并列领域页面（按 bounded context）</h4>
+      <div class="tree">
+        <details open><summary>业务域</summary><div class="kids">
+          <div>work-item · workflow · board · sprint</div>
+          <div>worktree · worktree/[id]/group · worktree/chat</div>
+          <div>canvas/[id] · collaboration · comment</div>
+          <div>project · workspace · planning · tenant</div>
+          <div>identity · permission · audit</div>
+          <div>scm · review 相关 · validation</div>
+          <div>agent · search · context · relation</div>
+        </div></details>
+        <details><summary>运行时 / 工具面</summary><div class="kids">
+          <div>local-runtime · remote/{desktop,files,terminal}/[id]</div>
+          <div>automation · automation-debug · ops</div>
+          <div>(worktree-canvas) · wasm-demo · terminal-stack-demo</div>
+          <div>offline · notification · development/annotate</div>
+        </div></details>
+        <details><summary>设置（高级设置是选项卡，不是树节点）</summary><div class="kids">
+          <div>/settings · /settings/advanced/[tab]</div>
+          <div>/settings/api-keys · /settings/cli-profiles · /settings/credentials</div>
+        </div></details>
+      </div>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <b>Hook 配置为什么不在这棵树里：</b>它属于"高级设置 → Hooks"选项卡，与 Skills/MCP/Plugins 并列，
+    必须是 typed、无代码的可视化编辑。Worktree 树、Run Detail、BI 里只显示<b>有效策略的执行结果</b>并深链回该选项卡——
+    树节点里不允许出现策略编辑器。
+  </div>
+
+  <h2 class="sec">03 REST 路由组 <span class="badge b-star">16 组 / 50 模板</span></h2>
+  <p>路由按<b>资源归属层级</b>组织，从 <code>/projects</code> 一路下沉到 <code>/worktrees/{id}/…</code>。
+    越靠下的路径越贴近运行现场，也越容易被多 Agent 并发触碰——这决定了它们同时需要锁与幂等。</p>
+  <div class="tabs" data-tabs="routes">
+    <button data-tab="l1" aria-selected="true">Project / Branch 层</button>
+    <button data-tab="l2" aria-selected="false">Run 层</button>
+    <button data-tab="l3" aria-selected="false">Worktree 层</button>
+    <button data-tab="l4" aria-selected="false">Work Item / Hook 层</button>
+    <button data-tab="l5" aria-selected="false">Canvas / Chat 层</button>
+  </div>
+
+  <div data-tabgroup="routes">
+    <div class="panel" data-tab="l1">
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>方法</th><th>路径</th><th>组模块</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects</td><td class="mono">worktrees</td><td>当前 actor 被授权的 Project 列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/members</td><td class="mono">worktrees</td><td>项目成员与角色</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/branches</td><td class="mono">engineering_runs</td><td>云端分支身份列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/branches/{branch_id}/engineering-runs</td><td class="mono">engineering_runs</td><td>该分支下的 Run 列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/worktrees</td><td class="mono">worktrees</td><td>项目下所有 Worktree 及状态</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/worktree-repositories</td><td class="mono">worktree_lifecycle</td><td>可导入的仓库清单</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/worktree-import-candidates</td><td class="mono">worktree_lifecycle</td><td>导入候选（已存在/冲突标记）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/projects/{project_id}/worktrees</td><td class="mono">worktree_lifecycle</td><td>创建 Worktree（需二次确认流程）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/projects/{project_id}/worktrees/import</td><td class="mono">worktree_lifecycle</td><td>导入既有 worktree</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="panel" data-tab="l2" hidden>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>方法</th><th>路径</th><th>组模块</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/engineering-runs/{engineering_run_id}/worktrees</td><td class="mono">engineering_runs</td><td>Run 管理的 Worktree 列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/engineering-runs/{engineering_run_id}/context</td><td class="mono">engineering_runs</td><td>Run 上下文（profile/digest/预算快照）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/run-context</td><td class="mono">engineering_runs</td><td>反查：Worktree 属于哪个 Run</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/engineering-runs/{run_id}/work-items</td><td class="mono">work_items</td><td>Run 级任务列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{p}/engineering-runs/{run_id}/automation/schedule-rules</td><td class="mono">schedule_rules</td><td>Run 的自动化排程规则</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/automation/schedule-rules/{rule_id}</td><td class="mono">schedule_rules</td><td>单条排程规则</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="panel" data-tab="l3" hidden>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>方法</th><th>路径</th><th>组模块</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/group-context</td><td class="mono">group_api.rs 内联</td><td>Worktree 的整体上下文（导航展开用）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/execution-profiles</td><td class="mono">execution_profiles</td><td>可用执行 profile</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/execution-profiles/{profile_id}</td><td class="mono">execution_profiles</td><td>单个 profile 详情</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/projects/{project_id}/execution-profiles/{profile_id}/lifecycle</td><td class="mono">execution_profile_admin</td><td>Project 级 profile 生命周期</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/worktrees/{worktree_id}/execution-profiles/{profile_id}/lifecycle</td><td class="mono">execution_profile_admin</td><td>Worktree 级 profile 生命周期</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/group-apps</td><td class="mono">group_apps</td><td>该 Worktree 打开的右侧 App tabs</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/worktrees/{worktree_id}/management-plans</td><td class="mono">worktrees</td><td>生成变更管理计划（批量操作前置）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/worktrees/{worktree_id}/management-plans/{plan_id}/confirm</td><td class="mono">worktrees</td><td>确认并执行计划</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="panel" data-tab="l4" hidden>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>方法</th><th>路径</th><th>组模块</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/work-items</td><td class="mono">work_items</td><td>Worktree 内任务</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}</td><td class="mono">work_items</td><td>任务详情</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">…/work-items/{work_item_id}/lifecycle</td><td class="mono">work_items</td><td><b>状态机推进</b>（唯一合法迁移入口）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">…/work-items/{work_item_id}/review</td><td class="mono">work_items</td><td>提交评审</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/work-items/{work_item_id}/runs</td><td class="mono">task_runs</td><td>任务的执行运行历史</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/work-items/{work_item_id}/runs/{run_id}</td><td class="mono">task_runs</td><td>单次执行详情（含证据）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/work-items/{work_item_id}/cli-sessions</td><td class="mono">cli_sessions</td><td>CLI 会话列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/cli-sessions/{session_id}</td><td class="mono">cli_sessions</td><td>会话详情</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">…/cli-sessions/{session_id}/attachment-tickets</td><td class="mono">cli_sessions</td><td>申请附件票据（限定范围授权）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/hook-policy</td><td class="mono">hook_policies</td><td>Project 级已发布策略</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/hook-policy/effective</td><td class="mono">hook_policies</td><td><b>Worktree 实际生效策略</b>（含继承链解析）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/hook-events</td><td class="mono">hook_policies</td><td>Hook 执行事件流</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/hook-events/summary</td><td class="mono">hook_policies</td><td>事件聚合（BI 用）</td></tr>
+          <tr><td class="mono">PUT</td><td class="mono">/api/v1/projects/{project_id}/hook-policy/draft</td><td class="mono">hook_policies</td><td>存草稿（typed 编辑器提交）</td></tr>
+          <tr><td class="mono">PUT</td><td class="mono">/api/v1/worktrees/{worktree_id}/hook-policy/draft</td><td class="mono">hook_policies</td><td>Worktree 覆盖草稿</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/projects/{project_id}/hook-policy/publish</td><td class="mono">hook_policies</td><td>发布（生成新 revision）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/worktrees/{worktree_id}/hook-policy/publish</td><td class="mono">hook_policies</td><td>Worktree 级发布</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/projects/{project_id}/hook-policy/rollback</td><td class="mono">hook_policies</td><td>回滚到指定 revision</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/worktrees/{worktree_id}/hook-policy/rollback</td><td class="mono">hook_policies</td><td>Worktree 级回滚</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="panel" data-tab="l5" hidden>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>方法</th><th>路径</th><th>组模块</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/canvases</td><td class="mono">canvas</td><td>Worktree 下的 Canvas 列表</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/canvases/{canvas_id}/elements</td><td class="mono">canvas</td><td>Canvas 元素（节点/连线）</td></tr>
+          <tr><td class="mono">PUT</td><td class="mono">…/elements/{element_id}</td><td class="mono">canvas</td><td>更新元素（乐观并发）</td></tr>
+          <tr><td class="mono">PUT</td><td class="mono">…/elements/{element_id}/entity-ref</td><td class="mono">canvas</td><td>绑定到业务实体（Work Item / Task）</td></tr>
+          <tr><td class="mono">PUT</td><td class="mono">…/canvases/{canvas_id}/document</td><td class="mono">canvas</td><td>整文档写入（CRDT 合并结果）</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">…/canvases/{canvas_id}/events</td><td class="mono">canvas</td><td>Canvas 事件流</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">…/canvases/{canvas_id}/work-items</td><td class="mono">canvas</td><td>由 Canvas 元素创建 Work Item</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/worktrees/{worktree_id}/chat/targets</td><td class="mono">scoped_chat</td><td>可聊天目标（scope 限定）</td></tr>
+          <tr><td class="mono">POST</td><td class="mono">/api/v1/worktrees/{worktree_id}/chat/messages</td><td class="mono">scoped_chat</td><td>底栏聊天（WORKTREE / GLOBAL scope）</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note" style="margin-top:12px">
+        <b>底栏聊天的 scope 是二选一：</b><code>WORKTREE</code> 绑定当前 Run 内选中的 Worktree，
+        <code>GLOBAL</code> 不绑定具体 Worktree。存储走 <code>multica.group_chat_*</code> 族表（session / message / payload / dispatch_event / audit_event）。
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">04 从导航到数据库：一条路径贯穿四层</h2>
+  <p>这条链解释了为什么 DB schema 里到处是 <code>worktree_id</code>、<code>engineering_run_id</code>、<code>branch_id</code>——
+  它们不是冗余外键，而是同一棵树的四级指针。</p>
+  <div class="figure rv">
+    <svg viewBox="0 0 1040 300" role="img" aria-label="四级导航与数据库表的对应关系">
+      <g class="node g" style="animation-delay:.05s">
+        <rect x="20" y="30" width="200" height="56" rx="9" fill="rgba(244,114,182,.14)" stroke="#f472b6" stroke-opacity=".5"/>
+        <text x="36" y="52">Project</text><text class="sub2" x="36" y="70">worktree_project_binding</text>
+      </g>
+      <g class="node g" style="animation-delay:.15s">
+        <rect x="260" y="30" width="200" height="56" rx="9" fill="rgba(251,191,36,.14)" stroke="#fbbf24" stroke-opacity=".5"/>
+        <text x="276" y="52">Branch</text><text class="sub2" x="276" y="70">cloud_branch_role_binding</text>
+      </g>
+      <g class="node g" style="animation-delay:.25s">
+        <rect x="500" y="30" width="220" height="56" rx="9" fill="rgba(91,140,255,.16)" stroke="#5b8cff" stroke-opacity=".6"/>
+        <text x="516" y="52">Engineering Run</text><text class="sub2" x="516" y="70">multica.engineering_run</text>
+      </g>
+      <g class="node g" style="animation-delay:.35s">
+        <rect x="760" y="30" width="220" height="56" rx="9" fill="rgba(56,225,255,.14)" stroke="#38e1ff" stroke-opacity=".5"/>
+        <text x="776" y="52">Worktree</text><text class="sub2" x="776" y="70">multica.work_item_worktree</text>
+      </g>
+
+      <g class="node g" style="animation-delay:.5s">
+        <rect x="20" y="150" width="200" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
+        <text x="36" y="172">/projects/[project_id]</text><text class="sub2" x="36" y="190">前端动态段</text>
+      </g>
+      <g class="node g" style="animation-delay:.6s">
+        <rect x="260" y="150" width="200" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
+        <text x="276" y="172">/branches/[branch_id]</text><text class="sub2" x="276" y="190">前端动态段</text>
+      </g>
+      <g class="node g" style="animation-delay:.7s">
+        <rect x="500" y="150" width="220" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
+        <text x="516" y="172">/runs/[engineering_run_id]</text><text class="sub2" x="516" y="190">前端动态段</text>
+      </g>
+      <g class="node g" style="animation-delay:.8s">
+        <rect x="760" y="150" width="220" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
+        <text x="776" y="172">/worktrees/[worktree_id]</text><text class="sub2" x="776" y="190">前端动态段</text>
+      </g>
+
+      <g class="node g" style="animation-delay:.95s">
+        <rect x="20" y="240" width="200" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
+        <text x="36" y="268">GET /projects</text>
+      </g>
+      <g class="node g" style="animation-delay:1.05s">
+        <rect x="260" y="240" width="200" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
+        <text x="276" y="268">GET …/branches</text>
+      </g>
+      <g class="node g" style="animation-delay:1.15s">
+        <rect x="500" y="240" width="220" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
+        <text x="516" y="268">GET …/engineering-runs</text>
+      </g>
+      <g class="node g" style="animation-delay:1.25s">
+        <rect x="760" y="240" width="220" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
+        <text x="776" y="268">GET …/worktrees</text>
+      </g>
+
+      <g>
+        <path class="edge" d="M120 86 L120 150"/>
+        <path class="edge" d="M360 86 L360 150"/>
+        <path class="edge" d="M610 86 L610 150"/>
+        <path class="edge" d="M870 86 L870 150"/>
+        <path class="edge" d="M120 206 L120 240"/>
+        <path class="edge" d="M360 206 L360 240"/>
+        <path class="edge" d="M610 206 L610 240"/>
+        <path class="edge" d="M870 206 L870 240"/>
+        <path class="edge" d="M220 58 L260 58"/>
+        <path class="edge" d="M460 58 L500 58"/>
+        <path class="edge" d="M720 58 L760 58"/>
+      </g>
+      <text class="lbl" x="20" y="18">概念层</text>
+      <text class="lbl" x="20" y="140">URL 层</text>
+      <text class="lbl" x="20" y="232">API 层</text>
+    </svg>
+  </div>
+
+  <details class="ev">
+    <summary>证据：四级模型的硬约束原文与路由来源</summary>
+    <div class="evbody">
+      <ul>
+        <li>四级主导航是仓库硬约束，见 <code>AGENTS.md</code> §0「产品导航与 Worktree 管理硬约束」：必须以此解决多 Agent Worktree 归属、Branch/checkout 绑定、锁与冲突信号分散等问题。</li>
+        <li>前端路由树来自 <code>frontend/src/app/**/page.tsx</code> 实扫（57 个），主干链为 <code>(app)/projects/[project_id]/branches/[branch_id]/runs/[engineering_run_id]/worktrees/[worktree_id]/page.tsx</code>。</li>
+        <li>50 条路由模板来自 <code>crates/star-api-rest/src/group_api/*.rs</code> 的 <code>.route(...)</code> 字面量，已排除测试用 UUID 字面量；数量由 <code>arch_live_doc_check.py</code> 校验（下限 45）。</li>
+        <li>路由组合入口：<code>crates/star-api-rest/src/group_api.rs:656 build_group_router</code>，merge 13 个路由组 + 1 条内联 group-context。</li>
+        <li>Hook 策略的 10 条路由挂在 Project 与 Worktree 两个层级（<code>hook_policies.rs</code>），既支持继承也支持 Worktree 覆盖。</li>
+      </ul>
+    </div>
+  </details>
+
+  <footer>
+    <div>Star arch-live · 分册 02 导航模型 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>下一册：<a href="03-request-lifecycle.html">请求生命周期</a> 看这条链在运行时怎么跑。</div>
+  </footer>
+</main>
+<script src="assets/arch.js"></script>
+</body>
+</html>

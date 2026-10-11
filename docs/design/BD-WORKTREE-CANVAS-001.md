@@ -2054,6 +2054,7 @@ Unit Test (Rust cargo + TS vitest)
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 39 段 (目的/决策点/继承清单/架构/模块/组件/9 子模块/4 支撑层/数据模型/状态机/计算模型/Semantic Zoom/Focus/View/Inspector/API/Event/数据流/时序/异常/并发/性能/安全/可观测/测试/追踪/签字/修订), 14 模块, 4 大抽象 Trait, 15 决策点全部已拍板 (per §三十五 推荐方案明确), 11 Node + 13 Edge + 18 Action + 5 View + 6 Zoom + 7 State, 3 张时序图, 7 层性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
 | v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-04 修正) | 修正: §0.3 / §37 / §A.3 总数与 Trace §11 同步 126 唯一 ID (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
 | v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
+| v1.3 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Project Worktree Overview Graph 与 Worktree 群组同级 Infinite Canvas 的对象、入口及类型化引用边界 | 用户要求以 Worktree 为渡口顶层索引并将 Canvas 作为同级群组应用 |
 | v1.4 | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Group Infinite Canvas/Task Card 属 Engineering Run 同级 Apps；Worktree 是 focus 与 CLI checkout，不是 Canvas/WorkItem owner；补充旧 Worktree-scoped Canvas API 为兼容切片 | 用户明确选中 Run 内 Worktree 后出现的是属于该 Run 的右侧 tabs |
 
 ---

@@ -1,4 +1,8 @@
 [package]
+# 2026-10-05 (per cargo-deny 实跑): 标记为 private, 使 cargo-deny 的
+# allow-wildcard-paths 生效, 并允许恢复 bans.wildcards = "deny"。
+# 本仓 crate 无 crates.io 发布意图。详见 PHASE-CD-SELECTION-REPORT.md §3 缺口 #6。
+publish = false
 name = "star-dispatcher"
 version.workspace = true
 edition.workspace = true

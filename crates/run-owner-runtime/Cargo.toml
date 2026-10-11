@@ -1,0 +1,32 @@
+[package]
+publish = false
+name = "run-owner-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-nats = { workspace = true }
+chrono = { workspace = true }
+domain-agent = { path = "../domain-agent" }
+domain-hook = { path = "../domain-hook" }
+domain-automation = { path = "../domain-automation" }
+domain-infrastructure = { path = "../domain-infrastructure" }
+futures-util = { workspace = true }
+platform-messaging-runtime = { path = "../platform-messaging-runtime" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+star-pg-adapter = { path = "../star-pg-adapter" }
+
+[lints]
+workspace = true

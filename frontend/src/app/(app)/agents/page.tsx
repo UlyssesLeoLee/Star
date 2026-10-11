@@ -1,5 +1,15 @@
 "use client";
 
+// @cypher schema=1 source_sha256=ef0dd0e66a0badf1746bc28c2f98704878279d5d95f4b3707835d5304836b8e1
+// MERGE (self:File {path:"frontend/src/app/(app)/agents/page.tsx"})
+// MERGE (page:Symbol {id:"frontend/src/app/(app)/agents/page.tsx::AgentsPage",kind:"function"})
+// MERGE (shader:File {path:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx"})
+// MERGE (palette:Type {id:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx::CelPalette"})
+// MERGE (self)-[:DEFINES]->(page)
+// MERGE (self)-[:IMPORTS]->(shader)
+// MERGE (page)-[:USES_TYPE]->(palette)
+// @endcypher
+
 // =====================================================================
 // /agents — Tactical Agent Command Hub (战术机关与自律代理人控制台)
 // =====================================================================
@@ -273,6 +283,7 @@ export default function AgentsPage() {
                       { id: "christmas-noel", label: "🎄 圣夜红 (毛玻璃)" },
                       { id: "christmas-pine", label: "🎄 松针绿" },
                       { id: "manga-vermilion", label: "☀️ 宣纸红 (Light)" },
+                      { id: "cel-azure", label: "🎞️ 赛璐璐蓝 (Cel)" },
                     ] as const
                   ).map((item) => (
                     <button

@@ -1,0 +1,89 @@
+#cloud-config
+# 修复引导 — Argo Rollouts RBAC + Kargo Helm 安装
+# 落地日期: 2026-10-05
+# 拍板: per ask_6da0b2511bcee76deccb5b21 (Mavis 修复 P1, 无需二次拍板 — 属
+#       "实现阶段发现缺陷并修复"范畴, per 守门 #11 缺标比错标)
+#
+# 【为什么需要这个文件】首版 cloud-init 的三处错误, 全部由实跑抓出:
+#
+#  P1-a  Argo Rollouts 装错 namespace → RBAC 全缺 → CrashLoopBackOff
+#       实测日志: configmaps "argo-rollouts-config" is forbidden:
+#       User "system:serviceaccount:default:argo-rollouts" cannot get
+#       resource "configmaps"。首版用 `kubectl create -f install.yaml`
+#       装到 default ns, 该 manifest 不含 namespaced Role/RoleBinding。
+#       修法: 用官方 kustomize overlay 装到 argo-rollouts ns (自带 RBAC),
+#             并显式声明 ConfigMap 读权限。
+#
+#  P1-b  Kargo 无 install.yaml → 404
+#       实测: https://github.com/akuity/kargo/releases/download/v1.12.1/install.yaml
+#       → HTTP 404。Kargo 官方安装方式是 Helm chart
+#       (oci://ghcr.io/akuity/kargo-charts/kargo), 且 passwordHash /
+#       tokenSigningKey 无默认值, 必须显式提供。
+#
+#  P1-c  首版 wait --timeout 300s 对三件套太短 → 误报 FAIL
+#       实测 cert-manager/argocd 实际 2-5 分钟就绪, 但镜像首拉偏慢。
+#       修法: 超时提到 600s, 且**先看 Pod 状态再判定**, 不以超时直接定罪。
+#
+# 守门 #5 v2: 本文件仍不含任何 secret。
+# ⚠️ Kargo 的 admin passwordHash / tokenSigningKey 是**本机一次性生成**的
+#   凭据, 由 runcmd 在 VM 内现场生成, 绝不写入 user-data。
+#   若需固定 admin 密码, 改用 install-sealed-secrets.sh 走 SOPS/SealedSecret。
+
+package_update: false
+package_upgrade: false
+
+write_files:
+  - path: /etc/rancher/k3s/star-gitops-versions.env
+    permissions: "0644"
+    content: |
+      ARGOCD_VERSION="v3.5.3"
+      KARGO_VERSION="v1.12.1"
+      ROLLOUTS_VERSION="v1.10.0"
+      CERT_MANAGER_VERSION="v1.18.2"
+
+  - path: /var/log/star-cloud-init-fix.log
+    permissions: "0644"
+    content: |
+      === star cloud-init FIX bootstrap log ===
+
+runcmd:
+  - [ sh, -c, 'exec >> /var/log/star-cloud-init-fix.log 2>&1; set -x; echo "[$(date -Is)] fix runcmd start"' ]
+
+  # ---------- 前置: Helm (k3s 未内置) ----------
+  - [ sh, -c, 'if command -v helm >/dev/null 2>&1; then echo "SKIP:helm-present"; else curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash && echo "DONE:helm-install" || { echo "FAIL:helm-install"; exit 1; }; fi' ]
+
+  # ---------- 清理: 删掉装错 ns 的 rollouts ----------
+  # 只删 default ns 里的 rollouts 资源, 不碰 CRD (CRD 是集群级, 且 Argo CD
+  # 若引用 Rollout CRD 需保留)。
+  - [ sh, -c, 'k3s kubectl -n default delete deployment argo-rollouts --ignore-not-found=true && k3s kubectl -n default delete serviceaccount argo-rollouts --ignore-not-found=true && echo "DONE:cleanup-rollouts-default" || echo "FAIL:cleanup-rollouts-default"' ]
+
+  # ---------- P1-a: Rollouts 装到官方 ns (含完整 RBAC) ----------
+  # 官方 kustomize 目录自带 Role/RoleBinding/ServiceAccount, 是 install.yaml 的
+  # 超集。改用 -n argo-rollouts 使 namespaced RBAC 生效。
+  - [ sh, -c, 'k3s kubectl create namespace argo-rollouts --dry-run=client -o yaml | k3s kubectl apply -f - && echo "DONE:rollouts-ns" || { echo "FAIL:rollouts-ns"; exit 1; }' ]
+  - [ sh, -c, '. /etc/rancher/k3s/star-gitops-versions.env; k3s kubectl apply -n argo-rollouts -k "https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS_VERSION}/manifests" && echo "DONE:rollouts-apply" || { echo "FAIL:rollouts-apply"; exit 1; }' ]
+  # 显式补 ConfigMap 读权限 (上游 ClusterRole 未覆盖 namespaced configmaps 时兜底)
+  - [ sh, -c, 'k3s kubectl create role argo-rollouts-config-reader -n argo-rollouts --verb=get,list,watch --resource=configmaps,secrets --dry-run=client -o yaml | k3s kubectl apply -f - && k3s kubectl create rolebinding argo-rollouts-config-reader -n argo-rollouts --role=argo-rollouts-config-reader --serviceaccount=argo-rollouts:argo-rollouts --dry-run=client -o yaml | k3s kubectl apply -f - && echo "DONE:rollouts-rbac-fix" || echo "FAIL:rollouts-rbac-fix"' ]
+  # 重启让 RBAC 生效 (CrashLoopBackOff 的 pod 不会自动重建)
+  - [ sh, -c, 'k3s kubectl -n argo-rollouts rollout restart deploy/argo-rollouts 2>/dev/null; k3s kubectl -n argo-rollouts delete pod -l app.kubernetes.io/name=argo-rollouts --ignore-not-found=true; echo "DONE:rollouts-restart"' ]
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n argo-rollouts deploy/argo-rollouts --timeout=600s && echo "DONE:rollouts-ready" || { echo "FAIL:rollouts-ready"; k3s kubectl -n argo-rollouts get pods -o wide; k3s kubectl -n argo-rollouts logs deploy/argo-rollouts --tail=20 2>&1; exit 1; }' ]
+
+  # ---------- P1-c: Argo CD 就绪复核 (首次只是超时) ----------
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n argocd deploy --all --timeout=600s && echo "DONE:argocd-ready" || { echo "FAIL:argocd-ready"; k3s kubectl -n argocd get pods; exit 1; }' ]
+
+  # ---------- P1-b: Kargo 走 Helm chart ----------
+  # 现场生成一次性凭据 (openssl + htpasswd)。htpasswd 由 apache2-utils 提供,
+  # k3s 的 Ubuntu 镜像可能没有, 缺失则用 openssl passwd -6 (SHA512) 兜底。
+  - [ sh, -c, 'PASS=$(openssl rand -base64 48 | tr -d "=+/" | head -c 32); SIGN=$(openssl rand -base64 48 | tr -d "=+/" | head -c 32); if command -v htpasswd >/dev/null 2>&1; then HASH=$(htpasswd -bnBC 10 "" "$PASS" | tr -d ":\n"); else apt-get install -y apache2-utils >/dev/null 2>&1 && HASH=$(htpasswd -bnBC 10 "" "$PASS" | tr -d ":\n") || HASH=$(openssl passwd -6 "$PASS"); fi; echo "$PASS" > /root/kargo-admin-pass.txt; chmod 600 /root/kargo-admin-pass.txt; printf "%s\n%s\n" "$HASH" "$SIGN" > /tmp/kargo-creds; echo "DONE:creds-generated"' ]
+  - [ sh, -c, '. /etc/rancher/k3s/star-gitops-versions.env; HASH=$(sed -n 1p /tmp/kargo-creds); SIGN=$(sed -n 2p /tmp/kargo-creds); helm install kargo oci://ghcr.io/akuity/kargo-charts/kargo --version "${KARGO_VERSION#v}" --namespace kargo --create-namespace --set api.adminAccount.passwordHash="$HASH" --set api.adminAccount.tokenSigningKey="$SIGN" --wait --timeout 10m && echo "DONE:kargo-apply" || { echo "FAIL:kargo-apply"; helm list -A; exit 1; }' ]
+  - [ sh, -c, 'k3s kubectl wait --for=condition=Available -n kargo deploy --all --timeout=600s && echo "DONE:kargo-ready" || { echo "FAIL:kargo-ready"; k3s kubectl -n kargo get pods; exit 1; }' ]
+
+  # ---------- 仓库内 GitOps 声明式资源 ----------
+  - [ sh, -c, 'if [ -d /home/ubuntu/star/deploy/gitops ]; then k3s kubectl apply -f /home/ubuntu/star/deploy/gitops/kargo/ && echo "DONE:kargo-manifests" || echo "FAIL:kargo-manifests"; else echo "SKIP:kargo-manifests (repo not mounted)"; fi' ]
+  - [ sh, -c, 'if [ -d /home/ubuntu/star/deploy/gitops ]; then k3s kubectl apply -f /home/ubuntu/star/deploy/gitops/argocd/ && echo "DONE:argocd-manifests" || echo "FAIL:argocd-manifests"; else echo "SKIP:argocd-manifests (repo not mounted)"; fi' ]
+
+  # ---------- 最终快照 ----------
+  - [ sh, -c, '{ echo "=== [$(date -Is)] FINAL ==="; k3s kubectl get nodes -o wide; echo "---"; k3s kubectl get pods -A -o wide; echo "---"; k3s helm list -A 2>/dev/null || helm list -A; } >> /var/log/star-cloud-init-fix.log 2>&1' ]
+  - [ sh, -c, 'touch /var/log/star-cloud-init-fix.complete; echo "DONE:fix-bootstrap-complete" >> /var/log/star-cloud-init-fix.log' ]
+
+final_message: "star fix bootstrap done after $UPTIME seconds. Check: sudo cat /var/log/star-cloud-init-fix.log"

@@ -10,17 +10,20 @@
 # 1 副本 (per 9/7 07:06 JST 拍板 dev 本地 + 1 副本)
 # 边缘 envoy 独立 deployment (per 9/1 13:05 JST 拍板, 不选 nginx / istio sidecar)
 #
-# 镜像来源 (per ULYS-160 issue #160):
-#   GHCR owner: SayAtelier (camel case, 必须跟 GitHub username 严格匹配,
-#            workflow 写 lowercase 会触发 GHCR API 'not_found: owner not found',
-#            per PR #169 followup)
+# 镜像来源 (per ULYS-160 issue #160; namespace 于 2026-10-05 改为本账号):
+#   GHCR namespace: ulyssesleolee (全小写)
+#   ⚠️ 登录用的 username 与镜像路径**不是同一个值**: workflow 里拆成两个变量
+#      env.IMAGE_OWNER=UlyssesLeoLee (camelCase, 供 docker/login-action;
+#      GHCR 登录 username 必须跟 GitHub username 严格匹配, 写成 lowercase 会触发
+#      'not_found: owner not found', per PR #169 followup)
+#      env.IMAGE_NAMESPACE=ulyssesleolee (全小写, OCI 引用规范要求 repository 小写)
 #   Image tag: :dev (per publish-canvas-game.yml `tags: type=ref,event=branch`,
 #            push dev → 自动推 :dev tag; 没有 :latest tag)
 #   4 image repo:
-#     - ghcr.io/sayatelier/star-canvas-engine:dev    (port 8080)
-#     - ghcr.io/sayatelier/star-domain-canvas:dev    (port 8081)
-#     - ghcr.io/sayatelier/star-canvas-realtime:dev  (port 8082 + 8083 WSS)
-#     - ghcr.io/sayatelier/star-canvas-game:dev      (port 8084)
+#     - ghcr.io/ulyssesleolee/star-canvas-engine:dev    (port 8080)
+#     - ghcr.io/ulyssesleolee/star-domain-canvas:dev    (port 8081)
+#     - ghcr.io/ulyssesleolee/star-canvas-realtime:dev  (port 8082 + 8083 WSS)
+#     - ghcr.io/ulyssesleolee/star-canvas-game:dev      (port 8084)
 #
 # 一键部署:
 #   pwsh -NoProfile -NonInteractive -File scripts/start-k3s-backend.ps1
@@ -144,7 +147,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-engine
-        image: ghcr.io/sayatelier/star-canvas-engine:dev
+        image: ghcr.io/ulyssesleolee/star-canvas-engine:dev
         imagePullSecrets:
         - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
@@ -199,7 +202,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: domain-canvas
-        image: ghcr.io/sayatelier/star-domain-canvas:dev
+        image: ghcr.io/ulyssesleolee/star-domain-canvas:dev
         imagePullSecrets:
         - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
@@ -254,7 +257,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-realtime
-        image: ghcr.io/sayatelier/star-canvas-realtime:dev
+        image: ghcr.io/ulyssesleolee/star-canvas-realtime:dev
         imagePullSecrets:
         - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
@@ -312,7 +315,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-game
-        image: ghcr.io/sayatelier/star-canvas-game:dev
+        image: ghcr.io/ulyssesleolee/star-canvas-game:dev
         imagePullSecrets:
         - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent

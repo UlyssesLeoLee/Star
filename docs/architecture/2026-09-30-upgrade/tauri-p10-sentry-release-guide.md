@@ -89,7 +89,7 @@ fn list_work_items() -> Result<Vec<WorkItem>, String> {
 # 1. 切到 release branch
 git checkout -b release/v0.1.0 dev
 
-# 2. 更新 crates/star-desktop/Cargo.toml version
+# 2. 更新 crates/star-desktop/src-tauri/Cargo.toml version
 #    version = "0.1.0"
 
 # 3. 更新 crates/star-desktop/frontend/package.json

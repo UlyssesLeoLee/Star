@@ -1,4 +1,26 @@
 /*
+@cypher schema=1 source_sha256=4b038bfd68532ba27a2ed7f879fe6f44d6157caf05e9485866cbe4d62cdcf96a
+MERGE (self:File {path:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts"})
+MERGE (suite:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::worktreeGroupApi tests",kind:"suite"})
+MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
+MERGE (pollOnce:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.pollOnce",kind:"method"})
+MERGE (streamTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::Worktree Canvas stream API case",kind:"test"})
+MERGE (malformedTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::malformed Worktree Canvas page case",kind:"test"})
+MERGE (self)-[:DEFINES]->(suite)
+MERGE (suite)-[:DEFINES]->(streamTest)
+MERGE (suite)-[:DEFINES]->(malformedTest)
+MERGE (streamTest)-[:CALLS]->(list)
+MERGE (malformedTest)-[:CALLS]->(pollOnce)
+MERGE (streamTest)-[:TESTS]->(list)
+MERGE (malformedTest)-[:TESTS]->(pollOnce)
+MERGE (taskRunListTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::Task Run list cursor case",kind:"test"})
+MERGE (runList:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listTaskRuns",kind:"method"})
+MERGE (suite)-[:DEFINES]->(taskRunListTest)
+MERGE (taskRunListTest)-[:CALLS]->(runList)
+MERGE (taskRunListTest)-[:TESTS]->(runList)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts",type:"file",language:"typescript"}),
@@ -61,6 +83,19 @@ CREATE (gitLockSuite:Function {name:"Worktree Git lock observation tests",type:"
 CREATE (file)-[:CONTAINS]->(gitLockSuite),
        (gitLockSuite)-[:CONTAINS]->(gitLockFreshCase),(gitLockSuite)-[:CONTAINS]->(gitLockFailClosedCase),
        (gitLockFreshCase)-[:CALLS]->(normalizeGitLock),(gitLockFailClosedCase)-[:CALLS]->(normalizeGitLock);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (suite:Function {name:"worktreeGroupApi tests"}),
+      (makeClient:Function {name:"makeClient"}),
+      (api:Function {name:"WorktreeGroupApiClient.listWorktreeCanvasEvents"}),
+      (poller:Class {name:"CanvasOutboxPoller"}),
+      (pollOnce:Function {name:"CanvasOutboxPoller.pollOnce"});
+CREATE (worktreeEventsCase:Function {name:"Worktree Canvas stream API case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
+       (invalidPageCase:Function {name:"malformed Worktree Canvas page case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
+CREATE (suite)-[:CONTAINS]->(worktreeEventsCase),(suite)-[:CONTAINS]->(invalidPageCase),
+       (worktreeEventsCase)-[:CALLS]->(makeClient),(worktreeEventsCase)-[:CALLS]->(api),
+       (invalidPageCase)-[:CALLS]->(makeClient),(invalidPageCase)-[:CALLS]->(poller),(invalidPageCase)-[:CALLS]->(pollOnce);
 */
 
 import { describe, expect, it, vi } from "vitest";
@@ -418,6 +453,19 @@ describe("WorktreeGroupApiClient", () => {
     expect(url.searchParams.get("cursor_event_id")).toBe("event-1");
   });
 
+  it("lists Worktree Canvas events with an opaque 64-bit decimal offset", async () => {
+    const { api, fetcher } = makeClient("user-jwt");
+
+    await api.listWorktreeCanvasEvents("wt one", "9007199254740993", 50);
+
+    const [input, init] = fetcher.mock.calls[0];
+    const url = new URL(String(input), "http://localhost");
+    expect(url.pathname).toBe("/api/v1/worktrees/wt%20one/canvas-events");
+    expect(url.searchParams.get("after_offset")).toBe("9007199254740993");
+    expect(url.searchParams.get("limit")).toBe("50");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
+  });
+
   it("lists Task Runs using an encoded Task scope and bounded cursor", async () => {
     const { api, fetcher } = makeClient("user-jwt");
 
@@ -425,6 +473,7 @@ describe("WorktreeGroupApiClient", () => {
       limit: 20,
       cursor: {
         cursor_started_at: "2026-09-29T10:00:00Z",
+        cursor_ordered_at: "2026-09-29T10:00:00Z",
         cursor_run_id: "run-1",
       },
     });
@@ -434,6 +483,7 @@ describe("WorktreeGroupApiClient", () => {
     expect(url.pathname).toBe("/api/v1/worktrees/wt%20one/work-items/task%2Fone/runs");
     expect(url.searchParams.get("limit")).toBe("20");
     expect(url.searchParams.get("cursor_started_at")).toBe("2026-09-29T10:00:00Z");
+    expect(url.searchParams.get("cursor_ordered_at")).toBe("2026-09-29T10:00:00Z");
     expect(url.searchParams.get("cursor_run_id")).toBe("run-1");
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
     expect(init?.cache).toBe("no-store");
@@ -447,30 +497,69 @@ describe("WorktreeGroupApiClient", () => {
   });
 
   it("replays events until authorized projection refresh succeeds", async () => {
+    const offset = "9007199254740993";
     const page = JSON.stringify({
-      events: [{ event_id: "event-1", occurred_at: "2026-09-29T10:00:00Z" }],
-      next_cursor: { cursor_at: "2026-09-29T10:00:00Z", cursor_event_id: "event-1" },
+      events: [{
+        stream_offset: offset,
+        event_id: "11111111-1111-4111-8111-111111111111",
+        canvas_id: "22222222-2222-4222-8222-222222222222",
+        event_type: "element.created",
+        occurred_at: "2026-09-29T10:00:00Z",
+      }],
+      has_more: false,
+      next_offset: offset,
     });
+    const emptyPage = JSON.stringify({ events: [], has_more: false, next_offset: offset });
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(page, { status: 200 }))
       .mockResolvedValueOnce(new Response(page, { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ events: [], next_cursor: null }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(emptyPage, { status: 200 }));
     const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
     const refreshProjection = vi.fn<() => Promise<void>>()
       .mockRejectedValueOnce(new Error("projection refresh failed"))
       .mockResolvedValue(undefined);
-    const poller = new CanvasOutboxPoller(api, "wt-1", "canvas-1", refreshProjection);
+    let savedCursor: { after_offset: string } | undefined;
+    const poller = new CanvasOutboxPoller(api, "wt-1", refreshProjection, {
+      cursorStore: {
+        load: () => savedCursor,
+        save: (_scopeKey, cursor) => { savedCursor = cursor; },
+      },
+    });
 
     await expect(poller.pollOnce()).rejects.toThrow("projection refresh failed");
     await expect(poller.pollOnce()).resolves.toBe(1);
     await expect(poller.pollOnce()).resolves.toBe(0);
 
     const urls = fetcher.mock.calls.map(([input]) => new URL(String(input), "http://localhost"));
-    expect(urls[0].searchParams.has("cursor_at")).toBe(false);
-    expect(urls[1].searchParams.has("cursor_at")).toBe(false);
-    expect(urls[2].searchParams.get("cursor_at")).toBe("2026-09-29T10:00:00Z");
-    expect(urls[2].searchParams.get("cursor_event_id")).toBe("event-1");
+    expect(urls.map((url) => url.pathname)).toEqual([
+      "/api/v1/worktrees/wt-1/canvas-events",
+      "/api/v1/worktrees/wt-1/canvas-events",
+      "/api/v1/worktrees/wt-1/canvas-events",
+    ]);
+    expect(urls[0].searchParams.get("after_offset")).toBe("0");
+    expect(urls[1].searchParams.get("after_offset")).toBe("0");
+    expect(urls[2].searchParams.get("after_offset")).toBe(offset);
+    expect(savedCursor).toEqual({ after_offset: offset });
     expect(refreshProjection).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects malformed empty Worktree Canvas pages without advancing the cursor", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(JSON.stringify({ events: [], has_more: true, next_offset: "1" }), { status: 200 }),
+    );
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+    const refreshProjection = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    let savedCursor: { after_offset: string } | undefined;
+    const poller = new CanvasOutboxPoller(api, "wt-1", refreshProjection, {
+      cursorStore: {
+        load: () => savedCursor,
+        save: (_scopeKey, cursor) => { savedCursor = cursor; },
+      },
+    });
+
+    await expect(poller.pollOnce()).rejects.toThrow("inconsistent cursor");
+    expect(savedCursor).toBeUndefined();
+    expect(refreshProjection).not.toHaveBeenCalled();
   });
 
   it("preserves API error status and code", async () => {
