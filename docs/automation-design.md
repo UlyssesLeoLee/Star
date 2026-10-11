@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.47 (2026-10-12)
+> **文档版本**: v2.48 (2026-10-12)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3051,3 +3051,15 @@ Cargo invoked local Rust 1.98.1 with `--ignore-rust-version` through a diagnosti
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v2.47 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.87 for D16 prerequisite migration repair, migration replay/idempotency checks, SQLx execution and exact audit evidence; keep Rust 1.99.0 and production gates open. | D16 PostgreSQL/SQLx runner correction |
+
+### 4.88 Phase 9F4C-D17 Transport Profile Master/resolver verification
+
+**自动化档：[P]** — `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --transport-profile-tests --ignore-rust-version` runs the disposable PostgreSQL 18.6 D17 chain without starting NATS or creating Multipass instances. The runner applies the Transport Profile Master migration twice, checks dual-scope FORCE RLS, role grants, append-only audit/Outbox and fixed-path trigger assertions, then executes the Rust SQLx CAS/idempotency/resolver integration test. The `--transport-profile-tests` option requires `--schema-only` and remains diagnostic when `--ignore-rust-version` is supplied.
+
+The completed D17 run passed 71/71 steps; SQLx passed 1/1. Audit: `target/phase9f4d-run-owner-consumer/d17-20261012-95eccc360293439eb519de9ba0bae69f/audit.jsonl`. It used PostgreSQL 18.6 and Rust 1.98.1 diagnostic mode; this is not the required Rust 1.99.0 gate. AssetsLake event metadata is adapted as a versioned Star Outbox envelope; its dry-run relay is excluded. The source repository remains read-only, and source eligibility/hash/license/dependency review is tracked in `docs/design/DD-RUST-SERVER-REUSE-001.md`.
+
+Target database runtime grants, production service identity/credential lifecycle, native durable transport, consumer/BI/Benchmark wiring, full application NATS dependency removal, bounded cache/RSS/concurrency, and Schedule/Run execution remain open. Do not interpret schema/SQLx success as transport acceptance or Run execution readiness.
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v2.48 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.88 for D17 profile Master/resolver runner, exact PostgreSQL/SQLx evidence and remaining toolchain/production gates. | Initial D17 profile implementation and isolated PostgreSQL verification |

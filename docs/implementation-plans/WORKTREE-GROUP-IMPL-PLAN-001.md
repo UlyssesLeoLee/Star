@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.72**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.73**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -2034,7 +2034,7 @@ Cargo SQLx 是本机 Rust 1.98.1 `--ignore-rust-version` 诊断运行，不构�
 
 ## 6.133 — Phase 9F4C-D17: Transport Profile Master/resolver 与可信服务身份
 
-**状态：🟡 设计已收口，实施未开始；D16 最终代码和数据库证据已同步到需求与详细设计。**
+**状态：🟡 首个 owner/schema/resolver 切片已实现并通过隔离 PostgreSQL/SQLx 验证；D17 整体仍进行中。**
 
 D17 先建立 Platform Messaging owner 的 deployment+tenant-scoped Transport Profile SCD2 Master、append-only Audit/Transactional Outbox 与 Rust trusted resolver。Profile 固定 provider/version/schema/digest、endpoint、durable log generation policy、allowed sender/recipient/kind scope；只存 secret-manager opaque reference，不存 credential。Resolver 必须从已认证部署上下文取 profile，重新校验 lifecycle/scope/digest 和 identity binding；信任的 TLS/provider 身份与业务 ACL 分开验证。首次 claim pinning 继续生效，profile successor 只影响新 delivery；旧 profile delivery 必须 drain/reconcile，不能被新 provider 自动接管。
 
@@ -2042,8 +2042,13 @@ D17 先建立 Platform Messaging owner 的 deployment+tenant-scoped Transport Pr
 
 D17 验收必须包括 Rust 1.99.0 正式 gates、migration 重放、双 scope FORCE RLS + 实际 runtime grants、SCD2/CAS/append-only 与 Outbox、profile digest/schema/identity resolver 正负例、secret-free persistence/logging，以及 bounded query/cache。生产 credential lifecycle、native durable append/pull/ack、provider restart/replay/terminal ACK、full-app NATS dependency removal、BI consumer、RSS/并行/故障基准仍是后续阶段；D17 不启用 Run execution。
 
-自动化档：[P]（R/V/S）。实现前生成 D17 automation brief；按 owner/schema、Rust resolver、source module adapter 与 disposable PostgreSQL 验收拆成有界子阶段。报告需记录真实依赖/hash/许可义务与失败门，不将 profile DB 验收误写为 transport 或执行验收。
+首个实现切片：`platform-messaging-runtime::transport_profile` 与 `transport_profile_pg` 提供 bounded typed profile、owner CAS/idempotent revision writer、uncached resolver；`2026-10-12-platform-transport-profile-master.sql` 新增一张 SCD2 Master 与两张 append-only Transaction 表；同库 Audit/Outbox 事实由固定 search_path trigger 写入。`phase9f4d_run_owner_consumer.py --schema-only --transport-profile-tests` 已接入 prerequisite chain、两次迁移应用、schema/grant/RLS/WORM assertions 和 SQLx 用例。AssetsLake 的 `schema_version/trace_id/causation_id/idempotency_key` 语义已按 Star envelope 映射到 `event_schema_version`、trace、causation、idempotency 字段；不复制其 dry-run relay。PostgreSQL 18.6 runner 71/71、SQLx 1/1、诊断 package 单测 21/21，以及 Rust 1.98.1 下 default/no-default all-target check 通过；报告见 [PHASE-9F4C-D17](../reports/PHASE-9F4C-D17-TRANSPORT-PROFILE-REPORT.md)。
+
+仍开放：生产认证 service session/provider 与凭证轮换、目标 DB runtime grants、真实网络 transport、profile 撤权和身份目录故障注入、Outbox consumer/BI/Benchmark、bounded cache 与 RSS/并行压力、Rust 1.99.0 正式门、provider restart/replay/terminal ACK、全应用 NATS 去除和 Schedule/Run 执行。`AuthenticatedTransportSession` 的实现本身不是认证证明；生产 composition 缺失时必须 fail closed，D17 也不启用 Run execution。
+
+自动化档：[P]（R/V/S）。已生成 D17 automation brief；按 owner/schema、Rust resolver、source module adapter 与 disposable PostgreSQL 验收拆成有界子阶段。报告记录实际文件 hash/许可证/依赖闭包与失败门，不将 profile DB 验收误写为 transport 或执行验收。
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v6.72 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 最终结果，定义 D17 profile master/resolver 与 service identity 边界，明确 AssetsLake/RustGameServer/SandTree/IDE1.0 的模块适配范围与未验收门 | 用户重申可直接参考复用本机 Rust 服务；发现 Schedule SRS/BD 与 Group DD 尚有 D16 中间状态 |
+| v6.73 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 D17 首个 profile owner/schema/resolver 切片及 71/71 PostgreSQL、SQLx 1/1 证据并入计划，保留生产身份、transport、BI、性能和 Rust 1.99.0 未关闭项 | D17 首片实现；AssetsLake envelope metadata 语义适配并完成隔离验收 |

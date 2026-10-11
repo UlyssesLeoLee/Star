@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.33 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.35
+> **文档版本**: v6.36 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.36
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5609,3 +5609,11 @@ rebase 后复验 PostgreSQL 18.6 disposable runner 68/68 步骤通过；SQLx `sc
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.33 | 2026-10-12 | Ulysses — Mavis接手审核 | 合并本机 Rust 模块复用意图和 SandTree/IDE1.0 的性能与接入限制；记录 rebase 后真实 receiver SQLx/68-step PostgreSQL 复验，保留正式 Rust/生产缺口 | 用户明确本机 Rust 服务可参考复用；D16 rebase 后复验通过 |
+
+### D17：Transport Profile Master 与可信解析器首片（v6.36）
+
+Platform Messaging owner 现在有 deployment+tenant scope 的 profile revision SCD2 Master、append-only Audit/Transactional Outbox 与 Rust typed resolver seam。Profile 只包含受限 provider/version/schema、endpoint identity、durable-log generation policy、allowed service/kind scope、canonical digest 与可选 opaque secret-manager reference；Outbox 不含 secret reference 或 credential。首次 claim 的 profile pin 仍保护既有 Work，revision successor 只影响新 claim。AssetsLake 的 schema-version/trace/causation/idempotency 事件元数据语义已映射进 Star 版本化 revision event，不搬入其 dry-run relay。PostgreSQL 18.6 disposable chain 71/71、SQLx 1/1 已通过；Rust 1.98.1 diagnostic crate unit tests（default 27/27、no-default `durable-quarantine` 21/21）与两种 all-target checks 通过，但 Rust 1.99.0、生产 service identity/credentials、target DB grants、实际 transport、BI/Benchmark consumer、内存/并发性能、全应用 NATS 移除和 Schedule/Run executor 仍未验收。Session trait 不是认证证明；未配置可信身份 provider 时保持 fail closed。详见 [D17 阶段报告](reports/PHASE-9F4C-D17-TRANSPORT-PROFILE-REPORT.md) 与 [详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md#635-d17-transport-profile-master-and-trusted-service-identity)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.36 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D17 profile Master/resolver 首片、AssetsLake metadata 适配及隔离 PostgreSQL/SQLx 验证；明确生产身份和消息投递未闭环 | D17 实施首片通过 71/71 PostgreSQL runner 与 SQLx 1/1 |

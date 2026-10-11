@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.35）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.36）
 
 ## 0. 文档说明与前提
 
@@ -3438,3 +3438,13 @@ Rust 1.98.1 `--ignore-rust-version` 是诊断运行，不替代 Rust 1.99.0 正�
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.35 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录真实 AdmissionReceiver→PostgreSQL quarantine SQLx 路径与 68/68 runner 复验；补充 SandTree/IDE1.0 模块级参考及超时、背压、授权与许可边界 | rebase 冲突收敛后重跑 D16；用户明确本机 Rust 服务可参考和选择性复用 |
+
+### D17 Transport Profile Master 与模块复用边界（v6.36）
+
+Platform Messaging owner 新增 deployment+tenant scope 的 Transport Profile revision Master、append-only Audit/Transactional Outbox 与 typed resolver seam。首片以 CAS revision、canonical digest、exact idempotency、service/route ACL、secret reference 隔离及 trigger 同事务事实为核心；Profile 后继只影响新 claim，旧 delivery 沿用固定的 provider/version/digest/endpoint binding。AssetsLake 的版本化 envelope metadata（schema version、trace、causation、idempotency）已映射到 Star Outbox；源项目保持只读，未复制其 dry-run relay，也不将其视作生产 durable transport。
+
+PostgreSQL 18.6 disposable runner 71/71、Transport Profile SQLx 用例 1/1、诊断 package unit tests（default 27/27；`--no-default-features --features durable-quarantine` 21/21），以及 Rust 1.98.1 下 default/no-default `durable-quarantine` all-target checks 已通过。Rust 1.99.0 正式门禁、生产 service identity/credentials、目标库 runtime grants、实际 native transport、Outbox consumer/BI/Benchmark、RSS/并发压力、完整应用 NATS 去除和 Schedule/Run 执行仍未验收，执行保持 fail closed。自有 Rust 服务按模块可直接参考/复用，但每个文件仍需核对确切 hash、源工作区、权属/许可证/NOTICE、完整依赖闭包与 Star owner/Run 语义；见 [DD-RUST-SERVER-REUSE-001](design/DD-RUST-SERVER-REUSE-001.md) 和 [D17 report](reports/PHASE-9F4C-D17-TRANSPORT-PROFILE-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.36 | 2026-10-12 | Ulysses — Mavis接手审核 | 增加 D17 Transport Profile 首片与 AssetsLake metadata 适配证据；明确生产身份、transport、BI、性能和 Rust 1.99.0 未验收项 | D17 首片实现并完成隔离 PostgreSQL/SQLx 验证 |

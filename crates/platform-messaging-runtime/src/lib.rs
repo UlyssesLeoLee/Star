@@ -1,9 +1,14 @@
 //! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=f6905373d6d7d6c645eeb4a13a41ddcf98fcb622f2e0a8f8979b96a05e0643cf
+@cypher schema=1 source_sha256=e513d8b4234c400092d3536924ebcda18bd70a5a4b6b8ba7b8d756ac25101510
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
+MERGE (transport_profile_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::transport_profile",kind:"module"})
+MERGE (transport_profile_pg_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::transport_profile_pg",kind:"module"})
+MERGE (transport_profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
+MERGE (transport_profile_pg_file:File {path:"crates/platform-messaging-runtime/src/transport_profile_pg.rs"})
+MERGE (durable_quarantine:Config {id:"cargo.feature.platform-messaging-runtime.durable-quarantine"})
 MERGE (source:Type {id:"crates/platform-messaging-runtime/src/lib.rs::TrustedJetStreamSource",kind:"struct"})
 MERGE (identity:Type {id:"crates/platform-messaging-runtime/src/lib.rs::JetStreamSourceIdentity",kind:"struct"})
 MERGE (fault:Type {id:"crates/platform-messaging-runtime/src/lib.rs::PermanentPoisonFault",kind:"enum"})
@@ -40,6 +45,11 @@ MERGE (kms_encrypt:Symbol {id:"crates/domain-kms/src/lib.rs::KmsClient.encrypt",
 MERGE (self)-[:DEFINES]->(module)
 MERGE (self)-[:DEPENDS_ON]->(jetstream_feature)
 MERGE (module)-[:DEFINES]->(source)
+MERGE (module)-[:DEFINES]->(transport_profile_module)
+MERGE (module)-[:DEFINES]->(transport_profile_pg_module)
+MERGE (transport_profile_module)-[:CONTAINS_FILE]->(transport_profile_file)
+MERGE (transport_profile_pg_module)-[:CONTAINS_FILE]->(transport_profile_pg_file)
+MERGE (transport_profile_pg_module)-[:CONFIGURES]->(durable_quarantine)
 MERGE (module)-[:DEFINES]->(identity)
 MERGE (module)-[:DEFINES]->(fault)
 MERGE (module)-[:DEFINES]->(policy)
@@ -133,6 +143,9 @@ pub mod admission_quarantine_pg;
 pub mod admission_receive;
 #[cfg(feature = "jetstream-adapter")]
 pub mod admission_receive_jetstream;
+pub mod transport_profile;
+#[cfg(feature = "durable-quarantine")]
+pub mod transport_profile_pg;
 
 #[cfg(feature = "jetstream-adapter")]
 use std::{sync::Arc, time::Duration};

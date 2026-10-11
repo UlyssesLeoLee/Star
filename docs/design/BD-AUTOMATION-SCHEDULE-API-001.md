@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D16 provider-neutral PostgreSQL quarantine is verified on a disposable PostgreSQL 18.6 runner (68/68), including D15 migration double-apply and the real receiver-to-quarantine SQLx scenario 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production profile resolver/service identity, native provider, encrypted replay, full app dependency closure, BI and execution remain open.
-> Version: 0.55 | Date: 2026-10-12
+> Status: 🟡 D17 initial Transport Profile Master/resolver slice is verified on disposable PostgreSQL 18.6 (71/71), including profile migration double-apply and SQLx profile scenario 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production service identity/credentials and target DB grants, native provider, BI, performance and execution remain open.
+> Version: 0.56 | Date: 2026-10-12
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -450,6 +450,7 @@ Selection evidence and per-file implementation gaps are maintained in `DD-RUST-S
 | 0.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Pin trusted log generation in poison quarantine identity and idempotency key |
 | 0.52 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify D16 provider-neutral PostgreSQL quarantine receipt, deployment/tenant RLS and metadata-only retention; mark migration and runtime verification open |
 | 0.55 | 2026-10-12 | Ulysses — Mavis接手审核 | Record final D16 disposable PostgreSQL 68/68, migration replay, D15 double-apply and SQLx receiver/quarantine 1/1; define D17 Transport Profile Master/resolver, trusted service identity and approved local module adaptation boundaries |
+| 0.56 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the initial D17 profile Master/resolver implementation and disposable PostgreSQL 71/71 plus SQLx 1/1 evidence; retain Rust 1.99.0, production identity, transport and BI gates |
 
 
 ## 6.34 Profile-pinned transport replacement design
@@ -484,3 +485,9 @@ First claim continues to pin provider/version/digest/endpoint on each delivery W
 Reuse inputs are selected by function, not repository: AssetsLake event metadata (trace/causation/idempotency) can inform the typed envelope mapping, but its dry-run relay is excluded from durable delivery; RustGameServer's Apache-2.0 mTLS channel helper can inform a client connector after removal of plaintext opt-out; SandTree EventRouter is only for bounded ephemeral notifications after commit; IDE1.0's CLI protocol is reserved for the Task Card CLI phase and needs bounded channels, cancellation and Run/Worktree/Task authorization. Source repositories stay read-only and each imported file retains required notices and a reviewed dependency closure.
 
 D17 acceptance must include duplicate-safe migrations, SCD2/CAS and append-only audit, deployment+tenant RLS under the actual least-privilege roles, deterministic digest verification, exact identity/profile positive cases and stale/revoked/cross-scope negative cases, bounded resolver queries and cache lifetime, and outbox event evidence. The initial D17 slice does not enable a native provider or Schedule execution; Rust 1.99.0, production credential lifecycle, native append/pull/ack, durable replay, full application dependency closure, BI consumption, runtime sandbox and independent validation remain separate gates.
+
+Initial implementation evidence (2026-10-12): typed profile definition/revision, owner CAS/idempotent publication, uncached resolver seam, Master/Audit/Transactional Outbox migration, and D17 schema assertions now exist. PostgreSQL 18.6 disposable verification passed 71/71 steps, including migration replay and SQLx profile test 1/1. Rust 1.98.1 diagnostic unit tests passed 21/21; default and no-default `durable-quarantine` all-target checks passed with `--ignore-rust-version`. AssetsLake event fields were adapted to Star's versioned event metadata without importing its dry-run relay. The session trait and test identity are not production authentication; Rust 1.99.0, target DB grants, production credentials/identity, native transport, BI consumer and performance evidence remain open.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the initial D17 owner/schema/resolver implementation and isolated PostgreSQL/SQLx evidence while retaining production identity and transport gates |

@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=d149b6fb48b5efd9c3069bd8bc12079943e5514277bd50db3262f2fcfe654bf8
+# @cypher schema=1 source_sha256=a92d9b2fc7b940bbea7236653043d741a9e1c62353cd6eb37033b153a4c0fa74
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -17,6 +17,9 @@
 # MERGE (quarantine_migration:Config {id:"db/migrations/2026-10-08-platform-poison-quarantine.sql"})
 # MERGE (admission_quarantine_migration:Config {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql"})
 # MERGE (transport_profile_migration:Config {id:"db/migrations/2026-10-12-admission-transport-profile-receipts.sql"})
+# MERGE (transport_profile_master:Config {id:"db/migrations/2026-10-12-platform-transport-profile-master.sql"})
+# MERGE (transport_profile_schema_test:Config {id:"db/tests/platform-transport-profile-schema.sql"})
+# MERGE (transport_profile_sqlx_test:Config {id:"crates/platform-messaging-runtime/tests/transport_profile_pg.rs"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
 # MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
@@ -67,6 +70,9 @@
 # MERGE (main)-[:READS]->(quarantine_migration)
 # MERGE (main)-[:READS]->(admission_quarantine_migration)
 # MERGE (main)-[:READS]->(transport_profile_migration)
+# MERGE (main)-[:READS]->(transport_profile_master)
+# MERGE (main)-[:TESTS]->(transport_profile_schema_test)
+# MERGE (main)-[:TESTS]->(transport_profile_sqlx_test)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
 # MERGE (main)-[:TESTS]->(admission_lifecycle_test)
@@ -143,6 +149,7 @@ SCHEDULE_CONFIRMATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-o
 SCHEDULE_HANDOFF_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-schedule-owner-admission-handoff.sql"
 ADMISSION_DELIVERY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-admission-owner-message-delivery.sql"
 ADMISSION_TRANSPORT_PROFILE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-admission-transport-profile-receipts.sql"
+TRANSPORT_PROFILE_MASTER_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-transport-profile-master.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -151,6 +158,7 @@ ADMISSION_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-o
 QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-schema.sql"
 ADMISSION_LIFECYCLE_TEST = ROOT / "db" / "tests" / "task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_TEST = ROOT / "db" / "tests" / "run-infrastructure-binding-master.sql"
+TRANSPORT_PROFILE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-transport-profile-schema.sql"
 PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
     ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2b.sql",
@@ -753,11 +761,14 @@ def main() -> int:
     parser.add_argument("--schema-only", action="store_true", help="Run PostgreSQL migration, privilege, RLS, and dedupe checks without the Rust/NATS integration test")
     parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
     parser.add_argument("--admission-tests", action="store_true", help="Also run Rust SQLx owner-local admission receipt/result tests; --schema-only avoids NATS")
+    parser.add_argument("--transport-profile-tests", action="store_true", help="Also run the D17 Rust SQLx profile Master/CAS/resolver test; requires --schema-only")
     parser.add_argument("--ignore-rust-version", action="store_true", help="Run selected Cargo tests with --ignore-rust-version for diagnostics only; does not satisfy the workspace toolchain gate")
     parser.add_argument("--admission-delivery-tests", "--admission-receiver-tests", dest="admission_delivery_tests", action="store_true", help="Start isolated NATS before admission tests to verify publisher replay, three owner receiver kinds and commit-before-ACK with a real database fault")
     arguments = parser.parse_args()
     if arguments.admission_delivery_tests and not arguments.admission_tests:
         parser.error("--admission-delivery-tests requires --admission-tests")
+    if arguments.transport_profile_tests and not arguments.schema_only:
+        parser.error("--transport-profile-tests requires --schema-only")
 
     global OUTPUT_DIR
     if arguments.output_dir:
@@ -798,7 +809,9 @@ def main() -> int:
             SCHEDULE_HANDOFF_MIGRATION,
             ADMISSION_DELIVERY_MIGRATION,
             ADMISSION_TRANSPORT_PROFILE_MIGRATION,
+            TRANSPORT_PROFILE_MASTER_MIGRATION,
             RUN_BINDING_TEST,
+            TRANSPORT_PROFILE_SCHEMA_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
         )
@@ -996,6 +1009,9 @@ def main() -> int:
                 results.append(run_sql(f"admission-transport-profile-migration-apply-{attempt}", psql_base, ADMISSION_TRANSPORT_PROFILE_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
+                results.append(run_sql(f"transport-profile-master-migration-apply-{attempt}", psql_base, TRANSPORT_PROFILE_MASTER_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
         if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-owner-schema-assertions", psql_base, SCHEMA_ASSERTIONS_SQL, env))
         if pg_started and all(item["status"] == "passed" for item in results):
@@ -1006,6 +1022,15 @@ def main() -> int:
                     "platform-poison-quarantine-schema",
                     psql_base,
                     QUARANTINE_SCHEMA_TEST.read_text(encoding="utf-8"),
+                    env,
+                )
+            )
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(
+                run_sql(
+                    "platform-transport-profile-schema",
+                    psql_base,
+                    TRANSPORT_PROFILE_SCHEMA_TEST.read_text(encoding="utf-8"),
                     env,
                 )
             )
@@ -1049,6 +1074,26 @@ def main() -> int:
                 [cargo, "test", "--offline", "--locked", "-p", "run-owner-runtime", "--test", "run_infrastructure_binding_pg", "-j", "4", "--", "--ignored", "--test-threads=1"],
                 ROOT,
                 binding_env,
+            ))
+
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.transport_profile_tests:
+            profile_env = env.copy()
+            profile_env["STAR_PLATFORM_PROFILE_TEST_DATABASE_URL"] = (
+                f"postgresql://star_run_owner_test_admin@127.0.0.1:{pg_port}/postgres"
+            )
+            profile_test_command = [cargo, "test"]
+            if arguments.ignore_rust_version:
+                profile_test_command.append("--ignore-rust-version")
+            profile_test_command.extend([
+                "--offline", "--locked", "-p", "platform-messaging-runtime",
+                "--no-default-features", "--features", "durable-quarantine",
+                "--test", "transport_profile_pg", "-j", "4", "--", "--ignored", "--test-threads=1",
+            ])
+            results.append(run_step(
+                "transport-profile-postgres-sqlx-integration",
+                profile_test_command,
+                ROOT,
+                profile_env,
             ))
 
         if pg_started and all(item["status"] == "passed" for item in results) and arguments.admission_delivery_tests:
@@ -1142,7 +1187,7 @@ def main() -> int:
         write_text(OUTPUT_DIR / "audit.jsonl", "".join(json.dumps(item, sort_keys=True) + "\n" for item in results))
         print(json.dumps({
             "result": "passed" if exit_code == 0 and all(item["status"] == "passed" for item in results) else "failed",
-            "mode": "postgres_admission_delivery_integration" if arguments.admission_delivery_tests else (("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration"),
+            "mode": "postgres_transport_profile_sqlx_integration" if arguments.transport_profile_tests else ("postgres_admission_delivery_integration" if arguments.admission_delivery_tests else (("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration")),
             "steps": results,
             "audit_path": str(OUTPUT_DIR / "audit.jsonl"),
             "multipass_instances_created": 0,

@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.16 (2026-10-12)
+> **文档版本**: v2.17 (2026-10-12)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -166,6 +166,7 @@
 | 事实类型 | 定义 | 存储位置 | 写入频率 | 本设计对应表 |
 |---|---|---|---|---|
 | v2.16 | 2026-10-12 | Add §4.13.23 for the provider-neutral admission quarantine Transaction receipt, W/T/M classification, deployment+tenant FORCE RLS, append-only grants, exact-wire digest, and unverified migration/runtime gates. | D16 adds durable poison metadata without retaining payload bodies. |
+| v2.17 | 2026-10-12 | Add D17 Transport Profile SCD2 Master and append-only Audit/Outbox Transaction classification (W/T/M=0/2/1); specify dual-scope FORCE RLS, trigger-emitted facts, least-privilege roles, secret exclusion, and disposable PostgreSQL/SQLx evidence while retaining target DB/identity gates. | D17 profile Master/resolver slice passed the isolated PostgreSQL gate. |
 | **Business Truth** | 业务事实,影响决策 | PostgreSQL(主事务表) | 低频,受事务约束 | `worktree.worktree`(Business 列), `agent_session.agent_session`, `feedback.feedback`, `validation_result.validation_result` 等 |
 | **Observed Runtime State** | 高频本地状态,非业务事实 | PostgreSQL(独立 Projection 表,与主表 1:N) | 高频,异步 | `worktree.worktree_status_observed`, `agent_session.agent_process_status_observed`, `validation_result.test_progress_observed` |
 | **SCM Truth** | Git 远端事实 | SCM Adapter 镜像 + 引用 | 中频 | `scm.commit`, `scm.pull_request`(镜像字段 + Object Storage Key) |
@@ -5974,3 +5975,15 @@ The migration chains after `2026-10-08-platform-poison-quarantine.sql` to reuse 
 v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：现有quarantine/capacity consumer仍需抽出接收/确认/replay port，Cargo依赖还需按provider隔离，当前不是已移除NATS的产品构建。
+
+## 4.13.24 — D17 Transport Profile Master and revision facts
+
+Migration: `db/migrations/2026-10-12-platform-transport-profile-master.sql`.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `platform_messaging.transport_profile_revision` | M | Platform Messaging owner SCD2 profile revisions keyed by deployment, tenant, profile and revision; carries bounded non-secret provider/endpoint/route data, opaque secret reference, digest and event metadata | No TTL or physical delete; immutable payload; one permitted `valid_to` close must have a deferred successor in the same transaction | FORCE RLS requires deployment and profile tenant; owner may SELECT/INSERT and UPDATE only `valid_to`; resolver gets SELECT only |
+| `platform_messaging.transport_profile_revision_audit` | T | Immutable audit of actor, prior/current revision, digest, request, trace, causation and idempotency identities | Append-only; no TTL or physical delete | FORCE RLS requires deployment and profile tenant; trigger is the only INSERT path; owner is read-only |
+| `platform_messaging.transport_profile_revision_outbox` | T | Versioned BI/Benchmark profile-revision event with schema version, trace/causation/idempotency metadata, provider identity, allowed routes and digest | Append-only; no TTL or physical delete | FORCE RLS requires deployment and profile tenant; fixed-search-path SECURITY DEFINER trigger writes in the Master transaction; owner is read-only |
+
+D17 adds W/T/M=0/2/1. No credential bytes, private keys, token values or secret-manager reference appear in Audit/Outbox; the Master stores only a bounded opaque secret reference. AssetsLake's `schema_version`, `trace_id`, `causation_id` and `idempotency_key` event shape is adapted to the Star Outbox envelope (`event_schema_version=1` plus correlation identities); its dry-run publisher is not imported or treated as transport. The profile Master migration applied twice, D17 schema assertions passed, and the real SQLx CAS/idempotency/resolver scenario passed 1/1 in the disposable PostgreSQL 18.6 chain (71/71 runner steps). Runtime grants in the target database, authenticated production identity, Outbox BI consumer and retention/archival policy remain open; do not infer these from the isolated owner-role test.

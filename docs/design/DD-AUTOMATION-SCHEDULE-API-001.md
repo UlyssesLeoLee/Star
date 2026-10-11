@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D16 adds a provider-neutral PostgreSQL metadata quarantine writer and standalone Cargo feature. PostgreSQL 18.6 disposable runner 68/68, D16 migration replay, D15 migration double-apply and real `AdmissionReceiver`→quarantine SQLx scenario 1/1 (21.37s) pass. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production verifier/composition, D17 profile resolver/service identity, encrypted replay body, native provider and full execution chain remain open.
-> Version: 0.57 | Date: 2026-10-12
+> Status: 🟡 D17 initial Transport Profile Master/resolver slice is verified on disposable PostgreSQL 18.6 (71/71), with migration double-apply and SQLx profile scenario 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production verifier/composition and service identity, target DB grants, encrypted replay body, native provider, BI/performance and full execution chain remain open.
+> Version: 0.58 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -633,6 +633,9 @@ The resolver and owner persistence stay Star-owned. Source modules are adapted o
 
 Acceptance covers repeatable migration, SCD2/CAS successor rules, append-only audit/outbox binding, dual-scope RLS using least-privilege identities, deterministic digest verification, active/disabled/revoked/stale-generation resolution, exact sender/recipient/kind authorization, replay and conflict cases, bounded query/cache behavior and BI event schema. PostgreSQL disposable acceptance does not substitute for target database deployment or production credential management. This phase does not implement a native durable log server, terminal ACK, encrypted replay body, worker, full app NATS removal, Agent sandbox, Hook execution or Schedule/Run executor; all remain fail-closed.
 
+Initial implementation evidence (2026-10-12): `transport_profile.rs` defines bounded/canonical typed profile and authenticated-session contracts; `transport_profile_pg.rs` publishes owner-scoped CAS revisions with exact idempotency and resolves one uncached active snapshot. The D17 migration creates one SCD2 Master and append-only Audit/Transactional Outbox tables, dual deployment+tenant FORCE RLS, restricted owner/resolver roles, and trigger-only fact emission. AssetsLake's versioned event fields are mapped into the profile revision facts (`event_schema_version`, trace, causation and idempotency); no source relay or transport code is copied. PostgreSQL 18.6 disposable runner passed 71/71 steps with both migration applications and the real SQLx profile path 1/1; crate diagnostic unit tests passed 27/27 with default features and 21/21 with `--no-default-features --features durable-quarantine`. All-target checks passed in both feature configurations using Rust 1.98.1 `--ignore-rust-version`. This does not establish production service authentication: the session trait and test identity are injected seams. Target database grants, production credential lifecycle/identity, native provider, consumer wiring, BI projection, performance/RSS and Rust 1.99.0 remain open. See [D17 report](../reports/PHASE-9F4C-D17-TRANSPORT-PROFILE-REPORT.md).
+
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.57 | 2026-10-12 | Ulysses — Mavis接手审核 | Synchronize final D16 evidence and specify D17 profile master/resolver, service identity, local source module fit and acceptance gates |
+| 0.58 | 2026-10-12 | Ulysses — Mavis接手审核 | Reconcile the first D17 Master/resolver implementation and verified disposable PostgreSQL/SQLx evidence; retain production identity, transport, BI and formal toolchain gates |
