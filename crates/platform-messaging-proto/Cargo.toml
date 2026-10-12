@@ -1,0 +1,16 @@
+[package]
+name = "platform-messaging-proto"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.99.0"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+prost = "0.14"
+tonic = { version = "0.14.6", default-features = false, features = ["codegen", "transport"] }
+tonic-prost = "0.14.6"
+
+[build-dependencies]
+protoc-bin-vendored = "3.3"
+tonic-prost-build = "0.14.6"

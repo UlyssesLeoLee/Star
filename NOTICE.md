@@ -70,6 +70,14 @@ cargo deny list --format human         # 人类可读
 cargo about generate about-list.hbs -o target/NOTICE-full.md --all-features
 ```
 
+## 本机项目代码适配归属
+
+| 来源 | 源版本与文件 | Star 适配文件 | 许可与范围 |
+|---|---|---|---|
+| RustGameServer | `89458d887e8bfddf6637f9d80ea65f2091e8b6f2`，`crates/shared-platform/src/tls.rs`，SHA-256 `675CBC3903775B69B7E878BA7820803EC03F962DC32E45FC8B94E68689C39164` | `crates/platform-messaging-runtime/src/native_grpc.rs` | Apache-2.0；源仓另有 `COMMERCIAL-LICENSE.md`，其书面授权条件由用户在 2026-10-12 明确授权 Star 复用本机 Rust server 模块覆盖。本文件仅适配 TLS PEM/config helper，保留来源和 Apache SPDX；未引入游戏业务域。 |
+
+该适配尚未完成构建与分发依赖闭包审计；完成前不得据此宣称 release bundle/SBOM 已放行。
+
 ## 已知待处理项
 
 | 项 | 状态 | 说明 |

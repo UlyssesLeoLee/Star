@@ -1,16 +1,16 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.1 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：已完成有界来源/许可审查、AssetsLake 候选复验与 D18 storage contract；尚未迁移来源代码，未实现 native transport provider。
+> v1.5 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：D19 gRPC/mTLS client slice 已在隔离 worktree 编写；Rust 1.99.0 目标 crate all-targets 检查、定向 Clippy 和 6 个 lib 单测通过。完整 package test 曾在 integration 与 lib-test executable 链接阶段遇到 Windows LNK1104；native server、生产证书身份映射、Profile→log provisioning、owner delivery 和 cutover 均未完成。
 
 ## 1. 范围与证据
 
-用户授权从本机 Rust 服务端项目参考并复用代码。此次核验 AssetsLake、RustGameServer、ROPE_CS 的消息/Outbox 候选，并以仓库级元数据筛查 Ada、CATs、GitGit、Physis；不是对电脑内全部 Cargo 项目的穷尽审计。所有源仓库只读，其未提交内容和运行环境均保留。直接复用仍须满足源仓库许可证和版权授权；“在本机可读取”不等于有权再分发或部署。
+用户明确允许参考并复用 `E:/AssetsLake` 与电脑内其他自有 Rust 服务端项目；该授权覆盖模块级复用，不自动覆盖第三方依赖许可、NOTICE、传递依赖义务或来源项目中的其他权利人代码。此次核验 AssetsLake、RustGameServer、ROPE_CS 的消息/Outbox 候选，并以仓库级元数据筛查 Ada、CATs、GitGit、Physis；后续又定向查看 `D:/DB_SERVER/db_api` 与 `C:/Users/leo19/actix-demo`。这不是对电脑内全部 Cargo 项目的穷尽审计。所有源仓库只读，其未提交内容和运行环境均保留。
 
 | 来源 | 当前 HEAD / 工作区 | 许可证与实际实现 | 决定 |
 |---|---|---|
 | `E:/AssetsLake` | `0156aca56c0d7364120d7389ebe1ccf0cb64b750`；17 个脏文件 | 根 LICENSE 为 AGPL-3.0。目标 `event_publisher_service.rs` 的 SHA-256 与本表一致；它有 envelope/outbox 字段，但当前 relay 无 Kafka client，dry-run 或未配置 broker 时会标记 published，且 stage 独立使用 pool，不能证明与业务写入同事务 | 按模块允许参考、适配或直接复用；AGPL-3.0 不禁止商业使用，但需按具体链接/部署/网络提供方式履行源码、NOTICE 等义务并核验完整依赖闭包。该 relay 本身因未真实投递而不作为生产 transport；D16 未复制源码，因为本阶段只需 Star-owned PG receipt |
-| `D:/RustGameServer` | `89458d887e8bfddf6637f9d80ea65f2091e8b6f2`；干净 | Apache-2.0。已核对的 channel/outbox/relay/producer 文件 SHA-256 与下表一致。它是 gRPC 游戏服务端；channel 模块是 mTLS 客户端构造器，不是消息 broker | 唯一当前许可清晰的模块级代码候选；可适配 mTLS/超时/指标模式。须移除明文 opt-out，并修正 owner lease fence 与完整 ack deadline 后才能接入 |
+| `D:/RustGameServer` | `89458d887e8bfddf6637f9d80ea65f2091e8b6f2`；当前复核为干净 | 根 `LICENSE` 为 Apache-2.0；另有 `COMMERCIAL-LICENSE.md`，商业生产使用要求权利人事先书面授权。用户于 2026-10-12 明确书面授权本项目复用其本机 Rust 服务端模块；本次仅按该授权适配列明的小型 TLS helper。目标 `tls.rs` SHA-256 为 `675CBC3903775B69B7E878BA7820803EC03F962DC32E45FC8B94E68689C39164`。它是 gRPC 游戏服务端，不是通用消息 broker | 已选择模块级适配 TLS 文件加载与强制 mTLS 配置；保留 Apache 来源与本次授权记录。`channel.rs` 的明文 opt-out 不复制；outbox/relay/producer 仍只作语义参考 |
 | `E:/ROPE_CS` | `3f4e54c595f3c486fd895b1a1456727b08931f86`；138 个脏文件 | `server/rope_server/LICENSE` 声明 proprietary/internal use，并禁止再分发或公开部署，除非获得 Say Co., Ltd. 明确许可 | 排除代码复制、改编和部署；先前候选结论由本版撤销。后续只有权利人明确书面授权后才能重新评估 |
 
 补充候选仅作仓库元数据与适配度筛查，不作代码迁移授权：
@@ -42,7 +42,8 @@ AssetsLake、RustGameServer、Ada、CATs、GitGit、Physis 未发现 `.codegraph
 
 | 模块 / 精确证据 | 选择 | Star 接入要求 |
 |---|---|---|
-| RGS `channel.rs:238–280` build_channel/retry_backoff | 优先适配候选：mTLS 默认拒绝无 TLS、连接/请求超时、错误分类退避、HTTP/2 通道复用 | 独立小模块；生产禁止明文 bypass；mTLS 身份再绑定 tenant/owner/recipient 授权，不能以 TLS 就绪代替业务授权 |
+| RGS `channel.rs:238–280` build_channel/retry_backoff | 参考 fail-closed 默认、连接/请求超时、错误分类退避与 HTTP/2 通道复用；源代码含 `require_tls=false` 明文 bypass | 不复制明文 bypass；Star client 强制 `https://`、mTLS identity 与 server name 校验，再独立绑定 tenant/owner/recipient 授权 |
+| RGS `crates/shared-platform/src/tls.rs` | D19 已将 PEM 读取、client/server TLS config 形状适配至 Star Tonic 0.14；添加文件大小上限、服务器域名验证和显式 `client_auth_optional(false)` | 仅 TLS 配置适配；Star 仍须从 peer certificate 映射到 active service identity，并逐次验证 tenant/profile/route。模块见 `crates/platform-messaging-runtime/src/native_grpc.rs` |
 | RGS `outbox.rs:480–554` list_pending/mark_sent/mark_failed | 参考事务内 SKIP LOCKED 与崩溃后租约接管 | settle 必须核对 worker lease token/generation；源 mark_sent 仅按 id 更新，不能直接沿用。保留 Star 已实现的 owner-local RLS、容量、永久回执和 stale-worker fence |
 | RGS `outbox_relay.rs:185–316` tick/run/publish_entry | 参考事件年龄、批量、重试和 cycle 指标 | 不从 NATS subject 推断领域身份；改用 typed owner/Run/event。补取消/drain、批量硬上限及消息字节预算；不引入整套游戏域、Wasm/网关依赖 |
 | RGS `producer.rs:293–340` publish_bytes | 参考 traceparent 与错误退避；不直接复用现有发布实现 | 当前 timeout 只包裹得到 ack future，后续 ack_future.await 无同一 timeout；还会每次重试 clone payload。Star 必须对完整持久化回执等待设 deadline、验证 log identity/cursor，并保持有界字节驻留 |
@@ -51,7 +52,7 @@ AssetsLake、RustGameServer、Ada、CATs、GitGit、Physis 未发现 `.codegraph
 
 ## 3. 目标接入架构
 
-复用以独立模块为单位；用户授权本机 Rust 服务端可作为直接复用/适配来源，逐项审查许可证、权属、源状态、依赖闭包和实现缺口仍是门槛。RustGameServer 的 Apache-2.0 通道代码是当前最明确的直接适配候选，但须删除明文 opt-out；AssetsLake 模块同样可以直接评估和复用，AGPL-3.0 本身不禁止商业使用，需按具体交付方式履行许可证义务并审查完整依赖闭包。AssetsLake 当前 relay 未真实投递且不能证明与业务写入同事务，所以它不是生产 transport；可复用的 envelope 或独立模块仍按源文件/依赖逐项选择。ROPE_CS、Ada 与许可冲突的 CATs 不得进入构建或部署。现有 `PlatformPoisonQuarantine` 保持 JetStream `Message`/source identity 专用；D16 新增独立 `PgAdmissionReceiveQuarantine`，通过 `durable-quarantine` feature 写入 provider-neutral、deployment/tenant RLS 保护的 metadata-only Transaction 收据。它复用 Star 自有 PostgreSQL owner-role、幂等和 WORM 机制，不从本机候选项目拷入消息逻辑，因为这段存储语义已由 Star 当前契约直接规定。来源 port 尚未接入生产 source verifier/composition，也不保留可重放原始 payload；不能据此宣称 native transport 或完整 poison recovery 上线。RustGameServer 本身不是通用消息 broker，Star 仍需实现自己的 Rust transport service。保持现有 `AdmissionTransport` 与 owner-local Outbox/Inbox；native 服务端仅拥有自身 transport persistence，不拥有 Schedule/Run 的业务写权限。不得跨 owner 共享写事务。
+复用以独立模块为单位；用户授权本机 Rust 服务端可作为直接复用/适配来源，逐项审查许可证、权属、源状态、依赖闭包和实现缺口仍是门槛。D19 已按用户当前书面授权适配 RustGameServer 的 Apache-2.0 TLS helper；该源仓额外 `COMMERCIAL-LICENSE.md` 的商业生产书面授权条件也须保留在来源记录中。`channel.rs` 的 plaintext opt-out 未复制。AssetsLake 模块同样可以直接评估和复用，AGPL-3.0 本身不禁止商业使用，需按具体交付方式履行许可证义务并审查完整依赖闭包；其当前 relay 未真实投递且不能证明与业务写入同事务，因此不作为生产 transport。ROPE_CS、Ada 与许可冲突的 CATs 不得进入构建或部署。现有 `PlatformPoisonQuarantine` 保持 JetStream `Message`/source identity 专用；D16 新增独立 `PgAdmissionReceiveQuarantine`，通过 `durable-quarantine` feature 写入 provider-neutral、deployment/tenant RLS 保护的 metadata-only Transaction 收据。它复用 Star 自有 PostgreSQL owner-role、幂等和 WORM 机制，不从本机候选项目拷入消息逻辑，因为这段存储语义已由 Star 当前契约直接规定。该 receive port 尚未接入生产 source verifier/composition，也不保留可重放原始 payload；不能据此宣称完整 poison recovery 上线。RustGameServer 本身不是通用消息 broker，Star 仍需实现自己的 Rust transport server。保持现有 `AdmissionTransport` 与 owner-local Outbox/Inbox；native 服务端仅拥有自身 transport persistence，不拥有 Schedule/Run 的业务写权限。不得跨 owner 共享写事务。
 
 版本化 TransportProfile 固定 provider/version/digest、endpoint/server identity、协议与权限范围。发布确认必须来自已持久化的日志及有效 receipt；接收确认必须晚于目标 owner 的 Inbox 与业务结果提交。确认丢失后以稳定 message identity 重放，不能重新执行业务副作用。provider cursor 不跨端点/generation 混用；不能为 native server 强制模拟 JetStream。
 
@@ -76,6 +77,8 @@ v0.2 审查只更新了设计与来源证据，没有新增运行时实现/测�
 
 This establishes crate-level compile seams only. The NATS feature is still default-enabled, other application crates may still pull NATS, and there is no native server provider. D16 supplies an admission poison metadata receipt, but not capacity-result quarantine, encrypted replay body retention, production source verification/composition or ACK-loss recovery. Do not remove the default adapter or claim replacement until the full application dependency closure and native provider contract are verified.
 
+D19 keeps protobuf code generation in `crates/platform-messaging-proto`, excluded from the root workspace and reached only through the optional `native-grpc-adapter` dependency. Normal workspace builds therefore do not compile Tonic/Prost codegen; enabling the native feature resolves the packages in the shared lockfile and compiles the isolated proto crate. Release SBOM/license review must still include this feature's full build and runtime dependency closure.
+
 ## 6. 本机候选扩展评估（v0.8）
 
 本轮扩大有界扫描，新增审查本机 E:/CATEST、E:/OpenAIActixMCP、E:/SandTree 与 E:/CATLLM。这不是对全盘 Rust 仓库的穷尽审计。源仓库保持只读，工作区状态与目标文件 SHA-256 按本轮实测记录；没有运行这些源项目的测试。
@@ -88,12 +91,14 @@ This establishes crate-level compile seams only. The NATS feature is still defau
 | E:/CATLLM | d4f06e1fedf56f42fa463d6be44b2d50f7cb2c5e；Cargo manifest、Rust crates、lock 与部署文件均未跟踪 | 根目录有 Apache-2.0 LICENSE；当前 crates/gateway/src/main.rs SHA-256 4A5DE949F5EE145BF1549511607F1F3CDF919E826C5052ACE10B77F26FE44C2F，使用 rskafka producer，但其源代码和 manifest 尚无可审查的 Git 基线 | 仅供当前文件级阅读参考；不复制、不进入 Star 构建，不宣称完成许可闭包或验证。形成可复现提交、锁定依赖/完整传递许可证并通过对应测试后再评估 |
 | E:/SandTree (EventRouter/Multipass modules) | `940edc3a8110d6edffc6224f1dbf044b6259d2cf`；仓库其它路径有脏改动，以下目标文件干净 | workspace 声明 MIT OR Apache-2.0，已见根级 Apache-2.0 LICENSE。EventRouter 为有界进程内 fan-out；Multipass provider 使用 argv/name/output 限制，但同步 `Command::output()` 忽略传入 timeout | EventRouter 可参考为提交后易失 UI/投影通知，不提供 durable log、ACK、replay 或恢复；Multipass adapter 可复用校验模式，接入前需实现 deadline、取消、子进程回收，并沿用 Star Rust Host Manager、Run binding、双层 reservation 和两实例 inventory 上限 |
 | E:/IDE1.0 | `f44479f145248bad808ea04831bf4ff5c652501f`；`main` 落后 `origin/main` 38 commits，仓库有未跟踪 feedback 文档，目标文件干净 | workspace 声明 MIT OR Apache-2.0；`ide-shell-protocol` 提供 HTTP/WebSocket/stdio server，但 event subscribers 使用无界 Tokio channel | 可参考任务卡 CLI 的协议适配面；不能直接引入无界 channel，须提供 bounded stream/backpressure、Run/Worktree/Task 授权、cancel/recover 与 output cap |
+| D:/DB_SERVER/db_api | `master` 无 commit；Cargo manifest/lock/source 未跟踪；`src/main.rs` SHA-256 `A3B7BFBF3BFBA8783A1F9D1301C67BBA90C866B301CDC79DE526D07E7CBB5AA8` | Axum 0.7 + deadpool-postgres 的单路由健康检查样例；无根级 LICENSE，连接配置含硬编码凭证并使用 NoTls | 用户已允许本机项目作为参考；仅可参考限量连接池的概念。来源无可复现提交和许可声明，且配置不符合凭证/TLS要求，不复制源码或配置；凭证值不记录于本文 |
+| C:/Users/leo19/actix-demo | `master` 无 commit；工作区含未跟踪文件；`src/main.rs` SHA-256 `D974724CE8DC4BF83D2DDD6E084F6638F67F930782824004708806EF467368F7` | Actix 4 + rustls 0.22 静态文件 HTTPS 示例；无根级 LICENSE，配置使用 `NoClientAuth`，不包含 durable messaging | 用户已允许本机项目作为参考；仅说明基础 listener/TLS 装配方式。没有 mTLS、消息持久化或 Star 授权契约，不复制到 NativeTransport；来源项目保持只读 |
 
 本轮结论：CATEST 与 AssetsLake 都有可参考的事件 envelope/producer 经验，但都没有可直接替换 NATS 的 Star-compatible durable server；CATEST consumer 的自动提交尤其不能用于 Star owner transaction。OpenAIActixMCP 与 SandTree 分别服务于 MCP HTTP endpoint 和本机进程 IPC，属于独立 app/runtime 边界的素材，不属于消息 broker。RustGameServer 的 mTLS client helper仍是候选小模块，但该游戏服务端本身也不是通用 broker。Star native provider 仍需拥有自己的认证身份、durable append/pull、owner-independent cursor receipt、重试/恢复、资源限额与故障契约。
 
 本轮再对 SandTree `EventRouter`、`provider-multipass` 与 IDE1.0 `ide-shell-protocol` 做文件级补充审查。EventRouter 默认每 subscriber queue 有界（256）并合并 `ResourceChanged`，只适合已提交事实之后可丢失的进程内通知。Multipass runner 同步阻塞且不执行传入 timeout，不能直接放进异步桌面/Host Manager 路径。IDE1.0 的多协议 CLI server 可参考协议形状，但无界 subscriber channel 不符合 Star 内存与背压预算。源文件哈希已记录；这些源仓仍只读，未运行源项目测试，未复制源码。未穷尽本机所有 Rust 项目；每次迁入仍须复核届时 HEAD、工作区、目标文件哈希、权属/许可证、NOTICE、传递依赖与产品语义。
 
-CodeGraph 未能提供这些来源仓库的索引覆盖审计；本节结论来自当前源码与 Git 状态的定向核对，不代表全盘审计或测试通过。
+CodeGraph 未能提供这些来源仓库的索引覆盖审计；本节结论来自当前源码与 Git 状态的定向核对，不代表全盘审计或源项目测试通过。源项目只读；这次没有复制 DB_SERVER 或 actix-demo 代码。
 
 ## 7. 修订历史
 
@@ -122,10 +127,22 @@ This recheck does not assert that all local Rust projects are audited, that AGPL
 
 D18 does not copy transport implementation from AssetsLake or another project because the storage semantics now required are Star-specific: deployment+tenant+service isolation, generation-pinned route identity, cross-generation exact idempotency, lease-fenced owner ACK, payload retention with permanent receipt, same-transaction metadata Outbox, and per-message producer identity. This is a fit decision for this storage slice, not a restriction on future direct module reuse.
 
-E:/AssetsLake remains eligible for direct reuse of independently reviewed modules; its typed event metadata is already adapted while its current dry-run/no-broker relay remains unsuitable as production durable delivery. The RustGameServer Apache-2.0 mTLS/client helper remains an adaptation candidate for D19 after removing `require_tls=false`, retaining applicable notices, and placing the complete request/ack path under Star's deadline and authenticated identity checks. Other local Rust server modules may also be adopted where behavior matches the contract. No source repository was modified by D18.
+E:/AssetsLake remains eligible for direct reuse of independently reviewed modules; its typed event metadata is already adapted while its current dry-run/no-broker relay remains unsuitable as production durable delivery. D19 has started by adapting the RustGameServer TLS config helper under the user's written authorization and retaining its Apache source attribution plus the additional commercial-use condition. The client-side bypass branch was not copied; peer certificate fingerprint extraction is present, while the production fingerprint registry, server handlers and per-request profile/route checks remain pending. Other local Rust server modules may also be adopted where behavior matches the contract. No source repository was modified by D18 or D19.
 
 The replacement path is incremental: preserve the existing NATS adapter behind the same versioned provider interface while the Star-owned Rust server implements the PostgreSQL durable log; run the same contract suite against each provider; add service authentication, profile→log provisioning, receiver recovery, BI/Benchmark parity, bounded memory and concurrency gates; then dual-run/compare before profile-based cutover. NATS remains a supported provider until all production routes, replay/recovery, operational rollback and performance gates are accepted. D18 provides no provider client/server, so this plan remains future implementation work.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v1.1 | 2026-10-12 | Ulysses — Mavis接手审核 | Record D18 as Star-owned durable storage, preserve module-level reuse eligibility, and outline a contract-compatible staged NATS replacement path |
+| v1.2 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录用户对 RustGameServer 模块的明确书面复用授权及额外商业条款；D19 首次适配 TLS helper 并加入 gRPC client/proto slice；标明服务端持久身份、Profile→log 与 Cargo/测试缺口 |
+| v1.3 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录用户对 AssetsLake 与本机其他 Rust 服务端的直接参考/模块复用授权；补充 DB_SERVER、actix-demo 的边界审查和 D19 proto codegen 隔离；登记 Rust 1.99.0 下目标 crate 编译/格式验证结果 |
+| v1.4 | 2026-10-12 | Ulysses — Mavis接手审核 | 为 D19 加入 PEM 文件实际读取上限与每实例 8 路并发背压；补充 5/5 定向测试、目标 crate 编译和全 workspace 格式检查的真实结果 |
+| v1.5 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 native client 构造参数收敛为公开类型化配置、绑定 URI 主机与 TLS 校验域名并修复新增 Clippy 告警；更新 Rust 1.99.0 all-targets check、Clippy、6 个 lib 单测与 Windows package-test 链接失败的实测状态 |
+
+## 10. D19 native gRPC adapter first slice
+
+本节记录隔离 worktree `codex/native-transport-d19-20261012` 中尚未提交的阶段进展，不代表 D19 或整体 Worktree-first 任务完成。当前代码将 `D:/RustGameServer/crates/shared-platform/src/tls.rs`（源仓 HEAD `89458d887e8bfddf6637f9d80ea65f2091e8b6f2`，源文件 SHA-256 `675CBC3903775B69B7E878BA7820803EC03F962DC32E45FC8B94E68689C39164`）中的 PEM 加载与 Tonic TLS 配置做小范围适配；没有复制 `channel.rs` 的明文分支、游戏业务域或 Outbox 实现。源仓 `COMMERCIAL-LICENSE.md` 的商业生产书面授权条件由用户本轮明确的书面复用授权覆盖；代码保留 `SPDX-License-Identifier: Apache-2.0`、来源 commit/hash 与 `NOTICE.md` 记录。
+
+新增的 `native_transport.proto` 定义版本化 unary Append/PullOne/AcknowledgeOne。ProfilePin 只传 32-byte canonical profile digest；该 digest 已提交 deployment、tenant、profile id、revision、lifecycle 和完整配置，因此服务端可在经证书认证的 deployment/tenant scope 内解析唯一 profile revision。Append 不接受客户端自报 sender identity；服务端必须从 mTLS peer certificate 得到 SHA-256 fingerprint，再查 active certificate→service identity registry。当前 `native_grpc.rs` 已提供强制客户端证书的 TLS config、peer certificate fingerprint 提取、通过 `Read::take` 最多读取 1 MiB+1 字节来拒绝超限 PEM，以及实现 `AdmissionTransport` 的多路复用 gRPC publisher。`NativeGrpcClientConfig` 将 owner、HTTPS endpoint、证书路径、deadline 与固定 Profile 作为单一构造输入。每个 adapter 实例通过共享 Semaphore 将并行请求限制为 8 个；取消 future 会释放许可。client 校验 HTTPS URI 主机名与 TLS server domain 一致、限制连接 deadline 至 30 秒和请求 deadline 至 10 秒、wire ≤16 KiB、gRPC frame ≤32 KiB，并在生成 receipt 前核验 exact wire SHA-256、log generation 与正 sequence。
+
+**实现边界**：Rust 1.99.0 下 `cargo check -p platform-messaging-runtime --features native-grpc-adapter --all-targets -j 4` 与目标 crate all-targets Clippy 均通过；Clippy 仅报告未修改的 `star-context`、`domain-automation`、`domain-kms` 警告，D19 文件无新增告警。`cargo test -p platform-messaging-runtime --features native-grpc-adapter --lib native_grpc::tests -j 1` 通过 6/6。未过滤 package tests 在链接 `transport_profile_pg` integration 与 `platform_messaging_runtime` lib-test executable 时遇 Windows `LNK1104`（无法打开目标 `.exe`）；单独的 integration target `--no-run` 随后成功，但完整 package test 未通过/未完成。定向 rustfmt check 与本轮 Cypher Graph Guardian 已通过；`cargo fmt --all -- --check` 因仓库内未修改文件的既有格式差异失败，未批量格式化无关代码。编译仍有 3 条未修改 `domain-kms` 的弃用 API 警告。Cargo.lock 已更新，但完整许可证/发布 SBOM 闭包仍未验收。没有 native gRPC server handler、certificate identity registry 查询、Profile endpoint identity→URI/TLS hostname 的可信解析、Profile digest 到 log generation 的数据库绑定/受控 provisioning、生产 server composition、完整 Append/Pull/Ack SQL 连接、consumer commit-after-ack 闭环、双 provider 契约套件、性能/恢复测试。服务端尚未证明返回 receipt 来源于 D18 PostgreSQL durable commit，因而 client 代码不能据此在产品中启用 native provider。AssetsLake 目标文件当前仍保持原 SHA-256 `3A2114863827CB8CE893AD5A24090D827F89B7752C6FF23546DBDB4DC3B8A4A5` 且未复制；其 dry-run relay 仍不构成 durable transport。

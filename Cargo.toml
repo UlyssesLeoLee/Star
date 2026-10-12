@@ -171,7 +171,7 @@ members = [
     # ULYS-228 (ULYS-104.18, 2026-09-29): layout-engine-wasm crate (阶段 1 PoC, wasm-pack cdylib + rlib 双输出, per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.1 P0: pick_algorithm + visual_distance 暴露给浏览器, 复用 crates/layout-engine 纯函数, 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #19 v19 0 动 V0.1 任何业务 logic)
     "crates/layout-engine-wasm",
 ]
-exclude = ["target"]
+exclude = ["target", "crates/platform-messaging-proto"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -192,6 +192,8 @@ repository = "https://github.com/UlyssesLeoLee/Star"
 tokio = { version = "1.40", features = ["full"] }
 async-nats = { version = "0.50.0", default-features = false, features = ["jetstream", "ring"] }
 async-trait = "0.1"
+# Native Rust durable transport gRPC contract (D19); MIT / Apache-2.0 crates, Rust 1.88+.
+tonic = { version = "0.14.6", default-features = false, features = ["transport", "tls-ring", "tls-connect-info", "codegen"] }
 # WebSocket HTTP server (per ULYS-222 P1-C — terminal-stack WebSocket protocol layer 依赖)
 # 0.8 选型跟 crates/api 守门 #48 一致
 axum = { version = "0.8", features = ["ws", "macros"] }

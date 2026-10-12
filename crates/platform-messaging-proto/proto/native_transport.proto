@@ -1,0 +1,85 @@
+// @cypher schema=1
+// MERGE (self:File {path:"crates/platform-messaging-proto/proto/native_transport.proto"})
+// MERGE (service:Type {id:"star.platform.transport.v1.DurableTransport",kind:"grpc-service"})
+// MERGE (append:Symbol {id:"star.platform.transport.v1.DurableTransport.Append",kind:"rpc"})
+// MERGE (pull:Symbol {id:"star.platform.transport.v1.DurableTransport.PullOne",kind:"rpc"})
+// MERGE (ack:Symbol {id:"star.platform.transport.v1.DurableTransport.AcknowledgeOne",kind:"rpc"})
+// MERGE (self)-[:DEFINES]->(service)
+// MERGE (service)-[:EXPOSES]->(append)
+// MERGE (service)-[:EXPOSES]->(pull)
+// MERGE (service)-[:EXPOSES]->(ack)
+// @endcypher
+//
+// Version 1 is unary and bounded. Append derives sender identity from the verified mTLS peer;
+// ProfilePin's digest commits the full immutable profile revision.
+syntax = "proto3";
+
+package star.platform.transport.v1;
+
+service DurableTransport {
+  rpc Append(AppendRequest) returns (AppendResponse);
+  rpc PullOne(PullOneRequest) returns (PullOneResponse);
+  rpc AcknowledgeOne(AcknowledgeOneRequest) returns (AcknowledgeOneResponse);
+}
+
+message ProfilePin {
+  bytes profile_digest = 1;
+}
+
+message AppendRequest {
+  ProfilePin profile = 1;
+  bytes recipient_service_id = 2;
+  string message_kind = 3;
+  bytes message_id = 4;
+  bytes wire = 5;
+  bytes wire_sha256 = 6;
+}
+
+message AppendResponse {
+  string log_id = 1;
+  bytes log_generation = 2;
+  int64 sequence = 3;
+  bytes wire_sha256 = 4;
+  bool exact_replay = 5;
+}
+
+message PullOneRequest {
+  ProfilePin profile = 1;
+  bytes sender_service_id = 2;
+  string message_kind = 3;
+  int32 lease_seconds = 4;
+}
+
+message Delivery {
+  string log_id = 1;
+  bytes log_generation = 2;
+  int64 sequence = 3;
+  bytes sender_service_id = 4;
+  string message_kind = 5;
+  bytes message_id = 6;
+  bytes wire = 7;
+  bytes wire_sha256 = 8;
+  bytes lease_id = 9;
+  int64 lease_expires_unix_ms = 10;
+  int32 attempt_count = 11;
+}
+
+message PullOneResponse {
+  Delivery delivery = 1;
+}
+
+message AcknowledgeOneRequest {
+  ProfilePin profile = 1;
+  bytes sender_service_id = 2;
+  string message_kind = 3;
+  string log_id = 4;
+  bytes log_generation = 5;
+  int64 sequence = 6;
+  bytes lease_id = 7;
+  bytes message_id = 8;
+  bytes wire_sha256 = 9;
+}
+
+message AcknowledgeOneResponse {
+  bool acknowledged = 1;
+}

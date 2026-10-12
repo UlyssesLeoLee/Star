@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.37）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.39）
 
 ## 0. 文档说明与前提
 
@@ -12,7 +12,7 @@ Vibe Coding Work Management SaaS 要件定义书（本文档）
 
 **重要前提说明**：本仓库（D:\Star）中未检索到被引用的原始《Kubernetes-native 工作管理 SaaS 要件定义》文档。因此本文档不是对原文档的"增量 diff"，而是一份**自包含（self-contained）的完整要件定义书**，按以下方式处理原文档依赖：
 
-- 提示词中明确列出的架构原则（K8s-native / K3s、Rust Modular Monolith、PostgreSQL System of Record、Transactional Outbox、NATS JetStream、Worker、Service Promotion Model、低 K8s Tax）**全部照原样继承**，不做任何推翻或重新论证，具体见第 13、44 章。
+- 提示词中明确列出的架构原则（K8s-native / K3s、Rust Modular Monolith、PostgreSQL System of Record、Transactional Outbox、NATS JetStream、Worker、Service Promotion Model、低 K8s Tax）作为当前部署基线继承。用户后续明确要求为 Star 自有 Rust durable transport 做分阶段替换准备；NATS 继续作为兼容 provider，只有 D18–D21 的身份、Profile、owner delivery、BI/Benchmark、恢复、性能与回滚门全部通过后才可逐路切换，详见本文件 D18/D19 条目和基本设计 §1.6。
 - 提示词中未展开、但原文档理应存在的基础章节（Tenant/Workspace/Project、Workflow、Board/Backlog/Sprint、Permission、Data Model 等，对应 §26、§54、§55、§58-61、§90-94），本文档在第 1-17 章中**重新完整编写**，以保证 §101 要求的"从 Business Goal 到 Traceability 全面审查"可以成立。
 - 若用户持有原文档，后续应以原文档为准对第 1-17 章做一致性校对；本文档在这些章节中不臆造与提示词矛盾的内容。
 
@@ -3456,3 +3456,18 @@ Platform Messaging owner 新增受限的 PostgreSQL durable-log storage contract
 D18 isolated PostgreSQL 18.6 schema-only runner 77/77 通过，包含迁移重复应用、存储契约和两路 concurrent append。两路调用分别返回首次接受与 exact replay；断言确认只生成一条 Work、一份 accepted receipt、一个 Outbox event 和一次 cursor/byte accounting；临时 PostgreSQL 停止成功，Multipass inventory 未改。此阶段只验收 durable storage contract；没有 Rust gRPC server/client、生产 mTLS/service identity、Transport Profile→log provisioning、consumer/BI/Benchmark、target DB runtime grants、完整应用 NATS 迁移、崩溃恢复或规模性能验收，因此不宣称替代 NATS，Schedule/Run 执行仍保持 fail closed。`app.platform_*` session GUC 只是调用上下文，不构成身份认证；未来 Rust server 必须先验证 mTLS/credential 身份并绑定到已授权 service identity，目标库只允许该受信 server workload 使用对应数据库角色，Agent/Plugin/任务卡 CLI 不可直接访问 transport DB。后续自研 Rust transport 必须经版本化 provider/wire contract 可替换，不向业务 owner 泄漏 provider-specific cursor/lease；Run/Infrastructure owner 仍只通过各自事务和 Outbox/Inbox 管理业务事实。本机 `E:/AssetsLake` 和其他 Rust server 可按模块直接参考、适配或复用，逐文件核对 hash、权属、许可证/NOTICE、完整依赖闭包和 Star 语义；D18 未复制外部源码。审计：`target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`。详见 [D18 阶段报告](reports/PHASE-9F4C-D18-NATIVE-TRANSPORT-LOG-REPORT.md)、[Rust 服务复用审查](design/DD-RUST-SERVER-REUSE-001.md) 与 [详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md)。
 
 | v6.37 | 2026-10-12 | Ulysses — Mavis接手审核 | 增加 D18 durable PostgreSQL transport log、并行 exact-append 验收、Rust transport 可替换边界及 NATS 保留门槛；明确仍无原生服务 | D18 isolated PostgreSQL schema-only runner 通过 |
+
+### D19：Rust native gRPC/mTLS provider 首片与本机模块复用（v6.39）
+
+D19 在隔离 worktree `codex/native-transport-d19-20261012` 增加可选 `native-grpc-adapter`，以 Tonic 0.14.6 实现版本化 Proto unary Append/PullOne/AcknowledgeOne wire contract，并在 `AdmissionTransport` publisher 首片适配 TLS helper。PEM 读取通过 `Read::take` 在最多 1 MiB+1 字节内判定超限；client 强制 mTLS、HTTPS 与 server-domain 校验并要求 HTTPS URI 主机与 TLS 域名一致，连接 deadline ≤30s、请求 deadline ≤10s、原始 wire ≤16 KiB、gRPC envelope ≤32 KiB，每个 adapter 实例最多 8 个并行请求；provider receipt 校验 exact wire SHA-256、log generation 和正 sequence。Proto codegen crate 排除在 root workspace 之外，只有启用 native feature 才构建；Cargo.lock 仍记录完整 feature 依赖。
+
+Rust 1.99.0 `cargo check -p platform-messaging-runtime --features native-grpc-adapter --all-targets -j 4`, 目标 crate all-targets Clippy、四个变更 Rust 文件的定向 rustfmt check 与 Cypher Graph Guardian 均通过；Clippy 未报告 D19 文件告警，仅报告未修改 crate 的既有警告。`cargo test -p platform-messaging-runtime --features native-grpc-adapter --lib native_grpc::tests -j 1` 通过 6/6。未过滤 package tests 在链接 `transport_profile_pg` integration 与 `platform_messaging_runtime` lib-test executable 时遇 Windows `LNK1104`；单独 integration target `--no-run` 随后成功，但完整 package tests 未通过/未完成。`cargo fmt --all -- --check` 仍被仓库中其他未改文件的既有格式差异阻断，本阶段不格式化无关代码。编译报告包含未修改 `domain-kms` 的 3 条弃用 API 警告。
+
+本机服务端直接参考/模块复用已获用户明确授权；本轮只适配 RustGameServer 的 TLS helper，并在详细设计记录 AssetsLake、RustGameServer、OpenAIActixMCP、CATEST、SandTree、IDE1.0、DB_SERVER 与 actix-demo 的用途和不适配边界。源项目均保持只读；AssetsLake dry-run relay、无界事件通道、明文 TLS opt-out、硬编码连接配置均未作为 Star 生产实现复用。各模块进入产品前仍须逐文件锁定 source hash、审阅权属及许可证/NOTICE 和完整传递依赖闭包。
+
+**D19 尚未完成**：没有 native gRPC server handlers、mTLS fingerprint→active service registry、Profile endpoint identity→URI/TLS hostname 可信解析、Profile digest→log generation provisioning、受限数据库 capability 连接、完整 Pull/Ack consumer commit-before-ACK、双 provider contract suite、production composition、BI/Benchmark parity、RSS/并发/恢复压力或发布 SBOM。服务端尚未返回能证明 D18 durable commit 的可信 receipt，native provider 不可生产启用；NATS 保留，Run/Agent 执行 fail closed。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.38 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D19 native gRPC/mTLS client 首片、Rust 1.99.0 定向编译与单测结果、本机 Rust 服务复用授权和未完成的生产迁移门槛；更新基本设计 §1.6 | 用户确认 AssetsLake 与其他本机 Rust server 可直接参考/模块复用，继续推进 Star native Rust 替换 NATS |
+| v6.39 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 NativeGrpcClientConfig 类型化构造 API、定向 Clippy 通过、6/6 lib 测试、HTTPS URI/TLS 域名绑定与 Windows package-test 链接失败；保持 D19 未完成状态 | 收敛首片新增 Clippy 告警并复跑 Rust 1.99.0 目标门禁 |

@@ -11,6 +11,7 @@ repository.workspace = true
 [features]
 default = ["jetstream-adapter"]
 durable-quarantine = []
+native-grpc-adapter = ["dep:platform-messaging-proto", "dep:tonic"]
 jetstream-adapter = [
     "durable-quarantine",
     "dep:async-nats",
@@ -33,6 +34,8 @@ serde_json = { workspace = true, optional = true }
 sha2 = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
+platform-messaging-proto = { path = "../platform-messaging-proto", optional = true }
+tonic = { workspace = true, optional = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
 

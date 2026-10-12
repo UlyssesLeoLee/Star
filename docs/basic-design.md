@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.37 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.37
+> **文档版本**: v6.39 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.39
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -132,7 +132,7 @@ flowchart TB
         ID[Identity Service]
         WC[work-core / Rust Modular Monolith]
         W[Worker --role all]
-        NATS[(NATS JetStream)]
+        MSG["Platform Messaging Provider<br/>NATS JetStream current; Star Rust migration target"]
         PG[(PostgreSQL SoR)]
         VALK[(Valkey Cache)]
         RT{Realtime (Optional)}
@@ -157,8 +157,8 @@ flowchart TB
     GW -.-> RT
     WC <--> PG
     WC <--> VALK
-    WC --> NATS
-    W --> NATS
+    WC -->|Provider port + owner Outbox| MSG
+    W -->|Provider port| MSG
     W --> PG
     LR -->|HTTPS / WSS| GW
     LR --> WTA
@@ -173,7 +173,7 @@ flowchart TB
 
 **继承自 §13.1、§13.2、§23.1**。关键设计要点:
 
-1. **服务器端最小闭环保持不变**:`gateway / identity / work-core / worker` 四个角色,加上 PostgreSQL / NATS / Valkey 三个数据面。`realtime` 角色仅在出现真实 Long Connection Scaling Boundary 时才拆出(§13.1,§15)。
+1. **服务器端最小闭环保持不变**:`gateway / identity / work-core / worker` 四个角色,加上 PostgreSQL / Platform Messaging provider / Valkey 三个数据面。NATS JetStream 是当前 provider；Star 自有 Rust durable transport 按 D18–D21 分阶段实现并通过替换门禁前继续保留 NATS。`realtime` 角色仅在出现真实 Long Connection Scaling Boundary 时才拆出(§13.1,§15)。
 2. **Local Runtime 不计入 K8s Workload**:Developer Machine 与 K3s Cluster 是平级关系,通过 Secure Channel 对接,而非 In-Cluster Pod(§23.1)。
 3. **External SCM 是事实源,不是镜像**:GitHub / GitLab 通过 Adapter 接入,平台不重新制造 Git(§19.2,§30.6)。
 
@@ -220,7 +220,7 @@ flowchart LR
 
     subgraph infra[crates/infrastructure]
         INFRA_PG[PostgreSQL Adapter]
-        INFRA_NATS[NATS Adapter]
+        INFRA_MSG["Platform Messaging Provider Port<br/>JetStream / Star Native Rust"]
         INFRA_VALK[Valkey Adapter]
         INFRA_OBJ[Object Storage Adapter]
         INFRA_SCM[SCM Adapter]
@@ -230,7 +230,7 @@ flowchart LR
     api --> application
     application --> domain
     domain --> infra
-    domain -.->|Domain Events| INFRA_NATS
+    domain -.->|Owner Outbox / Provider Port| INFRA_MSG
     D_WI --> D_WF
     D_WI --> D_BO
     D_WI --> D_PL
@@ -308,6 +308,14 @@ flowchart LR
 - 任一 Module 出现独立 Database
 
 ---
+
+### 1.6 Platform Messaging provider 与 NATS 分阶段替换
+
+Platform Messaging 是跨 owner 通信的 provider boundary。业务 owner 在各自事务内提交业务事实与 Transactional Outbox；provider 只负责已提交消息的有界持久接收、拉取、重放与确认，不共享 Run/Project owner 写事务。Provider-specific cursor、lease 和生成号留在 adapter / transport receipt 中，不向业务 owner 泄漏。
+
+NATS JetStream 保持当前可用 provider。Star 自有 Rust durable transport 是后续替换目标：D18 提供 PostgreSQL durable-log 存储契约，D19 增加版本化 gRPC/mTLS wire 与 client slice，D20 接通 owner Outbox/Inbox、BI/Benchmark 投影，D21 验收 Multipass/K3s 上的恢复、性能、内存、公平调度与运维回退。只有身份注册、固定 Profile→log、数据库权限、跨 owner delivery、指标对账、故障恢复和回滚门全部通过，才允许按版本化 Infrastructure Profile 逐路切换；任一前置条件未知时 fail closed 并保留 NATS route。
+
+D19 的 proto codegen 放在 root workspace 之外的独立 crate，并由可选 `native-grpc-adapter` feature 拉入；默认 workspace build 不编译 Tonic/Prost codegen，锁文件与发布 SBOM 仍需包含完整 feature 依赖闭包。Native client 对 TLS 文件做有界读取，强制 HTTPS URI 主机与 TLS server domain 一致，每个 adapter 实例最多 8 个并行请求；上层 worker 仍须提供全局并发预算、队列容量与公平调度。本机 `E:/AssetsLake`、RustGameServer 与其他自有 Rust 服务可以按模块直接参考、适配和复用；复制或改编时逐文件固定 source hash、工作区状态、权属、许可证/NOTICE 与传递依赖，并保持 Star 的 Run/owner 身份、事务、授权、限额和 backpressure 契约。当前 D19 仅完成 client/TLS/proto 首片，native server 和生产迁移尚未验收。
 
 ## 2. Domain / Module 划分
 
@@ -5627,3 +5635,5 @@ Platform Messaging owner 现在有 deployment+tenant scope 的 profile revision 
 PostgreSQL 18.6 disposable schema-only runner 77/77 通过：D18 migration 重复应用、所有 schema/role/RLS/WORM 与 append/pull/ACK/purge 案例通过；两个独立 session 同时提交相同 producer identity，分别得到首次接受与 exact replay，最终只有一份 Work/accepted receipt/Outbox 事实及一次序号和字节计数。PostgreSQL 已停止，Multipass inventory 未变。没有执行 Rust 编译或 Rust 1.99.0 正式门禁。该阶段仅验收 durable storage contract；没有 Rust gRPC/mTLS、可信生产身份、Profile→log provisioning、consumer/BI/Benchmark 或全应用 NATS 迁移。`app.platform_*` GUC 是受信 Rust server 传入的上下文而非身份凭据；正式服务必须在 server 侧把 mTLS/credential 身份绑定至授权 service identity，并限制能使用数据库角色的主体。后续 Star Rust transport provider 经版本化 contract 可替换，Schedule/Run owner 仍通过各自事务和 Outbox/Inbox 交换版本化业务消息，禁止共享跨 owner 写事务。`E:/AssetsLake` 与本机其他 Rust server 可按模块直接参考和复用；D18 没有复制来源代码，逐文件 license/NOTICE/dependency closure 审查继续有效。审计：`target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`。详见 [D18 report](reports/PHASE-9F4C-D18-NATIVE-TRANSPORT-LOG-REPORT.md) 和 [详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md#636-d18-star-native-durable-log-storage-foundation)。
 
 | v6.37 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D18 PostgreSQL durable-log storage contract、并行 exact-append 证据和 provider 替换边界；保留生产认证/服务/NATS 迁移门槛 | D18 isolated PostgreSQL schema-only runner 通过 |
+| v6.38 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 NATS 与 Star 原生 transport 定义为可替换 provider；增加 D18–D21 分阶段迁移、复用边界与 native gRPC/mTLS 首片 | D19 隔离 client/proto 首片落档 |
+| v6.39 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步类型化 client 构造配置、HTTPS URI/TLS 域名绑定与 D19 最新编译、Clippy、6/6 定向单测及链接失败结果；保留生产迁移关闭条件 | 修复首片新 Clippy 告警并完成 Rust 1.99.0 定向验证 |

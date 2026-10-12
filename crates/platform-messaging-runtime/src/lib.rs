@@ -1,13 +1,17 @@
 //! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=e513d8b4234c400092d3536924ebcda18bd70a5a4b6b8ba7b8d756ac25101510
+@cypher schema=1 source_sha256=2bfcae581490f01be09c4891cbcee47d33d4a2f7d073d9b1e866c1d63be7b5d0
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
 MERGE (transport_profile_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::transport_profile",kind:"module"})
 MERGE (transport_profile_pg_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::transport_profile_pg",kind:"module"})
+MERGE (native_grpc_module:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_grpc",kind:"module"})
+MERGE (native_grpc_feature:Config {id:"cargo.feature.platform-messaging-runtime.native-grpc-adapter"})
+MERGE (native_proto_package:Config {id:"cargo.package.platform-messaging-proto"})
 MERGE (transport_profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
 MERGE (transport_profile_pg_file:File {path:"crates/platform-messaging-runtime/src/transport_profile_pg.rs"})
+MERGE (native_grpc_file:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (durable_quarantine:Config {id:"cargo.feature.platform-messaging-runtime.durable-quarantine"})
 MERGE (source:Type {id:"crates/platform-messaging-runtime/src/lib.rs::TrustedJetStreamSource",kind:"struct"})
 MERGE (identity:Type {id:"crates/platform-messaging-runtime/src/lib.rs::JetStreamSourceIdentity",kind:"struct"})
@@ -47,8 +51,12 @@ MERGE (self)-[:DEPENDS_ON]->(jetstream_feature)
 MERGE (module)-[:DEFINES]->(source)
 MERGE (module)-[:DEFINES]->(transport_profile_module)
 MERGE (module)-[:DEFINES]->(transport_profile_pg_module)
+MERGE (module)-[:DEFINES]->(native_grpc_module)
 MERGE (transport_profile_module)-[:CONTAINS_FILE]->(transport_profile_file)
 MERGE (transport_profile_pg_module)-[:CONTAINS_FILE]->(transport_profile_pg_file)
+MERGE (native_grpc_module)-[:CONTAINS_FILE]->(native_grpc_file)
+MERGE (self)-[:DEPENDS_ON]->(native_grpc_feature)
+MERGE (native_grpc_feature)-[:DEPENDS_ON]->(native_proto_package)
 MERGE (transport_profile_pg_module)-[:CONFIGURES]->(durable_quarantine)
 MERGE (module)-[:DEFINES]->(identity)
 MERGE (module)-[:DEFINES]->(fault)
@@ -143,6 +151,8 @@ pub mod admission_quarantine_pg;
 pub mod admission_receive;
 #[cfg(feature = "jetstream-adapter")]
 pub mod admission_receive_jetstream;
+#[cfg(feature = "native-grpc-adapter")]
+pub mod native_grpc;
 pub mod transport_profile;
 #[cfg(feature = "durable-quarantine")]
 pub mod transport_profile_pg;
