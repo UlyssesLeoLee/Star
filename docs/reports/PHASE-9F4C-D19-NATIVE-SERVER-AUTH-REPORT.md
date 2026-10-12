@@ -26,6 +26,7 @@ Record the D19 Star-owned Rust gRPC server and mTLS-to-service/Profile/log autho
 - Disposable PostgreSQL 18.6 runner — 80/80 steps passed. D19 auth migration applied twice; positive exact-wire-hash append, exact replay, Pull lease, ACK, unknown/revoked certificate rejection, audit and role assertions passed; PostgreSQL stopped.
 - Final SQL audit: `target/phase9f4d-run-owner-consumer/d19-server-auth-20261012-r3/audit.jsonl`. Multipass inventory was not modified and no Multipass instance was created.
 - `cargo fmt --all -- --check` and complete package tests were not run in this slice. The previous package test invocation hit Windows `LNK1104`; this is not a passing package-test result. No real gRPC TLS handshake/e2e was run.
+- Independent CodeRabbit review was unavailable: the CLI entry failed with `/root/.local/bin/coderabbit: Permission denied`. Local source, migration, tests and documentation review was completed; the CLI failure is not treated as a clean independent review.
 
 ## §3 Known gaps
 
@@ -79,3 +80,4 @@ No subagents were dispatched for this slice; there is no subagent output to acce
 | Version | Date | Revision owner | Change | Trigger |
 |---|---|---|---|---|
 | v0.1 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the D19 native gRPC server/auth slice, Rust and PostgreSQL evidence, reuse boundary and production blockers. | Continue D19 after user authorized direct module-level reuse of local Rust servers. |
+| v0.2 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record that the independent CodeRabbit review could not run because its executable was denied; report local review separately. | Final review and integration readiness check |
