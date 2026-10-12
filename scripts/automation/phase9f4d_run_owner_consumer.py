@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=a92d9b2fc7b940bbea7236653043d741a9e1c62353cd6eb37033b153a4c0fa74
+# @cypher schema=1 source_sha256=9f465405f1cc152689d5c4ede032eebc1fd89b6a31ea75a1dc8ba31affa03357
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -18,7 +18,10 @@
 # MERGE (admission_quarantine_migration:Config {id:"db/migrations/2026-10-12-admission-receive-quarantine.sql"})
 # MERGE (transport_profile_migration:Config {id:"db/migrations/2026-10-12-admission-transport-profile-receipts.sql"})
 # MERGE (transport_profile_master:Config {id:"db/migrations/2026-10-12-platform-transport-profile-master.sql"})
+# MERGE (native_transport_log:Config {id:"db/migrations/2026-10-12-platform-native-transport-log.sql"})
 # MERGE (transport_profile_schema_test:Config {id:"db/tests/platform-transport-profile-schema.sql"})
+# MERGE (native_transport_log_test:Config {id:"db/tests/platform-native-transport-log.sql"})
+# MERGE (native_transport_concurrency_test:Config {id:"db/tests/platform-native-transport-log-concurrency.sql"})
 # MERGE (transport_profile_sqlx_test:Config {id:"crates/platform-messaging-runtime/tests/transport_profile_pg.rs"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
@@ -46,6 +49,7 @@
 # MERGE (sys:ExternalService {id:"python.sys",kind:"module"})
 # MERGE (pathlib:ExternalService {id:"python.pathlib",kind:"module"})
 # MERGE (typing:ExternalService {id:"python.typing",kind:"module"})
+# MERGE (thread_pool:ExternalService {id:"concurrent.futures.ThreadPoolExecutor",kind:"python module"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(run_sql)
@@ -66,12 +70,16 @@
 # MERGE (main)-[:CONFIGURES]->(postgres)
 # MERGE (main)-[:CONFIGURES]->(nats)
 # MERGE (main)-[:CONFIGURES]->(cargo)
+# MERGE (main)-[:USES]->(thread_pool)
 # MERGE (main)-[:READS]->(migration)
 # MERGE (main)-[:READS]->(quarantine_migration)
 # MERGE (main)-[:READS]->(admission_quarantine_migration)
 # MERGE (main)-[:READS]->(transport_profile_migration)
 # MERGE (main)-[:READS]->(transport_profile_master)
+# MERGE (main)-[:READS]->(native_transport_log)
 # MERGE (main)-[:TESTS]->(transport_profile_schema_test)
+# MERGE (main)-[:TESTS]->(native_transport_log_test)
+# MERGE (main)-[:TESTS]->(native_transport_concurrency_test)
 # MERGE (main)-[:TESTS]->(transport_profile_sqlx_test)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
@@ -126,6 +134,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import re
@@ -150,6 +159,7 @@ SCHEDULE_HANDOFF_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-schedule-o
 ADMISSION_DELIVERY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-admission-owner-message-delivery.sql"
 ADMISSION_TRANSPORT_PROFILE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-admission-transport-profile-receipts.sql"
 TRANSPORT_PROFILE_MASTER_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-transport-profile-master.sql"
+NATIVE_TRANSPORT_LOG_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-native-transport-log.sql"
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -159,6 +169,38 @@ QUARANTINE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-poison-quarantine-sch
 ADMISSION_LIFECYCLE_TEST = ROOT / "db" / "tests" / "task-run-admission-attempt-lifecycle.sql"
 RUN_BINDING_TEST = ROOT / "db" / "tests" / "run-infrastructure-binding-master.sql"
 TRANSPORT_PROFILE_SCHEMA_TEST = ROOT / "db" / "tests" / "platform-transport-profile-schema.sql"
+NATIVE_TRANSPORT_LOG_TEST = ROOT / "db" / "tests" / "platform-native-transport-log.sql"
+NATIVE_TRANSPORT_LOG_CONCURRENCY_TEST = ROOT / "db" / "tests" / "platform-native-transport-log-concurrency.sql"
+NATIVE_TRANSPORT_CONCURRENCY_FIXTURE_SQL = """\
+BEGIN;
+SELECT set_config('app.platform_deployment_id', '10000000-0000-0000-0000-000000000001', TRUE);
+SELECT set_config('app.platform_tenant_id', '20000000-0000-0000-0000-000000000001', TRUE);
+SELECT set_config('app.platform_service_id', '30000000-0000-0000-0000-000000000001', TRUE);
+INSERT INTO platform_transport.log_master (
+    deployment_id, tenant_id, log_id, generation, sender_service_id, recipient_service_id,
+    message_kind, payload_budget_bytes, terminal_retention_hours, max_delivery_attempts, lifecycle
+) VALUES (
+    '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001',
+    'test.schedule.concurrent', '40000000-0000-0000-0000-000000000003',
+    '30000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000002',
+    'schedule.concurrent-test', 16384, 24, 4, 'active'
+);
+COMMIT;
+"""
+NATIVE_TRANSPORT_CONCURRENT_APPEND_SQL = """\
+BEGIN;
+SELECT set_config('app.platform_deployment_id', '10000000-0000-0000-0000-000000000001', TRUE);
+SELECT set_config('app.platform_tenant_id', '20000000-0000-0000-0000-000000000001', TRUE);
+SELECT set_config('app.platform_service_id', '30000000-0000-0000-0000-000000000001', TRUE);
+SET LOCAL ROLE star_platform_transport_runtime;
+SELECT pg_sleep(0.25);
+SELECT * FROM platform_transport.append_message(
+    'test.schedule.concurrent', '40000000-0000-0000-0000-000000000003',
+    '30000000-0000-0000-0000-000000000002', 'schedule.concurrent-test',
+    '50000000-0000-0000-0000-000000000011', convert_to('concurrent-identical-wire','UTF8'),
+    decode('7fd52a02a5983c33419862e872c92918b83adb66be8f09001eca131c43b65d35','hex'));
+COMMIT;
+"""
 PREREQUISITE_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
     ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2b.sql",
@@ -810,8 +852,11 @@ def main() -> int:
             ADMISSION_DELIVERY_MIGRATION,
             ADMISSION_TRANSPORT_PROFILE_MIGRATION,
             TRANSPORT_PROFILE_MASTER_MIGRATION,
+            NATIVE_TRANSPORT_LOG_MIGRATION,
             RUN_BINDING_TEST,
             TRANSPORT_PROFILE_SCHEMA_TEST,
+            NATIVE_TRANSPORT_LOG_TEST,
+            NATIVE_TRANSPORT_LOG_CONCURRENCY_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
         )
@@ -1012,6 +1057,9 @@ def main() -> int:
                 results.append(run_sql(f"transport-profile-master-migration-apply-{attempt}", psql_base, TRANSPORT_PROFILE_MASTER_MIGRATION.read_text(encoding="utf-8"), env))
                 if results[-1]["status"] != "passed":
                     break
+                results.append(run_sql(f"native-transport-log-migration-apply-{attempt}", psql_base, NATIVE_TRANSPORT_LOG_MIGRATION.read_text(encoding="utf-8"), env))
+                if results[-1]["status"] != "passed":
+                    break
         if pg_started and all(item["status"] == "passed" for item in results):
             results.append(run_sql("run-owner-schema-assertions", psql_base, SCHEMA_ASSERTIONS_SQL, env))
         if pg_started and all(item["status"] == "passed" for item in results):
@@ -1034,6 +1082,41 @@ def main() -> int:
                     env,
                 )
             )
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(
+                run_sql(
+                    "platform-native-transport-log-contract",
+                    psql_base,
+                    NATIVE_TRANSPORT_LOG_TEST.read_text(encoding="utf-8"),
+                    env,
+                )
+            )
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(run_sql(
+                "native-transport-concurrency-fixture",
+                psql_base,
+                NATIVE_TRANSPORT_CONCURRENCY_FIXTURE_SQL,
+                env,
+            ))
+        if pg_started and all(item["status"] == "passed" for item in results):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                concurrent_steps = list(executor.map(
+                    lambda index: run_sql(
+                        f"native-transport-concurrent-append-{index}",
+                        psql_base,
+                        NATIVE_TRANSPORT_CONCURRENT_APPEND_SQL,
+                        env,
+                    ),
+                    (1, 2),
+                ))
+            results.extend(concurrent_steps)
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(run_sql(
+                "native-transport-concurrent-append-assertions",
+                psql_base,
+                NATIVE_TRANSPORT_LOG_CONCURRENCY_TEST.read_text(encoding="utf-8"),
+                env,
+            ))
         if pg_started and all(item["status"] == "passed" for item in results):
             fixture_setup, tenant_b_visibility, cross_tenant_collision, fixture_ids = rls_fixture_sql()
             results.append(run_sql("run-owner-rls-fixture-and-tenant-a-write", psql_base, fixture_setup, env))

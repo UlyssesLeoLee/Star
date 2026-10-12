@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.36）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.37）
 
 ## 0. 文档说明与前提
 
@@ -3448,3 +3448,11 @@ PostgreSQL 18.6 disposable runner 71/71、Transport Profile SQLx 用例 1/1、�
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.36 | 2026-10-12 | Ulysses — Mavis接手审核 | 增加 D17 Transport Profile 首片与 AssetsLake metadata 适配证据；明确生产身份、transport、BI、性能和 Rust 1.99.0 未验收项 | D17 首片实现并完成隔离 PostgreSQL/SQLx 验证 |
+
+### D18：Star 原生 durable transport 日志底座（v6.37）
+
+Platform Messaging owner 新增受限的 PostgreSQL durable-log storage contract：按 deployment、tenant、log 与 generation 隔离；append 按 authenticated producer identity 获取事务 advisory lock，并永久保存 accepted receipt；同一 log/generation 且 SHA-256 相同才算 exact replay。原始 wire 上限 16 KiB；可信 Rust service 必须对原始 bytes 自算 SHA-256，数据库 routine 仅校验摘要长度。Pull 使用单条有界 lease、attempt cap 和 `SKIP LOCKED`；ACK 由 lease fence 保护；TTL 到期只删除终态 payload，永久 receipt 保留；同事务 Outbox 只携带元数据。所有表 FORCE RLS；runtime 只通过固定 search_path 的 SECURITY DEFINER capabilities 访问，无表级 DML 权限。
+
+D18 isolated PostgreSQL 18.6 schema-only runner 77/77 通过，包含迁移重复应用、存储契约和两路 concurrent append。两路调用分别返回首次接受与 exact replay；断言确认只生成一条 Work、一份 accepted receipt、一个 Outbox event 和一次 cursor/byte accounting；临时 PostgreSQL 停止成功，Multipass inventory 未改。此阶段只验收 durable storage contract；没有 Rust gRPC server/client、生产 mTLS/service identity、Transport Profile→log provisioning、consumer/BI/Benchmark、target DB runtime grants、完整应用 NATS 迁移、崩溃恢复或规模性能验收，因此不宣称替代 NATS，Schedule/Run 执行仍保持 fail closed。`app.platform_*` session GUC 只是调用上下文，不构成身份认证；未来 Rust server 必须先验证 mTLS/credential 身份并绑定到已授权 service identity，目标库只允许该受信 server workload 使用对应数据库角色，Agent/Plugin/任务卡 CLI 不可直接访问 transport DB。后续自研 Rust transport 必须经版本化 provider/wire contract 可替换，不向业务 owner 泄漏 provider-specific cursor/lease；Run/Infrastructure owner 仍只通过各自事务和 Outbox/Inbox 管理业务事实。本机 `E:/AssetsLake` 和其他 Rust server 可按模块直接参考、适配或复用，逐文件核对 hash、权属、许可证/NOTICE、完整依赖闭包和 Star 语义；D18 未复制外部源码。审计：`target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`。详见 [D18 阶段报告](reports/PHASE-9F4C-D18-NATIVE-TRANSPORT-LOG-REPORT.md)、[Rust 服务复用审查](design/DD-RUST-SERVER-REUSE-001.md) 与 [详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md)。
+
+| v6.37 | 2026-10-12 | Ulysses — Mavis接手审核 | 增加 D18 durable PostgreSQL transport log、并行 exact-append 验收、Rust transport 可替换边界及 NATS 保留门槛；明确仍无原生服务 | D18 isolated PostgreSQL schema-only runner 通过 |

@@ -1,6 +1,6 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.17 (2026-10-12)
+> **文档版本**: v2.18 (2026-10-12)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -167,6 +167,7 @@
 |---|---|---|---|---|
 | v2.16 | 2026-10-12 | Add §4.13.23 for the provider-neutral admission quarantine Transaction receipt, W/T/M classification, deployment+tenant FORCE RLS, append-only grants, exact-wire digest, and unverified migration/runtime gates. | D16 adds durable poison metadata without retaining payload bodies. |
 | v2.17 | 2026-10-12 | Add D17 Transport Profile SCD2 Master and append-only Audit/Outbox Transaction classification (W/T/M=0/2/1); specify dual-scope FORCE RLS, trigger-emitted facts, least-privilege roles, secret exclusion, and disposable PostgreSQL/SQLx evidence while retaining target DB/identity gates. | D17 profile Master/resolver slice passed the isolated PostgreSQL gate. |
+| v2.18 | 2026-10-12 | Add D18 Platform Messaging durable log W/T/M classification, bounded wire/lease/retention and permanent receipt facts; record FORCE RLS, concurrent exact-append and storage-only verification boundary. | D18 disposable PostgreSQL 18.6 runner passed 77/77. |
 | **Business Truth** | 业务事实,影响决策 | PostgreSQL(主事务表) | 低频,受事务约束 | `worktree.worktree`(Business 列), `agent_session.agent_session`, `feedback.feedback`, `validation_result.validation_result` 等 |
 | **Observed Runtime State** | 高频本地状态,非业务事实 | PostgreSQL(独立 Projection 表,与主表 1:N) | 高频,异步 | `worktree.worktree_status_observed`, `agent_session.agent_process_status_observed`, `validation_result.test_progress_observed` |
 | **SCM Truth** | Git 远端事实 | SCM Adapter 镜像 + 引用 | 中频 | `scm.commit`, `scm.pull_request`(镜像字段 + Object Storage Key) |
@@ -5987,3 +5988,17 @@ Migration: `db/migrations/2026-10-12-platform-transport-profile-master.sql`.
 | `platform_messaging.transport_profile_revision_outbox` | T | Versioned BI/Benchmark profile-revision event with schema version, trace/causation/idempotency metadata, provider identity, allowed routes and digest | Append-only; no TTL or physical delete | FORCE RLS requires deployment and profile tenant; fixed-search-path SECURITY DEFINER trigger writes in the Master transaction; owner is read-only |
 
 D17 adds W/T/M=0/2/1. No credential bytes, private keys, token values or secret-manager reference appear in Audit/Outbox; the Master stores only a bounded opaque secret reference. AssetsLake's `schema_version`, `trace_id`, `causation_id` and `idempotency_key` event shape is adapted to the Star Outbox envelope (`event_schema_version=1` plus correlation identities); its dry-run publisher is not imported or treated as transport. The profile Master migration applied twice, D17 schema assertions passed, and the real SQLx CAS/idempotency/resolver scenario passed 1/1 in the disposable PostgreSQL 18.6 chain (71/71 runner steps). Runtime grants in the target database, authenticated production identity, Outbox BI consumer and retention/archival policy remain open; do not infer these from the isolated owner-role test.
+
+## 4.13.25 — D18 Platform Messaging durable transport log
+
+Migration: `db/migrations/2026-10-12-platform-native-transport-log.sql`.
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `platform_transport.log_master` | M | Platform Messaging route/generation identity, sender/recipient/kind and bounded storage/delivery policy | Immutable route and policy; guarded active→draining→disabled lifecycle; no deletion | FORCE deployment+tenant RLS; accessed through owner capabilities |
+| `platform_transport.log_state` | W | Per-log next sequence and retained payload bytes | Mutable counters; decremented atomically when terminal payload is purged | FORCE deployment+tenant RLS; no runtime table DML |
+| `platform_transport.message_work` | W | Exact wire, producer identity, SHA-256, lease, state and attempt count | Wire ≤16 KiB; purge terminal payload after configured retention (24–8760h); bounded attempt/lease | FORCE deployment+tenant RLS; runtime only via fixed-path functions |
+| `platform_transport.delivery_receipt` | T | Permanent accepted/acked receipt and exact-idempotency evidence | Append-only; no TTL or physical deletion, even after wire purge | FORCE deployment+tenant RLS; trigger/function-owned append only |
+| `platform_transport.receipt_outbox` | T | Same-transaction, metadata-only receipt event for independent consumers | Append-only; no wire, token, credential, or secret; no TTL in D18 | FORCE deployment+tenant RLS; SECURITY DEFINER trigger append |
+
+D18 adds W/T/M=2/2/1 (all five new tables classified). PostgreSQL 18.6 disposable runner passed 77/77 steps, including migration double-apply, fixed-path/routine grants, FORCE RLS, WORM/metadata-only checks, append/replay/hash conflict, lease-fenced ACK, tenant isolation, payload cap/quota, NULL purge-limit rejection, terminal purge/permanent replay, and two concurrent sessions for one producer identity. Both sessions succeeded (one new acceptance and one exact replay); postconditions found one Work row, one accepted receipt, one Outbox row, `next_sequence=2`, and one wire-length accounting update. The runner stopped PostgreSQL and made no Multipass inventory change. It started no NATS server and compiled no Rust. SHA-256 must be computed over exact wire bytes by future trusted Rust code; PostgreSQL validates the 32-byte input but does not independently hash the payload. `app.platform_*` GUCs are call context only; mTLS/credential verification and binding to service identity must occur in the trusted Rust server, while production database grants restrict the runtime role to that workload. Target database identity/grants, Rust gRPC/mTLS service, profile provisioning, consumer/BI/Benchmark integration, crash recovery and scale/performance remain unverified. D18 is not an NATS replacement release.

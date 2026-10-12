@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 D17 now has an initial Transport Profile Master/resolver slice verified on disposable PostgreSQL 18.6 (71/71) with its SQLx case 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production authentication/credentials and target DB grants, native transport, BI/Benchmark consumer, full-application provider closure, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.57 | Date: 2026-10-12
+> Status: 🟡 D18 has a PostgreSQL durable-log storage contract verified by the disposable schema-only runner, including migration replay and concurrent exact-append. This does not implement a Rust gRPC service: Rust 1.99.0, production service authentication/credentials and target DB grants, profile provisioning, delivery/BI/Benchmark consumers, full-application NATS migration, infrastructure/runtime/native Hook and complete execution remain open.
+> Version: 0.58 | Date: 2026-10-12
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -379,3 +379,11 @@ Initial D17 implementation (2026-10-12) adds typed profile definitions/revisions
 |---|---|---|---|
 | 0.56 | 2026-10-12 | Ulysses — Mavis接手审核 | Record final D16 receiver/database evidence and define D17 profile, service identity, reuse and fail-closed requirements |
 | 0.57 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the verified initial D17 Profile Master/resolver slice, AssetsLake metadata adaptation and remaining identity/provider gates |
+
+## 6.35 — D18 durable log storage and replaceable Rust transport requirement
+
+D18 requires PostgreSQL storage to preserve versioned log identity, deployment+tenant isolation, bounded raw wire and attempts, exact producer idempotency, lease-fenced ACK, retention-aware payload deletion, permanent terminal receipts, and a same-transaction metadata-only Outbox. Concurrent exact append for the same authenticated producer identity MUST allocate one cursor and one accepted receipt/outbox fact. Migrations MUST be replayable. Trusted Rust transport MUST compute SHA-256 over exact wire bytes before calling storage. `app.platform_*` GUC settings are caller context and MUST NOT be treated as authentication; production Rust server MUST bind verified mTLS/credential identity to the authorized service identity and exclusive runtime database role. Direct transport DB access from Agent, Plugin or task-card CLI processes is forbidden. Unknown or malformed identity, stale generation, digest conflict, expired lease, exhausted capacity, missing authorization/identity, or unknown commit outcome MUST fail closed.
+
+The Rust transport is a Star-owned provider behind a versioned contract. Provider cursors and leases are transport details, not business identities; Schedule, Run and Infrastructure owners retain their own transaction boundaries and source-of-truth records. Transition from the current NATS adapter is incremental and requires compatibility/recovery evidence, BI/Benchmark parity, bounded memory/concurrency evidence, and rollback. D18 supplies only storage schema/functions and disposable PostgreSQL verification. The final PostgreSQL 18.6 schema-only run passed 77/77 steps; both migration applications and the two-session concurrent append assertion passed, with one receipt/work/outbox/cursor allocation. gRPC/mTLS service, production authentication, Profile→log provisioning, consumer wiring, and NATS retirement remain open. The run used a Rust 1.98.1 Cargo executable only for a version check and did not compile Rust or satisfy the Rust 1.99.0 gate. E:/AssetsLake and other local Rust projects remain direct module reference/reuse sources under exact-file hash/source/license/NOTICE/dependency review. Audit: `../target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`.
+
+| 0.58 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D18 PostgreSQL durable-log storage requirements and a replaceable Star Rust transport boundary; preserve NATS migration and production execution gates |

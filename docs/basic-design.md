@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.36 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.36
+> **文档版本**: v6.37 (2026-10-12)
+> **上游要件定义书**: docs/requirements.md v6.37
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5617,3 +5617,13 @@ Platform Messaging owner 现在有 deployment+tenant scope 的 profile revision 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.36 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D17 profile Master/resolver 首片、AssetsLake metadata 适配及隔离 PostgreSQL/SQLx 验证；明确生产身份和消息投递未闭环 | D17 实施首片通过 71/71 PostgreSQL runner 与 SQLx 1/1 |
+
+### D18：Star 原生 durable transport 日志底座（v6.37）
+
+本阶段在 `platform_transport` schema 新增 storage contract：`log_master` 为版本化 Master，`log_state` 与 bounded `message_work` 为 Work，accepted/acked `delivery_receipt` 与 metadata-only `receipt_outbox` 为 append-only Transaction。所有表均启用 FORCE RLS，并通过固定 `search_path` 的 SECURITY DEFINER routine 按 deployment、tenant 与 service scope 控制；runtime 没有表级 DML 权限。
+
+并行 append 按 authenticated sender、recipient、message kind 和 ID 获取事务 advisory lock；只有相同 log/generation 与 SHA-256 才能 exact replay，payload/log/generation 冲突 fail closed。可信 Rust transport 必须对确切 wire bytes 计算 SHA-256，数据库仅检查摘要长度。Wire 上限 16 KiB；pull 一次 lease 一条，lease 30–120 秒、attempt 最多 12；ACK 复核 lease fence。终态 payload 到达配置 TTL 后可清除，永久 receipt 留作幂等和审计事实。purge batch limit 必须为非空且 1–100。
+
+PostgreSQL 18.6 disposable schema-only runner 77/77 通过：D18 migration 重复应用、所有 schema/role/RLS/WORM 与 append/pull/ACK/purge 案例通过；两个独立 session 同时提交相同 producer identity，分别得到首次接受与 exact replay，最终只有一份 Work/accepted receipt/Outbox 事实及一次序号和字节计数。PostgreSQL 已停止，Multipass inventory 未变。没有执行 Rust 编译或 Rust 1.99.0 正式门禁。该阶段仅验收 durable storage contract；没有 Rust gRPC/mTLS、可信生产身份、Profile→log provisioning、consumer/BI/Benchmark 或全应用 NATS 迁移。`app.platform_*` GUC 是受信 Rust server 传入的上下文而非身份凭据；正式服务必须在 server 侧把 mTLS/credential 身份绑定至授权 service identity，并限制能使用数据库角色的主体。后续 Star Rust transport provider 经版本化 contract 可替换，Schedule/Run owner 仍通过各自事务和 Outbox/Inbox 交换版本化业务消息，禁止共享跨 owner 写事务。`E:/AssetsLake` 与本机其他 Rust server 可按模块直接参考和复用；D18 没有复制来源代码，逐文件 license/NOTICE/dependency closure 审查继续有效。审计：`target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`。详见 [D18 report](reports/PHASE-9F4C-D18-NATIVE-TRANSPORT-LOG-REPORT.md) 和 [详细设计](design/DD-AUTOMATION-SCHEDULE-API-001.md#636-d18-star-native-durable-log-storage-foundation)。
+
+| v6.37 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D18 PostgreSQL durable-log storage contract、并行 exact-append 证据和 provider 替换边界；保留生产认证/服务/NATS 迁移门槛 | D18 isolated PostgreSQL schema-only runner 通过 |

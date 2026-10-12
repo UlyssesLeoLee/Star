@@ -583,4 +583,15 @@ flowchart TB
 
 ---
 
+## Phase 9F4C transport replacement sequence (D18 onward)
+
+| Phase | Scope | Acceptance boundary |
+|---|---|---|
+| D18 | Star-owned PostgreSQL durable-log schema, bounded Work, permanent receipt/Outbox and concurrent exact-append | Storage-only schema/lease/retention/RLS contract. Does not replace NATS or authorize Run execution. |
+| D19 | Versioned Rust provider contract plus native gRPC/mTLS server/client, identity binding and Profile→log provisioning | NATS adapter stays available. Run the same contract tests on both providers; production cutover remains disabled until auth, recovery and owner delivery gates pass. |
+| D20 | Owner Outbox/Inbox consumer migration, quarantine/replay and independent BI/Benchmark projections | Preserve each owner’s transaction and WORM boundaries; reconcile event parity before routing changes. |
+| D21 | Multipass/K3s end-to-end recovery, load, memory, fairness/backpressure and operational failover | Maximum two test Multipass inventory instances; no default Docker Desktop. Retire NATS only after rollback-tested route-by-route acceptance. |
+
+These D18–D21 rows are a sequenced implementation plan, not completion claims. E:/AssetsLake and other local Rust server projects remain directly reusable module sources after source-state/hash, rights, license/NOTICE, dependency-closure and Star contract review. The D18 storage implementation copies no outside code.
+
 *文档结束。本主实施计划 v0.1 与三份配套计划(MVP 30 天 / V1 90 天 / token-OLU 估算)共同构成项目级实施文档集。下游团队(25 Module Lead + SRE + PM + 架构师)据此推进。*

@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.48 (2026-10-12)
+> **文档版本**: v2.49 (2026-10-12)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3063,3 +3063,13 @@ Target database runtime grants, production service identity/credential lifecycle
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v2.48 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.88 for D17 profile Master/resolver runner, exact PostgreSQL/SQLx evidence and remaining toolchain/production gates. | Initial D17 profile implementation and isolated PostgreSQL verification |
+
+### 4.89 Phase 9F4C-D18 Star durable transport log schema and concurrent idempotency gate
+
+**自动化档：[P]** — Extend the existing `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only` disposable PostgreSQL 18.6 path. Apply `2026-10-12-platform-native-transport-log.sql` twice, verify security-definer routines/fixed paths, least-privilege runtime roles, RLS and WORM, then run the SQL contract for append/replay/conflict, pull/lease/ACK fencing, tenant isolation, 16 KiB payload and byte quota, terminal-payload purge/permanent receipts. Launch two independent psql sessions against the same producer identity and require one Work row, accepted receipt, Outbox fact and cursor/byte allocation. The runner starts no NATS and creates no Multipass instance in schema-only mode.
+
+Result: PostgreSQL 18.6 schema-only runner passed 77/77 steps. The D18 migration applied twice; both concurrent psql sessions passed, one allocated sequence 1 and the other returned exact replay, and the final assertion confirmed one Work/receipt/Outbox/cursor allocation. PostgreSQL stop passed and Multipass inventory was unchanged. Audit: `target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`.
+
+This gate is PostgreSQL storage only. The run performed no Rust compilation and does not implement Rust gRPC/mTLS, production service identity, Transport Profile→log provisioning, background consumers, BI/Benchmark, broker recovery or NATS migration. `payload_sha256` must be calculated by the future trusted Rust service over exact wire bytes. See [D18 report](reports/PHASE-9F4C-D18-NATIVE-TRANSPORT-LOG-REPORT.md) and [requirements](requirements.md).
+
+| v2.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.89 for D18 native durable-log schema, migration replay and concurrent exact-append verification; keep production Rust provider and NATS cutover open. | D18 PostgreSQL 18.6 schema-only runner passed 77/77 |

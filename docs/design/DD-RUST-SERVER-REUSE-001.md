@@ -1,7 +1,7 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.0 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：已完成有界来源/许可审查和模块选择并复验 AssetsLake 候选文件；尚未迁移源码，未实现 native transport provider。
+> v1.1 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：已完成有界来源/许可审查、AssetsLake 候选复验与 D18 storage contract；尚未迁移来源代码，未实现 native transport provider。
 
 ## 1. 范围与证据
 
@@ -117,3 +117,15 @@ The read-only recheck on 2026-10-12 found AssetsLake at `0156aca56c0d7364120d738
 The RustGameServer `channel.rs` candidate remains Apache-2.0 at SHA-256 `8949F57996706547BC8E60022101B8B4AB854D3D0B4AB07CB9BA4252A7433061`; its explicit `require_tls=false` plaintext branch must be removed before adapting the client connector. D17 may use this small helper for trusted transport authentication after retaining the applicable notice and wrapping the full publish/ack operation in Star's absolute deadline. It does not provide service authorization or a durable receipt. SandTree EventRouter, its blocking Multipass provider, and IDE1.0's unbounded CLI subscriber retain the v0.9 suitability limits.
 
 This recheck does not assert that all local Rust projects are audited, that AGPL obligations are already fulfilled for a hypothetical distribution, or that any external module is production-integrated. For each copied file, pin the exact source state, retain license/NOTICE, inspect the build and distribution dependency closure, adapt the code to Star's owner/Run authorization and bounded resource contracts, and record focused evidence.
+
+## 9. D18 source reuse and Rust-owned replacement path
+
+D18 does not copy transport implementation from AssetsLake or another project because the storage semantics now required are Star-specific: deployment+tenant+service isolation, generation-pinned route identity, cross-generation exact idempotency, lease-fenced owner ACK, payload retention with permanent receipt, same-transaction metadata Outbox, and per-message producer identity. This is a fit decision for this storage slice, not a restriction on future direct module reuse.
+
+E:/AssetsLake remains eligible for direct reuse of independently reviewed modules; its typed event metadata is already adapted while its current dry-run/no-broker relay remains unsuitable as production durable delivery. The RustGameServer Apache-2.0 mTLS/client helper remains an adaptation candidate for D19 after removing `require_tls=false`, retaining applicable notices, and placing the complete request/ack path under Star's deadline and authenticated identity checks. Other local Rust server modules may also be adopted where behavior matches the contract. No source repository was modified by D18.
+
+The replacement path is incremental: preserve the existing NATS adapter behind the same versioned provider interface while the Star-owned Rust server implements the PostgreSQL durable log; run the same contract suite against each provider; add service authentication, profile→log provisioning, receiver recovery, BI/Benchmark parity, bounded memory and concurrency gates; then dual-run/compare before profile-based cutover. NATS remains a supported provider until all production routes, replay/recovery, operational rollback and performance gates are accepted. D18 provides no provider client/server, so this plan remains future implementation work.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v1.1 | 2026-10-12 | Ulysses — Mavis接手审核 | Record D18 as Star-owned durable storage, preserve module-level reuse eligibility, and outline a contract-compatible staged NATS replacement path |
