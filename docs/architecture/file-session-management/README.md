@@ -1,4 +1,5 @@
 # File-Based Session Management System (FSMS)
+> **架构集成状态（2026-10-12）**：本文件包作为设计提案并入 `dev`，尚未通过产品架构裁决。其中“FileSession 直接隶属 Worktree、与 Task Card 并列”等层级陈述与当前规范（Project → Cloud Branch → Engineering Run → Worktree；Run 内 App/工作项按 RunContext 协作）不一致。本提案不得作为已批准的实现依据；FileSession 的归属、与 Run/Worktree/Task Card 的关系、存储及 CLI 边界须重新评审，并同步需求、基本设计、详细设计后才能排期。
 
 > **A Git-native, file-centric AI agent session management system for the Star monorepo**
 > **Version**: v0.1 (Draft)
@@ -8,6 +9,8 @@
 ---
 
 ## 📖 文档导航
+
+> 架构裁决状态与实施前门槛见 [INTEGRATION-STATUS.md](./INTEGRATION-STATUS.md)。
 
 | 文档 | 说明 | 适读人群 |
 |------|------|----------|
