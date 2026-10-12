@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D19 Star native gRPC server/authentication slice is implemented in the isolated worktree and verified with Rust 1.99.0 targeted gates plus disposable PostgreSQL 18.6 (80/80 runner steps). Production certificate/profile provisioning, endpoint resolver, target database grants, live TLS e2e, owner consumers, BI/performance and full execution chain remain open.
-> Version: 0.60 | Date: 2026-10-12
+> Status: 🟡 D20 native receive and exact-source-verification slices are implemented in the isolated worktree. Rust 1.98.1 diagnostic all-targets check, 41/41 library tests and Clippy-driver check pass; the origin-verification SQL migration and contract remain unrun because PostgreSQL server binaries are unavailable. Production certificate/profile provisioning, endpoint resolver, target database grants, live TLS e2e, owner consumers, BI/performance and full execution chain remain open.
+> Version: 0.64 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -692,3 +692,18 @@ The receive adapter limits each instance to eight concurrent RPCs and eight leas
 |---|---|---|---|
 | 0.62 | 2026-10-12 | Ulysses — Mavis接手审核 | Use the public shared provider-identity helper and clarify NATS as a transitional adapter pending Star-native production gates |
 | 0.61 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify Schedule's native Pull/Acknowledge adapter boundary, bounded outstanding deliveries and explicit remaining owner/production gates |
+
+## 6.39 D20 — Exact source provenance, quarantine revalidation and ACK fencing
+
+The native receiver computes SHA-256 from the exact wire bytes returned by `PullOne`; callers cannot substitute a digest or identity claim. `VerifyOrigin` pins the active Transport Profile digest, receive-side mTLS certificate, sender service, kind, exact log ID/generation/sequence/message ID and digest. On append, `append_authenticated` stores the authenticated sender certificate fingerprint on the immutable `message_work` row through a trigger-only write. Existing rows with NULL provenance remain readable only to legacy-compatible paths and are unauthorized for native source verification.
+
+`verify_origin_authenticated` resolves the current authorized pull route first, then requires an exact matching leased Work row, a live lease, and the original sender certificate identity registered no later than `accepted_at` and not revoked at that acceptance time. A source certificate revoked after acceptance remains valid historical provenance for the accepted message; the receiving server certificate must still authorize the current Pull/Ack route. The function locks the candidate Work/source identity while producing the authorization result. `AdmissionReceiveAuthorization::verify_source` receives the exact wire and invokes this proof before and after a durable poison-quarantine receipt is committed. `acknowledge_authenticated` calls the same proof inside its own transaction before the lease-fenced ACK, so owner commit and source-log disposition remain separate transactions and the ACK cannot rely on a stale caller-only check.
+
+Migration `2026-10-12-platform-native-origin-verification.sql` adds the nullable immutable source fingerprint and replaces authenticated Append/Ack wrappers; `platform-native-origin-verification.sql` covers least privilege, pre-attestation NULL rows, exact digest, tamper denial, live lease, ACK terminality and accepted-time revocation semantics. The automation runner applies the migration twice after the D19 native-server authorization prerequisites, then executes this contract. This runner path is intended for a disposable PostgreSQL 18.6 schema-only invocation and starts neither NATS nor Multipass.
+
+Rust 1.98.1 with `--ignore-rust-version` passed the native-feature all-targets check and 41/41 library tests. The SQL contract is currently **not run**: this workstation has no `psql`, `initdb` or `pg_ctl` command, and the checked PostgreSQL 15/17 installation directories contain no `initdb.exe`. Therefore SQL syntax, trigger grammar, row-lock behavior, RLS, role ownership/grants and repeat-apply behavior remain unverified until a disposable PostgreSQL 18.6 runner is available. Rust 1.99.0 formal gates, TLS e2e, production target grants/identity provisioning, owner consumer migration, quarantine replay, BI/Benchmark parity, crash/restart, RSS/latency/fairness and NATS cutover remain open; the adapter stays opt-in and execution fail-closed.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.64 | 2026-10-12 | Ulysses — Mavis接手审核 | Correct D20 library test count to 41/41 and record the isolated Rust 1.98.1 Clippy-driver result; retain the unrun PostgreSQL contract blocker | Two exact-wire origin verification tests added; isolated Clippy run completed |
+| 0.63 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D20 source-certificate provenance, exact-wire verification, quarantine rechecks and transaction-bound ACK; document unrun PostgreSQL contract as an explicit blocker | D20 origin-verifier implementation; local PostgreSQL server binaries unavailable |

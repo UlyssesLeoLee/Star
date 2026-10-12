@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.39）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.44）
 
 ## 0. 文档说明与前提
 
@@ -3482,15 +3482,21 @@ D19 新增 Star 自有 Tonic gRPC 服务端，将 Append/PullOne/AcknowledgeOne 
 
 | v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 补录 D19 Star native gRPC/mTLS 服务端、Profile/证书身份授权与 exact-log binding、Rust/PostgreSQL 验证证据及仍开放的生产门禁；更正 SQL authorization fixture 使 wire 摘要匹配实际 bytes | 用户允许参考并按模块复用本机 Rust 服务后继续推进 D19 |
 
-### D20：Native gRPC receive adapter 首片（v6.42）
+### D20：Native gRPC receiver 与来源证明首片（v6.43）
 
 `NativeGrpcAdmissionReceiveTransport` 实现现有 broker-neutral `AdmissionReceiveTransport`/`AdmissionReceivedDelivery` 契约，并通过版本化 `PullOne`/`AcknowledgeOne` 调用 Star 自有的 durable-log 服务。接收实例固定 Transport Profile、owner route 与 30–120 秒 lease；recipient service 由 mTLS 身份在服务端解析，不能从 wire 声明。每条 delivery 在进入 owner handler 前校验 sender/kind、log ID、generation、sequence、message ID、lease ID/attempt 和 exact wire SHA-256；payload ≤16 KiB，protobuf frame ≤32 KiB。公开的 `native_provider_identity()` 使用 domain-separated SHA-256 固定 provider ID/version、Profile digest 与 endpoint identity，供授权与 quarantine 实现共用 canonical 来源键；它不是认证凭据。每个 adapter 最多 8 个并行 RPC，另以 8 个 permit 限制尚未释放的 leased delivery handle；不建立无界预取队列。
 
 Native ACK 仍由共享 `AdmissionReceiver` 在 owner transaction commit、commit 后 ACL 复验之后调用；永久 disposition 必须先写入独立 durable quarantine，再由相同 lease-fenced `AcknowledgeOne` 终结来源 delivery。此切片不把 transport receipt 作为 owner Inbox、BI 或 Run 事实。用户明确允许直接参考或模块级复用 `E:/AssetsLake` 与其他本机 Rust 服务；D20 没有复制新源码，因为 AssetsLake 当前 relay 在 dry-run/无 broker 时会误标 published，不能满足 durable transport 语义。此前逐模块审查并适配的 RustGameServer TLS helper 继续沿用；源仓保持只读，商业许可义务、NOTICE 与依赖闭包仍逐模块核验。
 
-诊断验证使用本机 Rust 1.98.1 配合 `--ignore-rust-version`：目标 crate native-feature all-targets check 通过，Clippy 退出码 0（仅有未修改依赖 crate 的既有警告），`native_grpc::tests` 通过 10/10，定向 rustfmt 与 `git diff --check` 通过。该环境没有 Rust 1.99.0，不能记作项目正式工具链门禁；没有运行真实 TLS/gRPC e2e、生产消费组合、quarantine replay、目标 DB grant、BI/Benchmark parity、恢复或性能/RSS 验收。Owner Outbox/Inbox consumer migration、通用 quarantine/replay 与 BI/Benchmark projections 仍是 D20 后续工作；NATS 保留，native provider 与 Schedule/Run execution 保持 fail closed。详见 [D20 阶段报告](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md) 和 [Rust 服务端复用详细设计](design/DD-RUST-SERVER-REUSE-001.md)。
+诊断验证使用本机 Rust 1.98.1 配合 `--ignore-rust-version`：native-feature all-targets check 通过，使用该工具链 `clippy-driver.exe` 的隔离 Clippy-driver check 退出码 0（只有未修改的 `star-context`、`domain-automation` 既有 warnings，目标 crate 无新增 warning），`native_grpc::tests` 12/12、目标 crate 完整 library tests 41/41 通过，三个 runtime 实现文件 rustfmt check 与 `git diff --check` 通过。`schedule_admission_pg.rs` 全文件 rustfmt check 有既有格式差异，本轮仅改动一个 trait 方法签名，没有批量格式化该测试文件。该环境没有 Rust 1.99.0，不能记作项目正式工具链门禁；没有运行真实 TLS/gRPC e2e、生产消费组合、quarantine replay、目标 DB grant、BI/Benchmark parity、恢复或性能/RSS 验收。Owner Outbox/Inbox consumer migration、通用 quarantine/replay 与 BI/Benchmark projections 仍是 D20 后续工作；NATS 保留，native provider 与 Schedule/Run execution 保持 fail closed。详见 [D20 阶段报告](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md) 和 [Rust 服务端复用详细设计](design/DD-RUST-SERVER-REUSE-001.md)。
+
+D20 来源证明增量：native receiver 对精确 wire bytes 计算 SHA-256，并通过 `VerifyOrigin` 请求 Star 服务核对当前 Profile/route、log generation/sequence/message ID、活动 lease 与 append 时记录的源证书指纹；历史 D18/D19 message row 的来源证书字段为 NULL 时拒绝授权。持久化 poison quarantine 前后都复验同一来源，authenticated ACK 在同一数据库事务内再次验证 exact delivery 与 lease 后才执行。此证明只建立 transport origin，不代替 owner Inbox commit、业务事件身份或 BI/Run 事实。
+
+`2026-10-12-platform-native-origin-verification.sql` 与 `db/tests/platform-native-origin-verification.sql` 已接入 disposable PostgreSQL runner，包含 migration 重复应用、exact digest、旧行 fail-closed、ACK 后不可再作为 live proof，以及源证书在 append 后撤销时保留 accepted-time provenance 的场景。当前环境没有 PostgreSQL server binaries（`psql`/`initdb`/`pg_ctl` 不在 PATH，安装目录无 `initdb.exe`），该 D20 SQL contract 本轮未执行；不能据此宣称 migration、RLS 或函数 grants 已通过。Rust 1.98.1 `--ignore-rust-version` 诊断与 PG 阻塞详见阶段报告；Rust 1.99.0 正式门禁、真实 TLS e2e 和 D20 后续 consumers、quarantine/replay、BI/Benchmark 仍未完成。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.44 | 2026-10-12 | Ulysses — Mavis接手审核 | 校正 D20 当前 native_grpc 定向测试为 12/12、完整 library tests 为 41/41；记录 Rust 1.98.1 Clippy-driver 隔离检查与现有格式差异；保持 PostgreSQL/正式 1.99.0 门禁未完成 | 新增 exact-wire 来源验证用例并完成隔离验证复核 |
+| v6.43 | 2026-10-12 | Ulysses — Mavis接手审核 | 增加 append-time source certificate provenance、exact-wire `VerifyOrigin`、quarantine 前后复验与 ACK 同事务复验；接入 migration/SQL contract runner 并如实记录 PostgreSQL 缺失阻塞 | D20 实现 native 来源证明；Rust 诊断通过但本机没有 PostgreSQL server binaries |
 | v6.42 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 canonical provider identity helper 公开供授权/quarantine 复用；明确 AssetsLake 直接复用授权与当前 relay 不满足可靠投递语义的原因 | 用户再次确认本机 Rust 服务可直接复用；复核 provider identity 实现 |
 | v6.41 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D20 native receive adapter、来源身份/lease 背压约束与 1.98.1 诊断验证；保留 owner consumer、quarantine replay、BI、性能与 1.99.0 缺口 | D20 接通 Native gRPC Pull/Acknowledge 与共享 receiver port |

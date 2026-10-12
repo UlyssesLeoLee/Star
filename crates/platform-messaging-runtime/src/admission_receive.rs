@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=df7cd1b054ac6638143346047446b45da1ad5d8622a60526c7f83d10cfeac432
+@cypher schema=1 source_sha256=2428da2a2e33b0fe252347b4499f8f7d70219c158dad10d70ebc6db0b420a037
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_receive.rs"})
 MERGE (receiver:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver",kind:"struct"})
 MERGE (transport:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
@@ -230,6 +230,7 @@ pub trait AdmissionReceiveAuthorization: Send + Sync {
     fn verify_source(
         &self,
         _origin: &AdmissionReceiveOrigin,
+        _wire: &[u8],
     ) -> impl Future<Output = Result<(), AdmissionReceiveError>> + Send {
         async { Err(AdmissionReceiveError::Unauthorized) }
     }
@@ -268,11 +269,8 @@ pub struct AdmissionReceiver<T, H, A> {
     quarantine: Option<std::sync::Arc<dyn AdmissionReceiveQuarantine>>,
 }
 
-impl<
-        T: AdmissionReceiveTransport,
-        H: AdmissionReceiveHandler,
-        A: AdmissionReceiveAuthorization,
-    > AdmissionReceiver<T, H, A>
+impl<T: AdmissionReceiveTransport, H: AdmissionReceiveHandler, A: AdmissionReceiveAuthorization>
+    AdmissionReceiver<T, H, A>
 {
     /// Pin one logical route with explicit transport, owner and authorization implementations.
     pub fn new(
@@ -339,11 +337,15 @@ impl<
                 let Some(quarantine) = &self.quarantine else {
                     return Err(AdmissionReceiveError::Contract);
                 };
-                self.authorization.verify_source(delivery.origin()).await?;
+                self.authorization
+                    .verify_source(delivery.origin(), delivery.wire())
+                    .await?;
                 quarantine
                     .record(delivery.origin(), delivery.wire(), fault)
                     .await?;
-                self.authorization.verify_source(delivery.origin()).await?;
+                self.authorization
+                    .verify_source(delivery.origin(), delivery.wire())
+                    .await?;
                 delivery.terminate_permanently().await?;
                 return Ok(None);
             }
@@ -543,6 +545,7 @@ mod tests {
         async fn verify_source(
             &self,
             _: &AdmissionReceiveOrigin,
+            _: &[u8],
         ) -> Result<(), AdmissionReceiveError> {
             let mut events = self.events.lock().unwrap();
             let after_quarantine = events.contains(&"quarantine");

@@ -4,10 +4,12 @@
 // MERGE (append:Symbol {id:"star.platform.transport.v1.DurableTransport.Append",kind:"rpc"})
 // MERGE (pull:Symbol {id:"star.platform.transport.v1.DurableTransport.PullOne",kind:"rpc"})
 // MERGE (ack:Symbol {id:"star.platform.transport.v1.DurableTransport.AcknowledgeOne",kind:"rpc"})
+// MERGE (verify_origin:Symbol {id:"star.platform.transport.v1.DurableTransport.VerifyOrigin",kind:"rpc"})
 // MERGE (self)-[:DEFINES]->(service)
 // MERGE (service)-[:EXPOSES]->(append)
 // MERGE (service)-[:EXPOSES]->(pull)
 // MERGE (service)-[:EXPOSES]->(ack)
+// MERGE (service)-[:EXPOSES]->(verify_origin)
 // @endcypher
 //
 // Version 1 is unary and bounded. Append derives sender identity from the verified mTLS peer;
@@ -20,6 +22,7 @@ service DurableTransport {
   rpc Append(AppendRequest) returns (AppendResponse);
   rpc PullOne(PullOneRequest) returns (PullOneResponse);
   rpc AcknowledgeOne(AcknowledgeOneRequest) returns (AcknowledgeOneResponse);
+  rpc VerifyOrigin(VerifyOriginRequest) returns (VerifyOriginResponse);
 }
 
 message ProfilePin {
@@ -82,4 +85,19 @@ message AcknowledgeOneRequest {
 
 message AcknowledgeOneResponse {
   bool acknowledged = 1;
+}
+
+message VerifyOriginRequest {
+  ProfilePin profile = 1;
+  bytes sender_service_id = 2;
+  string message_kind = 3;
+  string log_id = 4;
+  bytes log_generation = 5;
+  int64 sequence = 6;
+  bytes message_id = 7;
+  bytes wire_sha256 = 8;
+}
+
+message VerifyOriginResponse {
+  bool authorized = 1;
 }

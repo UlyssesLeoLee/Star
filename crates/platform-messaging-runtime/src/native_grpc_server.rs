@@ -1,4 +1,4 @@
-// @cypher schema=1 source_sha256=a8046029df90a2af872912b126193113f410cb7151d5fdbd52d6da6653e1c952
+// @cypher schema=1 source_sha256=148e02ec7c6206f9ec75a6176c79ac2358dcbb441df28df94a54de6cf820d984
 // MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc_server.rs"})
 // MERGE (server:Type {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer",kind:"struct"})
 // MERGE (server_error:Type {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcServerError",kind:"enum"})
@@ -8,6 +8,7 @@
 // MERGE (append:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer.append",kind:"method"})
 // MERGE (pull:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer.pull_one",kind:"method"})
 // MERGE (ack:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer.acknowledge_one",kind:"method"})
+// MERGE (verify_origin:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer.verify_origin",kind:"method"})
 // MERGE (serve:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::serve_native_grpc",kind:"function"})
 // MERGE (authenticated_peer:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::authenticated_peer",kind:"function"})
 // MERGE (profile_digest:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::profile_digest",kind:"function"})
@@ -23,6 +24,7 @@
 // MERGE (append_fn:Function {id:"platform_transport.append_authenticated"})
 // MERGE (pull_fn:Function {id:"platform_transport.pull_authenticated"})
 // MERGE (ack_fn:Function {id:"platform_transport.acknowledge_authenticated"})
+// MERGE (verify_origin_fn:Function {id:"platform_transport.verify_origin_authenticated"})
 // MERGE (bounded:Config {id:"native_grpc_server::MAX_SERVER_IN_FLIGHT"})
 // MERGE (request_deadline:Config {id:"native_grpc_server::SERVER_REQUEST_DEADLINE"})
 // MERGE (wire_limit:Config {id:"native_grpc_server::MAX_WIRE_BYTES"})
@@ -37,6 +39,7 @@
 // MERGE (self)-[:DEFINES]->(append)
 // MERGE (self)-[:DEFINES]->(pull)
 // MERGE (self)-[:DEFINES]->(ack)
+// MERGE (self)-[:DEFINES]->(verify_origin)
 // MERGE (self)-[:DEFINES]->(serve)
 // MERGE (self)-[:DEFINES]->(authenticated_peer)
 // MERGE (self)-[:DEFINES]->(profile_digest)
@@ -75,6 +78,13 @@
 // MERGE (ack)-[:CALLS]->(validate_kind)
 // MERGE (ack)-[:CALLS]->(valid_log_id)
 // MERGE (ack)-[:CALLS]->(ack_fn)
+// MERGE (verify_origin)-[:CALLS]->(try_admit)
+// MERGE (verify_origin)-[:CALLS]->(authenticated_peer)
+// MERGE (verify_origin)-[:CALLS]->(profile_digest)
+// MERGE (verify_origin)-[:CALLS]->(uuid_field)
+// MERGE (verify_origin)-[:CALLS]->(validate_kind)
+// MERGE (verify_origin)-[:CALLS]->(valid_log_id)
+// MERGE (verify_origin)-[:CALLS]->(verify_origin_fn)
 // MERGE (serve)-[:CALLS]->(server_tls)
 // MERGE (serve)-[:CALLS]->(new)
 // MERGE (serve)-[:CALLS]->(into_service)
@@ -312,6 +322,52 @@ impl wire::durable_transport_server::DurableTransport for NativeGrpcTransportSer
         .map_err(map_database_error)?;
         let acknowledged: bool = result.try_get("acknowledged").map_err(map_database_error)?;
         Ok(Response::new(wire::AcknowledgeOneResponse { acknowledged }))
+    }
+
+    async fn verify_origin(
+        &self,
+        request: Request<wire::VerifyOriginRequest>,
+    ) -> Result<Response<wire::VerifyOriginResponse>, Status> {
+        let _permit = self.try_admit()?;
+        let certificate_sha256 = authenticated_peer(&request)?;
+        let request = request.into_inner();
+        let profile_digest = profile_digest(request.profile)?;
+        let sender_service_id = uuid_field(&request.sender_service_id, "sender service")?;
+        let generation = uuid_field(&request.log_generation, "log generation")?;
+        let message_id = uuid_field(&request.message_id, "message")?;
+        validate_message_kind(&request.message_kind)?;
+        if !valid_log_id(&request.log_id)
+            || request.sequence <= 0
+            || request.wire_sha256.len() != 32
+        {
+            return Err(Status::invalid_argument(
+                "invalid native transport origin verification boundary",
+            ));
+        }
+        let result = tokio::time::timeout(
+            SERVER_REQUEST_DEADLINE,
+            sqlx::query(
+                "SELECT platform_transport.verify_origin_authenticated(\
+                 $1,$2,$3,$4,$5,$6,$7,$8,$9) AS authorized",
+            )
+            .bind(certificate_sha256.to_vec())
+            .bind(profile_digest.to_vec())
+            .bind(sender_service_id)
+            .bind(request.message_kind)
+            .bind(request.log_id)
+            .bind(generation)
+            .bind(request.sequence)
+            .bind(message_id)
+            .bind(request.wire_sha256)
+            .fetch_one(&self.pool),
+        )
+        .await
+        .map_err(|_| {
+            Status::deadline_exceeded("native transport origin verification deadline elapsed")
+        })?
+        .map_err(map_database_error)?;
+        let authorized: bool = result.try_get("authorized").map_err(map_database_error)?;
+        Ok(Response::new(wire::VerifyOriginResponse { authorized }))
     }
 }
 
