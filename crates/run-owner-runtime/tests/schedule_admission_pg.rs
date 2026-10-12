@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=872105ee1e6512381a058fb3fa74e9dd7f6a21afa08886efea9013b7c5bbbb03
+@cypher schema=1 source_sha256=7bc03820b2dcaa7ccc30993a785820e3fdc3d4cb594506435627644a869ec8a9
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -1118,6 +1118,7 @@ impl platform_messaging_runtime::admission_receive::AdmissionReceiveAuthorizatio
     async fn verify_source(
         &self,
         _origin: &platform_messaging_runtime::admission_receive::AdmissionReceiveOrigin,
+        _wire: &[u8],
     ) -> Result<(), platform_messaging_runtime::admission_receive::AdmissionReceiveError> {
         self.state.lock().unwrap().source_verifications += 1;
         Ok(())

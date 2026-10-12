@@ -1,7 +1,7 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.8 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：D19 server/auth 与 D20 native receiver slices 已实现；D20 在 Rust 1.98.1 `--ignore-rust-version` 下目标 crate check/Clippy 和 10 个定向单测通过。真实 TLS e2e、production identity/control plane、Profile→log provisioning、target DB grants、owner delivery、BI/performance 和 cutover 均未完成。
+> v1.10 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：D19 server/auth 与 D20 native receiver/source-verifier slices 已实现；Rust 1.98.1 `--ignore-rust-version` 下目标 crate check、Clippy-driver check、12 个 native_grpc tests 与 41 个 library tests 通过。来源验证 PostgreSQL migration/contract 本轮未执行；真实 TLS e2e、production identity/control plane、Profile→log provisioning、target DB grants、owner delivery、BI/performance 和 cutover 均未完成。
 
 ## 1. 范围与证据
 
@@ -172,9 +172,19 @@ Current owner-level provisioning/revocation uses DDL owner database operations o
 
 `native_provider_identity()` 是公开的 canonical identity helper，接收端的授权与 quarantine 实现可以共用其稳定派生规则。结果只标识固定 Profile/provider revision 的来源键，不是认证凭据或授权结论；调用方仍必须验证可信 Profile 与 mTLS peer identity。
 
-Rust 1.98.1 `--ignore-rust-version` 下目标 crate all-targets check 通过，目标 crate Clippy 退出码 0、`native_grpc::tests` 10/10、定向 rustfmt 与 `git diff --check` 通过。因 cargo/rustc 不在 PATH，命令通过安装目录中的 1.98.1 `cargo.exe` 和显式 `build.rustc` 配置执行；这不构成 Rust 1.99.0 正式门禁。Clippy 仅报告未改动 `star-context`、`domain-automation`、`domain-kms` 的既有警告。未做真实 TLS server/client e2e、consumer/quarantine DB 联测、BI/Benchmark 对账、恢复、RSS、p95/p99、公平调度或 dual-provider contract suite。故该 native receiver 仍为 opt-in implementation slice，不算 D20 consumer migration/production-ready 或可替代 NATS。剩余 D20 scope 与不变的 fail-closed gates 见 [D20 阶段报告](../reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md)。
+在 exact-source-verification tests 加入前的 receiver-only slice 中，Rust 1.98.1 `--ignore-rust-version` 下目标 crate all-targets check、Clippy 与 `native_grpc::tests` 10/10 通过；这是当时的历史验证记录，不是当前 D20 总数。因 cargo/rustc 不在 PATH，命令通过安装目录中的 1.98.1 `cargo.exe` 和显式 `build.rustc` 配置执行；这不构成 Rust 1.99.0 正式门禁。Clippy 仅报告未改动 `star-context`、`domain-automation`、`domain-kms` 的既有警告。未做真实 TLS server/client e2e、consumer/quarantine DB 联测、BI/Benchmark 对账、恢复、RSS、p95/p99、公平调度或 dual-provider contract suite。故该 native receiver 仍为 opt-in implementation slice，不算 D20 consumer migration/production-ready 或可替代 NATS。当前 D20 为 `native_grpc::tests` 12/12、完整 library tests 41/41，仍受 v1.10 所列 PostgreSQL、TLS、consumer 和生产门禁阻塞；剩余 D20 scope 与 fail-closed gates 见 [D20 阶段报告](../reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md)。
+
+### 12.1 D20 append-time source proof and candidate reuse
+
+D20 adds a native `VerifyOrigin` RPC and an append-time source-certificate fingerprint stored on the immutable durable Work row. The receiver hashes exact wire bytes, rechecks the current Profile/route and live lease, and validates that the original sender certificate was valid when the row was accepted. Poison quarantine rechecks the same exact source before and after its durable write; ACK repeats the verification inside its own transaction. This is Star-owned security and persistence code, not copied from another local service.
+
+The user's direct reuse authorization covers suitable modules from `E:/AssetsLake` and other owned Rust server projects; it does not mean every candidate should be imported. The current AssetsLake event publisher remains read-only and is not a durable-transport implementation: disabled staging can return a newly generated UUID without persisting an Outbox fact, and relay dry-run/no-broker paths can mark events published without delivery. Its envelope fields remain useful reference material. The previously reviewed RustGameServer TLS helper remains the only direct source-code adaptation in this D20 line. Any later module reuse still records current source HEAD/file hash, owner/rights, precise license obligations, NOTICE, full dependency closure and a Star contract/performance/security review; no user re-approval is needed for the already authorized local sources, but third-party obligations still apply.
+
+The origin-verification migration and SQL contract were added to the disposable PostgreSQL runner but were not executed because this workstation has no PostgreSQL server binaries. Rust 1.98.1 diagnostic check and 41/41 library tests do not establish DDL/RLS/grant correctness. Source repositories were inspected read-only; AssetsLake remains at HEAD `0156aca56c0d7364120d7389ebe1ccf0cb64b750` with 17 dirty files, and RustGameServer at `89458d887e8bfddf6637f9d80ea65f2091e8b6f2` with a clean worktree. This is a targeted candidate recheck, not an exhaustive audit of all local Cargo projects.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| v1.10 | 2026-10-12 | Ulysses — Mavis接手审核 | Correct the D20 library test count to 41/41; record the isolated Clippy-driver result and existing integration-test formatting drift while keeping PostgreSQL verification open | Two exact-wire origin verification tests added; current focused gates rerun |
+| v1.9 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D20 append-time source provenance and exact-wire verifier design; revalidate AssetsLake/RustGameServer source state; record unrun PostgreSQL contract and reuse limits | User reaffirmed direct module reuse authorization for AssetsLake and local Rust servers; D20 added VerifyOrigin |
 | v1.8 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确用户可直接复用本机 Rust 服务模块并说明 AssetsLake relay 的实际投递边界；公开 canonical provider identity helper，记录当前 Rust 1.98.1 诊断验证与未关闭的 D20 gates | 用户再次确认模块级直接复用，并要求为 Star 自有 Rust 服务替换 NATS 做准备 |
 | v1.7 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 native gRPC receive port、canonical provider identity、leased-delivery memory cap 和真实诊断验证；明确 D20 consumer/BI/production gates 仍开放 |

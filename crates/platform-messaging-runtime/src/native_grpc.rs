@@ -3,7 +3,7 @@
 // 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 (Apache-2.0).
 // TLS loading and fail-closed behavior are retained; application identity stays Star-owned.
 /*
-@cypher schema=1 source_sha256=540c6acda8696c0a906764300e127c5527ceb99d8d2c1d842065a7a31275bf66
+@cypher schema=1 source_sha256=055cd209fb5039e48e8dfcf7ce624792917139d3be7f03ba44575893292784ca
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (tls_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
 MERGE (tls_server:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
@@ -16,17 +16,22 @@ MERGE (identity_error:Type {id:"crates/platform-messaging-runtime/src/native_grp
 MERGE (transport:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport",kind:"struct"})
 MERGE (client_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcClientConfig",kind:"struct"})
 MERGE (receive_transport:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport",kind:"struct"})
+MERGE (receive_authorization:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveAuthorization",kind:"struct"})
 MERGE (receive_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcReceiveClientConfig",kind:"struct"})
 MERGE (receive_delivery:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionDelivery",kind:"struct"})
 MERGE (connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport.connect",kind:"method"})
 MERGE (publish:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport.publish",kind:"method"})
 MERGE (connect_receive_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::connect_native_client",kind:"function"})
 MERGE (receive_connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport.connect",kind:"method"})
+MERGE (receive_authorization_factory:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport.authorization",kind:"method"})
+MERGE (verify_origin:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveAuthorization.verify_origin",kind:"method"})
+MERGE (origin_request:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::origin_verification_request",kind:"function"})
 MERGE (pull_one:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport.pull_one",kind:"method"})
 MERGE (acknowledge:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionDelivery.acknowledge",kind:"method"})
 MERGE (terminate:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionDelivery.terminate_permanently",kind:"method"})
 MERGE (validate_delivery:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::validate_native_delivery",kind:"function"})
 MERGE (validate_scope:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::valid_receive_scope",kind:"function"})
+MERGE (valid_log_id:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::valid_native_log_id",kind:"function"})
 MERGE (kind_mapping:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_message_kind",kind:"function"})
 MERGE (provider_identity:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_provider_identity",kind:"function"})
 MERGE (proto:File {path:"crates/platform-messaging-proto/src/lib.rs"})
@@ -34,11 +39,13 @@ MERGE (admission:Type {id:"crates/platform-messaging-runtime/src/admission_deliv
 MERGE (receipt:Type {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportReceipt",kind:"struct"})
 MERGE (receive_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
 MERGE (delivery_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceivedDelivery",kind:"trait"})
+MERGE (receive_authorization_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization",kind:"trait"})
 MERGE (tonic:ExternalService {id:"tonic::transport",kind:"library"})
 MERGE (tonic_request:ExternalService {id:"tonic::Request::peer_certs",kind:"method"})
 MERGE (tonic_append:ExternalService {id:"platform_messaging_proto::wire::DurableTransportClient::append",kind:"method"})
 MERGE (tonic_pull:ExternalService {id:"platform_messaging_proto::wire::DurableTransportClient::pull_one",kind:"method"})
 MERGE (tonic_ack:ExternalService {id:"platform_messaging_proto::wire::DurableTransportClient::acknowledge_one",kind:"method"})
+MERGE (tonic_verify_origin:ExternalService {id:"platform_messaging_proto::wire::DurableTransportClient::verify_origin",kind:"method"})
 MERGE (tonic_uri_host:ExternalService {id:"tonic::transport::Uri::host",kind:"method"})
 MERGE (tonic_uri_scheme:ExternalService {id:"tonic::transport::Uri::scheme_str",kind:"method"})
 MERGE (sha256:ExternalService {id:"sha2::Sha256::digest",kind:"method"})
@@ -56,6 +63,8 @@ MERGE (native_receive_valid_test:Symbol {id:"crates/platform-messaging-runtime/s
 MERGE (native_receive_route_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_receive_rejects_wrong_route_sender_kind_and_digest",kind:"test"})
 MERGE (native_receive_bounds_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_receive_rejects_malformed_or_oversized_delivery_metadata",kind:"test"})
 MERGE (native_provider_identity_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_provider_identity_pins_provider_version_profile_and_endpoint",kind:"test"})
+MERGE (origin_request_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_origin_verification_request_hashes_exact_wire",kind:"test"})
+MERGE (origin_request_bounds_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_origin_verification_request_rejects_invalid_scope_and_wire",kind:"test"})
 MERGE (semaphore:ExternalService {id:"tokio::sync::Semaphore::acquire_owned",kind:"method"})
 MERGE (permit:ExternalService {id:"tokio::sync::OwnedSemaphorePermit",kind:"type"})
 MERGE (bounded_read:ExternalService {id:"std::io::Read::read_to_end",kind:"method"})
@@ -82,8 +91,13 @@ MERGE (self)-[:DEFINES]->(acknowledge)
 MERGE (self)-[:DEFINES]->(terminate)
 MERGE (self)-[:DEFINES]->(validate_delivery)
 MERGE (self)-[:DEFINES]->(validate_scope)
+MERGE (self)-[:DEFINES]->(valid_log_id)
 MERGE (self)-[:DEFINES]->(kind_mapping)
 MERGE (self)-[:DEFINES]->(provider_identity)
+MERGE (self)-[:DEFINES]->(receive_authorization)
+MERGE (self)-[:DEFINES]->(receive_authorization_factory)
+MERGE (self)-[:DEFINES]->(verify_origin)
+MERGE (self)-[:DEFINES]->(origin_request)
 MERGE (self)-[:IMPORTS]->(proto)
 MERGE (self)-[:DEPENDS_ON]->(native_proto_package:Config {id:"cargo.package.platform-messaging-proto"})
 MERGE (self)-[:IMPORTS]->(admission)
@@ -106,6 +120,8 @@ MERGE (self)-[:DEFINES]->(native_receive_valid_test)
 MERGE (self)-[:DEFINES]->(native_receive_route_test)
 MERGE (self)-[:DEFINES]->(native_receive_bounds_test)
 MERGE (self)-[:DEFINES]->(native_provider_identity_test)
+MERGE (self)-[:DEFINES]->(origin_request_test)
+MERGE (self)-[:DEFINES]->(origin_request_bounds_test)
 MERGE (transport)-[:IMPLEMENTS]->(admission)
 MERGE (connect)-[:USES_TYPE]->(client_config)
 MERGE (connect)-[:CALLS]->(connect_receive_client)
@@ -136,16 +152,30 @@ MERGE (pull_one)-[:USES_TYPE]->(permit)
 MERGE (acknowledge)-[:CALLS]->(tonic_ack)
 MERGE (acknowledge)-[:CALLS]->(kind_mapping)
 MERGE (acknowledge)-[:CALLS]->(semaphore)
+MERGE (receive_transport)-[:IMPLEMENTS]->(receive_port)
+MERGE (receive_authorization)-[:IMPLEMENTS]->(receive_authorization_port)
+MERGE (receive_authorization_factory)-[:CREATES]->(receive_authorization)
+MERGE (receive_authorization_factory)-[:USES_TYPE]->(receive_authorization_port)
+MERGE (verify_origin)-[:CALLS]->(tonic_verify_origin)
+MERGE (verify_origin)-[:CALLS]->(origin_request)
+MERGE (verify_origin)-[:CALLS]->(sha256)
+MERGE (verify_origin)-[:CALLS]->(semaphore)
+MERGE (verify_origin)-[:USES_TYPE]->(receive_authorization_port)
 MERGE (terminate)-[:CALLS]->(acknowledge)
 MERGE (validate_delivery)-[:CALLS]->(sha256)
 MERGE (validate_delivery)-[:CALLS]->(uuid_parse)
 MERGE (validate_delivery)-[:CALLS]->(validate_scope)
+MERGE (validate_delivery)-[:CALLS]->(valid_log_id)
+MERGE (origin_request)-[:CALLS]->(valid_log_id)
+MERGE (origin_request)-[:CALLS]->(sha256)
 MERGE (validate_delivery)-[:CALLS]->(kind_mapping)
 MERGE (provider_identity)-[:CALLS]->(sha256)
 MERGE (native_receive_valid_test)-[:TESTS]->(validate_delivery)
 MERGE (native_receive_route_test)-[:TESTS]->(validate_delivery)
 MERGE (native_receive_bounds_test)-[:TESTS]->(validate_delivery)
 MERGE (native_provider_identity_test)-[:TESTS]->(provider_identity)
+MERGE (origin_request_test)-[:TESTS]->(origin_request)
+MERGE (origin_request_bounds_test)-[:TESTS]->(origin_request)
 MERGE (peer_fingerprint)-[:CALLS]->(tonic_request)
 MERGE (peer_fingerprint)-[:CALLS]->(sha256)
 MERGE (tls_client)-[:CALLS]->(read_pem)
@@ -180,8 +210,9 @@ use crate::admission_delivery::{
     AdmissionTransportProfile, AdmissionTransportReceipt,
 };
 use crate::admission_receive::{
-    AdmissionReceiveError, AdmissionReceiveKind, AdmissionReceiveOrigin, AdmissionReceiveScope,
-    AdmissionReceiveTransport, AdmissionReceivedDelivery,
+    AdmissionReceiveAuthorization, AdmissionReceiveError, AdmissionReceiveKind,
+    AdmissionReceiveOrigin, AdmissionReceiveScope, AdmissionReceiveTransport,
+    AdmissionReceivedDelivery,
 };
 
 /// The transport wire limit plus protobuf envelope headroom.
@@ -522,6 +553,110 @@ impl NativeGrpcAdmissionReceiveTransport {
             outstanding: Arc::new(Semaphore::new(MAX_NATIVE_GRPC_IN_FLIGHT)),
         })
     }
+
+    /// Build the trusted origin verifier that shares this receiver's pinned route and RPC budget.
+    pub fn authorization(&self) -> NativeGrpcAdmissionReceiveAuthorization {
+        NativeGrpcAdmissionReceiveAuthorization {
+            client: self.client.clone(),
+            profile: self.profile.clone(),
+            provider_identity: self.provider_identity.clone(),
+            scope: self.scope,
+            in_flight: self.in_flight.clone(),
+        }
+    }
+}
+
+/// Verify a received origin against the exact live lease and source credential recorded by Star.
+pub struct NativeGrpcAdmissionReceiveAuthorization {
+    client: wire::durable_transport_client::DurableTransportClient<Channel>,
+    profile: AdmissionTransportProfile,
+    provider_identity: String,
+    scope: AdmissionReceiveScope,
+    in_flight: Arc<Semaphore>,
+}
+
+impl NativeGrpcAdmissionReceiveAuthorization {
+    async fn verify_origin(
+        &self,
+        origin: &AdmissionReceiveOrigin,
+        wire_bytes: &[u8],
+    ) -> Result<(), AdmissionReceiveError> {
+        let request = origin_verification_request(
+            &self.profile,
+            self.scope,
+            &self.provider_identity,
+            origin,
+            wire_bytes,
+        )?;
+        let _permit = self
+            .in_flight
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| AdmissionReceiveError::Transport)?;
+        let mut client = self.client.clone();
+        let response = client
+            .verify_origin(Request::new(request))
+            .await
+            .map_err(|_| AdmissionReceiveError::Unauthorized)?
+            .into_inner();
+        if response.authorized {
+            Ok(())
+        } else {
+            Err(AdmissionReceiveError::Unauthorized)
+        }
+    }
+}
+
+impl AdmissionReceiveAuthorization for NativeGrpcAdmissionReceiveAuthorization {
+    async fn verify(
+        &self,
+        origin: &AdmissionReceiveOrigin,
+        wire_bytes: &[u8],
+    ) -> Result<(), AdmissionReceiveError> {
+        self.verify_origin(origin, wire_bytes).await
+    }
+
+    async fn verify_source(
+        &self,
+        origin: &AdmissionReceiveOrigin,
+        wire_bytes: &[u8],
+    ) -> Result<(), AdmissionReceiveError> {
+        self.verify_origin(origin, wire_bytes).await
+    }
+}
+
+fn origin_verification_request(
+    profile: &AdmissionTransportProfile,
+    scope: AdmissionReceiveScope,
+    provider_identity: &str,
+    origin: &AdmissionReceiveOrigin,
+    wire_bytes: &[u8],
+) -> Result<wire::VerifyOriginRequest, AdmissionReceiveError> {
+    if !valid_receive_scope(scope)
+        || origin.scope != scope
+        || origin.provider_identity != provider_identity
+        || origin.message_id.is_nil()
+        || origin.log_generation.is_nil()
+        || origin.sequence <= 0
+        || !valid_native_log_id(&origin.log_id)
+        || wire_bytes.is_empty()
+        || wire_bytes.len() > 16 * 1024
+    {
+        return Err(AdmissionReceiveError::Unauthorized);
+    }
+    Ok(wire::VerifyOriginRequest {
+        profile: Some(wire::ProfilePin {
+            profile_digest: profile.profile_digest.to_vec(),
+        }),
+        sender_service_id: scope.sender_service_id.as_bytes().to_vec(),
+        message_kind: native_message_kind(scope.kind).to_owned(),
+        log_id: origin.log_id.clone(),
+        log_generation: origin.log_generation.as_bytes().to_vec(),
+        sequence: origin.sequence,
+        message_id: origin.message_id.as_bytes().to_vec(),
+        wire_sha256: Sha256::digest(wire_bytes).to_vec(),
+    })
 }
 
 impl AdmissionReceiveTransport for NativeGrpcAdmissionReceiveTransport {
@@ -666,17 +801,7 @@ fn validate_native_delivery(
     if !valid_receive_scope(scope)
         || provider_identity.is_empty()
         || provider_identity.len() > 128
-        || delivery.log_id.is_empty()
-        || delivery.log_id.len() > 128
-        || !delivery
-            .log_id
-            .as_bytes()
-            .first()
-            .is_some_and(u8::is_ascii_alphanumeric)
-        || !delivery
-            .log_id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
+        || !valid_native_log_id(&delivery.log_id)
         || delivery.sequence <= 0
         || delivery.message_kind != native_message_kind(scope.kind)
         || delivery.wire.is_empty()
@@ -730,6 +855,18 @@ fn valid_receive_scope(scope: AdmissionReceiveScope) -> bool {
         && !scope.sender_service_id.is_nil()
         && !scope.recipient_service_id.is_nil()
         && scope.sender_service_id != scope.recipient_service_id
+}
+
+fn valid_native_log_id(log_id: &str) -> bool {
+    !log_id.is_empty()
+        && log_id.len() <= 128
+        && log_id
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && log_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
 }
 
 fn native_message_kind(kind: AdmissionReceiveKind) -> &'static str {
@@ -932,6 +1069,91 @@ mod tests {
         let mut different_digest = profile;
         different_digest.profile_digest[0] ^= 0xff;
         assert_ne!(native_provider_identity(&different_digest), identity);
+    }
+
+    #[test]
+    fn native_origin_verification_request_hashes_exact_wire() {
+        let profile = test_profile();
+        let scope = receive_scope(AdmissionReceiveKind::Result);
+        let provider_identity = native_provider_identity(&profile);
+        let origin = AdmissionReceiveOrigin {
+            scope,
+            message_id: Uuid::new_v4(),
+            provider_identity: provider_identity.clone(),
+            log_id: "native-origin-1".to_owned(),
+            log_generation: Uuid::new_v4(),
+            sequence: 7,
+        };
+        let wire_bytes = b"exact origin proof";
+
+        let request =
+            origin_verification_request(&profile, scope, &provider_identity, &origin, wire_bytes)
+                .unwrap();
+
+        assert_eq!(
+            request.profile.unwrap().profile_digest.as_slice(),
+            profile.profile_digest.as_slice()
+        );
+        assert_eq!(
+            request.sender_service_id.as_slice(),
+            scope.sender_service_id.as_bytes()
+        );
+        assert_eq!(request.message_kind, "result");
+        assert_eq!(request.log_id, origin.log_id);
+        assert_eq!(
+            request.log_generation.as_slice(),
+            origin.log_generation.as_bytes()
+        );
+        assert_eq!(request.sequence, 7);
+        assert_eq!(request.message_id.as_slice(), origin.message_id.as_bytes());
+        assert_eq!(
+            request.wire_sha256.as_slice(),
+            Sha256::digest(wire_bytes).as_slice()
+        );
+    }
+
+    #[test]
+    fn native_origin_verification_request_rejects_invalid_scope_and_wire() {
+        let profile = test_profile();
+        let scope = receive_scope(AdmissionReceiveKind::Request);
+        let provider_identity = native_provider_identity(&profile);
+        let wrong_scope = AdmissionReceiveScope {
+            kind: AdmissionReceiveKind::Resolution,
+            ..scope
+        };
+        let origin = AdmissionReceiveOrigin {
+            scope,
+            message_id: Uuid::new_v4(),
+            provider_identity: provider_identity.clone(),
+            log_id: "native-origin-1".to_owned(),
+            log_generation: Uuid::new_v4(),
+            sequence: 1,
+        };
+
+        assert!(matches!(
+            origin_verification_request(&profile, scope, &provider_identity, &origin, b""),
+            Err(AdmissionReceiveError::Unauthorized)
+        ));
+        assert!(matches!(
+            origin_verification_request(
+                &profile,
+                wrong_scope,
+                &provider_identity,
+                &origin,
+                b"wire"
+            ),
+            Err(AdmissionReceiveError::Unauthorized)
+        ));
+        assert!(matches!(
+            origin_verification_request(
+                &profile,
+                scope,
+                &provider_identity,
+                &origin,
+                &vec![b'x'; 16 * 1024 + 1]
+            ),
+            Err(AdmissionReceiveError::Unauthorized)
+        ));
     }
 
     #[test]

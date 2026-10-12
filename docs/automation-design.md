@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.49 (2026-10-12)
+> **文档版本**: v2.51 (2026-10-12)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3081,3 +3081,11 @@ This gate is PostgreSQL storage only. The run performed no Rust compilation and 
 The corrected D19 schema-only run passed 80/80 steps; D19 migration applied twice, auth SQL contract passed, PostgreSQL shutdown passed, and Multipass inventory remained unchanged. Audit: `target/phase9f4d-run-owner-consumer/d19-server-auth-20261012-r3/audit.jsonl`. Rust 1.99.0 server/client code checks were run separately: target crate all-targets check, Clippy and native-feature lib tests 35/35 passed. Runner success is not a live mTLS handshake, production certificate-control-plane or gRPC e2e result. NATS cutover, owner commit-before-ACK, BI/Benchmark, endpoint resolver, target DB grants, rotation/recovery/performance and Schedule/Run execution remain gated.
 
 | v2.50 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.90 for repeatable D19 certificate/Profile/log authorization SQL verification, corrected exact test-wire digest, 80/80 evidence and production/TLS-e2e boundaries. | Star-owned gRPC server and identity-bound route wrappers added |
+
+### 4.91 Phase 9F4C-D20 native source-verification SQL contract
+
+**自动化档：[P]** — The existing `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only` runner applies `2026-10-12-platform-native-origin-verification.sql` twice after the D17 Profile, D18 durable-log and D19 native-server-auth prerequisites, then runs `db/tests/platform-native-origin-verification.sql`. The contract checks the append-time source-certificate trigger, legacy NULL provenance denial, exact digest/live lease, tampered digest denial, ACK terminality and accepted-time source-certificate revocation. It starts neither NATS nor Multipass. Do not claim SQL verification when PostgreSQL binaries are unavailable; use a disposable PostgreSQL 18.6 runner and preserve its JSONL audit artifact.
+
+The runner code and SQL fixture were added, but this workstation lacks `psql`, `initdb` and `pg_ctl`, and the checked PostgreSQL 15/17 folders have no `initdb.exe`. The migration and contract remain **unverified** until the disposable database gate runs. Rust 1.98.1 diagnostics are recorded separately and do not satisfy Rust 1.99.0 or SQL acceptance. NATS, owner consumer/replay, BI/Benchmark, production grants, performance and execution gates remain closed.
+
+| v2.51 | 2026-10-12 | Ulysses — Mavis接手审核 | Add §4.91 for D20 append-time source provenance, exact-wire verification and idempotent migration/SQL contract runner; record missing PostgreSQL binaries as a blocker, not a pass. | D20 added native VerifyOrigin and the runner has not yet run against PostgreSQL |
