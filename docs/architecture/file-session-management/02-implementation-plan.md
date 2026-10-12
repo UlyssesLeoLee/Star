@@ -112,7 +112,7 @@ pub trait AgentAdapter: Send + Sync {
     fn agent_type(&self) -> AgentType;
     fn version(&self) -> semver::Version;
     fn capabilities(&self) -> AdapterCapabilities;
-    
+
     async fn spawn(&self, ctx: SpawnContext) -> Result<SessionHandle>;
     async fn attach(&self, handle: SessionHandle) -> Result<AttachResult>;
     async fn checkpoint(&self, handle: &SessionHandle) -> Result<Checkpoint>;
