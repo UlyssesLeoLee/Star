@@ -193,7 +193,7 @@ tokio = { version = "1.40", features = ["full"] }
 async-nats = { version = "0.50.0", default-features = false, features = ["jetstream", "ring"] }
 async-trait = "0.1"
 # Native Rust durable transport gRPC contract (D19); MIT / Apache-2.0 crates, Rust 1.88+.
-tonic = { version = "0.14.6", default-features = false, features = ["transport", "tls-ring", "tls-connect-info", "codegen"] }
+tonic = { version = "0.14.6", default-features = false, features = ["transport", "router", "tls-ring", "tls-connect-info", "codegen"] }
 # WebSocket HTTP server (per ULYS-222 P1-C — terminal-stack WebSocket protocol layer 依赖)
 # 0.8 选型跟 crates/api 守门 #48 一致
 axum = { version = "0.8", features = ["ws", "macros"] }

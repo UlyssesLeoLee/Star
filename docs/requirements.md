@@ -3465,9 +3465,19 @@ Rust 1.99.0 `cargo check -p platform-messaging-runtime --features native-grpc-ad
 
 本机服务端直接参考/模块复用已获用户明确授权；本轮只适配 RustGameServer 的 TLS helper，并在详细设计记录 AssetsLake、RustGameServer、OpenAIActixMCP、CATEST、SandTree、IDE1.0、DB_SERVER 与 actix-demo 的用途和不适配边界。源项目均保持只读；AssetsLake dry-run relay、无界事件通道、明文 TLS opt-out、硬编码连接配置均未作为 Star 生产实现复用。各模块进入产品前仍须逐文件锁定 source hash、审阅权属及许可证/NOTICE 和完整传递依赖闭包。
 
-**D19 尚未完成**：没有 native gRPC server handlers、mTLS fingerprint→active service registry、Profile endpoint identity→URI/TLS hostname 可信解析、Profile digest→log generation provisioning、受限数据库 capability 连接、完整 Pull/Ack consumer commit-before-ACK、双 provider contract suite、production composition、BI/Benchmark parity、RSS/并发/恢复压力或发布 SBOM。服务端尚未返回能证明 D18 durable commit 的可信 receipt，native provider 不可生产启用；NATS 保留，Run/Agent 执行 fail closed。
+**D19 截至 v6.39 的阶段状态**：客户端首片落档时，尚无服务端处理器、证书身份登记或 Profile→log generation 授权。v6.40 已补入这些首片；仍未完成生产证书/绑定 provisioning API、endpoint identity→URI/TLS hostname 解析、target DB grants、完整 consumer commit-before-ACK、双 provider contract、production composition、BI/Benchmark、RSS/并发/恢复和 SBOM。Native provider 不可生产启用；NATS 保留，Run/Agent 执行 fail closed。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v6.38 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D19 native gRPC/mTLS client 首片、Rust 1.99.0 定向编译与单测结果、本机 Rust 服务复用授权和未完成的生产迁移门槛；更新基本设计 §1.6 | 用户确认 AssetsLake 与其他本机 Rust server 可直接参考/模块复用，继续推进 Star native Rust 替换 NATS |
 | v6.39 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 NativeGrpcClientConfig 类型化构造 API、定向 Clippy 通过、6/6 lib 测试、HTTPS URI/TLS 域名绑定与 Windows package-test 链接失败；保持 D19 未完成状态 | 收敛首片新增 Clippy 告警并复跑 Rust 1.99.0 目标门禁 |
+
+#### D19 服务端身份授权与 durable-log 接线补充（v6.40）
+
+D19 新增 Star 自有 Tonic gRPC 服务端，将 Append/PullOne/AcknowledgeOne 请求从 mTLS peer leaf certificate 的 SHA-256 指纹映射到 active service identity；再按 deployment/tenant 检查当前 Transport Profile digest、provider/version/endpoint identity、sender/recipient/kind 与精确 log generation。Rust handler 校验 UUID、消息种类、Profile digest、日志 ID、wire 摘要与 16 KiB payload，上下行 protobuf frame 限制 32 KiB；每个 server 共享并发上限为 8，数据库操作 deadline 为 10 秒。Runtime 数据库角色只能调用带身份/路由复验的 SECURITY DEFINER wrappers，不读写身份、Profile、log 或消息表，也不能直接调用底层 append/pull/ack capabilities。
+
+新增证书注册/撤销与 Profile→log-generation 绑定 Master、append-only Audit，身份撤销和 Profile revision 使用事务锁与请求串行化，降低撤权/修订与正在授权的 RPC 竞态。绑定必须匹配 active Profile revision、方向性 service route 和 active log generation；pull/ack 仅允许 active/draining generation。配套 migration 及授权 SQL contract 在 disposable PostgreSQL 18.6 复验通过，D19 runner 80/80 steps，通过 migration 双次应用、身份授权、exact append replay、pull lease、ACK、未知/已撤销证书拒绝与审计事实断言。审计：`target/phase9f4d-run-owner-consumer/d19-server-auth-20261012-r3/audit.jsonl`。授权写入 fixture 使用与实际 wire 字节相符的 SHA-256。Rust 1.99.0 目标 crate all-targets check、Clippy 与 lib tests 35/35 通过；Clippy 仍显示未修改依赖 crate 的既有 warning。
+
+这仍是部分实现：未验证真实 TLS 握手/客户端证书端到端、production certificate issuance/revocation control-plane API、Profile endpoint identity→URI/TLS domain resolver、target database deployment grants、Run owner commit-before-ACK consumer、BI/Benchmark parity、full NATS cutover、恢复/容量/RSS/吞吐或 SBOM。D19 完整 package tests 本轮未复跑；上一轮链接阶段出现 Windows `LNK1104`，不得记作通过。NATS 继续保留；native transport 与 Schedule/Run 执行保持 fail closed。外部 Rust server 可继续按模块复用，源文件 hash、权属/许可证、NOTICE、依赖闭包和 Star 授权语义逐项核查；本切片只适配已授权 RustGameServer TLS helper，没有复制 AssetsLake relay 源码。
+
+| v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 补录 D19 Star native gRPC/mTLS 服务端、Profile/证书身份授权与 exact-log binding、Rust/PostgreSQL 验证证据及仍开放的生产门禁；更正 SQL authorization fixture 使 wire 摘要匹配实际 bytes | 用户允许参考并按模块复用本机 Rust 服务后继续推进 D19 |

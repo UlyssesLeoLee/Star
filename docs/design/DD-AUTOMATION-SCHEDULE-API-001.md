@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D18 PostgreSQL durable-log storage contract is verified in disposable PostgreSQL, including migration replay and concurrent exact-append. Rust 1.99.0, production verifier/composition and service identity, target DB grants, gRPC/mTLS service, profile-to-log provisioning, native consumers, BI/performance and full execution chain remain open.
-> Version: 0.59 | Date: 2026-10-12
+> Status: 🟡 D19 Star native gRPC server/authentication slice is implemented in the isolated worktree and verified with Rust 1.99.0 targeted gates plus disposable PostgreSQL 18.6 (80/80 runner steps). Production certificate/profile provisioning, endpoint resolver, target database grants, live TLS e2e, owner consumers, BI/performance and full execution chain remain open.
+> Version: 0.60 | Date: 2026-10-12
 
 ## 1. Routes
 
@@ -651,3 +651,31 @@ Validation contract: apply the migration twice; assert fixed-path routines, leas
 D18 is storage only. It does not implement a Rust gRPC/mTLS server/client, authenticated identity composition, Transport Profile→log provisioning, production DB grants, background cleanup/retention operations, BI/Benchmark consumers, or full NATS replacement. Next D19 wires a provider-neutral Rust contract and a Star-owned server/client; the Apache-2.0 RustGameServer mTLS connector can be adapted module-by-module after removing plaintext opt-out. `E:/AssetsLake` and other local servers remain eligible for direct reuse by module, but no source code is copied in D18 and the AssetsLake dry-run relay is not a durable transport. Follow the versioned provider and owner Outbox/Inbox boundary; provider offsets never become Run/business identities.
 
 | 0.59 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D18 exact PostgreSQL log/lease/outbox schema behavior and concurrent idempotency test; mark this as storage-only and schedule the Rust provider/service for D19 |
+
+## 6.37 D19 — Native gRPC server identity and Profile-bound log authorization
+
+### Server boundary and bounded RPC handling
+
+`platform-messaging-runtime::native_grpc_server::NativeGrpcTransportServer` implements the versioned Tonic `DurableTransport` service for unary Append, PullOne and AcknowledgeOne. Startup loads server cert/key/client CA through the bounded TLS loader and enables mandatory client-certificate verification. Every handler extracts the peer leaf-certificate SHA-256 fingerprint from Tonic TLS connect-info; absent peer certificates fail with `UNAUTHENTICATED`. The fingerprint is only a database lookup key and never a caller-supplied identity.
+
+The adapter validates exact-width profile digest, non-nil UUID fields, closed message-kind set (`request`, `result`, `resolution`), bounded log ID, positive cursor, lease range and exact wire digest. It recomputes SHA-256 over the received Append bytes and compares it with the claimed digest; Pull recomputes and verifies the returned body digest before serializing a Delivery. Payload is limited to 16 KiB and Tonic frames to 32 KiB. A shared semaphore caps the service at eight in-flight operations; Tonic also limits concurrency per connection to eight. Each database call has a 10-second Tokio deadline. Saturation returns `RESOURCE_EXHAUSTED`, malformed boundaries fail as `INVALID_ARGUMENT`, authorization failures are permission-denied, and storage faults are unavailable without exposing database details.
+
+### Certificate identity, active profile and exact log generation
+
+`service_certificate_identity` stores unique leaf-certificate fingerprints with deployment, tenant, service, provider/version, endpoint identity and revocation state. Registration/revocation facts are emitted to append-only audit in the same transaction; active identities can transition once to revoked. The production identity issuance/revocation API is not included in this slice; DDL owner operations are not a supported product control plane.
+
+`profile_log_binding` immutably binds an exact Transport Profile ID/revision/digest and allowed route tuple to one log ID/generation. The authorization routine derives deployment/tenant/service from the active certificate row, serializes against Transport Profile CAS using the same advisory-lock key, then re-reads the current active profile and exact route. Append requires an active generation; Pull/Ack accept active or draining generation. A log row share lock serializes the operation against lifecycle changes. Certificate-row locking serializes authorization against revocation. The profile and log binding must match the pinned provider/version/endpoint identity, sender, recipient, kind and generation policy.
+
+`append_authenticated`, `pull_authenticated` and `acknowledge_authenticated` repeat authorization inside their owner transaction before invoking D18 durable-log routines. The runtime DB role loses direct EXECUTE on unwrapped storage routines and has no identity, binding, profile, message, receipt or log table grants; it can invoke only these authenticated wrappers. WORM/append-only audit captures certificate registration/revocation and immutable Profile→route provisioning. `app.platform_*` GUCs continue to be context only; trust starts from verified peer certificate fingerprint and the server role's restricted database credentials.
+
+### Migration and evidence
+
+Migration `2026-10-12-platform-transport-z-native-server-auth.sql` is idempotently reapplied by `phase9f4d_run_owner_consumer.py`; the new SQL contract checks RLS/FORCE RLS, SECURITY DEFINER owner/fixed search path, removal of direct runtime storage grants, active/exact Profile route, exact append replay, Pull lease, ACK, unknown and revoked fingerprint rejection, and append-only audit counts. PostgreSQL 18.6 D19 schema-only runner passed 80/80 steps, including two applications of the D19 auth migration. Audit: `../../target/phase9f4d-run-owner-consumer/d19-server-auth-20261012-r3/audit.jsonl`. The SQL fixture's authorized wire hash is the known SHA-256 of its exact byte string after correcting the initial test fixture. Its Profile digest is a fixed 32-byte fixture that verifies exact pinned-profile lookup, not canonical digest calculation; the D17 typed resolver unit test covers canonical digest construction separately.
+
+Rust 1.99.0 `cargo check -p platform-messaging-runtime --features native-grpc-adapter --all-targets -j 4` and targeted all-targets Clippy passed; `cargo test -p platform-messaging-runtime --features native-grpc-adapter --lib -j 1` passed 35/35. Clippy still prints pre-existing warnings from unchanged `star-context`, `domain-automation` and `domain-kms`. These checks do not prove a real mTLS handshake, client-certificate mapping under a live network server, control-plane provisioning, target database grants, production certificate rotation, or deployment wiring. The full package test was not repeated for this slice; the prior package invocation encountered Windows `LNK1104`. No full workspace, release/doc/bench, perf/RSS/fairness, crash/recovery, dual-provider contract, full application NATS removal, BI/Benchmark or Schedule/Run executor gate is claimed.
+
+The feature remains opt-in; NATS is retained. Do not enable the provider for product traffic until production identity issuance, Profile endpoint resolver and log provisioning, owner consumer commit-before-ACK, target grants, live TLS/rotation/revocation and load/recovery/rollback gates have evidence. The source module adaptation from RustGameServer is limited to the separately attributed TLS helper in `native_grpc.rs`; this native server/auth flow is Star-written. AssetsLake source remains read-only and no dry-run relay code is copied.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.60 | 2026-10-12 | Ulysses — Mavis接手审核 | Add the bounded Star-owned gRPC server, certificate identity registry, Profile-to-generation authorization wrappers, D19 SQL fixture and 80/80 PostgreSQL evidence; preserve production, E2E and cutover blockers |

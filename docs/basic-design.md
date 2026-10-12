@@ -5516,7 +5516,7 @@ D13验证：Rust 1.99.0 + PostgreSQL 18.6 + 经官方SHA-256校验的NATS Server
 
 用户自有Rust服务器为最终替代方向，NATS仅为过渡transport adapter。`AdmissionTransport`接收owner、tenant、recipient、kind、message/request identity和原始wire；`AdmissionPublisher<T>`以静态派发调用该port，统一处理有界batch、超时、租约、取消、重试和owner receipt，核心不调用NATS API且不为每条消息装箱future。`JetStreamAdmissionTransport`独占subject、Nats-Msg-Id、expected-stream/domain、PubAck映射；兼容别名`AdmissionJetStreamPublisher`不作为产品领域模型。
 
-v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；当前没有原生server adapter或生产配置，接入准备不等于Rust-native服务器已实现。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
+v1 transport proof为固定durable log identity和正的持久化cursor，既不是socket写入成功，也不是receiver Inbox提交。现有SQL `broker_stream`/`broker_sequence`列在v1 adapter中承载该通用proof；原生服务器采用不同回执协议时需版本化迁移/映射，不能被迫实现JetStream。切换时固定TransportProfile provider/version/digest和endpoint identity，不混用不同provider的cursor或继续使用NATS ACK。原生server的认证授权、重放/去重、接收事务后确认、poison/recovery、分页/背压、性能预算与故障验收须实现后才能放行；截至 D18 验收时尚无原生server adapter或生产配置，D19 v6.40 已补入 opt-in server/auth 首片，但仍未形成生产服务。后续receiver必须使用同样的transport port隔离原则，保持owner Inbox/Outbox事实和BI契约稳定。
 
 Native替换剩余实施：`platform-messaging-runtime` 已提供默认启用的 `jetstream-adapter` feature 和 crate 级无默认 feature 构建缝隙；完整应用依赖闭包仍需按 provider 核验。现有 quarantine/capacity consumer 仍需抽出接收/确认/replay port，当前也不是已移除 NATS 的产品构建。
 
@@ -5637,3 +5637,15 @@ PostgreSQL 18.6 disposable schema-only runner 77/77 通过：D18 migration 重�
 | v6.37 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D18 PostgreSQL durable-log storage contract、并行 exact-append 证据和 provider 替换边界；保留生产认证/服务/NATS 迁移门槛 | D18 isolated PostgreSQL schema-only runner 通过 |
 | v6.38 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 NATS 与 Star 原生 transport 定义为可替换 provider；增加 D18–D21 分阶段迁移、复用边界与 native gRPC/mTLS 首片 | D19 隔离 client/proto 首片落档 |
 | v6.39 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步类型化 client 构造配置、HTTPS URI/TLS 域名绑定与 D19 最新编译、Clippy、6/6 定向单测及链接失败结果；保留生产迁移关闭条件 | 修复首片新 Clippy 告警并完成 Rust 1.99.0 定向验证 |
+
+### D19 服务端证书身份与 Profile 路由授权补充（v6.40）
+
+Native gRPC server 使用强制 mTLS。Tonic 握手成功后，Rust 服务端提取 peer leaf certificate fingerprint；fingerprint 只能作为注册表查询键，不能直接当作 service authorization。PostgreSQL 身份表把有效 fingerprint 绑定到 deployment、tenant、service、provider/version 与 endpoint identity。每次 RPC 都复核当前证书未撤销、Profile digest 对应的 active revision、允许的通信方向和 message kind，以及精确绑定的 durable log ID/generation；Append 固定以证书 service 为 sender，Pull/Ack 固定以证书 service 为 recipient。未知、撤销、Profile 漂移、generation mismatch 与数据库异常 fail closed。
+
+数据库通过固定 `search_path` 的 SECURITY DEFINER wrappers 暴露 authenticated Append/Pull/Ack。Wrapper 在一次数据库事务内复验身份及 route，再调用 D18 durable log capability；runtime role 只拥有这些 wrapper 的 EXECUTE 权限。证书注册/撤销、Profile-route binding 采用 append-only audit/WORM；证书锁、Profile CAS advisory lock 与 log row lock 保护撤权、Profile revision、generation lifecycle 与 RPC 授权之间的竞态。Rust server 对 wire 重新计算 SHA-256 并核对数据库回执，Pull 返回前复核 wire、摘要、lease 和 route 边界。
+
+桌面/服务端资源上界沿用：每个 server 全局最多 8 个同时处理 RPC，Tonic 每连接最多 8 个并发请求；每次数据库操作 deadline 10 秒；wire≤16 KiB，gRPC frame≤32 KiB。超并发返回 ResourceExhausted；无有效 mTLS 身份不接受匿名连接。这些上界是代码级保护，不等于已通过吞吐、tail latency、RSS、故障恢复或多租户公平性验收。
+
+验证状态：Rust 1.99.0 `platform-messaging-runtime` native feature all-targets check、Clippy 通过，lib tests 35/35；PostgreSQL 18.6 disposable runner 80/80，D19 migration 两次应用并运行 active/revoked/unknown certificate、Profile→exact generation、append exact replay、lease/Pull、ACK、WORM/Audit/role privilege 场景。SQL fixture 摘要已与真实 wire bytes 匹配。没有真实 gRPC TLS e2e、production identity/control-plane provisioning、target DB grant、owner consumer、BI/Benchmark、NATS cutover、性能/RSS 或恢复验收。完整 package tests 本轮未复跑；上次链接遇 `LNK1104`，全 workspace fmt 仍受未改文件格式差异影响。Native provider 与任务执行继续关闭，直到后续生产门全部通过。
+
+| v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 增补 native gRPC 服务端的强制 mTLS 身份映射、Profile→log 授权、并发/帧/期限边界及 D19 Rust/PostgreSQL 证据；明确 production、E2E 与性能缺口 | D19 服务端授权首片实现并经隔离数据库复验 |
