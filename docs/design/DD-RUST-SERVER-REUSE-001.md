@@ -1,11 +1,11 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.6 · 2026-10-12 · Ulysses — Mavis 接手审核
-> 状态：D19 client 与 Star-owned gRPC server/auth slice 已在隔离 worktree 编写；Rust 1.99.0 目标 crate all-targets check、Clippy 和 35 个 lib tests 通过，PostgreSQL 18.6 runner 80/80。真实 TLS e2e、production identity/control plane、Profile→log provisioning、target DB grants、owner delivery、BI/performance 和 cutover 均未完成。
+> v1.8 · 2026-10-12 · Ulysses — Mavis 接手审核
+> 状态：D19 server/auth 与 D20 native receiver slices 已实现；D20 在 Rust 1.98.1 `--ignore-rust-version` 下目标 crate check/Clippy 和 10 个定向单测通过。真实 TLS e2e、production identity/control plane、Profile→log provisioning、target DB grants、owner delivery、BI/performance 和 cutover 均未完成。
 
 ## 1. 范围与证据
 
-用户明确允许参考并复用 `E:/AssetsLake` 与电脑内其他自有 Rust 服务端项目；该授权覆盖模块级复用，不自动覆盖第三方依赖许可、NOTICE、传递依赖义务或来源项目中的其他权利人代码。此次核验 AssetsLake、RustGameServer、ROPE_CS 的消息/Outbox 候选，并以仓库级元数据筛查 Ada、CATs、GitGit、Physis；后续又定向查看 `D:/DB_SERVER/db_api` 与 `C:/Users/leo19/actix-demo`。这不是对电脑内全部 Cargo 项目的穷尽审计。所有源仓库只读，其未提交内容和运行环境均保留。
+用户再次明确允许从 `E:/AssetsLake` 与电脑内其他自有 Rust 服务端直接参考、适配或复用合适模块；不必为每个候选重复征求复用许可。该授权不自动覆盖第三方依赖许可、NOTICE、传递依赖义务或来源项目中的其他权利人代码。此次核验 AssetsLake、RustGameServer、ROPE_CS 的消息/Outbox 候选，并以仓库级元数据筛查 Ada、CATs、GitGit、Physis；后续又定向查看 `D:/DB_SERVER/db_api` 与 `C:/Users/leo19/actix-demo`。这不是对电脑内全部 Cargo 项目的穷尽审计。所有源仓库只读，其未提交内容和运行环境均保留。
 
 | 来源 | 当前 HEAD / 工作区 | 许可证与实际实现 | 决定 |
 |---|---|---|
@@ -159,3 +159,22 @@ The module is strictly bounded: payload 16 KiB, gRPC frame 32 KiB, up to eight c
 The D19 runner re-applied `2026-10-12-platform-transport-z-native-server-auth.sql` twice and passed 80/80 disposable PostgreSQL 18.6 steps. The auth SQL contract checked current certificate/profile/route binding, exact generation, append replay, lease/Pull/Ack, unknown/revoked certificates, FORCE RLS, fixed-path routines, restricted runtime grants and audit facts. Its accepted Append fixture now carries the real SHA-256 for its exact test wire; the Profile digest itself remains a fixed 32-byte pin fixture, so this SQL contract proves lookup equality but not canonical digest calculation (covered separately by the D17 typed resolver unit test). Rust 1.99.0 target check and Clippy pass; native-feature library tests pass 35/35. The complete package test and live gRPC TLS handshake were not verified in this slice.
 
 Current owner-level provisioning/revocation uses DDL owner database operations only for disposable tests; a typed service identity control-plane API is required before deployment. A trusted endpoint resolver must map the non-secret endpoint identity to HTTPS URI and TLS server-name pair. Production database role/grant deployment, certificate/key rotation, service lifecycle, per-owner consumer commit-before-ACK, quarantine/recovery, BI/Benchmark, Rust-native dual-provider parity, full NATS dependency removal, SBOM and performance gates remain open. Native transport is feature-gated and must remain disabled for production until these gates pass; Schedule/Run execution still requires its own budget, reservation, Hook, sandbox, cancellation and independent validation gates.
+
+## 12. D20 Native gRPC receive adapter slice
+
+隔离 worktree `codex/phase9f4c-d20-native-receiver-20261012` 在既有 `AdmissionReceiveTransport` 与 `AdmissionReceivedDelivery` 上实现 Star native Pull/Acknowledge client adapter。它连接 D19 mTLS client/TLS helper 和版本化 `PullOne`/`AcknowledgeOne` proto；调用者固定 `AdmissionReceiveScope`，Profile digest 固定 provider revision。`PullOneRequest` 携带 Profile pin、授权 sender service ID、message kind 与 bounded 30–120 秒 lease。recipient 由 server 根据已认证 mTLS service identity 解析，不信任 payload 或 caller body 声明。响应必须匹配固定 scope、sender/kind、合法 log ID、非零 log generation/message/lease UUID、正 sequence/attempt/lease timestamp、≤16 KiB wire 和 wire 的真实 SHA-256。
+
+`AdmissionReceiveOrigin.provider_identity` 由 domain-separated SHA-256 导出，输入按 length-prefix 组合 provider ID、provider version、Profile digest 与 endpoint identity。该不透明值是稳定 quarantine/replay 来源键，不代替 TLS 身份或 `AdmissionReceiveAuthorization` 的独立来源/授权复验。确认请求复用 pull 返回的 log generation、sequence、message ID、lease ID 和 wire digest；`acknowledged=false` 或 RPC 错误都保持未确认。共享 `AdmissionReceiver` 只在 owner handler 报告 durable commit 并完成提交后授权复验后 ACK；永久 disposition 只有在 quarantine receipt 已持久化后才能调用，native adapter 以同一 lease-fenced `AcknowledgeOne` 完成来源日志终态处置。
+
+并发内存边界分两层：每 adapter 最多 8 个 RPC 正在执行；另一个 8-permit semaphore 在 Pull 返回前取得并随 delivery handle 持有，只有 handle drop 才释放，因此慢 owner handler/遗留 delivery 无法无限累积租约或 wire buffer。每份 wire ≤16 KiB、Tonic frame ≤32 KiB；没有额外 prefetch queue。Profile/endpoint resolver、server certificate 生命周期与密钥轮换、target DB grants、production composition 和全局多 adapter/多 owner 预算仍属上层部署/调度责任。
+
+本 slice 没有从 `E:/AssetsLake` 复制代码，不是因为缺少复用授权：当前 `event_publisher_service.rs`（SHA-256 `3A2114863827CB8CE893AD5A24090D827F89B7752C6FF23546DBDB4DC3B8A4A5`）在 pipeline disabled 时会返回未持久化的新 UUID；relay 在 dry-run 或无 broker 时会将事件标为 published，而配置 broker 时因二进制未链接 Kafka client 只会标记失败，因此不能直接作为 Star durable message transport。它的版本、trace、causation 与幂等字段仍可供 Star-owned event envelope 参考。RustGameServer TLS helper 是此前已逐模块审查并按用户授权适配的代码，来源 hash/NOTICE 见上表；各源仓代码和 dirty worktree 均未改动。
+
+`native_provider_identity()` 是公开的 canonical identity helper，接收端的授权与 quarantine 实现可以共用其稳定派生规则。结果只标识固定 Profile/provider revision 的来源键，不是认证凭据或授权结论；调用方仍必须验证可信 Profile 与 mTLS peer identity。
+
+Rust 1.98.1 `--ignore-rust-version` 下目标 crate all-targets check 通过，目标 crate Clippy 退出码 0、`native_grpc::tests` 10/10、定向 rustfmt 与 `git diff --check` 通过。因 cargo/rustc 不在 PATH，命令通过安装目录中的 1.98.1 `cargo.exe` 和显式 `build.rustc` 配置执行；这不构成 Rust 1.99.0 正式门禁。Clippy 仅报告未改动 `star-context`、`domain-automation`、`domain-kms` 的既有警告。未做真实 TLS server/client e2e、consumer/quarantine DB 联测、BI/Benchmark 对账、恢复、RSS、p95/p99、公平调度或 dual-provider contract suite。故该 native receiver 仍为 opt-in implementation slice，不算 D20 consumer migration/production-ready 或可替代 NATS。剩余 D20 scope 与不变的 fail-closed gates 见 [D20 阶段报告](../reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md)。
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v1.8 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确用户可直接复用本机 Rust 服务模块并说明 AssetsLake relay 的实际投递边界；公开 canonical provider identity helper，记录当前 Rust 1.98.1 诊断验证与未关闭的 D20 gates | 用户再次确认模块级直接复用，并要求为 Star 自有 Rust 服务替换 NATS 做准备 |
+| v1.7 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 native gRPC receive port、canonical provider identity、leased-delivery memory cap 和真实诊断验证；明确 D20 consumer/BI/production gates 仍开放 |

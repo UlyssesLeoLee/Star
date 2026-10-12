@@ -313,9 +313,9 @@ flowchart LR
 
 Platform Messaging 是跨 owner 通信的 provider boundary。业务 owner 在各自事务内提交业务事实与 Transactional Outbox；provider 只负责已提交消息的有界持久接收、拉取、重放与确认，不共享 Run/Project owner 写事务。Provider-specific cursor、lease 和生成号留在 adapter / transport receipt 中，不向业务 owner 泄漏。
 
-NATS JetStream 保持当前可用 provider。Star 自有 Rust durable transport 是后续替换目标：D18 提供 PostgreSQL durable-log 存储契约，D19 增加版本化 gRPC/mTLS wire 与 client slice，D20 接通 owner Outbox/Inbox、BI/Benchmark 投影，D21 验收 Multipass/K3s 上的恢复、性能、内存、公平调度与运维回退。只有身份注册、固定 Profile→log、数据库权限、跨 owner delivery、指标对账、故障恢复和回滚门全部通过，才允许按版本化 Infrastructure Profile 逐路切换；任一前置条件未知时 fail closed 并保留 NATS route。
+NATS JetStream 仅作为现有过渡 provider 与可移除兼容 adapter。Star 自有 Rust durable transport 是目标服务：D18 提供 PostgreSQL durable-log 存储契约，D19 增加版本化 gRPC/mTLS server/client，D20 接通 owner Outbox/Inbox、BI/Benchmark 投影，D21 验收 Multipass/K3s 上的恢复、性能、内存、公平调度与运维回退。只有身份注册、固定 Profile→log、数据库权限、跨 owner delivery、指标对账、故障恢复和回滚门全部通过，才允许按版本化 Infrastructure Profile 逐路切换并最终移除 NATS 依赖；任一前置条件未知时 fail closed 并保留尚未迁移的 NATS route。
 
-D19 的 proto codegen 放在 root workspace 之外的独立 crate，并由可选 `native-grpc-adapter` feature 拉入；默认 workspace build 不编译 Tonic/Prost codegen，锁文件与发布 SBOM 仍需包含完整 feature 依赖闭包。Native client 对 TLS 文件做有界读取，强制 HTTPS URI 主机与 TLS server domain 一致，每个 adapter 实例最多 8 个并行请求；上层 worker 仍须提供全局并发预算、队列容量与公平调度。本机 `E:/AssetsLake`、RustGameServer 与其他自有 Rust 服务可以按模块直接参考、适配和复用；复制或改编时逐文件固定 source hash、工作区状态、权属、许可证/NOTICE 与传递依赖，并保持 Star 的 Run/owner 身份、事务、授权、限额和 backpressure 契约。当前 D19 仅完成 client/TLS/proto 首片，native server 和生产迁移尚未验收。
+D19 的 proto codegen 放在 root workspace 之外的独立 crate，并由可选 `native-grpc-adapter` feature 拉入；默认 workspace build 不编译 Tonic/Prost codegen，锁文件与发布 SBOM 仍需包含完整 feature 依赖闭包。Native client 对 TLS 文件做有界读取，强制 HTTPS URI 主机与 TLS server domain 一致，每个 adapter 实例最多 8 个并行请求；上层 worker 仍须提供全局并发预算、队列容量与公平调度。本机 `E:/AssetsLake`、RustGameServer 与其他自有 Rust 服务可以按模块直接参考、适配和复用；复制或改编时逐文件固定 source hash、工作区状态、权属、许可证/NOTICE 与传递依赖，并保持 Star 的 Run/owner 身份、事务、授权、限额和 backpressure 契约。D19 已增加 Star-owned native gRPC/mTLS server 与证书/route 授权首片；生产证书和 endpoint resolver、target DB grants、owner consumer、真实 TLS e2e 与迁移验收仍未完成，详见本节 D19 验证记录。
 
 ## 2. Domain / Module 划分
 
@@ -5649,3 +5649,16 @@ Native gRPC server 使用强制 mTLS。Tonic 握手成功后，Rust 服务端提
 验证状态：Rust 1.99.0 `platform-messaging-runtime` native feature all-targets check、Clippy 通过，lib tests 35/35；PostgreSQL 18.6 disposable runner 80/80，D19 migration 两次应用并运行 active/revoked/unknown certificate、Profile→exact generation、append exact replay、lease/Pull、ACK、WORM/Audit/role privilege 场景。SQL fixture 摘要已与真实 wire bytes 匹配。没有真实 gRPC TLS e2e、production identity/control-plane provisioning、target DB grant、owner consumer、BI/Benchmark、NATS cutover、性能/RSS 或恢复验收。完整 package tests 本轮未复跑；上次链接遇 `LNK1104`，全 workspace fmt 仍受未改文件格式差异影响。Native provider 与任务执行继续关闭，直到后续生产门全部通过。
 
 | v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 增补 native gRPC 服务端的强制 mTLS 身份映射、Profile→log 授权、并发/帧/期限边界及 D19 Rust/PostgreSQL 证据；明确 production、E2E 与性能缺口 | D19 服务端授权首片实现并经隔离数据库复验 |
+
+### D20 Native 接收适配器首片（v6.42）
+
+Native provider 现在沿用共享 `AdmissionReceiveTransport`/`AdmissionReceivedDelivery` 边界实现 Pull 与 lease-fenced Acknowledge；owner Inbox 事务、当前授权复验和持久化 quarantine 仍由各自 owner/平台边界负责。Route 与 Transport Profile 在构造时固定，服务端依据 mTLS principal 确认 recipient，wire 只提供受限消息内容与 sender/kind。Provider 来源身份由 provider ID/version、Profile digest 和 endpoint identity 的 domain-separated digest 导出，便于隔离 quarantine/replay key 且不暴露 endpoint label。
+
+公开的 `native_provider_identity()` 为授权/quarantine 实现提供共享 canonical 来源键；该 key 不等同于 mTLS 认证或授权。接收路径最多 8 个并行 RPC、最多 8 个未释放 lease handle，每条只拉取一个有界 delivery，不缓存无界队列；wire ≤16 KiB，gRPC frame ≤32 KiB，lease 30–120 秒。Rust 1.98.1 `--ignore-rust-version` 的目标 crate all-targets check、Clippy、10/10 定向 lib tests、定向 rustfmt 与 diff whitespace 检查通过；正式 Rust 1.99.0 门禁未运行。该适配器未进入 production composition：真实 mTLS e2e、owner consumer、quarantine replay、BI/Benchmark 对账、目标库权限、恢复与内存/公平性验收仍开放。D20 整体未关闭；NATS、生产流量切换门和 Run execution fail-closed 条件继续生效。
+
+用户确认可直接参考、适配或复用 `E:/AssetsLake` 与本机其他 Rust server 的合适模块；本切片未复制 AssetsLake event publisher，因为当前代码在 disabled/dry-run/no-broker 情况下会报告成功而不实际投递。RustGameServer TLS helper 是此前已完成逐模块审查的复用项。每个迁入模块仍需确认 hash、权属、许可证、NOTICE、依赖闭包和 Star owner/Run 语义；详见 [Rust 服务端复用详细设计](design/DD-RUST-SERVER-REUSE-001.md) 与 [D20 阶段报告](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.42 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确 NATS 是过渡 adapter、Star Rust durable transport 是最终目标；同步公开来源身份 helper 与 AssetsLake 模块复用选择依据，并订正 §1.6 的 D19 server 状态 | 用户重申 Rust 服务模块复用授权并确认 NATS 应由自有服务替代；最终设计对照发现 §1.6 状态滞后 |
+| v6.41 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D20 native Pull/Acknowledge receiver port、双层有界并行与剩余生产验收门槛 | D20 native receive adapter 首片实现 |

@@ -3481,3 +3481,16 @@ D19 新增 Star 自有 Tonic gRPC 服务端，将 Append/PullOne/AcknowledgeOne 
 这仍是部分实现：未验证真实 TLS 握手/客户端证书端到端、production certificate issuance/revocation control-plane API、Profile endpoint identity→URI/TLS domain resolver、target database deployment grants、Run owner commit-before-ACK consumer、BI/Benchmark parity、full NATS cutover、恢复/容量/RSS/吞吐或 SBOM。D19 完整 package tests 本轮未复跑；上一轮链接阶段出现 Windows `LNK1104`，不得记作通过。NATS 继续保留；native transport 与 Schedule/Run 执行保持 fail closed。外部 Rust server 可继续按模块复用，源文件 hash、权属/许可证、NOTICE、依赖闭包和 Star 授权语义逐项核查；本切片只适配已授权 RustGameServer TLS helper，没有复制 AssetsLake relay 源码。
 
 | v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 补录 D19 Star native gRPC/mTLS 服务端、Profile/证书身份授权与 exact-log binding、Rust/PostgreSQL 验证证据及仍开放的生产门禁；更正 SQL authorization fixture 使 wire 摘要匹配实际 bytes | 用户允许参考并按模块复用本机 Rust 服务后继续推进 D19 |
+
+### D20：Native gRPC receive adapter 首片（v6.42）
+
+`NativeGrpcAdmissionReceiveTransport` 实现现有 broker-neutral `AdmissionReceiveTransport`/`AdmissionReceivedDelivery` 契约，并通过版本化 `PullOne`/`AcknowledgeOne` 调用 Star 自有的 durable-log 服务。接收实例固定 Transport Profile、owner route 与 30–120 秒 lease；recipient service 由 mTLS 身份在服务端解析，不能从 wire 声明。每条 delivery 在进入 owner handler 前校验 sender/kind、log ID、generation、sequence、message ID、lease ID/attempt 和 exact wire SHA-256；payload ≤16 KiB，protobuf frame ≤32 KiB。公开的 `native_provider_identity()` 使用 domain-separated SHA-256 固定 provider ID/version、Profile digest 与 endpoint identity，供授权与 quarantine 实现共用 canonical 来源键；它不是认证凭据。每个 adapter 最多 8 个并行 RPC，另以 8 个 permit 限制尚未释放的 leased delivery handle；不建立无界预取队列。
+
+Native ACK 仍由共享 `AdmissionReceiver` 在 owner transaction commit、commit 后 ACL 复验之后调用；永久 disposition 必须先写入独立 durable quarantine，再由相同 lease-fenced `AcknowledgeOne` 终结来源 delivery。此切片不把 transport receipt 作为 owner Inbox、BI 或 Run 事实。用户明确允许直接参考或模块级复用 `E:/AssetsLake` 与其他本机 Rust 服务；D20 没有复制新源码，因为 AssetsLake 当前 relay 在 dry-run/无 broker 时会误标 published，不能满足 durable transport 语义。此前逐模块审查并适配的 RustGameServer TLS helper 继续沿用；源仓保持只读，商业许可义务、NOTICE 与依赖闭包仍逐模块核验。
+
+诊断验证使用本机 Rust 1.98.1 配合 `--ignore-rust-version`：目标 crate native-feature all-targets check 通过，Clippy 退出码 0（仅有未修改依赖 crate 的既有警告），`native_grpc::tests` 通过 10/10，定向 rustfmt 与 `git diff --check` 通过。该环境没有 Rust 1.99.0，不能记作项目正式工具链门禁；没有运行真实 TLS/gRPC e2e、生产消费组合、quarantine replay、目标 DB grant、BI/Benchmark parity、恢复或性能/RSS 验收。Owner Outbox/Inbox consumer migration、通用 quarantine/replay 与 BI/Benchmark projections 仍是 D20 后续工作；NATS 保留，native provider 与 Schedule/Run execution 保持 fail closed。详见 [D20 阶段报告](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md) 和 [Rust 服务端复用详细设计](design/DD-RUST-SERVER-REUSE-001.md)。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.42 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 canonical provider identity helper 公开供授权/quarantine 复用；明确 AssetsLake 直接复用授权与当前 relay 不满足可靠投递语义的原因 | 用户再次确认本机 Rust 服务可直接复用；复核 provider identity 实现 |
+| v6.41 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 D20 native receive adapter、来源身份/lease 背压约束与 1.98.1 诊断验证；保留 owner consumer、quarantine replay、BI、性能与 1.99.0 缺口 | D20 接通 Native gRPC Pull/Acknowledge 与共享 receiver port |

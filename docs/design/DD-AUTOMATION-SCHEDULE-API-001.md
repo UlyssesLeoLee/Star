@@ -679,3 +679,16 @@ The feature remains opt-in; NATS is retained. Do not enable the provider for pro
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.60 | 2026-10-12 | Ulysses — Mavis接手审核 | Add the bounded Star-owned gRPC server, certificate identity registry, Profile-to-generation authorization wrappers, D19 SQL fixture and 80/80 PostgreSQL evidence; preserve production, E2E and cutover blockers |
+
+## 6.38 D20 — Native gRPC receive adapter integration boundary
+
+`NativeGrpcAdmissionReceiveTransport` now implements the provider-neutral receive port used by Schedule admission; the same typed `AdmissionReceiveScope` pins tenant, expected sender, local recipient, and message kind at construction. `PullOne` carries the canonical Profile digest, authorized sender, kind and bounded lease. The server resolves the recipient from the authenticated mTLS service and bound Profile/log route. The adapter checks exact route metadata, server log generation/cursor, lease fence and SHA-256 over the unchanged typed wire before returning a delivery to `AdmissionReceiver`.
+
+The generic receiver remains the only owner sequencing authority: it validates the typed event, checks current authorization, commits through the owner-local transaction handler, checks authorization again, and then acknowledges. For permanent poison, it commits an independent Platform quarantine receipt before calling `terminate_permanently`; the native terminal operation uses the same generation/sequence/lease-fenced `AcknowledgeOne` API. Neither transport ACK nor quarantine receipt itself changes Schedule occurrence, Run, reservation, RunEvent/BI or executor state.
+
+The receive adapter limits each instance to eight concurrent RPCs and eight leased delivery handles retained until drop, uses one-message pulls, caps wire at 16 KiB and protobuf frames at 32 KiB, and uses the public `native_provider_identity()` helper to derive the Profile-bound quarantine/replay source key. Diagnostic Rust 1.98.1 `--ignore-rust-version` all-target check, Clippy, 10/10 focused lib tests, and source rustfmt pass; project-required Rust 1.99.0 was not available in this run. There is no live TLS end-to-end test or production Schedule consumer composition, target DB grant, quarantine replay test on native transport, or BI/Benchmark projection parity. NATS remains a transitional compatibility provider pending the same contract, recovery and performance gates for Star's Rust service. This is an adapter slice only, not completion of the D20 migration. Detailed provider identity, memory bounds and source-reuse evidence: [DD-RUST-SERVER-REUSE-001](DD-RUST-SERVER-REUSE-001.md#12-d20-native-gRPC-receive-adapter-slice).
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.62 | 2026-10-12 | Ulysses — Mavis接手审核 | Use the public shared provider-identity helper and clarify NATS as a transitional adapter pending Star-native production gates |
+| 0.61 | 2026-10-12 | Ulysses — Mavis接手审核 | Specify Schedule's native Pull/Acknowledge adapter boundary, bounded outstanding deliveries and explicit remaining owner/production gates |
