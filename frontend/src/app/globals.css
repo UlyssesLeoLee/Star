@@ -37,6 +37,32 @@
      Native Bitmap: 'SimSun', 'NSimSun' (Windows 原生 12px 点阵汉字), 'MingLiU'
      Fallback: ui-monospace, monospace */
   --font-pixel: "KenPixel", "Press Start 2P", "Silkscreen", "Ark Pixel 12px", "Ark Pixel 10px", "Fusion Pixel", "Zpix", "DotGothic16", "SimSun", "NSimSun", "MingLiU", ui-monospace, monospace;
+
+  /* ─────────────────────────────────────────────────────────────────────
+   * 侧栏宽度单一事实源 (per INV-LAYOUT-03)
+   *
+   * 所有 position:fixed 的全宽 dock / 底部面板必须读这个变量，
+   * 不得硬编码 px/rem。改宽度只改这里一处。
+   *
+   * 对应 Sidebar.tsx 的 SIDEBAR_WIDTH:
+   *   expanded  = w-64 = 256px = 16rem
+   *   collapsed = w-16 = 64px  = 4rem
+   *
+   * 折叠态由 Sidebar.tsx 在 <html data-fold="collapsed"> 上打标；
+   * <768px 时 Sidebar 渲染 hidden md:flex，侧栏不占位 → 0px。
+   * ───────────────────────────────────────────────────────────────────── */
+  --sidebar-w: 256px;
+}
+
+html[data-fold="collapsed"] {
+  --sidebar-w: 64px;
+}
+
+@media (max-width: 767px) {
+  /* Sidebar.tsx: hidden md:flex — 移动端侧栏不渲染，dock 可通栏 */
+  :root {
+    --sidebar-w: 0px;
+  }
 }
 
 /* 全局 body 走 anime 字体栈, 走 <html className="font-sans-jp"> 触发 */

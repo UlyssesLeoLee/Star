@@ -125,14 +125,28 @@ export function Sidebar() {
     }
   }, [sidebarScope, isProjectScopeAvailable, setSidebarScope]);
 
+  // 发布折叠态到 <html data-fold> — CSS 变量 --sidebar-w 的单一驱动源
+  // (per INV-LAYOUT-03: 所有 fixed 全宽 dock 读 var(--sidebar-w)，禁止硬编码 px/rem)。
+  // 不用 :root[data-fold=...] 是因为 Tailwind v4 的 cascade 顺序无法保证，
+  // 挂在 <html> 上语义最直白，devtools 里也一眼能看到当前宽度状态。
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.fold = sidebarFold;
+    return () => {
+      delete root.dataset.fold;
+    };
+  }, [sidebarFold]);
+
   return (
     <aside
       data-testid="app-sidebar"
       data-fold={sidebarFold}
       data-scope={sidebarScope}
       // 桌面: 256/64 sticky; <768px: 隐藏 (由 MobileBottomNav + AppMatrixDrawer 抽屉替代, per 2026-09-01 PHASE-MOBILE-PWA)
+      // z-40: 侧栏是结构性骨架层, 必须高于所有内容级 dock (L3 z-[35])
+      // (per INV-LAYOUT-01/04: 修复方式是提高 Sidebar 层级, 不是降低 dock 层级)
       className={clsx(
-        "hidden md:flex shrink-0 border-r-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))]/95 cel-shadow backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-20 transition-all duration-200 ease-out text-[var(--cel-text-primary,var(--color-text))]",
+        "hidden md:flex shrink-0 border-r-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))]/95 cel-shadow backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-40 transition-all duration-200 ease-out text-[var(--cel-text-primary,var(--color-text))]",
         SIDEBAR_WIDTH[sidebarFold]
       )}
     >

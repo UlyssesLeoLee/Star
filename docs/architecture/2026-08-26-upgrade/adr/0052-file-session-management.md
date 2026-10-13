@@ -75,6 +75,63 @@ Worktree (git worktree)
 4. 窗口 resize / 滚动时菜单自动重定位或优雅关闭
 5. 键盘 Tab 遍历菜单项 → 焦点环可见、屏幕阅读器可读
 
+### 0.3 布局与层级规范：左导航覆盖底部终端
+
+> **用户拍板 (2026-10-12)**："左侧导航条应该覆盖下方 terminal，而不是下方终端窗口覆盖左侧导航栏。"
+
+**核心原则**：左导航 (Sidebar) 是**结构性骨架层**，优先级高于任何内容面板。底部终端 / dock 可以滑动到导航下方，但**绝不允许**绘制在导航之上。
+
+#### 0.3.1 z-index 分层契约
+
+| 层 | z-index | 元素 | 约束 |
+|----|---------|------|------|
+| L0 背景 | `z-0` | AppShell ambient glow | `pointer-events-none` |
+| L1 内容 | `z-10` | `<main>` 内容列 | 主滚动容器 |
+| L2 顶栏 | `z-30` | AppHeader (`sticky top-0`) | 横向通栏 |
+| **L3 底部 dock** | **`z-[35]`** | **FileSession 终端面板** | 🔴 **必须 `left: var(--sidebar-w)`；被侧栏覆盖** |
+| **L4 侧栏** | **`z-40`** | **Sidebar** | 🔴 **垂直通栏，任何内容不得覆盖** |
+| L5 抽屉 | `z-50` | 详情抽屉 / Modal（移动端全屏） | 带遮罩 |
+| L6 浮层 | `z-50` | CommandBar / ContextMenu / Popover | 临时浮层，Esc 关闭 |
+| L7 系统提示 | `z-[9997..9999]` | PwaUpdateToast / MobileBottomNav | 最高层 |
+
+**硬约束**：
+- **INV-LAYOUT-01**：`z-index ≥ 40` 的元素**不得**横向跨越 Sidebar（全屏 Modal 带遮罩除外）。
+- **INV-LAYOUT-02**：`fixed bottom-*` 全宽 dock **禁止** `left-0`，必须读 CSS 变量。
+- **INV-LAYOUT-03**：侧栏宽度是**单一事实源**（`--sidebar-w`），禁止硬编码 px/rem。
+- **INV-LAYOUT-04**：修复方式是**提高 Sidebar 层级**，不是降低 dock 层级。
+
+#### 0.3.2 现状根因 (git 实证)
+
+`frontend/src/components/Sidebar.tsx:135` 当前为 `sticky top-0 h-screen ... z-20` — **低于**多数浮层（`z-40`/`z-50`），所以任何高 z-index 的全宽元素都会压过导航。
+
+`frontend/src/app/worktree/[id]/group/page.tsx:3002` 用 `md:left-[17rem]` 手工绕开，但 `SIDEBAR_WIDTH` 是 `{ expanded: "w-64"(16rem), collapsed: "w-16"(4rem) }` — **折叠态会留下 208px 死区**，且改宽度需同步改 3+ 处魔法数字。
+
+#### 0.3.3 实装配方
+
+```css
+:root { --sidebar-w: 256px; }                      /* 展开 16rem */
+:root[data-fold="collapsed"] { --sidebar-w: 64px; } /* 折叠 4rem */
+@media (max-width: 767px) { :root { --sidebar-w: 0px; } }
+```
+
+```tsx
+/* Sidebar.tsx — z-20 → z-40 */
+<aside className="... sticky top-0 h-screen z-40 ..." />
+
+/* 底部 dock 终端 — 尊重侧栏宽度，被侧栏覆盖 */
+<aside className="fixed bottom-0 z-[35] right-0 ..."
+         style={{ left: "var(--sidebar-w)" }}>
+  <TerminalStackContainer />
+</aside>
+```
+
+**反模式（禁止）**：
+```tsx
+❌ <div className="fixed bottom-0 left-0 right-0 z-50">        // 硬编码 z-50 压过导航 + left-0 覆盖导航
+❌ <div className="fixed bottom-0 inset-x-0 z-40 md:left-[17rem]">  // 魔法数字，折叠态死区 208px
+❌ <div style={{ left: 272 }} />                            // px 硬编码，改宽度即失效
+```
+
 ---
 
 ---

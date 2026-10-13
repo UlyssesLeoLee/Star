@@ -83,6 +83,99 @@ Worktree (git worktree)
 4. 窗口 resize / 滚动时菜单自动重定位或优雅关闭
 5. 键盘 Tab 遍历菜单项 → 焦点环可见、屏幕阅读器可读
 
+### 0.5 布局与层级规范：左导航覆盖底部终端
+
+> **用户拍板 (2026-10-12)**："左侧导航条应该覆盖下方 terminal，而不是下方终端窗口覆盖左侧导航栏。"
+
+**核心原则**：左导航 (Sidebar) 是**结构性骨架层**，优先级高于任何内容面板。底部终端 / dock 面板 / 抽屉可以滑动到导航下方，但**绝不允许**绘制在导航之上。
+
+#### 0.5.1 当前代码现状 (git 实证)
+
+| 位置 | 现状 | 问题 |
+|------|------|------|
+| `frontend/src/app/layout.tsx:71-90` | `flex min-h-screen` → `Sidebar` 与内容列是 **flex 兄弟节点**，流式布局不重叠 | ✅ 根层正确 |
+| `frontend/src/components/Sidebar.tsx:135` | `sticky top-0 h-screen ... z-20` | ⚠️ `z-20` **低于**多数浮层，导航会被 `z-40/z-50` 覆盖 |
+| `frontend/src/app/layout.tsx:76-83` | 内容列 `relative h-100dvh overflow-y-auto`，**无 z-index** | ⚠️ 无显式层级，靠 DOM 顺序兜底 |
+| `frontend/src/app/worktree/[id]/group/page.tsx:3002` | `group-chat-bar` = `fixed ... z-40 md:left-[17rem] md:right-5` | 🔴 用**硬编码 `17rem`** 手工绕开导航 |
+
+**根因**：`position: fixed` **逃逸 flex 流**，以 viewport 为定位基准，因此天然会横跨侧栏区域。当前不重叠不是因为架构正确，而是靠 `md:left-[17rem]` 这个魔法数字**恰好**挡住了。
+
+**`17rem` 硬编码的三重脆弱性**（`SIDEBAR_WIDTH = { expanded: "w-64"(256px/16rem), collapsed: "w-16"(64px/4rem) }`）：
+
+| 侧栏状态 | 实际宽度 | `md:left-[17rem]` | 结果 |
+|---------|---------|-----------------|------|
+| 展开 | 256px (16rem) | 272px | 16px 空隙 ✅ 勉强正确 |
+| 折叠 | 64px (4rem) | 272px | **208px 死区** 🔴 浪费横向空间 |
+| 改宽度 | 任意 | 272px | 🔴 需同步改 3+ 处魔法数字 |
+
+#### 0.5.2 层级表 (z-index 分层契约)
+
+| 层 | z-index | 元素 | 约束 |
+|----|---------|------|------|
+| L0 背景 | `z-0` | `AppShell` ambient glow (`pointer-events-none`) | 永不接收指针事件 |
+| L1 内容 | `z-10` | `<main>` 内容列 + 页面主体 | 主滚动容器 |
+| L2 顶栏 | `z-30` | `AppHeader` (`sticky top-0`) | 横向通栏，可覆盖内容 |
+| **L3 底部 dock** | **`z-[35]`** | **FileSession 终端面板 / 底部面板** | 🔴 **必须 `left: var(--sidebar-w)`；被侧栏覆盖** |
+| **L4 侧栏** | **`z-40`** | **`Sidebar`** | 🔴 **垂直通栏，任何内容都不得覆盖** |
+| L5 抽屉 | `z-50` | 详情抽屉 / Modal（仅移动端全屏） | 移动端遮罩；桌面端不跨导航 |
+| L6 浮层 | `z-50` | `CommandBar` / ContextMenu / Popover | 临时浮层，Esc 关闭 |
+| L7 系统提示 | `z-[9997..9999]` | `PwaUpdateToast` / `MobileBottomNav` | 最高层 |
+
+**硬约束**：
+- **INV-LAYOUT-01**：任何 `z-index ≥ 40` 的元素**不得**横向跨越 Sidebar 区域，除非它是全屏 Modal 且带遮罩（明确表示"临时覆盖全屏"）。
+- **INV-LAYOUT-02**：任何 `fixed bottom-*` 的全宽 dock **禁止**使用 `left-0`；必须从 CSS 变量读取侧栏宽度。
+- **INV-LAYOUT-03**：侧栏宽度是**单一事实源**（CSS 变量），所有 fixed 元素引用变量，不得硬编码 px/rem。
+- **INV-LAYOUT-04**：Sidebar 的 z-index 必须**高于**所有内容级 dock；提高 Sidebar 层级是修复手段，**降低 dock 层级**不是。
+
+#### 0.5.3 实装配方
+
+```css
+/* globals.css — 单一事实源 */
+:root {
+  --sidebar-w: 256px;                       /* 展开 16rem */
+}
+:root[data-fold="collapsed"] {
+  --sidebar-w: 64px;                        /* 折叠 4rem */
+}
+@media (max-width: 767px) {
+  :root { --sidebar-w: 0px; }               /* <768px 侧栏隐藏，见 Sidebar.tsx hidden md:flex */
+}
+```
+
+```tsx
+/* Sidebar.tsx — 从 z-20 提到 z-40，成为结构性骨架层 */
+<aside className="... sticky top-0 h-screen z-40 ..." />
+
+/* 底部 dock 终端 — 尊重侧栏宽度，被侧栏覆盖 */
+<aside
+  className="fixed bottom-0 z-[35] right-0 ..."
+  style={{ left: "var(--sidebar-w)" }}
+>
+  <TerminalStackContainer />
+</aside>
+
+/* 移动端全宽 dock — 侧栏本就不渲染，left 取 0 */
+<aside className="fixed bottom-0 inset-x-0 z-[35] md:hidden ..." />
+```
+
+**反模式（禁止）**：
+```tsx
+❌ <div className="fixed bottom-0 left-0 right-0 z-50">   // 硬编码 z-50 压过导航 + left-0 覆盖导航
+❌ <div className="fixed bottom-0 inset-x-0 z-40 md:left-[17rem]">  // 魔法数字，折叠态死区 208px
+❌ <div style={{ left: 272 }} />                            // px 硬编码，改宽度即失效
+```
+
+#### 0.5.4 验收测试
+
+| # | 用例 | 期望 |
+|---|------|------|
+| 1 | 侧栏**展开** + 底部 dock 激活 | dock 左边缘紧贴侧栏右边缘，0px 空隙 |
+| 2 | 侧栏**折叠** (Ctrl+B) + dock 激活 | dock 自动左移到 64px 处，无 208px 死区 |
+| 3 | 切换侧栏宽度配置后 | dock 自动跟随，无需改代码 |
+| 4 | 视口 < 768px | 侧栏不渲染，dock 通栏占满 |
+| 5 | z-index 审计扫描 (`z-\[?\d+\]?` 全量 grep) | 无 `z ≥ 40` 的横向内容元素跨导航；无 `left-0` 的底部 dock |
+| 6 | DOM 断言 | `#app-sidebar` 的 computed `z-index` > 所有 `.terminal-dock` 的 computed `z-index` |
+
 ---
 
 ---
