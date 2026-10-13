@@ -62,7 +62,8 @@ DECLARE
     first_delivery RECORD;
     second_delivery RECORD;
     authorized BOOLEAN;
-    exact_digest BYTEA := digest(convert_to('native-origin-verified-wire', 'UTF8'), 'sha256');
+    -- Fixed constants avoid pgcrypto under the verifier's restricted search_path.
+    exact_digest BYTEA := decode('a66b39241bc30964f86cb340f82632d87226b6a6897b49aa1bccb77325949b34', 'hex');
 BEGIN
     SELECT * INTO accepted FROM platform_transport.append_authenticated(
         decode(repeat('44', 32), 'hex'), decode(repeat('ab', 32), 'hex'),
@@ -107,7 +108,7 @@ BEGIN
         decode(repeat('44', 32), 'hex'), decode(repeat('ab', 32), 'hex'),
         '93000000-0000-0000-0000-000000000002', 'request',
         '99000000-0000-0000-0000-000000000003', convert_to('native-origin-revocation-wire', 'UTF8'),
-        digest(convert_to('native-origin-revocation-wire', 'UTF8'), 'sha256'));
+        decode('406619cc5476c57da4a3d7fd49d02a0225c3a6d4533e13e77a4bdb6b17f87167', 'hex'));
     SELECT * INTO second_delivery FROM platform_transport.pull_authenticated(
         decode(repeat('22', 32), 'hex'), decode(repeat('ab', 32), 'hex'),
         '93000000-0000-0000-0000-000000000001', 'request', 30);
@@ -123,6 +124,7 @@ BEGIN;
 SELECT set_config('app.platform_deployment_id', '91000000-0000-0000-0000-000000000001', TRUE);
 SELECT set_config('app.platform_tenant_id', '92000000-0000-0000-0000-000000000001', TRUE);
 SELECT set_config('app.platform_profile_tenant_id', '92000000-0000-0000-0000-000000000001', TRUE);
+SELECT set_config('app.platform_actor_service_id', '93000000-0000-0000-0000-000000000003', TRUE);
 SET LOCAL ROLE star_platform_transport_owner;
 UPDATE platform_transport.service_certificate_identity
    SET lifecycle_state = 'revoked', revoked_by_service_id = '93000000-0000-0000-0000-000000000003',
@@ -138,7 +140,7 @@ BEGIN
         '93000000-0000-0000-0000-000000000001', 'request', 'test.native.auth',
         '95000000-0000-0000-0000-000000000001', 3,
         '99000000-0000-0000-0000-000000000003',
-        digest(convert_to('native-origin-revocation-wire', 'UTF8'), 'sha256')) INTO authorized;
+        decode('406619cc5476c57da4a3d7fd49d02a0225c3a6d4533e13e77a4bdb6b17f87167', 'hex')) INTO authorized;
     IF NOT authorized THEN
         RAISE EXCEPTION 'credential revoked after acceptance must preserve historical source proof';
     END IF;
