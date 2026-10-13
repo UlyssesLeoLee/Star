@@ -1,9 +1,8 @@
 # PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT
 
-> **Status**: D20 首个 native receive adapter slice 已实现；D20 整体进行中，生产接入未开放。
-> **Worktree**: `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumers/Star`
-> **Branch**: `codex/phase9f4c-d20-native-receiver-20261012`
-> **Base**: `501c6cb5209a0f87df971cd0907a49f448118982`（本 worktree 本轮实际 HEAD 基线）
+> **Status**: D20 native receive/origin-proof 与 opt-in Run-owner admission composition 切片已实现；D20 整体进行中，生产接入未开放。
+> **Initial native receiver slice**: `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumers/Star`, branch `codex/phase9f4c-d20-native-receiver-20261012`, base `501c6cb5209a0f87df971cd0907a49f448118982`.
+> **Run-owner composition slice**: branch codex/d20-native-schedule-admission-20261013 at C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumer-native/Star, originated from dev baseline 87e11053b23032dd4dbaa1b276af985546470575; implementation and docs are verified on Rust 1.99.0, merge to dev pending.
 
 ## §0 目的
 
@@ -25,6 +24,8 @@
 | `docs/requirements.md`, `docs/basic-design.md` | 同步 D20 source certificate provenance、exact-wire verification、quarantine/ACK 复验与 SQL 阻塞 | 要件 v6.44；基本设计 v6.44 |
 | `docs/design/DD-AUTOMATION-SCHEDULE-API-001.md`, `docs/design/DD-RUST-SERVER-REUSE-001.md` | 细化来源证明、数据库事务与本机服务候选复用边界；校正测试数并记载隔离 Clippy 结果 | 详细设计 v0.64、Rust 服务复用设计 v1.10 |
 | `docs/plan/master-implementation-plan.md` | D20 标记为进行中并保留剩余验收项 | 已同步 |
+| crates/run-owner-runtime | 新增 opt-in native-grpc-adapter feature 和 NativeGrpcScheduleAdmissionConsumer，固定 native transport + origin verifier + Run-owner store；拒绝 Result route，逐次消费一条 | 已实现；Rust 1.99.0 package all-targets check/test/Clippy 与变更文件 rustfmt 通过 |
+| requirements/basic/detailed design | 同步 Run-owner composition 的 route、取消/quarantine 与 fail-closed 边界及正式 1.99.0 验证状态 | 已同步；需求/基本设计 v6.46，详细设计 0.67 |
 | `AGENTS.md` | 未修改；本机 Rust server 的模块级选择性复用规则已存在 | 无需重复 |
 
 ## §2 验证摘要
@@ -35,26 +36,30 @@
 | 定向 lib tests | `cargo test --ignore-rust-version --offline --locked -p platform-messaging-runtime --features native-grpc-adapter --lib native_grpc::tests -j 1` 12/12 通过（Rust 1.98.1 诊断） |
 | 本轮完整 lib tests | `cargo test --ignore-rust-version --offline --locked -p platform-messaging-runtime --features native-grpc-adapter --lib -j 4` 41/41 通过（Rust 1.98.1 诊断） |
 | Clippy driver / all-targets | `cargo check --ignore-rust-version --offline --locked -p platform-messaging-runtime --features native-grpc-adapter --all-targets -j 4`，设置 `RUSTC_WORKSPACE_WRAPPER` 为 Rust 1.98.1 的 `clippy-driver.exe`；退出码 0。目标 crate 未输出 Clippy warning；未修改的 `star-context`、`domain-automation` 有既有 warning。直接 `cargo clippy` 因 1.98.1 `rustc` 与 1.99.0 clippy driver 混用报 `E0514`，该次不计为 lint 结果 |
+| 新增 Run-owner composition（Rust 1.99.0） | cargo +1.99.0 check --offline --locked -p run-owner-runtime --features native-grpc-adapter --all-targets -j 4 exit 0；cargo +1.99.0 test --offline --locked -p run-owner-runtime --features native-grpc-adapter --lib -j 4 为 17/17；cargo +1.99.0 clippy --offline --locked -p run-owner-runtime --features native-grpc-adapter --all-targets -j 4 exit 0；changed module rustfmt 与 lib.rs（skip_children=true）exit 0。依赖 crate 有既有 warnings |
+| Run-owner Clippy-driver / all-targets | 使用独立 target dir 与 Rust 1.98.1 `clippy-driver.exe` 设置 `RUSTC_WORKSPACE_WRAPPER`，`cargo check --ignore-rust-version --offline --locked -p run-owner-runtime --features native-grpc-adapter --all-targets -j 4` 退出码 0；`run-owner-runtime` 未产生 Clippy warning，依赖 crate 存在历史 warning。普通 `cargo clippy` 因共享 target 混有 Rust 1.99.0 元数据报 `E0514`，不作为结果 |
+| GitConverge 到 `dev` | 未执行；当前调用 worktree 是 dirty detached HEAD，`dev` 在 Orca worktree 且含未跟踪 `.codegraph/.gitignore`，同时 `orca worktree ps --json` 返回 `runtime_access_denied (EPERM)`。GitConverge 的调用位置/clean gate 未满足；没有写入 `dev`、删除分支或移除 worktree |
 | Rust 格式 | 三个修改的 runtime 实现文件 `rustfmt --edition 2024 --check` 退出码 0；`schedule_admission_pg.rs` 全文件检查报告大量既有格式差异，本轮只修改 trait 方法签名，未格式化整份无关测试文件 |
 | Diff whitespace | `git diff --check` 退出码 0；Git 提示该 Rust 文件下次触碰时 CRLF 转 LF，不影响本次检查 |
-| CypherGraph Guardian | `cgg_guard.py --changed --stamp` 通过，1 个 Rust 源文件 |
-| 正式 Rust 版本 | 未通过正式门禁：本机使用 Rust 1.98.1 的 `--ignore-rust-version` 诊断运行；Rust 1.99.0 未安装/未运行 |
-| 工具调用方式 | `cargo`/`rustc` 不在 PATH；实际通过 Rust 1.98.1 安装目录下的 `cargo.exe` 与显式 `build.rustc` 配置运行上述诊断命令 |
+| CypherGraph Guardian | `cgg_guard.py --changed --stamp` 通过，最终变更的 2 个 Rust source files 检查并刷新 stamp |
+| 正式 Rust 版本 | Run-owner composition 的 Rust 1.99.0 package all-targets check/test/Clippy 与定向 rustfmt 通过；native receiver 的既有验证仍是 Rust 1.98.1 诊断结果，workspace-wide release gates 未运行 |
+| 工具调用方式 | rtk 不在 PATH；使用 E:\DevCache\cargo\bin 下的 cargo/rustfmt shim 与显式 +1.99.0 toolchain 运行本轮 gates |
 | D20 PostgreSQL origin migration/contract | 未运行：`psql`、`initdb`、`pg_ctl` 不在 PATH；PostgreSQL 15/17 安装目录无 `initdb.exe`。SQL 语法、触发器/锁、RLS、grants 和重复 migration 行为均未验证 |
 | Native gRPC live e2e / Multipass/K3s | 未运行；本切片没有启动 NATS、PostgreSQL 或 Multipass 实例 |
-| 独立 CodeRabbit review | 未运行成功：包装器返回 `/root/.local/bin/coderabbit: Permission denied`；本轮由实现者自审，不能称作独立 review 通过 |
+| 独立 CodeRabbit review | 未运行：Windows wrapper 的版本探测返回 `/bin/bash: line 1: /root/.local/bin/coderabbit: Permission denied`；本轮只完成实现者自审，不能称作独立 review 通过 |
 
 ## §3 已知缺口
 
-1. 只有 provider adapter；没有把实际 Schedule/Run 或 Infrastructure owner Outbox/Inbox consumer 接到该 native adapter。
+1. 当前新增 typed composition 仅把 native receive port 接到 Run-owner Schedule admission store，并未完成实际各 owner Outbox/Inbox producer/consumer 迁移，也没有接 Infrastructure result consumer。Run-owner package 的 Rust 1.99.0 gates 已通过；PG/TLS e2e 与 production assembly 仍未验收。
 2. 真实 TLS client/server handshake、证书轮换/撤销、生产 Profile endpoint resolver、production composition 和目标 PostgreSQL runtime grants 未验收。
 3. native provider 的 quarantine receipt/replay 再投递与 digest/fault 冲突尚未做端到端 DB 验收。共享 receiver 的代码顺序是 commit quarantine 后 terminal disposition；本 slice 未证明 native server/DB 联动。
 4. BI/Benchmark event projections、NATS/native 双 provider contract parity、双跑差异对账和逐 profile rollback/cutover 未实现。
 5. 未测 crash/restart recovery、lease reclaim、内存 RSS、p95/p99、全局多 adapter concurrency、跨 tenant fairness、队列 drain 或性能容量。
-6. Rust 1.99.0 正式质量门未运行。Rust 1.98.1 `--ignore-rust-version` 的 check/test/Clippy 仅为诊断证据。
+6. Run-owner composition 的 Rust 1.99.0 package check/test/Clippy 与改动文件格式门通过；workspace-wide release gates 与 D20 native receiver 全量复验尚未运行。
 7. D20 整体仍进行中；native provider 不可用于产品流量，NATS 继续保留，Schedule/Run execution 仍受原有授权、预算、Reservation、Hook、sandbox、取消恢复和独立验证门控制。
 8. 用户确认可直接参考、适配或按模块复用 AssetsLake 与其他本机 Rust server；本 slice 未搬入源代码。当前 AssetsLake event publisher 在 pipeline disabled 时只返回生成 UUID，relay 在 dry-run/no-broker 时会标记 published、配置 broker 时因无 Kafka client 标记失败，因此不适合作为当前 durable transport；它的 envelope、trace、causation 字段仍可作契约参考。RustGameServer TLS helper 是既有已审查适配；不据此推断整仓依赖、商业分发/SBOM 或其他模块已验收。
 9. 本轮 D20 source-verification SQL contract 尚未执行；Rust 诊断通过、源码存在和自动化 runner 接入都不能替代 PostgreSQL 18.6 disposable schema test。切流和执行继续 fail closed。
+10. 本 follow-on consumer slice 仍未提交或合并。仓库当前有 18 个本地分支；GitConverge 预检要求从目标 `dev` 的干净 worktree 执行，但该 Orca worktree 有未跟踪文件，Orca owner 状态查询又被 EPERM 阻断。分支收敛/清理未执行；本地改动保留在当前 Codex detached worktree。
 
 ## §4 子代理失败接手清单
 
@@ -70,7 +75,7 @@
 | 4 | mTLS 证书身份是 peer 来源认证基础 | 继承 D19；本轮无 live handshake |
 | 5 | Profile digest 与 endpoint/profile revision 必须固定 | 代码通过；production resolver 未接入 |
 | 6 | recipient 来自服务端已认证 principal，不信 wire claim | proto/server 路由契约遵守；无 e2e |
-| 7 | owner commit 和 commit 后授权复验先于 ACK | 共享 receiver 已定义；本轮无 production handler 组合 |
+| 7 | owner commit 和 commit 后授权复验先于 ACK | Schedule admission store 已由 opt-in typed consumer 组合，Rust 1.99.0 package gates 通过；真实 TLS/PG e2e 与 production assembly 未验收 |
 | 8 | permanent ACK 前先提交独立 durable quarantine | 共享 receiver 已定义；native DB 联测未做 |
 | 9 | ACK 绑定 generation、sequence、message、lease 和 exact digest | client request 固定并发送这些字段；server live 验证未做 |
 | 10 | digest 必须对原始 wire bytes 计算 | 代码已校验 exact SHA-256；10 项定向测试通过 |
@@ -79,8 +84,8 @@
 | 13 | 未知/超时/错误时 fail closed | RPC/ACK 错误返回未确认；集成重试/取消未测 |
 | 14 | provider-specific cursor 不泄漏为业务身份 | sequence/log/lease 留在 adapter delivery origin |
 | 15 | NATS 不得在 replacement gates 前移除 | 通过；NATS 保留 |
-| 16 | 需求、基本设计、详细设计与实现状态同步 | 通过；已同步 D20 origin proof 实现与 PostgreSQL blocker |
-| 17 | Rust 1.99.0 正式工具链、PostgreSQL migration/RLS contract 与独立性能验收不得由诊断结果替代 | 未通过/未运行；PG binary 缺失，禁止宣称完成 |
+| 16 | 需求、基本设计、详细设计与实现状态同步 | 已同步 Rust 1.99.0 Run-owner package gates；PostgreSQL、workspace-wide、TLS 与 production gates 仍开放 |
+| 17 | Rust 1.99.0 正式工具链、PostgreSQL migration/RLS contract 与独立性能验收不得由诊断结果替代 | Run-owner package 正式门通过；PostgreSQL contract 与独立性能验收未运行，D20 保持开放 |
 
 ## §6 签字栏
 
@@ -96,6 +101,10 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.8 | 2026-10-13 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 Run-owner consumer 正式 Rust 1.99.0 check/test/Clippy/rustfmt 证据；仍标记 PostgreSQL、TLS、production 和全量 D20 验收未完成 | 1.99.0 package gates 全部通过，17/17 tests |
+| v0.7 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 Result route 在 transport connect 前拒绝的回归测试；Run-owner library tests 更新为 17/17，定向测试 1/1 | Rust 1.98.1 隔离 target 下新增回归测试和完整测试集通过 |
+| v0.6 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 GitConverge 因调用 worktree/目标 worktree dirty gate 与 Orca runtime EPERM 未执行的证据；保留 detached D20 改动，不清理用户文件或 worktree | 用户要求优先合并 `dev` 并清理；当前 Orca 状态接口拒绝访问且 GitConverge preflight gate 未满足 |
+| v0.5 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 追加 opt-in Run-owner native Schedule admission composition、Result route pre-connect rejection、one-message cancellation/quarantine boundary；记录 Rust 1.98.1 诊断 check、16/16 tests 与隔离 Clippy-driver 结果，保留正式 1.99.0/PG/TLS/production blockers 且 D20 不关闭 | 延续 D20 实现并同步需求、基本/详细设计与 plan |
 | v0.4 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 校正 library tests 为 41/41、记录 Rust 1.98.1 Clippy-driver 检查与 integration test 文件格式现状；保持 PostgreSQL 合约未验证状态 | 隔离 Clippy-driver 检查完成并复核 D20 验证记录 |
 | v0.3 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 exact-wire VerifyOrigin、append-time source certificate evidence、同事务 ACK 复验和 SQL runner 接入；把未运行的 PostgreSQL contract 明确记为阻塞，并复核 AssetsLake/RustGameServer 来源状态 | D20 source-verification 实装；用户重申可参考/复用自有 Rust 服务 |
 | v0.2 | 2026-10-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确本机 Rust server 可直接模块复用，解释 AssetsLake 当前 relay 不满足 durable delivery；记录公开 canonical provider identity helper 与实际工具链调用方式 | 用户再次确认 AssetsLake/本机 Rust 服务复用授权，并要求为 Star 自有服务替换 NATS 做准备 |

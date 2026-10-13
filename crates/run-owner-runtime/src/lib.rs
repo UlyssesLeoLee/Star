@@ -1,6 +1,6 @@
 //! Run-owner persistence and bounded Infrastructure result consumption.
 /*
-@cypher schema=1 source_sha256=6f6701404d8f1e4d9ab9f129d9f100db3e89259ef900dd5da785cf35f01829a0
+@cypher schema=1 source_sha256=66d52d6cfdc715d329c2100d2680a476269398230d279ace9812ebc8d3fdbc7d
 MERGE (self:File {path:"crates/run-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/lib.rs::run_owner_runtime",kind:"module"})
 MERGE (binding_module:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::module",kind:"module"})
@@ -42,11 +42,21 @@ MERGE (module)-[:IMPORTS]->(capacity_file:File {path:"crates/run-owner-runtime/s
 MERGE (module)-[:EXPOSES]->(capacity_snapshot:Type {id:"run_owner_runtime::ScheduleProjectCapacitySnapshot",kind:"struct"})
 MERGE (receive_module:File {path:"crates/run-owner-runtime/src/admission_receive.rs"})
 MERGE (self)-[:IMPORTS]->(receive_module)
+MERGE (native_consumer_file:File {path:"crates/run-owner-runtime/src/native_schedule_admission_consumer.rs"})
+MERGE (self)-[:IMPORTS]->(native_consumer_file)
+MERGE (native_consumer:Type {id:"run_owner_runtime::NativeGrpcScheduleAdmissionConsumer",kind:"struct"})
+MERGE (native_consumer_error:Type {id:"run_owner_runtime::NativeScheduleAdmissionConsumerError",kind:"enum"})
+MERGE (module)-[:EXPOSES]->(native_consumer)
+MERGE (module)-[:EXPOSES]->(native_consumer_error)
+MERGE (native_consumer_feature:Config {id:"cargo.feature.run-owner-runtime.native-grpc-adapter"})
+MERGE (module)-[:CONFIGURES]->(native_consumer_feature)
 @endcypher
 */
 
-mod capacity_result;
 mod admission_receive;
+mod capacity_result;
+#[cfg(feature = "native-grpc-adapter")]
+mod native_schedule_admission_consumer;
 mod outbox;
 mod run_infrastructure_binding;
 mod schedule_admission;
@@ -74,3 +84,8 @@ pub use schedule_policy::SchedulePolicySnapshot;
 pub use schedule_catalog::ScheduleExecutionSnapshot;
 
 pub use schedule_capacity::ScheduleProjectCapacitySnapshot;
+
+#[cfg(feature = "native-grpc-adapter")]
+pub use native_schedule_admission_consumer::{
+    NativeGrpcScheduleAdmissionConsumer, NativeScheduleAdmissionConsumerError,
+};

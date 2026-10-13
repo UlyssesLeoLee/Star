@@ -8,6 +8,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+native-grpc-adapter = ["platform-messaging-runtime/native-grpc-adapter"]
+
 [dependencies]
 async-nats = { workspace = true }
 chrono = { workspace = true }

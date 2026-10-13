@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.44 (2026-10-12)
-> **上游要件定义书**: docs/requirements.md v6.44
+> **文档版本**: v6.46 (2026-10-13)
+> **上游要件定义书**: docs/requirements.md v6.46
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5650,7 +5650,7 @@ Native gRPC server 使用强制 mTLS。Tonic 握手成功后，Rust 服务端提
 
 | v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 增补 native gRPC 服务端的强制 mTLS 身份映射、Profile→log 授权、并发/帧/期限边界及 D19 Rust/PostgreSQL 证据；明确 production、E2E 与性能缺口 | D19 服务端授权首片实现并经隔离数据库复验 |
 
-### D20 Native 接收与来源证明首片（v6.44）
+### D20 Native 接收与来源证明首片（v6.46）
 
 Native provider 现在沿用共享 `AdmissionReceiveTransport`/`AdmissionReceivedDelivery` 边界实现 Pull 与 lease-fenced Acknowledge；owner Inbox 事务、当前授权复验和持久化 quarantine 仍由各自 owner/平台边界负责。Route 与 Transport Profile 在构造时固定，服务端依据 mTLS principal 确认 recipient，wire 只提供受限消息内容与 sender/kind。Provider 来源身份由 provider ID/version、Profile digest 和 endpoint identity 的 domain-separated digest 导出，便于隔离 quarantine/replay key 且不暴露 endpoint label。
 
@@ -5660,10 +5660,14 @@ Native provider 现在沿用共享 `AdmissionReceiveTransport`/`AdmissionReceive
 
 D20 来源证明将 mTLS peer 的 SHA-256 指纹在 authenticated append 时写入不可变 Work row；既有无此证据的行保持 NULL 并 fail closed。接收端把 exact wire SHA-256、Profile digest、sender、kind、log/generation、sequence 与 message ID 发给 `VerifyOrigin`；Star DB wrapper 同时要求当前接收方 route 有效、delivery lease 仍活跃，并核对来源证书在 append 时已注册且当时未撤销。通用 receiver 在永久 quarantine 写入前后复验来源，ACK wrapper 在一个事务中再核验来源/lease 并执行 lease-fenced ACK，避免把 transport receipt 误当成 owner commit。
 
-来源验证 migration 与 SQL contract 已接入 schema-only runner，但本轮未执行：该工作环境未安装 PostgreSQL server binaries。可执行 SQL migration、RLS、锁行为及 runtime grants仍须在 PostgreSQL 18.6 disposable instance 中验证；不得把 Rust 编译或 source-text check 当作数据库验证。当前 Rust 1.98.1 `--ignore-rust-version` 的 crate all-targets check 与 41/41 library tests 为诊断结果，Rust 1.99.0 正式门禁、live TLS e2e、生产 consumer composition、recovery、BI/Benchmark parity、RSS/performance/fairness 与 NATS route cutover 均未完成。NATS 保留，native provider 和 Schedule/Run execution 继续 fail closed。
+Run owner 提供 opt-in `native-grpc-adapter` feature，将 native transport、其来源授权 verifier 与 `PostgresScheduleAdmissionStore` 静态组合为 `NativeGrpcScheduleAdmissionConsumer`。连接前拒绝 Result route，只接受 Schedule admission 的 Request/Resolution；调用方逐次提交 cancellation receiver 并调用单条 `consume_one`，不会创建后台 loop。Durable quarantine 必须由调用方显式注入；缺少 quarantine 时 poison message 不会被永久 ACK。该 API 只处理 admission 输入，不能启动 TaskExecutionRun/executor，不能替代各 owner Outbox/Inbox producer、consumer、生产身份/Profile resolver、BI/Benchmark 或 D20/D21 验收门。
+
+来源验证 migration 与 SQL contract 已接入 schema-only runner，但本轮未执行：该工作环境未安装 PostgreSQL server binaries。可执行 SQL migration、RLS、锁行为及 runtime grants 仍须在 PostgreSQL 18.6 disposable instance 中验证。Run-owner consumer composition 已在 Rust 1.99.0 下通过 package all-targets check、17/17 library tests、all-targets Clippy 与变更文件 rustfmt；依赖 crate 仍输出既有 warnings。native origin-verification SQL、live TLS e2e、全量 owner consumer migration、recovery、BI/Benchmark parity、workspace-wide release gates、RSS/performance/fairness 与 NATS route cutover 均未完成。NATS 保留，native provider 和 Schedule/Run execution 继续 fail closed.
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.46 | 2026-10-13 | Ulysses — Mavis接手审核 | 补录 Run-owner composition 在 Rust 1.99.0 下的 package 验证，并保留 D20 PostgreSQL、TLS、全量 owner consumer 与 BI 未验收边界 | Rust 1.99.0 check/test/Clippy 与定向 rustfmt 通过 |
+| v6.45 | 2026-10-12 | Ulysses — Mavis接手审核 | 补充 Run-owner opt-in native Schedule admission 组合、Result route 拒绝、单条取消、显式 quarantine 与禁止启动 execution 的架构边界；明确全量 owner consumer 仍开放 | 新增 `run-owner-runtime/native-grpc-adapter` 与 typed consumer |
 | v6.43 | 2026-10-12 | Ulysses — Mavis接手审核 | 描述 append-time certificate provenance、exact-wire VerifyOrigin、quarantine/ACK 双重复验与 D20 SQL runner 状态；记录缺少 PostgreSQL binaries 的真实 blocker | D20 新增原生来源证明与 ACK 事务复验 |
 | v6.44 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 D20 当前 Rust library test 数校正为 41/41；记录 Clippy driver 隔离运行和 integration test 文件既有格式差异，不改变 PostgreSQL 未验证状态 | 新增两项 exact-wire 来源验证单测并完成 Rust 1.98.1 隔离 Clippy 检查 |
 | v6.42 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确 NATS 是过渡 adapter、Star Rust durable transport 是最终目标；同步公开来源身份 helper 与 AssetsLake 模块复用选择依据，并订正 §1.6 的 D19 server 状态 | 用户重申 Rust 服务模块复用授权并确认 NATS 应由自有服务替代；最终设计对照发现 §1.6 状态滞后 |
