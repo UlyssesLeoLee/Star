@@ -1,6 +1,6 @@
 //! Explicit, bounded native transport composition for Run-owned Schedule admission.
 /*
-@cypher schema=1 source_sha256=851b5bb88edf1cac823f0c44a6c77342e9cfc001252caa3a6567a9dccd93d0e5
+@cypher schema=1 source_sha256=495c553b632da532c24201c8e3f0aade071390c00ecca7816eb44e87d6b7406c
 MERGE (self:File {path:"crates/run-owner-runtime/src/native_schedule_admission_consumer.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/native_schedule_admission_consumer.rs::module",kind:"module"})
 MERGE (consumer:Type {id:"run_owner_runtime::NativeGrpcScheduleAdmissionConsumer",kind:"struct"})
@@ -26,6 +26,8 @@ MERGE (consume_one)-[:USES_TYPE]->(uuid:Type {id:"uuid::Uuid",kind:"struct"})
 MERGE (module)-[:IMPORTS]->(receive_file:File {path:"crates/platform-messaging-runtime/src/admission_receive.rs"})
 MERGE (module)-[:IMPORTS]->(native_file:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (module)-[:IMPORTS]->(store_file:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
+MERGE (module)-[:IMPORTS]->(endpoint_file:File {path:"crates/platform-messaging-runtime/src/transport_endpoint.rs"})
+MERGE (module)-[:IMPORTS]->(profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
 MERGE (connect)-[:CALLS]->(validate_kind)
 MERGE (connect)-[:CALLS]->(transport_connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport::connect",kind:"method"})
 MERGE (connect)-[:CALLS]->(authorization_factory:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport::authorization",kind:"method"})
@@ -36,6 +38,14 @@ MERGE (test:Symbol {id:"crates/run-owner-runtime/src/native_schedule_admission_c
 MERGE (test)-[:TESTS]->(validate_kind)
 MERGE (preconnect_test:Symbol {id:"crates/run-owner-runtime/src/native_schedule_admission_consumer.rs::tests::result_route_is_rejected_before_transport_connect",kind:"test"})
 MERGE (preconnect_test)-[:TESTS]->(connect)
+MERGE (endpoint_fixture:Symbol {id:"crates/run-owner-runtime/src/native_schedule_admission_consumer.rs::tests::resolved_endpoint_fixture",kind:"function"})
+MERGE (endpoint_fixture)-[:USES_TYPE]->(resolved_endpoint:Type {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::ResolvedTransportEndpoint",kind:"struct"})
+MERGE (endpoint_fixture)-[:CALLS]->(profile_definition_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileDefinition.new",kind:"method"})
+MERGE (endpoint_fixture)-[:CALLS]->(profile_revision_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileRevision.new",kind:"method"})
+MERGE (endpoint_fixture)-[:CALLS]->(trusted_endpoint_config_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointConfig.new",kind:"method"})
+MERGE (endpoint_fixture)-[:CALLS]->(trusted_resolver_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointResolver.new",kind:"method"})
+MERGE (endpoint_fixture)-[:CALLS]->(trusted_resolver_resolve:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointResolver.resolve",kind:"method"})
+MERGE (preconnect_test)-[:CALLS]->(endpoint_fixture)
 @endcypher
 */
 
@@ -129,14 +139,56 @@ mod tests {
         admission_delivery::AdmissionTransportProfile,
         admission_receive::{AdmissionReceiveKind, AdmissionReceiveScope},
         native_grpc::NativeGrpcReceiveClientConfig,
+        transport_endpoint::{
+            ResolvedTransportEndpoint, TrustedEndpointConfig, TrustedEndpointResolver,
+        },
+        transport_profile::{
+            TransportMessageKind, TransportProfileDefinition, TransportProfileLifecycle,
+            TransportProfileRevision,
+        },
     };
     use sqlx::postgres::PgPoolOptions;
     use uuid::Uuid;
 
     use super::{
-        NativeGrpcScheduleAdmissionConsumer, NativeScheduleAdmissionConsumerError,
-        supports_schedule_admission_kind,
+        supports_schedule_admission_kind, NativeGrpcScheduleAdmissionConsumer,
+        NativeScheduleAdmissionConsumerError,
     };
+
+    const TEST_DEPLOYMENT_ID: Uuid = Uuid::from_u128(10);
+
+    fn resolved_endpoint_fixture() -> ResolvedTransportEndpoint {
+        let definition = TransportProfileDefinition::new(
+            "star-rust-log".to_owned(),
+            "1.0.0".to_owned(),
+            "unused-endpoint".to_owned(),
+            "provider-log-generation-v1".to_owned(),
+            vec![Uuid::from_u128(20)],
+            vec![Uuid::from_u128(21)],
+            vec![TransportMessageKind::Request],
+            None,
+        )
+        .expect("test profile definition is valid");
+        let revision = TransportProfileRevision::new(
+            TEST_DEPLOYMENT_ID,
+            Uuid::from_u128(1),
+            Uuid::from_u128(12),
+            1,
+            TransportProfileLifecycle::Active,
+            definition,
+        )
+        .expect("test profile revision is valid");
+        let endpoint = TrustedEndpointConfig::new(
+            "unused-endpoint".to_owned(),
+            "https://transport.internal.example:7443/grpc/v1".to_owned(),
+            "transport.internal.example".to_owned(),
+        )
+        .expect("trusted test endpoint is valid");
+        TrustedEndpointResolver::new(TEST_DEPLOYMENT_ID, vec![endpoint])
+            .expect("trusted test endpoint registry is valid")
+            .resolve(&revision)
+            .expect("test profile resolves to its trusted endpoint")
+    }
 
     #[test]
     fn schedule_route_kind_is_bounded() {
@@ -170,10 +222,9 @@ mod tests {
             "unused-endpoint".to_owned(),
         )
         .expect("test profile is valid");
+        let endpoint = resolved_endpoint_fixture();
         let config = NativeGrpcReceiveClientConfig {
-            uri: "https://example.invalid:7443",
-            server_domain: "example.invalid",
-            endpoint_identity: "unused-endpoint",
+            endpoint: &endpoint,
             server_ca_path: Path::new("unused-ca.pem"),
             client_cert_path: Path::new("unused-cert.pem"),
             client_key_path: Path::new("unused-key.pem"),
