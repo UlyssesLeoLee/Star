@@ -5652,6 +5652,8 @@ Native gRPC server 使用强制 mTLS。Tonic 握手成功后，Rust 服务端提
 
 ### D20 Native 接收、来源证明与 consumer 验收（v6.49）
 
+**D20 follow-on status (2026-10-14):** the PostgreSQL 18.6 WSL ext4 schema-only runner now passes 89/89 steps, including restricted owner/runtime roles, exact runtime function grants, PUBLIC/untrusted verify and ACK denial, forced RLS/cross-tenant checks, role-guard rejection of `BYPASSRLS`, and migration replay. The SQLx origin target compiles with Rust 1.98.1 using `--ignore-rust-version`; its harness reports 0 passed, 0 failed, 1 ignored because the disposable PostgreSQL URL is absent, so SQLx transaction behavior remains unverified. Production role provisioning/deployment grants, Rust 1.99.0, Windows runtime, TLS/identity, owner recovery/replay, BI/Benchmark, performance and execution remain open. Native cutover and Schedule/Run execution stay fail closed; see [D20 report](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md).
+
 Native provider 现在沿用共享 `AdmissionReceiveTransport`/`AdmissionReceivedDelivery` 边界实现 Pull 与 lease-fenced Acknowledge；owner Inbox 事务、当前授权复验和持久化 quarantine 仍由各自 owner/平台边界负责。Route 与 Transport Profile 在构造时固定，服务端依据 mTLS principal 确认 recipient，wire 只提供受限消息内容与 sender/kind。Provider 来源身份由 provider ID/version、Profile digest 和 endpoint identity 的 domain-separated digest 导出，便于隔离 quarantine/replay key 且不暴露 endpoint label。
 
 公开的 `native_provider_identity()` 为授权/quarantine 实现提供共享 canonical 来源键；该 key 不等同于 mTLS 认证或授权。接收路径最多 8 个并行 RPC、最多 8 个未释放 lease handle，每条只拉取一个有界 delivery，不缓存无界队列；wire ≤16 KiB，gRPC frame ≤32 KiB，lease 30–120 秒。Rust 1.98.1 `--ignore-rust-version` 下 all-targets check 与 Clippy-driver 隔离 check 通过，`native_grpc::tests` 12/12、完整 library tests 41/41 通过，三个 runtime 实现文件 rustfmt 与 diff whitespace 检查通过；`schedule_admission_pg.rs` 全文件 rustfmt 报告既有格式差异，未批量改写。正式 Rust 1.99.0 门禁未运行。该适配器未进入 production composition：真实 mTLS e2e、owner consumer、quarantine replay、BI/Benchmark 对账、目标库权限、恢复与内存/公平性验收仍开放。D20 整体未关闭；NATS、生产流量切换门和 Run execution fail-closed 条件继续生效。
@@ -5668,6 +5670,7 @@ PostgreSQL 18.6 隔离 schema-only runner 共 83/83 步通过；`2026-10-12-plat
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.50 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D20 role/RLS 89/89 证据、SQLx target 编译但 ignored 的实际状态及生产验收边界 | D20 grants/RLS 与 SQLx 两条 worktree rebase 后快进合入本地 dev |
 | v6.49 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D20 来源验证 migration/SQL contract 的 PostgreSQL 18.6 schema-only 83/83 证据及 audit SHA-256；明确无 SQLx、生产身份/grants、TLS、全量 consumer、BI/性能或执行验收 | WSL disposable PostgreSQL runner 通过 D20 origin-verification contract |
 | v6.48 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Run-owner Result 与 Infrastructure demand native consumer、各 owner commit-before-ACK/来源复验，并记录合并后的 Rust 1.99.0 联合验证；保留 PostgreSQL、TLS、生产接线、BI 与性能缺口 | D20 两条 consumer worktree rebase 并合入本地 dev |
 | v6.47 | 2026-10-13 | Ulysses — Mavis接手审核 | 订正 Run-owner JetStream 132 KiB `max_bytes` 的 client-buffering 语义、消息物化后才执行的 128 KiB parser guard、NATS/Stream admission limits 与 RSS 门；同步 quarantine 已实现但 production 仍关闭的边界 | Run Owner 消费端 bounded-memory 文档复核 |

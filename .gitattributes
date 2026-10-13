@@ -30,3 +30,5 @@
 *.zip          binary
 *.gz           binary
 *.tar          binary
+# Preserve byte-exact audit evidence because its SHA-256 is recorded in D20 docs.
+docs/reports/evidence/PHASE-9F4C-D20-PG18.6-20261014/* binary

@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D20 owner-native receive slices are opt-in and pass combined Rust 1.99.0 package checks/tests/target-crate Clippy. PostgreSQL 18.6 disposable schema-only runner completed 83/83 steps; `2026-10-12-platform-native-origin-verification.sql` was applied twice and `native-origin-verification-contract` passed. Audit: `target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl` (SHA-256 `CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80`). The runner listened only on `127.0.0.1` and disabled Unix-domain sockets with `-c unix_socket_directories=`; the SQL fixture uses fixed SHA-256 values for the exact UTF-8 wire fixtures and sets the scoped actor in the revocation transaction. No NATS process was started and no Multipass instance or inventory entry was created or modified. Validation platform boundary: this evidence covers WSL/Linux only; Windows-native PostgreSQL `pg_ctl` startup/runtime was not exercised, so Windows runtime compatibility for the socket-disabling option is not established. SQLx, production database identity/grants, live TLS, BI, recovery, performance and execution remain open.
-> Version: 0.59 | Date: 2026-10-14
+> Status: 🟡 D20 owner-native receive slices are opt-in and pass combined Rust 1.99.0 package checks/tests/target-crate Clippy. The cumulative PostgreSQL 18.6 WSL ext4 schema-only runner passed 89/89 steps, including the restricted role/grants/RLS contract; the earlier 83/83 run remains historical. SQLx origin target compilation succeeded on Rust 1.98.1 with `--ignore-rust-version`, while the focused harness was 0 passed / 0 failed / 1 ignored and did not execute SQL. Windows-native PostgreSQL `pg_ctl`, production role provisioning/grants, live TLS, recovery, BI, performance and execution remain open. No NATS process or Multipass instance was started. This evidence covers WSL/Linux only; Windows runtime compatibility is unverified.
+> Version: 0.60 | Date: 2026-10-14
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -218,6 +218,8 @@ This resolver verifies stored Run-owner content integrity and the canonical Run 
 D2 SQLx follow-up: Rust 1.99.0 real PostgreSQL 18.6 binding test passed 1/1; the disposable runner passed 30/30 steps. It uses a LOGIN role with NOINHERIT, NOSUPERUSER and NOBYPASSRLS, explicitly activates star_multica_run_owner, and proves save/resolve digest roundtrip, wrong-tenant NotFound, stale revision rejection, single-winner concurrent CAS, insert-failure rollback of Master closure and audit facts, successful retry, and forged-digest rejection. No NATS or Multipass instance was started. Audit: target/phase9f4d-run-owner-consumer/cf849f3d-c7e8-4ea1-b1bd-a813121088c5/audit.jsonl. Production target DB/login provisioning, current authorization and Infrastructure currentness, owner consumers, reservations, sandbox/readiness and execution remain open/fail-closed.
 
 Run `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --binding-tests` with the PostgreSQL bin path and pinned Rust 1.99.0 toolchain. The new flag is opt-in; existing schema-only and NATS consumer modes retain their behavior. Canonical parent rows and insert fault are disposable test fixtures only; no production trigger is weakened.
+
+The D20 migration now validates the restricted owner/runtime role contract and the disposable PostgreSQL fixture verifies the runtime function allowlist, PUBLIC denial, forced RLS, cross-tenant isolation, and untrusted verify/ACK denial. WSL ext4 PostgreSQL 18.6 passed 89/89 schema-only steps. A SQLx origin integration target is authored and compiles under Rust 1.98.1 with `--ignore-rust-version`, but its harness reports 0 passed / 1 ignored because no disposable database URL was configured; the test behavior is not yet database-verified. Production role provisioning/grants, Rust 1.99.0, Windows runtime, TLS, recovery, BI/Benchmark and execution remain open.
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
@@ -501,5 +503,6 @@ Permanent poison is terminal only after its independent durable quarantine commi
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| 0.60 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record D20 restricted owner/runtime grant contract and 89/89 PostgreSQL 18.6 WSL schema-only evidence; mark SQLx as compiled but ignored/unexecuted and retain production gates | D20 grants/RLS fixture and SQLx lane merged to local dev |
 | 0.59 | 2026-10-14 | Ulysses — Mavis接手审核 | Record the D20 PostgreSQL 18.6 schema-only origin-verification contract (83/83; migration applied twice), audit SHA-256 and strict scope; retain production identity/grants, SQLx, TLS, BI/recovery/performance and execution gates | WSL disposable PostgreSQL runner passed the D20 SQL contract |
 | 0.58 | 2026-10-14 | Ulysses — Mavis接手审核 | Add D20 Run-owner Result and Infrastructure demand consumer transaction boundaries, validation evidence and fail-closed production gates | Two D20 consumer worktrees rebased and merged to local dev |

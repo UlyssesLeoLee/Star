@@ -1,7 +1,7 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.12 · 2026-10-14 · Ulysses — Mavis 接手审核
-> 状态：D19 server/auth 与 D20 native receiver/source-verifier/owner-consumer slices 已实现；PostgreSQL 18.6 WSL disposable schema-only origin migration/contract 83/83 通过，D20 migration 双次应用。Rust 1.99.0 owner-consumer package gates 记录于 D20 report。Windows PostgreSQL runtime、SQLx、目标库 RLS/grants、真实 TLS e2e、production identity/control plane、Profile→log provisioning、owner recovery、BI/performance 和 cutover 均未完成。
+> v1.13 · 2026-10-14 · Ulysses — Mavis 接手审核
+> 状态：D19 server/auth 与 D20 native receiver/source-verifier/owner-consumer slices 已实现；PostgreSQL 18.6 WSL disposable schema-only runner 89/89 通过，包含 restricted roles 与 grants/RLS contract。SQLx origin target 在 Rust 1.98.1 `--ignore-rust-version` 下编译通过，但 harness 为 1 ignored，未执行 SQL。Rust 1.99.0 owner-consumer package gates 记录于 D20 report。Windows PostgreSQL runtime、生产 role provisioning/grants、真实 TLS e2e、production identity/control plane、Profile→log provisioning、owner recovery、BI/performance 和 cutover 均未完成。
 
 ## 1. 范围与证据
 
@@ -182,6 +182,12 @@ The user's direct reuse authorization covers suitable modules from `E:/AssetsLak
 
 The D20 origin-verification migration and SQL contract passed the disposable PostgreSQL 18.6 WSL schema-only runner, 83/83 steps; the migration applied twice and the origin contract and shutdown passed. Audit: target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl (SHA-256 CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80). The runner binds to loopback and sets unix_socket_directories to empty without shell quotes. This verifies WSL/Linux startup and the SQL schema contract only; Windows runtime, SQLx, target-database RLS/runtime grants and production identity remain unverified. Rust diagnostics and library tests do not establish those gates. Source repositories were inspected read-only; AssetsLake remains at HEAD 0156aca56c0d7364120d7389ebe1ccf0cb64b750 with 17 dirty files, and RustGameServer at 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 with a clean worktree. This is a targeted candidate recheck, not an exhaustive audit of all local Cargo projects.
 
+### 12.1.1 D20 SQLx and database role follow-on
+
+The PostgreSQL 18.6 WSL ext4 schema-only runner now passes 89/89 steps. Its disposable fixture verifies restricted owner/runtime roles, the exact authenticated runtime function allowlist, no direct table access, no PUBLIC execution, forced RLS with a non-vacuous cross-tenant check, untrusted verify/ACK denial, and rejection/recovery of a `BYPASSRLS` role mutation. This validates the disposable migration/role contract, not production role provisioning or deployment grants.
+
+The SQLx `native_origin_verification_pg` target compiles with Rust 1.98.1 and `--ignore-rust-version`; the focused harness reported 0 passed, 0 failed, 1 ignored because no disposable PostgreSQL URL was configured. Therefore the authored rollback/retry and exact-origin SQL scenarios remain unexecuted. Windows PostgreSQL runtime, production mTLS/identity, durable recovery/replay, BI/Benchmark and resource/performance acceptance remain open; native cutover and Schedule/Run execution stay fail closed.
+
 ### 12.2 D20 Run-owner Result and Infrastructure demand consumers
 
 The two follow-on consumer modules are Star-owned Rust code and do not copy another local server. Infrastructure enables `NativeInfrastructureDemandConsumer` only through the explicit `infrastructure/native-grpc-adapter` feature; Run owner enables its result consumer through `run-owner-runtime/native-grpc-adapter`. Both compose the native receive adapter with strict bounded DTO validation, current owner binding checks, owner-local durable Inbox processing, source revalidation after commit, and ACK only after those checks. Permanent poison requires a separately committed durable quarantine. Result decoding is provider-neutral so the business contract is shared with the retained JetStream path; provider-specific cursor and ACK semantics stay inside adapters.
@@ -190,6 +196,7 @@ The combined Rust 1.99.0 checks passed, with Infrastructure library tests 71/71 
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| v1.13 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Update D20 PostgreSQL role/RLS gate to 89/89; record SQLx target compilation with 1 ignored test and retain production identity/grants/TLS/recovery/performance gates | D20 grants and SQLx worktrees merged to local dev |
 | v1.12 | 2026-10-14 | Ulysses — Mavis接手审核 | Replace the D20 PostgreSQL blocker with corrected 83/83 PostgreSQL 18.6 WSL schema-only evidence and preserve Windows, SQLx, grants, TLS and production limits | The pg_ctl startup argument was made shell-quote-free and independently reviewed
 | v1.11 | 2026-10-14 | Ulysses — Mavis接手审核 | Record the default-off Infrastructure demand and provider-neutral Run-owner Result consumers, owner commit-before-ACK/source revalidation, combined Rust 1.99.0 tests, and open production gates | Two D20 consumer worktrees rebased and merged to local dev |
 | v1.10 | 2026-10-12 | Ulysses — Mavis接手审核 | Correct the D20 library test count to 41/41; record the isolated Clippy-driver result and existing integration-test formatting drift while keeping PostgreSQL verification open | Two exact-wire origin verification tests added; current focused gates rerun |
