@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 D20 includes opt-in Run-owner Schedule admission/Result and Infrastructure demand native consumer slices. Their Rust 1.99.0 package gates pass; PostgreSQL origin migration, live TLS, production identity/grants, all-owner migration, BI/Benchmark, recovery and execution remain open.
-> Version: 0.60 | Date: 2026-10-14
+> Status: 🟡 D20 includes opt-in Run-owner Schedule admission/Result and Infrastructure demand native consumer slices. Rust 1.99.0 package gates pass. PostgreSQL 18.6 disposable schema-only runner completed 83/83 steps; `2026-10-12-platform-native-origin-verification.sql` was applied twice and `native-origin-verification-contract` passed. Audit: `target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl` (SHA-256 `CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80`). The runner listened only on `127.0.0.1` and disabled Unix-domain sockets with `-c unix_socket_directories=`; the SQL fixture uses fixed SHA-256 values for the exact UTF-8 wire fixtures and sets the scoped actor in the revocation transaction. No NATS process was started and no Multipass instance or inventory entry was created or modified. Validation platform boundary: this evidence covers WSL/Linux only; Windows-native PostgreSQL `pg_ctl` startup/runtime was not exercised, so Windows runtime compatibility for the socket-disabling option is not established. SQLx integration, production database identity/grants, live TLS, all-owner migration, BI/Benchmark, recovery, performance and execution remain open.
+> Version: 0.61 | Date: 2026-10-14
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -69,10 +69,13 @@ The 9F4D-3B1 runner passed 14/14 disposable PostgreSQL 18.6 gates, including rep
 
 9F4D-3D4 verification: Rust 1.99.0 package formatting, infrastructure all-target check, 53 library tests, targeted Clippy and dependency license/advisory gate passed. The disposable PostgreSQL 18.6 plus loopback NATS Server 2.15.0 runner passed 23/23 steps, 10/10 FORCE RLS checks and 11/11 ignored SQLx cases, including a real JetStream PubAck and delivered-state assertion. The runner created zero Multipass VMs. Production credentials/stream configuration, polling, target DB identity, Run-owner consumer, provider/Manager and executor remain unverified; durable Run Inbox dedupe is required beyond the broker duplicate window.
 
+D20 PostgreSQL 18.6 schema-only verification: PostgreSQL 18.6 disposable schema-only runner completed 83/83 steps; `2026-10-12-platform-native-origin-verification.sql` was applied twice and `native-origin-verification-contract` passed. Audit: `target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl` (SHA-256 `CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80`). The runner listened only on `127.0.0.1` and disabled Unix-domain sockets with `-c unix_socket_directories=`; the SQL fixture uses fixed SHA-256 values for the exact UTF-8 wire fixtures and sets the scoped actor in the revocation transaction. No NATS process was started and no Multipass instance or inventory entry was created or modified. This is schema/migration/SQL-contract evidence only. It does not verify SQLx integration targets, production database identity or deployment grants, live TLS/gRPC, all-owner producer/consumer parity, durable recovery/replay, BI/Benchmark parity, performance/RSS/fairness, workspace-wide Rust 1.99.0 gates, NATS cutover, or Schedule/Run execution; those gates remain open and execution stays fail closed.
+
 ## 4. Revision history
 
 | Version | Date | Change |
 |---|---|---|
+| v0.61 | 2026-10-14 | Record the D20 origin-verification migration applied twice and 83/83 disposable PostgreSQL 18.6 schema-only contract evidence with audit SHA-256; clarify that SQLx, production identity/grants, TLS, consumer parity, BI/performance and execution remain open. |
 | v0.1 | 2026-10-03 | Define the initial Run-scoped Rule API contract and retain all execution gates. |
 | v0.2 | 2026-10-04 | Record review fixes and focused verification while keeping production gates open. |
 | v0.3 | 2026-10-04 | Include Rule-revision currentness and record the direct all-targets/test-binary evidence. |

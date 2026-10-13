@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.48 (2026-10-14)
-> **上游要件定义书**: docs/requirements.md v6.48
+> **文档版本**: v6.49 (2026-10-14)
+> **上游要件定义书**: docs/requirements.md v6.49
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5650,7 +5650,7 @@ Native gRPC server 使用强制 mTLS。Tonic 握手成功后，Rust 服务端提
 
 | v6.40 | 2026-10-12 | Ulysses — Mavis接手审核 | 增补 native gRPC 服务端的强制 mTLS 身份映射、Profile→log 授权、并发/帧/期限边界及 D19 Rust/PostgreSQL 证据；明确 production、E2E 与性能缺口 | D19 服务端授权首片实现并经隔离数据库复验 |
 
-### D20 Native 接收与来源证明首片（v6.46）
+### D20 Native 接收、来源证明与 consumer 验收（v6.49）
 
 Native provider 现在沿用共享 `AdmissionReceiveTransport`/`AdmissionReceivedDelivery` 边界实现 Pull 与 lease-fenced Acknowledge；owner Inbox 事务、当前授权复验和持久化 quarantine 仍由各自 owner/平台边界负责。Route 与 Transport Profile 在构造时固定，服务端依据 mTLS principal 确认 recipient，wire 只提供受限消息内容与 sender/kind。Provider 来源身份由 provider ID/version、Profile digest 和 endpoint identity 的 domain-separated digest 导出，便于隔离 quarantine/replay key 且不暴露 endpoint label。
 
@@ -5662,12 +5662,13 @@ D20 来源证明将 mTLS peer 的 SHA-256 指纹在 authenticated append 时写�
 
 Run owner 提供 opt-in `native-grpc-adapter` feature，将 native transport、来源授权 verifier 与 owner store 组合为 typed consumer。Schedule admission consumer 只接收 Request/Resolution；新增 Result consumer 严格解析 provider-neutral envelope，并在 Run-owner Inbox 事实提交、再次验证 transport 来源后才 ACK。Infrastructure owner 新增默认关闭的 `native-grpc-adapter` Request consumer：先验证 typed demand 的当前 Run binding、placement 与 exact Host/cluster generation，再在 Infrastructure 自己的 Inbox 事务提交后复验来源并 ACK。两个方向都保持单条、有界 deadline、可取消、poison 必须 durable quarantine 后才 terminal-disposition，不跨 owner 共用写事务、不启动 executor。
 
-2026-10-14 合并后的 Rust 1.99.0 联合 all-targets check、目标 crate strict no-deps Clippy 和改动文件格式检查通过；`infrastructure` library tests 71/71、`run-owner-runtime` 22/22 通过。该 Rust 证据不验证 migration/SQLx、RLS/grants、真实 TLS、生产身份/Profile resolver、全量 Outbox/Inbox producers、恢复/重放、BI/Benchmark、RSS/延迟/公平性或 NATS cutover。对应 owner 独立事务、Multipass/K3s 两实例上限及 execution fail-closed 边界保持不变；详见 requirements v6.48、Schedule SRS v0.60、Schedule BD v0.58、Schedule DD v0.69、Infrastructure DD v0.35 与 D20 report v1.1。
+2026-10-14 合并后 Rust 1.99.0 联合 all-targets check、目标 crate strict no-deps Clippy 与改动文件格式检查通过；`infrastructure` library tests 71/71、`run-owner-runtime` 22/22 通过。Rust 证据不验证生产身份/Profile resolver、全量 Outbox/Inbox producers、恢复/重放、BI/Benchmark、RSS/延迟/公平性或 NATS cutover。PostgreSQL 18.6 隔离 schema-only runner 共 83/83 步通过；`2026-10-12-platform-native-origin-verification.sql` 双次应用，`native-origin-verification-contract` 通过。Audit：`target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl`（SHA-256 `CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80`）。Runner 仅监听 `127.0.0.1`，并通过 `-c unix_socket_directories=` 禁用 Unix-domain socket；SQL fixture 对精确 UTF-8 wire 样本使用固定 SHA-256，并在撤销事务中设置 scoped actor。本轮未启动 NATS，也未创建 Multipass 实例或修改 inventory。平台范围：本证据仅覆盖 WSL/Linux；未运行 Windows 原生 PostgreSQL `pg_ctl` 启动/运行，因此不证明 Windows runtime 对该 socket 参数的兼容性。 该证据只覆盖 schema/migration/SQL contract；不验证 SQLx integration target、生产数据库身份或部署 grants、live TLS/gRPC、全量 owner producer/consumer parity、durable recovery/replay、BI/Benchmark parity、性能/RSS/fairness、workspace-wide Rust 1.99.0 gates、NATS cutover 或 Schedule/Run execution。相关门禁仍开放，execution 继续 fail closed。 对应 owner 独立事务、Multipass/K3s 测试 inventory 最多 2 条记录及 execution fail-closed 边界保持不变；详见 requirements v6.49、Schedule SRS v0.61、Schedule BD v0.59、Schedule DD v0.70、Infrastructure DD v0.35 与 D20 report v1.1。
 
-来源验证 migration 与 SQL contract 已接入 schema-only runner，但本轮未执行：该工作环境未安装 PostgreSQL server binaries。可执行 SQL migration、RLS、锁行为及 runtime grants 仍须在 PostgreSQL 18.6 disposable instance 中验证。Run-owner consumer composition 已在 Rust 1.99.0 下通过 package all-targets check、17/17 library tests、all-targets Clippy 与变更文件 rustfmt；依赖 crate 仍输出既有 warnings。native origin-verification SQL、live TLS e2e、全量 owner consumer migration、recovery、BI/Benchmark parity、workspace-wide release gates、RSS/performance/fairness 与 NATS route cutover 均未完成。NATS 保留，native provider 和 Schedule/Run execution 继续 fail closed.
+PostgreSQL 18.6 隔离 schema-only runner 共 83/83 步通过；`2026-10-12-platform-native-origin-verification.sql` 双次应用，`native-origin-verification-contract` 通过。Audit：`target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl`（SHA-256 `CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80`）。Runner 仅监听 `127.0.0.1`，并通过 `-c unix_socket_directories=` 禁用 Unix-domain socket；SQL fixture 对精确 UTF-8 wire 样本使用固定 SHA-256，并在撤销事务中设置 scoped actor。本轮未启动 NATS，也未创建 Multipass 实例或修改 inventory。平台范围：本证据仅覆盖 WSL/Linux；未运行 Windows 原生 PostgreSQL `pg_ctl` 启动/运行，因此不证明 Windows runtime 对该 socket 参数的兼容性。 该证据只覆盖 schema/migration/SQL contract；不验证 SQLx integration target、生产数据库身份或部署 grants、live TLS/gRPC、全量 owner producer/consumer parity、durable recovery/replay、BI/Benchmark parity、性能/RSS/fairness、workspace-wide Rust 1.99.0 gates、NATS cutover 或 Schedule/Run execution。相关门禁仍开放，execution 继续 fail closed。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.49 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D20 来源验证 migration/SQL contract 的 PostgreSQL 18.6 schema-only 83/83 证据及 audit SHA-256；明确无 SQLx、生产身份/grants、TLS、全量 consumer、BI/性能或执行验收 | WSL disposable PostgreSQL runner 通过 D20 origin-verification contract |
 | v6.48 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Run-owner Result 与 Infrastructure demand native consumer、各 owner commit-before-ACK/来源复验，并记录合并后的 Rust 1.99.0 联合验证；保留 PostgreSQL、TLS、生产接线、BI 与性能缺口 | D20 两条 consumer worktree rebase 并合入本地 dev |
 | v6.47 | 2026-10-13 | Ulysses — Mavis接手审核 | 订正 Run-owner JetStream 132 KiB `max_bytes` 的 client-buffering 语义、消息物化后才执行的 128 KiB parser guard、NATS/Stream admission limits 与 RSS 门；同步 quarantine 已实现但 production 仍关闭的边界 | Run Owner 消费端 bounded-memory 文档复核 |
 | v6.46 | 2026-10-13 | Ulysses — Mavis接手审核 | 补录 Run-owner composition 在 Rust 1.99.0 下的 package 验证，并保留 D20 PostgreSQL、TLS、全量 owner consumer 与 BI 未验收边界 | Rust 1.99.0 check/test/Clippy 与定向 rustfmt 通过 |
