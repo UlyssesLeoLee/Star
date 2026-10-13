@@ -1,10 +1,11 @@
 //! Opt-in native receiver for Run-owner Infrastructure capacity results.
 /*
-@cypher schema=1 source_sha256=105dc031c5c4a8b1dc2b67261587821a355939ad1c1896e8ba9ac53b3f043bbf
+@cypher schema=1 source_sha256=df3cbdeebff51fb139104179acf179feea7aecfa1910897aa819f42b00404f22
 MERGE (self:File {path:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::module",kind:"module"})
 MERGE (consumer:Type {id:"run_owner_runtime::NativeGrpcCapacityResultConsumer",kind:"struct"})
 MERGE (consumer_error:Type {id:"run_owner_runtime::NativeCapacityResultConsumerError",kind:"enum"})
+MERGE (persist_outcome:Type {id:"run_owner_runtime::CapacityResultPersistOutcome",kind:"enum"})
 MERGE (fixture_delivery:Type {id:"run_owner_runtime::native_capacity_result_tests::FixtureDelivery",kind:"struct"})
 MERGE (fixture_authorization:Type {id:"run_owner_runtime::native_capacity_result_tests::FixtureAuthorization",kind:"struct"})
 MERGE (fixture_quarantine:Type {id:"run_owner_runtime::native_capacity_result_tests::FixtureQuarantine",kind:"struct"})
@@ -17,6 +18,7 @@ MERGE (supports_scope:Symbol {id:"crates/run-owner-runtime/src/native_capacity_r
 MERGE (valid_origin:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::validate_capacity_result_origin",kind:"function"})
 MERGE (origin_matches:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::capacity_result_matches_origin",kind:"function"})
 MERGE (classify_poison:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::capacity_result_poison_fault",kind:"function"})
+MERGE (persist_or_quarantine:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::persist_or_quarantine_capacity_result",kind:"function"})
 MERGE (commit_ack:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::persist_authorized_then_ack",kind:"function"})
 MERGE (quarantine_ack:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::quarantine_then_ack",kind:"function"})
 MERGE (test_scope_helper:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::tests.scope",kind:"function"})
@@ -27,9 +29,11 @@ MERGE (test_origin:Symbol {id:"crates/run-owner-runtime/src/native_capacity_resu
 MERGE (test_bounds:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::tests.provider_neutral_parser_enforces_wire_bounds",kind:"test"})
 MERGE (test_commit:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::tests.authorization_commit_reauthorization_and_ack_order_is_enforced",kind:"test"})
 MERGE (test_quarantine:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::tests.quarantine_failure_never_acknowledges",kind:"test"})
+MERGE (test_conflict:Symbol {id:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs::tests.idempotency_conflict_is_quarantined_before_terminal_disposition",kind:"test"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:DEFINES]->(consumer)
 MERGE (module)-[:DEFINES]->(consumer_error)
+MERGE (module)-[:DEFINES]->(persist_outcome)
 MERGE (module)-[:DEFINES]->(fixture_delivery)
 MERGE (module)-[:DEFINES]->(fixture_authorization)
 MERGE (module)-[:DEFINES]->(fixture_quarantine)
@@ -42,6 +46,7 @@ MERGE (module)-[:DEFINES]->(supports_scope)
 MERGE (module)-[:DEFINES]->(valid_origin)
 MERGE (module)-[:DEFINES]->(origin_matches)
 MERGE (module)-[:DEFINES]->(classify_poison)
+MERGE (module)-[:DEFINES]->(persist_or_quarantine)
 MERGE (module)-[:DEFINES]->(commit_ack)
 MERGE (module)-[:DEFINES]->(quarantine_ack)
 MERGE (module)-[:DEFINES]->(test_scope_helper)
@@ -52,6 +57,7 @@ MERGE (module)-[:DEFINES]->(test_origin)
 MERGE (module)-[:DEFINES]->(test_bounds)
 MERGE (module)-[:DEFINES]->(test_commit)
 MERGE (module)-[:DEFINES]->(test_quarantine)
+MERGE (module)-[:DEFINES]->(test_conflict)
 MERGE (consumer_error)-[:USES_TYPE]->(setup_error:Type {id:"platform_messaging_runtime::native_grpc::NativeGrpcSetupError",kind:"enum"})
 MERGE (consumer_error)-[:USES_TYPE]->(receive_error:Type {id:"platform_messaging_runtime::admission_receive::AdmissionReceiveError",kind:"enum"})
 MERGE (consumer_error)-[:USES_TYPE]->(capacity_error:Type {id:"run_owner_runtime::CapacityResultError",kind:"enum"})
@@ -69,10 +75,13 @@ MERGE (process)-[:CALLS]->(valid_origin)
 MERGE (process)-[:CALLS]->(parse:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::parse_capacity_result_envelope",kind:"function"})
 MERGE (process)-[:CALLS]->(origin_matches)
 MERGE (process)-[:CALLS]->(classify_poison)
-MERGE (process)-[:CALLS]->(commit_ack)
-MERGE (process)-[:CALLS]->(quarantine_ack)
+MERGE (process)-[:CALLS]->(persist_or_quarantine)
+MERGE (process)-[:USES_TYPE]->(persist_outcome)
 MERGE (process)-[:CALLS]->(quarantine_delivery)
 MERGE (quarantine_delivery)-[:CALLS]->(quarantine_ack)
+MERGE (persist_or_quarantine)-[:CALLS]->(classify_poison)
+MERGE (persist_or_quarantine)-[:CALLS]->(commit_ack)
+MERGE (persist_or_quarantine)-[:CALLS]->(quarantine_ack)
 MERGE (commit_ack)-[:CALLS]->(verify:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization.verify",kind:"method"})
 MERGE (commit_ack)-[:CALLS]->(record:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::PostgresRunOwnerCapacityStore.record_capacity_result",kind:"method"})
 MERGE (commit_ack)-[:CALLS]->(ack:Symbol {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceivedDelivery.acknowledge",kind:"method"})
@@ -96,6 +105,9 @@ MERGE (test_commit)-[:CALLS]->(test_wire_helper)
 MERGE (test_quarantine)-[:CALLS]->(quarantine_ack)
 MERGE (test_quarantine)-[:CALLS]->(test_delivery_helper)
 MERGE (test_quarantine)-[:CALLS]->(test_wire_helper)
+MERGE (test_conflict)-[:CALLS]->(persist_or_quarantine)
+MERGE (test_conflict)-[:CALLS]->(test_delivery_helper)
+MERGE (test_conflict)-[:CALLS]->(test_wire_helper)
 @endcypher
 */
 
@@ -124,6 +136,12 @@ use crate::{
 };
 
 const NATIVE_CAPACITY_RESULT_DEADLINE: Duration = Duration::from_secs(10);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CapacityResultPersistOutcome {
+    Stored(bool),
+    Quarantined,
+}
 
 /// Setup and receive failures for the opt-in native capacity result consumer.
 #[derive(Debug, Error)]
@@ -243,15 +261,27 @@ impl NativeGrpcCapacityResultConsumer {
         }
 
         let event_id = result.event_id;
-        let stored = persist_authorized_then_ack(&delivery, &self.authorization, || {
-            self.store.record_capacity_result(result)
-        })
+        let persist_outcome = persist_or_quarantine_capacity_result(
+            &delivery,
+            &self.authorization,
+            self.quarantine.as_deref(),
+            || self.store.record_capacity_result(result),
+        )
         .await?;
-        Ok(if stored {
-            CapacityResultConsumeOutcome::Stored { event_id }
-        } else {
-            CapacityResultConsumeOutcome::Duplicate { event_id }
-        })
+        match persist_outcome {
+            CapacityResultPersistOutcome::Stored(true) => {
+                Ok(CapacityResultConsumeOutcome::Stored { event_id })
+            }
+            CapacityResultPersistOutcome::Stored(false) => {
+                Ok(CapacityResultConsumeOutcome::Duplicate { event_id })
+            }
+            CapacityResultPersistOutcome::Quarantined => {
+                Ok(CapacityResultConsumeOutcome::QuarantinedNative {
+                    log_generation: delivery.origin().log_generation,
+                    sequence: delivery.origin().sequence,
+                })
+            }
+        }
     }
 
     async fn quarantine_delivery<D>(
@@ -311,8 +341,43 @@ fn capacity_result_poison_fault(
         CapacityResultError::InvalidEvent | CapacityResultError::Json(_) => {
             Some(AdmissionReceivePoisonFault::MalformedWire)
         }
-        // Idempotency conflicts and owner/database errors are not poison in this native path.
+        // A payload conflict for an existing event ID is permanent and must be quarantined.
+        CapacityResultError::IdempotencyConflict => {
+            Some(AdmissionReceivePoisonFault::IdentityMismatch)
+        }
+        // Owner/database consistency errors remain unacknowledged for repair or redelivery.
         _ => None,
+    }
+}
+
+async fn persist_or_quarantine_capacity_result<D, A, Q, F, Fut>(
+    delivery: &D,
+    authorization: &A,
+    quarantine: Option<&Q>,
+    persist: F,
+) -> Result<CapacityResultPersistOutcome, NativeCapacityResultConsumerError>
+where
+    D: AdmissionReceivedDelivery,
+    A: AdmissionReceiveAuthorization,
+    Q: AdmissionReceiveQuarantine + ?Sized,
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<bool, CapacityResultError>>,
+{
+    match persist_authorized_then_ack(delivery, authorization, persist).await {
+        Ok(stored) => Ok(CapacityResultPersistOutcome::Stored(stored)),
+        Err(NativeCapacityResultConsumerError::Capacity(
+            error @ CapacityResultError::IdempotencyConflict,
+        )) => {
+            let Some(fault) = capacity_result_poison_fault(&error) else {
+                return Err(NativeCapacityResultConsumerError::Capacity(error));
+            };
+            let Some(quarantine) = quarantine else {
+                return Err(AdmissionReceiveError::Contract.into());
+            };
+            quarantine_then_ack(delivery, authorization, quarantine, fault).await?;
+            Ok(CapacityResultPersistOutcome::Quarantined)
+        }
+        Err(error) => Err(error),
     }
 }
 
@@ -383,8 +448,9 @@ mod tests {
     };
 
     use super::{
-        capacity_result_matches_origin, persist_authorized_then_ack, quarantine_then_ack,
-        supports_capacity_result_scope, NativeCapacityResultConsumerError,
+        capacity_result_matches_origin, capacity_result_poison_fault, persist_authorized_then_ack,
+        persist_or_quarantine_capacity_result, quarantine_then_ack, supports_capacity_result_scope,
+        CapacityResultPersistOutcome, NativeCapacityResultConsumerError,
     };
 
     #[derive(Clone)]
@@ -608,6 +674,89 @@ mod tests {
             ))
         ));
         assert_eq!(*failed_events.lock().unwrap(), ["verify"]);
+    }
+
+    #[tokio::test]
+    async fn idempotency_conflict_is_quarantined_before_terminal_disposition() {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let delivery = make_delivery(valid_wire(), Arc::clone(&events));
+        let authorization = FixtureAuthorization {
+            events: Arc::clone(&events),
+            fail_source: false,
+        };
+        let quarantine = FixtureQuarantine {
+            events: Arc::clone(&events),
+            fail: false,
+        };
+        let conflict_events = Arc::clone(&events);
+
+        let outcome = persist_or_quarantine_capacity_result(
+            &delivery,
+            &authorization,
+            Some(&quarantine),
+            move || async move {
+                conflict_events.lock().unwrap().push("idempotency_conflict");
+                Err::<bool, _>(CapacityResultError::IdempotencyConflict)
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(outcome, CapacityResultPersistOutcome::Quarantined);
+        assert_eq!(
+            capacity_result_poison_fault(&CapacityResultError::IdempotencyConflict),
+            Some(AdmissionReceivePoisonFault::IdentityMismatch)
+        );
+        assert_eq!(
+            *events.lock().unwrap(),
+            [
+                "verify",
+                "idempotency_conflict",
+                "verify_source",
+                "quarantine",
+                "verify_source",
+                "terminate"
+            ]
+        );
+
+        let failed_events = Arc::new(Mutex::new(Vec::new()));
+        let failed_delivery = make_delivery(valid_wire(), Arc::clone(&failed_events));
+        let failed_authorization = FixtureAuthorization {
+            events: Arc::clone(&failed_events),
+            fail_source: false,
+        };
+        let failed_quarantine = FixtureQuarantine {
+            events: Arc::clone(&failed_events),
+            fail: true,
+        };
+        let conflict_events = Arc::clone(&failed_events);
+
+        let result = persist_or_quarantine_capacity_result(
+            &failed_delivery,
+            &failed_authorization,
+            Some(&failed_quarantine),
+            move || async move {
+                conflict_events.lock().unwrap().push("idempotency_conflict");
+                Err::<bool, _>(CapacityResultError::IdempotencyConflict)
+            },
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(NativeCapacityResultConsumerError::Receive(
+                AdmissionReceiveError::Quarantine
+            ))
+        ));
+        assert_eq!(
+            *failed_events.lock().unwrap(),
+            [
+                "verify",
+                "idempotency_conflict",
+                "verify_source",
+                "quarantine"
+            ]
+        );
     }
 
     #[tokio::test]

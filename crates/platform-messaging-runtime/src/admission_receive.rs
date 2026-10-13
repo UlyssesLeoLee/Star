@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2428da2a2e33b0fe252347b4499f8f7d70219c158dad10d70ebc6db0b420a037
+@cypher schema=1 source_sha256=2102e72d4309888197a71e53bc6c945075d18f2afe50318af70812612f68628d
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_receive.rs"})
 MERGE (receiver:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver",kind:"struct"})
 MERGE (transport:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
@@ -180,12 +180,12 @@ pub enum AdmissionReceiveError {
     Cancelled,
 }
 
-/// Permanent wire faults that may be terminally dispositioned after durable quarantine.
+/// Permanent delivery faults that may be terminally dispositioned after durable quarantine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AdmissionReceivePoisonFault {
     /// Payload was empty, oversized, or could not be decoded as the typed JSON contract.
     MalformedWire,
-    /// Decoded payload tenant or message identity did not match the pinned receive route.
+    /// Decoded tenant/message identity mismatched the route or conflicted with a durable Inbox fact.
     IdentityMismatch,
 }
 

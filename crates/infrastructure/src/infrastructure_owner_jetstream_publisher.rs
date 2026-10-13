@@ -1,6 +1,6 @@
 //! Bounded JetStream publication for tenant-scoped Infrastructure Outbox claims.
 //!
-//! @cypher schema=1 source_sha256=f30d2040868a73d4e7959c569cfabfa8c0762855f2c942cfdd0ed79aa1cf675b
+//! @cypher schema=1 source_sha256=91850eedef154a24fa3f477c537f1133b877211a254436b555217e5e5b11e02e
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
 //! MERGE (publisher:Type {id:"infrastructure::InfrastructureOwnerJetStreamPublisher",kind:"struct"})
@@ -186,7 +186,6 @@ fn build_envelope(
     let subject_event = match claim.event_type.as_str() {
         "capacity_accepted" => "capacity_accepted",
         "capacity_rejected" => "capacity_rejected",
-        "capacity_released" => "capacity_released",
         "capacity_expired" => "capacity_expired",
         _ => return Err(()),
     };
@@ -275,6 +274,7 @@ mod tests {
     #[test]
     fn unknown_event_types_and_schema_versions_fail_closed() {
         assert!(build_envelope(&claim("arbitrary.subject", "{}")).is_err());
+        assert!(build_envelope(&claim("capacity_released", "{}")).is_err());
 
         let mut unsupported = claim("capacity_rejected", "{}");
         unsupported.schema_version = 3;
@@ -283,10 +283,10 @@ mod tests {
 
     #[test]
     fn malformed_oversized_and_non_object_payloads_fail_closed() {
-        assert!(build_envelope(&claim("capacity_released", "not-json")).is_err());
-        assert!(build_envelope(&claim("capacity_released", "[]")).is_err());
+        assert!(build_envelope(&claim("capacity_accepted", "not-json")).is_err());
+        assert!(build_envelope(&claim("capacity_accepted", "[]")).is_err());
         let oversized = format!("{{\"data\":\"{}\"}}", "x".repeat(MAX_PAYLOAD_BYTES));
-        assert!(build_envelope(&claim("capacity_released", &oversized)).is_err());
+        assert!(build_envelope(&claim("capacity_accepted", &oversized)).is_err());
     }
 
     #[test]
