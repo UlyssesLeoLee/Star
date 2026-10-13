@@ -1,4 +1,5 @@
 -- Native transport source provenance is fixed at authenticated append and checked before owner ACK.
+-- @cypher schema=1 source_sha256=71cc6434b88b425337b37e1c8015f78afdb76fdd356562a7296b6c39b69b67e9
 -- MERGE (self:File {path:"db/migrations/2026-10-12-platform-native-origin-verification.sql"})
 -- MERGE (work:Table {id:"platform_transport.message_work",class:"Work"})
 -- MERGE (certificate:Table {id:"platform_transport.service_certificate_identity",class:"Master"})
@@ -12,6 +13,10 @@
 -- MERGE (self)-[:DEFINES]->(verify)
 -- MERGE (self)-[:REVISES]->(append)
 -- MERGE (self)-[:REVISES]->(ack)
+-- MERGE (owner_role:Config {id:"star_platform_transport_owner"})
+-- MERGE (runtime_role:Config {id:"star_platform_transport_runtime"})
+-- MERGE (self)-[:CONFIGURES]->(owner_role)
+-- MERGE (self)-[:CONFIGURES]->(runtime_role)
 -- MERGE (capture)-[:READS]->(certificate)
 -- MERGE (capture)-[:WRITES]->(work)
 -- MERGE (append)-[:CALLS]->(capture)
@@ -21,6 +26,22 @@
 -- @endcypher
 
 BEGIN;
+
+DO $role_guard$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'star_platform_transport_owner')
+       OR NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'star_platform_transport_runtime')
+       OR EXISTS (
+            SELECT 1 FROM pg_roles
+             WHERE rolname IN ('star_platform_transport_owner', 'star_platform_transport_runtime')
+               AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication
+                    OR rolbypassrls OR rolinherit)
+       ) THEN
+        RAISE EXCEPTION 'native transport owner/runtime roles must exist as restricted NOLOGIN NOBYPASSRLS NOINHERIT roles'
+            USING ERRCODE = '42501';
+    END IF;
+END
+$role_guard$;
 
 ALTER TABLE platform_transport.message_work
     ADD COLUMN IF NOT EXISTS source_certificate_sha256 BYTEA;
@@ -204,7 +225,8 @@ ALTER FUNCTION platform_transport.verify_origin_authenticated(BYTEA, BYTEA, UUID
 ALTER FUNCTION platform_transport.acknowledge_authenticated(BYTEA, BYTEA, UUID, TEXT, TEXT, UUID, BIGINT, UUID, UUID, BYTEA)
     OWNER TO star_platform_transport_owner;
 
-REVOKE ALL ON FUNCTION platform_transport.capture_message_source_certificate() FROM PUBLIC;
+REVOKE ALL ON FUNCTION platform_transport.capture_message_source_certificate()
+    FROM PUBLIC, star_platform_transport_runtime;
 REVOKE ALL ON FUNCTION platform_transport.verify_origin_authenticated(BYTEA, BYTEA, UUID, TEXT, TEXT, UUID, BIGINT, UUID, BYTEA)
     FROM PUBLIC, star_platform_transport_runtime;
 GRANT EXECUTE ON FUNCTION platform_transport.verify_origin_authenticated(BYTEA, BYTEA, UUID, TEXT, TEXT, UUID, BIGINT, UUID, BYTEA)

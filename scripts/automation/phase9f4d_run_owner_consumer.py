@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=e795cf1520e6ffec026b3e3909356cb4e03c1a8c1d97a2d73cd06083169cbf6b
+# @cypher schema=1 source_sha256=d520806d94a4b242e195c584604f3d26f12d3cd899e1f42e7ba6b0e0c5eb4499
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -26,6 +26,10 @@
 # MERGE (native_transport_concurrency_test:Config {id:"db/tests/platform-native-transport-log-concurrency.sql"})
 # MERGE (native_transport_server_auth_test:Config {id:"db/tests/platform-native-transport-server-auth.sql"})
 # MERGE (native_origin_verification_test:Config {id:"db/tests/platform-native-origin-verification.sql"})
+# MERGE (untrusted_transport_role:Config {id:"disposable-test-only::star_platform_transport_untrusted_probe"})
+# MERGE (untrusted_verify_sql:Config {id:"disposable-test-only::verify_origin_authenticated-denial"})
+# MERGE (untrusted_ack_sql:Config {id:"disposable-test-only::acknowledge_authenticated-denial"})
+# MERGE (bypassrls_mutation:Config {id:"disposable-test-only::native-transport-runtime-bypassrls-probe"})
 # MERGE (transport_profile_sqlx_test:Config {id:"crates/platform-messaging-runtime/tests/transport_profile_pg.rs"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
@@ -53,7 +57,7 @@
 # MERGE (sys:ExternalService {id:"python.sys",kind:"module"})
 # MERGE (pathlib:ExternalService {id:"python.pathlib",kind:"module"})
 # MERGE (typing:ExternalService {id:"python.typing",kind:"module"})
-# MERGE (thread_pool:ExternalService {id:"concurrent.futures.ThreadPoolExecutor",kind:"python module"})
+# MERGE (thread_pool:Type {id:"concurrent.futures.ThreadPoolExecutor"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(run_sql)
@@ -74,7 +78,7 @@
 # MERGE (main)-[:CONFIGURES]->(postgres)
 # MERGE (main)-[:CONFIGURES]->(nats)
 # MERGE (main)-[:CONFIGURES]->(cargo)
-# MERGE (main)-[:USES]->(thread_pool)
+# MERGE (main)-[:USES_TYPE]->(thread_pool)
 # MERGE (main)-[:READS]->(migration)
 # MERGE (main)-[:READS]->(quarantine_migration)
 # MERGE (main)-[:READS]->(admission_quarantine_migration)
@@ -88,6 +92,10 @@
 # MERGE (main)-[:TESTS]->(native_transport_concurrency_test)
 # MERGE (main)-[:TESTS]->(native_transport_server_auth_test)
 # MERGE (main)-[:TESTS]->(native_origin_verification_test)
+# MERGE (main)-[:CONFIGURES]->(untrusted_transport_role)
+# MERGE (main)-[:TESTS]->(untrusted_verify_sql)
+# MERGE (main)-[:TESTS]->(untrusted_ack_sql)
+# MERGE (main)-[:TESTS]->(bypassrls_mutation)
 # MERGE (main)-[:TESTS]->(transport_profile_sqlx_test)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
@@ -102,10 +110,19 @@
 # MERGE (main)-[:READS]->(policy_currentness:Config {id:"db/migrations/2026-10-10-run-owner-policy-currentness.sql"})
 # MERGE (main)-[:READS]->(task_currentness:Config {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql"})
 # MERGE (main)-[:READS]->(acl_lock)
-# MERGE (main)-[:USES_TEST_FIXTURE]->(legacy_audit_fixture)
+# MERGE (main)-[:TESTS]->(legacy_audit_fixture)
 # MERGE (main)-[:TESTS]->(consumer_test)
 # MERGE (run_sql)-[:CALLS]->(run_step)
 # MERGE (run_sql)-[:CALLS]->(write_text)
+# MERGE (run_expected_function_denial:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_expected_function_denial",kind:"function"})
+# MERGE (run_expected_sql_error:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_expected_sql_error",kind:"function"})
+# MERGE (self)-[:DEFINES]->(run_expected_function_denial)
+# MERGE (self)-[:DEFINES]->(run_expected_sql_error)
+# MERGE (main)-[:CALLS]->(run_expected_function_denial)
+# MERGE (main)-[:CALLS]->(run_expected_sql_error)
+# MERGE (run_expected_function_denial)-[:CALLS]->(run_sql)
+# MERGE (run_expected_function_denial)-[:CALLS]->(run_expected_sql_error)
+# MERGE (run_expected_sql_error)-[:CALLS]->(run_sql)
 # MERGE (start_nats)-[:CALLS]->(subprocess)
 # MERGE (start_nats)-[:CALLS]->(socket)
 # MERGE (start_nats)-[:CALLS]->(time)
@@ -170,6 +187,34 @@ TRANSPORT_PROFILE_MASTER_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-pl
 NATIVE_TRANSPORT_LOG_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-native-transport-log.sql"
 NATIVE_TRANSPORT_SERVER_AUTH_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-transport-z-native-server-auth.sql"
 NATIVE_ORIGIN_VERIFICATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-native-origin-verification.sql"
+UNTRUSTED_TRANSPORT_ROLE = "star_platform_transport_untrusted_probe"
+NATIVE_ORIGIN_SET_BYPASS_SQL = "ALTER ROLE star_platform_transport_runtime BYPASSRLS;"
+NATIVE_ORIGIN_RESTORE_ROLE_SQL = "ALTER ROLE star_platform_transport_runtime NOBYPASSRLS;"
+UNTRUSTED_TRANSPORT_ROLE_SETUP_SQL = f"""\
+CREATE ROLE {UNTRUSTED_TRANSPORT_ROLE} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+GRANT USAGE ON SCHEMA platform_transport TO {UNTRUSTED_TRANSPORT_ROLE};
+"""
+UNTRUSTED_ORIGIN_VERIFY_SQL = """\
+BEGIN;
+SET LOCAL ROLE star_platform_transport_untrusted_probe;
+SELECT platform_transport.verify_origin_authenticated(
+    decode(repeat('22', 32), 'hex'), decode(repeat('ab', 32), 'hex'),
+    '93000000-0000-0000-0000-000000000001', 'request', 'test.native.auth',
+    '95000000-0000-0000-0000-000000000001', 1,
+    '99000000-0000-0000-0000-000000000001', decode(repeat('cc', 32), 'hex'));
+ROLLBACK;
+"""
+UNTRUSTED_ORIGIN_ACK_SQL = """\
+BEGIN;
+SET LOCAL ROLE star_platform_transport_untrusted_probe;
+SELECT platform_transport.acknowledge_authenticated(
+    decode(repeat('22', 32), 'hex'), decode(repeat('ab', 32), 'hex'),
+    '93000000-0000-0000-0000-000000000001', 'request', 'test.native.auth',
+    '95000000-0000-0000-0000-000000000001', 1,
+    '99000000-0000-0000-0000-000000000001',
+    '98000000-0000-0000-0000-000000000001', decode(repeat('cc', 32), 'hex'));
+ROLLBACK;
+"""
 PROJECT_CAPACITY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-project-capacity.sql"
 CATALOG_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-catalog-currentness.sql"
 POLICY_CURRENTNESS_MIGRATION = ROOT / "db" / "migrations" / "2026-10-10-run-owner-policy-currentness.sql"
@@ -724,6 +769,39 @@ def run_sql(
     return result
 
 
+def run_expected_function_denial(
+    name: str,
+    command: Sequence[str],
+    sql: str,
+    function_name: str,
+    env: dict[str, str],
+) -> dict[str, object]:
+    expected_error = f"permission denied for function {function_name}"
+    return run_expected_sql_error(name, command, sql, expected_error, env)
+
+
+def run_expected_sql_error(
+    name: str,
+    command: Sequence[str],
+    sql: str,
+    expected_error: str,
+    env: dict[str, str],
+) -> dict[str, object]:
+    result = run_sql(name, command, sql, env, expect_success=False)
+    if result["status"] != "passed":
+        return result
+    stderr_path = OUTPUT_DIR / f"{name}.stderr.log"
+    stderr = stderr_path.read_text(encoding="utf-8", errors="replace").lower()
+    expected_error_lower = expected_error.lower()
+    if expected_error_lower not in stderr:
+        result["status"] = "failed"
+        result["reason"] = "expected PostgreSQL error was not observed"
+        result["expected_error"] = expected_error_lower
+        return result
+    result["expected_error"] = expected_error_lower
+    return result
+
+
 def start_nats_server(
     binary: Path, store_dir: Path, port: int, server_name: str, env: dict[str, str]
 ) -> tuple[subprocess.Popen[bytes] | None, dict[str, object]]:
@@ -905,7 +983,13 @@ def main() -> int:
 
     env = os.environ.copy()
     version_steps: list[dict[str, object]] = []
-    if arguments.toolchain_bin:
+    needs_cargo = (
+        not arguments.schema_only
+        or arguments.binding_tests
+        or arguments.admission_tests
+        or arguments.transport_profile_tests
+    )
+    if needs_cargo and arguments.toolchain_bin:
         toolchain_bin = arguments.toolchain_bin.resolve()
         cargo_name = "cargo.exe" if os.name == "nt" else "cargo"
         rustc_name = "rustc.exe" if os.name == "nt" else "rustc"
@@ -919,9 +1003,11 @@ def main() -> int:
         env["RUSTDOC"] = str(toolchain_bin / rustdoc_name)
         cargo = str(cargo_path)
         version_steps.append(run_step("rustc-version", [str(toolchain_bin / rustc_name), "--version"], ROOT, env))
-    else:
+    elif needs_cargo:
         cargo = shutil.which(arguments.cargo) or arguments.cargo
         version_steps.append(run_step("cargo-version", [cargo, "--version"], ROOT, env))
+    else:
+        cargo = arguments.cargo
     if not arguments.schema_only or arguments.admission_delivery_tests:
         assert arguments.nats_server is not None
         version_steps.append(run_step("nats-version", [str(arguments.nats_server.resolve()), "--version"], ROOT, env))
@@ -1165,6 +1251,54 @@ def main() -> int:
                 "native-origin-verification-contract",
                 psql_base,
                 NATIVE_ORIGIN_VERIFICATION_TEST.read_text(encoding="utf-8"),
+                env,
+            ))
+        if pg_started and all(item["status"] == "passed" for item in results):
+            role_bypass = run_sql("native-origin-set-bypassrls-probe", psql_base, NATIVE_ORIGIN_SET_BYPASS_SQL, env)
+            results.append(role_bypass)
+            if role_bypass["status"] == "passed":
+                results.append(run_expected_sql_error(
+                    "native-origin-role-guard-denied",
+                    psql_base,
+                    NATIVE_ORIGIN_VERIFICATION_MIGRATION.read_text(encoding="utf-8"),
+                    "must exist as restricted NOLOGIN NOBYPASSRLS NOINHERIT roles",
+                    env,
+                ))
+                role_restore = run_sql(
+                    "native-origin-restore-nobypassrls",
+                    psql_base,
+                    NATIVE_ORIGIN_RESTORE_ROLE_SQL,
+                    env,
+                )
+                results.append(role_restore)
+                if role_restore["status"] == "passed":
+                    results.append(run_sql(
+                        "native-origin-reapply-after-role-restore",
+                        psql_base,
+                        NATIVE_ORIGIN_VERIFICATION_MIGRATION.read_text(encoding="utf-8"),
+                        env,
+                    ))
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(run_sql(
+                "native-origin-untrusted-principal-fixture",
+                psql_base,
+                UNTRUSTED_TRANSPORT_ROLE_SETUP_SQL,
+                env,
+            ))
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(run_expected_function_denial(
+                "native-origin-untrusted-verify-denied",
+                psql_base,
+                UNTRUSTED_ORIGIN_VERIFY_SQL,
+                "verify_origin_authenticated",
+                env,
+            ))
+        if pg_started and all(item["status"] == "passed" for item in results):
+            results.append(run_expected_function_denial(
+                "native-origin-untrusted-ack-denied",
+                psql_base,
+                UNTRUSTED_ORIGIN_ACK_SQL,
+                "acknowledge_authenticated",
                 env,
             ))
         if pg_started and all(item["status"] == "passed" for item in results):
