@@ -3,7 +3,7 @@
 // 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 (Apache-2.0).
 // TLS loading and fail-closed behavior are retained; application identity stays Star-owned.
 /*
-@cypher schema=1 source_sha256=055cd209fb5039e48e8dfcf7ce624792917139d3be7f03ba44575893292784ca
+@cypher schema=1 source_sha256=74f5063a44bb9ed7c9c25c497ecad366709445a6ec6e74d4ab1a21d2361ac3f2
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (tls_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
 MERGE (tls_server:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
@@ -34,7 +34,11 @@ MERGE (validate_scope:Symbol {id:"crates/platform-messaging-runtime/src/native_g
 MERGE (valid_log_id:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::valid_native_log_id",kind:"function"})
 MERGE (kind_mapping:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_message_kind",kind:"function"})
 MERGE (provider_identity:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_provider_identity",kind:"function"})
+MERGE (profile_endpoint_guard:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::validate_profile_endpoint",kind:"function"})
 MERGE (proto:File {path:"crates/platform-messaging-proto/src/lib.rs"})
+MERGE (transport_profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
+MERGE (transport_endpoint_file:File {path:"crates/platform-messaging-runtime/src/transport_endpoint.rs"})
+MERGE (resolved_transport_endpoint:Type {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::ResolvedTransportEndpoint",kind:"struct"})
 MERGE (admission:Type {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransport",kind:"trait"})
 MERGE (receipt:Type {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportReceipt",kind:"struct"})
 MERGE (receive_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
@@ -65,6 +69,9 @@ MERGE (native_receive_bounds_test:Symbol {id:"crates/platform-messaging-runtime/
 MERGE (native_provider_identity_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_provider_identity_pins_provider_version_profile_and_endpoint",kind:"test"})
 MERGE (origin_request_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_origin_verification_request_hashes_exact_wire",kind:"test"})
 MERGE (origin_request_bounds_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_origin_verification_request_rejects_invalid_scope_and_wire",kind:"test"})
+MERGE (endpoint_profile_digest_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::resolved_endpoint_must_match_admission_profile_digest",kind:"test"})
+MERGE (endpoint_profile_identity_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::resolved_endpoint_must_match_admission_profile_identity",kind:"test"})
+MERGE (endpoint_profile_match_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::matching_resolved_endpoint_is_accepted_by_profile_guard",kind:"test"})
 MERGE (semaphore:ExternalService {id:"tokio::sync::Semaphore::acquire_owned",kind:"method"})
 MERGE (permit:ExternalService {id:"tokio::sync::OwnedSemaphorePermit",kind:"type"})
 MERGE (bounded_read:ExternalService {id:"std::io::Read::read_to_end",kind:"method"})
@@ -94,6 +101,7 @@ MERGE (self)-[:DEFINES]->(validate_scope)
 MERGE (self)-[:DEFINES]->(valid_log_id)
 MERGE (self)-[:DEFINES]->(kind_mapping)
 MERGE (self)-[:DEFINES]->(provider_identity)
+MERGE (self)-[:DEFINES]->(profile_endpoint_guard)
 MERGE (self)-[:DEFINES]->(receive_authorization)
 MERGE (self)-[:DEFINES]->(receive_authorization_factory)
 MERGE (self)-[:DEFINES]->(verify_origin)
@@ -101,6 +109,8 @@ MERGE (self)-[:DEFINES]->(origin_request)
 MERGE (self)-[:IMPORTS]->(proto)
 MERGE (self)-[:DEPENDS_ON]->(native_proto_package:Config {id:"cargo.package.platform-messaging-proto"})
 MERGE (self)-[:IMPORTS]->(admission)
+MERGE (self)-[:IMPORTS]->(transport_profile_file)
+MERGE (self)-[:IMPORTS]->(transport_endpoint_file)
 MERGE (self)-[:IMPORTS]->(receipt)
 MERGE (self)-[:IMPORTS]->(receive_port)
 MERGE (self)-[:IMPORTS]->(delivery_port)
@@ -122,18 +132,26 @@ MERGE (self)-[:DEFINES]->(native_receive_bounds_test)
 MERGE (self)-[:DEFINES]->(native_provider_identity_test)
 MERGE (self)-[:DEFINES]->(origin_request_test)
 MERGE (self)-[:DEFINES]->(origin_request_bounds_test)
+MERGE (self)-[:DEFINES]->(endpoint_profile_digest_test)
+MERGE (self)-[:DEFINES]->(endpoint_profile_identity_test)
+MERGE (self)-[:DEFINES]->(endpoint_profile_match_test)
 MERGE (transport)-[:IMPLEMENTS]->(admission)
 MERGE (connect)-[:USES_TYPE]->(client_config)
+MERGE (connect)-[:USES_TYPE]->(resolved_transport_endpoint)
 MERGE (connect)-[:CALLS]->(connect_receive_client)
 MERGE (receive_connect)-[:USES_TYPE]->(receive_config)
+MERGE (receive_connect)-[:USES_TYPE]->(resolved_transport_endpoint)
 MERGE (receive_connect)-[:CALLS]->(connect_receive_client)
 MERGE (receive_connect)-[:CALLS]->(validate_scope)
 MERGE (receive_connect)-[:CALLS]->(semaphore)
 MERGE (receive_transport)-[:IMPLEMENTS]->(receive_port)
 MERGE (receive_delivery)-[:IMPLEMENTS]->(delivery_port)
 MERGE (connect_receive_client)-[:CALLS]->(tls_client)
+MERGE (connect_receive_client)-[:CALLS]->(profile_endpoint_guard)
 MERGE (connect_receive_client)-[:CALLS]->(valid_https_endpoint)
 MERGE (connect_receive_client)-[:CALLS]->(tonic)
+MERGE (connect_receive_client)-[:USES_TYPE]->(resolved_transport_endpoint)
+MERGE (profile_endpoint_guard)-[:USES_TYPE]->(resolved_transport_endpoint)
 MERGE (valid_https_endpoint)-[:CALLS]->(valid_domain)
 MERGE (valid_https_endpoint)-[:CALLS]->(tonic_uri_host)
 MERGE (valid_https_endpoint)-[:CALLS]->(tonic_uri_scheme)
@@ -176,6 +194,9 @@ MERGE (native_receive_bounds_test)-[:TESTS]->(validate_delivery)
 MERGE (native_provider_identity_test)-[:TESTS]->(provider_identity)
 MERGE (origin_request_test)-[:TESTS]->(origin_request)
 MERGE (origin_request_bounds_test)-[:TESTS]->(origin_request)
+MERGE (endpoint_profile_digest_test)-[:TESTS]->(profile_endpoint_guard)
+MERGE (endpoint_profile_identity_test)-[:TESTS]->(profile_endpoint_guard)
+MERGE (endpoint_profile_match_test)-[:TESTS]->(profile_endpoint_guard)
 MERGE (peer_fingerprint)-[:CALLS]->(tonic_request)
 MERGE (peer_fingerprint)-[:CALLS]->(sha256)
 MERGE (tls_client)-[:CALLS]->(read_pem)
@@ -214,6 +235,7 @@ use crate::admission_receive::{
     AdmissionReceiveOrigin, AdmissionReceiveScope, AdmissionReceiveTransport,
     AdmissionReceivedDelivery,
 };
+use crate::transport_endpoint::ResolvedTransportEndpoint;
 
 /// The transport wire limit plus protobuf envelope headroom.
 pub const MAX_NATIVE_GRPC_MESSAGE_BYTES: usize = 32 * 1024;
@@ -353,12 +375,8 @@ pub struct NativeGrpcAdmissionTransport {
 pub struct NativeGrpcClientConfig<'a> {
     /// Star delivery owner that will use this client.
     pub owner: AdmissionDeliveryOwner,
-    /// HTTPS endpoint URI for the native transport server.
-    pub uri: &'a str,
-    /// DNS name pinned in the server certificate.
-    pub server_domain: &'a str,
-    /// Immutable endpoint identity pinned by the transport profile.
-    pub endpoint_identity: &'a str,
+    /// Destination resolved from the current trusted transport-profile revision.
+    pub endpoint: &'a ResolvedTransportEndpoint,
     /// Trusted CA bundle used to validate the server certificate.
     pub server_ca_path: &'a Path,
     /// Client certificate presented for mutual TLS authentication.
@@ -375,12 +393,8 @@ pub struct NativeGrpcClientConfig<'a> {
 
 /// Immutable construction inputs for one native receiver bound to one owner route.
 pub struct NativeGrpcReceiveClientConfig<'a> {
-    /// HTTPS endpoint URI for the native transport server.
-    pub uri: &'a str,
-    /// DNS name pinned in the server certificate.
-    pub server_domain: &'a str,
-    /// Immutable endpoint identity pinned by the transport profile.
-    pub endpoint_identity: &'a str,
+    /// Destination resolved from the current trusted transport-profile revision.
+    pub endpoint: &'a ResolvedTransportEndpoint,
     /// Trusted CA bundle used to validate the server certificate.
     pub server_ca_path: &'a Path,
     /// Client certificate presented for mutual TLS authentication.
@@ -424,9 +438,7 @@ pub struct NativeGrpcAdmissionDelivery {
 }
 
 struct NativeGrpcEndpointConfig<'a> {
-    uri: &'a str,
-    server_domain: &'a str,
-    endpoint_identity: &'a str,
+    endpoint: &'a ResolvedTransportEndpoint,
     server_ca_path: &'a Path,
     client_cert_path: &'a Path,
     client_key_path: &'a Path,
@@ -438,25 +450,24 @@ struct NativeGrpcEndpointConfig<'a> {
 async fn connect_native_client(
     config: NativeGrpcEndpointConfig<'_>,
 ) -> Result<wire::durable_transport_client::DurableTransportClient<Channel>, NativeGrpcSetupError> {
-    if config.profile.provider_id != NATIVE_PROVIDER_ID
-        || config.profile.endpoint_identity != config.endpoint_identity
-    {
-        return Err(NativeGrpcSetupError::Profile);
-    }
+    validate_profile_endpoint(config.profile, config.endpoint)?;
     if config.connect_timeout.is_zero()
         || config.connect_timeout > Duration::from_secs(30)
         || config.request_timeout.is_zero()
         || config.request_timeout > Duration::from_secs(10)
-        || !valid_https_endpoint(config.uri, config.server_domain)
+        || !valid_https_endpoint(
+            config.endpoint.https_uri(),
+            config.endpoint.tls_server_name(),
+        )
     {
         return Err(NativeGrpcSetupError::Endpoint);
     }
-    let endpoint = Endpoint::from_shared(config.uri.to_owned())
+    let endpoint = Endpoint::from_shared(config.endpoint.https_uri().to_owned())
         .map_err(|_| NativeGrpcSetupError::Endpoint)?
         .connect_timeout(config.connect_timeout)
         .timeout(config.request_timeout)
         .tls_config(client_tls_config(
-            config.server_domain,
+            config.endpoint.tls_server_name(),
             config.server_ca_path,
             config.client_cert_path,
             config.client_key_path,
@@ -473,14 +484,25 @@ async fn connect_native_client(
     )
 }
 
+fn validate_profile_endpoint(
+    profile: &AdmissionTransportProfile,
+    endpoint: &ResolvedTransportEndpoint,
+) -> Result<(), NativeGrpcSetupError> {
+    if profile.provider_id != NATIVE_PROVIDER_ID
+        || profile.endpoint_identity != endpoint.endpoint_identity()
+        || profile.profile_digest != endpoint.profile_digest()
+    {
+        return Err(NativeGrpcSetupError::Profile);
+    }
+    Ok(())
+}
+
 impl NativeGrpcAdmissionTransport {
     /// Connect one multiplexed, mutually authenticated HTTP/2 channel to a pinned endpoint.
     pub async fn connect(config: NativeGrpcClientConfig<'_>) -> Result<Self, NativeGrpcSetupError> {
         let NativeGrpcClientConfig {
             owner,
-            uri,
-            server_domain,
-            endpoint_identity,
+            endpoint,
             server_ca_path,
             client_cert_path,
             client_key_path,
@@ -489,9 +511,7 @@ impl NativeGrpcAdmissionTransport {
             profile,
         } = config;
         let client = connect_native_client(NativeGrpcEndpointConfig {
-            uri,
-            server_domain,
-            endpoint_identity,
+            endpoint,
             server_ca_path,
             client_cert_path,
             client_key_path,
@@ -515,9 +535,7 @@ impl NativeGrpcAdmissionReceiveTransport {
         config: NativeGrpcReceiveClientConfig<'_>,
     ) -> Result<Self, NativeGrpcSetupError> {
         let NativeGrpcReceiveClientConfig {
-            uri,
-            server_domain,
-            endpoint_identity,
+            endpoint,
             server_ca_path,
             client_cert_path,
             client_key_path,
@@ -531,9 +549,7 @@ impl NativeGrpcAdmissionReceiveTransport {
             return Err(NativeGrpcSetupError::ReceiveRoute);
         }
         let client = connect_native_client(NativeGrpcEndpointConfig {
-            uri,
-            server_domain,
-            endpoint_identity,
+            endpoint,
             server_ca_path,
             client_cert_path,
             client_key_path,
@@ -938,6 +954,13 @@ impl AdmissionTransport for NativeGrpcAdmissionTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport_endpoint::{TrustedEndpointConfig, TrustedEndpointResolver};
+    use crate::transport_profile::{
+        TransportMessageKind, TransportProfileDefinition, TransportProfileLifecycle,
+        TransportProfileRevision,
+    };
+
+    const TEST_DEPLOYMENT_ID: Uuid = Uuid::from_u128(10);
 
     fn test_profile() -> AdmissionTransportProfile {
         AdmissionTransportProfile::new(
@@ -947,6 +970,80 @@ mod tests {
             "native-endpoint-a".to_owned(),
         )
         .unwrap()
+    }
+
+    fn resolved_endpoint(identity: &str) -> ResolvedTransportEndpoint {
+        let definition = TransportProfileDefinition::new(
+            NATIVE_PROVIDER_ID.to_owned(),
+            "1".to_owned(),
+            identity.to_owned(),
+            "provider-log-generation-v1".to_owned(),
+            vec![Uuid::from_u128(20)],
+            vec![Uuid::from_u128(21)],
+            vec![TransportMessageKind::Request],
+            None,
+        )
+        .unwrap();
+        let profile = TransportProfileRevision::new(
+            TEST_DEPLOYMENT_ID,
+            Uuid::from_u128(11),
+            Uuid::from_u128(12),
+            1,
+            TransportProfileLifecycle::Active,
+            definition,
+        )
+        .unwrap();
+        let trusted_endpoint = TrustedEndpointConfig::new(
+            identity.to_owned(),
+            "https://transport.internal.example:7443/grpc/v1".to_owned(),
+            "transport.internal.example".to_owned(),
+        )
+        .unwrap();
+        TrustedEndpointResolver::new(TEST_DEPLOYMENT_ID, vec![trusted_endpoint])
+            .unwrap()
+            .resolve(&profile)
+            .unwrap()
+    }
+
+    fn profile_for_endpoint(endpoint: &ResolvedTransportEndpoint) -> AdmissionTransportProfile {
+        AdmissionTransportProfile::new(
+            NATIVE_PROVIDER_ID.to_owned(),
+            "1".to_owned(),
+            endpoint.profile_digest(),
+            endpoint.endpoint_identity().to_owned(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn resolved_endpoint_must_match_admission_profile_digest() {
+        let endpoint = resolved_endpoint("native-endpoint-a");
+        let mut profile = profile_for_endpoint(&endpoint);
+        profile.profile_digest[0] ^= 0xff;
+
+        assert!(matches!(
+            validate_profile_endpoint(&profile, &endpoint),
+            Err(NativeGrpcSetupError::Profile)
+        ));
+    }
+
+    #[test]
+    fn resolved_endpoint_must_match_admission_profile_identity() {
+        let endpoint = resolved_endpoint("native-endpoint-b");
+        let profile = test_profile();
+
+        assert!(matches!(
+            validate_profile_endpoint(&profile, &endpoint),
+            Err(NativeGrpcSetupError::Profile)
+        ));
+    }
+
+    #[test]
+    fn matching_resolved_endpoint_is_accepted_by_profile_guard() {
+        let endpoint = resolved_endpoint("native-endpoint-a");
+        let profile = profile_for_endpoint(&endpoint);
+
+        assert!(validate_profile_endpoint(&profile, &endpoint).is_ok());
     }
 
     fn receive_scope(kind: AdmissionReceiveKind) -> AdmissionReceiveScope {
