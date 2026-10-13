@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.81**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.82**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -558,11 +558,11 @@ Run Apps 和 Task Card CLI 不能据此显示“基础设施已准入”或启�
 
 ### 8.14 Run-owner capacity result Inbox（Phase 9F4D-3D5）
 
-Infrastructure capacity results enter the Run/Execution owner through its own durable explicit-ack JetStream consumer and PostgreSQL transaction. The consumer bounds each fetch to one message, 132 KiB, and 2 seconds; canonical Project/Branch/Engineering Run/Work Item/TaskExecutionRun/occurrence scope is loaded from the immutable demand fact because those fields are not all present in the result envelope. It appends a Run-owned result Inbox fact, commits, then double-acks. A repeated event_id is acknowledged only after scope, digest, and content equality are confirmed.
+Infrastructure capacity results enter the Run/Execution owner through its own durable explicit-ack JetStream consumer and PostgreSQL transaction. It requests one message, configures async-nats `max_bytes=132 KiB` as a client-side buffering target, and expires after 2 seconds; this does not cap a message already received. The parser rejects envelope payloads over 128 KiB after materialization. Before production consumption, NATS server `max_payload` and JetStream Stream `MaxMsgSize` must be enforced and verified at no more than 128 KiB, with peak RSS measured at planned concurrency. Canonical Project/Branch/Engineering Run/Work Item/TaskExecutionRun/occurrence scope is loaded from the immutable demand fact because those fields are not all present in the result envelope. It appends a Run-owned result Inbox fact, commits, then double-acks. A repeated event_id is acknowledged only after scope, digest, and content equality are confirmed.
 
 The demand Outbox append also validates the referenced TaskExecutionRun inside the caller-owned transaction: it must be schedule-origin and its rule ID/revision, occurrence ID and correlation ID must match the typed demand before any Outbox fact is written.
 
-This Inbox is a durable event fact, not a TaskExecutionRun/Schedule state projection and not a BI/RunEvent producer. Accepted capacity does not mean current reservations or K3s/Runtime readiness. The upstream capacity_released producer is unavailable, and invalid/unmatched messages are left unacknowledged without a durable quarantine table. Therefore the consumer remains production-disabled until producer, quarantine, consumer provisioning/identity, authorization/binding revalidation, and owner projection contracts are completed. The test uses no VM; Multipass inventory remains capped at two registered records.
+This Inbox is a durable event fact, not a TaskExecutionRun/Schedule state projection and not a BI/RunEvent producer. Accepted capacity does not mean current reservations or K3s/Runtime readiness. The upstream capacity_released producer is unavailable. A separate opt-in Platform Messaging quarantine owner now persists eligible permanent poison receipts and Term-acks only after commit; production remains disabled until consumer provisioning/identity, broker size limits, authorization/binding revalidation, operator controls, measured memory, and owner projection contracts are completed. The test uses no VM; Multipass inventory remains capped at two registered records.
 
 ### 8.15 Phase 9F4D-3D6 Platform Messaging/Ingress poison quarantine design
 
@@ -996,3 +996,4 @@ D16 最终 PostgreSQL 18.6 disposable runner 为 68/68；两份 D16 quarantine m
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v4.81 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 rebase 后 68/68 + SQLx 1/1 最终证据；更新 AssetsLake 候选文件状态/hash、模块复用适配映射与 D17 Profile/身份边界，保留生产及 native provider gates | D16 最终复验及用户再次明确本机 Rust 服务可复用 |
+| v4.82 | 2026-10-13 | Ulysses — Mavis接手审核 | 订正 Run capacity consumer 的 client buffering、消息接收后 parser limit、broker/stream 硬上限与 RSS 门；同步 separate quarantine owner 状态 | Run Owner 消费端 bounded-memory 文档复核 |

@@ -1,6 +1,6 @@
 //! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=d102538db1c9de1dbf37370c3a4cf0c8aeca1591ec554f8f3e8ae430bc0b53a8
+@cypher schema=1 source_sha256=0a179c28ba2e0b58a1e72dd7c9073cbe765187b07a4fb0cd994d5c91e3ee9458
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
@@ -181,7 +181,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 #[cfg(feature = "jetstream-adapter")]
-/// Hard upper bound for an original JetStream body accepted by quarantine.
+/// Post-receipt upper bound for a source body accepted by quarantine; this is not an ingress limit.
 pub const MAX_SOURCE_PAYLOAD_BYTES: usize = 132 * 1024;
 #[cfg(feature = "jetstream-adapter")]
 /// Maximum `Nats-Msg-Id` bytes copied into an encrypted replay envelope.

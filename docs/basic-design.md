@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.46 (2026-10-13)
-> **上游要件定义书**: docs/requirements.md v6.46
+> **文档版本**: v6.47 (2026-10-13)
+> **上游要件定义书**: docs/requirements.md v6.47
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5007,13 +5007,13 @@ Verification used Rust 1.99.0, PostgreSQL 18.6, and official NATS Server 2.15.0 
 
 The Run-owner demand Outbox append receives the caller's existing Run transaction and validates that the referenced TaskExecutionRun is schedule-origin with matching rule ID/revision, occurrence ID and correlation ID before it appends the typed demand. A mismatch creates no Outbox fact. This 3D5 primitive does not validate a Schedule confirmation receipt and is not production admission authority; Schedule-origin demand publication remains disabled until the Run owner consumes and persists the authenticated confirmation in the same transaction.
 
-Run/Execution owner receives Infrastructure capacity events through a supplied, provisioned durable JetStream pull consumer. The Rust consumer is deliberately not a broker/credential/consumer provisioner: it validates explicit-ack configuration and performs a single-message pull bounded to 132 KiB and 2 seconds. It checks the wire contract and resolves canonical Project, Branch, Engineering Run, Work Item, TaskExecutionRun, and occurrence identity by matching the exact stored Run demand fact.
+Run/Execution owner receives Infrastructure capacity events through a supplied, provisioned durable JetStream pull consumer. The Rust consumer is deliberately not a broker/credential/consumer provisioner: it requests one message, configures async-nats `max_bytes=132 KiB` as a client-side buffering target, and sets a 2-second expiry. `max_bytes` does not cap a message already received from the server. The parser rejects envelope payloads above 128 KiB only after `Message::payload` is materialized. Production provisioning must enforce and verify NATS server `max_payload` and JetStream Stream `MaxMsgSize` at no more than 128 KiB, confirm the selected server version's size semantics, and measure peak consumer RSS at the planned concurrency. It checks the wire contract and resolves canonical Project, Branch, Engineering Run, Work Item, TaskExecutionRun, and occurrence identity by matching the exact stored Run demand fact.
 
-Within the Run-owner database boundary, it appends one result Inbox fact and commits before double-ack. Duplicate event_id is accepted only when the previously persisted immutable scope and content match. No TaskExecutionRun/Schedule transition, RunEvent/BI projection, reservation release, readiness, or executor start occurs here. The upstream release producer contract and durable poison-message quarantine are absent; malformed messages remain unacknowledged, which blocks production deployment of this consumer. The exact rust-version is 1.99.0; disposable PostgreSQL/NATS verification creates no Multipass guest and keeps the two-record test cap.
+Within the Run-owner database boundary, it appends one result Inbox fact and commits before double-ack. Duplicate event_id is accepted only when the previously persisted immutable scope and content match. No TaskExecutionRun/Schedule transition, RunEvent/BI projection, reservation release, readiness, or executor start occurs here. A separate opt-in Platform Messaging quarantine owner now persists eligible permanent poison receipts and may Term-ack only after commit; it does not make this consumer production-ready. The release producer contract, trusted consumer provisioning, server/stream size enforcement, measured RSS, operator controls, and production identity remain open. The exact rust-version is 1.99.0; disposable PostgreSQL/NATS verification creates no Multipass guest and keeps the two-record test cap.
 
 | 验收 ID | 对应设计与当前边界 |
 |---|---|
-| AC-INFRA-002-P | §16.40；caller transaction 内校验 TaskExecutionRun 的 schedule origin、Rule ID/revision、occurrence 和 correlation 后写 demand Outbox；durable explicit-ack PullConsumer，单条/132 KiB/2 秒；以不可变 demand row 派生结果 scope；Run-owner Transaction Inbox commit 后 double-ack；严格 duplicate replay；invalid/unmatched 不 ACK；no quarantine/producer contract 时 production disabled；不改变 Run/Schedule/readiness/execution。 |
+| AC-INFRA-002-P | §16.40；caller transaction 内校验 TaskExecutionRun 的 schedule origin、Rule ID/revision、occurrence 和 correlation 后写 demand Outbox；durable explicit-ack PullConsumer，单条/132 KiB client-buffering/2 秒；这不是 ingress 大小限制。生产配置需 enforce/verify NATS server `max_payload` 与 JetStream Stream `MaxMsgSize` ≤128 KiB 并测量 planned concurrency 下 peak RSS；parser 的 128 KiB envelope 检查在 message payload 物化后执行。以不可变 demand row 派生结果 scope；Run-owner Transaction Inbox commit 后 double-ack；eligible permanent poison 经独立 quarantine owner commit 后才 Term-ack；release producer、生产身份/配置、内存与 operator gates 未关闭前 production disabled；不改变 Run/Schedule/readiness/execution。 |
 
 ### 16.41 Phase 9F4D-3D6 Platform ingress poison quarantine
 
@@ -5666,6 +5666,7 @@ Run owner 提供 opt-in `native-grpc-adapter` feature，将 native transport、�
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.47 | 2026-10-13 | Ulysses — Mavis接手审核 | 订正 Run-owner JetStream 132 KiB `max_bytes` 的 client-buffering 语义、消息物化后才执行的 128 KiB parser guard、NATS/Stream admission limits 与 RSS 门；同步 quarantine 已实现但 production 仍关闭的边界 | Run Owner 消费端 bounded-memory 文档复核 |
 | v6.46 | 2026-10-13 | Ulysses — Mavis接手审核 | 补录 Run-owner composition 在 Rust 1.99.0 下的 package 验证，并保留 D20 PostgreSQL、TLS、全量 owner consumer 与 BI 未验收边界 | Rust 1.99.0 check/test/Clippy 与定向 rustfmt 通过 |
 | v6.45 | 2026-10-12 | Ulysses — Mavis接手审核 | 补充 Run-owner opt-in native Schedule admission 组合、Result route 拒绝、单条取消、显式 quarantine 与禁止启动 execution 的架构边界；明确全量 owner consumer 仍开放 | 新增 `run-owner-runtime/native-grpc-adapter` 与 typed consumer |
 | v6.43 | 2026-10-12 | Ulysses — Mavis接手审核 | 描述 append-time certificate provenance、exact-wire VerifyOrigin、quarantine/ACK 双重复验与 D20 SQL runner 状态；记录缺少 PostgreSQL binaries 的真实 blocker | D20 新增原生来源证明与 ACK 事务复验 |

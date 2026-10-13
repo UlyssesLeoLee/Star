@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 D17 initial Transport Profile Master/resolver slice is verified on disposable PostgreSQL 18.6 (71/71), including profile migration double-apply and SQLx profile scenario 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production service identity/credentials and target DB grants, native provider, BI, performance and execution remain open.
-> Version: 0.56 | Date: 2026-10-12
+> Version: 0.57 | Date: 2026-10-13
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -113,9 +113,9 @@ Only successful PubAck permits the PostgreSQL row to transition to delivered. Ti
 
 ### 6.11 Phase 9F4D-3D5 Run-owner result consumer
 
-The Run-owner demand Outbox append accepts the caller's transaction and validates the referenced TaskExecutionRun's schedule origin, Rule ID/revision, occurrence and correlation before insertion. The result consumer uses an existing provisioned durable explicit-ack pull consumer. Rust performs one bounded fetch (one message, 132 KiB, 2 seconds), validates the event contract and derives canonical scope from the exact immutable demand Outbox row. It records only an append-only result Inbox fact in the Run-owner transaction, then double-acks after commit. Exact duplicate replay is verified against stored scope/content; conflicts and DB failures are not acknowledged.
+The Run-owner demand Outbox append accepts the caller's transaction and validates the referenced TaskExecutionRun's schedule origin, Rule ID/revision, occurrence and correlation before insertion. The result consumer uses an existing provisioned durable explicit-ack pull consumer. Rust requests one message, sets async-nats `max_bytes=132 KiB` as a client-side buffering target, and expires after 2 seconds. This does not cap a message already received. The parser rejects envelopes larger than 128 KiB after payload materialization; production provisioning must enforce and verify NATS `max_payload` and JetStream Stream `MaxMsgSize` at no more than 128 KiB and measure peak RSS at planned concurrency. The consumer validates the event contract and derives canonical scope from the exact immutable demand Outbox row. It records only an append-only result Inbox fact in the Run-owner transaction, then double-acks after commit. Exact duplicate replay is verified against stored scope/content; conflicts and DB failures are not acknowledged.
 
-No Run/Schedule state update, RunEvent/BI emission, reservation mutation, readiness, or execution is part of this slice. Because invalid messages have no durable quarantine and the release producer is unavailable, this consumer is implemented as a fail-closed adapter and is not production deployable. Rust minimum is 1.99.0; isolated PG/NATS verification uses zero Multipass instances and retains the two-entry cap.
+No Run/Schedule state update, RunEvent/BI emission, reservation mutation, readiness, or execution is part of this slice. Eligible permanent poison faults now have a separate opt-in Platform Messaging quarantine owner; production deployment remains disabled until consumer identity/provisioning, server/stream size enforcement, measured RSS, operator controls and the release producer contract are verified. Rust minimum is 1.99.0; isolated PG/NATS verification uses zero Multipass instances and retains the two-entry cap.
 
 ### 6.12 Phase 9F4D-3D6 Platform ingress quarantine
 
@@ -491,3 +491,4 @@ Initial implementation evidence (2026-10-12): typed profile definition/revision,
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the initial D17 owner/schema/resolver implementation and isolated PostgreSQL/SQLx evidence while retaining production identity and transport gates |
+| 0.57 | 2026-10-13 | Ulysses — Mavis接手审核 | Correct consumer buffering versus ingress-size semantics, specify NATS/Stream 128 KiB admission and RSS gates, and synchronize the separate quarantine owner status |

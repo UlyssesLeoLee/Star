@@ -1,6 +1,6 @@
 //! Bounded JetStream consumer for Infrastructure-owned capacity result facts.
 /*
-@cypher schema=1 source_sha256=5a6c66ea6814d5b8b31e83dd46d66f704bcc1271a1505f4375f95156fcd74f1b
+@cypher schema=1 source_sha256=091800ebe99adf3cb39ee3dce0b01eb588244208ad08eb35aaab83d77c213351
 MERGE (self:File {path:"crates/run-owner-runtime/src/capacity_result.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::capacity_result",kind:"module"})
 MERGE (consumer:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer",kind:"struct"})
@@ -175,6 +175,9 @@ use crate::outbox::{
 const SUBJECT_PREFIX: &str = "star.infrastructure.v2";
 const MAX_PAYLOAD_BYTES: usize = 16 * 1024;
 const MAX_ENVELOPE_BYTES: usize = 128 * 1024;
+// async-nats `max_bytes` limits client buffering of messages already received; it is not an
+// ingress or wire-size limit. Production must cap NATS and the JetStream stream at the envelope
+// limit and measure peak consumer RSS before enabling this consumer.
 const MAX_FETCH_BYTES: usize = MAX_ENVELOPE_BYTES + 4 * 1024;
 const MAX_FETCH_MESSAGES: usize = 1;
 const MAX_FETCH_EXPIRY: Duration = Duration::from_secs(2);
@@ -687,6 +690,8 @@ fn parse_capacity_result_message(
     headers: Option<&async_nats::HeaderMap>,
     wire: &[u8],
 ) -> Result<ValidatedCapacityResult, CapacityResultError> {
+    // `wire` is already materialized in `Message::payload` here; this parser guard does not bound
+    // the allocation made while receiving the message. Broker and stream limits must do that.
     if wire.len() > MAX_ENVELOPE_BYTES {
         return Err(CapacityResultError::InvalidEvent);
     }

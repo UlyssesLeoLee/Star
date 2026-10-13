@@ -2,6 +2,8 @@
 
 > Historical checkpoint: this document records the design-only state at its original review. Current implementation and verification status is in [`PHASE-9F4D-3D6-QUARANTINE-IMPLEMENTATION-REPORT.md`](PHASE-9F4D-3D6-QUARANTINE-IMPLEMENTATION-REPORT.md).
 
+> Memory/size clarification (2026-10-13): the historical 132 KiB `max_bytes` value is an async-nats client-side buffering target, not a NATS ingress or wire-size limit. The Run-owner parser's 128 KiB envelope guard executes after message payload materialization. The quarantine adapter's separate 132 KiB source-body acceptance check also runs after message receipt; oversized deliveries remain unacknowledged. Before production consumption, NATS server `max_payload` and JetStream Stream `MaxMsgSize` must be enforced and verified at no more than the parser's 128 KiB limit; planned-concurrency peak RSS must also be measured. Production remains disabled until its other identity, KMS, operator and producer gates pass.
+
 > Status: 🟡 Design increment recorded; implementation and production enablement are open.
 > Date: 2026-10-08
 > Base: local `dev` at `5577e3b1358f7f214f8838f17c8faba4ebecc171`
@@ -79,3 +81,4 @@ Define a safe poison-message quarantine boundary for the 9F4D-3D5 Run-owner JetS
 | Version | Date | Editor | Change | Trigger |
 |---|---|---|---|---|
 | v0.1 | 2026-10-08 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the 3D6 quarantine owner, trusted source identity, immutable receipt, optional Work payload, commit-before-Term invariant, unresolved retention/taxonomy, and all unimplemented production gates. | Continue Phase 9F4D after integrating the 3D5 Run-owner consumer. |
+| v0.2 | 2026-10-13 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add a current size/memory clarification without rewriting the historical design checkpoint; distinguish async-nats buffering, post-receive parser and quarantine storage limits from broker admission | Review Run-owner consumer memory claims against current async-nats and NATS documentation |
