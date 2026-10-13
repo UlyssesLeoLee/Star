@@ -82,7 +82,7 @@ CREATE
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { GroupApiError, normalizeWorktreeGitLock, type GitLockState, type WorktreeGroupApiClient } from "@/lib/group/worktreeGroupApi";
@@ -334,7 +334,40 @@ const MonacoEditor = dynamic(
   },
 );
 
+// =====================================================================
+// Suspense boundary wrapper.
+//
+// Next.js 16 App Router: `useSearchParams()` in a statically-prerendered
+// route forces a CSR bailout, and the build hard-fails with
+//   "useSearchParams() should be wrapped in a suspense boundary at page /worktree"
+// (per the 2026-10-12 build: `next build` aborts on the /worktree export).
+//
+// Fix: keep the real implementation in `WorktreePageInner` and export a
+// thin `<Suspense>`-wrapped default. The fallback is a real skeleton, not a
+// spinner (per ui-3pane-arch.md §3 rule 7: "loading 必须有 shape").
+// =====================================================================
 export default function WorktreePage() {
+  return (
+    <Suspense fallback={<WorktreePageSkeleton />}>
+      <WorktreePageInner />
+    </Suspense>
+  );
+}
+
+function WorktreePageSkeleton() {
+  return (
+    <div className="space-y-4" data-testid="worktree-page-skeleton" role="status" aria-label="加载 Worktree 清单">
+      <div className="h-8 w-48 animate-pulse rounded bg-bg-soft" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2, 3, 4, 5].map((index) => (
+          <div key={index} className="h-28 animate-pulse rounded-lg border border-line bg-bg-card" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorktreePageInner() {
   const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -843,9 +876,12 @@ export default function WorktreePage() {
                               </div>
                             </div>
 
-                            {/* ULYS-98-W1.1 — Monaco editor preview. W1 stub: read-only,
-                                显示 src/lib/store.ts 的 placeholder 内容; W2 改成真实
-                                file-system + AI 补全. */}
+                            {/* ULYS-98-W1.1 — Monaco editor preview.
+                                2026-10-12 用户拍板"确保至少可以替代 sakura editor":
+                                高度从 h-48 (192px, 约 12 行) 提到 h-[420px],
+                                因为 sakura 级交互 (行号/折叠/查找/多光标) 在 192px 里
+                                挤不开, 反而比没有更难用。
+                                readOnly 保持不变 — 这是 preview, 真实编辑走 FileSession。 */}
                             <div className="mt-4 pt-3 border-t border-line">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-[10px] uppercase tracking-wider text-ink-mute">
@@ -855,12 +891,14 @@ export default function WorktreePage() {
                                   src/lib/store.ts
                                 </div>
                               </div>
-                              <div className="h-48 rounded border border-line overflow-hidden">
+                              <div className="h-[420px] rounded border border-line overflow-hidden">
                                 <MonacoEditor
                                   path="src/lib/store.ts"
                                   value={`// ULYS-98-W1 — Monaco editor stub preview\n// (per docs/briefs/ulys-98-star-cursor-min-v1.md §"Sub-task 1.1")\n//\n// W1: read-only preview only — no AI completion, no Cmd-K, no save.\n// W2: real file-system + Cmd-K inline edit + inline AI suggestion.\n\nexport interface Worktree {\n  id: string;\n  branch: string;\n  status: WorktreeStatus;\n}\n`}
                                   readOnly
                                   testId="monaco-preview"
+                                  fontSize={13}
+                                  tabSize={2}
                                 />
                               </div>
                             </div>

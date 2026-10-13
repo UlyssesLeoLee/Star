@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/editor/index.ts — ULYS-98-W1.1 + W2.3 export barrel
-export { default as MonacoEditor, inferLanguageFromPath } from "./MonacoEditor";
+// frontend/src/components/editor/index.ts — ULYS-98-W1.1 + W2.3 + sakura 级交互 export barrel
+export { default as MonacoEditor, inferLanguageFromPath, STAR_DARK_THEME } from "./MonacoEditor";
 export type { MonacoEditorProps } from "./MonacoEditor";
 export {
   registerInlineCompletion,
