@@ -1,7 +1,7 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.11 · 2026-10-14 · Ulysses — Mavis 接手审核
-> 状态：D19 server/auth 与 D20 native receiver/source-verifier slices 已实现；Rust 1.98.1 `--ignore-rust-version` 下目标 crate check、Clippy-driver check、12 个 native_grpc tests 与 41 个 library tests 通过。来源验证 PostgreSQL migration/contract 本轮未执行；真实 TLS e2e、production identity/control plane、Profile→log provisioning、target DB grants、owner delivery、BI/performance 和 cutover 均未完成。
+> v1.12 · 2026-10-14 · Ulysses — Mavis 接手审核
+> 状态：D19 server/auth 与 D20 native receiver/source-verifier/owner-consumer slices 已实现；PostgreSQL 18.6 WSL disposable schema-only origin migration/contract 83/83 通过，D20 migration 双次应用。Rust 1.99.0 owner-consumer package gates 记录于 D20 report。Windows PostgreSQL runtime、SQLx、目标库 RLS/grants、真实 TLS e2e、production identity/control plane、Profile→log provisioning、owner recovery、BI/performance 和 cutover 均未完成。
 
 ## 1. 范围与证据
 
@@ -180,7 +180,7 @@ D20 adds a native `VerifyOrigin` RPC and an append-time source-certificate finge
 
 The user's direct reuse authorization covers suitable modules from `E:/AssetsLake` and other owned Rust server projects; it does not mean every candidate should be imported. The current AssetsLake event publisher remains read-only and is not a durable-transport implementation: disabled staging can return a newly generated UUID without persisting an Outbox fact, and relay dry-run/no-broker paths can mark events published without delivery. Its envelope fields remain useful reference material. The previously reviewed RustGameServer TLS helper remains the only direct source-code adaptation in this D20 line. Any later module reuse still records current source HEAD/file hash, owner/rights, precise license obligations, NOTICE, full dependency closure and a Star contract/performance/security review; no user re-approval is needed for the already authorized local sources, but third-party obligations still apply.
 
-The origin-verification migration and SQL contract were added to the disposable PostgreSQL runner but were not executed because this workstation has no PostgreSQL server binaries. Rust 1.98.1 diagnostic check and 41/41 library tests do not establish DDL/RLS/grant correctness. Source repositories were inspected read-only; AssetsLake remains at HEAD `0156aca56c0d7364120d7389ebe1ccf0cb64b750` with 17 dirty files, and RustGameServer at `89458d887e8bfddf6637f9d80ea65f2091e8b6f2` with a clean worktree. This is a targeted candidate recheck, not an exhaustive audit of all local Cargo projects.
+The D20 origin-verification migration and SQL contract passed the disposable PostgreSQL 18.6 WSL schema-only runner, 83/83 steps; the migration applied twice and the origin contract and shutdown passed. Audit: target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl (SHA-256 CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80). The runner binds to loopback and sets unix_socket_directories to empty without shell quotes. This verifies WSL/Linux startup and the SQL schema contract only; Windows runtime, SQLx, target-database RLS/runtime grants and production identity remain unverified. Rust diagnostics and library tests do not establish those gates. Source repositories were inspected read-only; AssetsLake remains at HEAD 0156aca56c0d7364120d7389ebe1ccf0cb64b750 with 17 dirty files, and RustGameServer at 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 with a clean worktree. This is a targeted candidate recheck, not an exhaustive audit of all local Cargo projects.
 
 ### 12.2 D20 Run-owner Result and Infrastructure demand consumers
 
@@ -190,6 +190,7 @@ The combined Rust 1.99.0 checks passed, with Infrastructure library tests 71/71 
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| v1.12 | 2026-10-14 | Ulysses — Mavis接手审核 | Replace the D20 PostgreSQL blocker with corrected 83/83 PostgreSQL 18.6 WSL schema-only evidence and preserve Windows, SQLx, grants, TLS and production limits | The pg_ctl startup argument was made shell-quote-free and independently reviewed
 | v1.11 | 2026-10-14 | Ulysses — Mavis接手审核 | Record the default-off Infrastructure demand and provider-neutral Run-owner Result consumers, owner commit-before-ACK/source revalidation, combined Rust 1.99.0 tests, and open production gates | Two D20 consumer worktrees rebased and merged to local dev |
 | v1.10 | 2026-10-12 | Ulysses — Mavis接手审核 | Correct the D20 library test count to 41/41; record the isolated Clippy-driver result and existing integration-test formatting drift while keeping PostgreSQL verification open | Two exact-wire origin verification tests added; current focused gates rerun |
 | v1.9 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D20 append-time source provenance and exact-wire verifier design; revalidate AssetsLake/RustGameServer source state; record unrun PostgreSQL contract and reuse limits | User reaffirmed direct module reuse authorization for AssetsLake and local Rust servers; D20 added VerifyOrigin |

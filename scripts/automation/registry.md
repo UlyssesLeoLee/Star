@@ -1,9 +1,9 @@
 # scripts/automation/registry.md — Agent 交互自动化脚本索引
 
-> **文档版本**: v0.98 (2026-10-12)
+> **文档版本**: v1.00 (2026-10-14)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本" + 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档"
-> **依赖**: `docs/automation-design.md` v2.51 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate, §4.87 D16 admission quarantine verification, §4.88 D17 Transport Profile Master/resolver verification, §4.89 D18 durable-log schema/concurrency verification, §4.90 D19 native server auth, §4.91 D20 native origin verification + §6 基类骨架 + §6.8 索引)
+> **依赖**: `docs/automation-design.md` v2.54 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate, §4.87 D16 admission quarantine verification, §4.88 D17 Transport Profile Master/resolver verification, §4.89 D18 durable-log schema/concurrency verification, §4.90 D19 native server auth, §4.91 D20 native origin verification + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
 ---
@@ -741,6 +741,8 @@ PostgreSQL 18.6 runner passed 80/80 steps; temporary DB stopped, no NATS started
 
 The existing schema-only runner now applies `2026-10-12-platform-native-origin-verification.sql` twice after D19 server authorization, then runs `db/tests/platform-native-origin-verification.sql`. The SQL contract covers source-certificate capture at authenticated append, legacy NULL provenance denial, exact-wire digest and live lease authorization, tampered digest rejection, ACK terminality, and source-certificate revocation after acceptance. It starts no NATS process and creates no Multipass instance.
 
-The D20 files are wired but the gate has not run: PostgreSQL server binaries are unavailable on this workstation. SQL syntax, trigger behavior, grants, RLS and repeat-apply remain unverified until PostgreSQL 18.6 is available; Rust 1.98.1 diagnostics are not SQL or Rust 1.99.0 acceptance.
+The disposable PostgreSQL 18.6 schema-only runner passed **83/83 steps**; D20 migration applied twice and `native-origin-verification-contract` passed. The WSL runner binds only to `127.0.0.1` and disables Unix-domain sockets with a quote-free setting; this gate ran on WSL/Linux only, so the Windows runtime path remains untested; the SQL fixture uses exact-wire SHA-256 constants and an explicit scoped actor for revocation. Audit: `target/phase9f4c-d20-origin-wsl-20261014-final-83steps-v3/audit.jsonl` (SHA-256 `CE8FB01327E7BA181E22099399BD1C5FB20BB0D860204F3A8B7F6ED91BA69E80`). PostgreSQL shutdown passed; no NATS started and no Multipass instance/inventory was changed. This establishes D20 migration/schema SQL contract behavior only, not SQLx tests, production identity or target database grants, live TLS/gRPC, complete owner consumers, recovery, BI/Benchmark, performance, Rust 1.99.0 or Schedule/Run execution acceptance.
 
 | v0.98 | 2026-10-12 | Ulysses — Mavis接手审核 | Index D20 append-time source-certificate proof, exact-wire verifier SQL contract and explicit unrun PostgreSQL blocker. | D20 VerifyOrigin wired into the disposable runner |
+| v0.99 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the successful 83/83 PostgreSQL 18.6 D20 origin schema/SQL gate and the loopback-only WSL runner/fixture corrections; retain SQLx and production gates | D20 origin migration and verifier SQL contract passed in the disposable runner |
+| v1.00 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the portable quote-free PostgreSQL startup setting and corrected v3 83/83 WSL audit; retain Windows, SQLx and production acceptance limits | Independent review finding and PostgreSQL 18.6 rerun
