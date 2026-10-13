@@ -3544,6 +3544,7 @@ dependencies = [
  "chrono",
  "domain-infrastructure",
  "multipass-adapter",
+ "platform-messaging-runtime",
  "ring",
  "serde",
  "serde_json",

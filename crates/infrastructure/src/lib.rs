@@ -6,18 +6,21 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
-//! @cypher schema=1 source_sha256=ffca571d010b99529f043fce0075146f07ab5ad463963ba4e70b713be655c78e
+//! @cypher schema=1 source_sha256=d11915794aee0ad4ce8d7da0c5e267df460dd96d94f031c2cbf52f0cfd3aea15
 //! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
 //! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
 //! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
 //! MERGE (ownerOutboxDelivery:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_outbox_delivery",kind:"module"})
 //! MERGE (ownerJetStreamPublisher:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
+//! MERGE (nativeDemandConsumer:Symbol {id:"crates/infrastructure/src/lib.rs::native_demand_consumer",kind:"module"})
+//! MERGE (nativeDemandFeature:Config {id:"cargo.feature.infrastructure.native-grpc-adapter"})
 //! MERGE (resourceCatalogWriter:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_resource_catalog_writer",kind:"module"})
 //! MERGE (multipassInventoryReconciliation:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_multipass_inventory_reconciliation",kind:"module"})
 //! MERGE (self)-[:DEFINES]->(ownerInbox)
 //! MERGE (self)-[:DEFINES]->(ownerAdmission)
 //! MERGE (self)-[:DEFINES]->(ownerOutboxDelivery)
 //! MERGE (self)-[:DEFINES]->(ownerJetStreamPublisher)
+//! MERGE (self)-[:DEFINES]->(nativeDemandConsumer)
 //! MERGE (self)-[:DEFINES]->(resourceCatalogWriter)
 //! MERGE (self)-[:DEFINES]->(multipassInventoryReconciliation)
 //! @endcypher
@@ -396,5 +399,7 @@ pub mod infrastructure_owner_inbox;
 pub mod infrastructure_owner_jetstream_publisher;
 pub mod infrastructure_owner_outbox_delivery;
 pub mod infrastructure_resource_catalog_writer;
+#[cfg(feature = "native-grpc-adapter")]
+pub mod native_demand_consumer;
 pub mod registry;
 pub mod registry_real_pg;
