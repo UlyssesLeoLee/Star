@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=0c5031fdd20789d1ba2cb02075fb3d0d59a8d3c2bcc18f8b3579d8a443099423
+@cypher schema=1 source_sha256=405930aa7db68c510dcacaa940b0d729b070f57849d930b1ffdb9a44d35b0b62
 MERGE (self:File {path:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs"})
 MERGE (test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::native_origin_verification_sqlx_persists_and_revalidates_exact_origin",kind:"test"})
 MERGE (fixture:Type {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::TestFixture",kind:"struct"})
@@ -9,6 +9,8 @@ MERGE (proof:Type {id:"crates/platform-messaging-runtime/tests/native_origin_ver
 MERGE (accepted_identity:Type {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::AcceptedIdentity",kind:"struct"})
 MERGE (prepare:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::prepare_fixture",kind:"function"})
 MERGE (database_precondition:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::require_d20_database",kind:"function"})
+MERGE (database_identity:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::require_d20_database_identity",kind:"function"})
+MERGE (current_database:Function {id:"PostgreSQL.current_database",kind:"database_function"})
 MERGE (provision:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::provision_origin_fixture",kind:"function"})
 MERGE (insert_certificate:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::insert_certificate",kind:"function"})
 MERGE (owner_scope:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::set_owner_scope",kind:"function"})
@@ -41,6 +43,7 @@ MERGE (self)-[:DEFINES]->(proof)
 MERGE (self)-[:DEFINES]->(accepted_identity)
 MERGE (self)-[:DEFINES]->(prepare)
 MERGE (self)-[:DEFINES]->(database_precondition)
+MERGE (self)-[:DEFINES]->(database_identity)
 MERGE (self)-[:DEFINES]->(provision)
 MERGE (self)-[:DEFINES]->(insert_certificate)
 MERGE (self)-[:DEFINES]->(owner_scope)
@@ -57,6 +60,8 @@ MERGE (self)-[:IMPORTS]->(profile_master)
 MERGE (prepare)-[:USES_TYPE]->(profile_revision)
 MERGE (test)-[:CALLS]->(prepare)
 MERGE (test)-[:CALLS]->(database_precondition)
+MERGE (test)-[:CALLS]->(database_identity)
+MERGE (database_identity)-[:CALLS]->(current_database)
 MERGE (prepare)-[:CALLS]->(profile_publish)
 MERGE (prepare)-[:CALLS]->(provision)
 MERGE (provision)-[:CALLS]->(owner_scope)
@@ -108,7 +113,7 @@ MERGE (test)-[:TESTS]->(profile_binding)
 
 //! SQLx integration coverage for the native origin verification transaction boundary.
 
-use std::env;
+use std::{env, net::IpAddr};
 
 use platform_messaging_runtime::{
     transport_profile::{
@@ -118,7 +123,10 @@ use platform_messaging_runtime::{
     transport_profile_pg::{PgTransportProfileMaster, ProfileChangeRequest},
 };
 use sha2::{Digest, Sha256};
-use sqlx::{postgres::PgPoolOptions, PgPool, Postgres, Row, Transaction};
+use sqlx::{
+    PgPool, Postgres, Row, Transaction,
+    postgres::{PgConnectOptions, PgPoolOptions},
+};
 use uuid::Uuid;
 
 const DATABASE_URL_ENV: &str = "STAR_PLATFORM_PROFILE_TEST_DATABASE_URL";
@@ -160,17 +168,31 @@ struct OriginProof {
 }
 
 #[tokio::test]
-#[ignore = "requires the disposable PostgreSQL profile database with D20 migrations and roles applied"]
+#[ignore = "requires the dedicated star_d20_origin_test PostgreSQL database with D20 migrations and roles applied"]
 async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin() {
     let database_url = env::var(DATABASE_URL_ENV).expect(
         "D20 SQLx proof requires STAR_PLATFORM_PROFILE_TEST_DATABASE_URL pointing to a disposable PostgreSQL database",
     );
+    let database_options = database_url
+        .parse::<PgConnectOptions>()
+        .expect("parse the disposable PostgreSQL connection options");
+    let database_host = database_options.get_host();
+    let is_loopback = database_host == "localhost"
+        || database_host
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.is_loopback());
+    assert!(
+        is_loopback && database_options.get_port() != 5432,
+        "the opt-in integration test must use a loopback PostgreSQL instance on a non-default port"
+    );
+
     let pool = PgPoolOptions::new()
         .max_connections(4)
-        .connect(&database_url)
+        .connect_with(database_options)
         .await
         .expect("connect to the disposable PostgreSQL integration database");
 
+    require_d20_database_identity(&pool).await;
     require_d20_database(&pool).await;
     let fixture = prepare_fixture(&pool).await;
 
@@ -228,14 +250,16 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
         Sha256::digest(&first_delivery.wire).as_slice()
     );
     assert_persisted_source(&pool, &fixture, &first_delivery).await;
-    assert!(verify_origin(
-        &pool,
-        &fixture,
-        &fixture.receiver_certificate,
-        &first_delivery.proof,
-    )
-    .await
-    .expect("verify current exact origin"));
+    assert!(
+        verify_origin(
+            &pool,
+            &fixture,
+            &fixture.receiver_certificate,
+            &first_delivery.proof,
+        )
+        .await
+        .expect("verify current exact origin")
+    );
 
     let mut invalid = first_delivery.proof.clone();
     invalid.log_id.push_str("-other");
@@ -353,14 +377,16 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .expect_err("acknowledgement must reject a different message identity");
     assert_sqlstate(&invalid_ack, "42501");
 
-    assert!(verify_origin(
-        &pool,
-        &fixture,
-        &fixture.receiver_certificate,
-        &first_delivery.proof,
-    )
-    .await
-    .expect("failed verification must leave the leased source proof retryable"));
+    assert!(
+        verify_origin(
+            &pool,
+            &fixture,
+            &fixture.receiver_certificate,
+            &first_delivery.proof,
+        )
+        .await
+        .expect("failed verification must leave the leased source proof retryable")
+    );
 
     let stale_lease = acknowledge_authenticated(
         &pool,
@@ -372,26 +398,30 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .await
     .expect_err("acknowledgement with a stale lease identity must fail");
     assert_sqlstate(&stale_lease, "40001");
-    assert!(verify_origin(
-        &pool,
-        &fixture,
-        &fixture.receiver_certificate,
-        &first_delivery.proof,
-    )
-    .await
-    .expect("stale lease failure must leave the current lease unchanged"));
+    assert!(
+        verify_origin(
+            &pool,
+            &fixture,
+            &fixture.receiver_certificate,
+            &first_delivery.proof,
+        )
+        .await
+        .expect("stale lease failure must leave the current lease unchanged")
+    );
 
     receipt_failure_rolls_back_and_retry_succeeds(&pool, &fixture, &first_delivery)
         .await
         .expect("receipt persistence conflict must roll back the ACK and allow retry");
-    assert!(!verify_origin(
-        &pool,
-        &fixture,
-        &fixture.receiver_certificate,
-        &first_delivery.proof,
-    )
-    .await
-    .expect("acked messages must no longer be live origin proofs"));
+    assert!(
+        !verify_origin(
+            &pool,
+            &fixture,
+            &fixture.receiver_certificate,
+            &first_delivery.proof,
+        )
+        .await
+        .expect("acked messages must no longer be live origin proofs")
+    );
     assert_ack_receipt_and_outbox(&pool, &fixture, &first_delivery).await;
 
     let second_message_id = Uuid::new_v4();
@@ -418,14 +448,16 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     revoke_certificate(&pool, &fixture, &fixture.sender_certificate)
         .await
         .expect("record source certificate revocation after acceptance");
-    assert!(verify_origin(
-        &pool,
-        &fixture,
-        &fixture.receiver_certificate,
-        &second_delivery.proof,
-    )
-    .await
-    .expect("post-acceptance source revocation preserves historical origin evidence"));
+    assert!(
+        verify_origin(
+            &pool,
+            &fixture,
+            &fixture.receiver_certificate,
+            &second_delivery.proof,
+        )
+        .await
+        .expect("post-acceptance source revocation preserves historical origin evidence")
+    );
 
     revoke_certificate(&pool, &fixture, &fixture.receiver_certificate)
         .await
@@ -452,18 +484,40 @@ struct AcceptedIdentity {
     exact_replay: bool,
 }
 
+async fn require_d20_database_identity(pool: &PgPool) {
+    let current_database: String = sqlx::query_scalar("SELECT current_database()")
+        .fetch_one(pool)
+        .await
+        .expect("read the connected database identity before creating fixture facts");
+    assert_eq!(
+        current_database, "star_d20_origin_test",
+        "this lane may write fixtures only to its dedicated star_d20_origin_test database"
+    );
+}
+
 async fn require_d20_database(pool: &PgPool) {
     let ready: bool = sqlx::query_scalar(
         r#"
         SELECT CASE
             WHEN NOT EXISTS (
                 SELECT 1 FROM pg_roles
-                 WHERE rolname IN ('star_platform_transport_owner', 'star_platform_transport_runtime')
-                 HAVING count(*) = 2
+                 WHERE rolname IN (
+                     'star_platform_profile_owner',
+                     'star_platform_transport_owner',
+                     'star_platform_transport_runtime'
+                 )
+                 HAVING count(*) = 3
             ) THEN FALSE
             WHEN to_regclass('platform_messaging.transport_profile_revision') IS NULL
+              OR to_regclass('platform_messaging.transport_profile_revision_audit') IS NULL
+              OR to_regclass('platform_messaging.transport_profile_revision_outbox') IS NULL
+              OR to_regclass('platform_transport.log_master') IS NULL
+              OR to_regclass('platform_transport.log_state') IS NULL
               OR to_regclass('platform_transport.message_work') IS NULL
               OR to_regclass('platform_transport.service_certificate_identity') IS NULL
+              OR to_regclass('platform_transport.service_certificate_identity_audit') IS NULL
+              OR to_regclass('platform_transport.profile_log_binding') IS NULL
+              OR to_regclass('platform_transport.profile_log_binding_audit') IS NULL
               OR to_regclass('platform_transport.delivery_receipt') IS NULL
               OR to_regclass('platform_transport.receipt_outbox') IS NULL
               OR to_regprocedure('platform_transport.append_authenticated(bytea,bytea,uuid,text,uuid,bytea,bytea)') IS NULL
@@ -472,7 +526,8 @@ async fn require_d20_database(pool: &PgPool) {
               OR to_regprocedure('platform_transport.acknowledge_authenticated(bytea,bytea,uuid,text,text,uuid,bigint,uuid,uuid,bytea)') IS NULL
             THEN FALSE
             ELSE
-                pg_has_role(current_user, 'star_platform_transport_owner', 'MEMBER')
+                pg_has_role(current_user, 'star_platform_profile_owner', 'MEMBER')
+                AND pg_has_role(current_user, 'star_platform_transport_owner', 'MEMBER')
                 AND pg_has_role(current_user, 'star_platform_transport_runtime', 'MEMBER')
                 AND has_function_privilege(
                     'star_platform_transport_runtime',
@@ -508,9 +563,16 @@ async fn require_d20_database(pool: &PgPool) {
                 AND NOT EXISTS (
                     SELECT 1
                       FROM (VALUES
-                          (to_regclass('platform_transport.service_certificate_identity')),
+                          (to_regclass('platform_messaging.transport_profile_revision')),
+                          (to_regclass('platform_messaging.transport_profile_revision_audit')),
+                          (to_regclass('platform_messaging.transport_profile_revision_outbox')),
                           (to_regclass('platform_transport.log_master')),
+                          (to_regclass('platform_transport.log_state')),
+                          (to_regclass('platform_transport.message_work')),
+                          (to_regclass('platform_transport.service_certificate_identity')),
                           (to_regclass('platform_transport.profile_log_binding')),
+                          (to_regclass('platform_transport.service_certificate_identity_audit')),
+                          (to_regclass('platform_transport.profile_log_binding_audit')),
                           (to_regclass('platform_transport.delivery_receipt')),
                           (to_regclass('platform_transport.receipt_outbox'))
                       ) AS expected_table(oid)
