@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=274515b28a90be0594d8716540dc7ce71be0a5a86d8209c623d4f43f6355ee1b
+# @cypher schema=1 source_sha256=e795cf1520e6ffec026b3e3909356cb4e03c1a8c1d97a2d73cd06083169cbf6b
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -958,7 +958,7 @@ def main() -> int:
             results.append(run_step(
                 "postgres-start",
                 [str(executables["pg_ctl"]), "-D", str(pg_data), "-l", str(pg_data / "server.log"),
-                 "-o", f"-h 127.0.0.1 -p {pg_port} -c listen_addresses=127.0.0.1 -k ''", "-w", "start"],
+                 "-o", f"-h 127.0.0.1 -p {pg_port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=", "-w", "start"],
                 ROOT,
                 env,
             ))
