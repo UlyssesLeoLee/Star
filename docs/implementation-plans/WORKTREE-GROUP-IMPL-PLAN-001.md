@@ -1,10 +1,11 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.74**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.75**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 日期：2026-10-12
+> - 日期：2026-10-13
+> - Phase 9F4C transport 状态：D18 bounded PostgreSQL durable-log storage slice 已验收；D19 Star-owned native gRPC/mTLS server 与身份/profile 授权为部分实现；D20 已有 native receiver/origin proof 与 opt-in Run-owner Schedule admission consumer，但 origin SQL、live TLS、生产身份/grants、全 owner consumers、BI/Benchmark、恢复与资源性能验收未关闭。NATS 保留；Schedule/Run 执行保持 fail closed。D21 仍是 Multipass/K3s 端到端恢复、负载、RSS、公平性/背压与运维故障转移阶段，测试 inventory 最多 2 条记录，不默认依赖 Docker Desktop。
 > - 基础设施架构决策与实现边界：Multipass 为本地/CI 多 Linux guest 与 K3s cluster 的首选 VM 管理路径；HostEnvironment/instance/cluster/node 分层，Run 绑定精确 cluster ID/generation，placement 与 Host/cluster 双容量由版本化 Infrastructure Profile/owner ledger 决定；当前测试阶段已登记实例总数上限为 2，含 Stopped/Deleted 记录，原因是宿主硬盘容量。测试 bootstrap 用 host-local 独占锁串行化 inventory 检查与 launch；权威 Rust Manager/provider 尚未实现，因此 live test 创建必须走该受控路径。Rust Infrastructure Manager 独占受限 provider adapter；Worktree 通过显式、受授权 workspace bridge 进入 guest。`domain-infrastructure` 已实现 Run binding/demand/readiness/capacity 的纯 Rust v2 contracts，3A 已验证六表 schema substrate，3B1 已验证受限 NOLOGIN role grant matrix，3C1 已验证 Inbox receive，3C2 已验证 tenant-scoped 双 reservation admission store primitive 与隔离 PostgreSQL 并发/expiry 用例；它们都不代表 trusted resolver/provider、production consumer 或 Schedule execution 已接通。目标 DB 应用身份/装配、跨租户 allocator、权威 resolver、owner delivery/consumer、VM/K3s provider、sandbox 与运行性能仍未实现或验收。
 > - Phase 9F4D-3A 更新：新增 Infrastructure-owner 六表 PostgreSQL schema 与可重放本机 runner；PG18.6 disposable 验证双次 migration、6/6 FORCE RLS、NOBYPASSRLS tenant 隔离、append-only Transaction facts、Work state/24–25h retention guards 均通过，零 Multipass instance。schema 不等价于生产 migration provisioning/grants 或 owner writer/consumer；Schedule worker、Manager/provider、sandbox、BI 与执行能力继续 fail closed。
 > - Phase 9F4D-3C3 更新：新增 tenant-scoped SCD2 Provider Profile Master/append-only revision events；owner admission 在事务中读取 binding 固定版本、验证持久化 digest 并派生容量请求；17/17 disposable PostgreSQL runner、8/8 FORCE RLS、5/5 SQLx 和 Rust 定向 gates 通过。没有创建 Multipass VM；测试登记实例上限保持 2（含 Stopped/Deleted）。生产 resolver、跨租户 allocator、target DB provisioning、provider、consumer、sandbox 与执行仍 fail-closed。
@@ -2053,3 +2054,24 @@ D17 验收必须包括 Rust 1.99.0 正式 gates、migration 重放、双 scope F
 | v6.72 | 2026-10-12 | Ulysses — Mavis接手审核 | 对齐 D16 最终结果，定义 D17 profile master/resolver 与 service identity 边界，明确 AssetsLake/RustGameServer/SandTree/IDE1.0 的模块适配范围与未验收门 | 用户重申可直接参考复用本机 Rust 服务；发现 Schedule SRS/BD 与 Group DD 尚有 D16 中间状态 |
 | v6.73 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 D17 首个 profile owner/schema/resolver 切片及 71/71 PostgreSQL、SQLx 1/1 证据并入计划，保留生产身份、transport、BI、性能和 Rust 1.99.0 未关闭项 | D17 首片实现；AssetsLake envelope metadata 语义适配并完成隔离验收 |
 | v6.74 | 2026-10-13 | Ulysses — Mavis接手审核 | Correct the D3D5 consumer size-bound wording and keep NATS ingress configuration and measured RSS as production acceptance gates | Run Owner consumer bounded-memory review |
+
+## 6.134 — Phase 9F4C-D18–D21 状态对账与后续验收顺序
+
+**状态：🟡 D18 bounded storage slice 已验收；D19/D20 为部分实现；D21 尚未开始。9F4C transport replacement 与 Schedule/Run 执行均未关闭。**
+
+本节将主实施计划中的 D18–D21 阶段矩阵与本实施计划已落地的代码、报告和验证证据对齐。D18 的存储验收不代表 Rust 服务或 NATS 替换；D19 的 provider/server 切片不代表生产身份与网络验收；D20 的一个 owner consumer 不代表全部 owner 已迁移。保持现有 Transport Profile pinning、owner-local Outbox/Inbox 和 fail-closed execution 边界。
+
+| 阶段 | 当前已实现并验证 | 尚未通过的关闭门 |
+|---|---|---|
+| D18 durable log | PostgreSQL 18.6 隔离 runner 77/77；migration 双次应用、RLS/WORM、bounded Work/lease/retention、永久 receipt/metadata Outbox，以及两个并发会话下 exact append 只分配一条 cursor/receipt。仅关闭 storage contract slice。 | Rust provider、生产 DB identity/grants、trusted exact-wire digest、receiver/BI、吞吐/RSS/恢复/故障转移均不属于已验收范围。详见 [D18 报告](../reports/PHASE-9F4C-D18-NATIVE-TRANSPORT-LOG-REPORT.md)。 |
+| D19 native server/auth | Rust 1.99.0 native feature all-targets check、Clippy、35/35 library tests；PostgreSQL 18.6 disposable contract 80/80，auth migration 双次应用及 certificate/profile/log-generation、RLS/WORM/runtime-role 场景通过。 | 完整 package tests 曾遇 Windows LNK1104，当前无通过证据；真实 mTLS gRPC e2e、生产证书/profile provisioning、可信 endpoint resolver、目标库 grants、owner commit-before-ACK、双 provider parity、SBOM、性能/RSS 和 rollback 未验收。详见 [D19 报告](../reports/PHASE-9F4C-D19-NATIVE-SERVER-AUTH-REPORT.md)。 |
+| D20 receiver/owner composition | 已有 bounded Pull/Acknowledge adapter、exact-wire origin proof、append-time source provenance 与 ACK 同事务复验；opt-in Run-owner consumer 只处理受支持的 admission Request/Resolution。Run-owner slice 的 Rust 1.99.0 package check/Clippy/rustfmt 与 17/17 tests 通过。 | D20 origin migration/SQLx contract 尚未运行；无 live TLS/目标库 grants/production composition；未覆盖全部 owner consumers、durable poison recovery、NATS/native BI parity、Benchmark、恢复、RSS、p95/p99、公平性与压力。详见 [D20 报告](../reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md)。 |
+| D21 end-to-end operations | 尚未开始。 | 使用最多 2 条 Multipass inventory 记录且不依赖 Docker Desktop，验证 Multipass/K3s 生命周期、Run/cluster 固定绑定、host 与 cluster 容量、consumer/server crash recovery、drain/cancel、并行公平/背压、磁盘与内存预算、BI/Benchmark、故障转移、观测与回滚；NATS 只能逐 route/profile 在 dual-run 与 rollback 验收后退役。 |
+
+后续执行顺序：先在可重复的隔离 PostgreSQL 18.6 环境运行 D20 origin migration、owner grants/RLS 与 SQLx rollback/replay 合约；随后完成真实 mTLS/证书撤销和生产 Profile resolver/身份装配；逐 owner 接齐 commit-before-ACK consumer、quarantine/replay 与 Infrastructure result；再完成 NATS/native 双 provider 的 BI 对账和故障/恢复/资源矩阵；最后进入 D21 两实例上限内的 Multipass/K3s 端到端验收。若 PostgreSQL、TLS 或有效 VM 环境不可用，记录精确阻塞并保持相关能力关闭，不以 schema-only、mock、编译或文档状态替代运行验收。NATS 依赖在所有 route 通过双跑、回滚与商业分发闭包审查前继续保留。
+
+自动化档：[P]（R/V/S）；复用 `scripts/automation/phase9f4d_run_owner_consumer.py` 的隔离数据库流程。不得清理或重建用户 Multipass inventory 以绕过环境问题；测试创建仍受 2 条记录硬上限与独占锁约束。
+
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v6.75 | 2026-10-13 | Ulysses — Mavis接手审核 | 对齐 D18–D21 阶段矩阵与当前 D18 storage、D19 native auth、D20 receiver/Run-owner 证据；明确 D18/D19/D20 未覆盖的验收门、D21 顺序、两实例上限及 NATS/执行 fail-closed 条件 | 继续推进全部 phase，并发现 Group 实施计划停在 D17、主计划已列出 D18–D21 |
