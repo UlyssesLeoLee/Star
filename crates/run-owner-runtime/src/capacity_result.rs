@@ -1,6 +1,6 @@
 //! Bounded JetStream consumer for Infrastructure-owned capacity result facts.
 /*
-@cypher schema=1 source_sha256=091800ebe99adf3cb39ee3dce0b01eb588244208ad08eb35aaab83d77c213351
+@cypher schema=1 source_sha256=a614bf6ab0d341f04950020674b465c8d1929454592ce7a328dd73f7b2eef0e2
 MERGE (self:File {path:"crates/run-owner-runtime/src/capacity_result.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::capacity_result",kind:"module"})
 MERGE (consumer:Type {id:"crates/run-owner-runtime/src/capacity_result.rs::RunOwnerCapacityResultConsumer",kind:"struct"})
@@ -21,6 +21,7 @@ MERGE (load:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::load_an
 MERGE (bind_scope:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::bind_result_scope_from_demand",kind:"function"})
 MERGE (verify_duplicate:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::verify_duplicate_result",kind:"function"})
 MERGE (parse:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::parse_capacity_result_message",kind:"function"})
+MERGE (parse_envelope:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::parse_capacity_result_envelope",kind:"function"})
 MERGE (common:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::common_payload",kind:"function"})
 MERGE (validate_payload:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::validate_result_payload",kind:"function"})
 MERGE (digest:Symbol {id:"crates/run-owner-runtime/src/capacity_result.rs::result_digest",kind:"function"})
@@ -74,6 +75,7 @@ MERGE (module)-[:DEFINES]->(load)
 MERGE (module)-[:DEFINES]->(bind_scope)
 MERGE (module)-[:DEFINES]->(verify_duplicate)
 MERGE (module)-[:DEFINES]->(parse)
+MERGE (module)-[:DEFINES]->(parse_envelope)
 MERGE (module)-[:DEFINES]->(common)
 MERGE (module)-[:DEFINES]->(validate_payload)
 MERGE (module)-[:DEFINES]->(digest)
@@ -126,9 +128,10 @@ MERGE (record)-[:CALLS]->(bind_scope)
 MERGE (record)-[:CALLS]->(set_scope)
 MERGE (load)-[:CALLS]->(bind_scope)
 MERGE (bind_scope)-[:CALLS]->(match_demand)
-MERGE (parse)-[:CALLS]->(validate_payload)
-MERGE (parse)-[:CALLS]->(common)
-MERGE (parse)-[:CALLS]->(digest)
+MERGE (parse)-[:CALLS]->(parse_envelope)
+MERGE (parse_envelope)-[:CALLS]->(validate_payload)
+MERGE (parse_envelope)-[:CALLS]->(common)
+MERGE (parse_envelope)-[:CALLS]->(digest)
 MERGE (validate_payload)-[:CALLS]->(common)
 MERGE (validate_payload)-[:CALLS]->(decode_digest)
 MERGE (validate_payload)-[:CALLS]->(reason)
@@ -174,7 +177,7 @@ use crate::outbox::{
 
 const SUBJECT_PREFIX: &str = "star.infrastructure.v2";
 const MAX_PAYLOAD_BYTES: usize = 16 * 1024;
-const MAX_ENVELOPE_BYTES: usize = 128 * 1024;
+pub(super) const MAX_ENVELOPE_BYTES: usize = 128 * 1024;
 // async-nats `max_bytes` limits client buffering of messages already received; it is not an
 // ingress or wire-size limit. Production must cap NATS and the JetStream stream at the envelope
 // limit and measure peak consumer RSS before enabling this consumer.
@@ -207,6 +210,14 @@ pub enum CapacityResultConsumeOutcome {
         stream_sequence: i64,
         /// True when the same source event had already been quarantined.
         duplicate: bool,
+    },
+    #[cfg(feature = "native-grpc-adapter")]
+    /// A poison receipt committed and a native durable-log delivery was terminally acknowledged.
+    QuarantinedNative {
+        /// Authenticated source log generation.
+        log_generation: Uuid,
+        /// Authenticated durable-log cursor.
+        sequence: i64,
     },
 }
 
@@ -500,16 +511,16 @@ struct ExpiredPayload {
 }
 
 #[derive(Debug, Clone)]
-struct ValidatedCapacityResult {
-    tenant_id: Uuid,
-    event_id: Uuid,
+pub(super) struct ValidatedCapacityResult {
+    pub(super) tenant_id: Uuid,
+    pub(super) event_id: Uuid,
     source_event_id: Uuid,
     project_id: Uuid,
     branch_id: Uuid,
     engineering_run_id: Uuid,
     work_item_id: Uuid,
-    task_execution_run_id: Uuid,
-    occurrence_id: Uuid,
+    pub(super) task_execution_run_id: Uuid,
+    pub(super) occurrence_id: Uuid,
     event_type: String,
     schema_version: i16,
     idempotency_key: String,
@@ -519,7 +530,7 @@ struct ValidatedCapacityResult {
 }
 
 impl PostgresRunOwnerCapacityStore {
-    async fn record_capacity_result(
+    pub(super) async fn record_capacity_result(
         &self,
         mut result: ValidatedCapacityResult,
     ) -> Result<bool, CapacityResultError> {
@@ -692,9 +703,6 @@ fn parse_capacity_result_message(
 ) -> Result<ValidatedCapacityResult, CapacityResultError> {
     // `wire` is already materialized in `Message::payload` here; this parser guard does not bound
     // the allocation made while receiving the message. Broker and stream limits must do that.
-    if wire.len() > MAX_ENVELOPE_BYTES {
-        return Err(CapacityResultError::InvalidEvent);
-    }
     let headers = headers.ok_or(CapacityResultError::InvalidEvent)?;
     let mut message_ids = headers.get_all("Nats-Msg-Id");
     let message_id = message_ids
@@ -706,6 +714,24 @@ fn parse_capacity_result_message(
         return Err(CapacityResultError::InvalidEvent);
     }
 
+    let result = parse_capacity_result_envelope(wire)?;
+    if message_id != result.event_id.to_string() {
+        return Err(CapacityResultError::InvalidEvent);
+    }
+    let expected_subject = format!("{SUBJECT_PREFIX}.{}", result.event_type);
+    if subject != expected_subject {
+        return Err(CapacityResultError::InvalidEvent);
+    }
+    Ok(result)
+}
+
+/// Strict provider-neutral envelope and payload parser shared by every receive adapter.
+pub(super) fn parse_capacity_result_envelope(
+    wire: &[u8],
+) -> Result<ValidatedCapacityResult, CapacityResultError> {
+    if wire.is_empty() || wire.len() > MAX_ENVELOPE_BYTES {
+        return Err(CapacityResultError::InvalidEvent);
+    }
     let envelope: InfrastructureResultEnvelope = serde_json::from_slice(wire)?;
     if envelope.envelope_version != 1
         || envelope.schema_version != DEMAND_SCHEMA_VERSION
@@ -714,7 +740,6 @@ fn parse_capacity_result_message(
         || envelope.correlation_id.is_nil()
         || envelope.idempotency_key.is_empty()
         || envelope.idempotency_key.len() > 200
-        || message_id != envelope.event_id.to_string()
         || !envelope.payload.is_object()
         || serde_json::to_vec(&envelope.payload)?.len() > MAX_PAYLOAD_BYTES
     {
@@ -722,10 +747,6 @@ fn parse_capacity_result_message(
     }
 
     let source_event_id = validate_result_payload(&envelope.event_type, &envelope.payload)?;
-    let expected_subject = format!("{SUBJECT_PREFIX}.{}", envelope.event_type);
-    if subject != expected_subject {
-        return Err(CapacityResultError::InvalidEvent);
-    }
     let expected_idempotency_key = format!("{}:{source_event_id}", envelope.event_type);
     if envelope.idempotency_key != expected_idempotency_key {
         return Err(CapacityResultError::InvalidEvent);
