@@ -103,3 +103,24 @@ This section supersedes the earlier “no branch or worktree was removed” snap
 - Other contained sources remain blocked from removal because their worktrees contain modified/untracked files, ignored files (including `.codegraph` data, `.cache` evidence, `target/`, or generated Tauri schemas), or are checked out in the non-invoking `D:/Star` main worktree with user changes. No ignored or user files were discarded.
 - Final local refs for this pass: 15 total (`main`, `dev`, and 13 other source branches including the temporary D20 branch). All remaining source tips are already contained in `dev`; the exact blockers are the dirty/ignored worktree contents listed in the earlier source table, except the four branches removed above.
 - `dev` remains local-only and ahead of `origin/dev`. No fetch, push, remote mutation, force operation, or worktree prune was performed. The invoking worktree is clean; no build or test was needed because this pass changed only local Git metadata and removed clean checkouts.
+
+## Final Run-owner lane cleanup — 2026-10-13
+
+This addendum records the user-approved archive and cleanup after the D20 Run-owner source had already been merged. It supersedes the prior temporary-retention state for that one lane; earlier source tables remain historical snapshots.
+
+### Recorded plan
+
+| Branch | Tip at plan time | Status against `dev` | Worktree and blocker assessment | Action |
+|---|---|---|---|---|
+| `main` | `608de5f1ce1a090179700afb350af5560bb88a69` | `CONTAINED` | `D:/Star`; protected, retained | None |
+| `dev` | `4c0de14d9e2de669044dc47ac4559348b65a6805` | Target | `C:/Users/leo19/orca/workspaces/Star/dev-converge-20261007`; clean, ahead of local `origin/dev` by 6 | Retained |
+| `codex/d20-native-schedule-admission-20261013` | `82ae8e3f96fb848d3a5c7763b41480d91826a61b` | `CONTAINED` by merge `78c7211ac7d08011db5adcaa9c378fab38b28193` | Clean; no ignored files, initialized submodules, in-progress operation, upstream, or same-name tag | Archive worktree, then delete local branch |
+
+### Applied cleanup and final state
+
+- The D20 worktree at `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumer-native/Star` was archived through Codex as artifact `01a135a5-85ba-7dc1-b8b6-76af953174cd`.
+- Rechecked the source tip and ancestry in `dev`, then deleted only the local source ref with `git branch -d`; deleted ref tip: `82ae8e3f96fb848d3a5c7763b41480d91826a61b`. No history was rewritten.
+- Final Git local branches: `main`, `dev`. Final linked worktrees: `D:/Star` on `main`, and `C:/Users/leo19/orca/workspaces/Star/dev-converge-20261007` on `dev`.
+- `dev` remained at `4c0de14d9e2de669044dc47ac4559348b65a6805` during Git cleanup; no push, fetch, remote-ref change, `main` movement, force operation, or worktree prune occurred. The archived feature commit remains reachable through `dev`.
+- Two stale Codex app artifacts still claim active worktrees at `C:/Users/leo19/.codex/worktrees/phase9f4d-schedule-worker/Star` and `C:/Users/leo19/.codex/worktrees/phase9f4d3d4-nats-publisher/Star`; both paths are absent from the filesystem and Git worktree list. Archive requests returned `This worktree is owned by another task.` These other-task records were left untouched.
+- The bounded manual review of the merged native consumer found no new execution bypass. The dev CodeGraph index reported up-to-date, but its query did not return the new consumer and no `check_index_coverage` MCP tool was available; review used exact commit/source fallback and makes no whole-graph coverage claim. CodeRabbit could not run because its wrapper failed with `/bin/bash: line 1: /root/.local/bin/coderabbit: Permission denied`; independent review remains incomplete. Previously recorded Rust 1.99.0 package checks and 17/17 library tests are not rerun here. PostgreSQL/RLS, live TLS, production wiring, full D20 acceptance, and BI/Benchmark remain open.
