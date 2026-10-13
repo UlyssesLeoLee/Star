@@ -1,6 +1,6 @@
 //! Run-owner persistence and bounded Infrastructure result consumption.
 /*
-@cypher schema=1 source_sha256=66d52d6cfdc715d329c2100d2680a476269398230d279ace9812ebc8d3fdbc7d
+@cypher schema=1 source_sha256=205e7fb970ff646a6316ee28a8137d28759c165baddb7e4d4671a028878269eb
 MERGE (self:File {path:"crates/run-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/lib.rs::run_owner_runtime",kind:"module"})
 MERGE (binding_module:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::module",kind:"module"})
@@ -46,8 +46,14 @@ MERGE (native_consumer_file:File {path:"crates/run-owner-runtime/src/native_sche
 MERGE (self)-[:IMPORTS]->(native_consumer_file)
 MERGE (native_consumer:Type {id:"run_owner_runtime::NativeGrpcScheduleAdmissionConsumer",kind:"struct"})
 MERGE (native_consumer_error:Type {id:"run_owner_runtime::NativeScheduleAdmissionConsumerError",kind:"enum"})
+MERGE (native_capacity_consumer:Type {id:"run_owner_runtime::NativeGrpcCapacityResultConsumer",kind:"struct"})
+MERGE (native_capacity_error:Type {id:"run_owner_runtime::NativeCapacityResultConsumerError",kind:"enum"})
 MERGE (module)-[:EXPOSES]->(native_consumer)
 MERGE (module)-[:EXPOSES]->(native_consumer_error)
+MERGE (native_capacity_file:File {path:"crates/run-owner-runtime/src/native_capacity_result_consumer.rs"})
+MERGE (self)-[:IMPORTS]->(native_capacity_file)
+MERGE (module)-[:EXPOSES]->(native_capacity_consumer)
+MERGE (module)-[:EXPOSES]->(native_capacity_error)
 MERGE (native_consumer_feature:Config {id:"cargo.feature.run-owner-runtime.native-grpc-adapter"})
 MERGE (module)-[:CONFIGURES]->(native_consumer_feature)
 @endcypher
@@ -55,6 +61,8 @@ MERGE (module)-[:CONFIGURES]->(native_consumer_feature)
 
 mod admission_receive;
 mod capacity_result;
+#[cfg(feature = "native-grpc-adapter")]
+mod native_capacity_result_consumer;
 #[cfg(feature = "native-grpc-adapter")]
 mod native_schedule_admission_consumer;
 mod outbox;
@@ -88,4 +96,9 @@ pub use schedule_capacity::ScheduleProjectCapacitySnapshot;
 #[cfg(feature = "native-grpc-adapter")]
 pub use native_schedule_admission_consumer::{
     NativeGrpcScheduleAdmissionConsumer, NativeScheduleAdmissionConsumerError,
+};
+
+#[cfg(feature = "native-grpc-adapter")]
+pub use native_capacity_result_consumer::{
+    NativeCapacityResultConsumerError, NativeGrpcCapacityResultConsumer,
 };
