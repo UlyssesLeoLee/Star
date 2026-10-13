@@ -1,6 +1,6 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.15 · 2026-10-14 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.16 · 2026-10-14 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > 状态：D19 bounded endpoint resolver 与真实 PostgreSQL-backed mTLS E2E 已实现/实跑；Rust 1.98.1 `--ignore-rust-version` 诊断门。D20 cumulative PostgreSQL 18.6 WSL runner 89/89；guarded SQLx origin target 编译通过但仍 ignored，未执行 SQL。测试仅允许 loopback、非默认端口和精确 `star_d20_origin_test`，并在任何 fixture 写入前预检 required roles/membership, tables, routines and FORCE RLS。另一个同名本机数据库仍须由环境管理隔离。Rust 1.99.0 正式门、production identity/control plane/profile-loader wiring、目标 DB grants、Windows PostgreSQL runtime、owner recovery、BI/performance 和 cutover 均未完成。
 
 ## 1. 范围与证据
@@ -203,8 +203,17 @@ The two follow-on consumer modules are Star-owned Rust code and do not copy anot
 
 The combined Rust 1.99.0 checks passed, with Infrastructure library tests 71/71 and Run-owner 22/22. PostgreSQL origin contract, TLS, production credentials/profile wiring, all-owner migration, recovery/replay, BI/Benchmark, RSS/latency/fairness, and NATS cutover remain open. The features do not start a worker loop or executor. No new third-party dependency or source-project code was added in these two slices.
 
+### 12.3 D20 native Result conflict and Infrastructure-owned publication gap
+
+The Run-owner native consumer now classifies a durable Inbox event-ID/content conflict as permanent poison. It revalidates the exact source before and after writing the quarantine receipt under the separate Platform owner; only then may it terminally disposition the source. Quarantine/source verification failure remains unsettled. Database, authorization and stored-demand integrity errors stay retryable. This adapter-local change does not widen the native producer or change the Run owner’s write authority.
+
+No Infrastructure→Run native publisher exists yet. A future adapter must read only Infrastructure-owned Outbox claims, preserve lease fencing and exact immutable bytes, pin the event's target Run route and trusted current Transport Profile revision/digest/endpoint identity, then append to the Star Rust server with durable producer/event idempotency. It must persist the append receipt in Infrastructure’s owner transaction before marking the Outbox row delivered. An ambiguous RPC retries the exact same payload and pinned identity; it may not reuse Run claims, write Run state, auto-retarget, or infer BI/reservation/readiness from the receipt. No external server module is copied or replaced in this design slice.
+
+capacity_released remains unavailable because its Run-owner typed consumer and BI/lifecycle contract are missing; the current NATS publisher must reject it too. The native producer, target schema/grants, startup identity wiring, recovery/replay, BI/Benchmark parity, resource gates and route rollback remain open. NATS remains enabled and production traffic/execution remain fail closed. The follow-on regression passed Infrastructure 71/71 and Run-owner 23/23 library tests with Rust 1.98.1 --ignore-rust-version; all-targets check and strict target Clippy passed diagnostically, not as the formal Rust 1.99.0 gate.
+
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| v1.16 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record durable quarantine for Run-owner Inbox event-ID/content conflicts; define the unimplemented Infrastructure-owned native Result append, receipt and fencing contract; exclude capacity_released and preserve production gates. |
 | v1.15 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Harden D20 SQLx database isolation and migration preflight; record compilation-only evidence and residual same-name database risk while retaining production integration gates | Independent review identified wrong-database and partial-write hazards; guard commit rebased and merged to local dev |
 | v1.14 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D19 endpoint resolver 与真实 PostgreSQL-backed Tonic mTLS handshake/revocation test；加入测试库身份隔离并保留生产 wiring/toolchain gates | D19 endpoint 与 mTLS E2E lanes reviewed and converged |
 | v1.13 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Update D20 PostgreSQL role/RLS gate to 89/89; record SQLx target compilation with 1 ignored test and retain production identity/grants/TLS/recovery/performance gates | D20 grants and SQLx worktrees merged to local dev |

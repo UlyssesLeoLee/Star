@@ -1,6 +1,6 @@
 # PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT
 
-> **Status**: D20 native receive/origin-proof、Run-owner Schedule admission/Result、Infrastructure demand receive、restricted grants/RLS contract 与 guarded SQLx origin target 已合并到本地 `dev`。原始 SQLx target commit `646eaa34` 已在 dev；本轮仅将数据库隔离/写前预检补丁 `b995636c` rebase 后快进合入。PostgreSQL 18.6 WSL ext4 cumulative schema-only runner 为 89/89；guarded SQLx target 编译通过但仍 ignored，未执行数据库行为。清理后本地 Git 仅保留 `main`/`dev` 两个分支与 worktree；D20 整体进行中，生产接入未开放；未 push。
+> **Status**: D20 native receive/origin-proof、Run-owner Schedule admission/Result、Infrastructure demand receive、restricted grants/RLS contract 与 guarded SQLx origin target 已合并到本地 dev。原始 SQLx target commit 646eaa34 与数据库隔离/写前预检 commit b995636c 已在 dev；本轮追加的 capacity-result 冲突隔离修复 commit f2629b58 已 rebase 并快进合入 dev。PostgreSQL 18.6 WSL ext4 cumulative schema-only runner 为 89/89；guarded SQLx target 编译通过但仍 ignored，未执行数据库行为。本轮 Rust 回归使用 1.98.1 --ignore-rust-version 诊断，不能代替 1.99.0 正式门。D20 整体进行中；Infrastructure→Run native publisher、生产接线与执行仍关闭；NATS 保留；未 push。
 > **Initial native receiver slice**: `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumers/Star`, branch `codex/phase9f4c-d20-native-receiver-20261012`, base `501c6cb5209a0f87df971cd0907a49f448118982`.
 > **Run-owner composition slice**: branch `codex/d20-native-schedule-admission-20261013` at `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumer-native/Star`, rebased onto `dev` at `4ffb0b9dc7d8bdcf0ec23c181f93c19a857167e6` and merged by `78c7211ac7d08011db5adcaa9c378fab38b28193`. After bounded manual review, its clean worktree was archived by Codex (archive artifact `01a135a5-85ba-7dc1-b8b6-76af953174cd`) and the local source branch was safely deleted. Post-merge Rust 1.99.0 package check/Clippy/formatting passed; the shared-target test link failed with LNK1104, then the isolated-target retry passed 17/17.
 > **Infrastructure demand consumer lane**: branch `codex/d20-infrastructure-demand-receiver`, rebased and merged by `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e`.
@@ -36,6 +36,10 @@
 | requirements/basic/Schedule DD/Rust reuse DD/implementation plan | 同步 D20 SQLx 写前安全预检、编译与未执行边界、production gates 和 fail-closed 状态 | requirements/basic v6.52、Schedule DD v0.73、Rust reuse DD v1.15 与 plan 已同步；dev 文档同步保留原有 D19 变更 |
 | `AGENTS.md` | 未修改；本机 Rust server 的模块级选择性复用规则已存在 | 无需重复 |
 
+| crates/run-owner-runtime/src/native_capacity_result_consumer.rs | Treat Run Inbox event-ID/scope/content idempotency conflicts as permanent poison; durably quarantine under Platform owner, revalidate exact source before and after quarantine, then terminally disposition | Implemented; focused regression and Run-owner 23/23 library tests passed diagnostically |
+| crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs; crates/platform-messaging-runtime/src/admission_receive.rs | Reject unsupported capacity_released in JetStream and document durable Inbox conflict as a permanent delivery fault | Implemented; Infrastructure 71/71 library tests passed diagnostically; unsupported release contract remains closed |
+| requirements/basic/DD/plan and D20 publisher brief | Synchronize quarantine, unsupported release, future native publisher receipt/fencing requirements and current unimplemented status | Synchronized in this follow-on documentation lane; no producer implementation claimed |
+
 ## §2 验证摘要
 
 | 守门 | 实际结果 |
@@ -66,6 +70,12 @@
 | Native gRPC live e2e / Multipass/K3s | 未运行 live gRPC/TLS e2e；本轮 schema-only gate 未启动 NATS、未创建 Multipass instance、未改变 inventory；临时 PostgreSQL 已停止 |
 | 代码审查 | 对新增 consumer 与共享 receiver 调用路径做了有界手工复查：Result route 在连接前拒绝；只接受 Request/Resolution；单次至多消费一条并遵守取消/10 秒 deadline；owner commit 与来源复验先于 ACK；永久 poison 必须配置 durable quarantine；未发现新增执行绕过。dev worktree 的 CodeGraph 索引报告 up-to-date，但本次查询未返回新增 consumer；`check_index_coverage` MCP 工具不可用，因此从提交 diff 与精确源码回退审查，不作全图覆盖声明。当前修复的独立只读 agent review 已完成，未发现 P0-P3；CodeRabbit 未能启动：Windows npm shim 调用 `/root/.local/bin/coderabbit` 时返回 `/bin/bash: line 1: /root/.local/bin/coderabbit: Permission denied`，因此不记为独立 CodeRabbit 通过 |
 
+### 本轮 conflict/quarantine follow-on 验证
+
+- Rust 1.98.1 --ignore-rust-version --offline --locked：Infrastructure library tests 71/71、Run-owner library tests 23/23 通过；联合 native-feature all-targets check 退出码 0；目标 crates clippy --all-targets -- -D warnings 退出码 0。依赖 crate domain-kms 仍有既有 deprecation warnings。
+- 修改后的 Run-owner consumer 与 Infrastructure publisher 的 targeted rustfmt check 通过；共享 receiver 文件存在无关的既有格式差异，本轮没有重排。CypherGraph Guardian 对 3 个改动源码文件通过，git diff --check 通过。
+- Rust 1.99.0 与 RTK wrapper 在本机不可用；本轮 Rust 结果是诊断，不作为正式 1.99.0 gate。CodeRabbit CLI 返回 /bin/bash: /root/.local/bin/coderabbit: Permission denied，不记为通过。此次没有运行新的 SQLx/PostgreSQL 行为测试。
+
 ## §3 已知缺口
 
 1. 当前已接入 Run-owner Schedule admission/Result 与 Infrastructure demand 的 opt-in/default-off consumers，但尚未完成所有 owner Outbox/Inbox producer/consumer 迁移。Rust package gates 与 D20 disposable PostgreSQL origin migration/SQL contract 已通过；SQLx target、TLS e2e、production assembly/grants 与 runtime deployment 仍未验收。
@@ -79,11 +89,15 @@
 9. D20 origin-only PostgreSQL gate 为 83/83；后续 cumulative restricted role/grants/RLS runner 为 89/89。SQLx target 经本轮加固后只编译通过，仍 ignored，SQL/事务行为未运行。guard 检查 loopback、非默认端口、精确测试库名以及写前 role/schema/function/FORCE RLS；第二个同名本机数据库仍须由环境管理隔离。生产 grants/identity、TLS 与恢复保持未验收，切流和执行继续 fail closed。
 10. Grants lane `a9bc2681` 与 SQLx baseline `646eaa34` 已在 dev；本轮 guard `b995636c` 仅包含测试文件。D20 临时 checkout/branch 与两个已合入的 D19 Orca worktree/branch 均已安全清理；终端移除前确认为空闲 shell。`main` 保持 `608de5f1`，本地 Git 只剩 `main` 与 `dev`；requirements/basic/Schedule DD/reuse DD/plan/report 已同步至 dev，`origin/dev` 未更新，未 push。D20 生产验收仍开放。
 
+11. Infrastructure→Run native Result publisher、Infrastructure-owned durable receipt persistence、生产 identity/Profile composition 与启动路由仍未实现；本轮只形成 future publisher brief。JetStream 与 native route 均不得发布 capacity_released，直至 typed lifecycle/consumer/BI contract 完整。
+
 ## §4 子代理失败接手清单
 
 本轮由 grants 与 SQLx 两条独立子代理/worktree lane 并行完成。Grants source commit `a9bc2681`、SQLx source commit `954a4673`（加入 brief 后 amend）依次 rebase 到 `dev`；SQLx 最终提交 `646eaa34` 与 grants commit 均已进入本地 dev。两条 lane 分别提供 `docs/briefs/D20-origin-grants.md` 与 `docs/briefs/D20-origin-sqlx.md`。合并前后对 role guard、RLS/non-vacuous cross-tenant fixture、SQLx ignored gating 和事务回滚路径做了有界手工复核，未发现已确认问题；CodeRabbit CLI 因 permission denied 无法启动，不记为独立 review 通过。来源 worktree clean/ancestor preflight 后非强制删除，源分支已删除；Codex archive API 仍返回 queued，附件列表仍显示 stale active identities，故不宣称 Codex archive 完成。已合入的代码提交保留在 dev 历史中，没有未提交内容遗失。此前其他 follow-on 的 brief 流程偏差见历史报告版本，不将其追溯补成事前记录。
 
 本轮继续工作记录：独立只读 reviewer 对数据库身份限制与完整写前预检给出接受建议；CodeRabbit CLI 启动返回 `/bin/bash: /root/.local/bin/coderabbit: Permission denied`，不记为 CodeRabbit 通过。已用 SQLx target `--no-run` 编译、rustfmt、CypherGraph Guardian 与 diff whitespace 检查复核；没有真实 PostgreSQL SQLx 执行。
+本轮并行审查发现 Infrastructure→Run 原生发布器没有 typed producer、owner-local durable receipt store 或生产 identity/Profile composition；两个只读审查 lane 均建议保持发送与执行关闭。当前代码只修复 Run-owner event-ID/content 冲突的无限重投路径，并收紧 JetStream allowlist。D20 native publisher brief 在首次并行派发后补写，属于流程顺序偏差；该 brief 只界定下一阶段，不把缺失实现写成已完成。相关 audit/empty lanes 与本轮 code/docs lanes 均须在合入后确认 clean、无活动 owner，再分别清理；不触碰其他历史或未知 owner worktree。
+
 ## §5 守门规则（17 项）
 
 | # | 守门规则 | 本阶段状态 |
@@ -94,7 +108,7 @@
 | 4 | mTLS 证书身份是 peer 来源认证基础 | 继承 D19；本轮无 live handshake |
 | 5 | Profile digest 与 endpoint/profile revision 必须固定 | 代码通过；production resolver 未接入 |
 | 6 | recipient 来自服务端已认证 principal，不信 wire claim | proto/server 路由契约遵守；无 e2e |
-| 7 | owner commit 和 commit 后授权复验先于 ACK | Run-owner Result 与 Infrastructure demand consumers 均在各自 owner commit、source revalidation 后 ACK；目标 crate gates 通过，真实 TLS/PG e2e 与 production assembly 未验收 |
+| 7 | owner commit 和 commit 后授权复验先于 ACK | 本轮 Result content-conflict 路径先由 Platform owner 持久隔离、再次验证 exact source 后才 terminal disposition；quarantine/source verification failure 不 ACK；Infra native producer 尚未实现 |
 | 8 | permanent ACK 前先提交独立 durable quarantine | 共享 receiver 已定义；native DB 联测未做 |
 | 9 | ACK 绑定 generation、sequence、message、lease 和 exact digest | client request 固定并发送这些字段；server live 验证未做 |
 | 10 | digest 必须对原始 wire bytes 计算 | 代码已校验 exact SHA-256；10 项定向测试通过 |
@@ -103,8 +117,8 @@
 | 13 | 未知/超时/错误时 fail closed | RPC/ACK 错误返回未确认；集成重试/取消未测 |
 | 14 | provider-specific cursor 不泄漏为业务身份 | sequence/log/lease 留在 adapter delivery origin |
 | 15 | NATS 不得在 replacement gates 前移除 | 通过；NATS 保留 |
-| 16 | 需求、基本设计、详细设计与实现状态同步 | requirements/basic/SRS/BD/DD/Group/Infrastructure/reuse/implementation plan 已同步到两个 merged consumer slices；PostgreSQL、workspace-wide、TLS 与 production gates 仍开放 |
-| 17 | Rust 1.99.0 正式工具链、PostgreSQL migration/RLS contract 与独立性能验收不得由诊断结果替代 | 既有 owner crates 的 Rust 1.99.0 check/tests/target Clippy/formats 与 PostgreSQL 89/89 disposable contract 证据仍有效；guarded SQLx target 使用 Rust 1.98.1 `--ignore-rust-version` 编译，仍 ignored 且 SQL 行为未运行；workspace-wide gates 与独立性能验收未运行，D20 保持开放 |
+| 16 | 需求、基本设计、详细设计与实现状态同步 | requirements/basic/SRS/BD/DD/Rust reuse/implementation plan/report 已同步本轮已实现修复与未实现的 native publisher/receipt gap；本轮 docs lane 合入后完成闭环 |
+| 17 | Rust 1.99.0 正式工具链、PostgreSQL migration/RLS contract 与独立性能验收不得由诊断结果替代 | 累计 PostgreSQL 89/89 disposable contract 证据仍有效；本轮 Rust 1.98.1 --ignore-rust-version tests/check/Clippy 仅为诊断；SQLx 仍 ignored，workspace-wide 1.99.0、RSS/latency/fairness 与 production gate 未运行 |
 
 ## §6 签字栏
 
@@ -113,13 +127,14 @@
 | 架构 | `架构师 (Mavis 接手 agent per DEC-008)`：检查 provider/owner 边界与用户确认的本机模块复用规则；D20 保持进行中 |
 | SRE Lead | Mavis review：未验收；没有恢复、负载、RSS、tail latency 或公平性证据 |
 | 平台 | Mavis review：确认 grants/RLS contract 和 SQLx test target 已与文档对齐；生产 role provisioning/deployment grants、resolver、server deployment 和 owner producer wiring 未验收 |
-| 评审主持 | Mavis review：独立只读审查接受 D20 SQLx 测试库身份与写前预检补丁，未确认目标库误写或 migration partial-write 路径；同名本机数据库仍是环境隔离残余。CodeRabbit 因 CLI 权限错误未完成，不冒称通过 |
+| 评审主持 | Mavis review：手工复查接受本轮 conflict quarantine 顺序与 capacity_released allowlist 收紧；native Infra→Run publisher/receipt 和生产身份接线仍缺失。CodeRabbit 因 CLI permission denied 未完成，不冒称通过 |
 | PM | Mavis review：阶段报告与 plan 均记录未关闭项；NATS/native cutover 不开放 |
 
 ## §7 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v1.8 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Run-owner event-ID 冲突先持久隔离、来源二次复验后 terminal disposition；JetStream 拒绝未支持的 capacity_released；Rust 1.98.1 诊断 gates、1.99.0 正式门缺失及 native Infrastructure→Run publisher/receipt 未实现。代码 commit f2629b58 已 rebase 并快进合入本地 dev；文档同步完成后合并，不 push。 | 并行审查发现 conflict 无限重投和 producer/consumer contract gap；保留 NATS 与生产 fail-closed 门禁 |
 | v1.7 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录仅新增 D20 SQLx database guard commit `b995636c` rebase/快进合入 dev；确认 baseline test commit 已 patch-equivalent 存在，避免重复合并；补录 loopback/非默认端口/精确库名与完整写前预检、no-run 编译及同名库残余风险；在确认干净、已合并和空闲终端后清理 D20/D19 worktrees 与额外分支，最终仅留 main/dev | 用户要求并行 worktree 结果合入 dev 并清理；独立审查指出误连库与 partial fixture 风险 |
 | v1.6 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 grants/RLS 与 SQLx 两条独立 lane rebase/快进合入本地 dev、PostgreSQL 89/89、SQLx 1 ignored 未运行、tracked evidence hashes 与 Git worktree/branch 清理结果；注明 Codex archive API 仍 queued/active，不冒称归档完成；保持 production/execution gates 开放 | 用户要求并行 worktree 完成后 rebase/merge 到 dev；两条 lane 合并完成 |
 | v1.5 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D20 PostgreSQL runner 修复及需求/基本/详细设计 rebase、快进合入本地 dev 的准确 delivery tip `8a6cae9d`；clean code/docs/review worktrees 与已合入 refs 已清理；runner archive request 仍 queued、Codex app 仍列出 active identities，不冒称归档完成；未 push，D20 执行与生产门保持开放 | 用户要求将完成的并行 worktree 结果 rebase/merge 到 dev 并清理 |
