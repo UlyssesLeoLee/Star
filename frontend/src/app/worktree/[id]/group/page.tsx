@@ -2999,7 +2999,19 @@ export default function GroupWorkspacePage({ params }: PageProps) {
         <Link href={appHref("task-card")} className="fixed bottom-36 right-4 z-30 rounded-full border border-line bg-bg-card px-3 py-2 text-[10px] text-ink-dim shadow-lg md:bottom-24">返回全部 Task Cards</Link>
       )}
 
-      <aside className="fixed bottom-[4.6rem] left-3 right-3 z-40 mx-auto max-w-[960px] rounded-xl border border-line bg-bg-card/95 p-3 shadow-2xl backdrop-blur md:bottom-4 md:left-[17rem] md:right-5" data-testid="group-chat-bar">
+      {/* 群组聊天栏 — 底部 dock。
+          per INV-LAYOUT-02/03: 原来硬编码 md:left-[17rem] (272px) 手工绕开侧栏，
+          但 Sidebar 折叠时只有 w-16 (64px)，会留下 208px 死区；改宽度还要同步改魔法数字。
+          现在读 var(--sidebar-w) 单一事实源 (globals.css)：
+          展开 256px / 折叠 64px / <768px 0px，且 z-[35] < Sidebar z-40 → 被侧栏覆盖。
+          max(0.75rem, ...) 保底 12px：--sidebar-w 在移动端是 0px，
+          而移动端原本靠 left-3 留边距；inline style 会盖掉 Tailwind 的 md: 断点，
+          所以这里必须自己算，不能靠 className 里的 left-3 / md:left-*。 */}
+      <aside
+        className="fixed bottom-[4.6rem] right-3 z-[35] mx-auto max-w-[960px] rounded-xl border border-line bg-bg-card/95 p-3 shadow-2xl backdrop-blur md:bottom-4 md:right-5"
+        style={{ left: "max(0.75rem, var(--sidebar-w, 0px))" }}
+        data-testid="group-chat-bar"
+      >
         <div className="flex flex-wrap items-center gap-2">
           <MessageSquareText size={15} className="shrink-0 text-accent" />
           <label htmlFor="group-chat-scope" className="text-[10px] font-semibold uppercase tracking-wider text-ink-mute">Scope</label>
