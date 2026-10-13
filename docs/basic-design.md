@@ -5656,6 +5656,12 @@ Star-owned TrustedEndpointResolver 已把 deployment-trusted endpoint identity �
 
 实际 Tonic mTLS 与 PostgreSQL-backed server E2E 已通过 1/1：可信 Append、匿名客户端、错误 CA、错误服务器名和同 channel 撤销后拒绝均有真实 RPC/数据库断言。测试目标默认 ignored，并将连接限制到 loopback、非 5432、数据库名 star_d19_test。结果来自 Rust 1.98.1 诊断工具链；正式 Rust 1.99.0 门、生产证书控制面、endpoint resolver composition、DB 部署 grants、redirect/no-follow、性能/恢复、BI/Benchmark 和 NATS 迁移仍未验收。Native provider 和 Schedule/Run execution 保持 fail closed。
 
+### D19 current Profile 与 native client composition（v6.53）
+
+`TrustedProfileEndpointResolver` 在每次调用时通过 authenticated transport session 从 PostgreSQL 重新读取当前 Profile revision，再将 Profile 的精确 endpoint identity 映射到不可变 deployment trust registry；不缓存 Profile snapshot，且把存储/解析细节归并为有界错误。native gRPC send/receive client API 只接受 resolver 产生的 `ResolvedTransportEndpoint`，连接前比较 provider、Profile digest 与 endpoint identity，并只从该类型提取 HTTPS URI/TLS server name，避免调用方拼接或注入任意目标地址。Run-owner 的 route rejection fixture 同步改为可信 profile/endpoint 构造。
+
+合并后的 Rust 1.98.1 `--ignore-rust-version` 联合 feature all-targets check 通过；`platform-messaging-runtime` library tests 53/53、`run-owner-runtime` 22/22 通过。这是诊断门，不是项目正式 Rust 1.99.0 门。当前 composition 尚未由 production startup/route 构造和调用，也未证明生产 profile grants、secret/certificate lifecycle、已有 channel 的撤权刷新或 redirect/no-follow。故 native traffic 与 Schedule/Run execution 继续 fail closed；D21 的 Multipass/K3s 两实例限制不变。
+
 ### D20 Native 接收、来源证明与 consumer 验收（v6.52）
 
 **D20 follow-on status (2026-10-14):** the cumulative PostgreSQL 18.6 WSL ext4 schema-only runner passed 89/89 steps, including restricted roles, the runtime function allowlist, PUBLIC/untrusted verify and ACK denial, forced RLS/cross-tenant checks, and migration replay. The SQLx origin target compiles with Rust 1.98.1 `--ignore-rust-version`; it remains ignored without a disposable database URL, so SQLx database behavior is unverified. Before fixtures can write, the test requires localhost/loopback, a non-default port, exact database name `star_d20_origin_test`, and preflights required roles/membership, tables/routines, and enabled+forced RLS. Another local non-default-port database with the same name cannot be distinguished by the test. Production role provisioning/deployment grants, Rust 1.99.0, Windows runtime, TLS/identity, recovery/replay, BI/Benchmark, performance and execution remain open. Native cutover and Schedule/Run execution stay fail closed; see [D20 report](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md).
@@ -5676,6 +5682,7 @@ Run owner 提供 opt-in `native-grpc-adapter` feature，将 native transport、�
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.53 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 uncached current Profile→trusted endpoint composition、typed native client destination 与 Run-owner fixture 迁移；同步合并后 Rust 1.98.1 diagnostic 证据及未关闭生产接线门 | D19 两条 worktree rebase/fast-forward 合入本地 dev |
 | v6.52 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 D20 SQLx test 的专用数据库身份、loopback/端口约束和写前完整 schema/RLS 预检；明确目标编译成功而真实 SQLx 行为仍未执行，并记录同名库残余风险 | 独立审查后将 SQLx test hardening rebase/快进合入本地 dev |
 | v6.51 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D19 bounded endpoint resolver、真实 PostgreSQL-backed TLS E2E 与 database-name guard；保留 profile freshness、production wiring、Rust 1.99.0、BI/performance 和 cutover 门槛 | D19 endpoint 与 TLS E2E worktree review 后 rebase 并合入本地 dev |
 | v6.50 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D20 role/RLS 89/89 证据、SQLx target 编译但 ignored 的实际状态及生产验收边界 | D20 grants/RLS 与 SQLx 两条 worktree rebase 后快进合入本地 dev |

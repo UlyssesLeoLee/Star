@@ -1008,5 +1008,23 @@ Run Apps 的消息处理仍按 owner 划分：Schedule admission Request/Resolut
 |---|---|---|---|---|
 | v4.83 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增补 D20 Run-owner Result 与 Infrastructure demand consumer 的 owner boundary、commit-before-ACK、导航与 App 边界及未关闭生产门 | 两条 D20 consumer worktree rebase 并合入本地 dev |
 
+### §8.23 D19 current Profile 到可信 endpoint 的 native client 组合
+
+`TrustedProfileEndpointResolver` 将 authenticated session、当前 PostgreSQL Profile resolver 与 deployment-owned trusted endpoint registry 组合为一个 uncached resolve 操作。`profile_id` 与 message kind 必须来自受信 server-side route；caller 不传 URI、TLS name 或 endpoint identity。Profile 缺失、撤销/禁用、授权失败或 endpoint pin 不匹配时拒绝返回地址，外部错误不泄露数据库或 endpoint 细节。配置与 registry 是部署级可信快照，Profile revision 每次从 owner store 当前读取。
+
+native gRPC delivery/receive config 只接收 `ResolvedTransportEndpoint`；连接前校验 provider、Profile digest 与 endpoint identity，并从已解析值取 HTTPS URI/TLS DNS name。禁止保留裸 URI/hostname 的构造入口。每次建立/重建 channel 前需重新读取授权后的 current Profile；本组合不自动热替换现有 channel，也不自行创建 production startup binding。
+
+| Acceptance ID | Acceptance criterion |
+|---|---|
+| AC-D19-PROFILE-ENDPOINT-01 | 每次 endpoint resolve MUST 通过当前 authenticated session 从 PostgreSQL 读取所请求的 current Profile revision；不得缓存 revision 或接受 caller 提供的目的地址。 |
+| AC-D19-NATIVE-CLIENT-PIN-02 | Native gRPC send/receive client MUST require a `ResolvedTransportEndpoint` and reject provider/profile-digest/endpoint-identity mismatch before network connection; TLS host and HTTPS URI MUST come only from this resolved object. |
+| AC-D19-PRODUCTION-GATE-03 | 未完成 production startup/route wiring、证书/secret provisioning、target DB grants、redirect/no-follow 与撤权/刷新集成验收前，native traffic 与 Schedule/Run execution MUST remain disabled. |
+
+本次 rebase/merge 后的 Rust 1.98.1 `--ignore-rust-version` 联合 feature all-targets check 与 `platform-messaging-runtime`/`run-owner-runtime` library tests 是诊断结果；不得作为 Rust 1.99.0 正式门或生产 TLS/身份验证。Run-owner fixture 只证明 route 在连接前拒绝，不证明实际生产消费。
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v4.84 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 D19 current Profile→deployment endpoint composition、native client pinning acceptance 与生产启用 fail-closed gate；记录两条 worktree 合并边界 | D19 profile resolver/native client contracts rebase 并快进合入本地 dev |
+
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|

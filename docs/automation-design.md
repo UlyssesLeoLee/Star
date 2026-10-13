@@ -3102,3 +3102,13 @@ The SQLx test target is `crates/platform-messaging-runtime/tests/native_origin_v
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v2.55 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add D20 runtime grant/RLS contract coverage and SQLx target invocation; record PostgreSQL 89/89 schema-only evidence and the ignored SQLx harness without overstating database verification | D20 grants and SQLx lanes rebased and merged to local dev |
+
+### 4.93 Phase 9F4C-D19 current Profile and native client composition
+
+**自动化档：[P]；本切片未新增 runner。** The D19 follow-on composes `PgTransportProfileResolver` with the deployment-trusted endpoint registry and makes native gRPC send/receive clients consume only a `ResolvedTransportEndpoint`. Its verified post-merge gate was command-driven: Rust 1.98.1 `--ignore-rust-version` joint native-feature all-targets check plus library tests (platform messaging 53/53, Run-owner 22/22). This is diagnostic evidence below the Rust 1.99.0 baseline. The two agent worktrees were independently reviewed and rebase/fast-forward merged; CodeRabbit was unavailable due to its wrapper permission error.
+
+No disposable PostgreSQL identity/grant fixture, live TLS network e2e, startup wiring, or migration was added by this slice. Do not report the typed resolver/client API as production enablement. A future repeatable gate must provision a disposable authorized Profile/session, exercise endpoint revocation/current-revision refresh and actual client TLS/no-follow behavior, preserve audit output, and keep native traffic disabled until production grants, certificate/secret lifecycle and target runtime identity are proven. It does not start NATS or Multipass.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.56 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add §4.93 for D19 current-Profile/trusted-endpoint/native-client validation; record the exact Rust 1.98.1 diagnostic tests and explicitly state no automated runner or production gate was added | Two D19 worktrees were rebased and fast-forward merged to local dev |

@@ -3484,11 +3484,17 @@ D19 新增 Star 自有 Tonic gRPC 服务端，将 Append/PullOne/AcknowledgeOne 
 
 #### D19 endpoint resolver 与 live mTLS follow-up（v6.51）
 
-新增部署级 TrustedEndpointResolver，将 Profile 的不可变 endpoint identity 解析到部署可信配置中的 HTTPS URI 与 TLS server name。解析器最多持有 64 个条目；URI ≤2048 bytes，TLS DNS name ≤253 bytes；仅接受无 wildcard、非 IP 的 ASCII DNS name，并要求 URI host 与 TLS name 完全一致。拒绝 userinfo、query、fragment、控制/空白字符、反斜杠和无效 path；日志 Debug 不输出 URI path 或 opaque secret reference。Profile 必须属于 resolver 固定的 deployment、处于 Active 且 revision/id 合法。此 resolver 接收不可变 revision 快照，不能自行观察后续撤权或禁用；调用方每次使用前必须重新读取并复验当前 revision。它尚未接入 production profile loader/native client。
+新增部署级 TrustedEndpointResolver，将 Profile 的不可变 endpoint identity 解析到部署可信配置中的 HTTPS URI 与 TLS server name。解析器最多持有 64 个条目；URI ≤2048 bytes，TLS DNS name ≤253 bytes；仅接受无 wildcard、非 IP 的 ASCII DNS name，并要求 URI host 与 TLS name 完全一致。拒绝 userinfo、query、fragment、控制/空白字符、反斜杠和无效 path；日志 Debug 不输出 URI path 或 opaque secret reference。Profile 必须属于 resolver 固定的 deployment、处于 Active 且 revision/id 合法。此 resolver 接收不可变 revision 快照，不能自行观察后续撤权或禁用；调用方每次使用前必须重新读取并复验当前 revision。**截至 v6.51**，它尚未接入 production profile loader/native client；v6.53 follow-on 的 composition 状态见下文。
 
 D19 新增 opt-in ignored 的真实 Tonic mTLS/PostgreSQL E2E：真实 NativeGrpcTransportServer 使用 runtime DB role；可信 client Append 成功；无 client certificate、错误 CA、错误 server name 均失败；在数据库撤销客户端证书后，同一已建立 channel 的下一 RPC 返回 PermissionDenied。该测试仅允许 loopback、非 5432 且 current_database() 精确为 star_d19_test 的 disposable 数据库。真实 isolated PostgreSQL 18.6 场景 1/1 通过，Rust 1.98.1 配合 --ignore-rust-version 的 target 编译和实跑证据不替代项目 Rust 1.99.0 正式门禁。rcgen、tempfile、tokio-stream 仅为 dev-dependencies；测试闭包为 MIT/Apache-2.0，不进入产品运行依赖。
 
-D19 仍未完成：endpoint resolver 未接入 profile loader/client，当前 revision freshness 由调用方负责；redirect/no-follow 行为未通过 transport integration 验收；production 证书签发/撤销 API、目标环境 DB grants、完整 owner producer/consumer 与 BI/Benchmark、恢复/性能/RSS/公平性、SBOM 和 NATS cutover 均未关闭。native provider 与 Schedule/Run execution 继续 fail closed。
+D19 v6.51 时的开放状态见下方 follow-on 更新。生产启动配置仍未实例化 endpoint composition，也未将 native client 接入可启用的生产 route；Profile freshness 仍要求每次连接前刷新，redirect/no-follow 行为未通过 transport integration 验收。production 证书签发/撤销 API、目标环境 DB grants、完整 owner producer/consumer 与 BI/Benchmark、恢复/性能/RSS/公平性、SBOM 和 NATS cutover 均未关闭。native provider 与 Schedule/Run execution 继续 fail closed。
+
+#### D19 current Profile 与 native client composition（v6.53）
+
+新增 `TrustedProfileEndpointResolver`，将每次调用的 `PgTransportProfileResolver::resolve(session, profile_id, kind)` 与 deployment-trusted `TrustedEndpointResolver` 组合；Profile 从 PostgreSQL 按当前认证 session 重新读取，不缓存。请求不能提供 endpoint URI、TLS name 或 endpoint identity；解析失败统一映射为有界错误。native gRPC send/receive client config 现在必须接收 `ResolvedTransportEndpoint`，连接前校验 provider ID、Profile digest 与 endpoint identity，再从该受信对象读取 HTTPS URI 和 TLS server name。旧的任意 URI/hostname/identity 配置入口已移除。Run-owner 的 Result-route 负向测试改用可信 endpoint fixture，保持连接前拒绝该 route。
+
+该实现完成了 Profile→deployment endpoint resolver 与 native client typed config 的代码级组合，不等于 production startup wiring：应用启动/route 尚未构造并调用 resolver，证书/secret provisioning 与目标库 grants 未验收。调用方必须在每次新建或重建 channel 前用当前受认证 session 重新 resolve；现有 channel 的自动刷新/撤销和 transport redirect/no-follow 行为仍须单独集成验证。Rust 1.98.1 加 `--ignore-rust-version` 的合并后诊断验证：联合 native-feature all-targets check 通过，`platform-messaging-runtime` library tests 53/53、`run-owner-runtime` 22/22 通过；结果不替代 Rust 1.99.0 正式门。Native traffic、NATS cutover 与 Schedule/Run execution 均保持关闭。
 
 ### D20：Native gRPC receiver 与来源证明首片（v6.52）
 
@@ -3518,6 +3524,7 @@ Infrastructure owner 新增默认关闭的 `infrastructure/native-grpc-adapter` 
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.53 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 current PostgreSQL Profile resolver 与 trusted endpoint registry 的组合、原生 gRPC client 对 `ResolvedTransportEndpoint` 的强类型绑定及合并后诊断验证；明确 production startup wiring、1.99.0、证书/DB grants、redirect、BI/性能、NATS 与执行门槛仍开放 | 两条 D19 lane rebase 并快进合入本地 dev |
 | v6.52 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 D20 SQLx origin test 增加 loopback/非默认端口/精确数据库名限制及写前完整 role/schema/function/FORCE RLS 预检；明确只完成编译、没有执行 SQL，并记录同名本机数据库残余边界 | 独立审查发现测试库误连及 fixture 部分准备风险；修订 rebase/快进合入本地 dev |
 | v6.51 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D19 bounded endpoint resolver、真实 PostgreSQL-backed mTLS handshake/revocation E2E、测试库身份守门和未关闭的生产集成门槛；明确 Rust 1.98.1 诊断验证不等于 1.99.0 正式门 | D19 endpoint 与 TLS E2E worktree review 后 rebase 并合入本地 dev |
 | v6.50 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 PostgreSQL 18.6 WSL ext4 D20 89/89 role/grants/RLS schema-only gate 与 SQLx target 编译状态；明确 harness 为 1 ignored、无真实 SQLx DB 执行，并保留生产身份/部署 grants、Rust 1.99.0、TLS、恢复、BI/性能及执行门 | D20 grants/RLS 与 SQLx 两条 worktree rebase 后快进合入本地 dev |
