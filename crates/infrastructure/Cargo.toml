@@ -11,6 +11,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+native-grpc-adapter = ["dep:platform-messaging-runtime", "platform-messaging-runtime/native-grpc-adapter"]
+
 [dependencies]
 # 基础依赖(全部 crate 共享)
 serde = { workspace = true }
@@ -33,6 +37,7 @@ sqlx = { workspace = true }
 async-nats = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 multipass-adapter = { path = "../multipass-adapter" }
+platform-messaging-runtime = { path = "../platform-messaging-runtime", default-features = false, optional = true }
 
 [dev-dependencies]
 # v0.66 P0-4 InMemoryAdapterRegistry 测试用 (#[tokio::test] async test runner)
