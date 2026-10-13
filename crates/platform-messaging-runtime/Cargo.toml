@@ -39,5 +39,10 @@ tonic = { workspace = true, optional = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+rcgen = "0.14.10"
+tempfile = { workspace = true }
+tokio-stream = { workspace = true, features = ["net"] }
+
 [lints]
 workspace = true
