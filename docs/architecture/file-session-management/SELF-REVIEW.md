@@ -35,6 +35,7 @@
 | **REST API: 新建 /file-sessions** | ✅ 合理 | 资源模型差异大；RLS 独立演进 | 客户端需维护两套 API | OpenAPI 统一生成 SDK；文档明确区分 |
 | **前端: 三端全覆盖** | ✅ 合理 | CLI 基础 + VS Code 本地 + Multica 云端 | 前端开发资源分散 | 先 CLI + REST 稳定，前端并行原型 |
 | **产品定位: Worktree 双入口** | ✅ 合理 | FileSession 隶属 Worktree，与 Task Card 同级平行；正交解耦 | UI 入口并列展示复杂度 | 文档明确 UI/UX 要求，实装时分离关注点 |
+| **动态交互: sakura 级菜单体验** | ✅ 合理 | 明确 8 类交互场景性能指标、安全三角区、容错半径、缓动曲线 | 实装复杂度高、需专用定位引擎 | Floating UI/Popper.js 成熟方案；验收用例可自动化 |
 
 ---
 

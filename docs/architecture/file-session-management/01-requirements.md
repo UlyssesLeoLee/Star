@@ -54,6 +54,37 @@ Worktree (git worktree)
 - 两个入口数据正交：Task Card 可选关联 FileSession (`linked_file_sessions`)，FileSession 可选关联 Task Card (`linked_task_card_id`)
 - 权限模型复用 Worktree 级权限 (Owner/Editor/Viewer)
 
+### 0.4 动态交互体验标准 (参考 sakura 级水准)
+
+> **基准**：sakura 终端/编辑器菜单交互 —— 菜单打开后移动鼠标，子菜单/上下文菜单能**跟随鼠标位置即时打开**，零感知延迟，无闪烁、无抖动。
+
+| 交互场景 | 行为规范 | 性能指标 |
+|----------|----------|----------|
+| **文件树右键菜单** | 右键点击文件节点 → 100ms 内弹出上下文菜单，菜单项含 "Start File Session"、"Open Sessions"、"Reveal in Explorer" 等；鼠标移动到菜单项 → 子菜单即时展开 (≤ 50ms) | 首帧渲染 < 100ms；子菜单展开 < 50ms |
+| **CodeLens 悬停** | 编辑器标题栏/行内 CodeLens 显示 "🤖 N sessions"；鼠标悬停 → Tooltip 即时展开 (≤ 80ms)，显示会话列表预览 (标题、状态、agent、更新时间)；点击列表项 → 直接跳转/恢复 | Tooltip 首显 < 80ms；列表渲染 < 120ms |
+| **Session 列表行悬停** | Session Panel / Worktree 页列表行鼠标悬停 → 行背景高亮 + 操作按钮显示 (Resume/Checkpoint/Archive/Delete)；无布局抖动 | 悬停响应 < 30ms |
+| **多级菜单导航** | 一级菜单 → 二级菜单 → 三级菜单；鼠标斜向移动进入子菜单区域时，**不关闭父菜单**，使用「安全三角区」判定 (参考 Amazon/Stripe 菜单算法) | 子菜单展开 < 50ms；误触关闭率 < 0.1% |
+| **键盘/鼠标混合操作** | 键盘 ↑↓ 选中菜单项时，鼠标位置不干扰焦点；Esc 关闭所有层级菜单；焦点陷阱正确 | 焦点切换 < 16ms |
+| **触发区域容错** | 菜单边缘 8px 内移动不触发关闭；鼠标快速穿越菜单间隙不误关闭 | 容错半径 ≥ 8px |
+| **动画缓动** | 菜单展开/关闭使用 `ease-out-cubic` 120ms；Tooltip `ease-out-quad` 80ms；无抖动、无掉帧 | 60fps 全程；无 layout shift |
+| **虚拟化长列表** | Session 列表 > 100 项时自动虚拟化渲染；搜索/过滤即时响应 (< 100ms) | 滚动 60fps；筛选 < 100ms |
+
+**实装技术要求** (供前端参考)：
+- 使用 **Floating UI / Popper.js** 定位引擎 (自动翻转、防溢出、跟随锚点)
+- 菜单状态机：`closed → opening → open → closing → closed`，配合 `requestAnimationFrame` 批量 DOM 操作
+- 事件委托 + 被动事件监听器 (`passive: true`) 减少主线程阻塞
+- CSS `contain: layout paint` 隔离菜单重绘影响范围
+- 避免 `position: fixed` 导致的滚动容器定位错误，改用 `position: absolute` + 容器相对定位
+
+**验收测试用例** (自动化 + 手工)：
+1. 连续快速在文件树 20 个节点间右键 → 每次菜单正确定位、无残留
+2. 鼠标从一级菜单斜向移动到三级菜单 → 父菜单保持打开、子菜单跟手
+3. CodeLens 悬停 100 次 → 平均首显 < 80ms，P99 < 120ms
+4. 窗口 resize / 滚动时菜单自动重定位或优雅关闭
+5. 键盘 Tab 遍历菜单项 → 焦点环可见、屏幕阅读器可读
+
+---
+
 ---
 
 ## §1 核心概念
