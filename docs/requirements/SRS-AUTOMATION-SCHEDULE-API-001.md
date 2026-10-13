@@ -1,7 +1,7 @@
 # SRS-AUTOMATION-SCHEDULE-API-001 — Run-scoped Schedule Rule Management API
 
-> Status: 🟡 D18 has a PostgreSQL durable-log storage contract verified by the disposable schema-only runner, including migration replay and concurrent exact-append. This does not implement a Rust gRPC service: Rust 1.99.0, production service authentication/credentials and target DB grants, profile provisioning, delivery/BI/Benchmark consumers, full-application NATS migration, infrastructure/runtime/native Hook and complete execution remain open.
-> Version: 0.59 | Date: 2026-10-13
+> Status: 🟡 D20 includes opt-in Run-owner Schedule admission/Result and Infrastructure demand native consumer slices. Their Rust 1.99.0 package gates pass; PostgreSQL origin migration, live TLS, production identity/grants, all-owner migration, BI/Benchmark, recovery and execution remain open.
+> Version: 0.60 | Date: 2026-10-14
 > Parent: `docs/requirements.md` §50 and `docs/specs/domain-automation-spec.md` Schedule contract.
 
 ## 1. Purpose and boundary
@@ -386,5 +386,14 @@ D18 requires PostgreSQL storage to preserve versioned log identity, deployment+t
 
 The Rust transport is a Star-owned provider behind a versioned contract. Provider cursors and leases are transport details, not business identities; Schedule, Run and Infrastructure owners retain their own transaction boundaries and source-of-truth records. Transition from the current NATS adapter is incremental and requires compatibility/recovery evidence, BI/Benchmark parity, bounded memory/concurrency evidence, and rollback. D18 supplies only storage schema/functions and disposable PostgreSQL verification. The final PostgreSQL 18.6 schema-only run passed 77/77 steps; both migration applications and the two-session concurrent append assertion passed, with one receipt/work/outbox/cursor allocation. gRPC/mTLS service, production authentication, Profile→log provisioning, consumer wiring, and NATS retirement remain open. The run used a Rust 1.98.1 Cargo executable only for a version check and did not compile Rust or satisfy the Rust 1.99.0 gate. E:/AssetsLake and other local Rust projects remain direct module reference/reuse sources under exact-file hash/source/license/NOTICE/dependency review. Audit: `../target/phase9f4d-run-owner-consumer/245a8441-2924-4a7f-806b-1237215bec0c/audit.jsonl`.
 
+## 6.36 — D20 owner-native consumer requirements
+
+The opt-in Run-owner Result consumer MUST strictly decode a bounded provider-neutral envelope, bind it to the originating demand and current Run binding, commit the Run-owner Inbox/processing facts in the Run owner's transaction, revalidate the exact transport source, then ACK. Permanent poison MUST remain unacknowledged until a separate durable quarantine commit succeeds. This consumer MUST NOT write Infrastructure state, produce BI projections directly, or launch an executor.
+
+The default-off Infrastructure native Request consumer MUST validate the typed demand against a trusted current Run binding, placement policy and exact Host/cluster generation. It MUST commit Inbox/processing facts only in the Infrastructure owner's transaction and revalidate the delivery source before ACK. Schedule/Run owners MUST NOT write Infrastructure tables, and Infrastructure MUST NOT mutate Schedule/Run state. Missing or stale binding, identity, storage, or quarantine capability MUST fail closed. Neither consumer may expose Multipass daemon access, arbitrary host shell, Kubernetes credentials or executor start authority.
+
+The consumers remain opt-in single-delivery slices. Shared acceptance still requires PostgreSQL 18.6 migration/RLS/grant/SQLx verification, live mTLS, production resolver and identity provisioning, replay/recovery, all owner producers/consumers, BI/Benchmark parity, bounded RSS/latency/fairness measurements and rollback. NATS remains enabled; Schedule/Run execution stays fail closed.
+
 | 0.58 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D18 PostgreSQL durable-log storage requirements and a replaceable Star Rust transport boundary; preserve NATS migration and production execution gates |
 | 0.59 | 2026-10-13 | Ulysses — Mavis接手审核 | Clarify that async-nats `max_bytes` is client buffering only, add hard NATS/JetStream 128 KiB admission and RSS gates, and distinguish the quarantine source-body retention cap from ingress size | Run Owner consumer bounded-memory review |
+| 0.60 | 2026-10-14 | Ulysses — Mavis接手审核 | Add Run-owner Result and Infrastructure demand native consumer requirements with owner-local commit-before-ACK, exact-source revalidation, durable quarantine and open production gates | Two D20 consumer worktrees rebased and merged to local dev |

@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.47）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.48）
 
 ## 0. 文档说明与前提
 
@@ -3492,16 +3492,23 @@ Native ACK 仍由共享 `AdmissionReceiver` 在 owner transaction commit、commi
 
 D20 来源证明增量：native receiver 对精确 wire bytes 计算 SHA-256，并通过 `VerifyOrigin` 请求 Star 服务核对当前 Profile/route、log generation/sequence/message ID、活动 lease 与 append 时记录的源证书指纹；历史 D18/D19 message row 的来源证书字段为 NULL 时拒绝授权。持久化 poison quarantine 前后都复验同一来源，authenticated ACK 在同一数据库事务内再次验证 exact delivery 与 lease 后才执行。此证明只建立 transport origin，不代替 owner Inbox commit、业务事件身份或 BI/Run 事实。
 
-D20 Run-owner Schedule admission 接收组合采用 opt-in Cargo feature `run-owner-runtime/native-grpc-adapter`。`NativeGrpcScheduleAdmissionConsumer` 将固定的 native gRPC transport、transport origin verifier 与 `PostgresScheduleAdmissionStore` 组合；仅接受 Request/Resolution route，Result route 必须在网络连接前拒绝。调用方显式调用 `consume_one`，每次最多处理一条，并传入取消信号；永久 poison disposition 只有显式提供 durable quarantine 后才可执行。组合本身不启动后台循环、不创建 Run executor，也不授权执行。该组合只是 Schedule admission 的入口切片，未完成各 owner 的全量 Outbox/Inbox producer/consumer 迁移、生产 resolver/grants 或 BI/Benchmark projection。
+D20 Run-owner Schedule admission 接收组合采用 opt-in Cargo feature `run-owner-runtime/native-grpc-adapter`。它只接受 Request/Resolution route，Result route 必须在网络连接前拒绝，每次显式消费至多一条 delivery，并要求调用方提供 cancellation 与有界 deadline。另新增同 feature 下的 provider-neutral Result consumer：严格解析有界 Result envelope，核对原始 demand、固定 Run binding 与 transport 来源；Run owner 在自己的 Inbox 事务提交后重新验证来源，再 ACK。永久 poison 只有独立 durable quarantine 已提交才可 terminal-disposition。该 consumer 不直接投影 BI 事实，也不启动 Run executor。
+
+Infrastructure owner 新增默认关闭的 `infrastructure/native-grpc-adapter` Request consumer。它只接受类型化 Infrastructure demand，解析可信的当前 Run binding/placement 与 exact Host/cluster generation，在 Infrastructure owner 自身事务提交 Inbox/处理事实后再次核验来源才 ACK。绑定不存在、generation/placement 不匹配、身份或存储不可用时 fail closed；permanent poison 必须先完成独立 durable quarantine。Schedule/Run owner 不跨边界写 Infrastructure 表，Infrastructure owner 也不代写 Run/Schedule 状态。两个 consumer 都不得暴露 Multipass daemon、任意宿主 shell、Kubernetes 凭证或 executor 启动权限。
+
+这些仍是 opt-in、单条 receive 的 owner 接线切片，不代表所有 owner 的 Outbox/Inbox producer/consumer 已迁移、生产身份/Profile/grants 已部署、quarantine/replay 已完成，或 BI/Benchmark 已消费事实。NATS 保留；Schedule/Run execution 与 native provider cutover 继续 fail closed。
 
 | Acceptance ID | Acceptance criterion |
 |---|---|
 | AC-D20-RUN-RECEIVE-01 | Native Run-owner Schedule consumer MUST remain behind an explicit Cargo feature; MUST reject Result scope before opening a transport connection; MUST accept only Request/Resolution; each invocation MUST handle at most one delivery with caller-supplied cancellation and the shared bounded deadline; permanent poison disposition MUST require a durable quarantine provider; construction MUST NOT start a background loop, create an executor or authorize Run execution. |
+| AC-D20-RUN-RESULT-RECEIVE-02 | Native Run-owner Result consumer MUST use strict bounded provider-neutral decoding, bind each result to the originating demand and current Run binding, commit its owner-local Inbox facts before ACK, revalidate transport origin before ACK, and require durable quarantine before permanent disposition. It MUST NOT write Infrastructure facts or launch execution. |
+| AC-D20-INFRA-DEMAND-RECEIVE-03 | Native Infrastructure Request consumer MUST remain opt-in, validate typed demand against a trusted current binding and exact Host/cluster generation, commit Inbox/processing facts only in the Infrastructure owner transaction, and revalidate source before ACK. Missing/stale binding, identity, storage, or durable quarantine MUST fail closed; it MUST NOT write Run/Schedule state or expose host/cluster administration to agents. |
 
-当前环境缺少 PostgreSQL server binaries，D20 SQL contract 本轮未执行；不能据此宣称 migration、RLS 或函数 grants 已通过。Run-owner consumer composition 已在 Rust 1.99.0 下通过 package all-targets check、17/17 library tests、all-targets Clippy 与变更文件 rustfmt；依赖 crate 仍输出既有 warnings。该结果不验证 D20 origin SQL、live TLS e2e、完整 owner consumers、quarantine/replay、BI/Benchmark 或 workspace-wide release gates，详见阶段报告。
+合并到本地 `dev` 后，Rust 1.99.0 联合 all-targets check 通过；`infrastructure` library tests 71/71、`run-owner-runtime` library tests 22/22 通过，变更文件 rustfmt 与目标 crate 的 `clippy --no-deps -D warnings` 通过。依赖 crate 有既有 deprecation warnings。当前未运行 D20 PostgreSQL migration/SQLx/RLS/grants、真实 mTLS/gRPC e2e、全量 owner consumers、durable recovery/replay、BI/Benchmark、RSS/latency/fairness 或 workspace-wide release gates；详见 [D20 阶段报告](reports/PHASE-9F4C-D20-NATIVE-RECEIVER-REPORT.md)。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.48 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 Infrastructure demand 与 Run-owner Result native consumer，明确 owner-local commit-before-ACK、来源复验、quarantine 和 fail-closed 边界；同步 dev 合并后的 Rust 1.99.0 联合验证与未关闭生产门 | D20 两条 consumer worktree rebase 并合入本地 dev |
 | v6.47 | 2026-10-13 | Ulysses — Mavis接手审核 | 订正 JetStream `max_bytes` 仅为 client buffering target、128 KiB parser guard 在消息物化后执行；要求 server/stream 硬上限和 peak RSS 验收，并同步 quarantine 当前状态 | Run Owner 消费端 bounded-memory 文档复核 |
 | v6.46 | 2026-10-13 | Ulysses — Mavis接手审核 | 记录 Run-owner native Schedule consumer 在 Rust 1.99.0 下的 all-targets check、17/17 library tests、Clippy 与定向格式验证；保持 PostgreSQL/TLS/全量 owner 与 BI 门禁开放 | 正式工具链验证完成并同步实施状态 |
 | v6.45 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 opt-in native Run-owner Schedule admission consumer 的 route、单条处理、取消与 quarantine 边界；明确该组合不等于 production enablement 或完整 owner consumer migration | 新增 `NativeGrpcScheduleAdmissionConsumer` typed composition 与 feature gate |

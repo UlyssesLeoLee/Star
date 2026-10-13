@@ -1,7 +1,7 @@
 # DD-AUTOMATION-SCHEDULE-API-001 — Detailed Design Addendum
 
-> Status: 🟡 D20 native receive, exact-source-verification, and opt-in Run-owner Schedule admission composition slices are implemented in isolated worktrees. The Run-owner consumer passed Rust 1.99.0 package all-targets check, 17/17 library tests, all-targets Clippy and targeted rustfmt; dependency crates emit existing warnings. The origin-verification SQL migration and contract remain unrun because PostgreSQL server binaries are unavailable. Production certificate/profile provisioning, endpoint resolver, target database grants, live TLS e2e, full owner producer/consumer migration, BI/performance and full execution chain remain open.
-> Version: 0.68 | Date: 2026-10-13
+> Status: 🟡 D20 now includes opt-in Run-owner Result and Infrastructure demand consumers. Combined Rust 1.99.0 package checks and target-crate strict Clippy pass; PostgreSQL origin contract, production identity/grants, live TLS, recovery, BI/performance and full execution remain open.
+> Version: 0.69 | Date: 2026-10-14
 
 ## 1. Routes
 
@@ -705,8 +705,17 @@ The native receiver baseline passed Rust 1.98.1 diagnostic all-targets check and
 
 The run-owner-runtime/native-grpc-adapter Cargo feature now gates NativeGrpcScheduleAdmissionConsumer. Its typed constructor rejects AdmissionReceiveKind::Result before opening the network connection, then composes the pinned native transport, its VerifyOrigin authorization implementation and PostgresScheduleAdmissionStore. consume_one delegates one bounded pull/commit/authorization/ACK cycle with caller-supplied cancellation. Quarantine is opt-in and explicit; without it, poison delivery remains unacknowledged. No autonomous loop, executor start, or Run execution capability is exposed. Unit tests cover accepted Request/Resolution kinds and reject Result before transport connect. Rust 1.99.0 package all-targets check, Run-owner library tests 17/17, all-targets Clippy and changed-source rustfmt passed; workspace-wide release gates remain unverified.
 
+## 6.40 D20 native owner Result and Infrastructure demand consumers
+
+The Run-owner native Result consumer is provider-neutral at the business boundary and shares the strict envelope parser with the legacy provider adapter. It binds the result to the originating demand, then resolves current owner binding/authorization before mutation. It writes only Run-owner Inbox/processing facts in its owner transaction, repeats exact source verification after commit, and acknowledges only after both steps succeed. The Infrastructure consumer is default-off behind `infrastructure/native-grpc-adapter`; it accepts only typed demand Requests, resolves a trusted current Infrastructure binding/placement, validates Host and exact cluster identities/generations, commits the Infrastructure Inbox result, rechecks delivery origin and only then ACKs. The two owners never share a database write transaction.
+
+Both consumers handle at most one delivery per call, have cancellation/deadline bounds, and require durable quarantine before terminal poison disposition. Stale binding, invalid placement/generation, owner storage failure, source mismatch, or quarantine failure leaves the message unsettled. These additions do not run a worker loop, create a TaskExecutionRun, start an executor, or project BI facts. NATS remains available.
+
+After the two feature worktrees were rebased and merged to local `dev`, Rust 1.99.0 combined all-targets check passed; `infrastructure` library tests passed 71/71 and `run-owner-runtime` passed 22/22; changed-source rustfmt and target-crate `clippy --no-deps -D warnings` passed. Existing dependency deprecation warnings remain. PostgreSQL origin migration/SQLx/RLS/grants, live TLS, production service/profile wiring, full owner producer/consumer parity, durable recovery/replay, BI/Benchmark, RSS/latency/fairness and workspace-wide release gates remain unverified.
+
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| 0.69 | 2026-10-14 | Ulysses — Mavis接手审核 | Add the native Run-owner Result and Infrastructure demand receive slices, owner transaction/ACK ordering, combined Rust 1.99.0 evidence and remaining production gates | Two D20 consumer worktrees rebased and merged to local dev |
 | 0.68 | 2026-10-13 | Ulysses — Mavis接手审核 | Clarify client-buffering versus broker-admission limits, require NATS/Stream 128 KiB ingress enforcement and measured RSS, and correct the separate quarantine body-retention cap | Run Owner consumer bounded-memory review |
 | 0.67 | 2026-10-13 | Ulysses — Mavis接手审核 | Record Rust 1.99.0 Run-owner package all-targets check, 17/17 tests, Clippy and targeted rustfmt; retain wider D20 SQL/TLS/production gates | Formal toolchain validation completed for the composition slice |
 | 0.66 | 2026-10-12 | Ulysses — Mavis接手审核 | Update Run-owner Schedule admission evidence to 17/17 tests and record the passing Result pre-connect regression | The focused 1/1 and full 17/17 Rust 1.98.1 diagnostic tests passed |

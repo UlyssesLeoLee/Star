@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
-> Status: 🟡 D17 initial Transport Profile Master/resolver slice is verified on disposable PostgreSQL 18.6 (71/71), including profile migration double-apply and SQLx profile scenario 1/1. Rust checks used 1.98.1 with `--ignore-rust-version`; required Rust 1.99.0, production service identity/credentials and target DB grants, native provider, BI, performance and execution remain open.
-> Version: 0.57 | Date: 2026-10-13
+> Status: 🟡 D20 owner-native receive slices are opt-in and pass combined Rust 1.99.0 package checks/tests/target-crate Clippy; PostgreSQL, TLS, production identity/grants, BI, recovery and execution remain open.
+> Version: 0.58 | Date: 2026-10-14
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -492,3 +492,13 @@ Initial implementation evidence (2026-10-12): typed profile definition/revision,
 |---|---|---|---|
 | 0.49 | 2026-10-12 | Ulysses — Mavis接手审核 | Record the initial D17 owner/schema/resolver implementation and isolated PostgreSQL/SQLx evidence while retaining production identity and transport gates |
 | 0.57 | 2026-10-13 | Ulysses — Mavis接手审核 | Correct consumer buffering versus ingress-size semantics, specify NATS/Stream 128 KiB admission and RSS gates, and synchronize the separate quarantine owner status |
+
+### 6.36 D20 native owner consumer transaction boundaries
+
+The opt-in native receive feature has three distinct owner routes: Run Schedule admission Request/Resolution, Run-owner Result, and Infrastructure demand Request. The Run-owner Result path strictly parses its bounded provider-neutral payload, checks the originating demand and current Run binding, commits only Run-owner Inbox facts, revalidates source provenance, then acknowledges. The Infrastructure path resolves the current trusted Run binding and exact Host/cluster generation, commits only Infrastructure Inbox/processing facts in the Infrastructure transaction, revalidates source provenance, then acknowledges. Neither path may open a cross-owner write transaction or start a Run executor.
+
+Permanent poison is terminal only after its independent durable quarantine commit; cancellation or unavailable quarantine leaves the delivery unsettled. The admissions remain single-delivery and feature-gated; no default background loop is created. Rust 1.99.0 merged-target checks passed for both crates (Infrastructure 71/71 and Run-owner 22/22 library tests). PostgreSQL origin migration/RLS/grants, live TLS, production service identity/Profile resolver, full producer/consumer rollout, recovery/replay, BI/Benchmark parity, measured memory/fairness and execution remain separate acceptance gates. NATS remains the compatibility provider.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.58 | 2026-10-14 | Ulysses — Mavis接手审核 | Add D20 Run-owner Result and Infrastructure demand consumer transaction boundaries, validation evidence and fail-closed production gates | Two D20 consumer worktrees rebased and merged to local dev |

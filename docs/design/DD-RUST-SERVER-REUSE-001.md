@@ -1,6 +1,6 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.10 · 2026-10-12 · Ulysses — Mavis 接手审核
+> v1.11 · 2026-10-14 · Ulysses — Mavis 接手审核
 > 状态：D19 server/auth 与 D20 native receiver/source-verifier slices 已实现；Rust 1.98.1 `--ignore-rust-version` 下目标 crate check、Clippy-driver check、12 个 native_grpc tests 与 41 个 library tests 通过。来源验证 PostgreSQL migration/contract 本轮未执行；真实 TLS e2e、production identity/control plane、Profile→log provisioning、target DB grants、owner delivery、BI/performance 和 cutover 均未完成。
 
 ## 1. 范围与证据
@@ -182,8 +182,15 @@ The user's direct reuse authorization covers suitable modules from `E:/AssetsLak
 
 The origin-verification migration and SQL contract were added to the disposable PostgreSQL runner but were not executed because this workstation has no PostgreSQL server binaries. Rust 1.98.1 diagnostic check and 41/41 library tests do not establish DDL/RLS/grant correctness. Source repositories were inspected read-only; AssetsLake remains at HEAD `0156aca56c0d7364120d7389ebe1ccf0cb64b750` with 17 dirty files, and RustGameServer at `89458d887e8bfddf6637f9d80ea65f2091e8b6f2` with a clean worktree. This is a targeted candidate recheck, not an exhaustive audit of all local Cargo projects.
 
+### 12.2 D20 Run-owner Result and Infrastructure demand consumers
+
+The two follow-on consumer modules are Star-owned Rust code and do not copy another local server. Infrastructure enables `NativeInfrastructureDemandConsumer` only through the explicit `infrastructure/native-grpc-adapter` feature; Run owner enables its result consumer through `run-owner-runtime/native-grpc-adapter`. Both compose the native receive adapter with strict bounded DTO validation, current owner binding checks, owner-local durable Inbox processing, source revalidation after commit, and ACK only after those checks. Permanent poison requires a separately committed durable quarantine. Result decoding is provider-neutral so the business contract is shared with the retained JetStream path; provider-specific cursor and ACK semantics stay inside adapters.
+
+The combined Rust 1.99.0 checks passed, with Infrastructure library tests 71/71 and Run-owner 22/22. PostgreSQL origin contract, TLS, production credentials/profile wiring, all-owner migration, recovery/replay, BI/Benchmark, RSS/latency/fairness, and NATS cutover remain open. The features do not start a worker loop or executor. No new third-party dependency or source-project code was added in these two slices.
+
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| v1.11 | 2026-10-14 | Ulysses — Mavis接手审核 | Record the default-off Infrastructure demand and provider-neutral Run-owner Result consumers, owner commit-before-ACK/source revalidation, combined Rust 1.99.0 tests, and open production gates | Two D20 consumer worktrees rebased and merged to local dev |
 | v1.10 | 2026-10-12 | Ulysses — Mavis接手审核 | Correct the D20 library test count to 41/41; record the isolated Clippy-driver result and existing integration-test formatting drift while keeping PostgreSQL verification open | Two exact-wire origin verification tests added; current focused gates rerun |
 | v1.9 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D20 append-time source provenance and exact-wire verifier design; revalidate AssetsLake/RustGameServer source state; record unrun PostgreSQL contract and reuse limits | User reaffirmed direct module reuse authorization for AssetsLake and local Rust servers; D20 added VerifyOrigin |
 | v1.8 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确用户可直接复用本机 Rust 服务模块并说明 AssetsLake relay 的实际投递边界；公开 canonical provider identity helper，记录当前 Rust 1.98.1 诊断验证与未关闭的 D20 gates | 用户再次确认模块级直接复用，并要求为 Star 自有 Rust 服务替换 NATS 做准备 |
