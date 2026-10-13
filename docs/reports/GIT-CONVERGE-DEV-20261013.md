@@ -88,3 +88,18 @@ Merge order: main first (already contained, no merge write); D20 second (1 uniqu
 | dev | 78c7211ac7d08011db5adcaa9c378fab38b28193 | target; ahead of `origin/dev` by 2 commits |
 | integrate/dev-into-main-20261012 | 608de5f1ce1a090179700afb350af5560bb88a69 | retained; contained; ignored generated Tauri files |
 | main | 608de5f1ce1a090179700afb350af5560bb88a69 | protected; unchanged |
+
+## Follow-up local cleanup — 2026-10-13
+
+This section supersedes the earlier “no branch or worktree was removed” snapshot above for the current local state. It records a later GitConverge apply pass after the user authorized retaining D20 temporarily while cleaning other eligible lanes.
+
+- `dev` was already at `ed82f436d8fa12ff3bfa313490ac78f0ff5a9896` when this pass began and remains there. D20 is contained; this pass had no source commits to merge and did not move `main`, `dev`, or remote refs.
+- Removed four contained, clean worktrees and their local branches after rechecking each recorded tip, ancestry in `dev`, clean status, ignored-file inventory, index flags, operation state, and submodules:
+  - `codex/engineering-run-nav-20261001` — `335b0c32cc7991b130ee971562c5f2abda7733f1`
+  - `codex/engineering-run-schema-20261001` — `da4d3cfb5e76ed0af7ef86b425f617e194eb2c37`
+  - `codex/native-runtime-fence-c5` — `e19a66894dc3f008383bc55c721d8316aadc89f1`; its lagging `origin/dev` upstream was unset before safe local deletion
+  - `codex/phase9f2-schedule-audit-20261002` — `e794d834498533176498cb0b649152ef2c64116e`
+- Retained `codex/d20-native-schedule-admission-20261013` and its worktree temporarily per the user's instruction.
+- Other contained sources remain blocked from removal because their worktrees contain modified/untracked files, ignored files (including `.codegraph` data, `.cache` evidence, `target/`, or generated Tauri schemas), or are checked out in the non-invoking `D:/Star` main worktree with user changes. No ignored or user files were discarded.
+- Final local refs for this pass: 15 total (`main`, `dev`, and 13 other source branches including the temporary D20 branch). All remaining source tips are already contained in `dev`; the exact blockers are the dirty/ignored worktree contents listed in the earlier source table, except the four branches removed above.
+- `dev` remains local-only ahead of `origin/dev` by 3 commits. No fetch, push, remote mutation, force operation, or worktree prune was performed. The invoking worktree is clean; no build or test was needed because this pass changed only local Git metadata and removed clean checkouts.
