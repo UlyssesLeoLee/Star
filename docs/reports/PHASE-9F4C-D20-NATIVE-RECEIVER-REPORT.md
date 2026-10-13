@@ -4,7 +4,7 @@
 > **Initial native receiver slice**: `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumers/Star`, branch `codex/phase9f4c-d20-native-receiver-20261012`, base `501c6cb5209a0f87df971cd0907a49f448118982`.
 > **Run-owner composition slice**: branch `codex/d20-native-schedule-admission-20261013` at `C:/Users/leo19/.codex/worktrees/phase9f4c-d20-consumer-native/Star`, rebased onto `dev` at `4ffb0b9dc7d8bdcf0ec23c181f93c19a857167e6` and merged by `78c7211ac7d08011db5adcaa9c378fab38b28193`. After bounded manual review, its clean worktree was archived by Codex (archive artifact `01a135a5-85ba-7dc1-b8b6-76af953174cd`) and the local source branch was safely deleted. Post-merge Rust 1.99.0 package check/Clippy/formatting passed; the shared-target test link failed with LNK1104, then the isolated-target retry passed 17/17.
 > **Infrastructure demand consumer lane**: branch `codex/d20-infrastructure-demand-receiver`, rebased and merged by `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e`.
-> **Run-owner capacity Result lane**: branch `codex/d20-native-capacity-result`, rebased and merged by `1cc94614a59ef687624e31744334716a30c9bbde`. The current dev HEAD is `1cc94614a59ef687624e31744334716a30c9bbde`; both source lanes remain pending app/worktree cleanup at report-edit time.
+> **Run-owner capacity Result lane**: branch `codex/d20-native-capacity-result`, rebased and merged by `1cc94614a59ef687624e31744334716a30c9bbde`. Both clean source worktrees were removed after merge-ancestry preflight and their branches were deleted with `git branch -d`. Codex app archive requests returned `queued`; artifact listing still reports the two old identities as active, so the app metadata is not recorded as archived.
 
 ## §0 目的
 
@@ -47,6 +47,7 @@
 | Follow-on combined library tests (Rust 1.99.0) | `infrastructure` 71/71 and `run-owner-runtime` 22/22 passed, including both new consumer modules. |
 | Follow-on strict target Clippy and format | `cargo +1.99.0 clippy --offline --locked --no-deps -p infrastructure -p run-owner-runtime --features infrastructure/native-grpc-adapter,run-owner-runtime/native-grpc-adapter --all-targets -j 4 -- -D warnings` exit 0; changed Rust modules and lib files rustfmt check exit 0. Existing `domain-kms` deprecation warnings remain outside the selected target crates. |
 | Follow-on Git integration | Infrastructure source commit `36680a392293540142eb1eb95ff730c66d354438` rebased and merged as `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e`; Run-owner source commit rebased to `8cf669ee8bcb433c90e08b0cfa22c08479784663` and merged as `1cc94614a59ef687624e31744334716a30c9bbde`. No conflicts; current dev clean before docs; no push. |
+| Git cleanup | Clean-ancestry preflight passed for both source commits. `git worktree remove` (without force) removed both clean checkouts and `git branch -d` deleted both merged refs; local `git branch` and `git worktree list` now contain only `main` and `dev`. Codex archive calls returned `queued`, and app artifact listing still shows the two stale identities as active; no archive completion is claimed. |
 | Run-owner Clippy-driver / all-targets | 使用独立 target dir 与 Rust 1.98.1 `clippy-driver.exe` 设置 `RUSTC_WORKSPACE_WRAPPER`，`cargo check --ignore-rust-version --offline --locked -p run-owner-runtime --features native-grpc-adapter --all-targets -j 4` 退出码 0；`run-owner-runtime` 未产生 Clippy warning，依赖 crate 存在历史 warning。普通 `cargo clippy` 因共享 target 混有 Rust 1.99.0 元数据报 `E0514`，不作为结果 |
 | GitConverge 到 `dev` | D20 已由 merge commit `78c7211ac7d08011db5adcaa9c378fab38b28193` 合入；清理时 `dev` 为 `4c0de14d9e2de669044dc47ac4559348b65a6805`，本地 ahead `origin/dev` 6 个提交，未 push。Run-owner worktree 已归档、分支已安全删除；本地只剩 `main` 与 `dev` 两个 branch ref、两处 worktree。Codex 应用登记仍有两个已不存在的旧 worktree 标为 active；归档请求被其他 task ownership gate 拒绝，未触碰其记录。完整收敛记录见 `GIT-CONVERGE-DEV-20261013.md` |
 | Rust 格式 | 三个修改的 runtime 实现文件 `rustfmt --edition 2024 --check` 退出码 0；`schedule_admission_pg.rs` 全文件检查报告大量既有格式差异，本轮只修改 trait 方法签名，未格式化整份无关测试文件 |
@@ -69,7 +70,7 @@
 7. D20 整体仍进行中；native provider 不可用于产品流量，NATS 继续保留，Schedule/Run execution 仍受原有授权、预算、Reservation、Hook、sandbox、取消恢复和独立验证门控制。
 8. 用户确认可直接参考、适配或按模块复用 AssetsLake 与其他本机 Rust server；本 slice 未搬入源代码。当前 AssetsLake event publisher 在 pipeline disabled 时只返回生成 UUID，relay 在 dry-run/no-broker 时会标记 published、配置 broker 时因无 Kafka client 标记失败，因此不适合作为当前 durable transport；它的 envelope、trace、causation 字段仍可作契约参考。RustGameServer TLS helper 是既有已审查适配；不据此推断整仓依赖、商业分发/SBOM 或其他模块已验收。
 9. 本轮 D20 source-verification SQL contract 尚未执行；Rust 诊断通过、源码存在和自动化 runner 接入都不能替代 PostgreSQL 18.6 disposable schema test。切流和执行继续 fail closed。
-10. 两条 follow-on lane 已 rebase 并合并到本地 `dev`，merge commits 为 `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e` 与 `1cc94614a59ef687624e31744334716a30c9bbde`；本次报告修订后再归档这两条已合并 worktree 并安全删除其 source branches。历史 D20 `78c7211a` integration cleanup 与旧 artifact owner-gate 结果不代表本轮 lane 清理状态。`origin/dev` 未更新，未 push。D20 整体仍进行中，PostgreSQL/RLS/TLS/production、全量 owner consumers、性能与 BI/Benchmark 验收仍开放。
+10. 两条 follow-on lane 已 rebase 并合并到本地 `dev`，merge commits 为 `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e` 与 `1cc94614a59ef687624e31744334716a30c9bbde`。两个 source checkout 均通过 clean/ancestor preflight 后用非强制 Git worktree remove 清理，两个分支用 `git branch -d` 删除；本地 refs/worktrees 只剩 main/dev。Codex app archive API 返回 queued，artifact listing 仍显示旧 identity active，未声称已归档。`origin/dev` 未更新，未 push。D20 整体仍进行中，PostgreSQL/RLS/TLS/production、全量 owner consumers、性能与 BI/Benchmark 验收仍开放。
 
 ## §4 子代理失败接手清单
 
@@ -111,6 +112,7 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v1.2 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新两条已合入 lane 的 Git worktree/branch 清理结果，并如实注明 Codex app archive queue 尚未反映为归档状态；D20 剩余生产门不变 | 完成两条 clean merged worktree 与 source branch 清理 |
 | v1.1 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Infrastructure demand 与 Run-owner Result consumer 的 rebase/merge、联合 Rust 1.99.0 gates、文档同步、lane cleanup 状态与派发 brief 流程偏差；保持 D20 生产门未关闭 | 两条 consumer worktree rebase 并合入本地 dev |
 | v1.0 | 2026-10-13 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补录 Run-owner lane 已归档并删除、Git refs/worktrees 收敛为 main/dev，以及两个旧 Codex artifact 受其他 task owner 阻止归档；记录本次有界手工审查与 CodeRabbit 执行阻塞，D20 生产缺口保持开放 | 用户授权先归档本地内容再清理；复核当前合并与应用登记状态 |
 | v0.9 | 2026-10-13 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D20 Run-owner composition rebase/merge 到本地 `dev`、合并后 gates 与 GitConverge 清理阻塞；不宣称 D20 全量完成 | GitConverge merge commit `78c7211a` 已创建，合并后 check/Clippy/rustfmt 与 isolated-target 17/17 tests 复验完成 |

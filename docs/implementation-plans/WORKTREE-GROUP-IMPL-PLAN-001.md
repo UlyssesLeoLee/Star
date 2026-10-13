@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.76**
+> **渡口 Project / Cloud Branch / Engineering Run 架构与实施计划 v6.77**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -2078,7 +2078,7 @@ D17 验收必须包括 Rust 1.99.0 正式 gates、migration 重放、双 scope F
 
 ## 6.135 — Phase 9F4C-D20 native owner consumer follow-on
 
-本地 `dev` 先后通过 merge commit `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e`（Infrastructure demand receiver）和 `1cc94614a59ef687624e31744334716a30c9bbde`（Run-owner Result receiver）集成两条独立责任 worktree。Infrastructure consumer 位于默认关闭的 `infrastructure/native-grpc-adapter`，核对可信 current binding/placement/Host+cluster generation、在 Infrastructure Inbox owner transaction 提交后复验来源再 ACK；Run-owner consumer 使用 opt-in feature 和 strict provider-neutral Result parser，绑定原始 demand/current Run state，owner Inbox commit、source revalidation 后 ACK。两者单次消费、支持取消/有界 deadline，poison 需先 durable quarantine；不添加跨 owner 写事务、不启动 loop/executor、不增加数据库迁移。
+本地 `dev` 先后通过 merge commit `2b7531746d044e45e0835cf6fa9a3b21e27cfa3e`（Infrastructure demand receiver）和 `1cc94614a59ef687624e31744334716a30c9bbde`（Run-owner Result receiver）集成两条独立责任 worktree。Infrastructure consumer 位于默认关闭的 `infrastructure/native-grpc-adapter`，核对可信 current binding/placement/Host+cluster generation、在 Infrastructure Inbox owner transaction 提交后复验来源再 ACK；Run-owner consumer 使用 opt-in feature 和 strict provider-neutral Result parser，绑定原始 demand/current Run state，owner Inbox commit、source revalidation 后 ACK。两者单次消费、支持取消/有界 deadline，poison 需先 durable quarantine；不添加跨 owner 写事务、不启动 loop/executor、不增加数据库迁移。两条 source checkout 均在确认 clean、merge ancestry 后用非强制 `git worktree remove` 清理，随后 `git branch -d` 删除；本地 refs/worktrees 只剩 `main` 与 `dev`。Codex app 的 archive 请求返回 `queued`，当前 artifact listing 仍显示旧 identity active；该元数据状态未被宣称为已归档。
 
 合并后验证：Rust 1.99.0 联合 `cargo check --offline --locked -p infrastructure -p run-owner-runtime --features infrastructure/native-grpc-adapter,run-owner-runtime/native-grpc-adapter --all-targets -j 4` 通过；联合 library tests 中 `infrastructure` 71/71、`run-owner-runtime` 22/22 通过；目标 crate strict no-deps Clippy、改动 Rust 文件 rustfmt、`git diff --check` 通过。验证输出包含未修改 `domain-kms` 的既有 deprecation warnings。`cargo clippy` 全依赖 strict 模式另被未修改依赖 lint 阻断，不记为通过。
 
@@ -2086,4 +2086,4 @@ D17 验收必须包括 Rust 1.99.0 正式 gates、migration 重放、双 scope F
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| v6.76 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D20 Run-owner Result 与 Infrastructure demand native consumers、合并后 Rust 1.99.0 联合验证、owner transaction/ACK 边界与仍开放的生产门；更新 D20 阶段矩阵和详细设计版本引用 | 两条 D20 consumer worktree rebase 并合入本地 dev |
+| v6.77 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录两条 D20 source worktree 与已合入分支的安全清理、本地只剩 main/dev refs/worktrees，以及 Codex app archive metadata 仍显示 queued/active 的状态 | 两条 lane 合并后完成 clean preflight 并清理 Git worktrees/branches |
