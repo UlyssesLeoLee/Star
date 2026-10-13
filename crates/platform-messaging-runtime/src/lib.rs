@@ -1,17 +1,19 @@
 //! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=0a179c28ba2e0b58a1e72dd7c9073cbe765187b07a4fb0cd994d5c91e3ee9458
+@cypher schema=1 source_sha256=1dc40e9ac82da52d866c3907072fa0bda021bec8805b7d442230815c559a502f
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
 MERGE (transport_profile_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::transport_profile",kind:"module"})
 MERGE (transport_profile_pg_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::transport_profile_pg",kind:"module"})
+MERGE (transport_endpoint_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::transport_endpoint",kind:"module"})
 MERGE (native_grpc_module:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_grpc",kind:"module"})
 MERGE (native_grpc_server_module:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::native_grpc_server",kind:"module"})
 MERGE (native_grpc_feature:Config {id:"cargo.feature.platform-messaging-runtime.native-grpc-adapter"})
 MERGE (native_proto_package:Config {id:"cargo.package.platform-messaging-proto"})
 MERGE (transport_profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
 MERGE (transport_profile_pg_file:File {path:"crates/platform-messaging-runtime/src/transport_profile_pg.rs"})
+MERGE (transport_endpoint_file:File {path:"crates/platform-messaging-runtime/src/transport_endpoint.rs"})
 MERGE (native_grpc_file:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (native_grpc_server_file:File {path:"crates/platform-messaging-runtime/src/native_grpc_server.rs"})
 MERGE (durable_quarantine:Config {id:"cargo.feature.platform-messaging-runtime.durable-quarantine"})
@@ -53,10 +55,12 @@ MERGE (self)-[:DEPENDS_ON]->(jetstream_feature)
 MERGE (module)-[:DEFINES]->(source)
 MERGE (module)-[:DEFINES]->(transport_profile_module)
 MERGE (module)-[:DEFINES]->(transport_profile_pg_module)
+MERGE (module)-[:DEFINES]->(transport_endpoint_module)
 MERGE (module)-[:DEFINES]->(native_grpc_module)
 MERGE (module)-[:DEFINES]->(native_grpc_server_module)
 MERGE (transport_profile_module)-[:CONTAINS_FILE]->(transport_profile_file)
 MERGE (transport_profile_pg_module)-[:CONTAINS_FILE]->(transport_profile_pg_file)
+MERGE (transport_endpoint_module)-[:CONTAINS_FILE]->(transport_endpoint_file)
 MERGE (native_grpc_module)-[:CONTAINS_FILE]->(native_grpc_file)
 MERGE (native_grpc_server_module)-[:CONTAINS_FILE]->(native_grpc_server_file)
 MERGE (self)-[:DEPENDS_ON]->(native_grpc_feature)
@@ -144,6 +148,7 @@ MERGE (test_headers)-[:TESTS]->(replay_header_limits)
 MERGE (module)-[:IMPORTS]->(admission_delivery_file:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
 MERGE (receive_module:File {path:"crates/platform-messaging-runtime/src/admission_receive.rs"})
 MERGE (self)-[:IMPORTS]->(receive_module)
+MERGE (self)-[:IMPORTS]->(transport_endpoint_file)
 MERGE (receive_jetstream_module:File {path:"crates/platform-messaging-runtime/src/admission_receive_jetstream.rs"})
 MERGE (self)-[:IMPORTS]->(receive_jetstream_module)
 @endcypher
@@ -159,6 +164,7 @@ pub mod admission_receive_jetstream;
 pub mod native_grpc;
 #[cfg(feature = "native-grpc-adapter")]
 pub mod native_grpc_server;
+pub mod transport_endpoint;
 pub mod transport_profile;
 #[cfg(feature = "durable-quarantine")]
 pub mod transport_profile_pg;
@@ -169,7 +175,7 @@ use std::{sync::Arc, time::Duration};
 #[cfg(feature = "jetstream-adapter")]
 use async_nats::jetstream::Message;
 #[cfg(feature = "jetstream-adapter")]
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 #[cfg(feature = "jetstream-adapter")]
 use domain_kms::{KeyId, KmsClient, KmsMode, TenantId};
 #[cfg(feature = "jetstream-adapter")]
