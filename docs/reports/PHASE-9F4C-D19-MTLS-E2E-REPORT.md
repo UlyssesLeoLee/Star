@@ -14,7 +14,7 @@
 
 | 文件 | 改动 | 状态 |
 |---|---|---|
-| `crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs` | 新增 opt-in ignored 集成测试；使用生产 TLS config helper、真实 gRPC 服务、真实 PostgreSQL profile/certificate/log/binding 事实；生成临时测试证书并覆盖四项拒绝/成功路径 | 已实现并实跑通过 |
+| `crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs` | 新增 opt-in ignored 集成测试；使用生产 TLS config helper、真实 gRPC 服务、真实 PostgreSQL profile/certificate/log/binding 事实；写 fixture 前读取 `current_database()` 并严格要求 `star_d19_test`；生成临时测试证书并覆盖四项拒绝/成功路径 | E2E 实跑通过；新增 DB 名称守门已编译 |
 | `crates/platform-messaging-runtime/Cargo.toml` | 添加 `rcgen`、`tempfile`、`tokio-stream` 到 `[dev-dependencies]`；测试同时要求 `native-grpc-adapter` 与 `durable-quarantine` feature | 已实现；生产依赖与默认 feature 未变 |
 | `Cargo.lock` | 为新增 test-only 闭包锁定 14 个 crate；既有 `bit-vec`、`pem`、`synstructure` 条目只作多版本消歧，未升级既有版本 | 已审阅 |
 | `docs/reports/PHASE-9F4C-D19-MTLS-E2E-REPORT.md` | 记录本 lane 的改动、验收、环境审计及限制 | 本报告 |
@@ -32,6 +32,8 @@
 | CypherGraph Guardian `cgg_guard.py --changed --stamp` | 通过，检查 1 个新增 Rust 源文件并写入当前 `@cypher` source hash |
 | `git diff --check` | 通过 |
 
+后续审查补充：集群清理后增加了数据库身份 fail-closed 检查。该修订执行 target `--no-run` 编译、rustfmt、Guardian 和 diff check；按协调端要求没有重新启动 PostgreSQL。先前真实 E2E 已在名称为 `star_d19_test` 的 disposable DB 上实跑通过；本次新增 `current_database()` 守门本身只有编译验证，没有在已清理的实例上再运行。
+
 E2E 实证路径：可信客户端 Append 写入 PostgreSQL-backed 服务并返回持久化回执；缺少 client identity、错误 CA、错误 server name 的客户端 RPC 均失败；owner-scoped SQL 更新将该客户端证书设为 revoked 后，复用原 `DurableTransportClient` 发起下一次 Append，返回 `PermissionDenied`。业务连接池在每条连接上执行 `SET ROLE star_platform_transport_runtime`，fixture 创建和撤销使用对应 owner scope 与事务。没有替代业务服务、mock 或合成撤销结果。
 
 数据库审计摘要：仅为本 lane 新建 WSL PostgreSQL 18.6 集群，PGDATA 为 `/tmp/star-d19-mtls-e2e-20261014-01`，数据库为 `star_d19_test`，仅监听 `127.0.0.1:55432`；未连接或写入既有 `5432` 实例。按依赖顺序应用且只应用以下迁移：
@@ -48,7 +50,7 @@ E2E 实证路径：可信客户端 Append 写入 PostgreSQL-backed 服务并返�
 ## §3 已知缺口
 
 - Rust 1.99.0 尚未安装；本报告中的编译与实跑结果是 Rust 1.98.1 诊断门，须在正式 1.99.0 环境重跑。
-- 这个集成测试默认 ignored；执行者必须提供 `STAR_PLATFORM_PROFILE_TEST_DATABASE_URL` 指向 disposable PostgreSQL。测试代码还会 fail closed 拒绝非 loopback 地址或默认 5432 端口。
+- 这个集成测试默认 ignored；执行者必须提供 `STAR_PLATFORM_PROFILE_TEST_DATABASE_URL` 指向 disposable PostgreSQL。测试代码在任何 fixture 写入前使用 SQL `current_database()` 精确要求 `star_d19_test`，并 fail closed 拒绝非 loopback 地址或默认 5432 端口。
 - 本 lane 只关闭 D19 的真实 gRPC/TLS/证书撤销验证缺口；没有启动或验收 D21 Multipass/K3s provider、集群绑定、容量预留或 Agent sandbox。
 - 未运行 workspace 全量 test、clippy 或 release/doc/bench gates；不能据此声称全 workspace 质量门通过。
 
@@ -65,7 +67,7 @@ E2E 实证路径：可信客户端 Append 写入 PostgreSQL-backed 服务并返�
 | 1 | 默认不执行；必须显式运行 ignored 集成测试 | 成功测试命令含 `-- --ignored` |
 | 2 | DB URL 必须解析成功且 host 为 loopback | 测试入口检查通过 |
 | 3 | 拒绝默认 PostgreSQL 5432 | 测试入口检查通过；本次端口为 55432 |
-| 4 | 数据库必须为可丢弃 fixture，禁止生产库 | 独立数据库 `star_d19_test`；测试文档声明 disposable 前置 |
+| 4 | 任何 fixture 写入前必须核对数据库身份 | `SELECT current_database()` 必须精确返回 `star_d19_test`；修订后 target `--no-run` 编译通过 |
 | 5 | PostgreSQL 只监听 loopback | 临时 `pg_ctl` 启动参数固定为 `127.0.0.1` |
 | 6 | 只应用四个直接所需迁移，按依赖顺序执行 | 四个迁移均成功提交 |
 | 7 | 测试 RPC 使用 runtime role，不用 superuser 执行业务请求 | pool `after_connect` 设置 runtime role，Append 通过 |

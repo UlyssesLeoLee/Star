@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=87c8727477eec48bea59805666bf7ef7d4f8a4c747e8052b9540c160f581ce3f
+@cypher schema=1 source_sha256=b9e7f14d63a6c70bf11121b8b679861a7910c50069069fe96b09d969ae734a9b
 MERGE (self:File {path:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs"})
 MERGE (test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::native_grpc_requires_mtls_and_rechecks_revocation",kind:"test"})
 MERGE (certificates:Type {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::TestCertificates",kind:"struct"})
@@ -8,6 +8,7 @@ MERGE (fixture:Type {id:"crates/platform-messaging-runtime/tests/native_grpc_tls
 MERGE (make_certificates:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::make_test_certificates",kind:"function"})
 MERGE (prepare_fixture:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::prepare_fixture",kind:"function"})
 MERGE (provision_fixture:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::provision_fixture",kind:"function"})
+MERGE (lane_database:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::require_lane_database_name",kind:"function"})
 MERGE (revoke:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::revoke_certificate",kind:"function"})
 MERGE (client_config:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
 MERGE (server_config:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
@@ -15,6 +16,7 @@ MERGE (service:Type {id:"crates/platform-messaging-runtime/src/native_grpc_serve
 MERGE (profile_master:Type {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster",kind:"struct"})
 MERGE (rpc:ExternalService {id:"platform_messaging_proto::wire::DurableTransportClient::append",kind:"method"})
 MERGE (database:ExternalService {id:"sqlx::PgPool",kind:"type"})
+MERGE (current_database:ExternalService {id:"PostgreSQL.current_database",kind:"function"})
 MERGE (tonic_server:ExternalService {id:"tonic::transport::Server::tls_config",kind:"method"})
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(certificates)
@@ -22,9 +24,11 @@ MERGE (self)-[:DEFINES]->(fixture)
 MERGE (self)-[:DEFINES]->(make_certificates)
 MERGE (self)-[:DEFINES]->(prepare_fixture)
 MERGE (self)-[:DEFINES]->(provision_fixture)
+MERGE (self)-[:DEFINES]->(lane_database)
 MERGE (self)-[:DEFINES]->(revoke)
 MERGE (test)-[:CALLS]->(make_certificates)
 MERGE (test)-[:CALLS]->(prepare_fixture)
+MERGE (test)-[:CALLS]->(lane_database)
 MERGE (test)-[:CALLS]->(rpc)
 MERGE (test)-[:CALLS]->(revoke)
 MERGE (test)-[:CALLS]->(server_config)
@@ -33,6 +37,7 @@ MERGE (test)-[:CALLS]->(tonic_server)
 MERGE (prepare_fixture)-[:USES_TYPE]->(profile_master)
 MERGE (prepare_fixture)-[:CALLS]->(provision_fixture)
 MERGE (provision_fixture)-[:WRITES]->(database)
+MERGE (lane_database)-[:CALLS]->(current_database)
 MERGE (revoke)-[:WRITES]->(database)
 MERGE (test)-[:CALLS]->(client_config)
 @endcypher
@@ -105,7 +110,7 @@ struct TestFixture {
 }
 
 #[tokio::test]
-#[ignore = "requires STAR_PLATFORM_PROFILE_TEST_DATABASE_URL pointing to a disposable database with the four D20 migrations and role memberships"]
+#[ignore = "requires STAR_PLATFORM_PROFILE_TEST_DATABASE_URL for disposable database star_d19_test with the four D20 migrations and role memberships"]
 async fn native_grpc_requires_mtls_and_rechecks_revocation() {
     let database_url = env::var(DATABASE_URL_ENV).expect(
         "set STAR_PLATFORM_PROFILE_TEST_DATABASE_URL to a disposable PostgreSQL database; never use a production database",
@@ -127,6 +132,7 @@ async fn native_grpc_requires_mtls_and_rechecks_revocation() {
         .connect(&database_url)
         .await
         .expect("connect to the disposable PostgreSQL database");
+    require_lane_database_name(&admin_pool).await;
     require_d20_schema(&admin_pool).await;
 
     let certificates = make_test_certificates().expect("create isolated test-only TLS material");
@@ -257,6 +263,17 @@ async fn native_grpc_requires_mtls_and_rechecks_revocation() {
         .expect("gracefully stop the Tonic server");
     runtime_pool.close().await;
     admin_pool.close().await;
+}
+
+async fn require_lane_database_name(pool: &PgPool) {
+    let current_database: String = sqlx::query_scalar("SELECT current_database()")
+        .fetch_one(pool)
+        .await
+        .expect("read the connected database identity before creating fixture facts");
+    assert_eq!(
+        current_database, "star_d19_test",
+        "this lane may write fixtures only to its dedicated star_d19_test database"
+    );
 }
 
 fn client_for(address: SocketAddr, tls: ClientTlsConfig) -> DurableTransportClient<Channel> {
