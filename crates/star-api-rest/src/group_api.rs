@@ -85,6 +85,10 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"})
 //! CREATE (erun:Module {name:"engineering_runs",type:"module",language:"rust"}),(erouter:Function {name:"engineering_runs::router",type:"function",language:"rust"}),
 //! (m)-[:CONTAINS]->(erun),(b)-[:CALLS]->(erouter);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),(sn:Function {name:"GroupApiState::new",type:"function"});
+//! CREATE (tcp:Interface {name:"RunTaskCardCommandPort",type:"interface",language:"rust"}),(tpa:Class {name:"PgRunTaskCardAdapter",type:"class",language:"rust"}),(adapterNew:Function {name:"PgRunTaskCardAdapter::new",type:"function",language:"rust"}),(mapTaskError:Function {name:"GroupApiError::from_run_task_card",type:"function",language:"rust"}),(taskError:Enum {name:"RunTaskCardError",type:"enum",language:"rust"});
+//! CREATE (m)-[:USES]->(tcp),(m)-[:USES]->(tpa),(s)-[:USES]->(tcp),(s)-[:USES]->(tpa),(sn)-[:CALLS]->(adapterNew),(e)-[:HAS_METHOD]->(mapTaskError),(mapTaskError)-[:USES]->(taskError);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -102,8 +106,11 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use domain_work_item::run_task_card::RunTaskCardCommandPort;
+use domain_work_item::run_task_card::RunTaskCardError;
+use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=68d800d67dcb9568d3b7b58364e43b23fccc14f79bf8ee1d50cdcbf4102e3b5e
+// @cypher schema=1 source_sha256=23d95ecee9493dacde43e69685689820df69bb4be0be230c7fc6941bb79f5067
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -114,7 +121,18 @@ use serde::{Deserialize, Serialize};
 // MERGE (api)-[:DEFINES]->(schedules)
 // MERGE (self)-[:CALLS]->(schedule_router)
 // MERGE (build)-[:CALLS]->(schedule_router)
-// @endcypher
+// MERGE (taskState:Type {id:"crates/star-api-rest/src/group_api.rs::GroupApiState",kind:"struct"})
+// MERGE (taskPort:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort",kind:"trait"})
+// MERGE (taskAdapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
+// MERGE (taskStateNew:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.new",kind:"method"})
+// MERGE (taskAdapterNew:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.new",kind:"method"})
+// MERGE (api)-[:DEFINES]->(taskState)
+// MERGE (taskState)-[:USES_TYPE]->(taskPort)
+// MERGE (taskState)-[:USES_TYPE]->(taskAdapter)
+// MERGE (taskState)-[:HAS_METHOD]->(taskStateNew)
+// MERGE (taskStateNew)-[:CREATES]->(taskAdapter)
+// MERGE (taskStateNew)-[:CALLS]->(taskAdapterNew)
+// MERGE (taskStateNew)-[:USES_TYPE]->(taskPort)// @endcypher
 
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
@@ -272,6 +290,8 @@ pub trait WorktreeArchiveReadinessObserver: Send + Sync {
 pub struct GroupApiState {
     jwt: Arc<JwtConfig>,
     resolver: GroupContextResolver,
+    run_task_card_command_port: Arc<dyn RunTaskCardCommandPort>,
+    run_task_card_pg_adapter: Arc<PgRunTaskCardAdapter>,
     task_cli_session_provisioner: Option<Arc<dyn TaskCliSessionProvisioner>>,
     scoped_chat_workflow: Option<Arc<dyn ScopedChatWorkflow>>,
     group_app_registry: Option<Arc<dyn GroupAppRegistryProvider>>,
@@ -282,9 +302,14 @@ pub struct GroupApiState {
 
 impl GroupApiState {
     pub fn new(jwt: Arc<JwtConfig>, pool: PgPool) -> Self {
+        let run_task_card_pg_adapter = Arc::new(PgRunTaskCardAdapter::new(pool.clone()));
+        let run_task_card_command_port: Arc<dyn RunTaskCardCommandPort> =
+            run_task_card_pg_adapter.clone();
         Self {
             jwt,
             resolver: GroupContextResolver::new(pool),
+            run_task_card_command_port,
+            run_task_card_pg_adapter,
             task_cli_session_provisioner: None,
             scoped_chat_workflow: None,
             group_app_registry: None,
@@ -494,6 +519,14 @@ impl GroupApiError {
         Self {
             status: StatusCode::UNPROCESSABLE_ENTITY,
             code,
+        }
+    }
+
+    fn from_run_task_card(error: RunTaskCardError) -> Self {
+        Self {
+            status: StatusCode::from_u16(error.http_status())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            code: error.code(),
         }
     }
 }

@@ -1,25 +1,97 @@
-//! Cypher structural manifest.
-//! CREATE
-//!   (f:File {name:"work_items.rs",type:"file",language:"rust"}),(m:Module {name:"work_items",type:"module",language:"rust"}),
-//!   (c:Class {name:"CreateWorkItemBody",type:"class"}),(t:Class {name:"LifecycleTransitionBody",type:"class"}),(a:Class {name:"AiTaskData",type:"class"}),(x:Class {name:"WorkItemListQuery",type:"class"}),(s:Class {name:"WorktreeScope",type:"class"}),(l:Class {name:"CurrentLifecycle",type:"class"}),(i:Class {name:"IdempotencyRow",type:"class"}),(p:Class {name:"WorkItemProjection",type:"class"}),
-//!   (rt:Function {name:"router",type:"function"}),(cr:Function {name:"create_work_item",type:"function"}),(li:Function {name:"list_work_items",type:"function"}),(ge:Function {name:"get_work_item",type:"function"}),(tr:Function {name:"transition_work_item",type:"function"}),(au:Function {name:"authorize_worktree",type:"function"}),(ld:Function {name:"load_work_item",type:"function"}),(lk:Function {name:"lookup_idempotency",type:"function"}),(sv:Function {name:"save_idempotency",type:"function"}),(hk:Function {name:"idempotency_key",type:"function"}),(rh:Function {name:"request_hash",type:"function"}),(pi:Function {name:"parse_id",type:"function"}),(vc:Function {name:"validate_create_body",type:"function"}),(ais:Function {name:"validate_ai_task_scope",type:"function"}),(vtb:Function {name:"validate_transition_body",type:"function"}),(vt:Function {name:"valid_transition",type:"function"}),(pr:Function {name:"project_work_item",type:"function"}),(dp:Function {name:"default_priority",type:"function"}),(rw:Function {name:"require_task_writer",type:"function"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(c),(m)-[:CONTAINS]->(t),(m)-[:CONTAINS]->(a),(m)-[:CONTAINS]->(x),(m)-[:CONTAINS]->(s),(m)-[:CONTAINS]->(l),(m)-[:CONTAINS]->(i),(m)-[:CONTAINS]->(p),
-//!   (m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(cr),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(ge),(m)-[:CONTAINS]->(tr),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(ld),(m)-[:CONTAINS]->(lk),(m)-[:CONTAINS]->(sv),(m)-[:CONTAINS]->(hk),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(pi),(m)-[:CONTAINS]->(vc),(m)-[:CONTAINS]->(ais),(m)-[:CONTAINS]->(vtb),(m)-[:CONTAINS]->(vt),(m)-[:CONTAINS]->(pr),(m)-[:CONTAINS]->(dp),(m)-[:CONTAINS]->(rw),
-//!   (rt)-[:CALLS]->(cr),(rt)-[:CALLS]->(li),(rt)-[:CALLS]->(ge),(rt)-[:CALLS]->(tr),(cr)-[:CALLS]->(vc),(cr)-[:CALLS]->(au),(cr)-[:CALLS]->(rw),(cr)-[:CALLS]->(ais),(cr)-[:CALLS]->(pi),(cr)-[:CALLS]->(hk),(cr)-[:CALLS]->(rh),(cr)-[:CALLS]->(lk),(cr)-[:CALLS]->(sv),(cr)-[:CALLS]->(ld),(li)-[:CALLS]->(au),(li)-[:CALLS]->(pr),(ge)-[:CALLS]->(au),(ge)-[:CALLS]->(ld),(tr)-[:CALLS]->(vtb),(tr)-[:CALLS]->(au),(tr)-[:CALLS]->(rw),(tr)-[:CALLS]->(pi),(tr)-[:CALLS]->(hk),(tr)-[:CALLS]->(rh),(tr)-[:CALLS]->(lk),(tr)-[:CALLS]->(vt),(tr)-[:CALLS]->(sv),(tr)-[:CALLS]->(ld),(ld)-[:CALLS]->(pr),(vc)-[:CALLS]->(dp);
-//! CREATE (rb:Class {name:"ReviewCommandBody",type:"class",language:"rust"}),(rv:Function {name:"review_work_item",type:"function",language:"rust"}),(vrb:Function {name:"validate_review_body",type:"function",language:"rust"}),(rr:Function {name:"require_task_reviewer",type:"function",language:"rust"});
-//! MATCH (m:Module {name:"work_items",type:"module",language:"rust"}),(rt:Function {name:"router",type:"function"}),(rv:Function {name:"review_work_item",type:"function",language:"rust"}),(rb:Class {name:"ReviewCommandBody",type:"class",language:"rust"}),(vrb:Function {name:"validate_review_body",type:"function",language:"rust"}),(rr:Function {name:"require_task_reviewer",type:"function",language:"rust"}),(hk:Function {name:"request_hash",type:"function"}),(lk:Function {name:"lookup_idempotency",type:"function"}),(sv:Function {name:"save_idempotency",type:"function"}),(ld:Function {name:"load_work_item",type:"function"});
-//! CREATE (m)-[:CONTAINS]->(rb),(m)-[:CONTAINS]->(rv),(m)-[:CONTAINS]->(vrb),(m)-[:CONTAINS]->(rr),(rt)-[:CALLS]->(rv),(rv)-[:USES]->(rb),(rv)-[:CALLS]->(vrb),(rv)-[:CALLS]->(rr),(rv)-[:CALLS]->(hk),(rv)-[:CALLS]->(lk),(rv)-[:CALLS]->(sv),(rv)-[:CALLS]->(ld);
-//! CYPHER STRUCTURE MANIFEST: Run-scoped Task Card reads and Worktree owner validation.
-//! CREATE (scope:Class {name:"RunTaskScope",type:"class",language:"rust"}),(runList:Function {name:"list_run_work_items",type:"function",language:"rust"}),(runAuthorize:Function {name:"authorize_task_run_for_worktree",type:"function",language:"rust"}),(runScopeAuthorize:Function {name:"authorize_run_task_scope",type:"function",language:"rust"}),(worktreeRunQuery:Function {name:"resolve_worktree_run",type:"function",language:"rust"});
-//! MATCH (m:Module {name:"work_items",type:"module",language:"rust"}),(rt:Function {name:"router",type:"function",language:"rust"}),(create:Function {name:"create_work_item",type:"function",language:"rust"}),(list:Function {name:"list_work_items",type:"function",language:"rust"}),(scope:Class {name:"RunTaskScope",type:"class",language:"rust"}),(runList:Function {name:"list_run_work_items",type:"function",language:"rust"}),(runAuthorize:Function {name:"authorize_task_run_for_worktree",type:"function",language:"rust"}),(runScopeAuthorize:Function {name:"authorize_run_task_scope",type:"function",language:"rust"}),(worktreeRunQuery:Function {name:"resolve_worktree_run",type:"function",language:"rust"});
-//! CREATE (m)-[:CONTAINS]->(runList),(m)-[:CONTAINS]->(runAuthorize),(rt)-[:CALLS]->(runList),(create)-[:CALLS]->(runAuthorize),(list)-[:CALLS]->(runAuthorize),(runAuthorize)-[:CALLS]->(runScopeAuthorize),(runAuthorize)-[:CALLS]->(worktreeRunQuery),(runAuthorize)-[:RETURNS]->(scope),(runList)-[:USES]->(scope);
-
+//! @cypher schema=1 source_sha256=fa611b8814d39d79cf36b34e954270929a79e659ba11c01a0b16475878128c62
+//! MERGE (self:File {path:"crates/star-api-rest/src/group_api/work_items.rs"})
+//! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::module",kind:"module"})
+//! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::router",kind:"function"})
+//! MERGE (create:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::create_work_item",kind:"function"})
+//! MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::list_work_items",kind:"function"})
+//! MERGE (listRun:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::list_run_work_items",kind:"function"})
+//! MERGE (get:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::get_work_item",kind:"function"})
+//! MERGE (transition:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::transition_work_item",kind:"function"})
+//! MERGE (review:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::review_work_item",kind:"function"})
+//! MERGE (authorizeWorktree:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::authorize_worktree",kind:"function"})
+//! MERGE (authorizeRun:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::authorize_task_run_for_worktree",kind:"function"})
+//! MERGE (load:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::load_work_item",kind:"function"})
+//! MERGE (lookupIdempotency:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::lookup_idempotency",kind:"function"})
+//! MERGE (saveIdempotency:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::save_idempotency",kind:"function"})
+//! MERGE (context:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::run_task_card_context",kind:"function"})
+//! MERGE (mapError:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::map_run_task_card_error",kind:"function"})
+//! MERGE (project:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::project_work_item",kind:"function"})
+//! MERGE (port:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort",kind:"trait"})
+//! MERGE (writerPort:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort.create",kind:"method"})
+//! MERGE (transitionPort:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort.transition",kind:"method"})
+//! MERGE (reviewPort:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort.review",kind:"method"})
+//! MERGE (authorizeRunScope:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::authorize_run_task_scope",kind:"function"})
+//! MERGE (taskMetadata:Table {id:"multica.task_metadata"})
+//! MERGE (taskLifecycle:Table {id:"multica.task_lifecycle_current"})
+//! MERGE (worktreeTask:Table {id:"multica.work_item_worktree"})
+//! MERGE (runBinding:Table {id:"multica.engineering_run_worktree_binding"})
+//! MERGE (idempotency:Table {id:"multica.task_command_idempotency"})
+//! MERGE (self)-[:DEFINES]->(module)
+//! MERGE (module)-[:DEFINES]->(router)
+//! MERGE (module)-[:DEFINES]->(create)
+//! MERGE (module)-[:DEFINES]->(list)
+//! MERGE (module)-[:DEFINES]->(listRun)
+//! MERGE (module)-[:DEFINES]->(get)
+//! MERGE (module)-[:DEFINES]->(transition)
+//! MERGE (module)-[:DEFINES]->(review)
+//! MERGE (module)-[:DEFINES]->(authorizeWorktree)
+//! MERGE (module)-[:DEFINES]->(authorizeRun)
+//! MERGE (module)-[:DEFINES]->(load)
+//! MERGE (module)-[:DEFINES]->(lookupIdempotency)
+//! MERGE (module)-[:DEFINES]->(saveIdempotency)
+//! MERGE (module)-[:DEFINES]->(context)
+//! MERGE (module)-[:DEFINES]->(mapError)
+//! MERGE (module)-[:DEFINES]->(project)
+//! MERGE (router)-[:CALLS]->(create)
+//! MERGE (router)-[:CALLS]->(list)
+//! MERGE (router)-[:CALLS]->(listRun)
+//! MERGE (router)-[:CALLS]->(get)
+//! MERGE (router)-[:CALLS]->(transition)
+//! MERGE (router)-[:CALLS]->(review)
+//! MERGE (create)-[:CALLS]->(context)
+//! MERGE (create)-[:CALLS]->(writerPort)
+//! MERGE (create)-[:CALLS]->(mapError)
+//! MERGE (transition)-[:CALLS]->(context)
+//! MERGE (transition)-[:CALLS]->(transitionPort)
+//! MERGE (transition)-[:CALLS]->(mapError)
+//! MERGE (review)-[:CALLS]->(context)
+//! MERGE (review)-[:CALLS]->(reviewPort)
+//! MERGE (review)-[:CALLS]->(mapError)
+//! MERGE (list)-[:CALLS]->(authorizeWorktree)
+//! MERGE (list)-[:CALLS]->(authorizeRun)
+//! MERGE (list)-[:CALLS]->(project)
+//! MERGE (listRun)-[:CALLS]->(authorizeRunScope)
+//! MERGE (listRun)-[:CALLS]->(project)
+//! MERGE (get)-[:CALLS]->(authorizeWorktree)
+//! MERGE (get)-[:CALLS]->(authorizeRun)
+//! MERGE (get)-[:CALLS]->(load)
+//! MERGE (authorizeRun)-[:CALLS]->(authorizeRunScope)
+//! MERGE (list)-[:READS]->(taskMetadata)
+//! MERGE (list)-[:READS]->(taskLifecycle)
+//! MERGE (list)-[:READS]->(worktreeTask)
+//! MERGE (list)-[:READS]->(runBinding)
+//! MERGE (listRun)-[:READS]->(taskMetadata)
+//! MERGE (listRun)-[:READS]->(taskLifecycle)
+//! MERGE (authorizeRun)-[:READS]->(runBinding)
+//! MERGE (load)-[:READS]->(taskMetadata)
+//! MERGE (load)-[:READS]->(taskLifecycle)
+//! MERGE (load)-[:READS]->(worktreeTask)
+//! MERGE (lookupIdempotency)-[:READS]->(idempotency)
+//! MERGE (saveIdempotency)-[:WRITES]->(idempotency)
+//! @endcypher
+//!
 use axum::{
     extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, post},
     Json, Router,
 };
+use domain_work_item::run_task_card::{
+    CreateRunTaskCardCommand, ReviewRunTaskCardCommand, RunTaskCardAiData,
+    RunTaskCardCommandContext, RunTaskCardError, RunTaskCardItemType, RunTaskCardPriority,
+    RunTaskCardReviewAction, RunTaskCardStatus, TransitionRunTaskCardCommand,
+};
+use domain_work_item::{TenantId, UserId, WorktreeId};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -78,16 +150,6 @@ pub(super) struct WorktreeScope {
     pub(super) workspace_id: Uuid,
     pub(super) project_id: Uuid,
     pub(super) repo_id: Uuid,
-}
-
-#[derive(Debug, FromRow)]
-struct CurrentLifecycle {
-    status: String,
-    review_state: String,
-    active_worktree_id: Option<Uuid>,
-    claimed_by: Option<Uuid>,
-    claim_expired: bool,
-    version: i32,
 }
 
 #[derive(Debug, FromRow)]
@@ -151,123 +213,36 @@ async fn create_work_item(
     let worktree_id = parse_id(&worktree_id)?;
     let key = idempotency_key(&headers)?;
     let hash = request_hash(&format!("create:{worktree_id}"), &body)?;
-    let mut tx = state
-        .resolver
-        .pool
-        .begin()
-        .await
-        .map_err(|_| GroupApiError::internal())?;
-    sqlx::query("SELECT set_config('app.actor_id', $1, true)")
-        .bind(actor.user_id.to_string())
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| GroupApiError::internal())?;
-    let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
-    let run_scope =
-        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
-    let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
-    require_task_writer(&binding.role)?;
-    require_task_writer(&run_scope.role)?;
-    validate_ai_task_scope(&body, worktree.repo_id)?;
-    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
-    }
-
-    let work_item_id = Uuid::new_v4();
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
-    sqlx::query(
-        "SELECT set_config('app.actor_id', $1, true), set_config('app.correlation_id', $2, true)",
-    )
-    .bind(actor.user_id.to_string())
-    .bind(correlation_id.to_string())
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-    sqlx::query(
-        r#"
-        INSERT INTO multica.task_metadata
-            (work_item_id, tenant_id, workspace_id, project_id, repository_id, branch_id,
-             engineering_run_id, item_type, title,
-             description, priority, labels, ai_task_data, reporter_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        "#,
-    )
-    .bind(work_item_id)
-    .bind(actor.tenant_id)
-    .bind(worktree.workspace_id)
-    .bind(worktree.project_id)
-    .bind(run_scope.repository_id)
-    .bind(run_scope.branch_id)
-    .bind(run_scope.engineering_run_id)
-    .bind(&body.item_type)
-    .bind(body.title.trim())
-    .bind(&body.description)
-    .bind(&body.priority)
-    .bind(&body.labels)
-    .bind(body.ai_task_data.as_ref().map(|value| json!(value)))
-    .bind(actor.user_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    sqlx::query(
-        r#"
-        INSERT INTO multica.task_lifecycle_current (work_item_id, tenant_id, status, version)
-        VALUES ($1, $2, 'pending', 1)
-        "#,
-    )
-    .bind(work_item_id)
-    .bind(actor.tenant_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    sqlx::query(
-        r#"
-        INSERT INTO multica.work_item_worktree (tenant_id, project_id, work_item_id, worktree_id)
-        VALUES ($1, $2, $3, $4)
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(work_item_id)
-    .bind(worktree_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    sqlx::query(
-        r#"
-        INSERT INTO multica.task_lifecycle_audit
-            (tenant_id, project_id, worktree_id, work_item_id, task_card_id,
-             to_status, event_type, actor_id, idempotency_key, correlation_id, details)
-        VALUES ($1, $2, $3, $4, $4, 'pending', 'created', $5, $6, $7, $8)
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(worktree_id)
-    .bind(work_item_id)
-    .bind(actor.user_id)
-    .bind(&key)
-    .bind(correlation_id)
-    .bind(json!({ "source": "task_card" }))
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    let response = load_work_item(
-        &mut tx,
+    let context = run_task_card_context(
         actor.tenant_id,
-        worktree.project_id,
+        actor.user_id,
         worktree_id,
-        work_item_id,
-    )
-    .await?;
-    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
-    tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+        key,
+        hash,
+        correlation_id,
+    )?;
+    let command = CreateRunTaskCardCommand {
+        item_type: RunTaskCardItemType::try_from(body.item_type.as_str())
+            .map_err(map_run_task_card_error)?,
+        title: body.title,
+        description: body.description,
+        priority: RunTaskCardPriority::try_from(body.priority.as_str())
+            .map_err(map_run_task_card_error)?,
+        labels: body.labels,
+        ai_task_data: body.ai_task_data.map(|data| RunTaskCardAiData {
+            objective: data.objective,
+            repository_scope: data.repository_scope.into_iter().map(Into::into).collect(),
+        }),
+    };
+    let receipt = state
+        .run_task_card_command_port
+        .create(context, command)
+        .await
+        .map_err(map_run_task_card_error)?;
+    Ok(Json(
+        serde_json::to_value(receipt.snapshot).map_err(|_| GroupApiError::internal())?,
+    ))
 }
 
 async fn list_work_items(
@@ -461,143 +436,31 @@ async fn transition_work_item(
     let work_item_id = parse_id(&work_item_id)?;
     let key = idempotency_key(&headers)?;
     let hash = request_hash(&format!("transition:{worktree_id}:{work_item_id}"), &body)?;
-    let mut tx = state
-        .resolver
-        .pool
-        .begin()
-        .await
-        .map_err(|_| GroupApiError::internal())?;
-    let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
-    let run_scope =
-        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
-    let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
-    require_task_writer(&binding.role)?;
-    require_task_writer(&run_scope.role)?;
-    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
-    }
-
-    let current = sqlx::query_as::<_, CurrentLifecycle>(
-        r#"
-        SELECT c.status, c.review_state, c.active_worktree_id, c.claimed_by,
-               COALESCE(c.claim_expires_at <= now(), FALSE) AS claim_expired, c.version
-        FROM multica.task_lifecycle_current c
-        JOIN multica.task_metadata m
-          ON m.tenant_id = c.tenant_id AND m.work_item_id = c.work_item_id AND m.valid_to IS NULL
-        JOIN multica.work_item_worktree l
-          ON l.tenant_id = c.tenant_id AND l.work_item_id = c.work_item_id
-         AND l.project_id = m.project_id AND l.worktree_id = $3 AND l.valid_to IS NULL
-        WHERE c.tenant_id = $1 AND c.work_item_id = $2 AND m.project_id = $4
-          AND m.repository_id = $5 AND m.branch_id = $6 AND m.engineering_run_id = $7
-        FOR UPDATE OF c
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(work_item_id)
-    .bind(worktree_id)
-    .bind(worktree.project_id)
-    .bind(run_scope.repository_id)
-    .bind(run_scope.branch_id)
-    .bind(run_scope.engineering_run_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)?;
-
-    // A concurrent retry can wait for the lifecycle row lock while the first request commits.
-    // Re-read idempotency after acquiring that lock before evaluating the now-stale version.
-    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
-    }
-    if current.version != body.expected_version {
-        return Err(GroupApiError::conflict("version_conflict"));
-    }
-    if matches!(current.status.as_str(), "claimed" | "in_progress")
-        && current.active_worktree_id != Some(worktree_id)
-    {
-        return Err(GroupApiError::conflict("active_worktree_conflict"));
-    }
-    if current.review_state == "pending_review" && body.target_status == "completed" {
-        return Err(GroupApiError::conflict("review_required"));
-    }
-    if current.status == "claimed"
-        && body.target_status == "in_progress"
-        && (current.claimed_by != Some(actor.user_id) || current.claim_expired)
-    {
-        return Err(GroupApiError::conflict(
-            "claim_expired_or_owned_by_other_actor",
-        ));
-    }
-    let expired_claim_requeue =
-        current.status == "claimed" && body.target_status == "pending" && current.claim_expired;
-    if !valid_transition(&current.status, &body.target_status) && !expired_claim_requeue {
-        return Err(GroupApiError::conflict("invalid_transition"));
-    }
-
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
-    sqlx::query(
-        r#"
-        UPDATE multica.task_lifecycle_current
-        SET status = $4,
-            active_worktree_id = CASE WHEN $4 IN ('claimed','in_progress') THEN $3 ELSE NULL END,
-            claimed_by = CASE WHEN $4 = 'claimed' THEN $5
-                              WHEN $4 = 'in_progress' THEN claimed_by
-                              ELSE NULL END,
-            claim_expires_at = CASE WHEN $4 = 'claimed' THEN now() + INTERVAL '30 seconds'
-                                    ELSE NULL END,
-            version = version + 1,
-            expires_at = CASE WHEN $4 IN ('completed','failed','cancelled') THEN now() + retention_period ELSE NULL END,
-            updated_at = now()
-        WHERE tenant_id = $1 AND work_item_id = $2 AND version = $6
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(work_item_id)
-    .bind(worktree_id)
-    .bind(&body.target_status)
-    .bind(actor.user_id)
-    .bind(body.expected_version)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    sqlx::query(
-        r#"
-        INSERT INTO multica.task_lifecycle_audit
-            (tenant_id, project_id, worktree_id, work_item_id, task_card_id,
-             from_status, to_status, event_type, actor_id, idempotency_key, correlation_id, details)
-        VALUES ($1, $2, $3, $4, $4, $5, $6, 'status_transition', $7, $8, $9, $10)
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(worktree_id)
-    .bind(work_item_id)
-    .bind(&current.status)
-    .bind(&body.target_status)
-    .bind(actor.user_id)
-    .bind(&key)
-    .bind(correlation_id)
-    .bind(json!({ "reason": body.reason }))
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    let response = load_work_item(
-        &mut tx,
+    let context = run_task_card_context(
         actor.tenant_id,
-        worktree.project_id,
+        actor.user_id,
         worktree_id,
-        work_item_id,
-    )
-    .await?;
-    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
-    tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+        key,
+        hash,
+        correlation_id,
+    )?;
+    let command = TransitionRunTaskCardCommand {
+        work_item_id: work_item_id.into(),
+        target_status: RunTaskCardStatus::try_from(body.target_status.as_str())
+            .map_err(map_run_task_card_error)?,
+        expected_version: body.expected_version,
+        reason: body.reason,
+    };
+    let receipt = state
+        .run_task_card_command_port
+        .transition(context, command)
+        .await
+        .map_err(map_run_task_card_error)?;
+    Ok(Json(
+        serde_json::to_value(receipt.snapshot).map_err(|_| GroupApiError::internal())?,
+    ))
 }
-
 async fn review_work_item(
     State(state): State<GroupApiState>,
     AuthenticatedUser(actor): AuthenticatedUser,
@@ -612,156 +475,31 @@ async fn review_work_item(
     let work_item_id = parse_id(&work_item_id)?;
     let key = idempotency_key(&headers)?;
     let hash = request_hash(&format!("review:{worktree_id}:{work_item_id}"), &body)?;
-    let mut tx = state
-        .resolver
-        .pool
-        .begin()
-        .await
-        .map_err(|_| GroupApiError::internal())?;
-    let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
-    let run_scope =
-        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
-    let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
-    if body.action == "submit" {
-        require_task_writer(&binding.role)?;
-        require_task_writer(&run_scope.role)?;
-    } else {
-        require_task_reviewer(&binding.role)?;
-        require_task_reviewer(&run_scope.role)?;
-    }
-    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
-    }
-
-    let current = sqlx::query_as::<_, CurrentLifecycle>(
-        r#"
-        SELECT c.status, c.review_state, c.active_worktree_id, c.claimed_by,
-               COALESCE(c.claim_expires_at <= now(), FALSE) AS claim_expired, c.version
-        FROM multica.task_lifecycle_current c
-        JOIN multica.task_metadata m
-          ON m.tenant_id = c.tenant_id AND m.work_item_id = c.work_item_id AND m.valid_to IS NULL
-        JOIN multica.work_item_worktree l
-          ON l.tenant_id = c.tenant_id AND l.work_item_id = c.work_item_id
-         AND l.project_id = m.project_id AND l.worktree_id = $3 AND l.valid_to IS NULL
-        WHERE c.tenant_id = $1 AND c.work_item_id = $2 AND m.project_id = $4
-          AND m.repository_id = $5 AND m.branch_id = $6 AND m.engineering_run_id = $7
-        FOR UPDATE OF c
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(work_item_id)
-    .bind(worktree_id)
-    .bind(worktree.project_id)
-    .bind(run_scope.repository_id)
-    .bind(run_scope.branch_id)
-    .bind(run_scope.engineering_run_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)?;
-
-    // A concurrent retry can wait for the lifecycle row lock while the first request commits.
-    // Re-read idempotency before evaluating the now-stale version.
-    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
-    }
-    if current.version != body.expected_version {
-        return Err(GroupApiError::conflict("version_conflict"));
-    }
-    if current.status != "in_progress" || current.active_worktree_id != Some(worktree_id) {
-        return Err(GroupApiError::conflict("review_worktree_conflict"));
-    }
-
-    let (next_status, next_review_state, event_type) = match body.action.as_str() {
-        "submit"
-            if current.claimed_by == Some(actor.user_id)
-                && !current.claim_expired
-                && matches!(current.review_state.as_str(), "none" | "rejected") =>
-        {
-            ("in_progress", "pending_review", "review_requested")
-        }
-        "submit" => return Err(GroupApiError::forbidden()),
-        "accept"
-            if current.review_state == "pending_review"
-                && current.claimed_by != Some(actor.user_id) =>
-        {
-            ("completed", "accepted", "review_accepted")
-        }
-        "reject"
-            if current.review_state == "pending_review"
-                && current.claimed_by != Some(actor.user_id) =>
-        {
-            ("failed", "rejected", "review_rejected")
-        }
-        "accept" | "reject" if current.claimed_by == Some(actor.user_id) => {
-            return Err(GroupApiError::forbidden());
-        }
-        _ => return Err(GroupApiError::conflict("review_not_pending")),
-    };
-
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
-    sqlx::query(
-        r#"
-        UPDATE multica.task_lifecycle_current
-        SET status = $4,
-            review_state = $5,
-            active_worktree_id = CASE WHEN $6 THEN NULL ELSE active_worktree_id END,
-            claimed_by = CASE WHEN $6 THEN NULL ELSE claimed_by END,
-            claim_expires_at = CASE WHEN $6 THEN NULL ELSE claim_expires_at END,
-            version = version + 1,
-            expires_at = CASE WHEN $6 THEN now() + retention_period ELSE NULL END,
-            updated_at = now()
-        WHERE tenant_id = $1 AND work_item_id = $2 AND version = $3
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(work_item_id)
-    .bind(body.expected_version)
-    .bind(next_status)
-    .bind(next_review_state)
-    .bind(body.action != "submit")
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    sqlx::query(
-        r#"
-        INSERT INTO multica.task_lifecycle_audit
-            (tenant_id, project_id, worktree_id, work_item_id, task_card_id,
-             from_status, to_status, event_type, actor_id, idempotency_key, correlation_id, details)
-        VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9, $10, $11)
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(worktree_id)
-    .bind(work_item_id)
-    .bind(&current.status)
-    .bind(next_status)
-    .bind(event_type)
-    .bind(actor.user_id)
-    .bind(&key)
-    .bind(correlation_id)
-    .bind(json!({ "review_state": next_review_state, "reason": body.reason }))
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-
-    let response = load_work_item(
-        &mut tx,
+    let context = run_task_card_context(
         actor.tenant_id,
-        worktree.project_id,
+        actor.user_id,
         worktree_id,
-        work_item_id,
-    )
-    .await?;
-    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
-    tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+        key,
+        hash,
+        correlation_id,
+    )?;
+    let command = ReviewRunTaskCardCommand {
+        work_item_id: work_item_id.into(),
+        action: RunTaskCardReviewAction::try_from(body.action.as_str())
+            .map_err(map_run_task_card_error)?,
+        expected_version: body.expected_version,
+        reason: body.reason,
+    };
+    let receipt = state
+        .run_task_card_command_port
+        .review(context, command)
+        .await
+        .map_err(map_run_task_card_error)?;
+    Ok(Json(
+        serde_json::to_value(receipt.snapshot).map_err(|_| GroupApiError::internal())?,
+    ))
 }
-
 pub(super) async fn authorize_task_run_for_worktree(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     actor: &super::AuthUser,
@@ -1020,20 +758,6 @@ fn validate_review_body(body: &ReviewCommandBody) -> Result<(), GroupApiError> {
     Ok(())
 }
 
-fn valid_transition(from: &str, to: &str) -> bool {
-    matches!(
-        (from, to),
-        ("pending", "claimed")
-            | ("pending", "cancelled")
-            | ("claimed", "in_progress")
-            | ("claimed", "cancelled")
-            | ("in_progress", "completed")
-            | ("in_progress", "failed")
-            | ("in_progress", "cancelled")
-            | ("failed", "pending")
-    )
-}
-
 fn project_work_item(row: WorkItemProjection) -> Value {
     json!({
         "work_item_id": row.work_item_id,
@@ -1056,6 +780,32 @@ fn project_work_item(row: WorkItemProjection) -> Value {
     })
 }
 
+pub(super) fn run_task_card_context(
+    tenant_id: Uuid,
+    actor_id: Uuid,
+    worktree_id: Uuid,
+    idempotency_key: String,
+    request_fingerprint: Vec<u8>,
+    correlation_id: Uuid,
+) -> Result<RunTaskCardCommandContext, GroupApiError> {
+    let request_fingerprint: [u8; 32] = request_fingerprint
+        .as_slice()
+        .try_into()
+        .map_err(|_| GroupApiError::internal())?;
+    Ok(RunTaskCardCommandContext {
+        tenant_id: TenantId(tenant_id),
+        actor_id: UserId(actor_id),
+        worktree_id: WorktreeId(worktree_id),
+        idempotency_key,
+        request_fingerprint,
+        correlation_id,
+    })
+}
+
+pub(super) fn map_run_task_card_error(error: RunTaskCardError) -> GroupApiError {
+    GroupApiError::from_run_task_card(error)
+}
+
 fn default_priority() -> String {
     "medium".to_owned()
 }
@@ -1063,13 +813,6 @@ fn default_priority() -> String {
 pub(super) fn require_task_writer(role: &str) -> Result<(), GroupApiError> {
     match role {
         "tenant_admin" | "project_admin" | "developer" | "agent" => Ok(()),
-        _ => Err(GroupApiError::forbidden()),
-    }
-}
-
-fn require_task_reviewer(role: &str) -> Result<(), GroupApiError> {
-    match role {
-        "tenant_admin" | "project_admin" | "developer" => Ok(()),
         _ => Err(GroupApiError::forbidden()),
     }
 }

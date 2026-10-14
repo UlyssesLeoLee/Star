@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.88**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.89**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -15,9 +15,10 @@
 > - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.59 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v6.59 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.30、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v6.85
+> - Phase 2C ERUN-P3.1 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Rust 1.99.0、目标 DB/RLS 和 PostgreSQL 并发验收未执行；metadata Outbox 不含 lifecycle/review typed event，生产 gates 仍开放。
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v6.60 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v6.60 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.20、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.30、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v6.86
 > - 文档边界：本 DD 定义 Project → Cloud Branch → Engineering Run → Run Worktree 的导航与应用契约；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -369,7 +370,7 @@ Engineering Loop 是单一 `TaskExecutionRun` 内版本化、预算受限的 Pla
 2. Task Card 打开时展示当前 Group Worktree。若 WorkItem 未关联当前 Worktree，允许查看并提示关联/选择 Worktree；在关联确认之前不允许启动 CLI、Agent 或写入 Worktree 文件。
 3. 服务端构造 `TaskExecutionContext { actor, project_id, repository_id, worktree_id, work_item_id, runtime_id, approved_profile_id, policy_version, expiry, nonce }`。路径、命令白名单、环境变量和 Secret 句柄均由服务端 policy 与 Runtime 配置派生，客户端不能提交可覆盖值。
 4. Local Runtime 只接受短期、签名且一次性的 session grant；启动、输入、退出和 session 重连均重新验证范围。审计记录 session ID、命令类别、结果摘要和退出码，不把任意终端内容复制进 WorkItem 描述。
-5. 当前实现支持 pending → claimed → in_progress → completed / failed / cancelled 与 failed → pending 的状态转移；`review_state` 独立保存。Group API 已增加版本化 review command：当前 claimant 可提交 `in_progress → pending_review`（主状态保持 in_progress）；非 claimant 的当前 Project `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回要求理由，通过转 `completed`，驳回转 `failed`。所有动作锁定当前 lifecycle 行、检查 Worktree association / version / idempotency，并写 append-only lifecycle audit。它仍是 REST SQL coordinator 代码切片，未抽为 Review Domain port、未产生 Outbox event；poison/stale-dispatch 与 Jira 外部 alias/sync 也尚未落地，不能据此宣称 Multica/Jira 生产链路完成。
+5. 当前实现支持 pending → claimed → in_progress → completed / failed / cancelled 与 failed → pending 的状态转移；`review_state` 独立保存。ERUN-P3.1 已新增 Run-scoped `RunTaskCardCommandPort` 和 PostgreSQL adapter；REST create/transition/review 命令经该 port 执行，adapter 在写事务内复验当前 Worktree、Project/Branch/Run binding 和 Project/Run writer/reviewer role，设置 statement_timeout=5000ms / lock_timeout=1000ms，使用幂等键锁、lifecycle 行锁/CAS 与 append-only lifecycle audit。Canvas 创建任务调用同一 adapter 的事务参与接口，并先取得同命名空间的幂等锁，再查组合回执；当前 REST state 暂时依赖具体 infrastructure adapter，Application/App composition boundary 尚未建立；任务、Canvas Element/EntityRef/event 和完整回执同事务提交。仍未有 lifecycle/review typed Outbox producer/consumer，metadata insert trigger 只记录 metadata event；poison/stale-dispatch、Jira 外部 alias/sync、目标 DB/RLS 与 Rust 1.99.0 build 也未验收，不能据此宣称 Multica/Jira 生产链路完成。
 
 Review route 为 `POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/review`，请求携带 `action=submit|accept|reject`、`expected_version`、`correlation_id`，并通过 `Idempotency-Key` 去重。submit 要求当前 `claimed_by=actor_id` 且 Worktree 一致；accept/reject 需 reviewer 角色且 actor 不等于 claimant。服务端返回同一 canonical WorkItem 投影。Group UI 仅在 provider-backed live projection 下显示提交/通过/驳回入口；驳回原因必填，成功或冲突刷新 projection。权限仍由 API 最终裁决，前端入口不作为 authorization。
 
@@ -702,7 +703,7 @@ Phase 2B-2D 与 Phase 3B migrations 按事实表分类；旧 `worktree_canvas_wo
 
 数据库 trigger 在新 current Task metadata 写入时要求 owner tuple 完整；现有 current legacy metadata 可保留全空 tuple。owner 变更只能创建下一个 SCD2 metadata 版本；`work_item_worktree` 新关联及当前 Run Worktree binding 变更都会比对 repository、branch 和 Engineering Run 三者。Run list API `GET /api/v1/engineering-runs/{run_id}/work-items` 按完整 tuple 使用稳定 UUID 游标；Worktree compatibility list/get/transition/review 只返回当前选中 Worktree 所属 Run 的任务，并在写命令同时校验 Project 与 Run grants。Canvas 创建任务写入同一 tuple，CLI start、Session attachment 与 TaskExecutionRun list/detail 都再次核对 tuple，旧无归属 Task 不可执行。
 
-Task metadata 当前版本写入与 `multica.task_run_outbox` Transaction event 在同一 PostgreSQL 事务中提交；事件投影限于 owner tuple、metadata version、actor、correlation 和 schema version，不保存任务正文或凭据。Outbox 是给 BI/跨 App 消费者的事务边界，不等于 NATS delivery 或持久 Inbox 已落地。
+Task metadata 当前版本写入与 `multica.task_run_outbox` metadata Transaction event 在同一 PostgreSQL 事务中提交；事件投影限于 owner tuple、metadata version、actor、correlation 和 schema version，不保存任务正文或凭据。新 Task Card command adapter 已提交 lifecycle audit 与 idempotency receipt，但当前 migration trigger 不产生 lifecycle/review Outbox event；不得将 audit row 或 metadata Outbox 误称为生命周期事件 consumer 已接通。Outbox 是给 BI/跨 App 消费者的事务边界，不等于 NATS delivery 或持久 Inbox 已落地。
 
 产品 seed/MSW 已移除 `wi-001`..`wi-030` demo Task Cards；独立 Tauri `MockDb` 的四条 `wi-001`..`wi-004` 任务记录和 browser-dev mock fallback 也已删除。Tauri Task IPC 在 Run-scoped provider 未配置时返回明确错误，不假装成功返回空列表。Zustand migration 只按精确已知 ID 清理历史浏览器数据，测试 fixture 使用 `test-*`。不清空未知服务器行、不按 ID 前缀批量删除，也不从 Worktree 猜测遗留 owner。Task Cards UI/client 已有 §10.0B 条件式只读代码，但 Host Provider/capability 均关闭；Owner migration 仍未在目标数据库执行。以上不表示生产数据平移或页面读取验收完成。
 
@@ -714,7 +715,7 @@ Run Workspace 默认选择 `Task Cards` 同级 tab。前端 `RunDirectoryApiClie
 
 UI 单页最多 12 条、解码响应最多 2 MiB、只保留当前页、最多 100 页；请求沿用 Run Directory client 的 15 秒 deadline、有界并发 (2 active + 16 queued)、fresh host Bearer token、`credentials: omit`、`no-store` 与 AbortSignal。Run 切换或卸载必须取消旧请求。视图只提供加载、错误/重试、空态、字段 allowlist 与分页，不变更任务事实；卡内 CLI 控件保持禁用直到 admission、OS sandbox、取消/恢复、独立验证和结果回写全部验收。
 
-Task Card 创建仅在 Run Apps capability、`work-item:write` 和当前 Project/Branch/Run/未归档 Worktree tuple 全部满足时开放；客户端通过 `POST /api/v1/worktrees/{worktree_id}/work-items` 提交 bounded payload、correlation ID 和 `Idempotency-Key`，服务端从当前 Worktree binding 推导 Run owner，并复验当前 actor/Project/Run 权限。服务端在一个事务写 metadata、lifecycle、Worktree association、审计、幂等回放；Task Owner migration 的 metadata `AFTER INSERT` trigger 同事务追加 Run Outbox。客户端验证响应的 Task Card alias/type/title；网络结果不确定时只允许同请求体和相同 owner/Worktree target 重试，焦点变更时阻止跨 checkout 重放。
+Task Card 创建仅在 Run Apps capability、`work-item:write` 和当前 Project/Branch/Run/未归档 Worktree tuple 全部满足时开放；客户端通过 `POST /api/v1/worktrees/{worktree_id}/work-items` 提交 bounded payload、correlation ID 和 `Idempotency-Key`。当前 REST mutation route 调用 `RunTaskCardCommandPort`，PostgreSQL adapter 从当前 binding 推导 Run owner 并在 owner transaction 复验 actor/Project/Run 权限；创建、transition、review 的 lifecycle audit 和 durable replay receipt 与业务写入同事务提交。Canvas 复合创建使用 adapter transaction participant，并在 lookup 前取得相同 actor/key lock；任务、Canvas projection/event 与组合 response receipt 同事务提交。Task Owner metadata `AFTER INSERT` trigger 仍只追加 metadata Run Outbox。客户端验证响应的 Task Card alias/type/title；网络结果不确定时只允许同请求体和相同 owner/Worktree target 重试，焦点变更时阻止跨 checkout 重放。
 
 POST 前，客户端将 bounded body、Idempotency-Key、correlation ID、创建时间，以及 tenant/actor/Project/Run scope 和 Project/Branch/Run/Worktree identity、授权 binding IDs/versions、Worktree binding IDs/versions、Run/Branch/Worktree/context/focus versions 异步保存在本机 IndexedDB。每个 tenant/actor/Project/Run scope 最多一条未决命令，store 总量最多 32 条；29 天后拒绝自动重放，短于 `multica.task_command_idempotency` 的 30 天服务器保留期。Run 重挂载或页面 reload 后恢复原命令；只有当前完整快照与原值一致时启用同 body/key 重试。目标/权限漂移或过期时明确阻止 POST，用户核对 Run Task Cards 列表后可显式清除记录。记录读取/写入失败时创建 fail closed，不持久化 token/credential。任务标题和描述以本机 WebView IndexedDB 数据形式保存，本 slice 未提供静态加密；浏览器清理/配置重置可能丢失记录，记录消失不能说明 server POST 未成功，因此本能力不等于 exactly-once、跨设备恢复或生产 owner reconciliation。成功后清理本地记录；服务端成功而本地删除失败时保留原 key/body，依赖服务端 30 天 replay 做同请求对账。
 
@@ -792,7 +793,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 ## §12 实施顺序与阻断门
 
 1. **2B 代码切片完成**：RS256 Actor、scope、Project membership 查询、GroupContext、Project/owner Master binding DDL。部署、membership provisioning、历史数据 reconciliation 和跨 Tenant/Project 负向集成仍是启用门。
-2. **2C 代码切片完成**：canonical task metadata、Worktree relation、Multica 六态 current projection、幂等 command 和 append-only audit；REST SQL coordinator 尚未抽到 Domain/PostgreSQL adapter，Review Gate、Jira alias/sync 与 UI 读写仍未启用。
+2. **2C 实现切片**：canonical task metadata、Worktree relation、Multica 六态 current projection、`RunTaskCardCommandPort`、PostgreSQL owner adapter 与 REST create/transition/review mutation 接线已有代码；Canvas 复合创建复用 adapter 事务参与接口和组合幂等锁。Review gate 目前有 adapter/audit 但没有 typed lifecycle/review Outbox；Jira alias/sync、目标 DB/RLS grants、Rust 1.99.0 build 与真实授权/并发验收仍开放，Run Apps 生产读写保持关闭。
 3. **2D 条件式代码切片**：cursor Index、owner/archived plan-confirm、owner SCD2、management audit 和 Git lock observer contract/UI。生产 main 尚未装配 Host Runtime observer；创建/导入、Runtime 活跃探测、Session drain、物理清理与恢复仍未实现，Index lock unknown 不得视为 unlocked。
 4. 完成 migration apply + 项目成员 provisioning 后，运行跨 Tenant/Project ACL 负向、数据库 RLS、并发 version conflict、同键幂等重放、审计不可变性和 API 集成验收，才能关闭生产写能力 gate。
 5. Group route 已支持宿主 provider 注入后的只读 GroupContext / WorkItem / Canvas 和 Plugin Registry projection；插件入口消费者已实现校验、排序、显式刷新、30 秒/可见性刷新与错误 fail-closed。真实宿主会话 provider 尚未挂载，因此当前运行仍显示 `preview / seed / not connected`；只有在目标 DB/RLS 和真实会话部署后完成跨 App 浏览器验收，才可把生产接线计为通过，不把 browser store 变化作为产品事实。
@@ -805,8 +806,8 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 | # | 缺口 | 影响 | 关闭条件 |
 |---|---|---|---|
-| 1 | 新 Group WorkItem coordinator 仍在 REST crate 直接 orchestrate SQL；旧 domain-work-item 是三态内存 service | Domain Command Port / PG adapter 的边界尚未完成；旧 `/work-items` 不可用作生产 | 抽出同事务 WorkItem Command / Multica Lifecycle application port，并用 PG repository 实作；完成 API 兼容迁移 |
-| 2 | 当前六态 API 与 review submit/accept/reject REST command 已有条件式代码切片；Review Domain port、Task metadata 更新和 Jira external alias/sync 尚未实现 | 任务流程与 Jira adapter 尚不完整 | 接入 DD-MULTICA §14 review/metadata port、alias registry + sync/outbox，跨 App 实测同一 ID/version |
+| 1 | Run-scoped `RunTaskCardCommandPort`、PostgreSQL owner adapter 与 REST create/transition/review 接线已有代码切片；Canvas 使用 adapter 的事务参与接口。没有 Rust 1.99.0 reproducible build、目标 DB/RLS grants、真实授权/并发 PostgreSQL 验收；read projections 仍由 REST SQL 查询 | 命令边界已落代码但不构成生产写能力；读取投影与写 owner 分层尚未全部迁移 | 在 Rust 1.99.0 完成锁定依赖构建；部署并验证目标 DB/runtime role/RLS；以真实 Project/Branch/Run grants 验收读写、并发 CAS、同键重放和审计不可变性 |
+| 2 | 当前 adapter 持久化 lifecycle/review audit 与命令回执，但没有 typed lifecycle/review Outbox producer/consumer；Task metadata trigger 仅发布 metadata event，Jira external alias/sync 尚未实现 | 审计事实不能驱动跨 App lifecycle projection；Jira 同步仍不完整 | 先冻结事件 schema、owner producer、幂等 Inbox consumer 和授权/RLS，再实现 alias registry + sync/outbox；跨 App 实测同一 ID/version |
 | 3 | 旧 Worktree projection 保留 `project_id` / `owner_user_id` denormalized columns；权威 Project / Owner SCD2 表已创建 | 历史投影与 Master binding 需保持一致；旧 owner/Project 行未回填 | provisioning/reconciliation 同事务维护 Master 与投影；历史映射有审计证据 |
 | 4 | App Registry 只读授权导航 API/provider 与 Group UI consumer 已有条件式切片；GroupContext 尚未包含 `allowed_actions[]`；Canvas API 有多项条件式切片，Chat 仅有逐目标 GroupContext 预检与 fail-closed workflow seam；Registry lifecycle writer、LangGraph 与 Plugin runtime/Gateway 仍未落地 | Worktree group shell 仍无法真实完成跨应用交互；显示入口不代表插件可执行 | 接入可信 manifest ingest、Registry lifecycle command、EntityRef resolver / Chat Workflow 与各 App API，补齐 LangGraph runtime 和 Plugin Gateway，并对每个入口通过权限验收 |
 | 5 | 当前 archive guard 仅根据 AgentSession/Runtime reference 是否为空；Git lock 有注入式 observer contract/UI 但 production main 未装配 Host Runtime provider；没有可靠活跃会话状态和 Runtime/Agent drain | 对有过绑定但已结束的 Runtime 也会保守拒绝；Git lock 显示 unknown，不能安全执行物理清理 | 装配带 freshness/deadline 的 Host Runtime observer；接 Agent/Runtime 活跃状态和 drain；实现 cleanup plan/confirm、恢复策略与故障演练；确认动作时对同一 Repository/Worktree 再观测 |
@@ -1024,6 +1025,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v4.89 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 ERUN-P3.1 Run Task Card command port、PostgreSQL adapter、REST mutation 与 Canvas 复合事务参与；同步 5s/1s owner transaction deadlines、metadata-only Outbox、共享幂等锁与临时 REST→infrastructure composition；目标 DB/RLS、1.99.0 和跨 App gates 未关闭 | owner-port 实现切片按 requirements/basic design 对照修订 |
 | v4.88 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 1 四项 host-session 前端回归及 Vitest 未启动；更新 D20 JetStream cross-provider diagnostics 的可信 route snapshot / Unavailable 语义、PG 两次 95/95 与 SQLx 两次 2/2；保持 Phase 1、D20 P2 与生产门开放 | Phase 1 session-test 与 D20 cross-provider 两个实现切片合入 dev |
 | v4.87 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D20 primary native claim 的有界 quarantine diagnostics、RLS/append-only 表与 final slice gates；明确 JetStream 跨 provider 缺口、operator authorization/UI、recovery/disposition 未实现，P2 保持开放 | D20 route-pin quarantine commit 合入 dev 并完成切片验证 |
 | v4.86 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 D20 P2 跨 provider 路由错配可观测性与不可变 route-pin 恢复/终态处置详细合同；明确来源定位、限维指标、authorized operator surface、append-only owner evidence 与未验收测试门 | D20 P2 docs-only lane，依据当前源代码与独立审查更新详细设计 |

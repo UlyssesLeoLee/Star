@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.59 (2026-10-15)
-> **上游要件定义书**: docs/requirements.md v6.59
+> **文档版本**: v6.60 (2026-10-15)
+> **上游要件定义书**: docs/requirements.md v6.60
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4679,7 +4679,7 @@ Task 的 goal/scope/dependencies/acceptance criteria 是持续事实；TaskExecu
 
 旧 UI seed 中 `wi-001` 至 `wi-030`、独立 Tauri 桌面端 `wi-001` 至 `wi-004` 的演示 Task Card，以及仅服务于已知演示 ID 的关联已从产品运行时移除；Tauri MockDb 不再构造任务，Tauri/browser-dev 缺少 canonical Run provider 时 fail closed。MSW 运行时不为这些任务提供 validation/comment 历史。浏览器持久化迁移只清理该精确已知 ID 集合及其 demo-only 引用；不按 ID 前缀删除其他本地任务、不猜测性清理服务器行，也不自动认领 legacy Task。隔离测试 fixture 使用 `test-*` ID，不进入产品 seed、MSW 任务历史或业务投影。
 
-本轮已编写 owner/outbox additive migration 并接入 Run/Worktree API、Canvas writer 和 Task CLI owner guard；定向 `cargo check -p star-api-rest --lib -j 4` 曾在临时解析更新 Cargo.lock 后通过，原始锁文件已恢复，因此不构成 locked/reproducible build 证据。Run Task Cards 已有只读 UI/client 代码切片；目标数据库尚未应用/验证迁移，实际 runtime role grants/RLS 未验收，宿主 JWT provider 未装配且服务端 capability 关闭。因此代码切片不代表已读取生产 Task 数据，也不代表 Task Card/CLI 的生产闭环已开放；缺少任一生产边界时仍 fail closed。独立 Tauri 前端的旧假任务也已退役，其宿主 Run provider 尚未接入。
+本轮 owner-command slice 新增 `domain-work-item::RunTaskCardCommandPort` 与 PostgreSQL adapter；REST create/transition/review mutation 通过同一 port，在 owner 事务内复验 Worktree→Project/Branch/Run 绑定及当前 Project/Run 角色，使用 事务初始化时设置 statement_timeout=5000ms / lock_timeout=1000ms，使用 actor-scoped 幂等锁、lifecycle 行锁/CAS 和 append-only audit。Canvas 创建任务使用该 PostgreSQL adapter 的事务参与接口，与 Canvas Element、typed EntityRef、Canvas event 和完整组合幂等回执同事务提交；查询回执前先取得与 Task Card command 相同的 advisory lock。Task metadata insert trigger 仍只写 metadata Run Outbox event，不代表 lifecycle/review event producer 已存在。为完成 Canvas 同事务组合，当前 REST state 暂时持有具体 infrastructure adapter；独立 Application/App composition boundary 尚未建立。该代码切片尚无 Rust 1.99.0 build、目标数据库/RLS grants 或 PostgreSQL 并发验收证据；owner migration、宿主 JWT provider、Run Apps capability 仍未在目标环境启用。因此不代表生产 Task 数据读取或 Task Card/CLI 闭环已开放，缺失生产边界时仍 fail closed。独立 Tauri 前端的旧假任务已退役，其宿主 Run provider 尚未接入。
 
 Task Contract 作为 Master/SCD2 保存版本、goal、scope、dependencies、acceptance criteria、actor 与有效区间；更新在一个领域事务内关闭旧版本、追加新版本和 append-only `task_contract_change_audit`。本轮 additive migration `db/migrations/2026-09-30-worktree-task-execution-run.sql` 已定义这些表、Transaction 事件/evidence 表、30 天 Work idempotency mapping、tenant/actor RLS 与 append-only trigger。
 
@@ -5694,6 +5694,7 @@ capacity_released 在当前 Result wire parser、JetStream publisher 与 native 
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.60 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Run Task Card command port/PostgreSQL adapter、REST mutation 与 Canvas 同事务 composition；记录 5s statement / 1s lock timeout、metadata-only Run Outbox、共享幂等锁与临时 REST→infrastructure composition；1.99.0/目标 DB gates 未运行 | ERUN-P3.1 owner command slice 自审与架构对照 |
 | v6.59 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 1 host-session 生命周期的四项前端回归、typecheck 通过及 Vitest 启动受阻；更新 D20 JetStream cross-provider diagnostics 的 route snapshot/Unavailable 语义、两次 PG95/95 与 SQLx 每次2/2证据，并保留 operator/recovery/生产门禁 | P1 与 D20 cross-provider 两个已合入 dev 的实现切片同步文档 |
 | v6.58 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D20 第三张 tenant Transaction 表、Infrastructure-owner 20=4W/10T/6M 与 final slice Rust/PG 95/95/SQLx/格式/Guardian 证据；说明主 native claim 已暴露 bounded quarantine diagnostics，但不宣称 20/20 全量或 production readiness，P2 继续开放 | Route-pin quarantine merge 到 dev 并通过所报切片门禁 |
 | v6.57 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 D20 P2 empty-batch 与 route-mismatch 的区分、跨 provider 诊断、authorized operator surface、append-only blocked evidence 及 immutable-route recovery/disposition；明确实现仍开放 | D20 P2 requirement/design synchronization |

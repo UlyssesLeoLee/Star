@@ -62,6 +62,7 @@ domain-permission = { path = "../domain-permission" }
 domain-workspace = { path = "../domain-workspace" }
 domain-project = { path = "../domain-project" }
 domain-work-item = { path = "../domain-work-item" }
+infrastructure = { path = "../infrastructure" }
 # Phase B.2.6 (Tier 3 真实数据源: worktree / agent / feedback)
 domain-worktree = { path = "../domain-worktree" }
 domain-agent = { path = "../domain-agent" }

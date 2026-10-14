@@ -1,4 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.59）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.60）
+
+> **v6.60 实现对齐**：Task Card 的创建、生命周期与 review mutation 共用 Run-scoped WorkItem command owner。所有 Task Card owner 写事务在首个授权查询前设置 statement_timeout=5000ms 与 lock_timeout=1000ms。Canvas 创建任务卡时，同一 Idempotency-Key 的并发请求必须先串行检查完整组合回执，再于一个事务提交任务、Canvas Element/EntityRef/event 与组合回执；重复请求返回原回执，不得重复创建。该修订明确 TCI-005 / AC-CAN-003 的行为目标，不代表生产部署或运行验收已完成。
 
 ## 0. 文档说明与前提
 
@@ -2300,7 +2302,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-021 | Project → Cloud Branch → Engineering Run → Worktree 目录按层懒加载并有界；Branch 来自可信 SCM 身份，不从 checkout 分支字符串归类生成；三层 current grant 每次重验；只有叶节点解析完整 Run/focus 后才建立执行焦点；缺会话或绑定时明确阻断 | P0 |
 | WTG-022 | Project Worktree Index 与 Run directory API 不得向浏览器返回主机绝对 checkout path 或可反推出主机目录的 locator；checkout 解析仅由受信任 Host/Repository capability 在服务端或受控 Runtime bridge 内完成 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
-| TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
+| TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 Run-scoped WorkItem lifecycle command owner，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则；owner 写事务必须在授权查询前设置不高于 5s 的 statement timeout 与不高于 1s 的 lock timeout | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
 | CAN-001 | Canvas 必须作为 Engineering Run 内与 Task Card 同级 App，并能互动 Run 内 WorkItem、Task Card、AgentSession、多个 Worktree、Relation 与自动化流程 | P0 |
 | CAN-002 | Canvas 发起的任务写操作必须经过 Task Domain Command 与 Guard；结果由事件回写所有订阅 App | P0 |
@@ -2450,9 +2452,10 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-TCI-007 | Session status / cancel / reattach 必须使用 Bearer actor、专用 `agent_session:read` / `agent_session:cancel` / `agent_session:attach` scope、当前 Project writer membership、canonical Task/Worktree association 和非空 `X-Correlation-ID`；Runtime provisioner 必须再次核验 tenant/project/repository/worktree/task/actor/runtime/session 绑定及当前 ACL/Runtime health，并将操作关联 TaskRun Audit；status 仅返回有限 lifecycle state / exit code / updated_at，不返回终端内容或 ticket；cancel 幂等；reattach 只能为活跃 session 新签 ≤60 秒 single-use ticket 并使用 no-store 响应；归档 Worktree 禁止 reattach；缺少 provisioner 时返回非成功响应，前端不得重用旧 ticket 自动重连 |
 | AC-TCI-008 | 页面内保留或由授权列表重新发现的 Task CLI Session 可调用状态刷新与幂等取消；断线或刷新恢复后的人工重连必须先读取当前状态，仅 `running` / `disconnected` 才请求新的一次性 ticket，校验 ticket/session/Worktree/Task 绑定和 ≤60 秒有效期后再重建终端；ticket 不得从浏览器缓存或 URL 还原 |
 | AC-TCI-009 | `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/cli-sessions?limit=N` 必须验证 Bearer actor、`agent_session:read`、当前 Project membership 与 canonical Task/Worktree/Runtime 绑定；默认 limit 为 20、允许 1–50，响应仅含最近状态/exit code/updated_at 并设 `Cache-Control: no-store`，不得包含 ticket 或终端输出；缺少 provisioner 时 fail closed，恢复连接另行签发新 ticket |
+| AC-TCI-010 | Task Card create/transition/review 与 Canvas 复合创建必须在任何授权查询、锁等待或写入前设置事务局部 statement_timeout 不高于 5000ms、lock_timeout 不高于 1000ms；超时使 owner 事务回滚，且不得留下业务写入、audit 或成功回执 |
 | AC-CAN-001 | Canvas 中选中任务卡或 WorkItem 节点可打开其详情；任务状态变更实时反映到节点；从 Canvas 变更状态仍经过既有 Guard |
 | AC-CAN-002 | Canvas Document 更新仅修改 viewport / frame / visual connector；需通过 Worktree ACL、writer role、expected version 和幂等校验；Frame / connector 越界引用被拒绝，connector 不作为 canonical WorkItem relation |
-| AC-CAN-003 | 从 Canvas 新建任务卡时，WorkItem metadata、Multica lifecycle、Worktree association、Canvas Element、typed EntityRef、Audit 和 Outbox 在同一事务提交；失败不得留下部分任务或孤儿画布元素；操作通过 `work-item:write`、`canvas:write` 和同一 Worktree writer ACL，并以一个 `correlation_id` 串联 |
+| AC-CAN-003 | 从 Canvas 新建任务卡时，WorkItem metadata、Multica lifecycle、Worktree association、Canvas Element、typed EntityRef、Audit 和 Outbox 在同一事务提交；相同 Idempotency-Key 的并发请求必须串行读取并返回同一组合回执，不得重复创建；失败不得留下部分任务或孤儿画布元素；操作通过 `work-item:write`、`canvas:write` 和同一 Worktree writer ACL，并以一个 `correlation_id` 串联 |
 | AC-CAN-004 | Canvas 单画布兼容读取接口逐请求重验当前 actor、Project membership、Worktree 和 Canvas scope，继续使用完整 `(occurred_at,event_id)` 复合游标；新增 Worktree 级读取接口以非负有界 `stream_offset` 分页覆盖该 Worktree 的 Canvas 事件，offset 在每个 tenant/worktree 事务锁内分配并保持提交顺序，DB statement/lock deadline 分别不超过 5s/1s，limit 默认 50、上限 100，JSON 以十进制字符串表达 64 位 offset。两种接口均仅返回事件元数据，不暴露可能失效的 EntityRef 目标或 payload；客户端据元数据刷新已授权 projection。浏览器游标只是 Worktree-local resume hint；轮询 API 不得被视作服务端 durable consumer 或 NATS/SSE/WebSocket 实时推送 |
 | AC-CAN-005 | live Canvas 元素移动必须通过当前 Worktree 授权的 Element update API，使用 `update_mode=position` 且只提交 x/y；服务端从当前锁定行保留其它字段，携带 Element `expected_version`、幂等键与 `correlation_id`；版本冲突后刷新投影，不得覆盖更新版本 |
 | AC-CAN-006 | live Canvas 可暂存并创建/删除 Frame、将当前 Canvas 元素加入 Frame、创建/删除纯视觉连线；所有改动作为一个完整 Document draft 以固定 `expected_version` 和幂等键显式保存；引用必须属于当前 Canvas；视觉连线不得创建或暗示 canonical WorkItem/Jira relation；冲突不得自动重基覆盖新版本 |
@@ -2986,6 +2989,7 @@ The Run owner changes the current binding with compare-and-swap: close exactly t
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v6.60 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task Card 写命令 owner 与 Canvas 复合创建并发幂等要求；所有 Task Card owner 写事务须设置 5s statement / 1s lock timeout；并发重放须先取得共享事务锁，再读取组合回执；生产部署、目标 DB/RLS 和 execution gate 仍未关闭 | Run Task Card owner command 与 Canvas composition 实现切片自审发现并补齐幂等竞态 |
 | v2.1 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Worktree Group、任务卡 CLI、范围化聊天、Canvas 互操作、插件热插拔和 LangGraph 约束 | 用户提出 Worktree 顶层索引与群组 App 体系 |
 | v2.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 导航修订为先选 Project，再展示项目 Worktree 清单，展开 Worktree 后显示同级 Group Apps；补充多 Agent Worktree 可见性和受控管理要求 | 用户澄清产品核心是解决多 Agent Worktree 混乱与内部管理不可控 |
 | v2.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project Worktree Index / Group 的可访问入口与深链验收，禁止 Worktree Index 被通用任务列表路由替代 | 浏览器验收发现 `/worktree` 被重定向到 Sprint 树视图 |
@@ -3535,6 +3539,7 @@ Infrastructure owner 新增默认关闭的 `infrastructure/native-grpc-adapter` 
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.60 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task Card 写命令 owner 与 Canvas 复合创建并发幂等要求；所有 Task Card owner 写事务须设置 5s statement / 1s lock timeout；并发重放须先取得共享事务锁，再读取组合回执；生产部署、目标 DB/RLS 和 execution gate 仍未关闭 | Run Task Card owner command 与 Canvas composition 实现切片自审发现并补齐幂等竞态 |
 | v6.59 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Phase 1 host-session 四项测试的实际覆盖和 typecheck/Vitest 状态；记录 D20 JetStream diagnostics 仅在 matching-tenant resolver-bound snapshot 下 Available、无 snapshot 为 Unavailable，以及两次 PG95/95 与 SQLx 每次2/2；明确 P2 和生产门禁未关闭 | 两个已合入 dev 的 Phase 1/D20 实现切片及其验证记录 |
 | v6.58 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D20 第三张 tenant Transaction 表、Infrastructure-owner 20=4W/10T/6M 与 commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 的 Rust/PG 95/95/SQLx/格式/Guardian 切片证据；不宣称全量 20/20 或生产验收，P2 仍开放 | Native route-pin quarantine 合入 dev 并完成切片验证 |
 | v6.57 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 D20 P2 增加 route-pin mismatch 的可观测状态、跨 provider 诊断、durable append-only 证据、原 route 恢复与 owner-governed 终态处置验收；实现仍开放且 fail closed | D20 P2 设计 lane 按当前 publisher source/review 证据补齐需求合同 |

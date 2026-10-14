@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f11e9254ae10537ee2e8f95bcef7b1a6d1df836c0a0b42961816528bf00fbdcf
+@cypher schema=1 source_sha256=c87b5e01e7909d4866a5c25f4c62c9093c116b4f7e102584e96a44c8cd2d30a9
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas.rs"})
 MERGE (route:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::router",kind:"function"})
 MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::list_worktree_canvas_events",kind:"function"})
@@ -24,7 +24,31 @@ MERGE (list)-[:CALLS]->(worktree)
 MERGE (list)-[:READS]->(outbox)
 MERGE (append)-[:CALLS]->(lock)
 MERGE (lock)-[:USES]->(advisory)
-@endcypher
+MERGE (createTask:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::create_work_item_on_canvas",kind:"function"})
+
+MERGE (taskAdapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
+MERGE (requireCanvas:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::require_canvas",kind:"function"})
+MERGE (insertEntityRef:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::insert_entity_ref",kind:"function"})
+MERGE (taskContext:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::run_task_card_context",kind:"function"})
+MERGE (lookupIdempotency:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::lookup_idempotency",kind:"function"})
+MERGE (saveIdempotency:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::save_idempotency",kind:"function"})
+MERGE (authorizeRun:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::authorize_task_run_for_worktree",kind:"function"})
+MERGE (lockTaskIdempotency:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.lock_composed_idempotency_in_transaction",kind:"method"})
+MERGE (createComposedTask:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.create_composed_with_audit_in_transaction",kind:"method"})
+MERGE (route)-[:CALLS]->(createTask)
+MERGE (createTask)-[:CALLS]->(scope)
+MERGE (createTask)-[:CALLS]->(requestWorktree)
+MERGE (createTask)-[:CALLS]->(authorizeRun)
+MERGE (createTask)-[:CALLS]->(requireCanvas)
+MERGE (createTask)-[:CALLS]->(taskContext)
+MERGE (createTask)-[:CALLS]->(lockTaskIdempotency)
+MERGE (createTask)-[:CALLS]->(lookupIdempotency)
+MERGE (createTask)-[:CALLS]->(createComposedTask)
+MERGE (createTask)-[:CALLS]->(insertEntityRef)
+MERGE (createTask)-[:CALLS]->(append)
+MERGE (createTask)-[:CALLS]->(saveIdempotency)
+
+MERGE (createTask)-[:USES_TYPE]->(taskAdapter)@endcypher
 */
 //! Cypher structural manifest.
 //! CREATE
@@ -78,6 +102,10 @@ MERGE (lock)-[:USES]->(advisory)
 //!        (wce)-[:READS]->(outbox:Table {name:"canvas.canvas_group_outbox",type:"table"}),
 //!        (lwsl)-[:USES]->(advisory:Database {name:"PostgreSQL transaction advisory lock",type:"database"});
 
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (cwoc:Function {name:"create_work_item_on_canvas",type:"function"}),(m:Module {name:"canvas",type:"module"});
+//! CREATE (taskAdapter:Class {name:"PgRunTaskCardAdapter",type:"class",language:"rust"}),(taskContext:Function {name:"run_task_card_context",type:"function",language:"rust"}),(lockComposed:Function {name:"PgRunTaskCardAdapter::lock_composed_idempotency_in_transaction",type:"function",language:"rust"}),(createComposed:Function {name:"PgRunTaskCardAdapter::create_composed_with_audit_in_transaction",type:"function",language:"rust"});
+//! CREATE (m)-[:USES]->(taskAdapter),(cwoc)-[:CALLS]->(taskContext),(cwoc)-[:CALLS]->(lockComposed),(cwoc)-[:CALLS]->(createComposed);
 use std::collections::HashSet;
 
 use axum::{
@@ -87,15 +115,19 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use domain_work_item::run_task_card::{
+    CreateRunTaskCardCommand, RunTaskCardAiData, RunTaskCardItemType, RunTaskCardPriority,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{
-    authorize_task_run_for_worktree, authorize_worktree, idempotency_key, load_work_item,
-    lookup_idempotency, parse_id, request_hash, require_task_writer, save_idempotency,
-    validate_ai_task_scope, validate_create_body, AiTaskData, CreateWorkItemBody, WorktreeScope,
+    authorize_task_run_for_worktree, authorize_worktree, idempotency_key, lookup_idempotency,
+    map_run_task_card_error, parse_id, request_hash, require_task_writer, run_task_card_context,
+    save_idempotency, validate_ai_task_scope, validate_create_body, AiTaskData, CreateWorkItemBody,
+    WorktreeScope,
 };
 use super::{
     active_binding, require_scope, validate_actor, AuthUser, AuthenticatedUser, GroupApiError,
@@ -553,79 +585,55 @@ async fn create_work_item_on_canvas(
 
     let (mut tx, scope) =
         authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
-    let run_scope = authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &scope).await?;
+    let _run_scope = authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &scope).await?;
     validate_ai_task_scope(&item_for_validation, scope.repo_id)?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
+    let element_id = Uuid::new_v4();
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let context = run_task_card_context(
+        actor.tenant_id,
+        actor.user_id,
+        worktree_id,
+        key.clone(),
+        hash.clone(),
+        correlation_id,
+    )?;
+    state
+        .run_task_card_pg_adapter
+        .lock_composed_idempotency_in_transaction(&mut *tx, &context)
+        .await
+        .map_err(map_run_task_card_error)?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(Json(response));
     }
 
-    let work_item_id = Uuid::new_v4();
-    let element_id = Uuid::new_v4();
-    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
-    sqlx::query("SELECT set_config('app.correlation_id', $1, true)")
-        .bind(correlation_id.to_string())
-        .execute(&mut *tx)
+    let element_title = body.title.trim().to_owned();
+    let element_item_type = body.item_type.clone();
+    let command = CreateRunTaskCardCommand {
+        item_type: RunTaskCardItemType::try_from(body.item_type.as_str())
+            .map_err(map_run_task_card_error)?,
+        title: body.title,
+        description: body.description,
+        priority: RunTaskCardPriority::try_from(body.priority.as_str())
+            .map_err(map_run_task_card_error)?,
+        labels: body.labels,
+        ai_task_data: body.ai_task_data.map(|data| RunTaskCardAiData {
+            objective: data.objective,
+            repository_scope: data.repository_scope.into_iter().map(Into::into).collect(),
+        }),
+    };
+    let task_receipt = state
+        .run_task_card_pg_adapter
+        .create_composed_with_audit_in_transaction(
+            &mut *tx,
+            &context,
+            &command,
+            json!({"source":"canvas","canvas_id":canvas_id,"element_id":element_id}),
+        )
         .await
-        .map_err(|_| GroupApiError::internal())?;
-    sqlx::query(
-        r#"INSERT INTO multica.task_metadata
-           (work_item_id,tenant_id,workspace_id,project_id,repository_id,branch_id,engineering_run_id,
-            item_type,title,description,priority,labels,ai_task_data,reporter_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)"#,
-    )
-    .bind(work_item_id)
-    .bind(actor.tenant_id)
-    .bind(scope.workspace_id)
-    .bind(scope.project_id)
-    .bind(run_scope.repository_id)
-    .bind(run_scope.branch_id)
-    .bind(run_scope.engineering_run_id)
-    .bind(&body.item_type)
-    .bind(body.title.trim())
-    .bind(&body.description)
-    .bind(&body.priority)
-    .bind(&body.labels)
-    .bind(body.ai_task_data.as_ref().map(|data| json!(data)))
-    .bind(actor.user_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-    sqlx::query(
-        "INSERT INTO multica.task_lifecycle_current (work_item_id,tenant_id,status,version) VALUES ($1,$2,'pending',1)",
-    )
-    .bind(work_item_id)
-    .bind(actor.tenant_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-    sqlx::query(
-        "INSERT INTO multica.work_item_worktree (tenant_id,project_id,work_item_id,worktree_id) VALUES ($1,$2,$3,$4)",
-    )
-    .bind(actor.tenant_id)
-    .bind(scope.project_id)
-    .bind(work_item_id)
-    .bind(worktree_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-    sqlx::query(
-        r#"INSERT INTO multica.task_lifecycle_audit
-           (tenant_id,project_id,worktree_id,work_item_id,task_card_id,to_status,event_type,actor_id,idempotency_key,correlation_id,details)
-           VALUES ($1,$2,$3,$4,$4,'pending','created',$5,$6,$7,$8)"#,
-    )
-    .bind(actor.tenant_id)
-    .bind(scope.project_id)
-    .bind(worktree_id)
-    .bind(work_item_id)
-    .bind(actor.user_id)
-    .bind(&key)
-    .bind(correlation_id)
-    .bind(json!({"source":"canvas","canvas_id":canvas_id,"element_id":element_id}))
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
+        .map_err(map_run_task_card_error)?;
+    let work_item_id = task_receipt.snapshot.work_item_id.as_uuid();
 
     sqlx::query(
         r#"INSERT INTO canvas.canvas_elements_backend
@@ -642,7 +650,7 @@ async fn create_work_item_on_canvas(
     .bind(body.height)
     .bind(body.rotation)
     .bind(body.z_index)
-    .bind(json!({"title":body.title.trim(),"item_type":body.item_type,"status":"pending"}))
+    .bind(json!({"title":element_title,"item_type":element_item_type,"status":"pending"}))
     .bind(actor.user_id)
     .execute(&mut *tx)
     .await
@@ -676,14 +684,8 @@ async fn create_work_item_on_canvas(
     )
     .await?;
 
-    let task = load_work_item(
-        &mut tx,
-        actor.tenant_id,
-        scope.project_id,
-        worktree_id,
-        work_item_id,
-    )
-    .await?;
+    let task =
+        serde_json::to_value(task_receipt.snapshot).map_err(|_| GroupApiError::internal())?;
     let element = load_element(
         &mut tx,
         actor.tenant_id,
@@ -699,7 +701,6 @@ async fn create_work_item_on_canvas(
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
     Ok(Json(response))
 }
-
 async fn list_canvases(
     State(state): State<GroupApiState>,
     AuthenticatedUser(actor): AuthenticatedUser,
