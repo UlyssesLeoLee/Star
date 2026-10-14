@@ -3,7 +3,7 @@
 //! The adapter repeats authorization and binding checks inside each write transaction. It does
 //! not publish lifecycle Outbox events: the current migration only emits metadata events.
 //!
-//! @cypher schema=1 source_sha256=594e0aeaee3f86cf2d9ced1d44cfb59644081811dae041ce9ea50b930a449323
+//! @cypher schema=1 source_sha256=44e1386e05a86aa79d9beca78acf7710c1802a8d86743709562de7110d82e78e
 //! MERGE (self:File {path:"crates/infrastructure/src/run_task_card_pg.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::module",kind:"module"})
 //! MERGE (adapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
@@ -14,6 +14,7 @@
 //! MERGE (review:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.review",kind:"method"})
 //! MERGE (createComposed:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.create_composed_in_transaction",kind:"method"})
 //! MERGE (createComposedAudit:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.create_composed_with_audit_in_transaction",kind:"method"})
+//! MERGE (lockComposedIdempotency:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.lock_composed_idempotency_in_transaction",kind:"method"})
 //! MERGE (createOnConnection:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::create_on_connection",kind:"function"})
 //! MERGE (transitionOnConnection:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::transition_on_connection",kind:"function"})
 //! MERGE (reviewOnConnection:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::review_on_connection",kind:"function"})
@@ -28,6 +29,8 @@
 //! MERGE (validateAudit:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::validate_audit_details",kind:"function"})
 //! MERGE (pool:Type {id:"sqlx::PgPool",kind:"external_type"})
 //! MERGE (connection:Type {id:"sqlx::PgConnection",kind:"external_type"})
+//! MERGE (statementTimeout:Config {id:"postgresql.statement_timeout"})
+//! MERGE (lockTimeout:Config {id:"postgresql.lock_timeout"})
 //! MERGE (metadata:Table {id:"multica.task_metadata"})
 //! MERGE (lifecycle:Table {id:"multica.task_lifecycle_current"})
 //! MERGE (audit:Table {id:"multica.task_lifecycle_audit"})
@@ -43,6 +46,7 @@
 //! MERGE (module)-[:DEFINES]->(review)
 //! MERGE (module)-[:DEFINES]->(createComposed)
 //! MERGE (module)-[:DEFINES]->(createComposedAudit)
+//! MERGE (module)-[:DEFINES]->(lockComposedIdempotency)
 //! MERGE (module)-[:DEFINES]->(createOnConnection)
 //! MERGE (module)-[:DEFINES]->(transitionOnConnection)
 //! MERGE (module)-[:DEFINES]->(reviewOnConnection)
@@ -62,6 +66,7 @@
 //! MERGE (createComposed)-[:CALLS]->(createComposedAudit)
 //! MERGE (createComposedAudit)-[:CALLS]->(validateAudit)
 //! MERGE (createComposedAudit)-[:CALLS]->(createOnConnection)
+//! MERGE (lockComposedIdempotency)-[:CALLS]->(lockIdempotency)
 //! MERGE (createOnConnection)-[:CALLS]->(scopeGuc)
 //! MERGE (createOnConnection)-[:CALLS]->(authorize)
 //! MERGE (createOnConnection)-[:CALLS]->(lockIdempotency)
@@ -93,6 +98,11 @@
 //! MERGE (reviewOnConnection)-[:WRITES]->(lifecycle)
 //! MERGE (insertAudit)-[:WRITES]->(audit)
 //! MERGE (saveIdempotency)-[:WRITES]->(idempotency)
+//! MERGE (commandPort:Type {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort",kind:"trait"})
+//! MERGE (module)-[:DEFINES]->(commandPort)
+//! MERGE (adapter)-[:IMPLEMENTS]->(commandPort)
+//! MERGE (scopeGuc)-[:CONFIGURES]->(statementTimeout)
+//! MERGE (scopeGuc)-[:CONFIGURES]->(lockTimeout)
 //! @endcypher
 
 use chrono::{DateTime, Utc};
@@ -204,6 +214,19 @@ impl PgRunTaskCardAdapter {
         command.validate()?;
         validate_audit_details(&audit_details)?;
         create_on_connection(connection, context, command, false, audit_details).await
+    }
+
+    /// Acquire the same transaction-scoped idempotency lock used by Task Card commands.
+    ///
+    /// Composite owners such as Canvas call this before looking up their complete response receipt,
+    /// then persist that response in the same transaction as the composed write.
+    pub async fn lock_composed_idempotency_in_transaction(
+        &self,
+        connection: &mut PgConnection,
+        context: &RunTaskCardCommandContext,
+    ) -> Result<(), RunTaskCardError> {
+        context.validate()?;
+        lock_idempotency_key(connection, context).await
     }
 
     /// Apply a six-state lifecycle transition and persist its replay receipt atomically.
@@ -606,7 +629,7 @@ async fn set_transaction_scope(
     context: &RunTaskCardCommandContext,
 ) -> Result<(), RunTaskCardError> {
     sqlx::query(
-        "SELECT set_config('app.tenant_id',$1,true),set_config('app.actor_id',$2,true),set_config('app.correlation_id',$3,true)",
+        "SELECT set_config('app.tenant_id',$1,true),set_config('app.actor_id',$2,true),set_config('app.correlation_id',$3,true),set_config('statement_timeout','5000',true),set_config('lock_timeout','1000',true)",
     )
     .bind(context.tenant_id.to_string())
     .bind(context.actor_id.to_string())
