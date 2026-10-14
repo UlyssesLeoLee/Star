@@ -1,10 +1,15 @@
+/*
+@cypher schema=1 source_sha256=53cd3fb06fb116754c0d01797bd88c4c3ab9304a0b55fd119cfd9d66f9216720
+MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
 // /agent-view — Agent 视图 (无限画布, 当前工作 agent 筛选, 拟人化游戏化)
 // =====================================================================
 // Per 2026-09-05 11:25 JST 用户发令 + 拍板 #1/#2/#3:
-//   1. 形式 = 无限画布 (Miro 风格, 自由散开)
+//   1. 形式 = 无限画布 (自由散开)
 //   2. 筛选 = 当前工作 agent (auto 选最近 active, 用户可手动覆盖)
 //   3. 数据 = 跟 kanban 等界面共享 store (workItems / worktrees / agentSessions)
 //   4. 路由 = /agent-view

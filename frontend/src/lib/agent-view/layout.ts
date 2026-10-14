@@ -1,7 +1,12 @@
+/*
+@cypher schema=1 source_sha256=a0b61ec8ce58f68d5545d992e69568423a32e70dcc53b918535fd1736be7f9da
+MERGE (self:File {path:"frontend/src/lib/agent-view/layout.ts"})
+@endcypher
+*/
 // =====================================================================
 // /agent-view — free-form layout algorithm
 // =====================================================================
-// Per 2026-09-05 11:25 JST 拍板 #1: 自由散开 (Miro 风格), 不强制 swimlane.
+// Per 2026-09-05 11:25 JST 拍板 #1: 自由散开, 不强制 swimlane.
 // 节点按关联性散开, agent 居中, worktree 紧贴 agent 右侧, work-items
 //   围绕 worktree 在圆周上分布, 排序 = [kanban status 优先级, due_date, id].
 //

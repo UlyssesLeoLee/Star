@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=42c952ee6ec541eb9e10b09a1ea85083af89909d82fab2410d92e5c4588fd982
+@cypher schema=1 source_sha256=fea982b39263bf451b1b4c9a24ea3b5950cd10d4503767cf0af1e3a1a2f0f92a
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -437,7 +437,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     href: "/settings/developer?tab=webhooks",
     category: "integration",
     categoryLabel: "Integration & Security",
-    description: "出站 Webhook endpoint + 5 域预置 vendor 模板 (Slack/Teams/Discord)",
+    description: "出站 Webhook endpoint + 5 域预置通知模板",
     icon: Webhook,
   },
   {
