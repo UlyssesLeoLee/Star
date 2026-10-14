@@ -1,13 +1,26 @@
 //! Bounded JetStream publication for tenant-scoped Infrastructure Outbox claims.
 //!
-//! @cypher schema=1 source_sha256=a17bc0c6f2f3700ef62d2fb91271ee1df39dbdaa58e2de383d8b53b4fae72942
+//! @cypher schema=1 source_sha256=c351c7aaa5f216461616498d9104ea318f7f8424b81d3af5d082b049862b90d7
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
 //! MERGE (publisher:Type {id:"infrastructure::InfrastructureOwnerJetStreamPublisher",kind:"struct"})
 //! MERGE (outcome:Type {id:"infrastructure::JetStreamPublishBatchOutcome",kind:"struct"})
+//! MERGE (route_diagnostics:Type {id:"infrastructure::JetStreamNativeRoutePinDiagnosticState",kind:"enum"})
 //! MERGE (error:Type {id:"infrastructure::JetStreamPublisherError",kind:"enum"})
 //! MERGE (publish_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.publish_due_for_tenant",kind:"method"})
+//! MERGE (new_publisher:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.new",kind:"method"})
+//! MERGE (from_callback:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.from_publish_callback",kind:"method"})
+//! MERGE (with_native_route:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.with_native_route_snapshot",kind:"method"})
+//! MERGE (with_test_hook:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.with_test_publish_hook",kind:"method"})
 //! MERGE (build_envelope:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::build_envelope",kind:"function"})
+//! MERGE (build_publish_message:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::build_publish_message",kind:"function"})
+//! MERGE (publish_callback:Type {id:"infrastructure::JetStreamPublishCallback",kind:"type"})
+//! MERGE (publish_future:Type {id:"infrastructure::PublishFuture",kind:"type"})
+//! MERGE (diagnose_native_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.diagnose_native_due",kind:"method"})
+//! MERGE (claim_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_due",kind:"method"})
+//! MERGE (mark_delivered:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.mark_delivered",kind:"method"})
+//! MERGE (record_failure:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.record_failure",kind:"method"})
+//! MERGE (send_publish:ExternalService {id:"async_nats::jetstream::Context::send_publish",kind:"method"})
 //! MERGE (delivery_store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"external_type"})
 //! MERGE (claim:Type {id:"infrastructure::InfrastructureOwnerOutboxDeliveryClaim",kind:"external_type"})
 //! MERGE (event_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_wire.rs::build_capacity_result_wire",kind:"function"})
@@ -15,25 +28,61 @@
 //! MERGE (publish_message:Type {id:"async_nats::jetstream::message::PublishMessage",kind:"external_type"})
 //! MERGE (module)-[:DEFINES]->(publisher)
 //! MERGE (module)-[:DEFINES]->(outcome)
+//! MERGE (module)-[:DEFINES]->(route_diagnostics)
 //! MERGE (module)-[:DEFINES]->(error)
+//! MERGE (module)-[:DEFINES]->(build_envelope)
+//! MERGE (module)-[:DEFINES]->(build_publish_message)
+//! MERGE (module)-[:DEFINES]->(publish_callback)
+//! MERGE (module)-[:DEFINES]->(publish_future)
 //! MERGE (publisher)-[:DEFINES]->(publish_due)
-//! MERGE (publish_due)-[:CALLS]->(build_envelope)
+//! MERGE (publisher)-[:DEFINES]->(new_publisher)
+//! MERGE (publisher)-[:DEFINES]->(from_callback)
+//! MERGE (publisher)-[:DEFINES]->(with_native_route)
+//! MERGE (publisher)-[:DEFINES]->(with_test_hook)
+//! MERGE (new_publisher)-[:CALLS]->(from_callback)
+//! MERGE (from_callback)-[:USES_TYPE]->(publish_callback)
+//! MERGE (from_callback)-[:USES_TYPE]->(delivery_store)
+//! MERGE (with_test_hook)-[:CALLS]->(from_callback)
+//! MERGE (with_test_hook)-[:USES_TYPE]->(publish_callback)
+//! MERGE (new_publisher)-[:USES_TYPE]->(jetstream)
+//! MERGE (new_publisher)-[:USES_TYPE]->(publish_message)
+//! MERGE (new_publisher)-[:CALLS]->(send_publish)
+//! MERGE (publish_due)-[:CALLS]->(build_publish_message)
+//! MERGE (publish_due)-[:CALLS]->(claim_due)
+//! MERGE (publish_due)-[:CALLS]->(mark_delivered)
+//! MERGE (publish_due)-[:CALLS]->(record_failure)
 //! MERGE (build_envelope)-[:CALLS]->(event_wire)
+//! MERGE (build_publish_message)-[:CALLS]->(build_envelope)
 //! MERGE (publish_due)-[:USES_TYPE]->(delivery_store)
 //! MERGE (publish_due)-[:USES_TYPE]->(claim)
-//! MERGE (publish_due)-[:USES_TYPE]->(jetstream)
 //! MERGE (publish_due)-[:USES_TYPE]->(publish_message)
+//! MERGE (publish_due)-[:CALLS]->(diagnose_native_due)
+//! MERGE (publish_due)-[:USES_TYPE]->(publish_callback)
+//! MERGE (publish_due)-[:RETURNS]->(outcome)
+//! MERGE (native_route:Type {id:"infrastructure::NativeInfrastructureDeliveryRoute",kind:"external_type"})
+//! MERGE (quarantine_page:Type {id:"infrastructure::NativeRoutePinQuarantinePage",kind:"external_type"})
+//! MERGE (publisher)-[:USES_TYPE]->(native_route)
+//! MERGE (publisher)-[:USES_TYPE]->(publish_callback)
+//! MERGE (publish_callback)-[:USES_TYPE]->(publish_future)
+//! MERGE (route_diagnostics)-[:USES_TYPE]->(quarantine_page)
+//! MERGE (outcome)-[:USES_TYPE]->(route_diagnostics)
+//! MERGE (publish_due)-[:USES_TYPE]->(route_diagnostics)
+//! MERGE (publish_due)-[:USES_TYPE]->(publish_future)
+//! MERGE (with_native_route)-[:USES_TYPE]->(native_route)
 //! @endcypher
 
-use std::time::Duration;
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use async_nats::jetstream::{message::PublishMessage, Context};
 use thiserror::Error;
 use uuid::Uuid;
 
+#[cfg(feature = "native-grpc-adapter")]
+use crate::infrastructure_owner_outbox_delivery::NativeInfrastructureDeliveryRoute;
 use crate::infrastructure_owner_outbox_delivery::{
     InfrastructureOwnerOutboxDeliveryClaim, InfrastructureOwnerOutboxDeliveryError,
-    OutboxDeliveryFailureKind, PostgresInfrastructureOwnerOutboxDelivery,
+    NativeRoutePinQuarantinePage, OutboxDeliveryFailureKind,
+    PostgresInfrastructureOwnerOutboxDelivery,
 };
 use crate::infrastructure_owner_outbox_wire::build_capacity_result_wire;
 
@@ -46,9 +95,28 @@ const MAX_ENVELOPE_BYTES: usize = 128 * 1024;
 const MAX_PAYLOAD_BYTES: usize = 16 * 1024;
 const ACK_TIMEOUT: Duration = Duration::from_secs(10);
 const SUBJECT_PREFIX: &str = "star.infrastructure.v2";
+type PublishFuture = Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'static>>;
+type JetStreamPublishCallback = dyn Fn(String, PublishMessage) -> PublishFuture + Send + Sync;
+
+/// Whether the JetStream pass could compare native route pins to a trusted resolved snapshot.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum JetStreamNativeRoutePinDiagnosticState {
+    /// No resolver-produced snapshot was bound to this publisher, so no blocked count is claimed.
+    #[default]
+    Unavailable,
+    /// Bounded tenant diagnostics from the same Infrastructure owner store used by claims.
+    Available {
+        /// Total due native-pinned rows observed, capped at the configured sample size.
+        due_native_pinned: usize,
+        /// True when the bounded due-row sample has more rows beyond this count.
+        due_native_pinned_truncated: bool,
+        /// Durable, bounded quarantine state and any newly quarantined rows.
+        route_pin_quarantine: NativeRoutePinQuarantinePage,
+    },
+}
 
 /// Tenant-scoped result counts for one bounded publisher pass.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct JetStreamPublishBatchOutcome {
     /// Number of Outbox claims leased from PostgreSQL.
     pub claimed: usize,
@@ -58,6 +126,8 @@ pub struct JetStreamPublishBatchOutcome {
     pub retry_scheduled: usize,
     /// Invalid event contracts and exhausted deliveries moved to terminal dead state.
     pub dead_lettered: usize,
+    /// Explicit native route-pin visibility; unavailable is never represented as zero.
+    pub native_route_pin_diagnostics: JetStreamNativeRoutePinDiagnosticState,
 }
 
 /// Errors from parameter validation or the Infrastructure Outbox owner store.
@@ -76,10 +146,12 @@ pub enum JetStreamPublisherError {
 /// The caller supplies the already-authenticated JetStream context and an owner-scoped
 /// delivery store. This adapter never discovers tenants, starts a worker, or configures a
 /// broker. A later consumer must still deduplicate the immutable `event_id` in its own Inbox.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InfrastructureOwnerJetStreamPublisher {
     delivery_store: PostgresInfrastructureOwnerOutboxDelivery,
-    jetstream: Context,
+    publish: Arc<JetStreamPublishCallback>,
+    #[cfg(feature = "native-grpc-adapter")]
+    native_route_snapshot: Option<NativeInfrastructureDeliveryRoute>,
 }
 
 impl InfrastructureOwnerJetStreamPublisher {
@@ -88,10 +160,54 @@ impl InfrastructureOwnerJetStreamPublisher {
         delivery_store: PostgresInfrastructureOwnerOutboxDelivery,
         jetstream: Context,
     ) -> Self {
+        let publish = move |subject, message| {
+            let jetstream = jetstream.clone();
+            Box::pin(async move {
+                let ack = jetstream
+                    .send_publish(subject, message)
+                    .await
+                    .map_err(|_| ())?;
+                ack.await.map(|_| ()).map_err(|_| ())
+            }) as PublishFuture
+        };
+        Self::from_publish_callback(delivery_store, publish)
+    }
+
+    fn from_publish_callback<F>(
+        delivery_store: PostgresInfrastructureOwnerOutboxDelivery,
+        publish: F,
+    ) -> Self
+    where
+        F: Fn(String, PublishMessage) -> PublishFuture + Send + Sync + 'static,
+    {
         Self {
             delivery_store,
-            jetstream,
+            publish: Arc::new(publish),
+            #[cfg(feature = "native-grpc-adapter")]
+            native_route_snapshot: None,
         }
+    }
+
+    /// Bind a resolver-produced route snapshot for tenant-scoped native-pin diagnostics.
+    #[cfg(feature = "native-grpc-adapter")]
+    pub fn with_native_route_snapshot(mut self, route: NativeInfrastructureDeliveryRoute) -> Self {
+        self.native_route_snapshot = Some(route);
+        self
+    }
+
+    /// Construct a publisher with a bounded fake callback for disposable store integration tests.
+    #[cfg(feature = "native-grpc-test-support")]
+    pub fn with_test_publish_hook<F, Fut>(
+        delivery_store: PostgresInfrastructureOwnerOutboxDelivery,
+        publish_hook: F,
+    ) -> Self
+    where
+        F: Fn(String, PublishMessage) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<(), ()>> + Send + 'static,
+    {
+        Self::from_publish_callback(delivery_store, move |subject, message| {
+            Box::pin(publish_hook(subject, message))
+        })
     }
 
     /// Lease and publish one tenant's due events with bounded memory and serial PubAck waits.
@@ -115,12 +231,31 @@ impl InfrastructureOwnerJetStreamPublisher {
             return Err(JetStreamPublisherError::InvalidParameters);
         }
 
+        #[cfg(feature = "native-grpc-adapter")]
+        let native_route_pin_diagnostics = match self.native_route_snapshot.as_ref() {
+            Some(route) if route.tenant_id() == tenant_id => {
+                let page = self
+                    .delivery_store
+                    .diagnose_native_due(lease_owner_id, route)
+                    .await?;
+                JetStreamNativeRoutePinDiagnosticState::Available {
+                    due_native_pinned: page.due_native_pinned,
+                    due_native_pinned_truncated: page.due_native_pinned_truncated,
+                    route_pin_quarantine: page,
+                }
+            }
+            _ => JetStreamNativeRoutePinDiagnosticState::Unavailable,
+        };
+        #[cfg(not(feature = "native-grpc-adapter"))]
+        let native_route_pin_diagnostics = JetStreamNativeRoutePinDiagnosticState::Unavailable;
+
         let claims = self
             .delivery_store
             .claim_due(tenant_id, lease_owner_id, max_items, lease_seconds)
             .await?;
         let mut outcome = JetStreamPublishBatchOutcome {
             claimed: claims.len(),
+            native_route_pin_diagnostics,
             ..JetStreamPublishBatchOutcome::default()
         };
 
@@ -136,17 +271,11 @@ impl InfrastructureOwnerJetStreamPublisher {
                 }
             };
 
-            let publish_result = tokio::time::timeout(ACK_TIMEOUT, async {
-                let ack = self
-                    .jetstream
-                    .send_publish(subject, message)
+            let publish_result =
+                tokio::time::timeout(ACK_TIMEOUT, (self.publish)(subject, message))
                     .await
-                    .map_err(|_| ())?;
-                ack.await.map(|_| ()).map_err(|_| ())
-            })
-            .await
-            .map_err(|_| ())
-            .and_then(|result| result);
+                    .map_err(|_| ())
+                    .and_then(|result| result);
 
             match publish_result {
                 Ok(()) => {

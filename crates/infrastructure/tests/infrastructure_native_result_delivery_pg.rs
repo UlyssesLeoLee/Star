@@ -1,8 +1,9 @@
 //! Disposable PostgreSQL verification for Infrastructure native delivery route pins, receipts, and quarantine.
 /*
-@cypher schema=1 source_sha256=233f45822dc1c65a9020f0de0a50111bb45b359229b0ae496608f407c302bd93
+@cypher schema=1 source_sha256=0ac845294d057ee48c209526cbf9f26f2acfb4490c9acfe43f47a9ef9bb946d3
 MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs"})
 MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence",kind:"test"})
+MERGE (jetstream_test:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::postgres_jetstream_reports_stale_native_pin_without_claim_or_publish",kind:"test"})
 MERGE (seed:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::seed_owner_outbox_event",kind:"function"})
 MERGE (profile:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::route",kind:"function"})
 MERGE (route_endpoint:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::route_for_endpoint",kind:"function"})
@@ -13,12 +14,18 @@ MERGE (expire:Symbol {id:"crates/infrastructure/tests/infrastructure_native_resu
 MERGE (bad_receipt:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::reject_mismatched_receipt",kind:"function"})
 MERGE (assert_worm:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_worm_and_truncate_guards",kind:"function"})
 MERGE (assert_quarantine:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_stale_native_route_quarantine",kind:"function"})
+MERGE (jetstream_publish:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.publish_due_for_tenant",kind:"method"})
+MERGE (jetstream_test_hook:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.with_test_publish_hook",kind:"method"})
+MERGE (jetstream_with_route:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::InfrastructureOwnerJetStreamPublisher.with_native_route_snapshot",kind:"method"})
 MERGE (assert_quarantine_rls:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_quarantine_tenant_scope",kind:"function"})
 MERGE (rollback:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_atomic_receipt_rollback",kind:"function"})
 MERGE (schema_assertions:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_native_result_schema",kind:"function"})
 MERGE (rls_assertions:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_tenant_scope_hides_other_tenant",kind:"function"})
 MERGE (store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"external_type"})
 MERGE (route:Type {id:"infrastructure::NativeInfrastructureDeliveryRoute",kind:"external_type"})
+MERGE (jetstream_publisher:Type {id:"infrastructure::InfrastructureOwnerJetStreamPublisher",kind:"external_type"})
+MERGE (jetstream_outcome:Type {id:"infrastructure::JetStreamPublishBatchOutcome",kind:"external_type"})
+MERGE (jetstream_diagnostics:Type {id:"infrastructure::JetStreamNativeRoutePinDiagnosticState",kind:"external_type"})
 MERGE (profile_revision:Type {id:"platform_messaging_runtime::transport_profile::TransportProfileRevision",kind:"external_type"})
 MERGE (endpoint_resolver:Type {id:"platform_messaging_runtime::transport_endpoint::TrustedEndpointResolver",kind:"external_type"})
 MERGE (claim:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
@@ -72,6 +79,22 @@ MERGE (test)-[:TESTS]->(route_pin)
 MERGE (test)-[:TESTS]->(receipt)
 MERGE (test)-[:TESTS]->(delivery)
 MERGE (test)-[:TESTS]->(quarantine)
+MERGE (self)-[:DEFINES]->(jetstream_test)
+MERGE (jetstream_test)-[:CALLS]->(seed)
+MERGE (jetstream_test)-[:CALLS]->(profile)
+MERGE (jetstream_test)-[:CALLS]->(route_endpoint)
+MERGE (jetstream_test)-[:CALLS]->(set_due)
+MERGE (jetstream_test)-[:CALLS]->(claim)
+MERGE (jetstream_test)-[:CALLS]->(pin_wire)
+MERGE (jetstream_test)-[:CALLS]->(jetstream_test_hook)
+MERGE (jetstream_test)-[:CALLS]->(jetstream_with_route)
+MERGE (jetstream_test)-[:CALLS]->(jetstream_publish)
+MERGE (jetstream_test)-[:USES_TYPE]->(jetstream_outcome)
+MERGE (jetstream_test)-[:USES_TYPE]->(jetstream_diagnostics)
+MERGE (jetstream_test)-[:TESTS]->(route_pin)
+MERGE (jetstream_test)-[:TESTS]->(receipt)
+MERGE (jetstream_test)-[:TESTS]->(delivery)
+MERGE (jetstream_test)-[:TESTS]->(quarantine)
 MERGE (assert_quarantine)-[:TESTS]->(quarantine)
 MERGE (assert_quarantine)-[:TESTS]->(route_pin)
 MERGE (assert_quarantine)-[:TESTS]->(delivery)
@@ -82,6 +105,9 @@ MERGE (assert_worm)-[:TESTS]->(quarantine)
 @endcypher
 */
 
+use infrastructure::infrastructure_owner_jetstream_publisher::{
+    InfrastructureOwnerJetStreamPublisher, JetStreamNativeRoutePinDiagnosticState,
+};
 use infrastructure::infrastructure_owner_outbox_delivery::{
     NativeInfrastructureDeliveryRoute, NativeRoutePinQuarantinePage, OutboxDeliveryFailureKind,
     PostgresInfrastructureOwnerOutboxDelivery,
@@ -97,6 +123,10 @@ use platform_messaging_runtime::{
 };
 use sha2::{Digest, Sha256};
 use sqlx::{postgres::PgPoolOptions, PgPool, Postgres, Row, Transaction};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use uuid::Uuid;
 
 const DATABASE_URL_ENV: &str = "STAR_INFRA_OWNER_TEST_DATABASE_URL";
@@ -258,6 +288,187 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
 
     let quarantined_event = assert_stale_native_route_quarantine(&pool, &store, tenant_a).await?;
     assert_worm_and_truncate_guards(&pool, tenant_a, event_a, quarantined_event).await?;
+    pool.close().await;
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --native-result-tests"]
+async fn postgres_jetstream_reports_stale_native_pin_without_claim_or_publish(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let database_url = std::env::var(DATABASE_URL_ENV)?;
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect(&database_url)
+        .await?;
+    let store = PostgresInfrastructureOwnerOutboxDelivery::new(pool.clone());
+    let no_snapshot_tenant = Uuid::new_v4();
+    let no_snapshot_event = seed_owner_outbox_event(&pool, no_snapshot_tenant).await?;
+    let no_snapshot_route = route(no_snapshot_tenant);
+    let no_snapshot_claim = store
+        .claim_native_due(Uuid::new_v4(), 1, 120, &no_snapshot_route)
+        .await?
+        .claims
+        .into_iter()
+        .find(|claim| claim.event_id == no_snapshot_event)
+        .expect("the test route creates a native-pinned event without a native publisher");
+    store
+        .get_or_pin_native_wire(&no_snapshot_claim, &no_snapshot_route)
+        .await?;
+    store
+        .record_failure(&no_snapshot_claim, OutboxDeliveryFailureKind::Transient)
+        .await?;
+    make_retry_due(&pool, no_snapshot_tenant, no_snapshot_event).await?;
+
+    let unavailable_publish_calls = Arc::new(AtomicUsize::new(0));
+    let unavailable_publish_calls_from_callback = Arc::clone(&unavailable_publish_calls);
+    let unavailable_publisher = InfrastructureOwnerJetStreamPublisher::with_test_publish_hook(
+        store.clone(),
+        move |_subject, _message| {
+            unavailable_publish_calls_from_callback.fetch_add(1, Ordering::SeqCst);
+            async { Ok(()) }
+        },
+    );
+    let unavailable = unavailable_publisher
+        .publish_due_for_tenant(no_snapshot_tenant, Uuid::new_v4(), 1, 120)
+        .await?;
+    assert_eq!(unavailable.claimed, 0);
+    assert_eq!(unavailable.delivered, 0);
+    assert_eq!(unavailable_publish_calls.load(Ordering::SeqCst), 0);
+    assert!(matches!(
+        unavailable.native_route_pin_diagnostics,
+        JetStreamNativeRoutePinDiagnosticState::Unavailable
+    ));
+    let (no_snapshot_delivery, no_snapshot_pin, no_snapshot_quarantine): (String, String, i64) =
+        sqlx::query_as(
+            "SELECT d.delivery_state, p.transport_provider, \
+                    (SELECT count(*) FROM infrastructure.capacity_native_route_pin_quarantine AS q \
+                      WHERE q.tenant_id = d.tenant_id AND q.event_id = d.event_id) \
+             FROM infrastructure.capacity_outbox_delivery AS d \
+             JOIN infrastructure.capacity_outbox_transport_pin AS p \
+               ON p.tenant_id = d.tenant_id AND p.event_id = d.event_id \
+             WHERE d.tenant_id = $1 AND d.event_id = $2",
+        )
+        .bind(no_snapshot_tenant)
+        .bind(no_snapshot_event)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(no_snapshot_delivery, "retry");
+    assert_eq!(no_snapshot_pin, "native-grpc");
+    assert_eq!(no_snapshot_quarantine, 0);
+
+    let empty_tenant = Uuid::new_v4();
+    let empty_route = route(empty_tenant);
+    let empty_publisher = InfrastructureOwnerJetStreamPublisher::with_test_publish_hook(
+        store.clone(),
+        |_subject, _message| async { Ok(()) },
+    )
+    .with_native_route_snapshot(empty_route);
+    let empty = empty_publisher
+        .publish_due_for_tenant(empty_tenant, Uuid::new_v4(), 1, 120)
+        .await?;
+    assert_eq!(empty.claimed, 0);
+    match empty.native_route_pin_diagnostics {
+        JetStreamNativeRoutePinDiagnosticState::Unavailable => {
+            panic!("an exact trusted route snapshot makes the empty result observable")
+        }
+        JetStreamNativeRoutePinDiagnosticState::Available {
+            due_native_pinned,
+            due_native_pinned_truncated,
+            route_pin_quarantine,
+        } => {
+            assert_eq!(due_native_pinned, 0);
+            assert!(!due_native_pinned_truncated);
+            assert_eq!(route_pin_quarantine.total_blocked, 0);
+            assert_eq!(route_pin_quarantine.newly_quarantined, 0);
+        }
+    }
+
+    let tenant_id = Uuid::new_v4();
+    let event_id = seed_owner_outbox_event(&pool, tenant_id).await?;
+    let pinned_route = route(tenant_id);
+    let native_claim = store
+        .claim_native_due(Uuid::new_v4(), 1, 120, &pinned_route)
+        .await?
+        .claims
+        .into_iter()
+        .find(|claim| claim.event_id == event_id)
+        .expect("the native route can pin this event before it becomes stale");
+    store
+        .get_or_pin_native_wire(&native_claim, &pinned_route)
+        .await?;
+    store
+        .record_failure(&native_claim, OutboxDeliveryFailureKind::Transient)
+        .await?;
+    make_retry_due(&pool, tenant_id, event_id).await?;
+
+    let current_route = route_for_endpoint(
+        tenant_id,
+        Uuid::new_v4(),
+        "jetstream-diagnostic-current-native-endpoint",
+    );
+    let publish_calls = Arc::new(AtomicUsize::new(0));
+    let publish_calls_from_callback = Arc::clone(&publish_calls);
+    let publisher = InfrastructureOwnerJetStreamPublisher::with_test_publish_hook(
+        store,
+        move |_subject, _message| {
+            publish_calls_from_callback.fetch_add(1, Ordering::SeqCst);
+            async { Ok(()) }
+        },
+    )
+    .with_native_route_snapshot(current_route);
+
+    let outcome = publisher
+        .publish_due_for_tenant(tenant_id, Uuid::new_v4(), 1, 120)
+        .await?;
+    assert_eq!(outcome.claimed, 0);
+    assert_eq!(outcome.delivered, 0);
+    assert_eq!(publish_calls.load(Ordering::SeqCst), 0);
+    match outcome.native_route_pin_diagnostics {
+        JetStreamNativeRoutePinDiagnosticState::Unavailable => {
+            panic!("the resolver-produced route snapshot enables diagnostics")
+        }
+        JetStreamNativeRoutePinDiagnosticState::Available {
+            due_native_pinned,
+            due_native_pinned_truncated,
+            route_pin_quarantine,
+        } => {
+            assert_eq!(due_native_pinned, 1);
+            assert!(!due_native_pinned_truncated);
+            assert_eq!(route_pin_quarantine.newly_quarantined, 1);
+            assert_eq!(route_pin_quarantine.total_blocked, 1);
+            assert!(route_pin_quarantine
+                .entries
+                .iter()
+                .any(|diagnostic| diagnostic.event_id == event_id));
+        }
+    }
+
+    let (delivery_state, provider_pin, receipt_count): (String, String, i64) = sqlx::query_as(
+        "SELECT d.delivery_state, p.transport_provider, \
+                (SELECT count(*) FROM infrastructure.capacity_native_append_receipt AS r \
+                  WHERE r.tenant_id = d.tenant_id AND r.event_id = d.event_id) \
+         FROM infrastructure.capacity_outbox_delivery AS d \
+         JOIN infrastructure.capacity_outbox_transport_pin AS p \
+           ON p.tenant_id = d.tenant_id AND p.event_id = d.event_id \
+         WHERE d.tenant_id = $1 AND d.event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(
+        delivery_state, "dead",
+        "stale native pins are durably quarantined"
+    );
+    assert_eq!(
+        provider_pin, "native-grpc",
+        "provider pins remain immutable"
+    );
+    assert_eq!(
+        receipt_count, 0,
+        "diagnostics do not manufacture native receipts"
+    );
     pool.close().await;
     Ok(())
 }

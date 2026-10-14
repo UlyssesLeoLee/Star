@@ -1,6 +1,6 @@
 //! PostgreSQL delivery state machine for immutable Infrastructure owner Outbox events.
 //!
-//! @cypher schema=1 source_sha256=3482baac85608bd06bc8da7a4fd772d9ae722f151e871d8b174f27a20b9cf906
+//! @cypher schema=1 source_sha256=468f523c1f558042c191bf295ba5dd11347c9a8043ee5548c48d900c6f0ec29e
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::infrastructure_owner_outbox_delivery",kind:"module"})
 //! MERGE (store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"struct"})
@@ -22,6 +22,8 @@
 //! MERGE (error:Type {id:"infrastructure::InfrastructureOwnerOutboxDeliveryError",kind:"enum"})
 //! MERGE (claim_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_due",kind:"method"})
 //! MERGE (claim_native_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
+//! MERGE (diagnose_native_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.diagnose_native_due",kind:"method"})
+//! MERGE (diagnose_route_pins:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::diagnose_native_route_pins_in_transaction",kind:"function"})
 //! MERGE (quarantine_page_read:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.native_route_pin_quarantine_page",kind:"method"})
 //! MERGE (load_quarantine_page:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::load_native_route_pin_quarantine_page",kind:"function"})
 //! MERGE (get_or_pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
@@ -52,6 +54,8 @@
 //! MERGE (self)-[:DEFINES]->(module)
 //! MERGE (module)-[:DEFINES]->(store)
 //! MERGE (module)-[:DEFINES]->(claim)
+//! MERGE (module)-[:DEFINES]->(diagnose_route_pins)
+//! MERGE (module)-[:DEFINES]->(load_quarantine_page)
 //! MERGE (module)-[:DEFINES]->(native_route)
 //! MERGE (module)-[:DEFINES]->(native_wire)
 //! MERGE (module)-[:DEFINES]->(quarantine_diagnostic)
@@ -67,6 +71,7 @@
 //! MERGE (module)-[:DEFINES]->(error)
 //! MERGE (store)-[:DEFINES]->(claim_due)
 //! MERGE (store)-[:DEFINES]->(claim_native_due)
+//! MERGE (store)-[:DEFINES]->(diagnose_native_due)
 //! MERGE (store)-[:DEFINES]->(quarantine_page_read)
 //! MERGE (store)-[:DEFINES]->(get_or_pin_wire)
 //! MERGE (store)-[:DEFINES]->(mark_delivered)
@@ -102,13 +107,29 @@
 //! MERGE (claim_native_due)-[:CALLS]->(set_scope)
 //! MERGE (claim_native_due)-[:CALLS]->(validate_route)
 //! MERGE (claim_native_due)-[:CALLS]->(route_tenant)
+//! MERGE (claim_native_due)-[:CALLS]->(diagnose_route_pins)
 //! MERGE (claim_native_due)-[:READS]->(delivery)
 //! MERGE (claim_native_due)-[:WRITES]->(delivery)
 //! MERGE (claim_native_due)-[:READS]->(outbox)
 //! MERGE (claim_native_due)-[:READS]->(route_pin)
-//! MERGE (claim_native_due)-[:WRITES]->(quarantine)
-//! MERGE (claim_native_due)-[:READS]->(quarantine)
 //! MERGE (claim_native_due)-[:RETURNS]->(claim_batch)
+//! MERGE (diagnose_native_due)-[:CALLS]->(set_scope)
+//! MERGE (diagnose_native_due)-[:CALLS]->(validate_route)
+//! MERGE (diagnose_native_due)-[:CALLS]->(route_tenant)
+//! MERGE (diagnose_native_due)-[:CALLS]->(diagnose_route_pins)
+//! MERGE (diagnose_native_due)-[:USES_TYPE]->(native_route)
+//! MERGE (diagnose_native_due)-[:USES_TYPE]->(pool)
+//! MERGE (diagnose_native_due)-[:RETURNS]->(quarantine_page)
+//! MERGE (diagnose_route_pins)-[:USES_TYPE]->(native_route)
+//! MERGE (diagnose_route_pins)-[:USES_TYPE]->(quarantine_page)
+//! MERGE (diagnose_route_pins)-[:CALLS]->(load_quarantine_page)
+//! MERGE (diagnose_route_pins)-[:READS]->(delivery)
+//! MERGE (diagnose_route_pins)-[:READS]->(route_pin)
+//! MERGE (diagnose_route_pins)-[:READS]->(append_receipt)
+//! MERGE (diagnose_route_pins)-[:READS]->(quarantine)
+//! MERGE (diagnose_route_pins)-[:WRITES]->(delivery)
+//! MERGE (diagnose_route_pins)-[:WRITES]->(quarantine)
+//! MERGE (diagnose_route_pins)-[:RETURNS]->(quarantine_page)
 //! MERGE (quarantine_page_read)-[:CALLS]->(set_scope)
 //! MERGE (quarantine_page_read)-[:CALLS]->(load_quarantine_page)
 //! MERGE (quarantine_page_read)-[:RETURNS]->(quarantine_page)
@@ -158,6 +179,8 @@ const MAX_NATIVE_BATCH_SIZE: i64 = 8;
 const MAX_NATIVE_ROUTE_PIN_QUARANTINE_BATCH: i64 = 64;
 #[cfg(feature = "native-grpc-adapter")]
 const MAX_NATIVE_ROUTE_PIN_DIAGNOSTIC_PAGE_SIZE: i64 = 32;
+#[cfg(feature = "native-grpc-adapter")]
+const MAX_NATIVE_PINNED_DUE_SAMPLE: i64 = 64;
 #[cfg(feature = "native-grpc-adapter")]
 const MIN_NATIVE_LEASE_SECONDS: i64 = 120;
 #[cfg(feature = "native-grpc-adapter")]
@@ -325,7 +348,6 @@ pub struct NativeInfrastructureDeliveryWire {
 }
 
 /// A bounded, non-secret description of one immutable native route-pin mismatch.
-#[cfg(feature = "native-grpc-adapter")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeRoutePinQuarantineDiagnostic {
     /// Immutable Infrastructure Outbox event identity.
@@ -341,7 +363,6 @@ pub struct NativeRoutePinQuarantineDiagnostic {
 }
 
 /// Stable cursor for bounded operator diagnostics; ordered by time then immutable event ID.
-#[cfg(feature = "native-grpc-adapter")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeRoutePinQuarantineCursor {
     /// Timestamp from the last returned diagnostic.
@@ -351,7 +372,6 @@ pub struct NativeRoutePinQuarantineCursor {
 }
 
 /// One tenant-scoped page of route-pin quarantine state.
-#[cfg(feature = "native-grpc-adapter")]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NativeRoutePinQuarantinePage {
     /// Total quarantined native route pins for the resolved tenant.
@@ -360,8 +380,12 @@ pub struct NativeRoutePinQuarantinePage {
     pub entries: Vec<NativeRoutePinQuarantineDiagnostic>,
     /// Cursor for the next page when more diagnostics remain.
     pub next_cursor: Option<NativeRoutePinQuarantineCursor>,
-    /// Number of new quarantine facts appended by the current claim pass.
+    /// Number of new quarantine facts appended by the current diagnostic pass.
     pub newly_quarantined: usize,
+    /// Number of due native-pinned rows observed, capped to a bounded sample.
+    pub due_native_pinned: usize,
+    /// Whether more due native-pinned rows exist beyond the bounded sample.
+    pub due_native_pinned_truncated: bool,
 }
 
 /// Native delivery claims together with route-pin operational state from the same owner transaction.
@@ -590,6 +614,29 @@ impl PostgresInfrastructureOwnerOutboxDelivery {
             .collect())
     }
 
+    /// Inspect due native-pinned work and durably quarantine stale route pins.
+    ///
+    /// This path does not lease or publish any event. The quarantine fact is append-only and
+    /// tenant scoped; it never rewrites the route pin or replaces an active lease or receipt.
+    #[cfg(feature = "native-grpc-adapter")]
+    pub async fn diagnose_native_due(
+        &self,
+        lease_owner_id: Uuid,
+        route: &NativeInfrastructureDeliveryRoute,
+    ) -> Result<NativeRoutePinQuarantinePage, InfrastructureOwnerOutboxDeliveryError> {
+        validate_native_route(route)?;
+        if lease_owner_id.is_nil() {
+            return Err(InfrastructureOwnerOutboxDeliveryError::InvalidParameters);
+        }
+
+        let mut tx = self.pool.begin().await?;
+        set_owner_scope(&mut tx, route.tenant_id()).await?;
+        let diagnostics =
+            diagnose_native_route_pins_in_transaction(&mut tx, route, lease_owner_id).await?;
+        tx.commit().await?;
+        Ok(diagnostics)
+    }
+
     /// Quarantine stale native route pins, lease due events, and return bounded diagnostics.
     ///
     /// The quarantine fact is append-only and tenant scoped. It never rewrites the route pin, never
@@ -616,102 +663,8 @@ impl PostgresInfrastructureOwnerOutboxDelivery {
 
         let mut tx = self.pool.begin().await?;
         set_owner_scope(&mut tx, tenant_id).await?;
-        let quarantined_event_ids = sqlx::query_scalar::<_, Uuid>(
-            r#"WITH stale AS (
-                   SELECT d.tenant_id, d.event_id
-                     FROM infrastructure.capacity_outbox_delivery AS d
-                     JOIN infrastructure.capacity_outbox_transport_pin AS pinned
-                       ON pinned.tenant_id = d.tenant_id AND pinned.event_id = d.event_id
-                    WHERE d.tenant_id = $1
-                      AND pinned.transport_provider = 'native-grpc'
-                      AND (pinned.profile_id IS DISTINCT FROM $3
-                           OR pinned.profile_revision IS DISTINCT FROM $4
-                           OR pinned.provider_id IS DISTINCT FROM $5
-                           OR pinned.provider_version IS DISTINCT FROM $6
-                           OR pinned.profile_digest IS DISTINCT FROM $7
-                           OR pinned.endpoint_identity IS DISTINCT FROM $8
-                           OR pinned.sender_service_id IS DISTINCT FROM $9
-                           OR pinned.recipient_service_id IS DISTINCT FROM $10)
-                      AND (d.delivery_state IN ('pending','retry','dead')
-                           OR (d.delivery_state = 'leased'
-                               AND d.lease_expires_at <= clock_timestamp()))
-                      AND NOT EXISTS (
-                           SELECT 1
-                             FROM infrastructure.capacity_native_route_pin_quarantine AS q
-                            WHERE q.tenant_id = d.tenant_id AND q.event_id = d.event_id)
-                      AND NOT EXISTS (
-                           SELECT 1
-                             FROM infrastructure.capacity_native_append_receipt AS receipt
-                            WHERE receipt.tenant_id = d.tenant_id AND receipt.event_id = d.event_id)
-                    ORDER BY d.updated_at, d.event_id
-                    LIMIT $2
-                    FOR UPDATE OF d SKIP LOCKED
-               )
-               INSERT INTO infrastructure.capacity_native_route_pin_quarantine (
-                   tenant_id, event_id, observed_profile_id, observed_profile_revision,
-                   observed_provider_id, observed_provider_version, observed_profile_digest,
-                   observed_endpoint_identity, observed_sender_service_id,
-                   observed_recipient_service_id, mismatch_fields)
-               SELECT pinned.tenant_id, pinned.event_id, $3, $4, $5, $6, $7, $8, $9, $10,
-                      ARRAY_REMOVE(ARRAY[
-                          CASE WHEN pinned.profile_id IS DISTINCT FROM $3 THEN 'profile_id' END,
-                          CASE WHEN pinned.profile_revision IS DISTINCT FROM $4 THEN 'profile_revision' END,
-                          CASE WHEN pinned.provider_id IS DISTINCT FROM $5 THEN 'provider_id' END,
-                          CASE WHEN pinned.provider_version IS DISTINCT FROM $6 THEN 'provider_version' END,
-                          CASE WHEN pinned.profile_digest IS DISTINCT FROM $7 THEN 'profile_digest' END,
-                          CASE WHEN pinned.endpoint_identity IS DISTINCT FROM $8 THEN 'endpoint_identity' END,
-                          CASE WHEN pinned.sender_service_id IS DISTINCT FROM $9 THEN 'sender_service_id' END,
-                          CASE WHEN pinned.recipient_service_id IS DISTINCT FROM $10 THEN 'recipient_service_id' END
-                      ]::TEXT[], NULL::TEXT)
-                 FROM stale
-                 JOIN infrastructure.capacity_outbox_transport_pin AS pinned
-                   ON pinned.tenant_id = stale.tenant_id AND pinned.event_id = stale.event_id
-               ON CONFLICT (tenant_id, event_id) DO NOTHING
-               RETURNING event_id"#,
-        )
-        .bind(tenant_id)
-        .bind(MAX_NATIVE_ROUTE_PIN_QUARANTINE_BATCH)
-        .bind(route.profile_id)
-        .bind(route.profile_revision)
-        .bind(&route.profile.provider_id)
-        .bind(&route.profile.provider_version)
-        .bind(route.profile.profile_digest.to_vec())
-        .bind(&route.profile.endpoint_identity)
-        .bind(route.sender_service_id)
-        .bind(route.recipient_service_id)
-        .fetch_all(&mut *tx)
-        .await?;
-
-        if !quarantined_event_ids.is_empty() {
-            sqlx::query(
-                "UPDATE infrastructure.capacity_outbox_delivery \
-                 SET delivery_state = 'leased', lease_owner_id = $3, \
-                     lease_expires_at = clock_timestamp() + interval '5 seconds', \
-                     updated_at = clock_timestamp() \
-                 WHERE tenant_id = $1 AND event_id = ANY($2) \
-                   AND delivery_state IN ('pending','retry')",
-            )
-            .bind(tenant_id)
-            .bind(&quarantined_event_ids)
-            .bind(lease_owner_id)
-            .execute(&mut *tx)
-            .await?;
-            sqlx::query(
-                "UPDATE infrastructure.capacity_outbox_delivery \
-                 SET delivery_state = 'dead', lease_owner_id = NULL, lease_expires_at = NULL, \
-                     terminal_at = clock_timestamp(), \
-                     retention_expires_at = clock_timestamp() + interval '24 hours', \
-                     updated_at = clock_timestamp() \
-                 WHERE tenant_id = $1 AND event_id = ANY($2) \
-                   AND delivery_state = 'leased' \
-                   AND (lease_owner_id = $3 OR lease_expires_at <= clock_timestamp())",
-            )
-            .bind(tenant_id)
-            .bind(&quarantined_event_ids)
-            .bind(lease_owner_id)
-            .execute(&mut *tx)
-            .await?;
-        }
+        let route_pin_quarantine =
+            diagnose_native_route_pins_in_transaction(&mut tx, route, lease_owner_id).await?;
 
         sqlx::query(
             r#"WITH exhausted AS (
@@ -837,14 +790,6 @@ impl PostgresInfrastructureOwnerOutboxDelivery {
         .bind(route.recipient_service_id)
         .fetch_all(&mut *tx)
         .await?;
-        let mut route_pin_quarantine = load_native_route_pin_quarantine_page(
-            &mut tx,
-            tenant_id,
-            None,
-            max_items.min(MAX_NATIVE_ROUTE_PIN_DIAGNOSTIC_PAGE_SIZE),
-        )
-        .await?;
-        route_pin_quarantine.newly_quarantined = quarantined_event_ids.len();
         tx.commit().await?;
 
         Ok(NativeInfrastructureDeliveryClaimBatch {
@@ -1222,6 +1167,147 @@ async fn set_owner_scope(
 }
 
 #[cfg(feature = "native-grpc-adapter")]
+async fn diagnose_native_route_pins_in_transaction(
+    tx: &mut Transaction<'_, Postgres>,
+    route: &NativeInfrastructureDeliveryRoute,
+    lease_owner_id: Uuid,
+) -> Result<NativeRoutePinQuarantinePage, InfrastructureOwnerOutboxDeliveryError> {
+    let tenant_id = route.tenant_id();
+    let observed_due_native_pins = sqlx::query_scalar::<_, Uuid>(
+        r#"SELECT d.event_id
+             FROM infrastructure.capacity_outbox_delivery AS d
+             JOIN infrastructure.capacity_outbox_transport_pin AS pinned
+               ON pinned.tenant_id = d.tenant_id AND pinned.event_id = d.event_id
+            WHERE d.tenant_id = $1
+              AND pinned.transport_provider = 'native-grpc'
+              AND ((d.delivery_state IN ('pending','retry')
+                    AND d.next_attempt_at <= clock_timestamp())
+                OR (d.delivery_state = 'leased'
+                    AND d.lease_expires_at <= clock_timestamp()))
+            ORDER BY CASE WHEN d.delivery_state = 'leased'
+                          THEN d.lease_expires_at ELSE d.next_attempt_at END,
+                     d.event_id
+            LIMIT $2"#,
+    )
+    .bind(tenant_id)
+    .bind(MAX_NATIVE_PINNED_DUE_SAMPLE + 1)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    let quarantined_event_ids = sqlx::query_scalar::<_, Uuid>(
+        r#"WITH stale AS (
+               SELECT d.tenant_id, d.event_id
+                 FROM infrastructure.capacity_outbox_delivery AS d
+                 JOIN infrastructure.capacity_outbox_transport_pin AS pinned
+                   ON pinned.tenant_id = d.tenant_id AND pinned.event_id = d.event_id
+                WHERE d.tenant_id = $1
+                  AND pinned.transport_provider = 'native-grpc'
+                  AND (pinned.profile_id IS DISTINCT FROM $3
+                       OR pinned.profile_revision IS DISTINCT FROM $4
+                       OR pinned.provider_id IS DISTINCT FROM $5
+                       OR pinned.provider_version IS DISTINCT FROM $6
+                       OR pinned.profile_digest IS DISTINCT FROM $7
+                       OR pinned.endpoint_identity IS DISTINCT FROM $8
+                       OR pinned.sender_service_id IS DISTINCT FROM $9
+                       OR pinned.recipient_service_id IS DISTINCT FROM $10)
+                  AND (d.delivery_state IN ('pending','retry','dead')
+                       OR (d.delivery_state = 'leased'
+                           AND d.lease_expires_at <= clock_timestamp()))
+                  AND NOT EXISTS (
+                       SELECT 1
+                         FROM infrastructure.capacity_native_route_pin_quarantine AS q
+                        WHERE q.tenant_id = d.tenant_id AND q.event_id = d.event_id)
+                  AND NOT EXISTS (
+                       SELECT 1
+                         FROM infrastructure.capacity_native_append_receipt AS receipt
+                        WHERE receipt.tenant_id = d.tenant_id AND receipt.event_id = d.event_id)
+                ORDER BY d.updated_at, d.event_id
+                LIMIT $2
+                FOR UPDATE OF d SKIP LOCKED
+           )
+           INSERT INTO infrastructure.capacity_native_route_pin_quarantine (
+               tenant_id, event_id, observed_profile_id, observed_profile_revision,
+               observed_provider_id, observed_provider_version, observed_profile_digest,
+               observed_endpoint_identity, observed_sender_service_id,
+               observed_recipient_service_id, mismatch_fields)
+           SELECT pinned.tenant_id, pinned.event_id, $3, $4, $5, $6, $7, $8, $9, $10,
+                  ARRAY_REMOVE(ARRAY[
+                      CASE WHEN pinned.profile_id IS DISTINCT FROM $3 THEN 'profile_id' END,
+                      CASE WHEN pinned.profile_revision IS DISTINCT FROM $4 THEN 'profile_revision' END,
+                      CASE WHEN pinned.provider_id IS DISTINCT FROM $5 THEN 'provider_id' END,
+                      CASE WHEN pinned.provider_version IS DISTINCT FROM $6 THEN 'provider_version' END,
+                      CASE WHEN pinned.profile_digest IS DISTINCT FROM $7 THEN 'profile_digest' END,
+                      CASE WHEN pinned.endpoint_identity IS DISTINCT FROM $8 THEN 'endpoint_identity' END,
+                      CASE WHEN pinned.sender_service_id IS DISTINCT FROM $9 THEN 'sender_service_id' END,
+                      CASE WHEN pinned.recipient_service_id IS DISTINCT FROM $10 THEN 'recipient_service_id' END
+                  ]::TEXT[], NULL::TEXT)
+             FROM stale
+             JOIN infrastructure.capacity_outbox_transport_pin AS pinned
+               ON pinned.tenant_id = stale.tenant_id AND pinned.event_id = stale.event_id
+           ON CONFLICT (tenant_id, event_id) DO NOTHING
+           RETURNING event_id"#,
+    )
+    .bind(tenant_id)
+    .bind(MAX_NATIVE_ROUTE_PIN_QUARANTINE_BATCH)
+    .bind(route.profile_id)
+    .bind(route.profile_revision)
+    .bind(&route.profile.provider_id)
+    .bind(&route.profile.provider_version)
+    .bind(route.profile.profile_digest.to_vec())
+    .bind(&route.profile.endpoint_identity)
+    .bind(route.sender_service_id)
+    .bind(route.recipient_service_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    if !quarantined_event_ids.is_empty() {
+        sqlx::query(
+            "UPDATE infrastructure.capacity_outbox_delivery \
+             SET delivery_state = 'leased', lease_owner_id = $3, \
+                 lease_expires_at = clock_timestamp() + interval '5 seconds', \
+                 updated_at = clock_timestamp() \
+             WHERE tenant_id = $1 AND event_id = ANY($2) \
+               AND delivery_state IN ('pending','retry')",
+        )
+        .bind(tenant_id)
+        .bind(&quarantined_event_ids)
+        .bind(lease_owner_id)
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query(
+            "UPDATE infrastructure.capacity_outbox_delivery \
+             SET delivery_state = 'dead', lease_owner_id = NULL, lease_expires_at = NULL, \
+                 terminal_at = clock_timestamp(), \
+                 retention_expires_at = clock_timestamp() + interval '24 hours', \
+                 updated_at = clock_timestamp() \
+             WHERE tenant_id = $1 AND event_id = ANY($2) \
+               AND delivery_state = 'leased' \
+               AND (lease_owner_id = $3 OR lease_expires_at <= clock_timestamp())",
+        )
+        .bind(tenant_id)
+        .bind(&quarantined_event_ids)
+        .bind(lease_owner_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    let mut page = load_native_route_pin_quarantine_page(
+        tx,
+        tenant_id,
+        None,
+        MAX_NATIVE_ROUTE_PIN_DIAGNOSTIC_PAGE_SIZE,
+    )
+    .await?;
+    page.newly_quarantined = quarantined_event_ids.len();
+    page.due_native_pinned = observed_due_native_pins
+        .len()
+        .min(MAX_NATIVE_PINNED_DUE_SAMPLE as usize);
+    page.due_native_pinned_truncated =
+        observed_due_native_pins.len() > MAX_NATIVE_PINNED_DUE_SAMPLE as usize;
+    Ok(page)
+}
+
+#[cfg(feature = "native-grpc-adapter")]
 async fn load_native_route_pin_quarantine_page(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
@@ -1288,6 +1374,8 @@ async fn load_native_route_pin_quarantine_page(
         entries: std::mem::take(&mut entries),
         next_cursor,
         newly_quarantined: 0,
+        due_native_pinned: 0,
+        due_native_pinned_truncated: false,
     })
 }
 
