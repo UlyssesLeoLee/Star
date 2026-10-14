@@ -82,6 +82,7 @@ Native server 的 tenant 来自 mTLS certificate identity，随后只在该身�
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.3 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 quarantine migration/primary native claim bounded diagnostics 的 merge 与切片验证；P2 仍开放，不宣称全量 20/20 或生产验收 | Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 合并 dev |
 | v0.2 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 P2 recommendation 收敛为跨 provider bounded observability、append-only blocked evidence、原 route 恢复和 owner-governed terminal disposition 合同；状态仍为未实现/生产阻断，未添加测试或运行证据 | D20 P2 docs lane 根据当前 source/review 证据补齐处置合同 |
 | v0.1 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 独立审查 D20 native exact append/publisher；记录 tenant-route P1 与 pinned-route 可观测性 P2，并说明未做 migration/runtime 验证 | 用户要求并行 Worktree lane 审查 D20 publisher |
 
@@ -91,6 +92,16 @@ Native server 的 tenant 来自 mTLS certificate identity，随后只在该身�
 |---|---|---|
 | P1 tenant-route mismatch | 已修复 | `8506766e` 将 deployment、tenant、Profile ID/revision 和 endpoint identity 绑定到 resolver-produced `ResolvedTransportEndpoint`；publisher 仅接收与该 snapshot 匹配的 `NativeGrpcAppendTransport`，claim 不再接受调用者单独指定 tenant。跨租户错配负例通过，Infrastructure library tests 76/76 通过。 |
 | PostgreSQL owner-store acceptance | 已验证，范围受限 | 随后的 disposable PostgreSQL 18.6 runner 为 93/93，owner-store SQLx test 为 1/1；验证 migration 双次应用、RLS/WORM、attempt fence 与 receipt/delivery 原子性。该测试使用 resolver/profile fixture 和合成 receipt，不调用 publisher 或 native server；详见 [PG 验收报告](PHASE-9F4C-D20-NATIVE-PUBLISHER-PG-REPORT.md)。 |
-| P2 stale route-pin observability | 基线未修复；production wiring blocker。目标合同已在本次 docs lane 明确，implementation lane 尚待复验 | 当前 native claim 会过滤与当前 route 不匹配的旧 pin；只有调用 native publisher 才能看到其零 claim，而 JetStream 会安全跳过 native-pinned event 且没有 operator-visible cross-provider status。star-api-rest 当前没有 Infrastructure operator route/scope；且 requested scope token 不能替代已验证的 client/user role provisioning。目标为新增可信 operator identity、verified user membership or registered client/service-identity tenant-binding resolver、分离的 least-privilege read/recover/dispose capabilities 与 owner-authorized idempotent append-only blocked 状态；只有原 route 恢复并重新授权后允许 same-route exact-wire retry。无法恢复必须由明确 terminal disposition 结束旧事件，不能标 delivered 或 retarget；新业务结果使用新 event identity/new immutable pin。即使 quarantine table/RLS read seam 已新增，也需 cross-provider diagnostics 和 authorized operator surface 验收。本次文档更新不是实现或运行证据。 |
+| P2 stale route-pin observability | 部分实现；P2 与 production gate 仍开放 | Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 adds the third tenant Transaction table and bounded quarantine diagnostics to the primary native claim outcome. Rust 1.99 cargo check --tests、Infrastructure library 76/76、PostgreSQL 18.6 runner audit 95/95 (quarantine migration applied twice)、SQLx owner-store 1/1、formatting、Guardian 与 diff checks passed. 这不是完整 20/20 migration gate 或 production target 部署。诊断只在 native claim/publisher 执行时产生；JetStream 仍无 cross-provider detection。star-api-rest 没有经 verified role provisioning/tenant resolver 授权的 Infrastructure operator API/UI；recovery command 和 terminal disposition 也未实现。即使原 route 恢复后，也只允许重新授权后按 same-route exact-wire retry；无法恢复时必须明确 terminal disposition，不能标 delivered 或 retarget，新业务结果使用新 event identity/new immutable pin。 |
 
 本 addendum 只更新 finding disposition；不扩大原审查范围。目标数据库部署、真实 native append/TLS/revocation、production Profile resolver/startup、BI/Benchmark、recovery、资源与 NATS rollback 仍未验收。CodeRabbit 因 CLI 权限问题未运行成功，不记为独立 clean review。
+
+## §9 Route-pin quarantine implementation follow-on (2026-10-14)
+
+Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 adds the tenant-scoped append-only route-pin quarantine table and bounded quarantine page to the primary native claim result; the publisher exposes that page in its batch outcome. The prior legacy claim wrapper could have discarded diagnostics into an empty claim list; the final commit returns a claim batch and the publisher consumes both fields. JetStream cross-provider detection remains absent: it can skip a native-pinned event without surfacing a mismatch.
+
+The migration adds D20's third tenant-scoped Transaction table. Infrastructure-owner authoring classification is 20 tables = 4 W / 10 T / 6 M; this does not update the historical whole-repository 100-table index or assert a comprehensive live-schema review.
+
+Final slice evidence reported for this commit: Rust 1.99 cargo check --tests passed; Infrastructure library tests 76/76 passed; PostgreSQL 18.6 runner audit 95/95 passed with the quarantine migration applied twice; SQLx owner-store test 1/1 passed; formatting, Guardian and diff checks passed. CodeRabbit was unavailable due to Permission denied. These checks are slice evidence, not a comprehensive 20/20 cumulative migration gate or production target deployment.
+
+P2 remains open. There is no authenticated Infrastructure operator API/UI with verified permission provisioning and tenant resolution, no safe recovery command or owner-authorized terminal disposition, and no production migration/identity/startup wiring, BI/Benchmark parity, or performance evidence. No NATS cutover or Schedule/Run execution is enabled.
