@@ -1,4 +1,4 @@
-// @cypher schema=1 source_sha256=8f19856368209c161af5db177be341a3eda05c14880ec087a793723f1050aeff
+// @cypher schema=1 source_sha256=7333460776de9496cd167d62ddca7dd20ddbd5ae3bfc703b0422bafbbe35a27f
 // MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs"})
 // MERGE (publisher:Type {id:"infrastructure::InfrastructureOwnerNativeResultPublisher",kind:"struct"})
 // MERGE (outcome:Type {id:"infrastructure::NativeResultPublishBatchOutcome",kind:"struct"})
@@ -11,10 +11,27 @@
 // MERGE (count_retry:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::count_retry_or_dead",kind:"function"})
 // MERGE (store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"external_type"})
 // MERGE (route:Type {id:"infrastructure::NativeInfrastructureDeliveryRoute",kind:"external_type"})
+// MERGE (endpoint:Type {id:"platform_messaging_runtime::transport_endpoint::ResolvedTransportEndpoint",kind:"external_type"})
+// MERGE (route_tenant:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::NativeInfrastructureDeliveryRoute.tenant_id",kind:"method"})
+// MERGE (route_deployment:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::NativeInfrastructureDeliveryRoute.deployment_id",kind:"method"})
+// MERGE (route_profile:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::NativeInfrastructureDeliveryRoute.profile",kind:"method"})
+// MERGE (route_recipient:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::NativeInfrastructureDeliveryRoute.recipient_service_id",kind:"method"})
+// MERGE (route_test_profile_binding:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::NativeInfrastructureDeliveryRoute.from_resolved_profile_for_test",kind:"method"})
+// MERGE (route_new:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::NativeInfrastructureDeliveryRoute.from_resolved_endpoint",kind:"method"})
 // MERGE (native_append_file:File {path:"crates/platform-messaging-runtime/src/native_append.rs"})
-// MERGE (transport:Type {id:"platform_messaging_runtime::native_append::NativeAppendTransport",kind:"external_type"})
+// MERGE (native_grpc_file:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
+// MERGE (admission_delivery_file:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
+// MERGE (transport_endpoint_file:File {path:"crates/platform-messaging-runtime/src/transport_endpoint.rs"})
+// MERGE (transport_profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
+// MERGE (transport:Type {id:"platform_messaging_runtime::native_grpc::NativeGrpcAppendTransport",kind:"external_type"})
 // MERGE (append_result:Symbol {id:"crates/platform-messaging-runtime/src/native_append.rs::NativeAppendTransport.append_result",kind:"method"})
 // MERGE (transport_profile:Symbol {id:"crates/platform-messaging-runtime/src/native_append.rs::NativeAppendTransport.profile",kind:"method"})
+// MERGE (endpoint_resolve:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointResolver.resolve",kind:"method"})
+// MERGE (endpoint_resolver_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointResolver.new",kind:"method"})
+// MERGE (endpoint_config_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointConfig.new",kind:"method"})
+// MERGE (profile_revision_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileRevision.new",kind:"method"})
+// MERGE (profile_definition_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileDefinition.new",kind:"method"})
+// MERGE (admission_profile_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportProfile.new",kind:"method"})
 // MERGE (receipt:Type {id:"platform_messaging_runtime::native_append::NativeAppendReceipt",kind:"external_type"})
 // MERGE (claim_native:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
 // MERGE (pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
@@ -26,6 +43,10 @@
 // MERGE (append_receipt:Table {id:"infrastructure.capacity_native_append_receipt",class:"Transaction"})
 // MERGE (test_profile:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::tests::receipt_must_match_exact_profile_wire_and_log_identity",kind:"test"})
 // MERGE (test_log:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::tests::receipt_rejects_profile_and_log_id_mismatch",kind:"test"})
+// MERGE (test_tenant_route:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::tests::route_rejects_transport_profile_from_another_tenant_before_claim_or_append",kind:"test"})
+// MERGE (test_endpoint:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::tests::endpoint",kind:"function"})
+// MERGE (test_profile_for_endpoint:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::tests::profile_for_endpoint",kind:"function"})
+// MERGE (test_route:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::tests::route",kind:"function"})
 // MERGE (self)-[:DEFINES]->(publisher)
 // MERGE (self)-[:DEFINES]->(outcome)
 // MERGE (self)-[:DEFINES]->(error)
@@ -35,6 +56,10 @@
 // MERGE (self)-[:DEFINES]->(wait_cancel)
 // MERGE (self)-[:DEFINES]->(test_profile)
 // MERGE (self)-[:DEFINES]->(test_log)
+// MERGE (self)-[:DEFINES]->(test_tenant_route)
+// MERGE (self)-[:DEFINES]->(test_endpoint)
+// MERGE (self)-[:DEFINES]->(test_profile_for_endpoint)
+// MERGE (self)-[:DEFINES]->(test_route)
 // MERGE (publisher)-[:DEFINES]->(new)
 // MERGE (publisher)-[:DEFINES]->(publish)
 // MERGE (publisher)-[:USES_TYPE]->(store)
@@ -42,11 +67,17 @@
 // MERGE (publisher)-[:USES_TYPE]->(transport)
 // MERGE (new)-[:USES_TYPE]->(route)
 // MERGE (new)-[:USES_TYPE]->(transport)
+// MERGE (new)-[:USES_TYPE]->(endpoint)
+// MERGE (new)-[:CALLS]->(route_new)
 // MERGE (self)-[:DEPENDS_ON]->(native_append_file)
+// MERGE (self)-[:DEPENDS_ON]->(native_grpc_file)
+// MERGE (self)-[:IMPORTS]->(admission_delivery_file)
+// MERGE (self)-[:IMPORTS]->(transport_endpoint_file)
+// MERGE (self)-[:IMPORTS]->(transport_profile_file)
 // MERGE (native_append_file)-[:DEFINES]->(append_result)
 // MERGE (native_append_file)-[:DEFINES]->(transport_profile)
-// MERGE (new)-[:CALLS]->(transport_profile)
 // MERGE (publish)-[:CALLS]->(claim_native)
+// MERGE (publish)-[:CALLS]->(route_recipient)
 // MERGE (publish)-[:CALLS]->(pin_wire)
 // MERGE (publish)-[:CALLS]->(append_result)
 // MERGE (publish)-[:CALLS]->(record_failure)
@@ -70,13 +101,33 @@
 // MERGE (test_log)-[:TESTS]->(valid_receipt)
 // MERGE (publish)-[:EMITS]->(native_result:Topic {id:"platform.native.result.append",kind:"topic"})
 // MERGE (valid_receipt)-[:USES_TYPE]->(receipt)
+// MERGE (test_tenant_route)-[:TESTS]->(route_tenant)
+// MERGE (test_tenant_route)-[:TESTS]->(route_deployment)
+// MERGE (test_tenant_route)-[:TESTS]->(route_profile)
+// MERGE (test_tenant_route)-[:CALLS]->(test_endpoint)
+// MERGE (test_tenant_route)-[:CALLS]->(test_profile_for_endpoint)
+// MERGE (test_tenant_route)-[:CALLS]->(route_test_profile_binding)
+// MERGE (test_route)-[:CALLS]->(test_endpoint)
+// MERGE (test_route)-[:CALLS]->(test_profile_for_endpoint)
+// MERGE (test_route)-[:CALLS]->(route_test_profile_binding)
+// MERGE (test_profile)-[:CALLS]->(test_route)
+// MERGE (test_log)-[:CALLS]->(test_route)
+// MERGE (test_endpoint)-[:CALLS]->(profile_definition_new)
+// MERGE (test_endpoint)-[:CALLS]->(profile_revision_new)
+// MERGE (test_endpoint)-[:CALLS]->(endpoint_config_new)
+// MERGE (test_endpoint)-[:CALLS]->(endpoint_resolver_new)
+// MERGE (test_endpoint)-[:CALLS]->(endpoint_resolve)
+// MERGE (test_profile_for_endpoint)-[:CALLS]->(admission_profile_new)
+// MERGE (valid_receipt)-[:CALLS]->(route_profile)
 // @endcypher
 //! Explicitly driven, bounded Infrastructure publisher for exact native capacity-result appends.
 
 use std::time::Duration;
 
-use platform_messaging_runtime::native_append::{
-    NativeAppendError, NativeAppendReceipt, NativeAppendTransport,
+use platform_messaging_runtime::{
+    native_append::{NativeAppendError, NativeAppendReceipt, NativeAppendTransport},
+    native_grpc::NativeGrpcAppendTransport,
+    transport_endpoint::ResolvedTransportEndpoint,
 };
 use thiserror::Error;
 use tokio::sync::watch;
@@ -113,31 +164,33 @@ pub struct NativeResultPublishBatchOutcome {
 /// Errors from native route setup or the Infrastructure owner delivery store.
 #[derive(Debug, Error)]
 pub enum NativeResultPublisherError {
-    /// The selected native client and trusted route do not describe the same profile.
-    #[error("native result transport profile does not match the trusted route")]
-    ProfileMismatch,
     /// The Infrastructure owner store rejected a lease, route pin, receipt, or transaction.
     #[error(transparent)]
     DeliveryStore(#[from] InfrastructureOwnerOutboxDeliveryError),
 }
 
 /// Owner-local native publisher with no background task, tenant discovery, or NATS fallback.
-pub struct InfrastructureOwnerNativeResultPublisher<T> {
+pub struct InfrastructureOwnerNativeResultPublisher {
     delivery_store: PostgresInfrastructureOwnerOutboxDelivery,
-    transport: T,
+    transport: NativeGrpcAppendTransport,
     route: NativeInfrastructureDeliveryRoute,
 }
 
-impl<T: NativeAppendTransport> InfrastructureOwnerNativeResultPublisher<T> {
-    /// Construct from an already authenticated client and a trusted, immutable route snapshot.
+impl InfrastructureOwnerNativeResultPublisher {
+    /// Construct from an already authenticated client and its trusted, immutable route snapshot.
     pub fn new(
         delivery_store: PostgresInfrastructureOwnerOutboxDelivery,
-        transport: T,
-        route: NativeInfrastructureDeliveryRoute,
+        transport: NativeGrpcAppendTransport,
+        endpoint: &ResolvedTransportEndpoint,
+        sender_service_id: Uuid,
+        recipient_service_id: Uuid,
     ) -> Result<Self, NativeResultPublisherError> {
-        if transport.profile() != &route.profile {
-            return Err(NativeResultPublisherError::ProfileMismatch);
-        }
+        let route = NativeInfrastructureDeliveryRoute::from_resolved_endpoint(
+            endpoint,
+            &transport,
+            sender_service_id,
+            recipient_service_id,
+        )?;
         Ok(Self {
             delivery_store,
             transport,
@@ -145,21 +198,21 @@ impl<T: NativeAppendTransport> InfrastructureOwnerNativeResultPublisher<T> {
         })
     }
 
-    /// Claim, pin, append, and persist receipts for one bounded tenant batch.
+    /// Claim, pin, append, and persist receipts for one bounded route-bound tenant batch.
     ///
     /// The exact route and bytes are persisted before any external append. A timeout or
     /// cancellation is ambiguous and therefore retries only the same event ID and bytes on the
-    /// same profile. NATS is never selected as a fallback after a native route is pinned.
+    /// same profile. The database tenant scope is derived from the route's resolved endpoint;
+    /// callers cannot supply a separate tenant. NATS is never selected as a fallback after a
+    /// native route is pinned.
     pub async fn publish_due_for_tenant(
         &self,
-        tenant_id: Uuid,
         lease_owner_id: Uuid,
         max_items: i64,
         lease_seconds: i64,
         cancellation: &mut watch::Receiver<bool>,
     ) -> Result<NativeResultPublishBatchOutcome, NativeResultPublisherError> {
-        if tenant_id.is_nil()
-            || lease_owner_id.is_nil()
+        if lease_owner_id.is_nil()
             || !(1..=MAX_NATIVE_PUBLISH_BATCH_SIZE).contains(&max_items)
             || !(MIN_NATIVE_PUBLISH_LEASE_SECONDS..=MAX_NATIVE_PUBLISH_LEASE_SECONDS)
                 .contains(&lease_seconds)
@@ -168,13 +221,7 @@ impl<T: NativeAppendTransport> InfrastructureOwnerNativeResultPublisher<T> {
         }
         let claims = self
             .delivery_store
-            .claim_native_due(
-                tenant_id,
-                lease_owner_id,
-                max_items,
-                lease_seconds,
-                &self.route,
-            )
+            .claim_native_due(lease_owner_id, max_items, lease_seconds, &self.route)
             .await?;
         let mut outcome = NativeResultPublishBatchOutcome {
             claimed: claims.len(),
@@ -213,7 +260,7 @@ impl<T: NativeAppendTransport> InfrastructureOwnerNativeResultPublisher<T> {
                 response = tokio::time::timeout(
                     NATIVE_APPEND_DEADLINE,
                     self.transport.append_result(
-                        self.route.recipient_service_id,
+                        self.route.recipient_service_id(),
                         claim.event_id,
                         &pinned_wire.payload,
                     ),
@@ -287,7 +334,7 @@ fn valid_native_receipt(
     route: &NativeInfrastructureDeliveryRoute,
     expected_sha256: &[u8; 32],
 ) -> bool {
-    receipt.profile == route.profile
+    receipt.profile == *route.profile()
         && receipt.wire_sha256 == *expected_sha256
         && !receipt.log_id.is_empty()
         && receipt.log_id.len() <= 128
@@ -315,22 +362,103 @@ async fn wait_for_cancellation(cancellation: &mut watch::Receiver<bool>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use platform_messaging_runtime::admission_delivery::AdmissionTransportProfile;
+    use platform_messaging_runtime::{
+        admission_delivery::AdmissionTransportProfile,
+        transport_endpoint::{TrustedEndpointConfig, TrustedEndpointResolver},
+        transport_profile::{
+            TransportMessageKind, TransportProfileDefinition, TransportProfileLifecycle,
+            TransportProfileRevision,
+        },
+    };
+
+    fn endpoint(
+        tenant_id: Uuid,
+        profile_id: Uuid,
+    ) -> platform_messaging_runtime::transport_endpoint::ResolvedTransportEndpoint {
+        let deployment_id = Uuid::from_u128(100);
+        let endpoint_identity = "native-endpoint";
+        let definition = TransportProfileDefinition::new(
+            "star-rust-log".to_owned(),
+            "1.0.0".to_owned(),
+            endpoint_identity.to_owned(),
+            "provider-log-generation-v1".to_owned(),
+            vec![Uuid::from_u128(2)],
+            vec![Uuid::from_u128(3)],
+            vec![TransportMessageKind::Result],
+            None,
+        )
+        .expect("valid profile definition");
+        let revision = TransportProfileRevision::new(
+            deployment_id,
+            tenant_id,
+            profile_id,
+            3,
+            TransportProfileLifecycle::Active,
+            definition,
+        )
+        .expect("valid immutable profile revision");
+        let endpoint_config = TrustedEndpointConfig::new(
+            endpoint_identity.to_owned(),
+            "https://transport.internal.example:7443/grpc/v1".to_owned(),
+            "transport.internal.example".to_owned(),
+        )
+        .expect("valid trusted endpoint config");
+        TrustedEndpointResolver::new(deployment_id, vec![endpoint_config])
+            .expect("valid trusted endpoint resolver")
+            .resolve(&revision)
+            .expect("profile resolves to trusted endpoint")
+    }
+
+    fn profile_for_endpoint(
+        endpoint: &platform_messaging_runtime::transport_endpoint::ResolvedTransportEndpoint,
+    ) -> AdmissionTransportProfile {
+        AdmissionTransportProfile::new(
+            "star-rust-log".to_owned(),
+            "1.0.0".to_owned(),
+            endpoint.profile_digest(),
+            endpoint.endpoint_identity().to_owned(),
+        )
+        .expect("valid transport profile")
+    }
 
     fn route() -> NativeInfrastructureDeliveryRoute {
-        NativeInfrastructureDeliveryRoute {
-            profile_id: Uuid::from_u128(1),
-            profile_revision: 3,
-            profile: AdmissionTransportProfile::new(
-                "star-rust-log".to_owned(),
-                "1.0.0".to_owned(),
-                [7; 32],
-                "local-star-rust-log".to_owned(),
-            )
-            .expect("valid trusted profile"),
-            sender_service_id: Uuid::from_u128(2),
-            recipient_service_id: Uuid::from_u128(3),
-        }
+        let endpoint = endpoint(Uuid::from_u128(41), Uuid::from_u128(1));
+        NativeInfrastructureDeliveryRoute::from_resolved_profile_for_test(
+            &endpoint,
+            profile_for_endpoint(&endpoint),
+            Uuid::from_u128(2),
+            Uuid::from_u128(3),
+        )
+        .expect("route binds the trusted endpoint tenant and profile")
+    }
+
+    #[test]
+    fn route_rejects_transport_profile_from_another_tenant_before_claim_or_append() {
+        let tenant_a = Uuid::from_u128(41);
+        let tenant_b = Uuid::from_u128(42);
+        let endpoint_a = endpoint(tenant_a, Uuid::from_u128(1));
+        let endpoint_b = endpoint(tenant_b, Uuid::from_u128(1));
+        let profile_b = profile_for_endpoint(&endpoint_b);
+
+        let route_b = NativeInfrastructureDeliveryRoute::from_resolved_profile_for_test(
+            &endpoint_b,
+            profile_b.clone(),
+            Uuid::from_u128(2),
+            Uuid::from_u128(3),
+        )
+        .expect("tenant B route is bound to the resolver tenant");
+        assert_eq!(route_b.tenant_id(), tenant_b);
+        assert_eq!(route_b.deployment_id(), endpoint_b.deployment_id());
+
+        assert!(matches!(
+            NativeInfrastructureDeliveryRoute::from_resolved_profile_for_test(
+                &endpoint_a,
+                profile_b,
+                Uuid::from_u128(2),
+                Uuid::from_u128(3),
+            ),
+            Err(InfrastructureOwnerOutboxDeliveryError::RouteConflict)
+        ));
     }
 
     fn receipt(profile: AdmissionTransportProfile, digest: [u8; 32]) -> NativeAppendReceipt {
@@ -349,16 +477,16 @@ mod tests {
         let route = route();
         let digest = [9; 32];
         assert!(valid_native_receipt(
-            &receipt(route.profile.clone(), digest),
+            &receipt(route.profile().clone(), digest),
             &route,
             &digest,
         ));
 
-        let mut mismatched = receipt(route.profile.clone(), digest);
+        let mut mismatched = receipt(route.profile().clone(), digest);
         mismatched.wire_sha256 = [8; 32];
         assert!(!valid_native_receipt(&mismatched, &route, &digest));
 
-        let mut malformed = receipt(route.profile.clone(), digest);
+        let mut malformed = receipt(route.profile().clone(), digest);
         malformed.sequence = 0;
         assert!(!valid_native_receipt(&malformed, &route, &digest));
     }
@@ -380,7 +508,7 @@ mod tests {
             &digest,
         ));
 
-        let mut malformed = receipt(route.profile.clone(), digest);
+        let mut malformed = receipt(route.profile().clone(), digest);
         malformed.log_id = "../foreign-log".to_owned();
         assert!(!valid_native_receipt(&malformed, &route, &digest));
     }

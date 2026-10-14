@@ -14,6 +14,7 @@ repository.workspace = true
 [features]
 default = []
 native-grpc-adapter = ["dep:platform-messaging-runtime", "platform-messaging-runtime/native-grpc-adapter"]
+native-grpc-test-support = ["native-grpc-adapter"]
 
 [dependencies]
 # 基础依赖(全部 crate 共享)
