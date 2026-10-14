@@ -1,4 +1,4 @@
-// @cypher schema=1 source_sha256=c7b8c22dcb5333b0b3c95a208412057df3edba614a9f6da31e0bdfe9b9257755
+// @cypher schema=1 source_sha256=cbe05fc2f349d772fbc220c6ff1e2e1cf572dc9a86037affbbe30033ba1eda39
 // MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs"})
 // MERGE (publisher:Type {id:"infrastructure::InfrastructureOwnerNativeResultPublisher",kind:"struct"})
 // MERGE (outcome:Type {id:"infrastructure::NativeResultPublishBatchOutcome",kind:"struct"})
@@ -35,7 +35,6 @@
 // MERGE (admission_profile_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportProfile.new",kind:"method"})
 // MERGE (receipt:Type {id:"platform_messaging_runtime::native_append::NativeAppendReceipt",kind:"external_type"})
 // MERGE (claim_native:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
-// MERGE (claim_native_diagnostics:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due_with_diagnostics",kind:"method"})
 // MERGE (pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
 // MERGE (record_failure:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.record_failure",kind:"method"})
 // MERGE (mark_delivered:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.mark_native_delivered",kind:"method"})
@@ -78,7 +77,7 @@
 // MERGE (self)-[:IMPORTS]->(transport_profile_file)
 // MERGE (native_append_file)-[:DEFINES]->(append_result)
 // MERGE (native_append_file)-[:DEFINES]->(transport_profile)
-// MERGE (publish)-[:CALLS]->(claim_native_diagnostics)
+// MERGE (publish)-[:CALLS]->(claim_native)
 // MERGE (outcome)-[:HAS_FIELD]->(quarantine_page)
 // MERGE (publish)-[:CALLS]->(route_recipient)
 // MERGE (publish)-[:CALLS]->(pin_wire)
@@ -227,12 +226,7 @@ impl InfrastructureOwnerNativeResultPublisher {
         }
         let claim_batch = self
             .delivery_store
-            .claim_native_due_with_diagnostics(
-                lease_owner_id,
-                max_items,
-                lease_seconds,
-                &self.route,
-            )
+            .claim_native_due(lease_owner_id, max_items, lease_seconds, &self.route)
             .await?;
         let mut outcome = NativeResultPublishBatchOutcome {
             claimed: claim_batch.claims.len(),

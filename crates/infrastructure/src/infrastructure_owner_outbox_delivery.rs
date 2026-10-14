@@ -1,6 +1,6 @@
 //! PostgreSQL delivery state machine for immutable Infrastructure owner Outbox events.
 //!
-//! @cypher schema=1 source_sha256=fbe9bbb4cdb0293b3e9edf5dcaf5a62336a74bbb9598a65b1a2c7e1dbf075c10
+//! @cypher schema=1 source_sha256=3482baac85608bd06bc8da7a4fd772d9ae722f151e871d8b174f27a20b9cf906
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::infrastructure_owner_outbox_delivery",kind:"module"})
 //! MERGE (store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"struct"})
@@ -22,7 +22,6 @@
 //! MERGE (error:Type {id:"infrastructure::InfrastructureOwnerOutboxDeliveryError",kind:"enum"})
 //! MERGE (claim_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_due",kind:"method"})
 //! MERGE (claim_native_due:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
-//! MERGE (claim_native_diagnostics:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due_with_diagnostics",kind:"method"})
 //! MERGE (quarantine_page_read:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.native_route_pin_quarantine_page",kind:"method"})
 //! MERGE (load_quarantine_page:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::load_native_route_pin_quarantine_page",kind:"function"})
 //! MERGE (get_or_pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
@@ -68,7 +67,6 @@
 //! MERGE (module)-[:DEFINES]->(error)
 //! MERGE (store)-[:DEFINES]->(claim_due)
 //! MERGE (store)-[:DEFINES]->(claim_native_due)
-//! MERGE (store)-[:DEFINES]->(claim_native_diagnostics)
 //! MERGE (store)-[:DEFINES]->(quarantine_page_read)
 //! MERGE (store)-[:DEFINES]->(get_or_pin_wire)
 //! MERGE (store)-[:DEFINES]->(mark_delivered)
@@ -102,28 +100,20 @@
 //! MERGE (mark_delivered)-[:CALLS]->(set_scope)
 //! MERGE (mark_delivered)-[:WRITES]->(delivery)
 //! MERGE (claim_native_due)-[:CALLS]->(set_scope)
-//! MERGE (claim_native_due)-[:CALLS]->(claim_native_diagnostics)
-//! MERGE (claim_native_diagnostics)-[:CALLS]->(set_scope)
-//! MERGE (claim_native_diagnostics)-[:CALLS]->(validate_route)
-//! MERGE (claim_native_diagnostics)-[:CALLS]->(route_tenant)
-//! MERGE (claim_native_diagnostics)-[:READS]->(delivery)
-//! MERGE (claim_native_diagnostics)-[:WRITES]->(delivery)
-//! MERGE (claim_native_diagnostics)-[:READS]->(outbox)
-//! MERGE (claim_native_diagnostics)-[:READS]->(route_pin)
-//! MERGE (claim_native_diagnostics)-[:WRITES]->(quarantine)
-//! MERGE (claim_native_diagnostics)-[:READS]->(quarantine)
-//! MERGE (claim_native_diagnostics)-[:RETURNS]->(claim_batch)
-//! MERGE (quarantine_page_read)-[:CALLS]->(set_scope)
-//! MERGE (quarantine_page_read)-[:CALLS]->(load_quarantine_page)
-//! MERGE (quarantine_page_read)-[:RETURNS]->(quarantine_page)
-//! MERGE (load_quarantine_page)-[:READS]->(quarantine)
-//! MERGE (load_quarantine_page)-[:RETURNS]->(quarantine_page)
 //! MERGE (claim_native_due)-[:CALLS]->(validate_route)
 //! MERGE (claim_native_due)-[:CALLS]->(route_tenant)
 //! MERGE (claim_native_due)-[:READS]->(delivery)
 //! MERGE (claim_native_due)-[:WRITES]->(delivery)
 //! MERGE (claim_native_due)-[:READS]->(outbox)
 //! MERGE (claim_native_due)-[:READS]->(route_pin)
+//! MERGE (claim_native_due)-[:WRITES]->(quarantine)
+//! MERGE (claim_native_due)-[:READS]->(quarantine)
+//! MERGE (claim_native_due)-[:RETURNS]->(claim_batch)
+//! MERGE (quarantine_page_read)-[:CALLS]->(set_scope)
+//! MERGE (quarantine_page_read)-[:CALLS]->(load_quarantine_page)
+//! MERGE (quarantine_page_read)-[:RETURNS]->(quarantine_page)
+//! MERGE (load_quarantine_page)-[:READS]->(quarantine)
+//! MERGE (load_quarantine_page)-[:RETURNS]->(quarantine_page)
 //! MERGE (get_or_pin_wire)-[:CALLS]->(set_scope)
 //! MERGE (get_or_pin_wire)-[:CALLS]->(validate_route)
 //! MERGE (get_or_pin_wire)-[:READS]->(delivery)
@@ -600,31 +590,14 @@ impl PostgresInfrastructureOwnerOutboxDelivery {
             .collect())
     }
 
-    /// Lease result events that are unpinned or already pinned to this exact native route.
-    ///
-    /// Route bytes are persisted separately by `get_or_pin_native_wire` under this lease fence
-    /// before any append RPC starts. NATS claims exclude every native-pinned event.
-    #[cfg(feature = "native-grpc-adapter")]
-    pub async fn claim_native_due(
-        &self,
-        lease_owner_id: Uuid,
-        max_items: i64,
-        lease_seconds: i64,
-        route: &NativeInfrastructureDeliveryRoute,
-    ) -> Result<Vec<InfrastructureOwnerOutboxDeliveryClaim>, InfrastructureOwnerOutboxDeliveryError>
-    {
-        Ok(self
-            .claim_native_due_with_diagnostics(lease_owner_id, max_items, lease_seconds, route)
-            .await?
-            .claims)
-    }
-
-    /// Quarantine stale native route pins, then lease due events and return bounded diagnostics.
+    /// Quarantine stale native route pins, lease due events, and return bounded diagnostics.
     ///
     /// The quarantine fact is append-only and tenant scoped. It never rewrites the route pin, never
     /// replaces an active lease or receipt, and does not expose an administrative recovery path.
+    /// Returning this batch from the primary claim path distinguishes no due events from work
+    /// quarantined because its immutable route pin no longer matches.
     #[cfg(feature = "native-grpc-adapter")]
-    pub async fn claim_native_due_with_diagnostics(
+    pub async fn claim_native_due(
         &self,
         lease_owner_id: Uuid,
         max_items: i64,

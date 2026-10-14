@@ -1,6 +1,6 @@
 //! Disposable PostgreSQL verification for Infrastructure native delivery route pins, receipts, and quarantine.
 /*
-@cypher schema=1 source_sha256=5b6d184331c4b35c51fe56e5cfadd8124b3de29fe6fb1e033f6c39577289686b
+@cypher schema=1 source_sha256=233f45822dc1c65a9020f0de0a50111bb45b359229b0ae496608f407c302bd93
 MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs"})
 MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence",kind:"test"})
 MERGE (seed:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::seed_owner_outbox_event",kind:"function"})
@@ -22,7 +22,6 @@ MERGE (route:Type {id:"infrastructure::NativeInfrastructureDeliveryRoute",kind:"
 MERGE (profile_revision:Type {id:"platform_messaging_runtime::transport_profile::TransportProfileRevision",kind:"external_type"})
 MERGE (endpoint_resolver:Type {id:"platform_messaging_runtime::transport_endpoint::TrustedEndpointResolver",kind:"external_type"})
 MERGE (claim:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
-MERGE (claim_diagnostics:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due_with_diagnostics",kind:"method"})
 MERGE (quarantine_page:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.native_route_pin_quarantine_page",kind:"method"})
 MERGE (pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
 MERGE (outbox:Table {id:"infrastructure.capacity_owner_outbox",class:"Transaction"})
@@ -60,7 +59,6 @@ MERGE (test)-[:CALLS]->(rollback)
 MERGE (test)-[:USES_TYPE]->(store)
 MERGE (test)-[:USES_TYPE]->(route)
 MERGE (test)-[:CALLS]->(claim)
-MERGE (test)-[:CALLS]->(claim_diagnostics)
 MERGE (test)-[:CALLS]->(quarantine_page)
 MERGE (test)-[:CALLS]->(pin_wire)
 MERGE (test)-[:USES_TYPE]->(postgres)
@@ -122,6 +120,7 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
     let first_claim = store
         .claim_native_due(Uuid::new_v4(), 1, 120, &route_a)
         .await?
+        .claims
         .pop()
         .expect("one native result event is claimed for the resolved tenant");
     assert_eq!(first_claim.event_id, event_a);
@@ -157,6 +156,7 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
     let second_claim = store
         .claim_native_due(Uuid::new_v4(), 1, 120, &route_a)
         .await?
+        .claims
         .pop()
         .expect("retry is claimable after its due time");
     assert_eq!(second_claim.attempt_count, first_claim.attempt_count + 1);
@@ -187,6 +187,7 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
         .claim_native_due(Uuid::new_v4(), 1, 120, &route_b)
         .await?;
     let claim_b = claim_b
+        .claims
         .into_iter()
         .next()
         .expect("tenant B result uses its separately resolved route");
@@ -208,6 +209,7 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
     let stale_claim = store
         .claim_native_due(old_owner, 1, 120, &route_fenced)
         .await?
+        .claims
         .pop()
         .expect("one native event is claimed");
     let old_wire = store
@@ -217,6 +219,7 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
     let new_claim = store
         .claim_native_due(Uuid::new_v4(), 1, 120, &route_fenced)
         .await?
+        .claims
         .pop()
         .expect("expired native lease is reclaimed");
     assert_eq!(new_claim.attempt_count, stale_claim.attempt_count + 1);
@@ -270,7 +273,7 @@ async fn assert_stale_native_route_quarantine(
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let empty_route = route(Uuid::new_v4());
     let empty_pass = store
-        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &empty_route)
+        .claim_native_due(Uuid::new_v4(), 1, 120, &empty_route)
         .await?;
     assert!(empty_pass.claims.is_empty());
     assert_eq!(empty_pass.route_pin_quarantine.total_blocked, 0);
@@ -282,6 +285,7 @@ async fn assert_stale_native_route_quarantine(
     let first_claim = store
         .claim_native_due(Uuid::new_v4(), 1, 120, &pinned_route)
         .await?
+        .claims
         .pop()
         .expect("new event is claimable before a route mismatch exists");
     let original_wire = store
@@ -294,7 +298,7 @@ async fn assert_stale_native_route_quarantine(
 
     let changed_route = route_for_endpoint(tenant_id, Uuid::new_v4(), "native-endpoint-conflict");
     let blocked_pass = store
-        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .claim_native_due(Uuid::new_v4(), 1, 120, &changed_route)
         .await?;
     assert!(
         blocked_pass.claims.is_empty(),
@@ -382,7 +386,7 @@ async fn assert_stale_native_route_quarantine(
         .is_empty());
 
     let repeated_pass = store
-        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .claim_native_due(Uuid::new_v4(), 1, 120, &changed_route)
         .await?;
     assert!(repeated_pass.claims.is_empty());
     assert_eq!(repeated_pass.route_pin_quarantine.total_blocked, 1);
@@ -398,6 +402,7 @@ async fn assert_stale_native_route_quarantine(
     let active_claim = store
         .claim_native_due(Uuid::new_v4(), 1, 120, &pinned_route)
         .await?
+        .claims
         .into_iter()
         .find(|claim| claim.event_id == active_event)
         .expect("second native event is leased on the pinned route");
@@ -405,7 +410,7 @@ async fn assert_stale_native_route_quarantine(
         .get_or_pin_native_wire(&active_claim, &pinned_route)
         .await?;
     let during_active_lease = store
-        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .claim_native_due(Uuid::new_v4(), 1, 120, &changed_route)
         .await?;
     assert!(during_active_lease.claims.is_empty());
     assert_eq!(during_active_lease.route_pin_quarantine.total_blocked, 1);
@@ -429,7 +434,7 @@ async fn assert_stale_native_route_quarantine(
         )
         .await?;
     let after_receipt = store
-        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .claim_native_due(Uuid::new_v4(), 1, 120, &changed_route)
         .await?;
     assert_eq!(after_receipt.route_pin_quarantine.total_blocked, 1);
     let delivered_quarantine_count: i64 = sqlx::query_scalar(
@@ -451,6 +456,7 @@ async fn assert_stale_native_route_quarantine(
     let other_claim = store
         .claim_native_due(Uuid::new_v4(), 1, 120, &other_route)
         .await?
+        .claims
         .pop()
         .expect("other tenant's event is claimable on its own route");
     store
@@ -484,7 +490,7 @@ async fn assert_stale_native_route_quarantine(
         "other-native-endpoint-conflict",
     );
     let other_pass = store
-        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &other_changed_route)
+        .claim_native_due(Uuid::new_v4(), 1, 120, &other_changed_route)
         .await?;
     assert_eq!(other_pass.route_pin_quarantine.total_blocked, 1);
     assert_eq!(
