@@ -6,7 +6,7 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
-//! @cypher schema=1 source_sha256=0063403356ff6eb38e701b92e87d1f9cbd634863e9d7202b48bf65805df40f13
+//! @cypher schema=1 source_sha256=3c96ce4d19ba8d50532bcd1386471cc3bd33a2daa9e225ee54da2dc1c4cb7136
 //! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
 //! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
 //! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
@@ -20,6 +20,7 @@
 //! MERGE (ownerNativeResultPublisherFile:File {path:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs"})
 //! MERGE (resourceCatalogWriter:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_resource_catalog_writer",kind:"module"})
 //! MERGE (multipassInventoryReconciliation:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_multipass_inventory_reconciliation",kind:"module"})
+//! MERGE (runTaskCardPg:Symbol {id:"crates/infrastructure/src/lib.rs::run_task_card_pg",kind:"module"})
 //! MERGE (self)-[:DEFINES]->(ownerInbox)
 //! MERGE (self)-[:DEFINES]->(ownerAdmission)
 //! MERGE (self)-[:DEFINES]->(ownerOutboxDelivery)
@@ -32,6 +33,7 @@
 //! MERGE (ownerNativeResultPublisher)-[:DEPENDS_ON]->(nativeDemandFeature)
 //! MERGE (self)-[:DEFINES]->(resourceCatalogWriter)
 //! MERGE (self)-[:DEFINES]->(multipassInventoryReconciliation)
+//! MERGE (self)-[:DEFINES]->(runTaskCardPg)
 //! @endcypher
 //!
 //! ## 职责
@@ -41,13 +43,13 @@
 //!
 //! ## 关键不变量
 //!
-//! //! - 本 crate 不允许反向依赖 `domain`,只实现 Domain 定义的 Port(§3 ACL)
+//! - `infrastructure` may depend on Domain ports and types; Domain must not depend on this crate.
 //! - PostgreSQL = 默认 SoR(§13.1,§30.6)
 //! - Database 保持单一 PostgreSQL(非 Database per Domain,§13.5)
 
 //! ## 上游依赖
 //!
-//! 本 supporting crate 编排多个 domain-*(骨架阶段不实际 import,仅占位模块结构)。
+//! 本 supporting crate hosts adapters that implement Domain-owned ports, including the Run Task Card PostgreSQL owner.
 
 //! ## 关键引用
 //!
@@ -415,3 +417,4 @@ pub mod infrastructure_resource_catalog_writer;
 pub mod native_demand_consumer;
 pub mod registry;
 pub mod registry_real_pg;
+pub mod run_task_card_pg;
