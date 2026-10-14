@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=d520806d94a4b242e195c584604f3d26f12d3cd899e1f42e7ba6b0e0c5eb4499
+# @cypher schema=1 source_sha256=04e10cac5fce687bcbda5eaf4f35f2e1300044a250a84c5e26bfe25ed44f0277
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -21,6 +21,7 @@
 # MERGE (native_transport_log:Config {id:"db/migrations/2026-10-12-platform-native-transport-log.sql"})
 # MERGE (native_transport_server_auth:Config {id:"db/migrations/2026-10-12-platform-transport-z-native-server-auth.sql"})
 # MERGE (native_origin_verification:Config {id:"db/migrations/2026-10-12-platform-native-origin-verification.sql"})
+# MERGE (native_result_delivery:Config {id:"db/migrations/2026-10-14-infrastructure-native-result-delivery.sql"})
 # MERGE (transport_profile_schema_test:Config {id:"db/tests/platform-transport-profile-schema.sql"})
 # MERGE (native_transport_log_test:Config {id:"db/tests/platform-native-transport-log.sql"})
 # MERGE (native_transport_concurrency_test:Config {id:"db/tests/platform-native-transport-log-concurrency.sql"})
@@ -31,6 +32,7 @@
 # MERGE (untrusted_ack_sql:Config {id:"disposable-test-only::acknowledge_authenticated-denial"})
 # MERGE (bypassrls_mutation:Config {id:"disposable-test-only::native-transport-runtime-bypassrls-probe"})
 # MERGE (transport_profile_sqlx_test:Config {id:"crates/platform-messaging-runtime/tests/transport_profile_pg.rs"})
+# MERGE (native_result_sqlx_test:Config {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs"})
 # MERGE (quarantine_schema_test:Config {id:"db/tests/platform-poison-quarantine-schema.sql"})
 # MERGE (admission_lifecycle:Config {id:"db/migrations/2026-10-09-task-run-admission-attempt-lifecycle.sql"})
 # MERGE (admission_lifecycle_test:Config {id:"db/tests/task-run-admission-attempt-lifecycle.sql"})
@@ -97,6 +99,7 @@
 # MERGE (main)-[:TESTS]->(untrusted_ack_sql)
 # MERGE (main)-[:TESTS]->(bypassrls_mutation)
 # MERGE (main)-[:TESTS]->(transport_profile_sqlx_test)
+# MERGE (main)-[:TESTS]->(native_result_sqlx_test)
 # MERGE (main)-[:READS]->(quarantine_schema_test)
 # MERGE (main)-[:READS]->(admission_lifecycle)
 # MERGE (main)-[:TESTS]->(admission_lifecycle_test)
@@ -106,6 +109,7 @@
 # MERGE (main)-[:READS]->(admission_migration)
 # MERGE (main)-[:TESTS]->(admission_test)
 # MERGE (main)-[:READS]->(currentness)
+# MERGE (main)-[:READS]->(native_result_delivery)
 # MERGE (main)-[:READS]->(catalog_currentness:Config {id:"db/migrations/2026-10-10-run-owner-catalog-currentness.sql"})
 # MERGE (main)-[:READS]->(policy_currentness:Config {id:"db/migrations/2026-10-10-run-owner-policy-currentness.sql"})
 # MERGE (main)-[:READS]->(task_currentness:Config {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql"})
@@ -187,6 +191,7 @@ TRANSPORT_PROFILE_MASTER_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-pl
 NATIVE_TRANSPORT_LOG_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-native-transport-log.sql"
 NATIVE_TRANSPORT_SERVER_AUTH_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-transport-z-native-server-auth.sql"
 NATIVE_ORIGIN_VERIFICATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-native-origin-verification.sql"
+NATIVE_RESULT_DELIVERY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-14-infrastructure-native-result-delivery.sql"
 UNTRUSTED_TRANSPORT_ROLE = "star_platform_transport_untrusted_probe"
 NATIVE_ORIGIN_SET_BYPASS_SQL = "ALTER ROLE star_platform_transport_runtime BYPASSRLS;"
 NATIVE_ORIGIN_RESTORE_ROLE_SQL = "ALTER ROLE star_platform_transport_runtime NOBYPASSRLS;"
@@ -228,6 +233,7 @@ NATIVE_TRANSPORT_LOG_TEST = ROOT / "db" / "tests" / "platform-native-transport-l
 NATIVE_TRANSPORT_LOG_CONCURRENCY_TEST = ROOT / "db" / "tests" / "platform-native-transport-log-concurrency.sql"
 NATIVE_TRANSPORT_SERVER_AUTH_TEST = ROOT / "db" / "tests" / "platform-native-transport-server-auth.sql"
 NATIVE_ORIGIN_VERIFICATION_TEST = ROOT / "db" / "tests" / "platform-native-origin-verification.sql"
+NATIVE_RESULT_DELIVERY_SQLX_TEST = ROOT / "crates" / "infrastructure" / "tests" / "infrastructure_native_result_delivery_pg.rs"
 NATIVE_TRANSPORT_CONCURRENCY_FIXTURE_SQL = """\
 BEGIN;
 SELECT set_config('app.platform_deployment_id', '10000000-0000-0000-0000-000000000001', TRUE);
@@ -776,8 +782,15 @@ def run_expected_function_denial(
     function_name: str,
     env: dict[str, str],
 ) -> dict[str, object]:
-    expected_error = f"permission denied for function {function_name}"
-    return run_expected_sql_error(name, command, sql, expected_error, env)
+    return run_expected_sql_error(
+        name,
+        command,
+        sql,
+        expected_error=f"permission denied for function {function_name}",
+        env=env,
+        expected_sqlstate="42501",
+        expected_target=function_name,
+    )
 
 
 def run_expected_sql_error(
@@ -786,19 +799,37 @@ def run_expected_sql_error(
     sql: str,
     expected_error: str,
     env: dict[str, str],
+    expected_sqlstate: str | None = None,
+    expected_target: str | None = None,
 ) -> dict[str, object]:
-    result = run_sql(name, command, sql, env, expect_success=False)
+    checked_sql = f"\\set VERBOSITY verbose\n{sql}" if expected_sqlstate else sql
+    result = run_sql(name, command, checked_sql, env, expect_success=False)
     if result["status"] != "passed":
         return result
     stderr_path = OUTPUT_DIR / f"{name}.stderr.log"
     stderr = stderr_path.read_text(encoding="utf-8", errors="replace").lower()
     expected_error_lower = expected_error.lower()
-    if expected_error_lower not in stderr:
+    if expected_sqlstate and not re.search(rf"\b{re.escape(expected_sqlstate)}\b", stderr):
+        result["status"] = "failed"
+        result["reason"] = "expected PostgreSQL SQLSTATE was not observed"
+        result["expected_sqlstate"] = expected_sqlstate
+        return result
+    if expected_target and expected_target.lower() not in stderr:
+        result["status"] = "failed"
+        result["reason"] = "expected PostgreSQL error target was not observed"
+        result["expected_target"] = expected_target
+        return result
+    if not expected_sqlstate and expected_error_lower not in stderr:
         result["status"] = "failed"
         result["reason"] = "expected PostgreSQL error was not observed"
         result["expected_error"] = expected_error_lower
         return result
-    result["expected_error"] = expected_error_lower
+    if expected_sqlstate:
+        result["expected_sqlstate"] = expected_sqlstate
+        if expected_target:
+            result["expected_target"] = expected_target
+    else:
+        result["expected_error"] = expected_error_lower
     return result
 
 
@@ -894,6 +925,7 @@ def main() -> int:
     parser.add_argument("--binding-tests", action="store_true", help="Also run Rust SQLx binding roundtrip/CAS/rollback tests; combine with --schema-only to avoid NATS")
     parser.add_argument("--admission-tests", action="store_true", help="Also run Rust SQLx owner-local admission receipt/result tests; --schema-only avoids NATS")
     parser.add_argument("--transport-profile-tests", action="store_true", help="Also run the D17 Rust SQLx profile Master/CAS/resolver test; requires --schema-only")
+    parser.add_argument("--native-result-tests", action="store_true", help="Apply the D20 Infrastructure native-result migration twice and run its SQLx route/receipt, RLS, WORM, replay, rollback, and attempt-fence test; requires --schema-only")
     parser.add_argument("--ignore-rust-version", action="store_true", help="Run selected Cargo tests with --ignore-rust-version for diagnostics only; does not satisfy the workspace toolchain gate")
     parser.add_argument("--admission-delivery-tests", "--admission-receiver-tests", dest="admission_delivery_tests", action="store_true", help="Start isolated NATS before admission tests to verify publisher replay, three owner receiver kinds and commit-before-ACK with a real database fault")
     arguments = parser.parse_args()
@@ -901,6 +933,8 @@ def main() -> int:
         parser.error("--admission-delivery-tests requires --admission-tests")
     if arguments.transport_profile_tests and not arguments.schema_only:
         parser.error("--transport-profile-tests requires --schema-only")
+    if arguments.native_result_tests and not arguments.schema_only:
+        parser.error("--native-result-tests requires --schema-only")
 
     global OUTPUT_DIR
     if arguments.output_dir:
@@ -945,12 +979,14 @@ def main() -> int:
             NATIVE_TRANSPORT_LOG_MIGRATION,
             NATIVE_TRANSPORT_SERVER_AUTH_MIGRATION,
             NATIVE_ORIGIN_VERIFICATION_MIGRATION,
+            NATIVE_RESULT_DELIVERY_MIGRATION,
             RUN_BINDING_TEST,
             TRANSPORT_PROFILE_SCHEMA_TEST,
             NATIVE_TRANSPORT_LOG_TEST,
             NATIVE_TRANSPORT_LOG_CONCURRENCY_TEST,
             NATIVE_TRANSPORT_SERVER_AUTH_TEST,
             NATIVE_ORIGIN_VERIFICATION_TEST,
+            NATIVE_RESULT_DELIVERY_SQLX_TEST,
             RUN_MIGRATION,
             QUARANTINE_SCHEMA_TEST,
         )
@@ -988,6 +1024,7 @@ def main() -> int:
         or arguments.binding_tests
         or arguments.admission_tests
         or arguments.transport_profile_tests
+        or arguments.native_result_tests
     )
     if needs_cargo and arguments.toolchain_bin:
         toolchain_bin = arguments.toolchain_bin.resolve()
@@ -1253,6 +1290,17 @@ def main() -> int:
                 NATIVE_ORIGIN_VERIFICATION_TEST.read_text(encoding="utf-8"),
                 env,
             ))
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.native_result_tests:
+            native_result_sql = NATIVE_RESULT_DELIVERY_MIGRATION.read_text(encoding="utf-8")
+            for attempt in (1, 2):
+                results.append(run_sql(
+                    f"infrastructure-native-result-delivery-migration-apply-{attempt}",
+                    psql_base,
+                    native_result_sql,
+                    env,
+                ))
+                if results[-1]["status"] != "passed":
+                    break
         if pg_started and all(item["status"] == "passed" for item in results):
             role_bypass = run_sql("native-origin-set-bypassrls-probe", psql_base, NATIVE_ORIGIN_SET_BYPASS_SQL, env)
             results.append(role_bypass)
@@ -1363,6 +1411,27 @@ def main() -> int:
                 profile_env,
             ))
 
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.native_result_tests:
+            native_result_env = env.copy()
+            native_result_env["STAR_INFRA_OWNER_TEST_DATABASE_URL"] = (
+                f"postgresql://star_run_owner_test_admin@127.0.0.1:{pg_port}/postgres"
+            )
+            native_test_command = [cargo, "test"]
+            if arguments.ignore_rust_version:
+                native_test_command.append("--ignore-rust-version")
+            native_test_command.extend([
+                "--offline", "--locked", "-p", "infrastructure",
+                "--test", "infrastructure_native_result_delivery_pg",
+                "--features", "native-grpc-test-support", "-j", "4",
+                "--", "--ignored", "--test-threads=1",
+            ])
+            results.append(run_step(
+                "infrastructure-native-result-delivery-postgres-sqlx-integration",
+                native_test_command,
+                ROOT,
+                native_result_env,
+            ))
+
         if pg_started and all(item["status"] == "passed" for item in results) and arguments.admission_delivery_tests:
             nats_data.mkdir(parents=False)
             nats_data_owned = True
@@ -1454,7 +1523,7 @@ def main() -> int:
         write_text(OUTPUT_DIR / "audit.jsonl", "".join(json.dumps(item, sort_keys=True) + "\n" for item in results))
         print(json.dumps({
             "result": "passed" if exit_code == 0 and all(item["status"] == "passed" for item in results) else "failed",
-            "mode": "postgres_transport_profile_sqlx_integration" if arguments.transport_profile_tests else ("postgres_admission_delivery_integration" if arguments.admission_delivery_tests else (("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration")),
+            "mode": "postgres_native_result_sqlx_integration" if arguments.native_result_tests else ("postgres_transport_profile_sqlx_integration" if arguments.transport_profile_tests else ("postgres_admission_delivery_integration" if arguments.admission_delivery_tests else (("postgres_admission_rust_integration" if arguments.admission_tests else "postgres_binding_rust_integration" if arguments.binding_tests else "schema_only") if arguments.schema_only else "postgres_nats_rust_integration"))),
             "steps": results,
             "audit_path": str(OUTPUT_DIR / "audit.jsonl"),
             "multipass_instances_created": 0,
