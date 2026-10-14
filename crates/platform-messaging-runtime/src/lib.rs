@@ -1,6 +1,6 @@
 //! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=34cab7e27d36ac543cfa9aa02290e31bb2a63e69b50e8f6ec1ce6e250c0a7591
+@cypher schema=1 source_sha256=958dfc4681b7750181bd9348577618671e6c0eb3f4096bf362c67f4803d1eb6b
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
@@ -168,9 +168,9 @@ pub mod admission_delivery;
 #[cfg(feature = "durable-quarantine")]
 pub mod admission_quarantine_pg;
 pub mod admission_receive;
-pub mod native_append;
 #[cfg(feature = "jetstream-adapter")]
 pub mod admission_receive_jetstream;
+pub mod native_append;
 #[cfg(feature = "native-grpc-adapter")]
 pub mod native_grpc;
 #[cfg(feature = "native-grpc-adapter")]

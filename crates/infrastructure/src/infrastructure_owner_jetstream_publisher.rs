@@ -1,6 +1,6 @@
 //! Bounded JetStream publication for tenant-scoped Infrastructure Outbox claims.
 //!
-//! @cypher schema=1 source_sha256=91850eedef154a24fa3f477c537f1133b877211a254436b555217e5e5b11e02e
+//! @cypher schema=1 source_sha256=a17bc0c6f2f3700ef62d2fb91271ee1df39dbdaa58e2de383d8b53b4fae72942
 //! MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
 //! MERGE (publisher:Type {id:"infrastructure::InfrastructureOwnerJetStreamPublisher",kind:"struct"})
@@ -10,6 +10,7 @@
 //! MERGE (build_envelope:Symbol {id:"crates/infrastructure/src/infrastructure_owner_jetstream_publisher.rs::build_envelope",kind:"function"})
 //! MERGE (delivery_store:Type {id:"infrastructure::PostgresInfrastructureOwnerOutboxDelivery",kind:"external_type"})
 //! MERGE (claim:Type {id:"infrastructure::InfrastructureOwnerOutboxDeliveryClaim",kind:"external_type"})
+//! MERGE (event_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_wire.rs::build_capacity_result_wire",kind:"function"})
 //! MERGE (jetstream:Type {id:"async_nats::jetstream::Context",kind:"external_type"})
 //! MERGE (publish_message:Type {id:"async_nats::jetstream::message::PublishMessage",kind:"external_type"})
 //! MERGE (module)-[:DEFINES]->(publisher)
@@ -17,6 +18,7 @@
 //! MERGE (module)-[:DEFINES]->(error)
 //! MERGE (publisher)-[:DEFINES]->(publish_due)
 //! MERGE (publish_due)-[:CALLS]->(build_envelope)
+//! MERGE (build_envelope)-[:CALLS]->(event_wire)
 //! MERGE (publish_due)-[:USES_TYPE]->(delivery_store)
 //! MERGE (publish_due)-[:USES_TYPE]->(claim)
 //! MERGE (publish_due)-[:USES_TYPE]->(jetstream)
@@ -26,8 +28,6 @@
 use std::time::Duration;
 
 use async_nats::jetstream::{message::PublishMessage, Context};
-use serde::Serialize;
-use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -35,13 +35,15 @@ use crate::infrastructure_owner_outbox_delivery::{
     InfrastructureOwnerOutboxDeliveryClaim, InfrastructureOwnerOutboxDeliveryError,
     OutboxDeliveryFailureKind, PostgresInfrastructureOwnerOutboxDelivery,
 };
+use crate::infrastructure_owner_outbox_wire::build_capacity_result_wire;
 
 const MAX_PUBLISH_BATCH_SIZE: i64 = 8;
 const MIN_PUBLISH_LEASE_SECONDS: i64 = 120;
 const MAX_PUBLISH_LEASE_SECONDS: i64 = 300;
 const MAX_DELIVERY_ATTEMPTS: i32 = 12;
-const MAX_PAYLOAD_BYTES: usize = 16 * 1024;
 const MAX_ENVELOPE_BYTES: usize = 128 * 1024;
+#[cfg(test)]
+const MAX_PAYLOAD_BYTES: usize = 16 * 1024;
 const ACK_TIMEOUT: Duration = Duration::from_secs(10);
 const SUBJECT_PREFIX: &str = "star.infrastructure.v2";
 
@@ -168,18 +170,6 @@ impl InfrastructureOwnerJetStreamPublisher {
     }
 }
 
-#[derive(Serialize)]
-struct InfrastructureEventEnvelope {
-    envelope_version: u8,
-    tenant_id: Uuid,
-    event_id: Uuid,
-    event_type: String,
-    schema_version: i16,
-    idempotency_key: String,
-    correlation_id: Uuid,
-    payload: Value,
-}
-
 fn build_envelope(
     claim: &InfrastructureOwnerOutboxDeliveryClaim,
 ) -> Result<(String, Vec<u8>, String), ()> {
@@ -189,34 +179,7 @@ fn build_envelope(
         "capacity_expired" => "capacity_expired",
         _ => return Err(()),
     };
-    if claim.tenant_id.is_nil()
-        || claim.event_id.is_nil()
-        || claim.lease_owner_id.is_nil()
-        || claim.correlation_id.is_nil()
-        || claim.attempt_count <= 0
-        || claim.schema_version != 2
-        || claim.idempotency_key.is_empty()
-        || claim.idempotency_key.len() > 200
-        || claim.payload_json.len() > MAX_PAYLOAD_BYTES
-    {
-        return Err(());
-    }
-
-    let payload: Value = serde_json::from_str(&claim.payload_json).map_err(|_| ())?;
-    if !payload.is_object() {
-        return Err(());
-    }
-    let envelope = InfrastructureEventEnvelope {
-        envelope_version: 1,
-        tenant_id: claim.tenant_id,
-        event_id: claim.event_id,
-        event_type: claim.event_type.clone(),
-        schema_version: claim.schema_version,
-        idempotency_key: claim.idempotency_key.clone(),
-        correlation_id: claim.correlation_id,
-        payload,
-    };
-    let payload = serde_json::to_vec(&envelope).map_err(|_| ())?;
+    let payload = build_capacity_result_wire(claim).map_err(|_| ())?;
     if payload.len() > MAX_ENVELOPE_BYTES {
         return Err(());
     }
@@ -240,6 +203,7 @@ fn build_publish_message(
 mod tests {
     use super::*;
     use chrono::Utc;
+    use serde_json::Value;
 
     fn claim(event_type: &str, payload_json: &str) -> InfrastructureOwnerOutboxDeliveryClaim {
         InfrastructureOwnerOutboxDeliveryClaim {

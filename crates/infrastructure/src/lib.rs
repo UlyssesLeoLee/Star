@@ -6,21 +6,30 @@
 //! **数据设计**: docs/data-design.md §6 / §7 (RLS) / §8 (索引)
 //! **API 设计**: docs/api-design.md —
 //!
-//! @cypher schema=1 source_sha256=d11915794aee0ad4ce8d7da0c5e267df460dd96d94f031c2cbf52f0cfd3aea15
+//! @cypher schema=1 source_sha256=0063403356ff6eb38e701b92e87d1f9cbd634863e9d7202b48bf65805df40f13
 //! MERGE (self:File {path:"crates/infrastructure/src/lib.rs"})
 //! MERGE (ownerInbox:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_inbox",kind:"module"})
 //! MERGE (ownerAdmission:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_admission",kind:"module"})
 //! MERGE (ownerOutboxDelivery:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_outbox_delivery",kind:"module"})
+//! MERGE (ownerOutboxWire:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_outbox_wire",kind:"module"})
+//! MERGE (ownerNativeResultPublisher:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_native_result_publisher",kind:"module"})
 //! MERGE (ownerJetStreamPublisher:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_owner_jetstream_publisher",kind:"module"})
 //! MERGE (nativeDemandConsumer:Symbol {id:"crates/infrastructure/src/lib.rs::native_demand_consumer",kind:"module"})
 //! MERGE (nativeDemandFeature:Config {id:"cargo.feature.infrastructure.native-grpc-adapter"})
+//! MERGE (ownerOutboxWireFile:File {path:"crates/infrastructure/src/infrastructure_owner_outbox_wire.rs"})
+//! MERGE (ownerNativeResultPublisherFile:File {path:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs"})
 //! MERGE (resourceCatalogWriter:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_resource_catalog_writer",kind:"module"})
 //! MERGE (multipassInventoryReconciliation:Symbol {id:"crates/infrastructure/src/lib.rs::infrastructure_multipass_inventory_reconciliation",kind:"module"})
 //! MERGE (self)-[:DEFINES]->(ownerInbox)
 //! MERGE (self)-[:DEFINES]->(ownerAdmission)
 //! MERGE (self)-[:DEFINES]->(ownerOutboxDelivery)
+//! MERGE (self)-[:DEFINES]->(ownerOutboxWire)
+//! MERGE (self)-[:DEFINES]->(ownerNativeResultPublisher)
 //! MERGE (self)-[:DEFINES]->(ownerJetStreamPublisher)
 //! MERGE (self)-[:DEFINES]->(nativeDemandConsumer)
+//! MERGE (ownerOutboxWire)-[:CONTAINS_FILE]->(ownerOutboxWireFile)
+//! MERGE (ownerNativeResultPublisher)-[:CONTAINS_FILE]->(ownerNativeResultPublisherFile)
+//! MERGE (ownerNativeResultPublisher)-[:DEPENDS_ON]->(nativeDemandFeature)
 //! MERGE (self)-[:DEFINES]->(resourceCatalogWriter)
 //! MERGE (self)-[:DEFINES]->(multipassInventoryReconciliation)
 //! @endcypher
@@ -397,7 +406,10 @@ pub mod infrastructure_multipass_inventory_reconciliation;
 pub mod infrastructure_owner_admission;
 pub mod infrastructure_owner_inbox;
 pub mod infrastructure_owner_jetstream_publisher;
+#[cfg(feature = "native-grpc-adapter")]
+pub mod infrastructure_owner_native_result_publisher;
 pub mod infrastructure_owner_outbox_delivery;
+pub mod infrastructure_owner_outbox_wire;
 pub mod infrastructure_resource_catalog_writer;
 #[cfg(feature = "native-grpc-adapter")]
 pub mod native_demand_consumer;

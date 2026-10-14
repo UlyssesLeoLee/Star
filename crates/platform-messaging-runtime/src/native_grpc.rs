@@ -3,7 +3,7 @@
 // 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 (Apache-2.0).
 // TLS loading and fail-closed behavior are retained; application identity stays Star-owned.
 /*
-@cypher schema=1 source_sha256=4334fba4a02a9e58b79296cec6a3bd72f39e9b62ff10963f205385f95472dee7
+@cypher schema=1 source_sha256=2d849e69a4c8f996b76d9206f75cb048f166386a49abdb3177d4199c0d40b7ce
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (tls_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
 MERGE (tls_server:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
@@ -254,8 +254,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::sync::Semaphore;
 use tonic::{
-    Request,
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity, ServerTlsConfig, Uri},
+    Request,
 };
 use uuid::Uuid;
 
@@ -269,8 +269,7 @@ use crate::admission_receive::{
     AdmissionReceivedDelivery,
 };
 use crate::native_append::{
-    MAX_NATIVE_APPEND_WIRE_BYTES, NativeAppendError, NativeAppendReceipt,
-    NativeAppendTransport,
+    NativeAppendError, NativeAppendReceipt, NativeAppendTransport, MAX_NATIVE_APPEND_WIRE_BYTES,
 };
 use crate::transport_endpoint::ResolvedTransportEndpoint;
 
@@ -1065,65 +1064,61 @@ impl NativeAppendTransport for NativeGrpcAppendTransport {
         &self.profile
     }
 
-    fn append_result<'a>(
+    async fn append_result<'a>(
         &'a self,
         recipient_service_id: Uuid,
         message_id: Uuid,
         wire: &'a [u8],
-    ) -> impl std::future::Future<Output = Result<NativeAppendReceipt, NativeAppendError>>
-           + Send
-           + 'a {
-        async move {
-            if recipient_service_id.is_nil()
-                || message_id.is_nil()
-                || wire.is_empty()
-                || wire.len() > MAX_NATIVE_APPEND_WIRE_BYTES
-            {
-                return Err(NativeAppendError::InvalidInput);
-            }
-            let _permit = self
-                .in_flight
-                .clone()
-                .try_acquire_owned()
-                .map_err(|_| NativeAppendError::Busy)?;
-            let wire_sha256: [u8; 32] = Sha256::digest(wire).into();
-            let request = wire::AppendRequest {
-                profile: Some(wire::ProfilePin {
-                    profile_digest: self.profile.profile_digest.to_vec(),
-                }),
-                recipient_service_id: recipient_service_id.as_bytes().to_vec(),
-                message_kind: "result".to_owned(),
-                message_id: message_id.as_bytes().to_vec(),
-                wire: wire.to_vec(),
-                wire_sha256: wire_sha256.to_vec(),
-            };
-            // A cloned Channel handle is cheap and lets bounded calls share the HTTP/2 channel.
-            let mut client = self.client.clone();
-            let response = client
-                .append(Request::new(request))
-                .await
-                .map_err(|_| NativeAppendError::Transport)?
-                .into_inner();
-            if response.wire_sha256.as_slice() != wire_sha256.as_slice()
-                || response.sequence <= 0
-                || !valid_native_log_id(&response.log_id)
-            {
-                return Err(NativeAppendError::InvalidReceipt);
-            }
-            let log_generation = Uuid::from_slice(&response.log_generation)
-                .map_err(|_| NativeAppendError::InvalidReceipt)?;
-            if log_generation.is_nil() {
-                return Err(NativeAppendError::InvalidReceipt);
-            }
-            Ok(NativeAppendReceipt {
-                profile: self.profile.clone(),
-                log_id: response.log_id,
-                log_generation,
-                sequence: response.sequence,
-                exact_replay: response.exact_replay,
-                wire_sha256,
-            })
+    ) -> Result<NativeAppendReceipt, NativeAppendError> {
+        if recipient_service_id.is_nil()
+            || message_id.is_nil()
+            || wire.is_empty()
+            || wire.len() > MAX_NATIVE_APPEND_WIRE_BYTES
+        {
+            return Err(NativeAppendError::InvalidInput);
         }
+        let _permit = self
+            .in_flight
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| NativeAppendError::Busy)?;
+        let wire_sha256: [u8; 32] = Sha256::digest(wire).into();
+        let request = wire::AppendRequest {
+            profile: Some(wire::ProfilePin {
+                profile_digest: self.profile.profile_digest.to_vec(),
+            }),
+            recipient_service_id: recipient_service_id.as_bytes().to_vec(),
+            message_kind: "result".to_owned(),
+            message_id: message_id.as_bytes().to_vec(),
+            wire: wire.to_vec(),
+            wire_sha256: wire_sha256.to_vec(),
+        };
+        // A cloned Channel handle is cheap and lets bounded calls share the HTTP/2 channel.
+        let mut client = self.client.clone();
+        let response = client
+            .append(Request::new(request))
+            .await
+            .map_err(|_| NativeAppendError::Transport)?
+            .into_inner();
+        if response.wire_sha256.as_slice() != wire_sha256.as_slice()
+            || response.sequence <= 0
+            || !valid_native_log_id(&response.log_id)
+        {
+            return Err(NativeAppendError::InvalidReceipt);
+        }
+        let log_generation = Uuid::from_slice(&response.log_generation)
+            .map_err(|_| NativeAppendError::InvalidReceipt)?;
+        if log_generation.is_nil() {
+            return Err(NativeAppendError::InvalidReceipt);
+        }
+        Ok(NativeAppendReceipt {
+            profile: self.profile.clone(),
+            log_id: response.log_id,
+            log_generation,
+            sequence: response.sequence,
+            exact_replay: response.exact_replay,
+            wire_sha256,
+        })
     }
 }
 
