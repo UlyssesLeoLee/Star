@@ -1,6 +1,6 @@
 """Run the disposable PostgreSQL + NATS integration gate for the Run-owner consumer."""
 
-# @cypher schema=1 source_sha256=04e10cac5fce687bcbda5eaf4f35f2e1300044a250a84c5e26bfe25ed44f0277
+# @cypher schema=1 source_sha256=a306672ccd1693dc2ac668d5893c12c317814338d96e1051e61185213f01c124
 # MERGE (self:File {path:"scripts/automation/phase9f4d_run_owner_consumer.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f4d_run_owner_consumer.py::run_step",kind:"function"})
@@ -22,6 +22,7 @@
 # MERGE (native_transport_server_auth:Config {id:"db/migrations/2026-10-12-platform-transport-z-native-server-auth.sql"})
 # MERGE (native_origin_verification:Config {id:"db/migrations/2026-10-12-platform-native-origin-verification.sql"})
 # MERGE (native_result_delivery:Config {id:"db/migrations/2026-10-14-infrastructure-native-result-delivery.sql"})
+# MERGE (native_route_pin_quarantine:Config {id:"db/migrations/2026-10-14-infrastructure-native-route-pin-quarantine.sql"})
 # MERGE (transport_profile_schema_test:Config {id:"db/tests/platform-transport-profile-schema.sql"})
 # MERGE (native_transport_log_test:Config {id:"db/tests/platform-native-transport-log.sql"})
 # MERGE (native_transport_concurrency_test:Config {id:"db/tests/platform-native-transport-log-concurrency.sql"})
@@ -110,6 +111,7 @@
 # MERGE (main)-[:TESTS]->(admission_test)
 # MERGE (main)-[:READS]->(currentness)
 # MERGE (main)-[:READS]->(native_result_delivery)
+# MERGE (main)-[:READS]->(native_route_pin_quarantine)
 # MERGE (main)-[:READS]->(catalog_currentness:Config {id:"db/migrations/2026-10-10-run-owner-catalog-currentness.sql"})
 # MERGE (main)-[:READS]->(policy_currentness:Config {id:"db/migrations/2026-10-10-run-owner-policy-currentness.sql"})
 # MERGE (main)-[:READS]->(task_currentness:Config {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql"})
@@ -192,6 +194,7 @@ NATIVE_TRANSPORT_LOG_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platfo
 NATIVE_TRANSPORT_SERVER_AUTH_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-transport-z-native-server-auth.sql"
 NATIVE_ORIGIN_VERIFICATION_MIGRATION = ROOT / "db" / "migrations" / "2026-10-12-platform-native-origin-verification.sql"
 NATIVE_RESULT_DELIVERY_MIGRATION = ROOT / "db" / "migrations" / "2026-10-14-infrastructure-native-result-delivery.sql"
+NATIVE_ROUTE_PIN_QUARANTINE_MIGRATION = ROOT / "db" / "migrations" / "2026-10-14-infrastructure-native-route-pin-quarantine.sql"
 UNTRUSTED_TRANSPORT_ROLE = "star_platform_transport_untrusted_probe"
 NATIVE_ORIGIN_SET_BYPASS_SQL = "ALTER ROLE star_platform_transport_runtime BYPASSRLS;"
 NATIVE_ORIGIN_RESTORE_ROLE_SQL = "ALTER ROLE star_platform_transport_runtime NOBYPASSRLS;"
@@ -980,6 +983,7 @@ def main() -> int:
             NATIVE_TRANSPORT_SERVER_AUTH_MIGRATION,
             NATIVE_ORIGIN_VERIFICATION_MIGRATION,
             NATIVE_RESULT_DELIVERY_MIGRATION,
+            NATIVE_ROUTE_PIN_QUARANTINE_MIGRATION,
             RUN_BINDING_TEST,
             TRANSPORT_PROFILE_SCHEMA_TEST,
             NATIVE_TRANSPORT_LOG_TEST,
@@ -1297,6 +1301,17 @@ def main() -> int:
                     f"infrastructure-native-result-delivery-migration-apply-{attempt}",
                     psql_base,
                     native_result_sql,
+                    env,
+                ))
+                if results[-1]["status"] != "passed":
+                    break
+        if pg_started and all(item["status"] == "passed" for item in results) and arguments.native_result_tests:
+            route_pin_quarantine_sql = NATIVE_ROUTE_PIN_QUARANTINE_MIGRATION.read_text(encoding="utf-8")
+            for attempt in (1, 2):
+                results.append(run_sql(
+                    f"infrastructure-native-route-pin-quarantine-migration-apply-{attempt}",
+                    psql_base,
+                    route_pin_quarantine_sql,
                     env,
                 ))
                 if results[-1]["status"] != "passed":

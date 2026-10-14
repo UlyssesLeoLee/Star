@@ -1,6 +1,6 @@
-//! Disposable PostgreSQL verification for Infrastructure's opt-in native result route and receipt.
+//! Disposable PostgreSQL verification for Infrastructure native delivery route pins, receipts, and quarantine.
 /*
-@cypher schema=1 source_sha256=84476e921f5e71e12827127e40c0114fc987dbfa88d4748d9c1d86a7bb6bedf1
+@cypher schema=1 source_sha256=5b6d184331c4b35c51fe56e5cfadd8124b3de29fe6fb1e033f6c39577289686b
 MERGE (self:File {path:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs"})
 MERGE (test:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence",kind:"test"})
 MERGE (seed:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::seed_owner_outbox_event",kind:"function"})
@@ -12,6 +12,8 @@ MERGE (set_due:Symbol {id:"crates/infrastructure/tests/infrastructure_native_res
 MERGE (expire:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::expire_lease",kind:"function"})
 MERGE (bad_receipt:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::reject_mismatched_receipt",kind:"function"})
 MERGE (assert_worm:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_worm_and_truncate_guards",kind:"function"})
+MERGE (assert_quarantine:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_stale_native_route_quarantine",kind:"function"})
+MERGE (assert_quarantine_rls:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_quarantine_tenant_scope",kind:"function"})
 MERGE (rollback:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_atomic_receipt_rollback",kind:"function"})
 MERGE (schema_assertions:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_native_result_schema",kind:"function"})
 MERGE (rls_assertions:Symbol {id:"crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs::assert_tenant_scope_hides_other_tenant",kind:"function"})
@@ -20,11 +22,14 @@ MERGE (route:Type {id:"infrastructure::NativeInfrastructureDeliveryRoute",kind:"
 MERGE (profile_revision:Type {id:"platform_messaging_runtime::transport_profile::TransportProfileRevision",kind:"external_type"})
 MERGE (endpoint_resolver:Type {id:"platform_messaging_runtime::transport_endpoint::TrustedEndpointResolver",kind:"external_type"})
 MERGE (claim:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
+MERGE (claim_diagnostics:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due_with_diagnostics",kind:"method"})
+MERGE (quarantine_page:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.native_route_pin_quarantine_page",kind:"method"})
 MERGE (pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
 MERGE (outbox:Table {id:"infrastructure.capacity_owner_outbox",class:"Transaction"})
 MERGE (delivery:Table {id:"infrastructure.capacity_outbox_delivery",class:"Work"})
 MERGE (route_pin:Table {id:"infrastructure.capacity_outbox_transport_pin",class:"Transaction"})
 MERGE (receipt:Table {id:"infrastructure.capacity_native_append_receipt",class:"Transaction"})
+MERGE (quarantine:Table {id:"infrastructure.capacity_native_route_pin_quarantine",class:"Transaction"})
 MERGE (postgres:ExternalService {id:"disposable PostgreSQL SQLx test database"})
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(seed)
@@ -35,6 +40,8 @@ MERGE (self)-[:DEFINES]->(set_due)
 MERGE (self)-[:DEFINES]->(expire)
 MERGE (self)-[:DEFINES]->(bad_receipt)
 MERGE (self)-[:DEFINES]->(assert_worm)
+MERGE (self)-[:DEFINES]->(assert_quarantine)
+MERGE (self)-[:DEFINES]->(assert_quarantine_rls)
 MERGE (self)-[:DEFINES]->(rollback)
 MERGE (self)-[:DEFINES]->(schema_assertions)
 MERGE (self)-[:DEFINES]->(rls_assertions)
@@ -48,10 +55,13 @@ MERGE (test)-[:CALLS]->(set_due)
 MERGE (test)-[:CALLS]->(expire)
 MERGE (test)-[:CALLS]->(bad_receipt)
 MERGE (test)-[:CALLS]->(assert_worm)
+MERGE (test)-[:CALLS]->(assert_quarantine)
 MERGE (test)-[:CALLS]->(rollback)
 MERGE (test)-[:USES_TYPE]->(store)
 MERGE (test)-[:USES_TYPE]->(route)
 MERGE (test)-[:CALLS]->(claim)
+MERGE (test)-[:CALLS]->(claim_diagnostics)
+MERGE (test)-[:CALLS]->(quarantine_page)
 MERGE (test)-[:CALLS]->(pin_wire)
 MERGE (test)-[:USES_TYPE]->(postgres)
 MERGE (route_endpoint)-[:USES_TYPE]->(profile_revision)
@@ -63,13 +73,19 @@ MERGE (expire)-[:WRITES]->(delivery)
 MERGE (test)-[:TESTS]->(route_pin)
 MERGE (test)-[:TESTS]->(receipt)
 MERGE (test)-[:TESTS]->(delivery)
+MERGE (test)-[:TESTS]->(quarantine)
+MERGE (assert_quarantine)-[:TESTS]->(quarantine)
+MERGE (assert_quarantine)-[:TESTS]->(route_pin)
+MERGE (assert_quarantine)-[:TESTS]->(delivery)
+MERGE (assert_quarantine)-[:CALLS]->(assert_quarantine_rls)
 MERGE (assert_worm)-[:TESTS]->(route_pin)
 MERGE (assert_worm)-[:TESTS]->(receipt)
+MERGE (assert_worm)-[:TESTS]->(quarantine)
 @endcypher
 */
 
 use infrastructure::infrastructure_owner_outbox_delivery::{
-    NativeInfrastructureDeliveryRoute, OutboxDeliveryFailureKind,
+    NativeInfrastructureDeliveryRoute, NativeRoutePinQuarantinePage, OutboxDeliveryFailureKind,
     PostgresInfrastructureOwnerOutboxDelivery,
 };
 use platform_messaging_runtime::{
@@ -237,13 +253,272 @@ async fn postgres_native_store_route_receipt_rls_worm_replay_and_attempt_fence(
         .mark_native_delivered(&new_claim, &route_fenced, &valid_receipt)
         .await?;
 
-    assert_worm_and_truncate_guards(&pool, tenant_a, event_a).await?;
+    let quarantined_event = assert_stale_native_route_quarantine(&pool, &store, tenant_a).await?;
+    assert_worm_and_truncate_guards(&pool, tenant_a, event_a, quarantined_event).await?;
     pool.close().await;
     Ok(())
 }
 
 fn route(tenant_id: Uuid) -> NativeInfrastructureDeliveryRoute {
     route_for_endpoint(tenant_id, Uuid::new_v4(), "native-endpoint")
+}
+
+async fn assert_stale_native_route_quarantine(
+    pool: &PgPool,
+    store: &PostgresInfrastructureOwnerOutboxDelivery,
+    tenant_id: Uuid,
+) -> Result<Uuid, Box<dyn std::error::Error>> {
+    let empty_route = route(Uuid::new_v4());
+    let empty_pass = store
+        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &empty_route)
+        .await?;
+    assert!(empty_pass.claims.is_empty());
+    assert_eq!(empty_pass.route_pin_quarantine.total_blocked, 0);
+    assert_eq!(empty_pass.route_pin_quarantine.newly_quarantined, 0);
+    assert!(empty_pass.route_pin_quarantine.entries.is_empty());
+
+    let event_id = seed_owner_outbox_event(pool, tenant_id).await?;
+    let pinned_route = route(tenant_id);
+    let first_claim = store
+        .claim_native_due(Uuid::new_v4(), 1, 120, &pinned_route)
+        .await?
+        .pop()
+        .expect("new event is claimable before a route mismatch exists");
+    let original_wire = store
+        .get_or_pin_native_wire(&first_claim, &pinned_route)
+        .await?;
+    store
+        .record_failure(&first_claim, OutboxDeliveryFailureKind::Transient)
+        .await?;
+    make_retry_due(pool, tenant_id, event_id).await?;
+
+    let changed_route = route_for_endpoint(tenant_id, Uuid::new_v4(), "native-endpoint-conflict");
+    let blocked_pass = store
+        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .await?;
+    assert!(
+        blocked_pass.claims.is_empty(),
+        "mismatched pin must not be claimed"
+    );
+    assert_eq!(blocked_pass.route_pin_quarantine.total_blocked, 1);
+    assert_eq!(blocked_pass.route_pin_quarantine.newly_quarantined, 1);
+    assert_eq!(blocked_pass.route_pin_quarantine.entries.len(), 1);
+    let diagnostic = &blocked_pass.route_pin_quarantine.entries[0];
+    assert_eq!(diagnostic.event_id, event_id);
+    assert_eq!(diagnostic.observed_profile_id, changed_route.profile_id());
+    assert!(diagnostic
+        .mismatch_fields
+        .iter()
+        .any(|field| field == "profile_id"));
+    assert!(diagnostic
+        .mismatch_fields
+        .iter()
+        .any(|field| field == "endpoint_identity"));
+    assert!(diagnostic
+        .mismatch_fields
+        .iter()
+        .any(|field| field == "profile_digest"));
+
+    let original_pin: (
+        Uuid,
+        i64,
+        String,
+        String,
+        Vec<u8>,
+        String,
+        Uuid,
+        Uuid,
+        String,
+        Vec<u8>,
+        Vec<u8>,
+    ) = sqlx::query_as(
+        "SELECT profile_id, profile_revision, provider_id, provider_version, profile_digest, \
+                endpoint_identity, sender_service_id, recipient_service_id, message_kind, \
+                wire_sha256, wire_payload \
+         FROM infrastructure.capacity_outbox_transport_pin WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(pool)
+    .await?;
+    assert_eq!(original_pin.0, pinned_route.profile_id());
+    assert_eq!(original_pin.1, pinned_route.profile_revision());
+    assert_eq!(original_pin.2, pinned_route.profile().provider_id);
+    assert_eq!(original_pin.3, pinned_route.profile().provider_version);
+    assert_eq!(
+        original_pin.4,
+        pinned_route.profile().profile_digest.to_vec()
+    );
+    assert_eq!(original_pin.5, pinned_route.profile().endpoint_identity);
+    assert_eq!(original_pin.6, pinned_route.sender_service_id());
+    assert_eq!(original_pin.7, pinned_route.recipient_service_id());
+    assert_eq!(original_pin.8, "result");
+    assert_eq!(original_pin.9.as_slice(), original_wire.sha256.as_slice());
+    assert_eq!(original_pin.10, original_wire.payload);
+    let delivery_state: String = sqlx::query_scalar(
+        "SELECT delivery_state FROM infrastructure.capacity_outbox_delivery \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(pool)
+    .await?;
+    assert_eq!(
+        delivery_state, "dead",
+        "quarantine must terminalize blocked pending/retry work"
+    );
+    let receipt_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM infrastructure.capacity_native_append_receipt \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(event_id)
+    .fetch_one(pool)
+    .await?;
+    assert_eq!(receipt_count, 0);
+    assert!(store
+        .claim_due(tenant_id, Uuid::new_v4(), 1, 30)
+        .await?
+        .is_empty());
+
+    let repeated_pass = store
+        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .await?;
+    assert!(repeated_pass.claims.is_empty());
+    assert_eq!(repeated_pass.route_pin_quarantine.total_blocked, 1);
+    assert_eq!(repeated_pass.route_pin_quarantine.newly_quarantined, 0);
+    let read_page = store
+        .native_route_pin_quarantine_page(&changed_route, None, 1)
+        .await?;
+    assert_eq!(read_page.total_blocked, 1);
+    assert_eq!(read_page.entries[0].event_id, event_id);
+    assert!(read_page.next_cursor.is_none());
+
+    let active_event = seed_owner_outbox_event(pool, tenant_id).await?;
+    let active_claim = store
+        .claim_native_due(Uuid::new_v4(), 1, 120, &pinned_route)
+        .await?
+        .into_iter()
+        .find(|claim| claim.event_id == active_event)
+        .expect("second native event is leased on the pinned route");
+    let active_wire = store
+        .get_or_pin_native_wire(&active_claim, &pinned_route)
+        .await?;
+    let during_active_lease = store
+        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .await?;
+    assert!(during_active_lease.claims.is_empty());
+    assert_eq!(during_active_lease.route_pin_quarantine.total_blocked, 1);
+    let active_quarantine_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM infrastructure.capacity_native_route_pin_quarantine \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(active_event)
+    .fetch_one(pool)
+    .await?;
+    assert_eq!(
+        active_quarantine_count, 0,
+        "active leases must remain untouched"
+    );
+    store
+        .mark_native_delivered(
+            &active_claim,
+            &pinned_route,
+            &native_receipt(&pinned_route, &active_wire.sha256, false, 4),
+        )
+        .await?;
+    let after_receipt = store
+        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &changed_route)
+        .await?;
+    assert_eq!(after_receipt.route_pin_quarantine.total_blocked, 1);
+    let delivered_quarantine_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM infrastructure.capacity_native_route_pin_quarantine \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(active_event)
+    .fetch_one(pool)
+    .await?;
+    assert_eq!(
+        delivered_quarantine_count, 0,
+        "a delivered receipt must not be quarantined"
+    );
+
+    let other_tenant = Uuid::new_v4();
+    let other_event = seed_owner_outbox_event(pool, other_tenant).await?;
+    let other_route = route(other_tenant);
+    let other_claim = store
+        .claim_native_due(Uuid::new_v4(), 1, 120, &other_route)
+        .await?
+        .pop()
+        .expect("other tenant's event is claimable on its own route");
+    store
+        .get_or_pin_native_wire(&other_claim, &other_route)
+        .await?;
+    store
+        .record_failure(&other_claim, OutboxDeliveryFailureKind::Transient)
+        .await?;
+    make_retry_due(pool, other_tenant, other_event).await?;
+    let other_tenant_state: String = sqlx::query_scalar(
+        "SELECT delivery_state FROM infrastructure.capacity_outbox_delivery \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(other_tenant)
+    .bind(other_event)
+    .fetch_one(pool)
+    .await?;
+    let other_tenant_quarantine_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM infrastructure.capacity_native_route_pin_quarantine \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(other_tenant)
+    .bind(other_event)
+    .fetch_one(pool)
+    .await?;
+    assert_eq!(other_tenant_state, "retry");
+    assert_eq!(other_tenant_quarantine_count, 0);
+    let other_changed_route = route_for_endpoint(
+        other_tenant,
+        Uuid::new_v4(),
+        "other-native-endpoint-conflict",
+    );
+    let other_pass = store
+        .claim_native_due_with_diagnostics(Uuid::new_v4(), 1, 120, &other_changed_route)
+        .await?;
+    assert_eq!(other_pass.route_pin_quarantine.total_blocked, 1);
+    assert_eq!(
+        other_pass.route_pin_quarantine.entries[0].event_id,
+        other_event
+    );
+
+    let tenant_a_page = assert_quarantine_tenant_scope(store, &changed_route, other_event).await?;
+    assert_eq!(tenant_a_page.total_blocked, 1);
+    assert!(tenant_a_page
+        .entries
+        .iter()
+        .any(|entry| entry.event_id == event_id));
+    assert!(!tenant_a_page
+        .entries
+        .iter()
+        .any(|entry| entry.event_id == other_event));
+
+    Ok(event_id)
+}
+
+async fn assert_quarantine_tenant_scope(
+    store: &PostgresInfrastructureOwnerOutboxDelivery,
+    tenant_a_route: &NativeInfrastructureDeliveryRoute,
+    tenant_b_event: Uuid,
+) -> Result<NativeRoutePinQuarantinePage, Box<dyn std::error::Error>> {
+    let page = store
+        .native_route_pin_quarantine_page(tenant_a_route, None, 32)
+        .await?;
+    assert!(!page
+        .entries
+        .iter()
+        .any(|entry| entry.event_id == tenant_b_event));
+    Ok(page)
 }
 
 fn route_for_endpoint(
@@ -446,12 +721,13 @@ async fn assert_native_result_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
                 has_table_privilege('star_infrastructure_owner', c.oid, 'TRUNCATE') AS can_truncate \
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace \
          WHERE n.nspname = 'infrastructure' AND c.relname IN \
-           ('capacity_outbox_transport_pin','capacity_native_append_receipt') \
+           ('capacity_outbox_transport_pin','capacity_native_append_receipt', \
+            'capacity_native_route_pin_quarantine') \
          ORDER BY c.relname",
     )
     .fetch_all(pool)
     .await?;
-    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.len(), 3);
     for row in rows {
         assert!(row.try_get::<bool, _>("relrowsecurity")?);
         assert!(row.try_get::<bool, _>("relforcerowsecurity")?);
@@ -470,14 +746,15 @@ async fn assert_native_result_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
     assert!(role_is_restricted);
     let tenant_policies: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM pg_policies WHERE schemaname = 'infrastructure' \
-         AND tablename IN ('capacity_outbox_transport_pin','capacity_native_append_receipt') \
+         AND tablename IN ('capacity_outbox_transport_pin','capacity_native_append_receipt', \
+                           'capacity_native_route_pin_quarantine') \
          AND qual LIKE '%app.tenant_id%' AND with_check LIKE '%app.tenant_id%'",
     )
     .fetch_one(pool)
     .await?;
     assert_eq!(
-        tenant_policies, 2,
-        "both tables require tenant-scoped USING and WITH CHECK policies"
+        tenant_policies, 3,
+        "all route-pin facts require tenant-scoped USING and WITH CHECK policies"
     );
     let guard_triggers: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid \
@@ -485,26 +762,29 @@ async fn assert_native_result_schema(pool: &PgPool) -> Result<(), sqlx::Error> {
          WHERE n.nspname = 'infrastructure' AND NOT t.tgisinternal \
            AND ((c.relname = 'capacity_outbox_transport_pin' AND t.tgname IN \
                  ('capacity_outbox_transport_pin_insert_guard','capacity_outbox_transport_pin_worm')) \
-             OR (c.relname = 'capacity_native_append_receipt' AND t.tgname IN \
-                 ('capacity_native_append_receipt_insert_guard','capacity_native_append_receipt_worm'))) ",
+              OR (c.relname = 'capacity_native_append_receipt' AND t.tgname IN \
+                  ('capacity_native_append_receipt_insert_guard','capacity_native_append_receipt_worm')) \
+              OR (c.relname = 'capacity_native_route_pin_quarantine' AND t.tgname IN \
+                  ('capacity_native_route_pin_quarantine_insert_guard','capacity_native_route_pin_quarantine_worm'))) ",
     )
     .fetch_one(pool)
     .await?;
     assert_eq!(
-        guard_triggers, 4,
-        "both tables require insert fencing and WORM guards"
+        guard_triggers, 6,
+        "route pins, receipts, and quarantine require insert fencing and WORM guards"
     );
     let truncate_guards: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid \
          JOIN pg_namespace n ON n.oid = c.relnamespace \
          WHERE n.nspname = 'infrastructure' AND NOT t.tgisinternal \
-           AND t.tgname IN ('capacity_outbox_transport_pin_worm','capacity_native_append_receipt_worm') \
+            AND t.tgname IN ('capacity_outbox_transport_pin_worm','capacity_native_append_receipt_worm', \
+                             'capacity_native_route_pin_quarantine_worm') \
            AND (t.tgtype & 32) = 32",
     )
     .fetch_one(pool)
     .await?;
     assert_eq!(
-        truncate_guards, 2,
+        truncate_guards, 3,
         "each immutable result table requires a statement-level TRUNCATE trigger"
     );
     Ok(())
@@ -608,6 +888,7 @@ async fn assert_worm_and_truncate_guards(
     pool: &PgPool,
     tenant_id: Uuid,
     event_id: Uuid,
+    quarantine_event_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     let mut owner_update = pool.begin().await?;
     set_owner_scope(&mut owner_update, tenant_id).await?;
@@ -640,6 +921,32 @@ async fn assert_worm_and_truncate_guards(
         "owner role must not be granted DELETE"
     );
 
+    let mut owner_quarantine_update = pool.begin().await?;
+    set_owner_scope(&mut owner_quarantine_update, tenant_id).await?;
+    let denied_quarantine_update = sqlx::query(
+        "UPDATE infrastructure.capacity_native_route_pin_quarantine \
+         SET detected_at = detected_at WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(quarantine_event_id)
+    .execute(&mut *owner_quarantine_update)
+    .await;
+    owner_quarantine_update.rollback().await?;
+    assert!(denied_quarantine_update.is_err());
+
+    let mut owner_quarantine_delete = pool.begin().await?;
+    set_owner_scope(&mut owner_quarantine_delete, tenant_id).await?;
+    let denied_quarantine_delete = sqlx::query(
+        "DELETE FROM infrastructure.capacity_native_route_pin_quarantine \
+         WHERE tenant_id = $1 AND event_id = $2",
+    )
+    .bind(tenant_id)
+    .bind(quarantine_event_id)
+    .execute(&mut *owner_quarantine_delete)
+    .await;
+    owner_quarantine_delete.rollback().await?;
+    assert!(denied_quarantine_delete.is_err());
+
     for (statement, expected_table) in [
         (
             "UPDATE infrastructure.capacity_outbox_transport_pin SET pinned_at = pinned_at WHERE event_id = $1",
@@ -664,6 +971,18 @@ async fn assert_worm_and_truncate_guards(
         (
             "TRUNCATE infrastructure.capacity_native_append_receipt CASCADE",
             "capacity_native_append_receipt",
+        ),
+        (
+            "UPDATE infrastructure.capacity_native_route_pin_quarantine SET detected_at = detected_at WHERE event_id = $1",
+            "capacity_native_route_pin_quarantine",
+        ),
+        (
+            "DELETE FROM infrastructure.capacity_native_route_pin_quarantine WHERE event_id = $1",
+            "capacity_native_route_pin_quarantine",
+        ),
+        (
+            "TRUNCATE infrastructure.capacity_native_route_pin_quarantine CASCADE",
+            "capacity_native_route_pin_quarantine",
         ),
     ] {
         let mut tx = pool.begin().await?;

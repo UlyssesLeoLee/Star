@@ -1,7 +1,8 @@
-// @cypher schema=1 source_sha256=7333460776de9496cd167d62ddca7dd20ddbd5ae3bfc703b0422bafbbe35a27f
+// @cypher schema=1 source_sha256=c7b8c22dcb5333b0b3c95a208412057df3edba614a9f6da31e0bdfe9b9257755
 // MERGE (self:File {path:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs"})
 // MERGE (publisher:Type {id:"infrastructure::InfrastructureOwnerNativeResultPublisher",kind:"struct"})
 // MERGE (outcome:Type {id:"infrastructure::NativeResultPublishBatchOutcome",kind:"struct"})
+// MERGE (quarantine_page:Type {id:"infrastructure::NativeRoutePinQuarantinePage",kind:"struct"})
 // MERGE (error:Type {id:"infrastructure::NativeResultPublisherError",kind:"enum"})
 // MERGE (new:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::InfrastructureOwnerNativeResultPublisher.new",kind:"method"})
 // MERGE (publish:Symbol {id:"crates/infrastructure/src/infrastructure_owner_native_result_publisher.rs::InfrastructureOwnerNativeResultPublisher.publish_due_for_tenant",kind:"method"})
@@ -34,6 +35,7 @@
 // MERGE (admission_profile_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportProfile.new",kind:"method"})
 // MERGE (receipt:Type {id:"platform_messaging_runtime::native_append::NativeAppendReceipt",kind:"external_type"})
 // MERGE (claim_native:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due",kind:"method"})
+// MERGE (claim_native_diagnostics:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.claim_native_due_with_diagnostics",kind:"method"})
 // MERGE (pin_wire:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.get_or_pin_native_wire",kind:"method"})
 // MERGE (record_failure:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.record_failure",kind:"method"})
 // MERGE (mark_delivered:Symbol {id:"crates/infrastructure/src/infrastructure_owner_outbox_delivery.rs::PostgresInfrastructureOwnerOutboxDelivery.mark_native_delivered",kind:"method"})
@@ -76,7 +78,8 @@
 // MERGE (self)-[:IMPORTS]->(transport_profile_file)
 // MERGE (native_append_file)-[:DEFINES]->(append_result)
 // MERGE (native_append_file)-[:DEFINES]->(transport_profile)
-// MERGE (publish)-[:CALLS]->(claim_native)
+// MERGE (publish)-[:CALLS]->(claim_native_diagnostics)
+// MERGE (outcome)-[:HAS_FIELD]->(quarantine_page)
 // MERGE (publish)-[:CALLS]->(route_recipient)
 // MERGE (publish)-[:CALLS]->(pin_wire)
 // MERGE (publish)-[:CALLS]->(append_result)
@@ -135,7 +138,8 @@ use uuid::Uuid;
 
 use crate::infrastructure_owner_outbox_delivery::{
     InfrastructureOwnerOutboxDeliveryError, NativeInfrastructureDeliveryRoute,
-    OutboxDeliveryFailureKind, PostgresInfrastructureOwnerOutboxDelivery,
+    NativeRoutePinQuarantinePage, OutboxDeliveryFailureKind,
+    PostgresInfrastructureOwnerOutboxDelivery,
 };
 
 const MAX_NATIVE_PUBLISH_BATCH_SIZE: i64 = 8;
@@ -145,7 +149,7 @@ const MAX_DELIVERY_ATTEMPTS: i32 = 12;
 const NATIVE_APPEND_DEADLINE: Duration = Duration::from_secs(10);
 
 /// Result counts for one bounded, explicitly invoked publisher pass.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NativeResultPublishBatchOutcome {
     /// Number of current-fence Outbox events claimed.
     pub claimed: usize,
@@ -157,6 +161,8 @@ pub struct NativeResultPublishBatchOutcome {
     pub retry_scheduled: usize,
     /// Number of invalid or exhausted events moved to the terminal dead state.
     pub dead_lettered: usize,
+    /// Bounded route-pin diagnostics so zero claims do not hide blocked work.
+    pub route_pin_quarantine: NativeRoutePinQuarantinePage,
     /// Whether cancellation stopped this pass before another event started.
     pub cancelled: bool,
 }
@@ -219,16 +225,22 @@ impl InfrastructureOwnerNativeResultPublisher {
         {
             return Err(InfrastructureOwnerOutboxDeliveryError::InvalidParameters.into());
         }
-        let claims = self
+        let claim_batch = self
             .delivery_store
-            .claim_native_due(lease_owner_id, max_items, lease_seconds, &self.route)
+            .claim_native_due_with_diagnostics(
+                lease_owner_id,
+                max_items,
+                lease_seconds,
+                &self.route,
+            )
             .await?;
         let mut outcome = NativeResultPublishBatchOutcome {
-            claimed: claims.len(),
+            claimed: claim_batch.claims.len(),
+            route_pin_quarantine: claim_batch.route_pin_quarantine,
             ..NativeResultPublishBatchOutcome::default()
         };
 
-        for claim in claims {
+        for claim in claim_batch.claims {
             if cancellation_requested(cancellation) {
                 self.delivery_store
                     .record_failure(&claim, OutboxDeliveryFailureKind::Transient)
