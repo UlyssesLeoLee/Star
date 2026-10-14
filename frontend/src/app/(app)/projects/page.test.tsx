@@ -1,5 +1,10 @@
+/*
+@cypher schema=1 source_sha256=e1af232eee37ce700751754f3c77a54e68119646f31628bd7cba942ed5a63f6f
+MERGE (self:File {path:"frontend/src/app/(app)/projects/page.test.tsx"})
+@endcypher
+*/
 // =====================================================================
-// Projects Page 单元测试 (per ui-redesign-multica-style.md §5.2)
+// Projects Page 单元测试 (per 前端布局设计说明 §5.2)
 // 覆盖:
 //   1. 渲染 5 tab + project switcher
 //   2. 默认显示 Overview tab + project 元信息 + KPI

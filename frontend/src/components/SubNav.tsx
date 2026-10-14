@@ -1,19 +1,24 @@
+/*
+@cypher schema=1 source_sha256=b50e4a56fb59bf174e29cddf9380c9f1c5352ac8d8d9e47f453a66cfa6ab155d
+MERGE (self:File {path:"frontend/src/components/SubNav.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
-// SubNav — 嵌套子页面左导航 (per docs/frontend/design/ui-redesign-multica-style.md §4)
+// SubNav — 嵌套子页面左导航 (per 前端布局设计说明 §4)
 // =====================================================================
 // 职责:
 //   1. 180px 宽 sticky 侧栏 (top-16, 顶栏下方)
 //   2. 渲染 items 列表 (id / label / href / 可选 count)
 //   3. active 状态: bg-accent/12 + 左侧 2px accent border
 //   4. hover 状态: bg-bg-soft/40
-//   5. text-label uppercase (per multica 风格 §7 fontSize.label = 12px)
+//   5. text-label uppercase (per 字体规范 §7 fontSize.label = 12px)
 //   6. 自动用 usePathname() 决定 active — 也可由父组件传 activeId 覆盖
 //   7. 提供 matchActive prop 让父组件自定义匹配逻辑 (e.g. /projects?tab=board)
 //
 // 设计原则 (per 守门):
-//   - 不引外部 icon 库 (icons 用文本标签 — multica 风格以小写 label 为主)
+//   - 不引外部 icon 库 (icons 用文本标签 — 以小写 label 为主)
 //   - 不持久化 (per W5 store persist 模式, SubNav 状态在 URL 上)
 //   - 不动 Sidebar.tsx (向后兼容 W1-W4 旧 page)
 //
@@ -51,10 +56,10 @@ export interface SubNavProps {
   matchActive?: (item: SubNavItem, pathname: string | null) => boolean;
   /** 测试用, 强制 active id (覆盖 matchActive 和 pathname 判断) */
   activeId?: string;
-  /** 顶部可选 label (per multica 风格) */
+  /** 顶部可选 label */
   topLabel?: string;
   /**
-   * 域分类 (per 2026-09-02 16:13 JST Jira 风格扩展).
+   * 域分类 (per 2026-09-02 16:13 JST 扩展).
    * 决定 active 项的 left border / bg / text 颜色.
    * 默认 'core' 兼容旧调用, 新 page 应该传 page 真实所在域.
    * 优先被 SubNavItem.category 覆盖.
@@ -80,7 +85,7 @@ export function SubNav({
 }: SubNavProps) {
   const { t } = useTranslation();
   const pathname = usePathname();
-  // Jira 风格扩展: active 状态用域色, 默认 core (cyan) 兼容旧 page
+  // active 状态用域色, 默认 core (cyan) 兼容旧 page
   const cs = getCategoryStyles(category);
 
   return (
@@ -124,8 +129,8 @@ export function SubNav({
                   "text-label uppercase tracking-wider transition-colors",
                   "border-l-2",
                   isActive
-                    ? // Jira 风格: active 用域色 (per 2026-09-02 16:13 JST)
-                      // 保留 multica 风格 12px uppercase, 只换色不换字号
+                    ? // active 用域色 (per 2026-09-02 16:13 JST)
+                      // 保留 12px uppercase, 只换色不换字号
                       clsx(itemCs.bg, itemCs.text, itemCs.border, "font-semibold", itemCs.glow)
                     : "text-ink-dim hover:bg-bg-soft/40 hover:text-ink border-l-transparent",
                 )}

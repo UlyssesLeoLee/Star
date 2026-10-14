@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=2f4f4ba4ece90ff429519daef938c735106cdfd4c6395541bd10d5986abd472c
+MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -93,7 +98,7 @@ const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode
   { id: "worktrees", label: "Worktrees", icon: <GitBranch size={12} /> },
 ];
 
-// Kanban 5 列 (per KANBAN_COLUMNS in mocks/data/kanban.ts, blocked 状态列入主面板 — Multica 阻塞语义)
+// Kanban 5 列 (per KANBAN_COLUMNS in mocks/data/kanban.ts, blocked 状态列入主面板)
 const KANBAN_COLUMNS: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done"];
 
 // ---- 角色 mock 推导 (per 已知缺口 #4) ----
@@ -528,7 +533,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             onWorkItemClick={handleWorkItemClick}
             onArchClick={arch.open}
           />
-          {/* Kanban 卡详情 / 新建 Drawer (per 2026-08-31 12:07 JST 拍板: Jira + Multica) */}
+          {/* Kanban 卡详情 / 新建 Drawer (per 2026-08-31 12:07 JST 拍板) */}
           <WorkItemDetailDrawer
             open={workItemDrawer}
             onClose={() => setWorkItemDrawer(null)}
@@ -760,7 +765,7 @@ function DomainMarker({ domain, label }: { domain: string; label: string }) {
 }
 
 // =====================================================================
-// ProjectSwitcher — 顶部项目切换 (multica 风格 chip row)
+// ProjectSwitcher — 顶部项目切换 (chip row)
 // =====================================================================
 function ProjectSwitcher({
   projects, selectedId, onSelect,

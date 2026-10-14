@@ -1,9 +1,14 @@
+/*
+@cypher schema=1 source_sha256=96c5859439e4484d13b1c7e5cb97cf360ba94f1678c9f135b666e0a81db65075
+MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
+@endcypher
+*/
 // =====================================================================
-// AppShell — 整体布局 (per docs/frontend/design/ui-redesign-multica-style.md §3 + §8.1)
+// AppShell — 整体布局 (per 前端布局设计说明 §3 + §8.1)
 // =====================================================================
 // - 顶栏 64px sticky + 主区 calc(100vh - 64px)
 // - 暗色背景 bg-bg (#0b0d10 per tailwind.config.ts)
-// - 不接受 className — 强制样式 (per multica 严格规范)
+// - 不接受 className — 统一强制样式
 // - SubNav 由 U2 接管 (per spec 任务分工), 留 placeholder comment
 // - fullBleed: 无限画布类页面 (/agent-view) 跳过 main 的 padding/max-width,
 //   自己管理 h-[calc(100vh-4rem)] 布局 (per 2026-09-06 导航栏遮挡修复)

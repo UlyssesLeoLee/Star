@@ -1,5 +1,10 @@
+/*
+@cypher schema=1 source_sha256=304bc89ffb0c5881befc3e1dc7efeee4253c46133526b622f32e45567fa13085
+MERGE (self:File {path:"frontend/src/app/(app)/layout.tsx"})
+@endcypher
+*/
 // =====================================================================
-// (app) layout — AppShell mount (per docs/frontend/design/ui-redesign-multica-style.md §3 + §8.1)
+// (app) layout — AppShell mount (per 前端布局设计说明 §3 + §8.1)
 // =====================================================================
 // - "use client" 因为 AppShell 包含 client AppHeader
 // - 只对 (app) 路由组生效 — 不污染 /api / 22 旧路由

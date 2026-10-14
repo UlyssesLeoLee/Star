@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=a33ecf327ca4a9a3c0933b806d9122990482d6edee094c50f146e7400e8cb11b
+MERGE (self:File {path:"frontend/src/components/board/KanbanBoard.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -63,7 +68,7 @@ export interface KanbanBoardProps {
   onRenameColumn?: (status: WorkItemStatus, newName: string) => void;
   /** 拖动列重排 (fromIdx, toIdx), per 2026-08-29 19:09 JST 补 reorderBoardColumns UI */
   onReorderColumns?: (fromIdx: number, toIdx: number) => void;
-  // 列内新增任务卡 (per 2026-08-31 11:56 JST Ulysses 拍板: Jira 风格 + Add task)
+  // 列内新增任务卡 (per 2026-08-31 11:56 JST Ulysses 拍板: 列内快捷新增)
   // 2026-08-31 12:07 JST 二拍: +Add task 按钮点击触发父组件推 Drawer (mode="new", status 锁定为列)
   //   - 入参只传 status, title 由 Drawer 内输入
   onRequestNewWorkItem?: (status: WorkItemStatus) => void;

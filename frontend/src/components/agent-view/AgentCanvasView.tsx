@@ -1,7 +1,12 @@
+/*
+@cypher schema=1 source_sha256=c73ec88ffbc23ad1c7f1a82a702404e44b9b4366e94bb0c9afcd434f43c5f472
+MERGE (self:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
-// AgentCanvasView — 3渲2 战术全息无限画布 (Miro / Tactical Holo-Board)
+// AgentCanvasView — 3渲2 战术全息无限画布
 // =====================================================================
 // Per 2026-09-06 用户发令:
 //   - 增强游戏界面感 (Game UI / Tactical Holo-Canvas)

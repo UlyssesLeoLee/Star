@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=6256908f3e636a4ecd4c86eb44cc120fbd60fcf60c4df2e038ef9c750dae9355
+MERGE (self:File {path:"frontend/src/lib/nav/__tests__/registry.test.ts"})
+@endcypher
+*/
 import { describe, it, expect } from "vitest";
 import {
   ALL_MODULES,
@@ -10,7 +15,7 @@ import {
 // =====================================================================
 // registry.test.ts — 域分色契约 + helper 行为单测
 //
-// Per 2026-09-02 15:42 JST 拍板, 5 域分色 token (Jira 风格 icon tile)
+// Per 2026-09-02 15:42 JST 拍板, 5 域分色 token (icon tile)
 // 不能改值, 改了需要 DDD Review 重新拍板 + 改这一份测试.
 // =====================================================================
 
@@ -133,7 +138,7 @@ describe("MODULE_MAP — id 唯一性 + 全覆盖", () => {
     expect(MODULE_MAP.size).toBe(ALL_MODULES.length);
   });
 
-  it("每个 module 都有 icon (regulatory: Jira 风格 icon tile 必含 icon)", () => {
+  it("每个 module 都有 icon (导航卡片必须包含 icon)", () => {
     ALL_MODULES.forEach((m) => {
       expect(m.icon).toBeDefined();
       // icon 是 React.ElementType (function/class), 不是 string

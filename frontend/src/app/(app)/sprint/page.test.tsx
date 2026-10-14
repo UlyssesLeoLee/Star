@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=d1cc4fd979e17ae4556cdd14c036f32340ed98a4b98fb0c41c67be6f389bddd5
+MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.test.tsx"})
+@endcypher
+*/
 // =====================================================================
 // Issues Page Test (per U2 任务 — 8 测试)
 // =====================================================================
@@ -143,13 +148,13 @@ describe("IssuesPage (U2)", () => {
     expect(screen.getByTestId("issues-tree")).toBeTruthy();
   });
 
-  // ---- Test 4: view 切换 (Sprint) — Jira 范式 (per 2026-09-05 19:32 JST 拍板) ----
-  it("renders Sprint Jira 范式 view (sprint-board-view + sprint-backlog) when view=sprint", () => {
+  // ---- Test 4: view 切换 (Sprint) — 看板视图 (per 2026-09-05 19:32 JST 拍板) ----
+  it("renders the Sprint board view (sprint-board-view + sprint-backlog) when view=sprint", () => {
     mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "sprint" : null));
     mockSearchParams.toString = () => "view=sprint";
     renderWithI18n(<IssuesPage />);
     expect(screen.getByTestId("issues-view-sprint")).toBeTruthy();
-    // Jira 范式 SprintBoardView 接管
+    // SprintBoardView 接管
     expect(screen.getByTestId("sprint-board-view")).toBeTruthy();
     expect(screen.getByTestId("sprint-backlog")).toBeTruthy();
   });

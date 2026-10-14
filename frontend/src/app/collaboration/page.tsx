@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=352576ade7d666a19ad57bb7fa15802fd58c062868be3e0ebde5a1840cb16da0
+MERGE (self:File {path:"frontend/src/app/collaboration/page.tsx"})
+@endcypher
+*/
 "use client";
 
 import { useStore } from "@/lib/store";
@@ -37,7 +42,7 @@ export default function CollaborationPage() {
     <div className="max-w-7xl">
       <PageHeader
         title={t.pageTitles['/collaboration'].title}
-        subtitle="无限画布(Miro 模式)与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。"
+        subtitle="无限协作画布与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。"
         icon={<Boxes className="text-accent" size={20} />}
         track="E"
         count={canvases.length}

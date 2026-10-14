@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=c2cb7f18e318425b1b6770d2a4d69c9d7629abf539e3ac85a2cfa17665d06c15
+MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
+@endcypher
+*/
 "use client";
 
 import Link from "next/link";
@@ -23,8 +28,8 @@ import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 // GitHub Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
-// 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (Multica spawn dev server 时注入)
-//             → process.env.NEXT_PUBLIC_MULTICA_ISSUE_ID (备选)
+// 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (开发服务器注入)
+//             → legacy issue identifier (备选)
 //             → '' (用户多 worktree 并开时仍可读)
 const WORKTREE_ID =
   process.env.NEXT_PUBLIC_WORKTREE_ID ||
@@ -207,7 +212,7 @@ interface HeaderTabProps {
 function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
   const mod = useModuleTranslation(tab);
   const { t, tx } = useTranslation();
-  // Jira 风格: 顶栏 active 用域色 + icon tile (per 2026-09-02 18:16 + 18:23 JST 推)
+  // 顶栏 active 用域色 + icon tile (per 2026-09-02 18:16 + 18:23 JST 推)
   // 之前 active 全用 accent 青色, 跟 module 业务域脱钩, 且只用 01/02 短码
   // 现在: Inbox=cyan, Issues/Projects/Analytics=blue, Agents=emerald, Settings=amber
   //      配 lucide icon (来自 ModuleDefinition.icon), 跟 Sidebar icon tile 风格统一
@@ -230,7 +235,7 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
             : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
         )}
       >
-        {/* Jira 风格 icon tile — 7x7 圆角色块 + 域分色 + line icon (per 18:23 JST 推) */}
+        {/* 域分色 icon tile — 7x7 圆角色块 + line icon (per 18:23 JST 推) */}
         <div
           data-testid={`tab-icon-tile-${tab.id}`}
           aria-hidden="true"
