@@ -42,7 +42,7 @@ Native server 的 tenant 来自 mTLS certificate identity，随后只在该身�
 
 当部署只装配了新 Profile revision/endpoint 时，指向旧 pin 的 pending/retry 或过期 leased event 无法由这个 publisher 领取，也不会被本路径推进到 dead/quarantine；外部只会看到空批次。拒绝跨 provider 重发是正确的安全边界，但当前 API 未解析原 pin，也未显式呈现阻塞原因。
 
-**建议**：生产接线按每条 pin 解析原 Profile revision/endpoint；若原 route 已撤销或不可恢复，则将该项转为可观测的 operator-blocked/quarantine 状态并保留审计事实，不能静默吞掉 mismatch。
+**建议**：按 AC-D20-INFRA-ROUTE-PIN-OBS-06/RECOVERY-07/DISPOSITION-08 落地跨 provider 盘点所有 native-pinned event、区分 empty-eligible 与 route-mismatch-blocked、bounded tenant/opaque-route aggregates、分页 event status 和新的 authenticated operator API/UI。operator permission 必须来自 verified client/user role provisioning 或独立认证的内部 operator identity；不能只相信请求 scope 字符串。tenant 必须经 verified user membership or registered client/service-identity tenant-binding resolver 推导；新增分离的 read/recover/dispose least-privilege capabilities。当前 star-api-rest 无对应 Infrastructure route/scope。数据库 quarantine table 或 RLS read seam 不足以关闭 P2。优先复验并恢复原 pinned Profile revision/endpoint，再以相同 message identity/exact bytes 重试；无法恢复则保持 operator-blocked 并等待 owner-authorized audited terminal disposition。禁止改 pin、跨 provider fallback 或 dual publish；替代业务结果必须由 origin owner 创建新 event/new pin。
 
 ## §3 已知缺口与限制
 
@@ -82,6 +82,7 @@ Native server 的 tenant 来自 mTLS certificate identity，随后只在该身�
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.2 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 P2 recommendation 收敛为跨 provider bounded observability、append-only blocked evidence、原 route 恢复和 owner-governed terminal disposition 合同；状态仍为未实现/生产阻断，未添加测试或运行证据 | D20 P2 docs lane 根据当前 source/review 证据补齐处置合同 |
 | v0.1 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 独立审查 D20 native exact append/publisher；记录 tenant-route P1 与 pinned-route 可观测性 P2，并说明未做 migration/runtime 验证 | 用户要求并行 Worktree lane 审查 D20 publisher |
 
 ## §8 后续处置与复验（2026-10-14）
@@ -90,6 +91,6 @@ Native server 的 tenant 来自 mTLS certificate identity，随后只在该身�
 |---|---|---|
 | P1 tenant-route mismatch | 已修复 | `8506766e` 将 deployment、tenant、Profile ID/revision 和 endpoint identity 绑定到 resolver-produced `ResolvedTransportEndpoint`；publisher 仅接收与该 snapshot 匹配的 `NativeGrpcAppendTransport`，claim 不再接受调用者单独指定 tenant。跨租户错配负例通过，Infrastructure library tests 76/76 通过。 |
 | PostgreSQL owner-store acceptance | 已验证，范围受限 | 随后的 disposable PostgreSQL 18.6 runner 为 93/93，owner-store SQLx test 为 1/1；验证 migration 双次应用、RLS/WORM、attempt fence 与 receipt/delivery 原子性。该测试使用 resolver/profile fixture 和合成 receipt，不调用 publisher 或 native server；详见 [PG 验收报告](PHASE-9F4C-D20-NATIVE-PUBLISHER-PG-REPORT.md)。 |
-| P2 stale route-pin observability | 未修复，生产接线阻断项 | 当前 native claim 会过滤与当前 route 不匹配的旧 pin，但没有 operator-visible mismatch/blocked 计数，也没有旧 Profile revision recovery/quarantine 路径。上线接线前需补齐可观测恢复或 durable quarantine；不能把空 batch 解释为无阻塞。 |
+| P2 stale route-pin observability | 基线未修复；production wiring blocker。目标合同已在本次 docs lane 明确，implementation lane 尚待复验 | 当前 native claim 会过滤与当前 route 不匹配的旧 pin；只有调用 native publisher 才能看到其零 claim，而 JetStream 会安全跳过 native-pinned event 且没有 operator-visible cross-provider status。star-api-rest 当前没有 Infrastructure operator route/scope；且 requested scope token 不能替代已验证的 client/user role provisioning。目标为新增可信 operator identity、verified user membership or registered client/service-identity tenant-binding resolver、分离的 least-privilege read/recover/dispose capabilities 与 owner-authorized idempotent append-only blocked 状态；只有原 route 恢复并重新授权后允许 same-route exact-wire retry。无法恢复必须由明确 terminal disposition 结束旧事件，不能标 delivered 或 retarget；新业务结果使用新 event identity/new immutable pin。即使 quarantine table/RLS read seam 已新增，也需 cross-provider diagnostics 和 authorized operator surface 验收。本次文档更新不是实现或运行证据。 |
 
 本 addendum 只更新 finding disposition；不扩大原审查范围。目标数据库部署、真实 native append/TLS/revocation、production Profile resolver/startup、BI/Benchmark、recovery、资源与 NATS rollback 仍未验收。CodeRabbit 因 CLI 权限问题未运行成功，不记为独立 clean review。
