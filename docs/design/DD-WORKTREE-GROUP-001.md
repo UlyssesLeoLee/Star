@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.83**
+> **渡口 Project / Branch / Engineering Run / Worktree 与 Run Apps 详细设计 v4.85**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -1000,12 +1000,13 @@ D16 最终 PostgreSQL 18.6 disposable runner 为 68/68；两份 D16 quarantine m
 
 ### §8.22 D20 native owner consumers in Run Apps
 
-Run Apps 的消息处理仍按 owner 划分：Schedule admission Request/Resolution 与 Result 由 Run owner 管理；Infrastructure demand 由 Infrastructure owner 管理。Run-owner Result 和 Infrastructure Request 的 native receive slices 均通过 opt-in feature 暴露，不改变 Project → Cloud Branch → Engineering Run → Worktree 导航，也不把 owner inbox 或 transport cursor 变成新的 UI 树层级。每个 consumer 只在自己的 owner transaction 内持久化 Inbox/处理事实；owner commit 后再复验 exact transport source 并 ACK。跨 owner 状态变化继续由版本化幂等命令、Outbox/Inbox 与各 owner 本地事务完成。
+Run Apps 的消息处理仍按 owner 划分：Schedule admission Request/Resolution 与 Result 由 Run owner 管理；Infrastructure demand 与 capacity-result Outbox publisher/receipt 由 Infrastructure owner 管理。D20 当前含 opt-in Run-owner receive slices，以及 opt-in Infrastructure native Result publisher、route/wire pin 与 receipt store/migration source；这些 source slices 尚未接入 production identity/Profile resolver 或 startup。
 
-绑定缺失/过期、owner 写入失败、来源校验失败和取消均不得确认 delivery；poison 必须先写入独立 durable quarantine。Result consumer 不直接写 BI 投影，Infrastructure consumer 不修改 Run/Schedule 状态或申请/执行 Multipass 操作。Rust 1.99.0 联合包检查与变更文件格式检查通过；Infrastructure 71/71、Run-owner 22/22 library tests 通过。目标 DB/TLS/production grants、consumer deployment、恢复、BI/Benchmark、RSS/延迟/公平性与 D20 closure 仍未验收。
+每个 Infrastructure Outbox event 在第一次外部发送前固定一个不可变 provider route，JetStream 为兼容 adapter；pinned-native event 不再投递给 JetStream，pinned-JetStream event 不再投递给 native。重试复用 Profile ID/revision/digest、endpoint identity、sender/recipient、result kind、稳定 message ID、精确 wire bytes 与 SHA-256。Run consumer 的提交/确认契约是 provider-neutral Inbox commit、来源复验、所选 adapter ACK；native receive 保持 opt-in。绑定缺失/过期、owner 写入失败、来源校验失败和取消均不得确认 delivery；poison 必须先写入独立 durable quarantine。Result consumer 不直接写 BI 投影，Infrastructure demand consumer 不修改 Run/Schedule 状态或申请/执行 Multipass 操作。Native append receipt 只证明 pinned wire 已被 native transport 接收，不是 Run Inbox commit、capacity reservation、readiness 或 execution proof。Rust 1.99.0 联合包检查与变更文件格式检查通过；Infrastructure 71/71、Run-owner 22/22 library tests 通过。既有验证不覆盖新 publisher migration、目标 DB/TLS/生产 grants、production profile/identity wiring、consumer deployment、replay/quarantine/recovery、BI/Benchmark、RSS/延迟/公平性与 rollback；D20 closure 未验收。capacity_released 对 JetStream/native 都保持 fail closed。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v4.85 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 D20 native Infrastructure Result publisher/route pin/receipt source slice 状态与 provider-neutral Run Inbox/ACK 合同；明确单 provider exact-retry、receipt 非 Run commit/readiness 证据、capacity_released 双 provider 禁用及生产门禁 | D20 native publisher 与文档合同复核 |
 | v4.83 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增补 D20 Run-owner Result 与 Infrastructure demand consumer 的 owner boundary、commit-before-ACK、导航与 App 边界及未关闭生产门 | 两条 D20 consumer worktree rebase 并合入本地 dev |
 
 ### §8.23 D19 current Profile 到可信 endpoint 的 native client 组合
