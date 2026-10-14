@@ -1,6 +1,6 @@
 //! Platform-owned bounded poison persistence; the JetStream integration is an optional adapter.
 /*
-@cypher schema=1 source_sha256=e0b3801a930fad11f9f33aa2a91a8451b55b0b95ab94fc5189a569e331038fdb
+@cypher schema=1 source_sha256=34cab7e27d36ac543cfa9aa02290e31bb2a63e69b50e8f6ec1ce6e250c0a7591
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/lib.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (module:Symbol {id:"crates/platform-messaging-runtime/src/lib.rs::platform_messaging_runtime",kind:"module"})
@@ -9,6 +9,7 @@ MERGE (transport_profile_pg_module:Symbol {id:"crates/platform-messaging-runtime
 MERGE (transport_endpoint_module:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::transport_endpoint",kind:"module"})
 MERGE (trusted_profile_endpoint_module:Symbol {id:"crates/platform-messaging-runtime/src/trusted_profile_endpoint.rs::trusted_profile_endpoint",kind:"module"})
 MERGE (native_grpc_module:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_grpc",kind:"module"})
+MERGE (native_append_module:Symbol {id:"crates/platform-messaging-runtime/src/native_append.rs::native_append",kind:"module"})
 MERGE (native_grpc_server_module:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::native_grpc_server",kind:"module"})
 MERGE (native_grpc_feature:Config {id:"cargo.feature.platform-messaging-runtime.native-grpc-adapter"})
 MERGE (native_proto_package:Config {id:"cargo.package.platform-messaging-proto"})
@@ -17,6 +18,7 @@ MERGE (transport_profile_pg_file:File {path:"crates/platform-messaging-runtime/s
 MERGE (transport_endpoint_file:File {path:"crates/platform-messaging-runtime/src/transport_endpoint.rs"})
 MERGE (trusted_profile_endpoint_file:File {path:"crates/platform-messaging-runtime/src/trusted_profile_endpoint.rs"})
 MERGE (native_grpc_file:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
+MERGE (native_append_file:File {path:"crates/platform-messaging-runtime/src/native_append.rs"})
 MERGE (native_grpc_server_file:File {path:"crates/platform-messaging-runtime/src/native_grpc_server.rs"})
 MERGE (durable_quarantine:Config {id:"cargo.feature.platform-messaging-runtime.durable-quarantine"})
 MERGE (source:Type {id:"crates/platform-messaging-runtime/src/lib.rs::TrustedJetStreamSource",kind:"struct"})
@@ -60,12 +62,14 @@ MERGE (module)-[:DEFINES]->(transport_profile_pg_module)
 MERGE (module)-[:DEFINES]->(transport_endpoint_module)
 MERGE (module)-[:DEFINES]->(trusted_profile_endpoint_module)
 MERGE (module)-[:DEFINES]->(native_grpc_module)
+MERGE (module)-[:DEFINES]->(native_append_module)
 MERGE (module)-[:DEFINES]->(native_grpc_server_module)
 MERGE (transport_profile_module)-[:CONTAINS_FILE]->(transport_profile_file)
 MERGE (transport_profile_pg_module)-[:CONTAINS_FILE]->(transport_profile_pg_file)
 MERGE (transport_endpoint_module)-[:CONTAINS_FILE]->(transport_endpoint_file)
 MERGE (trusted_profile_endpoint_module)-[:CONTAINS_FILE]->(trusted_profile_endpoint_file)
 MERGE (native_grpc_module)-[:CONTAINS_FILE]->(native_grpc_file)
+MERGE (native_append_module)-[:CONTAINS_FILE]->(native_append_file)
 MERGE (native_grpc_server_module)-[:CONTAINS_FILE]->(native_grpc_server_file)
 MERGE (self)-[:DEPENDS_ON]->(native_grpc_feature)
 MERGE (native_grpc_feature)-[:DEPENDS_ON]->(native_proto_package)
@@ -164,6 +168,7 @@ pub mod admission_delivery;
 #[cfg(feature = "durable-quarantine")]
 pub mod admission_quarantine_pg;
 pub mod admission_receive;
+pub mod native_append;
 #[cfg(feature = "jetstream-adapter")]
 pub mod admission_receive_jetstream;
 #[cfg(feature = "native-grpc-adapter")]

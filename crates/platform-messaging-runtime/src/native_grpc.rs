@@ -3,7 +3,7 @@
 // 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 (Apache-2.0).
 // TLS loading and fail-closed behavior are retained; application identity stays Star-owned.
 /*
-@cypher schema=1 source_sha256=74f5063a44bb9ed7c9c25c497ecad366709445a6ec6e74d4ab1a21d2361ac3f2
+@cypher schema=1 source_sha256=4334fba4a02a9e58b79296cec6a3bd72f39e9b62ff10963f205385f95472dee7
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (tls_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
 MERGE (tls_server:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
@@ -14,13 +14,18 @@ MERGE (valid_https_endpoint:Symbol {id:"crates/platform-messaging-runtime/src/na
 MERGE (setup_error:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcSetupError",kind:"enum"})
 MERGE (identity_error:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcIdentityError",kind:"struct"})
 MERGE (transport:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport",kind:"struct"})
+MERGE (append_transport:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAppendTransport",kind:"struct"})
 MERGE (client_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcClientConfig",kind:"struct"})
+MERGE (append_client_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAppendClientConfig",kind:"struct"})
 MERGE (receive_transport:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport",kind:"struct"})
 MERGE (receive_authorization:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveAuthorization",kind:"struct"})
 MERGE (receive_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcReceiveClientConfig",kind:"struct"})
 MERGE (receive_delivery:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionDelivery",kind:"struct"})
 MERGE (connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport.connect",kind:"method"})
 MERGE (publish:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport.publish",kind:"method"})
+MERGE (append_connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAppendTransport.connect",kind:"method"})
+MERGE (append_result:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAppendTransport.append_result",kind:"method"})
+MERGE (validate_profile_snapshot:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::validate_append_profile_snapshot",kind:"function"})
 MERGE (connect_receive_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::connect_native_client",kind:"function"})
 MERGE (receive_connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport.connect",kind:"method"})
 MERGE (receive_authorization_factory:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveTransport.authorization",kind:"method"})
@@ -35,6 +40,7 @@ MERGE (valid_log_id:Symbol {id:"crates/platform-messaging-runtime/src/native_grp
 MERGE (kind_mapping:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_message_kind",kind:"function"})
 MERGE (provider_identity:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_provider_identity",kind:"function"})
 MERGE (profile_endpoint_guard:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::validate_profile_endpoint",kind:"function"})
+MERGE (profile_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportProfile.new",kind:"method"})
 MERGE (proto:File {path:"crates/platform-messaging-proto/src/lib.rs"})
 MERGE (transport_profile_file:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
 MERGE (transport_endpoint_file:File {path:"crates/platform-messaging-runtime/src/transport_endpoint.rs"})
@@ -43,6 +49,11 @@ MERGE (admission:Type {id:"crates/platform-messaging-runtime/src/admission_deliv
 MERGE (receipt:Type {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportReceipt",kind:"struct"})
 MERGE (receive_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})
 MERGE (delivery_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceivedDelivery",kind:"trait"})
+MERGE (native_append_file:File {path:"crates/platform-messaging-runtime/src/native_append.rs"})
+MERGE (append_port:Type {id:"crates/platform-messaging-runtime/src/native_append.rs::NativeAppendTransport",kind:"trait"})
+MERGE (append_receipt:Type {id:"crates/platform-messaging-runtime/src/native_append.rs::NativeAppendReceipt",kind:"struct"})
+MERGE (append_error:Type {id:"crates/platform-messaging-runtime/src/native_append.rs::NativeAppendError",kind:"enum"})
+MERGE (append_wire_limit:Config {id:"crates/platform-messaging-runtime/src/native_append.rs::MAX_NATIVE_APPEND_WIRE_BYTES"})
 MERGE (receive_authorization_port:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveAuthorization",kind:"trait"})
 MERGE (tonic:ExternalService {id:"tonic::transport",kind:"library"})
 MERGE (tonic_request:ExternalService {id:"tonic::Request::peer_certs",kind:"method"})
@@ -73,6 +84,8 @@ MERGE (endpoint_profile_digest_test:Symbol {id:"crates/platform-messaging-runtim
 MERGE (endpoint_profile_identity_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::resolved_endpoint_must_match_admission_profile_identity",kind:"test"})
 MERGE (endpoint_profile_match_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::matching_resolved_endpoint_is_accepted_by_profile_guard",kind:"test"})
 MERGE (semaphore:ExternalService {id:"tokio::sync::Semaphore::acquire_owned",kind:"method"})
+MERGE (try_semaphore:ExternalService {id:"tokio::sync::Semaphore::try_acquire_owned",kind:"method"})
+MERGE (semaphore_new:ExternalService {id:"tokio::sync::Semaphore::new",kind:"method"})
 MERGE (permit:ExternalService {id:"tokio::sync::OwnedSemaphorePermit",kind:"type"})
 MERGE (bounded_read:ExternalService {id:"std::io::Read::read_to_end",kind:"method"})
 MERGE (uuid_parse:ExternalService {id:"uuid::Uuid::from_slice",kind:"method"})
@@ -85,12 +98,17 @@ MERGE (self)-[:DEFINES]->(valid_https_endpoint)
 MERGE (self)-[:DEFINES]->(setup_error)
 MERGE (self)-[:DEFINES]->(identity_error)
 MERGE (self)-[:DEFINES]->(transport)
+MERGE (self)-[:DEFINES]->(append_transport)
 MERGE (self)-[:DEFINES]->(client_config)
+MERGE (self)-[:DEFINES]->(append_client_config)
 MERGE (self)-[:DEFINES]->(receive_transport)
 MERGE (self)-[:DEFINES]->(receive_config)
 MERGE (self)-[:DEFINES]->(receive_delivery)
 MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(publish)
+MERGE (self)-[:DEFINES]->(append_connect)
+MERGE (self)-[:DEFINES]->(append_result)
+MERGE (self)-[:DEFINES]->(validate_profile_snapshot)
 MERGE (self)-[:DEFINES]->(connect_receive_client)
 MERGE (self)-[:DEFINES]->(receive_connect)
 MERGE (self)-[:DEFINES]->(pull_one)
@@ -114,6 +132,7 @@ MERGE (self)-[:IMPORTS]->(transport_endpoint_file)
 MERGE (self)-[:IMPORTS]->(receipt)
 MERGE (self)-[:IMPORTS]->(receive_port)
 MERGE (self)-[:IMPORTS]->(delivery_port)
+MERGE (self)-[:IMPORTS]->(native_append_file)
 MERGE (self)-[:IMPORTS]->(tonic)
 MERGE (self)-[:IMPORTS]->(sha256)
 MERGE (self)-[:DEFINES]->(wire_limit)
@@ -136,9 +155,22 @@ MERGE (self)-[:DEFINES]->(endpoint_profile_digest_test)
 MERGE (self)-[:DEFINES]->(endpoint_profile_identity_test)
 MERGE (self)-[:DEFINES]->(endpoint_profile_match_test)
 MERGE (transport)-[:IMPLEMENTS]->(admission)
+MERGE (append_transport)-[:IMPLEMENTS]->(append_port)
 MERGE (connect)-[:USES_TYPE]->(client_config)
 MERGE (connect)-[:USES_TYPE]->(resolved_transport_endpoint)
 MERGE (connect)-[:CALLS]->(connect_receive_client)
+MERGE (append_connect)-[:USES_TYPE]->(append_client_config)
+MERGE (append_connect)-[:CALLS]->(connect_receive_client)
+MERGE (append_connect)-[:CALLS]->(validate_profile_snapshot)
+MERGE (append_connect)-[:CALLS]->(semaphore_new)
+MERGE (append_result)-[:USES_TYPE]->(append_receipt)
+MERGE (append_result)-[:USES_TYPE]->(append_error)
+MERGE (append_result)-[:USES_TYPE]->(append_wire_limit)
+MERGE (append_result)-[:CALLS]->(tonic_append)
+MERGE (append_result)-[:CALLS]->(sha256)
+MERGE (append_result)-[:CALLS]->(try_semaphore)
+MERGE (append_result)-[:CALLS]->(valid_log_id)
+MERGE (append_result)-[:CALLS]->(uuid_parse)
 MERGE (receive_connect)-[:USES_TYPE]->(receive_config)
 MERGE (receive_connect)-[:USES_TYPE]->(resolved_transport_endpoint)
 MERGE (receive_connect)-[:CALLS]->(connect_receive_client)
@@ -188,6 +220,7 @@ MERGE (origin_request)-[:CALLS]->(valid_log_id)
 MERGE (origin_request)-[:CALLS]->(sha256)
 MERGE (validate_delivery)-[:CALLS]->(kind_mapping)
 MERGE (provider_identity)-[:CALLS]->(sha256)
+MERGE (validate_profile_snapshot)-[:CALLS]->(profile_new)
 MERGE (native_receive_valid_test)-[:TESTS]->(validate_delivery)
 MERGE (native_receive_route_test)-[:TESTS]->(validate_delivery)
 MERGE (native_receive_bounds_test)-[:TESTS]->(validate_delivery)
@@ -234,6 +267,10 @@ use crate::admission_receive::{
     AdmissionReceiveAuthorization, AdmissionReceiveError, AdmissionReceiveKind,
     AdmissionReceiveOrigin, AdmissionReceiveScope, AdmissionReceiveTransport,
     AdmissionReceivedDelivery,
+};
+use crate::native_append::{
+    MAX_NATIVE_APPEND_WIRE_BYTES, NativeAppendError, NativeAppendReceipt,
+    NativeAppendTransport,
 };
 use crate::transport_endpoint::ResolvedTransportEndpoint;
 
@@ -371,10 +408,36 @@ pub struct NativeGrpcAdmissionTransport {
     in_flight: Arc<Semaphore>,
 }
 
+/// Owner-neutral native gRPC client for appending exact `result` messages.
+#[derive(Clone)]
+pub struct NativeGrpcAppendTransport {
+    client: wire::durable_transport_client::DurableTransportClient<Channel>,
+    profile: AdmissionTransportProfile,
+    in_flight: Arc<Semaphore>,
+}
+
 /// Immutable construction inputs for one pinned native transport client.
 pub struct NativeGrpcClientConfig<'a> {
     /// Star delivery owner that will use this client.
     pub owner: AdmissionDeliveryOwner,
+    /// Destination resolved from the current trusted transport-profile revision.
+    pub endpoint: &'a ResolvedTransportEndpoint,
+    /// Trusted CA bundle used to validate the server certificate.
+    pub server_ca_path: &'a Path,
+    /// Client certificate presented for mutual TLS authentication.
+    pub client_cert_path: &'a Path,
+    /// Private key corresponding to `client_cert_path`.
+    pub client_key_path: &'a Path,
+    /// Connection establishment timeout, capped at 30 seconds.
+    pub connect_timeout: Duration,
+    /// Per-request timeout, capped at 10 seconds.
+    pub request_timeout: Duration,
+    /// Profile identity that pins provider and endpoint configuration.
+    pub profile: AdmissionTransportProfile,
+}
+
+/// Immutable construction inputs for one owner-neutral exact-append client.
+pub struct NativeGrpcAppendClientConfig<'a> {
     /// Destination resolved from the current trusted transport-profile revision.
     pub endpoint: &'a ResolvedTransportEndpoint,
     /// Trusted CA bundle used to validate the server certificate.
@@ -497,6 +560,19 @@ fn validate_profile_endpoint(
     Ok(())
 }
 
+fn validate_append_profile_snapshot(
+    profile: &AdmissionTransportProfile,
+) -> Result<(), NativeGrpcSetupError> {
+    AdmissionTransportProfile::new(
+        profile.provider_id.clone(),
+        profile.provider_version.clone(),
+        profile.profile_digest,
+        profile.endpoint_identity.clone(),
+    )
+    .map_err(|_| NativeGrpcSetupError::Profile)?;
+    Ok(())
+}
+
 impl NativeGrpcAdmissionTransport {
     /// Connect one multiplexed, mutually authenticated HTTP/2 channel to a pinned endpoint.
     pub async fn connect(config: NativeGrpcClientConfig<'_>) -> Result<Self, NativeGrpcSetupError> {
@@ -524,6 +600,39 @@ impl NativeGrpcAdmissionTransport {
             client,
             profile,
             owner,
+            in_flight: Arc::new(Semaphore::new(MAX_NATIVE_GRPC_IN_FLIGHT)),
+        })
+    }
+}
+
+impl NativeGrpcAppendTransport {
+    /// Connect one multiplexed, mutually authenticated channel to a pinned native endpoint.
+    pub async fn connect(
+        config: NativeGrpcAppendClientConfig<'_>,
+    ) -> Result<Self, NativeGrpcSetupError> {
+        let NativeGrpcAppendClientConfig {
+            endpoint,
+            server_ca_path,
+            client_cert_path,
+            client_key_path,
+            connect_timeout,
+            request_timeout,
+            profile,
+        } = config;
+        validate_append_profile_snapshot(&profile)?;
+        let client = connect_native_client(NativeGrpcEndpointConfig {
+            endpoint,
+            server_ca_path,
+            client_cert_path,
+            client_key_path,
+            connect_timeout,
+            request_timeout,
+            profile: &profile,
+        })
+        .await?;
+        Ok(Self {
+            client,
+            profile,
             in_flight: Arc::new(Semaphore::new(MAX_NATIVE_GRPC_IN_FLIGHT)),
         })
     }
@@ -948,6 +1057,73 @@ impl AdmissionTransport for NativeGrpcAdmissionTransport {
             &claim.wire,
         )
         .map_err(|_| AdmissionTransportError)
+    }
+}
+
+impl NativeAppendTransport for NativeGrpcAppendTransport {
+    fn profile(&self) -> &AdmissionTransportProfile {
+        &self.profile
+    }
+
+    fn append_result<'a>(
+        &'a self,
+        recipient_service_id: Uuid,
+        message_id: Uuid,
+        wire: &'a [u8],
+    ) -> impl std::future::Future<Output = Result<NativeAppendReceipt, NativeAppendError>>
+           + Send
+           + 'a {
+        async move {
+            if recipient_service_id.is_nil()
+                || message_id.is_nil()
+                || wire.is_empty()
+                || wire.len() > MAX_NATIVE_APPEND_WIRE_BYTES
+            {
+                return Err(NativeAppendError::InvalidInput);
+            }
+            let _permit = self
+                .in_flight
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| NativeAppendError::Busy)?;
+            let wire_sha256: [u8; 32] = Sha256::digest(wire).into();
+            let request = wire::AppendRequest {
+                profile: Some(wire::ProfilePin {
+                    profile_digest: self.profile.profile_digest.to_vec(),
+                }),
+                recipient_service_id: recipient_service_id.as_bytes().to_vec(),
+                message_kind: "result".to_owned(),
+                message_id: message_id.as_bytes().to_vec(),
+                wire: wire.to_vec(),
+                wire_sha256: wire_sha256.to_vec(),
+            };
+            // A cloned Channel handle is cheap and lets bounded calls share the HTTP/2 channel.
+            let mut client = self.client.clone();
+            let response = client
+                .append(Request::new(request))
+                .await
+                .map_err(|_| NativeAppendError::Transport)?
+                .into_inner();
+            if response.wire_sha256.as_slice() != wire_sha256.as_slice()
+                || response.sequence <= 0
+                || !valid_native_log_id(&response.log_id)
+            {
+                return Err(NativeAppendError::InvalidReceipt);
+            }
+            let log_generation = Uuid::from_slice(&response.log_generation)
+                .map_err(|_| NativeAppendError::InvalidReceipt)?;
+            if log_generation.is_nil() {
+                return Err(NativeAppendError::InvalidReceipt);
+            }
+            Ok(NativeAppendReceipt {
+                profile: self.profile.clone(),
+                log_id: response.log_id,
+                log_generation,
+                sequence: response.sequence,
+                exact_replay: response.exact_replay,
+                wire_sha256,
+            })
+        }
     }
 }
 
