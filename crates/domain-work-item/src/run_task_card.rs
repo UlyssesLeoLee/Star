@@ -27,6 +27,12 @@
 //! MERGE (module)-[:DEFINES]->(receipt)
 //! MERGE (module)-[:DEFINES]->(error)
 //! MERGE (module)-[:DEFINES]->(port)
+//! MERGE (createPortMethod:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort.create",kind:"method"})
+//! MERGE (transitionPortMethod:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort.transition",kind:"method"})
+//! MERGE (reviewPortMethod:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort.review",kind:"method"})
+//! MERGE (port)-[:HAS_METHOD]->(createPortMethod)
+//! MERGE (port)-[:HAS_METHOD]->(transitionPortMethod)
+//! MERGE (port)-[:HAS_METHOD]->(reviewPortMethod)
 //! @endcypher
 
 use async_trait::async_trait;
