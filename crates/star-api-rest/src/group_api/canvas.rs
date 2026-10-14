@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c87b5e01e7909d4866a5c25f4c62c9093c116b4f7e102584e96a44c8cd2d30a9
+@cypher schema=1 source_sha256=67b75e0a1af45f346b55d6acf1b03a395ba9e16f82e4ccf4deb4165d31670553
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas.rs"})
 MERGE (route:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::router",kind:"function"})
 MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::list_worktree_canvas_events",kind:"function"})
