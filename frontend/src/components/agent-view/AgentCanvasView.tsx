@@ -1,6 +1,11 @@
 /*
-@cypher schema=1 source_sha256=c73ec88ffbc23ad1c7f1a82a702404e44b9b4366e94bb0c9afcd434f43c5f472
+@cypher schema=1 source_sha256=c25fe0eee3c6e1964c2e4682910aa5ebe676d2e2cfcaf9d8f9ddb30b8b5329ed
 MERGE (self:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentCanvasView:Function {name:"AgentCanvasView", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (agentCanvasView)-[:CALLS]->(agentKindDisplayLabel)
 @endcypher
 */
 "use client";
@@ -19,6 +24,7 @@ MERGE (self:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"}
 import type {
   AgentSession, Worktree, WorkItem, AgentStatus, WorkItemStatus,
 } from "@/types/ids";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 import type {
   AgentCanvas, AgentCanvasNode, AgentCanvasConnector,
   AgentCanvasAnnotation, AgentCanvasFreeConnector,
@@ -556,7 +562,7 @@ export function AgentCanvasView({
               fontWeight="bold"
               letterSpacing={0.5}
             >
-              COMMAND UNIT // {agent.agent_kind.toUpperCase()}
+              COMMAND UNIT // {agentKindDisplayLabel(agent.agent_kind).toUpperCase()}
             </text>
           </g>
 

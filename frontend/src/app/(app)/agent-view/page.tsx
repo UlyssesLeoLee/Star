@@ -1,9 +1,16 @@
 /*
-@cypher schema=1 source_sha256=53cd3fb06fb116754c0d01797bd88c4c3ab9304a0b55fd119cfd9d66f9216720
+@cypher schema=1 source_sha256=e3512549721e244b70b6d116c1d8f1446c69ab23e2b8935f41c4085f15dec1f5
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentViewPage:Function {name:"AgentViewPage", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (agentViewPage)-[:CALLS]->(agentKindDisplayLabel)
 @endcypher
 */
 "use client";
+
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 // =====================================================================
 // /agent-view — Agent 视图 (无限画布, 当前工作 agent 筛选, 拟人化游戏化)
@@ -304,7 +311,7 @@ function AgentViewContent() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="text-sm font-semibold shrink-0" data-testid="agent-view-title">Agent</div>
           <div className="text-xs text-ink-mute font-mono truncate hidden lg:block">
-            {agent.id} · {agent.agent_kind} · {agent.current_step} · {relatedWorkItems.length} task{relatedWorkItems.length === 1 ? "" : "s"}
+            {agent.id} · {agentKindDisplayLabel(agent.agent_kind)} · {agent.current_step} · {relatedWorkItems.length} task{relatedWorkItems.length === 1 ? "" : "s"}
             {worktree && <> · worktree <span className="text-info font-bold">{worktree.branch}</span></>}
           </div>
         </div>

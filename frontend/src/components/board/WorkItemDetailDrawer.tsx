@@ -1,6 +1,11 @@
 /*
-@cypher schema=1 source_sha256=e4b3b527cc3a6febca9e1a832eab65beea06a24d6793e234d9c32f70998aecd1
+@cypher schema=1 source_sha256=c5c86afeab17a9ed05526c9f433ff277a7c70a4454f04e078aa3bcdfcd03707c
 MERGE (self:File {path:"frontend/src/components/board/WorkItemDetailDrawer.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (workItemDetailDrawer:Function {name:"WorkItemDetailDrawer", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (workItemDetailDrawer)-[:CALLS]->(agentKindDisplayLabel)
 @endcypher
 */
 "use client";
@@ -50,6 +55,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 import type {
   WorkItem, WorkItemStatus, WorkItemKind, WorkItemPriority,
   Identity, AgentSession, Worktree,
@@ -193,7 +199,7 @@ export function WorkItemDetailDrawer({
     }
     if (currentAssigneeKind === "agent") {
       const a = agentMap[draft.assignee_id];
-      return a ? `${a.agent_kind} · ${a.id}` : draft.assignee_id;
+      return a ? `${agentKindDisplayLabel(a.agent_kind)} · ${a.id}` : draft.assignee_id;
     }
     if (currentAssigneeKind === "squad") {
       return `${draft.assignee_id} (Phase 2)`;
@@ -429,7 +435,7 @@ export function WorkItemDetailDrawer({
                 <option value="">未分配</option>
                 {agentSessions.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.agent_kind} · {a.id} · {a.status}
+                    {agentKindDisplayLabel(a.agent_kind)} · {a.id} · {a.status}
                   </option>
                 ))}
               </select>
@@ -472,7 +478,7 @@ export function WorkItemDetailDrawer({
                       <Bot size={9} /> 关联 Agent
                     </span>
                     <span className="text-info font-mono">
-                      {currentWtAgent.agent_kind} · {currentWtAgent.status}
+                      {agentKindDisplayLabel(currentWtAgent.agent_kind)} · {currentWtAgent.status}
                     </span>
                   </div>
                 )}

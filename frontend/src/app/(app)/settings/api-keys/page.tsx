@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=1927059c04a3e0f6545f53677e2dcfb5ad2c933eaf47e1e8e57379747f187f3d
+MERGE (self:File {path:"frontend/src/app/(app)/settings/api-keys/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // Star Frontend — API Keys 设置页
@@ -26,15 +31,13 @@ const INITIAL: ApiKey[] = [
 ];
 
 const PROVIDER_HINT: Record<string, string> = {
-  // per 2026-09-02 02:49 JST Ulysses 拍板: 4 必备 = openai / claude / gemini / minimax
-  openai:    "OpenAI (GPT-4o / o1) — 4 必备",
-  claude:    "Anthropic Claude (3.5 / 4 Sonnet) — 4 必备",
-  gemini:    "Google Gemini (2.0 Flash / Pro) — 4 必备",
-  minimax:   "minimax (m2.7 / m-large) — 4 必备",
-  // 兼容旧 provider
+  openai:    "OpenAI (GPT-4o / o1)",
+  claude:    "Anthropic Claude (3.5 / 4 Sonnet)",
+  gemini:    "Google Gemini (2.0 Flash / Pro)",
+  minimax:   "MiniMax (m2.7 / m-large)",
   anthropic: "Anthropic (legacy alias)",
-  openclaw:  "OpenClaw API (CLI tool)",
-  hermes:    "Hermes AI (CLI tool)",
+  openclaw:  "OpenClaw API (Agent service)",
+  hermes:    "Hermes API (Agent service)",
   google:    "Google AI (legacy alias)",
 };
 
@@ -124,7 +127,7 @@ export default function ApiKeysPage() {
                 className="w-full mt-1 text-sm rounded border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-1.5"
               >
                 {Object.entries(PROVIDER_HINT).map(([k, v]) => (
-                  <option key={k} value={k}>{k} — {v}</option>
+                  <option key={k} value={k}>{v}</option>
                 ))}
               </select>
             </div>
@@ -216,7 +219,7 @@ export default function ApiKeysPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{k.label}</span>
-                    <span className="text-[10px] px-1 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]">{k.provider}</span>
+                    <span className="text-[10px] px-1 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]">{PROVIDER_HINT[k.provider] ?? "其他 API 服务"}</span>
                     <span className="text-[10px] px-1 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]">
                       {k.mode === "encrypted_rust" ? "Encrypted" : "Env Var"}
                     </span>

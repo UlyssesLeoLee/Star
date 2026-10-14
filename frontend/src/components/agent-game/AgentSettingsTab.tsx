@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=0535900695f618d11118ae27becfdd8c66d8803a91689f70912bb95ffb1cc965
+MERGE (self:File {path:"frontend/src/components/agent-game/AgentSettingsTab.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentSettingsTab:Function {name:"AgentSettingsTab", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (self)-[:DEFINES]->(agentSettingsTab)
+MERGE (agentSettingsTab)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -18,6 +29,7 @@ import {
   type AgentSettings,
 } from "@/lib/agent-game/settings";
 import { StatusPill } from "@/components/StatusPill";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 import { Check, Key, Cpu, Zap, FileText, Globe, Power, Save, AlertCircle, Bot } from "lucide-react";
 
 interface AgentSettingsTabProps {
@@ -95,7 +107,7 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
                   <span className="text-[9px] text-ink-mute">off</span>
                 )}
               </div>
-              <div className="text-[10px] text-ink-mute truncate">{a.agent_kind} · {a.current_step}</div>
+              <div className="text-[10px] text-ink-mute truncate">{agentKindDisplayLabel(a.agent_kind)} · {a.current_step}</div>
               <div className="mt-1">
                 <StatusPill value={a.status} size="xs" />
               </div>
@@ -117,7 +129,7 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
                   {selected.id}
                 </h2>
                 <div className="text-[10px] text-ink-mute font-mono mt-0.5">
-                  {selected.agent_kind} · worktree {selected.worktree_id} · started {new Date(selected.started_at).toLocaleString()}
+                  {agentKindDisplayLabel(selected.agent_kind)} · worktree {selected.worktree_id} · started {new Date(selected.started_at).toLocaleString()}
                 </div>
               </div>
               <button
@@ -151,7 +163,7 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
                 <FieldRow
                   icon={<Cpu size={12} />}
                   label="Model"
-                  hint={`per ${selected.agent_kind}`}
+                  hint={`per ${agentKindDisplayLabel(selected.agent_kind)}`}
                   testId="agent-settings-field-model"
                 >
                   <select

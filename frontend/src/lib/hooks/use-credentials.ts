@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=684226328f9b4960f6d66f965ccb6961003df0fcdb8dc12b562b5754ace8d746
+MERGE (self:File {path:"frontend/src/lib/hooks/use-credentials.ts"})
+@endcypher
+*/
 // Star Frontend - Credentials React Query Hooks
 // V2-2 完整版
 
@@ -45,9 +50,9 @@ export function useAuditLog(id: string | null) {
 }
 
 export const PROVIDER_LABELS: Record<Provider, string> = {
-  openclaw: "OpenClaw (LLM agent 编排)",
-  hermes: "Hermes (消息总线)",
-  kms_vault: "HashiCorp Vault (KMS)",
+  openclaw: "OpenClaw",
+  hermes: "Hermes",
+  kms_vault: "HashiCorp Vault",
   kms_aws: "AWS KMS",
-  kms_local_mock: "Local Mock (dev/test)",
+  kms_local_mock: "本地密钥服务 (开发/测试)",
 };

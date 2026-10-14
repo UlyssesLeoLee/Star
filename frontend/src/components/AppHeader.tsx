@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c2cb7f18e318425b1b6770d2a4d69c9d7629abf539e3ac85a2cfa17665d06c15
+@cypher schema=1 source_sha256=52fde591a21de285092f15444b79c1caa1f5b4e6c2a16d30b74fb0671602c997
 MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
 @endcypher
 */
@@ -27,7 +27,7 @@ import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/
 import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
-// GitHub Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
+// Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
 // 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (开发服务器注入)
 //             → legacy issue identifier (备选)
 //             → '' (用户多 worktree 并开时仍可读)
@@ -79,7 +79,7 @@ export function AppHeader() {
               <div
                 data-testid="worktree-id-badge"
                 className="flex items-center gap-1.5 pl-1 pr-2 h-5 text-[10px] font-mono font-bold border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-cyan,var(--color-primary))] whitespace-nowrap"
-                title={`GitHub worktree: ${WORKTREE_ID}${WORKTREE_BRANCH ? ` @ ${WORKTREE_BRANCH}` : ""}`}
+                title={`Worktree: ${WORKTREE_ID}${WORKTREE_BRANCH ? ` @ ${WORKTREE_BRANCH}` : ""}`}
               >
                 <span className="size-1.5 bg-[var(--cel-cyan,var(--color-primary))] animate-pulse" aria-hidden="true" />
                 <span className="text-[var(--cel-text-secondary,var(--color-text-dim))] font-black tracking-wider">WT</span>

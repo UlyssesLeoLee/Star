@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=27e7ab72744a106d034e866f40467cee47c767ebcc12fa2a31cffb1ec30b70bb
+MERGE (self:File {path:"frontend/src/app/agent/page.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentPage:Function {name:"AgentPage", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (self)-[:DEFINES]->(agentPage)
+MERGE (agentPage)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
 
 import { useStore } from "@/lib/store";
@@ -9,6 +20,7 @@ import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 export default function AgentPage() {
   const { t } = useTranslation();
@@ -49,7 +61,7 @@ export default function AgentPage() {
                 return (
                   <tr key={a.id} onClick={() => setSelected(a.id)} className="cursor-pointer">
                     <td className="font-mono text-xs">{a.id}</td>
-                    <td><span className="font-mono text-xs text-info">{a.agent_kind}</span></td>
+                    <td><span className="font-mono text-xs text-info">{agentKindDisplayLabel(a.agent_kind)}</span></td>
                     <td><StatusPill value={a.status} size="xs" /></td>
                     <td className="font-mono text-xs text-ink-dim">{a.current_step}</td>
                     <td className="font-mono text-xs">{a.token_usage.total.toLocaleString()}</td>
@@ -70,7 +82,7 @@ export default function AgentPage() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="text-xs text-ink-mute font-mono">{ag.id}</div>
-                <div className="text-base font-semibold">{ag.agent_kind}</div>
+                <div className="text-base font-semibold">{agentKindDisplayLabel(ag.agent_kind)}</div>
               </div>
               <StatusPill value={ag.status} />
             </div>

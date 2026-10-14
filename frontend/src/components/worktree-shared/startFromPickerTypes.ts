@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=52fd3f278d76ccd1a92edfb039ec80890ec4ff928ac4edb74004e29a958ac4ca
+MERGE (self:File {path:"frontend/src/components/worktree-shared/startFromPickerTypes.ts"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // frontend/src/components/worktree-shared/startFromPickerTypes.ts
 //
@@ -38,7 +43,7 @@ export interface PickerCandidateDto {
  * 一致以便后端替换 schema 时改一处即可.
  */
 export interface PickerCandidatesDto {
-  /** kind 1: GitHub remote branches (`remote_branch`). */
+  /** kind 1: 远程分支 (`remote_branch`). */
   github_branches: PickerCandidateDto[];
   /** kind 2: existing local branches (`local_branch`). */
   existing_worktrees: PickerCandidateDto[];

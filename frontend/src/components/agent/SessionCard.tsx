@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=32b033b7b6c3b0164e481144cd1f8f22813b105a360e108d530938e1437bbba0
+MERGE (self:File {path:"frontend/src/components/agent/SessionCard.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (inner:Function {name:"Inner", language:"typescript", visibility:"private"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (inner)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // frontend/src/components/agent/SessionCard.tsx
 //
@@ -24,6 +34,7 @@
 import { memo } from "react";
 import { RestartChip } from "./RestartChip";
 import type { AgentSession } from "@/types/ids";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 export interface SessionCardProps {
   /**
@@ -149,7 +160,7 @@ function Inner({ session, selected = false, onClick }: SessionCardProps) {
           {formatDuration(session.started_at, session.ended_at)}
         </span>
         <span className="font-mono text-[10px]" data-testid="session-kind">
-          {session.agent_kind}
+          {agentKindDisplayLabel(session.agent_kind)}
         </span>
         {/* chip: 注入"显式 override"分支, 不调用内部 hook;
             session.restart_available === false 走显式 false 不渲染分支,
