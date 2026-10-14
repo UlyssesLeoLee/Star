@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
 > **文档版本**: v6.55 (2026-10-14)
-> **上游要件定义书**: docs/requirements.md v6.54
+> **上游要件定义书**: docs/requirements.md v6.55
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
