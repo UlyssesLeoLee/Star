@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.54 (2026-10-14)
+> **文档版本**: v2.57 (2026-10-14)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3112,3 +3112,13 @@ No disposable PostgreSQL identity/grant fixture, live TLS network e2e, startup w
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v2.56 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add §4.93 for D19 current-Profile/trusted-endpoint/native-client validation; record the exact Rust 1.98.1 diagnostic tests and explicitly state no automated runner or production gate was added | Two D19 worktrees were rebased and fast-forward merged to local dev |
+
+### 4.94 Phase 9F4C-D20 resolver-bound native Result publisher owner-store acceptance
+
+**自动化档：[P]** — `scripts/automation/phase9f4d_run_owner_consumer.py --schema-only --native-result-tests` executes the cumulative disposable PostgreSQL 18.6 D20 contract, including the two publisher migrations applied twice, then runs `crates/infrastructure/tests/infrastructure_native_result_delivery_pg.rs` with the pinned Rust toolchain and test-support feature. The verified run passed 93/93 runner steps and SQLx 1/1. The SQLx test inserts synthetic route/receipt rows and validates the Infrastructure owner store, including the attempt fence; it does not invoke `InfrastructureOwnerNativeResultPublisher`, `NativeAppendTransport`, or a live native server append. Preserve the JSONL audit file and report its hash when recording a fresh run.
+
+P1 is closed: route tenant/deployment/Profile identity is derived from the resolver-produced endpoint and the publisher accepts only the matching concrete native transport. P2 remains open: a stale route-pin mismatch is filtered without an operator-visible blocked count/recovery path. The Rust run used 1.98.1 with `--ignore-rust-version`, so it is not the formal 1.99.0 gate. Production startup/Profile resolution, runtime grants/RLS deployment, live TLS/revocation, full producer/consumer parity, replay/quarantine/recovery, BI/Benchmark, load/RSS/fairness and NATS rollback remain open; traffic and Schedule/Run execution stay fail closed. No NATS service or Multipass instance was started.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.57 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add resolver-bound D20 publisher route evidence and opt-in owner-store SQLx acceptance; distinguish synthetic receipts from real native append and keep P2 and production gates open | Publisher route review and disposable PostgreSQL acceptance |
