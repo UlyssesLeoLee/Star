@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.71 (2026-10-16)
-> **上游要件定义书**: docs/requirements.md v6.72
+> **文档版本**: v6.72 (2026-10-16)
+> **上游要件定义书**: docs/requirements.md v6.73
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5740,10 +5740,11 @@ The additive migration adds `aggregate_type` to the existing append-only Task Ru
 
 An `AFTER INSERT` trigger on the Run-scoped lifecycle audit reads the current Task metadata and lifecycle snapshot and appends one Outbox event in the same owner transaction. The payload includes canonical Run ownership, optional repository/Branch and audit Worktree context, lifecycle/review/claim state, actor/correlation, and audit event identity/type. It excludes Task title/description and raw rejection reason. Any trigger, RLS, constraint or insert failure rolls back the Task state and audit write as well.
 
-The Outbox is an owner-local durable event source only. It does not provide a delivery worker, consumer Inbox, BI/Benchmark read model, cross-App projection or exactly-once external delivery. Existing Task metadata events are not rewritten. The migration source has not been applied to PostgreSQL in this phase; target grants/FORCE RLS, rollback and concurrent behavior remain unverified, and downstream consumers stay disabled.
+The Outbox is an owner-local durable event source only. It does not provide a delivery worker, consumer Inbox, BI/Benchmark read model, cross-App projection or exactly-once external delivery. Existing Task metadata events are not rewritten. `occurred_at` and UUID `event_id` are not commit-order cursors; consumers need durable event-ID deduplication, per-aggregate version fencing and safe replay that cannot skip a late-committing row. The migration source has not been applied to PostgreSQL in this phase; target grants/FORCE RLS, rollback and concurrent behavior remain unverified, and downstream consumers stay disabled.
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.72 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.73；规定 Outbox 消费者不得以 occurred_at/UUID 作为提交顺序游标，并要求持久事件去重、aggregate version fencing 与安全回放/对账 | 识别并发提交次序与事件生成时间、UUID 顺序无关，避免消费者高水位漏读 |
 | v6.71 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.72；定义 Task lifecycle audit trigger 在 owner transaction 内追加 schema v3 Outbox，metadata/lifecycle 独立 aggregate version、拒绝理由和 Task 正文不进入事件 payload；数据库部署、grants/RLS、delivery 与 BI/Benchmark projection 仍未验收 | lifecycle 状态变更已具备审计，但缺少事务性跨 App 事件来源 |
 | v6.70 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.71；明确无焦点时仅将唯一 current same-Run Task–Worktree relation 作为 lifecycle audit 归属，多重/缺失关系不猜测；更新宿主无关的会话失效提示；记录 Rust 1.98.1 诊断测试通过及 Rust 1.99.0 正式门、目标 DB/RLS 门禁仍未完成 | 自审发现 hostless Run 全局操作对唯一任务 Worktree relation 的审计归属与产品提示仍有偏差 |
 | v6.69 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.70；明确 Engineering Run 可在无远端宿主、repository、Branch 时由 Project 创建/授权/列出/打开；固定 Project → Run → Worktree → Branch 及中性产品命名、真实连接器 provider 标签边界；保留 target DB/RLS 和生产 provider 门禁 | 用户确认 Run 必须脱离宿主 Branch，并要求禁用对标/仿制文案 |

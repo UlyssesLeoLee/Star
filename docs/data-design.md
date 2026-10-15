@@ -1,10 +1,11 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.19 (2026-10-16)
+> **文档版本**: v2.20 (2026-10-16)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
+> | v2.20 | 2026-10-16 | 明确 Task Run Outbox 的 occurred_at/UUID 不是提交顺序游标；记录下游持久去重、aggregate version fencing、安全回放/对账要求，并保留迁移/consumer 未验收边界 | Mavis 接手审核 |
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 排期调整(V2 候选) / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
 > | v0.3 | 2026-10-02 | 增加 Phase 9F2 automation Schedule rule/occurrence durable substrate 与 W/T/M/RLS 实现对账；目标 DB migration 尚未部署 | Mavis 接手审核 |
@@ -6010,4 +6011,4 @@ D18 adds W/T/M=2/2/1 (all five new tables classified). PostgreSQL 18.6 disposabl
 |---|---|---|---|---|
 | `multica.task_run_outbox` | T | Existing append-only Task owner Outbox; metadata events use `aggregate_type=metadata`, lifecycle events use `aggregate_type=lifecycle` with independent aggregate versions and schema v3 | Append-only; no payload rewrite or raw Task body/rejection reason; delivery state is not stored here | Existing tenant FORCE RLS and actor-scoped insert policy; lifecycle audit trigger writes within the same Task owner transaction |
 
-This is a schema extension to one existing Transaction table; it adds no Work or Master table. Unique event identity is fenced by `(tenant_id, work_item_id, aggregate_type, aggregate_version)`. The lifecycle audit trigger resolves the current Project/Run owner and status snapshot and appends a compact event; any failure rolls back the Task lifecycle write and audit. The migration source has not been applied to PostgreSQL, and the trigger/RLS/grants/rollback/concurrency behavior remains unverified. No Outbox delivery worker, consumer Inbox, BI/Benchmark projection, or cross-App consumer is part of this slice.
+This is a schema extension to one existing Transaction table; it adds no Work or Master table. Unique event identity is fenced by `(tenant_id, work_item_id, aggregate_type, aggregate_version)`. The lifecycle audit trigger resolves the current Project/Run owner and status snapshot and appends a compact event; any failure rolls back the Task lifecycle write and audit. `occurred_at` and UUID `event_id` are not a commit-order cursor; consumers need durable event-ID dedupe plus per-aggregate version fencing and safe replay/reconciliation. The migration source has not been applied to PostgreSQL, and the trigger/RLS/grants/rollback/concurrency behavior remains unverified. No Outbox delivery worker, consumer Inbox, BI/Benchmark projection, or cross-App consumer is part of this slice.

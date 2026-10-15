@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.00**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.01**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -696,6 +696,8 @@ PostgreSQL stored procedure/function 只封装同一 owner transaction 中需要
 
 The lifecycle audit `AFTER INSERT` trigger is the only producer for the v3 event. It reads and locks the current Task metadata and lifecycle rows, then writes owner, optional repository/Branch context, audit Worktree context, current bounded lifecycle/review/claim state, audit event identity/type, actor and correlation fields. It deliberately omits free-form rejection reason and Task body. Audit and Outbox are atomic with the command; if the Outbox insert or its tenant RLS check fails, the whole owner transaction rolls back. No trigger path performs cross-owner writes or direct BI projection updates.
 
+`occurred_at` and UUID `event_id` provide event time and stable identity but do not establish commit order: concurrent transactions can become visible in a different order than their start time or generated UUID. A future consumer MUST use durable event-ID deduplication and per-aggregate version fencing, and its replay/reconciliation strategy MUST NOT advance a cursor past an event that was still uncommitted when the page was read.
+
 | Acceptance ID | Acceptance criterion |
 |---|---|
 | AC-TASK-LIFECYCLE-OUTBOX-01 | Metadata and lifecycle version fences are independent and tenant/Work Item/aggregate-type scoped; legacy v1/v2 metadata events remain valid. |
@@ -1063,6 +1065,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.01 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.73/basic v6.72；规定 Outbox consumer 采用持久事件去重与 aggregate version fence，replay/reconciliation 不得越过尚未提交的事件推进游标 | 并发提交顺序不由 occurred_at 或随机 UUID 决定，修订消费顺序与漏事件风险合同 |
 | v5.00 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.72/basic v6.71；定义 Task lifecycle audit→schema v3 owner-local Outbox 原子触发、metadata/lifecycle 独立 version stream、无自由文本敏感内容及未部署/未接消费边界 | Run Task Card 的 audit 记录已有，但生命周期事件尚未形成可靠的跨 App owner Outbox source |
 | v4.99 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.71/basic v6.70；细化 lifecycle audit Worktree 选择：active execution relation 优先，匹配 focus 次之，无匹配 focus 时仅选唯一 current same-Run relation；缺失/多重关联不猜测；统一中性 hostless 会话提示与代码验证缺口 | 自审发现无焦点 Run 操作仍会丢失唯一任务 Worktree 审计关联 |
 | v4.98 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.70/basic v6.69；重申 Project-owned Run 可在无远端宿主、repository、Branch 时创建、授权、列出与打开；补充 Run Task Card lifecycle/review 的事务授权、claimant/lease UI、审计 Worktree 归属与 hostless focus 语义；明确产品 UI 中性命名及真实连接器 provider 标签；验证和部署门禁见实施计划 §6.146 | 生命周期自审修复 unrelated Worktree focus 的审计归属，并落实用户对 hostless Run 与中性产品命名的确认 |

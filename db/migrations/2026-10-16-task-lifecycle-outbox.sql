@@ -43,7 +43,7 @@ ALTER TABLE multica.task_run_outbox
 CREATE UNIQUE INDEX IF NOT EXISTS uq_task_run_outbox_aggregate_version
     ON multica.task_run_outbox (tenant_id, work_item_id, aggregate_type, aggregate_version);
 
-CREATE INDEX IF NOT EXISTS idx_task_run_outbox_run_stream_cursor
+CREATE INDEX IF NOT EXISTS idx_task_run_outbox_run_stream_time
     ON multica.task_run_outbox
         (tenant_id, project_id, engineering_run_id, aggregate_type, occurred_at, event_id);
 
