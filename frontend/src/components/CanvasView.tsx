@@ -1,4 +1,13 @@
 /*
+@cypher schema=1 source_sha256=d13d309ae3792cd48b723ab0721cfc8584328c1a9ead21c497d39f299a4a2bae
+MERGE (self:File {path:"frontend/src/components/CanvasView.tsx"})
+MERGE (props:Type {id:"frontend/src/components/CanvasView.tsx::CanvasViewProps",kind:"interface"})
+MERGE (view:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
+MERGE (self)-[:DEFINES]->(props)
+MERGE (self)-[:DEFINES]->(view)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/components/CanvasView.tsx",type:"file",language:"tsx"}),
@@ -23,7 +32,7 @@ CREATE
 "use client";
 
 /**
- * CanvasView - Miro 模式无限画布
+ * CanvasView - 无限协作画布
  *
  * 继承 frontend-canvas-design.md v0.1:
  * - 无限世界坐标,viewport 转换

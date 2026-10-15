@@ -1,18 +1,22 @@
 /*
-@cypher schema=1 source_sha256=acfbf00aa2228bb3ab3f66f01d2ad7f7a4d93a7cdcca816deea47542c276eb6c
+@cypher schema=1 source_sha256=23b197b64609bed7b913e1225d20e44d04aae0e3b31d5315c22ba3a6821d13ab
 MERGE (self:File {path:"frontend/src/lib/run/runDirectoryApi.ts"})
 MERGE (create:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
+MERGE (projectRuns:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listProjectRuns",kind:"method"})
 MERGE (request:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.request",kind:"method"})
 MERGE (mapTask:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapRunTaskCard",kind:"function"})
 MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
 MERGE (input:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::CreateRunTaskCardInput",kind:"type"})
 MERGE (self)-[:DEFINES]->(create)
+MERGE (self)-[:DEFINES]->(projectRuns)
 MERGE (self)-[:DEFINES]->(request)
 MERGE (self)-[:DEFINES]->(mapTask)
 MERGE (create)-[:CALLS]->(request)
 MERGE (create)-[:CALLS]->(mapTask)
 MERGE (create)-[:USES_TYPE]->(context)
 MERGE (create)-[:USES_TYPE]->(input)
+MERGE (projectRuns)-[:CALLS]->(request)
+MERGE (projectRuns)-[:CALLS]->(mapRun)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
@@ -34,7 +38,7 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryApi.ts",type:"file",langu
  (request:Function {name:"RunDirectoryApiClient.request",type:"function"}),
  (acquire:Function {name:"RunDirectoryApiClient.acquire",type:"function"}),(release:Function {name:"RunDirectoryApiClient.release",type:"function"}),
  (dispose:Function {name:"RunDirectoryApiClient.dispose",type:"function"}),(ctor:Function {name:"RunDirectoryApiClient.constructor",type:"function"}),
- (projects:Function {name:"RunDirectoryApiClient.listProjects",type:"function"}),(branches:Function {name:"RunDirectoryApiClient.listBranches",type:"function"}),
+ (projects:Function {name:"RunDirectoryApiClient.listProjects",type:"function"}),(branches:Function {name:"RunDirectoryApiClient.listBranches",type:"function"}),(projectRuns:Function {name:"RunDirectoryApiClient.listProjectRuns",type:"function"}),
  (runs:Function {name:"RunDirectoryApiClient.listRuns",type:"function"}),(worktrees:Function {name:"RunDirectoryApiClient.listWorktrees",type:"function"}),
  (tasks:Function {name:"RunDirectoryApiClient.listRunWorkItems",type:"function"}),(createTaskCard:Function {name:"RunDirectoryApiClient.createRunTaskCard",type:"function"}),
  (resolve:Function {name:"RunDirectoryApiClient.getRunContext",type:"function"}),(compat:Function {name:"RunDirectoryApiClient.getWorktreeRunContext",type:"function"}),
@@ -53,10 +57,10 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryApi.ts",type:"file",langu
  (f)-[:CONTAINS]->(client),(f)-[:CONTAINS]->(project),(f)-[:CONTAINS]->(branch),(f)-[:CONTAINS]->(run),(f)-[:CONTAINS]->(wt),(f)-[:CONTAINS]->(taskCard),(f)-[:CONTAINS]->(taskPage),(f)-[:CONTAINS]->(taskCreateInput),(f)-[:CONTAINS]->(taskPriority),(f)-[:CONTAINS]->(grant),(f)-[:CONTAINS]->(context),(f)-[:CONTAINS]->(page),(f)-[:CONTAINS]->(options),
  (f)-[:CONTAINS]->(taskCreateTitleLimit),(f)-[:CONTAINS]->(taskCreateDescriptionLimit),(f)-[:CONTAINS]->(taskPriorities),
  (f)-[:CONTAINS]->(record),(f)-[:CONTAINS]->(text),(f)-[:CONTAINS]->(rawText),(f)-[:CONTAINS]->(id),(f)-[:CONTAINS]->(nullable),(f)-[:CONTAINS]->(version),(f)-[:CONTAINS]->(boolean),(f)-[:CONTAINS]->(projectMap),(f)-[:CONTAINS]->(branchMap),(f)-[:CONTAINS]->(runMap),(f)-[:CONTAINS]->(wtMap),(f)-[:CONTAINS]->(taskMap),(f)-[:CONTAINS]->(taskBody),(f)-[:CONTAINS]->(grantMap),(f)-[:CONTAINS]->(contextMap),(f)-[:CONTAINS]->(pageMap),(f)-[:CONTAINS]->(query),(f)-[:CONTAINS]->(origin),(f)-[:CONTAINS]->(json),(f)-[:CONTAINS]->(abort),(f)-[:CONTAINS]->(href),
- (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(request),(client)-[:HAS_METHOD]->(acquire),(client)-[:HAS_METHOD]->(release),(client)-[:HAS_METHOD]->(dispose),(client)-[:HAS_METHOD]->(projects),(client)-[:HAS_METHOD]->(branches),(client)-[:HAS_METHOD]->(runs),(client)-[:HAS_METHOD]->(worktrees),(client)-[:HAS_METHOD]->(tasks),(client)-[:HAS_METHOD]->(createTaskCard),(client)-[:HAS_METHOD]->(resolve),(client)-[:HAS_METHOD]->(compat),
+ (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(request),(client)-[:HAS_METHOD]->(acquire),(client)-[:HAS_METHOD]->(release),(client)-[:HAS_METHOD]->(dispose),(client)-[:HAS_METHOD]->(projects),(client)-[:HAS_METHOD]->(branches),(client)-[:HAS_METHOD]->(projectRuns),(client)-[:HAS_METHOD]->(runs),(client)-[:HAS_METHOD]->(worktrees),(client)-[:HAS_METHOD]->(tasks),(client)-[:HAS_METHOD]->(createTaskCard),(client)-[:HAS_METHOD]->(resolve),(client)-[:HAS_METHOD]->(compat),
  (ctor)-[:CALLS]->(origin),(request)-[:CALLS]->(acquire),(request)-[:CALLS]->(release),(request)-[:CALLS]->(json),(request)-[:CALLS]->(dispose),(request)-[:CALLS]->(abort),(acquire)-[:CALLS]->(abort),
- (projects)-[:CALLS]->(request),(branches)-[:CALLS]->(request),(runs)-[:CALLS]->(request),(worktrees)-[:CALLS]->(request),(tasks)-[:CALLS]->(request),(tasks)-[:CALLS]->(taskBody),(createTaskCard)-[:CALLS]->(request),(createTaskCard)-[:CALLS]->(taskMap),(createTaskCard)-[:CALLS]->(record),(createTaskCard)-[:CALLS]->(text),(createTaskCard)-[:CALLS]->(rawText),(createTaskCard)-[:CALLS]->(id),(createTaskCard)-[:USES]->(taskCreateTitleLimit),(createTaskCard)-[:USES]->(taskCreateDescriptionLimit),(createTaskCard)-[:USES]->(taskPriorities),(taskBody)-[:CALLS]->(taskMap),(resolve)-[:CALLS]->(request),(compat)-[:CALLS]->(request),
- (projects)-[:CALLS]->(pageMap),(branches)-[:CALLS]->(pageMap),(runs)-[:CALLS]->(pageMap),(worktrees)-[:CALLS]->(pageMap),(resolve)-[:CALLS]->(contextMap),(compat)-[:CALLS]->(contextMap),
+ (projects)-[:CALLS]->(request),(branches)-[:CALLS]->(request),(projectRuns)-[:CALLS]->(request),(projectRuns)-[:CALLS]->(record),(projectRuns)-[:CALLS]->(pageQuery),(projectRuns)-[:CALLS]->(pageMap),(projectRuns)-[:CALLS]->(runMap),(runs)-[:CALLS]->(request),(worktrees)-[:CALLS]->(request),(tasks)-[:CALLS]->(request),(tasks)-[:CALLS]->(taskBody),(createTaskCard)-[:CALLS]->(request),(createTaskCard)-[:CALLS]->(taskMap),(createTaskCard)-[:CALLS]->(record),(createTaskCard)-[:CALLS]->(text),(createTaskCard)-[:CALLS]->(rawText),(createTaskCard)-[:CALLS]->(id),(createTaskCard)-[:USES]->(taskCreateTitleLimit),(createTaskCard)-[:USES]->(taskCreateDescriptionLimit),(createTaskCard)-[:USES]->(taskPriorities),(taskBody)-[:CALLS]->(taskMap),(resolve)-[:CALLS]->(request),(compat)-[:CALLS]->(request),
+ (projects)-[:CALLS]->(pageMap),(branches)-[:CALLS]->(pageMap),(projectRuns)-[:CALLS]->(pageMap),(runs)-[:CALLS]->(pageMap),(worktrees)-[:CALLS]->(pageMap),(resolve)-[:CALLS]->(contextMap),(compat)-[:CALLS]->(contextMap),
  (pageMap)-[:CALLS]->(record),(pageMap)-[:CALLS]->(text),(branchMap)-[:CALLS]->(record),(branchMap)-[:CALLS]->(id),(runMap)-[:CALLS]->(record),(runMap)-[:CALLS]->(id),(wtMap)-[:CALLS]->(record),(wtMap)-[:CALLS]->(id),(taskMap)-[:CALLS]->(record),(taskMap)-[:CALLS]->(text),(taskMap)-[:CALLS]->(rawText),(taskMap)-[:CALLS]->(id),(taskMap)-[:CALLS]->(nullable),(taskMap)-[:CALLS]->(version),(taskBody)-[:CALLS]->(record),(taskBody)-[:CALLS]->(taskMap),(taskBody)-[:CALLS]->(id),(contextMap)-[:CALLS]->(branchMap),(contextMap)-[:CALLS]->(runMap),(contextMap)-[:CALLS]->(wtMap),(contextMap)-[:CALLS]->(grantMap),(nullable)-[:CALLS]->(id),(href)-[:CALLS]->(id);
 */
 
@@ -67,7 +71,7 @@ export interface CloudBranch {
   full_ref: string; head_commit_id: string | null; state: string; version: number;
 }
 export interface EngineeringRun {
-  engineering_run_id: string; project_id: string; repository_id: string; branch_id: string;
+  engineering_run_id: string; project_id: string; repository_id: string | null; branch_id: string | null;
   title: string; state: string; owner_user_id: string | null; version: number;
 }
 export interface RunWorktree {
@@ -80,12 +84,12 @@ export interface RunWorktree {
 export interface RunAuthorization { binding_id: string; role: string; version: number }
 export interface RunContextEnvelope {
   run_context: {
-    tenant_id: string; project_id: string; repository_id: string; branch_id: string;
+    tenant_id: string; project_id: string; repository_id: string | null; branch_id: string | null;
     engineering_run_id: string; actor_id: string; actor_kind: string;
-    authorization: { project: RunAuthorization; branch: RunAuthorization; engineering_run: RunAuthorization };
+    authorization: { project: RunAuthorization; branch: RunAuthorization | null; engineering_run: RunAuthorization };
     granted_scopes: string[]; context_version: string; resolved_at: string; correlation_id: string;
   };
-  branch: CloudBranch; engineering_run: EngineeringRun; focus: RunWorktree | null; focus_version: string | null;
+  branch: CloudBranch | null; engineering_run: EngineeringRun; focus: RunWorktree | null; focus_version: string | null;
   capabilities: { run_owned_apps_available: boolean; execution_admission_available: boolean };
 }
 export interface DirectoryPage<T> { rows: T[]; limit: number; next_cursor: string | null }
@@ -179,7 +183,7 @@ function mapRun(value: unknown): EngineeringRun {
   const row = record(value);
   return {
     engineering_run_id: uuid(row.engineering_run_id), project_id: uuid(row.project_id),
-    repository_id: uuid(row.repository_id), branch_id: uuid(row.branch_id), title: boundedText(row.title, 500),
+    repository_id: nullableUuid(row.repository_id), branch_id: nullableUuid(row.branch_id), title: boundedText(row.title, 500),
     state: boundedText(row.state, 64), owner_user_id: nullableUuid(row.owner_user_id), version: positiveVersion(row.version),
   };
 }
@@ -188,7 +192,7 @@ function mapWorktree(value: unknown): RunWorktree {
   return {
     worktree_id: uuid(row.worktree_id), engineering_run_id: uuid(row.engineering_run_id),
     project_id: uuid(row.project_id), repository_id: uuid(row.repository_id), workspace_id: uuid(row.workspace_id),
-    name: boundedText(row.name), branch: boundedText(row.branch, 512), human_state: boundedText(row.human_state, 64),
+    name: boundedText(row.name), branch: boundedString(row.branch, 512), human_state: boundedText(row.human_state, 64),
     machine_state: boundedText(row.machine_state, 64), agent_id: nullableUuid(row.agent_id),
     agent_session_id: nullableUuid(row.agent_session_id), runtime_id: nullableUuid(row.runtime_id),
     archived: boolean(row.archived), version: positiveVersion(row.version), binding_id: uuid(row.binding_id),
@@ -205,22 +209,30 @@ function mapRunContext(value: unknown): RunContextEnvelope {
   const raw = record(envelope.run_context);
   const authorization = record(raw.authorization);
   const capabilities = record(envelope.capabilities);
-  const branch = mapBranch(envelope.branch);
+  const branch = envelope.branch === null ? null : mapBranch(envelope.branch);
   const run = mapRun(envelope.engineering_run);
   const focus = envelope.focus === null ? null : mapWorktree(envelope.focus);
   if (!Array.isArray(raw.granted_scopes) || raw.granted_scopes.length > 128) throw new RunDirectoryError(0, "invalid_projection", "授权范围响应无效。");
   const context = {
-    tenant_id: uuid(raw.tenant_id), project_id: uuid(raw.project_id), repository_id: uuid(raw.repository_id),
-    branch_id: uuid(raw.branch_id), engineering_run_id: uuid(raw.engineering_run_id),
+    tenant_id: uuid(raw.tenant_id), project_id: uuid(raw.project_id), repository_id: nullableUuid(raw.repository_id),
+    branch_id: nullableUuid(raw.branch_id), engineering_run_id: uuid(raw.engineering_run_id),
     actor_id: uuid(raw.actor_id), actor_kind: boundedText(raw.actor_kind, 32),
-    authorization: { project: mapAuthorization(authorization.project), branch: mapAuthorization(authorization.branch), engineering_run: mapAuthorization(authorization.engineering_run) },
+    authorization: {
+      project: mapAuthorization(authorization.project),
+      branch: authorization.branch === null ? null : mapAuthorization(authorization.branch),
+      engineering_run: mapAuthorization(authorization.engineering_run),
+    },
     granted_scopes: raw.granted_scopes.map((scope) => boundedText(scope, 128)),
     context_version: boundedText(raw.context_version, 1024), resolved_at: boundedText(raw.resolved_at, 64), correlation_id: uuid(raw.correlation_id),
   };
-  if (!Number.isFinite(Date.parse(context.resolved_at)) || context.project_id !== branch.project_id || context.project_id !== run.project_id ||
-    context.repository_id !== branch.repository_id || context.repository_id !== run.repository_id || context.branch_id !== branch.branch_id ||
-    context.branch_id !== run.branch_id || context.engineering_run_id !== run.engineering_run_id ||
-    (focus && (focus.project_id !== context.project_id || focus.repository_id !== context.repository_id || focus.engineering_run_id !== context.engineering_run_id))) {
+  if (!Number.isFinite(Date.parse(context.resolved_at)) || context.project_id !== run.project_id ||
+    context.repository_id !== run.repository_id || context.branch_id !== run.branch_id ||
+    context.engineering_run_id !== run.engineering_run_id ||
+    (branch && (branch.project_id !== context.project_id || branch.repository_id !== context.repository_id || branch.branch_id !== context.branch_id)) ||
+    (context.branch_id !== null && branch === null) ||
+    (focus && (focus.project_id !== context.project_id ||
+      (context.repository_id !== null && focus.repository_id !== context.repository_id) ||
+      focus.engineering_run_id !== context.engineering_run_id))) {
     throw new RunDirectoryError(0, "scope_mismatch", "RunContext 的 Project、Branch、Run 或 Worktree 关联不一致。");
   }
   const focusVersion = envelope.focus_version === null ? null : boundedText(envelope.focus_version, 1024);
@@ -271,7 +283,7 @@ function mapRunTaskCard(value: unknown): RunTaskCard {
 function mapRunTaskCardBody(value: unknown, run: EngineeringRun, after?: string): RunTaskCardPage {
   const envelope = record(value);
   if (uuid(envelope.engineering_run_id) !== run.engineering_run_id || uuid(envelope.project_id) !== run.project_id ||
-    uuid(envelope.repository_id) !== run.repository_id || uuid(envelope.branch_id) !== run.branch_id ||
+    nullableUuid(envelope.repository_id) !== run.repository_id || nullableUuid(envelope.branch_id) !== run.branch_id ||
     envelope.limit !== RUN_TASK_CARD_PAGE_SIZE || !Array.isArray(envelope.work_items) || envelope.work_items.length > RUN_TASK_CARD_PAGE_SIZE) {
     throw new RunDirectoryError(0, "scope_mismatch", "Task Card 返回页不属于请求的 Engineering Run 或超过分页上限。");
   }
@@ -434,6 +446,39 @@ export class RunDirectoryApiClient {
   async listProjects(cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<AuthorizedRunProject>> {
     return mapPage(await this.request(`/api/v1/projects?${pageQuery(cursor)}`, signal), "projects", mapProject, (row) => row.project_id);
   }
+  async listProjectRuns(projectId: string, cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<EngineeringRun>> {
+    const id = uuid(projectId);
+    const result = record(await this.request(`/api/v1/projects/${id}/engineering-runs?${pageQuery(cursor)}`, signal));
+    const page = mapPage(result, "engineering_runs", mapRun, (row) => row.engineering_run_id);
+    if (uuid(result.project_id) !== id || page.rows.some((row) => row.project_id !== id)) {
+      throw new RunDirectoryError(0, "scope_mismatch", "Engineering Run 目录不属于当前 Project。");
+    }
+    return page;
+  }
+  async createEngineeringRun(
+    projectId: string,
+    title: string,
+    idempotencyKey: string,
+    correlationId: string,
+    signal?: AbortSignal,
+  ): Promise<EngineeringRun> {
+    const id = uuid(projectId);
+    const normalizedTitle = boundedText(title.trim(), 500);
+    const key = boundedText(idempotencyKey, 128);
+    const correlation = uuid(correlationId);
+    if (!normalizedTitle) throw new RunDirectoryError(0, "invalid_request", "Run 名称不能为空。");
+    const result = record(await this.request(
+      `/api/v1/projects/${id}/engineering-runs`,
+      signal,
+      MAX_RESPONSE_BYTES,
+      { method: "POST", idempotencyKey: key, body: JSON.stringify({ title: normalizedTitle, correlation_id: correlation }) },
+    ));
+    const run = mapRun(result.engineering_run);
+    if (uuid(result.project_id) !== id || run.project_id !== id || run.repository_id !== null || run.branch_id !== null) {
+      throw new RunDirectoryError(0, "invalid_projection", "新建 Run 响应没有保持 Project 所属且无宿主 Branch 的目录身份。");
+    }
+    return run;
+  }
   async listBranches(projectId: string, cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<CloudBranch>> {
     const id = uuid(projectId);
     const result = record(await this.request(`/api/v1/projects/${id}/branches?${pageQuery(cursor)}`, signal));
@@ -452,12 +497,15 @@ export class RunDirectoryApiClient {
   async listWorktrees(run: EngineeringRun, cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<RunWorktree>> {
     const result = record(await this.request(`/api/v1/engineering-runs/${uuid(run.engineering_run_id)}/worktrees?${pageQuery(cursor)}`, signal));
     const page = mapPage(result, "worktrees", mapWorktree, (row) => row.worktree_id);
-    if (uuid(result.project_id) !== run.project_id || uuid(result.branch_id) !== run.branch_id || uuid(result.engineering_run_id) !== run.engineering_run_id || page.rows.some((row) => row.project_id !== run.project_id || row.engineering_run_id !== run.engineering_run_id || row.repository_id !== run.repository_id)) {
+    if (uuid(result.project_id) !== run.project_id || nullableUuid(result.branch_id) !== run.branch_id || uuid(result.engineering_run_id) !== run.engineering_run_id || page.rows.some((row) => row.project_id !== run.project_id || row.engineering_run_id !== run.engineering_run_id || (run.repository_id !== null && row.repository_id !== run.repository_id))) {
       throw new RunDirectoryError(0, "scope_mismatch", "Worktree 目录不属于当前 Engineering Run。");
     }
     return page;
   }
   async listRunWorkItems(run: EngineeringRun, after?: string, signal?: AbortSignal): Promise<RunTaskCardPage> {
+    if (!run.repository_id || !run.branch_id) {
+      throw new RunDirectoryError(409, "run_task_scope_unavailable", "此 Run 尚无任务 owner 所需的 repository/Branch 授权范围；任务读写保持关闭。 ");
+    }
     const query = new URLSearchParams({ limit: String(RUN_TASK_CARD_PAGE_SIZE) });
     const cursor = after ? uuid(after) : undefined;
     if (cursor) query.set("after", cursor);
@@ -480,6 +528,9 @@ export class RunDirectoryApiClient {
     const run = context.engineering_run;
     const branch = context.branch;
     const focus = context.focus;
+    if (!run.repository_id || !run.branch_id || !branch) {
+      throw new RunDirectoryError(409, "run_task_scope_unavailable", "此 Run 尚无任务 owner 所需的 repository/Branch 授权范围；任务创建保持关闭。");
+    }
     const runId = uuid(run.engineering_run_id);
     const projectId = uuid(run.project_id);
     const repositoryId = uuid(run.repository_id);
@@ -543,6 +594,6 @@ export class RunDirectoryApiClient {
   }
 }
 
-export function canonicalRunWorktreeHref(projectId: string, branchId: string, runId: string, worktreeId: string): string {
-  return `/projects/${uuid(projectId)}/branches/${uuid(branchId)}/runs/${uuid(runId)}/worktrees/${uuid(worktreeId)}`;
+export function canonicalRunWorktreeHref(projectId: string, runId: string, worktreeId: string): string {
+  return `/projects/${uuid(projectId)}/runs/${uuid(runId)}/worktrees/${uuid(worktreeId)}`;
 }

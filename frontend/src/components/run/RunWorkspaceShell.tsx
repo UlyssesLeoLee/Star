@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=dc8a9384fac08f8edb002a0f2b460cb93eb12c8194a73d02ad9b212a629af777
+@cypher schema=1 source_sha256=c8e3b8a4473725f8a4360427a4ff006161619f4dbdba0b6120ed4726886e1095
 MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
@@ -31,7 +31,7 @@ import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
 import { RunTaskCardsPanel } from "@/components/run/RunTaskCardsPanel";
 
-export interface RunWorkspaceRoute { project_id: string; branch_id: string; engineering_run_id: string; worktree_id: string }
+export interface RunWorkspaceRoute { project_id: string; engineering_run_id: string; worktree_id: string }
 type ContextLoad = { client: RunDirectoryApiClient; route: string; status: "ready"; envelope: RunContextEnvelope } |
   { client: RunDirectoryApiClient; route: string; status: "error"; message: string };
 const RUN_APP_TABS = ["Inbox", "Task Cards", "Canvas", "Workflow / LangGraph", "Run BI / Benchmark", "Plugin Apps"] as const;
@@ -43,9 +43,8 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   const [chatScope, setChatScope] = useState<"WORKTREE" | "GLOBAL">("WORKTREE");
   const [activeApp, setActiveApp] = useState<(typeof RUN_APP_TABS)[number]>("Task Cards");
   let href = "";
-  try { href = canonicalRunWorktreeHref(route.project_id, route.branch_id, route.engineering_run_id, route.worktree_id); } catch { /* Invalid routes never reach the API. */ }
+  try { href = canonicalRunWorktreeHref(route.project_id, route.engineering_run_id, route.worktree_id); } catch { /* Invalid routes never reach the API. */ }
   const projectId = route.project_id.toLowerCase();
-  const branchId = route.branch_id.toLowerCase();
   const runId = route.engineering_run_id.toLowerCase();
   const worktreeId = route.worktree_id.toLowerCase();
   useEffect(function resolveCanonicalRunContext() {
@@ -57,7 +56,7 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
     void client.getRunContext(runId, worktreeId, controller.signal).then((envelope) => {
       if (controller.signal.aborted) return;
       const context = envelope.run_context;
-      if (context.project_id !== projectId || context.branch_id !== branchId || context.engineering_run_id !== runId || envelope.focus?.worktree_id !== worktreeId) {
+      if (context.project_id !== projectId || context.engineering_run_id !== runId || envelope.focus?.worktree_id !== worktreeId) {
         throw new RunDirectoryError(0, "scope_mismatch", "当前路径与授权 RunContext 不一致，checkout 焦点未设置。");
       }
       setLoad({ client, route: href, status: "ready", envelope });
@@ -66,11 +65,11 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
       if (!controller.signal.aborted) setLoad({ client, route: href, status: "error", message: directoryErrorMessage(error) });
     });
     return () => { controller.abort(); clearFocus(); };
-  }, [branchId, clearFocus, client, href, projectId, retry, runId, setFocus, status, worktreeId]);
+  }, [clearFocus, client, href, projectId, retry, runId, setFocus, status, worktreeId]);
   const current = load && load.client === client && load.route === href ? load : null;
-  if (!href) return <section className="p-6" role="alert"><h1 className="text-lg font-semibold">Run 路径无效</h1><p className="mt-2 text-sm text-ink-mute">Project、Branch、Run 与 Worktree 必须使用有效目录身份。</p></section>;
+  if (!href) return <section className="p-6" role="alert"><h1 className="text-lg font-semibold">Run 路径无效</h1><p className="mt-2 text-sm text-ink-mute">Project、Run 与 Worktree 必须使用有效目录身份。</p></section>;
   if (status !== "ready" || !client) return <section className="p-6" role="status"><h1 className="text-lg font-semibold">Engineering Run</h1><p className="mt-2 text-sm text-ink-mute">{message}</p></section>;
-  if (!current) return <section className="p-6" role="status">正在验证 Project、云端 Branch、Engineering Run 与 Worktree 焦点…</section>;
+  if (!current) return <section className="p-6" role="status">正在验证 Project、Engineering Run 与 Worktree 焦点…</section>;
   if (current.status === "error") return <section className="p-6" role="alert"><h1 className="text-lg font-semibold">Run 工作区暂不可用</h1><p className="my-3 text-sm text-ink-mute">{current.message}</p><button type="button" className="rounded border border-line px-3 py-1 text-sm" onClick={() => { setLoad(null); setRetry((value) => value + 1); }}>重试授权上下文</button></section>;
   const { envelope } = current;
   const focus = envelope.focus;
@@ -78,7 +77,7 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   const hooksQuery = new URLSearchParams({ project_id: projectId, worktree_id: worktreeId });
   return <section data-testid="engineering-run-workspace" data-engineering-run-id={runId} data-focus-worktree-id={worktreeId} className="flex min-h-[calc(100vh-4rem)] flex-col p-4 md:p-6">
     <header className="border-b border-line pb-4">
-      <p className="break-all text-xs text-ink-mute">Project {projectId} / 云端 Branch {envelope.branch.name} / Engineering Run / Worktree</p>
+      <p className="break-all text-xs text-ink-mute">Project {projectId} / Engineering Run / Worktree {focus.name} / 本地 Branch {focus.branch.trim() || "未关联"} / 远端 Branch {envelope.branch?.full_ref ?? "未关联"}</p>
       <h1 className="mt-2 break-words text-xl font-semibold">{envelope.engineering_run.title}</h1>
       <p className="mt-1 break-words text-sm">Checkout 焦点：<strong>{focus.name}</strong> · {focus.machine_state}{focus.archived && " · 已归档"}</p>
       <p className="mt-2 text-xs text-ink-mute">协作、任务、Canvas、Workflow、分析与插件的工作区属于此 Engineering Run。Worktree 提供本地 checkout 焦点。</p>
@@ -119,7 +118,7 @@ function RunContextDetails({ envelope }: { envelope: RunContextEnvelope }) {
       <dt className="text-ink-mute">Workspace</dt><dd>{focus?.workspace_id}</dd>
       <dt className="text-ink-mute">Agent / Session</dt><dd>{focus?.agent_id ?? "未绑定"} / {focus?.agent_session_id ?? "未绑定"}</dd>
       <dt className="text-ink-mute">Runtime</dt><dd>{focus?.runtime_id ?? "未绑定"}</dd>
-      <dt className="text-ink-mute">授权</dt><dd>Project {context.authorization.project.role} v{context.authorization.project.version} · Branch {context.authorization.branch.role} v{context.authorization.branch.version} · Run {context.authorization.engineering_run.role} v{context.authorization.engineering_run.version}</dd>
+      <dt className="text-ink-mute">授权</dt><dd>Project {context.authorization.project.role} v{context.authorization.project.version} · Run {context.authorization.engineering_run.role} v{context.authorization.engineering_run.version} · 远端 Branch {context.authorization.branch ? `${context.authorization.branch.role} v${context.authorization.branch.version}` : "未关联"}</dd>
     </dl>
   </details>;
 }

@@ -1,4 +1,4 @@
-# Star 平台《Frontend Design 詳細設計書》
+﻿# Star 平台《Frontend Design 詳細設計書》
 
 > **文档版本**: v0.1 (2026-08-26) → v0.2 (per 2026-08-31 12:48 JST handoff 兜底, 守门 #11 缺标比错标)
 > **修订历史**:
@@ -20,7 +20,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档是 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《Frontend Design 詳細設計書》阶段的产出。
+本文档是 Star 平台(AI Coding Worktree Control Plane + Work Management + SCM Integration)《Frontend Design 詳細設計書》阶段的产出。
 
 **输入**: basic-design §2(25 Module 划分)/ §6(安全边界)/ §7(6 状态机)/ §10(ADR-016~030) + api-design §3(REST 端点)/ §4(WebSocket)/ §5(AsyncAPI 事件总线)
 **输出**: 前端 IA / 组件目录 / 状态契约 / 设计 token / 交互规范 / 数据流契约 / ADR-frontend / 已知缺口

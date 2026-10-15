@@ -1,3 +1,9 @@
+/*
+@cypher schema=1 source_sha256=5fa166b6dbf452ec124a358cecb75d13fab4a63c634cebbbc6e052e744cf4cae
+MERGE (self:File {path:"frontend/src/lib/run/runDirectorySession.tsx"})
+@endcypher
+*/
+
 /* CYPHER STRUCTURE MANIFEST
 CREATE (f:File {name:"frontend/src/lib/run/runDirectorySession.tsx",type:"file",language:"tsx"}),
  (session:Class {name:"RunDirectoryHostSession",type:"class"}),(state:Class {name:"RunDirectorySessionState",type:"class"}),
@@ -41,7 +47,7 @@ export interface RunDirectorySessionState {
   clearFocus(): void;
 }
 const MISSING_SESSION: RunDirectorySessionState = {
-  status: "missing", message: "宿主认证会话尚未装配。Project → Branch → Engineering Run → Worktree 导航暂不可用。",
+  status: "missing", message: "宿主认证会话尚未装配。Project → Engineering Run → Worktree → Branch 导航暂不可用。",
   client: null, focus: null, setFocus: () => undefined, clearFocus: () => undefined,
 };
 const RunDirectoryContext = createContext<RunDirectorySessionState>(MISSING_SESSION);

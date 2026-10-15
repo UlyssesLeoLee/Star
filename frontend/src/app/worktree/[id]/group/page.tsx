@@ -1,4 +1,17 @@
 /*
+@cypher schema=1 source_sha256=e9df7d2ea47d8475d0ea8ecf2c1d17be8bd35214a214ae57194ff1e731737cb1
+MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
+MERGE (isAppId:Symbol {id:"frontend/src/app/worktree/[id]/group/page.tsx::isAppId",kind:"function"})
+MERGE (resolveAppId:Symbol {id:"frontend/src/app/worktree/[id]/group/page.tsx::resolveAppId",kind:"function"})
+MERGE (page:Symbol {id:"frontend/src/app/worktree/[id]/group/page.tsx::GroupWorkspacePage",kind:"component"})
+MERGE (self)-[:DEFINES]->(isAppId)
+MERGE (self)-[:DEFINES]->(resolveAppId)
+MERGE (self)-[:DEFINES]->(page)
+MERGE (page)-[:CALLS]->(resolveAppId)
+MERGE (resolveAppId)-[:CALLS]->(isAppId)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/worktree/[id]/group/page.tsx", type:"file", language:"tsx"}),
@@ -16,6 +29,7 @@ CREATE
   (pendingCanvasElementMove:Class {name:"PendingCanvasElementMoveCommand", type:"class", language:"typescript", visibility:"private"}),
   (pendingCanvasElementDelete:Class {name:"PendingCanvasElementDeleteCommand", type:"class", language:"typescript", visibility:"private"}),
   (isAppId:Function {name:"isAppId", type:"function", signature:"isAppId(value: string | null): value is AppId", visibility:"private", complexity:"simple"}),
+  (resolveAppId:Function {name:"resolveAppId", type:"function", signature:"resolveAppId(value: string | null, pluginIds?: readonly string[]): AppId | null", visibility:"private", complexity:"simple"}),
   (enabledPlugins:Variable {name:"enabledPlugins", type:"variable", language:"typescript"}),
   (groupCanvas:Variable {name:"groupCanvas", type:"variable", language:"typescript"}),
   (groupCanvases:Variable {name:"groupCanvases", type:"variable", language:"typescript"}),
@@ -112,8 +126,8 @@ CREATE
   (createCanvasElement:Function {name:"WorktreeGroupApiClient.createCanvasElement", type:"function", signature:"createCanvasElement(worktreeId, canvasId, body, idempotencyKey): Promise<T>", visibility:"public", complexity:"simple"}),
   (taskMap:Function {name:"taskMap", type:"function", signature:"projectWorkItems.map(workItem => JSX.Element)", visibility:"private", complexity:"moderate"}),
   (appMap:Function {name:"appMap", type:"function", signature:"GROUP_APPS.map(app => JSX.Element)", visibility:"private", complexity:"moderate"}),
-  (jiraColumnMap:Function {name:"jiraColumnMap", type:"function", signature:"STATUS_OPTIONS.map(status => JSX.Element)", visibility:"private", complexity:"moderate"}),
-  (jiraTaskMap:Function {name:"jiraTaskMap", type:"function", signature:"projectWorkItems.map(workItem => JSX.Element)", visibility:"private", complexity:"moderate"}),
+  (boardColumnMap:Function {name:"boardColumnMap", type:"function", signature:"STATUS_OPTIONS.map(status => JSX.Element)", visibility:"private", complexity:"moderate"}),
+  (boardTaskMap:Function {name:"boardTaskMap", type:"function", signature:"projectWorkItems.map(workItem => JSX.Element)", visibility:"private", complexity:"moderate"}),
   (statusMap:Function {name:"statusMap", type:"function", signature:"STATUS_OPTIONS.map(status => JSX.Element)", visibility:"private", complexity:"simple"}),
   (statusClick:Function {name:"statusClick", type:"function", signature:"onClick(): void", visibility:"private", complexity:"simple"}),
   (pluginToggle:Function {name:"pluginToggle", type:"function", signature:"onChange(event): void", visibility:"private", complexity:"simple"}),
@@ -136,7 +150,7 @@ CREATE
   (file)-[:CONTAINS]->(createCanvasElement),
   (file)-[:CONTAINS]->(updateCanvasElement),
   (file)-[:CONTAINS]->(deleteCanvasElement),
-  (file)-[:CONTAINS]->(isAppId),
+  (file)-[:CONTAINS]->(isAppId),(file)-[:CONTAINS]->(resolveAppId),
   (page)-[:USES]->(apps),
   (page)-[:USES]->(pluginPreview),
   (page)-[:USES]->(visibleGroupApps),
@@ -198,7 +212,7 @@ CREATE
   (page)-[:USES]->(worktrees),
   (page)-[:USES]->(worktree),
   (page)-[:USES]->(project),
-  (page)-[:CALLS]->(isAppId),
+  (page)-[:CALLS]->(isAppId),(page)-[:CALLS]->(resolveAppId),(resolveAppId)-[:CALLS]->(isAppId),
   (page)-[:CONTAINS]->(taskHref),
   (page)-[:CONTAINS]->(appHref),
   (page)-[:CONTAINS]->(changeScope),
@@ -226,8 +240,8 @@ CREATE
   (page)-[:CONTAINS]->(updateCanvasConnector),
   (page)-[:CONTAINS]->(taskMap),
   (page)-[:CONTAINS]->(appMap),
-  (page)-[:CONTAINS]->(jiraColumnMap),
-  (page)-[:CONTAINS]->(jiraTaskMap),
+  (page)-[:CONTAINS]->(boardColumnMap),
+  (page)-[:CONTAINS]->(boardTaskMap),
   (page)-[:CONTAINS]->(statusMap),
   (page)-[:CONTAINS]->(statusClick),
   (page)-[:CONTAINS]->(pluginToggle),
@@ -266,8 +280,8 @@ CREATE
   (visibleGroupApps)-[:FILTERS_BY]->(enabledPlugins),
   (selectedPlugin)-[:DERIVES_FROM]->(currentApp),
   (selectedPlugin)-[:LOOKS_UP]->(pluginPreview),
-  (page)-[:CALLS]->(jiraColumnMap),
-  (page)-[:CALLS]->(jiraTaskMap),
+  (page)-[:CALLS]->(boardColumnMap),
+  (page)-[:CALLS]->(boardTaskMap),
   (page)-[:CALLS]->(statusMap),
   (page)-[:CALLS]->(statusClick),
   (page)-[:CALLS]->(pluginToggle),
@@ -447,7 +461,7 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-type AppId = "multica" | "jira" | "task-card" | "canvas" | "workflow" | "plugins" | `plugin:${string}`;
+type AppId = "task-flow" | "board" | "task-card" | "canvas" | "workflow" | "plugins" | `plugin:${string}`;
 type ChatScope = "WORKTREE" | "GLOBAL";
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (review:Function {name:"reviewLiveWorkItem"}),
@@ -523,6 +537,13 @@ function isAppId(value: string | null, pluginIds: readonly string[] = []): value
   return GROUP_APPS.some((app) => app.id === value) || pluginIds.some((pluginId) => `plugin:${pluginId}` === value);
 }
 
+function resolveAppId(value: string | null, pluginIds: readonly string[] = []): AppId | null {
+  const canonical = value === "multica" ? "task-flow"
+    : value === "jira" || value === "work-items" ? "board"
+      : value;
+  return isAppId(canonical, pluginIds) ? canonical : null;
+}
+
 type GroupAppRegistryState =
   | { mode: "preview"; worktreeId: string; client: null; requestKey: number }
   | { mode: "loading"; worktreeId: string; client: WorktreeGroupApiClient; requestKey: number }
@@ -542,10 +563,10 @@ const GROUP_APPS: Array<{
   subtitle: string;
   icon: LucideIcon;
 }> = [
-  { id: "multica", label: "Multica", subtitle: "任务生命周期", icon: Blocks },
-  { id: "jira", label: "Jira 视图", subtitle: "Board / Backlog / Sprint", icon: SquareKanban },
+  { id: "task-flow", label: "任务流程", subtitle: "领取、执行与评审", icon: Blocks },
+  { id: "board", label: "计划看板", subtitle: "阶段、待办与迭代", icon: SquareKanban },
   { id: "task-card", label: "Task Cards", subtitle: "统一任务入口", icon: ClipboardList },
-  { id: "canvas", label: "Infinite Canvas", subtitle: "Miro 式协作画布", icon: LayoutGrid },
+  { id: "canvas", label: "无限画布", subtitle: "协作式空间画布", icon: LayoutGrid },
   { id: "workflow", label: "Workflow", subtitle: "LangGraph / L0", icon: Workflow },
   { id: "plugins", label: "Plugins", subtitle: "群组应用与能力", icon: Plug },
 ];
@@ -566,7 +587,7 @@ const STATUS_OPTIONS: Array<{ value: WorkItemStatus; label: string }> = [
 ];
 
 // V字モデル工程 (per IPA V字モデル 9 段階, P6 テスト 4 サブ → 12 縦列)
-// per 2026-10-01 ユーザー発令: V字モデルを Jira 視図のデフォルトにし,
+// V字モデルを計画看板のデフォルトとして,
 //   各工程を独立した縦列として配置, 工程内 5 状態槽横並び
 type VModelPhaseId =
   | "P1" | "P2" | "P3" | "P4" | "P5"
@@ -745,9 +766,17 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           .filter((plugin) => enabledPlugins[plugin.id])
           .map((plugin) => ({ ...plugin, source: "preview" as const }))
       : [];
-  const currentApp = isAppId(requestedApp, availablePlugins.map((plugin) => plugin.id))
-    ? requestedApp
-    : "multica";
+  const resolvedApp = resolveAppId(requestedApp, availablePlugins.map((plugin) => plugin.id));
+  const currentApp = resolvedApp ?? "task-flow";
+  useEffect(() => {
+    const canonicalAppId = requestedApp === "multica" ? "task-flow"
+      : requestedApp === "jira" || requestedApp === "work-items" ? "board"
+        : null;
+    if (!canonicalAppId) return;
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("app", canonicalAppId);
+    router.replace(window.location.pathname + "?" + query.toString(), { scroll: false });
+  }, [requestedApp, searchParams, router]);
   const visibleGroupApps: Array<{ id: AppId; label: string; subtitle: string; icon: LucideIcon }> = [
     ...GROUP_APPS,
     ...availablePlugins.map((plugin) => ({
@@ -2429,10 +2458,10 @@ export default function GroupWorkspacePage({ params }: PageProps) {
         </nav>
 
         <section className="min-w-0" aria-live="polite">
-          {currentApp === "multica" && (
+          {currentApp === "task-flow" && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">Multica · 生命周期</h2><p className="text-xs text-ink-mute">领取、执行与评审共用 WorkItem 状态源。</p></div>
+                <div><h2 className="text-lg font-semibold">任务流程</h2><p className="text-xs text-ink-mute">领取、执行与评审共用 Work Item 状态源。</p></div>
                 {groupProjection.mode === "live"
                   ? <span className="rounded border border-success/40 bg-success/10 px-2 py-1 text-[10px] text-success">服务端生命周期与版本</span>
                   : <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">示例数据只在浏览器 store</span>}
@@ -2441,7 +2470,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
             </div>
           )}
 
-          {currentApp === "jira" && (
+          {currentApp === "board" && (
             <div className="space-y-4" data-testid="group-vmodel-board">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
@@ -2554,14 +2583,14 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 })()}
               </div>
 
-              <p className="text-[10px] text-ink-mute">V字モデル 12 縦列 (9 工程 + テスト 4 サブ工程)。列内 5 状態槽は IPA V字モデル 工程ごとに WIP 上限を定義。Multica 周期駆動 (P5 実装→P6.1 単体→P6.2 結合→…→P9 終結) を前提。</p>
+              <p className="text-[10px] text-ink-mute">V字モデル 12 縦列 (9 工程 + テスト 4 サブ工程)。列内 5 状態槽は IPA V字モデル 工程ごとに WIP 上限を定義。工程間の状態遷移と WIP 上限を可視化。</p>
             </div>
           )}
 
           {currentApp === "task-card" && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">Task Card Index</h2><p className="text-xs text-ink-mute">Task Card 与 Canvas、Multica、Jira 视图是同级入口。</p></div>
+                <div><h2 className="text-lg font-semibold">Task Card Index</h2><p className="text-xs text-ink-mute">Task Card、Canvas、任务流程和计划看板是同级入口。</p></div>
                 <span className={`rounded border px-2 py-1 text-[10px] ${cliSessionForSelectedTask ? "border-success/40 bg-success/10 text-success" : "border-warning/40 bg-warning/10 text-warning"}`}>
                   {cliSessionForSelectedTask ? "Task CLI Session" : "CLI 预览 / 等待受控 Runtime"}
                 </span>
@@ -2602,7 +2631,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                         ? <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 卡内 CLI 预览</Link>
                         : <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">先绑定当前 Worktree 才能打开 CLI</span>}
                       {selectedTaskCanvasElement && <Link href={appHref("canvas", { highlight: selectedTaskCanvasElement.id })} className="btn text-xs"><LayoutGrid size={13} /> 在 Canvas 中定位</Link>}
-                      <Link href={appHref("jira")} className="btn text-xs"><ArrowUpRight size={13} /> 打开 Jira 视图</Link>
+                      <Link href={appHref("board")} className="btn text-xs"><ArrowUpRight size={13} /> 打开计划看板</Link>
                     </div>
                   </article>
                   <section className="card min-h-[320px] space-y-3">
@@ -2751,7 +2780,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           {currentApp === "canvas" && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">Infinite Canvas · Miro 等价入口</h2><p className="text-xs text-ink-mute">Canvas 与 Task Card 同级；typed EntityRef 指向当前 Worktree 内的 canonical WorkItem。</p></div>
+                <div><h2 className="text-lg font-semibold">无限画布</h2><p className="text-xs text-ink-mute">Canvas 与 Task Card 同级；typed EntityRef 指向当前 Worktree 内的 canonical Work Item。</p></div>
                 <div className="flex items-center gap-2">
                   {groupProjection.mode === "live" && groupCanvases.length > 1 && groupCanvas && <label className="flex items-center gap-2 text-xs">Canvas<select className="input py-1 text-xs" aria-label="选择 Worktree Canvas" value={groupCanvas.id} onChange={(event) => selectCanvas(event.target.value)}>{groupCanvases.map((canvas) => <option key={canvas.id} value={canvas.id}>{canvas.title}</option>)}</select></label>}
                   {groupProjection.mode === "live" && groupCanvas && <button type="button" className="btn text-xs" disabled={canvasBootstrapPending} onClick={() => void createWorktreeCanvas(`Worktree Canvas ${groupCanvases.length + 1}`)}>{canvasBootstrapPending ? "正在创建…" : "新建 Canvas"}</button>}
@@ -2799,7 +2828,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 <label className="grid gap-1 text-[10px]">标签<input className="input py-1 text-xs" maxLength={500} value={selectedConnector.label ?? ""} disabled={canvasDocumentSavePending} onChange={(event) => updateCanvasConnector(selectedConnector.id, { label: event.currentTarget.value })} /></label>
                 <label className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={selectedConnector.arrow_start} disabled={canvasDocumentSavePending} onChange={(event) => updateCanvasConnector(selectedConnector.id, { arrow_start: event.currentTarget.checked })} />起点箭头</label>
                 <label className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={selectedConnector.arrow_end} disabled={canvasDocumentSavePending} onChange={(event) => updateCanvasConnector(selectedConnector.id, { arrow_end: event.currentTarget.checked })} />终点箭头</label>
-                {selectedConnector.kind !== "free" && <p className="text-[10px] text-ink-mute lg:col-span-7">当前是其他领域投影的连线；这里仅编辑画布展示，不改变其 Jira/WorkItem 关系。</p>}
+                {selectedConnector.kind !== "free" && <p className="text-[10px] text-ink-mute lg:col-span-7">当前是其他领域投影的连线；这里仅编辑画布展示，不改变其 Work Item 关系。</p>}
               </div>}
               {groupProjection.mode === "live" && selectedCanvasElement && !selectedCanvasElement.locked && canvasElementGeometryDraft && <div className="grid gap-2 rounded-lg border border-line bg-bg-card p-3 sm:grid-cols-4" data-testid="canvas-element-geometry-editor">
                 <label className="grid gap-1 text-xs">元素宽度<input className="input py-1 text-xs" type="number" min={1} max={10_000} step={1} value={canvasElementGeometryDraft.width} disabled={canvasElementGeometryPending} onChange={(event) => { const value = event.currentTarget.valueAsNumber; if (Number.isFinite(value)) { setCanvasElementGeometryDraft((current) => current ? { ...current, width: value } : current); setCanvasElementGeometryError(null); setCanvasElementGeometrySaved(false); } }} /></label>

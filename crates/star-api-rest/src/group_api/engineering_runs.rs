@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=440cb3cf7261634e1c4067b34650e11ad64e643af75d3b637df4348eb085fc19
+MERGE (self:File {path:"crates/star-api-rest/src/group_api/engineering_runs.rs"})
+MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::router",kind:"function"})
+MERGE (listProjectRuns:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::list_project_runs",kind:"function"})
+MERGE (self)-[:DEFINES]->(router)
+MERGE (self)-[:DEFINES]->(listProjectRuns)
+MERGE (router)-[:CALLS]->(listProjectRuns)
+@endcypher
+*/
+
 //! Cypher structural manifest.
 //! CREATE (f:File {name:"engineering_runs.rs",type:"file",language:"rust"}),
 //! (query:Class {name:"DirectoryQuery",type:"class"}),(cursor:Class {name:"DirectoryCursor",type:"class"}),
@@ -8,17 +19,17 @@
 //! (router:Function {name:"router",type:"function"}),(parse:Function {name:"parse_id",type:"function"}),
 //! (read:Function {name:"begin_read",type:"function"}),(br:Function {name:"branch_authority",type:"function"}),
 //! (ra:Function {name:"run_authority",type:"function"}),(branches:Function {name:"list_branches",type:"function"}),
-//! (runs:Function {name:"list_runs",type:"function"}),(worktrees:Function {name:"list_run_worktrees",type:"function"}),
+//! (runs:Function {name:"list_runs",type:"function"}),(projectRuns:Function {name:"list_project_runs",type:"function"}),(worktrees:Function {name:"list_run_worktrees",type:"function"}),
 //! (context:Function {name:"resolve_run_context",type:"function"}),(legacy:Function {name:"resolve_worktree_run_context",type:"function"}),
 //! (load:Function {name:"load_focus",type:"function"}),(envelope:Function {name:"context_envelope",type:"function"}),
 //! (reply:Function {name:"reply",type:"function"}),(decode:Function {name:"DirectoryQuery::page",type:"function"}),
 //! (next:Function {name:"DirectoryPage::next_cursor",type:"function"}),(permission:Function {name:"DirectoryGrant::snapshot",type:"function"}),
 //! (sql:Variable {name:"WORKTREE_SELECT",type:"variable"}),
 //! (f)-[:CONTAINS]->(query),(f)-[:CONTAINS]->(cursor),(f)-[:CONTAINS]->(page),(f)-[:CONTAINS]->(branch),(f)-[:CONTAINS]->(run),(f)-[:CONTAINS]->(grant),(f)-[:CONTAINS]->(auth),(f)-[:CONTAINS]->(focus),(f)-[:CONTAINS]->(contextQuery),
-//! (f)-[:CONTAINS]->(router),(f)-[:CONTAINS]->(parse),(f)-[:CONTAINS]->(read),(f)-[:CONTAINS]->(br),(f)-[:CONTAINS]->(ra),(f)-[:CONTAINS]->(branches),(f)-[:CONTAINS]->(runs),(f)-[:CONTAINS]->(worktrees),(f)-[:CONTAINS]->(context),(f)-[:CONTAINS]->(legacy),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(envelope),(f)-[:CONTAINS]->(reply),(f)-[:CONTAINS]->(sql),
+//! (f)-[:CONTAINS]->(router),(f)-[:CONTAINS]->(parse),(f)-[:CONTAINS]->(read),(f)-[:CONTAINS]->(br),(f)-[:CONTAINS]->(ra),(f)-[:CONTAINS]->(branches),(f)-[:CONTAINS]->(runs),(f)-[:CONTAINS]->(projectRuns),(f)-[:CONTAINS]->(worktrees),(f)-[:CONTAINS]->(context),(f)-[:CONTAINS]->(legacy),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(envelope),(f)-[:CONTAINS]->(reply),(f)-[:CONTAINS]->(sql),
 //! (query)-[:HAS_METHOD]->(decode),(page)-[:HAS_METHOD]->(next),(grant)-[:HAS_METHOD]->(permission),
-//! (router)-[:CALLS]->(branches),(router)-[:CALLS]->(runs),(router)-[:CALLS]->(worktrees),(router)-[:CALLS]->(context),(router)-[:CALLS]->(legacy),
-//! (branches)-[:CALLS]->(decode),(runs)-[:CALLS]->(decode),(worktrees)-[:CALLS]->(decode),(branches)-[:CALLS]->(read),(runs)-[:CALLS]->(read),(worktrees)-[:CALLS]->(read),(context)-[:CALLS]->(read),(legacy)-[:CALLS]->(read),
+//! (router)-[:CALLS]->(branches),(router)-[:CALLS]->(runs),(router)-[:CALLS]->(projectRuns),(router)-[:CALLS]->(worktrees),(router)-[:CALLS]->(context),(router)-[:CALLS]->(legacy),
+//! (branches)-[:CALLS]->(decode),(runs)-[:CALLS]->(decode),(projectRuns)-[:CALLS]->(decode),(worktrees)-[:CALLS]->(decode),(branches)-[:CALLS]->(read),(runs)-[:CALLS]->(read),(projectRuns)-[:CALLS]->(read),(worktrees)-[:CALLS]->(read),(context)-[:CALLS]->(read),(legacy)-[:CALLS]->(read),
 //! (runs)-[:CALLS]->(br),(ra)-[:CALLS]->(br),(worktrees)-[:CALLS]->(ra),(context)-[:CALLS]->(ra),(legacy)-[:CALLS]->(ra),(context)-[:CALLS]->(load),(legacy)-[:CALLS]->(load),(context)-[:CALLS]->(envelope),(legacy)-[:CALLS]->(envelope),(envelope)-[:CALLS]->(permission),(load)-[:USES]->(sql),(worktrees)-[:USES]->(sql);
 
 //! CYPHER STRUCTURE MANIFEST: external call relationships.
@@ -34,7 +45,7 @@
 //! WITH f, sqlQuery, sqlScalar, sqlPlain, execute, validate, scope, tenant, active, begin, commit, bind, fetch, fetchAll, bad, internal, missing, invalid, decode64, encode64, fromJson, toJson, parseUuid, nil, uuid, clock, json, format, get, new, route, wrap
 //! MATCH (decode:Function {name:"DirectoryQuery::page",type:"function"}),(next:Function {name:"DirectoryPage::next_cursor",type:"function"}),(parse:Function {name:"parse_id",type:"function"}),
 //! (read:Function {name:"begin_read",type:"function"}),(br:Function {name:"branch_authority",type:"function"}),(ra:Function {name:"run_authority",type:"function"}),
-//! (branches:Function {name:"list_branches",type:"function"}),(runs:Function {name:"list_runs",type:"function"}),(worktrees:Function {name:"list_run_worktrees",type:"function"}),
+//! (branches:Function {name:"list_branches",type:"function"}),(runs:Function {name:"list_runs",type:"function"}),(projectRuns:Function {name:"list_project_runs",type:"function"}),(worktrees:Function {name:"list_run_worktrees",type:"function"}),
 //! (load:Function {name:"load_focus",type:"function"}),(context:Function {name:"resolve_run_context",type:"function"}),(legacy:Function {name:"resolve_worktree_run_context",type:"function"}),
 //! (envelope:Function {name:"context_envelope",type:"function"}),(permission:Function {name:"DirectoryGrant::snapshot",type:"function"}),(router:Function {name:"router",type:"function"}),(reply:Function {name:"reply",type:"function"})
 //! CREATE (decode)-[:CALLS]->(decode64),(decode)-[:CALLS]->(fromJson),(decode)-[:CALLS]->(bad),(decode)-[:CALLS]->(invalid),(decode)-[:CALLS]->(nil),(next)-[:CALLS]->(encode64),(next)-[:CALLS]->(toJson),(next)-[:CALLS]->(internal),(parse)-[:CALLS]->(parseUuid),(parse)-[:CALLS]->(nil),(parse)-[:CALLS]->(bad),
@@ -43,6 +54,7 @@
 //! (ra)-[:CALLS]->(sqlQuery),(ra)-[:CALLS]->(bind),(ra)-[:CALLS]->(fetch),(ra)-[:CALLS]->(internal),(ra)-[:CALLS]->(missing),
 //! (branches)-[:CALLS]->(parse),(branches)-[:CALLS]->(active),(branches)-[:CALLS]->(sqlQuery),(branches)-[:CALLS]->(bind),(branches)-[:CALLS]->(fetchAll),(branches)-[:CALLS]->(commit),(branches)-[:CALLS]->(next),(branches)-[:CALLS]->(reply),(branches)-[:CALLS]->(json),(branches)-[:CALLS]->(internal),
 //! (runs)-[:CALLS]->(parse),(runs)-[:CALLS]->(sqlQuery),(runs)-[:CALLS]->(bind),(runs)-[:CALLS]->(fetchAll),(runs)-[:CALLS]->(commit),(runs)-[:CALLS]->(next),(runs)-[:CALLS]->(reply),(runs)-[:CALLS]->(json),(runs)-[:CALLS]->(internal),
+//! (projectRuns)-[:CALLS]->(parse),(projectRuns)-[:CALLS]->(sqlQuery),(projectRuns)-[:CALLS]->(bind),(projectRuns)-[:CALLS]->(fetchAll),(projectRuns)-[:CALLS]->(commit),(projectRuns)-[:CALLS]->(next),(projectRuns)-[:CALLS]->(reply),(projectRuns)-[:CALLS]->(json),(projectRuns)-[:CALLS]->(internal),(projectRuns)-[:CALLS]->(active),
 //! (worktrees)-[:CALLS]->(parse),(worktrees)-[:CALLS]->(scope),(worktrees)-[:CALLS]->(sqlQuery),(worktrees)-[:CALLS]->(bind),(worktrees)-[:CALLS]->(fetchAll),(worktrees)-[:CALLS]->(format),(worktrees)-[:CALLS]->(commit),(worktrees)-[:CALLS]->(next),(worktrees)-[:CALLS]->(reply),(worktrees)-[:CALLS]->(json),(worktrees)-[:CALLS]->(internal),
 //! (load)-[:CALLS]->(sqlQuery),(load)-[:CALLS]->(bind),(load)-[:CALLS]->(fetch),(load)-[:CALLS]->(format),(load)-[:CALLS]->(scope),(load)-[:CALLS]->(internal),(load)-[:CALLS]->(missing),
 //! (context)-[:CALLS]->(parse),(context)-[:CALLS]->(commit),(context)-[:CALLS]->(reply),(context)-[:CALLS]->(internal),(legacy)-[:CALLS]->(parse),(legacy)-[:CALLS]->(sqlScalar),(legacy)-[:CALLS]->(bind),(legacy)-[:CALLS]->(fetch),(legacy)-[:CALLS]->(scope),(legacy)-[:CALLS]->(commit),(legacy)-[:CALLS]->(reply),(legacy)-[:CALLS]->(internal),(legacy)-[:CALLS]->(missing),
@@ -51,7 +63,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{
         header::{CACHE_CONTROL, VARY},
-        HeaderName,
+        HeaderMap, HeaderName,
     },
     routing::get,
     Json, Router,
@@ -67,6 +79,7 @@ use super::{
     active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
     GroupApiError, GroupApiState, ProjectBinding,
 };
+use super::work_items::{idempotency_key, request_hash};
 
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -155,8 +168,8 @@ struct CloudBranchRow {
 struct EngineeringRunRow {
     engineering_run_id: Uuid,
     project_id: Uuid,
-    repository_id: Uuid,
-    branch_id: Uuid,
+    repository_id: Option<Uuid>,
+    branch_id: Option<Uuid>,
     title: String,
     state: String,
     owner_user_id: Option<Uuid>,
@@ -177,10 +190,8 @@ impl DirectoryGrant {
 }
 
 struct RunAuthority {
-    branch: CloudBranchRow,
     run: EngineeringRunRow,
     project: ProjectBinding,
-    branch_grant: DirectoryGrant,
     run_grant: DirectoryGrant,
 }
 
@@ -221,9 +232,26 @@ struct ContextQuery {
     focus_worktree_id: Option<String>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CreateEngineeringRunBody {
+    title: String,
+    correlation_id: Uuid,
+}
+
+#[derive(FromRow)]
+struct RunCommandReplay {
+    request_hash: Vec<u8>,
+    response_body: Value,
+}
+
 pub(super) fn router() -> Router<GroupApiState> {
     Router::new()
         .route("/api/v1/projects/{project_id}/branches", get(list_branches))
+        .route(
+            "/api/v1/projects/{project_id}/engineering-runs",
+            get(list_project_runs).post(create_project_run),
+        )
         .route(
             "/api/v1/branches/{branch_id}/engineering-runs",
             get(list_runs),
@@ -270,6 +298,26 @@ async fn begin_read(
     Ok(tx)
 }
 
+async fn begin_write(
+    state: &GroupApiState,
+    actor: &AuthUser,
+) -> Result<Transaction<'static, Postgres>, GroupApiError> {
+    validate_actor(actor)?;
+    require_scope(actor, "project:write")?;
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    set_tenant(&mut tx, actor.tenant_id).await?;
+    sqlx::query("SELECT set_config('statement_timeout', '5000', true), set_config('lock_timeout', '1000', true)")
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    Ok(tx)
+}
+
 async fn branch_authority(
     tx: &mut Transaction<'_, Postgres>,
     actor: &AuthUser,
@@ -304,20 +352,15 @@ async fn run_authority(
          FOR SHARE OF r,v")
         .bind(actor.tenant_id).bind(run_id).fetch_optional(&mut **tx).await
         .map_err(|_| GroupApiError::internal())?.ok_or_else(GroupApiError::not_found)?;
-    let (branch, project, branch_grant) = branch_authority(tx, actor, run.branch_id).await?;
-    if branch.project_id != run.project_id || branch.repository_id != run.repository_id {
-        return Err(GroupApiError::not_found());
-    }
+    let project = active_binding(tx, actor, run.project_id).await?;
     let run_grant = sqlx::query_as::<_, DirectoryGrant>(
         "SELECT binding_id,role,version FROM permission.engineering_run_role_binding
          WHERE tenant_id=$1 AND engineering_run_id=$2 AND user_id=$3 AND valid_from<=now() AND valid_to IS NULL FOR SHARE")
         .bind(actor.tenant_id).bind(run_id).bind(actor.user_id).fetch_optional(&mut **tx).await
         .map_err(|_| GroupApiError::internal())?.ok_or_else(GroupApiError::not_found)?;
     Ok(RunAuthority {
-        branch,
         run,
         project,
-        branch_grant,
         run_grant,
     })
 }
@@ -328,11 +371,19 @@ pub(super) async fn authorize_run_task_scope(
     run_id: Uuid,
 ) -> Result<RunTaskScope, GroupApiError> {
     let authority = run_authority(tx, actor, run_id).await?;
+    let repository_id = authority
+        .run
+        .repository_id
+        .ok_or_else(|| GroupApiError::invalid_request("run_repository_binding_required"))?;
+    let branch_id = authority
+        .run
+        .branch_id
+        .ok_or_else(|| GroupApiError::invalid_request("run_task_scope_requires_repository_and_host_branch"))?;
     Ok(RunTaskScope {
         engineering_run_id: authority.run.engineering_run_id,
         project_id: authority.run.project_id,
-        repository_id: authority.run.repository_id,
-        branch_id: authority.run.branch_id,
+        repository_id,
+        branch_id,
         role: authority.run_grant.role,
         permission_snapshot_ref: format!(
             "{}:v{}",
@@ -374,6 +425,208 @@ async fn list_branches(
     Ok(reply(
         json!({"project_id":project_id,"branches":rows,"limit":page.limit,"next_cursor":next}),
     ))
+}
+
+async fn list_project_runs(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Query(query): Query<DirectoryQuery>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    let project_id = parse_id(&project_id)?;
+    let page = query.page("project_runs", project_id)?;
+    let mut tx = begin_read(&state, &actor).await?;
+    active_binding(&mut tx, &actor, project_id).await?;
+    let mut rows = sqlx::query_as::<_, EngineeringRunRow>(
+        "SELECT r.engineering_run_id,r.project_id,r.repository_id,r.branch_id,v.title,v.state,v.owner_user_id,v.version
+         FROM multica.engineering_run r
+         JOIN multica.engineering_run_revision v ON v.tenant_id=r.tenant_id AND v.engineering_run_id=r.engineering_run_id
+         JOIN permission.engineering_run_role_binding rg ON rg.tenant_id=r.tenant_id AND rg.engineering_run_id=r.engineering_run_id
+         WHERE r.tenant_id=$1 AND r.project_id=$2 AND rg.user_id=$3
+         AND v.valid_from<=now() AND v.valid_to IS NULL AND v.state<>'archived'
+         AND rg.valid_from<=now() AND rg.valid_to IS NULL
+         AND ($4::uuid IS NULL OR r.engineering_run_id>$4)
+         ORDER BY r.engineering_run_id LIMIT $5",
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(actor.user_id)
+    .bind(page.after_id)
+    .bind(page.limit + 1)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    let more = rows.len() > page.limit as usize;
+    if more {
+        rows.pop();
+    }
+    let next = page.next_cursor(if more {
+        rows.last().map(|row| row.engineering_run_id)
+    } else {
+        None
+    })?;
+    Ok(reply(json!({
+        "project_id": project_id,
+        "engineering_runs": rows,
+        "limit": page.limit,
+        "next_cursor": next,
+    })))
+}
+
+async fn create_project_run(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    headers: HeaderMap,
+    Json(body): Json<CreateEngineeringRunBody>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:write")?;
+    let project_id = parse_id(&project_id)?;
+    let title = body.title.trim();
+    if title.is_empty() || title.chars().count() > 500 || body.correlation_id.is_nil() {
+        return Err(GroupApiError::invalid_request("invalid_engineering_run"));
+    }
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(&format!("create-engineering-run:{project_id}"), &body)?;
+    let mut tx = begin_write(&state, &actor).await?;
+    let project = active_binding(&mut tx, &actor, project_id).await?;
+    if !matches!(project.role.as_str(), "tenant_admin" | "project_admin") {
+        return Err(GroupApiError::not_found());
+    }
+    sqlx::query("SELECT set_config('app.actor_id',$1,true), set_config('app.correlation_id',$2,true)")
+        .bind(actor.user_id.to_string())
+        .bind(body.correlation_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let lock_key = format!("{}:{}:{}", actor.tenant_id, actor.user_id, key);
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+        .bind(&lock_key)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let replay = sqlx::query_as::<_, RunCommandReplay>(
+        "SELECT request_hash,response_body FROM multica.engineering_run_command_idempotency
+         WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3 AND expires_at>now() FOR UPDATE",
+    )
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .bind(&key)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if let Some(replay) = replay {
+        if replay.request_hash != hash {
+            return Err(GroupApiError::conflict("idempotency_key_reused"));
+        }
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Ok(reply(replay.response_body));
+    }
+    sqlx::query(
+        "DELETE FROM multica.engineering_run_command_idempotency
+         WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3 AND expires_at<=now()",
+    )
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .bind(&key)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "WITH expired AS (
+            SELECT tenant_id,actor_id,idempotency_key
+            FROM multica.engineering_run_command_idempotency
+            WHERE tenant_id=$1 AND actor_id=$2 AND expires_at<=now()
+            ORDER BY expires_at,idempotency_key
+            LIMIT 32 FOR UPDATE SKIP LOCKED
+         )
+         DELETE FROM multica.engineering_run_command_idempotency target
+         USING expired
+         WHERE target.tenant_id=expired.tenant_id AND target.actor_id=expired.actor_id
+           AND target.idempotency_key=expired.idempotency_key",
+    )
+        .bind(actor.tenant_id).bind(actor.user_id)
+        .execute(&mut *tx).await.map_err(|_| GroupApiError::internal())?;
+
+    let run_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO multica.engineering_run (engineering_run_id,tenant_id,project_id,repository_id,branch_id)
+         VALUES ($1,$2,$3,NULL,NULL)",
+    )
+    .bind(run_id)
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "INSERT INTO multica.engineering_run_revision
+         (tenant_id,engineering_run_id,title,state,owner_user_id,changed_by,version)
+         VALUES ($1,$2,$3,'active',$4,$4,1)",
+    )
+    .bind(actor.tenant_id)
+    .bind(run_id)
+    .bind(title)
+    .bind(actor.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "INSERT INTO permission.engineering_run_role_binding
+         (tenant_id,engineering_run_id,user_id,role,granted_by,version)
+         VALUES ($1,$2,$3,$4,$3,1)",
+    )
+    .bind(actor.tenant_id)
+    .bind(run_id)
+    .bind(actor.user_id)
+    .bind(&project.role)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+
+    let response = json!({
+        "project_id": project_id,
+        "engineering_run": {
+            "engineering_run_id": run_id,
+            "project_id": project_id,
+            "repository_id": null,
+            "branch_id": null,
+            "title": title,
+            "state": "active",
+            "owner_user_id": actor.user_id,
+            "version": 1
+        }
+    });
+    sqlx::query(
+        "INSERT INTO multica.engineering_run_outbox
+         (tenant_id,project_id,engineering_run_id,event_type,correlation_id,payload)
+         VALUES ($1,$2,$3,'engineering_run.created',$4,$5)",
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(run_id)
+    .bind(body.correlation_id)
+    .bind(json!({"engineering_run_id":run_id,"project_id":project_id,"actor_id":actor.user_id}))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "INSERT INTO multica.engineering_run_command_idempotency
+         (tenant_id,actor_id,idempotency_key,request_hash,response_body,expires_at)
+         VALUES ($1,$2,$3,$4,$5,now()+INTERVAL '24 hours')",
+    )
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .bind(&key)
+    .bind(&hash)
+    .bind(&response)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::conflict("idempotency_race"))?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(reply(response))
 }
 
 async fn list_runs(
@@ -495,14 +748,11 @@ fn context_envelope(
         .as_ref()
         .map(|row| (row.project_binding_id, row.project_binding_version));
     let context_version = format!(
-        "p{}:{}:b{}:{}:r{}:{}:bv{}:rv{}",
+        "p{}:{}:r{}:{}:rv{}",
         authority.project.id,
         authority.project.version,
-        authority.branch_grant.binding_id,
-        authority.branch_grant.version,
         authority.run_grant.binding_id,
         authority.run_grant.version,
-        authority.branch.version,
         authority.run.version
     );
     let focus_version = focus
@@ -516,12 +766,12 @@ fn context_envelope(
             "actor_id":actor.user_id,"actor_kind":"user",
             "authorization": {
                 "project":{"binding_id":authority.project.id,"role":authority.project.role,"version":authority.project.version},
-                "branch":authority.branch_grant.snapshot(),"engineering_run":authority.run_grant.snapshot(),
+                "branch":null,"engineering_run":authority.run_grant.snapshot(),
             },
             "granted_scopes":actor.scope.split_ascii_whitespace().collect::<Vec<_>>(),
             "context_version":context_version,"resolved_at":Utc::now(),"correlation_id":Uuid::new_v4(),
         },
-        "branch":authority.branch,"engineering_run":authority.run,"focus":focus,"focus_version":focus_version,
+        "branch":null,"engineering_run":authority.run,"focus":focus,"focus_version":focus_version,
         "capabilities":{"run_owned_apps_available":false,"execution_admission_available":false},
     })
 }

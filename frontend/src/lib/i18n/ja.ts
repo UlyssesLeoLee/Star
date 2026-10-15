@@ -11,6 +11,17 @@ export const ja: Dictionary = {
     appName: "Star",
     appTagline: "Vibe Coding Work Management",
   },
+  runDirectory: {
+    newRun: "Run を作成",
+    newRunTitle: "Engineering Run を作成",
+    runName: "Run 名",
+    runNamePlaceholder: "名前を入力",
+    create: "Run を作成",
+    creating: "作成中…",
+    cancel: "キャンセル",
+    hostIndependentHint: "この Run にリモート Branch の関連付けは不要です。",
+    invalidRunName: "Run 名は 1〜500 文字で入力してください。",
+  },
   userMenu: {
     menuLabel: "ユーザーメニュー: {name} ({role})",
     themeEngine: "テーマエンジン",
@@ -146,7 +157,7 @@ export const ja: Dictionary = {
     identity: { label: "アイデンティティ & メンバー", description: "メンバーアカウント、組織構造、認証アイデンティティ", categoryLabel: "システム" },
     tenant: { label: "テナント管理", description: "マルチテナント分離とリソースクォータ制御", categoryLabel: "システム" },
     // Refactor Sweep (per 2026-09-02 10:41 JST 拍板)
-    refactor: { label: "リファクタスイープ", description: "完了済みタスクをバッチリファクタ — Jira 風 todo→done ループ, 列カスタマイズ可", categoryLabel: "ワーク管理" },
+    refactor: { label: "リファクタスイープ", description: "完了済みタスクを段階的に再構成 — 未着手から完了までの循環, 列をカスタマイズ可能", categoryLabel: "ワーク管理" },
   },
   status: {
     workItem: {
@@ -252,7 +263,7 @@ export const ja: Dictionary = {
   // ── v0.4 Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
   refactor: {
     title: "リファクタスイープ",
-    subtitle: "完了済みタスクをバッチリファクタ — Jira 風 todo→done フロー, ラウンド毎ループ",
+    subtitle: "完了済みタスクを段階的に再構成 — 未着手から完了までの循環を各ラウンドで実行",
     kpiTodo: "未着手",
     kpiDoing: "作業中",
     kpiTesting: "テスト中",
@@ -352,7 +363,7 @@ export const ja: Dictionary = {
     permission: { label: "RBAC 権限", categoryLabel: "システム / 治理", description: "細粒度ロール権限ポリシーマトリックス" },
     identity: { label: "身份とメンバー", categoryLabel: "システム / 治理", description: "メンバーアカウント・組織架构と身份認証" },
     tenant: { label: "テナント管理", categoryLabel: "システム / 治理", description: "マルチテナント分離とリソースクォータ制御" },
-    refactor: { label: "リファクタ专项", categoryLabel: "ワーク管理", description: "完了タスクを批量リファクタ · Jira 風 todo→done ループ" },
+    refactor: { label: "リファクタ专项", categoryLabel: "ワーク管理", description: "完了タスクを段階的に再構成 · 未着手から完了までの循環" },
   },
   // 28 page title/subtitle (mirror zh-CN shape; Japanese)
   pageTitles: {
@@ -368,13 +379,13 @@ export const ja: Dictionary = {
     "/audit": { title: "監査", subtitle: "Append-only hash chain + 9 AI 問題メタデータ + cross-tenant 100% 監査。INV-AU-01~07 で改竄不可保証。" },
     "/automation": { title: "自動化", subtitle: "Rule + Trigger + Condition(CEL) + Action + RuleExecutor。6 INV で観測可能・無効化可能・監査可能保証。" },
     "/board": { title: "ボード", subtitle: "Kanban ビュー + ドラッグ遷移 + マルチプレイヤー协同 (2s polling)。各列は status + 任意 wip_limit 定义;超限时ハイライト。" },
-    "/collaboration": { title: "協作キャンバス", subtitle: "無限キャンバス (Miro モード) とリアルタイム協作入口。各 canvas は Worktree / WorkItem / Project 連携可能、25 module 双方向联动。" },
+    "/collaboration": { title: "協作キャンバス", subtitle: "無限キャンバスとリアルタイム協作入口。各 canvas は Worktree / WorkItem / Project 連携可能、25 module 双方向联动。" },
     "/comment": { title: "コメント" },
     "/context": { title: "コンテキスト", subtitle: "ContextPacket (5 フィールド: priority/kind/payload/provenance/decision) + Decision (3 状態) + INV-CT-01~10。token 予算で単回 session 読込量決定。" },
     "/development": { title: "研究開発", subtitle: "ChangeSets コード変更・Worktree 沙箱と研发監査ログ" },
     "/feedback": { title: "フィードバック受信箱", subtitle: "6 状態機 (§7.3) + INV-FB-01~02。Agent は実行中人間に質問;人間 answer 後 agent コンテキストに戻る。" },
     "/identity": { title: "身份とアクセス", subtitle: "統一身份認証・権限マトリックスとマルチテナント作業区管理" },
-    "/integration": { title: "連携", subtitle: "外部サービスアダプタ (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)。loop_protection_key で webhook ストーム防止。" },
+    "/integration": { title: "連携", subtitle: "コード管理、チーム連携、タスク管理、自動化サービスを接続します。イベント冪等キーで重複配信を防ぎます。" },
     "/local-runtime": { title: "ローカルランタイム", subtitle: "開発機上の実行環境。device/tenant/user 三重绑定 (§23.2)。policy_violations で監査イベント触发。" },
     "/notification": { title: "通知", subtitle: "Inbox + Email + IM チャンネル。INV-N-07 抑制策略:同 actor 60min 内同 kind 2 回目自動 suppress (audit 書込)。" },
     "/permission": { title: "権限", subtitle: "Rules-based RBAC。scheme は project 绑定可能;rule は (resource_kind, action, role, effect, condition CEL) 定义。" },
@@ -501,3 +512,12 @@ export const ja: Dictionary = {
     docsEmpty: "このカテゴリのドキュメントはありません",
   },
 };
+/*
+@cypher schema=1 source_sha256=6884fcfba8e1535d43d3eac31ba817cd4d711a3614bc884cabd26ac064434aad
+MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
+MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (self)-[:IMPORTS]->(dictionary)
+MERGE (locale:Symbol {id:"frontend/src/lib/i18n/ja.ts::ja",kind:"constant"})
+MERGE (self)-[:DEFINES]->(locale)
+@endcypher
+*/

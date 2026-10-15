@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=bddce4420ce74b7f3aa9be7da9ac109f63505708ba9bcc71b24e589508f2a9aa
+@cypher schema=1 source_sha256=38d79cdc0a802ca8177d1fc07d7e8209e4d668eadcd2a1e0408c6b563627a1ac
 MERGE (self:File {path:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts"})
 MERGE (scope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
 MERGE (target:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
@@ -131,7 +131,10 @@ export function taskCardCreateRecoveryScopeKey(context: RunContextEnvelope): str
 
 export function taskCardCreateRecoveryTarget(context: RunContextEnvelope): TaskCardCreateRecoveryTarget | null {
   const focus = context.focus;
-  if (!focus || !context.run_context.context_version || !context.focus_version) return null;
+  const run = context.engineering_run;
+  const branch = context.branch;
+  if (!focus || !run.repository_id || !run.branch_id || !branch || !context.run_context.authorization.branch ||
+      !context.run_context.context_version || !context.focus_version) return null;
   const authorization = context.run_context.authorization;
   return {
     tenant_id: context.run_context.tenant_id,

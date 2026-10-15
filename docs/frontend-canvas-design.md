@@ -1,4 +1,4 @@
-# Star 平台《Frontend Canvas Design — Miro 无限画布集成》
+﻿# Star 平台《Frontend Canvas Design — 无限画布协作》
 
 > **文档版本**: v0.1 (2026-08-26)
 > **修订历史**:
@@ -9,7 +9,7 @@
 >
 > **上游 frontend-design**: `D:\Star\docs\frontend-design.md` v0.1
 > **上游 frontend-internal-01-04**: 4 份架构/组件/数据/交互详细设计
-> **参考对象**: Miro(无限画布 / Frame / Sticky Note / Connector / Presence)
+> **交互模式**: 无限画布 / Frame / Sticky Note / Connector / Presence
 > **文档定位**: 在 25 module 框架下,**改造 collaboration 域,加入无限画布主入口**;不破坏 25 module 1:1,只调整 frontend 路由 + 增补实体类型
 
 ---
@@ -18,7 +18,7 @@
 
 ### 0.1 目标
 
-在 Star 平台已有 25 module + 6 状态机 + 4 份 frontend-internal 详细设计的基础上,**吸纳 Miro 无限画布模式**,让用户能从"工作清单视角"无缝切换到"画布视角",并与现有 25 module 深度联动。
+在 Star 平台已有 25 module + 6 状态机 + 4 份 frontend-internal 详细设计的基础上,**采用无限画布交互模式**,让用户能从"工作清单视角"无缝切换到"画布视角",并与现有 25 module 深度联动。
 
 ### 0.2 核心约束
 
@@ -108,7 +108,7 @@ export interface Canvas {
   collaborator_ids: Uuid[];
   created_at: Iso8601;
   updated_at: Iso8601;
-  snapshot_url?: string;       // PNG 导出(Miro 同款)
+  snapshot_url?: string;       // PNG 导出
 }
 
 export interface CanvasFrame {
@@ -135,7 +135,7 @@ export type CanvasElementKind =
   | "text"            // 自由文本
   | "shape"           // 矩形/圆/三角
   | "image"           // 图片
-  | "embed"           // iframe 嵌入(YouTube/Figma)
+  | "embed"           // iframe 嵌入(受信任的外部内容)
   | "work_item_card"  // 关联 WorkItem 的卡片(联动主战场)
   | "worktree_node"   // 关联 Worktree 的节点(状态色码)
   | "agent_cursor"    // 关联 Agent 的 cursor(只读镜像)
@@ -149,7 +149,7 @@ export interface CanvasElement {
   /** 几何位置(无限画布坐标系) */
   x: number; y: number;
   width: number; height: number;
-  rotation: number;            // 旋转(Miro 支持)
+  rotation: number;            // 旋转
   z_index: number;            // 图层
   /** 元素内容(根据 kind 不同) */
   content: {
@@ -187,7 +187,7 @@ export interface CanvasConnector {
   kind: CanvasConnectorKind;
   from_element_id: Uuid;
   to_element_id: Uuid;
-  /** 路由算法:straight / curved / orthogonal(Miro 3 选 1) */
+  /** 路由算法:straight / curved / orthogonal(三种路由方式) */
   routing: "straight" | "curved" | "orthogonal";
   /** 起点箭头 / 终点箭头 */
   arrow_start: boolean;
@@ -266,7 +266,7 @@ world.y = screen.y / zoom + viewport.y
 |---|---|
 | 鼠标中键拖 / 双指拖 | pan(viewport.x/y 跟随) |
 | Ctrl + 滚轮 / 双指捏 | zoom(以光标为中心) |
-| Space + 拖 | 临时 pan(Miro 同款) |
+| Space + 拖 | 临时 pan |
 | Fit to content 按钮 | 自动计算所有 element bounding box + 居中 |
 | Zoom 100% 按钮 | zoom = 1,viewport = 0,0 |
 | Minimap(右下角) | 显示当前 viewport 在世界中的位置 |
@@ -494,7 +494,7 @@ C2 = (tx - dx*0.25, ty - dy*0.1)
 - Frame 操作完整支持
 - Auto-arrange(智能布局)
 - 多选 + 编组 + 撤销/重做
-- 嵌入(YouTube / Figma / PDF)
+- 嵌入(视频 / 设计 / PDF)
 
 ### 7.3 阶段 3(V2 候选)
 
@@ -538,7 +538,7 @@ src/app/
 | CANVAS-OI-01 | (V1) Realtime WS 通道(star.collaboration.canvas.*) | P1 |
 | CANVAS-OI-02 | (V1) 撤销/重做(Cmd+Z / Cmd+Shift+Z) | P2 |
 | CANVAS-OI-03 | (V1) Auto-arrange 智能布局 | P2 |
-| CANVAS-OI-04 | (V1) 嵌入 widget(YouTube / Figma / PDF) | P2 |
+| CANVAS-OI-04 | (V1) 嵌入 widget(视频 / 设计 / PDF) | P2 |
 | CANVAS-OI-05 | (V1) 演示模式 + Frame as slide | P2 |
 | CANVAS-OI-06 | (V1) Mind map auto-arrange | P2 |
 | CANVAS-OI-07 | (V1) 多选 + 编组 + 复制/粘贴 | P1 |

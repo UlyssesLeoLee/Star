@@ -1,21 +1,25 @@
 # 渡口架构与交付方向
 
-> v1.11 · 2026-10-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> v1.14 · 2026-10-15 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 >
 > 对照：requirements §50、basic-design §16、DD-WORKTREE-GROUP-001、WORKTREE-GROUP-IMPL-PLAN-001。本指引安排交付顺序，不替代既有 Phase 完成门。源码、编译、数据库与产品运行证据分别记录。
 
 ## 1. 产品主线
 
-渡口以多 Agent 开发的 Worktree 控制面为核心。用户要能看清每个 checkout 属于哪个项目、远端分支和协作 Run，由谁负责、哪些 Agent 在执行，以及哪些成果可以验证、合并和安全清理。任务管理、Canvas 和 BI 共同服务这条开发链。
+渡口以多 Agent 开发的 Worktree 控制面为核心。用户要能看清每个 checkout 属于哪个 Project 和 Engineering Run、其本地 Branch 状态、由谁负责、哪些 Agent 在执行，以及哪些成果可以验证、合并和安全清理。任务管理、Canvas 和 BI 共同服务这条开发链。
 
 ```text
 Project                         项目、成员、仓库、聚合质量与设置
-└─ Cloud Branch                 可信远端身份、保护规则、合并目标与进度
-   └─ Engineering Run           协作工作区、成员、计划、预算与跨 App 数据归属
-      └─ Worktree               本地 checkout、Runtime/Agent 绑定与执行焦点
+└─ Engineering Run              协作工作区、成员、计划、预算与跨 App 数据归属
+   └─ Worktree                  本地 checkout、Runtime/Agent 绑定与执行焦点
+      └─ Branch                 本地 checkout 分支投影与状态叶
 ```
 
-点击 Worktree 叶节点后，右侧打开该 Run 的同级 Apps：Inbox、Work Items/Multica/Jira、Task Card、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins。Task Card 内打开 CLI；Canvas 与任务卡通过 canonical EntityRef 和 owner API 互动。展开 Project/Branch/Run 只加载下一层，不自动选择首个 checkout。Project Worktree Index 保留为跨 Run 比较与管理入口。
+点击 Worktree 后，右侧打开该 Run 的同级 Apps：Inbox、任务与计划管理、Task Card、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins。Task Card 内打开 CLI；Canvas 与任务卡通过 canonical EntityRef 和 owner API 互动。展开 Project/Run/Worktree 只加载下一层，不自动选择首个 checkout；Branch 只显示在 Worktree 下。Project Worktree Index 保留为跨 Run/Worktree 比较与管理入口。
+
+产品界面的导航、功能标签、帮助、错误与空态采用 Star 自有的中性能力名称，不用第三方产品名作对标或仿制文案；真实启用的连接器可事实展示服务商名称，内部协议/adapter ID 不面向用户展示。
+
+Branch 表示 Worktree 的本地 checkout 分支投影；远端 SCM/宿主关联是可选 metadata，不参与 Project → Engineering Run → Worktree → Branch 层级。当前实现候选已新增 Project-scoped Run create/list/auth 路由和允许 repository_id/branch_id 为空的 migration source；它们尚未应用或验证。现有 Worktree binding、Task owner、Schedule 和 CLI 仍依赖 repository/branch，hostless 场景只覆盖 Run 目录，不覆盖 Worktree 绑定与任务执行。Branch leaf 依赖可信 Host/Repository observation；无 provider、绑定缺失、读取失败或 freshness 过期时显示 unknown 并关闭依赖该状态的写操作。
 
 同一 Run 切换 Worktree，只切换执行焦点。Run 身份、授权版本与 App 数据归属保持一致；checkout 的 workspace、绑定版本和生命周期版本置于独立 WorktreeFocus。切换 Run 或登录会话后取消旧请求，清除旧焦点与终端附件，重新解析授权。
 
@@ -25,9 +29,9 @@ Project                         项目、成员、仓库、聚合质量与设置
 |---|---|---|
 | 全局 | 跨项目搜索、通知汇总、GLOBAL chat、个人凭证 | 聚合视图按目标逐一授权；不得以全局界面获得跨项目写权限 |
 | Project | 成员、Repository、Worktree Index、跨 Run Quality & Improvement | Project 管理授权和聚合，不拥有各 Run 的 Task/Canvas |
-| Cloud Branch | 远端 ref、保护/同步、PR/合并队列 | SCM 持有可信 Branch 身份；本地 branch 字符串仅是观测值 |
-| Engineering Run | Inbox、Work Items/Task Card、Canvas、Workflow、BI、Benchmark、Plugin Apps | 各 App 可独立挂载，事实由相应 Domain 持有并以 Run 标识归属 |
-| WorktreeFocus | checkout、Agent/Runtime/session、Git 状态、任务 CLI 目标 | Worktree/Runtime 持有生命周期；一个有效 checkout 同时仅绑定一个 Run |
+| Engineering Run | Inbox、任务/计划/Task Card、Canvas、Workflow、BI、Benchmark、Plugin Apps | 各 App 可独立挂载，事实由相应 Domain 持有并以 Run 标识归属 |
+| Worktree | checkout、Agent/Runtime/session、Git 状态、任务 CLI 目标 | Worktree/Runtime 持有生命周期；一个有效 checkout 同时仅绑定一个 Run |
+| Branch（Worktree 子级） | 本地 checkout branch name/ref/status；远端 SCM/宿主关联为可选 metadata | 由可信 Repository/Host observation 投影；缺失或过期时为 unknown，不得提升为 Run 父节点 |
 | Advanced Settings | Skills、Hooks、MCP、Plugins 同级标签页 | Hooks 固定 `/settings/advanced/hooks`；树只展示生效策略与结果、提供深链 |
 
 `EngineeringRun` 是协作容器；`TaskExecutionRun` 是一次任务执行尝试，具有独立 ID、状态与证据。两者不得复用身份或数据库表。
@@ -40,7 +44,7 @@ Project                         项目、成员、仓库、聚合质量与设置
 |---|---|---|
 | SCM/Branch/Merge | Repository、Branch、PR、merge receipt | 可信 provider + owner API；远端事实不从 UI seed 构造 |
 | Engineering Run | Run 身份/版本、成员、Worktree 关系 | 授权目录与 RunContext；不直接改 Task/Canvas 表 |
-| Work Item/Multica/Jira | 任务、计划、关系、生命周期 | 同域存储过程/事务；Canvas 或 Workflow 调 owner command |
+| Work Item / Planning | 任务、计划、关系、生命周期 | 同域存储过程/事务；Canvas 或 Workflow 调 owner command |
 | Canvas | Document、Element、EntityRef、视觉连线 | 自有 API/CAS；关系事实由 Work Item owner 处理 |
 | Agent/Runtime | 执行尝试、PTY、资源租约、结果/验证证据 | Rust admission + CLI adapter；流输出有界、可取消、可恢复 |
 | Workflow/Loop | 计划、触发、checkpoint、循环预算 | 幂等 command；恢复时重新授权并复验租约 |
@@ -56,7 +60,7 @@ Kafka 和 Fluvio 进入相同负载的分析流 PoC。Kafka 的日志、consumer
 
 ## 4. 原生 Agent 与一期 CLI
 
-借鉴 pi agent 的核心职责分离：可取消的 agent loop、消息/工具事件流、上下文变换和独立会话 backend；其工具 preflight 与执行有明确事件顺序，也支持并行工具执行。[pi 官方 Agent core](https://github.com/earendil-works/pi/blob/main/packages/agent/README.md)。据此，渡口采用 Rust core，并把强制 Hook 设为工具派发前的原生阻断门，扩展回调不得绕过它。采用 CLI adapter 的一期也必须保留 task/run/worktree 绑定、超时与预算、原生 Hook、验证与审计。
+Agent 执行核心采用可取消的 loop、消息与工具事件流、上下文变换、独立会话后端及工具 preflight；渡口以 Rust core 实现，并把强制 Hook 设为工具派发前的原生阻断门，扩展回调不得绕过它。采用 CLI adapter 的一期也必须保留 task/run/worktree 绑定、超时与预算、原生 Hook、验证与审计。
 
 Memory、Skill、Context、Validation 均预留版本/摘要/来源和 API 边界。一期允许外部 CLI 提供能力，Run 启动固定所采用的 profile 与依赖快照；恢复或新尝试须重新验证当前授权与可用版本。Independent Validation 与生成过程分开记录，CLI 自报成功不能单独满足任务完成门。
 
@@ -122,3 +126,7 @@ Hook 编辑以高级设置的可视化表单/规则构造器为主，展示作�
 | v1.9 | 2026-10-07 | Update infrastructure pointers to DD v0.16 and plan §6.91; distinguish an isolated 14/14 runtime-grants contract gate from target DB identity provisioning and production owner execution. Retain the temporary two-instance test cap. | Phase 9F4D-3B1 grants migration and privilege matrix were verified in disposable PostgreSQL. |
 | v1.10 | 2026-10-07 | Record the 9F4D-3C1 owner Inbox receive slice, its non-admission boundary, the two-instance disk cap, and the next owner-reservation/delivery gates. |
 | v1.11 | 2026-10-07 | Record the 9F4D-3C2 tenant-scoped Infrastructure-owner admission primitive and its concurrency/expiry PostgreSQL evidence; make the cross-tenant allocator gap and remaining trusted resolver/consumer/provider/runtime phases explicit; keep the two-instance disk cap and fail-closed execution boundary. |
+| v1.12 | 2026-10-15 | Fix the hierarchy to Project → Engineering Run → Worktree → Branch; define Branch as the local checkout branch projection/status leaf with optional remote/host metadata; record the current `EngineeringRun.branch_id`, Branch API, branch-role and local observation freshness gaps; use neutral task-management labels. | User clarified that Branch must remain below Worktree regardless of host linkage and requested third-party product names be removed from product-facing content. |
+
+| v1.14 | 2026-10-15 | 对齐 Project → Run → Worktree → Branch 与 host-independent Run；要求用户文案中性、只在真实连接器上事实显示服务商；实现仍限于未部署源码和 migration candidate | 用户确认 Run 可脱离远端 Branch 并要求清除仿制/对标文案 |
+| v1.13 | 2026-10-15 | 对齐 Project-scoped host-independent Run create/list/auth 源码与可空 schema migration source；明确 DB/RLS 部署、Worktree binding、Task owner 和执行仍未完成 | 用户确认 Run 必须可脱离宿主 Branch |

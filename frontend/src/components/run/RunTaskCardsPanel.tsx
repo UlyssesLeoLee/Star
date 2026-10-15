@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d629ec24b1bf2cef9c44684e72d51eeb575ec268b65c0935b7583f6cf9eada32
+@cypher schema=1 source_sha256=e279242ffe5e80549c7bd93c98916dbcef9178a480200d1afd8c714ea2f6830e
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
 MERGE (submit:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::submitTaskCardCreate",kind:"function"})
@@ -123,7 +123,8 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   }>({ scope_key: null, phase: "loading", error: null });
   const cursor = cursorStack[pageIndex];
   const runId = run.engineering_run_id;
-  const canCreateTaskCard = Boolean(focus && !focus.archived &&
+  const taskOwnerAvailable = Boolean(run.repository_id && run.branch_id && context.branch && context.run_context.authorization.branch);
+  const canCreateTaskCard = Boolean(context.branch && run.repository_id && run.branch_id && focus && !focus.archived &&
     context.run_context.project_id === run.project_id &&
     context.run_context.branch_id === run.branch_id &&
     context.run_context.engineering_run_id === runId &&
@@ -162,7 +163,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   }, [recoveryScopeKey, recoveryStore]);
 
   useEffect(function loadRunTaskPage() {
-    if (!available) {
+    if (!available || !taskOwnerAvailable) {
       setCursorStack([undefined]);
       setPageIndex(0);
       setPage(null);
@@ -184,11 +185,13 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
       setPhase("error");
     });
     return () => controller.abort();
-  }, [available, client, cursor, revision, run]);
+  }, [available, client, cursor, revision, run, taskOwnerAvailable]);
 
-  if (!available) return <section role="tabpanel" aria-label="Task Cards" className="rounded border border-line p-4">
+  if (!available || !taskOwnerAvailable) return <section role="tabpanel" aria-label="Task Cards" className="rounded border border-line p-4">
     <h2 className="font-semibold">Task Cards</h2>
-    <p className="mt-2 text-sm text-ink-mute">服务端尚未开放 Run-owned Apps。此处不会读取 Worktree 旧任务投影或本地演示数据；Owner migration、数据库角色与 RLS 验收完成后才会加载真实 Run 任务。</p>
+    <p className="mt-2 text-sm text-ink-mute">{!run.repository_id || !run.branch_id || !context.branch || !context.run_context.authorization.branch
+      ? "此 Run 可以独立于远端 Branch 创建、授权和列出；当前任务 owner 仍要求 repository/Branch 授权范围，因此真实任务读取与写入保持关闭。"
+      : "服务端尚未开放 Run-owned Apps。此处不会读取 Worktree 旧任务投影或本地演示数据；Owner migration、数据库角色与 RLS 验收完成后才会加载真实 Run 任务。"}</p>
     {pendingCreate && <p className="mt-2 text-xs" role="status">已保留待确认创建“{pendingCreate.input.title}”，原目标 Worktree：{pendingCreate.target.worktree_id}。恢复服务端访问前不会重试或清除它。</p>}
     {recoveryState.phase === "error" && <p className="mt-2 text-xs" role="alert">本地待恢复请求无法读取：{recoveryState.error} 创建入口保持关闭。</p>}
   </section>;

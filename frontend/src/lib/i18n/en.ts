@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=7efd94b79389ec2d029d712952d58ed671e8cfa45b9c2016a988ba5d94aecba2
+MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
+MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (self)-[:IMPORTS]->(dictionary)
+MERGE (locale:Symbol {id:"frontend/src/lib/i18n/en.ts::en",kind:"constant"})
+MERGE (self)-[:DEFINES]->(locale)
+@endcypher
+*/
 // =====================================================================
 // en Dictionary — English
 // =====================================================================
@@ -10,6 +19,17 @@ export const en: Dictionary = {
   common: {
     appName: "Star",
     appTagline: "Vibe Coding Work Management",
+  },
+  runDirectory: {
+    newRun: "New Run",
+    newRunTitle: "Create an Engineering Run",
+    runName: "Run name",
+    runNamePlaceholder: "Enter a name",
+    create: "Create Run",
+    creating: "Creating…",
+    cancel: "Cancel",
+    hostIndependentHint: "This Run does not require a remote Branch association.",
+    invalidRunName: "Run name must contain 1 to 500 characters.",
   },
   userMenu: {
     menuLabel: "User menu: {name} ({role})",
@@ -146,7 +166,7 @@ export const en: Dictionary = {
     identity: { label: "Identity & Members", description: "Member accounts, org structure and auth identity", categoryLabel: "System & Meta" },
     tenant: { label: "Tenant Admin", description: "Multi-tenant isolation and resource quota control", categoryLabel: "System & Meta" },
     // Refactor Sweep (per 2026-09-02 10:41 JST 拍板)
-    refactor: { label: "Refactor Sweep", description: "Batch-refactor done work-items in Jira-style todo→done loop, columns customizable", categoryLabel: "Work Management" },
+    refactor: { label: "Refactor Sweep", description: "Batch-refactor completed work items in a customizable open-to-done cycle", categoryLabel: "Work Management" },
   },
   status: {
     workItem: {
@@ -252,7 +272,7 @@ export const en: Dictionary = {
   // ── v0.4 Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
   refactor: {
     title: "Refactor Sweep",
-    subtitle: "Batch-refactor completed work-items in a Jira-style todo→done flow, looping round after round",
+    subtitle: "Batch-refactor completed work items through a customizable open-to-done flow, one round at a time",
     kpiTodo: "To Refactor",
     kpiDoing: "Refactoring",
     kpiTesting: "Testing",
@@ -352,7 +372,7 @@ export const en: Dictionary = {
     permission: { label: "RBAC Permissions", categoryLabel: "System / Meta", description: "Fine-grained role permission policy matrix" },
     identity: { label: "Identity & Members", categoryLabel: "System / Meta", description: "Member accounts, organization and identity authentication" },
     tenant: { label: "Tenant Admin", categoryLabel: "System / Meta", description: "Multi-tenant isolation and resource quota control" },
-    refactor: { label: "Refactor Sweep", categoryLabel: "Work Management", description: "Batch refactor completed tasks · Jira-style todo→done loop" },
+    refactor: { label: "Refactor Sweep", categoryLabel: "Work Management", description: "Batch refactor completed tasks through an open-to-done cycle" },
   },
   // 28 page title/subtitle (mirror zh-CN shape; English source = registry)
   pageTitles: {
@@ -368,13 +388,13 @@ export const en: Dictionary = {
     "/audit": { title: "Audit", subtitle: "Append-only hash chain + 9 AI issue metadata + cross-tenant 100% audit. INV-AU-01~07 guarantee tamper-proof." },
     "/automation": { title: "Automation", subtitle: "Rule + Trigger + Condition(CEL) + Action + RuleExecutor. 6 INV for observability, disable, auditability." },
     "/board": { title: "Board", subtitle: "Kanban view + drag transition + multi-player collaboration (2s polling). Each column defines status + optional wip_limit; highlighted when exceeded." },
-    "/collaboration": { title: "Collaboration", subtitle: "Infinite canvas (Miro mode) and real-time collaboration entry. Each canvas can be linked to Worktree / WorkItem / Project, bi-directional across 25 modules." },
+    "/collaboration": { title: "Collaboration", subtitle: "Infinite canvas and real-time collaboration entry. Each canvas can be linked to Worktree / WorkItem / Project, bi-directional across 25 modules." },
     "/comment": { title: "Comments" },
     "/context": { title: "Context", subtitle: "ContextPacket (5 fields: priority/kind/payload/provenance/decision) + Decision (3 states) + INV-CT-01~10. Token budget controls per-session loadable amount." },
     "/development": { title: "Development", subtitle: "ChangeSets code changes, Worktree sandbox and R&D audit log" },
     "/feedback": { title: "Feedback Inbox", subtitle: "6 state machines (§7.3) + INV-FB-01~02. Agent asks humans during execution; after human answer returns to agent context." },
     "/identity": { title: "Identity & Access", subtitle: "Unified identity auth, permission matrix and multi-tenant workspace management" },
-    "/integration": { title: "Integrations", subtitle: "External service adapters (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook). loop_protection_key prevents webhook storms." },
+    "/integration": { title: "Integrations", subtitle: "Connect code hosting, team collaboration, task management, and automation services. Event idempotency prevents duplicate delivery." },
     "/local-runtime": { title: "Local Runtime", subtitle: "Execution environment on dev machine. device/tenant/user triple binding (§23.2). policy_violations trigger audit events." },
     "/notification": { title: "Notifications", subtitle: "Inbox + Email + IM channels. INV-N-07 suppress policy: same actor 60min same kind 2nd time auto-suppress (written to audit)." },
     "/permission": { title: "Permission", subtitle: "Rules-based RBAC. scheme can bind project; rule defines (resource_kind, action, role, effect, condition CEL)." },

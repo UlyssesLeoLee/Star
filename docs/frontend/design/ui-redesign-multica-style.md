@@ -1,4 +1,4 @@
-# Star Frontend — UI/UX Redesign (Multica.ai 风格)
+﻿# Star Frontend — UI/UX Redesign
 
 > **状态**: Draft v0.1 → v0.2 (per 2026-08-31 12:48 JST handoff 兜底, 5 tab 拍板实装注记, 守门 #11 缺标比错标)
 > **日期**: 2026-08-28 (v0.1) / 2026-08-31 12:48 JST (v0.2 追加实装注记)
@@ -12,7 +12,7 @@
 | v0.1 设计 5 tab | v0.2 实装 5 tab (2026-08-29 22:49 JST 拍板) | 映射 |
 |---|---|---|
 | list | backlog | work-item 列表按 status 排序 (per PageHeader §4) |
-| board | kanban | Jira 风 Kanban + +Add task 按钮 (per `commit 4c8bd5c`) |
+| board | kanban | Kanban 看板 + 新建任务按钮 (per `commit 4c8bd5c`) |
 | gantt | timeline | GanttChart + Calendar 并入 (per 8/28 22:49 拍板) |
 | calendar | timeline (合并) | Calendar 作为 timeline 子视图, 不再单 tab |
 | workflow | worktrees | worktree domain 入口 (per `frontend/src/lib/nav/registry.ts`) + 增 agents tab 取代原 Members 入口 |
@@ -22,13 +22,13 @@
 - `/scm /collaboration /workflow /relation` 4 redirect → `/projects?tab=worktrees` (旧 tab=workflow/relations 不存在, 改 worktrees)
 - `/canvas/:id` 独立路由 `app/canvas/[id]/page.tsx` (per 2026-09-04 canvas e2e 守门 prerequisite 注记; 不走 `?canvas=` 查询参数, 独立可测路由)
 
-**不改原 v0.1 §1-§10 内容**: 保留 v0.1 拍板时的设计思路 (multica 风格), 拍板后实装变更 (5 tab + 4 redirect) 在 §0.1 增量追加, 不回溯原段 (per 守门 #12 不沿用 v0.x 旧叙事 + #11 缺标比错标安全)。
+**不改原 v0.1 §1-§10 内容**: 保留 v0.1 拍板时的原始设计思路, 拍板后实装变更 (5 tab + 4 redirect) 在 §0.1 增量追加, 不回溯原段 (per 守门 #12 不沿用 v0.x 旧叙事 + #11 缺标比错标安全)。
 
 ---
 
 ## §1 目标与原则
 
-参考 multica.ai 的设计:
+当前设计目标:
 - **简洁高密度** — 14px text-label, 11px text-micro uppercase tracking
 - **顶栏 + 左 sidebar + 主区** 三层架构
 - **sticky 左导航** — 180px 宽,圆形 indicator
@@ -51,7 +51,7 @@
 
 ## §3 顶栏 (AppHeader)
 
-- **左**: logo (multica 风格 `*` clip-path 几何) + workspace switcher
+- **左**: Star 品牌标记 (`*` clip-path 几何) + workspace switcher
 - **中**: 5 视图 tab (Inbox / Issues / Projects / Agents / Analytics / Settings)
 - **右**:
   - ⌘K 搜索 (CommandBar 全局命令)
@@ -59,8 +59,8 @@
   - 🟢 状态 (online / sync status)
   - 👤 user avatar + workspace switcher
 
-高度: 64px (per multica 76px 减 12px 适配中等密度)
-背景: dark `#0a0d12` (multica `#05070b` 微调)
+高度: 64px (适配中等信息密度)
+背景: dark `#0a0d12`
 border-bottom: 1px `#21262d`
 
 ## §4 左 sidebar (SubNav)
@@ -190,10 +190,10 @@ fontFamily: {
 ## §10 已知缺口
 
 1. 22 路由 → 6 路由需 redirect (Phase I+)
-2. dark mode 优先, light mode 待后 (multica 同)
+2. dark mode 优先, light mode 待后
 3. mobile 响应式 (per G3 touch 后续)
-4. i18n (multica 暂仅 en, Star 暂 en, 后 i18n)
-5. PWA / desktop app (multica 都有, Star 暂仅 web)
+4. i18n (当前暂仅 en，后续扩展多语言)
+5. PWA / desktop app (后续扩展，当前仅 web)
 
 ---
 

@@ -40,6 +40,17 @@ export interface Dictionary {
     appName: string;
     appTagline: string;
   };
+  runDirectory: {
+    newRun: string;
+    newRunTitle: string;
+    runName: string;
+    runNamePlaceholder: string;
+    create: string;
+    creating: string;
+    cancel: string;
+    hostIndependentHint: string;
+    invalidRunName: string;
+  };
   userMenu: {
     menuLabel: string;
     themeEngine: string;
@@ -234,7 +245,7 @@ export interface Dictionary {
   refactor: {
     /** 重构专项页主标题 / 副标题 */
     title: string;                    // "Refactor Sweep 重构专项"
-    subtitle: string;                 // "分批次对已完成任务做重构 · Jira 风格 todo→done"
+    subtitle: string;                 // "分批次重构已完成任务 · 待办→完成循环"
     /** 顶部 KPI 4 卡 (待办/进行中/测试中/评审中/已完成 计数) */
     kpiTodo: string;                  // "待办"
     kpiDoing: string;                 // "进行中"
@@ -364,3 +375,16 @@ export interface Dictionary {
     docsEmpty: string;
   };
 }
+/*
+@cypher schema=1 source_sha256=67f5dd45b36951197cb442eb407ec04042a7428b89eb03819132d489b1f4b23c
+MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
+MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
+MERGE (pageTitle:Type {id:"frontend/src/lib/i18n/dictionary.ts::PageTitleI18n",kind:"interface"})
+MERGE (dictionary:Type {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary",kind:"interface"})
+MERGE (self)-[:DEFINES]->(category)
+MERGE (self)-[:DEFINES]->(module)
+MERGE (self)-[:DEFINES]->(pageTitle)
+MERGE (self)-[:DEFINES]->(dictionary)
+@endcypher
+*/
