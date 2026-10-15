@@ -3,7 +3,7 @@
 //! The adapter repeats authorization and binding checks inside each write transaction. It does
 //! not publish lifecycle Outbox events: the current migration only emits metadata events.
 //!
-//! @cypher schema=1 source_sha256=c1357b98fc9125ddfc82ba8b2f4dc85a81924823ceee6e440e9b72fe0b8233b1
+//! @cypher schema=1 source_sha256=fa51e753c1114773104682c561630e97d618ddd861f1e1b6d8c8cbedf12e44a6
 //! MERGE (self:File {path:"crates/infrastructure/src/run_task_card_pg.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::module",kind:"module"})
 //! MERGE (adapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
@@ -26,6 +26,8 @@
 //! MERGE (lookupIdempotency:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::lookup_idempotency",kind:"function"})
 //! MERGE (saveIdempotency:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::save_idempotency",kind:"function"})
 //! MERGE (insertAudit:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::insert_lifecycle_audit",kind:"function"})
+//! MERGE (resolveAuditWorktree:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::resolve_task_audit_worktree_id",kind:"function"})
+//! MERGE (selectAuditWorktree:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::select_unambiguous_task_audit_worktree",kind:"function"})
 //! MERGE (loadSnapshot:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::load_snapshot",kind:"function"})
 //! MERGE (validateAudit:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::validate_audit_details",kind:"function"})
 //! MERGE (pool:Type {id:"sqlx::PgPool",kind:"external_type"})
@@ -66,6 +68,8 @@
 //! MERGE (module)-[:DEFINES]->(lookupIdempotency)
 //! MERGE (module)-[:DEFINES]->(saveIdempotency)
 //! MERGE (module)-[:DEFINES]->(insertAudit)
+//! MERGE (module)-[:DEFINES]->(resolveAuditWorktree)
+//! MERGE (module)-[:DEFINES]->(selectAuditWorktree)
 //! MERGE (module)-[:DEFINES]->(loadSnapshot)
 //! MERGE (module)-[:DEFINES]->(validateAudit)
 //! MERGE (adapter)-[:USES_TYPE]->(pool)
@@ -107,6 +111,10 @@
 //! MERGE (transitionOnConnection)-[:WRITES]->(lifecycle)
 //! MERGE (reviewOnConnection)-[:WRITES]->(lifecycle)
 //! MERGE (insertAudit)-[:WRITES]->(audit)
+//! MERGE (insertAudit)-[:CALLS]->(resolveAuditWorktree)
+//! MERGE (resolveAuditWorktree)-[:CALLS]->(selectAuditWorktree)
+//! MERGE (resolveAuditWorktree)-[:READS]->(relation)
+//! MERGE (resolveAuditWorktree)-[:READS]->(runBinding)
 //! MERGE (saveIdempotency)-[:WRITES]->(idempotency)
 //! MERGE (requireWorktreeAssignment)-[:READS]->(runBinding)
 //! MERGE (requireWorktreeAssignment)-[:WRITES]->(relation)
@@ -132,7 +140,7 @@ use domain_work_item::run_task_card::{
     TransitionRunTaskCardCommand,
 };
 use domain_work_item::{RepositoryId, WorkItemId, WorktreeId};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
@@ -420,6 +428,7 @@ async fn create_on_connection(
         scope.engineering_run_id,
         work_item_id,
         None,
+        None,
         Some("pending"),
         "created",
         audit_details,
@@ -490,6 +499,13 @@ async fn transition_on_connection(
     if matches!(
         current.status,
         RunTaskCardStatus::Claimed | RunTaskCardStatus::InProgress
+    ) && current.active_worktree_id.is_none()
+    {
+        return Err(RunTaskCardError::Conflict("active_worktree_missing"));
+    }
+    if matches!(
+        current.status,
+        RunTaskCardStatus::Claimed | RunTaskCardStatus::InProgress
     ) && context.worktree_id.map(|id| id.as_uuid()) != current.active_worktree_id
     {
         return Err(RunTaskCardError::Conflict("active_worktree_conflict"));
@@ -543,6 +559,7 @@ async fn transition_on_connection(
         scope.project_id,
         scope.engineering_run_id,
         command.work_item_id,
+        current.active_worktree_id,
         Some(current.status.as_str()),
         Some(command.target_status.as_str()),
         "status_transition",
@@ -590,6 +607,9 @@ async fn review_on_connection(
     if current.status != RunTaskCardStatus::InProgress {
         return Err(RunTaskCardError::Conflict("review_worktree_conflict"));
     }
+    if current.active_worktree_id.is_none() {
+        return Err(RunTaskCardError::Conflict("active_worktree_missing"));
+    }
     if command.action == RunTaskCardReviewAction::Submit
         && context.worktree_id.map(|id| id.as_uuid()) != current.active_worktree_id
     {
@@ -622,7 +642,7 @@ async fn review_on_connection(
         RunTaskCardReviewAction::Accept | RunTaskCardReviewAction::Reject
             if current.claimed_by == Some(context.actor_id.as_uuid()) =>
         {
-            return Err(RunTaskCardError::Forbidden)
+            return Err(RunTaskCardError::Forbidden);
         }
         _ => return Err(RunTaskCardError::Conflict("review_not_pending")),
     };
@@ -655,6 +675,7 @@ async fn review_on_connection(
         scope.project_id,
         scope.engineering_run_id,
         command.work_item_id,
+        current.active_worktree_id,
         Some(current.status.as_str()),
         Some(next_status),
         event_type,
@@ -1017,11 +1038,23 @@ async fn insert_lifecycle_audit(
     project_id: Uuid,
     engineering_run_id: Uuid,
     work_item_id: WorkItemId,
+    preferred_worktree_id: Option<Uuid>,
     from_status: Option<&str>,
     to_status: Option<&str>,
     event_type: &str,
     details: Value,
 ) -> Result<(), RunTaskCardError> {
+    // Run focus is command/UI context. Audit ownership must use a Worktree associated with
+    // this Task Card, preferring its active execution checkout.
+    let audit_worktree_id = resolve_task_audit_worktree_id(
+        connection,
+        context,
+        project_id,
+        engineering_run_id,
+        work_item_id,
+        preferred_worktree_id,
+    )
+    .await?;
     sqlx::query(
         r#"INSERT INTO multica.task_lifecycle_audit
              (tenant_id,project_id,engineering_run_id,worktree_id,work_item_id,task_card_id,from_status,to_status,
@@ -1031,7 +1064,7 @@ async fn insert_lifecycle_audit(
     .bind(context.tenant_id.as_uuid())
     .bind(project_id)
     .bind(engineering_run_id)
-    .bind(context.worktree_id.map(|id| id.as_uuid()))
+    .bind(audit_worktree_id)
     .bind(work_item_id.as_uuid())
     .bind(from_status)
     .bind(to_status)
@@ -1044,6 +1077,93 @@ async fn insert_lifecycle_audit(
     .await
     .map_err(database_error)?;
     Ok(())
+}
+
+async fn resolve_task_audit_worktree_id(
+    connection: &mut PgConnection,
+    context: &RunTaskCardCommandContext,
+    project_id: Uuid,
+    engineering_run_id: Uuid,
+    work_item_id: WorkItemId,
+    preferred_worktree_id: Option<Uuid>,
+) -> Result<Option<Uuid>, RunTaskCardError> {
+    let focus_worktree_id = context.worktree_id.map(|id| id.as_uuid());
+    let candidate = preferred_worktree_id.or(focus_worktree_id);
+    if let Some(candidate) = candidate {
+        let related_worktree_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT relation.worktree_id
+               FROM multica.work_item_worktree relation
+               JOIN multica.engineering_run_worktree_binding binding
+                 ON binding.tenant_id=relation.tenant_id
+                AND binding.project_id=relation.project_id
+                AND binding.worktree_id=relation.worktree_id
+                AND binding.valid_to IS NULL
+                AND binding.engineering_run_id=$4
+               WHERE relation.tenant_id=$1 AND relation.project_id=$2
+                 AND relation.work_item_id=$3 AND relation.worktree_id=$5
+                 AND relation.valid_to IS NULL
+               FOR SHARE OF relation, binding"#,
+        )
+        .bind(context.tenant_id.as_uuid())
+        .bind(project_id)
+        .bind(work_item_id.as_uuid())
+        .bind(engineering_run_id)
+        .bind(candidate)
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(database_error)?;
+        if related_worktree_id.is_some() {
+            return Ok(related_worktree_id);
+        }
+        if preferred_worktree_id.is_some() {
+            return Err(RunTaskCardError::Conflict("task_worktree_relation_missing"));
+        }
+    }
+
+    // Without a matching focus, infer audit scope only when the Task Card has exactly one current
+    // Worktree in this Run. Two rows are enough to prove the association is ambiguous; locking
+    // this bounded result keeps concurrent relation changes from invalidating the chosen row.
+    let related_worktrees: Vec<Uuid> = sqlx::query_scalar(
+        r#"SELECT relation.worktree_id
+           FROM multica.work_item_worktree relation
+           JOIN multica.engineering_run_worktree_binding binding
+             ON binding.tenant_id=relation.tenant_id
+            AND binding.project_id=relation.project_id
+            AND binding.worktree_id=relation.worktree_id
+            AND binding.valid_to IS NULL
+            AND binding.engineering_run_id=$4
+           WHERE relation.tenant_id=$1 AND relation.project_id=$2
+             AND relation.work_item_id=$3 AND relation.valid_to IS NULL
+           ORDER BY relation.worktree_id
+           LIMIT 2
+           FOR SHARE OF relation, binding"#,
+    )
+    .bind(context.tenant_id.as_uuid())
+    .bind(project_id)
+    .bind(work_item_id.as_uuid())
+    .bind(engineering_run_id)
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(database_error)?;
+    Ok(select_unambiguous_task_audit_worktree(
+        focus_worktree_id,
+        &related_worktrees,
+    ))
+}
+
+fn select_unambiguous_task_audit_worktree(
+    focus_worktree_id: Option<Uuid>,
+    related_worktrees: &[Uuid],
+) -> Option<Uuid> {
+    if let Some(focus_worktree_id) = focus_worktree_id {
+        if related_worktrees.contains(&focus_worktree_id) {
+            return Some(focus_worktree_id);
+        }
+    }
+    match related_worktrees {
+        [worktree_id] => Some(*worktree_id),
+        _ => None,
+    }
 }
 
 async fn load_snapshot(
@@ -1134,4 +1254,42 @@ async fn load_snapshot(
 fn database_error(error: sqlx::Error) -> RunTaskCardError {
     tracing::error!(error = %error, "Run Task Card PostgreSQL operation failed");
     RunTaskCardError::Unavailable
+}
+
+#[cfg(test)]
+mod audit_worktree_tests {
+    use super::select_unambiguous_task_audit_worktree;
+    use uuid::Uuid;
+
+    #[test]
+    fn chooses_matching_focus_from_multiple_task_worktrees() {
+        let first = Uuid::new_v4();
+        let focused = Uuid::new_v4();
+        assert_eq!(
+            select_unambiguous_task_audit_worktree(Some(focused), &[first, focused]),
+            Some(focused)
+        );
+    }
+
+    #[test]
+    fn falls_back_to_single_relation_when_focus_is_absent_or_unrelated() {
+        let related = Uuid::new_v4();
+        assert_eq!(
+            select_unambiguous_task_audit_worktree(None, &[related]),
+            Some(related)
+        );
+        assert_eq!(
+            select_unambiguous_task_audit_worktree(Some(Uuid::new_v4()), &[related]),
+            Some(related)
+        );
+    }
+
+    #[test]
+    fn leaves_audit_worktree_empty_when_relation_is_missing_or_ambiguous() {
+        assert_eq!(select_unambiguous_task_audit_worktree(None, &[]), None);
+        assert_eq!(
+            select_unambiguous_task_audit_worktree(None, &[Uuid::new_v4(), Uuid::new_v4()]),
+            None
+        );
+    }
 }

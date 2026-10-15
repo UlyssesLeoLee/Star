@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=1e506f618a93fed08c4b2fc7b09329b137ecc477b8584e4754b469ffa9a39558
+//! @cypher schema=1 source_sha256=7d3681903cae398129bf7fc5b1234b9cc209512c5547617def442e9b5556b55f
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/work_items.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::router",kind:"function"})
@@ -9,6 +9,14 @@
 //! MERGE (get:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::get_work_item",kind:"function"})
 //! MERGE (transition:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::transition_work_item",kind:"function"})
 //! MERGE (review:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::review_work_item",kind:"function"})
+//! MERGE (transitionRun:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::transition_run_work_item",kind:"function"})
+//! MERGE (reviewRun:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::review_run_work_item",kind:"function"})
+//! MERGE (authorizeRunCommand:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::authorize_run_task_card_command_context",kind:"function"})
+//! MERGE (routeFocus:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::route_worktree_focus",kind:"function"})
+//! MERGE (focusHintTest:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::tests::route_focus_is_bound_to_legacy_worktree_path",kind:"test"})
+//! MERGE (legacyHashTest:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::tests::legacy_lifecycle_and_review_bodies_keep_their_request_hash_shape",kind:"test"})
+//! MERGE (transitionBody:Type {id:"crates/star-api-rest/src/group_api/work_items.rs::LifecycleTransitionBody",kind:"struct"})
+//! MERGE (reviewBody:Type {id:"crates/star-api-rest/src/group_api/work_items.rs::ReviewCommandBody",kind:"struct"})
 //! MERGE (authorizeWorktree:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::authorize_worktree",kind:"function"})
 //! MERGE (authorizeRun:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::authorize_task_run_for_worktree",kind:"function"})
 //! MERGE (load:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::load_work_item",kind:"function"})
@@ -39,6 +47,14 @@
 //! MERGE (module)-[:DEFINES]->(get)
 //! MERGE (module)-[:DEFINES]->(transition)
 //! MERGE (module)-[:DEFINES]->(review)
+//! MERGE (module)-[:DEFINES]->(transitionRun)
+//! MERGE (module)-[:DEFINES]->(reviewRun)
+//! MERGE (module)-[:DEFINES]->(authorizeRunCommand)
+//! MERGE (module)-[:DEFINES]->(routeFocus)
+//! MERGE (module)-[:DEFINES]->(focusHintTest)
+//! MERGE (module)-[:DEFINES]->(legacyHashTest)
+//! MERGE (module)-[:DEFINES]->(transitionBody)
+//! MERGE (module)-[:DEFINES]->(reviewBody)
 //! MERGE (module)-[:DEFINES]->(authorizeWorktree)
 //! MERGE (module)-[:DEFINES]->(authorizeRun)
 //! MERGE (module)-[:DEFINES]->(load)
@@ -54,6 +70,8 @@
 //! MERGE (router)-[:CALLS]->(get)
 //! MERGE (router)-[:CALLS]->(transition)
 //! MERGE (router)-[:CALLS]->(review)
+//! MERGE (router)-[:CALLS]->(transitionRun)
+//! MERGE (router)-[:CALLS]->(reviewRun)
 //! MERGE (create)-[:CALLS]->(context)
 //! MERGE (create)-[:CALLS]->(writerPort)
 //! MERGE (create)-[:CALLS]->(mapError)
@@ -63,6 +81,22 @@
 //! MERGE (review)-[:CALLS]->(context)
 //! MERGE (review)-[:CALLS]->(reviewPort)
 //! MERGE (review)-[:CALLS]->(mapError)
+//! MERGE (transitionRun)-[:CALLS]->(routeFocus)
+//! MERGE (transitionRun)-[:CALLS]->(authorizeRunCommand)
+//! MERGE (transitionRun)-[:CALLS]->(transitionPort)
+//! MERGE (transitionRun)-[:CALLS]->(mapError)
+//! MERGE (reviewRun)-[:CALLS]->(routeFocus)
+//! MERGE (reviewRun)-[:CALLS]->(authorizeRunCommand)
+//! MERGE (reviewRun)-[:CALLS]->(reviewPort)
+//! MERGE (reviewRun)-[:CALLS]->(mapError)
+//! MERGE (authorizeRunCommand)-[:CALLS]->(authorizeRunOwnedScope)
+//! MERGE (authorizeRunCommand)-[:CALLS]->(context)
+//! MERGE (authorizeRunCommand)-[:READS]->(runBinding)
+//! MERGE (authorizeRunCommand)-[:CONFIGURES]->(statementTimeout)
+//! MERGE (authorizeRunCommand)-[:CONFIGURES]->(lockTimeout)
+//! MERGE (focusHintTest)-[:TESTS]->(routeFocus)
+//! MERGE (legacyHashTest)-[:TESTS]->(transitionBody)
+//! MERGE (legacyHashTest)-[:TESTS]->(reviewBody)
 //! MERGE (list)-[:CALLS]->(authorizeWorktree)
 //! MERGE (list)-[:CALLS]->(authorizeRun)
 //! MERGE (list)-[:CALLS]->(project)
@@ -96,10 +130,10 @@
 //! @endcypher
 //!
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, post},
-    Json, Router,
 };
 use domain_work_item::run_task_card::{
     CreateRunTaskCardCommand, ReviewRunTaskCardCommand, RunTaskCardAiData,
@@ -108,14 +142,14 @@ use domain_work_item::run_task_card::{
 };
 use domain_work_item::{TenantId, UserId, WorktreeId};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
 use uuid::Uuid;
 
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
-    GroupApiState,
+    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
+    validate_actor,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -146,6 +180,8 @@ struct LifecycleTransitionBody {
     expected_version: i32,
     correlation_id: Option<Uuid>,
     reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    focus_worktree_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -154,6 +190,8 @@ struct ReviewCommandBody {
     expected_version: i32,
     correlation_id: Option<Uuid>,
     reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    focus_worktree_id: Option<Uuid>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -194,6 +232,8 @@ struct WorkItemProjection {
     status: String,
     review_state: String,
     active_worktree_id: Option<Uuid>,
+    claimed_by: Option<Uuid>,
+    claim_expires_at: Option<chrono::DateTime<chrono::Utc>>,
     version: i32,
     lifecycle_updated_at: chrono::DateTime<chrono::Utc>,
     metadata_updated_at: chrono::DateTime<chrono::Utc>,
@@ -208,6 +248,14 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/engineering-runs/{run_id}/work-items",
             get(list_run_work_items).post(create_run_work_item),
+        )
+        .route(
+            "/api/v1/engineering-runs/{run_id}/work-items/{work_item_id}/lifecycle",
+            post(transition_run_work_item),
+        )
+        .route(
+            "/api/v1/engineering-runs/{run_id}/work-items/{work_item_id}/review",
+            post(review_run_work_item),
         )
         .route(
             "/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}",
@@ -293,7 +341,7 @@ async fn list_work_items(
     let rows = sqlx::query_as::<_, WorkItemProjection>(
         r#"
         SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
-               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id,
+               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
                c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
         FROM multica.work_item_worktree l
         JOIN multica.task_metadata m
@@ -371,7 +419,7 @@ async fn list_run_work_items(
     let rows = sqlx::query_as::<_, WorkItemProjection>(
         r#"
         SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
-               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id,
+               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
                c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
         FROM multica.task_metadata m
         JOIN multica.task_lifecycle_current c
@@ -550,6 +598,7 @@ async fn transition_work_item(
     validate_transition_body(&body)?;
     let worktree_id = parse_id(&worktree_id)?;
     let work_item_id = parse_id(&work_item_id)?;
+    route_worktree_focus(body.focus_worktree_id, Some(worktree_id))?;
     let key = idempotency_key(&headers)?;
     let hash = request_hash(&format!("transition:{worktree_id}:{work_item_id}"), &body)?;
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
@@ -579,6 +628,52 @@ async fn transition_work_item(
         serde_json::to_value(receipt.snapshot).map_err(|_| GroupApiError::internal())?,
     ))
 }
+
+async fn transition_run_work_item(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((run_id, work_item_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<LifecycleTransitionBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "work-item:write")?;
+    validate_transition_body(&body)?;
+    let run_id = parse_id(&run_id)?;
+    let work_item_id = parse_id(&work_item_id)?;
+    let focus_worktree_id = route_worktree_focus(body.focus_worktree_id, None)?;
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(&format!("transition-run:{run_id}:{work_item_id}"), &body)?;
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let (project_id, context) = authorize_run_task_card_command_context(
+        &state,
+        &actor,
+        run_id,
+        focus_worktree_id,
+        key,
+        hash,
+        correlation_id,
+    )
+    .await?;
+    let command = TransitionRunTaskCardCommand {
+        work_item_id: work_item_id.into(),
+        target_status: RunTaskCardStatus::try_from(body.target_status.as_str())
+            .map_err(map_run_task_card_error)?,
+        expected_version: body.expected_version,
+        reason: body.reason,
+    };
+    let receipt = state
+        .run_task_card_command_port
+        .transition(context, command)
+        .await
+        .map_err(map_run_task_card_error)?;
+    Ok(Json(json!({
+        "project_id": project_id,
+        "engineering_run_id": run_id,
+        "task_card": receipt.snapshot,
+    })))
+}
+
 async fn review_work_item(
     State(state): State<GroupApiState>,
     AuthenticatedUser(actor): AuthenticatedUser,
@@ -591,6 +686,7 @@ async fn review_work_item(
     validate_review_body(&body)?;
     let worktree_id = parse_id(&worktree_id)?;
     let work_item_id = parse_id(&work_item_id)?;
+    route_worktree_focus(body.focus_worktree_id, Some(worktree_id))?;
     let key = idempotency_key(&headers)?;
     let hash = request_hash(&format!("review:{worktree_id}:{work_item_id}"), &body)?;
     let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
@@ -619,6 +715,116 @@ async fn review_work_item(
     Ok(Json(
         serde_json::to_value(receipt.snapshot).map_err(|_| GroupApiError::internal())?,
     ))
+}
+
+async fn review_run_work_item(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((run_id, work_item_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<ReviewCommandBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "work-item:write")?;
+    validate_review_body(&body)?;
+    let run_id = parse_id(&run_id)?;
+    let work_item_id = parse_id(&work_item_id)?;
+    let focus_worktree_id = route_worktree_focus(body.focus_worktree_id, None)?;
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(&format!("review-run:{run_id}:{work_item_id}"), &body)?;
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let (project_id, context) = authorize_run_task_card_command_context(
+        &state,
+        &actor,
+        run_id,
+        focus_worktree_id,
+        key,
+        hash,
+        correlation_id,
+    )
+    .await?;
+    let command = ReviewRunTaskCardCommand {
+        work_item_id: work_item_id.into(),
+        action: RunTaskCardReviewAction::try_from(body.action.as_str())
+            .map_err(map_run_task_card_error)?,
+        expected_version: body.expected_version,
+        reason: body.reason,
+    };
+    let receipt = state
+        .run_task_card_command_port
+        .review(context, command)
+        .await
+        .map_err(map_run_task_card_error)?;
+    Ok(Json(json!({
+        "project_id": project_id,
+        "engineering_run_id": run_id,
+        "task_card": receipt.snapshot,
+    })))
+}
+
+fn route_worktree_focus(
+    requested: Option<Uuid>,
+    route_worktree: Option<Uuid>,
+) -> Result<Option<Uuid>, GroupApiError> {
+    if requested.is_some() && route_worktree.is_some() && requested != route_worktree {
+        return Err(GroupApiError::invalid_request("worktree_focus_mismatch"));
+    }
+    Ok(route_worktree.or(requested))
+}
+
+async fn authorize_run_task_card_command_context(
+    state: &GroupApiState,
+    actor: &super::AuthUser,
+    run_id: Uuid,
+    focus_worktree_id: Option<Uuid>,
+    key: String,
+    hash: Vec<u8>,
+    correlation_id: Uuid,
+) -> Result<(Uuid, RunTaskCardCommandContext), GroupApiError> {
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    set_tenant(&mut tx, actor.tenant_id).await?;
+    sqlx::query("SELECT set_config('statement_timeout', '5000', true), set_config('lock_timeout', '1000', true)")
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let scope =
+        super::engineering_runs::authorize_run_owned_task_scope(&mut tx, actor, run_id).await?;
+    if let Some(worktree_id) = focus_worktree_id {
+        let belongs_to_run: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT worktree_id
+               FROM multica.engineering_run_worktree_binding
+               WHERE tenant_id=$1 AND project_id=$2 AND engineering_run_id=$3
+                 AND worktree_id=$4 AND valid_to IS NULL
+               FOR SHARE"#,
+        )
+        .bind(actor.tenant_id)
+        .bind(scope.project_id)
+        .bind(run_id)
+        .bind(worktree_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+        if belongs_to_run.is_none() {
+            return Err(GroupApiError::not_found());
+        }
+    }
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    let context = run_task_card_context(
+        actor.tenant_id,
+        actor.user_id,
+        Some(scope.project_id),
+        Some(scope.engineering_run_id),
+        focus_worktree_id,
+        key,
+        hash,
+        correlation_id,
+    )?;
+    Ok((scope.project_id, context))
 }
 pub(super) async fn authorize_task_run_for_worktree(
     tx: &mut Transaction<'_, sqlx::Postgres>,
@@ -709,7 +915,7 @@ pub(super) async fn load_work_item(
     let row = sqlx::query_as::<_, WorkItemProjection>(
         r#"
         SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
-               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id,
+               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
                c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
         FROM multica.work_item_worktree l
         JOIN multica.task_metadata m
@@ -913,6 +1119,8 @@ fn project_work_item(row: WorkItemProjection) -> Value {
             "status": row.status,
             "review_state": row.review_state,
             "active_worktree_id": row.active_worktree_id,
+            "claimed_by_user_id": row.claimed_by,
+            "claim_expires_at": row.claim_expires_at,
             "version": row.version,
             "updated_at": row.lifecycle_updated_at,
         },
@@ -958,5 +1166,73 @@ pub(super) fn require_task_writer(role: &str) -> Result<(), GroupApiError> {
     match role {
         "tenant_admin" | "project_admin" | "developer" | "agent" => Ok(()),
         _ => Err(GroupApiError::forbidden()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LifecycleTransitionBody, ReviewCommandBody, route_worktree_focus};
+    use serde_json::json;
+    use uuid::Uuid;
+
+    #[test]
+    fn run_route_accepts_absent_or_current_run_worktree_focus() {
+        let worktree_id = Uuid::new_v4();
+        assert_eq!(route_worktree_focus(None, None).unwrap(), None);
+        assert_eq!(
+            route_worktree_focus(Some(worktree_id), None).unwrap(),
+            Some(worktree_id)
+        );
+    }
+
+    #[test]
+    fn route_focus_is_bound_to_legacy_worktree_path() {
+        let route_worktree_id = Uuid::new_v4();
+        assert_eq!(
+            route_worktree_focus(None, Some(route_worktree_id)).unwrap(),
+            Some(route_worktree_id)
+        );
+        assert_eq!(
+            route_worktree_focus(Some(route_worktree_id), Some(route_worktree_id)).unwrap(),
+            Some(route_worktree_id)
+        );
+        assert!(route_worktree_focus(Some(Uuid::new_v4()), Some(route_worktree_id)).is_err());
+    }
+
+    #[test]
+    fn legacy_lifecycle_and_review_bodies_keep_their_request_hash_shape() {
+        let lifecycle: LifecycleTransitionBody = serde_json::from_value(json!({
+            "target_status": "cancelled",
+            "expected_version": 1,
+            "correlation_id": null,
+            "reason": null
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(lifecycle).unwrap(),
+            json!({
+                "target_status": "cancelled",
+                "expected_version": 1,
+                "correlation_id": null,
+                "reason": null
+            })
+        );
+
+        let review: ReviewCommandBody = serde_json::from_value(json!({
+            "action": "accept",
+            "expected_version": 1,
+            "correlation_id": null,
+            "reason": null
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(review).unwrap(),
+            json!({
+                "action": "accept",
+                "expected_version": 1,
+                "correlation_id": null,
+                "reason": null
+            })
+        );
     }
 }

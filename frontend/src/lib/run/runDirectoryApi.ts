@@ -1,28 +1,46 @@
 /*
-@cypher schema=1 source_sha256=a271a844b5e68f37ec811cfb7ffc96cf85d6da1461b400c16af5d2eccc59c8ad
+@cypher schema=1 source_sha256=f2637fcbb42cd7d76318b6ad37b99e01c2c79c1f27c414f50230f3b9e1cdaf92
 MERGE (self:File {path:"frontend/src/lib/run/runDirectoryApi.ts"})
 MERGE (create:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (createLegacy:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
+MERGE (transitionTask:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.transitionRunTaskCard",kind:"method"})
+MERGE (reviewTask:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.reviewRunTaskCard",kind:"method"})
 MERGE (projectRuns:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listProjectRuns",kind:"method"})
 MERGE (request:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.request",kind:"method"})
 MERGE (mapTask:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapRunTaskCard",kind:"function"})
+MERGE (validateTaskWrite:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::validateRunTaskCardWriteContext",kind:"function"})
 MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
 MERGE (input:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::CreateRunTaskCardInput",kind:"type"})
+MERGE (lifecycleCommand:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunTaskCardLifecycleCommand",kind:"type"})
+MERGE (reviewCommand:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunTaskCardReviewCommand",kind:"type"})
 MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
 MERGE (self)-[:DEFINES]->(runHref)
 MERGE (self)-[:DEFINES]->(create)
 MERGE (self)-[:DEFINES]->(projectRuns)
 MERGE (self)-[:DEFINES]->(request)
 MERGE (self)-[:DEFINES]->(mapTask)
+MERGE (self)-[:DEFINES]->(validateTaskWrite)
 MERGE (create)-[:CALLS]->(request)
 MERGE (create)-[:CALLS]->(mapTask)
 MERGE (create)-[:USES_TYPE]->(context)
 MERGE (create)-[:USES_TYPE]->(input)
 MERGE (self)-[:DEFINES]->(createLegacy)
+MERGE (self)-[:DEFINES]->(transitionTask)
+MERGE (self)-[:DEFINES]->(reviewTask)
 MERGE (createLegacy)-[:CALLS]->(request)
 MERGE (createLegacy)-[:CALLS]->(mapTask)
 MERGE (createLegacy)-[:USES_TYPE]->(context)
 MERGE (createLegacy)-[:USES_TYPE]->(input)
+MERGE (transitionTask)-[:CALLS]->(request)
+MERGE (transitionTask)-[:CALLS]->(mapTask)
+MERGE (transitionTask)-[:CALLS]->(validateTaskWrite)
+MERGE (transitionTask)-[:USES_TYPE]->(context)
+MERGE (transitionTask)-[:USES_TYPE]->(lifecycleCommand)
+MERGE (reviewTask)-[:CALLS]->(request)
+MERGE (reviewTask)-[:CALLS]->(mapTask)
+MERGE (reviewTask)-[:CALLS]->(validateTaskWrite)
+MERGE (reviewTask)-[:USES_TYPE]->(context)
+MERGE (reviewTask)-[:USES_TYPE]->(reviewCommand)
 MERGE (projectRuns)-[:CALLS]->(request)
 MERGE (projectRuns)-[:CALLS]->(mapRun)
 @endcypher
@@ -108,7 +126,15 @@ export interface RunTaskCard {
   description: string;
   priority: string;
   labels: string[];
-  lifecycle: { status: string; review_state: string; active_worktree_id: string | null; version: number; updated_at: string };
+  lifecycle: {
+    status: string;
+    review_state: string;
+    active_worktree_id: string | null;
+    claimed_by_user_id: string | null;
+    claim_expires_at: string | null;
+    version: number;
+    updated_at: string;
+  };
   metadata_updated_at: string;
 }
 export interface RunTaskCardPage { rows: RunTaskCard[]; limit: number; next_after: string | null }
@@ -118,6 +144,20 @@ export interface CreateRunTaskCardInput {
   description: string;
   priority: RunTaskCardPriority;
   correlation_id: string;
+}
+export type RunTaskCardTargetStatus = "pending" | "claimed" | "in_progress" | "completed" | "failed" | "cancelled";
+export type RunTaskCardReviewAction = "submit" | "accept" | "reject";
+export interface RunTaskCardLifecycleCommand {
+  target_status: RunTaskCardTargetStatus;
+  expected_version: number;
+  correlation_id: string;
+  reason?: string;
+}
+export interface RunTaskCardReviewCommand {
+  action: RunTaskCardReviewAction;
+  expected_version: number;
+  correlation_id: string;
+  reason?: string;
 }
 export interface RunDirectoryClientOptions {
   getAccessToken: RunAccessTokenProvider;
@@ -268,6 +308,12 @@ function mapRunTaskCard(value: unknown): RunTaskCard {
   if (!Array.isArray(row.labels) || row.labels.length > 100) throw new RunDirectoryError(0, "invalid_projection", "任务标签列表无效。");
   const labels: string[] = [];
   for (const label of row.labels) labels.push(boundedText(label, 128));
+  const claimExpiresAt = lifecycle.claim_expires_at === undefined || lifecycle.claim_expires_at === null
+    ? null
+    : boundedText(lifecycle.claim_expires_at, 64);
+  if (claimExpiresAt !== null && !Number.isFinite(Date.parse(claimExpiresAt))) {
+    throw new RunDirectoryError(0, "invalid_projection", "任务领取有效期无效。");
+  }
   const task = {
     work_item_id: uuid(row.work_item_id),
     item_type: boundedText(row.item_type, 64),
@@ -279,6 +325,10 @@ function mapRunTaskCard(value: unknown): RunTaskCard {
       status: boundedText(lifecycle.status, 64),
       review_state: boundedText(lifecycle.review_state, 64),
       active_worktree_id: nullableUuid(lifecycle.active_worktree_id),
+      claimed_by_user_id: lifecycle.claimed_by_user_id === undefined
+        ? null
+        : nullableUuid(lifecycle.claimed_by_user_id),
+      claim_expires_at: claimExpiresAt,
       version: positiveVersion(lifecycle.version),
       updated_at: boundedText(lifecycle.updated_at, 64),
     },
@@ -289,6 +339,37 @@ function mapRunTaskCard(value: unknown): RunTaskCard {
   }
   return task;
 }
+function validateRunTaskCardWriteContext(context: RunContextEnvelope): {
+  runId: string;
+  projectId: string;
+  focusWorktreeId: string | null;
+} {
+  const run = context.engineering_run;
+  const runId = uuid(run.engineering_run_id);
+  const projectId = uuid(run.project_id);
+  const repositoryId = run.repository_id === null ? null : uuid(run.repository_id);
+  const branchId = run.branch_id === null ? null : uuid(run.branch_id);
+  const focus = context.focus;
+  if (uuid(context.run_context.project_id) !== projectId ||
+    uuid(context.run_context.engineering_run_id) !== runId ||
+    context.run_context.repository_id !== repositoryId || context.run_context.branch_id !== branchId ||
+    (branchId === null) !== (context.branch === null) ||
+    (context.branch !== null && (uuid(context.branch.branch_id) !== branchId ||
+      uuid(context.branch.project_id) !== projectId || uuid(context.branch.repository_id) !== repositoryId)) ||
+    (focus !== null && (focus.archived || uuid(focus.engineering_run_id) !== runId ||
+      uuid(focus.project_id) !== projectId ||
+      (repositoryId !== null && uuid(focus.repository_id) !== repositoryId)))) {
+    throw new RunDirectoryError(0, "scope_mismatch", "当前 Run、Branch 或 Worktree 焦点关联不一致，不能更新任务卡。");
+  }
+  if (!context.run_context.granted_scopes.includes("work-item:write")) {
+    throw new RunDirectoryError(403, "insufficient_scope", "当前 Run 会话没有更新任务卡的授权。");
+  }
+  if (!context.capabilities.task_cards_available) {
+    throw new RunDirectoryError(403, "task_cards_unavailable", "当前 Run 尚未开放 Task Cards。");
+  }
+  return { runId, projectId, focusWorktreeId: focus ? uuid(focus.worktree_id) : null };
+}
+
 function mapRunTaskCardBody(value: unknown, run: EngineeringRun, after?: string): RunTaskCardPage {
   const envelope = record(value);
   if (uuid(envelope.engineering_run_id) !== run.engineering_run_id || uuid(envelope.project_id) !== run.project_id ||
@@ -435,9 +516,12 @@ export class RunDirectoryApiClient {
         },
         credentials: "omit", cache: "no-store", redirect: "error", signal: controller.signal,
       }), controller.signal);
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         this.dispose(); this.options.onAuthorizationError?.();
-        throw new RunDirectoryError(response.status, "authorization_failed", "会话或授权已失效，请重新连接宿主会话。");
+        throw new RunDirectoryError(response.status, "session_expired", "用户会话已失效，请重新登录。");
+      }
+      if (response.status === 403) {
+        throw new RunDirectoryError(response.status, "forbidden", "当前成员或角色无权执行此操作；会话仍有效。");
       }
       if (!response.ok) throw new RunDirectoryError(response.status, "directory_unavailable", "授权目录暂时不可用，请重试。");
       const result = await readBoundedJson(response, controller.signal, maxResponseBytes);
@@ -592,6 +676,99 @@ export class RunDirectoryApiClient {
       throw new RunDirectoryError(0, "invalid_projection", "创建结果与请求的 Task Card 身份不一致。");
     }
     return card;
+  }
+  async transitionRunTaskCard(
+    context: RunContextEnvelope,
+    card: RunTaskCard,
+    input: RunTaskCardLifecycleCommand,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<RunTaskCard> {
+    const { runId, projectId, focusWorktreeId } = validateRunTaskCardWriteContext(context);
+    const workItemId = uuid(card.work_item_id);
+    if (!Number.isSafeInteger(input.expected_version) || input.expected_version !== card.lifecycle.version ||
+      !["pending", "claimed", "in_progress", "completed", "failed", "cancelled"].includes(input.target_status)) {
+      throw new RunDirectoryError(0, "invalid_request", "Task Card 状态命令与当前版本不一致。");
+    }
+    if (["claimed", "in_progress"].includes(input.target_status) && !focusWorktreeId) {
+      throw new RunDirectoryError(409, "task_worktree_required", "领取或开始任务前，请先选择当前 Run 的 Worktree。");
+    }
+    if (["claimed", "in_progress"].includes(card.lifecycle.status) &&
+      ["in_progress", "completed", "failed", "cancelled"].includes(input.target_status) &&
+      focusWorktreeId !== card.lifecycle.active_worktree_id) {
+      throw new RunDirectoryError(409, "active_worktree_conflict", "请切换到任务当前绑定的 Worktree 后再更新状态。");
+    }
+    const key = boundedText(idempotencyKey, 128);
+    if (!key) throw new RunDirectoryError(0, "invalid_request", "状态命令需要幂等键。");
+    const result = record(await this.request(
+      `/api/v1/engineering-runs/${runId}/work-items/${workItemId}/lifecycle`,
+      signal,
+      MAX_RUN_TASK_CARD_RESPONSE_BYTES,
+      {
+        method: "POST",
+        idempotencyKey: key,
+        body: JSON.stringify({
+          target_status: input.target_status,
+          expected_version: input.expected_version,
+          correlation_id: uuid(input.correlation_id),
+          reason: input.reason === undefined ? null : boundedString(input.reason, 4_000),
+          focus_worktree_id: focusWorktreeId,
+        }),
+      },
+    ));
+    const rawTaskCard = record(result.task_card);
+    const updated = mapRunTaskCard(rawTaskCard);
+    if (uuid(result.project_id) !== projectId || uuid(result.engineering_run_id) !== runId ||
+      updated.work_item_id !== workItemId || uuid(rawTaskCard.task_card_id) !== workItemId) {
+      throw new RunDirectoryError(0, "invalid_projection", "Task Card 状态更新响应不属于当前 Project、Run 或任务。");
+    }
+    return updated;
+  }
+  async reviewRunTaskCard(
+    context: RunContextEnvelope,
+    card: RunTaskCard,
+    input: RunTaskCardReviewCommand,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<RunTaskCard> {
+    const { runId, projectId, focusWorktreeId } = validateRunTaskCardWriteContext(context);
+    const workItemId = uuid(card.work_item_id);
+    if (!Number.isSafeInteger(input.expected_version) || input.expected_version !== card.lifecycle.version ||
+      !["submit", "accept", "reject"].includes(input.action)) {
+      throw new RunDirectoryError(0, "invalid_request", "Task Card 审查命令与当前版本不一致。");
+    }
+    const reason = input.reason === undefined ? null : boundedString(input.reason, 4_000);
+    if (input.action === "reject" && !reason?.trim()) {
+      throw new RunDirectoryError(0, "invalid_request", "退回审查时必须填写原因。");
+    }
+    if (input.action === "submit" && focusWorktreeId !== card.lifecycle.active_worktree_id) {
+      throw new RunDirectoryError(409, "review_worktree_conflict", "请在任务当前绑定的 Worktree 中提交审查。");
+    }
+    const key = boundedText(idempotencyKey, 128);
+    if (!key) throw new RunDirectoryError(0, "invalid_request", "审查命令需要幂等键。");
+    const result = record(await this.request(
+      `/api/v1/engineering-runs/${runId}/work-items/${workItemId}/review`,
+      signal,
+      MAX_RUN_TASK_CARD_RESPONSE_BYTES,
+      {
+        method: "POST",
+        idempotencyKey: key,
+        body: JSON.stringify({
+          action: input.action,
+          expected_version: input.expected_version,
+          correlation_id: uuid(input.correlation_id),
+          reason,
+          focus_worktree_id: focusWorktreeId,
+        }),
+      },
+    ));
+    const rawTaskCard = record(result.task_card);
+    const updated = mapRunTaskCard(rawTaskCard);
+    if (uuid(result.project_id) !== projectId || uuid(result.engineering_run_id) !== runId ||
+      updated.work_item_id !== workItemId || uuid(rawTaskCard.task_card_id) !== workItemId) {
+      throw new RunDirectoryError(0, "invalid_projection", "Task Card 审查响应不属于当前 Project、Run 或任务。");
+    }
+    return updated;
   }
   async createLegacyRunTaskCard(
     context: RunContextEnvelope,

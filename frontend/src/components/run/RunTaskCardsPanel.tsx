@@ -1,10 +1,12 @@
 /*
-@cypher schema=1 source_sha256=bd8b0c2f87a8ab4d9e426f2459c36390a14bf7e7788c3be1493f661cc3c7e738
+@cypher schema=1 source_sha256=d46af69faae392e45f7344b114cf3afa866e8e1b283011e449f256dbf47e0b76
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
 MERGE (submit:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::submitTaskCardCreate",kind:"function"})
 MERGE (restore:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::restorePendingTaskCardCreate",kind:"effect"})
 MERGE (discard:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::discardPendingTaskCardCreate",kind:"function"})
+MERGE (mutate:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::mutateRunTaskCard",kind:"function"})
+MERGE (submitReject:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::submitTaskCardRejection",kind:"function"})
 MERGE (scope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
 MERGE (target:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
 MERGE (targetMatches:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTargetMatchesContext",kind:"function"})
@@ -16,6 +18,8 @@ MERGE (getStore:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts:
 MERGE (recoveryFile:File {path:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts"})
 MERGE (api:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (legacyApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
+MERGE (transitionApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.transitionRunTaskCard",kind:"method"})
+MERGE (reviewApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.reviewRunTaskCard",kind:"method"})
 MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
 MERGE (input:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::CreateRunTaskCardInput",kind:"type"})
 MERGE (maxAge:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS",kind:"constant"})
@@ -30,6 +34,8 @@ MERGE (panel)-[:CALLS]->(getStore)
 MERGE (panel)-[:USES_TYPE]->(store)
 MERGE (self)-[:DEFINES]->(restore)
 MERGE (self)-[:DEFINES]->(discard)
+MERGE (self)-[:DEFINES]->(mutate)
+MERGE (self)-[:DEFINES]->(submitReject)
 MERGE (restore)-[:CALLS]->(loadStore)
 MERGE (restore)-[:READS]->(scope)
 MERGE (discard)-[:CALLS]->(removeStore)
@@ -39,6 +45,10 @@ MERGE (submit)-[:CALLS]->(saveStore)
 MERGE (submit)-[:CALLS]->(removeStore)
 MERGE (submit)-[:CALLS]->(api)
 MERGE (submit)-[:CALLS]->(legacyApi)
+MERGE (mutate)-[:CALLS]->(transitionApi)
+MERGE (mutate)-[:CALLS]->(reviewApi)
+MERGE (submitReject)-[:CALLS]->(mutate)
+MERGE (panel)-[:CALLS]->(mutate)
 MERGE (submit)-[:USES_TYPE]->(input)
 MERGE (submit)-[:READS]->(maxAge)
 @endcypher
@@ -84,9 +94,16 @@ import {
   RUN_TASK_CARD_PRIORITIES,
   type RunContextEnvelope,
   type RunDirectoryApiClient,
+  type RunTaskCard,
+  type RunTaskCardLifecycleCommand,
   type RunTaskCardPage,
   type RunTaskCardPriority,
+  type RunTaskCardReviewCommand,
 } from "@/lib/run/runDirectoryApi";
+
+type RunTaskCardMutation =
+  | { kind: "lifecycle"; input: Omit<RunTaskCardLifecycleCommand, "expected_version" | "correlation_id"> }
+  | { kind: "review"; input: Omit<RunTaskCardReviewCommand, "expected_version" | "correlation_id"> };
 
 interface RunTaskCardsPanelProps {
   client: RunDirectoryApiClient;
@@ -117,6 +134,11 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   const [createPhase, setCreatePhase] = useState<"idle" | "submitting" | "error">("idle");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [commandBusyId, setCommandBusyId] = useState<string | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const [commandSuccess, setCommandSuccess] = useState<string | null>(null);
+  const [rejectingCardId, setRejectingCardId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [pendingCreate, setPendingCreate] = useState<PendingTaskCardCreate | null>(null);
   const [recoveryState, setRecoveryState] = useState<{
     scope_key: string | null;
@@ -133,6 +155,10 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   const canCreateTaskCard = Boolean(taskOwnerAvailable && context.run_context.granted_scopes.includes("work-item:write") &&
     (!focus || (!focus.archived && focus.project_id === run.project_id &&
       (run.repository_id === null || focus.repository_id === run.repository_id) && focus.engineering_run_id === runId)));
+  const canMutateTaskCards = Boolean(taskOwnerAvailable && context.run_context.granted_scopes.includes("work-item:write"));
+  const canReviewTaskCards = Boolean(canMutateTaskCards &&
+    [context.run_context.authorization.project.role, context.run_context.authorization.engineering_run.role]
+      .every((role) => ["tenant_admin", "project_admin", "developer"].includes(role)));
   const pendingTargetMatches = pendingCreate
     ? taskCardCreateRecoveryTargetMatchesContext(pendingCreate, context)
     : false;
@@ -203,6 +229,46 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   }
   function goPreviousTaskCardPage() { setPageIndex(Math.max(0, pageIndex - 1)); }
   function retryTaskCardPage() { setRevision(revision + 1); }
+  async function mutateRunTaskCard(card: RunTaskCard, mutation: RunTaskCardMutation) {
+    if (!canMutateTaskCards || commandBusyId !== null) return;
+    setCommandBusyId(card.work_item_id);
+    setCommandError(null);
+    setCommandSuccess(null);
+    try {
+      const key = globalThis.crypto.randomUUID();
+      if (mutation.kind === "lifecycle") {
+        const command: RunTaskCardLifecycleCommand = {
+          ...mutation.input,
+          expected_version: card.lifecycle.version,
+          correlation_id: globalThis.crypto.randomUUID(),
+        };
+        await client.transitionRunTaskCard(context, card, command, key);
+      } else {
+        const command: RunTaskCardReviewCommand = {
+          ...mutation.input,
+          expected_version: card.lifecycle.version,
+          correlation_id: globalThis.crypto.randomUUID(),
+        };
+        await client.reviewRunTaskCard(context, card, command, key);
+      }
+      if (mutation.kind === "review" && mutation.input.action === "reject") {
+        setRejectingCardId(null);
+        setRejectReason("");
+      }
+      setCommandSuccess(`Task Card「${card.title}」已更新，正在刷新列表。`);
+    } catch (reason: unknown) {
+      setCommandError(`操作结果未确认，正在刷新列表；请在新状态加载后继续，不会自动重放。${directoryErrorMessage(reason)}`);
+    } finally {
+      setCommandBusyId(null);
+      setRevision((value) => value + 1);
+    }
+  }
+  async function submitTaskCardRejection(event: FormEvent<HTMLFormElement>, card: RunTaskCard) {
+    event.preventDefault();
+    const reason = rejectReason.trim();
+    if (!reason || reason.length > 4_000) return;
+    await mutateRunTaskCard(card, { kind: "review", input: { action: "reject", reason } });
+  }
   function openTaskCardForm() {
     if (recoveryState.phase !== "ready" || recoveryState.scope_key !== recoveryScopeKey || pendingCreate) return;
     setCreateFormOpen(true);
@@ -347,6 +413,8 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
       <button type="button" onClick={discardPendingTaskCardCreate} disabled={createPhase === "submitting"} className="mt-2 rounded border border-line px-2 py-1 disabled:opacity-50">我已核对列表，清除恢复记录</button>
     </div>}
     {createSuccess && <p className="mt-3 text-sm" role="status">{createSuccess}</p>}
+    {commandSuccess && <p className="mt-3 text-sm" role="status">{commandSuccess}</p>}
+    {commandError && <p className="mt-3 text-sm" role="alert">{commandError}</p>}
     {createFormOpen && <form onSubmit={submitTaskCardCreate} className="mt-4 grid gap-3 rounded border border-line bg-bg-soft p-3">
       <p className="text-xs text-ink-mute">{pendingCreate ? "已恢复原请求；字段固定，不会生成新的请求正文或幂等键。" : "新卡属于当前 Engineering Run；可选 Worktree 焦点只记录为初始 checkout 关联。"}</p>
       <fieldset disabled={createPhase === "submitting" || Boolean(pendingCreate) || !canCreateTaskCard} className="grid gap-3">
@@ -388,6 +456,47 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
             {card.labels.length > 0 && <ul aria-label="任务标签" className="mt-2 flex flex-wrap gap-1">{card.labels.slice(0, 8).map((label) => <li key={label} className="rounded bg-bg px-2 py-0.5 text-[11px]">{label}</li>)}{card.labels.length > 8 && <li className="text-[11px] text-ink-mute">+{card.labels.length - 8}</li>}</ul>}
             {card.description && <details className="mt-2 text-sm"><summary className="cursor-pointer text-xs text-ink-mute">任务描述</summary><p className="mt-2 whitespace-pre-wrap break-words">{card.description}</p></details>}
             <p className="mt-2 break-all text-[11px] text-ink-mute">Work Item {card.work_item_id} · Active Worktree {card.lifecycle.active_worktree_id ?? "未绑定"}</p>
+            {canMutateTaskCards && ["claimed", "in_progress"].includes(card.lifecycle.status) && card.lifecycle.active_worktree_id !== focus?.worktree_id && <p className="mt-2 text-xs text-ink-mute">此任务当前绑定到 Worktree {card.lifecycle.active_worktree_id}；请切换到该 Worktree 后继续。</p>}
+            {canMutateTaskCards && <div className="mt-3 flex flex-wrap gap-2" aria-label={`Task Card 操作：${card.title}`}>
+              {card.lifecycle.status === "pending" && <>
+                <button type="button" disabled={commandBusyId !== null || !focus} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "claimed" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">领取到当前 Worktree</button>
+                <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "cancelled" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">取消任务</button>
+                {!focus && <span className="self-center text-xs text-ink-mute">选择 Run 下的 Worktree 后可领取执行。</span>}
+              </>}
+              {card.lifecycle.status === "claimed" && card.lifecycle.active_worktree_id === focus?.worktree_id && <>
+                {card.lifecycle.claimed_by_user_id === context.run_context.actor_id && card.lifecycle.claim_expires_at !== null && Date.parse(card.lifecycle.claim_expires_at) > Date.now()
+                  ? <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "in_progress" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">开始处理</button>
+                  : <span className="self-center text-xs text-ink-mute">{card.lifecycle.claimed_by_user_id === context.run_context.actor_id
+                    ? "领取已过期或状态不完整；请刷新后重新领取。"
+                    : "此任务由其他成员领取，当前成员不能开始执行。"}</span>}
+                {card.lifecycle.claim_expires_at !== null && Date.parse(card.lifecycle.claim_expires_at) <= Date.now() && <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "pending" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">重新排队</button>}
+                <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "cancelled" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">取消任务</button>
+              </>}
+              {card.lifecycle.status === "in_progress" && card.lifecycle.active_worktree_id === focus?.worktree_id && <>
+                {card.lifecycle.review_state !== "pending_review" && <>
+                  {card.lifecycle.claimed_by_user_id === context.run_context.actor_id
+                    ? <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "review", input: { action: "submit" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">提交审查</button>
+                    : <span className="self-center text-xs text-ink-mute">只有当前领取任务的成员可以提交审查。</span>}
+                  <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "completed" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">标记完成</button>
+                </>}
+                <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "cancelled" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">取消任务</button>
+              </>}
+              {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && canReviewTaskCards && card.lifecycle.claimed_by_user_id !== context.run_context.actor_id && <>
+                <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "review", input: { action: "accept" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">批准审查</button>
+                {rejectingCardId === card.work_item_id
+                  ? <form onSubmit={(event) => void submitTaskCardRejection(event, card)} className="flex w-full flex-wrap items-end gap-2">
+                    <label className="grid min-w-56 flex-1 gap-1 text-xs">退回原因
+                      <textarea value={rejectReason} onChange={(event) => setRejectReason(event.currentTarget.value)} maxLength={4_000} required rows={2} className="rounded border border-line bg-bg px-2 py-1 text-sm" />
+                    </label>
+                    <button type="submit" disabled={commandBusyId !== null || !rejectReason.trim()} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">确认退回</button>
+                    <button type="button" disabled={commandBusyId !== null} onClick={() => { setRejectingCardId(null); setRejectReason(""); }} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">取消</button>
+                  </form>
+                  : <button type="button" disabled={commandBusyId !== null} onClick={() => { setRejectingCardId(card.work_item_id); setRejectReason(""); }} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">退回修改</button>}
+              </>}
+              {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && canReviewTaskCards && card.lifecycle.claimed_by_user_id === context.run_context.actor_id && <p className="self-center text-xs text-ink-mute">执行成员不能审查自己提交的任务。</p>}
+              {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && !canReviewTaskCards && <p className="self-center text-xs text-ink-mute">等待具有 Run 审查权限的成员处理。</p>}
+              {card.lifecycle.status === "failed" && <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "pending" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">重新排队</button>}
+            </div>}
           </article>
         </li>)}
       </ul>

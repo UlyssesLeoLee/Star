@@ -1,27 +1,40 @@
 /*
-@cypher schema=1 source_sha256=03c4df543bb0876030a9912e81c41e7ceaf42fb2f7694201ee955d08f12c5aca
+@cypher schema=1 source_sha256=db4f1d1c12d66e140a1ef0ab0e0bfd415488ad05546523eac7620e0301ff6e5c
 MERGE (self:File {path:"frontend/src/lib/run/runDirectoryApi.test.ts"})
 MERGE (create:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::creates through the Run route with optional focus, Run scope and idempotency",kind:"test"})
 MERGE (hostlessList:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::lists hostless Run Task Cards with the same bounded keyset contract",kind:"test"})
 MERGE (hostlessCreate:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::creates a hostless Task Card with an explicit null focus and validates the Run response envelope",kind:"test"})
+MERGE (hostlessTransition:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::transitions a hostless Task Card through the Run lifecycle route",kind:"test"})
+MERGE (hostlessClaim:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::requires a Worktree focus before claiming a Run Task Card",kind:"test"})
 MERGE (legacyReplay:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::replays a legacy pending Worktree command through its original route and body",kind:"test"})
 MERGE (scope:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::rejects task creation before network when RunContext lacks the write scope",kind:"test"})
 MERGE (capability:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::rejects task creation before network when the Task Cards capability is closed",kind:"test"})
+MERGE (claimProjection:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::maps claim owner and expiry into the Task Card projection",kind:"test"})
+MERGE (forbiddenSession:Symbol {id:"frontend/src/lib/run/runDirectoryApi.test.ts::keeps the shared session alive after a domain forbidden response",kind:"test"})
 MERGE (api:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (legacyApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
+MERGE (transitionApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.transitionRunTaskCard",kind:"method"})
 MERGE (self)-[:DEFINES]->(create)
 MERGE (self)-[:DEFINES]->(hostlessList)
 MERGE (self)-[:DEFINES]->(hostlessCreate)
+MERGE (self)-[:DEFINES]->(hostlessTransition)
+MERGE (self)-[:DEFINES]->(hostlessClaim)
 MERGE (self)-[:DEFINES]->(legacyReplay)
 MERGE (self)-[:DEFINES]->(scope)
 MERGE (self)-[:DEFINES]->(capability)
+MERGE (self)-[:DEFINES]->(claimProjection)
+MERGE (self)-[:DEFINES]->(forbiddenSession)
 MERGE (create)-[:TESTS]->(api)
 MERGE (hostlessList)-[:TESTS]->(api)
 MERGE (hostlessCreate)-[:TESTS]->(api)
+MERGE (hostlessTransition)-[:TESTS]->(transitionApi)
+MERGE (hostlessClaim)-[:TESTS]->(transitionApi)
 MERGE (legacyReplay)-[:TESTS]->(api)
 MERGE (legacyReplay)-[:TESTS]->(legacyApi)
 MERGE (scope)-[:TESTS]->(api)
 MERGE (capability)-[:TESTS]->(api)
+MERGE (claimProjection)-[:TESTS]->(api)
+MERGE (forbiddenSession)-[:TESTS]->(api)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
@@ -42,7 +55,7 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryApi.test.ts",type:"file",
 */
 
 import { describe, expect, it, vi } from "vitest";
-import { RUN_TASK_CARD_PAGE_SIZE, RunDirectoryApiClient, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope } from "./runDirectoryApi";
+import { RUN_TASK_CARD_PAGE_SIZE, RunDirectoryApiClient, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope, type RunTaskCardLifecycleCommand } from "./runDirectoryApi";
 
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
 const PROJECT_ID = "10000000-0000-4000-8000-000000000002";
@@ -104,7 +117,7 @@ function taskFixture(index: number) {
     description: "",
     priority: "medium",
     labels: [],
-    lifecycle: { status: "pending", review_state: "not_required", active_worktree_id: null, version: 1, updated_at: "2026-10-02T00:00:00Z" },
+    lifecycle: { status: "pending", review_state: "not_required", active_worktree_id: null, claimed_by_user_id: null, claim_expires_at: null, version: 1, updated_at: "2026-10-02T00:00:00Z" },
     metadata_updated_at: "2026-10-02T00:00:00Z",
   };
 }
@@ -145,6 +158,43 @@ describe("RunDirectoryApiClient Run Task Cards", () => {
     expect(fixture.fetcher.mock.calls[0]?.[1]?.credentials).toBe("omit");
     expect(fixture.getAccessToken).toHaveBeenCalledOnce();
     fixture.client.dispose();
+  });
+
+  it("maps claim owner and expiry into the Task Card projection", async () => {
+    const item = taskFixture(1);
+    item.lifecycle = {
+      ...item.lifecycle,
+      status: "claimed",
+      claimed_by_user_id: "10000000-0000-4000-8000-000000000006",
+      claim_expires_at: "2026-10-15T12:00:30Z",
+    };
+    const fixture = clientFixture(pageFixture([item]));
+
+    const result = await fixture.client.listRunWorkItems(runFixture());
+
+    expect(result.rows[0]?.lifecycle).toMatchObject({
+      claimed_by_user_id: "10000000-0000-4000-8000-000000000006",
+      claim_expires_at: "2026-10-15T12:00:30Z",
+    });
+    fixture.client.dispose();
+  });
+
+  it("keeps the shared session alive after a domain forbidden response", async () => {
+    const onAuthorizationError = vi.fn();
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("", { status: 403 }));
+    fetcher.mockResolvedValueOnce(new Response("", { status: 403 }));
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify(pageFixture([taskFixture(1)])), { status: 200 }));
+    const client = new RunDirectoryApiClient({
+      getAccessToken: async () => "user-jwt",
+      fetcher,
+      onAuthorizationError,
+    });
+
+    await expect(client.listRunWorkItems(runFixture())).rejects.toMatchObject({ status: 403, code: "forbidden" });
+    expect(onAuthorizationError).not.toHaveBeenCalled();
+    await expect(client.listRunWorkItems(runFixture())).resolves.toMatchObject({ rows: [{ work_item_id: taskFixture(1).work_item_id }] });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    client.dispose();
   });
 
   it("lists hostless Run Task Cards with the same bounded keyset contract", async () => {
@@ -231,6 +281,58 @@ describe("RunDirectoryApiClient Run Task Cards", () => {
       project_id: PROJECT_ID, engineering_run_id: RUN_ID, focus_worktree_id: null,
       task_card: { item_type: "task", title: input.title, correlation_id: input.correlation_id },
     });
+    fixture.client.dispose();
+  });
+
+  it("transitions a hostless Task Card through the Run lifecycle route", async () => {
+    const context = contextFixture();
+    context.engineering_run = { ...context.engineering_run, repository_id: null, branch_id: null };
+    context.run_context.repository_id = null;
+    context.run_context.branch_id = null;
+    context.run_context.authorization.branch = null;
+    context.branch = null;
+    context.focus = null;
+    context.focus_version = null;
+    const task = taskFixture(13);
+    const updated = { ...task, lifecycle: { ...task.lifecycle, status: "cancelled", version: 2 } };
+    const fixture = clientFixture({ project_id: PROJECT_ID, engineering_run_id: RUN_ID, task_card: { ...updated, task_card_id: task.work_item_id } });
+    const command: RunTaskCardLifecycleCommand = {
+      target_status: "cancelled", expected_version: task.lifecycle.version,
+      correlation_id: "10000000-0000-4000-8000-000000000008",
+    };
+
+    const result = await fixture.client.transitionRunTaskCard(context, task, command, "run-cancel-key");
+    const [url, init] = fixture.fetcher.mock.calls[0] ?? [];
+    expect(String(url)).toBe(`/api/v1/engineering-runs/${RUN_ID}/work-items/${task.work_item_id}/lifecycle`);
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("run-cancel-key");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      target_status: "cancelled", expected_version: 1,
+      correlation_id: command.correlation_id, reason: null, focus_worktree_id: null,
+    });
+    expect(result.lifecycle.status).toBe("cancelled");
+    fixture.client.dispose();
+  });
+
+  it("requires a Worktree focus before claiming a Run Task Card", async () => {
+    const context = contextFixture();
+    context.engineering_run = { ...context.engineering_run, repository_id: null, branch_id: null };
+    context.run_context.repository_id = null;
+    context.run_context.branch_id = null;
+    context.run_context.authorization.branch = null;
+    context.branch = null;
+    context.focus = null;
+    context.focus_version = null;
+    const task = taskFixture(14);
+    const fixture = clientFixture({});
+    const command: RunTaskCardLifecycleCommand = {
+      target_status: "claimed", expected_version: task.lifecycle.version,
+      correlation_id: "10000000-0000-4000-8000-000000000008",
+    };
+
+    await expect(fixture.client.transitionRunTaskCard(context, task, command, "run-claim-key"))
+      .rejects.toMatchObject({ code: "task_worktree_required" });
+    expect(fixture.fetcher).not.toHaveBeenCalled();
     fixture.client.dispose();
   });
 

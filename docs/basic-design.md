@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.67 (2026-10-15)
-> **上游要件定义书**: docs/requirements.md v6.67
+> **文档版本**: v6.70 (2026-10-15)
+> **上游要件定义书**: docs/requirements.md v6.71
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5712,10 +5712,33 @@ Validation status: source migration and API changes are not evidence of deployme
 
 The Project → Run directory exposes a Task Cards action for an authorized Run even when it has no Worktree or remote Branch. The canonical `/projects/{project_id}/runs/{engineering_run_id}` page resolves Project/Run authorization on the server and loads Task Cards with `focus=null`; it does not render Worktree-bound App tabs. A Worktree selection uses `/projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}`, revalidates the current binding, establishes checkout focus, and then renders the Run App tabs. GLOBAL chat is the only available chat scope without focus; WORKTREE scope appears only for a focused Worktree.
 
+## 16.67 — Run Task Card audit ownership and claimant-aware actions
+
+Run-scoped lifecycle/review commands carry an optional Worktree focus for command context, but that focus is not itself Task Card ownership evidence. The PostgreSQL owner adapter selects the audit Worktree from the Task Card's current active execution Worktree, or from the supplied focus only when an explicit active Task Card–Worktree relation exists in the same Run. An unrelated focus on a pending hostless cancellation results in a null audit Worktree. If an active execution Worktree has lost its current association, the owner command fails closed. Claimed or in-progress state without an active Worktree also fails closed.
+
+Run Task Card list projections include claimant identity and claim expiry. The UI presents start only to the claimant with an unexpired lease, presents review submission only to the claimant, and excludes the claimant from their own review decisions. Domain 403 responses retain the shared authenticated client; authentication invalidation remains tied to 401. Review rejection uses an accessible in-app reason field with required, bounded text.
+
+These source changes do not establish PostgreSQL trigger behavior, target migration/grants/RLS, or full desktop runtime. Focused client/UI/API tests and database-backed owner verification must be reported separately; CLI execution, Schedule execution and Agent execution remain gated by their independent admission and verification contracts.
+
+Candidate validation on 2026-10-15: CypherGraph Guardian passed for six changed source files; TypeScript 7.0.2 passed with `--singleThreaded`; scoped rustfmt passed. Rust 1.98.1 diagnostic all-target checks passed with `--ignore-rust-version` and `native-grpc-test-support`; library tests passed (`infrastructure` 79/79; `star-api-rest` 137 passed, 1 ignored). These are not the required Rust 1.99.0 gate. Focused Vitest could not start because the shared dependency tree is missing `@csstools/css-parser-algorithms/index.js` (zero tests ran); target migration, grants/RLS, and database-backed validation remain open. The Orca-managed `dev` checkout is clean at the observed HEAD, but its runtime owner/activity remains unverified, so integration is not claimed.
+
+## 16.68 — Project-owned Run independent of remote host identity
+
+Engineering Run is created, granted, listed and opened under Project ownership even when no remote host, repository or Branch is connected. Project membership and the current Run grant authorize Run-directory operations and ordinary Run Apps; a Branch grant is required only for an explicit remote SCM operation. Creating or opening a Run never synthesizes a host/Branch identity and never depends on a Worktree. A Worktree is attached later through a current Project/Run binding; Branch is its local checkout ref/state beneath that Worktree, with remote provider identity retained only as optional metadata.
+
+The left navigation order is invariant: Project → Engineering Run → Worktree → Branch. A Run without a Worktree may show its Run-level directory and permitted hostless Task Cards surface, but does not show checkout-dependent tabs or enable CLI execution. Selecting a Worktree revalidates its current binding and establishes checkout focus before those tabs appear. Product-facing labels, help and current design copy use neutral capability names; real enabled connectors may factually show their provider name in connector settings/status. Internal schema/provider identifiers and compatibility aliases remain non-rendered implementation details.
+
+Task Card lifecycle audit ownership is independent of Run UI focus. Prefer the current active execution Worktree after verifying its Task relation and Run binding. For non-active events, use a focused Worktree only when it is explicitly related; without a matching focus, use the sole current Task–Worktree relation in the Run only when unique. Missing or multiple relations leave the audit Worktree empty, and a missing active execution relation fails closed.
+
+This is a design contract, not deployment evidence. Target DB migration, application-role grants/FORCE RLS, concurrent authorization revocation, Worktree binding freshness, production connector wiring and desktop navigation behavior remain separate acceptance gates.
+
 The browser route does not grant access. The run API must validate current Project/Run membership, Task Card capability, and optional Worktree binding. Validation after rebase: TypeScript 7.0.2 passes with `--singleThreaded`; its default parallel check exited after exhausting this machine's virtual memory. Focused Vitest could not start because the shared dependency tree lacks `@csstools/css-parser-algorithms/index.js` (zero tests ran); Cargo/rustfmt are unavailable in this PowerShell environment. The database migration, grants/RLS and production deployment remain unverified.
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.70 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.71；明确无焦点时仅将唯一 current same-Run Task–Worktree relation 作为 lifecycle audit 归属，多重/缺失关系不猜测；更新宿主无关的会话失效提示；记录 Rust 1.98.1 诊断测试通过及 Rust 1.99.0 正式门、目标 DB/RLS 门禁仍未完成 | 自审发现 hostless Run 全局操作对唯一任务 Worktree relation 的审计归属与产品提示仍有偏差 |
+| v6.69 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.70；明确 Engineering Run 可在无远端宿主、repository、Branch 时由 Project 创建/授权/列出/打开；固定 Project → Run → Worktree → Branch 及中性产品命名、真实连接器 provider 标签边界；保留 target DB/RLS 和生产 provider 门禁 | 用户确认 Run 必须脱离宿主 Branch，并要求禁用对标/仿制文案 |
+| v6.68 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.69；规定 Run command focus 与 Task Card audit Worktree 归属分离，active relation 缺失时 fail closed；增加 claimant/lease 感知的开始/审查 UI、403 会话保持与内联退回原因；标记数据库 trigger/目标 grants/RLS 仍待验证 | Run Task Card lifecycle/review 审查发现 unrelated Worktree focus 会触发 audit relation guard，且 UI 对 claimant 与 403 状态处理不完整 |
 | v6.67 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.67；增加无 Worktree 的 Run Task Cards 直接入口，限定为单独 Task Cards 页面；完整 Run App tabs 仍要求选中 Worktree 并建立 checkout focus；hostless context 显式显示未绑定；记录 TypeScript 7.0.2 `--singleThreaded` 通过及默认并行检查内存阻断、Vitest/Rust/DB 验证缺口 | 自审发现 hostless Task Card API 已有可选 focus，但 Run Shell 无 focus 时返回空 |
 | v6.66 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.66 与 ERUN-P3.2：Task Card 改为 Project/Run owner，新增无宿主 Branch、无 Worktree focus 的 Run list/create 路由；明确可选 focus 校验、schema v2 Outbox、未验证 migration/RLS 与仍关闭的生命周期/Schedule/CLI 门 | Run Task Card hostless owner 源码切片完成并对照需求、基本设计、详细设计 |
 | v6.65 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐需求 v6.65；明确 Run 导航与普通 App 授权不依赖 Worktree/Branch grant，定义 Project/Run Task owner 目标并将旧 repository/branch tuple 标为 hostless 迁移阻断；保留 DB/RLS、Schedule 与执行门禁 | 用户重申固定 Project → Run → Worktree → Branch 并确认 Run 脱离宿主 Branch |
