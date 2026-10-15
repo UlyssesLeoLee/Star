@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.70 (2026-10-15)
-> **上游要件定义书**: docs/requirements.md v6.71
+> **文档版本**: v6.71 (2026-10-16)
+> **上游要件定义书**: docs/requirements.md v6.72
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5734,8 +5734,17 @@ This is a design contract, not deployment evidence. Target DB migration, applica
 
 The browser route does not grant access. The run API must validate current Project/Run membership, Task Card capability, and optional Worktree binding. Validation after rebase: TypeScript 7.0.2 passes with `--singleThreaded`; its default parallel check exited after exhausting this machine's virtual memory. Focused Vitest could not start because the shared dependency tree lacks `@csstools/css-parser-algorithms/index.js` (zero tests ran); Cargo/rustfmt are unavailable in this PowerShell environment. The database migration, grants/RLS and production deployment remain unverified.
 
+## 16.69 — Run Task Card lifecycle Outbox and independent aggregate versions
+
+The additive migration adds `aggregate_type` to the existing append-only Task Run Outbox. Metadata remains aggregate type `metadata` with its existing schema v1/v2 events; lifecycle audit inserts append schema v3 events under aggregate type `lifecycle`. The unique event fence includes tenant, Work Item, aggregate type and that stream's version, preventing the independent metadata and lifecycle counters from colliding.
+
+An `AFTER INSERT` trigger on the Run-scoped lifecycle audit reads the current Task metadata and lifecycle snapshot and appends one Outbox event in the same owner transaction. The payload includes canonical Run ownership, optional repository/Branch and audit Worktree context, lifecycle/review/claim state, actor/correlation, and audit event identity/type. It excludes Task title/description and raw rejection reason. Any trigger, RLS, constraint or insert failure rolls back the Task state and audit write as well.
+
+The Outbox is an owner-local durable event source only. It does not provide a delivery worker, consumer Inbox, BI/Benchmark read model, cross-App projection or exactly-once external delivery. Existing Task metadata events are not rewritten. The migration source has not been applied to PostgreSQL in this phase; target grants/FORCE RLS, rollback and concurrent behavior remain unverified, and downstream consumers stay disabled.
+
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.71 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.72；定义 Task lifecycle audit trigger 在 owner transaction 内追加 schema v3 Outbox，metadata/lifecycle 独立 aggregate version、拒绝理由和 Task 正文不进入事件 payload；数据库部署、grants/RLS、delivery 与 BI/Benchmark projection 仍未验收 | lifecycle 状态变更已具备审计，但缺少事务性跨 App 事件来源 |
 | v6.70 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.71；明确无焦点时仅将唯一 current same-Run Task–Worktree relation 作为 lifecycle audit 归属，多重/缺失关系不猜测；更新宿主无关的会话失效提示；记录 Rust 1.98.1 诊断测试通过及 Rust 1.99.0 正式门、目标 DB/RLS 门禁仍未完成 | 自审发现 hostless Run 全局操作对唯一任务 Worktree relation 的审计归属与产品提示仍有偏差 |
 | v6.69 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.70；明确 Engineering Run 可在无远端宿主、repository、Branch 时由 Project 创建/授权/列出/打开；固定 Project → Run → Worktree → Branch 及中性产品命名、真实连接器 provider 标签边界；保留 target DB/RLS 和生产 provider 门禁 | 用户确认 Run 必须脱离宿主 Branch，并要求禁用对标/仿制文案 |
 | v6.68 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.69；规定 Run command focus 与 Task Card audit Worktree 归属分离，active relation 缺失时 fail closed；增加 claimant/lease 感知的开始/审查 UI、403 会话保持与内联退回原因；标记数据库 trigger/目标 grants/RLS 仍待验证 | Run Task Card lifecycle/review 审查发现 unrelated Worktree focus 会触发 audit relation guard，且 UI 对 claimant 与 403 状态处理不完整 |

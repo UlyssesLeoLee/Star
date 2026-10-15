@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v4.99**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.00**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -690,6 +690,21 @@ PostgreSQL stored procedure/function 只封装同一 owner transaction 中需要
 
 若未来必须在 Kafka 与 Fluvio 中为 production analytics stream 选型，先 PoC Kafka：官方 Kafka 4.3 提供 Connect/Streams 等 API，适合 Run BI 外部 connector 与历史分析；需支付额外 broker 运维与内存成本，并使用修复 Kafka Streams 4.3.0 native-memory leak 的 4.3.1+。Fluvio 保留为 Rust/Kubernetes/低资源候选，但低内存属于供应方主张且 Star 没有同负载数据；release/support cadence、connector/托管、故障恢复均需验证。PoC 固定事件体、保留期、吞吐、消费组数、故障注入与部署资源，比较峰值 RSS/CPU/磁盘、consumer lag、恢复时间和 connector 覆盖率。更换 broker 仅限 Outbox 之后的 consumer 链，绝不改变 SoR 或跨域事实 owner。
 
+### 9.3 Task lifecycle transactional Outbox v3
+
+`multica.task_run_outbox` remains the Task owner's append-only Transaction table. `aggregate_type` separates independent `metadata` and `lifecycle` version streams; the unique fence is `(tenant_id, work_item_id, aggregate_type, aggregate_version)`. Existing metadata events retain their v1 hosted and v2 Project/Run envelopes and are not rewritten. New lifecycle events use schema v3, aggregate type `lifecycle`, and stable event type `task.lifecycle.changed`.
+
+The lifecycle audit `AFTER INSERT` trigger is the only producer for the v3 event. It reads and locks the current Task metadata and lifecycle rows, then writes owner, optional repository/Branch context, audit Worktree context, current bounded lifecycle/review/claim state, audit event identity/type, actor and correlation fields. It deliberately omits free-form rejection reason and Task body. Audit and Outbox are atomic with the command; if the Outbox insert or its tenant RLS check fails, the whole owner transaction rolls back. No trigger path performs cross-owner writes or direct BI projection updates.
+
+| Acceptance ID | Acceptance criterion |
+|---|---|
+| AC-TASK-LIFECYCLE-OUTBOX-01 | Metadata and lifecycle version fences are independent and tenant/Work Item/aggregate-type scoped; legacy v1/v2 metadata events remain valid. |
+| AC-TASK-LIFECYCLE-OUTBOX-02 | Every new Run Task lifecycle audit insert produces exactly one v3 lifecycle Outbox event in the same transaction; any failure rolls back mutation, audit and event. |
+| AC-TASK-LIFECYCLE-OUTBOX-03 | Event payloads carry current owner/state and audit lineage, omit Task body/raw rejection reason/secrets, and remain append-only under tenant RLS. |
+| AC-TASK-LIFECYCLE-OUTBOX-04 | Delivery, owner Inbox, BI/Benchmark projections, target grants/RLS and concurrent/rollback behavior are separate gates; schema presence alone does not enable consumers or execution. |
+
+The migration is source-only until applied and exercised against PostgreSQL with the application role. No delivery or BI/Benchmark consumer is enabled by this contract.
+
 ## §10 持久化分类约束（W/T/M）
 
 本节以下列 W/T/M 表区分兼容 schema 与 Run-owned Task Card 目标。`db/migrations/2026-10-02-task-run-owner.sql` 已起草 additive migration：当前 `task_metadata` 增加完整 Run owner tuple 和 FK，legacy 全空 tuple 可保留，但不得按 Worktree 关系推断或自动回填；Task/Worktree 关联只在同一完整 Run tuple 内有效。migration 与 API 源码已增加 guard 和 Outbox seam，但目标库尚未应用验证、runtime role/grants/RLS 尚未验收，不能将其标为生产启用。冲突/缺少 Run binding 保持 unknown 并关闭写入；迁移时新旧 owner 不能双写成两个真相。
@@ -1048,6 +1063,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.00 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.72/basic v6.71；定义 Task lifecycle audit→schema v3 owner-local Outbox 原子触发、metadata/lifecycle 独立 version stream、无自由文本敏感内容及未部署/未接消费边界 | Run Task Card 的 audit 记录已有，但生命周期事件尚未形成可靠的跨 App owner Outbox source |
 | v4.99 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.71/basic v6.70；细化 lifecycle audit Worktree 选择：active execution relation 优先，匹配 focus 次之，无匹配 focus 时仅选唯一 current same-Run relation；缺失/多重关联不猜测；统一中性 hostless 会话提示与代码验证缺口 | 自审发现无焦点 Run 操作仍会丢失唯一任务 Worktree 审计关联 |
 | v4.98 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.70/basic v6.69；重申 Project-owned Run 可在无远端宿主、repository、Branch 时创建、授权、列出与打开；补充 Run Task Card lifecycle/review 的事务授权、claimant/lease UI、审计 Worktree 归属与 hostless focus 语义；明确产品 UI 中性命名及真实连接器 provider 标签；验证和部署门禁见实施计划 §6.146 | 生命周期自审修复 unrelated Worktree focus 的审计归属，并落实用户对 hostless Run 与中性产品命名的确认 |
 | v4.97 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements/basic v6.67；新增无 Worktree 的 Run Task Cards direct route 与 Run 行入口，限定该页面不显示完整 App tabs，完整 tabs 仍由选中 Worktree 触发，并显式呈现无焦点/未绑定状态；记录 TypeScript 7.0.2 `--singleThreaded` 通过、默认并行检查虚拟内存不足及 Vitest/Rust/DB 验证缺口 | 自审发现无焦点 API/面板虽可用，但 workspace shell 隐藏了整个页面 |

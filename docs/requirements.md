@@ -1,6 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.71）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.72）
 
-> **v6.71 实现与导航对齐**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 必须可脱离远端宿主、repository 和 Branch 身份创建、授权、列出及打开，远端 Branch grant 仅用于显式 SCM 操作。无 Worktree 的 Run 可从 Run 行打开独立 Task Cards 页面，不显示完整 App tabs；选中 Worktree 后才显示其 Run tabs 并固定 checkout focus。Run Task Cards 源码支持 hostless 列表、创建、生命周期与审查命令；命令焦点与审计归属分离，审计只能引用当前 Task Card 关联且属于同一 Run 的 Worktree；无明确焦点时仅唯一当前关联可作为审计归属，多重或缺失关联不猜测。列表投影公开领取人和领取期限以约束开始/提交操作；普通 403 保留有效会话，退回原因在应用内输入。执行态操作仍要求当前 Run 内的 Worktree focus；旧 Worktree 路径保留兼容请求摘要。migration 尚未应用；Rust、前端和数据库验证结果见 §50.8AO/§50.8AP，未通过的门禁不视为完成。数据库 grants/RLS、部署、Schedule、Agent/CLI 执行闭环仍未开放。产品 UI、帮助文本和面向用户的当前设计使用中性能力名称，不使用第三方产品作对标或仿制文案；真实启用的连接器可在其连接设置/状态中事实显示服务商名称。未验证能力不得标为已启用或已闭环。
+> **v6.72 Task lifecycle Outbox 与导航对齐**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；任务状态变更和审计落库后由同一 owner transaction 的数据库 trigger 写入 schema v3 lifecycle Outbox。Metadata 与 lifecycle 使用独立 aggregate_type/version；payload 不含退回理由或任务正文。迁移尚未应用，Outbox consumer、BI/Benchmark projection、应用 grants/RLS 与目标库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
 
 ## 0. 文档说明与前提
 
@@ -2997,6 +2997,7 @@ The Run owner changes the current binding with compare-and-swap: close exactly t
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v6.72 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Task lifecycle schema v3 owner-local Outbox 验收：独立 aggregate_type/version、audit-trigger 原子写入、bounded 隐私安全 payload；明确 schema/API source 不代表 migration 部署，BI/Benchmark consumer、目标 DB/RLS 与 outbox delivery 尚未验收 | Run Task Card 生命周期变更已写审计，但此前没有可靠的同事务下游事件源 |
 | v6.71 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确生命周期审计在无明确焦点时仅选择唯一 current same-Run Task–Worktree relation，多重关联保留空值；修复无焦点 Run 操作丢失唯一 Worktree 审计归属，并消除会话错误提示中的宿主依赖措辞；三项 Rust 选择测试在 Rust 1.98.1 诊断工具链下通过，正式 1.99.0 门禁仍未完成 | 自审发现全局 Run 页面存在唯一 Worktree 关联时仍丢失审计归属，并发现会话失效提示暗示远端宿主依赖 |
 | v6.70 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确无宿主 Engineering Run 的 Project-owned 创建、授权、列表与打开契约，Branch grant 仅保护显式 SCM 操作；补充中性产品能力命名及真实连接器服务商事实展示边界，并同步 lifecycle audit owner 与 claimant-aware UI 的验收边界 | 用户确认 Run 可脱离宿主 Branch，并要求产品文案不采用第三方对标/仿制表达 |
 | v6.69 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 Run 级任务命令将任意 UI Worktree 焦点写入审计的问题；审计 Worktree 仅从 Task Card 当前关联与 Run binding 中选取，执行关系缺失时 fail closed；任务列表投影补充领取所有者/期限，前端据此约束开始/提交、区分领域 403 与会话失效，并提供可访问的内联退回原因表单 | Run lifecycle/review 代码审查发现审计触发器要求 Task Card–Worktree 关系，且领取者/拒绝输入 UI 不完整 |
@@ -3603,3 +3604,11 @@ The primary navigation MUST remain Project → Engineering Run → Worktree → 
 Source/API/migration presence does not prove deployment. Target database migration, application-role grants, FORCE RLS, concurrent grant-revocation behavior, Worktree binding freshness, frontend navigation and production provider wiring remain separate acceptance gates and MUST be reported independently.
 
 Current candidate validation (2026-10-15): `cgg_guard.py --changed --stamp` passed for six changed source files; `pnpm exec tsc --noEmit --incremental false --singleThreaded` passed. With Rust 1.98.1 and `--ignore-rust-version`, feature-enabled all-target checks passed and library tests passed (`infrastructure` 79/79; `star-api-rest` 137 passed, 1 ignored); scoped rustfmt passed. These are diagnostics, not the required Rust 1.99.0 gate. Focused Vitest could not start workers because the shared dependency tree is missing `@csstools/css-parser-algorithms/index.js` (zero tests ran). Target PostgreSQL/RLS validation was unavailable. The Orca-managed `dev` owner/activity query returned `runtime_access_denied (EPERM)`, so no target checkout write or merge is claimed.
+
+## 50.8AQ AC-RUN-TASK-LIFECYCLE-OUTBOX-001 — Same-transaction lifecycle event source
+
+Run Task Card lifecycle/review commands MUST append their lifecycle audit fact and a corresponding schema v3 row to the owner-local `multica.task_run_outbox` in the same PostgreSQL transaction. The database trigger on the append-only lifecycle audit is the authoritative event writer; a failed Outbox insert MUST roll back the task mutation and audit fact. Metadata and lifecycle are independent aggregates: the Outbox MUST identify `aggregate_type` and enforce uniqueness by `(tenant_id, work_item_id, aggregate_type, aggregate_version)` so independent version counters cannot collide. Existing metadata schema v1/v2 rows and hosted payload semantics MUST remain readable without rewrite.
+
+Lifecycle v3 payloads MUST carry the canonical tenant/Project/Engineering Run owner, optional host context and audit Worktree context, lifecycle version and bounded current status/review/claim state, actor/correlation identity, and the audit event identity/type. They MUST NOT copy Task title/description, raw review rejection reasons, terminal output, credentials, or secrets. The Outbox remains append-only and tenant-RLS protected. Producers do not directly mutate BI, Benchmark, Inbox, or another owner's tables.
+
+This source migration does not prove target deployment, app-role grants/FORCE RLS, transaction rollback, concurrent replay, delivery, or projection parity. BI/Benchmark consumers, owner-local delivery/retry state, bounded-memory replay, and Schedule/Agent/CLI integrations remain separate acceptance gates; execution stays fail closed until their own contracts pass.
