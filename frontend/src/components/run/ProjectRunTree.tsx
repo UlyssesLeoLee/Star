@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=604fcbcde748af9ed605d98d261521b1d3e4b4d322cfc3982fbb9410785ff769
+@cypher schema=1 source_sha256=c4bb1da371d15de4be1341bdb23ff02b9998e1d8263bb3ed2b8588ae5eb75a30
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -38,7 +38,7 @@ import { ChevronDown, ChevronRight, FolderKanban, GitBranch, Layers, Monitor, Pl
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
 import { canonicalRunWorktreeHref, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
-import { RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
+import { directoryErrorMessage, RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
 import { useTranslation } from "@/lib/i18n";
 
 const ROW_HEIGHT = 36;
@@ -67,6 +67,7 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
   const [createTitle, setCreateTitle] = useState("");
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const pendingCreate = useRef<{ projectId: string; title: string; idempotencyKey: string; correlationId: string } | null>(null);
   useEffect(function mountDirectoryTree() { setScrollTop(0); model.start(); return () => model.dispose(); }, [model]);
   useEffect(function clampTreeViewport() {
     const element = viewport.current;
@@ -105,9 +106,11 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
     requestAnimationFrame(() => element.querySelector<HTMLElement>(`[data-directory-index="${next}"]`)?.focus());
   }
   function openCreateRun(project: ProjectNode, wasExpanded: boolean) {
+    const prior = pendingCreate.current;
+    const retry = prior?.projectId === project.entity.project_id ? prior : null;
     setCreateTarget({ project, wasExpanded });
-    setCreateTitle("");
-    setCreateError(null);
+    setCreateTitle(retry?.title ?? "");
+    setCreateError(retry ? "上次提交结果未知；再次提交将复用同一请求标识。" : null);
   }
   async function submitCreateRun(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -120,12 +123,14 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
     setCreateBusy(true);
     setCreateError(null);
     try {
-      await client.createEngineeringRun(
-        createTarget.project.entity.project_id,
-        title,
-        globalThis.crypto.randomUUID(),
-        globalThis.crypto.randomUUID(),
-      );
+      const projectId = createTarget.project.entity.project_id;
+      const previous = pendingCreate.current;
+      const command = previous?.projectId === projectId && previous.title === title
+        ? previous
+        : { projectId, title, idempotencyKey: globalThis.crypto.randomUUID(), correlationId: globalThis.crypto.randomUUID() };
+      pendingCreate.current = command;
+      await client.createEngineeringRun(projectId, title, command.idempotencyKey, command.correlationId);
+      pendingCreate.current = null;
       if (createTarget.wasExpanded) model.refresh(createTarget.project);
       else model.toggle(createTarget.project);
       setCreateTarget(null);

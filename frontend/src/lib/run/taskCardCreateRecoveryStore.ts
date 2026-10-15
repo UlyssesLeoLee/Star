@@ -1,11 +1,14 @@
 /*
-@cypher schema=1 source_sha256=38d79cdc0a802ca8177d1fc07d7e8209e4d668eadcd2a1e0408c6b563627a1ac
+@cypher schema=1 source_sha256=cf4f39c3da8b3fecf9f690fc31131df71e0c906737ead92ca33aa8ed5a6d05a3
 MERGE (self:File {path:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts"})
 MERGE (scope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
 MERGE (target:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
+MERGE (legacyTarget:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::legacyTaskCardCreateRecoveryTarget",kind:"function"})
 MERGE (sameTarget:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::sameTaskCardCreateRecoveryTarget",kind:"function"})
+MERGE (targetMatches:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTargetMatchesContext",kind:"function"})
 MERGE (store:Type {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TaskCardCreateRecoveryStore",kind:"interface"})
 MERGE (targetType:Type {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TaskCardCreateRecoveryTarget",kind:"interface"})
+MERGE (legacyTargetType:Type {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::LegacyTaskCardCreateRecoveryTarget",kind:"interface"})
 MERGE (factory:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::createTaskCardCreateRecoveryStore",kind:"function"})
 MERGE (databaseProvider:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::createTaskCardCreateRecoveryStore.database",kind:"function"})
 MERGE (getStore:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::getTaskCardCreateRecoveryStore",kind:"function"})
@@ -23,7 +26,9 @@ MERGE (maxAge:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::T
 MERGE (apiFile:File {path:"frontend/src/lib/run/runDirectoryApi.ts"})
 MERGE (self)-[:DEFINES]->(scope)
 MERGE (self)-[:DEFINES]->(target)
+MERGE (self)-[:DEFINES]->(legacyTarget)
 MERGE (self)-[:DEFINES]->(sameTarget)
+MERGE (self)-[:DEFINES]->(targetMatches)
 MERGE (self)-[:DEFINES]->(store)
 MERGE (self)-[:DEFINES]->(targetType)
 MERGE (self)-[:DEFINES]->(factory)
@@ -37,7 +42,13 @@ MERGE (self)-[:IMPORTS]->(apiFile)
 MERGE (scope)-[:USES_TYPE]->(context)
 MERGE (target)-[:USES_TYPE]->(context)
 MERGE (target)-[:USES_TYPE]->(targetType)
+MERGE (legacyTarget)-[:USES_TYPE]->(context)
+MERGE (legacyTarget)-[:USES_TYPE]->(legacyTargetType)
 MERGE (sameTarget)-[:USES_TYPE]->(targetType)
+MERGE (sameTarget)-[:USES_TYPE]->(legacyTargetType)
+MERGE (targetMatches)-[:CALLS]->(legacyTarget)
+MERGE (targetMatches)-[:CALLS]->(target)
+MERGE (targetMatches)-[:CALLS]->(sameTarget)
 MERGE (store)-[:USES_TYPE]->(input)
 MERGE (factory)-[:DEFINES]->(databaseProvider)
 MERGE (factory)-[:DEFINES]->(load)
@@ -74,7 +85,7 @@ const DATABASE_NAME = "star-run-task-card-recovery";
 export const TASK_CARD_CREATE_RECOVERY_MAX_RECORDS = 32;
 export const TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS = 29 * 24 * 60 * 60 * 1000;
 
-export interface TaskCardCreateRecoveryTarget {
+export interface LegacyTaskCardCreateRecoveryTarget {
   tenant_id: string;
   actor_id: string;
   actor_kind: string;
@@ -100,14 +111,41 @@ export interface TaskCardCreateRecoveryTarget {
   worktree_version: number;
 }
 
-export interface PendingTaskCardCreate {
-  schema_version: 1;
+export interface TaskCardCreateRecoveryTarget {
+  tenant_id: string;
+  actor_id: string;
+  actor_kind: string;
+  project_id: string;
+  repository_id: string | null;
+  branch_id: string | null;
+  engineering_run_id: string;
+  context_version: string;
+  focus_worktree_id: string | null;
+  focus_repository_id: string | null;
+  focus_version: string | null;
+  project_authorization_binding_id: string;
+  project_authorization_version: number;
+  run_authorization_binding_id: string;
+  run_authorization_version: number;
+  project_binding_id: string | null;
+  project_binding_version: number | null;
+  worktree_binding_id: string | null;
+  worktree_binding_version: number | null;
+  run_version: number;
+  worktree_version: number | null;
+}
+
+interface PendingTaskCardCreateBase {
   scope_key: string;
   created_at_ms: number;
   input: CreateRunTaskCardInput;
   idempotency_key: string;
-  target: TaskCardCreateRecoveryTarget;
 }
+
+export type PendingTaskCardCreate = PendingTaskCardCreateBase & (
+  | { schema_version: 1; target: LegacyTaskCardCreateRecoveryTarget }
+  | { schema_version: 2; target: TaskCardCreateRecoveryTarget }
+);
 
 export interface TaskCardCreateRecoveryStore {
   load(scopeKey: string): Promise<PendingTaskCardCreate | null>;
@@ -132,55 +170,105 @@ export function taskCardCreateRecoveryScopeKey(context: RunContextEnvelope): str
 export function taskCardCreateRecoveryTarget(context: RunContextEnvelope): TaskCardCreateRecoveryTarget | null {
   const focus = context.focus;
   const run = context.engineering_run;
-  const branch = context.branch;
-  if (!focus || !run.repository_id || !run.branch_id || !branch || !context.run_context.authorization.branch ||
-      !context.run_context.context_version || !context.focus_version) return null;
+  if (!context.run_context.context_version) return null;
   const authorization = context.run_context.authorization;
+  const repositoryId = run.repository_id;
+  const branchId = run.branch_id;
+  if (context.run_context.project_id !== run.project_id || context.run_context.engineering_run_id !== run.engineering_run_id ||
+      context.run_context.repository_id !== repositoryId || context.run_context.branch_id !== branchId ||
+      (branchId === null) !== (context.branch === null) ||
+      (context.branch && (context.branch.project_id !== run.project_id || context.branch.branch_id !== branchId || context.branch.repository_id !== repositoryId)) ||
+      (focus && (focus.archived || focus.project_id !== run.project_id || focus.engineering_run_id !== run.engineering_run_id ||
+        (repositoryId !== null && focus.repository_id !== repositoryId))) ||
+      ((focus === null) !== (context.focus_version === null))) return null;
   return {
     tenant_id: context.run_context.tenant_id,
     actor_id: context.run_context.actor_id,
     actor_kind: context.run_context.actor_kind,
-    project_id: context.engineering_run.project_id,
-    repository_id: context.engineering_run.repository_id,
-    branch_id: context.engineering_run.branch_id,
-    engineering_run_id: context.engineering_run.engineering_run_id,
-    worktree_id: focus.worktree_id,
+    project_id: run.project_id,
+    repository_id: repositoryId,
+    branch_id: branchId,
+    engineering_run_id: run.engineering_run_id,
     context_version: context.run_context.context_version,
+    focus_worktree_id: focus?.worktree_id ?? null,
+    focus_repository_id: focus?.repository_id ?? null,
     focus_version: context.focus_version,
     project_authorization_binding_id: authorization.project.binding_id,
     project_authorization_version: authorization.project.version,
-    branch_authorization_binding_id: authorization.branch.binding_id,
-    branch_authorization_version: authorization.branch.version,
     run_authorization_binding_id: authorization.engineering_run.binding_id,
     run_authorization_version: authorization.engineering_run.version,
-    project_binding_id: focus.project_binding_id,
-    project_binding_version: focus.project_binding_version,
-    worktree_binding_id: focus.binding_id,
-    worktree_binding_version: focus.binding_version,
-    branch_version: context.branch.version,
-    run_version: context.engineering_run.version,
-    worktree_version: focus.version,
+    project_binding_id: focus?.project_binding_id ?? null,
+    project_binding_version: focus?.project_binding_version ?? null,
+    worktree_binding_id: focus?.binding_id ?? null,
+    worktree_binding_version: focus?.binding_version ?? null,
+    run_version: run.version,
+    worktree_version: focus?.version ?? null,
   };
 }
 
 export function sameTaskCardCreateRecoveryTarget(
-  left: TaskCardCreateRecoveryTarget,
-  right: TaskCardCreateRecoveryTarget | null,
+  left: TaskCardCreateRecoveryTarget | LegacyTaskCardCreateRecoveryTarget,
+  right: TaskCardCreateRecoveryTarget | LegacyTaskCardCreateRecoveryTarget | null,
 ): boolean {
   if (!right) return false;
-  return Object.keys(left).every((key) =>
-    left[key as keyof TaskCardCreateRecoveryTarget] === right[key as keyof TaskCardCreateRecoveryTarget]);
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  const leftRecord = left as unknown as Record<string, unknown>;
+  const rightRecord = right as unknown as Record<string, unknown>;
+  return leftKeys.length === rightKeys.length && leftKeys.every((key, index) => key === rightKeys[index] &&
+    leftRecord[key] === rightRecord[key]);
+}
+
+function legacyTaskCardCreateRecoveryTarget(context: RunContextEnvelope): LegacyTaskCardCreateRecoveryTarget | null {
+  const focus = context.focus;
+  const run = context.engineering_run;
+  const branch = context.branch;
+  const branchAuthorization = context.run_context.authorization.branch;
+  if (!focus || focus.archived || !run.repository_id || !run.branch_id || !branch || !branchAuthorization ||
+      !context.run_context.context_version || !context.focus_version ||
+      context.run_context.project_id !== run.project_id || context.run_context.engineering_run_id !== run.engineering_run_id ||
+      context.run_context.repository_id !== run.repository_id || context.run_context.branch_id !== run.branch_id ||
+      focus.project_id !== run.project_id || focus.repository_id !== run.repository_id || focus.engineering_run_id !== run.engineering_run_id ||
+      branch.project_id !== run.project_id || branch.repository_id !== run.repository_id || branch.branch_id !== run.branch_id) return null;
+  const authorization = context.run_context.authorization;
+  return {
+    tenant_id: context.run_context.tenant_id, actor_id: context.run_context.actor_id, actor_kind: context.run_context.actor_kind,
+    project_id: run.project_id, repository_id: run.repository_id, branch_id: run.branch_id,
+    engineering_run_id: run.engineering_run_id, worktree_id: focus.worktree_id,
+    context_version: context.run_context.context_version, focus_version: context.focus_version,
+    project_authorization_binding_id: authorization.project.binding_id, project_authorization_version: authorization.project.version,
+    branch_authorization_binding_id: branchAuthorization.binding_id, branch_authorization_version: branchAuthorization.version,
+    run_authorization_binding_id: authorization.engineering_run.binding_id, run_authorization_version: authorization.engineering_run.version,
+    project_binding_id: focus.project_binding_id, project_binding_version: focus.project_binding_version,
+    worktree_binding_id: focus.binding_id, worktree_binding_version: focus.binding_version,
+    branch_version: branch.version, run_version: run.version, worktree_version: focus.version,
+  };
+}
+
+export function taskCardCreateRecoveryTargetMatchesContext(
+  pending: PendingTaskCardCreate,
+  context: RunContextEnvelope,
+): boolean {
+  const current = pending.schema_version === 1
+    ? legacyTaskCardCreateRecoveryTarget(context)
+    : taskCardCreateRecoveryTarget(context);
+  return sameTaskCardCreateRecoveryTarget(pending.target, current);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const TARGET_UUID_FIELDS: readonly (keyof TaskCardCreateRecoveryTarget)[] = [
+const LEGACY_TARGET_UUID_FIELDS: readonly (keyof LegacyTaskCardCreateRecoveryTarget)[] = [
   "tenant_id", "actor_id", "project_id", "repository_id", "branch_id", "engineering_run_id", "worktree_id",
-  "project_authorization_binding_id", "branch_authorization_binding_id", "run_authorization_binding_id",
-  "project_binding_id", "worktree_binding_id",
+  "project_authorization_binding_id", "branch_authorization_binding_id", "run_authorization_binding_id", "project_binding_id", "worktree_binding_id",
 ];
-const TARGET_VERSION_FIELDS: readonly (keyof TaskCardCreateRecoveryTarget)[] = [
+const LEGACY_TARGET_VERSION_FIELDS: readonly (keyof LegacyTaskCardCreateRecoveryTarget)[] = [
   "project_authorization_version", "branch_authorization_version", "run_authorization_version",
   "project_binding_version", "worktree_binding_version", "branch_version", "run_version", "worktree_version",
+];
+const CURRENT_TARGET_UUID_FIELDS: readonly (keyof TaskCardCreateRecoveryTarget)[] = [
+  "tenant_id", "actor_id", "project_id", "engineering_run_id", "project_authorization_binding_id", "run_authorization_binding_id",
+];
+const CURRENT_TARGET_VERSION_FIELDS: readonly (keyof TaskCardCreateRecoveryTarget)[] = [
+  "project_authorization_version", "run_authorization_version", "run_version",
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -188,7 +276,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function validPendingRecord(value: unknown, expectedScopeKey: string): value is PendingTaskCardCreate {
-  if (!isRecord(value) || value.schema_version !== 1 || value.scope_key !== expectedScopeKey ||
+  if (!isRecord(value) || (value.schema_version !== 1 && value.schema_version !== 2) || value.scope_key !== expectedScopeKey ||
       typeof value.created_at_ms !== "number" || !Number.isSafeInteger(value.created_at_ms) || value.created_at_ms <= 0 ||
       !UUID.test(String(value.idempotency_key ?? "")) || !isRecord(value.input) || !isRecord(value.target)) return false;
 
@@ -199,11 +287,33 @@ function validPendingRecord(value: unknown, expectedScopeKey: string): value is 
       typeof input.correlation_id !== "string" || !UUID.test(input.correlation_id)) return false;
 
   const target = value.target;
-  if (TARGET_UUID_FIELDS.some((field) => typeof target[field] !== "string" || !UUID.test(target[field] as string)) ||
-      TARGET_VERSION_FIELDS.some((field) => !Number.isSafeInteger(target[field]) || (target[field] as number) < 1) ||
-      typeof target.actor_kind !== "string" || target.actor_kind.length === 0 ||
-      typeof target.context_version !== "string" || target.context_version.length === 0 ||
-      typeof target.focus_version !== "string" || target.focus_version.length === 0) return false;
+  if (typeof target.actor_kind !== "string" || target.actor_kind.length === 0 ||
+      typeof target.context_version !== "string" || target.context_version.length === 0) return false;
+  if (value.schema_version === 1) {
+    if (LEGACY_TARGET_UUID_FIELDS.some((field) => typeof target[field] !== "string" || !UUID.test(target[field] as string)) ||
+        LEGACY_TARGET_VERSION_FIELDS.some((field) => !Number.isSafeInteger(target[field]) || (target[field] as number) < 1) ||
+        typeof target.focus_version !== "string" || target.focus_version.length === 0) return false;
+  } else {
+    if (CURRENT_TARGET_UUID_FIELDS.some((field) => typeof target[field] !== "string" || !UUID.test(target[field] as string)) ||
+        CURRENT_TARGET_VERSION_FIELDS.some((field) => !Number.isSafeInteger(target[field]) || (target[field] as number) < 1) ||
+        !(target.repository_id === null || (typeof target.repository_id === "string" && UUID.test(target.repository_id))) ||
+        !(target.branch_id === null || (typeof target.branch_id === "string" && UUID.test(target.branch_id))) ||
+        !(target.focus_worktree_id === null || (typeof target.focus_worktree_id === "string" && UUID.test(target.focus_worktree_id))) ||
+        !(target.focus_repository_id === null || (typeof target.focus_repository_id === "string" && UUID.test(target.focus_repository_id))) ||
+        !(target.focus_version === null || (typeof target.focus_version === "string" && target.focus_version.length > 0)) ||
+        !(target.project_binding_id === null || (typeof target.project_binding_id === "string" && UUID.test(target.project_binding_id))) ||
+        !(target.worktree_binding_id === null || (typeof target.worktree_binding_id === "string" && UUID.test(target.worktree_binding_id))) ||
+        !(target.project_binding_version === null || (Number.isSafeInteger(target.project_binding_version) && (target.project_binding_version as number) >= 1)) ||
+        !(target.worktree_binding_version === null || (Number.isSafeInteger(target.worktree_binding_version) && (target.worktree_binding_version as number) >= 1)) ||
+        !(target.worktree_version === null || (Number.isSafeInteger(target.worktree_version) && (target.worktree_version as number) >= 1)) ||
+        (target.focus_worktree_id === null) !== (target.focus_version === null) ||
+        (target.focus_worktree_id === null) !== (target.focus_repository_id === null) ||
+        (target.focus_worktree_id === null) !== (target.project_binding_id === null) ||
+        (target.focus_worktree_id === null) !== (target.project_binding_version === null) ||
+        (target.focus_worktree_id === null) !== (target.worktree_binding_id === null) ||
+        (target.focus_worktree_id === null) !== (target.worktree_binding_version === null) ||
+        (target.focus_worktree_id === null) !== (target.worktree_version === null)) return false;
+  }
 
   const targetScopeKey = JSON.stringify([
     "task-card-create", 1, target.tenant_id, target.actor_id, target.project_id, target.engineering_run_id,

@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 基本設計書 v0.7**
+> **Task Lifecycle 基本設計書 v0.8**
 >
-> - 状态: 🟡 Draft v0.7
+> - 状态: 🟡 Draft v0.8
 > - 日期: 2026-10-02 JST
-> - 上游需求: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.14
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.15
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -27,21 +27,19 @@ Multica 负责任务生命周期命令和状态规则；Worktree Group Shell 负
 
 | 层级 | 节点 | 设计约束 |
 |---|---|---|
-| 左侧一级 | Project | 项目管理根；Project Worktree Index 仅聚合，不替代 Branch/Run 主导航 |
-| Project 下 | Cloud Branch | 远端分支身份与合并锚点，不承载任务工作项列表 |
-| Branch 下 | Engineering Run | canonical 协作/任务/Canvas/Workflow/BI/Plugin Apps 工作区和授权上下文 |
-| Run 下 | Run Worktree | 绑定 Branch 的本地 checkout；选择它才展示当前 Run 的右侧 App tabs 并设为焦点 |
-| Run 同级 Apps | Multica/Jira 等价任务管理、Task Cards、Group Infinite Canvas、Inbox、Workflow/LangGraph、BI/Benchmark、授权插件 | 属于同一 Run；Task Cards 与 Canvas 同级，可通过统一 RunContext 和实体引用交互 |
-| Task Card 内 | CLI、Agent Session、输出、checkpoint、review、审计 | 会话绑定 `engineering_run_id`、`worktree_id`、`work_item_id`、`task_card_id`；执行未验收前不开放 |
-| 固定底栏 | Group Shell Chat Bar | 共享会话入口，可选 `WORKTREE` 或 `GLOBAL` 范围 |
-
-Worktree Overview Graph 是 Project/Repository 级视图，不是此群组树中的 Group Infinite Canvas；两个 Canvas 只经 Worktree 与类型化实体引用互链。详见 [`SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) §1.6。
+| 左侧一级 | Project | 项目根与管理入口；跨 Run 索引是汇总视图，不取代主树 |
+| Project 下 | Engineering Run | Run owner、协作授权和 Task/Canvas/Inbox/Workflow/BI/Plugin App 范围，不依赖宿主 Branch |
+| Run 下 | Worktree | Run 管理的本地 checkout；选中后显示该 Run 的右侧 App tabs，并设置 checkout focus |
+| Worktree 下 | Branch | 本地 checkout 分支投影与状态叶；远端分支仅是可选 SCM metadata |
+| Run 同级 Apps | 任务管理、Task Cards、Run Canvas、Inbox、Workflow、BI/Benchmark、已授权插件 | 同一 RunContext 和 typed entity references；Task Cards 与 Canvas 同级 |
+| Task Card 内 | CLI、Agent Session、输出、checkpoint、review、审计 | 绑定 Run/Task 和显式 Worktree focus；Runtime/security gates 未验收前禁用执行 |
+| 固定底栏 | Chat Bar | 支持 WORKTREE 与 GLOBAL scope |
 
 ### 1.2 事实源与投影
 
 | 对象 | 事实源/所有者 | 其他视图如何使用 |
 |---|---|---|
-| Task Lifecycle | Multica Lifecycle Domain | Task Card、Jira 等价视图及聊天栏发起命令，读取同一任务状态 |
+| Task Lifecycle | Run-scoped Task Lifecycle owner | Task Cards、任务视图与聊天命令读取同一任务状态 |
 | WorkItem 身份 | WorkItem Domain | Multica `work_item_id`、Task Card 和 Canvas `EntityRef` 统一引用 |
 | Task Card UI | Group Shell / Task Card Manager | 投影 WorkItem 与 Agent Session 状态，不维护平行状态机 |
 | CLI/Agent Session | Runtime / AgentPolicy | Task Card 提供启动入口与绑定上下文；Runtime 决定执行、恢复和权限 |
@@ -55,7 +53,7 @@ Worktree Overview Graph 是 Project/Repository 级视图，不是此群组树中
 ```mermaid
 flowchart LR
   Shell[Worktree Group Shell] --> Resolver[GroupContext Resolver]
-  Shell --> Apps[Multica / Jira / Task Card / Canvas / Plugins]
+  Shell --> Apps[Task Management / Task Cards / Run Canvas / Plugins]
   Chat[WORKTREE / GLOBAL Chat] --> TMO[LangGraph L0 / TMO]
   Apps --> Commands[Task Lifecycle Commands]
   TMO --> Commands
@@ -196,7 +194,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | `TaskFailed` / `TaskCancelled` | Runtime / authorized user | Lifecycle Service / Audit | actor、failure/cancel reason |
 | `TaskSessionPoisoned` | Session Health Handler | Runtime / Audit / Card | reason enum、session ref、fresh-start flag |
 | `TaskLifecycleChanged` | Outbox | Multica / Jira view / Task Card / Canvas projection | canonical IDs、new status、version、correlation_id |
-| `TaskCardCreateRequested` (`POST /api/v1/worktrees/{worktree_id}/work-items`) | Run Task Cards UI | Work Item owner API | title/description/priority、Idempotency-Key、correlation_id；服务端根据 Worktree 当前 binding 推导完整 Project/Branch/Run tuple，并重验 `work-item:write` |
+| TaskCardCreateRequested (POST /api/v1/engineering-runs/{engineering_run_id}/work-items) | Run Task Cards UI | Work Item owner API | Project/Run identity、可选 focus_worktree_id、bounded task payload、Idempotency-Key 与 correlation_id；服务端验证 Project/Run grants 和可选 focus binding |
 
 事件消费者以 `event_id` 去重；Outbox 发布失败时可重放。投影版本小于事件版本时拒绝旧事件覆盖新状态。
 
@@ -219,12 +217,12 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | AC-1 / AC-5 | `task_lifecycle_current`、`task_lifecycle_audit`、`task_metadata` 和 `task_session_health` 完成 W/T/M 分类与保留策略；迁移前后身份不变 |
 | AC-2 / AC-6 / AC-8 | 未经 Review Gate 不进入 `completed`；claim timeout、审计记录和 console 状态按定义呈现 |
 | AC-3 / AC-4 / AC-7 | poison 原因完整；stale dispatch 有 verify/collect_output；四类 404 类型独立可见 |
-| AC-9 | Multica、Jira 等价视图、Task Card 与 Canvas 对同一 `work_item_id` 显示一致状态 |
+| AC-9 | 任务管理视图、计划管理视图、Task Card 与 Canvas 对同一 `work_item_id` 显示一致状态 |
 | AC-10 | Task Card 启动 CLI 时 `worktree_id`、`work_item_id`、`task_card_id` 校验一致；Lifecycle enum 不因 CLI 扩展 |
 | AC-11 | Task Card Index 与 Group Infinite Canvas 是 Worktree 群组同级入口，任务写入经领域命令和 ACL |
 | AC-12 | 插件热插拔只改变入口/capability 暴露，不删除任务、审计和实体引用 |
 | AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、候选槽与 DST 探测各限 32,768 步、disabled Rule 拒绝物化、lease-expired event 记录旧 attempt/generation、TTL/fencing/RLS 约束可验证；9F3 parser/materializer/adapter 与 domain release 26/26 已通过隔离 PostgreSQL 验收；Rule 写 API、持续 worker、Run admission/Auth/Outbox/BI 与目标 DB 未验收时不开放 Schedule execution |
-| AC-19 | Task Card 创建仅在当前 Run capability 与 `work-item:write` 授权开放；服务端以当前 Worktree binding 推导 owner，并在同一事务持久化 metadata/lifecycle/worktree association/audit/idempotency，owner trigger 写 Run Outbox。客户端在 POST 前异步写入本机 IndexedDB，保存精确 body/key、tenant/actor/Project/Run scope 和 authorization/binding/focus 版本；每个操作者/Run 最多一条未决命令、总量 32 条、29 天后禁止重放。只有当前 target 与授权版本完全匹配才可重试，过期或不匹配需先由用户核对 Run Task Cards 列表后显式清除。不得持久化凭据；读写失败 fail closed。浏览器可清理本地记录，任务正文/描述在该切片中未加密，记录缺失也不证明原请求未成功，因此不承诺 exactly-once 或跨设备恢复。目标 DB/RLS/宿主 provider 未验收时 UI 保持 fail closed，CLI 仍关闭 |
+| AC-19 | Run Task Card 的 canonical owner 为 tenant/Project/Engineering Run；无 host Branch、无 Worktree focus 时仍支持受授权 list/create。POST 复验 Project/Run grants 与非归档 Run，focus_worktree_id 可选且必须绑定同一 Project/Run，repository/Branch 只作可选 context。单个 owner transaction 写 metadata/lifecycle/optional association/audit/idempotency/Outbox v2；客户端保留精确 body/key、32 条上限、29 天门控和人工恢复确认。目标 DB migration、app-role grants、RLS 和 Rust/HTTP/frontend 验证尚未完成；生命周期编辑、Schedule、CLI 仍关闭 |
 
 ---
 
@@ -237,7 +235,7 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | GAP-3 | Runtime profile 对 Claude Code、Codex、OpenCode、Multica CLI 的 capability 映射 | Runtime 詳細設計 |
 | GAP-4 | Global 批量操作的部分成功 UI 与补偿策略 | LangGraph/TMO 詳細設計 |
 | GAP-5 | 9F3 的 pinned cron/tzdb parser、due materializer 与 PostgreSQL lease adapter 已在隔离 PG 验收；disabled Rule 双层 fail closed，lease-expired 审计包含旧 attempt/fence；parser/tzdb registry、Rule 写 API、常驻 worker、同事务 Run/resource reservation/RunEvent/Outbox、BI 与目标 DB/Auth/RLS/grants 尚缺 | Phase 9F4+ / production integration |
-| GAP-6 | Task Card create UI/client 与本地 pending recovery 为条件式代码切片；IndexedDB 支持 remount/reload 恢复，但本机浏览器数据可被清理，数据未加密，不构成 exactly-once 或跨设备保证；宿主 `RunDirectoryHostSession`、服务端 capability、目标 Task Owner migration/应用身份 grants/RLS 部署与验证尚未完成；编辑、其它 Run Apps 和卡内 CLI 仍未闭环 | Run Apps 后续阶段 |
+| GAP-6 | Run-owned Task list/create 有源码切片；migration 未应用，app-role grants/RLS 与独立 DB/API 验收未完成。IndexedDB 只提供本机 pending request 恢复，数据未加密且可能清理；Run-level lifecycle/edit、宿主认证/Run capability、其他 Run Apps 与卡内 CLI 执行仍未闭环 | Run Apps 后续阶段 |
 
 ---
 
@@ -251,4 +249,5 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.8 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树固定为 Project → Engineering Run → Worktree → Branch；Run 不依赖宿主 Branch；Task canonical owner 为 Project/Run，Worktree focus 可选；定义 Run list/create、schema v2 Outbox 与未验证 migration/RLS 及仍关闭的 lifecycle/Schedule/CLI gates | ERUN-P3.2 Task owner 源码切片对照与导航纠正 |
 | v0.7 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Card pending request 改为 POST 前异步写入有界 IndexedDB；定义 tenant/actor/Run 隔离、精确授权/binding snapshot、32 条与 29 天重试边界、过期/不匹配人工对账和显式清除；记录本地数据未加密、浏览器清理风险与非 exactly-once/跨设备边界，保留生产 DB/RLS/host/CLI 阻断 | 实现 Task Card remount/reload recovery，并对齐 SRS v0.14 |

@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v6.90**
+> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v6.96**
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、其余 owner adapter 覆盖与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -21,7 +21,7 @@
 > - INFRA-2C4 更新：新增 bounded Multipass inventory empty-list parsing 与 Infrastructure-owner exact Host-generation read-only reconciliation projection；Rust 1.99.0 focused libraries 62/62 + 19/19、SQLx 1/1、PG18.6 runner 28/28、17/17 FORCE RLS 通过。C4 无 migration/event、零 VM、无 live inventory；Infrastructure control-plane PostgreSQL 必须位于目标 K3s 集群外并独立可用，生产拓扑/Manager/API/UI/Run/readiness/BI/执行门仍开放。
 
 
-> - 本轮设计更新：主导航固定为 Project → Engineering Run → Worktree → Branch；Branch 是 Worktree 本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata。Run 管理本地 Worktree，并提供 Inbox、任务与计划管理、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps。选中 Worktree 只设置当前 focus/CLI checkout target；Run apps 的授权与数据 owner 由 RunContext 决定。现有 `EngineeringRun.branch_id`、Branch/Run registry API 与 branch-role grant 尚未迁移，必须保留旧授权门并完成历史数据对账；local branch leaf 依赖可信 Host/Repository observation，缺失/过期时显示 unknown 并关闭相关操作。Run directory create/list/auth 仅有源码候选且未做 DB/RLS 部署验收；hostless Worktree/Task/CLI 与分支 freshness 仍未验收。Phase 1已实施目录schema/read API与条件式主树/context shell基础；Run Task Cards 有只读 UI/API client 代码切片；旧 Tauri 桌面端 Task mock/fallback 已退役。宿主 Auth Provider、服务端 capability、目标 DB/RLS 未就绪，其它 Run Apps/生产执行闭环与服务提取仍待完成。
+> - 本轮设计更新：主导航固定为 Project → Engineering Run → Worktree → Branch；Branch 是 Worktree 本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata。Run 管理本地 Worktree，并提供 Inbox、任务与计划管理、Task Card、Canvas、Workflow、BI/Benchmark 与 Plugin Apps。选中 Worktree 只设置当前 focus/CLI checkout target；Run apps 的授权与数据 owner 由 RunContext 决定。现有 `EngineeringRun.branch_id`、Branch/Run registry API 与 branch-role grant 尚未迁移，必须保留旧授权门并完成历史数据对账；local branch leaf 依赖可信 Host/Repository observation，缺失/过期时显示 unknown 并关闭相关操作。Run directory 与 Task Card list/create 已有源码和 migration candidate，但未做目标 DB/RLS 部署验收；hostless Worktree provisioning/binding、CLI 与分支 freshness 尚未验收。Phase 1已实施目录schema/read API与条件式主树/context shell基础；Run Task Cards 有 bounded list/create UI/API client 代码切片；旧 Tauri 桌面端 Task mock/fallback 已退役。宿主 Auth Provider、服务端 capability、目标 DB/RLS 未就绪，其它 Run Apps/生产执行闭环与服务提取仍待完成。
 > - 本轮补充：生产 Project 选择通过当前 actor 的服务端 membership 目录加载；API session generation 切换时同步隐藏旧 Project/Index/member-role 投影；分页与深链权限状态均 fail closed，缺失 Project 名称 SoR 时不借本地 seed 补名。
 > - Phase 8 更新：Run migration 在隔离临时 PostgreSQL 重复应用并通过 6 张表 FORCE RLS 检查，目标 DB/runtime grants 未部署；CLI Run writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已形成条件式代码切片；Contract 写命令、完整事件/Evidence producer、真实 Runtime 与目标环境端到端验收仍未完成。
 > - Phase 9A 更新：新增 `domain-hook` bounded Rust evaluator core 和 8 个单测，仅覆盖 Worktree archive/cleanup gate；未接入 lifecycle Domain Command、HookSet 持久化/发布、Advanced Settings UI 或 RunEvent/BI，Phase 9 仍开放。定向 test/Clippy 使用临时解析后的 lock 通过；原始锁文件仍有既存 `objc2 0.6.3` 与 Wry `^0.6.4` 冲突，完整刷新会改动 240 个 package，未混入本阶段。使用刷新锁进行的 `cargo check --workspace --all-targets -j 4` 随后被既有 `star-desktop/src-tauri/src/main.rs` 截断占位阻断。
@@ -40,9 +40,9 @@
 > - Phase 9F4B 状态：规则创建者固定为 `run_as_actor_id`，认证创建者派生身份且所有 successor revision 继承；additive migration 对历史行按最早版本 `changed_by` 回填，并以数据库 trigger 防止身份替换；domain occurrence snapshot 随规则快照携带该主体。每次定时触发/重试/恢复仍须由未来 worker 复验该主体当前 Project binding 与 Engineering Run grant，撤权或 ACL 不可确认时 fail closed。此阶段没有启用 worker、Run admission 或 Launch Profile authority；详见 §6.78 和 `docs/reports/PHASE-9F4B-SCHEDULE-RUN-AS-IDENTITY-REPORT.md`。
 > - Phase 9F4C 状态：9F4C-B Rule enable-time 授权已由 SCHED-API-015 / 9F4C-C 补上 Project-scoped transaction lock：授权 helper 获锁后，API 下一 SQL statement 重读 Project/Branch/Run grants；对应 grant mutation triggers 共用锁。PostgreSQL 18.6 双连接测试证明三类撤权等待已持锁授权事务，授权提交后撤权完成且后续授权 fail closed。完整 REST write rollback 与 target grants仍未完成；worker 每次 trigger/retry/resume reauthorization、原子 Run admission 保持 fail closed，见 §6.82。
 > - Phase 9F4D 状态：双 owner 事务边界仍为设计要求；`domain-infrastructure` 已提供并定向验证 V2 binding/demand/capacity/readiness contracts 与 Host reservation/readiness gate，并通过 Rust 1.98.1 focused gates（27/27 tests）。Gate 绑定 Manager receipt、Multipass daemon/owned guest（remote K3s 显式 NotApplicable）、K3s API/node/CRI、sandbox、workspace bridge、Host generation 和 30 秒新鲜度；它不解析实时 ACL/Run binding、不持久化 owner reservation、不连接 Inbox/Outbox、worker 或真实 Multipass Manager/provider；执行保持 fail closed，见 §6.85-§6.89。
-> - 关联需求：docs/requirements.md v6.35 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.12；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.56（9F4A/9F4B/9F4C/9F4D 增量）。
-> - 关联基本设计：docs/basic-design.md v6.33 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.5；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.55（9F4D 增量）。
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.83、docs/design/DD-MULTICA-TASK-001.md v1.25、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.69、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.35；Data Design v1.7。
+> - 关联需求：docs/requirements.md v6.66 §50；docs/requirements/SRS-MULTICA-TASK-001.md v0.15；docs/requirements/SRS-AUTOMATION-SCHEDULE-API-001.md v0.56（9F4A/9F4B/9F4C/9F4D 增量）。
+> - 关联基本设计：docs/basic-design.md v6.66 §8.1、§16.1-16.30；docs/design/BD-MULTICA-TASK-001.md v0.8；docs/design/BD-AUTOMATION-SCHEDULE-API-001.md v0.55（9F4D 增量）。
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.96、docs/design/DD-MULTICA-TASK-001.md v1.29、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.4、docs/design/DD-AUTOMATION-SCHEDULE-API-001.md v0.69、docs/design/DD-LOCAL-INFRASTRUCTURE-001.md v0.35；Data Design v1.7。
 
 ---
 
@@ -56,16 +56,14 @@ Project（一级：选择项目与项目级权限边界）
 └── Engineering Run（二级工作区）
     └── Worktree（Run 管理的本地 checkout）
         └── Branch（本地 checkout 分支投影叶）
-    └── Engineering Run（三级：Agent/loop 的工作上下文与应用容器）
-        ├── Local Worktrees（Run 管理的本地 checkout；选中仅设置 focus/CLI target）
-        └── Run Apps（右侧 tabs，由 RunContext 授权）
-            ├── Inbox
-            ├── Work Item / 任务管理 / 外部任务系统
-            ├── Task Card（CLI 在卡片内打开）
-            ├── Infinite Canvas（与 Task Card 同级，可互动并创建/关联任务）
-            ├── Workflow / LangGraph
-            ├── BI / Benchmark
-            └── Plugin Apps
+    ├── Run Apps（选择该 Run 下的 Worktree 后展示为右侧 tabs，由 RunContext 授权）
+    │   ├── Inbox
+    │   ├── Work Item / 任务管理 / 外部任务系统
+    │   ├── Task Card（CLI 在卡片内打开）
+    │   ├── Infinite Canvas（与 Task Card 同级，可互动并创建/关联任务）
+    │   ├── Workflow / LangGraph
+    │   ├── BI / Benchmark
+    │   └── Plugin Apps
 ```
 
 主导航为 Project → Engineering Run → Worktree → Branch；canonical Run shell deep link 为 `/projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}?tab={app_id}`。Project Worktree Index 是项目级跨 Run/Worktree 管理投影。展开或选择 Run 后，右侧 tabs 才展示其应用；选择 Worktree 仅设置 `focused_worktree_id`，不会改变 Run app 的数据归属或授权范围。旧 `/projects/{project_id}/branches/{branch_id}/runs/{engineering_run_id}/worktrees/{worktree_id}` 必须在复验旧授权后兼容重定向；`/worktree?project_id={project_id}` 保留为 Project Worktree Index 兼容入口，旧 Group routes 由 adapter 解析为 `RunContext`。`EngineeringRun` 表示可长期管理的工作区；`TaskExecutionRun` 表示某次 Agent/CLI 尝试，不可混称。应用导航由 Run Shell 持有；所有 app 通过各自 owner API 协作，不自行建立第二套上下文或聊天栏。
@@ -111,7 +109,7 @@ Project（一级：选择项目与项目级权限边界）
 
 | Phase | 交付范围 | 依赖 | 完成门 |
 |---|---|---|---|
-| **0 设计基线** | 需求/基本/详细设计统一 Project → Engineering Run → Worktree → Branch；Run 不以远端宿主 Branch 为父级或授权前提；Run 管理 Worktree；Run apps 以 owner API 协作；定义 Outbox/Inbox、性能与事件边界 | `requirements.md` v6.64 §50、`basic-design.md` v6.64 §16、`DD-WORKTREE-GROUP-001.md` v4.93 | 🟡 目标设计已同步；Project-scoped Run directory API 与 migration source 已有候选，尚未部署/数据库验证；Worktree binding、Run Apps 归属迁移与生产运行验收仍未完成 |
+| **0 设计基线** | 需求/基本/详细设计统一 Project → Engineering Run → Worktree → Branch；Run 不以远端宿主 Branch 为父级或授权前提；Run 管理 Worktree；Run apps 以 owner API 协作；定义 Outbox/Inbox、性能与事件边界 | `requirements.md` v6.66 §50、`basic-design.md` v6.66 §16、`DD-WORKTREE-GROUP-001.md` v4.96、`DD-MULTICA-TASK-001.md` v1.29 | 🟡 目标设计已同步；Project-scoped Run directory 与 host-independent Task Card list/create 有源码和 migration candidate；尚未部署/数据库验证；Worktree binding、Run Apps 归属迁移与生产运行验收仍未完成 |
 | **1 Run Shell 原型** | Project → Run → Worktree → Branch 左侧主树；Run 下选择本地 Worktree；右侧 Run tabs 展示 Inbox、Work Item、Task Card、Canvas、Workflow、BI/Benchmark、Plugin Apps；Task Card 内 CLI；底栏 WORKTREE/GLOBAL | Project membership 目录、Run directory API、Worktree binding/read APIs 与 Run App panels | 🟡 ProjectRunTree 已作为 Sidebar 一级 Project 树入口并只在展开时延迟加载下一层；点击 Worktree 才打开 Run shell；当前 Branch leaf freshness、hostless Worktree binding、Task owner/CLI 与其余 Run Apps 仍未闭环。产品文案遵循 AC-UI-NEUTRAL-001，真实连接器可以事实显示服务商名 |
 | **2 安全上下文与 canonical 任务闭环** | 2A GroupContext / 跨 App 契约；2B 认证 Actor、Project/Worktree ACL、GroupContextResolver；2C Postgres canonical WorkItem + 任务管理 生命周期、review、版本/幂等/审计；2D Project 授权目录、Cursor Index、owner/archive/owner-transfer/create-import plan-confirm | 2A 设计基线；2B-2D migrations、membership provisioning、历史 reconciliation、ACL/RLS 与并发验收 | 🟡 `/api/v1/projects` 当前 actor membership 目录与生产 selector 分页/重试已实现，API session generation 切换时旧 Project/Index/member-role 投影立即隐藏；其余 Index、成员目录、归档/恢复/负责人转派、create/import 与 review command 有条件式切片；宿主 provider 未装配、DB 部署与 ACL/RLS 验收仍缺；Review Domain port、外部任务系统 sync、metadata update、Runtime/Git 状态接入仍是 blocker |
 | **3 Canvas 双向联动** | 3A UI Worktree scope guard / 旧 seed 隔离；3B Canvas/Element/EntityRef API；3C Canvas Document viewport/frames/connectors SCD2 + CAS；3D Canvas→WorkItem 原子创建命令；3E Group UI 认证/API 接线、多 Canvas 列表/选择/初始化、Task Card 新建/关联、viewport/Element 位置与几何 CAS、Frame 与视觉连线的 Document 编辑、Outbox consumer 和实时投影 | Phase 2B ACL + Phase 2C persistence / WorkItem API + Canvas migrations/API + GroupContext | 3A-3D、授权 Outbox API、JWT adapter、provider-backed projection、多 Canvas `canvas_id` 选择/新建、Canvas→Task Card 新建与既有任务卡原子 EntityRef 关联、viewport/Element 位置与几何 CAS、Frame 创建/删除/元素归属/展示属性、纯视觉连线创建/删除/样式、无实体引用便笺编辑、安全 Element 删除及本地持久游标 poller 已有条件式 UI/API 切片；其他 Element 内容、宿主 provider、目标 DB、服务端 durable offset/realtime 未完成；Canvas 不得直接写 任务管理 lifecycle；部署、membership、Canvas 历史冲突分类和 ACL/RLS 运行验收全过后才关闭 Phase 3 |
@@ -2127,6 +2125,12 @@ D20 P2 follow-on（本段为设计与实施计划，不是实现证据）：实�
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v6.96 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 ERUN-P3.2 host-independent Task Card owner/API/UI 与 SRS/基本/详细设计；记录 Rust 1.98.1 诊断检查及 214 个定向 library tests passed、1 ignored，TypeScript、scoped rustfmt、Guardian 与 diff-check 结果；明确 Vitest/CodeRabbit/1.99.0/目标 DB-RLS/并发验收未通过或未验证，dev 仍受 Orca EPERM owner gate 阻挡 | 用户要求按 Project → Run → Worktree → Branch 与无宿主 Run 方向完成文档/实现收敛并并入 dev |
+| v6.95 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 ProjectRunTree 缺失错误映射导入及 App ID 的过时比较；前端 TypeScript 检查通过，记录 Vitest 受现有 CSS 依赖树缺失阻断及 Rust/DB/Orca 集成门禁 | 本轮针对候选前端目录执行 typecheck 并发现编译错误 |
+| v6.94 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正实施计划树中重复嵌套 Engineering Run 的错误，统一 Project → Run → Worktree → Branch；记录本轮 `git diff --check` 通过，Rust/前端/DB 运行验收及 dev 集成仍未完成 | 复核实施计划的导航树并完成候选工作树空白检查 |
+| v6.93 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 Task owner adapter 未定义的锁顺序和 legacy Worktree hint 锁反转；对齐 Project → Run → Worktree → Branch 树及 Project/Run-owned Task Card owner；同步 Task DD v1.29 与 Group DD v4.96；注明 Rust/前端/DB 并发验收与 dev 集成门禁仍开放 | 自审发现授权、binding 与 Task row lock 顺序不一致，并按用户最新指示校正 D:\Star AGENTS.md |
+| v6.92 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 ERUN-P3.2 Project/Run-owned Task Card list/create 源码与 host-independent migration candidate；修正旧 Task owner 仍要求 Repository/Branch 的状态；同步 Task DD v1.28 与其余 requirements/basic/BD/Group DD 版本；明确目标 dev 因 Orca runtime owner 状态不可确认而未写入，且本轮未运行编译、测试或数据库迁移 | 用户确认 Run 必须脱离宿主 Branch 并要求优先智能收敛到 dev |
+| v6.91 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 host-independent Project/Run 目录候选、Task owner 旧 Branch tuple 阻断、连接器假数据空态与品牌文案复核；明确候选尚未合并 dev，未运行测试或目标数据库迁移 | 用户确认 Project → Run → Worktree → Branch、Run 脱离宿主 Branch，并要求中性产品文案与妥善合并 |
 | v6.90 | 2026-10-15 | Mavis review | 同步 requirements/basic/DD/direction 版本；修正 Phase 0/1 过时导航与版本指针，补充中性文案验收和宿主无关 Run 边界；本轮不声称测试或数据库已通过 | 用户确认 Run 可脱离宿主 Branch 并要求产品文案不对标仿制 |
 | v6.89 | 2026-10-15 | Mavis review | 对齐 Project-scoped host-independent Run create/list/auth 源码与 nullable schema migration source；明确 DB/RLS 部署、Worktree binding、Task owner/CLI 仍开放，并记录本轮无测试或数据库执行证据 | 用户确认 Run 必须可脱离宿主 Branch |
 | v6.88 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 hostless Run 目录、授权与普通 App 验收；固定 Project → Run → Worktree → Branch 不随宿主连接变化；将 branch_id、owner tuple、Branch grant 与路由/API 迁移列为未完成门禁 | 用户明确导航顺序独立于宿主关联 |
@@ -2164,6 +2168,24 @@ This slice verifies front-end session lifecycle guards only. Production host aut
 
 实现候选新增 Project-scoped GET/POST /api/v1/projects/{project_id}/engineering-runs，以及挂在 Sidebar Project 一级的 ProjectRunTree 创建/刷新入口。导航固定 Project → Run → Worktree → Branch；Project 和 Run 下一级按需加载，点击 Worktree 才打开 Run shell。Run 可不带 remote repository_id/branch_id；列表复验 Project membership 与显式 Run grant，创建要求 Project 管理角色，并在 PostgreSQL 事务中写入 Run、初始 Run grant、Audit、24 小时幂等回执与 owner Outbox。旧 Branch-scoped Run API 保留兼容。
 
-迁移 2026-10-15-run-host-independent-directory.sql 和 API 均未在本轮应用或运行验证。Migration 将 remote repository/branch 设为可选，并在非空 Branch 绑定时要求其与相同 Project/Repository 一致。应用角色 grants/RLS、历史 reconciliation、Run→Worktree binding writer/API、可信本地 Branch observation、Task owner schema/API、Schedule/CLI hostless 路径以及 Outbox delivery worker 未完成。Task Cards 在缺少 repository/branch owner 时保持关闭，不从旧 Worktree seed 或 mock 回退。前端文案清理覆盖中英日支持语言与常见设置/集成/任务界面；真实连接器事实显示其服务商名，不采用对标或仿制文案。当前不是生产可用闭环。
+迁移 2026-10-15-run-host-independent-directory.sql 和 API 均未在本轮应用或运行验证。Migration 将 remote repository/branch 设为可选，并在非空 Branch 绑定时要求其与相同 Project/Repository 一致。应用角色 grants/RLS、历史 reconciliation、Run→Worktree binding writer/API、可信本地 Branch observation、Task owner schema/API、Schedule/CLI hostless 路径以及 Outbox delivery worker 未完成。Task Cards 在缺少 repository/branch owner 时保持关闭，不从旧 Worktree seed 或 mock 回退。前端文案清理覆盖中英日支持语言与常见设置/集成/任务界面；真实连接器事实显示其服务商名，不采用对标或仿制文案。当前不是生产可用闭环。此处 Task owner 阻断是当时状态；后续 ERUN-P3.2 已增加 Project/Run-owned list/create 源码与 migration candidate，尚未完成数据库与运行验收，见 §6.144。
 
 本轮未运行 cargo、前端测试或数据库 migration；仅进行了定向源码/文档审阅。目标 dev worktree 的 Orca 状态仍返回 runtime_access_denied，尚未对其执行集成。
+
+## 6.143 — Project/Run hostless scope and truthful connector UI reconciliation
+
+当前候选代码包含 Project-scoped Engineering Run create/list/auth 路由和 nullable remote repository/branch migration source；前端 Project tree 的父子顺序为 Project → Run → Worktree → local Branch。连接器页不再从本地 seed 显示虚构的 active provider/configuration；seed connector records 及引用这些假连接器的审计样例已移除。没有已验证 server directory/provider 时显示空状态，服务商名称仅在后续接入真实启用的连接器后显示。
+
+Task owner 的 canonical 身份为 `(tenant_id, project_id, engineering_run_id)`。ERUN-P3.2 候选已有 Run-scoped GET/POST API、Project/Run 授权、可选 Worktree focus、owner adapter 事务内权限复验、legacy unassigned rows 保留与 schema v2 Outbox source。Run owner 不要求 Repository/remote Branch；AI Task 的 repository-scoped payload 在无 Repository context 时拒绝。该切片仍未应用 target migration，也未验证 application-role grants、RLS、Rust/HTTP/frontend、并发/回滚，因此不能据此标为生产可用。Run-level transition/review、Schedule、CLI、Agent execution、BI/Benchmark 与生产 Run admission 仍未闭环。
+
+验证包含定向源码/文档审查、`git diff --check` 与 CypherGraph Guardian `--changed --stamp`（13 个源码文件 PASS）；未运行 Rust/前端测试、编译、数据库迁移或真实连接器检查。该候选当前仍在 `codex/run-task-command-port`，尚未合并至 `dev`；dev checkout 是 Orca 管理的 Worktree，runtime access 当前拒绝且 owner 状态无法确认，因此不直接修改目标 checkout。CodeGraph 项目索引与 RTK 命令代理在本环境不可用；Guardian 通过可用 Python 脚本执行。
+
+## 6.144 — ERUN-P3.2 Project/Run-owned Task Card list/create source slice
+
+Task Card canonical owner 为 `(tenant_id, project_id, engineering_run_id)`。新增 Run-scoped `GET/POST /api/v1/engineering-runs/{engineering_run_id}/work-items`；服务端以当前 Project membership、Run grant 和非归档 Run 授权，请求体 Project/Run identity 必须与 route 解析值一致。`focus_worktree_id` 为可选上下文，存在时必须是当前 Project/Run binding；没有 Repository/remote Branch 或 Worktree focus 也允许 list/create。Repository-scoped AI Task payload 在无 Repository context 时拒绝。UI 通过当前 Run Task capability 和 write scope 控制创建入口，hostless 目标和 pending recovery scope 固定在 Project/Run。
+
+Domain context 将 Project/Run 作为 owner identity，Worktree 可空。GET 授权/分页事务使用 3 秒 statement 与 1 秒 lock deadline；POST scope preflight 和 owner write transaction 使用 5 秒 statement 与 1 秒 lock deadline。owner 写事务锁顺序固定为 Project role → Run/revision → Run role → 可选 Worktree/Project/Run binding → idempotency advisory lock → Task metadata/lifecycle/association/audit/Outbox；legacy Worktree scope hint 不取行锁，授权后重读并锁定当前 binding。Migration guards 与该顺序配合，但不是并发正确性的证明；目标 PostgreSQL 并发/回滚验收仍未执行。创建时提交 metadata、lifecycle current、可选 Worktree association、append-only lifecycle audit、idempotency receipt 及 schema-v2 Outbox。迁移对 task metadata host/workspace context 设为可选、加 Project/Run FK 和 owner guards；保留既有未归属行且不猜测回填，审计表新行要求 Run identity、Worktree 可空，Outbox v1 历史行不改写。既有 Worktree routes 仅作兼容层，Run lifecycle transition/review 尚无无宿主入口。
+
+Run 目录树顺序固定 Project → Engineering Run → Worktree → Branch。Branch 是 Worktree 的本地 checkout ref/state 叶节点，远端 provider/host identity 为可选数据；选择 Worktree 才设 Run focus 并展示该 Run 的 App tabs。连接器 UI 只呈现真实连接器状态；服务商名仅用于实际启用的 provider，不以第三方产品作对标或仿制文案。
+
+当前验收边界：代码与 migration source 已形成。本轮以源文件定向审查（当前 CodeGraph MCP 未解析此 worktree 的索引）核对 Run owner adapter、REST 授权/写路径和 migration guards；不声称图覆盖完整。CypherGraph Guardian `--changed --stamp` 检查 15 个源码文件通过；`pnpm exec tsc --noEmit --incremental false` 通过。定向 Rust 诊断使用 Rust 1.98.1、`--ignore-rust-version`：`star-api-rest --all-targets` 检查通过，`star-api-rest` library tests 134 passed/1 ignored，`domain-work-item` 16/16，`infrastructure` 64/64；这些不是 Rust 1.99.0 正式门禁。五个改动 Rust 文件定向 rustfmt 检查通过；全 workspace `cargo fmt --all -- --check` 仍报告多个本改动之外文件的格式差异。Vitest worker 在启动前因共享依赖树缺少 `@csstools/css-parser-algorithms/index.js` 失败，0 个测试执行。`git diff --check` 通过。目标数据库 migration、app-role grants/FORCE RLS、PostgreSQL 并发/回滚未验证。前端品牌词扫描命中仅为旧 URL query/API 兼容值、内部 legacy ID/注释和允许展示的连接器 provider ID；未发现用户可见对标或仿制文案。Schedule/CLI/Agent 执行、Run-level transition/review、BI/Benchmark 的完整生产读模型、owner Outbox delivery worker 与生产授权 provider 保持关闭。候选 `codex/run-task-command-port` 包含 12 个相对 `dev` 的提交；`codex/run-task-owner-adapter` 的 4 个领先提交属于较早的 Worktree/Branch owner 设计，尚未选择合入。目标 `dev` 位于 Orca checkout；`orca worktree ps --json` 返回 `runtime_access_denied (EPERM)`，owner/activity 无法确认，因此本阶段不触写该 checkout 或清理其 worktree。CodeRabbit CLI 同样因 `/root/.local/bin/coderabbit: Permission denied` 未能运行；本地审查继续，不能报告 CodeRabbit clean。

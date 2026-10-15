@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c8e3b8a4473725f8a4360427a4ff006161619f4dbdba0b6120ed4726886e1095
+@cypher schema=1 source_sha256=bd8b0c6351ca8183b9428be0027d22ab07efee2059314a286228b319131428d2
 MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
@@ -77,7 +77,7 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   const hooksQuery = new URLSearchParams({ project_id: projectId, worktree_id: worktreeId });
   return <section data-testid="engineering-run-workspace" data-engineering-run-id={runId} data-focus-worktree-id={worktreeId} className="flex min-h-[calc(100vh-4rem)] flex-col p-4 md:p-6">
     <header className="border-b border-line pb-4">
-      <p className="break-all text-xs text-ink-mute">Project {projectId} / Engineering Run / Worktree {focus.name} / 本地 Branch {focus.branch.trim() || "未关联"} / 远端 Branch {envelope.branch?.full_ref ?? "未关联"}</p>
+      <p className="break-all text-xs text-ink-mute">Project {projectId} / Engineering Run / Worktree {focus.name} / 本地 Branch {focus.branch.trim() || "未关联"}</p>
       <h1 className="mt-2 break-words text-xl font-semibold">{envelope.engineering_run.title}</h1>
       <p className="mt-1 break-words text-sm">Checkout 焦点：<strong>{focus.name}</strong> · {focus.machine_state}{focus.archived && " · 已归档"}</p>
       <p className="mt-2 text-xs text-ink-mute">协作、任务、Canvas、Workflow、分析与插件的工作区属于此 Engineering Run。Worktree 提供本地 checkout 焦点。</p>
@@ -86,10 +86,10 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
       {RUN_APP_TABS.map((tab) => <button role="tab" aria-selected={activeApp === tab} aria-controls="run-app-content" disabled={tab !== "Task Cards"} onClick={() => setActiveApp(tab)} type="button" key={tab} className={`rounded border border-line px-3 py-2 text-xs ${activeApp === tab ? "bg-accent/15 text-accent" : "text-ink-mute"}`}>{tab}{tab === "Task Cards" ? "" : " · 待迁移"}</button>)}
     </div>
     <div id="run-app-content" className="my-4">
-      {activeApp === "Task Cards" && <RunTaskCardsPanel key={runId} client={current.client} context={envelope} available={envelope.capabilities.run_owned_apps_available} />}
+      {activeApp === "Task Cards" && <RunTaskCardsPanel key={runId} client={current.client} context={envelope} available={envelope.capabilities.task_cards_available} />}
     </div>
     <div role="status" className="mb-4 rounded border border-line bg-bg-soft p-4 text-sm">
-      <p>{envelope.capabilities.run_owned_apps_available ? "Run-owned Apps 已开放；Task Cards 提供受授权的读取与条件式创建入口。" : "服务端尚未开放 Run-owned Apps；Task Cards 页面保持禁用，不会回退到 Worktree 任务或演示数据。"} Canvas、Inbox、Workflow、BI/Benchmark 与插件仍是同级 Run App。</p>
+      <p>{envelope.capabilities.task_cards_available ? "Task Cards 已按当前 Run 授权开放读取与创建入口。" : "服务端尚未开放 Task Cards 读取能力；页面保持禁用，不会回退到 Worktree 任务或演示数据。"} Canvas、Inbox、Workflow、BI/Benchmark 与插件仍是同级 Run App。</p>
       <p className="mt-2">{envelope.capabilities.execution_admission_available ? "服务端执行准入已开放，但卡内 CLI Runtime 与结果验证界面尚未装配。" : "服务端执行准入尚未开放。"} CLI 将从任务卡内打开；Runtime、取消/恢复、独立验证和结果回写完成前，执行保持禁用。</p>
     </div>
     <RunContextDetails envelope={envelope} />

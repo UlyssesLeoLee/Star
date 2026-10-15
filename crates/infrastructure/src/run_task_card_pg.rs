@@ -3,7 +3,7 @@
 //! The adapter repeats authorization and binding checks inside each write transaction. It does
 //! not publish lifecycle Outbox events: the current migration only emits metadata events.
 //!
-//! @cypher schema=1 source_sha256=44e1386e05a86aa79d9beca78acf7710c1802a8d86743709562de7110d82e78e
+//! @cypher schema=1 source_sha256=c1357b98fc9125ddfc82ba8b2f4dc85a81924823ceee6e440e9b72fe0b8233b1
 //! MERGE (self:File {path:"crates/infrastructure/src/run_task_card_pg.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::module",kind:"module"})
 //! MERGE (adapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
@@ -17,6 +17,7 @@
 //! MERGE (lockComposedIdempotency:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter.lock_composed_idempotency_in_transaction",kind:"method"})
 //! MERGE (createOnConnection:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::create_on_connection",kind:"function"})
 //! MERGE (transitionOnConnection:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::transition_on_connection",kind:"function"})
+//! MERGE (requireWorktreeAssignment:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::require_task_worktree_assignment",kind:"function"})
 //! MERGE (reviewOnConnection:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::review_on_connection",kind:"function"})
 //! MERGE (authorize:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::authorize_run_task_scope",kind:"function"})
 //! MERGE (scopeGuc:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::set_transaction_scope",kind:"function"})
@@ -37,6 +38,13 @@
 //! MERGE (idempotency:Table {id:"multica.task_command_idempotency"})
 //! MERGE (relation:Table {id:"multica.work_item_worktree"})
 //! MERGE (outbox:Table {id:"multica.task_run_outbox"})
+//! MERGE (projectRole:Table {id:"permission.project_role_binding"})
+//! MERGE (run:Table {id:"multica.engineering_run"})
+//! MERGE (runRevision:Table {id:"multica.engineering_run_revision"})
+//! MERGE (runRole:Table {id:"permission.engineering_run_role_binding"})
+//! MERGE (worktree:Table {id:"worktree_canvas_worktree"})
+//! MERGE (projectBinding:Table {id:"multica.worktree_project_binding"})
+//! MERGE (runBinding:Table {id:"multica.engineering_run_worktree_binding"})
 //! MERGE (self)-[:DEFINES]->(module)
 //! MERGE (module)-[:DEFINES]->(adapter)
 //! MERGE (module)-[:DEFINES]->(scope)
@@ -49,6 +57,7 @@
 //! MERGE (module)-[:DEFINES]->(lockComposedIdempotency)
 //! MERGE (module)-[:DEFINES]->(createOnConnection)
 //! MERGE (module)-[:DEFINES]->(transitionOnConnection)
+//! MERGE (module)-[:DEFINES]->(requireWorktreeAssignment)
 //! MERGE (module)-[:DEFINES]->(reviewOnConnection)
 //! MERGE (module)-[:DEFINES]->(authorize)
 //! MERGE (module)-[:DEFINES]->(scopeGuc)
@@ -79,6 +88,7 @@
 //! MERGE (transitionOnConnection)-[:CALLS]->(lockIdempotency)
 //! MERGE (transitionOnConnection)-[:CALLS]->(lookupIdempotency)
 //! MERGE (transitionOnConnection)-[:CALLS]->(lockCurrent)
+//! MERGE (transitionOnConnection)-[:CALLS]->(requireWorktreeAssignment)
 //! MERGE (transitionOnConnection)-[:CALLS]->(insertAudit)
 //! MERGE (transitionOnConnection)-[:CALLS]->(loadSnapshot)
 //! MERGE (transitionOnConnection)-[:CALLS]->(saveIdempotency)
@@ -98,6 +108,15 @@
 //! MERGE (reviewOnConnection)-[:WRITES]->(lifecycle)
 //! MERGE (insertAudit)-[:WRITES]->(audit)
 //! MERGE (saveIdempotency)-[:WRITES]->(idempotency)
+//! MERGE (requireWorktreeAssignment)-[:READS]->(runBinding)
+//! MERGE (requireWorktreeAssignment)-[:WRITES]->(relation)
+//! MERGE (authorize)-[:READS]->(projectRole)
+//! MERGE (authorize)-[:READS]->(run)
+//! MERGE (authorize)-[:READS]->(runRevision)
+//! MERGE (authorize)-[:READS]->(runRole)
+//! MERGE (authorize)-[:READS]->(worktree)
+//! MERGE (authorize)-[:READS]->(projectBinding)
+//! MERGE (authorize)-[:READS]->(runBinding)
 //! MERGE (commandPort:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandPort",kind:"trait"})
 //! MERGE (adapter)-[:IMPLEMENTS]->(commandPort)
 //! MERGE (scopeGuc)-[:CONFIGURES]->(statementTimeout)
@@ -125,10 +144,10 @@ pub struct PgRunTaskCardAdapter {
 
 #[derive(Debug, Clone)]
 struct RunTaskCardRunScope {
-    workspace_id: Uuid,
+    workspace_id: Option<Uuid>,
     project_id: Uuid,
-    repository_id: Uuid,
-    branch_id: Uuid,
+    repository_id: Option<Uuid>,
+    branch_id: Option<Uuid>,
     engineering_run_id: Uuid,
 }
 
@@ -319,7 +338,7 @@ async fn create_on_connection(
     let scope = authorize_run_task_scope(connection, context, RequiredTaskRole::Writer).await?;
     if let Some(ai_data) = &command.ai_task_data {
         if ai_data.repository_scope.len() != 1
-            || ai_data.repository_scope.first() != Some(&RepositoryId(scope.repository_id))
+            || scope.repository_id.map(RepositoryId).as_ref() != ai_data.repository_scope.first()
         {
             return Err(RunTaskCardError::InvalidCommand(
                 "ai_task_repository_out_of_scope",
@@ -372,6 +391,19 @@ async fn create_on_connection(
     .await
     .map_err(database_error)?;
 
+    if let Some(worktree_id) = context.worktree_id {
+        sqlx::query(
+            "INSERT INTO multica.work_item_worktree (tenant_id,project_id,work_item_id,worktree_id) VALUES ($1,$2,$3,$4)",
+        )
+        .bind(context.tenant_id.as_uuid())
+        .bind(scope.project_id)
+        .bind(work_item_id.as_uuid())
+        .bind(worktree_id.as_uuid())
+        .execute(&mut *connection)
+        .await
+        .map_err(database_error)?;
+    }
+
     sqlx::query(
         "INSERT INTO multica.task_lifecycle_current (work_item_id, tenant_id, status, version) VALUES ($1,$2,'pending',1)",
     )
@@ -381,36 +413,27 @@ async fn create_on_connection(
     .await
     .map_err(database_error)?;
 
-    sqlx::query(
-        "INSERT INTO multica.work_item_worktree (tenant_id,project_id,work_item_id,worktree_id) VALUES ($1,$2,$3,$4)",
+    insert_lifecycle_audit(
+        connection,
+        context,
+        scope.project_id,
+        scope.engineering_run_id,
+        work_item_id,
+        None,
+        Some("pending"),
+        "created",
+        audit_details,
     )
-    .bind(context.tenant_id.as_uuid())
-    .bind(scope.project_id)
-    .bind(work_item_id.as_uuid())
-    .bind(context.worktree_id.as_uuid())
-    .execute(&mut *connection)
-    .await
-    .map_err(database_error)?;
+    .await?;
 
-    sqlx::query(
-        r#"INSERT INTO multica.task_lifecycle_audit
-             (tenant_id,project_id,worktree_id,work_item_id,task_card_id,to_status,event_type,
-              actor_id,idempotency_key,correlation_id,details)
-           VALUES ($1,$2,$3,$4,$4,'pending','created',$5,$6,$7,$8)"#,
+    let snapshot = load_snapshot(
+        connection,
+        context,
+        scope.project_id,
+        scope.engineering_run_id,
+        work_item_id,
     )
-    .bind(context.tenant_id.as_uuid())
-    .bind(scope.project_id)
-    .bind(context.worktree_id.as_uuid())
-    .bind(work_item_id.as_uuid())
-    .bind(context.actor_id.as_uuid())
-    .bind(&context.idempotency_key)
-    .bind(context.correlation_id)
-    .bind(audit_details)
-    .execute(&mut *connection)
-    .await
-    .map_err(database_error)?;
-
-    let snapshot = load_snapshot(connection, context, scope.project_id, work_item_id).await?;
+    .await?;
     if task_idempotency {
         save_idempotency(connection, context, &snapshot).await?;
     }
@@ -443,6 +466,19 @@ async fn transition_on_connection(
     if let Some(receipt) = lookup_idempotency(connection, context).await? {
         return Ok(receipt);
     }
+    if matches!(
+        command.target_status,
+        RunTaskCardStatus::Claimed | RunTaskCardStatus::InProgress
+    ) {
+        require_task_worktree_assignment(
+            connection,
+            context,
+            scope.project_id,
+            scope.engineering_run_id,
+            command.work_item_id,
+        )
+        .await?;
+    }
     let current = lock_current_lifecycle(connection, context, &scope, command.work_item_id).await?;
     // A retry may have waited for the lifecycle lock while its first request committed.
     if let Some(receipt) = lookup_idempotency(connection, context).await? {
@@ -454,7 +490,7 @@ async fn transition_on_connection(
     if matches!(
         current.status,
         RunTaskCardStatus::Claimed | RunTaskCardStatus::InProgress
-    ) && current.active_worktree_id != Some(context.worktree_id.as_uuid())
+    ) && context.worktree_id.map(|id| id.as_uuid()) != current.active_worktree_id
     {
         return Err(RunTaskCardError::Conflict("active_worktree_conflict"));
     }
@@ -491,7 +527,7 @@ async fn transition_on_connection(
     )
     .bind(context.tenant_id.as_uuid())
     .bind(command.work_item_id.as_uuid())
-    .bind(context.worktree_id.as_uuid())
+    .bind(context.worktree_id.map(|id| id.as_uuid()))
     .bind(command.target_status.as_str())
     .bind(context.actor_id.as_uuid())
     .bind(command.expected_version)
@@ -505,6 +541,7 @@ async fn transition_on_connection(
         connection,
         context,
         scope.project_id,
+        scope.engineering_run_id,
         command.work_item_id,
         Some(current.status.as_str()),
         Some(command.target_status.as_str()),
@@ -512,8 +549,14 @@ async fn transition_on_connection(
         json!({"reason":command.reason}),
     )
     .await?;
-    let snapshot =
-        load_snapshot(connection, context, scope.project_id, command.work_item_id).await?;
+    let snapshot = load_snapshot(
+        connection,
+        context,
+        scope.project_id,
+        scope.engineering_run_id,
+        command.work_item_id,
+    )
+    .await?;
     save_idempotency(connection, context, &snapshot).await?;
     Ok(RunTaskCardWriteReceipt {
         snapshot,
@@ -544,8 +587,11 @@ async fn review_on_connection(
     if current.version != command.expected_version {
         return Err(RunTaskCardError::Conflict("version_conflict"));
     }
-    if current.status != RunTaskCardStatus::InProgress
-        || current.active_worktree_id != Some(context.worktree_id.as_uuid())
+    if current.status != RunTaskCardStatus::InProgress {
+        return Err(RunTaskCardError::Conflict("review_worktree_conflict"));
+    }
+    if command.action == RunTaskCardReviewAction::Submit
+        && context.worktree_id.map(|id| id.as_uuid()) != current.active_worktree_id
     {
         return Err(RunTaskCardError::Conflict("review_worktree_conflict"));
     }
@@ -607,6 +653,7 @@ async fn review_on_connection(
         connection,
         context,
         scope.project_id,
+        scope.engineering_run_id,
         command.work_item_id,
         Some(current.status.as_str()),
         Some(next_status),
@@ -614,8 +661,14 @@ async fn review_on_connection(
         json!({"review_state":next_review,"reason":command.reason}),
     )
     .await?;
-    let snapshot =
-        load_snapshot(connection, context, scope.project_id, command.work_item_id).await?;
+    let snapshot = load_snapshot(
+        connection,
+        context,
+        scope.project_id,
+        scope.engineering_run_id,
+        command.work_item_id,
+    )
+    .await?;
     save_idempotency(connection, context, &snapshot).await?;
     Ok(RunTaskCardWriteReceipt {
         snapshot,
@@ -644,72 +697,33 @@ async fn authorize_run_task_scope(
     context: &RunTaskCardCommandContext,
     required_role: RequiredTaskRole,
 ) -> Result<RunTaskCardRunScope, RunTaskCardError> {
-    let (workspace_id, project_id, worktree_repository_id): (Uuid, Uuid, Uuid) = sqlx::query_as(
-        r#"SELECT w.workspace_id,p.project_id,w.repo_id
-           FROM worktree_canvas_worktree w
-           JOIN multica.worktree_project_binding p ON p.tenant_id=w.tenant_id AND p.worktree_id=w.id
-             AND p.project_id=w.project_id AND p.valid_to IS NULL
-           WHERE w.tenant_id=$1 AND w.id=$2
-           FOR SHARE OF w,p"#,
-    )
-    .bind(context.tenant_id.as_uuid())
-    .bind(context.worktree_id.as_uuid())
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(database_error)?
-    .ok_or(RunTaskCardError::NotFound)?;
-
-    let (engineering_run_id, repository_id, branch_id): (Uuid, Uuid, Uuid) = sqlx::query_as(
-        r#"SELECT engineering_run_id,repository_id,branch_id
-           FROM multica.engineering_run_worktree_binding
-           WHERE tenant_id=$1 AND project_id=$2 AND worktree_id=$3 AND valid_to IS NULL
-           FOR SHARE"#,
-    )
-    .bind(context.tenant_id.as_uuid())
-    .bind(project_id)
-    .bind(context.worktree_id.as_uuid())
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(database_error)?
-    .ok_or(RunTaskCardError::NotFound)?;
-
-    let (run_project_id, run_repository_id, run_branch_id): (Uuid, Uuid, Uuid) = sqlx::query_as(
-        r#"SELECT r.project_id,r.repository_id,r.branch_id
-           FROM multica.engineering_run r
-           JOIN multica.engineering_run_revision v ON v.tenant_id=r.tenant_id AND v.engineering_run_id=r.engineering_run_id
-           WHERE r.tenant_id=$1 AND r.engineering_run_id=$2
-             AND v.valid_from<=now() AND v.valid_to IS NULL AND v.state<>'archived'
-           FOR SHARE OF r,v"#,
-    )
-    .bind(context.tenant_id.as_uuid())
-    .bind(engineering_run_id)
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(database_error)?
-    .ok_or(RunTaskCardError::NotFound)?;
-    let (branch_project_id, branch_repository_id): (Uuid, Uuid) = sqlx::query_as(
-        r#"SELECT b.project_id,b.repository_id
-           FROM scm.cloud_branch b
-           JOIN scm.cloud_branch_revision v ON v.tenant_id=b.tenant_id AND v.branch_id=b.branch_id
-           WHERE b.tenant_id=$1 AND b.branch_id=$2
-             AND v.valid_from<=now() AND v.valid_to IS NULL AND v.state='active'
-           FOR SHARE OF b,v"#,
-    )
-    .bind(context.tenant_id.as_uuid())
-    .bind(branch_id)
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(database_error)?
-    .ok_or(RunTaskCardError::NotFound)?;
-    if project_id != run_project_id
-        || project_id != branch_project_id
-        || repository_id != run_repository_id
-        || repository_id != branch_repository_id
-        || branch_id != run_branch_id
-        || repository_id != worktree_repository_id
-    {
-        return Err(RunTaskCardError::NotFound);
-    }
+    // Legacy Worktree routes need a non-locking identity lookup first. Lock in canonical order:
+    // Project role, Run/revision, Run role, optional Worktree bindings, then Task rows.
+    let (project_id, engineering_run_id) = match (
+        context.project_id,
+        context.engineering_run_id,
+        context.worktree_id,
+    ) {
+        (Some(project_id), Some(run_id), _) => (project_id, run_id),
+        (None, None, Some(worktree_id)) => sqlx::query_as::<_, (Uuid, Uuid)>(
+            r#"SELECT p.project_id,b.engineering_run_id
+               FROM worktree_canvas_worktree w
+               JOIN multica.worktree_project_binding p
+                 ON p.tenant_id=w.tenant_id AND p.worktree_id=w.id
+                AND p.project_id=w.project_id AND p.valid_to IS NULL
+               JOIN multica.engineering_run_worktree_binding b
+                 ON b.tenant_id=w.tenant_id AND b.project_id=p.project_id
+                AND b.worktree_id=w.id AND b.valid_to IS NULL
+               WHERE w.tenant_id=$1 AND w.id=$2"#,
+        )
+        .bind(context.tenant_id.as_uuid())
+        .bind(worktree_id.as_uuid())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(database_error)?
+        .ok_or(RunTaskCardError::NotFound)?,
+        _ => return Err(RunTaskCardError::NotFound),
+    };
 
     let project_role: Option<String> = sqlx::query_scalar(
         r#"SELECT role FROM permission.project_role_binding
@@ -723,20 +737,24 @@ async fn authorize_run_task_scope(
     .await
     .map_err(database_error)?;
     let project_role = project_role.ok_or(RunTaskCardError::NotFound)?;
-    let branch_grant: Option<Uuid> = sqlx::query_scalar(
-        r#"SELECT binding_id FROM permission.cloud_branch_role_binding
-           WHERE tenant_id=$1 AND branch_id=$2 AND user_id=$3 AND valid_from<=now() AND valid_to IS NULL
-           FOR SHARE"#,
+
+    let (run_repository_id, run_branch_id): (Option<Uuid>, Option<Uuid>) = sqlx::query_as(
+        r#"SELECT r.repository_id,r.branch_id
+           FROM multica.engineering_run r
+           JOIN multica.engineering_run_revision v
+             ON v.tenant_id=r.tenant_id AND v.engineering_run_id=r.engineering_run_id
+           WHERE r.tenant_id=$1 AND r.project_id=$2 AND r.engineering_run_id=$3
+             AND v.valid_from<=now() AND v.valid_to IS NULL AND v.state<>'archived'
+           FOR SHARE OF r,v"#,
     )
     .bind(context.tenant_id.as_uuid())
-    .bind(branch_id)
-    .bind(context.actor_id.as_uuid())
+    .bind(project_id)
+    .bind(engineering_run_id)
     .fetch_optional(&mut *connection)
     .await
-    .map_err(database_error)?;
-    if branch_grant.is_none() {
-        return Err(RunTaskCardError::NotFound);
-    }
+    .map_err(database_error)?
+    .ok_or(RunTaskCardError::NotFound)?;
+
     let run_role: Option<String> = sqlx::query_scalar(
         r#"SELECT role FROM permission.engineering_run_role_binding
            WHERE tenant_id=$1 AND engineering_run_id=$2 AND user_id=$3
@@ -757,6 +775,44 @@ async fn authorize_run_task_scope(
     if !allowed {
         return Err(RunTaskCardError::Forbidden);
     }
+
+    // Lock and validate an optional focus only after the canonical owner and grants are locked.
+    // A concurrent rebind either waits or is observed here and fails closed on scope mismatch.
+    let focus = if let Some(worktree_id) = context.worktree_id {
+        Some(
+            sqlx::query_as::<_, (Uuid, Uuid, Uuid, Option<Uuid>, Option<Uuid>)>(
+                r#"SELECT w.workspace_id,p.project_id,b.engineering_run_id,b.repository_id,b.branch_id
+                   FROM worktree_canvas_worktree w
+                   JOIN multica.worktree_project_binding p
+                     ON p.tenant_id=w.tenant_id AND p.worktree_id=w.id
+                    AND p.project_id=w.project_id AND p.valid_to IS NULL
+                   JOIN multica.engineering_run_worktree_binding b
+                     ON b.tenant_id=w.tenant_id AND b.project_id=p.project_id
+                    AND b.worktree_id=w.id AND b.valid_to IS NULL
+                   WHERE w.tenant_id=$1 AND w.id=$2
+                   FOR SHARE OF w,p,b"#,
+            )
+            .bind(context.tenant_id.as_uuid())
+            .bind(worktree_id.as_uuid())
+            .fetch_optional(&mut *connection)
+            .await
+            .map_err(database_error)?
+            .ok_or(RunTaskCardError::NotFound)?,
+        )
+    } else {
+        None
+    };
+    if focus.is_some_and(|row| row.1 != project_id || row.2 != engineering_run_id) {
+        return Err(RunTaskCardError::NotFound);
+    }
+
+    // A selected Worktree contributes optional repository/Branch context, never Run ownership.
+    let (workspace_id, repository_id, branch_id) = focus.map_or(
+        (None, run_repository_id, run_branch_id),
+        |(workspace_id, _, _, repository_id, branch_id)| {
+            (Some(workspace_id), repository_id, branch_id)
+        },
+    );
     Ok(RunTaskCardRunScope {
         workspace_id,
         project_id,
@@ -872,18 +928,13 @@ async fn lock_current_lifecycle(
                   COALESCE(c.claim_expires_at<=now(),FALSE),c.version
            FROM multica.task_lifecycle_current c
            JOIN multica.task_metadata m ON m.tenant_id=c.tenant_id AND m.work_item_id=c.work_item_id AND m.valid_to IS NULL
-           JOIN multica.work_item_worktree l ON l.tenant_id=c.tenant_id AND l.work_item_id=c.work_item_id
-             AND l.project_id=m.project_id AND l.worktree_id=$3 AND l.valid_to IS NULL
-           WHERE c.tenant_id=$1 AND c.work_item_id=$2 AND m.project_id=$4
-             AND m.repository_id=$5 AND m.branch_id=$6 AND m.engineering_run_id=$7
+           WHERE c.tenant_id=$1 AND c.work_item_id=$2 AND m.project_id=$3
+             AND m.engineering_run_id=$4
            FOR UPDATE OF c"#,
     )
     .bind(context.tenant_id.as_uuid())
     .bind(work_item_id.as_uuid())
-    .bind(context.worktree_id.as_uuid())
     .bind(scope.project_id)
-    .bind(scope.repository_id)
-    .bind(scope.branch_id)
     .bind(scope.engineering_run_id)
     .fetch_optional(&mut *connection)
     .await
@@ -903,6 +954,53 @@ async fn lock_current_lifecycle(
     })
 }
 
+async fn require_task_worktree_assignment(
+    connection: &mut PgConnection,
+    context: &RunTaskCardCommandContext,
+    project_id: Uuid,
+    engineering_run_id: Uuid,
+    work_item_id: WorkItemId,
+) -> Result<(), RunTaskCardError> {
+    let worktree_id = context
+        .worktree_id
+        .ok_or(RunTaskCardError::Conflict("task_worktree_required"))?;
+    let binding: Option<Uuid> = sqlx::query_scalar(
+        r#"SELECT worktree_id
+           FROM multica.engineering_run_worktree_binding
+           WHERE tenant_id=$1 AND project_id=$2 AND engineering_run_id=$3
+             AND worktree_id=$4 AND valid_to IS NULL
+           FOR SHARE"#,
+    )
+    .bind(context.tenant_id.as_uuid())
+    .bind(project_id)
+    .bind(engineering_run_id)
+    .bind(worktree_id.as_uuid())
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(database_error)?;
+    if binding.is_none() {
+        return Err(RunTaskCardError::NotFound);
+    }
+
+    // Run-owned cards can acquire an explicit Worktree assignment at claim time. The current
+    // Run and target binding are validated above; the relation is inserted before the lifecycle
+    // row lock so its trigger can validate the canonical owner in this transaction.
+    sqlx::query(
+        r#"INSERT INTO multica.work_item_worktree
+             (tenant_id,project_id,work_item_id,worktree_id)
+           VALUES ($1,$2,$3,$4)
+           ON CONFLICT DO NOTHING"#,
+    )
+    .bind(context.tenant_id.as_uuid())
+    .bind(project_id)
+    .bind(work_item_id.as_uuid())
+    .bind(worktree_id.as_uuid())
+    .execute(&mut *connection)
+    .await
+    .map_err(database_error)?;
+    Ok(())
+}
+
 fn parse_review_state(value: &str) -> Option<RunTaskCardReviewState> {
     match value {
         "none" => Some(RunTaskCardReviewState::None),
@@ -917,6 +1015,7 @@ async fn insert_lifecycle_audit(
     connection: &mut PgConnection,
     context: &RunTaskCardCommandContext,
     project_id: Uuid,
+    engineering_run_id: Uuid,
     work_item_id: WorkItemId,
     from_status: Option<&str>,
     to_status: Option<&str>,
@@ -925,13 +1024,14 @@ async fn insert_lifecycle_audit(
 ) -> Result<(), RunTaskCardError> {
     sqlx::query(
         r#"INSERT INTO multica.task_lifecycle_audit
-             (tenant_id,project_id,worktree_id,work_item_id,task_card_id,from_status,to_status,
+             (tenant_id,project_id,engineering_run_id,worktree_id,work_item_id,task_card_id,from_status,to_status,
               event_type,actor_id,idempotency_key,correlation_id,details)
-           VALUES ($1,$2,$3,$4,$4,$5,$6,$7,$8,$9,$10,$11)"#,
+           VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12)"#,
     )
     .bind(context.tenant_id.as_uuid())
     .bind(project_id)
-    .bind(context.worktree_id.as_uuid())
+    .bind(engineering_run_id)
+    .bind(context.worktree_id.map(|id| id.as_uuid()))
     .bind(work_item_id.as_uuid())
     .bind(from_status)
     .bind(to_status)
@@ -950,6 +1050,7 @@ async fn load_snapshot(
     connection: &mut PgConnection,
     context: &RunTaskCardCommandContext,
     project_id: Uuid,
+    engineering_run_id: Uuid,
     work_item_id: WorkItemId,
 ) -> Result<RunTaskCardSnapshot, RunTaskCardError> {
     let row: Option<(
@@ -971,20 +1072,14 @@ async fn load_snapshot(
         r#"SELECT m.work_item_id,m.item_type,m.title,m.description,m.priority,m.labels,m.ai_task_data,
                   m.reporter_user_id,c.status,c.review_state,c.active_worktree_id,c.version,
                   c.updated_at,m.updated_at
-           FROM multica.work_item_worktree l
-           JOIN multica.task_metadata m ON m.tenant_id=l.tenant_id AND m.work_item_id=l.work_item_id
-             AND m.project_id=l.project_id AND m.valid_to IS NULL
-           JOIN multica.engineering_run_worktree_binding b ON b.tenant_id=l.tenant_id
-             AND b.project_id=l.project_id AND b.worktree_id=l.worktree_id AND b.valid_to IS NULL
-             AND b.repository_id=m.repository_id AND b.branch_id=m.branch_id
-             AND b.engineering_run_id=m.engineering_run_id
+           FROM multica.task_metadata m
            JOIN multica.task_lifecycle_current c ON c.tenant_id=m.tenant_id AND c.work_item_id=m.work_item_id
-           WHERE l.tenant_id=$1 AND l.project_id=$2 AND l.worktree_id=$3
-             AND l.work_item_id=$4 AND l.valid_to IS NULL"#,
+           WHERE m.tenant_id=$1 AND m.project_id=$2 AND m.engineering_run_id=$3
+             AND m.work_item_id=$4 AND m.valid_to IS NULL"#,
     )
     .bind(context.tenant_id.as_uuid())
     .bind(project_id)
-    .bind(context.worktree_id.as_uuid())
+    .bind(engineering_run_id)
     .bind(work_item_id.as_uuid())
     .fetch_optional(&mut *connection)
     .await

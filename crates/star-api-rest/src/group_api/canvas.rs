@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=67b75e0a1af45f346b55d6acf1b03a395ba9e16f82e4ccf4deb4165d31670553
+@cypher schema=1 source_sha256=1b8591221cc0dfefd69c831ac9c6c8805726b8e7f5b1fa1b3b23599dc4a2255a
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas.rs"})
 MERGE (route:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::router",kind:"function"})
 MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::list_worktree_canvas_events",kind:"function"})
@@ -593,7 +593,9 @@ async fn create_work_item_on_canvas(
     let context = run_task_card_context(
         actor.tenant_id,
         actor.user_id,
-        worktree_id,
+        None,
+        None,
+        Some(worktree_id),
         key.clone(),
         hash.clone(),
         correlation_id,

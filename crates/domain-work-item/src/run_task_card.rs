@@ -3,7 +3,7 @@
 //! This module is deliberately separate from the historical three-state `WorkItem` API. It
 //! models the canonical Multica Task Card lifecycle owned by an Engineering Run.
 //!
-//! @cypher schema=1 source_sha256=833e829dfe9b749021090c8831561c45dbce93b57389439d97b6e56370ca2e82
+//! @cypher schema=1 source_sha256=590447a18da1306e187202694ec56e3c8a06bd86cf7d88cc3e0159b8cd6f44f4
 //! MERGE (self:File {path:"crates/domain-work-item/src/run_task_card.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::module",kind:"module"})
 //! MERGE (context:Type {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandContext",kind:"struct"})
@@ -42,18 +42,23 @@ use uuid::Uuid;
 
 use crate::{RepositoryId, TenantId, UserId, WorkItemId, WorktreeId};
 
-/// Trusted request identity supplied by authenticated application composition.
+/// Trusted Project/Run identity supplied by authenticated application composition.
 ///
-/// The adapter still revalidates every binding and grant in its write transaction. These values
-/// must never be copied from an untrusted request body.
+/// A Worktree is optional execution context, not the Task Card owner. The adapter revalidates the
+/// Project, Run, optional Worktree binding, and grants in its owner transaction. These values must
+/// never be copied from an untrusted request body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunTaskCardCommandContext {
     /// Authenticated tenant.
     pub tenant_id: TenantId,
     /// Authenticated actor.
     pub actor_id: UserId,
-    /// Focus Worktree selected by the caller.
-    pub worktree_id: WorktreeId,
+    /// Authorized Project when the caller addresses a Run directly.
+    pub project_id: Option<Uuid>,
+    /// Canonical owner Run when the caller addresses a Run directly.
+    pub engineering_run_id: Option<Uuid>,
+    /// Optional checkout focus. Legacy Worktree routes may resolve Project/Run from this binding.
+    pub worktree_id: Option<WorktreeId>,
     /// Bounded idempotency key scoped to tenant and actor.
     pub idempotency_key: String,
     /// SHA-256 fingerprint over the canonical operation, route scope, and request body.
@@ -67,7 +72,13 @@ impl RunTaskCardCommandContext {
     pub fn validate(&self) -> Result<(), RunTaskCardError> {
         if self.tenant_id.as_uuid().is_nil()
             || self.actor_id.as_uuid().is_nil()
-            || self.worktree_id.as_uuid().is_nil()
+            || self.project_id.is_some_and(|id| id.is_nil())
+            || self.engineering_run_id.is_some_and(|id| id.is_nil())
+            || self
+                .worktree_id
+                .is_some_and(|worktree_id| worktree_id.as_uuid().is_nil())
+            || (self.engineering_run_id.is_some() != self.project_id.is_some())
+            || (self.engineering_run_id.is_none() && self.worktree_id.is_none())
             || self.correlation_id.is_nil()
             || self.idempotency_key.trim().is_empty()
             || self.idempotency_key.len() > 128

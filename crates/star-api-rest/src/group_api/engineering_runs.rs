@@ -1,11 +1,19 @@
 /*
-@cypher schema=1 source_sha256=440cb3cf7261634e1c4067b34650e11ad64e643af75d3b637df4348eb085fc19
+@cypher schema=1 source_sha256=463f18f2b7d4e43ea06bcd71d706c81a516f7c0a6088c3761039bd1b7a66afb9
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/engineering_runs.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::router",kind:"function"})
 MERGE (listProjectRuns:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::list_project_runs",kind:"function"})
+MERGE (ownedTaskScope:Type {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::RunOwnedTaskScope",kind:"struct"})
+MERGE (authorizeOwnedTask:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::authorize_run_owned_task_scope",kind:"function"})
+MERGE (runAuthority:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::run_authority",kind:"function"})
 MERGE (self)-[:DEFINES]->(router)
 MERGE (self)-[:DEFINES]->(listProjectRuns)
+MERGE (self)-[:DEFINES]->(ownedTaskScope)
+MERGE (self)-[:DEFINES]->(authorizeOwnedTask)
+MERGE (self)-[:DEFINES]->(runAuthority)
 MERGE (router)-[:CALLS]->(listProjectRuns)
+MERGE (authorizeOwnedTask)-[:CALLS]->(runAuthority)
+MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 @endcypher
 */
 
@@ -75,11 +83,11 @@ use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::work_items::{idempotency_key, request_hash};
 use super::{
     active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
     GroupApiError, GroupApiState, ProjectBinding,
 };
-use super::work_items::{idempotency_key, request_hash};
 
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -200,6 +208,16 @@ pub(super) struct RunTaskScope {
     pub(super) project_id: Uuid,
     pub(super) repository_id: Uuid,
     pub(super) branch_id: Uuid,
+    pub(super) role: String,
+    pub(super) permission_snapshot_ref: String,
+}
+
+/// Project/Run authorization used by Task Cards, whose canonical owner does not require a host Branch.
+pub(super) struct RunOwnedTaskScope {
+    pub(super) engineering_run_id: Uuid,
+    pub(super) project_id: Uuid,
+    pub(super) repository_id: Option<Uuid>,
+    pub(super) branch_id: Option<Uuid>,
     pub(super) role: String,
     pub(super) permission_snapshot_ref: String,
 }
@@ -370,20 +388,34 @@ pub(super) async fn authorize_run_task_scope(
     actor: &AuthUser,
     run_id: Uuid,
 ) -> Result<RunTaskScope, GroupApiError> {
-    let authority = run_authority(tx, actor, run_id).await?;
-    let repository_id = authority
-        .run
+    let scope = authorize_run_owned_task_scope(tx, actor, run_id).await?;
+    let repository_id = scope
         .repository_id
-        .ok_or_else(|| GroupApiError::invalid_request("run_repository_binding_required"))?;
-    let branch_id = authority
-        .run
-        .branch_id
-        .ok_or_else(|| GroupApiError::invalid_request("run_task_scope_requires_repository_and_host_branch"))?;
+        .ok_or_else(|| GroupApiError::conflict("run_task_scope_requires_repository_binding"))?;
+    let branch_id = scope.branch_id.ok_or_else(|| {
+        GroupApiError::conflict("run_task_scope_requires_repository_and_host_branch")
+    })?;
     Ok(RunTaskScope {
-        engineering_run_id: authority.run.engineering_run_id,
-        project_id: authority.run.project_id,
+        engineering_run_id: scope.engineering_run_id,
+        project_id: scope.project_id,
         repository_id,
         branch_id,
+        role: scope.role,
+        permission_snapshot_ref: scope.permission_snapshot_ref,
+    })
+}
+
+pub(super) async fn authorize_run_owned_task_scope(
+    tx: &mut Transaction<'_, Postgres>,
+    actor: &AuthUser,
+    run_id: Uuid,
+) -> Result<RunOwnedTaskScope, GroupApiError> {
+    let authority = run_authority(tx, actor, run_id).await?;
+    Ok(RunOwnedTaskScope {
+        engineering_run_id: authority.run.engineering_run_id,
+        project_id: authority.run.project_id,
+        repository_id: authority.run.repository_id,
+        branch_id: authority.run.branch_id,
         role: authority.run_grant.role,
         permission_snapshot_ref: format!(
             "{}:v{}",
@@ -495,12 +527,14 @@ async fn create_project_run(
     if !matches!(project.role.as_str(), "tenant_admin" | "project_admin") {
         return Err(GroupApiError::not_found());
     }
-    sqlx::query("SELECT set_config('app.actor_id',$1,true), set_config('app.correlation_id',$2,true)")
-        .bind(actor.user_id.to_string())
-        .bind(body.correlation_id.to_string())
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "SELECT set_config('app.actor_id',$1,true), set_config('app.correlation_id',$2,true)",
+    )
+    .bind(actor.user_id.to_string())
+    .bind(body.correlation_id.to_string())
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
     let lock_key = format!("{}:{}:{}", actor.tenant_id, actor.user_id, key);
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(&lock_key)
@@ -547,8 +581,11 @@ async fn create_project_run(
          WHERE target.tenant_id=expired.tenant_id AND target.actor_id=expired.actor_id
            AND target.idempotency_key=expired.idempotency_key",
     )
-        .bind(actor.tenant_id).bind(actor.user_id)
-        .execute(&mut *tx).await.map_err(|_| GroupApiError::internal())?;
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
 
     let run_id = Uuid::new_v4();
     sqlx::query(
@@ -736,6 +773,10 @@ fn context_envelope(
     authority: RunAuthority,
     focus: Option<RunWorktreeRow>,
 ) -> Value {
+    let task_cards_available = actor
+        .scope
+        .split_ascii_whitespace()
+        .any(|scope| scope == "work-item:read");
     let binding_snapshot = focus.as_ref().map(|row| {
         (
             row.binding_id,
@@ -772,7 +813,11 @@ fn context_envelope(
             "context_version":context_version,"resolved_at":Utc::now(),"correlation_id":Uuid::new_v4(),
         },
         "branch":null,"engineering_run":authority.run,"focus":focus,"focus_version":focus_version,
-        "capabilities":{"run_owned_apps_available":false,"execution_admission_available":false},
+        "capabilities":{
+            "run_owned_apps_available":false,
+            "task_cards_available":task_cards_available,
+            "execution_admission_available":false
+        },
     })
 }
 

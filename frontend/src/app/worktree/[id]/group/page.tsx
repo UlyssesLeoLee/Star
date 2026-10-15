@@ -1,14 +1,19 @@
 /*
-@cypher schema=1 source_sha256=e9df7d2ea47d8475d0ea8ecf2c1d17be8bd35214a214ae57194ff1e731737cb1
+@cypher schema=1 source_sha256=3f3e6e8b48f889fd5d5fb57cc916197e4357ee03d80ebc170241028670c30421
 MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
-MERGE (isAppId:Symbol {id:"frontend/src/app/worktree/[id]/group/page.tsx::isAppId",kind:"function"})
-MERGE (resolveAppId:Symbol {id:"frontend/src/app/worktree/[id]/group/page.tsx::resolveAppId",kind:"function"})
-MERGE (page:Symbol {id:"frontend/src/app/worktree/[id]/group/page.tsx::GroupWorkspacePage",kind:"component"})
+MERGE (page:Function {name:"GroupWorkspacePage", language:"typescript", visibility:"public"})
+MERGE (isAppId:Function {name:"isAppId", language:"typescript", visibility:"private"})
+MERGE (resolveAppId:Function {name:"resolveAppId", language:"typescript", visibility:"private"})
+MERGE (appHref:Function {name:"appHref", language:"typescript", visibility:"private"})
+MERGE (legacyAppCanonicalization:Logic {name:"legacyWorkItemAppUrlCanonicalization", language:"typescript"})
+MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:DEFINES]->(isAppId)
 MERGE (self)-[:DEFINES]->(resolveAppId)
-MERGE (self)-[:DEFINES]->(page)
-MERGE (page)-[:CALLS]->(resolveAppId)
+MERGE (self)-[:DEFINES]->(appHref)
 MERGE (resolveAppId)-[:CALLS]->(isAppId)
+MERGE (page)-[:CALLS]->(resolveAppId)
+MERGE (page)-[:CALLS]->(appHref)
+MERGE (page)-[:USES]->(legacyAppCanonicalization)
 @endcypher
 */
 /*
@@ -563,8 +568,8 @@ const GROUP_APPS: Array<{
   subtitle: string;
   icon: LucideIcon;
 }> = [
-  { id: "task-flow", label: "任务流程", subtitle: "领取、执行与评审", icon: Blocks },
-  { id: "board", label: "计划看板", subtitle: "阶段、待办与迭代", icon: SquareKanban },
+  { id: "task-flow", label: "任务生命周期", subtitle: "领取、执行与评审", icon: Blocks },
+  { id: "board", label: "工作项看板", subtitle: "阶段、待办与迭代", icon: SquareKanban },
   { id: "task-card", label: "Task Cards", subtitle: "统一任务入口", icon: ClipboardList },
   { id: "canvas", label: "无限画布", subtitle: "协作式空间画布", icon: LayoutGrid },
   { id: "workflow", label: "Workflow", subtitle: "LangGraph / L0", icon: Workflow },
@@ -587,7 +592,7 @@ const STATUS_OPTIONS: Array<{ value: WorkItemStatus; label: string }> = [
 ];
 
 // V字モデル工程 (per IPA V字モデル 9 段階, P6 テスト 4 サブ → 12 縦列)
-// V字モデルを計画看板のデフォルトとして,
+// V 字模型工作项看板的默认视图。
 //   各工程を独立した縦列として配置, 工程内 5 状態槽横並び
 type VModelPhaseId =
   | "P1" | "P2" | "P3" | "P4" | "P5"
@@ -2461,7 +2466,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           {currentApp === "task-flow" && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">任务流程</h2><p className="text-xs text-ink-mute">领取、执行与评审共用 Work Item 状态源。</p></div>
+                <div><h2 className="text-lg font-semibold">任务生命周期</h2><p className="text-xs text-ink-mute">领取、执行与评审共用 Work Item 状态源。</p></div>
                 {groupProjection.mode === "live"
                   ? <span className="rounded border border-success/40 bg-success/10 px-2 py-1 text-[10px] text-success">服务端生命周期与版本</span>
                   : <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">示例数据只在浏览器 store</span>}
@@ -2583,14 +2588,14 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 })()}
               </div>
 
-              <p className="text-[10px] text-ink-mute">V字モデル 12 縦列 (9 工程 + テスト 4 サブ工程)。列内 5 状態槽は IPA V字モデル 工程ごとに WIP 上限を定義。工程間の状態遷移と WIP 上限を可視化。</p>
+              <p className="text-[10px] text-ink-mute">V字模型包含 12 个阶段列（9 个工程阶段与 4 个测试子阶段）。每列的 5 个状态槽按工程设置 WIP 上限，并按 P5 实现、P6 测试、P9 收尾的阶段顺序推进。</p>
             </div>
           )}
 
           {currentApp === "task-card" && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">Task Card Index</h2><p className="text-xs text-ink-mute">Task Card、Canvas、任务流程和计划看板是同级入口。</p></div>
+                <div><h2 className="text-lg font-semibold">Task Card Index</h2><p className="text-xs text-ink-mute">任务卡与 Canvas、任务生命周期、工作项看板是同级入口。</p></div>
                 <span className={`rounded border px-2 py-1 text-[10px] ${cliSessionForSelectedTask ? "border-success/40 bg-success/10 text-success" : "border-warning/40 bg-warning/10 text-warning"}`}>
                   {cliSessionForSelectedTask ? "Task CLI Session" : "CLI 预览 / 等待受控 Runtime"}
                 </span>
@@ -2631,7 +2636,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                         ? <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 卡内 CLI 预览</Link>
                         : <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">先绑定当前 Worktree 才能打开 CLI</span>}
                       {selectedTaskCanvasElement && <Link href={appHref("canvas", { highlight: selectedTaskCanvasElement.id })} className="btn text-xs"><LayoutGrid size={13} /> 在 Canvas 中定位</Link>}
-                      <Link href={appHref("board")} className="btn text-xs"><ArrowUpRight size={13} /> 打开计划看板</Link>
+                      <Link href={appHref("board")} className="btn text-xs"><ArrowUpRight size={13} /> 打开工作项看板</Link>
                     </div>
                   </article>
                   <section className="card min-h-[320px] space-y-3">
@@ -2828,7 +2833,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 <label className="grid gap-1 text-[10px]">标签<input className="input py-1 text-xs" maxLength={500} value={selectedConnector.label ?? ""} disabled={canvasDocumentSavePending} onChange={(event) => updateCanvasConnector(selectedConnector.id, { label: event.currentTarget.value })} /></label>
                 <label className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={selectedConnector.arrow_start} disabled={canvasDocumentSavePending} onChange={(event) => updateCanvasConnector(selectedConnector.id, { arrow_start: event.currentTarget.checked })} />起点箭头</label>
                 <label className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={selectedConnector.arrow_end} disabled={canvasDocumentSavePending} onChange={(event) => updateCanvasConnector(selectedConnector.id, { arrow_end: event.currentTarget.checked })} />终点箭头</label>
-                {selectedConnector.kind !== "free" && <p className="text-[10px] text-ink-mute lg:col-span-7">当前是其他领域投影的连线；这里仅编辑画布展示，不改变其 Work Item 关系。</p>}
+                {selectedConnector.kind !== "free" && <p className="text-[10px] text-ink-mute lg:col-span-7">当前是其他领域投影的连线；这里仅编辑画布展示，不改变其工作项关系。</p>}
               </div>}
               {groupProjection.mode === "live" && selectedCanvasElement && !selectedCanvasElement.locked && canvasElementGeometryDraft && <div className="grid gap-2 rounded-lg border border-line bg-bg-card p-3 sm:grid-cols-4" data-testid="canvas-element-geometry-editor">
                 <label className="grid gap-1 text-xs">元素宽度<input className="input py-1 text-xs" type="number" min={1} max={10_000} step={1} value={canvasElementGeometryDraft.width} disabled={canvasElementGeometryPending} onChange={(event) => { const value = event.currentTarget.valueAsNumber; if (Number.isFinite(value)) { setCanvasElementGeometryDraft((current) => current ? { ...current, width: value } : current); setCanvasElementGeometryError(null); setCanvasElementGeometrySaved(false); } }} /></label>
