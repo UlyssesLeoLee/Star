@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=76d82afbf5b99284b857bc73acc3b4b318de7c377db86a85e95a286d2604d848
+@cypher schema=1 source_sha256=a271a844b5e68f37ec811cfb7ffc96cf85d6da1461b400c16af5d2eccc59c8ad
 MERGE (self:File {path:"frontend/src/lib/run/runDirectoryApi.ts"})
 MERGE (create:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (createLegacy:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
@@ -8,6 +8,8 @@ MERGE (request:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectory
 MERGE (mapTask:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapRunTaskCard",kind:"function"})
 MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
 MERGE (input:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::CreateRunTaskCardInput",kind:"type"})
+MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
+MERGE (self)-[:DEFINES]->(runHref)
 MERGE (self)-[:DEFINES]->(create)
 MERGE (self)-[:DEFINES]->(projectRuns)
 MERGE (self)-[:DEFINES]->(request)
@@ -662,6 +664,10 @@ export class RunDirectoryApiClient {
   }
 }
 
+export function canonicalRunHref(projectId: string, runId: string): string {
+  return `/projects/${uuid(projectId)}/runs/${uuid(runId)}`;
+}
+
 export function canonicalRunWorktreeHref(projectId: string, runId: string, worktreeId: string): string {
-  return `/projects/${uuid(projectId)}/runs/${uuid(runId)}/worktrees/${uuid(worktreeId)}`;
+  return `${canonicalRunHref(projectId, runId)}/worktrees/${uuid(worktreeId)}`;
 }

@@ -1,16 +1,18 @@
 /*
-@cypher schema=1 source_sha256=c4bb1da371d15de4be1341bdb23ff02b9998e1d8263bb3ed2b8588ae5eb75a30
+@cypher schema=1 source_sha256=e45edc20cf5004eb443f02f999fc9135737a7a848d92b431d26bfcdac81f7721
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
 MERGE (row:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::DirectoryRow",kind:"component"})
 MERGE (label:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::nodeScopeLabel",kind:"function"})
+MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
 MERGE (self)-[:DEFINES]->(tree)
 MERGE (self)-[:DEFINES]->(live)
 MERGE (self)-[:DEFINES]->(row)
 MERGE (self)-[:DEFINES]->(label)
 MERGE (live)-[:CALLS]->(row)
 MERGE (row)-[:CALLS]->(label)
+MERGE (row)-[:CALLS]->(runHref)
 @endcypher
 */
 
@@ -20,7 +22,7 @@ CREATE (f:File {name:"frontend/src/components/run/ProjectRunTree.tsx",type:"file
  (row:Function {name:"DirectoryRow",type:"function"}),(label:Function {name:"nodeScopeLabel",type:"function"}),
  (key:Function {name:"moveTreeFocus",type:"function"}),(start:Function {name:"mountDirectoryTree",type:"function"}),(clamp:Function {name:"clampTreeViewport",type:"function"}),
  (model:Class {name:"RunDirectoryTree",type:"class"}),(session:Function {name:"useRunDirectory",type:"function"}),
- (href:Function {name:"canonicalRunWorktreeHref",type:"function"}),
+ (href:Function {name:"canonicalRunWorktreeHref",type:"function"}),(runHref:Function {name:"canonicalRunHref",type:"function"}),
  (height:Variable {name:"ROW_HEIGHT",type:"variable"}),(viewport:Variable {name:"VIEWPORT_HEIGHT",type:"variable"}),(overscan:Variable {name:"OVERSCAN",type:"variable"}),
  (store:Function {name:"useSyncExternalStore",type:"function"}),(memo:Function {name:"useMemo",type:"function"}),
  (effect:Function {name:"useEffect",type:"function"}),(state:Function {name:"useState",type:"function"}),(ref:Function {name:"useRef",type:"function"}),
@@ -34,9 +36,9 @@ CREATE (f:File {name:"frontend/src/components/run/ProjectRunTree.tsx",type:"file
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, ChevronRight, FolderKanban, GitBranch, Layers, Monitor, Plus, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, ClipboardList, FolderKanban, GitBranch, Layers, Monitor, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
-import { canonicalRunWorktreeHref, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
+import { canonicalRunHref, canonicalRunWorktreeHref, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { directoryErrorMessage, RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
 import { useTranslation } from "@/lib/i18n";
@@ -229,8 +231,16 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCre
       </Link>
     </div>;
   }
+  if (node.kind === "run") return <div role="presentation" style={style} className="flex items-center gap-1">
+    <button role="treeitem" aria-level={depth + 1} aria-expanded={expanded} type="button" data-directory-index={index}
+      className={`${className} min-w-0 flex-1`} onClick={() => model.toggle(node)} title={node.label}>{contents}</button>
+    <Link href={canonicalRunHref(node.entity.project_id, node.entity.engineering_run_id)} prefetch={false}
+      aria-label={`${node.label}: 打开 Task Cards`} title="打开此 Run 的 Task Cards"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-mute hover:bg-accent/10 hover:text-accent focus:outline focus:outline-1 focus:outline-accent">
+      <ClipboardList size={13} />
+    </Link>
+  </div>;
   if (node.kind === "branch") return <div role="treeitem" aria-level={depth + 1} tabIndex={-1}
     data-directory-index={index} style={style} title={node.entity.name ? `本地 checkout 记录（来源/新鲜度未验证）：${node.entity.name}` : "本地 checkout 状态未采集"} className={className}>{contents}</div>;
-  return <button role="treeitem" aria-level={depth + 1} aria-expanded={expanded} type="button" data-directory-index={index}
-    style={style} title={node.label} className={className} onClick={() => model.toggle(node)}>{contents}</button>;
+  return null;
 }

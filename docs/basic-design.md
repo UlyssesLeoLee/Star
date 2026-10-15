@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.66 (2026-10-15)
-> **上游要件定义书**: docs/requirements.md v6.66
+> **文档版本**: v6.67 (2026-10-15)
+> **上游要件定义书**: docs/requirements.md v6.67
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4219,7 +4219,7 @@ frontend/src/
 
 canonical Worktree route 为 `/projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}?tab={app_id}`。旧 `/projects/{project_id}/branches/{branch_id}/runs/{engineering_run_id}/worktrees/{worktree_id}` 仅重定向到 canonical route 并忽略旧 `branch_id`；目标重新解析当前身份、Project/Run grants 与该 Worktree binding。Branch grant 不门控 Project/Run 导航或普通 Run Apps；旧 Branch-scoped compatibility API 可暂时保留原服务端授权检查，远端 SCM 操作仍必须复验相应 Branch grant。`/worktree?project_id=...` 与 `/worktree/{worktree_id}/group` 仍是兼容入口。Run 目录导航只重验 Project/Run；进入 Worktree 子树或设置 focus 时再重验 binding；`worktree_id` 不授予 Run App 权限。不得默认切换到任意项目或通用任务树。
 
-左侧主导航固定为 Project → Engineering Run → Worktree → Branch。Project Worktree Index 保留为跨 Run/Worktree 的汇总管理视图。Run 展开后显示本地 Worktree；Worktree 展开后显示 Branch 本地状态叶。点击 Worktree 才打开其所属 Run 的右侧 tabs。Inbox、任务生命周期、计划管理、Task Card、Infinite Canvas、Workflow/LangGraph、Run BI/Benchmark 与插件都是 Run 同级能力；**Task Card 与 Infinite Canvas 同级**，CLI 与 Agent Session 是卡内操作面板。Worktree 是真实 checkout，也是焦点和 CLI/Git 操作目标；Engineering Run 是 App、任务协作和分析范围。
+左侧主导航固定为 Project → Engineering Run → Worktree → Branch。Project Worktree Index 保留为跨 Run/Worktree 的汇总管理视图。Run 展开后显示本地 Worktree；Worktree 展开后显示 Branch 本地状态叶。点击 Worktree 才打开其所属 Run 的右侧完整 App tabs。没有 Worktree 的 hostless Run 可从 Run 行打开单独 Task Cards 页面，该页面不呈现完整 tabs，聊天 scope 固定为 GLOBAL。Inbox、任务生命周期、计划管理、Task Card、Infinite Canvas、Workflow/LangGraph、Run BI/Benchmark 与插件都是 Run 同级能力；**Task Card 与 Infinite Canvas 同级**，CLI 与 Agent Session 是卡内操作面板。Worktree 是真实 checkout，也是焦点和 CLI/Git 操作目标；Engineering Run 是 App、任务协作和分析范围。
 
 ```text
 Tenant → Workspace → Project（左侧第一级）
@@ -5708,8 +5708,15 @@ The additive migration leaves legacy rows unassigned and performs no inferred ba
 
 Validation status: source migration and API changes are not evidence of deployment. The target database migration, application-role grants, FORCE RLS, Rust/HTTP/frontend checks and production readiness have not been verified in this slice. Missing providers or database state must fail closed without mock/seed fallback.
 
+## 16.66 — Hostless Run Task Cards entry without Worktree focus
+
+The Project → Run directory exposes a Task Cards action for an authorized Run even when it has no Worktree or remote Branch. The canonical `/projects/{project_id}/runs/{engineering_run_id}` page resolves Project/Run authorization on the server and loads Task Cards with `focus=null`; it does not render Worktree-bound App tabs. A Worktree selection uses `/projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}`, revalidates the current binding, establishes checkout focus, and then renders the Run App tabs. GLOBAL chat is the only available chat scope without focus; WORKTREE scope appears only for a focused Worktree.
+
+The browser route does not grant access. The run API must validate current Project/Run membership, Task Card capability, and optional Worktree binding. Validation after rebase: TypeScript 7.0.2 passes with `--singleThreaded`; its default parallel check exited after exhausting this machine's virtual memory. Focused Vitest could not start because the shared dependency tree lacks `@csstools/css-parser-algorithms/index.js` (zero tests ran); Cargo/rustfmt are unavailable in this PowerShell environment. The database migration, grants/RLS and production deployment remain unverified.
+
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.67 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.67；增加无 Worktree 的 Run Task Cards 直接入口，限定为单独 Task Cards 页面；完整 Run App tabs 仍要求选中 Worktree 并建立 checkout focus；hostless context 显式显示未绑定；记录 TypeScript 7.0.2 `--singleThreaded` 通过及默认并行检查内存阻断、Vitest/Rust/DB 验证缺口 | 自审发现 hostless Task Card API 已有可选 focus，但 Run Shell 无 focus 时返回空 |
 | v6.66 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v6.66 与 ERUN-P3.2：Task Card 改为 Project/Run owner，新增无宿主 Branch、无 Worktree focus 的 Run list/create 路由；明确可选 focus 校验、schema v2 Outbox、未验证 migration/RLS 与仍关闭的生命周期/Schedule/CLI 门 | Run Task Card hostless owner 源码切片完成并对照需求、基本设计、详细设计 |
 | v6.65 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐需求 v6.65；明确 Run 导航与普通 App 授权不依赖 Worktree/Branch grant，定义 Project/Run Task owner 目标并将旧 repository/branch tuple 标为 hostless 迁移阻断；保留 DB/RLS、Schedule 与执行门禁 | 用户重申固定 Project → Run → Worktree → Branch 并确认 Run 脱离宿主 Branch |
 | v6.64 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐需求 v6.64；固定 Project → Run → Worktree → Branch 与 host-independent Run，加入中性产品命名/连接器事实标签边界；保持 migration/DB/RLS/Worktree binding/Task owner/执行未验收 | 用户要求综合导航层级与产品文案规则 |
