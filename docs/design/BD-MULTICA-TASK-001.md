@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Task Lifecycle 基本設計書 v0.15**
+> **Task Lifecycle 基本設計書 v0.16**
 >
-> - 状态: 🟡 Draft v0.15
+> - 状态: 🟡 Draft v0.16
 > - 日期: 2026-10-02 JST
-> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.22
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.23
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -260,7 +260,9 @@ BI owner runtime exposes a static-dispatch, caller-driven `TaskEventReceiver`. I
 
 The core limits exact wire to 16 KiB and requires the transport to reject oversized frames before buffering. After validating provider/source identity, route and exact event ID, it calls the BI owner transaction. ACK occurs only after the transaction returns a stable committed/replay receipt and a second current-origin authorization check. Cancellation may race commit or ACK; transport redelivery and Inbox exact replay resolve uncertainty. Malformed envelopes, tenant/message mismatch, and content conflicts go to a quarantine port that stores only bounded route/origin/cursor, digest, length and fault metadata. The port must deduplicate `(route, provider_identity, log_generation, log_id, sequence)` and reject changed digest/fault; terminal disposition requires a committed non-nil receipt plus reauthorization.
 
-This is only a receiver policy core. No concrete transport, identity verifier, quarantine database, owner composition, target DB grants/RLS, migration, BI query API/UI, downstream consumers or accepted settlement is delivered. The code's focused Rust gates were not run because cargo/rustfmt are unavailable; production BI ingress, delivery acceptance and Task/Run execution remain fail closed.
+The new `TaskEventQuarantineStore` writes through the fixed `bi.record_task_event_quarantine_v1` owner function. `bi.task_event_quarantine` is an append-only Transaction table containing route/source cursor metadata, message ID, exact-wire SHA-256/length and a fixed fault code only. Its unique key includes the full immutable route identity and source cursor. Exact replay returns the original receipt only when message ID, digest, length and fault match; otherwise the function returns a conflict without a receipt. The runtime has no direct privileges on this table; this migration grants EXECUTE on the fixed quarantine function. The fixture also checks NOINHERIT role attributes and rejects membership that would permit runtime `SET ROLE` to the owner. Tenant FORCE RLS and WORM are enforced. The isolated PostgreSQL 18 runner passed double application, invalid-input/tenant-scope, scoped privileges/RLS/WORM, exact-replay and deterministic unique-key lock-wait races across two sessions.
+
+The function does not prove that its route parameters came from the authoritative pin registry or authenticate a transport principal; a trusted Rust adapter must supply those facts. `app.tenant_id` rejects missing or mismatched call scope but is not a security boundary against a compromised runtime role able to set the GUC. No concrete production transport, identity verifier, receiver composition, target DB grants/RLS deployment, BI query API/UI, downstream consumers or accepted settlement is delivered. Rust 1.99.0 focused gates remain unrun because cargo/rustfmt are unavailable; production BI ingress, delivery acceptance and Task/Run execution remain fail closed.
 
 ## §9 已知缺口
 
@@ -287,6 +289,7 @@ GAP-7: Task route pin and bounded Rust claim/route/wire source store exist, but 
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.16 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.23、requirements v6.83/basic v6.82、Task DD v1.37 与 Data Design v2.29；将 §6.4 更新为包括固定 BI owner durable quarantine adapter、完整 route/cursor 幂等、metadata-only T 表、exactness 与隔离 PG18 并发验证；明确 trusted adapter/GUC 边界及生产/Rust gates | Phase 9F4G durable quarantine persistence slice |
 | v0.15 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.22、requirements v6.82/basic v6.81、Task DD v1.36；新增 §6.4 定义 provider-neutral receiver ports、单条 bounded receive、cancel/deadline、commit-before-ACK、exact replay 与 metadata-only quarantine；明确无生产 transport/auth/quarantine/target DB/query 且 Rust gates 未运行 | Phase 9F4G receiver core source slice |
 | v0.14 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.21、requirements v6.81/basic v6.80、Task DD v1.35/Group DD v5.08 与 Data Design v2.28；新增 §6.3 说明 DB-side projection、历史 raw fact 原子回填/替换、严格状态验证及隔离 PG18.6 通过；Rust 1.99.0 `bi-owner-runtime` rustfmt/all-target tests (4/4)/strict Clippy 通过；保留备份/WAL、target DB、认证 receiver、BI API 与 workspace-wide gates | 9F4F 最小化 BI durable fact 中的自由文本和未受控字段 |
 | v0.13 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.20、总需求 v6.80/basic v6.79、Task DD v1.34 与 Data Design v2.27；新增首个 BI owner Inbox + immutable fact / payload-free conflict incident、exact replay 与 bounded schema；记录 PostgreSQL 18.6 双次 apply/夹具通过及无 auth adapter/projection/fan-out/target DB/Rust build/retention policy | Phase 9F4E 首个业务消费者持久化边界实现 |

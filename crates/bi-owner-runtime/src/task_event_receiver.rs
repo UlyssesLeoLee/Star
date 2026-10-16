@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=44e9444f35bb89edb1478d2be9643d9b1c1f06e05b0af4525939d352b8bbfb1a
+@cypher schema=1 source_sha256=2a398109611bb5d29dd140f6daa899de9399a5d6875f36ca2aa7d3f550e685c4
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_receiver.rs"})
 MERGE (route:Type {id:"bi_owner_runtime::TaskEventReceiveRoute",kind:"struct"})
 MERGE (origin:Type {id:"bi_owner_runtime::TaskEventReceiveOrigin",kind:"struct"})
@@ -327,6 +327,10 @@ pub enum TaskEventReceiveError {
     Transport,
     #[error("durable Task-event quarantine did not commit")]
     Quarantine,
+    #[error("BI Task-event quarantine cursor conflicts with its committed record")]
+    QuarantineConflict,
+    #[error("BI Task-event quarantine database operation failed")]
+    QuarantineDatabase(#[from] sqlx::Error),
     #[error("Task-event receive was cancelled")]
     Cancelled,
     #[error("another delivery is already being processed for this receiver")]

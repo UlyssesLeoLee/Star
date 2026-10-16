@@ -1,10 +1,11 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.28 (2026-10-16)
+> **文档版本**: v2.29 (2026-10-17)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
+> | v2.29 | 2026-10-17 | Add Phase 9F4G metadata-only BI quarantine as a Transaction table; document full route/cursor idempotency, message/digest/length/fault comparison, PostgreSQL concurrency/RLS/WORM evidence and trusted-adapter/GUC boundary | Mavis 接手审核 |
 > | v2.28 | 2026-10-16 | Align Phase 9F4F; all three BI tables remain Transaction data; specify DB-generated allowlist projection, transactional legacy raw-fact replacement and backup/WAL boundary; record PostgreSQL 18.6 and Rust 1.99.0 package format/test/Clippy gates | Mavis 接手审核 |
 > | v2.27 | 2026-10-16 | 新增 Phase 9F4E BI owner 的三张 Transaction 表 W/T/M 全量分类；记录 16 KiB wire/8 KiB payload、owner function 原子提交、tenant FORCE RLS、runtime least privilege、WORM 与隔离 PostgreSQL 双次 apply/fixture 验收；明确认证 transport、BI projection、payload 长期保留与 target DB 仍开放 | Mavis 接手审核 |
 > | v2.26 | 2026-10-16 | 对账 Run-owner Rust Task delivery store：bounded claim、Profile `event` authorization、authenticated-context route identity、exact-wire route pin、fenced retry 与 proof dead-letter；确认 source Outbox payload 已有 8 KiB JSONB text check；无发送/accepted/receiver/consumer/fair scheduler，Rust 与目标 DB 未验收 | Mavis 接手审核 |
@@ -6068,3 +6069,14 @@ The route-pin migration source now defines its table, tenant FORCE RLS, immutabl
 No table is added; the three BI tables remain Transaction data. Function bi.project_task_event_payload_v1 validates supported schema/event/scope and allowlisted values and returns only the fixed projection. Function bi.commit_task_event_v2 is the runtime entry point: it projects bounded raw input before delegating to the owner-only v1 receipt/fact transaction. The runtime role cannot execute v1 or call the projector directly.
 
 Migration 2026-10-16-bi-task-event-projection.sql replaces the live fact table transactionally. It backfills through the same projector, preserves the composite Inbox foreign key and durable event/route/wire identity, then drops the old live raw table. Any unsupported legacy row aborts before replacement. PostgreSQL 18.6 disposable tests passed migration replay, sentinel removal, v2 exact replay, missing lifecycle-state rejection, FORCE RLS, WORM and grants. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust checks remain open. This does not purge historical bytes from WAL/backups or change retention of the Task source Outbox; those policies and production target DB verification remain open. This is a durable owner projection source, not a BI query API/dashboard or materialized analytics product.
+
+
+### 4.13.29 — Phase 9F4G BI Task quarantine
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| bi.task_event_quarantine | T — Transaction | BI owner; durable metadata-only terminal-fault receipt keyed by complete immutable route identity plus provider/log generation/log/sequence. Stores message ID, exact-wire SHA-256/length and an allowlisted fault code; never stores wire, payload or free-form error text. | Permanent append-only Transaction evidence; no TTL/purge is implemented in this slice. Retention/privacy approval remains a production gate. | Tenant FORCE RLS; SECURITY DEFINER fixed owner function with fixed search_path and row_security; runtime has no direct privileges on this quarantine table; this migration grants EXECUTE on the fixed owner function. |
+
+W/T/M coverage for the BI owner tables is now W/T/M = 0/4/0: Inbox receipt, immutable projected fact, integrity incident and quarantine are all Transaction records. The quarantine primary key is `(tenant_id, quarantine_id)`; its unique idempotency key includes tenant/consumer, sender/receiver, provider/version, profile/revision/digest, endpoint/destination generation and source provider/log generation/log/sequence. Exact replay additionally compares message ID, wire digest, wire length and fault code; changed content returns no receipt. See [`phase9f4g-bi-task-quarantine-wtm.md`](data-design/phase9f4g-bi-task-quarantine-wtm.md) for the complete column/retention/access classification.
+
+The disposable PostgreSQL 18 runner passed migration double-apply, validation, tenant GUC missing/mismatch, FORCE RLS, owner/runtime role attributes and NOINHERIT, runtime no-direct-table privilege, denial of runtime `SET ROLE` to the owner, PUBLIC EXECUTE revocation, fixed SECURITY DEFINER configuration, WORM, exact replay/conflict and deterministic unique-key lock-wait races across two sessions. This evidence is not target DB rollout or crash/PITR proof. The database trusts route metadata passed by the authorized Rust adapter; there is no authoritative route-pin registry in this slice. The tenant GUC rejects absent/mismatched call scope but is not an authentication boundary against a compromised runtime able to set it. Same-cursor conflicting retries return no receipt and do not append a separate incident row; operational monitoring for those unsettled deliveries remains open. The append-only table has no row quota, partitioning or production retention/restore policy in this slice; capacity and privacy review remain gates before ingestion is enabled.

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Run isolated PostgreSQL 18 gates for BI Task Inbox and safe projection."""
+"""Run isolated PostgreSQL 18 gates for BI Task Inbox, projection, and quarantine."""
 
-# @cypher schema=1 source_sha256=f6a3e34505c17b1b67f7ddd3e29f23a2853602522be85f82e1689d68a715bea0
+# @cypher schema=1 source_sha256=762fc53a888dc0180b0b97bb4b92d5cf18cc003ef77da4118a27089fafb566e8
 # MERGE (self:File {path:"scripts/automation/phase9f4e_bi_task_event_inbox.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::main",kind:"function"})
+# MERGE (race:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::run_quarantine_race",kind:"function"})
+# MERGE (worker:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::record_quarantine_race",kind:"function"})
 # MERGE (run:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::run_command",kind:"function"})
 # MERGE (port:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::reserve_loopback_port",kind:"function"})
 # MERGE (cleanup:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::remove_owned_data_dir",kind:"function"})
@@ -12,6 +14,8 @@
 # MERGE (test:File {path:"db/tests/bi-task-event-inbox.sql"})
 # MERGE (seed:File {path:"db/tests/bi-task-event-raw-payload-seed.sql"})
 # MERGE (projection_test:File {path:"db/tests/bi-task-event-projection.sql"})
+# MERGE (quarantine_migration:File {path:"db/migrations/2026-10-17-bi-task-event-quarantine.sql"})
+# MERGE (quarantine_test:File {path:"db/tests/bi-task-event-quarantine.sql"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run)
 # MERGE (self)-[:DEFINES]->(port)
@@ -19,16 +23,22 @@
 # MERGE (main)-[:CALLS]->(run)
 # MERGE (main)-[:CALLS]->(port)
 # MERGE (main)-[:CALLS]->(cleanup)
+# MERGE (main)-[:CALLS]->(race)
+# MERGE (race)-[:CALLS]->(worker)
+# MERGE (worker)-[:CALLS]->(run)
 # MERGE (main)-[:READS]->(migration)
 # MERGE (main)-[:READS]->(projection_migration)
 # MERGE (main)-[:READS]->(test)
 # MERGE (main)-[:READS]->(seed)
 # MERGE (main)-[:READS]->(projection_test)
+# MERGE (main)-[:READS]->(quarantine_migration)
+# MERGE (main)-[:READS]->(quarantine_test)
 # @endcypher
 
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import shutil
 import socket
 import subprocess
@@ -44,6 +54,8 @@ PROJECTION_MIGRATION = REPO_ROOT / "db" / "migrations" / "2026-10-16-bi-task-eve
 TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-inbox.sql"
 RAW_SEED_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-raw-payload-seed.sql"
 PROJECTION_TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-projection.sql"
+QUARANTINE_MIGRATION = REPO_ROOT / "db" / "migrations" / "2026-10-17-bi-task-event-quarantine.sql"
+QUARANTINE_TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-quarantine.sql"
 TARGET_ROOT = (REPO_ROOT / "target").resolve()
 
 
@@ -95,6 +107,94 @@ def remove_owned_data_dir(data_dir: Path) -> None:
     shutil.rmtree(resolved)
 
 
+def run_quarantine_race(
+    psql_base: list[str],
+    *,
+    sequence: int,
+    message_id: str,
+    wire_digests: tuple[str, str],
+    expected_outcomes: tuple[str, str],
+    expect_same_receipt: bool,
+) -> None:
+    first_app = f"bi-quarantine-race-{sequence}-first"
+    second_app = f"bi-quarantine-race-{sequence}-second"
+
+    def race_sql(wire_digest: str, application_name: str, *, hold_transaction: bool) -> str:
+        hold = "SELECT pg_sleep(3);" if hold_transaction else ""
+        return f"""
+SET application_name = '{application_name}';
+BEGIN;
+SET ROLE star_bi_runtime;
+SET app.tenant_id = '11111111-1111-4111-8111-111111111111';
+SELECT outcome || '|' || COALESCE(quarantine_id::TEXT, '')
+  FROM bi.record_task_event_quarantine_v1(
+      '11111111-1111-4111-8111-111111111111',
+      '88888888-8888-4888-8888-888888888888',
+      '77777777-7777-4777-8777-777777777777',
+      'star-rust-log', 'v1', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 1,
+      decode(repeat('d4', 32), 'hex'), 'loopback-test', 'bi-task-events',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'star-rust-log',
+      'task-event-log', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', {sequence},
+      '{message_id}', decode(repeat('{wire_digest}', 32), 'hex'), 1024,
+      'malformed_envelope'
+  );
+{hold}
+COMMIT;
+"""
+
+    def record_quarantine_race(wire_digest: str, application_name: str, *, hold_transaction: bool) -> tuple[str, str]:
+        result = run_command(
+            [*psql_base, "-qAt", "-c", race_sql(wire_digest, application_name, hold_transaction=hold_transaction)],
+            timeout_seconds=20,
+        )
+        rows = [line for line in result.stdout.splitlines() if "|" in line]
+        if len(rows) != 1:
+            raise RuntimeError(f"quarantine race returned {len(rows)} result rows: {result.stdout.strip()}")
+        outcome, receipt = rows[0].split("|", 1)
+        return outcome, receipt
+
+    def wait_for_activity(sql: str, description: str) -> None:
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            result = run_command([*psql_base, "-qAt", "-c", sql], timeout_seconds=5)
+            if result.stdout.strip() == "t":
+                return
+            time.sleep(0.1)
+        raise RuntimeError(f"timed out waiting for {description}")
+
+    first_activity = (
+        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+        f"WHERE application_name = '{first_app}' AND state = 'active' "
+        "AND position('pg_sleep' in query) > 0)"
+    )
+    second_lock_wait = (
+        "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+        f"WHERE application_name = '{second_app}' AND state = 'active' "
+        "AND wait_event_type = 'Lock')"
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(
+            record_quarantine_race, wire_digests[0], first_app, hold_transaction=True
+        )
+        wait_for_activity(first_activity, "the first session holding an uncommitted quarantine insert")
+        second = executor.submit(
+            record_quarantine_race, wire_digests[1], second_app, hold_transaction=False
+        )
+        wait_for_activity(second_lock_wait, "the second session waiting on the unique-key conflict")
+        results = [first.result(timeout=20), second.result(timeout=20)]
+
+    outcomes = tuple(sorted(outcome for outcome, _ in results))
+    if outcomes != tuple(sorted(expected_outcomes)):
+        raise RuntimeError(f"quarantine race outcomes were {outcomes}, expected {expected_outcomes}")
+    receipts = [receipt for _, receipt in results]
+    if expect_same_receipt:
+        if not receipts[0] or receipts[0] != receipts[1]:
+            raise RuntimeError(f"exact-replay race did not return one stable receipt: {receipts}")
+    elif sum(bool(receipt) for receipt in receipts) != 1:
+        raise RuntimeError(f"conflicting race returned an unexpected receipt set: {receipts}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pg-bin", type=Path, default=Path(r"D:\PostgreSQL\18\bin"))
@@ -103,7 +203,11 @@ def main() -> int:
     initdb = bin_dir / "initdb.exe"
     pg_ctl = bin_dir / "pg_ctl.exe"
     psql = bin_dir / "psql.exe"
-    for required in (initdb, pg_ctl, psql, MIGRATION, PROJECTION_MIGRATION, TEST_SQL, RAW_SEED_SQL, PROJECTION_TEST_SQL):
+    for required in (
+        initdb, pg_ctl, psql, MIGRATION, PROJECTION_MIGRATION,
+        QUARANTINE_MIGRATION, TEST_SQL, RAW_SEED_SQL,
+        PROJECTION_TEST_SQL, QUARANTINE_TEST_SQL,
+    ):
         if not required.is_file():
             raise RuntimeError(f"required file not found: {required}")
 
@@ -150,7 +254,29 @@ def main() -> int:
         run_command([*psql_base, "-f", str(TEST_SQL)])
         run_command([*psql_base, "-f", str(PROJECTION_MIGRATION)])
         run_command([*psql_base, "-f", str(PROJECTION_TEST_SQL)])
-        print("9F4E/9F4F BI Task Inbox and safe projection PostgreSQL gates passed (isolated loopback PostgreSQL).")
+        run_command([*psql_base, "-f", str(QUARANTINE_MIGRATION)])
+        run_command([*psql_base, "-f", str(QUARANTINE_MIGRATION)])
+        run_command([*psql_base, "-f", str(QUARANTINE_TEST_SQL)])
+        run_quarantine_race(
+            psql_base,
+            sequence=100,
+            message_id="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            wire_digests=("a1", "a1"),
+            expected_outcomes=("recorded", "exact_replay"),
+            expect_same_receipt=True,
+        )
+        run_quarantine_race(
+            psql_base,
+            sequence=101,
+            message_id="ffffffff-ffff-4fff-8fff-ffffffffffff",
+            wire_digests=("a1", "b2"),
+            expected_outcomes=("recorded", "conflict"),
+            expect_same_receipt=False,
+        )
+        row_count = run_command([*psql_base, "-qAt", "-c", "SELECT count(*) FROM bi.task_event_quarantine"])
+        if row_count.stdout.strip() != "5":
+            raise RuntimeError(f"concurrent quarantine postcondition expected 5 rows, got {row_count.stdout.strip()}")
+        print("9F4E/9F4F/9F4G BI Task Inbox, projection, and quarantine PostgreSQL gates passed (isolated loopback PostgreSQL).")
         passed = True
     finally:
         pid_file = data_dir / "postmaster.pid"
