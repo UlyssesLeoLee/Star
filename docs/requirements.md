@@ -1,6 +1,7 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.78）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.79）
 
 > **v6.78 Task Outbox route-pin migration source status**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。owner-local delivery Work queue 每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试；7 天期限从 Work 入队 `created_at` 起算，不因终态重置。终态回执先持久化再删除 Work；仍未终态的 Work 到期时记录 `retention_elapsed` 后删除。永久 Outbox 与不可变终态回执分离。新增的 2026-10-16 Task route-pin migration source 以 tenant/event 为不可变身份，复合绑定永久源事件，固定 sender/receiver、provider/Profile/endpoint/destination generation、schema、wire digest，并在固定函数中复验当前 worker/attempt/schema lease fence；该 source 已在 disposable PostgreSQL 18 synthetic-Outbox fixture 中双次应用，并通过选定的 schema/RLS/grant/WORM/lease/idempotency/事务回滚断言；此结果不证明目标 DB、并发或生产 owner identity。它仍未接入 Rust dispatcher。receiver Inbox writer、consumer stores/projections、目标 DB grants/RLS 与数据库验收仍开放；accepted settlement、Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
+> **v6.79 Rust Task delivery source slice status**：新增 Run-owner Rust delivery store，可按 1–8 有界 claim、从已认证 Transport Context 派生 sender/receiver，并要求 Transport Profile 独立授权 `event` kind；它从 Task 源事件构造确定性 envelope、执行当前 route pin 和 exact-wire digest 校验，并支持受 lease fence 保护的 retry。dead 仅接受由无效 source envelope 验证生成的私有 proof。源 Outbox 已有数据库 `octet_length(payload::text) <= 8192` 约束，因此 payload 在 PostgreSQL 返回 JSON 前已有硬上限；本阶段不重复添加约束迁移。此 Rust 切片没有网络发送、accepted settlement、receiver Inbox、consumer projection 或公平 Run 轮转；Cargo/Rust 工具链当前不可用，故代码尚未编译/格式化，目标 DB 与生产身份仍未验收。此前 route-pin fixture 的有限 PostgreSQL 断言不证明该 Rust store。
 
 ## 0. 文档说明与前提
 
@@ -2997,6 +2998,7 @@ The Run owner changes the current binding with compare-and-swap: close exactly t
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v6.79 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 Run-owner Rust Task Outbox delivery store：有界 claim、已认证 context 派生路由身份、独立 Profile `event` 授权、exact-wire/route-pin 校验、lease-fenced retry 与 invalid-envelope proof dead-letter；确认源表现有 8 KiB 数据库约束先于 payload 返回。未有 Rust 工具链、dispatcher send、accepted、receiver/consumer、公平调度或目标 DB 验收，生产执行保持关闭 | ERUN-P3.3 Rust delivery substrate 实现与代码/需求对账 |
 | v6.78 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账新增 Task route-pin migration source：固定首次外发身份、provider/Profile/endpoint/destination generation、schema 与 exact-wire digest，并由固定函数复验当前 lease；记录 disposable PostgreSQL 18 synthetic-Outbox fixture 的双次回放及选定 RLS/grant/WORM/lease/idempotency/事务回滚断言通过；目标 DB、并发及生产身份仍未验收，dispatcher/receiver/consumer 未接入，accepted 与执行继续关闭 | ERUN-P3.3 增加 Task Outbox route-pin DDL 与固定函数 source |
 | v6.77 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Task delivery Work 的 7 天 `expires_at` 从 enqueue `created_at` 起算；提前终态时先追加永久 receipt 再删除 Work，未终态到期写入 `retention_elapsed` receipt 后删除；同步 AC-RUN-OUTBOX 保留期限验收 | 对照 2026-10-16 Task delivery migration 发现“终态后 7 天”与 DDL 固定 enqueue expiry 不一致 |
 | v6.76 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加首次发送前不可变 route pin、exact-wire retry、接收 owner Inbox commit receipt 与每个下游 consumer 独立 Inbox/projection receipt 契约；明确 route pin/dispatcher/receiver/BI/Benchmark 与目标 DB 验收仍开放 | 审查发现 source delivery migration 缺少首次 route pin，且 ingress receipt 不足以证明每个消费投影已提交 |
@@ -3623,7 +3625,7 @@ Consumers MUST NOT treat `(occurred_at, event_id)` or UUID order as commit order
 
 Run Task Outbox dispatcher MUST 以 Project/Engineering Run 的当前授权上下文和 owner-local delivery lease 为入口；不得让 Worktree focus 或可选远端 Branch 改变事件 owner。事件信封保持 schema v1/v2 metadata 与 schema v3 lifecycle 的兼容身份，至少包含稳定 event_id、schema_version、event_type、tenant/Project/Run/Work Item owner、aggregate_type/version、actor/correlation、payload digest 与 source lineage。occurred_at 和 UUID 排序不得充当提交顺序或全局高水位。
 
-首次向外发送之前，Task delivery owner MUST 持久化不可变 DeliveryRoutePin：固定 sender/receiver service identity、transport provider/version、Transport Profile revision/digest、endpoint identity、logical destination/log generation、schema version 和精确 wire SHA-256；不保存 credential、secret 或 payload 副本。所有 retry 必须复用相同 route pin 与相同 wire bytes。Profile 撤销、目标漂移、receiver identity 不匹配或 exact-wire digest 不一致时 fail closed，不得自动切换另一个 provider。当前 Task delivery migration 没有该 route pin；必须先增加 owner-local migration/函数，并将 accepted settlement 继续保持关闭，直到其事务验证完成。
+首次向外发送之前，Task delivery owner MUST 持久化不可变 DeliveryRoutePin：固定 sender/receiver service identity、transport provider/version、Transport Profile revision/digest、endpoint identity、logical destination/log generation、schema version 和精确 wire SHA-256；不保存 credential、secret 或 payload 副本。所有 retry 必须复用相同 route pin 与相同 wire bytes。Profile 撤销、目标漂移、receiver identity 不匹配或 exact-wire digest 不一致时 fail closed，不得自动切换另一个 provider。route-pin migration source 与 Rust store 已存在；Rust store 要求已认证 transport context、Profile 对 `event` kind 的授权以及端点/profile revision/digest 一致，且从该 context 推导 sender/receiver。它仅 claim、固定 route 与 wire、retry 或对 contract-invalid event 使用 proof dead-letter，不执行网络发送。目标 DB、Profile/endpoint 每次发送前复验与并发租约仍是 dispatcher 的阻断门，accepted settlement 保持关闭。
 
 Dispatcher 的 transport-neutral port 至少支持有界 claim、route resolution、exact append/replay、lease-fenced retry/settle、cancel/drain 和 receipt verification。传输 adapter 的 publish ACK、socket 写成功或 broker 持久化回执都不是业务 acceptance。接收 owner 必须在自己的事务中按 tenant + event_id + source scope + wire digest 做 append-if-absent，提交 Inbox/持久 receipt 后才返回；同 ID 同 digest 返回稳定的同一 receipt，不同 scope 或 digest 是 poison/conflict，必须隔离并保持 source delivery unsettled。Task delivery owner 仅在可信 Rust dispatcher 已认证 receiver service identity，并核对 receipt、source event、immutable route pin、lease generation 与 wire digest 完全匹配后，才能调用新增的受控 accepted-settlement 路径。不存在跨 owner 共享事务。
 
@@ -3633,10 +3635,10 @@ Resource budget 必须有限且可测：沿用每 Run 最多 1024 个待处理 W
 
 | Acceptance ID | Acceptance criterion |
 |---|---|
-| AC-RUN-OUTBOX-01 | 每条首次外发前均有唯一不可变 route pin；retry 使用同一 Profile/endpoint/recipient 与 exact wire；route drift 时 fail closed。 |
+| AC-RUN-OUTBOX-01 | 每条首次外发前均有唯一不可变 route pin；retry 使用同一 Profile/endpoint/recipient 与 exact wire；Task event 必须由 Profile 独立授权 `event` kind，sender/receiver 从已认证 context 派生；route drift 时 fail closed。当前 Rust source store 只准备并 pin wire，不执行外发。 |
 | AC-RUN-OUTBOX-02 | Task delivery owner accepted settlement 只接受可信 dispatcher 验证的接收 owner durable Inbox commit receipt，并绑定 event/scope/digest/route/lease；transport ACK 不够。 |
 | AC-RUN-OUTBOX-03 | 接收 owner 在本地事务中幂等写 Inbox/receipt 后应答；精确重复回同一 receipt，身份或内容冲突进入 poison 流程且不 ACK。 |
 | AC-RUN-OUTBOX-04 | 每个订阅 consumer（包括订阅事件的 Schedule/Loop）在自己的事务中提交 Inbox receipt 与 projection/outcome，并按 consumer_id 去重、按 aggregate_type/version 防止倒退。 |
 | AC-RUN-OUTBOX-05 | replay/reconciliation 不以 event time/UUID 作为提交游标；缺失版本、消费 gap 和 projection lag 对 Run BI/Benchmark 明确可见。 |
 | AC-RUN-OUTBOX-06 | 1–8 有界 claim、1024/Run backlog、16 KiB wire、有限 worker 与 bytes、Run 公平轮转、取消/drain 均可验证。Task delivery Work 的 7 天 expiry 从 enqueue `created_at` 起算且不在终态时重置；终态先写永久 receipt 再删除 Work，未终态到期写 `retention_elapsed` receipt 再删除。 |
-| AC-RUN-OUTBOX-07 | route pin migration、Task dispatcher、receiver Inbox API、consumer owner store、目标 DB/RLS/grants、并发/崩溃恢复及 BI parity 分别通过后才能启用；当前 Schedule/Agent/Task CLI execution 继续 fail closed。 |
+| AC-RUN-OUTBOX-07 | Rust claim/route/wire store、route pin migration、Task dispatcher、receiver Inbox API、consumer owner store、目标 DB/RLS/grants、并发/崩溃恢复及 BI parity 分别通过后才能启用；当前 Rust store 未编译验证且不含网络发送/accepted/receiver/consumer/fair scheduler；Schedule/Agent/Task CLI execution 继续 fail closed。 |

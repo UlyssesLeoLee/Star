@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=365f852049cd79f70987e89d4053b3539970e0530a4e39cfe5ec061681526574
+@cypher schema=1 source_sha256=d391c6abfce0e0683510e5c7791bc8c6b2344378adeb717964b17a98249ef145
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/transport_profile.rs"})
 MERGE (kind:Type {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportMessageKind",kind:"enum"})
 MERGE (lifecycle:Type {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileLifecycle",kind:"enum"})
@@ -16,6 +16,10 @@ MERGE (definition_new:Symbol {id:"crates/platform-messaging-runtime/src/transpor
 MERGE (digest:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileDefinition.digest",kind:"method"})
 MERGE (revision_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileRevision.new",kind:"method"})
 MERGE (context_new:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::AuthenticatedTransportContext.from_session",kind:"method"})
+MERGE (context_direction:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::AuthenticatedTransportContext.direction",kind:"method"})
+MERGE (context_sender:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::AuthenticatedTransportContext.sender_service_id",kind:"method"})
+MERGE (context_recipient:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::AuthenticatedTransportContext.recipient_service_id",kind:"method"})
+MERGE (sender_recipient:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::AuthenticatedTransportContext.sender_recipient",kind:"method"})
 MERGE (authorize:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileRevision.authorize",kind:"method"})
 MERGE (valid_label:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::valid_label",kind:"function"})
 MERGE (put_bytes:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile.rs::put_bytes",kind:"function"})
@@ -53,6 +57,12 @@ MERGE (digest)-[:CALLS]->(put_text)
 MERGE (digest)-[:CALLS]->(put_ids)
 MERGE (revision_new)-[:CALLS]->(digest)
 MERGE (context_new)-[:CALLS]->(valid_label)
+MERGE (context)-[:DEFINES]->(context_direction)
+MERGE (context)-[:DEFINES]->(context_sender)
+MERGE (context)-[:DEFINES]->(context_recipient)
+MERGE (context)-[:DEFINES]->(sender_recipient)
+MERGE (context_sender)-[:CALLS]->(sender_recipient)
+MERGE (context_recipient)-[:CALLS]->(sender_recipient)
 MERGE (authorize)-[:USES_TYPE]->(context)
 MERGE (authorize)-[:USES_TYPE]->(kind)
 MERGE (test_digest)-[:TESTS]->(digest)
@@ -73,7 +83,7 @@ pub const MAX_PROFILE_SERVICE_IDENTITIES: usize = 32;
 /// Maximum characters in a durable log generation policy key.
 pub const MAX_LOG_GENERATION_POLICY_BYTES: usize = 64;
 
-/// Admission message kind permitted by a transport profile.
+/// Message kind permitted by a transport profile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TransportMessageKind {
     /// Schedule-to-Run preparation request.
@@ -82,6 +92,8 @@ pub enum TransportMessageKind {
     Result,
     /// Schedule-to-Run confirmation or compensation.
     Resolution,
+    /// Owner-scoped business event delivery.
+    Event,
 }
 
 impl TransportMessageKind {
@@ -91,6 +103,7 @@ impl TransportMessageKind {
             Self::Request => "request",
             Self::Result => "result",
             Self::Resolution => "resolution",
+            Self::Event => "event",
         }
     }
 
@@ -99,6 +112,7 @@ impl TransportMessageKind {
             "request" => Some(Self::Request),
             "result" => Some(Self::Result),
             "resolution" => Some(Self::Resolution),
+            "event" => Some(Self::Event),
             _ => None,
         }
     }
@@ -242,7 +256,7 @@ impl TransportProfileDefinition {
         }
         normalize_identities(&mut allowed_sender_service_ids)?;
         normalize_identities(&mut allowed_recipient_service_ids)?;
-        if allowed_message_kinds.is_empty() || allowed_message_kinds.len() > 3 {
+        if allowed_message_kinds.is_empty() || allowed_message_kinds.len() > 4 {
             return Err(ProfileDefinitionError::InvalidMessageKinds);
         }
         allowed_message_kinds.sort_unstable();
@@ -336,6 +350,7 @@ impl TransportProfileDefinition {
                 TransportMessageKind::Request => 1,
                 TransportMessageKind::Result => 2,
                 TransportMessageKind::Resolution => 3,
+                TransportMessageKind::Event => 4,
             });
         }
         match &self.secret_reference {
@@ -557,6 +572,21 @@ impl AuthenticatedTransportContext {
     /// Non-secret endpoint label supplied by trusted session configuration.
     pub fn endpoint_identity(&self) -> &str {
         &self.endpoint_identity
+    }
+
+    /// Direction of the operation relative to the authenticated local service.
+    pub fn direction(&self) -> TransportDirection {
+        self.direction
+    }
+
+    /// Authenticated sender identity for this operation.
+    pub fn sender_service_id(&self) -> Uuid {
+        self.sender_recipient().0
+    }
+
+    /// Authenticated recipient identity for this operation.
+    pub fn recipient_service_id(&self) -> Uuid {
+        self.sender_recipient().1
     }
 
     fn sender_recipient(&self) -> (Uuid, Uuid) {

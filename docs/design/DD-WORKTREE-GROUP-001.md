@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.05**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.06**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -16,10 +16,10 @@
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
-> - Phase 2C ERUN-P3.1 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。后续 source migration 已定义 schema v3 lifecycle Outbox 与 bounded delivery Work，但 route pin、Rust dispatcher、receiver Inbox 和 downstream consumer 尚未接线；目标 DB/RLS 与并发验收仍开放，accepted delivery 保持关闭。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.76 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.75 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.30、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.04
+> - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.79 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.78 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.33、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.07
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -657,11 +657,13 @@ The gate verified receipt failure backpressure, commit-before-confirmed-Term ACK
 
 ## §8.24 — Task Outbox route pin 与逐 consumer durable completion
 
-Task lifecycle source Outbox 和 delivery Work 只提供事件来源与有界重试 substrate。首次外发前必须由 Task delivery owner 持久化 immutable DeliveryRoutePin，固定 sender/receiver service identity、transport provider/version、Transport Profile revision/digest、endpoint identity、destination/log generation、schema version 与 exact-wire SHA-256。pin 不保存 payload 或 secret；所有 retry 使用相同 route 和 wire。撤销、profile/endpoint generation 漂移、身份不匹配或 digest mismatch 时 fail closed，不自动 fallback。当前 migration 未创建 route-pin schema/API，故没有生产首发路由固定能力。
+Task lifecycle source Outbox 和 delivery Work 提供事件来源与有界重试 substrate。首次外发前必须由 Task delivery owner 持久化 immutable DeliveryRoutePin，固定 sender/receiver service identity、transport provider/version、Transport Profile revision/digest、endpoint identity、destination/log generation、schema version 与 exact-wire SHA-256。pin 不保存 payload 或 secret；所有 retry 使用相同 route 和 wire。撤销、profile/endpoint generation 漂移、身份不匹配或 digest mismatch 时 fail closed，不自动 fallback。`2026-10-16-task-run-outbox-route-pin.sql` 已定义 route-pin schema 与固定函数；目标数据库与并发验收仍未完成。
+
+Run-owner Rust `TaskRunOutboxDeliveryStore` 现提供 1–8 有界 claim、确定性 Task envelope 构造、首次 route pin/readback、lease-fenced retry 与 invalid-envelope proof dead-letter。Profile 必须明确授权独立 `event` kind；route builder 用 `AuthenticatedTransportContext` 派生 sender/receiver，并验证已解析 endpoint 与 profile 的 deployment、tenant、ID、revision、digest、endpoint 一致。源 Outbox 已有 `octet_length(payload::text) <= 8192` 的数据库 check，限制 PostgreSQL 返回的 JSONB payload，claim batch 最大 8。该 store 不发送、不接受外部 receipt、不支持 accepted settlement，且尚未实现每发送前 Profile 撤销检查、receiver Inbox、consumer stores/projections 或 Run 间公平调度；Rust toolchain 不可用，尚无 compile/fmt 证据。
 
 Receiver owner 必须在自己的事务内 append-if-absent 写入 durable Inbox receipt 后再响应。receipt 绑定 tenant、event/source scope、schema/aggregate version、wire digest、receiver identity 和 route pin。相同 immutable tuple replay 返回稳定同一 receipt；event identity 被复用但内容或 scope 不同则 quarantine 且不结算。可信 Rust dispatcher 验证 receiver 身份、receipt、source event、route pin 和当前 lease generation 后，才可调用未来新增的 accepted settlement；现有 settlement 保持拒绝 accepted。跨 owner 不共享写事务。
 
-Run App、订阅相关事件的 Schedule/Loop、BI 与 Benchmark 的每个 consumer 必须有自己的 owner-local Inbox/projection receipt，并在同一 consumer transaction 提交。用 tenant + consumer identity + event ID 去重，按 aggregate type/version fencing；缺失版本、重建策略、lag、last durable receipt 与 freshness 都由 consumer 单独报告。Ingress receipt 不能代替任何 subscriber 的处理完成。现有 schema 仅是 migration source；route pin、dispatcher、receiver writer、consumer stores/projections、目标 DB/RLS/grants、并发崩溃恢复尚未实现/验收，因此跨 App delivery 与分析投影不得标记为可用。
+Run App、订阅相关事件的 Schedule/Loop、BI 与 Benchmark 的每个 consumer 必须有自己的 owner-local Inbox/projection receipt，并在同一 consumer transaction 提交。用 tenant + consumer identity + event ID 去重，按 aggregate type/version fencing；缺失版本、重建策略、lag、last durable receipt 与 freshness 都由 consumer 单独报告。Ingress receipt 不能代替任何 subscriber 的处理完成。Route-pin schema 与 Rust claim/route/wire source store 已有 migration/code，但目标 DB/RLS/grants、并发崩溃恢复仍未验收；Rust store 不含 network send、receiver writer、consumer stores/projections 或 accepted path。因此跨 App delivery 与分析投影不得标记为可用。
 
 ## §9 跨 App 事件与一致性
 
@@ -1078,6 +1080,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.06 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79/basic v6.78/Task SRS v0.19、BD v0.12、DD v1.33 与 Data Design v2.26；记录 Rust bounded Task claim/route/wire store、独立 Profile `event` authorization、authenticated-context route identity、fenced retry 与 proof dead-letter；明确无 send/accepted/receiver/consumer/fair scheduler，Rust/target DB 门禁开放 | ERUN-P3.3 Task Outbox Rust slice 与当前源码对账 |
 | v5.05 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.77/basic v6.76/data design v2.24/Task SRS v0.17、BD v0.10、DD v1.31 与 plan v7.05；明确 Task delivery Work expiry 从 enqueue `created_at` 起算，终态不重置，terminal receipt 先追加再删 Work | 对照 delivery migration 固定 `created_at + 7 days` 约束，纠正“终态后 7 天”描述 |
 | v5.04 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.76/basic v6.75/data design v2.23/Task SRS v0.16、BD v0.9、DD v1.30 与 plan v7.04；增加不可变 DeliveryRoutePin、receiver owner durable Inbox receipt、可信 dispatcher settlement 与逐 consumer Inbox/projection contract；确认这些仍是未实现的 acceptance gates | 自审发现 Task delivery migration 缺少 immutable first-send route pin，且 ingress acceptance 不证明各订阅投影已提交 |
 | v5.03 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.75/basic v6.74/data design v2.22；增加 source event 的 tenant+Run+event 复合外键；规定跨 owner Inbox 回执须由可信 dispatcher 认证且在其实现前保持 accepted 路径关闭 | 自审发现 schema 保存外部回执 ID 不能独立证明远端 commit，且原 event FK 未约束冗余 tenant/Run scope |
