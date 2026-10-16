@@ -29,7 +29,7 @@
     <div class="eyebrow">arch-live · 动态架构文档</div>
     <h1>Star 是怎么被构造出来的</h1>
     <p class="lead">这套文档不描述"应该是什么样"，只描述<strong>此刻代码里真实是什么样</strong>：每一张图都可以点开看证据文件，
-      每个数字都来自仓库扫描。数据基线：<code>commit 9e25f6b5</code>（<code>dev</code> 分支，2026-10-05 20:52 JST 快照）。</p>
+      每个数字都来自仓库扫描。数据基线：<code>commit a5f4c23c</code>（<code>dev</code> 分支，2026-10-05 20:52 JST 快照）。</p>
     <p class="lead sub">读法建议：先看本页全景 → 用「Crate 地图」确认代码归属 → 用「请求生命周期」和「Agent 闭环」看运行时怎么跑 →
       涉及数据/部署/守门时再跳对应页。每页底部都有 <span class="badge b-mute">证据</span> 折叠块，可核对到 file:line。</p>
   </section>
@@ -38,19 +38,19 @@
   <h2 class="sec">01 规模基线 <span class="badge b-ok">实测扫描</span></h2>
   <p class="sub">下列数字由 <code>docs/arch-live/README.md</code> 记录的扫描命令产出，并由 <code>scripts/automation/arch_live_doc_check.py</code> 在 CI 前做漂移校验。</p>
   <div class="grid g4 rv">
-    <div class="stat"><span class="dot"></span><div class="n" data-count="105" data-fact="crates_total">105</div><div class="k">Rust crate（workspace member 目录）</div><div class="m">crates/*</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="40" data-fact="domain_crates">40</div><div class="k">DDD bounded context（domain-*）</div><div class="m">domain-*</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="110" data-fact="crates_total">110</div><div class="k">Rust crate（workspace member 目录）</div><div class="m">crates/*</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="41" data-fact="domain_crates">41</div><div class="k">DDD bounded context（domain-*）</div><div class="m">domain-*</div></div>
     <div class="stat"><span class="dot"></span><div class="n" data-count="31" data-fact="star_crates">31</div><div class="k">平台能力 crate（star-*）</div><div class="m">star-*</div></div>
     <div class="stat"><span class="dot"></span><div class="n" data-count="3" data-fact="wasm_crates">3</div><div class="k">WASM 桥（前端复用 Rust 纯函数）</div><div class="m">*-wasm</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="741" data-fact="rust_files">741</div><div class="k">Rust 源文件</div><div class="m">*.rs</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="251311" data-fact="rust_loc">251311</div><div class="k">Rust 代码行（含空行）</div><div class="m">crates/**/*.rs</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="43" data-fact="migrations">43</div><div class="k">DB migration 文件</div><div class="m">db/migrations/*.sql</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="150" data-fact="db_tables">150</div><div class="k">CREATE TABLE</div><div class="m">6 schema</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="525" data-fact="db_policies">525</div><div class="k">CREATE POLICY（RLS）</div><div class="m">行级安全</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="50" data-fact="rest_routes">50</div><div class="k">REST 路由模板（生产路由组）</div><div class="m">star-api-rest</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="792" data-fact="rust_files">792</div><div class="k">Rust 源文件</div><div class="m">*.rs</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="289517" data-fact="rust_loc">289517</div><div class="k">Rust 代码行（含空行）</div><div class="m">crates/**/*.rs</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="81" data-fact="migrations">81</div><div class="k">DB migration 文件</div><div class="m">db/migrations/*.sql</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="204" data-fact="db_tables">204</div><div class="k">CREATE TABLE 声明</div><div class="m">9 schema · migration 源码</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="574" data-fact="db_policies">574</div><div class="k">CREATE POLICY 声明</div><div class="m">RLS migration 源码</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="54" data-fact="rest_routes">54</div><div class="k">REST 路由模板（生产路由组）</div><div class="m">star-api-rest</div></div>
     <div class="stat"><span class="dot"></span><div class="n" data-count="16" data-fact="mcp_tools">16</div><div class="k">MCP tool</div><div class="m">JSON-RPC 2.0</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="57" data-fact="fe_pages">57</div><div class="k">前端 page.tsx</div><div class="m">Next.js App Router</div></div>
-    <div class="stat"><span class="dot"></span><div class="n" data-count="11" data-fact="ci_workflows">11</div><div class="k">CI workflow</div><div class="m">.github/workflows</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="59" data-fact="fe_pages">59</div><div class="k">前端 page.tsx</div><div class="m">Next.js App Router</div></div>
+    <div class="stat"><span class="dot"></span><div class="n" data-count="12" data-fact="ci_workflows">12</div><div class="k">CI workflow</div><div class="m">.github/workflows</div></div>
   </div>
 
   <div class="note warn" style="margin-top:14px">
@@ -100,7 +100,7 @@
       <g class="node g" style="animation-delay:.05s">
         <rect x="120" y="40" width="290" height="52" rx="9" fill="url(#gfe)" stroke="#f472b6" stroke-opacity=".5"/>
         <text x="136" y="62">Next.js 16 · App Router</text>
-        <text class="sub2" x="136" y="80">57 page.tsx · 205 component files</text>
+        <text class="sub2" x="136" y="80">59 page.tsx · 205 component files</text>
       </g>
       <g class="node g" style="animation-delay:.12s">
         <rect x="430" y="40" width="250" height="52" rx="9" fill="url(#gfe)" stroke="#f472b6" stroke-opacity=".5"/>
@@ -124,7 +124,7 @@
       <g class="node g" style="animation-delay:.33s">
         <rect x="120" y="256" width="220" height="58" rx="9" fill="url(#gsvc)" stroke="#5b8cff" stroke-opacity=".55"/>
         <text x="134" y="278">star-api-rest :8081</text>
-        <text class="sub2" x="134" y="296">50 路由 / 16 路由组 / OAuth2+PKCE</text>
+        <text class="sub2" x="134" y="296">54 路由 / 16 路由组 / OAuth2+PKCE</text>
       </g>
       <g class="node g" style="animation-delay:.40s">
         <rect x="356" y="256" width="220" height="58" rx="9" fill="url(#gsvc)" stroke="#5b8cff" stroke-opacity=".55"/>
@@ -165,7 +165,7 @@
       <g class="node g" style="animation-delay:.82s">
         <rect x="120" y="560" width="300" height="58" rx="9" fill="url(#gdata)" stroke="#34d399" stroke-opacity=".55"/>
         <text x="134" y="582">PostgreSQL</text>
-        <text class="sub2" x="134" y="600">6 schema · 150 表 · 525 RLS</text>
+        <text class="sub2" x="134" y="600">9 schema · 204 建表声明 · 574 策略声明</text>
       </g>
       <g class="node g" style="animation-delay:.89s">
         <rect x="436" y="560" width="300" height="58" rx="9" fill="url(#gdata)" stroke="#34d399" stroke-opacity=".55"/>
@@ -237,7 +237,7 @@
     <div class="step">
       <div class="sh"><span class="idx">4</span> 权限：RLS 前置绑定 tenant</div>
       <div class="sd">请求进入事务后第一条 SQL 就是 <code>set_config('app.tenant_id', …)</code>，之后所有查询自动被行级安全策略过滤。租户隔离不是应用层约定，是数据库强制的。</div>
-      <div class="sf">crates/star-api-rest/src/group_api.rs:584 set_tenant · db/migrations/*-rls-*.sql（525 条 POLICY）</div>
+      <div class="sf">crates/star-api-rest/src/group_api.rs:584 set_tenant · db/migrations/*-rls-*.sql（574 条 POLICY）</div>
     </div>
     <div class="step">
       <div class="sh"><span class="idx">5</span> 角色绑定：project_role_binding 复核</div>
@@ -266,8 +266,8 @@
   <h2 class="sec">04 分册索引</h2>
   <div class="grid gauto rv">
     <a class="card" href="01-crate-map.html" style="text-decoration:none">
-      <h4>01 · Crate 地图 <span class="badge b-domain">105</span></h4>
-      <p>105 个 crate 按 7 个家族分组，可搜索/按家族过滤，附每个家族的文件数与代表 crate。回答"这段逻辑该写在哪"。</p>
+      <h4>01 · Crate 地图 <span class="badge b-domain">110</span></h4>
+      <p>110 个 crate 按 8 个家族分组，可搜索/按家族过滤，附每个家族的文件数与代表 crate。回答"这段逻辑该写在哪"。</p>
     </a>
     <a class="card" href="02-navigation-model.html" style="text-decoration:none">
       <h4>02 · 导航模型 <span class="badge b-star">Project → Run → Worktree → Branch</span></h4>
@@ -286,8 +286,8 @@
       <p>worktree-canvas 14 个同级 crate、3 个 WASM 桥、ARG 三层（Data/Bridge/Effect）、canvas 四进程端口图。</p>
     </a>
     <a class="card" href="06-data-model.html" style="text-decoration:none">
-      <h4>06 · 数据模型 <span class="badge b-infra">150 表</span></h4>
-      <p>6 个 schema 逐表统计，W/T/M 三类横展、审计与 SCD 策略、幂等表族。回答"这张表为什么长这样"。</p>
+      <h4>06 · 数据模型 <span class="badge b-infra">204 建表声明</span></h4>
+      <p>9 个 schema 的迁移声明统计，W/T/M 三类横展、审计与 SCD 策略、幂等表族。目标数据库尚未应用迁移。</p>
     </a>
     <a class="card" href="07-deploy-topology.html" style="text-decoration:none">
       <h4>07 · 部署拓扑 <span class="badge b-edge">k3s + envoy</span></h4>
@@ -303,18 +303,18 @@
     <summary>本页数字的采集命令（可复制复跑）</summary>
     <div class="evbody">
       <pre data-copy># crate 家族
-(Get-ChildItem crates -Directory).Count                                    # 105
-(Get-ChildItem crates -Directory | ? Name -like 'domain-*').Count          # 40
-(Get-ChildItem crates -Recurse -Filter *.rs -File).Count                    # 741
+(Get-ChildItem crates -Directory).Count                                    # 110
+(Get-ChildItem crates -Directory | ? Name -like 'domain-*').Count          # 41
+(Get-ChildItem crates -Recurse -Filter *.rs -File).Count                    # 792
 # 数据面
-(Get-ChildItem db/migrations -Filter *.sql -File).Count                     # 43
-(Select-String db/migrations/*.sql -Pattern 'CREATE TABLE' -AllMatches).Count  # 150
-(Select-String db/migrations/*.sql -Pattern 'CREATE POLICY' -AllMatches).Count # 525
+(Get-ChildItem db/migrations -Filter *.sql -File).Count                     # 81
+(Select-String db/migrations/*.sql -Pattern 'CREATE TABLE' -AllMatches).Count  # 204
+(Select-String db/migrations/*.sql -Pattern 'CREATE POLICY' -AllMatches).Count # 574
 # 路由 / 工具 / 前端
-(Select-String crates/star-api-rest/src/group_api/*.rs -Pattern '"/api/v1/').Count   # 50
+(Select-String crates/star-api-rest/src/group_api/*.rs -Pattern '"/api/v1/').Count   # 54
 (Get-ChildItem crates/star-mcp/src/tools -Filter *.rs | ? Name -ne mod.rs).Count   # 16
-(Get-ChildItem frontend/src/app -Recurse -Filter page.tsx).Count             # 57
-(Get-ChildItem .github/workflows -File).Count                               # 10</pre>
+(Get-ChildItem frontend/src/app -Recurse -Filter page.tsx).Count             # 59
+(Get-ChildItem .github/workflows -File).Count                               # 12</pre>
       <p>等价的一次性校验：<code>pwsh scripts/automation/arch_live_doc_check.py</code>（或 <code>python scripts/automation/arch_live_doc_check.py</code>）。</p>
     </div>
   </details>
@@ -327,14 +327,14 @@
         <li>边缘 — <code>deploy/k3s-local/envoy/{configmap,deployment,service}.yaml</code></li>
         <li>服务进程 — <code>crates/star-api-rest/src/main.rs</code>（<code>STAR_API_REST_BIND_ADDR</code>）、<code>bff/</code>、<code>crates/star-mcp/src/main.rs</code>、<code>crates/star-ops/src/ops_api.rs</code></li>
         <li>适配 — <code>crates/api/src/lib.rs</code>（<code>ApiGateway</code>/<code>ApiQuery</code> Port trait）、<code>crates/infrastructure/src/registry_real_pg.rs</code></li>
-        <li>crate — <code>Cargo.toml</code> members 段（105 member）</li>
+        <li>crate — <code>Cargo.toml</code> members 段（110 member）</li>
         <li>数据面 — <code>db/migrations/</code>、<code>crates/star-taskqueue/</code>、<code>crates/event-bus/src/</code>（Redis Streams abstraction）</li>
       </ul>
     </div>
   </details>
 
   <footer>
-    <div>Star arch-live · 动态架构文档 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>Star arch-live · 动态架构文档 · 数据基线 <code>a5f4c23c</code>（dev，2026-10-05）</div>
     <div>本套页面为纯静态 HTML + CSS + 原生 JS，零外部依赖，可离线 <code>file://</code> 打开。数字若与代码不符，说明文档已漂移——跑 <code>scripts/automation/arch_live_doc_check.py</code> 定位。</div>
   </footer>
 </main>

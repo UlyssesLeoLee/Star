@@ -27,8 +27,8 @@
   <section class="hero">
     <div class="eyebrow">分册 02 · 结构主轴</div>
     <h1>Project → Engineering Run → Worktree → Branch</h1>
-    <p class="lead">这一条链是整个产品的<b>结构主轴</b>：左侧导航固定为 Project → Engineering Run → Worktree → Branch；当前 API/schema 与路由迁移仍未闭环。
-      理解了这条链，105 个 crate 和 150 张表就有了归属位置——不需要逐个读。</p>
+    <p class="lead">这一条链是整个产品的<b>结构主轴</b>：左侧导航固定为 Project → Engineering Run → Worktree → Branch；无宿主 Run 的列表/创建路由已落代码，目标 DB migration 与 checkout binding 部署仍未闭环。
+      理解了这条链，110 个 crate 和 204 条建表声明就有了归属位置——不需要逐个读。</p>
   </section>
 
   <h2 class="sec">01 四级模型与各自的职责</h2>
@@ -65,7 +65,7 @@
     不取代 Project → Engineering Run → Worktree → Branch 主导航。一旦用通用任务列表或本地 seed 冒充生产管理，就破坏了这条轴。
   </div>
 
-  <h2 class="sec">02 前端路由树 <span class="badge b-fe">57 page.tsx</span></h2>
+  <h2 class="sec">02 前端路由树 <span class="badge b-fe">59 page.tsx</span></h2>
   <p>主干链路在 <code>(app)</code> 路由组里，是动态段；其余是并列的领域页面。点击展开。</p>
   <div class="grid g2 rv">
     <div class="card">
@@ -119,7 +119,7 @@
     树节点里不允许出现策略编辑器。
   </div>
 
-  <h2 class="sec">03 REST 路由组 <span class="badge b-star">16 组 / 50 模板</span></h2>
+  <h2 class="sec">03 REST 路由组 <span class="badge b-star">16 组 / 54 模板</span></h2>
   <p>路由按<b>资源归属层级</b>组织，从 <code>/projects</code> 一路下沉到 <code>/worktrees/{id}/…</code>。
     越靠下的路径越贴近运行现场，也越容易被多 Agent 并发触碰——这决定了它们同时需要锁与幂等。</p>
   <div class="tabs" data-tabs="routes">
@@ -138,7 +138,8 @@
           <tr><td class="mono">GET</td><td class="mono">/api/v1/projects</td><td class="mono">worktrees</td><td>当前 actor 被授权的 Project 列表</td></tr>
           <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/members</td><td class="mono">worktrees</td><td>项目成员与角色</td></tr>
           <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/branches</td><td class="mono">engineering_runs</td><td>云端分支身份列表</td></tr>
-          <tr><td class="mono">GET</td><td class="mono">/api/v1/branches/{branch_id}/engineering-runs</td><td class="mono">engineering_runs</td><td>该分支下的 Run 列表</td></tr>
+          <tr><td class="mono">GET, POST</td><td class="mono">/api/v1/projects/{project_id}/engineering-runs</td><td class="mono">engineering_runs</td><td>Project-owned Run 列表与创建；不要求远端 Branch 身份</td></tr>
+          <tr><td class="mono">GET</td><td class="mono">/api/v1/branches/{branch_id}/engineering-runs</td><td class="mono">engineering_runs</td><td>旧 Branch-scoped 兼容列表；不是 canonical 导航入口</td></tr>
           <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/worktrees</td><td class="mono">worktrees</td><td>项目下所有 Worktree 及状态</td></tr>
           <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/worktree-repositories</td><td class="mono">worktree_lifecycle</td><td>可导入的仓库清单</td></tr>
           <tr><td class="mono">GET</td><td class="mono">/api/v1/projects/{project_id}/worktree-import-candidates</td><td class="mono">worktree_lifecycle</td><td>导入候选（已存在/冲突标记）</td></tr>
@@ -228,8 +229,8 @@
   </div>
 
   <h2 class="sec">04 从导航到数据库：一条路径贯穿四层</h2>
-  <p>这条链解释了为什么 DB schema 里到处是 <code>worktree_id</code>、<code>engineering_run_id</code>、<code>branch_id</code>——
-  它们不是冗余外键，而是同一棵树的四级指针。</p>
+  <p>Project 与 Engineering Run 是 canonical 所有权链，Worktree binding 将本地 checkout 挂到 Run；Branch 叶由 checkout 的本地 ref/state 投影形成。
+  数据库中的 <code>branch_id</code> 仅是可选远端 SCM metadata，不是 Run 的父级身份，也不决定左侧导航顺序。</p>
   <div class="figure rv">
     <svg viewBox="0 0 1040 300" role="img" aria-label="四级导航与数据库表的对应关系">
       <g class="node g" style="animation-delay:.05s">
@@ -307,9 +308,9 @@
     <div class="evbody">
       <ul>
         <li>四级主导航是仓库硬约束，见 <code>AGENTS.md</code> §0「产品导航、命名与 Worktree 管理硬约束」：必须以此解决多 Agent Worktree 归属、Branch/checkout 绑定、锁与冲突信号分散等问题。</li>
-        <li>前端路由树来自 <code>frontend/src/app/**/page.tsx</code> 实扫（57 个），主干链为 <code>(app)/projects/[project_id]/runs/[engineering_run_id]/worktrees/[worktree_id]/page.tsx</code>。</li>
-        <li>50 条路由模板来自 <code>crates/star-api-rest/src/group_api/*.rs</code> 的 <code>.route(...)</code> 字面量，已排除测试用 UUID 字面量；数量由 <code>arch_live_doc_check.py</code> 校验（下限 45）。</li>
-        <li>当前代码差距：Run 列表仍依赖远端 Branch 授权，DB 的 <code>engineering_run.branch_id</code> 仍必填；无宿主关联的 Run 尚不能完整创建、授权和列出。</li>
+        <li>前端路由树来自 <code>frontend/src/app/**/page.tsx</code> 实扫（59 个），主干链为 <code>(app)/projects/[project_id]/runs/[engineering_run_id]/worktrees/[worktree_id]/page.tsx</code>。</li>
+        <li>54 条 REST 路由模板来自 <code>crates/star-api-rest/src/group_api/*.rs</code> 的路径字面量，已排除测试用 UUID 字面量；数量由 <code>arch_live_doc_check.py</code> 校验（下限 45）。</li>
+        <li>实现状态：源码已提供 Project-owned Run list/create 与 nullable host Branch migration；目标数据库尚未应用该 migration，真实 grants/FORCE RLS、历史 reconciliation、Worktree binding writer/API 与生产授权验收仍开放，不能据此宣称部署闭环。</li>
         <li>路由组合入口：<code>crates/star-api-rest/src/group_api.rs:656 build_group_router</code>，merge 13 个路由组 + 1 条内联 group-context。</li>
         <li>Hook 策略的 10 条路由挂在 Project 与 Worktree 两个层级（<code>hook_policies.rs</code>），既支持继承也支持 Worktree 覆盖。</li>
       </ul>
@@ -317,7 +318,7 @@
   </details>
 
   <footer>
-    <div>Star arch-live · 分册 02 导航模型 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>Star arch-live · 分册 02 导航模型 · 数据基线 <code>a5f4c23c</code>（dev，2026-10-05）</div>
     <div>下一册：<a href="03-request-lifecycle.html">请求生命周期</a> 看这条链在运行时怎么跑。</div>
   </footer>
 </main>

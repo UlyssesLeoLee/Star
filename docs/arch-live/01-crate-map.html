@@ -26,7 +26,7 @@
 <main class="wrap">
   <section class="hero">
     <div class="eyebrow">分册 01 · 代码归属</div>
-    <h1>105 个 crate，各归其位</h1>
+    <h1>110 个 crate，各归其位</h1>
     <p class="lead">这页回答一个具体问题：<strong>我要写的这段逻辑，应该放进哪个 crate？</strong>
       下面每个色块是一个真实存在的 crate，数字是它的 <code>.rs</code> 文件数（实现度代理指标）。输入框可搜索，点击家族按钮可高亮。</p>
   </section>
@@ -37,7 +37,7 @@
   <table class="tbl">
     <thead><tr><th>家族</th><th>数量</th><th>职责</th><th>允许依赖谁</th><th>代表 crate</th></tr></thead>
     <tbody>
-      <tr><td><span class="badge b-domain">DDD bounded context</span></td><td class="mono">40</td>
+      <tr><td><span class="badge b-domain">DDD bounded context</span></td><td class="mono">41</td>
         <td>业务规则所在：实体、值对象、领域服务、领域事件。business decision only。</td>
         <td><code>star-context</code> + 同层兄弟（受依赖图约束）</td>
         <td class="mono">work-item / worktree / identity / hook / llm / scm</td></tr>
@@ -75,12 +75,12 @@
 
   <div class="note">
     <b>关键不变量：</b><code>star-*</code> 平台 crate <b>不得</b> <code>use</code> 任何 <code>domain-*</code>。
-    这条是整个仓库能加到 105 个 crate 而不塌成一团的原因——一旦平台层开始 import 业务层，依赖方向就不可逆了。
+    这条是整个仓库能加到 110 个 crate 而不塌成一团的原因——一旦平台层开始 import 业务层，依赖方向就不可逆了。
     <a href="08-guardrails.html">守门与 CI</a> 记录了用 lint 强制它的做法。
   </div>
 
   <h2 class="sec">02 交互式 crate 墙</h2>
-  <p class="sub">共 <strong data-shown>105</strong> 个 crate 与当前筛选匹配。悬停看文件数。</p>
+  <p class="sub">共 <strong data-shown>110</strong> 个 crate 与当前筛选匹配。悬停看文件数。</p>
   <div class="rv" style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
     <input id="crateFilter" type="search" placeholder="搜索 crate 名，如 work / hook / star-" autocomplete="off"
            style="flex:1 1 240px;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font:13px var(--mono)">
@@ -94,7 +94,7 @@
   <div class="card rv" data-cratewall>
     <div class="cratewall">
 <div class="famgroup" data-family-group="domain">
-<div class="famlabel"><span class="badge k-domain">DDD bounded context · 40</span><span class="sub"> · 40 crate</span></div>
+<div class="famlabel"><span class="badge k-domain">DDD bounded context · 41</span><span class="sub"> · 41 crate</span></div>
 <div class="cratewall">
 <div class="chip k-domain" data-name="domain-agent" title="domain-agent - 6 rust files" style="animation-delay:0ms">domain-agent<span style="opacity:.55"> ·6</span></div>
 <div class="chip k-domain" data-name="domain-agent-windows" title="domain-agent-windows - 3 rust files" style="animation-delay:0ms">domain-agent-windows<span style="opacity:.55"> ·3</span></div>
@@ -114,6 +114,7 @@
 <div class="chip k-domain" data-name="domain-form" title="domain-form - 1 rust files" style="animation-delay:0ms">domain-form<span style="opacity:.55"> ·1</span></div>
 <div class="chip k-domain" data-name="domain-hook" title="domain-hook - 1 rust files" style="animation-delay:0ms">domain-hook<span style="opacity:.55"> ·1</span></div>
 <div class="chip k-domain" data-name="domain-identity" title="domain-identity - 1 rust files" style="animation-delay:0ms">domain-identity<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-domain" data-name="domain-infrastructure" title="domain-infrastructure - 3 rust files" style="animation-delay:0ms">domain-infrastructure<span style="opacity:.55"> ·3</span></div>
 <div class="chip k-domain" data-name="domain-integration" title="domain-integration - 11 rust files" style="animation-delay:0ms">domain-integration<span style="opacity:.55"> ·11</span></div>
 <div class="chip k-domain" data-name="domain-kms" title="domain-kms - 1 rust files" style="animation-delay:0ms">domain-kms<span style="opacity:.55"> ·1</span></div>
 <div class="chip k-domain" data-name="domain-llm" title="domain-llm - 13 rust files" style="animation-delay:0ms">domain-llm<span style="opacity:.55"> ·13</span></div>
@@ -132,7 +133,7 @@
 <div class="chip k-domain" data-name="domain-theme" title="domain-theme - 11 rust files" style="animation-delay:0ms">domain-theme<span style="opacity:.55"> ·11</span></div>
 <div class="chip k-domain" data-name="domain-tool" title="domain-tool - 2 rust files" style="animation-delay:0ms">domain-tool<span style="opacity:.55"> ·2</span></div>
 <div class="chip k-domain" data-name="domain-validation" title="domain-validation - 10 rust files" style="animation-delay:0ms">domain-validation<span style="opacity:.55"> ·10</span></div>
-<div class="chip k-domain" data-name="domain-work-item" title="domain-work-item - 3 rust files" style="animation-delay:0ms">domain-work-item<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-domain" data-name="domain-work-item" title="domain-work-item - 4 rust files" style="animation-delay:0ms">domain-work-item<span style="opacity:.55"> ·4</span></div>
 <div class="chip k-domain" data-name="domain-workflow" title="domain-workflow - 2 rust files" style="animation-delay:0ms">domain-workflow<span style="opacity:.55"> ·2</span></div>
 <div class="chip k-domain" data-name="domain-workspace" title="domain-workspace - 2 rust files" style="animation-delay:0ms">domain-workspace<span style="opacity:.55"> ·2</span></div>
 <div class="chip k-domain" data-name="domain-worktree" title="domain-worktree - 3 rust files" style="animation-delay:0ms">domain-worktree<span style="opacity:.55"> ·3</span></div>
@@ -153,7 +154,7 @@
 <div class="chip k-star" data-name="star-memory" title="star-memory - 4 rust files" style="animation-delay:40ms">star-memory<span style="opacity:.55"> ·4</span></div>
 <div class="chip k-star" data-name="star-mutex" title="star-mutex - 6 rust files" style="animation-delay:40ms">star-mutex<span style="opacity:.55"> ·6</span></div>
 <div class="chip k-star" data-name="star-ops" title="star-ops - 26 rust files" style="animation-delay:40ms">star-ops<span style="opacity:.55"> ·26</span></div>
-<div class="chip k-star" data-name="star-pg-adapter" title="star-pg-adapter - 15 rust files" style="animation-delay:40ms">star-pg-adapter<span style="opacity:.55"> ·15</span></div>
+<div class="chip k-star" data-name="star-pg-adapter" title="star-pg-adapter - 16 rust files" style="animation-delay:40ms">star-pg-adapter<span style="opacity:.55"> ·16</span></div>
 <div class="chip k-star" data-name="star-quota" title="star-quota - 3 rust files" style="animation-delay:40ms">star-quota<span style="opacity:.55"> ·3</span></div>
 <div class="chip k-star" data-name="star-sa" title="star-sa - 7 rust files" style="animation-delay:40ms">star-sa<span style="opacity:.55"> ·7</span></div>
 <div class="chip k-star" data-name="star-saga" title="star-saga - 15 rust files" style="animation-delay:40ms">star-saga<span style="opacity:.55"> ·15</span></div>
@@ -216,26 +217,29 @@
 <div class="cratewall">
 <div class="chip k-infra" data-name="api" title="api - 22 rust files" style="animation-delay:240ms">api<span style="opacity:.55"> ·22</span></div>
 <div class="chip k-infra" data-name="application" title="application - 3 rust files" style="animation-delay:240ms">application<span style="opacity:.55"> ·3</span></div>
-<div class="chip k-infra" data-name="infrastructure" title="infrastructure - 3 rust files" style="animation-delay:240ms">infrastructure<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-infra" data-name="infrastructure" title="infrastructure - 17 rust files" style="animation-delay:240ms">infrastructure<span style="opacity:.55"> ·17</span></div>
 </div></div>
 <div class="famgroup" data-family-group="surface">
-<div class="famlabel"><span class="badge k-canvas">终端 / Canvas / 桌面 进程面</span><span class="sub"> · 8 crate</span></div>
+<div class="famlabel"><span class="badge k-canvas">终端 / Canvas / 桌面 进程面</span><span class="sub"> · 12 crate</span></div>
 <div class="cratewall">
 <div class="chip k-canvas" data-name="ai-vault" title="ai-vault - 3 rust files" style="animation-delay:280ms">ai-vault<span style="opacity:.55"> ·3</span></div>
 <div class="chip k-canvas" data-name="canvas-engine" title="canvas-engine - 3 rust files" style="animation-delay:280ms">canvas-engine<span style="opacity:.55"> ·3</span></div>
 <div class="chip k-canvas" data-name="canvas-game" title="canvas-game - 3 rust files" style="animation-delay:280ms">canvas-game<span style="opacity:.55"> ·3</span></div>
 <div class="chip k-canvas" data-name="canvas-realtime" title="canvas-realtime - 3 rust files" style="animation-delay:280ms">canvas-realtime<span style="opacity:.55"> ·3</span></div>
+<div class="chip k-canvas" data-name="multipass-adapter" title="multipass-adapter - 1 rust files" style="animation-delay:280ms">multipass-adapter<span style="opacity:.55"> ·1</span></div>
+<div class="chip k-canvas" data-name="platform-messaging-proto" title="platform-messaging-proto - 2 rust files" style="animation-delay:280ms">platform-messaging-proto<span style="opacity:.55"> ·2</span></div>
+<div class="chip k-canvas" data-name="platform-messaging-runtime" title="platform-messaging-runtime - 15 rust files" style="animation-delay:280ms">platform-messaging-runtime<span style="opacity:.55"> ·15</span></div>
+<div class="chip k-canvas" data-name="run-owner-runtime" title="run-owner-runtime - 14 rust files" style="animation-delay:280ms">run-owner-runtime<span style="opacity:.55"> ·14</span></div>
 <div class="chip k-canvas" data-name="star-desktop" title="star-desktop - 5 rust files" style="animation-delay:280ms">star-desktop<span style="opacity:.55"> ·5</span></div>
 <div class="chip k-canvas" data-name="terminal-protocol" title="terminal-protocol - 4 rust files" style="animation-delay:280ms">terminal-protocol<span style="opacity:.55"> ·4</span></div>
 <div class="chip k-canvas" data-name="terminal-stack" title="terminal-stack - 13 rust files" style="animation-delay:280ms">terminal-stack<span style="opacity:.55"> ·13</span></div>
 <div class="chip k-canvas" data-name="worktree-canvas" title="worktree-canvas - 1 rust files" style="animation-delay:280ms">worktree-canvas<span style="opacity:.55"> ·1</span></div>
 </div></div>
-
     </div>
   </div>
 
   <h2 class="sec">03 实装度分布 <span class="badge b-warn">别被数量误导</span></h2>
-  <p>这是本页最该看的一张图。<strong>105 个 crate 里有大量 1–3 文件的骨架</strong>；真正厚的 crate 集中在
+  <p>这是本页最该看的一张图。<strong>110 个 crate 里有大量 1–3 文件的骨架</strong>；真正厚的 crate 集中在
     <code>star-api-rest</code>、<code>star-mcp</code>、<code>arg</code>、<code>domain-report</code> 这几处。</p>
   <div class="card rv rowlist">
 <div class="row"><div class="rn"><span class="badge b-star">star-api-rest</span></div><div class="bar" data-fill="100"><i></i></div><div class="rv">60 .rs</div></div>
@@ -301,7 +305,7 @@
   </details>
 
   <footer>
-    <div>Star arch-live · 分册 01 Crate 地图 · 数据基线 <code>9e25f6b5</code>（dev，2026-10-05）</div>
+    <div>Star arch-live · 分册 01 Crate 地图 · 数据基线 <code>a5f4c23c</code>（dev，2026-10-05）</div>
     <div>本页列表由脚本生成；数字漂移会被 <code>arch_live_doc_check.py</code> 判红。</div>
   </footer>
 </main>

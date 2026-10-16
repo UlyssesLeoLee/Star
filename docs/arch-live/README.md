@@ -16,12 +16,12 @@ docs/arch-live/index.html
 | 页面 | 内容 | 回答什么问题 |
 |---|---|---|
 | [index.html](index.html) | 规模基线 + 六层系统全景 + 7 步构造链 | 这个系统整体长什么样？ |
-| [01-crate-map.html](01-crate-map.html) | 105 个 crate 分 8 家族，可搜索/过滤 + 实装度 Top-15 | 我这段逻辑该写进哪个 crate？ |
-| [02-navigation-model.html](02-navigation-model.html) | Project → Engineering Run → Worktree → Branch 四级目标模型（本地路由迁移仍开放） + 57 个前端路由 + 50 条 REST 路由 | 一个页面/接口该挂在哪一层？ |
+| [01-crate-map.html](01-crate-map.html) | 110 个 crate 分 8 家族，可搜索/过滤 + 实装度 Top-15 | 我这段逻辑该写进哪个 crate？ |
+| [02-navigation-model.html](02-navigation-model.html) | Project → Engineering Run → Worktree → Branch 四级模型；源码支持无宿主 Run，目标 DB 与 checkout binding 部署门仍开放；59 个前端页面 + 54 条 REST 路由 | 一个页面/接口该挂在哪一层？ |
 | [03-request-lifecycle.html](03-request-lifecycle.html) | 13 步请求生命周期（可自动播放）+ 错误码语义 + 真实 SQL | 一次写操作在运行时怎么跑？ |
 | [04-agent-runtime.html](04-agent-runtime.html) | Agent 执行闭环 10 步 + Task 状态机 + Hook 判定器 + 资源预算 | Agent 到底被什么约束住？ |
 | [05-worktree-canvas.html](05-worktree-canvas.html) | worktree-canvas 14 crate + 3 WASM 桥 + ARG 三层 + Canvas 四进程 | 图谱 / Canvas / Agent 关系各由谁实现？ |
-| [06-data-model.html](06-data-model.html) | 6 schema 150 表 + W/T/M 三类横展 + SCD2 + 幂等表族 + 525 RLS | 这张表为什么长这样？ |
+| [06-data-model.html](06-data-model.html) | 9 schema、204 条建表声明、574 条策略声明 + W/T/M 横展与幂等表族；目标数据库未应用迁移 | 这张表为什么长这样？ |
 | [07-deploy-topology.html](07-deploy-topology.html) | k3s 拓扑 + envoy 5 前缀路由 + 端口全表 + 拉起顺序 | 服务跑在哪、流量怎么走？ |
 | [08-guardrails.html](08-guardrails.html) | 编译器 lint + CI 8 job + AGENTS 守门 + 门禁自身的三个陷阱 | 哪些规则会真的拦住我？ |
 
@@ -33,7 +33,7 @@ docs/arch-live/index.html
 3. **动画是装饰，不是门禁。** 入场动画失败、内容默认可见；`prefers-reduced-motion` 下 SMIL 动画会被移除。
 
 > 第 3 条不是口号，它由两条门禁实测守着：
-> `data-count` 数字的**初始文本就写成真实值**（`--sync-seed` 强制），所以禁用 JS 时数字墙照常显示 105 / 741 / 251311，
+> `data-count` 数字的**初始文本就写成真实值**（`--sync-seed` 强制），所以禁用 JS 时数字墙照常显示 110 / 792 / 289517，
 > 而不是一片 `0`；`html.anim` 这个透明度门控类**只由 JS 添加**，无 JS 时 `.rv` 一律不透明。
 
 ## 配套脚本
@@ -74,7 +74,7 @@ python scripts/automation/arch_live_interact_check.py --mutate   # 变异测试�
 
 页脚写着"数据基线 `<commit>`"，但这个串**不参与退出码**，只发 `NOTICE`。原因是：
 
-- 数字对得上，才是这套图谱还准确的**真信号**——哪怕 HEAD 已经前进，只要 105 crate / 150 表
+- 数字对得上，才是这套图谱还准确的**真信号**——哪怕 HEAD 已经前进，只要 110 crate / 204 条建表声明
   这些计数在 HEAD 上依然成立，图谱就没过期。
 - 若把 commit 串也做成硬门禁，仓库每来一个无关提交门禁就红一次，久了就没人看它了。
 
