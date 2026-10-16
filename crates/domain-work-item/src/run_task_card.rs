@@ -1,9 +1,9 @@
 //! Run-scoped six-state Task Card command contract.
 //!
 //! This module is deliberately separate from the historical three-state `WorkItem` API. It
-//! models the canonical Multica Task Card lifecycle owned by an Engineering Run.
+//! models the Run-scoped Task Card lifecycle owned by an Engineering Run.
 //!
-//! @cypher schema=1 source_sha256=590447a18da1306e187202694ec56e3c8a06bd86cf7d88cc3e0159b8cd6f44f4
+//! @cypher schema=1 source_sha256=332f5466a4826f2e145e2a1daa21ec728836d47395fbed2e5ad9d5ca7140a0ab
 //! MERGE (self:File {path:"crates/domain-work-item/src/run_task_card.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-work-item/src/run_task_card.rs::module",kind:"module"})
 //! MERGE (context:Type {id:"crates/domain-work-item/src/run_task_card.rs::RunTaskCardCommandContext",kind:"struct"})
