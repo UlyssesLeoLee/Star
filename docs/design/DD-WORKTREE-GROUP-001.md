@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.04**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.05**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -704,7 +704,7 @@ PostgreSQL stored procedure/function 只封装同一 owner transaction 中需要
 
 The lifecycle audit `AFTER INSERT` trigger is the only producer for the v3 event. It reads and locks the current Task metadata and lifecycle rows, then writes owner, optional repository/Branch context, audit Worktree context, current bounded lifecycle/review/claim state, audit event identity/type, actor and correlation fields. It deliberately omits free-form rejection reason and Task body. Audit and Outbox are atomic with the command; if the Outbox insert or its tenant RLS check fails, the whole owner transaction rolls back. No trigger path performs cross-owner writes or direct BI projection updates.
 
-`occurred_at` and UUID `event_id` provide event time and stable identity but do not establish commit order: concurrent transactions can become visible in a different order than their start time or generated UUID. The additive delivery migration creates a separate owner-local Work queue with a 1024 outstanding-event cap per Run, seven-day expiry, 1–8 item claims, 30–300 second leases and at most 12 attempts. Its bounded reconciliation repeatedly finds source event IDs missing from both Work and terminal receipts; it has no timestamp/UUID high-water cursor. A settlement is `accepted` only when the configured receiving/transport-ingress owner supplies its durable Inbox commit receipt. Provider/broker acknowledgements and socket writes alone do not qualify. This receipt confirms ingress-owner persistence, not completion by every subscribed Run App or BI projection; each consumer needs its own Inbox deduplication, version fence, progress and failure state. The terminal receipt is append-only and carries no event payload; the source Outbox remains permanent.
+`occurred_at` and UUID `event_id` provide event time and stable identity but do not establish commit order: concurrent transactions can become visible in a different order than their start time or generated UUID. The additive delivery migration creates a separate owner-local Work queue with a 1024 outstanding-event cap per Run and a hard expiry at `created_at + 7 days` from enqueue; terminalization does not reset the expiry. Terminal settlement appends its permanent receipt before deleting Work, while the expiry finalizer records `retention_elapsed` before deleting any still-unsettled Work. Claims are 1–8 items with 30–300 second leases and at most 12 attempts. Its bounded reconciliation repeatedly finds source event IDs missing from both Work and terminal receipts; it has no timestamp/UUID high-water cursor. A settlement is `accepted` only when the configured receiving/transport-ingress owner supplies its durable Inbox commit receipt. Provider/broker acknowledgements and socket writes alone do not qualify. This receipt confirms ingress-owner persistence, not completion by every subscribed Run App or BI projection; each consumer needs its own Inbox deduplication, version fence, progress and failure state. The terminal receipt is append-only and carries no event payload; the source Outbox remains permanent.
 
 | Acceptance ID | Acceptance criterion |
 |---|---|
@@ -744,7 +744,7 @@ Phase 2B-2D 与 Phase 3B migrations 按事实表分类；旧 `worktree_canvas_wo
 | `multica.task_contract` | Master | Task Contract SCD2，RLS/no-delete；变更需 append-only audit |
 | `multica.task_contract_change_audit` | Transaction | Contract version create/supersede；append-only + RLS |
 | `multica.task_run_outbox`、`multica.task_run_outbox_delivery_receipt` | Transaction | 永久 append-only Task event source 与终态投递 receipt；tenant+Run+event 复合外键；receipt 不复制 payload；当前 settlement 拒绝 accepted；未来跨 owner Inbox commit 须由可信 dispatcher 验证，源 DB 不独立证明；tenant FORCE RLS |
-| `multica.task_run_outbox_delivery` | Work | Run-local bounded queue，最多 1024 条 outstanding、7 天 TTL；tenant+Run+event 复合外键；独立 NOLOGIN 函数 owner 持有 DML，Run owner 仅调用固定函数；claim/retry/expiry 有短租约和有界批次 |
+| `multica.task_run_outbox_delivery` | Work | Run-local bounded queue，最多 1024 条 outstanding；expiry 固定为 enqueue `created_at + 7 days`，终态不会重置；terminal receipt 追加后删除 Work；tenant+Run+event 复合外键；独立 NOLOGIN 函数 owner 持有 DML，Run owner 仅调用固定函数；claim/retry/expiry 有短租约和有界批次 |
 | `multica.task_execution_run` | Transaction | immutable attempt + task/acceptance/profile/provider/HookSet/Loop/resource/ProjectEngineeringManifest snapshots；Schedule Run 只引用 Automation Rule/Occurrence ID/version；Worktree/repo refs 不设 FK |
 | `multica.task_execution_run_event` / `multica.task_execution_evidence` | Transaction | 独立状态维度、Schedule occurrence/Loop decision/Hook evaluation/override、每 Run 至多一条资源高水位汇总与脱敏证据索引；append-only + RLS |
 | `multica.task_execution_run_idempotency` | Work | actor-scoped CLI start replay mapping；30 天 TTL，不拥有 Run 身份 |
@@ -1078,6 +1078,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.05 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.77/basic v6.76/data design v2.24/Task SRS v0.17、BD v0.10、DD v1.31 与 plan v7.05；明确 Task delivery Work expiry 从 enqueue `created_at` 起算，终态不重置，terminal receipt 先追加再删 Work | 对照 delivery migration 固定 `created_at + 7 days` 约束，纠正“终态后 7 天”描述 |
 | v5.04 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.76/basic v6.75/data design v2.23/Task SRS v0.16、BD v0.9、DD v1.30 与 plan v7.04；增加不可变 DeliveryRoutePin、receiver owner durable Inbox receipt、可信 dispatcher settlement 与逐 consumer Inbox/projection contract；确认这些仍是未实现的 acceptance gates | 自审发现 Task delivery migration 缺少 immutable first-send route pin，且 ingress acceptance 不证明各订阅投影已提交 |
 | v5.03 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.75/basic v6.74/data design v2.22；增加 source event 的 tenant+Run+event 复合外键；规定跨 owner Inbox 回执须由可信 dispatcher 认证且在其实现前保持 accepted 路径关闭 | 自审发现 schema 保存外部回执 ID 不能独立证明远端 commit，且原 event FK 未约束冗余 tenant/Run scope |
 | v5.02 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.74/basic v6.73/data design v2.21；定义 Task Outbox owner-local delivery Work、1024/Run backlog cap、lease/retry/TTL 与无高水位 reconciliation；终态 accepted 必须绑定接收 owner Inbox commit receipt；标明 dispatcher、DB 验证与 BI consumer 未完成 | Outbox source 已存在但无法恢复投递，且未来 transport 替换不能依赖 broker ACK 作为业务完成证据 |

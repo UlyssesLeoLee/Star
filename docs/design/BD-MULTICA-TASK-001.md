@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Task Lifecycle 基本設計書 v0.9**
+> **Task Lifecycle 基本設計書 v0.10**
 >
-> - 状态: 🟡 Draft v0.9
+> - 状态: 🟡 Draft v0.10
 > - 日期: 2026-10-02 JST
-> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.16
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.17
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -206,6 +206,8 @@ The Task owner writes immutable lifecycle source facts; the Task delivery owner 
 
 Each consumer, including Run Apps, subscribed Schedule/Loop, and BI/Benchmark, has its own Inbox deduplication and commits the Inbox receipt with its projection/outcome in one local transaction. Version gaps, poison conflicts, lag and freshness are observable per consumer. No cross-owner table writes or distributed transaction are allowed. Route pin, receiver and consumer schemas/APIs, target grants/RLS, dispatcher, and crash/replay verification remain implementation and activation gates.
 
+Delivery Work has a hard expiry at `created_at + 7 days`, measured from enqueue and never reset by a terminal transition. A terminal settlement appends the permanent receipt before deleting Work in the same transaction. A still-unsettled row reaching expiry is recorded as `dead/retention_elapsed` before Work deletion. The receipt is a permanent Transaction fact; only the bounded delivery Work expires.
+
 ## §7 安全、失败与可观测性
 
 - 每次读、写、CLI 启动和插件 capability 调用都按 tenant、Worktree、actor、WorkItem 做授权；GLOBAL 目标逐个记录允许/拒绝结果。
@@ -229,7 +231,7 @@ Each consumer, including Run Apps, subscribed Schedule/Loop, and BI/Benchmark, h
 | AC-12 | 插件热插拔只改变入口/capability 暴露，不删除任务、审计和实体引用 |
 | AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、候选槽与 DST 探测各限 32,768 步、disabled Rule 拒绝物化、lease-expired event 记录旧 attempt/generation、TTL/fencing/RLS 约束可验证；9F3 parser/materializer/adapter 与 domain release 26/26 已通过隔离 PostgreSQL 验收；Rule 写 API、持续 worker、Run admission/Auth/Outbox/BI 与目标 DB 未验收时不开放 Schedule execution |
 | AC-19 | Run Task Card 的 canonical owner 为 tenant/Project/Engineering Run；无 host Branch、无 Worktree focus 时仍支持受授权 list/create。POST 复验 Project/Run grants 与非归档 Run，focus_worktree_id 可选且必须绑定同一 Project/Run，repository/Branch 只作可选 context。单个 owner transaction 写 metadata/lifecycle/optional association/audit/idempotency/Outbox v2；客户端保留精确 body/key、32 条上限、29 天门控和人工恢复确认。目标 DB migration、app-role grants、RLS 和 Rust/HTTP/frontend 验证尚未完成；生命周期编辑、Schedule、CLI 仍关闭 |
-| AC-20 | 首发前保存 immutable route pin 并绑定 exact-wire digest；retry 不得漂移 endpoint/Profile/provider；receiver 在本地提交 Inbox receipt 后才回复；可信 dispatcher 验证 receiver/source/route/digest/lease 后才可 settlement；每个 Run App、订阅事件的 Schedule/Loop 与 BI/Benchmark consumer 在本地事务提交独立 Inbox receipt 与 projection/outcome；当前 migration 缺 route pin/receiver/consumer stores，accepted 与 consumer delivery 均关闭 |
+| AC-20 | 首发前保存 immutable route pin 并绑定 exact-wire digest；retry 不得漂移 endpoint/Profile/provider；delivery Work expiry 为 enqueue `created_at + 7 days` 且终态不重置；terminal receipt 先追加再删除 Work，未终态到期时记录 `retention_elapsed` 再删除；receiver 在本地提交 Inbox receipt 后才回复；可信 dispatcher 验证 receiver/source/route/digest/lease 后才可 settlement；每个 Run App、订阅事件的 Schedule/Loop 与 BI/Benchmark consumer 在本地事务提交独立 Inbox receipt 与 projection/outcome；当前 migration 缺 route pin/receiver/consumer stores，accepted 与 consumer delivery 均关闭 |
 
 ---
 
@@ -258,6 +260,7 @@ GAP-7: Task route pin, Rust dispatcher, receiver owner Inbox writer, per-consume
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.10 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.17、Group DD v5.05、requirements v6.77/basic v6.76 与 data design v2.24；固定 delivery Work 的 enqueue-based 7 天 expiry、永久终态回执与删除顺序；保留 migration/API/DB/RLS 和消费闭环未实现状态 | 对照 delivery migration 的 `created_at + 7 days` 约束，纠正 terminal-based TTL 表述 |
 | v0.9 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Task SRS v0.16、Group DD v5.04、requirements v6.76、basic v6.75 与 data design v2.23；增加 route-pin、receiver Inbox receipt、dispatcher verify 与 per-consumer commit 边界；明确 migration/API/DB/RLS 和消费闭环仍未实现 | Outbox delivery source migration 审查补充不可变首发路由及 consumer-specific durable completion |
 | v0.8 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树固定为 Project → Engineering Run → Worktree → Branch；Run 不依赖宿主 Branch；Task canonical owner 为 Project/Run，Worktree focus 可选；定义 Run list/create、schema v2 Outbox 与未验证 migration/RLS 及仍关闭的 lifecycle/Schedule/CLI gates | ERUN-P3.2 Task owner 源码切片对照与导航纠正 |
 | v0.7 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Card pending request 改为 POST 前异步写入有界 IndexedDB；定义 tenant/actor/Run 隔离、精确授权/binding snapshot、32 条与 29 天重试边界、过期/不匹配人工对账和显式清除；记录本地数据未加密、浏览器清理风险与非 exactly-once/跨设备边界，保留生产 DB/RLS/host/CLI 阻断 | 实现 Task Card remount/reload recovery，并对齐 SRS v0.14 |

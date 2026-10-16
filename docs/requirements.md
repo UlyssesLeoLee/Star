@@ -1,6 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.76）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.77）
 
-> **v6.76 Task Run Outbox route pin 与 consumer 边界**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。owner-local delivery Work queue 每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试，7 天后写终态回执；永久 Outbox 与不可变终态回执分离。数据库以复合外键校验 delivery/receipt 的 tenant 与 Run scope 必须匹配源事件。首次外发前还必须持久化 immutable DeliveryRoutePin，固定身份、Profile revision/digest、endpoint/destination generation 与 exact-wire digest；当前 migration 尚无 route pin，accepted settlement 仍关闭。可信 Rust dispatcher 必须认证接收方身份并验证本地事务提交的 Inbox receipt，才允许受控 settlement。每个下游 App、订阅事件的 Schedule/Loop、BI/Benchmark consumer 还需自己的 Inbox、版本 fence、projection receipt 与有界 replay；ingress acceptance 不代表订阅者完成。当前仅有 migration source，Rust dispatcher、receiver Inbox writer、consumer stores/projections、目标 DB grants/RLS 与数据库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
+> **v6.77 Task Run Outbox route pin、consumer 与 Work expiry 边界**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。owner-local delivery Work queue 每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试；7 天期限从 Work 入队 `created_at` 起算，不因终态重置。终态回执先持久化再删除 Work；仍未终态的 Work 到期时记录 `retention_elapsed` 后删除。永久 Outbox 与不可变终态回执分离。数据库以复合外键校验 delivery/receipt 的 tenant 与 Run scope 必须匹配源事件。首次外发前还必须持久化 immutable DeliveryRoutePin，固定身份、Profile revision/digest、endpoint/destination generation 与 exact-wire digest；当前 migration 尚无 route pin，accepted settlement 仍关闭。可信 Rust dispatcher 必须认证接收方身份并验证本地事务提交的 Inbox receipt，才允许受控 settlement。每个下游 App、订阅事件的 Schedule/Loop、BI/Benchmark consumer 还需自己的 Inbox、版本 fence、projection receipt 与有界 replay；ingress acceptance 不代表订阅者完成。当前仅有 migration source，Rust dispatcher、receiver Inbox writer、consumer stores/projections、目标 DB grants/RLS 与数据库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
 
 ## 0. 文档说明与前提
 
@@ -2997,6 +2997,7 @@ The Run owner changes the current binding with compare-and-swap: close exactly t
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v6.77 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Task delivery Work 的 7 天 `expires_at` 从 enqueue `created_at` 起算；提前终态时先追加永久 receipt 再删除 Work，未终态到期写入 `retention_elapsed` receipt 后删除；同步 AC-RUN-OUTBOX 保留期限验收 | 对照 2026-10-16 Task delivery migration 发现“终态后 7 天”与 DDL 固定 enqueue expiry 不一致 |
 | v6.76 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加首次发送前不可变 route pin、exact-wire retry、接收 owner Inbox commit receipt 与每个下游 consumer 独立 Inbox/projection receipt 契约；明确 route pin/dispatcher/receiver/BI/Benchmark 与目标 DB 验收仍开放 | 审查发现 source delivery migration 缺少首次 route pin，且 ingress receipt 不足以证明每个消费投影已提交 |
 | v6.75 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 accepted 回执信任边界：DB 仅存回执身份，不独立证明跨 owner commit；要求可信 dispatcher 认证并关联消费者回执；delivery/receipt 增加 tenant+Run+event 复合外键；同步仍未启用 accepted/dispatcher 的验收门 | 自审发现迁移将外部 Inbox 回执 UUID 当作已验证事实，且 event FK 未校验冗余 tenant/Run scope |
 | v6.74 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Task Run Outbox owner-local delivery Work 与不可变终态回执：每 Run 上限 1024、7 天期限、1–8 有界 claim、30–300 秒租约、最多 12 次退避；accepted 要求接收 owner Inbox commit receipt；记录无高水位 reconciliation 与 migration/runtime 未验收状态 | 用户要求为自有 Rust durable transport 做好替换 NATS 的边界，并继续完成 owner Outbox 与 BI 链路 |
@@ -3627,7 +3628,7 @@ Dispatcher 的 transport-neutral port 至少支持有界 claim、route resolutio
 
 每个 Run App、订阅这些事件的 Schedule/Loop、Canvas 投影、BI/Benchmark consumer 各自拥有 Inbox 与投影事务，不共享一个全局已消费标记。Inbox 自然键为 tenant + consumer_id + event_id，并保存不可变 scope/schema/aggregate/version/digest 与处理结果；相同事件的精确 replay 返回既有结果，事件 ID 复用但内容变化时 quarantine。Inbox receipt 与本 owner projection/outcome 在同一事务提交。按 aggregate_type 分开的 version fence 保护迟到更新；state snapshot、需要完整事件的 BI 统计和副作用 consumer 必须分别声明 gap 处理策略。不能静默越过 missing aggregate version，也不能用 occurred_at/event_id 代替消费 checkpoint；consumer 恢复须从 durable log/source 做有界回放和 reconciliation，并公开 lag、gap、last durable receipt 与 projection freshness。Ingress acceptance 不代表所有 subscriber 已消费。
 
-Resource budget 必须有限且可测：沿用每 Run 最多 1024 个待处理 Work、单次 claim 1–8、30–300 秒 lease、最多 12 次 retry 和 7 天 Work TTL；dispatcher 按 Run 公平轮转并限制全局 worker/in-flight bytes，不建立无界 payload channel。每个 transport wire 最大 16 KiB，序列化、解析与 TLS scratch 的额外峰值也计入 worker/Profile 预算；旧 v1/v2 payload 的兼容上限必须逐版本确认，超限不得截断或降级投递。取消时停止新 claim，drain 持久化 receipt 或让 lease 安全过期。桌面 UI 只分页/虚拟化消费投影，不驻留完整 Outbox。
+Resource budget 必须有限且可测：沿用每 Run 最多 1024 个待处理 Work、单次 claim 1–8、30–300 秒 lease、最多 12 次 retry 和从 enqueue `created_at` 起算的七天 Work expiry；终态 receipt 永久保留，Work 删除前必须先写 receipt。dispatcher 按 Run 公平轮转并限制全局 worker/in-flight bytes，不建立无界 payload channel。每个 transport wire 最大 16 KiB，序列化、解析与 TLS scratch 的额外峰值也计入 worker/Profile 预算；旧 v1/v2 payload 的兼容上限必须逐版本确认，超限不得截断或降级投递。取消时停止新 claim，drain 持久化 receipt 或让 lease 安全过期。桌面 UI 只分页/虚拟化消费投影，不驻留完整 Outbox。
 
 | Acceptance ID | Acceptance criterion |
 |---|---|
@@ -3636,5 +3637,5 @@ Resource budget 必须有限且可测：沿用每 Run 最多 1024 个待处理 W
 | AC-RUN-OUTBOX-03 | 接收 owner 在本地事务中幂等写 Inbox/receipt 后应答；精确重复回同一 receipt，身份或内容冲突进入 poison 流程且不 ACK。 |
 | AC-RUN-OUTBOX-04 | 每个订阅 consumer（包括订阅事件的 Schedule/Loop）在自己的事务中提交 Inbox receipt 与 projection/outcome，并按 consumer_id 去重、按 aggregate_type/version 防止倒退。 |
 | AC-RUN-OUTBOX-05 | replay/reconciliation 不以 event time/UUID 作为提交游标；缺失版本、消费 gap 和 projection lag 对 Run BI/Benchmark 明确可见。 |
-| AC-RUN-OUTBOX-06 | 1–8 有界 claim、1024/Run backlog、16 KiB wire、有限 worker 与 bytes、Run 公平轮转、取消/drain 均可验证。 |
+| AC-RUN-OUTBOX-06 | 1–8 有界 claim、1024/Run backlog、16 KiB wire、有限 worker 与 bytes、Run 公平轮转、取消/drain 均可验证。Task delivery Work 的 7 天 expiry 从 enqueue `created_at` 起算且不在终态时重置；终态先写永久 receipt 再删除 Work，未终态到期写 `retention_elapsed` receipt 再删除。 |
 | AC-RUN-OUTBOX-07 | route pin migration、Task dispatcher、receiver Inbox API、consumer owner store、目标 DB/RLS/grants、并发/崩溃恢复及 BI parity 分别通过后才能启用；当前 Schedule/Agent/Task CLI execution 继续 fail closed。 |

@@ -1,11 +1,11 @@
 # SRS-MULTICA-TASK-001
 
-> **Task Lifecycle 域要件定義書 v0.16** (6 状态 + 独立 Review Gate; Project/Run owner 与 host-independent Task Card list/create 增量)
+> **Task Lifecycle 域要件定義書 v0.17** (6 状态 + 独立 Review Gate; Project/Run owner 与 host-independent Task Card list/create 增量)
 >
-> - 状态: 🟡 Draft v0.16
+> - 状态: 🟡 Draft v0.17
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: `d4edb3945872f3e8819c39c70e93762cf430e834` (Task Run Outbox delivery substrate; route pin/dispatcher/consumer remain gated)
-> - 关联基本設計書: [docs/design/BD-MULTICA-TASK-001.md](../design/BD-MULTICA-TASK-001.md) v0.9
+> - 关联基本設計書: [docs/design/BD-MULTICA-TASK-001.md](../design/BD-MULTICA-TASK-001.md) v0.10
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2
 > - 关联 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 (v33 候选)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3)
@@ -240,7 +240,7 @@ Task Lifecycle 是 Run 内的任务事实 owner；产品呈现使用中性任务
 
 | AC | 描述 |
 |---|---|
-| AC-20 | Before the first external send, the Task delivery owner persists an immutable route pin binding sender/receiver service identity, transport provider/version, Profile revision/digest, endpoint and destination generation, schema version, and exact-wire digest. Retries use the same pin and bytes; revoked or drifted routes fail closed without fallback. Receiver owner Inbox receipt must commit durably before response, and only a trusted Rust dispatcher that authenticates receiver identity and binds the receipt to the source event, route pin, digest, and current lease may settle accepted delivery. Every Run App, subscribed Schedule/Loop, BI, and Benchmark consumer commits its own Inbox receipt with its projection/outcome. Exact replay is idempotent; identity/content conflict is quarantined. The current migration lacks route-pin and receiver/consumer Inbox stores; accepted settlement, dispatch, projection and production activation remain disabled until each owner DB/RLS/rollback/replay gate passes. |
+| AC-20 | Before the first external send, the Task delivery owner persists an immutable route pin binding sender/receiver service identity, transport provider/version, Profile revision/digest, endpoint and destination generation, schema version, and exact-wire digest. Retries use the same pin and bytes; revoked or drifted routes fail closed without fallback. The delivery Work expiry is fixed at enqueue as `created_at + 7 days` and is not reset at terminalization; terminal settlement appends a permanent receipt before deleting Work, while still-unsettled expiry appends `retention_elapsed` before deletion. Receiver owner Inbox receipt must commit durably before response, and only a trusted Rust dispatcher that authenticates receiver identity and binds the receipt to the source event, route pin, digest, and current lease may settle accepted delivery. Every Run App, subscribed Schedule/Loop, BI, and Benchmark consumer commits its own Inbox receipt with its projection/outcome. Exact replay is idempotent; identity/content conflict is quarantined. The current migration lacks route-pin and receiver/consumer Inbox stores; accepted settlement, dispatch, projection and production activation remain disabled until each owner DB/RLS/rollback/replay gate passes. |
 
 ## §8 已知缺口 (per 守门 #11)
 
@@ -305,6 +305,7 @@ GAP-8: Task Outbox route-pin migration, dispatcher/receiver identity authenticat
 | v0.11 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 对账 Phase 9F3 pinned cron/tzdb materializer、PostgreSQL persistence/lease adapter、deadline/exhaustion finalizer 与隔离 PostgreSQL 18.6 migration/RLS/4 场景实测；保留 production API/worker/Run admission/Auth/Outbox/BI/target DB 阻断 | 9F3 验证结果需精确反映到 Schedule acceptance 与生产边界 |
 | v0.12 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 明确两个 32,768 扫描上限、disabled Rule 在物化与 adapter 两层 fail closed、lease-expired 审计保留旧 attempt/fencing generation；同步最终 domain release 26/26 与当前 9F4 生产 blockers | 最终源码自审修复安全执行条件、转换扫描预算与审计事件身份对应 |
 | v0.13 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将渡口产品层级统一为 Project → Cloud Branch → Engineering Run → Run Worktree；新增 AC-19 约束有写授权、固定 Worktree 重试目标、server-derived Run owner 和事务 Outbox 的条件式 Task Card 创建；保留 capability/DB/RLS/host session 与 CLI 阻断状态 | 用户要求以本对话确立的导航与 Worktree 归属设计筛选当前实现 |
+| v0.17 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修订 AC-20：delivery Work expiry 固定为 enqueue `created_at + 7 days`，不得写作 terminal 后开始 TTL；提前终态与过期均先记录永久 receipt 再删除 Work | 对照 Task delivery DDL 的 `expires_at = created_at + 7 days` 修正文档语义 |
 | v0.16 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 AC-20：不可变首发 route pin、exact-wire retry、receiver owner durable Inbox receipt、可信 dispatcher settlement 与 per-consumer Inbox/projection commit；明确 route pin/dispatcher/receiver/consumer stores 和目标 DB gates 未实现，accepted delivery 保持关闭 | Task Run Outbox delivery migration review 发现缺失 route pin 且 ingress receipt 无法证明逐 consumer commit |
 | v0.15 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project → Run → Worktree → Branch 与中性 UI 文案；将 Task owner 定为 Project/Run 并新增无宿主、无 focus 的 list/create AC；同步 target migration/RLS/validation blockers 与 lifecycle/Schedule/CLI closed status | ERUN-P3.2 host-independent Task Card owner 源码切片 |
 | v0.14 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 扩展 AC-19：在 POST 前写入按 tenant/actor/Project/Run 隔离的有界 IndexedDB pending command，固定当前授权/binding 快照，限制 32 条与 29 天重试窗口；明确本地存储失效、记录缺失、手动清除和非 exactly-once 边界；同步 Task BD/DD 与根要求/基本设计/Group DD/实施计划 | 补齐 Task Card create 在 remount/reload 后的本地恢复切片 |
