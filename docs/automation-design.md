@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.57 (2026-10-14)
+> **文档版本**: v2.58 (2026-10-14)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3122,3 +3122,13 @@ P1 is closed: route tenant/deployment/Profile identity is derived from the resol
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v2.57 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add resolver-bound D20 publisher route evidence and opt-in owner-store SQLx acceptance; distinguish synthetic receipts from real native append and keep P2 and production gates open | Publisher route review and disposable PostgreSQL acceptance |
+
+### 4.95 Phase 9F4F BI Task payload projection gate
+
+Automation tier: P. Runner scripts/automation/phase9f4e_bi_task_event_inbox.py --pg-bin D:\PostgreSQL\18\bin runs the 9F4E base schema and 9F4F projection upgrade against isolated loopback PostgreSQL. It double-applies each migration, seeds a legacy raw fact with a privacy sentinel, applies the projection migration again, commits and exactly replays an event through v2, rejects a missing lifecycle state, and checks that free-form and host-context fields did not survive. It verifies stable fact count, effective v1/v2/helper privileges, no runtime table DML or schema CREATE, tenant FORCE RLS and append-only triggers. The runner owns only a uniquely named target/phase9f4e-bi-* data directory and log and removes them only after PostgreSQL stops.
+
+The verified PostgreSQL 18.6 disposable run passed. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy also passed. These are focused source/package gates only. The runner does not connect to the target database, provision production roles, verify production identity, purge older backup/WAL copies, implement a BI query API/UI, start a network receiver/dispatcher, or enable accepted delivery or Task execution; workspace-wide Rust checks remain unverified.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v2.58 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the 9F4F disposable PostgreSQL gate for DB-generated allowlist projection, legacy raw-fact conversion, missing-state rejection, privacy sentinel removal and least privilege; record Rust 1.99.0 `bi-owner-runtime` format, all-target tests and strict Clippy pass; retain production/retention/workspace gates | 9F4F owner-side BI data-minimization implementation and test review |

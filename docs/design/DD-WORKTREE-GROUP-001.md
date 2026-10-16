@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.07**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.08**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -13,13 +13,13 @@
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9F4D-3B1 状态：在 9F4D-3A 六表 schema substrate 上新增受限 NOLOGIN Infrastructure-owner grant group 与分表 W/T 权限矩阵；disposable PostgreSQL 18.6 中重复应用迁移并通过 14/14 grants/schema gates。目标 DB provisioning、真实 app login membership/SET LOCAL ROLE、owner writer/consumer、capacity admission 与 Manager/provider 仍未实现；该 gate 未启动 Multipass，测试阶段最多登记 2 个实例。
-> - Phase 9F4E 状态：BI owner 已有独立 Task-event Inbox、immutable event fact、payload-free conflict incident、16 KiB wire/8 KiB payload 上限与 route-pin digest；PostgreSQL 18.6 隔离 runner 的 migration 双次应用及 fixture 通过。当前无可信 transport adapter/production receiver identity、BI projection/fan-out/accepted settlement、target DB/Rust build 或 raw-payload retention 策略，BI 消费仍关闭。
+> - Phase 9F4F 状态：BI owner fact 仅保存 database-generated allowlist projection；历史 live raw facts 在事务内转换，runtime 仅执行 v2 function。PostgreSQL 18.6 fixture 覆盖 sentinel 清除、double-apply、exact replay、缺失状态拒绝、RLS/WORM/grants；Rust 1.99.0 `bi-owner-runtime` rustfmt、all-target tests (4/4) 与 strict all-target Clippy 通过。workspace-wide Rust gates、可信 receiver、BI read API/UI、fan-out/accepted、target DB、并发/crash recovery 与 backup/WAL retention 仍开放，BI 消费保持关闭。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
 > - 上位需求：[docs/requirements.md](../requirements.md) v6.80 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.79 §16
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.80 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.34、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.08
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -670,7 +670,7 @@ Run App、订阅相关事件的 Schedule/Loop、BI 与 Benchmark 的每个 consu
 
 The Task source Outbox remains owned by the Run; BI owns its Inbox receipt, immutable event fact and payload-free integrity incident. The BI transaction function validates current tenant/Run scope, route-pin identity and exact wire digest, then commits the idempotent Inbox row and BI fact together. A matching replay returns the existing receipt. Reuse of an event identity with changed scope, route, wire or content records an incident without retaining another payload or returning a receipt. Inbox, fact and incident tables are tenant FORCE-RLS and append-only; the runtime role receives only fixed-function execution rights.
 
-The 9F4E PostgreSQL 18.6 disposable runner passed repeated migration application and fixture cases. This does not establish production authentication: the new crate-private authenticated principal currently has no trusted transport factory, and no network receiver, BI projection, fan-out or accepted settlement is wired. The immutable fact currently stores raw event payload with no approved retention/purge or capacity policy. Keep BI ingestion disabled until trusted identity, target DB/grants/RLS, Rust 1.99.0 gates, retention approval, projection and recovery are verified. Worktree focus and Project → Run → Worktree → Branch navigation are unchanged; BI remains a Run App, and this schema adds no navigation node.
+The 9F4E PostgreSQL 18.6 disposable runner passed repeated migration application and fixture cases. This does not establish production authentication: the new crate-private authenticated principal currently has no trusted transport factory, and no network receiver, BI read API, fan-out or accepted settlement is wired; the database allowlist projection is not an analytics query interface. That initial raw-fact shape is superseded by 8.26. Live facts now retain only the database-generated allowlist projection; backup/WAL and source Outbox retention remain separate gates. Keep BI ingestion disabled until trusted identity, target DB/grants/RLS, Rust 1.99.0, backup/WAL retention, BI read API and recovery are verified. Worktree focus and Project → Run → Worktree → Branch navigation are unchanged; BI remains a Run App, and this schema adds no navigation node.
 
 | Acceptance ID | Group design boundary |
 |---|---|
@@ -1091,6 +1091,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.08 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Align requirements v6.81/basic v6.80, Task SRS v0.21/BD v0.14/DD v1.35, Data Design v2.28 and plan v7.09; add 8.26 for DB allowlist projection, legacy live-fact conversion, privacy boundary and PG evidence; record Rust 1.99.0 `bi-owner-runtime` format/test/strict Clippy pass; keep workspace-wide gates, backup/WAL, target DB, receiver and query API open | Phase 9F4F BI Task payload minimization slice |
 | v5.07 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.80/basic v6.79/Task SRS v0.20、BD v0.13、DD v1.34、Data Design v2.27 与实施计划 v7.08；新增 §8.25 约束 BI 为首个 Task-event owner-local durable Inbox consumer，并记录 PostgreSQL 18.6 隔离证据及 trusted transport、projection、retention、target DB/Rust 门禁 | Phase 9F4E BI Inbox 持久化切片与 Run App 边界同步 |
 | v5.06 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79/basic v6.78/Task SRS v0.19、BD v0.12、DD v1.33 与 Data Design v2.26；记录 Rust bounded Task claim/route/wire store、独立 Profile `event` authorization、authenticated-context route identity、fenced retry 与 proof dead-letter；明确无 send/accepted/receiver/consumer/fair scheduler，Rust/target DB 门禁开放 | ERUN-P3.3 Task Outbox Rust slice 与当前源码对账 |
 | v5.05 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.77/basic v6.76/data design v2.24/Task SRS v0.17、BD v0.10、DD v1.31 与 plan v7.05；明确 Task delivery Work expiry 从 enqueue `created_at` 起算，终态不重置，terminal receipt 先追加再删 Work | 对照 delivery migration 固定 `created_at + 7 days` 约束，纠正“终态后 7 天”描述 |
@@ -1136,3 +1137,15 @@ native gRPC delivery/receive config 只接收 `ResolvedTransportEndpoint`；连�
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+
+## §8.26 — Phase 9F4F BI Task payload minimization
+
+The BI-owned event fact stores a strict, versioned projection generated inside the owner database. The existing Task source Outbox remains authoritative and retains its own payload under its separate owner contract. On BI ingress the bounded raw payload is validated for supported schema, event and Project/Run/Task scope, then reduced to approved identifiers, versions, event type, owner-change state or allowlisted lifecycle/review states. Free-form text and host checkout metadata are dropped before persistence. Missing or unknown lifecycle/review state is rejected at both the Rust boundary and the database projection function.
+
+The v2 commit function is the only runtime entry point. The owner function projects and commits the Inbox receipt and fact in the existing single transaction; direct runtime access to raw v1 persistence and the projection helper is revoked. A transactional backfill preserves stable event, Inbox receipt, route and wire identity while replacing the current fact table. Any incompatible legacy row aborts the migration before the table swap. The disposable PostgreSQL 18.6 runner passed double application, legacy sentinel removal, replay, malformed-state rejection, FORCE RLS, WORM and effective grants. Backup/WAL retention is not proven by dropping the live table.
+
+This is durable data minimization, not an analytics read API or materialized BI dashboard. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust gates remain open. No trusted receiver, network delivery, accepted settlement, query API/UI, target database deployment, production identity or concurrent/crash recovery is added. Keep BI ingestion and task execution disabled until those independent gates close.
+
+| Acceptance ID | Group design boundary |
+|---|---|
+| AC-RUN-OUTBOX-08/09 | Task DD 14.13.5; database-owned projection and migration are verified in a disposable fixture; query API, fan-out and production activation remain open. |

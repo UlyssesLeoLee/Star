@@ -1,7 +1,7 @@
--- @cypher schema=1 source_sha256=PLACEHOLDER
+-- @cypher schema=1 source_sha256=d4b36d7637d437003d7ad678a5681325bcf160162d757c4b27d755373eef6155
 -- MERGE (self:File {path:"db/tests/bi-task-event-inbox.sql"})
 -- MERGE (test:Symbol {id:"db/tests/bi-task-event-inbox.sql::bi_task_event_inbox_contract",kind:"test"})
--- MERGE (function:Database {id:"bi.commit_task_event_v1",kind:"stored_function"})
+-- MERGE (function:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
 -- MERGE (inbox:Table {id:"bi.task_event_inbox",kind:"table"})
 -- MERGE (fact:Table {id:"bi.task_event_fact",kind:"table"})
 -- MERGE (incident:Table {id:"bi.task_event_integrity_incident",kind:"table"})
@@ -44,10 +44,17 @@ BEGIN
             'project_id', project::TEXT,
             'engineering_run_id', run_id::TEXT
         ),
-        'change', jsonb_build_object('event_type', 'task.lifecycle.changed')
+        'lifecycle', jsonb_build_object('status', 'in_progress', 'review_state', 'none'),
+        'change', jsonb_build_object(
+            'event_type', 'task.lifecycle.changed',
+            'from_status', 'claimed',
+            'to_status', 'in_progress',
+            'private_note', 'BI must not retain this free-form value'
+        ),
+        'host_context', jsonb_build_object('branch_name', 'sensitive/freeform')
     );
 
-    SELECT * INTO result_row FROM bi.commit_task_event_v1(
+    SELECT * INTO result_row FROM bi.commit_task_event_v2(
         tenant, project, run_id, event_uuid, work_item, 'lifecycle', 1,
         'task.lifecycle.changed', 3, actor, correlation, happened_at,
         payload, sender_service, receiver_service, 'star-rust-log', 'v1', profile, 1,
@@ -59,7 +66,21 @@ BEGIN
     END IF;
     first_receipt := result_row.receipt_id;
 
-    SELECT * INTO result_row FROM bi.commit_task_event_v1(
+    BEGIN
+        PERFORM * FROM bi.commit_task_event_v2(
+            tenant, project, run_id, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', work_item,
+            'lifecycle', 1, 'task.lifecycle.changed', 3, actor, correlation, happened_at,
+            jsonb_set(payload, '{lifecycle,status}', 'null'::JSONB),
+            sender_service, receiver_service, 'star-rust-log', 'v1', profile, 1,
+            decode(repeat('d4', 32), 'hex'), 'loopback-test', 'bi-task-events',
+            destination_generation, decode(repeat('e5', 32), 'hex'), decode(repeat('c4', 32), 'hex')
+        );
+        RAISE EXCEPTION 'BI projection accepted a missing lifecycle status';
+    EXCEPTION WHEN SQLSTATE '23514' THEN
+        NULL;
+    END;
+
+    SELECT * INTO result_row FROM bi.commit_task_event_v2(
         tenant, project, run_id, event_uuid, work_item, 'lifecycle', 1,
         'task.lifecycle.changed', 3, actor, correlation, happened_at,
         payload, sender_service, receiver_service, 'star-rust-log', 'v1', profile, 1,
@@ -71,7 +92,7 @@ BEGIN
     END IF;
     replay_receipt := result_row.receipt_id;
 
-    SELECT * INTO result_row FROM bi.commit_task_event_v1(
+    SELECT * INTO result_row FROM bi.commit_task_event_v2(
         tenant, project, run_id, event_uuid, work_item, 'lifecycle', 1,
         'task.lifecycle.changed', 3, actor,
         '88888888-8888-4888-8888-888888888888',
@@ -85,7 +106,7 @@ BEGIN
     END IF;
 
     PERFORM set_config('app.tenant_id', '99999999-9999-4999-8999-999999999999', false);
-    SELECT * INTO result_row FROM bi.commit_task_event_v1(
+    SELECT * INTO result_row FROM bi.commit_task_event_v2(
         '99999999-9999-4999-8999-999999999999',
         'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', run_id, event_uuid, work_item,
         'lifecycle', 1, 'task.lifecycle.changed', 3, actor, correlation,
@@ -107,11 +128,11 @@ $$;
 RESET ROLE;
 DO $$
 BEGIN
-    IF (SELECT count(*) FROM bi.task_event_inbox) <> 1 THEN
-        RAISE EXCEPTION 'expected one BI Inbox receipt';
+    IF (SELECT count(*) FROM bi.task_event_inbox) <> 2 THEN
+        RAISE EXCEPTION 'expected the migrated and new BI Inbox receipts';
     END IF;
-    IF (SELECT count(*) FROM bi.task_event_fact) <> 1 THEN
-        RAISE EXCEPTION 'expected one BI immutable event fact';
+    IF (SELECT count(*) FROM bi.task_event_fact) <> 2 THEN
+        RAISE EXCEPTION 'expected the migrated and new BI immutable event facts';
     END IF;
     IF (SELECT count(*) FROM bi.task_event_integrity_incident) <> 2 THEN
         RAISE EXCEPTION 'expected two durable identity conflict incidents';
@@ -120,6 +141,10 @@ BEGIN
        OR has_table_privilege('star_bi_runtime', 'bi.task_event_fact', 'INSERT')
        OR has_schema_privilege('star_bi_runtime', 'bi', 'CREATE') THEN
         RAISE EXCEPTION 'BI runtime role has direct table access';
+    END IF;
+    IF has_function_privilege('star_bi_runtime', 'bi.commit_task_event_v1(uuid,uuid,uuid,uuid,uuid,character varying,integer,character varying,integer,uuid,uuid,timestamp with time zone,jsonb,uuid,uuid,character varying,character varying,uuid,bigint,bytea,character varying,character varying,uuid,bytea,bytea)', 'EXECUTE')
+       OR NOT has_function_privilege('star_bi_runtime', 'bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,character varying,integer,character varying,integer,uuid,uuid,timestamp with time zone,jsonb,uuid,uuid,character varying,character varying,uuid,bigint,bytea,character varying,character varying,uuid,bytea,bytea)', 'EXECUTE') THEN
+        RAISE EXCEPTION 'BI runtime function boundary is incorrect';
     END IF;
 END;
 $$;

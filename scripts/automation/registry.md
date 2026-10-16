@@ -53,6 +53,7 @@ Schedule 9F4C-C run-as ACL mutation serialization：`phase9f3_schedule.py` 将�
 
 ## 1. 脚本索引表
 
+| scripts/automation/phase9f4e_bi_task_event_inbox.py | Disposable PostgreSQL 18.6 loopback gate for the 9F4E BI Inbox schema plus 9F4F DB-generated allowlist projection/backfill; repeated migration apply, legacy sentinel removal, v2 exact replay, malformed-state rejection, stable identity/count, effective grants, FORCE RLS and WORM. Owns only its unique stopped PostgreSQL test directory; does not use target DB or enable receiver/BI execution. | Phase 9F4E/9F4F; automation-design §4.94/§4.95; implementation plan §6.151/§6.152; phase reports | This phase | Isolated PostgreSQL 18.6 gate passed; production identity, target DB, backup/WAL policy and Rust 1.99 remain open |
 | 脚本路径 | 用途 | 调用方 | 末次 commit | 状态 |
 |---|---|---|---|---|
 | `scripts/automation/phase9f4c_d_owner_protocol.py` | Reproducible focused Rust gate for the versioned Schedule→Run Command/Result/Resolution DTOs: rustfmt, all-target package check, admission-specific and full package tests, bounded-baseline Clippy and diff-check; writes per-run JSONL audit and separate stdout/stderr files. Does not create DB/broker/VM or enable consumers. | 9F4C-D owner-message contract; automation-design §4.71; implementation plan §6.112; phase report | This phase | 🟢 6/6 gates; 3/3 focused tests and 29/29 package tests; consumers and execution remain fail-closed |

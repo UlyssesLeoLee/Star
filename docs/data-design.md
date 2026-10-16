@@ -1,10 +1,11 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.27 (2026-10-16)
+> **文档版本**: v2.28 (2026-10-16)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
+> | v2.28 | 2026-10-16 | Align Phase 9F4F; all three BI tables remain Transaction data; specify DB-generated allowlist projection, transactional legacy raw-fact replacement and backup/WAL boundary; record PostgreSQL 18.6 and Rust 1.99.0 package format/test/Clippy gates | Mavis 接手审核 |
 > | v2.27 | 2026-10-16 | 新增 Phase 9F4E BI owner 的三张 Transaction 表 W/T/M 全量分类；记录 16 KiB wire/8 KiB payload、owner function 原子提交、tenant FORCE RLS、runtime least privilege、WORM 与隔离 PostgreSQL 双次 apply/fixture 验收；明确认证 transport、BI projection、payload 长期保留与 target DB 仍开放 | Mavis 接手审核 |
 > | v2.26 | 2026-10-16 | 对账 Run-owner Rust Task delivery store：bounded claim、Profile `event` authorization、authenticated-context route identity、exact-wire route pin、fenced retry 与 proof dead-letter；确认 source Outbox payload 已有 8 KiB JSONB text check；无发送/accepted/receiver/consumer/fair scheduler，Rust 与目标 DB 未验收 | Mavis 接手审核 |
 > | v2.25 | 2026-10-16 | 对账 Task route-pin migration source：tenant/event 主键、永久源 Outbox 复合外键、固定函数与当前 lease/schema fence；记录 disposable PostgreSQL 18 synthetic-Outbox fixture 的双次回放及选定 schema/RLS/grant/WORM/lease/idempotency/事务回滚断言通过；target DB、并发、迁移回退未验收，receiver/consumer 仍无 owner-local store | Mavis 接手审核 |
@@ -2115,7 +2116,7 @@ This migration has no Work table. The Master snapshot stores V2 JSON plus explic
 
 Verification: PostgreSQL 18.6 disposable schema-only runner passed 29/29 steps, including D2 migration idempotency, least-privilege grants, FORCE RLS, tenant isolation, revision lifecycle, WORM and direct event-insert denial; the cluster was stopped and its owned data removed. Rust 1.99.0 package tests passed 12/12, with focused rustfmt and package all-target warnings-as-errors Clippy passing. Broader strict Clippy remains blocked by two existing `star-context` lints. A Rust SQLx save/resolve round-trip is not yet tested. A no-op legacy Audit function existed only as an isolated prerequisite for older Worktree DDL; no production Audit/DB/role deployment, NATS, Multipass VM or inventory was tested or changed.
 
-### 4.13.12 Phase 9F4E BI Task event Inbox and immutable fact
+### 4.13.12 Phase 9F4E BI Task event Inbox and immutable fact (historical raw-fact shape; superseded by §4.13.28)
 
 | Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
 |---|---|---|---|---|
@@ -2125,7 +2126,7 @@ Verification: PostgreSQL 18.6 disposable schema-only runner passed 29/29 steps, 
 
 There are no Work or Master tables in this migration; all three persisted tables are Transaction data. `bi.commit_task_event_v1` performs strict scope checks, first Inbox/fact insert, exact replay receipt return, or conflict incident insertion in one BI owner transaction. Task event wire is capped at 16 KiB; supported payload schemas are validated before persistence. The Rust store requires a crate-internal `AuthenticatedTaskEventPrincipal`, but the trusted transport/auth adapter that would mint that value is not implemented. Disposable PostgreSQL 18.6 migration double-apply and fixture gates passed for exact replay, identity/content and cross-tenant conflicts, FORCE RLS, WORM and runtime grants. Rust 1.99 build/fmt, target deployment identity/grants, concurrent/crash recovery and rollback remain unverified.
 
-**Retention and privacy gap:** the BI fact stores the complete bounded event payload indefinitely, while inboxes and conflict incidents have no purge rule. The current schema is intentionally WORM and has no retention worker or legal hold/purge flow. Data classification, privacy basis, retention period, archive policy, storage growth budget and an approved deletion mechanism must be resolved before production ingestion; do not add ad hoc table deletion that bypasses owner audit.
+**Retention and privacy gap:** the BI fact stores the complete bounded event payload indefinitely, while inboxes and conflict incidents have no purge rule. The current schema is intentionally WORM and has no retention worker or legal hold/purge flow. Data classification, privacy basis, retention period, archive policy, storage growth budget and an approved deletion mechanism must be resolved before production ingestion; do not add ad hoc table deletion that bypasses owner audit. This live raw-fact retention statement is superseded by §4.13.28; backup/WAL and source Task Outbox retention remain separate.
 
 ### 4.14 Module: domain-identity(`identity` schema)
 
@@ -6055,3 +6056,15 @@ The receiver commits its Inbox receipt before replying. The trusted Rust dispatc
 Each subscriber stores a consumer-specific key of tenant + consumer ID + event ID in the same owner transaction as its projection/outcome. Replays with identical immutable scope and digest return the recorded result; changed content under the same event ID is poison/quarantine. Aggregate type and version are fenced independently; consumers declare whether a version gap may be rebuilt from a snapshot or requires full event replay. BI/Benchmark publish lag, gap, last durable receipt, and freshness separately from ingress delivery. Reconciliation is by stable event identity and bounded pages, never an occurred_at or UUID high-water mark.
 
 The route-pin migration source now defines its table, tenant FORCE RLS, immutable trigger and fixed lease-fenced function. A disposable PostgreSQL 18 synthetic-Outbox fixture passed double-apply, schema/effective privilege, tenant isolation, FORCE RLS, WORM, lease/schema fence, exact-retry/digest rejection and pin-transaction rollback checks. The Rust owner store now calls the fixed function for source-level route/wire preparation, but no network dispatcher is wired. Target DB deployment, migration downgrade/rollback, concurrent same-event pin and production identity remain unverified. No receiver-Inbox or per-consumer Inbox migration/table is included. Their owner APIs/functions, table-level W/T/M inventory, RLS/grants, retention/compaction, duplicate/conflict, crash-after-commit and replay verification remain required before enabling accepted delivery or projections.
+
+### 4.13.28 — Phase 9F4F BI Task payload projection
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| bi.task_event_inbox | T — Transaction | BI owner; durable consumer receipt keyed by tenant/consumer/event and bound to immutable source scope and route identity. | Permanent append-only receipt; no raw event payload; no TTL or purge in this slice. | Tenant FORCE RLS; fixed owner function only; runtime has no direct table access. |
+| bi.task_event_fact | T — Transaction | BI owner; immutable event dimensions and a versioned DB-generated allowlist payload projection. | Permanent append-only fact; payload contains approved IDs, versions, event type, owner-change or lifecycle/review state only; raw/free-form source payload is not retained in the live table. | Tenant FORCE RLS and WORM; runtime can invoke v2 only, with no direct table DML or helper/v1 function access. |
+| bi.task_event_integrity_incident | T — Transaction | BI owner; metadata-only evidence of event identity/scope/route/content conflict. | Permanent append-only incident; no received payload, TTL or purge in this slice. | Tenant FORCE RLS; fixed owner function only; runtime has no direct table access. |
+
+No table is added; the three BI tables remain Transaction data. Function bi.project_task_event_payload_v1 validates supported schema/event/scope and allowlisted values and returns only the fixed projection. Function bi.commit_task_event_v2 is the runtime entry point: it projects bounded raw input before delegating to the owner-only v1 receipt/fact transaction. The runtime role cannot execute v1 or call the projector directly.
+
+Migration 2026-10-16-bi-task-event-projection.sql replaces the live fact table transactionally. It backfills through the same projector, preserves the composite Inbox foreign key and durable event/route/wire identity, then drops the old live raw table. Any unsupported legacy row aborts before replacement. PostgreSQL 18.6 disposable tests passed migration replay, sentinel removal, v2 exact replay, missing lifecycle-state rejection, FORCE RLS, WORM and grants. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust checks remain open. This does not purge historical bytes from WAL/backups or change retention of the Task source Outbox; those policies and production target DB verification remain open. This is a durable owner projection source, not a BI query API/dashboard or materialized analytics product.

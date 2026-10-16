@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.79 (2026-10-16)
-> **上游要件定义书**: docs/requirements.md v6.80
+> **文档版本**: v6.80 (2026-10-16)
+> **上游要件定义书**: docs/requirements.md v6.81
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5760,6 +5760,17 @@ The isolated PostgreSQL 18.6 runner applied the migration twice and passed its f
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+## 16.72 — Phase 9F4F BI Task payload minimization
+
+The BI owner now persists only a database-generated, versioned allowlist projection in `bi.task_event_fact.payload`. `bi.commit_task_event_v2` validates and projects the bounded input before invoking the owner-only persistence function; the runtime role can execute v2 but cannot execute the raw v1 function or the projection helper. Metadata events retain only approved identifiers, versions, event type and owner-change state. Lifecycle events retain only approved scope/version, lifecycle/review states and optional transition states. Titles, descriptions, labels, claimant data, branch/worktree context and arbitrary extension fields are discarded before the fact write.
+
+The migration transaction copies historical facts into a replacement table through the same projector, keeps the Inbox/event/receipt/route/wire identities and audit dimensions, swaps the table and drops the live raw-payload table. Unsupported historical schemas or states abort the entire transaction. The PostgreSQL 18.6 disposable runner passed double application, legacy sentinel removal, v2 commit/replay, missing-state rejection, runtime privilege, FORCE RLS, WORM and projection assertions. This proves the isolated schema fixture only; it does not erase bytes already present in backups/WAL or change the source Task Outbox retention policy.
+
+No trusted receiver, network dispatcher, accepted settlement, BI query API/UI, target DB deployment, production identity, backup/WAL retention policy or concurrent/crash recovery evidence exists. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust gates remain open. Keep BI ingestion and execution disabled until the production gates pass. See Task SRS v0.21, Task BD v0.14, Task DD v1.35, Group DD v5.08, Data Design v2.28 and report `PHASE-9F4F-BI-TASK-PAYLOAD-PROJECTION-REPORT.md`.
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v6.80 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.81、Task SRS v0.21/BD v0.14/DD v1.35、Group DD v5.08 与 Data Design v2.28；新增 §16.72 说明 DB allowlist projection、raw fact 原子替换、least-privilege 与隔离 PostgreSQL 证据；Rust 1.99.0 `bi-owner-runtime` rustfmt/all-target tests (4/4)/strict Clippy 通过，workspace-wide checks 与备份/WAL、认证 receiver、target DB、BI API 仍开放 | 9F4F 为解决 BI immutable fact 永久复制自由文本增加 owner-side projection |
 | v6.79 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.80、Task SRS v0.20/BD v0.13/DD v1.34、Group DD v5.07 与 Data Design v2.27；新增 §16.71 描述 BI owner durable Inbox/fact/conflict、exact replay、16/8 KiB 限额、PG18.6 隔离验收和无认证 transport/projection/retention/target DB/Rust build 的阻断项 | Phase 9F4E 首个 Task-event consumer 持久化切片完成并同步设计 |
 | v6.78 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79；记录 Rust Task delivery store 的有界 claim、Profile event kind 授权、已认证身份派生、exact-wire route pin、lease-fenced retry 与 proof dead-letter；说明源表已有 8 KiB payload DB 约束；明确没有 send/accepted/receiver/consumer/fair scheduler，Rust/target DB 门禁仍开放 | ERUN-P3.3 Rust delivery substrate 与当前源码/需求对账 |
 | v6.77 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.78；记录 Task route-pin 表与固定函数 migration source、tenant/event 源事件身份及当前 worker/attempt/schema fence；记录 disposable PostgreSQL 18 fixture 的双次回放及选定 RLS/grant/WORM/lease/idempotency assertions 已通过；目标 DB、并发与生产身份未验收，Rust dispatcher/receiver/consumer 未接入，accepted 继续关闭 | ERUN-P3.3 增加 Task Outbox route-pin DDL source |

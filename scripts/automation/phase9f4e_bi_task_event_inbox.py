@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Run the isolated PostgreSQL 18 BI Task event Inbox gate."""
+"""Run isolated PostgreSQL 18 gates for BI Task Inbox and safe projection."""
 
-# @cypher schema=1 source_sha256=a240bfbc60c511ca05cb3ff9469c0c179e334992dbc079fd33a3e1ea747659ae
+# @cypher schema=1 source_sha256=f6a3e34505c17b1b67f7ddd3e29f23a2853602522be85f82e1689d68a715bea0
 # MERGE (self:File {path:"scripts/automation/phase9f4e_bi_task_event_inbox.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::main",kind:"function"})
 # MERGE (run:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::run_command",kind:"function"})
 # MERGE (port:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::reserve_loopback_port",kind:"function"})
 # MERGE (cleanup:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::remove_owned_data_dir",kind:"function"})
 # MERGE (migration:File {path:"db/migrations/2026-10-16-bi-task-event-inbox.sql"})
+# MERGE (projection_migration:File {path:"db/migrations/2026-10-16-bi-task-event-projection.sql"})
 # MERGE (test:File {path:"db/tests/bi-task-event-inbox.sql"})
+# MERGE (seed:File {path:"db/tests/bi-task-event-raw-payload-seed.sql"})
+# MERGE (projection_test:File {path:"db/tests/bi-task-event-projection.sql"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run)
 # MERGE (self)-[:DEFINES]->(port)
@@ -17,7 +20,10 @@
 # MERGE (main)-[:CALLS]->(port)
 # MERGE (main)-[:CALLS]->(cleanup)
 # MERGE (main)-[:READS]->(migration)
+# MERGE (main)-[:READS]->(projection_migration)
 # MERGE (main)-[:READS]->(test)
+# MERGE (main)-[:READS]->(seed)
+# MERGE (main)-[:READS]->(projection_test)
 # @endcypher
 
 from __future__ import annotations
@@ -34,7 +40,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = REPO_ROOT / "db" / "migrations" / "2026-10-16-bi-task-event-inbox.sql"
+PROJECTION_MIGRATION = REPO_ROOT / "db" / "migrations" / "2026-10-16-bi-task-event-projection.sql"
 TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-inbox.sql"
+RAW_SEED_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-raw-payload-seed.sql"
+PROJECTION_TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-projection.sql"
 TARGET_ROOT = (REPO_ROOT / "target").resolve()
 
 
@@ -94,7 +103,7 @@ def main() -> int:
     initdb = bin_dir / "initdb.exe"
     pg_ctl = bin_dir / "pg_ctl.exe"
     psql = bin_dir / "psql.exe"
-    for required in (initdb, pg_ctl, psql, MIGRATION, TEST_SQL):
+    for required in (initdb, pg_ctl, psql, MIGRATION, PROJECTION_MIGRATION, TEST_SQL, RAW_SEED_SQL, PROJECTION_TEST_SQL):
         if not required.is_file():
             raise RuntimeError(f"required file not found: {required}")
 
@@ -135,8 +144,13 @@ def main() -> int:
             raise RuntimeError("PostgreSQL loopback readiness check timed out")
         run_command([*psql_base, "-f", str(MIGRATION)])
         run_command([*psql_base, "-f", str(MIGRATION)])
+        run_command([*psql_base, "-f", str(RAW_SEED_SQL)])
+        run_command([*psql_base, "-f", str(PROJECTION_MIGRATION)])
+        run_command([*psql_base, "-f", str(PROJECTION_MIGRATION)])
         run_command([*psql_base, "-f", str(TEST_SQL)])
-        print("9F4E BI Task Inbox PostgreSQL gates passed (isolated loopback PostgreSQL).")
+        run_command([*psql_base, "-f", str(PROJECTION_MIGRATION)])
+        run_command([*psql_base, "-f", str(PROJECTION_TEST_SQL)])
+        print("9F4E/9F4F BI Task Inbox and safe projection PostgreSQL gates passed (isolated loopback PostgreSQL).")
         passed = True
     finally:
         pid_file = data_dir / "postmaster.pid"

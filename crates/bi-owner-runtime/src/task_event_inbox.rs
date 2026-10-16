@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=222cba4393358dea6711a10bfb7e539ad32713042485d7d84e70f5df51574d8b
+@cypher schema=1 source_sha256=34c50a4176e088f1c9361321689571dfc2f650067c4147605cb89d04252dde69
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (wire:Type {id:"bi_owner_runtime::TaskEventWireV1",kind:"struct"})
@@ -21,12 +21,16 @@ MERGE (route_digest:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs:
 MERGE (transport_label:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_transport_label",kind:"function"})
 MERGE (transport_version:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_transport_version",kind:"function"})
 MERGE (provider_id:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_provider_id",kind:"function"})
+MERGE (lifecycle_status:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_lifecycle_status",kind:"function"})
+MERGE (review_state:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_review_state",kind:"function"})
+MERGE (optional_status:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::optional_status_is_valid",kind:"function"})
 MERGE (test_module:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests",kind:"module"})
 MERGE (test_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.valid_lifecycle_wire",kind:"function"})
 MERGE (valid_lifecycle:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.accepts_valid_lifecycle_wire",kind:"test"})
 MERGE (reject_tenant:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_authenticated_tenant_mismatch",kind:"test"})
 MERGE (reject_unknown:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_unknown_envelope_fields",kind:"test"})
-MERGE (store_fn:Database {id:"bi.commit_task_event_v1",kind:"stored_function"})
+MERGE (reject_state:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_unrecognized_lifecycle_projection_values",kind:"test"})
+MERGE (store_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
 MERGE (chrono:ExternalService {id:"chrono",kind:"crate"})
 MERGE (serde:ExternalService {id:"serde",kind:"crate"})
 MERGE (serde_json:ExternalService {id:"serde_json",kind:"crate"})
@@ -68,17 +72,23 @@ MERGE (route_valid)-[:CALLS]->(transport_label)
 MERGE (route_valid)-[:CALLS]->(transport_version)
 MERGE (route_valid)-[:CALLS]->(provider_id)
 MERGE (validate)-[:CALLS]->(validate_payload)
+MERGE (validate_payload)-[:CALLS]->(lifecycle_status)
+MERGE (validate_payload)-[:CALLS]->(review_state)
+MERGE (validate_payload)-[:CALLS]->(optional_status)
 MERGE (self)-[:DEFINES]->(test_module)
 MERGE (test_module)-[:DEFINES]->(test_fixture)
 MERGE (test_module)-[:DEFINES]->(valid_lifecycle)
 MERGE (test_module)-[:DEFINES]->(reject_tenant)
 MERGE (test_module)-[:DEFINES]->(reject_unknown)
+MERGE (test_module)-[:DEFINES]->(reject_state)
 MERGE (valid_lifecycle)-[:CALLS]->(test_fixture)
 MERGE (reject_tenant)-[:CALLS]->(test_fixture)
 MERGE (reject_unknown)-[:CALLS]->(test_fixture)
+MERGE (reject_state)-[:CALLS]->(test_fixture)
 MERGE (valid_lifecycle)-[:TESTS]->(validate)
 MERGE (reject_tenant)-[:TESTS]->(validate)
 MERGE (reject_unknown)-[:TESTS]->(validate)
+MERGE (reject_state)-[:TESTS]->(validate)
 @endcypher
 */
 //! Bounded Task event validation and owner-local Inbox commit for the BI subscriber.
@@ -87,7 +97,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{postgres::PgPool, Row, Transaction};
+use sqlx::{Row, Transaction, postgres::PgPool};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -121,15 +131,25 @@ struct ValidatedTaskEventWire {
 /// Non-secret fields copied from the immutable sender route pin and authenticated connection.
 #[derive(Debug, Clone)]
 pub struct TaskEventRoutePin {
+    /// Authenticated identity of the Task event sender service.
     pub sender_service_id: Uuid,
+    /// Authenticated identity of the BI receiver service.
     pub receiver_service_id: Uuid,
+    /// Stable ID of the selected transport provider.
     pub transport_provider_id: String,
+    /// Version of the selected transport provider.
     pub transport_provider_version: String,
+    /// Identity of the immutable transport profile used for delivery.
     pub transport_profile_id: Uuid,
+    /// Monotonic revision of the transport profile.
     pub transport_profile_revision: i64,
+    /// SHA-256 digest of the selected transport profile contents.
     pub transport_profile_digest: [u8; 32],
+    /// Stable, non-secret identity of the authenticated endpoint.
     pub endpoint_identity: String,
+    /// Stable identity of the pinned destination.
     pub destination_id: String,
+    /// Generation of the destination captured by the route pin.
     pub destination_generation: Uuid,
 }
 
@@ -198,55 +218,88 @@ impl TaskEventRoutePin {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Result of committing a Task event to the BI Inbox.
 pub enum ReceiptOutcome {
+    /// The BI owner committed a new Inbox receipt and fact.
     Committed,
+    /// The exact event was already committed and its receipt was returned again.
     ExactReplay,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Durable BI Inbox receipt returned after the owner transaction commits.
 pub struct TaskEventInboxReceipt {
+    /// Tenant that owns the source Task event.
     pub tenant_id: Uuid,
+    /// Project that owns the source Task event.
     pub project_id: Uuid,
+    /// Engineering Run that owns the source Task event.
     pub engineering_run_id: Uuid,
+    /// Immutable source event identity.
     pub event_id: Uuid,
+    /// Stable identifier of the BI consumer that committed this receipt.
     pub consumer_id: &'static str,
+    /// Authenticated identity of the sender service.
     pub sender_service_id: Uuid,
+    /// Authenticated identity of the BI receiver service.
     pub receiver_service_id: Uuid,
+    /// Identity of the transport profile pinned for this delivery.
     pub transport_profile_id: Uuid,
+    /// Revision of the pinned transport profile.
     pub transport_profile_revision: i64,
+    /// SHA-256 digest of the pinned transport profile contents.
     pub transport_profile_digest: [u8; 32],
+    /// Stable, non-secret identity of the authenticated endpoint.
     pub endpoint_identity: String,
+    /// Stable identity of the pinned destination.
     pub destination_id: String,
+    /// Generation of the destination captured by the route pin.
     pub destination_generation: Uuid,
+    /// SHA-256 digest of the complete route pin and event identity.
     pub route_pin_sha256: [u8; 32],
+    /// Durable identifier assigned to the BI Inbox receipt.
     pub receipt_id: Uuid,
+    /// SHA-256 digest of the exact source event wire bytes.
     pub wire_sha256: [u8; 32],
+    /// Database time when the Inbox receipt was committed.
     pub committed_at: DateTime<Utc>,
+    /// Whether this call created the receipt or returned an exact replay.
     pub outcome: ReceiptOutcome,
 }
 
 #[derive(Debug, Error)]
+/// Failure to validate, authenticate, route, or durably commit a Task event.
 pub enum TaskEventInboxError {
+    /// The wire envelope or bounded projection contract is invalid.
     #[error("invalid Task event envelope")]
     InvalidEnvelope,
+    /// The event tenant differs from the authenticated tenant scope.
     #[error("Task event tenant does not match the authenticated tenant scope")]
     TenantMismatch,
+    /// The event identity was already used for different immutable content.
     #[error("Task event identity conflicts with previously committed BI content")]
     IdentityConflict,
+    /// Pinned transport identity does not match the authenticated connection.
     #[error("Task event route does not match the authenticated sender and BI receiver")]
     RouteIdentityMismatch,
+    /// The BI owner database operation failed before a receipt was returned.
     #[error("BI owner database operation failed")]
     Database(#[from] sqlx::Error),
 }
 
+/// Owner-local adapter that atomically commits a BI Inbox receipt and projected fact.
 pub struct TaskEventInboxStore {
     pool: PgPool,
     receiver_service_id: Uuid,
 }
 
 impl TaskEventInboxStore {
+    /// Construct a store bound to the BI receiver service identity.
     pub fn new(pool: PgPool, receiver_service_id: Uuid) -> Self {
-        Self { pool, receiver_service_id }
+        Self {
+            pool,
+            receiver_service_id,
+        }
     }
 
     /// Commit one exact Task wire after an in-crate trusted receiver authenticated sender and scope.
@@ -265,12 +318,13 @@ impl TaskEventInboxStore {
         {
             return Err(TaskEventInboxError::RouteIdentityMismatch);
         }
-        let route_pin_sha256 = route.digest(validated.event.schema_version, &validated.wire_sha256)?;
+        let route_pin_sha256 =
+            route.digest(validated.event.schema_version, &validated.wire_sha256)?;
         let event = validated.event;
         let mut tx = self.begin_scoped(principal.tenant_id).await?;
         let row = sqlx::query(
             r#"SELECT outcome, receipt_id, committed_at
-                 FROM bi.commit_task_event_v1(
+                 FROM bi.commit_task_event_v2(
                       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
                       $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)"#,
         )
@@ -371,9 +425,9 @@ fn valid_transport_label(value: &str, max_len: usize) -> bool {
 fn valid_transport_version(value: &str) -> bool {
     (1..=64).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || b"._:+-".contains(&byte)
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:+-".contains(&byte))
 }
 
 fn valid_provider_id(value: &str) -> bool {
@@ -425,9 +479,16 @@ fn validate_wire(
 
 fn validate_payload_scope(event: &TaskEventWireV1) -> Result<(), TaskEventInboxError> {
     let compatible = matches!(
-        (event.schema_version, event.aggregate_type.as_str(), event.event_type.as_str()),
-        (1 | 2, "metadata", "task.created" | "task.updated" | "task.owner_changed")
-            | (3, "lifecycle", "task.lifecycle.changed")
+        (
+            event.schema_version,
+            event.aggregate_type.as_str(),
+            event.event_type.as_str()
+        ),
+        (
+            1 | 2,
+            "metadata",
+            "task.created" | "task.updated" | "task.owner_changed"
+        ) | (3, "lifecycle", "task.lifecycle.changed")
     );
     if !compatible || !event.payload.is_object() {
         return Err(TaskEventInboxError::InvalidEnvelope);
@@ -446,7 +507,7 @@ fn validate_payload_scope(event: &TaskEventWireV1) -> Result<(), TaskEventInboxE
                 && event.payload["metadata_version"] == version
         }
         2 => {
-            event.payload["schema_version"] == Value::from(2)
+            event.payload["schema_version"] == 2
                 && event.payload["work_item_id"] == task_id
                 && event.payload["owner"]["tenant_id"] == tenant_id
                 && event.payload["owner"]["project_id"] == project_id
@@ -454,7 +515,7 @@ fn validate_payload_scope(event: &TaskEventWireV1) -> Result<(), TaskEventInboxE
                 && event.payload["metadata_version"] == version
         }
         3 => {
-            event.payload["schema_version"] == Value::from(3)
+            event.payload["schema_version"] == 3
                 && event.payload["aggregate"]["type"] == event.aggregate_type
                 && event.payload["aggregate"]["version"] == version
                 && event.payload["work_item_id"] == task_id
@@ -467,7 +528,38 @@ fn validate_payload_scope(event: &TaskEventWireV1) -> Result<(), TaskEventInboxE
     if !scope_matches {
         return Err(TaskEventInboxError::InvalidEnvelope);
     }
+    if event.schema_version == 3 {
+        let lifecycle = &event.payload["lifecycle"];
+        let change = &event.payload["change"];
+        if change["event_type"].as_str() != Some(event.event_type.as_str())
+            || !lifecycle["status"]
+                .as_str()
+                .is_some_and(valid_lifecycle_status)
+            || !lifecycle["review_state"]
+                .as_str()
+                .is_some_and(valid_review_state)
+            || !optional_status_is_valid(&change["from_status"])
+            || !optional_status_is_valid(&change["to_status"])
+        {
+            return Err(TaskEventInboxError::InvalidEnvelope);
+        }
+    }
     Ok(())
+}
+
+fn valid_lifecycle_status(status: &str) -> bool {
+    matches!(
+        status,
+        "pending" | "claimed" | "in_progress" | "completed" | "failed" | "cancelled"
+    )
+}
+
+fn valid_review_state(state: &str) -> bool {
+    matches!(state, "none" | "pending_review" | "accepted" | "rejected")
+}
+
+fn optional_status_is_valid(value: &Value) -> bool {
+    value.is_null() || value.as_str().is_some_and(valid_lifecycle_status)
 }
 
 #[cfg(test)]
@@ -488,7 +580,15 @@ mod tests {
                 "tenant_id": tenant_id.to_string(),
                 "project_id": project_id.to_string(),
                 "engineering_run_id": run_id.to_string()
-            }
+            },
+            "lifecycle": {"status": "in_progress", "review_state": "none"},
+            "change": {
+                "event_type": "task.lifecycle.changed",
+                "from_status": "claimed",
+                "to_status": "in_progress",
+                "private_note": "must not be retained by BI"
+            },
+            "host_context": {"branch_name": "sensitive/freeform"}
         });
         let wire = json!({
             "envelope_version": 1,
@@ -506,7 +606,10 @@ mod tests {
             "occurred_at": "2026-10-16T00:00:00Z",
             "payload": payload
         });
-        (tenant_id, serde_json::to_vec(&wire).expect("valid fixture serializes"))
+        (
+            tenant_id,
+            serde_json::to_vec(&wire).expect("valid fixture serializes"),
+        )
     }
 
     #[test]
@@ -537,6 +640,19 @@ mod tests {
         let drifted_wire = serde_json::to_vec(&value).expect("fixture serializes");
         assert!(matches!(
             validate_wire(tenant_id, &drifted_wire),
+            Err(TaskEventInboxError::InvalidEnvelope)
+        ));
+    }
+
+    #[test]
+    fn rejects_unrecognized_lifecycle_projection_values() {
+        let (tenant_id, wire) = valid_lifecycle_wire();
+        let mut value: Value = serde_json::from_slice(&wire).expect("fixture parses");
+        value["payload"]["lifecycle"]["status"] =
+            Value::String("freeform-personal-data".to_owned());
+        let invalid_wire = serde_json::to_vec(&value).expect("fixture serializes");
+        assert!(matches!(
+            validate_wire(tenant_id, &invalid_wire),
             Err(TaskEventInboxError::InvalidEnvelope)
         ));
     }
