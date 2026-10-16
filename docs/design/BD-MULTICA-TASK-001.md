@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Task Lifecycle 基本設計書 v0.10**
+> **Task Lifecycle 基本設計書 v0.11**
 >
-> - 状态: 🟡 Draft v0.10
+> - 状态: 🟡 Draft v0.11
 > - 日期: 2026-10-02 JST
-> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.17
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.18
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -202,9 +202,9 @@ CLI/Agent Session 出现在 Task Card 内。Shell 仅提供启动、输出和状
 
 ### 6.1 Task Outbox delivery and consumer boundary
 
-The Task owner writes immutable lifecycle source facts; the Task delivery owner manages owner-local delivery work. Before first external send, delivery requires a persisted route pin with sender/receiver identities, transport provider/version, Profile revision/digest, endpoint/destination generation, schema version and exact-wire digest. A retry may not resolve a new route or re-serialize different bytes. The receiver commits an owner-local Inbox receipt before responding; a trusted Rust dispatcher verifies identity and receipt binding to the source event, route pin, digest and active lease before any accepted settlement. The existing settlement remains closed.
+The Task owner writes immutable lifecycle source facts; the Task delivery owner manages owner-local delivery work. Migration source `2026-10-16-task-run-outbox-route-pin.sql` now defines a persisted route pin keyed by tenant/event and linked to the permanent source event, with a fixed function that rechecks the current worker/attempt/schema lease before insert or replay. It binds sender/receiver identities, provider/version, Profile ID/revision/digest, endpoint/destination generation, schema version and exact-wire digest; it stores no payload, endpoint URI, or credential. A retry may not resolve a new route or re-serialize different bytes. A disposable PostgreSQL 18 synthetic-Outbox fixture replayed both delivery migrations twice and passed selected schema, role/grant, FORCE RLS/tenant isolation, WORM, lease/schema fence, exact-retry/digest rejection and pin-transaction rollback assertions. Target DB deployment, migration downgrade/rollback, concurrency and production identity remain unverified; this source is not wired to a dispatcher. The receiver must commit an owner-local Inbox receipt before responding; a trusted Rust dispatcher must verify identity and receipt binding to the source event, route pin, digest and active lease before any accepted settlement. The existing settlement remains closed.
 
-Each consumer, including Run Apps, subscribed Schedule/Loop, and BI/Benchmark, has its own Inbox deduplication and commits the Inbox receipt with its projection/outcome in one local transaction. Version gaps, poison conflicts, lag and freshness are observable per consumer. No cross-owner table writes or distributed transaction are allowed. Route pin, receiver and consumer schemas/APIs, target grants/RLS, dispatcher, and crash/replay verification remain implementation and activation gates.
+Each consumer, including Run Apps, subscribed Schedule/Loop, and BI/Benchmark, has its own Inbox deduplication and commits the Inbox receipt with its projection/outcome in one local transaction. Version gaps, poison conflicts, lag and freshness are observable per consumer. No cross-owner table writes or distributed transaction are allowed. Route-pin PostgreSQL apply/replay and effective RLS/grants/WORM are not yet verified; receiver and consumer schemas/APIs, target grants/RLS, dispatcher, and crash/replay verification remain implementation and activation gates.
 
 Delivery Work has a hard expiry at `created_at + 7 days`, measured from enqueue and never reset by a terminal transition. A terminal settlement appends the permanent receipt before deleting Work in the same transaction. A still-unsettled row reaching expiry is recorded as `dead/retention_elapsed` before Work deletion. The receipt is a permanent Transaction fact; only the bounded delivery Work expires.
 
@@ -260,6 +260,7 @@ GAP-7: Task route pin, Rust dispatcher, receiver owner Inbox writer, per-consume
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.11 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.18、requirements v6.78/basic v6.77 与 data design v2.25；记录 Task route-pin migration source 与当前 lease-fenced pin function，记录 disposable PostgreSQL fixture 的双次回放及选定 schema/RLS/grant/WORM/lease/idempotency assertions 通过，保持 target DB/runtime/concurrency/dispatcher/receiver/consumer gates open | ERUN-P3.3 新增不可变 route-pin schema source，但尚无运行验收 |
 | v0.10 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.17、Group DD v5.05、requirements v6.77/basic v6.76 与 data design v2.24；固定 delivery Work 的 enqueue-based 7 天 expiry、永久终态回执与删除顺序；保留 migration/API/DB/RLS 和消费闭环未实现状态 | 对照 delivery migration 的 `created_at + 7 days` 约束，纠正 terminal-based TTL 表述 |
 | v0.9 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Task SRS v0.16、Group DD v5.04、requirements v6.76、basic v6.75 与 data design v2.23；增加 route-pin、receiver Inbox receipt、dispatcher verify 与 per-consumer commit 边界；明确 migration/API/DB/RLS 和消费闭环仍未实现 | Outbox delivery source migration 审查补充不可变首发路由及 consumer-specific durable completion |
 | v0.8 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树固定为 Project → Engineering Run → Worktree → Branch；Run 不依赖宿主 Branch；Task canonical owner 为 Project/Run，Worktree focus 可选；定义 Run list/create、schema v2 Outbox 与未验证 migration/RLS 及仍关闭的 lifecycle/Schedule/CLI gates | ERUN-P3.2 Task owner 源码切片对照与导航纠正 |
