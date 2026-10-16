@@ -41,6 +41,8 @@ members = [
     "crates/domain-dashboard",
     "crates/domain-form",
     "crates/domain-ai",
+    # Phase 9F4E: isolated BI owner for durable Task event Inbox/facts.
+    "crates/bi-owner-runtime",
     # Phase W17-W20 (2026-08-29) 新增 2 crate
     "crates/domain-cli",
     "crates/domain-agent-windows",

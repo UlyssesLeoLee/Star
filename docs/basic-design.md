@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.78 (2026-10-16)
-> **上游要件定义书**: docs/requirements.md v6.79
+> **文档版本**: v6.79 (2026-10-16)
+> **上游要件定义书**: docs/requirements.md v6.80
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5752,8 +5752,15 @@ The receiving owner must append its Inbox record and stable receipt in its own d
 
 Every Run App, subscribed Schedule/Loop, BI, and Benchmark consumer maintains a distinct owner-local Inbox and commits its receipt with its own projection or outcome. Dedupe key is tenant + consumer identity + event ID; aggregate-type/version fencing, gap handling, lag, last durable receipt, freshness, and bounded replay are consumer-specific. Ingress receipt does not imply downstream projection completion. Current delivery remains unsettled for accepted events: the route-pin and delivery migrations passed selected checks in a disposable PostgreSQL 18 synthetic-Outbox fixture, but target DB deployment, production grants/RLS, concurrent calls and the Rust dispatcher remain unverified; receiver Inbox writer, subscriber stores and crash/replay verification are open. No execution capability is enabled by this contract.
 
+## 16.71 — Phase 9F4E BI owner durable Task-event Inbox
+
+BI is the first Task-event consumer with its own owner-local persistence boundary. `bi-owner-runtime` accepts only a strict versioned envelope, enforces a 16 KiB exact-wire ceiling and 8 KiB JSON payload ceiling, and binds the sender/receiver identity, transport/Profile revision and digest, endpoint/destination generation, schema version and exact wire digest in a route pin. A single BI-owner database function commits the Inbox receipt and immutable event fact together; an exact replay returns the stable receipt, while a scope/route/wire/content conflict appends a payload-free incident and returns no receipt. The three BI tables use tenant `FORCE ROW LEVEL SECURITY`, append-only guards and runtime least-privilege function grants.
+
+The isolated PostgreSQL 18.6 runner applied the migration twice and passed its fixture, privilege and immutability cases. This is a persistence gate only: no trusted transport adapter can yet construct the crate-private authenticated principal; no network receive/send path, BI projection, fan-out, accepted settlement, target DB deployment or Rust 1.99.0 build/fmt evidence exists. Immutable raw payload currently has no approved retention, purge or capacity policy. Keep receiver activation and BI analysis disabled until identity, privacy/retention, projection, target DB and runtime gates pass. See Task SRS v0.20, Task BD v0.13, Task DD v1.34 and report `PHASE-9F4E-BI-TASK-EVENT-INBOX-REPORT.md`.
+
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.79 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.80、Task SRS v0.20/BD v0.13/DD v1.34、Group DD v5.07 与 Data Design v2.27；新增 §16.71 描述 BI owner durable Inbox/fact/conflict、exact replay、16/8 KiB 限额、PG18.6 隔离验收和无认证 transport/projection/retention/target DB/Rust build 的阻断项 | Phase 9F4E 首个 Task-event consumer 持久化切片完成并同步设计 |
 | v6.78 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79；记录 Rust Task delivery store 的有界 claim、Profile event kind 授权、已认证身份派生、exact-wire route pin、lease-fenced retry 与 proof dead-letter；说明源表已有 8 KiB payload DB 约束；明确没有 send/accepted/receiver/consumer/fair scheduler，Rust/target DB 门禁仍开放 | ERUN-P3.3 Rust delivery substrate 与当前源码/需求对账 |
 | v6.77 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.78；记录 Task route-pin 表与固定函数 migration source、tenant/event 源事件身份及当前 worker/attempt/schema fence；记录 disposable PostgreSQL 18 fixture 的双次回放及选定 RLS/grant/WORM/lease/idempotency assertions 已通过；目标 DB、并发与生产身份未验收，Rust dispatcher/receiver/consumer 未接入，accepted 继续关闭 | ERUN-P3.3 增加 Task Outbox route-pin DDL source |
 | v6.76 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.77；纠正 Task delivery Work 的 7 天 expiry 起点为 enqueue `created_at`，明确提前终态与到期时均先追加永久 receipt 再删除 Work | 对照 delivery migration DDL 发现终态 TTL 表述与固定 enqueue expiry 不一致 |

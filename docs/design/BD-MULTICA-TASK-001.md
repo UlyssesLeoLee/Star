@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Task Lifecycle 基本設計書 v0.12**
+> **Task Lifecycle 基本設計書 v0.13**
 >
-> - 状态: 🟡 Draft v0.12
+> - 状态: 🟡 Draft v0.13
 > - 日期: 2026-10-02 JST
-> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.19
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.20
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -210,6 +210,14 @@ The current Rust store slice now binds a bounded database claim to a determinist
 
 Delivery Work has a hard expiry at `created_at + 7 days`, measured from enqueue and never reset by a terminal transition. A terminal settlement appends the permanent receipt before deleting Work in the same transaction. A still-unsettled row reaching expiry is recorded as `dead/retention_elapsed` before Work deletion. The receipt is a permanent Transaction fact; only the bounded delivery Work expires.
 
+### 6.2 Phase 9F4E BI owner Task-event Inbox
+
+The first downstream business subscriber is BI. `bi-owner-runtime` bounds exact wire to 16 KiB and validates supported Task schemas and owner scope before opening its transaction. `bi.commit_task_event_v1` writes `bi.task_event_inbox` and immutable `bi.task_event_fact` together; exact replay returns the original receipt. Reused event identity with changed scope, route, wire, actor/correlation/time, or payload records a payload-free `bi.task_event_integrity_incident` and returns no receipt.
+
+The three BI tables are Transaction facts with tenant FORCE RLS and WORM. The runtime role has only schema USAGE and EXECUTE on the fixed function, with no direct table DML or schema CREATE. A PostgreSQL 18.6 disposable runner double-applied the migration and passed exact replay, conflict, cross-tenant identity, least privilege, RLS and WORM cases. This does not verify target DB roles or production rollout.
+
+`AuthenticatedTaskEventPrincipal` has crate-private fields so a caller outside the crate cannot manufacture authenticated IDs. The crate currently has no trusted transport adapter that creates it; this store is not yet a network receiver or production authentication proof. The stored fact is not a BI report projection. Dispatcher send, receiver response/receipt signature, accepted settlement, fan-out to Benchmark/Run Apps/Schedule/Canvas, target DB, Rust 1.99 build/fmt, concurrency/crash recovery and retention/privacy policy remain open; all consumers and execution remain fail closed.
+
 ## §7 安全、失败与可观测性
 
 - 每次读、写、CLI 启动和插件 capability 调用都按 tenant、Worktree、actor、WorkItem 做授权；GLOBAL 目标逐个记录允许/拒绝结果。
@@ -233,7 +241,8 @@ Delivery Work has a hard expiry at `created_at + 7 days`, measured from enqueue 
 | AC-12 | 插件热插拔只改变入口/capability 暴露，不删除任务、审计和实体引用 |
 | AC-18 | Automation schedule revisions 与 occurrence/dispatch/event 五表按 Master/Transaction/Work 分类；UTC slot 幂等、目标/Profile/HookSet 固定、候选槽与 DST 探测各限 32,768 步、disabled Rule 拒绝物化、lease-expired event 记录旧 attempt/generation、TTL/fencing/RLS 约束可验证；9F3 parser/materializer/adapter 与 domain release 26/26 已通过隔离 PostgreSQL 验收；Rule 写 API、持续 worker、Run admission/Auth/Outbox/BI 与目标 DB 未验收时不开放 Schedule execution |
 | AC-19 | Run Task Card 的 canonical owner 为 tenant/Project/Engineering Run；无 host Branch、无 Worktree focus 时仍支持受授权 list/create。POST 复验 Project/Run grants 与非归档 Run，focus_worktree_id 可选且必须绑定同一 Project/Run，repository/Branch 只作可选 context。单个 owner transaction 写 metadata/lifecycle/optional association/audit/idempotency/Outbox v2；客户端保留精确 body/key、32 条上限、29 天门控和人工恢复确认。目标 DB migration、app-role grants、RLS 和 Rust/HTTP/frontend 验证尚未完成；生命周期编辑、Schedule、CLI 仍关闭 |
-| AC-20 | 首发前保存 immutable route pin 并绑定 exact-wire digest；retry 不得漂移 endpoint/Profile/provider；delivery Work expiry 为 enqueue `created_at + 7 days` 且终态不重置；terminal receipt 先追加再删除 Work，未终态到期时记录 `retention_elapsed` 再删除；receiver 在本地提交 Inbox receipt 后才回复；可信 dispatcher 验证 receiver/source/route/digest/lease 后才可 settlement；每个 Run App、订阅事件的 Schedule/Loop 与 BI/Benchmark consumer 在本地事务提交独立 Inbox receipt 与 projection/outcome。route-pin migration 与 bounded Rust claim/route/wire store 已有源码；Profile 必须授权 `event` 且路由身份来自 authenticated context。当前没有网络发送、accepted、receiver/consumer stores 或 fair scheduler；Rust/target DB 未验收，生产 delivery 保持关闭 |
+| AC-20 | 首发前保存 immutable route pin 并绑定 exact-wire digest；retry 不得漂移 endpoint/Profile/provider；delivery Work expiry 为 enqueue `created_at + 7 days` 且终态不重置；terminal receipt 先追加再删除 Work，未终态到期时记录 `retention_elapsed` 再删除；receiver 在本地提交 Inbox receipt 后才回复；可信 dispatcher 验证 receiver/source/route/digest/lease 后才可 settlement；每个 Run App、订阅事件的 Schedule/Loop 与 BI/Benchmark consumer 在本地事务提交独立 Inbox receipt 与 projection/outcome。route-pin migration 与 bounded Rust claim/route/wire store 已有源码；Profile 必须授权 `event` 且路由身份来自 authenticated context。当前没有网络发送、accepted、receiver auth/API 或除 BI Inbox/fact source 外的 consumer stores/projections，也无 fair scheduler；Rust/target DB 未验收，生产 delivery 保持关闭 |
+| AC-21 | BI owner 在自身事务内原子提交 Task event Inbox 与 immutable fact；exact replay 稳定回执，scope/route/wire/content 冲突只写 payload-free incident 且无回执；16 KiB wire/8 KiB payload、tenant FORCE RLS、WORM、runtime 无直接表/CREATE 权限和双次 migration 在 disposable PostgreSQL 18.6 通过。crate 内 principal 无认证 transport factory，故未接生产 receiver；BI projection、其他 consumer/fan-out、dispatcher/accepted、target DB、Rust build/fmt 与无 TTL raw payload 的 retention/privacy policy 仍未关闭 |
 
 ---
 
@@ -262,6 +271,7 @@ GAP-7: Task route pin and bounded Rust claim/route/wire source store exist, but 
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.13 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.20、总需求 v6.80/basic v6.79、Task DD v1.34 与 Data Design v2.27；新增首个 BI owner Inbox + immutable fact / payload-free conflict incident、exact replay 与 bounded schema；记录 PostgreSQL 18.6 双次 apply/夹具通过及无 auth adapter/projection/fan-out/target DB/Rust build/retention policy | Phase 9F4E 首个业务消费者持久化边界实现 |
 | v0.12 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.19 与总需求 v6.79/basic v6.78；记录 Rust bounded claim、authenticated-context/Transport Profile `event` route 授权、exact-wire pin、lease-fenced retry 与 proof dead-letter；确认源表 8 KiB payload check；明确未编译且未接 send/accepted/receiver/consumer/fair scheduler | ERUN-P3.3 Rust delivery substrate 源码和门禁对账 |
 | v0.11 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.18、requirements v6.78/basic v6.77 与 data design v2.25；记录 Task route-pin migration source 与当前 lease-fenced pin function，记录 disposable PostgreSQL fixture 的双次回放及选定 schema/RLS/grant/WORM/lease/idempotency assertions 通过，保持 target DB/runtime/concurrency/dispatcher/receiver/consumer gates open | ERUN-P3.3 新增不可变 route-pin schema source，但尚无运行验收 |
 | v0.10 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.17、Group DD v5.05、requirements v6.77/basic v6.76 与 data design v2.24；固定 delivery Work 的 enqueue-based 7 天 expiry、永久终态回执与删除顺序；保留 migration/API/DB/RLS 和消费闭环未实现状态 | 对照 delivery migration 的 `created_at + 7 days` 约束，纠正 terminal-based TTL 表述 |

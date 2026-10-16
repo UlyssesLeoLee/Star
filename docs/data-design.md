@@ -1,10 +1,11 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.26 (2026-10-16)
+> **文档版本**: v2.27 (2026-10-16)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
+> | v2.27 | 2026-10-16 | 新增 Phase 9F4E BI owner 的三张 Transaction 表 W/T/M 全量分类；记录 16 KiB wire/8 KiB payload、owner function 原子提交、tenant FORCE RLS、runtime least privilege、WORM 与隔离 PostgreSQL 双次 apply/fixture 验收；明确认证 transport、BI projection、payload 长期保留与 target DB 仍开放 | Mavis 接手审核 |
 > | v2.26 | 2026-10-16 | 对账 Run-owner Rust Task delivery store：bounded claim、Profile `event` authorization、authenticated-context route identity、exact-wire route pin、fenced retry 与 proof dead-letter；确认 source Outbox payload 已有 8 KiB JSONB text check；无发送/accepted/receiver/consumer/fair scheduler，Rust 与目标 DB 未验收 | Mavis 接手审核 |
 > | v2.25 | 2026-10-16 | 对账 Task route-pin migration source：tenant/event 主键、永久源 Outbox 复合外键、固定函数与当前 lease/schema fence；记录 disposable PostgreSQL 18 synthetic-Outbox fixture 的双次回放及选定 schema/RLS/grant/WORM/lease/idempotency/事务回滚断言通过；target DB、并发、迁移回退未验收，receiver/consumer 仍无 owner-local store | Mavis 接手审核 |
 > | v2.24 | 2026-10-16 | 将 Task delivery Work 七天 expiry 固定为 enqueue `created_at + 7 days`；terminal settlement 或 expiry 均先追加永久 receipt 再删除 Work，纠正“终态后 TTL”表述 | Mavis 接手审核 |
@@ -2113,6 +2114,18 @@ Migration: `db/migrations/2026-10-10-multica-run-infrastructure-binding-master.s
 This migration has no Work table. The Master snapshot stores V2 JSON plus explicit scope/version columns; database checks match duplicated identity fields, enforce a 16 KiB JSONB text bound, and tie the canonical scope to `multica.engineering_run`. Rust strict deserialization and digest recomputation provide content-integrity verification; the digest is not authorization. CAS close/insert and lifecycle events occur in one Run-owner transaction. The Run owner does not read or write Infrastructure-owned Provider Profile, HostEnvironment, Multipass or K3s catalog tables. Infrastructure owner independently verifies those exact external revisions/generations and reserves Host plus selected-cluster capacity under its own transaction. Schema/Rust gates and target PostgreSQL/role provisioning are tracked separately; no binding record makes Schedule or Task execution available by itself.
 
 Verification: PostgreSQL 18.6 disposable schema-only runner passed 29/29 steps, including D2 migration idempotency, least-privilege grants, FORCE RLS, tenant isolation, revision lifecycle, WORM and direct event-insert denial; the cluster was stopped and its owned data removed. Rust 1.99.0 package tests passed 12/12, with focused rustfmt and package all-target warnings-as-errors Clippy passing. Broader strict Clippy remains blocked by two existing `star-context` lints. A Rust SQLx save/resolve round-trip is not yet tested. A no-op legacy Audit function existed only as an isolated prerequisite for older Worktree DDL; no production Audit/DB/role deployment, NATS, Multipass VM or inventory was tested or changed.
+
+### 4.13.12 Phase 9F4E BI Task event Inbox and immutable fact
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `bi.task_event_inbox` | T — Transaction | BI owner; stable consumer receipt keyed by tenant/consumer/event, bound to Project/Run/Work Item, sender/receiver, route profile/generation, route digest and exact wire digest. | Permanent append-only receipt; UPDATE/DELETE/TRUNCATE rejected; no TTL or purge exists. | Tenant ENABLE + FORCE RLS; only fixed owner SECURITY DEFINER function inserts; runtime role has no table DML or schema CREATE. |
+| `bi.task_event_fact` | T — Transaction | BI owner; immutable source event facts including actor, correlation, occurrence time and bounded JSON payload, committed atomically with Inbox. Not a metric/materialized projection. | Permanent append-only fact; payload JSONB text <= 8 KiB; UPDATE/DELETE/TRUNCATE rejected; no TTL or purge exists. | Tenant ENABLE + FORCE RLS; owner function only writes; runtime role has no table DML. |
+| `bi.task_event_integrity_incident` | T — Transaction | BI owner; append-only evidence for reused event identity with changed scope/route/wire/content; metadata only, no received payload. | Permanent append-only incident; UPDATE/DELETE/TRUNCATE rejected; duplicate same conflict digest is idempotent; no TTL or purge exists. | Tenant ENABLE + FORCE RLS; owner function only writes; runtime role has no table DML. |
+
+There are no Work or Master tables in this migration; all three persisted tables are Transaction data. `bi.commit_task_event_v1` performs strict scope checks, first Inbox/fact insert, exact replay receipt return, or conflict incident insertion in one BI owner transaction. Task event wire is capped at 16 KiB; supported payload schemas are validated before persistence. The Rust store requires a crate-internal `AuthenticatedTaskEventPrincipal`, but the trusted transport/auth adapter that would mint that value is not implemented. Disposable PostgreSQL 18.6 migration double-apply and fixture gates passed for exact replay, identity/content and cross-tenant conflicts, FORCE RLS, WORM and runtime grants. Rust 1.99 build/fmt, target deployment identity/grants, concurrent/crash recovery and rollback remain unverified.
+
+**Retention and privacy gap:** the BI fact stores the complete bounded event payload indefinitely, while inboxes and conflict incidents have no purge rule. The current schema is intentionally WORM and has no retention worker or legal hold/purge flow. Data classification, privacy basis, retention period, archive policy, storage growth budget and an approved deletion mechanism must be resolved before production ingestion; do not add ad hoc table deletion that bypasses owner audit.
 
 ### 4.14 Module: domain-identity(`identity` schema)
 
