@@ -1,10 +1,11 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v7.09**
+> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v7.10**
+> - Phase 9F4G 当前状态：provider-neutral BI Task event receiver core 源码已加入 §6.153；Rust 1.99.0 fmt/build/test/Clippy 未运行，生产 transport/auth/quarantine/target DB/query/fan-out/recovery/performance 门禁仍开放。
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、其余 owner adapter 覆盖与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 日期：2026-10-16
+> - 日期：2026-10-17
 > - 最新增量状态：Phase 1 host-session 有四项前端回归覆盖（typecheck 通过，Vitest 未启动且缺 `@csstools/css-parser-algorithms/index.js`），真实 host auth、trusted ingest/grants 与 Run Apps migration 仍开放。D20 JetStream cross-provider diagnostics 在 matching-tenant resolver-bound route snapshot 下可用；缺少/错配 snapshot 或 feature disabled 为 Unavailable。D20 P2、operator API/UI、recovery/disposition 与 production wiring 仍开放，见 §6.139–§6.140。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 状态：RunTaskCardCommandPort、PostgreSQL owner adapter、REST create/transition/review 与 Canvas 同事务组合已写入实现 lane；共享幂等 advisory lock 在读取 Canvas 组合回执前取得。Task lifecycle schema v3 Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 已有 source；Profile `event` authorization、authenticated-context-derived route identity、fenced retry 与 proof dead-letter 已加入。Rust 1.99.0 build/fmt、目标 DB/RLS 和并发验收未完成；无 network dispatcher、receiver Inbox、accepted settlement 或 consumer projection，delivery 与 Run Apps/CLI production capability 继续关闭。
 > - ERUN-P3.3 Rust Task delivery 状态：Run-owner bounded claim/route/wire store 已实现 source；Profile 必须独立授权 `event` kind，sender/receiver 从 authenticated context 派生，精确 route pin 与 wire digest 对比，retry 受当前 lease fence 约束，invalid-envelope dead-letter 要求私有 proof。源 Outbox DB 已有 8 KiB JSONB text check。没有 Rust compile/fmt、network send、accepted、receiver Inbox、consumer projection、公平调度或目标 DB 验收；执行保持 fail closed，详见 §6.150。
@@ -2128,6 +2129,7 @@ D20 P2 follow-on（本段为设计与实施计划，不是实现证据）：实�
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v7.10 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §6.153 并同步 requirements v6.82/basic v6.81/Task SRS v0.22、BD v0.15、DD v1.36；记录 provider-neutral BI receive core 的有界/cancel-safe/commit-before-ACK/quarantine 契约；六项 Rust 源测试未运行，生产 transport/auth/quarantine/target DB/query/recovery/performance 仍开放 | 推进 Phase 9F4G 的 BI Task event 接收核心 |
 | v7.09 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.81/basic v6.80/Task SRS v0.21、BD v0.14、DD v1.35/Group DD v5.08 与 Data Design v2.28；登记 §6.152 的 DB allowlist projection、legacy raw fact atomic replacement、missing-state rejection 与 PG18.6 gate；记录 Rust 1.99.0 `bi-owner-runtime` format/all-target tests/strict Clippy pass；区分 workspace-wide gates、live fact minimization 和 backup/WAL/source Outbox retention；保留认证 receiver、BI read API、target DB 与生产执行门禁 | 9F4F BI owner fact minimization and document-to-implementation reconciliation |
 | v7.08 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.80/basic v6.79/Task SRS v0.20、BD v0.13、DD v1.34/Group DD v5.07 与 Data Design v2.27；登记 §6.151 的 BI owner Inbox/fact/conflict 与 PostgreSQL 18.6 disposable gate；明确无可信 receiver、projection/fan-out、raw-payload retention、Rust build 与 target DB 验收，保持消费/执行关闭 | Phase 9F4E 首个 owner-local BI Task event consumer 切片完成并同步文档 |
 | v7.07 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79/basic v6.78/Task SRS v0.19、BD v0.12、DD v1.33/Group DD v5.06 与 Data Design v2.26；记录 Rust claim/route/wire source slice、Profile `event` authorization 与 authenticated route identity；保留 Rust compile/fmt、目标 DB、dispatcher/receiver/consumer/fairness/BI gates | ERUN-P3.3 Task Outbox Rust source 实现与文档逐项核对 |
@@ -2270,7 +2272,7 @@ The authenticated principal constructor is crate-private and currently has no tr
 | Target DB / production identity / transport | Not implemented or verified; receiver remains disabled. |
 | BI reporting/query projection / fan-out | Not implemented; the live fact now contains only an allowlist projection, while backup/WAL and source Outbox retention remain open. |
 
-Next: implement a trusted transport factory/receiver with authenticated principal construction; add the BI reporting/query API and per-consumer replay/recovery; define backup/WAL/PITR and source Outbox retention; verify target DB grants/RLS and concurrency/crash behavior under Rust 1.99.0. Do not mark the broader 9F phases complete from this slice.
+The provider-neutral receiver core is tracked in §6.153. Remaining work is a trusted production transport factory and authenticated principal, durable quarantine, BI reporting/query API, per-consumer replay/recovery, backup/WAL/PITR and source Outbox retention, target DB grants/RLS, and concurrent/crash verification under Rust 1.99.0. Do not mark the broader 9F phases complete from either slice.
 
 ## 6.152 — Phase 9F4F BI Task payload minimization
 Superseded status: Section 6.152 implements the live-fact allowlist projection and legacy raw-fact conversion. Remaining retention decisions concern backup/WAL/PITR and the separately owned Task source Outbox; BI reporting/query APIs, trusted transport, per-consumer recovery and production deployment remain open.
@@ -2293,3 +2295,20 @@ Remaining gates: trusted transport factory/receiver and production service ident
 | Workspace-wide Rust 1.99.0 gates | Not run in this slice. |
 | Target DB / production transport | Not implemented or verified; receiver and BI ingestion remain disabled. |
 | Retention and restore | Live fact payload minimized; backup/WAL/PITR and source Outbox retention remain unverified. |
+
+## 6.153 — Phase 9F4G provider-neutral BI Task event receiver core
+
+This slice adds `crates/bi-owner-runtime/src/task_event_receiver.rs` and wires it to the existing BI owner Inbox store. The core handles at most one delivery per call and per receiver, applies the existing 16 KiB exact-wire bound, validates route/source identity and event ID, commits the BI owner fact before ACK, returns the stable result on exact replay, and requires a fresh authorization check immediately before ACK. Cancellation and an absolute deadline cover pull through disposition. Transport contracts require pre-buffer frame bounds, no unbounded prefetch, and redelivery after an uncertain cancellation/ACK. Malformed and identity-conflict messages use an injected metadata-only, cursor-idempotent quarantine port; terminal disposition requires a non-nil durable receipt and source revalidation.
+
+Six focused unit tests were added for ordering, revocation, poison quarantine, failure, and pre-pull cancellation. They were not executed: `cargo`, `rustc`, `rustfmt`, and `rtk` are unavailable in this environment. Static review and the deterministic Cypher header guard/`git diff --check` are reported separately; no Rust compile or runtime result is claimed.
+
+| Gate | Evidence / status |
+|---|---|
+| Source/core contract | Implemented as provider-neutral ports; no network transport or background loop is configured. |
+| Bounded memory/concurrency | Core accepts one delivery, 16 KiB wire, one in-flight call; concrete adapter pre-allocation limits and RSS are not verified. |
+| Owner durability / ACK | Existing BI Inbox commit is called before ACK and exact replay is explicit; target DB and production roles are not verified. |
+| Quarantine / terminal disposition | Core requires metadata-only idempotent quarantine receipt and fresh source check; no durable adapter exists. |
+| Rust 1.99.0 fmt/build/tests/Clippy | Not run; toolchain unavailable. |
+| Production receiver / BI query / consumer recovery | Not implemented; BI ingestion, downstream acceptance and task execution stay fail closed. |
+
+Remaining work: trusted transport factory and production service identity; durable quarantine schema/owner transaction/grants/RLS; receiver composition and endpoint; target DB deployment; concurrent duplicate/crash/restart and per-consumer replay/gap recovery; BI query API/UI and Benchmark projection; backup/WAL/PITR policy; bounded RSS/latency/fairness validation; Rust 1.99.0 focused and workspace gates. Do not mark 9F4G, the BI pipeline, or the overall Worktree-first product complete from this source slice.

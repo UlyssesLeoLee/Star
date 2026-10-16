@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.80 (2026-10-16)
-> **上游要件定义书**: docs/requirements.md v6.81
+> **文档版本**: v6.81 (2026-10-17)
+> **上游要件定义书**: docs/requirements.md v6.82
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5758,18 +5758,25 @@ BI is the first Task-event consumer with its own owner-local persistence boundar
 
 The isolated PostgreSQL 18.6 runner applied the migration twice and passed its fixture, privilege and immutability cases. This is a persistence gate only: no trusted transport adapter can yet construct the crate-private authenticated principal; no network receive/send path, BI projection, fan-out, accepted settlement, target DB deployment or Rust 1.99.0 build/fmt evidence exists. Immutable raw payload currently has no approved retention, purge or capacity policy. Keep receiver activation and BI analysis disabled until identity, privacy/retention, projection, target DB and runtime gates pass. See Task SRS v0.20, Task BD v0.13, Task DD v1.34 and report `PHASE-9F4E-BI-TASK-EVENT-INBOX-REPORT.md`.
 
-| 版本 | 日期 | 修订人 | 改动 | 触发 |
-|---|---|---|---|---|
 ## 16.72 — Phase 9F4F BI Task payload minimization
 
 The BI owner now persists only a database-generated, versioned allowlist projection in `bi.task_event_fact.payload`. `bi.commit_task_event_v2` validates and projects the bounded input before invoking the owner-only persistence function; the runtime role can execute v2 but cannot execute the raw v1 function or the projection helper. Metadata events retain only approved identifiers, versions, event type and owner-change state. Lifecycle events retain only approved scope/version, lifecycle/review states and optional transition states. Titles, descriptions, labels, claimant data, branch/worktree context and arbitrary extension fields are discarded before the fact write.
 
 The migration transaction copies historical facts into a replacement table through the same projector, keeps the Inbox/event/receipt/route/wire identities and audit dimensions, swaps the table and drops the live raw-payload table. Unsupported historical schemas or states abort the entire transaction. The PostgreSQL 18.6 disposable runner passed double application, legacy sentinel removal, v2 commit/replay, missing-state rejection, runtime privilege, FORCE RLS, WORM and projection assertions. This proves the isolated schema fixture only; it does not erase bytes already present in backups/WAL or change the source Task Outbox retention policy.
 
-No trusted receiver, network dispatcher, accepted settlement, BI query API/UI, target DB deployment, production identity, backup/WAL retention policy or concurrent/crash recovery evidence exists. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust gates remain open. Keep BI ingestion and execution disabled until the production gates pass. See Task SRS v0.21, Task BD v0.14, Task DD v1.35, Group DD v5.08, Data Design v2.28 and report `PHASE-9F4F-BI-TASK-PAYLOAD-PROJECTION-REPORT.md`.
+A provider-neutral receiver core now exists in §16.73, but there is still no trusted production transport/auth adapter, durable quarantine implementation, network dispatcher, accepted settlement, BI query API/UI, target DB deployment, production identity, backup/WAL retention policy or concurrent/crash-recovery evidence. Rust 1.99.0 `bi-owner-runtime` focused gates for 9F4G were not run because cargo/rustfmt are unavailable; the earlier 9F4F projection gates passed and do not validate this receiver code. Keep BI ingress and execution disabled until the production gates pass. See Task SRS v0.22, Task BD v0.15, Task DD v1.36, Group DD v5.08, Data Design v2.28 and report `PHASE-9F4G-BI-TASK-RECEIVER-CORE-REPORT.md`.
+
+## 16.73 — Phase 9F4G BI Task event receiver core
+
+`bi-owner-runtime::TaskEventReceiver` 是显式调用的 provider-neutral core；构造实例不启动后台任务。`TaskEventReceiveTransport` 只能拉取一条 route-pinned delivery，adapter 必须在分配 payload 前限制 exact wire 为 16 KiB 且不无界预取。每个 receiver 以容量为 1 的 semaphore 拒绝并发调用，`CancellationToken` 与调用方绝对 deadline 覆盖 pull 到 disposition 的整个操作。
+
+处理顺序为 provider identity/来源授权与 route pin 校验、envelope/tenant/event ID 校验、BI owner Inbox/fact 事务提交、再次核验来源与当前授权、最后 ACK。Exact replay 使用持久化原回执并可安全重 ACK。取消可能与事务提交或 ACK 并发；source adapter 必须使未确认消息可重投，owner commit/ACK 必须可幂等重试。malformed envelope、tenant/message identity mismatch、Inbox identity conflict 只产生 digest/长度/route/origin/fault 元数据 quarantine；quarantine 要按来源 cursor 幂等，且只有收到有效 durable receipt 并复验授权后才可 terminal disposition。
+
+这是 Rust 接收核心源码切片，不是可部署的生产 receiver。缺少可信 transport factory/service identity、durable quarantine store、target DB/grants/RLS 与生产组合；取消崩溃恢复、并发 identity replay、备份/WAL、BI query/API/UI、consumer fan-out/accepted settlement 和 RSS/latency 仍开放。Rust 1.99.0 fmt/build/test 本轮未运行（本机 cargo/rustfmt 不可用）；BI ingress 和执行继续关闭。详见 Task SRS v0.22、BD v0.15、DD v1.36、requirements v6.82 与报告 `PHASE-9F4G-BI-TASK-RECEIVER-CORE-REPORT.md`。
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.81 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.82、Task SRS v0.22/BD v0.15/DD v1.36；新增 §16.73 描述单条、16 KiB、单并发、可取消 receiver core、commit-before-ACK、exact replay 与 idempotent metadata-only quarantine；明确 Rust 1.99.0 gates 未运行及 production adapter/DB/query/fan-out/performance blockers | Phase 9F4G receiver core source slice 与设计对账 |
 | v6.80 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.81、Task SRS v0.21/BD v0.14/DD v1.35、Group DD v5.08 与 Data Design v2.28；新增 §16.72 说明 DB allowlist projection、raw fact 原子替换、least-privilege 与隔离 PostgreSQL 证据；Rust 1.99.0 `bi-owner-runtime` rustfmt/all-target tests (4/4)/strict Clippy 通过，workspace-wide checks 与备份/WAL、认证 receiver、target DB、BI API 仍开放 | 9F4F 为解决 BI immutable fact 永久复制自由文本增加 owner-side projection |
 | v6.79 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.80、Task SRS v0.20/BD v0.13/DD v1.34、Group DD v5.07 与 Data Design v2.27；新增 §16.71 描述 BI owner durable Inbox/fact/conflict、exact replay、16/8 KiB 限额、PG18.6 隔离验收和无认证 transport/projection/retention/target DB/Rust build 的阻断项 | Phase 9F4E 首个 Task-event consumer 持久化切片完成并同步设计 |
 | v6.78 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79；记录 Rust Task delivery store 的有界 claim、Profile event kind 授权、已认证身份派生、exact-wire route pin、lease-fenced retry 与 proof dead-letter；说明源表已有 8 KiB payload DB 约束；明确没有 send/accepted/receiver/consumer/fair scheduler，Rust/target DB 门禁仍开放 | ERUN-P3.3 Rust delivery substrate 与当前源码/需求对账 |

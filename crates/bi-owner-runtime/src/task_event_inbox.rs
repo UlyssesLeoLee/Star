@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=34c50a4176e088f1c9361321689571dfc2f650067c4147605cb89d04252dde69
+@cypher schema=1 source_sha256=b81746f7058a70e8f2b159ecf7619b184caac3204a204da477fc397c6da18913
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (wire:Type {id:"bi_owner_runtime::TaskEventWireV1",kind:"struct"})
 MERGE (validated:Type {id:"bi_owner_runtime::ValidatedTaskEventWire",kind:"struct"})
 MERGE (receipt:Type {id:"bi_owner_runtime::TaskEventInboxReceipt",kind:"struct"})
 MERGE (route:Type {id:"bi_owner_runtime::TaskEventRoutePin",kind:"struct"})
+MERGE (max_wire:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::MAX_TASK_WIRE_BYTES",kind:"constant"})
 MERGE (principal:Type {id:"bi_owner_runtime::AuthenticatedTaskEventPrincipal",kind:"struct"})
 MERGE (route_input:Type {id:"bi_owner_runtime::RoutePinDigestInput",kind:"struct"})
 MERGE (outcome:Type {id:"bi_owner_runtime::ReceiptOutcome",kind:"enum"})
@@ -16,6 +17,7 @@ MERGE (commit:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskE
 MERGE (begin:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventInboxStore.begin_scoped",kind:"method"})
 MERGE (route_valid:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventRoutePin.is_valid",kind:"method"})
 MERGE (validate:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::validate_wire",kind:"function"})
+MERGE (event_id:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::validated_event_id",kind:"function"})
 MERGE (validate_payload:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::validate_payload_scope",kind:"function"})
 MERGE (route_digest:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventRoutePin.digest",kind:"method"})
 MERGE (transport_label:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_transport_label",kind:"function"})
@@ -42,6 +44,7 @@ MERGE (self)-[:DEFINES]->(wire)
 MERGE (self)-[:DEFINES]->(validated)
 MERGE (self)-[:DEFINES]->(receipt)
 MERGE (self)-[:DEFINES]->(route)
+MERGE (self)-[:DEFINES]->(max_wire)
 MERGE (self)-[:DEFINES]->(principal)
 MERGE (self)-[:DEFINES]->(route_input)
 MERGE (self)-[:DEFINES]->(outcome)
@@ -58,6 +61,7 @@ MERGE (store)-[:DEFINES]->(begin)
 MERGE (route)-[:DEFINES]->(route_valid)
 MERGE (route)-[:DEFINES]->(route_digest)
 MERGE (self)-[:DEFINES]->(validate)
+MERGE (self)-[:DEFINES]->(event_id)
 MERGE (self)-[:DEFINES]->(validate_payload)
 MERGE (self)-[:DEFINES]->(transport_label)
 MERGE (self)-[:DEFINES]->(transport_version)
@@ -67,6 +71,7 @@ MERGE (commit)-[:CALLS]->(begin)
 MERGE (commit)-[:CALLS]->(store_fn)
 MERGE (commit)-[:CALLS]->(route_digest)
 MERGE (commit)-[:CALLS]->(route_valid)
+MERGE (event_id)-[:CALLS]->(validate)
 MERGE (commit)-[:READS]->(principal)
 MERGE (route_valid)-[:CALLS]->(transport_label)
 MERGE (route_valid)-[:CALLS]->(transport_version)
@@ -102,7 +107,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 const MAX_TASK_PAYLOAD_BYTES: usize = 8 * 1024;
-const MAX_TASK_WIRE_BYTES: usize = 16 * 1024;
+pub(crate) const MAX_TASK_WIRE_BYTES: usize = 16 * 1024;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -204,7 +209,7 @@ impl TaskEventRoutePin {
         Ok(Sha256::digest(bytes).into())
     }
 
-    fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         !self.sender_service_id.is_nil()
             && !self.receiver_service_id.is_nil()
             && valid_provider_id(&self.transport_provider_id)
@@ -475,6 +480,14 @@ fn validate_wire(
         event,
         wire_sha256: Sha256::digest(wire).into(),
     })
+}
+
+/// Validate a bounded Task event envelope and return its stable event identity.
+pub(crate) fn validated_event_id(
+    authenticated_tenant_id: Uuid,
+    wire: &[u8],
+) -> Result<Uuid, TaskEventInboxError> {
+    Ok(validate_wire(authenticated_tenant_id, wire)?.event.event_id)
 }
 
 fn validate_payload_scope(event: &TaskEventWireV1) -> Result<(), TaskEventInboxError> {
