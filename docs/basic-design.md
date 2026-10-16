@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.74 (2026-10-16)
-> **上游要件定义书**: docs/requirements.md v6.75
+> **文档版本**: v6.75 (2026-10-16)
+> **上游要件定义书**: docs/requirements.md v6.76
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5742,8 +5742,17 @@ An `AFTER INSERT` trigger on the Run-scoped lifecycle audit reads the current Ta
 
 The append-only Outbox remains the permanent event source; a separate owner-local delivery Work queue carries leases and bounded retries, with 1024 outstanding rows per Run and seven-day retention. Claims are limited to 1–8 items and 30–300 second leases, with at most 12 attempts. Delivery and terminal receipt rows use a composite tenant/Run/event foreign key to prevent denormalized scope from diverging from the immutable source event. Terminal receipts are append-only. A dedicated NOLOGIN function-owner role holds table DML; the Run owner can call fixed routines but has no direct DML on delivery tables. The current settlement explicitly rejects `accepted`. After a future trusted Rust dispatcher authenticates the receiving owner, verifies the receipt contract and binds it to the claimed event, a separate acceptance path may store that receipt identity. The source database cannot independently prove a transaction committed in another owner's database. A transport acknowledgement alone is insufficient, and ingress acceptance does not mean all Run App subscribers or BI projections have consumed the event. Each subscriber keeps its own Inbox deduplication and processing state. Bounded reconciliation discovers historical events by missing event ID and does not advance a timestamp/UUID high-water cursor, so a late-committing row remains discoverable. Existing Task metadata events are not rewritten. The migration source has not been applied to PostgreSQL in this phase; target grants/FORCE RLS, rollback, concurrency, authenticated dispatcher and consumer Inbox remain unverified, and downstream consumers stay disabled.
 
+## 16.70 — Immutable route pin and per-consumer durable Inbox
+
+Before a Task Outbox event is first sent outside its owner, the Task delivery owner must persist an immutable DeliveryRoutePin containing sender and receiver service identities, transport provider/version, Transport Profile revision and digest, endpoint identity, logical destination/log generation, schema version, and SHA-256 of the exact wire bytes. The pin stores no payload copy, credential, or secret. Retries use that exact pin and wire; revoked or changed profile/endpoint, receiver identity mismatch, or digest mismatch fail closed without provider fallback. The existing source migration has no route-pin table or function, so this is a required additive schema/API phase, not an implemented fact.
+
+The receiving owner must append its Inbox record and stable receipt in its own durable transaction before responding. The receipt binds tenant, event ID, source scope, schema/aggregate version, wire digest, receiver identity, and route-pin identity. Exact replay returns the same receipt; any identity or content conflict is quarantined and remains unsettled. Only a trusted Rust dispatcher that verifies this receipt against the source event, immutable route pin, and current lease generation may invoke a future constrained accepted-settlement function. No owner writes another owner's tables.
+
+Every Run App, subscribed Schedule/Loop, BI, and Benchmark consumer maintains a distinct owner-local Inbox and commits its receipt with its own projection or outcome. Dedupe key is tenant + consumer identity + event ID; aggregate-type/version fencing, gap handling, lag, last durable receipt, freshness, and bounded replay are consumer-specific. Ingress receipt does not imply downstream projection completion. Current delivery remains unsettled for accepted events because dispatcher, route-pin persistence, receiver Inbox writer, subscriber stores, deployment grants/RLS, and crash/replay verification are not implemented or accepted. No execution capability is enabled by this contract.
+
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v6.75 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.76；定义首次外发前 immutable route pin、exact-wire retry、接收 owner 的 durable Inbox commit receipt、可信 dispatcher 验证及每个 App/BI/Benchmark consumer 的独立 Inbox/projection receipt；明确 route pin/dispatcher/consumer 与 DB/RLS 仍是开放实现和验收门 | Outbox delivery migration 审查发现缺少不可变首发路由固定及逐 consumer durable completion 证据 |
 | v6.74 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.75；将跨 owner Inbox receipt 定义为待可信 dispatcher 认证的输入，而非源数据库可独立证明的事实；增加 delivery/receipt tenant+Run+event 复合外键；保持接收路径关闭直到 dispatcher/receiver 合同验收 | 自审发现数据库只保存外部回执 UUID，无法自行证明跨 owner commit，且源事件外键未核对冗余 scope |
 | v6.73 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.74；增加 Task Run Outbox 的分离 delivery Work、每 Run 有界积压、fenced lease/重试、无高水位 reconciliation 和接收 owner Inbox commit receipt 条件；标记 migration/runtime 未验收 | 需要将 Task Outbox 连接到可替换 transport，同时不把 broker/socket acceptance 误当成接收方提交 |
 | v6.72 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.73；规定 Outbox 消费者不得以 occurred_at/UUID 作为提交顺序游标，并要求持久事件去重、aggregate version fencing 与安全回放/对账 | 识别并发提交次序与事件生成时间、UUID 顺序无关，避免消费者高水位漏读 |

@@ -1,14 +1,14 @@
 # DD-MULTICA-TASK-001
 
-> **Task Lifecycle 域 詳細設計書 v1.29** (Project/Run-owned Task Card list/create source slice and host-independent owner migration candidate)
+> **Task Lifecycle 域 詳細設計書 v1.30** (Project/Run-owned Task Card list/create source slice and host-independent owner migration candidate)
 >
-> - 状态: 🟡 Draft v1.29 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3、9F1/9F2/9F3 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Schedule 已有 typed parser/materializer/PostgreSQL occurrence/lease adapter 并通过 disposable PostgreSQL 18.6 集成场景，候选槽和 DST 转换探测均有 32,768 步硬上限，disabled Rule 双层 fail closed、lease-expired audit 对齐旧 attempt/fence，domain release tests 26/26，但无生产 Rule write API、常驻 worker 或 Run admission；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、BI 或跨 Run fair scheduler；Run Task Cards 现有 Project/Run-owned bounded list/create UI/client 与有界 IndexedDB pending recovery 切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、宿主 provider/capability、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/consumer 仍开放)
+> - 状态: 🟡 Draft v1.30 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3、9F1/9F2/9F3 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Schedule 已有 typed parser/materializer/PostgreSQL occurrence/lease adapter 并通过 disposable PostgreSQL 18.6 集成场景，候选槽和 DST 转换探测均有 32,768 步硬上限，disabled Rule 双层 fail closed、lease-expired audit 对齐旧 attempt/fence，domain release tests 26/26，但无生产 Rule write API、常驻 worker 或 Run admission；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、BI 或跨 Run fair scheduler；Run Task Cards 现有 Project/Run-owned bounded list/create UI/client 与有界 IndexedDB pending recovery 切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、宿主 provider/capability、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/consumer 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: docs/requirements.md v6.66 §50；docs/basic-design.md v6.66 §16
-> - 关联 Group / Hook 详细设计: docs/design/DD-WORKTREE-GROUP-001.md v4.96；docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14
-> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.15
-> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.8
+> - 关联总要件 / 基本设计: docs/requirements.md v6.76 §50；docs/basic-design.md v6.75 §16
+> - 关联 Group / Hook 详细设计: docs/design/DD-WORKTREE-GROUP-001.md v5.04；docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14
+> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.16
+> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.9
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
@@ -27,12 +27,12 @@
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
 | 文书名 | Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v1.29 |
+| 版本 | v1.30 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
 | 承認者 | Draft；v1.24 Schedule parser/adapter 本地 DB 证据与生产验收边界待评审 |
 | 关联 commit | (待生成) |
-| 关联文档 | SRS-MULTICA-TASK-001.md v0.15 + BD-MULTICA-TASK-001.md v0.8 + ADR-0026 v0.2 + DD-SHARED-TASK-001.md v0.2 |
+| 关联文档 | SRS-MULTICA-TASK-001.md v0.16 + BD-MULTICA-TASK-001.md v0.9 + ADR-0026 v0.2 + DD-SHARED-TASK-001.md v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
 | 守门 | 19 项 + 26 派生规 跨域覆盖 |
 
@@ -1166,4 +1166,17 @@ POST 的 REST scope preflight transaction 限时 5 秒、锁等待 1 秒，owner
 | v1.26 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Cards 从只读代码切片更新为带 `work-item:write`/Run focus 检查的条件式创建；固定 POST route、server-derived owner、task/lifecycle/association/audit/idempotency/triggered Outbox 原子边界与面板存活期间的同目标重试，并记录跨重挂载恢复仍未实现；同步 SRS v0.13、BD v0.6、根要求 v6.08、基本设计 v6.05 和 Group DD v4.74；保留 host/capability/target DB/RLS/CLI blockers | 完成与 Worktree checkout 焦点绑定的 Task Card create UI/client slice |
 | v1.27 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 POST 前 IndexedDB pending recovery；明确 actor/Run isolation、exact binding/authorization snapshot、32 条 store cap、29 天客户端安全窗口、超期/不匹配人工 reconcile、浏览器清理与未加密 local payload 的边界；成功清理失败时保留原 key 供 replay；同步 SRS v0.14、BD v0.7、requirements v6.09、basic design v6.06、Group DD v4.75 与 plan v6.42，保留生产 host/DB/RLS/CLI blockers | 完成 Run Task Card uncertain create 的 remount/reload recovery slice |
 | v1.28 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.13.2 Project/Run-owned Task Card list/create 契约与宿主独立 migration source；规定可选 Worktree focus、事务内 Project/Run grant 复验、legacy rows 不回填、schema v2 Outbox 与仍关闭的 Run lifecycle/Schedule/CLI；同步 SRS v0.15、BD v0.8、requirements/basic v6.66、Group DD v4.96、plan v6.92；目标 DB/RLS 与代码验证未完成 | ERUN-P3.2 hostless Task Card owner source slice 与架构文档对账 |
+| v1.30 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 §14.13.3 Task Outbox immutable route pin、exact-wire retry、receiver durable Inbox receipt、可信 dispatcher settlement 与 per-consumer Inbox/projection commit contract；同步 SRS v0.16/BD v0.9、requirements v6.76/basic v6.75、Group DD v5.04、Data Design v2.23；标记 migration/API/DB/RLS 与跨 owner dispatch 仍未实现 | 自审发现 Task delivery migration 缺少 route pin，且 ingress receipt 不证明 downstream consumer commit |
 | v1.29 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 统一 Task owner 写入锁顺序为 Project role → Run/revision → Run role → optional Worktree binding → idempotency advisory → Task rows；legacy Worktree hint lookup 改为无锁，授权后重读并锁定当前 binding；同步 Group DD v4.96 与计划 v6.93；记录并发/DB 验收仍未完成 | 自审发现 owner adapter 在 Project/Run/binding 授权顺序存在锁反转风险 |
+
+#### 14.13.3 Task Outbox immutable route pin and per-consumer commit receipts
+
+This section extends the Task owner Outbox contract. Existing source events and delivery Work migration are source-only; no Task dispatcher, route-pin persistence, receiver Inbox writer, or downstream consumer store is wired. The accepted terminal settlement path remains unavailable.
+
+Before the first external send, the Task delivery owner must atomically persist an immutable DeliveryRoutePin. Its identity binds tenant, source event, receiver service identity, transport provider and version, Transport Profile ID/revision/digest, endpoint identity, destination/log generation, schema version, and SHA-256 of exact serialized wire bytes. The record contains no payload copy, token, credential, or secret. Retries must use the same pin and exact bytes. Revocation, endpoint/profile drift, receiver mismatch, lease-generation change, or wire-digest mismatch fails closed; there is no implicit provider fallback.
+
+A receiver commits append-if-absent Inbox state and a stable receipt in its own durable transaction before returning the receipt. The receipt binds the source event/scope, schema and aggregate version, digest, route pin, and authenticated receiver identity. Exact replay returns the same receipt. Reuse of an event ID with a different scope or digest is poison and remains unsettled. A trusted Rust dispatcher authenticates the receiver, verifies this tuple against the source event and active lease, and only then invokes a constrained accepted-settlement command owned by the Task delivery store. Broker ACK or socket success is transport evidence only.
+
+Each Run App, subscribed Schedule/Loop, BI, and Benchmark consumer has a separate owner-local Inbox keyed by tenant, consumer identity, and event ID. Inbox receipt and that consumer's projection/outcome commit in one transaction. Aggregate-type/version fencing is independent per stream; missing versions, full-replay versus snapshot rebuild policy, lag, last durable receipt, and freshness are observable per consumer. Ingress acceptance never means every consumer has completed.
+
+AC-TASK-OUTBOX-DISPATCH requires route pin before first send, exact-wire retries, receiver durable commit before receipt, dispatcher verification under the current lease, consumer-specific idempotency and projection commit, and poison handling for identity/content conflicts. Before activation, add owner-local schemas/functions and FORCE RLS/grants, verify migration replay/rollback and tenant isolation, then verify duplicate delivery, route drift, receiver crash before/after commit, stale lease settlement, consumer replay/gap recovery, and bounded memory/queue behavior. Those are proposed gates; this document change does not claim they have been implemented or tested.

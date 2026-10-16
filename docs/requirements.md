@@ -1,6 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.75）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.76）
 
-> **v6.75 Task Run Outbox 投递约束修正**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。新增 owner-local delivery Work queue：每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试，7 天后写终态回执；永久 Outbox 与不可变终态回执分离。数据库以复合外键校验 delivery/receipt 的 tenant 与 Run scope 必须匹配源事件。独立 NOLOGIN 函数 owner 持有 delivery table DML；Run owner 只有固定函数执行权。当前 settlement 拒绝 `accepted`；未来可信 dispatcher 必须验证接收方身份、回执真实性及事件关联后，才可通过新的受控路径结算，当前 migration 本身不能证明远端数据库事务已提交。单独 broker ACK/socket 成功不算完成；接收 owner 的 ingress 持久化也不代表所有 Run App subscriber 或 BI projection 已消费，各 consumer 必须维护自己的 Inbox 去重与处理状态。无事件时间/UUID 高水位游标的 bounded reconciliation 防止并发迟提交漏读。当前仅有 migration source，Rust dispatcher、接收 owner Inbox writer、BI/Benchmark projections、目标 DB grants/RLS 与数据库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
+> **v6.76 Task Run Outbox route pin 与 consumer 边界**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。owner-local delivery Work queue 每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试，7 天后写终态回执；永久 Outbox 与不可变终态回执分离。数据库以复合外键校验 delivery/receipt 的 tenant 与 Run scope 必须匹配源事件。首次外发前还必须持久化 immutable DeliveryRoutePin，固定身份、Profile revision/digest、endpoint/destination generation 与 exact-wire digest；当前 migration 尚无 route pin，accepted settlement 仍关闭。可信 Rust dispatcher 必须认证接收方身份并验证本地事务提交的 Inbox receipt，才允许受控 settlement。每个下游 App、订阅事件的 Schedule/Loop、BI/Benchmark consumer 还需自己的 Inbox、版本 fence、projection receipt 与有界 replay；ingress acceptance 不代表订阅者完成。当前仅有 migration source，Rust dispatcher、receiver Inbox writer、consumer stores/projections、目标 DB grants/RLS 与数据库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
 
 ## 0. 文档说明与前提
 
@@ -2997,6 +2997,7 @@ The Run owner changes the current binding with compare-and-swap: close exactly t
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v6.76 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加首次发送前不可变 route pin、exact-wire retry、接收 owner Inbox commit receipt 与每个下游 consumer 独立 Inbox/projection receipt 契约；明确 route pin/dispatcher/receiver/BI/Benchmark 与目标 DB 验收仍开放 | 审查发现 source delivery migration 缺少首次 route pin，且 ingress receipt 不足以证明每个消费投影已提交 |
 | v6.75 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 accepted 回执信任边界：DB 仅存回执身份，不独立证明跨 owner commit；要求可信 dispatcher 认证并关联消费者回执；delivery/receipt 增加 tenant+Run+event 复合外键；同步仍未启用 accepted/dispatcher 的验收门 | 自审发现迁移将外部 Inbox 回执 UUID 当作已验证事实，且 event FK 未校验冗余 tenant/Run scope |
 | v6.74 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Task Run Outbox owner-local delivery Work 与不可变终态回执：每 Run 上限 1024、7 天期限、1–8 有界 claim、30–300 秒租约、最多 12 次退避；accepted 要求接收 owner Inbox commit receipt；记录无高水位 reconciliation 与 migration/runtime 未验收状态 | 用户要求为自有 Rust durable transport 做好替换 NATS 的边界，并继续完成 owner Outbox 与 BI 链路 |
 | v6.73 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Outbox 事件身份/时间不代表提交顺序；要求下游持久去重、aggregate version fencing 与不会越过未提交行的安全回放/对账 | 并发事务可能以与开始时间或随机 UUID 不同的次序提交，普通高水位分页会漏事件 |
@@ -3615,3 +3616,25 @@ Run Task Card lifecycle/review commands MUST append their lifecycle audit fact a
 Lifecycle v3 payloads MUST carry the canonical tenant/Project/Engineering Run owner, optional host context and audit Worktree context, lifecycle version and bounded current status/review/claim state, actor/correlation identity, and the audit event identity/type. They MUST NOT copy Task title/description, raw review rejection reasons, terminal output, credentials, or secrets. The Outbox remains append-only and tenant-RLS protected. Producers do not directly mutate BI, Benchmark, Inbox, or another owner's tables.
 
 Consumers MUST NOT treat `(occurred_at, event_id)` or UUID order as commit order: a transaction can commit later with an earlier timestamp or an unrelated identifier. Cross-App delivery MUST use durable event-ID deduplication and per-aggregate version fencing, with replay/reconciliation that cannot advance a high-water mark past an invisible uncommitted row. This source migration does not prove target deployment, app-role grants/FORCE RLS, transaction rollback, concurrent replay, delivery, or projection parity. BI/Benchmark consumers, owner-local delivery/retry state, bounded-memory replay, and Schedule/Agent/CLI integrations remain separate acceptance gates; execution stays fail closed until their own contracts pass.
+
+## 50.8AR AC-RUN-TASK-OUTBOX-DISPATCH-001 — 有界、可验证的 Task Outbox 投递与消费
+
+Run Task Outbox dispatcher MUST 以 Project/Engineering Run 的当前授权上下文和 owner-local delivery lease 为入口；不得让 Worktree focus 或可选远端 Branch 改变事件 owner。事件信封保持 schema v1/v2 metadata 与 schema v3 lifecycle 的兼容身份，至少包含稳定 event_id、schema_version、event_type、tenant/Project/Run/Work Item owner、aggregate_type/version、actor/correlation、payload digest 与 source lineage。occurred_at 和 UUID 排序不得充当提交顺序或全局高水位。
+
+首次向外发送之前，Task delivery owner MUST 持久化不可变 DeliveryRoutePin：固定 sender/receiver service identity、transport provider/version、Transport Profile revision/digest、endpoint identity、logical destination/log generation、schema version 和精确 wire SHA-256；不保存 credential、secret 或 payload 副本。所有 retry 必须复用相同 route pin 与相同 wire bytes。Profile 撤销、目标漂移、receiver identity 不匹配或 exact-wire digest 不一致时 fail closed，不得自动切换另一个 provider。当前 Task delivery migration 没有该 route pin；必须先增加 owner-local migration/函数，并将 accepted settlement 继续保持关闭，直到其事务验证完成。
+
+Dispatcher 的 transport-neutral port 至少支持有界 claim、route resolution、exact append/replay、lease-fenced retry/settle、cancel/drain 和 receipt verification。传输 adapter 的 publish ACK、socket 写成功或 broker 持久化回执都不是业务 acceptance。接收 owner 必须在自己的事务中按 tenant + event_id + source scope + wire digest 做 append-if-absent，提交 Inbox/持久 receipt 后才返回；同 ID 同 digest 返回稳定的同一 receipt，不同 scope 或 digest 是 poison/conflict，必须隔离并保持 source delivery unsettled。Task delivery owner 仅在可信 Rust dispatcher 已认证 receiver service identity，并核对 receipt、source event、immutable route pin、lease generation 与 wire digest 完全匹配后，才能调用新增的受控 accepted-settlement 路径。不存在跨 owner 共享事务。
+
+每个 Run App、订阅这些事件的 Schedule/Loop、Canvas 投影、BI/Benchmark consumer 各自拥有 Inbox 与投影事务，不共享一个全局已消费标记。Inbox 自然键为 tenant + consumer_id + event_id，并保存不可变 scope/schema/aggregate/version/digest 与处理结果；相同事件的精确 replay 返回既有结果，事件 ID 复用但内容变化时 quarantine。Inbox receipt 与本 owner projection/outcome 在同一事务提交。按 aggregate_type 分开的 version fence 保护迟到更新；state snapshot、需要完整事件的 BI 统计和副作用 consumer 必须分别声明 gap 处理策略。不能静默越过 missing aggregate version，也不能用 occurred_at/event_id 代替消费 checkpoint；consumer 恢复须从 durable log/source 做有界回放和 reconciliation，并公开 lag、gap、last durable receipt 与 projection freshness。Ingress acceptance 不代表所有 subscriber 已消费。
+
+Resource budget 必须有限且可测：沿用每 Run 最多 1024 个待处理 Work、单次 claim 1–8、30–300 秒 lease、最多 12 次 retry 和 7 天 Work TTL；dispatcher 按 Run 公平轮转并限制全局 worker/in-flight bytes，不建立无界 payload channel。每个 transport wire 最大 16 KiB，序列化、解析与 TLS scratch 的额外峰值也计入 worker/Profile 预算；旧 v1/v2 payload 的兼容上限必须逐版本确认，超限不得截断或降级投递。取消时停止新 claim，drain 持久化 receipt 或让 lease 安全过期。桌面 UI 只分页/虚拟化消费投影，不驻留完整 Outbox。
+
+| Acceptance ID | Acceptance criterion |
+|---|---|
+| AC-RUN-OUTBOX-01 | 每条首次外发前均有唯一不可变 route pin；retry 使用同一 Profile/endpoint/recipient 与 exact wire；route drift 时 fail closed。 |
+| AC-RUN-OUTBOX-02 | Task delivery owner accepted settlement 只接受可信 dispatcher 验证的接收 owner durable Inbox commit receipt，并绑定 event/scope/digest/route/lease；transport ACK 不够。 |
+| AC-RUN-OUTBOX-03 | 接收 owner 在本地事务中幂等写 Inbox/receipt 后应答；精确重复回同一 receipt，身份或内容冲突进入 poison 流程且不 ACK。 |
+| AC-RUN-OUTBOX-04 | 每个订阅 consumer（包括订阅事件的 Schedule/Loop）在自己的事务中提交 Inbox receipt 与 projection/outcome，并按 consumer_id 去重、按 aggregate_type/version 防止倒退。 |
+| AC-RUN-OUTBOX-05 | replay/reconciliation 不以 event time/UUID 作为提交游标；缺失版本、消费 gap 和 projection lag 对 Run BI/Benchmark 明确可见。 |
+| AC-RUN-OUTBOX-06 | 1–8 有界 claim、1024/Run backlog、16 KiB wire、有限 worker 与 bytes、Run 公平轮转、取消/drain 均可验证。 |
+| AC-RUN-OUTBOX-07 | route pin migration、Task dispatcher、receiver Inbox API、consumer owner store、目标 DB/RLS/grants、并发/崩溃恢复及 BI parity 分别通过后才能启用；当前 Schedule/Agent/Task CLI execution 继续 fail closed。 |

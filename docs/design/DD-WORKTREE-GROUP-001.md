@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.03**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.04**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -16,10 +16,10 @@
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
-> - Phase 2C ERUN-P3.1 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Rust 1.99.0、目标 DB/RLS 和 PostgreSQL 并发验收未执行；metadata Outbox 不含 lifecycle/review typed event，生产 gates 仍开放。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.75 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.74 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.29、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.30、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.03
+> - Phase 2C ERUN-P3.1 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。后续 source migration 已定义 schema v3 lifecycle Outbox 与 bounded delivery Work，但 route pin、Rust dispatcher、receiver Inbox 和 downstream consumer 尚未接线；目标 DB/RLS 与并发验收仍开放，accepted delivery 保持关闭。
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.76 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.75 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.30、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.04
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -383,7 +383,7 @@ Engineering Loop 是单一 `TaskExecutionRun` 内版本化、预算受限的 Pla
 2. Task Card 打开时展示当前 Group Worktree。若 WorkItem 未关联当前 Worktree，允许查看并提示关联/选择 Worktree；在关联确认之前不允许启动 CLI、Agent 或写入 Worktree 文件。
 3. 服务端构造 `TaskExecutionContext { actor, project_id, repository_id, worktree_id, work_item_id, runtime_id, approved_profile_id, policy_version, expiry, nonce }`。路径、命令白名单、环境变量和 Secret 句柄均由服务端 policy 与 Runtime 配置派生，客户端不能提交可覆盖值。
 4. Local Runtime 只接受短期、签名且一次性的 session grant；启动、输入、退出和 session 重连均重新验证范围。审计记录 session ID、命令类别、结果摘要和退出码，不把任意终端内容复制进 WorkItem 描述。
-5. 当前实现支持 pending → claimed → in_progress → completed / failed / cancelled 与 failed → pending 的状态转移；`review_state` 独立保存。ERUN-P3.1 已新增 Run-scoped `RunTaskCardCommandPort` 和 PostgreSQL adapter；REST create/transition/review 命令经该 port 执行，adapter 在写事务内复验当前 Worktree、Project/Branch/Run binding 和 Project/Run writer/reviewer role，设置 statement_timeout=5000ms / lock_timeout=1000ms，使用幂等键锁、lifecycle 行锁/CAS 与 append-only lifecycle audit。Canvas 创建任务调用同一 adapter 的事务参与接口，并先取得同命名空间的幂等锁，再查组合回执；当前 REST state 暂时依赖具体 infrastructure adapter，Application/App composition boundary 尚未建立；任务、Canvas Element/EntityRef/event 和完整回执同事务提交。仍未有 lifecycle/review typed Outbox producer/consumer，metadata insert trigger 只记录 metadata event；poison/stale-dispatch、外部任务系统 外部 alias/sync、目标 DB/RLS 与 Rust 1.99.0 build 也未验收，不能据此宣称 任务管理/外部任务系统 生产链路完成。
+5. 当前实现支持 pending → claimed → in_progress → completed / failed / cancelled 与 failed → pending 的状态转移；`review_state` 独立保存。ERUN-P3.1 已新增 Run-scoped `RunTaskCardCommandPort` 和 PostgreSQL adapter；REST create/transition/review 命令经该 port 执行，adapter 在写事务内复验当前 Worktree、Project/Branch/Run binding 和 Project/Run writer/reviewer role，设置 statement_timeout=5000ms / lock_timeout=1000ms，使用幂等键锁、lifecycle 行锁/CAS 与 append-only lifecycle audit。Canvas 创建任务调用同一 adapter 的事务参与接口，并先取得同命名空间的幂等锁，再查组合回执；当前 REST state 暂时依赖具体 infrastructure adapter，Application/App composition boundary 尚未建立；任务、Canvas Element/EntityRef/event 和完整回执同事务提交。schema v3 lifecycle Outbox source migration and audit trigger are defined; Rust dispatcher, receiver Inbox writer and consumer are not connected；poison/stale-dispatch、外部任务系统 外部 alias/sync、目标 DB/RLS 与 Rust 1.99.0 build 也未验收，不能据此宣称 任务管理/外部任务系统 生产链路完成。
 
 Review route 为 `POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/review`，请求携带 `action=submit|accept|reject`、`expected_version`、`correlation_id`，并通过 `Idempotency-Key` 去重。submit 要求当前 `claimed_by=actor_id` 且 Worktree 一致；accept/reject 需 reviewer 角色且 actor 不等于 claimant。服务端返回同一 canonical WorkItem 投影。Group UI 仅在 provider-backed live projection 下显示提交/通过/驳回入口；驳回原因必填，成功或冲突刷新 projection。权限仍由 API 最终裁决，前端入口不作为 authorization。
 
@@ -655,6 +655,14 @@ The gate verified receipt failure backpressure, commit-before-confirmed-Term ACK
 | AC-SCHED-API-028 | Schedule DD §6.15; verification evidence only for the existing Platform quarantine owner and Run-owner hook. Preserve Run/App ownership and Worktree focus semantics; no production execution or BI state is implied. |
 | AC-SCHED-API-029 | Requirements §50.8Y; Schedule DD §6.16; each owner commits only its own state; stable idempotent admission command/result, Schedule current-fence link/confirmation, Run demand only after confirmation, lost-reply replay and owner-command compensation. No cross-owner writes or distributed transaction; production Schedule execution remains fail-closed. |
 
+## §8.24 — Task Outbox route pin 与逐 consumer durable completion
+
+Task lifecycle source Outbox 和 delivery Work 只提供事件来源与有界重试 substrate。首次外发前必须由 Task delivery owner 持久化 immutable DeliveryRoutePin，固定 sender/receiver service identity、transport provider/version、Transport Profile revision/digest、endpoint identity、destination/log generation、schema version 与 exact-wire SHA-256。pin 不保存 payload 或 secret；所有 retry 使用相同 route 和 wire。撤销、profile/endpoint generation 漂移、身份不匹配或 digest mismatch 时 fail closed，不自动 fallback。当前 migration 未创建 route-pin schema/API，故没有生产首发路由固定能力。
+
+Receiver owner 必须在自己的事务内 append-if-absent 写入 durable Inbox receipt 后再响应。receipt 绑定 tenant、event/source scope、schema/aggregate version、wire digest、receiver identity 和 route pin。相同 immutable tuple replay 返回稳定同一 receipt；event identity 被复用但内容或 scope 不同则 quarantine 且不结算。可信 Rust dispatcher 验证 receiver 身份、receipt、source event、route pin 和当前 lease generation 后，才可调用未来新增的 accepted settlement；现有 settlement 保持拒绝 accepted。跨 owner 不共享写事务。
+
+Run App、订阅相关事件的 Schedule/Loop、BI 与 Benchmark 的每个 consumer 必须有自己的 owner-local Inbox/projection receipt，并在同一 consumer transaction 提交。用 tenant + consumer identity + event ID 去重，按 aggregate type/version fencing；缺失版本、重建策略、lag、last durable receipt 与 freshness 都由 consumer 单独报告。Ingress receipt 不能代替任何 subscriber 的处理完成。现有 schema 仅是 migration source；route pin、dispatcher、receiver writer、consumer stores/projections、目标 DB/RLS/grants、并发崩溃恢复尚未实现/验收，因此跨 App delivery 与分析投影不得标记为可用。
+
 ## §9 跨 App 事件与一致性
 
 业务写入使用事实 owner 的 Domain Command，在同一数据库事务提交业务事实与 Outbox；投影与通知异步、幂等消费。事件至少包含：
@@ -746,7 +754,7 @@ Phase 2B-2D 与 Phase 3B migrations 按事实表分类；旧 `worktree_canvas_wo
 
 数据库 trigger 在新 current Task metadata 写入时要求 owner tuple 完整；现有 current legacy metadata 可保留全空 tuple。owner 变更只能创建下一个 SCD2 metadata 版本；`work_item_worktree` 新关联及当前 Run Worktree binding 变更都会比对 repository、branch 和 Engineering Run 三者。Run list API `GET /api/v1/engineering-runs/{run_id}/work-items` 按完整 tuple 使用稳定 UUID 游标；Worktree compatibility list/get/transition/review 只返回当前选中 Worktree 所属 Run 的任务，并在写命令同时校验 Project 与 Run grants。Canvas 创建任务写入同一 tuple，CLI start、Session attachment 与 TaskExecutionRun list/detail 都再次核对 tuple，旧无归属 Task 不可执行。
 
-Task metadata 当前版本写入与 `multica.task_run_outbox` metadata Transaction event 在同一 PostgreSQL 事务中提交；事件投影限于 owner tuple、metadata version、actor、correlation 和 schema version，不保存任务正文或凭据。新 Task Card command adapter 已提交 lifecycle audit 与 idempotency receipt，但当前 migration trigger 不产生 lifecycle/review Outbox event；不得将 audit row 或 metadata Outbox 误称为生命周期事件 consumer 已接通。Outbox 是给 BI/跨 App 消费者的事务边界，不等于 NATS delivery 或持久 Inbox 已落地。
+Task metadata 当前版本写入与 `multica.task_run_outbox` metadata Transaction event 在同一 PostgreSQL 事务中提交；事件投影限于 owner tuple、metadata version、actor、correlation 和 schema version，不保存任务正文或凭据。新增 schema v3 migration 已定义生命周期 audit trigger，并在同一 owner transaction 追加 lifecycle Outbox event；但 migration 尚未在目标数据库验收，Rust dispatcher、receiver Inbox writer 与 consumer 仍未接通。不得把 Outbox source 当作 delivery 或消费完成。Outbox 是给 BI/跨 App 消费者的事务边界，不等于消息传输或持久 Inbox 已落地。
 
 产品 seed/MSW 已移除 `wi-001`..`wi-030` demo Task Cards；独立 Tauri `MockDb` 的四条 `wi-001`..`wi-004` 任务记录和 browser-dev mock fallback 也已删除。Tauri Task IPC 在 Run-scoped provider 未配置时返回明确错误，不假装成功返回空列表。Zustand migration 只按精确已知 ID 清理历史浏览器数据，测试 fixture 使用 `test-*`。不清空未知服务器行、不按 ID 前缀批量删除，也不从 Worktree 猜测遗留 owner。Task Cards UI/client 已有 §10.0B 条件式只读代码，但 Host Provider/capability 均关闭；Owner migration 仍未在目标数据库执行。以上不表示生产数据平移或页面读取验收完成。
 
@@ -838,7 +846,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 ## §12 实施顺序与阻断门
 
 1. **2B 代码切片完成**：RS256 Actor、scope、Project membership 查询、GroupContext、Project/owner Master binding DDL。部署、membership provisioning、历史数据 reconciliation 和跨 Tenant/Project 负向集成仍是启用门。
-2. **2C 实现切片**：canonical task metadata、Worktree relation、任务管理 六态 current projection、`RunTaskCardCommandPort`、PostgreSQL owner adapter 与 REST create/transition/review mutation 接线已有代码；Canvas 复合创建复用 adapter 事务参与接口和组合幂等锁。Review gate 目前有 adapter/audit 但没有 typed lifecycle/review Outbox；外部任务系统 alias/sync、目标 DB/RLS grants、Rust 1.99.0 build 与真实授权/并发验收仍开放，Run Apps 生产读写保持关闭。
+2. **2C 实现切片**：canonical task metadata、Worktree relation、任务管理 六态 current projection、`RunTaskCardCommandPort`、PostgreSQL owner adapter 与 REST create/transition/review mutation 接线已有代码；Canvas 复合创建复用 adapter 事务参与接口和组合幂等锁。schema v3 lifecycle Outbox source migration 与 audit trigger 已定义，但 migration/目标 DB/RLS grants 尚未验收，Rust dispatcher、receiver Inbox writer、consumer 和外部任务系统 alias/sync 未接通；Rust 1.99.0 build 与真实授权/并发验收仍开放，Run Apps 生产读写保持关闭。
 3. **2D 条件式代码切片**：cursor Index、owner/archived plan-confirm、owner SCD2、management audit 和 Git lock observer contract/UI。生产 main 尚未装配 Host Runtime observer；创建/导入、Runtime 活跃探测、Session drain、物理清理与恢复仍未实现，Index lock unknown 不得视为 unlocked。
 4. 完成 migration apply + 项目成员 provisioning 后，运行跨 Tenant/Project ACL 负向、数据库 RLS、并发 version conflict、同键幂等重放、审计不可变性和 API 集成验收，才能关闭生产写能力 gate。
 5. Group route 已支持宿主 provider 注入后的只读 GroupContext / WorkItem / Canvas 和 Plugin Registry projection；插件入口消费者已实现校验、排序、显式刷新、30 秒/可见性刷新与错误 fail-closed。真实宿主会话 provider 尚未挂载，因此当前运行仍显示 `preview / seed / not connected`；只有在目标 DB/RLS 和真实会话部署后完成跨 App 浏览器验收，才可把生产接线计为通过，不把 browser store 变化作为产品事实。
@@ -852,7 +860,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | # | 缺口 | 影响 | 关闭条件 |
 |---|---|---|---|
 | 1 | Run-scoped `RunTaskCardCommandPort`、PostgreSQL owner adapter 与 REST create/transition/review 接线已有代码切片；Canvas 使用 adapter 的事务参与接口。没有 Rust 1.99.0 reproducible build、目标 DB/RLS grants、真实授权/并发 PostgreSQL 验收；read projections 仍由 REST SQL 查询 | 命令边界已落代码但不构成生产写能力；读取投影与写 owner 分层尚未全部迁移 | 在 Rust 1.99.0 完成锁定依赖构建；部署并验证目标 DB/runtime role/RLS；以真实 Project/Branch/Run grants 验收读写、并发 CAS、同键重放和审计不可变性 |
-| 2 | 当前 adapter 持久化 lifecycle/review audit 与命令回执，但没有 typed lifecycle/review Outbox producer/consumer；Task metadata trigger 仅发布 metadata event，外部任务系统 external alias/sync 尚未实现 | 审计事实不能驱动跨 App lifecycle projection；外部任务系统 同步仍不完整 | 先冻结事件 schema、owner producer、幂等 Inbox consumer 和授权/RLS，再实现 alias registry + sync/outbox；跨 App 实测同一 ID/version |
+| 2 | 当前 adapter 持久化 lifecycle/review audit 与命令回执；schema v3 lifecycle Outbox source migration 已定义并与 audit trigger 同事务写入，但 Rust dispatcher、receiver Inbox writer 与 consumer 尚未接线，外部任务系统 external alias/sync 尚未实现 | 审计事实不能驱动跨 App lifecycle projection；外部任务系统 同步仍不完整 | 先冻结事件 schema、owner producer、幂等 Inbox consumer 和授权/RLS，再实现 alias registry + sync/outbox；跨 App 实测同一 ID/version |
 | 3 | 旧 Worktree projection 保留 `project_id` / `owner_user_id` denormalized columns；权威 Project / Owner SCD2 表已创建 | 历史投影与 Master binding 需保持一致；旧 owner/Project 行未回填 | provisioning/reconciliation 同事务维护 Master 与投影；历史映射有审计证据 |
 | 4 | App Registry 只读授权导航 API/provider 与 Group UI consumer 已有条件式切片；GroupContext 尚未包含 `allowed_actions[]`；Canvas API 有多项条件式切片，Chat 仅有逐目标 GroupContext 预检与 fail-closed workflow seam；Registry lifecycle writer、LangGraph 与 Plugin runtime/Gateway 仍未落地 | Worktree group shell 仍无法真实完成跨应用交互；显示入口不代表插件可执行 | 接入可信 manifest ingest、Registry lifecycle command、EntityRef resolver / Chat Workflow 与各 App API，补齐 LangGraph runtime 和 Plugin Gateway，并对每个入口通过权限验收 |
 | 5 | 当前 archive guard 仅根据 AgentSession/Runtime reference 是否为空；Git lock 有注入式 observer contract/UI 但 production main 未装配 Host Runtime provider；没有可靠活跃会话状态和 Runtime/Agent drain | 对有过绑定但已结束的 Runtime 也会保守拒绝；Git lock 显示 unknown，不能安全执行物理清理 | 装配带 freshness/deadline 的 Host Runtime observer；接 Agent/Runtime 活跃状态和 drain；实现 cleanup plan/confirm、恢复策略与故障演练；确认动作时对同一 Repository/Worktree 再观测 |
@@ -1070,6 +1078,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.04 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.76/basic v6.75/data design v2.23/Task SRS v0.16、BD v0.9、DD v1.30 与 plan v7.04；增加不可变 DeliveryRoutePin、receiver owner durable Inbox receipt、可信 dispatcher settlement 与逐 consumer Inbox/projection contract；确认这些仍是未实现的 acceptance gates | 自审发现 Task delivery migration 缺少 immutable first-send route pin，且 ingress acceptance 不证明各订阅投影已提交 |
 | v5.03 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.75/basic v6.74/data design v2.22；增加 source event 的 tenant+Run+event 复合外键；规定跨 owner Inbox 回执须由可信 dispatcher 认证且在其实现前保持 accepted 路径关闭 | 自审发现 schema 保存外部回执 ID 不能独立证明远端 commit，且原 event FK 未约束冗余 tenant/Run scope |
 | v5.02 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.74/basic v6.73/data design v2.21；定义 Task Outbox owner-local delivery Work、1024/Run backlog cap、lease/retry/TTL 与无高水位 reconciliation；终态 accepted 必须绑定接收 owner Inbox commit receipt；标明 dispatcher、DB 验证与 BI consumer 未完成 | Outbox source 已存在但无法恢复投递，且未来 transport 替换不能依赖 broker ACK 作为业务完成证据 |
 | v5.01 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.73/basic v6.72；规定 Outbox consumer 采用持久事件去重与 aggregate version fence，replay/reconciliation 不得越过尚未提交的事件推进游标 | 并发提交顺序不由 occurred_at 或随机 UUID 决定，修订消费顺序与漏事件风险合同 |
