@@ -1,6 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.73）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.75）
 
-> **v6.73 Task lifecycle Outbox 与导航对齐**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；任务状态变更和审计落库后由同一 owner transaction 的数据库 trigger 写入 schema v3 lifecycle Outbox。Metadata 与 lifecycle 使用独立 aggregate_type/version；payload 不含退回理由或任务正文。消费者不得把事件时间或 UUID 顺序当作提交顺序；需有持久事件去重、aggregate version fence，以及不会跳过尚未提交事件的安全回放/对账。迁移尚未应用，Outbox consumer、BI/Benchmark projection、应用 grants/RLS 与目标库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
+> **v6.75 Task Run Outbox 投递约束修正**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。新增 owner-local delivery Work queue：每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试，7 天后写终态回执；永久 Outbox 与不可变终态回执分离。数据库以复合外键校验 delivery/receipt 的 tenant 与 Run scope 必须匹配源事件。独立 NOLOGIN 函数 owner 持有 delivery table DML；Run owner 只有固定函数执行权。当前 settlement 拒绝 `accepted`；未来可信 dispatcher 必须验证接收方身份、回执真实性及事件关联后，才可通过新的受控路径结算，当前 migration 本身不能证明远端数据库事务已提交。单独 broker ACK/socket 成功不算完成；接收 owner 的 ingress 持久化也不代表所有 Run App subscriber 或 BI projection 已消费，各 consumer 必须维护自己的 Inbox 去重与处理状态。无事件时间/UUID 高水位游标的 bounded reconciliation 防止并发迟提交漏读。当前仅有 migration source，Rust dispatcher、接收 owner Inbox writer、BI/Benchmark projections、目标 DB grants/RLS 与数据库验收仍开放；Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
 
 ## 0. 文档说明与前提
 
@@ -2997,6 +2997,8 @@ The Run owner changes the current binding with compare-and-swap: close exactly t
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v6.75 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 accepted 回执信任边界：DB 仅存回执身份，不独立证明跨 owner commit；要求可信 dispatcher 认证并关联消费者回执；delivery/receipt 增加 tenant+Run+event 复合外键；同步仍未启用 accepted/dispatcher 的验收门 | 自审发现迁移将外部 Inbox 回执 UUID 当作已验证事实，且 event FK 未校验冗余 tenant/Run scope |
+| v6.74 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Task Run Outbox owner-local delivery Work 与不可变终态回执：每 Run 上限 1024、7 天期限、1–8 有界 claim、30–300 秒租约、最多 12 次退避；accepted 要求接收 owner Inbox commit receipt；记录无高水位 reconciliation 与 migration/runtime 未验收状态 | 用户要求为自有 Rust durable transport 做好替换 NATS 的边界，并继续完成 owner Outbox 与 BI 链路 |
 | v6.73 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Outbox 事件身份/时间不代表提交顺序；要求下游持久去重、aggregate version fencing 与不会越过未提交行的安全回放/对账 | 并发事务可能以与开始时间或随机 UUID 不同的次序提交，普通高水位分页会漏事件 |
 | v6.72 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Task lifecycle schema v3 owner-local Outbox 验收：独立 aggregate_type/version、audit-trigger 原子写入、bounded 隐私安全 payload；明确 schema/API source 不代表 migration 部署，BI/Benchmark consumer、目标 DB/RLS 与 outbox delivery 尚未验收 | Run Task Card 生命周期变更已写审计，但此前没有可靠的同事务下游事件源 |
 | v6.71 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确生命周期审计在无明确焦点时仅选择唯一 current same-Run Task–Worktree relation，多重关联保留空值；修复无焦点 Run 操作丢失唯一 Worktree 审计归属，并消除会话错误提示中的宿主依赖措辞；三项 Rust 选择测试在 Rust 1.98.1 诊断工具链下通过，正式 1.99.0 门禁仍未完成 | 自审发现全局 Run 页面存在唯一 Worktree 关联时仍丢失审计归属，并发现会话失效提示暗示远端宿主依赖 |

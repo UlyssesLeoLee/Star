@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.01**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.03**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -8,7 +8,7 @@
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
 > - Phase 9E-4C5 Runtime fence foundation：REST 与 Local Runtime 共用 `star-dto::task_run` strict DTO；ERUN-P2 带 V2 directory fence 的双 Profile grant 使用 signature v3（C5 基线为 v2），无 fence 的 legacy grant 保持 v1；Local Runtime 专用 consumer 完整比对当前 binding 并在 SQLite FULL WAL 单事务内消费 nonce/fence，receipt 上限 50,000 条并保留 5 分钟时钟偏差清理窗。该 helper 未接生产 provisioner，不负责实时 ACL/authority、reservation lifecycle、OS sandbox/spawn 或 BI outcome；producer capability 继续默认关闭，详见 §7.2。
 > - ERUN-P3 Run Task Cards 条件式 UI：bounded Run-scoped list/create routes 与 typed client 已有源码切片，Worktree focus 可选；保持 12 条/页、2 MiB response、最多 100 页、有界并发、取消与有界 IndexedDB pending recovery。Task owner 为 tenant/Project/Run，服务端复验当前 Project/Run grants；可选 focus 必须绑定同一 Run。旧 Tauri demo/mock fallback 已移除。migration、应用角色 grants/RLS、Rust/HTTP/frontend 验证未完成，生产页面保持 fail closed，CLI 禁用。
-> - 日期：2026-10-15
+> - 日期：2026-10-16
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
@@ -17,9 +17,9 @@
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Rust 1.99.0、目标 DB/RLS 和 PostgreSQL 并发验收未执行；metadata Outbox 不含 lifecycle/review typed event，生产 gates 仍开放。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.70 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.69 §16
-> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.29、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.30、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v6.98
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.75 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.74 §16
+> - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.29、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.30、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.03
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
 ---
@@ -696,16 +696,20 @@ PostgreSQL stored procedure/function 只封装同一 owner transaction 中需要
 
 The lifecycle audit `AFTER INSERT` trigger is the only producer for the v3 event. It reads and locks the current Task metadata and lifecycle rows, then writes owner, optional repository/Branch context, audit Worktree context, current bounded lifecycle/review/claim state, audit event identity/type, actor and correlation fields. It deliberately omits free-form rejection reason and Task body. Audit and Outbox are atomic with the command; if the Outbox insert or its tenant RLS check fails, the whole owner transaction rolls back. No trigger path performs cross-owner writes or direct BI projection updates.
 
-`occurred_at` and UUID `event_id` provide event time and stable identity but do not establish commit order: concurrent transactions can become visible in a different order than their start time or generated UUID. A future consumer MUST use durable event-ID deduplication and per-aggregate version fencing, and its replay/reconciliation strategy MUST NOT advance a cursor past an event that was still uncommitted when the page was read.
+`occurred_at` and UUID `event_id` provide event time and stable identity but do not establish commit order: concurrent transactions can become visible in a different order than their start time or generated UUID. The additive delivery migration creates a separate owner-local Work queue with a 1024 outstanding-event cap per Run, seven-day expiry, 1–8 item claims, 30–300 second leases and at most 12 attempts. Its bounded reconciliation repeatedly finds source event IDs missing from both Work and terminal receipts; it has no timestamp/UUID high-water cursor. A settlement is `accepted` only when the configured receiving/transport-ingress owner supplies its durable Inbox commit receipt. Provider/broker acknowledgements and socket writes alone do not qualify. This receipt confirms ingress-owner persistence, not completion by every subscribed Run App or BI projection; each consumer needs its own Inbox deduplication, version fence, progress and failure state. The terminal receipt is append-only and carries no event payload; the source Outbox remains permanent.
 
 | Acceptance ID | Acceptance criterion |
 |---|---|
 | AC-TASK-LIFECYCLE-OUTBOX-01 | Metadata and lifecycle version fences are independent and tenant/Work Item/aggregate-type scoped; legacy v1/v2 metadata events remain valid. |
 | AC-TASK-LIFECYCLE-OUTBOX-02 | Every new Run Task lifecycle audit insert produces exactly one v3 lifecycle Outbox event in the same transaction; any failure rolls back mutation, audit and event. |
 | AC-TASK-LIFECYCLE-OUTBOX-03 | Event payloads carry current owner/state and audit lineage, omit Task body/raw rejection reason/secrets, and remain append-only under tenant RLS. |
-| AC-TASK-LIFECYCLE-OUTBOX-04 | Delivery, owner Inbox, BI/Benchmark projections, target grants/RLS and concurrent/rollback behavior are separate gates; schema presence alone does not enable consumers or execution. |
+| AC-TASK-LIFECYCLE-OUTBOX-04 | Each Run's delivery Work is capped at 1024 outstanding events, claims are bounded to 1–8 with a 30–300 second lease, attempts stop at 12, and expiry/dead/accepted state is recorded without mutating the source Outbox. |
+| AC-TASK-LIFECYCLE-OUTBOX-05 | Bounded reconciliation uses missing durable event IDs and cannot advance a time/UUID cursor past a still-uncommitted source row. |
+| AC-TASK-LIFECYCLE-OUTBOX-06 | Current settlement rejects `accepted`. A future acceptance path may be enabled only after a trusted dispatcher authenticates the ingress-owner response and verifies its durable Inbox receipt is bound to the claimed event; transport acknowledgement alone is insufficient. The source database stores receipt identity but cannot independently prove a remote transaction committed. Terminal receipts are append-only and tenant-scoped. |
+| AC-TASK-LIFECYCLE-OUTBOX-07 | Rust dispatcher, receiving-owner Inbox writer, BI/Benchmark projections, target grants/RLS and concurrent/rollback behavior are separate gates; schema presence alone does not enable consumers or execution. |
+| AC-TASK-LIFECYCLE-OUTBOX-08 | Delivery Work and terminal receipt enforce a composite `(tenant_id, engineering_run_id, event_id)` foreign key to the immutable source event; lease owner/deadline fields are both present only while leased. |
 
-The migration is source-only until applied and exercised against PostgreSQL with the application role. No delivery or BI/Benchmark consumer is enabled by this contract.
+`2026-10-16-task-lifecycle-outbox.sql` and `2026-10-16-task-run-outbox-delivery.sql` are source-only until applied and exercised against PostgreSQL with the real owner roles. Rust dispatcher, receiving-owner Inbox writer, BI/Benchmark consumers and cross-App projections remain disabled.
 
 ## §10 持久化分类约束（W/T/M）
 
@@ -731,7 +735,8 @@ Phase 2B-2D 与 Phase 3B migrations 按事实表分类；旧 `worktree_canvas_wo
 | `plugin.group_app_audit_event` | Transaction | append-only Registry lifecycle Audit；不含 Secret 与用户内容 |
 | `multica.task_contract` | Master | Task Contract SCD2，RLS/no-delete；变更需 append-only audit |
 | `multica.task_contract_change_audit` | Transaction | Contract version create/supersede；append-only + RLS |
-| `multica.task_run_outbox` | Transaction | Task metadata current version 的 created/updated/owner_changed；same-transaction append-only、owner tuple FK、actor/tenant RLS 与有限 payload；consumer Inbox/read-model 尚未部署 |
+| `multica.task_run_outbox`、`multica.task_run_outbox_delivery_receipt` | Transaction | 永久 append-only Task event source 与终态投递 receipt；tenant+Run+event 复合外键；receipt 不复制 payload；当前 settlement 拒绝 accepted；未来跨 owner Inbox commit 须由可信 dispatcher 验证，源 DB 不独立证明；tenant FORCE RLS |
+| `multica.task_run_outbox_delivery` | Work | Run-local bounded queue，最多 1024 条 outstanding、7 天 TTL；tenant+Run+event 复合外键；独立 NOLOGIN 函数 owner 持有 DML，Run owner 仅调用固定函数；claim/retry/expiry 有短租约和有界批次 |
 | `multica.task_execution_run` | Transaction | immutable attempt + task/acceptance/profile/provider/HookSet/Loop/resource/ProjectEngineeringManifest snapshots；Schedule Run 只引用 Automation Rule/Occurrence ID/version；Worktree/repo refs 不设 FK |
 | `multica.task_execution_run_event` / `multica.task_execution_evidence` | Transaction | 独立状态维度、Schedule occurrence/Loop decision/Hook evaluation/override、每 Run 至多一条资源高水位汇总与脱敏证据索引；append-only + RLS |
 | `multica.task_execution_run_idempotency` | Work | actor-scoped CLI start replay mapping；30 天 TTL，不拥有 Run 身份 |
@@ -1065,6 +1070,8 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
+| v5.03 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.75/basic v6.74/data design v2.22；增加 source event 的 tenant+Run+event 复合外键；规定跨 owner Inbox 回执须由可信 dispatcher 认证且在其实现前保持 accepted 路径关闭 | 自审发现 schema 保存外部回执 ID 不能独立证明远端 commit，且原 event FK 未约束冗余 tenant/Run scope |
+| v5.02 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.74/basic v6.73/data design v2.21；定义 Task Outbox owner-local delivery Work、1024/Run backlog cap、lease/retry/TTL 与无高水位 reconciliation；终态 accepted 必须绑定接收 owner Inbox commit receipt；标明 dispatcher、DB 验证与 BI consumer 未完成 | Outbox source 已存在但无法恢复投递，且未来 transport 替换不能依赖 broker ACK 作为业务完成证据 |
 | v5.01 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.73/basic v6.72；规定 Outbox consumer 采用持久事件去重与 aggregate version fence，replay/reconciliation 不得越过尚未提交的事件推进游标 | 并发提交顺序不由 occurred_at 或随机 UUID 决定，修订消费顺序与漏事件风险合同 |
 | v5.00 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.72/basic v6.71；定义 Task lifecycle audit→schema v3 owner-local Outbox 原子触发、metadata/lifecycle 独立 version stream、无自由文本敏感内容及未部署/未接消费边界 | Run Task Card 的 audit 记录已有，但生命周期事件尚未形成可靠的跨 App owner Outbox source |
 | v4.99 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.71/basic v6.70；细化 lifecycle audit Worktree 选择：active execution relation 优先，匹配 focus 次之，无匹配 focus 时仅选唯一 current same-Run relation；缺失/多重关联不猜测；统一中性 hostless 会话提示与代码验证缺口 | 自审发现无焦点 Run 操作仍会丢失唯一任务 Worktree 审计关联 |
