@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=01bc7f4f2e9daf1305484de0a8ded178d43251314ae7047323f4c734746fcf52
+MERGE (self:File {path:"frontend/src/lib/search/globalSearch.ts"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (buildIndex:Function {name:"buildIndex", language:"typescript", visibility:"private"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (buildIndex)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 // =====================================================================
 // search/globalSearch.ts — CommandBar 统一搜索 (per 2026-10-01 OOB 指令)
 //   - 参考微信搜索: 顶部 search input + 下方 type filter chips
@@ -24,6 +34,7 @@ import {
   milestones,
   comments,
 } from "@/lib/seed";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 // ---------------------------------------------------------------------
 // Types
@@ -234,7 +245,7 @@ function buildIndex(): IndexEntry[] {
       id: `agent:${a.id}`,
       type: "agent",
       label: a.name,
-      subLabel: `${a.agent_kind} · ${a.status}`,
+      subLabel: `${agentKindDisplayLabel(a.agent_kind)} · ${a.status}`,
       href: `/agent-view?session=${encodeURIComponent(a.id)}`,
       tone: toneFor(a.status),
       score: 0,

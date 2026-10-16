@@ -1,7 +1,13 @@
 /*
-@cypher schema=1 source_sha256=bc640143e0de73d6f3ba2d1dee1a59a7c00bf1b6c37bcd662ea2535fe85cfdb9
+@cypher schema=1 source_sha256=a10f6fcc98a3ee3d1b0c2fea3f02cb2589616831e315a22748aed8028763c9c7
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.test.tsx"})
 MERGE (create:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::creates a Run-owned Task Card against the current authorized focus and refreshes the Run list",kind:"test"})
+MERGE (hostless:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::lists and creates hostless Run Task Cards without a Worktree focus",kind:"test"})
+MERGE (hostlessCancel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::allows a hostless Run Task Card to be cancelled without creating a Worktree focus",kind:"test"})
+MERGE (reviewRole:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::does not offer review decisions to an agent writer without reviewer roles",kind:"test"})
+MERGE (claimOwner:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::does not offer start to a different claim owner",kind:"test"})
+MERGE (rejectReasonTest:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::requires an accessible reason before rejecting a Task Card",kind:"test"})
+MERGE (legacyReplay:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::replays persisted schema v1 creates on the original Worktree route",kind:"test"})
 MERGE (retry:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::retries an uncertain create with the exact same idempotency key and body",kind:"test"})
 MERGE (scope:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::does not offer task creation without the current Run write scope",kind:"test"})
 MERGE (focus:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::blocks a retry if the focused Worktree changed after an uncertain create",kind:"test"})
@@ -18,12 +24,29 @@ MERGE (storeFactory:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore
 MERGE (storeScope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
 MERGE (storeTarget:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
 MERGE (api:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
+MERGE (legacyApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
+MERGE (transitionApi:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.transitionRunTaskCard",kind:"method"})
 MERGE (self)-[:DEFINES]->(create)
+MERGE (self)-[:DEFINES]->(hostless)
+MERGE (self)-[:DEFINES]->(hostlessCancel)
+MERGE (self)-[:DEFINES]->(reviewRole)
+MERGE (self)-[:DEFINES]->(claimOwner)
+MERGE (self)-[:DEFINES]->(rejectReasonTest)
+MERGE (self)-[:DEFINES]->(legacyReplay)
 MERGE (self)-[:DEFINES]->(retry)
 MERGE (self)-[:DEFINES]->(scope)
 MERGE (self)-[:DEFINES]->(focus)
 MERGE (create)-[:TESTS]->(panel)
 MERGE (create)-[:TESTS]->(api)
+MERGE (hostless)-[:TESTS]->(panel)
+MERGE (hostless)-[:TESTS]->(api)
+MERGE (hostlessCancel)-[:TESTS]->(panel)
+MERGE (hostlessCancel)-[:TESTS]->(transitionApi)
+MERGE (reviewRole)-[:TESTS]->(panel)
+MERGE (claimOwner)-[:TESTS]->(panel)
+MERGE (rejectReasonTest)-[:TESTS]->(panel)
+MERGE (legacyReplay)-[:TESTS]->(panel)
+MERGE (legacyReplay)-[:TESTS]->(legacyApi)
 MERGE (retry)-[:TESTS]->(panel)
 MERGE (scope)-[:TESTS]->(panel)
 MERGE (focus)-[:TESTS]->(panel)
@@ -49,11 +72,12 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.test.tsx",ty
  (cardFixture:Function {name:"cardFixture",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
  (clientFixture:Function {name:"clientFixture",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
  (closedTest:Function {name:"does not request or display tasks while Run Apps are unavailable",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+ (hostlessTest:Function {name:"lists and creates hostless Run Task Cards without a Worktree focus",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),(legacyReplayTest:Function {name:"replays persisted schema v1 creates on the original Worktree route",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
  (liveTest:Function {name:"renders authorized Run tasks while leaving task CLI disabled",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
  (createTest:Function {name:"creates a Run-owned Task Card against the current authorized focus and refreshes the Run list",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
  (retryTest:Function {name:"retries an uncertain create with the exact same idempotency key and body",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
- (f)-[:CONTAINS]->(runFixture),(f)-[:CONTAINS]->(contextFixture),(f)-[:CONTAINS]->(cardFixture),(f)-[:CONTAINS]->(clientFixture),(f)-[:CONTAINS]->(closedTest),(f)-[:CONTAINS]->(liveTest),(f)-[:CONTAINS]->(createTest),(f)-[:CONTAINS]->(retryTest),
- (contextFixture)-[:CALLS]->(runFixture),(clientFixture)-[:CALLS]->(cardFixture),(closedTest)-[:CALLS]->(contextFixture),(closedTest)-[:CALLS]->(clientFixture),(liveTest)-[:CALLS]->(contextFixture),(liveTest)-[:CALLS]->(cardFixture),(liveTest)-[:CALLS]->(clientFixture),(createTest)-[:CALLS]->(contextFixture),(createTest)-[:CALLS]->(clientFixture),(retryTest)-[:CALLS]->(contextFixture),(retryTest)-[:CALLS]->(clientFixture);
+ (f)-[:CONTAINS]->(runFixture),(f)-[:CONTAINS]->(contextFixture),(f)-[:CONTAINS]->(cardFixture),(f)-[:CONTAINS]->(clientFixture),(f)-[:CONTAINS]->(closedTest),(f)-[:CONTAINS]->(hostlessTest),(f)-[:CONTAINS]->(legacyReplayTest),(f)-[:CONTAINS]->(liveTest),(f)-[:CONTAINS]->(createTest),(f)-[:CONTAINS]->(retryTest),
+ (contextFixture)-[:CALLS]->(runFixture),(clientFixture)-[:CALLS]->(cardFixture),(closedTest)-[:CALLS]->(contextFixture),(closedTest)-[:CALLS]->(clientFixture),(hostlessTest)-[:CALLS]->(contextFixture),(hostlessTest)-[:CALLS]->(clientFixture),(legacyReplayTest)-[:CALLS]->(contextFixture),(legacyReplayTest)-[:CALLS]->(clientFixture),(liveTest)-[:CALLS]->(contextFixture),(liveTest)-[:CALLS]->(cardFixture),(liveTest)-[:CALLS]->(clientFixture),(createTest)-[:CALLS]->(contextFixture),(createTest)-[:CALLS]->(clientFixture),(retryTest)-[:CALLS]->(contextFixture),(retryTest)-[:CALLS]->(clientFixture);
 */
 
 import "fake-indexeddb/auto";
@@ -64,8 +88,9 @@ import {
   createTaskCardCreateRecoveryStore,
   taskCardCreateRecoveryScopeKey,
   taskCardCreateRecoveryTarget,
+  type PendingTaskCardCreate,
 } from "@/lib/run/taskCardCreateRecoveryStore";
-import { RUN_TASK_CARD_PAGE_SIZE, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope, type RunDirectoryApiClient, type RunTaskCardPage } from "@/lib/run/runDirectoryApi";
+import { RUN_TASK_CARD_PAGE_SIZE, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope, type RunDirectoryApiClient, type RunTaskCardLifecycleCommand, type RunTaskCardReviewCommand, type RunTaskCardPage } from "@/lib/run/runDirectoryApi";
 
 function runFixture(): EngineeringRun {
   return {
@@ -88,7 +113,7 @@ function cardFixture() {
     description: "Persisted service projection",
     priority: "high",
     labels: ["run-owned"],
-    lifecycle: { status: "pending", review_state: "not_required", active_worktree_id: null, version: 1, updated_at: "2026-10-02T00:00:00Z" },
+    lifecycle: { status: "pending", review_state: "not_required", active_worktree_id: null, claimed_by_user_id: null, claim_expires_at: null, version: 1, updated_at: "2026-10-02T00:00:00Z" },
     metadata_updated_at: "2026-10-02T00:00:00Z",
   };
 }
@@ -121,19 +146,50 @@ function contextFixture(): RunContextEnvelope {
       resolved_at: "2026-10-02T00:00:00Z", correlation_id: "10000000-0000-4000-8000-000000000007",
     },
     branch, engineering_run: run, focus, focus_version: "focus:v1",
-    capabilities: { run_owned_apps_available: true, execution_admission_available: false },
+    capabilities: { task_cards_available: true, run_owned_apps_available: false, execution_admission_available: false },
   };
 }
 
-function clientFixture() {
-  const page: RunTaskCardPage = { rows: [cardFixture()], limit: RUN_TASK_CARD_PAGE_SIZE, next_after: null };
+function clientFixture(card = cardFixture()) {
+  const page: RunTaskCardPage = { rows: [card], limit: RUN_TASK_CARD_PAGE_SIZE, next_after: null };
   const listRunWorkItems = vi.fn(async () => page);
   const createRunTaskCard = vi.fn(async (_context: RunContextEnvelope, _input: CreateRunTaskCardInput, _key: string) => cardFixture());
-  return { client: { listRunWorkItems, createRunTaskCard } as unknown as RunDirectoryApiClient, listRunWorkItems, createRunTaskCard };
+  const createLegacyRunTaskCard = vi.fn(async (_context: RunContextEnvelope, _input: CreateRunTaskCardInput, _key: string, _worktreeId: string) => cardFixture());
+  const transitionRunTaskCard = vi.fn(async (_context: RunContextEnvelope, _card: ReturnType<typeof cardFixture>, _input: RunTaskCardLifecycleCommand, _key: string) => cardFixture());
+  const reviewRunTaskCard = vi.fn(async (_context: RunContextEnvelope, _card: ReturnType<typeof cardFixture>, _input: RunTaskCardReviewCommand, _key: string) => cardFixture());
+  return { client: { listRunWorkItems, createRunTaskCard, createLegacyRunTaskCard, transitionRunTaskCard, reviewRunTaskCard } as unknown as RunDirectoryApiClient, listRunWorkItems, createRunTaskCard, createLegacyRunTaskCard, transitionRunTaskCard, reviewRunTaskCard };
 }
 
 function recoveryStoreFixture() {
   return createTaskCardCreateRecoveryStore(`test-task-card-recovery-${globalThis.crypto.randomUUID()}`);
+}
+
+function legacyPendingFixture(context: RunContextEnvelope): PendingTaskCardCreate {
+  const scopeKey = taskCardCreateRecoveryScopeKey(context);
+  const focus = context.focus;
+  const branch = context.branch;
+  const branchAuthorization = context.run_context.authorization.branch;
+  if (!scopeKey || !focus || !branch || !branchAuthorization) throw new Error("legacy recovery fixture requires its original bound Worktree context");
+  const authorization = context.run_context.authorization;
+  return {
+    schema_version: 1,
+    scope_key: scopeKey,
+    created_at_ms: Date.now(),
+    input: { title: "Recover v1 request", description: "exact old request", priority: "high", correlation_id: globalThis.crypto.randomUUID() },
+    idempotency_key: globalThis.crypto.randomUUID(),
+    target: {
+      tenant_id: context.run_context.tenant_id, actor_id: context.run_context.actor_id, actor_kind: context.run_context.actor_kind,
+      project_id: context.engineering_run.project_id, repository_id: context.engineering_run.repository_id!, branch_id: context.engineering_run.branch_id!,
+      engineering_run_id: context.engineering_run.engineering_run_id, worktree_id: focus.worktree_id,
+      context_version: context.run_context.context_version, focus_version: context.focus_version!,
+      project_authorization_binding_id: authorization.project.binding_id, project_authorization_version: authorization.project.version,
+      branch_authorization_binding_id: branchAuthorization.binding_id, branch_authorization_version: branchAuthorization.version,
+      run_authorization_binding_id: authorization.engineering_run.binding_id, run_authorization_version: authorization.engineering_run.version,
+      project_binding_id: focus.project_binding_id, project_binding_version: focus.project_binding_version,
+      worktree_binding_id: focus.binding_id, worktree_binding_version: focus.binding_version,
+      branch_version: branch.version, run_version: context.engineering_run.version, worktree_version: focus.version,
+    },
+  };
 }
 
 async function clickNewTaskCard() {
@@ -161,7 +217,7 @@ describe("RunTaskCardsPanel", () => {
 
     const create = await screen.findByRole("button", { name: "新建 Task Card" });
     expect(create).toBeDisabled();
-    expect(screen.getByText(/需要当前 Run 中具有 work-item:write 授权/)).toBeInTheDocument();
+    expect(screen.getByText(/需要当前 Run 的 work-item:write 授权/)).toBeInTheDocument();
     expect(fixture.createRunTaskCard).not.toHaveBeenCalled();
   });
 
@@ -172,6 +228,29 @@ describe("RunTaskCardsPanel", () => {
     expect(await screen.findByText("Real Run task")).toBeInTheDocument();
     expect(fixture.listRunWorkItems).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: /打开 CLI/ })).toBeDisabled();
+  });
+
+  it("lists and creates hostless Run Task Cards without a Worktree focus", async () => {
+    const fixture = clientFixture();
+    const context = contextFixture();
+    context.engineering_run = { ...context.engineering_run, repository_id: null, branch_id: null };
+    context.run_context.repository_id = null;
+    context.run_context.branch_id = null;
+    context.run_context.authorization.branch = null;
+    context.branch = null;
+    context.focus = null;
+    context.focus_version = null;
+    fixture.createRunTaskCard.mockResolvedValue({ ...cardFixture(), title: "Hostless card" });
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+
+    expect(await screen.findByText("Real Run task")).toBeInTheDocument();
+    await clickNewTaskCard();
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Hostless card" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
+
+    expect(await screen.findByText("Hostless card")).toBeInTheDocument();
+    expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
+    expect(fixture.createLegacyRunTaskCard).not.toHaveBeenCalled();
   });
 
   it("creates a Run-owned Task Card against the current authorized focus and refreshes the Run list", async () => {
@@ -212,6 +291,22 @@ describe("RunTaskCardsPanel", () => {
     fireEvent.click(retry);
     await waitFor(() => expect(fixture.createRunTaskCard).toHaveBeenCalledTimes(2));
     expect(fixture.createRunTaskCard.mock.calls[1]).toEqual(fixture.createRunTaskCard.mock.calls[0]);
+  });
+
+  it("replays persisted schema v1 creates on the original Worktree route", async () => {
+    const fixture = clientFixture();
+    fixture.createLegacyRunTaskCard.mockRejectedValueOnce(new Error("temporary network interruption"));
+    const context = contextFixture();
+    const recoveryStore = recoveryStoreFixture();
+    const pending = legacyPendingFixture(context);
+    await recoveryStore.saveIfAbsent(pending);
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "使用同一请求重试" }));
+
+    await waitFor(() => expect(fixture.createLegacyRunTaskCard).toHaveBeenCalledOnce());
+    expect(fixture.createLegacyRunTaskCard).toHaveBeenCalledWith(context, pending.input, pending.idempotency_key, pending.target.worktree_id);
+    expect(fixture.createRunTaskCard).not.toHaveBeenCalled();
   });
 
   it("blocks a retry if the focused Worktree changed after an uncertain create", async () => {
@@ -363,5 +458,102 @@ describe("RunTaskCardsPanel", () => {
     expect(await screen.findByText(/已超过安全重试期限/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用同一请求重试" })).toBeDisabled();
     expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
+  });
+
+  it("allows a hostless Run Task Card to be cancelled without creating a Worktree focus", async () => {
+    const fixture = clientFixture();
+    const context = contextFixture();
+    context.engineering_run = { ...context.engineering_run, repository_id: null, branch_id: null };
+    context.run_context.repository_id = null;
+    context.run_context.branch_id = null;
+    context.run_context.authorization.branch = null;
+    context.branch = null;
+    context.focus = null;
+    context.focus_version = null;
+    const recoveryStore = recoveryStoreFixture();
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStore} />);
+
+    await screen.findByText("Real Run task");
+    expect(screen.getByRole("button", { name: "领取到当前 Worktree" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "取消任务" }));
+
+    await waitFor(() => expect(fixture.transitionRunTaskCard).toHaveBeenCalledOnce());
+    expect(fixture.transitionRunTaskCard.mock.calls[0]?.[0]).toBe(context);
+    expect(fixture.transitionRunTaskCard.mock.calls[0]?.[2]).toMatchObject({ target_status: "cancelled", expected_version: 1 });
+    await waitFor(() => expect(fixture.listRunWorkItems).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Task Card「Real Run task」已更新，正在刷新列表。")).toBeInTheDocument();
+  });
+
+  it("does not offer review decisions to an agent writer without reviewer roles", async () => {
+    const context = contextFixture();
+    context.run_context.authorization.project.role = "agent";
+    context.run_context.authorization.engineering_run.role = "agent";
+    const card = {
+      ...cardFixture(),
+      lifecycle: {
+        ...cardFixture().lifecycle,
+        status: "in_progress",
+        review_state: "pending_review",
+        active_worktree_id: context.focus!.worktree_id,
+      },
+    };
+    const fixture = clientFixture(card);
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+
+    await screen.findByText("Real Run task");
+    expect(screen.queryByRole("button", { name: "批准审查" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "退回修改" })).not.toBeInTheDocument();
+    expect(screen.getByText("等待具有 Run 审查权限的成员处理。")).toBeInTheDocument();
+    expect(fixture.reviewRunTaskCard).not.toHaveBeenCalled();
+  });
+
+  it("does not offer start to a different claim owner", async () => {
+    const context = contextFixture();
+    const card = {
+      ...cardFixture(),
+      lifecycle: {
+        ...cardFixture().lifecycle,
+        status: "claimed",
+        active_worktree_id: context.focus!.worktree_id,
+        claimed_by_user_id: "10000000-0000-4000-8000-000000000099",
+        claim_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      },
+    };
+    const fixture = clientFixture(card);
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+
+    await screen.findByText("Real Run task");
+    expect(screen.queryByRole("button", { name: "开始处理" })).not.toBeInTheDocument();
+    expect(screen.getByText("此任务由其他成员领取，当前成员不能开始执行。")).toBeInTheDocument();
+    expect(fixture.transitionRunTaskCard).not.toHaveBeenCalled();
+  });
+
+  it("requires an accessible reason before rejecting a Task Card", async () => {
+    const context = contextFixture();
+    const card = {
+      ...cardFixture(),
+      lifecycle: {
+        ...cardFixture().lifecycle,
+        status: "in_progress",
+        review_state: "pending_review",
+        active_worktree_id: context.focus!.worktree_id,
+        claimed_by_user_id: "10000000-0000-4000-8000-000000000099",
+      },
+    };
+    const fixture = clientFixture(card);
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+
+    await screen.findByText("Real Run task");
+    fireEvent.click(screen.getByRole("button", { name: "退回修改" }));
+    const reason = screen.getByLabelText("退回原因");
+    expect(screen.getByRole("button", { name: "确认退回" })).toBeDisabled();
+    fireEvent.change(reason, { target: { value: "请补充独立验证证据" } });
+    expect(screen.getByRole("button", { name: "确认退回" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "确认退回" }));
+
+    await waitFor(() => expect(fixture.reviewRunTaskCard).toHaveBeenCalledOnce());
+    expect(fixture.reviewRunTaskCard.mock.calls[0]?.[2]).toMatchObject({
+      action: "reject", reason: "请补充独立验证证据", expected_version: 1,
+    });
   });
 });

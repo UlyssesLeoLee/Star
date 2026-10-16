@@ -1,8 +1,13 @@
+/*
+@cypher schema=1 source_sha256=48dcca1c5b1dcb950d0489a0454d650c0df0d55feedf3a4e6d0541ec3d869c89
+MERGE (self:File {path:"frontend/src/app/page.tsx"})
+@endcypher
+*/
 // =====================================================================
-// frontend/src/app/page.tsx — U5 (multica-style root redirect)
+// frontend/src/app/page.tsx — U5 (root redirect)
 //
-// The multica-style redesign consolidates 22 domain routes into 6
-// panel routes (per docs/frontend/design/ui-redesign-multica-style.md
+// The frontend redesign consolidates 22 domain routes into 6
+// panel routes (per frontend layout design specification
 // §2). The root path "/" now serves as a default landing redirect to
 // the new primary panel "/inbox" (notifications / @-mentions / audit
 // feed).

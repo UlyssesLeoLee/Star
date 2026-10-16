@@ -32,6 +32,7 @@ tracing = "0.1"
 # - star-pg-adapter 提供 healthcheck() 用于真实 PG 健康检查
 # - sqlx 提供 PgPool 类型 (connect_lazy 用于测试无需真 PG)
 star-context = { path = "../star-context" }
+domain-work-item = { path = "../domain-work-item" }
 domain-infrastructure = { path = "../domain-infrastructure" }
 star-pg-adapter = { path = "../star-pg-adapter" }
 sqlx = { workspace = true }

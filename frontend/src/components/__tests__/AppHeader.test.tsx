@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=368f109780c1d477436ec7a2806858a21ddbc6bbb95bc8314d5e37ec486bbd12
+MERGE (self:File {path:"frontend/src/components/__tests__/AppHeader.test.tsx"})
+@endcypher
+*/
 // =====================================================================
 // AppHeader.test.tsx — 顶栏测试 (per design §3 + §8.1)
 // =====================================================================
@@ -62,7 +67,7 @@ describe("AppHeader", () => {
     expect(screen.getByTestId("settings-gear")).toBeInTheDocument();
   });
 
-  it("marks the active tab by pathname + applies category color (per 2026-09-02 18:16 JST Jira 风格)", () => {
+  it("marks the active tab by pathname + applies category color (per 2026-09-02 18:16 JST)", () => {
     mockUsePathname.mockReturnValue("/sprint");
     renderWithI18n(<AppHeader />);
     const issuesTab = screen.getByTestId("tab-issues");
@@ -75,7 +80,7 @@ describe("AppHeader", () => {
     expect(issuesTab.className).toMatch(/border-blue-500/);
   });
 
-  it("applies different category colors per tab (per 2026-09-02 18:16 JST 推 Jira 风格)", () => {
+  it("applies different category colors per tab (per 2026-09-02 18:16 JST 推)", () => {
     // inbox=core (cyan), issues=work (blue), agents=agent (emerald), settings=system (amber)
     mockUsePathname.mockReturnValue("/inbox");
     renderWithI18n(<AppHeader />);
@@ -85,7 +90,7 @@ describe("AppHeader", () => {
     expect(screen.getByTestId("tab-issues").className).toMatch(/text-ink-dim/);
   });
 
-  it("renders 5 tab icon tiles with category color when active (per 2026-09-02 18:23 JST 推 Jira 风格 icon)", () => {
+  it("renders 5 tab icon tiles with category color when active (per 2026-09-02 18:23 JST 推 icon)", () => {
     mockUsePathname.mockReturnValue("/agents");
     renderWithI18n(<AppHeader />);
     // agents 是 agent 域, active icon tile 用 emerald-500/20 + border-emerald-500/50

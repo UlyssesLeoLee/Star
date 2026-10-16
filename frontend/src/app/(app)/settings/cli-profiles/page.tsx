@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=470c53ecd1a0d5477dc0fb95d052c2e4135a9783ba7ef6a2a52079f8e8a88061
+MERGE (self:File {path:"frontend/src/app/(app)/settings/cli-profiles/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // Star Frontend — CLI Profiles 设置页
@@ -24,8 +29,8 @@ interface CliProfile {
 const PROFILES: CliProfile[] = [
   { id: "claude", name: "Claude Code", kind: "cli", command: "claude", args: "--model claude-3-5-sonnet", env: "PATH=$PATH", worktreeBinding: "auto", enabled: true, hasApiKey: true },
   { id: "codex", name: "OpenAI Codex", kind: "cli", command: "codex", args: "--model gpt-4", env: "OPENAI_API_KEY", worktreeBinding: "auto", enabled: true, hasApiKey: true },
-  { id: "openclaw", name: "OpenClaw", kind: "api", command: "https://api.openclaw.dev/v1", args: "model=gpt-4", env: "OPENCLAW_API_KEY", worktreeBinding: "auto", enabled: false, hasApiKey: false },
-  { id: "hermes", name: "Hermes", kind: "api", command: "https://api.hermes.dev/v1", args: "model=hermes-2", env: "HERMES_API_KEY", worktreeBinding: "auto", enabled: false, hasApiKey: false },
+  { id: "openclaw", name: "OpenClaw", kind: "api", command: "https://provider-a.example.invalid/v1", args: "model=default", env: "OPENCLAW_API_KEY", worktreeBinding: "auto", enabled: false, hasApiKey: false },
+  { id: "hermes", name: "Hermes", kind: "api", command: "https://provider-b.example.invalid/v1", args: "model=default", env: "HERMES_API_KEY", worktreeBinding: "auto", enabled: false, hasApiKey: false },
   { id: "gemini", name: "Google Gemini", kind: "cli", command: "gemini", args: "", env: "GOOGLE_API_KEY", worktreeBinding: "auto", enabled: true, hasApiKey: true },
   { id: "aider", name: "Aider", kind: "cli", command: "aider", args: "--model gpt-4", env: "OPENAI_API_KEY", worktreeBinding: "auto", enabled: false, hasApiKey: true },
 ];
@@ -121,9 +126,9 @@ export default function CliProfilesPage() {
       <div className="rounded-md border border-[color:var(--color-info)]/30 bg-[color:var(--color-info)]/5 p-3 flex items-start gap-2 text-xs">
         <AlertCircle size={14} className="text-[color:var(--color-info)] flex-shrink-0 mt-0.5" />
         <div>
-          <div className="font-medium mb-1">关于 API Agent (OpenClaw / Hermes)</div>
+          <div className="font-medium mb-1">关于 API Agent 与本地 CLI Agent</div>
           <div className="text-[color:var(--color-text-dim)]">
-            OpenClaw 和 Hermes 通过 HTTP API 调用而非本地进程,需要对应的 API Key (在 <a href="/settings/api-keys" className="text-[color:var(--color-primary)] underline">API Keys 设置</a> 配置)。其他 4 个 (Claude/Codex/Gemini/Aider) 走本地 CLI 进程,需要系统已安装对应命令。
+            API Agent 通过 HTTP API 调用而非本地进程，需要对应的 API Key (在 <a href="/settings/api-keys" className="text-[color:var(--color-primary)] underline">API Keys 设置</a> 配置)。本地 CLI Agent 需要在运行环境中安装并配置对应命令。
           </div>
         </div>
       </div>

@@ -1,14 +1,14 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.27** (per 日本 IPA SEC 标准，补充 Run Task Cards bounded read/create UI、IndexedDB pending recovery、Run-local Engineering Loop controller 与 Schedule recurrence/lease adapter)
+> **Task Lifecycle 域 詳細設計書 v1.29** (Project/Run-owned Task Card list/create source slice and host-independent owner migration candidate)
 >
-> - 状态: 🟡 Draft v1.27 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3、9F1/9F2/9F3 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Schedule 已有 typed parser/materializer/PostgreSQL occurrence/lease adapter 并通过 disposable PostgreSQL 18.6 集成场景，候选槽和 DST 转换探测均有 32,768 步硬上限，disabled Rule 双层 fail closed、lease-expired audit 对齐旧 attempt/fence，domain release tests 26/26，但无生产 Rule write API、常驻 worker 或 Run admission；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、BI 或跨 Run fair scheduler；Run Task Cards 有条件式 bounded read/create UI/client 与有界 IndexedDB pending recovery 切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、宿主 provider/capability、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/consumer 仍开放)
+> - 状态: 🟡 Draft v1.29 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1/9E-4C2/9E-4C3、9F1/9F2/9F3 有条件式代码/schema 切片或设计收口；Run-local Rust Loop controller 已有 bounded state、snapshot guard、budget stop、独立验证与 drain receipt；Schedule 已有 typed parser/materializer/PostgreSQL occurrence/lease adapter 并通过 disposable PostgreSQL 18.6 集成场景，候选槽和 DST 转换探测均有 32,768 步硬上限，disabled Rule 双层 fail closed、lease-expired audit 对齐旧 attempt/fence，domain release tests 26/26，但无生产 Rule write API、常驻 worker 或 Run admission；Loop 尚未接 Run admission/Auth、CLI/provider/OS process、持久化/checkpoint、BI 或跨 Run fair scheduler；Run Task Cards 现有 Project/Run-owned bounded list/create UI/client 与有界 IndexedDB pending recovery 切片，旧 Tauri demo Task/fallback 已退役；目标 DB/RLS、宿主 provider/capability、生产 provisioner、ACL/provider、reservation lifecycle、catalog publisher 与 BI/consumer 仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v6.08 §50；`docs/basic-design.md` v6.05 §16.14-16.23
-> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.74；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.13
-> - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.6
+> - 关联总要件 / 基本设计: docs/requirements.md v6.66 §50；docs/basic-design.md v6.66 §16
+> - 关联 Group / Hook 详细设计: docs/design/DD-WORKTREE-GROUP-001.md v4.96；docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14
+> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.15
+> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.8
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
@@ -26,13 +26,13 @@
 | 项目 | 内容 |
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
-| 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v1.27 |
+| 文书名 | Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
+| 版本 | v1.29 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
 | 承認者 | Draft；v1.24 Schedule parser/adapter 本地 DB 证据与生产验收边界待评审 |
 | 关联 commit | (待生成) |
-| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.14 + `BD-MULTICA-TASK-001.md` v0.7 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
+| 关联文档 | SRS-MULTICA-TASK-001.md v0.15 + BD-MULTICA-TASK-001.md v0.8 + ADR-0026 v0.2 + DD-SHARED-TASK-001.md v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
 | 守门 | 19 项 + 26 派生规 跨域覆盖 |
 
@@ -1100,9 +1100,9 @@ Task Contract/Lifecycle/Relation 由 Work Item owner；TaskExecutionRun/Event/Ev
 
 #### 14.13.1 Run Task Cards bounded projection 与条件式创建 UI
 
-Run-scoped列表 API 是 UI 唯一任务读入口：`GET /api/v1/engineering-runs/{engineering_run_id}/work-items?limit=12[&after=<uuid>]`。客户端以当前宿主 Bearer 会话发出 no-store 请求，并检查 Project/Repository/Branch/Run tuple、Task Card/WorkItem identity alias、field bounds、重复 ID 与稳定游标。UI 在 Run Workspace 默认选中 Task Cards tab，只保留当前最多 12 条结果，每页响应最多 2 MiB、浏览最多 100 页；请求使用 15 秒 deadline，Run/Worktree route 变化后取消在途请求。服务端拒绝、未配置 provider 或 capability false 时显示明确状态，禁止读取 Worktree 兼容列表、旧演示 seed/Tauri MockDb 或其他 Run 任务。Tauri/browser-dev 不得回退到本地任务数组；provider 未配置时返回阻断错误。隔离测试只用 `test-*` Task ID。
+Run-scoped list API 是 UI 唯一任务读入口：GET /api/v1/engineering-runs/{engineering_run_id}/work-items?limit=12[&after=<uuid>]。身份与分页校验以 Project/Run、Task Card/WorkItem identity、字段界限、重复 ID 和游标为准；repository_id/branch_id 是可选上下文。UI 默认选中 Task Cards tab，只保留当前最多 12 条结果，每页响应最多 2 MiB、浏览最多 100 页；请求使用 15 秒 deadline，Run/Worktree route 变化后取消在途请求。服务端拒绝、未配置 provider 或 capability false 时显示明确状态，禁止读取 Worktree 兼容列表或旧演示 fallback。
 
-创建入口仅在 Run Apps capability 可用、`run_context.granted_scopes` 包含 `work-item:write` 且当前 Project/Branch/Run/未归档 Worktree tuple 一致时启用。请求经现有 `POST /api/v1/worktrees/{worktree_id}/work-items`，提交 bounded title（最多 500 字符）、description（最多 20,000 字符）、priority、correlation ID 与 `Idempotency-Key`；客户端不把 Run owner 身份当可信写入值。服务端从已授权 Worktree/Run binding 推导 Project/Repository/Branch/EngineeringRun，在同一事务内重验 actor scope、Project/Run writer grant，并写 Task metadata、lifecycle、Worktree association、审计和幂等响应；`2026-10-02-task-run-owner.sql` 的 `AFTER INSERT` trigger 为同一 metadata 写 Run Outbox。响应必须保持 `task_card_id == work_item_id`、type/title 与请求一致。
+创建入口仅在 Run Apps capability 可用且 run_context.granted_scopes 包含 work-item:write 时启用。请求经 POST /api/v1/engineering-runs/{engineering_run_id}/work-items，携带 Project/Run identity、可选 focus_worktree_id、bounded Task payload、correlation ID 与 Idempotency-Key。服务端复验 actor 的 Project/Run grants 与 Run 当前状态；focus 存在时必须绑定同一 Project/Run。owner transaction 持久化 metadata/lifecycle/可选 Worktree association/audit/idempotency，Run-owner migration trigger 写 schema v2 Outbox。客户端 POST 前在 IndexedDB 保存精确 body/key 和 tenant/actor/Project/Run、授权、binding 与 focus snapshot；上限为每 actor/Run 一条未决请求和全局 32 条，29 天后禁止自动重放，当前 target 不匹配或过期要求用户先核对列表并显式清除。禁止保存凭据；读写失败 fail closed。本机浏览器数据未加密且可能被清理，不承诺 exactly-once 或跨设备恢复。
 
 若 POST 返回不确定错误，客户端在发送前把完整 body、Idempotency-Key、created_at、scope 与原 Project/Repository/Branch/Run/Worktree target 保存到 IndexedDB；一个 tenant/actor/Project/Run scope 只允许一条未决创建，全 store 最多 32 条。记录只在当前 RunContext 的 tenant/actor、authorization binding ID/version、Project binding、Worktree binding ID/version、context/focus version 与原目标完全一致时重试；焦点或授权变化时禁止向新 Worktree 重放。记录 29 天后禁止重试，用户须先核对 Run Task Cards 列表并显式清除。服务端 `multica.task_command_idempotency` retention 为 30 天，29 天是客户端安全窗口，不扩展服务端契约。存储读取/写入失败时创建入口 fail closed，且不保存认证凭据；本机 WebView IndexedDB 保存任务正文/描述但本切片不加密，浏览器清理/用户清除数据可能丢失记录，因此不能承诺 exactly-once 或跨设备恢复。成功后删除本地记录并回到第一页刷新 Run owner 投影；若删除失败，保留同 body/key 供服务端幂等回放对账。此代码只实现条件式 Task Card create UI/client；根 `Providers` 尚未注入可信 `RunDirectoryHostSession`，RunContext `run_owned_apps_available` 与 `execution_admission_available` 固定为 false，Task Owner migration、实际应用身份 grants/RLS 和目标数据库尚未验收，因此生产页面不会开放写入。没有 mock/seed/Worktree task-list fallback。卡内 CLI 在 Runtime/OS sandbox、权限和资源复验、取消/恢复、独立验证与结果回写闭环完成前不得启用。
 
@@ -1113,6 +1113,16 @@ Run-scoped列表 API 是 UI 唯一任务读入口：`GET /api/v1/engineering-run
 签字栏:
 | 1 | 架构负责人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-11 | 🟢 接受 per 2026-09-11 20:50 JST 拍板 |
 | 2-5 | SRE / 平台 / 评审 / PM | 同上 | 同上 | 🟢 per 守门 #14 v3 Mavis 临时代签 |
+
+#### 14.13.2 Project/Run-owned Task Card list/create
+
+Task Card 的 canonical owner 为 `(tenant_id, project_id, engineering_run_id)`；远端 Repository/Branch 与本地 Worktree 均为可选上下文，不参与 owner 身份或基础授权。Run 可以没有宿主身份，且没有 Worktree focus 时仍可读写本阶段支持的 Task Card list/create。产品导航固定为 Project → Engineering Run → Worktree → Branch；Branch 是 Worktree 下的本地 checkout ref/state 叶节点。
+
+Run-scoped API 为 `GET/POST /api/v1/engineering-runs/{engineering_run_id}/work-items`。服务端以认证 actor、当前 Project membership、显式 Run grant 与非归档 Run 为准，忽略请求体以外任何客户端声明的授权事实；POST 中的 Project/Run identity 必须与 route 授权结果一致。可选 `focus_worktree_id` 必须在同一 Project/Run 有效 binding 中。Repository-scoped AI Task payload 在没有 Repository owner context 时拒绝，不得隐式补值。
+
+POST 的 REST scope preflight transaction 限时 5 秒、锁等待 1 秒，owner write transaction 也使用有界 statement/lock deadline；GET 的授权与分页读取限时 3 秒、锁等待 1 秒。写事务行锁顺序固定为 Project role → Run/revision → Run role → 可选 Worktree/Project/Run binding → actor/key idempotency advisory lock → Task metadata/lifecycle/association/audit/Outbox。旧 Worktree 路由只允许先做无锁 scope hint；拿到 Project/Run 授权锁后，必须重读并锁定当前 binding，再进入 Task 写入。该顺序约束用于降低并发写入的锁反转风险，仍须由目标 PostgreSQL 并发/回滚验收证明。创建事务写入 Task metadata、lifecycle current、可选 Worktree relation、append-only lifecycle audit、actor-scoped idempotency receipt 和 schema-v2 Outbox；客户端 pending recovery 以 tenant/actor/Project/Run 为 scope，保持原始 body/key 与授权快照，限制存储量和重放时窗。遗留未归属 Task 保持未归属，不做启发式回填；旧 Worktree API 只作为兼容入口，仍需从当前 Worktree binding 解析 Run。
+
+本阶段只提供 Run-scoped list/create。Worktree lifecycle/review 路由仍要求显式 Worktree binding；Run-owned transition/review、Schedule、CLI 执行及生产 capability 不在此切片内。Migration 只是未应用的 source candidate，目标 DB、app-role grants、RLS、并发/回滚和 Rust/HTTP/frontend 验收均未完成，因此生产能力保持 fail closed。
 
 修订履历:
 | v0.1 | 2026-09-11 | Ulysses — Mavis 接手**审核** | 初版（5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 W-T-M 100% + 6 API + 30+ 测试）| 2026-09-11 20:50 JST Ulysses 拍板 |
@@ -1155,3 +1165,5 @@ Run-scoped列表 API 是 UI 唯一任务读入口：`GET /api/v1/engineering-run
 | v1.25 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 自审补强 32,768 候选槽/DST 探测硬上限、disabled Rule 双层 fail-closed、lease-expired event 的旧 attempt/fencing generation 语义与 domain release 26/26；同步 Task SRS v0.12、BD v0.5、根要求 v5.56、基本设计 v5.53/Data Design v0.6；保留生产 API/worker/Run/Auth/Outbox/BI/目标 DB 阻断门 | 最终源码复核发现 DST transition scan 需独立硬上限，并收紧 Schedule 安全与审计契约 |
 | v1.26 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Cards 从只读代码切片更新为带 `work-item:write`/Run focus 检查的条件式创建；固定 POST route、server-derived owner、task/lifecycle/association/audit/idempotency/triggered Outbox 原子边界与面板存活期间的同目标重试，并记录跨重挂载恢复仍未实现；同步 SRS v0.13、BD v0.6、根要求 v6.08、基本设计 v6.05 和 Group DD v4.74；保留 host/capability/target DB/RLS/CLI blockers | 完成与 Worktree checkout 焦点绑定的 Task Card create UI/client slice |
 | v1.27 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 POST 前 IndexedDB pending recovery；明确 actor/Run isolation、exact binding/authorization snapshot、32 条 store cap、29 天客户端安全窗口、超期/不匹配人工 reconcile、浏览器清理与未加密 local payload 的边界；成功清理失败时保留原 key 供 replay；同步 SRS v0.14、BD v0.7、requirements v6.09、basic design v6.06、Group DD v4.75 与 plan v6.42，保留生产 host/DB/RLS/CLI blockers | 完成 Run Task Card uncertain create 的 remount/reload recovery slice |
+| v1.28 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.13.2 Project/Run-owned Task Card list/create 契约与宿主独立 migration source；规定可选 Worktree focus、事务内 Project/Run grant 复验、legacy rows 不回填、schema v2 Outbox 与仍关闭的 Run lifecycle/Schedule/CLI；同步 SRS v0.15、BD v0.8、requirements/basic v6.66、Group DD v4.96、plan v6.92；目标 DB/RLS 与代码验证未完成 | ERUN-P3.2 hostless Task Card owner source slice 与架构文档对账 |
+| v1.29 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 统一 Task owner 写入锁顺序为 Project role → Run/revision → Run role → optional Worktree binding → idempotency advisory → Task rows；legacy Worktree hint lookup 改为无锁，授权后重读并锁定当前 binding；同步 Group DD v4.96 与计划 v6.93；记录并发/DB 验收仍未完成 | 自审发现 owner adapter 在 Project/Run/binding 授权顺序存在锁反转风险 |

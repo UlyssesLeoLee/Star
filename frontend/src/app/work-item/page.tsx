@@ -1,7 +1,12 @@
+/*
+@cypher schema=1 source_sha256=1d119243350fd5386fd99ddcfdcb4b728e19346274efd3a340758dd63f1397a4
+MERGE (self:File {path:"frontend/src/app/work-item/page.tsx"})
+@endcypher
+*/
 // =====================================================================
 // work-item/page.tsx — U2 改造: 全部 work-item 列表 → 重定向到 /issues
 // =====================================================================
-// 旧页面是 work-item 列表 (per docs/frontend/design/ui-redesign-multica-style.md §2),
+// 旧页面是 work-item 列表 (per 前端布局设计说明 §2),
 // 现在 issues 主面板 (Kanban/List/Tree/Sprint) 已实装, 列表功能 100% 覆盖。
 // 为了符合"6 路由吸收 22 路由"原则, 这里 redirect 到 /issues (per §2 6 路由表)。
 //

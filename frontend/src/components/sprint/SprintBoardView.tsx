@@ -1,7 +1,12 @@
+/*
+@cypher schema=1 source_sha256=b57f39a2294da7ff8ffa5d3cd11cfebbcde7cee9a091f3295de2c947eecfab2c
+MERGE (self:File {path:"frontend/src/components/sprint/SprintBoardView.tsx"})
+@endcypher
+*/
 "use client";
 
 /**
- * SprintBoardView — Sprint 页面 Jira 范式重写 (per 2026-09-05 19:32 JST 拍板)
+ * SprintBoardView — Sprint 页面看板视图重写 (per 2026-09-05 19:32 JST 拍板)
  *
  * 布局 (神作级, 色彩心理学 + 平面设计 4 律):
  *   - 顶部 action bar: 搜索 + 创建 Sprint 按钮 (主操作, 电光青霓虹)

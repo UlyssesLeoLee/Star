@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=edc30dca9329c2ae66f7300452b6204e0ecb23ea8a91dd0c3678ed7fa03194c6
+MERGE (self:File {path:"frontend/src/lib/redirects.shim.cjs"})
+@endcypher
+*/
 // =====================================================================
 // frontend/src/lib/redirects.shim.cjs
 //
@@ -31,7 +36,7 @@ const LEGACY_REDIRECTS = [
   { source: "/workflow", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/relation", destination: "/projects?tab=worktrees", permanent: false },
   // /canvas/:id 不在 legacy redirect 列表 (per 2026-09-04 canvas e2e 守门 prerequisite):
-  //   app/canvas/[id]/page.tsx (CanvasView Miro 详情页) 是设计文档意图主入口.
+  //   app/canvas/[id]/page.tsx (CanvasView 详情页) 是设计文档意图主入口.
   //   跟 src/lib/redirects.ts 注释一致, 同步删除.
 
   // ── /sprint sink (per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint) ──

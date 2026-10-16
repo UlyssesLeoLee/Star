@@ -1,10 +1,11 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.18 (2026-10-12)
+> **文档版本**: v2.20 (2026-10-16)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
+> | v2.20 | 2026-10-16 | 明确 Task Run Outbox 的 occurred_at/UUID 不是提交顺序游标；记录下游持久去重、aggregate version fencing、安全回放/对账要求，并保留迁移/consumer 未验收边界 | Mavis 接手审核 |
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 排期调整(V2 候选) / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
 > | v0.3 | 2026-10-02 | 增加 Phase 9F2 automation Schedule rule/occurrence durable substrate 与 W/T/M/RLS 实现对账；目标 DB migration 尚未部署 | Mavis 接手审核 |
@@ -167,6 +168,7 @@
 |---|---|---|---|---|
 | v2.16 | 2026-10-12 | Add §4.13.23 for the provider-neutral admission quarantine Transaction receipt, W/T/M classification, deployment+tenant FORCE RLS, append-only grants, exact-wire digest, and unverified migration/runtime gates. | D16 adds durable poison metadata without retaining payload bodies. |
 | v2.17 | 2026-10-12 | Add D17 Transport Profile SCD2 Master and append-only Audit/Outbox Transaction classification (W/T/M=0/2/1); specify dual-scope FORCE RLS, trigger-emitted facts, least-privilege roles, secret exclusion, and disposable PostgreSQL/SQLx evidence while retaining target DB/identity gates. | D17 profile Master/resolver slice passed the isolated PostgreSQL gate. |
+| v2.19 | 2026-10-16 | Classify the Task Run Outbox schema v3 lifecycle stream as the existing append-only Transaction table with separate metadata/lifecycle aggregate versions; record same-transaction audit trigger, bounded payload and unverified migration/RLS/consumer gates. | Run Task Card lifecycle mutations need a durable event source for later owner consumers and BI/Benchmark projections. |
 | v2.18 | 2026-10-12 | Add D18 Platform Messaging durable log W/T/M classification, bounded wire/lease/retention and permanent receipt facts; record FORCE RLS, concurrent exact-append and storage-only verification boundary. | D18 disposable PostgreSQL 18.6 runner passed 77/77. |
 | **Business Truth** | 业务事实,影响决策 | PostgreSQL(主事务表) | 低频,受事务约束 | `worktree.worktree`(Business 列), `agent_session.agent_session`, `feedback.feedback`, `validation_result.validation_result` 等 |
 | **Observed Runtime State** | 高频本地状态,非业务事实 | PostgreSQL(独立 Projection 表,与主表 1:N) | 高频,异步 | `worktree.worktree_status_observed`, `agent_session.agent_process_status_observed`, `validation_result.test_progress_observed` |
@@ -6002,3 +6004,11 @@ Migration: `db/migrations/2026-10-12-platform-native-transport-log.sql`.
 | `platform_transport.receipt_outbox` | T | Same-transaction, metadata-only receipt event for independent consumers | Append-only; no wire, token, credential, or secret; no TTL in D18 | FORCE deployment+tenant RLS; SECURITY DEFINER trigger append |
 
 D18 adds W/T/M=2/2/1 (all five new tables classified). PostgreSQL 18.6 disposable runner passed 77/77 steps, including migration double-apply, fixed-path/routine grants, FORCE RLS, WORM/metadata-only checks, append/replay/hash conflict, lease-fenced ACK, tenant isolation, payload cap/quota, NULL purge-limit rejection, terminal purge/permanent replay, and two concurrent sessions for one producer identity. Both sessions succeeded (one new acceptance and one exact replay); postconditions found one Work row, one accepted receipt, one Outbox row, `next_sequence=2`, and one wire-length accounting update. The runner stopped PostgreSQL and made no Multipass inventory change. It started no NATS server and compiled no Rust. SHA-256 must be computed over exact wire bytes by future trusted Rust code; PostgreSQL validates the 32-byte input but does not independently hash the payload. `app.platform_*` GUCs are call context only; mTLS/credential verification and binding to service identity must occur in the trusted Rust server, while production database grants restrict the runtime role to that workload. Target database identity/grants, Rust gRPC/mTLS service, profile provisioning, consumer/BI/Benchmark integration, crash recovery and scale/performance remain unverified. D18 is not an NATS replacement release.
+
+## 4.13.26 — Task Run lifecycle Outbox v3 (Transaction)
+
+| Table | W/T/M primary class | Owner and purpose | Retention / mutation | RLS and runtime access |
+|---|---|---|---|---|
+| `multica.task_run_outbox` | T | Existing append-only Task owner Outbox; metadata events use `aggregate_type=metadata`, lifecycle events use `aggregate_type=lifecycle` with independent aggregate versions and schema v3 | Append-only; no payload rewrite or raw Task body/rejection reason; delivery state is not stored here | Existing tenant FORCE RLS and actor-scoped insert policy; lifecycle audit trigger writes within the same Task owner transaction |
+
+This is a schema extension to one existing Transaction table; it adds no Work or Master table. Unique event identity is fenced by `(tenant_id, work_item_id, aggregate_type, aggregate_version)`. The lifecycle audit trigger resolves the current Project/Run owner and status snapshot and appends a compact event; any failure rolls back the Task lifecycle write and audit. `occurred_at` and UUID `event_id` are not a commit-order cursor; consumers need durable event-ID dedupe plus per-aggregate version fencing and safe replay/reconciliation. The migration source has not been applied to PostgreSQL, and the trigger/RLS/grants/rollback/concurrency behavior remains unverified. No Outbox delivery worker, consumer Inbox, BI/Benchmark projection, or cross-App consumer is part of this slice.

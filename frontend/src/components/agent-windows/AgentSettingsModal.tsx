@@ -1,14 +1,25 @@
+/*
+@cypher schema=1 source_sha256=7936d8644fcc6a91d3549dd5c5f39a061c81f3e76f84aba18ab7e0d9f2a53f6a
+MERGE (self:File {path:"frontend/src/components/agent-windows/AgentSettingsModal.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentSettingsModal:Function {name:"AgentSettingsModal", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (self)-[:DEFINES]->(agentSettingsModal)
+MERGE (agentSettingsModal)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
-// AgentSettingsModal — Agent LLM API Key 设置弹窗 (per 2026-09-02 02:49 JST Ulysses 拍板)
+// AgentSettingsModal — Agent LLM API Key 设置弹窗
 // =====================================================================
 // 触发:
 //   - WindowsTabBar 每个 tab 旁边的齿轮按钮 (e.stopPropagation 防冒泡到 tab select)
 //
 // 职责:
 //   1. 弹 modal, 显示当前 agent (CliTab) 的 LLM API key 状态
-//   2. 用户选 provider (openai / claude / gemini / minimax 4 必备 + anthropic/hermes/openclaw 兼容)
+//   2. 用户选择已配置的 API provider
 //   3. 用户选 agent 维度 (cli_profile_id + agent_kind + agent_id 都可选)
 //   4. 选存储模式 (encrypted_rust AES-256-GCM / environment_var 沿用现有 /settings/api-keys)
 //   5. POST /api/api-keys 提交 (走现有 endpoint + body 扩 3 字段)
@@ -25,7 +36,7 @@
 //   2. 真实 key 校验 (mock 直接返 success, 真后端 401 走 audit)
 //   3. Test connection 按钮 (per key "ping" provider 校验有效性) — Phase 2+
 //   4. Provider 默认 base_url 配置 (OpenAI-compatible 自定义 endpoint) — Phase 2+
-//   5. minimax 没有具体 spec 文档, 4 必备之一先用通用 Bearer 格式占位 — Phase 2+ 跟 provider 实装
+//   5. 未覆盖 provider 的协议细节时, 先使用通用 Bearer 格式占位 — Phase 2+
 // =====================================================================
 
 import { useEffect, useState, useCallback } from "react";
@@ -38,6 +49,7 @@ import {
 } from "lucide-react";
 import type { CliTab } from "./WindowsTabBar";
 import type { ApiKey, ApiKeyCreateRequest } from "@/mocks/schemas/cli";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 // ---- types ----
 export interface AgentSettingsModalProps {
@@ -52,21 +64,21 @@ export interface AgentSettingsModalProps {
 type Provider = ApiKey["provider"];
 type StoreMode = "encrypted_rust" | "environment_var";
 
-// 4 必备 provider (per 2026-09-02 02:49 JST 拍板)
+// 主流 provider 集合
 const REQUIRED_PROVIDERS: Provider[] = ["openai", "claude", "gemini", "minimax"];
 // 完整 8 provider 列表
 const ALL_PROVIDERS: Provider[] = [
-  "openai", "claude", "gemini", "minimax",      // 4 必备
-  "anthropic", "openclaw", "hermes", "google",  // 兼容旧
+  "openai", "claude", "gemini", "minimax",
+  "anthropic", "openclaw", "hermes", "google",  // 兼容标识
 ];
 const PROVIDER_LABEL: Record<Provider, string> = {
   openai:    "OpenAI (GPT-4o / o1 / o3)",
   claude:    "Anthropic Claude (3.5 / 4 Sonnet/Opus)",
   gemini:    "Google Gemini (2.0 Flash / Pro)",
-  minimax:   "minimax (m2.7 / m-large)",
+  minimax:   "MiniMax (m2.7 / m-large)",
   anthropic: "Anthropic (legacy alias)",
-  openclaw:  "OpenClaw (CLI tool, not LLM)",
-  hermes:    "Hermes (CLI tool, not LLM)",
+  openclaw:  "OpenClaw (Agent service)",
+  hermes:    "Hermes (Agent service)",
   google:    "Google AI (legacy alias)",
 };
 const PROVIDER_DEFAULT_ENV: Partial<Record<Provider, string>> = {
@@ -269,7 +281,7 @@ export function AgentSettingsModal({ open, onClose, tab, tenantId = "tenant-phys
             <div>
               <div className="font-medium mb-1">LLM API Key 设置</div>
               <div className="text-[10px] text-[color:var(--color-text-dim)] space-y-0.5">
-                <div>per 2026-09-02 02:49 JST 拍板: <strong>4 必备 provider</strong> = openai / claude / gemini / minimax</div>
+                <div><strong>常用 API provider</strong> 具有独立配置项，兼容项沿用现有存储标识。</div>
                 <div>每 agent 分别填不同 key, 跟 CLI profile + agent_kind 双重绑定 (均可选)</div>
                 <div>存储双模式: 🔒 Encrypted (AES-256-GCM) / 🌐 Env Var</div>
               </div>
@@ -334,7 +346,7 @@ export function AgentSettingsModal({ open, onClose, tab, tenantId = "tenant-phys
                             ? "bg-[color:var(--color-primary)]/15 text-[color:var(--color-primary)] border border-[color:var(--color-primary)]/30"
                             : "bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]",
                         )}>
-                          {k.provider}{isProviderRequired(k.provider) ? " · 必备" : ""}
+                          {PROVIDER_LABEL[k.provider]}{isProviderRequired(k.provider) ? " · 常用" : ""}
                         </span>
                         {k.agent_id && (
                           <span className="text-[9px] px-1 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] font-mono">
@@ -348,7 +360,7 @@ export function AgentSettingsModal({ open, onClose, tab, tenantId = "tenant-phys
                         )}
                         {k.agent_kind && (
                           <span className="text-[9px] px-1 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] font-mono">
-                            kind={k.agent_kind}
+                            kind={agentKindDisplayLabel(k.agent_kind)}
                           </span>
                         )}
                       </div>

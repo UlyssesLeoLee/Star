@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=304bce187c7724a41622ad000cc0a51d60795ab78cab6b8dfea85ca08a8265ec
+MERGE (self:File {path:"frontend/src/app/layout.tsx"})
+@endcypher
+*/
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -15,10 +20,10 @@ import { OnboardingGuard } from "@/components/OnboardingGuard";
 
 // ── 3 套字体策略 (per 9/5 14:41 JST 用户拍板 q2-fonts_opt1) ──
 //
-// 选 system 字体栈而非 next/font Google, 原因 (per 9/5 14:48 JST 实测):
+// 选 system 字体栈而非远程字体加载, 原因 (per 9/5 14:48 JST 实测):
 //   - build-time fonts.gstatic.com ECONNRESET (Noto Serif JP 87 子集全失败)
 //   - next/font fallback 不抛错但产出空字体, 实际"灵魂"被掏空
-//   - system 字体栈含 PingFang SC / Microsoft YaHei / Yu Mincho, 中日文足够"日漫感"
+//   - system 字体栈含常见系统中文与日文字体, 中日文足够"日漫感"
 //   - 0 网络外联, 守门 #1 v1 + 守门 #5 一并满足
 //
 // 真正的"日漫灵魂" 80% 来自 Hero 渐变 + 3D 漂浮核心 + 切角玻璃 + 排版密度,

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=0f10faaf624846601ab3e209cc85649ee146c2e3c6b8842f7f151972672ee304
+MERGE (self:File {path:"frontend/src/components/PanelPlaceholder.tsx"})
+@endcypher
+*/
 // =====================================================================
 // PanelPlaceholder — U1 占位卡片 (per design §5 + §8.1 + 任务要求)
 // =====================================================================
@@ -64,8 +69,7 @@ export function PanelPlaceholder({
         <div className="text-sm text-ink-dim leading-relaxed">
           This panel is a <span className="text-accent font-mono">U1 placeholder</span>.
           Real implementation is owned by{" "}
-          <span className="text-ink font-mono">{owner}</span> (per design{" "}
-          <span className="font-mono">ui-redesign-multica-style.md §8.1</span>).
+          <span className="text-ink font-mono">{owner}</span>.
           SubNav 180px sticky sidebar will appear here for{" "}
           <span className="font-mono">/projects /agents /analytics</span> per §4.
         </div>

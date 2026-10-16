@@ -1,8 +1,13 @@
+/*
+@cypher schema=1 source_sha256=60f5ffeb46a66392daf43a3a1097cefe3db7f5f499c54c7825d5507b10675e07
+MERGE (self:File {path:"frontend/src/components/StartFromPicker.tsx"})
+@endcypher
+*/
 // =====================================================================
 // StartFromPicker.tsx — Start-from Picker 4 选 1 UI (per ULYS-194 §3.3)
 //
 // 实现 spec FR-ORCA-009 描述的 4 tab UI:
-//   1. GitHub (RemoteBranch) — origin/main, origin/HEAD, 远程其它分支
+//   1. RemoteBranch — origin/main, origin/HEAD, 远程其它分支
 //   2. Existing (LocalBranch) — 已存在 worktree 的 branch
 //   3. Local   (RepoBase)    — 用户手动选的本地路径
 //   4. Empty   (CommitSha)   — 空白起点 (sentinel)
@@ -191,7 +196,7 @@ export function StartFromPicker({
     return [
       {
         id: "github",
-        label: "GitHub",
+        label: "远程分支",
         count: c?.github_branches.length ?? 0,
       },
       {

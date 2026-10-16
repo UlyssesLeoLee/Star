@@ -1,3 +1,9 @@
+/*
+@cypher schema=1 source_sha256=75a2cd0d73d445387b91d7e83bd57a00d181777c779862313a79543895843655
+MERGE (self:File {path:"frontend/src/lib/store.ts"})
+@endcypher
+*/
+
 // =====================================================================
 // 全局 in-memory store + 操作 API + persist
 // =====================================================================
@@ -208,7 +214,7 @@ interface StoreState {
   transitionMilestone: (id: string, newDueDate: string) => void;  // ISO8601
   transitionSprint:    (id: string, newStart: string, newEnd: string) => void;
 
-  // Sprint Jira-范式 7 动作 (per 2026-09-05 19:32 JST 拍板: Sprint 对标 Jira, 估 1.5-2M tokens)
+  // Sprint 看板的 7 个生命周期动作
   // 状态机: planned → active → completed; cancelled 仅 planned 可达
   createSprint: (input: { name: string; goal: string; start_date: string; end_date: string; capacity_points: number; project_id?: string }) => string; // return id
   renameSprint: (id: string, name: string, goal: string) => void;
@@ -250,7 +256,7 @@ interface StoreState {
     visibility?: Project["visibility"];
     owner_id?: Uuid;
     member_count?: number;
-    kanbanTemplate?: "ipa-vmodel" | "jira-simplex" | "sprint-flat";
+    kanbanTemplate?: "ipa-vmodel" | "kanban-simplex" | "sprint-flat";
     initialPhaseCount?: number;
     defaultLocale?: "ja" | "zh-CN" | "en";
     description?: string;
@@ -690,7 +696,7 @@ const initialState = (set: any, get?: any): StoreState => ({
       sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, start_date: newStart, end_date: newEnd } : sp),
     })),
 
-  // ---- Sprint Jira-范式 7 动作 (per 2026-09-05 19:32 JST 拍板) ----
+  // ---- Sprint 看板的生命周期动作 ----
   // 状态机: planned → active → completed; cancelled 仅 planned 可达
   createSprint: (input) => {
     const id = `sprint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

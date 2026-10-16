@@ -1,5 +1,10 @@
+/*
+@cypher schema=1 source_sha256=702cc733fe2afbaa7fc13e6b8753cf47445c53e9e71ac3a9acfd0b463074855f
+MERGE (self:File {path:"frontend/src/components/SubNav.test.tsx"})
+@endcypher
+*/
 // =====================================================================
-// SubNav.test.tsx — U2 SubNav 4 测试 (per ui-redesign-multica-style.md §4)
+// SubNav.test.tsx — U2 SubNav 4 测试 (per 前端布局设计说明 §4)
 // =====================================================================
 // 4 个测试 (per spec):
 //   1. 渲染所有 items (label + href)
@@ -57,7 +62,7 @@ describe("SubNav (U2)", () => {
     expect(screen.getByTestId("subnav")).toBeTruthy();
   });
 
-  // ---- Test 2: active 状态 (per 2026-09-02 16:13 JST Jira 风格扩展) ----
+  // ---- Test 2: active 状态 (per 2026-09-02 16:13 JST 扩展) ----
   it("applies category-colored active styling (default category=core → cyan-500)", () => {
     renderWithI18n(<SubNav items={items} activeId="list" />);
     const active = screen.getByTestId("subnav-item-list");

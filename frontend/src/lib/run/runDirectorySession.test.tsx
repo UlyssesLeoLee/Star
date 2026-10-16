@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0a3e869665733a2c36726ef018d0f2a1b40e7af828e24d998e8908a447d4a5d1
+@cypher schema=1 source_sha256=2d49617fb9cdf380a09da4660855090dfd1e5ae64d7e580ff22679a7316e0366
 MERGE (self:File {path:"frontend/src/lib/run/runDirectorySession.test.tsx"})
 MERGE (provider:Symbol {id:"frontend/src/lib/run/runDirectorySession.tsx::RunDirectoryProvider", kind:"function"})
 MERGE (hook:Symbol {id:"frontend/src/lib/run/runDirectorySession.tsx::useRunDirectory", kind:"function"})
@@ -110,7 +110,7 @@ function contextFixture(): RunContextEnvelope {
       project_binding_version: 1,
     },
     focus_version: "focus:v1",
-    capabilities: { run_owned_apps_available: true, execution_admission_available: false },
+    capabilities: { task_cards_available: true, run_owned_apps_available: false, execution_admission_available: false },
   };
 }
 

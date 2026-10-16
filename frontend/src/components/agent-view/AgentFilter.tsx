@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=a36c17f09f38037c34a17c769649671f2d3233f1c2c61d42761963fa0c32a297
+MERGE (self:File {path:"frontend/src/components/agent-view/AgentFilter.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentFilter:Function {name:"AgentFilter", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (self)-[:DEFINES]->(agentFilter)
+MERGE (agentFilter)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -12,6 +23,7 @@ import type { AgentSession, AgentStatus } from "@/types/ids";
 import { isActiveAgent } from "@/lib/agent-view/selectors";
 import { ChevronDown, Bot, Sparkles, Circle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 interface AgentFilterProps {
   agents: ReadonlyArray<AgentSession>;
@@ -63,7 +75,7 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
           {selected ? (
             <>
               <span className="text-[var(--cel-cyan,#00f0ff)] font-extrabold">{selected.id}</span>
-              <span className="text-ink-mute ml-2 text-[11px]">· {selected.agent_kind}</span>
+              <span className="text-ink-mute ml-2 text-[11px]">· {agentKindDisplayLabel(selected.agent_kind)}</span>
             </>
           ) : (
             <span className="text-ink-mute">Select agent…</span>
@@ -117,7 +129,7 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
                       <span className={`font-bold truncate ${isSelected ? "text-[var(--cel-cyan,#00f0ff)]" : "text-white"}`}>
                         {a.id}
                       </span>
-                      <span className="text-ink-mute text-[10px]">· {a.agent_kind}</span>
+                      <span className="text-ink-mute text-[10px]">· {agentKindDisplayLabel(a.agent_kind)}</span>
                     </div>
                     <div className="text-[10px] text-ink-mute truncate">
                       {a.status} · {a.current_step}

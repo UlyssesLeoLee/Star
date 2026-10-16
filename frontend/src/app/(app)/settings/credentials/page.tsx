@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=5790fa018132158f4f878832082c4a87ac3037b866754c63c2f75f071d31678a
+MERGE (self:File {path:"frontend/src/app/(app)/settings/credentials/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // Star Frontend - /settings/credentials 凭证管理页面
@@ -77,7 +82,7 @@ export default function CredentialsPage() {
     <div className="space-y-6">
       <PageHeader
         title="凭证管理 (Credentials)"
-        description="用户在设置界面自行填入 OpenClaw / Hermes / KMS 凭证，后端 CredentialManager 加密存储 (per INV-CR-01~06)"
+        description="在设置界面添加 API 与密钥管理服务凭证，后端 CredentialManager 加密存储 (per INV-CR-01~06)"
         actions={
           <button
             onClick={() => setAdding(true)}
@@ -124,7 +129,7 @@ export default function CredentialsPage() {
                   <Key size={14} />
                   <span className="text-sm font-medium">{c.display_name}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)]">
-                    {c.provider}
+                    {PROVIDER_LABELS[c.provider] ?? "其他凭证服务"}
                   </span>
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded ${
@@ -187,7 +192,7 @@ export default function CredentialsPage() {
             </select>
             <input
               type="text"
-              placeholder="显示名 (e.g. 我的 OpenClaw 账号)"
+              placeholder="显示名 (例如：我的 API 服务账号)"
               value={form.display_name}
               onChange={(e) => setForm({ ...form, display_name: e.target.value })}
               className="px-2 py-1 text-sm rounded bg-[color:var(--color-surface)] border border-[color:var(--color-border)]"
@@ -201,7 +206,7 @@ export default function CredentialsPage() {
             />
             <input
               type="text"
-              placeholder="Base URL (可选, e.g. https://api.openclaw.example.com/v1)"
+              placeholder="Base URL (可选, 例如：https://provider.example.invalid/v1)"
               value={form.base_url}
               onChange={(e) => setForm({ ...form, base_url: e.target.value })}
               className="px-2 py-1 text-sm rounded bg-[color:var(--color-surface)] border border-[color:var(--color-border)]"

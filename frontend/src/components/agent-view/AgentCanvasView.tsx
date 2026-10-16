@@ -1,7 +1,17 @@
+/*
+@cypher schema=1 source_sha256=c25fe0eee3c6e1964c2e4682910aa5ebe676d2e2cfcaf9d8f9ddb30b8b5329ed
+MERGE (self:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentCanvasView:Function {name:"AgentCanvasView", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (agentCanvasView)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
-// AgentCanvasView — 3渲2 战术全息无限画布 (Miro / Tactical Holo-Board)
+// AgentCanvasView — 3渲2 战术全息无限画布
 // =====================================================================
 // Per 2026-09-06 用户发令:
 //   - 增强游戏界面感 (Game UI / Tactical Holo-Canvas)
@@ -14,6 +24,7 @@
 import type {
   AgentSession, Worktree, WorkItem, AgentStatus, WorkItemStatus,
 } from "@/types/ids";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 import type {
   AgentCanvas, AgentCanvasNode, AgentCanvasConnector,
   AgentCanvasAnnotation, AgentCanvasFreeConnector,
@@ -551,7 +562,7 @@ export function AgentCanvasView({
               fontWeight="bold"
               letterSpacing={0.5}
             >
-              COMMAND UNIT // {agent.agent_kind.toUpperCase()}
+              COMMAND UNIT // {agentKindDisplayLabel(agent.agent_kind).toUpperCase()}
             </text>
           </g>
 

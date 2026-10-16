@@ -1,4 +1,4 @@
-# Refactor Sweep — 架构设计文档 (v0.1)
+﻿# Refactor Sweep — 架构设计文档 (v0.1)
 
 > **Status**: 🟢 Active (per 2026-09-02 10:41 JST 拍板 + 10:50 JST 合并按钮拍板)
 > **Author**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
@@ -9,7 +9,7 @@
 
 ## 0. 一句话定位
 
-> **分批次对已完成任务做重构 · Jira 风格 todo→done 循环, 列可自定义, done 列一键合并 worktree + PR**
+> **分批次对已完成任务做重构 · 看板式 todo→done 循环, 列可自定义, done 列一键合并 worktree + PR**
 
 ---
 
@@ -24,7 +24,7 @@
 ### 1.2 目标 (per 2026-09-02 10:41 JST Ulysses 拍板)
 
 1. **新增 /refactor 页面** — 顶部 KPI + 5 列看板 + 历史轮次
-2. **5 状态 todo / doing / testing / review / done** — Jira 风格, 跟 Kanban 对齐
+2. **5 状态 todo / doing / testing / review / done** — 保持看板工作流的一致性
 3. **testing 列在 doing 和 review 中间** — 新增, 验证重构后回归测试
 4. **列可自定义** — 增/删/重命名/重排, 跟 KanbanBoard 行为 1:1
 5. **多轮循环** — 走完一轮, 卡全部 reset todo + round_number + 1, 历史保留

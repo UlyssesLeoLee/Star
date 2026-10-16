@@ -1,4 +1,4 @@
-# Star Frontend — 动态交互与多人协同设计书
+﻿# Star Frontend — 动态交互与多人协同设计书
 
 > **状态**: Draft v0.1
 > **日期**: 2026-08-28
@@ -134,7 +134,7 @@
 
 ### §6.1 现状
 - `frontend/src/app/workflow/page.tsx` 现有 mock
-- `frontend/src/components/CanvasView.tsx` 已有 Miro 风格画布
+- `frontend/src/components/CanvasView.tsx` 已有 无限画布布局
 
 ### §6.2 需求 (per AssetsLake `WorkflowAutomationPrimitives.tsx`)
 | 验收 | 引用 |

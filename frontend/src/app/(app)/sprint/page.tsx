@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=9a6e5a3334081ea749aed2b80178b748e7ee5128d1457a3f737573caa4f24742
+MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -318,7 +323,7 @@ function IssuesPageInner() {
               <IssuesTreeView items={filtered} identities={identities} onSelect={setSelectedId} />
             )}
             {view === "sprint" && (
-              // Per 2026-09-05 19:32 JST 拍板: Sprint 对标 Jira, 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除)
+              // Per 2026-09-05 19:32 JST 拍板: Sprint 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除)
               <SprintBoardView onSelect={setSelectedId} />
             )}
           </div>
@@ -326,7 +331,7 @@ function IssuesPageInner() {
           {/* 视图小贴士 (状态机 + 视图映射) */}
           <div className="mt-4 text-[10px] text-ink-mute font-mono">
             {/* Per 2026-09-05 19:13 JST 拍板: 删 Kanban tip */}
-            {/* Per 2026-09-05 19:32 JST 拍板: Sprint 对标 Jira, 7 项 (Backlog + 拖动 + 创建/启动/完成/删除) */}
+            {/* Per 2026-09-05 19:32 JST 拍板: Sprint 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除) */}
             {view === "list"   && <>列表视图 — key / title / kind / status / priority / assignee, 点行选中</>}
             {view === "tree"   && <>树形视图 — epic → story → task → spike 层级 (用 kind + key 推断, Phase 2+ 接 relations)</>}
             {view === "sprint" && <>Sprint 视图 — 左 Backlog 拖入右 Sprint, 启动/完成/删除/改名 + 4 列 kanban, 状态机 planned → active → completed</>}

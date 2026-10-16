@@ -1,3 +1,11 @@
+/*
+@cypher schema=1 source_sha256=a137778421974bf26e704e5ca0cbc163ee1774348d99c7278cc89597017c28ff
+MERGE (self:File {path:"frontend/src/lib/agent/types.ts"})
+CREATE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (self)-[:DEFINES]->(agentKindDisplayLabel)
+@endcypher
+*/
+
 /**
  * AI 凭证类型定义 (per ADR-0051 §2.1 凭证分类总表)
  *
@@ -103,5 +111,25 @@ export function credentialCategory(kind: CredentialKind): CredentialCategory {
     case "custom":
     default:
       return "custom";
+  }
+}
+
+/** Converts internal agent-kind identifiers into recognizable provider/model labels. */
+export function agentKindDisplayLabel(kind: string): string {
+  switch (kind) {
+    case "claude-sonnet":
+      return "Claude Sonnet";
+    case "gpt-4o":
+      return "GPT-4o";
+    case "codex":
+      return "Codex";
+    case "internal-vibe-coder":
+      return "Built-in Code Agent";
+    case "gemini-2":
+      return "Gemini";
+    case "minimax-v1":
+      return "MiniMax";
+    default:
+      return "Custom Agent";
   }
 }

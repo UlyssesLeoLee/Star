@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=c22aab844d326f3aa04f9614e2e8e4ec111320624cf79e43206b459c1f345e17
+MERGE (self:File {path:"frontend/src/lib/run/runDirectoryTree.ts"})
+MERGE (tree:Symbol {id:"frontend/src/lib/run/runDirectoryTree.ts::RunDirectoryTree",kind:"class"})
+MERGE (request:Symbol {id:"frontend/src/lib/run/runDirectoryTree.ts::RunDirectoryTree.requestPage",kind:"method"})
+MERGE (self)-[:DEFINES]->(tree)
+MERGE (tree)-[:DEFINES]->(request)
+@endcypher
+*/
+
 /* CYPHER STRUCTURE MANIFEST
 CREATE (f:File {name:"frontend/src/lib/run/runDirectoryTree.ts",type:"file",language:"typescript"}),
  (model:Class {name:"RunDirectoryTree",type:"class"}),(node:Class {name:"DirectoryNode",type:"class"}),(base:Class {name:"NodeBase",type:"class"}),
@@ -12,8 +22,8 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryTree.ts",type:"file",lang
  (visit:Function {name:"visitParent",type:"function"}),(map:Function {name:"directoryNodes",type:"function"}),
  (error:Function {name:"directoryErrorMessage",type:"function"}),(root:Variable {name:"DIRECTORY_ROOT",type:"variable"}),
  (budget:Variable {name:"RUN_DIRECTORY_TREE_BUDGET",type:"variable"}),
- (projects:Function {name:"RunDirectoryApiClient.listProjects",type:"function"}),(branches:Function {name:"RunDirectoryApiClient.listBranches",type:"function"}),
- (runs:Function {name:"RunDirectoryApiClient.listRuns",type:"function"}),(worktrees:Function {name:"RunDirectoryApiClient.listWorktrees",type:"function"}),
+ (projects:Function {name:"RunDirectoryApiClient.listProjects",type:"function"}),(projectRuns:Function {name:"RunDirectoryApiClient.listProjectRuns",type:"function"}),
+ (worktrees:Function {name:"RunDirectoryApiClient.listWorktrees",type:"function"}),
  (f)-[:CONTAINS]->(model),(f)-[:CONTAINS]->(base),(f)-[:CONTAINS]->(node),(f)-[:CONTAINS]->(parent),(f)-[:CONTAINS]->(row),(f)-[:CONTAINS]->(entry),
  (f)-[:CONTAINS]->(map),(f)-[:CONTAINS]->(error),(f)-[:CONTAINS]->(root),(f)-[:CONTAINS]->(budget),
  (model)-[:HAS_METHOD]->(ctor),(model)-[:HAS_METHOD]->(subscribe),(model)-[:HAS_METHOD]->(snapshot),(model)-[:HAS_METHOD]->(start),
@@ -23,21 +33,22 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryTree.ts",type:"file",lang
  (start)-[:CALLS]->(more),(toggle)-[:CALLS]->(cancel),(toggle)-[:CALLS]->(remove),(toggle)-[:CALLS]->(more),(refresh)-[:CALLS]->(remove),
  (refresh)-[:CALLS]->(more),(window)-[:CALLS]->(remove),(window)-[:CALLS]->(find),(window)-[:CALLS]->(more),(more)-[:CALLS]->(find),(more)-[:CALLS]->(fetch),(find)-[:CALLS]->(remove),(dispose)-[:CALLS]->(cancel),
  (remove)-[:CALLS]->(cancel),(fetch)-[:CALLS]->(request),(fetch)-[:CALLS]->(map),(fetch)-[:CALLS]->(error),(fetch)-[:CALLS]->(publish),
- (request)-[:CALLS]->(projects),(request)-[:CALLS]->(branches),(request)-[:CALLS]->(runs),(request)-[:CALLS]->(worktrees),(publish)-[:CALLS]->(visit),(start)-[:USES]->(root),(dispose)-[:USES]->(root),(refresh)-[:USES]->(root),(publish)-[:USES]->(root),(more)-[:USES]->(budget),(find)-[:USES]->(budget),(publish)-[:USES]->(budget);
+ (request)-[:CALLS]->(projects),(request)-[:CALLS]->(projectRuns),(request)-[:CALLS]->(worktrees),(publish)-[:CALLS]->(visit),(start)-[:USES]->(root),(dispose)-[:USES]->(root),(refresh)-[:USES]->(root),(publish)-[:USES]->(root),(more)-[:USES]->(budget),(find)-[:USES]->(budget),(publish)-[:USES]->(budget);
 */
 
 import {
-  RunDirectoryApiClient, RunDirectoryError, type AuthorizedRunProject, type CloudBranch,
+  RunDirectoryApiClient, RunDirectoryError, type AuthorizedRunProject,
   type DirectoryPage, type EngineeringRun, type RunWorktree,
 } from "./runDirectoryApi";
 
 interface NodeBase { key: string; parentKey: string; depth: number; label: string }
+interface WorktreeBranch { name: string }
 export type DirectoryNode =
   | (NodeBase & { kind: "project"; entity: AuthorizedRunProject })
-  | (NodeBase & { kind: "branch"; entity: CloudBranch })
   | (NodeBase & { kind: "run"; entity: EngineeringRun })
-  | (NodeBase & { kind: "worktree"; entity: RunWorktree; branchId: string });
-export type DirectoryParent = { kind: "root"; key: string; depth: number } | Exclude<DirectoryNode, { kind: "worktree" }>;
+  | (NodeBase & { kind: "worktree"; entity: RunWorktree })
+  | (NodeBase & { kind: "branch"; entity: WorktreeBranch });
+export type DirectoryParent = { kind: "root"; key: string; depth: number } | Exclude<DirectoryNode, { kind: "branch" }>;
 export type DirectoryTreeRow =
   | { kind: "node"; key: string; node: DirectoryNode; expanded: boolean }
   | { kind: "hint"; key: string; parent: DirectoryParent; depth: number; state: "loading" | "error" | "more" | "budget" | "empty" | "refresh"; message: string };
@@ -51,7 +62,7 @@ export const RUN_DIRECTORY_TREE_BUDGET = { parents: 16, pagesPerParent: 4 } as c
 export function directoryErrorMessage(error: unknown): string {
   return error instanceof RunDirectoryError ? error.message : "授权目录暂时不可用，请重试。";
 }
-function directoryNodes(parent: DirectoryParent, rows: Array<AuthorizedRunProject | CloudBranch | EngineeringRun | RunWorktree>): DirectoryNode[] {
+function directoryNodes(parent: DirectoryParent, rows: Array<AuthorizedRunProject | EngineeringRun | RunWorktree | WorktreeBranch>): DirectoryNode[] {
   return rows.map<DirectoryNode>((entity) => {
     const base = { parentKey: parent.key, depth: parent.depth + 1 };
     switch (parent.kind) {
@@ -60,16 +71,16 @@ function directoryNodes(parent: DirectoryParent, rows: Array<AuthorizedRunProjec
         return { ...base, kind: "project", key: `${parent.key}/project:${project.project_id}`, label: `Project ${project.project_id}`, entity: project };
       }
       case "project": {
-        const branch = entity as CloudBranch;
-        return { ...base, kind: "branch", key: `${parent.key}/branch:${branch.branch_id}`, label: branch.name, entity: branch };
-      }
-      case "branch": {
         const run = entity as EngineeringRun;
         return { ...base, kind: "run", key: `${parent.key}/run:${run.engineering_run_id}`, label: run.title, entity: run };
       }
       case "run": {
         const worktree = entity as RunWorktree;
-        return { ...base, kind: "worktree", key: `${parent.key}/worktree:${worktree.worktree_id}`, label: worktree.name, entity: worktree, branchId: parent.entity.branch_id };
+        return { ...base, kind: "worktree", key: `${parent.key}/worktree:${worktree.worktree_id}`, label: worktree.name, entity: worktree };
+      }
+      case "worktree": {
+        const branch = entity as WorktreeBranch;
+        return { ...base, kind: "branch", key: `${parent.key}/branch`, label: branch.name || "未关联分支", entity: branch };
       }
     }
   });
@@ -93,7 +104,7 @@ export class RunDirectoryTree {
     this.cancelPending(DIRECTORY_ROOT.key);
     this.cache.clear(); this.expanded.clear(); this.publish();
   }
-  toggle(node: Exclude<DirectoryNode, { kind: "worktree" }>): void {
+  toggle(node: Exclude<DirectoryNode, { kind: "branch" }>): void {
     if (!this.active) return;
     if (this.expanded.has(node.key)) {
       this.expanded.delete(node.key);
@@ -183,12 +194,15 @@ export class RunDirectoryTree {
       }
     }
   }
-  private async requestPage(parent: DirectoryParent, cursor: string | undefined, signal: AbortSignal): Promise<DirectoryPage<AuthorizedRunProject | CloudBranch | EngineeringRun | RunWorktree>> {
+  private async requestPage(parent: DirectoryParent, cursor: string | undefined, signal: AbortSignal): Promise<DirectoryPage<AuthorizedRunProject | EngineeringRun | RunWorktree | WorktreeBranch>> {
     switch (parent.kind) {
       case "root": return this.client.listProjects(cursor, signal);
-      case "project": return this.client.listBranches(parent.entity.project_id, cursor, signal);
-      case "branch": return this.client.listRuns(parent.entity, cursor, signal);
+      case "project": return this.client.listProjectRuns(parent.entity.project_id, cursor, signal);
       case "run": return this.client.listWorktrees(parent.entity, cursor, signal);
+      case "worktree": {
+        const name = parent.entity.branch.trim();
+        return { rows: [{ name }], limit: 1, next_cursor: null };
+      }
     }
   }
   private publish(): void {
@@ -199,7 +213,7 @@ export class RunDirectoryTree {
       for (const node of entry.rows) {
         const expanded = this.expanded.has(node.key);
         rows.push({ kind: "node", key: node.key, node, expanded });
-        if (expanded && node.kind !== "worktree") visitParent(node);
+        if (expanded && node.kind !== "branch") visitParent(node);
       }
       let state: "loading" | "error" | "more" | "budget" | "empty" | "refresh" | null = null;
       let message = "";

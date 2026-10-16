@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=c20f4b1c4bb41a8487de551c6010366da1feab138d56250c010db90ef1307c07
+MERGE (self:File {path:"frontend/src/app/board/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -29,7 +34,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { KanbanBoard, KANBAN_COLUMNS } from "@/components/board/KanbanBoard";
 import { KanbanFilters, type KanbanFiltersValue } from "@/components/board/KanbanFilters";
 import { useBoardSync, type BoardSyncChange } from "@/hooks/useBoardSync";
-import { SquareKanban as Trello, RefreshCw, X } from "lucide-react";
+import { SquareKanban as KanbanIcon, RefreshCw, X } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 
@@ -163,7 +168,7 @@ export default function BoardPage() {
       <PageHeader
         title={t.pageTitles['/board'].title}
         subtitle="Kanban 视图 + 拖动 transition + 多人协同 (2s polling)。每列定义 status + 可选 wip_limit;超限时高亮。"
-        icon={<Trello className="text-accent" size={20} />}
+        icon={<KanbanIcon className="text-accent" size={20} />}
         track="E"
         count={`${board.columns.reduce((s, c) => s + c.work_item_ids.length, 0)} cards`}
       />

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b1105f830bc4a31c9cd489af6bf8d7aad4e10782beff42df8fee2abf65a64878
+@cypher schema=1 source_sha256=0166996b15483d7a0d5ca31dcb89ff8496e50db30e8474b45b9e6bfa11a03621
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -313,8 +313,8 @@ function formatTimestamp(value: string): string {
 }
 
 const WORKTREE_GROUP_APPS = [
-  { id: "multica", label: "Multica" },
-  { id: "jira", label: "Jira 视图" },
+  { id: "task-flow", label: "任务流程" },
+  { id: "board", label: "计划看板" },
   { id: "task-card", label: "Task Cards" },
   { id: "canvas", label: "Infinite Canvas" },
   { id: "workflow", label: "Workflow / LangGraph" },
@@ -833,7 +833,7 @@ function WorktreePageInner() {
                 <Link
                   href={`/canvas/canvas-001?highlight=${wt.id === "wt-001" ? "el-wt-001" : wt.id === "wt-002" ? "el-wt-002" : wt.id === "wt-003" ? "el-wt-003" : "el-wt-001"}`}
                   className="btn text-[10px]"
-                  title="在 Miro 模式画布中查看 worktree node 状态(双击可跳回)"
+                  title="在协作画布中查看 Worktree 节点状态（双击可跳回）"
                 >
                   <span className="font-mono">⊞</span> 打开在 Canvas
                 </Link>

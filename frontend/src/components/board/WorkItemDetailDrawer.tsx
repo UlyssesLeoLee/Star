@@ -1,9 +1,19 @@
+/*
+@cypher schema=1 source_sha256=c5c86afeab17a9ed05526c9f433ff277a7c70a4454f04e078aa3bcdfcd03707c
+MERGE (self:File {path:"frontend/src/components/board/WorkItemDetailDrawer.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (workItemDetailDrawer:Function {name:"WorkItemDetailDrawer", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (workItemDetailDrawer)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
 // WorkItemDetailDrawer — Kanban 卡右侧抽屉详情 (per 2026-08-31 12:07 JST Ulysses 拍板)
 // =====================================================================
-// 触发 (per 拍板: "参考 Jira 和 multica.ai"):
+// 触发 (per 拍板: 任务卡可从看板创建或打开):
 //   - Kanban 列底部 +Add task 按钮  → mode="new"   (status = 点击的列)
 //   - KanbanCard 整张点击            → mode="view"  (status = wi.status)
 //
@@ -11,7 +21,7 @@
 //   - "new"  : title 必填, Status 锁定为触发列, 其他字段可选, 底部 "Create" 按钮
 //   - "view" : 所有字段 inline 编辑, 底部 "Save" 持久化 (走 store.updateWorkItemField)
 //
-// 字段 (per Star 设计 + Multica slide-over + Jira issue detail):
+// 字段 (per Star 设计):
 //   1. Title        inline 编辑 (autoFocus in new mode)
 //   2. Status       6 选 dropdown (todo/in_progress/review/blocked/done/wontfix)
 //   3. Priority     4 选 (p0/p1/p2/p3)
@@ -45,6 +55,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 import type {
   WorkItem, WorkItemStatus, WorkItemKind, WorkItemPriority,
   Identity, AgentSession, Worktree,
@@ -72,7 +83,7 @@ const STATUSES: WorkItemStatus[] = [
 const PRIORITIES: WorkItemPriority[] = ["p0", "p1", "p2", "p3"];
 const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 
-// ---- Drawer width (per Jira/Multica 一致, 480px 偏窄便于 board 仍可见) ----
+// ---- Drawer width (480px, 便于 board 仍可见) ----
 const DRAWER_W = 480;
 
 export function WorkItemDetailDrawer({
@@ -188,7 +199,7 @@ export function WorkItemDetailDrawer({
     }
     if (currentAssigneeKind === "agent") {
       const a = agentMap[draft.assignee_id];
-      return a ? `${a.agent_kind} · ${a.id}` : draft.assignee_id;
+      return a ? `${agentKindDisplayLabel(a.agent_kind)} · ${a.id}` : draft.assignee_id;
     }
     if (currentAssigneeKind === "squad") {
       return `${draft.assignee_id} (Phase 2)`;
@@ -228,7 +239,7 @@ export function WorkItemDetailDrawer({
       labels: draft.labels,
       worktree_id: draft.worktree_id,
     });
-    // 关闭后让父组件切到 view 模式显示新建的卡 (per Multica 模式)
+    // 关闭后让父组件切到 view 模式显示新建的卡
     onClose();
     // eslint-disable-next-line no-console
     console.info(`[WorkItemDetailDrawer] created work-item ${newId} (key auto-generated)`);
@@ -275,7 +286,7 @@ export function WorkItemDetailDrawer({
       role="dialog"
       aria-modal="true"
     >
-      {/* 背景: click 关闭 (per Jira/Multica 一致) */}
+      {/* 背景: click 关闭 */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-150"
         onClick={onClose}
@@ -424,7 +435,7 @@ export function WorkItemDetailDrawer({
                 <option value="">未分配</option>
                 {agentSessions.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.agent_kind} · {a.id} · {a.status}
+                    {agentKindDisplayLabel(a.agent_kind)} · {a.id} · {a.status}
                   </option>
                 ))}
               </select>
@@ -467,7 +478,7 @@ export function WorkItemDetailDrawer({
                       <Bot size={9} /> 关联 Agent
                     </span>
                     <span className="text-info font-mono">
-                      {currentWtAgent.agent_kind} · {currentWtAgent.status}
+                      {agentKindDisplayLabel(currentWtAgent.agent_kind)} · {currentWtAgent.status}
                     </span>
                   </div>
                 )}

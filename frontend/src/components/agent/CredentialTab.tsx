@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=ee2a6744c989949a5d749570c4a8ed26f32d799407067d02d5821d1d503d2e9a
+MERGE (self:File {path:"frontend/src/components/agent/CredentialTab.tsx"})
+@endcypher
+*/
 /**
  * CredentialTab - 凭证 tab 组件 (per ADR-0051 §2.3)
  *
@@ -16,6 +21,26 @@ import {
   type AgentId,
   type CredentialKind,
 } from "../../lib/agent/types";
+
+const CREDENTIAL_KIND_LABEL: Record<CredentialKind, string> = {
+  openai: "OpenAI",
+  claude: "Claude",
+  anthropic: "Anthropic",
+  google_gemini: "Google Gemini",
+  mistral: "Mistral",
+  github_copilot: "GitHub Copilot",
+  cursor: "Cursor",
+  openai_codex: "OpenAI Codex",
+  claude_code: "Claude Code",
+  cline: "Cline",
+  tavily: "Tavily Search",
+  brave: "Brave Search",
+  serpapi: "SerpAPI",
+  openai_embedding: "OpenAI Embeddings",
+  cohere: "Cohere",
+  voyage: "Voyage AI",
+  custom: "Custom",
+};
 
 interface CredentialTabProps {
   agentId: AgentId;
@@ -112,7 +137,7 @@ export function CredentialTab({
           >
             <div className="credential-tab__item-info">
               <strong>{cred.displayName}</strong>
-              <span>{cred.kind}</span>
+              <span>{CREDENTIAL_KIND_LABEL[cred.kind]}</span>
               <span>env: {cred.envKey}</span>
               {cred.active && <span className="badge">active</span>}
             </div>

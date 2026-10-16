@@ -1,10 +1,22 @@
+/*
+@cypher schema=1 source_sha256=e3512549721e244b70b6d116c1d8f1446c69ab23e2b8935f41c4085f15dec1f5
+MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
+MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
+MERGE (agentViewPage:Function {name:"AgentViewPage", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (agentViewPage)-[:CALLS]->(agentKindDisplayLabel)
+@endcypher
+*/
 "use client";
+
+import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 // =====================================================================
 // /agent-view — Agent 视图 (无限画布, 当前工作 agent 筛选, 拟人化游戏化)
 // =====================================================================
 // Per 2026-09-05 11:25 JST 用户发令 + 拍板 #1/#2/#3:
-//   1. 形式 = 无限画布 (Miro 风格, 自由散开)
+//   1. 形式 = 无限画布 (自由散开)
 //   2. 筛选 = 当前工作 agent (auto 选最近 active, 用户可手动覆盖)
 //   3. 数据 = 跟 kanban 等界面共享 store (workItems / worktrees / agentSessions)
 //   4. 路由 = /agent-view
@@ -299,7 +311,7 @@ function AgentViewContent() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="text-sm font-semibold shrink-0" data-testid="agent-view-title">Agent</div>
           <div className="text-xs text-ink-mute font-mono truncate hidden lg:block">
-            {agent.id} · {agent.agent_kind} · {agent.current_step} · {relatedWorkItems.length} task{relatedWorkItems.length === 1 ? "" : "s"}
+            {agent.id} · {agentKindDisplayLabel(agent.agent_kind)} · {agent.current_step} · {relatedWorkItems.length} task{relatedWorkItems.length === 1 ? "" : "s"}
             {worktree && <> · worktree <span className="text-info font-bold">{worktree.branch}</span></>}
           </div>
         </div>

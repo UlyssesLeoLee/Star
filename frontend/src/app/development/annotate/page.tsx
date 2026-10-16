@@ -1,4 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+
+/*
+@cypher schema=1 source_sha256=7092dbe5e425c74723a4e149ed37a3da46c444754f58d8de0e4f8e2371f1591e
+MERGE (self:File {path:"frontend/src/app/development/annotate/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/development/annotate/page.tsx::DiffAnnotatePage",kind:"function"})
+MERGE (header:Symbol {id:"frontend/src/components/PageHeader.tsx::PageHeader",kind:"component"})
+MERGE (annotator:Symbol {id:"frontend/src/components/DiffAnnotator.tsx::DiffAnnotator",kind:"component"})
+MERGE (demoData:Module {name:"frontend/src/mocks/data/annotations"})
+MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:IMPORTS]->(demoData)
+MERGE (page)-[:CALLS]->(header)
+MERGE (page)-[:CALLS]->(annotator)
+MERGE (page)-[:USES]->(demoData)
+@endcypher
+*/
 // frontend/src/app/development/annotate/page.tsx
 //
 // /development/annotate — Diff 标注工作台 (per FR-ORCA-035 §11 v1.0, ULYS-211)。
@@ -27,7 +42,7 @@ export default function DiffAnnotatePage() {
     <div className="mx-auto max-w-5xl" data-testid="diff-annotate-page">
       <PageHeader
         title="Diff 标注"
-        subtitle="在 AI 生成的 diff 上逐行 drop comment; 标注作为 structured feedback 回到 agent session 的下一轮 prompt (FR-ORCA-035)。"
+        subtitle="在 AI 生成的差异上逐行添加评注；评注会作为结构化反馈传回 Agent 会话，供下一轮处理。"
         icon={<MessageSquarePlus className="text-accent" size={20} />}
         track="D"
         count={DEMO_FILE_PATH}

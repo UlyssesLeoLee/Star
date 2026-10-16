@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=47656843a68d1ceef09666a51d177d295736e2e37a47c935d71842ee971b0814
+MERGE (self:File {path:"frontend/src/app/integration/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/integration/page.tsx::IntegrationPage",kind:"component"})
+MERGE (self)-[:DEFINES]->(page)
+@endcypher
+*/
 "use client";
 
 import { useStore } from "@/lib/store";
@@ -13,7 +20,7 @@ export default function IntegrationPage() {
     <div className="max-w-7xl">
       <PageHeader
         title={t.pageTitles['/integration'].title}
-        subtitle="外部服务适配器 (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)。loop_protection_key 防止 webhook 风暴。"
+        subtitle="连接代码托管、团队协作、任务管理和自动化服务。事件幂等键用于防止重复投递。"
         icon={<Plug className="text-accent" size={20} />}
         track="C"
         count={integrations.length}

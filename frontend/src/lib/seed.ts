@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=9220d1c7585cb57f8c3779a85bf6da87ac0273aa39b68139534d43ab96babbdb
+MERGE (self:File {path:"frontend/src/lib/seed.ts"})
+MERGE (integrations:Symbol {id:"frontend/src/lib/seed.ts::integrations",kind:"constant"})
+MERGE (canvases:Symbol {id:"frontend/src/lib/seed.ts::canvases",kind:"constant"})
+MERGE (localRuntimes:Symbol {id:"frontend/src/lib/seed.ts::localRuntimes",kind:"constant"})
+MERGE (self)-[:DEFINES]->(integrations)
+MERGE (self)-[:DEFINES]->(canvases)
+MERGE (self)-[:DEFINES]->(localRuntimes)
+@endcypher
+*/
 // =====================================================================
 // Mock data store — non-task UI seed only
 // =====================================================================
@@ -307,7 +318,6 @@ export const savedSearches: SavedSearch[] = [
 export const integrations: Integration[] = [
   { id: "int-001", tenant_id: TENANT_ID, kind: "github",   display_name: "GitHub (acme org)",         status: "active",      config_masked: "****ghp_***REDACTED***", loop_protection_key: "lp-github", last_sync_at: ago(0.4), error_count_24h: 0 },
   { id: "int-002", tenant_id: TENANT_ID, kind: "gitlab",   display_name: "GitLab (stargate)",         status: "active",      config_masked: "****glpat-***REDACTED***", loop_protection_key: "lp-gitlab", last_sync_at: ago(0.2), error_count_24h: 0 },
-  { id: "int-003", tenant_id: TENANT_ID, kind: "jira",     display_name: "Jira Mirror (read-only)",   status: "active",      config_masked: "jira://acme.atlassian.net?***", loop_protection_key: "lp-jira", last_sync_at: ago(5), error_count_24h: 1 },
   { id: "int-004", tenant_id: TENANT_ID, kind: "slack",    display_name: "#star-platform",            status: "active",      config_masked: "slack://T02***/C03***", loop_protection_key: "lp-slack", last_sync_at: ago(0.6), error_count_24h: 0 },
   { id: "int-005", tenant_id: TENANT_ID, kind: "lark",     display_name: "Lark Bot",                  status: "paused",      config_masked: "lark://cli_a8***", loop_protection_key: "lp-lark", last_sync_at: ago(60 * 2), error_count_24h: 0 },
   { id: "int-006", tenant_id: TENANT_ID, kind: "linear",   display_name: "Linear Mirror",             status: "circuit_open",config_masked: "lin_api_***REDACTED***", loop_protection_key: "lp-linear", last_sync_at: ago(0.1), error_count_24h: 12 },
@@ -329,7 +339,7 @@ export const whiteboards: Whiteboard[] = [
 ];
 
 // =====================================================================
-// Canvas(无限画布)— Miro 模式
+// Canvas(无限画布)— 协作画布模式
 // =====================================================================
 export const canvases: Canvas[] = [
   {

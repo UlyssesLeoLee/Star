@@ -1,4 +1,4 @@
-# Star Frontend — 三栏自适应信息架构 v0.1
+﻿# Star Frontend — 三栏自适应信息架构 v0.1
 
 > **状态**: Draft v0.1 → v0.2 (per 2026-08-31 12:48 JST handoff 兜底, 4 view → 5 tab 拍板实装注记, 守门 #11 缺标比错标)
 > **日期**: 2026-08-29 (v0.1) / 2026-08-31 12:48 JST (v0.2 追加实装注记)
@@ -13,7 +13,7 @@
 **4 view → 5 tab**: v0.1 §1.3 line 145-156 设计 `/projects` Cmd+1/2/3/4 = 看板/时间线/列表/概览 (4 view), 实装 (per `frontend/src/app/projects/page.tsx:78` ProjectsTabId) 5 tab: **kanban / timeline / backlog / agents / worktrees** (option 1, per `commit 7d85c34` 2026-08-29 22:49 JST 拍板)。
 
 **映射**:
-- 看板 → kanban (Jira 风 Kanban, +Add task 按钮 per `commit 4c8bd5c`)
+- 看板 → kanban (+Add task 按钮 per `commit 4c8bd5c`)
 - 时间线 → timeline (GanttChart + Calendar 子视图合并)
 - 列表 → backlog (work-items 列表按 status 排序)
 - 概览 → PageHeader (KPI + SectionTitle 整合, 不再单 tab)
@@ -22,15 +22,15 @@
 
 **重定向 4 修复** (per `commit 4614267` 2026-08-31 12:48 JST): `/board` `/scm` `/collaboration` `/workflow` `/relation` 5 redirect 目标 tab 旧 (board/workflow/relations) 不在 5 tab 之内, 全部改 (kanban/worktrees), 详见 `ui-redesign-multica-style.md §0.1`。
 
-**不改原 v0.1 §1-§3 内容**: 保留三栏自适应 IA 思路 (左导航 + 中面板 + 右抽屉), 拍板后实装变更 (5 tab 替换 4 view) 在 §0.1 增量追加 (守门 #12 + #11 同 multica §0.1)。
+**不改原 v0.1 §1-§3 内容**: 保留三栏自适应 IA 思路 (左导航 + 中面板 + 右抽屉), 拍板后实装变更 (5 tab 替换 4 view) 在 §0.1 增量追加 (守门 #12 + #11 同 UI redesign §0.1)。
 
 ---
 
 ## §0 目的
 
-定义 Star frontend 在 **补齐 P1-P3 全部 33 项 Jira 缺失功能** 时的统一信息架构, 避免子代理各自为政导致 UI 风格碎片化. 所有 wt (w6-w15) 必须遵守本规范, 不得在子代理 brief 中重新发明 UI 布局.
+定义 Star frontend 在 **补齐 P1-P3 全部 33 项产品需求差距** 时的统一信息架构, 避免子代理各自为政导致 UI 风格碎片化. 所有 wt (w6-w15) 必须遵守本规范, 不得在子代理 brief 中重新发明 UI 布局.
 
-**核心问题**: Jira 把所有内容挤在中栏, 用户认知负荷高. Star 解决方案 = 把 **项目 / 任务 / 上下文** 三个第一公民显式分栏.
+**核心问题**: 单栏工作区把过多内容挤在中栏, 用户认知负荷高. Star 解决方案 = 把 **项目 / 任务 / 上下文** 三个第一公民显式分栏.
 
 ---
 
@@ -40,7 +40,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  TopBar  (56px, sticky) — 面包屑 / 搜索 (Rovo Cmd+K) / 通知 / 用户 │
+│  TopBar  (56px, sticky) — 面包屑 / 搜索 (Cmd+K) / 通知 / 用户 │
 ├──────────┬────────────────────────────────────┬──────────────────┤
 │          │                                    │                  │
 │ SideBar  │  MainWorkArea  (自适应, 1fr)       │  ContextPanel    │
@@ -111,7 +111,7 @@
 **交互原则**:
 - 折叠 = 记忆, 不重置 (核心区例外, 见下)
 - Pinned 项 = 顶置, 上限 3 个
-- 数字徽章 = 真实计数, 不模糊 (区别于 Notion 的 "9+")
+- 数字徽章 = 真实计数, 不模糊 (徽章显示精确计数)
 - 键盘导航: `j/k` 上下, `Enter` 进入, `Space` 多选, `Cmd+B` 折叠整栏
 
 **核心区新增原则** (per §3 规则 1 每屏 ≤7±2 校验: Home 默认展开态 = 5 核心 + 1 "个人"折叠摘要行 = 6 个信息块, 在规则允许范围内):
@@ -206,7 +206,7 @@
 **6 个区域, 严格从左到右**:
 
 ```
-[☰ 折叠] [面包屑 /browse/... › 项目A › 看板 › 卡片#123] [Rovo Cmd+K 搜索框] [+] [🔔 3] [👤]
+[☰ 折叠] [面包屑 /browse/... › 项目A › 看板 › 卡片#123] [Cmd+K 搜索框] [+] [🔔 3] [👤]
    1        2                                              3                4   5    6
 ```
 
@@ -221,7 +221,7 @@
 
 ## §2 视觉语言 (避免认知负荷)
 
-### §2.1 色彩 (Star 调色板, 非 Jira 蓝)
+### §2.1 色彩 (Star 调色板, 避免默认蓝色)
 
 | 用途 | 颜色 | Hex | 用途 |
 |---|---|---|---|

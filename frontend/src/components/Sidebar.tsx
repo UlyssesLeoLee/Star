@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=16610472572c0093ddd2572b3cb0860781e66e921bf85de2927e41a93daf8898
+MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
+@endcypher
+*/
 "use client";
 
 import Link from "next/link";
@@ -582,7 +587,7 @@ function SidebarRow({
   const mod = useModuleTranslation(item);
   const { tx } = useTranslation();
   const Icon = item.icon;
-  // Jira 风格: 域分色 icon tile (5 域色, per 2026-09-02 15:42 JST 拍板)
+  // 域分色 icon tile (5 域色, per 2026-09-02 15:42 JST 拍板)
   const cs = getCategoryStyles(item.category);
   // 用 registry 静态 id 生成 testid (per 2026-09-05 19:13 JST: label 改 Sprint 后 testid 仍稳定, 不会随 i18n 漂移)
   const testIdSlug = item.id;
@@ -644,7 +649,7 @@ function SidebarRow({
             : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink border border-transparent"
         )}
       >
-        {/* Jira 风格 icon tile — 8x8 圆角色块底 + 域分色 + line icon */}
+        {/* 域分色 icon tile — 8x8 圆角色块底 + line icon */}
         <div
           data-testid={`${dataTestIdBase}-icon-tile-${item.id}`}
           className={clsx(

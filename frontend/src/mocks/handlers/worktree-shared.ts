@@ -1,4 +1,50 @@
 // frontend/src/mocks/handlers/worktree-shared.ts
+
+/*
+@cypher schema=1 source_sha256=aa7bdb1fdd72e78f3cf86473b6169387d698bdcb213e6ebf7ee67745334e234e
+MERGE (self:File {path:"frontend/src/mocks/handlers/worktree-shared.ts"})
+MERGE (maybeReal:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::maybeReal",kind:"function"})
+MERGE (get:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::get",kind:"function"})
+MERGE (post:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::post",kind:"function"})
+MERGE (handlers:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::worktreeSharedHandlers",kind:"constant"})
+MERGE (repoId:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::MOCK_REPO_ID",kind:"constant"})
+MERGE (candidates:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::MOCK_CANDIDATES",kind:"constant"})
+MERGE (external:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::MOCK_EXTERNAL_WORKTREES",kind:"constant"})
+MERGE (imported:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::importedPaths",kind:"constant"})
+MERGE (externalType:Symbol {id:"frontend/src/mocks/handlers/worktree-shared.ts::MockExternalWorktree",kind:"interface"})
+MERGE (isRealMode:Symbol {id:"frontend/src/mocks/real-mode.ts::isRealMode",kind:"function"})
+MERGE (realFetch:Symbol {id:"frontend/src/mocks/real-mode.ts::realFetch",kind:"function"})
+MERGE (msw:Module {name:"msw"})
+MERGE (realMode:Module {name:"frontend/src/mocks/real-mode"})
+MERGE (httpGet:ExternalService {name:"msw.http.get"})
+MERGE (httpPost:ExternalService {name:"msw.http.post"})
+MERGE (json:ExternalService {name:"msw.HttpResponse.json"})
+MERGE (self)-[:IMPORTS]->(msw)
+MERGE (self)-[:IMPORTS]->(realMode)
+MERGE (self)-[:DEFINES]->(maybeReal)
+MERGE (self)-[:DEFINES]->(get)
+MERGE (self)-[:DEFINES]->(post)
+MERGE (self)-[:DEFINES]->(handlers)
+MERGE (self)-[:DEFINES]->(repoId)
+MERGE (self)-[:DEFINES]->(candidates)
+MERGE (self)-[:DEFINES]->(external)
+MERGE (self)-[:DEFINES]->(imported)
+MERGE (self)-[:DEFINES]->(externalType)
+MERGE (maybeReal)-[:CALLS]->(isRealMode)
+MERGE (maybeReal)-[:CALLS]->(realFetch)
+MERGE (get)-[:CALLS]->(httpGet)
+MERGE (get)-[:CALLS]->(maybeReal)
+MERGE (post)-[:CALLS]->(httpPost)
+MERGE (post)-[:CALLS]->(maybeReal)
+MERGE (handlers)-[:CALLS]->(get)
+MERGE (handlers)-[:CALLS]->(post)
+MERGE (handlers)-[:CALLS]->(json)
+MERGE (handlers)-[:USES]->(candidates)
+MERGE (handlers)-[:USES]->(external)
+MERGE (handlers)-[:USES]->(imported)
+MERGE (external)-[:USES]->(repoId)
+@endcypher
+*/
 //
 // ULYS-228 (ULYS-218.1) FR-ORCA-009 + FR-ORCA-011 frontend MSW handlers.
 //
@@ -30,8 +76,8 @@ const MOCK_CANDIDATES = {
   // github_branches  → StartFromKind `remote_branch`
   github_branches: [
     {
-      id: "remote_branch:origin/feat-orca-picker",
-      label: "origin/feat-orca-picker",
+      id: "remote_branch:origin/feature/worktree-picker",
+      label: "origin/feature/worktree-picker",
       description: "Remote tracking branch, last fetched 2026-09-23",
       kind: "remote_branch",
     },
@@ -45,8 +91,8 @@ const MOCK_CANDIDATES = {
   // existing_worktrees → StartFromKind `local_branch`
   existing_worktrees: [
     {
-      id: "local_branch:feat-orca-picker",
-      label: "feat-orca-picker",
+      id: "local_branch:feature/worktree-picker",
+      label: "feature/worktree-picker",
       description: "Local branch, ahead 3 / behind 0",
       kind: "local_branch",
     },
@@ -73,7 +119,7 @@ const MOCK_CANDIDATES = {
     },
     {
       id: "commit_sha:f6e5d4c3b2a1",
-      label: "f6e5d4c — feat(orca): external worktree import",
+      label: "f6e5d4c — feat: external worktree import",
       description: "f6e5d4c3b2a109876543210fedcba0987654321",
       kind: "commit_sha",
     },

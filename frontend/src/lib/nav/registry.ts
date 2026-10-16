@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=fea982b39263bf451b1b4c9a24ea3b5950cd10d4503767cf0af1e3a1a2f0f92a
+MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
+@endcypher
+*/
 import {
   Inbox,
   CheckSquare,
@@ -61,14 +66,14 @@ export interface ModuleDefinition {
 }
 
 // =====================================================================
-// CATEGORY_STYLES — 5 域分色 (Jira 风格识别度)
+// CATEGORY_STYLES — 5 域分色
 //
 // Rationale (per 2026-09-02 15:42 JST 拍板):
-//   - Jira Software 主页 sidebar 走的是 "彩色 icon tile + 域语义分色"
+//   - 侧栏使用 "彩色 icon tile + 域语义分色"
 //   - Lucide 没有 filled 变体, 但可以用 圆角色块 + line icon + 域染色
-//     制造等效的"色块底 + 图标" JIRA card 风格
+//     形成统一的"色块底 + 图标"卡片风格
 //   - 5 域色: cyan (core) / sky (work) / emerald (agent) / violet
-//     (integration) / amber (system), 跟 Atlassian Design System 主色
+//     (integration) / amber (system), 与现有界面主色保持协调
 //     (#0052CC / #36B37E / #6554C0 / #FF8B00) 视觉接近
 //   - 同时支持 light/dark mode (light 用 -700 / dark 用 -300/400)
 //   - bg + text + border 三组 class, 配 hover / active / glow variant
@@ -106,7 +111,7 @@ export const CATEGORY_STYLES: Record<ModuleCategory, CategoryStyle> = {
     dot: "bg-cyan-500 dark:bg-cyan-400",
     name: "Core",
   },
-  // Work — blue (Jira Software 蓝, 用 blue-500 跟 core cyan-500 区分明显)
+  // Work — blue (用 blue-500 跟 core cyan-500 区分明显)
   work: {
     bg: "bg-blue-500/20 dark:bg-blue-400/20",
     bgActive: "bg-blue-500/30 dark:bg-blue-400/30",
@@ -117,7 +122,7 @@ export const CATEGORY_STYLES: Record<ModuleCategory, CategoryStyle> = {
     dot: "bg-blue-500 dark:bg-blue-400",
     name: "Work",
   },
-  // Agent — emerald (Jira 活跃绿 #36B37E)
+  // Agent — emerald (#36B37E)
   agent: {
     bg: "bg-emerald-500/20 dark:bg-emerald-400/20",
     bgActive: "bg-emerald-500/30 dark:bg-emerald-400/30",
@@ -128,7 +133,7 @@ export const CATEGORY_STYLES: Record<ModuleCategory, CategoryStyle> = {
     dot: "bg-emerald-500 dark:bg-emerald-400",
     name: "Agent",
   },
-  // Integration — violet (Confluence 紫 #6554C0)
+  // Integration — violet (#6554C0)
   integration: {
     bg: "bg-violet-500/20 dark:bg-violet-400/20",
     bgActive: "bg-violet-500/30 dark:bg-violet-400/30",
@@ -139,7 +144,7 @@ export const CATEGORY_STYLES: Record<ModuleCategory, CategoryStyle> = {
     dot: "bg-violet-500 dark:bg-violet-400",
     name: "Integration",
   },
-  // System — amber (Jira 警示橙 #FF8B00, 提到 /20 避免跟 cyan 撞色)
+  // System — amber (#FF8B00, 提到 /20 避免跟 cyan 撞色)
   system: {
     bg: "bg-amber-500/20 dark:bg-amber-400/20",
     bgActive: "bg-amber-500/30 dark:bg-amber-400/30",
@@ -432,7 +437,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     href: "/settings/developer?tab=webhooks",
     category: "integration",
     categoryLabel: "Integration & Security",
-    description: "出站 Webhook endpoint + 5 域预置 vendor 模板 (Slack/Teams/Discord)",
+    description: "出站 Webhook endpoint + 5 域预置通知模板",
     icon: Webhook,
   },
   {
@@ -537,7 +542,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     href: "/refactor",
     category: "work",
     categoryLabel: "Work Management",
-    description: "分批次重构已完成任务 · Jira 风格 todo→done 循环, 列可自定义",
+    description: "分批次重构已完成任务 · todo→done 循环, 列可自定义",
     icon: RefreshCw,
   },
 ];

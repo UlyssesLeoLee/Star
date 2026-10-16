@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
@@ -45,7 +45,7 @@
       <tr><td class="mono">worktree-shared-dir</td><td>共享目录解析</td><td>3 个 Source（per-user / workspace / FileBacked）+ 5 种 MountStrategy + 优先级 1-3</td></tr>
       <tr><td class="mono">risk-engine</td><td>冲突风险评估</td><td>V1 Git 冲突 + V2 Diff 重叠，11 类风险</td></tr>
       <tr><td class="mono">health-engine</td><td>健康度打分</td><td>13 个指标加权 → 0-100 分</td></tr>
-      <tr><td class="mono">agent-bridge</td><td>对接 Agent 运行时</td><td>Multica adapter，11 字段 AgentSession</td></tr>
+      <tr><td class="mono">agent-bridge</td><td>对接 Agent 运行时</td><td>Star typed runtime adapter，11-field AgentSession</td></tr>
       <tr><td class="mono">relationship-engine</td><td>边关系运算</td><td>13 类边操作 + 关系遍历</td></tr>
       <tr><td class="mono">canvas-renderer</td><td>渲染适配</td><td>CanvasRenderer trait → React-Flow 11.x；<b>LOD 3 级 + Viewport 虚拟化 + 5 种视图模式 + N-hop 聚焦</b></td></tr>
       <tr><td class="mono">layout-engine</td><td>布局算法</td><td>3 种（dagre / d3-force / ELK）+ 阈值切换 + <code>visualDistance = log(n+1)*30</code> + 增量布局</td></tr>

@@ -1,11 +1,14 @@
 /*
-@cypher schema=1 source_sha256=2dd63df2db2ee00ed165abacfdda258222f4eeaa87cbb83a91f34c37ab0a1861
+@cypher schema=1 source_sha256=7a00e510348b6f59a54036db8d3d46191f589a605893b2b4d6c6115a019cc55a
 MERGE (self:File {path:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts"})
 MERGE (roundTrip:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::persists one pending command across store instances without replacing its idempotency key",kind:"test"})
 MERGE (bounded:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::rejects the 33rd unresolved command instead of growing without a bound",kind:"test"})
 MERGE (missingFocusVersion:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::rejects a focus without a context version",kind:"test"})
+MERGE (hostless:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::builds a hostless Run target with no Worktree focus or Branch authorization",kind:"test"})
+MERGE (legacy:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.test.ts::loads schema v1 recovery unchanged and matches only its original legacy target",kind:"test"})
 MERGE (scope:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryScopeKey",kind:"function"})
 MERGE (target:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTarget",kind:"function"})
+MERGE (matchesContext:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::taskCardCreateRecoveryTargetMatchesContext",kind:"function"})
 MERGE (factory:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::createTaskCardCreateRecoveryStore",kind:"function"})
 MERGE (maxRecords:Symbol {id:"frontend/src/lib/run/taskCardCreateRecoveryStore.ts::TASK_CARD_CREATE_RECOVERY_MAX_RECORDS",kind:"constant"})
 MERGE (roundTrip)-[:TESTS]->(scope)
@@ -14,6 +17,9 @@ MERGE (roundTrip)-[:TESTS]->(factory)
 MERGE (bounded)-[:TESTS]->(factory)
 MERGE (bounded)-[:TESTS]->(maxRecords)
 MERGE (missingFocusVersion)-[:TESTS]->(target)
+MERGE (hostless)-[:TESTS]->(target)
+MERGE (legacy)-[:TESTS]->(factory)
+MERGE (legacy)-[:TESTS]->(matchesContext)
 @endcypher
 */
 
@@ -24,6 +30,7 @@ import {
   TASK_CARD_CREATE_RECOVERY_MAX_RECORDS,
   taskCardCreateRecoveryScopeKey,
   taskCardCreateRecoveryTarget,
+  taskCardCreateRecoveryTargetMatchesContext,
   type PendingTaskCardCreate,
 } from "./taskCardCreateRecoveryStore";
 import type { RunContextEnvelope } from "./runDirectoryApi";
@@ -69,7 +76,7 @@ function contextFixture(): RunContextEnvelope {
       project_binding_id: "30000000-0000-4000-8000-000000000004", project_binding_version: 1,
     },
     focus_version: "focus:v1",
-    capabilities: { run_owned_apps_available: true, execution_admission_available: false },
+    capabilities: { task_cards_available: true, run_owned_apps_available: false, execution_admission_available: false },
   };
 }
 
@@ -80,13 +87,29 @@ describe("Task Card create recovery store", () => {
     expect(taskCardCreateRecoveryTarget(context)).toBeNull();
   });
 
+  it("builds a hostless Run target with no Worktree focus or Branch authorization", () => {
+    const context = contextFixture();
+    context.engineering_run = { ...context.engineering_run, repository_id: null, branch_id: null };
+    context.run_context.repository_id = null;
+    context.run_context.branch_id = null;
+    context.run_context.authorization.branch = null;
+    context.branch = null;
+    context.focus = null;
+    context.focus_version = null;
+
+    expect(taskCardCreateRecoveryTarget(context)).toMatchObject({
+      repository_id: null, branch_id: null, focus_worktree_id: null, focus_version: null,
+      focus_repository_id: null, project_binding_id: null, worktree_binding_id: null,
+    });
+  });
+
   it("persists one pending command across store instances without replacing its idempotency key", async () => {
     const context = contextFixture();
     const scopeKey = taskCardCreateRecoveryScopeKey(context);
     const target = taskCardCreateRecoveryTarget(context);
-    if (!scopeKey || !target) throw new Error("fixture must contain a Run and Worktree focus");
+    if (!scopeKey || !target) throw new Error("fixture must contain a valid Run context");
     const record: PendingTaskCardCreate = {
-      schema_version: 1,
+      schema_version: 2,
       scope_key: scopeKey,
       created_at_ms: Date.now(),
       input: {
@@ -119,9 +142,9 @@ describe("Task Card create recovery store", () => {
       context.focus!.engineering_run_id = runId;
       const scopeKey = taskCardCreateRecoveryScopeKey(context);
       const target = taskCardCreateRecoveryTarget(context);
-      if (!scopeKey || !target) throw new Error("fixture must contain a Run and Worktree focus");
+      if (!scopeKey || !target) throw new Error("fixture must contain a valid Run context");
       records.push({
-        schema_version: 1,
+        schema_version: 2,
         scope_key: scopeKey,
         created_at_ms: Date.now(),
         input: {
@@ -139,5 +162,41 @@ describe("Task Card create recovery store", () => {
       expect(await store.saveIfAbsent(record)).toEqual(record);
     }
     await expect(store.saveIfAbsent(records[TASK_CARD_CREATE_RECOVERY_MAX_RECORDS])).rejects.toThrow("本地待恢复记录已达上限");
+  });
+
+  it("loads schema v1 recovery unchanged and matches only its original legacy target", async () => {
+    const context = contextFixture();
+    const scopeKey = taskCardCreateRecoveryScopeKey(context);
+    if (!scopeKey) throw new Error("fixture must contain a Run scope");
+    const record: PendingTaskCardCreate = {
+      schema_version: 1,
+      scope_key: scopeKey,
+      created_at_ms: Date.now(),
+      input: { title: "Legacy pending", description: "preserve", priority: "medium", correlation_id: "10000000-0000-4000-8000-000000000008" },
+      idempotency_key: "10000000-0000-4000-8000-000000000009",
+      target: {
+        tenant_id: context.run_context.tenant_id, actor_id: context.run_context.actor_id, actor_kind: context.run_context.actor_kind,
+        project_id: context.engineering_run.project_id, repository_id: context.engineering_run.repository_id!, branch_id: context.engineering_run.branch_id!,
+        engineering_run_id: context.engineering_run.engineering_run_id, worktree_id: context.focus!.worktree_id,
+        context_version: context.run_context.context_version, focus_version: context.focus_version!,
+        project_authorization_binding_id: context.run_context.authorization.project.binding_id,
+        project_authorization_version: context.run_context.authorization.project.version,
+        branch_authorization_binding_id: context.run_context.authorization.branch!.binding_id,
+        branch_authorization_version: context.run_context.authorization.branch!.version,
+        run_authorization_binding_id: context.run_context.authorization.engineering_run.binding_id,
+        run_authorization_version: context.run_context.authorization.engineering_run.version,
+        project_binding_id: context.focus!.project_binding_id, project_binding_version: context.focus!.project_binding_version,
+        worktree_binding_id: context.focus!.binding_id, worktree_binding_version: context.focus!.binding_version,
+        branch_version: context.branch!.version, run_version: context.engineering_run.version, worktree_version: context.focus!.version,
+      },
+    };
+    const store = createTaskCardCreateRecoveryStore(`task-card-recovery-v1-${globalThis.crypto.randomUUID()}`);
+
+    expect(taskCardCreateRecoveryTargetMatchesContext(record, context)).toBe(true);
+    const changedFocus = contextFixture();
+    changedFocus.focus = { ...changedFocus.focus!, worktree_id: "30000000-0000-4000-8000-000000000099" };
+    expect(taskCardCreateRecoveryTargetMatchesContext(record, changedFocus)).toBe(false);
+    expect(await store.saveIfAbsent(record)).toEqual(record);
+    expect(await store.load(scopeKey)).toEqual(record);
   });
 });

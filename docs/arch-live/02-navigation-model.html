@@ -26,8 +26,8 @@
 <main class="wrap">
   <section class="hero">
     <div class="eyebrow">分册 02 · 结构主轴</div>
-    <h1>Project → Branch → Run → Worktree</h1>
-    <p class="lead">这一条链是整个产品的<b>结构主轴</b>：左侧导航、REST 路由、数据库表、前端页面全部按它对齐。
+    <h1>Project → Engineering Run → Worktree → Branch</h1>
+    <p class="lead">这一条链是整个产品的<b>结构主轴</b>：左侧导航固定为 Project → Engineering Run → Worktree → Branch；当前 API/schema 与路由迁移仍未闭环。
       理解了这条链，105 个 crate 和 150 张表就有了归属位置——不需要逐个读。</p>
   </section>
 
@@ -43,43 +43,42 @@
     <div class="arrowdown">▼</div>
     <div class="layer">
       <span class="lbar" style="background:var(--c-edge)"></span>
-      <div class="lh"><span class="lname">② Branch（云端分支身份）</span><span class="badge b-mute">远端</span><span class="lmeta">git 分支 · 远端身份而非本地 checkout</span></div>
-      <div class="lbody">远端分支的<b>身份</b>，不是本地目录。它是 Project 下的协作线，Run 挂在它身上。注意：分支存在 ≠ 有人在上面写代码。</div>
+      <div class="lh"><span class="lname">② Engineering Run（协作工作区）</span><span class="badge b-mute">Project scope</span><span class="lmeta">Project 下的协作工作区 · 允许不绑定远端宿主</span></div>
+      <div class="lbody">Engineering Run 是 Project 下的协作工作区，承载任务、Canvas、Workflow 与分析视图；Worktree 与本地 Branch 是其管理的 checkout 层。</div>
     </div>
     <div class="arrowdown">▼</div>
     <div class="layer">
       <span class="lbar" style="background:var(--c-star)"></span>
-      <div class="lh"><span class="lname">③ Engineering Run</span><span class="badge b-star">协作工作区</span><span class="lmeta">canonical workspace · 任务/Canvas/分析的归属</span></div>
-      <div class="lbody"><b>Run 是"协作"的唯一归属地</b>：Work Item、Canvas、Workflow、BI/Benchmark、Plugin App、Agent/Runtime 生命周期都属于某个 Run。Run 固定 profile/version/digest 与资源预算，并持有 Run 快照（供 Hook 判定）。</div>
+      <div class="lh"><span class="lname">③ Worktree</span><span class="badge b-star">本地 checkout</span><span class="lmeta">Run 下的 checkout · 当前任务/CLI 焦点</span></div>
+      <div class="lbody">Run 持有 Work Item、Canvas、Workflow、BI/Benchmark、Plugin App 与 Agent/Runtime 生命周期。选择 Worktree 后，Run 内 App tabs 以该 checkout 作为当前焦点；Run 固定 profile/version/digest 与资源预算，并持有 Hook 判定快照。</div>
     </div>
     <div class="arrowdown">▼</div>
     <div class="layer">
       <span class="lbar" style="background:var(--c-domain)"></span>
-      <div class="lh"><span class="lname">④ Worktree</span><span class="badge b-domain">本地 checkout</span><span class="lmeta">绑定 Branch 的本地目录 · 一次可运行的工作面</span></div>
-      <div class="lbody">真正落盘、能跑 CLI/Agent 的本地 checkout。选中 Run 内的 Worktree 才打开右侧 App tabs，并把它设为当前焦点与 CLI checkout 目标——<b>焦点只有一个</b>。</div>
+      <div class="lh"><span class="lname">④ Branch（Worktree 下的状态叶）</span><span class="badge b-domain">本地状态</span><span class="lmeta">本地分支名或 detached 状态 · 不决定父层级</span></div>
+      <div class="lbody">Branch 是 Worktree 当前 checkout 的本地状态叶。远端 SCM/宿主关联可缺省，Run 与 Worktree 的导航层级不随之改变。</div>
     </div>
   </div>
 
   <div class="note">
     <b>选中的含义：</b>Project Worktree Index 可以汇总跨 Branch/Run/Worktree 的状态，但那是<b>只读汇总视图</b>，
-    不取代 Branch → Run 主导航。一旦用通用任务列表或本地 seed 冒充生产管理，就破坏了这条轴。
+    不取代 Project → Engineering Run → Worktree → Branch 主导航。一旦用通用任务列表或本地 seed 冒充生产管理，就破坏了这条轴。
   </div>
 
   <h2 class="sec">02 前端路由树 <span class="badge b-fe">57 page.tsx</span></h2>
   <p>主干链路在 <code>(app)</code> 路由组里，是动态段；其余是并列的领域页面。点击展开。</p>
   <div class="grid g2 rv">
     <div class="card">
-      <h4>主干（动态段，真实路径）</h4>
+      <h4>目标导航主干（旧 branch 段为兼容路由）</h4>
       <div class="tree">
         <details open><summary>(app) 主应用组</summary><div class="kids">
           <div>/inbox</div>
           <div>/projects</div>
           <details open><summary>/projects/[project_id] <span class="badge b-mute tag">Project</span></summary><div class="kids">
-            <details open><summary>/branches/[branch_id] <span class="badge b-mute tag">Branch</span></summary><div class="kids">
-              <details open><summary>/runs/[engineering_run_id] <span class="badge b-star tag">Run</span></summary><div class="kids">
-                <details open><summary>/worktrees/[worktree_id] <span class="badge b-domain tag">Worktree</span></summary><div class="kids">
-                  <div>← 选中后才打开右侧 App tabs / CLI checkout</div>
-                </div></details>
+            <details open><summary>/runs/[engineering_run_id] <span class="badge b-star tag">Engineering Run</span></summary><div class="kids">
+              <details open><summary>/worktrees/[worktree_id] <span class="badge b-domain tag">Worktree</span></summary><div class="kids">
+                <div>Branch（本地 checkout 状态叶）</div>
+                <div>← 选中 Worktree 后打开 Run App tabs / CLI checkout 焦点</div>
               </div></details>
             </div></details>
           </div></details>
@@ -239,15 +238,15 @@
       </g>
       <g class="node g" style="animation-delay:.15s">
         <rect x="260" y="30" width="200" height="56" rx="9" fill="rgba(251,191,36,.14)" stroke="#fbbf24" stroke-opacity=".5"/>
-        <text x="276" y="52">Branch</text><text class="sub2" x="276" y="70">cloud_branch_role_binding</text>
+        <text x="276" y="52">Engineering Run</text><text class="sub2" x="276" y="70">multica.engineering_run</text>
       </g>
       <g class="node g" style="animation-delay:.25s">
         <rect x="500" y="30" width="220" height="56" rx="9" fill="rgba(91,140,255,.16)" stroke="#5b8cff" stroke-opacity=".6"/>
-        <text x="516" y="52">Engineering Run</text><text class="sub2" x="516" y="70">multica.engineering_run</text>
+        <text x="516" y="52">Worktree</text><text class="sub2" x="516" y="70">engineering_run_worktree_binding</text>
       </g>
       <g class="node g" style="animation-delay:.35s">
         <rect x="760" y="30" width="220" height="56" rx="9" fill="rgba(56,225,255,.14)" stroke="#38e1ff" stroke-opacity=".5"/>
-        <text x="776" y="52">Worktree</text><text class="sub2" x="776" y="70">multica.work_item_worktree</text>
+        <text x="776" y="52">Branch</text><text class="sub2" x="776" y="70">local checkout status</text>
       </g>
 
       <g class="node g" style="animation-delay:.5s">
@@ -256,15 +255,15 @@
       </g>
       <g class="node g" style="animation-delay:.6s">
         <rect x="260" y="150" width="200" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
-        <text x="276" y="172">/branches/[branch_id]</text><text class="sub2" x="276" y="190">前端动态段</text>
+        <text x="276" y="172">/runs/[engineering_run_id]</text><text class="sub2" x="276" y="190">canonical Run route</text>
       </g>
       <g class="node g" style="animation-delay:.7s">
         <rect x="500" y="150" width="220" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
-        <text x="516" y="172">/runs/[engineering_run_id]</text><text class="sub2" x="516" y="190">前端动态段</text>
+        <text x="516" y="172">/worktrees/[worktree_id]</text><text class="sub2" x="516" y="190">canonical Worktree route</text>
       </g>
       <g class="node g" style="animation-delay:.8s">
         <rect x="760" y="150" width="220" height="56" rx="9" fill="rgba(24,35,66,.9)" stroke="#24304f"/>
-        <text x="776" y="172">/worktrees/[worktree_id]</text><text class="sub2" x="776" y="190">前端动态段</text>
+        <text x="776" y="172">branch (local state)</text><text class="sub2" x="776" y="190">not a route segment</text>
       </g>
 
       <g class="node g" style="animation-delay:.95s">
@@ -273,15 +272,15 @@
       </g>
       <g class="node g" style="animation-delay:1.05s">
         <rect x="260" y="240" width="200" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
-        <text x="276" y="268">GET …/branches</text>
+        <text x="276" y="268">GET …/engineering-runs</text>
       </g>
       <g class="node g" style="animation-delay:1.15s">
         <rect x="500" y="240" width="220" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
-        <text x="516" y="268">GET …/engineering-runs</text>
+        <text x="516" y="268">GET …/worktrees</text>
       </g>
       <g class="node g" style="animation-delay:1.25s">
         <rect x="760" y="240" width="220" height="44" rx="8" fill="rgba(52,211,153,.10)" stroke="#34d399" stroke-opacity=".45"/>
-        <text x="776" y="268">GET …/worktrees</text>
+        <text x="776" y="268">local checkout state</text>
       </g>
 
       <g>
@@ -307,9 +306,10 @@
     <summary>证据：四级模型的硬约束原文与路由来源</summary>
     <div class="evbody">
       <ul>
-        <li>四级主导航是仓库硬约束，见 <code>AGENTS.md</code> §0「产品导航与 Worktree 管理硬约束」：必须以此解决多 Agent Worktree 归属、Branch/checkout 绑定、锁与冲突信号分散等问题。</li>
-        <li>前端路由树来自 <code>frontend/src/app/**/page.tsx</code> 实扫（57 个），主干链为 <code>(app)/projects/[project_id]/branches/[branch_id]/runs/[engineering_run_id]/worktrees/[worktree_id]/page.tsx</code>。</li>
+        <li>四级主导航是仓库硬约束，见 <code>AGENTS.md</code> §0「产品导航、命名与 Worktree 管理硬约束」：必须以此解决多 Agent Worktree 归属、Branch/checkout 绑定、锁与冲突信号分散等问题。</li>
+        <li>前端路由树来自 <code>frontend/src/app/**/page.tsx</code> 实扫（57 个），主干链为 <code>(app)/projects/[project_id]/runs/[engineering_run_id]/worktrees/[worktree_id]/page.tsx</code>。</li>
         <li>50 条路由模板来自 <code>crates/star-api-rest/src/group_api/*.rs</code> 的 <code>.route(...)</code> 字面量，已排除测试用 UUID 字面量；数量由 <code>arch_live_doc_check.py</code> 校验（下限 45）。</li>
+        <li>当前代码差距：Run 列表仍依赖远端 Branch 授权，DB 的 <code>engineering_run.branch_id</code> 仍必填；无宿主关联的 Run 尚不能完整创建、授权和列出。</li>
         <li>路由组合入口：<code>crates/star-api-rest/src/group_api.rs:656 build_group_router</code>，merge 13 个路由组 + 1 条内联 group-context。</li>
         <li>Hook 策略的 10 条路由挂在 Project 与 Worktree 两个层级（<code>hook_policies.rs</code>），既支持继承也支持 Worktree 覆盖。</li>
       </ul>

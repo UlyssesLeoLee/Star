@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=7a36272f47277230ed788432253002b8a32d1ac736f8479dd38b527e353b7f36
+MERGE (self:File {path:"frontend/src/app/identity/page.tsx"})
+MERGE (identityProviderLabel:Function {name:"identityProviderLabel", language:"typescript", visibility:"private"})
+MERGE (identityPage:Function {name:"IdentityPage", language:"typescript", visibility:"public"})
+MERGE (self)-[:DEFINES]->(identityProviderLabel)
+MERGE (self)-[:DEFINES]->(identityPage)
+MERGE (identityPage)-[:CALLS]->(identityProviderLabel)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -11,6 +21,25 @@ import { StatusPill } from "@/components/StatusPill";
 import { Tabs } from "@/components/Tabs";
 import { Users, ShieldCheck, Building2, Key, CheckCircle2, AlertCircle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+
+function identityProviderLabel(provider: string): string {
+  switch (provider) {
+    case "password":
+      return "账号密码";
+    case "saml-sso":
+      return "企业单点登录";
+    case "local-runtime-device":
+      return "本地运行环境";
+    case "github":
+      return "GitHub";
+    case "gitlab":
+      return "GitLab";
+    case "google":
+      return "Google";
+    default:
+      return "身份提供方";
+  }
+}
 
 export default function IdentityPage() {
   const { t } = useTranslation();
@@ -34,7 +63,7 @@ export default function IdentityPage() {
         <Stat label="Total Members" value={identities.length} tone="info" />
         <Stat label="MFA Enforced" value={`${mfaCount}/${identities.length}`} tone="ok" />
         <Stat label="Active Tenants" value={tenants.length} tone="default" />
-        <Stat label="Auth Providers" value="6 Connected" tone="default" hint="GitHub / Google / SSO" />
+        <Stat label="Auth Providers" value="6 Connected" tone="default" hint="账号密码 / 企业单点登录 / GitHub / Google" />
       </div>
 
       <Tabs
@@ -68,7 +97,7 @@ export default function IdentityPage() {
                   <td className="font-mono text-xs text-accent">{i.id}</td>
                   <td className="font-medium">{i.display_name}</td>
                   <td className="text-ink-dim text-xs font-mono">{i.email}</td>
-                  <td><StatusPill value={i.provider} size="xs" /></td>
+                  <td><StatusPill value={identityProviderLabel(i.provider)} size="xs" /></td>
                   <td><StatusPill value={i.status} size="xs" /></td>
                   <td>
                     {i.mfa_enabled ? (

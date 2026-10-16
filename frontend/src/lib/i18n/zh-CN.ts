@@ -21,6 +21,17 @@ export const zhCN: Dictionary = {
     appName: "Star",
     appTagline: "Vibe Coding Work Management",
   },
+  runDirectory: {
+    newRun: "新建 Run",
+    newRunTitle: "创建 Engineering Run",
+    runName: "Run 名称",
+    runNamePlaceholder: "输入名称",
+    create: "创建 Run",
+    creating: "正在创建…",
+    cancel: "取消",
+    hostIndependentHint: "此 Run 不需要关联远端 Branch。",
+    invalidRunName: "Run 名称需为 1 至 500 个字符。",
+  },
   userMenu: {
     menuLabel: "用户菜单: {name} ({role})",
     themeEngine: "主题引擎",
@@ -156,7 +167,7 @@ export const zhCN: Dictionary = {
     identity: { label: "Identity & Members", description: "成员账号、组织架构与鉴权身份", categoryLabel: "系统与安全" },
     tenant: { label: "Tenant Admin", description: "多租户隔离与资源配额控制", categoryLabel: "系统与安全" },
     // Refactor Sweep (per 2026-09-02 10:41 JST 拍板)
-    refactor: { label: "Refactor Sweep 重构专项", description: "分批次对已完成任务做重构 · Jira 风格 todo→done 循环, 列可自定义", categoryLabel: "工作管理" },
+    refactor: { label: "Refactor Sweep 重构专项", description: "分批次重构已完成任务 · 待办→完成循环, 列可自定义", categoryLabel: "工作管理" },
   },
   status: {
     workItem: {
@@ -262,7 +273,7 @@ export const zhCN: Dictionary = {
   // ── v0.4 Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
   refactor: {
     title: "Refactor Sweep 重构专项",
-    subtitle: "分批次对已完成任务做重构 · Jira 风格 todo→done 敏捷流, 走完一轮后自动开下一轮, 第 N 次循环",
+    subtitle: "分批次重构已完成任务 · 待办→完成工作流, 每轮完成后自动开始下一轮",
     kpiTodo: "待办",
     kpiDoing: "处理中",
     kpiTesting: "测试中",
@@ -364,7 +375,7 @@ export const zhCN: Dictionary = {
     permission: { label: "RBAC 权限", categoryLabel: "系统 / 治理", description: "细粒度角色权限策略矩阵" },
     identity: { label: "身份与成员", categoryLabel: "系统 / 治理", description: "成员账号、组织架构与鉴权身份" },
     tenant: { label: "租户管理", categoryLabel: "系统 / 治理", description: "多租户隔离与资源配额控制" },
-    refactor: { label: "重构专项", categoryLabel: "工作管理", description: "分批次重构已完成任务 · Jira 风格 todo→done 循环" },
+    refactor: { label: "重构专项", categoryLabel: "工作管理", description: "分批次重构已完成任务 · 待办→完成循环" },
   },
   // 28 page title/subtitle (key = route, e.g. "/notification" "/agent")
   pageTitles: {
@@ -380,13 +391,13 @@ export const zhCN: Dictionary = {
     "/audit": { title: "审计日志", subtitle: "Append-only hash chain + 9 AI 问题元数据 + cross-tenant 100% 审计。INV-AU-01~07 保证不可篡改。" },
     "/automation": { title: "自动化", subtitle: "Rule + Trigger + Condition(CEL) + Action + RuleExecutor。6 INV 保证可观测、可禁用、可审计。" },
     "/board": { title: "看板", subtitle: "Kanban 视图 + 拖动 transition + 多人协同 (2s polling)。每列定义 status + 可选 wip_limit;超限时高亮。" },
-    "/collaboration": { title: "协作画布", subtitle: "无限画布(Miro 模式)与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。" },
+    "/collaboration": { title: "协作画布", subtitle: "无限画布与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。" },
     "/comment": { title: "评论" },
     "/context": { title: "上下文图谱", subtitle: "ContextPacket (5 字段: priority/kind/payload/provenance/decision) + Decision (3 状态) + INV-CT-01~10。token 预算决定单次 session 可加载量。" },
     "/development": { title: "研发", subtitle: "ChangeSets 代码变更、Worktree 沙箱与研发审计日志" },
     "/feedback": { title: "反馈收件箱", subtitle: "6 状态机 (§7.3) + INV-FB-01~02。Agent 在执行中向人类发问；人类 answer 后回到 agent 上下文。" },
     "/identity": { title: "身份与访问", subtitle: "统一身份认证、权限矩阵与多租户工作空间管理" },
-    "/integration": { title: "集成", subtitle: "外部服务适配器 (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)。loop_protection_key 防止 webhook 风暴。" },
+    "/integration": { title: "集成", subtitle: "连接代码托管、团队协作、任务管理和自动化服务。事件幂等键用于防止重复投递。" },
     "/local-runtime": { title: "本地运行时", subtitle: "开发机上的执行环境。device/tenant/user 三重绑定(§23.2)。policy_violations 触发审计事件。" },
     "/notification": { title: "通知", subtitle: "Inbox + Email + IM 渠道。INV-N-07 抑制策略:同 actor 60min 内同 kind 第 2 次自动 suppress(写入 audit)。" },
     "/permission": { title: "权限", subtitle: "Rules-based RBAC。scheme 可绑定 project;rule 定义 (resource_kind, action, role, effect, condition CEL)。" },
@@ -515,3 +526,12 @@ export const zhCN: Dictionary = {
     docsEmpty: "该类别暂无可用文档",
   },
 };
+/*
+@cypher schema=1 source_sha256=adba2ee6b48f951113a9806112445e831d6689adb18e148fea7d99f83dac2bdf
+MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
+MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (self)-[:IMPORTS]->(dictionary)
+MERGE (locale:Symbol {id:"frontend/src/lib/i18n/zh-CN.ts::zhCN",kind:"constant"})
+MERGE (self)-[:DEFINES]->(locale)
+@endcypher
+*/

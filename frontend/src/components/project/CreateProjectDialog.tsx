@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=1749265d4c70f75c9bebb4a285e697f63989167cab48676a0991bc0179c06fa7
+MERGE (self:File {path:"frontend/src/components/project/CreateProjectDialog.tsx"})
+MERGE (props:Type {id:"frontend/src/components/project/CreateProjectDialog.tsx::CreateProjectDialogProps",kind:"interface"})
+MERGE (dialog:Symbol {id:"frontend/src/components/project/CreateProjectDialog.tsx::CreateProjectDialog",kind:"component"})
+MERGE (self)-[:DEFINES]->(props)
+MERGE (self)-[:DEFINES]->(dialog)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -45,8 +54,8 @@ const KANBAN_TEMPLATES = [
     defaultPhases: 12,
   },
   {
-    id: "jira-simplex",
-    label: "Jira シンプル",
+    id: "kanban-simplex",
+    label: "シンプルな計画看板",
     description: "5 状態カラム (To Do / 進行中 / レビュー / ブロック / 完了) 単層. シンプルタスク管理向け.",
     recommended: false,
     defaultPhases: 0,
@@ -311,7 +320,7 @@ export function CreateProjectDialog({ open, onClose, onCreated }: CreateProjectD
                 onClick={() => {
                   setKanbanTemplate(tpl.id);
                   if (tpl.id === "ipa-vmodel") setInitialPhaseCount(12);
-                  if (tpl.id === "jira-simplex") setInitialPhaseCount(0);
+                  if (tpl.id === "kanban-simplex") setInitialPhaseCount(0);
                   if (tpl.id === "sprint-flat") setInitialPhaseCount(0);
                 }}
                 data-testid={`create-project-template-${tpl.id}`}

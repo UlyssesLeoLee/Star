@@ -19,6 +19,14 @@
 //!
 //! Lead 责任: work-item Lead
 
+//! @cypher schema=1 source_sha256=b4374b80dc77ca27ad14006e8e0a2f55413facd5eef547b8b1c1fdd7943e8b87
+//! MERGE (self:File {path:"crates/domain-work-item/src/lib.rs"})
+//! MERGE (crateModule:Symbol {id:"crates/domain-work-item/src/lib.rs::domain_work_item",kind:"module"})
+//! MERGE (runTaskCard:Symbol {id:"crates/domain-work-item/src/lib.rs::run_task_card",kind:"module"})
+//! MERGE (self)-[:DEFINES]->(crateModule)
+//! MERGE (crateModule)-[:DEFINES]->(runTaskCard)
+//! @endcypher
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -28,6 +36,8 @@ use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
+
+pub mod run_task_card;
 
 // =====================================================================
 // ID 类型

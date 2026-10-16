@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=131575c0251f127bf28e2d61d4bf9eaa0f5447083db2f6d57f4c920f18e55519
+MERGE (self:File {path:"frontend/src/lib/nav/subNavRegistry.ts"})
+@endcypher
+*/
 // =====================================================================
 // subNavRegistry — SubNav 数据源 (per 2026-09-03 12:36 JST 拍板)
 // =====================================================================
@@ -55,7 +60,7 @@ export interface SubNavEntry {
 export interface SubNavGroup {
   /** 路径前缀, pathname 命中时这组 items 全部展开 (e.g. "/projects") */
   pathnamePrefix: string;
-  /** 顶部 label, 跟 SubNav topLabel 一致 (per 2026-09-02 Jira 风格) */
+  /** 顶部 label, 跟 SubNav topLabel 一致 (per 2026-09-02 扩展) */
   topLabel: string;
   /** 该组的主 category, 决定 left border / bg / text 默认色 (per-item category 优先) */
   category: ModuleCategory;

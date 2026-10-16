@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=2107eb9e1d946f8d0079860505732f2b87984ea753a7152d2c39fc1dac174713
+MERGE (self:File {path:"frontend/src/app/refactor/page.tsx"})
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -248,7 +253,7 @@ export default function RefactorPage() {
         }
       />
 
-      {/* 项目切换 (multica 风格) */}
+      {/* 项目切换 */}
       <ProjectSwitcher
         projects={projects}
         selectedId={selectedProjectId}
@@ -375,7 +380,7 @@ export default function RefactorPage() {
 }
 
 // =====================================================================
-// ProjectSwitcher — 顶部项目切换 (multica 风格 chip row, 跟 ProjectsClient 形态一致)
+// ProjectSwitcher — 顶部项目切换 (chip row, 跟 ProjectsClient 形态一致)
 // =====================================================================
 function ProjectSwitcher({
   projects, selectedId, onSelect,
