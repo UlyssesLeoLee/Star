@@ -1,13 +1,13 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+> **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
-> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v7.13**
+> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v7.14**
 > - Phase 9F4G 当前状态：provider-neutral receiver core、durable metadata-only quarantine 与 Run-scoped Task-event read API source 已加入 §6.153–§6.154。隔离 PostgreSQL 18 query fixture 验证双次 migration、function-only grants、scope、keyset cursor、partial cursor/page bounds 与 payload omission；Rust 1.99.0 gates、target BI role/DB deployment、production transport/auth/receiver composition、UI、fan-out/recovery、Benchmark、retention 与性能仍开放，ingress 和执行保持 fail closed。
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、其余 owner adapter 覆盖与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 日期：2026-10-17
+> - 日期：2026-10-18
 > - 最新增量状态：Phase 1 host-session 有四项前端回归覆盖（typecheck 通过，Vitest 未启动且缺 `@csstools/css-parser-algorithms/index.js`），真实 host auth、trusted ingest/grants 与 Run Apps migration 仍开放。D20 JetStream cross-provider diagnostics 在 matching-tenant resolver-bound route snapshot 下可用；缺少/错配 snapshot 或 feature disabled 为 Unavailable。D20 P2、operator API/UI、recovery/disposition 与 production wiring 仍开放，见 §6.139–§6.140。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 状态：RunTaskCardCommandPort、PostgreSQL owner adapter、REST create/transition/review 与 Canvas 同事务组合已写入实现 lane；共享幂等 advisory lock 在读取 Canvas 组合回执前取得。Task lifecycle schema v3 Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 已有 source；Profile `event` authorization、authenticated-context-derived route identity、fenced retry 与 proof dead-letter 已加入。Rust 1.99.0 build/fmt、目标 DB/RLS 和并发验收未完成；无 network dispatcher、receiver Inbox、accepted settlement 或 consumer projection，delivery 与 Run Apps/CLI production capability 继续关闭。
 > - ERUN-P3.3 Rust Task delivery 状态：Run-owner bounded claim/route/wire store 已实现 source；Profile 必须独立授权 `event` kind，sender/receiver 从 authenticated context 派生，精确 route pin 与 wire digest 对比，retry 受当前 lease fence 约束，invalid-envelope dead-letter 要求私有 proof。源 Outbox DB 已有 8 KiB JSONB text check。没有 Rust compile/fmt、network send、accepted、receiver Inbox、consumer projection、公平调度或目标 DB 验收；执行保持 fail closed，详见 §6.150。
@@ -2335,3 +2335,16 @@ Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Proj
 `coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
 
 本次修订：v7.13，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。
+
+
+## 6.156 Phase 9F4I Native event transport foundation
+
+Native server 的 Append/Pull/VerifyOrigin/ACK 与 delivery 校验现在接受独立 `event` kind。新迁移 `2026-10-18-platform-native-event-kind.sql` 扩展绑定表 CHECK 和固定路径 SECURITY DEFINER 授权函数；保持当前 mTLS certificate registry、tenant、发送/接收服务、active Profile digest/revision、独立 allowed_message_kinds、immutable log binding/generation、锁与生命周期条件。必须先应用 `2026-10-16-platform-transport-profile-event-kind.sql`，旧的 request-only Profile 不获得 event 权限；未知 kind 继续拒绝。runtime 仅执行 authenticated wrappers，不能调用裸日志或授权 helper，不获得表权限。
+
+W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_identity`、`transport_profile_revision` 仍为 Master；`message_work` 为 Work；永久 `delivery_receipt`、`receipt_outbox` 与审计为 Transaction。现有 retention、RLS/FORCE RLS、WORM 与预算边界不变。迁移仅变更类别与函数，不改变历史 Profile digest，也不回填无来源证明的旧 wire。
+
+验收：`scripts/automation/phase9f4i_native_event.py --pg-bin D:\PostgreSQL\18\bin` 的 6 个迁移均双次应用，既有 server-auth、origin 和新增 event 契约共 15 步通过；覆盖 event append/replay/pull/source verification/ACK、changed-wire conflict、错误 generation、未知 kind/peer、两方向类别隔离与既有 runtime grants/RLS/WORM。Rust 1.99.0 native-only feature library 44/44 通过。首次 runner 顺序错误暴露 pre-attestation fixture 前提，已按真实历史升级顺序修复并重跑；不得回填原证据。
+
+这是原生传输基础切片。BI 专用 Native client/route-pin verifier、可信组合入口、Task sender dispatcher、BI owner 提交后 ACK 的真实网络联测、目标身份/DB provisioning、recovery/checkpoint、Benchmark 与性能仍开放；不启动消费者或 execution，不声明端到端 BI 上线。AC-RUN-OUTBOX-12 / Task AC-26 / BD §6.7 / DD §14.13.9 对应本片；下一步明确为 BI native adapter 与真实 owner commit-before-ACK 联测。
+
+修订 v7.14 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权与阶段验收对账。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。

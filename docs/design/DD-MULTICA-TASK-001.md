@@ -1,16 +1,16 @@
 # DD-MULTICA-TASK-001
 
-> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+> **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
-> **Task Lifecycle 域 詳細設計書 v1.39** (Project/Run-owned Task Card source and delivery substrate; BI owner fact projection, durable quarantine, and Run-scoped read API source exist, while trusted receiver transport, production BI UI and delivery remain open)
+> **Task Lifecycle 域 詳細設計書 v1.40** (Project/Run-owned Task Card source and delivery substrate; BI owner fact projection, durable quarantine and Run-scoped read API source exist; native `event` transport authorization is verified, while trusted BI receiver composition, production BI UI and delivery remain open)
 >
-> - 状态: 🟡 Draft v1.39 (9F4G adds a bounded Run-authorized query API and fixed BI owner query function; its isolated PostgreSQL 18 fixture passes. The new Rust gates and target role deployment were not verified; trusted transport/auth, production UI and recovery remain open; execution stays fail closed)
+> - 状态: 🟡 Draft v1.40 (9F4G adds a bounded Run-authorized query API and fixed BI owner query function; 9F4I adds independently authorized native `event` transport. Focused Rust 1.99.0 and isolated PostgreSQL gates pass; target role deployment, trusted BI receiver/auth composition, production UI, owner commit-before-ACK network evidence and recovery remain open; execution stays fail closed)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: docs/requirements.md v6.85 §50；docs/basic-design.md v6.84 §16
+> - 关联总要件 / 基本设计: docs/requirements.md v6.86 §50；docs/basic-design.md v6.85 §16
 > - 关联 Group / Hook 详细设计: docs/design/DD-WORKTREE-GROUP-001.md v5.08；docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14
-> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.25
-> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.18
+> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.26
+> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.19
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
@@ -1247,3 +1247,16 @@ Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Proj
 `coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
 
 本次修订：v1.39，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。
+
+
+## 14.13.9 Phase 9F4I 原生事件日志与身份授权
+
+Native server 的 Append/Pull/VerifyOrigin/ACK 与 delivery 校验现在接受独立 `event` kind。新迁移 `2026-10-18-platform-native-event-kind.sql` 扩展绑定表 CHECK 和固定路径 SECURITY DEFINER 授权函数；保持当前 mTLS certificate registry、tenant、发送/接收服务、active Profile digest/revision、独立 allowed_message_kinds、immutable log binding/generation、锁与生命周期条件。必须先应用 `2026-10-16-platform-transport-profile-event-kind.sql`，旧的 request-only Profile 不获得 event 权限；未知 kind 继续拒绝。runtime 仅执行 authenticated wrappers，不能调用裸日志或授权 helper，不获得表权限。
+
+W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_identity`、`transport_profile_revision` 仍为 Master；`message_work` 为 Work；永久 `delivery_receipt`、`receipt_outbox` 与审计为 Transaction。现有 retention、RLS/FORCE RLS、WORM 与预算边界不变。迁移仅变更类别与函数，不改变历史 Profile digest，也不回填无来源证明的旧 wire。
+
+验收：`scripts/automation/phase9f4i_native_event.py --pg-bin D:\PostgreSQL\18\bin` 的 6 个迁移均双次应用，既有 server-auth、origin 和新增 event 契约共 15 步通过；覆盖 event append/replay/pull/source verification/ACK、changed-wire conflict、错误 generation、未知 kind/peer、两方向类别隔离与既有 runtime grants/RLS/WORM。Rust 1.99.0 native-only feature library 44/44 通过。首次 runner 顺序错误暴露 pre-attestation fixture 前提，已按真实历史升级顺序修复并重跑；不得回填原证据。
+
+这是原生传输基础切片。BI 专用 Native client/route-pin verifier、可信组合入口、Task sender dispatcher、BI owner 提交后 ACK 的真实网络联测、目标身份/DB provisioning、recovery/checkpoint、Benchmark 与性能仍开放；不启动消费者或 execution，不声明端到端 BI 上线。AC-RUN-OUTBOX-12 / Task AC-26 / BD §6.7 / DD §14.13.9 对应本片；下一步明确为 BI native adapter 与真实 owner commit-before-ACK 联测。
+
+修订 v1.40 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权、focused Rust/PG gates 及详细设计对账。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。

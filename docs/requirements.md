@@ -1,6 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.85）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.86）
 
-> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+> **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 > **v6.78 Task Outbox route-pin migration source status**：主导航固定为 Project → Engineering Run → Worktree → Branch；Engineering Run 可脱离远端宿主身份创建、授权、列出及打开。Run Task Cards 支持 hostless 列表、创建、生命周期与审查命令；同一 owner transaction 写入 schema v3 lifecycle Outbox。owner-local delivery Work queue 每 Run 最多 1024 个待处理事件，租约批次 1–8、租期 30–300 秒、最多 12 次退避重试；7 天期限从 Work 入队 `created_at` 起算，不因终态重置。终态回执先持久化再删除 Work；仍未终态的 Work 到期时记录 `retention_elapsed` 后删除。永久 Outbox 与不可变终态回执分离。新增的 2026-10-16 Task route-pin migration source 以 tenant/event 为不可变身份，复合绑定永久源事件，固定 sender/receiver、provider/Profile/endpoint/destination generation、schema、wire digest，并在固定函数中复验当前 worker/attempt/schema lease fence；该 source 已在 disposable PostgreSQL 18 synthetic-Outbox fixture 中双次应用，并通过选定的 schema/RLS/grant/WORM/lease/idempotency/事务回滚断言；此结果不证明目标 DB、并发或生产 owner identity。它仍未接入 Rust dispatcher。receiver Inbox writer、consumer stores/projections、目标 DB grants/RLS 与数据库验收仍开放；accepted settlement、Schedule、Agent/CLI 执行仍 fail closed。产品 UI 使用中性能力名称，真实启用的连接器可事实显示服务商名称，不使用第三方产品作对标或仿制文案。
 > **v6.79 Rust Task delivery source slice status**：新增 Run-owner Rust delivery store，可按 1–8 有界 claim、从已认证 Transport Context 派生 sender/receiver，并要求 Transport Profile 独立授权 `event` kind；它从 Task 源事件构造确定性 envelope、执行当前 route pin 和 exact-wire digest 校验，并支持受 lease fence 保护的 retry。dead 仅接受由无效 source envelope 验证生成的私有 proof。源 Outbox 已有数据库 `octet_length(payload::text) <= 8192` 约束，因此 payload 在 PostgreSQL 返回 JSON 前已有硬上限；本阶段不重复添加约束迁移。此 Rust 切片没有网络发送、accepted settlement、receiver Inbox、consumer projection 或公平 Run 轮转；Cargo/Rust 工具链当前不可用，故代码尚未编译/格式化，目标 DB 与生产身份仍未验收。此前 route-pin fixture 的有限 PostgreSQL 断言不证明该 Rust store。
@@ -3687,3 +3687,16 @@ Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Proj
 `coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
 
 本次修订：v6.85，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。
+
+
+## 50.8AU AC-RUN-OUTBOX-12 — 原生事件传输授权
+
+Native server 的 Append/Pull/VerifyOrigin/ACK 与 delivery 校验现在接受独立 `event` kind。新迁移 `2026-10-18-platform-native-event-kind.sql` 扩展绑定表 CHECK 和固定路径 SECURITY DEFINER 授权函数；保持当前 mTLS certificate registry、tenant、发送/接收服务、active Profile digest/revision、独立 allowed_message_kinds、immutable log binding/generation、锁与生命周期条件。必须先应用 `2026-10-16-platform-transport-profile-event-kind.sql`，旧的 request-only Profile 不获得 event 权限；未知 kind 继续拒绝。runtime 仅执行 authenticated wrappers，不能调用裸日志或授权 helper，不获得表权限。
+
+W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_identity`、`transport_profile_revision` 仍为 Master；`message_work` 为 Work；永久 `delivery_receipt`、`receipt_outbox` 与审计为 Transaction。现有 retention、RLS/FORCE RLS、WORM 与预算边界不变。迁移仅变更类别与函数，不改变历史 Profile digest，也不回填无来源证明的旧 wire。
+
+验收：`scripts/automation/phase9f4i_native_event.py --pg-bin D:\PostgreSQL\18\bin` 的 6 个迁移均双次应用，既有 server-auth、origin 和新增 event 契约共 15 步通过；覆盖 event append/replay/pull/source verification/ACK、changed-wire conflict、错误 generation、未知 kind/peer、两方向类别隔离与既有 runtime grants/RLS/WORM。Rust 1.99.0 native-only feature library 44/44 通过。首次 runner 顺序错误暴露 pre-attestation fixture 前提，已按真实历史升级顺序修复并重跑；不得回填原证据。
+
+这是原生传输基础切片。BI 专用 Native client/route-pin verifier、可信组合入口、Task sender dispatcher、BI owner 提交后 ACK 的真实网络联测、目标身份/DB provisioning、recovery/checkpoint、Benchmark 与性能仍开放；不启动消费者或 execution，不声明端到端 BI 上线。AC-RUN-OUTBOX-12 / Task AC-26 / BD §6.7 / DD §14.13.9 对应本片；下一步明确为 BI native adapter 与真实 owner commit-before-ACK 联测。
+
+修订 v6.86 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权与 Rust/PG gates 完成、跨文档核对。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。

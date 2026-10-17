@@ -751,3 +751,10 @@ The disposable PostgreSQL 18.6 schema-only runner passed **83/83 steps**; D20 mi
 | v1.00 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the portable quote-free PostgreSQL startup setting and corrected v3 83/83 WSL audit; retain Windows, SQLx and production acceptance limits | Independent review finding and PostgreSQL 18.6 rerun
 | v1.01 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record D20 89/89 PostgreSQL role/grants/RLS schema-only verification, the SQLx target's Rust 1.98.1 compile and 1 ignored harness result, and the local-dev commits `a9bc2681` / `646eaa34`; preserve production and execution gates | Two D20 subagent lanes rebase and fast-forward merged to local dev |
 | v1.02 | 2026-10-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Index D19 current-Profile/trusted-endpoint composition and typed native-client destination; record post-merge checks and production startup/identity gates without claiming live transport | D19 profile/client worktrees rebase and fast-forward merged to local dev |
+
+
+## Phase 9F4I
+
+| Task | Script | Tier | Evidence |
+|---|---|---|---|
+| Native event DB authorization | `scripts/automation/phase9f4i_native_event.py` | P | 15 migration/contract steps PASS; automation-design.md §4.86; production/client gates open |

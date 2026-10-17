@@ -1,7 +1,7 @@
 # DD-RUST-SERVER-REUSE-001 — 自有 Rust 服务端复用与原生消息替换
 
-> v1.16 · 2026-10-14 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> 状态：D19 bounded endpoint resolver 与真实 PostgreSQL-backed mTLS E2E 已实现/实跑；Rust 1.98.1 `--ignore-rust-version` 诊断门。D20 cumulative PostgreSQL 18.6 WSL runner 89/89；guarded SQLx origin target 编译通过但仍 ignored，未执行 SQL。测试仅允许 loopback、非默认端口和精确 `star_d20_origin_test`，并在任何 fixture 写入前预检 required roles/membership, tables, routines and FORCE RLS。另一个同名本机数据库仍须由环境管理隔离。Rust 1.99.0 正式门、production identity/control plane/profile-loader wiring、目标 DB grants、Windows PostgreSQL runtime、owner recovery、BI/performance 和 cutover 均未完成。
+> v1.17 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> 状态：D19 bounded endpoint resolver 与真实 PostgreSQL-backed mTLS E2E 已实现/实跑；Rust 1.98.1 `--ignore-rust-version` 诊断门。D20 cumulative PostgreSQL 18.6 WSL runner 89/89；guarded SQLx origin target 编译通过但仍 ignored，未执行 SQL。测试仅允许 loopback、非默认端口和精确 `star_d20_origin_test`，并在任何 fixture 写入前预检 required roles/membership, tables, routines and FORCE RLS。9F4I 的 Rust 1.99.0 native-gRPC library tests 44/44、feature all-targets check 与 disposable PostgreSQL 18.6 event contracts 已通过；这不替代 D20 更广的 Windows/PostgreSQL runtime、production identity/control-plane/profile-loader wiring、目标 DB grants、owner recovery、BI/performance 和 cutover 门禁。
 
 ## 1. 范围与证据
 
@@ -223,3 +223,16 @@ capacity_released remains unavailable because its Run-owner typed consumer and B
 | v1.9 | 2026-10-12 | Ulysses — Mavis接手审核 | Add D20 append-time source provenance and exact-wire verifier design; revalidate AssetsLake/RustGameServer source state; record unrun PostgreSQL contract and reuse limits | User reaffirmed direct module reuse authorization for AssetsLake and local Rust servers; D20 added VerifyOrigin |
 | v1.8 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确用户可直接复用本机 Rust 服务模块并说明 AssetsLake relay 的实际投递边界；公开 canonical provider identity helper，记录当前 Rust 1.98.1 诊断验证与未关闭的 D20 gates | 用户再次确认模块级直接复用，并要求为 Star 自有 Rust 服务替换 NATS 做准备 |
 | v1.7 | 2026-10-12 | Ulysses — Mavis接手审核 | 记录 native gRPC receive port、canonical provider identity、leased-delivery memory cap 和真实诊断验证；明确 D20 consumer/BI/production gates 仍开放 |
+
+
+## Phase 9F4I — Native event route foundation
+
+Native server 的 Append/Pull/VerifyOrigin/ACK 与 delivery 校验现在接受独立 `event` kind。新迁移 `2026-10-18-platform-native-event-kind.sql` 扩展绑定表 CHECK 和固定路径 SECURITY DEFINER 授权函数；保持当前 mTLS certificate registry、tenant、发送/接收服务、active Profile digest/revision、独立 allowed_message_kinds、immutable log binding/generation、锁与生命周期条件。必须先应用 `2026-10-16-platform-transport-profile-event-kind.sql`，旧的 request-only Profile 不获得 event 权限；未知 kind 继续拒绝。runtime 仅执行 authenticated wrappers，不能调用裸日志或授权 helper，不获得表权限。
+
+W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_identity`、`transport_profile_revision` 仍为 Master；`message_work` 为 Work；永久 `delivery_receipt`、`receipt_outbox` 与审计为 Transaction。现有 retention、RLS/FORCE RLS、WORM 与预算边界不变。迁移仅变更类别与函数，不改变历史 Profile digest，也不回填无来源证明的旧 wire。
+
+验收：`scripts/automation/phase9f4i_native_event.py --pg-bin D:\PostgreSQL\18\bin` 的 6 个迁移均双次应用，既有 server-auth、origin 和新增 event 契约共 15 步通过；覆盖 event append/replay/pull/source verification/ACK、changed-wire conflict、错误 generation、未知 kind/peer、两方向类别隔离与既有 runtime grants/RLS/WORM。Rust 1.99.0 native-only feature library 44/44 通过。首次 runner 顺序错误暴露 pre-attestation fixture 前提，已按真实历史升级顺序修复并重跑；不得回填原证据。
+
+这是原生传输基础切片。BI 专用 Native client/route-pin verifier、可信组合入口、Task sender dispatcher、BI owner 提交后 ACK 的真实网络联测、目标身份/DB provisioning、recovery/checkpoint、Benchmark 与性能仍开放；不启动消费者或 execution，不声明端到端 BI 上线。AC-RUN-OUTBOX-12 / Task AC-26 / BD §6.7 / DD §14.13.9 对应本片；下一步明确为 BI native adapter 与真实 owner commit-before-ACK 联测。
+
+修订 v1.17 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权和 Rust 1.99.0/隔离 PostgreSQL 验收。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。

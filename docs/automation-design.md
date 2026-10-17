@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.58 (2026-10-14)
+> **文档版本**: v2.59 (2026-10-18)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3131,4 +3131,10 @@ The verified PostgreSQL 18.6 disposable run passed. Rust 1.99.0 `bi-owner-runtim
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
+| v2.59 | 2026-10-18 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the 9F4I native event-kind authorization runner and record the isolated PostgreSQL contract, Rust 1.99.0 focused tests and native-gRPC all-target check; retain production receiver, identity, recovery, performance and execution fail-closed gates | 9F4I native event authorization and cross-document review |
 | v2.58 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the 9F4F disposable PostgreSQL gate for DB-generated allowlist projection, legacy raw-fact conversion, missing-state rejection, privacy sentinel removal and least privilege; record Rust 1.99.0 `bi-owner-runtime` format, all-target tests and strict Clippy pass; retain production/retention/workspace gates | 9F4F owner-side BI data-minimization implementation and test review |
+
+
+## 4.86 Phase 9F4I native event verification
+
+Automation tier P. `scripts/automation/phase9f4i_native_event.py` owns a unique loopback-only disposable PostgreSQL instance; uses existing bounded command/port helpers; verifies the ordered real migration chain twice and event/legacy contracts (15 steps). Pre-attestation server-auth fixtures run before origin migration. It stops PostgreSQL before deleting only its own resolved target directory, preserves failures and logs, and never changes Multipass inventory or production credentials. Report: `PHASE-9F4I-NATIVE-EVENT-REPORT.md`; no claim of BI client/consumer production readiness.

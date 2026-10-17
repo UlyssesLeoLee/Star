@@ -1,4 +1,4 @@
-// @cypher schema=1 source_sha256=148e02ec7c6206f9ec75a6176c79ac2358dcbb441df28df94a54de6cf820d984
+// @cypher schema=1 source_sha256=b0b73cd806fa4cacc7d290e0ce30db257f105394bcb0d927408989eb4afe3c43
 // MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc_server.rs"})
 // MERGE (server:Type {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer",kind:"struct"})
 // MERGE (server_error:Type {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcServerError",kind:"enum"})
@@ -413,7 +413,7 @@ fn uuid_field(bytes: &[u8], name: &'static str) -> Result<Uuid, Status> {
 
 fn validate_message_kind(value: &str) -> Result<(), Status> {
     match value {
-        "request" | "result" | "resolution" => Ok(()),
+        "request" | "result" | "resolution" | "event" => Ok(()),
         _ => Err(Status::invalid_argument(
             "unsupported native transport message kind",
         )),
@@ -526,6 +526,8 @@ mod tests {
         assert!(valid_log_id("run-admission:request"));
         assert!(!valid_log_id("../untrusted"));
         assert!(validate_message_kind("request").is_ok());
+        assert!(validate_message_kind("event").is_ok());
+        assert!(validate_message_kind("Event").is_err());
         assert!(validate_message_kind("custom").is_err());
     }
 }
