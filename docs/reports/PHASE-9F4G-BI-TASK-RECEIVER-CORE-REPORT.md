@@ -22,6 +22,7 @@
 | `phase9f4e_bi_task_event_inbox.py --pg-bin D:\PostgreSQL\18\bin` | PASS：隔离 PostgreSQL 18 验证 BI Inbox/projection/quarantine/query migration；新 query migration 双次 apply、function-only grants、tenant/Project scope、相同时间戳 keyset paging、partial cursor/page bound 拒绝与 payload omission 断言通过 |
 | CodeGraph | PASS：候选 worktree 已同步当前源码；定向结构查询与源码核查，不宣称全仓覆盖。 |
 | `git diff --check` | PASS |
+| 本地 dev 集成 | PASS：Orca owner inactive、无 PTY/terminal，HEAD/clean/index flags/Git operation gate 复核后，从 203b93c7 快进到 cfb2ca6e；包含 09cf21d8、51d72f38 与 cfb2ca6e 三个 BI 提交，合并后工作区干净。 |
 | CypherGraph Guardian | PASS（变更 Rust 源文件 stamp 结果见本轮验证；如后续再改源文件需重跑） |
 | Rust 1.99.0 fmt/build/test/Clippy | 未运行：当前 PATH 无 `cargo`、`rustc`、`rustfmt`；不得宣称 Rust gates 通过 |
 | 生产数据库/角色 | 未部署或验证；隔离 fixture 不证明 target DB grants、login membership、备份/WAL 或 PITR |
@@ -39,7 +40,7 @@
 
 ## §4 子代理失败接手清单
 
-本轮派发代码、文档和拓扑三个独立审查子代理；代码审查发现依赖、rustdoc 与总超时缺口，子代理已修复，主代理复核了 manifest/lock、6 秒 timeout 和 cursor 构造边界。文档与拓扑审查已返回，无失败交接。全部改动位于候选 worktree；最新 Orca 检查中 dev 为 inactive、无 terminal/PTY，合并前仍须重新核对 HEAD 与 clean state。拓扑审查确认候选基线只领先 dev 两个 BI receiver/quarantine 提交；neutral-product-copy 的有效文案已由 f1d2fa40、6cd18fa5、e17e2a1a 选择性纳入 dev，余下旧架构差异不采纳。
+本轮派发代码、文档和拓扑三个独立审查子代理；代码审查发现依赖、rustdoc 与总超时缺口，子代理已修复，主代理复核了 manifest/lock、6 秒 timeout 和 cursor 构造边界。文档与拓扑审查已返回，无失败交接。源改动已从隔离候选 worktree 以记录的 cfb2ca6e 快进合入本地 dev；合并前复核 Orca inactive/无 terminal 与 PTY、HEAD 不变、clean state、隐藏 index flags 和 Git operation gate，合并后 dev 干净。拓扑审查确认候选基线只领先 dev 两个 BI receiver/quarantine 提交；neutral-product-copy 的有效文案已由 f1d2fa40、6cd18fa5、e17e2a1a 选择性纳入 dev，余下旧架构差异不采纳。
 
 ## §5 守门规则
 
@@ -75,6 +76,7 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.4 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记三个子代理审查、依赖/rustdoc/总超时修复与本地 dev 安全快进到 cfb2ca6e 的证据；记录 neutral-copy 有效意图已选择性纳入、剩余旧架构不采纳 | 用户要求子代理分头处理合并 |
 | v0.3 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Run-scoped BI Task-event read API、固定 DB function、可选两连接 query pool、授权持锁、50/100 keyset、unknown coverage/freshness；记录隔离 PG18 query fixture 通过及 Rust/target/production blockers | Phase 9F4G BI read surface 源码切片 |
 | v0.2 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加入固定 BI owner SQLx quarantine store、append-only T schema、完整 route/cursor exactness；记录隔离 PostgreSQL 18 double-apply、RLS/grants/WORM、输入和两种并发 race；同步 SRS/BD/DD/basic/requirements/Data Design；明确 trusted route/GUC 边界及 production/Rust gates | durable metadata-only quarantine persistence slice 与并发 PostgreSQL verification |
 | v0.1 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9F4G BI Task event receiver core 的实现范围、文档同步、未运行 Rust gates 与生产阻断项 | 增加 provider-neutral receiver core source slice |
