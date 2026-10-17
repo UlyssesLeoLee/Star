@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run isolated PostgreSQL 18 gates for BI Task Inbox, projection, and quarantine."""
+"""Run isolated PostgreSQL 18 gates for BI Task Inbox, projection, quarantine, and query."""
 
-# @cypher schema=1 source_sha256=762fc53a888dc0180b0b97bb4b92d5cf18cc003ef77da4118a27089fafb566e8
+# @cypher schema=1 source_sha256=fec64d414784e6f0357ab1d51971e645f73e30286e7a82471dcfc866f13d28f5
 # MERGE (self:File {path:"scripts/automation/phase9f4e_bi_task_event_inbox.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::main",kind:"function"})
 # MERGE (race:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::run_quarantine_race",kind:"function"})
@@ -16,6 +16,8 @@
 # MERGE (projection_test:File {path:"db/tests/bi-task-event-projection.sql"})
 # MERGE (quarantine_migration:File {path:"db/migrations/2026-10-17-bi-task-event-quarantine.sql"})
 # MERGE (quarantine_test:File {path:"db/tests/bi-task-event-quarantine.sql"})
+# MERGE (query_migration:File {path:"db/migrations/2026-10-17-bi-task-event-query.sql"})
+# MERGE (query_test:File {path:"db/tests/bi-task-event-query.sql"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run)
 # MERGE (self)-[:DEFINES]->(port)
@@ -33,6 +35,8 @@
 # MERGE (main)-[:READS]->(projection_test)
 # MERGE (main)-[:READS]->(quarantine_migration)
 # MERGE (main)-[:READS]->(quarantine_test)
+# MERGE (main)-[:READS]->(query_migration)
+# MERGE (main)-[:READS]->(query_test)
 # @endcypher
 
 from __future__ import annotations
@@ -56,6 +60,8 @@ RAW_SEED_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-raw-payload-seed.sql"
 PROJECTION_TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-projection.sql"
 QUARANTINE_MIGRATION = REPO_ROOT / "db" / "migrations" / "2026-10-17-bi-task-event-quarantine.sql"
 QUARANTINE_TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-quarantine.sql"
+QUERY_MIGRATION = REPO_ROOT / "db" / "migrations" / "2026-10-17-bi-task-event-query.sql"
+QUERY_TEST_SQL = REPO_ROOT / "db" / "tests" / "bi-task-event-query.sql"
 TARGET_ROOT = (REPO_ROOT / "target").resolve()
 
 
@@ -205,8 +211,8 @@ def main() -> int:
     psql = bin_dir / "psql.exe"
     for required in (
         initdb, pg_ctl, psql, MIGRATION, PROJECTION_MIGRATION,
-        QUARANTINE_MIGRATION, TEST_SQL, RAW_SEED_SQL,
-        PROJECTION_TEST_SQL, QUARANTINE_TEST_SQL,
+        QUARANTINE_MIGRATION, QUERY_MIGRATION, TEST_SQL, RAW_SEED_SQL,
+        PROJECTION_TEST_SQL, QUARANTINE_TEST_SQL, QUERY_TEST_SQL,
     ):
         if not required.is_file():
             raise RuntimeError(f"required file not found: {required}")
@@ -257,6 +263,9 @@ def main() -> int:
         run_command([*psql_base, "-f", str(QUARANTINE_MIGRATION)])
         run_command([*psql_base, "-f", str(QUARANTINE_MIGRATION)])
         run_command([*psql_base, "-f", str(QUARANTINE_TEST_SQL)])
+        run_command([*psql_base, "-f", str(QUERY_MIGRATION)])
+        run_command([*psql_base, "-f", str(QUERY_MIGRATION)])
+        run_command([*psql_base, "-f", str(QUERY_TEST_SQL)])
         run_quarantine_race(
             psql_base,
             sequence=100,
@@ -276,7 +285,7 @@ def main() -> int:
         row_count = run_command([*psql_base, "-qAt", "-c", "SELECT count(*) FROM bi.task_event_quarantine"])
         if row_count.stdout.strip() != "5":
             raise RuntimeError(f"concurrent quarantine postcondition expected 5 rows, got {row_count.stdout.strip()}")
-        print("9F4E/9F4F/9F4G BI Task Inbox, projection, and quarantine PostgreSQL gates passed (isolated loopback PostgreSQL).")
+        print("9F4E/9F4F/9F4G BI Task Inbox, projection, quarantine, and query PostgreSQL gates passed (isolated loopback PostgreSQL).")
         passed = True
     finally:
         pid_file = data_dir / "postmaster.pid"
@@ -297,5 +306,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(f"9F4E BI Task Inbox gate failed: {exc}", file=sys.stderr)
+        print(f"9F4E/9F4F/9F4G BI Task event gate failed: {exc}", file=sys.stderr)
         raise SystemExit(1)

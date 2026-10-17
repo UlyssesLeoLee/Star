@@ -1,10 +1,10 @@
 # BD-MULTICA-TASK-001
 
-> **Task Lifecycle 基本設計書 v0.16**
+> **Task Lifecycle 基本設計書 v0.17**
 >
-> - 状态: 🟡 Draft v0.16
+> - 状态: 🟡 Draft v0.17
 > - 日期: 2026-10-02 JST
-> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.23
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.24
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -224,7 +224,7 @@ The BI owner database now converts bounded source payloads into a strict version
 
 Migration `2026-10-16-bi-task-event-projection.sql` backfills existing facts through the same database projector inside one transaction, preserving stable event, Inbox receipt, route and wire identity. The replacement table is swapped in and the old live raw-payload table is dropped only after the backfill succeeds; any unsupported fact aborts and rolls back the migration. The disposable PostgreSQL 18.6 runner passed repeated apply, legacy sentinel removal, v2 commit/replay, missing-state rejection, effective runtime grants, FORCE RLS and WORM. This does not verify deployment or clean bytes already present in backups/WAL; source Task Outbox retention remains separately owned.
 
-The immutable fact is now a safe event projection source, not a BI query API or materialized analytics interface. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust gates remain open. Trusted receiver identity/factory, network dispatch, accepted settlement, BI query API/UI, target DB/RLS grants, backup/WAL retention and concurrent/crash recovery remain open. Keep BI ingestion and all task execution fail closed until these gates pass.
+The immutable fact is now a safe event projection source, not a BI query API or materialized analytics interface. Rust 1.99.0 `bi-owner-runtime` rustfmt, all-target tests (4/4) and strict all-target Clippy `-D warnings` passed; workspace-wide Rust gates remain open. Trusted receiver identity/factory, network dispatch, accepted settlement, production BI UI/query deployment (source API is in §6.5), target DB/RLS grants, backup/WAL retention and concurrent/crash recovery remain open. Keep BI ingestion and all task execution fail closed until these gates pass.
 
 ## §7 安全、失败与可观测性
 
@@ -262,7 +262,17 @@ The core limits exact wire to 16 KiB and requires the transport to reject oversi
 
 The new `TaskEventQuarantineStore` writes through the fixed `bi.record_task_event_quarantine_v1` owner function. `bi.task_event_quarantine` is an append-only Transaction table containing route/source cursor metadata, message ID, exact-wire SHA-256/length and a fixed fault code only. Its unique key includes the full immutable route identity and source cursor. Exact replay returns the original receipt only when message ID, digest, length and fault match; otherwise the function returns a conflict without a receipt. The runtime has no direct privileges on this table; this migration grants EXECUTE on the fixed quarantine function. The fixture also checks NOINHERIT role attributes and rejects membership that would permit runtime `SET ROLE` to the owner. Tenant FORCE RLS and WORM are enforced. The isolated PostgreSQL 18 runner passed double application, invalid-input/tenant-scope, scoped privileges/RLS/WORM, exact-replay and deterministic unique-key lock-wait races across two sessions.
 
-The function does not prove that its route parameters came from the authoritative pin registry or authenticate a transport principal; a trusted Rust adapter must supply those facts. `app.tenant_id` rejects missing or mismatched call scope but is not a security boundary against a compromised runtime role able to set the GUC. No concrete production transport, identity verifier, receiver composition, target DB grants/RLS deployment, BI query API/UI, downstream consumers or accepted settlement is delivered. Rust 1.99.0 focused gates remain unrun because cargo/rustfmt are unavailable; production BI ingress, delivery acceptance and Task/Run execution remain fail closed.
+The function does not prove that its route parameters came from the authoritative pin registry or authenticate a transport principal; a trusted Rust adapter must supply those facts. `app.tenant_id` rejects missing or mismatched call scope but is not a security boundary against a compromised runtime role able to set the GUC. No concrete production transport, identity verifier, receiver composition, target DB grants/RLS deployment, downstream consumers or accepted settlement is delivered. The query API source is described in §6.5; its Rust and production deployment gates remain open. Rust 1.99.0 focused gates remain unrun because cargo/rustfmt are unavailable; production BI ingress, delivery acceptance and Task/Run execution remain fail closed.
+
+### 6.5 Phase 9F4G Run-scoped BI Task-event query API
+
+The Run App exposes `GET /api/v1/engineering-runs/{engineering_run_id}/bi/task-events` through a read-only query port. The API validates the current actor and `project:read`, resolves Project/Run authorization through the existing host-independent owner transaction, and retains that transaction until the separate BI page query completes. Revocation therefore cannot race an already authorized page read. An optional `BI_DATABASE_URL` configures a dedicated pool capped at two connections; missing provider returns 503, while empty or invalid configuration prevents startup. A six-second wall-clock timeout bounds the provider read and releases the authorization transaction on expiry.
+
+The BI query uses a fixed `SECURITY DEFINER` owner function and the database role receives only EXECUTE on that function, without direct fact-table SELECT. Scope includes tenant, Project, Engineering Run and the fixed BI consumer. Pages default to 50 and cap at 100; cursor fields must be paired and use `(occurred_at DESC, event_id ASC)`. The response contains only allowlisted event/work-item IDs, versions, event type/time and lifecycle/review transitions/owner-change state. It omits payload, actor/correlation, route and wire metadata. Coverage and freshness remain unknown because there is no authoritative delivery checkpoint yet.
+
+The isolated PostgreSQL 18 runner passed migration double-apply, grants, tenant/project scope, equal-timestamp keyset paging, partial cursor, page bound and payload-exclusion checks. This verifies the SQL fixture, not target DB role membership or production rollout. Rust 1.99.0 gates for the query source were unavailable; the API does not provide dashboard UI, aggregate/Benchmark projection, receiver authentication, fan-out, recovery or execution.
+
+
 
 ## §9 已知缺口
 
@@ -289,6 +299,7 @@ GAP-7: Task route pin and bounded Rust claim/route/wire source store exist, but 
 | v0.4 | 2026-10-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对账 9F3 parser/materializer、PostgreSQL occurrence/lease adapter 与一次性 PG18.6 migration/FORCE RLS/4 场景实测；将未完成的 Rule API、常驻 worker、Run admission/Auth/Outbox/BI 与目标 DB 归为 9F4+ production blockers | Phase 9F3 实现和隔离 DB 验证完成 |
 | v0.5 | 2026-10-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确候选槽与 DST transition 各 32,768 步硬上限、disabled Rule 双层 fail closed、lease-expired event 固定旧 attempt/fencing generation，并对齐 domain release 26/26；保留生产 Rule API/worker/Run admission/Auth/Outbox/BI/目标 DB 门禁 | Phase 9F3 最终自审补强 bounded scan、安全与审计事件语义 |
 | v0.6 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树更正为 Project → Cloud Branch → Engineering Run → Run Worktree；Run Apps 归属 Run，Worktree 仅作为 checkout/focus；定义条件式 Task Card create API、授权/同目标幂等重试/事务 Outbox，并记录 pending recovery 仅存面板内存、跨 remount/reload 尚未实现及当前未验收的宿主/DB/RLS 门 | 用户要求将本对话架构方针落实到基本设计，并收紧创建重试目标 |
+| v0.17 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.24、requirements v6.84/basic v6.83、Task DD v1.38 与 Data Design v2.30；新增 §6.5 Run-scoped BI query API、持锁授权、最多两连接、function-only access、有界 keyset page 与 unknown coverage/freshness；记录隔离 PG18 gates 通过及 production/Rust blockers | Phase 9F4G BI Task-event read API 源码与查询 fixture |
 | v0.16 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.23、requirements v6.83/basic v6.82、Task DD v1.37 与 Data Design v2.29；将 §6.4 更新为包括固定 BI owner durable quarantine adapter、完整 route/cursor 幂等、metadata-only T 表、exactness 与隔离 PG18 并发验证；明确 trusted adapter/GUC 边界及生产/Rust gates | Phase 9F4G durable quarantine persistence slice |
 | v0.15 | 2026-10-17 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.22、requirements v6.82/basic v6.81、Task DD v1.36；新增 §6.4 定义 provider-neutral receiver ports、单条 bounded receive、cancel/deadline、commit-before-ACK、exact replay 与 metadata-only quarantine；明确无生产 transport/auth/quarantine/target DB/query 且 Rust gates 未运行 | Phase 9F4G receiver core source slice |
 | v0.14 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 Task SRS v0.21、requirements v6.81/basic v6.80、Task DD v1.35/Group DD v5.08 与 Data Design v2.28；新增 §6.3 说明 DB-side projection、历史 raw fact 原子回填/替换、严格状态验证及隔离 PG18.6 通过；Rust 1.99.0 `bi-owner-runtime` rustfmt/all-target tests (4/4)/strict Clippy 通过；保留备份/WAL、target DB、认证 receiver、BI API 与 workspace-wide gates | 9F4F 最小化 BI durable fact 中的自由文本和未受控字段 |

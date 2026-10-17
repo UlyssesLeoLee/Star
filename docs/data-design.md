@@ -1,10 +1,11 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v2.29 (2026-10-17)
+> **文档版本**: v2.30 (2026-10-17)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
+> | v2.30 | 2026-10-17 | Add the fixed Run-scoped BI Task-event query function and function-only runtime access; define tenant/Project/Run scope, bounded keyset pagination, no new table, unknown coverage/freshness, and isolated PostgreSQL query gates | Mavis 接手审核 |
 > | v2.29 | 2026-10-17 | Add Phase 9F4G metadata-only BI quarantine as a Transaction table; document full route/cursor idempotency, message/digest/length/fault comparison, PostgreSQL concurrency/RLS/WORM evidence and trusted-adapter/GUC boundary | Mavis 接手审核 |
 > | v2.28 | 2026-10-16 | Align Phase 9F4F; all three BI tables remain Transaction data; specify DB-generated allowlist projection, transactional legacy raw-fact replacement and backup/WAL boundary; record PostgreSQL 18.6 and Rust 1.99.0 package format/test/Clippy gates | Mavis 接手审核 |
 > | v2.27 | 2026-10-16 | 新增 Phase 9F4E BI owner 的三张 Transaction 表 W/T/M 全量分类；记录 16 KiB wire/8 KiB payload、owner function 原子提交、tenant FORCE RLS、runtime least privilege、WORM 与隔离 PostgreSQL 双次 apply/fixture 验收；明确认证 transport、BI projection、payload 长期保留与 target DB 仍开放 | Mavis 接手审核 |
@@ -6080,3 +6081,13 @@ Migration 2026-10-16-bi-task-event-projection.sql replaces the live fact table t
 W/T/M coverage for the BI owner tables is now W/T/M = 0/4/0: Inbox receipt, immutable projected fact, integrity incident and quarantine are all Transaction records. The quarantine primary key is `(tenant_id, quarantine_id)`; its unique idempotency key includes tenant/consumer, sender/receiver, provider/version, profile/revision/digest, endpoint/destination generation and source provider/log generation/log/sequence. Exact replay additionally compares message ID, wire digest, wire length and fault code; changed content returns no receipt. See [`phase9f4g-bi-task-quarantine-wtm.md`](data-design/phase9f4g-bi-task-quarantine-wtm.md) for the complete column/retention/access classification.
 
 The disposable PostgreSQL 18 runner passed migration double-apply, validation, tenant GUC missing/mismatch, FORCE RLS, owner/runtime role attributes and NOINHERIT, runtime no-direct-table privilege, denial of runtime `SET ROLE` to the owner, PUBLIC EXECUTE revocation, fixed SECURITY DEFINER configuration, WORM, exact replay/conflict and deterministic unique-key lock-wait races across two sessions. This evidence is not target DB rollout or crash/PITR proof. The database trusts route metadata passed by the authorized Rust adapter; there is no authoritative route-pin registry in this slice. The tenant GUC rejects absent/mismatched call scope but is not an authentication boundary against a compromised runtime able to set it. Same-cursor conflicting retries return no receipt and do not append a separate incident row; operational monitoring for those unsettled deliveries remains open. The append-only table has no row quota, partitioning or production retention/restore policy in this slice; capacity and privacy review remain gates before ingestion is enabled.
+
+### 4.13.30 — Phase 9F4G BI Task-event query function
+
+This read slice adds no table; `bi.task_event_inbox`, `bi.task_event_fact`, `bi.task_event_integrity_incident` and `bi.task_event_quarantine` remain Transaction data. `bi.list_task_event_page_v1` is a fixed `SECURITY DEFINER` function owned by `star_bi_owner`, with `search_path=pg_catalog` and `row_security=on`. It reads only `bi.task_event_fact` rows for the fixed `bi.task-event-fact.v1` consumer and filters exact tenant, Project and Engineering Run identity. The caller must set `app.tenant_id` to the requested tenant; this is a call-scope consistency guard, not caller authentication.
+
+The runtime receives EXECUTE on this function and no direct SELECT on the fact table. The application uses a separate optional BI pool capped at two connections; production deployment must supply a login with the intended `star_bi_runtime` membership and verify effective privileges in the target database. No BI-owner schema/table or retention policy changes are made by this query migration.
+
+The function bounds the requested limit to 1–101 (the API caps a page at 100 and fetches one extra row), requires cursor timestamp and event UUID together, and returns a fixed allowlist projection without payload, actor/correlation, route or wire columns. Stable pagination is `(occurred_at DESC, event_id ASC)` with a matching mixed-direction keyset predicate. API authorization is performed in the Project/Run owner transaction and kept open through the BI read; the database function itself does not establish Project/Run authorization. Completeness and freshness remain unknown without an authoritative durable delivery checkpoint.
+
+The disposable PostgreSQL 18 runner passed double-apply, function-only grants, tenant and Project scope, same-timestamp cursor order, partial cursor and page-limit rejection, and return-contract payload exclusion. Target DB role membership, production migration rollout and the new Rust API crate gates remain unverified. No materialized metrics, BI UI, Benchmark projection or consumer checkpoint is added.

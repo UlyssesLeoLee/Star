@@ -89,6 +89,10 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),(sn:Function {name:"GroupApiState::new",type:"function"});
 //! CREATE (tcp:Interface {name:"RunTaskCardCommandPort",type:"interface",language:"rust"}),(tpa:Class {name:"PgRunTaskCardAdapter",type:"class",language:"rust"}),(adapterNew:Function {name:"PgRunTaskCardAdapter::new",type:"function",language:"rust"}),(mapTaskError:Function {name:"GroupApiError::from_run_task_card",type:"function",language:"rust"}),(taskError:Enum {name:"RunTaskCardError",type:"enum",language:"rust"});
 //! CREATE (m)-[:USES]->(tcp),(m)-[:USES]->(tpa),(s)-[:USES]->(tcp),(s)-[:USES]->(tpa),(sn)-[:CALLS]->(adapterNew),(e)-[:HAS_METHOD]->(mapTaskError),(mapTaskError)-[:USES]->(taskError);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(b:Function {name:"build_group_router",type:"function"}),(p:Interface {name:"TaskEventQueryPort",type:"interface"});
+//! CREATE (ba:Module {name:"bi_analytics",type:"module",language:"rust"}),(install:Function {name:"GroupApiState::with_bi_task_event_query_port",type:"function",language:"rust"}),(ar:Function {name:"bi_analytics::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(ba),(s)-[:USES]->(p),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(p),(b)-[:CALLS]->(ar);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -110,7 +114,8 @@ use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=23d95ecee9493dacde43e69685689820df69bb4be0be230c7fc6941bb79f5067
+use bi_owner_runtime::TaskEventQueryPort;
+// @cypher schema=1 source_sha256=fd0016b43acb4cedb1abeb3984c4193c954b2ddfa866bd2eb65e6e03ed88bace
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -132,7 +137,18 @@ use serde::{Deserialize, Serialize};
 // MERGE (taskState)-[:HAS_METHOD]->(taskStateNew)
 // MERGE (taskStateNew)-[:CREATES]->(taskAdapter)
 // MERGE (taskStateNew)-[:CALLS]->(taskAdapterNew)
-// MERGE (taskStateNew)-[:USES_TYPE]->(taskPort)// @endcypher
+// MERGE (taskStateNew)-[:USES_TYPE]->(taskPort)
+// MERGE (biAnalytics:Symbol {id:"crates/star-api-rest/src/group_api/bi_analytics.rs::module",kind:"module"})
+// MERGE (biAnalyticsRouter:Symbol {id:"crates/star-api-rest/src/group_api/bi_analytics.rs::router",kind:"function"})
+// MERGE (biQueryPort:Type {id:"bi_owner_runtime::TaskEventQueryPort",kind:"trait"})
+// MERGE (biQueryInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_bi_task_event_query_port",kind:"method"})
+// MERGE (api)-[:DEFINES]->(biAnalytics)
+// MERGE (self)-[:CALLS]->(biAnalyticsRouter)
+// MERGE (build)-[:CALLS]->(biAnalyticsRouter)
+// MERGE (taskState)-[:USES_TYPE]->(biQueryPort)
+// MERGE (taskState)-[:HAS_METHOD]->(biQueryInstall)
+// MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
+// @endcypher
 
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
@@ -141,6 +157,7 @@ use uuid::Uuid;
 use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
 mod canvas;
+mod bi_analytics;
 mod cli_sessions;
 mod engineering_runs;
 mod execution_catalogs;
@@ -298,6 +315,7 @@ pub struct GroupApiState {
     worktree_git_lock_observer: Option<Arc<dyn WorktreeGitLockObserver>>,
     worktree_archive_readiness_observer: Option<Arc<dyn WorktreeArchiveReadinessObserver>>,
     worktree_lifecycle_provider: Option<Arc<dyn ProjectWorktreeLifecycleProvider>>,
+    bi_task_event_query_port: Option<Arc<dyn TaskEventQueryPort>>,
 }
 
 impl GroupApiState {
@@ -316,6 +334,7 @@ impl GroupApiState {
             worktree_git_lock_observer: None,
             worktree_archive_readiness_observer: None,
             worktree_lifecycle_provider: None,
+            bi_task_event_query_port: None,
         }
     }
 
@@ -364,6 +383,15 @@ impl GroupApiState {
         provider: Arc<dyn ProjectWorktreeLifecycleProvider>,
     ) -> Self {
         self.worktree_lifecycle_provider = Some(provider);
+        self
+    }
+
+    /// Install the least-privilege BI owner reader for Run-scoped Task analytics.
+    pub fn with_bi_task_event_query_port(
+        mut self,
+        query_port: Arc<dyn TaskEventQueryPort>,
+    ) -> Self {
+        self.bi_task_event_query_port = Some(query_port);
         self
     }
 
@@ -692,6 +720,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         )
         .merge(worktrees::router())
         .merge(engineering_runs::router())
+        .merge(bi_analytics::router())
         .merge(worktree_lifecycle::router())
         .merge(work_items::router())
         .merge(cli_sessions::router())

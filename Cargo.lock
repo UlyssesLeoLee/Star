@@ -578,12 +578,15 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 name = "bi-owner-runtime"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "sqlx",
  "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
  "uuid",
 ]
 
@@ -6944,6 +6947,7 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.23.1",
+ "bi-owner-runtime",
  "chrono",
  "domain-agent",
  "domain-automation",
