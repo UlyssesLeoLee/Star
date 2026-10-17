@@ -110,7 +110,7 @@ jobs:
       - name: Comment PR with baseline delta
         # PR 触发时, 把 baseline 数字写到 PR 评论 (advisory)
         if: github.event_name == 'pull_request' && (success() || failure())
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
