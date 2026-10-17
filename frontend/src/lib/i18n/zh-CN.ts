@@ -462,9 +462,9 @@ export const zhCN: Dictionary = {
   placeholders: {
     filter: "过滤...",
     searchTitle: "按 title / key / labels 过滤...",
-    credentialName: "显示名 (e.g. 我的 OpenClaw 账号)",
+    credentialName: "显示名 (例如：我的 API 服务账号)",
     credentialDesc: "描述 (e.g. 用于 LangGraph sub-agent 派发)",
-    credentialBaseUrl: "Base URL (可选, e.g. https://api.openclaw.example.com/v1)",
+    credentialBaseUrl: "Base URL (可选, 例如：https://provider.example.invalid/v1)",
     credentialApiKey: "API Key / Token (TLS 加密传输, 后端 KMS 加密存储)",
     newName: "新显示名",
     newDesc: "新描述",
@@ -527,7 +527,7 @@ export const zhCN: Dictionary = {
   },
 };
 /*
-@cypher schema=1 source_sha256=adba2ee6b48f951113a9806112445e831d6689adb18e148fea7d99f83dac2bdf
+@cypher schema=1 source_sha256=3e202436ec0dc22b2aa8d6f0a3fe430a470edc7e11e7476251549eca1f056a97
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)

@@ -448,9 +448,9 @@ export const ja: Dictionary = {
   placeholders: {
     filter: "フィルタ...",
     searchTitle: "title / key / labels でフィルタ...",
-    credentialName: "表示名 (例: 私の OpenClaw アカウント)",
+    credentialName: "表示名 (例: API サービスアカウント)",
     credentialDesc: "説明 (例: LangGraph sub-agent 派発用)",
-    credentialBaseUrl: "Base URL (任意, 例: https://api.openclaw.example.com/v1)",
+    credentialBaseUrl: "Base URL (任意, 例: https://provider.example.invalid/v1)",
     credentialApiKey: "API Key / Token (TLS 暗号化伝送, バックエンド KMS 暗号化保存)",
     newName: "新表示名",
     newDesc: "新説明",
@@ -513,7 +513,7 @@ export const ja: Dictionary = {
   },
 };
 /*
-@cypher schema=1 source_sha256=6884fcfba8e1535d43d3eac31ba817cd4d711a3614bc884cabd26ac064434aad
+@cypher schema=1 source_sha256=da2b01198035084e3ac5c1e24afe035530394fe1542807119ea0a818d60f22b7
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7efd94b79389ec2d029d712952d58ed671e8cfa45b9c2016a988ba5d94aecba2
+@cypher schema=1 source_sha256=785c1aec64ff48c9809559237bd7cbbeb057cc41775af701efadc34429b0e6ab
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -457,9 +457,9 @@ export const en: Dictionary = {
   placeholders: {
     filter: "Filter...",
     searchTitle: "Filter by title / key / labels...",
-    credentialName: "Display name (e.g. My OpenClaw account)",
+    credentialName: "Display name (e.g. My API service account)",
     credentialDesc: "Description (e.g. for LangGraph sub-agent dispatch)",
-    credentialBaseUrl: "Base URL (optional, e.g. https://api.openclaw.example.com/v1)",
+    credentialBaseUrl: "Base URL (optional, e.g. https://provider.example.invalid/v1)",
     credentialApiKey: "API Key / Token (TLS encrypted in transit, KMS encrypted at rest)",
     newName: "New display name",
     newDesc: "New description",
