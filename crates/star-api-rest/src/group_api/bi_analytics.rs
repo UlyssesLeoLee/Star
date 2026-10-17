@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=a11e5cde24d76aef51d9c4ee862a93a196544a79cf2bee90eeaadeda014daee6
+@cypher schema=1 source_sha256=4919e74d83e16ac54ded06eac2e830ed5fc91e9c4886f2d3c3ed6933fc77c7d6
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/bi_analytics.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/bi_analytics.rs::bi_analytics",kind:"module"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/bi_analytics.rs::router",kind:"function"})
@@ -39,16 +39,14 @@ MERGE (port)-[:CALLS]->(function)
 use axum::{
     extract::{Path, Query, State},
     routing::get,
-    Router,
+    Json, Router,
 };
-use bi_owner_runtime::{
-    TaskEventQueryCursor, TaskEventQueryPage, TaskEventQueryPageRequest, TaskEventQueryPort,
-};
+use bi_owner_runtime::{TaskEventQueryCursor, TaskEventQueryPage, TaskEventQueryPageRequest};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::json;
-use uuid::Uuid;
 use std::time::Duration;
+use uuid::Uuid;
 
 use crate::auth::oauth::AuthenticatedUser;
 
@@ -90,8 +88,8 @@ impl TaskEventQuery {
                 let occurred_at = DateTime::parse_from_rfc3339(&timestamp)
                     .map_err(|_| GroupApiError::bad_request())?
                     .with_timezone(&Utc);
-                let event_id = Uuid::parse_str(&event_id)
-                    .map_err(|_| GroupApiError::bad_request())?;
+                let event_id =
+                    Uuid::parse_str(&event_id).map_err(|_| GroupApiError::bad_request())?;
                 Some(
                     TaskEventQueryCursor::new(occurred_at, event_id)
                         .map_err(|_| GroupApiError::bad_request())?,
@@ -135,28 +133,30 @@ async fn list_task_events(
     .await
     .map_err(|_| GroupApiError::internal())?;
     let scope = authorize_run_owned_task_scope(&mut authorization_tx, &actor, run_id).await?;
-    let request = query.into_request(actor.tenant_id, scope.project_id, scope.engineering_run_id)?;
+    let request =
+        query.into_request(actor.tenant_id, scope.project_id, scope.engineering_run_id)?;
 
     let query_port = state
         .bi_task_event_query_port
         .as_ref()
         .ok_or_else(|| GroupApiError::feature_unavailable("bi_task_query_unavailable"))?;
-    let page = tokio::time::timeout(
-        Duration::from_secs(6),
-        query_port.list_task_events(request),
-    )
-    .await
-    .map_err(|_| GroupApiError::feature_unavailable("bi_task_query_unavailable"))?
-    .map_err(|_| GroupApiError::feature_unavailable("bi_task_query_unavailable"))?;
+    let page = tokio::time::timeout(Duration::from_secs(6), query_port.list_task_events(request))
+        .await
+        .map_err(|_| GroupApiError::feature_unavailable("bi_task_query_unavailable"))?
+        .map_err(|_| GroupApiError::feature_unavailable("bi_task_query_unavailable"))?;
     authorization_tx
         .commit()
         .await
         .map_err(|_| GroupApiError::internal())?;
 
-    Ok(super::reply(page_response(scope.project_id, run_id, page)))
+    Ok(Json(page_response(scope.project_id, run_id, page)))
 }
 
-fn page_response(project_id: Uuid, engineering_run_id: Uuid, page: TaskEventQueryPage) -> serde_json::Value {
+fn page_response(
+    project_id: Uuid,
+    engineering_run_id: Uuid,
+    page: TaskEventQueryPage,
+) -> serde_json::Value {
     let next_cursor = page.next_cursor.map(|cursor| {
         json!({
             "before_occurred_at": cursor.occurred_at,
@@ -188,18 +188,14 @@ mod tests {
             before_occurred_at: Some("2026-10-17T00:00:00Z".to_string()),
             before_event_id: None,
         };
-        assert!(partial
-            .into_request(TENANT_ID, PROJECT_ID, RUN_ID)
-            .is_err());
+        assert!(partial.into_request(TENANT_ID, PROJECT_ID, RUN_ID).is_err());
 
         let invalid = TaskEventQuery {
             limit: None,
             before_occurred_at: Some("not-a-time".to_string()),
             before_event_id: Some(Uuid::new_v4().to_string()),
         };
-        assert!(invalid
-            .into_request(TENANT_ID, PROJECT_ID, RUN_ID)
-            .is_err());
+        assert!(invalid.into_request(TENANT_ID, PROJECT_ID, RUN_ID).is_err());
     }
 
     #[test]

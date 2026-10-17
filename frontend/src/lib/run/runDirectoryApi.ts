@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f2637fcbb42cd7d76318b6ad37b99e01c2c79c1f27c414f50230f3b9e1cdaf92
+@cypher schema=1 source_sha256=b2649d76df507a09c71fb78ca3178d31c4542bea139f132408e7b13833a29069
 MERGE (self:File {path:"frontend/src/lib/run/runDirectoryApi.ts"})
 MERGE (create:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (createLegacy:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
@@ -43,6 +43,15 @@ MERGE (reviewTask)-[:USES_TYPE]->(context)
 MERGE (reviewTask)-[:USES_TYPE]->(reviewCommand)
 MERGE (projectRuns)-[:CALLS]->(request)
 MERGE (projectRuns)-[:CALLS]->(mapRun)
+MERGE (biList:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listRunTaskEvents",kind:"method"})
+MERGE (biPage:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapRunBiTaskEventPage",kind:"function"})
+MERGE (biItem:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapRunBiTaskEvent",kind:"function"})
+MERGE (self)-[:DEFINES]->(biList)
+MERGE (self)-[:DEFINES]->(biPage)
+MERGE (self)-[:DEFINES]->(biItem)
+MERGE (biList)-[:CALLS]->(request)
+MERGE (biList)-[:CALLS]->(biPage)
+MERGE (biPage)-[:CALLS]->(biItem)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
@@ -159,6 +168,20 @@ export interface RunTaskCardReviewCommand {
   correlation_id: string;
   reason?: string;
 }
+export interface RunBiTaskEventCursor { before_occurred_at: string; before_event_id: string }
+export interface RunBiTaskEventItem {
+  event_id: string; work_item_id: string; aggregate_type: string; aggregate_version: number;
+  event_type: string; schema_version: number; occurred_at: string;
+  lifecycle_status: string | null; review_state: string | null; from_status: string | null;
+  to_status: string | null; owner_changed: boolean;
+}
+export interface RunBiTaskEventPage {
+  project_id: string; engineering_run_id: string; items: RunBiTaskEventItem[]; has_more: boolean;
+  next_cursor: RunBiTaskEventCursor | null;
+  coverage: { completeness: "unknown"; freshness: "unknown"; basis: string };
+}
+const RUN_BI_TASK_EVENT_PAGE_SIZE = 50;
+
 export interface RunDirectoryClientOptions {
   getAccessToken: RunAccessTokenProvider;
   baseUrl?: string;
@@ -204,6 +227,69 @@ function boundedString(value: unknown, max: number): string {
 function uuid(value: unknown): string {
   if (typeof value !== "string" || !UUID.test(value)) throw new RunDirectoryError(0, "invalid_identity", "目录身份无效。");
   return value.toLowerCase();
+}
+function biProjectionError(): never {
+  throw new RunDirectoryError(0, "invalid_projection", "Run 分析事件响应无效。");
+}
+function biKeys(row: Record<string, unknown>, keys: string[]): void {
+  if (Object.keys(row).length !== keys.length || Object.keys(row).some((key) => !keys.includes(key))) biProjectionError();
+}
+function biTimestamp(value: unknown): string {
+  const text = boundedText(value, 64);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(text) || !Number.isFinite(Date.parse(text))) biProjectionError();
+  return text;
+}
+function biCompareTime(left: string, right: string): number {
+  const millis = Date.parse(left) - Date.parse(right);
+  if (millis) return millis;
+  const tail = (text: string) => Number((/\.(\d+)(?:Z|[+-])/.exec(text)?.[1] ?? "").padEnd(9, "0").slice(3));
+  return tail(left) - tail(right);
+}
+function biAfter(item: RunBiTaskEventItem, cursor: RunBiTaskEventCursor): boolean {
+  const time = biCompareTime(item.occurred_at, cursor.before_occurred_at);
+  return time < 0 || (time === 0 && item.event_id > cursor.before_event_id);
+}
+function mapRunBiTaskEvent(value: unknown): RunBiTaskEventItem {
+  const row = record(value);
+  biKeys(row, ["event_id", "work_item_id", "aggregate_type", "aggregate_version", "event_type", "schema_version", "occurred_at", "lifecycle_status", "review_state", "from_status", "to_status", "owner_changed"]);
+  const nullable = (field: unknown) => field === null ? null : boundedText(field, 128);
+  return {
+    event_id: uuid(row.event_id), work_item_id: uuid(row.work_item_id),
+    aggregate_type: boundedText(row.aggregate_type, 128), aggregate_version: positiveVersion(row.aggregate_version),
+    event_type: boundedText(row.event_type, 128), schema_version: positiveVersion(row.schema_version),
+    occurred_at: biTimestamp(row.occurred_at), lifecycle_status: nullable(row.lifecycle_status),
+    review_state: nullable(row.review_state), from_status: nullable(row.from_status), to_status: nullable(row.to_status),
+    owner_changed: boolean(row.owner_changed),
+  };
+}
+function mapRunBiTaskEventPage(value: unknown, run: EngineeringRun, cursor?: RunBiTaskEventCursor): RunBiTaskEventPage {
+  const row = record(value);
+  biKeys(row, ["project_id", "engineering_run_id", "items", "has_more", "next_cursor", "coverage"]);
+  if (uuid(row.project_id) !== uuid(run.project_id) || uuid(row.engineering_run_id) !== uuid(run.engineering_run_id)) {
+    throw new RunDirectoryError(0, "scope_mismatch", "分析事件不属于当前 Project 或 Run。");
+  }
+  if (!Array.isArray(row.items) || row.items.length > RUN_BI_TASK_EVENT_PAGE_SIZE) biProjectionError();
+  const items = row.items.map(mapRunBiTaskEvent);
+  if (new Set(items.map((item) => item.event_id)).size !== items.length) biProjectionError();
+  items.forEach((item, index) => {
+    const previous = index ? { before_occurred_at: items[index - 1].occurred_at, before_event_id: items[index - 1].event_id } : cursor;
+    if (previous && !biAfter(item, previous)) biProjectionError();
+  });
+  const hasMore = boolean(row.has_more);
+  let next: RunBiTaskEventCursor | null = null;
+  if (hasMore) {
+    if (!items.length) biProjectionError();
+    const raw = record(row.next_cursor);
+    biKeys(raw, ["before_occurred_at", "before_event_id"]);
+    next = { before_occurred_at: biTimestamp(raw.before_occurred_at), before_event_id: uuid(raw.before_event_id) };
+    const last = items[items.length - 1];
+    if (next.before_event_id !== last.event_id || biCompareTime(next.before_occurred_at, last.occurred_at) !== 0) biProjectionError();
+  } else if (row.next_cursor !== null) biProjectionError();
+  const coverage = record(row.coverage);
+  biKeys(coverage, ["completeness", "freshness", "basis"]);
+  if (coverage.completeness !== "unknown" || coverage.freshness !== "unknown") biProjectionError();
+  return { project_id: uuid(row.project_id), engineering_run_id: uuid(row.engineering_run_id), items, has_more: hasMore,
+    next_cursor: next, coverage: { completeness: "unknown", freshness: "unknown", basis: boundedText(coverage.basis, 512) } };
 }
 function nullableUuid(value: unknown): string | null { return value === null ? null : uuid(value); }
 function positiveVersion(value: unknown): number {
@@ -594,6 +680,17 @@ export class RunDirectoryApiClient {
       throw new RunDirectoryError(0, "scope_mismatch", "Worktree 目录不属于当前 Engineering Run。");
     }
     return page;
+  }
+  async listRunTaskEvents(run: EngineeringRun, cursor?: RunBiTaskEventCursor, signal?: AbortSignal): Promise<RunBiTaskEventPage> {
+    const runId = uuid(run.engineering_run_id);
+    uuid(run.project_id);
+    const query = new URLSearchParams({ limit: String(RUN_BI_TASK_EVENT_PAGE_SIZE) });
+    const before = cursor ? { before_occurred_at: biTimestamp(cursor.before_occurred_at), before_event_id: uuid(cursor.before_event_id) } : undefined;
+    if (before) {
+      query.set("before_occurred_at", before.before_occurred_at);
+      query.set("before_event_id", before.before_event_id);
+    }
+    return mapRunBiTaskEventPage(await this.request(`/api/v1/engineering-runs/${runId}/bi/task-events?${query}`, signal, MAX_RESPONSE_BYTES), run, before);
   }
   async listRunWorkItems(run: EngineeringRun, after?: string, signal?: AbortSignal): Promise<RunTaskCardPage> {
     const query = new URLSearchParams({ limit: String(RUN_TASK_CARD_PAGE_SIZE) });

@@ -1,7 +1,9 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v6.83 (2026-10-17)
-> **上游要件定义书**: docs/requirements.md v6.84
+> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+
+> **文档版本**: v6.84 (2026-10-17)
+> **上游要件定义书**: docs/requirements.md v6.85
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5827,3 +5829,14 @@ BI 查询仅调用固定 `bi.list_task_event_page_v1` owner function，并按 te
 | v6.44 | 2026-10-12 | Ulysses — Mavis接手审核 | 将 D20 当前 Rust library test 数校正为 41/41；记录 Clippy driver 隔离运行和 integration test 文件既有格式差异，不改变 PostgreSQL 未验证状态 | 新增两项 exact-wire 来源验证单测并完成 Rust 1.98.1 隔离 Clippy 检查 |
 | v6.42 | 2026-10-12 | Ulysses — Mavis接手审核 | 明确 NATS 是过渡 adapter、Star Rust durable transport 是最终目标；同步公开来源身份 helper 与 AssetsLake 模块复用选择依据，并订正 §1.6 的 D19 server 状态 | 用户重申 Rust 服务模块复用授权并确认 NATS 应由自有服务替代；最终设计对照发现 §1.6 状态滞后 |
 | v6.41 | 2026-10-12 | Ulysses — Mavis接手审核 | 同步 D20 native Pull/Acknowledge receiver port、双层有界并行与剩余生产验收门槛 | D20 native receive adapter 首片实现 |
+
+
+## 16.75 — Phase 9F4H Run BI read UI
+
+Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Project/Engineering Run，Worktree 仅决定焦点，不改变事实查询范围。`RunBiPanel` 通过 `RunDirectoryApiClient.listRunTaskEvents` 读取已授权的真实 API；不注入 seed 或 mock。验收映射：AC-RUN-OUTBOX-11 / Task AC-25 / BD §6.6 / DD §14.13.8。
+
+客户端固定每页 50 条，沿用最多 2 个并发请求、16 个等待请求、15 秒请求超时与 512 KiB 响应上限；只保留当前页和最多 100 个游标，不轮询或累积历史页。检查响应 Project/Run、白名单字段、重复 event ID、稳定排序和游标进展；时间比较保留亚毫秒精度。切换 scope、翻页和卸载时取消旧请求，加载状态按 scope/cursor/client/retry 隔离，防止旧 scope 闪现。BI 专属 503 提示不暴露后端配置；Tab 与 `tabpanel` 关联。
+
+`coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
+
+本次修订：v6.84，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。

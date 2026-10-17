@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=694cb142b54b057e74934dcd2e64192ab2788cb88eb6d922db4c82c11a07b23d
+@cypher schema=1 source_sha256=81ccdc638b683169e05b15ff2eb177b2592dfb35c1720e8e2cb6cc2dc3319100
 MERGE (self:File {path:"crates/bi-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/src/lib.rs::bi_owner_runtime",kind:"module"})
 MERGE (inbox:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::task_event_inbox",kind:"module"})
@@ -19,21 +19,21 @@ MERGE (query)-[:DEFINES]->(query_store:Type {id:"bi_owner_runtime::PgTaskEventQu
 //! Durable owner-local BI event ingestion.
 
 pub mod task_event_inbox;
-pub mod task_event_receiver;
 pub mod task_event_quarantine;
 /// Bounded, allowlisted queries over observed BI Task event facts.
 pub mod task_event_query;
+pub mod task_event_receiver;
 
 pub use task_event_inbox::{
-    AuthenticatedTaskEventPrincipal, ReceiptOutcome, TaskEventInboxError,
-    TaskEventInboxReceipt, TaskEventInboxStore, TaskEventRoutePin,
+    AuthenticatedTaskEventPrincipal, ReceiptOutcome, TaskEventInboxError, TaskEventInboxReceipt,
+    TaskEventInboxStore, TaskEventRoutePin,
 };
 
 pub use task_event_receiver::{
     TaskEventInboxCommitPort, TaskEventQuarantineFault, TaskEventQuarantinePort,
     TaskEventQuarantineReceipt, TaskEventReceiveAuthorization, TaskEventReceiveDelivery,
-    TaskEventReceiveError, TaskEventReceiveOrigin, TaskEventReceiveOutcome,
-    TaskEventReceiveRoute, TaskEventReceiveTransport, TaskEventReceiver,
+    TaskEventReceiveError, TaskEventReceiveOrigin, TaskEventReceiveOutcome, TaskEventReceiveRoute,
+    TaskEventReceiveTransport, TaskEventReceiver,
 };
 
 pub use task_event_quarantine::TaskEventQuarantineStore;

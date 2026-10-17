@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=2a398109611bb5d29dd140f6daa899de9399a5d6875f36ca2aa7d3f550e685c4
+@cypher schema=1 source_sha256=d451a762d24b307ee22ebbf30f42f18a2b80f56fa7f645a8eb13ac61228e0311
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_receiver.rs"})
 MERGE (route:Type {id:"bi_owner_runtime::TaskEventReceiveRoute",kind:"struct"})
 MERGE (origin:Type {id:"bi_owner_runtime::TaskEventReceiveOrigin",kind:"struct"})
@@ -121,14 +121,14 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::{
     sync::Semaphore,
-    time::{Instant, timeout_at},
+    time::{timeout_at, Instant},
 };
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::task_event_inbox::{
-    AuthenticatedTaskEventPrincipal, MAX_TASK_WIRE_BYTES, ReceiptOutcome, TaskEventInboxError,
-    TaskEventInboxReceipt, TaskEventInboxStore, TaskEventRoutePin, validated_event_id,
+    validated_event_id, AuthenticatedTaskEventPrincipal, ReceiptOutcome, TaskEventInboxError,
+    TaskEventInboxReceipt, TaskEventInboxStore, TaskEventRoutePin, MAX_TASK_WIRE_BYTES,
 };
 
 /// Tenant and immutable route pin for one BI Task-event subscription.
@@ -147,10 +147,12 @@ impl TaskEventReceiveRoute {
         Ok(Self { tenant_id, pin })
     }
 
+    /// Return the tenant whose BI subscription owns this route.
     pub fn tenant_id(&self) -> Uuid {
         self.tenant_id
     }
 
+    /// Return the immutable sender, receiver, and transport profile binding.
     pub fn pin(&self) -> &TaskEventRoutePin {
         &self.pin
     }
@@ -167,6 +169,9 @@ pub struct TaskEventReceiveOrigin {
 }
 
 impl TaskEventReceiveOrigin {
+    /// Construct an origin with bounded ASCII labels, non-nil identities, and a positive sequence.
+    ///
+    /// Returns [`TaskEventReceiveError::InvalidOrigin`] if any origin component is invalid.
     pub fn new(
         provider_identity: String,
         log_id: String,
@@ -191,22 +196,27 @@ impl TaskEventReceiveOrigin {
         })
     }
 
+    /// Return the transport provider identity to compare with the route pin.
     pub fn provider_identity(&self) -> &str {
         &self.provider_identity
     }
 
+    /// Return the durable log identifier within the provider.
     pub fn log_id(&self) -> &str {
         &self.log_id
     }
 
+    /// Return the generation that distinguishes incarnations of the durable log.
     pub fn log_generation(&self) -> Uuid {
         self.log_generation
     }
 
+    /// Return the positive position within this log generation.
     pub fn sequence(&self) -> i64 {
         self.sequence
     }
 
+    /// Return the transport message identity that must match the envelope event identity.
     pub fn message_id(&self) -> Uuid {
         self.message_id
     }
@@ -214,7 +224,9 @@ impl TaskEventReceiveOrigin {
 
 /// One bounded delivery. Adapters must reject over-limit frames before buffering them.
 pub trait TaskEventReceiveDelivery: Send + Sync {
+    /// Borrow the unmodified message bytes used for validation and the Inbox commit.
     fn exact_wire(&self) -> &[u8];
+    /// Borrow the durable source metadata independently checked by authorization.
     fn origin(&self) -> &TaskEventReceiveOrigin;
 
     /// Confirm only after the owner Inbox commit; adapters must tolerate uncertain, repeated ACK.
@@ -234,8 +246,10 @@ pub trait TaskEventReceiveDelivery: Send + Sync {
 /// unreturned delivery unacknowledged and redeliverable. They must enforce the wire bound before
 /// buffering a frame and make receive/ack operations safe to retry after an uncertain cancellation.
 pub trait TaskEventReceiveTransport: Send + Sync {
+    /// Delivery type carrying bounded bytes and provider-specific disposition operations.
     type Delivery: TaskEventReceiveDelivery;
 
+    /// Pull at most one delivery for the supplied route; return `None` when no delivery is ready.
     async fn pull_one(
         &self,
         route: &TaskEventReceiveRoute,
@@ -243,8 +257,11 @@ pub trait TaskEventReceiveTransport: Send + Sync {
 }
 
 /// Trusted deployment adapter verifies provider identity, pinned route generation, current
-/// authorization and the exact bytes before returning an authenticated principal to the core.
+/// authorization and the exact bytes before allowing the core to construct its Inbox principal.
 pub trait TaskEventReceiveAuthorization: Send + Sync {
+    /// Revalidate the current source authorization and exact bytes against the pinned route.
+    ///
+    /// The receiver calls this before persistence and again before disposition.
     async fn verify_origin(
         &self,
         route: &TaskEventReceiveRoute,
@@ -258,6 +275,7 @@ pub trait TaskEventReceiveAuthorization: Send + Sync {
 /// Use `(route, provider_identity, log_generation, log_id, sequence)` as its key; a replay with a
 /// different wire digest or fault must fail closed instead of replacing the committed receipt.
 pub trait TaskEventQuarantinePort: Send + Sync {
+    /// Commit or recover an exact metadata-only quarantine record before returning its receipt.
     async fn record(
         &self,
         route: &TaskEventReceiveRoute,
@@ -271,6 +289,7 @@ pub trait TaskEventQuarantinePort: Send + Sync {
 /// Owner-local Inbox commit port. Implementations return only after the BI transaction commits and
 /// must recover an original receipt through exact replay if cancellation obscures the commit result.
 pub trait TaskEventInboxCommitPort: Send + Sync {
+    /// Commit the authenticated exact wire to the owner Inbox, or recover its exact replay receipt.
     async fn commit_exact_wire(
         &self,
         principal: &AuthenticatedTaskEventPrincipal,
@@ -290,53 +309,79 @@ impl TaskEventInboxCommitPort for TaskEventInboxStore {
     }
 }
 
+/// Stable reason why an authenticated delivery cannot enter the normal Inbox projection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TaskEventQuarantineFault {
+    /// The envelope is invalid or its tenant does not match the receive route.
     MalformedEnvelope,
+    /// The envelope event identity differs from the durable transport message identity.
     MessageIdentityMismatch,
+    /// The Inbox already holds different content for this event identity.
     ContentConflict,
 }
 
+/// Evidence returned only after a metadata-only quarantine record is durable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TaskEventQuarantineReceipt {
+    /// Non-nil identity of the committed quarantine record.
     pub quarantine_id: Uuid,
 }
 
+/// Completed result of receiving at most one delivery.
 #[derive(Debug)]
 pub enum TaskEventReceiveOutcome {
+    /// The transport returned no delivery.
     Idle,
+    /// A new Inbox transaction committed and the delivery was acknowledged.
     Committed(TaskEventInboxReceipt),
+    /// An exact Inbox replay was recovered and the delivery was acknowledged.
     ExactReplay(TaskEventInboxReceipt),
+    /// Quarantine committed and the delivery received terminal disposition.
     Quarantined {
+        /// Durable quarantine evidence associated with the delivery.
         receipt: TaskEventQuarantineReceipt,
+        /// Reason recorded in the quarantine transaction.
         fault: TaskEventQuarantineFault,
     },
 }
 
+/// Failure to validate, persist, or dispose of a delivery within the caller limits.
 #[derive(Debug, Error)]
 pub enum TaskEventReceiveError {
+    /// The tenant or immutable route pin is invalid.
     #[error("invalid BI Task-event route")]
     InvalidRoute,
+    /// The durable source metadata is incomplete or invalid.
     #[error("invalid durable Task-event origin")]
     InvalidOrigin,
+    /// The delivered bytes exceed the receiver wire-size limit.
     #[error("Task-event wire exceeds the receiver limit")]
     WireTooLarge,
+    /// The source identity or current route authorization was rejected.
     #[error("Task-event source identity or route authorization failed")]
     Unauthorized,
+    /// A transport operation failed, including unsupported terminal disposition.
     #[error("Task-event transport operation failed")]
     Transport,
+    /// Quarantine failed to provide a committed, non-nil receipt.
     #[error("durable Task-event quarantine did not commit")]
     Quarantine,
+    /// The quarantine cursor already identifies different committed metadata.
     #[error("BI Task-event quarantine cursor conflicts with its committed record")]
     QuarantineConflict,
+    /// The quarantine database operation failed.
     #[error("BI Task-event quarantine database operation failed")]
     QuarantineDatabase(#[from] sqlx::Error),
+    /// The caller cancelled reception; persistence or disposition may require exact replay.
     #[error("Task-event receive was cancelled")]
     Cancelled,
+    /// This receiver already has a delivery in flight.
     #[error("another delivery is already being processed for this receiver")]
     Busy,
+    /// The caller deadline elapsed; persistence or disposition may require exact replay.
     #[error("Task-event receive deadline elapsed")]
     Deadline,
+    /// The owner-local Inbox rejected or failed to commit the delivery.
     #[error(transparent)]
     Inbox(#[from] TaskEventInboxError),
 }
@@ -358,6 +403,7 @@ where
     I: TaskEventInboxCommitPort,
     Q: TaskEventQuarantinePort,
 {
+    /// Assemble injected ports with a single-delivery concurrency limit; no work starts here.
     pub fn new(
         route: TaskEventReceiveRoute,
         transport: T,
@@ -418,20 +464,14 @@ where
             Ok(event_id) => event_id,
             Err(TaskEventInboxError::InvalidEnvelope | TaskEventInboxError::TenantMismatch) => {
                 return self
-                    .quarantine(
-                        &delivery,
-                        TaskEventQuarantineFault::MalformedEnvelope,
-                    )
+                    .quarantine(&delivery, TaskEventQuarantineFault::MalformedEnvelope)
                     .await;
             }
             Err(error) => return Err(TaskEventReceiveError::Inbox(error)),
         };
         if event_id != origin.message_id {
             return self
-                .quarantine(
-                    &delivery,
-                    TaskEventQuarantineFault::MessageIdentityMismatch,
-                )
+                .quarantine(&delivery, TaskEventQuarantineFault::MessageIdentityMismatch)
                 .await;
         }
 
@@ -506,8 +546,8 @@ fn valid_label(value: &str, max_len: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use std::sync::{
-        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
     };
     use std::time::Duration;
 
@@ -645,8 +685,7 @@ mod tests {
         TaskEventReceiver<FixtureTransport, FixtureAuthorization, FixtureInbox, FixtureQuarantine>;
 
     fn route() -> TaskEventReceiveRoute {
-        TaskEventReceiveRoute::new(Uuid::from_u128(1), route_pin())
-            .expect("valid fixture route")
+        TaskEventReceiveRoute::new(Uuid::from_u128(1), route_pin()).expect("valid fixture route")
     }
 
     fn route_pin() -> TaskEventRoutePin {
@@ -789,7 +828,10 @@ mod tests {
         );
         let result = receive(&receiver).await.expect("delivery committed");
         assert!(matches!(result, TaskEventReceiveOutcome::Committed(_)));
-        assert_eq!(events.values(), ["pull", "verify", "commit", "verify", "ack"]);
+        assert_eq!(
+            events.values(),
+            ["pull", "verify", "commit", "verify", "ack"]
+        );
     }
 
     #[tokio::test]
@@ -815,11 +857,23 @@ mod tests {
             None,
             false,
         );
-        let result = receive(&receiver).await.expect("poison durably quarantined");
-        assert!(matches!(result, TaskEventReceiveOutcome::Quarantined { .. }));
+        let result = receive(&receiver)
+            .await
+            .expect("poison durably quarantined");
+        assert!(matches!(
+            result,
+            TaskEventReceiveOutcome::Quarantined { .. }
+        ));
         assert_eq!(
             events.values(),
-            ["pull", "verify", "commit", "quarantine", "verify", "terminate"]
+            [
+                "pull",
+                "verify",
+                "commit",
+                "quarantine",
+                "verify",
+                "terminate"
+            ]
         );
     }
 
@@ -831,8 +885,13 @@ mod tests {
             None,
             false,
         );
-        let result = receive(&receiver).await.expect("poison durably quarantined");
-        assert!(matches!(result, TaskEventReceiveOutcome::Quarantined { .. }));
+        let result = receive(&receiver)
+            .await
+            .expect("poison durably quarantined");
+        assert!(matches!(
+            result,
+            TaskEventReceiveOutcome::Quarantined { .. }
+        ));
         assert_eq!(
             events.values(),
             ["pull", "verify", "quarantine", "verify", "terminate"]

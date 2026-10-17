@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=1125bcec36307f099f71459e4be988f9a225bf8572afcf0858be3de15d336d6d
+@cypher schema=1 source_sha256=35978d907979347dd39e234f5fcb893195bcbe2983e0305b37756626b99162b3
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_query.rs"})
 MERGE (port:Type {id:"bi_owner_runtime::TaskEventQueryPort",kind:"trait"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -122,7 +122,9 @@ impl TaskEventQueryPageRequest {
             || project_id.is_nil()
             || engineering_run_id.is_nil()
             || !(1..=MAX_TASK_EVENT_QUERY_PAGE_SIZE).contains(&page_size)
-            || before.as_ref().is_some_and(|cursor| cursor.event_id.is_nil())
+            || before
+                .as_ref()
+                .is_some_and(|cursor| cursor.event_id.is_nil())
         {
             return Err(TaskEventQueryError::InvalidRequest);
         }
@@ -319,14 +321,8 @@ mod tests {
         let project_id = Uuid::new_v4();
         let run_id = Uuid::new_v4();
 
-        assert!(TaskEventQueryPageRequest::new(
-            Uuid::nil(), project_id, run_id, 10, None
-        )
-        .is_err());
-        assert!(TaskEventQueryPageRequest::new(
-            tenant_id, project_id, run_id, 0, None
-        )
-        .is_err());
+        assert!(TaskEventQueryPageRequest::new(Uuid::nil(), project_id, run_id, 10, None).is_err());
+        assert!(TaskEventQueryPageRequest::new(tenant_id, project_id, run_id, 0, None).is_err());
         assert!(TaskEventQueryPageRequest::new(
             tenant_id,
             project_id,

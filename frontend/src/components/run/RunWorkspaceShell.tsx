@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0662b7a7a6a6e07b7bfa6659c6d3dc77945fa380525451719ed8f71e2d4a29a9
+@cypher schema=1 source_sha256=0b88cf74036c43b9cf3bae1f0bb979039b5a5912eea821043abffb183a4bdde0
 MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
@@ -7,6 +7,8 @@ MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnve
 MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
 MERGE (self)-[:DEFINES]->(shell)
 MERGE (shell)-[:CALLS]->(panel)
+MERGE (biPanel:Symbol {id:"frontend/src/components/run/RunBiPanel.tsx::RunBiPanel",kind:"function"})
+MERGE (shell)-[:CALLS]->(biPanel)
 MERGE (shell)-[:USES_TYPE]->(context)
 MERGE (shell)-[:CALLS]->(runHref)
 @endcypher
@@ -32,6 +34,7 @@ import { canonicalRunHref, canonicalRunWorktreeHref, RunDirectoryError, type Run
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
 import { RunTaskCardsPanel } from "@/components/run/RunTaskCardsPanel";
+import { RunBiPanel } from "@/components/run/RunBiPanel";
 
 export interface RunWorkspaceRoute { project_id: string; engineering_run_id: string; worktree_id?: string }
 type ContextLoad = { client: RunDirectoryApiClient; route: string; status: "ready"; envelope: RunContextEnvelope } |
@@ -88,10 +91,11 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
       <p className="mt-2 text-xs text-ink-mute">协作、任务、Canvas、Workflow、分析与插件的工作区属于此 Engineering Run。Worktree 提供本地 checkout 焦点。</p>
     </header>
     {focus && <div role="tablist" aria-label="Engineering Run Apps" className="mt-4 flex flex-wrap gap-2">
-      {RUN_APP_TABS.map((tab) => <button role="tab" aria-selected={activeApp === tab} aria-controls="run-app-content" disabled={tab !== "Task Cards"} onClick={() => setActiveApp(tab)} type="button" key={tab} className={`rounded border border-line px-3 py-2 text-xs ${activeApp === tab ? "bg-accent/15 text-accent" : "text-ink-mute"}`}>{tab}{tab === "Task Cards" ? "" : " · 待迁移"}</button>)}
+      {RUN_APP_TABS.map((tab) => <button role="tab" aria-selected={activeApp === tab} aria-controls="run-app-content" disabled={tab !== "Task Cards" && tab !== "Run BI / Benchmark"} onClick={() => setActiveApp(tab)} type="button" key={tab} className={`rounded border border-line px-3 py-2 text-xs ${activeApp === tab ? "bg-accent/15 text-accent" : "text-ink-mute"}`}>{tab}{tab === "Task Cards" || tab === "Run BI / Benchmark" ? "" : " · 待迁移"}</button>)}
     </div>}
-    <div id="run-app-content" className="my-4">
+    <div id="run-app-content" role="tabpanel" aria-label={activeApp} className="my-4">
       {(!focus || activeApp === "Task Cards") && <RunTaskCardsPanel key={runId} client={current.client} context={envelope} available={envelope.capabilities.task_cards_available} />}
+      {focus && activeApp === "Run BI / Benchmark" && <RunBiPanel key={`${projectId}/${runId}/${worktreeId}`} client={current.client} run={envelope.engineering_run} />}
     </div>
     <div role="status" className="mb-4 rounded border border-line bg-bg-soft p-4 text-sm">
       <p>{envelope.capabilities.task_cards_available ? "Task Cards 已按当前 Run 授权开放读取与创建入口。" : "服务端尚未开放 Task Cards 读取能力；页面保持禁用，不会回退到 Worktree 任务或演示数据。"} Canvas、Inbox、Workflow、BI/Benchmark 与插件仍是同级 Run App。</p>

@@ -1,10 +1,12 @@
 # BD-MULTICA-TASK-001
 
-> **Task Lifecycle 基本設計書 v0.17**
+> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+
+> **Task Lifecycle 基本設計書 v0.18**
 >
-> - 状态: 🟡 Draft v0.17
+> - 状态: 🟡 Draft v0.18
 > - 日期: 2026-10-02 JST
-> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.24
+> - 上游需求: [docs/requirements/SRS-MULTICA-TASK-001.md](../requirements/SRS-MULTICA-TASK-001.md) v0.25
 > - 渡口共享基线: [`docs/requirements.md`](../requirements.md) §50; [`docs/basic-design.md`](../basic-design.md) §16
 > - Multica 状态来源: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 下游詳細設計: [`docs/design/DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md)
@@ -310,3 +312,14 @@ GAP-7: Task route pin and bounded Rust claim/route/wire source store exist, but 
 | v0.9 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Task SRS v0.16、Group DD v5.04、requirements v6.76、basic v6.75 与 data design v2.23；增加 route-pin、receiver Inbox receipt、dispatcher verify 与 per-consumer commit 边界；明确 migration/API/DB/RLS 和消费闭环仍未实现 | Outbox delivery source migration 审查补充不可变首发路由及 consumer-specific durable completion |
 | v0.8 | 2026-10-15 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将产品树固定为 Project → Engineering Run → Worktree → Branch；Run 不依赖宿主 Branch；Task canonical owner 为 Project/Run，Worktree focus 可选；定义 Run list/create、schema v2 Outbox 与未验证 migration/RLS 及仍关闭的 lifecycle/Schedule/CLI gates | ERUN-P3.2 Task owner 源码切片对照与导航纠正 |
 | v0.7 | 2026-10-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Card pending request 改为 POST 前异步写入有界 IndexedDB；定义 tenant/actor/Run 隔离、精确授权/binding snapshot、32 条与 29 天重试边界、过期/不匹配人工对账和显式清除；记录本地数据未加密、浏览器清理风险与非 exactly-once/跨设备边界，保留生产 DB/RLS/host/CLI 阻断 | 实现 Task Card remount/reload recovery，并对齐 SRS v0.14 |
+
+
+## 6.6 Run BI read UI
+
+Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Project/Engineering Run，Worktree 仅决定焦点，不改变事实查询范围。`RunBiPanel` 通过 `RunDirectoryApiClient.listRunTaskEvents` 读取已授权的真实 API；不注入 seed 或 mock。验收映射：AC-RUN-OUTBOX-11 / Task AC-25 / BD §6.6 / DD §14.13.8。
+
+客户端固定每页 50 条，沿用最多 2 个并发请求、16 个等待请求、15 秒请求超时与 512 KiB 响应上限；只保留当前页和最多 100 个游标，不轮询或累积历史页。检查响应 Project/Run、白名单字段、重复 event ID、稳定排序和游标进展；时间比较保留亚毫秒精度。切换 scope、翻页和卸载时取消旧请求，加载状态按 scope/cursor/client/retry 隔离，防止旧 scope 闪现。BI 专属 503 提示不暴露后端配置；Tab 与 `tabpanel` 关联。
+
+`coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
+
+本次修订：v0.18，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。

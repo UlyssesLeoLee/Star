@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=588538c3ba4c22631cf3e3624973060047b29826ba5e7a2a6ce6ff541fbfab5a
+@cypher schema=1 source_sha256=916d83dc746dcb557dcc14b093dc75fc73d562bb3595070b5044ce7646ef76bf
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -32,12 +32,12 @@ MERGE (state)-[:HAS_METHOD]->(install)
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use bi_owner_runtime::{PgTaskEventQueryStore, TaskEventQueryPort};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use star_api_rest::{
     auth::JwtConfig,
-    group_api::{GroupApiState, PgGroupAppRegistryProvider, build_group_router},
+    group_api::{build_group_router, GroupApiState, PgGroupAppRegistryProvider},
 };
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use star_pg_adapter::{PgConfig, connect_pool};
+use star_pg_adapter::{connect_pool, PgConfig};
 use tracing::info;
 
 #[tokio::main]

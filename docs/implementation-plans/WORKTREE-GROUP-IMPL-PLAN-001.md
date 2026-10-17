@@ -1,6 +1,8 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v7.12**
+> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+
+> **渡口 Project / Engineering Run / Worktree / Branch 架构与实施计划 v7.13**
 > - Phase 9F4G 当前状态：provider-neutral receiver core、durable metadata-only quarantine 与 Run-scoped Task-event read API source 已加入 §6.153–§6.154。隔离 PostgreSQL 18 query fixture 验证双次 migration、function-only grants、scope、keyset cursor、partial cursor/page bounds 与 payload omission；Rust 1.99.0 gates、target BI role/DB deployment、production transport/auth/receiver composition、UI、fan-out/recovery、Benchmark、retention 与性能仍开放，ingress 和执行保持 fail closed。
 >
 > - 状态：🟡 执行中（Phase 0 设计基线已收口；Phase 1 仍开放，已有 canonical Branch/Engineering Run schema、授权只读目录、RunContext 和条件式懒树/context shell基础；真实会话/可信ingest/grants写入及Run Apps迁移未完成；Phase INFRA-2A/2B bounded read-only observation slices complete；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、其余 owner adapter 覆盖与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer；INFRA-2C3 已加入并验证受限 Rust lifecycle writer/延迟退休约束，但生产 key/login 生命周期、inventory reconciliation、target DB、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收仍缺；Phase 7 跨 App 生产验收未开始）
@@ -2322,3 +2324,14 @@ This slice adds `GET /api/v1/engineering-runs/{engineering_run_id}/bi/task-event
 The BI database function `bi.list_task_event_page_v1` limits reads to the fixed allowlist consumer and requested tenant/Project/Run. Runtime has function EXECUTE only, not fact-table SELECT. API pages default to 50/max 100 with a stable `(occurred_at DESC, event_id ASC)` keyset cursor and no payload/actor/correlation/route/wire fields. Coverage and freshness are explicitly unknown without a delivery checkpoint. No table is added, and no BI UI, materialized metric, Benchmark, receiver composition, fan-out or recovery is claimed.
 
 Verification: isolated PostgreSQL 18 runner passed the new migration twice, function-only grants, scope, same-timestamp cursor ordering, partial cursor/page bounds, and payload exclusion. `cargo`, `rustc` and `rustfmt` are unavailable in this environment, so the added Rust API/store has not passed formatting, compilation, unit tests or Clippy. The target BI role membership and production DB remain unverified. Keep ingress and execution fail closed until those gates and the trusted receiver/identity path are implemented.
+
+
+## 6.155 Phase 9F4H Run BI read UI
+
+Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Project/Engineering Run，Worktree 仅决定焦点，不改变事实查询范围。`RunBiPanel` 通过 `RunDirectoryApiClient.listRunTaskEvents` 读取已授权的真实 API；不注入 seed 或 mock。验收映射：AC-RUN-OUTBOX-11 / Task AC-25 / BD §6.6 / DD §14.13.8。
+
+客户端固定每页 50 条，沿用最多 2 个并发请求、16 个等待请求、15 秒请求超时与 512 KiB 响应上限；只保留当前页和最多 100 个游标，不轮询或累积历史页。检查响应 Project/Run、白名单字段、重复 event ID、稳定排序和游标进展；时间比较保留亚毫秒精度。切换 scope、翻页和卸载时取消旧请求，加载状态按 scope/cursor/client/retry 隔离，防止旧 scope 闪现。BI 专属 503 提示不暴露后端配置；Tab 与 `tabpanel` 关联。
+
+`coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
+
+本次修订：v7.13，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。

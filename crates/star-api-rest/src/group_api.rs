@@ -109,13 +109,13 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use bi_owner_runtime::TaskEventQueryPort;
 use chrono::{DateTime, Utc};
 use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-use bi_owner_runtime::TaskEventQueryPort;
-// @cypher schema=1 source_sha256=fd0016b43acb4cedb1abeb3984c4193c954b2ddfa866bd2eb65e6e03ed88bace
+// @cypher schema=1 source_sha256=455cccb7325d9094bc9f98ec3b101fda3b12408232f15ebc9abf74b91ec26f1c
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -156,8 +156,8 @@ use uuid::Uuid;
 
 use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
-mod canvas;
 mod bi_analytics;
+mod canvas;
 mod cli_sessions;
 mod engineering_runs;
 mod execution_catalogs;

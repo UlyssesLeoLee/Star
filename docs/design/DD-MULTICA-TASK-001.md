@@ -1,14 +1,16 @@
 # DD-MULTICA-TASK-001
 
-> **Task Lifecycle 域 詳細設計書 v1.38** (Project/Run-owned Task Card source and delivery substrate; BI owner fact projection, durable quarantine, and Run-scoped read API source exist, while trusted receiver transport, production BI UI and delivery remain open)
+> **9F4H 当前增量**：Run BI 只读界面、客户端和错误/分页/取消处理已实现，前端 11/11 与 typecheck 通过；Rust 1.99.0 API all-target check、BI runtime 12/12 通过。此前章节的未运行记录仅描述当时切片；本次结果与生产缺口以 `PHASE-9F4H-BI-READ-UI-REPORT.md` 为准，生产 BI 与全部 phases 仍未完成。
+
+> **Task Lifecycle 域 詳細設計書 v1.39** (Project/Run-owned Task Card source and delivery substrate; BI owner fact projection, durable quarantine, and Run-scoped read API source exist, while trusted receiver transport, production BI UI and delivery remain open)
 >
-> - 状态: 🟡 Draft v1.38 (9F4G adds a bounded Run-authorized query API and fixed BI owner query function; its isolated PostgreSQL 18 fixture passes. The new Rust gates and target role deployment were not verified; trusted transport/auth, production UI and recovery remain open; execution stays fail closed)
+> - 状态: 🟡 Draft v1.39 (9F4G adds a bounded Run-authorized query API and fixed BI owner query function; its isolated PostgreSQL 18 fixture passes. The new Rust gates and target role deployment were not verified; trusted transport/auth, production UI and recovery remain open; execution stays fail closed)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: docs/requirements.md v6.84 §50；docs/basic-design.md v6.83 §16
+> - 关联总要件 / 基本设计: docs/requirements.md v6.85 §50；docs/basic-design.md v6.84 §16
 > - 关联 Group / Hook 详细设计: docs/design/DD-WORKTREE-GROUP-001.md v5.08；docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14
-> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.24
-> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.17
+> - 上位要件: docs/requirements/SRS-MULTICA-TASK-001.md v0.25
+> - 上位基本設計: docs/design/BD-MULTICA-TASK-001.md v0.18
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
@@ -1234,3 +1236,14 @@ The REST route is `GET /api/v1/engineering-runs/{engineering_run_id}/bi/task-eve
 Requests default to 50 rows and reject sizes outside 1–100. Cursor values must be supplied together and parse as an RFC3339 timestamp plus non-nil UUID. The database uses keyset order `(occurred_at DESC, event_id ASC)`; the store fetches one extra row to compute `has_more` and returns the last visible row as the next cursor. The response includes event/work-item IDs, aggregate/schema versions, event type/time and allowlisted lifecycle/review transition/owner-change dimensions. It omits event payload and actor, correlation, route and wire metadata. `coverage.completeness` and `coverage.freshness` remain `unknown` because no authoritative delivery checkpoint or reconciliation contract exists.
 
 The isolated PostgreSQL 18 fixture passed double migration application, function-only grants, tenant/Project scope, stable same-timestamp keyset paging, partial-cursor and page-limit rejection, and payload-column exclusion. It does not prove target database deployment, application login role membership, Rust compilation, production authentication, dashboard UI, BI aggregates, Benchmark, consumer fan-out, recovery or execution.
+
+
+## 14.13.8 Phase 9F4H Run BI panel
+
+Run 内选定 Worktree 后启用 BI App；BI 数据与授权仍归属当前 Project/Engineering Run，Worktree 仅决定焦点，不改变事实查询范围。`RunBiPanel` 通过 `RunDirectoryApiClient.listRunTaskEvents` 读取已授权的真实 API；不注入 seed 或 mock。验收映射：AC-RUN-OUTBOX-11 / Task AC-25 / BD §6.6 / DD §14.13.8。
+
+客户端固定每页 50 条，沿用最多 2 个并发请求、16 个等待请求、15 秒请求超时与 512 KiB 响应上限；只保留当前页和最多 100 个游标，不轮询或累积历史页。检查响应 Project/Run、白名单字段、重复 event ID、稳定排序和游标进展；时间比较保留亚毫秒精度。切换 scope、翻页和卸载时取消旧请求，加载状态按 scope/cursor/client/retry 隔离，防止旧 scope 闪现。BI 专属 503 提示不暴露后端配置；Tab 与 `tabpanel` 关联。
+
+`coverage.completeness` / `freshness` 继续显示 unknown；空结果仅表示尚未观察到事件，不能解释为完整零值。界面与客户端现有测试 11/11、完整 TypeScript 检查通过；这不是生产数据链路验收。Rust 1.99.0 已通过绝对路径定位，此前报告中的不可用是当时 PATH 探测局限；本次正式编译暴露并修复 receiver 公开 rustdoc 缺口，最终编译结果见阶段报告。生产身份/receiver 接线、target DB/grants、可靠消费 checkpoint、aggregate/Benchmark、恢复与资源性能验收仍开放，执行继续 fail closed。
+
+本次修订：v1.39，2026-10-17，Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4H 客户端/界面实现与并行审查。证据与缺口：`docs/reports/PHASE-9F4H-BI-READ-UI-REPORT.md`。
