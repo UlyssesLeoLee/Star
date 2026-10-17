@@ -11,7 +11,8 @@ Integrate only reviewed, still-useful content into `dev`. The integration base w
 | Existing local branches | Ten branch tips are ancestors of or equal to the integration base. | No duplicate merge. |
 | `codex/neutral-product-copy` | Tip `0bb81f6c` is 26 commits behind `dev` and has three commits outside `dev` ancestry; one commit's patch is already present in `dev` as `6cd18fa5`. Forty-six of 56 compared paths are identical. The remaining changes include stale route/App-ID aliases, missing `runDirectory` translations, and a restored mock connector. | Do not merge the branch or its commits wholesale. |
 | Credential examples | The only selected source changes are six neutral placeholder strings in `en.ts`, `ja.ts`, and `zh-CN.ts`. | Change the display-name examples to a generic API service account and the base URL example to `provider.example.invalid`. |
-| Worktrees | Most clean checkouts contain ignored build, report, or validation data; two contain shared dependency junctions, and one contains a PostgreSQL data directory whose use is unverified. | Preserve them pending data-specific retention decisions. `task-outbox-dispatcher` is the sole archive candidate; its archive request remains queued pending confirmation. |
+| Worktrees | Most clean checkouts contain ignored build, report, or validation data; two contain shared dependency junctions, and one contains a PostgreSQL data directory whose use is unverified. | Preserve them pending data-specific retention decisions. `task-outbox-dispatcher` has clean tracked state but contains an ignored CodeGraph database (105,099,264 bytes) and sidecars. Its archive request remains queued; the database and sidecars were copied and hash-verified outside the worktree. |
+| Post-merge state | Local `dev` was fast-forwarded from `94d2c82c3be2678e5cc959dd38598cabdcc0779c` to `c76b2a590f33a2c8587a336b4901736ecea1793b`; the target was clean and Orca reported no live terminal, attached PTY, or agent. `main` remained at `8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`. | Deleted the merged candidate branch and removed `codex/neutral-product-copy` after saving tip `0bb81f6c255ad6b237469271607755d6676eea0f` as local tag `archive/neutral-product-copy-20261018`. The candidate worktree is archived, though its snapshot could not be restored. No fetch or push was performed. |
 
 Audited branch tips: `codex/bi-task-event-projection` `203b93c7`, `codex/d20-cross-provider-diagnostics` `d15951f9`, `codex/d20-p2-docs` `8e973f9c`, `codex/d20-pg-receipts` `27fc6f2a`, `codex/d20-route-pin-ops` `28778219`, `codex/phase1-gap-audit` `de31aaa7`, `codex/run-task-command-port` `90996791`, `codex/task-outbox-dispatcher` `d72b64e6`, `codex/phase9f4g-bi-query` `94d2c82c`, and `dev` `94d2c82c`. The review candidate was also based on `94d2c82c`.
 
@@ -26,7 +27,9 @@ Audited branch tips: `codex/bi-task-event-projection` `203b93c7`, `codex/d20-cro
 
 - Static frontend inspection does not cover backend-provided labels, user-authored content, or runtime injection.
 - Cleanup is incomplete because ignored user data, shared `node_modules` junctions, and a PostgreSQL directory cannot be safely removed based on the available evidence.
-- The current local `origin/dev` tracking ref was one commit behind the inspected local `dev`; remote freshness has not been refreshed.
+- At the post-merge check, local `origin/dev` was two commits behind local `dev`; remote freshness has not been refreshed.
+- Codex reports `dev-converge-review` as archived, but a restore attempt failed because its archived snapshot was missing. Its 1,074-byte raw audit log was separately preserved under `%LOCALAPPDATA%\Star\archive-evidence\dev-converge-review-20261018\` and SHA-256 verified.
+- The `task-outbox-dispatcher` archive request still had no completion confirmation at the final check; its worktree and branch remain present. Other data-bearing worktrees and their branch refs remain untouched.
 
 ## 4. Parallel review outcomes
 
@@ -50,3 +53,4 @@ Reviewed by the coordinating agent with parallel read-only branch, product-copy,
 | Date | Revision | Change |
 |---|---|---|
 | 2026-10-18 | v1 | Recorded selective locale integration, branch ancestry audit, validation, and cleanup blockers. |
+| 2026-10-18 | v2 | Recorded the verified fast-forward, branch-ref cleanup/archive tag, current local tracking-ref distance, and unresolved managed-worktree archival state. |
