@@ -1,0 +1,40 @@
+WBS WLD-0 source-backed audit evidence log
+Date: 2026-10-18 JST
+Branch: codex/wbs-wld0-binding
+Baseline: 6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e
+
+Scope
+- Read only: docs/requirements.md §50; docs/basic-design.md §16; docs/design/DD-WORKTREE-GROUP-001.md; docs/data-design/phase9f4d-run-owner-wtm.md; migrations 2026-10-01-engineering-run-directory.sql, 2026-10-15-run-host-independent-directory.sql, 2026-10-15-run-host-independent-task-owner.sql; relevant group API/service handlers and Phase ERUN directory report.
+- No .codegraph directory exists in this isolated worktree; no graph index was created.
+- No source-code, migration, test, canonical design, database or runtime edits/actions.
+
+Key source references
+- Requirements: docs/requirements.md:2231-2258, 2288-2295, 2446-2450.
+- Basic design: docs/basic-design.md:4216-4332, 4490-4637.
+- Detailed design: docs/design/DD-WORKTREE-GROUP-001.md:28-83, 123-207, 211 onward.
+- Run/Worktree table definition and write/audit guards: db/migrations/2026-10-01-engineering-run-directory.sql:126-220, 261-478, 488-500.
+- Host-independent constraints, binding insert guard, idempotency/outbox: db/migrations/2026-10-15-run-host-independent-directory.sql:23-60, 189-267.
+- Project-scoped Run route/create and no branch requirement at create: crates/star-api-rest/src/group_api/engineering_runs.rs:266-288, 509-666.
+- Legacy task scope still requires host Branch: same file:386-423.
+- Current Run Worktree read/focus joins: same file:704-765.
+- Project Worktree create/import routes: crates/star-api-rest/src/group_api/worktree_lifecycle.rs:228-246, 388-455.
+- Separate archive management and Worktree projection: crates/star-api-rest/src/group_api/worktrees.rs:144-164, 228-306, 381-518, 753-775.
+- Disposable directory DDL evidence/limits: docs/reports/PHASE-ERUN-DIRECTORY-P1-REPORT.md:19-24.
+- WTM scope distinction: docs/data-design/phase9f4d-run-owner-wtm.md:1-24.
+
+Validation run
+- RTK: 0.50.0 via the installed full path; all Git/search/read commands used through RTK.
+- Source discovery was bounded to the brief's required design, migration, API and report areas; one docs-tree filename lookup resolved the canonical SRS and Run W/T/M source paths.
+- No focused WLD-0 tests exist in the reviewed Run directory handler/tests. A disposable DDL run is recorded by the existing Phase ERUN report; target database role grants/runtime remain unverified.
+- `rtk git diff --check` and `rtk git diff --cached --check` passed after staging. Staged paths are exactly the three files in the brief manifest; the staged diff was manually reviewed against the task scope and source citations.
+- One audit commit is the remaining action on this isolated lane; no rebase, merge, push, cleanup or deletion is authorized for this worker.
+
+Findings summary
+- Canonical versioned RunWorktree Master relation exists partially: optional 0/1 active Run per Worktree, SCD2, exact Project binding; hostless Run directory create/read source exists.
+- No binding mutation API/owner command found in reviewed router; no explicit detach/rebind/recovery semantics.
+- `w.branch` is projected without observation freshness/source fields in Run directory DTO; it must not be confused with remote SCM `branch_id`.
+- Legacy execution-scope adapter and CLI still require a remote Branch; hostless Run directory is not a hostless execution proof.
+- DD's 8-table 3T/5M inventory predates the Oct 15 Work idempotency and Transaction Outbox tables.
+- Trigger audit is not an Outbox delivery/BI event. Target grants, production DB and runtime behavior are unverified.
+
+No WLD-0 implementation or production readiness is claimed. Coordinator owns design approval and integration.
