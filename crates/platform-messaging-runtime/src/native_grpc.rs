@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Adapted from D:/RustGameServer/crates/shared-platform/src/tls.rs at
-// 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 (Apache-2.0).
-// TLS loading and fail-closed behavior are retained; application identity stays Star-owned.
 /*
-@cypher schema=1 source_sha256=2d849e69a4c8f996b76d9206f75cb048f166386a49abdb3177d4199c0d40b7ce
+@cypher schema=1 source_sha256=2d17110a4fe1f2e601791652d9727bf4985f233596eb874e552bd87ee40aa476
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/native_grpc.rs"})
 MERGE (tls_client:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
 MERGE (tls_server:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
@@ -21,6 +18,15 @@ MERGE (receive_transport:Type {id:"crates/platform-messaging-runtime/src/native_
 MERGE (receive_authorization:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionReceiveAuthorization",kind:"struct"})
 MERGE (receive_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcReceiveClientConfig",kind:"struct"})
 MERGE (receive_delivery:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionDelivery",kind:"struct"})
+MERGE (event_scope:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveScope",kind:"struct"})
+MERGE (event_client_config:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveClientConfig",kind:"struct"})
+MERGE (event_transport:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveTransport",kind:"struct"})
+MERGE (event_delivery:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventDelivery",kind:"struct"})
+MERGE (event_origin:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventOrigin",kind:"struct"})
+MERGE (event_authorization:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveAuthorization",kind:"struct"})
+MERGE (event_verification_pins:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeEventOriginVerificationPins",kind:"struct"})
+MERGE (event_receive_error:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveError",kind:"enum"})
+MERGE (validated_event_delivery:Type {id:"crates/platform-messaging-runtime/src/native_grpc.rs::ValidatedNativeEventDelivery",kind:"struct"})
 MERGE (connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport.connect",kind:"method"})
 MERGE (publish:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAdmissionTransport.publish",kind:"method"})
 MERGE (append_connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcAppendTransport.connect",kind:"method"})
@@ -38,6 +44,16 @@ MERGE (validate_delivery:Symbol {id:"crates/platform-messaging-runtime/src/nativ
 MERGE (validate_scope:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::valid_receive_scope",kind:"function"})
 MERGE (valid_log_id:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::valid_native_log_id",kind:"function"})
 MERGE (kind_mapping:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_message_kind",kind:"function"})
+MERGE (event_connect:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveTransport.connect",kind:"method"})
+MERGE (event_pull_one:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveTransport.pull_one",kind:"method"})
+MERGE (event_authorization_factory:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveTransport.authorization",kind:"method"})
+MERGE (event_verify_origin:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventReceiveAuthorization.verify_origin",kind:"method"})
+MERGE (event_acknowledge:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::NativeGrpcEventDelivery.acknowledge",kind:"method"})
+MERGE (valid_event_scope:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::valid_native_event_receive_scope",kind:"function"})
+MERGE (event_pull_request:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_event_pull_request",kind:"function"})
+MERGE (validate_event_delivery:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::validate_native_event_delivery",kind:"function"})
+MERGE (event_origin_request:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_event_origin_verification_request",kind:"function"})
+MERGE (event_ack_request:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_event_acknowledgement_request",kind:"function"})
 MERGE (provider_identity:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::native_provider_identity",kind:"function"})
 MERGE (profile_endpoint_guard:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::validate_profile_endpoint",kind:"function"})
 MERGE (profile_new:Symbol {id:"crates/platform-messaging-runtime/src/admission_delivery.rs::AdmissionTransportProfile.new",kind:"method"})
@@ -80,6 +96,7 @@ MERGE (native_receive_bounds_test:Symbol {id:"crates/platform-messaging-runtime/
 MERGE (native_provider_identity_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_provider_identity_pins_provider_version_profile_and_endpoint",kind:"test"})
 MERGE (origin_request_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_origin_verification_request_hashes_exact_wire",kind:"test"})
 MERGE (origin_request_bounds_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::native_origin_verification_request_rejects_invalid_scope_and_wire",kind:"test"})
+MERGE (event_tests_file:File {path:"crates/platform-messaging-runtime/src/native_grpc_event_adapter_tests.rs"})
 MERGE (endpoint_profile_digest_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::resolved_endpoint_must_match_admission_profile_digest",kind:"test"})
 MERGE (endpoint_profile_identity_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::resolved_endpoint_must_match_admission_profile_identity",kind:"test"})
 MERGE (endpoint_profile_match_test:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::tests::matching_resolved_endpoint_is_accepted_by_profile_guard",kind:"test"})
@@ -104,6 +121,15 @@ MERGE (self)-[:DEFINES]->(append_client_config)
 MERGE (self)-[:DEFINES]->(receive_transport)
 MERGE (self)-[:DEFINES]->(receive_config)
 MERGE (self)-[:DEFINES]->(receive_delivery)
+MERGE (self)-[:DEFINES]->(event_scope)
+MERGE (self)-[:DEFINES]->(event_client_config)
+MERGE (self)-[:DEFINES]->(event_transport)
+MERGE (self)-[:DEFINES]->(event_delivery)
+MERGE (self)-[:DEFINES]->(event_origin)
+MERGE (self)-[:DEFINES]->(event_authorization)
+MERGE (self)-[:DEFINES]->(event_verification_pins)
+MERGE (self)-[:DEFINES]->(event_receive_error)
+MERGE (self)-[:DEFINES]->(validated_event_delivery)
 MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(publish)
 MERGE (self)-[:DEFINES]->(append_connect)
@@ -111,6 +137,16 @@ MERGE (self)-[:DEFINES]->(append_result)
 MERGE (self)-[:DEFINES]->(validate_profile_snapshot)
 MERGE (self)-[:DEFINES]->(connect_receive_client)
 MERGE (self)-[:DEFINES]->(receive_connect)
+MERGE (self)-[:DEFINES]->(event_connect)
+MERGE (self)-[:DEFINES]->(event_pull_one)
+MERGE (self)-[:DEFINES]->(event_authorization_factory)
+MERGE (self)-[:DEFINES]->(event_verify_origin)
+MERGE (self)-[:DEFINES]->(event_acknowledge)
+MERGE (self)-[:DEFINES]->(valid_event_scope)
+MERGE (self)-[:DEFINES]->(event_pull_request)
+MERGE (self)-[:DEFINES]->(validate_event_delivery)
+MERGE (self)-[:DEFINES]->(event_origin_request)
+MERGE (self)-[:DEFINES]->(event_ack_request)
 MERGE (self)-[:DEFINES]->(pull_one)
 MERGE (self)-[:DEFINES]->(acknowledge)
 MERGE (self)-[:DEFINES]->(terminate)
@@ -133,6 +169,7 @@ MERGE (self)-[:IMPORTS]->(receipt)
 MERGE (self)-[:IMPORTS]->(receive_port)
 MERGE (self)-[:IMPORTS]->(delivery_port)
 MERGE (self)-[:IMPORTS]->(native_append_file)
+MERGE (self)-[:IMPORTS]->(event_tests_file)
 MERGE (self)-[:IMPORTS]->(tonic)
 MERGE (self)-[:IMPORTS]->(sha256)
 MERGE (self)-[:DEFINES]->(wire_limit)
@@ -199,6 +236,40 @@ MERGE (pull_one)-[:CALLS]->(kind_mapping)
 MERGE (pull_one)-[:CALLS]->(semaphore)
 MERGE (pull_one)-[:CALLS]->(provider_identity)
 MERGE (pull_one)-[:USES_TYPE]->(permit)
+MERGE (event_connect)-[:CALLS]->(connect_receive_client)
+MERGE (event_connect)-[:CALLS]->(valid_event_scope)
+MERGE (event_connect)-[:CALLS]->(validate_profile_snapshot)
+MERGE (event_connect)-[:CALLS]->(provider_identity)
+MERGE (event_connect)-[:CALLS]->(semaphore_new)
+MERGE (event_pull_one)-[:CALLS]->(tonic_pull)
+MERGE (event_pull_one)-[:CALLS]->(event_pull_request)
+MERGE (event_pull_one)-[:CALLS]->(validate_event_delivery)
+MERGE (event_pull_one)-[:CALLS]->(try_semaphore)
+MERGE (event_pull_one)-[:USES_TYPE]->(permit)
+MERGE (event_authorization_factory)-[:CREATES]->(event_authorization)
+MERGE (event_verify_origin)-[:CALLS]->(tonic_verify_origin)
+MERGE (event_verify_origin)-[:CALLS]->(event_origin_request)
+MERGE (event_verify_origin)-[:CALLS]->(semaphore)
+MERGE (event_acknowledge)-[:CALLS]->(tonic_ack)
+MERGE (event_acknowledge)-[:CALLS]->(event_ack_request)
+MERGE (event_acknowledge)-[:CALLS]->(semaphore)
+MERGE (event_pull_request)-[:USES_TYPE]->(provider_id)
+MERGE (event_pull_request)-[:USES_TYPE]->(transport_message_kind:Type {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportMessageKind",kind:"enum"})
+MERGE (event_pull_request)-[:CALLS]->(validate_profile_snapshot)
+MERGE (validate_event_delivery)-[:CALLS]->(sha256)
+MERGE (validate_event_delivery)-[:CALLS]->(uuid_parse)
+MERGE (validate_event_delivery)-[:CALLS]->(valid_event_scope)
+MERGE (validate_event_delivery)-[:CALLS]->(valid_log_id)
+MERGE (validate_event_delivery)-[:CALLS]->(validate_profile_snapshot)
+MERGE (validate_event_delivery)-[:CALLS]->(provider_identity)
+MERGE (event_origin_request)-[:CALLS]->(sha256)
+MERGE (event_origin_request)-[:CALLS]->(valid_log_id)
+MERGE (event_origin_request)-[:CALLS]->(validate_profile_snapshot)
+MERGE (event_origin_request)-[:CALLS]->(provider_identity)
+MERGE (event_origin_request)-[:USES_TYPE]->(event_verification_pins)
+MERGE (event_ack_request)-[:CALLS]->(valid_log_id)
+MERGE (event_ack_request)-[:CALLS]->(validate_profile_snapshot)
+MERGE (event_ack_request)-[:CALLS]->(provider_identity)
 MERGE (acknowledge)-[:CALLS]->(tonic_ack)
 MERGE (acknowledge)-[:CALLS]->(kind_mapping)
 MERGE (acknowledge)-[:CALLS]->(semaphore)
@@ -245,6 +316,9 @@ MERGE (pem_limit_test)-[:TESTS]->(read_pem)
 MERGE (endpoint_test)-[:TESTS]->(valid_https_endpoint)
 @endcypher
 */
+// Adapted from D:/RustGameServer/crates/shared-platform/src/tls.rs at
+// 89458d887e8bfddf6637f9d80ea65f2091e8b6f2 (Apache-2.0).
+// TLS loading and fail-closed behavior are retained; application identity stays Star-owned.
 //! Native gRPC mTLS client adapter for Star's durable transport protocol.
 
 use std::{io::Read, path::Path, sync::Arc, time::Duration};
@@ -272,6 +346,7 @@ use crate::native_append::{
     NativeAppendError, NativeAppendReceipt, NativeAppendTransport, MAX_NATIVE_APPEND_WIRE_BYTES,
 };
 use crate::transport_endpoint::ResolvedTransportEndpoint;
+use crate::transport_profile::TransportMessageKind;
 
 /// The transport wire limit plus protobuf envelope headroom.
 pub const MAX_NATIVE_GRPC_MESSAGE_BYTES: usize = 32 * 1024;
@@ -886,6 +961,591 @@ impl AdmissionReceivedDelivery for NativeGrpcAdmissionDelivery {
     }
 }
 
+/// Immutable event route resolved by trusted deployment configuration.
+///
+/// The native server still derives the receiving principal from the mTLS certificate. This local
+/// route is a consistency pin and never substitutes for that authenticated server-side identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeGrpcEventReceiveScope {
+    tenant_id: Uuid,
+    sender_service_id: Uuid,
+    receiver_service_id: Uuid,
+    message_kind: TransportMessageKind,
+}
+
+impl NativeGrpcEventReceiveScope {
+    /// Construct the sole message kind supported by this adapter: an owner-scoped event.
+    pub fn new(
+        tenant_id: Uuid,
+        sender_service_id: Uuid,
+        receiver_service_id: Uuid,
+    ) -> Result<Self, NativeGrpcEventReceiveError> {
+        let scope = Self {
+            tenant_id,
+            sender_service_id,
+            receiver_service_id,
+            message_kind: TransportMessageKind::Event,
+        };
+        if valid_native_event_receive_scope(scope) {
+            Ok(scope)
+        } else {
+            Err(NativeGrpcEventReceiveError::Route)
+        }
+    }
+
+    /// Return the pinned tenant identifier.
+    pub fn tenant_id(self) -> Uuid {
+        self.tenant_id
+    }
+
+    /// Return the pinned source service identifier.
+    pub fn sender_service_id(self) -> Uuid {
+        self.sender_service_id
+    }
+
+    /// Return the service principal selected as the mTLS receiver.
+    pub fn receiver_service_id(self) -> Uuid {
+        self.receiver_service_id
+    }
+
+    /// Return the immutable message kind, always `event` for this adapter.
+    pub fn message_kind(self) -> TransportMessageKind {
+        self.message_kind
+    }
+}
+
+/// Immutable client inputs for one profile-pinned native event subscription.
+pub struct NativeGrpcEventReceiveClientConfig<'a> {
+    /// Destination returned by the trusted current-profile/endpoint resolver.
+    pub endpoint: &'a ResolvedTransportEndpoint,
+    /// Trusted CA bundle used to validate the native server certificate.
+    pub server_ca_path: &'a Path,
+    /// Client certificate for the receiving service's mTLS identity.
+    pub client_cert_path: &'a Path,
+    /// Private key for `client_cert_path`.
+    pub client_key_path: &'a Path,
+    /// Connection establishment timeout, capped at 30 seconds.
+    pub connect_timeout: Duration,
+    /// Per-RPC deadline, capped at 10 seconds.
+    pub request_timeout: Duration,
+    /// Tenant, sender and receiver identities resolved by trusted server-side routing.
+    pub scope: NativeGrpcEventReceiveScope,
+    /// Exact native log ID resolved for the immutable BI destination pin.
+    pub expected_log_id: &'a str,
+    /// Exact generation of the destination log resolved for the BI route pin.
+    pub expected_log_generation: Uuid,
+    /// Server-side delivery lease, bounded to 30–120 seconds.
+    pub lease_seconds: u32,
+    /// Current immutable native provider/profile snapshot.
+    pub profile: AdmissionTransportProfile,
+}
+
+/// Native gRPC adapter for a single pinned event route.
+///
+/// It has no background task and performs no prefetch. A caller must commit its owner Inbox before
+/// invoking [`NativeGrpcEventDelivery::acknowledge`]. Profile, endpoint, provider, route and Event
+/// kind remain pinned for the lifetime of this adapter; each origin verification and ACK is still
+/// authorized by the server against current mTLS identity and profile state.
+pub struct NativeGrpcEventReceiveTransport {
+    client: wire::durable_transport_client::DurableTransportClient<Channel>,
+    profile: AdmissionTransportProfile,
+    provider_identity: String,
+    scope: NativeGrpcEventReceiveScope,
+    expected_log_id: String,
+    expected_log_generation: Uuid,
+    lease_seconds: i32,
+    rpc_in_flight: Arc<Semaphore>,
+    outstanding: Arc<Semaphore>,
+}
+
+/// Exact one-message native event delivery; its permit bounds leased-but-unacknowledged messages.
+pub struct NativeGrpcEventDelivery {
+    client: wire::durable_transport_client::DurableTransportClient<Channel>,
+    profile: AdmissionTransportProfile,
+    scope: NativeGrpcEventReceiveScope,
+    origin: NativeGrpcEventOrigin,
+    wire: Vec<u8>,
+    lease_id: Uuid,
+    rpc_in_flight: Arc<Semaphore>,
+    _outstanding_permit: tokio::sync::OwnedSemaphorePermit,
+}
+
+/// Durable source identity and exact-wire digest returned with a native event.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NativeGrpcEventOrigin {
+    scope: NativeGrpcEventReceiveScope,
+    provider_identity: String,
+    log_id: String,
+    log_generation: Uuid,
+    sequence: i64,
+    message_id: Uuid,
+    wire_sha256: [u8; 32],
+}
+
+impl NativeGrpcEventOrigin {
+    /// Return the immutable event route.
+    pub fn scope(&self) -> NativeGrpcEventReceiveScope {
+        self.scope
+    }
+
+    /// Return the versioned provider identity derived from profile and endpoint pins.
+    pub fn provider_identity(&self) -> &str {
+        &self.provider_identity
+    }
+
+    /// Return the durable native log identifier.
+    pub fn log_id(&self) -> &str {
+        &self.log_id
+    }
+
+    /// Return the generation that distinguishes recreated logs.
+    pub fn log_generation(&self) -> Uuid {
+        self.log_generation
+    }
+
+    /// Return the durable sequence in this log generation.
+    pub fn sequence(&self) -> i64 {
+        self.sequence
+    }
+
+    /// Return the stable source message identifier.
+    pub fn message_id(&self) -> Uuid {
+        self.message_id
+    }
+
+    /// Return the SHA-256 digest of the exact original wire bytes.
+    pub fn wire_sha256(&self) -> [u8; 32] {
+        self.wire_sha256
+    }
+}
+
+/// Fail-closed native event receive errors; messages contain no payload or credentials.
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+pub enum NativeGrpcEventReceiveError {
+    /// The tenant/service route is malformed or differs from the bound route.
+    #[error("native event route rejected")]
+    Route,
+    /// The server returned malformed, oversized or mismatched delivery evidence.
+    #[error("native event delivery contract rejected")]
+    Contract,
+    /// Current source identity, route or profile authorization failed or was unavailable.
+    #[error("native event authorization rejected")]
+    Unauthorized,
+    /// The bounded native gRPC operation failed or had an ambiguous result.
+    #[error("native event transport failed or result is unknown")]
+    Transport,
+    /// One event is already leased by this route; no second pull was issued.
+    #[error("native event delivery is already outstanding")]
+    Busy,
+}
+
+struct ValidatedNativeEventDelivery {
+    origin: NativeGrpcEventOrigin,
+    wire: Vec<u8>,
+    lease_id: Uuid,
+}
+
+impl NativeGrpcEventReceiveTransport {
+    /// Connect a bounded mTLS client to the resolved tenant/profile/endpoint and fixed event route.
+    pub async fn connect(
+        config: NativeGrpcEventReceiveClientConfig<'_>,
+    ) -> Result<Self, NativeGrpcSetupError> {
+        let NativeGrpcEventReceiveClientConfig {
+            endpoint,
+            server_ca_path,
+            client_cert_path,
+            client_key_path,
+            connect_timeout,
+            request_timeout,
+            scope,
+            expected_log_id,
+            expected_log_generation,
+            lease_seconds,
+            profile,
+        } = config;
+        if !valid_native_event_receive_scope(scope)
+            || endpoint.tenant_id() != scope.tenant_id
+            || !valid_native_log_id(expected_log_id)
+            || expected_log_generation.is_nil()
+            || !(30..=120).contains(&lease_seconds)
+        {
+            return Err(NativeGrpcSetupError::ReceiveRoute);
+        }
+        validate_append_profile_snapshot(&profile)?;
+        let client = connect_native_client(NativeGrpcEndpointConfig {
+            endpoint,
+            server_ca_path,
+            client_cert_path,
+            client_key_path,
+            connect_timeout,
+            request_timeout,
+            profile: &profile,
+        })
+        .await?;
+        let provider_identity = native_provider_identity(&profile);
+        Ok(Self {
+            provider_identity,
+            client,
+            profile,
+            scope,
+            expected_log_id: expected_log_id.to_owned(),
+            expected_log_generation,
+            lease_seconds: lease_seconds as i32,
+            rpc_in_flight: Arc::new(Semaphore::new(1)),
+            outstanding: Arc::new(Semaphore::new(1)),
+        })
+    }
+
+    /// Return the route pinned at construction; callers must re-resolve before replacing the client.
+    pub fn scope(&self) -> NativeGrpcEventReceiveScope {
+        self.scope
+    }
+
+    /// Return the immutable transport profile snapshot pinned at construction.
+    pub fn profile(&self) -> &AdmissionTransportProfile {
+        &self.profile
+    }
+
+    /// Return the profile/version/endpoint-derived provider identity pinned at construction.
+    pub fn provider_identity(&self) -> &str {
+        &self.provider_identity
+    }
+
+    /// Build a verifier that uses the same authenticated channel and route snapshot.
+    pub fn authorization(&self) -> NativeGrpcEventReceiveAuthorization {
+        NativeGrpcEventReceiveAuthorization {
+            client: self.client.clone(),
+            profile: self.profile.clone(),
+            provider_identity: self.provider_identity.clone(),
+            scope: self.scope,
+            expected_log_id: self.expected_log_id.clone(),
+            expected_log_generation: self.expected_log_generation,
+            rpc_in_flight: self.rpc_in_flight.clone(),
+        }
+    }
+
+    /// Pull at most one event. The outstanding permit remains held until the delivery is dropped.
+    ///
+    /// If this future is cancelled after the server leases an event, no ACK is sent and the source
+    /// lease expiry makes the event available for idempotent replay. A second concurrent pull fails
+    /// closed before it can issue another RPC.
+    pub async fn pull_one(
+        &self,
+        expected_scope: NativeGrpcEventReceiveScope,
+    ) -> Result<Option<NativeGrpcEventDelivery>, NativeGrpcEventReceiveError> {
+        if expected_scope != self.scope {
+            return Err(NativeGrpcEventReceiveError::Route);
+        }
+        let outstanding_permit = self
+            .outstanding
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| NativeGrpcEventReceiveError::Busy)?;
+        let _rpc_permit = self
+            .rpc_in_flight
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| NativeGrpcEventReceiveError::Transport)?;
+        let request = native_event_pull_request(&self.profile, self.scope, self.lease_seconds)?;
+        let mut client = self.client.clone();
+        let response = client
+            .pull_one(Request::new(request))
+            .await
+            .map_err(|_| NativeGrpcEventReceiveError::Transport)?
+            .into_inner();
+        let Some(delivery) = response.delivery else {
+            return Ok(None);
+        };
+        let validated = validate_native_event_delivery(
+            self.scope,
+            &self.profile,
+            &self.expected_log_id,
+            self.expected_log_generation,
+            delivery,
+        )?;
+        Ok(Some(NativeGrpcEventDelivery {
+            client: self.client.clone(),
+            profile: self.profile.clone(),
+            scope: self.scope,
+            origin: validated.origin,
+            wire: validated.wire,
+            lease_id: validated.lease_id,
+            rpc_in_flight: self.rpc_in_flight.clone(),
+            _outstanding_permit: outstanding_permit,
+        }))
+    }
+}
+
+/// Verify provider origin and current server authorization over the exact immutable event bytes.
+pub struct NativeGrpcEventReceiveAuthorization {
+    client: wire::durable_transport_client::DurableTransportClient<Channel>,
+    profile: AdmissionTransportProfile,
+    provider_identity: String,
+    scope: NativeGrpcEventReceiveScope,
+    expected_log_id: String,
+    expected_log_generation: Uuid,
+    rpc_in_flight: Arc<Semaphore>,
+}
+
+#[derive(Clone, Copy)]
+struct NativeEventOriginVerificationPins<'a> {
+    profile: &'a AdmissionTransportProfile,
+    scope: NativeGrpcEventReceiveScope,
+    provider_identity: &'a str,
+    expected_log_id: &'a str,
+    expected_log_generation: Uuid,
+}
+
+impl NativeGrpcEventReceiveAuthorization {
+    /// Ask the mTLS server to revalidate current profile, route, source identity and wire digest.
+    pub async fn verify_origin(
+        &self,
+        expected_scope: NativeGrpcEventReceiveScope,
+        origin: &NativeGrpcEventOrigin,
+        exact_wire: &[u8],
+    ) -> Result<(), NativeGrpcEventReceiveError> {
+        let request = native_event_origin_verification_request(
+            NativeEventOriginVerificationPins {
+                profile: &self.profile,
+                scope: self.scope,
+                provider_identity: &self.provider_identity,
+                expected_log_id: &self.expected_log_id,
+                expected_log_generation: self.expected_log_generation,
+            },
+            expected_scope,
+            origin,
+            exact_wire,
+        )?;
+        let _rpc_permit = self
+            .rpc_in_flight
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| NativeGrpcEventReceiveError::Transport)?;
+        let mut client = self.client.clone();
+        let response = client
+            .verify_origin(Request::new(request))
+            .await
+            .map_err(|_| NativeGrpcEventReceiveError::Transport)?
+            .into_inner();
+        if response.authorized {
+            Ok(())
+        } else {
+            Err(NativeGrpcEventReceiveError::Unauthorized)
+        }
+    }
+}
+
+impl NativeGrpcEventDelivery {
+    /// Borrow the exact unmodified event wire validated against its SHA-256 digest.
+    pub fn exact_wire(&self) -> &[u8] {
+        &self.wire
+    }
+
+    /// Borrow the provider/log/message evidence for independent source verification.
+    pub fn origin(&self) -> &NativeGrpcEventOrigin {
+        &self.origin
+    }
+
+    /// Acknowledge this exact lease-fenced message after the caller's owner Inbox commit succeeds.
+    ///
+    /// The adapter has no access to owner storage and never calls this automatically. A transport
+    /// error is ambiguous; callers must rely on owner idempotency and re-delivery, never infer ACK.
+    pub async fn acknowledge(&self) -> Result<(), NativeGrpcEventReceiveError> {
+        let request = native_event_acknowledgement_request(
+            &self.profile,
+            self.scope,
+            &self.origin,
+            self.lease_id,
+        )?;
+        let _rpc_permit = self
+            .rpc_in_flight
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| NativeGrpcEventReceiveError::Transport)?;
+        let mut client = self.client.clone();
+        let response = client
+            .acknowledge_one(Request::new(request))
+            .await
+            .map_err(|_| NativeGrpcEventReceiveError::Transport)?
+            .into_inner();
+        if response.acknowledged {
+            Ok(())
+        } else {
+            Err(NativeGrpcEventReceiveError::Transport)
+        }
+    }
+}
+
+fn valid_native_event_receive_scope(scope: NativeGrpcEventReceiveScope) -> bool {
+    !scope.tenant_id.is_nil()
+        && !scope.sender_service_id.is_nil()
+        && !scope.receiver_service_id.is_nil()
+        && scope.sender_service_id != scope.receiver_service_id
+        && scope.message_kind == TransportMessageKind::Event
+}
+
+fn native_event_pull_request(
+    profile: &AdmissionTransportProfile,
+    scope: NativeGrpcEventReceiveScope,
+    lease_seconds: i32,
+) -> Result<wire::PullOneRequest, NativeGrpcEventReceiveError> {
+    if !valid_native_event_receive_scope(scope)
+        || profile.provider_id != NATIVE_PROVIDER_ID
+        || validate_append_profile_snapshot(profile).is_err()
+        || !(30..=120).contains(&lease_seconds)
+    {
+        return Err(NativeGrpcEventReceiveError::Route);
+    }
+    Ok(wire::PullOneRequest {
+        profile: Some(wire::ProfilePin {
+            profile_digest: profile.profile_digest.to_vec(),
+        }),
+        sender_service_id: scope.sender_service_id.as_bytes().to_vec(),
+        message_kind: scope.message_kind.as_str().to_owned(),
+        lease_seconds,
+    })
+}
+
+fn validate_native_event_delivery(
+    scope: NativeGrpcEventReceiveScope,
+    profile: &AdmissionTransportProfile,
+    expected_log_id: &str,
+    expected_log_generation: Uuid,
+    delivery: wire::Delivery,
+) -> Result<ValidatedNativeEventDelivery, NativeGrpcEventReceiveError> {
+    if !valid_native_event_receive_scope(scope)
+        || profile.provider_id != NATIVE_PROVIDER_ID
+        || validate_append_profile_snapshot(profile).is_err()
+        || !valid_native_log_id(expected_log_id)
+        || expected_log_generation.is_nil()
+        || !valid_native_log_id(&delivery.log_id)
+        || delivery.log_id != expected_log_id
+        || delivery.sequence <= 0
+        || delivery.message_kind != TransportMessageKind::Event.as_str()
+        || delivery.wire.is_empty()
+        || delivery.wire.len() > MAX_NATIVE_APPEND_WIRE_BYTES
+        || delivery.attempt_count <= 0
+        || delivery.lease_expires_unix_ms <= 0
+    {
+        return Err(NativeGrpcEventReceiveError::Contract);
+    }
+    let sender_service_id = Uuid::from_slice(&delivery.sender_service_id)
+        .map_err(|_| NativeGrpcEventReceiveError::Contract)?;
+    let message_id = Uuid::from_slice(&delivery.message_id)
+        .map_err(|_| NativeGrpcEventReceiveError::Contract)?;
+    let log_generation = Uuid::from_slice(&delivery.log_generation)
+        .map_err(|_| NativeGrpcEventReceiveError::Contract)?;
+    let lease_id =
+        Uuid::from_slice(&delivery.lease_id).map_err(|_| NativeGrpcEventReceiveError::Contract)?;
+    if sender_service_id != scope.sender_service_id
+        || log_generation != expected_log_generation
+        || message_id.is_nil()
+        || log_generation.is_nil()
+        || lease_id.is_nil()
+    {
+        return Err(NativeGrpcEventReceiveError::Contract);
+    }
+    let wire_sha256: [u8; 32] = delivery
+        .wire_sha256
+        .as_slice()
+        .try_into()
+        .map_err(|_| NativeGrpcEventReceiveError::Contract)?;
+    let actual_wire_sha256: [u8; 32] = Sha256::digest(&delivery.wire).into();
+    if wire_sha256 != actual_wire_sha256 {
+        return Err(NativeGrpcEventReceiveError::Contract);
+    }
+    Ok(ValidatedNativeEventDelivery {
+        origin: NativeGrpcEventOrigin {
+            scope,
+            provider_identity: native_provider_identity(profile),
+            log_id: delivery.log_id,
+            log_generation,
+            sequence: delivery.sequence,
+            message_id,
+            wire_sha256,
+        },
+        wire: delivery.wire,
+        lease_id,
+    })
+}
+
+fn native_event_origin_verification_request(
+    pins: NativeEventOriginVerificationPins<'_>,
+    expected_scope: NativeGrpcEventReceiveScope,
+    origin: &NativeGrpcEventOrigin,
+    exact_wire: &[u8],
+) -> Result<wire::VerifyOriginRequest, NativeGrpcEventReceiveError> {
+    let actual_wire_sha256: [u8; 32] = Sha256::digest(exact_wire).into();
+    if !valid_native_event_receive_scope(pins.scope)
+        || expected_scope != pins.scope
+        || origin.scope != pins.scope
+        || pins.provider_identity != native_provider_identity(pins.profile)
+        || origin.provider_identity != pins.provider_identity
+        || pins.profile.provider_id != NATIVE_PROVIDER_ID
+        || validate_append_profile_snapshot(pins.profile).is_err()
+        || origin.log_id != pins.expected_log_id
+        || origin.log_generation != pins.expected_log_generation
+        || origin.message_id.is_nil()
+        || origin.log_generation.is_nil()
+        || origin.sequence <= 0
+        || !valid_native_log_id(&origin.log_id)
+        || exact_wire.is_empty()
+        || exact_wire.len() > MAX_NATIVE_APPEND_WIRE_BYTES
+        || origin.wire_sha256 != actual_wire_sha256
+    {
+        return Err(NativeGrpcEventReceiveError::Unauthorized);
+    }
+    Ok(wire::VerifyOriginRequest {
+        profile: Some(wire::ProfilePin {
+            profile_digest: pins.profile.profile_digest.to_vec(),
+        }),
+        sender_service_id: pins.scope.sender_service_id.as_bytes().to_vec(),
+        message_kind: TransportMessageKind::Event.as_str().to_owned(),
+        log_id: origin.log_id.clone(),
+        log_generation: origin.log_generation.as_bytes().to_vec(),
+        sequence: origin.sequence,
+        message_id: origin.message_id.as_bytes().to_vec(),
+        wire_sha256: actual_wire_sha256.to_vec(),
+    })
+}
+
+fn native_event_acknowledgement_request(
+    profile: &AdmissionTransportProfile,
+    pinned_scope: NativeGrpcEventReceiveScope,
+    origin: &NativeGrpcEventOrigin,
+    lease_id: Uuid,
+) -> Result<wire::AcknowledgeOneRequest, NativeGrpcEventReceiveError> {
+    if !valid_native_event_receive_scope(pinned_scope)
+        || origin.scope != pinned_scope
+        || profile.provider_id != NATIVE_PROVIDER_ID
+        || validate_append_profile_snapshot(profile).is_err()
+        || origin.provider_identity != native_provider_identity(profile)
+        || origin.message_id.is_nil()
+        || origin.log_generation.is_nil()
+        || origin.sequence <= 0
+        || !valid_native_log_id(&origin.log_id)
+        || lease_id.is_nil()
+    {
+        return Err(NativeGrpcEventReceiveError::Contract);
+    }
+    Ok(wire::AcknowledgeOneRequest {
+        profile: Some(wire::ProfilePin {
+            profile_digest: profile.profile_digest.to_vec(),
+        }),
+        sender_service_id: pinned_scope.sender_service_id.as_bytes().to_vec(),
+        message_kind: TransportMessageKind::Event.as_str().to_owned(),
+        log_id: origin.log_id.clone(),
+        log_generation: origin.log_generation.as_bytes().to_vec(),
+        sequence: origin.sequence,
+        lease_id: lease_id.as_bytes().to_vec(),
+        message_id: origin.message_id.as_bytes().to_vec(),
+        wire_sha256: origin.wire_sha256.to_vec(),
+    })
+}
+
 /// Derive the opaque source key that receiver authorization and quarantine must share.
 ///
 /// This value is deterministic profile metadata, not peer authentication evidence or a secret.
@@ -1490,3 +2150,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "native_grpc_event_adapter_tests.rs"]
+mod event_adapter_tests;
