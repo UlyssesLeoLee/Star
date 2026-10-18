@@ -1,0 +1,83 @@
+# PHASE-9F4J.6 — BI Inbox PostgreSQL Persistence Test Report
+
+> **状态**：🟡 测试源与 Rust 编译门完成；数据库执行门未关闭，生产 consumer 保持 fail-closed
+> **日期**：2026-10-18
+> **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> **审批者**：架构师 (Mavis 接手 agent per DEC-008)
+> **范围**：只覆盖 BI owner Inbox PostgreSQL persistence test slice；不代表 Phase 9F4J、BI/Benchmark 或消息闭环完成
+
+## §0 目的
+
+记录 9F4J.6 的隔离 PostgreSQL 持久化测试源、准确验证边界和当前工具门状态。测试必须显式启用，并只允许使用命名为 `star_bi_task_event_test`、loopback、非默认端口的专用 disposable database。当前没有配置该数据库，因此报告只记录测试编译，不宣称数据库、target grants、生产 RLS 或 network commit-before-ACK 通过。
+
+## §1 改动矩阵
+
+| 文件 | 改动 | 结果 |
+|---|---|---|
+| `crates/bi-owner-runtime/src/task_event_inbox.rs` | 将 PostgreSQL test module 放在根模块的显式路径下；将共享生命周期 fixture 限定为 `pub(super)`；刷新测试模块 Cypher 关系。 | Rust 1.99.0 编译及变更文件格式检查通过。 |
+| `crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs` | 保留 ignored-by-default、loopback/port/database-name gate 和角色/函数/RLS/DML 检查；补充关闭首个 PgPool 后重新连接并验证原 receipt、commit timestamp、wire digest、route digest 仍可 exact replay。更新关系头。 | 测试代码已编译；未连接 PostgreSQL 执行。 |
+| `docs/implementation-plans/WBS-RUN-LIFECYCLE-DELTA-20261018.md` | 新增 9F4J.6 acceptance 证据矩阵与未关闭门禁。 | 明确区分源码/编译证据与数据库运行证据。 |
+| 本报告 | 记录验证结果、限制和 fail-closed 状态。 | phase partial。 |
+
+## §2 验证摘要
+
+| 验证 | 实测结果 |
+|---|---|
+| Rust toolchain | `rustup show active-toolchain` 显示 `1.99.0-x86_64-pc-windows-msvc`，由仓库 `rust-toolchain.toml` 选中。 |
+| Focused crate test | `cargo test --package bi-owner-runtime --all-targets -j 4` — PASS：12 passed、1 ignored。Ignored 用例参与编译但未执行。 |
+| Changed-file formatting | Rust 1.99.0 `rustfmt --check --edition 2021 crates/bi-owner-runtime/src/task_event_inbox.rs crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs` — PASS。 |
+| Package-wide format | `cargo fmt --package bi-owner-runtime -- --check` — FAIL：未修改的 `src/task_event_quarantine.rs:65` 有格式差异；该文件不属于本 lane manifest，未改动。 |
+| Clippy with warnings denied | `cargo clippy --package bi-owner-runtime --all-targets -j 4 -- -D warnings` — FAIL：既有 `async_fn_in_trait` 诊断位于未修改 `src/task_event_receiver.rs:253,265,279,293`；本 lane 未修改该文件。 |
+| Clippy advisory | `cargo clippy --package bi-owner-runtime --all-targets -j 4` — PASS（exit 0）：0 errors，4 warnings，均为上述 lane 外 `async_fn_in_trait` 诊断。 |
+| Dedicated PostgreSQL | `STAR_BI_TASK_EVENT_TEST_DATABASE_URL` 未配置；未运行 ignored test、migration apply 或 grants/RLS live query。未读取或显示任何环境变量值。 |
+| Network commit-before-ACK | 未运行；本测试只验证 BI owner database boundary，不构造 transport receipt/ACK 时序。 |
+| Cypher Graph Guardian | `cgg_guard.py --changed --stamp` 后再次运行 `cgg_guard.py --changed` — PASS：2 个 Rust source files checked。 |
+| Git whitespace | `git diff --cached --check` — PASS；本次仅暂存本 brief manifest 中的 5 个文件，其他任务 brief 保持未暂存。 |
+
+## §3 已知缺口
+
+1. 没有专用 disposable PostgreSQL，因此 exact replay、changed-wire conflict、pool reconnect、function privilege 和 FORCE RLS 断言仅完成编译，尚未获得 live DB 证据。
+2. Test 的 reconnect 检查证明目标 test database 上新连接能重放 receipt 时，才可作为 database persistence evidence；它不是数据库进程崩溃、WAL fsync、备份恢复或 PITR 证明。
+3. 本测试不验证任何 transport ACK，更不能证明 receiver 在确认消息前已完成 PostgreSQL commit；network commit-before-ACK 继续是独立阻断门。
+4. target DB migration、真实 app login membership/effective grants、生产 RLS、审计、恢复和数据保留仍未验收。
+5. Package-wide fmt 和 `-D warnings` Clippy 仍受本 lane 外既存差异阻断；没有越界修改这些文件。
+6. BI consumer、跨 owner delivery accepted settlement、recovery/retry/fan-out、BI/Benchmark 完整投影和生产启用仍未实现或未验收。此切片不得解锁任务执行或 Schedule/Run delivery。
+
+## §4 子代理失败接手清单
+
+本 lane 接手了 brief 指定的 inherited Inbox source/test draft，修正了 Rust test module 路径并补充 pool close/reconnect 断言。此 lane 没有继续派发子代理，没有遗留 worker 写入任务。另一个并行 lane 的平台/runtime 文件不属于本报告或本 commit。
+
+## §5 守门规则
+
+| # | 守门项 |
+|---:|---|
+| 1 | PostgreSQL 测试默认 ignored；只有明确配置专用 disposable DB URL 且连接后确认精确 DB identity 才可执行。 |
+| 2 | 不打印或复制 `STAR_BI_TASK_EVENT_TEST_DATABASE_URL` 内容。 |
+| 3 | `bi.commit_task_event_v2` 的调用签名、授权、Inbox/fact/incident 和 RLS 断言必须与迁移一致。 |
+| 4 | exact replay 必须复用 receipt ID、commit time、wire digest 和 route digest。 |
+| 5 | 相同身份不同 wire 必须返回 conflict，之后原 wire 仍复用初次 receipt。 |
+| 6 | pool close/reconnect 仅证明 test DB 可重放已提交状态，不外推为 crash/WAL/PITR。 |
+| 7 | Runtime 仅能执行固定 owner function；不得直接改写三张 Transaction 表。 |
+| 8 | FORCE RLS 必须覆盖 Inbox、fact 与 integrity incident；disposable DB 结果不代替 target DB 门禁。 |
+| 9 | PostgreSQL function commit receipt 不是 transport ACK；没有真实 receiver 时序证据就保持 delivery 未结算。 |
+| 10 | 当前未运行 ignored PostgreSQL test，不得标注 PostgreSQL assertion passed。 |
+| 11 | Rust 1.99.0 focused test 的 12 passed/1 ignored 不等于 workspace/all-targets gates 完成。 |
+| 12 | Package fmt/Clippy 的既存 lane 外问题在报告中列明，不为通过本切片而修改不归属文件。 |
+| 13 | 生产 BI consumer 和 Task/Schedule 执行保持 fail-closed，直到权限、传输、取消恢复与独立验证门全部满足。 |
+| 14 | 只提交本 brief manifest 中文件；不得 rebase、merge、push 或清理其它 checkout。 |
+
+## §6 签字栏
+
+| 角色 | 审阅 |
+|---|---|
+| 架构 | 架构师 (Mavis 接手 agent per DEC-008) — 接受阶段 partial 状态与 network/target DB 缺口 |
+| SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) — disposable PostgreSQL 尚未运行 |
+| 平台 | 架构师 (Mavis 接手 agent per DEC-008) — Rust 1.99.0 focused evidence 已记录；全 crate fmt/Clippy 有既存问题 |
+| 评审主持 | 架构师 (Mavis 接手 agent per DEC-008) — 两个 Rust 文件 CGG 检查通过，精确暂存集 `git diff --cached --check` 通过 |
+| PM | 架构师 (Mavis 接手 agent per DEC-008) — 不改变生产可用状态 |
+
+## §7 修订历史
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-10-18 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F4J.6 persistence test、pool reconnect durability assertion、Rust 1.99.0 focused gates 与明确未运行的 disposable DB/network 门禁；生产 consumer 保持 fail-closed。 | 9F4J.6 lane brief 完成与核验 |
