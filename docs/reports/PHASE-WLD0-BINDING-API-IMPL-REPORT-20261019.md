@@ -19,7 +19,7 @@ Record the reviewed WLD-0 source implementation and its current validation bound
 - Rust 1.99.0 `cargo check --package star-api-rest --all-targets -j 4` passed after the lock-error mapping change and final test assertion; existing warnings are in other modules/crates.
 - On the rebased candidate branch, `cargo test --package star-api-rest --all-targets -j 4` passed after the final lock-error mapping fix: 261 passed, 0 failed, 2 ignored. The ignored cases require a disposable PostgreSQL advisory-lock fixture and the Schedule canonical-directory ACL fixture.
 - The focused advisory-lock regression test also passed after the fix: 1 passed, 0 failed, 146 filtered out.
-- Integration lineage: API source commit `745cab56288b4fa3105dcf620b082bc1a8794b31` was cherry-picked as candidate commit `3bb6037b`; the candidate is based on the current `dev` commit `6f8d5b8f`. The shared `dev` checkout has not yet been advanced.
+- Integration lineage: API source commit `745cab56288b4fa3105dcf620b082bc1a8794b31` was cherry-picked as candidate commit `3bb6037b`; after rebase and final clean/HEAD/operation checks, the candidate was fast-forwarded to local `dev` at `cb0acdda`. This was a local merge; no push to `origin/dev` was performed.
 - Rust 1.99 rustfmt check for the changed Rust files passed with child-module traversal disabled for `group_api.rs`; the package-wide `cargo fmt --check` found pre-existing formatting differences in unchanged `group_api/work_items.rs`. That file was not reformatted.
 - CypherGraph Guardian passed for 3 changed source files. `git diff --check` passed.
 - CodeRabbit CLI review could not run: its Windows wrapper invoked `/root/.local/bin/coderabbit` through Ubuntu and failed with `Permission denied`. A separate static review found no P0/P1 issue and identified the lock-timeout classification issue; that P2 issue was corrected and the focused regression test passed.
@@ -62,3 +62,4 @@ The assigned worker reached its usage limit before final self-review and commit.
 |---|---|---|---|
 | v0.1 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record WLD-0 API source implementation, review, exact validation boundaries, coordinator takeover, and remaining DB/production gates. |
 | v0.2 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record candidate rebase to dev, post-fix all-targets check and test (261 passed, 2 ignored), and keep PostgreSQL/RLS/production gates open. |
+| v0.3 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the successful local fast-forward to dev at cb0acdda; remote push and production database acceptance remain open. |
