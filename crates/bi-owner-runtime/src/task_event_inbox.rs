@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=b81746f7058a70e8f2b159ecf7619b184caac3204a204da477fc397c6da18913
+@cypher schema=1 source_sha256=c46cb9837ddb285d84e4f8861f876cbed5ebde91cde9433f7707f07754350f7f
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (wire:Type {id:"bi_owner_runtime::TaskEventWireV1",kind:"struct"})
@@ -32,7 +32,15 @@ MERGE (valid_lifecycle:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.
 MERGE (reject_tenant:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_authenticated_tenant_mismatch",kind:"test"})
 MERGE (reject_unknown:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_unknown_envelope_fields",kind:"test"})
 MERGE (reject_state:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_unrecognized_lifecycle_projection_values",kind:"test"})
+MERGE (postgres_tests:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::postgres_tests",kind:"module"})
+MERGE (postgres_commit:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::pg_runtime_commit_is_durable_idempotent_and_conflict_safe",kind:"test"})
+MERGE (postgres_gate:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::require_runtime_contract",kind:"function"})
+MERGE (postgres_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::fresh_lifecycle_wire",kind:"function"})
+MERGE (postgres_route:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::route_pin",kind:"function"})
 MERGE (store_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
+MERGE (inbox_table:Table {id:"bi.task_event_inbox",class:"Transaction"})
+MERGE (fact_table:Table {id:"bi.task_event_fact",class:"Transaction"})
+MERGE (incident_table:Table {id:"bi.task_event_integrity_incident",class:"Transaction"})
 MERGE (chrono:ExternalService {id:"chrono",kind:"crate"})
 MERGE (serde:ExternalService {id:"serde",kind:"crate"})
 MERGE (serde_json:ExternalService {id:"serde_json",kind:"crate"})
@@ -86,6 +94,11 @@ MERGE (test_module)-[:DEFINES]->(valid_lifecycle)
 MERGE (test_module)-[:DEFINES]->(reject_tenant)
 MERGE (test_module)-[:DEFINES]->(reject_unknown)
 MERGE (test_module)-[:DEFINES]->(reject_state)
+MERGE (self)-[:DEFINES]->(postgres_tests)
+MERGE (postgres_tests)-[:DEFINES]->(postgres_commit)
+MERGE (postgres_tests)-[:DEFINES]->(postgres_gate)
+MERGE (postgres_tests)-[:DEFINES]->(postgres_fixture)
+MERGE (postgres_tests)-[:DEFINES]->(postgres_route)
 MERGE (valid_lifecycle)-[:CALLS]->(test_fixture)
 MERGE (reject_tenant)-[:CALLS]->(test_fixture)
 MERGE (reject_unknown)-[:CALLS]->(test_fixture)
@@ -94,6 +107,14 @@ MERGE (valid_lifecycle)-[:TESTS]->(validate)
 MERGE (reject_tenant)-[:TESTS]->(validate)
 MERGE (reject_unknown)-[:TESTS]->(validate)
 MERGE (reject_state)-[:TESTS]->(validate)
+MERGE (postgres_commit)-[:CALLS]->(postgres_gate)
+MERGE (postgres_commit)-[:CALLS]->(postgres_fixture)
+MERGE (postgres_commit)-[:CALLS]->(postgres_route)
+MERGE (postgres_commit)-[:CALLS]->(commit)
+MERGE (postgres_commit)-[:TESTS]->(store_fn)
+MERGE (postgres_commit)-[:TESTS]->(inbox_table)
+MERGE (postgres_commit)-[:TESTS]->(fact_table)
+MERGE (postgres_commit)-[:TESTS]->(incident_table)
 @endcypher
 */
 //! Bounded Task event validation and owner-local Inbox commit for the BI subscriber.
@@ -102,7 +123,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{Row, Transaction, postgres::PgPool};
+use sqlx::{postgres::PgPool, Row, Transaction};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -580,7 +601,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn valid_lifecycle_wire() -> (Uuid, Vec<u8>) {
+    pub(super) fn valid_lifecycle_wire() -> (Uuid, Vec<u8>) {
         let tenant_id = Uuid::from_u128(1);
         let project_id = Uuid::from_u128(2);
         let run_id = Uuid::from_u128(3);
@@ -670,3 +691,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "task_event_inbox_postgres_tests.rs"]
+mod postgres_tests;
