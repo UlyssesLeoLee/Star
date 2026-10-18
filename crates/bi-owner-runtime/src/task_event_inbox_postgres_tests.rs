@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=fc0a1971eb7bd41ca8b425d35a34f30387f2e57fb45a793a7a7df1978148021e
+@cypher schema=1 source_sha256=7e43d238bd794a70e80e913c5b37e8d6e055aacfc73c30ee8831847ed2294238
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs"})
 MERGE (parent:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::postgres_tests",kind:"module"})
@@ -12,6 +12,7 @@ MERGE (route_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_po
 MERGE (database_url_env:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::DATABASE_URL_ENV",kind:"constant"})
 MERGE (database_name:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::DATABASE_NAME",kind:"constant"})
 MERGE (commit_signature:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::COMMIT_FUNCTION",kind:"constant"})
+MERGE (owner_role:Config {id:"star_bi_owner",kind:"postgres_role"})
 MERGE (store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (principal:Type {id:"bi_owner_runtime::AuthenticatedTaskEventPrincipal",kind:"struct"})
 MERGE (route_pin_type:Type {id:"bi_owner_runtime::TaskEventRoutePin",kind:"struct"})
@@ -40,6 +41,7 @@ MERGE (self)-[:IMPORTS]->(uuid)
 MERGE (module)-[:CALLS]->(test)
 MERGE (test)-[:CALLS]->(database_identity)
 MERGE (test)-[:CALLS]->(runtime_contract)
+MERGE (runtime_contract)-[:READS]->(owner_role)
 MERGE (test)-[:CALLS]->(wire_fixture)
 MERGE (test)-[:CALLS]->(route_fixture)
 MERGE (test)-[:CALLS]->(commit)
@@ -192,6 +194,7 @@ async fn require_runtime_contract(pool: &PgPool) {
         r#"
         SELECT
             pg_has_role(current_user, 'star_bi_runtime', 'MEMBER') AS runtime_member,
+            NOT pg_has_role(session_user, 'star_bi_owner', 'SET') AS cannot_set_owner,
             has_function_privilege(current_user, $1, 'EXECUTE') AS can_call_commit,
             NOT rolsuper AND NOT rolbypassrls AS current_role_is_restricted,
             EXISTS (
@@ -200,6 +203,13 @@ async fn require_runtime_contract(pool: &PgPool) {
                    AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb
                    AND NOT rolcreaterole AND NOT rolbypassrls AND NOT rolinherit
             ) AS runtime_role_is_locked,
+            EXISTS (
+                SELECT 1 FROM pg_roles
+                 WHERE rolname = 'star_bi_owner'
+                   AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb
+                   AND NOT rolcreaterole AND NOT rolreplication
+                   AND NOT rolbypassrls AND NOT rolinherit
+            ) AS owner_role_is_locked,
             to_regclass('bi.task_event_inbox') IS NOT NULL
               AND (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
                     WHERE oid = to_regclass('bi.task_event_inbox')) AS inbox_force_rls,
@@ -231,6 +241,9 @@ async fn require_runtime_contract(pool: &PgPool) {
         .try_get::<bool, _>("runtime_member")
         .expect("runtime membership"));
     assert!(row
+        .try_get::<bool, _>("cannot_set_owner")
+        .expect("authenticated login cannot SET ROLE to the BI owner"));
+    assert!(row
         .try_get::<bool, _>("can_call_commit")
         .expect("commit function grant"));
     assert!(row
@@ -239,6 +252,9 @@ async fn require_runtime_contract(pool: &PgPool) {
     assert!(row
         .try_get::<bool, _>("runtime_role_is_locked")
         .expect("locked runtime role"));
+    assert!(row
+        .try_get::<bool, _>("owner_role_is_locked")
+        .expect("locked BI owner role"));
     assert!(row
         .try_get::<bool, _>("inbox_force_rls")
         .expect("Inbox FORCE RLS"));
