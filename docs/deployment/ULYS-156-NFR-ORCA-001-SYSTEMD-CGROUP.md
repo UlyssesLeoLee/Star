@@ -61,9 +61,16 @@ Slice=star-local-runtime.slice
 
 | 平台 | 进程组隔离 | 备注 |
 |---|---|---|
-| Linux | `setsid(2)` + `prctl(PR_SET_PDEATHSIG, ...)` | 本期由 `process_supervisor` 准备,真实 spawn 适配留 P1 (per 9/22 §A 决策已知 trade-off) |
+| Linux | `setsid(2)` session + process-group isolation via `process_wrap::tokio::ProcessSession` | Linux CLI spawn 已接入 `spawn_linux::wrap_linux_session`；尚未实现 `PR_SET_PDEATHSIG`，Linux runtime 验证待 CI。 |
 | macOS | `setpgid(0, 0)` + `posix_spawn` attr | 与 Linux 同源,代码路径可复用 |
 | Windows | Job Object (`CREATE_NEW_PROCESS_GROUP` + `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) | 本期留 P1 (per cli_spawn.rs 注释 "AC-1 子进程存活已在 PR #63 efa501a3 落地") |
+
+### 4.1 当前实现与验证状态（2026-10-18）
+
+- Linux 的 `new_session=true` 已接入 `process-wrap 10.0.1` Tokio `ProcessSession`；该适配实际建立新 session 和 process group，并保留 wrapped child 供输出读取、取消和等待使用。
+- `new_session=false` 不注册 session wrapper，保留调用方设置进程组的行为。
+- 已增加 Linux 回归测试，断言子进程 `getsid(pid) == pid`。当前工作机只有 Rust 1.98.1，未安装仓库要求的 Rust 1.99.0，也没有 Linux target；本地 Linux 编译和运行尚未验证，需由 Linux CI 验证后才能关闭此项。
+- `PR_SET_PDEATHSIG`、Windows Job Object 实战验收及 systemd/cgroup 压测仍按本文件的后续项处理。
 
 ## 5. 与 graceful_shutdown 模块的契约
 

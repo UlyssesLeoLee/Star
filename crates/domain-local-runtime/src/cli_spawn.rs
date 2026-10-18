@@ -1,3 +1,20 @@
+// @cypher schema=1 source_sha256=6a2aef52096cd9900c2664ff596c10213d72ccd2bbb97ed270a66db64cf1a6df
+// MERGE (self:File {path:"crates/domain-local-runtime/src/cli_spawn.rs"})
+// MERGE (runtime:Type {id:"crates/domain-local-runtime/src/cli_spawn.rs::RealCliRuntime",kind:"struct"})
+// MERGE (active_child:Type {id:"crates/domain-local-runtime/src/cli_spawn.rs::ActiveChild",kind:"type"})
+// MERGE (child_wrapper:Type {id:"process_wrap::tokio::ChildWrapper",kind:"external"})
+// MERGE (spawn:Symbol {id:"crates/domain-local-runtime/src/cli_spawn.rs::RealCliRuntime.spawn_cli",kind:"method"})
+// MERGE (cancel:Symbol {id:"crates/domain-local-runtime/src/cli_spawn.rs::RealCliRuntime.cancel",kind:"method"})
+// MERGE (linux_wrap:Symbol {id:"crates/domain-local-runtime/src/spawn_linux.rs::wrap_linux_session",kind:"function"})
+// MERGE (self)-[:DEFINES]->(runtime)
+// MERGE (self)-[:DEFINES]->(active_child)
+// MERGE (self)-[:DEFINES]->(spawn)
+// MERGE (self)-[:DEFINES]->(cancel)
+// MERGE (active_child)-[:USES_TYPE]->(child_wrapper)
+// MERGE (spawn)-[:CALLS]->(linux_wrap)
+// MERGE (spawn)-[:USES_TYPE]->(active_child)
+// MERGE (cancel)-[:USES_TYPE]->(active_child)
+// @endcypher
 //! Star Local Runtime — 真实 CLI 进程 spawn (wt-w22)
 //!
 //! 实现 `LocalRuntime::spawn_cli` 真实模式:
@@ -14,7 +31,9 @@ use std::process::Stdio;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
+#[cfg(not(target_os = "linux"))]
+use tokio::process::Child;
+use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -22,6 +41,11 @@ use uuid::Uuid;
 use super::process::{
     LocalRuntime, OutputLine, OutputStream, ProcessHandle, ProcessState, RuntimeError,
 };
+
+#[cfg(target_os = "linux")]
+type ActiveChild = Box<dyn process_wrap::tokio::ChildWrapper>;
+#[cfg(not(target_os = "linux"))]
+type ActiveChild = Child;
 
 // =====================================================================
 // 1. value_object
@@ -49,7 +73,7 @@ pub struct RealCliRuntime {
     /// 是否启用 mock 回退模式
     pub mock_fallback: bool,
     /// 活跃 child 句柄 (用于取消)
-    active: Arc<Mutex<HashMap<Uuid, Child>>>,
+    active: Arc<Mutex<HashMap<Uuid, ActiveChild>>>,
     /// Windows Job Object 注册表(pid → Job),per ULYS-212 P1 followup
     ///
     /// **跨平台字段**(非 Windows 上是 `()` 不占空间);
@@ -135,38 +159,15 @@ impl LocalRuntime for RealCliRuntime {
             // 直接冲突,因此关闭 —— 退出仍需由 `cancel()` 显式 kill。
             .kill_on_drop(false);
 
-        #[cfg(unix)]
+        #[cfg(target_os = "macos")]
         {
-            // 从父进程的 controlling terminal 信号组分离:父进程收到的 SIGINT/SIGHUP
-            // (终端 Ctrl-C、或父进程所在终端挂断)不会传播给子进程。
-            // pgid=0 等价 setpgid(0, 0)(以子进程自身 pid 作为新 pgid)。
-            //
-            // ULYS-212 P1 followup:此处改为走 [`crate::spawn_linux::wrap_linux_session`]
-            // (Linux 真 setsid,经 process_wrap safe wrapper) — 替代原 stub `process_group(0)`
-            // macOS 仍走 [`crate::spawn_macos::wrap_macos_setpgid`] (setpgid 语义)
-            // Unix 公用分支同时保留 `process_group(0)` fallback(若 new_session=false 显式禁)
-            #[cfg(target_os = "linux")]
-            {
-                use crate::spawn_linux::{wrap_linux_session, LinuxSpawnOptions};
-                let opts = LinuxSpawnOptions {
-                    new_session: true,
-                    cgroup: crate::spawn_linux::CgroupMode::Auto,
-                    scope_name: None,
-                };
-                cmd = wrap_linux_session(cmd, &opts);
-            }
-            #[cfg(target_os = "macos")]
-            {
-                use crate::spawn_macos::{wrap_macos_setpgid, MacosSpawnOptions};
-                let opts = MacosSpawnOptions { new_pg: true };
-                wrap_macos_setpgid(&mut cmd, &opts);
-            }
-            // 非 Linux/macOS Unix(如 BSD)fallback — 保留原 `process_group(0)` 路径
-            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-            {
-                cmd.process_group(0);
-            }
+            // macOS 保持 process group 隔离；Linux 使用完整的 ProcessSession wrapper。
+            use crate::spawn_macos::{wrap_macos_setpgid, MacosSpawnOptions};
+            let opts = MacosSpawnOptions { new_pg: true };
+            wrap_macos_setpgid(&mut cmd, &opts);
         }
+        #[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
+        cmd.process_group(0);
         #[cfg(windows)]
         {
             // CREATE_NEW_PROCESS_GROUP (0x00000200,Win32 CreateProcess 标志):
@@ -180,7 +181,19 @@ impl LocalRuntime for RealCliRuntime {
             apply_windows_creation_flags(&mut cmd, &opts);
         }
 
-        let mut child = match cmd.spawn() {
+        #[cfg(target_os = "linux")]
+        let child_result: Result<ActiveChild, std::io::Error> = {
+            let opts = crate::spawn_linux::LinuxSpawnOptions {
+                new_session: true,
+                cgroup: crate::spawn_linux::CgroupMode::Auto,
+                scope_name: None,
+            };
+            crate::spawn_linux::wrap_linux_session(cmd, &opts).spawn()
+        };
+        #[cfg(not(target_os = "linux"))]
+        let child_result: Result<ActiveChild, std::io::Error> = cmd.spawn();
+
+        let mut child = match child_result {
             Ok(c) => c,
             Err(e) => {
                 return Ok(ProcessHandle {
@@ -237,10 +250,22 @@ impl LocalRuntime for RealCliRuntime {
         }
 
         // 推 stdout/stderr 流
+        #[cfg(target_os = "linux")]
+        let stdout = child
+            .stdout()
+            .take()
+            .ok_or_else(|| RuntimeError::SpawnFailed("no stdout".into()))?;
+        #[cfg(not(target_os = "linux"))]
         let stdout = child
             .stdout
             .take()
             .ok_or_else(|| RuntimeError::SpawnFailed("no stdout".into()))?;
+        #[cfg(target_os = "linux")]
+        let stderr = child
+            .stderr()
+            .take()
+            .ok_or_else(|| RuntimeError::SpawnFailed("no stderr".into()))?;
+        #[cfg(not(target_os = "linux"))]
         let stderr = child
             .stderr
             .take()
