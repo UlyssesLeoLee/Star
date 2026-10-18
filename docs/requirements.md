@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.86）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.87）
 
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
@@ -6,6 +6,8 @@
 > **v6.79 Rust Task delivery source slice status**：新增 Run-owner Rust delivery store，可按 1–8 有界 claim、从已认证 Transport Context 派生 sender/receiver，并要求 Transport Profile 独立授权 `event` kind；它从 Task 源事件构造确定性 envelope、执行当前 route pin 和 exact-wire digest 校验，并支持受 lease fence 保护的 retry。dead 仅接受由无效 source envelope 验证生成的私有 proof。源 Outbox 已有数据库 `octet_length(payload::text) <= 8192` 约束，因此 payload 在 PostgreSQL 返回 JSON 前已有硬上限；本阶段不重复添加约束迁移。此 Rust 切片没有网络发送、accepted settlement、receiver Inbox、consumer projection 或公平 Run 轮转；Cargo/Rust 工具链当前不可用，故代码尚未编译/格式化，目标 DB 与生产身份仍未验收。此前 route-pin fixture 的有限 PostgreSQL 断言不证明该 Rust store。
 > **v6.80 Phase 9F4E BI Task Inbox source status**：新增独立 BI owner Inbox、不可变事件事实和身份冲突记录；Inbox 与事实在同一事务提交，exact replay 返回稳定回执，身份/内容冲突只追加受限元数据并不产生回执。envelope 限 16 KiB、payload 限 8 KiB；数据库 FORCE RLS、WORM、运行角色无直接表/CREATE 权限。隔离 PostgreSQL 18.6 runner 已双次应用 migration 并通过夹具。这个 Rust store 只接受 crate 内受信 receiver 才能构造的 principal；本 crate 尚无 transport/auth adapter，不能据此声称 sender 已在生产认证。无 BI materialized projection、Benchmark/其他 consumer fan-out、网络 dispatcher 或 accepted settlement；Rust 1.99 编译/格式、目标 DB/身份、并发/恢复与 payload 长期保留策略未验收。delivery 与任务执行继续 fail closed。
 > **v6.85 Phase 9F4G BI Task receiver/query source status**：在 v6.83 的单条有界 receiver 与 metadata-only quarantine 基础上，新增 Run 授权的只读 Task-event 查询 API 与固定 BI owner 查询函数；默认 50、最大 100，采用稳定 keyset cursor，仅返回既有 allowlist 字段，coverage/freshness 明示 unknown。BI 数据库 URL 可选且使用最多 2 个连接；缺少 provider 时 API fail closed。新增查询 migration 双次应用、scope、权限、游标和输入校验通过隔离 PostgreSQL 18 runner。此 API 是源码与隔离 fixture，不是生产 BI UI/分析闭环；target DB/角色成员、生产 Auth/BI identity、Rust 1.99.0 fmt/build/test/Clippy、receiver composition、fan-out/recovery、Benchmark、RSS/latency/fairness 仍未验收，BI ingress 与执行保持 fail closed。
+
+> **v6.87 WLD-0 Run-to-Worktree binding source status (2026-10-19)**：新增 Project/Run 授权的 Worktree 绑定、重绑和解绑 API 源码切片，使用 CAS、幂等、Worktree advisory lock、SCD2 历史、审计与同事务 Outbox；Run 可不带远端 repository/Branch 元数据，绑定仍保留本地 Worktree repository 身份。迁移尚未应用到目标数据库，应用角色 grants/RLS、认证写入、回滚、持久化幂等和并发验收未完成；`execution_admission_available` 保持 false，不能据此启用 CLI、Agent 或 Schedule 执行。
 
 ## 0. 文档说明与前提
 
@@ -2321,6 +2323,8 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 
 创建/导入是 Worktree Index 的受授权生命周期命令。浏览器仅选择当前 Project 已绑定的 repository，并在导入时引用 Host Runtime 返回的不透明候选 ID；路径和远端 URL 由服务端配置解析，不能由客户端指定。Host Runtime provider 必须在 Git 副作用前重新验证当前 actor membership、Project-Repository binding 与 Worktree 冲突，并幂等持久化 operation、归属投影、Audit 和 Outbox。provider 或受信任 repository binding 未配置时，请求失败关闭且不得生成“成功”Worktree。
 
+WLD-0 实现状态（2026-10-19）：Run-to-Worktree owner 已有绑定/重绑/解绑源码 API 和前向 migration；写入校验当前 Project/Run 授权、Project binding 版本、Worktree 所属与本地 repository、当前绑定 CAS 和唯一活动关系，并在 owner transaction 写入 SCD2 事实、Audit、幂等回执和 Outbox。迁移未在目标 DB 应用；target grants/RLS、真实认证写入、rollback、并发与部署后 reconciliation 仍是关闭门。该切片只建立归属事实，不表示 Host/cluster reservation、Runtime readiness 或任务执行可用。
+
 ### 50.4 任务卡内 CLI
 
 任务卡允许打开 CLI，以便人或 Agent 在卡内完成实际工作。CLI 会话必须绑定 `work_item_id`、`worktree_id`、Runtime、Agent Policy 和已批准的启动配置；界面在任务卡中展示会话状态、输出流、取消入口与返回的验证结果。
@@ -3700,3 +3704,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 这是原生传输基础切片。BI 专用 Native client/route-pin verifier、可信组合入口、Task sender dispatcher、BI owner 提交后 ACK 的真实网络联测、目标身份/DB provisioning、recovery/checkpoint、Benchmark 与性能仍开放；不启动消费者或 execution，不声明端到端 BI 上线。AC-RUN-OUTBOX-12 / Task AC-26 / BD §6.7 / DD §14.13.9 对应本片；下一步明确为 BI native adapter 与真实 owner commit-before-ACK 联测。
 
 修订 v6.86 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权与 Rust/PG gates 完成、跨文档核对。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
+
+修订 v6.87 · 2026-10-19 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 Run-to-Worktree binding API source slice 完成；同步 hostless/local repository 语义、CAS/幂等/Outbox 不变量和未关闭的目标 DB/RLS/并发验收门。详见 `PHASE-WLD0-BINDING-API-IMPL-REPORT-20261019.md`。

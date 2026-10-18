@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-19
 **Revision:** v0.2
-**Baseline:** `dev` documentation snapshot: requirements v6.86, basic design v6.85, Group DD v5.08, implementation plan v7.14.
+**Baseline:** `dev` documentation snapshot: requirements v6.87, basic design v6.86, Group DD v5.09, implementation plan v7.14.
 **Purpose:** Add the concrete integration and production-closure work that remains after the source slices recorded in the current plan. This delta supplements `WORKTREE-GROUP-IMPL-PLAN-001.md`; it does not replace or renumber its historical phases.
 
 ## 1. Audit conclusion
@@ -68,15 +68,18 @@ After WLD-0's binding contract is reviewed, WLD-1's lifecycle command model and 
 | Area | Evidence now available | Status and remaining gate |
 |---|---|---|
 | main → dev ordering | Fresh `git fetch origin dev main` succeeded. `origin/dev=6f8d5b8f...`, `origin/main=8dcb65f7...`, and `origin/dev...origin/main` is `121 0`; there is no main-only commit to cherry-pick in this snapshot. | Repeat comparison immediately before any integration. |
-| Shared dev ownership | Orca `worktree ps --json` still returns `runtime_access_denied (EPERM)`. The last local status snapshot was clean at `6f8d5b8f...`, but active writer/terminal ownership cannot be observed. | D0 remains blocked; do not write, fast-forward, rebase, merge, delete, prune, or clean the shared dev checkout. |
-| WLD-0 binding | The candidate contains the WLD-0 binding-contract audit at `6cf09063...`. A separate binding API lane has a dispatcher brief and is preparing typed assign/reassign/detach operations with owner-local authorization, CAS, idempotency, audit and Outbox. | At the latest worker update, implementation and validation had not started; keep hostless Run semantics and Project/Run consistency explicit. |
+| Shared dev ownership | User confirms Orca work has ended. Latest local dev snapshot is clean at 6f8d5b8f; Orca CLI still returns EPERM, so repeat status, HEAD and in-progress-operation checks immediately before fast-forward. | Owner gate is cleared by direct user confirmation; do not integrate if the recheck shows a changed or dirty checkout. |
+| WLD-0 binding | The isolated API lane now contains typed PUT/DELETE binding routes, Project/Run authorization, expected binding and Project-binding CAS, durable idempotency, a per-Worktree advisory lock, SCD2 close/insert, audit context, and same-transaction Outbox. Hostless Run metadata may omit remote repository/Branch while the binding retains the local Worktree repository identity. Rust 1.99.0 all-targets check passed after the final change; full all-targets tests passed before the last lock-error mapping fix, and the focused regression test passed after it. Changed-file rustfmt and CGG passed. | Source slice is reviewable for integration. PostgreSQL migration, application grants/FORCE RLS, authenticated DB writes, rollback, durable replay, concurrency and historical reconciliation remain unverified; execution stays disabled. |
 | 9F4J.6 persistence test | Candidate source now asserts authenticated `session_user` cannot `SET ROLE star_bi_owner` and checks locked owner-role attributes. Independent static review passed. Rust 1.99.0 all-targets check passed; all-targets test returned 12 passed, 0 failed, 1 ignored; changed-file rustfmt passed. | The ignored PostgreSQL test was not run. No live grants/RLS or network commit-before-ACK evidence; BI ingress and execution remain fail-closed. |
 | Remaining WBS | 9F4J.1 native Event adapter is present in the candidate; 9F4J.2–9F4J.5, Worktree lifecycle, Task CLI execution, Schedule worker, Multipass/K3s reservations/readiness, full Hook enforcement, BI/Benchmark, Rust desktop resource measurements, and release evidence remain open. | Continue by dependency order; source slices do not close production acceptance. |
 
-**Status:** Planning and execution evidence delta only. It does not claim phase completion or production acceptance, and it does not replace the canonical implementation plan until reviewed and merged there.
+**Status:** WLD-0 source implementation and planning evidence update only. It does not claim database acceptance, production execution, or completion of the broader WLD phases.
 
 ## 7. Revision history
 
 | Version | Date | Change |
 |---|---|---|
 | v0.2 | 2026-10-19 | Updated current Git, owner-access, WLD-0 and 9F4J.6 evidence after Codex restart; preserved all unverified production gates. |
+| v0.3 | 2026-10-19 | Refreshed WLD-0 execution status after the binding API worker began editing its assigned API file; validation remains open. |
+| v0.4 | 2026-10-19 | Recorded the coordinator's review of the implemented WLD-0 route/migration/test lane, successful all-targets check, changed-file formatting and CGG; corrected hostless semantics to distinguish optional remote Run metadata from the required local Worktree repository identity. Full tests and PostgreSQL evidence remain open. |
+| v0.5 | 2026-10-19 | Updated after user confirmation that Orca work ended; recorded clean dev snapshot, WLD-0 post-fix test evidence, synchronized requirements/basic/DD revisions and remaining database gates. |

@@ -2,8 +2,10 @@
 
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
-> **文档版本**: v6.85 (2026-10-18)
-> **上游要件定义书**: docs/requirements.md v6.86
+> **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
+
+> **文档版本**: v6.86 (2026-10-19)
+> **上游要件定义书**: docs/requirements.md v6.87
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4248,7 +4250,7 @@ Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 ### 16.2 Project / Run / Worktree / Branch 导航与 Run App Shell
 
-目标 Run 目录、创建、读取与授权仅以 Project/Run membership/grants 为准，不依赖远端宿主 Branch 或 Worktree binding；主树固定为 Project → Engineering Run → Worktree → Branch。Worktree binding 仅门控 Worktree 子树、checkout 操作和 focus，不能成为 Project/Run 可见性的前置条件。候选实现已提供 Project-scoped Run list/create 与 Project+Run 授权源码，且 remote repository_id/branch_id 可为空；旧 Branch/Run registry 继续兼容。新增 schema migration 尚未应用或验证。Run→Worktree binding API、可信本地 Branch observation、Task owner tuple hostless migration、应用角色 grants/RLS、历史 reconciliation 与授权负向验收仍未完成。Branch 只从受信 Worktree checkout observation 生成末级状态叶；远端 SCM 操作额外要求相应 Branch grant。
+目标 Run 目录、创建、读取与授权仅以 Project/Run membership/grants 为准，不依赖远端宿主 Branch 或 Worktree binding；主树固定为 Project → Engineering Run → Worktree → Branch。Worktree binding 仅门控 Worktree 子树、checkout 操作和 focus，不能成为 Project/Run 可见性的前置条件。候选实现已提供 Project-scoped Run list/create 与 Project+Run 授权源码，且 remote repository_id/branch_id 可为空；旧 Branch/Run registry 继续兼容。WLD-0 新增绑定/重绑/解绑 API 源码和前向 migration：绑定记录本地 Worktree repository，允许 hostless Run 的远端 repository/branch 为空，并使用 Project/Run 授权、版本 CAS、幂等、Worktree 锁、SCD2、Audit 和同事务 Outbox。migration 尚未应用到目标数据库，应用角色 grants/RLS、真实认证写入、回滚、并发与历史 reconciliation 尚未验收。可信本地 Branch observation、Task owner tuple hostless migration 和授权负向验收仍未完成。Branch 只从受信 Worktree checkout observation 生成末级状态叶；远端 SCM 操作额外要求相应 Branch grant。
 
 整体交付方向与批次完成门见 [渡口架构与交付方向](design/DUKOU-ARCHITECTURE-DIRECTION-001.md)。新目录与 shell 不会自动迁移既有 Worktree Task/Canvas/Plugin 所有权，Run-owned Apps 与 execution admission 当前明确不可用。
 
@@ -5853,3 +5855,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 这是原生传输基础切片。BI 专用 Native client/route-pin verifier、可信组合入口、Task sender dispatcher、BI owner 提交后 ACK 的真实网络联测、目标身份/DB provisioning、recovery/checkpoint、Benchmark 与性能仍开放；不启动消费者或 execution，不声明端到端 BI 上线。AC-RUN-OUTBOX-12 / Task AC-26 / BD §6.7 / DD §14.13.9 对应本片；下一步明确为 BI native adapter 与真实 owner commit-before-ACK 联测。
 
 修订 v6.85 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权、验收和版本引用同步。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
+
+修订 v6.86 · 2026-10-19 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 binding API source slice 完成；更新 §16.2 的 Run/Worktree 归属状态和 hostless repository 语义，保留 target DB、RLS、并发与 production admission 缺口。详见 `PHASE-WLD0-BINDING-API-IMPL-REPORT-20261019.md`。

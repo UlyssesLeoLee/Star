@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.08**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.09**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -8,7 +8,7 @@
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
 > - Phase 9E-4C5 Runtime fence foundation：REST 与 Local Runtime 共用 `star-dto::task_run` strict DTO；ERUN-P2 带 V2 directory fence 的双 Profile grant 使用 signature v3（C5 基线为 v2），无 fence 的 legacy grant 保持 v1；Local Runtime 专用 consumer 完整比对当前 binding 并在 SQLite FULL WAL 单事务内消费 nonce/fence，receipt 上限 50,000 条并保留 5 分钟时钟偏差清理窗。该 helper 未接生产 provisioner，不负责实时 ACL/authority、reservation lifecycle、OS sandbox/spawn 或 BI outcome；producer capability 继续默认关闭，详见 §7.2。
 > - ERUN-P3 Run Task Cards 条件式 UI：bounded Run-scoped list/create routes 与 typed client 已有源码切片，Worktree focus 可选；保持 12 条/页、2 MiB response、最多 100 页、有界并发、取消与有界 IndexedDB pending recovery。Task owner 为 tenant/Project/Run，服务端复验当前 Project/Run grants；可选 focus 必须绑定同一 Run。旧 Tauri demo/mock fallback 已移除。migration、应用角色 grants/RLS、Rust/HTTP/frontend 验证未完成，生产页面保持 fail closed，CLI 禁用。
-> - 日期：2026-10-16
+> - 日期：2026-10-19
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
@@ -18,10 +18,11 @@
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.80 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.80 §16
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.87 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.86 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.34、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.08
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
+> - WLD-0 source slice（2026-10-19）：新增 Project/Run 授权的 Run-to-Worktree bind/reassign/detach REST owner API 与前向 Outbox constraint migration；用本地 Worktree repository 身份维持归属，不要求 hostless Run 提供远端 repository/Branch。CAS、幂等、每 Worktree 锁、SCD2、Audit 与 Outbox 在单一 owner transaction 内。当前迁移只在源码中，目标 DB grants/RLS、认证持久化、回滚、并发与历史对账未验收，执行 admission 继续关闭。
 
 ---
 
@@ -207,6 +208,12 @@ Envelope { run_context, branch, engineering_run, focus?, focus_version?, capabil
 RunContext `context_version` 只包含当前 Project/Run grant identity/version 与 Run revision；remote Branch projection 可为空，即使某个 legacy Run 保留了 branch_id，普通 context 也不得因为 branch object/grant 缺失而拒绝。checkout 的 workspace与生命周期/关系版本位于 focus DTO 和独立 focus_version；同 Run 切换 checkout 不改变 App owner版本。无 focus 时不提供执行 workspace。Context只是查询快照；后续命令须重新解析授权，不是可复用凭据。
 
 目录默认50、最大100、UUID keyset cursor绑定 kind/parent并限512字节；未知 query字段拒绝。数据库索引为 `(tenant,project,branch_id)`、`(tenant,branch,engineering_run_id)`、current `(tenant,engineering_run_id,worktree_id)`。未做 EXPLAIN/负载实测。目标主树 cache/request/DOM上限与会话撤权行为须分别验收；不能以 LIMIT 代替全链路性能证据。
+
+### 3.5 Run-to-Worktree binding mutation owner（WLD-0）
+
+绑定 API 以 `PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}` 创建或重绑当前归属，以同一路径的 `DELETE` 关闭当前归属。请求携带 `expected_binding`（`unassigned` 或精确的 active binding ID/version）、`expected_project_binding_version`、`correlation_id` 与 `Idempotency-Key`。owner 在同一事务重新验证 Bearer actor、Project manager membership、Run grant、Project-Worktree binding 与其版本、Run 与本地 Worktree repository 兼容性；remote Run repository/Branch 可为空，但 Worktree repository identity 必须存在且属于该 Project。按 tenant+Worktree advisory lock 串行变更，执行 SCD2 close/insert、当前唯一性、Audit trigger context、稳定幂等回执与版本化 Outbox。响应和事件都明确 `execution_admission_available=false`。
+
+2026-10-19 源码切片已实现 route/mutation、前向 Outbox event constraint migration、鉴权边界 route test 与 transition/idempotency/hostless/lock SQLSTATE unit tests。Rust 1.99.0 all-targets check 与 full all-targets test 曾通过；补充的 lock SQLSTATE 单测单独通过。目标 PostgreSQL migration、application role grants/FORCE RLS、持久回放、事务回滚、竞争事务和部署后历史 reconciliation 没有验证。不得把 source slice 标为生产绑定闭环，也不得由绑定成功推导 Agent/CLI/Schedule 可执行。
 
 ## §4 API 契约
 
@@ -1092,6 +1099,7 @@ Commit 2877821974ef0bec1dc3aec7f6fc831c113d34a5 之前的源代码快照中，In
 | 版本 | 日期 | 修订人 | 改动 | 触发 |
 |---|---|---|---|---|
 | v5.08 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Align requirements v6.81/basic v6.80, Task SRS v0.21/BD v0.14/DD v1.35, Data Design v2.28 and plan v7.09; add 8.26 for DB allowlist projection, legacy live-fact conversion, privacy boundary and PG evidence; record Rust 1.99.0 `bi-owner-runtime` format/test/strict Clippy pass; keep workspace-wide gates, backup/WAL, target DB, receiver and query API open | Phase 9F4F BI Task payload minimization slice |
+| v5.09 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the WLD-0 bind/reassign/detach owner API contract, local Worktree repository identity for hostless Runs, transaction/CAS/idempotency/SCD2/audit/Outbox rules, and exact source/test evidence; preserve open target DB/RLS/concurrency and execution-admission gates | WLD-0 binding API source implementation and requirements/basic-design synchronization |
 | v5.07 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.80/basic v6.79/Task SRS v0.20、BD v0.13、DD v1.34、Data Design v2.27 与实施计划 v7.08；新增 §8.25 约束 BI 为首个 Task-event owner-local durable Inbox consumer，并记录 PostgreSQL 18.6 隔离证据及 trusted transport、projection、retention、target DB/Rust 门禁 | Phase 9F4E BI Inbox 持久化切片与 Run App 边界同步 |
 | v5.06 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.79/basic v6.78/Task SRS v0.19、BD v0.12、DD v1.33 与 Data Design v2.26；记录 Rust bounded Task claim/route/wire store、独立 Profile `event` authorization、authenticated-context route identity、fenced retry 与 proof dead-letter；明确无 send/accepted/receiver/consumer/fair scheduler，Rust/target DB 门禁开放 | ERUN-P3.3 Task Outbox Rust slice 与当前源码对账 |
 | v5.05 | 2026-10-16 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v6.77/basic v6.76/data design v2.24/Task SRS v0.17、BD v0.10、DD v1.31 与 plan v7.05；明确 Task delivery Work expiry 从 enqueue `created_at` 起算，终态不重置，terminal receipt 先追加再删 Work | 对照 delivery migration 固定 `created_at + 7 days` 约束，纠正“终态后 7 天”描述 |

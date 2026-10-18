@@ -3,7 +3,7 @@
 > **渡口 Worktree-first 产品未完成设计与交付 WBS 更新稿**
 >
 > 基线：2026-10-18 JST 通过 `rtk git fetch origin main dev` 刷新 refs 后核对；`origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e`，`origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`。`git rev-list --left-right --count origin/dev...origin/main` 为 `121 0`，当前 main 无 dev 未包含的领先提交。
-> 对照：需求 v6.86、基本设计 v6.85、`DD-WORKTREE-GROUP-001` v5.08、实施计划 v7.14 §6.140–§6.156、架构与交付方向 v1.14、`PHASE-9F4I-NATIVE-EVENT-REPORT` v0.2
+> 对照：需求 v6.87、基本设计 v6.86、DD-WORKTREE-GROUP-001 v5.09、实施计划 v7.14 §6.140–§6.156、架构与交付方向 v1.14、`PHASE-9F4I-NATIVE-EVENT-REPORT` v0.2
 > 状态：🟡 计划稿；未把远端文档审阅当成本地分支合并或生产验收
 
 ## 0. 目的与计划边界
@@ -27,7 +27,7 @@ Project
 
 | ID | 未完成设计/决策 | 当前文档证据 | 收口要求 |
 |---|---|---|---|
-| D-01 | Hostless Run 到 Worktree 的完整授权与绑定模型 | Run directory 已支持脱离远端身份的设计/源码切片；Run→Worktree 写入、历史归属对账、可信本地 Branch observation 尚未闭合 | 定义唯一 owner、绑定版本、迁移策略、Project/Run grants 与无宿主状态；旧 Branch grant 只用于 SCM 操作 |
+| D-01 | Hostless Run 到 Worktree 的完整授权与绑定模型 | Run directory 已支持 hostless 源码切片；WLD-0 已新增 bind/reassign/detach API 与前向 migration，覆盖 Project/Run 授权、CAS、幂等、每 Worktree 锁、SCD2、Audit 和 Outbox。目标 DB/RLS/grants、认证写入、回滚、并发及历史归属对账仍未闭合 | 定义唯一 owner、绑定版本、迁移策略、Project/Run grants 与无宿主状态；旧 Branch grant 只用于 SCM 操作 |
 | D-02 | 多 Agent Worktree 生命周期和安全收敛 | 有 Index、lock observer、部分 create/import/archive 条件式切片；生产 Host Runtime observer、drain、checkout 清理和 owner 信号未闭合 | 定义 Agent/terminal owner、锁、reservation、冲突、归档/删除、恢复、用户数据保全与 merge receipt 状态机 |
 | D-03 | Run Apps 的 owner API 与事件契约 | Task、Canvas、Hook、BI 等各有局部 owner/Outbox/Inbox 切片；端到端 delivery、consumer projection 与应用拆分边界不齐 | 固化 API、存储过程/owner transaction、Outbox/Inbox、idempotency、版本、撤权、重放、失败和审计契约；禁止跨 owner 直接写表 |
 | D-04 | Task Card 到安全 Agent CLI 的完整运行设计 | bounded list/create、审查/生命周期与恢复局部实现；真实 provisioner、OS sandbox、工具调用控制、独立验证和结果回写仍开放 | 设计并实现分配、启动、流输出、取消/恢复、预算、权限再验、证据、独立验证、结果回写与 PR/合并衔接 |
@@ -171,7 +171,7 @@ flowchart TD
 | D6 | BI/Benchmark、Rust 桌面 RSS/延迟、公平调度/背压、商业分发/SBOM 与系统发布验收 | 必须等可信事件链、执行链和基础设施状态源稳定后开始；可按测量/发行/恢复分离 | 有可复现设备与负载数据、owner-sourced BI 投影、backup/restore 证据、全发行闭包 SPDX/SBOM/NOTICE 与升级/回滚门 |
 | D7 | 每轮先比较 main/dev；如 main 有领先内容则先 cherry-pick 到 dev，再把通过审阅和验证的文档/代码 lane rebase 到最新 dev 并逐项 merge；核对已合并与归档保留内容，清理已明确完成且无人使用的 lane | 单一集成负责人串行；不得全分支盲合 | main/dev 提交图和 cherry-pick 决策有记录；有领先提交时先完成 cherry-pick 并验证；每次 lane 集成前复核 lane HEAD 与 dev HEAD；owner/dirty/untracked/ignored 和验证门通过；无活动 owner 的证明可用；只保留 main/dev 的目标须在不丢失用户数据前提下完成 |
 
-**立即下一步（2026-10-19）**：新一轮 `git fetch origin dev main` 成功，main 仍无领先提交（`origin/dev...origin/main=121 0`），当前无需 cherry-pick。RTK 0.50.0 可用；Orca owner/terminal 查询仍返回 EPERM，因此 D0 仍阻止共享 dev 写入、rebase/merge 与 cleanup。9F4J.6 的 owner-role P2 已修复、只读复核通过，Rust all-targets check/test 与变更文件格式通过；专用 PostgreSQL 和 network commit-before-ACK 尚未运行。WLD-0 binding API 已在隔离 worktree 开始，最近状态为尚未编辑/验证。下一步先完成 WLD-0 API lane 的限定实现、独立 review、Rust/DB 边界测试与文档对账；并行完成 9F4J.6 报告和 WBS 候选更新。随后按依赖继续 9F4J.2/.3、真实身份和专用 DB 下的 9F4J.4/.5。每次集成前再次 main/dev 比较；只在确认 Orca owner、dirty/ignored 与活动终端后，才对共享 dev 执行逐 lane rebase/merge。RTK 或 Orca 返回访问错误时不得执行共享 checkout 写入或清理。
+**执行更新（2026-10-19）**：用户确认 Orca worktree 已无活动写入者；本地 dev checkout 最近复核干净且 HEAD 为 6f8d5b8f，Orca CLI 仍返回 EPERM，owner 证据来自用户确认。最近一次远端比较为 origin/dev...origin/main=121 0，无 main-only 领先提交；合并前必须刷新并重查。RTK 0.50.0 已安装，当前 PowerShell 进程 PATH 未刷新，继续用绝对路径。WLD-0 binding API 源码已实现；Rust 1.99 all-targets check、完整 all-targets tests（最后一条 SQLSTATE 单测补充前）、补充后的定向单测、变更文件 rustfmt 与 CGG 通过。包级 cargo fmt --check 受未改动 work_items.rs 历史格式差异影响；target PostgreSQL migration/RLS/grants/rollback/concurrency 未运行。CodeRabbit CLI 被其 Ubuntu wrapper 的执行权限错误阻断，已有独立静态审查；下一步完成报告与三层文档对账，再将已审阅提交集成到 dev，并在快进前重复 owner/HEAD/dirty/ref 检查。
 
 ## 5. 验收与报告规则
 
@@ -189,7 +189,7 @@ flowchart TD
 | 项目 | 现状 |
 |---|---|
 | 远端 dev 设计基线 | 2026-10-19 本轮 `git fetch origin dev main` 成功；确认 `origin/dev=6f8d5b8f...`、`origin/main=8dcb65f7...`；`origin/dev...origin/main` 为 `121 0`，`origin/dev..origin/main` 为空。main 当前没有需要先 cherry-pick 的领先提交；每次实际集成前仍须重查 |
-| 本地 refs 与 checkout | `D:\Star` 仍在 `main@8dcb65f7...`；用户的 `AGENTS.md` 修改及两份未跟踪 WBS 原件均保留。Orca 的 `dev` checkout 上次只读状态为 clean、HEAD=`6f8d5b8f...`，但当前仍无法确认活动 writer。隔离候选 `codex/wbs-dev-integration@6cf09063...` 含原生 Event adapter、9F4J.6 persistence test 与 WLD-0 合同审计提交；9F4J.6 P2 修正、测试报告和两份 WBS 的候选更新尚未提交。WLD-0 binding API worker 在独立 worktree 中开始实施，最近回报尚未编辑或验证；其他 worktree 与其数据保持不动 |
+| 本地 refs 与 checkout | `D:\Star` 仍在 `main@8dcb65f7...`；用户的 `AGENTS.md` 修改及两份未跟踪 WBS 原件均保留。Orca 的 `dev` checkout 上次只读状态为 clean、HEAD=`6f8d5b8f...`，但当前仍无法确认活动 writer。隔离候选 `codex/wbs-dev-integration` 已保存此前 9F4J.6 与 WBS 更新提交；WLD-0 API worktree 现有 `group_api.rs`、新 binding module、route test、forward migration 与 brief，Rust all-targets check、变更文件格式及 CGG 已通过，全目标测试仍在运行；worker 因用量上限退出，协调者负责最终审查和提交。其他 worktree 与其数据保持不动 |
 | Orca runtime | 本轮 `rtk proxy orca worktree ps --json` 仍返回 `runtime_access_denied (EPERM)`。即使 dev checkout 的 Git 状态 clean，也无法确认 Orca 活动 writer/terminal owner；D0 仍未通过，不在该 checkout rebase、merge、fast-forward、删除或清理 |
 | RTK 命令代理 | 本轮通过完整路径复核 `rtk 0.50.0`；`rtk init --show --codex` 显示 Global RTK.md、Codex global hook 和 Global AGENTS.md reference 均已配置。用户 PATH 已含 WinGet 安装目录，但当前任务的 PowerShell 子进程 `Get-Command rtk` 未解析，因此本轮继续用绝对路径；通用 `rtk init --show` 的 hook 状态检查不代表 Codex hook 缺失。cargo/rustfmt 也通过 rustup 输出的绝对工具链路径运行 |
 | Rust 工具链 | `E:\DevCache\cargo\bin\rustup.exe toolchain list` 显示 `1.99.0-x86_64-pc-windows-msvc (active, default)`；Rust MSRV 工具链就绪 |
@@ -213,3 +213,6 @@ flowchart TD
 | v0.10 | 2026-10-18 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 用本轮真实 RTK、Git fetch、worktree、Rustup 与 Orca 输出刷新状态；更正 RTK 已安装/当前进程 PATH 过期、main/dev `121 0`、dev checkout clean 但 Orca owner 查询 EPERM；记录 9F4J.6 已提交及测试门状态、9F4J.1 实际验证结果与未提交状态，并启动 WLD-0 与 9F4J.6 独立审计 | 用户要求恢复 RTK 并继续完整 WBS；本轮现状复核与并行工作启动 |
 | v0.11 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 刷新远端 refs 并再次确认 main 无领先提交；记录 Orca EPERM 持续阻塞共享 dev；把 9F4J.6 P2 源码修复、独立复核、Rust check/test/fmt 结果和未运行的 DB 门更新到报告；将用户 WBS 原件复制到候选并记录 WLD-0 binding API lane 状态 | Codex 重启后继续推进，按最新工具输出更新实现与 WBS 状态 |
 | v0.12 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复核 RTK 0.50.0、用户 PATH 条目和 Codex global hook 配置；更正通用 `init --show` 与 Codex 专用集成状态的区别，并记录当前任务 PowerShell 仍以完整路径调用 RTK | 完成 RTK 安装/集成状态核验 |
+| v0.13 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 WLD-0 API lane 从准备状态更新为源码实施中；记录独立 worktree 的当前文件状态和未完成验证，不把任务提前标记为完成 | 轮询 WLD-0 API lane 后发现开始修改 `group_api.rs` |
+| v0.14 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 刷新 WLD-0 API 实施证据、hostless Run 与本地 Worktree repo 的区分、Rust check/rustfmt/CGG 状态及 worker 用量上限后由协调者接手的事实；全目标测试、PostgreSQL 验证和共享 dev 收敛仍开放 | worker 停止前已报告实现和测试，协调者复核当前 worktree 并接手最终验证 |
+| v0.15 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Orca worktree 已由用户确认结束、dev checkout 清洁状态与 HEAD；更新 WLD-0 source/test/审查证据和 requirements/basic/DD 版本对账，明确目标 DB/RLS/并发门仍开放并安排 dev 集成复核 | 用户确认 Orca 工作已结束并要求先整合已完成结果 |
