@@ -115,7 +115,7 @@ use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=455cccb7325d9094bc9f98ec3b101fda3b12408232f15ebc9abf74b91ec26f1c
+// @cypher schema=1 source_sha256=709c12ec4da839513844154eb57b11c635e95a1a55c6f2bbb7dce05d37ebd3a0
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -142,9 +142,14 @@ use serde::{Deserialize, Serialize};
 // MERGE (biAnalyticsRouter:Symbol {id:"crates/star-api-rest/src/group_api/bi_analytics.rs::router",kind:"function"})
 // MERGE (biQueryPort:Type {id:"bi_owner_runtime::TaskEventQueryPort",kind:"trait"})
 // MERGE (biQueryInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_bi_task_event_query_port",kind:"method"})
+// MERGE (runWorktreeBindings:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::module",kind:"module"})
+// MERGE (runWorktreeBindingsRouter:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::router",kind:"function"})
 // MERGE (api)-[:DEFINES]->(biAnalytics)
+// MERGE (api)-[:DEFINES]->(runWorktreeBindings)
 // MERGE (self)-[:CALLS]->(biAnalyticsRouter)
 // MERGE (build)-[:CALLS]->(biAnalyticsRouter)
+// MERGE (self)-[:CALLS]->(runWorktreeBindingsRouter)
+// MERGE (build)-[:CALLS]->(runWorktreeBindingsRouter)
 // MERGE (taskState)-[:USES_TYPE]->(biQueryPort)
 // MERGE (taskState)-[:HAS_METHOD]->(biQueryInstall)
 // MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
@@ -166,6 +171,7 @@ mod execution_profiles;
 mod execution_resources;
 mod group_apps;
 pub(super) mod hook_policies;
+mod run_worktree_bindings;
 mod schedule_rules;
 mod scoped_chat;
 mod scoped_chat_store;
@@ -728,6 +734,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(execution_profile_admin::router())
         .merge(task_runs::router())
         .merge(schedule_rules::router())
+        .merge(run_worktree_bindings::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
         .merge(group_apps::router())
