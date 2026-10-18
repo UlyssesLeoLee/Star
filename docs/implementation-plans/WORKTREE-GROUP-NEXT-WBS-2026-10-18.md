@@ -171,7 +171,7 @@ flowchart TD
 | D6 | BI/Benchmark、Rust 桌面 RSS/延迟、公平调度/背压、商业分发/SBOM 与系统发布验收 | 必须等可信事件链、执行链和基础设施状态源稳定后开始；可按测量/发行/恢复分离 | 有可复现设备与负载数据、owner-sourced BI 投影、backup/restore 证据、全发行闭包 SPDX/SBOM/NOTICE 与升级/回滚门 |
 | D7 | 每轮先比较 main/dev；如 main 有领先内容则先 cherry-pick 到 dev，再把通过审阅和验证的文档/代码 lane rebase 到最新 dev 并逐项 merge；核对已合并与归档保留内容，清理已明确完成且无人使用的 lane | 单一集成负责人串行；不得全分支盲合 | main/dev 提交图和 cherry-pick 决策有记录；有领先提交时先完成 cherry-pick 并验证；每次 lane 集成前复核 lane HEAD 与 dev HEAD；owner/dirty/untracked/ignored 和验证门通过；无活动 owner 的证明可用；只保留 main/dev 的目标须在不丢失用户数据前提下完成 |
 
-**执行更新（2026-10-19）**：用户确认 Orca worktree 已无活动写入者；本地 dev checkout 最近复核干净且 HEAD 为 6f8d5b8f，Orca CLI 仍返回 EPERM，owner 证据来自用户确认。最近一次远端比较为 origin/dev...origin/main=121 0，无 main-only 领先提交；合并前必须刷新并重查。RTK 0.50.0 已安装，当前 PowerShell 进程 PATH 未刷新，继续用绝对路径。WLD-0 binding API 源码已实现；Rust 1.99 all-targets check、完整 all-targets tests（最后一条 SQLSTATE 单测补充前）、补充后的定向单测、变更文件 rustfmt 与 CGG 通过。包级 cargo fmt --check 受未改动 work_items.rs 历史格式差异影响；target PostgreSQL migration/RLS/grants/rollback/concurrency 未运行。CodeRabbit CLI 被其 Ubuntu wrapper 的执行权限错误阻断，已有独立静态审查；下一步完成报告与三层文档对账，再将已审阅提交集成到 dev，并在快进前重复 owner/HEAD/dirty/ref 检查。
+**执行更新（2026-10-19）**：WLD-0 API 与设计/WBS/阶段报告已提交到候选分支并 rebase 到当前 dev（rebase 无改动）。刷新 refs 后 origin/dev...origin/main=121 0，无 main-only 提交。候选分支 Rust 1.99.0 star-api-rest all-targets check 通过；全目标测试 261 passed、0 failed、2 ignored（专用 PostgreSQL advisory-lock 与 Schedule ACL fixture 未运行）。变更 Rust 文件 rustfmt、CGG 和分支差异 whitespace check 通过；CodeRabbit Ubuntu wrapper 因 Permission denied 无法运行，独立静态审查已完成。dev 尚未写入；用户确认 Orca worktree 已结束，merge 前仍需最后复查 owner 约束下的 checkout HEAD、clean 状态、in-progress markers 和 refs；无 main 领先时再 fast-forward。目标 PostgreSQL/RLS/grants/回滚/持久化重放/并发/历史 reconciliation 未验收，执行保持关闭。
 
 ## 5. 验收与报告规则
 
@@ -216,3 +216,4 @@ flowchart TD
 | v0.13 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 WLD-0 API lane 从准备状态更新为源码实施中；记录独立 worktree 的当前文件状态和未完成验证，不把任务提前标记为完成 | 轮询 WLD-0 API lane 后发现开始修改 `group_api.rs` |
 | v0.14 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 刷新 WLD-0 API 实施证据、hostless Run 与本地 Worktree repo 的区分、Rust check/rustfmt/CGG 状态及 worker 用量上限后由协调者接手的事实；全目标测试、PostgreSQL 验证和共享 dev 收敛仍开放 | worker 停止前已报告实现和测试，协调者复核当前 worktree 并接手最终验证 |
 | v0.15 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Orca worktree 已由用户确认结束、dev checkout 清洁状态与 HEAD；更新 WLD-0 source/test/审查证据和 requirements/basic/DD 版本对账，明确目标 DB/RLS/并发门仍开放并安排 dev 集成复核 | 用户确认 Orca 工作已结束并要求先整合已完成结果 |
+| v0.16 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 API 与文档候选提交、rebase 基线、post-fix Rust 1.99.0 all-targets check/test 结果及两项 fixture-based ignored tests；共享 dev 尚待最终复核和 fast-forward | 候选 branch 整合回归完成 |
