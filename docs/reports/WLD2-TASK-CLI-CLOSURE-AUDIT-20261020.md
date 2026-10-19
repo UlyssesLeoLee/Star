@@ -1,8 +1,8 @@
 # WLD-2 Task Card 与任务绑定 CLI 闭环审计
 
-**日期：** 2026-10-20  
-**审计范围：** Run-scoped Task Card API/UI、TaskExecutionRun、Worktree 绑定、任务 CLI session/PTY、权限与 sandbox、取消恢复、验证与证据、Audit/Outbox、数据库 RLS/grants。  
-**基线：** `codex/wld2-task-cli-audit-20261020` @ `35a52c972a58b339cb790ad30ed07ee4c56a797a`。  
+**日期：** 2026-10-20
+**审计范围：** Run-scoped Task Card API/UI、TaskExecutionRun、Worktree 绑定、任务 CLI session/PTY、权限与 sandbox、取消恢复、验证与证据、Audit/Outbox、数据库 RLS/grants。
+**基线：** `codex/wld2-task-cli-audit-20261020` @ `35a52c972a58b339cb790ad30ed07ee4c56a797a`。
 **结论：** Task Card 的数据/API 与受控 CLI admission 源码切片已经存在；Run Directory 内的 CLI 明确禁用。当前仓库尚未形成可证明的、Run 绑定的生产执行闭环：默认 API composition 没有 provisioner，bounded `crates/` 搜索未找到生产实现；现有 CLI start context 仍要求远端 Branch 身份；PTY 只是 Local Runtime 的低层进程/IO 原语，未连接到该 API、OS sandbox、独立验证和执行结果写回。
 
 ## 1. §0 目的与边界 / §1 改动矩阵
