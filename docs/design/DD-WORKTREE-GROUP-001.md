@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.09**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.10**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -19,7 +19,7 @@
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
 > - 上位需求：[docs/requirements.md](../requirements.md) v6.87 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.86 §16
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.87 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.34、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.08
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 > - WLD-0 source slice（2026-10-19）：新增 Project/Run 授权的 Run-to-Worktree bind/reassign/detach REST owner API 与前向 Outbox constraint migration；用本地 Worktree repository 身份维持归属，不要求 hostless Run 提供远端 repository/Branch。CAS、幂等、每 Worktree 锁、SCD2、Audit 与 Outbox 在单一 owner transaction 内。当前迁移只在源码中，目标 DB grants/RLS、认证持久化、回滚、并发与历史对账未验收，执行 admission 继续关闭。
@@ -712,11 +712,11 @@ PostgreSQL stored procedure/function 只封装同一 owner transaction 中需要
 
 只有独立伸缩、故障隔离、发布节奏或合规边界的实测收益足以抵消网络、常驻内存和运维成本时，才把 bounded context 原子提取成服务。提取门包括 service identity/authorization propagation、API/event schema version、数据写 ownership、Outbox/Inbox replay、timeouts/backpressure/circuit behavior、observability、migration/rollback 和 memory/resource budget。App 拆分与 service promotion 是两项独立决策。
 
-### 9.2 Event broker 决策
+### 9.2 Messaging adapter 与 analytics stream 决策
 
-当前仓库架构基线为 PostgreSQL SoR + Transactional Outbox + NATS JetStream；Kafka/Fluvio 均不是当前 runtime dependency/deployment。领域事件默认留在 NATS，BI/Benchmark 使用 owner 事件生成可重建 read model。除非留存、历史 replay、connector 或 analytics 隔离 SLO 的实测结果要求更换，否则不增加第二个 broker。
+当前架构基线为 PostgreSQL SoR + owner-local Transactional Outbox/Inbox + 有界 delivery state。每条事件在首次外部发送前固定 immutable route pin，并且只允许对应的单一 Messaging adapter 投递；接收 owner 必须在同一事务内幂等提交 Inbox receipt 与本 owner effect/projection，然后确认 delivery。NATS JetStream 是现有可移除的兼容 adapter；Star 自有 Rust durable transport 是目标替换方向，但当前 opt-in/native source slices 尚未证明生产完整性、BI/Benchmark parity 或全量 route cutover。Provider cursor、lease、subject/stream/consumer ID 与 ACK API 是 adapter 细节；broker ACK、socket write 或 native append receipt 本身都不能替代 owner Inbox commit、reservation、readiness、BI 事实或执行证据。失败重试、隔离、恢复和对账由 owner-local delivery/Inbox/quarantine facts 驱动，不能依赖某个 broker 的私有 DLQ 或 retry 机制。Kafka/Fluvio 均不是当前基础 Messaging runtime dependency/deployment。
 
-若未来必须在 Kafka 与 Fluvio 中为 production analytics stream 选型，先 PoC Kafka：官方 Kafka 4.3 提供 Connect/Streams 等 API，适合 Run BI 外部 connector 与历史分析；需支付额外 broker 运维与内存成本，并使用修复 Kafka Streams 4.3.0 native-memory leak 的 4.3.1+。Fluvio 保留为 Rust/Kubernetes/低资源候选，但低内存属于供应方主张且 Star 没有同负载数据；release/support cadence、connector/托管、故障恢复均需验证。PoC 固定事件体、保留期、吞吐、消费组数、故障注入与部署资源，比较峰值 RSS/CPU/磁盘、consumer lag、恢复时间和 connector 覆盖率。更换 broker 仅限 Outbox 之后的 consumer 链，绝不改变 SoR 或跨域事实 owner。
+额外的 analytics stream 属于独立决策：只有留存、历史 replay、connector 或 analytics 隔离 SLO 的实测结果证明需要独立数据面时才评估，不因替换基础 Messaging adapter 自动增加第二个 broker。若未来必须在 Kafka 与 Fluvio 中为 production analytics stream 选型，先 PoC Kafka：官方 Kafka 4.3 提供 Connect/Streams 等 API，适合 Run BI 外部 connector 与历史分析；需支付额外 broker 运维与内存成本，并使用修复 Kafka Streams 4.3.0 native-memory leak 的 4.3.1+。Fluvio 保留为 Rust/Kubernetes/低资源候选，但低内存属于供应方主张且 Star 没有同负载数据；release/support cadence、connector/托管、故障恢复均需验证。PoC 固定事件体、保留期、吞吐、消费组数、故障注入与部署资源，比较峰值 RSS/CPU/磁盘、consumer lag、恢复时间和 connector 覆盖率。新增 analytics stream 只能消费 owner 已提交且允许外发的事件，绝不改变 SoR、owner Outbox/Inbox、immutable route pin 或跨域事实 owner。
 
 ### 9.3 Task lifecycle transactional Outbox v3
 
@@ -908,6 +908,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v5.10 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修订 §9.2 的跨 owner messaging 契约：owner Outbox/Inbox 与 immutable route pin 是稳定边界，NATS 为可移除兼容 adapter，Rust-native transport 为目标方向；将 analytics stream 评估与基础 transport 替换分开，并明确 ACK、恢复与 BI 事实的 owner 语义 | W1 有界设计核对发现 §9.2 仍将 NATS 写为固定 broker 基线 |
 | v0.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Project → Worktree → Group Apps 详细交互、安全上下文、管理操作、CLI、Canvas、Chat/LangGraph、Plugin、事件与 W/T/M 实施门；记录 REST no-op auth 与 in-memory blocker | 推进 Worktree Group Phase 2，并依据 Worktree Index 当前实现核对 API 安全边界 |
 | v0.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落地 RS256 actor 校验、Project scope + active membership、租户 RLS GroupContext resolver 与只读 Index/Group 路由；定义 2B migration 和未回填数据边界 | 推进 Worktree Group Phase 2B；落实 Project → Worktree Index → Worktree 同级应用架构 |
 | v0.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 canonical WorkItem / Multica 六态持久化、幂等与追加审计，稳定 cursor Index，Worktree owner SCD2 与 archive plan/confirm；逐项标出未部署数据库、旧投影 reconciliation、Jira/Review/Runtime/Canvas/Chat/Plugin 等生产缺口 | 用户要求继续完成 Phase 2B/2C/2D，并重申 Project Worktree Index 是管理多 Agent Worktree 的主入口 |

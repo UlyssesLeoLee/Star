@@ -4,7 +4,7 @@
 
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
 
-> **文档版本**: v6.86 (2026-10-19)
+> **文档版本**: v6.87 (2026-10-20)
 > **上游要件定义书**: docs/requirements.md v6.87
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
@@ -136,7 +136,7 @@ flowchart TB
         ID[Identity Service]
         WC[work-core / Rust Modular Monolith]
         W[Worker --role all]
-        MSG["Platform Messaging Provider<br/>NATS JetStream current; Star Rust migration target"]
+        MSG["Platform Messaging<br/>immutable route-pinned adapters"]
         PG[(PostgreSQL SoR)]
         VALK[(Valkey Cache)]
         RT{Realtime (Optional)}
@@ -177,7 +177,7 @@ flowchart TB
 
 **继承自 §13.1、§13.2、§23.1**。关键设计要点:
 
-1. **服务器端最小闭环保持不变**:`gateway / identity / work-core / worker` 四个角色,加上 PostgreSQL / Platform Messaging provider / Valkey 三个数据面。NATS JetStream 是当前 provider；Star 自有 Rust durable transport 按 D18–D21 分阶段实现并通过替换门禁前继续保留 NATS。`realtime` 角色仅在出现真实 Long Connection Scaling Boundary 时才拆出(§13.1,§15)。
+1. **服务器端最小闭环保持不变**:`gateway / identity / work-core / worker` 四个角色,加上 PostgreSQL / Platform Messaging / Valkey 三个数据面。业务事实与 Outbox/Inbox 属于各自 owner；每次 delivery 由不可变 route pin 选择传输 adapter。NATS JetStream 是可移除的兼容 adapter，Star 自有 Rust durable transport 是目标替换方向，但两者的 production parity 与逐路切换门仍未全部验收。`realtime` 角色仅在出现真实 Long Connection Scaling Boundary 时才拆出(§13.1,§15)。
 2. **Local Runtime 不计入 K8s Workload**:Developer Machine 与 K3s Cluster 是平级关系,通过 Secure Channel 对接,而非 In-Cluster Pod(§23.1)。
 3. **External SCM 是事实源,不是镜像**:GitHub / GitLab 通过 Adapter 接入,平台不重新制造 Git(§19.2,§30.6)。
 
@@ -315,9 +315,9 @@ flowchart LR
 
 ### 1.6 Platform Messaging provider 与 NATS 分阶段替换
 
-Platform Messaging 是跨 owner 通信的 provider boundary。业务 owner 在各自事务内提交业务事实与 Transactional Outbox；provider 只负责已提交消息的有界持久接收、拉取、重放与确认，不共享 Run/Project owner 写事务。Provider-specific cursor、lease 和生成号留在 adapter / transport receipt 中，不向业务 owner 泄漏。
+Platform Messaging 是跨 owner 通信的 replaceable provider boundary。每个业务 owner 在自己的事务内提交业务事实、幂等回执与 Transactional Outbox；接收 owner 在同一事务内幂等持久化 Inbox/processed-event key 并提交本 owner 的业务结果或可重建 projection，事务提交后才确认 delivery。传输 adapter 只负责有界持久接收、拉取、重放与传输回执，不共享 Run/Project owner 写事务。Provider-specific cursor、lease、generation 和 ACK 细节留在 adapter / transport receipt 中，不向业务 owner 泄漏；单独的 broker ACK、socket write 或 append receipt 不等于接收 owner 已提交 Inbox。
 
-NATS JetStream 仅作为现有过渡 provider 与可移除兼容 adapter。Star 自有 Rust durable transport 是目标服务：D18 提供 PostgreSQL durable-log 存储契约，D19 提供版本化 gRPC/mTLS server/client，D20 已有低层 exact-append client、opt-in Run-owner consumers、default-off Infrastructure demand consumer，以及 opt-in Infrastructure native Result publisher、owner-local route/wire pin、receipt store 与 migration source；这些切片不等于 production wiring、BI/Benchmark parity 或 transport cutover。D21 验收 Multipass/K3s 上的恢复、性能、内存、公平调度与运维回退。每个 Infrastructure Outbox event 必须在首次外部发送前固定不可变 provider route，只能由该 pinned provider 投递；JetStream 是兼容 adapter，不得再发送 native-pinned event。native retry 必须复用相同 Profile ID/revision/digest、endpoint identity、sender/recipient、result kind、exact wire bytes 与 SHA-256。Infrastructure 必须在自己的 attempt fence 下持久化 native append receipt 后才标记 delivered；该 transport receipt 不是 Run Inbox commit、capacity reservation、readiness、BI 事实或 execution proof。生产 identity/Profile resolver 与启动装配、目标库 grants/RLS/migration runtime proof、live TLS/revocation、replay/quarantine/recovery、BI/Benchmark、负载/RSS/fairness 及 NATS rollback 仍是开放门禁。只有身份注册、固定 Profile→log、数据库权限、跨 owner delivery、指标对账、故障恢复和回滚门全部通过，才允许按版本化 Infrastructure Profile 逐路切换并最终移除 NATS 依赖；任一前置条件未知时 fail closed 并保留尚未迁移的 NATS route。
+NATS JetStream 仅作为现有过渡 provider 与可移除兼容 adapter。Star 自有 Rust durable transport 是目标服务：D18 提供 PostgreSQL durable-log 存储契约，D19 提供版本化 gRPC/mTLS server/client，D20 已有低层 exact-append client、opt-in Run-owner consumers、default-off Infrastructure demand consumer，以及 opt-in Infrastructure native Result publisher、owner-local route/wire pin、receipt store 与 migration source；这些切片不等于 production wiring、BI/Benchmark parity 或 transport cutover。D21 验收 Multipass/K3s 上的恢复、性能、内存、公平调度与运维回退。每个 Infrastructure Outbox event 必须在首次外部发送前固定不可变 provider route，只能由该 pinned provider 投递；JetStream 是兼容 adapter，不得再发送 native-pinned event。native retry 必须复用相同 Profile ID/revision/digest、endpoint identity、sender/recipient、result kind、exact wire bytes 与 SHA-256。Infrastructure 必须在自己的 attempt fence 下持久化 native append receipt 后才标记 delivered；该 transport receipt 不是 Run Inbox commit、capacity reservation、readiness、BI 事实或 execution proof。生产 identity/Profile resolver 与启动装配、目标库 grants/RLS/migration runtime proof、live TLS/revocation、replay/quarantine/recovery、BI/Benchmark、负载/RSS/fairness 及路由回退仍是开放门禁。只有身份注册、固定 Profile→log、数据库权限、跨 owner delivery、指标对账、故障恢复和回退门全部通过，才允许按版本化 Infrastructure Profile 逐路切换；每条既有事件仍服从其 immutable route pin，回退不能改写旧 pin 或自动跨 provider 重发。所有流量迁移并通过验收后才移除 NATS adapter；任一前置条件未知时 fail closed。
 
 历史 D20 follow-on acceptance（2026-10-14；两表快照）：PostgreSQL 18.6 WSL disposable runner 93/93，native route/receipt migration 双次应用，owner-store SQLx target 1/1。SQLx 用合成 route/receipt fixture 验证 store 行为，不调用 publisher，也不证明 native server append。P1 已修复为 resolver-bound endpoint/tenant/Profile route 与同一 concrete transport。后续 native claim 已返回 bounded quarantine diagnostics；本轮 `d15951f9d2c720127899ebdd03df868a205be968` 增加 JetStream cross-provider diagnostic seam，但只有 feature 启用且调用方提供 tenant 匹配、由可信 resolver 产生的 route snapshot 时才为 `Available`。缺少/不匹配 snapshot 或 feature 关闭时返回 `Unavailable`，不伪装为零阻塞；JetStream 仍跳过 native-pinned event，绝不 publish。它不是 operator-visible API/UI。Rust 1.99/PG 95/95/SQLx 1/1 是之前 quarantining slice 的证据；本轮 D20 新切片两次 PG audit 各 95/95、SQLx 每次 2/2，Rust feature check、Infrastructure 76/76、format/Guardian/diff 通过。runner argv 未完整写入 audit JSONL，报告按当时调用记录说明实际可核实的命令和目录。Production startup/Profile resolver、授权 operator API/UI 与 verified tenant binding、recovery/terminal disposition、目标库 grants/RLS、live TLS/revocation、BI/Benchmark、RSS/fairness 与 NATS rollback 保持开放，Run execution 继续 fail closed。
 
@@ -496,7 +496,7 @@ domain-local-runtime ← domain-identity(device_identity,§23.2)
 
 | 机制 | 适用场景 | 示例 |
 |---|---|---|
-| **Domain Event**(NATS JetStream) | 异步通知,无强一致需求 | AgentSessionStarted, WorktreeDirtyStateChanged |
+| **Domain Event**(Owner Outbox/Inbox + replaceable transport adapter) | 异步通知,无强一致需求 | AgentSessionStarted, WorktreeDirtyStateChanged |
 | **ACL(Anti-Corruption Layer)** | 外部系统适配,防止厂商对象污染 | SCM Adapter(GitHub↔Domain), Agent Adapter(Codex↔Domain) |
 | **Shared Kernel** | 跨域通用概念,放在最低层 | TenantId, UserId, TimeRange(Currency-like Value Object) |
 | **Customer-Supplier** | 上游定义契约,下游实现 | SCM(S) → Development(C);Agent(S) → Worktree(C) |
@@ -2197,7 +2197,7 @@ per spec/saga/01-saga-coordination-spec.md v0.2 §4 Worktree Orchestration Saga 
 
 ### 4.12 Event Bus 协作机制 (v0.16 新增)
 
-per requirements §14.1 Event Architecture 12 核心事件 + §3.1 Domain Event (NATS JetStream),本节定义 22 domain 间 Event 协作的 **事件契约 + 订阅矩阵**。
+per requirements §14.1 Event Architecture 12 核心事件 + §3.1 owner-owned Domain Event，本节定义 22 domain 间 Event 协作的 **事件契约 + 订阅矩阵**。Outbox/Inbox 与业务事件语义独立于 NATS JetStream 或 Star Rust transport adapter。
 
 #### 4.12.1 12 核心事件契约 (per requirements §14.1)
 
@@ -2255,7 +2255,7 @@ per requirements §15 Realtime 要求 + §4.12 Event Bus + star-sse crate,本节
 #### 4.13.1 Realtime 通道架构
 
 ```text
-domain events (NATS JetStream)
+domain events (owner Outbox → pinned transport adapter → owner Inbox)
        │
        ▼
 star-sse (Rust WebSocket 端点)            per star-sse/src/lib.rs
@@ -2311,7 +2311,7 @@ star-sse (Rust WebSocket 端点)            per star-sse/src/lib.rs
 | **PostgreSQL(SoR)** | 业务事实 | WorkItem, Requirement, AcceptanceCriterion, Worktree(注册), DevelopmentExecution, AgentSession(注册), Feedback, Decision, ContextPacket(元数据), ValidationResult(摘要), SCM Link, Permission, Notification, Audit, Comment, Relation, Sprint, Board |
 | **Object Storage(S3 兼容)** | 大型 Raw / 二进制 / Transcript | Diff Artifact(>1MB), Build Log, Test Log, Agent Transcript(完整对话,需 AI Content Retention Policy 决定), Symbol Index Snapshot(>10MB), Agent Attachments |
 | **Valkey(缓存)** | 临时缓存 | Session Token, Rate Limit, Realtime Subscription, Heatmap Snapshot, Search Query Cache |
-| **NATS JetStream** | 异步事件流 | Domain Event(短生命周期), Webhook 缓冲(去重) |
+| **Platform Messaging adapters** | 依每条不可变 route pin 传递异步事件 | Outbox/Inbox 是 PostgreSQL owner facts；NATS JetStream 为可移除兼容 adapter，Star Rust durable transport 为目标替换方向 |
 | **Search Projection(独立索引,初版基于 PostgreSQL FTS)** | 全文检索 | WorkItem 全文, Comment 全文, Symbol 全文(V1 扩展) |
 
 **REQ-DATA-002 边界**:Large Diff / Large Log / Build Artifact / Agent Transcript / Binary 评估 PostgreSQL vs Object Storage,不得把无限 Agent Transcript 塞入 PostgreSQL 热表(§14,§59)。
@@ -2373,12 +2373,11 @@ PostgreSQL 存储的对象 = 元数据 + 摘要 + 引用(ref)
 Application Service 事务
     ├── 写业务聚合
     ├── 写 outbox 表(同事务)
-PG Transactional Outbox
-    ├── Worker Polling(每 1s)
-    └── 推送至 NATS JetStream
-NATS JetStream
-    ├── 持久化
-    └── 订阅者异步消费
+Owner Transactional Outbox + bounded delivery Work
+    └── worker 按 immutable route pin 调用一个 Platform Messaging adapter
+        └── 持久化传输回执并按有界策略重试 / 隔离
+Receiving owner transaction
+    └── Inbox 去重 + 业务处理原子提交后确认 delivery
 ```
 
 **Outbox 表字段**(不写 DDL,只列语义):
@@ -2388,10 +2387,12 @@ NATS JetStream
 **Outbox 强制规则**:
 
 - 与业务聚合同事务写入(原子性)
-- Worker Polling 推送至 NATS
-- 推送成功后标记 `published_at`
-- 失败重试(指数退避,最多 5 次)
-- 超过重试次数进入 DLQ
+- Bounded delivery worker 按 immutable route pin 选择单一 adapter；不得跨 provider fallback 或双发
+- adapter receipt 只记录传输边界结果；接收 owner Inbox commit receipt 才能证明该 owner 接受事件
+- 有界 lease/retry/quarantine/reconciliation 由 owner delivery state machine 定义，不能依赖 provider 私有 retry/DLQ 作为业务事实
+- 接收 owner 仅在 Inbox 事务提交后确认消息；重复投递由 Inbox 幂等处理
+
+字段表中的 `published_at` 若由兼容实现保留，只能表示对应 route 的传输回执时间，不代表 receiving owner 已提交 Inbox；接收事实必须由 owner-local commit receipt 表示。
 
 ### 5.5 NATS JetStream Subject 命名空间草案
 
@@ -4306,7 +4307,7 @@ live Canvas 中，未锁定的 Element 可拖动并单独编辑宽度、高度�
 | Run BI / Benchmark | `domain-bi` read models + versioned metric/cohort/benchmark APIs | 只读消费 Run/Event/Evidence/Audit；Project 层只聚合授权指标 |
 | 聊天与多 Agent | `ScopedChatRouter` + LangGraph TopAgent / Task SubAgent + TMO | Run 为默认工作区；WORKTREE/GLOBAL 明示作用域；L1 TaskExecutionRun 隔离执行 |
 | 插件 | `PluginAppRegistry` + `PluginCapabilityGateway` + ACL | Run tabs 中热插拔；Manifest、兼容性、权限、事件订阅、撤权与审计 |
-| 跨 App 同步 | Owner API + owner transaction + Transactional Outbox + NATS JetStream + consumer Inbox/Projection | 同域原子写、跨域 API 命令、跨域异步事实幂等消费；实时通道只推送投影 |
+| 跨 App 同步 | Owner API + owner transaction + Transactional Outbox + pinned Messaging adapter + consumer Inbox/Projection | 同域原子写、跨域 API 命令、跨域异步事实幂等消费；实时通道只推送投影 |
 
 以上是逻辑组件映射，第一阶段继续部署在现有 `work-core`、`worker --role all`、Web 前端与 Local Runtime 边界内。新增 UI App 和 Plugin Registry 不自动形成独立微服务或 K8s Deployment，遵循 §1.5 K8s Tax 纪律。
 
@@ -4340,13 +4341,16 @@ Run Inbox / Task / Canvas / Chat / Plugin UI
   → RunContextResolver + domain owner APIs
   → Authorization + AgentPolicy + Workflow Guard
   → Application Command（typed refs + idempotency key）
-  → Owner Domain Transaction + same-owner Transactional Outbox
-  → NATS JetStream（版本化业务事件）
-  → consumer Inbox（按 event_id 幂等）+ Task / Canvas / Agent / Plugin / BI / Search / Audit projections
+  → Owner Domain Transaction + same-owner Transactional Outbox / bounded delivery Work
+  → immutable route pin → one Platform Messaging adapter（NATS compatibility / Star Rust-native）
+  → receiving-owner transaction（Inbox 去重 + 本 owner effect/projection 原子提交；commit 后才 ACK）
+  → 其它 owner 的 Task / Canvas / Agent / Plugin / BI / Search / Audit projections
   → star-sse（当前已授权 Run 的实时更新）
 ```
 
-领域事件沿用 CloudEvents 1.0 与 §4.12 契约，新增或补足字段：`schema_version`、`tenant_id`、`project_id`、`branch_id`、`engineering_run_id`、适用时的 `repository_id` / `worktree_id`、`actor_id`、`event_id`、`causation_id`、`correlation_id`、`idempotency_key`、`occurred_at` 和 typed payload。Owner transaction 将领域事实与 Outbox row 同事务提交；consumer 先写本地 Inbox/processed-event key，再更新可重建 projection。NATS JetStream 是当前传输基线；Canvas WS/SSE、浏览器状态和插件订阅是可重建投影，不能产生第二份业务真相。
+领域事件沿用 CloudEvents 1.0 与 §4.12 契约，新增或补足字段：`schema_version`、`tenant_id`、`project_id`、`branch_id`、`engineering_run_id`、适用时的 `repository_id` / `worktree_id`、`actor_id`、`event_id`、`causation_id`、`correlation_id`、`idempotency_key`、`occurred_at` 和 typed payload。Owner transaction 将领域事实与 Outbox row 同事务提交；consumer 在自己的同一事务内提交 Inbox/processed-event key 与 owner-local effect/projection，再确认 delivery。NATS JetStream 与 Star Rust-native 均是传输 adapter，不是事实 owner；每条事件按不可变 route pin 使用一个 adapter。Canvas WS/SSE、浏览器状态和插件订阅是可重建投影，不能产生第二份业务真相。
+
+以上为跨 App 的目标事务与消息合同，不表示所有 owner 的持久 delivery、Inbox commit-before-ACK 或 Rust-native production path 已接通；各 owner 的实现与验收仍按 WBS / 阶段报告逐项关闭。
 
 Canvas viewport、frames 和 visual connectors 与 Canvas registry 共用 PostgreSQL Master/SCD2 版本。保存操作以 Canvas `expected_version` 做并发控制，按 `Idempotency-Key` 重放，并将版本变更、Audit 与 Outbox 放入同一事务；Frame / connector 的 element IDs 必须属于同一 Canvas。Live Group 可编辑 Frame 标题/几何/演示标记及 connector 颜色、线宽、路由、箭头和标签；这些都是完整 Document draft 的 CAS 修改。Connector 仅表达画布布局，不等价于 WorkItem relation；业务关系必须通过 WorkItem Relation Command。
 
@@ -4372,11 +4376,11 @@ Task Card review gate 的 canonical API 为 `POST /api/v1/engineering-runs/{engi
 | `PluginCapabilityRevoked` | Plugin Registry / Permission | Plugin Gateway, Agent Runtime, Audit | 禁用插件能力并中止或排空运行中调用 |
 | `ScopedChatCommandSubmitted` | Chat Application | LangGraph L0, Audit | 根据范围启动 GLOBAL 或当前 Run + focus Worktree 流程 |
 
-每个命令通过 Application API 执行，成功后才由 Outbox 发布事件。事件消费者需幂等；失败时按 Outbox/NATS retry/DLQ 恢复。高频 presence、光标和 CLI token stream 属 Realtime Observed State，不进入业务事务事件流。
+每个命令通过 Application API 执行，成功后才由 Outbox 发布事件。事件消费者需幂等；失败恢复由 owner-local delivery Work、Inbox、retry/quarantine 与 reconciliation 状态机负责，adapter 私有 retry/DLQ 不能替代这些事实。高频 presence、光标和 CLI token stream 属 Realtime Observed State，不进入业务事务事件流。
 
-Phase 3E 保留受保护的单 Canvas 兼容事件读取：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，以 `(occurred_at,event_id)` 复合游标返回最多 200 条（默认 100）。新增 Worktree 级 `GET /api/v1/worktrees/{worktree_id}/canvas-events`，供多个 Canvas 共用一个按 Worktree 隔离的顺序流；PostgreSQL identity `stream_offset` 由 tenant/worktree 事务 advisory lock 串行分配并持锁到提交，避免并发事务提交顺序与游标顺序相反。Canvas API 将数据库 statement timeout 限制为 5s、lock timeout 限制为 1s。新接口使用非负 `i64` offset、默认 50/最多 100 条，以十进制字符串编码 64 位值，并只返回 event/canvas/type/time 元数据，不返回 payload 或 EntityRef 目标。该读取端点是 Outbox 到 realtime/consumer 交付路径接通前的查询接口，不替代服务端 durable consumer acknowledgement、NATS JetStream、SSE/WebSocket 推送或跨 App 实时验收。
+Phase 3E 保留受保护的单 Canvas 兼容事件读取：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，以 `(occurred_at,event_id)` 复合游标返回最多 200 条（默认 100）。新增 Worktree 级 `GET /api/v1/worktrees/{worktree_id}/canvas-events`，供多个 Canvas 共用一个按 Worktree 隔离的顺序流；PostgreSQL identity `stream_offset` 由 tenant/worktree 事务 advisory lock 串行分配并持锁到提交，避免并发事务提交顺序与游标顺序相反。Canvas API 将数据库 statement timeout 限制为 5s、lock timeout 限制为 1s。新接口使用非负 `i64` offset、默认 50/最多 100 条，以十进制字符串编码 64 位值，并只返回 event/canvas/type/time 元数据，不返回 payload 或 EntityRef 目标。该读取端点是 Outbox 到 realtime/consumer 交付路径接通前的查询接口，不替代服务端 durable consumer acknowledgement、所选 messaging adapter、SSE/WebSocket 推送或跨 App 实时验收。
 
-浏览器 `CanvasOutboxPoller` 使用按 Worktree scope 隔离的本地十进制 `stream_offset` 作为可丢弃恢复提示；每页仍通过 Bearer API 重新授权，先刷新当前授权 projection，再写入下一 offset。客户端拒绝畸形页、空页游标不一致、offset 非单调或超出 PostgreSQL `BIGINT` 范围的结果；存储不可用/损坏时从 offset 0 at-least-once 重放。本地游标不包含身份凭据、不授予访问权、不是服务端 acknowledgement/checkpoint，也不代表 NATS / SSE / WebSocket 实时链路完成。
+浏览器 `CanvasOutboxPoller` 使用按 Worktree scope 隔离的本地十进制 `stream_offset` 作为可丢弃恢复提示；每页仍通过 Bearer API 重新授权，先刷新当前授权 projection，再写入下一 offset。客户端拒绝畸形页、空页游标不一致、offset 非单调或超出 PostgreSQL `BIGINT` 范围的结果；存储不可用/损坏时从 offset 0 at-least-once 重放。本地游标不包含身份凭据、不授予访问权、不是服务端 acknowledgement/checkpoint，也不代表 Platform Messaging adapter / SSE / WebSocket 实时链路完成。
 
 当前实现的隔离验证证据：Canvas base migration 与 stream-offset migration 在 disposable PostgreSQL 18.6 fixture 上各自可重复应用；既有 Outbox 行完成 identity offset 回填；FORCE RLS scope、append-only UPDATE 拒绝、advisory lock 等待顺序及 1s lock timeout fail-closed 均有验证。该 fixture 使用测试角色和临时授权，不代表目标数据库 migration、正式应用角色 grants、执行计划或生产消费者已验收。
 
@@ -4517,7 +4521,7 @@ Phase 6 migration 建立五张表：manifest、Worktree Registry revision、Work
 | Benchmark replay / Improvement proposal history | Transaction (T) | PostgreSQL quality audit | replay receipt、实验结论、授权采纳/回滚事件 append-only；strategy/proposal current version 单独维护 |
 | Plugin 注册/启停/撤权/迁移记录 | Transaction (T) | PostgreSQL Audit / Event | Append-only；包含 actor、reason、plugin/version 和 correlation_id |
 | 跨 App 命令、LangGraph interrupt 与操作结果 | Transaction (T) | Audit + domain transaction | Append-only 关键决策和操作结果；不把敏感 Prompt/Code 默认放普通日志 |
-| Outbox / Domain Event | Transaction (T) | Owner PostgreSQL Outbox → NATS JetStream | Event 不变；Schema versioned；consumer Inbox 幂等；DLQ 可审计 |
+| Outbox / Domain Event | Transaction (T) | Owner PostgreSQL Outbox → immutable route-pinned adapter → owner Inbox | Event 不变；Schema versioned；consumer Inbox 幂等；delivery failure/quarantine 可审计 |
 
 所有 Master 对象 100% Tenant/Project/owner-scope RLS 并按更新策略保留 Type 2 历史；所有 Transaction 审计 append-only；所有 Work 数据声明 retention period 并实施 TTL/过期删除。EngineeringRun 是协作范围，`TaskExecutionRun` 是不可变执行尝试且 Worktree 是可空历史 ref 而非 FK，避免清理 checkout 时删除执行历史。既有 lifecycle audit FK 仍可能限制硬删 Worktree master row，须按单独 retention/归档策略处理。`WorktreeGroup` 本身不建表为第二份 Worktree；实时状态与业务事实分离，遵守 §5.2 与 AGENTS.md 守门 #13。BI view 不补 unknown 为零，不把 LOC、commit 或 Agent 数作为生产力事实。
 
@@ -4878,7 +4882,7 @@ Run tabs 是前端可独立路由、延迟加载、授权、版本化和卸载�
 
 owner command 在同一 owner 的 PostgreSQL transaction 内提交业务事实、幂等回执、Audit 与 Transactional Outbox。PostgreSQL function/procedure 只封装同一 owner 需要 CAS、行锁、RLS 或原子多行更新的数据库不变量，并仅由该 owner API 调用；不得将 procedure 暴露给浏览器、当跨服务 RPC 使用或绕过 owner API 直接写另一 schema。跨域同步命令经目标 owner API；异步通知在本地 Inbox/processed-event key 幂等消费；多域流程由可恢复 Saga/Engineering Run coordinator 驱动，使用稳定 command ID、correlation/causation、compensation 与 append-only Audit，不承诺跨域分布式 ACID。每个服务提取候选必须先定义服务身份、授权传播、schema ownership、契约兼容、Outbox/Inbox 重放、限流/超时/故障隔离、可观测性、数据迁移与 rollback；只有部署/伸缩/故障隔离收益超过网络、内存与运维成本时才实际拆分。
 
-事件事实基线是 PostgreSQL SoR + Transactional Outbox + NATS JetStream，消费者维护各自有界 Inbox 与可重建 read model。不得为追求微服务外观叠加多套 broker，也不得由 Canvas realtime 或 BI 数据仓库承担领域事务。仓库未发现 Kafka/Fluvio runtime dependency/deployment；只有 connector、保留、回放或 analytics 隔离指标超出现有 NATS SLO 才立 ADR。若未来在两者之间选生产分析流平台，Kafka 是首选 PoC：Kafka Connect/Streams 生态适合 BI 数据接入，但要接受额外 broker 运维与 JVM/native memory budget，使用含 Kafka Streams 4.3.0 RocksDB memory fix 的 4.3.1+ 并做固定负载 RSS 基准。Fluvio 作为 Rust/Kubernetes 资源敏感场景候选；其低内存为官方自述且 Star 尚无实测，release/support/connectors 必须通过同负载 PoC。无基准前不切换，不为 Rust 桌面前端强制采用 Rust broker。
+事件事实与可靠处理基线是 PostgreSQL SoR + owner-local Transactional Outbox/Inbox + bounded delivery state；传输由每条事件的 immutable route pin 选择单一 adapter。NATS JetStream 是可移除的兼容 adapter，Star 自有 Rust durable transport 是目标替换方向，但其当前实现切片尚未满足 production parity 或全量 route cutover。不得为追求微服务外观叠加多套 broker，也不得由 Canvas realtime 或 BI 数据仓库承担领域事务。Kafka/Fluvio 当前都不是 runtime dependency/deployment；只有独立的 connector、保留、历史分析或 analytics 隔离 SLO 经测量确有需要时，才评估额外 analytics stream，并与基础消息 adapter 替换分开决策。若未来在两者之间选生产分析流平台，Kafka 是首选 PoC：Kafka Connect/Streams 生态适合 BI 数据接入，但要接受额外 broker 运维与 JVM/native memory budget，使用含 Kafka Streams 4.3.0 RocksDB memory fix 的 4.3.1+ 并做固定负载 RSS 基准。Fluvio 作为 Rust/Kubernetes 资源敏感场景候选；其低内存为官方自述且 Star 尚无实测，release/support/connectors 必须通过同负载 PoC。无基准前不切换，不为 Rust 桌面前端强制采用 Rust broker。
 
 Rust 桌面端保留轻量 client/query projection：按需加载 Run tabs，批量/游标拉取、虚拟化列表与 Canvas viewport culling；事件使用有界 channel、批处理、合并刷新与背压；长日志/Transcript/Benchmark artifact 按需读取且只持有摘要和窗口，按 Run/App 限制 LRU cache、subscription 和并行下载数。Worktree/Run/Agent/Plugin 各级 admission 继续使用公平 quota、cancel/drain 与 peak RSS/CPU/p95 telemetry；桌面 UI 不直连 broker、数据库或跨域 stored procedure。当前未锁定桌面目标设备与 workload，故本设计规定有界与观测机制，不编造绝对 RSS 数字；Phase 12 必须在目标设备上测量 idle、单 Run、最大授权并发和 Canvas/终端峰值，再固化进程总 RSS、增量 RSS、CPU、p95 更新延迟与帧时间门槛。未形成数值基线前不得关闭性能发布门。
 
@@ -5857,3 +5861,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.85 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权、验收和版本引用同步。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 修订 v6.86 · 2026-10-19 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 binding API source slice 完成；更新 §16.2 的 Run/Worktree 归属状态和 hostless repository 语义，保留 target DB、RLS、并发与 production admission 缺口。详见 `PHASE-WLD0-BINDING-API-IMPL-REPORT-20261019.md`。
+
+修订 v6.87 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：W1 有界设计核对发现活动架构条款仍把 NATS 写成必需传输基线。同步 §1、§1.6、§3、§4、§5、§16.3、§16.5、§16.19：以 owner-local Outbox/Inbox 与不可变 route pin 定义跨域事实和恢复边界；明确 NATS 为可移除兼容 adapter、Rust-native provider 为目标替换方向，并保留生产 parity、切换与回退门禁。仅完成文档修订，未执行运行时或数据库验收。
