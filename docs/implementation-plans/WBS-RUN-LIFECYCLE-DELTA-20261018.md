@@ -1,7 +1,7 @@
 # WBS Run Lifecycle Delta — 2026-10-18
 
 > Status: **partial as of 2026-10-19**. This delta records the isolated 9F4J.6 BI owner Inbox persistence test slice and P2 source correction. It does not close Phase 9F4J or enable production Task-event consumption.
-> Lane: `codex/wbs-9f4j-inbox-pg`, based on dev `6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e`.
+> Lane: `codex/wbs-9f4j-inbox-pg`; rebased onto local dev `59fbdacbb106898fded81f5d0455b53d43dbaff3` on 2026-10-19. Git skipped the original `09dbbd5b` patch as already applied; the private branch initially ended exactly at the checked dev SHA.
 
 ## 1. 9F4J.6 scope
 
@@ -22,15 +22,15 @@ The reviewed database contract is defined by `db/migrations/2026-10-16-bi-task-e
 
 ## 3. Validation state
 
-- Rust toolchain: repository-pinned Rust `1.99.0-x86_64-pc-windows-msvc` confirmed active.
-- Focused crate check: Rust 1.99.0 `cargo check -p bi-owner-runtime --all-targets -j 4` passed with four existing `async_fn_in_trait` warnings in untouched `task_event_receiver.rs`.
-- Focused crate tests: Rust 1.99.0 `cargo test -p bi-owner-runtime --all-targets -j 4` passed: **12 passed, 0 failed, 1 ignored**. The ignored PostgreSQL test compiled but did not run.
-- Changed-file formatting: Rust 1.99.0 `rustfmt --check --edition 2021 task_event_inbox_postgres_tests.rs` passed after the P2 correction.
-- Independent P2 review: read-only source/migration review passed; it did not run PostgreSQL.
-- Package-wide `cargo fmt --package bi-owner-runtime -- --check` reports an existing formatting difference in untouched `src/task_event_quarantine.rs:65`; that file is outside this lane manifest and was not changed.
-- `cargo clippy --package bi-owner-runtime --all-targets -j 4 -- -D warnings` reports four existing `async_fn_in_trait` errors in untouched `src/task_event_receiver.rs` lines 253, 265, 279, and 293. This lane does not modify that API.
-- The dedicated database variable was absent when checked. No PostgreSQL test, migration apply, target DB grant check, or network ACK test was run.
-- Cypher Graph Guardian and `git diff --check` results are recorded in the accompanying phase report after final source stamping.
+- The first check in this follow-up used a stale process PATH and resolved Rust `1.98.1`, so the default MSRV check was rejected. After prepending the already-installed `E:\DevCache\cargo\bin`, Rust `1.99.0` was selected; no toolchain was installed or changed.
+- Required focused check with Rust 1.99.0, `cargo check --package bi-owner-runtime --all-targets -j 4`, passed with 0 errors and 4 existing `async_fn_in_trait` warnings in untouched `task_event_receiver.rs`.
+- Required focused test with Rust 1.99.0, `cargo test --package bi-owner-runtime --all-targets -j 4`, passed: **12 passed, 0 failed, 1 ignored**. The ignored PostgreSQL test was compiled but not executed.
+- Earlier supplemental all-target check/test with `--ignore-rust-version` on Rust 1.98.1 also passed (check: 0 errors, 4 warnings; test: 12 passed, 1 ignored); this is extra evidence only and is not used in place of the verified 1.99.0 run.
+- Rust 1.99.0 `rustfmt --check --edition 2021 --config skip_children=true` on both Inbox Rust files passed. No Rust source was changed in this rebase follow-up.
+- Independent source/migration review found no unresolved P0/P1. SQLx 0.8.6's locked local source maps `hostaddr` to the same host field returned by `get_host()`, so the loopback check sees that override. Context7 was unavailable during this review.
+- Package-wide formatting and Clippy results above are prior lane evidence, not rerun in this follow-up. They report existing differences in untouched `task_event_quarantine.rs:65` and `task_event_receiver.rs:253,265,279,293` respectively.
+- A presence-only check found `STAR_BI_TASK_EVENT_TEST_DATABASE_URL` absent. No PostgreSQL test, migration apply, target DB grant/RLS check, rollback test, concurrency/replay run, or network ACK test was run.
+- Existing Cypher Graph Guardian evidence covers the unchanged Rust source. The follow-up changed documentation only; the final staged candidate `git diff --cached --check` passed.
 
 ## 4. Remaining gates
 
@@ -40,6 +40,8 @@ The reviewed database contract is defined by `db/migrations/2026-10-16-bi-task-e
 4. Keep target DB deployment, production login memberships, migration rollout, backup/WAL recovery, consumer recovery, and production readiness open until independently verified.
 5. Resolve the pre-existing package format and Clippy findings in their owning workstream; they are not changed by this slice.
 6. The owner-role `SET` gap is closed in source only. Do not mark the live privilege assertion complete until the dedicated PostgreSQL test executes successfully.
+7. Rust 1.99.0 focused package check/test passed; this does not establish workspace-wide gates.
+8. The current disposable database URL is absent; PostgreSQL grants/RLS/rollback/concurrency and transport commit-before-ACK evidence remain open.
 
 ## 5. State transition
 
@@ -55,3 +57,4 @@ The reviewed database contract is defined by `db/migrations/2026-10-16-bi-task-e
 | Version | Date | Change |
 |---|---|---|
 | v0.2 | 2026-10-19 | Added the independently reviewed owner-role `SET` denial and role-attribute assertions; recorded all-targets check/test/fmt evidence and preserved the unrun PostgreSQL gate. |
+| v0.3 | 2026-10-19 | Recorded the private-lane rebase onto dev `59fbdacb` (duplicate patch skipped), Rust 1.99.0 focused check/test and rustfmt rerun, and absent disposable DB URL; kept live database gates open. |
