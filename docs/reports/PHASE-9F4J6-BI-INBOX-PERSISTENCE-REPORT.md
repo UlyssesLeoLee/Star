@@ -48,7 +48,7 @@
 
 ## §4 子代理失败接手清单
 
-本 lane 接手了 brief 指定的 inherited Inbox source/test draft，修正 Rust test module 路径并补充 pool close/reconnect 断言。原独立 review 提出 owner-role `SET` P2 后，协调 lane 仅在 PostgreSQL test source 增加两个 fail-closed assertion；只读复核确认修复符合 migration 合同。此次私有分支 rebase 到 dev `59fbdacbb106898fded81f5d0455b53d43dbaff3`，Git 跳过原提交 `09dbbd5b`（补丁已在 dev），因此本次候选只含 brief、WBS 和本报告。Rust 1.99.0 focused check/test 通过；数据库运行仍未执行。其他 lane 的平台/runtime 文件不属于本报告。
+本 lane 接手了 brief 指定的 inherited Inbox source/test draft，修正 Rust test module 路径并补充 pool close/reconnect 断言。原独立 review 提出 owner-role `SET` P2 后，协调 lane 仅在 PostgreSQL test source 增加两个 fail-closed assertion；只读复核确认修复符合 migration 合同。首次私有分支 rebase 到 dev `59fbdacbb106898fded81f5d0455b53d43dbaff3` 时，Git 跳过原提交 `09dbbd5b`（补丁已在 dev）。dev 后续前进到 `15fa97c2aaf2ed335e8d0f771ba90d5acfd83068`，本 lane 的文档提交已再次 rebase 到该 ref，未触及 dev checkout。候选只含 brief、WBS 和本报告。Rust 1.99.0 focused check/test 通过；数据库运行仍未执行。其他 lane 的平台/runtime 文件不属于本报告。
 
 ## §5 守门规则
 
@@ -87,3 +87,4 @@
 | v0.1 | 2026-10-18 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9F4J.6 persistence test、pool reconnect durability assertion、Rust 1.99.0 focused gates 与明确未运行的 disposable DB/network 门禁；生产 consumer 保持 fail-closed。 | 9F4J.6 lane brief 完成与核验 |
 | v0.2 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 处置独立 review 的 owner-role `SET` P2：增加认证 principal 与 owner-role 属性断言；Rust all-targets check/test、变更文件格式和只读独立复核通过；明确 PostgreSQL 仍未运行。 | P2 发现的修复与源码复核完成 |
 | v0.3 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录私有分支 rebase 到 dev、重复代码提交被跳过，确认代码已在 dev；通过显式 PATH 找到已安装的 Rust 1.99.0 并重跑 focused check/test 与 rustfmt；更新候选文件和门禁状态。 | WBS-9F4J6-REBASE-20261019 brief 执行 |
+| v0.4 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 dev 前进后将文档候选再次 rebase 到 `15fa97c2`；未修改 dev、其它 checkout 或预存 untracked brief。 | 与 root 协调确认最新 dev 基线 |

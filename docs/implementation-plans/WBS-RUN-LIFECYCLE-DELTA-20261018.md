@@ -1,7 +1,7 @@
 # WBS Run Lifecycle Delta — 2026-10-18
 
 > Status: **partial as of 2026-10-19**. This delta records the isolated 9F4J.6 BI owner Inbox persistence test slice and P2 source correction. It does not close Phase 9F4J or enable production Task-event consumption.
-> Lane: `codex/wbs-9f4j-inbox-pg`; rebased onto local dev `59fbdacbb106898fded81f5d0455b53d43dbaff3` on 2026-10-19. Git skipped the original `09dbbd5b` patch as already applied; the private branch initially ended exactly at the checked dev SHA.
+> Lane: `codex/wbs-9f4j-inbox-pg`; rebased first onto local dev `59fbdacbb106898fded81f5d0455b53d43dbaff3`, then onto the advanced dev `15fa97c2aaf2ed335e8d0f771ba90d5acfd83068` on 2026-10-19. Git skipped the original `09dbbd5b` patch as already applied; the final private candidate is documentation-only.
 
 ## 1. 9F4J.6 scope
 
@@ -58,3 +58,4 @@ The reviewed database contract is defined by `db/migrations/2026-10-16-bi-task-e
 |---|---|---|
 | v0.2 | 2026-10-19 | Added the independently reviewed owner-role `SET` denial and role-attribute assertions; recorded all-targets check/test/fmt evidence and preserved the unrun PostgreSQL gate. |
 | v0.3 | 2026-10-19 | Recorded the private-lane rebase onto dev `59fbdacb` (duplicate patch skipped), Rust 1.99.0 focused check/test and rustfmt rerun, and absent disposable DB URL; kept live database gates open. |
+| v0.4 | 2026-10-19 | Rebased the documentation-only candidate onto newly advanced dev `15fa97c2`; recorded the second rebase in the audit brief and preserved the live database gates. |
