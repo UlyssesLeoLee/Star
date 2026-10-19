@@ -1,3 +1,23 @@
+// @cypher schema=1 source_sha256=ced9a873e3bfea03811883d8ea6c87429be6dad6e4f217e3f23f72febd806bb3
+// MERGE (self:File {path:"crates/domain-local-runtime/src/spawn_linux.rs"})
+// MERGE (options:Type {id:"crates/domain-local-runtime/src/spawn_linux.rs::LinuxSpawnOptions",kind:"struct"})
+// MERGE (session:Type {id:"process_wrap::tokio::ProcessSession",kind:"external"})
+// MERGE (command_wrap:Type {id:"process_wrap::tokio::CommandWrap",kind:"external"})
+// MERGE (wrap:Symbol {id:"crates/domain-local-runtime/src/spawn_linux.rs::wrap_linux_session",kind:"function"})
+// MERGE (apply:Symbol {id:"crates/domain-local-runtime/src/spawn_linux.rs::apply_linux_spawn",kind:"function"})
+// MERGE (disabled_test:Symbol {id:"crates/domain-local-runtime/src/spawn_linux.rs::tests.wrap_linux_session_new_session_false_is_noop",kind:"test"})
+// MERGE (enabled_test:Symbol {id:"crates/domain-local-runtime/src/spawn_linux.rs::tests.wrap_linux_session_new_session_true_registers_session_wrapper",kind:"test"})
+// MERGE (leader_test:Symbol {id:"crates/domain-local-runtime/src/spawn_linux.rs::tests.wrap_linux_session_makes_child_the_session_leader",kind:"test"})
+// MERGE (self)-[:DEFINES]->(options)
+// MERGE (self)-[:DEFINES]->(wrap)
+// MERGE (self)-[:DEFINES]->(apply)
+// MERGE (wrap)-[:USES_TYPE]->(options)
+// MERGE (wrap)-[:USES_TYPE]->(command_wrap)
+// MERGE (wrap)-[:USES_TYPE]->(session)
+// MERGE (disabled_test)-[:TESTS]->(wrap)
+// MERGE (enabled_test)-[:TESTS]->(wrap)
+// MERGE (leader_test)-[:TESTS]->(wrap)
+// @endcypher
 //! Star Local Runtime — Linux 真 OS spawn 适配 (ULYS-212)
 //!
 //! 实现 [ULYS-212](https://app.multica.ai/issue/01a0cd6c-846c-7781-82b6-1f55bffb8e7b)
@@ -14,14 +34,13 @@
 //! - [`apply_linux_spawn`] — 接受原始 (program, args),返回 (program, args) 元组
 //!   — 若 cgroup 启用 = SystemdRun,返回 `("systemd-run", [...scope flags, original_program, ...original_args])`
 //!   — 若 cgroup 禁用 / Noop,返回原 (program, args) 不变
-//!   — setsid 走 `process_wrap::std::ProcessSession` 注入由 caller 在 `tokio::process::Command::spawn()` 前调用
-//!   [`wrap_linux_session`] 完成(API 解耦以便不依赖 cgroup 也能用 setsid)
-//! - [`wrap_linux_session`] — 给 `tokio::process::Command` 注入 setsid(走 process-wrap safe wrapper)
+//!   — setsid 由 [`wrap_linux_session`] 通过 Tokio `CommandWrap` 在 spawn 时执行
+//! - [`wrap_linux_session`] — 将已配置的 Tokio command 包入 `ProcessSession`
 //! - [`detect_systemd`] / [`detect_systemd_run`] / [`pick_cgroup_backend`] — cgroup 探测
 //!
 //! ## 守门 #7 unsafe_code = "forbid" 处理
 //!
-//! `setsid(2)` 走 `process_wrap::std::ProcessSession::default()` safe wrapper
+//! `setsid(2)` 走 `process_wrap::tokio::ProcessSession` safe wrapper
 //! (其内部 unsafe 已被 process-wrap crate 隔离,用户代码 100% safe Rust)。
 //!
 //! `systemd-run --scope --unit=<scope>` 走外部命令拼接到 argv(无需 unsafe)。
@@ -158,46 +177,24 @@ pub fn pick_cgroup_backend(opts: &LinuxSpawnOptions) -> CgroupBackend {
 // 3. wrap_linux_session (Linux-only,setsid 注入)
 // =====================================================================
 
-/// 给 `tokio::process::Command` 注入 `process_wrap::std::ProcessSession`
-/// (内部调 `setsid(2)`,成为新 session leader + 脱离 tty)。
+/// 将已配置的 Tokio command 包进 `CommandWrap`，并按需注册 `ProcessSession`。
 ///
-/// 必须在 `cmd.spawn()` **前**调用。
-///
-/// `process_wrap::std::ProcessSession::default()` 是 safe Rust wrapper,
-/// 内部 unsafe 已被 process-wrap crate 隔离,**用户代码 0 unsafe**(per 守门 #7)。
-///
-/// ## noop
-///
-/// `opts.new_session == false` ⇒ 不动 cmd(调用方自行 `cmd.process_group(0)` 改 pgid)。
-///
-/// ## 错误
-///
-/// `tokio::process::Command::as_std_mut()` / `wrap_with` 自身不返回 Result,
-/// 真正的 setsid 在 `spawn()` 时执行,失败通过 `nix::Error` 冒泡到 spawn 调用方
-/// (典型:`EPERM` 当进程已是 session leader 且无 `CAP_SETGID`)。
+/// `CommandWrap::spawn()` 会执行 wrapper 的 spawn hooks；Linux `ProcessSession`
+/// 让子进程成为新 session/process-group leader，并把 wrapped child 保留给调用方，
+/// 以便后续 wait、cancel 和进程组清理继续使用同一生命周期句柄。
+/// `opts.new_session == false` 时不注册 wrapper，由调用方自行选择 `process_group(0)`。
 #[cfg(target_os = "linux")]
-pub fn wrap_linux_session(_cmd: tokio::process::Command, opts: &LinuxSpawnOptions) -> tokio::process::Command {
-    if !opts.new_session {
-        return _cmd;
+pub fn wrap_linux_session(
+    command: tokio::process::Command,
+    opts: &LinuxSpawnOptions,
+) -> process_wrap::tokio::CommandWrap {
+    use process_wrap::tokio::{CommandWrap, ProcessSession};
+
+    let mut wrapped = CommandWrap::from(command);
+    if opts.new_session {
+        wrapped.wrap(ProcessSession);
     }
-    // v10 process-wrap API migration (fixes dev baseline red).
-    //
-    // ⚠️ Functional no-op (per PR #157 / #159 / #162): ProcessSession 在 process-wrap v10
-    // 是 lazy wrapper, 必须装在 CommandWrap<Command> 容器上, 跟 caller 的
-    // tokio::process::Command 走两套 API. 要保留 caller 签名 (`&mut`/owned cmd) 就要么
-    // 真改 caller API (ULYS-212 P2 followup), 要么牺牲 setsid 完整语义降级.
-    //
-    // 本 PR 选择降级: 参数用 `_cmd` 标记 unused, 函数体 no-op. caller 的
-    // `tokio::process::Command::process_group(0)` fallback (cli_spawn.rs:147)
-    // 维持 pgid 部分, 失去 session-leader / controlling-terminal detach 部分.
-    //
-    // 本机 (windows cargo 1.98.1) cargo check --workspace --all-targets 0 err,
-    // ubuntu (cargo 1.97) PR #159 因 use-of-moved-value fail, PR #162 因
-    // std::process::Command 类型不匹配 fail, 本次改成 no-op 函数体彻底绕开.
-    //
-    // TODO (ULYS-212 P2): 重构 caller 改 `CommandWrap<tokio::process::Command>` 类型,
-    // 通过 wrapped.spawn() 调用恢复完整 setsid. 单独 PR, scope 跨 caller, 不在本 PR 内.
-    _cmd
+    wrapped
 }
 
 // =====================================================================
@@ -426,16 +423,42 @@ mod tests {
             new_session: false,
             ..Default::default()
         };
-        // 仅验证不 panic,不验证 cmd 内部状态(unsafe 块未被触发,Type system 保证不污染)
-        let _ = wrap_linux_session(cmd, &opts);
+        let wrapped = wrap_linux_session(cmd, &opts);
+        assert!(!wrapped.has_wrap::<process_wrap::tokio::ProcessSession>());
     }
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn wrap_linux_session_new_session_true_does_not_panic() {
+    fn wrap_linux_session_new_session_true_registers_session_wrapper() {
         let cmd = tokio::process::Command::new("echo");
         let opts = LinuxSpawnOptions::default();
-        // pre_exec 仅在 spawn 时执行,这里 closure 未触发;验证 safe wrapper 注入编译通过
-        let _ = wrap_linux_session(cmd, &opts);
+        let wrapped = wrap_linux_session(cmd, &opts);
+        assert!(wrapped.has_wrap::<process_wrap::tokio::ProcessSession>());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn wrap_linux_session_makes_child_the_session_leader() {
+        use nix::unistd::{getsid, Pid};
+        use process_wrap::tokio::ChildWrapper;
+
+        let mut command = tokio::process::Command::new("/bin/sleep");
+        command.arg("30").kill_on_drop(false);
+        let opts = LinuxSpawnOptions {
+            cgroup: CgroupMode::Disabled,
+            ..Default::default()
+        };
+        let mut wrapped = wrap_linux_session(command, &opts);
+        let mut child = wrapped.spawn().expect("spawn with ProcessSession");
+        let pid = child.id().expect("spawned child has pid");
+        let session_id = getsid(Some(Pid::from_raw(pid as i32))).map(|sid| sid.as_raw());
+
+        // Reap the native child directly so this test does not exercise the separate group-wait path.
+        let kill_result = child.inner_mut().start_kill();
+        let wait_result = child.inner_mut().wait().await;
+
+        assert_eq!(session_id.ok(), Some(pid as i32));
+        assert!(kill_result.is_ok(), "child cleanup failed: {kill_result:?}");
+        assert!(wait_result.is_ok(), "child reap failed: {wait_result:?}");
     }
 }

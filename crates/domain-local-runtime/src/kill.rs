@@ -1,3 +1,10 @@
+// @cypher schema=1 source_sha256=bd9465ac4f547e9f6bc8223ca397881270eb18768d2e715c2e53125dd1ace40b
+// MERGE (self:File {path:"crates/domain-local-runtime/src/kill.rs"})
+// MERGE (test:Symbol {id:"crates/domain-local-runtime/src/kill.rs::tests.test_spawn_sleep_then_direct_kill",kind:"test"})
+// MERGE (child:Type {id:"tokio::process::Child",kind:"external"})
+// MERGE (self)-[:DEFINES]->(test)
+// MERGE (test)-[:USES_TYPE]->(child)
+// @endcypher
 //! Star Local Runtime — 跨平台子进程 kill (ULYS-212)
 //!
 //! 实现 [ULYS-212](https://app.multica.ai/issue/01a0cd6c-846c-7781-82b6-1f55bffb8e7b)
@@ -313,44 +320,16 @@ mod tests {
         );
     }
 
-    /// Unix-only 端到端集成测试:spawn 一个 sleep 子进程(走 setsid wrapper 注入),
-    /// 拿到 pid,调 kill_tree,验证子进程被杀
-    ///
-    /// 仅 Linux 跑(macOS 上 process-wrap 的 pre_exec 行为可能不同)
+    /// Linux-only smoke test for direct-child cancellation; session isolation is tested in `spawn_linux`.
     #[cfg(target_os = "linux")]
     #[tokio::test]
-    async fn test_spawn_sleep_then_killpg() {
+    async fn test_spawn_sleep_then_direct_kill() {
         use std::time::Duration;
-        // 1) spawn sleep 30(走 setsid wrapper)
+        // Keep this test on Tokio's native child wait path; the ProcessSession
+        // group-wait behavior has a separate platform-specific test.
         let mut cmd = tokio::process::Command::new("sleep");
-        cmd.arg("30")
-            // setpgid(0, 0) → 子进程 pgid == pid (等价 setsid 的 pgid 部分)
-            // 注:此测试不验 setsid 完整语义(那是 wrap_linux_session 自己的范围),
-            // 仅验 killpg(SIGTERM) 能打到该 group
-            .process_group(0)
-            .kill_on_drop(false);
-        // 注: 此测试**仅验"spawn 出去的子进程能被杀掉"**, 不验 setsid 完整语义.
-        //     setsid 完整语义测试在 wrap_linux_session 模块自己.
-        //
-        // process-wrap v10 在 Linux 上 setsid 是 no-op (per PR #157/#159/#163 chain —
-        // process-wrap 0.x → v10 升级时删了 setsid 实现). 我们仍调用 wrap_linux_session
-        // 维持 API 契约 + pgid fallback 路径.
-        //
-        // 旧 test 用 `kill_tree(pid, 0)` 走 `killpg(pid, SIGTERM)`, 但 cargo-tarpaulin
-        // (ptrace attach) + nix::killpg 在某些 Linux 内核组合下会卡死/不回收
-        // (issue #173, ULYS-154). 改用 `tokio::process::Child::kill()` (走 waitid + SIGKILL
-        // 直接发, 不依赖 pgid / setsid / nix::killpg) 验子进程被杀.
-        //
-        // wrap_linux_session 现在是 no-op. 保留调用 (维持 API 契约 + pgid fallback 路径).
-                let mut cmd = crate::spawn_linux::wrap_linux_session(
-                    cmd,
-                    &crate::spawn_linux::LinuxSpawnOptions {
-                        new_session: true,
-                        cgroup: crate::spawn_linux::CgroupMode::Disabled,
-                        scope_name: None,
-                    },
-                );
-                let mut child = match cmd.spawn() {
+        cmd.arg("30").kill_on_drop(false);
+        let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("skip: spawn failed (no sleep on PATH?): {}", e);
