@@ -1,13 +1,26 @@
 /*
-@cypher schema=1 source_sha256=e3c24e33419c8ea163c34717546dd107605119d160c3e7ebca3407f1a0b65a95
+@cypher schema=1 source_sha256=8e3220b83918e31cb0276e7b76623b1bb4303854fb4227e7fb2ffb3153afd84c
 MERGE (self:File {path:"frontend/src/lib/group/groupProjection.tsx"})
 MERGE (projection:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupProjection",kind:"function"})
 MERGE (load:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::loadProjection",kind:"function"})
+MERGE (provider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
+MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupSessionState",kind:"function"})
+MERGE (sessionState:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupSessionState",kind:"type"})
+MERGE (authError:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.invalidateAuthorization",kind:"method"})
+MERGE (invalidatedSession:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::invalidatedSession",kind:"state"})
 MERGE (poller:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller",kind:"class"})
 MERGE (run:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.run",kind:"method"})
 MERGE (self)-[:DEFINES]->(projection)
 MERGE (self)-[:DEFINES]->(load)
+MERGE (self)-[:DEFINES]->(provider)
+MERGE (self)-[:DEFINES]->(sessionStateHook)
+MERGE (self)-[:DEFINES]->(sessionState)
 MERGE (projection)-[:CALLS]->(load)
+MERGE (provider)-[:CONFIGURES]->(authError)
+MERGE (provider)-[:WRITES]->(invalidatedSession)
+MERGE (provider)-[:READS]->(invalidatedSession)
+MERGE (projection)-[:CALLS]->(sessionStateHook)
+MERGE (projection)-[:USES_TYPE]->(sessionState)
 MERGE (projection)-[:CREATES]->(poller)
 MERGE (projection)-[:CALLS]->(run)
 @endcypher
@@ -43,6 +56,8 @@ import {
 } from "./worktreeGroupApi";
 
 const GroupApiContext = createContext<WorktreeGroupApiClient | null>(null);
+export type WorktreeGroupSessionState = { status: "unavailable" | "ready" | "invalidated"; message?: string };
+const GroupSessionStateContext = createContext<WorktreeGroupSessionState>({ status: "unavailable" });
 const clientIdentities = new WeakMap<WorktreeGroupApiClient, number>();
 let nextClientIdentity = 1;
 
@@ -60,18 +75,34 @@ export function WorktreeGroupApiProvider({
   baseUrl?: string;
   fetcher?: typeof fetch;
 }) {
+  const [invalidatedSession, setInvalidatedSession] = useState<{ sessionKey: string; message: string } | null>(null);
   const client = useMemo(
     () => {
-      if (!sessionKey.trim()) throw new Error("Group API provider requires a non-secret session generation key.");
-      return new WorktreeGroupApiClient(getAccessToken, fetcher ?? fetch, baseUrl);
+      if (!sessionKey.trim() || sessionKey.length > 256 || /[\u0000-\u001f\u007f]/.test(sessionKey)) return null;
+      return new WorktreeGroupApiClient(getAccessToken, fetcher ?? fetch, baseUrl, (error) => {
+        setInvalidatedSession({ sessionKey, message: error.message });
+      });
     },
     [getAccessToken, baseUrl, fetcher, sessionKey],
   );
-  return <GroupApiContext.Provider value={client}>{children}</GroupApiContext.Provider>;
+  const isInvalidated = !client || invalidatedSession?.sessionKey === sessionKey;
+  const availableClient = isInvalidated ? null : client;
+  const sessionState: WorktreeGroupSessionState = isInvalidated
+    ? { status: "invalidated", message: invalidatedSession?.sessionKey === sessionKey ? invalidatedSession.message : "Group API session generation is invalid." }
+    : { status: "ready" };
+  return (
+    <GroupSessionStateContext.Provider value={sessionState}>
+      <GroupApiContext.Provider value={availableClient}>{children}</GroupApiContext.Provider>
+    </GroupSessionStateContext.Provider>
+  );
 }
 
 export function useWorktreeGroupApi(): WorktreeGroupApiClient | null {
   return useContext(GroupApiContext);
+}
+
+export function useWorktreeGroupSessionState(): WorktreeGroupSessionState {
+  return useContext(GroupSessionStateContext);
 }
 
 export interface GroupWorktreeView {
@@ -135,6 +166,7 @@ export function useWorktreeGroupProjection(
   selectedCanvasId?: string,
 ): WorktreeGroupProjectionState {
   const client = useWorktreeGroupApi();
+  const sessionState = useWorktreeGroupSessionState();
   if (client && !clientIdentities.has(client)) clientIdentities.set(client, nextClientIdentity++);
   const requestKey = client ? `${clientIdentities.get(client)}:${worktreeId}:${refreshKey}:${selectedCanvasId ?? ""}` : "preview";
   const [internalState, setInternalState] = useState<{ requestKey: string; state: WorktreeGroupProjectionState }>(
@@ -191,7 +223,11 @@ export function useWorktreeGroupProjection(
     };
   }, [client, requestKey, refreshKey, selectedCanvasId, subscribeCanvas, worktreeId]);
 
-  if (!client) return { mode: "preview" };
+  if (!client) {
+    return sessionState.status === "invalidated"
+      ? { mode: "error", message: sessionState.message ?? "Group API session is no longer valid." }
+      : { mode: "preview" };
+  }
   return internalState.requestKey === requestKey ? internalState.state : { mode: "loading" };
 }
 
@@ -400,3 +436,20 @@ function finiteNumber(value: unknown, label: string): number {
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Group API request failed.";
 }
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/groupProjection.tsx"}),
+      (provider:Function {name:"WorktreeGroupApiProvider"}),
+      (projection:Function {name:"useWorktreeGroupProjection"});
+CREATE (sessionStatus:Class {name:"WorktreeGroupSessionState",type:"interface",language:"typescript",visibility:"public"}),
+       (sessionStatusContext:Variable {name:"GroupSessionStateContext",type:"variable",language:"typescript"}),
+       (sessionStatusHook:Function {name:"useWorktreeGroupSessionState",type:"function",signature:"useWorktreeGroupSessionState(): WorktreeGroupSessionState",visibility:"public",complexity:"simple"}),
+       (invalidatedSession:Variable {name:"invalidatedSession",type:"variable",language:"typescript"}),
+       (setInvalidatedSession:Function {name:"setInvalidatedSession",type:"function",signature:"setInvalidatedSession(session): void",visibility:"private",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(sessionStatus),(file)-[:CONTAINS]->(sessionStatusContext),(file)-[:CONTAINS]->(sessionStatusHook),
+       (file)-[:CONTAINS]->(invalidatedSession),(file)-[:CONTAINS]->(setInvalidatedSession),
+       (provider)-[:CALLS]->(setInvalidatedSession),(provider)-[:WRITES]->(invalidatedSession),
+       (provider)-[:WRITES]->(sessionStatusContext),
+       (sessionStatusHook)-[:READS]->(sessionStatusContext),(projection)-[:CALLS]->(sessionStatusHook),
+       (projection)-[:READS]->(sessionStatus);
+*/

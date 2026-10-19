@@ -1,7 +1,9 @@
 /*
-@cypher schema=1 source_sha256=fb77e1744b4213499a233cea884f9fb34a157cdd73e2a6edb395b6e51245888a
+@cypher schema=1 source_sha256=489b087969002436af86ef34267b9342b64d544b7338e6b8d6b71ce5e83f4129
 MERGE (self:File {path:"frontend/src/lib/group/worktreeGroupApi.ts"})
 MERGE (client:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient",kind:"class"})
+MERGE (authFailure:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.invalidateAuthorization",kind:"method"})
+MERGE (authInvalidated:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.authorizationInvalidated",kind:"state"})
 MERGE (request:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.request",kind:"method"})
 MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
 MERGE (poller:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller",kind:"class"})
@@ -19,6 +21,8 @@ MERGE (validateEvent:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::isW
 MERGE (compareOffset:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::compareStreamOffsets",kind:"function"})
 MERGE (refresh:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.refreshProjection",kind:"field"})
 MERGE (self)-[:DEFINES]->(client)
+MERGE (self)-[:DEFINES]->(authFailure)
+MERGE (self)-[:DEFINES]->(authInvalidated)
 MERGE (self)-[:DEFINES]->(poller)
 MERGE (self)-[:DEFINES]->(cursorStore)
 MERGE (self)-[:DEFINES]->(browserStore)
@@ -34,6 +38,9 @@ MERGE (self)-[:DEFINES]->(validateOffset)
 MERGE (self)-[:DEFINES]->(validateEvent)
 MERGE (self)-[:DEFINES]->(compareOffset)
 MERGE (client)-[:CALLS]->(request)
+MERGE (request)-[:CALLS]->(authFailure)
+MERGE (request)-[:READS]->(authInvalidated)
+MERGE (authFailure)-[:WRITES]->(authInvalidated)
 MERGE (list)-[:CALLS]->(request)
 MERGE (pollOnce)-[:CALLS]->(list)
 MERGE (pollOnce)-[:USES_TYPE]->(page)
@@ -754,19 +761,32 @@ export class GroupApiError extends Error {
 
 export class WorktreeGroupApiClient {
   private readonly baseUrl: string;
+  private authorizationInvalidated = false;
 
   constructor(
     private readonly getAccessToken: GroupAccessTokenProvider,
     private readonly fetcher: typeof fetch = fetch,
     baseUrl = "",
+    private readonly onAuthorizationError?: (error: GroupApiError) => void,
   ) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
   }
 
+  private invalidateAuthorization(error: GroupApiError): void {
+    if (this.authorizationInvalidated || error.status !== 401) return;
+    this.authorizationInvalidated = true;
+    this.onAuthorizationError?.(error);
+  }
+
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    if (this.authorizationInvalidated) {
+      throw new GroupApiError(401, "session_invalidated", "Group API session has been invalidated.");
+    }
     const token = (await this.getAccessToken())?.trim();
     if (!token) {
-      throw new GroupApiError(401, "session_required", "Group API requires an authenticated user session.");
+      const error = new GroupApiError(401, "session_required", "Group API requires an authenticated user session.");
+      this.invalidateAuthorization(error);
+      throw error;
     }
 
     const headers = new Headers(init.headers);
@@ -785,6 +805,7 @@ export class WorktreeGroupApiClient {
 
     if (!response.ok) {
       const error = await readApiError(response);
+      this.invalidateAuthorization(error);
       throw error;
     }
     if (response.status === 204) return undefined as T;
@@ -1453,6 +1474,20 @@ function waitForPoll(ms: number, signal: AbortSignal): Promise<void> {
     signal.addEventListener("abort", finish, { once: true });
   });
 }
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"});
+CREATE (invalidateAuthorization:Function {name:"WorktreeGroupApiClient.invalidateAuthorization",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+       (authorizationErrorHandler:Variable {name:"onAuthorizationError",type:"variable",language:"typescript"}),
+       (authorizationInvalidated:Variable {name:"authorizationInvalidated",type:"variable",language:"typescript"});
+CREATE (client)-[:HAS_METHOD]->(invalidateAuthorization),
+       (request)-[:CALLS]->(invalidateAuthorization),
+       (invalidateAuthorization)-[:USES]->(authorizationErrorHandler),
+       (request)-[:READS]->(authorizationInvalidated),
+       (invalidateAuthorization)-[:WRITES]->(authorizationInvalidated);
+*/
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),

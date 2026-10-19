@@ -1,4 +1,19 @@
 /*
+@cypher schema=1 source_sha256=f56b7cd560e4f3c3a571c241fed8a50794c6a86a83a3020cce4280a9e684b42e
+MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx"})
+MERGE (suite:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::HookPolicyPage tests",kind:"suite"})
+MERGE (expirationCase:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::clears policy UI when the host session expires case",kind:"test"})
+MERGE (provider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
+MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::HookPolicyPage",kind:"function"})
+MERGE (self)-[:DEFINES]->(suite)
+MERGE (suite)-[:DEFINES]->(expirationCase)
+MERGE (expirationCase)-[:CALLS]->(provider)
+MERGE (expirationCase)-[:CALLS]->(page)
+MERGE (expirationCase)-[:TESTS]->(provider)
+MERGE (expirationCase)-[:TESTS]->(page)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx",type:"file",language:"tsx"}),
@@ -28,6 +43,58 @@ describe("HookPolicyPage", () => {
 
     expect(screen.getByTestId("hook-auth-required")).toBeInTheDocument();
     expect(screen.getByText(/当前不显示策略样例/)).toBeInTheDocument();
+    expect(screen.queryByTestId("hook-policy-page")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("hook-execution-events")).not.toBeInTheDocument();
+  });
+
+  it("clears the policy UI when the host session expires", async () => {
+    let token: string | null = "user-jwt";
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname === "/api/v1/projects") {
+        return new Response(JSON.stringify({ projects: [{ project_id: projectId, role: "project_admin" }], next_cursor: null }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/hook-events/summary")) {
+        return new Response(JSON.stringify({
+          metric_version: "hook_execution_summary_v2",
+          window: { days: 30, from: "2026-09-01T00:00:00.000Z", to: "2026-10-01T00:00:00.000Z" },
+          observed_event_count: 0,
+          run_linked_event_count: 0,
+          run_state_joined_event_count: 0,
+          excluded_incomplete_run_event_count: 0,
+          timeout_count: 0,
+          duration_total_ms: 0,
+          groups: [],
+          coverage: { scope: "hook_execution_event_and_task_execution_run_event", status: "partial", reported_percentage: null, instrumented_phases: [], not_yet_instrumented_phases: ["run_admission", "tool"], run_state_join: "no_samples", note: "No producer evidence." },
+          formulas: {},
+        }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/hook-events")) {
+        return new Response(JSON.stringify({ events: [], next_cursor: null, coverage: { scope: "hook_execution_event_ledger", status: "partial", reported_percentage: null, instrumented_phases: [], not_yet_instrumented_phases: ["run_admission", "tool"], note: "No producer evidence." } }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/hook-policy")) {
+        return new Response(JSON.stringify({ producer_capabilities: { run_admission: false }, policy_set_id: null, policy_document: null, effective_policy_document: null, draft: null, audit: [] }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/worktrees")) return new Response(JSON.stringify({ worktrees: [], next_cursor: null }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    render(
+      <WorktreeGroupApiProvider getAccessToken={async () => token} sessionKey="host-session-1" fetcher={fetcher}>
+        <HookPolicyPage />
+      </WorktreeGroupApiProvider>,
+    );
+
+    expect(await screen.findByTestId("hook-policy-page")).toBeInTheDocument();
+    await waitFor(() => expect(fetcher.mock.calls.some(([input]) => String(input).includes("/hook-policy"))).toBe(true));
+
+    token = null;
+    const refreshEvents = screen.getByRole("button", { name: "刷新摘要与事件" });
+    await waitFor(() => expect(refreshEvents).toBeEnabled());
+    fireEvent.click(refreshEvents);
+
+    expect(await screen.findByTestId("hook-auth-required")).toBeInTheDocument();
     expect(screen.queryByTestId("hook-policy-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("hook-execution-events")).not.toBeInTheDocument();
   });

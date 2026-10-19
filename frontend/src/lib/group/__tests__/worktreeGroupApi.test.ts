@@ -1,12 +1,15 @@
 /*
-@cypher schema=1 source_sha256=4b038bfd68532ba27a2ed7f879fe6f44d6157caf05e9485866cbe4d62cdcf96a
+@cypher schema=1 source_sha256=23b3b50cbbe55b6b5c7523a3c2ffdf16897a2bc3c9d0ff8f0c108651c4de448c
 MERGE (self:File {path:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts"})
 MERGE (suite:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::worktreeGroupApi tests",kind:"suite"})
+MERGE (sessionInvalidationTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::invalidates host session for 401 and preserves 403 case",kind:"test"})
+MERGE (invalidateAuthorization:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.invalidateAuthorization",kind:"method"})
 MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
 MERGE (pollOnce:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.pollOnce",kind:"method"})
 MERGE (streamTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::Worktree Canvas stream API case",kind:"test"})
 MERGE (malformedTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::malformed Worktree Canvas page case",kind:"test"})
 MERGE (self)-[:DEFINES]->(suite)
+MERGE (self)-[:DEFINES]->(sessionInvalidationTest)
 MERGE (suite)-[:DEFINES]->(streamTest)
 MERGE (suite)-[:DEFINES]->(malformedTest)
 MERGE (streamTest)-[:CALLS]->(list)
@@ -18,6 +21,8 @@ MERGE (runList:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeG
 MERGE (suite)-[:DEFINES]->(taskRunListTest)
 MERGE (taskRunListTest)-[:CALLS]->(runList)
 MERGE (taskRunListTest)-[:TESTS]->(runList)
+MERGE (sessionInvalidationTest)-[:TESTS]->(invalidateAuthorization)
+MERGE (suite)-[:DEFINES]->(sessionInvalidationTest)
 @endcypher
 */
 /*
@@ -139,6 +144,36 @@ describe("Worktree Git lock observation", () => {
 });
 
 describe("WorktreeGroupApiClient", () => {
+  it("invalidates the host session on missing token or HTTP 401 but keeps 403 scoped", async () => {
+    const missingTokenInvalidation = vi.fn<(error: GroupApiError) => void>();
+    const missingTokenFetcher = vi.fn<typeof fetch>();
+    const missingTokenApi = new WorktreeGroupApiClient(async () => null, missingTokenFetcher, "", missingTokenInvalidation);
+    await expect(missingTokenApi.getGroupContext("wt-1")).rejects.toMatchObject({ status: 401, code: "session_required" });
+    expect(missingTokenInvalidation).toHaveBeenCalledTimes(1);
+    expect(missingTokenFetcher).not.toHaveBeenCalled();
+
+    const unauthorizedInvalidation = vi.fn<(error: GroupApiError) => void>();
+    const unauthorizedApi = new WorktreeGroupApiClient(
+      async () => "user-jwt",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ error: { code: "session_expired" } }), { status: 401 })),
+      "",
+      unauthorizedInvalidation,
+    );
+    await expect(unauthorizedApi.getGroupContext("wt-1")).rejects.toMatchObject({ status: 401, code: "session_expired" });
+    await expect(unauthorizedApi.getGroupContext("wt-1")).rejects.toMatchObject({ status: 401, code: "session_invalidated" });
+    expect(unauthorizedInvalidation).toHaveBeenCalledTimes(1);
+
+    const forbiddenInvalidation = vi.fn<(error: GroupApiError) => void>();
+    const forbiddenApi = new WorktreeGroupApiClient(
+      async () => "user-jwt",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ error: { code: "forbidden" } }), { status: 403 })),
+      "",
+      forbiddenInvalidation,
+    );
+    await expect(forbiddenApi.getGroupContext("wt-1")).rejects.toMatchObject({ status: 403, code: "forbidden" });
+    expect(forbiddenInvalidation).not.toHaveBeenCalled();
+  });
+
   it("lists Project-scoped Hook execution events with a bounded cursor", async () => {
     const responseBody = {
       events: [],

@@ -5,6 +5,17 @@
 // - Toaster 全局 toast 通知 (per §8.3 react-hot-toast)
 // - onError 全局 handler 接 dev console 调试用
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=ee523b910b183a3d71b1d84163067e31fcc1635f6760d9f6a6e5b145836de541
+MERGE (self:File {path:"frontend/src/app/providers.tsx"})
+MERGE (providers:Symbol {id:"frontend/src/app/providers.tsx::Providers",kind:"function"})
+MERGE (runProvider:Symbol {id:"frontend/src/lib/run/runDirectorySession.tsx::RunDirectoryProvider",kind:"function"})
+MERGE (groupProvider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
+MERGE (self)-[:DEFINES]->(providers)
+MERGE (providers)-[:CALLS]->(runProvider)
+MERGE (providers)-[:CALLS]->(groupProvider)
+@endcypher
+*/
 "use client";
 
 import { useState } from "react";
@@ -12,6 +23,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { RunDirectoryProvider, type RunDirectoryHostSession } from "@/lib/run/runDirectorySession";
+import { WorktreeGroupApiProvider } from "@/lib/group/groupProjection";
 
 export function Providers({ children, runDirectorySession = null }: { children: React.ReactNode; runDirectorySession?: RunDirectoryHostSession | null }) {
   // useState 保证 QueryClient 在 React 生命周期内只创建 1 次
@@ -32,7 +44,17 @@ export function Providers({ children, runDirectorySession = null }: { children: 
   return (
     <ThemeProvider defaultTheme="light" themes={["light", "dark", "christmas", "charisma", "shanghai", "cel"]}>
       <QueryClientProvider client={client}>
-        <RunDirectoryProvider session={runDirectorySession}>{children}</RunDirectoryProvider>
+        <RunDirectoryProvider session={runDirectorySession}>
+          {runDirectorySession ? (
+            <WorktreeGroupApiProvider
+              getAccessToken={runDirectorySession.getAccessToken}
+              sessionKey={runDirectorySession.generation}
+              fetcher={runDirectorySession.fetcher}
+            >
+              {children}
+            </WorktreeGroupApiProvider>
+          ) : children}
+        </RunDirectoryProvider>
         <Toaster
           position="top-right"
           toastOptions={{
