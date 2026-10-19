@@ -1,7 +1,7 @@
 # WLD-1 Worktree Lifecycle Closure Audit
 
-**日期：** 2026-10-20  
-**审计基线：** `dev` 派生审计 worktree，HEAD `35a52c972a58b339cb790ad30ed07ee4c56a797a`  
+**日期：** 2026-10-20
+**审计基线：** `dev` 派生审计 worktree，HEAD `35a52c972a58b339cb790ad30ed07ee4c56a797a`
 **范围：** 只读核对 Project Worktree lifecycle provider、Run binding 边界、archive/restore/cleanup 持久化路径、相关 migration 与测试证据。未修改产品源码、SQL、UI 或 WBS。
 
 ## §0 目的
