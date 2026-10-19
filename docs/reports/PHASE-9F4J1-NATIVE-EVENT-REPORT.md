@@ -1,25 +1,29 @@
 # PHASE-9F4J.1 Native BI Event Adapter Report
 
-**Date:** 2026-10-18
+**Date:** 2026-10-19
 **Branch:** `codex/wbs-9f4j-native-event`
-**Base:** `6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e`
-**Scope:** Isolated 9F4J.1 adapter slice only; this report does not close 9F4J or enable production ingress.
+**Base:** `59fbdacbb106898fded81f5d0455b53d43dbaff3`
+**Adapter source commit already in dev:** `4ed8e6f891e4e1fcfdb1b5d86e48d678e26889fa`
+**Scope:** Rebase review and independent revalidation of the isolated 9F4J.1 adapter slice; this report does not close 9F4J or enable production ingress.
+
+The private lane started at `3c7fa58c8bce4b5083460ee24bbffa6307acd7d1`. Immediately before rebase, local `dev` was `59fbdacbb106898fded81f5d0455b53d43dbaff3`. `git rebase refs/heads/dev` reported that the lane commit was previously applied and skipped; the matching adapter source commit `4ed8e6f891e4e1fcfdb1b5d86e48d678e26889fa` is an ancestor of `dev`. The private branch therefore landed on the `dev` base without a duplicate source commit. This follow-up changes only the lane report, its WBS evidence, and the assigned rebase brief.
 
 ## §0 Purpose
 
-Record the implementation and validation evidence for the bounded native gRPC Event adapter in this lane, with the explicit limits required by `docs/briefs/wbs-9f4j-native-event-20261018.md` and WBS section 4, phase 9F4J.1.
+Record the implementation review and post-rebase validation evidence for the bounded native gRPC Event adapter, with the explicit limits required by `docs/briefs/WBS-9F4J1-REBASE-20261019.md`, the original lane brief, and WBS section 4, phase 9F4J.1.
 
 ## §1 Change Matrix
 
 | Manifest path | Result |
 |---|---|
-| `crates/platform-messaging-runtime/src/native_grpc.rs` | Adds/finishes opt-in Event `PullOne`, `VerifyOrigin`, and lease-fenced `AcknowledgeOne` adapter behavior; pins provider identity to provider ID/version, profile digest and endpoint identity; keeps bounded requests and no background prefetch. Cypher header now records the verification-pin relationship and retains the existing Rust-server source attribution. |
-| `crates/platform-messaging-runtime/src/native_grpc_event_adapter_tests.rs` | Adds focused tests for scope validation, profile/sender/Event/lease pins, malformed route and identity, digest mismatch, 16 KiB wire boundary, exact-wire origin verification and ACK fencing. |
-| `docs/implementation-plans/WBS-PLATFORM-RUNTIME-DELTA-20261018.md` | Records 9F4J.1 source/test evidence, validation and remaining gates; explicitly keeps the larger BI and execution paths fail closed. |
-| `docs/reports/PHASE-9F4J1-NATIVE-EVENT-REPORT.md` | This phase evidence and limitation report. |
-| `docs/briefs/wbs-9f4j-native-event-20261018.md` | Lane brief retained as the acceptance manifest. |
+| `crates/platform-messaging-runtime/src/native_grpc.rs` | Reviewed current dev source from `4ed8e6f891e4e1fcfdb1b5d86e48d678e26889fa`: opt-in Event `PullOne`, `VerifyOrigin`, and lease-fenced `AcknowledgeOne`; provider identity uses provider ID/version, profile digest, and endpoint identity; request/frame limits and no background prefetch. No source edit was needed in this revalidation. |
+| `crates/platform-messaging-runtime/src/native_grpc_event_adapter_tests.rs` | Reviewed current dev tests for scope validation, profile/sender/Event/lease pins, malformed route and identity, digest mismatch, 16 KiB wire boundary, exact-wire origin verification, and ACK fencing. Re-ran the package library tests after rebase. |
+| `docs/implementation-plans/WBS-PLATFORM-RUNTIME-DELTA-20261018.md` | Updated 9F4J.1 provenance, validation results, identity and ACK boundary limits, and remaining gates. |
+| `docs/reports/PHASE-9F4J1-NATIVE-EVENT-REPORT.md` | This post-rebase review, evidence, and limitation report. |
+| `docs/briefs/WBS-9F4J1-REBASE-20261019.md` | Assigned rebase/revalidation brief with this lane's recorded outcome. |
+| `docs/briefs/wbs-9f4j-native-event-20261018.md` | Original lane brief retained as the source acceptance manifest. |
 
-No other agent's files or unrelated brief were included.
+The pre-existing untracked `docs/briefs/wbs-platform-runtime-20261018.md` was preserved and is not part of this lane's changes. No other agent's files were included.
 
 ## §2 Validation Summary
 
@@ -32,8 +36,9 @@ Commands were run through RTK with `E:\DevCache\cargo\bin` on `PATH`. The select
 | Focused check | `cargo +1.99.0 check -p platform-messaging-runtime --no-default-features --features native-grpc-adapter --lib -j 4` | Exit 0. Two existing dead-code warnings remain in `transport_profile.rs` (`TransportMessageKind::from_database`, `TransportProfileLifecycle::from_database`). |
 | Focused unit tests | `cargo +1.99.0 test -p platform-messaging-runtime --no-default-features --features native-grpc-adapter --lib -j 4` | Exit 0: 50 passed, 0 failed, 0 ignored. |
 | Clippy | `cargo +1.99.0 clippy -p platform-messaging-runtime --no-default-features --features native-grpc-adapter,durable-quarantine --all-targets -j 4` | Exit 0. The extra feature is needed for the crate's existing PostgreSQL integration-test imports during `--all-targets`; no database integration test was run. Warnings remain in untouched `star-context`, `domain-automation`, and `transport_endpoint.rs`; no Clippy warning was reported in the two lane Rust files. |
-| Cypher header | `python C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py --changed --stamp` | Exit 0: 2 changed source files checked. No CodeGraph repository index was present, so this is header-guard validation only, not graph-index or coverage verification. |
-| Whitespace | `git diff --check` | Exit 0; Git emitted only a CRLF-to-LF advisory for `native_grpc.rs`. |
+| Cypher header | `python C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py --changed --stamp` | This follow-up: exit 0, `PASS (0 source file(s) checked)` because only docs changed. The original source commit separately recorded checks for two changed Rust files. No CodeGraph repository index was present, so neither result is graph-index or coverage verification. |
+| Whitespace | `git diff --check` | This follow-up: exit 0 with no whitespace errors in the documentation diff. The original source commit recorded a CRLF-to-LF advisory for `native_grpc.rs`. |
+| Rebase | `git rebase refs/heads/dev` | Exit 0. Git skipped original lane commit `3c7fa58c` as previously applied; source-equivalent commit `4ed8e6f891e4e1fcfdb1b5d86e48d678e26889fa` is already an ancestor of the `59fbdacbb106898fded81f5d0455b53d43dbaff3` local dev base. The private branch was not written to `dev`. |
 
 The crate-wide format failure is an existing out-of-scope drift and remains open. It was not resolved by formatting files outside this lane manifest.
 
@@ -41,6 +46,8 @@ The crate-wide format failure is an existing out-of-scope drift and remains open
 
 - This slice provides a transport adapter and unit tests only. It does not provide BI consumer composition, owner Inbox/fact transaction, idempotent receipt persistence, checkpoint/replay recovery, quarantine flow, or Run BI/Benchmark projection.
 - The adapter cannot prove owner commit-before-ACK. The caller contract requires the owner to commit its inbox before it invokes ACK; that owner lifecycle is outside this phase.
+- Commit-before-ACK is a documented caller convention, not an invariant enforced by the adapter API: `acknowledge()` can be called without a typed owner-commit receipt or a preceding origin-verification result. A production caller must supply that ordering, and it remains unproven here.
+- `receiver_service_id` is retained in the local route scope, but `PullOneRequest` does not transmit it; the server derives the receiver from the authenticated client-certificate fingerprint. This lane does not prove that the trusted resolver selected a certificate registered to the local receiver ID. Production composition must bind those identities and verify the server-side mapping before enabling ingress.
 - Production Profile loading, production service identity and certificate rotation, target database migrations/RLS/grants, real network interoperability, process crash recovery, RSS/latency/fairness measurements, and production readiness were not validated.
 - `durable-quarantine` was enabled for Clippy's all-target compilation only. This did not execute the PostgreSQL integration tests or validate a database.
 - Crate-wide formatting remains blocked by the five files listed in §2. The required target-file formatting gate passed.
@@ -56,7 +63,7 @@ No delegated subagent failure occurred in this lane. The native adapter edits we
 The following are the phase's acceptance guardrails, not claims that other WBS phases have passed:
 
 1. Stay within the lane manifest; do not alter `D:\Star`, shared `dev`, or another agent's checkout.
-2. Do not rebase, merge, push, clean, or modify the shared integration target from this worker lane.
+2. The 2026-10-19 rebase brief authorizes rebasing this private lane onto the inspected local `dev`; do not modify `dev`, push, clean, or change another checkout from this worker lane.
 3. Route shell/Git/Cargo checks through RTK.
 4. Use the workspace Rust 1.99.0 baseline for the reported acceptance gates.
 5. Report crate-wide formatting separately from direct formatting of authorized files.
@@ -88,3 +95,4 @@ The following are the phase's acceptance guardrails, not claims that other WBS p
 | Version | Date | Editor | Change |
 |---|---|---|---|
 | v0.1 | 2026-10-18 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record 9F4J.1 adapter evidence, exact validation outcomes, out-of-scope formatter drift, and open production gates. |
+| v0.2 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the private rebase onto current local `dev`, identify the already-present adapter source commit, re-run focused Rust 1.99.0 gates, and clarify that receiver/certificate binding and owner commit-before-ACK remain composition gates. |
