@@ -4,7 +4,7 @@
 
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
 
-> **文档版本**: v6.87 (2026-10-20)
+> **文档版本**: v6.88 (2026-10-20)
 > **上游要件定义书**: docs/requirements.md v6.87
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
@@ -4243,15 +4243,17 @@ Tenant → Workspace → Project（左侧第一级）
 Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 ```
 
-`ProjectWorktreeIndex` 与 `EngineeringRunShell` 是 UI 组合，不自动构成新的领域事实。EngineeringRun 聚合成员、Run App Context 与分析范围；Worktree 通过 versioned binding 关联 Project 与当前活跃 Run，Branch 是 Worktree 本地 checkout 分支的投影叶，远端分支/宿主 ID 是可选 metadata。Run 可有多个本地 checkout，单个活跃 checkout 同时只归属一个 active Run；历史 TaskExecutionRun 的 Worktree/ref 是可空 snapshot，不建立阻止清理的外键。目标授权以 Project/Run membership 与 Worktree capability 为准。
+`ProjectWorktreeIndex` 与 `EngineeringRunShell` 是 UI 组合，不自动构成新的领域事实。Engineering Run Directory 持有 Project/Run 授权范围内的 `EngineeringRunWorktreeBinding` 关系及其 Run Outbox facts；Worktree Domain 持有本地 checkout lifecycle 和 Project-to-repository checkout ownership。两种关系分别版本化：Run/Worktree 使用 `binding_id` + `binding_version`，Project/repository 使用 `project_binding_id` + `project_binding_version`。`focus_version` 只标识 RunContext 中当前 Worktree focus 的修订；`worktree_generation` 与 `k3s_cluster_generation` 分别标识各自资源 incarnation，均不得替代 binding version。Run 可有多个本地 checkout，单个 Worktree 最多只有一个当前 Run binding，也可以没有；历史 TaskExecutionRun 的 Worktree/ref 是可空 snapshot，不建立阻止清理的外键。Branch 叶显示可信本地 checkout observation（`local_branch_ref`、`observation_source`、`observed_at`、`freshness`）；可选 `remote_branch_id` 是另一身份且须独立授权。缺失或陈旧的观察保持 unknown，不从远端 Branch 推断本地 checkout。目标授权以 Project/Run membership 与 Worktree capability 为准。
 
-**实现状态与迁移缺口**：当前候选新增 Project-scoped Run list/create REST 路由，Run row 的 remote `repository_id/branch_id` 可空；读操作复验 Project membership + Run grant，创建要求 Project 管理角色，并在同一事务写 Run、初始 Run grant、Audit、24 小时幂等回执和 owner Outbox。migration 仅在源码中，未应用到目标 DB，也未核验部署 grants/RLS。旧 Branch/Run registry 与 task owner tuple 保留兼容；Run→Worktree binding API 尚未增加，现有绑定仍要求 Repository。Task Card/CLI/Schedule owner 仍需 repository/branch，在无宿主身份时保持 fail closed。历史 reconciliation、授权负向验收与宿主缺席/切换验收未完成。Branch 叶依赖可信 Host/Repository observation；缺失 provider/binding 时显示 unknown 并关闭相关写操作，不创建或伪造 checkout。
+**实现状态与迁移缺口**：Project-scoped Run list/create 与 Run-to-Worktree bind/reassign/detach API 源码切片存在；Run row 的 remote `repository_id/branch_id` 可空，而 binding 保留本地 Worktree repository identity。读写复验 Project membership、Run grant 与 Project/Worktree binding 的边界；binding owner 与字段词汇按本节 §16.2 的 canonical contract 对齐。相关 migration 仍未在目标 DB 验收，应用角色 grants/FORCE RLS、认证写入、回滚、replay、并发及历史 reconciliation 均未证明。旧 Branch/Run registry 与 task owner tuple 保留兼容；Task Card/CLI/Schedule owner 的 hostless 执行能力仍未完成，在缺少运行时身份、sandbox 与独立验证时保持 fail closed。Branch 叶依赖可信本地 checkout observation；缺失、陈旧或 provider 不可用时显示 unknown 并关闭依赖该状态的写操作，不创建或伪造 checkout。此处源码存在不等同于生产 binding acceptance。
 
 当前 `/worktree-canvas` 是 Project 范围的 **Worktree Overview Graph**，用于跨 Run/Worktree 冲突、依赖和热区总览。它不替代 Engineering Run 内的 **Infinite Canvas**。两个页面有不同 owner、路由和查询范围；Overview Graph 可深链到 Run Worktree，Run Canvas 可引用多个 Worktree 并链接回 Overview Graph。
 
 ### 16.2 Project / Run / Worktree / Branch 导航与 Run App Shell
 
 目标 Run 目录、创建、读取与授权仅以 Project/Run membership/grants 为准，不依赖远端宿主 Branch 或 Worktree binding；主树固定为 Project → Engineering Run → Worktree → Branch。Worktree binding 仅门控 Worktree 子树、checkout 操作和 focus，不能成为 Project/Run 可见性的前置条件。候选实现已提供 Project-scoped Run list/create 与 Project+Run 授权源码，且 remote repository_id/branch_id 可为空；旧 Branch/Run registry 继续兼容。WLD-0 新增绑定/重绑/解绑 API 源码和前向 migration：绑定记录本地 Worktree repository，允许 hostless Run 的远端 repository/branch 为空，并使用 Project/Run 授权、版本 CAS、幂等、Worktree 锁、SCD2、Audit 和同事务 Outbox。migration 尚未应用到目标数据库，应用角色 grants/RLS、真实认证写入、回滚、并发与历史 reconciliation 尚未验收。可信本地 Branch observation、Task owner tuple hostless migration 和授权负向验收仍未完成。Branch 只从受信 Worktree checkout observation 生成末级状态叶；远端 SCM 操作额外要求相应 Branch grant。
+
+**WLD-0 binding vocabulary**：Engineering Run Directory owns `EngineeringRunWorktreeBinding`, its Project/Run-authorized attach/reassign/detach commands and Run Outbox facts. Worktree Domain owns checkout lifecycle and Project-to-repository checkout ownership; it does not own the Run binding fact. Run/Worktree relation CAS uses `binding_id` + `binding_version`; Project/repository relation CAS uses `project_binding_id` + `project_binding_version`; optional RunContext focus selection uses `focus_version`. `worktree_generation` and `k3s_cluster_generation` are separate resource-incarnation values and are never binding-version aliases. Local Branch is an observation with `local_branch_ref`, `observation_source`, `observed_at` and `freshness`; optional `remote_branch_id` is separate. Missing, stale or invalid observations remain unknown. Hostless Runs and optional Worktree focus remain valid; each attach/reassign/detach command must be authorized by its owning domain and revalidate current facts. These terms align the design only: target PostgreSQL roles/grants and FORCE RLS, authenticated writes, rollback/replay, concurrent races, duplicate-current-row handling and historical reconciliation remain open acceptance gates.
 
 整体交付方向与批次完成门见 [渡口架构与交付方向](design/DUKOU-ARCHITECTURE-DIRECTION-001.md)。新目录与 shell 不会自动迁移既有 Worktree Task/Canvas/Plugin 所有权，Run-owned Apps 与 execution admission 当前明确不可用。
 
@@ -5863,3 +5865,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.86 · 2026-10-19 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 binding API source slice 完成；更新 §16.2 的 Run/Worktree 归属状态和 hostless repository 语义，保留 target DB、RLS、并发与 production admission 缺口。详见 `PHASE-WLD0-BINDING-API-IMPL-REPORT-20261019.md`。
 
 修订 v6.87 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：W1 有界设计核对发现活动架构条款仍把 NATS 写成必需传输基线。同步 §1、§1.6、§3、§4、§5、§16.3、§16.5、§16.19：以 owner-local Outbox/Inbox 与不可变 route pin 定义跨域事实和恢复边界；明确 NATS 为可移除兼容 adapter、Rust-native provider 为目标替换方向，并保留生产 parity、切换与回退门禁。仅完成文档修订，未执行运行时或数据库验收。
+
+修订 v6.88 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 binding contract 对齐。同步 §16.1–§16.2 的 owner 边界与字段词汇：Engineering Run Directory 持有 Run/Worktree binding 和 Run Outbox，Worktree Domain 持有 checkout 与 Project/repository 归属；分开 binding/project-binding/focus 版本、资源 generation 与本地/远端 Branch 身份。保留目标 PostgreSQL/RLS、认证写入、回滚/replay、竞争、重复当前行和历史 reconciliation 未验收状态。

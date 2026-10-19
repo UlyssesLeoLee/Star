@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.10**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.11**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -137,7 +137,7 @@ Run 查询路由固定为 `GET /api/v1/worktrees/{worktree_id}/work-items/{work_
 | `DomainOwnerCommandGateway` | typed command、owner API、幂等键 | 调用事实所有者 API；owner txn 写 Audit/Outbox | 跨 schema 直接写表或在前端更新另一个 App store |
 | `RunProjection` | Outbox / Inbox-consumed domain events | 更新 Run tabs、Project aggregate 和订阅投影 | 覆写事实所有者状态 |
 
-Engineering Run Domain 持有 Run membership 与 App context；Worktree Domain 持有 checkout lifecycle/binding 与 Git 操作；Work Item Domain 持有 Run-scoped task/plan/relation facts；Canvas Domain 持有 Run-scoped Canvas；Agent / Runtime Domain 持有 `TaskExecutionRun`、执行和终端会话；Workflow Domain 持有流程状态；Plugin Registry 持有 Run App manifest/binding；BI/Benchmark 只拥有自身指标定义、cohort 与 replay receipts；Audit 持有不可变审计事实。UI tab 可以独立发布/挂载，后端事实仍按 domain owner 管理。
+Engineering Run Directory 持有 Run membership、App context、Project/Run-authorized `EngineeringRunWorktreeBinding` 关系及该关系的 Run Outbox facts。Worktree Domain 持有本地 checkout lifecycle、Project-to-repository checkout ownership 与 Git 操作，不持有 Run-to-Worktree binding 事实。Work Item Domain 持有 Run-scoped task/plan/relation facts；Canvas Domain 持有 Run-scoped Canvas；Agent / Runtime Domain 持有 `TaskExecutionRun`、执行和终端会话；Workflow Domain 持有流程状态；Plugin Registry 持有 Run App manifest/binding；BI/Benchmark 只拥有自身指标定义、cohort 与 replay receipts；Audit 持有不可变审计事实。UI tab 可以独立发布/挂载，后端事实仍按 domain owner 管理。
 
 当前侧栏 `ProjectWorktreeIndexLink` 将 navStore Project ID 带入辅助 Index 深链；该值不是授权依据。`/worktree` 仍须重读当前 session 的 Project membership。Phase 1 新增持久 Branch/Engineering Run 目录和 canonical RunContext read API；前端主树与 context shell 使用独立 Run session adapter，缺实际宿主身份时明确禁用。Run App ownership、SCM ingest、授权 provisioning、目标 DB/运行验收仍未关闭，不能把目录实现当作生产协作闭环。
 
@@ -148,7 +148,11 @@ Engineering Run Domain 持有 Run membership 与 App context；Worktree Domain �
 ```text
 WorktreeIndexItem {
   worktree_id, project_id, workspace_id, repository_id,
-  name, parent_id?, branch, human_state, machine_state,
+  name, parent_id?,
+  local_branch_observation {
+    local_branch_ref?, observation_source?, observed_at?, freshness
+  },
+  remote_branch_id?, human_state, machine_state,
   owner_user_id?, work_item_id?, agent_id?, agent_session_id?, runtime_id?,
   ahead, behind, dirty, health_score, test_state, risk_count,
   locked, git_lock { state, source, observed_at },
@@ -178,13 +182,17 @@ RunContext {
 
 WorktreeFocus {
   worktree_id, repository_id, workspace_id,
-  binding_id, binding_version, project_binding_id, project_binding_version, version
+  binding_id, binding_version,
+  project_binding_id, project_binding_version,
+  worktree_lifecycle_version, worktree_generation
 }
 
 Envelope { run_context, branch, engineering_run, focus?, focus_version?, capabilities }
 ```
 
-`RunContext` 仅由服务端基于 actor 的 Project/EngineeringRun membership 与当前 ACL 解析；Run 列表、创建、普通 Run Apps 和 hostless Run 不要求远端 repository/branch 或 Branch grant。远端 Branch 投影及授权是可选字段，仅在调用对应 SCM capability 时解析。`WorktreeFocus` 只为 checkout/Git/CLI 操作提供独立的当前 binding proof，不授予读取 Run Apps 的权限；Run 目录无需任何 WorktreeFocus。缓存键包含 actor、Project/Run 与其授权版本，不包含可选 Branch grant；membership、角色、Run ownership 或 Plugin grant 撤销后，相关缓存和实时订阅失效。旧 `/group-context` 响应中的 `GroupContext` 是迁移 DTO：兼容期可回传 `engineering_run_id` 与 `focus_worktree_id`，但不得继续把 Worktree ID 视为完整 App scope。任何 context 都不能从浏览器 Zustand、URL 参数或 LangGraph checkpoint 恢复为可信凭据。
+`binding_id` + `binding_version` identify the EngineeringRunWorktreeBinding relation; `project_binding_id` + `project_binding_version` identify the separate Project-to-repository checkout ownership relation. `worktree_lifecycle_version` is a Worktree lifecycle CAS value; `worktree_generation` identifies that checkout resource incarnation. K3s uses its own `k3s_cluster_generation` for cluster incarnation. These values are not aliases and must never substitute for a binding version. `focus_version` versions only the RunContext's optional Worktree focus selection. The `branch` envelope field is a local observation with `local_branch_ref`, `observation_source`, `observed_at` and `freshness`; optional `remote_branch_id` remains a distinct SCM identity. Missing, stale, future-dated or untrusted local observations resolve to unknown and cannot be inferred from remote metadata.
+
+`RunContext` 仅由服务端基于 actor 的 Project/EngineeringRun membership 与当前 ACL 解析；Run 列表、创建、普通 Run Apps 和 hostless Run 不要求远端 repository/branch 或 Branch grant。远端 Branch 投影及授权是可选字段，仅在调用对应 SCM capability 时解析。`WorktreeFocus` 只为 checkout/Git/CLI 操作提供独立的当前 binding proof，不授予读取 Run Apps 的权限；Run 目录无需任何 WorktreeFocus。`focus_version` 只随 focus 的建立、切换或清除递增，不代替 Run authorization/context version 或 Worktree/cluster generation。缓存键包含 actor、Project/Run 与其授权版本，不包含可选 Branch grant；membership、角色、Run ownership 或 Plugin grant 撤销后，相关缓存和实时订阅失效。旧 `/group-context` 响应中的 `GroupContext` 是迁移 DTO：兼容期可回传 `engineering_run_id` 与 `focus_worktree_id`，但不得继续把 Worktree ID 视为完整 App scope。任何 context 都不能从浏览器 Zustand、URL 参数或 LangGraph checkpoint 恢复为可信凭据。
 
 ### 3.3 EntityRef
 
@@ -211,7 +219,7 @@ RunContext `context_version` 只包含当前 Project/Run grant identity/version 
 
 ### 3.5 Run-to-Worktree binding mutation owner（WLD-0）
 
-绑定 API 以 `PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}` 创建或重绑当前归属，以同一路径的 `DELETE` 关闭当前归属。请求携带 `expected_binding`（`unassigned` 或精确的 active binding ID/version）、`expected_project_binding_version`、`correlation_id` 与 `Idempotency-Key`。owner 在同一事务重新验证 Bearer actor、Project manager membership、Run grant、Project-Worktree binding 与其版本、Run 与本地 Worktree repository 兼容性；remote Run repository/Branch 可为空，但 Worktree repository identity 必须存在且属于该 Project。按 tenant+Worktree advisory lock 串行变更，执行 SCD2 close/insert、当前唯一性、Audit trigger context、稳定幂等回执与版本化 Outbox。响应和事件都明确 `execution_admission_available=false`。
+绑定 API 以 `PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}` 创建或重绑当前归属，以同一路径的 `DELETE` 关闭当前归属。Engineering Run Directory 是关系事实、授权命令与 Run Outbox 的 owner；Worktree Domain 是 checkout lifecycle 和 Project-to-repository ownership 的 owner，并通过受授权查询/owner command 提供当前关联事实，不共享写事务。请求携带 `expected_binding`（`unassigned` 或精确的 active `binding_id`/`binding_version`）、当前 `project_binding_id` 与 `expected_project_binding_version`、`correlation_id` 与 `Idempotency-Key`。Run Directory owner 在同一事务重新验证 Bearer actor、Project manager membership、Run grant、当前 Project-Worktree binding/version、Run 与本地 Worktree repository 兼容性；remote Run repository/Branch 可为空，但 Worktree repository identity 必须存在且属于该 Project。按 tenant+Worktree advisory lock 串行变更，执行 SCD2 close/insert、当前唯一性、Audit trigger context、稳定幂等回执与版本化 Run Outbox。请求的 Project binding ID/version 必须匹配 Worktree Domain 当前有效事实；archive/restore 不隐式 attach、reassign 或 detach。响应和事件都明确 `execution_admission_available=false`。
 
 2026-10-19 源码切片已实现 route/mutation、前向 Outbox event constraint migration、鉴权边界 route test 与 transition/idempotency/hostless/lock SQLSTATE unit tests。Rust 1.99.0 all-targets check 与 full all-targets test 曾通过；补充的 lock SQLSTATE 单测单独通过。目标 PostgreSQL migration、application role grants/FORCE RLS、持久回放、事务回滚、竞争事务和部署后历史 reconciliation 没有验证。不得把 source slice 标为生产绑定闭环，也不得由绑定成功推导 Agent/CLI/Schedule 可执行。
 
@@ -909,6 +917,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.10 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修订 §9.2 的跨 owner messaging 契约：owner Outbox/Inbox 与 immutable route pin 是稳定边界，NATS 为可移除兼容 adapter，Rust-native transport 为目标方向；将 analytics stream 评估与基础 transport 替换分开，并明确 ACK、恢复与 BI 事实的 owner 语义 | W1 有界设计核对发现 §9.2 仍将 NATS 写为固定 broker 基线 |
+| v5.11 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 WLD-0 binding owner 与版本词汇：Run Directory 持有 Project/Run-authorized Run/Worktree relation 和 Run Outbox；Worktree Domain 持有 checkout lifecycle 与 Project/repository ownership；明确 binding、project-binding、focus、Worktree/K3s generation 和 local/remote Branch observation 各自语义；目标 PostgreSQL/RLS、认证写入与并发历史门保持开放 | WLD-0 binding contract vocabulary alignment |
 | v0.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Project → Worktree → Group Apps 详细交互、安全上下文、管理操作、CLI、Canvas、Chat/LangGraph、Plugin、事件与 W/T/M 实施门；记录 REST no-op auth 与 in-memory blocker | 推进 Worktree Group Phase 2，并依据 Worktree Index 当前实现核对 API 安全边界 |
 | v0.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落地 RS256 actor 校验、Project scope + active membership、租户 RLS GroupContext resolver 与只读 Index/Group 路由；定义 2B migration 和未回填数据边界 | 推进 Worktree Group Phase 2B；落实 Project → Worktree Index → Worktree 同级应用架构 |
 | v0.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 canonical WorkItem / Multica 六态持久化、幂等与追加审计，稳定 cursor Index，Worktree owner SCD2 与 archive plan/confirm；逐项标出未部署数据库、旧投影 reconciliation、Jira/Review/Runtime/Canvas/Chat/Plugin 等生产缺口 | 用户要求继续完成 Phase 2B/2C/2D，并重申 Project Worktree Index 是管理多 Agent Worktree 的主入口 |
