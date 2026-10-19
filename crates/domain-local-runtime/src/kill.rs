@@ -1,4 +1,4 @@
-// @cypher schema=1 source_sha256=bd9465ac4f547e9f6bc8223ca397881270eb18768d2e715c2e53125dd1ace40b
+// @cypher schema=1 source_sha256=dbe11167d93407007b3c2b5a8ce579e626d392ffc71653a5636115c268066a8b
 // MERGE (self:File {path:"crates/domain-local-runtime/src/kill.rs"})
 // MERGE (test:Symbol {id:"crates/domain-local-runtime/src/kill.rs::tests.test_spawn_sleep_then_direct_kill",kind:"test"})
 // MERGE (child:Type {id:"tokio::process::Child",kind:"external"})
@@ -7,7 +7,7 @@
 // @endcypher
 //! Star Local Runtime — 跨平台子进程 kill (ULYS-212)
 //!
-//! 实现 [ULYS-212](https://app.multica.ai/issue/01a0cd6c-846c-7781-82b6-1f55bffb8e7b)
+//! 设计追踪：ULYS-212（子进程终止与会话隔离）。
 //! 描述的 kill 部分:`kill.rs (SIGTERM/SIGKILL Windows TerminateProcess)`。
 //!
 //! ## 范围

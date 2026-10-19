@@ -1,8 +1,8 @@
 # ULYS-156 / NFR-ORCA-001 — systemd cgroup 边界 (KillMode=mixed 风险)
 
-> 配套 issue: [ULYS-156](https://app.multica.ai/issue/01a0bf6b-486c-71b8-99f4-92bde909c7f8)
+> 需求追踪：ULYS-156
 > spec 锚点: `docs/ecosystem-survey/orca-design-survey.md` §2 NFR-ORCA-001(行 158-162)
-> 父 issue: [ULYS-104](https://app.multica.ai/issue/01a0b920-28d5-7dc8-93c2-9cbc73ba9c4d)
+> 父项：ULYS-104
 > 状态: ✅ 落档(2026-09-23 JST, P0-A 续切片的文档产物)
 
 ## 1. 问题陈述

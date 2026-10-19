@@ -1,4 +1,4 @@
-// @cypher schema=1 source_sha256=ced9a873e3bfea03811883d8ea6c87429be6dad6e4f217e3f23f72febd806bb3
+// @cypher schema=1 source_sha256=8dd6271dda77e53ab3aa33a1123e2e076c747de65e9d49a0c982bf9a6b3c4ced
 // MERGE (self:File {path:"crates/domain-local-runtime/src/spawn_linux.rs"})
 // MERGE (options:Type {id:"crates/domain-local-runtime/src/spawn_linux.rs::LinuxSpawnOptions",kind:"struct"})
 // MERGE (session:Type {id:"process_wrap::tokio::ProcessSession",kind:"external"})
@@ -20,7 +20,7 @@
 // @endcypher
 //! Star Local Runtime — Linux 真 OS spawn 适配 (ULYS-212)
 //!
-//! 实现 [ULYS-212](https://app.multica.ai/issue/01a0cd6c-846c-7781-82b6-1f55bffb8e7b)
+//! 设计追踪：ULYS-212（Linux 子进程会话隔离）。
 //! 描述的 Linux 部分:`spawn_linux.rs (setsid + cgroup)`。
 //!
 //! ## 范围限定
@@ -65,7 +65,7 @@ use thiserror::Error;
 pub struct LinuxSpawnOptions {
     /// 是否创建新 session(`setsid(2)` + new group + leader)
     ///
-    /// - `true`(默认):走 `process_wrap::std::ProcessSession`,子进程脱离父进程
+    /// - `true`(默认):走 `process_wrap::tokio::ProcessSession`,子进程脱离父进程
     ///   session/pgid/tty,父进程 SIGINT/Ctrl-C 不传播
     /// - `false`:仅靠 `cmd.process_group(0)` 改 pgid,保留父进程 session
     ///   (向后兼容 fallback)
