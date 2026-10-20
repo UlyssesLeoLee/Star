@@ -1,7 +1,8 @@
 /*
-@cypher schema=1 source_sha256=3f3e6e8b48f889fd5d5fb57cc916197e4357ee03d80ebc170241028670c30421
+@cypher schema=1 source_sha256=ab9fc68904649135e3df63eb001002828ececc9b5a5dcbe6e435fe3bc81bde67
 MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
 MERGE (page:Function {name:"GroupWorkspacePage", language:"typescript", visibility:"public"})
+MERGE (resolveTaskCliUiState:Function {name:"resolveTaskCliUiState", language:"typescript", visibility:"public"})
 MERGE (isAppId:Function {name:"isAppId", language:"typescript", visibility:"private"})
 MERGE (resolveAppId:Function {name:"resolveAppId", language:"typescript", visibility:"private"})
 MERGE (appHref:Function {name:"appHref", language:"typescript", visibility:"private"})
@@ -13,6 +14,7 @@ MERGE (self)-[:DEFINES]->(appHref)
 MERGE (resolveAppId)-[:CALLS]->(isAppId)
 MERGE (page)-[:CALLS]->(resolveAppId)
 MERGE (page)-[:CALLS]->(appHref)
+MERGE (page)-[:CALLS]->(resolveTaskCliUiState)
 MERGE (page)-[:USES]->(legacyAppCanonicalization)
 @endcypher
 */
@@ -445,6 +447,28 @@ MATCH (page:File {name:"frontend/src/app/worktree/[id]/group/page.tsx"}),
       (runPanel:Function {name:"TaskRunHistoryPanel"});
 CREATE (page)-[:USES]->(runPanel);
 */
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (page:Function {name:"GroupWorkspacePage"}),
+      (cliState:Function {name:"resolveTaskCliUiState"});
+CREATE (sessionUncertain:Variable {name:"cliSessionUncertainId",type:"variable",language:"typescript"}),
+       (startUncertain:Variable {name:"cliStartUncertain",type:"variable",language:"typescript"}),
+       (cliPresentation:Variable {name:"cliPresentation",type:"variable",language:"typescript"}),
+       (terminalPaused:Variable {name:"cliTerminalPaused",type:"variable",language:"typescript"}),
+       (applyCliStatus:Function {name:"applyTaskCliSessionStatus",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
+       (markCliUncertain:Function {name:"markTaskCliSessionUncertain",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+       (refreshCli:Function {name:"refreshTaskCliSessionStatus",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
+       (reattachCliSession:Function {name:"reattachTaskCliSession",type:"function",language:"typescript",visibility:"private",complexity:"complex"}),
+       (cancelCliSession:Function {name:"cancelTaskCliSession",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
+CREATE (page)-[:CALLS]->(cliState),(page)-[:USES]->(sessionUncertain),
+       (page)-[:USES]->(startUncertain),(page)-[:USES]->(cliPresentation),(page)-[:USES]->(terminalPaused),
+       (page)-[:CONTAINS]->(applyCliStatus),(page)-[:CONTAINS]->(markCliUncertain),
+       (page)-[:CONTAINS]->(refreshCli),(page)-[:CONTAINS]->(reattachCliSession),
+       (page)-[:CONTAINS]->(cancelCliSession),
+       (applyCliStatus)-[:USES]->(sessionUncertain),
+       (refreshCli)-[:CALLS]->(applyCliStatus),(refreshCli)-[:CALLS]->(markCliUncertain),
+       (reattachCliSession)-[:CALLS]->(applyCliStatus),(reattachCliSession)-[:CALLS]->(markCliUncertain),
+       (cancelCliSession)-[:CALLS]->(applyCliStatus),(cancelCliSession)-[:CALLS]->(markCliUncertain);
+*/
 import {
   useWorktreeGroupApi,
   useWorktreeGroupProjection,
@@ -459,6 +483,7 @@ import type {
   WorktreeExecutionProfileSummary,
   WorktreeGroupApiClient,
 } from "@/lib/group/worktreeGroupApi";
+import { resolveTaskCliUiState } from "@/lib/group/taskCliPresentation";
 import { useStore } from "@/lib/store";
 import type { CanvasConnector, CanvasElement, CanvasFrame, CanvasViewport, WorkItemStatus } from "@/types/ids";
 
@@ -665,11 +690,14 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const [cliSessionControlPending, setCliSessionControlPending] = useState(false);
   const cliSessionControlRequest = useRef<string | null>(null);
   const [cliSessionError, setCliSessionError] = useState<string | null>(null);
+  const [cliSessionUncertainId, setCliSessionUncertainId] = useState<string | null>(null);
+  const [cliStartUncertain, setCliStartUncertain] = useState(false);
   const [cliWsConnected, setCliWsConnected] = useState(false);
   const [cliNeedsReattach, setCliNeedsReattach] = useState(false);
   const [cliTerminalGeneration, setCliTerminalGeneration] = useState(0);
   const cliSessionCommands = useRef(new Map<string, PendingTaskCliSessionCommand>());
   const cliTicketClaimed = useRef(false);
+  const cliTerminalPaused = useRef(false);
   const [chatTargets, setChatTargets] = useState<ScopedChatTarget[]>([]);
   const [chatTargetCursor, setChatTargetCursor] = useState<string | null>(null);
   const [chatTargetsPending, setChatTargetsPending] = useState(false);
@@ -1025,6 +1053,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     cliSession.requested_worktree_id === worktreeId
     ? cliSession
     : null;
+  const cliPresentation = resolveTaskCliUiState({
+    hasAuthorizedSession: Boolean(cliSessionForSelectedTask),
+    uncertain: cliSessionForSelectedTask?.session_id === cliSessionUncertainId,
+    needsReattach: cliNeedsReattach,
+    sessionState: cliSessionStatus?.state ?? null,
+  });
   useEffect(() => {
     if (cliSession && (
       cliSession.worktree_id !== worktreeId ||
@@ -1032,9 +1066,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       cliSession.requested_worktree_id !== worktreeId
     )) {
       cliTicketClaimed.current = false;
+      cliTerminalPaused.current = true;
       setCliSession(null);
       setCliSessionStatus(null);
       setCliSessionError(null);
+      setCliSessionUncertainId(null);
+      setCliStartUncertain(false);
       setCliWsConnected(false);
       setCliNeedsReattach(false);
     }
@@ -1055,10 +1092,16 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     return current.attachment_ticket;
   }, [cliSession, currentWorkItemId, worktreeId]);
   const handleTaskCliConnectionChange = useCallback((connected: boolean) => {
+    if (connected && cliTerminalPaused.current) {
+      setCliWsConnected(false);
+      return;
+    }
     setCliWsConnected(connected);
     if (connected) {
+      cliTerminalPaused.current = false;
       setCliNeedsReattach(false);
-    } else if (cliTicketClaimed.current) {
+    } else if (cliTicketClaimed.current && !cliTerminalPaused.current) {
+      cliTerminalPaused.current = true;
       setCliNeedsReattach(true);
     }
   }, []);
@@ -1917,6 +1960,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
 
     setCliSessionPending(true);
     setCliSessionError(null);
+    setCliStartUncertain(false);
     try {
       const receipt = await groupApi.startTaskCliSession(
         worktreeId,
@@ -1942,13 +1986,18 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       if (groupApiGeneration.current !== requestGeneration) return;
       cliSessionCommands.current.delete(fingerprint);
       cliTicketClaimed.current = false;
+      cliTerminalPaused.current = false;
       setCliSessionStatus(null);
       setCliWsConnected(false);
       setCliNeedsReattach(false);
+      setCliSessionUncertainId(null);
+      setCliStartUncertain(false);
       setCliSession({ ...receipt, requested_worktree_id: worktreeId });
     } catch (error) {
       if (groupApiGeneration.current === requestGeneration) {
         setCliSessionError(error instanceof Error ? error.message : "无法启动受控 Task CLI Session。");
+        setCliStartUncertain(true);
+        setCliSessionHistoryRefresh((value) => value + 1);
       }
     } finally {
       if (groupApiGeneration.current === requestGeneration) setCliSessionPending(false);
@@ -1957,9 +2006,23 @@ export default function GroupWorkspacePage({ params }: PageProps) {
 
   function applyTaskCliSessionStatus(status: TaskCliSessionStatus) {
     setCliSessionHistory((current) => current.map((entry) => entry.session_id === status.session_id ? status : entry));
+    setCliSessionUncertainId((current) => current === status.session_id ? null : current);
+    setCliSessionError(null);
     if (cliSessionForSelectedTask?.session_id === status.session_id) {
       setCliSessionStatus(status);
-      if (status.state !== "running" && status.state !== "disconnected") setCliNeedsReattach(false);
+      if (status.state === "disconnected") setCliNeedsReattach(true);
+      else if (status.state !== "running") setCliNeedsReattach(false);
+      if (status.state !== "running") cliTerminalPaused.current = true;
+    }
+  }
+
+  function markTaskCliSessionUncertain(sessionId: string) {
+    setCliSessionUncertainId(sessionId);
+    if (cliSessionForSelectedTask?.session_id === sessionId) {
+      setCliSessionStatus(null);
+      cliTerminalPaused.current = true;
+      setCliNeedsReattach(true);
+      setCliWsConnected(false);
     }
   }
 
@@ -1986,6 +2049,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       applyTaskCliSessionStatus(status);
     } catch (error) {
       if (groupApiGeneration.current === requestGeneration) {
+        markTaskCliSessionUncertain(sessionId);
         setCliSessionError(error instanceof Error ? error.message : "无法读取 Task CLI Session 状态。");
       }
     } finally {
@@ -2022,7 +2086,8 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       if (status.session_id !== sessionId) throw new Error("Task CLI status response did not match the selected session.");
       applyTaskCliSessionStatus(status);
       if (status.state !== "running" && status.state !== "disconnected") {
-        throw new Error(`当前 Session 状态为 ${status.state}，不能重新连接。`);
+        setCliSessionError(`Session 状态已确认是 ${status.state}，不能重新连接。任务完成状态仍由任务生命周期和独立验证决定。`);
+        return;
       }
 
       const correlationId = crypto.randomUUID();
@@ -2054,12 +2119,17 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       if (groupApiGeneration.current !== requestGeneration) return;
 
       cliTicketClaimed.current = false;
+      cliTerminalPaused.current = false;
+      setCliSessionStatus(null);
+      setCliSessionUncertainId(null);
+      setCliStartUncertain(false);
       setCliNeedsReattach(false);
       setCliWsConnected(false);
       setCliSession({ ...receipt, status: "running", requested_worktree_id: worktreeId });
       setCliTerminalGeneration((generation) => generation + 1);
     } catch (error) {
       if (groupApiGeneration.current === requestGeneration) {
+        markTaskCliSessionUncertain(sessionId);
         setCliSessionError(error instanceof Error ? error.message : "无法重新连接 Task CLI Session。");
       }
     } finally {
@@ -2081,6 +2151,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     cliSessionControlRequest.current = controlRequestId;
     setCliSessionControlPending(true);
     setCliSessionError(null);
+    if (cliSessionForSelectedTask?.session_id === sessionId) {
+      cliTerminalPaused.current = true;
+      setCliSessionUncertainId(sessionId);
+      setCliNeedsReattach(true);
+      setCliWsConnected(false);
+    }
     try {
       const status = await groupApi.cancelTaskCliSession(
         worktreeId,
@@ -2093,6 +2169,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       applyTaskCliSessionStatus(status);
     } catch (error) {
       if (groupApiGeneration.current === requestGeneration) {
+        markTaskCliSessionUncertain(sessionId);
         setCliSessionError(error instanceof Error ? error.message : "无法结束 Task CLI Session。");
       }
     } finally {
@@ -2596,8 +2673,16 @@ export default function GroupWorkspacePage({ params }: PageProps) {
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div><h2 className="text-lg font-semibold">Task Card Index</h2><p className="text-xs text-ink-mute">任务卡与 Canvas、任务生命周期、工作项看板是同级入口。</p></div>
-                <span className={`rounded border px-2 py-1 text-[10px] ${cliSessionForSelectedTask ? "border-success/40 bg-success/10 text-success" : "border-warning/40 bg-warning/10 text-warning"}`}>
-                  {cliSessionForSelectedTask ? "Task CLI Session" : "CLI 预览 / 等待受控 Runtime"}
+                <span className={`rounded border px-2 py-1 text-[10px] ${cliSessionForSelectedTask && cliPresentation === "ready" ? "border-success/40 bg-success/10 text-success" : "border-warning/40 bg-warning/10 text-warning"}`}>
+                  {cliSessionForSelectedTask
+                    ? cliPresentation === "ready" ? (cliWsConnected ? "Session 已连接" : "Session 已授权 · 等待连接")
+                      : cliPresentation === "uncertain" ? "Session 状态待确认"
+                      : cliPresentation === "reattach" ? "Session 需要重新连接"
+                      : cliPresentation === "not-running" ? "Session 未运行"
+                      : "Session 已结束"
+                    : cliStartUncertain ? "启动结果待确认 · 终端已关闭"
+                    : cliSessionPending ? "正在请求服务端授权 Session"
+                    : groupProjection.mode === "live" ? "等待服务端授权 Session" : "CLI 不可用 · 当前为预览数据"}
                 </span>
               </div>
               {selectedTask ? (
@@ -2633,7 +2718,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                     </div>
                     <div className="flex flex-wrap gap-2 border-t border-line pt-3">
                       {selectedTask.worktree_id === worktreeId
-                        ? <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 卡内 CLI 预览</Link>
+                        ? <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 打开 Task CLI 面板</Link>
                         : <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">先绑定当前 Worktree 才能打开 CLI</span>}
                       {selectedTaskCanvasElement && <Link href={appHref("canvas", { highlight: selectedTaskCanvasElement.id })} className="btn text-xs"><LayoutGrid size={13} /> 在 Canvas 中定位</Link>}
                       <Link href={appHref("board")} className="btn text-xs"><ArrowUpRight size={13} /> 打开工作项看板</Link>
@@ -2641,35 +2726,38 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                   </article>
                   <section className="card min-h-[320px] space-y-3">
                     <div className="flex items-center justify-between gap-3">
-                      <div><h3 className="text-sm font-semibold">{cliSessionForSelectedTask ? "卡内 CLI · 已启动" : cliPreviewOpen ? "卡内 CLI" : "执行入口"}</h3><p className="text-[10px] text-ink-mute">{cliSessionForSelectedTask ? `session ${cliSessionForSelectedTask.session_id}` : "命令只能由当前 Worktree 的授权 Local Runtime 执行"}</p></div>
-                      {cliPreviewOpen && !cliSessionForSelectedTask && <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">mock preview</span>}
+                      <div><h3 className="text-sm font-semibold">{cliSessionForSelectedTask ? cliPresentation === "ready" ? "卡内 CLI · Session 已授权" : cliPresentation === "uncertain" ? "Session 状态待确认" : cliPresentation === "reattach" ? "Session 等待重新连接" : cliPresentation === "not-running" ? "Session 未运行" : "Session 已结束" : cliPreviewOpen ? "Task CLI" : "执行入口"}</h3><p className="text-[10px] text-ink-mute">{cliSessionForSelectedTask ? `session ${cliSessionForSelectedTask.session_id}` : "命令只能由当前 Worktree 的授权服务端 Runtime 执行"}</p></div>
                     </div>
                     {cliSessionForSelectedTask ? (
                       <>
                         <div className="space-y-2 rounded border border-line p-2 text-[10px] leading-relaxed text-ink-dim">
-                          <p>状态：{cliSessionStatus?.state ?? "尚未查询"}{cliSessionStatus?.exit_code != null ? ` · exit ${cliSessionStatus.exit_code}` : ""}{cliSessionStatus ? ` · ${cliSessionStatus.updated_at}` : ""}</p>
-                          <p>WebSocket ticket 只保存在当前页面内存。断线后手动重连会先检查 session，再请求新的短时 ticket；页面刷新后暂时没有 session 列表接口恢复关联。</p>
+                          <p>状态：{cliPresentation === "uncertain" ? "未确认" : cliSessionStatus?.state ?? "服务端已签发运行 Session，尚未读取状态"}{cliSessionStatus?.exit_code != null ? ` · exit ${cliSessionStatus.exit_code}` : ""}{cliSessionStatus ? ` · ${cliSessionStatus.updated_at}` : ""}</p>
+                          <p>终端只在收到匹配当前 Task 与 Worktree 的服务端授权 Session、且状态允许运行时显示。Session 终态不会自动将任务标记为完成；任务结果仍需独立验证并回写。</p>
+                          {cliPresentation === "uncertain" && <p role="alert" className="rounded border border-warning/40 bg-warning/10 p-2 text-warning">无法确认该 Session 当前状态。终端输入已暂停；请重新检查状态或请求服务端重新授权连接。此状态不代表任务已完成。</p>}
+                          {cliPresentation === "reattach" && <p role="status" className="rounded border border-warning/40 bg-warning/10 p-2 text-warning">Session 尚未连接。终端保持关闭，重新连接前会先读取服务端状态并申请新的短时授权 ticket。</p>}
+                          {cliPresentation === "not-running" && <p role="status" className="rounded border border-line p-2">Session 当前处于 {cliSessionStatus?.state ?? "非运行"} 状态；终端保持关闭。</p>}
+                          {cliPresentation === "ended" && <p role="status" className="rounded border border-line p-2">Session 已进入终态。Session 结束不等于任务完成，请通过独立验证和任务生命周期确认结果。</p>}
                           <div className="flex flex-wrap gap-2">
                             <button type="button" className="btn text-[10px]" onClick={() => void refreshSelectedTaskCliSessionStatus()} disabled={cliSessionControlPending || groupProjection.mode !== "live" || !groupApi}>
                               {cliSessionControlPending ? "处理中…" : "刷新状态"}
                             </button>
-                            {cliNeedsReattach && (!cliSessionStatus || cliSessionStatus.state === "running" || cliSessionStatus.state === "disconnected") && <button type="button" className="btn-primary text-[10px]" onClick={() => void reattachSelectedTaskCliSession()} disabled={cliSessionControlPending || cliWsConnected || groupProjection.mode !== "live" || !groupApi}>
-                              检查状态并重新连接
+                            {(cliPresentation === "reattach" || cliPresentation === "uncertain") && <button type="button" className="btn-primary text-[10px]" onClick={() => void reattachSelectedTaskCliSession()} disabled={cliSessionControlPending || cliWsConnected || groupProjection.mode !== "live" || !groupApi}>
+                              检查状态并申请新连接
                             </button>}
-                            <button type="button" className="btn text-[10px]" onClick={() => void cancelSelectedTaskCliSession()} disabled={cliSessionControlPending || groupProjection.mode !== "live" || !groupApi || Boolean(cliSessionStatus && ["completed", "failed", "cancelled", "timed_out", "lost"].includes(cliSessionStatus.state))}>
+                            <button type="button" className="btn text-[10px]" onClick={() => void cancelSelectedTaskCliSession()} disabled={cliSessionControlPending || groupProjection.mode !== "live" || !groupApi || Boolean(cliSessionStatus && ["cancelling", "completed", "failed", "cancelled", "timed_out", "lost"].includes(cliSessionStatus.state))}>
                               结束 Session
                             </button>
                           </div>
                           {cliSessionError && <p role="alert" className="text-xs text-error">{cliSessionError}</p>}
                         </div>
-                        <TerminalStackContainer
-                          key={`${cliSessionForSelectedTask.session_id}:${cliTerminalGeneration}`}
-                          sessionId={cliSessionForSelectedTask.session_id}
-                          getAttachmentTicket={getCliAttachmentTicket}
-                          onConnectionChange={handleTaskCliConnectionChange}
-                          autoReconnect={false}
-                          allowSplit={false}
-                        />
+                        {cliPresentation === "ready" && <TerminalStackContainer
+                            key={`${cliSessionForSelectedTask.session_id}:${cliTerminalGeneration}`}
+                            sessionId={cliSessionForSelectedTask.session_id}
+                            getAttachmentTicket={getCliAttachmentTicket}
+                            onConnectionChange={handleTaskCliConnectionChange}
+                            autoReconnect={false}
+                            allowSplit={false}
+                          />}
                       </>
                     ) : cliPreviewOpen ? (
                       <>
@@ -2700,26 +2788,20 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                             {cliExecutionProfilesError && <p role="alert" className="text-xs text-error">{cliExecutionProfilesError}</p>}
                             {cliExecutionProfilesMore && <p className="text-[10px] text-warning">当前只显示前 50 个 Profile；请先整理有效 Profile 数量，再选择完整配置。</p>}
                             {!cliExecutionProfilesPending && !cliExecutionProfilesError && cliExecutionProfiles.length === 0 && <p className="text-[10px] text-ink-mute">当前 Worktree 没有可用的 Agent Execution Profile；新 Run 不会使用默认或 seed 配置。</p>}
-                            <button type="button" className="btn-primary text-xs" onClick={() => void startSelectedTaskCliSession()} disabled={cliSessionPending || cliExecutionProfilesPending || cliExecutionProfilesMore || !cliExecutionProfileId || groupProjection.mode !== "live" || !selectedTask || selectedTask.worktree_id !== worktreeId || !("lifecycle_status" in selectedTask) || selectedTask.lifecycle_status !== "in_progress" || selectedTask.active_worktree_id !== worktreeId}>
+                            <button type="button" className="btn-primary text-xs" onClick={() => void startSelectedTaskCliSession()} disabled={cliSessionPending || !groupApi || cliExecutionProfilesPending || cliExecutionProfilesMore || !cliExecutionProfileId || groupProjection.mode !== "live" || !selectedTask || selectedTask.worktree_id !== worktreeId || !("lifecycle_status" in selectedTask) || selectedTask.lifecycle_status !== "in_progress" || selectedTask.active_worktree_id !== worktreeId}>
                               {cliSessionPending ? "正在请求受控 Session…" : "启动 Task CLI Session"}
                             </button>
+                            {cliStartUncertain && <p role="alert" className="rounded border border-warning/40 bg-warning/10 p-2 text-[10px] text-warning">启动请求没有返回可验证的 Session 回执，服务端是否已受理尚未确认。终端保持关闭；刷新下面的 Session 列表以核实，不要把该请求视为任务完成。</p>}
                             {cliSessionError && <p role="alert" className="text-xs text-error">{cliSessionError}</p>}
                             <p className="text-[10px] text-ink-mute">当前如果 Profile resolver、Run snapshot writer、Session provisioner、sandbox 或授权未就绪，服务端会拒绝启动；ticket 未产生前终端保持断开。</p>
                           </div>
                         ) : (
-                          <div className="rounded border border-warning/30 bg-warning/5 p-2 text-[10px] leading-relaxed text-warning">
-                            这里只展示卡内终端布局。当前没有认证 Group API provider，命令执行保持禁用。
+                          <div role="status" aria-label="Task CLI 不可用" data-testid="task-cli-unavailable" className="space-y-2 rounded border border-warning/30 bg-warning/5 p-3 text-[10px] leading-relaxed text-warning">
+                            <p className="font-semibold">Task CLI 当前不可用</p>
+                            <p>当前任务内容来自本地预览，未收到服务端授权的 Task CLI Session 和单次连接 ticket。命令执行与终端输入均已关闭。</p>
+                            <p>只有当前 Task、Run、Worktree 的授权服务端返回有效 Session 回执后，才会显示终端。</p>
                           </div>
                         )}
-                        <TerminalStackContainer
-                          key={selectedTask.id}
-                          renderPane={(paneId) => (
-                            <div className="flex h-full flex-col justify-between bg-[#0d1117] p-3 font-mono text-[10px] text-emerald-300" data-testid="task-cli-preview-pane">
-                              <div><div>task: {selectedTask.key}</div><div>worktree: {selectedTask.worktree_id ?? "unbound"}</div><div>session: not provisioned</div></div>
-                              <div><span className="text-ink-mute">{paneId}</span> $ <span className="animate-pulse">▍</span></div>
-                            </div>
-                          )}
-                        />
                       </>
                     ) : (
                       <div className="flex h-48 flex-col items-center justify-center gap-2 rounded border border-dashed border-line text-center">
@@ -2740,7 +2822,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                           </button>
                         </div>
                         {cliSessionHistoryError && <p role="alert" className="text-[10px] text-error">无法读取 Session 列表：{cliSessionHistoryError}</p>}
-                        {!cliSessionHistoryPending && !cliSessionHistoryError && cliSessionHistory.length === 0 && <p className="text-[10px] text-ink-mute">当前任务没有可恢复的 Session，或服务端尚未配置 Session provisioner。</p>}
+                        {!cliSessionHistoryPending && !cliSessionHistoryError && cliSessionHistory.length === 0 && <p className="text-[10px] text-ink-mute">当前任务没有可见的 Session。没有有效服务端 Session 回执时，终端保持关闭。</p>}
                         {cliSessionHistory.length > 0 && (
                           <ul className="space-y-2">
                             {cliSessionHistory.map((session) => {
@@ -2752,8 +2834,8 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                                   <div className="min-w-0 text-[10px]">
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span className="font-mono">{session.session_id}</span>
-                                      <span className="rounded border border-line px-1.5 py-0.5">{session.state}{session.exit_code != null ? ` · exit ${session.exit_code}` : ""}</span>
-                                      {isCurrent && <span className="text-success">当前连接</span>}
+                                      <span className="rounded border border-line px-1.5 py-0.5">{cliSessionUncertainId === session.session_id ? "状态待确认" : session.state}{cliSessionUncertainId === session.session_id ? "" : session.exit_code != null ? ` · exit ${session.exit_code}` : ""}</span>
+                                      {isCurrent && <span className="text-info">当前 Session</span>}
                                     </div>
                                     <p className="mt-1 text-ink-mute">更新于 {session.updated_at}</p>
                                   </div>
