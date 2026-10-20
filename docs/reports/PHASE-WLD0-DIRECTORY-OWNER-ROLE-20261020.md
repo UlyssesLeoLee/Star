@@ -18,7 +18,7 @@ Add a least-privilege PostgreSQL mutation identity for Run-to-Worktree binding c
 | Lock-only source access | Narrow UPDATE column grants permit PostgreSQL `FOR SHARE` locks on current Project/Branch/Run revision and grant facts, Project/Worktree bindings, Worktree projection and Task facts. Restrictive UPDATE-deny policies prevent mutation of those source facts. | Disposable session verifies required column grants, row locks, restrictive policy catalog and no-row Project/Task updates. |
 | Owner-local writes | Run binding is the only SCD2 fact the role may change. Audit/Event writes are append-only, Run Outbox is INSERT-only, and idempotency access is bounded to replay/expiry cleanup. The role owns no RLS-protected table. | Grant and role-owner checks pass; no API bind/reassign/detach write is claimed. |
 | Migration runner | `--run-binding-ddl` now includes the Task/Run prerequisite schema, owner migration, per-migration fingerprints including owner grants and a separate real non-superuser login acceptance session. A drift fixture injects direct/database privileges and outgoing role memberships, then replays the migration; a separate role-owned schema fixture expects migration failure. | 6/6 runner tests and 34/34 PostgreSQL steps pass; normalization, schema fingerprint stability and owner-object fail-closed behavior are verified. |
-| Documentation | Requirements v6.90, Basic Design v6.91, Group DD v5.14, Automation Design v2.63, registry v1.06 and WBS v2.7 describe the contract and remaining gates. | Updated with disposable-only evidence, role-drift replay, owner-object rejection, and explicit unverified gates. |
+| Documentation | Requirements v6.90, Basic Design v6.91, Group DD v5.14, Automation Design v2.63, registry v1.06 and WBS v2.8 describe the contract and remaining gates. | Updated with disposable-only evidence, role-drift replay, owner-object rejection, local `dev` integration checkpoint, and explicit unverified gates. |
 
 ## §2 Verification summary
 
@@ -68,6 +68,7 @@ Add a least-privilege PostgreSQL mutation identity for Run-to-Worktree binding c
 
 | Version | Date | Revision author | Change |
 |---|---|---|---|
+| v0.4 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record feature commit `c0978e40` rebased and fast-forwarded into clean Orca `dev`; update the WBS integration checkpoint and retain the no-fetch/no-push and production-gate status. |
 | v0.3 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record 34/34 PostgreSQL steps, injected grant/database privilege/membership drift and migration re-normalization with a stable schema fingerprint; test role-owned schema rejection and preserve target DB/API/Rust production gates. |
 | v0.2 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add and verify the missing Run revision lock-only grant and UPDATE-deny policy found during final review; synchronize all design versions and preserve production and Rust 1.99.0 gates. |
 | v0.1 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the NOLOGIN Directory mutation role, transaction-local role switch, lock-only column grants, restrictive RLS denial and disposable PostgreSQL acceptance; preserve production and Rust 1.99.0 gates. |
