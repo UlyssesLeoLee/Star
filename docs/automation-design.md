@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.59 (2026-10-18)
+> **文档版本**: v2.60 (2026-10-20)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3138,3 +3138,13 @@ The verified PostgreSQL 18.6 disposable run passed. Rust 1.99.0 `bi-owner-runtim
 ## 4.86 Phase 9F4I native event verification
 
 Automation tier P. `scripts/automation/phase9f4i_native_event.py` owns a unique loopback-only disposable PostgreSQL instance; uses existing bounded command/port helpers; verifies the ordered real migration chain twice and event/legacy contracts (15 steps). Pre-attestation server-auth fixtures run before origin migration. It stops PostgreSQL before deleting only its own resolved target directory, preserves failures and logs, and never changes Multipass inventory or production credentials. Report: `PHASE-9F4I-NATIVE-EVENT-REPORT.md`; no claim of BI client/consumer production readiness.
+
+## 4.96 WLD-0 Run/Worktree binding DDL harness (2026-10-20)
+
+**自动化档：[P]** — `scripts/automation/engineering_run_directory.py --run-binding-ddl` extends the existing fresh-cluster directory chain with `2026-10-15-run-host-independent-directory.sql` and `2026-10-19-run-worktree-bindings.sql`, in order and exactly once each. It captures a read-only schema fingerprint after each committed migration, stops at the first migration or fingerprint error, checks the ten directory/Run binding tables' FORCE RLS catalog flags, verifies the exact four-event Run Outbox allowlist, and stops PostgreSQL before deleting only its unique disposable data directory. The older `--postgres-ddl` and optional `--task-run-ddl` scopes remain explicit. `--runner-tests` runs the focused Python order/fail-stop tests without a database.
+
+The bounded PostgreSQL 18 disposable run passed through 2026-10-19 and shut down cleanly; the 2026-10-01 repeat produced the same schema fingerprint as its first application. This proves the declared fresh-schema DDL/catalog chain only. It uses a bootstrap role and a no-op fixture for the external legacy audit trigger; it does not prove application-role grants, behavioral RLS, authenticated binding writes, API idempotency, rollback after an ambiguous commit, target migration state or production deployment. See `docs/reports/PHASE-WLD0-RUN-BINDING-DDL-HARNESS-20261020.md`; WLD-0 remains open and task execution stays fail closed.
+
+| Version | Date | Reviewer | Change | Trigger |
+|---|---|---|---|---|
+| v2.60 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the opt-in WLD-0 disposable Run binding migration chain, per-commit schema fingerprints, exact Outbox allowlist and fail-stop runner tests; preserve the target-role/RLS/API acceptance boundary | WLD-0 migration replay audit and successful local disposable PostgreSQL run |
