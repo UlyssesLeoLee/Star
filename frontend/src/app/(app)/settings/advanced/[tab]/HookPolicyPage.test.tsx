@@ -1,16 +1,21 @@
 /*
-@cypher schema=1 source_sha256=f56b7cd560e4f3c3a571c241fed8a50794c6a86a83a3020cce4280a9e684b42e
+@cypher schema=1 source_sha256=2b4290c300fc7e09933512dd5a571dd45c4b4ecd575698b4e7d140fb92997d93
 MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::HookPolicyPage tests",kind:"suite"})
 MERGE (expirationCase:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::clears policy UI when the host session expires case",kind:"test"})
+MERGE (unsavedCase:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::warns before discarding local policy edits case",kind:"test"})
 MERGE (provider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::HookPolicyPage",kind:"function"})
 MERGE (self)-[:DEFINES]->(suite)
 MERGE (suite)-[:DEFINES]->(expirationCase)
+MERGE (suite)-[:DEFINES]->(unsavedCase)
 MERGE (expirationCase)-[:CALLS]->(provider)
 MERGE (expirationCase)-[:CALLS]->(page)
 MERGE (expirationCase)-[:TESTS]->(provider)
 MERGE (expirationCase)-[:TESTS]->(page)
+MERGE (unsavedCase)-[:CALLS]->(provider)
+MERGE (unsavedCase)-[:CALLS]->(page)
+MERGE (unsavedCase)-[:TESTS]->(page)
 @endcypher
 */
 /*
@@ -18,9 +23,13 @@ CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx",type:"file",language:"tsx"}),
   (suite:Function {name:"HookPolicyPage unauthenticated state tests",type:"function",signature:"describe('HookPolicyPage', ...)",visibility:"private",complexity:"simple"}),
+  (page:Function {name:"HookPolicyPage",type:"function",signature:"HookPolicyPage()",visibility:"public",complexity:"complex"}),
   (failClosed:Function {name:"unauthenticated Hook page case",type:"function",signature:"it('does not show seeded policies without a host session', ...)",visibility:"private",complexity:"simple"}),
+  (unsavedChanges:Function {name:"unsaved policy changes case",type:"function",signature:"it('warns before discarding local policy edits', ...)",visibility:"private",complexity:"moderate"}),
   (render:Function {name:"Testing Library render",type:"function",signature:"render(<HookPolicyPage />)",visibility:"private",complexity:"simple"}),
-  (file)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(failClosed),(failClosed)-[:CALLS]->(render);
+  (file)-[:CONTAINS]->(suite),(file)-[:DEPENDS_ON]->(page),(suite)-[:CONTAINS]->(failClosed),(failClosed)-[:CALLS]->(render),
+  (suite)-[:CONTAINS]->(unsavedChanges),(unsavedChanges)-[:CALLS]->(render),
+  (unsavedChanges)-[:TESTS]->(page);
 */
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -249,6 +258,103 @@ describe("HookPolicyPage", () => {
     await waitFor(() => expect(screen.getByRole("option", { name: "Run admission" })).toBeEnabled());
     expect(screen.getByText(/Run admission producer 已由服务端报告可用/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("hook-event-coverage")).toHaveTextContent("run_admission"));
+  });
+
+  it("warns before discarding local policy edits and keeps them when the user cancels", async () => {
+    const projectId = "11111111-1111-4111-8111-111111111111";
+    const policyDocument = {
+      schema_version: 1,
+      evaluator_api_version: 1,
+      tenant_id: Array(16).fill(1),
+      project_id: Array(16).fill(2),
+      worktree_id: null,
+      project_version: 1,
+      worktree_version: null,
+      digest: Array(32).fill(0),
+      project_rules: [{
+        rule_id: Array(16).fill(3),
+        phase: "BeforeWorktreeArchiveCleanup",
+        priority: 1,
+        enabled: true,
+        decision: "Deny",
+        reason_code: "RuleDenied",
+        conditions: [{ field: "ActiveRunCount", operator: "GreaterThan", expected: { Count: 0 } }],
+      }],
+      worktree_rules: [],
+    };
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname === "/api/v1/projects") {
+        return jsonResponse({ projects: [{ project_id: projectId, role: "project_admin" }], next_cursor: null });
+      }
+      if (url.pathname.endsWith("/hook-policy")) {
+        return jsonResponse({
+          scope: { kind: "project", project_id: projectId, worktree_id: null },
+          producer_capabilities: { run_admission: false },
+          policy_set_id: "policy-1",
+          policy_document: policyDocument,
+          effective_policy_document: policyDocument,
+          inherited_project_policy_set_id: null,
+          draft: {
+            draft_id: "draft-1",
+            draft_version: 2,
+            base_policy_set_id: "policy-1",
+            inherited_project_policy_set_id: null,
+            expires_at: "2026-10-22T00:00:00.000Z",
+            is_stale: false,
+            policy_document: policyDocument,
+          },
+          audit: [],
+        });
+      }
+      if (url.pathname.endsWith("/hook-events/summary")) {
+        return jsonResponse({
+          metric_version: "hook_execution_summary_v2",
+          window: { days: 30, from: "2026-09-01T00:00:00.000Z", to: "2026-10-01T00:00:00.000Z" },
+          observed_event_count: 0,
+          run_linked_event_count: 0,
+          run_state_joined_event_count: 0,
+          excluded_incomplete_run_event_count: 0,
+          timeout_count: 0,
+          duration_total_ms: 0,
+          groups: [],
+          coverage: { scope: "hook_execution_event_and_task_execution_run_event", status: "partial", reported_percentage: null, instrumented_phases: [], not_yet_instrumented_phases: ["run_admission", "tool"], run_state_join: "no_samples", note: "No producer evidence." },
+          formulas: {},
+        });
+      }
+      if (url.pathname.endsWith("/hook-events")) {
+        return jsonResponse({ events: [], next_cursor: null, coverage: { scope: "hook_execution_event_ledger", status: "partial", reported_percentage: null, instrumented_phases: [], not_yet_instrumented_phases: ["run_admission", "tool"], note: "No producer evidence." } });
+      }
+      if (url.pathname.endsWith("/worktrees")) return jsonResponse({ worktrees: [], next_cursor: null });
+      return jsonResponse({});
+    });
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirm);
+
+    render(
+      <WorktreeGroupApiProvider getAccessToken={getTestAccessToken} sessionKey="draft-session" fetcher={fetcher}>
+        <HookPolicyPage />
+      </WorktreeGroupApiProvider>,
+    );
+
+    await screen.findByLabelText("Hook 适用阶段");
+    fireEvent.click(screen.getByRole("button", { name: "新增" }));
+    expect(await screen.findByTestId("hook-unsaved-draft")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发布版本" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("策略范围"), { target: { value: "worktree" } });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText("策略范围")).toHaveValue("project");
+    expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
+
+    const beforeUnload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(beforeUnload);
+    expect(beforeUnload.defaultPrevented).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "放弃本地更改" }));
+    expect(screen.queryByTestId("hook-unsaved-draft")).not.toBeInTheDocument();
+    expect(screen.getByText("本地未保存修改已放弃；服务端草稿和生效策略未改变。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发布版本" })).toBeEnabled();
   });
 });
 

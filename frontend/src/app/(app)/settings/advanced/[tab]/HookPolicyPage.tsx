@@ -1,8 +1,34 @@
 /*
+@cypher schema=1 source_sha256=347287fc02ed4246c22dc114134d18c26513a998b4f5ba5b223d64efb977d0ee
+MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::HookPolicyPage",kind:"function"})
+MERGE (confirm:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::confirmDiscardUnsavedChanges",kind:"function"})
+MERGE (discard:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::discardLocalChanges",kind:"function"})
+MERGE (editorDocument:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::documentForEditor",kind:"function"})
+MERGE (hasUnsaved:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::hasUnsavedChanges",kind:"variable"})
+MERGE (persisted:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::persistedDocument",kind:"variable"})
+MERGE (leaveHandler:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::warnBeforeLeaving",kind:"function"})
+MERGE (beforeUnload:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::beforeunload_event",kind:"event"})
+MERGE (self)-[:DEFINES]->(page)
+MERGE (page)-[:CALLS]->(confirm)
+MERGE (page)-[:CALLS]->(discard)
+MERGE (discard)-[:CALLS]->(editorDocument)
+MERGE (page)-[:USES]->(hasUnsaved)
+MERGE (page)-[:USES]->(persisted)
+MERGE (page)-[:HANDLES]->(beforeUnload)
+MERGE (page)-[:CALLS]->(leaveHandler)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx",type:"file",language:"tsx"}),
   (page:Function {name:"HookPolicyPage",type:"function",signature:"HookPolicyPage()",visibility:"public",complexity:"complex"}),
+  (confirmDiscard:Function {name:"confirmDiscardUnsavedChanges",type:"function",signature:"confirmDiscardUnsavedChanges(): boolean",visibility:"private",complexity:"simple"}),
+  (discardLocal:Function {name:"discardLocalChanges",type:"function",signature:"discardLocalChanges(): void",visibility:"private",complexity:"simple"}),
+  (warnBeforeLeaving:Function {name:"warnBeforeLeaving",type:"function",signature:"warnBeforeLeaving(event): void",visibility:"private",complexity:"simple"}),
+  (persistedDocument:Variable {name:"persistedDocument",type:"variable",language:"typescript"}),
+  (hasUnsavedChanges:Variable {name:"hasUnsavedChanges",type:"variable",language:"typescript"}),
   (executionPanel:Function {name:"HookExecutionEventPanel",type:"function",signature:"HookExecutionEventPanel({api,projectId})",visibility:"private",complexity:"moderate"}),
   (eventDecisionLabel:Function {name:"hookEventDecisionLabel",type:"function",signature:"hookEventDecisionLabel(decision)",visibility:"private",complexity:"simple"}),
   (ruleEditor:Function {name:"HookRuleEditor",type:"function",signature:"HookRuleEditor({rule,onChange,onDelete})",visibility:"private",complexity:"complex"}),
@@ -25,6 +51,10 @@ CREATE
   (isProject:Function {name:"isProjectRow",type:"function",signature:"isProjectRow(value): value is ProjectRow",visibility:"private",complexity:"simple"}),
   (isWorktree:Function {name:"isWorktreeRow",type:"function",signature:"isWorktreeRow(value): value is WorktreeRow",visibility:"private",complexity:"simple"}),
   (page)-[:CALLS]->(loadPolicy),(page)-[:CALLS]->(editorDocument),(page)-[:CALLS]->(digest),
+  (page)-[:CALLS]->(confirmDiscard),(page)-[:CALLS]->(discardLocal),
+  (page)-[:USES]->(persistedDocument),(page)-[:USES]->(hasUnsavedChanges),
+  (confirmDiscard)-[:USES]->(hasUnsavedChanges),(discardLocal)-[:CALLS]->(editorDocument),
+  (page)-[:CALLS]->(warnBeforeLeaving),
   (page)-[:CALLS]->(newRule),(ruleEditor)-[:CALLS]->(reason),(page)-[:CALLS]->(formatError),(page)-[:CALLS]->(executionPanel),
   (executionPanel)-[:CALLS]->(eventDecisionLabel),
   (ruleEditor)-[:CALLS]->(conditionEditor),(conditionEditor)-[:CALLS]->(conditionValue),
@@ -35,7 +65,9 @@ CREATE
   (page)-[:USES]->(maxRules),
   (ruleEditor)-[:USES]->(hookPhaseOptions),
   (executionPanel)-[:USES]->(maxVisibleEvents),
-  (file)-[:CONTAINS]->(page),(file)-[:CONTAINS]->(ruleEditor),(file)-[:CONTAINS]->(conditionEditor),
+  (file)-[:CONTAINS]->(page),(file)-[:CONTAINS]->(confirmDiscard),(file)-[:CONTAINS]->(discardLocal),
+  (file)-[:CONTAINS]->(warnBeforeLeaving),(file)-[:CONTAINS]->(persistedDocument),(file)-[:CONTAINS]->(hasUnsavedChanges),
+  (file)-[:CONTAINS]->(ruleEditor),(file)-[:CONTAINS]->(conditionEditor),
   (file)-[:CONTAINS]->(loadPolicy),(file)-[:CONTAINS]->(editorDocument),(file)-[:CONTAINS]->(digest),
   (file)-[:CONTAINS]->(formatError),(file)-[:CONTAINS]->(reason),(file)-[:CONTAINS]->(conditionValue),
   (file)-[:CONTAINS]->(operators),(file)-[:CONTAINS]->(newCondition),(file)-[:CONTAINS]->(newRule),
@@ -356,6 +388,30 @@ export default function HookPolicyPage() {
   const activeProject = projects.find((project) => project.project_id === projectId) ?? null;
   const canPublish = policyReady && (activeProject?.role === "tenant_admin" || activeProject?.role === "project_admin");
   const canEdit = Boolean(policyReady && api && policy && document && (!policy.draft?.is_stale || staleDraftRebased) && !busy);
+  const persistedDocument = policy ? documentForEditor(policy, scope, worktreeId) : null;
+  const hasUnsavedChanges = Boolean(document && policy && (staleDraftRebased
+    || JSON.stringify(document) !== JSON.stringify(persistedDocument)));
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [hasUnsavedChanges]);
+
+  const confirmDiscardUnsavedChanges = () => !hasUnsavedChanges || window.confirm(
+    "有尚未保存到服务端的 Hook 修改。选择继续会放弃这些本地修改；取消可返回并保存草稿。",
+  );
+
+  const discardLocalChanges = () => {
+    if (!policy) return;
+    setDocument(documentForEditor(policy, scope, worktreeId));
+    setStaleDraftRebased(false);
+    setNotice("本地未保存修改已放弃；服务端草稿和生效策略未改变。");
+  };
 
   const updateRules = useCallback((next: HookRule[]) => {
     setDocument((current) => {
@@ -417,7 +473,7 @@ export default function HookPolicyPage() {
   };
 
   const publishDraft = async () => {
-    if (!policyReady || !api || !policy?.draft || !canPublish || policy.draft.is_stale || busy) return;
+    if (!policyReady || !api || !policy?.draft || !canPublish || policy.draft.is_stale || hasUnsavedChanges || busy) return;
     const generation = policyRequestGeneration.current;
     setBusy(true);
     setError("");
@@ -437,7 +493,7 @@ export default function HookPolicyPage() {
   };
 
   const rollback = async (targetPolicySetId: string) => {
-    if (!policyReady || !api || !policy?.policy_set_id || !canPublish || !targetPolicySetId || busy) return;
+    if (!policyReady || !api || !policy?.policy_set_id || !canPublish || !targetPolicySetId || hasUnsavedChanges || busy) return;
     const generation = policyRequestGeneration.current;
     setBusy(true);
     setError("");
@@ -479,17 +535,17 @@ export default function HookPolicyPage() {
         <div><h2 className="text-lg font-semibold text-ink">Worktree 生命周期 Hook 策略</h2><p className="text-xs text-ink-dim">可视化配置服务端已安装 producer 的 phase 限制规则；Rust 内置安全基线不可关闭、删除或放宽。</p></div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-ink-mute">策略范围
-            <select value={scope} onChange={(event) => setScope(event.target.value as PolicyScopeKind)} disabled={!deepLinkSelectionReady} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink disabled:opacity-50">
+            <select value={scope} onChange={(event) => { if (confirmDiscardUnsavedChanges()) setScope(event.target.value as PolicyScopeKind); }} disabled={!deepLinkSelectionReady} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink disabled:opacity-50">
               <option value="project">Project 基线</option><option value="worktree">Worktree 限制覆盖</option>
             </select>
           </label>
           <label className="text-xs text-ink-mute">Project
-            <select value={projectId} onChange={(event) => { clearDeepLinkHintsForSelection(); setWorktreeId(""); setPolicy(null); setDocument(null); setStaleDraftRebased(false); setProjectId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 font-mono text-ink" disabled={!deepLinkSelectionReady || !projects.length}>
+            <select value={projectId} onChange={(event) => { if (!confirmDiscardUnsavedChanges()) return; clearDeepLinkHintsForSelection(); setWorktreeId(""); setPolicy(null); setDocument(null); setStaleDraftRebased(false); setProjectId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 font-mono text-ink" disabled={!deepLinkSelectionReady || !projects.length}>
               {projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.project_id} · {project.role}</option>)}
             </select>
           </label>
           {scope === "worktree" && <label className="text-xs text-ink-mute">Worktree
-            <select value={worktreeId} onChange={(event) => { clearDeepLinkHintsForSelection(); setWorktreeId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink" disabled={!deepLinkSelectionReady || !worktrees.length}>
+            <select value={worktreeId} onChange={(event) => { if (!confirmDiscardUnsavedChanges()) return; clearDeepLinkHintsForSelection(); setWorktreeId(event.target.value); }} className="ml-2 max-w-64 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink" disabled={!deepLinkSelectionReady || !worktrees.length}>
               {worktrees.map((worktree) => <option key={worktree.id} value={worktree.id}>{worktree.name ?? worktree.branch ?? worktree.id}</option>)}
             </select>
           </label>}
@@ -505,6 +561,10 @@ export default function HookPolicyPage() {
       </div>}
       {error && <div role="alert" className="rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-sm text-red-600">{error}</div>}
       {notice && <div role="status" className="rounded border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700">{notice}</div>}
+      {hasUnsavedChanges && <div role="status" aria-live="polite" data-testid="hook-unsaved-draft" className="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-800">
+        <span>有尚未保存到服务端的修改；当前生效策略未改变。切换范围或刷新前会先确认。</span>
+        <button type="button" onClick={discardLocalChanges} disabled={busy} className="rounded border border-current px-2 py-1 text-xs underline disabled:opacity-50">放弃本地更改</button>
+      </div>}
       <HookExecutionEventPanel key={projectSelectionReady ? projectId : "hook-deep-link-blocked"} api={api} projectId={projectSelectionReady ? projectId : ""} />
       {!deepLinkSelectionReady && <div role="status" className="card p-4 text-sm text-ink-mute">策略详情、执行事件与写操作均保持关闭，直到授权 Project 和 Worktree 范围验证完成。</div>}
       {loading && <div className="card p-4 text-sm text-ink-mute">正在加载服务端策略…</div>}
@@ -543,8 +603,8 @@ export default function HookPolicyPage() {
               /> : <div className="grid h-full min-h-64 place-items-center text-sm text-ink-mute">选择一条规则，或新增限制性规则。</div>}
               <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
                 <button type="button" onClick={saveDraft} disabled={!canEdit} className="btn-primary inline-flex items-center gap-1.5 text-xs"><Save size={13} />保存草稿</button>
-                <button type="button" onClick={publishDraft} disabled={!canPublish || !policy.draft || policy.draft.is_stale || busy} title={!canPublish ? "需要 tenant_admin 或 project_admin" : undefined} className="btn-secondary inline-flex items-center gap-1.5 text-xs"><Check size={13} />发布版本</button>
-                <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={busy} className="btn-secondary inline-flex items-center gap-1.5 text-xs">刷新</button>
+                <button type="button" onClick={publishDraft} disabled={!canPublish || !policy.draft || policy.draft.is_stale || hasUnsavedChanges || busy} title={hasUnsavedChanges ? "先保存或放弃本地修改" : !canPublish ? "需要 tenant_admin 或 project_admin" : undefined} className="btn-secondary inline-flex items-center gap-1.5 text-xs"><Check size={13} />发布版本</button>
+                <button type="button" onClick={() => { if (confirmDiscardUnsavedChanges()) setRefreshKey((value) => value + 1); }} disabled={busy} className="btn-secondary inline-flex items-center gap-1.5 text-xs">刷新</button>
                 {!canPublish && <span className="self-center text-[10px] text-ink-mute">当前 Project 角色不能发布（需 Project/Tenant Admin）。</span>}
               </div>
             </section>
@@ -561,7 +621,7 @@ export default function HookPolicyPage() {
                 <div className="max-h-56 space-y-2 overflow-y-auto">
                   {policy.audit.map((entry) => <div key={entry.event_id} className="border-l-2 border-line pl-2 text-[10px]">
                     <div className="flex items-center justify-between gap-2"><span className="font-mono text-ink">{entry.event_type}</span><time className="text-ink-mute">{new Date(entry.occurred_at).toLocaleString()}</time></div>
-                    {entry.policy_set_id && entry.policy_set_id !== policy.policy_set_id && canPublish && <button type="button" disabled={busy} onClick={() => rollback(entry.policy_set_id!)} className="mt-1 inline-flex items-center gap-1 text-amber-700 underline"><RotateCcw size={10} />回滚到此版本</button>}
+                    {entry.policy_set_id && entry.policy_set_id !== policy.policy_set_id && canPublish && <button type="button" disabled={busy || hasUnsavedChanges} onClick={() => rollback(entry.policy_set_id!)} title={hasUnsavedChanges ? "先保存或放弃本地修改" : undefined} className="mt-1 inline-flex items-center gap-1 text-amber-700 underline"><RotateCcw size={10} />回滚到此版本</button>}
                   </div>)}
                   {!policy.audit.length && <p className="text-[10px] text-ink-mute">暂无策略变更记录。</p>}
                 </div>
