@@ -3,9 +3,10 @@
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
+> **WLD-0 Directory owner-role 增量（2026-10-20）**：绑定 API transaction 显式 `SET LOCAL ROLE star_engineering_directory_owner`；前向 migration 创建 `NOLOGIN`、`NOSUPERUSER`、`NOBYPASSRLS`、`NOINHERIT` role，并以列级 lock grants + restrictive RLS 允许对 Project/Branch/Run revision/Worktree/Task 源事实取锁、拒绝修改。Focused runner tests 6/6、fresh PostgreSQL 18.6 role/RLS runner 34/34 passed；漂移夹具注入直接权限、数据库权限和向外成员关系后重放 migration，确认归一化及 schema fingerprint 稳定；role-owned schema 负向夹具确认迁移拒绝已有对象所有权。实际部署 API login membership、目标 DB migration/RLS、authenticated HTTP bind/reassign/detach、rollback/replay/concurrency 与历史 reconciliation 未验收；Rust 1.99.0 在当前执行环境不可用（仅发现 1.98.x toolchain），不得把 1.98.x 检查当作基线通过，执行 admission 继续关闭。详见 WLD-0 阶段报告。
 
-> **文档版本**: v6.88 (2026-10-20)
-> **上游要件定义书**: docs/requirements.md v6.87
+> **文档版本**: v6.91 (2026-10-20)
+> **上游要件定义书**: docs/requirements.md v6.90
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4255,6 +4256,10 @@ Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 **WLD-0 binding vocabulary**：Engineering Run Directory owns `EngineeringRunWorktreeBinding`, its Project/Run-authorized attach/reassign/detach commands and Run Outbox facts. Worktree Domain owns checkout lifecycle and Project-to-repository checkout ownership; it does not own the Run binding fact. Run/Worktree relation CAS uses `binding_id` + `binding_version`; Project/repository relation CAS uses `project_binding_id` + `project_binding_version`; optional RunContext focus selection uses `focus_version`. `worktree_generation` and `k3s_cluster_generation` are separate resource-incarnation values and are never binding-version aliases. Local Branch is an observation with `local_branch_ref`, `observation_source`, `observed_at` and `freshness`; optional `remote_branch_id` is separate. Missing, stale or invalid observations remain unknown. Hostless Runs and optional Worktree focus remain valid; each attach/reassign/detach command must be authorized by its owning domain and revalidate current facts. These terms align the design only: target PostgreSQL roles/grants and FORCE RLS, authenticated writes, rollback/replay, concurrent races, duplicate-current-row handling and historical reconciliation remain open acceptance gates.
 
+**WLD-0 database mutation identity**：`run_worktree_bindings.rs::begin_write` 在开启 PostgreSQL transaction 后、设置 tenant/actor GUC 前执行 `SET LOCAL ROLE star_engineering_directory_owner`；该 role 仅在本事务生效，角色缺失或登录 membership 未配置时 mutation 失败关闭。Migration 将其设为 `NOLOGIN`、`NOSUPERUSER`、`NOBYPASSRLS`、`NOINHERIT`，不授予任何默认 API 登录；migration 清除专用 role 的历史对象权限与向外角色成员关系，发现该 role 已拥有数据库对象时 fail closed，并保留 API login → owner-role 的部署 membership。部署 provisioning 必须按实际服务身份显式授予 membership 并验证 effective grants。它只写 Run Directory 自有 binding、idempotency、Audit 与 Outbox；Run Outbox 仅 INSERT。为 PostgreSQL `FOR SHARE` 所需的 `UPDATE(valid_to)` / `UPDATE(id)` 是 lock-only column grant，通过针对 owner role 的 restrictive `FOR UPDATE USING(false) WITH CHECK(false)` policy 禁止修改 Project/Branch/Run revision/Worktree/Task owner facts；idempotency expiry sweep 的受限 UPDATE 权限同样不能扩大到他域表。
+
+**WLD-0 database evidence state (2026-10-20)**：focused runner tests 6/6 passed；fresh disposable PostgreSQL 18.6 按完整 Task/Run prerequisite chain 34/34 steps passed，包括受限非超级用户登录、`SET LOCAL ROLE`、NOBYPASSRLS 与非表所有权、所需读/锁 privilege、tenant scoped Task reads、缺失 tenant 拒绝、源表 restrictive policy 与 Project/Task/Task-Worktree 事实更新被拒绝。另注入 owner-role 直接权限、数据库权限和向外成员关系，再重放 migration 并确认权限归一化及 schema fingerprint 稳定；创建归属于该 role 的 schema，确认 migration 按共享对象所有权记录 fail closed，并在回滚后清理夹具。role fixture 是本地测试登录，不等于部署 API identity；未执行认证 bind/reassign/detach API 写入，未访问目标 DB，也未验证生产 migration/rollback/race/reconciliation。项目要求 Rust 1.99.0，而当前环境只有 1.98.x；基线编译状态保持未验证。任务执行、Schedule 与 BI admission 不因此 evidence 开放。
+
 整体交付方向与批次完成门见 [渡口架构与交付方向](design/DUKOU-ARCHITECTURE-DIRECTION-001.md)。新目录与 shell 不会自动迁移既有 Worktree Task/Canvas/Plugin 所有权，Run-owned Apps 与 execution admission 当前明确不可用。
 
 用户可见的导航、功能标签、帮助、空态、错误与宣传文案使用 Star 的中性能力名称，不以第三方产品名作对标或仿制；实际已配置的连接器可事实性显示其服务商名称，内部 adapter/API/database 标识不作为产品标签。此规则只约束产品呈现，不改写实际连接器协议身份。
@@ -5867,3 +5872,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.87 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：W1 有界设计核对发现活动架构条款仍把 NATS 写成必需传输基线。同步 §1、§1.6、§3、§4、§5、§16.3、§16.5、§16.19：以 owner-local Outbox/Inbox 与不可变 route pin 定义跨域事实和恢复边界；明确 NATS 为可移除兼容 adapter、Rust-native provider 为目标替换方向，并保留生产 parity、切换与回退门禁。仅完成文档修订，未执行运行时或数据库验收。
 
 修订 v6.88 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 binding contract 对齐。同步 §16.1–§16.2 的 owner 边界与字段词汇：Engineering Run Directory 持有 Run/Worktree binding 和 Run Outbox，Worktree Domain 持有 checkout 与 Project/repository 归属；分开 binding/project-binding/focus 版本、资源 generation 与本地/远端 Branch 身份。保留目标 PostgreSQL/RLS、认证写入、回滚/replay、竞争、重复当前行和历史 reconciliation 未验收状态。
+
+修订 v6.91 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 owner-role 权限漂移注入、migration 重放和 role-owned schema fail-closed 负向夹具的 34/34 PostgreSQL 证据；保留部署身份、目标 DB、Rust 1.99.0、API 写入、回滚/并发与生产闭环门禁。

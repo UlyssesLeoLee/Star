@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=89c5cf65f74e83d61402e4dd8ca2cb2ed7da445ca763e09c0398f563688e440a
+@cypher schema=1 source_sha256=d5ec89af6658d5fde7327ff4a6dd7fe4ac814d34fdebb06d280b5ab4dff7f298
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::module",kind:"module"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::router",kind:"function"})
@@ -13,6 +13,7 @@ MERGE (closeBinding:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_
 MERGE (insertBinding:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::insert_current_binding",kind:"function"})
 MERGE (authorize:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::authorize_run_manager",kind:"function"})
 MERGE (begin:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::begin_write",kind:"function"})
+MERGE (directoryRole:Type {id:"star_engineering_directory_owner",kind:"database_role"})
 MERGE (transition:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::validate_transition",kind:"function"})
 MERGE (validateProjectVersion:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::validate_project_binding_version",kind:"function"})
 MERGE (validateTarget:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::validate_target_repository",kind:"function"})
@@ -111,6 +112,7 @@ MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/engine
 MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::idempotency_key",kind:"function"})
 MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::request_hash",kind:"function"})
 MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api.rs::active_binding",kind:"function"})
+MERGE (begin)-[:CONFIGURES]->(directoryRole)
 MERGE (begin)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api.rs::set_tenant",kind:"function"})
 MERGE (authorize)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::authorize_run_owned_task_scope",kind:"function"})
 MERGE (loadWorktree)-[:READS]->(:Table {id:"multica.worktree_project_binding",kind:"table"})
@@ -430,6 +432,10 @@ async fn begin_write(
         .begin()
         .await
         .map_err(|_| GroupApiError::internal())?;
+    sqlx::query("SET LOCAL ROLE star_engineering_directory_owner")
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     set_tenant(&mut tx, actor.tenant_id).await?;
     sqlx::query(
         "SELECT set_config('statement_timeout','5000',true), set_config('lock_timeout','1000',true)",
@@ -614,7 +620,7 @@ async fn load_idempotency_replay(
 ) -> Result<Option<RunCommandReplay>, GroupApiError> {
     sqlx::query_as::<_, RunCommandReplay>(
         "SELECT request_hash,response_body FROM multica.engineering_run_command_idempotency
-         WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3 AND expires_at>now() FOR UPDATE",
+         WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3 AND expires_at>now()",
     )
     .bind(actor.tenant_id)
     .bind(actor.user_id)

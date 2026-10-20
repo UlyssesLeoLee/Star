@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.87）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.90）
 
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
@@ -8,6 +8,7 @@
 > **v6.85 Phase 9F4G BI Task receiver/query source status**：在 v6.83 的单条有界 receiver 与 metadata-only quarantine 基础上，新增 Run 授权的只读 Task-event 查询 API 与固定 BI owner 查询函数；默认 50、最大 100，采用稳定 keyset cursor，仅返回既有 allowlist 字段，coverage/freshness 明示 unknown。BI 数据库 URL 可选且使用最多 2 个连接；缺少 provider 时 API fail closed。新增查询 migration 双次应用、scope、权限、游标和输入校验通过隔离 PostgreSQL 18 runner。此 API 是源码与隔离 fixture，不是生产 BI UI/分析闭环；target DB/角色成员、生产 Auth/BI identity、Rust 1.99.0 fmt/build/test/Clippy、receiver composition、fan-out/recovery、Benchmark、RSS/latency/fairness 仍未验收，BI ingress 与执行保持 fail closed。
 
 > **v6.87 WLD-0 Run-to-Worktree binding source status (2026-10-19)**：新增 Project/Run 授权的 Worktree 绑定、重绑和解绑 API 源码切片，使用 CAS、幂等、Worktree advisory lock、SCD2 历史、审计与同事务 Outbox；Run 可不带远端 repository/Branch 元数据，绑定仍保留本地 Worktree repository 身份。迁移尚未应用到目标数据库，应用角色 grants/RLS、认证写入、回滚、持久化幂等和并发验收未完成；`execution_admission_available` 保持 false，不能据此启用 CLI、Agent 或 Schedule 执行。
+> **v6.90 WLD-0 owner-role source status (2026-10-20)**：新增专用 `NOLOGIN`、`NOBYPASSRLS`、`NOINHERIT` Engineering Directory mutation role；绑定 API 在事务内显式 `SET LOCAL ROLE`，并以最小列级 UPDATE 权限获取 `FOR SHARE` 行锁、由 restrictive RLS 拒绝修改 Project/Branch/Run revision/Worktree/Task 源事实。Disposable PostgreSQL 18.6 runner 使用非超级用户登录验证角色切换、RLS、锁权限和拒绝更新，并注入旧直接权限/数据库权限/向外成员关系后重放 migration，验证权限归一化和 schema fingerprint 稳定；另以 role-owned schema 负向夹具确认任意共享对象所有权会导致迁移失败关闭。部署时 API 登录角色 membership 仍需由实际身份配置；目标 DB、真实 API 登录/绑定写入、撤权、回滚、并发及历史 reconciliation 未验收，execution admission 仍关闭。
 
 ## 0. 文档说明与前提
 
@@ -2325,6 +2326,14 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 
 WLD-0 实现状态（2026-10-19）：Run-to-Worktree owner 已有绑定/重绑/解绑源码 API 和前向 migration；写入校验当前 Project/Run 授权、Project binding 版本、Worktree 所属与本地 repository、当前绑定 CAS 和唯一活动关系，并在 owner transaction 写入 SCD2 事实、Audit、幂等回执和 Outbox。迁移未在目标 DB 应用；target grants/RLS、真实认证写入、rollback、并发与部署后 reconciliation 仍是关闭门。该切片只建立归属事实，不表示 Host/cluster reservation、Runtime readiness 或任务执行可用。
 
+### 50.3.2 Engineering Run Directory 数据库 owner role 与锁权限边界
+
+绑定、重绑和解绑命令必须在同一数据库事务开始后立即切换到专用 `star_engineering_directory_owner`（`NOLOGIN`、`NOSUPERUSER`、`NOBYPASSRLS`、`NOINHERIT`），再设置 tenant/actor 上下文并执行任何 Run Directory 查询或写入。缺少部署侧 API-login → owner-role membership 时，`SET LOCAL ROLE` 失败并回滚；迁移不得把 membership 授予通用 API 登录或假定任一部署登录名。若专用 role 已存在，migration 必须清除其既有 schema/table/sequence/routine 直接权限与 role 向外的成员关系，发现该 role 拥有数据库对象则 fail closed；部署授予 API-login 成为 owner-role 成员的关系必须保留。
+
+Owner role 只可读取当前 Project、Branch、Run、Worktree 与 Task 关联所需事实；仅对 Run Directory 自有 binding SCD2、actor-scoped idempotency、Audit append 与 Outbox insert 授予写权限。为在 PostgreSQL 上获取 `FOR SHARE` 锁所需的窄 `UPDATE(valid_to)` 或 `UPDATE(id)` 权限（包括 `multica.engineering_run_revision.valid_to`），不赋予跨域事实修改权：受影响源表必须有针对该 role 的 restrictive `FOR UPDATE USING(false) WITH CHECK(false)` policy；实际 mutation 仅可关闭自己的 Run/Worktree binding `valid_to`，idempotency 的 `expires_at` 只供受控过期清理。Run Outbox 对该 role 仅允许 INSERT，不允许 SELECT、UPDATE 或 DELETE；角色不得拥有受 RLS 保护的表。
+
+WLD-0 role acceptance 必须在一次性 loopback PostgreSQL 集群里使用真实非超级用户登录验证 `SET LOCAL ROLE`、role attributes、列级 lock grants、所有锁源表 `FOR SHARE` 可执行、restrictive policy 存在、带 tenant 的 scoped read、缺失 tenant fail-closed，以及至少一条带事实记录的锁专用 UPDATE 被 RLS 拒绝。该夹具只证明 SQL role/RLS 行为，不证明部署角色 membership、真实 HTTP API 写入、目标 DB migration 或生产授权。任何生产执行门仍须独立验收。
+
 ### 50.4 任务卡内 CLI
 
 任务卡允许打开 CLI，以便人或 Agent 在卡内完成实际工作。CLI 会话必须绑定 `work_item_id`、`worktree_id`、Runtime、Agent Policy 和已批准的启动配置；界面在任务卡中展示会话状态、输出流、取消入口与返回的验证结果。
@@ -3706,3 +3715,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.86 · 2026-10-18 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4I 原生 event 授权与 Rust/PG gates 完成、跨文档核对。详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 修订 v6.87 · 2026-10-19 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 Run-to-Worktree binding API source slice 完成；同步 hostless/local repository 语义、CAS/幂等/Outbox 不变量和未关闭的目标 DB/RLS/并发验收门。详见 `PHASE-WLD0-BINDING-API-IMPL-REPORT-20261019.md`。
+
+修订 v6.90 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：复验 owner-role migration 时注入历史直接/数据库权限和向外 role membership，并通过 migration 重放归一化；记录 PostgreSQL 18.6 34/34 步、权限漂移前后 fingerprint 稳定及 role-owned schema 导致 migration fail closed 的负向验收。目标 DB、真实 API、Rust 1.99.0 与生产 admission 继续未验收。详见 `PHASE-WLD0-DIRECTORY-OWNER-ROLE-20261020.md`。

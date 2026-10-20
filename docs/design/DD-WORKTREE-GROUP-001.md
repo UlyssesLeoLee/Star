@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.11**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.14**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -18,11 +18,12 @@
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.87 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.87 §16
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.88 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.90 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.34、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.75、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.08
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 > - WLD-0 source slice（2026-10-19）：新增 Project/Run 授权的 Run-to-Worktree bind/reassign/detach REST owner API 与前向 Outbox constraint migration；用本地 Worktree repository 身份维持归属，不要求 hostless Run 提供远端 repository/Branch。CAS、幂等、每 Worktree 锁、SCD2、Audit 与 Outbox 在单一 owner transaction 内。当前迁移只在源码中，目标 DB grants/RLS、认证持久化、回滚、并发与历史对账未验收，执行 admission 继续关闭。
+> - WLD-0 DB owner role slice（2026-10-20）：REST mutation transaction 使用 `SET LOCAL ROLE star_engineering_directory_owner`；migration 建立 NOLOGIN/NOBYPASSRLS/NOINHERIT role，以 lock-only 列权限满足 `FOR SHARE` 并为跨域源表添加 restrictive UPDATE-deny RLS。一次性 PostgreSQL 18.6 runner 验证 restricted test login 的角色切换、授权和行为 RLS；真实部署 membership、目标 DB、HTTP API 写入与并发/回滚门仍未验收，执行 admission 关闭。
 
 ---
 
@@ -222,6 +223,12 @@ RunContext `context_version` 只包含当前 Project/Run grant identity/version 
 绑定 API 以 `PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}` 创建或重绑当前归属，以同一路径的 `DELETE` 关闭当前归属。Engineering Run Directory 是关系事实、授权命令与 Run Outbox 的 owner；Worktree Domain 是 checkout lifecycle 和 Project-to-repository ownership 的 owner，并通过受授权查询/owner command 提供当前关联事实，不共享写事务。请求携带 `expected_binding`（`unassigned` 或精确的 active `binding_id`/`binding_version`）、当前 `project_binding_id` 与 `expected_project_binding_version`、`correlation_id` 与 `Idempotency-Key`。Run Directory owner 在同一事务重新验证 Bearer actor、Project manager membership、Run grant、当前 Project-Worktree binding/version、Run 与本地 Worktree repository 兼容性；remote Run repository/Branch 可为空，但 Worktree repository identity 必须存在且属于该 Project。按 tenant+Worktree advisory lock 串行变更，执行 SCD2 close/insert、当前唯一性、Audit trigger context、稳定幂等回执与版本化 Run Outbox。请求的 Project binding ID/version 必须匹配 Worktree Domain 当前有效事实；archive/restore 不隐式 attach、reassign 或 detach。响应和事件都明确 `execution_admission_available=false`。
 
 2026-10-19 源码切片已实现 route/mutation、前向 Outbox event constraint migration、鉴权边界 route test 与 transition/idempotency/hostless/lock SQLSTATE unit tests。Rust 1.99.0 all-targets check 与 full all-targets test 曾通过；补充的 lock SQLSTATE 单测单独通过。目标 PostgreSQL migration、application role grants/FORCE RLS、持久回放、事务回滚、竞争事务和部署后历史 reconciliation 没有验证。不得把 source slice 标为生产绑定闭环，也不得由绑定成功推导 Agent/CLI/Schedule 可执行。
+
+**Mutation database role and lock grant contract (v5.13)**：`begin_write` 必须在同一个 PostgreSQL transaction 内先执行 `SET LOCAL ROLE star_engineering_directory_owner`，再设置 tenant/actor GUC；此后才能读取 owner scope 或锁定目标事实。缺少部署 membership、role 属性错误或 RLS 不满足时事务失败关闭。owner role 为 NOLOGIN/NOSUPERUSER/NOBYPASSRLS/NOINHERIT，迁移不创建 API-login membership；若角色预先存在，先清除其历史 schema/object grants 与向外角色成员关系，既有数据库对象所有权则 fail closed，API-login 成员关系保留。
+
+`FOR SHARE` 源表访问需要表 SELECT 与 PostgreSQL 要求的窄 UPDATE 列权限：Project/Branch/Run revision/Run grant、Worktree Project binding、Worktree projection、Task metadata 与 Task/Worktree relation 使用其 `valid_to` 或主键列作为 lock-only grant；对这些他域源表统一附 restrictive `FOR UPDATE USING(false) WITH CHECK(false)` policies。对比之下，EngineeringRunWorktreeBinding 仅允许 owner 写入/关闭自身 SCD2 `valid_to`，Directory Event 为 INSERT-only，Run Outbox 为 INSERT-only，actor idempotency 有限 SELECT/INSERT/DELETE 与 expiry-lock grant；owner role 不拥有任何 FORCE RLS 表。目录 grants 与 restrictive policies 纳入每迁移 schema fingerprint。
+
+验证证据：`--runner-tests` 6/6；fresh PostgreSQL 18.6 loopback cluster 34/34 runner steps passed。真实非超级用户 login 只用于一次性夹具，并经显式 grant membership + `SET LOCAL ROLE` 运行；验证 NOBYPASSRLS、非表所有者、required SELECT/`FOR SHARE`（包括 Run revision 锁）、tenant-scoped Task metadata/关联读取、missing-tenant denial、restrictive policy catalog 与事实行 UPDATE 0 rows。额外在 owner role 上注入直接权限、数据库权限及向外 role membership，重放 migration 后验证归一化与 schema fingerprint 稳定；role-owned schema fixture 验证迁移因共享对象所有权而 fail closed，并在事务回滚后移除夹具。此证据不覆盖真实 deployment login membership、HTTP authenticated bind/reassign/detach、目标 database、exact API replay、rollback/ambiguous commit、并发 race、history reconciliation 或 production deployment；WLD-0 与 execution admission 仍开放。
 
 ## §4 API 契约
 
@@ -917,6 +924,9 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.10 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修订 §9.2 的跨 owner messaging 契约：owner Outbox/Inbox 与 immutable route pin 是稳定边界，NATS 为可移除兼容 adapter，Rust-native transport 为目标方向；将 analytics stream 评估与基础 transport 替换分开，并明确 ACK、恢复与 BI 事实的 owner 语义 | W1 有界设计核对发现 §9.2 仍将 NATS 写为固定 broker 基线 |
+| v5.13 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 Run revision 的 FOR SHARE lock-only 列权限与 restrictive RLS denial，并将其纳入非超级用户验收；保留目标 DB、真实 API、rollback/replay/concurrency 未验收 | Self-review found and fixed a missing Run revision lock grant |
+| v5.14 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步权限漂移注入、migration 重放归一化、稳定 schema fingerprint 与 role-owned schema 拒绝夹具的 34/34 PostgreSQL 证据；保留生产/API/Rust 门禁 | WLD-0 final disposable runner evidence and gap reconciliation; aligns requirements v6.90 and basic design v6.91 |
+| v5.12 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 WLD-0 NOLOGIN/NOBYPASSRLS/NOINHERIT mutation role、事务内 SET LOCAL ROLE、FOR SHARE lock-only 列权限、restrictive RLS 拒绝他域更新和一次性 PG18 role/RLS acceptance；明确生产登录 membership、目标 DB、API mutation、rollback/replay/concurrency 仍未验收 | Directory owner-role source implementation and disposable acceptance |
 | v5.11 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 WLD-0 binding owner 与版本词汇：Run Directory 持有 Project/Run-authorized Run/Worktree relation 和 Run Outbox；Worktree Domain 持有 checkout lifecycle 与 Project/repository ownership；明确 binding、project-binding、focus、Worktree/K3s generation 和 local/remote Branch observation 各自语义；目标 PostgreSQL/RLS、认证写入与并发历史门保持开放 | WLD-0 binding contract vocabulary alignment |
 | v0.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Project → Worktree → Group Apps 详细交互、安全上下文、管理操作、CLI、Canvas、Chat/LangGraph、Plugin、事件与 W/T/M 实施门；记录 REST no-op auth 与 in-memory blocker | 推进 Worktree Group Phase 2，并依据 Worktree Index 当前实现核对 API 安全边界 |
 | v0.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落地 RS256 actor 校验、Project scope + active membership、租户 RLS GroupContext resolver 与只读 Index/Group 路由；定义 2B migration 和未回填数据边界 | 推进 Worktree Group Phase 2B；落实 Project → Worktree Index → Worktree 同级应用架构 |

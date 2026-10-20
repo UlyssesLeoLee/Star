@@ -6,6 +6,11 @@ CREATE (f:File {name:"engineering_run_directory.py",type:"file",language:"python
  (ddl:Function {name:"validate_postgres_ddl",type:"function"}), (guards:Function {name:"task_run_identity_guard_sql",type:"function"}), (uuid:Function {name:"uuid4",type:"function"}),
  (migrationPlan:Function {name:"directory_migration_plan",type:"function"}), (applyPlan:Function {name:"apply_migration_plan",type:"function"}),
  (bindingCatalog:Function {name:"run_binding_catalog_sql",type:"function"}), (fingerprint:Function {name:"migration_fingerprint_sql",type:"function"}),
+ (roleSetup:Function {name:"run_binding_role_setup_sql",type:"function"}),
+ (roleDrift:Function {name:"run_binding_role_drift_sql",type:"function"}),
+ (roleAcceptance:Function {name:"run_binding_role_acceptance_sql",type:"function"}),
+ (runRevision:Table {name:"multica.engineering_run_revision",type:"table"}),
+ (ownerRole:Type {name:"star_engineering_directory_owner",type:"database_role"}),
  (remove:Function {name:"shutil.rmtree",type:"function"}), (relative:Function {name:"Path.is_relative_to",type:"function"}),
  (args:Class {name:"argparse.ArgumentParser",type:"class"}), (process:Function {name:"subprocess.run",type:"function"}),
  (which:Function {name:"shutil.which",type:"function"}), (home:Function {name:"Path.home",type:"function"}),
@@ -23,18 +28,21 @@ CREATE (f:File {name:"engineering_run_directory.py",type:"file",language:"python
  (main)-[:CALLS]->(subn),
  (f)-[:CONTAINS]->(ddl),(f)-[:CONTAINS]->(guards),(main)-[:CALLS]->(ddl),(ddl)-[:CALLS]->(guards),(ddl)-[:CALLS]->(run),(ddl)-[:CALLS]->(uuid),(ddl)-[:CALLS]->(remove),(ddl)-[:CALLS]->(relative),
  (f)-[:CONTAINS]->(migrationPlan),(f)-[:CONTAINS]->(applyPlan),(f)-[:CONTAINS]->(bindingCatalog),(f)-[:CONTAINS]->(fingerprint),
+ (f)-[:CONTAINS]->(roleSetup),(f)-[:CONTAINS]->(roleDrift),(f)-[:CONTAINS]->(roleAcceptance),
  (ddl)-[:CALLS]->(migrationPlan),(ddl)-[:CALLS]->(applyPlan),(ddl)-[:CALLS]->(bindingCatalog),(ddl)-[:CALLS]->(fingerprint),
+ (ddl)-[:CALLS]->(roleSetup),(ddl)-[:CALLS]->(roleDrift),(ddl)-[:CALLS]->(roleAcceptance),(roleAcceptance)-[:READS]->(runRevision),
+ (roleDrift)-[:CONFIGURES]->(ownerRole),
  (cargo)-[:USES]->(root),(run)-[:USES]->(root),(main)-[:USES]->(root);
 
 Compile the canonical Branch/Engineering Run directory slice. Runner tests run only with --runner-tests and Rust tests
-only with --cli-tests; --run-binding-ddl applies the audited migrations once in a fresh disposable cluster. No production migrations,
+ only with --cli-tests; --run-binding-ddl applies the audited migrations, injects privilege drift and replays the owner-role migration in a fresh disposable cluster. No production migrations,
 credential inspection, remote writes or workspace-wide source formatting are run.
 Temporary Cargo resolution is opt-in and the original lock bytes are restored.
 See docs/automation-design.md sections 4.36 and 4.37. Optional Task Run DDL checks exercise
 the new forward CLI identity gate and snapshot/FK constraints in the disposable cluster only.
 """
 
-# @cypher schema=1 source_sha256=8bf7385ce343a4d7e99a0ccdebc24d354ef4ff3dc73b135c2ed1c1cab12e1e92
+# @cypher schema=1 source_sha256=450e4cd42fda2cb1aadd7bac3d2f60ba17ee9f82abc6491499a41aeb799600e8
 # MERGE (self:File {path:"scripts/automation/engineering_run_directory.py"})
 # MERGE (find_cargo:Symbol {id:"scripts/automation/engineering_run_directory.py::find_cargo",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/engineering_run_directory.py::run_step",kind:"function"})
@@ -44,6 +52,11 @@ the new forward CLI identity gate and snapshot/FK constraints in the disposable 
 # MERGE (apply_plan:Symbol {id:"scripts/automation/engineering_run_directory.py::apply_migration_plan",kind:"function"})
 # MERGE (binding_catalog:Symbol {id:"scripts/automation/engineering_run_directory.py::run_binding_catalog_sql",kind:"function"})
 # MERGE (fingerprint:Symbol {id:"scripts/automation/engineering_run_directory.py::migration_fingerprint_sql",kind:"function"})
+# MERGE (role_setup:Symbol {id:"scripts/automation/engineering_run_directory.py::run_binding_role_setup_sql",kind:"function"})
+# MERGE (role_drift:Symbol {id:"scripts/automation/engineering_run_directory.py::run_binding_role_drift_sql",kind:"function"})
+# MERGE (role_acceptance:Symbol {id:"scripts/automation/engineering_run_directory.py::run_binding_role_acceptance_sql",kind:"function"})
+# MERGE (run_revision:Table {id:"multica.engineering_run_revision",kind:"table"})
+# MERGE (owner_role:Type {id:"star_engineering_directory_owner",kind:"database_role"})
 # MERGE (main:Symbol {id:"scripts/automation/engineering_run_directory.py::main",kind:"function"})
 # MERGE (root:Config {id:"scripts/automation/engineering_run_directory.py::ROOT"})
 # MERGE (callable:Type {id:"collections.abc.Callable"})
@@ -69,6 +82,11 @@ the new forward CLI identity gate and snapshot/FK constraints in the disposable 
 # MERGE (validate_ddl)-[:CALLS]->(apply_plan)
 # MERGE (validate_ddl)-[:CALLS]->(binding_catalog)
 # MERGE (validate_ddl)-[:CALLS]->(fingerprint)
+# MERGE (validate_ddl)-[:CALLS]->(role_setup)
+# MERGE (validate_ddl)-[:CALLS]->(role_drift)
+# MERGE (validate_ddl)-[:CALLS]->(role_acceptance)
+# MERGE (role_drift)-[:CONFIGURES]->(owner_role)
+# MERGE (role_acceptance)-[:READS]->(run_revision)
 # MERGE (apply_plan)-[:USES_TYPE]->(callable)
 # MERGE (main)-[:READS]->(executable)
 # MERGE (find_cargo)-[:USES_TYPE]->(root)
@@ -127,6 +145,27 @@ def run_step(name: str, command: list[str], workdir: Path, environment: dict[str
     return {"name": name, "exit_code": status, "log": str(log_path)}
 
 
+def run_expected_failure_step(
+    name: str,
+    command: list[str],
+    workdir: Path,
+    environment: dict[str, str],
+    output_dir: Path,
+    expected_message: str,
+) -> dict:
+    """Pass only when a command fails for the expected fail-closed reason."""
+    result = run_step(name, command, workdir, environment, output_dir)
+    output = Path(result["log"]).read_text(encoding="utf-8", errors="replace")
+    observed_exit_code = result["exit_code"]
+    expected_failure_observed = observed_exit_code != 0 and expected_message in output
+    result["observed_exit_code"] = observed_exit_code
+    result["expected_failure"] = expected_message
+    result["exit_code"] = 0 if expected_failure_observed else 1
+    if not expected_failure_observed:
+        result["verification_error"] = "Expected fail-closed error was not observed"
+    return result
+
+
 def directory_migration_plan(run_binding: bool = False) -> list[tuple[str, str]]:
     """Return the disposable directory chain; October 15 runs once, never as a replay probe."""
     migrations = [
@@ -136,9 +175,13 @@ def directory_migration_plan(run_binding: bool = False) -> list[tuple[str, str]]
         ("postgres-directory-repeat", "2026-10-01-engineering-run-directory.sql"),
     ]
     if run_binding:
+        migrations.insert(2, ("postgres-task-metadata-prerequisite", "2026-09-29-worktree-group-phase-2c.sql"))
         migrations.extend([
+            ("postgres-task-run-owner", "2026-10-02-task-run-owner.sql"),
             ("postgres-run-host-independent-directory", "2026-10-15-run-host-independent-directory.sql"),
             ("postgres-run-worktree-bindings", "2026-10-19-run-worktree-bindings.sql"),
+            ("postgres-run-host-independent-task-owner", "2026-10-15-run-host-independent-task-owner.sql"),
+            ("postgres-engineering-directory-owner-role", "2026-10-20-engineering-directory-owner-role.sql"),
         ])
     return migrations
 
@@ -163,33 +206,63 @@ def apply_migration_plan(
 
 
 def migration_fingerprint_sql() -> str:
-    """Fingerprint relevant columns, constraints, indexes, RLS flags and policies."""
+    """Fingerprint relevant schema, RLS policies, and directory-owner grants."""
     return """WITH signatures AS (
       SELECT format('column:%I.%I:%s:%s:%s:%s', table_schema,table_name,ordinal_position,
                     column_name,data_type,is_nullable) AS signature
         FROM information_schema.columns
-       WHERE table_schema IN ('scm','permission','multica')
+       WHERE table_schema IN ('public','scm','permission','multica')
       UNION ALL
       SELECT format('constraint:%I.%I:%I:%s',n.nspname,r.relname,c.conname,pg_get_constraintdef(c.oid,true))
         FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid
         JOIN pg_namespace n ON n.oid=r.relnamespace
-       WHERE n.nspname IN ('scm','permission','multica')
+       WHERE n.nspname IN ('public','scm','permission','multica')
       UNION ALL
       SELECT format('index:%I.%I:%I:%s',n.nspname,r.relname,i.relname,pg_get_indexdef(i.oid))
         FROM pg_index x JOIN pg_class r ON r.oid=x.indrelid
         JOIN pg_class i ON i.oid=x.indexrelid JOIN pg_namespace n ON n.oid=r.relnamespace
-       WHERE n.nspname IN ('scm','permission','multica')
+       WHERE n.nspname IN ('public','scm','permission','multica')
       UNION ALL
       SELECT format('rls:%I.%I:%s:%s',n.nspname,r.relname,r.relrowsecurity,r.relforcerowsecurity)
         FROM pg_class r JOIN pg_namespace n ON n.oid=r.relnamespace
-       WHERE n.nspname IN ('scm','permission','multica') AND r.relkind IN ('r','p')
+       WHERE n.nspname IN ('public','scm','permission','multica') AND r.relkind IN ('r','p')
       UNION ALL
       SELECT format('policy:%I.%I:%I:%s:%s:%s',n.nspname,r.relname,p.polname,p.polcmd,
                     coalesce(pg_get_expr(p.polqual,p.polrelid),''),
                     coalesce(pg_get_expr(p.polwithcheck,p.polrelid),''))
         FROM pg_policy p JOIN pg_class r ON r.oid=p.polrelid
         JOIN pg_namespace n ON n.oid=r.relnamespace
-       WHERE n.nspname IN ('scm','permission','multica')
+       WHERE n.nspname IN ('public','scm','permission','multica')
+      UNION ALL
+      SELECT format('role:%I:%s:%s:%s:%s:%s:%s:%s',rolname,rolcanlogin,rolsuper,rolcreatedb,
+                    rolcreaterole,rolreplication,rolbypassrls,rolinherit)
+        FROM pg_roles WHERE rolname='star_engineering_directory_owner'
+      UNION ALL
+      SELECT format('schema-grant:%I:%s:%s',n.nspname,a.privilege_type,a.is_grantable)
+        FROM pg_namespace n
+        CROSS JOIN LATERAL aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a
+        JOIN pg_roles grantee ON grantee.oid=a.grantee
+       WHERE n.nspname IN ('public','scm','permission','multica')
+         AND grantee.rolname='star_engineering_directory_owner'
+      UNION ALL
+      SELECT format('database-grant:%I:%s:%s',d.datname,a.privilege_type,a.is_grantable)
+        FROM pg_database d
+        CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a
+        JOIN pg_roles grantee ON grantee.oid=a.grantee
+       WHERE grantee.rolname='star_engineering_directory_owner'
+      UNION ALL
+      SELECT format('table-grant:%I.%I:%I:%s:%s',table_schema,table_name,grantee,privilege_type,is_grantable)
+        FROM information_schema.table_privileges
+       WHERE table_schema IN ('public','scm','permission','multica') AND grantee='star_engineering_directory_owner'
+      UNION ALL
+      SELECT format('column-grant:%I.%I.%I.%I:%s:%s',table_schema,table_name,column_name,grantee,
+                    privilege_type,is_grantable)
+        FROM information_schema.column_privileges
+       WHERE table_schema IN ('public','scm','permission','multica') AND grantee='star_engineering_directory_owner'
+      UNION ALL
+      SELECT format('routine-grant:%I.%I:%I:%s:%s',routine_schema,routine_name,grantee,privilege_type,is_grantable)
+        FROM information_schema.routine_privileges
+       WHERE routine_schema IN ('public','scm','permission','multica') AND grantee='star_engineering_directory_owner'
     )
     SELECT md5(coalesce(string_agg(signature,E'\\n' ORDER BY signature),'')) AS schema_fingerprint
       FROM signatures;"""
@@ -225,6 +298,252 @@ def run_binding_catalog_sql() -> str:
       END IF;
       RAISE NOTICE '10 directory tables have FORCE RLS and Run Outbox schema is valid; runtime grants, behavior and writes remain unverified';
     END $$;"""
+
+
+def run_binding_role_setup_sql() -> str:
+    """Create a disposable non-superuser login and seed Project, Worktree and Task facts."""
+    return """DO $role$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='erun_directory_api_test') THEN
+        EXECUTE 'ALTER ROLE erun_directory_api_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT';
+      ELSE
+        EXECUTE 'CREATE ROLE erun_directory_api_test LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT';
+      END IF;
+    END
+    $role$;
+    GRANT star_engineering_directory_owner TO erun_directory_api_test;
+    INSERT INTO permission.project_role_binding
+      (id,tenant_id,project_id,user_id,role,granted_by,valid_from,version)
+    VALUES
+      ('40000000-0000-0000-0000-000000000001',
+       '10000000-0000-0000-0000-000000000001',
+       '20000000-0000-0000-0000-000000000001',
+       '30000000-0000-0000-0000-000000000001',
+       'project_admin','30000000-0000-0000-0000-000000000001',now()-INTERVAL '1 second',1)
+    ON CONFLICT (id) DO NOTHING;
+    INSERT INTO worktree_canvas_worktree
+      (id,tenant_id,workspace_id,repo_id,project_id,name,branch,path)
+    VALUES ('90000000-0000-0000-0000-000000000001',
+            '10000000-0000-0000-0000-000000000001',
+            '70000000-0000-0000-0000-000000000001',
+            '80000000-0000-0000-0000-000000000001',
+            '20000000-0000-0000-0000-000000000001',
+            'role-acceptance','feature/role-acceptance','/tmp/role-acceptance')
+    ON CONFLICT (id) DO NOTHING;
+    INSERT INTO multica.task_metadata
+      (metadata_id,tenant_id,workspace_id,project_id,work_item_id,item_type,title,reporter_user_id,valid_to)
+    VALUES ('a0000000-0000-0000-0000-000000000001',
+            '10000000-0000-0000-0000-000000000001',
+            '70000000-0000-0000-0000-000000000001',
+            '20000000-0000-0000-0000-000000000001',
+            'b0000000-0000-0000-0000-000000000001','task','Role acceptance task',
+            '30000000-0000-0000-0000-000000000001',now())
+    ON CONFLICT (metadata_id) DO NOTHING;
+    INSERT INTO multica.work_item_worktree
+      (relation_id,tenant_id,project_id,work_item_id,worktree_id,valid_to)
+    VALUES ('c0000000-0000-0000-0000-000000000001',
+            '10000000-0000-0000-0000-000000000001',
+            '20000000-0000-0000-0000-000000000001',
+            'b0000000-0000-0000-0000-000000000001',
+            '90000000-0000-0000-0000-000000000001',now())
+    ON CONFLICT (relation_id) DO NOTHING;"""
+
+
+def run_binding_role_drift_sql() -> str:
+    """Inject excessive direct privileges before the disposable migration replay."""
+    return """CREATE ROLE star_engineering_directory_drift_member NOLOGIN;
+    GRANT star_engineering_directory_drift_member TO star_engineering_directory_owner;
+    GRANT CREATE ON SCHEMA public,scm,permission,multica TO star_engineering_directory_owner;
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public,scm,permission,multica
+      TO star_engineering_directory_owner;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public,scm,permission,multica
+      TO star_engineering_directory_owner;
+    GRANT ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA public,scm,permission,multica
+      TO star_engineering_directory_owner;
+    DO $database_grants$
+    BEGIN
+      EXECUTE format('GRANT CONNECT, CREATE, TEMPORARY ON DATABASE %I TO star_engineering_directory_owner',
+                     current_database());
+    END
+    $database_grants$;"""
+
+
+def run_binding_role_ownership_fixture_sql() -> str:
+    """Create one role-owned database object to exercise the migration fail-closed path."""
+    return "CREATE SCHEMA engineering_directory_owner_owned_fixture AUTHORIZATION star_engineering_directory_owner;"
+
+
+def run_binding_role_acceptance_sql() -> str:
+    """Exercise owner grants and FORCE RLS as an actual non-superuser login."""
+    return """BEGIN;
+    DO $$ BEGIN
+      IF session_user <> 'erun_directory_api_test' THEN RAISE EXCEPTION 'runtime fixture login mismatch'; END IF;
+      IF (SELECT rolsuper OR rolbypassrls OR rolcreaterole FROM pg_roles WHERE rolname=session_user) THEN
+        RAISE EXCEPTION 'runtime fixture must be non-superuser and NOBYPASSRLS';
+      END IF;
+    END $$;
+    SET LOCAL ROLE star_engineering_directory_owner;
+    SELECT set_config('app.tenant_id','10000000-0000-0000-0000-000000000001',true),
+           set_config('app.actor_id','30000000-0000-0000-0000-000000000001',true);
+    DO $$
+    DECLARE
+      table_name TEXT;
+      visible_rows INTEGER;
+      changed_rows INTEGER;
+      role_row RECORD;
+    BEGIN
+      IF current_user <> 'star_engineering_directory_owner'
+         OR session_user <> 'erun_directory_api_test' THEN
+        RAISE EXCEPTION 'SET LOCAL ROLE did not establish the expected execution identity';
+      END IF;
+      IF has_table_privilege(session_user,'multica.engineering_run_worktree_binding','INSERT') THEN
+        RAISE EXCEPTION 'NOINHERIT runtime login unexpectedly inherited owner privileges';
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member=current_user::regrole) THEN
+        RAISE EXCEPTION 'directory owner must not be a member of another database role';
+      END IF;
+      IF has_schema_privilege(current_user,'public','CREATE')
+         OR has_schema_privilege(current_user,'scm','CREATE')
+         OR has_schema_privilege(current_user,'permission','CREATE')
+         OR has_schema_privilege(current_user,'multica','CREATE') THEN
+        RAISE EXCEPTION 'directory owner retained a direct schema CREATE grant';
+      END IF;
+      IF EXISTS (
+        SELECT 1
+        FROM pg_database d
+        CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) acl
+        WHERE d.datname=current_database() AND acl.grantee=current_user::regrole::oid
+      ) THEN
+        RAISE EXCEPTION 'directory owner retained a direct database privilege';
+      END IF;
+      SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls, rolinherit
+        INTO role_row FROM pg_roles WHERE rolname=current_user;
+      IF role_row.rolcanlogin OR role_row.rolsuper OR role_row.rolcreatedb OR role_row.rolcreaterole
+         OR role_row.rolreplication OR role_row.rolbypassrls OR role_row.rolinherit THEN
+        RAISE EXCEPTION 'directory owner role attributes are unsafe';
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_class c WHERE c.oid='multica.engineering_run_command_idempotency'::regclass
+                 AND c.relowner=(SELECT oid FROM pg_roles WHERE rolname=current_user)) THEN
+        RAISE EXCEPTION 'directory owner must not own its RLS-protected table';
+      END IF;
+      FOREACH table_name IN ARRAY ARRAY[
+        'permission.project_role_binding','scm.cloud_branch','scm.cloud_branch_revision',
+        'permission.cloud_branch_role_binding','multica.engineering_run','multica.engineering_run_revision',
+        'permission.engineering_run_role_binding','multica.worktree_project_binding',
+        'public.worktree_canvas_worktree','multica.task_metadata','multica.work_item_worktree',
+        'multica.engineering_run_worktree_binding'] LOOP
+        IF NOT has_table_privilege(current_user,table_name,'SELECT') THEN
+          RAISE EXCEPTION 'required scoped SELECT grant missing: %', table_name;
+        END IF;
+      END LOOP;
+      FOREACH table_name IN ARRAY ARRAY[
+        'permission.project_role_binding','scm.cloud_branch_revision',
+        'permission.cloud_branch_role_binding','permission.engineering_run_role_binding',
+        'multica.engineering_run_revision','multica.worktree_project_binding','public.worktree_canvas_worktree',
+        'multica.task_metadata','multica.work_item_worktree'] LOOP
+        EXECUTE format('SELECT 1 FROM %s WHERE false FOR SHARE', table_name::regclass);
+      END LOOP;
+      FOREACH table_name IN ARRAY ARRAY[
+        'permission.project_role_binding','scm.cloud_branch_revision',
+        'permission.cloud_branch_role_binding','permission.engineering_run_role_binding',
+        'multica.engineering_run_revision','multica.worktree_project_binding','public.worktree_canvas_worktree',
+        'multica.task_metadata','multica.work_item_worktree'] LOOP
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid=table_name::regclass AND p.polcmd='w' AND NOT p.polpermissive
+            AND current_user::regrole::oid = ANY(p.polroles)
+            AND pg_get_expr(p.polqual,p.polrelid)='false'
+            AND pg_get_expr(p.polwithcheck,p.polrelid)='false'
+        ) THEN
+          RAISE EXCEPTION 'lock-only row UPDATE is not denied by restrictive RLS: %', table_name;
+        END IF;
+      END LOOP;
+      IF NOT has_column_privilege(current_user,'permission.project_role_binding','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'scm.cloud_branch_revision','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'permission.cloud_branch_role_binding','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'permission.engineering_run_role_binding','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'multica.engineering_run_revision','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'multica.worktree_project_binding','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'public.worktree_canvas_worktree','id','UPDATE')
+         OR NOT has_column_privilege(current_user,'multica.task_metadata','valid_to','UPDATE')
+         OR NOT has_column_privilege(current_user,'multica.work_item_worktree','valid_to','UPDATE') THEN
+        RAISE EXCEPTION 'minimum row-lock UPDATE column grant missing';
+      END IF;
+      IF has_table_privilege(current_user,'permission.project_role_binding','INSERT')
+         OR has_table_privilege(current_user,'permission.project_role_binding','DELETE')
+         OR has_table_privilege(current_user,'multica.engineering_run_outbox','SELECT')
+         OR has_table_privilege(current_user,'multica.engineering_run_outbox','UPDATE')
+         OR has_table_privilege(current_user,'multica.engineering_run_outbox','DELETE') THEN
+        RAISE EXCEPTION 'owner role has an unexpected cross-owner or Outbox privilege';
+      END IF;
+      IF NOT has_table_privilege(current_user,'multica.engineering_run_worktree_binding','INSERT')
+         OR NOT has_column_privilege(current_user,'multica.engineering_run_worktree_binding','valid_to','UPDATE')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run_command_idempotency','INSERT')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run_command_idempotency','DELETE')
+         OR NOT has_column_privilege(current_user,'multica.engineering_run_command_idempotency','expires_at','UPDATE')
+         OR NOT has_table_privilege(current_user,'multica.engineering_directory_event','INSERT')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run_outbox','INSERT') THEN
+        RAISE EXCEPTION 'required owner-local mutation grant missing';
+      END IF;
+      SELECT count(*) INTO visible_rows FROM permission.project_role_binding
+       WHERE id='40000000-0000-0000-0000-000000000001';
+      IF visible_rows <> 1 THEN RAISE EXCEPTION 'tenant-scoped Project membership is not visible'; END IF;
+      SELECT count(*) INTO visible_rows FROM multica.task_metadata
+       WHERE metadata_id='a0000000-0000-0000-0000-000000000001';
+      IF visible_rows <> 1 THEN RAISE EXCEPTION 'tenant-scoped Task metadata is not visible'; END IF;
+      SELECT count(*) INTO visible_rows FROM multica.work_item_worktree
+       WHERE relation_id='c0000000-0000-0000-0000-000000000001';
+      IF visible_rows <> 1 THEN RAISE EXCEPTION 'tenant-scoped Task/Worktree relation is not visible'; END IF;
+      PERFORM 1 FROM permission.project_role_binding
+       WHERE id='40000000-0000-0000-0000-000000000001' FOR SHARE;
+      UPDATE permission.project_role_binding SET valid_to=now()
+       WHERE id='40000000-0000-0000-0000-000000000001';
+      GET DIAGNOSTICS changed_rows = ROW_COUNT;
+      IF changed_rows <> 0 THEN RAISE EXCEPTION 'lock-only UPDATE grant mutated Project membership'; END IF;
+      PERFORM 1 FROM multica.task_metadata
+       WHERE metadata_id='a0000000-0000-0000-0000-000000000001' FOR SHARE;
+      UPDATE multica.task_metadata SET valid_to=now()
+       WHERE metadata_id='a0000000-0000-0000-0000-000000000001';
+      GET DIAGNOSTICS changed_rows = ROW_COUNT;
+      IF changed_rows <> 0 THEN RAISE EXCEPTION 'lock-only UPDATE grant mutated Task metadata'; END IF;
+      PERFORM 1 FROM multica.work_item_worktree
+       WHERE relation_id='c0000000-0000-0000-0000-000000000001' FOR SHARE;
+      UPDATE multica.work_item_worktree SET valid_to=now()
+       WHERE relation_id='c0000000-0000-0000-0000-000000000001';
+      GET DIAGNOSTICS changed_rows = ROW_COUNT;
+      IF changed_rows <> 0 THEN RAISE EXCEPTION 'lock-only UPDATE grant mutated Task/Worktree relation'; END IF;
+      INSERT INTO multica.engineering_run_command_idempotency
+        (tenant_id,actor_id,idempotency_key,request_hash,response_body,expires_at)
+      VALUES ('10000000-0000-0000-0000-000000000001',
+              '30000000-0000-0000-0000-000000000001','role-acceptance-probe',
+              decode(repeat('00',32),'hex'),'{}'::jsonb,now()+INTERVAL '1 hour');
+      SELECT count(*) INTO visible_rows FROM multica.engineering_run_command_idempotency
+       WHERE idempotency_key='role-acceptance-probe';
+      IF visible_rows <> 1 THEN RAISE EXCEPTION 'tenant/actor scoped receipt is not visible'; END IF;
+      PERFORM set_config('app.tenant_id','50000000-0000-0000-0000-000000000001',true);
+      PERFORM set_config('app.actor_id','60000000-0000-0000-0000-000000000001',true);
+      SELECT count(*) INTO visible_rows FROM multica.engineering_run_command_idempotency
+       WHERE idempotency_key='role-acceptance-probe';
+      IF visible_rows <> 0 THEN RAISE EXCEPTION 'cross-tenant/actor receipt became visible'; END IF;
+      PERFORM set_config('app.tenant_id','',true);
+      PERFORM set_config('app.actor_id','30000000-0000-0000-0000-000000000001',true);
+      SELECT count(*) INTO visible_rows FROM multica.engineering_run_command_idempotency
+       WHERE idempotency_key='role-acceptance-probe';
+      IF visible_rows <> 0 THEN RAISE EXCEPTION 'missing tenant context did not fail closed'; END IF;
+      SELECT count(*) INTO visible_rows FROM multica.task_metadata
+       WHERE metadata_id='a0000000-0000-0000-0000-000000000001';
+      IF visible_rows <> 0 THEN RAISE EXCEPTION 'Task metadata RLS allowed reads without tenant context'; END IF;
+      BEGIN
+        INSERT INTO multica.engineering_run_command_idempotency
+          (tenant_id,actor_id,idempotency_key,request_hash,response_body,expires_at)
+        VALUES ('10000000-0000-0000-0000-000000000001',
+                '30000000-0000-0000-0000-000000000001','missing-context-probe',
+                decode(repeat('00',32),'hex'),'{}'::jsonb,now()+INTERVAL '1 hour');
+        RAISE EXCEPTION 'RLS allowed an insert without tenant context';
+      EXCEPTION WHEN insufficient_privilege THEN NULL;
+      END;
+    END $$;
+    ROLLBACK;"""
 
 
 def task_run_identity_guard_sql() -> str:
@@ -360,6 +679,38 @@ def validate_postgres_ddl(bin_dir: Path, port: int, environment: dict[str, str],
                                          fingerprint_migration))
         if any(row["exit_code"] != 0 for row in steps):
             return steps
+        if run_binding:
+            steps.append(run_step("postgres-engineering-directory-owner-role-drift",
+                                  psql + ["-c", run_binding_role_drift_sql()], ROOT, environment, output_dir))
+            if steps[-1]["exit_code"]:
+                return steps
+            steps.append(apply_migration("postgres-engineering-directory-owner-role-normalize",
+                                         "2026-10-20-engineering-directory-owner-role.sql"))
+            if steps[-1]["exit_code"]:
+                return steps
+            steps.append(fingerprint_migration("postgres-engineering-directory-owner-role-normalize",
+                                                "2026-10-20-engineering-directory-owner-role.sql"))
+            if steps[-1]["exit_code"]:
+                return steps
+            ownership_fixture = run_binding_role_ownership_fixture_sql()
+            steps.append(run_step("postgres-engineering-directory-owner-role-ownership-fixture",
+                                  psql + ["-c", ownership_fixture], ROOT, environment, output_dir))
+            if steps[-1]["exit_code"]:
+                return steps
+            steps.append(run_expected_failure_step(
+                "postgres-engineering-directory-owner-role-ownership-rejection",
+                psql + ["-f", str(ROOT / "db" / "migrations" /
+                                   "2026-10-20-engineering-directory-owner-role.sql")],
+                ROOT, environment, output_dir,
+                "star_engineering_directory_owner must not own database objects",
+            ))
+            if steps[-1]["exit_code"]:
+                return steps
+            ownership_cleanup = "DROP SCHEMA engineering_directory_owner_owned_fixture CASCADE;"
+            steps.append(run_step("postgres-engineering-directory-owner-role-ownership-cleanup",
+                                  psql + ["-c", ownership_cleanup], ROOT, environment, output_dir))
+            if steps[-1]["exit_code"]:
+                return steps
         catalog_sql = """DO $$ DECLARE total int; BEGIN
           SELECT count(*) INTO total FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
           WHERE (n.nspname,c.relname) IN (
@@ -375,6 +726,17 @@ def validate_postgres_ddl(bin_dir: Path, port: int, environment: dict[str, str],
             return steps
         if run_binding:
             steps.append(run_step("postgres-run-binding-catalog", psql + ["-c", run_binding_catalog_sql()],
+                                  ROOT, environment, output_dir))
+            if steps[-1]["exit_code"]:
+                return steps
+            steps.append(run_step("postgres-run-binding-role-setup", psql + ["-c", run_binding_role_setup_sql()],
+                                  ROOT, environment, output_dir))
+            if steps[-1]["exit_code"]:
+                return steps
+            role_psql = [str(bin_dir / "psql.exe"), "-X", "-h", "127.0.0.1", "-p", str(port), "-U",
+                         "erun_directory_api_test", "-d", "postgres", "-v", "ON_ERROR_STOP=1"]
+            steps.append(run_step("postgres-run-binding-role-acceptance",
+                                  role_psql + ["-c", run_binding_role_acceptance_sql()],
                                   ROOT, environment, output_dir))
             if steps[-1]["exit_code"]:
                 return steps
@@ -423,7 +785,7 @@ def main() -> int:
     parser.add_argument("--frontend", action="store_true")
     parser.add_argument("--postgres-ddl", action="store_true", help="Apply only DDL in a fresh disposable loopback cluster")
     parser.add_argument("--run-binding-ddl", action="store_true",
-                        help="Also apply October 15/19 Run binding migrations once in a fresh disposable cluster")
+                        help="Apply the Run/Task binding and owner-role chain once, then test least-privilege grants/RLS in a disposable cluster")
     parser.add_argument("--task-run-ddl", action="store_true", help="Also check Task Run identity forward guards in a disposable cluster")
     parser.add_argument("--postgres-bin", type=Path, default=Path("D:/PostgreSQL/18/bin"))
     parser.add_argument("--postgres-port", type=int, default=57432)

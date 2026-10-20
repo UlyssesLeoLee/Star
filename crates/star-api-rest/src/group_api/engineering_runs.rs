@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=463f18f2b7d4e43ea06bcd71d706c81a516f7c0a6088c3761039bd1b7a66afb9
+@cypher schema=1 source_sha256=740406508c3941033454c7e0ce596f009104e00a888bdd9971219307e6c1dca6
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/engineering_runs.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::router",kind:"function"})
 MERGE (listProjectRuns:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::list_project_runs",kind:"function"})
@@ -345,7 +345,7 @@ async fn branch_authority(
         "SELECT b.branch_id,b.project_id,b.repository_id,v.name,v.full_ref,v.head_commit_id,v.state,v.version
          FROM scm.cloud_branch b JOIN scm.cloud_branch_revision v ON v.tenant_id=b.tenant_id AND v.branch_id=b.branch_id
          WHERE b.tenant_id=$1 AND b.branch_id=$2 AND v.valid_from<=now() AND v.valid_to IS NULL AND v.state='active'
-         FOR SHARE OF b,v")
+         FOR SHARE OF v")
         .bind(actor.tenant_id).bind(branch_id).fetch_optional(&mut **tx).await
         .map_err(|_| GroupApiError::internal())?.ok_or_else(GroupApiError::not_found)?;
     let project = active_binding(tx, actor, branch.project_id).await?;
@@ -367,7 +367,7 @@ async fn run_authority(
          FROM multica.engineering_run r JOIN multica.engineering_run_revision v
          ON v.tenant_id=r.tenant_id AND v.engineering_run_id=r.engineering_run_id
          WHERE r.tenant_id=$1 AND r.engineering_run_id=$2 AND v.valid_from<=now() AND v.valid_to IS NULL AND v.state<>'archived'
-         FOR SHARE OF r,v")
+         FOR SHARE OF v")
         .bind(actor.tenant_id).bind(run_id).fetch_optional(&mut **tx).await
         .map_err(|_| GroupApiError::internal())?.ok_or_else(GroupApiError::not_found)?;
     let project = active_binding(tx, actor, run.project_id).await?;
