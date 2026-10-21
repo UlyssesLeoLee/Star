@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=5a1e873b92a78185ea84e5655dcc70ff65c3a1d3363bc95ff6346dfe817a522b
+# @cypher schema=1 source_sha256=0ddcefac8fe5bf08870c4ac7cbf1a1bb9c43a7bd2dc4a1fa937b15268d0e05ba
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -16,6 +16,7 @@
 # MERGE (migrations:Config {id:"scripts/automation/phase9f3_schedule.py::MIGRATIONS"})
 # MERGE (run_as_acl_lock_migration:File {path:"db/migrations/2026-10-05-schedule-run-as-acl-lock.sql"})
 # MERGE (hostless_rule_migration:File {path:"db/migrations/2026-10-21-schedule-hostless-run-authorization.sql"})
+# MERGE (occurrence_branch_migration:File {path:"db/migrations/2026-10-22-schedule-occurrence-branch-snapshot.sql"})
 # MERGE (host_independent_directory_migration:File {path:"db/migrations/2026-10-15-run-host-independent-directory.sql"})
 # MERGE (task_run_schema:Config {id:"scripts/automation/phase9f3_schedule.py::TASK_RUN_SCHEMA_FIXTURE_SQL"})
 # MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
@@ -24,6 +25,7 @@
 # MERGE (directory_migrations:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_MIGRATIONS"})
 # MERGE (directory_prerequisite:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUDIT_PREREQUISITE_SQL"})
 # MERGE (directory_acl_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUTH_FIXTURE_SQL"})
+# MERGE (occurrence_branch_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL"})
 # MERGE (acl_rust_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_run_as_authorization_rechecks_canonical_directory_grants",kind:"test"})
 # MERGE (domain_hostless_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_can_be_configured_but_cannot_be_materialized",kind:"test"})
 # MERGE (self)-[:DEFINES]->(main)
@@ -45,12 +47,14 @@
 # MERGE (postgres)-[:READS]->(migrations)
 # MERGE (postgres)-[:READS]->(run_as_acl_lock_migration)
 # MERGE (postgres)-[:READS]->(hostless_rule_migration)
+# MERGE (postgres)-[:READS]->(occurrence_branch_migration)
 # MERGE (directory_migrations)-[:CONTAINS]->(host_independent_directory_migration)
 # MERGE (postgres)-[:READS]->(task_run_schema)
 # MERGE (postgres)-[:READS]->(admission_fixture)
 # MERGE (postgres)-[:READS]->(directory_migrations)
 # MERGE (postgres)-[:READS]->(directory_prerequisite)
 # MERGE (postgres)-[:READS]->(directory_acl_fixture)
+# MERGE (postgres)-[:READS]->(occurrence_branch_assertion)
 # MERGE (postgres)-[:TESTS]->(acl_rust_test)
 # MERGE (postgres)-[:TESTS]->(domain_hostless_test)
 # @endcypher
@@ -78,6 +82,7 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-admission.sql",
     ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
     ROOT / "db" / "migrations" / "2026-10-21-schedule-hostless-run-authorization.sql",
+    ROOT / "db" / "migrations" / "2026-10-22-schedule-occurrence-branch-snapshot.sql",
 )
 DIRECTORY_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
@@ -252,6 +257,102 @@ BEGIN
     IF occurrence_actor IS DISTINCT FROM 'a0000000-0000-4000-8000-000000000001'::uuid THEN
         RAISE EXCEPTION 'legacy occurrence did not inherit its exact Rule creator';
     END IF;
+END $$;"""
+OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL = """\
+DO $$
+DECLARE
+    invalid_snapshot JSONB;
+    invalid_snapshots JSONB[] := ARRAY[
+        '{"rule_snapshot":{"target":{}}}'::jsonb,
+        '{"rule_snapshot":{"target":{"branch_id":null}}}'::jsonb,
+        '{"rule_snapshot":{"target":{"branch_id":""}}}'::jsonb,
+        '{"rule_snapshot":{"target":{"branch_id":"not-a-uuid"}}}'::jsonb,
+        '{"rule_snapshot":{"target":{"branch_id":"00000000-0000-0000-0000-000000000000"}}}'::jsonb
+    ];
+    case_index integer := 0;
+    hostless_rule_id UUID;
+    hostless_branch_id UUID;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'automation'
+          AND table_name = 'schedule_rule_revision'
+          AND column_name = 'branch_id'
+          AND is_nullable = 'YES'
+    ) THEN
+        RAISE EXCEPTION 'branchless Schedule Rule configuration must remain storable';
+    END IF;
+
+    INSERT INTO automation.schedule_rule_revision
+    SELECT (jsonb_populate_record(
+        NULL::automation.schedule_rule_revision,
+        to_jsonb(rule) || jsonb_build_object(
+            'rule_id', gen_random_uuid(),
+            'rule_version', 1,
+            'branch_id', NULL,
+            'changed_by', rule.run_as_actor_id,
+            'valid_from', clock_timestamp(),
+            'valid_to', NULL
+        )
+    )).*
+    FROM automation.schedule_rule_revision rule
+    WHERE rule.tenant_id = '10000000-0000-4000-8000-000000000001'
+      AND rule.rule_id = '30000000-0000-4000-8000-000000000001'
+      AND rule.rule_version = 2
+    RETURNING rule_id, branch_id INTO hostless_rule_id, hostless_branch_id;
+    IF hostless_rule_id IS NULL OR hostless_branch_id IS NOT NULL THEN
+        RAISE EXCEPTION 'branchless Schedule Rule revision was not persisted';
+    END IF;
+
+    INSERT INTO automation.occurrence (
+        occurrence_id, tenant_id, project_id, rule_id, rule_version, run_as_actor_id,
+        scheduled_for_utc, scheduled_local_label, utc_offset_seconds, parser_version,
+        tzdb_version, target_snapshot, target_snapshot_digest, materialized_at
+    ) VALUES (
+        gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000001', 2,
+        'a0000000-0000-4000-8000-000000000001', clock_timestamp() + interval '1 hour',
+        '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
+        '{"rule_snapshot":{"target":{"branch_id":"40000000-0000-4000-8000-000000000001"}}}'::jsonb,
+        repeat('d', 64), clock_timestamp()
+    );
+
+    INSERT INTO automation.occurrence (
+        occurrence_id, tenant_id, project_id, rule_id, rule_version, run_as_actor_id,
+        scheduled_for_utc, scheduled_local_label, utc_offset_seconds, parser_version,
+        tzdb_version, target_snapshot, target_snapshot_digest, materialized_at
+    ) VALUES (
+        gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+        '20000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000001', 2,
+        'a0000000-0000-4000-8000-000000000001', clock_timestamp() + interval '2 hours',
+        '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
+        '{"rule_snapshot":{"target":{"branch_id":"ABCDEF12-3456-4ABC-8DEF-1234567890AB"}}}'::jsonb,
+        repeat('f', 64), clock_timestamp()
+    );
+
+    FOREACH invalid_snapshot IN ARRAY invalid_snapshots LOOP
+        case_index := case_index + 1;
+        BEGIN
+            INSERT INTO automation.occurrence (
+                occurrence_id, tenant_id, project_id, rule_id, rule_version, run_as_actor_id,
+                scheduled_for_utc, scheduled_local_label, utc_offset_seconds, parser_version,
+                tzdb_version, target_snapshot, target_snapshot_digest, materialized_at
+            ) VALUES (
+                gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+                '20000000-0000-4000-8000-000000000001',
+                '30000000-0000-4000-8000-000000000001', 2,
+                'a0000000-0000-4000-8000-000000000001',
+                clock_timestamp() + (case_index + 1) * interval '1 hour',
+                '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
+                invalid_snapshot, repeat('e', 64), clock_timestamp()
+            );
+            RAISE EXCEPTION 'invalid occurrence Branch snapshot unexpectedly accepted: %', invalid_snapshot;
+        EXCEPTION WHEN check_violation THEN
+            NULL;
+        END;
+    END LOOP;
 END $$;"""
 DIRECTORY_AUTH_FIXTURE_SQL = """\
 BEGIN;
@@ -842,6 +943,15 @@ def run_isolated_postgres(
                     )
                     if steps[-1]["status"] != "passed":
                         return steps
+
+        steps.append(
+            run_step(
+                "postgres-schedule-occurrence-branch-snapshot",
+                [*cluster.psql("schedule_admin"), "-c", OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL],
+            )
+        )
+        if steps[-1]["status"] != "passed":
+            return steps
 
         catalog_sql = """DO $$
 DECLARE forced_count integer;

@@ -7,7 +7,7 @@
 
 > **WLD-1 Worktree 管理 Outbox 增量（2026-10-21）**：逻辑 archive/restore 在 Worktree owner transaction 中同步提交状态/version、append-only Audit、schema-v1 owner-local Outbox fact 与 `worktree_management_plan.result_body` exact replay receipt。同一 tenant/requester/idempotency key 的计划创建经事务级 advisory lock 串行化；请求 hash 不同则拒绝复用。状态 no-op 保留 version/retention expiry，不执行 archive Hook 或状态更新。事件只描述实际状态变化，payload 为 Worktree/plan identity 与连续 before/after archive/version allowlist；assign-owner 与 no-op 不产生 archive/restore fact。PostgreSQL 18.6 disposable fixture 双次迁移及 RLS/WORM/payload/状态事实断言通过；此 source slice 未验证 Rust 1.99.0、target DB/app-role grants/RLS 或真实 Host provider；没有 delivery consumer，也不执行物理 Git checkout cleanup。
 
-> **文档版本**: v6.93 (2026-10-21)
+> **文档版本**: v6.94 (2026-10-22)
 > **上游要件定义书**: docs/requirements.md v6.91
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
@@ -4939,7 +4939,7 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 
 `multica.lock_schedule_run_as_authorization` 核对事务内 `app.tenant_id`/`app.actor_id`、当前 Project/Run grants，并在 Run 存在远端 Branch 时要求其目录事实与 Branch grant；随后取得 Project-scoped advisory lock。API 在后续 `READ COMMITTED` 语句重新读取当前 ACL 与 Run state。Project、Cloud Branch、Engineering Run grant triggers 继续共用此锁；跨 Project mutation 按 UUID 排序。hostless Run 仍通过 Project/Run ACL 与同一 Project lock 串行化，不依赖 Branch 身份。
 
-`schedule_runtime` 对 Directory ACL tables 保持 SELECT-only，并仅通过 provisioning 获得锁 helper 的 EXECUTE；target database 的 migration owner、角色存在顺序与 grants 仍须单独验收。下一轮 disposable runner 必须双次应用新增 migration，确认仅 Rule revision `branch_id` 放宽为可空、Occurrence `target_snapshot` 仍为必需，并验证 hostless Project/Run 授权与撤权、branch-backed active/revoked Branch、paused/archived Run 和并发锁语义。Occurrence 中 Branch 字段存在于已验证的 target snapshot，而非独立数据库列；当前 schema 不单独检查 JSON Branch key。该设计变化只涉及 Rule 配置/读取授权；materializer、occurrence snapshot、admission binding 和 Run-owner runtime 均继续拒绝缺 Branch 的执行事实。Rust 1.99.0 与 PostgreSQL 新增用例当前未执行；也不代表 worker、admission writer 或 executor 已实现。
+`schedule_runtime` 对 Directory ACL tables 保持 SELECT-only，并仅通过 provisioning 获得锁 helper 的 EXECUTE；target database 的 migration owner、角色存在顺序与 grants 仍须单独验收。Occurrence 中 Branch 身份保存在必需的 `target_snapshot` JSONB，而非独立列。新增 migration `2026-10-22-schedule-occurrence-branch-snapshot.sql` 通过 `NOT VALID` CHECK 要求每个新插入或变更的快照都在 `rule_snapshot.target.branch_id` 保存大小写不敏感、标准连字符格式的非 nil UUID；旧行不回填，后续修改旧行时也须满足约束。Rule revision 的 `branch_id` 仍可为 NULL，因此 hostless Run 配置/读取 Rule 的语义不变。静态 migration-contract tests 通过 3/3；双次迁移、nullable Rule 与 Branch 正反例的 disposable PostgreSQL harness 已编写但尚未执行，Rust 1.99.0 格式/编译/测试亦未执行。该设计不实现 Schedule worker、admission writer 或 executor；缺 Branch 的 materialization、admission binding 和 runtime 仍 fail closed。
 
 ### 16.27 Phase 9F4D Schedule admission 与 Multipass/K3s Run binding
 
@@ -5881,4 +5881,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 
 修订 v6.92 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore source slice；在 §16.2 明确 Worktree owner-local Audit/Outbox/receipt 原子事务、事务级同键序列化、no-op 保留 version/retention、连续最小事件 payload 与 Run Directory Outbox 分离；记录 PostgreSQL 18.6 disposable fixture 和 Rust 1.98.1 diagnostic test 证据，并保留 Rust 1.99.0、目标 DB/grants、API 并发、consumer、Host provider 与物理 cleanup 未验收状态。同步 requirements v6.91 与 Group DD v5.15。
 
+修订 v6.94 · 2026-10-22 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-3 occurrence 快照约束实现；新增 SQL `NOT VALID` CHECK，强制新建/更新 occurrence 的 JSON Branch 快照为非 nil UUID，同时保留未修改的历史数据且不回填；hostless Rule 配置保持不变。记录静态契约测试 3/3，并明确 disposable PostgreSQL/Rust 验证尚未执行，worker/admission/executor 继续关闭。同步 Schedule API SRS v0.65 与 DD v0.77。
 修订 v6.93 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD3 hostless Schedule Rule 授权设计与源码切片；明确无 Branch 的 Run 可配置/读取 Rule，branch-backed Run 仍校验 Branch，Rule 配置 branch_id 可空而 occurrence/admission/runtime 保持 Branch 必需和 fail closed；Rust 1.99.0、数据库重复迁移及新 ACL fixture 门禁尚未执行，不开放 Schedule worker/executor。同步 Schedule API SRS v0.64 与 DD v0.76。

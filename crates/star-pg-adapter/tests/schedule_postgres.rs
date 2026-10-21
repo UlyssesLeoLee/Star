@@ -1,10 +1,11 @@
 /*
-@cypher schema=1 source_sha256=4d19e82b6ce897605a59b5166b2e40db02d9ff62e636f0786ada74439fdac6e5
+@cypher schema=1 source_sha256=136bae69f78617a6d1002bb8077fc5bab76b302507fac3ac0748badce7cf03a3
 MERGE (self:File {path:"crates/star-pg-adapter/tests/schedule_postgres.rs"})
 MERGE (fixture:Type {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture"})
 MERGE (connect:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::connect_pools",kind:"function"})
 MERGE (seed_rule:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_rule",kind:"function"})
 MERGE (seed_occurrence:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_pending_occurrence",kind:"function"})
+MERGE (seed_occurrence_deadline:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_pending_occurrence_with_deadline",kind:"function"})
 MERGE (test_materialize:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::materialization_is_idempotent_and_tenant_scoped",kind:"test"})
 MERGE (test_claim:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::concurrent_claims_and_fencing_are_database_authoritative",kind:"test"})
 MERGE (test_retry:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::retry_terminal_ttl_and_expired_lease_reclaim_are_durable",kind:"test"})
@@ -26,8 +27,10 @@ MERGE (self)-[:DEFINES]->(test_retry)
 MERGE (self)-[:DEFINES]->(test_run_as)
 MERGE (self)-[:DEFINES]->(occurrence_run_as_actor)
 MERGE (connect)-[:CALLS]->(sqlx)
-MERGE (seed_rule)-[:WRITES]->(occurrence)
-MERGE (seed_occurrence)-[:WRITES]->(dispatch)
+MERGE (seed_rule)-[:WRITES]->(schedule_rule)
+MERGE (seed_occurrence)-[:CALLS]->(seed_occurrence_deadline)
+MERGE (seed_occurrence_deadline)-[:WRITES]->(occurrence)
+MERGE (seed_occurrence_deadline)-[:WRITES]->(dispatch)
 MERGE (test_materialize)-[:CALLS]->(adapter)
 MERGE (test_materialize)-[:TESTS]->(occurrence)
 MERGE (test_materialize)-[:TESTS]->(event)
@@ -170,7 +173,11 @@ async fn seed_pending_occurrence_with_deadline(
     .bind(scheduled_for)
     .bind(SCHEDULE_PARSER_VERSION)
     .bind(SCHEDULE_TZDB_VERSION)
-    .bind(json!({ "fixture": true }))
+    .bind(json!({
+        "rule_snapshot": {
+            "target": { "branch_id": fixture.branch_id.to_string() }
+        }
+    }))
     .bind("c".repeat(64))
     .execute(admin)
     .await
@@ -221,7 +228,11 @@ async fn schedule_rule_run_as_actor_cannot_change_between_revisions() {
     .bind(replacement_actor)
     .bind(SCHEDULE_PARSER_VERSION)
     .bind(SCHEDULE_TZDB_VERSION)
-    .bind(json!({ "fixture": true }))
+    .bind(json!({
+        "rule_snapshot": {
+            "target": { "branch_id": fixture.branch_id.to_string() }
+        }
+    }))
     .bind("d".repeat(64))
     .execute(&admin)
     .await

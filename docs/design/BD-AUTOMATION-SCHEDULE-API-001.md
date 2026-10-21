@@ -1,7 +1,7 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
 
 > Status: 🟡 D20 owner-native receive slices are opt-in and pass combined Rust 1.99.0 package checks/tests/target-crate Clippy. The cumulative PostgreSQL 18.6 WSL ext4 schema-only runner passed 89/89 steps, including the restricted role/grants/RLS contract; the earlier 83/83 run remains historical. SQLx origin target compilation succeeded on Rust 1.98.1 with `--ignore-rust-version`, while the focused harness was 0 passed / 0 failed / 1 ignored and did not execute SQL. Windows-native PostgreSQL `pg_ctl`, production role provisioning/grants, live TLS, recovery, BI, performance and execution remain open. No NATS process or Multipass instance was started. This evidence covers WSL/Linux only; Windows runtime compatibility is unverified.
-> Version: 0.61 | Date: 2026-10-14
+> Version: 0.63 | Date: 2026-10-22
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -508,6 +508,16 @@ The opt-in Infrastructure native Result publisher and owner-store source slice i
 Ambiguous RPC results retry the same event ID, bytes and destination. They MUST NOT trigger dual publish, reuse Run-owner claims, write Run state or silently retarget after Profile changes. The Run owner still receives the result through its own Inbox commit-before-ACK path; a transport receipt does not prove capacity reservation, readiness, BI projection or execution. `capacity_released` remains outside the publisher allowlist until its typed Run-owner contract, quarantine/replay behavior and BI event are implemented end to end. The producer stays default-off pending schema/grants, production identity/Profile composition, recovery, BI parity, measured RSS/fairness and rollback acceptance.
 
 Disposable PostgreSQL 18.6 verification passed 93/93 runner steps, including two applications of the D20 native-result migration; the owner-store SQLx test passed 1/1. It validates database/store behavior with a resolver/profile fixture and synthetic receipt, not a live publisher or native append. P1 cross-tenant route binding is fixed and Infrastructure tests passed 76/76 using Rust 1.98.1 `--ignore-rust-version`. P2 stale route-pin mismatch remains filtered without an operator-visible blocked count or recovery path; production wiring stays blocked until this is observable and recoverable. See the [independent review](../reports/PHASE-9F4C-D20-NATIVE-PUBLISHER-REVIEW.md) and [PG report](../reports/PHASE-9F4C-D20-NATIVE-PUBLISHER-PG-REPORT.md).
+
+### 6.38 9F4H — Branch identity in persisted occurrence snapshots
+
+Hostless Engineering Runs may persist Schedule Rule revisions with `branch_id = NULL`; this is configuration/master data and remains unchanged. A materialized occurrence remains an execution input and must pin an exact remote Branch identity at `target_snapshot.rule_snapshot.target.branch_id`. Migration `2026-10-22-schedule-occurrence-branch-snapshot.sql` adds a `NOT VALID` CHECK that accepts only a case-insensitive, standard hyphenated, non-nil UUID string. The guarded `CASE` performs the UUID cast only after validating JSON type and syntax. The constraint leaves existing rows untouched and unbackfilled, while PostgreSQL checks all new and changed rows. The occurrence table still uses required `target_snapshot` JSONB and adds no duplicate Branch column.
+
+The disposable harness is authored to apply the migration twice, store a complete Rule revision with a NULL Branch, accept lower/uppercase UUID snapshots, and reject missing, JSON-null, empty, malformed, and nil Branch values. Static migration-contract tests passed 3/3. The PostgreSQL harness was not executed (`psql`/`initdb` unavailable); Rust formatting/compile/tests are also unverified (`cargo`/`rustfmt` unavailable). This persistence constraint does not implement a worker, materializer, admission consumer, or executor; Schedule execution remains disabled.
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| 0.63 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the occurrence-snapshot Branch UUID CHECK while preserving nullable Rule Branch configuration and legacy occurrence rows; record static 3/3 evidence and leave PostgreSQL/Rust/worker gates open. |
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
