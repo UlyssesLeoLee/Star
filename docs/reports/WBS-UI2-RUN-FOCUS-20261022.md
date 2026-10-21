@@ -1,7 +1,7 @@
 # WBS UI-2：Run 未选 Worktree 焦点
 
 日期：2026-10-22
-状态：实现完成；聚焦 Vitest 与 TypeScript 检查通过，待主协调者集成。
+状态：实现已集成到本地 dev（`ff3b142d`）；聚焦 Vitest 与 TypeScript 检查通过。此状态不表示完整 UI-2 或生产 Run App 已验收。
 
 ## §0 目的
 
@@ -52,11 +52,12 @@ Worktree 选择只调用授权目录端点，不加载 App 数据；点击链接
 
 ## §6 审核状态
 
-实现 worker 自查完成；主协调者已复核实现，复跑聚焦 Vitest、TypeScript 与 Cypher guard 通过。未创建提交；待 rebase/merge。
+实现 worker 自查完成；主协调者复核并复跑聚焦 Vitest、TypeScript 与 Cypher guard。UI-2 no-focus 源码提交 `ff3b142d` 已包含在本地 dev，报告与当前 dev 历史一致。该集成不关闭右侧完整 App 工作区、分页搜索、聊天 Runtime/send、浏览器 Back/Forward、Run 生命周期 provider 或生产 owner 验收。
 
 ## §7 修订历史
 
 | 版本 | 日期 | 修订内容 |
 |---|---|---|
-| v0.1 | 2026-10-22 | 实施 UI-2 无 Worktree 焦点时的 App 挂载门禁、授权目录选择器、GLOBAL/WORKTREE 范围门控和聚焦测试；记录依赖缺失导致的验证阻塞。 |
+| v0.3 | 2026-10-22 | 将集成状态更新为 UI-2 no-focus 提交 `ff3b142d` 已进入本地 dev；明确仍未关闭的完整 UI 与生产 Run App 门禁。 |
 | v0.2 | 2026-10-22 | 主协调者使用冻结锁文件的离线 pnpm 安装复跑聚焦 Vitest（2/2）与 TypeScript 检查（退出码 0），更新子代理执行及审核状态；未运行全量 UI/E2E 构建。 |
+| v0.1 | 2026-10-22 | 实施 UI-2 无 Worktree 焦点时的 App 挂载门禁、授权目录选择器、GLOBAL/WORKTREE 范围门控和聚焦测试；记录依赖缺失导致的验证阻塞。 |

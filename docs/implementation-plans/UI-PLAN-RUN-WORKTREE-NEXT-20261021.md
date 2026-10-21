@@ -1,9 +1,9 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v0.7（Worktree 状态与操作的屏幕级交互规划）
+**版本：** v0.8（WLD-1 Run 生命周期 API 后的下一版 UI 规划）
 **日期：** 2026-10-22
 **设计基线：** 本地 dev 起始提交 a5b4404a；requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、DD-WORKTREE-GROUP-001.md v5.16、实施计划 v7.14、WBS v3.7、UI 规划 v0.6。
-**实现基线：** 本规划基于本地 dev `30c6b975612ce72cfc626db70037420885be6672`；本地 main 为 `8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`，`main...dev = 0 205`。UI-2 no-focus Run Shell、WLD-3 occurrence Branch snapshot constraint 与 WLD-5 同源内容链接守卫已在该基线中；相关前端/静态验证只覆盖各自切片。Rust 1.99.0、目标 PostgreSQL、生产 Runtime 与完整产品闭环仍未验收。规划起始提交 a5b4404a 保留为历史设计基线。
+**实现基线：** 本规划基于本地 dev `8245b90c8150394439672c0b179ce0e51946444d`；本地 main 为 `8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`，`main...dev = 0 208`。该基线包含 WLD-1 Run-scoped Worktree Lifecycle API 源码切片：允许 hostless Run 与可选远端 Branch，变更要求 Run 当前绑定 Repository；真实 provider 默认未安装，前端仍使用旧 Project-scoped lifecycle paths，旧路径继续 fail closed。Rust 1.99.0、PostgreSQL 目标库/RLS、Run↔Worktree 持久绑定 owner、真实 provider 和完整产品闭环仍未验收。缓存 `origin/dev` 比本地 dev 落后 54 个提交；本轮未 fetch，远端 freshness 未知。规划起始提交 a5b4404a 保留为历史设计基线。
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
 
 ## 0. 目的与本轮结论
@@ -12,9 +12,9 @@
 
 本轮不把当前 Web/React 页面或 Tauri 原型当作最终桌面体验。Web 端已有导航、授权 RunContext、Task Card 与受控终端的局部实现；Tauri 壳的独立界面仍由 React/Vite 渲染，Rust IPC provider 尚不完整。目标桌面 UI 按 Rust 原生前端规划，先用代表性页面测量渲染器和资源成本，再冻结技术选型。
 
-v0.7 把 v0.6 的原则细化为 Project 选择、Run 选择、Worktree 焦点三种独立状态，以及 Worktree 状态检查器、生命周期操作门、可重复的 Rust 桌面性能测量和交付验收矩阵。当前实现缺少 Project/Run 独立选择、Run 归属状态、若干 Worktree 观察字段和完整生命周期 API；本文将这些写为接口/实现前置条件，不把现有预览或不完整投影描述成已可用产品能力。
+v0.8 以 v0.7 的屏幕规格为底稿，加入 WLD-1 Run-scoped lifecycle API 的当前实现边界，细化 Worktree 生命周期检查器、操作预览、Run API 接入门和分期 WBS。当前仍缺 Run↔Worktree 持久绑定 owner、真实 provider、目标 PostgreSQL/RLS 验收及前端 Run API 迁移；本文将这些写为接口/实现前置条件，不把现有 API seam、预览或不完整投影描述成已可用产品能力。
 
-v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run → Worktree → Branch 树始终承担目录管理；只选 Project/Run 时，右侧工作区显示授权摘要和 Worktree 选择，不挂载 Run App；选中并重新验证 Worktree 后，右侧工作区才显示该 Run 的同级 App tabs 与内容。UI-2 本轮已修复无 focus 时误显示 Task Cards 的行为。当前选择器只显示第一页；有更多 Worktree 时引导用户从左侧目录继续，后续须补可搜索、可分页的右侧选择器。GLOBAL 聊天范围已显示，但聊天 Runtime 和发送仍禁用。
+v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run → Worktree → Branch 树始终承担目录管理；只选 Project/Run 时，右侧工作区显示授权摘要和 Worktree 选择，不挂载 Run App；选中并重新验证 Worktree 后，右侧工作区才显示该 Run 的同级 App tabs 与内容。UI-2 的 no-focus 门已在 dev 集成；当前选择器只显示第一页，有更多 Worktree 时引导用户从左侧目录继续，后续须补可搜索、可分页的右侧选择器。GLOBAL 聊天范围已显示，但聊天 Runtime 和发送仍禁用。
 
 ## 1. 现状基线与差距
 
@@ -22,6 +22,7 @@ v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run �
 |---|---|---|
 | 左侧 Project 目录 | `ProjectRunTree` 按 Project → Engineering Run → Worktree → Branch 展示，并使用固定视口、行高、overscan 和键盘树导航；UI-1 切片分别呈现人工状态、机器状态、Agent 分配、Session/Runtime 绑定、归档状态和 binding 版本。锁、变更详情、观测时间、Branch 来源/新鲜度尚无可信观测，显示 unknown。 | 延续树形导航；补齐有 owner 证据的冲突、锁、freshness 和生命周期状态；Project Worktree Index 只作跨 Run 汇总，不取代主导航。 |
 | Run Shell | UI-2 已改为无 focus 时只读取该 Run 授权 Worktree 目录、显示摘要/选择器和 GLOBAL 范围；不挂载 Task Cards、BI、App tabs 或 App 数据请求。聚焦测试 2/2 与全量 TypeScript 检查通过。选中 Worktree 后，目标规范路由再次获取并验证 RunContext 才挂载现有 App 面板；当前只有 Task Cards 与 BI 面板，其他 tabs 明确待迁移。 | 保持 Worktree-first 焦点门；补齐分页/搜索和右侧工作区布局；按 owner capability 呈现可用、只读、不可用或等待状态。GLOBAL 聊天仍无 Runtime/send。 |
+| Worktree 生命周期 | WLD-1 已增加 Run-scoped repository discovery、import candidate、create/import API 与显式 provider 注入边界；缺少 provider 或 Run 当前 Repository binding 时 fail closed。Ready receipt 需 Run↔Worktree binding 身份/版本，但此切片不创建该绑定。前端仍调用旧 Project-scoped paths，API/DB/Rust/provider 验收未完成。 | 迁移 UI 到 Run-scoped API 合同；provider、binding owner、目标 DB/RLS 与持久 receipt 未验收前，操作显示不可用原因，不回退到 Project API、不做乐观成功。 |
 | Task Card / CLI | Task Card 有分页创建与读取切片；终端必须对应当前 Task、Worktree 和经服务端授权的 Session。无 provisioner、授权或状态不确定时 fail closed。 | 将 CLI 收入卡内执行面板；补全 Agent 分配、运行状态、取消/重接、验证证据与结果回写的界面闭环。不得显示假终端或把 Session 结束当作任务完成。 |
 | Canvas | 有独立 Canvas 页面和 Group Canvas/Worktree 图相关实现，但 Run 内统一入口和完整 owner 生产闭环尚未完成。 | Infinite Canvas 与 Task Card 在 Run 层同级；Canvas 保存几何、布局和 typed 引用，Task/Worktree/关系事实仍由其 owner API 管理。 |
 | 聊天 | scope 选择与授权目标目录存在局部实现；当前 Run Shell 的输入和发送仍禁用。 | 固定底栏，明确 `WORKTREE` / `GLOBAL`；发送前展示有效目标、权限和上下文摘要。GLOBAL 不扩大授权。 |
@@ -29,7 +30,7 @@ v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run �
 | Schedule / hostless Run | WLD-3 已增加没有远端 Branch 的 Run 规则读写/配置路径；目标仍须绑定当前本地 Worktree、Task、repository、Profile 和 HookSet，Branch 仅由授权 Run 范围提供。Rust 与 PostgreSQL 门禁未运行，且没有 Schedule worker/trigger/executor。 | 将“规则配置已保存”“规则启用配置态”和“Occurrence/Run 实际执行”显示为不同状态；无远端 Branch 只允许配置，不显示为可触发或可运行。触发仍受 Domain/materializer 与 Run-owner Branch 必需门保护。 |
 | 桌面端 | `crates/star-desktop` 是 Tauri 2 + React/Vite 壳和 Rust IPC；Task provider 缺失时失败关闭，旧任务演示回退已移除。当前不能称为 Rust 原生前端闭环。 | 建立 Rust UI 目标架构，与 Web 端共享 API/owner/event 契约；Rust IPC 只做有界 adapter，不拥有第二份业务事实。 |
 
-代码与报告证据：`frontend/src/components/Sidebar.tsx`、`frontend/src/components/run/ProjectRunTree.tsx`、`frontend/src/components/run/RunWorkspaceShell.tsx`、`frontend/src/components/run/RunTaskCardsPanel.tsx`、`frontend/src/lib/group/taskCliPresentation.ts`、`crates/star-desktop/frontend/src/App.tsx`，以及 `docs/reports/WLD1-LIFECYCLE-OP-OUTBOX-20261021.md`、`docs/reports/WLD2-TASK-CLI-UI-SLICE-20261020.md`、`docs/reports/WLD5-HOOK-POLICY-UI-SLICE-20261020.md`。这些证据只覆盖报告声明的代码/测试范围；不证明生产身份、目标 DB、Runtime 或全产品闭环。
+代码与报告证据：`frontend/src/components/Sidebar.tsx`、`frontend/src/components/run/ProjectRunTree.tsx`、`frontend/src/components/run/RunWorkspaceShell.tsx`、`frontend/src/components/run/RunTaskCardsPanel.tsx`、`frontend/src/lib/group/taskCliPresentation.ts`、`crates/star-desktop/frontend/src/App.tsx`，以及 `docs/reports/WLD1-LIFECYCLE-OP-OUTBOX-20261021.md`、`docs/reports/WLD1-LIFECYCLE-PROVIDER-20261022.md`、`docs/reports/WLD2-TASK-CLI-UI-SLICE-20261020.md`、`docs/reports/WLD5-HOOK-POLICY-UI-SLICE-20261020.md`。这些证据只覆盖报告声明的代码/测试范围；不证明生产身份、目标 DB、Runtime 或全产品闭环。
 
 ## 2. 产品交互原则
 
@@ -428,6 +429,51 @@ UI-0/UI-1 开发前提交：
 
 UI-0 完成门：三条 lane 可重复运行，边界及负载已说明，Rust parity 原型完成同语义交互，取消与背压可观测，资源结果可归因；评审确认渲染架构后才冻结技术选择和预算。UI-1 完成门：Project 与 Run 可分别选择/展开；名字缺失不伪造；主层级恒定；Project Index 不产生无证据的 Run 归属；无 focus 为零 Run App 数据请求；键盘/读屏、分页、旧焦点清理与错误恢复通过。生命周期、CLI、Hook、Plugin、BI、Infrastructure 未通过各自 WLD owner/API 和运行时门前保持 disabled/partial。当前整轮只完成规划，不声明上述界面、Rust renderer、Runtime 或生产闭环已经实现。
 
+## 8.4 v0.8 下一版 UI 规划：Run 生命周期接入与 Worktree 控制闭环
+
+### 规划基线和目标
+
+v0.8 以 dev `8245b90c` 为实施事实基线，承接 WLD-1 Run-scoped lifecycle API 源码切片，并将其明确限制为“路由/授权/Provider seam 已有，真实 checkout 操作未开放”。旧 Project-scoped 前端路径仍返回 unavailable；前端不得把 Run API 源码存在描述为创建、导入、归档、恢复或清理已经可用。Run 当前 Repository binding、持久化 Run↔Worktree relation、目标数据库授权和可信 provider 均是开放门。
+
+本版目标是把多 Agent checkout 管理路径做成可审查、可恢复的桌面体验方案：用户从 Project 目录定位 Run 和 Worktree，观察归属、执行、checkout、并行保护与 freshness；选择 Worktree 并重新验证后才进入该 Run 的工作区；每个危险动作从授权预览开始，直到可追溯 receipt 和重新观察完成。规划先冻结状态语义与 API-to-UI 合同，再进入实现。
+
+### 核心屏幕与状态
+
+| 屏幕 | 关键内容 | 明确边界 |
+|---|---|---|
+| Project Worktree Index | 跨 Run 筛选/排序；每行含 Project、Run、Worktree、Branch、owner 来源和观测时间。 | Run ID/binding 缺失时显示部分或不可用；不推断归属，不维护第二份事实。 |
+| Run 概览（无 Worktree focus） | Run 身份、授权摘要、Worktree 目录分页、受控动作能力状态、GLOBAL 聊天范围。 | 不挂载 App tabs，不读取 Task/Canvas/BI/Plugin 内容；无焦点时不得启用 WORKTREE 聊天。 |
+| Worktree focused workspace | 面包屑、checkout/Branch 摘要、Run 同级 tabs、按需打开的 inspector。 | 每次 focus 变化先取消旧请求/流、清理旧 scope，再复验授权、binding 和版本。 |
+| Worktree inspector | Project/Run/Worktree owner、Agent/Session/Task 关联、Branch/HEAD、dirty/ahead/behind、lock/lease、HookSet/Profile、freshness。 | 只展示 owner-backed 字段；unknown、stale、denied、unavailable 分别表达，绝不当作 idle。 |
+| Lifecycle operation preview | Create/import/rebind/archive/restore/cleanup 的目标、影响范围、授权、策略、dirty 数据、冲突、幂等身份和阻塞项。 | 未具备可信 provider、Run Repository binding、当前授权和 receipt owner 前，确认按钮保持禁用。 |
+| Task Card 与 Canvas | 两个同级 Run App tabs；Task 卡内可显示 CLI 面板。Canvas 通过 typed reference 链接到 Task/Worktree/Branch 及其他 Run 对象。 | CLI 必须关联 Task/Run/Worktree/Session 并经过 sandbox/Hook/预算门；Canvas 只保存布局和引用，不能代写业务 owner 事实。 |
+| Chat Bar | 固定在底栏，显式选择 `WORKTREE` 或 `GLOBAL`，显示作用域身份与 Runtime 状态。 | 每次切换清理旧流和响应；GLOBAL 不扩展已授予权限；未装 Runtime 时输入禁用。 |
+
+### 生命周期可用状态与交互门
+
+生命周期按钮只依据 capability 和 owner receipt 开放，状态至少区分 `available`、`preview-only`、`pending`、`unavailable`、`denied`、`stale`、`conflict` 和 `recovering`。API 的 202/queued、前端导航成功、provider 进程启动和 guest/VM 就绪都不得映射为 checkout ready。
+
+Run API 可读取或配置不等于可以执行本地文件系统操作。用户确认操作时，服务端仍需实时重验 Project/Run 授权、Run 当前 Repository binding、HookSet/Profile 版本、idempotency key 和资源预算；provider 回执应能识别 Run↔Worktree binding ID/version、操作状态、审计和重放。失败后刷新 owner 状态并展示恢复入口，不能以旧 Project 路由、preview store 或 seed 数据补成功。
+
+| 交互 | 前置事实 | 成功反馈 | 未满足时 |
+|---|---|---|---|
+| 打开 Worktree | Project/Run/Worktree identity、当前授权、binding/version 和观测 freshness。 | 设置 focus，按需挂载当前 Run App。 | 保留安全目录信息，清除旧焦点内容，显示重试或重新授权原因。 |
+| 创建/导入 checkout | Run repository binding、trusted provider、路径解析结果、并发冲突与资源 admission。 | 显示 operation receipt 和新的 Run↔Worktree binding；ready 经独立观察确认。 | 按 unavailable/denied/conflict 分类；不调用 Project-scoped legacy path。 |
+| 归档/恢复/清理 | retention/lease/claim、Agent/PTY/Runtime drain、dirty/untracked 和确认的保留计划。 | 显示对应 owner 的状态迁移、审计/Outbox 与对账结果。 | 未知状态/陈旧状态/未 drain/数据未保留时停止并给恢复步骤。 |
+| 合并准备 | 本地 Branch、目标基线、dirty/conflict、Hook/验证证据和用户授权。 | 显示提交/冲突结果及新鲜度。 | 不把 Worktree 下的本地 Branch 与远端 SCM identity 混为一谈；不强制清理。 |
+
+### 新版实施阶段和并行边界
+
+本版不改变 UI-0..UI-7 命名，细化每阶段的交付物与前置门，见 [`WBS-UI-PLAN-NEXT-20261022.md`](WBS-UI-PLAN-NEXT-20261022.md)。UI-0 设计和性能协议先行；UI-1 目录投影与 UI-2 Run 焦点壳完成后，生命周期、Task CLI、Canvas 和分析/Plugin 面板可在 API/owner 合同冻结、文件边界互斥时分开实现。不得把未验收 provider/Rust Runtime 的执行按钮作为视觉占位。
+
+Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Project/Run 摘要；Worktree 目录分页和虚拟化；Canvas 只载入视口元素；Task transcript/terminal output 采用有界 ring buffer；事件进度允许合并、owner 事实事件不丢失；API、文件扫描、Git 观察和渲染资源均支持取消/drain。性能规划分开记录 Tauri+React 现状、共享 Web 参考和 Rust-native parity 原型，使用确定规模数据、process-tree RSS、缓存/队列/绘制计数、交互 p50/p95 与取消 drain 数据；目标设备测量前不编造硬阈值。Multipass/K3s 交互属于 Run Infrastructure App 的 owner 事实，测试最多 2 个 Multipass inventory 实例，绝不要求 Docker Desktop。
+
+### 本轮完成定义和未完成项
+
+- 完成定义：实现基线更新到 `8245b90c`；UI-2 集成状态、WLD-1 API/Provider gap 和所有后续 UI 阶段在计划与 WBS 中一致；Project → Run → Worktree → Branch 导航和无焦点 App mount 门不被改写；无 mock/seed 生产成功表述。
+- 本轮只更新规划文档，不实现新页面、不开放生命周期、任务执行、聊天发送或 BI ingress。
+- Rust 1.99.0、目标 PostgreSQL/RLS、真实 provider、Run↔Worktree 持久绑定、Runtime sandbox 与 UI 性能实测仍未验收；相应 UI capability 必须显示 disabled/unavailable。
+
 ## 9. 总体验收清单
 
 - 导航顺序恒为 Project → Engineering Run → Worktree → Branch；Project 是第一层，Branch 是 Worktree 子层，不以宿主连接状态改序。
@@ -437,6 +483,7 @@ UI-0 完成门：三条 lane 可重复运行，边界及负载已说明，Rust p
 - Schedule 面板把 Rule 配置状态与 trigger、Occurrence、Run admission、executor 状态分开；没有远端 Branch 的 Run 可配置规则，但不能据此显示为可执行。目标 Worktree、Task、Profile、HookSet 和 run-as 授权仍需有效。
 - Hook 草稿的 Leave/Stay 保护不得在用户选择 Stay 时关闭菜单、改写最近访问记录或丢失焦点；普通同源内容链接批准后走 SPA push，Stay 不调用链接回调。浏览器 Back/Forward 仍未保护，必须显式列为限制并在进一步实现后单独验收。
 - Worktree Index、Run、Task、Canvas、Workflow、BI、Plugin、Hook、Infrastructure 状态均指向单一 owner 数据/API；跨 App 变更返回 receipt、version 和可审计结果。
+- Worktree 生命周期按钮仅连接 Run-scoped API；无真实 provider、Run Repository binding、目标 DB/RLS 与有效 receipt owner 时保持 disabled，不回退到已关闭的 Project-scoped API。
 - 多 Agent 工作区能区分运行中、等待、冲突、锁定、授权撤销、资源不足、状态未知和已完成；状态来自可信服务，陈旧数据带时间戳。
 - UI 加载、缓存、列表、事件订阅、终端输出、图表和插件资源均有界；所有长任务可取消并在取消后释放资源。
 - 关键操作具备键盘可达、焦点恢复、可读状态、错误恢复与确认；颜色不是唯一状态信号。
@@ -452,11 +499,13 @@ UI-0 完成门：三条 lane 可重复运行，边界及负载已说明，Rust p
 6. WLD-3 hostless Schedule Rule 与 Occurrence snapshot CHECK source slices 尚未通过 Rust 1.99.0 和 PostgreSQL migration/API acceptance；Occurrence 仍只有 JSONB `target_snapshot`，CHECK 约束 JSON path，不新增 Branch 列，也不实现 worker/materializer/admission/executor。
 7. Project 投影当前只有 ID/role；Run Worktree projection 缺 lock、dirty/ahead/behind、observed-at、Branch freshness 与 assignment receipt。Project Worktree Index 缺 Engineering Run ID，创建/导入也没有 Run binding receipt。补齐 owner/API 合同前，不得把这些字段作为生产事实或开放 Run 级生命周期操作。
 8. 旧 Group 路由可回退至本地 store/预览；当前 BI 面板是任务事件视图，Canvas 未装配到 canonical Run Shell。仅凭这些现象不得声称完整 App 集成、BI/Benchmark 或生产数据闭环。
+9. WLD-1 Run-scoped lifecycle API 还没有真实 provider、Run↔Worktree binding writer 和目标数据库验收；现有 UI 未迁移至这些路径。Run API 与旧 Project API 的表面存在不可作为 UI 可用能力证明。
 
 ## 11. 修订历史
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.8 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将规划基线更新到 dev `8245b90c`；纳入 WLD-1 Run-scoped lifecycle API seam、provider 默认缺失、Run↔Worktree binding owner/目标 DB/Rust 门未关闭以及前端仍使用旧 Project routes 的事实；新增 Worktree 检查器、操作预览与 receipt 屏幕状态，细化 UI-0..7 下一版阶段、并行边界和低内存/可取消性能要求。此次为规划，未实现 UI 或解除执行 fail-closed。 | WLD-1 源码切片合入 dev 后，用户要求针对新版本开展 UI 规划 |
 | v0.7 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在已合并的 dev `30c6b975` 基线上把 UI 规划升级为屏幕级规格：区分 Project/Run 选择与 Worktree focus，修正无焦点 Run 快捷入口、Project Index 缺 Run 归属、Run Worktree 状态字段和 lifecycle API 的证据边界；增加 App mount 状态、键盘/读屏、owner receipt 与幂等恢复合同，并细化 Tauri/Web/Rust parity 三条 UI-0 性能测量 lane、fixture、计数和 p50/p95 门。没有把规划写成已实现能力。 | 用户要求当前开发轮结束后，对新版本进行一轮 UI 规划；UX 与性能只读评审 |
 | v0.6 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 基于本地 dev a5b4404a 与已整合的 UI-2/WLD-3/WLD-5 切片，将下一版 UI 主线聚焦到多 Agent Worktree 可见管理与安全生命周期控制；细化页面、状态、用户流程、操作预览/回执、性能输入和下一批交付物。 | 当前开发轮已合并到 dev，用户要求随后规划新版本 UI |
 | v0.5 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在 UI-2 实际交付后更新实现基线；增加 Run/Worktree 焦点状态矩阵、切换/失败清理约束和下一轮 UI-0..7 排序、交付物及停止条件。 | UI-2 与 WLD-3 本轮实现及验证结果 |
