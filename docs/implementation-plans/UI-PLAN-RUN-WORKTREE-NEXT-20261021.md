@@ -1,9 +1,9 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v0.5（UI-2 实现后规划）
+**版本：** v0.6（Worktree-first 多 Agent UI 规划）
 **日期：** 2026-10-22
-**设计基线：** requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、`DD-WORKTREE-GROUP-001.md` v5.16、实施计划 v7.14
-**实现基线：** UI-2 no-focus Run Shell 与 WLD-3 occurrence Branch snapshot constraint 已在隔离 Worktree 完成并通过当前可用的静态/前端门禁；本地 dev 集成 SHA 与验收边界将在本轮 WBS v3.6 集成记录中登记。
+**设计基线：** 本地 dev 起始提交 a5b4404a；requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、DD-WORKTREE-GROUP-001.md v5.16、实施计划 v7.14、WBS v3.6、UI 规划 v0.5。
+**实现基线：** UI-2 no-focus Run Shell、WLD-3 occurrence Branch snapshot constraint 与 WLD-5 同源内容链接守卫已合并到本地 dev；a5b4404a 为本规划起始提交。相关前端/静态验证只覆盖各自切片；Rust 1.99.0、目标 PostgreSQL、生产 Runtime 与完整产品闭环仍未验收。
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
 
 ## 0. 目的与本轮结论
@@ -12,7 +12,7 @@
 
 本轮不把当前 Web/React 页面或 Tauri 原型当作最终桌面体验。Web 端已有导航、授权 RunContext、Task Card 与受控终端的局部实现；Tauri 壳的独立界面仍由 React/Vite 渲染，Rust IPC provider 尚不完整。目标桌面 UI 按 Rust 原生前端规划，先用代表性页面测量渲染器和资源成本，再冻结技术选型。
 
-v0.5 是依据 UI-2 实际交付重新排定的下一轮 UI 规划：它把“未选 Worktree”“切换中/复验中”“已验证 Worktree”“验证失败”定义为独立页面状态，并明确 UI-2 只是焦点门的窄切片。近期顺序先完成 Rust UI-0 基准与架构决策，再补齐 Worktree 目录选择器和切换体验；Task/CLI、Canvas、Hook、Plugin、BI 与基础设施 UI 继续按其 owner/runtime 门分期交付。
+v0.6 在 v0.5 的焦点门与阶段计划之上，把下一版的产品主线收敛为“多 Agent Worktree 控制台”：先让用户能看清每个 checkout 的归属、Agent/任务/运行态、分支与未提交变更、锁和冲突，再安全地执行绑定、切换、归档、恢复和清理。此版本只规划交互与交付顺序，不代表这些控制面已经实现。近期顺序是先完成 Rust 桌面 UI-0 基准和架构决策，再做 Project 目录/Worktree 管理视图、Run 焦点工作区与状态检查器，随后交付任务卡内 CLI、Canvas 与其他 Run Apps。
 
 v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run → Worktree → Branch 树始终承担目录管理；只选 Project/Run 时，右侧工作区显示授权摘要和 Worktree 选择，不挂载 Run App；选中并重新验证 Worktree 后，右侧工作区才显示该 Run 的同级 App tabs 与内容。UI-2 本轮已修复无 focus 时误显示 Task Cards 的行为。当前选择器只显示第一页；有更多 Worktree 时引导用户从左侧目录继续，后续须补可搜索、可分页的右侧选择器。GLOBAL 聊天范围已显示，但聊天 Runtime 和发送仍禁用。
 
@@ -221,6 +221,116 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 
 本轮交付状态：UI-2 的 no-focus 挂载门、授权 Worktree 首页面、禁预取规范链接和 WORKTREE/GLOBAL 焦点门已实现；两项聚焦 Vitest、TypeScript、CypherGraph Guardian 和 diff whitespace checks 通过。UI-2 仍未完成完整右侧工作区、跨 App inspector、目录分页/搜索、聊天发送及 Browser Back/Forward。WLD-3 本轮仅加 Occurrence 快照持久化 CHECK；静态契约测试通过 3/3，数据库与 Rust 验收未运行。以上均不替代 UI-0 的 Rust 渲染器与资源基准；本文件 v0.5 新增 UI 状态矩阵和下一轮排序，不代表这些工作已实现。
 
+## 8.2 v0.6 新版 UI 规划：多 Agent Worktree 控制台
+
+### 规划目标与版本边界
+
+本版优先解决 Project 内多个 Agent 同时开发时 Worktree 难以归属、运行状态分散、冲突与生命周期操作不可控的问题。主导航仍固定为 Project → Engineering Run → Worktree → Branch；Project Worktree Index 是跨 Run 汇总入口，不改变该树形层级。用户先选 Project，再进入 Run；只有选择并验证某个 Worktree 后，右侧才加载该 Run 的 App 工作区。没有远端宿主身份时，Project、Run、Worktree 与本地 Branch 的管理路径仍完整可用。
+
+本版规划覆盖导航、Worktree 状态与动作、Run 工作区、Task Card/CLI、Canvas、聊天范围以及插件/Hook/Loop/BI 的信息呈现。实施按 owner API、身份和 Runtime 能力逐项开放；缺少 provider、权限、持久化回执或沙箱时，界面显示明确的不可用原因，不提供假的成功状态。
+
+### 版本首页结构
+
+| 区域 | 职责 | 主要信息 |
+|---|---|---|
+| Project 导航 | 选择 Project，进入该 Project 的 Run 树；提供 Project Worktree Index 汇总入口。 | Project 身份与权限；Run 数量；跨 Run 的 Worktree 摘要、过滤器和更新时间。 |
+| Run 树 | 管理 Project 下的 Engineering Run。 | Run 身份、成员/策略摘要、Host/SCM 关联（可选元数据）、Worktree 数量与待处理风险。 |
+| Worktree 树节点 | 管理 Run 绑定的本地 checkout，是多 Agent 状态的主要可见单元。 | checkout 所有者、Agent/Session、关联 Work Item、工作目录、运行态、锁/租约、变更摘要、最近观察时间与 freshness。每类状态来自各自 owner，未知值显示为 unknown。 |
+| Branch 叶节点 | 展示 Worktree 当前本地 checkout branch/ref 与提交观察。 | 本地 ref 名、HEAD、相对基线 ahead/behind、最近同步/观察时间；远端 Branch 身份另列且可为空，不推导远端状态。 |
+| Worktree 工作区 | 用户选中并验证 Worktree 后出现，标题显示 Project / Run / Worktree 与本地 Branch 摘要。 | Run 级同级 App tabs：Inbox/Work Items、Task Cards、Canvas、Workflow/Schedule、BI/Benchmark、授权 Plugin Apps。Task Cards 与 Canvas 是同级 App；Worktree focus 只是 checkout 上下文，不扩大 Run 授权。 |
+| 详情检查器 | 按需显示选中实体详情和可审计动作。 | Agent/Session/Task 绑定、HookSet/Profile 版本、锁与冲突事实、来源/时间、命令预览与最终 receipt。 |
+| 固定 Chat Bar | 在全局和 Worktree 之间显式选作用域。 | GLOBAL 或 WORKTREE 标签、目标身份、授权摘要和 Runtime 可用状态；切换 scope 会取消旧流并丢弃旧身份响应。 |
+
+### Worktree 控制视图
+
+Project Worktree Index 提供跨 Run 的表格/列表、搜索、状态筛选和风险排序；树仍是首要导航。每条 Worktree 记录将状态分开显示，不压成单个含糊的健康灯：
+
+- **归属**：Project、Run、Worktree ID、负责人、当前 Agent 与关联任务。
+- **执行**：Agent/Session 生命周期、Runtime 与执行预算状态；提交/排队/启动/取消/恢复各显示自己的 owner 事实。
+- **checkout**：本地目录标识、Branch/HEAD、dirty/untracked 摘要、相对基线差异与最近观测时间。
+- **并行冲突**：文件/资源冲突、锁/租约 owner、阻塞操作及新鲜度；不确定或过期状态带时间戳并禁止危险操作。
+- **策略与资源**：HookSet/Profile 版本、授权结果、资源上限和等待原因；敏感策略通过深链进入高级设置 → Hooks。
+- **动作**：创建/导入、绑定/重绑、交接、归档/恢复、合并准备、清理。危险动作先预览影响和阻塞项，提交后显示 owner receipt、审计结果与刷新状态。
+
+自动 Agent 分配在 Worktree/Task 详情里显示候选 Agent、负载/能力/冲突理由、被分配的 Run 与 Worktree、预算及可取消状态；用户可确认、重新分配或查看阻塞原因。UI 不直接修改 Agent/Task/Worktree 的 owner 事实，不将建议状态展示为已分配。
+
+清理或删除路径必须重新读取 retention lock、绑定/租约、Agent 进程、PTY 与 Runtime 操作状态。dirty/untracked 内容、活动执行、未知 freshness、权限缺失或状态冲突时默认阻止清理，给出可恢复的下一步；不得用 UI 直接 purge Worktree、Multipass 记录或宿主数据来绕过门禁。合并准备界面区分本地 Branch/ref、变更集、目标基线与验证结果；远端 SCM 操作单独检查连接器和权限。
+
+### 核心用户流程
+
+~~~mermaid
+flowchart TD
+  P[选择 Project] --> R[展开 Engineering Run]
+  R --> W[查看 Worktree 目录与跨 Run 汇总]
+  W --> V{选择并验证具体 Worktree}
+  V -->|授权与绑定有效| A[打开该 Run 的 App tabs]
+  V -->|过期/拒绝/未知| E[保留目录并显示恢复原因]
+  A --> T[Task Card 与卡内 CLI]
+  A --> C[Canvas 与 typed owner references]
+  A --> L[Workflow / Schedule / Loop 状态]
+  A --> B[BI / Benchmark coverage]
+  A --> H[授权的 Plugin Apps]
+  A --> G[Chat Bar: WORKTREE 或 GLOBAL]
+  T -->|取消/恢复/验证| A
+  C -->|打开 canonical owner 页面| A
+  L -->|resume 前复验授权/版本| A
+~~~
+
+| 用户任务 | 交互步骤 | 安全与可恢复门 |
+|---|---|---|
+| 找出哪个 Agent 正在修改哪个 checkout | Project Worktree Index 筛选 Agent/Session/任务；打开 Worktree 查看归属、Branch、锁和更新时间。 | 状态按 owner 来源分栏；陈旧或未知信号不显示为空闲。 |
+| 为任务分配 Agent 和 Worktree | 打开 Run 的 Task Card；查看候选 Agent 和 Worktree 负载/冲突；确认后显示已提交的 assignment receipt。 | 先复验 Project/Run 权限、Worktree binding、HookSet/Profile 和预算；UI 不在本地乐观标记分配成功。 |
+| 在任务卡中运行 CLI | Task Card 显示 Task/Run/Worktree/Session 身份，进入卡内 CLI 面板并查看受控输出。 | 只有服务端授权 Session receipt、sandbox、原生 Hook、预算和当前 binding 全部有效才可输入；否则保持只读/禁用并解释原因。 |
+| 准备合并或交接 Worktree | 检查 Branch/HEAD、变更、锁/租约、活动执行和验证证据；预览目标并提交明确的操作。 | 每步由对应 owner API 执行，使用幂等键、审计/Outbox 和可追溯 receipt；冲突或不确定时停止，不丢弃文件。 |
+| 从 Canvas 管理协作对象 | 搜索/放置 Task、Worktree、Branch 或分析卡片；点击节点打开其 owner 页面。 | Canvas 保存布局和 typed 引用；业务关系只经对应 owner 的 API 变更，跨 owner 命令失败可恢复。 |
+| 查看 Loop 与分析反馈 | Run 工作区打开 Workflow/Schedule 或 BI/Benchmark；沿事件/coverage 深链到 Task、Hook 决策、Worktree 与基础设施事实。 | checkpoint 不作为 Task/Run/Git 业务事实；未 materialize/未接纳/未执行分别显示；BI 明示 freshness、coverage、样本量和公式版本。 |
+
+### 焦点切换与危险操作状态
+
+切换顺序固定为 current focus → stop/cancel old streams → clear old scoped view state → resolve target → recheck auth/binding/version → mount target App tabs。只有最后一步成功才展示目标 Run App。旧 Worktree 的 CLI 输入、终端流、Canvas selection、Inspector selection 和 chat response 都不能跨焦点残留。
+
+| 操作 | 预览内容 | 确认后回执 | 必须阻止条件 |
+|---|---|---|---|
+| 创建/导入 Worktree | Project/Run、源目录/仓库、目标本地 ref、资源预算、冲突检测。 | 新 Worktree ID、provider operation ID、初始观测与审计事件。 | Project/Run 不同域、目录冲突、provider/容量未知、未经授权。 |
+| 重绑/交接 | 原/新 Run、Agent/Task、Session/PTY、锁/租约、策略与权限影响。 | 新 binding version、原/新 owner receipt、Outbox/event ID。 | 活跃运行未 drain、跨 Project、版本冲突或任何 owner 状态未知。 |
+| 合并准备 | 本地源 ref、目标 ref、提交差异、工作区 dirty 状态、验证/Hook 结果。 | 操作方、目标 identity、提交结果或可恢复冲突记录。 | 有未解决冲突、dirty data 未确认、验证失败、目标授权不完整。 |
+| 归档/恢复/清理 | retention lock、Run/Task/Agent 绑定、存活进程、PTY、Runtime、文件保留和目标路径。 | 独立 operation ID、状态迁移、Audit 与 Outbox 结果。 | active lease/session/process、freshness 未知、未授权或历史连续性缺失。 |
+
+### 新版本交付顺序
+
+以下顺序复用 UI-0..UI-7，不把所有 App 同时塞入首个可用版本：
+
+| 次序 | 交付包 | 设计产物 | 实施门 |
+|---|---|---|---|
+| 0 | **UI-0：Rust 桌面基准与架构决策** | 项目树、Worktree 列表、Task 卡/Canvas 代表性原型；输入/滚动/切焦/窗口变化、冷启动与闲置/压力测量计划；Rust UI renderer 与 IPC/数据层 ADR。 | 测量目标机器与真实数据集后再定 RSS/交互预算；无 UI 线程 I/O、无限日志缓存或主进程任意插件加载。 |
+| 1 | **UI-1：Project/Run/Worktree 控制台** | Project 树、Worktree Index、Run 无 focus 摘要、Worktree 状态详情与危险操作预览；键盘/窄屏/空态稿。 | Project → Run → Worktree → Branch 稳定；状态来源/观测时间可见；未知/陈旧/活动任务不能触发破坏操作。 |
+| 2 | **UI-2：Run 工作区与跨 App 焦点** | 右侧同级 App tabs、分页/搜索 Worktree picker、Inspector、Chat scope 与焦点切换图。 | Worktree 授权成功后才挂载 App；每个写操作重新授权；切换取消旧流/响应；失效后清理旧敏感状态。 |
+| 3 | **UI-3：Task Card 与受控 CLI** | 任务详情、Agent 选择/分配、Session、CLI、取消/恢复、验证证据和结果回写。 | 无 provisioner/sandbox/Hook/当前授权/预算时不开放输入；只认 Task owner 的最终状态。 |
+| 4 | **UI-4/5：Canvas、Workflow、Schedule、Hooks 与 Plugin Apps** | Canvas/Task sibling tabs；Loop timeline；Rule config 与执行状态；可视化 Hooks 和 plugin capability/lifecycle 管理。 | Typed EntityRef 与 owner API；核心 Hook 不可被 Plugin 绕过；插件撤销先停止新调用并 drain 在途操作。 |
+| 5 | **UI-6/7：BI/Benchmark、Infrastructure 与发布** | Coverage-aware dashboard、Host/Cluster/Reservation 分层视图、无障碍/升级/跨客户端一致性矩阵。 | WLD-4/6/7 各自验收；未知/部分覆盖不显示成功；测试 VM inventory 保持最多 2 个记录且无自动 purge。 |
+
+### Rust 桌面性能设计输入
+
+1. **分层按需加载**：启动先加载 Project/Run 摘要，展开 Worktree 时按页请求，选中 Worktree 后才加载其 Run App；Canvas 按视口取数，Task transcript/CLI 输出按需订阅。
+2. **有界 view model**：客户端只缓存可见行、少量前后页、当前焦点与当前 App 数据；每个 Worktree 的日志/事件/Canvas scene 都有上限和淘汰策略；Project 切换清理旧 Run scope 缓存。
+3. **UI 与 I/O 分离**：Rust UI 主线程只处理输入与小型 view diff；API、数据库、Git observation、文件扫描、图表聚合和插件 IPC 放在可取消后台任务。所有队列有界、可观测、带 backpressure 和 owner fairness。
+4. **事件合并**：Agent stdout、文件变更与 Run 事件进行批量合并/节流；维护最终状态的 owner event 不可丢，纯展示进度可 coalesce，记录丢弃计数和重同步 cursor。
+5. **资源分层**：按 Project、Run、Worktree、Agent、Plugin 分层预算 CPU、RAM、打开句柄、流和渲染对象；低优先级 BI/Benchmark 与缩略图工作不可饿死当前交互。
+6. **可复测指标**：UI-0 记录冷/热启动、Project Tree 可交互时间、Worktree 滚动/切换 p50/p95、键盘输入到反馈延迟、空闲/峰值 RSS、终端缓冲、Canvas 可见对象数、事件积压和取消 drain 时间；经目标机器测量后再批准绝对阈值。
+
+### 本轮验收与后续交付物
+
+本次只完成 UI 规划更新，不实现新页面、不放开任务/计划执行或 BI ingress。下一实现批次的审查包应包含：
+
+1. 5 张低保真状态稿：Project/Worktree Index、Run 无 focus、Worktree focused workspace、Worktree 生命周期操作预览、Task Card 中 CLI disabled/enabled 两态。
+2. Worktree 归属/锁/dirty/Agent/Session/Task/Branch/freshness 的状态字典及来源 owner 映射表。
+3. Project/Run/Worktree/Branch 的键盘树交互、焦点管理、窄屏折叠和读屏顺序说明。
+4. UI-0 Rust renderer/IPC/插件隔离 ADR 与可重复性能测量方案；测量前不设置没有基线依据的 RSS/毫秒硬值。
+5. 每个界面动作到 API/owner、授权/version、幂等键、receipt/审计、失败恢复与独立验证的追踪矩阵。
+
+开工顺序：先评审并冻结第 1–4 项的设计输入，再按 UI-0 → UI-1 → UI-2 推进基础导航/焦点，然后 UI-3/UI-4/5/UI-6/7 与 WLD owner 门并行。此阶段不代表视觉稿、Rust 前端、运行时或生产业务功能已经完成。
+
+
 ## 9. 总体验收清单
 
 - 导航顺序恒为 Project → Engineering Run → Worktree → Branch；Project 是第一层，Branch 是 Worktree 子层，不以宿主连接状态改序。
@@ -248,6 +358,7 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.6 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 基于本地 dev a5b4404a 与已整合的 UI-2/WLD-3/WLD-5 切片，将下一版 UI 主线聚焦到多 Agent Worktree 可见管理与安全生命周期控制；细化页面、状态、用户流程、操作预览/回执、性能输入和下一批交付物。 | 当前开发轮已合并到 dev，用户要求随后规划新版本 UI |
 | v0.5 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在 UI-2 实际交付后更新实现基线；增加 Run/Worktree 焦点状态矩阵、切换/失败清理约束和下一轮 UI-0..7 排序、交付物及停止条件。 | UI-2 与 WLD-3 本轮实现及验证结果 |
 | v0.4 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 以 UI-2 实际 no-focus 门更新 Run Shell 状态；明确左侧 Project/Run/Worktree/Branch 常驻、右侧工作区仅在 Worktree 授权后出现、当前 Worktree 选择仅第一页，并把 Rust UI-0 基准、搜索分页、完整右侧 App/Inspector 作为后续计划；同步 WLD-3 Occurrence Branch CHECK 与未验证门禁。 | UI-2 与 WLD-3 本轮实现及验证结果 |
 | v0.3 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 根据 UI-1 Worktree 状态呈现与 WLD-5 普通同源链接保护的本轮验证证据，修正 no-focus Run 误显示 Task Cards 的导航偏差，补充双态布局示意、焦点切换合同、unknown 状态边界及后续 UI 阶段验收。 | 用户要求当前开发完成后规划新版 UI，并确认 App tabs 必须在选择 Worktree 后才显示 |
