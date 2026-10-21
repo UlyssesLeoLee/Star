@@ -1,9 +1,9 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v0.1（规划稿）
+**版本：** v0.2（新版规划）
 **日期：** 2026-10-21
-**设计基线：** requirements v6.91、basic design v6.92、`DD-WORKTREE-GROUP-001.md` v5.15、实施计划 v7.14
-**实现基线：** 本地 `dev` `6f4ebc1779ee29813e004f9a514336082bca29ab`（WLD-1、WLD-2、WLD-5 有界切片已集成）
+**设计基线：** requirements v6.91、Schedule API SRS v0.64、basic design v6.93、`DD-WORKTREE-GROUP-001.md` v5.16、实施计划 v7.14
+**实现基线：** 本地 `dev` `1d6b3338416723fabc4d1a5bacfbb17972718745`（包含 WLD-3 hostless Schedule Rule 配置切片及 WLD-5 Hook 草稿导航保护切片）
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
 
 ## 0. 目的与本轮结论
@@ -21,7 +21,8 @@
 | Task Card / CLI | Task Card 有分页创建与读取切片；终端必须对应当前 Task、Worktree 和经服务端授权的 Session。无 provisioner、授权或状态不确定时 fail closed。 | 将 CLI 收入卡内执行面板；补全 Agent 分配、运行状态、取消/重接、验证证据与结果回写的界面闭环。不得显示假终端或把 Session 结束当作任务完成。 |
 | Canvas | 有独立 Canvas 页面和 Group Canvas/Worktree 图相关实现，但 Run 内统一入口和完整 owner 生产闭环尚未完成。 | Infinite Canvas 与 Task Card 在 Run 层同级；Canvas 保存几何、布局和 typed 引用，Task/Worktree/关系事实仍由其 owner API 管理。 |
 | 聊天 | scope 选择与授权目标目录存在局部实现；当前 Run Shell 的输入和发送仍禁用。 | 固定底栏，明确 `WORKTREE` / `GLOBAL`；发送前展示有效目标、权限和上下文摘要。GLOBAL 不扩大授权。 |
-| Hooks | 高级设置内已有可视化 Hook 编辑页；WLD-5 切片保护未保存草稿。全局路由切换保护、真实宿主身份和执行期原生 Hook 链路仍开放。 | 保留“高级设置 → Hooks”；补足跨页离开保护、继承/版本差异、模拟评估、发布回滚和决策深链。 |
+| Hooks | 高级设置内已有可视化 Hook 编辑页。WLD-5 已为已审计的全局壳导航和 CommandBar 路由跳转接入未保存草稿保护，定向 4 个测试文件 31 项通过，TypeScript typecheck 通过。浏览器 Back/Forward 和任意页面内容链接尚未全部纳入；真实宿主身份与执行期原生 Hook 链路仍开放。 | 保留“高级设置 → Hooks”；统一所有导航出口的 Leave/Stay 确认，并让菜单关闭、最近访问记录等副作用只在确认离开后发生；补足继承/版本差异、模拟评估、发布回滚和决策深链。 |
+| Schedule / hostless Run | WLD-3 已增加没有远端 Branch 的 Run 规则读写/配置路径；目标仍须绑定当前本地 Worktree、Task、repository、Profile 和 HookSet，Branch 仅由授权 Run 范围提供。Rust 与 PostgreSQL 门禁未运行，且没有 Schedule worker/trigger/executor。 | 将“规则配置已保存”“规则启用配置态”和“Occurrence/Run 实际执行”显示为不同状态；无远端 Branch 只允许配置，不显示为可触发或可运行。触发仍受 Domain/materializer 与 Run-owner Branch 必需门保护。 |
 | 桌面端 | `crates/star-desktop` 是 Tauri 2 + React/Vite 壳和 Rust IPC；Task provider 缺失时失败关闭，旧任务演示回退已移除。当前不能称为 Rust 原生前端闭环。 | 建立 Rust UI 目标架构，与 Web 端共享 API/owner/event 契约；Rust IPC 只做有界 adapter，不拥有第二份业务事实。 |
 
 代码与报告证据：`frontend/src/components/Sidebar.tsx`、`frontend/src/components/run/ProjectRunTree.tsx`、`frontend/src/components/run/RunWorkspaceShell.tsx`、`frontend/src/components/run/RunTaskCardsPanel.tsx`、`frontend/src/lib/group/taskCliPresentation.ts`、`crates/star-desktop/frontend/src/App.tsx`，以及 `docs/reports/WLD1-LIFECYCLE-OP-OUTBOX-20261021.md`、`docs/reports/WLD2-TASK-CLI-UI-SLICE-20261020.md`、`docs/reports/WLD5-HOOK-POLICY-UI-SLICE-20261020.md`。这些证据只覆盖报告声明的代码/测试范围；不证明生产身份、目标 DB、Runtime 或全产品闭环。
@@ -36,6 +37,7 @@
 6. **明确区分事实、投影和执行状态。** Session、Task、Schedule、Hook 决策、Infrastructure admission、集群 readiness、BI coverage 各显示自身 owner 的状态；请求已排队、IPC 已返回或插件已加载都不等于业务成功。
 7. **故障时保留可理解的状态。** Loading、空结果、权限拒绝、授权过期、provider 不可用、状态未知、版本冲突、离线、取消中、重接中、部分覆盖均使用不同文案和操作入口。
 8. **产品文案保持能力中性。** 可显示已配置的真实连接器名称，不使用竞品对照、模仿暗示或仿制文案。
+9. **区分已保存配置与可执行能力。** Schedule Rule 写入成功不代表存在 worker、Occurrence、Run admission 或 executor；Hook 草稿离开确认也不代表策略已经发布或执行。
 
 ## 3. 信息架构
 
@@ -86,10 +88,10 @@ Project（首层选择器与主导航根）
 | Task Card 详情 | 目标、优先级、关系、计划、Agent 分配、执行/Session 历史、验证条件、审计和产出证据。 | Task lifecycle 与 Session lifecycle 分开；重复请求、冲突和撤权均可恢复且不丢草稿。 |
 | 卡内 CLI 面板 | 绑定 Task + Run + 可选 Worktree；授权状态、启动配置、输出、取消/重接、运行预算、验证/提交结果。 | 无 Session receipt、无 sandbox、binding 不符、Hook 失败、预算未知或状态不确定时不可输入；输出有界、支持暂停/重连。 |
 | Infinite Canvas | 无限画布、Task Card/Worktree/Branch/BI fact 的 typed node、布局与连接器；节点侧栏可跳到 owner 页面。 | 视口裁剪和局部加载；断开的引用显示失效原因；拖拽布局不修改业务关系。 |
-| Workflow / Schedule | Run 内工作流模板、步骤状态、计划触发、租约/重试/暂停/恢复/审计。 | checkpoint 仅保存编排游标；resume 前重新授权并检查版本、幂等键和当前策略。 |
+| Workflow / Schedule | Run 内工作流模板、步骤状态、Schedule Rule 配置与审计。目标 Worktree/Task/Profile/HookSet 必须有效；没有远端 Branch 时仍可保存规则配置。 | 明确区分“规则配置态”与“运行态”；当前无 Schedule worker/trigger。Occurrence 在应用层仍须有 Branch，resume 前重新授权并检查版本、幂等键和当前策略。 |
 | BI / Benchmark | Run 级指标、趋势、队列/成功率/成本/延迟、Hook/验证结果和版本化基准 cohort。 | 显示 freshness、coverage、缺口、样本量和公式版本；不完整覆盖保持 partial/unknown。 |
 | Plugin Apps | 可插拔 App 列表、版本兼容、Run scope、capabilities、启停/卸载和权限审查。 | Manifest 不可信或 capability 被撤销时隔离/卸载；展示受影响操作与保存状态。 |
-| 高级设置 → Hooks | 可视化 typed rule builder、继承来源、Run 快照版本、差异、dry-run、发布/回滚、执行结果深链。 | 先提示未保存草稿；策略解析/审计失败 fail closed；危险操作说明影响范围。 |
+| 高级设置 → Hooks | 可视化 typed rule builder、继承来源、Run 快照版本、差异、dry-run、发布/回滚、执行结果深链；所有壳级路由通过统一的未保存草稿守卫。 | Leave/Stay 确认先于导航副作用；失败时保留草稿和焦点。历史前进/后退、外部页面链接和非壳级 imperative navigation 需要逐项接入；策略解析/审计失败 fail closed。 |
 | Infrastructure 状态面板 | HostEnvironment、Multipass instance、目标 cluster identity/generation、Run binding、reservation、K3s/Agent sandbox readiness 的分层状态。 | Host 与 cluster 容量分开显示；未知或过期不可启执行；不提供任意宿主 shell/socket。测试 inventory 上限固定 2 个 Multipass 记录，不提供自动 purge。 |
 
 ## 5. RunContext、跨 App 合同与状态管理
@@ -159,7 +161,7 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 | UI-2 Run Shell 与跨 App 上下文 | 无 focus Run Overview；聚焦后完整同级 App tabs；右侧检查器；WORKTREE/GLOBAL 底栏聊天；统一 context 切换与取消。 | UI-1；RunContext/EntityRef/owner API。 | App tabs 只在有效 Worktree focus 后开放；每个写动作重新授权；Global 目标逐项校验；旧响应不会覆盖新 scope。 |
 | UI-3 Task Card 与卡内 CLI | Inbox/Task Card 详情、Agent 分配、计划/依赖、Session 生命周期、受控终端、取消/恢复、验证与结果证据。 | UI-2；WLD-0/2，Hook/Runtime/sandbox gates。 | 当前 Task/Run/Worktree/Session 匹配才可输入；缺执行准入/provisioner/sandbox/Hook/预算时禁用并说明；独立验证和结果回写未接通前不标“可用”。 |
 | UI-4 Infinite Canvas 与协作对象 | Run Canvas、WorkItem/Worktree/Branch/BI typed refs、关系检查器、从 Canvas 建 Task 的复合命令、跳转与回链。 | UI-2；Canvas 与 WorkItem owner contracts；WLD-2 中涉及 Task 的复合命令。 | Canvas 与 Task Card 同级；布局与业务关系分离；引用逐次授权；跨 owner 失败不留孤儿对象；大画布遵守视口/内存界限。 |
-| UI-5 Workflow、Schedule、Hooks 与 Plugin Apps | Workflow/Loop 状态与 Schedule 操作；高级设置 Hooks；Plugin Registry/热插拔/capability 可视化、授权撤销。 | UI-2；WLD-3/5；Plugin manifest/runtime contract。 | checkpoint 不作业务事实；resume/retry 复验权限、策略和幂等；核心 Hook 不可被插件削弱；插件卸载取消并 drain 在途工作。 |
+| UI-5 Workflow、Schedule、Hooks 与 Plugin Apps | Workflow/Loop 状态；Schedule Rule 配置与执行分态；高级设置 Hooks 和全局未保存草稿守卫；Plugin Registry/热插拔/capability 可视化、授权撤销。 | UI-2；WLD-3/5；Plugin manifest/runtime contract。 | hostless Run 可配置规则只在 Rust/PostgreSQL acceptance 完成后展示为可用配置；明确它没有触发/Occurrence/执行能力。确认守卫覆盖全部离开路径；checkpoint 不作业务事实；resume/retry 复验权限、策略和幂等；核心 Hook 不可被插件削弱；卸载取消并 drain 在途插件调用。 |
 | UI-6 BI/Benchmark 与 Infrastructure 可视化 | Coverage-aware BI/Benchmark；Run/Host/Cluster/Instance/Reservation/readiness 分层详情和故障深链。 | UI-2；WLD-4/6；版本化指标和 Infrastructure Profile。 | Unknown/partial 不显示成功；host 与 cluster 容量分开；Run 固定 cluster generation；测试 Multipass inventory 仍最多 2 条记录，无自动清理。 |
 | UI-7 发布质量与 Rust 桌面替换 | 主要路径端到端验收、键盘/读屏/缩放、恢复与性能复测、打包/升级/迁移说明、Web/Rust 客户端一致性矩阵。 | UI-0..6；WLD-7 对应产品事实/owner 门关闭。 | Rust 1.99.0 工具链门、授权/目标 DB/runtime、性能与内存预算、恢复/取消、插件隔离和真实数据验收均有证据；未通过的功能在界面中保持禁用。 |
 
@@ -171,6 +173,8 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 - 选 Run 而无 focus 时，用户仍能查看 Run 并管理不要求 checkout 的 Task；完整 Run tabs 只在选择有效 Worktree 后展示。
 - Task Card 与 Canvas 在 Run 层同级；CLI 只从 Task Card 内进入，并持有正确 Task/Run/Worktree/Session 身份。
 - Chat Bar 固定并显式选择 WORKTREE/GLOBAL；GLOBAL 只扩大候选范围，不扩大授权。
+- Schedule 面板把 Rule 配置状态与 trigger、Occurrence、Run admission、executor 状态分开；没有远端 Branch 的 Run 可配置规则，但不能据此显示为可执行。目标 Worktree、Task、Profile、HookSet 和 run-as 授权仍需有效。
+- Hook 草稿的 Leave/Stay 保护不得在用户选择 Stay 时关闭菜单、改写最近访问记录或丢失焦点；未覆盖的浏览器历史导航须清楚提示并纳入后续验收。
 - Worktree Index、Run、Task、Canvas、Workflow、BI、Plugin、Hook、Infrastructure 状态均指向单一 owner 数据/API；跨 App 变更返回 receipt、version 和可审计结果。
 - 多 Agent 工作区能区分运行中、等待、冲突、锁定、授权撤销、资源不足、状态未知和已完成；状态来自可信服务，陈旧数据带时间戳。
 - UI 加载、缓存、列表、事件订阅、终端输出、图表和插件资源均有界；所有长任务可取消并在取消后释放资源。
@@ -181,12 +185,14 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 
 1. Rust 原生桌面渲染器尚未通过原型比较；UI-0 前不固定具体框架。
 2. 当前 Tauri + React/Vite 桌面原型的导航、Task、Canvas 和 IPC 需要按本计划重新映射；旧界面只能作为交互参考，不能把它的样例记录带入生产路径。
-3. Web Run Shell 现有 tabs、聊天和 CLI 有限实现不等于完整 Runtime/App；UI 阶段需同 WLD 报告逐项复核，尤其全局导航保护、目标 DB、真实 session provisioner、Hook 生命周期和 BI receiver。
+3. Web Run Shell 现有 tabs、聊天和 CLI 有限实现不等于完整 Runtime/App；UI 阶段需同 WLD 报告逐项复核，尤其浏览器历史/内容链接导航保护、目标 DB、真实 session provisioner、Hook 生命周期和 BI receiver。
 4. Rust 前端的跨平台字体/输入法、屏幕阅读、窗口/多显示器、终端渲染以及插件沙箱具体协议，在 UI-0 用目标设备实测确定。
 5. 基准所用硬件型号、合成目录规模、绝对 RSS/延迟阈值需在 UI-0 定版；在此之前不得声称满足了性能目标。
+6. WLD-3 hostless Schedule Rule source slice 尚未通过 Rust 1.99.0 与 PostgreSQL migration/API acceptance；Occurrence 的 `target_snapshot` 是 JSONB，Branch 必需性由 Domain/materializer/admission 校验，不能在 UI 或文档中暗示数据库存在独立 Branch 列约束。
 
 ## 11. 修订历史
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.2 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 按 dev `1d6b3338` 更新 WLD-3 hostless Rule 配置/Branch-required 执行分态和 WLD-5 全局壳导航草稿保护现状；明确 Rust/PostgreSQL 与浏览器历史导航缺口，细化 UI-5 验收。 | 当前开发轮完成并按用户要求规划新版 UI |
 | v0.1 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 基于本地 dev `6f4ebc17` 的导航、Run Shell、Task/CLI、Hooks 与 Tauri 源码证据制定 UI 信息架构、Rust 桌面性能边界、交互合同、分阶段计划和验收门；保留未实现与生产差距。 | 用户要求本轮开发后规划新版 UI |

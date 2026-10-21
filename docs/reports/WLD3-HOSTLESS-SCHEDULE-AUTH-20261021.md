@@ -33,7 +33,7 @@ Changed code and fixture files: `crates/star-api-rest/src/group_api/schedule_rul
 | PostgreSQL 18.6 migration replay and focused DB tests | Not run: PostgreSQL 18 binaries are absent from the checked standard installation path; no target database acceptance is claimed |
 | CodeRabbit second review | Unavailable: CLI launch failed with `/bin/bash: line 1: /root/.local/bin/coderabbit: Permission denied`; local diff review continued |
 
-CodeGraph coverage tooling was not exposed in this lane. The impact check used targeted source and migration searches, exact call-site inspection, and the passing Cypher header guard; this is not an exhaustive repository graph audit.
+No indexed `.codegraph/` project was available for this lane. The impact check used targeted source and migration searches, exact call-site inspection, and the passing Cypher header guard; this is not an exhaustive repository graph audit.
 
 ## §3 Known gaps
 
