@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.63 (2026-10-20)
+> **文档版本**: v2.64 (2026-10-21)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3157,6 +3157,19 @@ After the DDL catalog checks, the runner creates only an ephemeral non-superuser
 
 Current evidence: focused `--runner-tests` 6/6; fresh PostgreSQL 18.6 run 34/34 steps. A drift fixture injects direct object grants, database privileges and outgoing memberships on the NOLOGIN owner role, then re-applies the migration and verifies normalization and stable schema fingerprints. A role-owned schema fixture confirms the shared-object dependency guard rejects an existing owned object; the failed migration rolls back and the fixture is removed. This proves the disposable migration/role/RLS contract only. It does not exercise the actual API deployment login, authenticated bind/reassign/detach writes, target DB migration state, exact API replay, rollback/ambiguous commit, concurrent races, history reconciliation or production deployment. Rust all-targets was not validated: this environment has Rust 1.98.1 but the workspace requires 1.99.0, and Cargo correctly rejected that toolchain. See [`PHASE-WLD0-DIRECTORY-OWNER-ROLE-20261020.md`](reports/PHASE-WLD0-DIRECTORY-OWNER-ROLE-20261020.md); WLD-0 remains open and execution admission remains closed.
 
+## 4.98 WLD-3 hostless Schedule Rule authorization (2026-10-21)
+
+**Automation tier: [P]** — scripts/automation/dispatcher.py records the auditable brief docs/briefs/wld3-hostless-schedule-auth-20261021.md. The assigned lane separates Schedule Run authorization from remote Branch identity while preserving Project/Run grants and fail-closed execution admission.
+
+**Status: dispatched; implementation and verification remain open.** Acceptance requires an authorized hostless Run to support Schedule Rule read/write without a required remote Branch row; current run-as identity, active Run, tenant, idempotency, audit/Outbox and applicable Task/Worktree/Profile/HookSet binding checks remain intact. This brief does not enable a worker or executor. Target DB grants, per-trigger/retry/resume reauthorization and Run execution remain WLD-3 gates.
+
+## 4.99 WLD-5 app navigation guard for unsaved Hook policy drafts (2026-10-21)
+
+**Automation tier: [P]** — scripts/automation/dispatcher.py records the auditable brief docs/briefs/wld5-global-hook-navigation-20261021.md. The task extends the existing Advanced Settings → Hooks editor draft protection to supported main-app navigation using public App Router APIs.
+
+**Status: dispatched; implementation and verification remain open.** Preserve the current editor's scope guard and browser-unload warning, prevent supported in-app navigation from silently discarding dirty drafts, and report any App Router navigation paths that cannot be protected safely with public APIs. Do not claim all navigation classes are covered without evidence.
+
+| v2.64 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register two bounded WLD dispatch cards: hostless Schedule Rule authorization and supported App Router navigation protection for Hook drafts; implementation and runtime gates remain open | WBS next development round parallel dispatch |
 | v2.63 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the completed 34/34 PostgreSQL owner-role run, injected privilege/membership drift, migration re-normalization, stable schema fingerprint and role-owned schema fail-closed fixture; preserve target DB/API/Rust gates | Final drift/replay verification and evidence synchronization |
 | v2.62 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Correct the self-review finding by granting and verifying the Run revision FOR SHARE lock column under restrictive RLS; record 6/6 focused tests and 28/28 disposable PostgreSQL steps, with target DB and authenticated API gates open | Run revision lock-grant gap found during final review |
 | v2.61 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Extend WLD-0 runner to include Task-source lock dependencies, NOLOGIN/NOBYPASSRLS Directory owner migration, effective non-superuser SET ROLE/RLS assertions, and owner-grant-aware fingerprints; record 6/6 tests and 28/28 disposable PostgreSQL steps while keeping target DB and authenticated API gates open | Runtime-role/RLS acceptance implementation and PostgreSQL verification |
