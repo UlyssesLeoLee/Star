@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=1d7b4565718ae38cfe56d4318e98fcc07a28c5e31b8b55e26f22ffec48353adb
+//! @cypher schema=1 source_sha256=214970d9f0da5fd664e424e9744571da6fd43d1d5ea35a697f8caec13eee6a2c
 //! Cypher structural manifest.
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/worktrees.rs"});
 //! CREATE
@@ -39,6 +39,10 @@
 //! CREATE (fenceMargin:Function {name:"archive_fence_has_commit_margin",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (fenceTest:Function {name:"admission_fence_requires_commit_margin",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (m)-[:CONTAINS]->(fenceMargin),(factsFresh)-[:CALLS]->(fenceMargin),(archiveTests)-[:CONTAINS]->(fenceTest),(fenceTest)-[:CALLS]->(fenceMargin);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(co:Function {name:"confirm_management_plan",type:"function"}),(archiveTests:Module {name:"archive_gate_tests",type:"module"});
+//! CREATE (outboxFact:Class {name:"WorktreeManagementOutboxFact",type:"class",language:"rust"}),(buildOutboxFact:Function {name:"worktree_management_outbox_fact",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(shouldMutate:Function {name:"management_plan_changes_worktree",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(requiresArchiveGate:Function {name:"management_plan_requires_archive_gate",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(schemaVersion:Variable {name:"WORKTREE_MANAGEMENT_OUTBOX_SCHEMA_VERSION",type:"variable",language:"rust"}),(outboxTest:Function {name:"management_outbox_fact_is_versioned_and_minimal",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(requestHashTest:Function {name:"management_request_hash_is_stable_and_detects_changed_requests",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(ownerAssignmentTest:Function {name:"owner_assignment_does_not_emit_archive_outbox_fact",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(noopTest:Function {name:"unchanged_archive_plan_preserves_worktree_version",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(outboxTable:Class {name:"multica.worktree_management_outbox",type:"class",language:"sql"});
+//! CREATE (m)-[:CONTAINS]->(outboxFact),(m)-[:CONTAINS]->(buildOutboxFact),(m)-[:CONTAINS]->(shouldMutate),(m)-[:CONTAINS]->(requiresArchiveGate),(m)-[:CONTAINS]->(schemaVersion),(archiveTests)-[:CONTAINS]->(outboxTest),(archiveTests)-[:CONTAINS]->(requestHashTest),(archiveTests)-[:CONTAINS]->(ownerAssignmentTest),(archiveTests)-[:CONTAINS]->(noopTest),(co)-[:CALLS]->(buildOutboxFact),(co)-[:CALLS]->(shouldMutate),(co)-[:CALLS]->(requiresArchiveGate),(buildOutboxFact)-[:USES]->(schemaVersion),(outboxTest)-[:CALLS]->(buildOutboxFact),(outboxTest)-[:USES]->(schemaVersion),(ownerAssignmentTest)-[:CALLS]->(buildOutboxFact),(requestHashTest)-[:CALLS]->(request_hash),(noopTest)-[:CALLS]->(shouldMutate),(noopTest)-[:CALLS]->(requiresArchiveGate),(co)-[:WRITES]->(outboxTable);
 //! @endcypher
 
 use axum::{
@@ -108,7 +112,7 @@ struct ManagementPlanBody {
     correlation_id: Option<Uuid>,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, Clone, FromRow)]
 struct ManageWorktreeRow {
     project_id: Uuid,
     repository_id: Uuid,
@@ -139,6 +143,69 @@ struct ArchiveGateFacts {
 struct PlanIdempotency {
     request_hash: Vec<u8>,
     plan_response: Value,
+}
+
+#[derive(Debug)]
+struct WorktreeManagementOutboxFact {
+    event_type: &'static str,
+    schema_version: i32,
+    payload: Value,
+}
+
+const WORKTREE_MANAGEMENT_OUTBOX_SCHEMA_VERSION: i32 = 1;
+
+fn worktree_management_outbox_fact(
+    operation: &str,
+    target_archived: Option<bool>,
+    worktree_id: Uuid,
+    plan_id: Uuid,
+    before: &ManageWorktreeRow,
+    after: &ManageWorktreeRow,
+) -> Option<WorktreeManagementOutboxFact> {
+    let (event_type, transition) =
+        match (operation, target_archived, before.archived, after.archived) {
+            ("set_archived", Some(true), false, true) => ("worktree.archived", "archive"),
+            ("set_archived", Some(false), true, false) => ("worktree.restored", "restore"),
+            _ => return None,
+        };
+
+    Some(WorktreeManagementOutboxFact {
+        event_type,
+        schema_version: WORKTREE_MANAGEMENT_OUTBOX_SCHEMA_VERSION,
+        payload: json!({
+            "worktree_id": worktree_id,
+            "plan_id": plan_id,
+            "transition": transition,
+            "before": {
+                "archived": before.archived,
+                "version": before.version,
+            },
+            "after": {
+                "archived": after.archived,
+                "version": after.version,
+            },
+        }),
+    })
+}
+
+fn management_plan_changes_worktree(
+    operation: &str,
+    target_owner_user_id: Option<Uuid>,
+    target_archived: Option<bool>,
+    current: &ManageWorktreeRow,
+) -> bool {
+    target_owner_user_id.is_some_and(|owner| current.owner_user_id != Some(owner))
+        || (operation == "set_archived"
+            && target_archived.is_some_and(|archived| current.archived != archived))
+        || (operation == "assign_owner" && target_owner_user_id.is_some())
+}
+
+fn management_plan_requires_archive_gate(
+    operation: &str,
+    target_archived: Option<bool>,
+    current: &ManageWorktreeRow,
+) -> bool {
+    operation == "set_archived" && target_archived == Some(true) && !current.archived
 }
 
 pub(super) fn router() -> Router<GroupApiState> {
@@ -406,6 +473,17 @@ async fn create_management_plan(
     let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
     let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
     require_manager_role(&binding.role)?;
+    // Serialize requests sharing this actor-scoped key before lookup. A hash collision only
+    // causes extra serialization; the persisted key and request hash remain authoritative.
+    let advisory_key = format!(
+        "worktree-management-plan:{}:{}:{}",
+        actor.tenant_id, actor.user_id, key
+    );
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(advisory_key)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     if let Some(existing) = sqlx::query_as::<_, PlanIdempotency>(
         r#"
         SELECT request_hash, plan_response
@@ -510,7 +588,7 @@ async fn create_management_plan(
     .bind(confirm_by)
     .execute(&mut *tx)
     .await
-    .map_err(|_| GroupApiError::conflict("idempotency_race"))?;
+    .map_err(|_| GroupApiError::internal())?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
     Ok(Json(plan_response))
 }
@@ -545,7 +623,11 @@ async fn confirm_management_plan(
 
     // Host Runtime calls can take up to two seconds. Release the Worktree and plan row locks
     // before asking the host to drain, then reacquire and reauthorize before applying anything.
-    let archive_facts = if context.plan.target_archived == Some(true) {
+    let archive_facts = if management_plan_requires_archive_gate(
+        &context.plan.operation,
+        context.plan.target_archived,
+        &context.current,
+    ) {
         let expected_project_id = context.current.project_id;
         let expected_repository_id = context.current.repository_id;
         let expected_runtime_id = context.current.runtime_id;
@@ -748,8 +830,16 @@ async fn confirm_management_plan(
         "archived": current.archived,
         "version": current.version,
     });
-    sqlx::query(
-        r#"
+    let should_update_worktree = management_plan_changes_worktree(
+        &plan.operation,
+        plan.target_owner_user_id,
+        plan.target_archived,
+        &current,
+    );
+    let updated_rows = if should_update_worktree {
+        Some(
+            sqlx::query(
+                r#"
         UPDATE worktree_canvas_worktree
         SET owner_user_id = COALESCE($4, owner_user_id),
             archived = COALESCE($5, archived),
@@ -760,17 +850,25 @@ async fn confirm_management_plan(
             updated_at = now()
         WHERE id = $1 AND tenant_id = $2 AND project_id = $3 AND version = $6
         "#,
-    )
-    .bind(worktree_id)
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(plan.target_owner_user_id)
-    .bind(plan.target_archived)
-    .bind(current.version)
-    .execute(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
-    let updated = sqlx::query_as::<_, ManageWorktreeRow>(
+            )
+            .bind(worktree_id)
+            .bind(actor.tenant_id)
+            .bind(worktree.project_id)
+            .bind(plan.target_owner_user_id)
+            .bind(plan.target_archived)
+            .bind(current.version)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| GroupApiError::internal())?,
+        )
+    } else {
+        None
+    };
+    if updated_rows.is_some_and(|rows| rows.rows_affected() != 1) {
+        return Err(GroupApiError::conflict("version_conflict"));
+    }
+    let updated = if should_update_worktree {
+        sqlx::query_as::<_, ManageWorktreeRow>(
         r#"
         SELECT w.project_id, w.repo_id AS repository_id, w.owner_user_id, w.runtime_id, w.archived, w.version
         FROM worktree_canvas_worktree w WHERE w.id = $1 AND w.tenant_id = $2
@@ -778,9 +876,12 @@ async fn confirm_management_plan(
     )
     .bind(worktree_id)
     .bind(actor.tenant_id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?;
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?
+    } else {
+        current.clone()
+    };
     let after = json!({
         "owner_user_id": updated.owner_user_id,
         "archived": updated.archived,
@@ -816,6 +917,36 @@ async fn confirm_management_plan(
     .execute(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
+    if let Some(fact) = worktree_management_outbox_fact(
+        &plan.operation,
+        plan.target_archived,
+        worktree_id,
+        plan_id,
+        &current,
+        &updated,
+    ) {
+        sqlx::query(
+            r#"
+            INSERT INTO multica.worktree_management_outbox
+                (tenant_id, project_id, worktree_id, worktree_version, plan_id,
+                 event_type, schema_version, actor_id, correlation_id, payload)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "#,
+        )
+        .bind(actor.tenant_id)
+        .bind(worktree.project_id)
+        .bind(worktree_id)
+        .bind(updated.version)
+        .bind(plan_id)
+        .bind(fact.event_type)
+        .bind(fact.schema_version)
+        .bind(actor.user_id)
+        .bind(plan.correlation_id)
+        .bind(fact.payload)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    }
     sqlx::query(
         r#"
         UPDATE multica.worktree_management_plan
@@ -1585,5 +1716,181 @@ mod archive_gate_tests {
             hook_reason_name(domain_hook::HookReasonCode::ExternalConditionPending),
             "external_condition_pending"
         );
+    }
+
+    #[test]
+    fn management_outbox_fact_is_versioned_and_minimal() {
+        let before = ManageWorktreeRow {
+            project_id: Uuid::from_u128(1),
+            repository_id: Uuid::from_u128(2),
+            owner_user_id: Some(Uuid::from_u128(3)),
+            runtime_id: Some(Uuid::from_u128(4)),
+            archived: false,
+            version: 7,
+        };
+        let archived = ManageWorktreeRow {
+            project_id: before.project_id,
+            repository_id: before.repository_id,
+            owner_user_id: before.owner_user_id,
+            runtime_id: before.runtime_id,
+            archived: true,
+            version: 8,
+        };
+        let worktree_id = Uuid::from_u128(5);
+        let plan_id = Uuid::from_u128(6);
+
+        let fact = worktree_management_outbox_fact(
+            "set_archived",
+            Some(true),
+            worktree_id,
+            plan_id,
+            &before,
+            &archived,
+        )
+        .expect("archive transition emits an owner-local fact");
+        assert_eq!(fact.event_type, "worktree.archived");
+        assert_eq!(
+            fact.schema_version,
+            WORKTREE_MANAGEMENT_OUTBOX_SCHEMA_VERSION
+        );
+        assert_eq!(fact.payload["worktree_id"], json!(worktree_id));
+        assert_eq!(fact.payload["plan_id"], json!(plan_id));
+        assert_eq!(fact.payload["transition"], "archive");
+        assert_eq!(fact.payload["before"]["version"], 7);
+        assert_eq!(fact.payload["after"]["version"], 8);
+        assert!(fact.payload["after"]["archived"].as_bool().unwrap_or(false));
+        for forbidden in [
+            "owner_user_id",
+            "runtime_id",
+            "host_path",
+            "prompt",
+            "raw_logs",
+        ] {
+            assert!(fact.payload.get(forbidden).is_none());
+        }
+        assert!(worktree_management_outbox_fact(
+            "set_archived",
+            Some(true),
+            worktree_id,
+            plan_id,
+            &before,
+            &before,
+        )
+        .is_none());
+
+        let restored = worktree_management_outbox_fact(
+            "set_archived",
+            Some(false),
+            worktree_id,
+            Uuid::from_u128(7),
+            &archived,
+            &ManageWorktreeRow {
+                project_id: archived.project_id,
+                repository_id: archived.repository_id,
+                owner_user_id: archived.owner_user_id,
+                runtime_id: archived.runtime_id,
+                archived: false,
+                version: 9,
+            },
+        )
+        .expect("restore transition emits an owner-local fact");
+        assert_eq!(restored.event_type, "worktree.restored");
+        assert_eq!(restored.payload["transition"], "restore");
+        assert!(!restored.payload["after"]["archived"]
+            .as_bool()
+            .unwrap_or(true));
+    }
+
+    #[test]
+    fn management_request_hash_is_stable_and_detects_changed_requests() {
+        let worktree_id = Uuid::from_u128(11);
+        let request = ManagementPlanBody {
+            operation: "set_archived".to_owned(),
+            owner_user_id: None,
+            archived: Some(true),
+            expected_version: 4,
+            correlation_id: Some(Uuid::from_u128(12)),
+        };
+        let replay = ManagementPlanBody {
+            operation: request.operation.clone(),
+            owner_user_id: request.owner_user_id,
+            archived: request.archived,
+            expected_version: request.expected_version,
+            correlation_id: request.correlation_id,
+        };
+        let changed = ManagementPlanBody {
+            archived: Some(false),
+            ..replay
+        };
+
+        let original_hash = request_hash(worktree_id, &request).expect("hash original request");
+        let replay_hash = request_hash(
+            worktree_id,
+            &ManagementPlanBody {
+                operation: request.operation.clone(),
+                owner_user_id: request.owner_user_id,
+                archived: request.archived,
+                expected_version: request.expected_version,
+                correlation_id: request.correlation_id,
+            },
+        )
+        .expect("hash exact replay");
+        let changed_hash = request_hash(worktree_id, &changed).expect("hash changed request");
+
+        assert_eq!(original_hash, replay_hash);
+        assert_ne!(original_hash, changed_hash);
+    }
+
+    #[test]
+    fn owner_assignment_does_not_emit_archive_outbox_fact() {
+        let current = ManageWorktreeRow {
+            project_id: Uuid::from_u128(1),
+            repository_id: Uuid::from_u128(2),
+            owner_user_id: Some(Uuid::from_u128(3)),
+            runtime_id: None,
+            archived: false,
+            version: 1,
+        };
+        assert!(worktree_management_outbox_fact(
+            "assign_owner",
+            None,
+            Uuid::from_u128(4),
+            Uuid::from_u128(5),
+            &current,
+            &current,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn unchanged_archive_plan_preserves_worktree_version() {
+        let current = ManageWorktreeRow {
+            project_id: Uuid::from_u128(1),
+            repository_id: Uuid::from_u128(2),
+            owner_user_id: Some(Uuid::from_u128(3)),
+            runtime_id: None,
+            archived: true,
+            version: 8,
+        };
+        assert!(!management_plan_changes_worktree(
+            "set_archived",
+            None,
+            Some(true),
+            &current,
+        ));
+        assert!(!management_plan_requires_archive_gate(
+            "set_archived",
+            Some(true),
+            &current,
+        ));
+        assert!(worktree_management_outbox_fact(
+            "set_archived",
+            Some(true),
+            Uuid::from_u128(4),
+            Uuid::from_u128(5),
+            &current,
+            &current,
+        )
+        .is_none());
     }
 }

@@ -5,8 +5,10 @@
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
 > **WLD-0 Directory owner-role 增量（2026-10-20）**：绑定 API transaction 显式 `SET LOCAL ROLE star_engineering_directory_owner`；前向 migration 创建 `NOLOGIN`、`NOSUPERUSER`、`NOBYPASSRLS`、`NOINHERIT` role，并以列级 lock grants + restrictive RLS 允许对 Project/Branch/Run revision/Worktree/Task 源事实取锁、拒绝修改。Focused runner tests 6/6、fresh PostgreSQL 18.6 role/RLS runner 34/34 passed；漂移夹具注入直接权限、数据库权限和向外成员关系后重放 migration，确认归一化及 schema fingerprint 稳定；role-owned schema 负向夹具确认迁移拒绝已有对象所有权。实际部署 API login membership、目标 DB migration/RLS、authenticated HTTP bind/reassign/detach、rollback/replay/concurrency 与历史 reconciliation 未验收；Rust 1.99.0 在当前执行环境不可用（仅发现 1.98.x toolchain），不得把 1.98.x 检查当作基线通过，执行 admission 继续关闭。详见 WLD-0 阶段报告。
 
-> **文档版本**: v6.91 (2026-10-20)
-> **上游要件定义书**: docs/requirements.md v6.90
+> **WLD-1 Worktree 管理 Outbox 增量（2026-10-21）**：逻辑 archive/restore 在 Worktree owner transaction 中同步提交状态/version、append-only Audit、schema-v1 owner-local Outbox fact 与 `worktree_management_plan.result_body` exact replay receipt。同一 tenant/requester/idempotency key 的计划创建经事务级 advisory lock 串行化；请求 hash 不同则拒绝复用。状态 no-op 保留 version/retention expiry，不执行 archive Hook 或状态更新。事件只描述实际状态变化，payload 为 Worktree/plan identity 与连续 before/after archive/version allowlist；assign-owner 与 no-op 不产生 archive/restore fact。PostgreSQL 18.6 disposable fixture 双次迁移及 RLS/WORM/payload/状态事实断言通过；此 source slice 未验证 Rust 1.99.0、target DB/app-role grants/RLS 或真实 Host provider；没有 delivery consumer，也不执行物理 Git checkout cleanup。
+
+> **文档版本**: v6.92 (2026-10-21)
+> **上游要件定义书**: docs/requirements.md v6.91
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4260,6 +4262,8 @@ Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 **WLD-0 database evidence state (2026-10-20)**：focused runner tests 6/6 passed；fresh disposable PostgreSQL 18.6 按完整 Task/Run prerequisite chain 34/34 steps passed，包括受限非超级用户登录、`SET LOCAL ROLE`、NOBYPASSRLS 与非表所有权、所需读/锁 privilege、tenant scoped Task reads、缺失 tenant 拒绝、源表 restrictive policy 与 Project/Task/Task-Worktree 事实更新被拒绝。另注入 owner-role 直接权限、数据库权限和向外成员关系，再重放 migration 并确认权限归一化及 schema fingerprint 稳定；创建归属于该 role 的 schema，确认 migration 按共享对象所有权记录 fail closed，并在回滚后清理夹具。role fixture 是本地测试登录，不等于部署 API identity；未执行认证 bind/reassign/detach API 写入，未访问目标 DB，也未验证生产 migration/rollback/race/reconciliation。项目要求 Rust 1.99.0，而当前环境只有 1.98.x；基线编译状态保持未验证。任务执行、Schedule 与 BI admission 不因此 evidence 开放。
 
+**WLD-1 archive/restore Outbox source contract**：Worktree Domain 是逻辑 checkout lifecycle 的事实 owner，与 Engineering Run Directory 的 Run/Worktree binding owner 分开。确认归档或恢复时，owner transaction 依序按当前 Worktree version 更新逻辑状态、追加原有 management Audit、插入 schema-v1 `worktree.archived` / `worktree.restored` owner-local Outbox fact，并保存现有短时 plan 的精确 response receipt；任一写入失败整体回滚，exact retry 重放存储 response 而不产生第二个状态变更或事件。payload 严格限制为 Worktree/plan identity、transition 和 before/after `{archived, version}`，不含主机路径、Secret、prompt 或日志；owner assignment 与状态 no-op 不产生 archive/restore fact。Outbox 记录源事实，不提供 delivery/BI consumer，也不证明物理 Git cleanup/restore、Host readiness 或目标数据库权限。目标 DB migration、应用登录角色 grants/RLS、Rust 1.99.0、真实 Host provider、生命周期全阶段 Hook/lease/retention 与物理操作仍是关闭门。
+
 整体交付方向与批次完成门见 [渡口架构与交付方向](design/DUKOU-ARCHITECTURE-DIRECTION-001.md)。新目录与 shell 不会自动迁移既有 Worktree Task/Canvas/Plugin 所有权，Run-owned Apps 与 execution admission 当前明确不可用。
 
 用户可见的导航、功能标签、帮助、空态、错误与宣传文案使用 Star 的中性能力名称，不以第三方产品名作对标或仿制；实际已配置的连接器可事实性显示其服务商名称，内部 adapter/API/database 标识不作为产品标签。此规则只约束产品呈现，不改写实际连接器协议身份。
@@ -5874,3 +5878,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.88 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 binding contract 对齐。同步 §16.1–§16.2 的 owner 边界与字段词汇：Engineering Run Directory 持有 Run/Worktree binding 和 Run Outbox，Worktree Domain 持有 checkout 与 Project/repository 归属；分开 binding/project-binding/focus 版本、资源 generation 与本地/远端 Branch 身份。保留目标 PostgreSQL/RLS、认证写入、回滚/replay、竞争、重复当前行和历史 reconciliation 未验收状态。
 
 修订 v6.91 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 owner-role 权限漂移注入、migration 重放和 role-owned schema fail-closed 负向夹具的 34/34 PostgreSQL 证据；保留部署身份、目标 DB、Rust 1.99.0、API 写入、回滚/并发与生产闭环门禁。
+
+修订 v6.92 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore source slice；在 §16.2 明确 Worktree owner-local Audit/Outbox/receipt 原子事务、事务级同键序列化、no-op 保留 version/retention、连续最小事件 payload 与 Run Directory Outbox 分离；记录 PostgreSQL 18.6 disposable fixture 和 Rust 1.98.1 diagnostic test 证据，并保留 Rust 1.99.0、目标 DB/grants、API 并发、consumer、Host provider 与物理 cleanup 未验收状态。同步 requirements v6.91 与 Group DD v5.15。

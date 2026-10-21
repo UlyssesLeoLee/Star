@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.90）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.91）
 
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
@@ -9,6 +9,7 @@
 
 > **v6.87 WLD-0 Run-to-Worktree binding source status (2026-10-19)**：新增 Project/Run 授权的 Worktree 绑定、重绑和解绑 API 源码切片，使用 CAS、幂等、Worktree advisory lock、SCD2 历史、审计与同事务 Outbox；Run 可不带远端 repository/Branch 元数据，绑定仍保留本地 Worktree repository 身份。迁移尚未应用到目标数据库，应用角色 grants/RLS、认证写入、回滚、持久化幂等和并发验收未完成；`execution_admission_available` 保持 false，不能据此启用 CLI、Agent 或 Schedule 执行。
 > **v6.90 WLD-0 owner-role source status (2026-10-20)**：新增专用 `NOLOGIN`、`NOBYPASSRLS`、`NOINHERIT` Engineering Directory mutation role；绑定 API 在事务内显式 `SET LOCAL ROLE`，并以最小列级 UPDATE 权限获取 `FOR SHARE` 行锁、由 restrictive RLS 拒绝修改 Project/Branch/Run revision/Worktree/Task 源事实。Disposable PostgreSQL 18.6 runner 使用非超级用户登录验证角色切换、RLS、锁权限和拒绝更新，并注入旧直接权限/数据库权限/向外成员关系后重放 migration，验证权限归一化和 schema fingerprint 稳定；另以 role-owned schema 负向夹具确认任意共享对象所有权会导致迁移失败关闭。部署时 API 登录角色 membership 仍需由实际身份配置；目标 DB、真实 API 登录/绑定写入、撤权、回滚、并发及历史 reconciliation 未验收，execution admission 仍关闭。
+> **v6.91 WLD-1 Worktree archive/restore Outbox source slice (2026-10-21)**：Worktree 管理 owner 在确认逻辑归档或恢复时，把 Worktree version/state、append-only Audit、schema-v1 owner-local Outbox fact 与现有 plan `result_body` replay receipt 放进同一数据库事务；tenant/requester/idempotency-key 同键创建请求先由事务级 advisory lock 串行化，再按请求 hash 返回 exact receipt 或拒绝冲突。状态 no-op 保留 Worktree version、retention expiry 与 Hook/Outbox 状态，只确认并记录原操作回执。事件 payload 仅包含 Worktree/plan identity、transition 和连续 before/after archive/version；owner assignment 与 archive no-op 不发 archive/restore fact。真实 PostgreSQL 18.6 disposable fixture 已通过双次 migration、RLS/WORM、archive/restore、payload 与版本连续性断言。此源码增量不执行 Git checkout 删除/恢复，不代表应用角色 grants、目标 DB migration、Rust 1.99.0 或生产 Host provider 已验收；Task/Schedule execution 继续 fail closed。
 
 ## 0. 文档说明与前提
 
@@ -2313,6 +2314,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-021 | Project → Engineering Run → Worktree → Branch 目录按层懒加载并有界；Project/Run grant 决定 Project 与 Run 可见性，缺少 Worktree binding 只能阻断 Worktree 子树/checkout 操作，不能隐藏或拒绝 Run；Branch 叶由受信任 Host/Repository 对选中 checkout 的本地状态生成，缺失/过期显示 unknown；远端 SCM grant 仅用于 SCM 操作，宿主关联缺失不得改变层级 | P0 |
 | WTG-023 | Branch 是 Worktree 下本地 checkout 分支投影与状态叶，远端分支/宿主关联为可选元数据；Branch 无关联时仍保持在 Worktree 下，且不得将该状态误报为已完成的无宿主运行能力 | P0 |
 | WTG-024 | `EngineeringRun.branch_id`、Branch/Run API 与 branch-role 授权门的迁移必须有版本化 schema/API 兼容、历史数据对账、授权负向验收；迁移期间旧 Branch-scoped compatibility API 可保留原检查，但 Project/Run 目录与普通 Run App 不得要求 Branch grant，远端 SCM 操作必须继续 fail closed | P0 |
+| WTG-025 | Worktree owner 对逻辑 archive/restore 的成功状态转换必须在同一 owner transaction 中提交 versioned append-only Audit、schema-versioned owner-local Outbox fact 与可精确重放的操作回执；payload 限于脱敏 Worktree/plan identity、transition 与 before/after archive/version，纯 owner assignment 和状态 no-op 不得产生 archive/restore fact；Outbox 持久化不等于已 delivery、BI 投影或物理 checkout cleanup | P0 |
 | WTG-022 | Project Worktree Index 与 Run directory API 不得向浏览器返回主机绝对 checkout path 或可反推出主机目录的 locator；checkout 解析仅由受信任 Host/Repository capability 在服务端或受控 Runtime bridge 内完成 | P0 |
 | TCI-001 | 任务生命周期和计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | 任务管理、外部任务系统 与 Task Card 的生命周期动作必须调用同一个 Run-scoped WorkItem lifecycle command owner，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则；owner 写事务必须在授权查询前设置不高于 5s 的 statement timeout 与不高于 1s 的 lock timeout | P0 |
@@ -2333,6 +2335,12 @@ WLD-0 实现状态（2026-10-19）：Run-to-Worktree owner 已有绑定/重绑/�
 Owner role 只可读取当前 Project、Branch、Run、Worktree 与 Task 关联所需事实；仅对 Run Directory 自有 binding SCD2、actor-scoped idempotency、Audit append 与 Outbox insert 授予写权限。为在 PostgreSQL 上获取 `FOR SHARE` 锁所需的窄 `UPDATE(valid_to)` 或 `UPDATE(id)` 权限（包括 `multica.engineering_run_revision.valid_to`），不赋予跨域事实修改权：受影响源表必须有针对该 role 的 restrictive `FOR UPDATE USING(false) WITH CHECK(false)` policy；实际 mutation 仅可关闭自己的 Run/Worktree binding `valid_to`，idempotency 的 `expires_at` 只供受控过期清理。Run Outbox 对该 role 仅允许 INSERT，不允许 SELECT、UPDATE 或 DELETE；角色不得拥有受 RLS 保护的表。
 
 WLD-0 role acceptance 必须在一次性 loopback PostgreSQL 集群里使用真实非超级用户登录验证 `SET LOCAL ROLE`、role attributes、列级 lock grants、所有锁源表 `FOR SHARE` 可执行、restrictive policy 存在、带 tenant 的 scoped read、缺失 tenant fail-closed，以及至少一条带事实记录的锁专用 UPDATE 被 RLS 拒绝。该夹具只证明 SQL role/RLS 行为，不证明部署角色 membership、真实 HTTP API 写入、目标 DB migration 或生产授权。任何生产执行门仍须独立验收。
+
+### 50.3.3 Worktree archive/restore 操作事实
+
+成功的逻辑 archive/restore 必须由 Worktree 管理 owner 在同一事务内更新 Worktree state/version、追加 immutable Audit、插入 schema-versioned owner-local Outbox fact，并保存当前 management plan 的精确 `result_body`。创建计划时先对 `(tenant, requester, idempotency key)` 取得事务级 advisory lock，再查找持久回执；同一请求并发到达也返回同一回执，身份相同但请求内容不同则冲突，不得重新执行状态变更或再写事件。目标 archived 状态与当前值一致时作为审计型 no-op 确认计划，不调用 archive Hook、不改 Worktree version/retention expiry，也不写 archive/restore fact。仅实际的 `false → true` 归档与 `true → false` 恢复生成事件；纯 owner assignment 不生成这两类事实。
+
+事件 payload 仅含 `worktree_id`、`plan_id`、`transition` 与连续 before/after `{archived, version}`；数据库约束校验 allowlist、identity、transition、单步版本连续性和最大 payload 字节数；不得含主机路径、凭据、prompt、终端输出或 raw log。Outbox 是 Worktree owner 的持久事实，不与 Engineering Run Directory Outbox 合并，也不自行承诺 transport delivery、BI/Benchmark 投影、Git checkout 删除或宿主恢复成功。物理 cleanup/restore 仍要求独立的 fresh authorization、lease/claim/process drain、retention-lock observation 和 Host provider acceptance；任何未知信号 fail closed。
 
 ### 50.4 任务卡内 CLI
 
@@ -3717,3 +3725,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.87 · 2026-10-19 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 Run-to-Worktree binding API source slice 完成；同步 hostless/local repository 语义、CAS/幂等/Outbox 不变量和未关闭的目标 DB/RLS/并发验收门。详见 `PHASE-WLD0-BINDING-API-IMPL-REPORT-20261019.md`。
 
 修订 v6.90 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：复验 owner-role migration 时注入历史直接/数据库权限和向外 role membership，并通过 migration 重放归一化；记录 PostgreSQL 18.6 34/34 步、权限漂移前后 fingerprint 稳定及 role-owned schema 导致 migration fail closed 的负向验收。目标 DB、真实 API、Rust 1.99.0 与生产 admission 继续未验收。详见 `PHASE-WLD0-DIRECTORY-OWNER-ROLE-20261020.md`。
+
+修订 v6.91 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore owner-local Outbox source slice；新增 WTG-025、串行化 exact replay、状态 no-op 不修改版本/retention 与连续最小事件 payload 约束；记录 isolated PostgreSQL 18.6 fixture 通过，并明确 Rust 1.99.0、应用角色 grants、目标 DB、consumer 与物理 Git cleanup 尚未验收。详见 `WLD1-LIFECYCLE-OP-OUTBOX-20261021.md`。
