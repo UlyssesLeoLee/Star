@@ -45,7 +45,7 @@
 
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(b:Function {name:"build_group_router",type:"function"});
-//! CREATE (wl:Module {name:"worktree_lifecycle",type:"module",language:"rust"}),(wp:Interface {name:"ProjectWorktreeLifecycleProvider",type:"interface",language:"rust"}),(install:Function {name:"GroupApiState::with_worktree_lifecycle_provider",type:"function",language:"rust"}),(wlRouter:Function {name:"worktree_lifecycle::router",type:"function",language:"rust"});
+//! CREATE (wl:Module {name:"worktree_lifecycle",type:"module",language:"rust"}),(wp:Interface {name:"RunWorktreeLifecycleProvider",type:"interface",language:"rust"}),(install:Function {name:"GroupApiState::with_run_worktree_lifecycle_provider",type:"function",language:"rust"}),(wlRouter:Function {name:"worktree_lifecycle::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(wl),(wl)-[:CONTAINS]->(wp),(s)-[:USES]->(wp),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(wp),(b)-[:CALLS]->(wlRouter);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
@@ -95,10 +95,10 @@
 //! CREATE (m)-[:CONTAINS]->(ba),(s)-[:USES]->(p),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(p),(b)-[:CALLS]->(ar);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
-    ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
-    ProjectWorktreeRepository, ProjectWorktreeRepositoryQuery, WorktreeImportCandidate,
-    WorktreeImportCandidatesQuery, WorktreeLifecycleProviderError, WorktreeLifecycleReceipt,
-    WorktreeLifecycleState,
+    ProjectWorktreeRepository, RunWorktreeCreateCommand, RunWorktreeImportCommand,
+    RunWorktreeImportCandidatesQuery, RunWorktreeLifecycleProvider, RunWorktreeLifecycleReceipt,
+    RunWorktreeLifecycleState, RunWorktreeRepositoryQuery, WorktreeImportCandidate,
+    WorktreeLifecycleProviderError,
 };
 
 use async_trait::async_trait;
@@ -115,7 +115,7 @@ use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=709c12ec4da839513844154eb57b11c635e95a1a55c6f2bbb7dce05d37ebd3a0
+// @cypher schema=1 source_sha256=77482eea713943d20600bae944210a174f21ba3cc513bbde60052e57ddca9070
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -144,12 +144,27 @@ use serde::{Deserialize, Serialize};
 // MERGE (biQueryInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_bi_task_event_query_port",kind:"method"})
 // MERGE (runWorktreeBindings:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::module",kind:"module"})
 // MERGE (runWorktreeBindingsRouter:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::router",kind:"function"})
+// MERGE (worktreeLifecycle:Symbol {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::module",kind:"module"})
+// MERGE (worktreeLifecycleRouter:Symbol {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::router",kind:"function"})
+// MERGE (runLifecycleProvider:Type {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider",kind:"trait"})
+// MERGE (runLifecycleInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_run_worktree_lifecycle_provider",kind:"method"})
+// MERGE (runLifecycleField:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.run_worktree_lifecycle_provider",kind:"field"})
 // MERGE (api)-[:DEFINES]->(biAnalytics)
 // MERGE (api)-[:DEFINES]->(runWorktreeBindings)
+// MERGE (api)-[:DEFINES]->(worktreeLifecycle)
 // MERGE (self)-[:CALLS]->(biAnalyticsRouter)
 // MERGE (build)-[:CALLS]->(biAnalyticsRouter)
 // MERGE (self)-[:CALLS]->(runWorktreeBindingsRouter)
 // MERGE (build)-[:CALLS]->(runWorktreeBindingsRouter)
+// MERGE (self)-[:IMPORTS]->(runLifecycleProvider)
+// MERGE (taskState)-[:USES_TYPE]->(runLifecycleProvider)
+// MERGE (taskState)-[:DEFINES]->(runLifecycleField)
+// MERGE (taskState)-[:HAS_METHOD]->(runLifecycleInstall)
+// MERGE (taskStateNew)-[:WRITES]->(runLifecycleField)
+// MERGE (runLifecycleInstall)-[:USES_TYPE]->(runLifecycleProvider)
+// MERGE (runLifecycleInstall)-[:WRITES]->(runLifecycleField)
+// MERGE (self)-[:CALLS]->(worktreeLifecycleRouter)
+// MERGE (build)-[:CALLS]->(worktreeLifecycleRouter)
 // MERGE (taskState)-[:USES_TYPE]->(biQueryPort)
 // MERGE (taskState)-[:HAS_METHOD]->(biQueryInstall)
 // MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
@@ -320,7 +335,7 @@ pub struct GroupApiState {
     group_app_registry: Option<Arc<dyn GroupAppRegistryProvider>>,
     worktree_git_lock_observer: Option<Arc<dyn WorktreeGitLockObserver>>,
     worktree_archive_readiness_observer: Option<Arc<dyn WorktreeArchiveReadinessObserver>>,
-    worktree_lifecycle_provider: Option<Arc<dyn ProjectWorktreeLifecycleProvider>>,
+    run_worktree_lifecycle_provider: Option<Arc<dyn RunWorktreeLifecycleProvider>>,
     bi_task_event_query_port: Option<Arc<dyn TaskEventQueryPort>>,
 }
 
@@ -339,7 +354,7 @@ impl GroupApiState {
             group_app_registry: None,
             worktree_git_lock_observer: None,
             worktree_archive_readiness_observer: None,
-            worktree_lifecycle_provider: None,
+            run_worktree_lifecycle_provider: None,
             bi_task_event_query_port: None,
         }
     }
@@ -383,12 +398,12 @@ impl GroupApiState {
         self
     }
 
-    /// Install a trusted Project-scoped Git Worktree lifecycle adapter.
-    pub fn with_worktree_lifecycle_provider(
+    /// Install a trusted Run-scoped Git Worktree lifecycle adapter.
+    pub fn with_run_worktree_lifecycle_provider(
         mut self,
-        provider: Arc<dyn ProjectWorktreeLifecycleProvider>,
+        provider: Arc<dyn RunWorktreeLifecycleProvider>,
     ) -> Self {
-        self.worktree_lifecycle_provider = Some(provider);
+        self.run_worktree_lifecycle_provider = Some(provider);
         self
     }
 
