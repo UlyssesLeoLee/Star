@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=1a4755aa3371c915e53b4acfab12f0b697ad4e9acee10829f955fe9d3770b94f
+MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
+MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (self)-[:IMPORTS]->(dictionary)
+MERGE (locale:Symbol {id:"frontend/src/lib/i18n/zh-CN.ts::zhCN",kind:"constant"})
+MERGE (self)-[:DEFINES]->(locale)
+@endcypher
+*/
+
 // =====================================================================
 // zh-CN Dictionary — 简体中文 (默认语言)
 // =====================================================================
@@ -31,6 +41,35 @@ export const zhCN: Dictionary = {
     cancel: "取消",
     hostIndependentHint: "此 Run 不需要关联远端 Branch。",
     invalidRunName: "Run 名称需为 1 至 500 个字符。",
+    localWorktree: "本地 Worktree",
+    humanState: "人工状态",
+    machineState: "机器状态",
+    humanStates: {
+      running: "运行中", waiting: "等待中", ready: "已就绪", diverged: "已分叉", conflict: "冲突", merged: "已合并", stale: "长期未活动",
+    },
+    machineStates: {
+      agent_executing: "Agent 执行中", git_clean: "Git 工作区干净", git_dirty: "Git 工作区状态为脏",
+      merge_in_progress: "合并进行中", rebase_in_progress: "变基进行中", ci_running: "CI 运行中",
+      awaiting_human: "等待人工输入", awaiting_feedback: "等待 Agent 反馈", awaiting_tool: "等待工具返回",
+      merged_clean: "干净合并后", archived: "机器状态：已归档", deleted: "机器状态：已删除",
+    },
+    unknownState: "未知状态",
+    agentAssigned: "已分配 Agent",
+    agentUnassigned: "未分配 Agent",
+    sessionBound: "已绑定会话",
+    sessionUnbound: "未绑定会话",
+    runtimeBound: "已绑定 Runtime",
+    runtimeUnbound: "未绑定 Runtime",
+    archived: "已归档",
+    notArchived: "未归档",
+    runBindingVersion: "Run 绑定 v{version}",
+    projectBindingVersion: "Project 绑定 v{version}",
+    lockUnknown: "锁状态未知",
+    dirtyDetailsUnknown: "变更详情未知",
+    observedAtUnknown: "观测时间未知",
+    branchFreshnessUnknown: "Branch 来源与新鲜度未知",
+    branchRecord: "本地 checkout 记录",
+    branchUnavailable: "本地 checkout 状态不可用",
   },
   userMenu: {
     menuLabel: "用户菜单: {name} ({role})",
@@ -526,12 +565,3 @@ export const zhCN: Dictionary = {
     docsEmpty: "该类别暂无可用文档",
   },
 };
-/*
-@cypher schema=1 source_sha256=3e202436ec0dc22b2aa8d6f0a3fe430a470edc7e11e7476251549eca1f056a97
-MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
-MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
-MERGE (self)-[:IMPORTS]->(dictionary)
-MERGE (locale:Symbol {id:"frontend/src/lib/i18n/zh-CN.ts::zhCN",kind:"constant"})
-MERGE (self)-[:DEFINES]->(locale)
-@endcypher
-*/

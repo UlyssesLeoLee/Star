@@ -1,4 +1,20 @@
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=1204efb2268324a5ef1933028acc26fe6300d899bd7625a10fa9c61c3355cec6
+MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
+MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
+MERGE (pageTitle:Type {id:"frontend/src/lib/i18n/dictionary.ts::PageTitleI18n",kind:"interface"})
+MERGE (dictionary:Type {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary",kind:"interface"})
+MERGE (runDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory",kind:"property"})
+MERGE (self)-[:DEFINES]->(category)
+MERGE (self)-[:DEFINES]->(module)
+MERGE (self)-[:DEFINES]->(pageTitle)
+MERGE (self)-[:DEFINES]->(dictionary)
+MERGE (dictionary)-[:DEFINES]->(runDirectory)
+@endcypher
+*/
+
 // Dictionary — 字典 interface (宽 string 类型, 允许 3 语言字面量差异)
 // =====================================================================
 // 注意: 此处用 interface 而非 typeof as const, 否则 en/ja 字面量会被
@@ -50,6 +66,34 @@ export interface Dictionary {
     cancel: string;
     hostIndependentHint: string;
     invalidRunName: string;
+    localWorktree: string;
+    humanState: string;
+    machineState: string;
+    humanStates: {
+      running: string; waiting: string; ready: string; diverged: string; conflict: string; merged: string; stale: string;
+    };
+    machineStates: {
+      agent_executing: string; git_clean: string; git_dirty: string; merge_in_progress: string; rebase_in_progress: string;
+      ci_running: string; awaiting_human: string; awaiting_feedback: string; awaiting_tool: string; merged_clean: string;
+      archived: string; deleted: string;
+    };
+    unknownState: string;
+    agentAssigned: string;
+    agentUnassigned: string;
+    sessionBound: string;
+    sessionUnbound: string;
+    runtimeBound: string;
+    runtimeUnbound: string;
+    archived: string;
+    notArchived: string;
+    runBindingVersion: string;
+    projectBindingVersion: string;
+    lockUnknown: string;
+    dirtyDetailsUnknown: string;
+    observedAtUnknown: string;
+    branchFreshnessUnknown: string;
+    branchRecord: string;
+    branchUnavailable: string;
   };
   userMenu: {
     menuLabel: string;
@@ -375,16 +419,3 @@ export interface Dictionary {
     docsEmpty: string;
   };
 }
-/*
-@cypher schema=1 source_sha256=67f5dd45b36951197cb442eb407ec04042a7428b89eb03819132d489b1f4b23c
-MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
-MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
-MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
-MERGE (pageTitle:Type {id:"frontend/src/lib/i18n/dictionary.ts::PageTitleI18n",kind:"interface"})
-MERGE (dictionary:Type {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary",kind:"interface"})
-MERGE (self)-[:DEFINES]->(category)
-MERGE (self)-[:DEFINES]->(module)
-MERGE (self)-[:DEFINES]->(pageTitle)
-MERGE (self)-[:DEFINES]->(dictionary)
-@endcypher
-*/

@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=e3c3ca44d392295d165361acfb396f79861ebd6a25fbd5bb5e49ac7c3632d002
+MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
+MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
+MERGE (self)-[:IMPORTS]->(dictionary)
+MERGE (locale:Symbol {id:"frontend/src/lib/i18n/ja.ts::ja",kind:"constant"})
+MERGE (self)-[:DEFINES]->(locale)
+@endcypher
+*/
+
 // =====================================================================
 // ja Dictionary — 日本語
 // =====================================================================
@@ -21,6 +31,35 @@ export const ja: Dictionary = {
     cancel: "キャンセル",
     hostIndependentHint: "この Run にリモート Branch の関連付けは不要です。",
     invalidRunName: "Run 名は 1〜500 文字で入力してください。",
+    localWorktree: "ローカル Worktree",
+    humanState: "人の状態",
+    machineState: "機械状態",
+    humanStates: {
+      running: "実行中", waiting: "待機中", ready: "準備完了", diverged: "分岐あり", conflict: "競合", merged: "マージ済み", stale: "長期未使用",
+    },
+    machineStates: {
+      agent_executing: "Agent 実行中", git_clean: "Git ワークツリー clean", git_dirty: "Git ワークツリー dirty 状態",
+      merge_in_progress: "マージ中", rebase_in_progress: "リベース中", ci_running: "CI 実行中",
+      awaiting_human: "人の入力待ち", awaiting_feedback: "Agent の応答待ち", awaiting_tool: "ツールの応答待ち",
+      merged_clean: "clean にマージ済み", archived: "機械状態: アーカイブ済み", deleted: "機械状態: 削除済み",
+    },
+    unknownState: "不明な状態",
+    agentAssigned: "Agent 割り当て済み",
+    agentUnassigned: "Agent 未割り当て",
+    sessionBound: "セッション紐付け済み",
+    sessionUnbound: "セッション未紐付け",
+    runtimeBound: "Runtime 紐付け済み",
+    runtimeUnbound: "Runtime 未紐付け",
+    archived: "アーカイブ済み",
+    notArchived: "未アーカイブ",
+    runBindingVersion: "Run binding v{version}",
+    projectBindingVersion: "Project binding v{version}",
+    lockUnknown: "ロック状態は不明",
+    dirtyDetailsUnknown: "変更内容は不明",
+    observedAtUnknown: "観測時刻は不明",
+    branchFreshnessUnknown: "Branch の出典と鮮度は不明",
+    branchRecord: "ローカル checkout 記録",
+    branchUnavailable: "ローカル checkout 状態は取得不可",
   },
   userMenu: {
     menuLabel: "ユーザーメニュー: {name} ({role})",
@@ -512,12 +551,3 @@ export const ja: Dictionary = {
     docsEmpty: "このカテゴリのドキュメントはありません",
   },
 };
-/*
-@cypher schema=1 source_sha256=da2b01198035084e3ac5c1e24afe035530394fe1542807119ea0a818d60f22b7
-MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
-MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
-MERGE (self)-[:IMPORTS]->(dictionary)
-MERGE (locale:Symbol {id:"frontend/src/lib/i18n/ja.ts::ja",kind:"constant"})
-MERGE (self)-[:DEFINES]->(locale)
-@endcypher
-*/

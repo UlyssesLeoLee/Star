@@ -1,10 +1,15 @@
 /*
-@cypher schema=1 source_sha256=c54545c8b2e6f472d9fc32594fb900b0c260c9162fb3f6b0d72621a1264d62fc
+@cypher schema=1 source_sha256=9bf184142ec22440fcb045c87671199d31563bef67583c2954fecfb62b6139f5
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
 MERGE (row:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::DirectoryRow",kind:"component"})
 MERGE (label:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::nodeScopeLabel",kind:"function"})
+MERGE (worktreeStatus:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::worktreeStatusLabel",kind:"function"})
+MERGE (stateLabel:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::stateLabel",kind:"function"})
+MERGE (i18n:File {path:"frontend/src/lib/i18n/index.ts"})
+MERGE (dictionary:Type {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary",kind:"interface"})
+MERGE (worktreeType:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunWorktree",kind:"interface"})
 MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (self)-[:IMPORTS]->(guardedLink)
@@ -13,8 +18,17 @@ MERGE (self)-[:DEFINES]->(live)
 MERGE (self)-[:DEFINES]->(row)
 MERGE (row)-[:USES]->(guardedLink)
 MERGE (self)-[:DEFINES]->(label)
+MERGE (self)-[:DEFINES]->(worktreeStatus)
+MERGE (self)-[:DEFINES]->(stateLabel)
+MERGE (self)-[:IMPORTS]->(i18n)
+MERGE (worktreeStatus)-[:USES_TYPE]->(worktreeType)
+MERGE (worktreeStatus)-[:USES_TYPE]->(dictionary)
+MERGE (row)-[:USES_TYPE]->(dictionary)
 MERGE (live)-[:CALLS]->(row)
 MERGE (row)-[:CALLS]->(label)
+MERGE (row)-[:CALLS]->(worktreeStatus)
+MERGE (label)-[:CALLS]->(worktreeStatus)
+MERGE (worktreeStatus)-[:CALLS]->(stateLabel)
 MERGE (row)-[:CALLS]->(runHref)
 @endcypher
 */
@@ -23,6 +37,7 @@ MERGE (row)-[:CALLS]->(runHref)
 CREATE (f:File {name:"frontend/src/components/run/ProjectRunTree.tsx",type:"file",language:"tsx"}),
  (tree:Function {name:"ProjectRunTree",type:"function"}),(live:Function {name:"AuthenticatedProjectRunTree",type:"function"}),
  (row:Function {name:"DirectoryRow",type:"function"}),(label:Function {name:"nodeScopeLabel",type:"function"}),
+ (worktreeStatus:Function {name:"worktreeStatusLabel",type:"function"}),(stateLabel:Function {name:"stateLabel",type:"function"}),
  (key:Function {name:"moveTreeFocus",type:"function"}),(start:Function {name:"mountDirectoryTree",type:"function"}),(clamp:Function {name:"clampTreeViewport",type:"function"}),
  (model:Class {name:"RunDirectoryTree",type:"class"}),(session:Function {name:"useRunDirectory",type:"function"}),
  (href:Function {name:"canonicalRunWorktreeHref",type:"function"}),(runHref:Function {name:"canonicalRunHref",type:"function"}),
@@ -32,7 +47,8 @@ CREATE (f:File {name:"frontend/src/components/run/ProjectRunTree.tsx",type:"file
  (f)-[:CONTAINS]->(tree),(f)-[:CONTAINS]->(live),(f)-[:CONTAINS]->(row),(f)-[:CONTAINS]->(label),(f)-[:CONTAINS]->(height),(f)-[:CONTAINS]->(viewport),
  (live)-[:CONTAINS]->(key),(live)-[:CONTAINS]->(start),(live)-[:CONTAINS]->(clamp),(f)-[:CONTAINS]->(overscan),(tree)-[:CALLS]->(session),(tree)-[:CALLS]->(live),
  (live)-[:CALLS]->(session),(live)-[:CALLS]->(model),(live)-[:CALLS]->(store),(live)-[:CALLS]->(memo),(live)-[:CALLS]->(effect),
- (live)-[:CALLS]->(state),(live)-[:CALLS]->(ref),(live)-[:CALLS]->(row),(row)-[:CALLS]->(label),(row)-[:CALLS]->(href),
+ (live)-[:CALLS]->(state),(live)-[:CALLS]->(ref),(live)-[:CALLS]->(row),(row)-[:CALLS]->(label),(row)-[:CALLS]->(worktreeStatus),(row)-[:CALLS]->(href),
+ (label)-[:CALLS]->(worktreeStatus),(worktreeStatus)-[:CALLS]->(stateLabel),
  (live)-[:USES]->(overscan),(live)-[:USES]->(height),(live)-[:USES]->(viewport),(row)-[:USES]->(height),(key)-[:USES]->(height),(key)-[:USES]->(viewport),(clamp)-[:USES]->(height),(clamp)-[:USES]->(viewport);
 */
 
@@ -44,7 +60,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEv
 import { canonicalRunHref, canonicalRunWorktreeHref, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { directoryErrorMessage, RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Dictionary } from "@/lib/i18n";
 
 const ROW_HEIGHT = 36;
 const VIEWPORT_HEIGHT = 288;
@@ -151,7 +167,8 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative overflow-y-auto overflow-x-hidden" style={{ height: VIEWPORT_HEIGHT }}>
       <div role="presentation" style={{ height: rows.length * ROW_HEIGHT }}>
         {visible.map((row, offset) => <DirectoryRow key={row.key} row={row} index={start + offset} model={model}
-          selectedWorktreeId={focus?.focus?.worktree_id} clearFocus={clearFocus} onCreateRun={openCreateRun} newRunLabel={t.runDirectory.newRun} />)}
+          selectedWorktreeId={focus?.focus?.worktree_id} clearFocus={clearFocus} onCreateRun={openCreateRun}
+          newRunLabel={t.runDirectory.newRun} statusLabels={t.runDirectory} />)}
       </div>
     </div>
     <p className="px-2 pt-1 text-[10px] text-ink-mute">展开层级；选择 Worktree 设为当前 Run 焦点。</p>
@@ -175,17 +192,51 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
 
 type ProjectNode = Extract<DirectoryNode, { kind: "project" }>;
 
-function nodeScopeLabel(node: DirectoryNode): string {
+type RunDirectoryLabels = Dictionary["runDirectory"];
+
+function stateLabel(value: string, labels: object, unknownStateLabel: string): string {
+  const normalized = value.trim().toLowerCase();
+  const known = (labels as Record<string, string>)[normalized];
+  if (known) return known;
+  const safe = value.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 32);
+  return safe ? `${unknownStateLabel}: ${safe}` : unknownStateLabel;
+}
+
+function worktreeStatusLabel(worktree: Extract<DirectoryNode, { kind: "worktree" }>['entity'], labels: RunDirectoryLabels) {
+  const humanState = stateLabel(worktree.human_state, labels.humanStates, labels.unknownState);
+  const machineState = stateLabel(worktree.machine_state, labels.machineStates, labels.unknownState);
+  const summary = [
+    `${labels.humanState}: ${humanState}`,
+    `${labels.machineState}: ${machineState}`,
+    worktree.agent_id !== null ? labels.agentAssigned : labels.agentUnassigned,
+    worktree.agent_session_id !== null ? labels.sessionBound : labels.sessionUnbound,
+    worktree.archived ? labels.archived : labels.notArchived,
+  ].join(" · ");
+  const details = [
+    worktree.runtime_id !== null ? labels.runtimeBound : labels.runtimeUnbound,
+    labels.runBindingVersion.replace("{version}", String(worktree.binding_version)),
+    labels.projectBindingVersion.replace("{version}", String(worktree.project_binding_version)),
+    labels.lockUnknown,
+    labels.dirtyDetailsUnknown,
+    labels.observedAtUnknown,
+    labels.branchFreshnessUnknown,
+  ].join(" · ");
+  return { summary, details };
+}
+
+function nodeScopeLabel(node: DirectoryNode, labels: RunDirectoryLabels): string {
   switch (node.kind) {
     case "project": return `Project · ${node.entity.role}`;
     case "run": return `Engineering Run · ${node.entity.state}`;
-    case "worktree": return `本地 Worktree · ${node.entity.archived ? "已归档" : node.entity.machine_state}`;
-    case "branch": return node.entity.name ? "本地 checkout 记录 · 来源/新鲜度未验证" : "本地 checkout 状态未采集";
+    case "worktree": return `${labels.localWorktree} · ${worktreeStatusLabel(node.entity, labels).summary}`;
+    case "branch": return node.entity.name
+      ? `${labels.branchRecord} · ${labels.branchFreshnessUnknown}`
+      : labels.branchUnavailable;
   }
 }
-function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCreateRun, newRunLabel }: {
+function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCreateRun, newRunLabel, statusLabels }: {
   row: DirectoryTreeRow; index: number; model: RunDirectoryTree; selectedWorktreeId?: string; clearFocus: () => void;
-  onCreateRun: (project: ProjectNode, expanded: boolean) => void; newRunLabel: string;
+  onCreateRun: (project: ProjectNode, expanded: boolean) => void; newRunLabel: string; statusLabels: RunDirectoryLabels;
 }) {
   const depth = row.kind === "node" ? row.node.depth : row.depth;
   const style = { position: "absolute" as const, top: index * ROW_HEIGHT, height: ROW_HEIGHT, left: 0, right: 0, paddingLeft: 4 + depth * 12 };
@@ -203,8 +254,9 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCre
   }
   const { node, expanded } = row;
   const Icon = { project: FolderKanban, branch: GitBranch, run: Layers, worktree: Monitor }[node.kind];
+  const scopeLabel = nodeScopeLabel(node, statusLabels);
   const contents = <><span className="flex shrink-0 items-center">{node.kind === "branch" ? <span className="w-3" /> : expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}<Icon size={13} /></span>
-    <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{nodeScopeLabel(node)}</span></span></>;
+    <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span></>;
   const className = "flex w-full min-w-0 items-center gap-1 rounded pr-1 text-left hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent";
   if (node.kind === "project") return <div role="presentation" style={style} className="flex items-center gap-1">
     <button role="treeitem" aria-level={depth + 1} aria-expanded={expanded} type="button" data-directory-index={index}
@@ -215,6 +267,8 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCre
   </div>;
   if (node.kind === "worktree") {
     const selected = selectedWorktreeId === node.entity.worktree_id;
+    const status = worktreeStatusLabel(node.entity, statusLabels);
+    const statusDescription = `${node.label}. ${status.summary}. ${status.details}`;
     return <div role="presentation" style={style} className="flex items-center">
       <button type="button" tabIndex={-1} aria-label={`${expanded ? "折叠" : "展开"} ${node.label}`}
         aria-expanded={expanded} title={`${expanded ? "折叠" : "展开"} Worktree 分支状态`}
@@ -223,14 +277,14 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCre
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected} aria-current={selected ? "page" : undefined}
-        data-directory-index={index} title={`${node.label} · ${node.entity.worktree_id}`}
+        aria-label={statusDescription} data-directory-index={index} title={statusDescription}
         className={`${className} w-auto flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`} prefetch={false}
         onNavigate={() => {
           if (!selected) clearFocus();
         }}
         href={canonicalRunWorktreeHref(node.entity.project_id, node.entity.engineering_run_id, node.entity.worktree_id)}>
         <span className="flex shrink-0 items-center"><Monitor size={13} /></span>
-        <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{nodeScopeLabel(node)}</span></span>
+        <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span>
       </Link>
     </div>;
   }
@@ -244,6 +298,6 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCre
     </Link>
   </div>;
   if (node.kind === "branch") return <div role="treeitem" aria-level={depth + 1} tabIndex={-1}
-    data-directory-index={index} style={style} title={node.entity.name ? `本地 checkout 记录（来源/新鲜度未验证）：${node.entity.name}` : "本地 checkout 状态未采集"} className={className}>{contents}</div>;
+    data-directory-index={index} style={style} title={node.entity.name ? `${statusLabels.branchRecord} · ${statusLabels.branchFreshnessUnknown}: ${node.entity.name}` : statusLabels.branchUnavailable} className={className}>{contents}</div>;
   return null;
 }

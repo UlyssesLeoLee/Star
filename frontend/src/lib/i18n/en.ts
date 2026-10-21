@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=785c1aec64ff48c9809559237bd7cbbeb057cc41775af701efadc34429b0e6ab
+@cypher schema=1 source_sha256=7bed3cff364e66ef41fb90f1a5b9652d98b5754c650850b2f1a0ed9d0d8d63e2
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -30,6 +30,35 @@ export const en: Dictionary = {
     cancel: "Cancel",
     hostIndependentHint: "This Run does not require a remote Branch association.",
     invalidRunName: "Run name must contain 1 to 500 characters.",
+    localWorktree: "Local Worktree",
+    humanState: "Human",
+    machineState: "Machine",
+    humanStates: {
+      running: "Running", waiting: "Waiting", ready: "Ready", diverged: "Diverged", conflict: "Conflict", merged: "Merged", stale: "Stale",
+    },
+    machineStates: {
+      agent_executing: "Agent executing", git_clean: "Git clean", git_dirty: "Git dirty state",
+      merge_in_progress: "Merge in progress", rebase_in_progress: "Rebase in progress", ci_running: "CI running",
+      awaiting_human: "Awaiting human", awaiting_feedback: "Awaiting Agent feedback", awaiting_tool: "Awaiting tool",
+      merged_clean: "Merged clean", archived: "Machine archived", deleted: "Machine deleted",
+    },
+    unknownState: "Unknown state",
+    agentAssigned: "Agent assigned",
+    agentUnassigned: "No Agent assigned",
+    sessionBound: "Session bound",
+    sessionUnbound: "No session bound",
+    runtimeBound: "Runtime bound",
+    runtimeUnbound: "No runtime bound",
+    archived: "Archived",
+    notArchived: "Not archived",
+    runBindingVersion: "Run binding v{version}",
+    projectBindingVersion: "Project binding v{version}",
+    lockUnknown: "Lock status unknown",
+    dirtyDetailsUnknown: "Dirty change details unknown",
+    observedAtUnknown: "Observation time unknown",
+    branchFreshnessUnknown: "Branch source and freshness unknown",
+    branchRecord: "Local checkout record",
+    branchUnavailable: "Local checkout state unavailable",
   },
   userMenu: {
     menuLabel: "User menu: {name} ({role})",
