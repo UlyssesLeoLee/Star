@@ -1,11 +1,13 @@
 /*
-@cypher schema=1 source_sha256=16610472572c0093ddd2572b3cb0860781e66e921bf85de2927e41a93daf8898
+@cypher schema=1 source_sha256=90aa1b178eb926791fc186f89602612080c9193bc43c7fc8fab4667d49e7545a
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:IMPORTS]->(guardedLink)
 @endcypher
 */
 "use client";
 
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Radio,

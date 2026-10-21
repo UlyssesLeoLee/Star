@@ -1,9 +1,19 @@
 // Star Mobile Bottom Navigation (per 2026-09-01 PHASE-MOBILE-PWA)
 // 仅在 <768px 视口显示,与 Sidebar 互斥。
 // 5 个核心入口:Dashboard / Worktree / Agent / Feedback / More
+/*
+@cypher schema=1 source_sha256=befab9fb571bdb5dc7367df3f6a955a733ddbc9a429322ce8b76e6128a70ce57
+MERGE (self:File {path:"frontend/src/components/MobileBottomNav.tsx"})
+MERGE (navigation:Symbol {id:"frontend/src/components/MobileBottomNav.tsx::MobileBottomNav",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:DEFINES]->(navigation)
+MERGE (self)-[:IMPORTS]->(guardedLink)
+MERGE (navigation)-[:CALLS]->(guardedLink)
+@endcypher
+*/
 "use client";
 
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import {
@@ -151,7 +161,7 @@ export function MobileBottomNav() {
                 <li key={it.href}>
                   <Link
                     href={it.href}
-                    onClick={() => setMoreOpen(false)}
+                    onNavigate={() => setMoreOpen(false)}
                     data-testid={`mobile-more-${it.href.replace(/\W+/g, "-")}`}
                     className="block px-3 py-3 rounded-xl border-2 border-line bg-bg/50 text-xs text-ink-dim hover:text-ink hover:border-accent/40 transition-colors text-center shadow-[2px_2px_0px_0px_var(--cel-shadow-color)]"
                   >

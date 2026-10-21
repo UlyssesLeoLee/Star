@@ -11,6 +11,16 @@
 //   5. 界面语言切换 (zh-CN / en / ja) — 2026-08-31 新增
 //   6. 安全退出
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=00bd6f02d571ee0214fc524e2c0f3cab19ee11ed3914c49773a042c4b4d0adf5
+MERGE (self:File {path:"frontend/src/components/UserMenu.tsx"})
+MERGE (menu:Symbol {id:"frontend/src/components/UserMenu.tsx::UserMenu",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:DEFINES]->(menu)
+MERGE (self)-[:IMPORTS]->(guardedLink)
+MERGE (menu)-[:CALLS]->(guardedLink)
+@endcypher
+*/
 
 import { useState, useRef, useEffect } from "react";
 import {
@@ -29,7 +39,7 @@ import {
   Check,
   Wrench,
 } from "lucide-react";
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import {
   useTranslation,
   LANGUAGE_META,

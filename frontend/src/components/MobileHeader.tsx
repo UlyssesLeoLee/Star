@@ -1,9 +1,19 @@
 // Star Mobile Header (per 2026-09-01 PHASE-MOBILE-PWA)
 // 仅 <768px 视口显示:汉堡按钮 + 标题 + 通知 icon
 // 与 AppHeader(桌面顶栏)互斥,通过 CSS md:hidden 控制。
+/*
+@cypher schema=1 source_sha256=770554ac352d7b796cbc8224f81f6ac43f19f2531e1da058163cc4182e88c70b
+MERGE (self:File {path:"frontend/src/components/MobileHeader.tsx"})
+MERGE (header:Symbol {id:"frontend/src/components/MobileHeader.tsx::MobileHeader",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:DEFINES]->(header)
+MERGE (self)-[:IMPORTS]->(guardedLink)
+MERGE (header)-[:USES]->(guardedLink)
+@endcypher
+*/
 "use client";
 
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { usePathname } from "next/navigation";
 import { Bell, Menu, Search } from "lucide-react";
 import { useState } from "react";

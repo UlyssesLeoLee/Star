@@ -1,4 +1,14 @@
 /*
+@cypher schema=1 source_sha256=e368b42d592e97f026facdf517b6c6066afc90b817c0ebefe1ab9d602c8c39ef
+MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/layout.tsx"})
+MERGE (layout:Symbol {id:"frontend/src/app/(app)/settings/advanced/layout.tsx::AdvancedSettingsLayout",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:DEFINES]->(layout)
+MERGE (self)-[:IMPORTS]->(guardedLink)
+MERGE (layout)-[:CALLS]->(guardedLink)
+@endcypher
+*/
+/*
 CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/(app)/settings/advanced/layout.tsx",type:"file",language:"tsx"}),
@@ -13,7 +23,7 @@ CREATE
 
 "use client";
 
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { usePathname } from "next/navigation";
 import { Blocks, Plug, ShieldCheck, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";

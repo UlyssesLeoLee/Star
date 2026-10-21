@@ -1,5 +1,19 @@
 "use client";
 
+/*
+@cypher schema=1 source_sha256=26611d7bae257a89cb0cb39f5899a984e23af0ecafc729883056bca31c5968a0
+MERGE (self:File {path:"frontend/src/components/CommandBar.tsx"})
+MERGE (commandBar:Symbol {id:"frontend/src/components/CommandBar.tsx::CommandBar",kind:"component"})
+MERGE (navigate:Symbol {id:"frontend/src/components/CommandBar.tsx::navigateTo",kind:"function"})
+MERGE (guard:Symbol {id:"frontend/src/lib/navigation/UnsavedNavigationGuard.tsx::confirmNavigation",kind:"function"})
+MERGE (self)-[:DEFINES]->(commandBar)
+MERGE (self)-[:DEFINES]->(navigate)
+MERGE (self)-[:IMPORTS]->(guard)
+MERGE (commandBar)-[:CALLS]->(navigate)
+MERGE (navigate)-[:CALLS]->(guard)
+@endcypher
+*/
+
 // =====================================================================
 // CommandBar — ⌘K 全局命令面板 (per 2026-10-01 OOB 强化)
 //   - 微信式: 顶部 search input + 下方 type filter chips + 分组列表
@@ -10,6 +24,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedNavigationGuard } from "@/lib/navigation/UnsavedNavigationGuard";
 import { Search, CornerDownLeft, ArrowUp, ArrowDown, X, Layers, FileText, Hash } from "lucide-react";
 import { useCommandBarStore, type RecentItem } from "@/lib/commandBarStore";
 import {
@@ -24,6 +39,7 @@ import { useTranslation } from "@/lib/i18n";
 
 export function CommandBar() {
   const router = useRouter();
+  const { confirmNavigation } = useUnsavedNavigationGuard();
   const isOpen = useCommandBarStore((s) => s.isOpen);
   const query = useCommandBarStore((s) => s.query);
   const setQuery = useCommandBarStore((s) => s.setQuery);
@@ -82,17 +98,23 @@ export function CommandBar() {
     }
   }, [flat.length, activeIdx]);
 
+  const navigateTo = (href: string, recentItem?: RecentItem) => {
+    if (!confirmNavigation()) return false;
+    if (recentItem) pushRecent(recentItem);
+    close();
+    router.push(href);
+    return true;
+  };
+
   // 选中跳转
   const commit = (hit: SearchHit) => {
-    pushRecent({
+    navigateTo(hit.href, {
       id: hit.id,
       label: hit.label,
       href: hit.href,
       type: "page",
       at: Date.now(),
     });
-    close();
-    router.push(hit.href);
   };
 
   // 键盘导航 (input 上)
@@ -205,7 +227,7 @@ export function CommandBar() {
           className="max-h-[60vh] overflow-y-auto py-1"
         >
           {query.trim() === "" ? (
-            <EmptyQueryState recent={recent} t={t} onPick={(href) => router.push(href)} />
+            <EmptyQueryState recent={recent} t={t} onPick={(href) => { navigateTo(href); }} />
           ) : result.groups.length === 0 ? (
             <div className="px-4 py-10 text-center text-ink-mute text-xs font-mono">
               {t.commandBar.emptyHint}

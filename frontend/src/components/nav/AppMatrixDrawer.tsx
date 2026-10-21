@@ -1,5 +1,16 @@
 "use client";
 
+/*
+@cypher schema=1 source_sha256=777fb6104130cbce33b2949e1f00bd69f884abc22765b41f6b8494bb766e8712
+MERGE (self:File {path:"frontend/src/components/nav/AppMatrixDrawer.tsx"})
+MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:DEFINES]->(matrix)
+MERGE (self)-[:IMPORTS]->(guardedLink)
+MERGE (matrix)-[:CALLS]->(guardedLink)
+@endcypher
+*/
+
 import { useState, useMemo } from "react";
 import { ALL_MODULES, CATEGORY_STYLES, getCategoryStyles, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
 import { useNavStore } from "@/lib/nav/navStore";
@@ -15,7 +26,7 @@ import {
   RotateCcw,
   Pin,
 } from "lucide-react";
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { clsx } from "clsx";
 import { useTranslation, useModuleTranslation, type Dictionary } from "@/lib/i18n";
 
@@ -317,7 +328,7 @@ function MatrixCard({
         {/* 直接跳转 */}
         <Link
           href={m.href}
-          onClick={onOpen}
+          onNavigate={onOpen}
           className="p-1.5 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white border border-black bg-black/60 hover:bg-black transition-colors"
           title={t.appMatrix.openNow}
         >

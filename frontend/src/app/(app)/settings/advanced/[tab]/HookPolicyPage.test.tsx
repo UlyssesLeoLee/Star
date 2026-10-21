@@ -1,10 +1,12 @@
 /*
-@cypher schema=1 source_sha256=2b4290c300fc7e09933512dd5a571dd45c4b4ecd575698b4e7d140fb92997d93
+@cypher schema=1 source_sha256=504b34ac6b44141af966a6f25d2af035d184b35ce1ca92e353e71d711d1db86d
 MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::HookPolicyPage tests",kind:"suite"})
 MERGE (expirationCase:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::clears policy UI when the host session expires case",kind:"test"})
 MERGE (unsavedCase:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::warns before discarding local policy edits case",kind:"test"})
 MERGE (provider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
+MERGE (navigationProvider:Symbol {id:"frontend/src/lib/navigation/UnsavedNavigationGuard.tsx::UnsavedNavigationGuardProvider",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::HookPolicyPage",kind:"function"})
 MERGE (self)-[:DEFINES]->(suite)
 MERGE (suite)-[:DEFINES]->(expirationCase)
@@ -16,6 +18,8 @@ MERGE (expirationCase)-[:TESTS]->(page)
 MERGE (unsavedCase)-[:CALLS]->(provider)
 MERGE (unsavedCase)-[:CALLS]->(page)
 MERGE (unsavedCase)-[:TESTS]->(page)
+MERGE (unsavedCase)-[:TESTS]->(guardedLink)
+MERGE (unsavedCase)-[:CALLS]->(navigationProvider)
 @endcypher
 */
 /*
@@ -36,6 +40,29 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorktreeGroupApiProvider } from "@/lib/group/groupProjection";
 import HookPolicyPage from "./HookPolicyPage";
+import { GuardedLink } from "@/components/navigation/GuardedLink";
+import { UnsavedNavigationGuardProvider } from "@/lib/navigation/UnsavedNavigationGuard";
+
+const linkHarness = vi.hoisted(() => ({
+  onNavigate: undefined as ((event: { preventDefault: () => void }) => void) | undefined,
+  navigate: vi.fn(),
+}));
+
+vi.mock("next/link", () => ({
+  default: ({ href, children, onNavigate, ...props }: any) => {
+    linkHarness.onNavigate = onNavigate;
+    return (
+      <a href={href} {...props} onClick={(event) => {
+        event.preventDefault();
+        let blocked = false;
+        onNavigate?.({ preventDefault: () => { blocked = true; event.preventDefault(); } });
+        if (!blocked) linkHarness.navigate(String(href));
+      }}>
+        {children}
+      </a>
+    );
+  },
+}));
 
 const navigation = vi.hoisted(() => ({ query: "", router: { replace: vi.fn() } }));
 vi.mock("next/navigation", () => ({
@@ -43,7 +70,11 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/settings/advanced/hooks",
   useSearchParams: () => new URLSearchParams(navigation.query),
 }));
-beforeEach(() => { navigation.query = ""; navigation.router.replace.mockClear(); });
+beforeEach(() => {
+  navigation.query = "";
+  navigation.router.replace.mockClear();
+  linkHarness.navigate.mockClear();
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe("HookPolicyPage", () => {
@@ -260,7 +291,7 @@ describe("HookPolicyPage", () => {
     await waitFor(() => expect(screen.getByTestId("hook-event-coverage")).toHaveTextContent("run_admission"));
   });
 
-  it("warns before discarding local policy edits and keeps them when the user cancels", async () => {
+  it("protects local, app-shell and browser exits, then clears the guard on save, discard and unmount", async () => {
     const projectId = "11111111-1111-4111-8111-111111111111";
     const policyDocument = {
       schema_version: 1,
@@ -282,10 +313,17 @@ describe("HookPolicyPage", () => {
       }],
       worktree_rules: [],
     };
-    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    let savedDraftDocument = policyDocument;
+    let savedDraftVersion = 2;
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
       const url = new URL(String(input), "http://localhost");
       if (url.pathname === "/api/v1/projects") {
         return jsonResponse({ projects: [{ project_id: projectId, role: "project_admin" }], next_cursor: null });
+      }
+      if (url.pathname.endsWith("/hook-policy/draft") && init?.method === "PUT") {
+        savedDraftDocument = JSON.parse(String(init.body)).policy_document;
+        savedDraftVersion += 1;
+        return jsonResponse({ draft_id: "draft-1", draft_version: savedDraftVersion });
       }
       if (url.pathname.endsWith("/hook-policy")) {
         return jsonResponse({
@@ -297,12 +335,12 @@ describe("HookPolicyPage", () => {
           inherited_project_policy_set_id: null,
           draft: {
             draft_id: "draft-1",
-            draft_version: 2,
+            draft_version: savedDraftVersion,
             base_policy_set_id: "policy-1",
             inherited_project_policy_set_id: null,
             expires_at: "2026-10-22T00:00:00.000Z",
             is_stale: false,
-            policy_document: policyDocument,
+            policy_document: savedDraftDocument,
           },
           audit: [],
         });
@@ -331,10 +369,13 @@ describe("HookPolicyPage", () => {
     const confirm = vi.fn().mockReturnValue(false);
     vi.stubGlobal("confirm", confirm);
 
-    render(
-      <WorktreeGroupApiProvider getAccessToken={getTestAccessToken} sessionKey="draft-session" fetcher={fetcher}>
-        <HookPolicyPage />
-      </WorktreeGroupApiProvider>,
+    const view = render(
+      <UnsavedNavigationGuardProvider>
+        <WorktreeGroupApiProvider getAccessToken={getTestAccessToken} sessionKey="draft-session" fetcher={fetcher}>
+          <HookPolicyPage />
+        </WorktreeGroupApiProvider>
+        <GuardedLink href="/inbox" data-testid="hook-app-shell-navigation">Inbox</GuardedLink>
+      </UnsavedNavigationGuardProvider>,
     );
 
     await screen.findByLabelText("Hook 适用阶段");
@@ -342,8 +383,13 @@ describe("HookPolicyPage", () => {
     expect(await screen.findByTestId("hook-unsaved-draft")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "发布版本" })).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("策略范围"), { target: { value: "worktree" } });
+    fireEvent.click(screen.getByTestId("hook-app-shell-navigation"));
     expect(confirm).toHaveBeenCalledOnce();
+    expect(linkHarness.navigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("策略范围"), { target: { value: "worktree" } });
+    expect(confirm).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText("策略范围")).toHaveValue("project");
     expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
 
@@ -355,6 +401,34 @@ describe("HookPolicyPage", () => {
     expect(screen.queryByTestId("hook-unsaved-draft")).not.toBeInTheDocument();
     expect(screen.getByText("本地未保存修改已放弃；服务端草稿和生效策略未改变。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "发布版本" })).toBeEnabled();
+
+    confirm.mockClear();
+    fireEvent.click(screen.getByTestId("hook-app-shell-navigation"));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(linkHarness.navigate).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "新增" }));
+    expect(await screen.findByTestId("hook-unsaved-draft")).toBeInTheDocument();
+    vi.stubGlobal("crypto", {
+      subtle: { digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer) },
+      randomUUID: () => "44444444-4444-4444-8444-444444444444",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    await waitFor(() => expect(screen.queryByTestId("hook-unsaved-draft")).not.toBeInTheDocument());
+    confirm.mockClear();
+    fireEvent.click(screen.getByTestId("hook-app-shell-navigation"));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(linkHarness.navigate).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "新增" }));
+    expect(await screen.findByTestId("hook-unsaved-draft")).toBeInTheDocument();
+    const navigateAfterUnmount = linkHarness.onNavigate;
+    view.unmount();
+    confirm.mockClear();
+    const preventDefault = vi.fn();
+    navigateAfterUnmount?.({ preventDefault });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 });
 

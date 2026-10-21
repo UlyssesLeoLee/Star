@@ -1,14 +1,17 @@
 /*
-@cypher schema=1 source_sha256=e45edc20cf5004eb443f02f999fc9135737a7a848d92b431d26bfcdac81f7721
+@cypher schema=1 source_sha256=c54545c8b2e6f472d9fc32594fb900b0c260c9162fb3f6b0d72621a1264d62fc
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
 MERGE (row:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::DirectoryRow",kind:"component"})
 MERGE (label:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::nodeScopeLabel",kind:"function"})
 MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:IMPORTS]->(guardedLink)
 MERGE (self)-[:DEFINES]->(tree)
 MERGE (self)-[:DEFINES]->(live)
 MERGE (self)-[:DEFINES]->(row)
+MERGE (row)-[:USES]->(guardedLink)
 MERGE (self)-[:DEFINES]->(label)
 MERGE (live)-[:CALLS]->(row)
 MERGE (row)-[:CALLS]->(label)
@@ -35,7 +38,7 @@ CREATE (f:File {name:"frontend/src/components/run/ProjectRunTree.tsx",type:"file
 
 "use client";
 
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { ChevronDown, ChevronRight, ClipboardList, FolderKanban, GitBranch, Layers, Monitor, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
 import { canonicalRunHref, canonicalRunWorktreeHref, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
@@ -222,8 +225,8 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, onCre
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected} aria-current={selected ? "page" : undefined}
         data-directory-index={index} title={`${node.label} · ${node.entity.worktree_id}`}
         className={`${className} w-auto flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`} prefetch={false}
-        onClick={(event) => {
-          if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !selected) clearFocus();
+        onNavigate={() => {
+          if (!selected) clearFocus();
         }}
         href={canonicalRunWorktreeHref(node.entity.project_id, node.entity.engineering_run_id, node.entity.worktree_id)}>
         <span className="flex shrink-0 items-center"><Monitor size={13} /></span>

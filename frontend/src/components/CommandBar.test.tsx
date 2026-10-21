@@ -3,12 +3,35 @@
 // =====================================================================
 // 守门: 消费组件存在 + isOpen=true 渲染 + 过滤 + 键盘 ↑↓ Enter + Esc 关闭
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=e91f7a8620699448557d568cf67e62897b0b57f873fea4aa11d14b5517c98466
+MERGE (self:File {path:"frontend/src/components/CommandBar.test.tsx"})
+MERGE (suite:Symbol {id:"frontend/src/components/CommandBar.test.tsx::CommandBar tests",kind:"suite"})
+MERGE (searchGuardCase:Symbol {id:"frontend/src/components/CommandBar.test.tsx::keeps the command bar open and does not record a route when dirty navigation is cancelled case",kind:"test"})
+MERGE (recentGuardCase:Symbol {id:"frontend/src/components/CommandBar.test.tsx::guards imperative navigation from a recent item case",kind:"test"})
+MERGE (dirtyDraft:Symbol {id:"frontend/src/components/CommandBar.test.tsx::DirtyDraft",kind:"component"})
+MERGE (commandBar:Symbol {id:"frontend/src/components/CommandBar.tsx::CommandBar",kind:"component"})
+MERGE (provider:Symbol {id:"frontend/src/lib/navigation/UnsavedNavigationGuard.tsx::UnsavedNavigationGuardProvider",kind:"component"})
+MERGE (register:Symbol {id:"frontend/src/lib/navigation/UnsavedNavigationGuard.tsx::registerUnsavedNavigationGuard",kind:"function"})
+MERGE (self)-[:DEFINES]->(suite)
+MERGE (suite)-[:DEFINES]->(searchGuardCase)
+MERGE (suite)-[:DEFINES]->(recentGuardCase)
+MERGE (suite)-[:DEFINES]->(dirtyDraft)
+MERGE (suite)-[:TESTS]->(commandBar)
+MERGE (searchGuardCase)-[:CALLS]->(provider)
+MERGE (searchGuardCase)-[:TESTS]->(commandBar)
+MERGE (recentGuardCase)-[:CALLS]->(provider)
+MERGE (recentGuardCase)-[:TESTS]->(commandBar)
+MERGE (dirtyDraft)-[:CALLS]->(register)
+@endcypher
+*/
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { CommandBar } from "./CommandBar";
 import { useCommandBarStore } from "@/lib/commandBarStore";
 import { I18nProvider } from "@/lib/i18n";
+import { UnsavedNavigationGuardProvider, useUnsavedNavigationGuard } from "@/lib/navigation/UnsavedNavigationGuard";
 
 // per 2026-08-31 i18n 补缺口: CommandBar 内 useTranslation() 必须包 I18nProvider
 function renderWithI18n(ui: ReactNode) {
@@ -32,6 +55,68 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
 
   afterEach(() => {
     cleanup(); // 清掉上一个 render 残留,避免 getByTestId 命中多个 inbox
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the command bar open and does not record a route when dirty navigation is cancelled", () => {
+    function DirtyDraft() {
+      const { registerUnsavedNavigationGuard } = useUnsavedNavigationGuard();
+      useEffect(() => registerUnsavedNavigationGuard("Unsaved Hook policy draft"), [registerUnsavedNavigationGuard]);
+      return null;
+    }
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirm);
+    useCommandBarStore.getState().open();
+    useCommandBarStore.getState().setQuery("in");
+    renderWithI18n(
+      <UnsavedNavigationGuardProvider>
+        <DirtyDraft />
+        <CommandBar />
+      </UnsavedNavigationGuardProvider>,
+    );
+
+    fireEvent.keyDown(screen.getByTestId("command-bar-input"), { key: "Enter" });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(useCommandBarStore.getState().isOpen).toBe(true);
+    expect(useCommandBarStore.getState().recent).toHaveLength(0);
+
+    confirm.mockReturnValue(true);
+    fireEvent.keyDown(screen.getByTestId("command-bar-input"), { key: "Enter" });
+    expect(mockPush).toHaveBeenCalledOnce();
+    expect(useCommandBarStore.getState().isOpen).toBe(false);
+    expect(useCommandBarStore.getState().recent).toHaveLength(1);
+  });
+
+  it("guards imperative navigation from a recent item", () => {
+    function DirtyDraft() {
+      const { registerUnsavedNavigationGuard } = useUnsavedNavigationGuard();
+      useEffect(() => registerUnsavedNavigationGuard("Unsaved Hook policy draft"), [registerUnsavedNavigationGuard]);
+      return null;
+    }
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirm);
+    useCommandBarStore.setState({
+      isOpen: true,
+      query: "",
+      recent: [{ id: "recent-inbox", label: "Inbox", href: "/inbox", type: "page", at: 1 }],
+    });
+    renderWithI18n(
+      <UnsavedNavigationGuardProvider>
+        <DirtyDraft />
+        <CommandBar />
+      </UnsavedNavigationGuardProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("command-bar-recent-recent-inbox"));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(useCommandBarStore.getState().isOpen).toBe(true);
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByTestId("command-bar-recent-recent-inbox"));
+    expect(mockPush).toHaveBeenCalledWith("/inbox");
+    expect(useCommandBarStore.getState().isOpen).toBe(false);
   });
 
   it("A. isOpen=false 时不渲染 panel", () => {

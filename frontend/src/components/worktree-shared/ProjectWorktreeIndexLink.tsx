@@ -16,7 +16,18 @@
 //   (component)-[:USES]->(projectId),(component)-[:USES]->(active),(component)-[:USES]->(collapsed),(component)-[:USES]->(href),
 //   (component)-[:CALLS]->(encodeURIComponent),(component)-[:CALLS]->(clsx),(component)-[:CALLS]->(Link),(component)-[:CALLS]->(FolderKanban);
 
-import Link from "next/link";
+/*
+@cypher schema=1 source_sha256=cfe226dd0239d126757002906b682718ebfbd9133b2e38426978638f53d317ed
+MERGE (self:File {path:"frontend/src/components/worktree-shared/ProjectWorktreeIndexLink.tsx"})
+MERGE (indexLink:Symbol {id:"frontend/src/components/worktree-shared/ProjectWorktreeIndexLink.tsx::ProjectWorktreeIndexLink",kind:"component"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:DEFINES]->(indexLink)
+MERGE (self)-[:IMPORTS]->(guardedLink)
+MERGE (indexLink)-[:CALLS]->(guardedLink)
+@endcypher
+*/
+
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { FolderKanban } from "lucide-react";
 import { clsx } from "clsx";
 

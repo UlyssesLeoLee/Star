@@ -32,7 +32,7 @@ Close one usability and data-loss gap in the visual Hook policy editor. Existing
 ## §3 Known gaps and remaining WLD-5 gates
 
 1. The production embedding host still has no verified authentication issuer/session callback. The page remains unavailable without the existing authenticated Group API client; authentication expiry continues to clear protected UI state by design.
-2. This slice does not persist unsaved edits in browser storage or intercept every app-router navigation. Project/Worktree/scope changes and policy refresh are guarded; top-level browser unload/reload uses `beforeunload` where supported. Save the server draft before leaving the app or before the session expires. No policy content is copied across sessions.
+2. This slice does not persist unsaved edits in browser storage or intercept every App Router navigation. The follow-up in `WLD5-GLOBAL-ROUTE-GUARD-20261021.md` now guards the audited app-shell `Link` routes and CommandBar search/recent `router.push` transitions. Ordinary page-content links/imperative transitions outside that shell and browser Back/Forward are not intercepted. Top-level unload/reload and same-tab external navigation rely on `beforeunload` where supported; new-tab links do not leave the current editor. Save the server draft before leaving the app or before the session expires. No policy content is copied across sessions.
 3. No target database grants/RLS behavior, production Hook producer, native Rust enforcement at Run/tool/review/cleanup boundaries, live authorization, or lifecycle-wide Audit/BI linkage was exercised here.
 4. Publish and rollback remain server-authorized operations using existing typed endpoints. The UI does not claim that this frontend itself enforces security-critical Hook decisions.
 5. WLD-5 stays open in the WBS; this report does not mark the visual policy acceptance matrix or native enforcement phase complete.
@@ -51,7 +51,7 @@ Close one usability and data-loss gap in the visual Hook policy editor. Existing
 | Policy editor consumes only the authenticated typed Group API response | Preserved; no fallback policy facts were added. |
 | Local draft edits are visibly distinguished from persisted draft/active policy | Implemented and covered by a focused test. |
 | Scope changes and policy refresh do not silently discard local edits | Implemented with explicit confirmation. |
-| Browser leave is guarded while local edits are unsaved | Implemented with `beforeunload`; browser-specific dialog rendering was not runtime-tested. |
+| Browser leave is guarded while local edits are unsaved | App-shell Link/CommandBar routes use an explicit confirmation; document unload uses `beforeunload`. Browser-specific dialog rendering, app-router Back/Forward, and non-shell page navigation were not runtime-tested or intercepted. |
 | Publish/rollback cannot apply while there are unsaved local edits | Disabled in the UI and guarded in handlers. Server authorization remains authoritative. |
 | Native Rust Hook decisions, target DB and production auth | Not covered by this slice; remain fail-closed/open. |
 
@@ -72,3 +72,4 @@ This report records a source/UI slice only. It does not approve production Hook 
 | Version | Date | Editor | Change | Trigger |
 |---|---|---|---|---|
 | v0.1 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Recorded local unsaved-draft protection, focused test/typecheck results, broad-suite limitations, and remaining WLD-5 gates. | `docs/briefs/WLD5-HOOK-POLICY-UI-20261020.md` |
+| v0.2 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Clarified the follow-up app-shell Link and CommandBar guard coverage, with page-content navigation and browser Back/Forward explicitly out of scope. | `docs/briefs/wld5-global-hook-navigation-20261021.md` |

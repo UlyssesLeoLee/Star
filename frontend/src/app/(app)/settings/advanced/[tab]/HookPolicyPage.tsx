@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=347287fc02ed4246c22dc114134d18c26513a998b4f5ba5b223d64efb977d0ee
+@cypher schema=1 source_sha256=6bbfb8a0d0518fd7f5d8ede5cb991e49562e3de62776345ec84e385a3a03fb3d
 MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::HookPolicyPage",kind:"function"})
 MERGE (confirm:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::confirmDiscardUnsavedChanges",kind:"function"})
@@ -9,6 +9,8 @@ MERGE (hasUnsaved:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/Hoo
 MERGE (persisted:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::persistedDocument",kind:"variable"})
 MERGE (leaveHandler:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::warnBeforeLeaving",kind:"function"})
 MERGE (beforeUnload:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx::beforeunload_event",kind:"event"})
+MERGE (registerNavigationGuard:Symbol {id:"frontend/src/lib/navigation/UnsavedNavigationGuard.tsx::registerUnsavedNavigationGuard",kind:"function"})
+MERGE (self)-[:IMPORTS]->(registerNavigationGuard)
 MERGE (self)-[:DEFINES]->(page)
 MERGE (page)-[:CALLS]->(confirm)
 MERGE (page)-[:CALLS]->(discard)
@@ -17,6 +19,7 @@ MERGE (page)-[:USES]->(hasUnsaved)
 MERGE (page)-[:USES]->(persisted)
 MERGE (page)-[:HANDLES]->(beforeUnload)
 MERGE (page)-[:CALLS]->(leaveHandler)
+MERGE (page)-[:CALLS]->(registerNavigationGuard)
 @endcypher
 */
 /*
@@ -80,6 +83,7 @@ CREATE
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useUnsavedNavigationGuard } from "@/lib/navigation/UnsavedNavigationGuard";
 import { AlertTriangle, Check, CircleHelp, Clock3, FileClock, Plus, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 import {
@@ -137,9 +141,11 @@ const MAX_VISIBLE_HOOK_EVENTS = 300;
 const AUTHORIZED_DIRECTORY_PAGE_SIZE = 200;
 const MAX_DEEP_LINK_LOOKUP_PAGES = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UNSAVED_HOOK_POLICY_MESSAGE = "有尚未保存到服务端的 Hook 修改。继续离开会放弃这些本地修改；取消可返回并保存草稿。";
 
 export default function HookPolicyPage() {
   const api = useWorktreeGroupApi();
+  const { registerUnsavedNavigationGuard } = useUnsavedNavigationGuard();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -402,8 +408,13 @@ export default function HookPolicyPage() {
     return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
   }, [hasUnsavedChanges]);
 
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    return registerUnsavedNavigationGuard(UNSAVED_HOOK_POLICY_MESSAGE);
+  }, [hasUnsavedChanges, registerUnsavedNavigationGuard]);
+
   const confirmDiscardUnsavedChanges = () => !hasUnsavedChanges || window.confirm(
-    "有尚未保存到服务端的 Hook 修改。选择继续会放弃这些本地修改；取消可返回并保存草稿。",
+    UNSAVED_HOOK_POLICY_MESSAGE,
   );
 
   const discardLocalChanges = () => {

@@ -1,11 +1,13 @@
 /*
-@cypher schema=1 source_sha256=52fde591a21de285092f15444b79c1caa1f5b4e6c2a16d30b74fb0671602c997
+@cypher schema=1 source_sha256=13aad78317dbc1c24f547bd84ddbddc6a22c81081640560f89d7dd28b84302b9
 MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
+MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (self)-[:IMPORTS]->(guardedLink)
 @endcypher
 */
 "use client";
 
-import Link from "next/link";
+import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { useState } from "react";
