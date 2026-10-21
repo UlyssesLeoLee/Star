@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0cf700f5231fafd927b7ba1d28c43de44b01cfb1dec1dce7c9b703cd9f54f138
+@cypher schema=1 source_sha256=81ceb7fbbe645e5d18a0ef816ddbe8f276ce872942039c1ddc3f8d07e19381e3
 MERGE (self:File {path:"frontend/src/components/UserMenu.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/UserMenu.test.tsx::UserMenu navigation tests",kind:"suite"})
 MERGE (stayCase:Symbol {id:"frontend/src/components/UserMenu.test.tsx::keeps the menu open when dirty-draft navigation is canceled case",kind:"test"})
@@ -30,6 +30,10 @@ import {
 } from "@/lib/navigation/UnsavedNavigationGuard";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: (...args: unknown[]) => navigation.push(...args) }),
+}));
 
 vi.mock("next/link", () => ({
   default: ({ href, children, onNavigate, onClick, ...props }: any) => (

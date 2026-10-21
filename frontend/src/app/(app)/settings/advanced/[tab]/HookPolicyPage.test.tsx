@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=504b34ac6b44141af966a6f25d2af035d184b35ce1ca92e353e71d711d1db86d
+@cypher schema=1 source_sha256=bbad0e5656f390c616ddda7f0ba7d683f8c7bead368646e5789d11718af9d65e
 MERGE (self:File {path:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::HookPolicyPage tests",kind:"suite"})
 MERGE (expirationCase:Symbol {id:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx::clears policy UI when the host session expires case",kind:"test"})
@@ -20,6 +20,7 @@ MERGE (unsavedCase)-[:CALLS]->(page)
 MERGE (unsavedCase)-[:TESTS]->(page)
 MERGE (unsavedCase)-[:TESTS]->(guardedLink)
 MERGE (unsavedCase)-[:CALLS]->(navigationProvider)
+MERGE (unsavedCase)-[:TESTS]->(navigationProvider)
 @endcypher
 */
 /*
@@ -64,7 +65,7 @@ vi.mock("next/link", () => ({
   },
 }));
 
-const navigation = vi.hoisted(() => ({ query: "", router: { replace: vi.fn() } }));
+const navigation = vi.hoisted(() => ({ query: "", router: { push: vi.fn(), replace: vi.fn() } }));
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation.router,
   usePathname: () => "/settings/advanced/hooks",
@@ -72,6 +73,7 @@ vi.mock("next/navigation", () => ({
 }));
 beforeEach(() => {
   navigation.query = "";
+  navigation.router.push.mockClear();
   navigation.router.replace.mockClear();
   linkHarness.navigate.mockClear();
 });
@@ -367,6 +369,7 @@ describe("HookPolicyPage", () => {
       return jsonResponse({});
     });
     const confirm = vi.fn().mockReturnValue(false);
+    const contentClick = vi.fn();
     vi.stubGlobal("confirm", confirm);
 
     const view = render(
@@ -375,6 +378,7 @@ describe("HookPolicyPage", () => {
           <HookPolicyPage />
         </WorktreeGroupApiProvider>
         <GuardedLink href="/inbox" data-testid="hook-app-shell-navigation">Inbox</GuardedLink>
+        <a href="/work-items/wi-7" data-testid="hook-content-navigation" onClick={contentClick}>Open work item</a>
       </UnsavedNavigationGuardProvider>,
     );
 
@@ -388,14 +392,32 @@ describe("HookPolicyPage", () => {
     expect(linkHarness.navigate).not.toHaveBeenCalled();
     expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("策略范围"), { target: { value: "worktree" } });
+    const phaseSelect = screen.getByLabelText("Hook 适用阶段");
+    phaseSelect.focus();
+    fireEvent.click(screen.getByTestId("hook-content-navigation"));
     expect(confirm).toHaveBeenCalledTimes(2);
+    expect(contentClick).not.toHaveBeenCalled();
+    expect(navigation.router.push).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(phaseSelect);
+    expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("策略范围"), { target: { value: "worktree" } });
+    expect(confirm).toHaveBeenCalledTimes(3);
     expect(screen.getByLabelText("策略范围")).toHaveValue("project");
     expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
 
     const beforeUnload = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(beforeUnload);
     expect(beforeUnload.defaultPrevented).toBe(true);
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByTestId("hook-content-navigation"));
+    expect(confirm).toHaveBeenCalledTimes(4);
+    expect(navigation.router.push).toHaveBeenCalledOnce();
+    expect(navigation.router.push).toHaveBeenCalledWith("/work-items/wi-7");
+    expect(contentClick).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("hook-unsaved-draft")).toBeInTheDocument();
+    confirm.mockReturnValue(false);
 
     fireEvent.click(screen.getByRole("button", { name: "放弃本地更改" }));
     expect(screen.queryByTestId("hook-unsaved-draft")).not.toBeInTheDocument();
