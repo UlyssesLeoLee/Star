@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4d0be837ee9b240bf3134d815ebdbf31d424763c8d1ba510a51ca5b3e284a833
+@cypher schema=1 source_sha256=93c058e942a8104bd5a1fc8cadfaf771c0143e98c888a4d1fab389ffb0065b3a
 MERGE (self:File {path:"frontend/src/components/navigation/GuardedLink.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::GuardedLink navigation tests",kind:"suite"})
 MERGE (navigationCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::cancels a supported internal route when the user stays and permits it after confirmation case",kind:"test"})
@@ -33,7 +33,8 @@ const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/link", () => ({
   default: ({ href, target, children, onNavigate, onClick, ...props }: any) => (
     <a
-      href={href}
+      href="#"
+      data-destination={String(href)}
       target={target}
       {...props}
       onClick={(event) => {

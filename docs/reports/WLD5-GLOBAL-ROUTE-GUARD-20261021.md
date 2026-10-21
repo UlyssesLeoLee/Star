@@ -13,7 +13,7 @@ Hook policy drafts already warned on document unload and on local scope changes,
 | File group | Change | Evidence |
 |---|---|---|
 | `frontend/src/lib/navigation/UnsavedNavigationGuard.tsx`, `frontend/src/components/navigation/GuardedLink.tsx` | Added a root-provided guard context and a `Link.onNavigate` wrapper using public Next.js App Router API. Guard state is held in a ref, registered only while dirty, and token-cleaned on save/discard/unmount. | Focused component tests cover stay/leave, clean state, unmount cleanup, caller navigation callbacks, external URLs, and new tabs. |
-| `frontend/src/app/providers.tsx`, app-shell Link consumers | Mounted the context in `Providers`; routed desktop/mobile shell, Run tree, settings tabs, app matrix, user menu and Project Worktree Index entry through `GuardedLink`. `MobileHeader` is included because it is mounted by RootLayout. Navigation side effects now run only after the route is approved. | Source audit of the named shell components and the root layout confirmed the consumers. |
+| `frontend/src/app/providers.tsx`, app-shell Link consumers | Mounted the context in `Providers`; routed desktop/mobile shell, Run tree, settings tabs, app matrix, user menu and Project Worktree Index entry through `GuardedLink`. `MobileHeader` is included because it is mounted by RootLayout. User-menu close actions use `onNavigate`, so they only run after the route is approved. | Source audit of the named shell components and the root layout confirmed the consumers; the UserMenu regression test verifies a canceled route leaves the menu open. |
 | `frontend/src/components/CommandBar.tsx` | Gated both search-result and recent-item imperative `router.push` transitions before recording recents or closing the command bar. | CommandBar tests cover canceled/approved search and recent-item routes. |
 | `frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx` and focused tests | Registers while `hasUnsavedChanges`; keeps the existing `beforeunload` listener and local scope confirmation. Save, discard and unmount clear protection. | Hook page integration test exercises route stay, no duplicate scope prompt, browser unload event, discard, save, and cleanup. |
 | This report and `WLD5-HOOK-POLICY-UI-SLICE-20261020.md` | Records tested scope and remaining route gaps without marking WLD-5 complete. | The prior report now points to this follow-up and states its exact boundary. |
@@ -34,12 +34,14 @@ Hook policy drafts already warned on document unload and on local scope changes,
 | Check | Result |
 |---|---|
 | Dependency setup | `rtk pnpm install --frozen-lockfile` completed; lockfiles were not changed. |
-| Focused tests | `rtk pnpm exec vitest run 'src/components/navigation/GuardedLink.test.tsx' 'src/components/CommandBar.test.tsx' 'src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx'` passed: 3 files, 30 tests. The first attempt exposed a test-only origin mismatch; the mock now uses the active jsdom origin and models Next.js client navigation. |
+| Focused tests | `rtk pnpm exec vitest run 'src/components/navigation/GuardedLink.test.tsx' 'src/components/UserMenu.test.tsx' 'src/components/CommandBar.test.tsx' 'src/app/(app)/settings/advanced/[tab]/HookPolicyPage.test.tsx'` passed: 4 files, 31 tests. The mocks simulate client navigation without asking jsdom to navigate to another document. |
 | TypeScript | `rtk pnpm typecheck` passed: no errors. |
-| Cypher Graph Guardian | `rtk python <skill>/scripts/cgg_guard.py --changed --stamp` passed: 17 source files checked. The 17 files match the 14 modified tracked TS/TSX files plus 3 new source/test files in this lane; documentation files are not counted as source files. |
+| Cypher Graph Guardian | Initial lane validation passed for 17 source files. Follow-up `rtk python <skill>/scripts/cgg_guard.py --changed --stamp` passed for the 3 changed source/test files (`UserMenu.tsx`, `GuardedLink.test.tsx`, `UserMenu.test.tsx`); documentation is not counted as source. |
 | Diff whitespace | `rtk git diff --check` passed. |
 | Code review | Direct source/diff self-review completed. The parent reports the CodeRabbit shim cannot run because WSL returned `permission denied`; no external review is claimed. |
 | CodeGraph | No recognized indexed project/generation was available for this isolated checkout. Exact-source fallback covered the RootLayout shell, named link consumers, CommandBar route calls, and related Hook page. No graph completeness claim is made. |
+
+The UserMenu regression also exposed that its route links closed the menu in `onClick`, before `GuardedLink` could cancel navigation. These close actions now run in `onNavigate`. Route-test anchors use `href="#"` while retaining the intended destination in the test harness; this avoids jsdom's unsupported document-navigation warning while preserving assertions against the modeled Next.js client transition.
 
 ## §3 Known gaps and remaining WLD-5 gates
 
@@ -53,6 +55,7 @@ Hook policy drafts already warned on document unload and on local scope changes,
 
 - No child agents were dispatched by this bounded worker; no child output remains to hand off.
 - The first focused test attempt failed because the test mock treated `localhost` and the jsdom `localhost:<port>` origin as different sites. The test harness was corrected, and the repeated focused suite passed.
+- The follow-up route tests initially emitted jsdom's `Not implemented: navigation to another Document` warning because the mocked Next.js links used real route `href` values on DOM anchors. The route mock now uses `href="#"` and drives navigation from the separately retained destination; the isolated and combined focused runs completed without that warning.
 - A first diff scan found `MobileHeader` still importing `next/link` despite being mounted by RootLayout; it was included before final validation.
 
 ## §5 Slice-specific gates
@@ -62,6 +65,7 @@ Hook policy drafts already warned on document unload and on local scope changes,
 | Advanced Settings → Hooks remains the configuration surface | Preserved. |
 | Guard is inactive while the editor is clean | Implemented and tested. |
 | Dirty app-shell links prompt and cancel without route side effects | Implemented and tested through the shared guarded-link component and Hook page. |
+| UserMenu stays open on canceled navigation and closes only after approval | Implemented and tested. |
 | CommandBar search and recent routes prompt before changing panel/recents | Implemented and tested. |
 | Existing scope-change confirmation remains single-prompt | Preserved and tested. |
 | Save/discard/unmount remove the guard; document `beforeunload` stays active while dirty | Implemented and tested. |
@@ -85,3 +89,4 @@ This report records a bounded UI navigation guard. It does not approve productio
 | Version | Date | Editor | Change | Trigger |
 |---|---|---|---|---|
 | v0.1 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Added app-shell and CommandBar protection for dirty Hook policy drafts, with exact limitations and focused validation. | `docs/briefs/wld5-global-hook-navigation-20261021.md` |
+| v0.2 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Defer UserMenu close effects until `Link.onNavigate`, add Stay/Leave regression coverage, and remove jsdom's mock-anchor document-navigation warning. | Follow-up review of the same brief. |

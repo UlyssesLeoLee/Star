@@ -12,7 +12,7 @@
 //   6. 安全退出
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=00bd6f02d571ee0214fc524e2c0f3cab19ee11ed3914c49773a042c4b4d0adf5
+@cypher schema=1 source_sha256=581a8f942601f56cbab14630570cd1628aa602d1b48e586ab35c9a371d1549c4
 MERGE (self:File {path:"frontend/src/components/UserMenu.tsx"})
 MERGE (menu:Symbol {id:"frontend/src/components/UserMenu.tsx::UserMenu",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -206,7 +206,7 @@ export function UserMenu() {
             <Link
               href="/agent-windows"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onNavigate={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
             >
               <Sparkles size={13} className="text-accent" />
@@ -218,7 +218,7 @@ export function UserMenu() {
             <Link
               href="/settings/cli-profiles"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onNavigate={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
             >
               <Terminal size={13} className="text-info" />
@@ -230,7 +230,7 @@ export function UserMenu() {
             <Link
               href="/settings/api-keys"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onNavigate={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
             >
               <Key size={13} className="text-warn" />
@@ -244,7 +244,7 @@ export function UserMenu() {
               href="/ops"
               role="menuitem"
               data-testid="user-menu-ops"
-              onClick={() => setOpen(false)}
+              onNavigate={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
             >
               <Wrench size={13} className="text-info" />
@@ -342,7 +342,7 @@ export function UserMenu() {
             <Link
               href="/settings/profile"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onNavigate={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
             >
               <User size={13} />
@@ -351,7 +351,7 @@ export function UserMenu() {
             <Link
               href="/settings"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onNavigate={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
             >
               <Settings size={13} />
