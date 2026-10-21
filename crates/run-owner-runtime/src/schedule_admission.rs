@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=816a43c1243212b2dbdd721d5a0381d7d692c361f80246b77980a9caadadc889
+@cypher schema=1 source_sha256=3d5aee3093c97bbe762c59caccf0129aab6bf582a54af5d29d9e2b17a8e48c38
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -16,7 +16,17 @@ MERGE (self)-[:DEFINES]->(session)
 MERGE (self)-[:DEFINES]->(begin)
 MERGE (self)-[:DEFINES]->(commit)
 MERGE (revalidate:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.revalidate_directory_and_binding",kind:"method"})
+MERGE (require_branch:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::required_schedule_branch_id",kind:"function"})
+MERGE (hostless_wire:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::hostless_schedule_target_in_wire",kind:"function"})
+MERGE (decode_bound:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::decode_branch_bound_schedule_command",kind:"function"})
+MERGE (branch_required_test:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::tests::schedule_admission_requires_remote_branch_for_runtime_scope",kind:"test"})
+MERGE (hostless_wire_test:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::tests::branchless_schedule_admission_wire_fails_before_owner_work",kind:"test"})
 MERGE (self)-[:DEFINES]->(revalidate)
+MERGE (self)-[:DEFINES]->(require_branch)
+MERGE (self)-[:DEFINES]->(hostless_wire)
+MERGE (self)-[:DEFINES]->(decode_bound)
+MERGE (self)-[:DEFINES]->(branch_required_test)
+MERGE (self)-[:DEFINES]->(hostless_wire_test)
 MERGE (revalidate)-[:CALLS]->(verify_directory:Symbol {id:"db/migrations/2026-10-10-run-owner-admission-currentness.sql::verify_schedule_run_as_current",kind:"function"})
 MERGE (revalidate)-[:CALLS]->(resolve_locked:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::resolve_current_binding_locked",kind:"function"})
 MERGE (revalidate)-[:CALLS]->(scope)
@@ -33,7 +43,10 @@ MERGE (policy)-[:CALLS]->(load_policy:Symbol {id:"crates/run-owner-runtime/src/s
 MERGE (task)-[:CALLS]->(revalidate)
 MERGE (task)-[:CALLS]->(verify_task:Symbol {id:"db/migrations/2026-10-10-run-owner-task-currentness.sql::verify_schedule_task_current",kind:"function"})
 MERGE (begin)-[:CALLS]->(scope)
-MERGE (begin)-[:CALLS]->(decode)
+MERGE (begin)-[:CALLS]->(decode_bound)
+MERGE (decode_bound)-[:CALLS]->(decode)
+MERGE (decode_bound)-[:CALLS]->(hostless_wire)
+MERGE (decode_bound)-[:CALLS]->(require_branch)
 MERGE (begin)-[:CALLS]->(match)
 MERGE (commit)-[:CALLS]->(match)
 MERGE (begin)-[:READS]->(inbox)
@@ -62,12 +75,13 @@ MERGE (compensate)-[:READS]->(inbox)
 MERGE (compensate)-[:READS]->(outbox)
 MERGE (compensate)-[:CALLS]->(resolution_decode:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::decode_json",kind:"method"})
 MERGE (compensate)-[:CALLS]->(resolution_match:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResolutionV1::validate_for_result",kind:"method"})
-MERGE (compensate)-[:CALLS]->(decode)
+MERGE (compensate)-[:CALLS]->(decode_bound)
 MERGE (compensate)-[:CALLS]->(match)
 MERGE (compensate)-[:CALLS]->(native_compensate:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-compensation.sql::compensate_schedule_preparation",kind:"function"})
 MERGE (confirm:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.confirm_admission",kind:"method"})
 MERGE (self)-[:DEFINES]->(confirm)
 MERGE (confirm)-[:CALLS]->(scope)
+MERGE (confirm)-[:CALLS]->(decode_bound)
 MERGE (confirm)-[:CALLS]->(resolution_decode)
 MERGE (confirm)-[:CALLS]->(resolution_match)
 MERGE (confirm)-[:CALLS]->(catalog)
@@ -77,6 +91,9 @@ MERGE (confirm)-[:READS]->(outbox)
 MERGE (confirm)-[:READS]->(confirmed:Table {id:"multica.schedule_confirmation_inbox"})
 MERGE (confirm)-[:USES_TYPE]->(demand_type:Type {id:"domain_infrastructure::HostInfrastructureDemandV2",kind:"external_type"})
 MERGE (confirm)-[:CALLS]->(native_confirm:Symbol {id:"db/migrations/2026-10-10-run-owner-schedule-confirmation.sql::confirm_schedule_preparation",kind:"function"})
+MERGE (branch_required_test)-[:TESTS]->(require_branch)
+MERGE (hostless_wire_test)-[:TESTS]->(hostless_wire)
+MERGE (hostless_wire_test)-[:TESTS]->(decode_bound)
 @endcypher
 */
 
@@ -113,6 +130,45 @@ pub enum ScheduleAdmissionStoreError {
     Database(#[from] sqlx::Error),
 }
 
+pub(crate) fn required_schedule_branch_id(
+    branch_id: Option<Uuid>,
+) -> Result<Uuid, ScheduleAdmissionStoreError> {
+    branch_id.ok_or(ScheduleAdmissionStoreError::PrerequisiteRejected(
+        ScheduleAdmissionRejectionCodeV1::BindingUnavailable,
+    ))
+}
+
+fn hostless_schedule_target_in_wire(payload: &[u8]) -> bool {
+    if payload.len() > domain_automation::schedule::MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES {
+        return false;
+    }
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(payload) else {
+        return false;
+    };
+    let Some(target) = value
+        .pointer("/occurrence/rule_snapshot/target")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return false;
+    };
+    target
+        .get("branch_id")
+        .map_or(true, serde_json::Value::is_null)
+}
+
+fn decode_branch_bound_schedule_command(
+    payload: &[u8],
+) -> Result<(ScheduleRunAdmissionCommandV1, Uuid), ScheduleAdmissionStoreError> {
+    if hostless_schedule_target_in_wire(payload) {
+        return Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+            ScheduleAdmissionRejectionCodeV1::BindingUnavailable,
+        ));
+    }
+    let command = ScheduleRunAdmissionCommandV1::decode_json(payload)?;
+    let branch_id = required_schedule_branch_id(command.occurrence.rule_snapshot.target.branch_id)?;
+    Ok((command, branch_id))
+}
+
 /// The receiver must compose real service authentication before invoking this store.
 /// A tenant argument is an injected scope, never proof of broker/service authentication.
 #[derive(Clone)]
@@ -142,6 +198,7 @@ pub enum ScheduleAdmissionStart {
 pub struct ScheduleAdmissionTransaction {
     transaction: Transaction<'static, Postgres>,
     command: ScheduleRunAdmissionCommandV1,
+    branch_id: Uuid,
     wire: Vec<u8>,
     wire_sha256: [u8; 32],
     source_schedule_service_id: Uuid,
@@ -201,7 +258,7 @@ impl PostgresScheduleAdmissionStore {
         if row.try_get::<Vec<u8>, _>("command_sha256")? != wire_sha256 {
             return Err(ScheduleAdmissionStoreError::ReplayConflict);
         }
-        let command = ScheduleRunAdmissionCommandV1::decode_json(&wire)?;
+        let (command, branch_id) = decode_branch_bound_schedule_command(&wire)?;
         let result =
             ScheduleRunAdmissionResultV1::decode_json(&row.try_get::<Vec<u8>, _>("result_wire")?)?;
         result.validate_for_command(&command)?;
@@ -228,6 +285,7 @@ impl PostgresScheduleAdmissionStore {
         let mut pending = ScheduleAdmissionTransaction {
             transaction: tx,
             command,
+            branch_id,
             wire,
             wire_sha256,
             source_schedule_service_id: source.schedule_service_id,
@@ -237,6 +295,7 @@ impl PostgresScheduleAdmissionStore {
         execution.validate_lifetime()?;
         let command = &pending.command;
         let target = &command.occurrence.rule_snapshot.target;
+        let branch_id = pending.branch_id;
         let deadline = command
             .occurrence
             .key
@@ -251,7 +310,7 @@ impl PostgresScheduleAdmissionStore {
             correlation_id: command.correlation_id,
             tenant_id: command.tenant_id,
             project_id: target.project_id,
-            branch_id: target.branch_id,
+            branch_id,
             engineering_run_id: target.engineering_run_id,
             task_execution_run_id: resolution.task_execution_run_id,
             schedule_rule_id: command.occurrence.rule_snapshot.rule_id.as_uuid(),
@@ -338,7 +397,7 @@ impl PostgresScheduleAdmissionStore {
         if row.try_get::<Uuid, _>("source_schedule_service_id")? != source.schedule_service_id {
             return Err(ScheduleAdmissionStoreError::UntrustedScope);
         }
-        let command = ScheduleRunAdmissionCommandV1::decode_json(
+        let (command, _) = decode_branch_bound_schedule_command(
             &row.try_get::<Vec<u8>, _>("command_wire")?,
         )?;
         let result =
@@ -376,7 +435,7 @@ impl PostgresScheduleAdmissionStore {
         source: ScheduleAdmissionSource,
         command_wire: &[u8],
     ) -> Result<ScheduleAdmissionStart, ScheduleAdmissionStoreError> {
-        let command = ScheduleRunAdmissionCommandV1::decode_json(command_wire)?;
+        let (command, branch_id) = decode_branch_bound_schedule_command(command_wire)?;
         let trusted_tenant_id = source.tenant_id;
         if trusted_tenant_id.is_nil()
             || source.schedule_service_id.is_nil()
@@ -428,6 +487,7 @@ impl PostgresScheduleAdmissionStore {
             ScheduleAdmissionTransaction {
                 transaction,
                 command,
+                branch_id,
                 wire: command_wire.to_vec(),
                 wire_sha256,
                 source_schedule_service_id: source.schedule_service_id,
@@ -575,7 +635,7 @@ impl ScheduleAdmissionTransaction {
         .bind(command.tenant_id)
         .bind(command.occurrence.run_as_actor_id)
         .bind(target.project_id)
-        .bind(target.branch_id)
+        .bind(branch_id)
         .bind(target.engineering_run_id)
         .bind(target.repository_id)
         .bind(target.worktree_id)
@@ -600,6 +660,7 @@ impl ScheduleAdmissionTransaction {
     ) -> Result<(), ScheduleAdmissionStoreError> {
         let command = &self.command;
         let target = &command.occurrence.rule_snapshot.target;
+        let branch_id = self.branch_id;
         crate::outbox::set_run_owner_scope(&mut self.transaction, command.tenant_id).await?;
         sqlx::query("SELECT set_config('app.actor_id', $1, true)")
             .bind(command.occurrence.run_as_actor_id.to_string())
@@ -610,7 +671,7 @@ impl ScheduleAdmissionTransaction {
                 .bind(command.tenant_id)
                 .bind(command.occurrence.run_as_actor_id)
                 .bind(target.project_id)
-                .bind(target.branch_id)
+                .bind(branch_id)
                 .bind(target.engineering_run_id)
                 .bind(target.repository_id)
                 .fetch_one(&mut *self.transaction)
@@ -623,7 +684,7 @@ impl ScheduleAdmissionTransaction {
         let scope = crate::RunInfrastructureBindingScope {
             tenant_id: command.tenant_id,
             project_id: target.project_id,
-            branch_id: target.branch_id,
+            branch_id,
             engineering_run_id: target.engineering_run_id,
         };
         let current = match crate::run_infrastructure_binding::resolve_current_binding_locked(
@@ -674,6 +735,7 @@ impl ScheduleAdmissionTransaction {
         let command = &self.command;
         let rule = &command.occurrence.rule_snapshot;
         let target = &rule.target;
+        let branch_id = self.branch_id;
         let rule_version = i64::try_from(rule.rule_version)
             .map_err(|_| ScheduleAdmissionStoreError::ReplayConflict)?;
         sqlx::query(
@@ -687,7 +749,7 @@ impl ScheduleAdmissionTransaction {
         .bind(command.request_id)
         .bind(result.result_id)
         .bind(target.project_id)
-        .bind(target.branch_id)
+        .bind(branch_id)
         .bind(target.engineering_run_id)
         .bind(target.work_item_id)
         .bind(target.worktree_id)
@@ -721,5 +783,45 @@ impl ScheduleAdmissionTransaction {
         .await?;
         self.transaction.commit().await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        decode_branch_bound_schedule_command, hostless_schedule_target_in_wire,
+        required_schedule_branch_id,
+        ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionStoreError,
+    };
+    use uuid::Uuid;
+
+    #[test]
+    fn schedule_admission_requires_remote_branch_for_runtime_scope() {
+        assert!(matches!(
+            required_schedule_branch_id(None),
+            Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+                ScheduleAdmissionRejectionCodeV1::BindingUnavailable
+            ))
+        ));
+        assert!(required_schedule_branch_id(Some(Uuid::new_v4())).is_ok());
+    }
+
+    #[test]
+    fn branchless_schedule_admission_wire_fails_before_owner_work() {
+        for payload in [
+            br#"{"occurrence":{"rule_snapshot":{"target":{"branch_id":null}}}}"#.as_slice(),
+            br#"{"occurrence":{"rule_snapshot":{"target":{}}}}"#.as_slice(),
+        ] {
+            assert!(matches!(
+                decode_branch_bound_schedule_command(payload),
+                Err(ScheduleAdmissionStoreError::PrerequisiteRejected(
+                    ScheduleAdmissionRejectionCodeV1::BindingUnavailable
+                ))
+            ));
+        }
+        assert!(!hostless_schedule_target_in_wire(
+            br#"{"occurrence":{"rule_snapshot":{"target":{"branch_id":"00000000-0000-0000-0000-000000000001"}}}}"#
+        ));
+        assert!(!hostless_schedule_target_in_wire(b"not-json"));
     }
 }

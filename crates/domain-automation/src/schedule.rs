@@ -4,10 +4,11 @@
 //! It intentionally contains no in-memory scheduler or worker; materialization, claiming, and
 //! Run creation must be committed by the application layer against PostgreSQL.
 //!
-//! @cypher schema=1 source_sha256=c469db4cdc35638a3f25212a0c731e1eb773ef9f79c0ca96fbe88d08d7b995d0
+//! @cypher schema=1 source_sha256=e42cd71bfa6e3150c8fe81dce9ef2aeb41be8959c5f3cade5ae5722d7849305c
 //! MERGE (self:File {path:"crates/domain-automation/src/schedule.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-automation/src/schedule.rs::schedule",kind:"module"})
 //! MERGE (target:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1"})
+//! MERGE (target_branch:Symbol {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1.branch_id",kind:"field"})
 //! MERGE (retry:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRetryPolicyV1"})
 //! MERGE (overlap:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleOverlapPolicyV1"})
 //! MERGE (misfire:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleMisfirePolicyV1"})
@@ -27,10 +28,14 @@
 //! MERGE (rule_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::AutomationScheduleRuleRevisionV1::validate",kind:"method"})
 //! MERGE (key_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceKey::validate",kind:"method"})
 //! MERGE (occurrence_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceSnapshotV1::validate",kind:"method"})
+//! MERGE (materializer:Symbol {id:"crates/domain-automation/src/schedule.rs::materialize_schedule_window",kind:"function"})
+//! MERGE (recurrence_validator:Symbol {id:"crates/domain-automation/src/schedule.rs::validate_schedule_recurrence",kind:"function"})
+//! MERGE (candidate_collector:Symbol {id:"crates/domain-automation/src/schedule.rs::collect_schedule_candidates",kind:"function"})
 //! MERGE (fence_validate:Symbol {id:"crates/domain-automation/src/schedule.rs::AutomationOccurrenceLeaseFenceV1::validate",kind:"method"})
 //! MERGE (digest:Symbol {id:"crates/domain-automation/src/schedule.rs::is_lower_hex_sha256",kind:"function"})
 //! MERGE (self)-[:DEFINES]->(module)
 //! MERGE (self)-[:DEFINES]->(target)
+//! MERGE (target)-[:CONTAINS]->(target_branch)
 //! MERGE (self)-[:DEFINES]->(retry)
 //! MERGE (self)-[:DEFINES]->(overlap)
 //! MERGE (self)-[:DEFINES]->(misfire)
@@ -50,13 +55,23 @@
 //! MERGE (self)-[:DEFINES]->(rule_validate)
 //! MERGE (self)-[:DEFINES]->(key_validate)
 //! MERGE (self)-[:DEFINES]->(occurrence_validate)
+//! MERGE (self)-[:DEFINES]->(materializer)
+//! MERGE (self)-[:DEFINES]->(recurrence_validator)
+//! MERGE (self)-[:DEFINES]->(candidate_collector)
 //! MERGE (self)-[:DEFINES]->(fence_validate)
 //! MERGE (self)-[:DEFINES]->(digest)
 //! MERGE (target_validate)-[:CALLS]->(digest)
+//! MERGE (target_validate)-[:ALLOWS_NULL]->(target_branch)
 //! MERGE (rule_validate)-[:CALLS]->(target_validate)
 //! MERGE (rule_validate)-[:CALLS]->(retry_validate)
 //! MERGE (occurrence_validate)-[:CALLS]->(key_validate)
 //! MERGE (occurrence_validate)-[:CALLS]->(rule_validate)
+//! MERGE (occurrence_validate)-[:REQUIRES_PRESENT]->(target_branch)
+//! MERGE (recurrence_validator)-[:CALLS]->(candidate_collector)
+//! MERGE (materializer)-[:CALLS]->(candidate_collector)
+//! MERGE (candidate_collector)-[:CALLS]->(rule_validate)
+//! MERGE (materializer)-[:REQUIRES_PRESENT]->(target_branch)
+//! MERGE (materializer)-[:EMITS]->(occurrence)
 //! MERGE (admission_command:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionCommandV1"})
 //! MERGE (admission_result:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionResultV1"})
 //! MERGE (admission_outcome:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleRunAdmissionOutcomeV1"})
@@ -85,6 +100,8 @@
 //! MERGE (admission_command_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::admission_command_round_trips_and_pins_canonical_binding_scope",kind:"test"})
 //! MERGE (admission_result_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::admission_result_and_resolution_must_match_the_same_request_and_binding",kind:"test"})
 //! MERGE (admission_wire_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::admission_wire_rejects_unknown_fields_and_oversized_payloads",kind:"test"})
+//! MERGE (hostless_config_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_can_be_configured_but_cannot_be_materialized",kind:"test"})
+//! MERGE (occurrence_snapshot_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::occurrence_key_and_snapshot_bind_exact_rule_revision_and_utc_slot",kind:"test"})
 //! MERGE (self)-[:DEFINES]->(admission_command)
 //! MERGE (self)-[:DEFINES]->(admission_result)
 //! MERGE (self)-[:DEFINES]->(admission_outcome)
@@ -110,6 +127,8 @@
 //! MERGE (tests)-[:DEFINES]->(admission_command_test)
 //! MERGE (tests)-[:DEFINES]->(admission_result_test)
 //! MERGE (tests)-[:DEFINES]->(admission_wire_test)
+//! MERGE (tests)-[:DEFINES]->(hostless_config_test)
+//! MERGE (tests)-[:DEFINES]->(occurrence_snapshot_test)
 //! MERGE (admission_command)-[:CONTAINS]->(occurrence)
 //! MERGE (admission_command)-[:USES_TYPE]->(binding_snapshot)
 //! MERGE (admission_result)-[:CONTAINS]->(admission_outcome)
@@ -147,6 +166,10 @@
 //! MERGE (admission_result_test)-[:TESTS]->(resolution_decode)
 //! MERGE (admission_wire_test)-[:TESTS]->(command_encode)
 //! MERGE (admission_wire_test)-[:TESTS]->(command_decode)
+//! MERGE (hostless_config_test)-[:TESTS]->(rule_validate)
+//! MERGE (hostless_config_test)-[:TESTS]->(recurrence_validator)
+//! MERGE (hostless_config_test)-[:TESTS]->(materializer)
+//! MERGE (occurrence_snapshot_test)-[:TESTS]->(occurrence_validate)
 //! MERGE (self)-[:IMPORTS]->(:File {path:"crates/domain-infrastructure/src/lib.rs"})
 //! @endcypher
 
@@ -170,14 +193,15 @@ const MAX_SCHEDULE_SCAN_SLOTS: usize = 32_768;
 const MAX_TRANSITION_PROBE_SECONDS: i64 = 3_600;
 const MAX_TRANSITION_PROBES: usize = 32_768;
 
-/// A fully resolved Worktree-first target for one scheduled run.
+/// A configured Worktree-first Schedule target. Remote Branch context may be absent while a
+/// hostless Run is being configured; occurrence materialization still requires that context.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScheduleTargetV1 {
     /// Owning Project.
     pub project_id: Uuid,
-    /// Cloud Branch identity.
-    pub branch_id: Uuid,
+    /// Optional remote Branch identity; not an Engineering Run authorization prerequisite.
+    pub branch_id: Option<Uuid>,
     /// Engineering Run workspace identity.
     pub engineering_run_id: Uuid,
     /// Repository containing the local checkout.
@@ -203,7 +227,6 @@ impl ScheduleTargetV1 {
     pub fn validate(&self) -> Result<(), ScheduleContractError> {
         if [
             self.project_id,
-            self.branch_id,
             self.engineering_run_id,
             self.repository_id,
             self.worktree_id,
@@ -214,6 +237,7 @@ impl ScheduleTargetV1 {
         .any(Uuid::is_nil)
             || self.execution_profile_version == 0
             || self.hook_set_version == 0
+            || self.branch_id.is_some_and(|branch_id| branch_id.is_nil())
         {
             return Err(ScheduleContractError::IncompleteTarget);
         }
@@ -463,6 +487,7 @@ impl AutomationOccurrenceSnapshotV1 {
             || self.key.rule_version != self.rule_snapshot.rule_version
             || self.run_as_actor_id.is_nil()
             || self.run_as_actor_id != self.rule_snapshot.run_as_actor_id
+            || self.rule_snapshot.target.branch_id.is_none()
             || self.scheduled_local_label.trim().is_empty()
             || self.scheduled_local_label.len() > 64
             || self.scheduled_local_label.chars().any(char::is_control)
@@ -569,7 +594,7 @@ impl ScheduleRunAdmissionCommandV1 {
         if self.tenant_id != self.occurrence.key.tenant_id
             || self.tenant_id != binding.tenant_id
             || target.project_id != binding.project_id
-            || target.branch_id != binding.branch_id
+            || target.branch_id != Some(binding.branch_id)
             || target.engineering_run_id != binding.engineering_run_id
         {
             return Err(ScheduleAdmissionContractError::ScopeMismatch);
@@ -1001,20 +1026,34 @@ pub enum ScheduleMaterializationError {
     TimestampOutOfRange,
 }
 
-/// Resolve a versioned Rule into a bounded page of timezone-aware UTC occurrences.
+/// Validate a configured recurrence without creating an occurrence snapshot.
 ///
-/// `after_utc` is exclusive, `through_utc` is inclusive, and `misfire_cutoff_utc` is a
-/// caller-owned checkpoint boundary. Slots at or before that boundary follow the frozen
-/// Skip/CoalesceLatest/CatchUp policy. The caller must persist the returned page atomically
-/// before advancing its checkpoint.
-pub fn materialize_schedule_window(
+/// This is suitable for configuration-time API validation, including a hostless Run. A later
+/// occurrence materialization still requires an exact remote Branch identity.
+pub fn validate_schedule_recurrence(
     rule: &AutomationScheduleRuleRevisionV1,
     after_utc: DateTime<Utc>,
     through_utc: DateTime<Utc>,
     misfire_cutoff_utc: DateTime<Utc>,
-    materialized_at: DateTime<Utc>,
     page_limit: usize,
-) -> Result<ScheduleMaterializationBatchV1, ScheduleMaterializationError> {
+) -> Result<(), ScheduleMaterializationError> {
+    collect_schedule_candidates(
+        rule,
+        after_utc,
+        through_utc,
+        misfire_cutoff_utc,
+        page_limit,
+    )
+    .map(|_| ())
+}
+
+fn collect_schedule_candidates(
+    rule: &AutomationScheduleRuleRevisionV1,
+    after_utc: DateTime<Utc>,
+    through_utc: DateTime<Utc>,
+    misfire_cutoff_utc: DateTime<Utc>,
+    page_limit: usize,
+) -> Result<Vec<SlotCandidate>, ScheduleMaterializationError> {
     if !rule.enabled || rule.validate().is_err() {
         return Err(ScheduleMaterializationError::InvalidRule);
     }
@@ -1084,6 +1123,33 @@ pub fn materialize_schedule_window(
         )
     });
     candidates.dedup_by(|right, left| right.scheduled_for_utc == left.scheduled_for_utc);
+    Ok(candidates)
+}
+
+/// Resolve a versioned Rule into a bounded page of timezone-aware UTC occurrences.
+///
+/// `after_utc` is exclusive, `through_utc` is inclusive, and `misfire_cutoff_utc` is a
+/// caller-owned checkpoint boundary. Slots at or before that boundary follow the frozen
+/// Skip/CoalesceLatest/CatchUp policy. The caller must persist the returned page atomically
+/// before advancing its checkpoint.
+pub fn materialize_schedule_window(
+    rule: &AutomationScheduleRuleRevisionV1,
+    after_utc: DateTime<Utc>,
+    through_utc: DateTime<Utc>,
+    misfire_cutoff_utc: DateTime<Utc>,
+    materialized_at: DateTime<Utc>,
+    page_limit: usize,
+) -> Result<ScheduleMaterializationBatchV1, ScheduleMaterializationError> {
+    if rule.target.branch_id.is_none() {
+        return Err(ScheduleMaterializationError::InvalidRule);
+    }
+    let candidates = collect_schedule_candidates(
+        rule,
+        after_utc,
+        through_utc,
+        misfire_cutoff_utc,
+        page_limit,
+    )?;
 
     let newest_misfire = candidates
         .iter()
@@ -1306,13 +1372,14 @@ mod tests {
         ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResolutionV1,
         ScheduleRunAdmissionResultV1, ScheduleTargetV1, MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES,
         SCHEDULE_ADMISSION_SCHEMA_VERSION, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
+        validate_schedule_recurrence,
     };
     use crate::RuleId;
 
     fn schedule_target(project_id: Uuid) -> ScheduleTargetV1 {
         ScheduleTargetV1 {
             project_id,
-            branch_id: Uuid::new_v4(),
+            branch_id: Some(Uuid::new_v4()),
             engineering_run_id: Uuid::new_v4(),
             repository_id: Uuid::new_v4(),
             worktree_id: Uuid::new_v4(),
@@ -1377,6 +1444,33 @@ mod tests {
     }
 
     #[test]
+    fn hostless_rule_can_be_configured_but_cannot_be_materialized() {
+        let mut rule = schedule_rule();
+        rule.target.branch_id = None;
+        assert!(rule.validate().is_ok());
+        assert!(validate_schedule_recurrence(
+            &rule,
+            utc("2026-10-04T23:00:00Z"),
+            utc("2026-10-05T01:00:00Z"),
+            utc("2026-10-04T23:30:00Z"),
+            16,
+        )
+        .is_ok());
+
+        assert_eq!(
+            materialize_schedule_window(
+                &rule,
+                utc("2026-10-04T23:00:00Z"),
+                utc("2026-10-05T01:00:00Z"),
+                utc("2026-10-04T23:30:00Z"),
+                utc("2026-10-04T23:31:00Z"),
+                16,
+            ),
+            Err(ScheduleMaterializationError::InvalidRule)
+        );
+    }
+
+    #[test]
     fn occurrence_key_and_snapshot_bind_exact_rule_revision_and_utc_slot() {
         let rule = schedule_rule();
         let scheduled_for_utc = chrono::DateTime::parse_from_rfc3339("2026-10-05T00:00:00Z")
@@ -1398,6 +1492,13 @@ mod tests {
             materialized_at: scheduled_for_utc - Duration::minutes(1),
         };
         assert!(snapshot.validate().is_ok());
+
+        let mut hostless = snapshot.clone();
+        hostless.rule_snapshot.target.branch_id = None;
+        assert_eq!(
+            hostless.validate(),
+            Err(ScheduleContractError::InvalidOccurrenceSnapshot)
+        );
 
         let mut wrong_run_as = snapshot.clone();
         wrong_run_as.run_as_actor_id = Uuid::new_v4();
@@ -1663,7 +1764,10 @@ mod tests {
             schema_version: 2,
             tenant_id: rule.tenant_id,
             project_id: rule.project_id,
-            branch_id: rule.target.branch_id,
+            branch_id: rule
+                .target
+                .branch_id
+                .expect("admission fixtures require a remote Branch"),
             engineering_run_id: rule.target.engineering_run_id,
             binding_id: Uuid::new_v4(),
             binding_revision: 1,
@@ -1715,6 +1819,13 @@ mod tests {
                 .infrastructure_binding
                 .digest()
                 .expect("canonical binding digest")
+        );
+
+        let mut hostless = command.clone();
+        hostless.occurrence.rule_snapshot.target.branch_id = None;
+        assert_eq!(
+            hostless.validate(),
+            Err(ScheduleAdmissionContractError::InvalidOccurrence)
         );
 
         let mut wrong_scope = command;

@@ -7,7 +7,7 @@
 
 > **WLD-1 Worktree 管理 Outbox 增量（2026-10-21）**：逻辑 archive/restore 在 Worktree owner transaction 中同步提交状态/version、append-only Audit、schema-v1 owner-local Outbox fact 与 `worktree_management_plan.result_body` exact replay receipt。同一 tenant/requester/idempotency key 的计划创建经事务级 advisory lock 串行化；请求 hash 不同则拒绝复用。状态 no-op 保留 version/retention expiry，不执行 archive Hook 或状态更新。事件只描述实际状态变化，payload 为 Worktree/plan identity 与连续 before/after archive/version allowlist；assign-owner 与 no-op 不产生 archive/restore fact。PostgreSQL 18.6 disposable fixture 双次迁移及 RLS/WORM/payload/状态事实断言通过；此 source slice 未验证 Rust 1.99.0、target DB/app-role grants/RLS 或真实 Host provider；没有 delivery consumer，也不执行物理 Git checkout cleanup。
 
-> **文档版本**: v6.92 (2026-10-21)
+> **文档版本**: v6.93 (2026-10-21)
 > **上游要件定义书**: docs/requirements.md v6.91
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
@@ -4933,13 +4933,13 @@ Phase 9F4C-A 在 disposable PostgreSQL 中验证完整 migration chain 重复应
 
 ### 16.25 Phase 9F4C-B Rule enable-time run-as authorization
 
-规则管理员与无人值守执行主体分开授权。目标 Rule 授权以固定 `run_as_actor_id` 的当前 Project/Run writer grants 与 Engineering Run 状态为准；仅要求远端 SCM 的命令额外校验 Branch grant。重新启用 successor 时沿用锁定 revision 中的原主体；编辑者另行通过自己的 Rule 管理权限；停用不要求创建者仍有权限。现有 helper/DB policy 仍把 Branch grant 纳入兼容校验，且 Schedule Task/Worktree binding 仍依赖 repository/branch legacy tuple；该兼容门未迁移前 hostless Schedule 必须 fail closed，不能当作 Project/Run 目标授权。Disposable PostgreSQL 18.6 的当前 fixture 验证 active grants 通过，Project/Branch/Run 任一撤权和 paused Run 均 fail closed；Phase 9F4C-C 对现有 ACL mutation 安装共同的 Project-scoped transaction advisory lock，并验证三类双连接撤权序列。该 gate 只保护 Rule enable 操作；worker 每次新 occurrence、retry 和 resume 的当前身份/执行能力检查仍未实现，Schedule 继续 fail closed。完整 API create/revise rollback 与生产 grants 仍未验证。
+规则管理员与无人值守执行主体分开授权。启用或修订 Rule 时，固定 `run_as_actor_id` 必须具有当前 Project/Run writer grants，且 Engineering Run 处于 active 状态；Run 不含远端 Branch 时可配置/读取 Rule，且不从 Worktree binding 推断或制造 Branch。配置时仍用 pinned parser/timezone 与有界窗口检查 recurrence，但该检查不创建 occurrence。Run 带有远端 Branch 时，API 还须核验对应 Branch、active Branch revision 与当前 Branch grant。目标仍须绑定当前 Worktree、Task、Profile、HookSet；本地 repository identity 保持必需。重新启用 successor 时沿用锁定 revision 中的原主体；编辑者另行通过自己的 Rule 管理权限；停用不要求创建者仍有权限。仅配置事实 `automation.schedule_rule_revision.branch_id` 允许 NULL。Occurrence 使用非空 `target_snapshot` JSONB，不存在独立 `automation.occurrence.branch_id` 列；Rust occurrence/domain contract、materializer 与 admission/runtime 在生成和消费 occurrence 时仍要求真实 Branch，缺失即 fail closed。Disposable PostgreSQL 18.6 现有 fixture 对 branch-backed active/revoked/paused 情况的证据仍有效；本次新增 hostless Project/Run grant fixture、Rule nullable/Occurrence snapshot schema assertion 和 Rust 边界测试尚未执行。worker 每次 trigger/retry/resume 的身份、target 与执行能力复验仍未实现；Schedule capability 继续 fail closed。
 
 ### 16.26 Phase 9F4C-C Schedule run-as ACL mutation serialization
 
-现有 `multica.lock_schedule_run_as_authorization` 核对事务内 `app.tenant_id`/`app.actor_id`、Project/Branch/Run grants 并取得 Project-scoped advisory lock，是兼容实现状态。目标 Schedule run-as 授权只依赖 Project/Run grants；Branch grant 只在远端 SCM capability 被请求时校验。ACL schema/helper 移除 Branch 对 Run 目录与普通执行上下文的硬依赖、完成目标 DB/RLS 迁移和负向测试前，不得对 hostless Schedule 开放。当前 Project/Cloud Branch/Engineering Run grant triggers 共用此锁，多 Project mutation 按 UUID 排序；既有撤权串行语义继续适用。
+`multica.lock_schedule_run_as_authorization` 核对事务内 `app.tenant_id`/`app.actor_id`、当前 Project/Run grants，并在 Run 存在远端 Branch 时要求其目录事实与 Branch grant；随后取得 Project-scoped advisory lock。API 在后续 `READ COMMITTED` 语句重新读取当前 ACL 与 Run state。Project、Cloud Branch、Engineering Run grant triggers 继续共用此锁；跨 Project mutation 按 UUID 排序。hostless Run 仍通过 Project/Run ACL 与同一 Project lock 串行化，不依赖 Branch 身份。
 
-`schedule_runtime` 对 Directory ACL tables 保持 SELECT-only，并仅通过 provisioning 获得锁 helper 的 EXECUTE；target database 的 migration owner、角色存在顺序与 grants 仍须单独验收。PostgreSQL 18.6 disposable runner 双次应用五份 Schedule migrations；真实并发测试分别观察 Project、Branch、Run 撤权等候 advisory lock，释放授权事务后撤权完成，后续授权均拒绝。该竞态门只覆盖 API Rule enable-time authorization 与 canonical grant mutations，不代表 worker per-trigger/retry/resume 重授权或 admission writer 已实现。
+`schedule_runtime` 对 Directory ACL tables 保持 SELECT-only，并仅通过 provisioning 获得锁 helper 的 EXECUTE；target database 的 migration owner、角色存在顺序与 grants 仍须单独验收。下一轮 disposable runner 必须双次应用新增 migration，确认仅 Rule revision `branch_id` 放宽为可空、Occurrence `target_snapshot` 仍为必需，并验证 hostless Project/Run 授权与撤权、branch-backed active/revoked Branch、paused/archived Run 和并发锁语义。Occurrence 中 Branch 字段存在于已验证的 target snapshot，而非独立数据库列；当前 schema 不单独检查 JSON Branch key。该设计变化只涉及 Rule 配置/读取授权；materializer、occurrence snapshot、admission binding 和 Run-owner runtime 均继续拒绝缺 Branch 的执行事实。Rust 1.99.0 与 PostgreSQL 新增用例当前未执行；也不代表 worker、admission writer 或 executor 已实现。
 
 ### 16.27 Phase 9F4D Schedule admission 与 Multipass/K3s Run binding
 
@@ -5880,3 +5880,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.91 · 2026-10-20 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 owner-role 权限漂移注入、migration 重放和 role-owned schema fail-closed 负向夹具的 34/34 PostgreSQL 证据；保留部署身份、目标 DB、Rust 1.99.0、API 写入、回滚/并发与生产闭环门禁。
 
 修订 v6.92 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore source slice；在 §16.2 明确 Worktree owner-local Audit/Outbox/receipt 原子事务、事务级同键序列化、no-op 保留 version/retention、连续最小事件 payload 与 Run Directory Outbox 分离；记录 PostgreSQL 18.6 disposable fixture 和 Rust 1.98.1 diagnostic test 证据，并保留 Rust 1.99.0、目标 DB/grants、API 并发、consumer、Host provider 与物理 cleanup 未验收状态。同步 requirements v6.91 与 Group DD v5.15。
+
+修订 v6.93 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD3 hostless Schedule Rule 授权设计与源码切片；明确无 Branch 的 Run 可配置/读取 Rule，branch-backed Run 仍校验 Branch，Rule 配置 branch_id 可空而 occurrence/admission/runtime 保持 Branch 必需和 fail closed；Rust 1.99.0、数据库重复迁移及新 ACL fixture 门禁尚未执行，不开放 Schedule worker/executor。同步 Schedule API SRS v0.64 与 DD v0.76。

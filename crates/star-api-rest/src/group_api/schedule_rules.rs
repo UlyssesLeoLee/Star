@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=3c1336cce4697aa7c9200371375e6476123a0ffc58aaaf09e99da0f74ad4fc53
+//! @cypher schema=1 source_sha256=d3fe26c26ea38ae099e8a354efe1a9e30597f974e8d1ef618fe43c7687ad8e9e
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -56,9 +56,9 @@
 //! MERGE (require_scope:Symbol {id:"crates/star-api-rest/src/group_api.rs::require_scope",kind:"function"})
 //! MERGE (set_tenant:Symbol {id:"crates/star-api-rest/src/group_api.rs::set_tenant",kind:"function"})
 //! MERGE (validate_actor:Symbol {id:"crates/star-api-rest/src/group_api.rs::validate_actor",kind:"function"})
-//! MERGE (run_scope:Type {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::RunTaskScope"})
+//! MERGE (run_scope:Type {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::RunOwnedTaskScope"})
 //! MERGE (admission_snapshot:Symbol {id:"crates/star-api-rest/src/group_api/execution_catalogs.rs::load_current_execution_admission_snapshot",kind:"function"})
-//! MERGE (materializer:Symbol {id:"crates/domain-automation/src/schedule.rs::materialize_schedule_window",kind:"function"})
+//! MERGE (recurrence_validator:Symbol {id:"crates/domain-automation/src/schedule.rs::validate_schedule_recurrence",kind:"function"})
 //! MERGE (authorize_principal:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::authorize_run_principal",kind:"function"})
 //! MERGE (authorize_run_as:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::authorize_schedule_run_as",kind:"function"})
 //! MERGE (lock_authorization:Function {id:"multica.lock_schedule_run_as_authorization"})
@@ -193,7 +193,7 @@
 //! MERGE (authorization_row)-[:USES_TYPE]->(branch_grants)
 //! MERGE (authorization_row)-[:USES_TYPE]->(run_grants)
 //! MERGE (prepare)-[:CALLS]->(admission_snapshot)
-//! MERGE (validate_recurrence)-[:CALLS]->(materializer)
+//! MERGE (validate_recurrence)-[:CALLS]->(recurrence_validator)
 //! MERGE (list)-[:USES]->(page_limit)
 //! MERGE (save)-[:USES]->(replay_ttl)
 //! MERGE (response)-[:CALLS]->(private_response)
@@ -242,7 +242,7 @@ use axum::{
 };
 use chrono::{Duration as ChronoDuration, Utc};
 use domain_automation::schedule::{
-    materialize_schedule_window, AutomationScheduleRuleRevisionV1, ScheduleDstFoldPolicyV1,
+    validate_schedule_recurrence, AutomationScheduleRuleRevisionV1, ScheduleDstFoldPolicyV1,
     ScheduleDstGapPolicyV1, ScheduleMisfirePolicyV1, ScheduleOverlapPolicyV1,
     SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleTargetV1, SCHEDULE_PARSER_VERSION,
     SCHEDULE_TZDB_VERSION,
@@ -304,7 +304,7 @@ struct RuleJsonRow {
 #[derive(FromRow)]
 struct AuthorizedTargetRow {
     repository_id: Uuid,
-    branch_id: Uuid,
+    branch_id: Option<Uuid>,
     engineering_run_id: Uuid,
     worktree_archived: bool,
 }
@@ -313,8 +313,8 @@ struct AuthorizedTargetRow {
 struct ScheduleRunAuthorizationRow {
     engineering_run_id: Uuid,
     project_id: Uuid,
-    repository_id: Uuid,
-    branch_id: Uuid,
+    repository_id: Option<Uuid>,
+    branch_id: Option<Uuid>,
     run_state: String,
     project_role: String,
     run_role: String,
@@ -616,7 +616,7 @@ async fn authorize_run(
     project_id: Uuid,
     run_id: Uuid,
     write: bool,
-) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
+) -> Result<super::engineering_runs::RunOwnedTaskScope, GroupApiError> {
     authorize_run_principal(
         tx,
         actor.tenant_id,
@@ -629,20 +629,18 @@ async fn authorize_run(
     .await
 }
 
-/// Recheck the scheduled execution principal's current Project, Branch and Engineering Run grants.
-/// The caller must run this inside the same transaction that enables a rule or admits a scheduled
-/// Run; an absent row or database error is a fail-closed result. The checked helper takes the
-/// Project-scoped transaction advisory lock before this function reads canonical grants, and ACL
-/// mutation triggers take the same lock. This serializes grant revocation with this authorization
-/// read. Directory authorization only is checked here: current target/Profile/HookSet/quota and
-/// Runtime fence checks remain separate gates.
+/// Recheck the scheduled principal's current Project and Engineering Run grants, plus Branch
+/// authorization when the Run has remote Branch metadata. The caller must run this inside the same
+/// transaction that enables a Rule or admits a scheduled Run. Missing authority or a database
+/// error fails closed. The Project-scoped advisory lock serializes this read with ACL mutations.
+/// Target/Profile/HookSet/quota and Runtime fence checks remain separate gates.
 pub(super) async fn authorize_schedule_run_as(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
     run_as_actor_id: Uuid,
     project_id: Uuid,
     run_id: Uuid,
-) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
+) -> Result<super::engineering_runs::RunOwnedTaskScope, GroupApiError> {
     authorize_run_principal(
         tx,
         tenant_id,
@@ -663,7 +661,7 @@ async fn authorize_run_principal(
     run_id: Uuid,
     require_writer: bool,
     require_active_run: bool,
-) -> Result<super::engineering_runs::RunTaskScope, GroupApiError> {
+) -> Result<super::engineering_runs::RunOwnedTaskScope, GroupApiError> {
     if tenant_id.is_nil() || actor_id.is_nil() || project_id.is_nil() || run_id.is_nil() {
         return Err(GroupApiError::not_found());
     }
@@ -701,7 +699,7 @@ async fn authorize_run_principal(
         require_schedule_writer(&authority.project_role)?;
         require_schedule_writer(&authority.run_role)?;
     }
-    Ok(super::engineering_runs::RunTaskScope {
+    Ok(super::engineering_runs::RunOwnedTaskScope {
         engineering_run_id: authority.engineering_run_id,
         project_id: authority.project_id,
         repository_id: authority.repository_id,
@@ -723,22 +721,25 @@ fn schedule_run_authorization_sql() -> &'static str {
            JOIN multica.engineering_run_revision rv
              ON rv.tenant_id=r.tenant_id AND rv.engineering_run_id=r.engineering_run_id
             AND rv.valid_from<=now() AND rv.valid_to IS NULL AND rv.state<>'archived'
-           JOIN scm.cloud_branch b
-             ON b.tenant_id=r.tenant_id AND b.branch_id=r.branch_id
+           LEFT JOIN scm.cloud_branch b
+             ON r.branch_id IS NOT NULL
+            AND b.tenant_id=r.tenant_id AND b.branch_id=r.branch_id
             AND b.project_id=r.project_id AND b.repository_id=r.repository_id
-           JOIN scm.cloud_branch_revision bv
+           LEFT JOIN scm.cloud_branch_revision bv
              ON bv.tenant_id=b.tenant_id AND bv.branch_id=b.branch_id
             AND bv.valid_from<=now() AND bv.valid_to IS NULL AND bv.state='active'
            JOIN permission.project_role_binding p
              ON p.tenant_id=r.tenant_id AND p.project_id=r.project_id AND p.user_id=$2
             AND p.valid_from<=now() AND p.valid_to IS NULL
-           JOIN permission.cloud_branch_role_binding bg
+           LEFT JOIN permission.cloud_branch_role_binding bg
              ON bg.tenant_id=b.tenant_id AND bg.branch_id=b.branch_id AND bg.user_id=$2
             AND bg.valid_from<=now() AND bg.valid_to IS NULL
            JOIN permission.engineering_run_role_binding rg
              ON rg.tenant_id=r.tenant_id AND rg.engineering_run_id=r.engineering_run_id
             AND rg.user_id=$2 AND rg.valid_from<=now() AND rg.valid_to IS NULL
-           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4"#
+           WHERE r.tenant_id=$1 AND r.project_id=$3 AND r.engineering_run_id=$4
+             AND (r.branch_id IS NULL OR
+                  (b.branch_id IS NOT NULL AND bv.branch_id IS NOT NULL AND bg.binding_id IS NOT NULL))"#
 }
 
 fn require_schedule_writer(role: &str) -> Result<(), GroupApiError> {
@@ -753,7 +754,7 @@ async fn prepare_rule(
     actor: &AuthUser,
     project_id: Uuid,
     run_id: Uuid,
-    run_scope: &super::engineering_runs::RunTaskScope,
+    run_scope: &super::engineering_runs::RunOwnedTaskScope,
     body: &RuleWriteBody,
     run_as_actor_id: Uuid,
     rule_id: Uuid,
@@ -772,7 +773,7 @@ async fn prepare_rule(
             AND b.project_binding_id=p.binding_id AND b.valid_from<=now() AND b.valid_to IS NULL
            JOIN multica.task_metadata m
              ON m.tenant_id=b.tenant_id AND m.project_id=b.project_id
-            AND m.repository_id=b.repository_id AND m.branch_id=b.branch_id
+            AND m.repository_id=b.repository_id AND m.branch_id IS NOT DISTINCT FROM b.branch_id
             AND m.engineering_run_id=b.engineering_run_id AND m.work_item_id=$4
             AND m.valid_from<=now() AND m.valid_to IS NULL
            JOIN multica.work_item_worktree l
@@ -794,8 +795,12 @@ async fn prepare_rule(
     .ok_or_else(GroupApiError::not_found)?;
     if target_row.worktree_archived
         || target_row.engineering_run_id != run_id
-        || target_row.repository_id != run_scope.repository_id
-        || target_row.branch_id != run_scope.branch_id
+        || run_scope
+            .repository_id
+            .is_some_and(|repository_id| target_row.repository_id != repository_id)
+        || run_scope
+            .branch_id
+            .is_some_and(|branch_id| target_row.branch_id != Some(branch_id))
     {
         return Err(GroupApiError::not_found());
     }
@@ -809,9 +814,10 @@ async fn prepare_rule(
     .await?;
     let target = ScheduleTargetV1 {
         project_id,
+        // Only the authorized Run scope may supply optional remote Branch identity.
         branch_id: run_scope.branch_id,
         engineering_run_id: run_scope.engineering_run_id,
-        repository_id: run_scope.repository_id,
+        repository_id: target_row.repository_id,
         worktree_id: body.target.worktree_id,
         work_item_id: body.target.work_item_id,
         execution_profile_id: snapshot.profile_identity.profile_id,
@@ -849,11 +855,10 @@ fn validate_recurrence(rule: &AutomationScheduleRuleRevisionV1) -> Result<(), Gr
     let now = Utc::now();
     let mut candidate = rule.clone();
     candidate.enabled = true;
-    materialize_schedule_window(
+    validate_schedule_recurrence(
         &candidate,
         now,
         now + ChronoDuration::seconds(120),
-        now,
         now,
         1,
     )
@@ -1347,6 +1352,23 @@ mod tests {
             .connect(&database_url)
             .await
             .expect("the disposable canonical ACL database must be reachable");
+        let rule_branch_is_nullable = sqlx::query_scalar::<_, bool>(
+            "SELECT is_nullable='YES' FROM information_schema.columns WHERE table_schema='automation' AND table_name='schedule_rule_revision' AND column_name='branch_id'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("Schedule Rule branch nullability should be queryable");
+        let occurrence_snapshot_is_required = sqlx::query_scalar::<_, bool>(
+            "SELECT is_nullable='NO' FROM information_schema.columns WHERE table_schema='automation' AND table_name='occurrence' AND column_name='target_snapshot'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("Schedule occurrence target snapshot nullability should be queryable");
+        assert!(rule_branch_is_nullable, "Rule configuration may omit remote Branch context");
+        assert!(
+            occurrence_snapshot_is_required,
+            "occurrences must keep a required immutable target snapshot"
+        );
         let admin_database_url = std::env::var("STAR_SCHEDULE_ADMIN_DATABASE_URL")
             .expect("the Schedule runner must provide its disposable ACL admin database URL");
         assert!(
@@ -1406,6 +1428,30 @@ mod tests {
                 "paused Engineering Run",
                 "23000000-0000-4000-8000-000000000005",
                 "25000000-0000-4000-8000-000000000005",
+                false,
+            ),
+            (
+                "hostless active Project and Run grants",
+                "23000000-0000-4000-8000-000000000006",
+                "25000000-0000-4000-8000-000000000006",
+                true,
+            ),
+            (
+                "hostless revoked Project grant",
+                "23000000-0000-4000-8000-000000000007",
+                "25000000-0000-4000-8000-000000000007",
+                false,
+            ),
+            (
+                "hostless archived Engineering Run",
+                "23000000-0000-4000-8000-000000000008",
+                "25000000-0000-4000-8000-000000000008",
+                false,
+            ),
+            (
+                "hostless revoked Run grant",
+                "23000000-0000-4000-8000-000000000006",
+                "25000000-0000-4000-8000-000000000009",
                 false,
             ),
         ];
@@ -1495,6 +1541,32 @@ mod tests {
                 let scope = result.expect("active current grants should authorize run-as");
                 assert_eq!(scope.project_id, project_id);
                 assert_eq!(scope.engineering_run_id, run_id);
+                if scenario == "hostless active Project and Run grants" {
+                    assert_eq!(scope.repository_id, None);
+                    assert_eq!(scope.branch_id, None);
+                    let editor_read = authorize_run_principal(
+                        &mut tx,
+                        tenant_id,
+                        actor_id,
+                        project_id,
+                        run_id,
+                        false,
+                        false,
+                    )
+                    .await;
+                    assert!(editor_read.is_ok(), "hostless Run read must use Project/Run grants");
+                    let editor_write = authorize_run_principal(
+                        &mut tx,
+                        tenant_id,
+                        actor_id,
+                        project_id,
+                        run_id,
+                        true,
+                        false,
+                    )
+                    .await;
+                    assert!(editor_write.is_ok(), "hostless Rule write must use Project/Run writer grants");
+                }
             }
             tx.rollback()
                 .await

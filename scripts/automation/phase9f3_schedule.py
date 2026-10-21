@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=365e84b4a27103cd6526aca588364719a423c3d8f1967df4c8b1fcb9f432c70e
+# @cypher schema=1 source_sha256=5a1e873b92a78185ea84e5655dcc70ff65c3a1d3363bc95ff6346dfe817a522b
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -15,6 +15,8 @@
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
 # MERGE (migrations:Config {id:"scripts/automation/phase9f3_schedule.py::MIGRATIONS"})
 # MERGE (run_as_acl_lock_migration:File {path:"db/migrations/2026-10-05-schedule-run-as-acl-lock.sql"})
+# MERGE (hostless_rule_migration:File {path:"db/migrations/2026-10-21-schedule-hostless-run-authorization.sql"})
+# MERGE (host_independent_directory_migration:File {path:"db/migrations/2026-10-15-run-host-independent-directory.sql"})
 # MERGE (task_run_schema:Config {id:"scripts/automation/phase9f3_schedule.py::TASK_RUN_SCHEMA_FIXTURE_SQL"})
 # MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
 # MERGE (legacy_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::LEGACY_BACKFILL_FIXTURE_SQL"})
@@ -23,6 +25,7 @@
 # MERGE (directory_prerequisite:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUDIT_PREREQUISITE_SQL"})
 # MERGE (directory_acl_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUTH_FIXTURE_SQL"})
 # MERGE (acl_rust_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_run_as_authorization_rechecks_canonical_directory_grants",kind:"test"})
+# MERGE (domain_hostless_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_can_be_configured_but_cannot_be_materialized",kind:"test"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(postgres)
@@ -41,12 +44,15 @@
 # MERGE (postgres)-[:READS]->(legacy_assertion)
 # MERGE (postgres)-[:READS]->(migrations)
 # MERGE (postgres)-[:READS]->(run_as_acl_lock_migration)
+# MERGE (postgres)-[:READS]->(hostless_rule_migration)
+# MERGE (directory_migrations)-[:CONTAINS]->(host_independent_directory_migration)
 # MERGE (postgres)-[:READS]->(task_run_schema)
 # MERGE (postgres)-[:READS]->(admission_fixture)
 # MERGE (postgres)-[:READS]->(directory_migrations)
 # MERGE (postgres)-[:READS]->(directory_prerequisite)
 # MERGE (postgres)-[:READS]->(directory_acl_fixture)
 # MERGE (postgres)-[:TESTS]->(acl_rust_test)
+# MERGE (postgres)-[:TESTS]->(domain_hostless_test)
 # @endcypher
 
 from __future__ import annotations
@@ -71,11 +77,13 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-as-actor.sql",
     ROOT / "db" / "migrations" / "2026-10-04-schedule-run-admission.sql",
     ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
+    ROOT / "db" / "migrations" / "2026-10-21-schedule-hostless-run-authorization.sql",
 )
 DIRECTORY_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
     ROOT / "db" / "migrations" / "2026-09-29-worktree-group-phase-2b.sql",
     ROOT / "db" / "migrations" / "2026-10-01-engineering-run-directory.sql",
+    ROOT / "db" / "migrations" / "2026-10-15-run-host-independent-directory.sql",
 )
 DIRECTORY_AUDIT_PREREQUISITE_SQL = """\
 CREATE OR REPLACE FUNCTION public.audit_trigger_func()
@@ -263,7 +271,13 @@ VALUES
     ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
     ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
     ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
-    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000006', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000006', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000007', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000007', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000008', '22000000-0000-4000-8000-000000000002', 'project_admin', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000008', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
 
 INSERT INTO scm.cloud_branch
     (branch_id, tenant_id, project_id, repository_id, remote_identity)
@@ -299,7 +313,11 @@ VALUES
     ('25000000-0000-4000-8000-000000000002', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000002', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000002'),
     ('25000000-0000-4000-8000-000000000003', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000003', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000003'),
     ('25000000-0000-4000-8000-000000000004', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000004', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000004'),
-    ('25000000-0000-4000-8000-000000000005', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000005');
+    ('25000000-0000-4000-8000-000000000005', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000005', '26000000-0000-4000-8000-000000000001', '24000000-0000-4000-8000-000000000005'),
+    ('25000000-0000-4000-8000-000000000006', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000006', NULL, NULL),
+    ('25000000-0000-4000-8000-000000000007', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000007', NULL, NULL),
+    ('25000000-0000-4000-8000-000000000008', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000008', NULL, NULL),
+    ('25000000-0000-4000-8000-000000000009', '21000000-0000-4000-8000-000000000001', '23000000-0000-4000-8000-000000000006', NULL, NULL);
 
 INSERT INTO multica.engineering_run_revision
     (tenant_id, engineering_run_id, title, state, owner_user_id, changed_by, valid_from, version)
@@ -308,7 +326,11 @@ VALUES
     ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000002', 'Schedule ACL revoked project', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
     ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000003', 'Schedule ACL revoked branch', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
     ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000004', 'Schedule ACL revoked run', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
-    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000005', 'Schedule ACL paused run', 'paused', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000005', 'Schedule ACL paused run', 'paused', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000006', 'Schedule ACL hostless active', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000007', 'Schedule ACL hostless revoked Project', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000008', 'Schedule ACL hostless archived', 'archived', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000009', 'Schedule ACL hostless revoked Run', 'active', '22000000-0000-4000-8000-000000000001', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
 
 INSERT INTO permission.engineering_run_role_binding
     (tenant_id, engineering_run_id, user_id, role, granted_by, valid_from, version)
@@ -317,7 +339,11 @@ VALUES
     ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000002', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
     ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000003', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
     ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000004', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
-    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000005', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000006', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000007', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000008', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1),
+    ('21000000-0000-4000-8000-000000000001', '25000000-0000-4000-8000-000000000009', '22000000-0000-4000-8000-000000000001', 'developer', '22000000-0000-4000-8000-000000000002', now() - interval '1 minute', 1);
 
 DO $$
 DECLARE closed_rows integer;
@@ -342,6 +368,20 @@ BEGIN
        AND user_id = '22000000-0000-4000-8000-000000000001' AND valid_to IS NULL;
     GET DIAGNOSTICS closed_rows = ROW_COUNT;
     IF closed_rows <> 1 THEN RAISE EXCEPTION 'Run revoke fixture did not close one grant'; END IF;
+
+    UPDATE permission.project_role_binding SET valid_to = statement_timestamp()
+     WHERE tenant_id = '21000000-0000-4000-8000-000000000001'
+       AND project_id = '23000000-0000-4000-8000-000000000007'
+       AND user_id = '22000000-0000-4000-8000-000000000001' AND valid_to IS NULL;
+    GET DIAGNOSTICS closed_rows = ROW_COUNT;
+    IF closed_rows <> 1 THEN RAISE EXCEPTION 'Hostless Project revoke fixture did not close one grant'; END IF;
+
+    UPDATE permission.engineering_run_role_binding SET valid_to = statement_timestamp()
+     WHERE tenant_id = '21000000-0000-4000-8000-000000000001'
+       AND engineering_run_id = '25000000-0000-4000-8000-000000000009'
+       AND user_id = '22000000-0000-4000-8000-000000000001' AND valid_to IS NULL;
+    GET DIAGNOSTICS closed_rows = ROW_COUNT;
+    IF closed_rows <> 1 THEN RAISE EXCEPTION 'Hostless Run revoke fixture did not close one grant'; END IF;
 END $$;
 COMMIT;"""
 RUST_FILES = (

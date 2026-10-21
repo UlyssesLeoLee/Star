@@ -1,6 +1,6 @@
 //! Real PostgreSQL owner-local admission receipt/replay/rollback verification.
 /*
-@cypher schema=1 source_sha256=7bc03820b2dcaa7ccc30993a785820e3fdc3d4cb594506435627644a869ec8a9
+@cypher schema=1 source_sha256=e6e195dba84e7c67ffd8f8808640f850390d3e6d5102ba7269d1af77fa942a9e
 MERGE (self:File {path:"crates/run-owner-runtime/tests/schedule_admission_pg.rs"})
 MERGE (test:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::admission_receipt_replay_conflict_rollback_and_scope",kind:"test"})
 MERGE (fixture:Symbol {id:"crates/run-owner-runtime/tests/schedule_admission_pg.rs::command_fixture",kind:"function"})
@@ -1269,7 +1269,7 @@ fn command_fixture() -> ScheduleRunAdmissionCommandV1 {
         deadline_seconds: 3600,
         target: ScheduleTargetV1 {
             project_id: binding.project_id,
-            branch_id: binding.branch_id,
+            branch_id: Some(binding.branch_id),
             engineering_run_id: binding.engineering_run_id,
             repository_id: Uuid::new_v4(),
             worktree_id: Uuid::new_v4(),
@@ -2912,7 +2912,12 @@ async fn verify_schedule_compensation(
         correlation_id: cmd.correlation_id,
         tenant_id: cmd.tenant_id,
         project_id: cmd.occurrence.rule_snapshot.target.project_id,
-        branch_id: cmd.occurrence.rule_snapshot.target.branch_id,
+        branch_id: cmd
+            .occurrence
+            .rule_snapshot
+            .target
+            .branch_id
+            .expect("admission fixtures require a remote Branch"),
         engineering_run_id: cmd.occurrence.rule_snapshot.target.engineering_run_id,
         task_execution_run_id: resolution.task_execution_run_id,
         schedule_rule_id: cmd.occurrence.rule_snapshot.rule_id.as_uuid(),

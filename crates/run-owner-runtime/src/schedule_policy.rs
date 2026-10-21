@@ -1,12 +1,14 @@
 //! Bounded locked policy verification, not complete execution admission.
 /*
-@cypher schema=1 source_sha256=e0ba80ca5c49417ae4d91da51fcd0089411fa21843f1e2afd0a34113a4acb6e2
+@cypher schema=1 source_sha256=b2b801255cf3f30beb03f133a559e9d6fc0c09fe9b6ef95ec3f150e6376cb003
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_policy.rs"})
 MERGE (load:Symbol {id:"crates/run-owner-runtime/src/schedule_policy.rs::load_current",kind:"function"})
+MERGE (required_branch:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::required_schedule_branch_id",kind:"function"})
 MERGE (hook:Symbol {id:"crates/run-owner-runtime/src/schedule_policy.rs::verify_hook",kind:"function"})
 MERGE (self)-[:DEFINES]->(load)
 MERGE (self)-[:DEFINES]->(hook)
 MERGE (load)-[:CALLS]->(hook)
+MERGE (load)-[:CALLS]->(required_branch)
 MERGE (hex:Symbol {id:"crates/run-owner-runtime/src/schedule_policy.rs::hex_digest",kind:"function"})
 MERGE (self)-[:DEFINES]->(hex)
 MERGE (load)-[:CALLS]->(hex)
@@ -88,9 +90,10 @@ pub(crate) async fn load_current(
     command: &ScheduleRunAdmissionCommandV1,
 ) -> Result<SchedulePolicySnapshot, ScheduleAdmissionStoreError> {
     let target = &command.occurrence.rule_snapshot.target;
+    let branch_id = crate::schedule_admission::required_schedule_branch_id(target.branch_id)?;
     let rows = sqlx::query("SELECT kind,payload FROM multica.read_schedule_policies_current($1,$2,$3,$4,$5,$6,$7,$8,$9)")
         .bind(command.tenant_id).bind(command.occurrence.run_as_actor_id).bind(target.project_id)
-        .bind(target.branch_id).bind(target.engineering_run_id).bind(target.repository_id)
+        .bind(branch_id).bind(target.engineering_run_id).bind(target.repository_id)
         .bind(target.worktree_id).bind(target.work_item_id).bind(target.execution_profile_id)
         .fetch_all(&mut **tx).await?;
     if !(2..=3).contains(&rows.len()) {
