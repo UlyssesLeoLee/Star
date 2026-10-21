@@ -1,9 +1,9 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v0.8（WLD-1 Run 生命周期 API 后的下一版 UI 规划）
+**版本：** v0.9（UI-0 屏幕/状态与 Rust 桌面 ADR 完成）
 **日期：** 2026-10-22
 **设计基线：** 本地 dev 起始提交 a5b4404a；requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、DD-WORKTREE-GROUP-001.md v5.16、实施计划 v7.14、WBS v3.7、UI 规划 v0.6。
-**实现基线：** 本规划基于本地 dev `8245b90c8150394439672c0b179ce0e51946444d`；本地 main 为 `8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`，`main...dev = 0 208`。该基线包含 WLD-1 Run-scoped Worktree Lifecycle API 源码切片：允许 hostless Run 与可选远端 Branch，变更要求 Run 当前绑定 Repository；真实 provider 默认未安装，前端仍使用旧 Project-scoped lifecycle paths，旧路径继续 fail closed。Rust 1.99.0、PostgreSQL 目标库/RLS、Run↔Worktree 持久绑定 owner、真实 provider 和完整产品闭环仍未验收。缓存 `origin/dev` 比本地 dev 落后 54 个提交；本轮未 fetch，远端 freshness 未知。规划起始提交 a5b4404a 保留为历史设计基线。
+**实现基线：** 本规划基于本地 dev 17b3d06539f0281b8a5f9e7a1576864487b26337；本地 main 为 8dcb65f7cc5602d4f7c6b681c368d5097bc12a22，main...dev = 0 209。此基线包含 WLD-1 Run-scoped Worktree Lifecycle API 源码切片：允许 hostless Run 与可选远端 Branch，变更要求 Run 当前绑定 Repository；真实 provider 默认未安装，前端仍使用旧 Project-scoped lifecycle paths，旧路径继续 fail closed。Rust 1.99.0、PostgreSQL 目标库/RLS、Run↔Worktree 持久绑定 owner、真实 provider 和完整产品闭环仍未验收。缓存 origin/dev 比本地 dev 落后 55 个提交；本轮未 fetch，远端 freshness 未知。UI-0 设计产物已完成，渲染器选择与目标机性能门仍开放。
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
 
 ## 0. 目的与本轮结论
@@ -474,6 +474,26 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 - 本轮只更新规划文档，不实现新页面、不开放生命周期、任务执行、聊天发送或 BI ingress。
 - Rust 1.99.0、目标 PostgreSQL/RLS、真实 provider、Run↔Worktree 持久绑定、Runtime sandbox 与 UI 性能实测仍未验收；相应 UI capability 必须显示 disabled/unavailable。
 
+## 8.5 v0.9 UI-0 设计包与下一版工作顺序
+
+本版本把 UI-0 从方向性文字收敛为可审查的屏幕/状态合同与桌面架构边界：
+
+- [UI0-SCREEN-STATE-20261022.md](UI0-SCREEN-STATE-20261022.md) 定义 Project/Run 目录、Worktree focus 验证、Run 同层 App、Task Card 内 CLI、Canvas、Chat Bar 的状态、owner/API 映射、切换清理、无障碍要求和 fail-closed 表现。
+- [UI0-RUST-DESKTOP-ADR-20261022.md](UI0-RUST-DESKTOP-ADR-20261022.md) 固定 Rust 桌面职责、类型化 IPC scope/version/cancellation 边界、有界并发与缓存、原生 Hook/Plugin 隔离要求，以及可复测的性能报告协议。
+- [WBS-UI-PLAN-NEXT-20261022.md](WBS-UI-PLAN-NEXT-20261022.md) 将 UI-0..UI-7 排成依赖明确的交付批次。
+
+这轮只完成设计文档，没有改 UI 代码。UI-0 的设计包可供实现评审；目标设备库存与压力负载尚未采集，因此渲染 crate、绝对内存/延迟阈值和 Rust parity 结论仍未决定。不得把设计完成写作桌面实现或性能验收完成。
+
+后续顺序：
+
+1. **UI-1：目录与可观测性。** 先补 Worktree 到 Run 的可信归属、binding/version、observed-at/freshness、分页和键盘可达；owner 未提供的 lock、dirty、ahead/behind、assignment 继续显示 unknown。
+2. **UI-2：焦点工作区。** 完成可搜索/分页 Worktree picker、focus 代次切换、旧请求/订阅清理、Run App lazy mount 和固定 WORKTREE/GLOBAL Chat Bar。无 Worktree focus 时不请求 App 数据。
+3. **UI-3：生命周期控制。** 仅在 provider、Run↔Worktree binding owner、目标 DB/RLS、权限复验、审计和 durable receipt 都通过后开放预览/执行/恢复流程。
+4. **UI-4/5：CLI 与 Canvas。** CLI 经 Task/Run/Worktree/Session、Hook、budget、sandbox、验证和结果回写闭环；Canvas 使用视口数据与 typed references，不直接更改其他 owner 的事实。
+5. **UI-6：Workflow、Hooks、BI/Benchmark、Plugins 和 Infrastructure。** 展示规则与执行分态、原生 Hook 决策、coverage/freshness、plugin capability/revoke/drain，以及 Host/Multipass/K3s 分层身份。
+6. **UI-7：桌面候选比较和发布门。** 在目标机 inventory、固定 fixture 和 renderer parity 原型齐备后比较 Rust 前端；记录进程树内存、队列/缓存高水位、交互 p50/p95、取消 drain 和无障碍。先测量，再由评审定阈值。
+
+所有性能敏感后台工作继续遵守按 Project/Run 公平份额、有界队列与字节、优先级、背压、generation、取消/drain；工作流事实由业务 owner 持久化，LangGraph/checkpoint 或本地投影不替代 Run 授权与业务事实。
 ## 9. 总体验收清单
 
 - 导航顺序恒为 Project → Engineering Run → Worktree → Branch；Project 是第一层，Branch 是 Worktree 子层，不以宿主连接状态改序。
@@ -505,6 +525,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.9 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 基于实际 dev 17b3d065 更新规划基线；增加 UI-0 屏幕/状态包、Rust 桌面架构 ADR 与 UI-1..7 的下一版实施顺序。明确此次仅完成规划，renderer/目标机性能门仍开放，未修改 UI 实现。 | 本轮设计交付及与 dev 实际源码状态核对 |
 | v0.8 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将规划基线更新到 dev `8245b90c`；纳入 WLD-1 Run-scoped lifecycle API seam、provider 默认缺失、Run↔Worktree binding owner/目标 DB/Rust 门未关闭以及前端仍使用旧 Project routes 的事实；新增 Worktree 检查器、操作预览与 receipt 屏幕状态，细化 UI-0..7 下一版阶段、并行边界和低内存/可取消性能要求。此次为规划，未实现 UI 或解除执行 fail-closed。 | WLD-1 源码切片合入 dev 后，用户要求针对新版本开展 UI 规划 |
 | v0.7 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在已合并的 dev `30c6b975` 基线上把 UI 规划升级为屏幕级规格：区分 Project/Run 选择与 Worktree focus，修正无焦点 Run 快捷入口、Project Index 缺 Run 归属、Run Worktree 状态字段和 lifecycle API 的证据边界；增加 App mount 状态、键盘/读屏、owner receipt 与幂等恢复合同，并细化 Tauri/Web/Rust parity 三条 UI-0 性能测量 lane、fixture、计数和 p50/p95 门。没有把规划写成已实现能力。 | 用户要求当前开发轮结束后，对新版本进行一轮 UI 规划；UX 与性能只读评审 |
 | v0.6 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 基于本地 dev a5b4404a 与已整合的 UI-2/WLD-3/WLD-5 切片，将下一版 UI 主线聚焦到多 Agent Worktree 可见管理与安全生命周期控制；细化页面、状态、用户流程、操作预览/回执、性能输入和下一批交付物。 | 当前开发轮已合并到 dev，用户要求随后规划新版本 UI |

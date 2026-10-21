@@ -1,16 +1,16 @@
 # WBS：下一版 Worktree-first UI
 
 **Date:** 2026-10-22
-**Revision:** v0.1
-**Baseline:** local `dev` at `8245b90c8150394439672c0b179ce0e51946444d`; local `main` at `8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`; `main...dev = 0 208`. Cached `origin/dev` is 54 commits behind local dev; no fetch or push was performed, so remote freshness is unknown.
-**Design:** [`UI-PLAN-RUN-WORKTREE-NEXT-20261021.md`](UI-PLAN-RUN-WORKTREE-NEXT-20261021.md) v0.8.
-**Status:** planning/WBS only. No screen or execution capability is implemented by this document.
+**Revision:** v0.2
+**Baseline:** local dev at 17b3d06539f0281b8a5f9e7a1576864487b26337; local main at 8dcb65f7cc5602d4f7c6b681c368d5097bc12a22; main...dev = 0 209. Cached origin/dev is 55 commits behind local dev; no fetch or push was performed, so remote freshness is unknown.
+**Design:** [UI-PLAN-RUN-WORKTREE-NEXT-20261021.md](UI-PLAN-RUN-WORKTREE-NEXT-20261021.md) v0.9.
+**Status:** UI-0 screen/state and Rust desktop architecture design package is complete; target-device benchmark and renderer choice remain open; all upcoming UI implementation gates remain open.
 
 ## §0 Purpose
 
 Convert the v0.8 UI plan into reviewable delivery phases. The product problem is multi-Agent Worktree ownership, lifecycle, concurrency and change visibility inside a Project. Every phase preserves the Project → Engineering Run → Worktree → Branch navigation hierarchy, Worktree-focus gate, Run-level app ownership and Rust desktop resource constraints.
 
-The dev baseline includes the WLD-1 Run-scoped lifecycle API seam, but has no installed trusted provider by default, no complete Run↔Worktree binding writer, and no frontend migration from the disabled Project-scoped paths. Rust 1.99.0 and PostgreSQL validation were unavailable for that source slice. Consequently all physical lifecycle actions, task execution, chat send and BI ingestion remain fail-closed until their respective owners pass acceptance.
+The dev baseline includes the WLD-1 Run-scoped lifecycle API seam, but has no installed trusted provider by default, no complete Run↔Worktree binding writer, and no frontend migration from the disabled Project-scoped paths. Rust 1.99.0 and PostgreSQL validation were unavailable for that source slice. UI-0 now has a screen/state package and Rust desktop ADR; renderer choice and target-device measurements are still open. Consequently all physical lifecycle actions, task execution, chat send and BI ingestion remain fail-closed until their respective owners pass acceptance.
 
 ## §1 Fixed product and UI contracts
 
@@ -25,7 +25,7 @@ The dev baseline includes the WLD-1 Run-scoped lifecycle API seam, but has no in
 
 | Phase | Deliverables | Dependencies | Acceptance gate | State |
 |---|---|---|---|---|
-| UI-0 — Design and performance decision | Screen/state package; API-to-UI owner map; keyboard/screen-reader and focus-transition flows; Rust renderer/IPC/plugin isolation ADR; reproducible Tauri, Web-reference and Rust-parity benchmark protocol. | WLD owner contracts for facts being displayed; target device inventory. | Representative Project tree, Worktree directory, Task Card and Canvas scenarios run on deterministic bounded datasets; process-tree RSS, queue/cache/output counters, p50/p95 and cancellation/drain are measurable; no machine-independent limits invented before target-device evidence. | Planned; this is the first gate. |
+| UI-0 — Design package and performance decision | Screen/state package, owner/API map, focus/keyboard/accessibility flows, Rust desktop IPC/resource/plugin/Hook ADR and repeatable benchmark protocol are complete in the linked UI0 artifacts. | WLD owner contracts for displayed facts; target device inventory for measurements. | Design package reviewed; target-machine scenarios collect process-tree RSS, queue/cache/output counters, p50/p95 and cancellation/drain. Renderer and thresholds remain unselected until comparable target-device evidence exists. | Design artifacts complete; performance/renderer gate open. |
 | UI-1 — Project and Worktree control surface | Project selector/tree; Run expand/select; Worktree directory and cross-Run index; ownership, Agent/Session/Task links, local Branch/HEAD, dirty/ahead/behind, locks/leases and freshness when their owners provide them. | UI-0 state dictionary; WLD-0 relation/binding source. | Project → Run → Worktree → Branch remains stable; the index carries a trusted Run ID/binding; missing facts appear unknown; expand and select are separate; keyboard navigation and paging are accessible. | Planned; existing slices are partial. |
 | UI-2 — Focused Run workspace | No-focus Run overview and paged Worktree picker; verified focus transition; same-level app tabs; lazy app data loading; inspector; fixed WORKTREE/GLOBAL Chat Bar scope. | UI-1; current session and RunContext contract. | No focus means zero Run App mounts/requests. Focus change cancels and drains old streams, clears scoped state, then reauthorizes and validates binding/version before mounting. GLOBAL does not broaden authorization. | Partially implemented in Web; broader shell and production chat remain open. |
 | UI-3 — Worktree lifecycle controls | Run-scoped create/import/rebind/archive/restore/cleanup panels; command preview, blocker list, confirmation, idempotency identity, receipt and reconciliation view. | WLD-0 binding owner; WLD-1 provider, target DB/RLS and authenticated mutation acceptance; Run repository binding. | UI calls only Run-scoped contracts. No operation enables until trusted provider, live authorization, owner binding, retention/lease/PTY/Runtime drain and durable receipt gates are proven. Recovery is based on owner facts; no physical deletion on unknown/stale state. | Blocked on WLD-1 production closure; API source seam alone is insufficient. |
@@ -69,7 +69,7 @@ UI-3 through UI-6 may be delivered in separate lanes only after UI-0 freezes sha
 
 ## §6 First implementation batch after this plan
 
-1. Review the UI-0 screen/state package and Rust renderer/IPC ADR; record target-machine and synthetic workload parameters without modifying the running UI.
+1. Review [UI0-SCREEN-STATE-20261022.md](UI0-SCREEN-STATE-20261022.md) and [UI0-RUST-DESKTOP-ADR-20261022.md](UI0-RUST-DESKTOP-ADR-20261022.md); inventory the target device and record repeatable synthetic workload parameters before choosing a renderer.
 2. Close the UI-1 projection gaps needed to truthfully assign each Worktree to a Run, including Run ID, binding version, observed-at and freshness.
 3. Finish UI-2's paged/searchable Worktree picker and right-side focused workspace contract while preserving the no-focus zero-app-data gate.
 4. Start UI-3 only after WLD-1 provider, binding owner, target DB/RLS and receipt acceptance exist; until then document disabled states and recovery copy.
@@ -79,4 +79,5 @@ UI-3 through UI-6 may be delivered in separate lanes only after UI-0 freezes sha
 
 | Version | Date | Change |
 |---|---|---|
+| v0.2 | 2026-10-22 | Updated to the actual dev 17b3d065 baseline and linked UI plan v0.9; recorded the completed screen/state and Rust desktop ADR artifacts while keeping target-device performance and renderer selection open. No UI implementation or production capability is claimed. |
 | v0.1 | 2026-10-22 | Turned UI plan v0.8 into ordered UI-0..UI-7 deliverables, dependency/parallel map, Rust resource acceptance gates and explicit WLD owner prerequisites. No UI implementation or production capability is claimed. |
