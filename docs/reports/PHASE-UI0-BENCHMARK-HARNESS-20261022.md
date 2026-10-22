@@ -2,10 +2,10 @@
 
 | 项目 | 内容 |
 |---|---|
-| 版本 / 状态 | v0.1.2 / harness 已实现并通过父级自审；三条 UI track 尚未运行 |
+| 版本 / 状态 | v0.1.3 / harness 已实现；已有三次 shared-Web 记录；Tauri/Rust track、renderer 和阈值仍 OPEN |
 | 日期 | 2026-10-22 |
-| 分支 / 基线 | `codex/ui0-bench-harness-20261022` / `dev` `5a051bfd8f76fbfbe8ff49a994579c60166d6ec6` |
-| 范围 | 仅 UI-0 benchmark generator、Windows inventory、measurement runner、标准库测试和本报告 |
+| 分支 / 基线 | Shared-Web evidence lane `codex/ui-plan-v0-7-20261022` / `dev` `df1c22f66d8d0c3b48baac7e348494ba3466569b`；原 harness 基线 `5a051bfd8f76fbfbe8ff49a994579c60166d6ec6` |
+| 范围 | 原 UI-0 harness 加三次既有 shared-Web 样本、host inventory、measurement/raw 记录和两份 phase report；不改 WBS、UI plan、canonical fixture 或 frontend |
 | 规范输入 | `ui0-bench-fixture-v0.1.json` SHA-256 `d06d57b7ca0d30fdb9960e9fc8757aa936c991ade1993f2f59ea0ce9b5118328` |
 
 ## §0 目的
@@ -18,11 +18,11 @@
 |---|---|---|
 | `scripts/ui0_bench/generate_fixture.py` | 以 manifest/seed 固定顺序、ID、时间戳和 SplitMix64 输出 JSONL；终端字节以有限大小 chunk 流式输出并记录 SHA-256；manifest、记录数、worktree、terminal、canvas、BI、作用域和 repetitions 均有显式上限。 | 已实现；规范输入两次输出字节一致。 |
 | `scripts/ui0_bench/test_generate_fixture.py` | Python 标准库测试覆盖确定性、不同 seed、manifest 验证、终端 chunk、PRNG 固定向量、无 driver 状态、真实样本汇总、raw hash、inventory 筛选及大小上限、driver 行/总字节上限、全空行超限、非普通文件、负计数器、单位冲突和 p50/p95。 | 16 项通过。 |
-| `scripts/ui0_bench/capture_windows_inventory.ps1` | 收集 Windows/CPU/内存/GPU 与 driver、活动显示分辨率/刷新率/DPI、电源计划；API 失败记录 `unknown` 与原因。 | 实机采集成功；4 个显示器的刷新率和 DPI 均可读。 |
+| `scripts/ui0_bench/capture_windows_inventory.ps1` | 收集 Windows/CPU/内存/GPU 与 driver、活动显示分辨率/刷新率/DPI、电源计划；API 失败记录 `unknown` 与原因。 | R3 inventory: all 4 DPI readings were 96x96; refresh rates were unknown (collection_failed), and the power-scheme name was unreadable. |
 | `scripts/ui0_bench/run_measurement.py` | 仅接受普通文件形式的 driver 输入；按字节预算流式读取 JSONL，单行最多 16 KiB、总输入另设独立 8 MiB 上限（包括空行；避免 16 KiB × 10,000 条样本的理论约 160 MiB 读取量）、最多 10,000 个样本；保留筛选后的原始样本，汇总 p50/p95 和计数器/生命周期时间；记录 manifest SHA、Git HEAD、track、renderer/runtime/toolchain/build mode、inventory。缺少样本时不合成 UI 时延。 | 单测通过；读取失败只保留原始输出文件，不写 `measurement.json`；没有 UI driver 时状态为 `unavailable` 或 `not_run`。 |
-| `docs/reports/PHASE-UI0-BENCHMARK-HARNESS-20261022.md` | 记录实现矩阵、验证证据、实机采集、缺口和守门条件。 | 本报告。 |
+| `docs/reports/PHASE-UI0-BENCHMARK-HARNESS-20261022.md` | 更新状态为已有三次 shared-Web 浏览器记录；Rust/Tauri、renderer 和阈值仍 OPEN。 | 本报告及 follow-up 报告。 |
 
-本 lane 仅交付 UI-0 harness 与本报告，没有改动 WBS、UI 规划、规范 manifest 或前端文件。父级对脚本、边界、失败状态和验证结果完成自审；该报告只记录 harness 验收，不表示真实 UI track 或 renderer 已通过。分支集成由父级在单独复核目标 owner、HEAD 和工作区后执行；本任务未 push。
+本报告 v0.1.3 补充独立 UI0-WEB-SAMPLES lane 的只读证据审计；此 lane 未改动 WBS、UI 规划、canonical manifest、frontend 或已有样本。三次样本与 measurement/raw 文件按登记路径保留。浏览器记录现在存在，但不代表 UI-0 完成，也不表示 renderer 或性能阈值已获选择。集成由 coordinator 在独立复核后执行；本 lane 不 push、merge 或 rebase。
 
 ## §2 验证摘要
 
@@ -32,7 +32,7 @@
 | Python 语法 | `python -B -c "import ast, pathlib; paths = [pathlib.Path('scripts/ui0_bench/generate_fixture.py'), pathlib.Path('scripts/ui0_bench/run_measurement.py'), pathlib.Path('scripts/ui0_bench/test_generate_fixture.py')]; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in paths]"` | 3 个 Python 文件通过。 |
 | PowerShell 语法 | `System.Management.Automation.Language.Parser.ParseFile` 对 `capture_windows_inventory.ps1` 解析并检查 parser errors | 父级复跑通过。 |
 | 规范 fixture | 对规范 manifest 分别运行 `generate_fixture.py --manifest <canonical> --output <new-jsonl>` 两次 | 每次 92,078 records、73,610,591 bytes；SHA-256 均为 `51cd0d1a016e7c72505d30bcd6afd58c8e4ee4558622720e46b46d905b2e0c91`；文件大小与 SHA-256 一致。 |
-| 实机 inventory + runner | `capture_windows_inventory.ps1` 输出 JSON，runner 使用该 JSON 与规范 manifest 生成一次无 track 的记录 | inventory `available`；测量状态 `unavailable`，原因 `track_not_selected`，UI 样本数 0。不是一次 UI benchmark 成功。 |
+| 实机 inventory + runner | `capture_windows_inventory.ps1` 输出 JSON，runner 使用该 JSON 与规范 manifest 生成一次无 track 的记录 | 历史 no-track harness 检查：inventory `available`；测量状态 `unavailable`，原因为 `track_not_selected`，样本数 0。它不表示后续 shared-Web 样本不存在，也不是一次 UI benchmark。 |
 | CypherGraph Guardian | `rtk proxy python C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py --changed --stamp` | 父级复跑 PASS，4 个源文件已核对并刷新 stamp。 |
 | CodeGraph | 本 worktree 没有可用 index，且无 `check_index_coverage` 工具 | 未初始化 index；依照任务 brief 仅做定向文档和源文件检查。 |
 | CodeRabbit | `coderabbit review --agent -t uncommitted` | 未能运行：Windows shim 转到 WSL 后，`/root/.local/bin/coderabbit` 返回 `Permission denied`。因此不视为独立审阅通过；已做本地自审。 |
@@ -49,7 +49,7 @@
 
 ## §3 已知缺口
 
-1. `tauri-react`、`shared-web`、`rust-native` 均未提供 UI driver 样本；没有真实交互延迟、RSS/CPU、queue/cache、terminal/Canvas 或 stop/cancel/drain 性能结论。
+1. 已有三次 shared-Web Playwright 记录，分别为 52、60、60 个有效样本；没有 Tauri/Rust-native 可比数据，也没有 native 进程 RSS/CPU、queue/cache、terminal/Canvas 或 stop/cancel/drain 结论。R1 少 8 条均为缺失的 warm FCP，浏览器侧缺失原因未知。
 2. renderer 选择与性能通过门槛保持 **OPEN**，等待同一规范输入下三条 track 的可比真实运行。
 3. `Win32_VideoController.AdapterRAM` 对 RTX 3060 返回的 CIM 字段不是经独立核验的显存容量；本报告不与 ADR 的硬件目标快照作容量等值判断。
 4. CodeGraph index/coverage 在该 worktree 不可用；没有初始化索引。当前图结构结论限于 CypherGraph Guardian 的源文件关系检查和直接文件审阅，不声称图索引覆盖完整。
@@ -96,6 +96,7 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.1.3 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 审核三次既存 shared-Web 样本并更新状态；renderer 和性能阈值继续 OPEN。 | UI0-WEB-SAMPLES-20261022 follow-up lane。 |
 | v0.1.0 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 首次记录 UI-0 benchmark harness、标准库验证、实机 inventory 与未执行的 UI track。 | UI0-BENCH-HARNESS-20261022 实施任务。 |
 | v0.1.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 父级复跑 16/16 标准库测试、3 个 Python AST、PowerShell parser、4 个源码关系检查和 diff 检查；自审确认没有引入 UI 样本或把 unavailable/not_run 描述为性能通过。 | 按 UI WBS 推进 UI-0 并完成集成前复核。 |
 | v0.1.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 driver 普通文件限制、独立 8 MiB 总输入预算和失败无 measurement.json 的回归测试；同步 16 项验证结果。 | 父 lane review 指出空行可绕过样本上限。 |
