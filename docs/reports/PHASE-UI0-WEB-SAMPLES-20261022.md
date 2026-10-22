@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 版本 / 状态 | v0.1.0 / 三次既存 shared-Web 样本已审计；UI-0 整体仍未完成 |
+| 版本 / 状态 | v0.1.1 / 三次既存 shared-Web 样本已审计；UI-0 整体仍未完成 |
 | 日期 | 2026-10-22 |
 | Lane | branch codex/ui-plan-v0-7-20261022；base dev df1c22f66d8d0c3b48baac7e348494ba3466569b |
 | 依据 | docs/briefs/UI0-WEB-SAMPLES-20261022.md 登记的文件清单 |
@@ -16,7 +16,7 @@
 
 | 登记路径 / 证据 | 内容与结果 |
 |---|---|
-| scripts/ui0_bench/playwright_driver.mjs | 源审查确认只接受 http/https 的 localhost、127.0.0.1、::1；固定访问 /projects 与 /worktree；cold 各一次、warm 默认五次且最多十次，导航 timeout 30 秒；仅保留有限的浏览器指标；输出限 8 MiB，并以 wx 创建文件以拒绝覆盖。此 lane 未修改 driver。 |
+| scripts/ui0_bench/playwright_driver.mjs | UI0-WEB-SAMPLES 源提交新增了有界 driver；源审查确认只接受 http/https 的 localhost、127.0.0.1、::1；固定访问 /projects 与 /worktree；cold 各一次、warm 默认五次且最多十次，导航 timeout 30 秒；仅保留有限的浏览器指标；输出限 8 MiB，并以 wx 创建文件以拒绝覆盖。本次样本审计未修改或重新运行该 driver；三份样本是既有记录，实际 invocation 与 base URL provenance 仍为 UNKNOWN。 |
 | docs/reports/ui0-web-driver-samples-20261022.jsonl | R1：52 条，6,780 bytes，SHA-256 13af00ae216f43a22302e2a0d4b516e6b90bd8ab76180cbbdda4b3006e888ad6。 |
 | docs/reports/ui0-web-driver-samples-20261022-r2.jsonl | R2：60 条，7,730 bytes，SHA-256 28da9f59522a49b26a8323a81db71846dc39425e0686d793a1b174acd17c0a20。 |
 | docs/reports/ui0-web-driver-samples-20261022-r3.jsonl | R3：60 条，7,746 bytes，SHA-256 c2c9f235cdabbb805ec704ca2733ec774abde535ee399e4ab00e3dacfdd9dd6c。 |
@@ -106,6 +106,8 @@ R3 host inventory 的 captured_at 为 2026-10-22T14:12:15.833Z，measurement obs
 | Host inventory 引用 | SHA-256(ui0-web-host-inventory-20261022.json) 与 R3 host_inventory.source_sha256 比较 | 匹配；R1/R2 明确为 not_supplied。 |
 | Playwright driver 语法 | rtk proxy node --check scripts/ui0_bench/playwright_driver.mjs | 通过。 |
 | 标准库测试 | rtk proxy python -B -m unittest discover -s scripts/ui0_bench -p test_generate_fixture.py -v | 16/16 通过，3.084 秒。 |
+| 集成候选重验 | `rtk proxy python -B -m unittest discover -s scripts/ui0_bench -p test_generate_fixture.py -v`；`rtk proxy node --check scripts/ui0_bench/playwright_driver.mjs`；`rtk proxy git diff --check` | Python 标准库测试 16/16 通过（2.788 秒）；Node 语法检查通过；tracked diff 无 whitespace errors。本次没有运行 UI driver 或本地服务。 |
+| 候选样本记录保全 | 将三份 source JSONL 和三份 measurement `raw_samples.jsonl` 的 Git blob ID 与来源提交 `f286b6ac04dddee67ac75ffada4cc73afba4c9e8` 比较；在 Windows checkout 对工作文件 CRLF 作 LF 规范化后重算 SHA-256 | 六个 Git blob ID 全部相同；三份 source JSONL 及三份 raw 输出的 LF 规范化 SHA-256 均与本报告/measurement 记录一致。`core.autocrlf=true` 使工作副本物理字节数比 LF 记录多出每行一个 CR；这属于 checkout 行尾转换，未改变 Git 中的样本内容。 |
 | Python AST / PowerShell parser | 现有 generator、runner、test 的 AST parse；capture_windows_inventory.ps1 的 PowerShell Parser | Python 3/3 通过；PowerShell parse 通过。 |
 | CypherGraph Guardian | rtk proxy python C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py --changed --stamp | PASS；1 个源文件已核对。 |
 | whitespace / diff | git diff --check；登记文件逐行尾随空白检查 | PASS after report updates; all 15 manifest paths had zero trailing whitespace. |
@@ -158,4 +160,5 @@ R3 host inventory 的 captured_at 为 2026-10-22T14:12:15.833Z，measurement obs
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.1.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 订正 driver 与源提交的关系，明确样本为既有记录且未在审计中重采；补记当前集成候选测试与源记录 Git blob/LF 规范化 hash 保全结果，不改样本内容。 | UI0 evidence integration candidate |
 | v0.1.0 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 审计并分别记录三次 shared-Web driver 样本、host inventory、measurement 汇总及现存限制。 | UI0-WEB-SAMPLES-20261022 lane。 |

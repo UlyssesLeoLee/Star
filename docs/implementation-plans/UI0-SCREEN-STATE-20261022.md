@@ -151,7 +151,7 @@ Worktree focus 是一个受验证的运行上下文，不是前端选中行的�
 ## 9. 已知缺口
 
 - Rust UI 的具体 renderer crate 与插件 runtime 还未选定；Context7 当前不可用，本设计不编造框架性能或无障碍结论。
-- 目标机静态硬件和 UI0-BENCH-001 合成输入已记录；显示器/DPI/刷新率/电源模式、真实负载分布、性能测量与 RSS/启动时间/交互延迟阈值仍待基准后审定。
+- 目标机静态硬件和 UI0-BENCH-001 合成输入已记录；另有三次既有 shared-Web 浏览器 run 经独立报告审计，但没有为该审计重新采集，实际 invocation/base URL provenance 未知，且 R1 缺少 8 条 warm FCP。该浏览器证据不是 Tauri/Rust-native 可比性能数据；R1/R2 inventory、真实目标负载、native RSS/CPU、启动/交互延迟及队列/缓存/取消 drain 阈值仍待测量和审定，详见 [UI0 web evidence report](../reports/PHASE-UI0-WEB-SAMPLES-20261022.md)。
 - 图数据库索引覆盖检查端点当前不可用；源码证据边界见 §1，不作全仓 exhaustive claim。
 - UI-1 到 UI-7 的界面/业务实现及 owner API 验收仍按 WBS 分阶段执行；本文件本身不表示这些能力已落地。
 - Web UI-1 已将 Project/Run 的选择链接与展开按钮拆分：Project 导航到 Project Worktree Index，Run 导航到无焦点概览；组件级 ArrowRight disclosure 和导航测试通过，UI-1/UI-2 focused 测试共 9/9 且 TypeScript typecheck 通过。真实浏览器、完整键盘焦点、屏幕阅读器和 owner facts 仍待验证。
@@ -160,6 +160,7 @@ Worktree focus 是一个受验证的运行上下文，不是前端选中行的�
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.5 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 引用三次既有 shared-Web 样本审计，澄清它们不是 native/Tauri 性能证据、未在该审计中重采，且 provenance/R1 warm FCP 有缺口；UI-0 与所有 native 性能验收继续开放。 | UI0 evidence integration candidate |
 | v0.4 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 UI-1 Project/Run 选择与展开分离的局部实现及 9/9 focused test、typecheck 结果；增加组件级键盘 disclosure 证据，明确真实浏览器、完整键盘/读屏和 owner facts 仍开放。 | 按 WBS 推进 Project/Run 选择态 |
 | v0.3 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 UI-0 状态更新为目标机静态 inventory 与 hash-pinned UI0-BENCH-001 参数已记录；补充 UI-1 可见 unknown 元数据标记，显示设备、generator/runner、实际测量、owner freshness 字段与性能阈值仍列为开放项。 | 按 WBS 推进 UI-0 基准和 UI-1 投影准备 |
 | v0.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 UI-2 Worktree 选择器当前实现边界：最多 200 条、已加载范围搜索、分页错误恢复与上限提示；将跨全目录搜索和视觉/辅助技术验收留作未关闭项。 | 用户要求基于最新 dev 优化 UI/UX 并继续 WBS |

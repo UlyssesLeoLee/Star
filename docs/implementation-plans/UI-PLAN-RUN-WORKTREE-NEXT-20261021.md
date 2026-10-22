@@ -1,9 +1,9 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v2.2（Project-first 桌面/移动导航；移动端中英日文案；UI-1/UI-2 八个 focused suites 35/35、typecheck 通过；UI-0 与 UI-1/2 已集成到 dev；真实驱动样本、读屏与授权导航仍开放）
+**版本：** v2.3（Project-first 桌面/移动导航；移动端中英日文案；UI-1/UI-2 八个 focused suites 35/35、typecheck 通过；三次既有 shared-Web run 已审计但没有重新采集；renderer/native 性能、读屏与授权导航仍开放）
 **日期：** 2026-10-22
 **设计基线：** 本地 dev 起始提交 a5b4404a；requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、DD-WORKTREE-GROUP-001.md v5.16、实施计划 v7.14、WBS v3.7、UI 规划 v0.6。
-**实现基线：** UI-0 harness commit `4e8a8268d59c1bcd7c3e5bf5ebe6847b128b21e2` 已 rebase 并快进到本地 dev；UI-1/UI-2 commit `4dcf567d1e89aa4c648fd06a297554166da0f173` 已 rebase 到 UI-0 并快进，当前本地 dev HEAD 为 `4dcf567d1e89aa4c648fd06a297554166da0f173`。WLD-1 Run-scoped API 仍无默认可信 provider、Run↔Worktree binding writer、目标 DB/RLS 验收，UI 在缺少 owner/client 时 fail closed。UI-1 现将 Project/Run 选择与展开分开，移动端底栏改为 Project → Engineering Run → Worktree → Branch 目录入口，导航文案覆盖英语、简体中文和日语；Project Worktree Index 在没有授权客户端时不再显示本地预览 Worktree，并移除旧生命周期状态机大图。八个 UI-1/UI-2 focused suites 共 35/35 通过，包含 Project 选择、独立展开控件和 ArrowRight 展开回归；TypeScript typecheck 通过。浏览器 AX 显示 Project-first 层级和无授权目录状态；390×844 无横向溢出及 Escape 焦点恢复来自此前本轮浏览器验收。真实读屏、完整授权焦点转换及 owner-backed 闭环仍未验收。UI-0 harness 的 16/16 标准库测试、三个 Python AST、PowerShell parser 和四个源码关系检查通过，但没有真实 UI track 样本；renderer、阈值与性能结论保持开放。Production build 此前以 Node OOM/exit 134 失败，本轮未重跑。
+**实现基线：** 当前候选基于本地 `dev` `df1c22f66d8d0c3b48baac7e348494ba3466569b`；shared-Web evidence 源提交 `f286b6ac04dddee67ac75ffada4cc73afba4c9e8` 已在候选分支 cherry-pick 为 `45028bf3`，尚未集成到 dev。WLD-1 Run-scoped API 仍无默认可信 provider、Run↔Worktree binding writer、目标 DB/RLS 验收，UI 在缺少 owner/client 时 fail closed。UI-1 现将 Project/Run 选择与展开分开，移动端底栏改为 Project → Engineering Run → Worktree → Branch 目录入口，导航文案覆盖英语、简体中文和日语；Project Worktree Index 在没有授权客户端时不再显示本地预览 Worktree，并移除旧生命周期状态机大图。八个 UI-1/UI-2 focused suites 共 35/35 通过，包含 Project 选择、独立展开控件和 ArrowRight 展开回归；TypeScript typecheck 通过。浏览器 AX 显示 Project-first 层级和无授权目录状态；390×844 无横向溢出及 Escape 焦点恢复来自此前本轮浏览器验收。真实读屏、完整授权焦点转换及 owner-backed 闭环仍未验收。UI-0 的三个既有 shared-Web run（52/60/60 条样本）已逐项审计，但没有为本次集成重新采集；driver invocation 和实际 base URL provenance 未记录，R1 缺 8 条 warm FCP，R1/R2 无 host inventory。此证据不包含 Tauri/Rust-native 可比 run、native RSS/CPU、queue/cache、terminal/Canvas 或 cancel/drain 结果；renderer、阈值及 UI-0 整体验收保持开放。Production build 此前以 Node OOM/exit 134 失败，本轮未重跑。
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
 
 **本轮 UI-1 增量：** 桌面侧栏不再有 Main/Project 范围切换，Project → Engineering Run → Worktree → Branch 始终是唯一主导航；未迁移到 Run 的现有页面仍可从“其他入口”折叠区访问。移除了没有运行时数据来源的静态“All Green”状态。移动目录导航使用三语文案；浏览器 AX 可见 Project-first 导航和 unavailable 状态。当前验证覆盖八个相关测试套件（35/35）、TypeScript typecheck 和 CypherGraph Guardian；ProjectRunTree 直接回归 Project 选择、Project/Run 展开分离及 ArrowRight 展开；390×844 无横向溢出及抽屉 Escape 焦点恢复由此前浏览器检查记录。真实读屏和完整授权目录交互仍待验收，阶段记录见 [WBS-UI1-PROJECT-FIRST-NAV-20261022](../reports/WBS-UI1-PROJECT-FIRST-NAV-20261022.md)。
@@ -485,7 +485,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 - [UI0-RUST-DESKTOP-ADR-20261022.md](UI0-RUST-DESKTOP-ADR-20261022.md) 固定 Rust 桌面职责、类型化 IPC scope/version/cancellation 边界、有界并发与缓存、原生 Hook/Plugin 隔离要求，以及可复测的性能报告协议。
 - [WBS-UI-PLAN-NEXT-20261022.md](WBS-UI-PLAN-NEXT-20261022.md) 将 UI-0..UI-7 排成依赖明确的交付批次。
 
-本轮已完成 UI-2 picker 的有限分页/已加载项搜索实现和 focused test/typecheck；UI-0 generator/runner 与实际性能比较转入下一批。UI-0 的设计包可供实现评审；目标设备库存与压力负载尚未采集，因此渲染 crate、绝对内存/延迟阈值和 Rust parity 结论仍未决定。不得把设计完成写作桌面实现或性能验收完成。
+本轮已完成 UI-2 picker 的有限分页/已加载项搜索实现和 focused test/typecheck；UI-0 generator/runner 与有界 driver 已提交，三次既有 shared-Web run 已审计。样本未在本次审计重新采集，实际 invocation/base URL provenance 未知，R1 缺 8 条 warm FCP，R1/R2 未提供 host inventory。R3 inventory 只对应 R3。浏览器数据不能代替目标机 Tauri/Rust-native 可比性能、process-tree RSS/CPU、资源队列/缓存和取消 drain 测量，因此渲染 crate、绝对内存/延迟阈值和 Rust parity 结论仍未决定。不得把设计完成写作桌面实现或性能验收完成。
 
 后续顺序：
 
@@ -518,7 +518,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 2. 当前 Tauri + React/Vite 桌面原型的 Worktree/Canvas 数据与部分 IPC 仍是 fixture/preview 路径；Worktree 可视化没有视口裁剪。旧界面仅作交互参考，不能把样例记录带入生产路径或当作 Rust 桌面性能基线。
 3. UI-2 已关闭 Web Run Shell 的 no-focus Task Cards 偏差；UI-1 已实现 Project/Run 选择与展开分离，组件测试覆盖 Project Index 导航、Project scope 更新、Run no-focus 导航及展开不隐式选择。浏览器/键盘/读屏仍未验收。Run Worktree picker 最多呈现 4 页/200 条并支持已加载项搜索。右侧完整 App 工作区、Inspector、服务端范围搜索、聊天 Runtime/send、浏览器 Back/Forward、目标 DB、真实 session provisioner、Hook 生命周期和 BI receiver 仍开放。
 4. Rust 前端的跨平台字体/输入法、屏幕阅读、窗口/多显示器、终端渲染以及插件沙箱具体协议，在 UI-0 用目标设备实测确定。
-5. 基准所用硬件型号、合成目录规模、绝对 RSS/延迟阈值需在 UI-0 定版；在此之前不得声称满足了性能目标。
+5. 一份 R3 shared-Web inventory 和三个既有浏览器样本已单独记录；R1/R2 inventory、实际 endpoint provenance、缺失的 R1 warm FCP、完整 target-equivalent Tauri/Rust-native measurements、绝对 RSS/延迟阈值仍待补齐与评审。在此之前不得声称满足性能目标。
 6. WLD-3 hostless Schedule Rule 与 Occurrence snapshot CHECK source slices 尚未通过 Rust 1.99.0 和 PostgreSQL migration/API acceptance；Occurrence 仍只有 JSONB `target_snapshot`，CHECK 约束 JSON path，不新增 Branch 列，也不实现 worker/materializer/admission/executor。
 7. Project 投影当前只有 ID/role；Run Worktree projection 缺 lock、dirty/ahead/behind、observed-at、Branch freshness 与 assignment receipt。Project Worktree Index 缺 Engineering Run ID，创建/导入也没有 Run binding receipt。补齐 owner/API 合同前，不得把这些字段作为生产事实或开放 Run 级生命周期操作。
 8. 旧 Group 路由可回退至本地 store/预览；当前 BI 面板是任务事件视图，Canvas 未装配到 canonical Run Shell。仅凭这些现象不得声称完整 App 集成、BI/Benchmark 或生产数据闭环。
@@ -528,6 +528,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v2.3 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录基于当前 dev `df1c22f6` 的隔离候选及三次既有 shared-Web run 审计；标明 driver provenance、R1 warm FCP 与 inventory 缺口，并保留 native/Rust 性能、renderer、阈值和 UI-0 全部发布门。 | UI0 evidence integration candidate |
 | v2.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 UI-1/UI-2 commit rebased onto UI-0 并 fast-forward 到本地 dev 的 HEAD `4dcf567d`；WBS 和阶段报告均同步 35/35 八套件结果及仍开放的授权/读屏/真实性能门。 | 完成 UI WBS 当前批次集成 |
 | v2.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 提交前自审恢复 ProjectRunTree 对 Project 选择、Project/Run 独立展开和 ArrowRight 键盘展开的直接回归测试；八个 UI-1/UI-2 suites 重新验证为 35/35，typecheck 与 CypherGraph Guardian 通过。 | UI 自审发现局部测试覆盖被替换 |
 | v2.0 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 UI-0 harness 集成到本地 dev 的提交和 UI-1/UI-2 当前 32/32（八个测试套件）验证结果；浏览器 AX 重验无授权目录 fail-closed 状态。明确真实 UI driver 样本、屏幕阅读器、授权焦点转换和 Rust renderer 性能结论仍开放。 | 用户要求在 UI 优化后继续按 WBS 推进 |
