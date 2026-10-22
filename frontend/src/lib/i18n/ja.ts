@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e3c3ca44d392295d165361acfb396f79861ebd6a25fbd5bb5e49ac7c3632d002
+@cypher schema=1 source_sha256=c87c0a6a48607fb4281d899a9c7d8a5042c8532102e44e8ff8af8239531e6cfa
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -31,6 +31,22 @@ export const ja: Dictionary = {
     cancel: "キャンセル",
     hostIndependentHint: "この Run にリモート Branch の関連付けは不要です。",
     invalidRunName: "Run 名は 1〜500 文字で入力してください。",
+    projectWorktreeIndexTitle: "Project Worktree Index",
+    directoryUnavailableTitle: "認証済みディレクトリを利用できません",
+    directoryUnavailableDescription: "現在のセッションには検証可能な Project と Run のディレクトリ接続がありません。復旧するまでは、サンプル状態を Worktree 管理の事実と誤認しないよう、ローカルのプレビュー、キャッシュ、seed レコードを表示しません。",
+    hierarchyHint: "Engineering Run → ローカル Worktree → Branch",
+    refreshDirectory: "認証済みディレクトリを再読み込み",
+    unknownCreateResult: "前回のリクエスト結果は不明です。再送時は同じリクエスト ID を使用します。",
+    expandNode: "展開",
+    collapseNode: "折りたたむ",
+    projectChildren: "Project の下位階層",
+    worktreeBranches: "Worktree の Branch 状態",
+    runChildren: "Engineering Run の下位階層",
+    selectNode: "選択",
+    openRunOverview: "Engineering Run を開く",
+    runOverviewFocusHint: "Run の概要を開きます。Worktree のフォーカスが認証された後に App を表示します。",
+    retryAction: "再試行",
+    projectIdLabel: "Project",
     localWorktree: "ローカル Worktree",
     humanState: "人の状態",
     machineState: "機械状態",
@@ -96,13 +112,17 @@ export const ja: Dictionary = {
   sidebar: {
     brandTagline: "VIBE CONTROL PLANE",
     vibeControlPlane: "VIBE CONTROL PLANE",
+    otherPages: "その他のページ",
+    projectNavigation: "Project ナビゲーション",
+    openProjectDirectory: "Project → Engineering Run → Worktree → Branch ディレクトリを開く",
+    projectDirectory: "Project → Engineering Run → Worktree → Branch ディレクトリ",
+    projectDirectoryTitle: "Project ディレクトリ",
+    projectDirectoryHint: "Project または Run を展開し、Worktree を選択してワークスペースを開きます。",
+    closeProjectDirectory: "閉じる",
     groupWorkspaces: "ワークスペース",
     groupTactical: "タクティカルビュー",
     pinned: "ピン留め",
     customAdd: "+ モジュールをカスタマイズ",
-    footerStatus: "SYS // TACTICAL",
-    footerStatusAllGreen: "正常稼働",
-    footerNode: "NERV-01 // VIBE CODING NODE",
     removeFromSidebar: "サイドバーから {label} を削除",
     removeFromPinned: "ピン留めビューから {label} を削除",
     // 折りたたみ / スコープ切替 (per 2026-09-03 12:36 JST)

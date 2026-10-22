@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=dc853e00d658ea0877b3b04e7a0682f230f5dc8d9716e69bac74f17ad5837c99
+@cypher schema=1 source_sha256=db4680229dd05bfc6428e941b11b0400f67d0041807abb809ec66d5dfd6f9215
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -26,6 +26,8 @@ MERGE (self)-[:DEFINES]->(label)
 MERGE (self)-[:DEFINES]->(worktreeStatus)
 MERGE (self)-[:DEFINES]->(stateLabel)
 MERGE (self)-[:IMPORTS]->(i18n)
+MERGE (tree)-[:USES_TYPE]->(dictionary)
+MERGE (live)-[:USES_TYPE]->(dictionary)
 MERGE (self)-[:IMPORTS]->(navStore)
 MERGE (self)-[:IMPORTS]->(pathHook)
 MERGE (worktreeStatus)-[:USES_TYPE]->(worktreeType)
@@ -87,10 +89,11 @@ const OVERSCAN = 3;
 
 export function ProjectRunTree({ collapsed }: { collapsed: boolean }) {
   const session = useRunDirectory();
-  if (collapsed) return <div className="flex justify-center py-2" title="展开侧栏以浏览 Project → Run → Worktree → Branch"><FolderKanban size={20} aria-label="Project 目录" /></div>;
-  return <section aria-label="Project 目录" data-testid="project-run-directory" className="border-b border-line pb-3">
-    <div className="px-2 py-1 text-xs font-bold">Projects</div>
-    <p className="px-2 pb-2 text-[10px] text-ink-mute">Engineering Run → 本地 Worktree → Branch</p>
+  const { t } = useTranslation();
+  if (collapsed) return <div className="flex justify-center py-2" title={t.sidebar.openProjectDirectory}><FolderKanban size={20} aria-label={t.sidebar.projectNavigation} /></div>;
+  return <section aria-label={t.sidebar.projectDirectory} data-testid="project-run-directory" className="border-b border-line pb-3">
+    <div className="px-2 py-1 text-xs font-bold">{t.sidebar.projectNavigation}</div>
+    <p className="px-2 pb-2 text-[10px] text-ink-mute">{t.runDirectory.hierarchyHint}</p>
     {session.status === "ready" && session.client ? <AuthenticatedProjectRunTree client={session.client} /> :
       <p role="status" className="px-2 py-3 text-xs text-ink-mute">{session.message}</p>}
   </section>;
@@ -158,7 +161,7 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
     const retry = prior?.projectId === project.entity.project_id ? prior : null;
     setCreateTarget({ project, wasExpanded });
     setCreateTitle(retry?.title ?? "");
-    setCreateError(retry ? "上次提交结果未知；再次提交将复用同一请求标识。" : null);
+    setCreateError(retry ? t.runDirectory.unknownCreateResult : null);
   }
   async function submitCreateRun(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -189,8 +192,8 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
     }
   }
   return <>
-    <button type="button" onClick={() => { model.refresh(); if (viewport.current) viewport.current.scrollTop = 0; setScrollTop(0); }} className="mb-1 flex items-center gap-1 px-2 text-[10px] text-ink-mute hover:text-ink"><RefreshCw size={11} />刷新授权目录</button>
-    <div ref={viewport} role="tree" aria-label="Project、Engineering Run、Worktree、Branch" onKeyDown={moveTreeFocus}
+    <button type="button" onClick={() => { model.refresh(); if (viewport.current) viewport.current.scrollTop = 0; setScrollTop(0); }} className="mb-1 flex items-center gap-1 px-2 text-[10px] text-ink-mute hover:text-ink"><RefreshCw size={11} />{t.runDirectory.refreshDirectory}</button>
+    <div ref={viewport} role="tree" aria-label={t.sidebar.projectDirectory} onKeyDown={moveTreeFocus}
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative overflow-y-auto overflow-x-hidden" style={{ height: VIEWPORT_HEIGHT }}>
       <div role="presentation" style={{ height: rows.length * ROW_HEIGHT }}>
         {visible.map((row, offset) => <DirectoryRow key={row.key} row={row} index={start + offset} model={model}
@@ -199,11 +202,11 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
           newRunLabel={t.runDirectory.newRun} statusLabels={t.runDirectory} />)}
       </div>
     </div>
-    <p className="px-2 pt-1 text-[10px] text-ink-mute">展开层级；选择 Worktree 设为当前 Run 焦点。</p>
+    <p className="px-2 pt-1 text-[10px] text-ink-mute">{t.sidebar.projectDirectoryHint}</p>
     {createTarget && <div role="dialog" aria-modal="true" aria-labelledby="create-run-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <form onSubmit={submitCreateRun} className="w-full max-w-md rounded-lg border border-line bg-bg p-5 shadow-xl">
         <h2 id="create-run-title" className="text-base font-semibold">{t.runDirectory.newRunTitle}</h2>
-        <p className="mt-1 break-all text-xs text-ink-mute">Project {createTarget.project.entity.project_id} · {t.runDirectory.hostIndependentHint}</p>
+        <p className="mt-1 break-all text-xs text-ink-mute">{t.runDirectory.projectIdLabel} {createTarget.project.entity.project_id} · {t.runDirectory.hostIndependentHint}</p>
         <label className="mt-4 grid gap-1 text-sm">{t.runDirectory.runName}
           <input value={createTitle} onChange={(event) => setCreateTitle(event.target.value)} autoFocus required maxLength={500}
             placeholder={t.runDirectory.runNamePlaceholder} className="rounded border border-line bg-bg-soft px-3 py-2" />
@@ -278,7 +281,7 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
         else if (actionable) model.loadMore(row.parent);
       }}
       title={row.message} className="w-full truncate pr-1 text-left text-[10px] text-ink-mute focus:outline focus:outline-1 focus:outline-accent">
-      {row.message}{row.state === "error" && " 点击重试"}
+      {row.message}{row.state === "error" && ` ${statusLabels.retryAction}`}
     </button>;
   }
   const { node, expanded } = row;
@@ -291,13 +294,13 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     const selected = selectedProjectId === node.entity.project_id;
     const projectHref = `/worktree?project_id=${encodeURIComponent(node.entity.project_id)}`;
     return <div role="presentation" style={style} className="flex items-center gap-1">
-      <button type="button" tabIndex={-1} aria-label={`${expanded ? "折叠" : "展开"} ${node.label}`}
-        aria-expanded={expanded} title={`${expanded ? "折叠" : "展开"} Project 下级目录`}
+      <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
+        aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.projectChildren}`}
         className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected}
         aria-current={selected && pathname === "/worktree" ? "page" : undefined} data-directory-index={index} href={projectHref} prefetch={false}
-        aria-label={`选择 ${node.label}`} title={node.label} className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
+        aria-label={`${statusLabels.selectNode} ${node.label}`} title={node.label} className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
         onNavigate={() => { onSelectProject(node.entity.project_id); clearFocus(); }}>{contents}</Link>
       <button type="button" aria-label={`${node.label}: ${newRunLabel}`} title={newRunLabel}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-mute hover:bg-accent/10 hover:text-accent focus:outline focus:outline-1 focus:outline-accent"
@@ -309,8 +312,8 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     const status = worktreeStatusLabel(node.entity, statusLabels);
     const statusDescription = `${node.label}. ${status.summary}. ${status.details}`;
     return <div role="presentation" style={style} className="flex items-center">
-      <button type="button" tabIndex={-1} aria-label={`${expanded ? "折叠" : "展开"} ${node.label}`}
-        aria-expanded={expanded} title={`${expanded ? "折叠" : "展开"} Worktree 分支状态`}
+      <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
+        aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.worktreeBranches}`}
         className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -332,13 +335,13 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     const href = canonicalRunHref(node.entity.project_id, node.entity.engineering_run_id);
     const selected = pathname === href;
     return <div role="presentation" style={style} className="flex items-center gap-1">
-      <button type="button" tabIndex={-1} aria-label={`${expanded ? "折叠" : "展开"} ${node.label}`}
-        aria-expanded={expanded} title={`${expanded ? "折叠" : "展开"} Engineering Run 下级目录`}
+      <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
+        aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.runChildren}`}
         className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected}
         aria-current={selected ? "page" : undefined} data-directory-index={index} href={href} prefetch={false}
-        aria-label={`打开 Engineering Run ${node.label}`} title="打开 Run 概览；App tabs 需要先验证 Worktree 焦点"
+        aria-label={`${statusLabels.openRunOverview} ${node.label}`} title={statusLabels.runOverviewFocusHint}
         className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
         onNavigate={() => { onSelectProject(node.entity.project_id); clearFocus(); }}>{contents}</Link>
     </div>;

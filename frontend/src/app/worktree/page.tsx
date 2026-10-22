@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0166996b15483d7a0d5ca31dcb89ff8496e50db30e8474b45b9e6bfa11a03621
+@cypher schema=1 source_sha256=ec99b0710b77917d0aebcadc63a1dcff626409bcec36a6da116a5eba62a21d1e
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -89,7 +89,6 @@ import { GroupApiError, normalizeWorktreeGitLock, type GitLockState, type Worktr
 import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
-import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { WORKTREE_SM, type Worktree, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
@@ -550,6 +549,24 @@ function WorktreePageInner() {
     return <AuthenticatedWorktreeIndex projectId={requestedProjectId} />;
   }
 
+  if (!worktreeGroupApi) {
+    return (
+      <main className="mx-auto w-full max-w-4xl space-y-4 p-4" data-testid="worktree-directory-unavailable">
+        <header className="border-b border-line pb-3">
+          <h1 className="text-xl font-semibold">{t.runDirectory.projectWorktreeIndexTitle}</h1>
+          <p className="mt-1 text-xs text-ink-mute">{t.sidebar.projectDirectory}</p>
+        </header>
+        <section className="card space-y-2" role="status">
+          <h2 className="font-semibold">{t.runDirectory.directoryUnavailableTitle}</h2>
+          <p className="text-sm text-ink-dim">{t.runDirectory.directoryUnavailableDescription}</p>
+          <button type="button" className="btn text-xs" onClick={() => window.location.reload()}>
+            {t.runDirectory.refreshDirectory}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="max-w-7xl">
       <PageHeader
@@ -635,9 +652,6 @@ function WorktreePageInner() {
           />
 
           <SectionTitle>{selectedProject.key} · {selectedProject.name} 的 Worktree</SectionTitle>
-          <div className="mb-5">
-            <StateMachineDiagram sm={WORKTREE_SM} highlightState={liveWorktree?.status ?? wt?.status} />
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* 列表 */}

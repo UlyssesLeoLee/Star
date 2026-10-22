@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1a4755aa3371c915e53b4acfab12f0b697ad4e9acee10829f955fe9d3770b94f
+@cypher schema=1 source_sha256=0c8939aa80b63b2cb76f0e507eb6ef941994e558a145475012b19dad9f10f392
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -41,6 +41,22 @@ export const zhCN: Dictionary = {
     cancel: "取消",
     hostIndependentHint: "此 Run 不需要关联远端 Branch。",
     invalidRunName: "Run 名称需为 1 至 500 个字符。",
+    projectWorktreeIndexTitle: "Project Worktree Index",
+    directoryUnavailableTitle: "授权目录暂不可用",
+    directoryUnavailableDescription: "当前会话没有可验证的 Project 与 Run 目录连接。目录恢复前不显示本地预览、缓存或 seed 记录，避免将示例状态误认为 Worktree 管理事实。",
+    hierarchyHint: "Engineering Run → 本地 Worktree → Branch",
+    refreshDirectory: "重新读取授权目录",
+    unknownCreateResult: "上次提交结果未知；再次提交将复用同一请求标识。",
+    expandNode: "展开",
+    collapseNode: "折叠",
+    projectChildren: "Project 下级目录",
+    worktreeBranches: "Worktree 分支状态",
+    runChildren: "Engineering Run 下级目录",
+    selectNode: "选择",
+    openRunOverview: "打开 Engineering Run",
+    runOverviewFocusHint: "打开 Run 概览；通过 Worktree 焦点授权后才显示 App。",
+    retryAction: "重试",
+    projectIdLabel: "Project",
     localWorktree: "本地 Worktree",
     humanState: "人工状态",
     machineState: "机器状态",
@@ -106,13 +122,17 @@ export const zhCN: Dictionary = {
   sidebar: {
     brandTagline: "VIBE CONTROL PLANE",
     vibeControlPlane: "VIBE CONTROL PLANE",
+    otherPages: "其他入口",
+    projectNavigation: "Project 导航",
+    openProjectDirectory: "打开 Project → Engineering Run → Worktree → Branch 导航目录",
+    projectDirectory: "Project → Engineering Run → Worktree → Branch 目录",
+    projectDirectoryTitle: "Project 目录",
+    projectDirectoryHint: "展开 Project 和 Run；选择 Worktree 后进入其工作区。",
+    closeProjectDirectory: "收起",
     groupWorkspaces: "Workspaces",
     groupTactical: "Tactical Views",
     pinned: "PINNED",
     customAdd: "+ 定制添加模块",
-    footerStatus: "SYS // TACTICAL",
-    footerStatusAllGreen: "ALL GREEN",
-    footerNode: "NERV-01 // VIBE CODING NODE",
     removeFromSidebar: "从左侧移除 {label}",
     removeFromPinned: "从视图移除 {label}",
     // 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)

@@ -1,12 +1,12 @@
 /*
-@cypher schema=1 source_sha256=3e21621fa72cc87ce765364264b2d3b7c8197367cad560e462c87c1e5a51fb28
+@cypher schema=1 source_sha256=4a0f2d091e56074639ad1f15691e3b3c336b2f6a29ec028d9b5c77b051f35246
 MERGE (self:File {path:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx"})
 MERGE (sidebar:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (tree:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (i18n:File {path:"frontend/src/lib/i18n/index.ts"})
 MERGE (session:File {path:"frontend/src/lib/run/runDirectorySession.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx::Project Worktree Index sidebar navigation",kind:"suite"})
-MERGE (navigationTest:Symbol {id:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx::project scope opens the authorized Project Worktree Index route",kind:"test"})
+MERGE (navigationTest:Symbol {id:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx::keeps the Project hierarchy primary and exposes the authorized Project Worktree Index",kind:"test"})
 MERGE (statusTest:Symbol {id:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx::Run Worktree rows distinguish lifecycle and binding facts without exposing identifiers",kind:"test"})
 MERGE (fetcher:Symbol {id:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx::directoryStatusFetcher",kind:"function"})
 MERGE (self)-[:IMPORTS]->(sidebar)
@@ -27,7 +27,7 @@ MERGE (navigationTest)-[:TESTS]->(sidebar)
 //   (file:File {name:"SidebarProjectWorktreeNavigation.test.tsx",type:"file",language:"typescript"}),
 //   (module:Module {name:"SidebarProjectWorktreeNavigation",type:"module",language:"typescript"}),
 //   (suite:Function {name:"Project Worktree Index sidebar navigation suite",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
-//   (test:Function {name:"project scope opens the authorized Project Worktree Index route",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+//   (test:Function {name:"keeps the Project hierarchy primary and exposes the authorized Project Worktree Index",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
 //   (statusTest:Function {name:"Run Worktree rows distinguish lifecycle and binding facts without exposing identifiers",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
 //   (projectId:Variable {name:"projectId",type:"variable",language:"typescript"}),
 //   (mockUsePathname:Function {name:"mockUsePathname",type:"function",language:"typescript"}),
@@ -71,7 +71,7 @@ MERGE (navigationTest)-[:TESTS]->(sidebar)
 //   (statusTest)-[:CALLS]->(findByRole),(statusTest)-[:USES]->(fetcher),(fetcher)-[:CALLS]->(newUrl),
 //   (fetcher)-[:CALLS]->(newResponse);
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Sidebar } from "../Sidebar";
 import { ProjectRunTree } from "../run/ProjectRunTree";
@@ -83,13 +83,21 @@ const projectId = "prj-authorized-123";
 const mockUsePathname = vi.fn(() => "/worktree");
 const mockUseSearchParams = vi.fn(() => new URLSearchParams(""));
 
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  window.localStorage.clear();
+});
+
 vi.mock("next/navigation", () => ({
   usePathname: () => mockUsePathname(),
   useSearchParams: () => mockUseSearchParams(),
 }));
 
 describe("Project Worktree Index sidebar navigation", () => {
-  it("project scope opens the authorized Project Worktree Index route", () => {
+  it("keeps the Project hierarchy primary and exposes the authorized Project Worktree Index", () => {
     useNavStore.setState({
       sidebarItemIds: ["inbox", "issues", "projects", "agents"],
       pinnedViewIds: ["kanban", "timeline"],
@@ -105,8 +113,9 @@ describe("Project Worktree Index sidebar navigation", () => {
         <Sidebar />
       </I18nProvider>,
     );
-    fireEvent.click(screen.getByTestId("sidebar-scope-project"));
 
+    expect(screen.getByTestId("app-sidebar")).toHaveAttribute("data-nav-model", "project-run");
+    expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
     const link = screen.getByTestId("sidebar-project-worktree-index");
     expect(link).toHaveAttribute(
       "href",
@@ -182,8 +191,8 @@ describe("Project Worktree Index sidebar navigation", () => {
       </I18nProvider>,
     );
 
-    fireEvent.click(await screen.findByRole("treeitem", { name: new RegExp(runProjectId) }));
-    fireEvent.click(await screen.findByRole("treeitem", { name: /Run Alpha/ }));
+    fireEvent.click(await screen.findByRole("button", { name: `Expand Project ${runProjectId}` }));
+    fireEvent.click(await screen.findByRole("button", { name: "Expand Run Alpha" }));
     const assignedRow = await screen.findByRole("treeitem", { name: /^assigned-checkout/ });
     const assignedDescription = assignedRow.getAttribute("aria-label") ?? "";
     expect(assignedDescription).toContain("Human: Waiting");

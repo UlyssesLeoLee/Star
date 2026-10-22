@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7bed3cff364e66ef41fb90f1a5b9652d98b5754c650850b2f1a0ed9d0d8d63e2
+@cypher schema=1 source_sha256=74a2e66c8f3534bf5463f09d827af55cd83b5c2f2c5a0d311ca38c99ff2fbd0d
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -30,6 +30,22 @@ export const en: Dictionary = {
     cancel: "Cancel",
     hostIndependentHint: "This Run does not require a remote Branch association.",
     invalidRunName: "Run name must contain 1 to 500 characters.",
+    projectWorktreeIndexTitle: "Project Worktree Index",
+    directoryUnavailableTitle: "Authorized directory unavailable",
+    directoryUnavailableDescription: "This session has no verifiable Project and Run directory connection. Until it is restored, local previews, cached data, and seed records are hidden so sample state cannot be mistaken for Worktree management facts.",
+    hierarchyHint: "Engineering Run → Local Worktree → Branch",
+    refreshDirectory: "Refresh authorized directory",
+    unknownCreateResult: "The previous request result is unknown; retrying reuses the same request ID.",
+    expandNode: "Expand",
+    collapseNode: "Collapse",
+    projectChildren: "Project child hierarchy",
+    worktreeBranches: "Worktree branch state",
+    runChildren: "Engineering Run child hierarchy",
+    selectNode: "Select",
+    openRunOverview: "Open Engineering Run",
+    runOverviewFocusHint: "Open Run overview; Apps appear after Worktree focus is authorized.",
+    retryAction: "Retry",
+    projectIdLabel: "Project",
     localWorktree: "Local Worktree",
     humanState: "Human",
     machineState: "Machine",
@@ -95,13 +111,17 @@ export const en: Dictionary = {
   sidebar: {
     brandTagline: "VIBE CONTROL PLANE",
     vibeControlPlane: "VIBE CONTROL PLANE",
+    otherPages: "Other pages",
+    projectNavigation: "Project navigation",
+    openProjectDirectory: "Open the Project → Engineering Run → Worktree → Branch directory",
+    projectDirectory: "Project → Engineering Run → Worktree → Branch directory",
+    projectDirectoryTitle: "Project directory",
+    projectDirectoryHint: "Expand a Project or Run; select a Worktree to open its workspace.",
+    closeProjectDirectory: "Close",
     groupWorkspaces: "Workspaces",
     groupTactical: "Tactical Views",
     pinned: "PINNED",
     customAdd: "+ Customize Modules",
-    footerStatus: "SYS // TACTICAL",
-    footerStatusAllGreen: "ALL GREEN",
-    footerNode: "NERV-01 // VIBE CODING NODE",
     removeFromSidebar: "Remove {label} from sidebar",
     removeFromPinned: "Remove {label} from pinned views",
     // Fold / scope toggle (per 2026-09-03 12:36 JST)

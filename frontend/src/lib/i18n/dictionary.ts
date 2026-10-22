@@ -1,17 +1,63 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=1204efb2268324a5ef1933028acc26fe6300d899bd7625a10fa9c61c3355cec6
+@cypher schema=1 source_sha256=0dcbddeae3d7fc2ed3dbc2a04291a2814ec75791623c061326e0b8cbf3a778b6
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
 MERGE (pageTitle:Type {id:"frontend/src/lib/i18n/dictionary.ts::PageTitleI18n",kind:"interface"})
 MERGE (dictionary:Type {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary",kind:"interface"})
 MERGE (runDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory",kind:"property"})
+MERGE (sidebarOtherPages:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.otherPages",kind:"property"})
+MERGE (sidebarProjectNavigation:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectNavigation",kind:"property"})
+MERGE (sidebarOpenProjectDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.openProjectDirectory",kind:"property"})
+MERGE (sidebarProjectDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectory",kind:"property"})
+MERGE (sidebarProjectDirectoryTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectoryTitle",kind:"property"})
+MERGE (sidebarProjectDirectoryHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectoryHint",kind:"property"})
+MERGE (sidebarCloseProjectDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.closeProjectDirectory",kind:"property"})
+MERGE (runDirectoryUnavailableTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.directoryUnavailableTitle",kind:"property"})
+MERGE (runDirectoryUnavailableDescription:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.directoryUnavailableDescription",kind:"property"})
+MERGE (runDirectoryHierarchyHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.hierarchyHint",kind:"property"})
+MERGE (runDirectoryRefresh:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.refreshDirectory",kind:"property"})
+MERGE (runDirectoryIndexTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.projectWorktreeIndexTitle",kind:"property"})
+MERGE (runDirectoryUnknownCreate:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.unknownCreateResult",kind:"property"})
+MERGE (runDirectoryExpandNode:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.expandNode",kind:"property"})
+MERGE (runDirectoryCollapseNode:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.collapseNode",kind:"property"})
+MERGE (runDirectoryProjectChildren:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.projectChildren",kind:"property"})
+MERGE (runDirectoryWorktreeBranches:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.worktreeBranches",kind:"property"})
+MERGE (runDirectoryRunChildren:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.runChildren",kind:"property"})
+MERGE (runDirectorySelectNode:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.selectNode",kind:"property"})
+MERGE (runDirectoryOpenRunOverview:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.openRunOverview",kind:"property"})
+MERGE (runDirectoryFocusHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.runOverviewFocusHint",kind:"property"})
+MERGE (runDirectoryRetry:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.retryAction",kind:"property"})
+MERGE (runDirectoryProjectIdLabel:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.projectIdLabel",kind:"property"})
 MERGE (self)-[:DEFINES]->(category)
 MERGE (self)-[:DEFINES]->(module)
 MERGE (self)-[:DEFINES]->(pageTitle)
 MERGE (self)-[:DEFINES]->(dictionary)
 MERGE (dictionary)-[:DEFINES]->(runDirectory)
+MERGE (dictionary)-[:DEFINES]->(sidebarOtherPages)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectNavigation)
+MERGE (dictionary)-[:DEFINES]->(sidebarOpenProjectDirectory)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectDirectory)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectDirectoryTitle)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectDirectoryHint)
+MERGE (dictionary)-[:DEFINES]->(sidebarCloseProjectDirectory)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryUnavailableTitle)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryUnavailableDescription)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryHierarchyHint)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryRefresh)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryIndexTitle)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryUnknownCreate)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryExpandNode)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryCollapseNode)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryProjectChildren)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryWorktreeBranches)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryRunChildren)
+MERGE (dictionary)-[:DEFINES]->(runDirectorySelectNode)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryOpenRunOverview)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryFocusHint)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryRetry)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryProjectIdLabel)
 @endcypher
 */
 
@@ -66,6 +112,22 @@ export interface Dictionary {
     cancel: string;
     hostIndependentHint: string;
     invalidRunName: string;
+    projectWorktreeIndexTitle: string;
+    directoryUnavailableTitle: string;
+    directoryUnavailableDescription: string;
+    hierarchyHint: string;
+    refreshDirectory: string;
+    unknownCreateResult: string;
+    expandNode: string;
+    collapseNode: string;
+    projectChildren: string;
+    worktreeBranches: string;
+    runChildren: string;
+    selectNode: string;
+    openRunOverview: string;
+    runOverviewFocusHint: string;
+    retryAction: string;
+    projectIdLabel: string;
     localWorktree: string;
     humanState: string;
     machineState: string;
@@ -132,13 +194,17 @@ export interface Dictionary {
   sidebar: {
     brandTagline: string;          // "VIBE CONTROL PLANE"
     vibeControlPlane: string;      // alias for brandTagline
-    groupWorkspaces: string;       // "Workspaces"
+    otherPages: string;            // secondary navigation disclosure
+    projectNavigation: string;
+    openProjectDirectory: string;
+    projectDirectory: string;
+    projectDirectoryTitle: string;
+    projectDirectoryHint: string;
+    closeProjectDirectory: string;
+    groupWorkspaces: string;       // pinned workspace links
     groupTactical: string;         // "Tactical Views"
     pinned: string;                // "PINNED" badge
     customAdd: string;             // "+ 定制添加模块"
-    footerStatus: string;          // "SYS // TACTICAL"
-    footerStatusAllGreen: string;  // "ALL GREEN"
-    footerNode: string;            // "NERV-01 // VIBE CODING NODE"
     removeFromSidebar: string;     // "从左侧移除 {label}"
     removeFromPinned: string;      // "从视图移除 {label}"
     // 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)
