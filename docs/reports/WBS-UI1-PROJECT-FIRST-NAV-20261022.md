@@ -2,9 +2,9 @@
 
 | 项目 | 内容 |
 |---|---|
-| 版本 / 状态 | v0.3 / UI-1 桌面与移动导航切片完成；阶段总体验收仍开放 |
+| 版本 / 状态 | v0.4 / UI-1 桌面与移动导航切片完成；阶段总体验收仍开放 |
 | 日期 | 2026-10-22 |
-| 分支 / 基线 | `codex/ui-plan-v0-7-20261022` / `aa30385c6e41f9712c78b9a2fe824f0d40a2f312` |
+| 分支 / 基线 | `codex/ui-plan-v0-7-20261022`，rebase onto UI-0 `4e8a8268`；fast-forwarded local dev at `4dcf567d1e89aa4c648fd06a297554166da0f173` |
 | 范围 | Project-first 左侧导航、移动目录抽屉、Project Worktree Index fail-closed 呈现、相关测试及 WBS/详细设计同步 |
 
 ## §0 目的
@@ -73,6 +73,7 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.4 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 UI-1/UI-2 提交经 rebase 后快进至本地 dev 的 commit `4dcf567d`；35/35 定向测试、typecheck 通过，授权数据、真实读屏和 driver 样本仍是未完成验收门。 | 完成当前 WBS 集成批次 |
 | v0.3 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 恢复 ProjectRunTree 对 Project 选择、独立展开和 ArrowRight 键盘展开的直接回归测试；八个 focused suites 35/35、typecheck 和 12 个源码关系检查通过。UI-0 已集成，但读屏、真实授权导航和 driver 样本仍开放。 | UI 自审发现局部测试覆盖被替换 |
 | v0.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 UI-1/UI-2 相关实测更新为 8 个 focused suites 32/32、typecheck 和 12 个源码关系检查通过；补充 `/worktree` no-provider 浏览器 AX 复验，并记录 UI-0 已集成以及 CodeRabbit WSL 权限限制。读屏、真实授权导航、driver 样本仍开放。 | 按 UI WBS 继续推进并完成提交前自审 |
 | v0.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Project-first 桌面导航、移动目录、多语言标签、窄屏无溢出、焦点恢复及 UI-0 后续阻塞状态。 | 用户要求优化 UI/UX 并按 WBS 继续推进 |

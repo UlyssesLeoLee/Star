@@ -1,9 +1,9 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v2.1（Project-first 桌面/移动导航；移动端中英日文案；UI-1/UI-2 八个 focused suites 35/35、typecheck 通过；UI-0 harness 已集成；真实驱动样本、读屏与授权导航仍开放）
+**版本：** v2.2（Project-first 桌面/移动导航；移动端中英日文案；UI-1/UI-2 八个 focused suites 35/35、typecheck 通过；UI-0 与 UI-1/2 已集成到 dev；真实驱动样本、读屏与授权导航仍开放）
 **日期：** 2026-10-22
 **设计基线：** 本地 dev 起始提交 a5b4404a；requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、DD-WORKTREE-GROUP-001.md v5.16、实施计划 v7.14、WBS v3.7、UI 规划 v0.6。
-**实现基线：** UI-0 harness commit `4e8a8268d59c1bcd7c3e5bf5ebe6847b128b21e2` 已 rebase 并快进到本地 dev。UI-1/UI-2 lane 从 dev `aa30385c6e41f9712c78b9a2fe824f0d40a2f312` 继续，集成仍需单独复核。WLD-1 Run-scoped API 仍无默认可信 provider、Run↔Worktree binding writer、目标 DB/RLS 验收，UI 在缺少 owner/client 时 fail closed。UI-1 现将 Project/Run 选择与展开分开，移动端底栏改为 Project → Engineering Run → Worktree → Branch 目录入口，导航文案覆盖英语、简体中文和日语；Project Worktree Index 在没有授权客户端时不再显示本地预览 Worktree，并移除旧生命周期状态机大图。八个 UI-1/UI-2 focused suites 共 35/35 通过，包含 Project 选择、独立展开控件和 ArrowRight 展开回归；TypeScript typecheck 通过。浏览器 AX 显示 Project-first 层级和无授权目录状态；390×844 无横向溢出及 Escape 焦点恢复来自此前本轮浏览器验收。真实读屏、完整授权焦点转换及 owner-backed 闭环仍未验收。UI-0 harness 的 16/16 标准库测试、三个 Python AST、PowerShell parser 和四个源码关系检查通过，但没有真实 UI track 样本；renderer、阈值与性能结论保持开放。Production build 此前以 Node OOM/exit 134 失败，本轮未重跑。
+**实现基线：** UI-0 harness commit `4e8a8268d59c1bcd7c3e5bf5ebe6847b128b21e2` 已 rebase 并快进到本地 dev；UI-1/UI-2 commit `4dcf567d1e89aa4c648fd06a297554166da0f173` 已 rebase 到 UI-0 并快进，当前本地 dev HEAD 为 `4dcf567d1e89aa4c648fd06a297554166da0f173`。WLD-1 Run-scoped API 仍无默认可信 provider、Run↔Worktree binding writer、目标 DB/RLS 验收，UI 在缺少 owner/client 时 fail closed。UI-1 现将 Project/Run 选择与展开分开，移动端底栏改为 Project → Engineering Run → Worktree → Branch 目录入口，导航文案覆盖英语、简体中文和日语；Project Worktree Index 在没有授权客户端时不再显示本地预览 Worktree，并移除旧生命周期状态机大图。八个 UI-1/UI-2 focused suites 共 35/35 通过，包含 Project 选择、独立展开控件和 ArrowRight 展开回归；TypeScript typecheck 通过。浏览器 AX 显示 Project-first 层级和无授权目录状态；390×844 无横向溢出及 Escape 焦点恢复来自此前本轮浏览器验收。真实读屏、完整授权焦点转换及 owner-backed 闭环仍未验收。UI-0 harness 的 16/16 标准库测试、三个 Python AST、PowerShell parser 和四个源码关系检查通过，但没有真实 UI track 样本；renderer、阈值与性能结论保持开放。Production build 此前以 Node OOM/exit 134 失败，本轮未重跑。
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
 
 **本轮 UI-1 增量：** 桌面侧栏不再有 Main/Project 范围切换，Project → Engineering Run → Worktree → Branch 始终是唯一主导航；未迁移到 Run 的现有页面仍可从“其他入口”折叠区访问。移除了没有运行时数据来源的静态“All Green”状态。移动目录导航使用三语文案；浏览器 AX 可见 Project-first 导航和 unavailable 状态。当前验证覆盖八个相关测试套件（35/35）、TypeScript typecheck 和 CypherGraph Guardian；ProjectRunTree 直接回归 Project 选择、Project/Run 展开分离及 ArrowRight 展开；390×844 无横向溢出及抽屉 Escape 焦点恢复由此前浏览器检查记录。真实读屏和完整授权目录交互仍待验收，阶段记录见 [WBS-UI1-PROJECT-FIRST-NAV-20261022](../reports/WBS-UI1-PROJECT-FIRST-NAV-20261022.md)。
@@ -528,6 +528,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v2.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 UI-1/UI-2 commit rebased onto UI-0 并 fast-forward 到本地 dev 的 HEAD `4dcf567d`；WBS 和阶段报告均同步 35/35 八套件结果及仍开放的授权/读屏/真实性能门。 | 完成 UI WBS 当前批次集成 |
 | v2.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 提交前自审恢复 ProjectRunTree 对 Project 选择、Project/Run 独立展开和 ArrowRight 键盘展开的直接回归测试；八个 UI-1/UI-2 suites 重新验证为 35/35，typecheck 与 CypherGraph Guardian 通过。 | UI 自审发现局部测试覆盖被替换 |
 | v2.0 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 UI-0 harness 集成到本地 dev 的提交和 UI-1/UI-2 当前 32/32（八个测试套件）验证结果；浏览器 AX 重验无授权目录 fail-closed 状态。明确真实 UI driver 样本、屏幕阅读器、授权焦点转换和 Rust renderer 性能结论仍开放。 | 用户要求在 UI 优化后继续按 WBS 推进 |
 | v1.9 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 Project 导航和移动目录抽屉补齐英语、简体中文和日语标签；390×844 浏览器检查无横向溢出，Escape 关闭后焦点恢复到触发按钮；五个 focused suites 21/21、TypeScript typecheck 通过。真实屏幕阅读器及授权目录导航仍开放；UI-0 harness lane 16/16 重跑通过但仍未提交/集成且无真实 UI 样本。 | 按 WBS 完成 UI-1 窄屏与移动键盘切片，并继续 UI-0 审查 |

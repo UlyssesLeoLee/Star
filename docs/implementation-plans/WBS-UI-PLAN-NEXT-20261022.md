@@ -1,8 +1,8 @@
 # WBS：下一版 Worktree-first UI
 
 **Date:** 2026-10-22
-**Revision:** v1.4
-**Baseline:** UI-0 harness commit `4e8a8268d59c1bcd7c3e5bf5ebe6847b128b21e2` was rebased onto and fast-forwarded to local `dev` at `aa30385c6e41f9712c78b9a2fe824f0d40a2f312`; UI-1/UI-2 changes remain in the registered source lane pending its own rebase and integration. Cached remote freshness has not been refreshed.
+**Revision:** v1.5
+**Baseline:** UI-0 harness commit `4e8a8268d59c1bcd7c3e5bf5ebe6847b128b21e2` was rebased onto dev `aa30385c6e41f9712c78b9a2fe824f0d40a2f312` and fast-forwarded; UI-1/UI-2 commit `4dcf567d1e89aa4c648fd06a297554166da0f173` was rebased onto UI-0 and fast-forwarded. Local `dev` now points to `4dcf567d1e89aa4c648fd06a297554166da0f173`. Cached remote freshness has not been refreshed.
 **Design:** [UI-PLAN-RUN-WORKTREE-NEXT-20261021.md](UI-PLAN-RUN-WORKTREE-NEXT-20261021.md) v2.0.
 **Status:** UI-0 harness is committed to local `dev`; its 16 standard-library tests, three Python AST parses, PowerShell parser, four Cypher source checks and whitespace review pass. Inventory capture is available, but no real UI driver samples exist, so measurements are unavailable and renderer/threshold choices remain open. UI-1 keeps Project → Engineering Run → Worktree → Branch as the only primary sidebar hierarchy; legacy pages are secondary, mobile navigation opens the same hierarchy, and labels are localized in English, Simplified Chinese, and Japanese. The Worktree Index fails closed without an authorized directory client, and the legacy state-machine graphic is removed. Eight focused UI-1/UI-2 suites pass 35/35 and TypeScript typecheck passes. The tree component retains explicit Project selection, separate Run/Project expansion, and ArrowRight keyboard regression tests. Browser AX confirms the Project-first navigation and unavailable state; the earlier 390×844 viewport check had no horizontal overflow, and Escape restores focus after closing the mobile drawer. Screen-reader and fully authorized navigation acceptance remain open.
 
@@ -79,6 +79,7 @@ UI-3 through UI-6 may be delivered in separate lanes only after UI-0 freezes sha
 
 | Version | Date | Change |
 |---|---|---|
+| v1.5 | 2026-10-22 | Recorded UI-1/UI-2 fast-forward integration into local dev after rechecking Orca owner, target cleanliness and HEAD; the integrated commit contains the corrected 35/35 eight-suite tests, typecheck and synchronized UI report/plan. | Complete the current WBS UI integration batch |
 | v1.4 | 2026-10-22 | Restored direct ProjectRunTree regression coverage for Project selection, separate expand controls and ArrowRight expansion after review found the localization test had replaced the old tree behavior tests; the full eight-suite result is now 35/35 plus typecheck. | Self-review follow-up before UI lane integration |
 | v1.3 | 2026-10-22 | Integrated the reviewed UI-0 harness into local dev; corrected UI-1/UI-2 validation to the current reproducible result of 32/32 across eight suites plus typecheck, refreshed the browser AX evidence, and kept real performance samples, screen-reader and authorized focus gates open. | Continue WBS with real UI driver samples and owner-backed navigation acceptance |
 | v1.2 | 2026-10-22 | Recorded localized mobile navigation in three languages, 390×844 no-overflow viewport evidence, mobile Escape/focus restoration, and 21/21 focused tests plus typecheck. Corrected UI-0 integration status: its source lane is untracked/unintegrated and has no real UI driver samples. | Continue UI-0 promotion and remaining UI-1/UI-2 acceptance |
