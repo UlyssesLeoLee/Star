@@ -1,4 +1,4 @@
-# @cypher schema=1 source_sha256=30f6c56025e5dffe578a41165dce71c0e0bd754350eeb863e9e1249c6883c54e
+# @cypher schema=1 source_sha256=97db84df112a4cd43c3c2b6dd38f46799e416e555ca55c172d220623972e6636
 # MERGE (self:File {path:"scripts/automation/test_schedule_occurrence_branch_snapshot.py"})
 # MERGE (suite:Symbol {id:"scripts/automation/test_schedule_occurrence_branch_snapshot.py::OccurrenceBranchSnapshotMigrationTests",kind:"class"})
 # MERGE (migration_test:Symbol {id:"scripts/automation/test_schedule_occurrence_branch_snapshot.py::OccurrenceBranchSnapshotMigrationTests.test_migration_is_forward_only_and_idempotent",kind:"test"})
@@ -57,6 +57,7 @@ class OccurrenceBranchSnapshotMigrationTests(unittest.TestCase):
         sql = MIGRATION.read_text(encoding="utf-8")
         self.assertIn("2026-10-22-schedule-occurrence-branch-snapshot.sql", source)
         self.assertIn('for pass_name in ("first", "repeat")', source)
+        self.assertIn('f"-h 127.0.0.1 -p {self.port} -k {self.data_dir}"', source)
         self.assertIn('"postgres-schedule-occurrence-branch-snapshot"', source)
         for invalid in (
             '"target":{}}',

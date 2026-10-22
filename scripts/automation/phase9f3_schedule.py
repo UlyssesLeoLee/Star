@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=0ddcefac8fe5bf08870c4ac7cbf1a1bb9c43a7bd2dc4a1fa937b15268d0e05ba
+# @cypher schema=1 source_sha256=8000d62bd0949ec226d1373a56884736fe7c9d7d99d6e662e92cc8ce5e33a187
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -640,7 +640,7 @@ class DisposablePostgres:
                     "-l",
                     str(self.data_dir / "server.log"),
                     "-o",
-                    f"-h 127.0.0.1 -p {self.port}",
+                    f"-h 127.0.0.1 -p {self.port} -k {self.data_dir}",
                     "-w",
                     "start",
                 ],
