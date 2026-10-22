@@ -1,9 +1,9 @@
 # UI-0：Worktree-first 界面与状态设计
 
-**版本：** v0.1
+**版本：** v0.4
 **日期：** 2026-10-22
-**设计基线：** 本地 dev 源码提交 17b3d06539f0281b8a5f9e7a1576864487b26337
-**状态：** 设计交付；页面实现和生产闭环仍未完成
+**设计基线：** 原始屏幕/状态审查基于 dev `17b3d06539f0281b8a5f9e7a1576864487b26337`；UI-2 Worktree 选择器后续实现基于共同 `dev`/`main`/`origin/dev` 提交 `5a051bfd8f76fbfbe8ff49a994579c60166d6ec6`
+**状态：** 设计交付；Web UI-1 Project/Run 选择态与 UI-2 picker 边界有局部实现；页面完整性和生产闭环仍未完成
 **修订人：** Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 
 ## 0. 目的和结论
@@ -128,7 +128,7 @@ Worktree focus 是一个受验证的运行上下文，不是前端选中行的�
 
 - 只选 Project/Run 不请求 Task、Canvas、BI 或 Plugin 内容；只加载导航所需的 Run/Worktree 目录摘要。
 - Worktree 选择不会乐观挂载；授权、binding/version 或当前会话不确定时 focus 为空。
-- Run Worktree 目录必须支持 next_cursor、搜索与明确的 loading/error/retry；当前 Run Shell 只呈现首批结果，尚无右侧完整分页选择器。
+- Run Worktree 目录使用 next_cursor 分页；当前 Run Shell 已提供最多 4 页/200 条的加载更多与已加载条目搜索，并呈现 loading/error/retry/上限。搜索不覆盖尚未加载的服务端条目；跨全目录搜索仍待 owner/API 合同。
 - Run App tabs 的外观不代表实现；当前 Task Cards/BI 面板与其他待迁移 tab 分开呈现。
 - 生命周期按钮在真实 Run provider、Repository binding、目标 DB/RLS 与 durable owner receipt 通过前必须 disabled。
 - CLI 输入在 Session provisioner、隔离 sandbox、Rust native Hooks、资源预算、取消/drain、独立验证与结果写回未满足前 disabled。
@@ -151,12 +151,16 @@ Worktree focus 是一个受验证的运行上下文，不是前端选中行的�
 ## 9. 已知缺口
 
 - Rust UI 的具体 renderer crate 与插件 runtime 还未选定；Context7 当前不可用，本设计不编造框架性能或无障碍结论。
-- 当前 target machine 硬件/显示器/内存库存和实际负载尚未记录，RSS、启动时间、交互延迟阈值待基准后审定。
+- 目标机静态硬件和 UI0-BENCH-001 合成输入已记录；显示器/DPI/刷新率/电源模式、真实负载分布、性能测量与 RSS/启动时间/交互延迟阈值仍待基准后审定。
 - 图数据库索引覆盖检查端点当前不可用；源码证据边界见 §1，不作全仓 exhaustive claim。
 - UI-1 到 UI-7 的界面/业务实现及 owner API 验收仍按 WBS 分阶段执行；本文件本身不表示这些能力已落地。
+- Web UI-1 已将 Project/Run 的选择链接与展开按钮拆分：Project 导航到 Project Worktree Index，Run 导航到无焦点概览；组件级 ArrowRight disclosure 和导航测试通过，UI-1/UI-2 focused 测试共 9/9 且 TypeScript typecheck 通过。真实浏览器、完整键盘焦点、屏幕阅读器和 owner facts 仍待验证。
 
 ## 10. 修订历史
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.4 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 UI-1 Project/Run 选择与展开分离的局部实现及 9/9 focused test、typecheck 结果；增加组件级键盘 disclosure 证据，明确真实浏览器、完整键盘/读屏和 owner facts 仍开放。 | 按 WBS 推进 Project/Run 选择态 |
+| v0.3 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 UI-0 状态更新为目标机静态 inventory 与 hash-pinned UI0-BENCH-001 参数已记录；补充 UI-1 可见 unknown 元数据标记，显示设备、generator/runner、实际测量、owner freshness 字段与性能阈值仍列为开放项。 | 按 WBS 推进 UI-0 基准和 UI-1 投影准备 |
+| v0.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 UI-2 Worktree 选择器当前实现边界：最多 200 条、已加载范围搜索、分页错误恢复与上限提示；将跨全目录搜索和视觉/辅助技术验收留作未关闭项。 | 用户要求基于最新 dev 优化 UI/UX 并继续 WBS |
 | v0.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 建立 UI-0 界面/状态包、owner/API 对照、焦点与取消流程、无障碍行为、fail-closed 门和当前实现差距；不声称 UI 或生产能力已完成。 | 用户要求当前开发轮完成后，为新版本开展 UI 规划 |

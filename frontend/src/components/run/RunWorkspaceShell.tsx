@@ -1,7 +1,15 @@
 /*
-@cypher schema=1 source_sha256=76fdd30675064e0393fa20d793008d0b204dceb24167c6785ff6628bc6a52db0
+@cypher schema=1 source_sha256=06eadf84322318ebaeb159eaa5eb1af9cf449927afb770f52231a46aa1e2877c
 MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
+MERGE (loadMore:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::loadMoreWorktreeSelection",kind:"function"})
+MERGE (validatePage:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::validateWorktreeSelectionPage",kind:"function"})
+MERGE (filtered:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::filteredWorktrees",kind:"variable"})
+MERGE (selection:Type {id:"frontend/src/components/run/RunWorkspaceShell.tsx::WorktreeSelectionLoad",kind:"type"})
+MERGE (pageSize:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RUN_DIRECTORY_PAGE_SIZE",kind:"constant"})
+MERGE (pageBudget:Symbol {id:"frontend/src/lib/run/runDirectoryTree.ts::RUN_DIRECTORY_TREE_BUDGET",kind:"constant"})
+MERGE (selectionLimit:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::WORKTREE_SELECTION_MAX_ROWS",kind:"constant"})
+MERGE (directoryErrorType:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryError",kind:"class"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
 MERGE (worktrees:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listWorktrees",kind:"method"})
 MERGE (worktreeHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunWorktreeHref",kind:"function"})
@@ -9,6 +17,7 @@ MERGE (worktree:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunWorktree",
 MERGE (context:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::RunContextEnvelope",kind:"type"})
 MERGE (runHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalRunHref",kind:"function"})
 MERGE (self)-[:DEFINES]->(shell)
+MERGE (self)-[:DEFINES]->(validatePage)
 MERGE (shell)-[:CALLS]->(panel)
 MERGE (biPanel:Symbol {id:"frontend/src/components/run/RunBiPanel.tsx::RunBiPanel",kind:"function"})
 MERGE (shell)-[:CALLS]->(biPanel)
@@ -17,28 +26,42 @@ MERGE (shell)-[:CALLS]->(worktreeHref)
 MERGE (shell)-[:USES_TYPE]->(context)
 MERGE (shell)-[:USES_TYPE]->(worktree)
 MERGE (shell)-[:CALLS]->(runHref)
+MERGE (shell)-[:CALLS]->(loadMore)
+MERGE (shell)-[:CALLS]->(validatePage)
+MERGE (loadMore)-[:CALLS]->(worktrees)
+MERGE (loadMore)-[:CALLS]->(validatePage)
+MERGE (loadMore)-[:CALLS]->(directoryErrorType)
+MERGE (loadMore)-[:CALLS]->(error)
+MERGE (validatePage)-[:CALLS]->(directoryErrorType)
+MERGE (validatePage)-[:USES]->(pageSize)
+MERGE (validatePage)-[:USES]->(selectionLimit)
+MERGE (shell)-[:USES]->(pageSize)
+MERGE (shell)-[:USES]->(pageBudget)
+MERGE (shell)-[:USES]->(selectionLimit)
+MERGE (shell)-[:USES]->(filtered)
+MERGE (shell)-[:USES_TYPE]->(selection)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
 CREATE (f:File {name:"frontend/src/components/run/RunWorkspaceShell.tsx",type:"file",language:"tsx"}),
  (route:Class {name:"RunWorkspaceRoute",type:"class"}),(load:Class {name:"ContextLoad",type:"class"}),
- (shell:Function {name:"RunWorkspaceShell",type:"function"}),(resolve:Function {name:"resolveCanonicalRunContext",type:"function"}),
+ (shell:Function {name:"RunWorkspaceShell",type:"function"}),(loadMore:Function {name:"loadMoreWorktreeSelection",type:"function"}),(filtered:Variable {name:"filteredWorktrees",type:"variable"}),(selection:Type {name:"WorktreeSelectionLoad",type:"type"}),(resolve:Function {name:"resolveCanonicalRunContext",type:"function"}),
  (detail:Function {name:"RunContextDetails",type:"function"}),(session:Function {name:"useRunDirectory",type:"function"}),(taskCards:Function {name:"RunTaskCardsPanel",type:"function"}),
  (href:Function {name:"canonicalRunHref",type:"function"}),(context:Function {name:"RunDirectoryApiClient.getRunContext",type:"function"}),
  (error:Function {name:"directoryErrorMessage",type:"function"}),(tabs:Variable {name:"RUN_APP_TABS",type:"variable"}),(activeApp:Variable {name:"activeApp",type:"variable"}),
- (state:Function {name:"useState",type:"function"}),(effect:Function {name:"useEffect",type:"function"}),
- (f)-[:CONTAINS]->(route),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(shell),(f)-[:CONTAINS]->(detail),(f)-[:CONTAINS]->(tabs),
+ (state:Function {name:"useState",type:"function"}),(effect:Function {name:"useEffect",type:"function"}),(memo:Function {name:"useMemo",type:"function"}),(ref:Function {name:"useRef",type:"function"}),(pageSize:Variable {name:"RUN_DIRECTORY_PAGE_SIZE",type:"variable"}),(pageBudget:Variable {name:"RUN_DIRECTORY_TREE_BUDGET",type:"variable"}),(selectionLimit:Variable {name:"WORKTREE_SELECTION_MAX_ROWS",type:"variable"}),(directoryErrorType:Class {name:"RunDirectoryError",type:"class"}),
+ (f)-[:CONTAINS]->(route),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(shell),(f)-[:CONTAINS]->(loadMore),(f)-[:CONTAINS]->(filtered),(f)-[:CONTAINS]->(selectionLimit),(f)-[:CONTAINS]->(detail),(f)-[:CONTAINS]->(tabs),
  (shell)-[:CONTAINS]->(resolve),(shell)-[:CALLS]->(session),(shell)-[:CALLS]->(href),(shell)-[:CALLS]->(state),(shell)-[:CALLS]->(effect),
- (shell)-[:CALLS]->(detail),(shell)-[:CALLS]->(taskCards),(resolve)-[:CALLS]->(context),(resolve)-[:CALLS]->(error),(shell)-[:USES]->(tabs),(shell)-[:USES]->(activeApp);
+ (shell)-[:CALLS]->(detail),(shell)-[:CALLS]->(taskCards),(shell)-[:CALLS]->(loadMore),(loadMore)-[:CALLS]->(worktrees),(loadMore)-[:CALLS]->(directoryErrorType),(loadMore)-[:CALLS]->(error),(shell)-[:CALLS]->(memo),(shell)-[:CALLS]->(ref),(shell)-[:USES]->(pageSize),(shell)-[:USES]->(pageBudget),(shell)-[:USES]->(selectionLimit),(shell)-[:USES]->(filtered),(shell)-[:USES_TYPE]->(selection),(resolve)-[:CALLS]->(context),(resolve)-[:CALLS]->(error),(shell)-[:USES]->(tabs),(shell)-[:USES]->(activeApp);
 */
 
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { canonicalRunHref, canonicalRunWorktreeHref, RunDirectoryError, type RunContextEnvelope, type RunDirectoryApiClient, type RunWorktree } from "@/lib/run/runDirectoryApi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { canonicalRunHref, canonicalRunWorktreeHref, RUN_DIRECTORY_PAGE_SIZE, RunDirectoryError, type RunContextEnvelope, type RunDirectoryApiClient, type RunWorktree } from "@/lib/run/runDirectoryApi";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
-import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
+import { directoryErrorMessage, RUN_DIRECTORY_TREE_BUDGET } from "@/lib/run/runDirectoryTree";
 import { RunTaskCardsPanel } from "@/components/run/RunTaskCardsPanel";
 import { RunBiPanel } from "@/components/run/RunBiPanel";
 
@@ -46,9 +69,34 @@ export interface RunWorkspaceRoute { project_id: string; engineering_run_id: str
 type ContextLoad = { client: RunDirectoryApiClient; route: string; status: "ready"; envelope: RunContextEnvelope } |
   { client: RunDirectoryApiClient; route: string; status: "error"; message: string };
 type WorktreeSelectionLoad = { client: RunDirectoryApiClient; route: string; status: "loading" } |
-  { client: RunDirectoryApiClient; route: string; status: "ready"; rows: RunWorktree[]; hasMore: boolean } |
+  { client: RunDirectoryApiClient; route: string; status: "ready"; rows: RunWorktree[]; hasMore: boolean; nextCursor: string | null; pagesLoaded: number; cursorHistory: string[]; loadingMore: boolean; pageError: string | null } |
   { client: RunDirectoryApiClient; route: string; status: "error"; message: string };
+const WORKTREE_SELECTION_MAX_ROWS = RUN_DIRECTORY_PAGE_SIZE * RUN_DIRECTORY_TREE_BUDGET.pagesPerParent;
 const RUN_APP_TABS = ["Inbox", "Task Cards", "Canvas", "Workflow / LangGraph", "Run BI / Benchmark", "Plugin Apps"] as const;
+type WorktreeDirectoryPage = Awaited<ReturnType<RunDirectoryApiClient["listWorktrees"]>>;
+
+function validateWorktreeSelectionPage(
+  page: WorktreeDirectoryPage,
+  existingRows: readonly RunWorktree[],
+  requestedCursor: string | null,
+  cursorHistory: readonly string[],
+): void {
+  if (page.rows.length > RUN_DIRECTORY_PAGE_SIZE || page.rows.length > WORKTREE_SELECTION_MAX_ROWS - existingRows.length) {
+    throw new RunDirectoryError(0, "page_limit", "Worktree 分页超过单页或选择器读取上限，请刷新目录后重试。");
+  }
+
+  const knownIds = new Set(existingRows.map((row) => row.worktree_id));
+  for (const row of page.rows) {
+    if (knownIds.has(row.worktree_id)) {
+      throw new RunDirectoryError(0, "invalid_page", "Worktree 分页包含重复条目，请刷新目录后重试。");
+    }
+    knownIds.add(row.worktree_id);
+  }
+
+  if (page.next_cursor !== null && (page.next_cursor === requestedCursor || cursorHistory.includes(page.next_cursor))) {
+    throw new RunDirectoryError(0, "invalid_page", "Worktree 分页游标重复，请刷新目录后重试。");
+  }
+}
 
 export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   const { client, status, message, setFocus, clearFocus } = useRunDirectory();
@@ -56,6 +104,8 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   const [worktreeSelection, setWorktreeSelection] = useState<WorktreeSelectionLoad | null>(null);
   const [retry, setRetry] = useState(0);
   const [worktreeRetry, setWorktreeRetry] = useState(0);
+  const [worktreeSearch, setWorktreeSearch] = useState("");
+  const selectionController = useRef<AbortController | null>(null);
   const [chatScope, setChatScope] = useState<"WORKTREE" | "GLOBAL">("GLOBAL");
   const [activeApp, setActiveApp] = useState<(typeof RUN_APP_TABS)[number]>("Task Cards");
   let href = "";
@@ -88,19 +138,66 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
   }, [clearFocus, client, href, projectId, retry, runId, setFocus, status, worktreeId]);
   const current = load && load.client === client && load.route === href ? load : null;
   useEffect(function loadAuthorizedWorktreeChoices() {
+    selectionController.current?.abort();
+    selectionController.current = null;
     setWorktreeSelection(null);
+    setWorktreeSearch("");
     if (!client || !href || !current || current.status !== "ready" || current.envelope.focus || worktreeId) return;
     const controller = new AbortController();
+    selectionController.current = controller;
     setWorktreeSelection({ client, route: href, status: "loading" });
     void client.listWorktrees(current.envelope.engineering_run, undefined, controller.signal).then((page) => {
-      if (!controller.signal.aborted) setWorktreeSelection({ client, route: href, status: "ready", rows: page.rows, hasMore: page.next_cursor !== null });
+      if (controller.signal.aborted) return;
+      validateWorktreeSelectionPage(page, [], null, []);
+      setWorktreeSelection({ client, route: href, status: "ready", rows: page.rows, hasMore: page.next_cursor !== null, nextCursor: page.next_cursor, pagesLoaded: 1, cursorHistory: [], loadingMore: false, pageError: null });
     }).catch((error: unknown) => {
       if (!controller.signal.aborted) setWorktreeSelection({ client, route: href, status: "error", message: directoryErrorMessage(error) });
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      selectionController.current?.abort();
+      selectionController.current = null;
+    };
   }, [client, current, href, worktreeId, worktreeRetry]);
   const currentWorktreeSelection = worktreeSelection && worktreeSelection.client === client && worktreeSelection.route === href
     ? worktreeSelection : null;
+  async function loadMoreWorktreeSelection() {
+    if (!client || !current || current.status !== "ready" || currentWorktreeSelection?.status !== "ready") return;
+    const selection = currentWorktreeSelection;
+    const cursor = selection.hasMore && selection.pagesLoaded < RUN_DIRECTORY_TREE_BUDGET.pagesPerParent
+      ? selection.nextCursor
+      : null;
+    if (!cursor || selection.loadingMore) return;
+    if (selection.cursorHistory.includes(cursor)) {
+      setWorktreeSelection({ ...selection, pageError: "Worktree 分页游标重复。请重试目录读取。" });
+      return;
+    }
+    const controller = new AbortController();
+    selectionController.current?.abort();
+    selectionController.current = controller;
+    setWorktreeSelection({ ...selection, loadingMore: true, pageError: null });
+    try {
+      const page = await client.listWorktrees(current.envelope.engineering_run, cursor, controller.signal);
+      if (controller.signal.aborted) return;
+      validateWorktreeSelectionPage(page, selection.rows, cursor, selection.cursorHistory);
+      setWorktreeSelection((previous) => previous?.status === "ready" && previous.client === client && previous.route === href
+        ? { ...previous, rows: [...previous.rows, ...page.rows], hasMore: page.next_cursor !== null, nextCursor: page.next_cursor, pagesLoaded: previous.pagesLoaded + 1, cursorHistory: [...previous.cursorHistory, cursor], loadingMore: false, pageError: null }
+        : previous);
+    } catch (error) {
+      if (!controller.signal.aborted) setWorktreeSelection((previous) => previous?.status === "ready" && previous.client === client && previous.route === href
+        ? { ...previous, loadingMore: false, pageError: directoryErrorMessage(error) }
+        : previous);
+    } finally {
+      if (selectionController.current === controller) selectionController.current = null;
+    }
+  }
+  const filteredWorktrees = useMemo(() => {
+    if (currentWorktreeSelection?.status !== "ready") return [];
+    const needle = worktreeSearch.trim().toLocaleLowerCase();
+    if (!needle) return currentWorktreeSelection.rows;
+    return currentWorktreeSelection.rows.filter((worktree) =>
+      `${worktree.name} ${worktree.branch} ${worktree.worktree_id} ${worktree.machine_state} ${worktree.human_state}`.toLocaleLowerCase().includes(needle));
+  }, [currentWorktreeSelection, worktreeSearch]);
   const visibleChatScope = current?.status === "ready" && current.envelope.focus && chatScope === "WORKTREE" ? "WORKTREE" : "GLOBAL";
   if (!href) return <section className="p-6" role="alert"><h1 className="text-lg font-semibold">Run 路径无效</h1><p className="mt-2 text-sm text-ink-mute">Project 与 Run 必须使用有效目录身份。</p></section>;
   if (status !== "ready" || !client) return <section className="p-6" role="status"><h1 className="text-lg font-semibold">Engineering Run</h1><p className="mt-2 text-sm text-ink-mute">{message}</p></section>;
@@ -142,15 +239,24 @@ export function RunWorkspaceShell({ route }: { route: RunWorkspaceRoute }) {
         <button type="button" className="mt-2 rounded border border-line px-3 py-1" onClick={() => { setWorktreeSelection(null); setWorktreeRetry((value) => value + 1); }}>重试 Worktree 目录</button>
       </div>}
       {currentWorktreeSelection?.status === "ready" && currentWorktreeSelection.rows.length === 0 && <p className="mt-3 text-sm text-ink-mute">此 Run 当前没有已授权的 Worktree。请先通过受控 Worktree 创建流程完成创建或绑定，再回到此 Run 选择。</p>}
-      {currentWorktreeSelection?.status === "ready" && currentWorktreeSelection.rows.length > 0 && <ul className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="此 Run 的授权 Worktree">
-        {currentWorktreeSelection.rows.map((worktree) => <li key={worktree.worktree_id}>
-          <Link prefetch={false} href={canonicalRunWorktreeHref(projectId, runId, worktree.worktree_id)} className="block rounded border border-line bg-bg-card p-3 hover:border-accent focus:outline focus:outline-2 focus:outline-accent">
-            <span className="block truncate text-sm font-medium">{worktree.name}</span>
-            <span className="mt-1 block truncate text-xs text-ink-mute">{worktree.machine_state} · 本地 Branch {worktree.branch.trim() || "未关联"}</span>
-          </Link>
-        </li>)}
-      </ul>}
-      {currentWorktreeSelection?.status === "ready" && currentWorktreeSelection.hasMore && <p className="mt-3 text-xs text-ink-mute">当前显示首批 Worktree。请在左侧 Project 目录展开此 Run 并加载更多条目。</p>}
+      {currentWorktreeSelection?.status === "ready" && currentWorktreeSelection.rows.length > 0 && <div className="mt-4">
+        <label htmlFor="run-worktree-search" className="block text-xs font-medium">搜索已加载的 Worktree</label>
+        <input id="run-worktree-search" type="search" maxLength={128} value={worktreeSearch} onChange={(event) => setWorktreeSearch(event.target.value)} placeholder="名称、Branch、状态或 ID" className="mt-1 w-full rounded border border-line bg-bg-card px-3 py-2 text-sm focus:outline focus:outline-2 focus:outline-accent" />
+        <p role="status" className="mt-2 text-xs text-ink-mute">显示 {filteredWorktrees.length} / {currentWorktreeSelection.rows.length} 项；搜索范围是已加载条目，单次最多 {WORKTREE_SELECTION_MAX_ROWS} 项。</p>
+        {filteredWorktrees.length > 0 ? <ul className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="已加载的授权 Worktree">
+          {filteredWorktrees.map((worktree) => <li key={worktree.worktree_id}>
+            <Link prefetch={false} href={canonicalRunWorktreeHref(projectId, runId, worktree.worktree_id)} className="block rounded border border-line bg-bg-card p-3 transition-colors hover:border-accent hover:bg-accent/5 focus:outline focus:outline-2 focus:outline-accent">
+              <span className="block truncate text-sm font-medium">{worktree.name}</span>
+              <span className="mt-1 block truncate text-xs text-ink-mute">{worktree.machine_state}{worktree.archived ? " · 已归档" : ""} · 本地 Branch {worktree.branch.trim() || "未关联"}</span>
+            </Link>
+          </li>)}
+        </ul> : <p role="status" className="mt-3 rounded border border-line p-3 text-sm text-ink-mute">没有匹配当前已加载条目的 Worktree。清除搜索或加载更多条目后再试。</p>}
+        {currentWorktreeSelection.loadingMore && <p role="status" className="mt-3 text-sm text-ink-mute">正在读取下一页；当前结果会保留到加载完成。</p>}
+        {currentWorktreeSelection.pageError && <div role="alert" className="mt-3 text-sm"><p>{currentWorktreeSelection.pageError}</p><button type="button" disabled={currentWorktreeSelection.loadingMore} className="mt-2 rounded border border-line px-3 py-1 disabled:opacity-50" onClick={() => { setWorktreeSelection(null); setWorktreeRetry((value) => value + 1); }}>刷新 Worktree 目录</button></div>}
+        {currentWorktreeSelection.hasMore && currentWorktreeSelection.pagesLoaded < RUN_DIRECTORY_TREE_BUDGET.pagesPerParent
+          ? <button type="button" disabled={currentWorktreeSelection.loadingMore} onClick={() => void loadMoreWorktreeSelection()} className="mt-3 rounded border border-line px-3 py-2 text-sm hover:border-accent focus:outline focus:outline-2 focus:outline-accent disabled:opacity-50">{currentWorktreeSelection.loadingMore ? "正在加载…" : "加载更多 Worktree"}</button>
+          : currentWorktreeSelection.hasMore && <p className="mt-3 text-xs text-ink-mute">此选择器最多加载 {WORKTREE_SELECTION_MAX_ROWS} 项。请在左侧 Project 目录展开此 Run，继续查看下一组 Worktree。</p>}
+      </div>}
     </section>}
     {focus && <RunContextDetails envelope={envelope} />}
     <footer className="mt-auto border-t border-line pt-4">
