@@ -1,14 +1,16 @@
 # WBS Delta — Run Lifecycle and Execution Closure
 
 **Date:** 2026-10-23
-**Revision:** v4.5.1
-**Baseline:** Current local `dev=d01e42e08666ebbc5d1a4e1af3e1ad594c489846` and `main=5a051bfd8f76fbfbe8ff49a994579c60166d6ec6` (`main...dev = 0 19`). This includes the v4.5 WBS reconciliation commit `d01e42e0`; the WLD-0 positive acceptance and latest WLD-3 report are also ancestors of this `dev`. No fetch or push was performed, so remote freshness is unknown. Design baselines remain requirements v6.91, Schedule API SRS v0.65, basic design v6.94, Schedule BD v0.63, Schedule DD v0.77, Group DD v5.16, implementation plan v7.14, and UI plan v2.3.
+**Revision:** v4.6
+**Baseline:** Current local `dev=3d60676dbfb6a514ef31a97463a7b5fbca60c29a` and `main=5a051bfd8f76fbfbe8ff49a994579c60166d6ec6` (`main...dev = 0 22`). This includes the WLD-0 migration-ledger classifier integration. No fetch or push was performed, so remote freshness is unknown. Design baselines remain requirements v6.91, Schedule API SRS v0.65, basic design v6.94, Schedule BD v0.63, Schedule DD v0.77, Group DD v5.16, implementation plan v7.14, and UI plan v2.3.
 **Historical integration checkpoint:** Positive WLD-0 acceptance commit `3e67b3fb3f36c5e2524695abcefdc61edff83c20` was rebased onto `dev@89edea2b85d0433b96446546bfb28b9d1b89d27a` and fast-forwarded into the clean, inactive Orca `dev` checkout. At integration, local `dev` was 17 commits ahead of its recorded `origin/dev` ref; no fetch or push was performed, so remote freshness remains unknown.
 **Planning-time integration checkpoint:** local `dev` was at `8245b90c`; cached `origin/dev` was 54 commits behind. No fetch or push was performed, so remote freshness was unknown at this planning snapshot.
 **Planning source checkpoint (before v0.7 docs integration):** local `dev` was clean at `30c6b975612ce72cfc626db70037420885be6672`; local `main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`, `main...dev = 0 205`. The v0.7 UI plan was based on this commit and the v0.6 plan/WBS v3.7. The recorded `origin/dev` ref was 51 commits behind at this checkpoint; no fetch or push was performed, so remote freshness is unknown.
 **Purpose:** Add the concrete integration, product-closure and UI planning work that remains after the source slices recorded in the current plan. This delta supplements `WORKTREE-GROUP-IMPL-PLAN-001.md`; it does not replace or renumber its historical phases.
 
 ## 1. Audit conclusion
+
+**Latest WLD-0 checkpoint:** Commit `3d60676d` adds a pure migration-ledger/catalog snapshot classifier with exact-predecessor, exact-applied, ambiguous-commit, approved-successor and fail-closed mismatch cases. The focused runner passed 19/19 tests after rebase. This slice does not read or mutate a target database; migration deployment, target history reconciliation and production acceptance remain open. Its completed worktree was removed after integration, with 29 ignored cache/log files hash-verified in `C:\Users\leo19\.codex\archives\Star\2026-10-23-wld0-run-binding-ddl`.
 
 The canonical navigation and several host-independent source paths are documented and partially implemented. The remaining work is chiefly binding/lifecycle integration, owner-to-owner execution, production identity and target-database validation, and runtime acceptance. Existing migrations, isolated PostgreSQL fixtures, source contracts, UI, and unit tests are useful evidence for their own scopes; none alone proves the production Run/Worktree/Task/Schedule execution loop.
 
@@ -133,6 +135,7 @@ The UI workstream may refine wireframes, Rust renderer prototypes and read-only 
 
 | Version | Date | Change |
 |---|---|---|
+| v4.6 | 2026-10-23 | Record WLD-0 classifier commit `3d60676d`, 19/19 focused tests, unresolved target-database gates, updated local `main...dev = 0 22`, and hash-verified cleanup of the completed WLD-0 worktree/branch. Preserve the active WLD-3 formatter lane and keep Schedule execution open. |
 | v4.5.1 | 2026-10-23 | Advance the WBS baseline through integration of v4.5 at `d01e42e0` (`main...dev = 0 19`); correct current status for completed WLD-0 positive/WLD-3 occurrence Git worktree and local branch cleanup; record that Codex artifact-registry entries remain stale despite absent checkout paths; keep Schedule closed and WLD-0 DDL as the next active implementation lane. |
 | v4.5 | 2026-10-23 | Reconcile the baseline to local `dev=f70f8a77` and `main=5a051bfd` (`main...dev = 0 18`); update WLD-0 positive acceptance and superseding WLD-3 35/35 helper, 5/5 Schedule integration and 1/1 ACL evidence without claiming the full phase CLI passed; keep Schedule fail-closed; refresh the ordered WBS for target DB, lifecycle provider, host authentication, Task CLI, Schedule/Loop, infrastructure, native Hooks, BI/Benchmark, UI v2.3 and WLD-7; record verified Git worktree/branch cleanup and the separate Codex artifact-registry state. |
 | v4.4 | 2026-10-23 | Record the rebased WLD-0 positive binding HTTP acceptance, the 50/50 disposable PostgreSQL 18.6 run, the fast-forward to local `dev`, and the remaining target-database/runtime gates; report Codex archival requests as queued until confirmed complete. |
