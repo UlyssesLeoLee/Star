@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=d3fe26c26ea38ae099e8a354efe1a9e30597f974e8d1ef618fe43c7687ad8e9e
+//! @cypher schema=1 source_sha256=cffcc595d2e4fcadbf5b6f2233bd4abdc59c9532cf556a608c9ea2af76111746
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -855,15 +855,9 @@ fn validate_recurrence(rule: &AutomationScheduleRuleRevisionV1) -> Result<(), Gr
     let now = Utc::now();
     let mut candidate = rule.clone();
     candidate.enabled = true;
-    validate_schedule_recurrence(
-        &candidate,
-        now,
-        now + ChronoDuration::seconds(120),
-        now,
-        1,
-    )
-    .map(|_| ())
-    .map_err(|_| GroupApiError::invalid_request("invalid_schedule_recurrence"))
+    validate_schedule_recurrence(&candidate, now, now + ChronoDuration::seconds(120), now, 1)
+        .map(|_| ())
+        .map_err(|_| GroupApiError::invalid_request("invalid_schedule_recurrence"))
 }
 
 async fn persist_revision(
@@ -1364,7 +1358,10 @@ mod tests {
         .fetch_one(&pool)
         .await
         .expect("Schedule occurrence target snapshot nullability should be queryable");
-        assert!(rule_branch_is_nullable, "Rule configuration may omit remote Branch context");
+        assert!(
+            rule_branch_is_nullable,
+            "Rule configuration may omit remote Branch context"
+        );
         assert!(
             occurrence_snapshot_is_required,
             "occurrences must keep a required immutable target snapshot"
@@ -1545,27 +1542,21 @@ mod tests {
                     assert_eq!(scope.repository_id, None);
                     assert_eq!(scope.branch_id, None);
                     let editor_read = authorize_run_principal(
-                        &mut tx,
-                        tenant_id,
-                        actor_id,
-                        project_id,
-                        run_id,
-                        false,
-                        false,
+                        &mut tx, tenant_id, actor_id, project_id, run_id, false, false,
                     )
                     .await;
-                    assert!(editor_read.is_ok(), "hostless Run read must use Project/Run grants");
+                    assert!(
+                        editor_read.is_ok(),
+                        "hostless Run read must use Project/Run grants"
+                    );
                     let editor_write = authorize_run_principal(
-                        &mut tx,
-                        tenant_id,
-                        actor_id,
-                        project_id,
-                        run_id,
-                        true,
-                        false,
+                        &mut tx, tenant_id, actor_id, project_id, run_id, true, false,
                     )
                     .await;
-                    assert!(editor_write.is_ok(), "hostless Rule write must use Project/Run writer grants");
+                    assert!(
+                        editor_write.is_ok(),
+                        "hostless Rule write must use Project/Run writer grants"
+                    );
                 }
             }
             tx.rollback()

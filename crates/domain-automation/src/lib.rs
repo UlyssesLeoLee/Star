@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=c5f069a90fcca0373f36381b1d41791c68153ac57c50add591209ee46bb883fd
+//! @cypher schema=1 source_sha256=e82fe49319d0c16965b535c01ecd2cd4ea28fc575f230d5bdb76a6811dbb6d24
 //! MERGE (self:File {path:"crates/domain-automation/src/lib.rs"})
 //! MERGE (schedule:Symbol {id:"crates/domain-automation/src/lib.rs::schedule",kind:"module"})
 //! MERGE (service:Type {id:"crates/domain-automation/src/lib.rs::InMemoryAutomationService",kind:"struct"})
@@ -43,7 +43,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
 use thiserror::Error;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use uuid::Uuid;
 
 pub mod schedule;

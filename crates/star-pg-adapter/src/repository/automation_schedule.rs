@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7cc601e6726032d604df5f497e647c09cd764ec673a4d2b3f1522fb891172fdd
+@cypher schema=1 source_sha256=e2b4778530f59e69660fb28f27c8ac6392b1f6e32867de5909f902db0cd04aac
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (repo:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository"})
 MERGE (error:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::ScheduleRepositoryError"})
@@ -84,6 +84,7 @@ MERGE (result_admission)-[:READS]->(request_outbox:Table {id:"automation.run_adm
 //! PostgreSQL persistence and fenced dispatch operations for Schedule occurrences.
 
 use chrono::{DateTime, Duration, Utc};
+use domain_automation::RuleId;
 use domain_automation::schedule::{
     AutomationOccurrenceLeaseFenceV1, AutomationScheduleRuleRevisionV1,
     MaterializedScheduleOccurrenceV1, ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1,
@@ -92,7 +93,6 @@ use domain_automation::schedule::{
     ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1,
     ScheduleTargetV1,
 };
-use domain_automation::RuleId;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::postgres::PgRow;

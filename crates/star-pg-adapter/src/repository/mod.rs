@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=980712de6e67a7821c2fc117d2f7f058d57793906f3a0726ac28f55900667b18
+@cypher schema=1 source_sha256=ffc0f29a06dde1963985a4bc3716c07c27828286ac3d36c2ef9c1af53b6270a8
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/mod.rs"})
 MERGE (schedule_module:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (terminal:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::OccurrenceTerminalOutcome"})
@@ -21,8 +21,8 @@ MERGE (self)-[:IMPORTS]->(receive_module)
 //! v0.67 拆出 ops_metrics_config 到独立文件 (跟其他 5 ops + 4 OAuth Repository 模式一致)
 //! 守门 #13 W/T/M 100% 覆盖: T=3 (ops_helm_release_state + ops_cluster_action_log + ops_log_query_log) + W=2 (ops_log_entry TTL 7d + ops_log_analysis TTL 30d) + M=1 (ops_metrics_config SCD2)
 
-pub mod automation_schedule;
 mod admission_receive;
+pub mod automation_schedule;
 pub mod ops_cluster_action_log;
 pub mod ops_helm_release_state;
 pub mod ops_log_analysis;

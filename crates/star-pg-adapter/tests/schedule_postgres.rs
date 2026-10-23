@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d3d47352c9725c0e5b7b3e567e613e0de02d9c05999af36baf1ecf9e7ad8087b
+@cypher schema=1 source_sha256=8d26233d71ba1150737605d3dcc8000e0e9668c1086cd90240f4d3a9d9775b00
 MERGE (self:File {path:"crates/star-pg-adapter/tests/schedule_postgres.rs"})
 MERGE (fixture:Type {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture"})
 MERGE (connect:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::connect_pools",kind:"function"})
@@ -49,11 +49,11 @@ MERGE (test_run_as)-[:TESTS]->(occurrence_run_as_actor)
 
 use chrono::{Duration, Utc};
 use domain_automation::schedule::{
-    materialize_schedule_window, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
+    SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION, materialize_schedule_window,
 };
 use serde_json::json;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use star_pg_adapter::repository::{
     OccurrenceTerminalOutcome, PgAutomationScheduleRepository, ScheduleDispatchResult,
     ScheduleRepositoryError,
@@ -229,9 +229,11 @@ async fn schedule_rule_run_as_actor_cannot_change_between_revisions() {
     .execute(&admin)
     .await
     .expect_err("an occurrence must retain the pinned Rule revision's run-as principal");
-    assert!(mismatched_occurrence_error
-        .to_string()
-        .contains("occurrence run-as identity differs from pinned Rule revision"));
+    assert!(
+        mismatched_occurrence_error
+            .to_string()
+            .contains("occurrence run-as identity differs from pinned Rule revision")
+    );
 
     let initial_rule_id = Uuid::new_v4();
     let initial_error = sqlx::query(
@@ -254,9 +256,11 @@ async fn schedule_rule_run_as_actor_cannot_change_between_revisions() {
     .execute(&admin)
     .await
     .expect_err("an initial run-as principal must be the authenticated creator");
-    assert!(initial_error
-        .to_string()
-        .contains("initial automation schedule run-as identity must match its creator"));
+    assert!(
+        initial_error
+            .to_string()
+            .contains("initial automation schedule run-as identity must match its creator")
+    );
 
     let error = sqlx::query(
         "INSERT INTO automation.schedule_rule_revision \
@@ -452,11 +456,13 @@ async fn retry_terminal_ttl_and_expired_lease_reclaim_are_durable() {
     let ScheduleDispatchResult::RetryScheduled { next_attempt_at } = retry else {
         panic!("first failed attempt must enter retry_wait");
     };
-    assert!(repository
-        .claim_due_occurrences(fixture.tenant_id, Uuid::new_v4(), 30, 1)
-        .await
-        .expect("early retry poll")
-        .is_empty());
+    assert!(
+        repository
+            .claim_due_occurrences(fixture.tenant_id, Uuid::new_v4(), 30, 1)
+            .await
+            .expect("early retry poll")
+            .is_empty()
+    );
     let remaining = (next_attempt_at - Utc::now()).to_std().unwrap_or_default();
     tokio::time::sleep(remaining + std::time::Duration::from_millis(150)).await;
 
@@ -553,11 +559,13 @@ async fn expired_deadlines_and_exhausted_leases_are_terminalized() {
     let deadline_occurrence =
         seed_pending_occurrence_with_deadline(&admin, &deadline_fixture, 60, 1).await;
     tokio::time::sleep(std::time::Duration::from_millis(1_150)).await;
-    assert!(repository
-        .claim_due_occurrences(deadline_fixture.tenant_id, Uuid::new_v4(), 30, 10)
-        .await
-        .expect("deadline sweep succeeds")
-        .is_empty());
+    assert!(
+        repository
+            .claim_due_occurrences(deadline_fixture.tenant_id, Uuid::new_v4(), 30, 10)
+            .await
+            .expect("deadline sweep succeeds")
+            .is_empty()
+    );
     let (deadline_state, deadline_code): (String, String) = sqlx::query_as(
         "SELECT dispatch_state, last_failure_code FROM automation.occurrence_dispatch \
          WHERE tenant_id = $1 AND occurrence_id = $2",
@@ -590,11 +598,13 @@ async fn expired_deadlines_and_exhausted_leases_are_terminalized() {
         .next()
         .expect("one attempt was claimed");
     tokio::time::sleep(std::time::Duration::from_millis(1_150)).await;
-    assert!(repository
-        .claim_due_occurrences(exhausted_fixture.tenant_id, Uuid::new_v4(), 30, 10)
-        .await
-        .expect("exhausted lease sweep succeeds")
-        .is_empty());
+    assert!(
+        repository
+            .claim_due_occurrences(exhausted_fixture.tenant_id, Uuid::new_v4(), 30, 10)
+            .await
+            .expect("exhausted lease sweep succeeds")
+            .is_empty()
+    );
     let (exhausted_state, exhausted_code): (String, String) = sqlx::query_as(
         "SELECT dispatch_state, last_failure_code FROM automation.occurrence_dispatch \
          WHERE tenant_id = $1 AND occurrence_id = $2",

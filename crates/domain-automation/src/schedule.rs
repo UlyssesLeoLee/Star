@@ -4,7 +4,7 @@
 //! It intentionally contains no in-memory scheduler or worker; materialization, claiming, and
 //! Run creation must be committed by the application layer against PostgreSQL.
 //!
-//! @cypher schema=1 source_sha256=e42cd71bfa6e3150c8fe81dce9ef2aeb41be8959c5f3cade5ae5722d7849305c
+//! @cypher schema=1 source_sha256=9c199502b11e0edf8778ca621c8c91ccc130d5ade09aeb73641897905faba46a
 //! MERGE (self:File {path:"crates/domain-automation/src/schedule.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-automation/src/schedule.rs::schedule",kind:"module"})
 //! MERGE (target:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1"})
@@ -1037,14 +1037,8 @@ pub fn validate_schedule_recurrence(
     misfire_cutoff_utc: DateTime<Utc>,
     page_limit: usize,
 ) -> Result<(), ScheduleMaterializationError> {
-    collect_schedule_candidates(
-        rule,
-        after_utc,
-        through_utc,
-        misfire_cutoff_utc,
-        page_limit,
-    )
-    .map(|_| ())
+    collect_schedule_candidates(rule, after_utc, through_utc, misfire_cutoff_utc, page_limit)
+        .map(|_| ())
 }
 
 fn collect_schedule_candidates(
@@ -1143,13 +1137,8 @@ pub fn materialize_schedule_window(
     if rule.target.branch_id.is_none() {
         return Err(ScheduleMaterializationError::InvalidRule);
     }
-    let candidates = collect_schedule_candidates(
-        rule,
-        after_utc,
-        through_utc,
-        misfire_cutoff_utc,
-        page_limit,
-    )?;
+    let candidates =
+        collect_schedule_candidates(rule, after_utc, through_utc, misfire_cutoff_utc, page_limit)?;
 
     let newest_misfire = candidates
         .iter()
@@ -1362,16 +1351,16 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        materialize_schedule_window, AutomationOccurrenceKey, AutomationOccurrenceLeaseFenceV1,
-        AutomationOccurrenceSnapshotV1, AutomationScheduleRuleRevisionV1,
+        AutomationOccurrenceKey, AutomationOccurrenceLeaseFenceV1, AutomationOccurrenceSnapshotV1,
+        AutomationScheduleRuleRevisionV1, MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES,
+        SCHEDULE_ADMISSION_SCHEMA_VERSION, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
         ScheduleAdmissionCompensationReasonV1, ScheduleAdmissionContractError,
         ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionResolutionKindV1, ScheduleContractError,
         ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1, ScheduleMaterializationError,
         ScheduleMisfirePolicyV1, ScheduleOccurrenceDispositionV1, ScheduleOverlapPolicyV1,
         SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleRunAdmissionCommandV1,
         ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResolutionV1,
-        ScheduleRunAdmissionResultV1, ScheduleTargetV1, MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES,
-        SCHEDULE_ADMISSION_SCHEMA_VERSION, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
+        ScheduleRunAdmissionResultV1, ScheduleTargetV1, materialize_schedule_window,
         validate_schedule_recurrence,
     };
     use crate::RuleId;
@@ -1448,14 +1437,16 @@ mod tests {
         let mut rule = schedule_rule();
         rule.target.branch_id = None;
         assert!(rule.validate().is_ok());
-        assert!(validate_schedule_recurrence(
-            &rule,
-            utc("2026-10-04T23:00:00Z"),
-            utc("2026-10-05T01:00:00Z"),
-            utc("2026-10-04T23:30:00Z"),
-            16,
-        )
-        .is_ok());
+        assert!(
+            validate_schedule_recurrence(
+                &rule,
+                utc("2026-10-04T23:00:00Z"),
+                utc("2026-10-05T01:00:00Z"),
+                utc("2026-10-04T23:30:00Z"),
+                16,
+            )
+            .is_ok()
+        );
 
         assert_eq!(
             materialize_schedule_window(
