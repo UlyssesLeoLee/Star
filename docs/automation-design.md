@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.64 (2026-10-21)
+> **文档版本**: v2.66 (2026-10-23)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3169,6 +3169,14 @@ Current evidence: focused `--runner-tests` 6/6; fresh PostgreSQL 18.6 run 34/34 
 
 **Status: dispatched; implementation and verification remain open.** Preserve the current editor's scope guard and browser-unload warning, prevent supported in-app navigation from silently discarding dirty drafts, and report any App Router navigation paths that cannot be protected safely with public APIs. Do not claim all navigation classes are covered without evidence.
 
+## 4.100 WLD-0 migration ledger/catalog reconciliation preflight (2026-10-23)
+
+`classify_migration_reconciliation` is a pure, deterministic classifier over a complete migration-ledger snapshot and the matching catalog fingerprint. It has no database connector or apply callback. It permits an apply decision only when the observed ledger exactly matches the approved predecessor chain and the catalog fingerprint exactly matches the approved pre-migration fingerprint. Expected scalar manifest fields and the observed catalog fingerprint must be nonblank strings; predecessor, target, observed, and successor ledger entries must each contain three nonblank strings. An exact target migration ledger row (including the expected source checksum) plus the expected post-migration fingerprint is classified as already applied; after a lost/ambiguous apply response, the same exact later read is reported as committed. Exact prefixes of the approved successor chain are accepted only when the catalog fingerprint matches that chain head. A missing target ledger row with the post fingerprint, a checksum/fingerprint mismatch, partial catalog state, unexpected successor history, or incomplete snapshot fails closed; an exact target row with unapproved history is diagnosed separately from a target-row mismatch.
+
+This helper specifies a reconciliation boundary; it is not wired to a target database or the disposable-cluster apply path, and it does not supply the approved target fingerprints, deployment lock, transaction protocol, rollback, or history-repair process. No production migration is run or proven. WLD-0 remains open; target DB access/grants, authenticated API mutations, concurrent races, rollback, runtime authorization, Task CLI, Schedule, and execution admission remain separate gates and fail closed.
+
+| v2.66 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Reject blank scalar inputs; verify approved successor prefixes and distinguish unexpected successor history from a mismatched target ledger row; keep the classifier pure and target DB/apply path disabled | WLD-0 reconciliation review follow-up |
+| v2.65 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add a pure WLD-0 migration ledger/catalog classifier for exact predecessor, applied, and ambiguous-commit states; mismatch/partial/unknown snapshots stop; no target DB or apply path is enabled | WLD-0 safe reconciliation preflight gap |
 | v2.64 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register two bounded WLD dispatch cards: hostless Schedule Rule authorization and supported App Router navigation protection for Hook drafts; implementation and runtime gates remain open | WBS next development round parallel dispatch |
 | v2.63 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the completed 34/34 PostgreSQL owner-role run, injected privilege/membership drift, migration re-normalization, stable schema fingerprint and role-owned schema fail-closed fixture; preserve target DB/API/Rust gates | Final drift/replay verification and evidence synchronization |
 | v2.62 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Correct the self-review finding by granting and verifying the Run revision FOR SHARE lock column under restrictive RLS; record 6/6 focused tests and 28/28 disposable PostgreSQL steps, with target DB and authenticated API gates open | Run revision lock-grant gap found during final review |

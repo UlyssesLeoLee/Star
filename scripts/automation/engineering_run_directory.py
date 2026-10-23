@@ -5,6 +5,8 @@ CREATE (f:File {name:"engineering_run_directory.py",type:"file",language:"python
  (main:Function {name:"main",type:"function"}), (root:Variable {name:"ROOT",type:"variable"}),
  (ddl:Function {name:"validate_postgres_ddl",type:"function"}), (guards:Function {name:"task_run_identity_guard_sql",type:"function"}), (uuid:Function {name:"uuid4",type:"function"}),
  (migrationPlan:Function {name:"directory_migration_plan",type:"function"}), (applyPlan:Function {name:"apply_migration_plan",type:"function"}),
+ (reconcile:Function {name:"classify_migration_reconciliation",type:"function"}),
+ (ledgerEntry:Type {name:"MigrationLedgerEntry",type:"type"}),
  (bindingCatalog:Function {name:"run_binding_catalog_sql",type:"function"}), (fingerprint:Function {name:"migration_fingerprint_sql",type:"function"}),
  (roleSetup:Function {name:"run_binding_role_setup_sql",type:"function"}),
  (roleDrift:Function {name:"run_binding_role_drift_sql",type:"function"}),
@@ -27,9 +29,10 @@ CREATE (f:File {name:"engineering_run_directory.py",type:"file",language:"python
  (main)-[:CALLS]->(parse),(main)-[:CALLS]->(add),(main)-[:CALLS]->(dump),(main)-[:CALLS]->(text),
  (main)-[:CALLS]->(subn),
  (f)-[:CONTAINS]->(ddl),(f)-[:CONTAINS]->(guards),(main)-[:CALLS]->(ddl),(ddl)-[:CALLS]->(guards),(ddl)-[:CALLS]->(run),(ddl)-[:CALLS]->(uuid),(ddl)-[:CALLS]->(remove),(ddl)-[:CALLS]->(relative),
- (f)-[:CONTAINS]->(migrationPlan),(f)-[:CONTAINS]->(applyPlan),(f)-[:CONTAINS]->(bindingCatalog),(f)-[:CONTAINS]->(fingerprint),
+  (f)-[:CONTAINS]->(migrationPlan),(f)-[:CONTAINS]->(applyPlan),(f)-[:CONTAINS]->(reconcile),(f)-[:CONTAINS]->(bindingCatalog),(f)-[:CONTAINS]->(fingerprint),
  (f)-[:CONTAINS]->(roleSetup),(f)-[:CONTAINS]->(roleDrift),(f)-[:CONTAINS]->(roleAcceptance),
- (ddl)-[:CALLS]->(migrationPlan),(ddl)-[:CALLS]->(applyPlan),(ddl)-[:CALLS]->(bindingCatalog),(ddl)-[:CALLS]->(fingerprint),
+  (ddl)-[:CALLS]->(migrationPlan),(ddl)-[:CALLS]->(applyPlan),(ddl)-[:CALLS]->(bindingCatalog),(ddl)-[:CALLS]->(fingerprint),
+  (reconcile)-[:USES_TYPE]->(ledgerEntry),
  (ddl)-[:CALLS]->(roleSetup),(ddl)-[:CALLS]->(roleDrift),(ddl)-[:CALLS]->(roleAcceptance),(roleAcceptance)-[:READS]->(runRevision),
  (roleDrift)-[:CONFIGURES]->(ownerRole),
  (cargo)-[:USES]->(root),(run)-[:USES]->(root),(main)-[:USES]->(root);
@@ -42,7 +45,7 @@ See docs/automation-design.md sections 4.36 and 4.37. Optional Task Run DDL chec
 the new forward CLI identity gate and snapshot/FK constraints in the disposable cluster only.
 """
 
-# @cypher schema=1 source_sha256=6877a15ef9b2dbb0d6f8a838b83ead527406c75e4d300a16b53099aad90bd45e
+# @cypher schema=1 source_sha256=dd8500ffc6240c136f488c31813a4cca614b2a72e75073d7852118d7b850b2ce
 # MERGE (self:File {path:"scripts/automation/engineering_run_directory.py"})
 # MERGE (find_cargo:Symbol {id:"scripts/automation/engineering_run_directory.py::find_cargo",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/engineering_run_directory.py::run_step",kind:"function"})
@@ -203,6 +206,133 @@ def apply_migration_plan(
         if fingerprint["exit_code"] != 0:
             break
     return results
+
+
+MigrationLedgerEntry = tuple[str, str, str]
+
+
+def classify_migration_reconciliation(
+    migration_name: str,
+    migration_checksum: str,
+    expected_predecessors: list[MigrationLedgerEntry],
+    observed_ledger: list[MigrationLedgerEntry] | None,
+    expected_predecessor_fingerprint: str | None,
+    expected_applied_fingerprint: str | None,
+    observed_catalog_fingerprint: str | None,
+    expected_successors: list[MigrationLedgerEntry] | None = None,
+    *,
+    snapshot_complete: bool,
+    apply_outcome_ambiguous: bool = False,
+) -> dict[str, object]:
+    """Classify one exact ledger/catalog snapshot without performing database I/O.
+
+    Ledger entries are ``(migration_name, source_checksum, post_schema_fingerprint)``.
+    The caller must obtain the entries and catalog fingerprint from one complete,
+    authoritative read and supply the release-approved predecessor, target, and any
+    known-successor fingerprints. The catalog must match the exact last ledger entry;
+    this supports a target migration that is no longer the deployed chain tip. This
+    helper deliberately has no apply callback so it cannot replay a migration.
+    """
+
+    def result(status: str, reason: str) -> dict[str, object]:
+        return {
+            "status": status,
+            "reason": reason,
+            "action": "apply" if status == "safe_to_apply" else "stop" if status == "blocked" else "skip",
+            "safe_to_apply": status == "safe_to_apply",
+            "committed": status in {"already_applied", "committed_after_ambiguous_apply"},
+        }
+
+    if not snapshot_complete:
+        return result("blocked", "unknown_incomplete_snapshot")
+    if (
+        observed_ledger is None
+        or not isinstance(observed_catalog_fingerprint, str)
+        or not observed_catalog_fingerprint.strip()
+    ):
+        return result("blocked", "unknown_missing_ledger_or_catalog")
+    if not all(
+        isinstance(value, str) and value.strip()
+        for value in (
+            migration_name,
+            migration_checksum,
+            expected_predecessor_fingerprint,
+            expected_applied_fingerprint,
+        )
+    ):
+        return result("blocked", "unknown_incomplete_expected_manifest")
+    expected_successors = expected_successors or []
+
+    def valid_entry(entry: object) -> bool:
+        return (
+            isinstance(entry, tuple)
+            and len(entry) == 3
+            and all(isinstance(value, str) and value.strip() for value in entry)
+        )
+
+    if any(not valid_entry(entry) for entry in expected_predecessors):
+        return result("blocked", "unknown_invalid_predecessor_manifest")
+    if any(not valid_entry(entry) for entry in expected_successors):
+        return result("blocked", "unknown_invalid_successor_manifest")
+    if any(not valid_entry(entry) for entry in observed_ledger):
+        return result("blocked", "unknown_invalid_observed_ledger")
+
+    migration_names = [entry[0] for entry in expected_predecessors]
+    migration_names.extend([migration_name, *(entry[0] for entry in expected_successors)])
+    if len(migration_names) != len(set(migration_names)):
+        return result("blocked", "unknown_invalid_migration_order")
+    if (expected_predecessors
+            and expected_predecessors[-1][2] != expected_predecessor_fingerprint):
+        return result("blocked", "unknown_predecessor_fingerprint_manifest_mismatch")
+
+    target_entry: MigrationLedgerEntry = (
+        migration_name, migration_checksum, expected_applied_fingerprint
+    )
+    expected_current = [*expected_predecessors, target_entry]
+
+    if observed_ledger == expected_predecessors:
+        if observed_catalog_fingerprint == expected_predecessor_fingerprint:
+            reason = (
+                "complete snapshot proves the prior ambiguous attempt did not commit"
+                if apply_outcome_ambiguous
+                else "complete snapshot matches the required predecessor chain"
+            )
+            return result("safe_to_apply", reason)
+        if observed_catalog_fingerprint == expected_applied_fingerprint:
+            return result("blocked", "ledger_catalog_disagreement_target_fingerprint_without_entry")
+        return result("blocked", "partial_or_unrecognized_catalog_state")
+
+    observed_chain = [*expected_predecessors, target_entry]
+    successor_prefixes = [
+        [*expected_successors[:length]]
+        for length in range(len(expected_successors) + 1)
+    ]
+    for successor_prefix in successor_prefixes:
+        expected_current = [*observed_chain, *successor_prefix]
+        if observed_ledger != expected_current:
+            continue
+        expected_catalog = expected_current[-1][2]
+        if observed_catalog_fingerprint == expected_catalog:
+            status = "committed_after_ambiguous_apply" if apply_outcome_ambiguous else "already_applied"
+            reason = (
+                "complete later read proves the exact migration checksum and ledger-head fingerprint committed"
+                if apply_outcome_ambiguous
+                else "ledger checksums and ledger-head fingerprint exactly match the catalog"
+            )
+            return result(status, reason)
+        if observed_catalog_fingerprint == expected_predecessor_fingerprint:
+            return result("blocked", "ledger_catalog_disagreement_catalog_is_predecessor")
+        return result("blocked", "partial_or_unrecognized_catalog_state")
+
+    target_entries = [entry for entry in observed_ledger if entry[0] == migration_name]
+    if target_entries:
+        if len(target_entries) != 1 or target_entries[0] != target_entry:
+            return result("blocked", "ledger_catalog_disagreement_migration_entry_mismatch")
+        target_index = observed_ledger.index(target_entry)
+        if observed_ledger[:target_index] != expected_predecessors:
+            return result("blocked", "ledger_history_does_not_match_required_predecessor_chain")
+        return result("blocked", "ledger_history_contains_unapproved_successor")
+    return result("blocked", "ledger_history_does_not_match_required_predecessor_chain")
 
 
 def migration_fingerprint_sql() -> str:
