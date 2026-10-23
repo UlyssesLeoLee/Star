@@ -83,7 +83,7 @@ The complete command/output record is `docs/reports/WLD3-RUST-GATE-UNBLOCK-20261
 | SRE Lead | Mavis 接手审核：Rust 1.99.0 focused tests pass; PostgreSQL, target grants, worker operations, and recovery remain unverified. |
 | Platform | Mavis 接手审核：targeted lint passes; strict Clippy and focused rustfmt failures are recorded without unrelated cleanup. |
 | Review chair | Mavis 接手审核：CypherGraph Guardian and final diff checks are required and recorded; no production or integration claim is made. |
-| PM | Mavis 接手审核：this is a coordinator-accepted compatibility-unblock slice only; WLD-3 remains open and no commit/integration is performed in this lane. |
+| PM | Mavis 接手审核：the compatibility-unblock slice is locally committed; no dev integration or production completion is claimed, and WLD-3 remains open. |
 
 ## §7 Revision history
 

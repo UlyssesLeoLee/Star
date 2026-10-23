@@ -1,7 +1,7 @@
 # WBS Delta — Run Lifecycle and Execution Closure
 
 **Date:** 2026-10-22
-**Revision:** v4.0
+**Revision:** v4.1
 **Baseline:** UI planning now uses local dev `8245b90c8150394439672c0b179ce0e51946444d` (main=`8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`; `main...dev = 0 208`). Design baselines remain requirements v6.91, Schedule API SRS v0.65, basic design v6.94, Schedule BD v0.63, Schedule DD v0.77, Group DD v5.16, implementation plan v7.14, and UI plan v0.8.
 **Planning-time integration checkpoint:** local `dev` was at `8245b90c`; cached `origin/dev` was 54 commits behind. No fetch or push was performed, so remote freshness was unknown at this planning snapshot.
 **Planning source checkpoint (before v0.7 docs integration):** local `dev` was clean at `30c6b975612ce72cfc626db70037420885be6672`; local `main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`, `main...dev = 0 205`. The v0.7 UI plan was based on this commit and the v0.6 plan/WBS v3.7. The recorded `origin/dev` ref was 51 commits behind at this checkpoint; no fetch or push was performed, so remote freshness is unknown.
@@ -165,4 +165,4 @@ The UI workstream may refine wireframes, Rust renderer prototypes and read-only 
 | v2.4 | 2026-10-20 | Recorded the WLD-0 2026-10-15/19 disposable DDL runner, 4/4 focused tests, precise evidence limits, local `dev` fast-forward to `e71dd085`, and current main/dev/remote-ref comparison; kept target database and production closure open. |
 | v2.6 | 2026-10-20 | Recorded the final self-review correction for Run revision FOR SHARE permissions, restrictive RLS and disposable role acceptance; updated requirements/basic/detail/automation/registry versions while keeping Rust 1.99.0, target DB, production API and remaining WLD gates open. |
 | v2.5 | 2026-10-20 | Added the WLD-0 NOLOGIN Directory owner role, transaction-local role switch, lock-only grants, restrictive RLS denial and 6/6 runner + 28/28 disposable PostgreSQL evidence; clarified missing Rust 1.99.0 and preserved production API/target DB and remaining WLD phase gates. |
-| v2.7 | 2026-10-22 | Recorded the WLD-3 Rust 1.99.0 focused test/lint passes and precise strict Clippy/rustfmt failures; kept PostgreSQL/API/ACL, worker/saga, and production execution gates open. |
+| v4.1 | 2026-10-22 | Recorded the WLD-3 Rust 1.99.0 focused test results and targeted lint pass, retained the strict Clippy/rustfmt baseline failures, and kept WLD-3 plus PostgreSQL/API/ACL and production execution gates open. |
