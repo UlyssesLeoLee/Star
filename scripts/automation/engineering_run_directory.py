@@ -42,7 +42,7 @@ See docs/automation-design.md sections 4.36 and 4.37. Optional Task Run DDL chec
 the new forward CLI identity gate and snapshot/FK constraints in the disposable cluster only.
 """
 
-# @cypher schema=1 source_sha256=450e4cd42fda2cb1aadd7bac3d2f60ba17ee9f82abc6491499a41aeb799600e8
+# @cypher schema=1 source_sha256=6877a15ef9b2dbb0d6f8a838b83ead527406c75e4d300a16b53099aad90bd45e
 # MERGE (self:File {path:"scripts/automation/engineering_run_directory.py"})
 # MERGE (find_cargo:Symbol {id:"scripts/automation/engineering_run_directory.py::find_cargo",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/engineering_run_directory.py::run_step",kind:"function"})
@@ -388,9 +388,11 @@ def run_binding_role_acceptance_sql() -> str:
     DO $$
     DECLARE
       table_name TEXT;
+      expected_using TEXT;
       visible_rows INTEGER;
       changed_rows INTEGER;
       role_row RECORD;
+      update_sqlstate TEXT := NULL;
     BEGIN
       IF current_user <> 'star_engineering_directory_owner'
          OR session_user <> 'erun_directory_api_test' THEN
@@ -448,11 +450,21 @@ def run_binding_role_acceptance_sql() -> str:
         'permission.cloud_branch_role_binding','permission.engineering_run_role_binding',
         'multica.engineering_run_revision','multica.worktree_project_binding','public.worktree_canvas_worktree',
         'multica.task_metadata','multica.work_item_worktree'] LOOP
+        expected_using := CASE
+          WHEN table_name = ANY (ARRAY[
+            'permission.project_role_binding',
+            'permission.engineering_run_role_binding',
+            'multica.engineering_run_revision',
+            'multica.worktree_project_binding',
+            'public.worktree_canvas_worktree'
+          ]::TEXT[]) THEN 'true'
+          ELSE 'false'
+        END;
         IF NOT EXISTS (
           SELECT 1 FROM pg_policy p
           WHERE p.polrelid=table_name::regclass AND p.polcmd='w' AND NOT p.polpermissive
             AND current_user::regrole::oid = ANY(p.polroles)
-            AND pg_get_expr(p.polqual,p.polrelid)='false'
+            AND pg_get_expr(p.polqual,p.polrelid)=expected_using
             AND pg_get_expr(p.polwithcheck,p.polrelid)='false'
         ) THEN
           RAISE EXCEPTION 'lock-only row UPDATE is not denied by restrictive RLS: %', table_name;
@@ -496,10 +508,22 @@ def run_binding_role_acceptance_sql() -> str:
       IF visible_rows <> 1 THEN RAISE EXCEPTION 'tenant-scoped Task/Worktree relation is not visible'; END IF;
       PERFORM 1 FROM permission.project_role_binding
        WHERE id='40000000-0000-0000-0000-000000000001' FOR SHARE;
-      UPDATE permission.project_role_binding SET valid_to=now()
-       WHERE id='40000000-0000-0000-0000-000000000001';
-      GET DIAGNOSTICS changed_rows = ROW_COUNT;
-      IF changed_rows <> 0 THEN RAISE EXCEPTION 'lock-only UPDATE grant mutated Project membership'; END IF;
+      BEGIN
+        UPDATE permission.project_role_binding SET valid_to=now()
+         WHERE id='40000000-0000-0000-0000-000000000001';
+        GET DIAGNOSTICS changed_rows = ROW_COUNT;
+      EXCEPTION WHEN SQLSTATE '42501' THEN
+        GET STACKED DIAGNOSTICS update_sqlstate = RETURNED_SQLSTATE;
+      END;
+      IF update_sqlstate IS DISTINCT FROM '42501' THEN
+        RAISE EXCEPTION 'lock-only Project grant UPDATE must fail with SQLSTATE 42501; got %, rows=%',
+          update_sqlstate, changed_rows;
+      END IF;
+      SELECT count(*) INTO visible_rows FROM permission.project_role_binding
+       WHERE id='40000000-0000-0000-0000-000000000001' AND valid_to IS NULL;
+      IF visible_rows <> 1 THEN
+        RAISE EXCEPTION 'lock-only UPDATE changed or hid Project membership; active rows=%', visible_rows;
+      END IF;
       PERFORM 1 FROM multica.task_metadata
        WHERE metadata_id='a0000000-0000-0000-0000-000000000001' FOR SHARE;
       UPDATE multica.task_metadata SET valid_to=now()

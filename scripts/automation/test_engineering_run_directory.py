@@ -1,4 +1,4 @@
-# @cypher schema=1 source_sha256=592c24c83f6124cf05fe86c9549d2eaf498eadd2485f564af4ea2b4eef0f1b5a
+# @cypher schema=1 source_sha256=3030dadb19b8c478a7811ad5b627e7ccc51343d4cc00ca1075f74bbd97e88669
 # MERGE (self:File {path:"scripts/automation/test_engineering_run_directory.py"})
 # MERGE (suite:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests",kind:"class"})
 # MERGE (base_plan:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_base_plan_preserves_existing_chain",kind:"test"})
@@ -84,6 +84,57 @@ class DirectoryMigrationPlanTests(unittest.TestCase):
 
     def test_role_acceptance_covers_all_lock_sources(self) -> None:
         sql = runner.run_binding_role_acceptance_sql()
+        policy_table_list = (
+            sql.split("expected_using := CASE", 1)[0]
+            .rsplit("FOREACH table_name IN ARRAY ARRAY[", 1)[1]
+            .split("] LOOP", 1)[0]
+        )
+        policy_tables = {
+            item.strip().strip("' ")
+            for item in policy_table_list.replace("\n", "").split(",")
+            if item.strip()
+        }
+        self.assertEqual(
+            policy_tables,
+            {
+                "permission.project_role_binding",
+                "scm.cloud_branch_revision",
+                "permission.cloud_branch_role_binding",
+                "permission.engineering_run_role_binding",
+                "multica.engineering_run_revision",
+                "multica.worktree_project_binding",
+                "public.worktree_canvas_worktree",
+                "multica.task_metadata",
+                "multica.work_item_worktree",
+            },
+        )
+        policy_expectations = sql.split("expected_using := CASE", 1)[1].split("END;", 1)[0]
+        lock_only_case_list = (
+            policy_expectations.split("THEN 'true'", 1)[0]
+            .rsplit("ARRAY[", 1)[1]
+            .split("]::TEXT[]", 1)[0]
+        )
+        lock_only_relations = {
+            item.strip().strip("' ")
+            for item in lock_only_case_list.replace("\n", "").split(",")
+            if item.strip()
+        }
+        self.assertEqual(
+            lock_only_relations,
+            {
+                "permission.project_role_binding",
+                "permission.engineering_run_role_binding",
+                "multica.engineering_run_revision",
+                "multica.worktree_project_binding",
+                "public.worktree_canvas_worktree",
+            },
+        )
+        self.assertIn("ELSE 'false'", policy_expectations)
+        self.assertIn("pg_get_expr(p.polqual,p.polrelid)=expected_using", sql)
+        self.assertIn("pg_get_expr(p.polwithcheck,p.polrelid)='false'", sql)
+        self.assertIn("EXCEPTION WHEN SQLSTATE '42501'", sql)
+        self.assertIn("update_sqlstate IS DISTINCT FROM '42501'", sql)
+        self.assertIn("lock-only UPDATE changed or hid Project membership", sql)
         for relation in (
             "permission.engineering_run_role_binding",
             "multica.engineering_run_revision",
