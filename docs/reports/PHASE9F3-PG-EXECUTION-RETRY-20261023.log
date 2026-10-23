@@ -1,0 +1,56 @@
+WLD3 / phase9f3_schedule PostgreSQL acceptance retry
+Date: 2026-10-23 UTC
+Repository base: dev e3a59c60b727649500fb4a2d42ac6aa3d16516ea
+Registered evidence-only worktree: codex/wld3-occurrence-pg-retry-20261023
+
+Environment and noninterference
+- Multipass inventory: existing Running instance informed-impala; reused only.
+- Guest toolchain: rustc 1.99.0 (b940084d7 2026-09-28); cargo 1.99.0 (5f94df478 2026-08-27); rustfmt 1.10.0.
+- PostgreSQL: 18.6, binaries /usr/lib/postgresql/18/bin.
+- No VM create/stop/delete/purge; no Docker Desktop; no use of port 5432; no existing PostgreSQL service stopped or altered.
+- Source snapshot was made from current HEAD for isolated guest runs. No production source, WBS, or old WLD3 checkout was edited.
+
+Focused compile
+Command: cargo test --locked -p star-pg-adapter --test schedule_postgres --no-run -j 4
+Toolchain: Rust/Cargo 1.99.0, guest informed-impala
+Exit: 0
+Artifact: /var/tmp/star-wld3-target-1990-20261023-r1/debug/deps/schedule_postgres-b5a7dc86b0331b62
+
+Checked-in runner, unmodified startup
+Runner: scripts/automation/phase9f3_schedule.py::run_isolated_postgres
+PG initdb: /usr/lib/postgresql/18/bin/initdb -D <unique runner datadir> -U schedule_admin --auth=trust --no-instructions; exit 0.
+PG start: /usr/lib/postgresql/18/bin/pg_ctl -D <unique runner datadir> -l <datadir>/server.log -o "-h 127.0.0.1 -p 38265" -w start; exit 1.
+JSON evidence: /var/tmp/star-wld3-pg-retry-20261023-r1/pg-runner-result.json
+The checked-in runner's startup failed and did not reach migrations or Rust database tests. Runner stderr: pg_ctl: could not start server; Examine the log output.
+
+Private-socket path diagnostic
+An in-memory wrapper added `-k <that attempt's unique data directory>` to pg_ctl; no repository source changed. On the long source path the server log reported the Unix-domain socket path exceeded PostgreSQL's 107-byte maximum. This diagnostic did not pass.
+
+Short-path private diagnostic runs (not checked-in harness acceptance)
+Private extracted source root: /tmp/w3r1. In-memory wrapper appended `-k <UUID data directory>` for postgres-start. Runner: run_isolated_postgres(cargo=<Rust 1.99.0 cargo>, bin_dir=/usr/lib/postgresql/18/bin). Each run used the same source snapshot but a distinct disposable database, dynamic loopback port, evidence directory, and UUID data directory.
+
+Run 1
+- Port: 55845
+- Data directory: /tmp/w3r1/.cache/phase9f3-schedule/postgres-5500d43b-ddb7-4254-bb82-5479ca3afe43
+- Evidence: /var/tmp/star-wld3-pg-retry-20261023-r1/evidence-short-socket/
+- Result: 32 steps; 31 passed, 1 failed, 0 blocked.
+- ACL Rust test command: cargo test --locked -p star-api-rest --lib schedule_run_as_authorization_rechecks_canonical_directory_grants -j 1 -- --ignored --nocapture; exit 0; 1 passed, 0 failed, 155 filtered.
+- Schedule DB target command: /var/tmp/star-wld3-target-1990-20261023-r1/debug/deps/schedule_postgres-b5a7dc86b0331b62 --ignored --test-threads=1 --nocapture; exit 101; 4 passed, 1 failed.
+- Failure: materialization_is_idempotent_and_tenant_scoped; SQLSTATE 23514; constraint occurrence_target_snapshot_branch_uuid_check; crates/star-pg-adapter/tests/schedule_postgres.rs:327:10.
+- Logs: postgres-schedule-integration-tests.stdout.log and .stderr.log in the evidence directory above.
+
+Run 2
+- Port: 41225
+- Data directory: /tmp/w3r1/.cache/phase9f3-schedule/postgres-284e7184-a59b-4ff0-97ba-da39147e036b
+- Evidence: /var/tmp/star-wld3-pg-retry-20261023-r2/evidence-short-socket/
+- Result: 32 steps; 31 passed, 1 failed, 0 blocked.
+- ACL Rust test command: same focused cargo command as run 1; exit 0; 1 passed, 0 failed, 155 filtered.
+- Schedule DB target: same test binary command as run 1; exit 101; 4 passed, 1 failed, same SQLSTATE/constraint.
+- Logs: postgres-schedule-integration-tests.stdout.log and .stderr.log in the evidence directory above.
+
+All migrations in both runs applied initially and reapplied with exit 0, including 2026-10-22-schedule-occurrence-branch-snapshot.sql. RLS catalog checks, runtime role setup, canonical directory ACL fixtures, occurrence Branch UUID positive/negative assertions, Schedule run-as ACL assertions, and tenant Outbox checks passed. The one failed step was the Rust-backed schedule_postgres integration test described above.
+
+Run summaries JSON: /var/tmp/star-wld3-pg-retry-20261023-r1/pg-patched-short-socket-runs.json
+After both runs, each listed UUID data directory was confirmed absent. Guest process scan found no matching /tmp/w3r1, retry runner, or schedule_postgres process. No existing PostgreSQL service was stopped.
+
+Gate result: FAIL / OPEN. The diagnostic wrapper is not a production runner acceptance. Fix runner socket path in a separately registered code lane; investigate fixture/materializer/Branch UUID constraint compatibility in a separately registered code lane. Keep Schedule execution fail-closed until all WLD-3 gates pass.
