@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a705920a895bf5d80a26729424d271c3bdcd0874ae2c26f991b21ad81cdf4119
+@cypher schema=1 source_sha256=539c4055fbbcb7b5625bf3b2fdbe047c1a060e50f5aa4f4a7a5fdb589ef9124e
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs"})
 MERGE (provider:Type {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider",kind:"trait"})
 MERGE (providerList:Symbol {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider.list_project_repositories",kind:"method"})
@@ -812,7 +812,7 @@ fn validate_receipt(
             }
             RunWorktreeLifecycleState::Ready => {
                 receipt.run_binding_id.is_none()
-                    || receipt.run_binding_id.is_some_and(Uuid::is_nil)
+                    || receipt.run_binding_id.is_some_and(|id| id.is_nil())
                     || receipt.run_binding_version.is_none_or(|version| version <= 0)
             }
         }

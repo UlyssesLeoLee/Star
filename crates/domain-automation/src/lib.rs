@@ -1,7 +1,14 @@
-//! @cypher schema=1 source_sha256=bdcf80bc4408064f26c49837f2579b8637f598e1d68e51a809a4a16c27d2b5f8
+//! @cypher schema=1 source_sha256=c5f069a90fcca0373f36381b1d41791c68153ac57c50add591209ee46bb883fd
 //! MERGE (self:File {path:"crates/domain-automation/src/lib.rs"})
 //! MERGE (schedule:Symbol {id:"crates/domain-automation/src/lib.rs::schedule",kind:"module"})
+//! MERGE (service:Type {id:"crates/domain-automation/src/lib.rs::InMemoryAutomationService",kind:"struct"})
+//! MERGE (listRules:Symbol {id:"crates/domain-automation/src/lib.rs::InMemoryAutomationService.list_rules",kind:"method"})
+//! MERGE (checkTenant:Symbol {id:"crates/domain-automation/src/lib.rs::InMemoryAutomationService.check_tenant",kind:"method"})
 //! MERGE (self)-[:DEFINES]->(schedule)
+//! MERGE (self)-[:DEFINES]->(service)
+//! MERGE (service)-[:DEFINES]->(listRules)
+//! MERGE (service)-[:DEFINES]->(checkTenant)
+//! MERGE (listRules)-[:CALLS]->(checkTenant)
 //! @endcypher
 //!
 //! domain-automation crate
@@ -1037,7 +1044,7 @@ impl AutomationQueryPort for InMemoryAutomationService {
                 .values()
                 .filter(|r| {
                     r.tenant_id == q.tenant_id
-                        && q.project_id.map_or(true, |p| r.project_id == p)
+                        && q.project_id.is_none_or(|p| r.project_id == p)
                         && (!q.enabled_only || r.enabled)
                 })
                 .cloned()
