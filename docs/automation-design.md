@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.66 (2026-10-23)
+> **文档版本**: v2.67 (2026-10-24)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3163,11 +3163,13 @@ Current evidence: focused `--runner-tests` 6/6; fresh PostgreSQL 18.6 run 34/34 
 
 **Status: dispatched; implementation and verification remain open.** Acceptance requires an authorized hostless Run to support Schedule Rule read/write without a required remote Branch row; current run-as identity, active Run, tenant, idempotency, audit/Outbox and applicable Task/Worktree/Profile/HookSet binding checks remain intact. This brief does not enable a worker or executor. Target DB grants, per-trigger/retry/resume reauthorization and Run execution remain WLD-3 gates.
 
-## 4.99 WLD-5 app navigation guard for unsaved Hook policy drafts (2026-10-21)
+## 4.99 WLD-5 app navigation guard for unsaved Hook policy drafts (2026-10-21; verification refreshed 2026-10-24)
 
-**Automation tier: [P]** — scripts/automation/dispatcher.py records the auditable brief docs/briefs/wld5-global-hook-navigation-20261021.md. The task extends the existing Advanced Settings → Hooks editor draft protection to supported main-app navigation using public App Router APIs.
+**Automation tier: [P]** — `scripts/automation/dispatcher.py` recorded the current lane brief `docs/briefs/WLD5-GLOBAL-HOOK-NAVIGATION-20261024.md` in `docs/reports/WBS-DISPATCH-WLD5-GLOBAL-HOOK-NAVIGATION-20261024.jsonl`. The task audits the existing Advanced Settings → Hooks draft protection and verifies the navigation cases that the current implementation supports with public App Router APIs.
 
-**Status: dispatched; implementation and verification remain open.** Preserve the current editor's scope guard and browser-unload warning, prevent supported in-app navigation from silently discarding dirty drafts, and report any App Router navigation paths that cannot be protected safely with public APIs. Do not claim all navigation classes are covered without evidence.
+**Status: bounded frontend paths verified; complete navigation coverage remains open.** `HookPolicyPage` registers the unsaved-draft guard while dirty and retains its `beforeunload` handler. `UnsavedNavigationGuardProvider` captures same-origin anchor clicks, skips modified/non-primary clicks, downloads, non-self targets, external destinations and same-path/same-query navigation, cancels safely, and routes approved anchors through `router.push`. `GuardedLink` uses Next's public `onNavigate` hook; the shared command bar calls `confirmNavigation()` before its programmatic route change, and the user menu uses `GuardedLink`. A new test verifies that clicks originating inside a nested anchor element are still guarded. The focused tests pass 24/24 and frontend typecheck passes; exact evidence is in `docs/reports/PHASE-WLD5-GLOBAL-HOOK-NAVIGATION-20261024.md`.
+
+The provider does not block browser Back/Forward `popstate` transitions, and arbitrary programmatic `router.push` calls are protected only when their caller explicitly invokes `confirmNavigation()`. This slice did not change those navigation paths, add browser-level E2E coverage, or implement production host authentication. Do not describe the guard as covering all navigation classes; those gaps remain open for a separately scoped route-transition design.
 
 ## 4.100 WLD-0 migration ledger/catalog reconciliation preflight (2026-10-23)
 
