@@ -58,3 +58,21 @@ Before using this classifier to authorize a migration, obtain a complete authori
 | Version | Date | Revision | Change |
 |---|---|---|---|
 | v1.0 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Repaired unreadable brief text and recorded bounded source review, findings, validation limits, and integration gates. |
+
+## 8. Follow-up verification (2026-10-23)
+
+The earlier findings were rechecked against `dev` baseline `182dba2a69b5b8c82d9b7215a86a0b800e85dc79` in the isolated follow-up worktree. The current classifier rejects blank-after-trim values for each scalar manifest/fingerprint input and each ledger tuple value (`engineering_run_directory.py:246-271`). The focused tests exercise whitespace-only manifest and catalog values, an exact approved successor prefix, an unapproved successor, and a successor/catalog mismatch (`test_engineering_run_directory.py:360-437`).
+
+| Finding | Follow-up disposition |
+|---|---|
+| WLD0-R1 | Resolved on the tested baseline: all scalar checks use `str.strip()`, and tuple validation checks every value. |
+| WLD0-R2 | Resolved on the tested baseline: the three successor-path cases are covered; the exact approved prefix is accepted only with its ledger-head fingerprint, while unapproved or mismatched states remain blocked. |
+| WLD0-R3 | Reconfirmed in this lane: `rtk proxy git diff --check` exited 0. |
+
+Validation on the baseline commit:
+
+- `rtk proxy python scripts/automation/engineering_run_directory.py --runner-tests`: exit 0; 19 tests passed.
+- `rtk proxy python -B -m py_compile scripts/automation/engineering_run_directory.py scripts/automation/test_engineering_run_directory.py`: exit 0.
+- `rtk proxy git diff --check`: exit 0.
+
+No source change was needed. This remains a pure, side-effect-free preflight classifier with no target-database read/apply path proven. These results do not authorize migration apply, target DB mutation, or production deployment; the serialization boundary, target manifest, runtime-role grants/RLS behavior, rollback, and deployment protocol remain open.

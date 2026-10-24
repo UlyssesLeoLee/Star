@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-23
 - **Baseline:** local `dev` after `9c988ad3`
-- **Revision:** v0.3
+- **Revision:** v0.4
 - **Reviewer:** Coordinator review completed; target-database acceptance remains open
 
 ## §0 Purpose
@@ -26,6 +26,7 @@ Extend the existing Engineering Run directory automation with an opt-in, fresh-c
 - Current v0.3 focused command: `rtk proxy python scripts/automation/engineering_run_directory.py --runner-tests`: exit 0, 19 tests passed. The 13 classifier tests cover exact predecessor/applied/ambiguous outcomes, nonblank manifest and catalog values, approved successor prefixes, unapproved successor history, successor catalog mismatch, missing/partial catalog, checksum mismatch, and incomplete snapshots. No database was opened by this command.
 - `rtk proxy python -B -m py_compile scripts/automation/engineering_run_directory.py scripts/automation/test_engineering_run_directory.py`: exit 0.
 - `rtk proxy git diff --check`: exit 0.
+- Follow-up revalidation on `dev@182dba2a69b5b8c82d9b7215a86a0b800e85dc79`: `rtk proxy python scripts/automation/engineering_run_directory.py --runner-tests` exited 0 (19 tests); `rtk proxy python -B -m py_compile scripts/automation/engineering_run_directory.py scripts/automation/test_engineering_run_directory.py` exited 0; and `rtk proxy git diff --check` exited 0. The classifier review findings are resolved on this baseline; no source edit was required. No target database was read or modified.
 - `rtk proxy python scripts/automation/registry_check.py --output-log .cache/wld0-run-binding-ddl/registry-check.log`: exit 0, 0 errors and 201 existing script-index warnings; both `engineering_run_directory.py` and its test are registered without warnings.
 - CypherGraph Guardian `--changed --stamp`: passed, 2 source files checked.
 - CodeRabbit CLI review was not completed: the installed command resolved to `/root/.local/bin/coderabbit` and failed with `Permission denied`; this is not recorded as an independent clean review.
@@ -89,6 +90,7 @@ Extend the existing Engineering Run directory automation with an opt-in, fresh-c
 
 | Version | Date | Revision author | Change |
 |---|---|---|---|
+| v0.4 | 2026-10-23 | Ulysses (Mavis review) | Record follow-up test, compile and diff-check evidence on `dev@182dba2a`; close the reviewed pure-classifier findings without changing source; retain target-database and deployment gates. |
 | v0.3 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Reject blank classifier inputs, exercise approved successor prefixes and unapproved-successor diagnostics, correct stale validation status, and keep target DB/deployment gates open. |
 | v0.2 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add a pure, fail-closed migration ledger/catalog reconciliation classifier and focused tests; target DB and deployment remain unverified; coordinator review requested. |
 | v0.1 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add opt-in October 15/19 Run binding DDL chain, migration fingerprints, fail-stop tests and exact catalog checks; preserve target DB/RLS/API acceptance gaps. |
