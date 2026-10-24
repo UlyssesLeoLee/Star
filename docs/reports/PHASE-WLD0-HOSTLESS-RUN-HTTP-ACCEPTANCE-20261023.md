@@ -3,8 +3,8 @@
 - **Date:** 2026-10-23
 - **Baseline:** local `dev` candidate `ad56a413cf87b55587f6b2c7b15a271e13e8945f`
 - **Lane:** `UlyssesLeoLee/wld0-hostless-run-api-20261023`
-- **Revision:** v0.1
-- **Review state:** Local disposable acceptance passed; integration to `dev` is the next gate.
+- **Revision:** v0.2
+- **Review state:** Local disposable acceptance passed; fast-forwarded to local `dev` at `8945bb28c7e4ada07e4a2963ffb208854fba2c0f`; completed Orca lane worktree and branch were removed after the evidence archive was verified.
 
 ## §0 Purpose
 
@@ -61,7 +61,7 @@ Verify the Project-scoped hostless Engineering Run API through authenticated HTT
 | Architecture | Mavis | Reviewed owner boundary and hostless Project → Run semantics. |
 | SRE Lead | Mavis | Reviewed disposable database lifecycle; target deployment remains open. |
 | Platform | Mavis | Authenticated route and effective role-grant acceptance passed locally. |
-| Review chair | Mavis | Final source, migration, test and documentation review recorded before integration. |
+| Review chair | Mavis | Final source, migration, test and documentation review recorded; `dev` fast-forward and lane cleanup verified. |
 | Product manager | Mavis | No production or execution capability is promoted by this phase. |
 
 ## §7 Revision history
@@ -69,3 +69,4 @@ Verify the Project-scoped hostless Engineering Run API through authenticated HTT
 | Version | Date | Revision author | Change |
 |---|---|---|---|
 | v0.1 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add authenticated hostless Run HTTP acceptance, least-privilege owner INSERT migration, 55-step PostgreSQL evidence, and explicit deployment/execution gaps; `dev` integration pending. |
+| v0.2 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record fast-forward to local `dev` at `8945bb28`, Orca removal of the completed lane, merged local branch cleanup, and SHA-256 verified external `.cache` evidence archive; production/database/execution gaps remain open. |
