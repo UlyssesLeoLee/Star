@@ -1,3 +1,47 @@
+/*
+@cypher schema=1 source_sha256=0b3a96039221a88e25a116ac72fae35d57a9601c80e7775cacde492f456abacc
+MERGE (self:File {path:"crates/domain-scm/src/lib.rs"})
+MERGE (metadata:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterMetadata", kind:"struct"})
+MERGE (revision:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterRevision", kind:"struct"})
+MERGE (validate:Symbol {id:"crates/domain-scm/src/lib.rs::RepositoryMasterMetadata.validate", kind:"method"})
+MERGE (validText:Symbol {id:"crates/domain-scm/src/lib.rs::valid_repository_metadata_text", kind:"function"})
+MERGE (safeUrl:Symbol {id:"crates/domain-scm/src/lib.rs::is_credential_free_repository_url", kind:"function"})
+MERGE (optionalMetadataTest:Symbol {id:"crates/domain-scm/src/lib.rs::repository_master_metadata_accepts_optional_provider_metadata", kind:"test"})
+MERGE (credentialUrlTest:Symbol {id:"crates/domain-scm/src/lib.rs::repository_master_metadata_rejects_credential_bearing_urls", kind:"test"})
+MERGE (schemeTest:Symbol {id:"crates/domain-scm/src/lib.rs::repository_master_metadata_accepts_case_insensitive_url_scheme", kind:"test"})
+MERGE (sshUrlTest:Symbol {id:"crates/domain-scm/src/lib.rs::repository_master_metadata_accepts_credential_free_ssh_url", kind:"test"})
+MERGE (whitespaceTest:Symbol {id:"crates/domain-scm/src/lib.rs::repository_master_metadata_rejects_ambiguous_whitespace", kind:"test"})
+MERGE (scmError:Type {id:"crates/domain-scm/src/lib.rs::ScmError", kind:"enum"})
+MERGE (repositoryId:Type {id:"crates/domain-scm/src/lib.rs::RepositoryId", kind:"uuid_id"})
+MERGE (tenantId:Type {id:"crates/domain-scm/src/lib.rs::TenantId", kind:"uuid_id"})
+MERGE (userId:Type {id:"crates/domain-scm/src/lib.rs::UserId", kind:"uuid_id"})
+MERGE (datetime:Type {id:"chrono::DateTime<Utc>", kind:"external_type"})
+MERGE (self)-[:DEFINES]->(metadata)
+MERGE (self)-[:DEFINES]->(revision)
+MERGE (self)-[:DEFINES]->(validText)
+MERGE (self)-[:DEFINES]->(safeUrl)
+MERGE (self)-[:DEFINES]->(optionalMetadataTest)
+MERGE (self)-[:DEFINES]->(credentialUrlTest)
+MERGE (self)-[:DEFINES]->(schemeTest)
+MERGE (self)-[:DEFINES]->(sshUrlTest)
+MERGE (self)-[:DEFINES]->(whitespaceTest)
+MERGE (metadata)-[:HAS_METHOD]->(validate)
+MERGE (metadata)-[:USES_TYPE]->(scmError)
+MERGE (revision)-[:USES_TYPE]->(repositoryId)
+MERGE (revision)-[:USES_TYPE]->(tenantId)
+MERGE (revision)-[:USES_TYPE]->(userId)
+MERGE (revision)-[:USES_TYPE]->(metadata)
+MERGE (revision)-[:USES_TYPE]->(datetime)
+MERGE (validate)-[:CALLS]->(validText)
+MERGE (validate)-[:CALLS]->(safeUrl)
+MERGE (validate)-[:USES_TYPE]->(scmError)
+MERGE (optionalMetadataTest)-[:TESTS]->(validate)
+MERGE (credentialUrlTest)-[:TESTS]->(validate)
+MERGE (schemeTest)-[:TESTS]->(validate)
+MERGE (sshUrlTest)-[:TESTS]->(validate)
+MERGE (whitespaceTest)-[:TESTS]->(validate);
+@endcypher
+*/
 //! domain-scm crate
 //!
 //! 详细 spec: docs/specs/domain-scm-spec.md §19 (REQ-SCM-001/002/003)
@@ -16,7 +60,7 @@
 //! - **INV-SCM-01** Domain 层不出现厂商特有对象(由 ACL 翻译)
 //! - **INV-SCM-02** MVP 仅支持 Connected 所有权
 //! - **INV-SCM-03** Bidirectional Sync 必须有 Loop 防护(Idempotency Key + Sync Token)
-//! - **INV-SCM-04** Repository 必带 `tenant_id + project_id`,跨 tenant 拒绝
+//! - **INV-SCM-04** Existing project-scoped Repository aggregate requires `tenant_id + project_id` for compatibility; the separate canonical `RepositoryMasterRevision` is tenant-owned and has no Project/Branch binding.
 //! - **INV-SCM-05** Repository Credential 走 Credential Broker,不存明文
 //! - **INV-SCM-06** PR Content 必带 `tenant_id`(Object Storage Key 前缀,§6.1)
 //! - **INV-SCM-07** `PullRequest.state` 状态机严格按 §7.5 迁移
@@ -365,11 +409,11 @@ pub mod multi_provider_identity;
 
 // Re-export 常用类型到 crate 根,方便 integration test 和 application 层 import
 pub use multi_provider_identity::{
-    IdentityLink, IdentityLinkId, IdentityPropagation, IdentityPropagationId,
-    IdentityProvider, IdentityValidation, IdentityValidationId, InMemoryMultiProviderIdentityService,
+    IdentityLink, IdentityLinkId, IdentityPropagation, IdentityPropagationId, IdentityProvider,
+    IdentityValidation, IdentityValidationId, InMemoryMultiProviderIdentityService,
     LinkIdentitiesCommand, MultiProviderIdentityCommandPort, MultiProviderIdentityError,
-    MultiProviderIdentityPort, MultiProviderIdentityQueryPort, PropagationStatus, PropagatedField,
-    PropagateIdentityChangeCommand, ProviderIdentity, ProviderIdentityId,
+    MultiProviderIdentityPort, MultiProviderIdentityQueryPort, PropagateIdentityChangeCommand,
+    PropagatedField, PropagationStatus, ProviderIdentity, ProviderIdentityId,
     RegisterProviderIdentityCommand, RevokeIdentityCommand, ValidateIdentityCommand,
     ValidationStatus,
 };
@@ -481,6 +525,240 @@ impl Repository {
     pub fn bump_version(&mut self) {
         self.lock_version = self.lock_version.saturating_add(1);
         self.updated_at = Utc::now();
+    }
+}
+
+/// SCM-owned Repository identity metadata, independent of Project and Branch.
+///
+/// The legacy [`Repository`] aggregate remains Project-scoped for compatibility.
+/// This value is the metadata payload for the tenant-wide canonical master; it
+/// grants no Project or Engineering Run access and is not a checkout capability.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RepositoryMasterMetadata {
+    /// User-facing repository name, bounded to 255 UTF-8 bytes.
+    pub name: String,
+    /// Optional stable provider key (for example a connector identifier).
+    pub provider_key: Option<String>,
+    /// Optional non-secret provider identity, meaningful only with a provider key.
+    pub remote_identity: Option<String>,
+    /// Optional credential-free canonical remote URL; never used as a credential source.
+    pub remote_url: Option<String>,
+    /// Optional provider-reported default branch name.
+    pub default_branch: Option<String>,
+}
+
+impl RepositoryMasterMetadata {
+    /// Validate the bounded identity metadata and reject credential-bearing URL forms.
+    pub fn validate(&self) -> Result<(), ScmError> {
+        if !valid_repository_metadata_text(&self.name, 255) {
+            return Err(ScmError::InvalidState(
+                "repository name must be non-empty and at most 255 bytes".to_string(),
+            ));
+        }
+        if self.provider_key.as_deref().is_some_and(|value| {
+            !valid_repository_metadata_text(value, 64)
+                || !value.bytes().all(|byte| {
+                    byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(&byte)
+                })
+        }) {
+            return Err(ScmError::InvalidState(
+                "repository provider key has an invalid format".to_string(),
+            ));
+        }
+        if self.remote_identity.as_deref().is_some_and(|value| {
+            !valid_repository_metadata_text(value, 512) || value.chars().any(char::is_whitespace)
+        }) {
+            return Err(ScmError::InvalidState(
+                "repository remote identity must be non-empty and at most 512 bytes".to_string(),
+            ));
+        }
+        if self.remote_identity.is_some() && self.provider_key.is_none() {
+            return Err(ScmError::InvalidState(
+                "repository remote identity requires a provider key".to_string(),
+            ));
+        }
+        if self.remote_url.as_deref().is_some_and(|value| {
+            !valid_repository_metadata_text(value, 2048)
+                || !is_credential_free_repository_url(value)
+        }) {
+            return Err(ScmError::InvalidState(
+                "repository URL must be credential-free HTTP(S) or SSH metadata".to_string(),
+            ));
+        }
+        if self
+            .default_branch
+            .as_deref()
+            .is_some_and(|value| !valid_repository_metadata_text(value, 255))
+        {
+            return Err(ScmError::InvalidState(
+                "repository default branch must be non-empty and at most 255 bytes".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// One persisted SCD Type 2 view of the SCM-owned canonical Repository master.
+///
+/// `(tenant_id, id)` is the stable identity. `created_by` is provenance only;
+/// Project membership, Run binding, and repository visibility are owned elsewhere.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RepositoryMasterRevision {
+    /// Stable SCM identity, shared across revisions and independent of Branch IDs.
+    pub id: RepositoryId,
+    /// Tenant isolation boundary; this type deliberately has no `project_id` or `branch_id`.
+    pub tenant_id: TenantId,
+    /// Versioned display/provider metadata.
+    pub metadata: RepositoryMasterMetadata,
+    /// Original registration actor, retained as provenance only.
+    pub created_by: UserId,
+    /// Actor that authored this revision, retained for audit provenance.
+    pub changed_by: UserId,
+    /// Monotonic SCD Type 2 revision number within `(tenant_id, id)`.
+    pub version: u32,
+    /// SCD Type 2 start timestamp.
+    pub valid_from: DateTime<Utc>,
+    /// SCD Type 2 end timestamp; `None` identifies the current revision.
+    pub valid_to: Option<DateTime<Utc>>,
+}
+
+fn valid_repository_metadata_text(value: &str, max_bytes: usize) -> bool {
+    // PostgreSQL btrim(value) removes U+0020 by default; mirror that exact
+    // boundary here. Other control whitespace is rejected below by both layers.
+    !value.trim_matches(' ').is_empty()
+        && value == value.trim_matches(' ')
+        && value.len() <= max_bytes
+        && !value.chars().any(char::is_control)
+}
+
+fn is_credential_free_repository_url(value: &str) -> bool {
+    let Some((scheme, remainder)) = value.split_once("://") else {
+        return false;
+    };
+    if !matches!(
+        scheme.to_ascii_lowercase().as_str(),
+        "http" | "https" | "ssh"
+    ) || value.contains('?')
+        || value.contains('#')
+        || value.contains('%')
+        || value.contains('\\')
+        || value.chars().any(char::is_whitespace)
+    {
+        return false;
+    }
+    let Some((authority, path)) = remainder.split_once('/') else {
+        return false;
+    };
+    !authority.is_empty() && !authority.contains('@') && !path.trim_matches('/').is_empty()
+}
+
+#[cfg(test)]
+mod repository_master_tests {
+    use super::RepositoryMasterMetadata;
+
+    #[test]
+    fn repository_master_metadata_accepts_optional_provider_metadata() {
+        let metadata = RepositoryMasterMetadata {
+            name: "local-project".to_string(),
+            provider_key: None,
+            remote_identity: None,
+            remote_url: None,
+            default_branch: None,
+        };
+
+        assert!(metadata.validate().is_ok());
+    }
+
+    #[test]
+    fn repository_master_metadata_rejects_credential_bearing_urls() {
+        for remote_url in [
+            "https://user:secret@example.com/org/repo.git",
+            "https://example.com/org/repo.git?token=secret",
+            "https://example.com/org/repo.git#credential",
+            "https://example.com/%2fsecret/repo.git",
+        ] {
+            let metadata = RepositoryMasterMetadata {
+                name: "repo".to_string(),
+                provider_key: Some("forge".to_string()),
+                remote_identity: Some("org/repo".to_string()),
+                remote_url: Some(remote_url.to_string()),
+                default_branch: None,
+            };
+
+            assert!(metadata.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn repository_master_metadata_accepts_case_insensitive_url_scheme() {
+        let metadata = RepositoryMasterMetadata {
+            name: "repo".to_string(),
+            provider_key: Some("forge".to_string()),
+            remote_identity: Some("org/repo".to_string()),
+            remote_url: Some("HTTPS://example.com/org/repo.git".to_string()),
+            default_branch: None,
+        };
+
+        assert!(metadata.validate().is_ok());
+    }
+
+    #[test]
+    fn repository_master_metadata_accepts_credential_free_ssh_url() {
+        let metadata = RepositoryMasterMetadata {
+            name: "repo".to_string(),
+            provider_key: Some("forge".to_string()),
+            remote_identity: Some("org/repo".to_string()),
+            remote_url: Some("ssh://example.com/org/repo.git".to_string()),
+            default_branch: None,
+        };
+
+        assert!(metadata.validate().is_ok());
+    }
+
+    #[test]
+    fn repository_master_metadata_rejects_ambiguous_whitespace() {
+        for name in [" repo", "repo ", "repo\nname"] {
+            let metadata = RepositoryMasterMetadata {
+                name: name.to_string(),
+                provider_key: None,
+                remote_identity: None,
+                remote_url: None,
+                default_branch: None,
+            };
+            assert!(metadata.validate().is_err());
+        }
+
+        let metadata = RepositoryMasterMetadata {
+            name: "repo".to_string(),
+            provider_key: Some("forge".to_string()),
+            remote_identity: Some(" org/repo".to_string()),
+            remote_url: None,
+            default_branch: None,
+        };
+        assert!(metadata.validate().is_err());
+    }
+
+    #[test]
+    fn repository_master_metadata_matches_database_ascii_space_trimming() {
+        for name in ["\u{2003}repo", "repo\u{2003}"] {
+            let metadata = RepositoryMasterMetadata {
+                name: name.to_string(),
+                provider_key: None,
+                remote_identity: None,
+                remote_url: None,
+                default_branch: None,
+            };
+            assert!(metadata.validate().is_ok());
+        }
+
+        let metadata = RepositoryMasterMetadata {
+            name: " repo".to_string(),
+            provider_key: None,
+            remote_identity: None,
+            remote_url: None,
+            default_branch: None,
+        };
+        assert!(metadata.validate().is_err());
     }
 }
 

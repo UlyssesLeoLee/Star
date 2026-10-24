@@ -7278,6 +7278,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-automation",
+ "domain-scm",
  "hex",
  "platform-messaging-runtime",
  "serde",

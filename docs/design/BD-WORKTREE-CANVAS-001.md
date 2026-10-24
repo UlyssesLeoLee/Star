@@ -1,12 +1,12 @@
 # BD-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 基本設計書 v1.5** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **AI Worktree Graph Canvas — 基本設計書 v1.11** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟢 Draft v1.5 (Run 工作区、双 Canvas 与 Repository identity 来源边界补充)
-> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.5 (126 个历史需求 ID + WTG-026/AC-WTG-013)
+> - 状态: 🟢 Draft v1.11 (Run 工作区、双 Canvas 与 Repository identity/persistence remediation 验证状态补充)
+> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.10 (126 个历史需求 ID + WTG-026/AC-WTG-013)
 > - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4 (Worktree Group 边界补充) + 实装代码
-> - Run App owner 边界: [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.18 §1 / §6.1.3；本 BD 中 Project Worktree Overview Graph 与 Run Infinite Canvas 是分离能力
-> - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.3
+> - Run App owner 边界: [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.24 §1 / §6.1.3；本 BD 中 Project Worktree Overview Graph 与 Run Infinite Canvas 是分离能力
+> - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.9
 > - 守门基线: 守门 #1+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29 共 14 项必过
 > - 平行参考: `docs/requirements/SRS-CANVAS-001.md` v1.4 (无限画布总册) + `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
@@ -69,7 +69,7 @@
 
 ### 0.3 Requirements 继承清单 (per §三十一 Requirements Traceability)
 
-本 BD 继承 SRS v1.5 中已统计的历史 **126 FR/NFR 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)，并增加跨领域 WTG-026 / AC-WTG-013。详细追踪矩阵见 §37、§1.6 与独立 `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.3。
+本 BD 继承 SRS v1.10 中已统计的历史 **126 FR/NFR 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)，并增加跨领域 WTG-026 / AC-WTG-013。详细追踪矩阵见 §37、§1.6 与独立 `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.9。
 
 继承大类:
 
@@ -289,13 +289,13 @@ graph TB
 
 ### 1.6 WLD-1 Repository 与本地 root 身份来源
 
-SCM owner 持有独立稳定的 Repository master；外部 provider key、远端 URL、default branch 是可空来源元数据。Project owner 只持有 Project↔Repository 授权关联、状态/revision、审计与默认候选，不拥有 Repository master。Engineering Run Directory owner 持有显式、可空的 Run→Repository binding，并在 CAS 写入时复验 Project-Repository 关联。Project 默认项不得隐式写入 Run；`repository_id = NULL` 表示未绑定，不得由 remote Branch 或历史 Worktree 猜测。
+SCM owner 持有独立稳定的 Repository master；外部 provider key、远端 URL、default branch 是可空且不含 credential 的来源元数据。Project owner 只持有 Project↔Repository 授权关联、状态/revision、审计与默认候选，不拥有 Repository master。Engineering Run Directory owner 持有显式、可空的 Run→Repository binding，并在 CAS 写入时复验 Project-Repository 关联。Project 默认项不得隐式写入 Run；`repository_id = NULL` 表示未绑定，不得由 remote Branch 或历史 Worktree 猜测。
 
 可信 Host Infrastructure owner 持有持久 local root registration，至少以 `(host_environment_id, repository_id, generation)` 标识并追踪授权、freshness、验证和撤销状态。原始宿主路径只由受信任 Host capability 解析，不能序列化到 API/UI 或开放给 Agent/Plugin/任务 CLI。Worktree checkout path、shared-directory path 和进程内映射都不是 root registration。
 
 Run-scoped repository candidates 仅在当前 Project membership 与 Run read grant 均有效时返回；候选可见仅表示“可申请绑定”，不意味着已绑定或获得 Worktree 权限。Worktree create/import/CLI 要求显式 Run binding、当前 grants、有效 Project↔Repository link、匹配的新鲜 root generation 以及真实 lifecycle provider；任意来源缺失即 fail closed。无 Repository 的 Run 与不需要 checkout 的 Run Apps 仍可存在。
 
-当前源码审计没有找到 PostgreSQL Repository master、持久 Host root registry 或已装配 lifecycle provider；`repository_id` nullable 字段和项目/Run 查询端口不足以证明这些 owner contracts 已落地。该节定义目标所有权与门禁，不代表 schema、migration、provider 或目标数据库验收。来源证据与范围见 [`PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md`](../reports/PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md)。
+Repository master 的 current partial unique index 保证每个 identity 至多一个 current revision；新增 DEFERRABLE INITIALLY DEFERRED constraint trigger 在事务提交时保证至少一个。单独关闭 current revision 会回滚，关闭旧 revision 并同事务插入连续 successor 可通过；唯一性与连续性不依赖 adapter 调用路径。owner role migration 先于任何 role/grant DDL 检查全部 database ACL、其他 database 上的 `pg_shdepend` direct ACL dependency、当前 database 的 schema/relation/column/function/type/language/tablespace/FDW/server/large-object/default/parameter ACL、向外角色继承与对象所有权；其他 database 的 owner-role object ACL 一律保守拒绝。当前 database ACL 只按实际 owner role grantee 匹配，不把 PUBLIC 误判为 direct grant，也不自动跨 schema 清理。adapter 显式 acquire PoolConnection，并在同一物理连接开始 transaction；admin identity recheck 和全部 migration DDL 经同一事务执行，pool 单连接上限只作资源控制。PostgreSQL test 标记为 ignored 且未运行；迁移前要求双重 opt-in、不同实际 login/current identity、superuser admin、star_scm_test_ 精确库名、相同 loopback endpoint 与双 session fixture UUID marker；address/port mismatch pure guard 负例通过。此证据不证明所在 VM/cluster 可被销毁，operator 必须提供一次性隔离集群。Rust 1.99 目标包 locked all-targets check、两个包测试 35+35、ignored PG target 编译、四个变更 Rust 文件的定向 rustfmt 通过；package fmt check 仅被四个未修改文件的差异阻断。full workspace Rust、Clippy、DB/RLS/并发仍未验收；Cargo.lock diff 仅新增 adapter 到既有 `domain-scm` package 的 direct edge，无新增 package entry 或其他锁改动，独立 lock/resolution gate 未运行。Project authorization writer、Run binding、Host root registry/provider 与 Worktree lifecycle 仍待实现，故不关闭 WTG-026/AC-WTG-013，不开放 Worktree create/import/CLI。详见阶段报告。
 
 ## §2 模块边界 (14 模块, per SRS §二十四)
 
@@ -2069,6 +2069,12 @@ Unit Test (Rust cargo + TS vitest)
 | v1.3 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Project Worktree Overview Graph 与 Worktree 群组同级 Infinite Canvas 的对象、入口及类型化引用边界 | 用户要求以 Worktree 为渡口顶层索引并将 Canvas 作为同级群组应用 |
 | v1.4 | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Group Infinite Canvas/Task Card 属 Engineering Run 同级 Apps；Worktree 是 focus 与 CLI checkout，不是 Canvas/WorkItem owner；补充旧 Worktree-scoped Canvas API 为兼容切片 | 用户明确选中 Run 内 Worktree 后出现的是属于该 Run 的右侧 tabs |
 | v1.5 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 D-REPO-001 与 §1.6：分离 SCM Repository master、Project authorization link、nullable Run binding 和 Host root registry，候选不等于 binding；标注 provider/schema/target DB 尚未验收，并同步 SRS v1.5、Group DD v5.18 与 Traceability v1.3 | WLD-1 Repository identity source audit 与 owner contract 提案 |
+| v1.10 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1 PG fixture 在 probe/cleanup 双失败时保留双方诊断；订正 Cargo.lock 仅新增 direct `domain-scm` edge、无新增 package entry/无关改动，并对齐 16-path manifest。Cargo lock/resolution、Rust 1.99 与 PostgreSQL gates 未运行。同步 requirements v6.98、SRS v1.9、Group DD v5.23、Traceability v1.8、basic v7.01 | WLD1 remediation review finding closure |
+| v1.7 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复核 migration 权限变更仅作用于 `scm` schema，并对额外 owner-role membership/对象所有权 fail closed；记录 PostgreSQL test 工件为 ignored 且未执行、Cargo/MSRV/DB 验证未完成和 Cargo.lock 限制；同步 requirements v6.95、SRS v1.6、Group DD v5.20、Traceability v1.5 与 basic v6.98 | WLD-1 Repository master persistence review |
+| v1.6 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 §1.6 与 SCM master 对账到实际代码：补充 `scm.repository_master` M/SCD2、`repository_master_event` T/append-only、owner role/FORCE RLS、adapter CAS/advisory lock 和 credential-free metadata；明确尚无 target DB、login membership、Project/Run/Host/provider 集成和运行时验收，并同步 requirements v6.94、Group DD v5.19、Traceability v1.4 | WLD-1 Repository master persistence source slice |
+| v1.7 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复核 migration 权限变更仅作用于 `scm` schema，并对额外 owner-role membership/对象所有权 fail closed；记录 PostgreSQL test 工件为 ignored 且未执行、Cargo/MSRV/DB 验证未完成和 Cargo.lock 限制；同步 requirements v6.95、SRS v1.6、Group DD v5.20、Traceability v1.5 与 basic v6.98 | WLD-1 Repository master persistence review |
+| v1.10 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1 PG fixture 在 probe/cleanup 双失败时保留双方诊断；订正 Cargo.lock 仅新增 direct `domain-scm` edge、无新增 package entry/无关改动，并对齐 16-path manifest。Cargo lock/resolution、Rust 1.99 与 PostgreSQL gates 未运行。同步 requirements v6.98、SRS v1.9、Group DD v5.23、Traceability v1.8、basic v7.01 | WLD1 remediation review finding closure |
+| v1.11 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 SRS v1.10、Group DD v5.24 与 Traceability v1.9；记录 explicit PoolConnection 同一物理连接事务、endpoint address/port negative guard、cleanup error 聚合及实际 Rust 1.99 focused gates。数据库 runtime 与 full workspace gates 保持开放 | WLD1 TOCTOU closure 与 Rust gate validation
 
 ---
 

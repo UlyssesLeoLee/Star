@@ -25,6 +25,7 @@ sqlx = { workspace = true }
 # UUID + chrono (workspace 已有)
 uuid = { workspace = true }
 chrono = { workspace = true }
+domain-scm = { path = "../domain-scm" }
 domain-automation = { path = "../domain-automation" }
 platform-messaging-runtime = { path = "../platform-messaging-runtime" }
 sha2 = { workspace = true }

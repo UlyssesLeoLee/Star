@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=ffc0f29a06dde1963985a4bc3716c07c27828286ac3d36c2ef9c1af53b6270a8
+@cypher schema=1 source_sha256=ab7ea6f6fe66df1acd9e5fe0a8017a4406e828c81a3292d3e49b40aeba43976d
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/mod.rs"})
 MERGE (schedule_module:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (terminal:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::OccurrenceTerminalOutcome"})
@@ -14,6 +14,15 @@ MERGE (self)-[:EXPOSES]->(dispatch)
 MERGE (self)-[:EXPOSES]->(error)
 MERGE (receive_module:File {path:"crates/star-pg-adapter/src/repository/admission_receive.rs"})
 MERGE (self)-[:IMPORTS]->(receive_module)
+MERGE (scm_repository_master_module:File {path:"crates/star-pg-adapter/src/repository/scm_repository_master.rs"})
+MERGE (scm_repository_master:Type {id:"crates/star-pg-adapter/src/repository/scm_repository_master.rs::PgScmRepositoryMasterRepository",kind:"struct"})
+MERGE (scm_repository_master_trait:Type {id:"crates/star-pg-adapter/src/repository/scm_repository_master.rs::ScmRepositoryMasterRepository",kind:"trait"})
+MERGE (scm_repository_master_error:Type {id:"crates/star-pg-adapter/src/repository/scm_repository_master.rs::ScmRepositoryMasterError",kind:"enum"})
+MERGE (self)-[:IMPORTS]->(scm_repository_master_module)
+MERGE (self)-[:EXPOSES]->(scm_repository_master_module)
+MERGE (self)-[:EXPOSES]->(scm_repository_master)
+MERGE (self)-[:EXPOSES]->(scm_repository_master_trait)
+MERGE (self)-[:EXPOSES]->(scm_repository_master_error)
 @endcypher
 */
 //! Repository 索引 (per WBS §14.10.4 缺口 #4 6 ops Repository + 4 OAuth Repository)
@@ -29,6 +38,7 @@ pub mod ops_log_analysis;
 pub mod ops_log_entry;
 pub mod ops_log_query_log;
 pub mod ops_metrics_config;
+pub mod scm_repository_master;
 
 pub use automation_schedule::{
     OccurrenceTerminalOutcome, PgAutomationScheduleRepository, ScheduleDispatchResult,
@@ -45,6 +55,9 @@ pub use ops_log_entry::{OpsLogEntry, OpsLogEntryRepository, PgOpsLogEntryReposit
 pub use ops_log_query_log::{OpsLogQueryLog, OpsLogQueryLogRepository, PgOpsLogQueryLogRepository};
 pub use ops_metrics_config::{
     OpsMetricsConfig, OpsMetricsConfigRepository, PgOpsMetricsConfigRepository,
+};
+pub use scm_repository_master::{
+    PgScmRepositoryMasterRepository, ScmRepositoryMasterError, ScmRepositoryMasterRepository,
 };
 
 // ==========================================

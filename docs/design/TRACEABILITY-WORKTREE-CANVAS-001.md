@@ -1,13 +1,13 @@
 # TRACEABILITY-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 需求追踪矩阵 v1.3** (per 日本 IPA SEC 標準 / 追踪マトリックス)
+> **AI Worktree Graph Canvas — 需求追踪矩阵 v1.9**
 >
 > - 上游文档:
->   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.5 (126 个历史 FR/NFR ID + WTG-026/AC-WTG-013)
->   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.5 (14 模块 + 15 原决策点 + D-REPO-001)
->   - [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.18 §6.1.3 (Run Apps / Repository identity detailed contract)
+>   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.10
+>   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.11
+>   - [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.24
 > - 目的: 形成 Requirement ↔ BD ↔ DD ↔ Test 完整闭环, 验证需求无遗漏 / 设计无偏离 / 测试覆盖完整
-> - 状态: 🟢 Draft v1.3 (2026-10-23, WTG-026 identity contract trace addendum)
+> - 状态: 🟢 Draft v1.9 (2026-10-24, WLD1 TOCTOU closure and Rust focused validation; PostgreSQL runtime remains open)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v3)
 > - 日期: 2026-09-15 JST
@@ -312,7 +312,7 @@
 | AC-D-4 | Traceability 落档 (15 段 + 1 附录) | 落档检查 | (本追踪矩阵 §A) | 落档 ✅ |
 | AC-D-5 | Spec + IMPL-PLAN 落档 | 落档检查 | IMPL-PLAN §1-§6 | 落档 ✅ |
 | AC-D-6 | TEST-DESIGN 落档 (122 实证锚点) | 落档检查 | TEST-DESIGN §2-§6 | 落档 ✅ |
-| AC-WTG-013 | 区分 SCM Repository master、Project 授权关联、Run nullable binding、Host root registry 与 checkout path；Run candidates 同时复验 Project membership + Run read grant 且不自动绑定；缺授权/binding/fresh generation/provider 时 fail closed | source/design audit；owner stores 与 PG/HTTP integration gates 尚未实现 | requirements §50.3.4；SRS §16；BD §1.6；Group DD §6.1.3 | 设计目标；实现未验收 |
+| AC-WTG-013 | 区分 SCM Repository master、Project 授权关联、Run nullable binding、Host root registry 与 checkout path；Run candidates 同时复验 Project membership + Run read grant 且不自动绑定；缺授权/binding/fresh generation/provider 时 fail closed | SCM master source 增加 deferred commit-time current-revision invariant；owner-role ACL preflight 覆盖当前 DB ACL catalog，并借 `pg_shdepend` fail closed 拒绝其他 database 的任意 object ACL。ignored PG 回归覆盖 single-close commit rejection、close+successor、ACL drift rollback、PUBLIC exclusion 和 target identity；PG runtime 尚未运行。bootstrap/drift probe 与 cleanup 双失败时均保留双方诊断。Migration 显式 acquire PoolConnection，在其同一物理连接事务中复验 admin identity 并执行所有 DDL；address/port mismatch guard 负例通过。Cargo.lock 仅新增到既有 domain-scm package 的 direct edge，无新增 package entry/无关变化。Rust 1.99 selected-package locked all-target check、35+35 package tests、ignored PG target compile 与四个改动 Rust 文件定向 rustfmt 通过；package fmt check 被四个未改文件阻断。full workspace、Clippy、独立 lock/resolution、目标 DB/RLS/并发仍未验收 | requirements §50.8AV；SRS §16；BD §1.6；Group DD §6.1.3；WLD1 phase report §2–§3 | source/test 与 selected-package gates 已验证；数据库运行时未验收
 
 **历史 SRS AC 覆盖率**: **43/43 = 100%** (AC-F 20 + AC-P 7 + AC-Q 10 + AC-D 6, per self-review C-03 v1.1)。另新增跨域设计验收 AC-WTG-013；相关 owner stores/provider 尚未实现，状态保持“设计目标；实现未验收”，不纳入旧 SRS AC 统计。
 
@@ -409,6 +409,11 @@
 | v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01/C-03 修正) | 修正: 总数 115 → 126 唯一 ID (103 FR + 23 NFR 子段); §11 AC 43 项全表化展开 (AC-F 20 + AC-P 7 + AC-Q 10 + AC-D 6); 覆盖率声明同步; 上游文档版本号 v1.0 → v1.1 | 2026-09-17 ULYS-62 self-review 修正落地 |
 | v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (AC-Q-3 / 守门 #10 / 守门 #14 v3 行, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
 | v1.3 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 WTG-026 / AC-WTG-013 追踪闭环：SCM master、Project 授权、nullable Run binding、Host root generation registry 与候选/绑定分离；指向设计目标与当前 source 缺口，不声称实现验收 | WLD-1 Repository identity contract docs-only slice |
+| v1.4 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 WTG-026/AC-WTG-013 与 master persistence source 对账；分别记录 SCM domain/adapter/migration source、待验证的 Rust/DB 行为以及未实现的 Project/Run/Host/provider 全链路；同步 requirements v6.94、basic v6.97、BD v1.6、Group DD v5.19 | WLD-1 Repository master persistence source slice |
+| v1.5 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 PostgreSQL acceptance test 工件已登记但 ignored 且未运行；更新 scoped migration role cleanup/fail-closed 条件；明确 Cargo/MSRV、DB/RLS/权限/并发未验证和 Cargo.lock 排除原因；同步 requirements v6.95/basic v6.98/SRS v1.6/BD v1.7/Group DD v5.20 | WLD-1 Repository master persistence review |
+| v1.7 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加其他 database 上 owner-role object ACL dependency 检查状态、修正 test identity query 并记录 superuser/单连接 migration gate；所有 Cargo/PostgreSQL gates 仍未运行，disposable cluster 真实性由 fixture/operator 提供 | WLD1 remediation 自检修正 |
+| v1.8 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 probe/task 与 cleanup 双失败可观测性纳入 AC-WTG-013 回归状态；对账 16-path manifest 和 Cargo.lock 单一 direct `domain-scm` edge，明确无新增 package entry/无关改动且 lock/resolution 未验证；运行时 gates 仍开放 | WLD1 remediation review finding closure |
+| v1.9 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 AC-WTG-013 的实证状态更新为 selected Rust 1.99 locked gates 通过、PG target 编译通过而 runtime 未运行；记录同物理连接事务、endpoint mismatch、cleanup error 聚合与 Cargo.lock 精确 direct edge；同步 SRS v1.10、BD v1.11、Group DD v5.24，full workspace/Clippy/DB gates 保持开放 | WLD1 TOCTOU closure 与 Rust gate validation
 
 ---
 
@@ -418,9 +423,9 @@
 
 | Requirement ID | 需求来源 | 基本设计 | 详细设计 | 验收目标 | 当前证据状态 |
 |---|---|---|---|---|---|
-| WTG-026 | `docs/requirements.md` §50.3.4；SRS §16 | BD §1.6 / D-REPO-001 | Group DD §6.1.3 | AC-WTG-013 | 当前源码审计报告证明 Repository master、持久 Host root registry 与 lifecycle provider 缺失；本次只落 owner/authorization contract。实现验收未通过/未执行。 |
+| WTG-026 | `docs/requirements.md` §50.3.4；SRS §16 | BD §1.6 / D-REPO-001 | Group DD §6.1.3 | AC-WTG-013 | SCM master source 已增加 tenant-owned M/SCD2 + append-only T audit、FORCE RLS、expected-version CAS；PG acceptance test 工件仍 ignored 且未执行。Cargo.lock 仅新增 adapter 到既有 domain-scm package 的 direct dependency edge，无新增 package entry/无关变化。Rust 1.99 selected-package locked check/tests、ignored PG target compile 与定向 rustfmt 已通过；独立 lock/resolution、full workspace、Clippy、目标 DB/deployed login membership、RLS/权限/并发与 Project link、Run binding、Host root registry/provider、端到端 HTTP/DB acceptance 仍开放，AC-WTG-013 全链路未通过。|
 
-设计一致性检查须保持这些身份分离：SCM Repository master ≠ Project authorization link ≠ Run binding ≠ Host root registration ≠ Worktree checkout path。候选发现须同时授权当前 Project membership 与 Run read grant，且不自动绑定。目标运行验收需要持久 owner facts、Run binding CAS/idempotency/audit/outbox、generation freshness/revocation、path non-disclosure、provider 503/fail-closed，以及越权/撤权/错 Project/NULL binding/过期 root 的负向 HTTP + PostgreSQL evidence。当前这些实施与部署测试尚未完成。
+设计一致性检查须保持这些身份分离：SCM Repository master ≠ Project authorization link ≠ Run binding ≠ Host root registration ≠ Worktree checkout path。候选发现须同时授权当前 Project membership 与 Run read grant，且不自动绑定。master source slice 不改变 Project/Run 授权或 Worktree/CLI admission；目标运行验收还需要持久 owner facts、Run binding CAS/idempotency/audit/outbox、generation freshness/revocation、path non-disclosure、provider 503/fail-closed，以及越权/撤权/错 Project/NULL binding/过期 root 的负向 HTTP + PostgreSQL evidence。当前部署与跨 owner 集成测试尚未完成。
 
 ---
 
@@ -430,10 +435,10 @@
 
 | 文档 | 版本 | 大小 | 章节数 | 状态 |
 |---|---|---|---|---|
-| `SRS-WORKTREE-CANVAS-001.md` | v1.5 | ~105KB + WLD-1 addendum | 15 段 + 2 附录 + §16 addendum | 🟢 Baseline |
-| `BD-WORKTREE-CANVAS-001.md` | v1.5 | ~83KB + WLD-1 section | 39 段 + 1 附录 + §1.6 | 🟢 Draft |
-| `DD-WORKTREE-CANVAS-001.md` | v1.0 | ~120KB | 52 段 + 1 附录 | 🟢 Draft |
-| `TRACEABILITY-WORKTREE-CANVAS-001.md` | v1.3 | ~28KB + WLD-1 addendum | 15 段 + 1 附录 + §16 addendum | 🟢 Draft |
+| `SRS-WORKTREE-CANVAS-001.md` | v1.10 | ~105KB + WLD-1 addendum | 15 段 + 2 附录 + §16 addendum | 🟢 Baseline |
+| `BD-WORKTREE-CANVAS-001.md` | v1.11 | ~83KB + WLD-1 section | 39 段 + 1 附录 + §1.6 | 🟢 Draft |
+| `DD-WORKTREE-CANVAS-001.md` | v1.4 | ~120KB | 52 段 + 1 附录 | 🟢 Draft |
+| `TRACEABILITY-WORKTREE-CANVAS-001.md` | v1.9 | ~28KB + WLD-1 addendum | 15 段 + 1 附录 + §16 addendum | 🟢 Draft |
 
 **总文档大小**: ~336KB
 **总章节数**: 121 段 + 5 附录
