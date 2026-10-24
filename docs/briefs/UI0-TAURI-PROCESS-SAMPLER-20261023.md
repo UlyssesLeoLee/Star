@@ -23,7 +23,7 @@
 
 ## 范围
 
-只拥有 manifest 中的 5 个文件。新增 scripts/ui0_bench/capture_tauri_process.py：Windows-only、只采样、不启动/终止进程；操作者显式给 Tauri 根 PID、scenario、cold/warm、采样间隔与时长。以 Win32_Process 父子关系找进程树，处理 PID 重用/进程退出/子进程变化；输出进程树 RSS、CPU 和进程数量样本，raw file 有界、创建时防止覆盖、输出不可包含进程名或其他无关宿主信息。CPU 数值要说明核数归一化方式；不伪造起始区间 CPU 值。
+只拥有 manifest 中的 5 个文件。新增 scripts/ui0_bench/capture_tauri_process.py：Windows-only、只采样、不启动/终止进程；操作者显式给 Tauri 根 PID、scenario、cold/warm、采样间隔与时长。以 Win32_Process 父子关系找进程树，处理 PID 重用/进程退出/子进程变化；输出进程树 RSS、CPU 和进程数量样本，raw file 有界、创建时防止覆盖、输出不可包含进程名或其他无关宿主信息。RSS 是各进程 Windows working set 的总和，共享页可能重复计数，因此不等于进程树唯一物理内存。CPU 数值要说明核数归一化方式；不伪造起始区间 CPU 值。
 
 采样要受现有 runner 的 16 KiB 单行、8 MiB 总输入、10,000 条样本限制约束。使用固定的 PowerShell 查询和 subprocess 参数列表，无 shell、无任意命令输入；缺少 Windows/CIM/目标 PID 或权限时输出结构化失败，不能退化成手工样本。新增单测通过 mock snapshot 子进程覆盖树聚合、RSS、CPU delta、进程退出/PID 重用、限制与失败路径。可做一次对当前普通进程的短采集 smoke，但必须标为工具链 smoke，不能计入 Tauri benchmark。
 
