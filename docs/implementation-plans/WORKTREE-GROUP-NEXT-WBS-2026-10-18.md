@@ -224,6 +224,7 @@ flowchart TD
 | v0.20 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录八条已合入 lane 的 worktree/branch 清理和 42 个 untracked/ignored 文件的外部 hash 校验归档；注明 Codex 归档接口仍返回 queued，需单独核对其附件登记状态 | 用户此前要求仅保留 main/dev 并归档后清理；清理前再次确认 Orca writer 已结束 |
 
 | v0.22 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD-0 快进至 dev `8945bb28`、当前 `dev...main=39 0`、只保留 main/dev 本地分支和 worktree；WLD-0 `.cache` 证据已在 Orca 删除 checkout 前复制并校验 SHA-256。目标 DB、部署身份、历史 reconciliation 与执行闭环仍开放 | WLD-0 lane 通过 disposable HTTP/PG acceptance 并完成选择性集成和工作区清理 |
+| v0.23 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD-1 repository-directory 与 WLD-5 host-auth 两条审计 lane 的 fail-closed 结论、选择性 rebase/fast-forward 集成、claim 释放及两条已完成 worktree/branch 清理；没有 Rust 实现改动或测试声称 | 用户要求清理已完成开发 worktree；两条 lane 均完成证据审阅并集成到 dev |
 
 ## 8. Current execution state (2026-10-23)
 
@@ -248,3 +249,21 @@ This snapshot supersedes the older owner, RTK, local-ref and lane-status values 
 3. **Independent product gates:** apply and verify target PostgreSQL migrations, runtime grants, FORCE RLS/cross-tenant tests, Linux Runtime build/session tests, durable Outbox delivery/restart recovery, and the constrained Multipass/K3s runtime path. Source audits and Windows checks do not close these gates.
 4. Work on WLD-1 identity/provider and WLD-5 host-auth preparation may proceed in disjoint manifests/worktrees. Rebase each code slice onto current `dev`, review the precise diff, run the relevant focused gates, then integrate serially. Preserve fail-closed behavior whenever canonical identity, authorization, storage, runtime, or session evidence is unavailable.
 5. Reconcile the stale Codex worktree attachment entries against the external archive and Git inventory. Keep the archive until the Codex UI either marks the worktrees archived or confirms that no recoverable task state remains attached.
+
+## 9. Current execution update after WLD-1/WLD-5 audits (2026-10-23)
+
+This update supersedes §8 WLD-1/WLD-5 lane and local cleanup state for this integration. The reports close only the source-audit slices; neither end-to-end WBS item is complete.
+
+| Area | Verified result | Remaining gate |
+|---|---|---|
+| WLD-1 repository directory | [PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md](../reports/PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md) found no canonical PostgreSQL Repository master or trusted persistent host-owned repository-root registry. Existing Run authorization reads are current, but `repository_id` is nullable and does not authorize inferring repositories for an unbound Run. Lifecycle provider remains uninstalled and its route returns 503. | Define and implement canonical Project→Repository master, trusted root registry, least-privilege reads, creator/owner policy, and `NULL` Run binding semantics before attempting provider wiring. Keep create/import/archive and physical cleanup closed until their owner transaction, Outbox, host dispatch, drain, recovery and data-preservation gates pass. |
+| WLD-5 host authentication | [PHASE-WLD5-HOST-AUTH-BRIDGE-20261023.md](../reports/PHASE-WLD5-HOST-AUTH-BRIDGE-20261023.md) found no production host session owner/provider. The Group cookie route lacks an in-repo issuer/refresh owner; Rust OAuth scaffold has incomplete human consent/client-secret/introspection and no production router wiring. | Keep Hooks, Run Directory and Group live API unavailable until the embedding host supplies a verifiable session contract or a complete BFF owner. Then wire the existing token callback/generation boundary and verify expiry, revocation, stale callbacks and scoped 403 behavior. |
+| Lane integration | WLD-1 `fbb4431d` fast-forwarded first. WLD-5 was rebased on that updated dev tip and fast-forwarded as `d93588c0`; both reports are reachable from local `dev`. The lane claims were released after integration. No source changes were made, so no Rust build or test result is claimed. | Continue with one reviewed lane at a time; sync requirements/basic/detailed design only when a verified implementation changes their contract. |
+| Local branches and worktrees | After verifying both lanes clean, without ignored files, special index flags, in-progress Git operations or submodules, their worktrees and branches were removed. Local `main` remains an ancestor of `dev`; local refs now retain only `main` and `dev`. No remote branch was pushed or deleted. | Keep the dirty `D:\Star` main checkout and its user-provided AR-ATLAS files untouched. Preserve ignored build/index data in `dev`. |
+| Stale Codex artifact records | A prior UI-0 sampler artifact points to a directory that is already absent. Codex archive rejected the request because the worktree belongs to another task. Git no longer lists it as a linked worktree. | Reconcile that attachment with its owning task; do not remove another task's artifact record or claim all historical Codex attachments are cleaned. |
+
+### Next work sequence
+
+1. **WLD-1 identity source contract:** establish the owner of Project→Repository master data, host-owned root registry, grants, lifecycle, and the unbound-Run response rule. Only then implement the read-only listing provider and target PostgreSQL/RLS acceptance.
+2. **WLD-5 session owner handoff:** obtain the embedding host's real session owner and contract. Until then keep authentication-dependent live surfaces disabled; do not add a local token issuer or treat the cookie proxy/OAuth scaffold as production identity.
+3. **Continue independent product gates:** target DB deployment grants/RLS, Linux Runtime/sandbox, durable Outbox recovery, Multipass/K3s two-instance budget, and WBS-wide acceptance remain open. The two source-audit reports do not close these gates.
