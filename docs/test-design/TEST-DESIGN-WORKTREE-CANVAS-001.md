@@ -1,8 +1,8 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.0** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + Multica ULYS-57 评审发令 "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.2** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + Multica ULYS-57 评审发令 "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟢 Draft v1.0 (2026-09-16 JST 初版落档, per 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了")
+> - 状态: 🟢 Draft v1.2 (2026-10-23 JST 增补 Group 注入会话 generation 迟到响应回归用例)
 > - 关联 issue: `Multica ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
@@ -108,6 +108,12 @@ UAT:         43/43 AC 100% 签字 (5 域 Lead 签字栏)
 | **E2E** | TS | Playwright + MSW handler | Next.js dev server + BFF mock | MSW + WebSocket mock |
 | **PT** | Rust + TS | `cargo bench` (criterion-rs) + `vitest bench` + k6 | PG + Redis + Neo4j + headless Chrome | 真实服务 + 合成负载 |
 | **UAT** | Manual + Auto | 手动 + Playwright UAT mode | 全栈真实环境 | 5 域 Lead 真人 (Mavis 临时代签) |
+
+### 1.3.1 Group 注入会话 generation 迟到响应回归
+
+| 用例 | 可控时序 | 预期结果 | 证据边界 |
+|---|---|---|---|
+| **UT-FE-SESSION-01** `ignores a delayed 401 from a replaced Group session and keeps the new projection live` | 通过 deferred fetch 固定旧 generation：旧投影请求暂缓；随后旧请求的 401 暂缓；切换非密钥 `sessionKey` 与注入 token，确认新投影完成后，再依次释放旧成功响应与旧 401。全程不使用计时 sleep 或真实网络。 | 新 generation 保持 `live` 且仍显示新投影；迟到的旧成功响应不覆盖新投影；旧 401 不使新 generation 失效；新 generation 的请求使用新注入 token。 | 仅验证 Worktree Group 注入式 API provider 的客户端 generation 隔离和前端投影状态；不证明生产登录、token issuer、宿主 session owner 或生产身份授权已接通。命令：`pnpm run test src/lib/group/__tests__/groupProjection.test.tsx`（从 `frontend/` 运行；脚本参数前不加 `--`，否则当前 pnpm/Vitest 调用会运行整个 suite）。 |
 
 ### 1.4 引用基线 (per 守门 #9 v20 子代理 dispatch 必先 brief)
 
@@ -541,6 +547,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 |---|---|---|---|---|
 | **v1.0** | **2026-09-16 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 9 段 IPA SEC 模板 (目的 / 范围 / UT / IT / E2E / PT / UAT / RACI / 修订), 52 UT + 10 IT + 8 E2E + 8 PT + 43 AC = 121 实证锚点, 14 crate × 模块测试矩阵 1:1 对齐, 5 子任务 RACI, 13 已知缺口 (G-IT-01..05 + G-E2E-01..08 + G-PT-01..05 = 18, 含 sub-issue 分解), 5 角色签字栏, 守门 5 项必过, Token OLU ~500K (含 docs)** | **2026-09-16 10:48 JST 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了"** |
 | **v1.1** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 M-2/M-3/m-7 派生)** | **修正: 5 子任务命名 ULYS-57.x → ULYS-58..62 (per Multica 实际 identifier); AC-D-7 误增撤销 → 43 AC (与 SRS / Traceability §11 一致); 子任务创建命令 `--parent` 缺失 flag 修正为 `--description-file` + `update --parent-issue-id`; 守门 #14 v3/v4 "永久代签" 措辞 → "接手代签 (5 域真人到位后切真人)" (per self-review m-7)** | **2026-09-19 04:55 JST 自审整体审查 Mavis 推荐 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
+| **v1.2** | **2026-10-23 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 UT-FE-SESSION-01：以受控 deferred 响应验证 sessionKey generation 替换后旧 401 与旧投影响应不会使新 session 失效或回写；标明注入式测试的生产认证证据边界。** | **WBS-WLD-NEXT-20261023：补充迟到 401 / stale projection 确定性回归验证** |
 
 ---
 
