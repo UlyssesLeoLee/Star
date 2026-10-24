@@ -1,10 +1,10 @@
 # PHASE-WLD1-REPOSITORY-MASTER-20261023
 
-> 状态：WLD1 SCM Repository master persistence source、TOCTOU/ACL/cleanup 修复及 Rust 1.99 selected-package gates 已验证；PostgreSQL runtime、full workspace 和集成验收仍未关闭。
+> 状态：WLD1 SCM Repository master persistence source、TOCTOU/ACL/cleanup 修复及 Rust 1.99 selected-package gates 已验证并 fast-forward 集成到 dev（`ab2a69c`）；PostgreSQL runtime、full workspace 和完整 WTG-026 验收仍未关闭。
 > Lane：`codex/wbs-repository-master-20261023`
 > 基线 HEAD：`5059508e5dcea98cd5a7a3aceb99e85ada60da10`
 > 目标 dev HEAD（派发时）：`44b027ca09204ce1480667946a37f4900da10691`
-> 集成：由父任务 review/integrate；本 lane 未 commit、rebase、merge、push 或 fetch。
+> 集成：父任务按登记的 16-path manifest 提交并 rebase 到当时 dev HEAD `3dd37dc7232d523187c8b536f5e24dae9c1eb1f6`，随后 fast-forward dev 到 `ab2a69cce74be0c0ea5bc25a66cc4ffbf655873c`；未 push 或 fetch。5 个父级复核支持文件仍作为 dev 中未跟踪审计材料保留。
 
 ## §0 目的
 
@@ -57,7 +57,7 @@
 
 ## §4 子代理失败接手清单
 
-本 lane 未派生子代理。独立 WLD1 review 确认先前的 2 P1 与 1 P2 在源码层已修复，未发现新的代码/SQL P1/P2；父任务随后独立重跑 Rust 1.99.0 selected-package all-target tests，70 项通过，PG runtime 仍未验证。父级复核流程生成的 5 个支持文件不在实现 manifest 中，实施提交会排除它们并单独保留到 `dev`。独立 workspace lock/resolution 与 integration 仍由父任务处理。不能把 lane 状态或该报告等同于 commit/merge。
+本 lane 未派生子代理。独立 WLD1 review 确认先前的 2 P1 与 1 P2 在源码层已修复，未发现新的代码/SQL P1/P2；父任务随后独立重跑 Rust 1.99.0 selected-package all-target tests，70 项通过，PG runtime 仍未验证。父级复核流程生成的 5 个支持文件不在实现 manifest 中，未进入实现提交，仍留在 `dev` 的审计材料中。实现已 rebase 并 fast-forward 集成；独立 workspace lock/resolution 与 PostgreSQL runtime 仍未完成。该部分集成不代表完整 WTG-026 验收。
 
 ## §5 守门规则
 
@@ -88,7 +88,7 @@
 | SRE Lead | Mavis 接手审核 | disposable PostgreSQL 与目标 DB gates 开放。 |
 | 平台 | Mavis 接手审核 | 目标 package Rust 1.99 locked check/tests 与 selected test target compilation 通过；package fmt 有四个未改文件差异；PG runtime、full workspace、Clippy 与独立 lock/resolution gates 开放。 |
 | 评审主持 | Mavis 接手审核 | same-physical-connection transaction 与 cleanup diagnostics 已有 source/test evidence；PostgreSQL acceptance 仍未运行。 |
-| PM | Mavis 接手审核 | 由父任务 review 后决定是否集成。 |
+| PM | Mavis 接手审核 | WLD1 source slice 已集成到 dev；目标 DB 与完整 WTG-026 验收仍开放。 |
 
 ## §7 修订历史
 
@@ -98,6 +98,7 @@
 | v0.5 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更正实现 manifest 与 worktree dirty-path 数的表述，区分 16 个实现路径和父级复核流程额外生成的 5 个支持文件；记录独立复核结论，并把实现 owner 的 test 结果与独立复证状态分开 | WLD1 独立复核收尾与集成范围核对 |
 | v0.6 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 父任务在独立 Cargo target dir 对两个目标 package 独立复验 Rust 1.99.0 locked all-target tests：`domain-scm` 35 项与 `star-pg-adapter` 35 项通过；Schedule PG 5 项与 SCM PG 1 项仍 ignored，身份 guard 1 项通过。共享 target 首次 LNK1104 在隔离 `-j 4` 测试中未复现；共享缓存未清理 | 完成 worktree 收敛前的 selected-package 独立复验 |
 | v0.7 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | WLD1 rebase 后再次执行 `cargo check --all-targets --locked -j 4` 与 all-target tests；check 通过，测试 `-j 4` 遇到 MSVC LNK1104，随后 `-j 1` 两个 package 各 35 项通过。仍有 5 个 Schedule PG 和 1 个 SCM PG test ignored；不宣称 PostgreSQL runtime 已验收 | rebase 后的验证及 Windows 链接器并行度诊断 |
+| v0.8 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 WLD1 记录为仅包含 16 个登记路径的提交并 rebase 到 dev 基线；fast-forward 集成 dev 至 `ab2a69c`。5 个额外支持材料保留为 dev 的未跟踪文件，未推送。PostgreSQL runtime、full workspace、独立 lock-resolution 与完整 WTG-026 验收仍开放 | WLD1 安全集成与阶段报告收尾 |
 | v0.3 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 PG probe 与清理双失败时的诊断遮蔽；将 manifest 锁文件事实统一为精确 16 paths、Cargo.lock 仅增加 direct `domain-scm` edge 且无新增 package entry/无关变更；记录 Cargo/Rust/PostgreSQL gates 仍未运行 | WLD1 独立 review remediation |
 | v0.2 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复独立 review 发现的 current revision commit invariant、owner ACL drift 和 PG target identity guard；补充 `pg_shdepend` 跨库 ACL fail closed、login alias/superuser/single-connection correction；同步 SRS/BD/DD/traceability，并精确记录 Cargo/PostgreSQL/cluster disposal gates 仍未通过 | WLD1 remediation 自检与第二轮 source review |
 | v0.1 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 SCM Repository master source slice、15 path manifest、跨 actor CAS、权限边界与未执行的 Cargo/PostgreSQL 验证 | WBS-WLD1 Repository master persistence slice |
