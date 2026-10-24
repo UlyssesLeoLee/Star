@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.17**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.18**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -18,12 +18,13 @@
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.92 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.95 §16
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.93 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.96 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.34、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.76、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.08
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 > - WLD-0 source slice（2026-10-19）：新增 Project/Run 授权的 Run-to-Worktree bind/reassign/detach REST owner API 与前向 Outbox constraint migration；用本地 Worktree repository 身份维持归属，不要求 hostless Run 提供远端 repository/Branch。CAS、幂等、每 Worktree 锁、SCD2、Audit 与 Outbox 在单一 owner transaction 内。当前迁移只在源码中，目标 DB grants/RLS、认证持久化、回滚、并发与历史对账未验收，执行 admission 继续关闭。
 > - WLD-0 DB owner role slice（2026-10-20）：REST mutation transaction 使用 `SET LOCAL ROLE star_engineering_directory_owner`；migration 建立 NOLOGIN/NOBYPASSRLS/NOINHERIT role，以 lock-only 列权限满足 `FOR SHARE` 并为跨域源表添加 restrictive UPDATE-deny RLS。一次性 PostgreSQL 18.6 runner 验证 restricted test login 的角色切换、授权和行为 RLS；真实部署 membership、目标 DB、HTTP API 写入与并发/回滚门仍未验收，执行 admission 关闭。
+> - WLD-1 repository identity contract（2026-10-23）：设计拆分 SCM Repository master、Project authorization link、Engineering Run Directory 的 nullable repository binding、Host Infrastructure root registry。source audit 未发现持久 master/root registry 或 lifecycle provider；本增量只定义 owner/API/授权门，不声称已实现。
 
 ---
 
@@ -385,6 +386,18 @@ Worktree management owner 在同一事务提交 Worktree logical state/version�
 只有实际 `false → true` / `true → false` 转换发事件；assign-owner 不发这两类事实。archived 状态 no-op 只确认并审计操作回执，不调用 archive Hook、不改 Worktree version 或 retention expiry，也不生成 Outbox fact。Outbox 按 tenant/plan 和 tenant/Worktree/version 分别唯一。payload 严格为 `worktree_id`、`plan_id`、`transition` 与 before/after `{archived,version}`，DB shape constraint 核对字段 allowlist、row identity、event type、before/after 整数连续一版和 after version，最大 8192 bytes。禁止主机路径、凭据、prompt、终端输出和 raw log。Outbox 为 Transaction 类，FORCE RLS，拒绝 UPDATE/DELETE/TRUNCATE；现有短期 plan 属 Work，management Audit 属 Transaction，owner assignment 属 Master/SCD2。
 
 它属于 Worktree lifecycle owner，与 Engineering Run Directory binding Outbox 分开。此 source slice 不实现 delivery worker、consumer Inbox、BI projection 或 physical Git cleanup/restore。目标 DB/app-login grants、真实授权事务、exact replay/rollback/concurrency、Host provider 与 lease/claim/process drain/retention gate 仍须独立验收。追加事实对 plan 的 RESTRICT FK 继承现有 Audit 的保留依赖；不可将 Work plan TTL 宣称为已具备物理清理能力。
+
+#### 6.1.3 WLD-1 Repository identity、Run binding 与可信 root registration（设计目标）
+
+**Owner 划分。** `RepositoryId` 的稳定主身份由 SCM bounded context 持有；provider/repository key、URL 与 default branch 是 optional source metadata。Project owner 持有版本化 Project↔Repository authorization link、有效状态、审计与默认候选。不要把 `domain-project::ProjectRepository` 关联端口当成 SCM master，也不要以 `scm.cloud_branch` 行完整性推导 repository directory。Engineering Run Directory owner 持有显式可空 Run→Repository binding；Host Infrastructure owner 持有可信本地 root registry，Worktree owner 只持有 checkout lifecycle/path locator 的受限操作视图。
+
+**读候选与 binding 是不同 API 语义。** 当前 Project-scoped `GET /api/v1/projects/{project_id}/worktree-repositories` 是兼容 provider seam，不是 Run binding 接口；provider 缺失时现状为 503。目标 Run-scoped 候选查询可使用 `GET /api/v1/engineering-runs/{engineering_run_id}/repository-candidates`（路径为设计提案，尚未实现）：必须在同一授权决策中验证当前 Project membership 与 Run read grant，再只返回最小候选 `repository_id/name/default_branch`。候选读取不得写 Run，也不授予 Worktree 操作权限。
+
+目标显式绑定命令可采用 `PUT /api/v1/engineering-runs/{engineering_run_id}/repository-binding`（路径为设计提案，尚未实现），接受 `repository_id`、`expected_binding_version` 与幂等键。Engineering Run Directory owner 在 owner transaction 中复验 Project/Run grants、SCM master identity 与当前 Project-Repository authorization link，以 CAS 写入 binding revision、Audit、owner-local Outbox 和精确 replay receipt。NULL 表示未绑定；不从 Project default、remote Branch 或旧 Worktree 反推。hostless Run 目录及非 checkout Run Apps 保持可用，只有 Worktree checkout 子树/create/import/CLI 被阻断。
+
+**Host root registration。** Host Infrastructure owner 的目标持久注册键至少为 `(host_environment_id, repository_id, generation)`，并保存 registry revision、验证/撤销状态、验证时间与来源 authorization identity。generation 变更或撤销后，旧 Worktree operation 必须重新解析并核验，不得继续使用缓存路径。可信 Host capability 可以在本地解析绝对路径；响应、审计和跨 owner Outbox 仅传稳定 identity/generation 与状态，不传路径、URL 或 credential。`worktree.path` 是 checkout locator，`worktree_shared_dir.path` 是共享目录配置，`ExternalWorktreeImportRegistry` 的进程内 map 是临时映射，三者都不是可信 root registry。
+
+**Admission 顺序。** create/import/CLI 开始前依序验证当前 Project membership、Run read/write grant、当前 Run→Repository binding、有效 Project↔Repository link、HostEnvironment 存在、Repository root generation 匹配且 fresh、provider readiness/授权和 Worktree 冲突；副作用前再次复验 binding revision、Project link revision 与 root generation。任何数据源不可用、NULL/不匹配/过期或授权事实不完整，返回非成功并不产生 Worktree 成功投影。当前源码只证明 nullable Run fields、Project/Run authorization、默认未安装的 provider seam 与进程内 root map；canonical Repository master、Project link 持久 writer、Run binding writer/endpoint、持久 root registry、最小 SQL grants、部署与 HTTP/DB acceptance 全部待实现。此处设计不能用于声明生产 Worktree/CLI 已可用。
 
 ### 6.2 并行 Agent 可见性
 
@@ -848,6 +861,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | WTG-010 / AC-WTI-001 | §3.1、§4、§5、§12 | Git retention lock 与持久化 `locked` 分离，且不代表 Agent 活跃/互斥；unknown/unlocked 不表示空闲；cleanup 需独立活跃状态、drain 和最终重观测 |
 | WTG-011 / AC-WTG-008 | §4、§6.1、§10、§11 A | Project Repository discovery + Index create/import UI；严格字段 allowlist、当前授权与 binding 复核，拒绝客户端路径/URL，持久化 operation/Audit/Outbox，provider 缺失返回 503 |
 | WTG-012 / AC-WTG-009 | §1.2、§2、§4.2、§11 | Project selector 来自当前用户 membership 目录；ID/role 最小投影、cursor/缓存边界、seed 不回退和无名称 SoR 时使用 UUID 标签 |
+| WTG-026 / AC-WTG-013 | §3.4、§3.5、§4、§5、§6.1.3、§11 | 分离 SCM Repository master、Project authorization link、候选查询、nullable Run binding 与 HostEnvironment+RepositoryId+generation root registry；Run candidates 双重授权且不隐式绑定；路径不出 Host capability；source audit 与实现缺口显式标注 |
 | AC-ERUN-008 | §1.1-§1.2 | Run 目录、创建与授权不依赖远端宿主 Branch；固定 Project → Run → Worktree → Branch；Branch grant 仅用于远端 SCM 操作；Run→Worktree/Task owner/CLI 未完成时保持 fail closed |
 | AC-UI-NEUTRAL-001 | §1.2.1 | 用户可见文案使用中性能力名称；仅真实启用连接器可事实显示服务商名，不以第三方产品名作对标或仿制 |
 | WTG-022 / AC-WTG-012 | §1.5、§3.1、§4、§5、§11 | Index 与 Run directory 响应禁止暴露主机 checkout path；同源 BFF 只在服务端读取 HttpOnly token，缺宿主 issuer/config 时保持错误态 |
@@ -936,6 +950,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v5.17 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增补 hostless Run authenticated HTTP acceptance 与 Directory owner 对 Run identity、初始 revision、creator grant 的最小 INSERT 权限；记录 fresh disposable PostgreSQL runner 55/55、create/replay/list/context/权限隔离与 binding rollback/detach，并保留目标 DB/生产身份及执行闭环门禁；同步 requirements v6.92 与 Basic Design v6.95 | WLD-0 hostless Run API acceptance 与文档对账 |
+| v5.18 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 WTG-026 / AC-WTG-013、§6.1.3：界定 SCM/Project/Run/Host owners、Run-scoped candidates 与显式 nullable binding、generation-scoped root registration、执行前授权和 fail-closed 顺序；只更新契约，不声称持久 master/registry/provider 已实现 | WLD-1 Repository Directory source audit 与 identity contract docs-only slice；同步 requirements v6.93/basic v6.96/SRS v1.5/BD v1.5/Traceability v1.3 |
 | v5.16 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §8.11 与 Schedule API DD：hostless Run 可按 Project/Run grants 配置 Rule，Branch 仅在 Run 带有远端 Branch 时校验；Rule recurrence 配置校验不创建 occurrence，Rule revision Branch 可空，Occurrence 的非空 target_snapshot JSONB 由 Rust 域验证保证 Branch 存在，admission/runtime 仍要求 Branch；同步 Basic Design v6.93、Schedule API DD v0.76，并记录 Rust/DB 验收未运行 | WLD3 hostless Schedule authorization slice |
 | v5.10 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修订 §9.2 的跨 owner messaging 契约：owner Outbox/Inbox 与 immutable route pin 是稳定边界，NATS 为可移除兼容 adapter，Rust-native transport 为目标方向；将 analytics stream 评估与基础 transport 替换分开，并明确 ACK、恢复与 BI 事实的 owner 语义 | W1 有界设计核对发现 §9.2 仍将 NATS 写为固定 broker 基线 |
 | v5.13 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 Run revision 的 FOR SHARE lock-only 列权限与 restrictive RLS denial，并将其纳入非超级用户验收；保留目标 DB、真实 API、rollback/replay/concurrency 未验收 | Self-review found and fixed a missing Run revision lock grant |

@@ -1,12 +1,12 @@
 # BD-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 基本設計書 v1.4** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **AI Worktree Graph Canvas — 基本設計書 v1.5** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟢 Draft v1.4 (Run 工作区与双 Canvas 边界补充)
-> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.4 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)
+> - 状态: 🟢 Draft v1.5 (Run 工作区、双 Canvas 与 Repository identity 来源边界补充)
+> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.5 (126 个历史需求 ID + WTG-026/AC-WTG-013)
 > - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4 (Worktree Group 边界补充) + 实装代码
-> - Run App owner 边界: [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v4.25 §1 / §8.1；本 BD 中 Project Worktree Overview Graph 与 Run Infinite Canvas 是分离能力
-> - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档)
+> - Run App owner 边界: [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.18 §1 / §6.1.3；本 BD 中 Project Worktree Overview Graph 与 Run Infinite Canvas 是分离能力
+> - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.3
 > - 守门基线: 守门 #1+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29 共 14 项必过
 > - 平行参考: `docs/requirements/SRS-CANVAS-001.md` v1.4 (无限画布总册) + `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
@@ -63,12 +63,13 @@
 | D-RISK-001 | Risk Score 阈值 | **0.7 = 高风险, 0.4-0.7 = 中风险, <0.4 = 低风险** | 0.5/0.8 单阈值 | FR-RISK-006 | BD 拍板 |
 | D-HEALTH-001 | Health Score 算法 | **加权扣分制 (13 因素权重表 §21.3)** + **下限 0** | 神经网络 / 决策树 | FR-WT-006 | BD 拍板 |
 | D-COLOR-001 | 颜色编码 | **D3 SchemeCategory10 + StatusPill 60+ 色码复用** + 色盲友好调色板 | 自定义调色板 | FR-WT-007, §34 UI 原则 | BD 拍板 |
+| D-REPO-001 | Repository 与本地 root 的身份来源 | **SCM master + Project 授权关联 + nullable Run binding + Host Infrastructure generation-scoped root registry**；每个 owner 只写自己的事实 | 把 Branch rows、Project default 或 Worktree path 当作统一 Repository/root 来源 | WTG-026 / AC-WTG-013 | 设计决定；owner stores/provider 待实现 |
 
 **拍板原则** (per §三十五): "可以指出备选方案, 但必须选定推荐方案"; MVP 优先推荐方案, P2 阶段允许切换备选。
 
 ### 0.3 Requirements 继承清单 (per §三十一 Requirements Traceability)
 
-本 BD 继承 SRS v1.1 全部 **126 唯一 ID** 需求 ID (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID), 详细追踪矩阵见 §37 + 独立 `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1。
+本 BD 继承 SRS v1.5 中已统计的历史 **126 FR/NFR 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)，并增加跨领域 WTG-026 / AC-WTG-013。详细追踪矩阵见 §37、§1.6 与独立 `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.3。
 
 继承大类:
 
@@ -285,6 +286,17 @@ graph TB
 | Plugin App Registry | Run 工作区扩展入口 | 热插拔注册经过授权的同级应用 | manifest 声明 Run/Worktree scope、capability、permission |
 
 两类 Canvas 可互相深链，但各自拥有独立路由上下文、数据模型与布局状态。Project Graph 消费 Run/Worktree 对象引用和授权事件，不复制 WorkItem/Task Card 状态；Run Canvas 复用 Run Shell 底栏聊天，不嵌入第二条聊天栏。跨应用层级以 [`docs/requirements.md`](../requirements.md) §50 和 [`docs/basic-design.md`](../basic-design.md) §16 为准。现有按 `worktree_id` 存储与访问的 Group Canvas API 是兼容实现切片，Run-owned schema/API 与历史归属迁移列入 Phase 2E。
+
+### 1.6 WLD-1 Repository 与本地 root 身份来源
+
+SCM owner 持有独立稳定的 Repository master；外部 provider key、远端 URL、default branch 是可空来源元数据。Project owner 只持有 Project↔Repository 授权关联、状态/revision、审计与默认候选，不拥有 Repository master。Engineering Run Directory owner 持有显式、可空的 Run→Repository binding，并在 CAS 写入时复验 Project-Repository 关联。Project 默认项不得隐式写入 Run；`repository_id = NULL` 表示未绑定，不得由 remote Branch 或历史 Worktree 猜测。
+
+可信 Host Infrastructure owner 持有持久 local root registration，至少以 `(host_environment_id, repository_id, generation)` 标识并追踪授权、freshness、验证和撤销状态。原始宿主路径只由受信任 Host capability 解析，不能序列化到 API/UI 或开放给 Agent/Plugin/任务 CLI。Worktree checkout path、shared-directory path 和进程内映射都不是 root registration。
+
+Run-scoped repository candidates 仅在当前 Project membership 与 Run read grant 均有效时返回；候选可见仅表示“可申请绑定”，不意味着已绑定或获得 Worktree 权限。Worktree create/import/CLI 要求显式 Run binding、当前 grants、有效 Project↔Repository link、匹配的新鲜 root generation 以及真实 lifecycle provider；任意来源缺失即 fail closed。无 Repository 的 Run 与不需要 checkout 的 Run Apps 仍可存在。
+
+当前源码审计没有找到 PostgreSQL Repository master、持久 Host root registry 或已装配 lifecycle provider；`repository_id` nullable 字段和项目/Run 查询端口不足以证明这些 owner contracts 已落地。该节定义目标所有权与门禁，不代表 schema、migration、provider 或目标数据库验收。来源证据与范围见 [`PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md`](../reports/PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md)。
+
 ## §2 模块边界 (14 模块, per SRS §二十四)
 
 ### 2.1 模块清单 + 职责
@@ -2031,7 +2043,7 @@ Unit Test (Rust cargo + TS vitest)
 | NFR-THEME-001 | §34 |
 | NFR-KEYB-001 | §34 |
 
-**完整追踪矩阵 (126 唯一 ID)**: 见独立文件 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1 (self-review C-04 修正)
+**历史 SRS 追踪矩阵 (126 FR/NFR 唯一 ID)**: 见独立文件 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.3；WLD-1 增量另见 §1.6 与 trace addendum §16。
 
 ---
 
@@ -2056,6 +2068,7 @@ Unit Test (Rust cargo + TS vitest)
 | v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
 | v1.3 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Project Worktree Overview Graph 与 Worktree 群组同级 Infinite Canvas 的对象、入口及类型化引用边界 | 用户要求以 Worktree 为渡口顶层索引并将 Canvas 作为同级群组应用 |
 | v1.4 | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Group Infinite Canvas/Task Card 属 Engineering Run 同级 Apps；Worktree 是 focus 与 CLI checkout，不是 Canvas/WorkItem owner；补充旧 Worktree-scoped Canvas API 为兼容切片 | 用户明确选中 Run 内 Worktree 后出现的是属于该 Run 的右侧 tabs |
+| v1.5 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 D-REPO-001 与 §1.6：分离 SCM Repository master、Project authorization link、nullable Run binding 和 Host root registry，候选不等于 binding；标注 provider/schema/target DB 尚未验收，并同步 SRS v1.5、Group DD v5.18 与 Traceability v1.3 | WLD-1 Repository identity source audit 与 owner contract 提案 |
 
 ---
 

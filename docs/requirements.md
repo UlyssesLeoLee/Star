@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.92）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v6.93）
 
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
@@ -11,6 +11,7 @@
 > **v6.90 WLD-0 owner-role source status (2026-10-20)**：新增专用 `NOLOGIN`、`NOBYPASSRLS`、`NOINHERIT` Engineering Directory mutation role；绑定 API 在事务内显式 `SET LOCAL ROLE`，并以最小列级 UPDATE 权限获取 `FOR SHARE` 行锁、由 restrictive RLS 拒绝修改 Project/Branch/Run revision/Worktree/Task 源事实。Disposable PostgreSQL 18.6 runner 使用非超级用户登录验证角色切换、RLS、锁权限和拒绝更新，并注入旧直接权限/数据库权限/向外成员关系后重放 migration，验证权限归一化和 schema fingerprint 稳定；另以 role-owned schema 负向夹具确认任意共享对象所有权会导致迁移失败关闭。部署时 API 登录角色 membership 仍需由实际身份配置；目标 DB、真实 API 登录/绑定写入、撤权、回滚、并发及历史 reconciliation 未验收，execution admission 仍关闭。
 > **v6.91 WLD-1 Worktree archive/restore Outbox source slice (2026-10-21)**：Worktree 管理 owner 在确认逻辑归档或恢复时，把 Worktree version/state、append-only Audit、schema-v1 owner-local Outbox fact 与现有 plan `result_body` replay receipt 放进同一数据库事务；tenant/requester/idempotency-key 同键创建请求先由事务级 advisory lock 串行化，再按请求 hash 返回 exact receipt 或拒绝冲突。状态 no-op 保留 Worktree version、retention expiry 与 Hook/Outbox 状态，只确认并记录原操作回执。事件 payload 仅包含 Worktree/plan identity、transition 和连续 before/after archive/version；owner assignment 与 archive no-op 不发 archive/restore fact。真实 PostgreSQL 18.6 disposable fixture 已通过双次 migration、RLS/WORM、archive/restore、payload 与版本连续性断言。此源码增量不执行 Git checkout 删除/恢复，不代表应用角色 grants、目标 DB migration、Rust 1.99.0 或生产 Host provider 已验收；Task/Schedule execution 继续 fail closed。
 > **v6.92 WLD-0 hostless Run authenticated HTTP acceptance (2026-10-23)**：Project 管理员可通过认证的 Project-scoped REST 创建不依赖宿主 Branch 的 Run；创建、同键 exact replay、Project Run 列表和 RunContext 解析，以及无 Run grant 的普通成员不可见，均在一次性 loopback PostgreSQL 18 集群中经真实 HTTP 路由验收。专用 Directory owner role 仅新增对 Run identity、初始 revision 和 creator grant 三张事实表的 INSERT；API 登录不继承这些 INSERT。完整 disposable runner 55/55 步通过，目标数据库未触碰且临时集群已停止删除。该证据不表示目标库部署、真实 API-login membership、线上撤权/并发或后续 Worktree/Task/CLI 执行已完成。
+> **v6.93 WLD-1 Repository identity contract（2026-10-23，设计提案）**：SCM owner 持有稳定 Repository 主身份；Project owner 持有带版本/状态和审计的授权关联及默认选择；Engineering Run Directory 持有显式可空的 Run→Repository binding；可信 Host Infrastructure owner 持有按 HostEnvironment + RepositoryId + generation 管理的持久 root registration。候选可见不构成 Run binding；Run-scoped discovery 同时要求当前 Project membership 与 Run read grant；NULL binding 不得推断。Worktree create/import/CLI 还必须有显式 Run binding、新鲜 root registration 与已装配 lifecycle provider。此为设计补充，不代表相关 master、registry、writer 或 provider 已实现；缺项保持 fail closed。源码审计见 [`PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md`](reports/PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md)，设计决策见 [`PHASE-WLD1-REPOSITORY-IDENTITY-CONTRACT-20261023.md`](reports/PHASE-WLD1-REPOSITORY-IDENTITY-CONTRACT-20261023.md)。
 
 ## 0. 文档说明与前提
 
@@ -1495,6 +1496,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | WTG-006 | Project Worktree Index 与 Engineering Run Shell 可分别访问；canonical Run deep link 为 `/projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}?tab={app_id}`；旧含 `branch_id` 的路径仅作兼容重定向；忽略旧 Branch 路径参数，由目标 canonical 路由重解析并授权 Project/Run/Worktree/Branch grants；Index 不得被通用任务列表替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | WTG-010 | Worktree Index 分开呈现当前 Git lock observation 与持久化 lock 标记；unknown 不得通过 cleanup guard | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
 | WTG-022 | Project Index 与 Run directory projection 禁止泄露主机 checkout path；解析只在受信任 Host/Repository capability 内进行 | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
+| WTG-026 | Repository master、Project 授权关联、可空 Run binding 与可信 Host root registration 分属明确 owner；候选可见不代表 Run 已绑定 | §50.3.4、§50.8AV | AC-WTG-013 |
 | WTG-011 | Project Worktree Index 必须以 `project:read` + 当前 membership 查询脱敏的已绑定 Repository 清单（仅 ID/name/default branch，不含 URL/路径），并提供授权候选发现、创建与导入；仅接受 Project 已绑定 repository_id、经过 Git ref 校验的 branch/base_ref 或可信 Host Runtime opaque candidate_id；拒绝客户端路径、仓库 URL 和 Git 命令；副作用前重验 membership 与 Project-Repository binding，以 Idempotency-Key/correlation_id 幂等持久化 operation、Worktree projection、Audit/Outbox 后返回 202；缺少 provider 返回 503；Index UI 不得回退本地 seed，须验证 Project/Repository/candidate/receipt 关联并在受理后刷新 Index | 第 50.3.1 章 | ARCH-OBL-GRP-001 |
 | TCI-001 | 任务管理视图与 Engineering Run 下直接访问的 Task Card 必须共用 Run-scoped WorkItem 事实源；见第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控交互式 PTY CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
@@ -2316,6 +2318,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-023 | Branch 是 Worktree 下本地 checkout 分支投影与状态叶，远端分支/宿主关联为可选元数据；Branch 无关联时仍保持在 Worktree 下，且不得将该状态误报为已完成的无宿主运行能力 | P0 |
 | WTG-024 | `EngineeringRun.branch_id`、Branch/Run API 与 branch-role 授权门的迁移必须有版本化 schema/API 兼容、历史数据对账、授权负向验收；迁移期间旧 Branch-scoped compatibility API 可保留原检查，但 Project/Run 目录与普通 Run App 不得要求 Branch grant，远端 SCM 操作必须继续 fail closed | P0 |
 | WTG-025 | Worktree owner 对逻辑 archive/restore 的成功状态转换必须在同一 owner transaction 中提交 versioned append-only Audit、schema-versioned owner-local Outbox fact 与可精确重放的操作回执；payload 限于脱敏 Worktree/plan identity、transition 与 before/after archive/version，纯 owner assignment 和状态 no-op 不得产生 archive/restore fact；Outbox 持久化不等于已 delivery、BI 投影或物理 checkout cleanup | P0 |
+| WTG-026 | Repository identity 必须与宿主 Branch 分离：SCM owner 持有稳定 Repository master；Project owner 持有带版本/状态和审计的 Repository 授权关联及默认选择；Engineering Run Directory 持有显式可空 Run→Repository binding；可信 Host Infrastructure owner 持有 HostEnvironment + RepositoryId + generation 的持久 root registration。候选可见不构成 Run binding；Run-scoped discovery 同时要求当前 Project membership 与 Run read grant；NULL binding 不得推断，且缺授权、fresh root 或 lifecycle provider 时 Worktree create/import/CLI fail closed | P0 |
 | WTG-022 | Project Worktree Index 与 Run directory API 不得向浏览器返回主机绝对 checkout path 或可反推出主机目录的 locator；checkout 解析仅由受信任 Host/Repository capability 在服务端或受控 Runtime bridge 内完成 | P0 |
 | TCI-001 | 任务生命周期和计划视图必须投影同一 Run-scoped WorkItem；Task Card 索引作为 Engineering Run 下的平级 App 访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | 任务管理、外部任务系统 与 Task Card 的生命周期动作必须调用同一个 Run-scoped WorkItem lifecycle command owner，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则；owner 写事务必须在授权查询前设置不高于 5s 的 statement timeout 与不高于 1s 的 lock timeout | P0 |
@@ -2326,8 +2329,6 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 ### 50.3.1 Project scoped Worktree 创建与导入
 
 创建/导入是 Worktree Index 的受授权生命周期命令。浏览器仅选择当前 Project 已绑定的 repository，并在导入时引用 Host Runtime 返回的不透明候选 ID；路径和远端 URL 由服务端配置解析，不能由客户端指定。Host Runtime provider 必须在 Git 副作用前重新验证当前 actor membership、Project-Repository binding 与 Worktree 冲突，并幂等持久化 operation、归属投影、Audit 和 Outbox。provider 或受信任 repository binding 未配置时，请求失败关闭且不得生成“成功”Worktree。
-
-WLD-0 实现状态（2026-10-19）：Run-to-Worktree owner 已有绑定/重绑/解绑源码 API 和前向 migration；写入校验当前 Project/Run 授权、Project binding 版本、Worktree 所属与本地 repository、当前绑定 CAS 和唯一活动关系，并在 owner transaction 写入 SCD2 事实、Audit、幂等回执和 Outbox。迁移未在目标 DB 应用；target grants/RLS、真实认证写入、rollback、并发与部署后 reconciliation 仍是关闭门。该切片只建立归属事实，不表示 Host/cluster reservation、Runtime readiness 或任务执行可用。
 
 ### 50.3.2 Engineering Run Directory 数据库 owner role 与锁权限边界
 
@@ -2344,6 +2345,20 @@ WLD-0 role acceptance 必须在一次性 loopback PostgreSQL 集群里使用真�
 成功的逻辑 archive/restore 必须由 Worktree 管理 owner 在同一事务内更新 Worktree state/version、追加 immutable Audit、插入 schema-versioned owner-local Outbox fact，并保存当前 management plan 的精确 `result_body`。创建计划时先对 `(tenant, requester, idempotency key)` 取得事务级 advisory lock，再查找持久回执；同一请求并发到达也返回同一回执，身份相同但请求内容不同则冲突，不得重新执行状态变更或再写事件。目标 archived 状态与当前值一致时作为审计型 no-op 确认计划，不调用 archive Hook、不改 Worktree version/retention expiry，也不写 archive/restore fact。仅实际的 `false → true` 归档与 `true → false` 恢复生成事件；纯 owner assignment 不生成这两类事实。
 
 事件 payload 仅含 `worktree_id`、`plan_id`、`transition` 与连续 before/after `{archived, version}`；数据库约束校验 allowlist、identity、transition、单步版本连续性和最大 payload 字节数；不得含主机路径、凭据、prompt、终端输出或 raw log。Outbox 是 Worktree owner 的持久事实，不与 Engineering Run Directory Outbox 合并，也不自行承诺 transport delivery、BI/Benchmark 投影、Git checkout 删除或宿主恢复成功。物理 cleanup/restore 仍要求独立的 fresh authorization、lease/claim/process drain、retention-lock observation 和 Host provider acceptance；任何未知信号 fail closed。
+
+### 50.3.4 WLD-1 Repository 身份、授权关联与 Run binding
+
+Repository 与其本地 checkout root 是两个不同事实。SCM owner 持有跨宿主稳定的 `RepositoryId` 主身份以及非敏感展示元数据；外部 provider/repository key、远端 URL 与默认分支只是可选的来源元数据。Project owner 持有 Project↔Repository 授权关联、当前状态、revision 和审计；Project 默认 Repository 只用于界面候选排序/初始选择，不自动写成 Run 的绑定。现有 `domain-project::ProjectRepository` 若只表达关联/查询端口，不得被当作 Repository master 或已持久化 SoR。
+
+Engineering Run Directory owner 持有显式、可空且可版本化的 Run→Repository binding，并在写入时确认该 Repository 仍由 SCM master 识别且与当前 Project 有效关联。`repository_id IS NULL` 表示尚未绑定；不得从 Project default、远端 Branch 或既有 Worktree 反向推断。hostless Run 可以创建、授权、列出和使用不依赖 Repository 的 Run Apps；未绑定 Repository 只禁止 Worktree checkout 子树、Worktree lifecycle 与 CLI 准入，不得隐藏 Run。
+
+Run 内候选发现必须在同一授权决策中确认当前 Project membership 与 Run read grant。返回候选只允许最小稳定 identity/display fields；候选可见不创建绑定、不授予 Worktree 权限。明确的绑定命令须由 Engineering Run Directory owner 以 CAS、幂等、Audit/Outbox 和当前 Project-Repository grant 复验完成。解绑或关联撤销后，已有 Worktree binding 不会被默默重绑；需要显式迁移/解绑并审计。
+
+可信 Rust Host Infrastructure owner 单独持有持久 root registry，键至少包含 `HostEnvironmentId + RepositoryId + generation`，并记录注册状态、验证时间及所用授权来源。generation 必须单调且可撤销；registry 缺失、身份不匹配、失效或过期即视为不可解析。原始绝对路径只在可信 Host capability 内存取和解析，不得返回 API/UI，也不得交给 Agent、Plugin 或任务卡 CLI。Worktree checkout path、共享目录配置及进程内 `repo_id → PathBuf` map 均不能替代该注册。
+
+Worktree create/import/CLI 的执行前置同时要求显式且当前的 Run→Repository binding、Project/Run grants、有效 Project↔Repository 授权、匹配且新鲜的 Host root generation、以及已安装并验证授权的生命周期/Runtime provider。任一事实缺失或 owner 不可用时 fail closed；候选查询不得触发 Git 副作用。当前源审计未找到 canonical PostgreSQL Repository master 或持久 Host root registry，Run binding 写 API 和 lifecycle provider 亦未闭合；这些是待实现的交付依赖，不得将本节当作实现或数据库验收。
+
+WLD-0 实现状态（2026-10-19）：Run-to-Worktree owner 已有绑定/重绑/解绑源码 API 和前向 migration；写入校验当前 Project/Run 授权、Project binding 版本、Worktree 所属与本地 repository、当前绑定 CAS 和唯一活动关系，并在 owner transaction 写入 SCD2 事实、Audit、幂等回执和 Outbox。迁移未在目标 DB 应用；target grants/RLS、真实认证写入、rollback、并发与部署后 reconciliation 仍是关闭门。该切片只建立归属事实，不表示 Host/cluster reservation、Runtime readiness 或任务执行可用。
 
 ### 50.4 任务卡内 CLI
 
@@ -2514,6 +2529,7 @@ Benchmark 使用固定任务集、repo commit、环境与验收/评分版本，t
 | AC-WTG-010 | Project Worktree Index 可进入 Project 级 Quality & Improvement 视图；所有指标显示公式、分子/分母、单位、时间窗、coverage 与版本，并能下钻至授权 Task/Run/Evidence；unknown 数据不作为零计入分母，结果按 task type/complexity 分层 |
 | AC-WTG-011 | 固定 Benchmark 重放使用版本化 task/repo/environment/acceptance/scoring snapshots，并分离 tuning/holdout；候选策略不得改标准；proposal 经过隔离对比和授权采纳后可回滚，历史分数保持原口径 |
 | AC-WTG-012 | Project Worktree Index 与 Run/Worktree directory projection 只返回最小脱敏身份/状态字段，不包含主机绝对 checkout path 或可反推出主机目录的 locator；浏览器无法提交路径覆盖可信绑定；仅受信任 Host/Repository capability 或受控 Runtime bridge 可解析 checkout 位置 |
+| AC-WTG-013 | 需求/设计与实现审计必须区分 SCM Repository master、Project 授权关联、候选目录、显式可空 Run→Repository binding、HostEnvironment+RepositoryId+generation root registration 和 Worktree checkout 路径。Run 候选列表需同时复验 Project membership 与 Run read grant，但不得隐式绑定；NULL binding、撤权/缺权、缺失或过期 root generation、缺失 lifecycle provider 时 Worktree create/import/CLI fail closed；任何面向浏览器/Agent/Plugin 的响应均不含原始宿主路径。当前仅为设计验收目标，直至 owner store、provider 与数据库/运行时验收齐备 |
 | AC-TRACE-001 | 一次从 Canvas 或底栏聊天发起的任务操作，可由同一 `correlation_id` 串起 Worktree、WorkItem、TaskCard、TaskExecutionRun、CLI Session、Canvas Element、Plugin 调用与 Audit |
 | AC-ERUN-001 | Project → Engineering Run → Worktree → Branch 主导航保持身份与深链；canonical path 为 /projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}?tab={app_id}；旧 branch 路径忽略 branch_id 并兼容重定向；canonical 目标重新解析并授权当前 Project/Run/Worktree membership/binding，Branch 授权仅用于需要远端 SCM 的操作；点击 Worktree 后才加载所属 Run tabs，Branch 为本地 checkout 投影叶，Worktree 只设 focus/CLI target；右侧 Task/Canvas/BI 数据按 Run 授权 | P0 |
 | AC-ERUN-002 | Run Context/API 对每个实体域复验 membership 与 capability；跨域命令调用 owner API，同 owner DB 事务使用 Outbox，消费者经 Inbox 幂等去重；前端不能跨域表写入或直接使用 stored procedure | P0 |
@@ -3732,3 +3748,20 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v6.91 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore owner-local Outbox source slice；新增 WTG-025、串行化 exact replay、状态 no-op 不修改版本/retention 与连续最小事件 payload 约束；记录 isolated PostgreSQL 18.6 fixture 通过，并明确 Rust 1.99.0、应用角色 grants、目标 DB、consumer 与物理 Git cleanup 尚未验收。详见 `WLD1-LIFECYCLE-OP-OUTBOX-20261021.md`。
 
 修订 v6.92 · 2026-10-23 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 hostless Run authenticated HTTP acceptance；补充 Directory owner role 对 Run identity、初始 revision 与创建者 grant 的最小 INSERT 权限，并记录 55/55 disposable PostgreSQL runner、hostless create/replay/list/context 与不可见性验收。目标 DB、部署登录 membership、线上撤权/并发及后续 Task/CLI 执行门保持开放。详见 `PHASE-WLD0-HOSTLESS-RUN-HTTP-ACCEPTANCE-20261023.md`。
+
+### 50.8AV WLD-1 Repository identity 与可信本地 root registration（设计目标）
+
+| 数据/授权事实 | owner | 目标契约 | 当前审计状态 |
+|---|---|---|---|
+| 稳定 Repository identity | SCM bounded context | `RepositoryId` 不依赖远端 Branch；provider key、URL、default branch 是 optional metadata。不得从 Branch registrations 推导完整目录 | 没有可证明的 canonical PostgreSQL Repository master/adapter；`InMemoryScmService` 不是生产来源 |
+| Project↔Repository association | Project owner | 保存带 revision/current status 的授权 link 与审计；Project default 仅供候选排序，不自动绑定 Run。关联/查询端口不等于 Repository master | 未找到该授权关联的权威持久写入和运行时数据证据 |
+| Run→Repository binding | Engineering Run Directory owner | 显式可空、版本化；bind/unbind 使用当前 Project/Run grants、Project link、SCM identity，CAS、幂等、Audit 与 owner-local Outbox | Run schema 可表达 nullable repository identity，但本次审计未证明专属 binding mutation/API 已闭合 |
+| Local repository root | trusted Host Infrastructure owner | 按 HostEnvironment + RepositoryId + generation 持久注册并记录授权来源、验证/撤销状态、freshness；绝对路径只能由 Host capability 解析 | 没有持久 root registry；Worktree checkout path、shared-directory path 和进程内路径 map 都不满足 |
+
+读取候选与执行授权严格分开。Run-scoped candidate discovery 必须同时复验当前 Project membership 与 Run read grant，仅返回脱敏 identity/display metadata；返回候选不写 Run binding，也不授予 Worktree 权限。`repository_id IS NULL` 明确表示未绑定，不得由 Project default、远端 Branch 或历史 Worktree 补值。hostless Run 可继续创建、授权、列出和使用不依赖 checkout 的 Apps。
+
+现有 Project-scoped repository-list/create/import seam 只能作为迁移兼容接口。目标 Worktree create/import/CLI admission 必须另外确认显式 Run→Repository binding、当前 Project/Run grants、有效 Project↔Repository link、匹配且 fresh 的 Host root generation、provider readiness 与 Worktree 冲突。副作用前再次复验 binding/link/root revisions；缺失、撤权、generation 不匹配/过期或 provider 未安装时返回非成功，不创建成功投影。浏览器、Agent、Plugin 与任务卡 CLI 永不获得原始宿主路径、任意路径选择权或 Host shell capability。
+
+本设计依赖的交付物包括 SCM Repository master 与最小只读角色、Project association writer、Run binding writer/migration/API、Host-owned durable root registry/verification agent、owner-specific grants/RLS、真实生命周期 provider，以及针对 NULL binding/撤权/跨 Project 和 tenant/旧 generation/path disclosure/provider unavailable 的 disposable PostgreSQL 与 HTTP 负向验收。当前 [`PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md`](reports/PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md) 证明这些来源尚未闭合；本提案不把既有 schema seam、内存 map 或 fixture 变成生产实现证据。
+
+修订 v6.93 · 2026-10-23 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 Repository identity contract docs-only slice；新增 WTG-026 / AC-WTG-013，分离 SCM Repository master、Project 授权关联、Run nullable binding 与 Host root registry owner，定义候选可见性与 Run binding 的差异及 create/import/CLI fail-closed 前置；源审计仍证明 master/root registry/provider 缺失，本次仅设计提案，不声称实现。详见 `PHASE-WLD1-REPOSITORY-IDENTITY-CONTRACT-20261023.md`。

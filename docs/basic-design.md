@@ -9,8 +9,8 @@
 
 > **WLD-0 hostless Run HTTP acceptance（2026-10-23）**：REST 读写事务在 tenant/actor scope 初始化前显式切换至 `star_engineering_directory_owner`；该 role 仅对 Run identity、首个 revision、创建者 grant 获得 INSERT。fresh PostgreSQL 18 loopback runner 55/55 步通过，并以实际认证 HTTP 路由验证 hostless create、同键 replay、Project list、RunContext 和无 Run grant actor 的不可见性；同时覆盖绑定 race、outbox 故障回滚、detach。runner 未连接目标数据库，结束后停止并删除唯一临时 cluster。目标部署 login membership、目标 DB migration/grants、历史 reconciliation 与 hostless Task/CLI/执行仍未验收或保持 fail closed；详见 WLD-0 报告。
 
-> **文档版本**: v6.95 (2026-10-23)
-> **上游要件定义书**: docs/requirements.md v6.92
+> **文档版本**: v6.96 (2026-10-23)
+> **上游要件定义书**: docs/requirements.md v6.93
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4612,6 +4612,7 @@ Chat Bar(scope, text, entity_refs)
 | WTG-011 | §16.2、§16.10-16.11 | AC-WTG-008 |
 | WTG-012 | §16.2、§16.10-16.11 | AC-WTG-009 |
 | WTG-022 | §16.29 | AC-WTG-012 |
+| WTG-026 | §16.77；DD-WORKTREE-GROUP-001 §6.1.3 | AC-WTG-013 |
 | TCI-001 | §16.2-16.3 | AC-WTG-001 |
 | TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
 | CAN-001/002/003/004/005 | §16.2, §16.5, §16.9, §16.11 B | AC-CAN-001/002 |
@@ -5883,6 +5884,23 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 
 修订 v6.92 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore source slice；在 §16.2 明确 Worktree owner-local Audit/Outbox/receipt 原子事务、事务级同键序列化、no-op 保留 version/retention、连续最小事件 payload 与 Run Directory Outbox 分离；记录 PostgreSQL 18.6 disposable fixture 和 Rust 1.98.1 diagnostic test 证据，并保留 Rust 1.99.0、目标 DB/grants、API 并发、consumer、Host provider 与物理 cleanup 未验收状态。同步 requirements v6.91 与 Group DD v5.15。
 
+修订 v6.93 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD3 hostless Schedule Rule 授权设计与源码切片；明确无 Branch 的 Run 可配置/读取 Rule，branch-backed Run 仍校验 Branch，Rule 配置 branch_id 可空而 occurrence/admission/runtime 保持 Branch 必需和 fail closed；Rust 1.99.0、数据库重复迁移及新 ACL fixture 门禁尚未执行，不开放 Schedule worker/executor。同步 Schedule API SRS v0.64 与 DD v0.76。
+
+## 16.77 WLD-1 Repository identity 与 Worktree root 来源边界（设计提案）
+
+本节定义跨 owner 的身份契约，不创建表结构或宣称 provider 可用：
+
+| 事实 | canonical owner | 约束 | 当前来源审计 |
+|---|---|---|---|
+| Repository master | SCM bounded context | 稳定 `RepositoryId`；provider key、URL、默认分支为可选来源元数据；不能从 Branch row 汇总代替完整 Repository 目录 | 未找到 canonical PostgreSQL master/adapter；`InMemoryScmService` 仅是开发/测试实现 |
+| Project↔Repository authorization link | Project owner | 有效状态、revision、授权来源和审计；默认项只排序/预选，不自动绑定 Run | 不得把关联端口误称为 Repository master 或其持久化事实 |
+| Run→Repository binding | Engineering Run Directory owner | 显式可空、版本化；绑定/解绑 CAS、幂等、审计/Outbox，并复验 Project 授权关系 | 数据模型含可空 repository identity，但 binding mutation/HTTP acceptance 尚未由本次审计证明 |
+| Local repository root | trusted Host Infrastructure owner | 持久键为 HostEnvironment + RepositoryId + monotonic generation；仅 Host capability 解析原始 path | 未找到持久 registry；Worktree path/shared-dir/in-memory map 都不是该事实 |
+
+Run 内 repository candidate query 必须同时校验 Project membership 与 Run read grant；它只给可授权选择的脱敏候选，绝不自动形成 Run binding。未绑定 Run 仍可存在并使用不需要 checkout 的 Run Apps；`repository_id IS NULL` 时 Worktree subtree/create/import/CLI 禁用，不能由 Project default、remote Branch 或 history 推断。create/import/CLI 还需当前 grants、有效 Project↔Repository link、新鲜一致的 Host root generation 和已安装的生命周期 provider，任一缺失均失败关闭。浏览器、Agent、Plugin 不接收宿主 path。
+
+这一设计取代“仅依赖 Project repository list 就足以启动 Worktree lifecycle”的含混解释；当前已存在的 Project-scoped endpoint/provider seam 仍是兼容边界，默认无 provider 返回 503。源码审计见 [`PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md`](reports/PHASE-WLD1-REPOSITORY-DIRECTORY-20261023.md)。本节为目标契约，Repository master、Project binding persistence、Run binding writer、Host root registry、最小 owner grants、provider 与目标 PostgreSQL/HTTP 负向验收均未由此设计切片实现。
+
 修订 v6.94 · 2026-10-22 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-3 occurrence 快照约束实现；新增 SQL `NOT VALID` CHECK，强制新建/更新 occurrence 的 JSON Branch 快照为非 nil UUID，同时保留未修改的历史数据且不回填；hostless Rule 配置保持不变。记录静态契约测试 3/3，并明确 disposable PostgreSQL/Rust 验证尚未执行，worker/admission/executor 继续关闭。同步 Schedule API SRS v0.65 与 DD v0.77。
 修订 v6.95 · 2026-10-23 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 hostless Run authenticated HTTP acceptance；对齐 Project/Run owner role 的最小 Run/revision/creator-grant INSERT grants、55/55 disposable PostgreSQL runner 与 hostless create/replay/list/context/权限隔离证据，保留目标 DB、部署 identity 和执行闭环为开放门。详见 WLD-0 阶段报告。
-修订 v6.93 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD3 hostless Schedule Rule 授权设计与源码切片；明确无 Branch 的 Run 可配置/读取 Rule，branch-backed Run 仍校验 Branch，Rule 配置 branch_id 可空而 occurrence/admission/runtime 保持 Branch 必需和 fail closed；Rust 1.99.0、数据库重复迁移及新 ACL fixture 门禁尚未执行，不开放 Schedule worker/executor。同步 Schedule API SRS v0.64 与 DD v0.76。
+修订 v6.96 · 2026-10-23 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 Repository identity audit/design reconciliation；同步 requirements v6.93、SRS v1.5、BD v1.5、Group DD v5.18 与 Traceability v1.3；新增 SCM/Project/Run/Host owner 分工、nullable binding 与 fail-closed gate。仅更新设计，不表示持久化实现或运行时验收。详见 `PHASE-WLD1-REPOSITORY-IDENTITY-CONTRACT-20261023.md`。
