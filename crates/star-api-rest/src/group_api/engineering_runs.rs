@@ -1,17 +1,24 @@
 /*
-@cypher schema=1 source_sha256=740406508c3941033454c7e0ce596f009104e00a888bdd9971219307e6c1dca6
+@cypher schema=1 source_sha256=8c624eea04dd1a7e717aea810df5dd42bc9f7e9e3aeaeef5c2da9e150e6a1194
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/engineering_runs.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::router",kind:"function"})
 MERGE (listProjectRuns:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::list_project_runs",kind:"function"})
+MERGE (beginRead:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::begin_read",kind:"function"})
+MERGE (beginWrite:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::begin_write",kind:"function"})
+MERGE (directoryRole:Config {id:"database-role:star_engineering_directory_owner",kind:"postgres_role"})
 MERGE (ownedTaskScope:Type {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::RunOwnedTaskScope",kind:"struct"})
 MERGE (authorizeOwnedTask:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::authorize_run_owned_task_scope",kind:"function"})
 MERGE (runAuthority:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::run_authority",kind:"function"})
 MERGE (self)-[:DEFINES]->(router)
 MERGE (self)-[:DEFINES]->(listProjectRuns)
+MERGE (self)-[:DEFINES]->(beginRead)
+MERGE (self)-[:DEFINES]->(beginWrite)
 MERGE (self)-[:DEFINES]->(ownedTaskScope)
 MERGE (self)-[:DEFINES]->(authorizeOwnedTask)
 MERGE (self)-[:DEFINES]->(runAuthority)
 MERGE (router)-[:CALLS]->(listProjectRuns)
+MERGE (beginRead)-[:CONFIGURES]->(directoryRole)
+MERGE (beginWrite)-[:CONFIGURES]->(directoryRole)
 MERGE (authorizeOwnedTask)-[:CALLS]->(runAuthority)
 MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 @endcypher
@@ -25,7 +32,7 @@ MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 //! (auth:Class {name:"RunAuthority",type:"class"}),(focus:Class {name:"RunWorktreeRow",type:"class"}),
 //! (contextQuery:Class {name:"ContextQuery",type:"class"}),
 //! (router:Function {name:"router",type:"function"}),(parse:Function {name:"parse_id",type:"function"}),
-//! (read:Function {name:"begin_read",type:"function"}),(br:Function {name:"branch_authority",type:"function"}),
+//! (read:Function {name:"begin_read",type:"function"}),(write:Function {name:"begin_write",type:"function"}),(directoryRole:Config {name:"star_engineering_directory_owner",type:"database_role"}),(br:Function {name:"branch_authority",type:"function"}),
 //! (ra:Function {name:"run_authority",type:"function"}),(branches:Function {name:"list_branches",type:"function"}),
 //! (runs:Function {name:"list_runs",type:"function"}),(projectRuns:Function {name:"list_project_runs",type:"function"}),(worktrees:Function {name:"list_run_worktrees",type:"function"}),
 //! (context:Function {name:"resolve_run_context",type:"function"}),(legacy:Function {name:"resolve_worktree_run_context",type:"function"}),
@@ -34,10 +41,10 @@ MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 //! (next:Function {name:"DirectoryPage::next_cursor",type:"function"}),(permission:Function {name:"DirectoryGrant::snapshot",type:"function"}),
 //! (sql:Variable {name:"WORKTREE_SELECT",type:"variable"}),
 //! (f)-[:CONTAINS]->(query),(f)-[:CONTAINS]->(cursor),(f)-[:CONTAINS]->(page),(f)-[:CONTAINS]->(branch),(f)-[:CONTAINS]->(run),(f)-[:CONTAINS]->(grant),(f)-[:CONTAINS]->(auth),(f)-[:CONTAINS]->(focus),(f)-[:CONTAINS]->(contextQuery),
-//! (f)-[:CONTAINS]->(router),(f)-[:CONTAINS]->(parse),(f)-[:CONTAINS]->(read),(f)-[:CONTAINS]->(br),(f)-[:CONTAINS]->(ra),(f)-[:CONTAINS]->(branches),(f)-[:CONTAINS]->(runs),(f)-[:CONTAINS]->(projectRuns),(f)-[:CONTAINS]->(worktrees),(f)-[:CONTAINS]->(context),(f)-[:CONTAINS]->(legacy),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(envelope),(f)-[:CONTAINS]->(reply),(f)-[:CONTAINS]->(sql),
+//! (f)-[:CONTAINS]->(router),(f)-[:CONTAINS]->(parse),(f)-[:CONTAINS]->(read),(f)-[:CONTAINS]->(write),(f)-[:CONTAINS]->(directoryRole),(f)-[:CONTAINS]->(br),(f)-[:CONTAINS]->(ra),(f)-[:CONTAINS]->(branches),(f)-[:CONTAINS]->(runs),(f)-[:CONTAINS]->(projectRuns),(f)-[:CONTAINS]->(worktrees),(f)-[:CONTAINS]->(context),(f)-[:CONTAINS]->(legacy),(f)-[:CONTAINS]->(load),(f)-[:CONTAINS]->(envelope),(f)-[:CONTAINS]->(reply),(f)-[:CONTAINS]->(sql),
 //! (query)-[:HAS_METHOD]->(decode),(page)-[:HAS_METHOD]->(next),(grant)-[:HAS_METHOD]->(permission),
 //! (router)-[:CALLS]->(branches),(router)-[:CALLS]->(runs),(router)-[:CALLS]->(projectRuns),(router)-[:CALLS]->(worktrees),(router)-[:CALLS]->(context),(router)-[:CALLS]->(legacy),
-//! (branches)-[:CALLS]->(decode),(runs)-[:CALLS]->(decode),(projectRuns)-[:CALLS]->(decode),(worktrees)-[:CALLS]->(decode),(branches)-[:CALLS]->(read),(runs)-[:CALLS]->(read),(projectRuns)-[:CALLS]->(read),(worktrees)-[:CALLS]->(read),(context)-[:CALLS]->(read),(legacy)-[:CALLS]->(read),
+//! (branches)-[:CALLS]->(decode),(runs)-[:CALLS]->(decode),(projectRuns)-[:CALLS]->(decode),(worktrees)-[:CALLS]->(decode),(branches)-[:CALLS]->(read),(runs)-[:CALLS]->(read),(projectRuns)-[:CALLS]->(read),(worktrees)-[:CALLS]->(read),(context)-[:CALLS]->(read),(legacy)-[:CALLS]->(read),(read)-[:CONFIGURES]->(directoryRole),(write)-[:CONFIGURES]->(directoryRole),
 //! (runs)-[:CALLS]->(br),(ra)-[:CALLS]->(br),(worktrees)-[:CALLS]->(ra),(context)-[:CALLS]->(ra),(legacy)-[:CALLS]->(ra),(context)-[:CALLS]->(load),(legacy)-[:CALLS]->(load),(context)-[:CALLS]->(envelope),(legacy)-[:CALLS]->(envelope),(envelope)-[:CALLS]->(permission),(load)-[:USES]->(sql),(worktrees)-[:USES]->(sql);
 
 //! CYPHER STRUCTURE MANIFEST: external call relationships.
@@ -52,12 +59,13 @@ MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 //! (json:Function {name:"json!",type:"function"}),(format:Function {name:"format!",type:"function"}),(get:Function {name:"axum::routing::get",type:"function"}),(new:Function {name:"Router::new",type:"function"}),(route:Function {name:"Router::route",type:"function"}),(wrap:Function {name:"Json",type:"function"})
 //! WITH f, sqlQuery, sqlScalar, sqlPlain, execute, validate, scope, tenant, active, begin, commit, bind, fetch, fetchAll, bad, internal, missing, invalid, decode64, encode64, fromJson, toJson, parseUuid, nil, uuid, clock, json, format, get, new, route, wrap
 //! MATCH (decode:Function {name:"DirectoryQuery::page",type:"function"}),(next:Function {name:"DirectoryPage::next_cursor",type:"function"}),(parse:Function {name:"parse_id",type:"function"}),
-//! (read:Function {name:"begin_read",type:"function"}),(br:Function {name:"branch_authority",type:"function"}),(ra:Function {name:"run_authority",type:"function"}),
+//! (read:Function {name:"begin_read",type:"function"}),(write:Function {name:"begin_write",type:"function"}),(directoryRole:Config {name:"star_engineering_directory_owner",type:"database_role"}),(br:Function {name:"branch_authority",type:"function"}),(ra:Function {name:"run_authority",type:"function"}),
 //! (branches:Function {name:"list_branches",type:"function"}),(runs:Function {name:"list_runs",type:"function"}),(projectRuns:Function {name:"list_project_runs",type:"function"}),(worktrees:Function {name:"list_run_worktrees",type:"function"}),
 //! (load:Function {name:"load_focus",type:"function"}),(context:Function {name:"resolve_run_context",type:"function"}),(legacy:Function {name:"resolve_worktree_run_context",type:"function"}),
 //! (envelope:Function {name:"context_envelope",type:"function"}),(permission:Function {name:"DirectoryGrant::snapshot",type:"function"}),(router:Function {name:"router",type:"function"}),(reply:Function {name:"reply",type:"function"})
 //! CREATE (decode)-[:CALLS]->(decode64),(decode)-[:CALLS]->(fromJson),(decode)-[:CALLS]->(bad),(decode)-[:CALLS]->(invalid),(decode)-[:CALLS]->(nil),(next)-[:CALLS]->(encode64),(next)-[:CALLS]->(toJson),(next)-[:CALLS]->(internal),(parse)-[:CALLS]->(parseUuid),(parse)-[:CALLS]->(nil),(parse)-[:CALLS]->(bad),
-//! (read)-[:CALLS]->(validate),(read)-[:CALLS]->(scope),(read)-[:CALLS]->(tenant),(read)-[:CALLS]->(begin),(read)-[:CALLS]->(sqlPlain),(read)-[:CALLS]->(execute),(read)-[:CALLS]->(internal),
+//! (read)-[:CALLS]->(validate),(read)-[:CALLS]->(scope),(read)-[:CALLS]->(tenant),(read)-[:CALLS]->(begin),(read)-[:CALLS]->(sqlPlain),(read)-[:CALLS]->(execute),(read)-[:CALLS]->(internal),(read)-[:CONFIGURES]->(directoryRole),
+//! (write)-[:CALLS]->(validate),(write)-[:CALLS]->(scope),(write)-[:CALLS]->(tenant),(write)-[:CALLS]->(begin),(write)-[:CALLS]->(sqlPlain),(write)-[:CALLS]->(execute),(write)-[:CALLS]->(internal),(write)-[:CONFIGURES]->(directoryRole),
 //! (br)-[:CALLS]->(sqlQuery),(br)-[:CALLS]->(bind),(br)-[:CALLS]->(fetch),(br)-[:CALLS]->(active),(br)-[:CALLS]->(internal),(br)-[:CALLS]->(missing),
 //! (ra)-[:CALLS]->(sqlQuery),(ra)-[:CALLS]->(bind),(ra)-[:CALLS]->(fetch),(ra)-[:CALLS]->(internal),(ra)-[:CALLS]->(missing),
 //! (branches)-[:CALLS]->(parse),(branches)-[:CALLS]->(active),(branches)-[:CALLS]->(sqlQuery),(branches)-[:CALLS]->(bind),(branches)-[:CALLS]->(fetchAll),(branches)-[:CALLS]->(commit),(branches)-[:CALLS]->(next),(branches)-[:CALLS]->(reply),(branches)-[:CALLS]->(json),(branches)-[:CALLS]->(internal),
@@ -68,25 +76,25 @@ MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 //! (context)-[:CALLS]->(parse),(context)-[:CALLS]->(commit),(context)-[:CALLS]->(reply),(context)-[:CALLS]->(internal),(legacy)-[:CALLS]->(parse),(legacy)-[:CALLS]->(sqlScalar),(legacy)-[:CALLS]->(bind),(legacy)-[:CALLS]->(fetch),(legacy)-[:CALLS]->(scope),(legacy)-[:CALLS]->(commit),(legacy)-[:CALLS]->(reply),(legacy)-[:CALLS]->(internal),(legacy)-[:CALLS]->(missing),
 //! (envelope)-[:CALLS]->(format),(envelope)-[:CALLS]->(json),(envelope)-[:CALLS]->(clock),(envelope)-[:CALLS]->(uuid),(permission)-[:CALLS]->(json),(router)-[:CALLS]->(new),(router)-[:CALLS]->(route),(router)-[:CALLS]->(get),(reply)-[:CALLS]->(wrap);
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::{
-        header::{CACHE_CONTROL, VARY},
         HeaderMap, HeaderName,
+        header::{CACHE_CONTROL, VARY},
     },
     routing::get,
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{idempotency_key, request_hash};
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
-    GroupApiError, GroupApiState, ProjectBinding,
+    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, ProjectBinding, active_binding,
+    require_scope, set_tenant, validate_actor,
 };
 
 #[derive(Default, Deserialize)]
@@ -308,6 +316,10 @@ async fn begin_read(
         .begin()
         .await
         .map_err(|_| GroupApiError::internal())?;
+    sqlx::query("SET LOCAL ROLE star_engineering_directory_owner")
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     set_tenant(&mut tx, actor.tenant_id).await?;
     sqlx::query("SELECT set_config('statement_timeout', '3000', true), set_config('lock_timeout', '1000', true)")
         .execute(&mut *tx)
@@ -326,6 +338,10 @@ async fn begin_write(
         .resolver
         .pool
         .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    sqlx::query("SET LOCAL ROLE star_engineering_directory_owner")
+        .execute(&mut *tx)
         .await
         .map_err(|_| GroupApiError::internal())?;
     set_tenant(&mut tx, actor.tenant_id).await?;

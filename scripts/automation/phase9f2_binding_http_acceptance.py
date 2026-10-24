@@ -1,6 +1,6 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=c53a7cf82c1f9f393635662fba595ef9b405c48c9720761df8a218fb1b910085
+# @cypher schema=1 source_sha256=a277dd8c2bb66429f683a8a35db60f380af893372614d2fff6f6f70ad7b97b0b
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
@@ -60,12 +60,16 @@
 # MERGE (stop)-[:CALLS]->(step)
 # MERGE (test)-[:TESTS]->(:Endpoint {id:"PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}",kind:"http_route"})
 # MERGE (test)-[:TESTS]->(:Endpoint {id:"DELETE /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}",kind:"http_route"})
+# MERGE (test)-[:TESTS]->(:Endpoint {id:"POST /api/v1/projects/{project_id}/engineering-runs",kind:"http_route"})
+# MERGE (test)-[:TESTS]->(:Endpoint {id:"GET /api/v1/projects/{project_id}/engineering-runs",kind:"http_route"})
+# MERGE (test)-[:TESTS]->(:Endpoint {id:"GET /api/v1/engineering-runs/{engineering_run_id}/context",kind:"http_route"})
 # MERGE (snapshot)-[:READS]->(:Table {id:"multica.engineering_run_worktree_binding",kind:"table"})
 # MERGE (snapshot)-[:READS]->(:Table {id:"multica.engineering_run_outbox",kind:"table"})
 # MERGE (snapshot)-[:READS]->(:Table {id:"multica.engineering_directory_event",kind:"table"})
 # MERGE (snapshot)-[:READS]->(:Table {id:"multica.engineering_run_command_idempotency",kind:"table"})
 # MERGE (fixture)-[:READS]->(:Table {id:"permission.project_role_binding",kind:"table"})
 # MERGE (fixture)-[:DEPENDS_ON]->(:File {path:"db/migrations/2026-10-23-engineering-directory-lock-only-policy.sql"})
+# MERGE (fixture)-[:DEPENDS_ON]->(:File {path:"db/migrations/2026-10-23-engineering-run-create-owner-grants.sql"})
 # MERGE (fixture)-[:TESTS_POLICY]->(:Policy {id:"permission.project_role_binding::engineering_directory_owner_no_project_grant_update",kind:"row_level_security"})
 # MERGE (fixture)-[:READS_AND_LOCKS]->(:Table {id:"multica.worktree_project_binding",kind:"table"})
 # MERGE (fixture)-[:READS_AND_LOCKS]->(:Table {id:"public.worktree_canvas_worktree",kind:"table"})
@@ -317,6 +321,13 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
         "postgres-engineering-directory-lock-only-policy-migration", bin_dir, port,
         environment, output_dir,
         file=ROOT / "db" / "migrations" / "2026-10-23-engineering-directory-lock-only-policy.sql",
+    ))
+    if results[-1]["exit_code"]:
+        return results
+    results.append(run_sql(
+        "postgres-engineering-run-create-owner-grants", bin_dir, port, environment,
+        output_dir,
+        file=ROOT / "db" / "migrations" / "2026-10-23-engineering-run-create-owner-grants.sql",
     ))
     if results[-1]["exit_code"]:
         return results
@@ -846,6 +857,12 @@ def main() -> int:
         results.extend(seed_fixture(options.postgres_bin, port, environment, log_dir))
         if any(row["exit_code"] for row in results):
             return 1
+        results.append(run_rust_phase(options.cargo, "hostless-run", port, environment, log_dir))
+        if results[-1]["exit_code"]:
+            return 1
+
+        # Hostless Run creation has its own Outbox/idempotency facts; take the
+        # binding-race baseline after that independent HTTP acceptance phase.
         baseline, snapshot_result = read_snapshot(options.postgres_bin, port, environment, log_dir, 0)
         results.append(snapshot_result)
         if baseline is None:

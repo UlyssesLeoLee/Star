@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.16**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.17**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -8,7 +8,7 @@
 > - Phase 8A/8B 条件式实现：Run migration 在隔离 PostgreSQL 临时集群重复执行，6 张 Run 表均验证 `FORCE ROW LEVEL SECURITY`；目标数据库/runtime grants 未部署。CLI start writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已有代码切片；其余 Event/Evidence producer、Task Contract 写 API 和真实 Runtime provider 未实现。
 > - Phase 9E-4C5 Runtime fence foundation：REST 与 Local Runtime 共用 `star-dto::task_run` strict DTO；ERUN-P2 带 V2 directory fence 的双 Profile grant 使用 signature v3（C5 基线为 v2），无 fence 的 legacy grant 保持 v1；Local Runtime 专用 consumer 完整比对当前 binding 并在 SQLite FULL WAL 单事务内消费 nonce/fence，receipt 上限 50,000 条并保留 5 分钟时钟偏差清理窗。该 helper 未接生产 provisioner，不负责实时 ACL/authority、reservation lifecycle、OS sandbox/spawn 或 BI outcome；producer capability 继续默认关闭，详见 §7.2。
 > - ERUN-P3 Run Task Cards 条件式 UI：bounded Run-scoped list/create routes 与 typed client 已有源码切片，Worktree focus 可选；保持 12 条/页、2 MiB response、最多 100 页、有界并发、取消与有界 IndexedDB pending recovery。Task owner 为 tenant/Project/Run，服务端复验当前 Project/Run grants；可选 focus 必须绑定同一 Run。旧 Tauri demo/mock fallback 已移除。migration、应用角色 grants/RLS、Rust/HTTP/frontend 验证未完成，生产页面保持 fail closed，CLI 禁用。
-> - 日期：2026-10-21
+> - 日期：2026-10-23
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - Phase 9B2C 状态：REST archive-confirm gate 已接入已验证的 Project/Worktree Hook policy 与 Rust evaluator；数据库事务锁外先观测 Git lock，仅新鲜 Unlocked 时才请求 Host Runtime drain/readiness，并取得 operation-scoped admission fence expiry；最终 archive mutation 前要求至少 5 秒余量并复核。provider 需保证 fence 覆盖命令完成窗口，目标 DB 事务时限仍需定义和验收。production main 未安装 readiness provider，缺失时 fail-closed 返回 503；目标 DB/RLS、RunEvent/outbox 与物理 checkout cleanup 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
 > - Phase 9D 状态：Project-scoped hook-events/summary API 已提供 1–90 天 source-only metric v1，按 phase/decision 汇总当前 ledger 并保留 partial/null coverage；尚未 join RunEvent/outcomes、实现完整 BI read model 或接入 Quality & Improvement。目标 DB/RLS/grants 与 app auth Provider 未验收。Hooks 导航仍是 Advanced Settings 内与 Skills/MCP/Plugins 并列标签，不属于 Worktree 树。
@@ -18,8 +18,8 @@
 > - Phase 1 目录基础：canonical Branch/Engineering Run八表schema、五个授权只读API、RunContext/WorktreeFocus分离和有界懒树/context shell已实现；2026-10-15 增加四项 host-session 生命周期回归，typecheck 通过但 Vitest 未启动（缺依赖模块）；真实宿主认证、SCM ingest/grants写入、目标DB与Run Apps/执行接线仍开放，详见 Phase 1 host-session 报告与实施计划§6.140。
 > - Phase 1 host-independent Run source：Project-scoped Run directory 与 host-independent Task Card list/create 均有源码和 migration candidate；无 Worktree 的 Run 行可打开独立 Task Cards 页面，完整 App tabs 只在选中 Worktree 后展示。Task owner migration 尚未应用，目标 DB/grants/RLS 未验收；TypeScript 7.0.2 `--singleThreaded` 通过，默认并行检查受本机虚拟内存不足阻断；Vitest 未启动（共享依赖缺模块），Rust 当前 shell 不可用。导航固定 Project → Run → Worktree → Branch。
 > - Phase 2C ERUN-P3.1/ERUN-P3.3 owner slice：新增 Run-scoped Task Card command port、PostgreSQL owner adapter 与 REST mutation 接线；Canvas 复用 adapter 事务参与接口，并用共享事务幂等锁保护组合回执。Task schema v3 lifecycle Outbox、bounded delivery Work、immutable route-pin migration 与 Rust claim/route/wire store 均有源码；Profile `event` 授权和 authenticated-context route identity 已纳入 Rust source。尚无 compile/fmt、target DB/RLS/并发验收，也无网络 dispatcher、receiver Inbox、accepted settlement 或 downstream consumers；delivery 保持关闭。
-> - 上位需求：[docs/requirements.md](../requirements.md) v6.91 §50
-> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.93 §16
+> - 上位需求：[docs/requirements.md](../requirements.md) v6.92 §50
+> - 上位基本设计：[docs/basic-design.md](../basic-design.md) v6.95 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v1.34、[`DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.4、[`DD-AUTOMATION-SCHEDULE-API-001.md`](DD-AUTOMATION-SCHEDULE-API-001.md) v0.76、[`DD-LOCAL-INFRASTRUCTURE-001.md`](DD-LOCAL-INFRASTRUCTURE-001.md) v0.39、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11、实施计划 v7.08
 > - 文档边界：本 DD 定义 Project → Engineering Run → Worktree → Branch 的导航与应用契约；Branch 是 Worktree 下的本地 checkout 分支投影/状态叶，远端 SCM/宿主关联为可选 metadata；Worktree Index 仅为 Project aggregate 管理视图，Worktree 不拥有 Run Apps；不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 > - WLD-0 source slice（2026-10-19）：新增 Project/Run 授权的 Run-to-Worktree bind/reassign/detach REST owner API 与前向 Outbox constraint migration；用本地 Worktree repository 身份维持归属，不要求 hostless Run 提供远端 repository/Branch。CAS、幂等、每 Worktree 锁、SCD2、Audit 与 Outbox 在单一 owner transaction 内。当前迁移只在源码中，目标 DB grants/RLS、认证持久化、回滚、并发与历史对账未验收，执行 admission 继续关闭。
@@ -226,9 +226,11 @@ RunContext `context_version` 只包含当前 Project/Run grant identity/version 
 
 **Mutation database role and lock grant contract (v5.13)**：`begin_write` 必须在同一个 PostgreSQL transaction 内先执行 `SET LOCAL ROLE star_engineering_directory_owner`，再设置 tenant/actor GUC；此后才能读取 owner scope 或锁定目标事实。缺少部署 membership、role 属性错误或 RLS 不满足时事务失败关闭。owner role 为 NOLOGIN/NOSUPERUSER/NOBYPASSRLS/NOINHERIT，迁移不创建 API-login membership；若角色预先存在，先清除其历史 schema/object grants 与向外角色成员关系，既有数据库对象所有权则 fail closed，API-login 成员关系保留。
 
+hostless Run create/list/context 同属 Directory owner scope。`begin_read` 与 `begin_write` 都必须在设置 tenant/actor GUC 前切换至该 role；为创建 Run 的单一事务，owner role 只额外取得 `INSERT` 于 `multica.engineering_run`、`multica.engineering_run_revision` 与 `permission.engineering_run_role_binding`。此授权不赋给 API login，且不扩展为通用 UPDATE/DELETE；部署 membership 仍由环境单独配置并在缺失时 fail closed。
+
 `FOR SHARE` 源表访问需要表 SELECT 与 PostgreSQL 要求的窄 UPDATE 列权限：Project/Branch/Run revision/Run grant、Worktree Project binding、Worktree projection、Task metadata 与 Task/Worktree relation 使用其 `valid_to` 或主键列作为 lock-only grant；对这些他域源表统一附 restrictive `FOR UPDATE USING(false) WITH CHECK(false)` policies。对比之下，EngineeringRunWorktreeBinding 仅允许 owner 写入/关闭自身 SCD2 `valid_to`，Directory Event 为 INSERT-only，Run Outbox 为 INSERT-only，actor idempotency 有限 SELECT/INSERT/DELETE 与 expiry-lock grant；owner role 不拥有任何 FORCE RLS 表。目录 grants 与 restrictive policies 纳入每迁移 schema fingerprint。
 
-验证证据：`--runner-tests` 6/6；fresh PostgreSQL 18.6 loopback cluster 34/34 runner steps passed。真实非超级用户 login 只用于一次性夹具，并经显式 grant membership + `SET LOCAL ROLE` 运行；验证 NOBYPASSRLS、非表所有者、required SELECT/`FOR SHARE`（包括 Run revision 锁）、tenant-scoped Task metadata/关联读取、missing-tenant denial、restrictive policy catalog 与事实行 UPDATE 0 rows。额外在 owner role 上注入直接权限、数据库权限及向外 role membership，重放 migration 后验证归一化与 schema fingerprint 稳定；role-owned schema fixture 验证迁移因共享对象所有权而 fail closed，并在事务回滚后移除夹具。此证据不覆盖真实 deployment login membership、HTTP authenticated bind/reassign/detach、目标 database、exact API replay、rollback/ambiguous commit、并发 race、history reconciliation 或 production deployment；WLD-0 与 execution admission 仍开放。
+验证证据：`--runner-tests` 6/6；fresh PostgreSQL 18.6 loopback cluster 34/34 runner steps passed。真实非超级用户 login 只用于一次性夹具，并经显式 grant membership + `SET LOCAL ROLE` 运行；验证 NOBYPASSRLS、非表所有者、required SELECT/`FOR SHARE`（包括 Run revision 锁）、tenant-scoped Task metadata/关联读取、missing-tenant denial、restrictive policy catalog 与事实行 UPDATE 0 rows。额外在 owner role 上注入直接权限、数据库权限及向外 role membership，重放 migration 后验证归一化与 schema fingerprint 稳定；role-owned schema fixture 验证迁移因共享对象所有权而 fail closed，并在事务回滚后移除夹具。该 2026-10-20 role fixture 本身不覆盖生产 deployment login membership、HTTP writes、target database、ambiguous commit、并发 race、history reconciliation 或 production deployment。补充的 2026-10-23 fresh PostgreSQL runner 55/55 通过，另覆盖 authenticated hostless create/exact replay/list/context/no-grant invisibility 与 binding race/rollback/detach；仍未覆盖部署 API-login membership、目标数据库、authenticated reassign、ambiguous commit、历史 reconciliation 或生产部署。WLD-0 与 execution admission 仍开放。
 
 ## §4 API 契约
 
@@ -237,6 +239,8 @@ RunContext `context_version` 只包含当前 Project/Run grant identity/version 
 Run-owned canonical API family:
 
 Phase 1 已实现 Branch 元数据列表、旧 Branch-scoped Run 列表、Run context、Run Worktree 列表和 Worktree context 兼容发现；本候选另新增 Project-scoped GET/POST /api/v1/projects/{project_id}/engineering-runs。Run list/create 不要求远端 Branch grant；读取复验当前 Project membership 与 Run grant，创建要求 Project 管理角色，并在同一事务写 Run、初始授权、Audit、幂等回执和 owner Outbox。其余 Run Apps 能力与 owner migration 尚未实现；RunContext 在 provider 未启用时保持相应 capability false。成功响应 no-store/Vary Authorization；目录不返回 path；兼容发现不会自动重定向旧 Group 或启用旧 App。migration 未应用到目标 DB，故本候选不能标为生产启用。
+
+2026-10-23 authenticated HTTP acceptance 在一次性 PostgreSQL 18 loopback fixture 中验证 hostless Run create、同键 exact replay、按 Project 列表、RunContext 读取及无 Run grant actor 不可见；同时覆盖绑定竞争、outbox 写入故障回滚与 detach。完整 runner 55/55 步通过，临时数据库停止并删除，`target_database_touched=false`。该结果补齐本地 disposable API/role evidence，不表示目标 DB migration、部署 API-login membership、生产授权部署、历史 reconciliation 或 Task/CLI/Schedule 执行闭环通过。
 
 2026-10-15 新增 `frontend/src/lib/run/runDirectorySession.test.tsx` 的四项 host-session 生命周期回归：缺失会话保持 fail closed；有效会话创建 ready client 并允许设置 Run focus；401 清除 client/focus；session generation 改变时清除旧 focus、dispose 旧 client 并 abort 旧请求。`npm run typecheck` 通过；Vitest 未启动，缺少 `@csstools/css-parser-algorithms/index.js`。这只是前端回归覆盖，不证明生产 host auth/session provider、SCM ingest/grants 写入或 Run Apps 持久化。Phase 1 保持开放，见 [host-session 阶段报告](../reports/PHASE-ERUN-DIRECTORY-P1-HOST-SESSION-REPORT.md)。
 
@@ -931,6 +935,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v5.17 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增补 hostless Run authenticated HTTP acceptance 与 Directory owner 对 Run identity、初始 revision、creator grant 的最小 INSERT 权限；记录 fresh disposable PostgreSQL runner 55/55、create/replay/list/context/权限隔离与 binding rollback/detach，并保留目标 DB/生产身份及执行闭环门禁；同步 requirements v6.92 与 Basic Design v6.95 | WLD-0 hostless Run API acceptance 与文档对账 |
 | v5.16 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 §8.11 与 Schedule API DD：hostless Run 可按 Project/Run grants 配置 Rule，Branch 仅在 Run 带有远端 Branch 时校验；Rule recurrence 配置校验不创建 occurrence，Rule revision Branch 可空，Occurrence 的非空 target_snapshot JSONB 由 Rust 域验证保证 Branch 存在，admission/runtime 仍要求 Branch；同步 Basic Design v6.93、Schedule API DD v0.76，并记录 Rust/DB 验收未运行 | WLD3 hostless Schedule authorization slice |
 | v5.10 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修订 §9.2 的跨 owner messaging 契约：owner Outbox/Inbox 与 immutable route pin 是稳定边界，NATS 为可移除兼容 adapter，Rust-native transport 为目标方向；将 analytics stream 评估与基础 transport 替换分开，并明确 ACK、恢复与 BI 事实的 owner 语义 | W1 有界设计核对发现 §9.2 仍将 NATS 写为固定 broker 基线 |
 | v5.13 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 Run revision 的 FOR SHARE lock-only 列权限与 restrictive RLS denial，并将其纳入非超级用户验收；保留目标 DB、真实 API、rollback/replay/concurrency 未验收 | Self-review found and fixed a missing Run revision lock grant |

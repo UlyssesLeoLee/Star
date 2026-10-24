@@ -3,7 +3,7 @@
 > **渡口 Worktree-first 产品未完成设计与交付 WBS 更新稿**
 >
 > 基线：2026-10-18 JST 通过 `rtk git fetch origin main dev` 刷新 refs 后核对；`origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e`，`origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22`。`git rev-list --left-right --count origin/dev...origin/main` 为 `121 0`，当前 main 无 dev 未包含的领先提交。
-> 对照：需求 v6.87、基本设计 v6.86、DD-WORKTREE-GROUP-001 v5.09、实施计划 v7.14 §6.140–§6.156、架构与交付方向 v1.14、`PHASE-9F4I-NATIVE-EVENT-REPORT` v0.2
+> 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 状态：🟡 计划稿；未把远端文档审阅当成本地分支合并或生产验收
 
 ## 0. 目的与计划边界
@@ -27,7 +27,7 @@ Project
 
 | ID | 未完成设计/决策 | 当前文档证据 | 收口要求 |
 |---|---|---|---|
-| D-01 | Hostless Run 到 Worktree 的完整授权与绑定模型 | Run directory 已支持 hostless 源码切片；WLD-0 已新增 bind/reassign/detach API 与前向 migration，覆盖 Project/Run 授权、CAS、幂等、每 Worktree 锁、SCD2、Audit 和 Outbox。目标 DB/RLS/grants、认证写入、回滚、并发及历史归属对账仍未闭合 | 定义唯一 owner、绑定版本、迁移策略、Project/Run grants 与无宿主状态；旧 Branch grant 只用于 SCM 操作 |
+| D-01 | Hostless Run 到 Worktree 的完整授权与绑定模型 | WLD-0 已有 hostless directory 与 bind/reassign/detach 源码；本轮 fresh disposable PostgreSQL authenticated HTTP runner 55/55 通过，验证 hostless create/exact replay/list/context、无 Run grant 不可见、binding race/rollback/detach，并加上 Run identity/revision/creator-grant 最小 owner INSERT grants。目标 DB/deployment membership、完整 Worktree binding、历史归属对账仍未闭合 | 定义并保留唯一 owner、版本与 Project/Run grants；把 disposable API 证据与目标库/生产身份验收分开；跨域、撤权、并发与线上 reconciliation fail closed |
 | D-02 | 多 Agent Worktree 生命周期和安全收敛 | 有 Index、lock observer、部分 create/import/archive 条件式切片；生产 Host Runtime observer、drain、checkout 清理和 owner 信号未闭合 | 定义 Agent/terminal owner、锁、reservation、冲突、归档/删除、恢复、用户数据保全与 merge receipt 状态机 |
 | D-03 | Run Apps 的 owner API 与事件契约 | Task、Canvas、Hook、BI 等各有局部 owner/Outbox/Inbox 切片；端到端 delivery、consumer projection 与应用拆分边界不齐 | 固化 API、存储过程/owner transaction、Outbox/Inbox、idempotency、版本、撤权、重放、失败和审计契约；禁止跨 owner 直接写表 |
 | D-04 | Task Card 到安全 Agent CLI 的完整运行设计 | bounded list/create、审查/生命周期与恢复局部实现；真实 provisioner、OS sandbox、工具调用控制、独立验证和结果回写仍开放 | 设计并实现分配、启动、流输出、取消/恢复、预算、权限再验、证据、独立验证、结果回写与 PR/合并衔接 |
@@ -68,7 +68,7 @@ Project
 
 | ID / 依赖 | 未关闭的设计与实现边界 | 完成门 | 映射 WBS / 权威设计基线 |
 |---|---|---|---|
-| **WLD-0 Project/Run/Worktree canonical binding** / 无 | Hostless Run、导航与 Task Card 无 Worktree focus 已有局部设计/源码；Run↔Worktree attach/rebind/detach、过期/歧义 generation、统一 ACL 和目标库写入仍未闭环。 | Hostless Run 可创建/列出/打开；focus Worktree 必须属于同 Project/Run；跨域、stale/ambiguous binding、撤权均 fail closed；UI/REST/Task/CLI 读取同一绑定事实；目标 DB、grants、FORCE RLS、并发和 replay 验收通过。 | W1/W2/W3；requirements §50、§50.3.1；basic §16.2、§16.20；Group DD §3.1、§7.1；plan §6.144–§6.146 |
+| **WLD-0 Project/Run/Worktree canonical binding** / 无 | Hostless authenticated Run create/list/context 与无 Run grant 不可见已通过本地 disposable HTTP/PG acceptance；本轮额外验证了 Directory owner role 的三张 INSERT facts grants。完整 Worktree attach/reassign/detach 的目标库/生产身份、历史归属 reconciliation 与 UI/Task/CLI 多域一致性仍开放。 | 本地 Run create/exact replay/list/context 与权限隔离已验证；完整门仍需目标 DB、实际 deployment membership、FORCE RLS、跨域/stale binding、撤权/并发/replay 以及 Task/CLI/REST 同一绑定事实通过；执行保持 fail closed。 | W1/W2/W3；requirements §50、§50.3.1–§50.3.2；basic §16.2；Group DD §3.1、§3.5、§4 |
 | **WLD-1 Safe Worktree lifecycle, merge and cleanup** / WLD-0 | 创建/导入/归档/恢复/重绑定/清理的设计已有；生产 owner command 原子复验、真实 provider 幂等副作用，以及 Agent/Run/PTY/进程 drain 与用户数据保护仍未验收。 | 对 stale version、重复/replay、provider timeout、活动 lease/file claim/PTY/process、dirty/untracked、retention lock 和 unknown state 做并发/恢复验证；不确定时禁止破坏性操作；成功操作产生 owner transaction audit/Outbox receipt 并支持 reconciliation；disposable checkout 与目标 DB/RLS 通过。 | W3/W5/W13；requirements §22.2、§22.6–§22.7、§50.3.1、§50.8D；Group DD §6、§8.6；basic §16.17 |
 | **WLD-2 Run Task Card lifecycle + in-card CLI** / WLD-0；checkout teardown 另依赖 WLD-1 | Task owner、列表/创建、claim/lease、CLI identity、ticket/PTy 有局部切片；生产 session provisioner、独立 OS sandbox、工具控制、取消/drain、恢复、独立验证和结果回写未闭环。 | Task Card 绑定同 Run Worktree；实时复验 claimant/lease/Profile/HookSet/budget；仅 allowlisted argv/env 和 scoped cwd 在独立 sandbox 执行；有界 PTY 背压；撤权、取消、超时、重启、reattach、子进程 drain 幂等可审计；独立 validator 回写 criterion-linked evidence；依赖缺失时不可执行。 | W6/W7/W12/W13；requirements §50.4、§50.8AN–§50.8AO；basic §16.6、§16.20；Group DD §7.1、§8.5；plan §6.141、§6.144–§6.150 |
 | **WLD-3 Schedule occurrence → Run owner saga / Engineering Loop** / WLD-0；共享 WLD-2 的执行身份和预算契约 | Rule API、固定 run-as、schema/lease/admission primitives 部分存在；生产 worker、每次 trigger/retry/resume 的现时授权复验、Run↔Schedule 双方 Inbox/Outbox saga、补偿/恢复未闭环。Loop controller 不等于持久 checkpoint 或执行器。 | occurrence 幂等地产生至多一个 non-executing Run；每次重试按不可变 `run_as_actor_id` 重验当前 ACL、profile、HookSet、Task、binding 与 quota；过期 fencing token 不可写入；DST/misfire/overlap/catch-up/deadline/queue-full 遵循固定策略；owner 各自提交并支持撤权/故障补偿；Loop 固定 acceptance snapshot、预算及 stall/oscillation stop reason。只有 WLD-4 readiness 回执后才允许进入执行态。 | W9/W12；requirements §50.8B、AC-LOOP-001–010；basic §16.16、§16.24–§16.27；Group DD §8.7、§8.10–§8.12；plan §6.77–§6.82、§6.109–§6.140 |
@@ -220,14 +220,16 @@ flowchart TD
 | v0.17 | 2026-10-19 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD-0 与设计/WBS 在本地 dev 的首次 fast-forward（cb0acdda）和最终集成测试；注明未 push、目标数据库门仍开放及下一阶段 WLD-1 | 用户要求合并已完成结果到 dev，且确认 Orca worktree 无活动写入者 |
 | v0.18 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复核当前本地 main/dev ancestry、RTK PATH/proxy、Orca writer 状态、已合入分支和剩余 archive；将下一批明确为 WLD-1 provider/lifecycle 与 WLD-5 Hook session/authentication 两条隔离审阅线，并记录确切 source gaps | 用户确认 Orca 工作结束、要求安装 RTK 并继续 WBS |
 | v0.19 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 合入 WLD-1/WLD-5 source-only 审计报告；将已完成审计与尚未具备可信 provider、宿主认证来源、目标数据库及运行时验收的实现门区分，并重排下一步工作 | 两份隔离审计报告已 rebase 并快进到 dev |
+| v0.21 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD-0 hostless Run HTTP/PG acceptance 55/55、owner 三事实 INSERT grants 与需求/基本/详细设计同步；本地 dev integration 和 worktree cleanup 为下一道 Git 门。目标 DB、deployment login membership、历史 reconciliation、Task/CLI/runtime 仍开放 | 完成 WLD-0 hostless Run API disposable acceptance，进入选择性集成与归档 |
 | v0.20 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录八条已合入 lane 的 worktree/branch 清理和 42 个 untracked/ignored 文件的外部 hash 校验归档；注明 Codex 归档接口仍返回 queued，需单独核对其附件登记状态 | 用户此前要求仅保留 main/dev 并归档后清理；清理前再次确认 Orca writer 已结束 |
 
-## 8. Current execution state (2026-10-20)
+## 8. Current execution state (2026-10-23)
 
 This snapshot supersedes the older owner, RTK, local-ref and lane-status values above. Historical remote fetch results and earlier test reports retain their original dates and scopes.
 
 | Area | Verified current state | Next gate |
 |---|---|---|
+| WLD-0 hostless Run HTTP | Fresh PostgreSQL 18 disposable runner completed 55/55 steps with `target_database_touched=false`; authenticated HTTP create/exact replay/Project list/RunContext and no-Run-grant invisibility passed. Binding race, rollback injection, detach, owner-role catalog/grants and migration fingerprints also passed. | This local slice is ready for dev integration; target DB/deployment membership, historical reconciliation, full UI/Task/CLI consistency and production execution remain open. |
 | Local main/dev ordering | Local `main` is an ancestor of `dev`; there is no main-only commit to cherry-pick before this integration. This is a local-ref comparison, not a new remote fetch. | Recheck local refs before each integration; cherry-pick and validate any newly found main-only commit first. |
 | Dev ownership | The pre-refresh `dev` checkout was clean at `1136a24c709e944a538d28a2feff7e72b2b29f4c`; WBS updates and audit reports have since been fast-forwarded as documentation-only commits. The user confirmed Orca work has ended, both audit agents completed, and no agent is writing to shared `dev`. | Preserve the branch/worktree audit and final clean/HEAD check for every fast-forward. |
 | RTK | WinGet lists `rtk-ai.rtk` 0.50.0; the current PowerShell resolves the user-PATH executable, `rtk --version`, `rtk gain`, `rtk proxy --help`, and `rtk proxy git status` work. The “no hook installed” message is an optional auto-rewrite notice; manual proxy use is available. | Use `rtk proxy` for Git/Cargo/dispatcher commands. Do not run global hook setup unless a later task specifically needs automatic rewriting. |

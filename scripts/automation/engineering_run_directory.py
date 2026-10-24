@@ -45,7 +45,7 @@ See docs/automation-design.md sections 4.36 and 4.37. Optional Task Run DDL chec
 the new forward CLI identity gate and snapshot/FK constraints in the disposable cluster only.
 """
 
-# @cypher schema=1 source_sha256=dd8500ffc6240c136f488c31813a4cca614b2a72e75073d7852118d7b850b2ce
+# @cypher schema=1 source_sha256=5d28b513197d24a7c8d712005da63c50dca738db069b28b125c565a0e10cb821
 # MERGE (self:File {path:"scripts/automation/engineering_run_directory.py"})
 # MERGE (find_cargo:Symbol {id:"scripts/automation/engineering_run_directory.py::find_cargo",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/engineering_run_directory.py::run_step",kind:"function"})
@@ -60,6 +60,8 @@ the new forward CLI identity gate and snapshot/FK constraints in the disposable 
 # MERGE (role_acceptance:Symbol {id:"scripts/automation/engineering_run_directory.py::run_binding_role_acceptance_sql",kind:"function"})
 # MERGE (run_revision:Table {id:"multica.engineering_run_revision",kind:"table"})
 # MERGE (owner_role:Type {id:"star_engineering_directory_owner",kind:"database_role"})
+# MERGE (lock_policy:File {path:"db/migrations/2026-10-23-engineering-directory-lock-only-policy.sql"})
+# MERGE (run_create_grants:File {path:"db/migrations/2026-10-23-engineering-run-create-owner-grants.sql"})
 # MERGE (main:Symbol {id:"scripts/automation/engineering_run_directory.py::main",kind:"function"})
 # MERGE (root:Config {id:"scripts/automation/engineering_run_directory.py::ROOT"})
 # MERGE (callable:Type {id:"collections.abc.Callable"})
@@ -88,6 +90,8 @@ the new forward CLI identity gate and snapshot/FK constraints in the disposable 
 # MERGE (validate_ddl)-[:CALLS]->(role_setup)
 # MERGE (validate_ddl)-[:CALLS]->(role_drift)
 # MERGE (validate_ddl)-[:CALLS]->(role_acceptance)
+# MERGE (migration_plan)-[:INCLUDES]->(lock_policy)
+# MERGE (migration_plan)-[:INCLUDES]->(run_create_grants)
 # MERGE (role_drift)-[:CONFIGURES]->(owner_role)
 # MERGE (role_acceptance)-[:READS]->(run_revision)
 # MERGE (apply_plan)-[:USES_TYPE]->(callable)
@@ -170,7 +174,7 @@ def run_expected_failure_step(
 
 
 def directory_migration_plan(run_binding: bool = False) -> list[tuple[str, str]]:
-    """Return the disposable directory chain; October 15 runs once, never as a replay probe."""
+    """Return the disposable directory chain; each audited forward migration applies once."""
     migrations = [
         ("postgres-worktree-base", "2026-09-16-worktree-canvas-worktree.sql"),
         ("postgres-project-binding", "2026-09-29-worktree-group-phase-2b.sql"),
@@ -185,6 +189,8 @@ def directory_migration_plan(run_binding: bool = False) -> list[tuple[str, str]]
             ("postgres-run-worktree-bindings", "2026-10-19-run-worktree-bindings.sql"),
             ("postgres-run-host-independent-task-owner", "2026-10-15-run-host-independent-task-owner.sql"),
             ("postgres-engineering-directory-owner-role", "2026-10-20-engineering-directory-owner-role.sql"),
+            ("postgres-engineering-directory-lock-only-policy", "2026-10-23-engineering-directory-lock-only-policy.sql"),
+            ("postgres-engineering-run-create-owner-grants", "2026-10-23-engineering-run-create-owner-grants.sql"),
         ])
     return migrations
 
@@ -528,7 +534,10 @@ def run_binding_role_acceptance_sql() -> str:
          OR session_user <> 'erun_directory_api_test' THEN
         RAISE EXCEPTION 'SET LOCAL ROLE did not establish the expected execution identity';
       END IF;
-      IF has_table_privilege(session_user,'multica.engineering_run_worktree_binding','INSERT') THEN
+      IF has_table_privilege(session_user,'multica.engineering_run_worktree_binding','INSERT')
+           OR has_table_privilege(session_user,'multica.engineering_run','INSERT')
+           OR has_table_privilege(session_user,'multica.engineering_run_revision','INSERT')
+           OR has_table_privilege(session_user,'permission.engineering_run_role_binding','INSERT') THEN
         RAISE EXCEPTION 'NOINHERIT runtime login unexpectedly inherited owner privileges';
       END IF;
       IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member=current_user::regrole) THEN
@@ -619,6 +628,9 @@ def run_binding_role_acceptance_sql() -> str:
         RAISE EXCEPTION 'owner role has an unexpected cross-owner or Outbox privilege';
       END IF;
       IF NOT has_table_privilege(current_user,'multica.engineering_run_worktree_binding','INSERT')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run','INSERT')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run_revision','INSERT')
+         OR NOT has_table_privilege(current_user,'permission.engineering_run_role_binding','INSERT')
          OR NOT has_column_privilege(current_user,'multica.engineering_run_worktree_binding','valid_to','UPDATE')
          OR NOT has_table_privilege(current_user,'multica.engineering_run_command_idempotency','INSERT')
          OR NOT has_table_privilege(current_user,'multica.engineering_run_command_idempotency','DELETE')
@@ -846,6 +858,18 @@ def validate_postgres_ddl(bin_dir: Path, port: int, environment: dict[str, str],
                                                 "2026-10-20-engineering-directory-owner-role.sql"))
             if steps[-1]["exit_code"]:
                 return steps
+            for name, migration in (
+                ("postgres-engineering-directory-lock-only-policy-normalize",
+                 "2026-10-23-engineering-directory-lock-only-policy.sql"),
+                ("postgres-engineering-run-create-owner-grants-normalize",
+                 "2026-10-23-engineering-run-create-owner-grants.sql"),
+            ):
+                steps.append(apply_migration(name, migration))
+                if steps[-1]["exit_code"]:
+                    return steps
+                steps.append(fingerprint_migration(name, migration))
+                if steps[-1]["exit_code"]:
+                    return steps
             ownership_fixture = run_binding_role_ownership_fixture_sql()
             steps.append(run_step("postgres-engineering-directory-owner-role-ownership-fixture",
                                   psql + ["-c", ownership_fixture], ROOT, environment, output_dir))

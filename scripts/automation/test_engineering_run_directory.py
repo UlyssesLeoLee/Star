@@ -1,4 +1,4 @@
-# @cypher schema=1 source_sha256=eb799ff8880b85c13afccd662c6df15187d8f097d278e34780348af43fca53c6
+# @cypher schema=1 source_sha256=42e4445e50543893135a959301ce5a9e951bd9d56b607a7bf555c8392ce4d7ee
 # MERGE (self:File {path:"scripts/automation/test_engineering_run_directory.py"})
 # MERGE (suite:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests",kind:"class"})
 # MERGE (reconciliation_suite:Symbol {id:"scripts/automation/test_engineering_run_directory.py::MigrationReconciliationTests",kind:"class"})
@@ -6,6 +6,7 @@
 # MERGE (base_plan:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_base_plan_preserves_existing_chain",kind:"test"})
 # MERGE (binding_plan:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_run_binding_migrations_are_ordered_and_single_apply",kind:"test"})
 # MERGE (role_acceptance:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_role_acceptance_covers_all_lock_sources",kind:"test"})
+# MERGE (hostless_create:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_role_acceptance_covers_hostless_run_creation_grants",kind:"test"})
 # MERGE (grant_fingerprint:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_fingerprint_includes_owner_grants",kind:"test"})
 # MERGE (stop_on_error:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_migration_failure_stops_following_steps",kind:"test"})
 # MERGE (fingerprint_failure:Symbol {id:"scripts/automation/test_engineering_run_directory.py::DirectoryMigrationPlanTests.test_fingerprint_failure_stops_following_steps",kind:"test"})
@@ -36,6 +37,7 @@
 # MERGE (suite)-[:HAS_METHOD]->(base_plan)
 # MERGE (suite)-[:HAS_METHOD]->(binding_plan)
 # MERGE (suite)-[:HAS_METHOD]->(role_acceptance)
+# MERGE (suite)-[:HAS_METHOD]->(hostless_create)
 # MERGE (suite)-[:HAS_METHOD]->(grant_fingerprint)
 # MERGE (suite)-[:HAS_METHOD]->(stop_on_error)
 # MERGE (suite)-[:HAS_METHOD]->(fingerprint_failure)
@@ -56,6 +58,7 @@
 # MERGE (base_plan)-[:CALLS]->(assert_equal)
 # MERGE (binding_plan)-[:CALLS]->(assert_equal)
 # MERGE (role_acceptance)-[:CALLS]->(assert_equal)
+# MERGE (hostless_create)-[:CALLS]->(assert_equal)
 # MERGE (grant_fingerprint)-[:CALLS]->(assert_equal)
 # MERGE (stop_on_error)-[:CONTAINS]->(apply_step)
 # MERGE (stop_on_error)-[:CONTAINS]->(fingerprint_step)
@@ -109,12 +112,14 @@ class DirectoryMigrationPlanTests(unittest.TestCase):
         self.assertIn("2026-09-29-worktree-group-phase-2c.sql", names)
         self.assertLess(names.index("2026-09-29-worktree-group-phase-2c.sql"),
                         names.index("2026-10-15-run-host-independent-directory.sql"))
-        self.assertEqual(names[-5:], [
+        self.assertEqual(names[-7:], [
             "2026-10-02-task-run-owner.sql",
             "2026-10-15-run-host-independent-directory.sql",
             "2026-10-19-run-worktree-bindings.sql",
             "2026-10-15-run-host-independent-task-owner.sql",
             "2026-10-20-engineering-directory-owner-role.sql",
+            "2026-10-23-engineering-directory-lock-only-policy.sql",
+            "2026-10-23-engineering-run-create-owner-grants.sql",
         ])
         self.assertEqual(names.count("2026-09-29-worktree-group-phase-2c.sql"), 1)
         self.assertEqual(names.count("2026-10-15-run-host-independent-directory.sql"), 1)
@@ -122,6 +127,8 @@ class DirectoryMigrationPlanTests(unittest.TestCase):
         self.assertEqual(names.count("2026-10-02-task-run-owner.sql"), 1)
         self.assertEqual(names.count("2026-10-15-run-host-independent-task-owner.sql"), 1)
         self.assertEqual(names.count("2026-10-20-engineering-directory-owner-role.sql"), 1)
+        self.assertEqual(names.count("2026-10-23-engineering-directory-lock-only-policy.sql"), 1)
+        self.assertEqual(names.count("2026-10-23-engineering-run-create-owner-grants.sql"), 1)
 
     def test_role_acceptance_covers_all_lock_sources(self) -> None:
         sql = runner.run_binding_role_acceptance_sql()
@@ -187,6 +194,16 @@ class DirectoryMigrationPlanTests(unittest.TestCase):
         self.assertIn("restrictive RLS", sql)
         self.assertIn("directory owner must not be a member of another database role", sql)
         self.assertIn("Task metadata RLS allowed reads without tenant context", sql)
+
+    def test_role_acceptance_covers_hostless_run_creation_grants(self) -> None:
+        sql = runner.run_binding_role_acceptance_sql()
+        for relation in (
+            "multica.engineering_run",
+            "multica.engineering_run_revision",
+            "permission.engineering_run_role_binding",
+        ):
+            self.assertIn(f"has_table_privilege(current_user,'{relation}','INSERT')", sql)
+            self.assertIn(f"has_table_privilege(session_user,'{relation}','INSERT')", sql)
 
     def test_fingerprint_includes_owner_grants(self) -> None:
         sql = runner.migration_fingerprint_sql()

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ffa960814848b387072ae3f2833aae9abcd5db6f1e649a78a5f7540e0c66a884
+@cypher schema=1 source_sha256=cb62de59a6a930dd641ce5604a6449ebdc89534a05aa67f99d2c863727859bae
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})
@@ -19,6 +19,11 @@ MERGE (jwtPrivate:File {path:"crates/star-api-rest/tests/fixtures/schedule-route
 MERGE (jwtPublic:File {path:"crates/star-api-rest/tests/fixtures/schedule-route-test-public.pem"})
 MERGE (putEndpoint:Endpoint {id:"PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}",kind:"http_route"})
 MERGE (deleteEndpoint:Endpoint {id:"DELETE /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}",kind:"http_route"})
+MERGE (runCreateEndpoint:Endpoint {id:"POST /api/v1/projects/{project_id}/engineering-runs",kind:"http_route"})
+MERGE (runListEndpoint:Endpoint {id:"GET /api/v1/projects/{project_id}/engineering-runs",kind:"http_route"})
+MERGE (runContextEndpoint:Endpoint {id:"GET /api/v1/engineering-runs/{engineering_run_id}/context",kind:"http_route"})
+MERGE (runDirectoryRequest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::send_project_run_request",kind:"function"})
+MERGE (assertDirectory:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::assert_directory_response",kind:"function"})
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(scopeTest)
 MERGE (self)-[:DEFINES]->(httpAcceptance)
@@ -30,6 +35,8 @@ MERGE (self)-[:DEFINES]->(assertPrivate)
 MERGE (self)-[:DEFINES]->(mutationBody)
 MERGE (self)-[:DEFINES]->(currentBinding)
 MERGE (self)-[:DEFINES]->(ownerScopeProbe)
+MERGE (self)-[:DEFINES]->(runDirectoryRequest)
+MERGE (self)-[:DEFINES]->(assertDirectory)
 MERGE (test)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
 MERGE (scopeTest)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
 MERGE (scopeTest)-[:CALLS]->(testJwt)
@@ -42,6 +49,9 @@ MERGE (httpAcceptance)-[:CALLS]->(assertPrivate)
 MERGE (httpAcceptance)-[:CALLS]->(mutationBody)
 MERGE (httpAcceptance)-[:CALLS]->(currentBinding)
 MERGE (httpAcceptance)-[:CALLS]->(ownerScopeProbe)
+MERGE (httpAcceptance)-[:CALLS]->(runDirectoryRequest)
+MERGE (httpAcceptance)-[:CALLS]->(assertDirectory)
+MERGE (runDirectoryRequest)-[:CALLS]->(tokenForActor)
 MERGE (sendMutation)-[:CALLS]->(tokenForActor)
 MERGE (testToken)-[:CALLS]->(issueToken)
 MERGE (tokenForActor)-[:CALLS]->(issueToken)
@@ -62,6 +72,9 @@ MERGE (scopeTest)-[:TESTS]->(putEndpoint)
 MERGE (scopeTest)-[:TESTS]->(deleteEndpoint)
 MERGE (httpAcceptance)-[:TESTS]->(putEndpoint)
 MERGE (httpAcceptance)-[:TESTS]->(deleteEndpoint)
+MERGE (httpAcceptance)-[:TESTS]->(runCreateEndpoint)
+MERGE (httpAcceptance)-[:TESTS]->(runListEndpoint)
+MERGE (httpAcceptance)-[:TESTS]->(runContextEndpoint)
 @endcypher
 */
 
@@ -197,6 +210,66 @@ async fn send_binding_mutation(
         vary,
         body,
     }
+}
+
+async fn send_project_run_request(
+    app: Router,
+    config: &JwtConfig,
+    actor_id: &str,
+    tenant_id: &str,
+    scope: &str,
+    method: Method,
+    uri: &str,
+    idempotency_key: Option<&str>,
+    body: Option<&Value>,
+) -> MutationReply {
+    let token = route_test_token_for_actor(config, actor_id, tenant_id, scope);
+    let mut request = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .header(header::CONTENT_TYPE, "application/json");
+    if let Some(key) = idempotency_key {
+        request = request.header("Idempotency-Key", key);
+    }
+    let body = body.map(Value::to_string).unwrap_or_default();
+    let response = app
+        .oneshot(
+            request
+                .body(Body::from(body))
+                .expect("Run directory request should build"),
+        )
+        .await
+        .expect("router should return a Run directory response");
+    let status = response.status();
+    let cache_control = response
+        .headers()
+        .get(header::CACHE_CONTROL)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let vary = response
+        .headers()
+        .get(header::VARY)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let bytes = to_bytes(response.into_body(), 64 * 1024)
+        .await
+        .expect("bounded Run directory response body should be readable");
+    let body = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|_| json!({"raw": String::from_utf8_lossy(&bytes)}));
+    MutationReply {
+        status,
+        cache_control,
+        vary,
+        body,
+    }
+}
+
+fn assert_directory_response(reply: &MutationReply) {
+    assert_eq!(reply.cache_control, "no-store");
+    assert_eq!(reply.vary, "Authorization");
 }
 
 fn assert_private_response(reply: &MutationReply) {
@@ -403,6 +476,145 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
     let jwt = route_test_jwt_config();
     let app = build_group_router(GroupApiState::new(jwt.clone(), pool.clone()));
     match phase.as_str() {
+        "hostless-run" => {
+            let collection_path = format!("/api/v1/projects/{ACCEPTANCE_PROJECT}/engineering-runs");
+            let create_body = json!({
+                "title": "Hostless Run HTTP acceptance",
+                "correlation_id": Uuid::new_v4(),
+            });
+            let create_key = Uuid::new_v4().to_string();
+            let created = send_project_run_request(
+                app.clone(),
+                &jwt,
+                ACCEPTANCE_ACTOR,
+                ACCEPTANCE_TENANT,
+                "project:write",
+                Method::POST,
+                &collection_path,
+                Some(&create_key),
+                Some(&create_body),
+            )
+            .await;
+            assert_eq!(created.status, StatusCode::OK, "{:?}", created.body);
+            assert_directory_response(&created);
+            let created_run = &created.body["engineering_run"];
+            assert_eq!(created_run["project_id"], ACCEPTANCE_PROJECT);
+            assert_eq!(created_run["repository_id"], Value::Null);
+            assert_eq!(created_run["branch_id"], Value::Null);
+            let run_id = created_run["engineering_run_id"]
+                .as_str()
+                .expect("created Run id should be a UUID string")
+                .to_owned();
+
+            let replay = send_project_run_request(
+                app.clone(),
+                &jwt,
+                ACCEPTANCE_ACTOR,
+                ACCEPTANCE_TENANT,
+                "project:write",
+                Method::POST,
+                &collection_path,
+                Some(&create_key),
+                Some(&create_body),
+            )
+            .await;
+            assert_eq!(replay.status, StatusCode::OK, "{:?}", replay.body);
+            assert_directory_response(&replay);
+            assert_eq!(
+                replay.body, created.body,
+                "exact create replay returns its receipt"
+            );
+
+            let listed = send_project_run_request(
+                app.clone(),
+                &jwt,
+                ACCEPTANCE_ACTOR,
+                ACCEPTANCE_TENANT,
+                "project:read",
+                Method::GET,
+                &collection_path,
+                None,
+                None,
+            )
+            .await;
+            assert_eq!(listed.status, StatusCode::OK, "{:?}", listed.body);
+            assert_directory_response(&listed);
+            let rows = listed.body["engineering_runs"]
+                .as_array()
+                .expect("Run directory should return an array");
+            let listed_run = rows
+                .iter()
+                .find(|row| row["engineering_run_id"] == run_id)
+                .expect("new hostless Run should appear in its Project directory");
+            assert_eq!(listed_run["repository_id"], Value::Null);
+            assert_eq!(listed_run["branch_id"], Value::Null);
+
+            let context_path = format!("/api/v1/engineering-runs/{run_id}/context");
+            let opened = send_project_run_request(
+                app.clone(),
+                &jwt,
+                ACCEPTANCE_ACTOR,
+                ACCEPTANCE_TENANT,
+                "project:read",
+                Method::GET,
+                &context_path,
+                None,
+                None,
+            )
+            .await;
+            assert_eq!(opened.status, StatusCode::OK, "{:?}", opened.body);
+            assert_directory_response(&opened);
+            assert_eq!(opened.body["run_context"]["project_id"], ACCEPTANCE_PROJECT);
+            assert_eq!(opened.body["run_context"]["engineering_run_id"], run_id);
+            assert_eq!(opened.body["run_context"]["repository_id"], Value::Null);
+            assert_eq!(opened.body["run_context"]["branch_id"], Value::Null);
+            assert_eq!(
+                opened.body["run_context"]["authorization"]["branch"],
+                Value::Null
+            );
+            assert_eq!(opened.body["branch"], Value::Null);
+            assert_eq!(opened.body["focus"], Value::Null);
+            assert_eq!(opened.body["focus_version"], Value::Null);
+            assert_eq!(
+                opened.body["capabilities"]["execution_admission_available"],
+                false
+            );
+
+            let member_list = send_project_run_request(
+                app.clone(),
+                &jwt,
+                ACCEPTANCE_DEVELOPER,
+                ACCEPTANCE_TENANT,
+                "project:read",
+                Method::GET,
+                &collection_path,
+                None,
+                None,
+            )
+            .await;
+            assert_eq!(member_list.status, StatusCode::OK, "{:?}", member_list.body);
+            assert_directory_response(&member_list);
+            assert!(
+                member_list.body["engineering_runs"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
+
+            let member_open = send_project_run_request(
+                app,
+                &jwt,
+                ACCEPTANCE_DEVELOPER,
+                ACCEPTANCE_TENANT,
+                "project:read",
+                Method::GET,
+                &context_path,
+                None,
+                None,
+            )
+            .await;
+            assert_eq!(member_open.status, StatusCode::NOT_FOUND);
+        }
         "bind-race" => {
             let unassigned = json!({"state":"unassigned"});
             let first_body = mutation_body(unassigned.clone(), 1, Uuid::new_v4());
