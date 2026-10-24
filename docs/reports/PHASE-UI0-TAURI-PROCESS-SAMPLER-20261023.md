@@ -2,9 +2,9 @@
 
 | 项目 | 内容 |
 |---|---|
-| 版本 / 状态 | v0.1.0 / 采样器与聚焦验证已完成；真实 Tauri、Rust-native 与性能决策仍 OPEN |
+| 版本 / 状态 | v0.2.0 / lane 已 rebase、集成并清理 worktree；真实 Tauri、Rust-native 与性能决策仍 OPEN |
 | 日期 | 2026-10-23 |
-| 分支 / 基线 | `codex/ui0-tauri-process-sampler` / brief 基线 `f70c8b8d`，lane 来源为本地 `dev@194f7b89` |
+| 分支 / 基线 | `codex/ui0-tauri-process-sampler` / 来源 `dev@194f7b89`；rebase 到 `dev@29444401` 后 fast-forward 为 `75839e36` |
 | 范围 | 只读 Windows `Win32_Process` 进程树 RSS/CPU 采样、进程计数、聚焦测试、UI WBS 与本报告；不修改现有 runner、生成器、inventory 或 Web evidence |
 
 ## §0 目的
@@ -17,8 +17,9 @@
 |---|---|---|
 | `scripts/ui0_bench/capture_tauri_process.py` | 固定 PowerShell 查询本机 `Win32_Process` 的 PID、父 PID、创建时间、working set 与累计 kernel/user CPU 时间；沿父子关系选树，拒绝缺失/超限数据；输出受行数、行长和总字节限制的 RSS、进程数与 CPU JSONL。 | 完成；只读、不启动或终止进程。 |
 | `scripts/ui0_bench/test_capture_tauri_process.py` | 覆盖树聚合/变化、父 PID 重用、root/child PID 重用、首样本不输出 CPU、CPU 归一化、schema/property 失败、固定 PowerShell 调用、权限/CIM 错误、Windows 限制、输出不覆盖、root 中途退出清理、输出限制及现有 runner schema。 | 17 项聚焦测试。 |
-| `docs/implementation-plans/WBS-UI-PLAN-NEXT-20261022.md` | 同步 UI-0 采样器状态、后续真实 Tauri 采样步骤和开放门禁。 | 更新至 v1.9；UI-0 保持 OPEN。 |
-| 本报告 | 记录实现、验证、工具链 smoke 和未完成验收。 | 完成。 |
+| `docs/implementation-plans/WBS-UI-PLAN-NEXT-20261022.md` | 同步 sampler 集成状态、真实 Tauri 采样步骤和开放门禁。 | 更新至 v2.0；UI-0 保持 OPEN。 |
+| `docs/briefs/UI0-TAURI-PROCESS-SAMPLER-20261023.md` | 保留本 lane 的受控 brief 与验收边界。 | 已集成。 |
+| 本报告 | 记录实现、验证、工具链 smoke 和未完成验收。 | v0.2.0；集成完成，UI-0 验收仍 OPEN。 |
 
 实现边界：scenario 仅接受有限 ASCII 标识；PowerShell 命令是固定查询，PID 在校验为 uint32 后以十进制写入固定脚本；不使用 shell、不接受任意命令、不把进程名、命令行、路径、错误原文或原始 stderr 写入 JSONL。每个 snapshot 都启动受限 PowerShell helper，最小采样间隔设为 1 秒以限制启动频率；该 collector 对被测应用的观察者开销尚未量化，真实性能对比前必须校准。RSS 按进程树汇总每个 `WorkingSetSize`，共享页可能在多个进程的工作集中重复出现，因此它不能代表进程树的唯一物理内存。文件以独占创建方式打开，已存在输出不会被覆盖。采样中断时删除本次创建的不完整文件，并通过稳定错误码报告失败。
 
@@ -34,8 +35,8 @@ CPU 百分比为进程树累计 kernel/user CPU 时间增量 ÷ 实测采样墙�
 | 输出 schema | 聚焦测试将样本送入 `run_measurement.read_driver_samples` | 接受 3 个记录，并识别 RSS counter 与 process-count metric；该测试使用 fixtures，不是实际 Tauri benchmark。 |
 | CypherGraph Guardian | `rtk python C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py --root . --changed --stamp` | **通过**；2 个变更源码文件的 Cypher 头与指纹通过校验。 |
 | 独立代码审查 CLI | `rtk proxy coderabbit --version` 与 `rtk proxy coderabbit auth status` | 未能启动；本机 WSL shim 对 `/root/.local/bin/coderabbit` 返回 `Permission denied`。不据此声称 CodeRabbit review 已执行。 |
-| Diff 检查 | `rtk git diff --check` | 提交前复核；不包含未审阅路径。 |
-| CodeGraph | 当前 worktree 无索引；会话提供的工具中无 `index_repository` / `check_index_coverage` | 未初始化索引；本 lane 只审阅精确范围内源码和文档，不作全仓结构结论。 |
+| Diff 检查 | `rtk git diff --check dev...HEAD` | rebase 后通过；集成后报告/WBS 改动另经父级 diff 检查。 |
+| CodeGraph | 本 lane worktree 无索引；本会话未提供 `index_repository` / `check_index_coverage` | 未初始化索引；只审阅精确范围内源码和文档，不作全仓结构结论。 |
 
 Python 版本为本机 `3.13.7`。Smoke 未记录 Tauri 产品版本、构建 SHA、renderer、Rust 工具链、benchmark workload 或目标设备 inventory：这些字段对 PowerShell tooling smoke 不适用/未采集，不能从中推导产品性能结论。
 
@@ -51,7 +52,7 @@ Python 版本为本机 `3.13.7`。Smoke 未记录 Tauri 产品版本、构建 SH
 
 ## §4 子代理失败接手清单
 
-本 lane 未派发子代理，没有子代理失败或待接手成果。父级集成复核仍需确认 manifest 路径、commit 与 `dev` checkout 状态；本 lane 不 rebase、merge、push 或清理 worktree。
+本 lane 未派发子代理，没有子代理失败或待接手成果。父级已核对五个变更路径和提交，rebase 到 `dev@29444401` 后 fast-forward 到 `75839e36`；4 个 ignored bytecode 文件已归档校验，Orca/Git 均确认 checkout 已移除。分支 `codex/ui0-tauri-process-sampler` 仍保留，未 push。
 
 ## §5 守门规则
 
@@ -77,7 +78,7 @@ Python 版本为本机 `3.13.7`。Smoke 未记录 Tauri 产品版本、构建 SH
 
 | 角色 | 状态 |
 |---|---|
-| 架构 | 父级复核待完成 |
+| 架构 | Mavis 已完成源码、diff、聚焦测试与集成复核；性能验收仍 OPEN |
 | SRE Lead | 父级复核待完成 |
 | 平台 | 父级复核待完成 |
 | 评审主持 | 父级复核待完成 |
@@ -89,4 +90,5 @@ Python 版本为本机 `3.13.7`。Smoke 未记录 Tauri 产品版本、构建 SH
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.2.0 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 lane rebase、fast-forward 集成、post-rebase 17/17 测试、忽略缓存归档及 worktree 清理；真实 Tauri/Rust-native 性能验收继续 OPEN。 | UI-0 lane 集成收敛。 |
 | v0.1.0 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增只读 Windows Tauri 进程树 sampler 阶段报告，记录聚焦验证、tooling smoke 与仍开放的 UI-0 性能门。 | WBS-UI0-TAURI-PROCESS-SAMPLER-20261023 brief。 |
