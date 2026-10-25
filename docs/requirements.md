@@ -1,4 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.05）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.06）
+
+> **v7.06 WLD-7 引用唯一化（2026-10-24）**：基本设计的实时协作章节唯一编号为 §16.78（§16.56 保留给既有 Schedule D5）；同步需求、Group DD、协作 spec、owner-local 数据设计、测试设计与 WBS 的当前交叉引用。协作目标与实现状态不变：当前代码仍以轮询为主，WLD-7 实施和目标环境验收保持 OPEN。
 
 > **v7.05 WLD-7 owner-local 数据与测试设计（2026-10-24）**：草稿头、不可变 sealed checkpoint、冲突/参与者未读/查看回执/解决事实分别由 Task 或 Canvas canonical owner 持有；owner-local schema、W/T/M、索引、RLS、retention 与预算见 `docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md`；常态 delta coalesce 到 draft head，不逐键击追加 checkpoint；每 draft 单在途写入，待发输入合并到一个有界 delta。双 actor、双 gateway、目标 PostgreSQL 的验收计划见 `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` §4.8/§5.2/§6.2.5。此增量是逻辑模型及测试设计，未生成迁移、未部署、未验收；当前投影仍轮询。同步 Basic Design §16.56、Group DD §8.27、协作 spec v0.7、WBS v0.32。
 
@@ -3827,3 +3829,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v7.03 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：明确 1 秒是双方可见冲突提醒的 p99 送达 SLO，而非轮询周期或冲突判定窗；要求双方持久未读提醒共享同一冲突 ID、各自草稿原子固定，传输 ACK 不清除未读状态。当前实现仍未通过 WLD-7。
 修订 v7.04 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：把 1 秒 p99 SLO 扩展为双方同一持久冲突提醒及首个有界差异页可读取；用户可见冲突只引用双方 complete、digest-verified、sealed 提案；定义结构化字段自动合并与版本化有界文本 OT/不可变冲突边界，以及事务通知唤醒、断线 cursor catch-up 与事件级 due retry 的无周期轮询 relay。同步 basic v7.07、Group DD v5.29、collaboration spec v0.6 与 WBS v0.31。当前实现仍未通过 WLD-7。
 修订 v7.05 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：为 WLD-7 补充 WorkItem/Canvas owner-local 草稿头、不可变 checkpoint、参与者未读/查看回执、冲突/解决事实的逻辑 W/T/M 数据映射，以及双 actor/双 gateway/目标 PostgreSQL 验收计划；明确常态 patch 只 coalesce draft head，冲突 owner transaction 自动 seal/pin 两侧完整 revision 而不依赖最终 Save；将每草稿单在途写入与有界合并待发量纳入低资源门；同步 Basic Design §16.56、Group DD §8.27、domain-collaboration spec v0.7、WBS v0.32。未生成数据库迁移或实现推送；现有 Group 路径仍轮询，WLD-7 保持开放。
+
+修订 v7.06 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：跨文档审查发现基本设计 §16.56 与旧 Schedule D5 重复，修复协作章节为唯一 §16.78，并同步当前要求说明与设计/测试引用；未改变协作范围或实现状态。

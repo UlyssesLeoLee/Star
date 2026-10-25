@@ -5923,7 +5923,7 @@ SCM master 的物理模型为 `scm.repository_master`：复合主键 `(tenant_id
 修订 v7.03 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。WLD-3 hostless occurrence：允许在完整本地 canonical identity 下物化并持久化 branchless occurrence，nullable Branch 以 null-safe Rule replay；更新 Schedule SRS/BD/DD、Group DD 与 WBS。实现门禁当时未运行；admission/execution 仍关闭。
 修订 v7.04 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。记录 WLD-3 在 Rust/Cargo 1.99.0 与本地一次性 PostgreSQL 的 47/47 runner 结果：domain 31/31、两个 API 授权测试各 1/1、Schedule PostgreSQL integration 6/6；注明 PostgreSQL NULL CHECK 语义修正和 changed-target scoped Clippy 边界。目标库、生产授权、worker/admission 与执行仍未验收并保持关闭。同步 requirements v7.01、Schedule SRS v0.67、BD v0.65、DD v0.79、Group DD v5.26。
 
-### 16.56 Resource-scoped push collaboration, drafts and conflict recovery
+## 16.78 Resource-scoped push collaboration, drafts and conflict recovery
 
 实时协作以 Project→Engineering Run→Worktree 的已授权资源 scope 为边界。每个 Run App 窗口复用单个多路复用连接，订阅数不超过 100；“全局通知”是对同一资源全部当前有权订阅者扇出，不是 tenant-wide broadcast。常态页面不定时轮询；WebSocket 负责事件推送，cursor catch-up 只在初次打开、断线重连或检测到 gap 时执行。当前 BFF 的内存 `tokio::broadcast` 与 SSE hub 只可作为低延迟进程内 fan-out；它们不是持久化事实、跨实例总线或 durable delivery。
 
@@ -5948,7 +5948,7 @@ Owner transaction 同时写 Outbox 并产生轻量 transactional notification（
 | `ResolveConflict` | conflict ID、expected revision、resolution patch、idempotency key | 对最新 owner revision 执行 CAS，保存不可变 resolution/audit；新编辑则保持未解决并生成 successor | `ConflictResolved` 或新的 `ConflictDetected` |
 | `Subscribe` / `CatchUp` | resource scope、opaque cursor | Collaboration/owner 复验 viewer grant；首次或 gap 时返回一致 snapshot + cursor | 单 WebSocket 订阅；常态不轮询 |
 
-### 16.56.1 数据分类与保留
+### 16.78.1 数据分类与保留
 
 | 数据 | 主责 owner | W/T/M 分类 | 生命周期与保留 |
 |---|---|---|---|
@@ -5957,7 +5957,7 @@ Owner transaction 同时写 Outbox 并产生轻量 transactional notification（
 | Presence、connection、subscription、短期 fan-out lease | Collaboration runtime | W，短 TTL | 按租约/TTL 清理，不做永久事件事实 |
 | Stream cursor 与客户端 resume hint | owner delivery / 客户端设备 | W 或可重建状态 | 只作位置；不可授权/不可作为业务 receipt；过期时 snapshot rebuild |
 
-### 16.56.2 Owner-local 目标记录映射
+### 16.78.2 Owner-local 目标记录映射
 
 WorkItem 与 Canvas 各自在自己的 owner schema 内落实相同的逻辑协作合同，不由 Collaboration runtime 建立第二份业务内容库。`edit_draft_head` 为 W 类可合并的当前草稿索引；普通输入只合并更新该 head，不逐击键/逐 delta 写快照；`edit_draft_checkpoint` 仅在显式持久化、安全 flush 或冲突 seal 时创建不可变版本（W，未解决冲突引用时 retention lock）；`edit_conflict`、`edit_conflict_participant`、`edit_conflict_view_receipt`、`edit_conflict_resolution` 与 owner Audit/Outbox 为 T 类持久业务/审计事实。各表统一带 tenant、Project、Run、canonical resource 与 owner generation；worktree 是受校验上下文，不是授权凭据。资源/参与者/草稿身份复合唯一约束、changed-path 索引、FORCE RLS、精确 grants、blob 加密与 retention 细节按 [`WLD-7 owner-local 数据设计`](data-design/WLD-7-COLLABORATION-DATA-DESIGN.md) 落到各 owner schema；目标记录不得计入已部署 inventory，迁移/目标库验收前保持未实现。
 
@@ -5970,3 +5970,5 @@ WorkItem 与 Canvas 各自在自己的 owner schema 内落实相同的逻辑协�
 修订 v7.06 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：明确 p99 ≤1 秒是双方显示同一持久未读 conflict ID 的送达 SLO，不是轮询/冲突判定窗口；未读状态仅由查看/显式标记清除，双方 draft 在冲突事实中精确固定。同步 requirements v7.03、Group DD v5.28、WBS v0.30。当前内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
 修订 v7.07 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：要求 1 秒 p99 覆盖双方持久提醒与首个有界差异页可读取；禁止在冲突提案尚未完整校验/seal 时弹出不可读提醒；补充结构化路径自动合并和版本化有界文本 OT 边界、transaction-notification 唤醒/重连追赶/事件 due retry 与 cursor-only 恢复，并澄清每个 draft checkpoint seal 是可读不可变草稿快照而非最终 Save。同步 requirements v7.04、Group DD v5.29、collaboration spec v0.6、WBS v0.31。当前轮询、内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
 修订 v7.08 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：为实时协作补充 owner-local draft/checkpoint/conflict/participant/receipt/resolution 的 W/T/M 逻辑映射、作用域唯一约束与目标迁移/RLS/retention 门，明确常态 patch 合并写 draft head、单在途写入及有界待发量、重叠 head 在冲突事务内自动 seal/pin，并链接双 actor/双 gateway 测试设计。同步 requirements v7.05、Group DD v5.30、collaboration spec v0.7、WBS v0.32。仅为逻辑数据设计；当前 Group 仍轮询，目标 DB、迁移与推送实现均未验收。
+
+修订 v7.09 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：发现实时协作章节与旧 Schedule D5 共用 §16.56；将协作章节提升为 §16.78 并置于 §16.77 之后，保留 D5 的原编号，供所有需求/设计/测试引用使用唯一目标。设计内容与运行状态不变，WLD-7 仍未实施或验收。

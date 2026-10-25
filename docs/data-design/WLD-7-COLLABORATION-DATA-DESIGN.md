@@ -1,8 +1,8 @@
 # WLD-7 多用户实时协作目标数据设计
 
-> 状态：目标逻辑数据设计 v0.1；尚未生成迁移、部署或目标数据库验证。
+> 状态：目标逻辑数据设计 v0.2；尚未生成迁移、部署或目标数据库验证。
 > 适用：Task Card / WorkItem 与 Canvas 等支持协作编辑的 Run 资源。
-> 上游：requirements §50.8AW / AC-COLLAB-01–08、basic design §16.56、Group DD §8.27、domain collaboration spec §13。
+> 上游：requirements §50.8AW / AC-COLLAB-01–08、basic design §16.78、Group DD §8.27、domain collaboration spec §13。
 > 此文件定义 owner-local 数据边界，不代表实时协作已实现。
 
 ## 0. 所有权和事实边界
@@ -61,3 +61,5 @@ Outbox 仍是持久真相，wake-up 只提示 relay 立即 claim。Relay 重启�
 WLD-7 实施时必须把以上目标实体逐表对齐 Data Inventory、W/T/M、数据库迁移、owner grants、RLS、retention、blob 生命周期和 schema fingerprint。需要并发证明 draft seal 与 revision CAS 同 fence、两个 gateway 与丢失 wake-up 仍恢复同一 conflict_id、participant view receipt 幂等、未授权第三人读失败，以及容量/RSS/CPU/commit-to-first-diff p99 基准。每个表的 physical inventory 行和 IPA table detail 只有在具体 DDL 确定后追加；本文件不声称当前已部署这些表。
 
 修订 v0.1 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。依据：用户要求事件触发推送、双边提示、保留双方草稿、可查看对方改动且降低轮询与全量广播开销；单 draft 单在途写入与一个有界合并待发增量限制慢网络下的内存/请求增长。所有结构均为 WLD-7 目标设计，实施/目标库验收开放。
+
+修订 v0.2 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：将 Basic Design 上游引用从重复编号 §16.56 更正为实时协作章节唯一编号 §16.78；旧 §16.56 仍指 Schedule D5。数据模型和未实施状态不变。

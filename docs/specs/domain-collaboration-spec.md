@@ -1,9 +1,9 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v0.7 (2026-10-24；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v0.8 (2026-10-24；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–08
-> - 《Basic Design》§2.1(表 24), §5.7, §16.56
+> - 《Basic Design》§2.1(表 24), §5.7, §16.78
 > - 《Group Detailed Design》§8.27
 > - 《API Design》§4 (WebSocket / Realtime 通道)
 > - 《Data Design》§4.17 (`collaboration` schema)
@@ -373,3 +373,5 @@ Revision v0.4 · 2026-10-24 · Mavis review: reconciled legacy NATS/role/subscri
 Revision v0.5 · 2026-10-24 · Mavis review: promoted the resource-scoped push/conflict contract over older transport drafts and recorded that the live Group path still uses interval polling.
 Revision v0.6 · 2026-10-24 · Mavis review: require both sealed, digest-verified readable proposals before conflict visibility; extend the one-second p99 objective through first bounded diff-page read; specify deterministic bounded OT, stale-base recovery and transactional-notification/wake-latch relay recovery; synchronize requirements v7.04, basic design v7.07 and Group DD v5.29. Implementation remains open.
 Revision v0.7 · 2026-10-24 · Mavis review: add the owner-local W/T/M target record map, retention/RLS/grant and target-migration acceptance boundary; specify coalesced mutable draft heads, one in-flight write plus one bounded pending delta per draft, and automatic sealing/pinning on overlap without requiring final Save; link the planned two-actor/two-gateway E2E and performance evidence; synchronize requirements v7.05, basic design v7.08, Group DD v5.30, data design v0.1 and WBS v0.32. No migration or runtime push implementation is claimed.
+
+Revision v0.8 · 2026-10-24 · Mavis review: correct the Basic Design collaboration cross-reference to unique §16.78; retain §16.56 for the existing Schedule D5 section. No change to runtime status; WLD-7 remains open.

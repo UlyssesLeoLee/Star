@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.30**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.31**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -1355,3 +1355,5 @@ Migration design is not production acceptance. Before closing AC-COLLAB-07, add 
 | v5.28 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 1s 为双方显示同一 conflict ID 的送达 SLO、不是轮询/判定窗口；双方草稿在 conflict fact 精确固定，传输 ACK 不清除持久未读提醒 | 用户强调双方须在一秒内获知冲突并保留、查看彼此修改 |
 | v5.29 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冲突只在两份提案完整校验并 seal 后对用户可见；1s p99 覆盖双方持久提醒与首个有界差异页读取；补充稳定 conflict ID 幂等配对、版本化有界文本 OT 与事务通知/合并唤醒/重连追赶/事件 due retry relay；对齐 requirements v7.04、basic v7.07、collaboration spec v0.6 与 WBS v0.31 | 用户要求无轮询、冲突双方一秒内同时看到提醒并可读取对方改动 |
 | v5.30 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §8.27.8 owner-local 目标 W/T/M 数据映射与 AC-COLLAB-07 迁移/RLS/恢复验收边界；明确普通 delta 合并写 draft head、每 draft 单在途写入与一个有界 pending delta，检测到重叠后由 owner 自动 seal/pin 双方完整版本，无需最终 Save；确认数据设计与测试计划未实现、未验收，当前 Group 实时路径仍轮询。同步 requirements v7.05、basic v7.08、collaboration spec v0.7、WBS v0.32 | 用户要求以低消耗推送替代轮询，并保存双方草稿及冲突差异 |
+
+| v5.31 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将实时协作的 Basic Design 引用更正为唯一章节 §16.78；保留 §16.56 的 Schedule D5 含义，WLD-7 实施、目标 DB/RLS 与双 gateway 验收仍开放 | 跨文档编号核对发现协作章节与 Schedule D5 重复使用 §16.56 |

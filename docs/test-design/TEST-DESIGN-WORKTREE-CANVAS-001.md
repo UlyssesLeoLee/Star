@@ -1,8 +1,8 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.3** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + Multica ULYS-57 评审发令 "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.4** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + Multica ULYS-57 评审发令 "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v1.3 (2026-10-24 增补 WLD-7 实时协作验收设计；用例未实现/未执行)
+> - 状态: 🟡 Draft v1.4 (2026-10-24 修正 WLD-7 Basic Design 引用；用例未实现/未执行)
 > - 关联 issue: `Multica ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
@@ -581,6 +581,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **v1.1** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 M-2/M-3/m-7 派生)** | **修正: 5 子任务命名 ULYS-57.x → ULYS-58..62 (per Multica 实际 identifier); AC-D-7 误增撤销 → 43 AC (与 SRS / Traceability §11 一致); 子任务创建命令 `--parent` 缺失 flag 修正为 `--description-file` + `update --parent-issue-id`; 守门 #14 v3/v4 "永久代签" 措辞 → "接手代签 (5 域真人到位后切真人)" (per self-review m-7)** | **2026-09-19 04:55 JST 自审整体审查 Mavis 推荐 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
 | **v1.2** | **2026-10-23 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 UT-FE-SESSION-01：以受控 deferred 响应验证 sessionKey generation 替换后旧 401 与旧投影响应不会使新 session 失效或回写；标明注入式测试的生产认证证据边界。** | **WBS-WLD-NEXT-20261023：补充迟到 401 / stale projection 确定性回归验证** |
 | **v1.3** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 WLD-7 的 8 项双 actor/durable gateway E2E 计划、PT-09 p99/写放大/RSS/CPU/Outbox 基准、AC-COLLAB-01..08 追踪和 G-E2E-09/G-PT-06 缺口；明确普通 delta 合并写 draft head、重叠时自动固定双边版本、每 draft 单在途写入加有界 pending delta，且所有用例均未实现/执行，并链接目标 W/T/M 数据设计。** | **requirements §50.8AW v7.05、协作数据设计 v0.1 与 WBS WLD-7 要求把实时推送、双边草稿和冲突恢复落实到可验收用例。**
+| **v1.4** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 的 Basic Design 引用更正为唯一章节 §16.78，并同步当前协作 spec / owner-local 数据设计版本；用例及运行结果未改变。** | **跨文档编号核对发现 §16.56 与 Schedule D5 重复。** |
 
 ---
 
@@ -609,9 +610,9 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 
 ### 9.5 WLD-7 实时协作验收来源
 
-- requirements §50.8AW AC-COLLAB-01–08 与 basic design §16.56
-- Group detailed design §8.27 与 docs/specs/domain-collaboration-spec.md §13 / v0.7
-- docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md v0.1（目标 owner-local W/T/M 记录）
+- requirements §50.8AW AC-COLLAB-01–08 与 basic design §16.78
+- Group detailed design §8.27 / v5.31 与 docs/specs/domain-collaboration-spec.md §13 / v0.8
+- docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md v0.2（目标 owner-local W/T/M 记录）
 - docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md W16 / WLD-7
 
 ---
