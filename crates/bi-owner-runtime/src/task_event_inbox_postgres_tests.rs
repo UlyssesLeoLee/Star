@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=7e43d238bd794a70e80e913c5b37e8d6e055aacfc73c30ee8831847ed2294238
+@cypher schema=1 source_sha256=8faa44687f4a077fda622d02dc426de8dbf8aa0a9c245022261b34027cc9e139
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs"})
 MERGE (parent:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::postgres_tests",kind:"module"})
@@ -9,6 +9,7 @@ MERGE (database_identity:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbo
 MERGE (runtime_contract:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::require_runtime_contract",kind:"function"})
 MERGE (wire_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::fresh_lifecycle_wire",kind:"function"})
 MERGE (route_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::route_pin",kind:"function"})
+MERGE (origin_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::build_source_origin",kind:"function"})
 MERGE (database_url_env:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::DATABASE_URL_ENV",kind:"constant"})
 MERGE (database_name:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::DATABASE_NAME",kind:"constant"})
 MERGE (commit_signature:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::COMMIT_FUNCTION",kind:"constant"})
@@ -18,10 +19,12 @@ MERGE (principal:Type {id:"bi_owner_runtime::AuthenticatedTaskEventPrincipal",ki
 MERGE (route_pin_type:Type {id:"bi_owner_runtime::TaskEventRoutePin",kind:"struct"})
 MERGE (receipt_outcome:Type {id:"bi_owner_runtime::ReceiptOutcome",kind:"enum"})
 MERGE (inbox_error:Type {id:"bi_owner_runtime::TaskEventInboxError",kind:"enum"})
+MERGE (source_origin:Type {id:"bi_owner_runtime::TaskEventSourceOrigin",kind:"struct"})
 MERGE (commit:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventInboxStore.commit_exact_wire",kind:"method"})
 MERGE (lifecycle_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.valid_lifecycle_wire",kind:"function"})
-MERGE (commit_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
+MERGE (commit_fn:Database {id:"bi.commit_task_event_v3",kind:"stored_function"})
 MERGE (inbox:Table {id:"bi.task_event_inbox",class:"Transaction"})
+MERGE (origin_table:Table {id:"bi.task_event_source_origin",class:"Transaction"})
 MERGE (fact:Table {id:"bi.task_event_fact",class:"Transaction"})
 MERGE (incident:Table {id:"bi.task_event_integrity_incident",class:"Transaction"})
 MERGE (rust_std:ExternalService {id:"rust::std",kind:"standard_library"})
@@ -34,6 +37,7 @@ MERGE (self)-[:DEFINES]->(database_identity)
 MERGE (self)-[:DEFINES]->(runtime_contract)
 MERGE (self)-[:DEFINES]->(wire_fixture)
 MERGE (self)-[:DEFINES]->(route_fixture)
+MERGE (self)-[:DEFINES]->(origin_fixture)
 MERGE (self)-[:IMPORTS]->(rust_std)
 MERGE (self)-[:IMPORTS]->(serde_json)
 MERGE (self)-[:IMPORTS]->(sqlx)
@@ -44,6 +48,7 @@ MERGE (test)-[:CALLS]->(runtime_contract)
 MERGE (runtime_contract)-[:READS]->(owner_role)
 MERGE (test)-[:CALLS]->(wire_fixture)
 MERGE (test)-[:CALLS]->(route_fixture)
+MERGE (test)-[:CALLS]->(origin_fixture)
 MERGE (test)-[:CALLS]->(commit)
 MERGE (test)-[:CALLS]->(lifecycle_fixture)
 MERGE (test)-[:READS]->(database_url_env)
@@ -54,10 +59,13 @@ MERGE (test)-[:USES_TYPE]->(principal)
 MERGE (test)-[:USES_TYPE]->(route_pin_type)
 MERGE (test)-[:USES_TYPE]->(receipt_outcome)
 MERGE (test)-[:USES_TYPE]->(inbox_error)
+MERGE (test)-[:USES_TYPE]->(source_origin)
 MERGE (test)-[:TESTS]->(commit_fn)
 MERGE (test)-[:TESTS]->(inbox)
 MERGE (test)-[:TESTS]->(fact)
 MERGE (test)-[:TESTS]->(incident)
+MERGE (test)-[:TESTS]->(origin_table)
+MERGE (origin_fixture)-[:CALLS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.new",kind:"method"})
 MERGE (commit)-[:CALLS]->(commit_fn)
 MERGE (parent)-[:IMPORTS]->(module)
 @endcypher
@@ -69,9 +77,17 @@ use std::{env, net::IpAddr};
 use super::tests::valid_lifecycle_wire;
 use super::{
     AuthenticatedTaskEventPrincipal, ReceiptOutcome, TaskEventInboxError, TaskEventInboxStore,
-    TaskEventRoutePin,
+    TaskEventRoutePin, TaskEventSourceOrigin,
+};
+use crate::{
+    task_event_quarantine::TaskEventQuarantineStore,
+    task_event_receiver::{
+        TaskEventQuarantineFault, TaskEventQuarantinePort, TaskEventReceiveError,
+        TaskEventReceiveRoute,
+    },
 };
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     PgPool, Row,
@@ -80,7 +96,8 @@ use uuid::Uuid;
 
 const DATABASE_URL_ENV: &str = "STAR_BI_TASK_EVENT_TEST_DATABASE_URL";
 const DATABASE_NAME: &str = "star_bi_task_event_test";
-const COMMIT_FUNCTION: &str = "bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea)";
+const COMMIT_FUNCTION: &str = "bi.commit_task_event_v3(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea,varchar,varchar,uuid,bigint,bytea,uuid)";
+const LEGACY_COMMIT_FUNCTION: &str = "bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea)";
 
 #[tokio::test]
 #[ignore = "requires the dedicated star_bi_task_event_test PostgreSQL database with BI migrations and runtime grants applied"]
@@ -117,16 +134,18 @@ async fn pg_runtime_commit_is_durable_idempotent_and_conflict_safe() {
         receiver_service_id: route.receiver_service_id,
     };
     let store = TaskEventInboxStore::new(pool.clone(), route.receiver_service_id);
+    let source_origin = build_source_origin(&route, event_id, 17);
 
     let committed = store
-        .commit_exact_wire(&principal, &route, &wire)
+        .commit_exact_wire(&principal, &route, &source_origin, &wire)
         .await
         .expect("the BI owner function must commit the Inbox receipt and fact");
     assert_eq!(committed.event_id, event_id);
     assert_eq!(committed.outcome, ReceiptOutcome::Committed);
+    assert_eq!(committed.source_origin, source_origin);
 
     let replay = store
-        .commit_exact_wire(&principal, &route, &wire)
+        .commit_exact_wire(&principal, &route, &source_origin, &wire)
         .await
         .expect("an exact redelivery must return the existing durable receipt");
     assert_eq!(replay.outcome, ReceiptOutcome::ExactReplay);
@@ -134,6 +153,34 @@ async fn pg_runtime_commit_is_durable_idempotent_and_conflict_safe() {
     assert_eq!(replay.committed_at, committed.committed_at);
     assert_eq!(replay.wire_sha256, committed.wire_sha256);
     assert_eq!(replay.route_pin_sha256, committed.route_pin_sha256);
+    assert_eq!(replay.source_origin, committed.source_origin);
+
+    let mut reused_sequence: Value =
+        serde_json::from_slice(&wire).expect("the committed fixture parses");
+    let reused_message_id = Uuid::new_v4();
+    reused_sequence["event_id"] = json!(reused_message_id);
+    let reused_sequence_wire =
+        serde_json::to_vec(&reused_sequence).expect("the alternate event serializes");
+    let reused_sequence_origin = build_source_origin(&route, reused_message_id, 17);
+    assert!(matches!(
+        store
+            .commit_exact_wire(
+                &principal,
+                &route,
+                &reused_sequence_origin,
+                &reused_sequence_wire,
+            )
+            .await,
+        Err(TaskEventInboxError::IdentityConflict)
+    ));
+
+    let changed_origin = build_source_origin(&route, event_id, 18);
+    assert!(matches!(
+        store
+            .commit_exact_wire(&principal, &route, &changed_origin, &wire)
+            .await,
+        Err(TaskEventInboxError::IdentityConflict)
+    ));
 
     let mut changed: Value = serde_json::from_slice(&wire).expect("the exact fixture parses");
     changed["payload"]["lifecycle"]["status"] = json!("completed");
@@ -142,18 +189,19 @@ async fn pg_runtime_commit_is_durable_idempotent_and_conflict_safe() {
         serde_json::to_vec(&changed).expect("the conflicting fixture serializes");
     assert!(matches!(
         store
-            .commit_exact_wire(&principal, &route, &conflicting_wire)
+            .commit_exact_wire(&principal, &route, &source_origin, &conflicting_wire)
             .await,
         Err(TaskEventInboxError::IdentityConflict)
     ));
 
     let replay_after_conflict = store
-        .commit_exact_wire(&principal, &route, &wire)
+        .commit_exact_wire(&principal, &route, &source_origin, &wire)
         .await
         .expect("a conflicting identity must not alter the original receipt or fact");
     assert_eq!(replay_after_conflict.outcome, ReceiptOutcome::ExactReplay);
     assert_eq!(replay_after_conflict.receipt_id, committed.receipt_id);
     assert_eq!(replay_after_conflict.wire_sha256, committed.wire_sha256);
+    assert_eq!(replay_after_conflict.source_origin, source_origin);
 
     pool.close().await;
 
@@ -167,7 +215,7 @@ async fn pg_runtime_commit_is_durable_idempotent_and_conflict_safe() {
     require_runtime_contract(&reopened_pool).await;
     let reopened_store = TaskEventInboxStore::new(reopened_pool.clone(), route.receiver_service_id);
     let durable_replay = reopened_store
-        .commit_exact_wire(&principal, &route, &wire)
+        .commit_exact_wire(&principal, &route, &source_origin, &wire)
         .await
         .expect("a committed receipt must survive closing its original pool");
     assert_eq!(durable_replay.outcome, ReceiptOutcome::ExactReplay);
@@ -175,6 +223,50 @@ async fn pg_runtime_commit_is_durable_idempotent_and_conflict_safe() {
     assert_eq!(durable_replay.committed_at, committed.committed_at);
     assert_eq!(durable_replay.wire_sha256, committed.wire_sha256);
     assert_eq!(durable_replay.route_pin_sha256, committed.route_pin_sha256);
+    assert_eq!(durable_replay.source_origin, source_origin);
+
+    let quarantine_route = TaskEventReceiveRoute::new(tenant_id, route.clone())
+        .expect("the PostgreSQL route is valid for quarantine");
+    let quarantine = TaskEventQuarantineStore::new(reopened_pool.clone());
+    let quarantine_digest: [u8; 32] = Sha256::digest(&wire).into();
+    let quarantine_receipt = quarantine
+        .record(
+            &quarantine_route,
+            &source_origin,
+            quarantine_digest,
+            wire.len() as u32,
+            TaskEventQuarantineFault::MalformedEnvelope,
+        )
+        .await
+        .expect("the first poison delivery must persist quarantine evidence");
+    let quarantine_replay = quarantine
+        .record(
+            &quarantine_route,
+            &source_origin,
+            quarantine_digest,
+            wire.len() as u32,
+            TaskEventQuarantineFault::MalformedEnvelope,
+        )
+        .await
+        .expect("an exact poison replay returns the existing quarantine receipt");
+    assert_eq!(
+        quarantine_replay.quarantine_id,
+        quarantine_receipt.quarantine_id
+    );
+
+    let reused_source_sequence = build_source_origin(&route, Uuid::new_v4(), 17);
+    assert!(matches!(
+        quarantine
+            .record(
+                &quarantine_route,
+                &reused_source_sequence,
+                quarantine_digest,
+                wire.len() as u32,
+                TaskEventQuarantineFault::MalformedEnvelope,
+            )
+            .await,
+        Err(TaskEventReceiveError::QuarantineConflict)
+    ));
     reopened_pool.close().await;
 }
 
@@ -196,6 +288,7 @@ async fn require_runtime_contract(pool: &PgPool) {
             pg_has_role(current_user, 'star_bi_runtime', 'MEMBER') AS runtime_member,
             NOT pg_has_role(session_user, 'star_bi_owner', 'SET') AS cannot_set_owner,
             has_function_privilege(current_user, $1, 'EXECUTE') AS can_call_commit,
+            NOT has_function_privilege(current_user, $2, 'EXECUTE') AS cannot_call_legacy_commit,
             NOT rolsuper AND NOT rolbypassrls AS current_role_is_restricted,
             EXISTS (
                 SELECT 1 FROM pg_roles
@@ -219,6 +312,9 @@ async fn require_runtime_contract(pool: &PgPool) {
             to_regclass('bi.task_event_integrity_incident') IS NOT NULL
               AND (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
                     WHERE oid = to_regclass('bi.task_event_integrity_incident')) AS incident_force_rls,
+            to_regclass('bi.task_event_source_origin') IS NOT NULL
+              AND (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+                    WHERE oid = to_regclass('bi.task_event_source_origin')) AS source_origin_force_rls,
             NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'INSERT')
               AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'UPDATE')
               AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'DELETE')
@@ -227,12 +323,16 @@ async fn require_runtime_contract(pool: &PgPool) {
               AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'DELETE')
               AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'INSERT')
               AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'UPDATE')
-              AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'DELETE') AS no_direct_dml
+              AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'DELETE')
+              AND NOT has_table_privilege(current_user, 'bi.task_event_source_origin', 'INSERT')
+              AND NOT has_table_privilege(current_user, 'bi.task_event_source_origin', 'UPDATE')
+              AND NOT has_table_privilege(current_user, 'bi.task_event_source_origin', 'DELETE') AS no_direct_dml
         FROM pg_roles
         WHERE rolname = current_user
         "#,
     )
     .bind(COMMIT_FUNCTION)
+    .bind(LEGACY_COMMIT_FUNCTION)
     .fetch_one(pool)
     .await
     .expect("inspect BI runtime role, function grant, table privileges, and RLS");
@@ -246,6 +346,9 @@ async fn require_runtime_contract(pool: &PgPool) {
     assert!(row
         .try_get::<bool, _>("can_call_commit")
         .expect("commit function grant"));
+    assert!(row
+        .try_get::<bool, _>("cannot_call_legacy_commit")
+        .expect("legacy commit function revocation"));
     assert!(row
         .try_get::<bool, _>("current_role_is_restricted")
         .expect("restricted login role"));
@@ -264,6 +367,9 @@ async fn require_runtime_contract(pool: &PgPool) {
     assert!(row
         .try_get::<bool, _>("incident_force_rls")
         .expect("incident FORCE RLS"));
+    assert!(row
+        .try_get::<bool, _>("source_origin_force_rls")
+        .expect("source origin FORCE RLS"));
     assert!(row
         .try_get::<bool, _>("no_direct_dml")
         .expect("runtime direct DML denial"));
@@ -309,4 +415,20 @@ fn route_pin() -> TaskEventRoutePin {
         destination_id: "bi-task-events".to_owned(),
         destination_generation: Uuid::new_v4(),
     }
+}
+
+fn build_source_origin(
+    route: &TaskEventRoutePin,
+    event_id: Uuid,
+    sequence: i64,
+) -> TaskEventSourceOrigin {
+    TaskEventSourceOrigin::new(
+        route.transport_provider_id.clone(),
+        route.destination_id.clone(),
+        route.destination_generation,
+        sequence,
+        sequence.to_be_bytes().to_vec(),
+        event_id,
+    )
+    .expect("fixture source origin is valid")
 }

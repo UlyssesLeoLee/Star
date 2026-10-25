@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=405930aa7db68c510dcacaa940b0d729b070f57849d930b1ffdb9a44d35b0b62
+@cypher schema=1 source_sha256=8868b59aa521cf6f336ab1271edb73af52a48a45b6cf7388b02bac6418db17ad
 MERGE (self:File {path:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs"})
 MERGE (test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::native_origin_verification_sqlx_persists_and_revalidates_exact_origin",kind:"test"})
 MERGE (fixture:Type {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::TestFixture",kind:"struct"})
@@ -23,11 +23,17 @@ MERGE (source_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_
 MERGE (receipt_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::assert_ack_receipt_and_outbox",kind:"function"})
 MERGE (sqlstate_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::assert_sqlstate",kind:"function"})
 MERGE (receipt_retry:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::receipt_failure_rolls_back_and_retry_succeeds",kind:"function"})
+MERGE (active_lease_index_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::assert_active_lease_lookup_index",kind:"function"})
+MERGE (static_lease_predicate_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::active_lease_query_and_partial_index_share_lease_predicate",kind:"test"})
+MERGE (pull_one_grant_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::pull_one_execute_is_regranted_only_to_the_runtime_role",kind:"test"})
+MERGE (active_lease_index:Config {id:"ix_platform_transport_active_lease_lookup",kind:"postgres_index"})
+MERGE (runtime_role:Config {id:"star_platform_transport_runtime",kind:"postgres_role"})
 MERGE (profile_master:Type {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster",kind:"struct"})
 MERGE (profile_publish:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster.publish_revision",kind:"method"})
 MERGE (profile_revision:Type {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileRevision",kind:"struct"})
 MERGE (append_db:Function {id:"platform_transport.append_authenticated",kind:"database_function"})
 MERGE (pull_db:Function {id:"platform_transport.pull_authenticated",kind:"database_function"})
+MERGE (pull_one_db:Function {id:"platform_transport.pull_one",kind:"database_function"})
 MERGE (verify_db:Function {id:"platform_transport.verify_origin_authenticated",kind:"database_function"})
 MERGE (ack_db:Function {id:"platform_transport.acknowledge_authenticated",kind:"database_function"})
 MERGE (message_work:Table {id:"platform_transport.message_work",class:"Work"})
@@ -56,7 +62,11 @@ MERGE (self)-[:DEFINES]->(source_assert)
 MERGE (self)-[:DEFINES]->(receipt_assert)
 MERGE (self)-[:DEFINES]->(sqlstate_assert)
 MERGE (self)-[:DEFINES]->(receipt_retry)
+MERGE (self)-[:DEFINES]->(active_lease_index_assert)
+MERGE (self)-[:DEFINES]->(static_lease_predicate_test)
+MERGE (self)-[:DEFINES]->(pull_one_grant_test)
 MERGE (self)-[:IMPORTS]->(profile_master)
+MERGE (self)-[:IMPORTS]->(:File {path:"db/migrations/2026-10-24-platform-native-transport-lease-order.sql"})
 MERGE (prepare)-[:USES_TYPE]->(profile_revision)
 MERGE (test)-[:CALLS]->(prepare)
 MERGE (test)-[:CALLS]->(database_precondition)
@@ -78,6 +88,14 @@ MERGE (test)-[:CALLS]->(source_assert)
 MERGE (test)-[:CALLS]->(receipt_assert)
 MERGE (test)-[:CALLS]->(sqlstate_assert)
 MERGE (test)-[:CALLS]->(receipt_retry)
+MERGE (test)-[:CALLS]->(active_lease_index_assert)
+MERGE (test)-[:TESTS]->(active_lease_index)
+MERGE (static_lease_predicate_test)-[:TESTS]->(active_lease_index)
+MERGE (static_lease_predicate_test)-[:READS]->(:File {path:"db/migrations/2026-10-24-platform-native-transport-lease-order.sql"})
+MERGE (pull_one_grant_test)-[:TESTS]->(pull_one_db)
+MERGE (pull_one_grant_test)-[:TESTS]->(runtime_role)
+MERGE (pull_one_grant_test)-[:READS]->(:File {path:"db/migrations/2026-10-24-platform-native-transport-lease-order.sql"})
+MERGE (active_lease_index_assert)-[:READS]->(active_lease_index)
 MERGE (append)-[:CALLS]->(append_db)
 MERGE (pull)-[:CALLS]->(pull_db)
 MERGE (verify)-[:CALLS]->(verify_db)
@@ -124,8 +142,8 @@ use platform_messaging_runtime::{
 };
 use sha2::{Digest, Sha256};
 use sqlx::{
-    PgPool, Postgres, Row, Transaction,
     postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Postgres, Row, Transaction,
 };
 use uuid::Uuid;
 
@@ -134,6 +152,8 @@ const PROVIDER_ID: &str = "star-rust-log";
 const PROVIDER_VERSION: &str = "1.0.0";
 const ENDPOINT_IDENTITY: &str = "native-origin-sqlx";
 const MESSAGE_KIND: &str = "request";
+const LEASE_ORDER_MIGRATION: &str =
+    include_str!("../../../db/migrations/2026-10-24-platform-native-transport-lease-order.sql");
 
 struct TestFixture {
     deployment_id: Uuid,
@@ -194,6 +214,7 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
 
     require_d20_database_identity(&pool).await;
     require_d20_database(&pool).await;
+    assert_active_lease_lookup_index(&pool).await;
     let fixture = prepare_fixture(&pool).await;
 
     let first_message_id = Uuid::new_v4();
@@ -236,6 +257,19 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .expect_err("same message identity with different wire bytes must fail closed");
     assert_sqlstate(&replay_conflict, "22000");
 
+    let second_message_id = Uuid::new_v4();
+    let second_wire = b"source certificate historical proof".to_vec();
+    let second_accepted = append_authenticated(
+        &pool,
+        &fixture,
+        &fixture.sender_certificate,
+        second_message_id,
+        &second_wire,
+    )
+    .await
+    .expect("append the next sequence before testing the active lease boundary");
+    assert_eq!(second_accepted.sequence, accepted.sequence + 1);
+
     let first_delivery = pull_authenticated(&pool, &fixture)
         .await
         .expect("pull the accepted message as its authorized receiver")
@@ -249,17 +283,22 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
         first_delivery.proof.payload_sha256,
         Sha256::digest(&first_delivery.wire).as_slice()
     );
-    assert_persisted_source(&pool, &fixture, &first_delivery).await;
     assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("verify current exact origin")
+        pull_authenticated(&pool, &fixture)
+            .await
+            .expect("a second pull should be checked against the durable active lease")
+            .is_none(),
+        "a later sequence must remain unavailable while the first lease is unexpired"
     );
+    assert_persisted_source(&pool, &fixture, &first_delivery).await;
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
+    )
+    .await
+    .expect("verify current exact origin"));
 
     let mut invalid = first_delivery.proof.clone();
     invalid.log_id.push_str("-other");
@@ -377,16 +416,14 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .expect_err("acknowledgement must reject a different message identity");
     assert_sqlstate(&invalid_ack, "42501");
 
-    assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("failed verification must leave the leased source proof retryable")
-    );
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
+    )
+    .await
+    .expect("failed verification must leave the leased source proof retryable"));
 
     let stale_lease = acknowledge_authenticated(
         &pool,
@@ -398,48 +435,35 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .await
     .expect_err("acknowledgement with a stale lease identity must fail");
     assert_sqlstate(&stale_lease, "40001");
-    assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("stale lease failure must leave the current lease unchanged")
-    );
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
+    )
+    .await
+    .expect("stale lease failure must leave the current lease unchanged"));
 
     receipt_failure_rolls_back_and_retry_succeeds(&pool, &fixture, &first_delivery)
         .await
         .expect("receipt persistence conflict must roll back the ACK and allow retry");
-    assert!(
-        !verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("acked messages must no longer be live origin proofs")
-    );
-    assert_ack_receipt_and_outbox(&pool, &fixture, &first_delivery).await;
-
-    let second_message_id = Uuid::new_v4();
-    let second_wire = b"source certificate historical proof".to_vec();
-    append_authenticated(
+    assert!(!verify_origin(
         &pool,
         &fixture,
-        &fixture.sender_certificate,
-        second_message_id,
-        &second_wire,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
     )
     .await
-    .expect("append a second message before source certificate revocation");
+    .expect("acked messages must no longer be live origin proofs"));
+    assert_ack_receipt_and_outbox(&pool, &fixture, &first_delivery).await;
+
     let second_delivery = pull_authenticated(&pool, &fixture)
         .await
-        .expect("pull the second exact message")
-        .expect("the second message should be leased");
+        .expect("pull after the first durable lease was ACKed")
+        .expect("the next sequence should now be leased");
     assert_eq!(second_delivery.proof.message_id, second_message_id);
+    assert_eq!(second_delivery.proof.sequence, second_accepted.sequence);
+    assert_eq!(second_delivery.wire, second_wire);
 
     sqlx::query("SELECT pg_sleep(0.01)")
         .execute(&pool)
@@ -448,16 +472,14 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     revoke_certificate(&pool, &fixture, &fixture.sender_certificate)
         .await
         .expect("record source certificate revocation after acceptance");
-    assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &second_delivery.proof,
-        )
-        .await
-        .expect("post-acceptance source revocation preserves historical origin evidence")
-    );
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &second_delivery.proof,
+    )
+    .await
+    .expect("post-acceptance source revocation preserves historical origin evidence"));
 
     revoke_certificate(&pool, &fixture, &fixture.receiver_certificate)
         .await
@@ -482,6 +504,57 @@ struct AcceptedIdentity {
     sequence: i64,
     sha256: Vec<u8>,
     exact_replay: bool,
+}
+
+#[test]
+fn active_lease_query_and_partial_index_share_lease_predicate() {
+    let compact = LEASE_ORDER_MIGRATION
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(compact.contains("w.state='leased'andw.lease_expires_at>clock_timestamp()"));
+    assert!(compact.contains(
+        "(deployment_id,tenant_id,log_id,generation,recipient_service_id,lease_expires_at)wherestate='leased'"
+    ));
+}
+
+#[test]
+fn pull_one_execute_is_regranted_only_to_the_runtime_role() {
+    let compact = LEASE_ORDER_MIGRATION
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(compact.contains(
+        "revokeallonfunctionplatform_transport.pull_one(text,uuid,integer)frompublic,star_platform_transport_runtime;"
+    ));
+    assert!(compact.contains(
+        "grantexecuteonfunctionplatform_transport.pull_one(text,uuid,integer)tostar_platform_transport_runtime;"
+    ));
+    assert!(!compact
+        .contains("grantexecuteonfunctionplatform_transport.pull_one(text,uuid,integer)topublic"));
+    assert!(compact.contains("createindexifnotexistsix_platform_transport_active_lease_lookup"));
+    assert!(compact.contains("createorreplacefunctionplatform_transport.pull_one"));
+}
+
+async fn assert_active_lease_lookup_index(pool: &PgPool) {
+    let indexdef = sqlx::query_scalar::<_, String>(
+        "SELECT indexdef FROM pg_indexes WHERE schemaname = 'platform_transport' AND indexname = 'ix_platform_transport_active_lease_lookup'",
+    )
+    .fetch_optional(pool)
+    .await
+    .expect("read the active-lease index catalog entry")
+    .expect("active-lease partial index must be applied");
+    let compact = indexdef
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(compact.contains(
+        "(deployment_id,tenant_id,log_id,generation,recipient_service_id,lease_expires_at)"
+    ));
+    assert!(compact.contains("where(state='leased'"));
 }
 
 async fn require_d20_database_identity(pool: &PgPool) {
