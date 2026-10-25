@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.32**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.33**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -391,7 +391,7 @@ Worktree management owner 在同一事务提交 Worktree logical state/version�
 
 #### 6.1.3 WLD-1 Repository identity、Run binding 与可信 root registration（设计目标）
 
-**Owner 划分。** `RepositoryId` 的稳定主身份由 SCM bounded context 持有；provider/repository key、URL 与 default branch 是 optional source metadata。Project owner 持有版本化 Project↔Repository authorization link、有效状态、审计与默认候选。不要把 `domain-project::ProjectRepository` 关联端口当成 SCM master，也不要以 `scm.cloud_branch` 行完整性推导 repository directory。Engineering Run Directory owner 持有显式可空 Run→Repository binding；Host Infrastructure owner 持有可信本地 root registry，Worktree owner 只持有 checkout lifecycle/path locator 的受限操作视图。
+**Owner 划分。** `RepositoryId` 的稳定主身份由 SCM bounded context 持有；provider/repository key、URL 与 default branch 是 optional source metadata。Project owner 持有 0..N 条版本化 Project↔Repository authorization link、有效状态与审计；default_repository_id 可空且仅作为 UI 候选偏好。不要把 `domain-project::ProjectRepository` 关联端口当成 SCM master，也不要以 `scm.cloud_branch` 行完整性推导 repository directory。Engineering Run Directory owner 持有显式可空 Run→Repository binding；Host Infrastructure owner 持有可信本地 root registry，Worktree owner 只持有 checkout lifecycle/path locator 的受限操作视图。
 
 **SCM master source schema。** 当前分支新增 scm.repository_master，主键 (tenant_id, repository_id, version)，字段包括 bounded name、optional provider_key/remote_identity/credential-free remote_url/default_branch、created_by_actor_id/changed_by_actor_id 和 valid_from/valid_to。它是 Master/SCD Type 2：partial unique index 保证 current identity 与可选 provider identity 至多一个，deferred constraint trigger 在事务 commit 时保证每个 identity 至少一个 current revision，因此单独关闭当前版本不能提交；合法修订须在同一事务关闭旧版并追加连续 successor。数据库 preflight 同时验证已有历史恰有一个 current，物理删除禁止。created_by_actor_id 仅 provenance，不构成成员、Project 或 Run 授权。scm.repository_master_event 是 Transaction 类 append-only audit，不设短 TTL；master 新版本插入时，数据库 trigger 在同事务写入 allowlisted after-state、actor 与 correlation ID。两表 tenant-scoped、ENABLE/FORCE RLS；star_scm_repository_owner 为 NOLOGIN/NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS/NOINHERIT。migration 在任何 role/grant DDL 前，以 `pg_shdepend` 拒绝其他 database 上的 owner-role direct object ACL dependency，检查所有 database ACL、当前 database 的 schema/relation/column/function/type/language/tablespace/FDW/server/large object/default ACL 与可用 parameter ACL，并检查向外 role membership 与对象所有权；其他 database 上任何 object ACL 一律保守拒绝，不跨 schema 自动撤权，当前 database ACL 按实际 owner-role grantee 匹配且 PUBLIC 不会误判。通过检查后只在 SCM schema 与当前 database 清理权限，并授权所需 SELECT/INSERT 及 master valid_to 列 UPDATE；应用登录 membership 由部署配置。adapter 每个事务显式 SET LOCAL ROLE 与 tenant/actor/correlation scope，identity 上取得 transaction advisory lock，修订采用 expected-version CAS。迁移文件按当前 adapter migration runner 的“一物理行一条 SQL statement”格式编排。PostgreSQL test 工件标记 ignored 且未运行；migration 前必须通过双重 opt-in、实际 distinct session_user/current_user、loopback endpoint、精确 star_scm_test_ database 名与两 session 匹配的预置 fixture token，并要求 superuser admin migration login。每次 migration transaction 在任何 DDL 前通过同一事务连接重新读取实际 admin identity，并与预检的 admin/runtime identity、loopback endpoint、数据库名及 fixture token 比对；只有完整匹配才执行 DDL。pool 的单连接上限仅用于资源控制，不提供物理连接固定保证。该 token 仅证明连接符合 operator 设置的本地 fixture；代码不能独立证明承载它的 VM/cluster 可销毁，测试必须使用操作者提供的一次性隔离集群。Rust 1.99 目标包 all-targets check 与身份负例单测通过；ignored PostgreSQL runtime、full workspace gates 和 DB/RLS/并发仍未验收。
 
@@ -406,6 +406,12 @@ Worktree management owner 在同一事务提交 Worktree logical state/version�
 **Host root registration。** Host Infrastructure owner 的目标持久注册键至少为 `(host_environment_id, repository_id, generation)`，并保存 registry revision、验证/撤销状态、验证时间与来源 authorization identity。generation 变更或撤销后，旧 Worktree operation 必须重新解析并核验，不得继续使用缓存路径。可信 Host capability 可以在本地解析绝对路径；响应、审计和跨 owner Outbox 仅传稳定 identity/generation 与状态，不传路径、URL 或 credential。`worktree.path` 是 checkout locator，`worktree_shared_dir.path` 是共享目录配置，`ExternalWorktreeImportRegistry` 的进程内 map 是临时映射，三者都不是可信 root registry。
 
 **Admission 顺序。** create/import/CLI 开始前依序验证当前 Project membership、Run read/write grant、当前 Run→Repository binding、有效 Project↔Repository link、HostEnvironment 存在、Repository root generation 匹配且 fresh、provider readiness/授权和 Worktree 冲突；副作用前再次复验 binding revision、Project link revision 与 root generation。任何数据源不可用、NULL/不匹配/过期或授权事实不完整，返回非成功并不产生 Worktree 成功投影。当前源码已有 SCM identity domain/PG adapter/migration source，并有 nullable Run fields、Project/Run authorization、默认未安装的 provider seam 与进程内 root map；Project link 持久 writer、Run binding writer/endpoint 的本阶段之外部分、持久 root registry、部署 membership/target DB、HTTP/DB acceptance 与真实 lifecycle provider 仍未证明或实现。此处设计不能用于声明生产 Worktree/CLI 已可用。
+
+### 6.1.4 ProjectRepository 退役与迁移先行解绑
+
+ProjectRepository 授权关联是 0..N。移除单条关联不是直接 DELETE：Project owner 以 expected_link_revision/CAS 创建幂等 retire operation，将 link 置为 retiring 并冻结新 Run binding、Worktree create/import；同事务写 Audit、Outbox 和 operation receipt。迁移命令按 operation_id 送达 Run Directory 与 Worktree/Host lifecycle owners，各自复验 link revision、Project/Run grants 与替代 Repository 仍在同一 Project 有效关联。Run Directory owner 在自己的事务内迁移或显式清除 Run→Repository binding；Worktree/Host owner 经可信 provider 校验并迁移 checkout identity，或执行经授权的完整退役/清理后清除活动引用。每个 owner 使用本地 CAS/幂等回执记录完成 revision、已处理引用和剩余活动引用；跨 owner 不共享数据库事务、不直接写彼此表。
+
+只有新增引用被 retiring fence 阻断、所有必需 owner 的最终串行化核验回执均确认活动引用为零后，Project owner 才可关闭授权关联并保留历史审计。失败、超时、撤权、provider 不可用或引用计数未知时继续 retiring/fail closed；历史只读事实保留原 RepositoryId，不因迁移改写。替代项缺失时不得把活动 checkout 静默指向其他仓库，必须先完成明确授权的退役流程。
 
 ### 6.2 并行 Agent 可见性
 
@@ -1332,7 +1338,8 @@ Do not persist a full event copy for every subscriber. Persist owner facts and o
 | AC-COLLAB-05 | Missed commit notification/listener reconnect, duplicate/reordered events, two gateway instances, owner restart, stale cursor, revoked grant and simultaneous resolve recover from durable owner facts with no lost draft or duplicate business effect. |
 | AC-COLLAB-06 | Load test proves one multiplexed connection, bounded patch/frame/queue/cache, at most one in-flight write and one coalesced pending delta per draft, coalesced presence, measured RSS/CPU and backpressure recovery at agreed concurrent editor/agent counts. |
 | AC-COLLAB-07 | Target PostgreSQL grants/RLS/WORM, owner-boundary review, migration replay/rollback, backup recovery and transport adapter substitution pass before production enablement. |
-| AC-COLLAB-08 | Versioned bounded OT operations converge deterministically for safely transformable text edits; ambiguous overlap preserves both drafts as a recoverable conflict, while a stale client outside the transform window keeps its local draft and reloads a consistent authorized snapshot. |
+| AC-COLLAB-08 | Any semantic overlap in a text span or the same field/path creates a durable conflict and pins both exact drafts even if OT can mechanically transform it; only proven disjoint edits may auto-rebase. Stale bases keep local drafts and reload a consistent authorized snapshot. |
+| AC-COLLAB-09 | OT is an optional side-effect-free preview only after explicit user entry into conflict resolution; only the user-selected result accepted by a current-revision owner CAS may change canonical state, and stale CAS preserves both drafts/conflict. |
 
 This section is design-only. The checked-in BFF `CollaborationWssHub` is in-process broadcast with a fixed bounded channel and reports lagged events after they have been dropped; the Worktree SSE hub has no business event fan-in. Those scaffolds need replacement/connection to durable owner Outbox streams, participant draft/conflict APIs, cross-instance delivery and the above measured acceptance before any UI is labeled shared live editing.
 
@@ -1358,3 +1365,4 @@ Migration design is not production acceptance. Before closing AC-COLLAB-07, add 
 
 | v5.31 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将实时协作的 Basic Design 引用更正为唯一章节 §16.78；保留 §16.56 的 Schedule D5 含义，WLD-7 实施、目标 DB/RLS 与双 gateway 验收仍开放 | 跨文档编号核对发现协作章节与 Schedule D5 重复使用 §16.56 |
 | v5.32 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v7.06 与 Basic Design v7.10；将 100 subscriptions、64 events / 128 KiB 标为待 Collaboration Profile 固定且须目标环境测量的候选预算，明确 16 KiB frame 才是协议上限 | 多用户协作低资源设计复核发现初始队列数值可能被误读为已验证容量 |
+| v5.33 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Project→Repository 0..N 与 retiring/migrate-before-unlink 多 owner 回执状态机；所有语义重叠均持久冲突，即使 OT 可变换，OT 仅为显式解决预览；同步需求 v7.08、基本设计 v7.12、SRS v1.11、BD v1.12 与协作验收 v1.7。以上是目标设计，Run/Worktree owner writer、provider、数据库与运行时验收仍 OPEN。

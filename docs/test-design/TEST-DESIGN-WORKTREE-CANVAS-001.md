@@ -1,8 +1,8 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.6** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.7** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v1.6 (2026-10-25 增加同秒重叠提案无等待冲突用例 E2E-COLLAB-09；全部用例未实现/未执行)
+> - 状态: 🟡 Draft v1.7 (2026-10-25 增加同秒重叠提案无等待冲突用例 E2E-COLLAB-09；全部用例未实现/未执行)
 > - 关联工作项: `ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
@@ -334,7 +334,7 @@ IT 共 **10 测**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + Graph 集成
 ### 4.7 本章小结
 E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划用例（§4.8），尚未实现/执行，不计入已通过数量。缺口 G-E2E-01..09 显式标记。
 
-### 4.8 WLD-7 多用户推送、冲突与草稿恢复 E2E（9 项计划，未执行）
+### 4.8 WLD-7 多用户推送、冲突与草稿恢复 E2E（11 项计划，未执行）
 
 环境要求：两个独立登录 actor、可重建目标 owner database、至少两个 realtime gateway 实例和可控 relay/wake-up 故障注入。只用 MSW、单进程 broadcast 或同一浏览器两个 tab 不构成跨实例 durable 验收。
 
@@ -351,9 +351,21 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 | E2E-COLLAB-07 | 两 gateway 收到同一资源更新，并注入重复、乱序、慢 consumer、延迟写回执与队列上限 | event ID/sequence 去重；每 draft 最多一个在途写入，慢回执期间的新输入合并到一个有界 pending delta；超限 resync_required + cursor catch-up；不能静默跳过 durable event | AC-COLLAB-05/06 |
 | E2E-COLLAB-08 | 撤销参与者权限后尝试订阅、读取、resolve；并发 resolve 使用 stale expected revision | 活跃订阅关闭；读写均重新授权；stale resolve 保留两稿并创建 successor conflict | AC-COLLAB-05/07 |
 | E2E-COLLAB-09 | 两位 actor 用同步屏障在服务端 ≤1000 ms 内提交完整、digest-valid 且语义重叠的 draft heads；记录第二份 head 到达 owner 的时间与 owner transaction/Outbox trace | 不等待一秒 debounce、batch 或 arbitration timer；第二份完整 head 通过校验后立即进入同一 resource fence 并原子 pin 两稿、写出一个 stable conflict_id 与双方 unread facts/Outbox；双方收到同一持久提醒且可读取首个有界 base/current/mine/theirs diff。≤1000 ms 是输入到达刺激，不是检测窗口；任意更长到达间隔的语义重叠仍应由相同路径检测。端到端 p99 由 PT-09 测量 | AC-COLLAB-02/04 |
+| E2E-COLLAB-10 | 两位 actor 从同一文本 base 对有交集的 span 提交内容，即使测试 OT 能无损变换 | owner 仍按语义重叠创建唯一持久 conflict，seal/pin 两侧精确 draft；双方均收到同一 conflict_id 并可读对方修改；不得自动提交合并 revision | AC-COLLAB-02/08 |
+| E2E-COLLAB-11 | 一位参与者显式进入 conflict resolve 并请求 OT 建议，再分别验证取消、确认及 stale CAS | OT 建议只显示为无副作用预览；取消不改变 canonical revision/conflict/drafts；仅明确选中且当前 revision CAS 成功后写入；stale CAS 保留双方稿和原冲突 | AC-COLLAB-08/09 |
 
 
 ---
+
+### 4.9 Project Repository 解绑与迁移 E2E（设计目标，未执行）
+
+| Case | 场景与操作 | 必须观察到的结果 | Gate |
+|---|---|---|---|
+| E2E-REPO-01 | Project 分别绑定 0、1、多个 Repository，并设置/清除 default | 列表准确反映 0..N；default 可空且只影响预选/排序，不授予授权，不创建 Run binding | WTG-027/AC-WTG-014 |
+| E2E-REPO-02 | retiring 与 Run binding/Worktree create/import 并发到达 | retiring CAS 先后决定序列；进入 retiring 后所有新引用拒绝，既有引用保留待迁移，不产生静默重绑 | WTG-027/AC-WTG-014 |
+| E2E-REPO-03 | 多 owner 将活动 Run/Worktree 迁移至同 Project 已授权替代 Repository，重复投递相同 operation_id | owner-local CAS/Outbox 与回执可精确幂等重放；Host 校验 checkout source/target identity 与 generation；不跨 owner 写表 | WTG-027/AC-WTG-014 |
+| E2E-REPO-04 | 注入 owner 超时、授权撤销、Host provider 不可用、未完成 checkout drain 或未知引用数 | 关联维持 retiring；新操作继续 fail closed；重试可恢复且不会伪造完成回执 | WTG-027/AC-WTG-014 |
+| E2E-REPO-05 | 全部 owner 回执成功并声称零活动引用后最终解绑；同时保留历史审计读取 | 序列化复核为零才允许关闭 link；缺少/过期回执拒绝解绑；历史 Repository identity 不被改写 | WTG-027/AC-WTG-014 |
 
 ## §5 PT 性能测试 (per 守门 #1 + 守门 #7 v3 P95<200ms + DD §48)
 
@@ -507,9 +519,16 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 | AC-COLLAB-05 | E2E-COLLAB-06/07 + restart/replay integration | wake-up 丢失、重复乱序、离线重连、cursor gap 与 revoke 均不丢事实 | WLD-7 OPEN/NOT_RUN |
 | AC-COLLAB-06 | E2E-COLLAB-07 + PT-09 + PT-09-GATE-01 | 单 multiplexed connection、每 draft 单在途写入与一个有界合并 pending delta、配置化 bounded queue/cache、慢消费者背压恢复；以固定版本化 Collaboration Profile 和记录的精确 workload/并发、host、PostgreSQL、gateway 基线报告 RSS/CPU、pending 大小及每编辑 burst 的 draft-head/checkpoint 写放大，确认没有逐键击不可变快照 | WLD-7 OPEN/NOT_RUN |
 | AC-COLLAB-07 | disposable PostgreSQL migration/RLS/grants/backup suite | W/T/M、RLS、参与者读取边界、retention 与恢复通过 | WLD-7 OPEN/NOT_RUN |
-| AC-COLLAB-08 | OT property/convergence tests + E2E-COLLAB-02/03 | 固定算法版本的可变换编辑确定性收敛；不可安全变换时保留两稿冲突 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-08 | E2E-COLLAB-03/10 + overlap-detector property tests | 任意语义重叠均保存两稿并生成持久冲突，不因 OT 可变换而自动合并 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-09 | E2E-COLLAB-11 + owner CAS audit | OT 仅显式 resolve 预览；取消/过期 CAS 无副作用，用户选择且 CAS 成功才更新 canonical revision | WLD-7 OPEN/NOT_RUN |
 
 只有真实 owner transaction、目标 DB、两个 gateway 与权限撤销证据通过后，才可将 AC-COLLAB 标成已实现；内存 hub 和 UI mock 只能用于组件测试。
+
+#### 6.2.6 ProjectRepository 生命周期验收映射
+
+| Requirement | 自动化证据 | 通过条件 | 当前状态 |
+|---|---|---|---|
+| WTG-027 / AC-WTG-014 | E2E-REPO-01..05 + owner API/DB/RLS/fault-injection suite | 0..N 关联与 UI-only default；retiring 阻断新增引用；分 owner 迁移及幂等回执；失败保持 retiring；所有新鲜回执与零活动引用复核成功后才可解绑 | WLD-1 OPEN/NOT_RUN |
 
 ### 6.3 5 域 Lead 真人到位后追溯签字 (per 守门 #14 v3 Mavis 临时代签 + v0.62 反转 v4)
 | 角色 | 责任人 | 签字 | 状态 |
@@ -590,6 +609,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **v1.4** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 的 Basic Design 引用更正为唯一章节 §16.78，并同步当前协作 spec / owner-local 数据设计版本；用例及运行结果未改变。** | **跨文档编号核对发现 §16.56 与 Schedule D5 重复。** |
 | **v1.5** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 协作规范引用同步到 v1.0、owner-local 数据设计同步到 v0.2；为 PT-09 增加前置门：固定 Collaboration Profile ID/revision/digest，并记录精确 workload/并发规模和目标 host、PostgreSQL、gateway 基线；未有批准值与实测记录时保持 OPEN/NOT_RUN，不虚构阈值；将任务来源和旧 adapter 描述改为中性名称。** | **WLD-7 跨文档版本对账、名称清理与低消耗/可复现性能验收门补齐。** |
 | **v1.6** | **2026-10-25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 E2E-COLLAB-09：两个 actor 的完整摘要校验重叠提案在服务端 ≤1000 ms 到达时不等待仲裁窗口，第二份提案立即进入 owner conflict transaction，双方保留并读取精确草稿；将该到达场景与 PT-09 的 commit-to-first-diff p99 测量区分，并更新 AC-COLLAB-02/04 追踪。用例仍未实现/执行。** | **requirements v7.07、basic design v7.11、collaboration spec v1.1、owner-local data design v0.3 的同秒协作验收要求。** |
+| **v1.7** | **2026-10-25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 E2E-COLLAB-10/11：语义重叠即使 OT 可变换也必须冲突；OT 建议仅为显式解决的无副作用预览并要求用户选择与 owner CAS。增加 E2E-REPO-01..05 与 AC-WTG-014 生命周期映射，覆盖 0..N、retiring、owner 回执、失败恢复和零引用解绑。所有测试均为设计，未运行。** | **requirements v7.08 / basic v7.12 / Group DD v5.33 / SRS v1.11 / BD v1.12 / collaboration spec v1.2 / data v0.4** |
 
 ---
 

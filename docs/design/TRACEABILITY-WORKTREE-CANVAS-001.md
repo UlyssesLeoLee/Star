@@ -1,13 +1,13 @@
 # TRACEABILITY-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 需求追踪矩阵 v1.9**
+> **AI Worktree Graph Canvas — 需求追踪矩阵 v2.0**
 >
 > - 上游文档:
->   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.10
->   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.11
->   - [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.24
+>   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.11
+>   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.12
+>   - [`docs/design/DD-WORKTREE-GROUP-001.md`](DD-WORKTREE-GROUP-001.md) v5.33
 > - 目的: 形成 Requirement ↔ BD ↔ DD ↔ Test 完整闭环, 验证需求无遗漏 / 设计无偏离 / 测试覆盖完整
-> - 状态: 🟢 Draft v1.9 (2026-10-24, WLD1 TOCTOU closure and Rust focused validation; PostgreSQL runtime remains open)
+> - 状态: 🟢 Draft v2.0 (2026-10-25, WTG-027 / AC-WTG-014 and ProjectRepository unlink contract; PostgreSQL runtime remains open)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v3)
 > - 日期: 2026-09-15 JST
@@ -313,8 +313,9 @@
 | AC-D-5 | Spec + IMPL-PLAN 落档 | 落档检查 | IMPL-PLAN §1-§6 | 落档 ✅ |
 | AC-D-6 | TEST-DESIGN 落档 (122 实证锚点) | 落档检查 | TEST-DESIGN §2-§6 | 落档 ✅ |
 | AC-WTG-013 | 区分 SCM Repository master、Project 授权关联、Run nullable binding、Host root registry 与 checkout path；Run candidates 同时复验 Project membership + Run read grant 且不自动绑定；缺授权/binding/fresh generation/provider 时 fail closed | SCM master source 增加 deferred commit-time current-revision invariant；owner-role ACL preflight 覆盖当前 DB ACL catalog，并借 `pg_shdepend` fail closed 拒绝其他 database 的任意 object ACL。ignored PG 回归覆盖 single-close commit rejection、close+successor、ACL drift rollback、PUBLIC exclusion 和 target identity；PG runtime 尚未运行。bootstrap/drift probe 与 cleanup 双失败时均保留双方诊断。Migration 显式 acquire PoolConnection，在其同一物理连接事务中复验 admin identity 并执行所有 DDL；address/port mismatch guard 负例通过。Cargo.lock 仅新增到既有 domain-scm package 的 direct edge，无新增 package entry/无关变化。Rust 1.99 selected-package locked all-target check、35+35 package tests、ignored PG target compile 与四个改动 Rust 文件定向 rustfmt 通过；package fmt check 被四个未改文件阻断。full workspace、Clippy、独立 lock/resolution、目标 DB/RLS/并发仍未验收 | requirements §50.8AV；SRS §16；BD §1.6；Group DD §6.1.3；WLD1 phase report §2–§3 | source/test 与 selected-package gates 已验证；数据库运行时未验收
+| AC-WTG-014 | Project repository link 0..N、default 可空且非授权；retiring 阻断新引用；迁移先于解绑；各 owner 幂等回执与最终零活动引用对账；失败/未知保持 retiring | SRS §16；BD §1.6.1 | Group DD §6.1.4 | E2E-REPO-01..05 + owner DB/RLS/fault injection | WLD-1 OPEN/NOT_RUN；无 owner writer、target DB 或运行时验收 |
 
-**历史 SRS AC 覆盖率**: **43/43 = 100%** (AC-F 20 + AC-P 7 + AC-Q 10 + AC-D 6, per self-review C-03 v1.1)。另新增跨域设计验收 AC-WTG-013；相关 owner stores/provider 尚未实现，状态保持“设计目标；实现未验收”，不纳入旧 SRS AC 统计。
+**历史 SRS AC 覆盖率**: **43/43 = 100%** (AC-F 20 + AC-P 7 + AC-Q 10 + AC-D 6, per self-review C-03 v1.1)。另新增跨域设计验收 AC-WTG-013/014；相关 owner stores/provider 尚未实现，状态保持“设计目标；实现未验收”，不纳入旧 SRS AC 统计。
 
 ---
 
@@ -414,6 +415,7 @@
 | v1.7 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加其他 database 上 owner-role object ACL dependency 检查状态、修正 test identity query 并记录 superuser/单连接 migration gate；所有 Cargo/PostgreSQL gates 仍未运行，disposable cluster 真实性由 fixture/operator 提供 | WLD1 remediation 自检修正 |
 | v1.8 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 probe/task 与 cleanup 双失败可观测性纳入 AC-WTG-013 回归状态；对账 16-path manifest 和 Cargo.lock 单一 direct `domain-scm` edge，明确无新增 package entry/无关改动且 lock/resolution 未验证；运行时 gates 仍开放 | WLD1 remediation review finding closure |
 | v1.9 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 AC-WTG-013 的实证状态更新为 selected Rust 1.99 locked gates 通过、PG target 编译通过而 runtime 未运行；记录同物理连接事务、endpoint mismatch、cleanup error 聚合与 Cargo.lock 精确 direct edge；同步 SRS v1.10、BD v1.11、Group DD v5.24，full workspace/Clippy/DB gates 保持开放 | WLD1 TOCTOU closure 与 Rust gate validation
+| v2.0 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 WTG-027 / AC-WTG-014 追踪：Project Repository 0..N、UI-only default、retiring、owner migration receipts 与 zero-active-reference final unlink；同步 SRS v1.11、BD v1.12、Group DD v5.33 与新的 E2E-REPO-01..05。运行时/数据库状态仍开放 | Project Repository unlink lifecycle decision
 
 ---
 
@@ -424,6 +426,7 @@
 | Requirement ID | 需求来源 | 基本设计 | 详细设计 | 验收目标 | 当前证据状态 |
 |---|---|---|---|---|---|
 | WTG-026 | `docs/requirements.md` §50.3.4；SRS §16 | BD §1.6 / D-REPO-001 | Group DD §6.1.3 | AC-WTG-013 | SCM master source 已增加 tenant-owned M/SCD2 + append-only T audit、FORCE RLS、expected-version CAS；PG acceptance test 工件仍 ignored 且未执行。Cargo.lock 仅新增 adapter 到既有 domain-scm package 的 direct dependency edge，无新增 package entry/无关变化。Rust 1.99 selected-package locked check/tests、ignored PG target compile 与定向 rustfmt 已通过；独立 lock/resolution、full workspace、Clippy、目标 DB/deployed login membership、RLS/权限/并发与 Project link、Run binding、Host root registry/provider、端到端 HTTP/DB acceptance 仍开放，AC-WTG-013 全链路未通过。|
+| WTG-027 | docs/requirements.md §50.3.4；SRS §16 | BD §1.6.1 | Group DD §6.1.4 | AC-WTG-014 | 目标设计已同步；Project link writer、Run/Worktree owner migration command、Host provider 与 PostgreSQL/RLS/fault/recovery acceptance 尚未实现/运行；WLD-1 OPEN/NOT_RUN |
 
 设计一致性检查须保持这些身份分离：SCM Repository master ≠ Project authorization link ≠ Run binding ≠ Host root registration ≠ Worktree checkout path。候选发现须同时授权当前 Project membership 与 Run read grant，且不自动绑定。master source slice 不改变 Project/Run 授权或 Worktree/CLI admission；目标运行验收还需要持久 owner facts、Run binding CAS/idempotency/audit/outbox、generation freshness/revocation、path non-disclosure、provider 503/fail-closed，以及越权/撤权/错 Project/NULL binding/过期 root 的负向 HTTP + PostgreSQL evidence。当前部署与跨 owner 集成测试尚未完成。
 

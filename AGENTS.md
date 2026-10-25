@@ -21,6 +21,8 @@
 
 **消息传输可替换约束**：用户自有 Rust 服务器是消息基础设施的最终替代方向；NATS 仅作为可移除的 transport adapter。业务事件、owner-local Outbox/Inbox、幂等身份、租约/重试/取消、持久化回执与 BI 契约不得依赖 NATS subject、JetStream stream/consumer 或 ACK API；这些细节只能由 adapter 映射。每条逻辑消息首次领用时必须固定不可变的 provider/version/profile digest/endpoint 身份，所有重试沿用该 profile；终态回执保存 provider/profile/endpoint、log generation、opaque durable cursor 和原 wire 摘要。切换 provider 必须先 drain 旧 profile 的待投递并进行显式迁移，禁止跨 provider 比较 cursor 或复用 dedupe 窗口。Rust-native provider 接入须有版本化身份/授权、可靠投递、接收事务提交后确认、恢复和资源预算契约，复用相同验收套件；缺少实现或持久化证明时 fail closed，不得用内存队列或 socket 写入成功冒充 durable acceptance。
 
+**Project→Repository 关联生命周期**：一个 Project 可关联 0..N 个 Repository；默认 Repository 可为空，只是界面排序/预选偏好，不能作为授权或隐式 Run binding。解除关联前必须先把活动 Run/Worktree 引用迁移到同一 Project 已授权的替代 Repository，或由其 canonical owner 显式完成不再需要 checkout 的退役流程。关联先进入 retiring 并冻结新增引用；Run Directory、Worktree/Host 各自在自己的 owner 事务中迁移并发出幂等完成回执。Project 授权 owner 只有在所有必需 owner 回执成功且新鲜对账确认无活动引用后才能最终解绑。失败、超时或未知状态保留 retiring 并 fail closed；禁止跨 owner 直接写表或伪造零引用结果。
+
 **分支内容选择性收敛**：从其他分支引入改动时，先按本对话确认的产品架构逐项审阅其差异、依赖、验证和文档状态；只接纳必要且兼容的领先内容，不因分支存在或 `--apply` 就照单合入整分支或大型重构。架构偏离、依赖不清或验证不足的内容先隔离并说明；保留脏或仍由他人使用的 worktree/branch。
 
 **商业开源依赖硬约束**：新引入、默认支持或随产品分发的第三方组件必须允许不限用途、行业、席位或用量的商业使用；不得把 copyleft 许可证等同于禁止商用，也不得仅因其为 GPL/AGPL/LGPL 而一概排除。对修改、链接、捆绑、安装和再分发逐项审查并履行相应源码、许可证、NOTICE、安装信息等义务；无法满足义务时调整交付形态或替换组件，不把许可义务误写为商业用途禁令。排除非商业、field-of-use、source-available 或要求付费订阅/席位才能解锁核心功能的组件。逐版本审查完整构建/分发闭包中的传递依赖、二进制、安装器、容器与 guest image，并生成 SPDX/SBOM；只核对上游仓库主许可证不足以放行。上游社区活跃度须以近 12 个月的发布/维护证据和公开维护渠道核验；保留各许可证要求的版权、NOTICE 与专利声明。

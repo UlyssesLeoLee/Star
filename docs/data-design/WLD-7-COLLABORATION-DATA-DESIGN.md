@@ -1,8 +1,8 @@
 # WLD-7 多用户实时协作目标数据设计
 
-> 状态：目标逻辑数据设计 v0.3；尚未生成迁移、部署或目标数据库验证。
+> 状态：目标逻辑数据设计 v0.4；尚未生成迁移、部署或目标数据库验证。
 > 适用：Task Card / WorkItem 与 Canvas 等支持协作编辑的 Run 资源。
-> 上游：requirements v7.07 §50.8AW / AC-COLLAB-01–08、basic design v7.11 §16.78、Group DD §8.27、domain collaboration spec v1.1 §13、test design v1.6 E2E-COLLAB-09。
+> 上游：requirements v7.08 §50.8AW / AC-COLLAB-01–08、basic design v7.12 §16.78、Group DD §8.27、domain collaboration spec v1.2 §13、test design v1.7 E2E-COLLAB-09。
 > 此文件定义 owner-local 数据边界，不代表实时协作已实现。
 
 ## 0. 所有权和事实边界
@@ -17,10 +17,10 @@ WorkItem owner 保存任务字段的 revision、draft、conflict、participant n
 |---|---|---|---|
 | edit_draft_head | W | tenant_id、project_id、engineering_run_id、可空 worktree_id、resource_id、actor_id、device_id、draft_id、draft_revision、base_revision、changed_path_keys、encrypted_payload_ref、payload_digest、last_operation_id、last_request_digest、updated_at、expires_at；每 actor/device/draft 仅一条当前 head | 增量以 upsert/coalesce 更新，不为每次击键追加一行；按 Project retention 到期清理。 |
 | edit_draft_checkpoint | W | checkpoint_id、资源 scope、actor/device/draft identity、draft_revision、base_revision、changed_path_keys、payload_ref、digest、byte_length、operation_id、sealed_at、retention_until；proposal identity 唯一 | 普通增量只合并更新 draft head；不为每次键击或每个 250ms delta 追加 checkpoint。只有显式持久化检查点、安全 flush 或冲突事务需要固定提案时才 seal 不可变快照；冲突引用时由 FK/引用保护禁止 TTL 删除。未引用旧 checkpoint 按策略清理。 |
-| edit_conflict | T | conflict_id、资源 scope、base_revision、current_revision、按稳定规则排序的两侧 checkpoint_id、overlap_path_keys、algorithm_version、created_at、pair_key | append-only。canonical resource + 有序 proposal identity 唯一，确保重试/并发 detector 得到同一 conflict_id；正文留在被 pin 的 checkpoint/blob 中。 |
+| edit_conflict | T | conflict_id、资源 scope、base_revision、current_revision、按稳定规则排序的两侧 checkpoint_id、overlap_path_keys、overlap_detector_version、created_at、pair_key | append-only。canonical resource + 有序 proposal identity 唯一，确保重试/并发 detector 得到同一 conflict_id；正文留在被 pin 的 checkpoint/blob 中。 |
 | edit_conflict_participant | T | conflict_id、actor_id、device_id、created_at；(conflict_id, actor_id, device_id) 唯一 | 在 conflict transaction 中为两个参与者各写一条；提供离线时仍存在的持久未读提醒事实，不因 socket ACK 变化。 |
 | edit_conflict_view_receipt | T | conflict_id、actor_id、device_id、operation_id、viewed_at；按 participant 幂等 | 用户实际打开冲突后 append-only 写入；UI unread 由 participant notice 且无有效 view receipt 推导，传输 ACK 不产生该事实。 |
-| edit_conflict_resolution | T | resolution_id、conflict_id、resolver_actor_id、expected_revision、result_revision、resolution_digest、operation_id、created_at | append-only 的显式解决事实；旧 conflict 不更新覆盖。过期 CAS 产生 successor conflict 并保留原双方草稿。 |
+| edit_conflict_resolution | T | resolution_id、conflict_id、resolver_actor_id、expected_revision、result_revision、resolution_digest、resolution_method、suggestion_algorithm_version(nullable)、user_confirmed_at、operation_id、created_at | append-only 的显式解决事实；旧 conflict 不更新覆盖。过期 CAS 产生 successor conflict 并保留原双方草稿。 |
 | owner transactional Outbox event | T | event_id、stream_id、sequence、schema_version、resource/revision、conflict_id、participant IDs、correlation/idempotency IDs | 沿用事实 owner 的 Outbox 与事务，不另建 Collaboration 业务 outbox；正文 patch 不进入广播事件。 |
 
 `created_at`/`occurred_at` 由 owner 服务端在事务中生成；冲突排序以 owner revision、stream sequence、resource fence 与提案身份为准，不以客户端时间戳排序。两份完整提案在服务端 1000 ms 内到达只是并发验收条件，不对应数据库字段、冲突时间窗或延迟任务。
@@ -36,6 +36,7 @@ WorkItem owner 保存任务字段的 revision、draft、conflict、participant n
 - 所有变更命令必须使用 owner-local 幂等回执机制：优先复用 canonical owner 现有账本；若当前 owner 尚无对应能力，则在该 owner 边界内补齐。事务内固定 `(tenant, actor, operation, idempotency_key, request_digest, result_ref)`；同键同 digest 返回原回执，同键不同 digest 拒绝。不得新增跨 owner 的 Collaboration 幂等事实库。
 - Overlap 查找先按 tenant_id + resource_id 限定，再用 changed_path_keys 的 GIN 或等效 owner 索引筛选；不得扫描全租户草稿。活跃 draft/编辑器预算由版本化 Collaboration Profile 限制，达到上限时保留本地稿并显式返回容量状态，不降低冲突检测完整性。
 - Conflict detector 不按一秒桶聚合，不依据 client timestamp 延迟判定。第二份完整且 digest-verified 的重叠 head 在 resource fence 下提交冲突；任何更长间隔仍按有效 revision/draft 语义检测。1 秒仅用于 E2E 的同秒到达刺激及 PT-09 的 commit-to-first-diff p99 测量，不落为一个 holdback 或冲突 deadline。
+- 语义重叠由独立的 overlap_detector_version 记录并强制生成持久 conflict；是否存在可执行 OT transform 不改变冲突判定。resolution_method 只有在显式 resolve 命令中由用户选择后才可记录；suggestion_algorithm_version 仅记录预览算法，生成预览不得修改 canonical revision、sealed checkpoints、participant unread 或 conflict 状态，最终写入仍由 owner 的当前 revision CAS 决定。
 - Draft checkpoint/seal、revision CAS 和 conflict/resolve 共享同一短时 resource fence；网络收块、上传与差异读取均在 fence 外。不同 resource 使用独立 fence 可并行。
 - 每个资源最多生成一个有序 proposal pair 的 conflict；冲突摘要只保存必要重叠 path/key。resolution、view receipt 与 audit 均为追加事实，不原位改写历史。
 
@@ -68,3 +69,4 @@ WLD-7 实施时必须把以上目标实体逐表对齐 Data Inventory、W/T/M、
 修订 v0.2 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：将 Basic Design 上游引用从重复编号 §16.56 更正为实时协作章节唯一编号 §16.78；旧 §16.56 仍指 Schedule D5。数据模型和未实施状态不变。
 
 修订 v0.3 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：为 owner-local 协作记录规定服务端时间与 revision/sequence 排序权威；明确 ≤1000 ms 只作为同秒 E2E 刺激，不形成数据库冲突窗口；要求完整重叠提案立即在 resource fence 内建立双方 pin 与冲突事实，并单独通过 PT-09 测量 commit-to-first-diff p99。同步 requirements v7.07、basic v7.11、collaboration spec v1.1、test design v1.6。逻辑目标未迁移或实施。
+修订 v0.4 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。新增独立 overlap_detector_version，明确 OT 可变换不豁免语义冲突；显式解决时可记录无副作用 OT suggestion algorithm 与用户选择，canonical 写入必须通过 owner 当前 revision CAS。同步 requirements v7.08、basic v7.12、collaboration spec v1.2、test design v1.7。目标逻辑 schema 尚未迁移、部署或验证。
