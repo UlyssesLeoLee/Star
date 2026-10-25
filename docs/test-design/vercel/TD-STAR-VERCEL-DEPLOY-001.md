@@ -28,7 +28,7 @@
 
 | 状态 | 含义 |
 |---|---|
-| NOT_RUN | 尚未执行；所有 T-001..T-048 均以此状态开始 |
+| NOT_RUN | 尚未执行；所有 T-001..T-049 均以此状态开始 |
 | PASS | 已在指定目标环境按预期实测，证据可复核 |
 | FAIL | 实际结果违反预期；保留日志、请求 ID 和环境信息，不隐藏副作用 |
 | BLOCKED | 实际执行前置检查后，由缺少的 Owner、账户、provider、测试数据或决策阻断 |
@@ -66,7 +66,7 @@
 |---|---|---|
 | 构建与静态 | 必需环境、Next.js build、类型阻塞门、产物、SBOM、secret scan | T-001..T-003, T-010, T-012 |
 | BFF 单测/安全 | 方法/来源/cookie/上游/path/body/header/cache/redirect 约束 | T-004..T-009, T-013 |
-| Hosted Preview | 真实宿主会话、Project/Run/Worktree 读取、跨 Run deny、不可用状态 | T-014..T-019 |
+| Hosted Preview | 真实宿主会话、Project/Run/Worktree 读取、跨 Run deny、不可用状态、Star-owned Gateway 长连接 | T-014..T-019, T-049 |
 | Cron/Schedule | 漏发、失败、重复、延迟、重叠、回滚、run-as 和 owner recovery | T-020..T-027 |
 | Rust VCD-2 | 构建根、MSRV、函数包、运行限制、支持矩阵和恢复 | T-028..T-036 |
 | Owner/PG VCD-3 条件 | 持久回执、RLS/连接池、迁移边界、Outbox/Inbox | T-037..T-042 |
@@ -158,6 +158,14 @@
 | T-047 | 检查 OTLP/平台 trace 与 Star Owner receipt 关联，并触发已批准的成本告警配置 | Telemetry 不含 secret/过量个人数据；部署健康与业务完成区分；告警阈值按批准配置实际触发 | FR-VC-020; AC-VC-001; NFR-VC-04 |
 | T-048 | 审查实际 Node 与 Rust 供应链部署闭包，包括传递依赖、二进制、安装器/镜像、许可证和 NOTICE | 有 SPDX/SBOM；每项许可义务有处置记录；未决限制许可为 0；完整闭包而非只看主依赖许可证 | FR-VC-019; AC-VC-001 |
 
+### 4.7 Star-owned Gateway 长连接集成
+
+T-049 当前状态为 **NOT_RUN**。Star Gateway 的浏览器凭证握手方式和允许的 Preview Origin 尚未定义，属于执行前置门：只有 canonical SRS/BD/DD 记录了真实的 Star-authorized 握手、Origin 校验、当前 Project/Run/capability 授权、撤权行为，以及各协议可观测的数据流和生命周期契约后，正向路径才具备执行资格。本测试设计不选择或假设握手协议；缺少任一契约时，T-049 保持 NOT_RUN，VCD-0 保持 OPEN。不得将可复用 bearer、cookie 或连接凭证写入 URL、浏览器存储、日志、trace、terminal 或测试证据；证据须脱敏。本用例仅使用隔离且无生产副作用的 fixture，不覆盖 remote file-browser，也不启用 Vercel 本地 Worktree 文件系统；后者继续由 T-018 验证 fail closed。
+
+| 用例 | 前置/操作 | 预期结果 / 留证 | 需求映射 |
+|---|---|---|---|
+| T-049 | 在上述握手、Origin、授权及协议契约完成并可观测后，以当前获准身份从允许的 Preview Origin 通过 Star Gateway 建立 terminal PTY/session WebSocket、ARG WebSocket、Canvas WebSocket 和 chat SSE。对每种协议分别观察一条经授权的无副作用 fixture event/frame/heartbeat；对双向 WebSocket 按已记录的 Gateway 协议完成一次安全 round trip，对 chat SSE 消费一条经授权的无副作用 fixture event。记录 Preview deployment、Run、Star 当前授权决定、脱敏后的浏览器网络证据、连接关联 ID、Gateway ingress/egress/lifecycle audit，并对照 Vercel Route Handler trace。随后用缺失/无效身份及伪造 actor/Run header 测试拒绝；只有实际 Gateway contract 可验证时才测试 disallowed Origin。连接建立后撤销当前授权并尝试继续收发及重连；令 Gateway 暂不可达，再恢复 Gateway 和明确授权，以新鲜 session 经已记录握手重连并重复安全的数据流断言。 | 四种连接均由 Star-owned Gateway 承载；每次初始建连和重连均按 Star 当前 Project/Run/capability 授权结果判定，actor/Run header 不构成身份依据；证据显示 Vercel handler 未持有或代理长连接。每种协议均观察到已记录契约定义的正向 event/frame/heartbeat，双向通道完成契约定义的安全 round trip，SSE 收到并消费对应 fixture event。只使用 Gateway contract 已规定的 heartbeat/lifecycle 目标；若正向数据事件、round trip 或生命周期目标未定义，则该项仍为前置缺口且验收保持 NOT_RUN，不添加时长或延迟阈值。缺失/无效身份须被拒绝；disallowed Origin 仅按实际契约验证；撤权后活动连接关闭，或在任何后续受保护数据/操作释放前被拒绝，旧授权不得用于重连。Gateway 不可达时 UI 明示不可用且不得回退到 Vercel handler 或显示假连接成功。恢复后须经新鲜授权和同一 Star Gateway 握手重连并再次满足协议正向断言；本用例不触发业务命令或副作用，因此不对“无重复副作用”作结论。留存脱敏的正向、拒绝、撤权、不可用和恢复证据；用例完成前保持 NOT_RUN。 | FR-VC-013; FR-VC-008; AC-VC-005/006 |
+
 ## 5. AC 与 SRS FR 全量追踪
 
 ### 5.1 Acceptance Criteria
@@ -168,8 +176,8 @@
 | AC-VC-002 | T-002 | NOT_RUN |
 | AC-VC-003 | T-004..T-009, T-013, T-015, T-017 | NOT_RUN |
 | AC-VC-004 | T-003, T-010, T-013 | NOT_RUN |
-| AC-VC-005 | T-014..T-017, T-019, T-024..T-025 | NOT_RUN |
-| AC-VC-006 | T-011, T-018..T-019, T-045 | NOT_RUN |
+| AC-VC-005 | T-014..T-017, T-019, T-024..T-025, T-049 | NOT_RUN |
+| AC-VC-006 | T-011, T-018..T-019, T-045, T-049 | NOT_RUN |
 | AC-VC-007 | T-028..T-030 | NOT_RUN |
 | AC-VC-008 | T-031, T-036..T-037 | NOT_RUN |
 | AC-VC-009 | T-038, T-042 | NOT_RUN |
@@ -189,12 +197,12 @@
 | FR-VC-005 | T-003, T-010, T-013 |
 | FR-VC-006 | T-002, T-013 |
 | FR-VC-007 | T-004..T-008, T-041 |
-| FR-VC-008 | T-002, T-006, T-009, T-014..T-015 |
+| FR-VC-008 | T-002, T-006, T-009, T-014..T-015, T-049 |
 | FR-VC-009 | T-038..T-039, T-042 |
 | FR-VC-010 | T-038, T-042 |
 | FR-VC-011 | T-036, T-039 |
 | FR-VC-012 | T-038 |
-| FR-VC-013 | T-018, T-034 |
+| FR-VC-013 | T-018, T-034, T-049 |
 | FR-VC-014 | T-020..T-027 |
 | FR-VC-015 | T-022, T-027, T-036..T-041 |
 | FR-VC-016 | T-011, T-014..T-019, T-045 |
@@ -250,7 +258,7 @@ If no durable Owner path, receipt API, binding, reservation or safe fixture exis
 
 ## 8. Release exit criteria
 
-- **VCD-0:** canonical SRS/ADR/basic/detail/test documents align; no invented SRS IDs or alternate Owner/DB/worker/scheduler/VM architecture; every test state is honestly recorded.
+- **VCD-0 (OPEN):** canonical SRS/ADR/basic/detail/test documents align; no invented SRS IDs or alternate Owner/DB/worker/scheduler/VM architecture; every test state is honestly recorded.
 - **VCD-1:** AC-VC-001..006 and AC-VC-013 have actual required CI/hosted/identity/isolation evidence. Preview has no production secrets/data or Owner side effects.
 - **VCD-2:** AC-VC-007..011 and GAP-01/02/03/04/10/11 are evidenced in the target plan; Rust-specific unknowns are resolved only by scoped official evidence or reproducible runtime tests. If a blocking limit fails, Rust control-plane deployment remains on Star runtime.
 - **VCD-3:** only after VCD-2 PASS plus WLD-0/WLD-6 and concrete Owner/API/session/data/recovery review; AC-VC-012 proves the actual Owner-to-consumer receipt path without a new owner.
@@ -272,3 +280,5 @@ No exit criterion is satisfied by this test design alone.
 | Version | Date | Reviser | Change |
 |---|---|---|---|
 | v0.1 | 2026-10-24 | Ulysses — Mavis review | Established NOT_RUN test plan against SRS v0.4 with complete FR/NFR/AC/GAP traceability, Preview no-side-effect, Cron recovery, Rust VCD-2, owner/data gates and two-record Multipass safety; no implementation or runtime claim. |
+| v0.2 | 2026-10-24 | Ulysses — Mavis review | Added T-049 for authorized Preview access to terminal/session, file, ARG, Canvas and chat SSE through the Star-owned Gateway, including current authorization, revocation, unavailable-path and recovery assertions; updated FR/AC traceability. All tests remain NOT_RUN and VCD-0 remains OPEN; no runtime or deployment proof. |
+| v0.3 | 2026-10-24 | Ulysses — Mavis review | Revised T-049 per independent review R2: removed remote file-browser WS; made the unresolved Star-authorized handshake and Preview Origin contract an explicit execution gate; added protocol-specific positive event/round-trip evidence and credential redaction; removed unsupported duplicate-side-effect claims; retained NOT_RUN and VCD-0 OPEN. No runtime or deployment proof. |
