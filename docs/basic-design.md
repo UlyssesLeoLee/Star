@@ -10,8 +10,8 @@
 > **WLD-0 hostless Run HTTP acceptance（2026-10-23）**：REST 读写事务在 tenant/actor scope 初始化前显式切换至 `star_engineering_directory_owner`；该 role 仅对 Run identity、首个 revision、创建者 grant 获得 INSERT。fresh PostgreSQL 18 loopback runner 55/55 步通过，并以实际认证 HTTP 路由验证 hostless create、同键 replay、Project list、RunContext 和无 Run grant actor 的不可见性；同时覆盖绑定 race、outbox 故障回滚、detach。runner 未连接目标数据库，结束后停止并删除唯一临时 cluster。目标部署 login membership、目标 DB migration/grants、历史 reconciliation 与 hostless Task/CLI/执行仍未验收或保持 fail closed；详见 WLD-0 报告。
 > **WLD-1 Repository master review remediation（2026-10-24）**：SCM bounded context 增加 RepositoryMasterRevision 与 tenant RLS owner adapter。current partial unique index 保证每个身份至多一个 current revision，新增 DEFERRABLE INITIALLY DEFERRED 约束 trigger 在提交时保证至少一个；单独关闭 current revision 会回滚，关闭+连续 successor 同事务提交可成功。owner-role migration 在任何 role/schema/grant 变更前枚举 database、schema、relation/column、function、type、language、tablespace、FDW/server、large-object、default ACL 与可用 parameter ACL；发现 SCM schema 外直接 ACL、向外 role membership 或对象所有权即 fail closed，PUBLIC ACL 不误判为 owner direct grant，也不跨 schema 撤权。migration 显式获取 PoolConnection，在该物理连接上开始事务并执行身份复验和全部 DDL；pool 单连接上限仅控制资源。两个 PG bootstrap/drift probe 分支在 probe/task 与 cleanup 同时失败时都保留双方诊断；地址/端口 mismatch identity guard 负例通过。Rust 1.99 目标包 locked all-targets check、35+35 包测试、ignored PG target 编译和定向 rustfmt 检查通过；package fmt 检查被四个未改文件阻断。PostgreSQL test 仍 ignored 且未运行（缺一次性数据库 fixture），full workspace、Clippy、独立 lock/resolution、目标 DB/RLS/并发仍未验收。当前 Cargo.lock diff 仅新增 adapter 到既有 `domain-scm` package 的 direct dependency edge，无新增 package entry 或其他 lockfile 改动。Project link、Run binding、Host root registry、provider/API 与 Worktree/CLI admission 仍未实现。详见 PHASE-WLD1-REPOSITORY-MASTER-20261023.md。
 
-> **文档版本**: v7.10 (2026-10-25)
-> **上游要件定义书**: docs/requirements.md v7.06
+> **文档版本**: v7.11 (2026-10-25)
+> **上游要件定义书**: docs/requirements.md v7.07
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -5939,6 +5939,8 @@ Owner transaction 同时写 Outbox 并产生轻量 transactional notification（
 
 **冲突延迟目标**：在线、授权有效且网络正常时，从 owner conflict transaction commit 到双方客户端显示带同一 `conflict_id` 的持久未读提醒，并能读取首个有界差异页（base/current/mine/theirs），p99 不超过 1 秒。1 秒是提醒与可读取性的端到端送达 SLO，不是固定轮询周期、冲突判定时间窗或草稿分块上传期限；冲突始终按 base revision 与重叠范围判定。冲突事实只在两份提案 complete、digest-verified、sealed 后提交，因此提醒不指向尚未可读的 `receiving` 内容。传输 ACK 只确认客户端收到事件，不清除未读冲突；用户查看冲突前，双方的未读状态与各自草稿均可恢复。超时不能转为静默成功：记录超时/未 ACK 状态、显示延迟标记，并确保冲突仍可从 Run Inbox/冲突列表或 cursor replay 读取。离线用户在恢复连接后看到同一持久冲突和自己的 draft。该目标须在目标 DB、跨 gateway 实例与指定并发档位下测量后方可关闭验收。
 
+**同秒冲突判定**：不建立一秒分桶、仲裁延迟或“等双方停止输入”的冲突定时器。按资源序列与 owner revision fence 判断有效草稿/提交之间的语义重叠；完整提案的服务端接收时间相差 ≤1000 ms 只是高并发验收刺激。第二份 complete、digest-verified 的重叠 draft head 被 owner 接受后，owner 立即在 resource fence 内 seal/pin 两侧确切版本，并在同一事务写入 conflict、双方 participant unread 与 Outbox。任何更长时间间隔的语义重叠也必须执行同一检查。客户端的 250 ms draft coalescing 只限制增量发送频率与写放大，不得作为冲突判定延迟。若上传尚未完整或摘要不匹配，不向另一方发出“可读取冲突”提醒；继续保留提交者本地稿并显示 `sync_pending`，待完整且验证后立即处理。
+
 **读取/解决 API 的逻辑契约**：
 
 | 命令/查询 | 最小输入 | 业务 owner 行为 | 实时副作用 |
@@ -5965,7 +5967,7 @@ WorkItem 与 Canvas 各自在自己的 owner schema 内落实相同的逻辑协�
 
 **授权/故障规则**：每次 subscribe、catch-up、draft save、conflict read/resolve 和 reconnect 均重新授权。撤权需关闭现存 socket、拒绝后续 cursor replay 与冲突读取。Owner commit 成功但 transport 未发送时由 Outbox retry；同事件重放必须幂等。Gateway 不能确认游标/送达时保持未确认并重放。DB、identity、owner stream 或 current policy 不可用时不接受写入，不以 browser cache 伪造 shared draft 已保存。
 
-**验收要求**：对相同 base 的双用户同字段编辑、不同字段编辑、重叠文本 span、250 ms draft sync、owner transaction/Outbox 原子性、重复/乱序/迟到事件、跨实例与进程重启恢复、离线参与者、权限撤销、并发 resolve、连接背压、队列 RSS、CPU 和 1 s p99 通知逐项出具可重放证据。单元测试、内存 hub 测试、浏览器本地草稿或单实例 smoke test 不能替代跨实例/目标 DB 性能验收。
+**验收要求**：对相同 base 的双用户同字段编辑、不同字段编辑、重叠文本 span、服务端 ≤1000 ms 内到达的两份完整重叠提案（确认没有一秒 holdback）、250 ms draft sync、owner transaction/Outbox 原子性、重复/乱序/迟到事件、跨实例与进程重启恢复、离线参与者、权限撤销、并发 resolve、连接背压、队列 RSS、CPU 和 1 s p99 通知逐项出具可重放证据。E2E 同秒用例验证无等待；PT-09 单独测量 owner commit 到双方提醒/首个有界 diff 可读的 p99。单元测试、内存 hub 测试、浏览器本地草稿或单实例 smoke test 不能替代跨实例/目标 DB 性能验收。
 
 修订 v7.06 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：明确 p99 ≤1 秒是双方显示同一持久未读 conflict ID 的送达 SLO，不是轮询/冲突判定窗口；未读状态仅由查看/显式标记清除，双方 draft 在冲突事实中精确固定。同步 requirements v7.03、Group DD v5.28、WBS v0.30。当前内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
 修订 v7.07 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：要求 1 秒 p99 覆盖双方持久提醒与首个有界差异页可读取；禁止在冲突提案尚未完整校验/seal 时弹出不可读提醒；补充结构化路径自动合并和版本化有界文本 OT 边界、transaction-notification 唤醒/重连追赶/事件 due retry 与 cursor-only 恢复，并澄清每个 draft checkpoint seal 是可读不可变草稿快照而非最终 Save。同步 requirements v7.04、Group DD v5.29、collaboration spec v0.6、WBS v0.31。当前轮询、内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
@@ -5974,3 +5976,5 @@ WorkItem 与 Canvas 各自在自己的 owner schema 内落实相同的逻辑协�
 修订 v7.09 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：发现实时协作章节与旧 Schedule D5 共用 §16.56；将协作章节提升为 §16.78 并置于 §16.77 之后，保留 D5 的原编号，供所有需求/设计/测试引用使用唯一目标。设计内容与运行状态不变，WLD-7 仍未实施或验收。
 
 修订 v7.10 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：复核多人实时协作目标与低消耗边界；明确每窗口订阅数及 64 events / 128 KiB 队列为 Collaboration Profile 待固定、待目标环境测量的候选预算，16 KiB patch/frame 继续作为协议上限。同步 requirements v7.06、Group DD v5.32、collaboration spec v1.0、数据设计 v0.2、测试设计 v1.5 与 WBS v0.38。当前轮询/单进程广播及协作持久化、跨实例推送、性能验收仍未完成。
+
+修订 v7.11 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：将同秒重叠提案明确为立即 owner 冲突事务，禁止一秒聚合/仲裁等待；语义检测不受提案到达间隔限制，客户端 debounce 不得延迟冲突判定；新增 E2E-COLLAB-09 并将无等待行为与 p99 送达测量分开。同步 requirements v7.07、collaboration spec v1.1、数据设计 v0.3、测试设计 v1.6、WBS v0.39。当前轮询/单进程广播、草稿冲突持久化、跨实例推送及性能验收仍未完成。

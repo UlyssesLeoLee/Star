@@ -1,8 +1,8 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.5** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.6** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v1.5 (2026-10-24 同步 WLD-7 协作规范并增加 PT-09 profile/环境基线门；用例未实现/未执行)
+> - 状态: 🟡 Draft v1.6 (2026-10-25 增加同秒重叠提案无等待冲突用例 E2E-COLLAB-09；全部用例未实现/未执行)
 > - 关联工作项: `ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
@@ -332,9 +332,9 @@ IT 共 **10 测**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + Graph 集成
 | **G-E2E-09** | WLD-7 需要双 actor、目标 PostgreSQL 与两个 gateway 的持久恢复验收；现有 MSW/单实例 E2E 不够 | §4.8 | WLD-7 |
 
 ### 4.7 本章小结
-E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划用例（§4.8），尚未实现/执行，不计入已通过数量。缺口 G-E2E-01..09 显式标记。
+E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划用例（§4.8），尚未实现/执行，不计入已通过数量。缺口 G-E2E-01..09 显式标记。
 
-### 4.8 WLD-7 多用户推送、冲突与草稿恢复 E2E（计划，未执行）
+### 4.8 WLD-7 多用户推送、冲突与草稿恢复 E2E（9 项计划，未执行）
 
 环境要求：两个独立登录 actor、可重建目标 owner database、至少两个 realtime gateway 实例和可控 relay/wake-up 故障注入。只用 MSW、单进程 broadcast 或同一浏览器两个 tab 不构成跨实例 durable 验收。
 
@@ -350,6 +350,7 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划�
 | E2E-COLLAB-06 | owner commit 后丢失 wake-up、断开一位 actor、重启 relay/gateway 再重连 | durable cursor/backlog 恢复事件与离线 conflict；去重后不丢草稿、不重复业务事实 | AC-COLLAB-05 |
 | E2E-COLLAB-07 | 两 gateway 收到同一资源更新，并注入重复、乱序、慢 consumer、延迟写回执与队列上限 | event ID/sequence 去重；每 draft 最多一个在途写入，慢回执期间的新输入合并到一个有界 pending delta；超限 resync_required + cursor catch-up；不能静默跳过 durable event | AC-COLLAB-05/06 |
 | E2E-COLLAB-08 | 撤销参与者权限后尝试订阅、读取、resolve；并发 resolve 使用 stale expected revision | 活跃订阅关闭；读写均重新授权；stale resolve 保留两稿并创建 successor conflict | AC-COLLAB-05/07 |
+| E2E-COLLAB-09 | 两位 actor 用同步屏障在服务端 ≤1000 ms 内提交完整、digest-valid 且语义重叠的 draft heads；记录第二份 head 到达 owner 的时间与 owner transaction/Outbox trace | 不等待一秒 debounce、batch 或 arbitration timer；第二份完整 head 通过校验后立即进入同一 resource fence 并原子 pin 两稿、写出一个 stable conflict_id 与双方 unread facts/Outbox；双方收到同一持久提醒且可读取首个有界 base/current/mine/theirs diff。≤1000 ms 是输入到达刺激，不是检测窗口；任意更长到达间隔的语义重叠仍应由相同路径检测。端到端 p99 由 PT-09 测量 | AC-COLLAB-02/04 |
 
 
 ---
@@ -500,9 +501,9 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划�
 | Requirement AC | 自动化证据 | 通过条件 | 当前状态 |
 |---|---|---|---|
 | AC-COLLAB-01 | E2E-COLLAB-01 + 请求计数/Outbox wake-up trace | 已连接时没有固定周期读取；owner commit 触发同资源授权 push | WLD-7 OPEN/NOT_RUN |
-| AC-COLLAB-02 | E2E-COLLAB-02/03 + resource fence race test | 不重叠改动合并；重叠修改保留两稿并只产生稳定冲突 | WLD-7 OPEN/NOT_RUN |
-| AC-COLLAB-03 | E2E-COLLAB-03/04 + owner API/DB evidence | 精确 draft revision 在冲突事务中 pin；双方可恢复并查看差异，第三人拒绝 | WLD-7 OPEN/NOT_RUN |
-| AC-COLLAB-04 | E2E-COLLAB-04/05 + PT-09 | 仅完整、digest-verified、sealed 提案可见；在线 p99 ≤1s 到双方提醒和首个有界 diff 页 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-02 | E2E-COLLAB-02/03/09 + resource fence race test | 不重叠改动合并；重叠修改保留两稿并只产生稳定冲突；同秒到达不等待，其他到达间隔也不漏判 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-03 | E2E-COLLAB-03/04/09 + owner API/DB evidence | 精确 draft revision 在冲突事务中 pin；双方可恢复并查看差异，第三人拒绝 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-04 | E2E-COLLAB-04/05/09 + PT-09 | 仅完整、digest-verified、sealed 提案可见；同秒冲突无 holdback；在线 p99 ≤1s 到双方提醒和首个有界 diff 页 | WLD-7 OPEN/NOT_RUN |
 | AC-COLLAB-05 | E2E-COLLAB-06/07 + restart/replay integration | wake-up 丢失、重复乱序、离线重连、cursor gap 与 revoke 均不丢事实 | WLD-7 OPEN/NOT_RUN |
 | AC-COLLAB-06 | E2E-COLLAB-07 + PT-09 + PT-09-GATE-01 | 单 multiplexed connection、每 draft 单在途写入与一个有界合并 pending delta、配置化 bounded queue/cache、慢消费者背压恢复；以固定版本化 Collaboration Profile 和记录的精确 workload/并发、host、PostgreSQL、gateway 基线报告 RSS/CPU、pending 大小及每编辑 burst 的 draft-head/checkpoint 写放大，确认没有逐键击不可变快照 | WLD-7 OPEN/NOT_RUN |
 | AC-COLLAB-07 | disposable PostgreSQL migration/RLS/grants/backup suite | W/T/M、RLS、参与者读取边界、retention 与恢复通过 | WLD-7 OPEN/NOT_RUN |
@@ -588,6 +589,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **v1.3** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 WLD-7 的 8 项双 actor/durable gateway E2E 计划、PT-09 p99/写放大/RSS/CPU/Outbox 基准、AC-COLLAB-01..08 追踪和 G-E2E-09/G-PT-06 缺口；明确普通 delta 合并写 draft head、重叠时自动固定双边版本、每 draft 单在途写入加有界 pending delta，且所有用例均未实现/执行，并链接目标 W/T/M 数据设计。** | **requirements §50.8AW v7.05、协作数据设计 v0.1 与 WBS WLD-7 要求把实时推送、双边草稿和冲突恢复落实到可验收用例。**
 | **v1.4** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 的 Basic Design 引用更正为唯一章节 §16.78，并同步当前协作 spec / owner-local 数据设计版本；用例及运行结果未改变。** | **跨文档编号核对发现 §16.56 与 Schedule D5 重复。** |
 | **v1.5** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 协作规范引用同步到 v1.0、owner-local 数据设计同步到 v0.2；为 PT-09 增加前置门：固定 Collaboration Profile ID/revision/digest，并记录精确 workload/并发规模和目标 host、PostgreSQL、gateway 基线；未有批准值与实测记录时保持 OPEN/NOT_RUN，不虚构阈值；将任务来源和旧 adapter 描述改为中性名称。** | **WLD-7 跨文档版本对账、名称清理与低消耗/可复现性能验收门补齐。** |
+| **v1.6** | **2026-10-25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 E2E-COLLAB-09：两个 actor 的完整摘要校验重叠提案在服务端 ≤1000 ms 到达时不等待仲裁窗口，第二份提案立即进入 owner conflict transaction，双方保留并读取精确草稿；将该到达场景与 PT-09 的 commit-to-first-diff p99 测量区分，并更新 AC-COLLAB-02/04 追踪。用例仍未实现/执行。** | **requirements v7.07、basic design v7.11、collaboration spec v1.1、owner-local data design v0.3 的同秒协作验收要求。** |
 
 ---
 

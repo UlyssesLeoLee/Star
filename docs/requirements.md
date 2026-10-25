@@ -1,4 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.06）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.07）
+
+> **v7.07 WLD-7 同秒重叠编辑立即冲突（2026-10-25）**：明确语义重叠不依赖客户端时钟或固定一秒窗口；两份完整、摘要校验通过的重叠提案即使在服务端 1000 ms 内到达，也必须在第二份提案进入 owner 处理后立即通过同一 resource fence 建立冲突事实、固定双方草稿并触发持久提醒。测试设计增加 E2E-COLLAB-09。1 秒仍仅是 conflict commit 至双方提醒/首个有界差异页可读的 p99 目标；当前运行仍轮询，WLD-7 未实施/验收。
 
 > **v7.06 WLD-7 引用唯一化（2026-10-24）**：基本设计的实时协作章节唯一编号为 §16.78（§16.56 保留给既有 Schedule D5）；同步需求、Group DD、协作 spec、owner-local 数据设计、测试设计与 WBS 的当前交叉引用。协作目标与实现状态不变：当前代码仍以轮询为主，WLD-7 实施和目标环境验收保持 OPEN。
 
@@ -3799,7 +3801,7 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 
 ### 50.8AW Worktree-scoped push collaboration、draft recovery 与 conflict resolution（设计）
 
-**意图与范围**：Task Card、Canvas Document 以及其他支持协作编辑的 Run App 均按 canonical resource scope 工作。一次内容更新提交后，Star 应主动把版本变更通知同一 Project/Engineering Run/Worktree/资源内有权访问的协作者；“全局发送”指该资源的全部授权订阅者，不代表向全租户或无关 Run 广播。实时协作不得依赖固定周期客户端轮询或正常路径定时扫 Outbox。1 秒是冲突 owner transaction 提交后，两位在线参与者都显示同一持久未读提醒、并能从受保护读取 API 获取首个有界差异页的 p99 目标；它不是轮询节拍、冲突判定时间窗或分块上传期限。判定始终依据 owner base revision 与重叠范围。当前内存 WebSocket/SSE 广播只属于进程内低延迟扇出，不能作为业务事实、持久传输、跨实例广播、草稿存储或协作完成证据。
+**意图与范围**：Task Card、Canvas Document 以及其他支持协作编辑的 Run App 均按 canonical resource scope 工作。一次内容更新提交后，Star 应主动把版本变更通知同一 Project/Engineering Run/Worktree/资源内有权访问的协作者；“全局发送”指该资源的全部授权订阅者，不代表向全租户或无关 Run 广播。实时协作不得依赖固定周期客户端轮询或正常路径定时扫 Outbox。1 秒是冲突 owner transaction 提交后，两位在线参与者都显示同一持久未读提醒、并能从受保护读取 API 获取首个有界差异页的 p99 目标；它不是轮询节拍、冲突判定时间窗、提案仲裁延迟或分块上传期限。判定始终依据 owner base revision、服务端接受的完整提案和重叠范围；两份完整且摘要校验通过的重叠提案即使在服务端 1000 ms 内到达，也不得等待一秒聚合/仲裁窗口，第二份提案进入 owner 处理后应立即触发冲突事务。此规则不设语义时间上限：间隔更长但仍与有效草稿/版本重叠的编辑也必须检测。当前内存 WebSocket/SSE 广播只属于进程内低延迟扇出，不能作为业务事实、持久传输、跨实例广播、草稿存储或协作完成证据。
 
 **Owner 与原子性**：Task、Canvas 等业务资源的 canonical owner 同时拥有该资源的 revision/CAS、Actor/Device-scoped draft、conflict/resolution fact、审计与 transactional Outbox；`domain-collaboration` 只拥有连接/订阅/presence 和受授权事件路由，不复制或直接修改 Task/Canvas 业务状态。同一资源的 draft checkpoint/seal 与 revision/resolve 命令必须使用同一短时 resource revision fence（或等价数据库锁）串行化“检查已提交 revision + 检查有效 draft + 更新 changed-path index”的临界区，避免一个提交扫描结束后并发 draft 才进入索引而漏报冲突；不同资源仍可并行，网络传输/大块组装不得持有该 fence。一次 owner transaction 中复验当前 actor 与 RunContext、比较 `base_revision`、判定 intervening changes、保存 draft 或新 revision、写 conflict fact/participant visibility 与 Outbox，然后提交。同一事务还产生小型 commit notification（例如 DB transactional NOTIFY 或等价机制）；在线 relay 以有界合并唤醒立即 claim Outbox，唤醒是提示而 Outbox 才是持久事实。进程内可用单一 pending latch 合并通知；listener 断开/重启时立即按 durable cursor/backlog 追赶。传输失败为具体事件安排有界 due retry；不靠客户端固定轮询，也不靠服务端正常路径周期扫表。事件只在 commit 成功后扇出，失败不回滚已提交事实。
 
@@ -3816,9 +3818,9 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 | Acceptance ID | 验收标准 |
 |---|---|
 | AC-COLLAB-01 | 常态连接下客户端无固定间隔轮询，Outbox 正常发布由 owner commit 后的有界 wake-up 驱动而非周期扫表；更新由 owner transaction + Outbox 触发资源 scoped push，重新连接只按 opaque cursor catch-up。 |
-| AC-COLLAB-02 | 两个 actor 从相同 base revision 修改不同字段时都保留变更并生成新 revision；变更相同字段/重叠文本 span 时不得丢失任何一方内容；draft checkpoint/seal 与 revision CAS 并发时共用 resource fence，竞态测试不得漏报冲突。 |
+| AC-COLLAB-02 | 两个 actor 从相同 base revision 修改不同字段时都保留变更并生成新 revision；变更相同字段/重叠文本 span 时不得丢失任何一方内容；draft checkpoint/seal 与 revision CAS 并发时共用 resource fence，竞态测试不得漏报冲突。两份完整提案在 ≤1000 ms 内到达时不得等待窗口结束；不同到达间隔也不得绕过语义重叠检测。 |
 | AC-COLLAB-03 | 冲突 transaction 原子固定双方精确 draft revision；冲突后双方可分别重载自己的 draft，并在重新授权后读取完整 base/current/mine/theirs；无关用户不能读私有 draft 或冲突 payload。 |
-| AC-COLLAB-04 | 仅在两份冲突提案完整上传、摘要验证、seal 且可读后提交冲突事实；在线且授权的双方均显示同一 `conflict_id` 持久未读提醒并能读取首个有界 base/current/mine/theirs 差异页，owner conflict commit 到双方可见且可读 p99 ≤ 1 s；传输 ACK 不自动清除未读状态。延迟/丢失推送须由 durable conflict inbox/cursor replay 恢复并标明迟到。1 秒不是轮询周期、冲突判定窗口或大草稿上传期限。 |
+| AC-COLLAB-04 | 仅在两份冲突提案完整上传、摘要验证、seal 且可读后提交冲突事实；在线且授权的双方均显示同一 `conflict_id` 持久未读提醒并能读取首个有界 base/current/mine/theirs 差异页，owner conflict commit 到双方可见且可读 p99 ≤ 1 s；传输 ACK 不自动清除未读状态。≤1000 ms 内到达的重叠提案由 E2E-COLLAB-09 证明不会等待窗口结束。延迟/丢失推送须由 durable conflict inbox/cursor replay 恢复并标明迟到。1 秒不是轮询周期、冲突判定窗口、仲裁等待或大草稿上传期限。 |
 | AC-COLLAB-05 | 断线重连、commit notification 遗失/监听器重启、重复乱序事件、cursor gap/过期、撤权及并发 resolve 均从 durable owner facts 恢复，无丢稿、无重复业务 effect；版本冲突采用 CAS/幂等而非 last-write-wins。 |
 | AC-COLLAB-06 | 慢消费者触发有界背压和可恢复重连；同一 draft 最多一个在途写入，未发送输入合并为一个有界增量；压测报告连接/订阅规模、patch/queue 上限、事件延迟、内存 RSS 与 CPU，不以无界缓冲或每次全文档广播满足延迟。 |
 | AC-COLLAB-07 | draft/conflict owner tables 落实 W/T/M 分类、tenant RLS、授权只读参与者边界、审计与 retention；目标 DB grants、迁移重放、备份恢复及 revoked-subscriber 拒绝读取须通过验收后才可生产启用。 |
@@ -3831,3 +3833,5 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 修订 v7.05 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：为 WLD-7 补充 WorkItem/Canvas owner-local 草稿头、不可变 checkpoint、参与者未读/查看回执、冲突/解决事实的逻辑 W/T/M 数据映射，以及双 actor/双 gateway/目标 PostgreSQL 验收计划；明确常态 patch 只 coalesce draft head，冲突 owner transaction 自动 seal/pin 两侧完整 revision 而不依赖最终 Save；将每草稿单在途写入与有界合并待发量纳入低资源门；同步 Basic Design §16.56、Group DD §8.27、domain-collaboration spec v0.7、WBS v0.32。未生成数据库迁移或实现推送；现有 Group 路径仍轮询，WLD-7 保持开放。
 
 修订 v7.06 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：跨文档审查发现基本设计 §16.56 与旧 Schedule D5 重复，修复协作章节为唯一 §16.78，并同步当前要求说明与设计/测试引用；未改变协作范围或实现状态。
+
+修订 v7.07 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：补明确完整重叠提案在服务端一秒内到达时立即进入 owner 冲突事务，不等待时间窗；同时说明语义冲突检测不受一秒间隔限制，并新增 E2E-COLLAB-09。同步 basic v7.11、collaboration spec v1.1、数据设计 v0.3、测试设计 v1.6 与 WBS v0.39。当前实现仍为轮询，全部运行时验收保持 OPEN/NOT_RUN。

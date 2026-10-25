@@ -1,8 +1,8 @@
 # WLD-7 多用户实时协作目标数据设计
 
-> 状态：目标逻辑数据设计 v0.2；尚未生成迁移、部署或目标数据库验证。
+> 状态：目标逻辑数据设计 v0.3；尚未生成迁移、部署或目标数据库验证。
 > 适用：Task Card / WorkItem 与 Canvas 等支持协作编辑的 Run 资源。
-> 上游：requirements §50.8AW / AC-COLLAB-01–08、basic design §16.78、Group DD §8.27、domain collaboration spec §13。
+> 上游：requirements v7.07 §50.8AW / AC-COLLAB-01–08、basic design v7.11 §16.78、Group DD §8.27、domain collaboration spec v1.1 §13、test design v1.6 E2E-COLLAB-09。
 > 此文件定义 owner-local 数据边界，不代表实时协作已实现。
 
 ## 0. 所有权和事实边界
@@ -23,6 +23,8 @@ WorkItem owner 保存任务字段的 revision、draft、conflict、participant n
 | edit_conflict_resolution | T | resolution_id、conflict_id、resolver_actor_id、expected_revision、result_revision、resolution_digest、operation_id、created_at | append-only 的显式解决事实；旧 conflict 不更新覆盖。过期 CAS 产生 successor conflict 并保留原双方草稿。 |
 | owner transactional Outbox event | T | event_id、stream_id、sequence、schema_version、resource/revision、conflict_id、participant IDs、correlation/idempotency IDs | 沿用事实 owner 的 Outbox 与事务，不另建 Collaboration 业务 outbox；正文 patch 不进入广播事件。 |
 
+`created_at`/`occurred_at` 由 owner 服务端在事务中生成；冲突排序以 owner revision、stream sequence、resource fence 与提案身份为准，不以客户端时间戳排序。两份完整提案在服务端 1000 ms 内到达只是并发验收条件，不对应数据库字段、冲突时间窗或延迟任务。
+
 已有 collaboration.presence 与 collaboration.realtime_subscription 仍是 W 类短 TTL 观察/连接数据；它们不是 revision、草稿或冲突真相。普通 revision/history 如果尚无 owner-local durable 表，应先纳入该 owner 的 Transaction data design，再由 owner 决定映射。
 
 ## 2. 共同列、索引与一致性约束
@@ -33,6 +35,7 @@ WorkItem owner 保存任务字段的 revision、draft、conflict、participant n
 - draft_checkpoint 使用唯一键 (tenant_id, resource_id, actor_id, device_id, draft_id, draft_revision)。sealed checkpoint 内容和 digest 不可变。edit_conflict 对两侧 proposal identity 排序后建立唯一约束；保存 checkpoint 引用，删除保护必须拒绝删除 unresolved conflict 所引用的草稿。
 - 所有变更命令必须使用 owner-local 幂等回执机制：优先复用 canonical owner 现有账本；若当前 owner 尚无对应能力，则在该 owner 边界内补齐。事务内固定 `(tenant, actor, operation, idempotency_key, request_digest, result_ref)`；同键同 digest 返回原回执，同键不同 digest 拒绝。不得新增跨 owner 的 Collaboration 幂等事实库。
 - Overlap 查找先按 tenant_id + resource_id 限定，再用 changed_path_keys 的 GIN 或等效 owner 索引筛选；不得扫描全租户草稿。活跃 draft/编辑器预算由版本化 Collaboration Profile 限制，达到上限时保留本地稿并显式返回容量状态，不降低冲突检测完整性。
+- Conflict detector 不按一秒桶聚合，不依据 client timestamp 延迟判定。第二份完整且 digest-verified 的重叠 head 在 resource fence 下提交冲突；任何更长间隔仍按有效 revision/draft 语义检测。1 秒仅用于 E2E 的同秒到达刺激及 PT-09 的 commit-to-first-diff p99 测量，不落为一个 holdback 或冲突 deadline。
 - Draft checkpoint/seal、revision CAS 和 conflict/resolve 共享同一短时 resource fence；网络收块、上传与差异读取均在 fence 外。不同 resource 使用独立 fence 可并行。
 - 每个资源最多生成一个有序 proposal pair 的 conflict；冲突摘要只保存必要重叠 path/key。resolution、view receipt 与 audit 均为追加事实，不原位改写历史。
 
@@ -58,8 +61,10 @@ Outbox 仍是持久真相，wake-up 只提示 relay 立即 claim。Relay 重启�
 
 ## 6. 迁移前验收与实施状态
 
-WLD-7 实施时必须把以上目标实体逐表对齐 Data Inventory、W/T/M、数据库迁移、owner grants、RLS、retention、blob 生命周期和 schema fingerprint。需要并发证明 draft seal 与 revision CAS 同 fence、两个 gateway 与丢失 wake-up 仍恢复同一 conflict_id、participant view receipt 幂等、未授权第三人读失败，以及容量/RSS/CPU/commit-to-first-diff p99 基准。每个表的 physical inventory 行和 IPA table detail 只有在具体 DDL 确定后追加；本文件不声称当前已部署这些表。
+WLD-7 实施时必须把以上目标实体逐表对齐 Data Inventory、W/T/M、数据库迁移、owner grants、RLS、retention、blob 生命周期和 schema fingerprint。需要并发证明 draft seal 与 revision CAS 同 fence；E2E-COLLAB-09 用两 actor 完整重叠提案在 ≤1000 ms 到达的刺激验证第二份提案不会等待一秒时间窗，并确认双方草稿精确 pin、同一 conflict_id 与双方首个有界差异可读；两个 gateway 与丢失 wake-up 仍恢复同一 conflict_id；participant view receipt 幂等、未授权第三人读失败；以及容量/RSS/CPU/commit-to-first-diff p99 基准（p99 由 PT-09 单独测量）。每个表的 physical inventory 行和 IPA table detail 只有在具体 DDL 确定后追加；本文件不声称当前已部署这些表。
 
 修订 v0.1 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。依据：用户要求事件触发推送、双边提示、保留双方草稿、可查看对方改动且降低轮询与全量广播开销；单 draft 单在途写入与一个有界合并待发增量限制慢网络下的内存/请求增长。所有结构均为 WLD-7 目标设计，实施/目标库验收开放。
 
 修订 v0.2 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：将 Basic Design 上游引用从重复编号 §16.56 更正为实时协作章节唯一编号 §16.78；旧 §16.56 仍指 Schedule D5。数据模型和未实施状态不变。
+
+修订 v0.3 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：为 owner-local 协作记录规定服务端时间与 revision/sequence 排序权威；明确 ≤1000 ms 只作为同秒 E2E 刺激，不形成数据库冲突窗口；要求完整重叠提案立即在 resource fence 内建立双方 pin 与冲突事实，并单独通过 PT-09 测量 commit-to-first-diff p99。同步 requirements v7.07、basic v7.11、collaboration spec v1.1、test design v1.6。逻辑目标未迁移或实施。
