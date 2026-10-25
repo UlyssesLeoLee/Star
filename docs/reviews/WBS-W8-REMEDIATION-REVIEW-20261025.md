@@ -67,3 +67,44 @@ The migration assigns the function to `star_platform_transport_owner`, revokes e
 | Tests run by reviewer | None; manual source review only |
 | Rebase / merge / push | None |
 | Report author | Ulysses — Mavis handoff review |
+
+## 6. Addendum — independent shared-claim review (2026-10-25)
+
+- **Implementation reviewed:** `07a896e3561affb885594b9fb53b65b199921fa6` against parent `0ae310440e446f530a210ec413efb526cb038d8f`
+- **Review checkout HEAD before this addendum:** `f83d1dbf08f54456ea29b40f98b98ddc3332a70b`
+- **Scope:** only the implementation commit's migration, PostgreSQL test, and phase report, plus the original finding above. This review did not execute PostgreSQL or tests.
+
+### P2 — Legacy cursorless quarantine claims cannot arbitrate a cursor-only collision
+
+**Affected paths:**
+
+- `db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:85-132, 218-251`
+- `crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs:785-799`
+
+The new claim ledger permits `source_cursor` to be `NULL` for compatibility with legacy quarantine rows (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:91-112, 128-132`). Sequence uniqueness still protects every such row, including a later claim at the same sequence. For claims with known cursors, the partial unique cursor index and trigger conflict lookup reject a reused cursor at a different sequence.
+
+However, an old quarantine row whose cursor is unknown is backfilled with `NULL`. A future claim at a different sequence with the same opaque cursor cannot match that legacy row: the unique index excludes `NULL`, and the trigger lookup compares cursors only when the stored row has an equal non-null cursor. Because BI must treat provider cursors as opaque, it cannot infer the missing cursor from sequence. The historical sequence key prevents same-sequence duplication, but this migration cannot establish cursor uniqueness against an unknown legacy cursor across different sequences.
+
+The PostgreSQL test helper also sets every cursor to `sequence.to_be_bytes()` (`crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs:785-799`). It therefore cannot exercise the cursor-only unique-index path where two records have different sequences and the same non-null cursor.
+
+**Required before claiming global cursor uniqueness:** either resolve legacy cursorless rows with a trusted provider-specific backfill, or fail closed for affected provider/log generations until those rows are reconciled. Add a PostgreSQL case with two different sequences sharing one cursor, and a legacy cursorless case that verifies the selected conservative policy. Do not derive a cursor from the sequence in BI.
+
+### Original P1 — source-level cross-disposition arbitration is closed for the sequence and known-cursor keys
+
+The new migration locks both receipt tables before duplicate detection and backfill (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:38-39, 42-79`), creates one append-only claim ledger with a scoped sequence primary key and a partial unique index for non-null cursor (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:85-112`), and backfills both dispositions before enabling writes through triggers (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:113-132, 272-279`). It rejects existing cross-disposition sequence or known-cursor collisions before installing the ledger rather than choosing a winner.
+
+The two `BEFORE INSERT` triggers claim inside the existing Inbox/source-origin or quarantine transaction. The Inbox trigger reads the already-created Inbox receipt digest before source-origin insertion (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:172-190`), matching the v3 order. On an insert conflict, the trigger accepts only one existing row with identical disposition, sequence, cursor, message identity, and digest; otherwise it raises and aborts the surrounding receipt transaction (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:205-251`). Thus Inbox→quarantine and quarantine→Inbox conflicts at the same sequence cannot create a second receipt or reach terminal ACK. The WORM trigger, forced tenant RLS, owner policy, runtime revocations, and `SECURITY DEFINER`/fixed `search_path` boundary are present (`db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:134-149, 258-279`). The claim stores identity and digest metadata only.
+
+The added integration test covers exact replay, changed content, both cross-disposition write orders, a concurrent Inbox/quarantine race, failed retries, terminal receipt counts, runtime versus owner-audit roles, same-database loopback checks, and tenant-scoped owner reads (`crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs:183-190, 197-499, 505-730`). The trigger/unique-index assertions are source-supported; the integration test is still ignored and was not run.
+
+**P1 result:** source-level CLOSED for the original same-sequence cross-disposition defect and for collisions involving known non-null cursors. The legacy cursorless limitation above remains an explicit P2 rollout constraint; it prevents claiming complete historical cursor uniqueness until reconciled.
+
+**PostgreSQL gate:** OPEN / UNRUN. The phase report records `0 passed, 1 ignored` and says migrations, FORCE RLS, role behavior, and concurrency were not executed (`docs/reports/PHASE-WBS-W8-SOURCE-CLAIM-FIX-20261025.md:32-34`). This source review is not database evidence. W8 remains OPEN for this gate and the previously listed mTLS, recovery, settlement, and remaining W8 acceptance work.
+
+| Review item | Result |
+|---|---|
+| Source-level original P1 | Closed for sequence and known non-null cursor arbitration |
+| P2 legacy cursor-only limitation | Remains; requires explicit resolution or fail-closed rollout policy |
+| PostgreSQL migration / RLS / concurrency | Unrun; acceptance gate remains open |
+| Tests run by reviewer | None; manual source review only |
+| Implementation edits / rebase / merge / push | None |
