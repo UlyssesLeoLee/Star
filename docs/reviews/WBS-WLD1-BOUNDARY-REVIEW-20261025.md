@@ -40,7 +40,7 @@ CodeGraph 对本 worktree 返回“无 `.codegraph/` 索引”；按审查 brief
 
 ## §3 差距与安全边界
 
-- **P0 — 缺 Project→Repository canonical relation**：建立 Project 范围内的持久关联事实。建议该关系由 Project Directory / Project authority owner 管理；`scm.repository_master` 继续只负责 Repository stable identity 与非敏感元数据，不向其加 Project authorization 语义。明确“一名 Project 可以关联多个 Repository”“移除关联后的 Run 处理”“无 Branch 仓库可见性”。
+- **P0 — 缺 Project→Repository canonical relation**：建立 Project 范围内的持久关联事实前，必须先拍板权威关系的基数和变更语义。当前代码的 `ProjectPolicy.default_repository_id: Option<RepositoryId>` 只表达可空的默认 Repository 值，现有已批准文档没有把它定义为完整的 Project 授权关系，也没有批准每个 Project 只能有一个关联。`scm.repository_master` 只负责 tenant-scoped Repository identity / 元数据，不携带 Project 关系或授权语义。以下两种方案及其代价、待拍板问题见 §7.1；本审查不替产品决定基数或撤销策略。
 - **P0 — 缺 Run→Repository binding command**：由 Run owner 实施单独的绑定 / 解除命令，校验目标 ProjectRepository 关系并记录 binding revision。绑定需 CAS + 幂等；每次 Worktree read / mutation 前重新检查当前 Project 与 Run grants 以及当前关联。撤销 ProjectRepository 后既有 Run 不能继续访问 root。跨 owner 不共享写事务、不直接写对方表；使用 owner API / 命令及可核验的关联版本引用。
 - **P0 — 缺 Host-owned trusted root registry**：由可信 Rust Host/Manager 管理稳定 `HostId + RepositoryId + generation` 到本机 canonical root 的映射。路径不可由 API、Agent、Plugin 或任务卡 CLI 提供/改写；API 与事件仅传 opaque repository/root identity 和 generation，不返回绝对路径或凭证。root 过期、重复、解析不一致、Host 离线或 generation 不符均 fail closed。
 - **P1 — 缺隔离只读 Worktree provider**：新增只读 trait / adapter，只实现受限的 discovery/list；Run scope 必须有唯一当前 Repository binding 后才可查询对应 root。provider 仅运行有界、可取消的 Git worktree listing，并返回路径脱敏、字段限量的投影。将它与 `create/import/archive/cleanup` 等写能力分开，provider 缺失继续 503；本阶段不得开启任何写侧 lifecycle。
@@ -52,7 +52,7 @@ CodeGraph 对本 worktree 返回“无 `.codegraph/` 索引”；按审查 brief
 | 事实或操作 | 唯一写 owner | 读取与授权要求 | 禁止边界 |
 |---|---|---|---|
 | Repository identity / provider metadata | SCM Repository master owner | tenant scope；该事实本身不授权用户 | 不把 Project/Run/Host path 写进 SCM master |
-| Project↔Repository active association | Project Directory / Project authority owner（需在 WLD1 contract 明确） | 当前 Project membership / manager grant；独立关联 revision 与事件 | SCM owner、Run owner、Host manager 不可直接写此关系 |
+| Project↔Repository active association | 建议由 Project Directory / Project authority owner 管理，仍需明确拍板 | 当前 Project membership / manager grant；独立关联 revision 与事件 | SCM owner、Run owner、Host manager 不可直接写此关系；`default_repository_id` 是否同时承担此事实尚未决定 |
 | Run↔Repository current binding | Engineering Run owner | 写时验证 active Project↔Repository；读 / Git 操作前复验 Project + Run grants 与绑定 currentness | 不复用 Run↔Worktree binding 表表示仓库绑定；不跨 owner 写表 |
 | Host↔Repository canonical local root | Rust Host Infrastructure Manager owner | `HostId + RepositoryId + generation` 精确 currentness；本机 capability 限制 | Agent / Plugin / CLI 不获得任意 host path、shell、daemon/socket |
 | Worktree discovery projection | 独立 Read-only Host/Run Worktree provider | 只接受已授权的 Run + 已绑定 Repository opaque identity；受限 Git list 操作 | 不创建、导入、删除、归档 Worktree；不暴露本机绝对路径 |
@@ -86,7 +86,7 @@ WLD1-0 边界合同与 owner 决定
 
 | 门 | 正向验收 | 反向 / 失败关闭验收 | 证据等级 |
 |---|---|---|---|
-| ProjectRepository | Project manager 添加/读取/移除关联；active association 指向现有 Repository master revision；同 Project 多 Repo 与无 Branch Repo 可完整列举 | 普通成员不能管理关联；撤权 / 移除后 API 不再授权；跨 tenant / Project 关联不可读写；重复请求精确回放、重用 idempotency key 更改内容冲突 | owner 单测 + PG owner/app role/RLS route integration；target DB 实证未取得前不得关闭 |
+| ProjectRepository | 产品先确认 §7.1 的关联模型；随后验证 Project manager 可按已批准模型添加/读取/移除关联、active association 指向现有 Repository master revision、无 Branch Repository 按模型列举 | 普通成员不能管理关联；关联撤销后 API 不再授权；跨 tenant / Project 关联不可读写；重复请求精确回放、重用 idempotency key 更改内容冲突；Run 已绑定时按已批准的阻止或撤权规则处理 | 当前是待定契约，不是通过项；后续需 owner 单测 + PG owner/app role/RLS route integration，target DB 实证未取得前不得关闭 |
 | RunRepository | hostless Run 可以无仓库存在；Project manager 绑定当前已授权 Repo 后形成新的 binding revision；读写 Run grant 正确分开 | 非 ProjectRepository 的 Repo、撤销 grant、Run grant 撤销、expected revision 过期均拒绝；一个 Run 不会被 Project 的其它 Repo 隐式查询 | Run owner command + PG CAS/RLS + Run route integration |
 | Host root registry | 受信 Host Manager 注册稳定 Host/Repo/generation；合法 Repo root 能以 opaque identity 解引用 | Agent/Plugin/用户直接提交 path 一律拒绝；symlink/canonical root mismatch、generation stale、路径不存在、Host offline 返回 unavailable；API/event/log 不泄露路径或 credential | Host adapter security tests + target role/ACL probe + sanitized API evidence |
 | Read-only Worktree discovery | 已授权且唯一绑定的 Run 返回有界 Git worktree DTO | 无 binding/授权撤销/root stale/provider absent 超时或取消时无文件写/无 shell 副作用；调用者无权读取其他 Project 的 worktrees；响应不含 absolute path | provider contract + controlled host integration + auth/revoke route tests |
@@ -100,3 +100,23 @@ WLD1-0 边界合同与 owner 决定
 - 当前阻断项：ProjectRepository association owner/API/DDL；Run→Repository command；Host-owned durable root registry；独立只读 provider；target PostgreSQL / RLS / app-role 运行证据；共享入口的合并门禁。
 - **集成建议**：仅将这份审查作为下一 WLD1 实施 lane 的输入；不据此关闭 WLD1，不安装 provider，也不打开 Worktree 写操作。
 - **修订历史**：v0.1（2026-10-25）— 按 WBS-WLD1-BOUNDARY-REVIEW brief 对 dev 候选基线进行静态边界审查，补充 verified/unknown 矩阵、owner 数据责任、互斥实施 DAG 与验收矩阵。
+- **修订历史**：v0.2（2026-10-25）— 根据 WLD1 Project→Repository 只读审查补充 `default_repository_id` 与 `scm.repository_master` 的语义边界、关联策略影响及明确待拍板问题；未新增 schema/API，也未决定 cardinality。
+
+### §7.1 Project→Repository 关联策略与待拍板问题
+
+本补充核验基于隔离 lane 的 dev 基线 `32d9a3ad727ca81c51adc3ef8e1a29df79d00b10`；它扩展当前 dev 已跟踪的 `docs/reviews/WBS-WLD1-BOUNDARY-REVIEW-20261025.md`，不另建重复审查文件。
+
+**已核实的现状**：`crates/domain-project/src/lib.rs:156-180,206` 中 `ProjectPolicy` 有 `default_repository_id: Option<RepositoryId>`，且默认值为 `None`；`domain-project-spec.md:46` 也只把该项列为可选 SCM 默认值。`ProjectRepository` trait（`crates/domain-project/src/lib.rs:408`）负责 Project 记录 / policy 持久化，不是单独的 Project↔SCM Repository 授权关系。`db/migrations/2026-10-23-scm-repository-master.sql:22,31,74` 将 `scm.repository_master` 定义为 tenant-scoped Repository identity 与元数据，并明确 Project authorization links 在其他 owner 边界、没有 Project FK，且 actor provenance 不授予访问权限。因此，不能从字段名、同 tenant、创建者或 Repository master 推导当前 Project 对 Repository 的可见或使用授权。
+
+| 方案 | 关系基数与现有字段解释 | 主要影响 / 风险 |
+|---|---|---|
+| A. 将 `ProjectPolicy.default_repository_id` 作为唯一 Project↔Repository 关联 | 每个 Project 为 0 或 1 个 Repository；该字段同时成为 canonical association 与默认选择。 | 不需要新增关联事实，但会把“默认配置”升级为“成员关系 / 授权事实”：修改 policy 即可能授予或撤销仓库访问，必须纳入相应授权、审计、revision、tenant/Repository identity 完整性及 Run 绑定并发规则。无法表达一个 Project 管理多个 Repository 的情形。若字段仅被当作 picker 默认值，则它仍不能提供授权允许集合。 |
+| B. 建立由 Project owner 管理的显式关联，并保留 `default_repository_id` 为默认选择 | 可批准为每 Project 0..N 个关联，或另行确定其他基数；`default_repository_id` 仅指向当前关联集合中的一个默认 Repository，不作为授权真相。 | 明确分离默认值与授权成员关系，能支持多仓 Project；需要独立关联事实及其 owner-local revision、审计、授权、RLS、幂等与 Outbox，并定义默认值必须属于 active association 的一致性规则。`scm.repository_master` 仍只保留 SCM identity/metadata，不能由它直接承载 Project 授权。 |
+
+**待产品拍板（实现前置条件）**：
+
+1. 一个 Project 的 Repository 关联应为 **0..1**，并让 `ProjectPolicy.default_repository_id` 同时承担唯一关联和默认选择；还是允许 **0..N**，另建 Project-owned canonical association，而保留该字段只作默认选择？当前源码与已批准文档不足以替产品选择其中一个。
+2. 若 Repository 已被一个或多个 Run 绑定，Project 管理员移除其关联时，应 **阻止移除，直到相关 Run 先解除或重绑**；还是 **允许立即撤销关联授权**，并保留历史 Run binding 作为审计事实、令依赖该关联的后续 Worktree discovery 与所有 mutation 立即 fail closed？两种策略都必须处理并发读取/撤销并保留历史证据，不能静默继续访问。
+3. 是否确认 Project Directory / Project authority owner 是 Project↔Repository active association 的唯一写入 owner，而 SCM owner 仅管理 `scm.repository_master` identity/metadata、Run owner 独立管理 Run↔Repository binding？现有边界报告建议此职责拆分，但当前仍应由 WLD1 contract 明确批准。
+
+在上述问题获得决定前，不新增 association schema/API，不实现 Project Repository authorization/list provider，也不将 `default_repository_id` 解释为仓库访问许可；只读候选列表若没有独立、明确授权的数据事实，同样必须 fail closed。
