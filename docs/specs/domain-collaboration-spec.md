@@ -1,6 +1,6 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v0.8 (2026-10-24；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v0.9 (2026-10-24；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–08
 > - 《Basic Design》§2.1(表 24), §5.7, §16.78
@@ -59,7 +59,7 @@
 | INV-CB-04 | Realtime Event 必带 tenant_id 且 AuthorizationChecker 校验一致 | api-design §4.4, security-design §3.5 |
 | INV-CB-05 | 高频 Token Stream 可不入 SaaS(REQ-RT-003) | basic-design §15 |
 | INV-CB-06 | MVP 阶段不拆 `realtime-service`(§8.2,§13.1) | basic-design §13.1, §30.3 |
-| INV-CB-07 | 已连接协作不依赖固定周期轮询；资源 owner commit + Outbox 是 push 触发源，cursor catch-up 只用于 bootstrap/reconnect/gap | requirements §50.8AW, basic-design §16.56 |
+| INV-CB-07 | 已连接协作不依赖固定周期轮询；资源 owner commit + Outbox 是 push 触发源，cursor catch-up 只用于 bootstrap/reconnect/gap | requirements §50.8AW, basic-design §16.78 |
 | INV-CB-08 | stale base 的重叠 patch 不覆盖；两方精确 draft revision 与 conflict 参与者同事务固定，双方重新授权后可读取差异 | requirements AC-COLLAB-02/03, Group DD §8.27 |
 | INV-CB-09 | 慢连接队列有界；溢出必须标记 resync 并按 durable cursor 恢复，不得静默丢弃 owner event | requirements AC-COLLAB-05/06, Group DD §8.27 |
 
@@ -375,3 +375,4 @@ Revision v0.6 · 2026-10-24 · Mavis review: require both sealed, digest-verifie
 Revision v0.7 · 2026-10-24 · Mavis review: add the owner-local W/T/M target record map, retention/RLS/grant and target-migration acceptance boundary; specify coalesced mutable draft heads, one in-flight write plus one bounded pending delta per draft, and automatic sealing/pinning on overlap without requiring final Save; link the planned two-actor/two-gateway E2E and performance evidence; synchronize requirements v7.05, basic design v7.08, Group DD v5.30, data design v0.1 and WBS v0.32. No migration or runtime push implementation is claimed.
 
 Revision v0.8 · 2026-10-24 · Mavis review: correct the Basic Design collaboration cross-reference to unique §16.78; retain §16.56 for the existing Schedule D5 section. No change to runtime status; WLD-7 remains open.
+Revision v0.9 · 2026-10-24 · Mavis review: align INV-CB-07 with the unique current Basic Design section §16.78; keep §16.56 reserved for Schedule D5. Runtime remains polling-based and WLD-7 remains open.

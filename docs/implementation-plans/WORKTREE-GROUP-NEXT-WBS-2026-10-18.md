@@ -241,6 +241,7 @@ flowchart TD
 | v0.32 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 完成 WLD-7 目标 owner-local W/T/M 逻辑记录、复合约束/索引/RLS/retention/加密正文映射及双 actor/双 gateway/PostgreSQL 验收计划；明确常态 patch coalesce 到 draft head、每 draft 单在途写入与一个有界 pending delta，重叠时 owner 自动 seal/pin 双方完整 revision 而无需最终 Save；修正测试设计章节顺序和引用。同步 requirements v7.05、basic v7.08、Group DD v5.30、collaboration spec v0.7、数据设计 v0.1 与测试设计 v1.3。代码仍为轮询/进程内广播基线，WLD-7 实施、目标 DB 与性能验收保持 OPEN | 用户要求低消耗事件推送、双方草稿恢复/查看冲突并完善文档 |
 | v0.33 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 Basic Design 实时协作章节与 Schedule D5 的重复编号：将 WLD-7 协作章节改为唯一 §16.78，更新 requirements v7.06、Basic Design v7.09、Group DD v5.31、collaboration spec v0.8、数据设计 v0.2 与测试设计 v1.4 的引用；刷新文档集成前 dev/main 快照，确认 main-only 的 Vercel SRS v0.2 已被 dev v0.4 取代，不需 cherry-pick。WLD-7 运行时仍 OPEN。 | 跨文档审查发现编号冲突，并按当前分支证据重新核对 main-first 集成门。 |
 | v0.34 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD-7 协作章节编号与跨文档引用修订 commit 539cc90f 已通过 fast-forward 合入本地 dev（28a00095 → 539cc90f）；三份用户 reviewer briefs 保留，D:\Star main 用户数据未触碰，未 push。WLD-7 运行时、目标 DB 与性能验收仍 OPEN；本轮仅文档检查，未运行代码测试。 | 文档差异审阅完成并通过 Git whitespace check，本地 dev 目标快照未变且无活动 terminal。 |
+| v0.35 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正协作规范 INV-CB-07 指向的 Basic Design 章节为 §16.78（§16.56 保留给 Schedule D5），并确认实现仍以 1 秒 `CanvasOutboxPoller` 轮询为基线；推送、双边草稿/冲突读取、持久 Outbox 恢复与 ≤1 秒 p99 仍为 WLD-7 目标，未宣称已实现。 | 用户要求明确当前轮询实现与目标事件推送设计的差别，并确保双方冲突草稿可读可恢复。 |
 
 ## 8. Current execution state (2026-10-23)
 
