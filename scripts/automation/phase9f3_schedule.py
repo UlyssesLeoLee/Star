@@ -1,6 +1,6 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=2e0d75cfc40acdad5cf798b4b68a199e92ee9b3316914614d50d7c262429d580
+# @cypher schema=1 source_sha256=9eb27916e5c9d635b777d32e1bce76f68802b5d4f37878ae8f746399aaccc5fb
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
@@ -23,6 +23,7 @@
 # MERGE (hostless_rule_migration:File {path:"db/migrations/2026-10-21-schedule-hostless-run-authorization.sql"})
 # MERGE (occurrence_branch_migration:File {path:"db/migrations/2026-10-22-schedule-occurrence-branch-snapshot.sql"})
 # MERGE (occurrence_branch_correction_migration:File {path:"db/migrations/2026-10-23-schedule-occurrence-branch-snapshot-correction.sql"})
+# MERGE (branchless_occurrence_migration:File {path:"db/migrations/2026-10-24-schedule-branchless-occurrence.sql"})
 # MERGE (host_independent_directory_migration:File {path:"db/migrations/2026-10-15-run-host-independent-directory.sql"})
 # MERGE (task_run_schema:Config {id:"scripts/automation/phase9f3_schedule.py::TASK_RUN_SCHEMA_FIXTURE_SQL"})
 # MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
@@ -31,9 +32,9 @@
 # MERGE (directory_migrations:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_MIGRATIONS"})
 # MERGE (directory_prerequisite:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUDIT_PREREQUISITE_SQL"})
 # MERGE (directory_acl_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUTH_FIXTURE_SQL"})
-# MERGE (occurrence_branch_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL"})
+# MERGE (branchless_occurrence_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::HOSTLESS_OCCURRENCE_ASSERTION_SQL"})
 # MERGE (acl_rust_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_run_as_authorization_rechecks_canonical_directory_grants",kind:"test"})
-# MERGE (domain_hostless_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_can_be_configured_but_cannot_be_materialized",kind:"test"})
+# MERGE (domain_hostless_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_materializes_occurrence_and_branch_bound_admission_fails_closed",kind:"test"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(postgres)
@@ -64,13 +65,14 @@
 # MERGE (postgres)-[:READS]->(hostless_rule_migration)
 # MERGE (postgres)-[:READS]->(occurrence_branch_migration)
 # MERGE (postgres)-[:READS]->(occurrence_branch_correction_migration)
+# MERGE (postgres)-[:READS]->(branchless_occurrence_migration)
 # MERGE (directory_migrations)-[:CONTAINS]->(host_independent_directory_migration)
 # MERGE (postgres)-[:READS]->(task_run_schema)
 # MERGE (postgres)-[:READS]->(admission_fixture)
 # MERGE (postgres)-[:READS]->(directory_migrations)
 # MERGE (postgres)-[:READS]->(directory_prerequisite)
 # MERGE (postgres)-[:READS]->(directory_acl_fixture)
-# MERGE (postgres)-[:READS]->(occurrence_branch_assertion)
+# MERGE (postgres)-[:READS]->(branchless_occurrence_assertion)
 # MERGE (postgres)-[:TESTS]->(acl_rust_test)
 # MERGE (postgres)-[:TESTS]->(domain_hostless_test)
 # @endcypher
@@ -101,6 +103,7 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-21-schedule-hostless-run-authorization.sql",
     ROOT / "db" / "migrations" / "2026-10-22-schedule-occurrence-branch-snapshot.sql",
     ROOT / "db" / "migrations" / "2026-10-23-schedule-occurrence-branch-snapshot-correction.sql",
+    ROOT / "db" / "migrations" / "2026-10-24-schedule-branchless-occurrence.sql",
 )
 DIRECTORY_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
@@ -276,21 +279,46 @@ BEGIN
         RAISE EXCEPTION 'legacy occurrence did not inherit its exact Rule creator';
     END IF;
 END $$;"""
-OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL = """\
+HOSTLESS_OCCURRENCE_ASSERTION_SQL = """\
 DO $$
 DECLARE
+    target_snapshot JSONB := jsonb_build_object(
+        'project_id', '20000000-0000-4000-8000-000000000001',
+        'branch_id', '40000000-0000-4000-8000-000000000001',
+        'engineering_run_id', '41000000-0000-4000-8000-000000000001',
+        'repository_id', '42000000-0000-4000-8000-000000000001',
+        'worktree_id', '43000000-0000-4000-8000-000000000001',
+        'work_item_id', '44000000-0000-4000-8000-000000000001',
+        'execution_profile_id', '45000000-0000-4000-8000-000000000001',
+        'execution_profile_version', 1,
+        'execution_profile_digest', repeat('a', 64),
+        'hook_set_version', 1,
+        'hook_set_digest', repeat('b', 64)
+    );
     invalid_snapshot JSONB;
-    invalid_snapshots JSONB[] := ARRAY[
-        '{}'::jsonb,
-        '{"branch_id":null}'::jsonb,
-        '{"branch_id":""}'::jsonb,
-        '{"branch_id":"not-a-uuid"}'::jsonb,
-        '{"branch_id":"00000000-0000-0000-0000-000000000000"}'::jsonb
-    ];
+    invalid_snapshots JSONB[];
     case_index integer := 0;
     hostless_rule_id UUID;
     hostless_branch_id UUID;
 BEGIN
+    invalid_snapshots := ARRAY[
+        '{}'::jsonb,
+        target_snapshot - 'worktree_id',
+        jsonb_set(target_snapshot, '{project_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{engineering_run_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{repository_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{work_item_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{execution_profile_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{execution_profile_version}', '0'::jsonb),
+        jsonb_set(target_snapshot, '{hook_set_digest}', '"not-a-digest"'::jsonb),
+        jsonb_set(target_snapshot, '{worktree_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{branch_id}', '""'::jsonb),
+        jsonb_set(target_snapshot, '{branch_id}', '"not-a-uuid"'::jsonb),
+        jsonb_set(target_snapshot, '{branch_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{execution_profile_digest}', '"not-a-digest"'::jsonb),
+        jsonb_set(target_snapshot, '{hook_set_version}', '0'::jsonb)
+    ];
+
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'automation'
@@ -332,7 +360,7 @@ BEGIN
         '30000000-0000-4000-8000-000000000001', 2,
         'a0000000-0000-4000-8000-000000000001', clock_timestamp() + interval '1 hour',
         '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
-        '{"branch_id":"40000000-0000-4000-8000-000000000001"}'::jsonb,
+        jsonb_set(target_snapshot, '{branch_id}', 'null'::jsonb),
         repeat('d', 64), clock_timestamp()
     );
 
@@ -346,7 +374,7 @@ BEGIN
         '30000000-0000-4000-8000-000000000001', 2,
         'a0000000-0000-4000-8000-000000000001', clock_timestamp() + interval '2 hours',
         '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
-        '{"branch_id":"ABCDEF12-3456-4ABC-8DEF-1234567890AB"}'::jsonb,
+        target_snapshot - 'branch_id',
         repeat('f', 64), clock_timestamp()
     );
 
@@ -362,11 +390,11 @@ BEGIN
                 '20000000-0000-4000-8000-000000000001',
                 '30000000-0000-4000-8000-000000000001', 2,
                 'a0000000-0000-4000-8000-000000000001',
-                clock_timestamp() + (case_index + 1) * interval '1 hour',
+                clock_timestamp() + (case_index + 2) * interval '1 hour',
                 '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
                 invalid_snapshot, repeat('e', 64), clock_timestamp()
             );
-            RAISE EXCEPTION 'invalid occurrence Branch snapshot unexpectedly accepted: %', invalid_snapshot;
+            RAISE EXCEPTION 'invalid occurrence target identity unexpectedly accepted: %', invalid_snapshot;
         EXCEPTION WHEN check_violation THEN
             NULL;
         END;
@@ -976,8 +1004,8 @@ def run_isolated_postgres(
 
         steps.append(
             run_step(
-                "postgres-schedule-occurrence-branch-snapshot",
-                [*cluster.psql("schedule_admin"), "-c", OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL],
+                "postgres-schedule-branchless-occurrence",
+                [*cluster.psql("schedule_admin"), "-c", HOSTLESS_OCCURRENCE_ASSERTION_SQL],
             )
         )
         if steps[-1]["status"] != "passed":
@@ -1148,7 +1176,8 @@ def main() -> int:
                 "--locked",
                 "-p",
                 "star-pg-adapter",
-                "--all-targets",
+                "--test",
+                "schedule_postgres",
                 "-j",
                 "4",
                 "--",

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e2b4778530f59e69660fb28f27c8ac6392b1f6e32867de5909f902db0cd04aac
+@cypher schema=1 source_sha256=374ccf79d7f1c848d61ae380fbd6d467fbb787c1f83474800c7adb2639c0609b
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (repo:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository"})
 MERGE (error:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::ScheduleRepositoryError"})
@@ -18,6 +18,7 @@ MERGE (rule_match:Symbol {id:"crates/star-pg-adapter/src/repository/automation_s
 MERGE (pool:ExternalService {id:"sqlx.PgPool",kind:"type"})
 MERGE (transaction:ExternalService {id:"sqlx.Transaction",kind:"type"})
 MERGE (schedule_rule:Table {id:"automation.schedule_rule_revision"})
+MERGE (branch_id:Column {id:"automation.schedule_rule_revision.branch_id"})
 MERGE (run_as_actor:Column {id:"automation.schedule_rule_revision.run_as_actor_id"})
 MERGE (occurrence:Table {id:"automation.occurrence"})
 MERGE (occurrence_run_as_actor:Column {id:"automation.occurrence.run_as_actor_id"})
@@ -65,6 +66,7 @@ MERGE (terminalize)-[:WRITES]->(event)
 MERGE (purge)-[:CALLS]->(set_tenant_scope)
 MERGE (purge)-[:WRITES]->(dispatch)
 MERGE (rule_match)-[:READS]->(schedule_rule)
+MERGE (rule_match)-[:READS]->(branch_id)
 MERGE (queue_admission:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::persist_admission_request",kind:"method"})
 MERGE (result_admission:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository::resolve_admission_result",kind:"method"})
 MERGE (owner_scope:Symbol {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::set_schedule_owner_scope",kind:"function"})
@@ -859,7 +861,7 @@ async fn persisted_rule_matches(
            AND misfire_policy = $14 AND misfire_max_occurrences = $15 AND pause_policy = $16 \
            AND retry_max_attempts = $17 AND retry_initial_backoff_seconds = $18 \
            AND retry_max_backoff_seconds = $19 AND deadline_seconds = $20 \
-           AND branch_id = $21 AND engineering_run_id = $22 AND repository_id = $23 \
+           AND branch_id IS NOT DISTINCT FROM $21 AND engineering_run_id = $22 AND repository_id = $23 \
            AND worktree_id = $24 AND work_item_id = $25 AND execution_profile_id = $26 \
            AND execution_profile_version = $27 AND execution_profile_digest = $28 \
            AND hook_set_version = $29 AND hook_set_digest = $30 \

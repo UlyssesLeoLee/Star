@@ -1,7 +1,8 @@
 # BD-AUTOMATION-SCHEDULE-API-001 — Basic Design Addendum
+> WLD-3 local verification (2026-10-24): Rust/Cargo 1.99.0 plus the disposable PostgreSQL runner passed 47/47; Schedule PostgreSQL integration passed 6/6. The runner exposed and verified the fix for SQL CHECK NULL-pass behavior on required canonical identity. This is local acceptance only; target DB, production authorization, worker/admission and execution remain open.
 
 > Status: 🟡 D20 owner-native receive slices are opt-in and pass combined Rust 1.99.0 package checks/tests/target-crate Clippy. The cumulative PostgreSQL 18.6 WSL ext4 schema-only runner passed 89/89 steps, including the restricted role/grants/RLS contract; the earlier 83/83 run remains historical. SQLx origin target compilation succeeded on Rust 1.98.1 with `--ignore-rust-version`, while the focused harness was 0 passed / 0 failed / 1 ignored and did not execute SQL. Windows-native PostgreSQL `pg_ctl`, production role provisioning/grants, live TLS, recovery, BI, performance and execution remain open. No NATS process or Multipass instance was started. This evidence covers WSL/Linux only; Windows runtime compatibility is unverified.
-> Version: 0.63 | Date: 2026-10-22
+> Version: 0.65 | Date: 2026-10-24
 > Parent: `docs/basic-design.md` §16 and `docs/data-design.md` §4.13.
 
 ## 1. Placement in the Worktree-first architecture
@@ -13,6 +14,9 @@ The D2 disposable PostgreSQL runner passed 29/29 steps, including repeated bindi
 Schedule Rules are an Automation capability owned by an Engineering Run. The API is nested under Project → Engineering Run. A Schedule Rule references the Run's Branch, Repository, local Worktree, and Task Card; it does not create a separate workspace or bypass Run authorization. The UI may configure rules from the Run's Automation app. Selecting a Worktree remains the focus/CLI checkout decision and is not itself schedule authorization.
 
 ## 2. Components and transaction boundary
+### 2.1 Hostless occurrence materialization and persistence
+
+Remote Branch is optional Schedule target metadata. A validated Rule with no `branch_id` may produce a deterministic occurrence whose durable snapshot still includes canonical non-nil Project, Engineering Run, Repository, Worktree, Task and Profile identities plus positive Profile/HookSet versions and digests. The forward-only snapshot migration accepts Branch omission or JSON null and rejects malformed/nil present Branch values; null-safe Rule matching preserves replay idempotency. This contract creates no admission, authorization grant, reservation or executor capability.
 
 `star-api-rest::group_api::schedule_rules` is the authenticated REST boundary and is merged into `build_group_router`, which the REST binary uses. The workspace explicitly selects `jsonwebtoken`'s RustCrypto backend for deterministic RS256 signing/verification. Request-level tests run all four methods through the production router: missing credentials return 401, signed JWTs with insufficient scope return 403 before database access, and an oversized write body with a valid write scope returns 413; rejection responses carry private/no-store headers. These tests prove route wiring, token validation, scope rejection, and the body cap, but do not validate accepted Project/Run access, role grants, target ownership, or deployment. The boundary composes Project binding, Engineering Run authorization, Worktree/Task ownership checks, execution Profile resolution, and effective HookSet verification. `domain-automation::schedule` validates the pinned recurrence contract. PostgreSQL stores the immutable rule revision, append-only audit fact, append-only event Outbox record, and short-lived command replay record.
 
@@ -177,6 +181,8 @@ This resolver verifies stored Run-owner content integrity and the canonical Run 
 
 | Version | Date | Change |
 |---|---|---|
+| v0.64 | 2026-10-24 | Allow branchless deterministic occurrence materialization and durable canonical snapshot persistence; specify null-safe replay and preserve all admission/execution fail-closed gates. |
+| v0.65 | 2026-10-24 | Record the completed local Rust 1.99.0/disposable PostgreSQL 47/47 runner and Schedule integration 6/6; document the canonical-identity CHECK NULL-semantics fix and keep production admission/execution gates open. |
 | v0.1 | 2026-10-03 | Define the initial Run-scoped component and storage boundary. |
 | v0.2 | 2026-10-04 | Record the reviewed persistence and cache-safety repair set. |
 | v0.3 | 2026-10-04 | Align Rule-revision currentness with the current-fact contract and evidence. |
@@ -511,7 +517,7 @@ Disposable PostgreSQL 18.6 verification passed 93/93 runner steps, including two
 
 ### 6.38 9F4H — Branch identity in persisted occurrence snapshots
 
-Hostless Engineering Runs may persist Schedule Rule revisions with `branch_id = NULL`; this is configuration/master data and remains unchanged. A materialized occurrence remains an execution input and must pin an exact remote Branch identity at `target_snapshot.rule_snapshot.target.branch_id`. Migration `2026-10-22-schedule-occurrence-branch-snapshot.sql` adds a `NOT VALID` CHECK that accepts only a case-insensitive, standard hyphenated, non-nil UUID string. The guarded `CASE` performs the UUID cast only after validating JSON type and syntax. The constraint leaves existing rows untouched and unbackfilled, while PostgreSQL checks all new and changed rows. The occurrence table still uses required `target_snapshot` JSONB and adds no duplicate Branch column.
+Hostless Engineering Runs may persist Schedule Rule revisions with `branch_id = NULL`; this is configuration/master data and remains unchanged. A materialized occurrence is durable scheduling input and may omit remote Branch identity when its canonical local target scope is complete. If present, `target_snapshot.branch_id` must be a non-nil UUID. Migration `2026-10-24-schedule-branchless-occurrence.sql` replaces the historical Branch-required check with absent/JSON-null allowance plus canonical identity and pinned Profile/HookSet checks. `NOT VALID` preserves unchanged legacy snapshots while enforcing the contract on inserts and updates. The occurrence table retains required `target_snapshot` JSONB and has no duplicate Branch column.
 
 The disposable harness is authored to apply the migration twice, store a complete Rule revision with a NULL Branch, accept lower/uppercase UUID snapshots, and reject missing, JSON-null, empty, malformed, and nil Branch values. Static migration-contract tests passed 3/3. The PostgreSQL harness was not executed (`psql`/`initdb` unavailable); Rust formatting/compile/tests are also unverified (`cargo`/`rustfmt` unavailable). This persistence constraint does not implement a worker, materializer, admission consumer, or executor; Schedule execution remains disabled.
 
