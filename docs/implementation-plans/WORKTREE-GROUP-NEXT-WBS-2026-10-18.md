@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿；§13 是 2026-10-25 最新设计决策增量；§12 保留此前集成快照；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.47；§13 是 2026-10-25 最新设计决策增量；§12 保留此前集成快照；Project↔Repository 0..N 与迁移核验后 CAS 解绑已确认，但 Project 身份/授权 authority 仍 OPEN，代码、DB/API 与 PostgreSQL 验收未完成；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -254,6 +254,7 @@ flowchart TD
 | v0.44 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the post-integration local checkpoint: reviewed WBS/VCD0 commit ee620d9a0b39c3d8bc91166c6c33aa3ad48fe9fd fast-forwarded into inactive Orca dev; dev=ee620d9a0b39c3d8bc91166c6c33aa3ad48fe9fd, main=02e0cbd8f87a8422100d4fdd83d54e7838ab1fff, dev...main=100/5; no fetch/push and remote freshness unknown. Confirm the existing requirements §50.8AW and Basic Design §16.78 scope fan-out to all authorized subscribers of the same canonical resource, not tenant-wide; connected updates are push-triggered, complete overlaps have no one-second holdback, and WLD-7/PT-09 remain OPEN/NOT_RUN. The three user reviewer briefs were restored and D:\Star was preserved. | User reiterated event-triggered collaboration, same-resource visibility, draft preservation and low resource use; WBS integration completed. |
 | v0.45 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Project Repository 0..N、retiring/migrate-before-unlink 与多 owner 幂等回执/零引用关闭门；修订 WLD-7 规则为语义重叠总是持久冲突，OT 仅为用户显式解决预览；新增 WLD1-R0..R2 与 WLD7-C1..C2 分阶段工作包。仅更新计划，不声称代码/数据库/运行时已完成 | 2026-10-25 design decision follow-up |
 | v0.46 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1-R0 bounded owner/source audit：当前没有持久 Project identity / ProjectRepository writer；建议 Project bounded context 持有关联，但需先决定并建立 Project 身份与授权 authority。拆分 WLD1-R0a owner/source decision 与 R0b relation foundation，并引用 `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`。未实现关联/API/迁移，也未运行 PostgreSQL/RLS/故障验收。 | WLD1-R0 static source audit complete; user owner decision pending |
+| v0.47 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落档已确认的 Project↔Repository 0..N 关系，以及活跃 Run/Worktree 引用迁移必须验证同 Project 的 active destination binding、Host checkout identity/root，并以 owner-local 原子 audit/Outbox 和 durable receipt 留证；所有 owner 新鲜回执与零引用对账后，再以 expected-revision CAS 并发安全解绑。Project identity/authorization authority 仍 OPEN；R0b/R1/R2 的源码、schema/API 与 PostgreSQL/RLS 验收均未实现/验证。 | 用户确认多仓关联和迁移、核验后才允许解绑；同步至 WBS 与 owner audit |
 ## 8. Current execution state (2026-10-23)
 
 This snapshot supersedes the older owner, RTK, local-ref and lane-status values above. Historical remote fetch results and earlier test reports retain their original dates and scopes.
@@ -361,31 +362,31 @@ These review reports are static evidence only. No tests, PostgreSQL, mTLS, deplo
 
 ## 13. ProjectRepository 解绑与语义重叠协作决策（2026-10-25）
 
-本节记录用户确认的设计约束，并取代其他章节中“Project 只绑定一个 Repository”或“OT 可变换的重叠编辑自动收敛”的旧表述。WLD1-R0 已完成有界源码审计并形成 `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`；当前仍没有 Project association writer、持久 Project identity/authorization writer、owner migration command、协作 conflict detector/resolve API，也没有运行数据库或客户端验收。
+本节记录用户确认的设计约束，并取代其他章节中“Project 只绑定一个 Repository”或“OT 可变换的重叠编辑自动收敛”的旧表述。Project↔Repository 0..N 和迁移、核验后解绑已确认；WLD1-R0 的有界源码审计指出当前没有 Project association writer、持久 Project identity/authorization writer 或 owner migration command。Project 身份/授权 authority 仍 OPEN；WLD1-R0b/R1/R2、协作 conflict detector/resolve API 的代码和 schema/API 均未完成，也没有目标 PostgreSQL、RLS 或客户端验收证据。
 
 ### 决策
 
-- Project↔Repository 是 0..N；default_repository_id 可空且只服务 UI 排序/预选，不参与授权，不自动写 Run binding。
-- 解绑先将关联置为 retiring 并冻结新 Run binding/Worktree create/import，再由 Run Directory 与 Worktree/Host owners 在各自事务内迁移到同 Project 的有效替代仓库，或显式退役不再需要的 checkout 引用。owner 以幂等 operation/receipt 逐项推进；所有最终回执成功且新鲜串行化对账为零活动引用之后，Project owner 才关闭关联。失败/超时/撤权/未知引用数维持 retiring/fail closed；无跨 owner 事务或直接写表。
+- Project↔Repository 是 0..N；default_repository_id 可空且只服务 UI 排序/预选，不参与授权，不自动写 Run binding。该关系数量与迁移顺序是已确认设计；Project identity / authorization 的 canonical writer 尚未确定，不得据此推定其 owner。
+- 解绑先由 Project link owner 用 expected revision CAS 将关联置为 `retiring`，并通过版本化 fence 阻止新 Run binding/Worktree create/import 使用该关联。Run Directory 与 Worktree/Host owners 在各自事务内将每个活跃引用迁移到同 Project 的另一个 active ProjectRepository link，或显式退役该引用；迁移前核验目标关联、目标授权和目标身份，迁移后验证已持久化的目标 Run binding，且 Host owner 还要核验 checkout Repository identity 与可信 root。每个 owner 必须在自己的事务中原子提交状态变更、append-only audit 与 Outbox，再发出绑定 operation、源/目标版本、owner revision 和验证结果的 durable idempotent receipt。所有 owner fence/receipt 成功后，进行新鲜的 owner-revision-aware 零活动引用 reconciliation，并以原预期 retiring revision 执行最终 CAS unlink；CAS 冲突必须中止解绑、重查引用与回执后重试。失败/超时/撤权/目标未验证/审计或 Outbox 缺失/未知引用数维持 `retiring`/fail closed；无跨 owner 事务或直接写表。
 - 文本任何语义重叠均形成持久冲突，即使 OT 能机械变换；两侧草稿在 owner conflict transaction 中 seal/pin，并由同一 conflict_id 通知参与者。OT 只在用户显式进入解决流程后提供无副作用预览，用户选择且 owner 当前 revision CAS 成功才写 canonical revision。
 
 ### WBS 工作包与完成门
 
 | 工作包 | 优先级 | 产物 | 依赖 | 完成门/当前状态 |
 |---|---|---|---|---|
-| WLD1-R0a Project 身份与授权 authority 决策/建立 | P0 | 明确持久 Project identity 与成员授权的 canonical writer；用户选择 Star 原生 Project owner 或宿主 Project 服务；若选择 Star 原生，建立 Project identity / authorization owner 与版本化迁移边界 | 本轮 source audit 已完成；等待用户确认 authority | OPEN；审计报告确认现有 ProjectRepository 为内存实现，仓库没有可证的持久 Project identity / 授权 writer；未实现 |
-| WLD1-R0b ProjectRepository 关联基础 | P0 | Project owner 写入 0..N Repository links、optional default preference、CAS/version、retiring 状态、幂等 operation/outbox/receipt；不跨 owner 直接写 | WLD1-R0a；SCM Repository master identity/authorization contract | OPEN；未实现 schema/API；需 RLS、授权、重复/replay 与 CAS 验收 |
-| WLD1-R1 Run/Worktree 引用迁移 | P0 | Run Directory binding migration 与 Worktree/Host checkout migration/retire commands；各 owner 本地事务、版本门和可恢复进度/完成回执 | WLD1-R0b；可信 Host root/provider | 未实现；失败与未知保持 retiring；替代 Repository 同 Project 授权且 Host 校验实际 checkout identity |
-| WLD1-R2 最终解绑与运行验收 | P0 | 新引用 freeze、并发 race、重放、owner outage、权限撤销、零活动引用对账与最终 unlink 的 API/DB/RLS/fault tests | WLD1-R1 | 未运行；只有全部 owner 新鲜回执和零引用证明通过才允许解绑，历史身份保持不变 |
+| WLD1-R0a Project 身份与授权 authority 决策/建立 | P0 | 识别并建立持久 Project identity 与成员授权的 canonical writer，明确版本化读写/授权契约及迁移边界；不得预设 Star 或宿主 authority | WLD1-R0 bounded source audit 已完成 | OPEN；本轮没有决定 authority，现有 `ProjectRepository` 仍为内存实现，仓库内没有可证的持久 Project identity / 授权 writer；未实现 |
+| WLD1-R0b ProjectRepository 关联基础 | P0 | 在 R0a owner 确定后写入 0..N Repository links、optional default preference、CAS/version、retiring fence、idempotent operation、owner-local atomic audit + Outbox 与 durable receipt；不跨 owner 直接写 | WLD1-R0a；SCM Repository master identity/authorization contract | 设计决策已确认，implementation OPEN；schema/API/代码未实现，PostgreSQL/RLS、授权、重放、审计/Outbox 原子性及 CAS 均未验证 |
+| WLD1-R1 Run/Worktree 引用迁移 | P0 | 每个 active Run/Worktree 引用迁至同 Project 的 active destination link 或显式退役；验证并持久化目标 Run binding，Host 验证 checkout Repository identity/trusted root；各 owner 在本地事务中原子记录状态、audit、Outbox 并提供 durable receipt | WLD1-R0b；可信 Host root/provider | 未实现/未验证；目标 link、目标授权、目标 binding 任一未证则不签发成功回执，失败与未知维持 retiring |
+| WLD1-R2 最终解绑与运行验收 | P0 | 对新引用 fence 与并发 race、重放、owner outage、权限撤销、owner-local audit/Outbox、durable receipts、零活动引用 reconciliation 和 expected-revision final unlink 执行 API/DB/RLS/fault tests | WLD1-R1 | 未实现/未运行；只有全部 owner 新鲜回执、已验证目标 binding、串行化零引用证明与最终 revision CAS 全部通过才允许解绑，历史身份保持不变 |
 | WLD7-C1 重叠检测与显式解决 | P1 | overlap_detector_version、冲突对与参与者通知；OT suggestion metadata 与用户选择/CAS 记录 | WLD-2 canonical owner APIs 与 WLD-6 durable Outbox/Inbox/fan-out | 设计已对齐；实现/DB/runtime OPEN，E2E-COLLAB-10/11、OT side-effect 与 stale-CAS 验收未运行 |
 | WLD7-C2 低资源跨实例推送闭环 | P1 | 双 owner、双 gateway、断线/restart/cursor recovery、bounded queue/RSS/CPU/PT-09 实证 | WLD7-C1；固定 Collaboration Profile 与目标环境 | 仍 OPEN/NOT_RUN；不能以本地 broadcast、轮询或 UI fixture 关闭 |
 
 ### 后续执行顺序
 
-1. WLD1-R0 源审计已完成并归档；先收敛用户对 Project 身份/授权 authority 的选择，再完成 R0a，禁止在 owner 未定时新建身份或授权表。
-2. 完成 R0b：Project owner 维护 ProjectRepository 0..N 关联与可选 default preference；SCM owner 只维护 Repository identity；Permission owner 负责成员/授权事实。
-3. 分开实现 Project retiring fence、Run Directory binding migration、Worktree/Host checkout migration；每个 owner 独立事务、审计、Outbox/Inbox、幂等回执和恢复门，不做跨 owner 写。
-4. 先在 disposable PostgreSQL 验证 0..N、迁移竞态、重放、拒绝新增引用、故障时保持 retiring、最终零活动引用解绑和历史审计，再考虑开放 Worktree mutation。
+1. WLD1-R0 源审计已完成并归档；R0a 的 Project identity/authorization authority 仍 OPEN，实施前必须从权威证据确定，禁止凭本轮 0..N 决策推定 owner 或新建身份/授权表。
+2. authority 与 owner 确认后完成 R0b：Project owner 维护 ProjectRepository 0..N 关联与可选 default preference；SCM owner 只维护 Repository identity；Permission owner 负责成员/授权事实。
+3. 分开实现 Project retiring fence、Run Directory binding migration、Worktree/Host checkout migration；逐条迁移前验证同 Project active destination，迁移后核对实际持久 binding 与 checkout identity/root；每个 owner 将状态、audit、Outbox 原子提交并提供 durable idempotent receipt，不做跨 owner 写。
+4. 在 disposable PostgreSQL 验证 0..N、owner-local audit/Outbox 原子性、目标绑定证据、迁移竞态、重放、拒绝新增引用、故障时保持 retiring、零引用 reconciliation 与 expected-revision CAS unlink，再考虑开放 Worktree mutation。
 5. 按新的 overlap 规则实现 WLD-7 owner detector、draft seal/pin、participant unread、OT preview-only resolve，并跑 E2E-COLLAB-10/11 与双 gateway/PG/RSS/PT-09。
 6. 重新审阅 requirements/basic/DD/SRS/BD/spec/data/test/traceability/WBS 与实际实现；每道 owner、数据库、运行时和性能门分别给证据，未通过前保持 fail closed。
 
