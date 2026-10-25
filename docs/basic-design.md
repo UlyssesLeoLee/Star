@@ -5937,7 +5937,7 @@ Owner commit 后通过有界、可合并的 owner-local IPC 或事务提交通�
 
 协作事件的 stream identity 是 tenant + canonical resource + owner generation；每条 owner 事实包含 `event_id`、`stream_id`、单调 `sequence`、schema version、owner revision、actor、correlation/idempotency 与 occurred-at。Outbox relay 经可替换的持久 transport adapter 扇出；实时 gateway 是可重建投影。浏览器以 `(stream_id, sequence, event_id)` 去重，持久游标只表示恢复位置。慢消费者、跨实例切换或 gateway 重启后从 owner durable stream 恢复；cursor 已过保留边界时重新取得当前授权 snapshot，并显式报告历史缺口。
 
-**冲突延迟目标**：在线、授权有效且网络正常的冲突参与者，从 owner conflict transaction commit 到客户端确认提醒的 p99 目标不超过 1 秒。超时不能转为静默成功：记录超时/未 ACK 状态、显示延迟标记，并确保冲突仍可从 Run Inbox/冲突列表或 cursor replay 读取。离线用户在恢复连接后看到同一持久冲突和自己的 draft。该目标须在目标 DB、跨 gateway 实例与指定并发档位下测量后方可关闭验收。
+**冲突延迟目标**：在线、授权有效且网络正常时，从 owner conflict transaction commit 到双方客户端确认显示带同一 `conflict_id` 的持久未读提醒，p99 不超过 1 秒。1 秒是送达 SLO，不是固定轮询周期或冲突判定时间窗；冲突始终按 base revision 与重叠范围判定。传输 ACK 只确认客户端收到事件，不清除未读冲突；用户查看冲突前，双方的未读状态与各自草稿均可恢复。超时不能转为静默成功：记录超时/未 ACK 状态、显示延迟标记，并确保冲突仍可从 Run Inbox/冲突列表或 cursor replay 读取。离线用户在恢复连接后看到同一持久冲突和自己的 draft。该目标须在目标 DB、跨 gateway 实例与指定并发档位下测量后方可关闭验收。
 
 **读取/解决 API 的逻辑契约**：
 
@@ -5963,4 +5963,4 @@ Owner commit 后通过有界、可合并的 owner-local IPC 或事务提交通�
 
 **验收要求**：对相同 base 的双用户同字段编辑、不同字段编辑、重叠文本 span、250 ms draft sync、owner transaction/Outbox 原子性、重复/乱序/迟到事件、跨实例与进程重启恢复、离线参与者、权限撤销、并发 resolve、连接背压、队列 RSS、CPU 和 1 s p99 通知逐项出具可重放证据。单元测试、内存 hub 测试、浏览器本地草稿或单实例 smoke test 不能替代跨实例/目标 DB 性能验收。
 
-修订 v7.05 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：新增资源范围 push、owner revision/CAS、双边 draft/conflict、1 秒冲突提醒和有界内存/游标恢复基本设计；核对并明示浏览器 Group 当前调用 `CanvasOutboxPoller.pollOnce`；增加共同 resource fence 与 owner commit wake-up，规定活动编辑事件触发 debounce、空闲不轮询；同步 requirements v7.02、Group DD v5.27、WBS v0.29。当前内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
+修订 v7.06 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：明确 p99 ≤1 秒是双方显示同一持久未读 conflict ID 的送达 SLO，不是轮询/冲突判定窗口；未读状态仅由查看/显式标记清除，双方 draft 在冲突事实中精确固定。同步 requirements v7.03、Group DD v5.28、WBS v0.30。当前内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。

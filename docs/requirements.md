@@ -1,6 +1,6 @@
 # Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.02）
 
-> **v7.02 实时协作与冲突保全设计增量（2026-10-24）**：协作采用持久化 owner 事件驱动的推送，不采用定时轮询作为实时主链路。文档/任务/画布各自 owner 在一个事务内验证 base revision、保存 revision 或冲突双方草稿并写 Outbox；协作 Gateway 将受授权事件推送给相关资源的在线订阅者。重叠编辑绝不静默覆盖：双方草稿均可恢复、双方收到冲突提醒，并可在权限复验后查看 base/当前/双方 patch 与显式解决。在线冲突通知目标为持久化检测后 1 秒内送达；断线时依赖 owner 事实、持久游标回放及未读冲突视图恢复。当前浏览器 Group 投影仍会实例化 `CanvasOutboxPoller` 并周期调用 `pollOnce`；BFF WebSocket/SSE 仍是非持久化或占位路径，均须纳入 WLD-7 替换与验收，不能按目标设计描述为已实现。详见 §50.8AW、基本设计 §16.56、Group DD §8.27 与 WBS WLD-7。
+> **v7.03 实时协作与冲突保全设计增量（2026-10-24）**：协作采用持久化 owner 事件驱动的推送，不采用定时轮询作为实时主链路。文档/任务/画布各自 owner 在一个事务内验证 base revision、保存 revision 或冲突双方草稿并写 Outbox；协作 Gateway 将受授权事件推送给相关资源的在线订阅者。重叠编辑绝不静默覆盖：双方草稿均可恢复、双方收到同一冲突 ID 的持久未读提醒，并可在权限复验后查看 base/当前/双方 patch 与显式解决。在线通知 p99 ≤ 1 秒是冲突提交到双方客户端显示提醒的送达目标，不是轮询间隔或冲突判定时间窗；冲突按 owner revision 与重叠范围判定。断线时依赖 owner 事实、持久游标回放及未读冲突视图恢复。当前浏览器 Group 投影仍会实例化 `CanvasOutboxPoller` 并周期调用 `pollOnce`；BFF WebSocket/SSE 仍是非持久化或占位路径，均须纳入 WLD-7 替换与验收，不能按目标设计描述为已实现。详见 §50.8AW、基本设计 §16.56、Group DD §8.27 与 WBS WLD-7。
 
 > **v7.01 WLD-3 hostless occurrence 验证（2026-10-24）**：完整 `phase9f3_schedule.py` runner 使用 Rust/Cargo 1.99.0 与本地一次性 PostgreSQL，通过 47/47 steps；domain tests 31/31、两个 Schedule Rule API 授权聚焦测试各 1/1、Schedule PostgreSQL integration 6/6。验证覆盖 migration 重放、RLS、canonical identity 与 branchless/null Branch 幂等物化；修正 SQL `CHECK` 对 NULL 结果会放行的问题。Adapter Clippy 仅对本 lane 的 `schedule_postgres` target 通过，整 crate 检查仍受五项无关旧测试 lint 阻断。仅为本地隔离验收，不代表目标数据库、生产授权、worker/admission 或执行通过；Schedule execution 继续 fail closed。
 
@@ -3795,7 +3795,7 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 
 ### 50.8AW Worktree-scoped push collaboration、draft recovery 与 conflict resolution（设计）
 
-**意图与范围**：Task Card、Canvas Document 以及其他支持协作编辑的 Run App 均按 canonical resource scope 工作。一次内容更新提交后，Star 应主动把版本变更通知同一 Project/Engineering Run/Worktree/资源内有权访问的协作者；“全局发送”指该资源的全部授权订阅者，不代表向全租户或无关 Run 广播。实时协作不得依赖固定周期轮询。当前内存 WebSocket/SSE 广播只属于进程内低延迟扇出，不能作为业务事实、持久传输、跨实例广播、草稿存储或协作完成证据。
+**意图与范围**：Task Card、Canvas Document 以及其他支持协作编辑的 Run App 均按 canonical resource scope 工作。一次内容更新提交后，Star 应主动把版本变更通知同一 Project/Engineering Run/Worktree/资源内有权访问的协作者；“全局发送”指该资源的全部授权订阅者，不代表向全租户或无关 Run 广播。实时协作不得依赖固定周期轮询。1 秒是 owner 冲突提交到两位在线参与者客户端显示同一持久未读提醒的 p99 送达目标，不是轮询节拍或冲突判定时间窗；判定始终依据 owner base revision 与重叠范围。当前内存 WebSocket/SSE 广播只属于进程内低延迟扇出，不能作为业务事实、持久传输、跨实例广播、草稿存储或协作完成证据。
 
 **Owner 与原子性**：Task、Canvas 等业务资源的 canonical owner 同时拥有该资源的 revision/CAS、Actor/Device-scoped draft、conflict/resolution fact、审计与 transactional Outbox；`domain-collaboration` 只拥有连接/订阅/presence 和受授权事件路由，不复制或直接修改 Task/Canvas 业务状态。同一资源的 draft checkpoint/seal 与 revision/resolve 命令必须使用同一短时 resource revision fence（或等价数据库锁）串行化“检查已提交 revision + 检查有效 draft + 更新 changed-path index”的临界区，避免一个提交扫描结束后并发 draft 才进入索引而漏报冲突；不同资源仍可并行，网络传输/大块组装不得持有该 fence。一次 owner transaction 中复验当前 actor 与 RunContext、比较 `base_revision`、判定 intervening changes、保存 draft 或新 revision、写 conflict fact/participant visibility 与 Outbox，然后提交。提交后 owner 通过有界可合并的本地 IPC 或事务提交通知唤醒 relay，由 relay 立即 claim 有界批次；wake-up 只是提示，Outbox 才是持久事实。正常发布不依赖固定间隔扫描；启动、断线重建、明确 gap 和有界退避重试才查询 durable backlog。事件只在 commit 成功后扇出；事件传输失败由 durable Outbox 重试，不回滚已提交事实。
 
@@ -3813,11 +3813,11 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 |---|---|
 | AC-COLLAB-01 | 常态连接下客户端无固定间隔轮询，Outbox 正常发布由 owner commit 后的有界 wake-up 驱动而非周期扫表；更新由 owner transaction + Outbox 触发资源 scoped push，重新连接只按 opaque cursor catch-up。 |
 | AC-COLLAB-02 | 两个 actor 从相同 base revision 修改不同字段时都保留变更并生成新 revision；变更相同字段/重叠文本 span 时不得丢失任何一方内容；draft checkpoint/seal 与 revision CAS 并发时共用 resource fence，竞态测试不得漏报冲突。 |
-| AC-COLLAB-03 | 冲突 transaction 后双方可重载各自 draft，且可在重新授权后读取完整 base/current/mine/theirs；无关用户不能读私有 draft 或冲突 payload。 |
-| AC-COLLAB-04 | 连接在线且订阅仍授权时，所有 conflict participants 的提醒从 owner commit 到客户端 receipt p99 ≤ 1 s；故意延迟/丢失推送时，durable conflict inbox/cursor replay 仍能恢复，UI 明确标出迟到而非隐藏冲突。 |
+| AC-COLLAB-03 | 冲突 transaction 原子固定双方精确 draft revision；冲突后双方可分别重载自己的 draft，并在重新授权后读取完整 base/current/mine/theirs；无关用户不能读私有 draft 或冲突 payload。 |
+| AC-COLLAB-04 | 连接在线且订阅仍授权时，双方客户端均显示带同一 `conflict_id` 的持久未读提醒，owner commit 到双方客户端 receipt p99 ≤ 1 s；传输 ACK 不自动清除未读状态。故意延迟/丢失推送时，durable conflict inbox/cursor replay 仍能恢复，UI 明确标出迟到而非隐藏冲突。1 秒不得被实现为轮询周期或冲突判定窗口。 |
 | AC-COLLAB-05 | 断线重连、重复事件、重启、cursor gap/过期、撤权及并发 resolve 均无丢稿、无重复业务 effect；版本冲突采用 CAS/幂等而非 last-write-wins。 |
 | AC-COLLAB-06 | 慢消费者触发有界背压和可恢复重连；压测报告连接/订阅规模、patch/queue 上限、事件延迟、内存 RSS 与 CPU，不以无界缓冲或每次全文档广播满足延迟。 |
 
 **交付状态**：本节是需求/设计基线。当前已知 BFF `CollaborationWssHub` 是进程内 `tokio::broadcast` 占位且 lagged 事件会被跳过，Worktree SSE hub 尚无业务 event fan-in；当前 Canvas cursor/REST 读取不是 push delivery/consumer ACK。draft/conflict owner tables、Outbox relay、跨实例 gateway、participant inbox/replay 与端到端性能验收未实现，不能把现有 WebSocket endpoint/Canvas CAS 标为多人实时协作已完成。
 
-修订 v7.02 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：用户要求将轮询式同步改为事件触发推送，并要求一秒冲突提醒、双边草稿保全、读取对方修改内容和低消耗高并行协作；新增 AC-COLLAB-01–06 与 WLD-7 依赖，核对并明示浏览器 Group 当前调用 `CanvasOutboxPoller.pollOnce`；增加共同 resource fence 以封闭草稿/提交竞态，并明确 owner commit wake-up 驱动 Outbox；不宣称当前 scaffold 已完成。
+修订 v7.03 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：明确 1 秒是双方可见冲突提醒的 p99 送达 SLO，而非轮询周期或冲突判定窗；要求双方持久未读提醒共享同一冲突 ID、各自草稿原子固定，传输 ACK 不清除未读状态。当前实现仍未通过 WLD-7。

@@ -1,6 +1,6 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v0.2 (2026-10-24；v0.2 push/conflict 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v0.3 (2026-10-24；push/conflict 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–06
 > - 《Basic Design》§2.1(表 24), §5.7, §16.56
@@ -344,7 +344,7 @@ A durable owner event includes `event_id`, `stream_id`, monotonically increasing
 
 One app window multiplexes up to 100 authorized resource subscriptions over one connection. The initial connection budget is 64 queued events or 128 KiB, whichever is reached first. A slow consumer receives `resync_required` where possible and is closed; it then catches up from its durable cursor. Never silently drop durable business events and continue from a later sequence. Presence and cursor events may be coalesced/throttled under short TTL because they are observed state, not business facts. Metrics track commit-to-client delay, Outbox lag, conflict count, draft recovery, replay gap, per-connection bytes and RSS without retaining unbounded event payloads.
 
-For online participants with valid subscriptions and healthy network, conflict notification has p99 ≤ 1 s from owner transaction commit to client receipt/ACK. A delivery timeout is observable and leaves the conflict unread/replayable. Offline clients see the durable conflict after reconnect; no design promises delivery across a network partition, so persistence and later recovery are mandatory.
+For online participants with valid subscriptions and healthy network, both clients must display a persistent unread notice with the same `conflict_id` at p99 ≤ 1 s from owner transaction commit. This is a delivery SLO, not a polling cadence or conflict-detection window; overlap is determined by owner base revision and validated changed ranges. Transport ACK confirms receipt only and cannot mark a conflict read. A delivery timeout is observable and leaves both participant conflict states unread/replayable. Offline clients see the durable conflict after reconnect; no design promises delivery across a network partition, so persistence and later recovery are mandatory.
 
 ### 13.5 Acceptance gates
 
@@ -352,9 +352,11 @@ For online participants with valid subscriptions and healthy network, conflict n
 |---|---|
 | AC-COLLAB-01 | No fixed-interval client polling while connected and no periodic Outbox table scan in the normal publication path; owner commit emits a bounded wake-up, and committed Outbox facts route to authorized subscriptions for exactly that resource scope. |
 | AC-COLLAB-02 | Concurrent disjoint edits merge without lost updates; overlapping edits preserve both drafts, create one recoverable conflict and require explicit CAS resolution. Draft checkpoint/seal and revision CAS share a per-resource fence; race tests prove no missed overlap. |
-| AC-COLLAB-03 | Both conflict participants can read base/current/mine/theirs after refresh; unrelated principals cannot read the private draft or conflict content. |
-| AC-COLLAB-04 | Online participant notification p99 ≤ 1 s; offline, delayed ACK, process restart and cursor gap preserve and replay the same conflict. |
+| AC-COLLAB-03 | The owner transaction pins both exact draft revisions; both conflict participants can recover their own draft and read base/current/mine/theirs after fresh authorization; unrelated principals cannot read private draft or conflict content. |
+| AC-COLLAB-04 | Both online participants display the same persistent unread `conflict_id` at p99 ≤ 1 s after owner commit; transport ACK does not mark it read. Offline, delayed ACK, process restart and cursor gap preserve and replay the same conflict. The 1-second value is not a polling cadence or conflict window. |
 | AC-COLLAB-05 | Two gateway instances, bounded slow-consumer queue, owner/relay restart, duplicate/reordered delivery and permission revoke pass recovery and memory/latency acceptance. |
 | AC-COLLAB-06 | Draft/conflict owner tables have explicit Work/Transaction/Master classification, tenant RLS, content retention and audit; target grants and backup recovery are verified before production enablement. |
 
 The current code inventory is not a pass for these gates: `CollaborationWssHub` is process-local fan-out and reports dropped lagged frames; Worktree SSE has no durable business event fan-in; the Canvas cursor endpoint is a read seam, not a transport consumer ACK or live event delivery. Production status stays disabled until canonical owner draft/conflict APIs and cross-instance durable fan-out are verified.
+
+Revision v0.3 · 2026-10-24 · Mavis review: clarified dual-participant persistent unread notices, exact pinned drafts and that the 1-second objective measures push delivery rather than a poll/conflict window.

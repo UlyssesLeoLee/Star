@@ -31,7 +31,7 @@
 
 **多代理并行与 Rust 桌面性能硬约束**：设计必须为 Project/Worktree/Run/Agent/Plugin 定义资源预算、公平调度、有界队列、背压、取消与 drain；Rust 桌面前端必须采用分页/虚拟化、按需加载和有界缓存，避免 UI 阻塞及无界日志驻留。Pi 仅作为小核心、组合扩展、事件生命周期、可分支历史与上下文压缩的设计参考；产品执行核心与性能敏感桌面界面以 Rust 实现，不引入 Pi/Node 运行时替代实现。Agent、Memory、Skill、Context、Validation、Loop 与项目工程规范必须提供版本化扩展契约，Run 固定 profile/version/digest 与资源预算；第一期可用受控 Rust CLI adapter 调用现有工具，但权限、scope、上下文组装、事件/证据记录与独立验证由 Star 控制，并保留后续 Rust-native provider 替换路径。插件必须有版本化 capability 边界和隔离运行时，禁止在主进程加载任意 native code。
 
-**实时协作与冲突保护**：协作编辑必须由资源 owner 的事务事实与 transactional Outbox 触发授权范围推送；已连接用户不得依赖固定周期轮询获取实时更新，游标读取只用于首次加载、断线恢复或 gap 补齐。并发编辑必须基于 owner revision/CAS 检测重叠，保留双方可恢复的精确草稿修订、通知冲突参与者并在重新授权后提供对照和显式解决；不得静默采用 last-write-wins。连接、订阅、草稿、补丁、发送队列和缓存必须有界并支持慢消费者恢复，不能用进程内广播代替持久事实。
+**实时协作与冲突保护**：协作编辑必须由资源 owner 的事务事实与 transactional Outbox 触发授权范围推送；已连接用户不得依赖固定周期轮询获取实时更新，游标读取只用于首次加载、断线恢复或 gap 补齐。并发编辑必须基于 owner revision/CAS 检测重叠，保留双方可恢复的精确草稿修订；在线冲突在 owner commit 后 p99 ≤ 1 秒向双方显示同一 `conflict_id` 的持久未读提醒（1 秒是送达目标，不是轮询间隔或冲突判定窗口），并在重新授权后提供对照和显式解决；不得静默采用 last-write-wins。连接、订阅、草稿、补丁、发送队列和缓存必须有界并支持慢消费者恢复，不能用进程内广播代替持久事实。
 
 **原生 Hook 强约束**：安全关键 Hook 必须由 Rust 核心原生执行，fail-closed 且不可被插件替代或减弱；Project/Worktree 继承、Run 快照、生命周期门与 BI 事件使用同一版本化 HookSet 契约。旧 Python Hook handler 仅可作为显式非权威的兼容/观测输入，不得参与授权、命令放行或验收决策。
 
