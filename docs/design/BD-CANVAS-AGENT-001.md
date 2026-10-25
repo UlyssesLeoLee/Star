@@ -1,11 +1,11 @@
 # BD-CANVAS-AGENT-001
 
-> **无限画布 — Agent 管理域 (Agent Management Domain) 基本設計書 v0.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **无限画布 — Agent 管理域 (Agent Management Domain) 基本設計書 v0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档)
+> - 状态: 🟡 Draft v0.2 (2026-10-25 WLD-7 对齐；设计目标，运行时未验收)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
-> - 上位要件: [`docs/requirements/SRS-CANVAS-AGENT-001.md`](../requirements/SRS-CANVAS-AGENT-001.md) v1.2 (155KB, **46 项 = A1-A10 28 + A11 10 + A12 8**, 13 段, **14 张表 W/T/M 100% 覆盖**, 守门 14/14 通过, v0.63 反转多 A12 多人编辑 8 项)
+> - 上位要件: [`docs/requirements/SRS-CANVAS-AGENT-001.md`](../requirements/SRS-CANVAS-AGENT-001.md) v1.4 (155KB, **46 项 = A1-A10 28 + A11 10 + A12 8**, 13 段, **14 张表 W/T/M 100% 覆盖**, 守门 14/14 通过, v0.63 反转多 A12 多人编辑 8 项)
 > - 上位总册: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (总册, 双核心 78 项 = 46 + 32, 含 17:34 JST v0.63 反转) + [`docs/design/BD-CANVAS-001.md`](./BD-CANVAS-001.md) (root 写总册 BD, 本 BD 专题聚焦 A1-A12 详细)
 > - 平行专题 BD: [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) (双核心之 2: 游戏化 32 项, root 派 2 子代理之 2/2)
 > - 平行 view BD: [`docs/design/BD-AGENT-VIEW-001.md`](./BD-AGENT-VIEW-001.md) v0.1 (44KB, agent 视图画布, 5 view 跨块接口)
@@ -24,9 +24,11 @@
 
 ---
 
+> **A12 当前规范优先级（WLD-7；design-only）**：本文件 §1.5 是当前基本设计契约，服从 SRS-CANVAS-AGENT-001 v1.4、requirements §50.8AW / AC-COLLAB-01–08、Group Basic Design §16.78、Group DD §8.27、collaboration spec §13、WLD-7 owner-local data design v0.3 与 TEST-DESIGN-WORKTREE-CANVAS-001 v1.6 §4.8/§5.2。其他章节的旧 A12 transport、CRDT/LWW、固定容量/延迟、Envoy 与 schema 仅为历史草案。当前 runtime 仍 polling/process-local，WLD-7/PT-09 OPEN/NOT_RUN。
+
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-CANVAS-AGENT-001`](../requirements/SRS-CANVAS-AGENT-001.md) v1.2 的需求, 定义 **无限画布 — Agent 管理域 (Agent Management Domain)** 的基本設計:
+本文档基于 [`SRS-CANVAS-AGENT-001`](../requirements/SRS-CANVAS-AGENT-001.md) v1.4 的需求, 定义 **无限画布 — Agent 管理域 (Agent Management Domain)** 的基本設計:
 
 - 系统架构 (**5 view 跨域**: 機能 / データ / 動作 / モジュール / ネットワーク) 跨 A1-A12 46 项
 - 组件一覧 (A1-A12 12 子能力组件 + 复用 V0.1 组件 + 新增 12 module)
@@ -39,7 +41,7 @@
 
 **A11 必含**: 10 类关系边 + 4 维度协作影响 + 5 团队模板 + 同步桥 + 成就协同, **派生自** [`BD-AGENT-RELATIONSHIP-001` §1-§7](./BD-AGENT-RELATIONSHIP-001.md) v0.1 模板 (5-tier 架构 + 7 张表 W/T/M + 13 端点 + 8 UC, **1:1 映射**).
 
-**A12 必含**: 多人同时编辑 + 实时 cursor + 元素增删改同步 + Follow mode + 评论线程 + @ 提醒 + 冲突解决 (CRDT 选型) + 3 级权限 + audit log, **派生自** [`frontend-canvas-design.md` §4.1 模式 A Realtime 通道 + §4.6 PresenceCursor 升级](../frontend-canvas-design.md) (V0.1 design + 扩展实装, **1:1 映射**).
+**A12 必含**: 多人编辑、presence、元素变更、Follow、评论/mention、revision-fenced 冲突与草稿、资源授权和 owner audit/Outbox；历史 v0.1 的 transport/CRDT/LWW 选项不构成当前架构约束。当前契约见 §1.5。
 
 **dual-use 提醒**: 本 BD 不重复总册 BD (`BD-CANVAS-001.md` root 写) 跨域共享部分 (跨块接口 / 共享约束 / 公共表 / 公共 API 等), 本 BD 聚焦 **A1-A12 46 项详细设计 + 14 张表 + 23 API + 5 WebSocket**.
 
@@ -122,7 +124,7 @@
 | **A11.9** | 同步桥 UI 状态 (Memgraph ↔ LangGraph StateGraph, 4 状态 synced/syncing/error/offline) | P1 | `BD-AGENT-RELATIONSHIP-001` §6.3.2 + §1.1.2 |
 | **A11.10** | 跟 `SRS-AGENT-RELATIONSHIP-001` 协同 (Agent View "Relationship" tab) | P1 | `BD-AGENT-RELATIONSHIP-001` §1.1.4 AgentViewTab |
 
-#### 1.1.12 A12 多人编辑 (8 项, P0/P1, **派生自** `frontend-canvas-design.md` v0.1 §4.1 + §4.6, **v0.63 反转**)
+#### 1.1.12 A12 多人编辑 (v0.1 历史草案；当前规范见 §1.5；8 项, **派生自** `frontend-canvas-design.md` v0.1 §4.1 + §4.6, **v0.63 反转**)
 
 > **v0.63 反转声明** (per 2026-09-10 17:34 JST Ulysses 拍板"**多人编辑是要的**"): 撤回 2026-09-10 17:08 JST 砍多人编辑决定, A12 8 项必含, 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 `comment_pin` (A12.5). v0.63 反转行**显式标** per 守门 #1 禁回溯叙事.
 
@@ -131,7 +133,7 @@
 | **A12.1** | 多人同时编辑 (max 10 并发, ≤ 200ms P95, WSS 选型 P0 阻塞) | P0 | `frontend-canvas-design.md` §4.1 模式 A |
 | **A12.2** | 实时 cursor 同步 (PresenceCursor 升级, 12 色调色板, ≤ 100ms P95) | P0 | `frontend-canvas-design.md` §4.6 |
 | **A12.3** | 元素增删改实时同步 (跟 V0.1 localStorage 冲突, backend 持久化) | P0 | `frontend-canvas-design.md` §4.1 模式 A 扩展 |
-| **A12.4** | Follow mode (A 跟随 B 视角, GitHub Live Share UX, 1 canvas 1 follower) | P1 | `frontend-canvas-design.md` §4.9 透传 + GitHub Live Share |
+| **A12.4** | Follow mode (授权 Run/资源内跟随其他参与者视角) | P1 | `frontend-canvas-design.md` §4.9 透传（历史基线） |
 | **A12.5** | 多人评论线程 + @ 提醒 (V0.1 `comment_pin` line 253-262 升级) | P0 | `frontend-canvas-design.md` §3.4 `comment_pin` |
 | **A12.6** | 冲突解决 CRDT 选型 (Yjs / Automerge / LWW, P0 阻塞) | P0 | (新引入, per `SRS-AGENT-RELATIONSHIP-001` G-3 同步桥同源) |
 | **A12.7** | 协作权限 (view / comment / edit 3 级, BFF middleware 强制) | P1 | (新引入, per 总册 `SRS-CANVAS-001` §6.2.2) |
@@ -154,9 +156,9 @@
 | **5 域独立 Lead ≠ Star 22 DDD bounded context** | 业务子域↔DDD 映射 disclaimer 显式 | per 2026-08-31 22:45 JST Q1-D 拍板 |
 | **内置视频通话 (Miro Talk / Zoom)** | ❌ 砍掉, 留 P3+ | per `SRS-CANVAS-AGENT-001` §1.4 v0.63 反转行 |
 | **协作工具集成 (Slack / Jira)** | ❌ 砍掉, 留 P3+ | per `SRS-CANVAS-AGENT-001` §1.4 |
-| **A12 多人编辑 WSS 选型 (Yjs / Automerge / LWW / native WebSocket / Socket.IO)** | 拍板前 P0 阻塞, 拍板后落 `docs/design/REALTIME-CHANNEL-SELECTION-DECISION.md` | per A12.1 + A12.6 |
-| **A12 CRDT 选型** | 拍板前 P0 阻塞, 拍板后落 `docs/design/CRDT-SELECTION-DECISION.md` | per A12.6 |
-| **A12.7 view/comment/edit 3 级权限具体矩阵** | 5 域 Lead 真人到位后决策, 拍板前走 view-only 兜底 | per 守门 #14 v2 |
+| **A12 physical transport/Profile** | 由实现设计固定；transport 未定不阻塞 owner/outbox 逻辑契约，性能门仍 OPEN/NOT_RUN | per §1.5 |
+| **A12 冲突处理** | revision/path 裁决、双方 sealed draft 与双边提示为强制；OT 只允许显式 resolve 时作可选建议 | per §1.5 |
+| **A12.7 resource capability 映射** | RunContext 复验与撤权 fail-closed 已定；具体 owner capability 映射仍为实现/授权验收门 | per §1.5 |
 
 ### 1.3 文档结构 (10 段, per `BD-AGENT-RELATIONSHIP-001.md` v0.1 模板)
 
@@ -193,22 +195,43 @@
 
 **A11 1:1 派生验证**: A11 10 子项全部派生自 `BD-AGENT-RELATIONSHIP-001` v0.1 模板, 不重新设计 5-tier 架构 / 13 端点 / 7 张表 / 8 UC.
 
-#### 1.4.2 A12 派生自 `frontend-canvas-design.md` v0.1 §4.1 + §4.6 (1:1 映射)
+#### 1.4.2 A12 v0.1 派生记录（历史；当前契约见 §1.5）
 
 | A12 子项 | `frontend-canvas-design.md` v0.1 派生 | 备注 |
 |---|---|---|
 | A12.1 多人同时编辑 | §4.1 模式 A Realtime 通道 (BFF 推 element 增删改) | 扩展为多人 + WSS, V0.1 1 user → A12 N user |
 | A12.2 实时 cursor 同步 | §4.6 PresenceCursor 升级 (cursor 锚定 element) | V0.1 1 cursor → A12 N cursor 多人 |
 | A12.3 元素增删改同步 | §4.1 模式 A + §2.1 CanvasElement (14 字段) | backend 持久化, V0.1 localStorage 降级为 fallback |
-| A12.4 Follow mode | §4.9 URL param 透传 + GitHub Live Share UX | 1 canvas 1 follower 限制 |
+| A12.4 Follow mode | 历史提案：§4.9 URL param 透传 | 当前仅限获授权 Run/资源，具体 Profile 见 §1.5 |
 | A12.5 多人评论线程 | §3.4 `comment_pin` (V0.1 line 253-262) + §2.1 content.comment_id | 1 顶级 + N 回复 + @ 提醒 |
 | A12.6 CRDT 选型 | (新引入, per A11 同步桥同源设计) | Yjs / Automerge / LWW |
 | A12.7 协作权限 | (新引入, per 总册 `SRS-CANVAS-001` §6.2.2) | BFF middleware 强制 view/comment/edit |
 | A12.8 audit log | (新引入, per 守门 #13 Transaction append-only) | 新增表 `canvas_multi_user_audit` |
 
-**A12 1:1 派生验证**: A12 8 子项全部派生自 `frontend-canvas-design.md` v0.1 + 引入 CRDT / 权限 / audit 3 个新机制, 不重新设计画布基础能力 (pan/zoom/select/element/connector/frame).
+**A12 1:1 派生验证（历史记录）**: 该 v0.1 映射曾记录旧 transport/CRDT/权限/audit 提案；当前机制与授权以 §1.5 为准。
 
 ---
+
+### 1.5 A12 当前基本设计绑定 (WLD-7；覆盖本文件中的早期方案)
+
+**权威引用**：requirements.md §50.8AW / AC-COLLAB-01–08；Group Basic Design §16.78；DD-WORKTREE-GROUP-001.md §8.27；domain-collaboration-spec.md v1.1 §13；WLD-7 data design v0.3；TEST-DESIGN-WORKTREE-CANVAS-001.md v1.6 §4.8 / §5.2。本文 v0.1 的 A12 topic / transport / Envoy、NATS、CRDT/LWW、fixed capacity/latency、localStorage fallback 和 7-table schema 皆为历史草案；与本节不一致时以本节为准。设计仍为 design-only：当前代码 CanvasOutboxPoller 仍轮询，CollaborationWssHub 仍为进程内广播，WLD-7/PT-09 OPEN/NOT_RUN。
+
+| A12 | 当前基本设计 | 要件 / 验收 / 测试 |
+|---|---|---|
+| A12.1 多人同步 | Resource Owner 在业务事务提交 revision + audit + transactional Outbox；commit 后 bounded/coalesced wake-up 驱动 durable relay 和同资源授权 push。Collaboration 只拥有连接、订阅、presence、fan-out，不拥有 Canvas/Work Item 正文。常态无固定轮询/周期扫表；cursor 仅 bootstrap/reconnect/gap/recovery。一个 multiplexed connection。 | FR-AGENT-A12.1；AC-COLLAB-01/05；E2E-COLLAB-01/03 |
+| A12.2 Presence | cursor/viewport/selection 是短 TTL、按资源合并限频的 observed state；不进入业务 audit；队列按 count/bytes 有界，慢消费者背压后可恢复。 | FR-AGENT-A12.2；AC-COLLAB-05/06；PT-09 |
+| A12.3 Canvas 写入 | owner 以 base revision、owner revision、server sequence 和稳定 element/property path 校验；本地加密草稿优先，发送每 draft 一个 in-flight write + 一个合并 pending delta；patch/frame ≤16KiB。 | FR-AGENT-A12.3；AC-COLLAB-01/03/05/06/07 |
+| A12.4 Follow | 只在当前授权资源与会话内生效，复用 multiplexed connection，并由版本化 Collaboration Profile 限频；撤权/断线/过期立即停止。 | FR-AGENT-A12.4；AC-COLLAB-05/06 |
+| A12.5 评论/mention | 评论走 owner command；业务事实、audit 与 Outbox 同事务；通知 consumer 幂等、可恢复，不能扩大正文或 draft 权限。 | FR-AGENT-A12.5；AC-COLLAB-01/05/07 |
+| A12.6 冲突与草稿 | 不使用客户端时钟、LWW 或共享 CRDT。server commit time、base/owner revision 与 allowlisted changed-path 判断重叠；非重叠且语义可交换才可自动合并。任何同路径/语义冲突均保全双方 sealed draft。两份完整 digest-verified 的重叠提案若 server commit time 相差 ≤1000ms，第二份被 owner 接受时立即在同一 resource-fence transaction seal/pin 双方 refs 与 common base，写稳定 conflict_id 和双方持久 unread；更长间隔重叠仍按 revision/path 冲突。无等待/holdback。OT 仅可作为显式 resolve 时的可选 merge suggestion，不自动改写或解决草稿。 | FR-AGENT-A12.6；AC-COLLAB-02/03/04/08；E2E-COLLAB-09 |
+| A12.7 资源授权 | 每次 read/write/subscribe/diff/resolve/reconnect/catch-up 都重验 Project/Run/Worktree/Canvas 资源权限；参与者只能读其获准的 base/current/mine/theirs；撤权和授权事实不完整 fail closed。 | FR-AGENT-A12.7；AC-COLLAB-03/05/07 |
+| A12.8 Audit / Outbox | owner 事务内提交业务 revision、append-only audit 与 owner-local Outbox；事件用 event_id + stream_id + sequence 幂等、至少一次投递；notice ACK 不清 unread。W/T/M/RLS/retention/schema 以 owner-local data design v0.3 为准。 | FR-AGENT-A12.8；AC-COLLAB-01/04/05/07 |
+
+**Run/resource 范围与并发裁决**：所谓“全局”推送仅指同一 Run 与资源边界内当前授权协作者，不向全租户或无关 Run fan-out。连接建立、订阅和每份 draft/diff 读取均继承 RunContext 并重新授权；撤权立即取消订阅、拒绝后续读取。未完成 draft 默认作者私有；冲突时固定 common base 与双方 sealed draft refs，按 conflict ACL 只向两位参与者开放有界 base/current/mine/theirs，并为双方各写持久 unread。以 server commit time、resource/base revision 与 changed-path 判断并发；≤1000ms 内到达的完整重叠提案在第二份接受时立即冲突，更长间隔也按 revision/path 检测；不设一秒等待/holdback。OT 仅可在显式 resolve 时给出可选建议，不得自动改写或解决。
+
+**低消耗 Profile**：通过版本化 Collaboration Profile 固定并测量连接/订阅、patch/frame、队列和缓存预算。100 subscriptions、64 events、128KiB 是候选值，不是验收容量；目标 workload、并发数、host、PostgreSQL、gateway、RSS/CPU 基线未记录前 PT-09 不可通过。conflict commit 至双方显示同一持久 unread conflict_id 且首个有界差异页可读的 p99 ≤1s，是在线健康路径 SLO；1s 不是轮询间隔、冲突窗口或仲裁等待。全部运行门 OPEN/NOT_RUN。
+
+**验收追踪**：AC-COLLAB-01 → E2E-COLLAB-01/03；AC-COLLAB-02/03/08 → E2E-COLLAB-02/04/05/09；AC-COLLAB-04 → E2E-COLLAB-04/05/09 + PT-09；AC-COLLAB-05/07 → E2E-COLLAB-06/08；AC-COLLAB-06 → E2E-COLLAB-07 + PT-09-GATE-01。test design §4.8 / §5.2 的所有运行用例均未执行。
 
 ## §2 系统架构 (System Architecture)
 
@@ -462,7 +485,7 @@ interface CanvasCollabStore {
 [audit 写 agent_relationship_edges_audit 表] (per A11.5 4 表 W/T/M 100%)
 ```
 
-#### 2.3.3 A12 正常流: 多人同时编辑
+#### 2.3.3 A12 v0.1 历史数据流草案（当前设计见 §1.5）
 
 ```
 [PM 浏览器] 拖拽 ag-005 到 (100, 200)
@@ -480,7 +503,7 @@ interface CanvasCollabStore {
   ↓ 看到 PM @ SRE notification (per 25 module notification 域对接)
 ```
 
-#### 2.3.4 A12 异常流: WSS 断开 + 重连
+#### 2.3.4 A12 v0.1 历史 WSS 断线草案（当前恢复设计见 §1.5）
 
 ```
 [PM 浏览器] WSS 连接断开 (网络抖动)
@@ -833,7 +856,7 @@ CREATE INDEX idx_events_edge ON relationship_events(edge_id);
 CREATE INDEX idx_events_timestamp ON relationship_events(timestamp);
 ```
 
-### 4.3 A12 派生 7 张表 (per 守门 #13, 100% 覆盖)
+### 4.3 A12 v0.1 历史 schema 提案 (当前数据所有权见 §1.5)
 
 #### 4.3.1 `canvas_multi_user_audit` (Transaction, append-only, 物理删除禁止, SCD Type 2) ⭐
 
@@ -1179,7 +1202,7 @@ interface CanvasCollabStore {
 
 ## §5 接口设计 (Interface Design)
 
-### 5.1 REST API (23 端点, BFF 跨域)
+### 5.1 REST API (A12 v0.1 路由提案；当前逻辑接口见 §1.5)
 
 #### 5.1.1 A1-A10 双核心 13 端点 (跟 `BD-AGENT-VIEW-001` 共用)
 
@@ -1209,7 +1232,7 @@ interface CanvasCollabStore {
 | 17 | `DELETE` | `/api/arg/edges/{id}` | 归档关系 (archived=true, per A11.7) | ✓ | append-only audit |
 | 18 | `POST` | `/api/arg/templates/instantiate` | 5 模板实例化 (1 事务 Cypher, per A11.4) | ✓ | 1 batch write |
 
-#### 5.1.3 A12 5 端点 (BFF envoy 独立 deployment)
+#### 5.1.3 A12 v0.1 路由提案（历史；当前逻辑接口见 §1.5）
 
 | # | Method | Path | 说明 | RLS | 守门 |
 |---|---|---|---|---|---|
@@ -1219,7 +1242,7 @@ interface CanvasCollabStore {
 | 22 | `POST` | `/v1/collaboration/canvases/[id]/follow?user_id=` | 启动 Follow mode (per A12.4) | ✓ | BFF 校验 ≥ view 权限 + 1 canvas 1 follower |
 | 23 | `GET` | `/v1/collaboration/canvases/[id]/multi-user-audit` | 多人编辑 audit 查询 (per A12.8) | ✓ | 100% RLS 13 类 |
 
-### 5.2 WebSocket (5 端点, BFF 跨域)
+### 5.2 WebSocket（A12 v0.1 endpoint 提案；当前 A12 使用 §1.5 逻辑接口）
 
 | # | Path | 协议 | 事件类型 | 守门 |
 |---|---|---|---|---|
@@ -1385,7 +1408,7 @@ interface CanvasCollabStore {
 |---|---|---|
 | A1-A10 正常流 | 5 域 Lead 打开画布 → agent 拓扑 → 启停 | §2.3.1 |
 | A11 正常流 | 拖拽建 delegates_to 关系 | §2.3.2 |
-| A12 正常流 | 多人同时编辑 + cursor + 评论 + @ | §2.3.3 |
+| A12 正常流 | owner commit/outbox、同 Run/资源 fan-out、revision/draft/conflict、presence/comment | §1.5 |
 
 #### 6.3.2 异常流 (4 类)
 
@@ -1393,8 +1416,8 @@ interface CanvasCollabStore {
 |---|---|---|
 | A1-A8 store 无 agent session | 空状态 + 跳 /agents | per `SRS-CANVAS-AGENT-001` UC-A8 |
 | A11 Memgraph 不可达 | 离线降级 + in-process 缓存 + 周期 flush | per `BD-AGENT-RELATIONSHIP-001` §6.3.2 |
-| A12 WSS 断开 + 重连 | 离线模式 localStorage fallback + 重连后自动 sync | per `SRS-CANVAS-AGENT-001` UC-A14 |
-| A12 CRDT 选型拍板前阻塞 | view-only 兜底 | per `SRS-CANVAS-AGENT-001` UC-A15 |
+| A12 断线与恢复 | 历史 localStorage/WSS fallback 草案已由 §1.5 的 durable cursor、gap recovery 与 owner authorization 取代 | 当前验收见 WLD-7 gates（OPEN/NOT_RUN） |
+| A12 并发冲突 | 两侧草稿 seal/pin、双边 unread 与授权 diff；不降级为静默覆盖或将 CRDT 选型当 blocker | 当前验收见 §1.5（OPEN/NOT_RUN） |
 
 #### 6.3.3 5 域 Lead 真人未到位代签流 (per 守门 #14 v2)
 
@@ -1476,16 +1499,16 @@ interface CanvasCollabStore {
 
 ### 7.2 NFR-AGENT-RELIABILITY: 可靠性 (3 项)
 
-- **NFR-AGENT-RELI-01**: 元素增删改 100% 持久化 (PostgreSQL `canvas_elements_backend` + audit `canvas_multi_user_audit` 双写)
-- **NFR-AGENT-RELI-02**: WSS 断线自动 retry 3 次 (exponential backoff 1s/2s/4s), 重连后自动 sync, 不丢操作 (per UC-A14)
+- **NFR-AGENT-RELI-01**: A12 revision、audit、draft/conflict/unread 与 Outbox 按 owner-local data design 持久化；migration/grants/recovery 尚待 WLD-7 验收（OPEN/NOT_RUN）
+- **NFR-AGENT-RELI-02**: transport/Profile 决定后实施有界 reconnect、durable cursor recovery 与授权复验；A12 当前实现与验收未关闭（OPEN/NOT_RUN）
 - **NFR-AGENT-RELI-03**: Memgraph 不可达时 in-process 缓存继续工作 (派生自 `BD-AGENT-RELATIONSHIP-001` §7.2)
 
 ### 7.3 NFR-AGENT-SECURITY: 安全 (per 守门 #5 + 守门 #13)
 
 - **NFR-AGENT-SEC-01**: 13 租户隔离 (RLS 13 类必携, per 守门 #13), audit log 必记 (per 守门 #13 Transaction 100% audit)
 - **NFR-AGENT-SEC-02**: A12 BFF 3 级权限校验走 envoy middleware (per A12.7 + 9/1 13:03+13:05 JST envoy 偏好), 不依赖前端隐藏
-- **NFR-AGENT-SEC-03**: A12 WSS connection 走 TLS 1.3+ (per NFR-AGENT-MU-CONS-01)
-- **NFR-AGENT-SEC-04**: A12.8 `canvas_multi_user_audit` 表 100% RLS 13 类必携 (per 守门 #13 + A12.8)
+- **NFR-AGENT-SEC-03**: A12 connection、subscription 与每份 draft/diff 读取继承 RunContext 并重新授权；撤权取消订阅并拒读（per §1.5）
+- **NFR-AGENT-SEC-04**: A12 audit、RLS 与 retention 遵循 owner-local data design v0.3；旧 canvas_multi_user_audit 不构成当前 schema（OPEN/NOT_RUN）
 - **NFR-AGENT-SEC-05**: Memgraph 连接字符串走 env (per 守门 #5), 不打印
 - **NFR-AGENT-SEC-06**: 代签规则 (per 守门 #10 + 9/8 15:19 第 6 次强化), author = Ulysses, 真人到位后追溯签字
 
@@ -1512,7 +1535,7 @@ interface CanvasCollabStore {
 - **NFR-AGENT-ARG-05**: 5 模板 1-click 部署 ≤ 30s (1 事务 Cypher)
 - **NFR-AGENT-ARG-06**: 信任度动态 (成功 +0.01 / 失败 -0.05)
 
-### 7.7 NFR-AGENT-MU-CONS-01 (A12 多人编辑守门合规, 跨域)
+### 7.7 NFR-AGENT-MU-CONS-01 (历史提案；当前 NFR 与验收门见 §1.5)
 
 - BFF 权限校验走 envoy middleware (per 9/1 13:03 JST envoy 偏好)
 - 25 module notification 域对接 (per 总册 §6.3)
@@ -1540,7 +1563,7 @@ interface CanvasCollabStore {
 | **#6 v2** (Frontend typecheck/test/build advisory) | 改 advisory | A12 实装时 CI 守门同步反转 | 🟢 pass (待 P3-C 实证) |
 | **#7** (0 unsafe) | 守门 | Rust crate 0 unsafe (实装阶段) | 🟢 pass |
 | **#7 v3** (cargo clippy advisory) | 改 advisory | A12 实装时 CI 守门同步反转 | 🟢 pass (待 P3-C 实证) |
-| **#9** (子代理 RPC 不可靠) | 实证 | A11 同步桥用 in-process 推 + 周期 flush, 不用 RPC; **A12 多人编辑用 WSS + in-process 缓存, 不用 RPC** | 🟢 pass |
+| **#9** (子代理 RPC 不可靠) | 实证 | A11 同步桥沿用其 owner 边界；A12 持久事实由 owner-local Outbox 承载，不以进程内缓存作为事实源 | 🟢 design；runtime OPEN |
 | **#9 #3** (5/5 RPC 失败实证) | 不派二级子代理 | 0 子代理调用 (本 BD 在 main worktree 直实装, per brief §0) | 🟢 pass |
 | **#9 v19** (调试控制台 subprocess 替代 RPC) | subprocess 可重放可观测 | 调试控制台走 subprocess (per 守门 #9 v3) | 🟢 pass |
 | **#10** (代签规则) | Mavis 默认代 Ulysses | author = Ulysses, 修订人 = Ulysses (Mavis 接手) | 🟢 pass |
@@ -1567,9 +1590,9 @@ interface CanvasCollabStore {
 | 4 effect 维度 reload 失败 | in-process state 兜底, 继续用旧关系 (degraded mode) |
 | 成就评估超时 (> 5s) | 异步 task kill, 记录 WARN, 下次 event 再评估 |
 | 模板实例化部分失败 (1 边失败) | 整事务回滚, 提示用户重试 |
-| 多人编辑 WSS 断开 | 客户端 retry 3 次 (exponential backoff 1s/2s/4s), 重连后自动 sync (per UC-A14) |
+| A12 transport / owner unavailable | 未同步 draft 保持作者私有并标 sync_pending；恢复走授权复验和 durable cursor/gap recovery (per §1.5；OPEN/NOT_RUN) |
 | BFF 权限校验失败 (403) | UI 弹错误 toast + 提示"权限不足" + 跳 view-only 兜底 (per A12.7) |
-| CRDT 选型未拍板并发冲突 | 走 view-only 兜底 (per A12.6 + A12.7) |
+| A12 同路径/语义冲突 | seal/pin 双方 draft、写双边 unread 与有界差异，需显式 resolve；不静默 merge/覆盖 (per §1.5) |
 | Memgraph 不可达 (A11) | 离线降级 + in-process 缓存 + 周期 flush 队列 (per `BD-AGENT-RELATIONSHIP-001` §6.3.2) |
 | 5 域 Lead 真人未到位 (跨域编排) | Mavis 临时代签 (per 守门 #14 v2), 真人到位后追溯签字 |
 
@@ -1589,19 +1612,19 @@ interface CanvasCollabStore {
 | **#8** | A9.2 / A11.10 `/agent-relationships` 路由待 ARG UI 实装阶段落档 (per `BD-AGENT-RELATIONSHIP-001` §2.2 Tier 1) | "Relationship" tab 暂时 disable + 占位提示 | | P3-C ARG UI 实装阶段落档后激活 |
 | **#9** | A11.1 `arg_edge` element kind V0.1 schema 缺, 需新增 | ARG 边渲染暂时走 mock | | P3-C ARG 实装阶段 |
 | **#10** | A11.2 / A11.3 / A11.4 / A11.6 / A11.9 ARG 后端 5 维度 effect tier 模块实装待 P3-C 阶段 | ARG 关系建边 / 4 维度影响 / 5 模板 / 信任度 / 同步桥 暂时走 mock | | P3-C ARG 实装阶段 |
-| **#11** ⭐ P0 | A12.1 多人同时编辑 WebSocket 选型未拍板 (候选 NATS JetStream / native WebSocket / Socket.IO), 跟 A3 + A11 同步桥同源 | A12.1 + A12.3 多人编辑 Realtime 通道实现依赖选型 | **P0 阻塞** | P3-C/D 阶段拍板, 拍板后落 `docs/design/REALTIME-CHANNEL-SELECTION-DECISION.md` |
+| **#11** | A12 transport adapter 与目标容量未选定/测量；当前架构只固定 owner/outbox/auth/event identity 契约 | Profile/workload 未批准前不宣称容量 | 固定 Profile 与目标环境后评审 adapter |
 | **#12** | A12.2 PresenceCursor V0.1 design 已落档, A12 实装扩展待 P3-C/D 阶段 | 多人 cursor 暂时走 in-process mock | | P3-C/D 实装阶段 |
-| **#13** ⭐ P0 | A12.3 V0.1 localStorage + zustand persist 跟多人编辑冲突, 实施时需重构持久化层 | V0.1 持久化逻辑降级为离线 fallback, A12 主数据走 backend 持久化 | **P0 阻塞** | P3-C/D 实装阶段重构 |
+| **#13** | 目标 DB migration/grants、draft/conflict/unread 持久化与恢复未验收 | 以 WLD-7 owner-local data design v0.3 为准 | 补 migration/grants/备份恢复/撤权拒读验证；OPEN |
 | **#14** | A12.5 V0.1 `comment_pin` 渲染保留, thread + @ 数据结构 + 25 module notification 域对接实装待 P3-C 阶段 | 评论暂时只支持 1 顶级, 不支持 thread + @ | | P3-C 实装阶段 |
-| **#15** ⭐ P0 | A12.6 **CRDT 选型未拍板** (候选 Yjs / Automerge / LWW), 跟 ARG 同步桥同源 | 2 用户并发改同 1 element 暂时走 view-only 兜底 (per A12.7) | **P0 阻塞** | P3-C 阶段拍板, 拍板后落 `docs/design/CRDT-SELECTION-DECISION.md` |
+| **#15** | revision-fence overlap、双方 draft seal/pin、持久 unread 与显式 conflict resolve 尚未实现/验证 | OT 仅为可选 resolve suggestion；不得自动 merge/覆盖 | 完成 AC-COLLAB-02/03/04/08 与 E2E-COLLAB-09 |
 | **#16** | A12.7 具体权限矩阵 (哪个 user 哪个 role) 待 5 域 Lead 真人到位后决策, 拍板前走 view-only 兜底 (外部用户仅 view, 内部 Lead 默认 edit, per BC-9), 25 module 联动待 DDD Review 拍板 | view-only 兜底期间外部用户功能受限 | | 真人到位时追溯 + 拍板 |
-| **#17** | A12 WSS 选型 + CRDT 选型 + 5 域 Lead 真人到位 + 25 module 联动 = 4 跨 session 续做 P0 阻塞 (per brief §3) | A12 跨 session 续做需先解决 4 阻塞 | **P0 阻塞** | P3-C/D 阶段拍板 |
+| **#17** | WLD-7 owner transaction、Outbox wake-up、跨实例 push、draft/conflict/unread 恢复、Profile 与 PT-09 未关闭 | 当前仍 polling/process-local | 按 WBS WLD-7 与 AC-COLLAB-01–08 关闭；OPEN/NOT_RUN |
 | **#18** | A11 跨专题 5 缺口: 5 域 Lead 真人未到位 + Memgraph 部署 + L0 ↔ L1 通信协议 + ARG 集成 + TMO 9 节点 边界 梳理 | A11 跨 session 续做 5 域 Lead + Memgraph 部署 + L0↔L1 通信 + TMO 边界待 DDD Review + P3-C ARG 实装阶段 | | P3-C ARG 实装阶段 + DDD Review 拍板 |
 | **#19** | 当前 store 是 in-memory + zustand persist (localStorage); 多用户多 session 共享状态不可见 | 实际跨 session 协同走后端 (D.6+ backend); **A12 实施时 V0.1 持久化层重构 (per 缺口 #13)** | | 当前 SPA 模式可接受, D.6+ 接入真实 data plane |
 
-**已知缺口统计**: **19 个** (≥ 8 满足, 含 A11 跨专题 5 缺口 + **A12 多人编辑 7 缺口 #11-#17** + 3 P0 阻塞 #11/#13/#15 + 1 跨 session 总结 #17)
+**已知缺口统计**: **19 个** (≥ 8 满足，含 A11 跨专题 5 项与 A12 7 项 #11-#17；A12 persistence/conflict 核心门 #13/#15 为 P0，#17 为实现与 PT-09 总结门；全部 OPEN/NOT_RUN)
 
-**DDD Review 必查**: 缺口 #1 + #2 + #3 + #4 + #7 (schema gap 5 字段) + #11 (A12 WSS 选型) + #15 (A12 CRDT 选型) + #16 (A12 权限矩阵) + #17 (A12 4 跨 session 阻塞) + #18 (A11 跨专题 5 缺口)
+**DDD Review 必查**: 缺口 #1 + #2 + #3 + #4 + #7 + #11 (Profile/adapter capacity) + #13 (target DB/grants/recovery) + #15 (revision-fence/OT/conflict) + #16 (resource authorization) + #17 (WLD-7 implementation/PT-09) + #18 (A11 跨专题 5 缺口)
 
 ---
 
@@ -1625,6 +1648,7 @@ interface CanvasCollabStore {
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| **v0.2** | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | A12 当前基本设计绑定 WLD-7：owner/outbox、资源授权、冲突/草稿、逻辑接口、Profile 低资源预算及 AC/test 映射；旧设计标为历史提案。运行时仍轮询/进程内广播，WLD-7/PT-09 OPEN/NOT_RUN。 | Canvas A12 文档对齐 |
 | **v0.1** | 2026-09-10 18:00 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #10 + 守门 #14 v3 + 9/8 15:19 JST 第 6 次强化 + 守门 #14 v4 反转 v0.62 + 9/10 12:45 JST v0.62 反转 + 17:34 JST v0.63 反转) | **初版落档** — 10 段 (目的/范围/架构/组件/数据/接口/5 view/NFR/守门/签字/修订), A1-A12 12 子能力 46 项 (A1-A10 28 + A11 10 + A12 8), 5 view 跨域 (機能 46 项 + データ 14 表 W/T/M 100% 覆盖 + 動作 4 异常流 + モジュール 6 crate + ネットワーク e2e 9 + 多人编辑 WS 4), 5-tier 架构 (UI/API/Application/Data/Effect), 24 新组件 (C-1..C-24) + 6 新 crate (agent-domain/arg/arg-bridge/arg-effect/canvas-collab/api/arg 扩展) + 1 BFF (envoy 独立 deployment), 14 张表 W/T/M 100% 覆盖 (3 Work + 5 Transaction + 6 Master, per 守门 #13), 23 API 端点 (A1-A10 13 + A11 5 + A12 5) + 5 WebSocket (A11 1 + A12 4), 内部 5 协议 + 5 状态机 (Agent 14 状态 / Edge / Element / Trust Score 5 档 / Permission 3 级), 5 domain-* Rust 数据结构, zustand store 3 扩展 (AgentStore + ARGStore 5 channel + CanvasCollabStore), NFR 6 类 (性能 6 / 可靠性 3 / 安全 6 / 易用 5 / 可观测 3 / ARG 6 + MU-CONS-01), 守门 19 项 + 26 派生规 跨域全过 (含 #1 v15 / #9 #3 / #9 v19 / #10 / #11 / #13 / #14 v2/v3/v4 / #15 / #23 v2), 19 已知缺口 (含 3 P0 阻塞 #11+#13+#15 + 1 跨 session 总结 #17), 11 子代理失败接手; **A11 派生自 `BD-AGENT-RELATIONSHIP-001` v0.1 模板** (5-tier 架构 + 7 张表 W/T/M + 13 端点 + 8 UC, 1:1 映射, per §1.4.1); **A12 派生自 `frontend-canvas-design.md` v0.1 §4.1 模式 A + §4.6 PresenceCursor 升级** (V0.1 design + 扩展实装, 1:1 映射, per §1.4.2); **v0.63 反转行显式标** (A12 8 项必含, per 17:34 JST Ulysses 拍板"多人编辑是要的", 撤回 17:08 JST 砍多人编辑决定); 0 子代理调用, 0 文件改动除输出 BD, 0 commit (root 统一 commit per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件) | **2026-09-10 18:00 JST Ulysses 拍板"基于需求文档制作基本设计文档"** (本 BD 落档触发) + 2026-09-10 17:34 JST v0.63 反转拍板"**多人编辑是要的**" (A12 8 项必含) + 2026-09-10 17:21 JST 拍板"画布内体现 agent 之间关系的图论构造" (A11 10 项必含) + 2026-09-10 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余" (双核心 = 46 + 32 划分) + 2026-09-10 12:45 JST v0.62 反转"真人代签流程全部取消, 改为 mavis 审核 author=Ulysses" (守门 #14 v4) + 2026-09-08 15:19 JST 第 6 次强化"所有找 ulysses 的事都交给 mavis" (守门 #14 v3) + 2026-08-27 19:39 JST 用户授权代签 (守门 #10) |
 
 ---
@@ -1728,4 +1752,4 @@ interface CanvasCollabStore {
 
 ---
 
-> **文档结束** — BD-CANVAS-AGENT-001.md v0.1 (2026-09-10 JST 初版落档, 10 段, 5 view 跨域, 14 张表 W/T/M 100% 覆盖, 23 API + 5 WebSocket, 19 已知缺口含 3 P0 阻塞, 守门 19 项 + 26 派生规 跨域全过, A11/A12 派生映射 1:1 显式标)
+> **文档结束** — BD-CANVAS-AGENT-001.md v0.2 (2026-10-25 WLD-7 A12 对齐；2026-09-10 初版目录/统计为历史快照，不代表当前接口或验收状态；所有运行门 OPEN/NOT_RUN)
