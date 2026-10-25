@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.48；§13 记录最新设计决策；§14 记录 2026-10-25 集成检查点；Project↔Repository 0..N 与迁移核验后 CAS 解绑已确认，但 Project 身份/授权 authority 仍 OPEN，代码、DB/API 与 PostgreSQL 验收未完成；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.49；§13 记录最新设计决策；§14 记录 2026-10-25 集成检查点；Project↔Repository 0..N 与“先迁移、验证后 CAS 解绑”已确认，但 Project 身份/授权 authority 仍 OPEN，代码、DB/API 与 PostgreSQL 验收未完成；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -256,6 +256,8 @@ flowchart TD
 | v0.46 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1-R0 bounded owner/source audit：当前没有持久 Project identity / ProjectRepository writer；建议 Project bounded context 持有关联，但需先决定并建立 Project 身份与授权 authority。拆分 WLD1-R0a owner/source decision 与 R0b relation foundation，并引用 `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`。未实现关联/API/迁移，也未运行 PostgreSQL/RLS/故障验收。 | WLD1-R0 static source audit complete; user owner decision pending |
 | v0.47 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落档已确认的 Project↔Repository 0..N 关系，以及活跃 Run/Worktree 引用迁移必须验证同 Project 的 active destination binding、Host checkout identity/root，并以 owner-local 原子 audit/Outbox 和 durable receipt 留证；所有 owner 新鲜回执与零引用对账后，再以 expected-revision CAS 并发安全解绑。Project identity/authorization authority 仍 OPEN；R0b/R1/R2 的源码、schema/API 与 PostgreSQL/RLS 验收均未实现/验证。 | 用户确认多仓关联和迁移、核验后才允许解绑；同步至 WBS 与 owner audit |
 | v0.48 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1 docs-only lane `e603b638` 在基于最新本地 dev rebase 后 fast-forward 集成；审计与分阶段 WBS 已在 dev，WLD1-R0a identity/authorization authority、schema/API/DB/RLS 仍 OPEN。记录 W8 source-position lane `fd0472ff` 保持隔离：Rust fmt/check/no-run 编译通过，独立复审进行中，PostgreSQL/RLS/并发实跑未运行，不得标 READY。刷新本地 refs：dev=`e603b638`、main=`02e0cbd8`、`dev...main=114 5`；五个 main-only commits 均为 patch-equivalent，不需 cherry-pick。未 fetch/push，origin/dev 新鲜度未知；D:\Star 用户脏状态未触碰；三份 VCD0 briefs 已逐个 hash 校验归档后从 dev checkout 移除。 | WLD1 docs lane fast-forward integration and W8 source-level remediation review checkpoint |
+| v0.49 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W8 `824c76d0` 的独立源码复审 `99d85cb5`：双向新 claim 屏障源码级通过；exact replay P2 是门禁范围文案与实际无新写回执路径不符，W8 报告以 `cd89b894` 修正；真实 PostgreSQL/RLS/并发/exact replay/ACK 仍未验证，W8 不可标 READY 或集成。用户再次确认 Project↔Repository 解除关系前须先迁移并验证活动引用；该规则已存在于项目 `AGENTS.md` 和 v0.47，不重复扩张。 | W8 independent source review completion and exact-replay contract reconciliation |
+
 ## 8. Current execution state (2026-10-23)
 
 This snapshot supersedes the older owner, RTK, local-ref and lane-status values above. Historical remote fetch results and earlier test reports retain their original dates and scopes.
@@ -400,13 +402,19 @@ WLD-1、WLD-7 与总体交付仍 OPEN；本节不宣称实现或验收完成。
 | Lane / 范围 | 变更与集成状态 | 仍未通过的门 |
 |---|---|---|
 | WLD1 ProjectRepository owner audit | lane `codex/wld1-r0-owner-audit-20261025` 在 `fc87ea8a` 上 rebase 后形成 `e603b638`，仅包含 owner 审计与 WBS 两份文档；inactive 且 clean 的 Orca dev checkout 以 `--ff-only` 快进集成。WBS v0.47 将用户已确认的 0..N、迁移/目标绑定核验、owner-local audit/Outbox、durable receipt、零引用对账与 expected-revision CAS 纳入阶段验收。 | Project identity 与成员授权 authority 尚未确定。关联 writer/schema/API、Run/Worktree owner migration、目标 PostgreSQL、应用角色 grants、RLS、故障恢复均未实现或验证；Worktree 写操作保持关闭。 |
-| W8 source-position arbitration | lane `UlyssesLeoLee/w8-source-position-claim-fix-20261025` HEAD `fd0472ff` 添加 generation shared/exclusive advisory barrier、cursorless history index 和两类回归用例；仍处于隔离 lane，未合入 dev。 | 独立 reviewer 正在检查 P2 修复。Rust 1.99 `cargo fmt --check`、目标 `cargo check` 与 PG harness `--no-run` 编译已通过；PostgreSQL migration、RLS grants、cursorless/history concurrency 和真实回归均未执行，W8 仍 OPEN/NOT_RUN。没有测试数据库 URL，`psql` 不在 PATH。 |
-| main → dev 对账 | 当前本地 `dev=e603b638`、`main=02e0cbd8`；`git rev-list --left-right --count dev...main` 为 `114 5`。`git cherry dev main` 对五个 main-only commit 均标记 patch-equivalent，因此当前无 main 独有 patch 需要 cherry-pick。 | 只代表本地 refs；未 fetch，不能推断远端状态。 |
+| W8 source-position arbitration | lane `UlyssesLeoLee/w8-source-position-claim-fix-20261025` HEAD `cd89b894`；包含候选实现 `824c76d0` 与精确重放隔离范围报告更正。独立 reviewer `99d85cb5` 确认双向新 claim barrier 源码级通过，lane 仍隔离、未 rebase/合入 dev。 | Rust 1.99 fmt/check/PG harness `--no-run` 编译通过；独立源审已完成。PostgreSQL migration、RLS grants、cursorless/history concurrency、隔离级别 exact replay 与真实 ACK/终态行为未执行；W8 仍 OPEN/NOT_RUN。测试数据库选择待用户回复，未创建或启动 Multipass 实例。 |
+| main → dev 对账 | 当前本地 `dev=b1105a93`、`main=02e0cbd8`；`git rev-list --left-right --count dev...main` 为 `118 5`。本轮 `git cherry dev main` 对五个 main-only commit 均标记 patch-equivalent，因此当前无 main 独有 patch 需要 cherry-pick。 | 只代表本地 refs；未 fetch，不能推断远端状态。 |
 | dev 目标 checkout 与用户数据 | Orca 显示 `C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007` 无活动 Agent/Terminal，快进前后均无未提交文件。三份用户 VCD0 review briefs 先复制并逐项校验 SHA-256，再从 checkout 移除，原件保存在本地外置归档；主工作树 `D:\Star` 的用户脏状态未触碰。 | 归档不进入 Git。需要恢复时从用户本机归档取回；不因本地快进而删除或改写 `main`。 |
+
+### 14.1 W8 独立源码复审后的状态（2026-10-25）
+
+W8 候选代码提交 `824c76d0` 与源码复审后的报告更正 `cd89b894` 仍位于隔离 lane，没有 rebase/merge/push。独立复审 `99d85cb5` 确认 known↔cursorless 双向**新 claim**屏障在源码层面关闭先前 P1；P2 是隔离门禁范围表述不符：完全匹配且已持久化的 Inbox/quarantine exact replay 不新增终态回执或 claim，可以复用旧回执并执行对应终态处理。W8 报告已修正为新 claim 才要求 `READ COMMITTED`。该结论来自静态代码路径与独立复审，不是 PostgreSQL 运行证明。
+
+Rust 1.99 fmt/check/PG harness no-run 已通过；默认 PG 集成目标仍 `1 ignored`。专用 PostgreSQL 迁移、RLS/grants、双模式并发、隔离级别、exact replay、接收 ACK/quarantine 终态处理均未实跑；mTLS、恢复与 settlement 仍是独立 OPEN 门。W8 保持 OPEN/NOT_RUN，不能据此 rebase/集成。Orca 当前仍显示 W8 lane 有存活终端，故保留该 checkout。
 
 ### 下一步
 
-1. 收到 W8 独立源码复审后修复确证的问题；即使源码审查通过，仍须取得 disposable PostgreSQL migration/RLS/并发/故障回归证据，再重新评估是否 rebase 并集成 W8。
+1. W8 独立源码复审已完成；下一步先落实专用 disposable PostgreSQL 验收环境，在测试容量限制内运行 migration、RLS/grants、双向并发、隔离级别、Inbox/quarantine exact replay 与 ACK/终态处理回归。当前环境选择尚待用户回复，未获答复前不创建或启动 Multipass 实例。全部适用数据库与运行门通过后，再重新审阅目标 HEAD 与 Orca owner，决定是否 rebase 并集成 W8。
 2. WLD1-R0a 继续只做权威来源决策与接口确定；未确定 Project identity/authorization writer 前，不建立 ProjectRepository 持久关联表或假定某 owner。
 3. 按 §13 与 WLD7-C1/C2 推进协作 owner 冲突处理与跨实例事件推送。设计已要求无连接态定时轮询、同秒提案立即进入冲突事务、双方草稿封存及可读对方有界 diff；现有运行时仍轮询/单进程广播，WLD-7 与 PT-09 继续 OPEN/NOT_RUN。
 4. 后续每次 lane 集成前重新核对 main/dev、HEAD、目标 checkout owner/cleanliness、reviewed SHA 与验证证据；本轮不 push。
