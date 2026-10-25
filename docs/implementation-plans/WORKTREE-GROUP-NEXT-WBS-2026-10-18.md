@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.47；§13 是 2026-10-25 最新设计决策增量；§12 保留此前集成快照；Project↔Repository 0..N 与迁移核验后 CAS 解绑已确认，但 Project 身份/授权 authority 仍 OPEN，代码、DB/API 与 PostgreSQL 验收未完成；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.48；§13 记录最新设计决策；§14 记录 2026-10-25 集成检查点；Project↔Repository 0..N 与迁移核验后 CAS 解绑已确认，但 Project 身份/授权 authority 仍 OPEN，代码、DB/API 与 PostgreSQL 验收未完成；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -255,6 +255,7 @@ flowchart TD
 | v0.45 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Project Repository 0..N、retiring/migrate-before-unlink 与多 owner 幂等回执/零引用关闭门；修订 WLD-7 规则为语义重叠总是持久冲突，OT 仅为用户显式解决预览；新增 WLD1-R0..R2 与 WLD7-C1..C2 分阶段工作包。仅更新计划，不声称代码/数据库/运行时已完成 | 2026-10-25 design decision follow-up |
 | v0.46 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1-R0 bounded owner/source audit：当前没有持久 Project identity / ProjectRepository writer；建议 Project bounded context 持有关联，但需先决定并建立 Project 身份与授权 authority。拆分 WLD1-R0a owner/source decision 与 R0b relation foundation，并引用 `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`。未实现关联/API/迁移，也未运行 PostgreSQL/RLS/故障验收。 | WLD1-R0 static source audit complete; user owner decision pending |
 | v0.47 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落档已确认的 Project↔Repository 0..N 关系，以及活跃 Run/Worktree 引用迁移必须验证同 Project 的 active destination binding、Host checkout identity/root，并以 owner-local 原子 audit/Outbox 和 durable receipt 留证；所有 owner 新鲜回执与零引用对账后，再以 expected-revision CAS 并发安全解绑。Project identity/authorization authority 仍 OPEN；R0b/R1/R2 的源码、schema/API 与 PostgreSQL/RLS 验收均未实现/验证。 | 用户确认多仓关联和迁移、核验后才允许解绑；同步至 WBS 与 owner audit |
+| v0.48 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1 docs-only lane `e603b638` 在基于最新本地 dev rebase 后 fast-forward 集成；审计与分阶段 WBS 已在 dev，WLD1-R0a identity/authorization authority、schema/API/DB/RLS 仍 OPEN。记录 W8 source-position lane `fd0472ff` 保持隔离：Rust fmt/check/no-run 编译通过，独立复审进行中，PostgreSQL/RLS/并发实跑未运行，不得标 READY。刷新本地 refs：dev=`e603b638`、main=`02e0cbd8`、`dev...main=114 5`；五个 main-only commits 均为 patch-equivalent，不需 cherry-pick。未 fetch/push，origin/dev 新鲜度未知；D:\Star 用户脏状态未触碰；三份 VCD0 briefs 已逐个 hash 校验归档后从 dev checkout 移除。 | WLD1 docs lane fast-forward integration and W8 source-level remediation review checkpoint |
 ## 8. Current execution state (2026-10-23)
 
 This snapshot supersedes the older owner, RTK, local-ref and lane-status values above. Historical remote fetch results and earlier test reports retain their original dates and scopes.
@@ -391,3 +392,23 @@ These review reports are static evidence only. No tests, PostgreSQL, mTLS, deplo
 6. 重新审阅 requirements/basic/DD/SRS/BD/spec/data/test/traceability/WBS 与实际实现；每道 owner、数据库、运行时和性能门分别给证据，未通过前保持 fail closed。
 
 WLD-1、WLD-7 与总体交付仍 OPEN；本节不宣称实现或验收完成。
+
+## 14. 集成检查点（2026-10-25）
+
+本节只更新已观察的本地 Git 与验证状态；未 fetch，远端新鲜度未知，未 push。
+
+| Lane / 范围 | 变更与集成状态 | 仍未通过的门 |
+|---|---|---|
+| WLD1 ProjectRepository owner audit | lane `codex/wld1-r0-owner-audit-20261025` 在 `fc87ea8a` 上 rebase 后形成 `e603b638`，仅包含 owner 审计与 WBS 两份文档；inactive 且 clean 的 Orca dev checkout 以 `--ff-only` 快进集成。WBS v0.47 将用户已确认的 0..N、迁移/目标绑定核验、owner-local audit/Outbox、durable receipt、零引用对账与 expected-revision CAS 纳入阶段验收。 | Project identity 与成员授权 authority 尚未确定。关联 writer/schema/API、Run/Worktree owner migration、目标 PostgreSQL、应用角色 grants、RLS、故障恢复均未实现或验证；Worktree 写操作保持关闭。 |
+| W8 source-position arbitration | lane `UlyssesLeoLee/w8-source-position-claim-fix-20261025` HEAD `fd0472ff` 添加 generation shared/exclusive advisory barrier、cursorless history index 和两类回归用例；仍处于隔离 lane，未合入 dev。 | 独立 reviewer 正在检查 P2 修复。Rust 1.99 `cargo fmt --check`、目标 `cargo check` 与 PG harness `--no-run` 编译已通过；PostgreSQL migration、RLS grants、cursorless/history concurrency 和真实回归均未执行，W8 仍 OPEN/NOT_RUN。没有测试数据库 URL，`psql` 不在 PATH。 |
+| main → dev 对账 | 当前本地 `dev=e603b638`、`main=02e0cbd8`；`git rev-list --left-right --count dev...main` 为 `114 5`。`git cherry dev main` 对五个 main-only commit 均标记 patch-equivalent，因此当前无 main 独有 patch 需要 cherry-pick。 | 只代表本地 refs；未 fetch，不能推断远端状态。 |
+| dev 目标 checkout 与用户数据 | Orca 显示 `C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007` 无活动 Agent/Terminal，快进前后均无未提交文件。三份用户 VCD0 review briefs 先复制并逐项校验 SHA-256，再从 checkout 移除，原件保存在本地外置归档；主工作树 `D:\Star` 的用户脏状态未触碰。 | 归档不进入 Git。需要恢复时从用户本机归档取回；不因本地快进而删除或改写 `main`。 |
+
+### 下一步
+
+1. 收到 W8 独立源码复审后修复确证的问题；即使源码审查通过，仍须取得 disposable PostgreSQL migration/RLS/并发/故障回归证据，再重新评估是否 rebase 并集成 W8。
+2. WLD1-R0a 继续只做权威来源决策与接口确定；未确定 Project identity/authorization writer 前，不建立 ProjectRepository 持久关联表或假定某 owner。
+3. 按 §13 与 WLD7-C1/C2 推进协作 owner 冲突处理与跨实例事件推送。设计已要求无连接态定时轮询、同秒提案立即进入冲突事务、双方草稿封存及可读对方有界 diff；现有运行时仍轮询/单进程广播，WLD-7 与 PT-09 继续 OPEN/NOT_RUN。
+4. 后续每次 lane 集成前重新核对 main/dev、HEAD、目标 checkout owner/cleanliness、reviewed SHA 与验证证据；本轮不 push。
+
+WLD1、W8、WLD-7、VCD-0 及总体交付仍 OPEN；本检查点只记录已完成的 docs lane 集成和本地证据，不宣称产品闭环完成。
