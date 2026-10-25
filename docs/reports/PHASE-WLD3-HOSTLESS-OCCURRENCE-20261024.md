@@ -2,7 +2,7 @@
 
 **Status:** Source/design slice implemented; local Rust/Cargo 1.99.0 and disposable PostgreSQL acceptance passed 47/47. Domain tests passed 31/31, the two focused Schedule Rule API authorization tests passed 1/1 each, and Schedule PostgreSQL integration passed 6/6. WLD-3 remains open and Schedule execution remains fail-closed.
 **Lane:** `codex/wbs-wld3-hostless-occurrence-20261024`
-**Base:** Original lane base was `dev@25659752f28e4e1a6446915b36f2ce8a387ca1c1`; integration base will be recorded after rebase.
+**Base:** Original lane base: `dev@25659752f28e4e1a6446915b36f2ce8a387ca1c1`. Rebased onto local `dev@74ec0db4e94d53da799825d181f71e0a3149269c`; candidate HEAD `a19e69e8e75010c838acbe54fc5c1236b14ed8c0`. Final dev fast-forward is pending the target owner/HEAD/clean gate.
 **Manifest:** `C:\Users\leo19\.codex\worktree-manifests\Star-WLD3-hostless-occurrence-20261024.txt`
 
 ## §0 Purpose
