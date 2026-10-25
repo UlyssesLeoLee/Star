@@ -252,7 +252,8 @@ flowchart TD
 | v0.42 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 WLD1 与 W8 两份独立审查报告并细化 OPEN 门：WLD1 仍缺 Project→Repository 规范授权关系、Run→Repository owner command、Host-owned 持久可信根目录、独立只读 Worktree provider 与目标 PostgreSQL/RLS/应用角色证据；W8 候选发现 `pull_one` runtime grant 被撤销且 legacy quarantine 同 source sequence / 不同 message ID 可绕过冲突检测。保留两份报告为只读审查证据；不合入 W8 脏候选、不开放 Worktree 写入、不声称 PostgreSQL/mTLS/runtime 验收。 | 并行 WLD1 边界审查与 W8 候选集成审查完成；修复与运行验收仍待后续 lane。 |
 | v0.43 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Correct the current VCD-0 checkpoint: DD/TD R3 reports are already committed in dev as static evidence, with findings still open; record the current local dev/main comparison (673e698d / 02e0cbd8, 99/5, all five main-only commits patch-equivalent) and keep no-fetch/no-push and remote-unknown limits. Preserve VCD-0 OPEN, VCD-1..VCD-4 unstarted, and deployment/database/runtime/test evidence NOT_RUN. Reaffirm the collaboration acceptance split: immediate conflict entry without a one-second holdback; p99 <=1s is measured from conflict-owner commit to both alerts and bounded diff readability. | Independent VCD-0 DD/TD R3 review audit and WBS/document-state reconciliation. |
 | v0.44 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the post-integration local checkpoint: reviewed WBS/VCD0 commit ee620d9a0b39c3d8bc91166c6c33aa3ad48fe9fd fast-forwarded into inactive Orca dev; dev=ee620d9a0b39c3d8bc91166c6c33aa3ad48fe9fd, main=02e0cbd8f87a8422100d4fdd83d54e7838ab1fff, dev...main=100/5; no fetch/push and remote freshness unknown. Confirm the existing requirements §50.8AW and Basic Design §16.78 scope fan-out to all authorized subscribers of the same canonical resource, not tenant-wide; connected updates are push-triggered, complete overlaps have no one-second holdback, and WLD-7/PT-09 remain OPEN/NOT_RUN. The three user reviewer briefs were restored and D:\Star was preserved. | User reiterated event-triggered collaboration, same-resource visibility, draft preservation and low resource use; WBS integration completed. |
-| v0.45 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Project Repository 0..N、retiring/migrate-before-unlink 与多 owner 幂等回执/零引用关闭门；修订 WLD-7 规则为语义重叠总是持久冲突，OT 仅为用户显式解决预览；新增 WLD1-R0..R2 与 WLD7-C1..C2 分阶段工作包。仅更新计划，不声称代码/数据库/运行时已完成 | 2026-10-25 design decision follow-up
+| v0.45 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Project Repository 0..N、retiring/migrate-before-unlink 与多 owner 幂等回执/零引用关闭门；修订 WLD-7 规则为语义重叠总是持久冲突，OT 仅为用户显式解决预览；新增 WLD1-R0..R2 与 WLD7-C1..C2 分阶段工作包。仅更新计划，不声称代码/数据库/运行时已完成 | 2026-10-25 design decision follow-up |
+| v0.46 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1-R0 bounded owner/source audit：当前没有持久 Project identity / ProjectRepository writer；建议 Project bounded context 持有关联，但需先决定并建立 Project 身份与授权 authority。拆分 WLD1-R0a owner/source decision 与 R0b relation foundation，并引用 `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`。未实现关联/API/迁移，也未运行 PostgreSQL/RLS/故障验收。 | WLD1-R0 static source audit complete; user owner decision pending |
 ## 8. Current execution state (2026-10-23)
 
 This snapshot supersedes the older owner, RTK, local-ref and lane-status values above. Historical remote fetch results and earlier test reports retain their original dates and scopes.
@@ -360,7 +361,7 @@ These review reports are static evidence only. No tests, PostgreSQL, mTLS, deplo
 
 ## 13. ProjectRepository 解绑与语义重叠协作决策（2026-10-25）
 
-本节记录用户确认的设计约束，并取代其他章节中“Project 只绑定一个 Repository”或“OT 可变换的重叠编辑自动收敛”的旧表述。此次只完成文档与 WBS 对齐；没有实现 Project association writer、owner migration command、协作 conflict detector/resolve API，也没有运行数据库或客户端验收。
+本节记录用户确认的设计约束，并取代其他章节中“Project 只绑定一个 Repository”或“OT 可变换的重叠编辑自动收敛”的旧表述。WLD1-R0 已完成有界源码审计并形成 `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`；当前仍没有 Project association writer、持久 Project identity/authorization writer、owner migration command、协作 conflict detector/resolve API，也没有运行数据库或客户端验收。
 
 ### 决策
 
@@ -372,18 +373,20 @@ These review reports are static evidence only. No tests, PostgreSQL, mTLS, deplo
 
 | 工作包 | 优先级 | 产物 | 依赖 | 完成门/当前状态 |
 |---|---|---|---|---|
-| WLD1-R0 ProjectRepository owner 设计落地 | P0 | 确定 Project link canonical writer、0..N schema、default 语义、retiring 状态机、migration command/outbox/receipt identity；解决 owner 归属仍未定的问题 | Project/SCM 源数据 owner 审计 | 未实现；需 owner API、CAS、审计、RLS/幂等与 retry 契约评审 |
-| WLD1-R1 Run/Worktree 引用迁移 | P0 | Run Directory binding migration 与 Worktree/Host checkout migration/retire commands；各 owner 本地事务、版本门和可恢复进度/完成回执 | WLD1-R0；可信 Host root/provider | 未实现；失败与未知保持 retiring；替代 Repository 同 Project 授权且 Host 校验实际 checkout identity |
+| WLD1-R0a Project 身份与授权 authority 决策/建立 | P0 | 明确持久 Project identity 与成员授权的 canonical writer；用户选择 Star 原生 Project owner 或宿主 Project 服务；若选择 Star 原生，建立 Project identity / authorization owner 与版本化迁移边界 | 本轮 source audit 已完成；等待用户确认 authority | OPEN；审计报告确认现有 ProjectRepository 为内存实现，仓库没有可证的持久 Project identity / 授权 writer；未实现 |
+| WLD1-R0b ProjectRepository 关联基础 | P0 | Project owner 写入 0..N Repository links、optional default preference、CAS/version、retiring 状态、幂等 operation/outbox/receipt；不跨 owner 直接写 | WLD1-R0a；SCM Repository master identity/authorization contract | OPEN；未实现 schema/API；需 RLS、授权、重复/replay 与 CAS 验收 |
+| WLD1-R1 Run/Worktree 引用迁移 | P0 | Run Directory binding migration 与 Worktree/Host checkout migration/retire commands；各 owner 本地事务、版本门和可恢复进度/完成回执 | WLD1-R0b；可信 Host root/provider | 未实现；失败与未知保持 retiring；替代 Repository 同 Project 授权且 Host 校验实际 checkout identity |
 | WLD1-R2 最终解绑与运行验收 | P0 | 新引用 freeze、并发 race、重放、owner outage、权限撤销、零活动引用对账与最终 unlink 的 API/DB/RLS/fault tests | WLD1-R1 | 未运行；只有全部 owner 新鲜回执和零引用证明通过才允许解绑，历史身份保持不变 |
 | WLD7-C1 重叠检测与显式解决 | P1 | overlap_detector_version、冲突对与参与者通知；OT suggestion metadata 与用户选择/CAS 记录 | WLD-2 canonical owner APIs 与 WLD-6 durable Outbox/Inbox/fan-out | 设计已对齐；实现/DB/runtime OPEN，E2E-COLLAB-10/11、OT side-effect 与 stale-CAS 验收未运行 |
 | WLD7-C2 低资源跨实例推送闭环 | P1 | 双 owner、双 gateway、断线/restart/cursor recovery、bounded queue/RSS/CPU/PT-09 实证 | WLD7-C1；固定 Collaboration Profile 与目标环境 | 仍 OPEN/NOT_RUN；不能以本地 broadcast、轮询或 UI fixture 关闭 |
 
 ### 后续执行顺序
 
-1. 先由 WLD1 源审计确定 ProjectRepository 持久 writer 与授权事实 owner，冻结 relation/operation/receipt schemas 和各 owner 的命令契约。
-2. 分开实现 Project retiring fence、Run Directory binding migration、Worktree/Host checkout migration；每个 owner 独立事务、审计、Outbox/Inbox、幂等回执和恢复门，不做跨 owner 写。
-3. 先在 disposable PostgreSQL 验证 0..N、迁移竞态、重放、拒绝新增引用、故障时保持 retiring、最终零活动引用解绑和历史审计，再考虑开放 Worktree mutation。
-4. 按新的 overlap 规则实现 WLD-7 owner detector、draft seal/pin、participant unread、OT preview-only resolve，并跑 E2E-COLLAB-10/11 与双 gateway/PG/RSS/PT-09。
-5. 重新审阅 requirements/basic/DD/SRS/BD/spec/data/test/traceability/WBS 与实际实现；每道 owner、数据库、运行时和性能门分别给证据，未通过前保持 fail closed。
+1. WLD1-R0 源审计已完成并归档；先收敛用户对 Project 身份/授权 authority 的选择，再完成 R0a，禁止在 owner 未定时新建身份或授权表。
+2. 完成 R0b：Project owner 维护 ProjectRepository 0..N 关联与可选 default preference；SCM owner 只维护 Repository identity；Permission owner 负责成员/授权事实。
+3. 分开实现 Project retiring fence、Run Directory binding migration、Worktree/Host checkout migration；每个 owner 独立事务、审计、Outbox/Inbox、幂等回执和恢复门，不做跨 owner 写。
+4. 先在 disposable PostgreSQL 验证 0..N、迁移竞态、重放、拒绝新增引用、故障时保持 retiring、最终零活动引用解绑和历史审计，再考虑开放 Worktree mutation。
+5. 按新的 overlap 规则实现 WLD-7 owner detector、draft seal/pin、participant unread、OT preview-only resolve，并跑 E2E-COLLAB-10/11 与双 gateway/PG/RSS/PT-09。
+6. 重新审阅 requirements/basic/DD/SRS/BD/spec/data/test/traceability/WBS 与实际实现；每道 owner、数据库、运行时和性能门分别给证据，未通过前保持 fail closed。
 
 WLD-1、WLD-7 与总体交付仍 OPEN；本节不宣称实现或验收完成。
