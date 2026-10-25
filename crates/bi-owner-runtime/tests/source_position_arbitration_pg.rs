@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=341e3b514c2c811dc03d6331d5361ced3100738f29c92749c754329ea55ed302
+@cypher schema=1 source_sha256=07ba2036d285331afa113e210af8715222e11aaef411f6092823195f31ced8a9
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs"})
 MERGE (test:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::pg_source_position_is_unique_across_inbox_and_quarantine",kind:"test"})
 MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::connect_disposable_pool",kind:"function"})
@@ -9,9 +9,11 @@ MERGE (same_db:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitra
 MERGE (schema:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::require_shared_claim_contract",kind:"function"})
 MERGE (assert_counts:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::assert_terminal_counts",kind:"function"})
 MERGE (terminal_counts:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::terminal_counts",kind:"function"})
+MERGE (seed_history:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::seed_cursorless_quarantine_history",kind:"function"})
 MERGE (receiver_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::receive_one",kind:"function"})
 MERGE (route_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::route_pin",kind:"function"})
 MERGE (origin_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::source_origin",kind:"function"})
+MERGE (origin_cursor_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::source_origin_with_cursor",kind:"function"})
 MERGE (wire_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::lifecycle_wire",kind:"function"})
 MERGE (delivery:Type {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::PgDelivery",kind:"struct"})
 MERGE (transport:Type {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::OneShotTransport",kind:"struct"})
@@ -34,9 +36,11 @@ MERGE (self)-[:DEFINES]->(same_db)
 MERGE (self)-[:DEFINES]->(schema)
 MERGE (self)-[:DEFINES]->(assert_counts)
 MERGE (self)-[:DEFINES]->(terminal_counts)
+MERGE (self)-[:DEFINES]->(seed_history)
 MERGE (self)-[:DEFINES]->(receiver_helper)
 MERGE (self)-[:DEFINES]->(route_helper)
 MERGE (self)-[:DEFINES]->(origin_helper)
+MERGE (self)-[:DEFINES]->(origin_cursor_helper)
 MERGE (self)-[:DEFINES]->(wire_helper)
 MERGE (self)-[:DEFINES]->(delivery)
 MERGE (self)-[:DEFINES]->(transport)
@@ -56,11 +60,15 @@ MERGE (test)-[:CALLS]->(assert_counts)
 MERGE (test)-[:CALLS]->(receiver_helper)
 MERGE (test)-[:CALLS]->(route_helper)
 MERGE (test)-[:CALLS]->(origin_helper)
+MERGE (test)-[:CALLS]->(origin_cursor_helper)
+MERGE (test)-[:CALLS]->(seed_history)
 MERGE (test)-[:CALLS]->(wire_helper)
 MERGE (assert_counts)-[:CALLS]->(terminal_counts)
 MERGE (terminal_counts)-[:READS]->(claim_table)
 MERGE (terminal_counts)-[:READS]->(origin_table)
 MERGE (terminal_counts)-[:READS]->(quarantine_table)
+MERGE (seed_history)-[:WRITES]->(quarantine_table)
+MERGE (origin_helper)-[:CALLS]->(origin_cursor_helper)
 MERGE (test)-[:TESTS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.receive_one",kind:"method"})
 MERGE (receiver_helper)-[:CALLS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.receive_one",kind:"method"})
 MERGE (transport)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveTransport",kind:"trait"})
@@ -450,7 +458,7 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         Some(Arc::clone(&barrier)),
     );
     let quarantine_race = receive_one(
-        receive_route,
+        receive_route.clone(),
         &pool,
         &pin,
         race_poison_wire.clone(),
@@ -497,6 +505,147 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         terminal_counts(&audit_pool, tenant, &pin, 19).await;
     assert_eq!(claims, 1);
     assert_eq!(inbox_receipts + quarantine_receipts, 1);
+
+    // A shared cursor is unique even when two terminal paths report different sequences.
+    let repeated_cursor = b"shared-cursor-different-sequence".to_vec();
+    let cursor_owner_event = Uuid::new_v4();
+    let cursor_owner_origin =
+        source_origin_with_cursor(&pin, cursor_owner_event, 20, repeated_cursor.clone());
+    let (cursor_owner_result, cursor_owner_counts) = receive_one(
+        receive_route.clone(),
+        &pool,
+        &pin,
+        b"{".to_vec(),
+        cursor_owner_origin.clone(),
+        None,
+    )
+    .await;
+    assert!(matches!(
+        cursor_owner_result,
+        Ok(TaskEventReceiveOutcome::Quarantined { .. })
+    ));
+    assert_eq!(cursor_owner_counts.quarantine_ack.load(Ordering::SeqCst), 1);
+
+    let repeated_cursor_event = Uuid::new_v4();
+    let repeated_cursor_origin =
+        source_origin_with_cursor(&pin, repeated_cursor_event, 21, repeated_cursor);
+    let repeated_cursor_wire = lifecycle_wire(
+        tenant,
+        repeated_cursor_event,
+        Uuid::new_v4(),
+        Uuid::new_v4(),
+        "same cursor at a different sequence",
+    );
+    let (repeated_cursor_result, repeated_cursor_counts) = receive_one(
+        receive_route.clone(),
+        &pool,
+        &pin,
+        repeated_cursor_wire,
+        repeated_cursor_origin,
+        None,
+    )
+    .await;
+    assert!(repeated_cursor_result.is_err());
+    assert_eq!(repeated_cursor_counts.inbox_ack.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        repeated_cursor_counts.quarantine_ack.load(Ordering::SeqCst),
+        0
+    );
+    assert_terminal_counts(&audit_pool, tenant, &pin, 20, 1, 0, 1).await;
+    assert_terminal_counts(&audit_pool, tenant, &pin, 21, 0, 0, 0).await;
+
+    // Model legacy quarantine history that had no saved opaque cursor. The owner-side insert is
+    // tenant-scoped and passes through the same claim trigger; later known-cursor writes in this
+    // generation must fail closed, while an exact replay of an already claimed position remains
+    // idempotent.
+    let known_poison_origin = source_origin_with_cursor(
+        &pin,
+        Uuid::new_v4(),
+        30,
+        b"known-position-before-unknown-history".to_vec(),
+    );
+    let known_poison_wire = b"{".to_vec();
+    let (known_poison_result, known_poison_counts) = receive_one(
+        receive_route.clone(),
+        &pool,
+        &pin,
+        known_poison_wire.clone(),
+        known_poison_origin.clone(),
+        None,
+    )
+    .await;
+    let known_poison_id = match known_poison_result {
+        Ok(TaskEventReceiveOutcome::Quarantined { receipt, .. }) => receipt.quarantine_id,
+        other => {
+            panic!("known cursor position must commit before cursorless history, got {other:?}")
+        }
+    };
+    assert_eq!(known_poison_counts.quarantine_ack.load(Ordering::SeqCst), 1);
+
+    seed_cursorless_quarantine_history(&audit_pool, tenant, &pin, 31, Uuid::new_v4()).await;
+    assert_terminal_counts(&audit_pool, tenant, &pin, 31, 1, 0, 1).await;
+
+    let (known_poison_replay, known_poison_replay_counts) = receive_one(
+        receive_route.clone(),
+        &pool,
+        &pin,
+        known_poison_wire,
+        known_poison_origin,
+        None,
+    )
+    .await;
+    assert!(matches!(
+        known_poison_replay,
+        Ok(TaskEventReceiveOutcome::Quarantined { receipt, .. })
+            if receipt.quarantine_id == known_poison_id
+    ));
+    assert_eq!(
+        known_poison_replay_counts
+            .quarantine_ack
+            .load(Ordering::SeqCst),
+        1
+    );
+
+    let after_gap_event = Uuid::new_v4();
+    let after_gap_origin = source_origin_with_cursor(
+        &pin,
+        after_gap_event,
+        32,
+        b"cursor-after-unknown-history".to_vec(),
+    );
+    let after_gap_wire = lifecycle_wire(
+        tenant,
+        after_gap_event,
+        Uuid::new_v4(),
+        Uuid::new_v4(),
+        "must fail closed after cursorless history",
+    );
+    let (after_gap_result, after_gap_counts) = receive_one(
+        receive_route.clone(),
+        &pool,
+        &pin,
+        after_gap_wire.clone(),
+        after_gap_origin.clone(),
+        None,
+    )
+    .await;
+    assert!(after_gap_result.is_err());
+    assert_eq!(after_gap_counts.inbox_ack.load(Ordering::SeqCst), 0);
+    assert_eq!(after_gap_counts.quarantine_ack.load(Ordering::SeqCst), 0);
+    assert_terminal_counts(&audit_pool, tenant, &pin, 32, 0, 0, 0).await;
+
+    let (after_gap_retry, after_gap_retry_counts) = receive_one(
+        receive_route,
+        &pool,
+        &pin,
+        after_gap_wire,
+        after_gap_origin,
+        None,
+    )
+    .await;
+    assert!(after_gap_retry.is_err());
+    assert_eq!(after_gap_retry_counts.inbox_ack.load(Ordering::SeqCst), 0);
+    assert_terminal_counts(&audit_pool, tenant, &pin, 32, 0, 0, 0).await;
 
     pool.close().await;
     audit_pool.close().await;
@@ -595,6 +744,11 @@ async fn require_shared_claim_contract(pool: &PgPool) {
                  WHERE indexrelid = to_regclass('bi.task_event_source_position_claim_cursor_uq')
                    AND indisunique
             ) AS cursor_unique,
+            EXISTS (
+                SELECT 1 FROM pg_index
+                 WHERE indexrelid = to_regclass('bi.task_event_source_position_claim_cursorless_scope_idx')
+                   AND NOT indisunique
+            ) AS cursorless_scope_index,
             NOT has_table_privilege(current_user, 'bi.task_event_source_position_claim', 'SELECT')
               AND NOT has_table_privilege(current_user, 'bi.task_event_source_position_claim', 'INSERT')
               AND NOT has_table_privilege(current_user, 'bi.task_event_source_position_claim', 'UPDATE')
@@ -627,6 +781,7 @@ async fn require_shared_claim_contract(pool: &PgPool) {
         "quarantine_claim_trigger",
         "sequence_unique",
         "cursor_unique",
+        "cursorless_scope_index",
         "runtime_has_no_direct_access",
         "runtime_cannot_call_trigger_function",
         "trigger_is_owner_definer",
@@ -731,6 +886,65 @@ async fn terminal_counts(
     counts
 }
 
+async fn seed_cursorless_quarantine_history(
+    audit_pool: &PgPool,
+    tenant: Uuid,
+    pin: &TaskEventRoutePin,
+    sequence: i64,
+    message_id: Uuid,
+) -> Uuid {
+    let mut tx = audit_pool
+        .begin()
+        .await
+        .expect("begin tenant-scoped cursorless history fixture transaction");
+    sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
+        .bind(tenant.to_string())
+        .execute(&mut *tx)
+        .await
+        .expect("set tenant scope before seeding legacy cursorless quarantine history");
+    let quarantine_id = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO bi.task_event_quarantine (
+            tenant_id, sender_service_id, receiver_service_id,
+            transport_provider_id, transport_provider_version,
+            transport_profile_id, transport_profile_revision, transport_profile_digest,
+            endpoint_identity, destination_id, destination_generation,
+            origin_provider_identity, source_log_id, source_log_generation,
+            source_sequence, source_cursor, message_id, wire_sha256,
+            wire_length, fault_code
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, NULL, $16, $17, 1, 'malformed_envelope'
+        )
+        RETURNING quarantine_id
+        "#,
+    )
+    .bind(tenant)
+    .bind(pin.sender_service_id)
+    .bind(pin.receiver_service_id)
+    .bind(&pin.transport_provider_id)
+    .bind(&pin.transport_provider_version)
+    .bind(pin.transport_profile_id)
+    .bind(pin.transport_profile_revision)
+    .bind(pin.transport_profile_digest.to_vec())
+    .bind(&pin.endpoint_identity)
+    .bind(&pin.destination_id)
+    .bind(pin.destination_generation)
+    .bind(&pin.transport_provider_id)
+    .bind(&pin.destination_id)
+    .bind(pin.destination_generation)
+    .bind(sequence)
+    .bind(message_id)
+    .bind(vec![0x71_u8; 32])
+    .fetch_one(&mut *tx)
+    .await
+    .expect("insert legacy cursorless quarantine metadata through shared claim trigger");
+    tx.commit()
+        .await
+        .expect("commit the cursorless-history claim before testing later delivery");
+    quarantine_id
+}
+
 async fn receive_one(
     route: TaskEventReceiveRoute,
     pool: &PgPool,
@@ -787,12 +1001,21 @@ fn source_origin(
     message_id: Uuid,
     sequence: i64,
 ) -> TaskEventReceiveOrigin {
+    source_origin_with_cursor(pin, message_id, sequence, sequence.to_be_bytes().to_vec())
+}
+
+fn source_origin_with_cursor(
+    pin: &TaskEventRoutePin,
+    message_id: Uuid,
+    sequence: i64,
+    cursor: Vec<u8>,
+) -> TaskEventReceiveOrigin {
     TaskEventReceiveOrigin::new(
         pin.transport_provider_id.clone(),
         pin.destination_id.clone(),
         pin.destination_generation,
         sequence,
-        sequence.to_be_bytes().to_vec(),
+        cursor,
         message_id,
     )
     .expect("valid source-position fixture")
