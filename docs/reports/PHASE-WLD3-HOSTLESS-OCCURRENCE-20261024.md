@@ -1,8 +1,8 @@
 # PHASE-WLD3-HOSTLESS-OCCURRENCE-20261024
 
-**Status:** Source/design slice implemented; local Rust/Cargo 1.99.0 and disposable PostgreSQL acceptance passed 47/47. Domain tests passed 31/31, the two focused Schedule Rule API authorization tests passed 1/1 each, and Schedule PostgreSQL integration passed 6/6. WLD-3 remains open and Schedule execution remains fail-closed.
+**Status:** Source/design slice implemented and locally accepted by the Rust/Cargo 1.99.0 plus disposable PostgreSQL runner (47/47). It has been rebased and fast-forwarded into local `dev` at `e5d48be09684fe2dc742ae37b1ccba57ae29faa9`. WLD-3 remains open and Schedule execution remains fail-closed.
 **Lane:** `codex/wbs-wld3-hostless-occurrence-20261024`
-**Base:** Original lane base: `dev@25659752f28e4e1a6446915b36f2ce8a387ca1c1`. Rebased onto local `dev@74ec0db4e94d53da799825d181f71e0a3149269c`; candidate HEAD `a19e69e8e75010c838acbe54fc5c1236b14ed8c0`. Final dev fast-forward is pending the target owner/HEAD/clean gate.
+**Base:** Original lane base: `dev@25659752f28e4e1a6446915b36f2ce8a387ca1c1`. Rebased onto `dev@74ec0db4e94d53da799825d181f71e0a3149269c`; candidate `e5d48be09684fe2dc742ae37b1ccba57ae29faa9` was fast-forwarded into local `dev`. Remote refs were not refreshed; nothing was pushed.
 **Manifest:** `C:\Users\leo19\.codex\worktree-manifests\Star-WLD3-hostless-occurrence-20261024.txt`
 
 ## §0 Purpose
@@ -40,7 +40,7 @@ The repository `.codegraph/` index and codebase-memory coverage endpoint are una
 - The lane-specific ignored PostgreSQL integration case was executed by the disposable runner; production/target database tests still require separate identities and deployment gates.
 - This source does not implement worker/lease recovery, run-as reauthorization, Run/Execution owner saga, confirmation, binding resolution, Host/K3s capacity reservations, Runtime sandbox, native Hook execution, readiness, independent verification, BI/Benchmark, deployment or production activation.
 - A branchless occurrence cannot satisfy an admission contract whose resolved binding requires remote Branch context. Materialization creates no Run and grants no execution authority.
-- The WLD-3 lane is not committed or integrated; parent controls review and dev convergence.
+- The WLD-3 lane was committed, rebased and fast-forwarded into local dev; target deployment and production execution gates remain open.
 
 ## §4 Child-agent failure and handoff
 
@@ -69,10 +69,10 @@ No child agents were dispatched in this lane. No delegated work failed or was dr
 
 | Role | Status |
 |---|---|
-| Architecture | Mavis implementation self-review completed; integration acceptance will be recorded after rebase and fast-forward. |
+| Architecture | Mavis implementation self-review completed; lane rebased and fast-forwarded into local dev at `e5d48be0`. |
 | SRE Lead | Local disposable PostgreSQL migration/replay/RLS and six Schedule integration tests passed; target operations, production identity, recovery and deployment remain pending. |
 | Platform | Rust/Cargo 1.99.0 focused format/check/test and scoped Clippy gates passed; workspace/whole-crate lint, target grants and production identity remain open. |
-| Review host | CodeRabbit could not start because the installed executable returned permission denied; parent review/integration acceptance pending. |
+| Review host | CodeRabbit could not start because its executable returned permission denied; direct source/design review and integration completed, no automated second-review result is claimed. |
 | PM | WLD-3 remains OPEN; no production capability is marked available. |
 
 ## §7 Revision history
@@ -81,3 +81,4 @@ No child agents were dispatched in this lane. No delegated work failed or was dr
 |---|---|---|
 | v0.1 | 2026-10-24 | Add hostless occurrence materialization/persistence boundary, synchronize requirements/design/WBS, and record exact static evidence and unrun Rust/PostgreSQL gates. |
 | v0.2 | 2026-10-24 | Record completed Rust/Cargo 1.99.0 and disposable PostgreSQL runner evidence (47/47), domain 31/31, two focused API authorization tests 1/1 each, Schedule PostgreSQL integration 6/6, the SQL CHECK NULL-semantics correction and scoped-Clippy limitation; preserve all target/production gates as open. |
+| v0.3 | 2026-10-24 | Record the rebase onto local dev `74ec0db4` and clean Orca fast-forward to `e5d48be0`; note the inactive/no-terminal target check, the patch-equivalent main-only commits, no fetch/push, and all remaining production/worker/admission/execution gates. |
