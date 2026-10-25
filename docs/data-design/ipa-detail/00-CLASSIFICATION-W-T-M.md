@@ -752,13 +752,17 @@ CREATE POLICY observation_tenant_isolation ON local_runtime.runtime_observation
 
 → **守门 #13 的 100% 覆盖要求对生产表实际为 0%。** 生产表侧的 W/T/M + RLS 13 類 + retention 归属尚未建立（本次不处理，仅登记；口径待拍板）。
 
-### D14.3 无表级设计登记的 domain crate（6 个）
+### D14.3 INVENTORY に crate 名が出現しない crate（16 個 — 名称照合であり「表級登録なし」の証明ではない）
 
-`domain-batch` / `domain-cli` / `domain-ai` / `domain-dashboard` / `domain-agent-windows` / `domain-canvas` 在本索引 25 个 domain schema 段中命中数均为 **0** —— 即这些 crate 没有任何表级设计登记。
+父会话实测（2026-10-25）：`00-INVENTORY.md` 全文检索 41 個の `domain-*` crate 名 → **命中 0 = 16 個**、命中あり = 25 個（各 3 回）：
+
+`domain-agent-windows` `domain-ai` `domain-batch` `domain-canvas` `domain-cli` `domain-dashboard` `domain-form` `domain-hook` `domain-infrastructure` `domain-kms` `domain-llm` `domain-mcp` `domain-report` `domain-task` `domain-theme` `domain-tool`
+
+> ⚠️ **解釈の限定**: 本索引は **schema 名**（`work_item` / `agent` / `tenant` …）で構造化されており crate 名ではない。よって「crate 名 0 命中」は **名称照合の結果** であり、「表級設計が登録されていない」ことの証明ではない（crate 名と schema 名が一致しない場合运会する）。真の判定には schema 単位の逐表核対が必要 — 本 D14 は照合結果の記録に留め、**未判定**（per 缺标比错标）。
 
 
 ## D15 — 改訂履歴 (D14 追加分, 2026-10-25)
 
 | 版本 | 日付 | 改訂人 | 改訂内容 | 触发 |
 |---|---|---|---|---|
-| D14 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 新增 D14 監査差異記録：① §3.1/§3.2 集計数字与 §2 明細的互斥点（实测 M=42/T=46/W=12，scm 8 vs 9）② 「100% 表覆盖」仅在设计表宇宙内成立的限定（生产 175 表交集 = 0）③ 6 个 crate 无表级设计登记。**未改写既有分类数字与归属** | 用户 2026-10-25 提问「各种 domain model 都齐全么?」+ 拍板 `ask_b66403e46d985090ade079d4`（Q1 = 只补文档不动别的） |
+| D14 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 新增 D14 監査差異記録：① §3.1/§3.2 集計数字与 §2 明細的互斥点（实测 M=42/T=46/W=12，scm 8 vs 9）② 「100% 表覆盖」仅在设计表宇宙内成立的限定（生产 175 表交集 = 0）③ INVENTORY 中 crate 名 0 命中 = **16** 个（非 6 个），且明确标注「名称照合 ≠ 无表登记」为未判定。**未改写既有分类数字与归属** | 用户 2026-10-25 提问「各种 domain model 都齐全么?」+ 拍板 `ask_b66403e46d985090ade079d4`（Q1 = 只补文档不动别的） |
