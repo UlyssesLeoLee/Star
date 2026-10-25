@@ -720,3 +720,45 @@ CREATE POLICY observation_tenant_isolation ON local_runtime.runtime_observation
 | multica.admission_message_delivery_receipt | T | Immutable terminal receipt; no TTL/deletion; FORCE tenant RLS |
 
 新增W/T/M=2/2/0；source views引用既有T事实，不新增业务表或归类为M。两owner独立事务、role与队列；原始wire不在W重复存储。验证状态见D13报告，未声称重新审计整个历史表索引。
+
+
+## D14 — 2026-10-25 監査差異記録（per 用户拍板：只补文档，不改分类归属）
+
+> **本节性质**: 记录实测差异，**不改** §2 明细与 §3.1/§3.2 的既有数字（per 用户 2026-10-25 拍板 `ask_b66403e46d985090ade079d4` Q1 =「只补文档不动别的」）。
+> 审计全量: `docs/reports/DDD-DOMAIN-MODEL-COMPLETENESS-AUDIT.md` v0.1 §4。
+
+### D14.1 集計数字の三箇所互斥（父会话实测复算）
+
+| 位置 | 既有記載 | 実測 | 判定 |
+|---|---|---|---|
+| §2（`:67-302`） | 100 テーブル 三類分類 | **100 行，逐行标记 M=42 / T=46 / W=12，混合 0，未识别 0** | ✅ 真值 |
+| §3.1（`:309-314`） | M=35 / T=49 / W=14，合計 **100** | 相加 = **98**（与標 100 矛盾） | ⚠️ 数字過期 |
+| §3.2（`:322-351`） | 計 **98** | 其 25 schema 行相加 = **101** | ⚠️ 数字過期 |
+| §3.2 `scm` 行（`:343`） | 計 9 | §2.18 scm 实为 **8** 行 | ⚠️ 唯一逐 schema 偏差（+1） |
+| `:353` 整合確認 | 「v0.2 §9 推測 2 混合（`ほか`）待 P3-B SRE Lead 拍板」 | §2 已无未识别行、混合 0 | ⚠️ 該待办描述已過期 |
+
+**复算方法**（可重放）：限定 §2 区間（L67-L302），取 `^\|\s*T\d+\s*\|` 行，第 3 列去 `*` 后按 `M`/`T`/`W`/含 `/` 计数。
+
+**待拍板**：§3.1 / §3.2 的数字应订正为 M=42 / T=46 / W=12（合計 100），且 `scm` 行由 9 订正为 8。本节按「只补文档不动别的」**未代为改写**。
+
+### D14.2 「100% 表覆盖」の適用範囲（重要限定）
+
+本索引の「100 テーブル 100% 覆盖」**仅在设计表宇宙（100 表 / 25 个 DDD 域 schema）内成立**。生产表宇宙与之**表名精确交集 = 0**：
+
+| 集合 | 実測 | schema 組織 |
+|---|---|---|
+| `db/migrations` 实建表 | **175** | 技術性 schema: `multica` 60 / `infrastructure` 19 / `automation` 11 / `platform_transport` 9 / `platform_messaging` 7 / `bi` 5 / `canvas` 5 / `plugin` 5 / `permission` 3 / `scm` 2 + 49 未限定 |
+| 本索引 / `00-INVENTORY.md` | **100** | DDD 域 schema: `development` 9 / `scm` 8 / `validation` 6 / `agent` 5 / `work_item` 5 / `local_runtime` 5 / `identity` 5 / `worktree` 5 / `feedback` 4 … 共 25 |
+
+→ **守门 #13 的 100% 覆盖要求对生产表实际为 0%。** 生产表侧的 W/T/M + RLS 13 類 + retention 归属尚未建立（本次不处理，仅登记；口径待拍板）。
+
+### D14.3 无表级设计登记的 domain crate（6 个）
+
+`domain-batch` / `domain-cli` / `domain-ai` / `domain-dashboard` / `domain-agent-windows` / `domain-canvas` 在本索引 25 个 domain schema 段中命中数均为 **0** —— 即这些 crate 没有任何表级设计登记。
+
+
+## D15 — 改訂履歴 (D14 追加分, 2026-10-25)
+
+| 版本 | 日付 | 改訂人 | 改訂内容 | 触发 |
+|---|---|---|---|---|
+| D14 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 新增 D14 監査差異記録：① §3.1/§3.2 集計数字与 §2 明細的互斥点（实测 M=42/T=46/W=12，scm 8 vs 9）② 「100% 表覆盖」仅在设计表宇宙内成立的限定（生产 175 表交集 = 0）③ 6 个 crate 无表级设计登记。**未改写既有分类数字与归属** | 用户 2026-10-25 提问「各种 domain model 都齐全么?」+ 拍板 `ask_b66403e46d985090ade079d4`（Q1 = 只补文档不动别的） |
