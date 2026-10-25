@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=72724a6b56bfc2049f904e46b76f40f289c4a8f736f56b6c657cf3aa0f560252
+@cypher schema=1 source_sha256=babc46ba92a6737aeffba30bf6d89b15bc0a446b5aa0dee9936c562af9149951
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs"})
 MERGE (test:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::pg_source_position_is_unique_across_inbox_and_quarantine",kind:"test"})
 MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::connect_disposable_pool",kind:"function"})
@@ -13,6 +13,7 @@ MERGE (seed_history:Symbol {id:"crates/bi-owner-runtime/tests/source_position_ar
 MERGE (seed_known_claim:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::seed_legacy_nonnull_quarantine_claim",kind:"function"})
 MERGE (seed_known_receipt:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::seed_legacy_nonnull_quarantine_receipt",kind:"function"})
 MERGE (mode_conflict:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::assert_pg_mode_conflict",kind:"function"})
+MERGE (isolation_rejected:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::assert_pg_isolation_rejected",kind:"function"})
 MERGE (receiver_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::receive_one",kind:"function"})
 MERGE (route_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::route_pin",kind:"function"})
 MERGE (origin_helper:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::source_origin",kind:"function"})
@@ -32,6 +33,7 @@ MERGE (quarantine_store:Type {id:"bi_owner_runtime::TaskEventQuarantineStore",ki
 MERGE (claim_table:Table {id:"bi.task_event_source_position_claim",class:"Transaction"})
 MERGE (origin_table:Table {id:"bi.task_event_source_origin",class:"Transaction"})
 MERGE (quarantine_table:Table {id:"bi.task_event_quarantine",class:"Transaction"})
+MERGE (isolation_levels:Config {id:"READ COMMITTED/REPEATABLE READ/SERIALIZABLE",kind:"postgres_test_isolation"})
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(identity)
@@ -43,6 +45,7 @@ MERGE (self)-[:DEFINES]->(seed_history)
 MERGE (self)-[:DEFINES]->(seed_known_claim)
 MERGE (self)-[:DEFINES]->(seed_known_receipt)
 MERGE (self)-[:DEFINES]->(mode_conflict)
+MERGE (self)-[:DEFINES]->(isolation_rejected)
 MERGE (self)-[:DEFINES]->(receiver_helper)
 MERGE (self)-[:DEFINES]->(route_helper)
 MERGE (self)-[:DEFINES]->(origin_helper)
@@ -52,6 +55,7 @@ MERGE (self)-[:DEFINES]->(delivery)
 MERGE (self)-[:DEFINES]->(transport)
 MERGE (self)-[:DEFINES]->(authorization)
 MERGE (self)-[:DEFINES]->(counters)
+MERGE (self)-[:DEFINES]->(isolation_levels)
 MERGE (self)-[:IMPORTS]->(receiver)
 MERGE (self)-[:IMPORTS]->(inbox_store)
 MERGE (self)-[:IMPORTS]->(quarantine_store)
@@ -71,12 +75,14 @@ MERGE (test)-[:CALLS]->(seed_history)
 MERGE (test)-[:CALLS]->(seed_known_claim)
 MERGE (test)-[:CALLS]->(seed_known_receipt)
 MERGE (test)-[:CALLS]->(mode_conflict)
+MERGE (test)-[:CALLS]->(isolation_rejected)
 MERGE (test)-[:CALLS]->(wire_helper)
 MERGE (assert_counts)-[:CALLS]->(terminal_counts)
 MERGE (terminal_counts)-[:READS]->(claim_table)
 MERGE (terminal_counts)-[:READS]->(origin_table)
 MERGE (terminal_counts)-[:READS]->(quarantine_table)
 MERGE (seed_history)-[:WRITES]->(quarantine_table)
+MERGE (seed_history)-[:USES]->(isolation_levels)
 MERGE (seed_known_claim)-[:WRITES]->(claim_table)
 MERGE (seed_known_receipt)-[:WRITES]->(quarantine_table)
 MERGE (seed_known_receipt)-[:WRITES]->(claim_table)
@@ -606,6 +612,7 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         41,
         Uuid::new_v4(),
         None,
+        None,
     )
     .await;
     assert_pg_mode_conflict(
@@ -626,6 +633,7 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         &cursorless_pin,
         50,
         Uuid::new_v4(),
+        None,
         None,
     )
     .await
@@ -674,13 +682,41 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
     assert_eq!(after_gap_retry_counts.inbox_ack.load(Ordering::SeqCst), 0);
     assert_terminal_counts(&audit_pool, tenant, &cursorless_pin, 51, 0, 0, 0).await;
 
+    // The advisory-lock proof depends on READ COMMITTED snapshots. Higher isolation levels must
+    // reject before writing a new claim; VOLATILE is not a snapshot-refresh guarantee.
+    let isolation_pin = route_pin();
+    for (sequence, isolation) in [(55, "repeatable read"), (56, "serializable")] {
+        let claim = seed_cursorless_quarantine_history(
+            &audit_pool,
+            tenant,
+            &isolation_pin,
+            sequence,
+            Uuid::new_v4(),
+            Some(isolation),
+            None,
+        )
+        .await;
+        assert_pg_isolation_rejected(
+            &claim.expect_err("non-READ COMMITTED claim transactions fail closed"),
+        );
+        assert_terminal_counts(&audit_pool, tenant, &isolation_pin, sequence, 0, 0, 0).await;
+    }
+
     // Migration backfill may preserve an already mixed legacy generation. Only fully identical
     // replays of its historical rows are allowed; new unmatched claims in either mode fail.
     let mixed_pin = route_pin();
     let mixed_route = TaskEventReceiveRoute::new(tenant, mixed_pin.clone()).expect("mixed route");
-    seed_cursorless_quarantine_history(&audit_pool, tenant, &mixed_pin, 60, Uuid::new_v4(), None)
-        .await
-        .expect("seed a historical cursorless row in a fresh generation");
+    seed_cursorless_quarantine_history(
+        &audit_pool,
+        tenant,
+        &mixed_pin,
+        60,
+        Uuid::new_v4(),
+        None,
+        None,
+    )
+    .await
+    .expect("seed a historical cursorless row in a fresh generation");
 
     let legacy_sequence = 59;
     let legacy_message_id = Uuid::new_v4();
@@ -770,6 +806,7 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         62,
         Uuid::new_v4(),
         None,
+        None,
     )
     .await;
     assert_pg_mode_conflict(
@@ -806,6 +843,7 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         &race_pin,
         71,
         Uuid::new_v4(),
+        None,
         Some(race_barrier),
     );
     let ((known_mode_result, known_mode_counts), cursorless_mode_result) =
@@ -1075,6 +1113,7 @@ async fn seed_cursorless_quarantine_history(
     pin: &TaskEventRoutePin,
     sequence: i64,
     message_id: Uuid,
+    transaction_isolation: Option<&'static str>,
     start_barrier: Option<Arc<Barrier>>,
 ) -> Result<Uuid, sqlx::Error> {
     if let Some(barrier) = start_barrier {
@@ -1084,6 +1123,14 @@ async fn seed_cursorless_quarantine_history(
         .begin()
         .await
         .expect("begin tenant-scoped cursorless history fixture transaction");
+    if let Some(isolation) = transaction_isolation {
+        let isolation_sql = match isolation {
+            "repeatable read" => "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+            "serializable" => "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+            _ => panic!("unsupported fixture transaction isolation: {isolation}"),
+        };
+        sqlx::query(isolation_sql).execute(&mut *tx).await?;
+    }
     sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
         .bind(tenant.to_string())
         .execute(&mut *tx)
@@ -1251,6 +1298,19 @@ fn assert_pg_mode_conflict(error: &sqlx::Error, expected_fragment: &str) {
     assert!(
         database_error.message().contains(expected_fragment),
         "unexpected PostgreSQL mode-conflict error: {database_error}"
+    );
+}
+
+fn assert_pg_isolation_rejected(error: &sqlx::Error) {
+    let database_error = error
+        .as_database_error()
+        .expect("isolation gate should reject with a PostgreSQL database error");
+    assert_eq!(database_error.code().as_deref(), Some("0A000"));
+    assert!(
+        database_error
+            .message()
+            .contains("require READ COMMITTED transaction isolation"),
+        "unexpected PostgreSQL isolation-gate error: {database_error}"
     );
 }
 

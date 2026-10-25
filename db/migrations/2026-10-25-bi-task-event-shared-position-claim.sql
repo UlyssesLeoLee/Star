@@ -1,4 +1,4 @@
--- @cypher schema=1 source_sha256=3af3d95d0ae1dd94c80ff9e203d0e7a2de83ff8cccafe08bea0e01adbe48dfd0
+-- @cypher schema=1 source_sha256=d2ee89e43fabbc107a5336bdd791e67349b50c879c07b948eee4f762450465e8
 -- MERGE (self:File {path:"db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql"})
 -- MERGE (claim:Table {id:"bi.task_event_source_position_claim",class:"Transaction"})
 -- MERGE (source_origin:Table {id:"bi.task_event_source_origin",class:"Transaction"})
@@ -10,6 +10,7 @@
 -- MERGE (claim_cursor_idx:Config {id:"task_event_source_position_claim_cursor_uq",kind:"postgres_index"})
 -- MERGE (claim_cursorless_idx:Config {id:"task_event_source_position_claim_cursorless_scope_idx",kind:"postgres_index"})
 -- MERGE (cursor_history_lock:Config {id:"bi-task-source-cursor-history",kind:"postgres_advisory_lock",modes:["shared","exclusive"]})
+-- MERGE (claim_isolation:Config {id:"READ COMMITTED",kind:"postgres_transaction_isolation"})
 -- MERGE (source_trigger:Config {id:"task_event_source_origin_claim_position",kind:"postgres_trigger"})
 -- MERGE (quarantine_trigger:Config {id:"task_event_quarantine_claim_position",kind:"postgres_trigger"})
 -- MERGE (claim_worm:Config {id:"task_event_source_position_claim_worm",kind:"postgres_trigger"})
@@ -20,6 +21,7 @@
 -- MERGE (self)-[:CONFIGURES]->(claim_cursor_idx)
 -- MERGE (self)-[:CONFIGURES]->(claim_cursorless_idx)
 -- MERGE (self)-[:CONFIGURES]->(cursor_history_lock)
+-- MERGE (self)-[:CONFIGURES]->(claim_isolation)
 -- MERGE (self)-[:CONFIGURES]->(source_trigger)
 -- MERGE (self)-[:CONFIGURES]->(quarantine_trigger)
 -- MERGE (self)-[:CONFIGURES]->(claim_worm)
@@ -27,6 +29,7 @@
 -- MERGE (claim_fn)-[:READS]->(quarantine)
 -- MERGE (claim_fn)-[:READS]->(inbox)
 -- MERGE (claim_fn)-[:USES]->(cursor_history_lock)
+-- MERGE (claim_fn)-[:USES]->(claim_isolation)
 -- MERGE (claim_fn)-[:READS]->(claim_cursorless_idx)
 -- MERGE (claim_fn)-[:READS]->(claim_cursor_idx)
 -- MERGE (claim_fn)-[:WRITES]->(claim)
@@ -161,6 +164,8 @@ GRANT SELECT, INSERT ON bi.task_event_source_position_claim TO star_bi_owner;
 CREATE FUNCTION bi.claim_task_event_source_position()
 RETURNS TRIGGER
 LANGUAGE plpgsql SECURITY DEFINER
+-- VOLATILE does not refresh a REPEATABLE READ/SERIALIZABLE transaction snapshot. The advisory-lock
+-- visibility proof below therefore accepts claim writes only under READ COMMITTED.
 VOLATILE
 SET search_path = pg_catalog
 SET row_security = on
@@ -183,6 +188,11 @@ DECLARE
 BEGIN
     IF active_tenant IS NULL OR active_tenant IS DISTINCT FROM NEW.tenant_id THEN
         RAISE EXCEPTION 'BI tenant scope mismatch for source-position claim' USING ERRCODE = '42501';
+    END IF;
+
+    IF current_setting('transaction_isolation') IS DISTINCT FROM 'read committed' THEN
+        RAISE EXCEPTION 'BI source-position claims require READ COMMITTED transaction isolation'
+            USING ERRCODE = '0A000';
     END IF;
 
     IF TG_TABLE_SCHEMA <> 'bi' THEN
