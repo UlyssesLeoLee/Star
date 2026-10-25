@@ -1,4 +1,4 @@
--- @cypher schema=1 source_sha256=3ed8bc42b9c47ac02117a18fb2e15bb5c2d4ed9b4020bc669cfb4eb5ae9e1c87
+-- @cypher schema=1 source_sha256=3af3d95d0ae1dd94c80ff9e203d0e7a2de83ff8cccafe08bea0e01adbe48dfd0
 -- MERGE (self:File {path:"db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql"})
 -- MERGE (claim:Table {id:"bi.task_event_source_position_claim",class:"Transaction"})
 -- MERGE (source_origin:Table {id:"bi.task_event_source_origin",class:"Transaction"})
@@ -28,6 +28,7 @@
 -- MERGE (claim_fn)-[:READS]->(inbox)
 -- MERGE (claim_fn)-[:USES]->(cursor_history_lock)
 -- MERGE (claim_fn)-[:READS]->(claim_cursorless_idx)
+-- MERGE (claim_fn)-[:READS]->(claim_cursor_idx)
 -- MERGE (claim_fn)-[:WRITES]->(claim)
 -- MERGE (claim)-[:CONFIGURES]->(claim_worm)
 -- MERGE (claim_worm)-[:CALLS]->(reject_fn)
@@ -160,6 +161,7 @@ GRANT SELECT, INSERT ON bi.task_event_source_position_claim TO star_bi_owner;
 CREATE FUNCTION bi.claim_task_event_source_position()
 RETURNS TRIGGER
 LANGUAGE plpgsql SECURITY DEFINER
+VOLATILE
 SET search_path = pg_catalog
 SET row_security = on
 AS $$
@@ -218,9 +220,9 @@ BEGIN
         RAISE EXCEPTION 'unexpected BI source-position trigger relation' USING ERRCODE = '23514';
     END IF;
 
-    -- A cursorless claim marks the generation's ordering history as unknown. Known-cursor writes
-    -- share the generation lock and remain parallel; cursorless writes take it exclusively so a
-    -- concurrent first unknown claim cannot race past the indexed barrier lookup below.
+    -- Claims in one source generation must not mix known and unknown cursor modes. Known-cursor
+    -- writes share the generation lock and remain parallel; cursorless writes take it exclusively
+    -- so either mode's indexed barrier lookup cannot race past a concurrent opposite-mode claim.
     source_history_lock_key := hashtextextended(
         format('bi-task-source-cursor-history/%s/%s/%s/%s/%s', NEW.tenant_id,
             source_consumer, source_provider, source_log, source_generation), 0);
@@ -277,6 +279,18 @@ BEGIN
             RAISE EXCEPTION 'BI source position already has a conflicting terminal disposition'
                 USING ERRCODE = '23505';
         END IF;
+    ELSIF source_cursor IS NULL AND EXISTS (
+        SELECT 1
+          FROM bi.task_event_source_position_claim AS known_history
+         WHERE known_history.tenant_id = NEW.tenant_id
+           AND known_history.consumer_id = source_consumer
+           AND known_history.provider_identity = source_provider
+           AND known_history.source_log_id = source_log
+           AND known_history.source_log_generation = source_generation
+           AND known_history.source_cursor IS NOT NULL
+    ) THEN
+        RAISE EXCEPTION 'BI source generation has known cursor history; use a fresh generation or reconcile history'
+            USING ERRCODE = '23505';
     ELSIF source_cursor IS NOT NULL AND EXISTS (
         SELECT 1
           FROM bi.task_event_source_position_claim AS unknown_history
