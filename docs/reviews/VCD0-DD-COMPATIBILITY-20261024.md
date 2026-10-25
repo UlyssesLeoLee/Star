@@ -92,3 +92,66 @@ Reviewed 2026-10-24:
 **Do not merge or adopt `DD-STAR-VERCEL-DEPLOY-001.md` as-is.** It is an untracked, unapproved v2.0 candidate built around a second parallel business/execution platform, while current `dev` approves only an optional protected frontend path and a Rust HTTP adapter candidate gated by VCD-2. That difference changes authority, data ownership, execution, and Schedule semantics; it is not a documentation-only naming mismatch.
 
 Carry forward only the bounded security/transport/Owner invariants in §2 above as source notes for the VCD-0 rewrite. First author a new detailed design against current SRS v0.3 and WBS VCD-0..4, remove unapproved topologies, repair the traceability and platform facts, and leave all deployment/runtime/production gates open. This review adds no requirements and claims no implementation.
+
+# R3 follow-up — current dev document review
+
+- **Review date:** 2026-10-25
+- **Baseline:** local dev commit `9fbb62b1d98171ed3051e944e91c2b8cd34b4285`; review lane HEAD `88a7fa1f1a97d1e2103dd21425940a4aac10b524` (brief-only commit on that baseline).
+- **Decision:** BLOCKED for VCD-0 closure. Current DD is a safe, explicitly gated draft, but the canonical route and the FR-VC-009..012 storage contract remain unresolved or inconsistent.
+- **Execution status:** document review only; all runtime, account, deployment, database, and test evidence remains NOT_RUN.
+
+## §0 Purpose and scope
+
+Independently review the current dev SRS, ADR, Basic Design, Detailed Design, Test Design, and WBS for the VCD-0 detailed-design closure gate. This addendum supersedes the earlier review only for findings rechecked against the current dev baseline; the earlier review is retained as historical evidence. No shared design or test document was edited, and no tests were run.
+
+## §1 Findings and remediation matrix
+
+| ID | Priority | Current evidence | Finding and required disposition |
+|---|---|---|---|
+| DD-R3-01 | P1 | SRS §4.3, FR-VC-009..012 (lines 167–170): Marketplace/hosted PostgreSQL credentials in platform environment, per-function DB pool, and a separate CI/external migrator. DD §5.2 (lines 132–143): only an existing Star Owner-approved storage/API may be used; Vercel must not open a business DB connection or create a migration authority; the concrete Provider/API/role/pool mapping is UNKNOWN and fail-closed. TD T-038/T-039/T-042 (lines 144–148) tests the pool and independent migration but does not name whether the target is inside the existing Star Owner or a Vercel function. | The DD has now added the conditional Owner mapping requested by DD-R2-01, but the requirement and test baselines still read as direct Vercel database access. FR-VC-009/012 and DD §5.2 cannot both be implemented literally. FR-VC-011 also needs to state whether its independent CI job is the existing Star migration authority. This is a current cross-document contract gap, not evidence that a second database is approved. Resolve by explicitly assigning storage, RLS transaction context, connection pool, and migration identity to the existing Star Owner/provider path; if that cannot satisfy the SRS, revise SRS/AC and test mappings before VCD-0 approval. Do not create a Vercel-owned DB, owner, migrator, or bypass role by implication. |
+| DD-R3-02 | P1 | SRS FR-VC-013 (line 176) permits chat SSE through a Next route; ADR §6 (line 57), BD §5 (line 138), DD §2.3 (lines 62–66) and §7 (lines 168–177) all say the final route is not selected. TD §4.7/T-049 (lines 163–177) tests the route only after canonical design and real contracts exist. WBS §11 (line 325) explicitly keeps the route and session/authorization/Origin/streaming/lifecycle contract unresolved. | The documents correctly avoid inventing a route, but there is no canonical chat SSE path to implement or test. Select a path only after confirming the actual Star session and upstream API contract; then document the exact route owner, upstream endpoint, credential transfer, current Run/capability authorization on connect and reconnect, Origin/cross-site protection, streaming/no-buffer behavior, bounded backpressure, disconnect/cancel propagation, event/reconnect semantics, audit correlation, and failure handling. Synchronize SRS/ADR/BD/DD/TD and keep the UI unavailable until the contract is implemented and verified. |
+| DD-R3-03 | P1 | SRS §0 repository inventory (line 35) names four current browser connections: terminal, remote file browser, ARG, and chat SSE. SRS FR-VC-013 (line 176) lists four execution-plane types (terminal/PTY, noVNC, Canvas WSS, ARG), with chat SSE as a separate optional route. BD §5 (lines 137–139), DD §2.3/§7 (lines 64, 177), and TD T-049 (lines 167–177) define five test channels: those four execution-plane types plus chat SSE. TD §4.7 (line 163) explicitly excludes remote file-browser. | The channel count can be reconciled if terminal WS and PTY are one type, but the repository inventory and normative/test scope substitute remote file-browser with noVNC and Canvas. Reconcile which are existing versus proposed channels and whether remote file-browser is out of Vercel scope or an execution-plane read capability. Keep local Worktree filesystem access fail-closed. Update the FR acceptance statement, topology, T-049 matrix, and traceability together; do not treat a repository inventory as authorization to expose a capability. |
+| DD-R3-04 | P1 | DD §2.3 (line 64) and §7 (line 168) explicitly leave Gateway credential handshake, Origin allow/deny, current authorization/revocation propagation, frame/event protocol, heartbeat, and close/reconnect behavior unknown. TD T-049 (lines 163–177) now makes these prerequisites and requires positive flow, deny cases, revocation, outage, and fresh-authorized recovery. WBS §8 (line 280) says no production host-session owner/provider was found. | The R2 test-design deficiencies are partly repaired: T-049 now asserts positive event/frame delivery and recovery, and avoids claiming “no duplicate side effect” when it issues no business command. The actual session/Gateway contract is still absent, so the test remains correctly NOT_RUN and cannot close VCD-0. Before closure, bind each connection to an authoritative identity issuer/API and capability scope; define environment-specific Origin allow/deny, connection credential handling without reusable credentials in URLs/logs, authorization freshness and active-connection revocation, protocol-level positive event, heartbeat, timeout/close/reconnect and recovery evidence. Use the real contract; until supplied, keep each affected channel unavailable and the gate open. |
+| DD-R3-05 | P2 | SRS header line 11 still says detailed/test designs do not exist on dev although both are present. ADR and BD headers cite WBS v4.19 while current WBS §11 line 325 identifies v4.21. | Refresh document headers and revision history when the canonical design set is reconciled. This is documentation trace drift; it does not change the fail-closed decision. |
+
+## §2 Verification summary
+
+- Compared current dev SRS v0.4, ADR v0.2, BD v0.3, DD v0.3, TD v0.4, and WBS §11 at the exact baseline above.
+- Rechecked DD-R2-01: the DD now explicitly maps FR-VC-009..012 to existing Star Owners and fail-closed gates, but the SRS and TD still imply a Vercel-side database connection; finding remains partially open.
+- Rechecked DD-R2-02: the DD now discloses the chat SSE route gap and traces T-049; the omission finding is repaired, while the route decision and real protocol contract remain open.
+- Rechecked TD R2 findings: T-049 now has positive data-flow and recovery assertions, excludes business commands so it does not claim duplicate-side-effect coverage, and explicitly excludes remote file-browser. The excluded channel still conflicts with the SRS inventory; Gateway/session and route prerequisites remain unknown.
+- No tests, builds, account checks, network probes, deployments, or database operations were run. All such evidence is NOT_RUN.
+
+## §3 Known gaps and WBS impact
+
+1. VCD-0 remains OPEN. WBS §11 row “Vercel deployment” (line 325) already records the chat SSE contract, FR-VC-013/T-049 channel reconciliation, and independent R3 review as gates. This report completes only the independent-review deliverable; it does not clear the route, owner/database, channel-scope, or runtime gates.
+2. WBS §11 next-work item 4 (line 332) remains applicable: reconcile and approve the VCD-0 document set and route contract before VCD-1/VCD-2 execution.
+3. The actual host-session owner/provider and Gateway protocol are not established in this repository review. A written interface contract or verified integration input is required; no credential form, endpoint, Origin value, or wire format is inferred here.
+4. Database provider, connection-pool location, Owner API/context transfer, and approved migration-job identity remain UNKNOWN.
+
+## §4 Subagent failure handoff
+
+This lane performed an independent document review only; it did not dispatch subagents. No failed child work requires handoff.
+
+## §5 Guardrails
+
+1. VCD-0 remains OPEN; this review is not approval or implementation evidence.
+2. Preserve Star Owner authority; do not infer a second database, Owner, migrator, or direct Vercel database role.
+3. Keep chat SSE and Gateway channels unavailable while route, identity, authorization, Origin, or lifecycle contracts are unknown.
+4. Do not infer Gateway protocol or credential details. Do not place reusable bearer/cookie/connection credentials in URLs, browser storage, logs, traces, or test artifacts.
+5. Keep T-049, database, account, deployment, and runtime status NOT_RUN.
+6. This R3 review edited only its assigned report; the already modified task brief was not changed in this review. SRS, ADR, Basic Design, Detailed Design, Test Design, WBS, and product code were not changed.
+
+## §6 Review sign-off
+
+| Role | Result |
+|---|---|
+| Independent detailed-design review | **BLOCKED for VCD-0 closure**; DD-R3-01 through DD-R3-04 remain open, with DD-R3-05 as documentation cleanup. |
+| SRE / Platform | Runtime, account, deployment, database and performance evidence **NOT_RUN**. |
+| Review chair / PM | This review provides findings and acceptance conditions; it does not approve the Vercel design set or close WBS gates. |
+
+## §7 Revision history
+
+| Version | Date | Reviewer | Change |
+|---|---|---|---|
+| v0.2 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Re-reviewed current dev VCD-0 design set; distinguished resolved documentation gaps from still-open route, Owner/database, Gateway contract, and channel-scope findings; runtime/tests remain NOT_RUN. |
