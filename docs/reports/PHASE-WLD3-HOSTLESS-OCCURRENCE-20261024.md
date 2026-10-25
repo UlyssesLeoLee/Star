@@ -1,6 +1,6 @@
 # PHASE-WLD3-HOSTLESS-OCCURRENCE-20261024
 
-**Status:** Source/design slice implemented and locally accepted by the Rust/Cargo 1.99.0 plus disposable PostgreSQL runner (47/47). It has been rebased and fast-forwarded into local `dev` at `e5d48be09684fe2dc742ae37b1ccba57ae29faa9`. WLD-3 remains open and Schedule execution remains fail-closed.
+**Status:** Source/design slice accepted by the Rust/Cargo 1.99.0 plus disposable PostgreSQL runner (47/47), rebased and fast-forwarded into local dev at e5d48be09684fe2dc742ae37b1ccba57ae29faa9. The completed inactive/no-terminal worktree and merged local lane branch have been removed after SHA-256 preserving 96 ignored runner JSON/log/SQL files (148,612 bytes) under C:\Users\leo19\.codex\archives\Star\2026-10-24-wld3-full-runner. Before this cleanup-status documentation commit, local dev was d4d1e2fa and main...dev was 2 64; no fetch or push. WLD-3 remains open and Schedule execution remains fail-closed.
 **Lane:** `codex/wbs-wld3-hostless-occurrence-20261024`
 **Base:** Original lane base: `dev@25659752f28e4e1a6446915b36f2ce8a387ca1c1`. Rebased onto `dev@74ec0db4e94d53da799825d181f71e0a3149269c`; candidate `e5d48be09684fe2dc742ae37b1ccba57ae29faa9` was fast-forwarded into local `dev`. Remote refs were not refreshed; nothing was pushed.
 **Manifest:** `C:\Users\leo19\.codex\worktree-manifests\Star-WLD3-hostless-occurrence-20261024.txt`
@@ -40,7 +40,7 @@ The repository `.codegraph/` index and codebase-memory coverage endpoint are una
 - The lane-specific ignored PostgreSQL integration case was executed by the disposable runner; production/target database tests still require separate identities and deployment gates.
 - This source does not implement worker/lease recovery, run-as reauthorization, Run/Execution owner saga, confirmation, binding resolution, Host/K3s capacity reservations, Runtime sandbox, native Hook execution, readiness, independent verification, BI/Benchmark, deployment or production activation.
 - A branchless occurrence cannot satisfy an admission contract whose resolved binding requires remote Branch context. Materialization creates no Run and grants no execution authority.
-- The WLD-3 lane was committed, rebased and fast-forwarded into local dev; target deployment and production execution gates remain open.
+- The WLD-3 lane was committed, rebased and fast-forwarded into local dev; after a fresh inactive/no-terminal/clean check, Orca removed the completed worktree and Git confirmed the checkout was gone before the merged local branch was deleted. All 96 ignored runner JSON/log/SQL files (148,612 bytes) were copied to C:\Users\leo19\.codex\archives\Star\2026-10-24-wld3-full-runner and SHA-256 verified with zero mismatches. No fetch or push was performed. Target deployment and production execution gates remain open.
 
 ## §4 Child-agent failure and handoff
 
@@ -63,7 +63,7 @@ No child agents were dispatched in this lane. No delegated work failed or was dr
 13. Keep Schedule admission/execution fail-closed until independent owner/runtime gates pass.
 14. Never treat static fixtures or source assertions as SQL/runtime/production acceptance.
 15. Keep Cypher relationships evidence-backed and disclose unavailable CodeGraph coverage.
-16. Do not rebase, merge, push, archive or clean the worktree; parent owns integration.
+16. During the lane, rebase/merge/push/archive/cleanup remained parent-owned. After acceptance, the parent rebased and fast-forwarded the lane, preserved its 96 runner evidence files with SHA-256 verification, and removed the inactive/no-terminal worktree and merged local branch.
 
 ## §6 Sign-off
 
@@ -82,3 +82,4 @@ No child agents were dispatched in this lane. No delegated work failed or was dr
 | v0.1 | 2026-10-24 | Add hostless occurrence materialization/persistence boundary, synchronize requirements/design/WBS, and record exact static evidence and unrun Rust/PostgreSQL gates. |
 | v0.2 | 2026-10-24 | Record completed Rust/Cargo 1.99.0 and disposable PostgreSQL runner evidence (47/47), domain 31/31, two focused API authorization tests 1/1 each, Schedule PostgreSQL integration 6/6, the SQL CHECK NULL-semantics correction and scoped-Clippy limitation; preserve all target/production gates as open. |
 | v0.3 | 2026-10-24 | Record the rebase onto local dev `74ec0db4` and clean Orca fast-forward to `e5d48be0`; note the inactive/no-terminal target check, the patch-equivalent main-only commits, no fetch/push, and all remaining production/worker/admission/execution gates. |
+| v0.4 | 2026-10-24 | Record final dev integration and local cleanup: archive/hash-verify 96 ignored runner JSON/log/SQL files (148,612 bytes), remove the inactive/no-terminal clean worktree through Orca and delete the branch after confirming its tip is contained in dev; refresh local ancestry and origin-tracking counts without fetch or push; keep all production gates open. |
