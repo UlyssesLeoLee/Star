@@ -108,3 +108,54 @@ The added integration test covers exact replay, changed content, both cross-disp
 | PostgreSQL migration / RLS / concurrency | Unrun; acceptance gate remains open |
 | Tests run by reviewer | None; manual source review only |
 | Implementation edits / rebase / merge / push | None |
+
+## 7. Addendum — cursorless arbitration follow-up (2026-10-25)
+
+- **Implementation reviewed:** `fd0472ffdf2ad5fe6385b071abbbf4b6024198f2` against parent `07a896e3561affb885594b9fb53b65b199921fa6`
+- **Review checkout HEAD before this addendum:** `e098fe4061e23045049aa08c0c2bef75cec6561a`
+- **Scope:** manual source review of the candidate migration/test/report delta and the original cross-disposition finding plus prior shared-claim addendum. No source changes, test execution, PostgreSQL connection, RLS run, rebase, merge, push, or external review service.
+
+### P1 — the cursorless barrier is one-way and accepts a known-to-unknown transition
+
+**Affected paths:**
+
+- `db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:221-244, 280-294`
+- `db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql:51-93, 128-147`
+- `crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs:557-648, 889-944`
+
+The advisory lock serializes a known-cursor writer (shared lock) against a cursorless writer (exclusive lock), but the post-insert barrier is only evaluated when `source_cursor IS NOT NULL` (`...sql:280-289`). Therefore this legal READ COMMITTED ordering remains possible: a known delivery at sequence 32 takes the shared lock, inserts its non-null claim, sees no null claim, and commits; a delayed cursorless quarantine at the earlier sequence 31 then obtains the exclusive lock, inserts a distinct sequence key, skips the `ELSIF` body because its cursor is NULL, and commits. The lock orders transactions; it does not order source sequences. This leaves one generation containing known and unknown cursor history even though BI cannot determine whether sequence 31's missing cursor equals a cursor already claimed at another sequence.
+
+The migration's historical prechecks reject duplicate sequences and duplicate *known* cursors, but do not reject a generation containing both cursorless and non-null rows (`...sql:51-93`). Its backfill preserves null quarantine cursors (`...sql:143-147`), so an already mixed legacy generation is also accepted into the new ledger. The new null-history test seeds a null row only after migration and then tests a later non-null sequence (`source_position_arbitration_pg.rs:585, 889-944`); it does not cover known-then-null or a mixed pre-migration backfill.
+
+The regular Rust quarantine adapter currently passes a non-empty cursor and the prior SQL receiver rejects a NULL parameter (`db/migrations/2026-10-24-bi-task-event-source-origin.sql:416`), which narrows the live application path. It does not establish the database invariant: the new trigger and nullable quarantine schema explicitly support cursorless inserts, the integration fixture uses that path, and legacy null rows are backfilled. This review therefore treats the missing reverse barrier as a source-integrity defect, not as a PostgreSQL runtime finding.
+
+**Minimum fail-closed fix:** when a *new* null-cursor claim is inserted under the exclusive generation lock, reject and roll back if that scope already contains any non-null claim. Keep exact replay on the existing `inserted_count = 0` equality-check path. Separately make migration preflight reject (or persist an explicit blocked-generation fact for) any pre-existing scope containing both NULL and non-NULL claims; do not erase append-only receipts to reconcile it. Add regression coverage for known sequence 32 followed by cursorless sequence 31, cursorless-first followed by known, exact replay of both existing claims, and migration from a pre-existing mixed scope. Re-review the new commit before treating the original P2 as closed.
+
+**Merge effect:** block this commit as a completed source-position safety fix until the reverse transition and mixed-history migration policy are closed. A later non-null claim after cursorless history is rejected source-side, but that alone does not make the policy symmetric.
+
+### P2 — the new tests do not exercise the lock race or migration-time legacy backfill
+
+The candidate adds valuable sequential checks for the same non-null cursor at two sequences (`source_position_arbitration_pg.rs:509-555`) and for cursorless history followed by a new known cursor (`:557-648`). Its only concurrent test races two known-cursor dispositions at one sequence (`:451-507`); it never races the exclusive cursorless path against a shared known-cursor path. The cursorless fixture writes a post-migration row through the trigger (`:889-944`) rather than creating a legacy quarantine row before migration and verifying the migration backfill. These gaps are material because the safety claim depends on the advisory-lock ordering and the migration's historical state.
+
+The test is explicitly ignored until a dedicated PostgreSQL database is available (`source_position_arbitration_pg.rs:191-195`); the candidate report records `0 passed, 1 ignored` and says migration, RLS, mTLS, recovery, and settlement were not run (`docs/reports/PHASE-WBS-W8-SOURCE-CLAIM-FIX-20261025.md:35-36`). Static inspection supports the lock ordering under the stated READ COMMITTED operating assumption, but this is not runtime or concurrency evidence. Add two-session database tests for both lock winner orders and an actual pre-migration cursorless backfill fixture.
+
+### P2 — migration/test database role requirements remain unproven
+
+The earlier BI migration declares `star_bi_owner` and `star_bi_runtime` as `NOLOGIN` and `NOBYPASSRLS` (`db/migrations/2026-10-16-bi-task-event-inbox.sql:31-45`). The phase report describes the test URLs as logging in directly as those roles (`docs/reports/PHASE-WBS-W8-SOURCE-CLAIM-FIX-20261025.md:40`), while the test connects using the URL as supplied and only verifies `current_user` (`source_position_arbitration_pg.rs:654-683`); it does not perform `SET ROLE`. A separate login role plus explicit role switching/startup configuration is needed unless the deployment has another tested setup. Also, this migration sets the claim function owner and revokes PUBLIC/runtime EXECUTE before creating the three triggers (`...sql:299-322`); the exact migration principal must have the required RLS-bypass and trigger/function privileges. The report names the RLS-bypass requirement but no actual migration identity or grant proof. This is an unresolved deployment/test setup gate, not a claim that a PostgreSQL migration was attempted or failed.
+
+**Concrete closure:** document the supported migration principal and test login-to-effective-role setup, then apply the migration and run the ignored test under those production-equivalent roles. Confirm trigger creation succeeds after the function revocations, migration backfill sees all tenants under FORCE RLS, and runtime still cannot access the claim table/function directly.
+
+## 8. Verdict and gate status
+
+**Verdict: BLOCK this commit as the completed cursorless-history fix.** The known-cursor cross-sequence collision path added in this commit is represented in the test source and the previous known-cursor P1 remains source-level closed. The one-way barrier still permits a cursorless claim to follow a known claim, including at a lower sequence; the migration also admits historical mixed generations. The source-level P2 is therefore not fully closed.
+
+**Runtime status: OPEN / NOT_RUN.** No PostgreSQL migration, RLS, advisory-lock concurrency, mTLS, recovery, or settlement test was run by this reviewer. W8 remains OPEN. The candidate report's compile/format results were read as reported evidence only; I did not reproduce them.
+
+| Review item | Result |
+|---|---|
+| Candidate / parent | `fd0472ffdf2ad5fe6385b071abbbf4b6024198f2` / `07a896e3561affb885594b9fb53b65b199921fa6` |
+| New P1 | Cursorless insertion can follow known claims and make generation history ambiguous; migration also backfills mixed scopes without preflight rejection |
+| New P2 | Missing reverse-order lock and pre-migration backfill integration cases; migration/test effective-role setup unproven |
+| PostgreSQL / RLS / concurrency / mTLS / recovery / settlement | OPEN / NOT_RUN |
+| Reviewer tests / implementation edits | None / None |
+| Rebase / merge / push / external review | None / None / None / None |
