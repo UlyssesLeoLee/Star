@@ -135,7 +135,7 @@ P3 全 5 阶段 5/5 质量门实证后, 落地 P3 阶段收官报告 (类似 `PH
 | 应 review 的域 | 41 个 `crates/domain-*`（+ 21 个未登记 `star-*`） |
 | 已 review | **0 个**（流程 Draft v0.1，从未启动） |
 | 域模型完备度实测 | **齐全 9 / 部分 20 / 骨架 12**（详见审计报告 §2） |
-| 结构性缺口 | 12+ 个 crate 有实体 + 不变量 + port 但**不发领域事件**（R4=N）→ owner-local Outbox 无从写入 |
+| 结构性缺口 | **27/41** crate 有实体 + 不变量 + port 但**不发领域事件**（R4=N）→ owner-local Outbox 无从写入（详见审计报告 §3.1，crate 清单可由 §2 矩阵 `R4` 列数出） |
 | 假安全感 | `domain-feedback` `ALL_INVARIANT_CHECKS = &[]`（`invariants.rs:94`）、`domain-comment` 空切片（`invariants.rs:125`）、`domain-kms` 轮换周期不变量无代码强制、`domain-identity` INV-ID-03 不可执行 |
 | 孤儿 crate | `domain-mcp` 全仓 0 依赖方（实现实际在 `crates/star-mcp`） |
 | 跨层断裂 | `db/migrations` 实建 **175** 表 与 W/T/M 分类 **100** 表 **表名精确交集 = 0** → 守门 #13 的「100% 表覆盖」对生产表实为 0%（详见审计报告 §4） |
@@ -152,3 +152,4 @@ P3 全 5 阶段 5/5 质量门实证后, 落地 P3 阶段收官报告 (类似 `PH
 |---|---|---|---|---|
 | v0.1 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: DDD Review 阶段 5 角色 (架构/SRE/平台/评审/PM) + 7 步流程 + 5 维度质量门 5/5 实证表 + 签字栏 5 角色 | 2026-08-30 10:45 JST Ulysses 指令"全做" 5 套推进触发 |
 | v0.2 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 新增 §6 域模型完备度审计补充：① 5 域 → crate 映射与守门 #3 冲突登记（**不改 `docs/ddd/01-05`**，per 拍板）② 本文件「等 10 名真人」前提已随守门 #14 v4 / v0.62–0.64 失效的登记 ③ DDD Review 实际覆盖率 0/41 + 完备度实测 9/20/12 + 3 类结构性缺口 ④ 建议 review 入口。审计全量见 `docs/reports/DDD-DOMAIN-MODEL-COMPLETENESS-AUDIT.md` v0.1 | 用户 2026-10-25 提问「各种 domain model 都齐全么?」+ 拍板 `ask_b66403e46d985090ade079d4`（Q2 = 不动，仅登记冲突） |
+| v0.3 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 自审修订：§6.3 结构性缺口「12+ 个 crate 无领域事件」→ **27/41**（与审计报告 v0.2 §2 矩阵 `R4=N` 列可数对齐；原数字与所列 crate 名不符） | 交付前自审（用户 2026-10-25 指令「自审这些文档」） |

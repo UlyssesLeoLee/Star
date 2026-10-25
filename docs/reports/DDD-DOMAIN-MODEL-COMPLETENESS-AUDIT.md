@@ -1,8 +1,8 @@
 # DDD-DOMAIN-MODEL-COMPLETENESS-AUDIT
 
-> **STAR 域模型完备度审计报告 v0.1**
+> **STAR 域模型完备度审计报告 v0.2**
 >
-> - 状态: 🟢 审计完成（41/41 crate 判定 + 清单对齐）；0 代码改动
+> - 状态: 🟢 审计完成（41/41 crate 判定 + 清单对齐）；0 代码改动；**v0.2 = 交付前自审修订**
 > - 触发: 2026-10-25 用户提问「各种 domain model 都齐全么?」
 > - 范围: `crates/domain-*` 全部 **41** 个 crate + 24 个非 `domain-*` 域职责 crate + 设计清单 ↔ 代码 ↔ 表清单三向对齐
 > - 证据来源: 4 份 brief + 4 路 explore 子代理判定（全部带 `file:line`）；父会话独立复核 9 条关键结论
@@ -44,14 +44,37 @@
 
 > 该口径由 DDD-AUDIT-01 子代理提出并说明理由：字面全量扫描会把 `domain-agent`（9690 行实代码，仅因 `NoopAuditSink` 一处注释）误判为骨架，与事实相悖。
 
-### 1.3 复算命令（可重放）
+### 1.3 统计口径与复算命令（可重放）
+
+**口径**（§2 矩阵统一使用，父会话 2026-10-25 复算）：
+
+- `LOC` = `crates/<crate>/src/**/*.rs` 行数，**不含** `tests/` 目录
+- `测试` = 整个 crate（含 `tests/`）内 `#[test]` + `#[tokio::test]` 属性计数
+- 另有 **15** 个 crate 带独立 `tests/` 目录，合计 **7,962** 行未计入 LOC 列
+- `R4` 列 = 领域事件判定（Y = 有事件类型或 outbox 事件载荷；N = 无）
+
+> ⚠️ **口径变更说明**：4 份 brief 子代理各自报的 LOC 值口径不一致（部分含 `tests/`、部分不含，且与父会话复算值互有高低，如 `domain-report` 子代理 4079 vs 父会话 src-only 4221 / total 4435）。**本报告 §2 矩阵统一采用父会话复算值**，子代理原值不再引用 —— 交付物里的数字必须可复现。
 
 ```powershell
-# crate 规模指标
-Get-ChildItem crates/domain-* -Directory | ForEach-Object { ... LOC / #[test] 计数 ... }
-# 表宇宙交集（§4 复算）
-$rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
-        Where-Object { $_ -match '^\|\s*T\d+\s*\|' }   # §2 区間 L67-L302 限定
+# §2 矩阵 LOC / 测试数 复算（须在仓根 D:\Star 执行）
+foreach ($d in (Get-ChildItem crates -Directory -Filter 'domain-*')) {
+  $src = Get-ChildItem -Recurse -File $d.FullName -Filter '*.rs' |
+         Where-Object { $_.FullName -notmatch '\\tests\\' }
+  $loc = ($src | ForEach-Object { (Get-Content $_.FullName).Count } | Measure-Object -Sum).Sum
+  $tst = (Get-ChildItem -Recurse -File $d.FullName -Filter '*.rs' |
+          ForEach-Object { (Get-Content $_.FullName |
+                            Select-String '#\[(?:tokio::)?test\]').Count } |
+          Measure-Object -Sum).Sum
+  "{0}`t{1}`t{2}" -f $d.Name, $loc, $tst
+}
+
+# §4 表宇宙交集复算（§2 区間限定 L67-L302，否则会误计 §7 fixture 映射表）
+$c = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md
+$s = ($c | Select-String '^## 2\. 全 100 テーブル' | Select-Object -First 1).LineNumber
+$e = ($c | Select-String '^## 3\. 集計' | Select-Object -First 1).LineNumber
+$c[($s-1)..($e-2)] | Where-Object { $_ -match '^\|\s*T\d+\s*\|' } | ForEach-Object {
+  $p = $_.Split('|'); "{0}`t{1}" -f $p[2].Trim(), ($p[3].Trim() -replace '\*','')
+} | Group-Object { ($_ -split "`t")[1] } | Select-Object Name, Count
 ```
 
 ---
@@ -60,49 +83,49 @@ $rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
 
 ✅ = 父会话**独立复核**过该条结论。
 
-| # | crate | LOC | 测试 | 分类 | 关键证据 | 缺口要点 |
-|---|---|---|---|---|---|---|
-| 1 | `domain-agent` | 10335 | 142 | **齐全** | 强类型 ID `lib.rs:68` + 14 状态机 `lib.rs:177` + 11 trait + `AuditEventSpec` `policy_hooks.rs:173` | R4 弱：无 `star.events.*` subject，与 audit/batch/comment 事件契约不一致 |
-| 2 | `domain-audit` | 1651 | 12 | **齐全** | 4 不变量 `lib.rs:431-504` + `AuditEventKind` `lib.rs:644` | `InMemoryAuditRecorder.record_ai` 未实装 `lib.rs:1299`（测试替身，主路径已实现 `lib.rs:984`） |
-| 3 | `domain-automation` | 4024 | 30 | **齐全** | `AutomationRule` `lib.rs:387` + 6 不变量 `lib.rs:510-537` + `AutomationEvent` `lib.rs:611` | — |
-| 4 | `domain-cli` | 4343 | 103 | **齐全** | `ApiKey`/`CliProfile` + AES 加密 `lib.rs:648` + `inv_01~04` `lib.rs:688` + `AuditSink` `api_monitor.rs:181` | 内含 HTTP 适配器（`hermes_client.rs` / `openclaw_client.rs`），边界混合 |
-| 5 | `domain-comment` | 3670 | 38 | **齐全** | `Comment` `entity.rs:21` + 5 类事件 `event.rs:79` + 7 端口 `port.rs:79/124/148` | `ALL_INVARIANT_CHECKS` 空切片 `invariants.rs:125`；INV-C-02/04/06 空实现 `invariants.rs:37/64/90` |
-| 6 | `domain-integration` | 3514 | 32 | **齐全** | 6 端口 + 事件载荷 + 完整服务层 | `adapter.rs` + `confluence.rs`（747 行）适配代码混在域 crate 内 |
-| 7 | `domain-scm` | 3724 | 29 | **齐全** | 8 态 PR 机 + 8 不变量 + `ScmEvent` `lib.rs:860` + 3 port | — |
-| 8 | `domain-validation` | 2853 | 23 | **齐全** | 10 不变量 `invariants.rs:18-202` + 6 态机 + `ValidationEvent` `event.rs:113` + 3 port | — |
-| 9 | `domain-workspace` | 1364 | 14 | **齐全** | 4 不变量 + `WorkspaceEvent` `lib.rs:407` + 2 port | — |
-| 10 | `domain-agent-windows` | 1570 | 31 | 部分 | Window/Tab 聚合 `lib.rs:94/119` + `inv_01~04` `lib.rs:451` | 无域事件；`CliPort` 全仓 0 实现（仅 trait `lib.rs:295`） |
-| 11 | `domain-ai` | 488 | 8 | 部分 | 值对象 `lib.rs:24/46/71/143` + 端口 `lib.rs:173` | `AiError` 4 变体 `lib.rs:287-300` **从未被构造**（`Err(` 0 次）；仅 `MockLlmProvider` `lib.rs:310` |
-| 12 | `domain-board` | 2512 | 26 | 部分 | `Board` 聚合 `lib.rs:284` + `WipGuard` `wip_swimlane.rs:39` + 3 端口 | 无域事件；同 crate 类型重复（`Swimlane` `lib.rs:235` vs `wip_swimlane.rs:89`；两套 `BoardService`） |
-| 13 | `domain-collaboration` | 2140 | 17 | 部分 | Session/Presence/Whiteboard `lib.rs:209/288/471` + `assert_tenant` `lib.rs:257` | 无域事件 |
-| 14 | `domain-context` | 1645 | 14 | 部分 | `ContextPacket` `lib.rs:182` + `verify_packet` `lib.rs:682` + 3 端口 | 无域事件 |
-| 15 | `domain-dashboard` | 391 | 7 | 部分 | `Dashboard` 聚合 `lib.rs:129` + 上限 20 `lib.rs:173` + Global 需 admin `lib.rs:251` | **0 个 `pub trait`**、无事件 |
-| 16 | `domain-development` | 1801 | 22 | 部分 | `ChangeSet` `lib.rs:97` + `can_transition_to` `lib.rs:208` + 3 端口 | 无域事件 |
-| 17 | `domain-form` | 592 | 11 | 部分 | 实体/校验 `lib.rs:298,379` | **0 个 `pub trait`**、无事件；`rate_limit_per_hour` 无执行逻辑 `lib.rs:248` |
-| 18 | `domain-hook` | 1237 | 17 | 部分 | fail-closed 判定在域内 `lib.rs:548-687` | **0 个 `pub trait`**（策略来源/发布无契约）、无事件 |
-| 19 | `domain-identity` | 1227 | 14 | 部分 | User/Device/Credential 实体 + 3 端口 | **无凭证签发/校验路径** → INV-ID-03「绝不存明文」不可执行（`secret_hash: String` `lib.rs:250` 无格式校验） |
-| 20 | `domain-infrastructure` | 2610 | 29 | 部分 | 容量 `capacity.rs:395` + 就绪 `readiness.rs:307` + outbox 载荷 `lib.rs:469` | 无 port trait（host/cluster 预留无契约） |
-| 21 | `domain-notification` | 2298 | 39 | 部分 | 抑制/重试/DLQ `lib.rs:124,140,630,727` | 仅判别枚举 `lib.rs:55`，无事件载荷 |
-| 22 | `domain-permission` | 2232 | 22 | 部分 | `decide()` 授权判定在域内 `lib.rs:645-736` | 无领域事件 / 审计载荷 |
-| 23 | `domain-planning` | 1901 | 20 | 部分 | Sprint/Milestone/Capacity 状态机 + 重叠校验 `lib.rs:984` | 无领域事件 |
-| 24 | `domain-project` | 970 | 16 | 部分 | 实体 + 策略 + 模板，slug 唯一 / 跨租户有测试 | 无领域事件 |
-| 25 | `domain-relation` | 1713 | 16 | 部分 | 强类型 ID + 3 port | 全 crate 0 处 event |
-| 26 | `domain-tenant` | 1087 | 13 | 部分 | 4 聚合根 + slug 唯一 / 跨租户不变量 `lib.rs:572,665` | 无事件类型 |
-| 27 | `domain-work-item` | 3500 | 47 | 部分 | 三态机 + 3 port + 47 测试 | ✅ `lib.rs:667` 明写「不发送事件（避免污染 event bus）」 |
-| 28 | `domain-workflow` | 1724 | 17 | 部分 | 严格转换表 + 5 不变量 + 3 port `lib.rs:401/451/489` | 无事件 |
-| 29 | `domain-worktree` | 2859 | 59 | 部分 | 17 态机 + 5 port + 59 测试 | 无事件（`edit.rs:208` 仅为回执非事件） |
-| 30 | `domain-batch` | 2506 | 20 | **骨架** | 模型层齐（Task/Dag + 11 事件 + Kahn 环检测） | 唯一端口实现是 `NoopBatchService`（`port.rs:404/513`，22 处 `not_implemented`）；`error.rs:97` 自述「P2 阶段未实装」；`invariant.rs:115` 12 条不变量仅 4 条实装 |
-| 31 | `domain-canvas` | 174 | 5 | **骨架** | ✅ `Cargo.toml:13` 明写「阶段 1 骨架 … 占位 endpoint」 | 仅 healthz/version，无实体/端口/事件 |
-| 32 | `domain-feedback` | 2420 | 18 | **骨架** | 域模型本完整 | ✅ `invariants.rs:10,16,24,38,81` 5 个 `*_placeholder` + `ALL_INVARIANT_CHECKS = &[]`（`invariants.rs:94`）→ **检查入口永不触发** |
-| 33 | `domain-kms` | 371 | 3 | **骨架** | 租户隔离在域内 `lib.rs:324-329` | 唯一实现 `LocalMockKms` `lib.rs:188`；轮换周期不变量（master 90 天 / DEK 30 天）**无代码强制**，`rotate_dek` `lib.rs:350-362` 只生成新 key，actor 仅进 `warn!`，无审计事件 |
-| 34 | `domain-llm` | 5625 | 126 | **骨架** | `openai.rs:321` + `anthropic.rs:333` 已实现 `LlmProvider` | **自述过期**：`lib.rs:9,14` + `chat.rs:6` 仍称「v0.0.1 stub / no real provider wiring」→ 文档与代码冲突 |
-| 35 | `domain-local-runtime` | 11555 | 197 | **骨架** | 授权边界真在域内（`task_execution.rs:196,214` Ed25519 grant） | `cli_session_lock.rs:18` + `graceful_shutdown.rs:22-23,97,320,390` 留 P1/Windows stub；**约 2200 行属 OS/PTY/SSE/传输适配**，应迁 infrastructure |
-| 36 | `domain-mcp` | 178 | 4 | **骨架** | 全文件自述 stub `lib.rs:9,14,84,87,89` | ✅ 存储 `HashMap<Uuid,String>` 裸串 `lib.rs:93`；✅ **全仓 0 依赖方**（仅自身 Cargo.toml 引用）；实现其实在 `crates/star-mcp`（10271 行 / 230 测试） |
-| 37 | `domain-report` | 4079 | 68 | **骨架** | `lib.rs:5-8` 自述 6 P1 stub / 8 P2 stub / 13 路由 stub | 走 `NotImplemented` `lib.rs:406` / `generate_stub` `lib.rs:524`；仅 C01 落地 |
-| 38 | `domain-search` | 2697 | 33 | **骨架** | `jql.rs:10` 「本任务 stub 形式」+ `jql.rs:11` 「真实数据接入 Phase 2」 | JQL 执行器跑内存行集 `jql.rs:444/447/461`；`lib.rs:238/254` 列号恒为 0 |
-| 39 | `domain-task` | 178 | 4 | **骨架** | `lib.rs:14,89,117` 自述「v0.0.1 stub」 | 仅 `TaskQueue` trait + 内存 map，无业务实体、无状态机、无租户边界 |
-| 40 | `domain-theme` | 1025 | 14 | **骨架** | — | ✅ `service.rs:32` `ThemeId::Light, // 占位, 真实应按"当前激活"字段查`；`:43` 无条件返回 Light → **三层解析链实际不生效** |
-| 41 | `domain-tool` | 569 | 15 | **骨架** | `lib.rs:14,161,252,256`「v0.0.1 stub / Sprint 2 stub」 | `execute` 恒返 Backend 错误；实体层仅 `ToolExecutionMode` `traits.rs:135` |
+| # | crate | LOC | 测试 | 分类 | R4 | 关键证据 | 缺口要点 |
+|---|---|---|---|---|---|---|---|
+| 1 | `domain-agent` | 10335 | 142 | **齐全** | Y | 强类型 ID `lib.rs:68` + 14 状态机 `lib.rs:177` + 11 trait + `AuditEventSpec` `policy_hooks.rs:173` | R4 弱：无 `star.events.*` subject，与 audit/batch/comment 事件契约不一致 |
+| 2 | `domain-audit` | 1651 | 12 | **齐全** | Y | 4 不变量 `lib.rs:431-504` + `AuditEventKind` `lib.rs:644` | `InMemoryAuditRecorder.record_ai` 未实装 `lib.rs:1299`（测试替身，主路径已实现 `lib.rs:984`） |
+| 3 | `domain-automation` | 4024 | 30 | **齐全** | Y | `AutomationRule` `lib.rs:387` + 6 不变量 `lib.rs:510-537` + `AutomationEvent` `lib.rs:611` | — |
+| 4 | `domain-cli` | 3878 | 103 | **齐全** | Y | `ApiKey`/`CliProfile` + AES 加密 `lib.rs:648` + `inv_01~04` `lib.rs:688` + `AuditSink` `api_monitor.rs:181` | 内含 HTTP 适配器（`hermes_client.rs` / `openclaw_client.rs`），边界混合 |
+| 5 | `domain-comment` | 2870 | 38 | **齐全** | Y | `Comment` `entity.rs:21` + 5 类事件 `event.rs:79` + 7 端口 `port.rs:79/124/148` | `ALL_INVARIANT_CHECKS` 空切片 `invariants.rs:125`；INV-C-02/04/06 空实现 `invariants.rs:37/64/90` |
+| 6 | `domain-integration` | 3915 | 32 | **齐全** | Y | 6 端口 + 事件载荷 + 完整服务层 | `adapter.rs` + `confluence.rs`（747 行）适配代码混在域 crate 内 |
+| 7 | `domain-scm` | 3107 | 29 | **齐全** | Y | 8 态 PR 机 + 8 不变量 + `ScmEvent` `lib.rs:860` + 3 port | — |
+| 8 | `domain-validation` | 2638 | 23 | **齐全** | Y | 10 不变量 `invariants.rs:18-202` + 6 态机 + `ValidationEvent` `event.rs:113` + 3 port | — |
+| 9 | `domain-workspace` | 1110 | 14 | **齐全** | Y | 4 不变量 + `WorkspaceEvent` `lib.rs:407` + 2 port | — |
+| 10 | `domain-agent-windows` | 1570 | 31 | 部分 | N | Window/Tab 聚合 `lib.rs:94/119` + `inv_01~04` `lib.rs:451` | 无域事件；`CliPort` 全仓 0 实现（仅 trait `lib.rs:295`） |
+| 11 | `domain-ai` | 488 | 8 | 部分 | N | 值对象 `lib.rs:24/46/71/143` + 端口 `lib.rs:173` | `AiError` 4 变体 `lib.rs:287-300` **从未被构造**（`Err(` 0 次）；仅 `MockLlmProvider` `lib.rs:310` |
+| 12 | `domain-board` | 2153 | 26 | 部分 | N | `Board` 聚合 `lib.rs:284` + `WipGuard` `wip_swimlane.rs:39` + 3 端口 | 无域事件；同 crate 类型重复（`Swimlane` `lib.rs:235` vs `wip_swimlane.rs:89`；两套 `BoardService`） |
+| 13 | `domain-collaboration` | 2140 | 17 | 部分 | N | Session/Presence/Whiteboard `lib.rs:209/288/471` + `assert_tenant` `lib.rs:257` | 无域事件 |
+| 14 | `domain-context` | 1645 | 14 | 部分 | N | `ContextPacket` `lib.rs:182` + `verify_packet` `lib.rs:682` + 3 端口 | 无域事件 |
+| 15 | `domain-dashboard` | 391 | 7 | 部分 | N | `Dashboard` 聚合 `lib.rs:129` + 上限 20 `lib.rs:173` + Global 需 admin `lib.rs:251` | **0 个 `pub trait`**、无事件 |
+| 16 | `domain-development` | 1801 | 22 | 部分 | N | `ChangeSet` `lib.rs:97` + `can_transition_to` `lib.rs:208` + 3 端口 | 无域事件 |
+| 17 | `domain-form` | 636 | 11 | 部分 | N | 实体/校验 `lib.rs:298,379` | **0 个 `pub trait`**、无事件；`rate_limit_per_hour` 无执行逻辑 `lib.rs:248` |
+| 18 | `domain-hook` | 1307 | 17 | 部分 | N | fail-closed 判定在域内 `lib.rs:548-687` | **0 个 `pub trait`**（策略来源/发布无契约）、无事件 |
+| 19 | `domain-identity` | 1309 | 14 | 部分 | N | User/Device/Credential 实体 + 3 端口 | **无凭证签发/校验路径** → INV-ID-03「绝不存明文」不可执行（`secret_hash: String` `lib.rs:250` 无格式校验） |
+| 20 | `domain-infrastructure` | 2718 | 29 | 部分 | Y | 容量 `capacity.rs:395` + 就绪 `readiness.rs:307` + outbox 载荷 `lib.rs:469` | 无 port trait（host/cluster 预留无契约） |
+| 21 | `domain-notification` | 1500 | 39 | 部分 | N | 抑制/重试/DLQ `lib.rs:124,140,630,727` | 仅判别枚举 `lib.rs:55`，无事件载荷 |
+| 22 | `domain-permission` | 1951 | 22 | 部分 | N | `decide()` 授权判定在域内 `lib.rs:645-736` | 无领域事件 / 审计载荷 |
+| 23 | `domain-planning` | 2056 | 20 | 部分 | N | Sprint/Milestone/Capacity 状态机 + 重叠校验 `lib.rs:984` | 无领域事件 |
+| 24 | `domain-project` | 1033 | 16 | 部分 | N | 实体 + 策略 + 模板，slug 唯一 / 跨租户有测试 | 无领域事件 |
+| 25 | `domain-relation` | 1813 | 16 | 部分 | N | 强类型 ID + 3 port | 全 crate 0 处 event |
+| 26 | `domain-tenant` | 1170 | 13 | 部分 | N | 4 聚合根 + slug 唯一 / 跨租户不变量 `lib.rs:572,665` | 无事件类型 |
+| 27 | `domain-work-item` | 1931 | 47 | 部分 | N | 三态机 + 3 port + 47 测试 | ✅ `lib.rs:667` 明写「不发送事件（避免污染 event bus）」 |
+| 28 | `domain-workflow` | 1849 | 17 | 部分 | N | 严格转换表 + 5 不变量 + 3 port `lib.rs:401/451/489` | 无事件 |
+| 29 | `domain-worktree` | 2686 | 59 | 部分 | N | 17 态机 + 5 port + 59 测试 | 无事件（`edit.rs:208` 仅为回执非事件） |
+| 30 | `domain-batch` | 2506 | 20 | **骨架** | Y | 模型层齐（Task/Dag + 11 事件 + Kahn 环检测） | 唯一端口实现是 `NoopBatchService`（`port.rs:404/513`，22 处 `not_implemented`）；`error.rs:97` 自述「P2 阶段未实装」；`invariant.rs:115` 12 条不变量仅 4 条实装 |
+| 31 | `domain-canvas` | 118 | 5 | **骨架** | N | ✅ `Cargo.toml:13` 明写「阶段 1 骨架 … 占位 endpoint」 | 仅 healthz/version，无实体/端口/事件 |
+| 32 | `domain-feedback` | 2621 | 18 | **骨架** | Y | 域模型本完整 | ✅ `invariants.rs:10,16,24,38,81` 5 个 `*_placeholder` + `ALL_INVARIANT_CHECKS = &[]`（`invariants.rs:94`）→ **检查入口永不触发** |
+| 33 | `domain-kms` | 410 | 3 | **骨架** | N | 租户隔离在域内 `lib.rs:324-329` | 唯一实现 `LocalMockKms` `lib.rs:188`；轮换周期不变量（master 90 天 / DEK 30 天）**无代码强制**，`rotate_dek` `lib.rs:350-362` 只生成新 key，actor 仅进 `warn!`，无审计事件 |
+| 34 | `domain-llm` | 5831 | 126 | **骨架** | N | `openai.rs:321` + `anthropic.rs:333` 已实现 `LlmProvider` | **自述过期**：`lib.rs:9,14` + `chat.rs:6` 仍称「v0.0.1 stub / no real provider wiring」→ 文档与代码冲突 |
+| 35 | `domain-local-runtime` | 12517 | 197 | **骨架** | Y | 授权边界真在域内：`task_execution.rs:196` verifier trait + `:204` Ed25519 实现 + `:214` 域分离签名载荷 | `cli_session_lock.rs:18` + `graceful_shutdown.rs:22-23,97,320,390` 留 P1/Windows stub；**约 2200 行属 OS/PTY/SSE/传输适配**，应迁 infrastructure |
+| 36 | `domain-mcp` | 212 | 4 | **骨架** | N | 全文件自述 stub `lib.rs:9,14,84,87,89` | ✅ 存储 `HashMap<Uuid,String>` 裸串 `lib.rs:93`；✅ **全仓 0 依赖方**（仅自身 Cargo.toml 引用）；实现其实在 `crates/star-mcp`（10271 行 / 230 测试） |
+| 37 | `domain-report` | 4221 | 68 | **骨架** | N | `lib.rs:5-8` 自述 6 P1 stub / 8 P2 stub / 13 路由 stub | 走 `NotImplemented` `lib.rs:406` / `generate_stub` `lib.rs:524`；仅 C01 落地 |
+| 38 | `domain-search` | 2867 | 33 | **骨架** | N | `jql.rs:10` 「本任务 stub 形式」+ `jql.rs:11` 「真实数据接入 Phase 2」 | JQL 执行器跑内存行集 `jql.rs:444/447/461`；`lib.rs:238/254` 列号恒为 0 |
+| 39 | `domain-task` | 212 | 4 | **骨架** | N | `lib.rs:14,89,117` 自述「v0.0.1 stub」 | 仅 `TaskQueue` trait + 内存 map，无业务实体、无状态机、无租户边界 |
+| 40 | `domain-theme` | 1129 | 14 | **骨架** | Y | — | ✅ `service.rs:32` `ThemeId::Light, // 占位, 真实应按"当前激活"字段查`；`:43` 无条件返回 Light → **三层解析链实际不生效** |
+| 41 | `domain-tool` | 642 | 15 | **骨架** | N | `lib.rs:14,161,252,256`「v0.0.1 stub / Sprint 2 stub」 | `execute` 恒返 Backend 错误；实体层仅 `ToolExecutionMode` `traits.rs:135` |
 
 ### 2.1 统计
 
@@ -112,15 +135,36 @@ $rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
 | 部分 | **20** | 49% |
 | 骨架 | **12** | 29% |
 
-**结论：域模型层不齐 —— 41 个域中仅 9 个（22%）达到「齐全」，12 个（29%）实质是骨架。**
+按 R4（领域事件）交叉：**R4=Y 14 个 / R4=N 27 个**（详见 §2 矩阵 `R4` 列与 §3.1）。
+
+**结论：域模型层不齐 —— 41 个域中仅 9 个（22%）达到「齐全」，12 个（29%）实质是骨架，27 个（66%）没有领域事件。**
+
+### 2.2 父会话独立复核清单（10 项，可复现）
+
+子代理结论只作证据，以下 10 项由父会话直接读取源码 / 集合运算复核：
+
+| # | 复核对象 | 结论 | 证据 |
+|---|---|---|---|
+| 1 | `domain-feedback` 空不变量表 | 成立 | `crates/domain-feedback/src/invariants.rs:94` = `pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[];` |
+| 2 | `domain-mcp` 孤儿 | 成立 | 全仓仅 `crates/domain-mcp/Cargo.toml` 自身引用（引用计数 = 1） |
+| 3 | `domain-theme` 硬编码 | 成立 | `crates/domain-theme/src/service.rs:32` `ThemeId::Light, // 占位…` + `:43` `Ok(ThemeId::Light)` |
+| 4 | `domain-work-item` 不发事件 | 成立 | `crates/domain-work-item/src/lib.rs:667` `/// - 不发送事件 (避免污染 event bus)` |
+| 5 | `domain-scm` 事件样板 | 成立 | `crates/domain-scm/src/lib.rs:860` `pub enum ScmEvent` |
+| 6 | 表宇宙零交集 | 成立 | 迁移 175 表 basename 集合 ∩ INVENTORY 100 表 basename 集合 = **0**（精确集合运算；子串匹配得到的 6/31 命中为假阳性） |
+| 7 | W/T/M §2 明细真值 | 成立 | 限定 L67-L302 取 100 行 → **M=42 / T=46 / W=12 / 混合 0 / 未识别 0** |
+| 8 | W/T/M §3.2 误差定位 | 成立 | 其 25 schema 行相加 = **101**（声称 98）；`scm` 行声称 9 实为 **8**（§2.18） |
+| 9 | `domain-canvas` / `domain-task` 自述差异 | 成立 | `crates/domain-canvas/Cargo.toml:13` 明写「阶段 1 骨架」；`crates/domain-task/Cargo.toml` **未**写骨架（描述为 L0 dispatch TaskQueue business layer） |
+| 10 | **全部 107 条 `file:line` 引用验真** | 成立 | 逐条按「行所属 crate + 文件名 + 行号」解析：**91 条**由脚本按 crate 相对路径自动校验（含子目录 `provider/openai.rs` 等），**16 条**跨表 / 子目录引用逐条人工复核，**107/107 命中且语义与文字描述一致** |
 
 ---
 
 ## §3 三类系统性缺口
 
-### 3.1 缺口 A（影响面最大）：R4 领域事件缺失 —— 12 个 crate
+### 3.1 缺口 A（影响面最大）：R4 领域事件缺失 —— **27 个 crate**（§2 矩阵 `R4=N` 列可数）
 
-`domain-work-item` ✅`lib.rs:667`、`domain-workflow`、`domain-tenant`、`domain-relation`、`domain-worktree`、`domain-board`、`domain-collaboration`、`domain-context`、`domain-development`、`domain-report`、`domain-search`、`domain-task`、`domain-tool`、`domain-agent-windows`、`domain-form`、`domain-hook`、`domain-identity`、`domain-infrastructure`、`domain-notification`、`domain-permission`、`domain-planning`、`domain-project` —— 这类 crate 的共同形态是**实体 + 不变量 + port 齐全，但不发事件**。
+R4=N 的 27 个：`domain-agent-windows` `domain-ai` `domain-board` `domain-canvas` `domain-collaboration` `domain-context` `domain-dashboard` `domain-development` `domain-form` `domain-hook` `domain-identity` `domain-kms` `domain-llm` `domain-mcp` `domain-notification` `domain-permission` `domain-planning` `domain-project` `domain-relation` `domain-report` `domain-search` `domain-task` `domain-tenant` `domain-tool` `domain-work-item` `domain-workflow` `domain-worktree`
+
+其中**已具备实体 + 不变量 + port、只差事件类型**的一类（补齐成本最低、收益最大）：`domain-work-item` ✅`lib.rs:667`、`domain-workflow`、`domain-tenant`、`domain-relation`、`domain-worktree`、`domain-board`、`domain-collaboration`、`domain-context`、`domain-development`、`domain-hook`、`domain-form`、`domain-identity`、`domain-notification`、`domain-permission`、`domain-planning`、`domain-project`、`domain-agent-windows`、`domain-dashboard`、`domain-ai`。
 
 **后果**：域层没有事件源 → owner-local Outbox 无从写入 → BI / saga / 审计回执链在生产上接不上。这不是「补几个类型」的问题，是**域模型缺一个维度**。
 
@@ -201,9 +245,11 @@ $rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
 - 但守门 #14 v4 / v0.62–0.64 已连续反转：**到位 timeline 不适用、真人内容由 agent 决定**
 - 实证后果：**41/41 `domain-*` crate 至今 0 个经过 DDD Review 流程**
 
-### 5.4 无表级设计登记的 crate
+### 5.4 crate 名在 INVENTORY 中 0 命中的 crate（16 个）
 
-`domain-batch` / `domain-cli` / `domain-ai` / `domain-dashboard` / `domain-agent-windows` / `domain-canvas` —— 6 个 crate 在 `00-INVENTORY.md` 的 25 个 domain schema 段中**命中数均为 0**。
+`00-INVENTORY.md` 全文检索 41 个 `domain-*` crate 名 → **命中 0 = 16 个**（命中 25 个各 3 次）：`domain-agent-windows` `domain-ai` `domain-batch` `domain-canvas` `domain-cli` `domain-dashboard` `domain-form` `domain-hook` `domain-infrastructure` `domain-kms` `domain-llm` `domain-mcp` `domain-report` `domain-task` `domain-theme` `domain-tool`。
+
+> ⚠️ 这是**名称照合结果，不是「无表级设计登记」的证明** —— INVENTORY 按 **schema 名**（`work_item` / `agent` / `tenant` …）结构化而非 crate 名，crate 名与 schema 名不一致时会漏配。真判定需逐 schema 核对（本次未做，标为未判定）。
 
 ---
 
@@ -225,7 +271,7 @@ $rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
 
 | # | 项 | 说明 |
 |---|---|---|
-| 1 | R4 是否为设计要求 | 20 个 crate 判 R4=N 仅基于代码事实，未核对其 spec 是否要求发布事件 → 「缺事件」是完备性观察，**不等于设计违规** |
+| 1 | R4 是否为设计要求 | **27** 个 crate 判 R4=N 仅基于代码事实，未核对其 spec 是否要求发布事件 → 「缺事件」是完备性观察，**不等于设计违规** |
 | 2 | `domain-batch` 归类分歧 | R6=Y（crate 级自述未实装 + 唯一端口为 stub）⇒ 判骨架；若 R6 收窄为「自称骨架」才算 Y，则应为齐全（5/5）。**这是本次最具后果的判断分歧点** |
 | 3 | `domain-ai` R2 边界 | `PromptTemplate::render` `lib.rs:158` 算不算「派生规则」；计 Y 仍归部分，结论不变 |
 | 4 | `domain-cli` / `domain-agent-windows` 是否算域层 | 二者含 transport/adapter 代码但同时具备实体/值对象/不变量/端口/测试，按 rubric 判承载域模型；若以「含适配器即非域层」为准则需改判 |
@@ -233,16 +279,19 @@ $rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
 | 6 | 175 生产表与 100 设计表孰为 SoR | 两集合零交集，仓内无「迁移执行顺序 / owner」权威文档可判 |
 | 7 | 7 个未登记 `domain-*` 是否独立 bounded context | 各特性文档按 feature 而非 DDD 边界描述，无 `BoundedContext` 声明 |
 | 8 | W-T-M 聚合 98 / 100 / 101 的正解 | §2 明细已无未分类行；「2 混合待拍板」描述过期（`:353`），但 §3.1/§3.2 数字未同步 |
-| 9 | 24 个非 `domain-*` crate 的边界 | 已按 4 分类归类（域模型 14 / 应用编排 2 / 基础设施 3 / 工具传输 5），但仓内无逐 crate 边界声明 |
+| 9 | 24 个非 `domain-*` crate 的边界 | 已按 4 分类归类（**域模型 17 / 应用编排 1 / 基础设施 2 / 工具传输 4** = 24，与 brief 范围一致），但仓内无逐 crate 边界声明 |
+| 10 | 「crate 名 0 命中」≠「无表级设计登记」 | INVENTORY 按 schema 名结构化，名称照合会漏配；16 个 0 命中 crate 是否真的无表登记，需逐 schema 核对（本次未做） |
 
-### 7.1 非 `domain-*` 域职责 crate 归属（24/24 已归类，无不确定项）
+### 7.1 非 `domain-*` 域职责 crate 归属（brief 范围 24/24 已归类，无不确定项）
 
-| 归属 | crate |
-|---|---|
-| 域模型（14） | `shared-task` `leads` `arg`（混合）`worktree-service`（混合）`relationship-engine` `query-engine` `layout-engine` `action-engine` `risk-engine` `health-engine` `star-workflow` `star-canvas` `star-scheduler` `star-task` `star-game` `agent-domain`（骨架）`canvas-collab`（骨架） |
-| 应用编排（2） | `arg-effect` `arg-bridge` |
-| 基础设施 / 设置（3） | `event-bus` `ai-vault` `star-cache` |
-| 工具 / 传输层（5） | `canvas-engine` `canvas-game` `worktree-canvas` `terminal-stack` `star-desktop` |
+| 归属 | 数量 | crate |
+|---|---|---|
+| 域模型 | **17** | `agent-domain`（骨架）`shared-task` `leads` `arg`（混合）`worktree-service`（混合）`canvas-collab`（骨架）`relationship-engine` `query-engine` `layout-engine` `action-engine` `risk-engine` `health-engine` `star-workflow` `star-canvas` `star-scheduler` `star-task` `star-game` |
+| 应用编排 | **1** | `arg-effect` |
+| 基础设施 / 设置 | **2** | `event-bus` `ai-vault` |
+| 工具 / 传输层 | **4** | `canvas-engine` `canvas-game` `worktree-canvas` `terminal-stack` |
+
+> brief 范围外的 **3 个追加观察**（不计入上表 24）：`arg-bridge`（应用编排）、`star-cache`（基础设施）、`star-desktop`（工具 / 传输层）—— 三者均未列入 `DDD-AUDIT-03` 的 B 组清单，此处仅作范围登记。
 
 ---
 
@@ -263,6 +312,7 @@ $rows = Get-Content docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md |
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 初版：41/41 crate 完备度矩阵 + 3 类系统性缺口 + 表宇宙零交集实证 + 治理冲突登记 + 补齐优先级 + 9 项未判定 | 用户 2026-10-25 提问「各种 domain model 都齐全么?」+ 拍板 `ask_b66403e46d985090ade079d4`（只补文档不动其他 / 5 域映射只记录不改动） |
+| **v0.2** | **2026-10-25** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | **交付前自审修订（4 项）**: (1) **LOC 列改为父会话复算值** — 4 份 brief 子代理各自报的 LOC 口径不一致（部分含 `tests/`、部分不含，且与父会话复算值互有高低，如 `domain-report` 子代理 4079 vs 父会话 src-only 4221 / total 4435），交付物里的数字必须可复现 → §2 矩阵统一改用父会话 src-only 口径，并新增 `R4` 列 + §1.3 写明口径与可运行复算命令（原 §1.3 为伪命令，不可重放）。(2) **修正 R4 缺失数量 12 → 27** — 原 §3.1 标题写「12 个 crate」却列了 21 个 crate 名，实测 R4=N 为 **27**（R4=Y 14）；现矩阵加 `R4` 列使该数可从表内直接数出，DDD Review 报告 §6.3 的「12+ 个」同步改为 27/41。(3) **修正 §7.1 归属计数** — 原写「域模型 14 / 应用编排 2 / 基础设施 3 / 工具传输 5 = 24」，但表内实际列了 27 个 crate 名；按 brief 实际范围订正为 **17 / 1 / 2 / 4 = 24**，另将 3 个 brief 范围外 crate（`arg-bridge` / `star-cache` / `star-desktop`）单列为「追加观察」。(4) **新增 §2.2 独立复核清单（10 项）** — 原仅在头部写「独立复核 9 条」而未列举，不可审计；现逐条列出复核对象 / 结论 / 证据，并附 **107/107 条 `file:line` 引用验真** 结果（91 条脚本自动 + 16 条人工复核）。另修正 `domain-local-runtime` 的 Ed25519 引用精度（`:196` verifier trait / `:204` Ed25519 实现 / `:214` 域分离签名载荷）。(5) **修正「无表级设计登记」过度断言** — 原 §5.4 与 W-T-M `D14.3` 均称「6 个 crate 无表级设计登记」，实测 `00-INVENTORY.md` 名称照合 **0 命中 = 16 个**（非 6 个），且 INVENTORY 按 **schema 名**而非 crate 名结构化 → 「名字 0 命中」不构成「无表登记」的证明；两处均改为「名称照合结果」并标未判定。 | 交付前自审（用户 2026-10-25 指令「自审这些文档」） |
 
 ---
 
