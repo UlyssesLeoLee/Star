@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=babc46ba92a6737aeffba30bf6d89b15bc0a446b5aa0dee9936c562af9149951
+@cypher schema=1 source_sha256=6ff3d09377586c85398c6b24ae16b726fa15c389a2c20e57cf6f1a0f1c922382
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs"})
 MERGE (test:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::pg_source_position_is_unique_across_inbox_and_quarantine",kind:"test"})
 MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::connect_disposable_pool",kind:"function"})
@@ -241,10 +241,10 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         None,
     )
     .await;
-    assert!(matches!(
-        inbox_result,
-        Ok(TaskEventReceiveOutcome::Committed(_))
-    ));
+    assert!(
+        matches!(&inbox_result, Ok(TaskEventReceiveOutcome::Committed(_))),
+        "unexpected first Inbox result: {inbox_result:?}"
+    );
     assert_eq!(inbox_counts.inbox_ack.load(Ordering::SeqCst), 1);
     assert_eq!(inbox_counts.quarantine_ack.load(Ordering::SeqCst), 0);
 
