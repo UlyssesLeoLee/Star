@@ -10,8 +10,8 @@
 > **WLD-0 hostless Run HTTP acceptance（2026-10-23）**：REST 读写事务在 tenant/actor scope 初始化前显式切换至 `star_engineering_directory_owner`；该 role 仅对 Run identity、首个 revision、创建者 grant 获得 INSERT。fresh PostgreSQL 18 loopback runner 55/55 步通过，并以实际认证 HTTP 路由验证 hostless create、同键 replay、Project list、RunContext 和无 Run grant actor 的不可见性；同时覆盖绑定 race、outbox 故障回滚、detach。runner 未连接目标数据库，结束后停止并删除唯一临时 cluster。目标部署 login membership、目标 DB migration/grants、历史 reconciliation 与 hostless Task/CLI/执行仍未验收或保持 fail closed；详见 WLD-0 报告。
 > **WLD-1 Repository master review remediation（2026-10-24）**：SCM bounded context 增加 RepositoryMasterRevision 与 tenant RLS owner adapter。current partial unique index 保证每个身份至多一个 current revision，新增 DEFERRABLE INITIALLY DEFERRED 约束 trigger 在提交时保证至少一个；单独关闭 current revision 会回滚，关闭+连续 successor 同事务提交可成功。owner-role migration 在任何 role/schema/grant 变更前枚举 database、schema、relation/column、function、type、language、tablespace、FDW/server、large-object、default ACL 与可用 parameter ACL；发现 SCM schema 外直接 ACL、向外 role membership 或对象所有权即 fail closed，PUBLIC ACL 不误判为 owner direct grant，也不跨 schema 撤权。migration 显式获取 PoolConnection，在该物理连接上开始事务并执行身份复验和全部 DDL；pool 单连接上限仅控制资源。两个 PG bootstrap/drift probe 分支在 probe/task 与 cleanup 同时失败时都保留双方诊断；地址/端口 mismatch identity guard 负例通过。Rust 1.99 目标包 locked all-targets check、35+35 包测试、ignored PG target 编译和定向 rustfmt 检查通过；package fmt 检查被四个未改文件阻断。PostgreSQL test 仍 ignored 且未运行（缺一次性数据库 fixture），full workspace、Clippy、独立 lock/resolution、目标 DB/RLS/并发仍未验收。当前 Cargo.lock diff 仅新增 adapter 到既有 `domain-scm` package 的 direct dependency edge，无新增 package entry 或其他 lockfile 改动。Project link、Run binding、Host root registry、provider/API 与 Worktree/CLI admission 仍未实现。详见 PHASE-WLD1-REPOSITORY-MASTER-20261023.md。
 
-> **文档版本**: v7.02 (2026-10-24)
-> **上游要件定义书**: docs/requirements.md v6.99
+> **文档版本**: v7.05 (2026-10-24)
+> **上游要件定义书**: docs/requirements.md v7.02
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4394,7 +4394,9 @@ Task Card review gate 的 canonical API 为 `POST /api/v1/engineering-runs/{engi
 
 Phase 3E 保留受保护的单 Canvas 兼容事件读取：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，以 `(occurred_at,event_id)` 复合游标返回最多 200 条（默认 100）。新增 Worktree 级 `GET /api/v1/worktrees/{worktree_id}/canvas-events`，供多个 Canvas 共用一个按 Worktree 隔离的顺序流；PostgreSQL identity `stream_offset` 由 tenant/worktree 事务 advisory lock 串行分配并持锁到提交，避免并发事务提交顺序与游标顺序相反。Canvas API 将数据库 statement timeout 限制为 5s、lock timeout 限制为 1s。新接口使用非负 `i64` offset、默认 50/最多 100 条，以十进制字符串编码 64 位值，并只返回 event/canvas/type/time 元数据，不返回 payload 或 EntityRef 目标。该读取端点是 Outbox 到 realtime/consumer 交付路径接通前的查询接口，不替代服务端 durable consumer acknowledgement、所选 messaging adapter、SSE/WebSocket 推送或跨 App 实时验收。
 
-浏览器 `CanvasOutboxPoller` 使用按 Worktree scope 隔离的本地十进制 `stream_offset` 作为可丢弃恢复提示；每页仍通过 Bearer API 重新授权，先刷新当前授权 projection，再写入下一 offset。客户端拒绝畸形页、空页游标不一致、offset 非单调或超出 PostgreSQL `BIGINT` 范围的结果；存储不可用/损坏时从 offset 0 at-least-once 重放。本地游标不包含身份凭据、不授予访问权、不是服务端 acknowledgement/checkpoint，也不代表 Platform Messaging adapter / SSE / WebSocket 实时链路完成。
+实时 Canvas 与其他协作编辑不运行定时 `CanvasOutboxPoller`。编辑事实由 Canvas/Task owner 的 revision transaction + Outbox 触发 WebSocket push；客户端仅在首次打开、断线重连、服务器报告 gap/`resync_required` 时，使用按 Worktree scope 隔离的本地十进制 `stream_offset` 做一次受保护的 cursor catch-up。每次 catch-up 仍通过 Bearer API 重新授权，并在一致的 snapshot/cursor 边界刷新投影；客户端拒绝畸形页、offset 非单调和超出 PostgreSQL `BIGINT` 范围的结果，存储不可用/损坏时从 snapshot 重建。本地游标不是授权凭据、业务 ACK 或 server-side consumer checkpoint。现有 poller 代码/兼容 endpoint 若尚未移除，只能作为迁移期显式恢复入口，不得按定时器触发，也不得据此宣称实时协作完成。
+
+**当前实现对账**：浏览器 Group 投影已接入 `CanvasOutboxPoller`，并在正常运行时按间隔调用 `pollOnce`；这就是现阶段 Canvas 更新的轮询路径，必须由 WLD-7 的授权资源推送替换。BFF 的 process-local WebSocket broadcast 与 Worktree SSE placeholder 尚未接入 owner Outbox 的跨实例可靠 fan-out，也没有双方草稿/冲突事实。该段描述的是目标架构；替换完成前，不得宣称当前产品已提供实时多人编辑。
 
 当前实现的隔离验证证据：Canvas base migration 与 stream-offset migration 在 disposable PostgreSQL 18.6 fixture 上各自可重复应用；既有 Outbox 行完成 identity offset 回填；FORCE RLS scope、append-only UPDATE 拒绝、advisory lock 等待顺序及 1s lock timeout fail-closed 均有验证。该 fixture 使用测试角色和临时授权，不代表目标数据库 migration、正式应用角色 grants、执行计划或生产消费者已验收。
 
@@ -5920,3 +5922,45 @@ SCM master 的物理模型为 `scm.repository_master`：复合主键 `(tenant_id
 修订 v7.02 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD1 lane 完成 Rust 1.99 focused gates 与 same-physical-connection 闭环复核；同步 locked all-target check、35+35 package tests、ignored PG target compile 和定向 rustfmt 结果，标清 package fmt、PostgreSQL runtime、full workspace、Clippy 与独立 lock/resolution 仍开放。同步 requirements v6.99、SRS v1.10、BD v1.11、Group DD v5.24 与 Traceability v1.9。
 修订 v7.03 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。WLD-3 hostless occurrence：允许在完整本地 canonical identity 下物化并持久化 branchless occurrence，nullable Branch 以 null-safe Rule replay；更新 Schedule SRS/BD/DD、Group DD 与 WBS。实现门禁当时未运行；admission/execution 仍关闭。
 修订 v7.04 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。记录 WLD-3 在 Rust/Cargo 1.99.0 与本地一次性 PostgreSQL 的 47/47 runner 结果：domain 31/31、两个 API 授权测试各 1/1、Schedule PostgreSQL integration 6/6；注明 PostgreSQL NULL CHECK 语义修正和 changed-target scoped Clippy 边界。目标库、生产授权、worker/admission 与执行仍未验收并保持关闭。同步 requirements v7.01、Schedule SRS v0.67、BD v0.65、DD v0.79、Group DD v5.26。
+
+### 16.56 Resource-scoped push collaboration, drafts and conflict recovery
+
+实时协作以 Project→Engineering Run→Worktree 的已授权资源 scope 为边界。每个 Run App 窗口复用单个多路复用连接，订阅数不超过 100；“全局通知”是对同一资源全部当前有权订阅者扇出，不是 tenant-wide broadcast。常态页面不定时轮询；WebSocket 负责事件推送，cursor catch-up 只在初次打开、断线重连或检测到 gap 时执行。当前 BFF 的内存 `tokio::broadcast` 与 SSE hub 只可作为低延迟进程内 fan-out；它们不是持久化事实、跨实例总线或 durable delivery。
+
+Owner commit 后通过有界、可合并的 owner-local IPC 或事务提交通知立即唤醒 Outbox relay；relay 只将 wake-up 作为提示，再从 owner Outbox 有界 claim 并经所选 durable transport 发布。正常发布路径不靠定时扫表；进程启动、relay 重连、显式 gap 和到期重试时才从 durable cursor/backlog 恢复。这样减少空闲 DB 查询，同时保证唤醒丢失不会丢掉已提交事件。
+
+业务 owner 保持唯一真相：WorkItem owner 维护 Task revision/draft/conflict；Canvas owner 维护 Document revision/draft/conflict；协作 Gateway 管理授权订阅、连接和投递。每个编辑请求携带 `resource_ref`、`base_revision`、`draft_id`、`draft_revision`、`operation_id` 和受限 delta patch；actor、Project/Run/Worktree scope 与 capability 从当前认证上下文派生。Owner 在一个事务中复验授权、读取当前 revision、检测与已提交历史及同资源有效 draft 的 field/path/text-span 重叠、CAS 写入新 revision 或完整冲突事实、保存 draft、写 Audit/Outbox。draft checkpoint/seal 和 revision/resolve 必须取得同一短时 resource fence，原子检查 committed revision 与有效 draft 索引后再更新；避免并发 checkpoint 漏过正在提交的 revision。fence 只覆盖数据库临界区，不覆盖网络收块；不同资源并行。有效 draft 通过 resource + changed-path index 做有界匹配，并受每资源并发编辑预算限制；提交者提交新 revision 时也检查其他用户已有 draft，使对方无需继续输入就能看到新冲突。检测到重叠后，任一参与者的下一次 draft sync 或已提交更新都要在一个 conflict fact 中绑定双方修改。只有事务提交后才发布。跨 App 只使用版本化 owner API 与 Outbox/Inbox，不跨 owner 写表。
+
+不重叠的 field/path/span 可自动重基并提交；重叠的内容不采用 last-write-wins。冲突记录固定 base revision、已提交一方的 revision、另一方的 draft revision、参与者、重叠路径与状态，并 pin 冲突发生时的精确 draft revision；作者继续编辑时创建新 draft revision，不覆写仍被冲突引用的内容。双方的本地持久草稿在发送前先落盘，网络中断或刷新不清空；服务端收到的 draft patch 由资源 owner 持久化，未解决冲突不受 TTL 清理。冲突提醒同时指向两位参与者，包含稳定 `conflict_id` 和轻量摘要；用户再次授权后读取 base/current/mine/theirs 差异。非参与者不因订阅同一 Project 而自动得到未提交草稿。显式 resolve 使用当前 revision + 幂等键 CAS；发生后续编辑则保留原草稿并创建后继冲突，完成解决后才按 Project retention policy 清理草稿。
+
+文本编辑的客户端每次输入先写有界本地加密存储；桌面端密钥由 OS secure store 保护，Web 端使用 profile-scoped secure-storage adapter，未取得保护密钥时明确标为 `local_only` 并保持内存草稿，不宣称已持久化。仅在 draft 变脏时启动事件触发 debounce，活动编辑期间最迟每 250 ms 合并同步一次，空闲时不发轮询请求，并在 blur/提交/关闭时 flush。patch/frame 上限 16 KiB；不发送全量 Canvas/Task 文档。冲突内容用单独受保护 API 按需读取。每连接发送队列同时有条数和字节上限，初始设计预算为 64 events / 128 KiB；队列满时发送 `resync_required` 并终止慢连接，客户端按 cursor 恢复，不静默跳过持久事件。presence/cursor 是短 TTL 的 observed state，按资源合并并限频，不写进 owner 业务事件历史。冷启动 snapshot 和 cursor 必须在一个一致性读视图中获取，避免 snapshot 与 live subscription 之间形成丢失窗口。
+
+协作事件的 stream identity 是 tenant + canonical resource + owner generation；每条 owner 事实包含 `event_id`、`stream_id`、单调 `sequence`、schema version、owner revision、actor、correlation/idempotency 与 occurred-at。Outbox relay 经可替换的持久 transport adapter 扇出；实时 gateway 是可重建投影。浏览器以 `(stream_id, sequence, event_id)` 去重，持久游标只表示恢复位置。慢消费者、跨实例切换或 gateway 重启后从 owner durable stream 恢复；cursor 已过保留边界时重新取得当前授权 snapshot，并显式报告历史缺口。
+
+**冲突延迟目标**：在线、授权有效且网络正常的冲突参与者，从 owner conflict transaction commit 到客户端确认提醒的 p99 目标不超过 1 秒。超时不能转为静默成功：记录超时/未 ACK 状态、显示延迟标记，并确保冲突仍可从 Run Inbox/冲突列表或 cursor replay 读取。离线用户在恢复连接后看到同一持久冲突和自己的 draft。该目标须在目标 DB、跨 gateway 实例与指定并发档位下测量后方可关闭验收。
+
+**读取/解决 API 的逻辑契约**：
+
+| 命令/查询 | 最小输入 | 业务 owner 行为 | 实时副作用 |
+|---|---|---|---|
+| `SaveDraft` | resource ref、base revision、draft ID/revision、operation ID、delta patch | 当前授权校验，幂等保存 actor/device draft；必要时按 field/path/span 建冲突 | `DraftSaved` 或 `ConflictDetected` owner event；冲突事件只路由给参与者 |
+| `ReadConflict` | conflict ID、当前 actor | 再验证参与者/解决者权限，返回 base/current/mine/theirs 的受限差异 | 不广播内容；只写脱敏 access audit |
+| `ResolveConflict` | conflict ID、expected revision、resolution patch、idempotency key | 对最新 owner revision 执行 CAS，保存不可变 resolution/audit；新编辑则保持未解决并生成 successor | `ConflictResolved` 或新的 `ConflictDetected` |
+| `Subscribe` / `CatchUp` | resource scope、opaque cursor | Collaboration/owner 复验 viewer grant；首次或 gap 时返回一致 snapshot + cursor | 单 WebSocket 订阅；常态不轮询 |
+
+### 16.56.1 数据分类与保留
+
+| 数据 | 主责 owner | W/T/M 分类 | 生命周期与保留 |
+|---|---|---|---|
+| 当前文档 revision、已提交 patch、ConflictRaised/Resolved 与 Audit | 对应 Canvas/WorkItem owner | T，append-only transaction facts；当前状态为可重建 projection | 不因冲突解决而改写历史；按业务审计/备份政策保留 |
+| 每 Actor/Device draft checkpoint | 对应 Canvas/WorkItem owner | W，含明确 retention policy 的作业数据 | 未解决冲突被 retention lock 保护；解决/显式放弃后按 Project policy 到期清理；内容加密且 RLS 隔离 |
+| Presence、connection、subscription、短期 fan-out lease | Collaboration runtime | W，短 TTL | 按租约/TTL 清理，不做永久事件事实 |
+| Stream cursor 与客户端 resume hint | owner delivery / 客户端设备 | W 或可重建状态 | 只作位置；不可授权/不可作为业务 receipt；过期时 snapshot rebuild |
+
+不创建“协作服务的第二份 Task/Canvas 文档表”，也不逐订阅者持久化每条普通推送的完整副本。只为冲突参与者保存必要的未读/交付状态和审计；在线 fan-out telemetry 聚合为有界指标。draft content 不进入普通日志、BI 广播或插件事件正文。
+
+**授权/故障规则**：每次 subscribe、catch-up、draft save、conflict read/resolve 和 reconnect 均重新授权。撤权需关闭现存 socket、拒绝后续 cursor replay 与冲突读取。Owner commit 成功但 transport 未发送时由 Outbox retry；同事件重放必须幂等。Gateway 不能确认游标/送达时保持未确认并重放。DB、identity、owner stream 或 current policy 不可用时不接受写入，不以 browser cache 伪造 shared draft 已保存。
+
+**验收要求**：对相同 base 的双用户同字段编辑、不同字段编辑、重叠文本 span、250 ms draft sync、owner transaction/Outbox 原子性、重复/乱序/迟到事件、跨实例与进程重启恢复、离线参与者、权限撤销、并发 resolve、连接背压、队列 RSS、CPU 和 1 s p99 通知逐项出具可重放证据。单元测试、内存 hub 测试、浏览器本地草稿或单实例 smoke test 不能替代跨实例/目标 DB 性能验收。
+
+修订 v7.05 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：新增资源范围 push、owner revision/CAS、双边 draft/conflict、1 秒冲突提醒和有界内存/游标恢复基本设计；核对并明示浏览器 Group 当前调用 `CanvasOutboxPoller.pollOnce`；增加共同 resource fence 与 owner commit wake-up，规定活动编辑事件触发 debounce、空闲不轮询；同步 requirements v7.02、Group DD v5.27、WBS v0.29。当前内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。

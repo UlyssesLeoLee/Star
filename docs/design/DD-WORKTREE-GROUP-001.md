@@ -1,6 +1,6 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.26**
+> **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.27**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)
 >
@@ -1224,3 +1224,112 @@ This is durable data minimization, not an analytics read API or materialized BI 
 | Acceptance ID | Group design boundary |
 |---|---|
 | AC-RUN-OUTBOX-08/09 | Task DD 14.13.5; database-owned projection and migration are verified in a disposable fixture; query API, fan-out and production activation remain open. |
+
+## §8.27 Push-based multi-user editing, conflict visibility and draft recovery
+
+**Implementation status:** the browser Group projection currently instantiates `CanvasOutboxPoller` and periodically invokes `pollOnce`; this is the active Canvas update path and must be removed from the live path. The BFF WebSocket broadcast is process-local and its Worktree SSE hub is still a placeholder; neither is connected to a durable owner Outbox relay or conflict/draft store. The push and recovery protocol below is a target design, not a claim that live collaboration is implemented.
+
+### 8.27.1 Decision and ownership
+
+The collaboration path is event-driven. A fixed-interval client poll is not the live update mechanism. Canvas and Task changes remain facts owned by their existing canonical domain owners; Collaboration owns authenticated connections, scoped subscriptions, ephemeral Presence and fan-out. A Canvas edit cannot create a second Canvas document inside Collaboration, and a Task edit cannot bypass the WorkItem owner. Every durable edit/conflict command is executed by its resource owner under its own authorization and transaction boundary.
+
+An owner commit atomically writes the new revision or conflict fact, actor/device draft checkpoint, audit metadata, idempotency receipt and a compact owner-local Outbox event. After commit, the owner emits a coalesced bounded local IPC or transaction-commit wake-up; the relay immediately claims a bounded Outbox batch and publishes it. The wake-up is only a hint: the committed Outbox remains the durable source, so a process restart, relay reconnect, explicit cursor gap or due retry resumes from durable state. Normal publication does not use fixed-interval table scans. A transport adapter can be replaced without changing owner event identity, revisions, conflict semantics or client recovery cursor. In-memory `tokio::broadcast` remains a local latency optimization only; it may never be the durability boundary, cross-instance bus, source of truth or proof of delivery.
+
+### 8.27.2 Command and revision contract
+
+| Field | Rule |
+|---|---|
+| `resource_ref` | Canonical typed reference containing tenant, Project, Engineering Run, resource kind and resource ID; Worktree binding is resolved/validated by the owner when relevant. |
+| `base_revision` | Owner revision observed when the editing draft began; client wall clock never determines ordering. |
+| `draft_id` / `draft_revision` | Stable per actor/device draft identity and monotonically increasing checkpoint revision. A stale or repeated checkpoint is idempotently recognized. |
+| `operation_id` | Stable idempotency identity for each submitted delta/resolve command; same identity with changed bytes is rejected as a conflict. |
+| `changed_paths` | Server-validated allowlisted field/path/span identities used for overlap detection; never trusted as authorization. |
+| `patch_delta` | Bounded typed delta, maximum 16 KiB per frame; no full-document broadcast. Actor and permissions are derived from current authenticated session. |
+| `chunk_index` / `chunk_count` / digest | Larger draft revisions use ordered frames of at most 16 KiB. Chunks are idempotent; the owner exposes a draft revision as readable only after all chunks match the declared digest. |
+
+The owner compares the patch against every committed revision after `base_revision` while holding the resource revision fence. Draft checkpoint/seal and revision/resolve transactions use the same short per-resource fence (or equivalent database serialization primitive) for the critical section that checks committed revisions plus active-draft indexes and updates those indexes. This prevents the race in which a committed edit scans the index immediately before a concurrent draft becomes visible. The fence is scoped to one resource and never held while receiving network chunks, so unrelated resources continue in parallel. Non-overlapping fields/paths or text spans are rebased and committed as a new revision. Overlapping field/path/text ranges produce a durable Conflict fact and preserve both proposals. There is no last-write-wins fallback. Text merging must be deterministic and versioned; unresolved overlapping spans require an explicit user resolution. Structured Canvas changes use element/property-level paths so moving an unrelated element does not conflict with a Task lifecycle transition.
+
+Conflict detection also checks active, server-persisted drafts for the same resource. When an accepted revision overlaps another participant's current draft, the owner uses a bounded `(resource_id, changed_path_key, actor_id, draft_revision)` index to bind both proposals into a Conflict fact within the same transaction; the draft author does not need to type another character or press Save to learn about it. Draft checkpoints replace/coalesce prior mutable checkpoints rather than append an unbounded row for every keystroke. Enforce a per-resource active-editor/draft budget and a bounded overlap result; when the budget is exhausted, preserve local draft state and return an explicit collaboration-capacity response instead of silently accepting an incomplete conflict scan.
+
+The conflict fact pins the exact opposing `draft_revision` and content digest. Subsequent typing creates a newer draft revision and cannot mutate a revision referenced by an unresolved Conflict fact. Large pastes are transferred as ordered, idempotent frames (maximum 16 KiB each); the owner marks the checkpoint readable only after the complete revision digest is verified. An overlap can be announced from the validated path header within the one-second target while frame transfer completes, but the UI labels the other proposal as `receiving` until its exact pinned revision is available to read.
+
+Concurrent operations from the same base are ordered by the owner revision fence/commit sequence, not by client timestamp. The first accepted patch becomes the current revision; a later overlapping patch becomes a conflict with references to both changes. A draft checkpoint that detects a new conflicting revision can raise the conflict before the user presses Save, subject to the maximum 250 ms active sync interval.
+
+### 8.27.3 Durable drafts and conflict visibility
+
+The editor writes each local change to bounded encrypted device storage before network submission. Desktop key material is protected by the OS secure store; the Web client uses a profile-scoped secure-storage adapter. If no protected key is available, retain the draft in memory, label it `local_only`, and do not claim it is durable. Start an event-triggered debounce only after a draft becomes dirty, coalesce adjacent changes into a typed draft delta, sync no later than 250 ms while edits continue, perform no idle polling, and flush on blur, explicit save, navigation and graceful close. If the network is unavailable, the local draft stays visible as `local_only`; UI must not label it shared or saved remotely.
+
+The resource owner stores an encrypted server draft checkpoint keyed by tenant/resource/actor/device/draft ID. A non-conflicting draft is private to its author and authorized recovery session. On overlap, the owner persists a Conflict fact in the same transaction, referencing base revision, current revision, both participants, each proposal/draft revision, overlapping paths and conflict state. The event delivered to both participants contains the `conflict_id`, stable revisions and a short redacted summary only; recipients call an authorized `ReadConflict` operation to fetch base/current/mine/theirs. Other subscribers do not gain access to unrelated private drafts.
+
+Unresolved conflict participants are excluded from draft TTL cleanup. Explicit resolution requires an `expected_revision`, a selected/manual merged patch and idempotency key. The owner rechecks current ACL, applies CAS against the latest revision, and appends a resolution fact. If another edit arrived meanwhile, the original drafts remain preserved and the owner produces a successor conflict instead of accepting a stale merge. Resolved/discarded drafts expire only according to Project retention policy and retain auditable metadata without copying free-form content into ordinary Audit or BI.
+
+### 8.27.4 Push topology, one-second notice and recovery
+
+```mermaid
+sequenceDiagram
+    actor A as Editor A
+    actor B as Editor B
+    participant O as Canonical resource owner
+    participant DB as Owner DB + Outbox
+    participant R as Durable event relay
+    participant G as Scoped realtime gateway
+
+    A->>O: SaveDraft(base revision, draft revision, bounded patch)
+    O->>DB: Reauthorize + compare paths + persist revision/draft/conflict + Outbox
+    DB-->>O: Transaction committed
+    O->>R: Outbox event (at least once, idempotent event identity)
+    R->>G: Resource-scoped conflict/revision event
+    G-->>A: ConflictDetected (metadata + conflict_id)
+    G-->>B: ConflictDetected (metadata + conflict_id)
+    A->>O: ReadConflict(conflict_id)
+    B->>O: ReadConflict(conflict_id)
+    O-->>A: Authorized base/current/mine/theirs diff
+    O-->>B: Authorized base/current/mine/theirs diff
+```
+
+The event stream key is derived from tenant + canonical resource identity + owner generation. Each event carries `event_id`, `stream_id`, strictly increasing owner `sequence`, schema version, resource revision, actor/correlation/idempotency IDs, occurred-at and typed delta metadata. Clients deduplicate by `(stream_id, sequence, event_id)` and advance an opaque per-stream cursor only after applying the event. Duplicate delivery is expected; gaps are detected and never treated as success.
+
+Each app window uses one multiplexed authorized connection, with at most 100 resource subscriptions. The gateway authorizes each scope at subscribe time and revalidates replay/read operations; grant revocation closes active subscriptions. The connection send queue is bounded by both count and bytes (initial design budget: 64 events or 128 KiB per connection). If either cap is exceeded, the gateway sends `resync_required` where possible and closes the slow consumer. The client reconnects from the last durable cursor. If the cursor is outside retention or a gap cannot be repaired, it obtains an authorized snapshot and a matching cursor from one consistent owner read view; the UI reports the missing interval and does not claim a complete history.
+
+Cold start performs one snapshot + cursor bootstrap, then attaches the live stream from that cursor so events committed in the handover window are replayed. Reconnect and gap recovery use cursor catch-up on demand. No timer, foreground polling, or repeated full-snapshot refresh is permitted. Presence and cursors remain short-lived observed state; they may be coalesced/throttled and never enter durable business event history.
+
+For online participants with an active authorized connection, the delivery objective is p99 ≤ 1 second from conflict transaction commit to client receipt/ACK. Failure to meet the target raises a delivery-lag signal and leaves participant conflict state unread/replayable. Offline participants see the durable conflict in the Run conflict/inbox view after reconnect. The one-second objective is measurable only under defined deployment, target DB, cross-instance gateway and concurrency conditions; no design can promise network delivery during a partition, so persistence and later recovery remain mandatory.
+
+### 8.27.5 Data ownership, classification and access
+
+| Record | Owner | W/T/M | Required controls |
+|---|---|---|---|
+| Canonical resource revisions and committed deltas | Canvas or WorkItem owner | T / append-only facts; current document is a rebuildable projection | Owner transaction, CAS sequence, Audit, RLS, idempotent Outbox |
+| Conflict raised/resolved facts and participant visibility state | Same canonical resource owner | T for conflict/resolution facts; per-participant unread/delivery state follows that owner’s transaction policy | Append-only conflict history; participants-only read; resolution is a new fact |
+| Draft checkpoint | Same canonical resource owner | W with explicit Project retention; unresolved conflict applies a retention lock | Encrypted content, tenant/resource/actor/device isolation, local and server size limits, never TTL-delete unresolved proposals |
+| Connection, Presence, subscriptions and fan-out lease | Collaboration runtime | W / short TTL | In-memory fast path plus bounded store if needed; no business truth; expiry cleanup |
+| Client resume hint and stream cursor | Client device / owner delivery projection | W or rebuildable projection | Opaque, bounded, non-authorizing; gap/expiry falls back to snapshot |
+
+Do not persist a full event copy for every subscriber. Persist owner facts and only the participant delivery state needed to guarantee conflict visibility/recovery. Keep latency and byte metrics aggregated and bounded. Do not put draft text, source snippets or conflict payloads in general logs, plugin-wide events or BI projections; BI receives approved metadata and evidence references only.
+
+### 8.27.6 Authorization and failure semantics
+
+1. Subscribe, draft save, revision commit, replay, conflict read and resolve independently reauthorize the current actor, Project, Run, Worktree binding and resource capability.
+2. The client may choose a resource and submit a delta, but cannot supply trusted actor identity, entitlement, recipient list, stream sequence or owner generation.
+3. Missing authorization, owner DB, current revision, Outbox persistence or transport profile fails closed. A durable owner commit may be retried for fan-out; an uncommitted draft is never reported as remotely saved.
+4. Event and draft replay is at-least-once and idempotent. Exact duplicate identity/bytes returns the stable receipt; identity reuse with different bytes is rejected and quarantined without exposing payload.
+5. A stale cursor, slow subscriber, relay restart or gateway failover cannot erase drafts/conflicts. Reauthorize, replay from cursor, or request snapshot rebuild; report delayed/gapped state in the UI.
+6. Resolving one conflict never silently deletes a competing draft. Any compaction/archive is explicit, owner-controlled and retention-audited.
+
+### 8.27.7 Acceptance and rollout gates
+
+| ID | Acceptance criterion |
+|---|---|
+| AC-COLLAB-01 | Normal active sessions issue no fixed-interval read requests; owner commit emits a bounded wake-up that drives Outbox publication and scoped push, with no periodic table scan in the normal path. Cursor catch-up is limited to initial bootstrap, reconnect and detected gap. |
+| AC-COLLAB-02 | Concurrent disjoint updates from the same base both survive and produce a valid new owner revision; overlapping edits preserve both proposals and never use last-write-wins. Concurrent draft checkpoint/seal and revision CAS share a resource fence, and race tests prove no missed conflict. |
+| AC-COLLAB-03 | Both conflict participants can recover their own draft after refresh/restart and can read the authorized base/current/mine/theirs diff; unrelated users cannot read private drafts/conflict content. |
+| AC-COLLAB-04 | Online authorized participants receive conflict notice with measured p99 ≤ 1 second; forced delay, lost ACK and offline cases remain durable and appear on replay/inbox. |
+| AC-COLLAB-05 | Duplicate/reordered events, two gateway instances, owner restart, stale cursor, revoked grant and simultaneous resolve are idempotent/recoverable with no lost draft or duplicate business effect. |
+| AC-COLLAB-06 | Load test proves one multiplexed connection, bounded patch/frame/queue/cache, coalesced presence, measured RSS/CPU and backpressure recovery at agreed concurrent editor/agent counts. |
+| AC-COLLAB-07 | Target PostgreSQL grants/RLS/WORM, owner-boundary review, migration replay/rollback, backup recovery and transport adapter substitution pass before production enablement. |
+
+This section is design-only. The checked-in BFF `CollaborationWssHub` is in-process broadcast with a fixed bounded channel and reports lagged events after they have been dropped; the Worktree SSE hub has no business event fan-in. Those scaffolds need replacement/connection to durable owner Outbox streams, participant draft/conflict APIs, cross-instance delivery and the above measured acceptance before any UI is labeled shared live editing.
+
+| 版本 | 日期 | 修订人 | 改动 | 触发 |
+|---|---|---|---|---|
+| v5.27 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增资源 scoped push、owner revision/CAS、双边 draft/conflict、p99 1s 提醒、cursor-only recovery、低内存背压和安全验收门；核对并明示浏览器 Group 当前调用 `CanvasOutboxPoller.pollOnce`，增加共同 resource fence 与 owner commit wake-up，当前内存 hub/SSE 不构成生产闭环 | 用户要求修正轮询设计并保留双方修改和冲突可见性 |
