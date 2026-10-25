@@ -1,8 +1,8 @@
 # SRS-STAR-VERCEL-DEPLOY-001
 
-> **STAR Vercel 部署形态软件需求规格说明书 v0.3**
+> **STAR Vercel 部署需求说明 v0.4**
 >
-> - 状态: Requirements Baseline (Draft — 需求已定义, 0 实现; v0.3 = 官方平台能力复核, 见附录 C)
+> - 状态: Requirements Baseline（Draft，未批准，0 实现；v0.4 = 修正 Functions WebSocket GA 范围并同步 VCD-0 兼容性评审结论，详见附录 C）
 > - 目标阶段: 需求定义 → 基本设计 (Phase 1 前端; Phase 2 Rust HTTP adapter 为可行性门后的候选)
 > - 核心语言: TypeScript (前端) + Rust (后端)
 > - 核心运行时: Next.js 16 App Router (前端) + 可选 Vercel Rust Runtime Beta (HTTP adapter, Phase 2 候选)
@@ -42,7 +42,7 @@
 | 平台 | Rust runtime 需 `api/` 下每文件一 function + Cargo.toml `[[bin]]` 逐个声明 + `vercel_runtime` v2 (`service_fn`) | 同上 |
 | 平台 | 通用函数计划表列 Hobby 300s、Pro/Ent 标准上限 800s；1800s Beta 明确列 Node.js/Bun/Python，Rust 专属 duration 未确认 | vercel.com/docs/limits；Rust runtime 功能矩阵见 GAP-11 |
 | 平台 | 标准函数按 250MB 预算；5GB Large Functions Beta 明确限 Node.js/Python；载荷 4.5MB、fd 1024 并发共享。Rust 专属矩阵仍需实测 | vercel.com/docs/functions/limitations；vercel.com/changelog/vercel-functions-can-now-be-up-to-5-gb-in-package-size |
-| 平台 | Functions WebSocket 为 Public Beta，Fluid Compute，连接固定实例且随函数时长关闭；外部持久存储协调跨实例。Rust WebSocket/Streaming 兼容未确认 | vercel.com/kb/guide/do-vercel-serverless-functions-support-websocket-connections；Rust runtime 文档 |
+| 平台 | 通用 Vercel Functions WebSocket 于 2026-10-20 进入 GA；要求 Fluid Compute，单连接固定到一个 Function 实例并受 Function duration/limits 约束，跨实例持久状态须外部协调。该通用能力不证明 Rust Runtime 支持；Rust 专页仍标 Beta，feature-support 表为空且没有 WebSocket 行 | https://vercel.com/changelog/websocket-support-is-now-generally-available；https://vercel.com/docs/functions/websockets；https://vercel.com/docs/functions/runtimes/rust |
 | 平台 | Cron: Hobby 每日一次、指定小时内触发；其他团队分钟级。投递 best-effort，可能漏发/重复/重叠、失败不重试；Rollback 会恢复部署对应的 Cron 定义 | vercel.com/docs/cron-jobs/manage-cron-jobs |
 | 平台 | Vercel Postgres 已于 2025-06 关停并全量迁 Neon, 新库走 Marketplace | 第三方报道（kuberns.com，2026-10-24 检索）—⛔ 需以 Neon / Marketplace 官方页复核，见 §8 GAP-06 |
 
@@ -97,7 +97,7 @@
 | 文件描述符 | 1024 在并发执行间共享，Runtime 自身也占用 | DB / HTTP 连接池上限必须显式收敛 |
 | 内存 | 平台表列 Hobby 2GB·1vCPU；Pro/Ent 默认 2GB·1vCPU，最高 4GB·2vCPU；Rust 专属资格仍需核实 | 禁进程内大缓存，并以目标 Runtime 实测 RSS/并发 |
 | 区域 | 可配置执行区域；平台页面未支持本文件此前写入的固定 `iad1` 默认值 | 部署前显式选择与数据库可达性、数据驻留一致的区域 |
-| WebSocket | Vercel Functions WebSocket 为全套餐 Public Beta，要求 Fluid Compute；连接固定在接入实例并在函数时长上限断开；跨实例状态需外部持久化协调。Rust Runtime 的 WebSocket/Streaming 支持未确认 | 终端/PTy/noVNC/Canvas 实时 WSS 仍归 Star 自有执行面；不得依赖 Vercel 函数内存作为连接或协作事实（GAP-02/11） |
+| WebSocket | 通用 Vercel Functions WebSocket 已于 2026-10-20 GA（全套餐）；要求 Fluid Compute，连接固定到接入实例并受 Function duration 限制，跨实例持久状态需外部协调。Rust Runtime 仍为 Beta，官方 feature-support 表为空且没有 WebSocket 行，因此 Rust 专属 WebSocket/Streaming 能力未确认 | PTY/noVNC/Canvas WSS 仍归 Star 自有执行面；不得依赖 Vercel 函数内存作为连接或协作事实（GAP-02/11） |
 | Cron | Hobby 每日一次且在指定小时内触发；其他团队为分钟级。投递 best-effort，可能漏发、重复、重叠；失败不自动重试；Instant Rollback 会恢复该部署关联的 Cron 定义 | 仅作可重复唤醒/补偿入口；业务事实必须由持久 owner 状态、幂等收据与对账驱动 |
 | 构建 | Rust runtime 走 Cargo 构建 + `[[bin]]` 逐函数声明, **且要求项目根为带 `[package]` 的 manifest** | 仓根是虚拟 manifest, 需先裁决构建形态（GAP-10 / FR-VC-002） |
 | 工具链 | 构建镜像 Rust 版本未公开承诺 | 本仓固定 1.99.0（`rust-toolchain.toml:4`）能否在 Vercel 构建镜像内编译 ⛔ 待验证（GAP-03） |
@@ -244,14 +244,14 @@ Phase 1 的「同源 BFF 改造」是 Phase 2 的前置件, 两阶段复用同�
 | ID | 缺口 | 影响 | 验证方式 | 状态 |
 |---|---|---|---|---|
 | GAP-01 | 按每个 Rust handler 的真实依赖闭包计算函数包体积；不是把 111 个 workspace crate 假定为全部链接进每个函数。标准函数按 250MB 保守预算；Large Functions 5GB Beta 官方只列 Node.js/Python | 影响 Rust adapter 是否能部署；超预算即保留 Rust 控制面在自有运行时 | 最小 handler 与代表性业务 handler 分别构建并测量 `.vercel/output/functions/*`；确认启用的具体限制 | ⛔ |
-| GAP-02 | Vercel Functions WebSocket 已有 Public Beta，但 Rust Runtime 文档的 Streaming/WebSocket 能力表为空；跨实例连接需外部状态，连接受 maxDuration 限制 | 不影响将 PTY/Canvas WSS 留在 Star 自有执行面；Rust adapter 不得据一般 Functions WS 能力默认可用 | 官方 Rust runtime 对应支持矩阵更新或最小 Rust Runtime 部署实测；另验 SSE 与 WebSocket 的连接恢复语义 | ⛔ |
+| GAP-02 | 通用 Functions WebSocket 已于 2026-10-20 GA；Rust Runtime WebSocket/Streaming 能力仍未确认：Rust 页面标 Beta、feature-support 表留空且没有 WebSocket 行；连接仍受 Function duration 限制，跨实例状态需外部持久化 | 通用 Functions GA 不得外推为 Rust 支持；PTY/Canvas WSS 留在 Star 自有执行面。VCD-2 仅在隔离目标账号/计划中验证 Rust streaming/WebSocket、时长、并发、内存和恢复语义 | 官方 Rust Runtime/WebSocket 文档更新或可复现的目标账号最小部署实测；保留通用 GA 与 Rust 专属能力的区分 | ⛔ |
 | GAP-03 | Vercel 构建镜像的 Rust 版本能否满足 MSRV 1.99.0 | 决定 Phase 2 可行性 | 最小 Rust 工程部署实测 | ⛔ |
 | GAP-04 | 托管 PG 在事务级池化下与 RLS 13 类 + `SET LOCAL` 的兼容性 | FR-VC-010 的实现细节未定 | spike: 池化 + 双租户并发实测 | ⛔ |
 | GAP-05 | Next.js 16 + TypeScript 7.0.2 + monaco/three 在平台构建镜像的兼容性与构建时长 | 构建超时 / 失败 | 首次构建实测 | ⛔ |
 | GAP-06 | 「Vercel Postgres 已关停并迁 Neon」目前仅第三方来源, 未以 Neon / Marketplace 官方页复核 | 影响 FR-VC-009 的目标选型表述 | 官方页复核 | ⛔ |
 | GAP-07 | 类型门禁为 advisory 且平台构建跳过类型检查: CI 已跑 `npx tsc --noEmit` 但 `continue-on-error: true`（ci.yml:143-148, 且注明 4 个 pre-existing 错误）, 同时 `frontend/next.config.js:38` 的 `ignoreBuildErrors: true` 使平台构建也不拦类型错误 → 两道门都不阻塞, 类型缺陷可带入生产 | 类型缺陷进入生产的风险 | 先清零 4 个 pre-existing 错误, 再把 CI typecheck 由 advisory 改回 blocking, 并移除 `ignoreBuildErrors` | ⛔ |
 | GAP-08 | `frontend/src/app/automation-debug/api/scripts/route.ts` 依赖本机 Python `scripts/automation/console_server.py`: `FASTAPI_BASE` 默认 `http://127.0.0.1:8080`（`route.ts:10`）, 在函数形态下 loopback 指向函数自身 → 该代理必然 502 | 该调试页在 Vercel 形态下不可用, 且失败原因易被误读为「后端挂了」 | 显式禁用该路由（生产构建不暴露）, 并在 UI 标注为本地专用调试面 | ⛔ |
-| GAP-09 | 平台 WS beta 的行为变化 / Rust runtime 仍在 Beta | 接口与限额可能变 | 锁版本 + 季度复核 | ⛔ |
+| GAP-09 | Rust Runtime remains Beta and its official feature table does not establish a stable streaming/WebSocket contract; general Functions WebSocket GA does not remove Rust-specific uncertainty | Runtime or capability changes can invalidate assumptions | Track official Rust runtime revisions and rerun the VCD-2 matrix before enabling any Rust capability; pin evidence to the intended account and plan | ⛔ |
 | GAP-10 | **构建根与虚拟 manifest 冲突（Phase 2 可行性关键项）**: 仓根 `Cargo.toml` 段标题实测仅 `[workspace]` / `[workspace.lints.rust]` / `[workspace.package]` / `[workspace.dependencies]` / `[profile.release]` / `[profile.dev]` → **无 `[package]`** ⇒ 虚拟 manifest; 而 Rust Runtime 要求项目根为带 `[[bin]]` 的 package manifest。两种构建根位置各有失败模式: 放仓根 → builder 无 package 可用; 放子目录 → path deps 指向 `crates/*` 是否随部署上传未确认 | 直接决定 Phase 2 能否成立, 决定 FR-VC-002 走候选 A（git integration + Root Directory 子目录 + path deps）还是候选 B（CI 预构建 + Build Output API v3 + `vercel deploy --prebuilt`）; 未裁决前 Phase 2 无法开工, 开工即返工 | 最小工程 spike 分别试 A / B 两条路径, 判据 = 「能部署成功 + 能访问 `crates/star-api-rest` 业务 crate」; 裁决结果回写 FR-VC-002 / 附录 A | ⛔ |
 | GAP-11 | Rust Runtime 仍为 Beta，官方 Rust 页面虽称运行在 Fluid Compute，但专属 feature-support 表中 Fluid compute、Active CPU、Streaming、`waitUntil`、日志与请求指标均未给出值；Rust 专属 duration、memory、并发与 WebSocket 映射也未形成可依赖的契约 | Phase 2 不得从 Node/Python/通用 Function 数据推导 Rust 服务承诺；未确认前只允许无敏感数据、无业务写入的隔离 spike | 对照官方 Rust runtime、limits 与 WebSocket 文档，并通过目标计划最小部署实测：duration/streaming/WS、并发、RSS/冷启动、日志/指标、请求体/包体限制及回滚；差异回写 BD/DD/测试设计 | ⛔ |
 
@@ -319,7 +319,7 @@ Phase 1 的「同源 BFF 改造」是 Phase 2 的前置件, 两阶段复用同�
 | 函数时长、内存与请求/响应/包体限制（平台表不是 Rust 专属能力承诺） | https://vercel.com/docs/functions/limitations |
 | Rust Runtime Beta、Cargo package/`[[bin]]`/`api/` 结构与当前留空的功能支持矩阵 | https://vercel.com/docs/functions/runtimes/rust |
 | Large Functions 5GB Beta 的 runtime 范围（Node.js/Python）及标准 250MB 路径 | https://vercel.com/changelog/vercel-functions-can-now-be-up-to-5-gb-in-package-size |
-| WebSocket Public Beta、Fluid Compute、实例固定、断线重连、跨实例持久化及 runtime 代码路径 | https://vercel.com/kb/guide/do-vercel-serverless-functions-support-websocket-connections |
+| WebSocket GA 与 Rust Runtime 能力边界、Fluid Compute、实例固定、duration/reconnect 与跨实例外部状态 | https://vercel.com/changelog/websocket-support-is-now-generally-available；https://vercel.com/docs/functions/websockets；https://vercel.com/docs/functions/runtimes/rust |
 | Preview/Production environment 与每环境变量隔离 | https://vercel.com/docs/deployments/environments；https://vercel.com/docs/environment-variables |
 | Preview 和 Production 部署访问保护的套餐能力与 scope | https://vercel.com/docs/deployment-protection；https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan |
 | Preview 提升到 Production、Instant Rollback 的发布语义 | https://vercel.com/docs/deployments/promoting-a-deployment |
@@ -334,4 +334,5 @@ Phase 1 的「同源 BFF 改造」是 Phase 2 的前置件, 两阶段复用同�
 |---|---|---|---|---|
 | v0.1 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 初版: 10 段 IPA 章节 + 平面切分 (§3.1) + 排除清单 (§3.2) + FR-VC-001..020 (§4) + NFR-VC-01..08 (§5) + fail-closed 矩阵 (§6) + AC-VC-001..012 (§7) + GAP-01..09 (§8) + R-01..08 (§9)。范围 = ① 分阶段 (Phase 1 前端 / Phase 2 Rust 控制面)。仓库事实均当日实测, 平台事实检索日期 2026-10-24 | 用户 2026-10-24 提问「部署到 Vercel 的要件定义」+ 拍板 `ask_36f7d8462d9773f241c35533`（范围 ① 分阶段 / 落档本文件） |
 | **v0.2** | **2026-10-24** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | **自审修订 (5 项)**: (1) **修正 crate 计数** — 原写「~130 crate」为估数, 实测 members 数组 = 116 条 / **111 唯一 crate**（含 5 组重复声明: `leads` / `shared-task` / `star-canvas` / `star-scheduler` / `star-workflow`）, §0/§2.2/§5/§8/§9 全部改为实测值; (2) **新增 GAP-10（Phase 2 可行性关键项）** — 仓根 `Cargo.toml` 实测为**虚拟 manifest**（无 `[package]`）, 而 Rust Runtime 要求项目根为带 `[[bin]]` 的 package manifest → FR-VC-002 改为「先裁决候选 A（git integration + Root Directory 子目录 + path deps）/ 候选 B（CI 预构建 + Build Output API v3 + `--prebuilt`）」, §2.2 构建行 + 附录 A 同步; (3) **FR-VC-004 对齐既有 `[profile.release]`**（`Cargo.toml:293-295` lto=thin / codegen-units=1）并标注构建根不继承 workspace profile; (4) **补实现级证据** — FR-VC-007 追加 `group/[...path]/route.ts` 逐条行号（既有安全约束确已实现, 非仅设计文档）, GAP-08 追加 `FASTAPI_BASE` 默认 `127.0.0.1:8080` 证据（函数形态必然 502）; (5) **并发写入事件** — 自审期间检测到本文件被并发进程追加了 1 行同主题 GAP-10 草案（措辞不同, 含 `⇒` 标记, 非本会话所写）, 导致 §8 出现 2 条 GAP-10; 已**合并为单条**并保留其实质内容（构建根放仓根 → builder 无 package 可用 / 放子目录 → path deps 是否随部署上传未确认 + 二选一 spike 判据）, 未删除其任何信息 | 交付前自审（用户 2026-10-24 指令「自审」）; 全部结论均以当日实测为准, 未沿用记忆 |
-| **v0.3** | **2026-10-24** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | 基于 Vercel 官方文档复核修订平台能力边界：确认 Functions WebSocket 已进入 Public Beta，但 Rust Runtime 的 Streaming/能力矩阵仍留空；将 Rust maxDuration/内存/并发/WebSocket 映射列为实测缺口；修正 Cron best-effort、可能漏发/重复/重叠、失败不自动重试及 Instant Rollback 恢复 Cron 定义；将 5GB Large Functions 范围限定为 Node.js/Python，Rust 按 250MB 保守预算；删除未有官方证据的 `iad1` 固定默认推断；新增 GAP-11 与 FR/AC Preview 环境隔离门，并将基本/详细/测试设计缺失、Phase 1 与有条件 Phase 2 交由总 WBS 跟进。本文仍为 Draft，0 实现。 | 用户要求审核 Vercel 版本设计并纳入 WBS；基于 2026-10-24 Vercel 官方 Rust、Functions limits、WebSocket、Cron、Large Functions 与 Deployment Protection 页面复核 |
+| **v0.3** | **2026-10-24** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | 基于 Vercel 官方文档复核修订平台能力边界：当时将 Functions WebSocket 记录为 Public Beta（该表述由 v0.4 按 2026-10-20 官方 GA 公告纠正），但 Rust Runtime 的 Streaming/能力矩阵仍留空；将 Rust maxDuration/内存/并发/WebSocket 映射列为实测缺口；修正 Cron best-effort、可能漏发/重复/重叠、失败不自动重试及 Instant Rollback 恢复 Cron 定义；将 5GB Large Functions 范围限定为 Node.js/Python，Rust 按 250MB 保守预算；删除未有官方证据的 `iad1` 固定默认推断；新增 GAP-11 与 FR/AC Preview 环境隔离门，并将基本/详细/测试设计缺失、Phase 1 与有条件 Phase 2 交由总 WBS 跟进。本文仍为 Draft，0 实现。 | 用户要求审核 Vercel 版本设计并纳入 WBS；基于 2026-10-24 Vercel 官方 Rust、Functions limits、WebSocket、Cron、Large Functions 与 Deployment Protection 页面复核 |
+| **v0.4** | **2026-10-24** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **纠正 v0.3 的平台快照：通用 Functions WebSocket 已于 2026-10-20 GA；Rust Runtime 仍为 Beta，专属 feature 表为空且没有 WebSocket 项，Rust 能力继续保持未确认。补充官方 GA 公告与现行 WebSocket 文档引用；VCD-0 兼容性审查报告确认候选设计只能选择性吸收，未批准的第二 Owner/数据库/worker/scheduler/VM 执行拓扑仍排除。部署、账户、Rust runtime 与生产能力均未验证，实施状态仍为 0。** | **2026-10-24 当前官方 Vercel 文档复核及 VCD-0 basic/ADR、detailed、test 兼容性审查。** |
