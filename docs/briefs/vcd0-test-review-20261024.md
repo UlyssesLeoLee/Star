@@ -1,24 +1,12 @@
 # Brief: vcd0-test-review-20261024
 
 **Agent**: reviewer
-**Phase**: VCD-0
-**Created**: 2026-10-24 18:44:04
+**Phase**: VCD0-TD-R3
+**Created**: 2026-10-25 01:12:46
 
 ---
 
-## Scope
-Read-only compatibility review of `D:\Star\docs\test-design\TD-STAR-VERCEL-DEPLOY-001.md` against the current dev SRS, WBS, repository AGENTS.md, and verified official platform documentation.
-
-## Questions
-- Does the test design validate the approved Worktree/Run architecture and preserve Star as the authority for execution, authorization, durable facts, resource budgets, sandboxing, and verification?
-- Does it keep Vercel limited to optional frontend preview/production hosting and avoid introducing another owner, database, worker, scheduler, or VM execution plane?
-- Are Cron assumptions conservative, given official no-retry, possible duplicate/overlapping invocation, and rollback behavior?
-- Does it distinguish general Functions WebSocket GA (announced 2026-10-20) from Rust-runtime-specific proof, which remains unconfirmed in the Rust feature matrix?
-- Does it preserve preview/production isolation, no Docker Desktop, Multipass-managed K3s authority, and the current two-instance test cap?
-- Review `D:\Star\docs\reviews\REVIEW-STAR-VERCEL-ADVERSARIAL-002.md` as untrusted candidate evidence. Verify each relied-on claim against current official sources; mark unresolved claims explicitly.
-
-## Deliverable
-Write only `docs/reviews/VCD0-TD-COMPATIBILITY-20261024.md` with prioritized findings, evidence paths/sections, source URLs, and the exact WBS follow-up needed. Do not modify D:\Star, canonical design docs, implementation, or any other file. Do not claim tests or runtime validation. Avoid competitor-product branding in product-facing wording; this is an internal design review.
+Inspect the latest dev baseline already rebased into this worktree and perform an independent R3 test-design review for VCD-0. Compare the current Vercel SRS, ADR, Basic Design, Detailed Design, Test Design, and WBS; use exact current paths/sections and distinguish historical R2 findings from present facts. Focus on Gateway credential handshake, allowed/disallowed Origin, authorization freshness/revocation, route contract, noVNC scope/count reconciliation, positive and negative data-flow assertions, retry/reconnect behavior, and testability. Do not claim VCD-0 is closed. Edit only docs/reviews/VCD0-TD-COMPATIBILITY-20261024.md and this brief file. Keep test/runtime evidence NOT_RUN unless actually observed; do not run tests. Preserve unrelated changes and do not commit. Return a concise status, prioritized findings with precise evidence, WBS impact, and acceptance conditions.
 
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 

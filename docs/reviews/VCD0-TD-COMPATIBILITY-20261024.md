@@ -1,58 +1,81 @@
-# VCD-0 Test Design Compatibility Review — 2026-10-24
+# VCD-0 Test Design Compatibility Review — R3, 2026-10-25
 
-## Scope and conclusion
+## 1. Scope and disposition
 
-Read-only review of D:\Star\docs\test-design\TD-STAR-VERCEL-DEPLOY-001.md against the assigned checkout’s current Vercel SRS, platform-runtime WBS, Run-lifecycle WBS, AGENTS.md, and current official platform documentation. The candidate adversarial review was treated as untrusted and checked only where relevant.
+Independent document review of the current dev baseline in this worktree: Vercel SRS v0.4, ADR v0.2, Basic Design v0.3, Detailed Design v0.3, Test Design v0.4, and the VCD-0 WBS entries. Review was limited to the Gateway/browser connection contract and T-049 coverage. No tests, deployment, or runtime checks were run; all test/runtime evidence remains **NOT_RUN**.
 
-**Disposition: do not use this TD as the current approved acceptance baseline until P0 finding VCD-R1 is resolved.** It has useful fail-closed, idempotency, secret-scanning, and NOT_RUN controls, but it describes a larger A/B owner topology than the current dev baseline approves. All reviewed TD cases remain NOT_RUN. This document review did not run tests, deploy services, or establish implementation or runtime behavior.
+**Disposition: VCD-0 remains OPEN.** TD v0.4 has materially improved T-049 and correctly refuses to invent gateway wire details. It is a draft test plan, not an approved protocol contract or proof of behavior. Remaining issues below must be resolved before VCD-0 can close.
 
-## Findings
+## 2. Historical R2 findings versus current evidence
 
-### VCD-R1 — P0: A/B independent/attached owner topology is not the current approved scope
+- TD v0.4 now gives noVNC its own authorized Gateway row and includes positive fixture flow, Origin/identity rejection, revocation, outage/recovery, and trace evidence (§4.7, lines 167–177). The earlier document-level finding that T-049 omitted noVNC is resolved in the test-design text. This is not runtime evidence.
+- T-049 now has a positive fixture-data assertion and no longer claims duplicate-side-effect proof for a fixture-only test (§4.7, lines 163–177). Those R2 test-text findings are resolved at document level.
+- The real Star Gateway credential handshake and Origin allow/deny contract are still absent. TD correctly marks them as execution prerequisites; they remain open architecture inputs, not assumptions to fill in from this review.
+- The earlier removal of remote file-browser coverage from T-049 is not a complete scope decision: the current SRS repository inventory still lists a remote file-browser WebSocket, while the current Vercel requirements and TD do not classify its Vercel behavior. See R3-01.
 
-**Evidence.** TD §0 and §1 define A-K3s, B-Independent with its own VM/PostgreSQL, B-Attached, and B-Web preview; §1 adds eight A/B acceptance cases pending approval; §3 expects a B Owner, B database, B WebSocket owner, B Schedule owner, and B Rust service; §5 then makes P1B a release phase with a real Gateway/Owner and writes. See target TD lines 3, 7, 11–22, 49–62, 68–77, and 133–140.
+R2 reports based on earlier SRS revisions are historical evidence only. The findings below use the current paths and versions named in §1.
 
-The current dev SRS is v0.3. Its approved sequence is Phase 1 frontend plus same-origin BFF, with a Rust HTTP control-plane only a Phase 2 candidate after VCD-2 and owner/database/identity review; Star retains execution and durable-fact authority. See SRS §0 and §§3.1–3.3, especially lines 11, 24, and 113–137. Current VCD WBS §2 likewise says the Vercel track is optional hosting and preserves Star’s owners and execution plane (VCD-0..4, lines 50–60). The TD labels PAR-01..08 as awaiting approval but uses B-owner behavior as if it were already approved.
+## 3. Prioritized findings
 
-**Required WBS follow-up — VCD-0, then VCD-1/VCD-2/VCD-3 as applicable.** Rebase the active test baseline on SRS v0.3: protected frontend/BFF for Phase 1; isolate Rust runtime feasibility under VCD-2; allow any Rust endpoint only under VCD-3 after VCD-2 PASS and WLD-0. Keep PAR-01..08 in a clearly marked, ADR-gated proposal until the architecture and SRS/basic/detail designs approve that topology. Do not make a second Owner, database, worker, scheduler, or VM execution plane a release prerequisite by implication.
+### R3-01 — P1: Reconcile the current browser-channel inventory, including remote file-browser
 
-### VCD-R2 — P1: Upstream design versions and acceptance IDs do not trace to current dev
+**Evidence.** SRS §0, line 35, inventories four existing browser long connections as terminal WS, remote file-browser WS, ARG WS, and chat SSE. SRS §4.4 / FR-VC-013, line 176, instead places terminal/PTy, noVNC, Canvas WSS, and ARG WS on the execution plane, with chat SSE as a separate permitted route; its acceptance text says “4 类长连接.” Basic Design §5, lines 137–138, likewise names PTY/noVNC, Canvas, ARG, and chat SSE. TD v0.4 §4.7, lines 163 and 167–175, tests four Gateway channels plus chat SSE, but explicitly excludes remote file-browser.
 
-**Evidence.** TD line 3 claims upstream SRS/BD/DD v2.0 and ADR-PAR-001. TD §4.2 creates AC-VC-023..034, while §6 line 144 calls AC-VC-001..034 “upstream.” In the required current dev checkout, the Vercel SRS is v0.3 and explicitly says the basic, detailed, and test designs are not yet in the dev document tree (SRS lines 3, 11, 20). It defines FR-VC-001..021, NFR-VC-01..08, and AC-VC-001..013 (lines 20, 222–238). VCD-0 is specifically the WBS item to create and reconcile that design set (WBS lines 54–56). This finding is against the requested dev baseline; it does not assert what may exist in D:\Star outside the reviewed target and candidate files.
+The “four Gateway channels plus SSE” count is internally understandable: chat SSE is separate from the four Gateway channels. The unresolved mismatch is the product inventory: remote file-browser appears in the SRS’s current-repository inventory but has no Vercel plane/availability decision or test, while noVNC and Canvas appear in the Vercel requirements but not in that inventory. Remote file-browser is also distinct from the local Worktree filesystem that TD assigns to T-018.
 
-**Required WBS follow-up — VCD-0.** Add a trace matrix for every current SRS FR/NFR/GAP/AC to the approved design section and test ID. Mark PAR and AC-VC-014..034 as proposed/derived until the upstream SRS and decision record approve them; do not describe them as upstream requirements. Keep all unexecuted cases NOT_RUN.
+**WBS impact.** Keep the VCD-0 endpoint-inventory gate open in `docs/implementation-plans/WBS-RUN-LIFECYCLE-EXECUTION-CLOSURE-20261019.md` §VCD-0 (line 56) and the summary in `docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md` (line 325). Refine it to reconcile the browser inventory and explicitly decide remote file-browser handling; do not treat noVNC’s new TD row alone as closure.
 
-### VCD-R3 — P1: WebSocket cases conflate general Functions GA with unproven Rust-runtime support
+**Acceptance condition.** Establish one canonical inventory that maps terminal/PTy, noVNC, ARG, Canvas real-time, chat SSE, and remote file-browser to exactly one Vercel behavior each: approved Star Gateway route, approved same-origin route where applicable, or explicitly unavailable/fail-closed. Trace every enabled feature to its SRS requirement, design plane, and positive plus negative test. If remote file-browser is unavailable on Vercel, test that it is disabled without attempting a local-filesystem fallback.
 
-**Evidence.** TD includes WS authentication and owner-ready expectations in UT-VC-010, IT-VC-003/005, ST-VC-004, AD-19..21, AC-029, and P1B. The current SRS assigns PTY/noVNC and Canvas WSS to Star’s execution plane and permits chat SSE through Next.js; see §§3.1–3.3 and FR-VC-013 (lines 113–137, 176). The TD cannot treat successful general Functions WebSocket behavior as evidence that its Rust-runtime path supports WebSockets.
+### R3-02 — P1: Add an authenticated out-of-scope principal/data-isolation assertion
 
-Official status: general Vercel Functions WebSocket support became GA on 2026-10-20 ([official changelog](https://vercel.com/changelog/websocket-support-is-now-generally-available)). The Rust runtime page still labels Rust Beta; its feature matrix leaves entries blank and does not list WebSocket support ([Rust runtime documentation](https://vercel.com/docs/functions/runtimes/rust)). Rust-specific WebSocket/streaming compatibility is therefore **unresolved**, not disproven. The current dev SRS §2.2 and VCD-0 WBS row still call general Functions WebSocket Beta (SRS line 100; WBS line 56), so that source baseline also needs correction.
+**Evidence.** TD §4.7, lines 167 and 171–175, checks valid fixture delivery, missing/invalid identity, forged actor/Run headers, Origin allow/deny, and revocation. It does not explicitly connect a second otherwise-authenticated principal lacking the fixture Run/capability and assert that this principal receives zero fixture events/frames. Rejecting spoofed identity headers is not equivalent to proving that a valid but out-of-scope session cannot read another Run’s stream.
 
-**Required WBS follow-up — VCD-0 and VCD-2.** Correct general Functions status to GA while preserving the Rust-runtime uncertainty. Keep PTY/noVNC/Canvas WSS acceptance on Star-owned runtime paths. If a Vercel Rust handler has a real WebSocket requirement, test it only as an isolated VCD-2 feasibility gate on the intended plan/runtime; leave that capability disabled until runtime-specific proof and a design decision exist. Do not infer Rust support from the general GA announcement.
+**WBS impact.** Add this as a required VCD-0 T-049 acceptance case before the VCD-1 hosted Preview smoke gate. Keep VCD-0 OPEN until its outcome is represented in the trace matrix.
 
-### VCD-R4 — P1: Cron tests do not explicitly prove recovery from missed and failed invocations
+**Acceptance condition.** In an isolated fixture, prove both directions: a principal authorized for Run A receives only Run A’s expected fixture data; a valid principal without Run A access/capability receives no Run A data and cannot subscribe or reconnect into that stream. Include the negative assertion in captured evidence for each applicable Gateway channel and the selected chat SSE route, without using production Owner data or creating business side effects.
 
-**Evidence.** TD IT-VC-007 covers duplicate/late/DST/misfire, AD-24 covers 100 simultaneous ticks, and AD-25 covers rollback (lines 55, 106–107); these are useful partial controls. The listed cases do not explicitly assert that a request which never reaches the function is absent from runtime logs, that a failed invocation is not retried, that a later invocation scans and catches up durable due work, or that a prior long-running invocation overlaps a later interval. “Misfire” and simultaneous duplicate delivery do not independently prove those cases. Current SRS FR-VC-014 requires missed/duplicate/overlap/failure/rollback handling and durable reconciliation (line 177); WBS VCD-4 and WLD-3 require the operational and owner-side recovery gates (VCD WBS line 60; WLD WBS line 38). AGENTS.md also requires live authorization on every trigger/retry/resume (line 37).
+### R3-03 — P1: Gateway credential, Origin, authorization-freshness and revocation contracts remain execution blockers
 
-Official Cron documentation says delivery is best effort, invocations may be missed or duplicated, a still-running invocation can overlap a later one, and failed invocations are not retried ([Managing Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs), especially “Cron job error handling,” “delivery and idempotency,” and “controlling cron job concurrency”).
+**Evidence.** SRS FR-VC-013 (§4.4, line 176) establishes the execution-plane boundary but does not define a browser credential exchange. ADR §6, line 57, keeps chat SSE routing and real session/security contracts unselected. Basic Design §5, lines 137–138, and Detailed Design §2.3, lines 64–66, explicitly defer real Gateway handshake, Preview Origin allow/deny, current Project/Run/capability authorization, revocation, protocol data and lifecycle details to an approved contract. DD §7, lines 168–170, requires fresh authorization on initial connection/reconnection and protection of subsequent data/actions. TD §4.7, lines 163 and 177, correctly makes the missing contract a hard precondition and keeps T-049 NOT_RUN.
 
-**Required WBS follow-up — VCD-4 + WLD-3.** Add deterministic cases for a missed request, failed/timeout invocation with no automatic retry, overlapping invocations across intervals, durable catch-up on a later wake-up, one logical occurrence/one owner receipt, and run_as_actor_id revocation before retry/resume. For rollback, assert the exact Cron definitions restored from the target deployment and the project’s Disable Cron Jobs state, then reconcile owner Schedule state; checking only that some Cron is active is insufficient.
+This is currently fail-closed by design. It is not evidence that the handshake or Origin protection works. The design does not yet provide a testable source for the credential issuer/audience and browser exchange, the exact allowed and denied Preview Origin rules, or the maximum revocation-propagation behavior.
 
-### VCD-R5 — P1: Preview isolation lacks an explicit no-side-effect acceptance case
+**WBS impact.** Preserve the VCD-0 contract gate in the parent WBS §VCD-0 and VCD-1 prerequisite. Do not promote a review of the conditional test text into a Gateway security approval.
 
-**Evidence.** TD tests secret exposure (ST-VC-008) and a Preview credential attempt against production Owner (AD-03), but no case explicitly asserts that an untrusted Preview cannot create or mutate production Run/Task/Schedule facts, publish an Outbox event, or trigger production Cron. Current SRS FR-VC-021 and AC-VC-013 explicitly require no production Owner side effects and no Preview Schedule authority (lines 189, 238). VCD-1 requires the same gate (WBS line 57).
+**Acceptance condition.** A canonical Star Gateway/session contract must define, per enabled channel, the trusted credential source and safe browser exchange, Origin allow/deny rules (including missing or untrusted Origin behavior), Project/Run/capability checks, credential expiry, and revocation behavior with an observable, measurable upper bound. T-049 must then exercise one allowed and one rejected Origin, current authorization, and a post-revocation protected read/action or reconnect. No reusable credential may appear in URL, browser storage, logs, traces, or evidence.
 
-**Required WBS follow-up — VCD-1.** Add a negative hosted-Preview case that attempts the relevant owner and Schedule writes and then checks authoritative Run/Task/Schedule/Outbox state is unchanged. Exercise untrusted branch Preview, isolated credentials/data, denied production access, protected promotion identity/audit, and confirm no production Cron invocation.
+### R3-04 — P1: Fix a chat SSE route and define route-specific stream recovery before T-049 is executable
 
-### VCD-R6 — P1, unresolved: VM test-provider and two-record Multipass cap are not specified
+**Evidence.** SRS FR-VC-013 allows chat SSE through a Next route (§4.4, line 176); ADR §6, line 57, leaves its final route unselected; Basic Design §5, line 138, and Detailed Design §2.3, lines 66 and 170, require a canonical route decision; TD §4.7, lines 163 and 167, correctly tests only the ultimately approved route. T-049 covers a Gateway outage followed by a fresh-session reconnection, but it does not define route-specific streaming behavior or assert retry policy, cancellation on client disconnect, reauthorization after 401/403, or event gap/replay/duplicate behavior for SSE.
 
-**Evidence.** TD §0 and IT-VC-001 require a B-Independent “VM/PG” and Rust VM but name no VM provider or inventory guard (lines 7, 49, 58, 76). It is unclear whether this fixture is intended to consume the local Multipass test inventory. AGENTS.md §0 (line 28) forbids a Docker Desktop prerequisite and caps Multipass inventory at two records, counting stopped/deleted entries, with locked creation, fail-closed inventory checks, and no automatic purge. WBS VCD-2 expects an isolated no-production-data runtime proof (line 58); WLD-4 preserves the two-record limit for infrastructure tests (WLD WBS line 39).
+**WBS impact.** VCD-0 must choose and synchronize the route across SRS/ADR/BD/DD/TD. VCD-1 must retain the real route’s hosted Preview evidence; do not enable the UI while the route is unresolved.
 
-**Required WBS follow-up — VCD-0/VCD-2; WLD-4 if the fixture uses Multipass/K3s.** State whether the VM is externally managed or Multipass-managed. If Multipass-managed, charge it against the two-record inventory and use the guarded locked launcher; fail closed for unknown/full inventory and do not purge. State explicitly that no Docker Desktop setup is required. This is an unresolved test-fixture detail, not a verified cap violation.
+**Acceptance condition.** Select either the already-permitted Next Route Handler passthrough or another explicitly supported Star route, then document its authentication and Origin enforcement, streaming/backpressure behavior, heartbeat and termination semantics, client-disconnect cancellation, reconnect rules, event resume/gap/duplicate behavior, and handling of authorization failures. T-049 must test a transient interruption and recovery under that contract, verify no stale credential is retried after authorization failure, and verify the defined event continuity semantics. Do not invent timing or retry-count thresholds without a measured/approved contract.
 
-## Official evidence and candidate-claim check
+### R3-05 — P2: Refresh the SRS downstream-document status line
 
-- General Functions WebSocket GA date/status is confirmed by the [2026-10-20 official changelog](https://vercel.com/changelog/websocket-support-is-now-generally-available). Rust-runtime WebSocket compatibility remains unresolved in the [Rust runtime page](https://vercel.com/docs/functions/runtimes/rust).
-- Cron miss/duplicate/best-effort delivery, no retry, and overlap risks are confirmed by [Managing Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
-- The candidate review §3 claim that the current Instant Rollback and Cron pages conflict was not confirmed. Both [Managing Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs) and [Instant Rollback](https://vercel.com/docs/instant-rollback) currently state that rollback restores the Cron definitions associated with the target deployment and preserves the project-level Disable Cron Jobs setting. The TD’s active-state check is prudent, but the test should assert those exact semantics.
-- No test, deployment, runtime limit, or production behavior is claimed as validated here.
+**Evidence.** SRS header line 11 says the detailed and test designs have not yet been created in the current dev document tree, but the current baseline includes `docs/detailed-design/vercel/DD-STAR-VERCEL-DEPLOY-001.md` v0.3 and `docs/test-design/vercel/TD-STAR-VERCEL-DEPLOY-001.md` v0.4. This stale header weakens baseline traceability even though the documents themselves cite the current SRS v0.4.
+
+**WBS impact.** Add a small VCD-0 documentation-sync item; it is not runtime evidence and does not change the OPEN gate.
+
+**Acceptance condition.** Update the SRS header to name the current downstream documents and their draft/approval state, then verify the SRS/ADR/BD/DD/TD revision references agree.
+
+## 4. Testability and status
+
+T-049 is substantially more testable than the historical R2 version: it now requires positive per-channel fixture flow, explicit negative Origin/CSRF coverage, identity rejection, revocation, outage and recovery, and redacted evidence. Its fail-closed rule is appropriate while the Gateway contract is missing. It still cannot be executed until R3-01 through R3-04 are closed. Do not infer that adding a row for noVNC proves noVNC protocol compatibility or runtime support.
+
+| Item | Current evidence status |
+|---|---|
+| SRS / ADR / BD / DD / TD document review | Reviewed at the versions in §1 |
+| T-049 and other tests | NOT_RUN; explicitly not executed per assignment |
+| Gateway handshake / Origin / revocation / route behavior | UNKNOWN / no approved contract cited |
+| Vercel Preview, deployment, runtime, and performance | NOT_RUN |
+| VCD-0 | OPEN |
+
+## 5. Review history
+
+| Revision | Date | Change |
+|---|---|---|
+| R2 | 2026-10-24 | Historical compatibility review against the prior SRS baseline; superseded for current findings. |
+| R3 | 2026-10-25 | Re-reviewed current SRS v0.4, ADR/BD/DD v0.2/v0.3, TD v0.4, and WBS; recorded remaining inventory, isolation-test, Gateway-contract, SSE-route/recovery, and SRS-header gaps. No tests or runtime checks run. |
