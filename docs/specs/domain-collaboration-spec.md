@@ -1,6 +1,6 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v0.9 (2026-10-24；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v1.0 (2026-10-24；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–08
 > - 《Basic Design》§2.1(表 24), §5.7, §16.78
@@ -8,8 +8,8 @@
 > - 《API Design》§4 (WebSocket / Realtime 通道)
 > - 《Data Design》§4.17 (`collaboration` schema)
 > - 《Security Design》§3.1-3.4
-> - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.1
-> - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` §4.8/§5.2/§6.2.5（计划，未运行）
+> - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.2
+> - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v1.5 §4.8/§5.2/§6.2.5（计划，未运行）
 > **下游交付**: Implementation team — Rust crate 路径 `crates/domain-collaboration/`
 > **最后审稿**: 待 RFC 化时
 
@@ -346,7 +346,7 @@ Local draft persistence happens before network submission in bounded encrypted d
 
 A durable owner event includes `event_id`, `stream_id`, monotonically increasing `sequence`, schema version, canonical resource/revision, actor and correlation/idempotency identity. Owner commit emits a transactional notification to wake a relay, and the in-process pending latch coalesces bursts. Listener/process unavailability is recovered by cursor/backlog catch-up on restart/reconnect; each failed event publish is scheduled by its bounded due-retry timer. There is no periodic client polling or Outbox scan in the normal path. Clients deduplicate at least-once delivery by event ID plus stream sequence. The event body is compact metadata/delta, not a repeated full document; conflict body is loaded by ID under fresh authorization.
 
-One app window multiplexes up to 100 authorized resource subscriptions over one connection. The initial connection budget is 64 queued events or 128 KiB, whichever is reached first. A slow consumer receives `resync_required` where possible and is closed; it then catches up from its durable cursor. Never silently drop durable business events and continue from a later sequence. Presence and cursor events may be coalesced/throttled under short TTL because they are observed state, not business facts. Metrics track commit-to-client delay, Outbox lag, conflict count, draft recovery, replay gap, per-connection bytes and RSS without retaining unbounded event payloads.
+One app window multiplexes authorized resource subscriptions over one connection. The current proposed per-window subscription cap (100) and initial connection queue cap (64 events or 128 KiB, whichever is reached first) are bounded design values, not measured concurrency or host-capacity claims; the active versioned Collaboration Profile must pin the selected limits. A slow consumer receives `resync_required` where possible and is closed; it then catches up from its durable cursor. Never silently drop durable business events and continue from a later sequence. Presence and cursor events may be coalesced/throttled under short TTL because they are observed state, not business facts. Metrics track commit-to-client delay, Outbox lag, conflict count, draft recovery, replay gap, per-connection bytes and RSS without retaining unbounded event payloads.
 
 For online participants with valid subscriptions and healthy network, both clients must display the same persistent unread `conflict_id` and fetch the first bounded page of the exact pinned base/current/mine/theirs diff at p99 ≤ 1 s from owner conflict transaction commit. The timer begins only after both proposals are sealed and readable; this is a delivery/readability SLO, not an upload deadline, polling cadence or conflict-detection window. An alert never points to a proposal still `receiving`. Transport ACK confirms receipt only and cannot mark a conflict read. A delivery timeout is observable and leaves both participant conflict states unread/replayable. Offline clients see the durable conflict after reconnect; no design promises delivery across a network partition, so persistence and later recovery are mandatory.
 
@@ -359,7 +359,7 @@ For online participants with valid subscriptions and healthy network, both clien
 | AC-COLLAB-03 | The owner transaction pins both exact draft revisions; both conflict participants can recover their own draft and read base/current/mine/theirs after fresh authorization; unrelated principals cannot read private draft or conflict content. |
 | AC-COLLAB-04 | A user-visible conflict requires both exact proposals to be complete, digest-verified, sealed and readable; both online participants display the same persistent unread `conflict_id` and fetch its first bounded diff page at p99 ≤ 1 s after conflict commit. Transport ACK does not mark it read. Offline, delayed ACK, process restart and cursor gap preserve/replay the conflict; the target is not an upload deadline, polling cadence or conflict window. |
 | AC-COLLAB-05 | Two gateway instances, listener/owner restart, missed commit notification, duplicate/reordered delivery, cursor gap and permission revoke recover from durable owner events without lost drafts or duplicate business effect. |
-| AC-COLLAB-06 | Load test proves one multiplexed connection, bounded patch/frame/queue/cache, at most one in-flight write and one coalesced pending delta per draft, coalesced presence, measured RSS/CPU and backpressure recovery at agreed concurrent editor/agent counts. |
+| AC-COLLAB-06 | Load test proves one multiplexed connection, bounded patch/frame/queue/cache, at most one in-flight write and one coalesced pending delta per draft, coalesced presence, measured RSS/CPU and backpressure recovery at the workload/concurrency recorded by the versioned Collaboration Profile and PT-09 environment baseline. Proposed caps are not measured capacity evidence. |
 | AC-COLLAB-07 | Draft/conflict owner tables meet W/T/M classification, tenant RLS, participant-only read authorization, audit and retention rules; target database grants, migration replay and backup recovery pass before production enablement. |
 | AC-COLLAB-08 | Versioned bounded OT operations converge deterministically for transformable text edits; ambiguous overlap remains a recoverable conflict, while a stale client outside the transform window keeps its draft and reloads a consistent snapshot. |
 
@@ -376,3 +376,4 @@ Revision v0.7 · 2026-10-24 · Mavis review: add the owner-local W/T/M target re
 
 Revision v0.8 · 2026-10-24 · Mavis review: correct the Basic Design collaboration cross-reference to unique §16.78; retain §16.56 for the existing Schedule D5 section. No change to runtime status; WLD-7 remains open.
 Revision v0.9 · 2026-10-24 · Mavis review: align INV-CB-07 with the unique current Basic Design section §16.78; keep §16.56 reserved for Schedule D5. Runtime remains polling-based and WLD-7 remains open.
+Revision v1.0 · 2026-10-24 · Mavis review: synchronize the active owner-local schema reference to data design v0.2 and the test design to v1.5, which adds a mandatory versioned Collaboration Profile and measured workload/host/database/gateway baseline before PT-09 can pass. Runtime remains polling/process-local and WLD-7 remains OPEN/NOT_RUN; no benchmark or implementation is claimed.

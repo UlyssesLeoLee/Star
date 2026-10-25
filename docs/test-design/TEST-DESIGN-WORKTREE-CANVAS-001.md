@@ -1,9 +1,9 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.4** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + Multica ULYS-57 评审发令 "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.5** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v1.4 (2026-10-24 修正 WLD-7 Basic Design 引用；用例未实现/未执行)
-> - 关联 issue: `Multica ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
+> - 状态: 🟡 Draft v1.5 (2026-10-24 同步 WLD-7 协作规范并增加 PT-09 profile/环境基线门；用例未实现/未执行)
+> - 关联工作项: `ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
 >   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](../design/BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 15 决策点全部已拍板)
@@ -147,7 +147,7 @@ UAT:         43/43 AC 100% 签字 (5 域 Lead 签字栏)
 | **worktree-service** (T3) | WorktreeService + 7 状态机迁移 + CRUD + Health/Risk 集成 | 5 | `worktree_state_transition_7states_all_paths` / `state_machine_invalid_transition_rejected` / `worktree_cleanup_batch_with_provenance` / `worktree_status_observed_projection_30day_hot` / `health_risk_integration_health_low_triggers_risk` | DD §12 + §23 | INV-WC-01 (7 状态机) |
 | **risk-engine** (T4) | RiskEngine V1 (Git Status) + V2 (Diff Overlap) + 11 Risk 类型 | 4 | `risk_score_v1_v2_v3_layered` / `risk_score_invariant_0_to_1` / `risk_threshold_07_04_classification` / `risk_health_bridge_risk_change_triggers_health_recompute` | DD §13 + §35 | INV-WC-03 (Risk ∈ [0,1]) |
 | **health-engine** (T5) | HealthEngine + 13 因素加权扣分 + Health Score ∈ [0,100] | 3 | `health_score_13_factors_weighted` / `health_score_invariant_0_to_100` / `health_score_perfect_minimum_boundaries` | DD §14 + §34 | INV-WC-02 (Health ∈ [0,100]) |
-| **agent-bridge** (T6) | AgentRuntime Trait + Multica adapter + 14 AgentSession 状态 | 2 | `agent_runtime_trait_8_methods` / `agent_session_sync_14_states` | DD §15 + §45.3 | INV-WC-10 (LLM 不改 Source) |
+| **agent-bridge** (T6) | AgentRuntime Trait + external work-item adapter + 14 AgentSession 状态 | 2 | `agent_runtime_trait_8_methods` / `agent_session_sync_14_states` | DD §15 + §45.3 | INV-WC-10 (LLM 不改 Source) |
 | **relationship-engine** (T7) | RelationshipEngine + 13 Edge ops + 4 高风险 Edge metadata | 3 | `edge_kind_validation_13_kinds` / `edge_ops_crud_4_high_risk_metadata` / `edge_query_graph_n_hop_1_2_3` | DD §13 + §8 | INV-WC-04 (13 Edge) |
 | **action-engine** (T8) | ActionEngine + 18 Action + 3 类别 + 二次确认 + Idempotency + Audit | 6 | `action_18_types_register_correctly` / `action_destructive_requires_confirmation` / `idempotency_24h_ttl_replay` / `audit_log_scd_type2_immutable` / `action_rbac_5_roles_enforced` / `action_retry_strategy_3_levels` | DD §18 + §42-§43 | INV-WC-09/11/12 |
 | **event-bus** (T9) | EventBus (Redis Streams) + 15 Event + 4 消费者 + 防抖 | 3 | `event_bus_15_types_emit_correct` / `event_4_consumers_graph_ui_risk_notification` / `event_debouncer_100ms_burst_merged` | DD §19 + §20 | NFR-REL-002 (10k eps) |
@@ -338,6 +338,8 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划�
 
 环境要求：两个独立登录 actor、可重建目标 owner database、至少两个 realtime gateway 实例和可控 relay/wake-up 故障注入。只用 MSW、单进程 broadcast 或同一浏览器两个 tab 不构成跨实例 durable 验收。
 
+**当前状态**：Group 实时路径仍有周期读取与进程内 gateway 广播；WLD-7 推送、持久双边草稿/冲突、跨实例恢复和运行证据均为 OPEN/NOT_RUN。以下是目标验收计划，不代表实现已具备。
+
 | Case | 场景与操作 | 必须观察到的结果 | Gate |
 |---|---|---|---|
 | E2E-COLLAB-01 | 两位 actor 订阅同一已授权 Resource；A 提交 revision | B 由事件 push 收到新 revision；连接稳定期间无固定周期 Canvas/Task read 请求；未授权 Run 无事件 | AC-COLLAB-01 |
@@ -376,7 +378,9 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划�
 | **PT-06** | `bench_event_bus_redis_streams_throughput` | criterion-rs + Redis | >= 10k eps | NFR-REL-002 | `cargo bench -p event-bus --bench throughput_10k_eps` |
 | **PT-07** | `bench_risk_engine_delta_update` | criterion-rs | P95<500ms (incremental) | AC-P-4 | `cargo bench -p risk-engine --bench delta_update` |
 | **PT-08** | `bench_explanation_cache_hit` | vitest bench | P95<50ms (cache hit) | AC-P-5 | `pnpm vitest bench bench/explain-cache.spec.ts` |
-| **PT-09** | WLD-7 push/conflict latency and write amplification | 双 gateway + 目标 owner DB + 受控并发 actor | 从 conflict transaction commit 到双方同一 unread conflict_id 可见且首个有界差异页可读，p99 ≤ 1 s；同时记录每 draft 在途请求数、pending delta 大小、draft-head upsert/checkpoint writes per edit burst、RSS/CPU/Outbox lag，证明常态 patch coalesce、队列有界且无逐键击快照 | AC-COLLAB-04/06；W14 | 计划；未实测 |
+| **PT-09** | WLD-7 push/conflict latency and write amplification | 双 gateway + 目标 owner DB + 受控并发 actor | 从 conflict transaction commit 到双方同一 unread conflict_id 可见且首个有界差异页可读，p99 ≤ 1 s；同时记录每 draft 在途请求数、pending delta 大小、draft-head upsert/checkpoint writes per edit burst、RSS/CPU/Outbox lag，证明常态 patch coalesce、队列有界且无逐键击快照 | AC-COLLAB-04/06；W14；PT-09-GATE-01 | 计划；未实测 |
+
+**PT-09-GATE-01 — Profile 与测量基线前置门**：PT-09 只有在测试记录中固定版本化 Collaboration Profile 的 profile ID、revision 与 digest，并记录本次精确 workload/并发规模及目标 host、PostgreSQL、gateway 实例数与关键配置基线后，才可判定通过。结果必须关联该 profile 和同一环境基线，报告 p99、RSS、CPU、Outbox lag、队列/草稿写放大与慢消费者恢复证据。当前 workload/并发数值和资源阈值尚未批准/实测，本设计不预设或虚构这些数值；缺少 Profile 或基线时 PT-09 状态保持 NOT_RUN/OPEN，不得用单实例或内存 hub 结果替代。
 
 ### 5.3 容量规划 (per SRS §12.2 性能 AC + 守门 #7 v3)
 
@@ -406,10 +410,11 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划�
 | **G-PT-04** | Redis Streams 4 消费者并行 throughput 实测, 实施期补 | PT-06 | MVP |
 | **G-PT-05** | Explanation cache L1/L2/L3 命中率实测, 实施期补 | PT-08 | MVP |
 | **G-PT-06** | WLD-7 push、冲突 diff 和慢消费者基准没有目标 DB/跨 gateway 运行证据；不得引用单实例内存 hub 通过 | PT-09 | WLD-7 |
+| **G-PT-07** | WLD-7 尚无经固定的版本化 Collaboration Profile，也无记录精确 workload/并发规模与目标 host、PostgreSQL、gateway 配置的测量基线；未补齐前 PT-09 不得判为通过 | PT-09-GATE-01 | WLD-7 |
 
 ### 5.6 本章小结
 
-既有 PT 共 **8 bench**；WLD-7 增加 PT-09 计划基准（未实现/未实测）。AC-COLLAB-04/06 的 p99、RSS、CPU 和 Outbox lag 必须在目标 DB 与双 gateway 下测量。既有缺口 G-PT-01..05 保留，新增 G-PT-06；Canvas 原有 10/100/500/1000 WT 容量规划不替代协作负载验收。
+既有 PT 共 **8 bench**；WLD-7 增加 PT-09 计划基准（未实现/未实测）。AC-COLLAB-04/06 的 p99、RSS、CPU 和 Outbox lag 必须在目标 DB 与双 gateway 下测量。既有缺口 G-PT-01..05 保留，G-PT-06 与新增 G-PT-07 均开放；PT-09-GATE-01 要求先固定 Collaboration Profile 并记录 workload/并发规模及 host/DB/gateway 基线。Canvas 原有 10/100/500/1000 WT 容量规划不替代协作负载验收。
 
 ---
 
@@ -494,14 +499,14 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 8 项计划�
 
 | Requirement AC | 自动化证据 | 通过条件 | 当前状态 |
 |---|---|---|---|
-| AC-COLLAB-01 | E2E-COLLAB-01 + 请求计数/Outbox wake-up trace | 已连接时没有固定周期读取；owner commit 触发同资源授权 push | WLD-7 未实现 |
-| AC-COLLAB-02 | E2E-COLLAB-02/03 + resource fence race test | 不重叠改动合并；重叠修改保留两稿并只产生稳定冲突 | WLD-7 未实现 |
-| AC-COLLAB-03 | E2E-COLLAB-03/04 + owner API/DB evidence | 精确 draft revision 在冲突事务中 pin；双方可恢复并查看差异，第三人拒绝 | WLD-7 未实现 |
-| AC-COLLAB-04 | E2E-COLLAB-04/05 + PT-09 | 仅完整、digest-verified、sealed 提案可见；在线 p99 ≤1s 到双方提醒和首个有界 diff 页 | WLD-7 未实现 |
-| AC-COLLAB-05 | E2E-COLLAB-06/07 + restart/replay integration | wake-up 丢失、重复乱序、离线重连、cursor gap 与 revoke 均不丢事实 | WLD-7 未实现 |
-| AC-COLLAB-06 | E2E-COLLAB-07 + PT-09 | 单 multiplexed connection、每 draft 单在途写入与一个有界合并 pending delta、配置化 bounded queue/cache、慢消费者背压恢复；报告 RSS/CPU、pending 大小及每编辑 burst 的 draft-head/checkpoint 写放大，确认没有逐键击不可变快照 | WLD-7 未实现 |
-| AC-COLLAB-07 | disposable PostgreSQL migration/RLS/grants/backup suite | W/T/M、RLS、参与者读取边界、retention 与恢复通过 | WLD-7 未实现 |
-| AC-COLLAB-08 | OT property/convergence tests + E2E-COLLAB-02/03 | 固定算法版本的可变换编辑确定性收敛；不可安全变换时保留两稿冲突 | WLD-7 未实现 |
+| AC-COLLAB-01 | E2E-COLLAB-01 + 请求计数/Outbox wake-up trace | 已连接时没有固定周期读取；owner commit 触发同资源授权 push | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-02 | E2E-COLLAB-02/03 + resource fence race test | 不重叠改动合并；重叠修改保留两稿并只产生稳定冲突 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-03 | E2E-COLLAB-03/04 + owner API/DB evidence | 精确 draft revision 在冲突事务中 pin；双方可恢复并查看差异，第三人拒绝 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-04 | E2E-COLLAB-04/05 + PT-09 | 仅完整、digest-verified、sealed 提案可见；在线 p99 ≤1s 到双方提醒和首个有界 diff 页 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-05 | E2E-COLLAB-06/07 + restart/replay integration | wake-up 丢失、重复乱序、离线重连、cursor gap 与 revoke 均不丢事实 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-06 | E2E-COLLAB-07 + PT-09 + PT-09-GATE-01 | 单 multiplexed connection、每 draft 单在途写入与一个有界合并 pending delta、配置化 bounded queue/cache、慢消费者背压恢复；以固定版本化 Collaboration Profile 和记录的精确 workload/并发、host、PostgreSQL、gateway 基线报告 RSS/CPU、pending 大小及每编辑 burst 的 draft-head/checkpoint 写放大，确认没有逐键击不可变快照 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-07 | disposable PostgreSQL migration/RLS/grants/backup suite | W/T/M、RLS、参与者读取边界、retention 与恢复通过 | WLD-7 OPEN/NOT_RUN |
+| AC-COLLAB-08 | OT property/convergence tests + E2E-COLLAB-02/03 | 固定算法版本的可变换编辑确定性收敛；不可安全变换时保留两稿冲突 | WLD-7 OPEN/NOT_RUN |
 
 只有真实 owner transaction、目标 DB、两个 gateway 与权限撤销证据通过后，才可将 AC-COLLAB 标成已实现；内存 hub 和 UI mock 只能用于组件测试。
 
@@ -578,10 +583,11 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v1.0** | **2026-09-16 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 9 段 IPA SEC 模板 (目的 / 范围 / UT / IT / E2E / PT / UAT / RACI / 修订), 52 UT + 10 IT + 8 E2E + 8 PT + 43 AC = 121 实证锚点, 14 crate × 模块测试矩阵 1:1 对齐, 5 子任务 RACI, 13 已知缺口 (G-IT-01..05 + G-E2E-01..08 + G-PT-01..05 = 18, 含 sub-issue 分解), 5 角色签字栏, 守门 5 项必过, Token OLU ~500K (含 docs)** | **2026-09-16 10:48 JST 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了"** |
-| **v1.1** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 M-2/M-3/m-7 派生)** | **修正: 5 子任务命名 ULYS-57.x → ULYS-58..62 (per Multica 实际 identifier); AC-D-7 误增撤销 → 43 AC (与 SRS / Traceability §11 一致); 子任务创建命令 `--parent` 缺失 flag 修正为 `--description-file` + `update --parent-issue-id`; 守门 #14 v3/v4 "永久代签" 措辞 → "接手代签 (5 域真人到位后切真人)" (per self-review m-7)** | **2026-09-19 04:55 JST 自审整体审查 Mavis 推荐 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
+| **v1.1** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 M-2/M-3/m-7 派生)** | **修正: 5 子任务命名 ULYS-57.x → ULYS-58..62 (按当时任务系统返回的标识); AC-D-7 误增撤销 → 43 AC (与 SRS / Traceability §11 一致); 子任务创建步骤改为先提供描述文件，再单独设置 parent work item ID; 守门 #14 v3/v4 "永久代签" 措辞 → "接手代签 (5 域真人到位后切真人)" (per self-review m-7)** | **2026-09-19 04:55 JST 自审整体审查 Mavis 推荐 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
 | **v1.2** | **2026-10-23 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 UT-FE-SESSION-01：以受控 deferred 响应验证 sessionKey generation 替换后旧 401 与旧投影响应不会使新 session 失效或回写；标明注入式测试的生产认证证据边界。** | **WBS-WLD-NEXT-20261023：补充迟到 401 / stale projection 确定性回归验证** |
 | **v1.3** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 WLD-7 的 8 项双 actor/durable gateway E2E 计划、PT-09 p99/写放大/RSS/CPU/Outbox 基准、AC-COLLAB-01..08 追踪和 G-E2E-09/G-PT-06 缺口；明确普通 delta 合并写 draft head、重叠时自动固定双边版本、每 draft 单在途写入加有界 pending delta，且所有用例均未实现/执行，并链接目标 W/T/M 数据设计。** | **requirements §50.8AW v7.05、协作数据设计 v0.1 与 WBS WLD-7 要求把实时推送、双边草稿和冲突恢复落实到可验收用例。**
 | **v1.4** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 的 Basic Design 引用更正为唯一章节 §16.78，并同步当前协作 spec / owner-local 数据设计版本；用例及运行结果未改变。** | **跨文档编号核对发现 §16.56 与 Schedule D5 重复。** |
+| **v1.5** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 协作规范引用同步到 v1.0、owner-local 数据设计同步到 v0.2；为 PT-09 增加前置门：固定 Collaboration Profile ID/revision/digest，并记录精确 workload/并发规模和目标 host、PostgreSQL、gateway 基线；未有批准值与实测记录时保持 OPEN/NOT_RUN，不虚构阈值；将任务来源和旧 adapter 描述改为中性名称。** | **WLD-7 跨文档版本对账、名称清理与低消耗/可复现性能验收门补齐。** |
 
 ---
 
@@ -611,7 +617,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 ### 9.5 WLD-7 实时协作验收来源
 
 - requirements §50.8AW AC-COLLAB-01–08 与 basic design §16.78
-- Group detailed design §8.27 / v5.31 与 docs/specs/domain-collaboration-spec.md §13 / v0.8
+- Group detailed design §8.27 / v5.31 与 docs/specs/domain-collaboration-spec.md §13 / v1.0
 - docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md v0.2（目标 owner-local W/T/M 记录）
 - docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md W16 / WLD-7
 
@@ -646,7 +652,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 - [x] 守门 #6: PowerShell + Unix 路径兼容
 - [x] 守门 #9: 子代理 dispatch 必先 brief (本文档即 IT/E2E/PT brief 入口)
 - [x] 守门 #10: 错误码 6-field
-- [x] 守门 #11: 缺标比错标 (18 已知缺口显式标)
+- [x] 守门 #11: 缺标比错标 (21 已知缺口显式标)
 - [x] 守门 #13: W/T/M 100% 覆盖 (5 表)
 - [x] 守门 #14 v3: 5 域 Lead 签字栏 (Mavis 临时代签)
 - [x] 守门 #14 v4: v0.62 反转, 真人代签流程取消
@@ -661,7 +667,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 
 **触发**: 2026-09-16 10:48 JST 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了"
 
-**分解原则** (per `multica-platform` skill `references/issues.md` §"Parent coordinator"):
+**分解原则** (per parent-coordinator workflow):
 
 - 每个子任务对应一个独立 git worktree (per user profile § "sub-issue workers each get a dedicated git worktree")
 - 每个子任务独立 agent assignee, 平行推进
@@ -671,7 +677,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | Sub-issue | 标题 | 包含任务 | 依赖 | Token 估 | 完成标准 | assignee |
 |---|---|---|---|---|---|---|
 | **ULYS-58** | graph-core + git 基础 2 crate (T1-T2) | GraphRepository Trait + Neo4j adapter + 11 Node + 13 Edge + GitProvider Trait + libgit2 + CLI fallback + GitObserver + 100ms 防抖 + 15 GitEvent + 5 表 DDL | 无 | ~500K | `cargo test -p graph-core --lib` 4/4 + `cargo test -p git-adapter --lib` 4/4 + `cargo test -p git-observer --lib` 3/3 = 11/11 UT pass | (已 done) |
-| **ULYS-59** | 业务核心 5 crate (T3-T7) | worktree-service 7 状态机 + risk-engine V1+V2 + health-engine 13 因素 + agent-bridge Multica adapter + relationship-engine 13 Edge ops | T1 + T2 | ~1.1M | `cargo test -p worktree-service --lib` 5/5 + `cargo test -p risk-engine --lib` 4/4 + `cargo test -p health-engine --lib` 3/3 + `cargo test -p agent-bridge --lib` 2/2 + `cargo test -p relationship-engine --lib` 3/3 = 17/17 UT pass | (已 done) |
+| **ULYS-59** | 业务核心 5 crate (T3-T7) | worktree-service 7 状态机 + risk-engine V1+V2 + health-engine 13 因素 + agent-bridge external work-item adapter + relationship-engine 13 Edge ops | T1 + T2 | ~1.1M | `cargo test -p worktree-service --lib` 5/5 + `cargo test -p risk-engine --lib` 4/4 + `cargo test -p health-engine --lib` 3/3 + `cargo test -p agent-bridge --lib` 2/2 + `cargo test -p relationship-engine --lib` 3/3 = 17/17 UT pass | (已 done) |
 | **ULYS-60** | 5 engine (T8-T12) | action-engine 18 Action + event-bus Redis Streams + layout-engine 3 算法 + query-engine DSL Parser + canvas-renderer React-Flow | T1 + T3 + T4 + T5 + T6 + T7 | ~1.3M | `cargo test -p action-engine --lib` 6/6 + `cargo test -p event-bus --lib` 3/3 + `cargo test -p layout-engine --lib` 3/3 + `cargo test -p query-engine --lib` 4/4 + `cargo test -p canvas-renderer --lib` 4/4 = 20/20 UT pass | (待 review) |
 | **ULYS-61** | BFF + Frontend (T13-T14) | bff/worktree_canvas 11 REST + 15 SSE + 1 WS + RBAC + Idempotency + Audit + 30 前端 TS/TSX 文件 + 5 View Mode + 6 Semantic Zoom + 11 Inspector Tab + Zustand Store | T8 + T9 + T10 + T11 + T12 | ~650K | `cargo test -p bff --lib --features worktree_canvas` 2/2 + `pnpm vitest run` 30/30 + `pnpm playwright test` 8/8 E2E pass | (待解阻) |
 | **ULYS-62** | 测试 + NFR + 自审修正 (T4.1-T4.8) | 52 UT 实证 + 10 IT 实证 + 8 E2E 实证 + 8 PT 实证 + 5 类 NFR benchmark + 4 Critical 自审修正 (C-01..04) + 13 已知缺口交叉验证 | T1-T14 | ~1.0M | `cargo test --workspace` 52/52 UT + 10/10 IT pass + `pnpm playwright test` 8/8 E2E pass + `cargo bench` 8/8 PT pass + 守门 13 项必过 + 5 域 Lead 签字 (Mavis 临时代签) | (待 review) |
@@ -688,22 +694,12 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 
 ### 11.2 子任务创建执行 (本期操作, per 评论者发令)
 
-本节由 Ulysses 在本期操作, 5 子任务通过 `multica issue create --description-file ...` (父 ID 在创建后通过 `multica issue update --parent-issue-id` 设定, 因 Multica 当前 CLI 不支持 `--parent` flag) 创建, 落到本 issue (ULYS-57) 下, 平行推进开发。**实际 Multica 分配: ULYS-58 / ULYS-59 / ULYS-60 / ULYS-61 / ULYS-62** (独立 identifier, 与本 issue 平级而非 issue 内 sub-issue, per user profile "parent + 5 sub-issues" 模式 + Multica workspace 命名约定)。
-
-创建命令 (调整后, 用 `--description-file` 而非 `--parent`):
-
-```bash
-# 1) 创建子 issue (返回 issue ID)
-multica issue create --title "ULYS-58 graph-core + git 基础 2 crate (T1-T2)" --description-file ./sub-issue-58.md
-# 2) 设置父 issue
-multica issue update <ULYS-58-ID> --parent-issue-id 01a0a4d8-6669-77ee-bbb1-758e19e69244
-# (重复 1+2 步骤 for ULYS-59..62)
-```
+本节记录 5 个子任务的历史分解：创建任务后再设置 parent work item ID（当时的任务系统不支持在 create 时指定 `--parent`）。**记录的任务标识: ULYS-58 / ULYS-59 / ULYS-60 / ULYS-61 / ULYS-62**；这些是独立 identifier，与 ULYS-57 平级，不是系统内嵌 sub-issue。该历史分配不代表当前 WLD-7 实施或验收状态。
 
 ### 11.3 子任务派工原则 (per user profile § "parent + 5 sub-issues")
 
-- 每个 sub-issue worker 拿独立 git worktree (per Multica workspace convention)
-- 工作目录: `~/multica_workspaces_*/ulys-58-*/worktree`..`ulys-62-*/worktree`
+- 每个子任务 worker 使用独立 Git worktree
+- 工作目录由当时的任务管理工作区提供
 - 分支命名: `agent/<agent>/ulys-58`..`ulys-62`
 - 完成标准: 子任务 PR merged + Mavis 接手 Review pass + Token OLU 不超估
 
@@ -724,14 +720,14 @@ multica issue update <ULYS-58-ID> --parent-issue-id 01a0a4d8-6669-77ee-bbb1-758e
 
 ### A.1 测试设计书完整性
 
-- **5 级别测试设计**: UT (52) + IT (10) + E2E (8) + PT (8) + UAT (43 AC) = 121 实证锚点
+- **测试锚点计数**: v1.0 初版记录 121 个锚点；后续增加 UT-FE-SESSION-01 与 WLD-7 的 8 项 E2E/PT-09 计划。各级矩阵尚未统一重计，不宣称新的聚合总数；WLD-7 用例仍未实现/执行
 - **14 crate × 模块测试矩阵**: 1:1 对齐, 100% 覆盖
 - **103 FR + 23 NFR + 12 INV + 15 决策点**: 全闭环
 - **43 AC 验收 (per SRS §12)**: AC-F-1..20 + AC-P-1..7 + AC-Q-1..10 + AC-D-1..6
-- **18 已知缺口** (G-IT-01..05 + G-E2E-01..08 + G-PT-01..05): 显式标, 实施期校准
+- **21 已知缺口** (G-IT-01..05 + G-E2E-01..09 + G-PT-01..07): 显式标记；其中 WLD-7 的缺口仍 OPEN，实施期校准
 - **5 子任务 RACI**: ULYS-58 / 59 / 60 / 61 / 62 + Mavis 接手代签 (5 域真人到位后切真人)
 
-### A.2 Multica ULYS-57 任务完成度
+### A.2 ULYS-57 任务完成度
 
 | 阶段 | 状态 | 文档 |
 |---|---|---|
@@ -755,21 +751,21 @@ multica issue update <ULYS-58-ID> --parent-issue-id 01a0a4d8-6669-77ee-bbb1-758e
 - [x] 守门 #6: PowerShell + Unix 路径兼容
 - [x] 守门 #9: 子代理 dispatch 必先 brief (本文档即 IT/E2E/PT brief 入口)
 - [x] 守门 #10: 错误码 6-field
-- [x] 守门 #11: 缺标比错标 (18 已知缺口显式标)
+- [x] 守门 #11: 缺标比错标 (21 已知缺口显式标)
 - [x] 守门 #13: W/T/M 100% 覆盖 (5 表)
 - [x] 守门 #14 v3: 5 域 Lead 签字栏 (Mavis 临时代签)
 - [x] 守门 #14 v4: v0.62 反转, 真人代签流程取消
 - [x] 守门 #28: token-OLU 估算 (本文档 ~500K)
 - [x] 守门 #29: 1 commit 多文件 (本期 SRS/BD/DD/Trace/Spec/IMPL-PLAN/TEST-DESIGN 7 文件同 commit 落档)
 
-### A.4 下一步 (per 评论者发令)
+### A.4 下一步 (per work-item request)
 
 1. **创建 5 子任务** (本期操作, 落到 ULYS-57 issue 下, 见 §11.2 命令)
-2. **派 5 agent 平行推进** (per `multica-platform` skill `references/issues.md` §"Parent coordinator")
-3. **5 子任务完成后** ULYS-62 (测试 + NFR + 自审修正) 启动, 实证 122 锚点
+2. **派 5 agent 平行推进** (per parent-coordinator workflow)
+3. **5 子任务完成后** ULYS-62 (测试 + NFR + 自审修正) 启动, 按原 ULYS-57 范围实证 122 锚点；新增 WLD-7 验收项单独列为开放门，不计入原闭环
 4. **UAT 签字** (43 AC 全过, Mavis 接手代签)
 5. **ULYS-57 父 issue 关闭**, 进入下一阶段 (P2 18 任务)
 
 ---
 
-**文档结束** — per 日本 IPA SEC 標準 V モデル + 日本 SIer 项目常见测试工程规范 + Multica ULYS-57 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了" 制作完成。
+**文档结束** — per 日本 IPA SEC 標準 V モデル + 日本 SIer 项目常见测试工程规范 + internal work item ULYS-57 request "可以开子任务推进开发并且制作各级测试设计书了" 制作完成。
