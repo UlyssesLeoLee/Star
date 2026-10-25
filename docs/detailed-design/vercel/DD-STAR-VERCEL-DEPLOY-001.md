@@ -59,6 +59,12 @@ Rust 函数不是当前部署目标。只有 VCD-2 目标账户和套餐可行�
 - Rust Runtime 当前为 Beta。其专属 WebSocket、streaming、maxDuration、内存、并发、日志和指标支持保持 UNKNOWN，直至目标账户/计划实测。
 - 通用 Vercel Functions WebSocket GA 不能证明 Rust Runtime 的 WebSocket 支持。现有 PTY、Canvas WSS 和长生命周期协作通道仍由 Star 自有运行时承载。
 
+### 2.3 Star Gateway 长连接与 chat SSE（契约待批准）
+
+长连接保持在 Star 自有 Gateway/执行面，不进入 Vercel BFF 的代理或持久状态路径。TD T-049 的目标覆盖 terminal PTY/session WebSocket、ARG WebSocket、Canvas WebSocket 与 chat SSE；其浏览器到 Gateway 的实际数据路径、凭证握手、Preview Origin allow/deny、当前 Project/Run/capability 授权、撤权传播、协议事件/帧、heartbeat、关闭/重连生命周期及可审计证据均须由真实 Star Gateway 契约确认。当前文档集没有足以确定这些协议细节的已批准契约，本设计不推定 issuer、token/cookie 形式、握手消息、Origin 值、URL 或 wire format。
+
+SRS FR-VC-013 允许 chat SSE 经 Next Route Handler 透传，而 TD T-049 将 chat SSE 纳入经 Star Gateway 建立的连接验证；该路径差异尚未裁决。在 SRS/ADR/TD 与真实 Gateway 契约完成一致性审批前，chat SSE 及其他相关长连接在 Vercel 形态下保持不可用，不启用 BFF/函数转发或回退路径。T-049 保持 NOT_RUN，VCD-0 保持 OPEN。
+
 ## 3. 请求、授权和 BFF 安全边界
 
 ### 3.1 身份与范围授权
@@ -123,11 +129,18 @@ VCD-2 报告需保存目标计划/region、测试 commit、函数依赖、构建
 
 ### 5.2 Owner、数据库和迁移
 
-- 数据库只由现有 Star Owner 持有。Phase 2 若需要 Owner 连接，必须先确认实际 Owner API/数据归属以及 VCD-2、WLD-0/WLD-6 的依赖门；Vercel 函数不获得独立业务写权限。
-- Vercel Project 不能直接绕过 Star API/Owner 连接任意数据库，也不能在请求启动/函数初始化时自动迁移。
-- 托管 PostgreSQL 候选、私网可达性、连接池模式与 RLS 13 类的兼容性仍未裁决。需要证明每个事务以 SET LOCAL 建立租户上下文，并在同一事务内提交/回滚；不允许会话级 SET 泄漏到复用连接。
-- 连接池总预算与 fd/供应商连接上限按实测容量制定；不得每请求新建连接或在实例中保留无界连接/数据缓存。
-- Schema 改动必须走现有 DDD、W/T/M、RLS 和迁移治理；本设计不新增表名或业务数据模型。
+FR-VC-009..012 的责任映射限定到已经存在的 Star 授权/业务 Owner、Star 管理的数据面，以及仓库既有 DDD/W/T/M 与迁移治理；此处不创建 Vercel-owned database、第二业务 Owner、独立 migrator 或新的权限权威。下表定义必须复用的责任边界，并记录当前证据状态：
+
+| SRS 需求 | 既有 Star 责任边界 | Vercel 限制 | 当前映射状态 |
+|---|---|---|---|
+| FR-VC-009 托管 PostgreSQL/数据存储 | 持有相应业务事实的既有 Star Owner 是数据权威；只可使用该 Owner 当前批准并管理的数据存储/API。 | 不得由 Vercel 建立独立业务数据库或绕过 Owner 直连任意 PG。 | 当前 VCD 设计材料没有批准具体 Provider、Owner-to-storage/API 映射或网络/凭证路径；保持 UNKNOWN。 |
+| FR-VC-010 事务级租户上下文与 RLS | 当前 Star 授权责任提供经验证的 actor/Project/Run/tenant 范围；相应既有数据 Owner 在同一事务内执行授权后的数据操作与 `SET LOCAL`/RLS。 | Vercel 不自行推导 tenant/Run 权限、不设置会话级上下文、不持有可绕过 Owner 的角色。 | 具体 Owner API、上下文传递及事务/连接池契约尚未在本设计集中获批；保持 UNKNOWN。 |
+| FR-VC-011 独立迁移流程 | Schema 变更继续归属 Star 既有 DDD、W/T/M、RLS 和迁移治理；只能使用已存在且经批准的 Star CI/迁移执行流程。 | Function、请求路径和 Vercel Project 均无 DDL 权限、无迁移执行职责；不得新增 Vercel migrator。 | 仓库迁移文件及治理规则存在，但本设计集尚未确定其获批的目标环境执行身份、作业和授权证据；保持 UNKNOWN。 |
+| FR-VC-012 连接预算 | 既有 Star 数据 Owner 与其批准的 Provider/数据面共同管理有限连接池及连接总预算。 | Vercel 不自行打开业务数据库连接或建立无界缓存/连接池。 | Provider、池化模式、每实例预算及与 fd/Provider 上限的实测映射尚未确认；保持 UNKNOWN。 |
+
+**Fail-closed 门禁：** 当前没有可据以批准上述具体 Owner/Provider/迁移映射的证据。因此 FR-VC-009..012 不能被解释为允许新建 Vercel 数据面。映射经既有 Owner、授权/数据面负责人及迁移治理显式批准，并补齐 SRS/AC 与运行契约之前，不启用 Vercel 数据库连接、依赖这些连接的 Vercel Function/部署能力或任何执行能力；仅可进行不触达 Star 业务事实的隔离验证。若既有 Star Owner/迁移路径无法满足 SRS FR-VC-009..012，必须先修订 SRS 与验收条件，不得用新 Owner、Vercel 数据库或新迁移权威填补缺口。
+
+在门通过后，所有租户事务仍须以 `SET LOCAL` 建立上下文，并在同一事务中执行、提交/回滚；禁止会话级 `SET` 泄漏到复用连接。连接池总预算与 fd/Provider 上限须按目标环境实测制定，禁止每请求新建连接。Schema 改动不得脱离现有 DDD、W/T/M、RLS 与迁移治理；本设计不新增表名或业务数据模型。
 
 ## 6. Cron、Schedule 与执行事实
 
@@ -152,12 +165,16 @@ VCD-2 报告需保存目标计划/region、测试 commit、函数依赖、构建
 
 Vercel 呈现面读取当前可用的 Project、Run 与 Worktree 状态时，必须经过现有 Star 授权契约。它不改变主导航的 Project → Engineering Run → Worktree → Branch 语义，也不把 Vercel Deployment/Preview 当成 Run 或 Branch 真相。
 
+Gateway 连接是明确的安全前置门，不是 Vercel 端已具备的能力。只有真实契约批准并完成验证后，才可定义浏览器握手及各协议的数据流；每次初始连接、重连和受保护数据/操作都必须使用当前 Star 授权，并按契约执行撤权关闭/拒绝。Preview Origin 必须依据契约实行 allow/deny；未定义的 Origin、身份、协议事件或生命周期一律 UNKNOWN 并拒绝连接。不得通过 actor/Run 请求头、自定义身份字段、陈旧连接授权或 Vercel 凭证替代 Star 决策。
+
+chat SSE 的部署路径存在未决差异：TD T-049 将其纳入 Star Gateway 连接；SRS FR-VC-013 同时允许 Next Route Handler 透传。直到该差异经 SRS/ADR/TD 与实际 Gateway 契约批准并对齐，Vercel UI 必须显示 unavailable，禁止经 BFF、Function 或未定义的替代路径连接。T-049 保持 NOT_RUN。
+
 | 能力 | Vercel Web 处理方式 |
 |---|---|
 | Star 授权读取 | 仅显示真实 Owner/API 返回且当前用户有权读取的数据；上游不可达则显示不可达状态 |
 | Agent、Task CLI、Loop/Workflow | 不在 Vercel 执行；无 Star 执行 Runtime/授权时禁用，清晰说明所需本地运行时 |
 | 原生 Hook | 始终由 Rust Star Runtime 决策；浏览器配置或第三方插件不能替代/减弱强制门 |
-| Terminal PTY、noVNC、Canvas WSS、ARG WS | 保留 Star 自有长连接 gateway；Vercel 不代理终端或 CRDT 会话 |
+| Terminal PTY、noVNC、Canvas WSS、ARG WS、chat SSE | 目标由 Star 自有 Gateway/执行面承载；最终路由与协议契约未批准前全部标记 unavailable。Vercel 不代理 PTY/CRDT；chat SSE 的 SRS 与 T-049 路径差异按本节门禁处理，禁止猜测或回退 |
 | Canvas 非实时页面 | 可呈现受授权的已持久内容；写入仍由 Canvas/Star Owner 控制 |
 | Automation Debug | 依赖本机 Python console 的路由在 Vercel 形态明确不可用，不暴露一个会误报 502 的功能入口 |
 | BI / Benchmark | 来源与口径由 Star BI owner 固定；Vercel trace/平台监控只作部署诊断，不直接创建或覆盖业务指标 |
@@ -224,16 +241,16 @@ Vercel 呈现面读取当前可用的 Project、Run 与 Worktree 状态时，必
 | FR-VC-005 | §3.2、§4 | AC-VC-004；T-003/T-010/T-013 |
 | FR-VC-006 | §2.1、§3.2 | AC-VC-002；T-002/T-013 |
 | FR-VC-007 | §3.2 | AC-VC-003；T-004..T-008 |
-| FR-VC-008 | §3.1–3.2、§10 | AC-VC-003/005；T-006/T-009/T-014..T-017 |
-| FR-VC-009 | §5.2 | AC-VC-009/010；T-038/T-039；GAP-04/06 |
-| FR-VC-010 | §5.2 | AC-VC-009；T-038/T-042；GAP-04 |
-| FR-VC-011 | §5.2 | AC-VC-010；T-036/T-039 |
-| FR-VC-012 | §5.2、§9 | AC-VC-009；T-038 |
-| FR-VC-013 | §2.2、§7 | AC-VC-005/006；T-018/T-034；GAP-02/09/11 |
+| FR-VC-008 | §3.1–3.2、§10、§2.3/§7 | AC-VC-003/005；T-006/T-009/T-014..T-017/T-049 |
+| FR-VC-009 | §5.2 | AC-VC-009/010；T-038/T-039/T-042；GAP-04/06；owner/provider gate OPEN |
+| FR-VC-010 | §5.2 | AC-VC-009；T-038/T-042；GAP-04；authorization/transaction mapping OPEN |
+| FR-VC-011 | §5.2 | AC-VC-010；T-036/T-039；approved migration-job identity OPEN |
+| FR-VC-012 | §5.2、§9 | AC-VC-009；T-038；provider/pool budget OPEN |
+| FR-VC-013 | §2.2–2.3、§7、§12 | AC-VC-005/006；T-018/T-034/T-049；GAP-02/09/11；Gateway contract OPEN |
 | FR-VC-014 | §6、§8 | T-020..T-027；NFR-VC-07 |
 | FR-VC-015 | §1.2、§6 | AC-VC-012；T-027/T-037/T-040/T-041 |
 | FR-VC-016 | §1.2、§7 | AC-VC-005/006；T-018/T-019/T-045 |
-| FR-VC-017 | §3.1、§10 | AC-VC-003/005；T-006/T-017 |
+| FR-VC-017 | §3.1、§10、§2.3/§7 | AC-VC-003/005；T-006/T-017/T-049 |
 | FR-VC-018 | §4、§10 | T-002/T-009/T-012/T-035/T-046 |
 | FR-VC-019 | §4、§10 | T-012/T-048 |
 | FR-VC-020 | §9 | T-035/T-047 |
@@ -258,8 +275,8 @@ Vercel 呈现面读取当前可用的 Project、Run 与 Worktree 状态时，必
 | AC-VC-002 | §3.2 | T-002 |
 | AC-VC-003 | §3.2、§10 | T-004..T-009/T-013 |
 | AC-VC-004 | §3.2、§4 | T-003/T-010 |
-| AC-VC-005 | §3.1、§7 | T-014..T-017/T-019 |
-| AC-VC-006 | §7 | T-011/T-018/T-019/T-045 |
+| AC-VC-005 | §3.1、§2.3、§7 | T-014..T-017/T-019/T-049 |
+| AC-VC-006 | §2.3、§7 | T-011/T-018/T-019/T-045/T-049 |
 | AC-VC-007 | §2.2、§5.1 | T-028..T-029 |
 | AC-VC-008 | §2.2、§5.2 | T-031/T-036 |
 | AC-VC-009 | §5.2 | T-038 |
@@ -292,8 +309,10 @@ Vercel 呈现面读取当前可用的 Project、Run 与 Worktree 状态时，必
 4. Preview 供应商侧保护和 Promotion 审计的实证方式；禁止访问生产 Owner 的负向证明。
 5. Rust Runtime MSRV 1.99.0、Cargo build root、函数包、时长、RSS、并发、streaming/WebSocket、log/metrics 支持矩阵。
 6. PostgreSQL/provider 与 RLS 13 类、事务级池化、连接预算和迁移运行流程；不得据第三方文章认定供应商事实。
-7. Schedule 所需的真实 Star Owner intake、幂等收据查询及 owner-side durable catch-up API。接口未核实前不启用 Cron。
-8. SBOM/许可证流水线、OTLP 接收端、成本告警预算和数据保留策略。
+7. FR-VC-009..012 所需的既有 Star Owner/API/Provider 与授权上下文映射、获批迁移作业身份和连接预算。未有书面批准映射及对应验证证据前，§5.2 的 Vercel DB/函数部署/执行能力维持关闭；若既有路径不能满足 FR，先修订 SRS/AC。
+8. TD T-049 所需的真实 Gateway 握手、Preview Origin allow/deny、当前授权/撤权、terminal/ARG/Canvas 协议数据流和生命周期证据。SRS FR-VC-013 与 TD T-049 对 chat SSE 路由的差异尚未裁决；相关连接和验收继续关闭/NOT_RUN。
+9. Schedule 所需的真实 Star Owner intake、幂等收据查询及 owner-side durable catch-up API。接口未核实前不启用 Cron。
+10. SBOM/许可证流水线、OTLP 接收端、成本告警预算和数据保留策略。
 
 当前证据只足以定义设计边界，不足以批准上线。VCD-0 需完成 ADR/基本/详细/测试设计的横向一致性评审；VCD-1 以受保护 Web Preview 和真实会话/授权为目标；VCD-2 是隔离 Rust runtime 可行性证明；VCD-3 仅可在 VCD-2 PASS 且 WLD-0/WLD-6 门通过后实施；VCD-4 验证回滚、Schedule 对账、成本与运行手册。任何未达到其门槛的能力继续关闭。
 
@@ -302,3 +321,4 @@ Vercel 呈现面读取当前可用的 Project、Run 与 Worktree 状态时，必
 | 版本 | 日期 | 修订人 | 变更 |
 |---|---|---|---|
 | v0.1 | 2026-10-24 | Ulysses — Mavis 接手审核 | 基于 SRS v0.4 和 VCD-0/DD/TD 兼容性报告建立单一 Vercel Web/BFF 详细设计，明确 Star Owner/执行权威、隔离环境、条件式 Rust 证明、Cron 边界、失败恢复和追踪；无实现或部署声明。 |
+| v0.2 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 按独立 DD R2 补齐 FR-VC-009..012 到既有 Star Owner/数据面/迁移治理的条件式责任映射及未获批准时的 fail-closed 门禁；将 T-049 Gateway 握手、Preview Origin、当前授权/撤权、协议数据流/lifecycle 与 chat SSE 路由差异纳入架构、能力边界、追踪和开放门禁。保持 Draft、VCD-0 OPEN，所有执行/部署/运行验证 NOT_RUN；未发明协议或映射。 |
