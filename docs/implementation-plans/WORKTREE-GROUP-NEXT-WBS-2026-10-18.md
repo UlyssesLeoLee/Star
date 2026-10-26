@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.56；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 的 SRS/BD/DD/TD v0.2 设计基线已建立，仍为 Draft；owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计与 WLD1 设计文档；§16–§17 记录 W14 UI-0 信息架构和 UI-1 流程原型已完成文档/静态复核，独立人员复核待补，UI-2 目标设备基线与 UI-3–UI-4 比较/决策仍 OPEN/NOT_RUN。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.56；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 的 SRS/BD/DD/TD v0.2 设计基线已建立，仍为 Draft；owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计与 WLD1 设计文档；§16–§17 记录 W14 UI-0 信息架构和 UI-1 流程原型文档/静态复核已集成到本地 `dev`，源 commit `265edcd9`；UI-1 独立人员复核待补，UI-2 目标设备基线与 UI-3–UI-4 比较/决策仍 OPEN/NOT_RUN。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -262,7 +262,7 @@ flowchart TD
 | v0.53 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 WLD1 SRS/BD/DD/TD v0.2 设计基线：由 Star 原生 Project owner 维护 Project 身份、成员授权与 0..N Repository association；将 default repository preference 与授权分离；明确 retiring fence、同 Project 迁移或显式退役、Neon/Multipass VM 数据库 profile。所有实现、目标 PostgreSQL/RLS、部署接线和测试仍 OPEN/NOT_RUN；不关闭 VCD-0。 | 落实用户确认的 owner、部署拓扑和解绑规则，并将已完成设计稿反映到 WBS |
 | v0.54 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 集成 W14 桌面 UI 方向研究：保留现有 Tauri+React 作为测量基线，先完成信息架构与流程规划，再在相同数据契约下比较 egui/eframe 与 Slint；未作框架迁移决定。真实 provider、虚拟化、可访问性、取消/背压、目标设备资源指标与 benchmark 均保持 OPEN/NOT_RUN。 | 完成 W14 lane 研究并将分阶段 UI 规划写入 dev WBS，避免将候选框架或源码审计误标为已验收 |
 | v0.55 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W14 UI-0 导航信息架构审查 `1a8bbb5a` 已快进集成；冻结 Project→Engineering Run→Worktree→Branch、Project Worktree Index、Worktree 焦点后显示同级 Run Apps、Task Card 内 CLI 与 WORKTREE/GLOBAL 聊天 scope。实施仅是两份文档，无代码/运行/性能验证；将 UI-1 可点击流程原型列为下一步，W14 仍 OPEN。同步本地 main/dev 对比：dev 比 main 多 133 个提交，main 多 5 个提交且均为 patch-equivalent；未 fetch/push。 | W14 UI-0 lane review 通过并合入 dev；按已确认设计方向更新 WBS，明确规划完成不代表产品能力验收 |
-| v0.56 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 W14 UI-1 可点击静态原型和审查报告；比较 A/B/C 三种布局并保留冻结层级。复核修正撤权后旧 Branch 可见、跨 Worktree 草稿混用、重新选择绕过授权确认、切换 scope 后草稿未恢复及未授权 scope 状态读取问题；任务/Worktree 数据仅为演示数据，CLI 与未连接 App 禁用。浏览器、产品服务、同伴复核与性能测量未运行，W14 仍 OPEN。 | 按 UI-0 验收标准交付 UI-1 原型；复核明确标记自审，避免将未做的独立审查或运行验证记为通过 |
+| v0.56 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 W14 UI-1 可点击静态原型和审查报告；比较 A/B/C 三种布局并保留冻结层级。复核修正撤权后旧 Branch 可见、跨 Worktree 草稿混用、重新选择绕过授权确认、切换 scope 后草稿未恢复及未授权 scope 状态读取问题；源 commit `265edcd9` 已快进到本地 `dev`，该 lane branch/worktree 已移除，其 ignored `.pyc` SHA-256 校验后保存在用户 Codex 归档目录。任务/Worktree 数据仅为演示数据，CLI 与未连接 App 禁用。浏览器、产品服务、同伴复核与性能测量未运行，W14 仍 OPEN。 | 按 UI-0 验收标准交付 UI-1 原型；复核明确标记自审，避免将未做的独立审查或运行验证记为通过 |
 
 ## 8. Current execution state (2026-10-23)
 
@@ -477,6 +477,7 @@ UI-0 文档 lane 已 rebase 到本地 dev 并以 fast-forward 集成：`1a8bbb5a
 - 原型：`docs/prototypes/w14-ui1-flow-20261026/index.html`，单文件静态 HTML/CSS/JavaScript，无依赖、API、持久化或 Shell。
 - 复核：`docs/reviews/WBS-W14-UI1-FLOW-REVIEW-20261026.md`，包含验收矩阵、状态图、修正记录与未决门。
 - 变体：A 项目树工作台、B Project Worktree Index、C 聚焦式控制台；都保留 Project → Engineering Run → Worktree → Branch。
+- 集成：源 lane commit `265edcd9` 已 fast-forward 到 Orca `dev` checkout；source worktree 与已合入 branch 均清理。三个 ignored Python bytecode 文件逐项 SHA-256/长度校验后保存在 `C:\Users\leo19\.codex\preserved-worktree-ignored\wbs-w14-ui1-flow-20261026\scripts\automation\guardian\__pycache__`。本地远端跟踪状态为 ahead 76；未 fetch、未 push。
 
 ### 17.2 交互与安全状态
 
