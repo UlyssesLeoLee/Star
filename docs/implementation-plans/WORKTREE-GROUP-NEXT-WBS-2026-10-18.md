@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.57。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）。W14、VCD-0 与 WLD-7 均未关闭。
+> 状态：🟡 计划稿 v0.58。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）；§20 更新 W8 SQLx 解码阻塞与 W14 设备候选快照。W8、W14、VCD-0 与 WLD-7 均未关闭。
 
 ## 0. 目的与计划边界
 
@@ -264,6 +264,7 @@ flowchart TD
 | v0.55 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W14 UI-0 导航信息架构审查 `1a8bbb5a` 已快进集成；冻结 Project→Engineering Run→Worktree→Branch、Project Worktree Index、Worktree 焦点后显示同级 Run Apps、Task Card 内 CLI 与 WORKTREE/GLOBAL 聊天 scope。实施仅是两份文档，无代码/运行/性能验证；将 UI-1 可点击流程原型列为下一步，W14 仍 OPEN。同步本地 main/dev 对比：dev 比 main 多 133 个提交，main 多 5 个提交且均为 patch-equivalent；未 fetch/push。 | W14 UI-0 lane review 通过并合入 dev；按已确认设计方向更新 WBS，明确规划完成不代表产品能力验收 |
 | v0.56 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 W14 UI-1 可点击静态原型和审查报告；比较 A/B/C 三种布局并保留冻结层级。复核修正撤权后旧 Branch 可见、跨 Worktree 草稿混用、重新选择绕过授权确认、切换 scope 后草稿未恢复及未授权 scope 状态读取问题；源 commit `265edcd9` 已快进到本地 `dev`，该 lane branch/worktree 已移除，其 ignored `.pyc` SHA-256 校验后保存在用户 Codex 归档目录。任务/Worktree 数据仅为演示数据，CLI 与未连接 App 禁用。浏览器、产品服务、同伴复核与性能测量未运行，W14 仍 OPEN。 | 按 UI-0 验收标准交付 UI-1 原型；复核明确标记自审，避免将未做的独立审查或运行验证记为通过 |
 | v0.57 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 合入 W0 VCD-0 分支收敛审计 f15a1d2f：六个来源分支无须再摘取设计文件，VCD-0 仍 OPEN；六个 Orca Worktree 仍为 in-progress 且 owner 未知，故保留，不清理 branch/worktree/claim。同步 W14 UI-2 协议审查报告：设备与 workload 未冻结，桌面实测 NOT_RUN，W14 仍 OPEN。未 fetch/push，未运行测试或桌面基准。 | W0 审计报告与 W14 UI-2 证据报告已集成到 dev，按事实更新 WBS，不把文档审查误标为功能/性能验收 |
+| v0.58 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 W8 PostgreSQL 解码失败后的当前修复状态与 MAGOS 文件冲突门；记录 W14 UI-2 本机设备候选快照。修复代码尚未通过编译或 PostgreSQL 回归，设备未批准且未做桌面性能测量；W8/W14 均保持 OPEN。 | 继续推进 WBS，并将最新实测/门禁状态与计划同步。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -517,3 +518,27 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 | 目标设备/workload/profile/预算确认 | OPEN；需产品/工程 owner 决定 |
 | 当前 Tauri+React 产品路径的 pilot 与完整性能采样 | NOT_RUN；没有 build/provider/原始测量结果 |
 | W14 | OPEN；实际 UI-2 测量完成后再进入 UI-3 同数据对比与 UI-4 决策 |
+
+## 20. W8 SQLx 解码阻塞与 W14 UI-2 设备候选快照（2026-10-26）
+
+本节更新 §14 的 W8 解码复测状态和 §19 的 UI-2 设备未知项。此更新只记录可复核事实，不关闭 W8、W14 或总体 WBS，也不代表目标部署验收。
+
+### 20.1 W8 source-position 解码修复
+
+- PostgreSQL 18.6 一次性集成测试的最后实测仍是在 Inbox 结果行解码处失败：source_sequence 未包含在 SQLx SELECT 中；后续并发、exact replay、ACK/quarantine 场景没有运行。
+- 隔离 lane UlyssesLeoLee/w8-source-position-claim-fix-20261025 的未提交候选仅将 source_sequence 加入 SELECT，并增加 PostgreSQL 回归断言。cargo fmt --check 通过；cargo check 被中断；--no-run 与 PostgreSQL 集成测试没有运行。因此修复候选仍未验证，不能据此清除失败状态。
+- 2026-10-26 MAGOS 拒绝扩大该 lane manifest，fingerprint 52c321488e77：目标源文件与 codex/wbs-w8-transport-remediation-20261025 的已提交内容及 detached wbs-w8-bi-native-adapter-20261024 的未提交内容重叠。没有覆盖登记、修改冲突 worktree 或运行该源文件检查。
+- W8 保持 OPEN / FAILED-TEST。先等占用 lane 被审查后集成或明确释放；之后只登记最小修复文件，运行 Rust 编译与完整一次性 PostgreSQL 回归并独立复审。只有解码、并发、隔离、exact replay、ACK/终态处置等适用门全部通过后，才能开始 9F4J 网络 commit-before-ACK 验收。mTLS、崩溃恢复和 settlement 仍是独立门禁。
+
+### 20.2 W14 UI-2 本机设备候选
+
+- 只读设备快照报告：[WBS-W14 UI-2 本机设备候选清单](../reviews/WBS-W14-UI2-DEVICE-INVENTORY-20261026.md)。报告记录 16 核 / 24 线程 i7-13700F、约 31.76 GiB 已安装内存、Windows 11 Pro build 26300、WMI 报告 1920×1080@60 Hz、WebView2 Runtime 155.0.4283.62，以及 C: 约 60.36 GiB、D: 约 94.92 GiB 可用空间。
+- NVIDIA RTX 3060 的 WMI AdapterRAM 约 4.00 GiB，不能当作已核实的专用 VRAM；显示缩放、Star 当前桌面 build、Star 实际加载的 WebView2 与运行时指标仍为 UNKNOWN。
+- 该清单是单次本机候选快照，不批准目标设备、build、真实 provider/workload、数据 manifest、并发档位、资源预算、采样 profile 或 SLA。没有启动 Star、build、测试或 benchmark；RSS、CPU、帧时间、缓存和并行容量均 NOT_RUN。
+- W14 保持 OPEN。下一门是由产品/工程 owner 冻结目标设备与 build、授权 workload/data manifest、采样 profile、预算和 SLA；然后先测当前产品路径，再进入 UI-3 的同数据 Rust-native 比较与 UI-4 决策。
+
+### 20.3 当前推进顺序
+
+1. 保留 W8 的未验证最小候选；先解决 task_event_inbox.rs 的现有 MAGOS 登记冲突，不触碰两个占用工作树。解锁后重跑完整回归并做独立复审。
+2. W8 解码/owner transaction 验收通过后，继续 9F4J 的真实 native gRPC+mTLS、BI owner commit-before-ACK 与恢复验收。
+3. W14 的设备审批与协议冻结可并行准备；在产品/工程 owner 决定前，不把候选快照当作 target profile，也不宣称性能达标。
