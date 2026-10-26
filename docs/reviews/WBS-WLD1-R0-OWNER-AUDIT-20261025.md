@@ -57,7 +57,7 @@ Open design items: the destination selection rule (including whether it must be 
 
 ## 5. Next WBS gate and acceptance evidence
 
-WBS v0.50 §13 records the selected Star-native Project owner authority and the Vercel/Neon versus K3s/Multipass-VM database topology, alongside the accepted 0..N association and migrate-before-unlink invariants. The authority choice is closed; durable writer/API, deployment wiring, migration-target policy, reference enumeration authority, and migration transaction boundaries remain unimplemented or OPEN. [`docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md`](../implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md)
+WBS v0.51 §13 records the selected Star-native Project owner authority and the Vercel/Neon versus K3s/Multipass-VM database topology, alongside the accepted 0..N association and migrate-before-unlink invariants. The authority choice is closed; durable writer/API, deployment wiring, migration-target policy, reference enumeration authority, and migration transaction boundaries remain unimplemented or OPEN. [`docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md`](../implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md)
 
 Recommended split before WLD1-R1:
 
