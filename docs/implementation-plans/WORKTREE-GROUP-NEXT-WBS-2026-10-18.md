@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.50；§13 记录最新设计决策；§14 记录 2026-10-25 集成检查点；Project↔Repository 0..N 与“先迁移、验证后 CAS 解绑”已确认，但 Project 身份/授权 authority 仍 OPEN，代码、DB/API 与 PostgreSQL 验收未完成；W8 已在一次性 PostgreSQL 18.6 应用依赖 migration，首次真实集成测试发现 Inbox 查询漏选 `source_sequence` 并失败，修复受两个 MAGOS lane claim 冲突阻挡；协作设计定义授权资源级事件推送；同秒重叠提案无一秒 holdback 并新增 E2E-COLLAB-09，但运行时仍轮询/单进程广播，WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.51；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计集成。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -258,6 +258,7 @@ flowchart TD
 | v0.48 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WLD1 docs-only lane `e603b638` 在基于最新本地 dev rebase 后 fast-forward 集成；审计与分阶段 WBS 已在 dev，WLD1-R0a identity/authorization authority、schema/API/DB/RLS 仍 OPEN。记录 W8 source-position lane `fd0472ff` 保持隔离：Rust fmt/check/no-run 编译通过，独立复审进行中，PostgreSQL/RLS/并发实跑未运行，不得标 READY。刷新本地 refs：dev=`e603b638`、main=`02e0cbd8`、`dev...main=114 5`；五个 main-only commits 均为 patch-equivalent，不需 cherry-pick。未 fetch/push，origin/dev 新鲜度未知；D:\Star 用户脏状态未触碰；三份 VCD0 briefs 已逐个 hash 校验归档后从 dev checkout 移除。 | WLD1 docs lane fast-forward integration and W8 source-level remediation review checkpoint |
 | v0.49 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W8 `824c76d0` 的独立源码复审 `99d85cb5`：双向新 claim 屏障源码级通过；exact replay P2 是门禁范围文案与实际无新写回执路径不符，W8 报告以 `cd89b894` 修正；真实 PostgreSQL/RLS/并发/exact replay/ACK 仍未验证，W8 不可标 READY 或集成。用户再次确认 Project↔Repository 解除关系前须先迁移并验证活动引用；该规则已存在于项目 `AGENTS.md` 和 v0.47，不重复扩张。 | W8 independent source review completion and exact-replay contract reconciliation |
 | v0.50 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 W8 的真实 PostgreSQL 证据：一次性 PostgreSQL 18.6 依赖 migration 链成功；首次 receiver integration 失败，SQLx SELECT 漏选 `source_sequence`。登记该源文件扩展 MAGOS manifest 的冲突指纹与下一步用户端解除条件；W8 保持 OPEN，未集成。 | W8 disposable PostgreSQL integration attempt and manifest conflict |
+| v0.51 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Star 原生 Project owner：统一承担 Project identity、成员授权持久事实与 ProjectRepository association 的 canonical ownership，并由版本化 owner API 提供当前授权/关联能力；同步部署拓扑 Vercel→Neon、K3s→Multipass VM 内数据库。更新 WLD1 迁移失败保持源关联与既有绑定有效、详细迁移/事务边界待决；纳入 W14/W16 静态审计报告的本地集成状态。API、持久化、部署接线及 PostgreSQL/RLS/运行验证仍未完成。 | 用户确认 Project owner 与部署方向，并完成 W14/W16 审计报告阶段集成 |
 
 ## 8. Current execution state (2026-10-23)
 
@@ -364,35 +365,38 @@ These review reports are static evidence only. No tests, PostgreSQL, mTLS, deplo
 2. W8 remediation must fix both reported migration defects and add real disposable-PostgreSQL regressions before rebase. Do not use the current dirty candidate as an integration source until its complete diff is reconciled and independently reviewed.
 3. Keep WLD1, W8/WLD6, WLD7, VCD-0 and overall WBS gates open until their own acceptance evidence passes. Rebase completed lanes onto current `dev`, verify exact paths and state, then fast-forward only after the target owner/cleanliness gate passes.
 
-## 13. ProjectRepository 解绑与语义重叠协作决策（2026-10-25）
+## 13. ProjectRepository owner、部署拓扑、解绑与语义重叠协作决策（2026-10-26）
 
-本节记录用户确认的设计约束，并取代其他章节中“Project 只绑定一个 Repository”或“OT 可变换的重叠编辑自动收敛”的旧表述。Project↔Repository 0..N 和迁移、核验后解绑已确认；WLD1-R0 的有界源码审计指出当前没有 Project association writer、持久 Project identity/authorization writer 或 owner migration command。Project 身份/授权 authority 仍 OPEN；WLD1-R0b/R1/R2、协作 conflict detector/resolve API 的代码和 schema/API 均未完成，也没有目标 PostgreSQL、RLS 或客户端验收证据。
+本节记录 2026-10-26 用户确认的设计约束，并取代其他章节中 Project 仅绑定一个 Repository 或重叠编辑自动收敛的旧表述。Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 有界源码审计仍未找到持久 Project identity、成员授权或关联 writer/API；数据库接线、PostgreSQL/RLS 与运行时均未验证。
 
 ### 决策
 
-- Project↔Repository 是 0..N；default_repository_id 可空且只服务 UI 排序/预选，不参与授权，不自动写 Run binding。该关系数量与迁移顺序是已确认设计；Project identity / authorization 的 canonical writer 尚未确定，不得据此推定其 owner。
-- 解绑先由 Project link owner 用 expected revision CAS 将关联置为 `retiring`，并通过版本化 fence 阻止新 Run binding/Worktree create/import 使用该关联。Run Directory 与 Worktree/Host owners 在各自事务内将每个活跃引用迁移到同 Project 的另一个 active ProjectRepository link，或显式退役该引用；迁移前核验目标关联、目标授权和目标身份，迁移后验证已持久化的目标 Run binding，且 Host owner 还要核验 checkout Repository identity 与可信 root。每个 owner 必须在自己的事务中原子提交状态变更、append-only audit 与 Outbox，再发出绑定 operation、源/目标版本、owner revision 和验证结果的 durable idempotent receipt。所有 owner fence/receipt 成功后，进行新鲜的 owner-revision-aware 零活动引用 reconciliation，并以原预期 retiring revision 执行最终 CAS unlink；CAS 冲突必须中止解绑、重查引用与回执后重试。失败/超时/撤权/目标未验证/审计或 Outbox 缺失/未知引用数维持 `retiring`/fail closed；无跨 owner 事务或直接写表。
-- 文本任何语义重叠均形成持久冲突，即使 OT 能机械变换；两侧草稿在 owner conflict transaction 中 seal/pin，并由同一 conflict_id 通知参与者。OT 只在用户显式进入解决流程后提供无副作用预览，用户选择且 owner 当前 revision CAS 成功才写 canonical revision。
+- Project↔Repository 是 0..N；default_repository_id 可空，仅服务 UI 排序/预选，不参与授权，也不自动写 Run binding。Star 原生 Project owner 持有 Project identity、成员授权持久事实和 Repository association；版本化 owner API 应提供当前授权判断及关联读写。API 形状、授权事实字段/版本、缓存与撤权重验契约尚未实现或冻结；调用方不得以 UI 权限快照代替 owner 当前授权事实。
+- 部署拓扑已确认：Vercel 版使用 Neon 数据库；K3s 版使用 Multipass VM 内数据库。该决定不表示两种部署共享或复制同一份数据，也不指定数据库/版本、VM 归属与数量、迁移账号、备份/故障切换、连接池或数据同步；这些均为 OPEN。
+- 有活动 Run/Worktree 引用时，必须先迁移并验证全部引用，再允许解绑。迁移失败、超时、授权撤销、目标绑定未验证、证据缺失或引用清点不完整时，源 association 与既有 Run/Worktree binding 保持有效且不被改写，unlink 必须 fail closed。迁移 fence 活跃期间不接纳新的源引用，直至迁移和核验恢复成功；fence 状态与精确的新绑定策略须在实现前冻结。
+- 迁移目标策略、活动引用清点的权威来源、迁移期间新绑定处理、各 owner 内 binding/audit/Outbox 的事务归组及原子持久边界、跨 owner 协调/提交顺序仍为 OPEN，不由当前源码推定。解绑完成门仍要求验证全部目标 Run/Worktree binding、具备持久 audit/Outbox evidence、从所有权威引用源完成 revision-aware reconciliation 并证明源关联活动引用为零，然后通过 concurrency-safe revision check 才能 unlink。
+- 文本任何语义重叠均形成持久冲突，即使 OT 能机械变换；两侧草稿在 owner conflict transaction 中 seal/pin，并由同一 conflict_id 通知参与者。OT 只在用户显式进入解决流程后提供无副作用预览；用户选择且 owner 当前 revision CAS 成功才写 canonical revision。
 
 ### WBS 工作包与完成门
 
 | 工作包 | 优先级 | 产物 | 依赖 | 完成门/当前状态 |
 |---|---|---|---|---|
-| WLD1-R0a Project 身份与授权 authority 决策/建立 | P0 | 识别并建立持久 Project identity 与成员授权的 canonical writer，明确版本化读写/授权契约及迁移边界；不得预设 Star 或宿主 authority | WLD1-R0 bounded source audit 已完成 | OPEN；本轮没有决定 authority，现有 `ProjectRepository` 仍为内存实现，仓库内没有可证的持久 Project identity / 授权 writer；未实现 |
-| WLD1-R0b ProjectRepository 关联基础 | P0 | 在 R0a owner 确定后写入 0..N Repository links、optional default preference、CAS/version、retiring fence、idempotent operation、owner-local atomic audit + Outbox 与 durable receipt；不跨 owner 直接写 | WLD1-R0a；SCM Repository master identity/authorization contract | 设计决策已确认，implementation OPEN；schema/API/代码未实现，PostgreSQL/RLS、授权、重放、审计/Outbox 原子性及 CAS 均未验证 |
-| WLD1-R1 Run/Worktree 引用迁移 | P0 | 每个 active Run/Worktree 引用迁至同 Project 的 active destination link 或显式退役；验证并持久化目标 Run binding，Host 验证 checkout Repository identity/trusted root；各 owner 在本地事务中原子记录状态、audit、Outbox 并提供 durable receipt | WLD1-R0b；可信 Host root/provider | 未实现/未验证；目标 link、目标授权、目标 binding 任一未证则不签发成功回执，失败与未知维持 retiring |
-| WLD1-R2 最终解绑与运行验收 | P0 | 对新引用 fence 与并发 race、重放、owner outage、权限撤销、owner-local audit/Outbox、durable receipts、零活动引用 reconciliation 和 expected-revision final unlink 执行 API/DB/RLS/fault tests | WLD1-R1 | 未实现/未运行；只有全部 owner 新鲜回执、已验证目标 binding、串行化零引用证明与最终 revision CAS 全部通过才允许解绑，历史身份保持不变 |
+| WLD1-R0a Project identity 与成员授权 owner API/持久化 | P0 | 由已选定的 Star 原生 Project owner 持久化 Project identity 与成员授权事实，并通过版本化 owner API 提供当前授权判断；落实 Vercel→Neon、K3s→Multipass VM 内数据库接线 | WLD1-R0 bounded source audit 已完成；用户已确认 owner 与部署拓扑 | authority 选择已确认；durable writer、owner API、数据库接线及 PostgreSQL/RLS/授权运行验证未实现/未完成 |
+| WLD1-R0b ProjectRepository 关联基础 | P0 | 同一 Star 原生 Project owner 持久化 0..N Repository links 与可选 default preference、revisioned mutation contract；具体关联状态与事务边界待设计确认 | WLD1-R0a；SCM Repository identity 与授权契约 | owner 已选；schema/API/代码未实现，PostgreSQL/RLS、授权与 revision behavior 未验证 |
+| WLD1-R1 Run/Worktree 引用迁移 | P0 | 迁移并逐项验证活动 Run/Worktree 引用及目标 binding；先确定迁移目标、权威引用源、迁移期间新绑定规则、每 owner 事务/evidence 边界及跨 owner 协调顺序 | WLD1-R0b；权威 Run/Worktree 引用源与目标验证契约（待确定） | 未实现/未验收；迁移失败时源 association 与旧 binding 保持有效且不得 unlink；细节仍 OPEN |
+| WLD1-R2 最终解绑与运行验收 | P0 | 完整 revision-aware Run/Worktree 引用 reconciliation；核对所有目标 binding 和持久 audit/Outbox evidence；通过 concurrency-safe revision check 后 unlink，并覆盖并发、失败/重试及恢复 | WLD1-R1；R1 目标策略与事务/evidence 契约决策 | 未实现/未运行；证据不全、版本冲突或任一迁移失败时拒绝 unlink，旧关联和引用继续有效 |
 | WLD7-C1 重叠检测与显式解决 | P1 | overlap_detector_version、冲突对与参与者通知；OT suggestion metadata 与用户选择/CAS 记录 | WLD-2 canonical owner APIs 与 WLD-6 durable Outbox/Inbox/fan-out | 设计已对齐；实现/DB/runtime OPEN，E2E-COLLAB-10/11、OT side-effect 与 stale-CAS 验收未运行 |
 | WLD7-C2 低资源跨实例推送闭环 | P1 | 双 owner、双 gateway、断线/restart/cursor recovery、bounded queue/RSS/CPU/PT-09 实证 | WLD7-C1；固定 Collaboration Profile 与目标环境 | 仍 OPEN/NOT_RUN；不能以本地 broadcast、轮询或 UI fixture 关闭 |
 
 ### 后续执行顺序
 
-1. WLD1-R0 源审计已完成并归档；R0a 的 Project identity/authorization authority 仍 OPEN，实施前必须从权威证据确定，禁止凭本轮 0..N 决策推定 owner 或新建身份/授权表。
-2. authority 与 owner 确认后完成 R0b：Project owner 维护 ProjectRepository 0..N 关联与可选 default preference；SCM owner 只维护 Repository identity；Permission owner 负责成员/授权事实。
-3. 分开实现 Project retiring fence、Run Directory binding migration、Worktree/Host checkout migration；逐条迁移前验证同 Project active destination，迁移后核对实际持久 binding 与 checkout identity/root；每个 owner 将状态、audit、Outbox 原子提交并提供 durable idempotent receipt，不做跨 owner 写。
-4. 在 disposable PostgreSQL 验证 0..N、owner-local audit/Outbox 原子性、目标绑定证据、迁移竞态、重放、拒绝新增引用、故障时保持 retiring、零引用 reconciliation 与 expected-revision CAS unlink，再考虑开放 Worktree mutation。
-5. 按新的 overlap 规则实现 WLD-7 owner detector、draft seal/pin、participant unread、OT preview-only resolve，并跑 E2E-COLLAB-10/11 与双 gateway/PG/RSS/PT-09。
-6. 重新审阅 requirements/basic/DD/SRS/BD/spec/data/test/traceability/WBS 与实际实现；每道 owner、数据库、运行时和性能门分别给证据，未通过前保持 fail closed。
+1. WLD1-R0 源审计已完成；Project owner 选择已确认。由 Star 原生 Project owner 建立 durable identity/member-auth writer 与版本化 owner API；不再把 authority 选择列为待决，当前实现仍未交付。
+2. 在 R1 实施前冻结迁移目标策略、权威 Run/Worktree 引用清点源、迁移期间新绑定处理、每 owner binding/audit/Outbox 事务和持久 evidence 边界，以及跨 owner 协调/提交顺序；本 WBS 不代选这些实现细节。
+3. 由同一 Star 原生 Project owner 完成 R0a/R0b：持久化 Project identity、成员授权事实与 0..N Repository association；SCM owner 仍只负责 Repository identity。部署分别接入 Vercel→Neon 与 K3s→Multipass VM 内数据库，不推定跨部署共享或复制数据。
+4. 实现迁移时逐项核验目标 binding；任一失败路径都保留源 association 和既有 Run/Worktree binding，不允许 unlink。只有所有活动引用完成迁移、目标 binding 与持久 evidence 验证通过、完整 revision-aware reconciliation 证明源引用为零后，才进行 concurrency-safe revision check 和 unlink。
+5. 按最终 owner/事务契约在目标 PostgreSQL 部署中验证 0..N、目标绑定、审计/Outbox evidence、引用清点完整性、并发新绑定、失败恢复、零引用证明与 revision-check unlink，再考虑开放 Worktree mutation。
+6. 按新的 overlap 规则实现 WLD-7 owner detector、draft seal/pin、participant unread、OT preview-only resolve，并跑 E2E-COLLAB-10/11 与双 gateway/PG/RSS/PT-09。
+7. 重新审阅 requirements/basic/DD/SRS/BD/spec/data/test/traceability/WBS 与实际实现；每道 owner、数据库、运行时和性能门分别给证据，未通过前保持 fail closed。
 
 WLD-1、WLD-7 与总体交付仍 OPEN；本节不宣称实现或验收完成。
 
@@ -421,3 +425,15 @@ Rust 1.99 fmt/check/PG harness no-run 已通过；默认 PG 集成目标仍 `1 i
 4. 后续每次 lane 集成前重新核对 main/dev、HEAD、目标 checkout owner/cleanliness、reviewed SHA 与验证证据；本轮不 push。
 
 WLD1、W8、WLD-7、VCD-0 及总体交付仍 OPEN；本检查点只记录已完成的 docs lane 集成和本地证据，不宣称产品闭环完成。
+
+## 15. 桌面性能与多人协作审计集成（2026-10-26）
+
+本阶段只集成静态审计报告并更新设计/WBS；没有运行代码测试、编译、桌面程序、PostgreSQL、gateway 或 benchmark。
+
+| 审计 | 已集成内容 | 未关闭的门 |
+|---|---|---|
+| W14 桌面内存与并行 | `docs/reviews/WBS-W14-DESKTOP-PERFORMANCE-AUDIT-20261025.md`，lane commit `c8ea6a1c` 已快进到本地 dev | 真实 provider、UI 虚拟化、Rust 桌面路径接线、资源预算、目标设备 RSS/CPU/p95 与 benchmark 均 OPEN/NOT_RUN |
+| W16 多用户低消耗协作 | `docs/reviews/WBS-W16-COLLABORATION-RUNTIME-AUDIT-20261025.md`，rebase 后 commit `0838da92` 已快进到本地 dev | durable relay/fan-out、冲突双草稿、撤权、RLS、断线恢复、跨实例和 PT-09 仍 OPEN/NOT_RUN |
+| WLD1 Project/Repository owner | `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md` 与本节同步原生 Project owner 及 Neon/Multipass 部署选择 | 仅为文档与源审计；owner API、持久化、部署接线、数据库/RLS 和迁移运行证据均未实现/验证 |
+
+以上报告是差距证据，不代表性能、协作或 ProjectRepository 产品闭环已经通过。
