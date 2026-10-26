@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.53；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 的 SRS/BD/DD/TD v0.2 设计基线已建立，仍为 Draft；owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计与 WLD1 设计文档。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.54；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 的 SRS/BD/DD/TD v0.2 设计基线已建立，仍为 Draft；owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计、WLD1 设计文档与 W14 桌面 UI 分阶段规划；Rust UI 尚未选型，性能验收仍 OPEN/NOT_RUN。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -60,7 +60,7 @@ Project
 | W11 | P1 | **Multipass/K3s Infrastructure Manager**：trusted resolver/profile、跨租户物理 Host/cluster ledger、独立 reservations、delivery consumers、VM provider、K3s readiness、workspace bridge | W2、W4、W8 | 只读观察、容量原语和部分 schema/owner slices 已有；生产 manager/provider 未验收 | 只由 Rust Manager 调 Multipass；测试 inventory 总数不超过 2 且不自动 purge；Run 固定 cluster ID+generation；Host 与 cluster 双预约可对账；sandbox/权限/资源限制满足后才启动 agent |
 | W12 | P1 | **Agent 扩展能力、插件热插拔与 Workflow/LangGraph**：Rust-native 小核心和可替换的 Memory/Skill/Context/Validation/Loop provider contracts、profile/version/digest 固定、一期受控 Rust CLI adapter、capability broker、隔离 worker、事件生命周期、可分支 history、上下文压缩、插件安装/升级/卸载/drain、图版本与 checkpoint | W4、W5、W8 | 设计有方向；生产 provider composition、权限与证据链尚未验收 | 每个 Run 固定兼容的能力 profile/version/digest 与资源预算；上下文来源/裁剪、skill 版本、Memory 读写、事件生命周期/分支历史/压缩、独立 Validation evidence、Loop stop reason 可审计；压缩不破坏审计/验证证据；provider 替换不变更授权/owner 契约；插件不能加载进主进程；热卸载先停止新准入再 drain；LangGraph resume 重新授权并复验 Hook、profile、budget；全链路可重放 |
 | W13 | P2 | **跨 App 导航与交互**：Inbox、Task、Canvas、Workflow、BI/Benchmark、Plugins 同级 tabs；CLI 只从卡内启动；深链、错误态、无焦点/未绑定态统一 | W2、W3、W5、W6、W10、W12、W16 | Task/BI 部分 UI；其余 Run Apps 与真实数据链路不完整 | 同 Run 切换 Worktree 不改变 App owner；跨 Run/Project/tenant 引用拒绝；直接深链重新授权；UI 无虚假连接器、mock 事实或过期 scope 闪现；跨 App 内容更新由授权资源事件触发 |
-| W14 | P2 | **Rust 桌面内存/并行验收**：缓存、虚拟化、日志、IPC、Tokio 队列、公平调度、背压、取消/drain、RSS 与 p95 benchmark | W3、W7、W11、W13、W16 | 局部有界实现；整体基准/阈值缺失 | 设备、fixture、并发 workload、采样方法可复现；并发档位由版本化 Profile 与目标 workload 确定，1/2/4/8/16 仅是资源允许时的候选扫描序列，不构成产品容量承诺或 PT-09 基线；覆盖实时推送、draft cache、慢消费者恢复；按实测结果冻结预算 |
+| W14 | P2 | **Rust 桌面内存/并行验收**：缓存、虚拟化、日志、IPC、Tokio 队列、公平调度、背压、取消/drain、RSS 与 p95 benchmark | W3、W7、W11、W13、W16 | 已完成静态源码审计与方向研究；Tauri+React 保留为可测基线，egui/eframe 与 Slint 进入同数据原型比较；未决定迁移，未运行性能验收 | 完成 UI-0 信息架构、UI-1 操作流程原型、UI-2 当前路径实测基线、UI-3 同数据 Rust-native 原型对比、UI-4 迁移或维持决策；设备、fixture、并发 workload、采样方法可复现；并发档位由版本化 Profile 与目标 workload 确定，1/2/4/8/16 仅是资源允许时的候选扫描序列，不构成产品容量承诺或 PT-09 基线；覆盖实时推送、draft cache、慢消费者恢复；按目标 Windows 实测冻结预算 |
 | W15 | P3 | **商业发布与系统验收**：Windows 桌面打包、目标 DB 部署、身份/RLS、升级/回滚、故障恢复、SBOM/NOTICE、support diagnostics、跨 App E2E | W2–W14、W16 | 未启动完整验收 | 一条可重复商业使用链覆盖创建 Project/Run→绑定 Worktree→分配 Agent→卡内 CLI→验证→合并/安全清理→BI 证据；部署、升级、备份恢复、权限和性能全部有可追溯证据 |
 | W16 | P1 | **低消耗实时协作、草稿与冲突闭环**：资源 scoped push、owner revision/CAS、双方草稿、冲突可读/显式解决、跨实例 Outbox fan-out、cursor recovery、离线 conflict inbox | W2、W4、W6、W8 | 当前浏览器 Group 投影会周期调用 `CanvasOutboxPoller.pollOnce`；BFF WebSocket 仅进程内 broadcast、Worktree SSE 是 placeholder；Canvas 有 CAS/cursor 读取但无 durable draft/conflict、跨实例 fan-out 或双边提醒验收 | 客户端常态无固定轮询，Outbox 正常发布由 owner commit wake-up 驱动；冲突按 base revision + 重叠范围判定（1 秒不是轮询/冲突窗口）；同字段冲突保留双方精确 draft revision 并向双方推送同一 `conflict_id` 的持久未读提醒，从冲突 commit 到双方显示提醒并可读首个有界 base/current/mine/theirs 差异页的 p99 ≤1s；用户查看前提醒不清除，各自草稿可恢复；离线/gap 可恢复。每窗口单 multiplexed connection；订阅数及发送队列限额由版本化 Collaboration Profile 固定（100 subscriptions、64 events/128 KiB 仅候选初始值，须目标环境测量）；patch/frame ≤16 KiB 是协议上限。resource fence 竞态测试、RLS/retention、背压、RSS/CPU 与跨实例恢复验收通过 |
 
@@ -260,6 +260,7 @@ flowchart TD
 | v0.50 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 W8 的真实 PostgreSQL 证据：一次性 PostgreSQL 18.6 依赖 migration 链成功；首次 receiver integration 失败，SQLx SELECT 漏选 `source_sequence`。登记该源文件扩展 MAGOS manifest 的冲突指纹与下一步用户端解除条件；W8 保持 OPEN，未集成。 | W8 disposable PostgreSQL integration attempt and manifest conflict |
 | v0.52 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确活动 Run/Worktree 引用只迁至同一 Project 内已授权的 active Repository association，或由 Project owner 显式退役不再需要 checkout 的引用；同步 AGENTS、WLD1 审计报告，迁移目标选择、权威引用清点及事务/evidence 边界仍 OPEN。 | 用户确认 Project owner/部署拓扑后，按仓库架构约束修正文档范围并消除跨文档矛盾 |
 | v0.53 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 WLD1 SRS/BD/DD/TD v0.2 设计基线：由 Star 原生 Project owner 维护 Project 身份、成员授权与 0..N Repository association；将 default repository preference 与授权分离；明确 retiring fence、同 Project 迁移或显式退役、Neon/Multipass VM 数据库 profile。所有实现、目标 PostgreSQL/RLS、部署接线和测试仍 OPEN/NOT_RUN；不关闭 VCD-0。 | 落实用户确认的 owner、部署拓扑和解绑规则，并将已完成设计稿反映到 WBS |
+| v0.54 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 集成 W14 桌面 UI 方向研究：保留现有 Tauri+React 作为测量基线，先完成信息架构与流程规划，再在相同数据契约下比较 egui/eframe 与 Slint；未作框架迁移决定。真实 provider、虚拟化、可访问性、取消/背压、目标设备资源指标与 benchmark 均保持 OPEN/NOT_RUN。 | 完成 W14 lane 研究并将分阶段 UI 规划写入 dev WBS，避免将候选框架或源码审计误标为已验收 |
 
 ## 8. Current execution state (2026-10-23)
 
@@ -429,11 +430,11 @@ WLD1、W8、WLD-7、VCD-0 及总体交付仍 OPEN；本检查点只记录已完�
 
 ## 15. 桌面性能与多人协作审计集成（2026-10-26）
 
-本阶段只集成静态审计报告并更新设计/WBS；没有运行代码测试、编译、桌面程序、PostgreSQL、gateway 或 benchmark。
+本阶段集成 W14/W16 静态审计与 W14 桌面 UI 方向研究并更新 WBS；没有运行代码测试、编译、桌面程序、PostgreSQL、gateway 或 benchmark。
 
-| 审计 | 已集成内容 | 未关闭的门 |
+| 审计/规划 | 已集成内容 | 未关闭的门 |
 |---|---|---|
-| W14 桌面内存与并行 | `docs/reviews/WBS-W14-DESKTOP-PERFORMANCE-AUDIT-20261025.md`，lane commit `c8ea6a1c` 已快进到本地 dev | 真实 provider、UI 虚拟化、Rust 桌面路径接线、资源预算、目标设备 RSS/CPU/p95 与 benchmark 均 OPEN/NOT_RUN |
+| W14 桌面内存与并行 | `docs/reviews/WBS-W14-DESKTOP-PERFORMANCE-AUDIT-20261025.md` 与 `docs/reviews/WBS-W14-RUST-DESKTOP-UI-OPTIONS-20261026.md`；方向研究 lane `f80779be` 已快进到本地 dev。建议保留 Tauri+React 为基线、先优化当前路径，再以相同数据比较 egui/eframe 与 Slint；没有作框架迁移决定 | 真实 provider、UI 虚拟化、Rust 桌面路径接线、资源预算、目标设备 RSS/CPU/p95、可访问性、取消/drain 与 benchmark 仍 OPEN/NOT_RUN；UI-0–UI-4 为后续阶段，不代表已验收 |
 | W16 多用户低消耗协作 | `docs/reviews/WBS-W16-COLLABORATION-RUNTIME-AUDIT-20261025.md`，rebase 后 commit `0838da92` 已快进到本地 dev | durable relay/fan-out、冲突双草稿、撤权、RLS、断线恢复、跨实例和 PT-09 仍 OPEN/NOT_RUN |
 | WLD1 Project/Repository owner | `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`；`docs/requirements/SRS-WLD1-REPOSITORY-BOUNDARY-001.md`、`docs/basic-design/BD-WLD1-REPOSITORY-BOUNDARY-001.md`、`docs/detailed-design/DD-WLD1-REPOSITORY-BOUNDARY-001.md`、`docs/test-design/TD-WLD1-REPOSITORY-BOUNDARY-001.md` v0.2 | 设计基线已建立但仍为 Draft；durable owner/API、数据库迁移、RLS/grants、Neon 与 Multipass VM 接线、解绑运行验收均未实现/验证。R1 目标选择、引用权威源及 owner-local evidence/事务边界仍 OPEN |
 
