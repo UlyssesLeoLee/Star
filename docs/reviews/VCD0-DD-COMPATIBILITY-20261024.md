@@ -150,8 +150,28 @@ This lane performed an independent document review only; it did not dispatch sub
 | SRE / Platform | Runtime, account, deployment, database and performance evidence **NOT_RUN**. |
 | Review chair / PM | This review provides findings and acceptance conditions; it does not approve the Vercel design set or close WBS gates. |
 
+## R4 Candidate detailed-design branch comparison — 2026-10-26
+
+### Scope and baseline
+
+Compared only the detailed-design tree at dev commit 8f0f692b4cc31f53fdbfe7f927f496cb754c2e3b with candidate tree 4f0ceae9818b7bd2b3b25d9164d6e43303121689 on codex/vcd0-canonical-detail-test-20261024 and candidate tree 4e559dcd131e3d292050b664d1bf086c71e1c014 on codex/vcd0-td049-remediate. The compared file is docs/detailed-design/vercel/DD-STAR-VERCEL-DEPLOY-001.md. The 4e559dcd commit itself changes only docs/test-design/vercel/TD-STAR-VERCEL-DEPLOY-001.md; the DD observations below describe that commit's tree, not files changed by the commit. The current dev DD is v0.3 and remains Draft, unapproved, unimplemented, and undeployed (lines 3–6).
+
+### Findings
+
+| Candidate | Detailed-design comparison | Disposition |
+|---|---|---|
+| 4f0ceae9818b7bd2b3b25d9164d6e43303121689 | The candidate tree regresses the DD header from v0.3 to v0.1. Its T-049 paragraph omits noVNC from the five-channel scope and interprets chat SSE as a Gateway connection, while current dev includes noVNC and says the final approved route may be the Next Route Handler permitted by SRS FR-VC-013 (dev DD §§2.3, lines 62–66). It also weakens the current route and unavailable gates in §7 (lines 168–177), shortens the related open-gate inventory (lines 312–317), and drops the v0.3 revision row (lines 323–325). | No leading DD content. Keep current dev v0.3; do not selectively carry forward the candidate edits. |
+| 4e559dcd131e3d292050b664d1bf086c71e1c014 | The candidate tree's DD is also v0.1. Relative to dev it omits §2.3 and its explicit five-channel, Gateway/session, Origin, authorization/revocation, and route gates (dev DD lines 62–66); replaces the detailed FR-VC-009..012 Star Owner/Provider/RLS/migration responsibility matrix and fail-closed gate with generic bullets (§5.2, lines 130–143); removes the §7 Gateway and chat-route gates (lines 168–177); removes T-049 links from requirement traceability (lines 244–253); and drops the corresponding owner/Gateway open gates and v0.2/v0.3 history (lines 312–325). The candidate retains broad principles such as Star Owner ownership and bounded connections, but dev already states them with more specific responsibility and fail-closed conditions. | No leading DD content. Do not carry forward DD text from this candidate tree. Its commit-level TD change is outside this DD comparison and is not assessed here. |
+
+### Cross-check and decision
+
+Current dev keeps the required Project → Engineering Run → Worktree → Branch semantics and does not treat a Vercel deployment as Run or Branch truth (DD §7, line 166). WBS §13 assigns Project identity and repository associations to the Star-native Project Owner and records Vercel/Neon versus K3s/Multipass-VM topology while explicitly leaving database and runtime wiring unverified (docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md, lines 374–382). WBS §18 confirms VCD-0 remains OPEN with channel scope, Star Owner/database mapping, chat SSE/Gateway contract, and traceability still unresolved; tests, account, database, deployment, and runtime evidence remain NOT_RUN (lines 502–505). WBS §20 is a separate W8/W14 checkpoint and states that its snapshot does not represent target deployment acceptance (lines 522–524); it supplies no evidence to close VCD-0.
+
+**Branch-comparison verdict:** current dev supersedes both candidate DD trees. No DD content merits selective carry-forward. This comparison does not approve the design set or close any cross-document finding. VCD-0 remains OPEN; T-049, Preview/deployment, account, database, runtime, and test evidence remain NOT_RUN. No tests, deployments, account checks, or database operations were performed.
+
 ## §7 Revision history
 
 | Version | Date | Reviewer | Change |
 |---|---|---|---|
 | v0.2 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Re-reviewed current dev VCD-0 design set; distinguished resolved documentation gaps from still-open route, Owner/database, Gateway contract, and channel-scope findings; runtime/tests remain NOT_RUN. |
+| v0.3 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Compared both candidate DD trees to dev@8f0f692b; confirmed dev v0.3 supersedes them and no DD content merits carry-forward. VCD-0 remains OPEN; execution evidence remains NOT_RUN. |
