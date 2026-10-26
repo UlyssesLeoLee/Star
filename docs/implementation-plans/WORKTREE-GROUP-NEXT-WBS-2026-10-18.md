@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.56；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 的 SRS/BD/DD/TD v0.2 设计基线已建立，仍为 Draft；owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计与 WLD1 设计文档；§16–§17 记录 W14 UI-0 信息架构和 UI-1 流程原型文档/静态复核已集成到本地 `dev`，源 commit `265edcd9`；UI-1 独立人员复核待补，UI-2 目标设备基线与 UI-3–UI-4 比较/决策仍 OPEN/NOT_RUN。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.57。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）。W14、VCD-0 与 WLD-7 均未关闭。
 
 ## 0. 目的与计划边界
 
@@ -60,7 +60,7 @@ Project
 | W11 | P1 | **Multipass/K3s Infrastructure Manager**：trusted resolver/profile、跨租户物理 Host/cluster ledger、独立 reservations、delivery consumers、VM provider、K3s readiness、workspace bridge | W2、W4、W8 | 只读观察、容量原语和部分 schema/owner slices 已有；生产 manager/provider 未验收 | 只由 Rust Manager 调 Multipass；测试 inventory 总数不超过 2 且不自动 purge；Run 固定 cluster ID+generation；Host 与 cluster 双预约可对账；sandbox/权限/资源限制满足后才启动 agent |
 | W12 | P1 | **Agent 扩展能力、插件热插拔与 Workflow/LangGraph**：Rust-native 小核心和可替换的 Memory/Skill/Context/Validation/Loop provider contracts、profile/version/digest 固定、一期受控 Rust CLI adapter、capability broker、隔离 worker、事件生命周期、可分支 history、上下文压缩、插件安装/升级/卸载/drain、图版本与 checkpoint | W4、W5、W8 | 设计有方向；生产 provider composition、权限与证据链尚未验收 | 每个 Run 固定兼容的能力 profile/version/digest 与资源预算；上下文来源/裁剪、skill 版本、Memory 读写、事件生命周期/分支历史/压缩、独立 Validation evidence、Loop stop reason 可审计；压缩不破坏审计/验证证据；provider 替换不变更授权/owner 契约；插件不能加载进主进程；热卸载先停止新准入再 drain；LangGraph resume 重新授权并复验 Hook、profile、budget；全链路可重放 |
 | W13 | P2 | **跨 App 导航与交互**：Inbox、Task、Canvas、Workflow、BI/Benchmark、Plugins 同级 tabs；CLI 只从卡内启动；深链、错误态、无焦点/未绑定态统一 | W2、W3、W5、W6、W10、W12、W16 | Task/BI 部分 UI；其余 Run Apps 与真实数据链路不完整 | 同 Run 切换 Worktree 不改变 App owner；跨 Run/Project/tenant 引用拒绝；直接深链重新授权；UI 无虚假连接器、mock 事实或过期 scope 闪现；跨 App 内容更新由授权资源事件触发 |
-| W14 | P2 | **Rust 桌面内存/并行验收**：缓存、虚拟化、日志、IPC、Tokio 队列、公平调度、背压、取消/drain、RSS 与 p95 benchmark | W3、W7、W11、W13、W16 | UI-0 已集成；UI-1 静态流程原型已完成，仍待独立人员复核；没有产品代码或运行/性能验收。Tauri+React 保留为可测基线，egui/eframe 与 Slint 仍是待比较候选；未决定迁移 | 下一步 UI-2 冻结设备、fixture、目标 workload、RSS/CPU/响应指标和采样方法并实测当前路径；之后 UI-3 同数据 Rust-native 对比、UI-4 迁移或维持决策。并发档位由版本化 Profile 与目标 workload 确定，1/2/4/8/16 仅为资源允许时的候选扫描序列，不构成产品容量承诺或 PT-09 基线；覆盖实时推送、draft cache、慢消费者恢复；按目标 Windows 实测冻结预算 |
+| W14 | P2 | Rust 桌面内存/并行验收：缓存、虚拟化、日志、IPC、Tokio 队列、公平调度、背压、取消/drain、RSS 与 p95 benchmark | W3、W7、W11、W13、W16 | UI-0/UI-1 文档与静态原型已集成；UI-2 设备/数据/workload/采样协议审查已完成，但设备、真实 provider、数据 manifest、并发档位和预算仍未冻结。当前 Tauri+React 是待测基线；egui/eframe 与 Slint 仍为对比候选 | 下一步由产品/工程 owner 确认目标 Windows 设备、真实授权 workload、build、profile 与预算责任人；先对当前产品路径执行 pilot 并保存原始进程/资源/交互证据，再完成 UI-2 可复现测量。UI-3 才能用同一 manifest 比较 Rust-native，UI-4 再按证据决定迁移或维持。候选 Agent 档位不构成容量承诺；W14 继续 OPEN，测量前不宣称低内存或并行容量达标 |
 | W15 | P3 | **商业发布与系统验收**：Windows 桌面打包、目标 DB 部署、身份/RLS、升级/回滚、故障恢复、SBOM/NOTICE、support diagnostics、跨 App E2E | W2–W14、W16 | 未启动完整验收 | 一条可重复商业使用链覆盖创建 Project/Run→绑定 Worktree→分配 Agent→卡内 CLI→验证→合并/安全清理→BI 证据；部署、升级、备份恢复、权限和性能全部有可追溯证据 |
 | W16 | P1 | **低消耗实时协作、草稿与冲突闭环**：资源 scoped push、owner revision/CAS、双方草稿、冲突可读/显式解决、跨实例 Outbox fan-out、cursor recovery、离线 conflict inbox | W2、W4、W6、W8 | 当前浏览器 Group 投影会周期调用 `CanvasOutboxPoller.pollOnce`；BFF WebSocket 仅进程内 broadcast、Worktree SSE 是 placeholder；Canvas 有 CAS/cursor 读取但无 durable draft/conflict、跨实例 fan-out 或双边提醒验收 | 客户端常态无固定轮询，Outbox 正常发布由 owner commit wake-up 驱动；冲突按 base revision + 重叠范围判定（1 秒不是轮询/冲突窗口）；同字段冲突保留双方精确 draft revision 并向双方推送同一 `conflict_id` 的持久未读提醒，从冲突 commit 到双方显示提醒并可读首个有界 base/current/mine/theirs 差异页的 p99 ≤1s；用户查看前提醒不清除，各自草稿可恢复；离线/gap 可恢复。每窗口单 multiplexed connection；订阅数及发送队列限额由版本化 Collaboration Profile 固定（100 subscriptions、64 events/128 KiB 仅候选初始值，须目标环境测量）；patch/frame ≤16 KiB 是协议上限。resource fence 竞态测试、RLS/retention、背压、RSS/CPU 与跨实例恢复验收通过 |
 
@@ -263,10 +263,11 @@ flowchart TD
 | v0.54 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 集成 W14 桌面 UI 方向研究：保留现有 Tauri+React 作为测量基线，先完成信息架构与流程规划，再在相同数据契约下比较 egui/eframe 与 Slint；未作框架迁移决定。真实 provider、虚拟化、可访问性、取消/背压、目标设备资源指标与 benchmark 均保持 OPEN/NOT_RUN。 | 完成 W14 lane 研究并将分阶段 UI 规划写入 dev WBS，避免将候选框架或源码审计误标为已验收 |
 | v0.55 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W14 UI-0 导航信息架构审查 `1a8bbb5a` 已快进集成；冻结 Project→Engineering Run→Worktree→Branch、Project Worktree Index、Worktree 焦点后显示同级 Run Apps、Task Card 内 CLI 与 WORKTREE/GLOBAL 聊天 scope。实施仅是两份文档，无代码/运行/性能验证；将 UI-1 可点击流程原型列为下一步，W14 仍 OPEN。同步本地 main/dev 对比：dev 比 main 多 133 个提交，main 多 5 个提交且均为 patch-equivalent；未 fetch/push。 | W14 UI-0 lane review 通过并合入 dev；按已确认设计方向更新 WBS，明确规划完成不代表产品能力验收 |
 | v0.56 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 W14 UI-1 可点击静态原型和审查报告；比较 A/B/C 三种布局并保留冻结层级。复核修正撤权后旧 Branch 可见、跨 Worktree 草稿混用、重新选择绕过授权确认、切换 scope 后草稿未恢复及未授权 scope 状态读取问题；源 commit `265edcd9` 已快进到本地 `dev`，该 lane branch/worktree 已移除，其 ignored `.pyc` SHA-256 校验后保存在用户 Codex 归档目录。任务/Worktree 数据仅为演示数据，CLI 与未连接 App 禁用。浏览器、产品服务、同伴复核与性能测量未运行，W14 仍 OPEN。 | 按 UI-0 验收标准交付 UI-1 原型；复核明确标记自审，避免将未做的独立审查或运行验证记为通过 |
+| v0.57 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 合入 W0 VCD-0 分支收敛审计 f15a1d2f：六个来源分支无须再摘取设计文件，VCD-0 仍 OPEN；六个 Orca Worktree 仍为 in-progress 且 owner 未知，故保留，不清理 branch/worktree/claim。同步 W14 UI-2 协议审查报告：设备与 workload 未冻结，桌面实测 NOT_RUN，W14 仍 OPEN。未 fetch/push，未运行测试或桌面基准。 | W0 审计报告与 W14 UI-2 证据报告已集成到 dev，按事实更新 WBS，不把文档审查误标为功能/性能验收 |
 
-## 8. Current execution state (2026-10-23)
+## 8. Execution state snapshot (2026-10-23)
 
-This snapshot supersedes the older owner, RTK, local-ref and lane-status values above. Historical remote fetch results and earlier test reports retain their original dates and scopes.
+This is a historical 2026-10-23 snapshot. Later scoped W0 and W14 state is recorded in §§18–19; do not use this table to infer current branch or measurement status.
 
 | Area | Verified current state | Next gate |
 |---|---|---|
@@ -453,21 +454,21 @@ UI-0 文档 lane 已 rebase 到本地 dev 并以 fast-forward 集成：`1a8bbb5a
 
 本阶段只完成信息架构和文档审查：没有改动产品 UI/服务代码，也没有运行测试、编译、桌面启动、辅助技术、授权 E2E、PostgreSQL 或 RSS/CPU/延迟测量。UI-0 完成不关闭 W14。
 
-### UI-1 交付记录与下一阶段：UI-2 基线测量
+### UI-1 交付记录与 UI-2 后续门
 
 1. UI-1 已在§17交付本地静态原型；可切换 A/B/C、Project Worktree Index、Worktree 授权状态、同级 Apps、任务卡内 CLI 禁用态与双 scope 草稿。
 2. 静态复核发现并修正撤权后旧 Branch 显示、跨 Worktree 草稿混用、点击切换直接授权、scope 切换后草稿未恢复及未授权 scope 状态读取五项问题；详细证据见§17。
 3. UI-1 未启动浏览器、未产出流程截图，也未作辅助技术或窄屏运行验收；同伴复核仍待补。W14 不因此关闭。
-4. UI-2 冻结目标 Windows 设备、数据规模、并发 workload、采样方法、RSS/CPU/响应预算和空闲态要求，并实测当前 Tauri+React 路径；必须保留原始采样和复现说明。
+4. UI-2 的协议与证据清单审查已在§19记录；实际测量仍 NOT_RUN。先由产品/工程 owner 冻结目标设备、真实数据/workload、当前 build、采样配置和预算责任人，再运行 Tauri+React 产品路径的 pilot 与完整复现测量。
 5. UI-3 才能在相同数据/交互契约下比较 Rust-native 原型；UI-4 根据可访问性、许可、性能、取消/背压与完整工作流证据决策迁移或维持现路径。
 
 | 验收项 | 当前结果 |
 |---|---|
 | 导航与运行范围符合已确认方向 | UI-0 文档审查通过；UI-1 静态原型保留同一层级，并在没有有效 Worktree 授权时隐藏 Run Apps 与旧 Branch 值 |
 | 改动范围 | UI-0 两份文档；UI-1 原型、brief、复核报告与 WBS 状态更新；没有产品代码改动 |
-| 文档校验 | 已完成原型源码、文案与 WBS 对照复核；未执行产品测试或构建；独立复核待补 |
-| 桌面运行/性能 | NOT_RUN；无浏览器截图、设备基线、RSS、CPU、帧时间或并发容量结论 |
-| W14 状态 | OPEN；UI-1 原型交付，独立复核/运行体验待补；下一项 UI-2，随后 UI-3–UI-4 |
+| 文档校验 | UI-1 原型源码/文案复核完成；UI-2 协议与证据清单审查完成；产品构建/测试未运行，UI-1 独立人员复核仍待补 |
+| 桌面运行/性能 | NOT_RUN；仅记录一台未批准的设备候选，无实际 build/provider 运行、RSS、CPU、帧时间或并发容量结论 |
+| W14 状态 | OPEN；UI-2 文档协议审查完成，设备确认与实际测量未完成；下一项是冻结参数并测量，之后 UI-3–UI-4 |
 
 ## 17. W14 UI-1 流程原型（2026-10-26）
 
@@ -495,4 +496,24 @@ UI-0 文档 lane 已 rebase 到本地 dev 并以 fast-forward 集成：`1a8bbb5a
 | 产品 API、Worktree 权限、Task/Canvas 事实、受控 CLI | NOT_RUN/未接入；执行仍关闭 |
 | RSS、CPU、帧时间、缓存、并行负载 | NOT_RUN；交由 UI-2 冻结 workload 后测量 |
 
-UI-1 仅表示交互原型完成，W14 继续 OPEN。下一步 UI-2 先确定目标设备与基线方法并实测现有 Tauri+React；不得据静态原型选定生产框架。UI-3 做同数据 Rust-native 比较，UI-4 再作迁移或维持决策。
+UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议与未知项见§19；在目标设备、真实 workload/build、预算和采样 profile 获确认前不得将其标为实测完成，也不得据原型选定生产框架。随后 UI-3 才做同数据 Rust-native 比较，UI-4 再作迁移或维持决策。
+
+## 18. W0 VCD-0 分支收敛审计（2026-10-26）
+
+- 审计报告：docs/reviews/WBS-W0-VCD0-CONVERGENCE-AUDIT-20261026.md；提交 f15a1d2fc5f7e2953152445c2caf88a2fd8970e2 已从当前 dev@2fa28ecc 快进集成到 dev@f15a1d2f。本轮没有对六条来源分支 cherry-pick 或整体合并设计文件。
+- 审计结论：当前 dev 已包含较新的 canonical Vercel SRS/ADR/BD/DD/TD 内容；VCD-0 仍 OPEN，通道范围、Star Owner/数据库映射、chat SSE/Gateway 契约和追踪漂移仍需设计收敛。测试、账户、数据库、部署及运行时验证均 NOT_RUN。
+- Orca 对六个精确来源 Worktree 显示 in-progress 且未归档，终端 inventory 为空，但没有 owner 字段；空终端不能证明无活动聊天/agent。故保留六个 Worktree 与 branch，不删除或重置其 MAGOS claims。
+- 此审计没有刷新 main/dev 远端引用，也没有 push；2026-10-18/24 的 main 比较仅作为历史快照，不作为本轮远端证明。W0 的分支内容审计已完成，owner 确认与安全清理仍开放。
+
+## 19. W14 UI-2 目标设备基线协议审查（2026-10-26）
+
+- 审查报告：docs/reviews/WBS-W14-UI2-DEVICE-BASELINE-20261026.md，随 UI-2 文档 lane 集成到 dev@2fa28ecc。报告提供需求到证据矩阵、可复现测量协议、采集边界与缺失项；没有改动产品代码。
+- 候选设备仅用于复核：Dell Inspiron 3020、Intel Core i7-13700F、约 31.76 GiB RAM、Windows 11 build 26300。它不是获批目标设备；GPU/磁盘/显示/电源/WebView2/build/PID 树等字段仍 UNKNOWN。
+- 采样频率、阶段时长、重复次数等均是待评审的协议建议，不是产品预算、性能 SLA 或容量承诺。真实授权 provider、去标识数据 manifest、并发 workload、采集器、性能阈值与 profile owner 未冻结。
+
+| 门 | 状态 |
+|---|---|
+| UI-2 文档协议与证据清单审查 | 完成；报告明确 NOT_RUN 与所有未知字段 |
+| 目标设备/workload/profile/预算确认 | OPEN；需产品/工程 owner 决定 |
+| 当前 Tauri+React 产品路径的 pilot 与完整性能采样 | NOT_RUN；没有 build/provider/原始测量结果 |
+| W14 | OPEN；实际 UI-2 测量完成后再进入 UI-3 同数据对比与 UI-4 决策 |
