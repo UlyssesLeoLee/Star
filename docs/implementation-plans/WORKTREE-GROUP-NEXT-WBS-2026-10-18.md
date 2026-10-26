@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.52；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计集成。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
+> 状态：🟡 计划稿 v0.53；§13 记录 2026-10-26 用户确认：Star 原生 Project owner 是 Project 身份、成员授权持久事实与 Repository association 的 canonical owner；Vercel 使用 Neon，K3s 使用 Multipass VM 内数据库。WLD1 的 SRS/BD/DD/TD v0.2 设计基线已建立，仍为 Draft；owner API/持久化和数据库接线未实现/验证，迁移目标、引用清点 authority、新绑定规则及 owner 事务边界仍 OPEN；§14 保留 2026-10-25 的 W8 PostgreSQL 阻断与协作状态快照，§15 记录 W14/W16 静态审计与 WLD1 设计文档。W8 首次真实集成测试因 Inbox 查询漏选 `source_sequence` 失败；WLD-7 OPEN/NOT_RUN。
 
 ## 0. 目的与计划边界
 
@@ -259,6 +259,7 @@ flowchart TD
 | v0.49 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W8 `824c76d0` 的独立源码复审 `99d85cb5`：双向新 claim 屏障源码级通过；exact replay P2 是门禁范围文案与实际无新写回执路径不符，W8 报告以 `cd89b894` 修正；真实 PostgreSQL/RLS/并发/exact replay/ACK 仍未验证，W8 不可标 READY 或集成。用户再次确认 Project↔Repository 解除关系前须先迁移并验证活动引用；该规则已存在于项目 `AGENTS.md` 和 v0.47，不重复扩张。 | W8 independent source review completion and exact-replay contract reconciliation |
 | v0.50 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 W8 的真实 PostgreSQL 证据：一次性 PostgreSQL 18.6 依赖 migration 链成功；首次 receiver integration 失败，SQLx SELECT 漏选 `source_sequence`。登记该源文件扩展 MAGOS manifest 的冲突指纹与下一步用户端解除条件；W8 保持 OPEN，未集成。 | W8 disposable PostgreSQL integration attempt and manifest conflict |
 | v0.52 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确活动 Run/Worktree 引用只迁至同一 Project 内已授权的 active Repository association，或由 Project owner 显式退役不再需要 checkout 的引用；同步 AGENTS、WLD1 审计报告，迁移目标选择、权威引用清点及事务/evidence 边界仍 OPEN。 | 用户确认 Project owner/部署拓扑后，按仓库架构约束修正文档范围并消除跨文档矛盾 |
+| v0.53 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 WLD1 SRS/BD/DD/TD v0.2 设计基线：由 Star 原生 Project owner 维护 Project 身份、成员授权与 0..N Repository association；将 default repository preference 与授权分离；明确 retiring fence、同 Project 迁移或显式退役、Neon/Multipass VM 数据库 profile。所有实现、目标 PostgreSQL/RLS、部署接线和测试仍 OPEN/NOT_RUN；不关闭 VCD-0。 | 落实用户确认的 owner、部署拓扑和解绑规则，并将已完成设计稿反映到 WBS |
 
 ## 8. Current execution state (2026-10-23)
 
@@ -434,6 +435,6 @@ WLD1、W8、WLD-7、VCD-0 及总体交付仍 OPEN；本检查点只记录已完�
 |---|---|---|
 | W14 桌面内存与并行 | `docs/reviews/WBS-W14-DESKTOP-PERFORMANCE-AUDIT-20261025.md`，lane commit `c8ea6a1c` 已快进到本地 dev | 真实 provider、UI 虚拟化、Rust 桌面路径接线、资源预算、目标设备 RSS/CPU/p95 与 benchmark 均 OPEN/NOT_RUN |
 | W16 多用户低消耗协作 | `docs/reviews/WBS-W16-COLLABORATION-RUNTIME-AUDIT-20261025.md`，rebase 后 commit `0838da92` 已快进到本地 dev | durable relay/fan-out、冲突双草稿、撤权、RLS、断线恢复、跨实例和 PT-09 仍 OPEN/NOT_RUN |
-| WLD1 Project/Repository owner | `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md` 与本节同步原生 Project owner 及 Neon/Multipass 部署选择 | 仅为文档与源审计；owner API、持久化、部署接线、数据库/RLS 和迁移运行证据均未实现/验证 |
+| WLD1 Project/Repository owner | `docs/reviews/WBS-WLD1-R0-OWNER-AUDIT-20261025.md`；`docs/requirements/SRS-WLD1-REPOSITORY-BOUNDARY-001.md`、`docs/basic-design/BD-WLD1-REPOSITORY-BOUNDARY-001.md`、`docs/detailed-design/DD-WLD1-REPOSITORY-BOUNDARY-001.md`、`docs/test-design/TD-WLD1-REPOSITORY-BOUNDARY-001.md` v0.2 | 设计基线已建立但仍为 Draft；durable owner/API、数据库迁移、RLS/grants、Neon 与 Multipass VM 接线、解绑运行验收均未实现/验证。R1 目标选择、引用权威源及 owner-local evidence/事务边界仍 OPEN |
 
 以上报告是差距证据，不代表性能、协作或 ProjectRepository 产品闭环已经通过。
