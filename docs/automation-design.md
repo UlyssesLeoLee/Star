@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.67 (2026-10-24)
+> **文档版本**: v2.68 (2026-10-26)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3191,7 +3191,18 @@ This is catalog and role-switch evidence only. The legacy ledger stores no migra
 | Version | Date | Reviewer | Change | Trigger |
 |---|---|---|---|---|
 | v2.67 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add the pinned-identity, read-only WLD-0 target catalog probe and its bounded ledger/grant/RLS snapshot; explicitly keep replay classification, authenticated API writes, and production acceptance open | WLD-0 target database evidence remained uncollected |
+
 | v2.64 | 2026-10-21 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register two bounded WLD dispatch cards: hostless Schedule Rule authorization and supported App Router navigation protection for Hook drafts; implementation and runtime gates remain open | WBS next development round parallel dispatch |
 | v2.63 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record the completed 34/34 PostgreSQL owner-role run, injected privilege/membership drift, migration re-normalization, stable schema fingerprint and role-owned schema fail-closed fixture; preserve target DB/API/Rust gates | Final drift/replay verification and evidence synchronization |
 | v2.62 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Correct the self-review finding by granting and verifying the Run revision FOR SHARE lock column under restrictive RLS; record 6/6 focused tests and 28/28 disposable PostgreSQL steps, with target DB and authenticated API gates open | Run revision lock-grant gap found during final review |
 | v2.61 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Extend WLD-0 runner to include Task-source lock dependencies, NOLOGIN/NOBYPASSRLS Directory owner migration, effective non-superuser SET ROLE/RLS assertions, and owner-grant-aware fingerprints; record 6/6 tests and 28/28 disposable PostgreSQL steps while keeping target DB and authenticated API gates open | Runtime-role/RLS acceptance implementation and PostgreSQL verification |
+
+## 4.102 WBS-VCD0 Neon official platform-fact research (2026-10-26)
+
+**Automation tier: [P].** This is a bounded, manual, read-only source review; no custom automation runner is created. The report `docs/reports/WBS-VCD0-NEON-OFFICIAL-FACTS-20261026.md` records direct official URLs, supported Neon/Vercel platform facts, UNKNOWN target-account details, and the Star Project/Run, RLS-owner-context, owner-transaction/Outbox, Gateway/chat-SSE and deployment-acceptance boundaries.
+
+This research is preparation for later Vercel design synchronization only. It does not edit canonical Vercel SRS/ADR/BD/DD/TD or close GAP-04, GAP-06, VCD-0, WLD-7, or any acceptance gate. WLD-7 Canvas design synchronization remains the earlier WBS step. No account/database connection, cloud-resource creation, deployment, or tests are part of this task.
+
+| Version | Date | Reviewer | Change | Trigger |
+|---|---|---|---|---|
+| v2.68 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register the read-only Neon/Vercel official-fact report and preserve canonical design, Owner/RLS/Outbox, Gateway/SSE, deployment, and acceptance gates as open | WBS VCD-0 GAP-06 official platform facts required source verification |

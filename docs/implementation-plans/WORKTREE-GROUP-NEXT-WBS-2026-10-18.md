@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.60。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）；§20 更新 W8 SQLx 解码阻塞与 W14 设备候选快照；§21 记录 VCD-0 DD/TD 候选分支逐项对比；§22 汇总 main/dev 内容核对、WLD-7 Canvas 与 VCD-0 合同缺口审计及后续顺序。W8、W14、VCD-0 与 WLD-7 均未关闭。
+> 状态：🟡 计划稿 v0.61。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）；§20 更新 W8 SQLx 解码阻塞与 W14 设备候选快照；§21 记录 VCD-0 DD/TD 候选分支逐项对比；§22 汇总 main/dev 内容核对、WLD-7 Canvas 与 VCD-0 合同缺口审计及后续顺序。W8、W14、VCD-0 与 WLD-7 均未关闭。
 
 ## 0. 目的与计划边界
 
@@ -267,6 +267,7 @@ flowchart TD
 | v0.58 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 W8 PostgreSQL 解码失败后的当前修复状态与 MAGOS 文件冲突门；记录 W14 UI-2 本机设备候选快照。修复代码尚未通过编译或 PostgreSQL 回归，设备未批准且未做桌面性能测量；W8/W14 均保持 OPEN。 | 继续推进 WBS，并将最新实测/门禁状态与计划同步。 |
 | v0.59 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 集成 VCD-0 详细设计与测试设计候选分支的独立对比报告：当前 dev DD v0.3 与 TD v0.4 已包含或超越候选内容，无需 cherry-pick；VCD-0 继续 OPEN，T-049、部署、账号、数据库及运行时验证均 NOT_RUN。记录两条审查 lane rebase 与 fast-forward 集成。 | 两项并行 VCD-0 branch comparison 完成并已合入 dev。 |
 | v0.60 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 main/dev 领先内容复核：五个 main-only 提交均与 dev patch-equivalent，main 的旧 Vercel SRS v0.1/v0.2 被 dev v0.4 超越，无需 cherry-pick；合入 WLD-7 Canvas 兼容审计与 VCD-0 合同缺口审计。Canvas 候选只部分兼容，AC-COLLAB-09/E2E-COLLAB-10/11、≤1000 ms arrival stimulus 与 commit 后 p99 ≤1 s 必须分开处理；VCD-0 的 Neon/Star Owner/session/Gateway/协作差距及 NOT_RUN 门保持开放。未 fetch/push，remote freshness 未知；保留 D:\Star 既有 dirty/untracked 内容。 | 两份只读审计报告已合入本地 dev；更新 WBS 与后续设计/验收顺序，不把静态审查标成实现完成。 |
+| v0.61 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加入 Neon/Vercel 官方平台事实的准备性只读核验报告链接；保持 canonical Vercel 设计、GAP-04/GAP-06、VCD-0 与运行/部署验收门开放，明确 WLD-7 Canvas 设计同步仍先于 Vercel 设计同步。 | VCD-0 GAP-06 官方平台来源待核验；按 §22.4 顺序完成准备性研究。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -585,6 +586,8 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - 协作验收继续分层：T-049 负责 hosted route/security；WLD-6/WLD-7 与 E2E/PT gates 负责 Owner truth、持久投递、双稿、撤权/恢复和性能；两个一秒门不得合并。
 
 ### 22.4 后续执行顺序
+
+**2026-10-26 准备性 Neon/Vercel 官方事实核验：** 只读报告见 [`WBS-VCD0-NEON-OFFICIAL-FACTS-20261026.md`](../reports/WBS-VCD0-NEON-OFFICIAL-FACTS-20261026.md)。官方资料确认了 Vercel Postgres 当前状态，以及 Neon pooled/direct、branch/role、连接预算和 compute 行为；具体目标账户、Star Owner/Project/Run、RLS、Outbox、Gateway/chat SSE 与部署验收仍 UNKNOWN。此研究不修改 canonical Vercel SRS/ADR/BD/DD/TD、不关闭 GAP-04/GAP-06 或 VCD-0；§22.4 的优先顺序保持 WLD-7 Canvas 设计同步在先、Vercel 设计同步随后。
 
 1. **先完成 WLD-7 Canvas 设计同步。** 依据 §22.2 将候选有用方向纳入当前 SRS/BD/DD，逐项对齐 AC-COLLAB-09、E2E-COLLAB-10/11 和当前 data/test 版本；完成独立文档审查后，才更新该切片设计完成状态。数据库、跨实例事件、运行时、恢复和 PT-09 继续单独作为实现/验收门。
 2. **再修订 Vercel 设计追踪。** 对齐 SRS/ADR/BD/DD/TD/WBS 的版本和引用，明确 Neon provider 选择与 Star Owner runtime、授权、API/DB 访问、RLS/pool、migration identity 的责任边界；保留 GAP-06 官方来源核验及真实 session/Gateway/chat SSE/部署证据门，不把设计同步当成 VCD-0 关闭。
