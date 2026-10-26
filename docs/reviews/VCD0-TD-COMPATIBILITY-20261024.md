@@ -73,9 +73,25 @@ T-049 is substantially more testable than the historical R2 version: it now requ
 | Vercel Preview, deployment, runtime, and performance | NOT_RUN |
 | VCD-0 | OPEN |
 
-## 5. Review history
+## 5. Candidate branch comparison — 2026-10-26
+
+The comparison uses the current integration baseline `dev@8f0f692b4cc31f53fdbfe7f927f496cb754c2e3b` and the two candidate tips named in the follow-up brief.
+
+| Candidate | Test-design evidence | Disposition |
+|---|---|---|
+| `codex/vcd0-canonical-detail-test-20261024` at `4f0ceae9818b7bd2b3b25d9164d6e43303121689` | `git show --stat` shows this commit changes only `docs/detailed-design/vercel/DD-STAR-VERCEL-DEPLOY-001.md`; it does not change the test design. In `docs/test-design/vercel/TD-STAR-VERCEL-DEPLOY-001.md`, the candidate tree's TD is v0.1 (header line 3; T-049 lines 161–167), while current dev is v0.4 (header line 3) and has the five-channel T-049 matrix, including noVNC and the mandatory Origin/security assertions (lines 163–177). The candidate tree is older and supplies no leading TD content. | Do not carry forward a TD change from this commit. Review its DD change separately; this TD review does not approve it. |
+| `codex/vcd0-td049-remediate` at `4e559dcd131e3d292050b664d1bf086c71e1c014` | The commit changes `docs/test-design/vercel/TD-STAR-VERCEL-DEPLOY-001.md` (17 additions, 6 deletions). Its resulting TD blob is `cd202ed928452f0a27f3fb42c208bf3d7411bb51`, identical to the blob at current dev HEAD; the path-only diff from current dev is empty. The patch is not listed as patch-equivalent by `git cherry`, but the exact file content is already present in dev. | No cherry-pick or merge is needed to recover this TD content. Do not use the broader branch as a proxy for unreviewed files. |
+
+**Selective carry-forward: none for the test design.** The 4f0 candidate contains an older TD tree, and the 4e559 candidate's final TD file is already byte-for-byte present in current dev. Current dev's TD v0.4 records T-049 as `NOT_RUN`, requires a real approved Gateway/session and Origin contract before execution, and includes terminal, noVNC, ARG, Canvas, and chat SSE coverage (TD §4.7, lines 163–177). This is document coverage only, not protocol or runtime evidence.
+
+The prior R3 gaps remain open: reconcile the SRS browser-channel inventory with Vercel scope (SRS line 35 versus TD lines 163–175); add a valid but out-of-scope principal's zero-data assertion; approve and verify the Gateway credential, Origin, current authorization, and revocation contract; choose the chat SSE route and define its recovery behavior; and correct the SRS downstream-document status line. The canonical ADR still says the chat SSE route and security/session contracts are unapproved (ADR line 57); Basic Design lists the Next route as optional and unselected (BD line 138); Detailed Design keeps the Gateway contract and chat SSE route as gates (DD lines 62–66, 168–170). The current WBS v0.58 says VCD-0 remains open (WBS line 8 and §18, lines 502–507). WBS §13 (lines 374–395) tracks ProjectRepository ownership and Run/Worktree reconciliation, while §20 (lines 522–538) tracks W8 transport and W14 UI-2; neither section adds a VCD-0 TD acceptance or changes the branch comparison. No evidence here closes those items.
+
+**Status:** VCD-0 remains **OPEN**; T-049 and all tests remain **NOT_RUN**. No deployment, account, Gateway, database, or runtime behavior was verified.
+
+## 6. Review history
 
 | Revision | Date | Change |
 |---|---|---|
 | R2 | 2026-10-24 | Historical compatibility review against the prior SRS baseline; superseded for current findings. |
 | R3 | 2026-10-25 | Re-reviewed current SRS v0.4, ADR/BD/DD v0.2/v0.3, TD v0.4, and WBS; recorded remaining inventory, isolation-test, Gateway-contract, SSE-route/recovery, and SRS-header gaps. No tests or runtime checks run. |
+| R3.1 | 2026-10-26 | Compared candidate commits `4f0ceae9` and `4e559dcd` with dev `8f0f692b`; the former carries no TD change and the latter's final TD blob already matches dev. No selective TD carry-forward; prior VCD-0 gaps remain OPEN and tests remain NOT_RUN. |
