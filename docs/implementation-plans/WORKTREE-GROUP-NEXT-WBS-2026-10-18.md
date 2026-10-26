@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.58。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）；§20 更新 W8 SQLx 解码阻塞与 W14 设备候选快照。W8、W14、VCD-0 与 WLD-7 均未关闭。
+> 状态：🟡 计划稿 v0.59。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§15 保留历史 W8/W14/W16/WLD1 证据；§16–§17 记录 UI-0/UI-1 规划与静态原型；§18 记录 W0 VCD-0 分支审计（报告已合入 dev，但六个 owner 未知的活动 Worktree 保留）；§19 记录 UI-2 测量协议审查（目标设备/workload 未冻结，实测 NOT_RUN）；§20 更新 W8 SQLx 解码阻塞与 W14 设备候选快照；§21 记录 VCD-0 DD/TD 候选分支逐项对比。W8、W14、VCD-0 与 WLD-7 均未关闭。
 
 ## 0. 目的与计划边界
 
@@ -265,6 +265,7 @@ flowchart TD
 | v0.56 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 W14 UI-1 可点击静态原型和审查报告；比较 A/B/C 三种布局并保留冻结层级。复核修正撤权后旧 Branch 可见、跨 Worktree 草稿混用、重新选择绕过授权确认、切换 scope 后草稿未恢复及未授权 scope 状态读取问题；源 commit `265edcd9` 已快进到本地 `dev`，该 lane branch/worktree 已移除，其 ignored `.pyc` SHA-256 校验后保存在用户 Codex 归档目录。任务/Worktree 数据仅为演示数据，CLI 与未连接 App 禁用。浏览器、产品服务、同伴复核与性能测量未运行，W14 仍 OPEN。 | 按 UI-0 验收标准交付 UI-1 原型；复核明确标记自审，避免将未做的独立审查或运行验证记为通过 |
 | v0.57 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 合入 W0 VCD-0 分支收敛审计 f15a1d2f：六个来源分支无须再摘取设计文件，VCD-0 仍 OPEN；六个 Orca Worktree 仍为 in-progress 且 owner 未知，故保留，不清理 branch/worktree/claim。同步 W14 UI-2 协议审查报告：设备与 workload 未冻结，桌面实测 NOT_RUN，W14 仍 OPEN。未 fetch/push，未运行测试或桌面基准。 | W0 审计报告与 W14 UI-2 证据报告已集成到 dev，按事实更新 WBS，不把文档审查误标为功能/性能验收 |
 | v0.58 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 W8 PostgreSQL 解码失败后的当前修复状态与 MAGOS 文件冲突门；记录 W14 UI-2 本机设备候选快照。修复代码尚未通过编译或 PostgreSQL 回归，设备未批准且未做桌面性能测量；W8/W14 均保持 OPEN。 | 继续推进 WBS，并将最新实测/门禁状态与计划同步。 |
+| v0.59 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 集成 VCD-0 详细设计与测试设计候选分支的独立对比报告：当前 dev DD v0.3 与 TD v0.4 已包含或超越候选内容，无需 cherry-pick；VCD-0 继续 OPEN，T-049、部署、账号、数据库及运行时验证均 NOT_RUN。记录两条审查 lane rebase 与 fast-forward 集成。 | 两项并行 VCD-0 branch comparison 完成并已合入 dev。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -542,3 +543,14 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 1. 保留 W8 的未验证最小候选；先解决 task_event_inbox.rs 的现有 MAGOS 登记冲突，不触碰两个占用工作树。解锁后重跑完整回归并做独立复审。
 2. W8 解码/owner transaction 验收通过后，继续 9F4J 的真实 native gRPC+mTLS、BI owner commit-before-ACK 与恢复验收。
 3. W14 的设备审批与协议冻结可并行准备；在产品/工程 owner 决定前，不把候选快照当作 target profile，也不宣称性能达标。
+
+## 21. VCD-0 详细设计与测试设计候选分支对照（2026-10-26）
+
+本节记录两条已完成的只读文档审查 lane 与它们的本地 dev 集成。它不代表 VCD-0 设计获批或运行验收通过。
+
+| Lane | 审查结论 | Integration evidence |
+|---|---|---|
+| DD candidate comparison | dev@8f0f692b 的 canonical DD v0.3 比 `codex/vcd0-canonical-detail-test-20261024`@4f0ceae9 与 `codex/vcd0-td049-remediate`@4e559dcd 更完整；两候选树没有值得择取的 DD 内容。 | 报告 `docs/reviews/VCD0-DD-COMPATIBILITY-20261024.md`；lane commit `1c999317684195a2ed857ac5d21a778efa419c1b`，rebase 到 dev 后 fast-forward 集成。 |
+| TD candidate comparison | `4f0ceae9` 不修改 TD；`4e559dcd` 的最终 TD blob 已与 dev v0.4 完全一致，没有额外 TD 内容需摘取。 | 报告 `docs/reviews/VCD0-TD-COMPATIBILITY-20261024.md`；原 lane commit `20251cdd` rebase 后为 `b49f31bdb5b7db9882d910eccb503014abe518ca`，fast-forward 集成。 |
+
+**当前状态：** VCD-0 仍 OPEN。Gateway/session credential、Origin、实时授权/撤权、chat SSE route/recovery、SRS downstream trace 等设计门仍待收敛；T-049 与所有测试、账户、数据库、部署和 runtime 证据均 NOT_RUN。没有从候选分支 cherry-pick 设计文件。工作仅做文档差异审查并运行 diff/commit whitespace 检查；没有运行测试或外部验证。目标 `dev` 集成后为 `b49f31bdb5b7db9882d910eccb503014abe518ca`，本轮未 fetch/push，remote freshness 未验证；D:\Star main checkout 的既有 dirty 内容未触碰。
