@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.63。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、当前 main/dev 快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.64。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -270,6 +270,7 @@ flowchart TD
 | v0.61 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加入 Neon/Vercel 官方平台事实的准备性只读核验报告链接；保持 canonical Vercel 设计、GAP-04/GAP-06、VCD-0 与运行/部署验收门开放，明确 WLD-7 Canvas 设计同步仍先于 Vercel 设计同步。 | VCD-0 GAP-06 官方平台来源待核验；按 §22.4 顺序完成准备性研究。 |
 | v0.62 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W11/PR-2 差距审计与本机 Rust 服务复用盘点；明确当前 Cloud Branch 必填与 hostless Run 冲突、两记录限制仅在宿主 bootstrap 路径得到证据、原生 Manager/readiness/目标 DB/sandbox/bridge 未验收；将 W11 binding 改为仅基础设施 placement 的 Run 必须固定 cluster ID+generation，并记录 hostless Run 无远端 Branch/infrastructure binding 的设计前置。RustGameServer Outbox 仅作为隔离适配研究候选，未复制代码；AGPL/依赖闭包按义务继续审查。更新本地 main/dev 快照与 W11-A→E 后续顺序；W11/PR-2 保持 OPEN。 | W11 与本机 Rust server 只读审计报告已复核并快进集成到本地 dev；需要把审计发现转成明确设计和实施顺序。 |
 | v0.63 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补入 W14 UI-1 独立静态复核 I-1–I-4 与原型修正；明确 Index 列表授权与 Worktree 焦点授权独立：列表授权失效隐藏列表行，但不撤销仍有效的单 Worktree 焦点；Index 复验的取消/拒绝/撤权恢复有效 Worktree 页面，检查中提供返回焦点入口；焦点撤权时清理 Branch/Apps/WORKTREE chat；变体 B 不重复显示 Index；Task Card 归 Run。保持 W14 OPEN，浏览器/产品/辅助技术/性能验证 NOT_RUN。 | 独立复核报告识别出冷启动授权绕过、Index 行状态、重复索引与任务/执行上下文文案歧义；实现自审发现 Index 状态切换会暂时困住有效焦点，补充返回/恢复路径。 |
+| v0.64 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W11-A hostless binding 文档同步已部分合入：SRS/BD/DD 与 Run/Infrastructure owner 的 W-T-M 增量加入 V3 设计目标，支持无远端 Branch 的 Run、可选 infrastructure placement 与 Schedule/Manual tagged trigger；明确当前 API/schema 仍为 V2（Cloud Branch 必填、Schedule-only），DD-LOCAL、TD、API/schema/migration/digest/replay 完整契约和运行验收仍未闭合。新增 W14/W11 本地 dev 集成快照，main-only 提交复核为 patch-equivalent；保留 D:\Star dirty/untracked 内容，未 push。W11-A/W14/WLD-7 均保持 PARTIAL/OPEN，测试、数据库与运行验收未运行。 | W14 UI-1 原型修正与 W11-A 设计切片已经 rebase/fast-forward 到本地 dev；继续按证据拆分“设计同步完成”与“产品/运行验收完成”，规划后续 WLD-7 文档同步。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -618,13 +619,13 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 | 范围 | 当前证据 | WBS 结果 |
 |---|---|---|
 | 两条 Multipass inventory 上限 | PowerShell bootstrap 自身的 launch 路径有跨进程独占锁、inventory 验证、2 条上限和不自动 purge；Rust Multipass adapter 是只读 inventory probe，512 行 parser bound 不等于两实例业务上限。 | W11 仍 OPEN。下一步必须让所有受控 VM create 入口经过同一 Rust Manager 的原子 lock/cap；保留 Stopped/Deleted/未知记录并在无效 inventory、锁失败或达限时 fail closed。 |
-| Run 与基础设施 binding | `RunInfrastructureBindingSnapshotV2` 固定 cluster ID/generation，但目前 `branch_id` 仍为必填 Cloud Branch 身份并进入 digest；详细设计也保留 Project/Branch/Run 绑定表述。 | W11-A 先统一需求、基本设计、详细设计、API/schema、migration 与 digest/replay 契约。只有明确选择 infrastructure placement 的 Run 才固定 cluster ID/generation；hostless Run 可不含该 binding，且不得依赖远端宿主 Branch 创建、授权、列出或执行其非基础设施功能。Worktree 的本地 checkout Branch 仍是 Worktree 子级状态。 |
+| Run 与基础设施 binding | 实现仍为 `RunInfrastructureBindingSnapshotV2`：`branch_id` 是必填 Cloud Branch 身份并进入 digest，API 执行入口仍是 Schedule-only。已合入的 W11-A 文档增量提出 V3 目标：无远端 Branch 的 Run、可选 infrastructure placement，以及携带 Schedule/Manual 来源身份的 tagged trigger；Manual command ID 由 owner 分配，执行身份由 owner 推导并进入 digest。 | W11-A 为 PARTIAL/OPEN。保留 V2 当前实现与 V3 设计目标的明确边界；后续同步 DD-LOCAL、TD、API/schema、migration、digest/replay 与 Run owner 的完整版本化契约。只有明确选择 infrastructure placement 的 Run 才固定 cluster ID+generation；hostless Run 的创建、授权、列表和非基础设施能力不得依赖远端宿主 Branch。Worktree 的本地 checkout Branch 仍是 Worktree 子级状态。 |
 | Manager、readiness、sandbox、workspace bridge | Rust receipt/catalog writer、只读 observation、reservation owner primitives 和纯 readiness validator 是不同证据层；没有生产 Multipass mutation Manager、readiness producer、目标 DB/grants 与端到端 executor gate 证明。宿主 K3s PoC 也不能代替产品集成。 | PR-2/WLD-4 保持 OPEN；先接可信 resolver 与 owner-local Inbox/Outbox，再实现受限 Manager/provider 和真实 readiness producer；在双层 reservation、当前 ACL/Hook、独立 sandbox、受限 bridge 都新鲜通过前，TaskExecutionRun 必须保持 non-executing。 |
 | Rust 服务端来源 | 盘点报告未放行任何直接复制/部署模块。`D:\RustGameServer` 的 PostgreSQL Outbox repository 只作为概念适配候选，relay/producer/consumer 仍耦合 NATS，scale operator 是 Noop；`E:\AssetsLake` 只作参考，AGPL 义务、权属及完整依赖 SPDX/SBOM 仍未核验；Ada 与 IM1.0 的许可证文本冲突/dirty candidate 不使用。 | 不复制整仓或业务域。若评估 Outbox seam，只在 Star owner-local 事务与 provider-neutral adapter 内重新验证/适配；先完成权属、传递依赖、feature 与发行物义务审查。自有 Rust transport 仍是长期可替换方向，NATS 细节不得进入业务事实。 |
 
 ### 23.2 W11/PR-2 实施顺序与完成门
 
-1. **W11-A — hostless binding 设计闭合（先于 Provider 实施）**：修正强制 Cloud Branch 依赖，定义可选远端关联与可选 infrastructure placement；同步 SRS、基本设计、详细设计、API/schema、migration、digest/replay 兼容规则。完成门为 hostless Run identity/授权/list 不需要远端身份，而选择集群的 Run 可固定精确 cluster ID+generation；本项不声称数据库/运行时已验证。
+1. **W11-A — hostless binding 设计闭合（先于 Provider 实施，当前 PARTIAL）**：SRS、基本设计、详细设计及 Run/Infrastructure owner W-T-M 增量已记录 V3 hostless binding 与 Schedule/Manual tagged trigger 目标；当前代码/API 仍是 V2 Cloud Branch 必填、Schedule-only。下一步同步 DD-LOCAL、TD、API/schema、migration、digest/replay 与 owner 事务契约，再做独立设计审查。完成门为 hostless Run identity/授权/list 不需要远端身份，而选择集群的 Run 可固定精确 cluster ID+generation；本项不声称数据库/运行时已验证。
 2. **W11-B — resolver 与 owner admission 交接**：按当前 Run binding、profile digest、ACL 和 Host/cluster generation 形成可信 demand；Run/Execution 与 Infrastructure owner 各在自己的事务里写事实，经版本化 Outbox/Inbox、幂等回执和恢复接合；target DB/grants 与 RLS 独立验收。
 3. **W11-C — Rust Host Infrastructure Manager 与 Multipass provider**：统一同一 inventory 的锁与两记录 cap，实现有界 argv allowlist、受控生命周期操作、签名操作回执、catalog reconciliation、cancel/drain/restart recovery；拒绝 owner 不明资源，绝不自动 purge。Agent/Plugin/Task CLI 不获得宿主 shell、daemon/socket、凭据或任意 mount。
 4. **W11-D — readiness producer、sandbox 与 bridge**：以 Manager 收据与固定 generation 采集 guest/K3s API/node/CRI，接入独立 Agent Runtime sandbox 和限路径 Worktree bridge；当前权限/原生 Hook/双层 reservation/readiness 任一缺失或过期都保持 non-executing。
@@ -636,3 +637,11 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - 本轮只使用本地 refs：`dev@d8a08e19`，`main@02e0cbd8`，`main...dev` 为 `5 157`；dev checkout 在本次写入前后均复核干净。未 fetch/push，因此远端 freshness 未验证。
 - `D:\Star` main 的既有未提交删除/新增与 `AGENTS.md` 修改均保留；本节不以主工作树 dirty 内容为合并来源，也不覆盖这些设计文件。
 - W11 与 Rust reuse 审查报告及本节 WBS 均为文档证据。W11-A 设计同步、PR-2 目标部署、VM/集群、Agent CLI/sandbox、资源性能与完整发行 SBOM 均未完成；没有测试/运行证据时保持 OPEN/NOT_RUN。
+
+### 23.4 2026-10-27 集成快照与下一步
+
+- 本次 WBS 同步的起始目标为本地 `dev@b74f46d1192089966ca835fffadd337dc1744e85`。该 tip 已包含 W14 UI-1 独立复核 `4f629ce5`、原型修正 `f3e6fa2a`，以及 W11-A hostless binding 文档切片 `b74f46d1`；W14/W11 source lane 都已 rebase 并 fast-forward 集成。此处记录的是 WBS v0.64 同步开始时的目标快照，不替代后续 lane 的逐次集成记录。
+- W14 只完成静态 HTML 原型修正，仍无浏览器、产品/API、辅助技术、性能或 Rust 桌面验证；W14 保持 OPEN。W11-A 的 V3 设计目标尚未实现到 API/schema；当前实现仍要求 Cloud Branch 和 Schedule 来源，不支持 V3 的 hostless/Manual 语义；W11-A 为 PARTIAL，W11-B–E 与 PR-2 运行验收保持 OPEN。
+- 当前本地 `main@02e0cbd8` 相对 `dev` 的五个 ahead 提交均由 `git cherry dev main` 标记为 patch-equivalent（`-`），未发现需补入 dev 的 main 独有内容。本机 `origin/dev` 跟踪 ref 为 `40a84c1a`，起始 dev 对它 ahead 102；`origin/main` 跟踪 ref 为 `5a051bfd`。这些是先前 fetch 的本地跟踪快照，本次未刷新 refs，因此不能表述为最新远端状态；本次未 push。
+- `D:\Star` main 工作树原有 `AGENTS.md` 修改、设计文档删除/移动和 untracked 文件均保留，未作为 lane 内容读取后覆盖、未清理。WBS lane 完成后才启动 WLD-7 新文档 lane，因为两者都会更新本 WBS 文件；WLD-7 仍是下一项优先设计同步，完成文档同步与独立审查也不关闭协作事件、持久化、恢复、性能和 PT-09 验收门。
+- 本轮 WBS 验证范围仅为 manifest 文件核对与 `git diff --check`；没有运行测试、构建、数据库/RLS、Multipass/K3s、浏览器或桌面基准。清理源 worktree 前须先核对 ignored 数据并在外部归档后校验哈希；D:\Star 与其他活跃/未核验 worktree 不在本轮清理范围。
