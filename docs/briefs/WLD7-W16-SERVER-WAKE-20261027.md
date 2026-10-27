@@ -10,12 +10,12 @@
 Implement the backend owner-triggered Canvas event wake stream as a bounded, authorization-checked adapter over the existing durable Canvas Outbox. The existing paged Outbox API remains the only source of event details and recovery truth.
 
 ## Fixed contract
-- HTTP GET `/api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events/stream` returns authenticated SSE.
-- The stream emits only `canvas-wake` with an empty or metadata-only payload; no document, draft, connector, or patch content is sent over the stream. The browser then reads the existing paged Worktree Canvas Outbox API.
-- PostgreSQL `NOTIFY` is a transactional wake-up only. A trigger on `canvas.canvas_group_outbox` publishes only tenant/worktree/canvas scope identifiers. The Outbox table remains durable truth; notification loss, duplicates, or reordering must be recovered by authorized REST pagination.
+- One active Worktree context per browser window uses one authenticated, multiplexed SSE connection at `GET /api/v1/worktrees/{worktree_id}/canvas-events/stream`; do not create one stream per Canvas/App tab.
+- The stream emits only `canvas-wake` with an empty payload, or `resync_required` before a bounded disconnect; no document, draft, connector, patch, or resource contents are sent. The browser reads details from the existing paged Worktree Canvas Outbox API.
+- PostgreSQL `NOTIFY` is a transactional wake-up only. A trigger on `canvas.canvas_group_outbox` publishes only a validated Worktree scope identifier. The Outbox table remains durable truth; notification loss, duplicates, or reordering must be recovered by authorized REST pagination.
 - Run one `PgListener` per long-lived Rust API process, not one per browser and not inside a Vercel Function. Each server process receives the DB notification and wakes only its local subscribers. Vercel hosts the UI and connects to the separately hosted Rust API/gateway.
 - Bound the shared broadcast queue, total SSE connections, and event metadata bytes. Slow consumers must get `resync_required` and disconnect; never silently skip durable events.
-- Reauthorize the current Project/Run/Worktree/Canvas scope before every wake is sent. Revoke or invalid scope => close stream. Do not compare canvas_id to tenant_id.
+- Reauthorize the current Project/Run/Worktree scope before every wake is sent; each Outbox catch-up request independently reauthorizes its resource scope. Revoke or invalid scope => close stream. Do not compare canvas_id to tenant_id.
 
 ## Owned files
 Only edit: `crates/star-api-rest/src/group_api.rs`, `crates/star-api-rest/src/group_api/canvas.rs`, `crates/star-api-rest/src/group_api/canvas_event_stream.rs` (new), `crates/star-api-rest/src/main.rs`, `crates/star-api-rest/Cargo.toml`, `db/migrations/2026-10-28-canvas-outbox-wakeup.sql`, and `crates/star-api-rest/tests/canvas_event_stream_pg.rs` (new). If the manifest lacks a file actually required, stop and report before editing it. Do not edit frontend or docs; the coordinator will synchronize docs after review.

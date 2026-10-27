@@ -10,9 +10,9 @@
 Replace the fixed-interval Canvas Outbox poller with an event-triggered client that uses the backend authenticated SSE wake stream and the existing durable Outbox page API for all content and recovery.
 
 ## Fixed contract
-- Connect to `GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events/stream` using authenticated `fetch()` streaming so the existing injected token callback/generation can be used; do not rely on EventSource if it cannot carry the bearer token.
+- Use one authenticated `fetch()` SSE stream per active Worktree context/window at `GET /api/v1/worktrees/{worktree_id}/canvas-events/stream`; multiple Canvas/App consumers within that Worktree share the same connection. Do not create one stream per Canvas or rely on EventSource if it cannot carry the bearer token.
 - The stream emits `canvas-wake` with no document content. On open, run one authorized catch-up; on each wake, call the existing bounded Outbox page reader and coalesce concurrent wakes. On `resync_required`, stream close, network failure, or reconnect, re-open with bounded exponential backoff and catch up from the last cursor.
-- Keep browser cursor state as an untrusted resume hint only. Every REST page remains freshly authorized. A missing token/401 invalidates the current injected host-session generation; 403 remains scoped authorization and no mutation is replayed.
+- Keep browser cursor state as an untrusted resume hint only. Every REST page remains freshly authorized. A missing token/401 invalidates the current injected host-session generation; 403 remains scoped authorization and no mutation is replayed. The wake subscription is Worktree-multiplexed; resource-specific details remain behind the existing authorized REST endpoints.
 - Abort/cleanup must stop the fetch reader, reconnect timer, and pending page reads when the selected Canvas/Worktree changes or component unmounts. There is no fixed-interval polling fallback.
 
 ## Owned files
