@@ -1,21 +1,33 @@
 /*
-@cypher schema=1 source_sha256=23b3b50cbbe55b6b5c7523a3c2ffdf16897a2bc3c9d0ff8f0c108651c4de448c
+@cypher schema=1 source_sha256=41dd226ce4791b959581581ce6336dc149db4b38a23e406ecdcd15f04e18e1ca
 MERGE (self:File {path:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts"})
 MERGE (suite:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::worktreeGroupApi tests",kind:"suite"})
+MERGE (selectedCanvasTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::keeps one Worktree stream across Strict Mode cleanup and selected Canvas changes",kind:"test"})
+MERGE (timerAbortTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::cancels stream backoff and failed catch-up retry timers when the Worktree scope leaves",kind:"test"})
+MERGE (abortAuthTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::does not issue or invalidate an authorized read when its scope aborts during token resolution",kind:"test"})
+MERGE (projection:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupProjection",kind:"function"})
+MERGE (provider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
 MERGE (sessionInvalidationTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::invalidates host session for 401 and preserves 403 case",kind:"test"})
 MERGE (invalidateAuthorization:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.invalidateAuthorization",kind:"method"})
 MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
-MERGE (pollOnce:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.pollOnce",kind:"method"})
+MERGE (catchUp:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxCatchUp.catchUp",kind:"method"})
 MERGE (streamTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::Worktree Canvas stream API case",kind:"test"})
 MERGE (malformedTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::malformed Worktree Canvas page case",kind:"test"})
 MERGE (self)-[:DEFINES]->(suite)
 MERGE (self)-[:DEFINES]->(sessionInvalidationTest)
 MERGE (suite)-[:DEFINES]->(streamTest)
 MERGE (suite)-[:DEFINES]->(malformedTest)
+MERGE (suite)-[:DEFINES]->(selectedCanvasTest)
+MERGE (suite)-[:DEFINES]->(timerAbortTest)
+MERGE (suite)-[:DEFINES]->(abortAuthTest)
+MERGE (abortAuthTest)-[:TESTS]->(list)
+MERGE (timerAbortTest)-[:TESTS]->(catchUp)
+MERGE (selectedCanvasTest)-[:CALLS]->(provider)
+MERGE (selectedCanvasTest)-[:CALLS]->(projection)
 MERGE (streamTest)-[:CALLS]->(list)
-MERGE (malformedTest)-[:CALLS]->(pollOnce)
+MERGE (malformedTest)-[:CALLS]->(catchUp)
 MERGE (streamTest)-[:TESTS]->(list)
-MERGE (malformedTest)-[:TESTS]->(pollOnce)
+MERGE (malformedTest)-[:TESTS]->(catchUp)
 MERGE (taskRunListTest:Symbol {id:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts::Task Run list cursor case",kind:"test"})
 MERGE (runList:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listTaskRuns",kind:"method"})
 MERGE (suite)-[:DEFINES]->(taskRunListTest)
@@ -36,7 +48,7 @@ CREATE
   (planCase:Function {name:"management plan case",type:"function",signature:"it('sends an idempotent Worktree management plan', ...)",visibility:"private",complexity:"moderate"}),
   (confirmCase:Function {name:"management confirm case",type:"function",signature:"it('confirms a Worktree management plan at the scoped route', ...)",visibility:"private",complexity:"moderate"}),
   (cursor:Function {name:"cursor case",type:"function",signature:"it('sends both event cursor components', ...)",visibility:"private",complexity:"moderate"}),
-  (pollerCase:Function {name:"Outbox poller retry case",type:"function",signature:"it('replays events until authorized projection refresh succeeds', ...)",visibility:"private",complexity:"complex"}),
+  (catchUpCase:Function {name:"Outbox catch-up retry case",type:"function",signature:"it('replays events until authorized projection refresh succeeds', ...)",visibility:"private",complexity:"complex"}),
   (canvasTaskCase:Function {name:"Canvas Task Card creation case",type:"function",signature:"it('creates a canonical WorkItem through the scoped Canvas command', ...)",visibility:"private",complexity:"moderate"}),
   (createCanvasCase:Function {name:"Worktree Canvas bootstrap case",type:"function",signature:"it('creates a Canvas through the authenticated Worktree route', ...)",visibility:"private",complexity:"moderate"}),
   (canvasElementCase:Function {name:"Canvas Element link case",type:"function",signature:"it('creates a scoped Canvas element with an idempotent entity link', ...)",visibility:"private",complexity:"moderate"}),
@@ -54,13 +66,13 @@ CREATE
   (updateCanvasDocument:Function {name:"WorktreeGroupApiClient.updateCanvasDocument",type:"function",signature:"updateCanvasDocument(worktreeId, canvasId, body, idempotencyKey)",visibility:"public",complexity:"simple"}),
   (createCanvasElement:Function {name:"WorktreeGroupApiClient.createCanvasElement",type:"function",signature:"createCanvasElement(worktreeId, canvasId, body, idempotencyKey)",visibility:"public",complexity:"simple"}),
   (events:Function {name:"WorktreeGroupApiClient.listCanvasEvents",type:"function",signature:"listCanvasEvents(worktreeId, canvasId, cursor)",visibility:"public",complexity:"moderate"}),
-  (poller:Class {name:"CanvasOutboxPoller",type:"class",visibility:"public"}),
-  (pollOnce:Function {name:"CanvasOutboxPoller.pollOnce",type:"function",signature:"pollOnce()",visibility:"public",complexity:"moderate"}),
+  (catchUp:Class {name:"CanvasOutboxCatchUp",type:"class",visibility:"public"}),
+  (catchUpRun:Function {name:"CanvasOutboxCatchUp.catchUp",type:"function",signature:"catchUp(signal)",visibility:"public",complexity:"complex"}),
   (refreshCallback:Function {name:"projection refresh callback",type:"function",signature:"() => Promise<void>",visibility:"private",complexity:"simple"}),
   (apiError:Class {name:"GroupApiError",type:"class",visibility:"public"}),
-  (file)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(missingToken),(suite)-[:CONTAINS]->(authorization),(suite)-[:CONTAINS]->(indexCase),(suite)-[:CONTAINS]->(planCase),(suite)-[:CONTAINS]->(confirmCase),(suite)-[:CONTAINS]->(cursor),(suite)-[:CONTAINS]->(pollerCase),(suite)-[:CONTAINS]->(canvasTaskCase),(suite)-[:CONTAINS]->(createCanvasCase),(suite)-[:CONTAINS]->(canvasElementCase),(suite)-[:CONTAINS]->(documentCase),(suite)-[:CONTAINS]->(error),(suite)-[:CONTAINS]->(freshToken),(suite)-[:CONTAINS]->(https),
+  (file)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(missingToken),(suite)-[:CONTAINS]->(authorization),(suite)-[:CONTAINS]->(indexCase),(suite)-[:CONTAINS]->(planCase),(suite)-[:CONTAINS]->(confirmCase),(suite)-[:CONTAINS]->(cursor),(suite)-[:CONTAINS]->(catchUpCase),(suite)-[:CONTAINS]->(canvasTaskCase),(suite)-[:CONTAINS]->(createCanvasCase),(suite)-[:CONTAINS]->(canvasElementCase),(suite)-[:CONTAINS]->(documentCase),(suite)-[:CONTAINS]->(error),(suite)-[:CONTAINS]->(freshToken),(suite)-[:CONTAINS]->(https),
   (makeClient)-[:CONTAINS]->(tokenProvider),(makeClient)-[:CALLS]->(apiCtor),
-  (missingToken)-[:CALLS]->(makeClient),(authorization)-[:CALLS]->(makeClient),(authorization)-[:CALLS]->(groupContext),(indexCase)-[:CALLS]->(makeClient),(indexCase)-[:CALLS]->(index),(planCase)-[:CALLS]->(makeClient),(planCase)-[:CALLS]->(managementPlan),(confirmCase)-[:CALLS]->(makeClient),(confirmCase)-[:CALLS]->(managementConfirm),(cursor)-[:CALLS]->(makeClient),(cursor)-[:CALLS]->(events),(pollerCase)-[:CALLS]->(apiCtor),(pollerCase)-[:CALLS]->(poller),(pollerCase)-[:CALLS]->(pollOnce),(pollerCase)-[:USES]->(refreshCallback),(canvasElementCase)-[:CALLS]->(makeClient),(canvasElementCase)-[:CALLS]->(createCanvasElement),(documentCase)-[:CALLS]->(makeClient),(documentCase)-[:CALLS]->(updateCanvasDocument),(error)-[:CALLS]->(makeClient),(error)-[:CALLS]->(groupContext),(error)-[:USES]->(apiError),(freshToken)-[:CALLS]->(apiCtor),(freshToken)-[:CALLS]->(groupContext),(https)-[:CALLS]->(apiCtor),(https)-[:USES]->(apiError);
+  (missingToken)-[:CALLS]->(makeClient),(authorization)-[:CALLS]->(makeClient),(authorization)-[:CALLS]->(groupContext),(indexCase)-[:CALLS]->(makeClient),(indexCase)-[:CALLS]->(index),(planCase)-[:CALLS]->(makeClient),(planCase)-[:CALLS]->(managementPlan),(confirmCase)-[:CALLS]->(makeClient),(confirmCase)-[:CALLS]->(managementConfirm),(cursor)-[:CALLS]->(makeClient),(cursor)-[:CALLS]->(events),(catchUpCase)-[:CALLS]->(apiCtor),(catchUpCase)-[:CALLS]->(catchUp),(catchUpCase)-[:CALLS]->(catchUpRun),(catchUpCase)-[:USES]->(refreshCallback),(canvasElementCase)-[:CALLS]->(makeClient),(canvasElementCase)-[:CALLS]->(createCanvasElement),(documentCase)-[:CALLS]->(makeClient),(documentCase)-[:CALLS]->(updateCanvasDocument),(error)-[:CALLS]->(makeClient),(error)-[:CALLS]->(groupContext),(error)-[:USES]->(apiError),(freshToken)-[:CALLS]->(apiCtor),(freshToken)-[:CALLS]->(groupContext),(https)-[:CALLS]->(apiCtor),(https)-[:USES]->(apiError);
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
@@ -92,25 +104,110 @@ CREATE (file)-[:CONTAINS]->(gitLockSuite),
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (suite:Function {name:"worktreeGroupApi tests"}),
+      (provider:Function {name:"WorktreeGroupApiProvider"}),
+      (projection:Function {name:"useWorktreeGroupProjection"});
+CREATE (selectedCanvasStreamCase:Function {name:"single Worktree stream across Canvas selection case",type:"function",language:"typescript",visibility:"private",complexity:"complex"});
+CREATE (suite)-[:CONTAINS]->(selectedCanvasStreamCase),
+       (selectedCanvasStreamCase)-[:CALLS]->(provider),
+       (selectedCanvasStreamCase)-[:CALLS]->(projection);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (suite:Function {name:"worktreeGroupApi tests"}),
       (makeClient:Function {name:"makeClient"}),
       (api:Function {name:"WorktreeGroupApiClient.listWorktreeCanvasEvents"}),
-      (poller:Class {name:"CanvasOutboxPoller"}),
-      (pollOnce:Function {name:"CanvasOutboxPoller.pollOnce"});
+      (catchUp:Class {name:"CanvasOutboxCatchUp"}),
+      (catchUpRun:Function {name:"CanvasOutboxCatchUp.catchUp"});
 CREATE (worktreeEventsCase:Function {name:"Worktree Canvas stream API case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
        (invalidPageCase:Function {name:"malformed Worktree Canvas page case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
 CREATE (suite)-[:CONTAINS]->(worktreeEventsCase),(suite)-[:CONTAINS]->(invalidPageCase),
        (worktreeEventsCase)-[:CALLS]->(makeClient),(worktreeEventsCase)-[:CALLS]->(api),
-       (invalidPageCase)-[:CALLS]->(makeClient),(invalidPageCase)-[:CALLS]->(poller),(invalidPageCase)-[:CALLS]->(pollOnce);
+       (invalidPageCase)-[:CALLS]->(makeClient),(invalidPageCase)-[:CALLS]->(catchUp),(invalidPageCase)-[:CALLS]->(catchUpRun);
 */
 
+import { createElement, StrictMode, type ReactNode } from "react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { CanvasOutboxPoller, GroupApiError, normalizeWorktreeGitLock, WorktreeGroupApiClient } from "../worktreeGroupApi";
+import { WorktreeGroupApiProvider, useWorktreeGroupProjection } from "../groupProjection";
+
+import {
+  CanvasOutboxCatchUp,
+  CanvasOutboxWakeSubscriber,
+  GroupApiError,
+  normalizeWorktreeGitLock,
+  WorktreeGroupApiClient,
+} from "../worktreeGroupApi";
 
 function makeClient(token: string | null, response = new Response(JSON.stringify({ ok: true }), { status: 200 })) {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
   const api = new WorktreeGroupApiClient(async () => token, fetcher);
   return { api, fetcher };
+}
+
+function makeWakeStream() {
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let cancelled = false;
+  const response = new Response(new ReadableStream<Uint8Array>({
+    start(nextController) {
+      controller = nextController;
+    },
+    cancel() {
+      cancelled = true;
+    },
+  }), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream; charset=utf-8" },
+  });
+  const encoder = new TextEncoder();
+  return {
+    response,
+    send(value: string) {
+      controller?.enqueue(encoder.encode(value));
+    },
+    close() {
+      controller?.close();
+    },
+    wasCancelled() {
+      return cancelled;
+    },
+  };
+}
+
+function makeWakeThenClosedResponse(): Response {
+  const encoder = new TextEncoder();
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode("event: canvas-wake\n\n"));
+      controller.close();
+    },
+  }), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+function makeClosedWakeResponse(): Response {
+  return new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.close(); } }), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+function emptyWorktreeCanvasPage(offset = "0"): string {
+  return JSON.stringify({ events: [], has_more: false, next_offset: offset });
+}
+
+async function flushAsyncWork(): Promise<void> {
+  for (let index = 0; index < 30; index += 1) await Promise.resolve();
+}
+
+async function waitForAsyncCondition(condition: () => boolean): Promise<void> {
+  for (let index = 0; index < 100; index += 1) {
+    if (condition()) return;
+    await Promise.resolve();
+  }
+  throw new Error("Asynchronous condition did not settle within the test turn.");
 }
 
 describe("Worktree Git lock observation", () => {
@@ -144,6 +241,22 @@ describe("Worktree Git lock observation", () => {
 });
 
 describe("WorktreeGroupApiClient", () => {
+  it("does not issue or invalidate an authorized read when its scope aborts during token resolution", async () => {
+    let resolveToken!: (token: string | null) => void;
+    const token = new Promise<string | null>((resolve) => { resolveToken = resolve; });
+    const fetcher = vi.fn<typeof fetch>();
+    const onAuthorizationError = vi.fn();
+    const api = new WorktreeGroupApiClient(() => token, fetcher, "", onAuthorizationError);
+    const controller = new AbortController();
+    const request = api.listWorktreeCanvasEvents("wt-1", "0", 50, controller.signal);
+
+    controller.abort();
+    resolveToken("user-jwt");
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(onAuthorizationError).not.toHaveBeenCalled();
+  });
+
   it("invalidates the host session on missing token or HTTP 401 but keeps 403 scoped", async () => {
     const missingTokenInvalidation = vi.fn<(error: GroupApiError) => void>();
     const missingTokenFetcher = vi.fn<typeof fetch>();
@@ -554,16 +667,17 @@ describe("WorktreeGroupApiClient", () => {
       .mockRejectedValueOnce(new Error("projection refresh failed"))
       .mockResolvedValue(undefined);
     let savedCursor: { after_offset: string } | undefined;
-    const poller = new CanvasOutboxPoller(api, "wt-1", refreshProjection, {
+    const catchUp = new CanvasOutboxCatchUp(api, "wt-1", refreshProjection, {
       cursorStore: {
         load: () => savedCursor,
         save: (_scopeKey, cursor) => { savedCursor = cursor; },
       },
     });
 
-    await expect(poller.pollOnce()).rejects.toThrow("projection refresh failed");
-    await expect(poller.pollOnce()).resolves.toBe(1);
-    await expect(poller.pollOnce()).resolves.toBe(0);
+    const controller = new AbortController();
+    await expect(catchUp.catchUp(controller.signal)).rejects.toThrow("projection refresh failed");
+    await expect(catchUp.catchUp(controller.signal)).resolves.toBe(1);
+    await expect(catchUp.catchUp(controller.signal)).resolves.toBe(0);
 
     const urls = fetcher.mock.calls.map(([input]) => new URL(String(input), "http://localhost"));
     expect(urls.map((url) => url.pathname)).toEqual([
@@ -585,16 +699,334 @@ describe("WorktreeGroupApiClient", () => {
     const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
     const refreshProjection = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     let savedCursor: { after_offset: string } | undefined;
-    const poller = new CanvasOutboxPoller(api, "wt-1", refreshProjection, {
+    const catchUp = new CanvasOutboxCatchUp(api, "wt-1", refreshProjection, {
       cursorStore: {
         load: () => savedCursor,
         save: (_scopeKey, cursor) => { savedCursor = cursor; },
       },
     });
 
-    await expect(poller.pollOnce()).rejects.toThrow("inconsistent cursor");
+    await expect(catchUp.catchUp(new AbortController().signal)).rejects.toThrow("inconsistent cursor");
     expect(savedCursor).toBeUndefined();
     expect(refreshProjection).not.toHaveBeenCalled();
+  });
+
+  it("shares one authenticated Worktree wake stream and fans out resource wakes", async () => {
+    const wakeStream = makeWakeStream();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(wakeStream.response);
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+    const firstEvents: string[] = [];
+    const secondEvents: string[] = [];
+    const unsubscribeFirst = api.subscribeWorktreeCanvasWake("wt-1", (event) => firstEvents.push(event.type));
+    const unsubscribeSecond = api.subscribeWorktreeCanvasWake("wt-1", (event) => secondEvents.push(event.type));
+    await flushAsyncWork();
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [input, init] = fetcher.mock.calls[0];
+    expect(new URL(String(input), "http://localhost").pathname).toBe(
+      "/api/v1/worktrees/wt-1/canvas-events/stream",
+    );
+    expect(new Headers(init?.headers).get("Accept")).toBe("text/event-stream");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
+    expect(init?.credentials).toBe("omit");
+    expect(init?.cache).toBe("no-store");
+    expect(firstEvents).toContain("resync_required");
+    expect(secondEvents).toContain("resync_required");
+
+    wakeStream.send("event: canvas-wake\ndata: {}\n\n");
+    await flushAsyncWork();
+    expect(firstEvents).toContain("canvas-wake");
+    expect(secondEvents).toContain("canvas-wake");
+
+    const streamSignal = init?.signal;
+    unsubscribeFirst();
+    expect(streamSignal?.aborted).toBe(false);
+    unsubscribeSecond();
+    await flushAsyncWork();
+    expect(streamSignal?.aborted).toBe(true);
+    expect(wakeStream.wasCancelled()).toBe(true);
+  });
+
+  it("keeps one Worktree stream across Strict Mode cleanup and selected Canvas changes", async () => {
+    const streamSignals: AbortSignal[] = [];
+    const wakeStreams: ReturnType<typeof makeWakeStream>[] = [];
+    const canvases = ["canvas-1", "canvas-2"].map((canvasId) => ({
+      canvas_id: canvasId,
+      title: canvasId,
+      version: 1,
+      document: { version: 1, viewport: { x: 0, y: 0, zoom: 1 }, frames: [], connectors: [] },
+    }));
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname.endsWith("/canvas-events/stream")) {
+        if (init?.signal) streamSignals.push(init.signal);
+        const wakeStream = makeWakeStream();
+        wakeStreams.push(wakeStream);
+        return wakeStream.response;
+      }
+      if (url.pathname.endsWith("/group-context")) {
+        return new Response(JSON.stringify({
+          group_context: { worktree_id: "wt-1", project_id: "project-1" },
+          worktree: { id: "wt-1", project_id: "project-1", name: "Agent WT", branch: "codex/agent", human_state: "active", archived: false },
+        }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/work-items")) {
+        return new Response(JSON.stringify({ worktree_id: "wt-1", project_id: "project-1", work_items: [] }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/canvases")) {
+        return new Response(JSON.stringify({ worktree_id: "wt-1", project_id: "project-1", canvases }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/elements")) {
+        const canvasId = url.pathname.split("/").at(-2);
+        return new Response(JSON.stringify({ worktree_id: "wt-1", canvas_id: canvasId, elements: [] }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/canvas-events")) {
+        return new Response(emptyWorktreeCanvasPage(url.searchParams.get("after_offset") ?? "0"), { status: 200 });
+      }
+      throw new Error(`Unexpected request ${url.pathname}`);
+    });
+    const getAccessToken = async () => "user-jwt";
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(
+      StrictMode,
+      null,
+      createElement(WorktreeGroupApiProvider, {
+        getAccessToken,
+        sessionKey: "session-1",
+        fetcher,
+      }, children),
+    );
+    const { result, rerender, unmount } = renderHook(
+      ({ selectedCanvasId }: { selectedCanvasId: string }) => useWorktreeGroupProjection("wt-1", true, 0, selectedCanvasId),
+      { initialProps: { selectedCanvasId: "canvas-1" }, wrapper },
+    );
+
+    await waitFor(() => expect(result.current).toMatchObject({ mode: "live", canvas: { id: "canvas-1" } }));
+    await waitFor(() => expect(streamSignals.filter((signal) => !signal.aborted)).toHaveLength(1));
+    const initialStreamCount = streamSignals.length;
+    expect(initialStreamCount).toBeGreaterThan(0);
+
+    rerender({ selectedCanvasId: "canvas-2" });
+    await waitFor(() => expect(result.current).toMatchObject({ mode: "live", canvas: { id: "canvas-2" } }));
+    expect(streamSignals).toHaveLength(initialStreamCount);
+    expect(streamSignals.filter((signal) => !signal.aborted)).toHaveLength(1);
+
+    act(() => unmount());
+    expect(streamSignals.every((signal) => signal.aborted)).toBe(true);
+    expect(wakeStreams.every((stream) => stream.wasCancelled())).toBe(true);
+  });
+
+  it("coalesces same-turn wake frames and catches up through the authorized Outbox API", async () => {
+    const wakeStream = makeWakeStream();
+    let outboxRequests = 0;
+    const offset = "3";
+    const eventPage = JSON.stringify({
+      events: [{
+        stream_offset: offset,
+        event_id: "11111111-1111-4111-8111-111111111111",
+        canvas_id: "22222222-2222-4222-8222-222222222222",
+        event_type: "document.updated",
+        occurred_at: "2026-10-27T10:00:00Z",
+      }],
+      has_more: false,
+      next_offset: offset,
+    });
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname.endsWith("/canvas-events/stream")) return wakeStream.response;
+      if (url.pathname.endsWith("/canvas-events")) {
+        outboxRequests += 1;
+        return new Response(outboxRequests === 1 ? emptyWorktreeCanvasPage() : eventPage, { status: 200 });
+      }
+      throw new Error(`Unexpected request ${url.pathname}`);
+    });
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+    const refreshProjection = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    let savedCursor: { after_offset: string } | undefined;
+    const subscriber = new CanvasOutboxWakeSubscriber(api, "wt-1", async () => refreshProjection(), {
+      cursorStore: {
+        load: () => savedCursor,
+        save: (_scopeKey, cursor) => { savedCursor = cursor; },
+      },
+    });
+    const controller = new AbortController();
+    const unsubscribe = subscriber.subscribe(controller.signal);
+    await waitForAsyncCondition(() => outboxRequests === 1);
+    await flushAsyncWork();
+
+    wakeStream.send("event: canvas-wake\n\nevent: canvas-wake\n\nevent: canvas-wake\n\n");
+    await waitForAsyncCondition(() => outboxRequests === 2 && refreshProjection.mock.calls.length === 1 && savedCursor !== undefined);
+    expect(outboxRequests).toBe(2);
+    expect(savedCursor).toEqual({ after_offset: offset });
+    expect(fetcher.mock.calls.filter(([input]) => new URL(String(input), "http://localhost").pathname.endsWith("/canvas-events/stream"))).toHaveLength(1);
+
+    unsubscribe();
+    await flushAsyncWork();
+  });
+
+  it("reconnects with a fresh token and bounded exponential backoff after stream close", async () => {
+    vi.useFakeTimers();
+    try {
+      const streams = [makeWakeThenClosedResponse(), makeWakeThenClosedResponse(), makeWakeStream().response];
+      let streamIndex = 0;
+      let tokenIndex = 0;
+      const fetcher = vi.fn<typeof fetch>(async (input) => {
+        const url = new URL(String(input), "http://localhost");
+        if (!url.pathname.endsWith("/canvas-events/stream")) throw new Error(`Unexpected request ${url.pathname}`);
+        const response = streams[streamIndex];
+        streamIndex += 1;
+        return response;
+      });
+      const api = new WorktreeGroupApiClient(async () => `user-jwt-${++tokenIndex}`, fetcher);
+      const unsubscribe = api.subscribeWorktreeCanvasWake("wt-1", () => undefined);
+      await flushAsyncWork();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(499);
+      await flushAsyncWork();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await flushAsyncWork();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer user-jwt-1");
+      expect(new Headers(fetcher.mock.calls[1][1]?.headers).get("Authorization")).toBe("Bearer user-jwt-2");
+
+      await vi.advanceTimersByTimeAsync(999);
+      await flushAsyncWork();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      await flushAsyncWork();
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      unsubscribe();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels stream backoff and failed catch-up retry timers when the Worktree scope leaves", async () => {
+    vi.useFakeTimers();
+    try {
+      let streamRequests = 0;
+      let outboxRequests = 0;
+      const fetcher = vi.fn<typeof fetch>(async (input) => {
+        const url = new URL(String(input), "http://localhost");
+        if (url.pathname.endsWith("/canvas-events/stream")) {
+          streamRequests += 1;
+          return makeClosedWakeResponse();
+        }
+        if (url.pathname.endsWith("/canvas-events")) {
+          outboxRequests += 1;
+          return new Response(JSON.stringify({ error: { code: "temporarily_unavailable" } }), { status: 503 });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      });
+      const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+      const subscriber = new CanvasOutboxWakeSubscriber(api, "wt-1", async () => undefined);
+      const unsubscribe = subscriber.subscribe(new AbortController().signal);
+      await waitForAsyncCondition(() => streamRequests === 1 && outboxRequests === 1);
+      await flushAsyncWork();
+
+      unsubscribe();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await flushAsyncWork();
+      expect(streamRequests).toBe(1);
+      expect(outboxRequests).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("catches up on resync_required and reconnects after the bounded delay", async () => {
+    vi.useFakeTimers();
+    try {
+      const streams = [makeWakeStream(), makeWakeStream()];
+      let streamIndex = 0;
+      let outboxRequests = 0;
+      const fetcher = vi.fn<typeof fetch>(async (input) => {
+        const url = new URL(String(input), "http://localhost");
+        if (url.pathname.endsWith("/canvas-events/stream")) {
+          const stream = streams[streamIndex];
+          streamIndex += 1;
+          return stream.response;
+        }
+        if (url.pathname.endsWith("/canvas-events")) {
+          outboxRequests += 1;
+          return new Response(emptyWorktreeCanvasPage(), { status: 200 });
+        }
+        throw new Error(`Unexpected request ${url.pathname}`);
+      });
+      const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+      const controller = new AbortController();
+      const subscriber = new CanvasOutboxWakeSubscriber(api, "wt-1", async () => undefined);
+      const unsubscribe = subscriber.subscribe(controller.signal);
+      await waitForAsyncCondition(() => outboxRequests === 1 && streamIndex === 1);
+      await flushAsyncWork();
+
+      streams[0].send("event: resync_required\n\n");
+      await waitForAsyncCondition(() => outboxRequests >= 2);
+      await flushAsyncWork();
+      expect(streamIndex).toBe(1);
+      expect(outboxRequests).toBeGreaterThanOrEqual(2);
+
+      await vi.advanceTimersByTimeAsync(499);
+      await flushAsyncWork();
+      expect(streamIndex).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await waitForAsyncCondition(() => streamIndex === 2);
+      expect(outboxRequests).toBeGreaterThanOrEqual(3);
+      unsubscribe();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("aborts the shared reader and in-flight authorized catch-up when scope is removed", async () => {
+    const wakeStream = makeWakeStream();
+    let streamSignal: AbortSignal | null | undefined;
+    let pageSignal: AbortSignal | null | undefined;
+    const fetcher = vi.fn<typeof fetch>((input, init) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname.endsWith("/canvas-events/stream")) {
+        streamSignal = init?.signal;
+        return Promise.resolve(wakeStream.response);
+      }
+      pageSignal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        pageSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+    const controller = new AbortController();
+    const subscriber = new CanvasOutboxWakeSubscriber(api, "wt-1", async () => undefined);
+    const unsubscribe = subscriber.subscribe(controller.signal);
+    await waitForAsyncCondition(() => pageSignal !== undefined && streamSignal !== undefined);
+
+    unsubscribe();
+    await flushAsyncWork();
+    expect(pageSignal?.aborted).toBe(true);
+    expect(streamSignal?.aborted).toBe(true);
+    expect(wakeStream.wasCancelled()).toBe(true);
+  });
+
+  it.each([
+    { status: 401, invalidatesSession: true },
+    { status: 403, invalidatesSession: false },
+  ])("stops a rejected wake stream for status $status and preserves the 403 session scope", async ({ status, invalidatesSession }) => {
+    const onAuthorizationError = vi.fn();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: "denied", message: "Denied." } }), { status }),
+    );
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher, "", onAuthorizationError);
+    const errors: unknown[] = [];
+    const unsubscribe = api.subscribeWorktreeCanvasWake("wt-1", (event) => {
+      if (event.type === "error") errors.push(event.error);
+    });
+    await flushAsyncWork();
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ status, code: "denied" });
+    expect(onAuthorizationError).toHaveBeenCalledTimes(invalidatesSession ? 1 : 0);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    unsubscribe();
   });
 
   it("preserves API error status and code", async () => {
