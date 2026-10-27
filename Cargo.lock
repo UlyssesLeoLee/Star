@@ -6968,6 +6968,7 @@ dependencies = [
  "domain-work-item",
  "domain-workspace",
  "domain-worktree",
+ "futures-util",
  "git-adapter",
  "graph-core",
  "hex",

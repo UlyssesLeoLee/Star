@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1b8591221cc0dfefd69c831ac9c6c8805726b8e7f5b1fa1b3b23599dc4a2255a
+@cypher schema=1 source_sha256=30f30e76d87fb4cbf69575b12b99eef7fa3c75179f661ff9c1057a4aa4b3f108
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas.rs"})
 MERGE (route:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::router",kind:"function"})
 MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::list_worktree_canvas_events",kind:"function"})
@@ -9,6 +9,9 @@ MERGE (append:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::append_e
 MERGE (query:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::WorktreeCanvasEventsQuery",kind:"struct"})
 MERGE (row:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::CanvasOutboxStreamRow",kind:"struct"})
 MERGE (scope:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::authorize_group_scope",kind:"function"})
+MERGE (wakeAuthorize:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::reauthorize_worktree_canvas_read",kind:"function"})
+MERGE (validateActor:Symbol {id:"crates/star-api-rest/src/group_api.rs::validate_actor",kind:"function"})
+MERGE (requireScope:Symbol {id:"crates/star-api-rest/src/group_api.rs::require_scope",kind:"function"})
 MERGE (worktree:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::request_worktree",kind:"function"})
 MERGE (outbox:Table {name:"canvas.canvas_group_outbox"})
 MERGE (advisory:Database {name:"PostgreSQL transaction advisory lock"})
@@ -17,6 +20,7 @@ MERGE (self)-[:DEFINES]->(validate)
 MERGE (self)-[:DEFINES]->(lock)
 MERGE (self)-[:DEFINES]->(query)
 MERGE (self)-[:DEFINES]->(row)
+MERGE (self)-[:DEFINES]->(wakeAuthorize)
 MERGE (route)-[:CALLS]->(list)
 MERGE (list)-[:CALLS]->(validate)
 MERGE (list)-[:CALLS]->(scope)
@@ -24,6 +28,9 @@ MERGE (list)-[:CALLS]->(worktree)
 MERGE (list)-[:READS]->(outbox)
 MERGE (append)-[:CALLS]->(lock)
 MERGE (lock)-[:USES]->(advisory)
+MERGE (wakeAuthorize)-[:CALLS]->(validateActor)
+MERGE (wakeAuthorize)-[:CALLS]->(requireScope)
+MERGE (wakeAuthorize)-[:CALLS]->(scope)
 MERGE (createTask:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::create_work_item_on_canvas",kind:"function"})
 
 MERGE (taskAdapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
@@ -1705,6 +1712,19 @@ async fn authorize_group_scope<'a>(
         .await
         .map_err(|_| GroupApiError::internal())?;
     Ok((tx, scope))
+}
+
+/// Re-check current request scopes and persisted Project/Run/Worktree access, then release the read transaction.
+pub(super) async fn reauthorize_worktree_canvas_read(
+    pool: &PgPool,
+    actor: &AuthUser,
+    worktree_id: Uuid,
+) -> Result<(), GroupApiError> {
+    validate_actor(actor)?;
+    require_scope(actor, "worktree:read")?;
+    require_scope(actor, "canvas:read")?;
+    let (tx, _) = authorize_group_scope(pool, actor, worktree_id, false).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())
 }
 
 async fn require_canvas(

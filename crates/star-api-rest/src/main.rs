@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=916d83dc746dcb557dcc14b093dc75fc73d562bb3595070b5044ce7646ef76bf
+@cypher schema=1 source_sha256=d4e8284a90261ac0ba6610a6f21e76995e95635c13c8bbe4f5eeadd6fb3f935c
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
 MERGE (port:Type {id:"bi_owner_runtime::TaskEventQueryPort",kind:"trait"})
 MERGE (state:Type {id:"crates/star-api-rest/src/group_api.rs::GroupApiState",kind:"struct"})
 MERGE (install:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_bi_task_event_query_port",kind:"method"})
+MERGE (wakeHub:Type {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub",kind:"struct"})
+MERGE (wakeStart:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub.start",kind:"method"})
+MERGE (wakeInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_canvas_event_wake_hub",kind:"method"})
 MERGE (self)-[:DEFINES]->(main)
 MERGE (main)-[:USES_TYPE]->(store)
 MERGE (main)-[:USES_TYPE]->(port)
 MERGE (main)-[:CALLS]->(install)
+MERGE (main)-[:CALLS]->(wakeStart)
+MERGE (main)-[:CALLS]->(wakeInstall)
+MERGE (main)-[:USES_TYPE]->(wakeHub)
+MERGE (wakeStart)-[:USES_TYPE]->(:Type {id:"sqlx::postgres::PgListener",kind:"struct"})
 MERGE (install)-[:USES_TYPE]->(port)
 MERGE (state)-[:HAS_METHOD]->(install)
 @endcypher
@@ -35,7 +42,9 @@ use bi_owner_runtime::{PgTaskEventQueryStore, TaskEventQueryPort};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use star_api_rest::{
     auth::JwtConfig,
-    group_api::{build_group_router, GroupApiState, PgGroupAppRegistryProvider},
+    group_api::{
+        build_group_router, CanvasEventWakeHub, GroupApiState, PgGroupAppRegistryProvider,
+    },
 };
 use star_pg_adapter::{connect_pool, PgConfig};
 use tracing::info;
@@ -55,6 +64,9 @@ async fn main() -> anyhow::Result<()> {
     let pool = connect_pool(&pg_config)
         .await
         .map_err(|error| anyhow::anyhow!("PostgreSQL connection failed ({})", error.code()))?;
+    let canvas_event_wake_hub = CanvasEventWakeHub::start(pool.clone())
+        .await
+        .map_err(|_| anyhow::anyhow!("Canvas event wake listener setup failed"))?;
 
     let bi_task_event_query_port: Option<Arc<dyn TaskEventQueryPort>> =
         match std::env::var("BI_DATABASE_URL") {
@@ -80,8 +92,9 @@ async fn main() -> anyhow::Result<()> {
         pool.clone(),
         PgGroupAppRegistryProvider::HOST_API_VERSION,
     ));
-    let mut group_api_state =
-        GroupApiState::new(jwt, pool).with_group_app_registry(group_app_registry);
+    let mut group_api_state = GroupApiState::new(jwt, pool)
+        .with_group_app_registry(group_app_registry)
+        .with_canvas_event_wake_hub(canvas_event_wake_hub);
     if let Some(query_port) = bi_task_event_query_port {
         group_api_state = group_api_state.with_bi_task_event_query_port(query_port);
     }

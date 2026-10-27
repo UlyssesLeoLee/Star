@@ -95,8 +95,8 @@
 //! CREATE (m)-[:CONTAINS]->(ba),(s)-[:USES]->(p),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(p),(b)-[:CALLS]->(ar);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
-    ProjectWorktreeRepository, RunWorktreeCreateCommand, RunWorktreeImportCommand,
-    RunWorktreeImportCandidatesQuery, RunWorktreeLifecycleProvider, RunWorktreeLifecycleReceipt,
+    ProjectWorktreeRepository, RunWorktreeCreateCommand, RunWorktreeImportCandidatesQuery,
+    RunWorktreeImportCommand, RunWorktreeLifecycleProvider, RunWorktreeLifecycleReceipt,
     RunWorktreeLifecycleState, RunWorktreeRepositoryQuery, WorktreeImportCandidate,
     WorktreeLifecycleProviderError,
 };
@@ -115,7 +115,7 @@ use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=77482eea713943d20600bae944210a174f21ba3cc513bbde60052e57ddca9070
+// @cypher schema=1 source_sha256=1fdc8716adbd028cb42463f2e79d9d64e083fe869035f620ec69fc8eca32bbaf
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -149,6 +149,12 @@ use serde::{Deserialize, Serialize};
 // MERGE (runLifecycleProvider:Type {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider",kind:"trait"})
 // MERGE (runLifecycleInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_run_worktree_lifecycle_provider",kind:"method"})
 // MERGE (runLifecycleField:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.run_worktree_lifecycle_provider",kind:"field"})
+// MERGE (canvasWakeModule:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::module",kind:"module"})
+// MERGE (canvasWakeHub:Type {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub",kind:"struct"})
+// MERGE (canvasWakeRouter:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::router",kind:"function"})
+// MERGE (canvasWakeStart:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub.start",kind:"method"})
+// MERGE (canvasWakeInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_canvas_event_wake_hub",kind:"method"})
+// MERGE (canvasWakeField:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.canvas_event_wake_hub",kind:"field"})
 // MERGE (api)-[:DEFINES]->(biAnalytics)
 // MERGE (api)-[:DEFINES]->(runWorktreeBindings)
 // MERGE (api)-[:DEFINES]->(worktreeLifecycle)
@@ -165,6 +171,16 @@ use serde::{Deserialize, Serialize};
 // MERGE (runLifecycleInstall)-[:WRITES]->(runLifecycleField)
 // MERGE (self)-[:CALLS]->(worktreeLifecycleRouter)
 // MERGE (build)-[:CALLS]->(worktreeLifecycleRouter)
+// MERGE (api)-[:DEFINES]->(canvasWakeModule)
+// MERGE (canvasWakeModule)-[:DEFINES]->(canvasWakeHub)
+// MERGE (canvasWakeModule)-[:DEFINES]->(canvasWakeRouter)
+// MERGE (canvasWakeHub)-[:HAS_METHOD]->(canvasWakeStart)
+// MERGE (self)-[:CALLS]->(canvasWakeRouter)
+// MERGE (build)-[:CALLS]->(canvasWakeRouter)
+// MERGE (taskState)-[:USES_TYPE]->(canvasWakeHub)
+// MERGE (taskState)-[:HAS_METHOD]->(canvasWakeInstall)
+// MERGE (canvasWakeInstall)-[:USES_TYPE]->(canvasWakeHub)
+// MERGE (canvasWakeInstall)-[:WRITES]->(canvasWakeField)
 // MERGE (taskState)-[:USES_TYPE]->(biQueryPort)
 // MERGE (taskState)-[:HAS_METHOD]->(biQueryInstall)
 // MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
@@ -178,6 +194,7 @@ use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
 mod bi_analytics;
 mod canvas;
+mod canvas_event_stream;
 mod cli_sessions;
 mod engineering_runs;
 mod execution_catalogs;
@@ -195,6 +212,7 @@ mod work_items;
 mod worktree_lifecycle;
 mod worktrees;
 
+pub use canvas_event_stream::CanvasEventWakeHub;
 pub use cli_sessions::{
     TaskCliSessionAccessCommand, TaskCliSessionListCommand, TaskCliSessionProvisionError,
     TaskCliSessionProvisioner, TaskCliSessionReceipt, TaskCliSessionStartCommand,
@@ -337,6 +355,7 @@ pub struct GroupApiState {
     worktree_archive_readiness_observer: Option<Arc<dyn WorktreeArchiveReadinessObserver>>,
     run_worktree_lifecycle_provider: Option<Arc<dyn RunWorktreeLifecycleProvider>>,
     bi_task_event_query_port: Option<Arc<dyn TaskEventQueryPort>>,
+    canvas_event_wake_hub: Option<Arc<CanvasEventWakeHub>>,
 }
 
 impl GroupApiState {
@@ -356,6 +375,7 @@ impl GroupApiState {
             worktree_archive_readiness_observer: None,
             run_worktree_lifecycle_provider: None,
             bi_task_event_query_port: None,
+            canvas_event_wake_hub: None,
         }
     }
 
@@ -413,6 +433,12 @@ impl GroupApiState {
         query_port: Arc<dyn TaskEventQueryPort>,
     ) -> Self {
         self.bi_task_event_query_port = Some(query_port);
+        self
+    }
+
+    /// Install the process-local fanout hub backed by transactional Canvas Outbox wakeups.
+    pub fn with_canvas_event_wake_hub(mut self, hub: Arc<CanvasEventWakeHub>) -> Self {
+        self.canvas_event_wake_hub = Some(hub);
         self
     }
 
@@ -752,6 +778,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(run_worktree_bindings::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
+        .merge(canvas_event_stream::router())
         .merge(group_apps::router())
         .merge(hook_policies::router())
         .with_state(state)
