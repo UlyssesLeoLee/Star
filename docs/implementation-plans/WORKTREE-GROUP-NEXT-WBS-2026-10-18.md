@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.65。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.66。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -273,6 +273,7 @@ flowchart TD
 | v0.64 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W11-A hostless binding 文档同步已部分合入：SRS/BD/DD 与 Run/Infrastructure owner 的 W-T-M 增量加入 V3 设计目标，支持无远端 Branch 的 Run、可选 infrastructure placement 与 Schedule/Manual tagged trigger；明确当前 API/schema 仍为 V2（Cloud Branch 必填、Schedule-only），DD-LOCAL、TD、API/schema/migration/digest/replay 完整契约和运行验收仍未闭合。新增 W14/W11 本地 dev 集成快照，main-only 提交复核为 patch-equivalent；保留 D:\Star dirty/untracked 内容，未 push。W11-A/W14/WLD-7 均保持 PARTIAL/OPEN，测试、数据库与运行验收未运行。 | W14 UI-1 原型修正与 W11-A 设计切片已经 rebase/fast-forward 到本地 dev；继续按证据拆分“设计同步完成”与“产品/运行验收完成”，规划后续 WLD-7 文档同步。 |
 
 | v0.65 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W11-A TD v0.3 与 W16 有界事件推送审计已随本地集成目标 9494e842 合入 dev；W11-A 保持 PARTIAL/OPEN，W16 保持 OPEN，相关 API/schema、DD-LOCAL、持久推送/草稿/冲突、目标数据库与运行验收仍未完成。明确本轮未 fetch/push，remote-tracking refs 新鲜度未知，并保留旧 WLD-7 与 D:\Star 用户状态；新增有依赖顺序的后续工作。 | 两条审阅 lane 已合入本地 dev，需把 TD 与协作事件审计证据同步到 WBS，并明确未完成门。 |
+| v0.66 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Canvas 当前 Run/Worktree 协作契约至 SRS v1.4、BD v0.2、DD v0.2；将 owner-local revision/audit/outbox、逐操作授权、双方草稿与冲突、显式 Resolve/CAS 写入需求、设计和验收追踪。明确第二份完整 proposal 在 owner ≤1000 ms 抵达是测试刺激，PT-09 p99 ≤1s 从 conflict commit 起算；WLD-7、PT-09、W16 均保持 OPEN/NOT_RUN。 | WLD-7 候选审计确认仅选择性吸收 Keep/Adapt 内容并与当前协作测试设计对齐；容量值和运行效果仍待实现及验证。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -660,3 +661,14 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
   3. 完成 W11-A API/schema、migration、digest/replay 与 owner-local 事务契约及实现。
   4. 单独实现并验证 W16 的 durable push、双方草稿/冲突、恢复和多实例协作。
   5. W14 桌面验证及 Neon/Multipass VM 数据库、RLS、资源与运行验收继续保持 OPEN/NOT_RUN；静态文档证据不关闭任何阶段。
+
+### 23.6 2026-10-27 WLD-7 Canvas 协作文档同步
+
+- 本节只记录新隔离文档 lane 的设计同步，不代表功能实现或验收关闭。同步文件为 Canvas SRS v1.4、BD v0.2、DD v0.2；候选审计只按 Keep/Adapt 条目选择吸收，没有整份复制旧候选。
+- 当前产品层级统一为 Project → Engineering Run → Worktree → local Branch。Run 可在没有远端宿主身份时创建、授权和管理；远端 provider/repository/branch 仅是可选元数据。Canvas 与 Task Card/work item 是所选 Run/Worktree 下的同级 App，遵守相同的 RunContext、授权和资源边界。
+- 协作目标按事实 owner 分区：owner 在自己的事务中提交 canonical revision、append-only audit、draft/conflict 事实及 Outbox wake-up；事件只传资源范围内的版本/唤醒信号，正文按授权读取。逐操作重新校验授权，撤权后停止推送。该节是设计契约，不构成持久推送、目标数据库事务、RLS 或多实例运行已实现的证据。
+- AC-COLLAB-09 映射显式 Resolve：OT 仅作无副作用预览，用户确认后以 owner 当前 revision 做 CAS；取消不产生副作用，CAS 过期时保留双方草稿和冲突。E2E-COLLAB-10 覆盖“可变换的语义重叠仍须冲突且不得自动提交”；E2E-COLLAB-11 覆盖 Resolve 预览、取消、确认和 stale-CAS；E2E-COLLAB-09 覆盖双方草稿、冲突通知与首个有界差异可读性。具体环境和通过结果仍待实现阶段记录。
+- 时间门含义分开：第二份完整 proposal 在 owner 侧 ≤1000 ms 内到达仅是测试刺激条件，不是冲突识别窗口、持有期或服务端承诺；PT-09 的 p99 ≤1 s 从 conflict commit 提交点测量，必须以真实多实例负载数据验收。容量、帧、队列、缓存、限频和恢复阈值均标为待测试配置，不能视作已验证性能承诺。
+- 历史章节中的旧端点、schema、传输、CRDT/LWW 与固定容量数值仅作历史/非规范记录；不得据此声称当前实现。当前需求与验收追踪以 SRS §4.12.9/§9.1、BD §1.5、DD §8.7 及协作 spec v1.2、owner-local data design v0.4、Canvas test design v1.7 为准。
+- 本 lane 仅进行静态文档一致性审查和 `rtk git diff --check`；未运行测试、构建、Cargo、数据库/RLS、Multipass/K3s、浏览器、桌面或性能检查。WLD-7、PT-09、W16 继续保持 **OPEN / NOT_RUN**。
+- 后续按依赖顺序推进：先由协调者独立审阅文档与映射；再实现 owner API/schema/migration/RLS、授权撤销复验、幂等及 durable push；随后完成双方草稿、冲突和 Resolve/CAS/recovery；最后在已就绪的目标数据库与多实例环境运行 E2E-COLLAB-09/10/11 和 PT-09，并将结果逐项回写文档。未完成任一 owner 持久化/授权/验证门之前，不开放协作写入。

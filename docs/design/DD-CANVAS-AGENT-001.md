@@ -1,12 +1,12 @@
 # DD-CANVAS-AGENT-001
 
-> **无限画布 — Agent 管理域 (Agent Management Domain) 詳細設計書 v0.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
+> **无限画布 — Agent 管理域 (Agent Management Domain) 詳細設計書 v0.2** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
 >
-> - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档, per 18:25 JST Ulysses 拍板"完善详细设计文档")
+> - 状态: 🟡 Draft v0.2 (2026-10-27 更新；同步当前 Run-scoped 协作 owner 与验收边界；初版落档日期见修订历史)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
-> - 上位基本設計: [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) v0.1 (105KB, 46 项 = A1-A10 28 + A11 10 + A12 8, 10 段, 14 张表 W/T/M 100% 覆盖, 守门 19/19 通过, v0.63 反转 A12 8 项必含)
-> - 上位要件: [`docs/requirements/SRS-CANVAS-AGENT-001.md`](../requirements/SRS-CANVAS-AGENT-001.md) v1.2 (155KB, 46 项, 13 段, 14 张表 W/T/M 100% 覆盖, 守门 14/14, v0.63 反转 A12 多人编辑 8 项)
+> - 上位基本設計: [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) v0.2 (105KB, 46 项 = A1-A10 28 + A11 10 + A12 8, 10 段, 14 张表 W/T/M 100% 覆盖, 守门 19/19 通过, v0.63 反转 A12 8 项必含)
+> - 上位要件: [`docs/requirements/SRS-CANVAS-AGENT-001.md`](../requirements/SRS-CANVAS-AGENT-001.md) v1.4 (155KB, 46 项, 13 段, 14 张表 W/T/M 100% 覆盖, 守门 14/14, v0.63 反转 A12 多人编辑 8 项)
 > - 上位总册: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (总册, 双核心 78 项 = 46 + 32) + [`docs/design/BD-CANVAS-001.md`](./BD-CANVAS-001.md) (root 写总册 BD)
 > - 平行专题 BD: [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) (双核心之 2: 游戏化 32 项, root 派 2 子代理之 2/2)
 > - 平行 view BD: [`docs/design/BD-AGENT-VIEW-001.md`](./BD-AGENT-VIEW-001.md) v0.1 (44KB, agent 视图画布, 5 view 跨块接口)
@@ -37,12 +37,12 @@
 |---|---|
 | 文书 ID | DD-CANVAS-AGENT-001 |
 | 文书名 | 无限画布 — Agent 管理域 (Agent Management Domain) 詳細設計書 |
-| 版本 | v0.1 |
+| 版本 | v0.2 |
 | 作成日 | 2026-09-10 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
-| 关联 commit | 待生成 (v0.1 落档后, root 统一 commit) |
-| 关联文档 | `BD-CANVAS-AGENT-001.md` v0.1 (本 DD 派生源, 105KB) + `SRS-CANVAS-AGENT-001.md` v1.2 (155KB) + 2 份平行 SRS + 2 份平行 BD + `frontend-canvas-design.md` v0.1 (A12 派生源) + `DD-AGENT-RELATIONSHIP-001.md` v0.1 (A11 模板, 94KB) |
+| 关联 commit | 待生成 (v0.2 设计同步后由协调者统一提交) |
+| 关联文档 | `BD-CANVAS-AGENT-001.md` v0.2 + `SRS-CANVAS-AGENT-001.md` v1.4 + 当前协作 spec v1.2 + owner-local data design v0.4 + Canvas test design v1.7 + 历史模板与 V0.1 画布设计 |
 | 平行 DD | `DD-AGENT-VIEW-001.md` (待补, 9/5 落档) + `DD-CANVAS-GAMIFY-001.md` (双核心之 2, root 派 2 子代理之 2/2) + `DD-CANVAS-001.md` (root 写总册 DD) |
 | 范围 | A1-A12 12 子能力 46 项 = A1-A10 28 + A11 10 + A12 8, 14 张表 W/T/M 100% 覆盖, 23 API + 5 WebSocket, 13 关键 class 跨域, 5 状态机, 11 共享类型, 4 时序图, 74+ 测试 (跨域 ≥ 30) |
 | 守门 | 19 项 + 26 派生规 跨域覆盖 (含 #1 v15 / #9 #3 / #9 v19 / #10 / #11 / #13 / #14 v2/v3/v4 / #15 / #23 v2) |
@@ -55,7 +55,7 @@
 
 ### 1.1 文档目的
 
-本文档基于 [`BD-CANVAS-AGENT-001` §0-§10](./BD-CANVAS-AGENT-001.md) v0.1 的基本設計, 定义 **无限画布 — Agent 管理域 (Agent Management Domain)** 的詳細設計:
+本文档基于 [`BD-CANVAS-AGENT-001` §0-§10](./BD-CANVAS-AGENT-001.md) v0.2 的基本设计，定义 **无限画布 — Agent 管理域 (Agent Management Domain)** 的详细设计；A12 当前协作契约见 §8.7。
 
 - 概念 module 布局 (24 组件 → 6 新 crate + 1 BFF + 18 Rust module + 1 Python LangGraph module, per §3.1)
 - 13 个关键 class (C-1/C-2/C-3/C-4/C-7/C-8/C-11/C-12/C-13/C-14/C-15/C-21/C-16) 的完整字段 + 方法签名 + 错误处理
@@ -113,9 +113,9 @@
 - 25 module 实体实现 (25 module 各自 docs, 画布只联动不实装)
 - ARG 跟 RGS 仓数据同步 (Star 仓不引用 RGS 仓, per AGENTS.md §5 仓库拓扑硬约束)
 - 5 域独立 Lead 真人到位 (per 守门 #14 v2, Mavis 临时代签, 真人到位后追溯签字, **不沿用代签决策** per 守门 #1 禁回溯叙事)
-- Miro 通用 12 类 (PDF/Word 导出/移动端/12 diagram/2500+ 模板库/AI 通用/Tables/Chart/Form/完整 a11y), 留 P3+ 评估
-- 内置视频通话 (Miro Talk / Zoom), 留 P3+
-- 协作工具集成 (Slack / Jira), 留 P3+
+- 通用画布扩展 (多格式导出/移动端专属/模板库/图表/表单/完整无障碍认证), 由对应产品域或后续计划管理
+- 内置视频通话不属于当前画布设计范围
+- 外部服务连接由独立 connector/API 域管理
 - A12 WSS 选型 (Yjs / Automerge / LWW / native WebSocket / Socket.IO), 拍板前 P0 阻塞
 - A12 CRDT 选型, 拍板前 P0 阻塞
 - A12.7 view/comment/edit 3 级权限具体矩阵, 5 域 Lead 真人到位后决策
@@ -146,7 +146,7 @@
 | **Output Achievement** | 协作产出指标触发的成就 (5 个), 聚合指标查询 (A11) | 派生自 `BD-AGENT-RELATIONSHIP-001` §7.4 |
 | **PresenceCursor** | V0.1 已有 PresenceCursor (x/y/selection), 升级为锚定 canvas 特定 element, 显示 agent 名字 + 当前操作 (A12.2) | 派生自 `frontend-canvas-design.md` §4.6 |
 | **Realtime 通道 (模式 A)** | NATS Subject `star.collaboration.canvas.element.*`, BFF 推送 element 增删改 (A12.1 + A12.3 派生源) | 派生自 `frontend-canvas-design.md` §4.1 |
-| **Follow mode** | A 跟随 B 视角, 1 canvas 1 follower 限制, GitHub Live Share UX (A12.4) | 派生自 `frontend-canvas-design.md` §4.9 + GitHub Live Share |
+| **Follow mode** | A 跟随 B 视角, 1 canvas 1 follower 限制 (A12.4) | 派生自 `frontend-canvas-design.md` §4.9 |
 | **CRDT** | Conflict-free Replicated Data Type, 解决多用户并发编辑冲突 (Yjs / Automerge / LWW 候选, P0 阻塞) (A12.6) | 派生自 `SRS-AGENT-RELATIONSHIP-001` G-3 |
 | **3 级权限** | view / comment / edit, BFF middleware 强制 (A12.7) | 派生自总册 `SRS-CANVAS-001` §6.2.2 |
 | **envoy 独立 deployment** | BFF envoy 独立 deployment (per 9/1 13:03+13:05 JST 偏好), 业务 svc 通过 `svc://` 引用 | per 9/1 13:03+13:05 JST 偏好 |
@@ -1374,7 +1374,7 @@ wss://canvas-comments/canvases/{id}:
 ```yaml
 wss://canvas-follow/canvases/{id}:
   get:
-    summary: Follow mode 同步 (A12.4, GitHub Live Share UX, 1 canvas 1 follower)
+    summary: Follow mode 同步 (A12.4，单 canvas 单 follower)
     parameters:
       - name: id
         in: path
@@ -1680,6 +1680,51 @@ sequenceDiagram
     WSS-->>SRE: viewport.sync (SRE 浏览器同步 PM 视口)
     Note over SRE: SRE 浏览器 ≤ 100ms P95 看到 PM 视口同步
 ```
+
+---
+
+### 8.7 WLD-7 当前 owner-local 协作契约（目标设计；未实现）
+
+本节定义 A12 当前逻辑行为，优先于本 DD 早期列出的固定 REST/WSS endpoint、单进程 Hub、物理 schema、CRDT/LWW 选型和未测容量数字。旧细节保留为历史提案，不作为当前实现事实、迁移规格或可执行接口。
+
+#### 8.7.1 资源和 owner 边界
+
+- 主导航为 Project → Engineering Run → Worktree → 本地 Branch。Run 可以没有宿主 Branch/repository；远端 provider/repository/branch 只是可选元数据。Worktree 是 Run 管理的本地 checkout；Branch 只表示该 checkout 的本地 ref/state。
+- 选定 Run/Worktree 后，Task Card/工作项与 Canvas 是同级 App。它们共享 RunContext、Actor 身份和授权 scope；各业务事实仍由各自 owner 管理。Canvas 不拥有 Task/Worktree/Branch 的业务事实。
+- 每项 owner command 在本 owner 的短事务内重验授权和 expected revision，再原子写 canonical revision、append-only audit、draft/conflict facts、operation/idempotency receipt 和 transactional Outbox。禁止跨 owner 共写事务。
+
+#### 8.7.2 草稿、封存与冲突事实
+
+- 每份 draft 由稳定 resource identity、actor、base revision、单调 draft revision、operation identity 与 bounded content digest 标识。未完成或未通过摘要验证的 head 仅作者可见；连接断开不自动公开半截内容。
+- 同一 resource 的 owner 以短时 resource fence 串行化 revision CAS 与 draft seal/conflict detection。两份完整、摘要验证通过且语义重叠的 proposal 在第二份被 owner 接受时立即生成一个稳定 conflict_id，原子 pin 双方精确 draft revision/content digest、base/current revision 和 overlap keys。普通 delta 合并到可变 draft head，不为每次按键追加不可变快照。
+- 重叠按语义规则判断；即使文本 OT 能机械变换，仍建立持久 conflict。任何较长到达间隔内仍有效的语义重叠 proposal 也要检测。
+
+#### 8.7.3 Resolve 命令与 CAS
+
+1. 已授权参与者显式打开 conflict resolve，owner 返回双方获授权可读的有界差异页及当前 canonical revision。
+2. OT suggestion 只在该显式操作中生成预览，不能更新 canonical revision、sealed drafts、conflict state 或 unread receipts。
+3. 用户可取消；取消不产生业务副作用。用户确认所选结果后，owner 以 expected current revision + idempotency key 执行 CAS。
+4. CAS 成功后才写新 revision 和 append-only resolution/audit/outbox 事实；CAS stale 时保留原冲突和双方稿件，返回冲突更新信号供用户重新读取。
+
+#### 8.7.4 授权推送、恢复与有限资源
+
+- 打开连接、订阅、取草稿/差异、接收资源事件、恢复 cursor 与 Resolve 每次都重新校验当前 Actor、Project、Run、Worktree 和资源授权。撤权后取消对应订阅并停止推送；断线重连不复用历史授权。
+- owner Outbox 事务通知仅唤醒 provider-neutral relay。事件只含 resource/revision/conflict ID 等轻量元数据，按当前授权集合 fan-out；正文按需再次授权后读取。relay 的 retry、cursor catch-up 和幂等必须由持久 owner/transport 契约保障。
+- 一个受授权的多路复用连接承载多个 resource subscription。事件数/字节数队列、frame/delta、pending writes、draft/cache bytes 和 presence TTL 由版本化 Collaboration Profile 限界；慢消费者收到 resync_required 后用 durable cursor 补齐，不静默跳过业务事实。
+- 100 subscriptions、64 events、128 KiB 等早期候选值都不是批准的并发容量。固定 Profile 和环境基线前，不将这些数值标成通过或对外容量承诺。
+
+#### 8.7.5 时序和验收映射
+
+第二份完整、摘要有效且语义重叠的 proposal 在 ≤1000 ms 到达 owner 是 E2E 测试刺激；它不表示 commit-time 差值、冲突检测窗口、debounce 或 holdback。PT-09 从 owner conflict transaction commit 开始计时，要求在线且授权的双方在 p99 ≤1 s 看到同一 unread conflict_id 并可读取首个有界差异页。两个时间目标分别记录。
+
+| 验收项 | 验收证据 |
+|---|---|
+| AC-COLLAB-02 | E2E-COLLAB-09/10 与 owner fence/CAS 并发审计：保存双方稿、唯一 conflict_id；到达刺激和任意间隔的语义重叠分别覆盖 |
+| AC-COLLAB-04 | E2E-COLLAB-09 与 PT-09：p99 从 conflict commit 到双方 unread 冲突提示及首个有界差异可读 |
+| AC-COLLAB-06 | PT-09-GATE-01：固定 Collaboration Profile / 环境负载基线，记录 RSS、CPU、queue、Outbox lag、写放大和慢消费者恢复 |
+| AC-COLLAB-09 | E2E-COLLAB-11：无副作用 OT 预览、取消、用户确认、当前 revision CAS、stale CAS 保留双方草稿/冲突 |
+
+上游依据：domain-collaboration-spec v1.2、owner-local data design v0.4、Canvas test design v1.7 §4.8、WBS §22.2。当前实现仍受集成 W16 审计约束；push relay、持久草稿/冲突、跨实例恢复、目标 PostgreSQL/RLS、双 gateway、资源测量与 PT-09 均未验证，WLD-7 继续 OPEN/NOT_RUN。
 
 ---
 
@@ -2364,6 +2409,7 @@ CREATE INDEX ON :Achievement(category);
 |---|---|---|---|---|
 | **v0.1** | **2026-09-10 18:32 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **初版落档 — 子代理 1 bg_9ce1be6e 撰写, 13 段 (含 §11 NFR + §12 守门) + 5 附录, A1-A12 12 子能力 46 项 (A1-A10 28 + A11 10 + A12 8), 5 view 跨域, 5-tier 架构, 24 组件 + 6 crate + 1 BFF, 14 张表 W/T/M 100% 覆盖, 23 API + 5 WebSocket, 5 状态机 + 11 共享类型 + 13 关键 class (C-16=RelationshipEditor + C-21=ARGController 1:1 派生 ARG 源) + 6 时序图 (4 必含 + 2 补充 A12), NFR 6 类, 守门 19/19 + 26 派生规跨域全过, 19 已知缺口含 3 P0 阻塞 (#11 A12 WSS + #13 localStorage + #15 CRDT) + 1 跨 session 总结 (#17), 15 子代理失败接手; A11 1:1 派生自 `DD-AGENT-RELATIONSHIP-001.md` v0.1 模板; A12 1:1 派生自 `frontend-canvas-design.md` v0.1 §4.1+§4.6+§3.4** | **2026-09-10 18:25 JST Ulysses 拍板"完善详细设计文档"** |
 | **v0.1.1** | **2026-09-10 19:10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **IPA SEC 合规性修复: 加 §13 5 角色签字栏 (per AGENTS.md §3 7 段结构) + §14 修订历史 (从原附录 E 抽出). 不重写 §0-§12 + 附录 A-D (per 守门 #1 禁回溯叙事, v0.1.1 反转行显式标).** | **2026-09-10 19:06 JST Ulysses 拍板"确保这里的文档符合日本 IPA 标准"** |
+| **v0.2 (当前)** | **2026-10-27** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | 新增 §8.7 WLD-7 owner-local 草稿、冲突、授权、Outbox、Resolve/CAS 与资源界限；区分 ≤1000 ms 到达刺激与 PT-09 commit-to-read p99。同步 SRS v1.4、BD v0.2、协作 spec v1.2、data design v0.4 和 test design v1.7。旧接口/schema/transport/算法候选标为历史提案；durable push、持久冲突、目标 DB/RLS、跨实例恢复与性能均未验证。中性化文档内外部产品比较措辞。 | WBS §22.2 的选择性候选审计与 WLD-7 文档同步 brief |
 
 ---
 
@@ -2373,7 +2419,7 @@ CREATE INDEX ON :Achievement(category);
 
 | 文档 | 引用章节 | 用途 |
 |---|---|---|
-| `SRS-CANVAS-AGENT-001.md` v1.2 | §1-§13 (46 项 + 14 表 + 16 NFR + 19 缺口) | **本 DD 派生源**, 1:1 全量覆盖 |
+| `SRS-CANVAS-AGENT-001.md` v1.4 | §4.12.9/§9.1 当前 WLD-7 协作契约与验收追踪 | **本 DD 的上位需求**；旧 A12 物理端点/算法候选不构成当前实现要求 |
 | `SRS-CANVAS-001.md` v1.1 | §6.3 (25 module 联动) + §6.2.2 (A12 端点) | 总册, 跨域接口 |
 | `SRS-CANVAS-GAMIFY-001.md` v0.1 | (平行专题, 不引用) | 双核心之 2 |
 | `SRS-AGENT-RELATIONSHIP-001.md` v0.1 | §1-§8 (10 类关系 + 4 维度 + 5 模板 + 4 表) | **A11 派生源** |
@@ -2384,7 +2430,7 @@ CREATE INDEX ON :Achievement(category);
 
 | 文档 | 引用章节 | 用途 |
 |---|---|---|
-| `BD-CANVAS-AGENT-001.md` v0.1 | §1-§10 (10 段 + 5 view + 14 表 + 23 API + 19 缺口) | **本 DD 派生源**, 1:1 全量覆盖 |
+| `BD-CANVAS-AGENT-001.md` v0.2 | §1.5 A12 Run-scoped owner、导航与验收边界 | **本 DD 的上位基本设计**；历史接口提案不作为实现事实 |
 | `BD-AGENT-RELATIONSHIP-001.md` v0.1 | §1-§7 (5-tier + 7 表 + 13 端点 + 8 UC) | **A11 BD 模板** |
 | `BD-AGENT-VIEW-001.md` v0.1 | (平行 view, 5 view 跨块接口) | A9 跨域引用 |
 | `BD-CANVAS-001.md` (root 写) | 跨域共享部分 | 总册, 本 DD 不重复 |
@@ -2551,4 +2597,4 @@ CREATE INDEX ON :Achievement(category);
 
 ---
 
-> **文档结束** — DD-CANVAS-AGENT-001.md v0.1 (2026-09-10 JST 初版落档, 10 段 + 5 附录, 5 view 跨域, 14 张表 W/T/M 100% 覆盖, 23 REST + 5 WebSocket 完整 OpenAPI spec, 19 已知缺口含 3 P0 阻塞, 守门 19 项 + 26 派生规 跨域全过, 13 关键 class + 5 状态机 + 11 共享类型 + 4 时序图 1:1 派生自 `DD-AGENT-RELATIONSHIP-001.md` v0.1 模板, A12 1:1 派生自 `frontend-canvas-design.md` v0.1 §4.1+§4.6+§3.4)
+> **文档结束** — DD-CANVAS-AGENT-001.md v0.2 (2026-10-27；§8.7 为当前 owner-local 协作逻辑设计；实施、目标数据库和性能验收仍未验证)
