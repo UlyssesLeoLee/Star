@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.64。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.65。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -271,6 +271,8 @@ flowchart TD
 | v0.62 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W11/PR-2 差距审计与本机 Rust 服务复用盘点；明确当前 Cloud Branch 必填与 hostless Run 冲突、两记录限制仅在宿主 bootstrap 路径得到证据、原生 Manager/readiness/目标 DB/sandbox/bridge 未验收；将 W11 binding 改为仅基础设施 placement 的 Run 必须固定 cluster ID+generation，并记录 hostless Run 无远端 Branch/infrastructure binding 的设计前置。RustGameServer Outbox 仅作为隔离适配研究候选，未复制代码；AGPL/依赖闭包按义务继续审查。更新本地 main/dev 快照与 W11-A→E 后续顺序；W11/PR-2 保持 OPEN。 | W11 与本机 Rust server 只读审计报告已复核并快进集成到本地 dev；需要把审计发现转成明确设计和实施顺序。 |
 | v0.63 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补入 W14 UI-1 独立静态复核 I-1–I-4 与原型修正；明确 Index 列表授权与 Worktree 焦点授权独立：列表授权失效隐藏列表行，但不撤销仍有效的单 Worktree 焦点；Index 复验的取消/拒绝/撤权恢复有效 Worktree 页面，检查中提供返回焦点入口；焦点撤权时清理 Branch/Apps/WORKTREE chat；变体 B 不重复显示 Index；Task Card 归 Run。保持 W14 OPEN，浏览器/产品/辅助技术/性能验证 NOT_RUN。 | 独立复核报告识别出冷启动授权绕过、Index 行状态、重复索引与任务/执行上下文文案歧义；实现自审发现 Index 状态切换会暂时困住有效焦点，补充返回/恢复路径。 |
 | v0.64 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W11-A hostless binding 文档同步已部分合入：SRS/BD/DD 与 Run/Infrastructure owner 的 W-T-M 增量加入 V3 设计目标，支持无远端 Branch 的 Run、可选 infrastructure placement 与 Schedule/Manual tagged trigger；明确当前 API/schema 仍为 V2（Cloud Branch 必填、Schedule-only），DD-LOCAL、TD、API/schema/migration/digest/replay 完整契约和运行验收仍未闭合。新增 W14/W11 本地 dev 集成快照，main-only 提交复核为 patch-equivalent；保留 D:\Star dirty/untracked 内容，未 push。W11-A/W14/WLD-7 均保持 PARTIAL/OPEN，测试、数据库与运行验收未运行。 | W14 UI-1 原型修正与 W11-A 设计切片已经 rebase/fast-forward 到本地 dev；继续按证据拆分“设计同步完成”与“产品/运行验收完成”，规划后续 WLD-7 文档同步。 |
+
+| v0.65 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W11-A TD v0.3 与 W16 有界事件推送审计已随本地集成目标 9494e842 合入 dev；W11-A 保持 PARTIAL/OPEN，W16 保持 OPEN，相关 API/schema、DD-LOCAL、持久推送/草稿/冲突、目标数据库与运行验收仍未完成。明确本轮未 fetch/push，remote-tracking refs 新鲜度未知，并保留旧 WLD-7 与 D:\Star 用户状态；新增有依赖顺序的后续工作。 | 两条审阅 lane 已合入本地 dev，需把 TD 与协作事件审计证据同步到 WBS，并明确未完成门。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -645,3 +647,16 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - 当前本地 `main@02e0cbd8` 相对 `dev` 的五个 ahead 提交均由 `git cherry dev main` 标记为 patch-equivalent（`-`），未发现需补入 dev 的 main 独有内容。本机 `origin/dev` 跟踪 ref 为 `40a84c1a`，起始 dev 对它 ahead 102；`origin/main` 跟踪 ref 为 `5a051bfd`。这些是先前 fetch 的本地跟踪快照，本次未刷新 refs，因此不能表述为最新远端状态；本次未 push。
 - `D:\Star` main 工作树原有 `AGENTS.md` 修改、设计文档删除/移动和 untracked 文件均保留，未作为 lane 内容读取后覆盖、未清理。WBS lane 完成后才启动 WLD-7 新文档 lane，因为两者都会更新本 WBS 文件；WLD-7 仍是下一项优先设计同步，完成文档同步与独立审查也不关闭协作事件、持久化、恢复、性能和 PT-09 验收门。
 - 本轮 WBS 验证范围仅为 manifest 文件核对与 `git diff --check`；没有运行测试、构建、数据库/RLS、Multipass/K3s、浏览器或桌面基准。清理源 worktree 前须先核对 ignored 数据并在外部归档后校验哈希；D:\Star 与其他活跃/未核验 worktree 不在本轮清理范围。
+
+### 23.5 2026-10-27 W11-A / W16 文档状态更新
+
+- 本节记录本地集成目标 dev@9494e842f06206c9112148f722bdbcb9756761fb 上的后续文档同步。已审阅并集成 W11-A 测试设计 lane 126565b5 与 W16 事件推送审计 lane 2837e5b5；两者通过本组集成快照 9494e842 出现在本地 dev。未 fetch 或 push；本机 remote-tracking refs 的新鲜度未知。本地集成不代表远端已更新。
+- W11-A 的 TD 已更新为 v0.3，并与 WLD1 SRS/BD/DD v0.4 对齐，补充 hostless Run、可选基础设施 placement、V2/V3 Schedule 语义、数据库与部署验收用例。W11-A 仍为 **PARTIAL / OPEN**：用户保留的 DD-LOCAL 设计状态尚未同步；API/schema、migration、digest/replay 与 owner 事务实现和运行验收仍未完成。不得读取或覆盖 D:\Star 中用户已有的移动/删除设计文件。
+- W16 审计保持 **OPEN**。这是限定代码/设计范围的静态证据，不是端到端或运行时证明。现有正常浏览器路径每 1 秒轮询；浏览器 localStorage 游标只是可丢失、可篡改且不具授权效力的恢复提示；BFF 广播是单进程内存状态。未验证 owner Outbox 触发的持久推送、持久草稿/冲突事实、跨实例投递和恢复。当前事件过滤比较 canvas_id 与 tenant_id，身份字段不匹配可能过滤合法事件；本证据不表示跨租户泄漏。p99、RSS/CPU、队列背压、恢复及运行验收均为 **NOT_RUN**。
+- 上一组仅清理了已集成的两个 lane worktree/branch 及其集成 branch；旧 WLD-7 候选 branch/worktree 和其他 worktree 均保留。D:\Star 用户改动保留且未作为本节改动来源；本 lane 未检查其移动/删除的 Canvas 文件。
+- 后续按依赖顺序推进：
+  1. 完成旧 WLD-7 候选的独立差异审计，再基于审计结论选择性同步 SRS/BD/DD；不整份照搬候选。
+  2. 在不覆盖用户保留的 DD-LOCAL 文件状态前提下，补齐 W11-A 详细设计缺口并做独立设计复核。
+  3. 完成 W11-A API/schema、migration、digest/replay 与 owner-local 事务契约及实现。
+  4. 单独实现并验证 W16 的 durable push、双方草稿/冲突、恢复和多实例协作。
+  5. W14 桌面验证及 Neon/Multipass VM 数据库、RLS、资源与运行验收继续保持 OPEN/NOT_RUN；静态文档证据不关闭任何阶段。
