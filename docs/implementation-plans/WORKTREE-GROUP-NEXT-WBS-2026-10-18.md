@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.62。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、当前 main/dev 快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.63。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、当前 main/dev 快照和实施顺序。W11/PR-2、W8、W14、VCD-0 与 WLD-7 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -269,6 +269,7 @@ flowchart TD
 | v0.60 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 main/dev 领先内容复核：五个 main-only 提交均与 dev patch-equivalent，main 的旧 Vercel SRS v0.1/v0.2 被 dev v0.4 超越，无需 cherry-pick；合入 WLD-7 Canvas 兼容审计与 VCD-0 合同缺口审计。Canvas 候选只部分兼容，AC-COLLAB-09/E2E-COLLAB-10/11、≤1000 ms arrival stimulus 与 commit 后 p99 ≤1 s 必须分开处理；VCD-0 的 Neon/Star Owner/session/Gateway/协作差距及 NOT_RUN 门保持开放。未 fetch/push，remote freshness 未知；保留 D:\Star 既有 dirty/untracked 内容。 | 两份只读审计报告已合入本地 dev；更新 WBS 与后续设计/验收顺序，不把静态审查标成实现完成。 |
 | v0.61 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加入 Neon/Vercel 官方平台事实的准备性只读核验报告链接；保持 canonical Vercel 设计、GAP-04/GAP-06、VCD-0 与运行/部署验收门开放，明确 WLD-7 Canvas 设计同步仍先于 Vercel 设计同步。 | VCD-0 GAP-06 官方平台来源待核验；按 §22.4 顺序完成准备性研究。 |
 | v0.62 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W11/PR-2 差距审计与本机 Rust 服务复用盘点；明确当前 Cloud Branch 必填与 hostless Run 冲突、两记录限制仅在宿主 bootstrap 路径得到证据、原生 Manager/readiness/目标 DB/sandbox/bridge 未验收；将 W11 binding 改为仅基础设施 placement 的 Run 必须固定 cluster ID+generation，并记录 hostless Run 无远端 Branch/infrastructure binding 的设计前置。RustGameServer Outbox 仅作为隔离适配研究候选，未复制代码；AGPL/依赖闭包按义务继续审查。更新本地 main/dev 快照与 W11-A→E 后续顺序；W11/PR-2 保持 OPEN。 | W11 与本机 Rust server 只读审计报告已复核并快进集成到本地 dev；需要把审计发现转成明确设计和实施顺序。 |
+| v0.63 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补入 W14 UI-1 独立静态复核 I-1–I-4 与原型修正；明确 Index 列表授权与 Worktree 焦点授权独立：列表授权失效隐藏列表行，但不撤销仍有效的单 Worktree 焦点；Index 复验的取消/拒绝/撤权恢复有效 Worktree 页面，检查中提供返回焦点入口；焦点撤权时清理 Branch/Apps/WORKTREE chat；变体 B 不重复显示 Index；Task Card 归 Run。保持 W14 OPEN，浏览器/产品/辅助技术/性能验证 NOT_RUN。 | 独立复核报告识别出冷启动授权绕过、Index 行状态、重复索引与任务/执行上下文文案歧义；实现自审发现 Index 状态切换会暂时困住有效焦点，补充返回/恢复路径。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -463,15 +464,15 @@ UI-0 文档 lane 已 rebase 到本地 dev 并以 fast-forward 集成：`1a8bbb5a
 
 1. UI-1 已在§17交付本地静态原型；可切换 A/B/C、Project Worktree Index、Worktree 授权状态、同级 Apps、任务卡内 CLI 禁用态与双 scope 草稿。
 2. 静态复核发现并修正撤权后旧 Branch 显示、跨 Worktree 草稿混用、点击切换直接授权、scope 切换后草稿未恢复及未授权 scope 状态读取五项问题；详细证据见§17。
-3. UI-1 未启动浏览器、未产出流程截图，也未作辅助技术或窄屏运行验收；同伴复核仍待补。W14 不因此关闭。
+3. UI-1 已完成独立静态复核并据四项发现修正原型状态/文案；复核报告为 [`WBS-W14-UI1-INDEPENDENT-REVIEW-20261027.md`](../reviews/WBS-W14-UI1-INDEPENDENT-REVIEW-20261027.md)，本 lane 修正记录见 [`PHASE-WBS-W14-UI1-PROTOTYPE-REMEDIATION-20261027.md`](../reports/PHASE-WBS-W14-UI1-PROTOTYPE-REMEDIATION-20261027.md)。Project Index 重新授权时保存有效 Worktree 页面；取消/拒绝/撤权恢复该页面，检查中可显式返回并取消模拟检查；若焦点授权失效则回到 Project/Run workspace。未启动浏览器、未产出流程截图，也未作辅助技术或窄屏运行验收。W14 不因此关闭。
 4. UI-2 的协议与证据清单审查已在§19记录；实际测量仍 NOT_RUN。先由产品/工程 owner 冻结目标设备、真实数据/workload、当前 build、采样配置和预算责任人，再运行 Tauri+React 产品路径的 pilot 与完整复现测量。
 5. UI-3 才能在相同数据/交互契约下比较 Rust-native 原型；UI-4 根据可访问性、许可、性能、取消/背压与完整工作流证据决策迁移或维持现路径。
 
 | 验收项 | 当前结果 |
 |---|---|
-| 导航与运行范围符合已确认方向 | UI-0 文档审查通过；UI-1 静态原型保留同一层级，并在没有有效 Worktree 授权时隐藏 Run Apps 与旧 Branch 值 |
-| 改动范围 | UI-0 两份文档；UI-1 原型、brief、复核报告与 WBS 状态更新；没有产品代码改动 |
-| 文档校验 | UI-1 原型源码/文案复核完成；UI-2 协议与证据清单审查完成；产品构建/测试未运行，UI-1 独立人员复核仍待补 |
+| 导航与运行范围符合已确认方向 | UI-0 文档审查通过；UI-1 保留 Project → Run → Worktree → Branch；冷启动无焦点/授权，Project Index 列表授权与 Worktree 焦点授权独立；仅列表授权允许显示 Index 行，焦点 checking/denied/revoked 清除当前 Branch、Run Apps 与 WORKTREE chat；Index 复验失败/取消时恢复仍有效焦点，检查中有显式返回路径；变体 B 不重复绘制 Index；Task Card 明确归 Run，Worktree/Branch 仅为执行上下文 |
+| 改动范围 | UI-0 两份文档；UI-1 原型、实现 brief、独立复核报告、修正报告与 WBS 同步；没有产品后端或运行时代码改动 |
+| 文档校验 | 独立静态复核发现 I-1–I-4，原型与 WBS 已按报告修正；UI-2 协议与证据清单审查完成；未运行测试/构建/浏览器，生产 API、辅助技术与性能均 NOT_RUN |
 | 桌面运行/性能 | NOT_RUN；仅记录一台未批准的设备候选，无实际 build/provider 运行、RSS、CPU、帧时间或并发容量结论 |
 | W14 状态 | OPEN；UI-2 文档协议审查完成，设备确认与实际测量未完成；下一项是冻结参数并测量，之后 UI-3–UI-4 |
 
@@ -482,12 +483,15 @@ UI-0 文档 lane 已 rebase 到本地 dev 并以 fast-forward 集成：`1a8bbb5a
 - Brief：`docs/briefs/WBS-W14-UI1-FLOW-PROTOTYPE-20261026.md`。
 - 原型：`docs/prototypes/w14-ui1-flow-20261026/index.html`，单文件静态 HTML/CSS/JavaScript，无依赖、API、持久化或 Shell。
 - 复核：`docs/reviews/WBS-W14-UI1-FLOW-REVIEW-20261026.md`，包含验收矩阵、状态图、修正记录与未决门。
+- 独立复核：[`WBS-W14-UI1-INDEPENDENT-REVIEW-20261027.md`](../reviews/WBS-W14-UI1-INDEPENDENT-REVIEW-20261027.md)；修正记录：[`PHASE-WBS-W14-UI1-PROTOTYPE-REMEDIATION-20261027.md`](../reports/PHASE-WBS-W14-UI1-PROTOTYPE-REMEDIATION-20261027.md)。
 - 变体：A 项目树工作台、B Project Worktree Index、C 聚焦式控制台；都保留 Project → Engineering Run → Worktree → Branch。
 - 集成：源 lane commit `265edcd9` 已 fast-forward 到 Orca `dev` checkout；source worktree 与已合入 branch 均清理。三个 ignored Python bytecode 文件逐项 SHA-256/长度校验后保存在 `C:\Users\leo19\.codex\preserved-worktree-ignored\wbs-w14-ui1-flow-20261026\scripts\automation\guardian\__pycache__`。本地远端跟踪状态为 ahead 76；未 fetch、未 push。
 
 ### 17.2 交互与安全状态
 
-选择 Worktree、打开深链或撤权后重试会先进入 checking；拒绝/撤权/检查中不展示 Run App tabs、旧 Branch 值或 Worktree 聊天 scope。授权演示通过后，才出现 Inbox、Task Cards、Canvas、Workflow、Run BI/Benchmark 与 Plugin Apps 同级 tabs。Project Worktree Index 属 Project 范围，但真实数据仍必须按当前 actor 授权过滤；打开一行再次执行 Worktree 级授权检查。Canvas 节点回到 canonical Task Card。Task Card CLI、发送消息以及未连接 Apps 明确禁用/未接入。GLOBAL 草稿与按 Worktree ID 分区的 WORKTREE 草稿分别保存于本地演示内存。
+冷启动没有 Worktree 焦点或已通过授权。Project Index 列表与 Worktree 焦点分别验证：列表授权未通过时，A/B/C 左侧树和 Index 均不显示受保护的 Worktree 名称、Branch 行或计数；列表授权通过后可以显示 Index 样例行，但这不授权打开某个 Worktree。点击行/选择 Worktree/显式模拟深链后进入新的焦点 checking；未通过或撤销 Worktree 焦点时，当前焦点的 Branch、Run App tabs、任务详情和 WORKTREE chat scope 清除。若 Project Index 列表授权仍有效，独立列表行可以保留；它们不表示当前焦点已授权，Branch 树叶只在该 Worktree 焦点 ready 时显示。Index 列表复验、拒绝或撤权只隐藏受保护列表行，不撤销另一条仍有效的 Worktree 焦点授权，也不改写其 WORKTREE/GLOBAL scope。进入 Index 复验前保存有效 Worktree 页面；取消/拒绝/撤权后若该焦点仍有效就恢复其 Apps/Branch/chat，检查期间有“返回当前 Worktree”入口并取消本地模拟检查；若焦点授权已失效则返回无焦点 workspace。
+
+焦点授权通过后，Inbox、Task Cards、Canvas、Workflow、Run BI/Benchmark 与 Plugin Apps 才作为同级 Run Apps 出现。变体 B 的固定 Index 只绘制一次；右侧展示选择提示或焦点授权状态。Canvas 节点回到 canonical Task Card。Task Card 归属 Run；当前 Worktree 与本地 Branch 只作为受控 CLI 的执行上下文，CLI、发送消息以及未连接 Apps 明确禁用/未接入。GLOBAL 草稿与按 Worktree ID 分区的 WORKTREE 草稿分别保存在本地演示内存。
 
 所有工作区、任务、分支及状态都是原型场景数据。页面没有产品服务、执行器或数据库接线，不可作为生产行为、Agent 执行、实时权限或性能证据。
 
@@ -495,13 +499,21 @@ UI-0 文档 lane 已 rebase 到本地 dev 并以 fast-forward 集成：`1a8bbb5a
 
 | 门 | 结果 |
 |---|---|
-| 导航/App/chat 结构和静态授权状态 | 源码级自审完成；三类状态风险已修正 |
-| 独立人员复核 | 待补；当前报告由同一实现者复核，不冒充独立审查 |
+| 导航/App/chat 结构和静态授权状态 | 独立复核后源码级修正完成；Index 行受独立列表授权控制，焦点内容按 Worktree 授权与 generation 清理 |
+| 独立人员复核 | 已完成；报告 [`WBS-W14-UI1-INDEPENDENT-REVIEW-20261027.md`](../reviews/WBS-W14-UI1-INDEPENDENT-REVIEW-20261027.md) 记录 I-1–I-4，未把静态审查当作运行验收 |
 | 浏览器/键盘/读屏/窄屏体验 | NOT_RUN；没有截图或辅助技术验证 |
 | 产品 API、Worktree 权限、Task/Canvas 事实、受控 CLI | NOT_RUN/未接入；执行仍关闭 |
 | RSS、CPU、帧时间、缓存、并行负载 | NOT_RUN；交由 UI-2 冻结 workload 后测量 |
 
 UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议与未知项见§19；在目标设备、真实 workload/build、预算和采样 profile 获确认前不得将其标为实测完成，也不得据原型选定生产框架。随后 UI-3 才做同数据 Rust-native 比较，UI-4 再作迁移或维持决策。
+
+### 17.4 独立复核与静态原型修正（2026-10-27）
+
+- I-1：冷启动默认为 idle、无焦点、无已通过授权；只有显式 Index 验证或深链动作进入 checking，模拟通过后才呈现相应范围。
+- I-2：独立建模 Project Index 列表授权和 Worktree 焦点授权。Index 未授权/检查中/拒绝/撤销时隐藏 A/B/C 各变体左侧树中的 Worktree/Branch 对象行和 Index 表行。有效 Index 列表授权可在单个 Worktree 焦点 checking/denied/revoked 时保留 Project 范围样例行；这些行明确标注为独立列表授权，不等于当前焦点授权。焦点失效时，当前 Worktree Branch 树叶、Run Apps、任务详情和 WORKTREE 聊天范围清除。反向也保持独立：Index 复验/拒绝/撤权只影响列表可见性，不撤销另有有效授权的 Worktree 焦点或其聊天 scope；Index 复验取消/拒绝/撤权时恢复仍有效焦点页面，检查中提供显式返回焦点并取消本地检查的入口。
+- I-3：变体 B 的 Project Worktree Index 只绘制一次；右侧显示选择提示或 Worktree 焦点状态。
+- I-4：Task Card 标为 Run 级任务；Worktree/本地 Branch 仅为 CLI 执行上下文；受控 CLI 保持禁用。
+- 静态对照通过 `index.html` 源码与本节 WBS 描述完成。没有运行浏览器、测试、构建、辅助技术、产品 API、生产执行或性能采样；generation 仅是同步静态演示状态，不证明真实异步授权回调安全。故本节不关闭 UI-1 运行态门或 W14。
 
 ## 18. W0 VCD-0 分支收敛审计（2026-10-26）
 

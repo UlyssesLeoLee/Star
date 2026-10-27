@@ -1,57 +1,41 @@
 <!--
-@cypher schema=1
-CREATE
-  (file:File {name: "index.html", type: "file", language: "html"}),
-  (state:Variable {name: "state", type: "variable", language: "javascript"}),
-  (variantNames:Variable {name: "variantNames", type: "variable", language: "javascript"}),
-  (root:Variable {name: "root", type: "variable", language: "javascript"}),
-  (render:Function {name: "render", type: "function", language: "javascript"}),
-  (beginAuthorization:Function {name: "beginWorktreeAuthorization", type: "function", language: "javascript"}),
-  (handleClick:Function {name: "handleClick", type: "function", language: "javascript"}),
-  (handleInput:Function {name: "handleInput", type: "function", language: "javascript"}),
-  (searchParams:Function {name: "URLSearchParams", type: "function", language: "javascript"}),
-  (url:Function {name: "URL", type: "function", language: "javascript"}),
-  (replaceState:Function {name: "history.replaceState", type: "function", language: "javascript"}),
-  (getElementById:Function {name: "document.getElementById", type: "function", language: "javascript"}),
-  (addEventListener:Function {name: "document.addEventListener", type: "function", language: "javascript"}),
-  (closest:Function {name: "event.target.closest", type: "function", language: "javascript"}),
-  (matches:Function {name: "event.target.matches", type: "function", language: "javascript"}),
-  (entry:Logic {name: "initial render and event registration", type: "logic", language: "javascript"}),
-  (dispatch:Logic {name: "data-action state transitions", type: "logic", language: "javascript"}),
-  (focusGate:Logic {name: "authorization and Worktree focus visibility gate", type: "logic", language: "javascript"}),
-  (scopeDrafts:Logic {name: "scope-partitioned in-memory chat drafts", type: "logic", language: "javascript"}),
-  (file)-[:CONTAINS]->(state),
-  (file)-[:CONTAINS]->(variantNames),
-  (file)-[:CONTAINS]->(root),
-  (file)-[:CONTAINS]->(render),
-  (file)-[:CONTAINS]->(beginAuthorization),
-  (file)-[:CONTAINS]->(handleClick),
-  (file)-[:CONTAINS]->(handleInput),
-  (file)-[:CONTAINS]->(entry),
-  (file)-[:CONTAINS]->(dispatch),
-  (file)-[:CONTAINS]->(focusGate),
-  (file)-[:CONTAINS]->(scopeDrafts),
-  (entry)-[:CALLS]->(searchParams),
-  (entry)-[:CALLS]->(addEventListener),
-  (entry)-[:CALLS]->(render),
-  (render)-[:CALLS]->(getElementById),
-  (render)-[:USES]->(state),
-  (render)-[:USES]->(variantNames),
-  (beginAuthorization)-[:USES]->(state),
-  (handleClick)-[:CALLS]->(closest),
-  (handleClick)-[:CALLS]->(beginAuthorization),
-  (handleClick)-[:CALLS]->(searchParams),
-  (handleClick)-[:CALLS]->(url),
-  (handleClick)-[:CALLS]->(replaceState),
-  (handleClick)-[:CALLS]->(render),
-  (handleClick)-[:USES]->(state),
-  (handleClick)-[:USES]->(variantNames),
-  (handleClick)-[:USES]->(dispatch),
-  (handleClick)-[:USES]->(focusGate),
-  (handleInput)-[:CALLS]->(matches),
-  (handleInput)-[:CALLS]->(getElementById),
-  (handleInput)-[:USES]->(state),
-  (handleInput)-[:USES]->(scopeDrafts);
+@cypher schema=1 source_sha256=d3f3ed69fe3745d8d5f3c1bb5d176a6b17e12b99df3d3657b6be98f1b660d04c
+MERGE (self:File {path:"docs/prototypes/w14-ui1-flow-20261026/index.html"})
+MERGE (state:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::state", kind:"state"})
+MERGE (render:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::render", kind:"function"})
+MERGE (clearWorktreeFocus:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::clearWorktreeFocus", kind:"function"})
+MERGE (worktreeFocusReady:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::worktreeFocusReady", kind:"function"})
+MERGE (restoreIndexReturnView:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::restoreIndexReturnView", kind:"function"})
+MERGE (beginWorktreeAuthorization:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::beginWorktreeAuthorization", kind:"function"})
+MERGE (beginProjectIndexAuthorization:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::beginProjectIndexAuthorization", kind:"function"})
+MERGE (indexAuthorizationReady:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::indexAuthorizationReady", kind:"function"})
+MERGE (handleClick:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::handleClick", kind:"function"})
+MERGE (self)-[:DEFINES]->(state)
+MERGE (self)-[:DEFINES]->(render)
+MERGE (self)-[:DEFINES]->(clearWorktreeFocus)
+MERGE (self)-[:DEFINES]->(worktreeFocusReady)
+MERGE (self)-[:DEFINES]->(restoreIndexReturnView)
+MERGE (self)-[:DEFINES]->(beginWorktreeAuthorization)
+MERGE (self)-[:DEFINES]->(beginProjectIndexAuthorization)
+MERGE (self)-[:DEFINES]->(indexAuthorizationReady)
+MERGE (self)-[:DEFINES]->(handleClick)
+MERGE (render)-[:USES]->(state)
+MERGE (render)-[:CALLS]->(indexAuthorizationReady)
+MERGE (clearWorktreeFocus)-[:USES]->(state)
+MERGE (worktreeFocusReady)-[:USES]->(state)
+MERGE (restoreIndexReturnView)-[:USES]->(state)
+MERGE (beginWorktreeAuthorization)-[:USES]->(state)
+MERGE (beginWorktreeAuthorization)-[:CALLS]->(clearWorktreeFocus)
+MERGE (restoreIndexReturnView)-[:CALLS]->(worktreeFocusReady)
+MERGE (beginProjectIndexAuthorization)-[:USES]->(state)
+MERGE (beginProjectIndexAuthorization)-[:CALLS]->(worktreeFocusReady)
+MERGE (indexAuthorizationReady)-[:USES]->(state)
+MERGE (handleClick)-[:USES]->(state)
+MERGE (handleClick)-[:CALLS]->(beginWorktreeAuthorization)
+MERGE (handleClick)-[:CALLS]->(beginProjectIndexAuthorization)
+MERGE (handleClick)-[:CALLS]->(restoreIndexReturnView)
+MERGE (handleClick)-[:CALLS]->(worktreeFocusReady)
+MERGE (handleClick)-[:CALLS]->(render);
 @endcypher
 -->
 <!doctype html>
@@ -121,6 +105,7 @@ CREATE
     .tree-block { margin-top: 21px; }
     .tree-indent { margin-left: 12px; padding-left: 12px; border-left: 1px solid #34414f; }
     .tree-node { display: flex; width: 100%; align-items: center; gap: 8px; margin: 4px 0; padding: 8px 7px; text-align: left; }
+    .tree-access-state { margin: 6px 0 9px; padding: 9px; border: 1px dashed #384453; border-radius: 9px; color: var(--muted); font-size: 10px; line-height: 1.5; }
     .tree-node.selected { border-color: #3b6963; background: var(--accent-wash); }
     .tree-node.selected .node-icon { background: #28544e; color: var(--accent-strong); }
     .node-caret { width: 13px; color: var(--soft); font-size: 11px; }
@@ -182,7 +167,8 @@ CREATE
     .empty-state, .not-connected { display: grid; min-height: 300px; place-items: center; padding: 24px; border: 1px dashed #3a4654; border-radius: 14px; text-align: center; }
     .empty-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
     .empty-icon { display: grid; width: 43px; height: 43px; place-items: center; margin: 0 auto 12px; border: 1px solid #405263; border-radius: 13px; background: #202a35; color: var(--blue); font-size: 18px; }
-    .empty-state h2, .not-connected h2 { margin: 0; font-size: 14px; }
+    .empty-state h2, .empty-state h3, .not-connected h2 { margin: 0; font-size: 14px; }
+    .empty-state h3 { font-size: 13px; }
     .empty-state p, .not-connected p { max-width: 420px; margin: 8px auto 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }
     .primary-button { padding: 9px 12px; border-color: #55968b; background: #27635a; color: #e4fff7; font-size: 11px; font-weight: 650; }
     .primary-button:hover { background: #34786c; transform: translateY(-1px); }
@@ -294,7 +280,8 @@ CREATE
     <span><strong>UI-1 本地交互原型</strong> · 仅演示导航与状态；目录为样例数据，不连接服务或执行命令。</span>
     <div class="prototype-actions">
       <button class="quiet-button" type="button" data-action="simulate-deep-link">模拟深链授权</button>
-      <button class="quiet-button" type="button" data-action="revoke-access">模拟撤权</button>
+      <button class="quiet-button" type="button" data-action="revoke-access">模拟撤销 Worktree 焦点权限</button>
+      <button class="quiet-button" type="button" data-action="revoke-index-access">模拟撤销 Project Index 列表权限</button>
     </div>
   </div>
   <div class="app-frame">
@@ -322,53 +309,93 @@ CREATE
     const initialVariant = new URLSearchParams(window.location.search).get("variant");
     const state = {
       variant: variantNames[initialVariant] ? initialVariant : "A",
-      worktreeId: "wt-navigation",
-      focus: true,
-      authorization: "ready",
-      view: "apps",
+      worktreeId: null,
+      focus: false,
+      authorization: "idle",
+      authorizationGeneration: 0,
+      authorizedGeneration: null,
+      indexAuthorization: "idle",
+      indexGeneration: 0,
+      indexAuthorizedGeneration: null,
+      indexReturnView: "workspace",
+      view: "workspace",
       app: "tasks",
       taskOpen: false,
-      chatScope: "WORKTREE",
-      pendingWorktreeId: "wt-navigation",
+      chatScope: "GLOBAL",
+      pendingWorktreeId: null,
       drafts: { WORKTREE: { "wt-navigation": "", "wt-validation": "" }, GLOBAL: "" }
     };
     const root = document.getElementById("prototype");
 
-    function beginWorktreeAuthorization(worktreeId) {
-      state.pendingWorktreeId = worktreeId;
-      state.worktreeId = worktreeId;
+    function clearWorktreeFocus(nextAuthorization = "idle") {
+      state.authorizationGeneration += 1;
+      state.authorizedGeneration = null;
+      state.worktreeId = null;
+      state.pendingWorktreeId = null;
       state.focus = false;
-      state.authorization = "checking";
-      state.view = "apps";
+      state.authorization = nextAuthorization;
       state.taskOpen = false;
       state.chatScope = "GLOBAL";
+      state.indexReturnView = "workspace";
+    }
+
+    function worktreeFocusReady() {
+      return state.focus && state.authorization === "ready" && state.authorizedGeneration === state.authorizationGeneration && !!state.worktreeId;
+    }
+
+    function restoreIndexReturnView() {
+      state.view = worktreeFocusReady() && state.indexReturnView === "apps" ? "apps" : "workspace";
+      state.indexReturnView = "workspace";
+    }
+
+    function beginWorktreeAuthorization(worktreeId) {
+      clearWorktreeFocus("checking");
+      state.pendingWorktreeId = worktreeId;
+      state.view = "workspace";
+    }
+
+    function beginProjectIndexAuthorization() {
+      if (worktreeFocusReady()) state.indexReturnView = "apps";
+      else if (state.view !== "index") state.indexReturnView = "workspace";
+      state.indexGeneration += 1;
+      state.indexAuthorizedGeneration = null;
+      state.indexAuthorization = "checking";
+      state.view = "index";
+    }
+
+    function indexAuthorizationReady() {
+      return state.indexAuthorization === "ready" && state.indexAuthorizedGeneration === state.indexGeneration;
     }
 
     function render() {
       const variant = state.variant;
-      const focusReady = state.focus && state.authorization === "ready";
+      const focusReady = worktreeFocusReady();
+      const showIndexRows = indexAuthorizationReady();
       const showApps = focusReady && state.view === "apps";
+      const worktreeTree = showIndexRows ? `
+        <div class="tree-indent">
+          <button class="tree-node ${focusReady && state.worktreeId === "wt-navigation" ? "selected" : ""}" type="button" data-action="select-navigation">
+            <span class="node-icon" aria-hidden="true">W</span><span class="node-copy"><span class="node-title">导航流程</span><span class="node-meta">Worktree · Project 列表样例</span></span>
+          </button>
+          ${focusReady && state.worktreeId === "wt-navigation" ? `<div class="branch-leaf">Branch · local/ui/navigation</div>` : ""}
+          <button class="tree-node ${focusReady && state.worktreeId === "wt-validation" ? "selected" : ""}" type="button" data-action="select-validation">
+            <span class="node-icon" aria-hidden="true">W</span><span class="node-copy"><span class="node-title">授权验证</span><span class="node-meta">Worktree · Project 列表样例</span></span>
+          </button>
+          ${focusReady && state.worktreeId === "wt-validation" ? `<div class="branch-leaf">Branch · local/ui/validation</div>` : ""}
+        </div>` : `
+        <div class="tree-access-state">${state.indexAuthorization === "checking" ? "Project Index 列表权限正在验证；受保护的 Worktree 与 Branch 行已收起。" : state.indexAuthorization === "denied" || state.indexAuthorization === "revoked" ? "Project Index 列表未授权；受保护的 Worktree 与 Branch 行已隐藏。" : "先验证 Project Index 列表权限；对象名称与 Branch 值已隐藏。"}</div>`;
       const projectTree = `
         <div class="section-label">Project</div>
         <button class="project-option" type="button" aria-current="page">
           <span class="project-icon" aria-hidden="true">P</span>
-          <span class="project-copy"><span class="project-title">示例项目</span><span class="project-meta">2 个 Runs · 本地演示</span></span>
+          <span class="project-copy"><span class="project-title">Project 导航容器</span><span class="project-meta">身份与资源按授权加载</span></span>
           <span aria-hidden="true">⌄</span>
         </button>
         <div class="tree-block">
           <div class="section-label">Engineering Runs</div>
           <div class="tree-indent">
-            <div class="tree-node" aria-current="true"><span class="node-caret" aria-hidden="true">⌄</span><span class="node-icon" aria-hidden="true">R</span><span class="node-copy"><span class="node-title">工作区导航</span><span class="node-meta">Engineering Run</span></span></div>
-            <div class="tree-indent">
-              <button class="tree-node ${state.worktreeId === "wt-navigation" ? "selected" : ""}" type="button" data-action="select-navigation">
-                <span class="node-icon" aria-hidden="true">W</span><span class="node-copy"><span class="node-title">导航流程</span><span class="node-meta">Worktree · 当前焦点</span></span>
-              </button>
-              ${focusReady && state.worktreeId === "wt-navigation" ? `<div class="branch-leaf">Branch · local/ui/navigation</div>` : ""}
-              <button class="tree-node ${state.worktreeId === "wt-validation" ? "selected" : ""}" type="button" data-action="select-validation">
-                <span class="node-icon" aria-hidden="true">W</span><span class="node-copy"><span class="node-title">授权验证</span><span class="node-meta">Worktree · 本地 checkout</span></span>
-              </button>
-              ${focusReady && state.worktreeId === "wt-validation" ? `<div class="branch-leaf">Branch · local/ui/validation</div>` : ""}
-            </div>
+            <div class="tree-node" aria-current="true"><span class="node-caret" aria-hidden="true">⌄</span><span class="node-icon" aria-hidden="true">R</span><span class="node-copy"><span class="node-title">Engineering Run</span><span class="node-meta">Run 导航容器</span></span></div>
+            ${worktreeTree}
           </div>
         </div>
         <button class="index-link" type="button" data-action="show-index"><span aria-hidden="true">▦</span> Project Worktree Index <span aria-hidden="true">↗</span></button>
@@ -380,8 +407,8 @@ CREATE
           <div class="summary-cell"><span class="summary-label">Worktree / Branch</span><span class="summary-value mono">${state.worktreeId === "wt-navigation" ? "导航流程 · local/ui/navigation" : "授权验证 · local/ui/validation"}</span></div>
         </div>` : `
         <div class="run-summary" aria-label="当前资源路径">
-          <div class="summary-cell"><span class="summary-label">Project</span><span class="summary-value">示例项目</span></div>
-          <div class="summary-cell"><span class="summary-label">Engineering Run</span><span class="summary-value">工作区导航</span></div>
+          <div class="summary-cell"><span class="summary-label">Project</span><span class="summary-value">Project</span></div>
+          <div class="summary-cell"><span class="summary-label">Engineering Run</span><span class="summary-value">Engineering Run</span></div>
           <div class="summary-cell"><span class="summary-label">Worktree</span><span class="summary-value">未验证</span></div>
           <div class="summary-cell"><span class="summary-label">Branch</span><span class="summary-value">未加载</span></div>
         </div>`;
@@ -394,34 +421,43 @@ CREATE
           <button class="tab ${state.app === "bi" ? "active" : ""}" type="button" data-action="tab-bi" aria-pressed="${state.app === "bi"}">Run BI / Benchmark</button>
           <button class="tab ${state.app === "plugins" ? "active" : ""}" type="button" data-action="tab-plugins" aria-pressed="${state.app === "plugins"}">Plugin Apps</button>
         </nav>` : "";
+      const indexRows = `
+        <div style="overflow-x:auto">
+          <table class="index-table"><thead><tr><th>Engineering Run</th><th>Worktree</th><th>Branch（本地）</th><th>状态</th><th></th></tr></thead><tbody>
+            <tr><td>工作区导航</td><td>导航流程 · 样例</td><td class="mono-text">local/ui/navigation · 样例</td><td><span class="row-status">演示项</span></td><td><button class="worktree-row-button" type="button" data-action="open-navigation">验证并打开</button></td></tr>
+            <tr><td>工作区导航</td><td>授权验证 · 样例</td><td class="mono-text">local/ui/validation · 样例</td><td><span class="row-status">演示项</span></td><td><button class="worktree-row-button" type="button" data-action="open-validation">验证并打开</button></td></tr>
+          </tbody></table>
+        </div>`;
+      const indexStatus = state.indexAuthorization === "checking" ? `
+        <div class="empty-state"><div><div class="empty-icon" aria-hidden="true">…</div><h3>正在验证 Project Index 列表权限</h3><p>列表授权与 Worktree 焦点授权相互独立。验证期间不显示 Worktree 名称、计数或 Branch 值。</p><div class="empty-actions"><button class="primary-button" type="button" data-action="authorize-index">模拟列表验证通过</button><button class="secondary-button" type="button" data-action="deny-index">模拟无权查看列表</button><button class="quiet-button" type="button" data-action="cancel-index">取消</button></div></div></div>` : state.indexAuthorization === "denied" || state.indexAuthorization === "revoked" ? `
+        <div class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h3>Project Index 列表未授权</h3><p>受保护的 Worktree 行和 Branch 值已隐藏。重新验证仅检查列表权限，不会授权打开具体 Worktree。</p><button class="primary-button" type="button" data-action="retry-index">重新验证 Project Index</button></div></div>` : !indexAuthorizationReady() ? `
+        <div class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h3>先验证 Project Index 列表权限</h3><p>列表权限只允许查看 Project 范围的样例；打开每个 Worktree 时还会单独验证 Worktree 焦点。</p><button class="primary-button" type="button" data-action="retry-index">验证 Project Index 列表权限</button></div></div>` : indexRows;
       const indexMarkup = `
         <section class="index-panel" aria-labelledby="indexTitle">
-          <div class="content-heading"><div><div class="eyebrow">Project view</div><h2 id="indexTitle">Project Worktree Index</h2></div><span class="count-pill">2 个样例 Worktrees</span></div>
-          <p class="subtle">这是 Project 范围的汇总入口；真实列表只包含当前用户有权查看的项。打开 Worktree 后仍须重新验证权限。</p>
-          <div style="overflow-x:auto">
-            <table class="index-table"><thead><tr><th>Engineering Run</th><th>Worktree</th><th>Branch（本地）</th><th>状态</th><th></th></tr></thead><tbody>
-              <tr><td>工作区导航</td><td>导航流程</td><td class="mono-text">local/ui/navigation</td><td><span class="row-status"><span class="status-dot"></span>可用</span></td><td><button class="worktree-row-button" type="button" data-action="open-navigation">打开</button></td></tr>
-              <tr><td>工作区导航</td><td>授权验证</td><td class="mono-text">local/ui/validation</td><td><span class="row-status"><span class="status-dot"></span>可用</span></td><td><button class="worktree-row-button" type="button" data-action="open-validation">打开</button></td></tr>
-            </tbody></table>
-          </div>
+          <div class="content-heading"><div><div class="eyebrow">Project view</div><h2 id="indexTitle">Project Worktree Index</h2></div>${showIndexRows ? `<span class="count-pill">2 个样例 Worktrees</span>` : ""}</div>
+          ${state.view === "index" && focusReady ? `<button class="secondary-button" type="button" data-action="return-focus">返回当前 Worktree（取消列表验证）</button>` : ""}
+          <p class="subtle">Project 列表权限与单个 Worktree 焦点权限分别验证；列表行只代表独立列表授权，不代表当前 Worktree 焦点已授权。打开每个 Worktree 都会重新检查焦点。行内对象仅为原型样例。</p>
+          ${indexStatus}
         </section>`;
       let appMarkup = "";
-      if (state.authorization === "checking") {
-        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">…</div><h2>正在验证 Worktree scope</h2><p>验证期间隐藏 Run Apps、Branch 和旧焦点内容。按钮只切换本地原型状态。</p><div class="empty-actions"><button class="primary-button" type="button" data-action="authorize-link">模拟验证通过</button><button class="secondary-button" type="button" data-action="deny-link">模拟无权访问</button><button class="quiet-button" type="button" data-action="cancel-auth">取消并返回 Project</button></div></div></section>`;
-      } else if (!focusReady) {
-        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h2>${state.authorization === "denied" ? "当前身份无权访问此 Worktree" : "先选择并验证一个 Worktree"}</h2><p>${state.authorization === "revoked" ? "当前 Worktree 授权已撤销，应用与旧 Branch 内容已隐藏。" : state.authorization === "denied" ? "没有 Worktree 焦点；可切换到其他授权资源或重新验证。" : "Project 和 Run 可见；Run 应用只在 Worktree 焦点及实时授权通过后出现。"}</p><button class="primary-button" type="button" data-action="retry-auth">重新验证当前 Worktree</button></div></section>`;
+      if (state.view === "index" && variant === "B") {
+        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h2>${indexAuthorizationReady() ? "从左侧 Project Index 选择 Worktree" : "Project 列表尚未授权"}</h2><p>Index 只提供 Project 范围的列表视图。打开一项后还会单独验证 Worktree 焦点；两个权限没有相互继承关系。</p></div></section>`;
       } else if (state.view === "index") {
         appMarkup = indexMarkup;
+      } else if (state.authorization === "checking") {
+        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">…</div><h2>正在验证 Worktree scope</h2><p>验证期间隐藏 Run Apps、Branch 和旧焦点内容。按钮只切换本地原型状态。</p><div class="empty-actions"><button class="primary-button" type="button" data-action="authorize-link">模拟验证通过</button><button class="secondary-button" type="button" data-action="deny-link">模拟无权访问</button><button class="quiet-button" type="button" data-action="cancel-auth">取消并返回 Project</button></div></div></section>`;
+      } else if (!focusReady) {
+        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h2>${state.authorization === "denied" ? "当前身份无权访问此 Worktree" : state.authorization === "revoked" ? "Worktree 授权已撤销" : "先选择并验证一个 Worktree"}</h2><p>${state.authorization === "revoked" ? "Worktree 焦点、Run Apps、Branch 值和 WORKTREE 聊天范围已清除。" : state.authorization === "denied" ? "当前没有 Worktree 焦点；Run Apps、Branch 值和 WORKTREE 聊天范围均已清除。" : "Project 与 Run 导航保留；先验证 Project Index 列表，或显式模拟深链，再单独验证 Worktree 焦点。"}</p><div class="empty-actions"><button class="primary-button" type="button" data-action="show-index">验证 Project Index</button><button class="secondary-button" type="button" data-action="simulate-deep-link">显式模拟深链</button>${state.pendingWorktreeId ? `<button class="quiet-button" type="button" data-action="retry-auth">重新验证当前 Worktree</button>` : ""}</div></div></section>`;
       } else if (state.taskOpen && state.app === "tasks") {
         appMarkup = `
           <section class="content-area" aria-labelledby="taskDetailTitle">
-            <div class="content-heading"><div><div class="eyebrow">Task Card · Worktree bound</div><h2 id="taskDetailTitle">整理 Project → Run 导航状态</h2></div><button class="small-button" type="button" data-action="close-task">返回任务列表</button></div>
-            <div class="detail-grid"><div class="detail-block"><h3>任务上下文</h3><p>此任务绑定当前 Run、Worktree 与本地 Branch。工作目录、授权范围和结果回写由同一任务上下文固定。</p><ul><li>Worktree：${state.worktreeId === "wt-navigation" ? "导航流程" : "授权验证"}</li><li>Branch：${state.worktreeId === "wt-navigation" ? "local/ui/navigation" : "local/ui/validation"}</li><li>完成后需要独立验证并记录证据。</li></ul><div class="cli-locked"><strong>受控 CLI 尚未接入</strong><p>必须先具备真实 Agent Runtime、隔离 sandbox、原生 Hook、资源预算、当前授权复验、取消/恢复、独立验证和结果回写。</p><button class="disabled-button" type="button" disabled aria-disabled="true">打开受控 CLI · 当前不可用</button></div></div><div class="detail-block"><h3>任务状态</h3><p><span class="task-state review">待验证</span></p><p>任务可见不代表 Agent 执行 provider 已连接。此原型不会启动终端或写入任务数据。</p><button class="secondary-button" type="button" data-action="tab-canvas">在 Canvas 中查看关联</button></div></div>
+            <div class="content-heading"><div><div class="eyebrow">Run 级 Task Card</div><h2 id="taskDetailTitle">整理 Project → Run 导航状态</h2></div><button class="small-button" type="button" data-action="close-task">返回任务列表</button></div>
+            <div class="detail-grid"><div class="detail-block"><h3>任务归属与执行上下文</h3><p>Task Card 归属当前 Engineering Run。Worktree 与本地 Branch 只是 CLI 的执行上下文，不改变任务归属；启用 CLI 时必须使用当前重新授权的 Worktree。</p><ul><li>任务归属：工作区导航 Run</li><li>CLI Worktree：${state.worktreeId === "wt-navigation" ? "导航流程" : "授权验证"}（当前授权焦点）</li><li>本地 Branch：${state.worktreeId === "wt-navigation" ? "local/ui/navigation" : "local/ui/validation"}</li><li>完成后需要独立验证并记录证据。</li></ul><div class="cli-locked"><strong>受控 CLI 尚未接入</strong><p>必须先具备真实 Agent Runtime、隔离 sandbox、原生 Hook、资源预算、当前授权复验、取消/恢复、独立验证和结果回写。</p><button class="disabled-button" type="button" disabled aria-disabled="true">打开受控 CLI · 当前不可用</button></div></div><div class="detail-block"><h3>任务状态</h3><p><span class="task-state review">待验证</span></p><p>任务可见不代表 Agent 执行 provider 已连接。此原型不会启动终端或写入任务数据。</p><button class="secondary-button" type="button" data-action="tab-canvas">在 Canvas 中查看关联</button></div></div>
           </section>`;
       } else if (state.app === "tasks") {
         appMarkup = `
           <section class="content-area" aria-labelledby="taskListTitle">
-            <div class="content-heading"><div><div class="eyebrow">Run App · Worktree scope</div><h2 id="taskListTitle">Task Cards</h2></div><span class="count-pill">2 个原型场景</span></div>
+            <div class="content-heading"><div><div class="eyebrow">Run App · Run 级任务</div><h2 id="taskListTitle">Task Cards</h2></div><span class="count-pill">2 个原型场景</span></div>
             <div class="task-list">
               <button class="task-card" type="button" data-action="open-task"><span class="task-mark" aria-hidden="true">T1</span><span style="text-align:left"><span class="task-title">整理 Project → Run 导航状态</span><span class="task-meta">负责人：本地场景 · 关联 Canvas 节点 1</span></span><span class="task-state review">待验证</span></button>
               <button class="task-card" type="button" data-action="open-task"><span class="task-mark" aria-hidden="true">T2</span><span style="text-align:left"><span class="task-title">补齐 Worktree 焦点撤权流程</span><span class="task-meta">负责人：本地场景 · 关联 Canvas 节点 2</span></span><span class="task-state">待处理</span></button>
@@ -445,7 +481,7 @@ CREATE
           <section class="focus-panel"><div class="page-heading"><div><div class="eyebrow">Current Worktree</div><h1>Run 工作区</h1><p class="heading-subtitle">从 Project Index 打开后，进入对应 Run 与 Worktree。</p></div>${statusPill}</div>${summary}${appTabs}${appMarkup}</section>
         </div>` : `
         <main class="main-panel">
-          <div class="page-heading"><div><div class="eyebrow">Engineering Run · 工作区导航</div><h1>${state.view === "index" ? "Project Worktree Index" : "Run 工作区"}</h1><p class="heading-subtitle">${state.view === "index" ? "跨 Worktree 汇总；选择一项后返回对应 Worktree。" : "先确定有效 Worktree 焦点，再浏览该 Run 的应用。"}</p></div>${statusPill}</div>
+          <div class="page-heading"><div><div class="eyebrow">Engineering Run · 工作区</div><h1>${state.view === "index" ? "Project Worktree Index" : "Run 工作区"}</h1><p class="heading-subtitle">${state.view === "index" ? "跨 Worktree 汇总；选择一项后返回对应 Worktree。" : "先确定有效 Worktree 焦点，再浏览该 Run 的应用。"}</p></div>${statusPill}</div>
           ${variant === "C" ? `<div class="stepper" aria-label="导航层级"><span class="step active"><span class="step-number">1</span>Project</span><span class="step-line"></span><span class="step active"><span class="step-number">2</span>Run</span><span class="step-line"></span><span class="step ${focusReady ? "active" : ""}"><span class="step-number">3</span>Worktree</span><span class="step-line"></span><span class="step ${focusReady ? "active" : ""}"><span class="step-number">4</span>Branch</span></div>` : ""}
           ${summary}${appTabs}<div class="content-area">${appMarkup}</div>
         </main>`;
@@ -454,7 +490,7 @@ CREATE
       } else if (variant === "B") {
         root.innerHTML = `<div class="layout layout-b"><aside class="project-rail" aria-label="Project 与 Run 导航">${projectTree}</aside>${bodyContent}</div>`;
       } else {
-        root.innerHTML = `<div class="layout layout-c"><aside class="project-rail" aria-label="Project 导航">${projectTree}</aside><div><div class="mobile-project"><strong>Project · 示例项目</strong><button class="small-button" type="button" data-action="show-index">Worktree Index</button></div>${bodyContent}</div></div>`;
+        root.innerHTML = `<div class="layout layout-c"><aside class="project-rail" aria-label="Project 导航">${projectTree}</aside><div><div class="mobile-project"><strong>Project 导航</strong><button class="small-button" type="button" data-action="show-index">Worktree Index</button></div>${bodyContent}</div></div>`;
       }
       document.getElementById("chatDock").innerHTML = `
         <div class="chat-shell" aria-label="底部聊天栏">
@@ -475,7 +511,8 @@ CREATE
       const button = event.target.closest("[data-action]");
       if (!button || button.disabled) return;
       const action = button.dataset.action;
-      const focusReady = state.focus && state.authorization === "ready";
+      const focusReady = worktreeFocusReady();
+      const showIndexRows = indexAuthorizationReady();
       const actionToApp = { "tab-inbox": "inbox", "tab-tasks": "tasks", "tab-canvas": "canvas", "tab-workflow": "workflow", "tab-bi": "bi", "tab-plugins": "plugins" };
       if (action === "variant-prev" || action === "variant-next") {
         const currentIndex = variantOrder.indexOf(state.variant);
@@ -484,52 +521,87 @@ CREATE
         const nextUrl = new URL(window.location.href);
         nextUrl.searchParams.set("variant", state.variant);
         window.history.replaceState(null, "", nextUrl);
-      } else if (action === "select-navigation" || action === "open-navigation") {
+      } else if ((action === "select-navigation" || action === "open-navigation") && showIndexRows) {
         beginWorktreeAuthorization("wt-navigation");
-      } else if (action === "select-validation" || action === "open-validation") {
+      } else if ((action === "select-validation" || action === "open-validation") && showIndexRows) {
         beginWorktreeAuthorization("wt-validation");
       } else if (action === "authorize-link") {
-        state.worktreeId = state.pendingWorktreeId;
-        state.focus = true;
-        state.authorization = "ready";
-        state.view = "apps";
+        if (state.authorization === "checking" && state.pendingWorktreeId) {
+          state.worktreeId = state.pendingWorktreeId;
+          state.pendingWorktreeId = null;
+          state.focus = true;
+          state.authorization = "ready";
+          state.authorizedGeneration = state.authorizationGeneration;
+          state.view = "apps";
+          state.indexReturnView = "apps";
+        }
       } else if (action === "cancel-auth") {
-        state.authorization = "idle";
-        state.focus = false;
-        state.view = "apps";
-        state.taskOpen = false;
-        state.chatScope = "GLOBAL";
+        clearWorktreeFocus("idle");
+        state.view = indexAuthorizationReady() ? "index" : "workspace";
       } else if (action === "deny-link") {
-        state.authorization = "denied";
-        state.focus = false;
-        state.view = "apps";
-        state.taskOpen = false;
-        state.chatScope = "GLOBAL";
+        if (state.authorization === "checking" && state.pendingWorktreeId) {
+          state.authorizationGeneration += 1;
+          state.authorizedGeneration = null;
+          state.worktreeId = null;
+          state.focus = false;
+          state.authorization = "denied";
+          state.view = "workspace";
+          state.taskOpen = false;
+          state.chatScope = "GLOBAL";
+          state.indexReturnView = "workspace";
+        }
       } else if (action === "retry-auth" || action === "restore-focus") {
-        beginWorktreeAuthorization(state.worktreeId);
+        const targetWorktreeId = state.pendingWorktreeId || state.worktreeId || "wt-navigation";
+        beginWorktreeAuthorization(targetWorktreeId);
+      } else if (action === "authorize-index") {
+        if (state.indexAuthorization === "checking") {
+          state.indexAuthorization = "ready";
+          state.indexAuthorizedGeneration = state.indexGeneration;
+          state.view = "index";
+        }
+      } else if (action === "deny-index") {
+        if (state.indexAuthorization === "checking") {
+          state.indexAuthorization = "denied";
+          state.indexAuthorizedGeneration = null;
+          restoreIndexReturnView();
+        }
+      } else if (action === "retry-index" || action === "show-index") {
+        beginProjectIndexAuthorization();
+      } else if (action === "cancel-index") {
+        state.indexGeneration += 1;
+        state.indexAuthorizedGeneration = null;
+        state.indexAuthorization = "idle";
+        restoreIndexReturnView();
+      } else if (action === "return-focus" && focusReady) {
+        if (state.indexAuthorization === "checking") {
+          state.indexGeneration += 1;
+          state.indexAuthorizedGeneration = null;
+          state.indexAuthorization = "idle";
+        }
         state.view = "apps";
-      } else if (action === "show-index") {
-        state.view = "index";
-        state.taskOpen = false;
+        state.indexReturnView = "workspace";
       } else if (action === "simulate-deep-link") {
-        beginWorktreeAuthorization(state.worktreeId);
+        beginWorktreeAuthorization(state.pendingWorktreeId || state.worktreeId || "wt-navigation");
       } else if (action === "revoke-access") {
-        state.authorization = "revoked";
-        state.focus = false;
-        state.view = "apps";
-        state.taskOpen = false;
-        state.chatScope = "GLOBAL";
+        clearWorktreeFocus("revoked");
+        state.view = "workspace";
+      } else if (action === "revoke-index-access") {
+        if (state.view !== "index") state.indexReturnView = worktreeFocusReady() && state.view === "apps" ? "apps" : "workspace";
+        state.indexGeneration += 1;
+        state.indexAuthorizedGeneration = null;
+        state.indexAuthorization = "revoked";
+        restoreIndexReturnView();
       } else if (action === "scope-global") {
         state.chatScope = "GLOBAL";
       } else if (action === "scope-worktree" && focusReady) {
         state.chatScope = "WORKTREE";
-      } else if (action === "open-task") {
+      } else if (action === "open-task" && focusReady) {
         state.app = "tasks";
         state.view = "apps";
         state.taskOpen = true;
       } else if (action === "close-task") {
         state.taskOpen = false;
-      } else if (actionToApp[action]) {
+      } else if (actionToApp[action] && focusReady) {
         state.app = actionToApp[action];
         state.view = "apps";
         state.taskOpen = false;
