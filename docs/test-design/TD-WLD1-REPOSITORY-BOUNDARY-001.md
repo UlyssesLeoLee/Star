@@ -1,8 +1,8 @@
 # TD-WLD1-REPOSITORY-BOUNDARY-001
 
-> 状态：Draft v0.2；目标测试设计，测试尚未实现或执行。
-> 需求：`SRS-WLD1-REPOSITORY-BOUNDARY-001.md` v0.2。
-> 设计：`BD-WLD1-REPOSITORY-BOUNDARY-001.md` v0.2、`DD-WLD1-REPOSITORY-BOUNDARY-001.md` v0.2。
+> 状态：Draft v0.3；目标测试设计，测试尚未实现或执行。
+> 需求：`SRS-WLD1-REPOSITORY-BOUNDARY-001.md` v0.4。
+> 设计：`BD-WLD1-REPOSITORY-BOUNDARY-001.md` v0.4、`DD-WLD1-REPOSITORY-BOUNDARY-001.md` v0.4。
 
 ## §0 验收原则
 
@@ -23,6 +23,11 @@
 | FR-WLD1-09, AC-WLD1-08 | UI-WLD1-01..08 | navigation, empty, detached, stale and unavailable state |
 | FR-WLD1-10 | EVT-WLD1-01..08 | owner outbox/inbox replay, duplicate, reorder and transport replacement |
 | FR-WLD1-12/13/14, AC-WLD1-10/11/12 | UT-PROJECT-07..12, PG-PROJECT-09..15, DEP-WLD1-01..04 | canonical Project authority, current member grants, deployment-specific DB acceptance, migration-before-unlink and fail-closed recovery |
+| FR-WLD1-15/16, AC-WLD1-13/14 | UT-RUN-09, UT-PLACE-01..04, API-RUN-06..08, API-RUN-10 | hostless Run authorization and placement-independent management; no-placement behavior; exact Profile/Host/cluster generations and fail-closed execution readiness |
+| FR-WLD1-17/20, AC-WLD1-14/16 | UT-SCHED-V2-01, UT-SCHED-V3-04, PG-V3-01/02, API-RUN-09 | immutable branch-required V2 Schedule replay; additive V3 schema/digest with no Branch; no cross-version dedupe |
+| FR-WLD1-18/19, AC-WLD1-15/16 | UT-SCHED-V3-01/03, UT-SCHED-MIG-01, PG-V3-05/07 | exact tagged origin identities, causal-only attribution, positive unique attempts, exact replay/conflict and legacy quarantine |
+| FR-WLD1-21, AC-WLD1-17 | UT-SCHED-V3-02, API-RUN-10, PG-V3-04 | owner-derived immutable actor and current authorization checks on each trigger/admission/retry/resume |
+| Deployment profile and infrastructure binding | DEP-WLD1-05..07, PG-V3-02..07 | independent Neon and Multipass VM target evidence; owner/RLS/grants, target identity, two-instance inventory cap, no automatic create/purge |
 | NFR path/privacy/resource | SEC-WLD1-01..12, PERF-WLD1-01..07 | no path leakage, bounded children/output/queue/cache, cancellation and RSS/CPU |
 
 ## §2 Unit 与 contract tests
@@ -55,7 +60,23 @@
 - UT-RUN-07：Project relation revoke 和 Run grant revoke 后，新 discover/list detail 失败，即使 binding row 和 cache 仍存在。
 - UT-RUN-08：Host/root generation 更新使旧 binding stale；新 binding 必须显式确认新代次。
 
-### 2.3 Host registry 与只读 provider
+### 2.3 Hostless Run、Infrastructure placement 与 Schedule V2/V3
+
+| ID | 场景 | 预期 |
+|---|---|---|
+| UT-RUN-09 | 无远端 Branch、Repository 或 Host 身份时创建、列出并授权 Run | Project → Engineering Run 授权闭环成功；不隐式创建 Repository/Branch binding 或 Worktree provider 调用 |
+| UT-PLACE-01 | 分别新增/移除 Repository binding 与可选 Infrastructure placement | 两个关系独立校验、独立修订与审计；任一关系变化不隐式创建、替换或删除另一关系 |
+| UT-PLACE-02 | 创建 Run 时未选择 placement；或选择后 profile/Host/cluster 不存在、撤权或 generation 过期 | 未选择时不创建 binding、reservation 或 infrastructure demand；选定 placement 不完整/失效时 fail closed，不启动执行 |
+| UT-PLACE-03 | 选择 Infrastructure Profile placement | 持久化并固定 Profile ID/revision/digest、精确 HostEnvironment ID/generation、K3s cluster ID/generation、namespace、runtime-profile digest 与 budget；运行时解析结果不匹配时拒绝 |
+| UT-PLACE-04 | placement-bound execution admission or resume; and management-only API on a Run without placement | Each required-environment admission/resume rechecks current grants, exact binding/Profile digest, Host/cluster generations, readiness and both owner reservations before execution; any missing/stale state fails closed. APIs that do not require an environment remain usable for a hostless Run without remote Branch identity. |
+| UT-SCHED-V2-01 | V2 Schedule 写入、重放或提交 Manual 来源 | V2 保持 schema_version=2、branch_id 必填和 run_origin=schedule；按原 V2 canonicalizer/branch identity 精确重放；Manual 被拒绝；不得用 V3 key/window 命中 V2 |
+| UT-SCHED-V3-01 | V3 Schedule 或 Manual demand 缺少 variant-required identity，或提供另一 variant 字段/nil Schedule UUID | schema_version=3 且 origin 必须是 tagged union；Schedule 要求 rule ID/revision/occurrence，Manual 要求 manual_command_id；可选 schedule_attribution 必须是有效因果对象或 absent，不能用 nil/空 UUID；V3 不含 branch_id |
+| UT-SCHED-V3-02 | V3 Schedule 和 Manual command 的 actor 来源、客户端篡改以及 trigger/admission/retry/resume | Schedule actor 来自冻结 Rule revision 的 run_as_actor_id；Manual actor 由认证 command context 盖章；每次均按固定 actor 复验当前 Project/Run execution 权限；客户端不能设置 actor，schedule_attribution 不改变 Manual 身份或授权 |
+| UT-SCHED-V3-03 | 相同 Schedule occurrence 或 Manual command 重复触发；同一 TaskExecutionRun attempt 同 digest/异 digest 重放；创建合法新 attempt | Root uniqueness 分别为 (tenant, schedule_rule_id, schedule_rule_revision, occurrence_id) 与 (tenant, manual_command_id)；attempt_number 为正数且在 origin 下不复用，并绑定唯一 task_execution_run_id；同 attempt+digest 返回原 receipt，异 digest 冲突；新 attempt 用新 ID/number 并保留冻结 origin/provenance |
+| UT-SCHED-V3-04 | V3 digest 包含字段、可选 attribution 缺席/存在差异和 V2/V3 重放边界 | 规范化摘要包含 origin discriminant/required identity、effective actor、attempt identity/number、可选对象 presence/content、placement/Profile 与各 generation 等安全敏感值；同一尝试固定摘要；跨版本或跨 profile 不复用 dedupe receipt |
+| UT-SCHED-MIG-01 | legacy V2 row 含义不明确、授权已撤销或 additive migration 中断 | 不改写旧事实；逐行 quarantine 并可审计；迁移失败保持旧路径可读且新 V3 写入关闭 |
+
+### 2.4 Host registry 与只读 provider
 
 | ID | 输入/故障 | 预期 |
 |---|---|---|
@@ -111,7 +132,19 @@
 | PG-PROJECT-14 | Missing owner receipt, stale inventory cursor, incomplete page or failed target root verification prevents zero-reference proof and final unlink |
 | PG-PROJECT-15 | Only complete fresh zero-reference reconciliation plus expected-revision CAS can finalize unlink; every failure preserves source association and old bindings |
 
-### §3.1 Deployment-profile database integration
+### §3.1 V2/V3 Schedule and Infrastructure owner integration
+
+| ID | Acceptance |
+|---|---|
+| PG-V3-01 | Existing V2 schema remains immutable and compatible: branch_id stays required, Schedule-only constraints remain enforced, and V2 replay returns the original receipt. |
+| PG-V3-02 | When a future approved V3 migration is introduced, it adds the versioned relations without rewriting V2 facts and keeps dedupe namespaces isolated; this planned test does not assert that V3 physical tables currently exist. |
+| PG-V3-03 | Owner roles, FORCE RLS, grants, tenant/Project/Run scope and direct-write denial are checked with the intended non-superuser roles. |
+| PG-V3-04 | V3 execution_actor_id is derived from the fixed Rule revision run_as_actor_id or authenticated Manual command actor; every trigger/admission/retry/resume rechecks current execution authorization in the Run-owner transaction. |
+| PG-V3-05 | Root origin uniqueness and positive attempt_number uniqueness hold under concurrent inserts; same task_execution_run_id/attempt/digest replays one durable receipt, a different digest conflicts, and a new attempt uses a new ID/number while retaining root origin provenance. |
+| PG-V3-06 | Optional placement stores exact Profile revision/digest, HostEnvironment ID/generation, K3s cluster ID/generation, namespace, runtime-profile digest and budget; no placement creates no demand; required execution stays non-executable until current binding, both owner reservations, target readiness and independent sandbox readiness are confirmed. |
+| PG-V3-07 | Failed, ambiguous or revoked legacy-row migration quarantines the row without rewriting its V2 fact; incomplete migration prevents V3 writes while preserving readable prior state. |
+
+### §3.2 Deployment-profile database integration
 
 | ID | Target | Acceptance |
 |---|---|---|
@@ -119,6 +152,9 @@
 | DEP-WLD1-02 | Multipass VM PostgreSQL disposable database | Apply the same migrations and owner tests; verify the VM endpoint identity is pinned and no test exceeds the two-instance inventory cap. |
 | DEP-WLD1-03 | Both targets independently | Verify there is no browser DB access, cross-profile credential reuse, shared mutable DB assumption or reuse of one target pass as the other target’s evidence. |
 | DEP-WLD1-04 | Multipass inventory preparation | If inventory is unknown, full, or identity cannot be classified, fail closed; never auto-create or purge an instance. |
+| DEP-WLD1-05 | Neon Vercel target, independently | Validate V2 compatibility and additive V3 schema/migrations using target-owned non-superuser roles, RLS/grants, replay and rollback evidence; do not reuse VM-target credentials or evidence. |
+| DEP-WLD1-06 | Multipass VM PostgreSQL target, independently | Validate the same owner/RLS/grant contract against the pinned VM database identity; count all inventory entries including Stopped/Deleted, enforce the cap of two, and never auto-create or purge. |
+| DEP-WLD1-07 | Cross-target evidence boundary | Keep Neon and VM migration, role, authorization and replay results separate; neither target pass implies the other target pass. |
 
 ## §4 Host controlled integration
 
@@ -157,6 +193,11 @@
 | API-RUN-03 | 未授权 User 请求另一个 Project/Run binding ID | 统一拒绝，不泄漏 Repository/Host/root existence |
 | API-RUN-04 | revoke Project link / Run grant / root generation then retry list | 新请求拒绝，活跃 discovery/cursor/cache 失效 |
 | API-RUN-05 | Worktree write API missing provider / feature flags | 仍 unavailable，read-only binding 不扩大 capability |
+| API-RUN-06 | Hostless Run create/read/list plus actor authorization | Works without remote Branch identity; every read uses current Project/Run grant; no implicit Repository binding. |
+| API-RUN-07 | Repository binding changes while Infrastructure placement is absent or unchanged | Repository association and placement revisions remain independent; absent placement produces no demand/reservation. |
+| API-RUN-08 | Select placement then retrieve Run/execute admission | Response pins exact Profile revision/digest, Host generation and cluster generation; any mismatch or unavailable reservation fails closed. |
+| API-RUN-09 | V2 Manual trigger versus V3 Schedule/Manual trigger | V2 rejects Manual and keeps schema_version=2, branch-required Schedule identity and old replay contract; V3 accepts exact typed Schedule/Manual identities, no Branch field, and same-version attempt replay/conflict only. |
+| API-RUN-10 | V3 trigger/admission/retry/resume for Schedule and Manual origins | Run owner derives and revalidates the fixed actor each time; exact placement and both owner reservations plus K3s/runtime readiness are required only for tasks that need that environment. |
 | UI-WLD1-01 | 项目设置关联多个 Repo | 只在设置/选择流程呈现，不插入 Worktree 导航父层 |
 | UI-WLD1-02 | hostless Run | Worktree 面板显示可解释未绑定态 |
 | UI-WLD1-03 | Run 有两个 repo binding | Worktree rows 显示明确 Repo 标签并稳定分页 |
@@ -164,7 +205,7 @@
 | UI-WLD1-05 | Host offline/root stale/provider unavailable | 明确状态与可操作重试/绑定提示，不显示本地路径或错误堆栈 |
 | UI-WLD1-06 | 权限撤销时当前页面打开 | 页面清除已加载 Worktree，关闭订阅，后续读取拒绝 |
 | UI-WLD1-07 | 直接 deep link 到 Worktree row | 服务器重新授权后才返回 details |
-| UI-WLD1-08 | 按 `Project→Run→Worktree→Branch` 逐级导航 | Repository 不改变主层级；Branch 保持 Worktree local ref 子项 |
+| UI-WLD1-08 | 按 Project → Engineering Run → Worktree → Branch 逐级导航 | Repository 不改变主层级；Engineering Run 可脱离远端 Branch；Branch 表示 Worktree 的 local checkout ref/state |
 | EVT-WLD1-01..08 | owner outbox 重复、乱序、延迟 ACK、消费者重启、provider 替换 | inbox 幂等；接收事务提交后 ACK；不丢关联/绑定审计事实；event payload 不含敏感路径 |
 
 ## §6 性能 / 资源基准
@@ -185,7 +226,7 @@
 
 WLD1 设计阶段只能在 SRS/BD/DD/TD 交叉检查与兼容评审通过后关闭。实现阶段需依赖 owner relation、Host registry、Run binding、readonly provider 按 WBS 顺序执行。只有实际目标 PostgreSQL 角色/RLS、受控 Host Git integration、API撤权、资源基准和 `Project→Run→Worktree→Branch` E2E 均有结果时才可标记对应 gate PASS。
 
-当前状态：上述测试是计划，尚未实现或运行。没有数据库、Host、Cargo、API、UI 或性能结果被宣称通过。
+当前状态：上述测试是计划，尚未实现或运行。没有数据库、Host、Cargo、API、UI 或性能结果被宣称通过。W11-A 仍为 Partial/Open；本版只同步测试设计，DD-LOCAL 与 WBS 的依赖项仍未关闭。V3 迁移、数据库角色/RLS、真实目标执行及 Neon/Multipass VM 证据均未验证。
 
 ## §8 修订历史
 
@@ -193,3 +234,4 @@ WLD1 设计阶段只能在 SRS/BD/DD/TD 交叉检查与兼容评审通过后关�
 |---|---|---|
 | v0.1 | 2026-10-25 | 建立 Project/Run/Host boundary、数据库/Host/E2E/性能测试矩阵与未验证门。 |
 | v0.2 | 2026-10-26 | 补充 Project owner/member 授权真相、Neon 与 Multipass VM 独立验收、解绑迁移/fence/失败恢复测试；所有测试仍未运行。 |
+| v0.3 | 2026-10-27 | 对齐 WLD1 v0.4 与 W11-A：补充 hostless Run、可选 Infrastructure placement、V2/V3 Schedule 来源/身份/attempt/digest、additive migration quarantine、双目标数据库和两实例 VM inventory 验收；仅静态文档同步，未运行验证。 |
