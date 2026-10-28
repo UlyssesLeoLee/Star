@@ -1,20 +1,22 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.7** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.8** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v1.7 (2026-10-25 增加同秒重叠提案无等待冲突用例 E2E-COLLAB-09；全部用例未实现/未执行)
+> - 状态: 🟡 Draft v1.8 (2026-10-28 增加 W16 身份、密文 envelope 与恢复测试设计；新增用例均未实现/未执行)
 > - 关联工作项: `ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
 >   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](../design/BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 15 决策点全部已拍板)
 >   - [`docs/design/DD-WORKTREE-CANVAS-001.md`](../design/DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例 + 14 crate + 30 TS 文件)
 >   - [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](../design/TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (126 ID 追踪 + 43 AC)
+>   - [`docs/requirements/SRS-W16-PAYLOAD-SECURITY-001.md`](../requirements/SRS-W16-PAYLOAD-SECURITY-001.md) v0.1 (W16 协作载荷身份与持久加密要求；补充设计，未并回主 SRS)
+>   - [`docs/design/BD-W16-PAYLOAD-SECURITY-001.md`](../design/BD-W16-PAYLOAD-SECURITY-001.md) v0.1 / [`docs/design/DD-W16-PAYLOAD-SECURITY-001.md`](../design/DD-W16-PAYLOAD-SECURITY-001.md) v0.1 (目标设计，未实现)
 > - 平行实施文档: [`docs/implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md`](../implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md) v0.1 (MVP 14 任务 + P2 18 任务)
 > - 平行 spec: [`docs/specs/worktree-canvas-spec.md`](../specs/worktree-canvas-spec.md) v0.1 (10 关键测试入口)
 > - 受众: 実装エンジニア / テストエンジニア / アーキテクト / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 守门 #14 v3 + v0.62 反转 v4)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008)
-> - 日期: 2026-09-16 JST
+> - 日期: 2026-10-28 JST
 > - 模板参考: [`docs/test-design/TEST-DESIGN-SANDBOX-002.md`](TEST-DESIGN-SANDBOX-002.md) v0.1 (单文档分章, 5 级别 UT/IT/E2E/PT/UAT 模式) + `TEST-DESIGN-OPS-001.md` v0.2
 
 ---
@@ -77,6 +79,7 @@ UAT:  43 AC (per SRS §12 全表化)
 | **§4 E2E** | 端到端 | 5 视图模式 5 E2E + 6 Semantic Zoom 6 E2E + 18 Action 18 E2E + 4 流程 E2E = 33 测 → 关键 8 E2E 落 MVP | Playwright + MSW handler 8/8 E2E pass | DD §47 |
 | **§5 PT** | 性能测试 | 性能 7 AC (AC-P-1..7) + 守门 #1 v25 单 crate P95<200ms + k6 负载 + criterion-rs bench | `cargo bench` 4 PT + `vitest bench` 4 PT = 8 PT 实证 | DD §48 |
 | **§6 UAT** | 验收测试 | 43 AC 全表化 (AC-F-1..20 + AC-P-1..7 + AC-Q-1..10 + AC-D-1..6) + 5 域 Lead 签字栏 (Mavis 临时代签) | 5 域 Lead 签字 (Mavis 临时代签 per 守门 #14 v3) | SRS §12 + Trace §11 |
+| **W16 补充** | UT / IT / E2E / PT / UAT 追踪 | 设备身份、撤销、OAuth 单次消费、envelope/AAD、KMS fail-closed、轮换/恢复与有界加密成本 | UT-W16 / IT-W16 / E2E-COLLAB-12..19 / PT-10；全部计划、未执行 | SRS/BD/DD-W16-PAYLOAD-SECURITY-001 v0.1 |
 
 **累计实证锚点** (per 守门 #1 v25 单 crate):
 
@@ -120,6 +123,7 @@ UAT:         43/43 AC 100% 签字 (5 域 Lead 签字栏)
 - **上游 4 份设计文档** (必读): SRS / BD / DD / TRACEABILITY (同步落档, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 - **平行 2 份实施文档**: IMPL-PLAN + spec (本 commit 同期落档)
 - **既有 2 份同级测试设计书** (模板参考): `TEST-DESIGN-SANDBOX-002.md` + `TEST-DESIGN-OPS-001.md`
+- **W16 补充需求与设计**: `SRS-W16-PAYLOAD-SECURITY-001.md` / `BD-W16-PAYLOAD-SECURITY-001.md` / `DD-W16-PAYLOAD-SECURITY-001.md` v0.1 (目标设计，不代表实现)
 - **守门基线** (13 项必过): #1 v25 + #3 + #5 + #6 + #9 + #10 + #11 + #13 + #14 v3 + #14 v4 + #28 + #29
 - **不变量 12 项** (INV-WC-01..12, per spec §3)
 
@@ -206,7 +210,17 @@ UAT:         43/43 AC 100% 签字 (5 域 Lead 签字栏)
 
 ### 2.7 本章小结
 
-UT 共 **52 测**, 14 crate × 模块 1:1 对齐, 覆盖 103 FR + 23 NFR + 12 不变量 + 15 决策点 + 43 AC。覆盖率目标 Rust >= 80% / TS >= 70%。边界值覆盖 7 维, 错误路径覆盖 10 错误码。守门 5 项必过, 跟 SANDBOX-002 §2 UT (56 测) 模式一致。
+UT 共 **52 项既有基线**，14 crate × 模块 1:1 对齐，覆盖 103 FR + 23 NFR + 12 不变量 + 15 决策点 + 43 AC。覆盖率目标 Rust >= 80% / TS >= 70%。边界值覆盖 7 维，错误路径覆盖 10 错误码。守门 5 项必过，跟 SANDBOX-002 §2 UT (56 测) 模式一致。
+
+### 2.8 W16 可信身份与受保护 envelope 单元测试设计（计划，未执行）
+
+W16 另增以下 3 项补充设计，均未实现/执行：
+
+| UT ID | 测试名 | 输入 / 边界 | 必须观察到的结果 | 追踪 | 状态 |
+|---|---|---|---|---|---|
+| **UT-W16-AUTH-01** | `verified_claims_override_client_device_fields` | 验证 issuer claims 与客户端 body/header 中缺失、伪造或互相矛盾的 `actor_id`、`tenant_id`、`device_id`、generation | author、RLS scope、冲突参与者与通知接收者只来自已验证且当前有效的 issuer/device 绑定；无可信设备身份时为 `local_only / sync_pending`，不能形成共享成功事实 | SRS-W16-PAYLOAD-01 | 设计；未实现/执行 |
+| **UT-W16-ENVELOPE-01** | `canonical_aad_binds_resource_revision_and_schema` | 对 canonical tenant/Project/Run/resource/revision、envelope format 与 AAD schema 版本逐项变更或提供未知版本 | 原上下文可供受控解密；任一字段被替换或版本未知均拒绝，且不返回正文或将错误上下文静默规范化 | SRS-W16-PAYLOAD-04/05 | 设计；未实现/执行 |
+| **UT-W16-ENVELOPE-02** | `ciphertext_or_tag_tamper_fails_without_plaintext` | 篡改密文、AEAD tag、nonce、wrapped DEK 元数据或 envelope digest | 解密失败、无明文输出、canonical revision 不变；错误日志/指标不包含正文、DEK、凭证或密钥身份秘密 | SRS-W16-PAYLOAD-05/06 | 设计；未实现/执行 |
 
 ---
 
@@ -257,7 +271,18 @@ UT 共 **52 测**, 14 crate × 模块 1:1 对齐, 覆盖 103 FR + 23 NFR + 12 �
 
 ### 3.5 本章小结
 
-IT 共 **10 测**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + Graph 集成 1 项 + Cache/Redis 集成 2 项 + gRPC/REST 集成 5 项 (部分重合)。testcontainers-rs 真实容器 (PG 16 + Redis 7 + Neo4j 5)。缺口 5 项显式标 (G-IT-01..05)。守门 5 项必过。
+IT 共 **10 项既有基线**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + Graph 集成 1 项 + Cache/Redis 集成 2 项 + gRPC/REST 集成 5 项 (部分重合)。testcontainers-rs 真实容器 (PG 16 + Redis 7 + Neo4j 5)。缺口 5 项显式标 (G-IT-01..05)。守门 5 项必过。
+
+### 3.6 W16 身份、令牌单次消费与 provider 集成测试设计（计划，未执行）
+
+W16 另增以下 4 项补充集成设计，均未实现/执行：
+
+| IT ID | 测试名 | 真实边界 | 必须观察到的结果 | 追踪 | 状态 |
+|---|---|---|---|---|---|
+| **IT-W16-AUTH-01** | `authorization_code_and_refresh_are_single_use_under_race` | 目标 PostgreSQL 上并发兑换同一 authorization code；另对同一 refresh token 并发刷新 | 每组竞争最多一个成功消费者/新 token；其余认证失败；消费、签发或轮换在 auth owner 事务内原子完成，身份/设备/tenant/client/scope 绑定保持 | SRS-W16-PAYLOAD-03 | 设计；未实现/执行 |
+| **IT-W16-IDENTITY-01** | `enrollment_proof_generation_revoke_and_stream_expiry` | 真实身份 owner、授权目录与两个 gateway；设备 enrollment proof、generation 变化、撤销与事件丢失 | 未验证 proof 不能激活；伪造/过期 generation 不能读写；撤销阻止新操作，并关闭现有 SSE 或在有界授权租约内失效；状态未知时 fail closed | SRS-W16-PAYLOAD-01/02 | 设计；未实现/执行 |
+| **IT-W16-KMS-01** | `protected_envelope_roundtrip_restart_and_no_content_facts` | 被批准的真实 provider profile、owner PostgreSQL 与可重启 Rust 服务进程 | 仅密文与必要 envelope 元数据可持久；重启后固定 provider/profile/key version 可解密授权旧信封；DB、audit、logs、metrics、Outbox、NOTIFY 与 wake payload 均不含正文/明文 DEK | SRS-W16-PAYLOAD-04/05/07 | 设计；未实现/执行 |
+| **IT-W16-KMS-02** | `rotation_rewrap_and_backup_reference_recovery` | 固定 provider/profile、保留备份与轮换/rewrap worker；重复投递与中断恢复 | 轮换/rewrap 可审计、幂等且可恢复；保留期/备份仍引用旧 key 时合法读取保持可用；只有所有 live 与 backup 引用迁移或到期后才能销毁旧 key | SRS-W16-PAYLOAD-07 | 设计；未实现/执行 |
 
 ---
 
@@ -330,13 +355,14 @@ IT 共 **10 测**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + Graph 集成
 | **G-E2E-07** | Audit Log 跨 session 持久化需 PG 真实环境, MVP 走 MSW | 4.2 | MVP |
 | **G-E2E-08** | Inspector 11 tab 全部 E2E 覆盖耗时长 (~5min), 拆 11 子 spec | 4.2 | MVP |
 | **G-E2E-09** | WLD-7 需要双 actor、目标 PostgreSQL 与两个 gateway 的持久恢复验收；现有 MSW/单实例 E2E 不够 | §4.8 | WLD-7 |
+| **G-E2E-10** | W16 设备凭据/撤销、OAuth 并发单次消费、真实 provider envelope、AAD 篡改、轮换与恢复依赖尚未实现；当前 mock 不能关闭这些安全门 | §4.8 / SRS-W16-PAYLOAD-01..08 | W16 |
 
 ### 4.7 本章小结
-E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划用例（§4.8），尚未实现/执行，不计入已通过数量。缺口 G-E2E-01..09 显式标记。
+既有 Canvas 核心 E2E 共 **8 项基线**；WLD-7 另有 **19 项计划用例**（§4.8），尚未实现/执行，不计入已通过数量。缺口 G-E2E-01..10 显式标记。
 
-### 4.8 WLD-7 多用户推送、冲突与草稿恢复 E2E（11 项计划，未执行）
+### 4.8 WLD-7 多用户推送、冲突、草稿恢复与 W16 载荷安全 E2E（19 项计划，未执行）
 
-环境要求：两个独立登录 actor、可重建目标 owner database、至少两个 realtime gateway 实例和可控 relay/wake-up 故障注入。只用 MSW、单进程 broadcast 或同一浏览器两个 tab 不构成跨实例 durable 验收。
+环境要求：两个独立登录 actor、可重建目标 owner database、至少两个 realtime gateway 实例和可控 relay/wake-up 故障注入。Vercel 路径使用 Neon；自托管路径使用 Multipass 管理的 K3s，测试期 Multipass inventory 总数最多 2 个实例（包含 Stopped/Deleted 记录），不要求 Docker Desktop。两个节点上的 Raft 不具备 HA 容错能力。只用 MSW、单进程 broadcast 或同一浏览器两个 tab 不构成跨实例 durable 验收；每次测试还须固定 provider/profile/key version 与实际环境基线。若目标 profile/provider、数据库或资源预算未准备好，相应场景保持 OPEN/NOT_RUN，不以 mock 替代。
 
 **当前状态**：Group 实时路径仍有周期读取与进程内 gateway 广播；WLD-7 推送、持久双边草稿/冲突、跨实例恢复和运行证据均为 OPEN/NOT_RUN。以下是目标验收计划，不代表实现已具备。
 
@@ -353,6 +379,14 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 | E2E-COLLAB-09 | 两位 actor 用同步屏障在服务端 ≤1000 ms 内提交完整、digest-valid 且语义重叠的 draft heads；记录第二份 head 到达 owner 的时间与 owner transaction/Outbox trace | 不等待一秒 debounce、batch 或 arbitration timer；第二份完整 head 通过校验后立即进入同一 resource fence 并原子 pin 两稿、写出一个 stable conflict_id 与双方 unread facts/Outbox；双方收到同一持久提醒且可读取首个有界 base/current/mine/theirs diff。≤1000 ms 是输入到达刺激，不是检测窗口；任意更长到达间隔的语义重叠仍应由相同路径检测。端到端 p99 由 PT-09 测量 | AC-COLLAB-02/04 |
 | E2E-COLLAB-10 | 两位 actor 从同一文本 base 对有交集的 span 提交内容，即使测试 OT 能无损变换 | owner 仍按语义重叠创建唯一持久 conflict，seal/pin 两侧精确 draft；双方均收到同一 conflict_id 并可读对方修改；不得自动提交合并 revision | AC-COLLAB-02/08 |
 | E2E-COLLAB-11 | 一位参与者显式进入 conflict resolve 并请求 OT 建议，再分别验证取消、确认及 stale CAS | OT 建议只显示为无副作用预览；取消不改变 canonical revision/conflict/drafts；仅明确选中且当前 revision CAS 成功后写入；stale CAS 保留双方稿和原冲突 | AC-COLLAB-08/09 |
+| E2E-COLLAB-12 | 无 enrollment 的客户端省略可信设备 claim，或在 body/header 伪造、替换 `device_id` / generation 后尝试共享写入 | 客户端字段不改变 issuer 绑定的 actor/tenant/device；写入被拒绝或保留为 `local_only / sync_pending`，不得产生共享 revision、冲突参与者或成功通知事实 | SRS-W16-PAYLOAD-01 |
+| E2E-COLLAB-13 | 完成经 proof 验证的设备 enrollment 后订阅资源，再撤销该设备并尝试新读写/resolve；另注入撤销事件丢失与授权目录不可用 | enrollment 前不能共享；撤销后新操作拒绝；在线 SSE 被关闭，或在明确有界的授权租约到期前重新核验并失效；未知撤销状态与代次不匹配 fail closed | SRS-W16-PAYLOAD-01/02 |
+| E2E-COLLAB-14 | 对同一 authorization code 并发兑换；另对同一 refresh token 并发刷新/重放 | 每组最多一个调用成功签发/轮换 token；其余认证失败；身份、设备、tenant、client 与 scope 绑定在唯一胜者的结果中保持 | SRS-W16-PAYLOAD-03 |
+| E2E-COLLAB-15 | 注入 KMS/provider 不可用、显式拒绝与未知 key version，提交共享 checkpoint；核对 DB、revision、receipt、audit、Outbox、NOTIFY、SSE wake 和 LocalMockKms 调用 | 失败保持 `local_only / sync_pending`；不出现持久明文、canonical revision、成功回执或含正文的 Outbox/消息；不得调用 `LocalMockKms`、内存密钥或 plaintext fallback | SRS-W16-PAYLOAD-04/06 |
+| E2E-COLLAB-16 | 使用真实已批准 profile 写入 envelope，重启 Rust owner server 后，以新进程和原授权上下文读取旧 envelope | 新进程从 envelope 固定的 provider/profile/version/digest、opaque key identity 与 key version 恢复读取；不能依赖旧进程内状态或默认当前 key；未授权 actor 仍拒绝 | SRS-W16-PAYLOAD-05/07 |
+| E2E-COLLAB-17 | 分别替换 tenant、Project、Run、resource、revision AAD 字段；再修改 ciphertext、AEAD tag 或 envelope digest | 每次上下文替换或完整性篡改均拒绝，不返回明文、不更改 canonical revision，也不在日志/指标/错误响应泄漏正文或密钥材料 | SRS-W16-PAYLOAD-04..06 |
+| E2E-COLLAB-18 | 持久化若干旧 key/profile envelope 后执行 key rotation/rewrap；在仍有 live 与 retained backup 引用期间读取；重放/中断后继续迁移 | 旧正文在所有 live 与备份引用迁移或到期前仍可授权读取；rewrap 进度可审计、幂等并可恢复；未满足引用清零门时拒绝销毁旧 key | SRS-W16-PAYLOAD-05/07 |
+| E2E-COLLAB-19 | 从一致性 DB/blob/provider backup 恢复；分别以仍授权身份和已撤销身份读取恢复后的旧 envelope | 授权身份在固定 provider/profile/key version 可用时读回；已撤销设备仍拒绝，不能因恢复旧设备状态或授权快照而复活；恢复过程不泄漏明文 | SRS-W16-PAYLOAD-02/05/07 |
 
 
 ---
@@ -379,7 +413,7 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 | **缓存命中率 >= 80%** | Prometheus metric | NFR-CACHE-001 | SRS §4.9.13 |
 | **事件合并 + 防抖 1s 内 100 次状态变化不触发全量重算** | 压力测试 | AC-P-7 | SRS §12.2 |
 
-### 5.2 8 PT 实证矩阵 (per DD §48)
+### 5.2 PT 实证矩阵（8 项既有基线 + PT-09/PT-10 两项 WLD-7 计划，均未实测）(per DD §48)
 
 | PT ID | 测试名 | 工具 | 基准 | 引用 | 实证命令 |
 |---|---|---|---|---|---|
@@ -392,8 +426,11 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 | **PT-07** | `bench_risk_engine_delta_update` | criterion-rs | P95<500ms (incremental) | AC-P-4 | `cargo bench -p risk-engine --bench delta_update` |
 | **PT-08** | `bench_explanation_cache_hit` | vitest bench | P95<50ms (cache hit) | AC-P-5 | `pnpm vitest bench bench/explain-cache.spec.ts` |
 | **PT-09** | WLD-7 push/conflict latency and write amplification | 双 gateway + 目标 owner DB + 受控并发 actor | 从 conflict transaction commit 到双方同一 unread conflict_id 可见且首个有界差异页可读，p99 ≤ 1 s；同时记录每 draft 在途请求数、pending delta 大小、draft-head upsert/checkpoint writes per edit burst、RSS/CPU/Outbox lag，证明常态 patch coalesce、队列有界且无逐键击快照 | AC-COLLAB-04/06；W14；PT-09-GATE-01 | 计划；未实测 |
+| **PT-10** | W16 protected-envelope / KMS overhead and bounded resource behavior | 固定版本化 Collaboration Profile 与经批准的实际 provider；目标 Rust owner、数据库及部署拓扑 | 对已 coalesce checkpoint 记录每 checkpoint KMS 调用数、加解密与 KMS latency percentiles、RSS/CPU、队列/临时缓冲边界、取消响应与 provider outage recovery；workload 与阈值仅采用已批准的 W14 profile，不在本设计预设具体数值 | SRS-W16-PAYLOAD-08；W14；PT-10-GATE-01 | 设计；未实测 |
 
 **PT-09-GATE-01 — Profile 与测量基线前置门**：PT-09 只有在测试记录中固定版本化 Collaboration Profile 的 profile ID、revision 与 digest，并记录本次精确 workload/并发规模及目标 host、PostgreSQL、gateway 实例数与关键配置基线后，才可判定通过。结果必须关联该 profile 和同一环境基线，报告 p99、RSS、CPU、Outbox lag、队列/草稿写放大与慢消费者恢复证据。当前 workload/并发数值和资源阈值尚未批准/实测，本设计不预设或虚构这些数值；缺少 Profile 或基线时 PT-09 状态保持 NOT_RUN/OPEN，不得用单实例或内存 hub 结果替代。
+
+**PT-10-GATE-01 — 固定 Collaboration Profile 与 W14 预算前置门**：必须固定 Collaboration Profile ID/revision/digest、provider/profile/key version、Rust/DB/provider 版本与部署拓扑，并由 W14 批准 workload、并发度、资源预算和验收阈值；测试记录须给出各项观测值与分位数、coalesced checkpoint 对应的 KMS 调用数、RSS/CPU、队列/临时缓冲上界、取消和 outage recovery 证据。当前 workload、阈值及生产 provider 均未批准/验证，本设计不填造数值。前置门不满足时 PT-10 保持 OPEN/NOT_RUN；mock KMS、单机 microbenchmark 或只报告平均延迟不能关闭此门。
 
 ### 5.3 容量规划 (per SRS §12.2 性能 AC + 守门 #7 v3)
 
@@ -424,10 +461,11 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 | **G-PT-05** | Explanation cache L1/L2/L3 命中率实测, 实施期补 | PT-08 | MVP |
 | **G-PT-06** | WLD-7 push、冲突 diff 和慢消费者基准没有目标 DB/跨 gateway 运行证据；不得引用单实例内存 hub 通过 | PT-09 | WLD-7 |
 | **G-PT-07** | WLD-7 尚无经固定的版本化 Collaboration Profile，也无记录精确 workload/并发规模与目标 host、PostgreSQL、gateway 配置的测量基线；未补齐前 PT-09 不得判为通过 | PT-09-GATE-01 | WLD-7 |
+| **G-PT-08** | W16 加密/KMS overhead 的 workload、资源阈值与实际 provider profile 尚未由 W14 批准；未有 profile 基线和真实 provider 证据时 PT-10 不得判为通过 | PT-10-GATE-01 | W16 |
 
 ### 5.6 本章小结
 
-既有 PT 共 **8 bench**；WLD-7 增加 PT-09 计划基准（未实现/未实测）。AC-COLLAB-04/06 的 p99、RSS、CPU 和 Outbox lag 必须在目标 DB 与双 gateway 下测量。既有缺口 G-PT-01..05 保留，G-PT-06 与新增 G-PT-07 均开放；PT-09-GATE-01 要求先固定 Collaboration Profile 并记录 workload/并发规模及 host/DB/gateway 基线。Canvas 原有 10/100/500/1000 WT 容量规划不替代协作负载验收。
+既有 **8 项 PT 基线**保留；WLD-7 另有 PT-09 与 W16 PT-10 两项计划基准，均未实现/未实测。PT-09 的 conflict commit 到双方提醒及首个有界差异页 p99 ≤1s 定义保持不变；PT-10 只测固定 profile 下的 envelope/KMS overhead 和有界资源行为。既有缺口 G-PT-01..05 保留，G-PT-06..08 均开放；PT-09-GATE-01 与 PT-10-GATE-01 分别约束协作推送和加密成本的基线。Canvas 原有 10/100/500/1000 WT 容量规划不替代协作负载验收。
 
 ---
 
@@ -530,6 +568,19 @@ E2E 共 **8 测**, 覆盖既有 Canvas 核心流程；WLD-7 另有 9 项计划�
 |---|---|---|---|
 | WTG-027 / AC-WTG-014 | E2E-REPO-01..05 + owner API/DB/RLS/fault-injection suite | 0..N 关联与 UI-only default；retiring 阻断新增引用；分 owner 迁移及幂等回执；失败保持 retiring；所有新鲜回执与零活动引用复核成功后才可解绑 | WLD-1 OPEN/NOT_RUN |
 
+#### 6.2.7 W16 协作载荷身份与持久加密验收映射（目标设计，未执行）
+
+| W16 Requirement | 自动化证据 | 通过条件 | 当前状态 |
+|---|---|---|---|
+| SRS-W16-PAYLOAD-01 | UT-W16-AUTH-01 + IT-W16-IDENTITY-01 + E2E-COLLAB-12 | author/scope/device 仅来自经验证的 issuer claims；伪造客户端设备字段不能建立共享身份 | W16 OPEN/NOT_RUN |
+| SRS-W16-PAYLOAD-02 | IT-W16-IDENTITY-01 + E2E-COLLAB-13/19 | 撤销阻断后续读写/resolve，并关闭事件流或在有界租约内重新核验；备份恢复不得复活撤销身份 | W16 OPEN/NOT_RUN |
+| SRS-W16-PAYLOAD-03 | IT-W16-AUTH-01 + E2E-COLLAB-14 | 同一 authorization code / refresh token 的并发单次消费最多有一个成功者，事务内完成消费与签发/轮换 | W16 OPEN/NOT_RUN |
+| SRS-W16-PAYLOAD-04..06 | UT-W16-ENVELOPE-01/02 + IT-W16-KMS-01 + E2E-COLLAB-15..17 | canonical AAD 与密文完整性受保护；provider 故障、未知版本、撤权、篡改均 fail closed；持久及消息旁路不包含正文或明文 DEK | W16 OPEN/NOT_RUN |
+| SRS-W16-PAYLOAD-07 | IT-W16-KMS-01/02 + E2E-COLLAB-16/18/19 | 进程重启与备份恢复可使用 envelope 固定的 provider/profile/key version；旧 key 在 live 和保留备份引用处理完成前不销毁 | W16 OPEN/NOT_RUN |
+| SRS-W16-PAYLOAD-08 | PT-10 + PT-10-GATE-01 | 固定版本化 Collaboration Profile 与 W14 批准 workload/预算后，报告 KMS/checkpoint 调用、分位延迟、RSS/CPU、有界队列、取消与 outage recovery | W16 OPEN/NOT_RUN |
+
+上述 W16 用例和 PT 只有设计定义；本修订未运行测试或验证数据库/provider 行为。
+
 ### 6.3 5 域 Lead 真人到位后追溯签字 (per 守门 #14 v3 Mavis 临时代签 + v0.62 反转 v4)
 | 角色 | 责任人 | 签字 | 状态 |
 |---|---|---|---|
@@ -610,6 +661,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **v1.5** | **2026-10-24 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **将 WLD-7 协作规范引用同步到 v1.0、owner-local 数据设计同步到 v0.2；为 PT-09 增加前置门：固定 Collaboration Profile ID/revision/digest，并记录精确 workload/并发规模和目标 host、PostgreSQL、gateway 基线；未有批准值与实测记录时保持 OPEN/NOT_RUN，不虚构阈值；将任务来源和旧 adapter 描述改为中性名称。** | **WLD-7 跨文档版本对账、名称清理与低消耗/可复现性能验收门补齐。** |
 | **v1.6** | **2026-10-25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 E2E-COLLAB-09：两个 actor 的完整摘要校验重叠提案在服务端 ≤1000 ms 到达时不等待仲裁窗口，第二份提案立即进入 owner conflict transaction，双方保留并读取精确草稿；将该到达场景与 PT-09 的 commit-to-first-diff p99 测量区分，并更新 AC-COLLAB-02/04 追踪。用例仍未实现/执行。** | **requirements v7.07、basic design v7.11、collaboration spec v1.1、owner-local data design v0.3 的同秒协作验收要求。** |
 | **v1.7** | **2026-10-25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 E2E-COLLAB-10/11：语义重叠即使 OT 可变换也必须冲突；OT 建议仅为显式解决的无副作用预览并要求用户选择与 owner CAS。增加 E2E-REPO-01..05 与 AC-WTG-014 生命周期映射，覆盖 0..N、retiring、owner 回执、失败恢复和零引用解绑。所有测试均为设计，未运行。** | **requirements v7.08 / basic v7.12 / Group DD v5.33 / SRS v1.11 / BD v1.12 / collaboration spec v1.2 / data v0.4** |
+| **v1.8** | **2026-10-28 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 W16 claim mapping、envelope/AAD 单元测试、OAuth 单次消费/身份与 provider 集成测试、E2E-COLLAB-12..19、PT-10 与 W14 profile gate 及需求追踪；明确 Neon 与最多两个 Multipass K3s inventory 实例的目标拓扑。PT-09 commit-to-first-diff p99 定义保留。所有新增用例均未实现/执行，数据库/provider 行为未验证。** | **SRS/BD/DD-W16-PAYLOAD-SECURITY-001 v0.1 与 dispatcher brief W16-PAYLOAD-SECURITY-TEST-DESIGN-20261028** |
 
 ---
 
@@ -626,7 +678,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 
 - [`docs/implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md`](../implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md) v0.1 (MVP 14 + P2 18 = 32 WBS 任务 + 70 测试 + 8 PT)
 - [`docs/specs/worktree-canvas-spec.md`](../specs/worktree-canvas-spec.md) v0.1 (10 关键测试入口 + 14 crate 接口签名)
-- `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` (本文档) v1.0 (5 级别 + 122 实证锚点)
+- `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` (本文档) v1.8 (5 级别；既有锚点聚合计数未重算)
 
 ### 9.3 既有同级测试设计书 (模板参考, per 守门 #1 R-05 平行不重叠)
 
@@ -642,6 +694,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 - Group detailed design §8.27 / v5.31 与 docs/specs/domain-collaboration-spec.md §13 / v1.0
 - docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md v0.2（目标 owner-local W/T/M 记录）
 - docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md W16 / WLD-7
+- `docs/requirements/SRS-W16-PAYLOAD-SECURITY-001.md` v0.1, `docs/design/BD-W16-PAYLOAD-SECURITY-001.md` v0.1, and `docs/design/DD-W16-PAYLOAD-SECURITY-001.md` v0.1 (W16 companion design; target requirements only, not implementation evidence)
 
 ---
 
@@ -674,7 +727,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 - [x] 守门 #6: PowerShell + Unix 路径兼容
 - [x] 守门 #9: 子代理 dispatch 必先 brief (本文档即 IT/E2E/PT brief 入口)
 - [x] 守门 #10: 错误码 6-field
-- [x] 守门 #11: 缺标比错标 (21 已知缺口显式标)
+- [x] 守门 #11: 缺标比错标 (23 已知缺口显式标)
 - [x] 守门 #13: W/T/M 100% 覆盖 (5 表)
 - [x] 守门 #14 v3: 5 域 Lead 签字栏 (Mavis 临时代签)
 - [x] 守门 #14 v4: v0.62 反转, 真人代签流程取消
@@ -742,11 +795,11 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 
 ### A.1 测试设计书完整性
 
-- **测试锚点计数**: v1.0 初版记录 121 个锚点；后续增加 UT-FE-SESSION-01 与 WLD-7 的 8 项 E2E/PT-09 计划。各级矩阵尚未统一重计，不宣称新的聚合总数；WLD-7 用例仍未实现/执行
+- **测试锚点计数**: v1.0 初版记录 121 个锚点；后续增加 UT-FE-SESSION-01、WLD-7 E2E/PT-09 及 W16 UT/IT/E2E/PT-10 计划。各级矩阵尚未统一重计，不宣称新的聚合总数；新增 WLD-7/W16 用例仍未实现/执行
 - **14 crate × 模块测试矩阵**: 1:1 对齐, 100% 覆盖
 - **103 FR + 23 NFR + 12 INV + 15 决策点**: 全闭环
 - **43 AC 验收 (per SRS §12)**: AC-F-1..20 + AC-P-1..7 + AC-Q-1..10 + AC-D-1..6
-- **21 已知缺口** (G-IT-01..05 + G-E2E-01..09 + G-PT-01..07): 显式标记；其中 WLD-7 的缺口仍 OPEN，实施期校准
+- **23 已知缺口** (G-IT-01..05 + G-E2E-01..10 + G-PT-01..08): 显式标记；WLD-7/W16 缺口仍 OPEN，实施期校准
 - **5 子任务 RACI**: ULYS-58 / 59 / 60 / 61 / 62 + Mavis 接手代签 (5 域真人到位后切真人)
 
 ### A.2 ULYS-57 任务完成度
@@ -759,7 +812,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **STEP 4 Traceability** | ✅ 完成 | `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 |
 | **STEP 5 Spec** | ✅ 完成 | `worktree-canvas-spec.md` v0.1 |
 | **STEP 6 IMPL-PLAN** | ✅ 完成 | `WORKTREE-CANVAS-IMPL-PLAN-001.md` v0.1 |
-| **STEP 7 TEST-DESIGN** | ✅ 完成 | `TEST-DESIGN-WORKTREE-CANVAS-001.md` v1.0 (本文档) |
+| **STEP 7 TEST-DESIGN** | ✅ 完成 | `TEST-DESIGN-WORKTREE-CANVAS-001.md` v1.8 (本文档) |
 | **STEP 8 5 子任务分解** | ✅ 完成 | §11 RACI |
 | **STEP 9 实装** | ⏳ 待 5 子任务推进 | T1-T14 + T4.1-T4.8 |
 | **STEP 10 验收** | ⏳ 待 UAT | 43 AC |
@@ -773,7 +826,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 - [x] 守门 #6: PowerShell + Unix 路径兼容
 - [x] 守门 #9: 子代理 dispatch 必先 brief (本文档即 IT/E2E/PT brief 入口)
 - [x] 守门 #10: 错误码 6-field
-- [x] 守门 #11: 缺标比错标 (21 已知缺口显式标)
+- [x] 守门 #11: 缺标比错标 (23 已知缺口显式标)
 - [x] 守门 #13: W/T/M 100% 覆盖 (5 表)
 - [x] 守门 #14 v3: 5 域 Lead 签字栏 (Mavis 临时代签)
 - [x] 守门 #14 v4: v0.62 反转, 真人代签流程取消
