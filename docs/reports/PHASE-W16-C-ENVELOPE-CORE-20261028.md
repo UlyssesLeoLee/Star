@@ -1,6 +1,6 @@
 # PHASE-W16-C-ENVELOPE-CORE-20261028
 
-> 状态：🟡 W16-C provider-neutral envelope core 局部实现；集成审查与完整生产验收未完成。
+> 状态：🟡 W16-C provider-neutral envelope core 已快进合入本地 `dev`；完整生产验收未完成。
 
 ## §0 目的
 
@@ -25,7 +25,8 @@
 - 两次 21/21 测试编译都保留 3 个 deprecation warning：`crates/domain-kms/src/lib.rs` LocalMockKms 路径的 `Nonce::from_slice` 位于 297、342、392 行；本 lane 新增路径已改用 `Nonce::try_from`，未扩大修补到 mock 实现。
 - CodeGraph 工具报告本 worktree 未索引（缺少 `.codegraph/`），按仓库约束停止继续查询并对 `profile.rs`、`provider_contract.rs` 做精确源码核对。
 - CypherGraph Guardian `py -3 .../cgg_guard.py --root . --changed --stamp`：PASS，2 个改动 Rust 源文件已刷新 SHA-256 header。
-- 包级 `cargo fmt --package domain-kms -- --check` 与当前 tracked diff 的 `git diff --check` 已通过；staged diff 与 MAGOS manifest 的最终逐项核对待提交前完成。
+- 包级 `cargo fmt --package domain-kms -- --check`、`git diff --cached --check`、10 项 MAGOS manifest 精确匹配与提交前完整差异审查均通过。
+- 在目标 `dev` 工作树再次运行 lane 专属 `cargo +1.99.0 test --locked --offline -p domain-kms --lib -j 4`：**21 passed; 0 failed**。
 - 未运行 REST、PostgreSQL/RLS、Neon、真实 KMS、Multipass/K3s、持久化、跨重启、性能或商业分发验证。
 
 ## §3 已知缺口
@@ -41,7 +42,7 @@
 ## §4 子代理失败接手清单
 
 - 原 W16-C worker 在用量上限处停止，尚未完成最终报告校订、staged diff 审查和提交；协调者接手完成审查与收尾。Cargo 链接冲突来自并行 lane 共用的目标目录；本 worker 未终止、覆盖或清理其他 lane 的构建。
-- 协调者已完成独立源代码审查与 lane 专属 Rust 测试复核；提交和集成仍待执行。此 lane 不 push 或清理其他 worktree。
+- 协调者已完成独立源代码审查与 lane 专属 Rust 测试复核；提交 `7db36f6f2fbeb09f3b6d31917b33c0490239510e` 已从 `codex/w16-c-envelope-core-20261028` fast-forward 合入本地 `dev`。未 push，也未清理其他 worktree。
 
 ## §5 守门规则
 
@@ -67,3 +68,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16-C provider-neutral envelope core、AAD 增量、单对象边界、验证现状与生产缺口；不表示 W16 或共享写入闭环。 | W16-C envelope core lane。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 订正 CodeGraph 未索引及原 worker 用量上限中断的记录；补入协调者独立审查、Rust 1.99.0 lane 专属测试与格式验证结果，并保留集成和生产验收为未完成。 | 协调者接手收尾和独立复核。 |
+| v0.3 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补记精确 manifest、staged diff 门、dev 分支回归结果与本地集成提交；生产验收仍 OPEN/NOT_RUN。 | W16-C 已快进合入本地 `dev`。 |
