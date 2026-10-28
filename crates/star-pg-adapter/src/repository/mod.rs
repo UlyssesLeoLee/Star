@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=ab7ea6f6fe66df1acd9e5fe0a8017a4406e828c81a3292d3e49b40aeba43976d
+@cypher schema=1 source_sha256=19ced9c7868542ea09d15bcc9e7761571120341aca90dbbc4533347efcacb312
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/mod.rs"})
 MERGE (schedule_module:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (terminal:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::OccurrenceTerminalOutcome"})
@@ -18,11 +18,19 @@ MERGE (scm_repository_master_module:File {path:"crates/star-pg-adapter/src/repos
 MERGE (scm_repository_master:Type {id:"crates/star-pg-adapter/src/repository/scm_repository_master.rs::PgScmRepositoryMasterRepository",kind:"struct"})
 MERGE (scm_repository_master_trait:Type {id:"crates/star-pg-adapter/src/repository/scm_repository_master.rs::ScmRepositoryMasterRepository",kind:"trait"})
 MERGE (scm_repository_master_error:Type {id:"crates/star-pg-adapter/src/repository/scm_repository_master.rs::ScmRepositoryMasterError",kind:"enum"})
+MERGE (device_bindings_module:File {path:"crates/star-pg-adapter/src/repository/device_bindings.rs"})
+MERGE (device_binding:Type {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::DeviceBinding",kind:"struct"})
+MERGE (device_repository:Type {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::DeviceBindingRepository",kind:"trait"})
+MERGE (device_repository_impl:Type {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::PgDeviceBindingRepository",kind:"struct"})
 MERGE (self)-[:IMPORTS]->(scm_repository_master_module)
 MERGE (self)-[:EXPOSES]->(scm_repository_master_module)
 MERGE (self)-[:EXPOSES]->(scm_repository_master)
 MERGE (self)-[:EXPOSES]->(scm_repository_master_trait)
 MERGE (self)-[:EXPOSES]->(scm_repository_master_error)
+MERGE (self)-[:IMPORTS]->(device_bindings_module)
+MERGE (self)-[:EXPOSES]->(device_binding)
+MERGE (self)-[:EXPOSES]->(device_repository)
+MERGE (self)-[:EXPOSES]->(device_repository_impl)
 @endcypher
 */
 //! Repository 索引 (per WBS §14.10.4 缺口 #4 6 ops Repository + 4 OAuth Repository)
@@ -32,6 +40,7 @@ MERGE (self)-[:EXPOSES]->(scm_repository_master_error)
 
 mod admission_receive;
 pub mod automation_schedule;
+pub mod device_bindings;
 pub mod ops_cluster_action_log;
 pub mod ops_helm_release_state;
 pub mod ops_log_analysis;
@@ -43,6 +52,10 @@ pub mod scm_repository_master;
 pub use automation_schedule::{
     OccurrenceTerminalOutcome, PgAutomationScheduleRepository, ScheduleDispatchResult,
     ScheduleRepositoryError,
+};
+pub use device_bindings::{
+    DeviceBinding, DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
+    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, PgDeviceBindingRepository,
 };
 pub use ops_cluster_action_log::{
     OpsClusterActionLog, OpsClusterActionLogRepository, PgOpsClusterActionLogRepository,

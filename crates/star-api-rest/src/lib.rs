@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=eeec93d59d0ffaa0ba73c27948a238b822d7cfb3a8219608138830aaf489ffd1
+MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
+MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
+MERGE (deviceRouter:Symbol {id:"crates/star-api-rest/src/auth/oauth/device_enrollment.rs::router",kind:"function"})
+MERGE (self)-[:DEFINES]->(router)
+MERGE (router)-[:CALLS]->(deviceRouter)
+@endcypher
+*/
 //! `crates/star-api-rest` — STAR Developer REST API
 //!
 //! per `docs/architecture/2026-09-02-upgrade/spec/integration/02-developer-api-and-outbound-webhook-spec.md` (sibling) §1.1 + §2 + §7.3
@@ -36,8 +45,8 @@ pub mod response;
 pub mod routes;
 
 use axum::{
-    routing::{delete, get, patch, post},
     Router,
+    routing::{delete, get, patch, post},
 };
 
 /// REST API 版本前缀 (per spec §2.1)
@@ -198,6 +207,7 @@ pub fn build_oauth_router() -> axum::Router<auth::oauth::OAuth2State> {
         .route("/.well-known/jwks.json", get(handlers::jwks_handler))
         .route("/oauth/introspect", post(handlers::introspect_handler))
         .route("/oauth/revoke", post(handlers::revoke_handler))
+        .merge(auth::oauth::device_enrollment::router())
 }
 
 /// 组合 router: REST API + OAuth2 5 endpoints (per brief v0.47 §3.1)
@@ -663,7 +673,7 @@ mod tests {
     /// 真实 DB 不可达, 用 `sqlx::PgPool::connect_lazy` 构造 lazy pool
     /// (handler 调用时才会 connect, 跨 session 续真实 DB).
     async fn mock_oauth2_state() -> auth::oauth::OAuth2State {
-        use auth::oauth::{keypair::OAuthKeyManager, OAuth2State};
+        use auth::oauth::{OAuth2State, keypair::OAuthKeyManager};
         use star_pg_adapter::repository::{
             OAuthAccessTokenRepository, OAuthAuthorizationCodeRepository, OAuthClientRepository,
             OAuthRefreshTokenRepository, PgOAuthAccessTokenRepository,
@@ -698,8 +708,12 @@ mod tests {
                 as Arc<dyn OAuthAuthorizationCodeRepository>,
             access_token_repo: Arc::new(PgOAuthAccessTokenRepository::new(pool.clone()))
                 as Arc<dyn OAuthAccessTokenRepository>,
-            refresh_token_repo: Arc::new(PgOAuthRefreshTokenRepository::new(pool))
+            refresh_token_repo: Arc::new(PgOAuthRefreshTokenRepository::new(pool.clone()))
                 as Arc<dyn OAuthRefreshTokenRepository>,
+            device_binding_repo: Arc::new(
+                star_pg_adapter::repository::PgDeviceBindingRepository::new(pool.clone()),
+            )
+                as Arc<dyn star_pg_adapter::repository::DeviceBindingRepository>,
         }
     }
 

@@ -1,4 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=aa38b418d8549c35fa815d51de0bb4dc3b5d862419f0156e661fd24f48fd14b3
+MERGE (self:File {path:"crates/star-api-rest/src/auth/mod.rs"})
+MERGE (claims:Type {id:"crates/star-api-rest/src/auth/mod.rs::Claims",kind:"struct"})
+MERGE (device:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
+MERGE (issue:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token_with_device_context",kind:"function"})
+MERGE (context:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::Claims.device_context",kind:"method"})
+MERGE (self)-[:DEFINES]->(claims)
+MERGE (self)-[:DEFINES]->(device)
+MERGE (self)-[:DEFINES]->(issue)
+MERGE (self)-[:DEFINES]->(context)
+MERGE (issue)-[:USES_TYPE]->(claims)
+MERGE (issue)-[:USES_TYPE]->(device)
+MERGE (context)-[:RETURNS_TYPE]->(device)
+@endcypher
+*/
 //! `star-api-rest::auth` — OAuth2 + JWT 鉴权 middleware (per §14.12 IV)
 //!
 //! v0.41 端到端实装 (per 2026-09-09 19:20 JST 用户拍板"OAuth2 + JWT (推荐)"):
@@ -12,7 +28,7 @@
 //! 估 3-4M tokens, 1-2 session 续
 
 use chrono::{DateTime, Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -74,6 +90,19 @@ pub struct Claims {
     pub roles: Vec<String>,
     /// OAuth2 scope (e.g. "work-items:read work-items:write")
     pub scope: String,
+    /// Server-verified device identity; absent for legacy and unbound sessions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<Uuid>,
+    /// Monotonic device generation issued by the identity owner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_generation: Option<i64>,
+}
+
+/// Device identity copied only from a successfully verified issuer token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceTokenContext {
+    pub device_id: Uuid,
+    pub generation: i64,
 }
 
 /// JWT Config (RS256 keys 走 env var, 守门 #5 v2)
@@ -138,6 +167,18 @@ pub fn issue_token(
     roles: Vec<String>,
     scope: String,
 ) -> Result<(String, Claims), JwtError> {
+    issue_token_with_device_context(config, sub, tenant_id, roles, scope, None)
+}
+
+/// Issue a JWT optionally bound to a device generation from the identity owner.
+pub fn issue_token_with_device_context(
+    config: &JwtConfig,
+    sub: Uuid,
+    tenant_id: Uuid,
+    roles: Vec<String>,
+    scope: String,
+    device_context: Option<DeviceTokenContext>,
+) -> Result<(String, Claims), JwtError> {
     let now = Utc::now();
     let exp = now + Duration::seconds(config.ttl_seconds);
     let claims = Claims {
@@ -152,6 +193,8 @@ pub fn issue_token(
         user_id: sub,
         roles,
         scope,
+        device_id: device_context.map(|context| context.device_id),
+        device_generation: device_context.map(|context| context.generation),
     };
     let header = Header::new(jsonwebtoken::Algorithm::RS256);
     let encoding_key = EncodingKey::from_rsa_pem(config.private_key_pem.as_bytes())
@@ -204,6 +247,19 @@ impl Claims {
             tenant_id: self.tenant_id,
             roles: self.roles.clone(),
             scope: self.scope.clone(),
+        }
+    }
+
+    /// Return a well-formed device identity only when both signed claims exist.
+    pub fn device_context(&self) -> Option<DeviceTokenContext> {
+        match (self.device_id, self.device_generation) {
+            (Some(device_id), Some(generation)) if !device_id.is_nil() && generation > 0 => {
+                Some(DeviceTokenContext {
+                    device_id,
+                    generation,
+                })
+            }
+            _ => None,
         }
     }
 

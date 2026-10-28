@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=8d4b398cbf3c91e92e5aea18d030b57c05276cbb2f74918492a00f12e2a2f234
+@cypher schema=1 source_sha256=1d4d4e175e477f3d55abe0b4b955505cf824a44de7effddbb00d30da068c1900
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas_event_stream.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::module",kind:"module"})
 MERGE (hub:Type {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub",kind:"struct"})
@@ -11,6 +11,7 @@ MERGE (listener:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stre
 MERGE (stream:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::stream_worktree_canvas_events",kind:"function"})
 MERGE (authorize:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::reauthorize_worktree_canvas_read",kind:"function"})
 MERGE (notify:Topic {id:"postgresql.star_canvas_outbox_wake",kind:"topic"})
+MERGE (deviceWake:Topic {id:"postgresql.star_device_binding_wake",kind:"topic"})
 MERGE (endpoint:Endpoint {id:"GET /api/v1/worktrees/{worktree_id}/canvas-events/stream",kind:"http_route"})
 MERGE (connect:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::connect_listener",kind:"function"})
 MERGE (reconnect:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::reconnect_listener",kind:"function"})
@@ -30,8 +31,10 @@ MERGE (endpoint)-[:HANDLES]->(stream)
 MERGE (hub)-[:HAS_METHOD]->(start)
 MERGE (start)-[:CALLS]->(connect)
 MERGE (connect)-[:SUBSCRIBES]->(notify)
+MERGE (connect)-[:SUBSCRIBES]->(deviceWake)
 MERGE (listener)-[:CALLS]->(reconnect)
 MERGE (listener)-[:SUBSCRIBES]->(notify)
+MERGE (listener)-[:SUBSCRIBES]->(deviceWake)
 MERGE (listener)-[:EMITS]->(signal)
 MERGE (stream)-[:CALLS]->(authorize)
 MERGE (stream)-[:CALLS]->(filter)
@@ -61,13 +64,15 @@ use tracing::warn;
 use uuid::Uuid;
 
 use super::{
-    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState,
+    AuthenticatedDeviceContext, GroupApiError, GroupApiState,
     canvas::reauthorize_worktree_canvas_read,
 };
 
 const NOTIFY_CHANNEL: &str = "star_canvas_outbox_wake";
+const DEVICE_BINDING_CHANNEL: &str = "star_device_binding_wake";
 const WAKE_QUEUE_CAPACITY: usize = 64;
 const MAX_ACTIVE_STREAMS_PER_PROCESS: usize = 128;
+const AUTHORIZATION_LEASE: Duration = Duration::from_secs(60);
 const MAX_NOTIFY_PAYLOAD_BYTES: usize = 36;
 const MAX_SSE_EVENT_FRAME_BYTES: usize = 30;
 
@@ -78,6 +83,7 @@ const _: () = assert!(MAX_WAKE_QUEUE_BYTES <= 2_048 && MAX_SSE_EVENT_FRAME_BYTES
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WakeSignal {
     Worktree(Uuid),
+    DeviceBindingChanged,
     ResyncRequired,
 }
 
@@ -102,6 +108,14 @@ impl CanvasEventWakeHub {
         .await?;
         if !trigger_ready {
             anyhow::bail!("Canvas Outbox wake trigger migration is not installed");
+        }
+        let device_trigger_ready: bool = sqlx::query_scalar(
+            "SELECT EXISTS (\n                 SELECT 1 FROM pg_trigger \n                 WHERE tgrelid = to_regclass('public.oauth_device_bindings') \n                   AND tgname = 'w16_oauth_device_binding_generation_wake' \n                   AND NOT tgisinternal AND tgenabled IN ('O', 'A')\n             )",
+        )
+        .fetch_one(&pool)
+        .await?;
+        if !device_trigger_ready {
+            anyhow::bail!("Device binding wake trigger migration is not installed");
         }
 
         let listener = connect_listener(&pool).await?;
@@ -139,9 +153,10 @@ pub(super) fn router() -> Router<GroupApiState> {
 
 async fn stream_worktree_canvas_events(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path(worktree_id): Path<String>,
 ) -> Result<Response, GroupApiError> {
+    let actor = &device_context.actor;
     super::validate_actor(&actor)?;
     super::require_scope(&actor, "worktree:read")?;
     super::require_scope(&actor, "canvas:read")?;
@@ -153,12 +168,13 @@ async fn stream_worktree_canvas_events(
     let permit = hub.try_acquire_stream()?;
 
     let receiver = hub.subscribe();
-    reauthorize_worktree_canvas_read(&state.resolver.pool, &actor, worktree_id).await?;
+    reauthorize_worktree_canvas_read(&state.resolver.pool, &device_context, worktree_id).await?;
     let stream_state = StreamState {
         receiver,
-        actor,
+        device_context,
         worktree_id,
         pool: state.resolver.pool.clone(),
+        authorization_lease_deadline: tokio::time::Instant::now() + AUTHORIZATION_LEASE,
         close_after_resync: false,
         _permit: permit,
     };
@@ -167,12 +183,31 @@ async fn stream_worktree_canvas_events(
             return None;
         }
         loop {
-            match state.receiver.recv().await {
+            let wake = tokio::select! {
+                result = state.receiver.recv() => Some(result),
+                _ = tokio::time::sleep_until(state.authorization_lease_deadline) => None,
+            };
+            let Some(wake) = wake else {
+                if reauthorize_worktree_canvas_read(
+                    &state.pool,
+                    &state.device_context,
+                    state.worktree_id,
+                )
+                .await
+                .is_err()
+                {
+                    return None;
+                }
+                state.authorization_lease_deadline =
+                    tokio::time::Instant::now() + AUTHORIZATION_LEASE;
+                return Some((Ok::<_, Infallible>(keepalive()), state));
+            };
+            match wake {
                 Ok(signal) => match signal_for_subscriber(signal, state.worktree_id) {
                     Some(WakeSignal::Worktree(_)) => {
                         if reauthorize_worktree_canvas_read(
                             &state.pool,
-                            &state.actor,
+                            &state.device_context,
                             state.worktree_id,
                         )
                         .await
@@ -180,11 +215,27 @@ async fn stream_worktree_canvas_events(
                         {
                             return None;
                         }
+                        state.authorization_lease_deadline =
+                            tokio::time::Instant::now() + AUTHORIZATION_LEASE;
                         return Some((Ok::<_, Infallible>(event("canvas-wake")), state));
                     }
                     Some(WakeSignal::ResyncRequired) => {
                         state.close_after_resync = true;
                         return Some((Ok::<_, Infallible>(event("resync_required")), state));
+                    }
+                    Some(WakeSignal::DeviceBindingChanged) => {
+                        if reauthorize_worktree_canvas_read(
+                            &state.pool,
+                            &state.device_context,
+                            state.worktree_id,
+                        )
+                        .await
+                        .is_err()
+                        {
+                            return None;
+                        }
+                        state.authorization_lease_deadline =
+                            tokio::time::Instant::now() + AUTHORIZATION_LEASE;
                     }
                     None => continue,
                 },
@@ -207,9 +258,10 @@ async fn stream_worktree_canvas_events(
 
 struct StreamState {
     receiver: broadcast::Receiver<WakeSignal>,
-    actor: AuthUser,
+    device_context: AuthenticatedDeviceContext,
     worktree_id: Uuid,
     pool: PgPool,
+    authorization_lease_deadline: tokio::time::Instant,
     close_after_resync: bool,
     // Keeps the global connection permit for exactly the stream lifetime.
     _permit: OwnedSemaphorePermit,
@@ -219,10 +271,15 @@ fn event(name: &'static str) -> Event {
     Event::default().event(name).data("")
 }
 
+fn keepalive() -> Event {
+    Event::default().comment("authorization-revalidated")
+}
+
 fn signal_for_subscriber(signal: WakeSignal, worktree_id: Uuid) -> Option<WakeSignal> {
     match signal {
         WakeSignal::Worktree(wake_worktree_id) if wake_worktree_id == worktree_id => Some(signal),
         WakeSignal::Worktree(_) => None,
+        WakeSignal::DeviceBindingChanged => Some(signal),
         WakeSignal::ResyncRequired => Some(signal),
     }
 }
@@ -230,12 +287,16 @@ fn signal_for_subscriber(signal: WakeSignal, worktree_id: Uuid) -> Option<WakeSi
 async fn connect_listener(pool: &PgPool) -> Result<PgListener, sqlx::Error> {
     let mut listener = PgListener::connect_with(pool).await?;
     listener.listen(NOTIFY_CHANNEL).await?;
+    listener.listen(DEVICE_BINDING_CHANNEL).await?;
     Ok(listener)
 }
 
 async fn run_listener(pool: PgPool, mut listener: PgListener, hub: Arc<CanvasEventWakeHub>) {
     loop {
         match listener.try_recv().await {
+            Ok(Some(notification)) if notification.channel() == DEVICE_BINDING_CHANNEL => {
+                hub.publish(WakeSignal::DeviceBindingChanged);
+            }
             Ok(Some(notification)) if notification.channel() == NOTIFY_CHANNEL => {
                 let payload = notification.payload();
                 let worktree_id = (payload.len() <= MAX_NOTIFY_PAYLOAD_BYTES)
@@ -322,6 +383,10 @@ mod tests {
         assert_eq!(
             signal_for_subscriber(WakeSignal::ResyncRequired, target),
             Some(WakeSignal::ResyncRequired)
+        );
+        assert_eq!(
+            signal_for_subscriber(WakeSignal::DeviceBindingChanged, target),
+            Some(WakeSignal::DeviceBindingChanged)
         );
         assert_ne!(target, other);
     }

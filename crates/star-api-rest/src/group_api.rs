@@ -103,11 +103,11 @@ pub use worktree_lifecycle::{
 
 use async_trait::async_trait;
 use axum::{
+    Json, Router,
     extract::{FromRef, Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use bi_owner_runtime::TaskEventQueryPort;
 use chrono::{DateTime, Utc};
@@ -115,7 +115,8 @@ use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=1fdc8716adbd028cb42463f2e79d9d64e083fe869035f620ec69fc8eca32bbaf
+use star_pg_adapter::repository::{DeviceBindingRepository, PgDeviceBindingRepository};
+// @cypher schema=1 source_sha256=e297f86392d9abd2d41d0c0056f2be2c7867da3b64b7d97a4e0bbc223239677e
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -186,11 +187,14 @@ use serde::{Deserialize, Serialize};
 // MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
 // @endcypher
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
+use crate::auth::{
+    AuthUser, JwtConfig,
+    oauth::{AuthenticatedDeviceContext, AuthenticatedUser},
+};
 
 mod bi_analytics;
 mod canvas;
@@ -346,6 +350,7 @@ pub trait WorktreeArchiveReadinessObserver: Send + Sync {
 pub struct GroupApiState {
     jwt: Arc<JwtConfig>,
     resolver: GroupContextResolver,
+    device_binding_repo: Arc<dyn DeviceBindingRepository>,
     run_task_card_command_port: Arc<dyn RunTaskCardCommandPort>,
     run_task_card_pg_adapter: Arc<PgRunTaskCardAdapter>,
     task_cli_session_provisioner: Option<Arc<dyn TaskCliSessionProvisioner>>,
@@ -361,11 +366,14 @@ pub struct GroupApiState {
 impl GroupApiState {
     pub fn new(jwt: Arc<JwtConfig>, pool: PgPool) -> Self {
         let run_task_card_pg_adapter = Arc::new(PgRunTaskCardAdapter::new(pool.clone()));
+        let device_binding_repo: Arc<dyn DeviceBindingRepository> =
+            Arc::new(PgDeviceBindingRepository::new(pool.clone()));
         let run_task_card_command_port: Arc<dyn RunTaskCardCommandPort> =
             run_task_card_pg_adapter.clone();
         Self {
             jwt,
             resolver: GroupContextResolver::new(pool),
+            device_binding_repo,
             run_task_card_command_port,
             run_task_card_pg_adapter,
             task_cli_session_provisioner: None,
@@ -456,6 +464,12 @@ impl GroupApiState {
 impl FromRef<GroupApiState> for Arc<JwtConfig> {
     fn from_ref(state: &GroupApiState) -> Self {
         state.jwt.clone()
+    }
+}
+
+impl FromRef<GroupApiState> for Arc<dyn DeviceBindingRepository> {
+    fn from_ref(state: &GroupApiState) -> Self {
+        Arc::clone(&state.device_binding_repo)
     }
 }
 
