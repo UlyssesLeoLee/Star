@@ -1,6 +1,6 @@
 # SRS-W16-PAYLOAD-SECURITY-001 — 协作载荷身份与持久加密要求
 
-> 状态：Draft v0.1；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。它定义目标验收条件，不表示实现已交付。
+> 状态：Draft v0.2；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。W16-C lane 增加了有界 provider-neutral envelope core，但不是生产协作保护闭环。
 
 ## 0. 目的与范围
 
@@ -13,11 +13,11 @@
 | SRS-W16-PAYLOAD-01 | 共享写入必须绑定由认证签发方确认且当前有效的 `actor_id`、`tenant_id`、`device_id` 与设备凭据代次。客户端 body/header 中的 `device_id` 只能被拒绝或忽略，不能决定作者、RLS scope、冲突参与者或通知接收者。缺少可信设备身份时保持 `local_only / sync_pending`。 |
 | SRS-W16-PAYLOAD-02 | 设备撤销后，后续读取、写入、订阅和 resolve 必须拒绝；已连接的事件流须收到撤销失效并关闭，或在有界授权租约到期前重新核验。撤销状态未知、授权目录不可用或代次不匹配时 fail closed。 |
 | SRS-W16-PAYLOAD-03 | 授权码和 refresh token 的单次兑换必须原子化。并发重放时最多一个调用成功签发新令牌；其余返回认证失败，不得仅依赖“先读、后更新”的两步逻辑。身份、设备、tenant、client、scope 绑定必须在刷新轮换后保持。 |
-| SRS-W16-PAYLOAD-04 | 任何持久化协作正文须由 Rust owner 服务通过版本化 envelope-encryption 保护；密文完整性和 canonical tenant/Project/Run/resource/revision 上下文须被认证。数据库、备份、审计、日志、指标、Outbox、PostgreSQL NOTIFY 与 SSE wake payload 不得包含正文或明文 DEK。 |
-| SRS-W16-PAYLOAD-05 | 每份密文必须固定可恢复的 provider/profile identity、版本/digest、opaque key identity、envelope format/AAD schema 版本、wrapped DEK、AEAD suite 与 nonce。只保留足够的密文元数据；不得持久化明文 DEK、长期 KMS 凭证或未保护的正文摘要。 |
+| SRS-W16-PAYLOAD-04 | 任何持久化协作正文须由 Rust owner 服务通过版本化 envelope-encryption 保护；密文完整性和 canonical tenant/Project/Run/optional Worktree/resource/revision 上下文须被认证。数据库、备份、审计、日志、指标、Outbox、PostgreSQL NOTIFY 与 SSE wake payload 不得包含正文或明文 DEK。 |
+| SRS-W16-PAYLOAD-05 | 每份密文必须固定可恢复的 provider/profile identity、版本/digest、opaque key identity、envelope format/AAD schema 版本、wrapped DEK、AEAD suite 与 nonce。只保留足够的密文元数据；不得持久化明文 DEK、长期 KMS 凭证或未保护的正文摘要。当前 envelope core 使用 AES-256-GCM、96-bit nonce、128-bit tag。 |
 | SRS-W16-PAYLOAD-06 | KMS/provider 不可用、密钥版本未知/已禁用、身份撤销、AAD 不匹配、密文/tag/digest 篡改或解密失败时，不得回退至 `LocalMockKms`、明文、进程内密钥或内存队列。正文只能留在受控本地草稿并标记未同步，不能呈现为已共享。 |
 | SRS-W16-PAYLOAD-07 | 轮换、重启和备份恢复必须保留仍在 retention 与备份窗口内的合法读取能力；旧密钥只能在所有引用与保留备份迁移/到期并完成审计后销毁。跨 provider/profile 切换须显式迁移，不得将旧 provider 的 opaque wrapped bytes 交给新 provider 解包。 |
-| SRS-W16-PAYLOAD-08 | 保护过程必须有界且可取消。客户端编辑不逐键调用 KMS；owner 仅对已 coalesce 的 checkpoint 执行密钥操作。明文、DEK、并发 KMS 调用、临时缓冲、队列和缓存须受版本化资源预算限制；指标只记录脱敏的操作/耗时/字节范围。 |
+| SRS-W16-PAYLOAD-08 | 保护过程必须有界且可取消。客户端编辑不逐键调用 KMS；owner 仅对已 coalesce 的 checkpoint 执行密钥操作。Envelope core 当前单条正文上限为 256 KiB、wrapped DEK 上限为 64 KiB、JSON envelope 上限为 1 MiB；这些单对象界限不证明进程 RSS、并发、队列或取消预算已通过。指标只记录脱敏的操作/耗时/字节范围。 |
 
 ## 2. 验收映射与状态
 
@@ -25,7 +25,7 @@
 |---|---|---|
 | 01–02 | E2E-COLLAB-12/13；认证 owner 与 SSE 撤销测试 | 未实现 / NOT_RUN |
 | 03 | E2E-COLLAB-14；数据库并发单次消费测试 | 审计已发现双重成功风险；未修复 / NOT_RUN |
-| 04–06 | E2E-COLLAB-15/16/17；provider 故障与篡改测试 | 只有 trait 与进程内 mock；未实现 / NOT_RUN |
+| 04–06 | W16-C envelope-core focused unit tests；E2E-COLLAB-15/16/17、真实 provider 故障与 DB/RLS 测试 | domain-kms lib tests 21/21 PASS（lane 专属 Cargo target）；未接 owner/REST/DB，生产 provider、RLS、持久化、恢复未实现 / NOT_RUN |
 | 07 | E2E-COLLAB-18/19；恢复与轮换测试 | 未实现 / NOT_RUN |
 | 08 | PT-10 与 PT-09-GATE-01；固定 workload/profile 的内存、CPU、队列和 KMS 调用证据 | 未实测 / NOT_RUN |
 
@@ -34,7 +34,7 @@
 ## 3. 已知缺口
 
 - `Claims`/`AuthUser` 当前没有 device identity；`Device` 没有生产持久 adapter、设备 proof 路由或撤销联动。详见 `W16-DEVICE-IDENTITY-AUDIT-20261028.md`。
-- `TranscriptBodyProtector` 没有 concrete implementation 或解密读回；`LocalMockKms` 不能跨重启恢复。详见 `W16-KMS-SOURCE-AUDIT-20261028.md`。
+- W16-C lane 加入 `TranscriptEnvelopeProtector` 与单元测试，但尚未接入 `TranscriptBodyProtector`、业务 owner 或生产请求路径；`LocalMockKms` 不能跨重启恢复，生产 KMS、RLS、持久化、跨重启解密仍未实现/NOT_RUN。详见 `W16-KMS-SOURCE-AUDIT-20261028.md` 与 W16-C 阶段报告。
 - Provider 研究仅形成候选建议；完整依赖/镜像/部署闭包、密钥恢复演练、运行预算和生产配置尚未批准。详见 `W16-KMS-PROVIDER-RESEARCH-20261028.md`。
 - 本补充文件尚未合并进主 SRS；在主文件冲突解除之前，它与对应 BD/DD/TD 作为一个独立且规范性的 W16 增量维护。
 
@@ -43,3 +43,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增设备身份、撤销、一次性令牌、防持久正文泄露、KMS fail-closed、轮换/恢复和低消耗验收要求；状态保持 NOT_RUN。 | W16 前置审计发现认证、持久 KMS 与恢复链尚未闭合。 |
+| v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 canonical AAD 包含可选 Worktree；记录 W16-C 单对象大小界限和仅有 envelope core 单元实现，所有生产 provider/owner/DB/恢复门仍 OPEN/NOT_RUN。 | W16-C envelope core 实施与字段顺序复核。 |

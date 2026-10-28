@@ -1,6 +1,6 @@
 # PHASE-W16-PAYLOAD-SECURITY-DESIGN-20261028
 
-> 状态：🟡 设计增量草案；不表示 W16 身份、KMS、加密保护或持久协作已实现。
+> 状态：🟡 设计增量与后续实现状态同步；不表示 W16 身份、生产 KMS、持久协作或可共享正文闭环已实现。
 
 ## §0 目的
 
@@ -16,6 +16,7 @@
 | `TEST-DESIGN-WORKTREE-CANVAS-001.md` | v1.8，新增 W16 UT/IT/E2E-COLLAB-12..19/PT-10 目标验收设计 | 已审阅并同步；均未实现/执行 |
 | `W16-PAYLOAD-SECURITY-TEST-DESIGN-20261028.md` | 测试设计审阅结论、依赖与未验证边界 | 已审阅；仅设计级 |
 | `WORKTREE-GROUP-NEXT-WBS-2026-10-18.md` | v0.70，记录三条并行审计结果、W16-A..E 阶段门及测试设计 lane 集成 | 本轮文档同步 |
+| `PHASE-W16-C-ENVELOPE-CORE-20261028.md` | 后续 W16-C 阶段报告：Rust envelope core、focused 单测、AAD 版本增量和生产缺口 | 已新增；见其独立验证结果 |
 | 三份 W16 审计/研究报告 | 身份、Rust 来源、provider 研究 | 已 rebase 并快进到本地 `dev` |
 
 ## §2 验证摘要
@@ -24,11 +25,13 @@
 - 本设计 lane 未运行 Cargo、数据库迁移、Neon、Multipass/K3s、浏览器、性能、KMS 或密码学测试。后续需在真实 provider 与持久数据库下完成独立验收。
 - 独立测试设计 lane 经 `rtk proxy git diff --check` 与协调者文档审阅后 rebase/快进到本地 `dev`；该 lane 也未运行测试或构建，所有新增测试仍为设计状态。
 - 对五份 manifest 文件运行 `rtk proxy git diff --cached --check`，成功且无 whitespace/error 输出；这只是差异静态检查，不是内容、密码学或运行验收。
+- 后续 W16-C 实施 lane 的详细证据记录于独立报告：`rtk proxy cargo fmt --package domain-kms` 成功；首轮测试 19/21 是 AAD 长度期望值错误，随后一次共享 Cargo target 遇到 `LNK1104`；修正并串行重跑后为 21/21，再以 lane 专属 `CARGO_TARGET_DIR=E:\DevCache\cargo\target-w16-c-envelope-core` 重跑也为 21/21。最终结果 `21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s`。该 core 单测不覆盖本设计阶段列出的真实 KMS/DB/RLS/恢复/性能门。
 
 ## §3 已知缺口
 
 - Access token 和 `AuthUser` 当前没有可信设备身份；Device 没有生产持久化/认证链。授权码与 refresh 消费有并发双成功风险。
 - 没有生产 KMS provider、具体 `TranscriptBodyProtector` 或跨重启 decrypt path；`LocalMockKms` 不具备持久密钥能力。
+- 后续 W16-C branch 有 `TranscriptEnvelopeProtector` provider-neutral core，但没有生产 profile resolver、owner/REST/RLS 接入、持久化或 `TranscriptBodyProtector` adapter；wrapped key 轮换、跨重启恢复、可靠 zeroization 与性能目标仍未验收。AAD 的 optional Worktree 是相对旧 DD 的显式增量，放在 Run 之后，tag 0/1 固定编码；最大长度为 absent 201 / present 217 bytes。
 - OpenBao Transit 是自托管候选而非已批准依赖；两节点 Raft 不具备故障容忍。AWS KMS 是托管服务，不满足纯自托管开源运行形态。
 - 全传递依赖、镜像、chart、许可证公告与实际 SBOM 尚未审查；本地 Rust 源代码没有被复制。
 - 主 SRS/BD/DD 路径受既有分支及 `D:\Star` 用户脏文档保护约束影响，本 lane 采用 W16 companion 文档；之后需择机无冲突地归并。
@@ -63,3 +66,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 建立 W16 载荷安全设计 companion、阶段门、并行审计证据与未验证边界；不表示实现通过。 | W16 payload readiness 审计与用户要求的安全/性能设计补全。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16 测试设计 v1.8 的协调者审阅与本地 dev 集成，更新改动矩阵、阶段状态与签字栏；所有安全、数据库、provider 与性能验收仍 OPEN/NOT_RUN。 | 独立测试设计 lane 完成并合入本地 dev。 |
+| v0.3 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 链接后续 W16-C envelope-core 阶段报告并同步单元测试结果、AAD optional Worktree 编码与生产缺口；不将 core 单测视为 W16 闭环验收。 | W16-C envelope core 与 SRS/BD/DD/WBS 状态同步。 |

@@ -1,6 +1,6 @@
 # DD-W16-PAYLOAD-SECURITY-001 — 设备身份与协作载荷 envelope 详细设计
 
-> 状态：Draft v0.1；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。接口、schema 与算法仍须实现 review；当前无生产实现。
+> 状态：Draft v0.2；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。W16-C branch 已增加 provider-neutral envelope core，但接口、schema 与算法仍须独立安全 review；当前无生产实现。
 
 ## 1. 模块边界
 
@@ -34,15 +34,20 @@
 
 ### 3.1 保护上下文
 
-加密与解密使用同一版本的 canonical binary encoding 构造 AAD：
+加密与解密使用同一版本的 canonical binary encoding 构造 AAD。W16-C 将 optional Worktree 作为明确的设计增量加入旧版上下文；旧版 DD 字段中不包含 Worktree。编码固定如下：
 
 ```text
-aad_schema_version | tenant_id | project_id | run_id | resource_kind |
-resource_id | actor_id | base_revision | payload_id | checkpoint_revision |
-retention_policy_revision | envelope_format_version
+domain_separator("STAR-W16") |
+aad_schema_version:u16_be |
+tenant_id:uuid16 | project_id:uuid16 | run_id:uuid16 |
+worktree_tag:u8 (0=absent, 1=present) | [worktree_id:uuid16 when tag=1] |
+resource_kind_length:u16_be | resource_kind:1..64_ascii_bytes |
+resource_id:uuid16 | actor_id:uuid16 | base_revision:u64_be |
+payload_id:uuid16 | checkpoint_revision:u64_be |
+retention_policy_revision:u64_be | envelope_format_version:u32_be
 ```
 
-所有 id 来自经验证的 owner/context，字段顺序、UUID 编码、空值表示及规范化版本固定；不得用客户端 JSON 原串直接作为 AAD。跨 tenant/Project/Run/resource/revision 替换记录必须认证失败。
+所有 ID 来自经验证的 owner/context，UUID 是固定 16-byte 表示；所有整数使用 big-endian。`resource_kind` 只允许小写 ASCII 字母、数字及 `._-`，首尾必须是字母或数字。`base_revision` 可为 0；checkpoint 与 retention revision 必须非零。不存在的 Worktree 只编码单字节 tag `0`，存在时编码 tag `1` 后跟 UUID；未知 tag 不属于当前 schema。最大 AAD 长度可由字段宽度推导：无 Worktree 为 201 bytes，有 Worktree 且 kind 为 64 bytes 时为 217 bytes。不得使用客户端 JSON 原串或字符串拼接冒充 canonical AAD。跨 tenant/Project/Run/Worktree/resource/revision 替换记录必须认证失败。
 
 ### 3.2 Envelope 逻辑字段
 
@@ -50,12 +55,12 @@ retention_policy_revision | envelope_format_version
 
 | 字段 | 规则 |
 |---|---|
-| `format_version` / `aad_schema_version` | 不可省略；未知版本 fail closed。 |
-| `provider_profile_id` / `profile_revision` / `profile_digest` | 在第一次持久化时固定，不随运行配置变化。 |
+| `format_version` / `aad_schema_version` | 不可省略；未知版本 fail closed。当前 core 只接受 envelope format 1 / AAD schema 1。 |
+| `provider_profile_id` / `profile_revision` / `profile_digest` | 在第一次持久化时固定，不随运行配置变化。当前代码由 `wrapped_dek.profile` 携带该固定 profile identity。 |
 | `key_ref` / `key_version` | opaque、可恢复、可审计；不得含凭证。 |
 | `wrapped_dek` | 仅 provider 可 unwrap 的密钥封装；禁止 DEK 明文持久化。 |
-| `aead_suite` / `nonce` / `ciphertext_and_tag` | suite 明确版本；nonce 对同一 DEK 不复用；tag 校验失败拒绝。 |
-| `ciphertext_digest` | 仅用于传输/对象完整性，不产生明文摘要或可识别内容标记。 |
+| `aead_suite` / `nonce` / `ciphertext_and_tag` | suite 明确版本；当前 core 为 AES-256-GCM、96-bit nonce、128-bit tag；tag 校验失败拒绝。 |
+| `ciphertext_digest` | 目标持久化 envelope 的可选传输/对象完整性字段；W16-C core 尚未实现该字段，不产生明文摘要或可识别内容标记。 |
 | `resource/payload reference` | 从 owner 的授权记录解析；客户端不能通过替换 reference 越权读回。 |
 
 逻辑结构不冻结物理 SQL/对象存储表。若拆 envelope manifest 或 blob table，须依 basic design §3 分类并落实 per-table RLS/retention/audit。
@@ -64,9 +69,17 @@ retention_policy_revision | envelope_format_version
 
 1. Auth extractor 验证 JWT 和 active device generation；owner 从可信 context 重新解析 Project/Run/Worktree scope、actor 权限、expected revision 与 retention policy revision。
 2. 前端只在有限 pending delta 中 coalesce；达到 profile 的 checkpoint 条件后提交单个幂等 operation id。禁止逐字符写出 immutable snapshot 或逐键调用 KMS。
-3. Rust protector 取固定 `KmsProfile`，通过短期最小权限身份请求 DEK wrap/generate，使用本地 AEAD 对正文加密；DEK/明文缓冲进入有限生命周期区，正常/错误/取消路径均尽最大努力清零。
+3. Rust protector 取固定 `KmsProfile`，通过短期最小权限身份请求 DEK wrap/generate，使用本地 AEAD 对正文加密；DEK/明文缓冲进入有限生命周期区，正常/错误/取消路径均尽最大努力清零。W16-C branch 的 `TranscriptEnvelopeProtector` 已实现 core API：`protect(context, aad, plaintext)` 调用固定 `KmsProviderClient::generate_data_key`，`decrypt(context, aad, envelope)` 调用同 profile 的 `unwrap_data_key` 后再做认证解密。该切片不构成 owner/REST/DB 接入或生产 `TranscriptBodyProtector`。
 4. 协作 owner 在自己的事务中写密文元数据、draft head/checkpoint、审计和幂等 receipt；只有完整密文 digest、tag 及 retention 通过验证后才可参与冲突判定。owner Outbox 只带 resource/revision/event/conflict id 等 metadata。
 5. 读回先重验 actor/device/Run/resource 权限与 retention，再用记录固定的 provider/profile/key version、同一 AAD unwrap 和 AEAD 解密。撤权检查先于 KMS call；所有保护结果只在内存中短暂供授权响应使用。
+
+### 3.4 当前 core 的有界编码与未实现保证
+
+- 单条明文最大 256 KiB；密文含 16-byte GCM tag，最大 256 KiB + 16 bytes。wrapped DEK 最大 64 KiB；解码前拒绝超过 1 MiB 的 JSON envelope，并拒绝 envelope 外层未知字段、版本、suite、nonce 长度及超限密文。
+- binary AAD 最大 217 bytes。JSON 序列化/解码和 AEAD 目前是完整对象操作而非 streaming；上述上限约束单对象及单次缓冲规模，不证明并发峰值 RSS、系统队列、延迟或可取消性已达标。
+- nonce 使用 rand 0.10 `rand::rng()` 提供的 `ThreadRng`；它由 `SysRng/getrandom` 自动 seed，且支持周期 reseed。该实现不是逐次直接调用 OS RNG。目标 workload 的熵源可用性与安全配置仍须部署验证。
+- provider 错误仅转换为 `KmsProviderErrorKind`，对外错误不携带 provider 原始文字。`TranscriptEnvelope` 的 Debug 实现不输出 nonce/ciphertext；envelope 只序列化 wrapped key 元数据与密文。
+- `SecretDataKey` 当前仅 best-effort 清零；本 lane 未启用 audited `zeroize` feature，且不保证 AES 内部副本被清除。不得宣称可靠零化。无生产 provider、profile resolver、持久化、REST/RLS、跨重启恢复、key rotation/backup restore 或 `TranscriptBodyProtector` adapter；这些仍 OPEN/NOT_RUN。
 
 ## 4. 轮换、恢复与删除
 
@@ -93,7 +106,7 @@ retention_policy_revision | envelope_format_version
 | Gate | 必须证明 |
 |---|---|
 | Device/Auth | forged body/header identity 被拒绝；已撤销设备对新 API 与活跃 stream 均失效；并发 auth-code/refresh 消费恰好一个胜者。 |
-| Envelope | 重启/第二进程可在合法授权下解密；跨 tenant/resource/revision AAD 替换、ciphertext/tag 篡改均失败。 |
+| Envelope | W16-C `domain-kms --lib` unit tests 21/21 PASS，覆盖同 profile 往返、canonical AAD、AAD/ciphertext/tag 篡改、版本/长度上限、profile mismatch 与安全 provider error；重启/第二进程解密、生产 provider、持久化、RLS、key rotation 与 backup restore 仍 OPEN/NOT_RUN。 |
 | KMS lifecycle | unavailable/permission revoked/unknown profile fail closed；key rotation 前后历史读取；database/blob/provider backup restore；有引用时 key deletion 被阻止。 |
 | Owner/RLS | Neon 或真实 PostgreSQL 的 RLS、owner transaction、idempotency、retention 与只含 metadata 的 Outbox；两 actor 互读 scope 被拒绝。 |
 | Bounded runtime | 固定 Collaboration Profile 与 workload 下 KMS 请求频次、缓冲/队列上限、RSS/CPU、取消、慢消费者与 PT-09 p99 结果。 |
@@ -105,3 +118,4 @@ retention_policy_revision | envelope_format_version
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义认证设备链、原子 OAuth 凭据消费、canonical AAD、envelope 字段、撤销、轮换/恢复、错误语义及资源有界验证门；未批准物理 DDL/provider。 | W16 device 与 KMS 审计。 |
+| v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在旧 AAD 字段基础上显式加入 optional Worktree（位于 Run 之后），固定二进制编码/tag/端序与长度；记录 W16-C core API、边界和未验证的生产/清零/持久化能力。 | W16-C envelope core 实施与 DD 对照。 |

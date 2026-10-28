@@ -1,6 +1,6 @@
 # BD-W16-PAYLOAD-SECURITY-001 — 协作载荷安全基本设计
 
-> 状态：Draft v0.1；补充 `BD-CANVAS-AGENT-001` v0.2 的 W16 安全边界，不取代其 Run/owner 结构。目标设计，未实现。
+> 状态：Draft v0.2；补充 `BD-CANVAS-AGENT-001` v0.2 的 W16 安全边界，不取代其 Run/owner 结构。W16-C branch 有 provider-neutral envelope core 的局部实现；生产协作链仍未实现。
 
 ## 1. 目标与边界
 
@@ -31,10 +31,18 @@
 ## 4. 保护与持久化边界
 
 1. owner 先从认证上下文取得 actor/device/tenant，再校验 Project/Run/Worktree 资源授权、expected revision 与当前 retention policy。
-2. Rust `TranscriptBodyProtector` 对已 coalesce 的 checkpoint 生成/取得短期 DEK，用 versioned AEAD 加密正文，再由配置的 `KmsClient` wrap DEK。Project/Run/resource/revision/schema 的 canonical identity 作为 AAD；只用经 owner 校验的值构造上下文。
+2. Rust `TranscriptBodyProtector` 对已 coalesce 的 checkpoint 生成/取得短期 DEK，用 versioned AEAD 加密正文，再由配置的 `KmsClient` wrap DEK。Project/Run/optional Worktree/resource/revision/schema 的 canonical identity 作为 AAD；只用经 owner 校验的值构造上下文。
 3. owner 保存密文、wrapped DEK 与必要 envelope metadata；正文不进入 audit、metric、trace、Outbox、NOTIFY 或 SSE。保护和解密都要求相同的稳定 AAD version。
 4. KMS 调用成功但 owner 事务失败时，不能产生业务成功回执；孤儿 envelope 可按幂等/引用对账审计并清理。客户端收到失败时只显示 `local_only / sync_pending`。
 5. 解密前重新授权当前 actor/device/Run/resource 并检查 retention。撤权、密文篡改、provider 不可用、未识别 envelope 或旧 key 不可用均拒绝，不泄露明文错误详情。
+
+### 4.1 W16-C 当前代码切片与界限
+
+- `domain-kms::TranscriptEnvelopeProtector` 是 provider-neutral core；它只接受固定的 `KmsProfileIdentity` 与 `KmsProviderClient`，每次保护调用一次 `generate_data_key`，读回调用一次 `unwrap_data_key`，不在逐 envelope 路径触发 capability discovery。
+- 当前切片使用 AES-256-GCM、96-bit nonce、默认 128-bit tag。nonce 由 rand 0.10 `rand::rng()` 提供的 `ThreadRng` 填充；该 RNG 通过 `SysRng/getrandom` seed 并支持自动 reseed，不能描述成每字节直接由 OS RNG 提供。
+- 单对象上限为明文 256 KiB、wrapped DEK 64 KiB、JSON envelope 1 MiB。该固定上限限制单次编码/加密对象，但不能证明并发 RSS、队列、取消、进程内密钥清零或生产 workload 达标。
+- `SecretDataKey` 当前仅有 best-effort 清除行为；没有启用经审计的 zeroize 依赖/feature。AES 实现内部临时副本也没有清零保证。生产启用保持阻断。
+- 该类型尚未接入 `TranscriptBodyProtector`、REST、owner transaction、RLS、持久 KMS provider、profile resolver 或跨重启恢复；不得把 branch 级实现标为共享协作可用。
 
 ## 5. Provider 与部署策略
 
@@ -62,3 +70,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增身份 owner、协作 owner、provider adapter、W/T/M 逻辑分类、密文边界、失败策略和最多两个 Multipass 测试实例约束。未定义或声称已实施 DDL/provider。 | W16 认证与 KMS 前置审计及 provider 研究。 |
+| v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W16-C 单对象有界 envelope core 的实际状态、AES-GCM/RNG 语义与未通过的生产/清零/并发/恢复限制；optional Worktree 纳入 AAD 上下文。 | W16-C envelope core 实施与源文档对照。 |

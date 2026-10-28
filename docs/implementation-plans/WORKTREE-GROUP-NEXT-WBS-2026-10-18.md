@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.70。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究、安全设计增量与测试设计 v1.8，以及集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.71。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究、安全设计增量、测试设计 v1.8 与 W16-C envelope-core 部分实现，以及集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -710,3 +710,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
   4. **W16-D durable drafts/conflicts**：仅在 A–C 通过后实现 coalesced encrypted draft head/checkpoint、retention/RLS、幂等/resource fence、双边 unread conflict、显式 Resolve/CAS 与 metadata-only Outbox；不得先开放明文写路径。
   5. **W16-E 环境与性能验收**：Vercel 路径使用 Neon；自托管路径使用 Multipass 管理的 K3s，测试 inventory 最多 2 个实例且不依赖 Docker Desktop。运行 E2E-COLLAB-09/10/11/12–19、PT-09/10、撤权/恢复/轮换与 bounded memory/CPU/queue 检查。无 profile、可重复 workload 与运行证据时继续 NOT_RUN。
 - 本轮 companion SRS/BD/DD 与测试设计 v1.8 已作为文档目标设计同步至本地 `dev`；UT/IT/E2E-COLLAB-12..19/PT-10 均未实现或执行，PT-09 定义未改变。真实 KMS/PostgreSQL/RLS、Neon 与 Multipass/K3s 环境、性能和商业发行闭包仍为 OPEN；W16、WLD-7 与 PT-09/10 均不关闭。
+
+### 23.10 2026-10-28 W16-C envelope core 实施切片
+
+- W16-C 在隔离分支增加 `domain-kms::TranscriptEnvelopeProtector`、版本化 envelope、固定 profile 的 `generate_data_key`/`unwrap_data_key` 调用、AES-256-GCM 与 canonical AAD。可选 Worktree 是相对旧 DD 的显式增量，编码在 Run 后；tag=0 表示 absent，tag=1 后跟 16-byte UUID。最大 AAD 长度由字段宽度推导为 absent 201 bytes / present 217 bytes。
+- 当前单对象界限：plaintext 256 KiB、wrapped DEK 64 KiB、JSON envelope 1 MiB；这些界限不表示并发 RSS、队列、性能或取消预算已经验收。`ThreadRng` 由 `SysRng/getrandom` seed 并支持 reseed，不应写成每字节直接来自 OS RNG。SecretDataKey 只有 best-effort 清理，不构成可靠 zeroization。focused `domain-kms --lib` 单测以 lane 专属 target 21/21 通过；这不能关闭其余 W16 安全/生产验收门。
+- 本 lane 仅为 provider-neutral core 层及单元测试；尚未接入 `TranscriptBodyProtector`、真实 provider/profile resolver、REST、owner transaction、RLS、持久化、跨重启恢复、轮换/备份恢复。测试/格式/差异门的最终结果以 `PHASE-W16-C-ENVELOPE-CORE-20261028.md` 为准，缺失证据不得标 PASS。
+- 协调者已完成独立代码审查；Rust 1.99.0 lane 专属 `domain-kms --lib` 测试 21/21，包级格式与当前差异检查通过。代码仍是 provider-neutral core，尚未快进到 `dev`；生产 provider/owner protector、目标 DB/RLS、跨重启恢复与密钥轮换仍是 W16-C 的后续门，全部通过前不得开始 W16-D durable drafts/conflicts。
