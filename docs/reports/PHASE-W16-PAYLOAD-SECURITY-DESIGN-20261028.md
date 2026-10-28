@@ -13,13 +13,16 @@
 | `SRS-W16-PAYLOAD-SECURITY-001.md` | 设备绑定/撤销、OAuth 防重放、envelope、安全恢复与有界资源验收 | 本 lane 草案 |
 | `BD-W16-PAYLOAD-SECURITY-001.md` | owner 边界、W/T/M 逻辑记录、provider 与部署约束 | 本 lane 草案 |
 | `DD-W16-PAYLOAD-SECURITY-001.md` | 身份链、AAD/envelope、撤销、轮换、恢复与错误流程 | 本 lane 草案 |
-| `WORKTREE-GROUP-NEXT-WBS-2026-10-18.md` | v0.69，记录三条并行审计结果与 W16-A..E 阶段门 | 本 lane 草案 |
+| `TEST-DESIGN-WORKTREE-CANVAS-001.md` | v1.8，新增 W16 UT/IT/E2E-COLLAB-12..19/PT-10 目标验收设计 | 已审阅并同步；均未实现/执行 |
+| `W16-PAYLOAD-SECURITY-TEST-DESIGN-20261028.md` | 测试设计审阅结论、依赖与未验证边界 | 已审阅；仅设计级 |
+| `WORKTREE-GROUP-NEXT-WBS-2026-10-18.md` | v0.70，记录三条并行审计结果、W16-A..E 阶段门及测试设计 lane 集成 | 本轮文档同步 |
 | 三份 W16 审计/研究报告 | 身份、Rust 来源、provider 研究 | 已 rebase 并快进到本地 `dev` |
 
 ## §2 验证摘要
 
 - 三条报告分支均在受检的单文件 manifest 范围内，`git diff --check` 通过、工作树干净；已分别 rebase 并 fast-forward 合入本地 `dev`。
 - 本设计 lane 未运行 Cargo、数据库迁移、Neon、Multipass/K3s、浏览器、性能、KMS 或密码学测试。后续需在真实 provider 与持久数据库下完成独立验收。
+- 独立测试设计 lane 经 `rtk proxy git diff --check` 与协调者文档审阅后 rebase/快进到本地 `dev`；该 lane 也未运行测试或构建，所有新增测试仍为设计状态。
 - 对五份 manifest 文件运行 `rtk proxy git diff --cached --check`，成功且无 whitespace/error 输出；这只是差异静态检查，不是内容、密码学或运行验收。
 
 ## §3 已知缺口
@@ -34,7 +37,7 @@
 
 - 设备审计与 KMS 来源审计的子代理曾出现传输中断；已在原隔离 worktree 恢复并完成提交。协调者审阅后已 rebase/快进合入本地 `dev`。
 - KMS provider 研究 lane 已完成并合入；研究报告中候选 provider 均保持未批准状态。
-- 已派发独立测试设计子代理 lane `codex/w16-payload-security-test-design-20261028`，基线依赖本 lane commit `42948810`；代理只拥有 Canvas 测试设计与其 review 文件，未授权运行测试或合并。其完成后须先合入本 lane，再由协调者按依赖顺序 rebase/集成。
+- 独立测试设计子代理 lane `codex/w16-payload-security-test-design-20261028` 基于本 lane commit `42948810` 完成；协调者审阅后 rebase 并快进合入本地 `dev`。其加入 TEST-DESIGN-WORKTREE-CANVAS-001 v1.8、对应 review、dispatcher brief/audit，并同步本 WBS 与本阶段报告；UT/IT/E2E-COLLAB-12..19/PT-10 均未实现或执行。
 
 ## §5 守门规则
 
@@ -51,7 +54,7 @@
 | 架构 / 本报告审阅 | 架构师（Mavis 接手审核）；仅审阅本阶段范围与证据，不批准 provider 或关闭 W16 |
 | SRE Lead | 待目标 provider/恢复/资源预算验收 |
 | 平台 Lead | 待身份与 KMS Rust adapter 实现 review |
-| 评审主持 | 待并行测试设计 lane 完成 |
+| 评审主持 | 测试设计 v1.8 已审阅并同步到本地 `dev`；实现与运行验收仍开放 |
 | PM | W16/WLD-7/PT-09/10 保持 OPEN/NOT_RUN |
 
 ## §7 修订历史
@@ -59,3 +62,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 建立 W16 载荷安全设计 companion、阶段门、并行审计证据与未验证边界；不表示实现通过。 | W16 payload readiness 审计与用户要求的安全/性能设计补全。 |
+| v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16 测试设计 v1.8 的协调者审阅与本地 dev 集成，更新改动矩阵、阶段状态与签字栏；所有安全、数据库、provider 与性能验收仍 OPEN/NOT_RUN。 | 独立测试设计 lane 完成并合入本地 dev。 |

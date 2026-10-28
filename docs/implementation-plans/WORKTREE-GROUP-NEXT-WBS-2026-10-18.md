@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.69。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究及安全设计增量、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.70。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究、安全设计增量与测试设计 v1.8，以及集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -276,6 +276,8 @@ flowchart TD
 | v0.66 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Canvas 当前 Run/Worktree 协作契约至 SRS v1.4、BD v0.2、DD v0.2；将 owner-local revision/audit/outbox、逐操作授权、双方草稿与冲突、显式 Resolve/CAS 写入需求、设计和验收追踪。明确第二份完整 proposal 在 owner ≤1000 ms 抵达是测试刺激，PT-09 p99 ≤1s 从 conflict commit 起算；WLD-7、PT-09、W16 均保持 OPEN/NOT_RUN。 | WLD-7 候选审计确认仅选择性吸收 Keep/Adapt 内容并与当前协作测试设计对齐；容量值和运行效果仍待实现及验证。 |
 | v0.67 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16 Rust Outbox wake/SSE 后端与前端单 Worktree 连接已集成到本地 dev；全目标编译与 3 个唤醒单测通过，PG fixture 为 2 passed/1 ignored。同步 §23.7 阶段报告及 W16/WLD-7 当前实现状态；持久草稿/冲突、Resolve、目标 DB、多实例和 PT-09 仍 OPEN/NOT_RUN，未 fetch/push。 | W16 事件唤醒代码已快进到本地 dev，需要对照实际行为更新 WBS 并保留未验收门。 |
 | v0.68 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 authenticated device identity、生产持久 KMS/envelope-encryption protector 的实现前置门；只读审计 E:\AssetsLake 的 dirty 状态、AGPL-3.0 声明及相关文件 hash；调整 W16 依赖顺序，保持 fail-closed 与 OPEN/PARTIAL/NOT_RUN。 | W16 事件推送已集成，但 owner-local durable draft/conflict 尚无可信 device identity 与生产正文保护实现。 |
+| v0.69 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W16 设备身份、KMS 来源与 provider 并行审计证据；新增 payload security SRS/基本设计/详细设计 companion 与 W16-A..E 阶段门。所有内容均为目标设计/审计，不代表实现、provider 批准或数据库验收。 | W16 payload readiness 审计明确共享正文写入前置安全门。 |
+| v0.70 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 TEST-DESIGN-WORKTREE-CANVAS-001 v1.8：新增 W16 UT/IT、E2E-COLLAB-12..19、PT-10 与 W14 profile gate；修订阶段报告记录测试设计审阅与本地 dev 集成。新增用例均未实现/执行，PT-09 语义保持不变，W16/WLD-7/PT-09/10 仍 OPEN/NOT_RUN。 | W16 测试设计并行 lane 完成，完成后需使测试追踪与 WBS/阶段报告一致。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -707,4 +709,4 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
   3. **W16-C Rust envelope/protector**：接通持久 provider 和 `TranscriptBodyProtector` 保护/解密，覆盖 tenant/Project/Run/resource/revision AAD、篡改拒绝、重启/第二进程解密、key rotation、backup restore、保留引用与撤权；任何未验证状态均保持 `local_only / sync_pending`。
   4. **W16-D durable drafts/conflicts**：仅在 A–C 通过后实现 coalesced encrypted draft head/checkpoint、retention/RLS、幂等/resource fence、双边 unread conflict、显式 Resolve/CAS 与 metadata-only Outbox；不得先开放明文写路径。
   5. **W16-E 环境与性能验收**：Vercel 路径使用 Neon；自托管路径使用 Multipass 管理的 K3s，测试 inventory 最多 2 个实例且不依赖 Docker Desktop。运行 E2E-COLLAB-09/10/11/12–19、PT-09/10、撤权/恢复/轮换与 bounded memory/CPU/queue 检查。无 profile、可重复 workload 与运行证据时继续 NOT_RUN。
-- 本轮 companion SRS/BD/DD 与 WBS 属文档目标设计；测试设计同步、实现、真实 KMS/PostgreSQL/RLS、Neon 与 Multipass/K3s 环境、性能和商业发行闭包仍为 OPEN。W16、WLD-7 与 PT-09/10 均不关闭。
+- 本轮 companion SRS/BD/DD 与测试设计 v1.8 已作为文档目标设计同步至本地 `dev`；UT/IT/E2E-COLLAB-12..19/PT-10 均未实现或执行，PT-09 定义未改变。真实 KMS/PostgreSQL/RLS、Neon 与 Multipass/K3s 环境、性能和商业发行闭包仍为 OPEN；W16、WLD-7 与 PT-09/10 均不关闭。
