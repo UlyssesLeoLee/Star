@@ -38,6 +38,13 @@ Rust `PgListener::try_recv()` 返回 `None` 的断连语义已根据 [SQLx 官�
 - 没有 E2E-COLLAB-09/10/11、RLS 并发/resource-fence、撤权恢复或 PT-09 性能实测。100 subscriptions、64 wake events 等是有界代码参数候选，不是经目标负载验证的商业容量承诺。
 - W16/WLD-7/PT-09 均不因本切片关闭；协作写入仍须由 owner 持久化、Hook/授权与独立验证门控制。
 
+### 3.1 2026-10-28 durable payload 与认证身份前置门
+
+- Star 源码静态审阅发现 `AuthUser` / `Claims` 没有 authenticated device identity；WLD-7 数据设计要求 actor/device 从认证上下文取得。实现必须补可信设备注册/凭据绑定，不能采信客户端自报 device_id；缺少身份时只能 `local_only / sync_pending`。
+- `TranscriptBodyProtector` 目前仅有 trait，在 `crates/` 未发现 concrete implementation；`KmsClient` 当前只有 `LocalMockKms`，启动随机 master key 不持久化、DEK 留在内存。此实现不能保护 durable drafts/conflicts。应先实现生产持久 KMS 与 envelope encryption，验证 tenant/resource 绑定、integrity、key version/rotation、重启解密、备份恢复与 retention/ref fencing；此前 owner 写入必须 fail closed，不得存明文正文或把正文放入 Outbox/SSE。
+- 只读来源盘点发现 `E:\AssetsLake` HEAD `0156aca56c0d7364120d7389ebe1ccf0cb64b750`，main 相对 origin/main ahead 2 / behind 6，工作树 dirty；本地 `backend/Cargo.toml` 有未提交改动。相关工作文件 SHA-256：Cargo manifest `2dbe3b0c655c49bad4041226ed4f8f438de5617aca7e7f382de41880b0352ae2`、S3 storage service `fbeb221bc9391551aa368495d6e25a24cb804fea9fafa342965e08d90384a268`、根许可证 `6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75`。根许可证声明 AGPL-3.0；该仓库有 S3 对象存储 CRUD 代码，但未证明有 KMS/protector，也未完成权属或传递依赖许可证闭包审计。本 lane 没有复制、修改或部署其代码。继续评估时应依据商业开源策略核对实际改编/链接/分发形态义务，不能把根许可证或单个依赖作为完整 SBOM 结论。
+- 后续实现必须先完成模块来源/权属/许可/依赖审计、authenticated device identity 和生产 KMS/protector，再启动 owner-local draft/conflict 写入。真实 Neon PostgreSQL/RLS 与最多两个 Multipass/K3s 测试实例、双实例恢复和性能门仍未运行；本项是静态 readiness 证据，W16 仍为 OPEN/PARTIAL/NOT_RUN。
+
 ## §4 子代理失败接手清单
 
 本报告 lane 未新派子代理，因此没有本 lane 的子代理失败待接手项。前端与后端来源均按提交和本报告列出的本地验证证据审查，未以代理状态代替验证结果。
@@ -67,3 +74,4 @@ Rust `PgListener::try_recv()` 返回 `None` 的断连语义已根据 [SQLx 官�
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 首次记录 W16 Rust/前端 wake slice、本地 dev 集成及严格的 OPEN/PARTIAL 验收边界 | 后端事件流合入本地 dev 并完成集成后检查 |
+| v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 authenticated device identity、生产 KMS/正文保护缺口及 E:\AssetsLake 只读来源审计；W16 继续 fail closed 并明确实现依赖顺序 | durable drafts/conflicts 开始实施前需证明身份绑定与密文的持久/恢复能力。 |

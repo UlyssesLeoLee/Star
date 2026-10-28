@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.67。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成证据、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.68。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 安全前置审计、集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -275,6 +275,7 @@ flowchart TD
 | v0.65 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W11-A TD v0.3 与 W16 有界事件推送审计已随本地集成目标 9494e842 合入 dev；W11-A 保持 PARTIAL/OPEN，W16 保持 OPEN，相关 API/schema、DD-LOCAL、持久推送/草稿/冲突、目标数据库与运行验收仍未完成。明确本轮未 fetch/push，remote-tracking refs 新鲜度未知，并保留旧 WLD-7 与 D:\Star 用户状态；新增有依赖顺序的后续工作。 | 两条审阅 lane 已合入本地 dev，需把 TD 与协作事件审计证据同步到 WBS，并明确未完成门。 |
 | v0.66 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Canvas 当前 Run/Worktree 协作契约至 SRS v1.4、BD v0.2、DD v0.2；将 owner-local revision/audit/outbox、逐操作授权、双方草稿与冲突、显式 Resolve/CAS 写入需求、设计和验收追踪。明确第二份完整 proposal 在 owner ≤1000 ms 抵达是测试刺激，PT-09 p99 ≤1s 从 conflict commit 起算；WLD-7、PT-09、W16 均保持 OPEN/NOT_RUN。 | WLD-7 候选审计确认仅选择性吸收 Keep/Adapt 内容并与当前协作测试设计对齐；容量值和运行效果仍待实现及验证。 |
 | v0.67 | 2026-10-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16 Rust Outbox wake/SSE 后端与前端单 Worktree 连接已集成到本地 dev；全目标编译与 3 个唤醒单测通过，PG fixture 为 2 passed/1 ignored。同步 §23.7 阶段报告及 W16/WLD-7 当前实现状态；持久草稿/冲突、Resolve、目标 DB、多实例和 PT-09 仍 OPEN/NOT_RUN，未 fetch/push。 | W16 事件唤醒代码已快进到本地 dev，需要对照实际行为更新 WBS 并保留未验收门。 |
+| v0.68 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 authenticated device identity、生产持久 KMS/envelope-encryption protector 的实现前置门；只读审计 E:\AssetsLake 的 dirty 状态、AGPL-3.0 声明及相关文件 hash；调整 W16 依赖顺序，保持 fail-closed 与 OPEN/PARTIAL/NOT_RUN。 | W16 事件推送已集成，但 owner-local durable draft/conflict 尚无可信 device identity 与生产正文保护实现。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -682,3 +683,13 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - 集成后 `cargo check -p star-api-rest --all-targets -j 4` 通过；`cargo test -p star-api-rest --lib -j 4 canvas_event_stream::tests` 为 3/3 通过；`cargo test -p star-api-rest --test canvas_event_stream_pg -j 4` 为 2 passed、1 ignored。事务性通知测试因没有隔离且已迁移的 PostgreSQL 数据库及 fixture Worktree 而忽略；不能据此声称目标数据库、RLS 或 trigger 运行验收通过。CodeRabbit CLI 在执行环境启动失败（permission denied）；协调者进行了本地源码审阅，SQLx `PgListener::try_recv()` 语义按官方文档核实。
 - 本切片没有实现持久草稿/冲突事实、双方 conflict inbox/未读提醒、显式 Resolve/CAS、浏览器/多实例恢复 E2E；未运行 Neon/Multipass PostgreSQL、真实 Vercel gateway、p99、RSS/CPU、压力、backpressure 或跨实例恢复测试。W16 和 PT-09 继续 **OPEN / PARTIAL / NOT_RUN**；只有完成上述 owner 数据闭环与实际目标环境验收后才可关闭。
 - 后续顺序：①实现 owner-local draft revision、幂等写入与 retention/RLS；②实现基于 base revision 的冲突事实、双方持久未读提醒、有界 diff 和显式 Resolve/CAS；③在两 API 实例 + 真实 PostgreSQL 中验证事务通知、故障重连、Outbox catch-up、撤权和并发；④执行 E2E-COLLAB-09/10/11 与 PT-09，p99 从 conflict commit 起测，并记录 RSS/CPU/队列与 profile 上限；⑤据实更新 SRS/BD/DD/TD 与 WBS，达标前禁止将 W16 标为完成。
+
+
+### 23.8 2026-10-28 W16 durable payload 安全前置审计
+
+- 本节是实现 readiness 与本机 Rust 来源盘点，不代表 draft/conflict 代码、schema、目标数据库或加密 provider 已交付。审计基线为隔离 lane 的 `dev@825ddc276721f9d6150bcb1a64ee5a09b6e6a15d`；仅读取 `E:\AssetsLake`，没有复制或修改来源文件。
+- 当前 Star 认证 `AuthUser` 只有 user、tenant、roles、scope，`Claims` 转换也没有 device identity。WLD-7 owner-local data design 要求 actor/device identity 来自认证上下文，客户端值不能决定 RLS、参与者或通知对象。实现前必须提供受认证的 device 注册/凭据绑定；禁止把请求体/header 中自报的 device_id 当身份。没有可信 device identity 时，编辑只能保持本地并标记 `local_only / sync_pending`，不能被声称为共享持久化。
+- `TranscriptBodyProtector` 当前只有 trait；在 `crates/` 全域检索未发现 concrete implementation。当前唯一 `KmsClient` 实现为 `LocalMockKms`，其 master key 每次启动随机生成且不持久化，DEK 明文仅存进程内。它不能支撑 durable draft/conflict。任何 owner store 必须 fail closed，直到有生产级持久 KMS provider 与 envelope-encryption protector，且覆盖 tenant/resource 绑定、ciphertext 与 digest/integrity 验证、key version/rotation、重启解密、备份恢复及 retention/引用保护；正文不能落入明文数据库列、SSE 或 Outbox wake payload。
+- 本机 Rust 来源只读核对：`E:\AssetsLake` HEAD 为 `0156aca56c0d7364120d7389ebe1ccf0cb64b750`，分支 `main` 相对 origin/main 为 ahead 2 / behind 6，工作树 dirty；`backend/Cargo.toml` 也有本地未提交改动。工作文件 SHA-256：该 manifest `2dbe3b0c655c49bad4041226ed4f8f438de5617aca7e7f382de41880b0352ae2`；`backend/src/services/storage_service.rs` `fbeb221bc9391551aa368495d6e25a24cb804fea9fafa342965e08d90384a268`；根 `LICENSE` `6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75`。根许可证声明 AGPL-3.0。存储模块使用 AWS S3 API 做对象存储 CRUD；该事实不证明存在 envelope encryption/KMS，也不等同于可直接复用的 WLD-7 payload protector。商业使用并非自动排除项，但复制、链接、部署或分发前仍须由 owner 核对代码权属、AGPL 对目标交付形态的义务及完整传递依赖许可证/SBOM。此次未复制该仓库代码，也未完成其依赖闭包审计。
+- 后续依赖顺序改为：①只读完成可候选模块的源码/HEAD/dirty/hash/权属/许可证/依赖闭包审计；②设计并接通由认证上下文签发的 device identity；③实现并验证生产级持久 KMS/envelope-encryption adapter 与 `TranscriptBodyProtector`，覆盖重启、key rotation、备份恢复及授权读取；④再实现 owner-local coalesced draft head/checkpoint、retention/RLS、幂等与 resource fence；⑤随后实现双边 conflict/inbox、显式 Resolve/CAS 和 Outbox wake；⑥在 Neon 与最多两个 Multipass/K3s 测试实例中运行 RLS、双实例恢复、E2E-COLLAB-09/10/11 与 PT-09。任一身份、密钥、数据库、RLS 或恢复门未满足时继续 fail closed；W16/WLD-7/PT-09 保持 OPEN/PARTIAL/NOT_RUN。
+- 本 lane 只改 WBS 与阶段报告；未运行代码测试、构建、Cargo、数据库、Multipass/K3s、浏览器、桌面或性能测试。
