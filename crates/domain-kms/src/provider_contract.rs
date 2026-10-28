@@ -1,7 +1,7 @@
 //! Provider-neutral, bounded KMS operations and their identity-pinning facade.
 
 /*
-@cypher schema=1 source_sha256=a49b189787ba8c9fdd5892d34ecb1ec98e32a711c16a4b76969e50d3542fe7c7
+@cypher schema=1 source_sha256=d4d2cd48aaae39424eb51641e655f81a4081f5799e84c2c7cf6e18c753095df5
 MERGE (self:File {path:"crates/domain-kms/src/provider_contract.rs"})
 MERGE (profiles:File {path:"crates/domain-kms/src/profile.rs"})
 MERGE (self)-[:IMPORTS]->(profiles)
@@ -51,11 +51,11 @@ MERGE (self)-[:DEFINES]->(limit_check)
 MERGE (discover)-[:CALLS]->(provider_check)
 MERGE (discover)-[:CALLS]->(adapter_discover)
 MERGE (provider_check)-[:CALLS]->(adapter_descriptor)
+MERGE (check)-[:CALLS]->(provider_check)
 MERGE (generate)-[:CALLS]->(adapter_generate)
 MERGE (wrap)-[:CALLS]->(adapter_wrap)
 MERGE (unwrap)-[:CALLS]->(adapter_unwrap)
 MERGE (rewrap)-[:CALLS]->(adapter_rewrap)
-MERGE (check)-[:CALLS]->(discover)
 MERGE (generate)-[:CALLS]->(check)
 MERGE (wrap)-[:CALLS]->(check)
 MERGE (unwrap)-[:CALLS]->(check)
@@ -72,6 +72,7 @@ MERGE (self)-[:DEFINES]->(tests)
 MERGE (tests)-[:TESTS]->(client)
 MERGE (tests)-[:TESTS]->(wrapped)
 MERGE (tests)-[:TESTS]->(context)
+MERGE (tests)-[:TESTS]->(discover)
 MERGE (tests)-[:TESTS]->(generate)
 MERGE (tests)-[:TESTS]->(wrap)
 MERGE (tests)-[:TESTS]->(unwrap)
@@ -342,13 +343,19 @@ impl fmt::Debug for GeneratedDataKey {
 /// Business callers should use [`KmsProviderClient`] so identity, capabilities,
 /// wrapped-key provenance, and response limits are checked at the boundary. Adapters
 /// must treat [`KmsCallContext::timeout_ms`] as a hard operation deadline and cancel
-/// provider work when it expires.
+/// provider work when it expires. Adapters must also reject an operation they cannot
+/// perform; profile capability authorization is checked locally by the facade. Adapters
+/// must not run a separate capability-discovery request inside each per-key operation.
 #[async_trait]
 pub trait KmsProvider: Send + Sync {
     /// Returns the stable implementation descriptor advertised by this adapter.
     fn descriptor(&self) -> &KmsProviderDescriptor;
 
-    /// Discovers operations supported by the resolved endpoint/key profile.
+    /// Reads operations supported by the resolved endpoint/key profile.
+    ///
+    /// This is an explicit preflight/refresh call, not part of an envelope operation.
+    /// Implementations must bound it by `context`; the per-key facade methods do not
+    /// invoke this method and rely on the immutable profile capability snapshot.
     async fn discover_capabilities(
         &self,
         profile: &KmsProfileIdentity,
@@ -399,7 +406,11 @@ impl<P: KmsProvider> KmsProviderClient<P> {
         Self { provider }
     }
 
-    /// Discovers capabilities and verifies that the profile grants only supported operations.
+    /// Explicitly refreshes provider capabilities and verifies the profile grant set.
+    ///
+    /// Call this during profile resolution/preflight as needed. Per-key operations use
+    /// the already-resolved immutable capability snapshot and never trigger a remote
+    /// discovery round trip.
     pub async fn discover_capabilities(
         &self,
         profile: &KmsProfileIdentity,
@@ -430,8 +441,7 @@ impl<P: KmsProvider> KmsProviderClient<P> {
         profile: &KmsProfileIdentity,
         context: &KmsCallContext,
     ) -> Result<GeneratedDataKey, KmsProviderError> {
-        self.check_operation(profile, context, KmsCapability::GenerateDataKey)
-            .await?;
+        self.check_operation(profile, KmsCapability::GenerateDataKey)?;
         let generated = self.provider.generate_data_key(profile, context).await?;
         validate_generated_identity(profile, &generated, context)?;
         Ok(generated)
@@ -444,8 +454,7 @@ impl<P: KmsProvider> KmsProviderClient<P> {
         context: &KmsCallContext,
         plaintext: &SecretDataKey,
     ) -> Result<WrappedDataKey, KmsProviderError> {
-        self.check_operation(profile, context, KmsCapability::WrapDataKey)
-            .await?;
+        self.check_operation(profile, KmsCapability::WrapDataKey)?;
         let wrapped = self
             .provider
             .wrap_data_key(profile, context, plaintext)
@@ -467,8 +476,7 @@ impl<P: KmsProvider> KmsProviderClient<P> {
             ));
         }
         ensure_response_bound(wrapped, context)?;
-        self.check_operation(profile, context, KmsCapability::UnwrapDataKey)
-            .await?;
+        self.check_operation(profile, KmsCapability::UnwrapDataKey)?;
         self.provider
             .unwrap_data_key(profile, context, wrapped)
             .await
@@ -491,10 +499,8 @@ impl<P: KmsProvider> KmsProviderClient<P> {
             ));
         }
         ensure_response_bound(wrapped, context)?;
-        self.check_operation(source_profile, context, KmsCapability::RewrapDataKey)
-            .await?;
-        self.check_operation(target_profile, context, KmsCapability::RewrapDataKey)
-            .await?;
+        self.check_operation(source_profile, KmsCapability::RewrapDataKey)?;
+        self.check_operation(target_profile, KmsCapability::RewrapDataKey)?;
         let result = self
             .provider
             .rewrap_data_key(source_profile, target_profile, context, wrapped)
@@ -503,19 +509,13 @@ impl<P: KmsProvider> KmsProviderClient<P> {
         Ok(result)
     }
 
-    async fn check_operation(
+    fn check_operation(
         &self,
         profile: &KmsProfileIdentity,
-        context: &KmsCallContext,
         required: KmsCapability,
     ) -> Result<(), KmsProviderError> {
+        self.check_provider(profile)?;
         if !profile.supports(required) {
-            return Err(KmsProviderError::new(
-                KmsProviderErrorKind::CapabilityDenied,
-            ));
-        }
-        let actual = self.discover_capabilities(profile, context).await?;
-        if !actual.contains(required) {
             return Err(KmsProviderError::new(
                 KmsProviderErrorKind::CapabilityDenied,
             ));
@@ -593,6 +593,7 @@ mod tests {
         descriptor: KmsProviderDescriptor,
         capabilities: KmsCapabilities,
         calls: Arc<AtomicUsize>,
+        discovery_calls: Arc<AtomicUsize>,
         output_profile_override: Option<KmsProfileIdentity>,
     }
 
@@ -607,6 +608,7 @@ mod tests {
             _profile: &KmsProfileIdentity,
             _context: &KmsCallContext,
         ) -> Result<KmsCapabilities, KmsProviderError> {
+            self.discovery_calls.fetch_add(1, Ordering::SeqCst);
             Ok(self.capabilities.clone())
         }
 
@@ -690,15 +692,26 @@ mod tests {
         KmsCallContext::new("op-1", 5_000, max_response_bytes).unwrap()
     }
 
-    fn client(provider_id: &str) -> (KmsProviderClient<TestProvider>, Arc<AtomicUsize>) {
+    fn client(
+        provider_id: &str,
+    ) -> (
+        KmsProviderClient<TestProvider>,
+        Arc<AtomicUsize>,
+        Arc<AtomicUsize>,
+    ) {
         client_with_output_profile(provider_id, None)
     }
 
     fn client_with_output_profile(
         provider_id: &str,
         output_profile_override: Option<KmsProfileIdentity>,
-    ) -> (KmsProviderClient<TestProvider>, Arc<AtomicUsize>) {
+    ) -> (
+        KmsProviderClient<TestProvider>,
+        Arc<AtomicUsize>,
+        Arc<AtomicUsize>,
+    ) {
         let calls = Arc::new(AtomicUsize::new(0));
+        let discovery_calls = Arc::new(AtomicUsize::new(0));
         let client = KmsProviderClient::new(TestProvider {
             descriptor: KmsProviderDescriptor::new(provider_id, "1.0").unwrap(),
             capabilities: KmsCapabilities::new([
@@ -708,14 +721,15 @@ mod tests {
                 KmsCapability::RewrapDataKey,
             ]),
             calls: Arc::clone(&calls),
+            discovery_calls: Arc::clone(&discovery_calls),
             output_profile_override,
         });
-        (client, calls)
+        (client, calls, discovery_calls)
     }
 
     #[tokio::test]
     async fn operation_pins_profile_and_rejects_provider_mismatch_before_call() {
-        let (client, calls) = client("provider-a");
+        let (client, calls, _) = client("provider-a");
         let wrong_profile = profile("provider-b", 1);
         let error = client
             .generate_data_key(&wrong_profile, &context(1024))
@@ -729,7 +743,7 @@ mod tests {
     async fn rejects_provider_output_bound_to_a_different_profile() {
         let expected = profile("provider-a", 11);
         let other = profile("provider-a", 12);
-        let (client, calls) = client_with_output_profile("provider-a", Some(other));
+        let (client, calls, _) = client_with_output_profile("provider-a", Some(other));
         let error = client
             .generate_data_key(&expected, &context(1024))
             .await
@@ -740,7 +754,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_capability_not_pinned_by_profile() {
-        let (client, calls) = client("provider-a");
+        let (client, calls, _) = client("provider-a");
         let resolved = profile("provider-a", 2);
         let profile = KmsProfileIdentity::new(
             resolved.provider().clone(),
@@ -761,7 +775,7 @@ mod tests {
 
     #[tokio::test]
     async fn capability_discovery_returns_only_profile_pinned_capabilities() {
-        let (client, _) = client("provider-a");
+        let (client, _, discovery_calls) = client("provider-a");
         let resolved = profile("provider-a", 9);
         let profile = KmsProfileIdentity::new(
             resolved.provider().clone(),
@@ -778,11 +792,46 @@ mod tests {
             .unwrap();
         assert_eq!(discovered, profile.capabilities().clone());
         assert_eq!(discovered.len(), 1);
+        assert_eq!(discovery_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn per_key_operations_use_profile_snapshot_without_discovery_round_trips() {
+        let (client, operation_calls, discovery_calls) = client("provider-a");
+        let source = profile("provider-a", 13);
+        let context = context(1024);
+
+        let generated = client.generate_data_key(&source, &context).await.unwrap();
+        let wrapped = client
+            .wrap_data_key(&source, &context, &generated.plaintext)
+            .await
+            .unwrap();
+        let _plaintext = client
+            .unwrap_data_key(&source, &context, &wrapped)
+            .await
+            .unwrap();
+        let target = KmsProfileIdentity::new(
+            source.provider().clone(),
+            source.revision() + 1,
+            source.endpoint_ref(),
+            "tenant/key-v2",
+            source.capabilities().clone(),
+            ProfileDigest::from_trusted_resolver([14; 32]).unwrap(),
+        )
+        .unwrap();
+        let rewrapped = client
+            .rewrap_data_key(&source, &target, &context, &wrapped)
+            .await
+            .unwrap();
+
+        assert_eq!(rewrapped.profile(), &target);
+        assert_eq!(operation_calls.load(Ordering::SeqCst), 4);
+        assert_eq!(discovery_calls.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
     async fn wrapped_metadata_is_bound_to_profile_and_response_limit() {
-        let (client, _) = client("provider-a");
+        let (client, _, _) = client("provider-a");
         let profile = profile("provider-a", 4);
         let wrapped = client
             .generate_data_key(&profile, &context(64))
@@ -810,7 +859,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_cross_provider_rewrap_and_mismatched_wrapped_identity() {
-        let (client, calls) = client("provider-a");
+        let (client, calls, _) = client("provider-a");
         let source = profile("provider-a", 5);
         let target = profile("provider-b", 6);
         let wrapped = WrappedDataKey::new(source.clone(), "v1", vec![1, 2, 3]).unwrap();

@@ -29,7 +29,7 @@ Graph/source findings from coordinator:
 - codebase-memory-mcp coverage tools were unavailable in this session; graph output is provisional and not proof of exhaustive call sites.
 
 Scope:
-1. Add an additive, provider-neutral async interface covering generate-data-key, wrap, unwrap, rewrap, and capability discovery. Model typed results/errors and bounded operation metadata without tying business callers to Vault/OpenBao/AWS/NATS-specific APIs.
+1. Add an additive, provider-neutral async interface covering generate-data-key, wrap, unwrap, rewrap, and capability discovery. Model typed results/errors and bounded operation metadata without tying business callers to Vault/OpenBao/AWS/NATS-specific APIs. Per-key operations must use the trusted immutable profile capability snapshot locally; they must not trigger a capability-discovery network round trip. Capability discovery is an explicit bounded profile preflight/refresh operation.
 2. Define immutable KmsProfile identity: provider id/version, profile revision, endpoint/key reference, capability set, and a fixed 32-byte profile digest. The digest must be supplied only by a trusted profile-resolution boundary in this phase; do not pretend this crate computes a canonical digest unless a cryptographic hashing dependency is already directly available. Mark canonical serialization/digest production as an open W16-B item if not implementable without a manifest amendment.
 3. Ensure wrapped-key metadata carries provider/profile/key-version identity needed for later recovery/rewrap and is safe to persist. Never include credentials, bearer tokens, plaintext DEKs, or payload data in serializable profile or log/health structures.
 4. Keep the existing KmsClient and LocalMockKms behavior only for existing dev/test callers; never label it durable or allow it as an automatic production fallback. Do not implement a mock provider as proof of production availability.
@@ -38,6 +38,7 @@ Scope:
 Acceptance:
 - The new contract does not depend on provider-specific request/response types or transport mechanisms.
 - Unknown provider/profile/capability mismatch fails closed. Profile identity does not silently change during a logical envelope operation.
+- Per-key operations do not perform hidden capability-discovery calls; a counter test must prove generate/wrap/unwrap/rewrap use the profile snapshot, while an explicit discovery call is counted separately. Unsupported provider operations still fail closed through typed adapter errors.
 - Existing KmsClient callers compile unchanged.
 - No new third-party dependencies, Cargo.toml changes, Cargo.lock changes, production provider implementation, or canonical document edits in this lane. If a required dependency or file is discovered, stop and request a manifest amendment before touching it.
 - W16-B remains OPEN until trusted canonical profile digest generation, full distributable dependency/image/chart SPDX/SBOM and NOTICE closure, provider operational security, and W16-C persistent restart/rotation/restore evidence are complete.
