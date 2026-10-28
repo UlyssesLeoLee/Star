@@ -692,6 +692,7 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - `TranscriptBodyProtector` 当前只有 trait；在 `crates/` 全域检索未发现 concrete implementation。当前唯一 `KmsClient` 实现为 `LocalMockKms`，其 master key 每次启动随机生成且不持久化，DEK 明文仅存进程内。它不能支撑 durable draft/conflict。任何 owner store 必须 fail closed，直到有生产级持久 KMS provider 与 envelope-encryption protector，且覆盖 tenant/resource 绑定、ciphertext 与 digest/integrity 验证、key version/rotation、重启解密、备份恢复及 retention/引用保护；正文不能落入明文数据库列、SSE 或 Outbox wake payload。
 - 本机 Rust 来源只读核对：`E:\AssetsLake` HEAD 为 `0156aca56c0d7364120d7389ebe1ccf0cb64b750`，分支 `main` 相对 origin/main 为 ahead 2 / behind 6，工作树 dirty；`backend/Cargo.toml` 也有本地未提交改动。工作文件 SHA-256：该 manifest `2dbe3b0c655c49bad4041226ed4f8f438de5617aca7e7f382de41880b0352ae2`；`backend/src/services/storage_service.rs` `fbeb221bc9391551aa368495d6e25a24cb804fea9fafa342965e08d90384a268`；根 `LICENSE` `6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75`。根许可证声明 AGPL-3.0。存储模块使用 AWS S3 API 做对象存储 CRUD；该事实不证明存在 envelope encryption/KMS，也不等同于可直接复用的 WLD-7 payload protector。商业使用并非自动排除项，但复制、链接、部署或分发前仍须由 owner 核对代码权属、AGPL 对目标交付形态的义务及完整传递依赖许可证/SBOM。此次未复制该仓库代码，也未完成其依赖闭包审计。
 - 后续依赖顺序改为：①只读完成可候选模块的源码/HEAD/dirty/hash/权属/许可证/依赖闭包审计；②设计并接通由认证上下文签发的 device identity；③实现并验证生产级持久 KMS/envelope-encryption adapter 与 `TranscriptBodyProtector`，覆盖重启、key rotation、备份恢复及授权读取；④再实现 owner-local coalesced draft head/checkpoint、retention/RLS、幂等与 resource fence；⑤随后实现双边 conflict/inbox、显式 Resolve/CAS 和 Outbox wake；⑥在 Neon 与最多两个 Multipass/K3s 测试实例中运行 RLS、双实例恢复、E2E-COLLAB-09/10/11 与 PT-09。任一身份、密钥、数据库、RLS 或恢复门未满足时继续 fail closed；W16/WLD-7/PT-09 保持 OPEN/PARTIAL/NOT_RUN。
+- §23.8 前置审计 lane 只更新 WBS 与阶段报告；未运行代码测试、构建、Cargo、数据库、Multipass/K3s、浏览器、桌面或性能测试。
 
 ### 23.9 2026-10-28 W16 身份、KMS provider 与 payload security 设计增量
 
@@ -707,4 +708,3 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
   4. **W16-D durable drafts/conflicts**：仅在 A–C 通过后实现 coalesced encrypted draft head/checkpoint、retention/RLS、幂等/resource fence、双边 unread conflict、显式 Resolve/CAS 与 metadata-only Outbox；不得先开放明文写路径。
   5. **W16-E 环境与性能验收**：Vercel 路径使用 Neon；自托管路径使用 Multipass 管理的 K3s，测试 inventory 最多 2 个实例且不依赖 Docker Desktop。运行 E2E-COLLAB-09/10/11/12–19、PT-09/10、撤权/恢复/轮换与 bounded memory/CPU/queue 检查。无 profile、可重复 workload 与运行证据时继续 NOT_RUN。
 - 本轮 companion SRS/BD/DD 与 WBS 属文档目标设计；测试设计同步、实现、真实 KMS/PostgreSQL/RLS、Neon 与 Multipass/K3s 环境、性能和商业发行闭包仍为 OPEN。W16、WLD-7 与 PT-09/10 均不关闭。
-- 本 lane 只改 WBS 与阶段报告；未运行代码测试、构建、Cargo、数据库、Multipass/K3s、浏览器、桌面或性能测试。

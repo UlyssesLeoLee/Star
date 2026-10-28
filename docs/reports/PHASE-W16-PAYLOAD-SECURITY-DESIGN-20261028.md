@@ -34,7 +34,7 @@
 
 - 设备审计与 KMS 来源审计的子代理曾出现传输中断；已在原隔离 worktree 恢复并完成提交。协调者审阅后已 rebase/快进合入本地 `dev`。
 - KMS provider 研究 lane 已完成并合入；研究报告中候选 provider 均保持未批准状态。
-- 本设计 lane 没有派发子代理；测试设计同步作为下一独立 WBS lane，必须引用本报告所列 SRS/BD/DD 增量并维持 OPEN/NOT_RUN 状态。
+- 已派发独立测试设计子代理 lane `codex/w16-payload-security-test-design-20261028`，基线依赖本 lane commit `42948810`；代理只拥有 Canvas 测试设计与其 review 文件，未授权运行测试或合并。其完成后须先合入本 lane，再由协调者按依赖顺序 rebase/集成。
 
 ## §5 守门规则
 
