@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1eb6bc73db10a992084e5190eebd2d628fe4b724a5cc81b63eeb1aa10d7e7c79
+@cypher schema=1 source_sha256=686cfc4eb737c7e31755faaf726ca0ae2a84a94394c36f81412f4dd0a3b34af6
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})
@@ -474,7 +474,11 @@ async fn assert_directory_role_locks_device_generation_without_mutating(pool: &s
     .expect("Directory role must obtain a shared lock on the active binding under RLS");
     assert_eq!(current_role, "star_engineering_directory_owner");
     assert_eq!(generation, Some(1));
-    let update = sqlx::query(
+    sqlx::query("SAVEPOINT directory_device_update_denial")
+        .execute(&mut *tx)
+        .await
+        .expect("device update denial probe should create a savepoint");
+    let update_error = sqlx::query(
         "UPDATE oauth_device_bindings SET generation=generation+1 \
          WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL",
     )
@@ -483,12 +487,19 @@ async fn assert_directory_role_locks_device_generation_without_mutating(pool: &s
     .bind(ACCEPTANCE_DEVICE_ACTOR)
     .execute(&mut *tx)
     .await
-    .expect("restrictive RLS must deny direct generation updates without an SQL error");
+    .expect_err("restrictive RLS WITH CHECK must reject direct generation updates");
     assert_eq!(
-        update.rows_affected(),
-        0,
-        "Directory role must not mutate device state"
+        update_error
+            .as_database_error()
+            .and_then(|database_error| database_error.code())
+            .as_deref(),
+        Some("42501"),
+        "Directory role UPDATE must fail with insufficient_privilege"
     );
+    sqlx::query("ROLLBACK TO SAVEPOINT directory_device_update_denial")
+        .execute(&mut *tx)
+        .await
+        .expect("failed direct update should roll back to the diagnostic savepoint");
     let generation_after: Option<i64> = sqlx::query_scalar(
         "SELECT generation FROM oauth_device_bindings \
          WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL",

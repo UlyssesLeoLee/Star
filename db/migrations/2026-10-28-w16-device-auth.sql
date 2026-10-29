@@ -59,12 +59,12 @@ GRANT UPDATE (consumed_at) ON TABLE oauth_device_enrollment_challenges TO star_o
 GRANT SELECT, INSERT ON TABLE oauth_device_bindings TO star_oauth_credential_owner;
 GRANT UPDATE (generation, status, revoked_at) ON TABLE oauth_device_bindings TO star_oauth_credential_owner;
 GRANT INSERT ON TABLE oauth_device_binding_audit TO star_oauth_credential_owner;
--- PostgreSQL requires UPDATE privilege on a selected column for SELECT ... FOR SHARE; this column-only ACL enables the generation lock, while the restrictive RLS policy below prevents all actual Directory-role updates.
+-- SELECT ... FOR SHARE requires an UPDATE column ACL and applies UPDATE RLS USING; scope locks to this actor, while WITH CHECK(false) rejects every actual Directory-role update.
 REVOKE ALL ON TABLE oauth_device_bindings FROM star_engineering_directory_owner;
 GRANT SELECT ON TABLE oauth_device_bindings TO star_engineering_directory_owner;
 GRANT UPDATE (generation) ON TABLE oauth_device_bindings TO star_engineering_directory_owner;
 DROP POLICY IF EXISTS engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings;
-CREATE POLICY engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings AS RESTRICTIVE FOR UPDATE TO star_engineering_directory_owner USING (false) WITH CHECK (false);
+CREATE POLICY engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings AS RESTRICTIVE FOR UPDATE TO star_engineering_directory_owner USING (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND actor_id=NULLIF(current_setting('app.actor_id',true),'')::UUID) WITH CHECK (false);
 CREATE TABLE IF NOT EXISTS oauth_credential_tenant_locator (credential_kind TEXT NOT NULL CHECK (credential_kind IN ('authorization_code','refresh_token')), token_hash TEXT NOT NULL, tenant_id UUID NOT NULL, actor_id UUID NOT NULL, client_id TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT transaction_timestamp(), PRIMARY KEY (credential_kind,token_hash));
 CREATE INDEX IF NOT EXISTS idx_oauth_credential_tenant_locator_expiry ON oauth_credential_tenant_locator(expires_at);
 ALTER TABLE oauth_credential_tenant_locator ENABLE ROW LEVEL SECURITY;
