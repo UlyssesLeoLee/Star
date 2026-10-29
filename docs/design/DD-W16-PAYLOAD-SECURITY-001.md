@@ -1,6 +1,6 @@
 # DD-W16-PAYLOAD-SECURITY-001 — 设备身份与协作载荷 envelope 详细设计
 
-> 状态：Draft v0.3；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。W16-A 部分 device/auth owner 与 PG/RLS 切片已经本地 PostgreSQL 验证；W16-C provider-neutral envelope core 仍未接入生产 owner.
+> 状态：Draft v0.4；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas SSE candidate compile 受资源门中断；W16-C provider-neutral envelope core 仍未接入生产 owner。
 
 ## 1. 模块边界
 
@@ -29,6 +29,11 @@
 ### 2.3 撤销与活跃 stream
 
 撤销先由 Identity owner 原子推进 device generation、标记 revoked、撤销 refresh family 并追加审计；事务 Outbox 通知 auth/API 节点失效。每个 API 请求在 owner 授权前确认当前 generation/status；SSE 订阅收到失效事件即关闭，连接重建必重新认证/授权。缓存为容量有界、事件失效、短 TTL；事件丢失后的授权租约上限必须写入 profile。撤销检查无法完成时拒绝读写，不能假定 JWT 未过期即仍有效。
+
+### 2.4 当前 OAuth / Canvas 验收切片边界
+
+- OAuth repository implementation 在本地 disposable PostgreSQL 18.6 上通过三项 ignored tests：auth-code 竞争最多一个胜者且消费/令牌对持久化；refresh 竞争最多一个胜者、唯一 successor 与旧 token 撤销；stale token snapshot 不能消费新状态。run `1b4673269a04435daa1fab5c93333133` 的测试进程以 disposable cluster superuser 连接，并依赖测试专用 role/audit/SCD2 migration prerequisites。该结果只验 repository transaction slice，不替代生产 grants/RLS、认证 HTTP flow、目标数据库或完整 E2E-COLLAB-14。
+- Canvas SSE device-revocation test 仍是 isolated candidate source，focused `--no-run` compile 因 free-memory guard 低于 2,560 MiB（观察值 2,551 MiB）而 exit 1；状态为 `RESOURCE_INTERRUPTED / NOT_RUN`，未生成可执行测试 binary，未启动 PostgreSQL，candidate 未合入 `dev`。不得据此把 SSE revocation 或 W16-A compile/runtime 标为 PASS。
 
 ## 3. Envelope 数据与密码学契约
 
@@ -101,7 +106,7 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 
 应用和 provider 日志只能记录 operation ID、profile/key opaque id、结果码、耗时分桶和字节数分桶。禁止记录正文、DEK、access/refresh token、enrollment proof、provider credentials、未脱敏 headers 或完整 KMS request/response。
 
-**当前实现状态（2026-10-29）**：W16-A 隔离 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 完成 70/70 步骤，包含 device repository PG tests 2/2、迁移与 owner/ACL/RLS、设备 generation `FOR SHARE` 与拒绝 UPDATE、refresh-token tenant+actor 隔离及配对 CHECK 弱约束升级/非法值回滚。Run/Worktree binding HTTP 测试也通过，但不代表 Canvas device-auth 请求面验收。尚未覆盖目录 row lock 与并发撤销争用、OAuth 单赢家、Canvas 共享 read/write/resolve、SSE 跨节点失效、生产 audit/SCD2、Neon/Multipass/K3s、KMS 持久恢复或性能。
+**当前实现状态（2026-10-29）**：W16-A 隔离 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 完成 70/70 步骤，包含 device repository PG tests 2/2、迁移与 owner/ACL/RLS、设备 generation `FOR SHARE` 与拒绝 UPDATE、refresh-token tenant+actor 隔离及配对 CHECK 弱约束升级/非法值回滚。OAuth repository 的独立 disposable PostgreSQL 18.6 run `1b4673269a04435daa1fab5c93333133` 通过 3/3 named tests，但以 disposable superuser 和 test-only migration prerequisites 运行，不证明 production grants/RLS、audit/SCD2 或 OAuth HTTP flow。Run/Worktree binding HTTP 测试也通过，但不代表 Canvas device-auth 请求面验收。Canvas SSE candidate compile 因 2,551 MiB 低于 guard 中断，未运行数据库且未合入 dev。尚未覆盖目录 row lock 与并发撤销争用、Canvas 共享 read/write/resolve、SSE 跨节点失效、生产 audit/SCD2、Neon/Multipass/K3s、KMS 持久恢复或性能。
 
 ## 6. 验证映射与实施门
 
@@ -122,3 +127,4 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义认证设备链、原子 OAuth 凭据消费、canonical AAD、envelope 字段、撤销、轮换/恢复、错误语义及资源有界验证门；未批准物理 DDL/provider。 | W16 device 与 KMS 审计。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在旧 AAD 字段基础上显式加入 optional Worktree（位于 Run 之后），固定二进制编码/tag/端序与长度；记录 W16-C core API、边界和未验证的生产/清零/持久化能力。 | W16-C envelope core 实施与 DD 对照。 |
 | v0.3 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16-A 已通过的本地 PG18 owner/RLS、设备 repository 和 Run/Worktree binding HTTP 切片，并列出未覆盖的并发撤销、OAuth 单赢家、Canvas 设备请求面、生产 SCD2/KMS、云/VM 部署与性能验收。 | W16-A PG18 acceptance 70/70 步骤完成。 |
+| v0.4 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 repository OAuth PG18.6 3/3 slice 的准确范围与生产授权限制；标记 Canvas SSE candidate compile 为资源中断、未运行 DB/未入 dev；保持 E2E 与 W16-A 开放。 | W16-A OAuth acceptance 和 Canvas compile 状态复核。 |

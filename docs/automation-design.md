@@ -1,6 +1,6 @@
 # Star 平台 — Agent 交互自动化设计 (Automation Design)
 
-> **文档版本**: v2.68 (2026-10-26)
+> **文档版本**: v2.69 (2026-10-29)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
 > **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
@@ -3206,3 +3206,13 @@ This research is preparation for later Vercel design synchronization only. It do
 | Version | Date | Reviewer | Change | Trigger |
 |---|---|---|---|---|
 | v2.68 | 2026-10-26 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register the read-only Neon/Vercel official-fact report and preserve canonical design, Owner/RLS/Outbox, Gateway/SSE, deployment, and acceptance gates as open | WBS VCD-0 GAP-06 official platform facts required source verification |
+
+## 4.103 W16-A OAuth repository PostgreSQL acceptance (2026-10-29)
+
+**Automation tier: [P].** `scripts/automation/w16a_oauth_pg_acceptance.py` runs only the `oauth_device_auth_pg` focused ignored tests against a newly initialized PostgreSQL 18 loopback cluster. It strips inherited database-target environment variables, installs only the OAuth base/W16 migrations after test-only role/audit/SCD2 placeholders, requires the exact three expected test cases and a clean `3 passed; 0 failed; 0 ignored` result, and stores bounded logs/summary under `.cache/w16a-oauth-pg-acceptance/runs/<run-id>/`. The owned cluster is stopped by the runner; caller-provided database targets and suite-selection switches are not accepted.
+
+Latest local run `1b4673269a04435daa1fab5c93333133` passed all three tests on PostgreSQL 18.6; the runner's five unit checks also passed. This proves only the named repository transaction slice, including concurrent auth-code/refresh winners and persisted token rotation. The test connection uses the disposable cluster superuser, and migration-only placeholders are not production implementations. Production grants/RLS under a runtime login, audit/SCD2, OAuth HTTP flow, target database, Canvas device-auth/SSE revocation, Neon, Multipass/K3s, and full W16-A remain open. The adjacent Canvas revocation source is an isolated candidate whose authorized no-run compile was resource-interrupted at 2,551 MiB and did not start PostgreSQL; this runner does not compile or execute Canvas tests. See `docs/reports/PHASE-W16-A-OAUTH-PG-ACCEPTANCE-20261029.md` and `docs/reports/PHASE-W16-A-DOC-SYNC-20261029.md`.
+
+| Version | Date | Reviewer | Change | Trigger |
+|---|---|---|---|---|
+| v2.69 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register the bounded OAuth repository PostgreSQL acceptance runner and its 3/3 disposable PG18.6 result; preserve production grants/RLS, HTTP, Canvas revocation, and full W16-A gates as open | W16-A OAuth repository PG acceptance and Canvas candidate compile status synchronization |

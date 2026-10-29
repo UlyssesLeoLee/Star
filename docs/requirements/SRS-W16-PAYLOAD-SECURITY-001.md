@@ -1,6 +1,6 @@
 # SRS-W16-PAYLOAD-SECURITY-001 — 协作载荷身份与持久加密要求
 
-> 状态：Draft v0.3；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。W16-A 已有设备身份源码及隔离 PostgreSQL 18 owner/RLS 切片验证；W16-C 只有有界 provider-neutral envelope core，均不构成生产协作闭环。
+> 状态：Draft v0.4；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。W16-A 已有设备身份源码、隔离 PostgreSQL 18 owner/RLS 切片，以及仅限 OAuth repository 的 3/3 PG18.6 测试；Canvas SSE candidate 编译因资源门中断，生产协作闭环仍未验收。W16-C 只有有界 provider-neutral envelope core。
 
 ## 0. 目的与范围
 
@@ -23,17 +23,17 @@
 
 | Requirement | 目标证据 | 当前状态 |
 |---|---|---|
-| 01–02 | E2E-COLLAB-12/13；身份绑定、共享读写、订阅与 SSE 撤销失效 | 部分源码存在；设备 repository 的 PostgreSQL 18 测试通过，但伪造客户端身份、Canvas 共享请求、订阅/resolve 与活跃 SSE 撤销未验收，整体 PARTIAL / OPEN |
-| 03 | E2E-COLLAB-14；数据库并发单次消费测试 | OAuth authorization-code / refresh-token 并发单赢家仍未实现或验证，OPEN / NOT_RUN |
+| 01–02 | E2E-COLLAB-12/13；身份绑定、共享读写、订阅与 SSE 撤销失效 | 部分源码存在；设备 repository 的 PostgreSQL 18 测试通过。Canvas SSE test source 仅在隔离 candidate lane；focused compile 因资源门中断（`RESOURCE_INTERRUPTED / NOT_RUN`），未启动 PostgreSQL；伪造客户端身份、Canvas 共享请求、订阅/resolve 与活跃 SSE 撤销仍未验收，整体 PARTIAL / OPEN |
+| 03 | E2E-COLLAB-14；数据库并发单次消费测试 | OAuth repository 的本地 disposable PG18.6 slice 通过 3/3 named tests；使用临时 superuser 和 test-only prerequisites。完整 E2E-COLLAB-14、生产角色/RLS 与 HTTP auth flow 仍 PARTIAL / OPEN |
 | 04–06 | W16-C envelope-core focused unit tests；E2E-COLLAB-15/16/17、真实 provider 故障与 DB/RLS 测试 | domain-kms lib tests 21/21 PASS（lane 专属 Cargo target）；未接 owner/REST/DB，生产 provider、密文持久化与恢复仍 OPEN / NOT_RUN |
 | 07 | E2E-COLLAB-18/19；恢复与轮换测试 | 未实现 / NOT_RUN |
 | 08 | PT-10 与 PT-09-GATE-01；固定 workload/profile 的内存、CPU、队列和 KMS 调用证据 | 未实测 / NOT_RUN |
 
-W16-A 隔离本地 PostgreSQL 18 runner 于 2026-10-29 完成 70/70 步骤（run `6af04e5a765446c8b3baaffff126bd52`），其中设备 repository PG 测试 2/2 通过，并验证迁移、owner/RLS、设备 generation `FOR SHARE`/拒写、refresh-token tenant+actor 可见性与约束升级/回滚。它未验证 Canvas 设备身份端到端、并发撤销阻塞、OAuth 单赢家、SSE 撤销传播、生产审计/owner contract、Neon 或 Multipass/K3s，因此不关闭 E2E-COLLAB-12..14 或 W16。其余要求仍须在目标 PostgreSQL/RLS 与实际 provider profile 下验收；单元模拟和单进程内存实现不能关闭这些门。测试环境使用 Neon（Vercel 路径）或 Multipass 管理的 K3s（本地路径），Multipass 实例总数最多 2；不要求 Docker Desktop。
+W16-A 隔离本地 PostgreSQL 18 runner 于 2026-10-29 完成 70/70 步骤（run `6af04e5a765446c8b3baaffff126bd52`），其中设备 repository PG 测试 2/2 通过，并验证迁移、owner/RLS、设备 generation `FOR SHARE`/拒写、refresh-token tenant+actor 可见性与约束升级/回滚。另一个 OAuth repository runner（run `1b4673269a04435daa1fab5c93333133`）在 disposable PostgreSQL 18.6 上通过 3/3 named tests，覆盖 authorization-code 单赢家/持久化及 refresh-token 单赢家、successor 与旧 token 撤销。OAuth runner 使用 disposable superuser、测试专用 role/audit/SCD2 prerequisites；因此不证明生产 grants、RLS runtime、审计/SCD2 或 HTTP authorization flow。Canvas SSE candidate 的 focused `--no-run` 编译因内存门中断（exit 1、free memory 2,551 MiB），状态为 `RESOURCE_INTERRUPTED / NOT_RUN`，未生成测试 binary、未启动数据库，且测试源码尚未合入 dev。上述局部结果不关闭 E2E-COLLAB-12..14 或 W16。其余要求仍须在目标 PostgreSQL/RLS 与实际 provider profile 下验收；单元模拟和单进程内存实现不能关闭这些门。测试环境使用 Neon（Vercel 路径）或 Multipass 管理的 K3s（本地路径），Multipass 实例总数最多 2；不要求 Docker Desktop。
 
 ## 3. 已知缺口
 
-- 现有源码已加入认证设备上下文、enrollment/proof/revoke 端点与 PostgreSQL `DeviceBindingRepository`，并在 Run/Worktree 写事务复验当前设备 generation；隔离 PG18 仅通过了设备 repository 与选定 owner/RLS 边界。Canvas 所有共享读写、订阅、resolve、OAuth 并发单赢家及 SSE 即时撤销仍未端到端验收。详见 `PHASE-W16-A-DEVICE-AUTH-IMPLEMENTATION-20261028.md` 与 `PHASE-W16-A-PG-DEVICE-CONTEXT-HARNESS-20261028.md`。
+- 现有源码已加入认证设备上下文、enrollment/proof/revoke 端点与 PostgreSQL `DeviceBindingRepository`，并在 Run/Worktree 写事务复验当前设备 generation；隔离 PG18 仅通过了设备 repository 与选定 owner/RLS 边界。OAuth repository 并发消费的 disposable PG slice 现已通过，但 Canvas 所有共享读写、订阅、resolve、生产身份/RLS 与 SSE 即时撤销仍未端到端验收；Canvas candidate 的 focused compile 因资源门中断且未运行数据库。详见既有设备报告与 `PHASE-W16-A-OAUTH-PG-ACCEPTANCE-20261029.md`。
 - W16-C lane 加入 `TranscriptEnvelopeProtector` 与单元测试，但尚未接入 `TranscriptBodyProtector`、业务 owner 或生产请求路径；`LocalMockKms` 不能跨重启恢复，生产 KMS、RLS、持久化、跨重启解密仍未实现/NOT_RUN。详见 `W16-KMS-SOURCE-AUDIT-20261028.md` 与 W16-C 阶段报告。
 - Provider 研究仅形成候选建议；完整依赖/镜像/部署闭包、密钥恢复演练、运行预算和生产配置尚未批准。详见 `W16-KMS-PROVIDER-RESEARCH-20261028.md`。
 - 本补充文件尚未合并进主 SRS；在主文件冲突解除之前，它与对应 BD/DD/TD 作为一个独立且规范性的 W16 增量维护。
@@ -45,3 +45,4 @@ W16-A 隔离本地 PostgreSQL 18 runner 于 2026-10-29 完成 70/70 步骤（run
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增设备身份、撤销、一次性令牌、防持久正文泄露、KMS fail-closed、轮换/恢复和低消耗验收要求；状态保持 NOT_RUN。 | W16 前置审计发现认证、持久 KMS 与恢复链尚未闭合。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 canonical AAD 包含可选 Worktree；记录 W16-C 单对象大小界限和仅有 envelope core 单元实现，所有生产 provider/owner/DB/恢复门仍 OPEN/NOT_RUN。 | W16-C envelope core 实施与字段顺序复核。 |
 | v0.3 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 W16-A 源码与隔离 PostgreSQL 18 owner/RLS 验收：记录设备 repository、generation 锁/拒写、refresh actor+tenant 过滤和约束迁移通过；Canvas 读写/订阅/SSE、OAuth 并发单赢家、生产 provider/恢复与性能保持 OPEN。 | W16-A 全量本地 PG18 acceptance 70/70 步骤完成。 |
+| v0.4 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 OAuth repository disposable PG18.6 3/3 测试通过及其 superuser/test-prerequisite 限制；记录 Canvas SSE candidate compile 被资源门中断、未启动 PostgreSQL；完整 E2E、生产 RLS/身份与 W16 保持 OPEN。 | W16-A OAuth PostgreSQL acceptance 与 Canvas candidate 状态复核。 |

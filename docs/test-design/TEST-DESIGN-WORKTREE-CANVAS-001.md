@@ -1,16 +1,16 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v1.9** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v2.0** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v1.9 (2026-10-29 增加 W16-A 隔离 PG18 owner/RLS 已执行切片；完整 Canvas device-auth、OAuth 并发、KMS/恢复与性能用例仍未执行)
+> - 状态: 🟡 Draft v2.0 (2026-10-29 同步 OAuth repository PG18.6 3/3 slice；Canvas SSE candidate 编译受资源门中断且未运行 PG；完整 E2E、KMS/恢复与性能验收仍未完成)
 > - 关联工作项: `ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
 >   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](../design/BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 15 决策点全部已拍板)
 >   - [`docs/design/DD-WORKTREE-CANVAS-001.md`](../design/DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例 + 14 crate + 30 TS 文件)
 >   - [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](../design/TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (126 ID 追踪 + 43 AC)
->   - [`docs/requirements/SRS-W16-PAYLOAD-SECURITY-001.md`](../requirements/SRS-W16-PAYLOAD-SECURITY-001.md) v0.3 (W16 协作载荷身份与持久加密要求；补充设计，未并回主 SRS)
->   - [`docs/design/BD-W16-PAYLOAD-SECURITY-001.md`](../design/BD-W16-PAYLOAD-SECURITY-001.md) v0.3 / [`docs/design/DD-W16-PAYLOAD-SECURITY-001.md`](../design/DD-W16-PAYLOAD-SECURITY-001.md) v0.3 (目标设计；W16-A 部分源码与 PG18 owner/RLS 切片已验证，完整协作验收未完成)
+>   - [`docs/requirements/SRS-W16-PAYLOAD-SECURITY-001.md`](../requirements/SRS-W16-PAYLOAD-SECURITY-001.md) v0.4 (W16 协作载荷身份与持久加密要求；补充设计，未并回主 SRS)
+>   - [`docs/design/BD-W16-PAYLOAD-SECURITY-001.md`](../design/BD-W16-PAYLOAD-SECURITY-001.md) v0.4 / [`docs/design/DD-W16-PAYLOAD-SECURITY-001.md`](../design/DD-W16-PAYLOAD-SECURITY-001.md) v0.4 (目标设计；局部 repository PG18 slices 有限通过，完整协作验收未完成)
 > - 平行实施文档: [`docs/implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md`](../implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md) v0.1 (MVP 14 任务 + P2 18 任务)
 > - 平行 spec: [`docs/specs/worktree-canvas-spec.md`](../specs/worktree-canvas-spec.md) v0.1 (10 关键测试入口)
 > - 受众: 実装エンジニア / テストエンジニア / アーキテクト / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 守门 #14 v3 + v0.62 反转 v4)
@@ -79,7 +79,7 @@ UAT:  43 AC (per SRS §12 全表化)
 | **§4 E2E** | 端到端 | 5 视图模式 5 E2E + 6 Semantic Zoom 6 E2E + 18 Action 18 E2E + 4 流程 E2E = 33 测 → 关键 8 E2E 落 MVP | Playwright + MSW handler 8/8 E2E pass | DD §47 |
 | **§5 PT** | 性能测试 | 性能 7 AC (AC-P-1..7) + 守门 #1 v25 单 crate P95<200ms + k6 负载 + criterion-rs bench | `cargo bench` 4 PT + `vitest bench` 4 PT = 8 PT 实证 | DD §48 |
 | **§6 UAT** | 验收测试 | 43 AC 全表化 (AC-F-1..20 + AC-P-1..7 + AC-Q-1..10 + AC-D-1..6) + 5 域 Lead 签字栏 (Mavis 临时代签) | 5 域 Lead 签字 (Mavis 临时代签 per 守门 #14 v3) | SRS §12 + Trace §11 |
-| **W16 补充** | UT / IT / E2E / PT / UAT 追踪 | 设备身份、撤销、OAuth 单次消费、envelope/AAD、KMS fail-closed、轮换/恢复与有界加密成本 | UT-W16 / IT-W16 / E2E-COLLAB-12..19 / PT-10；三个隔离 PG18 补充 IT 已执行，完整 E2E/PT 仍计划中 | SRS/BD/DD-W16-PAYLOAD-SECURITY-001 v0.3 |
+| **W16 补充** | UT / IT / E2E / PT / UAT 追踪 | 设备身份、撤销、OAuth 单次消费、envelope/AAD、KMS fail-closed、轮换/恢复与有界加密成本 | UT-W16 / IT-W16 / E2E-COLLAB-12..19 / PT-10；设备/RLS 与 OAuth repository PG18 slices 局部通过，Canvas candidate compile/runtime 未执行；完整 E2E/PT 仍计划中 | SRS/BD/DD-W16-PAYLOAD-SECURITY-001 v0.4 |
 
 **累计实证锚点** (per 守门 #1 v25 单 crate):
 
@@ -123,7 +123,7 @@ UAT:         43/43 AC 100% 签字 (5 域 Lead 签字栏)
 - **上游 4 份设计文档** (必读): SRS / BD / DD / TRACEABILITY (同步落档, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 - **平行 2 份实施文档**: IMPL-PLAN + spec (本 commit 同期落档)
 - **既有 2 份同级测试设计书** (模板参考): `TEST-DESIGN-SANDBOX-002.md` + `TEST-DESIGN-OPS-001.md`
-- **W16 补充需求与设计**: `SRS-W16-PAYLOAD-SECURITY-001.md` / `BD-W16-PAYLOAD-SECURITY-001.md` / `DD-W16-PAYLOAD-SECURITY-001.md` v0.3 (目标设计与当前实现状态；完整 W16 验收未完成)
+- **W16 补充需求与设计**: `SRS-W16-PAYLOAD-SECURITY-001.md` / `BD-W16-PAYLOAD-SECURITY-001.md` / `DD-W16-PAYLOAD-SECURITY-001.md` v0.4 (目标设计与当前实现状态；完整 W16 验收未完成)
 - **守门基线** (13 项必过): #1 v25 + #3 + #5 + #6 + #9 + #10 + #11 + #13 + #14 v3 + #14 v4 + #28 + #29
 - **不变量 12 项** (INV-WC-01..12, per spec §3)
 
@@ -275,7 +275,7 @@ IT 共 **10 项既有基线**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + 
 
 ### 3.6 W16 身份、令牌单次消费与 provider 集成测试设计
 
-下列 4 项端到端生产验收用例仍未实现/执行。另有补充的隔离 PostgreSQL 18 切片用例已执行，见本节后表；它们不替代下列完整用例：
+下列 4 项端到端生产验收用例仍未实现/执行。本节后表分别列出已执行的隔离 PostgreSQL 18 slices，以及未编译/未运行的 Canvas SSE candidate；这些局部记录不替代下列完整用例：
 
 | IT ID | 测试名 | 真实边界 | 必须观察到的结果 | 追踪 | 状态 |
 |---|---|---|---|---|---|
@@ -287,6 +287,8 @@ IT 共 **10 项既有基线**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + 
 | **IT-W16-IDENTITY-PG-01** | `device_repository_proof_revoke_and_challenge_cap` | 隔离 PostgreSQL 18 与 `PgDeviceBindingRepository` | owner-scoped challenge 创建/读取、proof completion、revoke 与并发 challenge 上限符合数据库约束 | SRS-W16-PAYLOAD-01/02 | PASS；2 tests，run `6af04e5a765446c8b3baaffff126bd52` |
 | **IT-W16-DIRECTORY-RLS-01** | `device_generation_for_share_and_denied_update` | 隔离 PostgreSQL 18、runtime login 与 Directory owner role | tenant+actor 可见性独立验证；匹配设备 generation 可 `FOR SHARE`；直接 UPDATE 返回 42501 且 generation 不变 | SRS-W16-PAYLOAD-01/02 | PASS；run `6af04e5a765446c8b3baaffff126bd52`；未测试第二事务的 revoke contention |
 | **IT-W16-REFRESH-RLS-01** | `refresh_token_tenant_actor_scope_and_pair_constraint_upgrade` | 隔离 PostgreSQL 18、历史弱同名 CHECK、OAuth owner role | 只可见本 tenant+actor refresh rows；旧弱约束被升级；device 非空而 generation 空的插入失败并回滚 | SRS-W16-PAYLOAD-01/03 | PASS；run `6af04e5a765446c8b3baaffff126bd52`；不证明 OAuth 并发单赢家 |
+| **IT-W16-OAUTH-REPOSITORY-PG-01** | `postgres_oauth_credentials_have_one_winner_when_test_database_is_configured`; `postgres_auth_code_redemption_persists_tokens_with_consumption`; `postgres_refresh_rotation_commits_one_successor_with_the_consume` | Disposable PostgreSQL 18.6 与 OAuth repository；24 concurrent contenders are barrier-released | auth-code and refresh races each have one winner; code consumption/token pair and refresh successor/revocation persist; stale refresh snapshot is rejected | SRS-W16-PAYLOAD-03 | PASS；3/3 tests，run `1b4673269a04435daa1fab5c93333133`；disposable superuser + test-only migration prerequisites；不证明 production grants/RLS 或 HTTP E2E-COLLAB-14 |
+| **IT-W16-CANVAS-SSE-REVOCATION-PG-01** | `canvas_device_auth_pg` candidate test source | Isolated Canvas candidate lane: real router/hub, PostgreSQL Outbox wake and persisted device revocation | Revoked device causes its active stream to close within the bounded test deadline; authorization is rechecked and no payload is sent after revocation | SRS-W16-PAYLOAD-02 | NOT_RUN / RESOURCE_INTERRUPTED；focused `--no-run` compile exited 1 at 2,551 MiB free memory, below the 2,560 MiB guard; PostgreSQL was not started and candidate source is not merged to `dev` |
 
 ---
 
@@ -576,14 +578,14 @@ IT 共 **10 项既有基线**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + 
 
 | W16 Requirement | 自动化证据 | 通过条件 | 当前状态 |
 |---|---|---|---|
-| SRS-W16-PAYLOAD-01 | UT-W16-AUTH-01 + IT-W16-IDENTITY-01 + E2E-COLLAB-12 | author/scope/device 仅来自经验证的 issuer claims；伪造客户端设备字段不能建立共享身份 | PARTIAL/OPEN；设备 repository 与部分 PG/RLS 已验证，Canvas 端到端身份仍未运行 |
-| SRS-W16-PAYLOAD-02 | IT-W16-IDENTITY-01 + E2E-COLLAB-13/19 | 撤销阻断后续读写/resolve，并关闭事件流或在有界租约内重新核验；备份恢复不得复活撤销身份 | PARTIAL/OPEN；repository revoke 与选定 RLS 通过，所有共享读/resolve/SSE 仍未验证 |
-| SRS-W16-PAYLOAD-03 | IT-W16-AUTH-01 + E2E-COLLAB-14 | 同一 authorization code / refresh token 的并发单次消费最多有一个成功者，事务内完成消费与签发/轮换 | W16 OPEN/NOT_RUN |
+| SRS-W16-PAYLOAD-01 | UT-W16-AUTH-01 + IT-W16-IDENTITY-01 + E2E-COLLAB-12 | author/scope/device 仅来自经验证的 issuer claims；伪造客户端设备字段不能建立共享身份 | PARTIAL/OPEN；设备 repository 与部分 PG/RLS 已验证，Canvas candidate 编译中断、端到端身份仍未运行 |
+| SRS-W16-PAYLOAD-02 | IT-W16-IDENTITY-01 + IT-W16-CANVAS-SSE-REVOCATION-PG-01 + E2E-COLLAB-13/19 | 撤销阻断后续读写/resolve，并关闭事件流或在有界租约内重新核验；备份恢复不得复活撤销身份 | PARTIAL/OPEN；repository revoke 与选定 RLS 通过；Canvas candidate compile 为 RESOURCE_INTERRUPTED / NOT_RUN，DB 未启动，所有共享读/resolve/SSE 仍未验证 |
+| SRS-W16-PAYLOAD-03 | IT-W16-AUTH-01 + IT-W16-OAUTH-REPOSITORY-PG-01 + E2E-COLLAB-14 | 同一 authorization code / refresh token 的并发单次消费最多有一个成功者，事务内完成消费与签发/轮换 | Repository PG18.6 slice PASS 3/3；disposable superuser/test prerequisites；完整 E2E-COLLAB-14、生产 grants/RLS/HTTP flow 保持 PARTIAL/OPEN |
 | SRS-W16-PAYLOAD-04..06 | UT-W16-ENVELOPE-01/02 + IT-W16-KMS-01 + E2E-COLLAB-15..17 | canonical AAD 与密文完整性受保护；provider 故障、未知版本、撤权、篡改均 fail closed；持久及消息旁路不包含正文或明文 DEK | W16 OPEN/NOT_RUN |
 | SRS-W16-PAYLOAD-07 | IT-W16-KMS-01/02 + E2E-COLLAB-16/18/19 | 进程重启与备份恢复可使用 envelope 固定的 provider/profile/key version；旧 key 在 live 和保留备份引用处理完成前不销毁 | W16 OPEN/NOT_RUN |
 | SRS-W16-PAYLOAD-08 | PT-10 + PT-10-GATE-01 | 固定版本化 Collaboration Profile 与 W14 批准 workload/预算后，报告 KMS/checkpoint 调用、分位延迟、RSS/CPU、有界队列、取消与 outage recovery | W16 OPEN/NOT_RUN |
 
-SRS-W16-PAYLOAD-01..08 与 E2E-COLLAB-12..19/PT-10 的完整目标验收仍未完成。本次只执行了上述 3 条隔离 PG18 补充用例及绑定 API runner 中的相关 HTTP 场景；不关闭 Canvas device-auth、OAuth 并发单赢家、SSE 撤销传播、真实 provider/KMS、恢复或性能门。
+SRS-W16-PAYLOAD-01..08 与 E2E-COLLAB-12..19/PT-10 的完整目标验收仍未完成。已有 device/RLS PG18 slice（run `6af04e5a765446c8b3baaffff126bd52`）及 OAuth repository slice（run `1b4673269a04435daa1fab5c93333133`）各自只关闭其表内的局部测试断言；OAuth 使用 disposable superuser 与 test-only migration prerequisites。Canvas SSE candidate `--no-run` compile 因资源门中断，未运行数据库、未合入 dev。完整 Canvas device-auth、生产授权与 RLS、OAuth HTTP 流程、跨实例 SSE 撤销、真实 provider/KMS、恢复和性能门均保持 OPEN/PARTIAL/NOT_RUN。
 
 ### 6.3 5 域 Lead 真人到位后追溯签字 (per 守门 #14 v3 Mavis 临时代签 + v0.62 反转 v4)
 | 角色 | 责任人 | 签字 | 状态 |
@@ -667,6 +669,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **v1.7** | **2026-10-25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 E2E-COLLAB-10/11：语义重叠即使 OT 可变换也必须冲突；OT 建议仅为显式解决的无副作用预览并要求用户选择与 owner CAS。增加 E2E-REPO-01..05 与 AC-WTG-014 生命周期映射，覆盖 0..N、retiring、owner 回执、失败恢复和零引用解绑。所有测试均为设计，未运行。** | **requirements v7.08 / basic v7.12 / Group DD v5.33 / SRS v1.11 / BD v1.12 / collaboration spec v1.2 / data v0.4** |
 | **v1.8** | **2026-10-28 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 W16 claim mapping、envelope/AAD 单元测试、OAuth 单次消费/身份与 provider 集成测试、E2E-COLLAB-12..19、PT-10 与 W14 profile gate 及需求追踪；明确 Neon 与最多两个 Multipass K3s inventory 实例的目标拓扑。PT-09 commit-to-first-diff p99 定义保留。所有新增用例均未实现/执行，数据库/provider 行为未验证。** | **SRS/BD/DD-W16-PAYLOAD-SECURITY-001 v0.1 与 dispatcher brief W16-PAYLOAD-SECURITY-TEST-DESIGN-20261028** |
 | **v1.9** | **2026-10-29 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 IT-W16-IDENTITY-PG-01、IT-W16-DIRECTORY-RLS-01、IT-W16-REFRESH-RLS-01 的已执行 PG18 切片记录；同步 W16 companion SRS/BD/DD v0.3 与部分实现状态；完整 E2E-COLLAB-12..19、OAuth 并发、KMS/恢复及 PT-10 继续 OPEN/NOT_RUN。** | **W16-A isolated PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52`** |
+| **v2.0** | **2026-10-29 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **记录 OAuth repository PG18.6 3/3 tests 的边界；增加 Canvas SSE revocation candidate 的 RESOURCE_INTERRUPTED / NOT_RUN 状态（2,551 MiB 触发 compile guard、未启动 PG、未合入 dev）；更新 W16 SRS/BD/DD v0.4 与保持开放的完整 E2E/PT 验收。** | **W16-A OAuth PG acceptance run `1b4673269a04435daa1fab5c93333133` 与 Canvas compile 中断结果。** |
 
 ---
 
@@ -699,7 +702,7 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 - Group detailed design §8.27 / v5.31 与 docs/specs/domain-collaboration-spec.md §13 / v1.0
 - docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md v0.2（目标 owner-local W/T/M 记录）
 - docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md W16 / WLD-7
-- `docs/requirements/SRS-W16-PAYLOAD-SECURITY-001.md` v0.3, `docs/design/BD-W16-PAYLOAD-SECURITY-001.md` v0.3, and `docs/design/DD-W16-PAYLOAD-SECURITY-001.md` v0.3 (W16 companion design; current implementation status is bounded and does not mean full acceptance)
+- `docs/requirements/SRS-W16-PAYLOAD-SECURITY-001.md` v0.4, `docs/design/BD-W16-PAYLOAD-SECURITY-001.md` v0.4, and `docs/design/DD-W16-PAYLOAD-SECURITY-001.md` v0.4 (W16 companion design; current implementation status is bounded and does not mean full acceptance)
 
 ---
 

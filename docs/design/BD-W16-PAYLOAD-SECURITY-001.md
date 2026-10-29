@@ -1,6 +1,6 @@
 # BD-W16-PAYLOAD-SECURITY-001 — 协作载荷安全基本设计
 
-> 状态：Draft v0.3；补充 `BD-CANVAS-AGENT-001` v0.2 的 W16 安全边界，不取代其 Run/owner 结构。W16-A 的部分设备身份与 PostgreSQL owner/RLS 切片已验收；W16-C 只有 provider-neutral envelope core，生产协作链仍未闭合。
+> 状态：Draft v0.4；补充 `BD-CANVAS-AGENT-001` v0.2 的 W16 安全边界，不取代其 Run/owner 结构。W16-A 的部分设备身份与 PostgreSQL owner/RLS 切片已验收，OAuth repository 本地 PG18.6 slice 3/3 通过；Canvas SSE candidate 的 compile 被资源门中断，生产协作链仍未闭合。W16-C 只有 provider-neutral envelope core。
 
 ## 1. 目标与边界
 
@@ -48,7 +48,9 @@
 
 - 隔离本地 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 共 70 步、失败 0；覆盖 W16 migration 顺序、owner role/ACL、设备 generation `FOR SHARE` 与拒写、tenant+actor refresh-token RLS、NULL generation 约束及旧弱同名 CHECK 升级。
 - Rust `device_auth_pg` 两项 PostgreSQL 测试通过，覆盖 proof/revoke repository 行为与并发 enrollment challenge 上限；独立 Run/Worktree binding HTTP 场景验证其自身的绑定、并发、回滚与 detach 路径。后者不证明 Canvas 设备身份端到端。
-- 此切片未证明目录锁与并发 revoke 的阻塞关系、OAuth code/refresh 并发单赢家、全体共享读写/订阅/resolve、SSE 撤销传播、生产 audit/SCD2、真实 Neon/Multipass/K3s 部署、KMS 持久化恢复或 PT-09/10。相关 W16 门继续 OPEN/PARTIAL。
+- OAuth repository 的隔离 PostgreSQL 18.6 runner `1b4673269a04435daa1fab5c93333133` 通过三个 named tests，覆盖 auth-code 并发单赢家和消费/令牌持久化，以及 refresh 并发单赢家、唯一 successor、旧 refresh 撤销和 stale-snapshot 拒绝。runner 使用 disposable superuser 与迁移所需 test-only placeholders，不证明生产应用角色 grants、RLS runtime、audit/SCD2 或 OAuth HTTP 流程；完整 E2E-COLLAB-14 仍 PARTIAL/OPEN。
+- Canvas SSE 撤销测试源码仅存在于隔离 candidate lane；focused `--no-run` compile 因内存安全门在 2,551 MiB 时中断（exit 1），没有运行 PostgreSQL，也没有合入 `dev`。运行态撤销、跨进程 wake-up 与 SSE 关闭仍未验收。
+- 此切片未证明目录锁与并发 revoke 的阻塞关系、全体共享读写/订阅/resolve、SSE 撤销传播、生产 audit/SCD2、真实 Neon/Multipass/K3s 部署、KMS 持久化恢复或 PT-09/10。OAuth repository 并发单赢家仅有独立 disposable PG18.6 slice；生产 runtime grants/RLS 与 HTTP auth flow 未验收。Canvas candidate compile 受资源门中断且未运行数据库。相关 W16 门继续 OPEN/PARTIAL。
 
 ## 5. Provider 与部署策略
 
@@ -78,3 +80,4 @@
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增身份 owner、协作 owner、provider adapter、W/T/M 逻辑分类、密文边界、失败策略和最多两个 Multipass 测试实例约束。未定义或声称已实施 DDL/provider。 | W16 认证与 KMS 前置审计及 provider 研究。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W16-C 单对象有界 envelope core 的实际状态、AES-GCM/RNG 语义与未通过的生产/清零/并发/恢复限制；optional Worktree 纳入 AAD 上下文。 | W16-C envelope core 实施与源文档对照。 |
 | v0.3 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 W16-A 的部分 PostgreSQL 18 owner/RLS 验收，并明确 Device binding 尚未实现 SCD Type 2；其它端到端撤销、OAuth 并发、生产 KMS、恢复与性能门继续开放。 | W16-A PG18 acceptance 及 SCD2 实现差异复核。 |
+| v0.4 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 OAuth repository PG18.6 slice 3/3 的范围和临时 superuser/test-only prerequisite 边界，并注明 Canvas SSE candidate compile 因资源门中断、DB 未运行；完整端到端与生产授权验收保持开放。 | W16-A OAuth PG runner 结果和 Canvas candidate 资源门状态同步。 |
