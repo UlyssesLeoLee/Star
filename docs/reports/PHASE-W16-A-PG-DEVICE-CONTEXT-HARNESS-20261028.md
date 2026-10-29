@@ -1,9 +1,9 @@
 # PHASE-W16-A-PG-DEVICE-CONTEXT-HARNESS-20261028
 
 **Phase:** W16-A-PG-DEVICE-CONTEXT-HARNESS  
-**Base:** W16-A `eeeda771bd16c6b3e608766064d9b91e8f310e45`  
-**Target:** `dev` at `06466f7522f558cb3a27d108ec56b7d2e3caac83`  
-**Scope:** PostgreSQL acceptance fixture and its disposable-cluster assertions only; no Rust, migration, Cargo, or WBS implementation edits.
+**Base:** W16-A source lane `e0594a90c3d33d0584491babdfc7dfb9557e324c`; the harness is based on this source revision.
+**Initial target:** `dev` at `06466f7522f558cb3a27d108ec56b7d2e3caac83`; refresh Orca owner/terminal state and target HEAD before integration.
+**Scope:** Disposable PostgreSQL acceptance runner and fixtures; the final `device_auth_pg.rs` fixture-helper change is assigned to the source lane during convergence. No production migration, Cargo manifest/lock, or WBS changes.
 
 ## §0 Purpose
 
@@ -13,13 +13,13 @@ Prepare and exercise the existing authenticated Run-to-Worktree PostgreSQL runne
 
 | File / area | Change | Evidence state |
 |---|---|---|
-| `scripts/automation/phase9f2_binding_http_acceptance.py` | Adds test-only audit/SCD2 prerequisites, applies OAuth and Run Directory migrations, installs the historical weak same-name refresh device/generation CHECK before W16, then applies the current migration; seeds four device rows and probes ACL/RLS, same-tenant other-actor and other-tenant same-actor visibility, FOR SHARE, denied UPDATE, and NULL-pair rejection. | Runner/static checks pass; legacy-constraint replacement, device PG tests, and HTTP acceptance are pending rebase onto source commit df0870d1. |
-| Device authorization fixture | Uses device UUIDs `a0000000-0000-0000-0000-000000000001`, `...0002`, and `...0003`, generation 1, for actor A/tenant A, developer B/tenant A, and actor C/tenant B respectively, and adds a same-actor cross-tenant row to isolate tenant filtering. Distinct IDs satisfy the W16 `(tenant_id, device_id)` primary key while retaining the actors' current Project/Run authorization assertions. | Source fixture implemented. The local run stopped at the reader gate before inserting these rows. |
-| Directory lock privilege gate | Requires table-level `SELECT`, exactly one non-grantable column-level `UPDATE(generation)`, no other table/column ACLs, and the named restrictive UPDATE policy whose `USING` scopes both tenant and actor and whose `WITH CHECK` is false. Runtime/PUBLIC receive no direct OAuth ACL. The behavior probe uses the runtime login with `SET LOCAL ROLE`, expects `SELECT generation ... FOR SHARE` to succeed, then requires a direct UPDATE to fail with SQLSTATE `42501` while leaving generation unchanged. It also uses device-ID-only lookups to verify the actor and tenant predicates independently. | Static assertions implemented. Real PostgreSQL execution is pending rebase onto source commit df0870d1. |
-| Device-generation pair | Checks the applied constraint explicitly includes `device_generation IS NOT NULL`; as admin, attempts a refresh-token insert with non-null `device_id` and NULL generation inside a transaction, requires `check_violation`, and rolls the transaction back. No runtime privilege is added. | Static assertions implemented. Real PostgreSQL execution is pending rebase onto source commit df0870d1. |
-| OAuth owner ACL and refresh isolation | Retains the exact OAuth owner table/column allowlist, direct-runtime/PUBLIC ACL rejection, and the three-row refresh-token tenant+actor SELECT/UPDATE isolation probe. | Static assertions retained; real PostgreSQL execution awaits the backend fix commit. |
+| `scripts/automation/phase9f2_binding_http_acceptance.py` | Adds test-only audit/SCD2 prerequisites, applies OAuth and Run Directory migrations, installs the historical weak same-name refresh device/generation CHECK before W16, then applies the current migration; seeds four device rows and probes ACL/RLS, same-tenant other-actor and other-tenant same-actor visibility, FOR SHARE, denied UPDATE, and NULL-pair rejection. | Full isolated PostgreSQL 18 run `6af04e5a765446c8b3baaffff126bd52` passed all 70 steps, including migrations, owner/RLS probes, device PG tests and selected binding HTTP scenarios. |
+| Device authorization fixture | Uses device UUIDs `a0000000-0000-0000-0000-000000000001`, `...0002`, and `...0003`, generation 1, for actor A/tenant A, developer B/tenant A, and actor C/tenant B respectively, and adds a same-actor cross-tenant row to isolate tenant filtering. Distinct IDs satisfy the W16 `(tenant_id, device_id)` primary key while retaining the actors' current Project/Run authorization assertions. | Source fixture rows were seeded in the successful run; actor and tenant isolation probes passed. |
+| Directory lock privilege gate | Requires table-level `SELECT`, exactly one non-grantable column-level `UPDATE(generation)`, no other table/column ACLs, and the named restrictive UPDATE policy whose `USING` scopes both tenant and actor and whose `WITH CHECK` is false. Runtime/PUBLIC receive no direct OAuth ACL. The behavior probe uses the runtime login with `SET LOCAL ROLE`, expects `SELECT generation ... FOR SHARE` to succeed, then requires a direct UPDATE to fail with SQLSTATE `42501` while leaving generation unchanged. It also uses device-ID-only lookups to verify the actor and tenant predicates independently. | PostgreSQL 18 catalog and behavior checks passed: expected owner ACL, own tenant/actor row `FOR SHARE`, other-scope rows invisible, direct UPDATE SQLSTATE 42501, generation unchanged. Concurrent revoke contention remains untested. |
+| Device-generation pair | Checks the applied constraint explicitly includes `device_generation IS NOT NULL`; as admin, attempts a refresh-token insert with non-null `device_id` and NULL generation inside a transaction, requires `check_violation`, and rolls the transaction back. No runtime privilege is added. | PostgreSQL 18 catalog check, historical weak same-name CHECK upgrade, and invalid non-NULL device / NULL generation rollback all passed. |
+| OAuth owner ACL and refresh isolation | Retains the exact OAuth owner table/column allowlist, direct-runtime/PUBLIC ACL rejection, and the three-row refresh-token tenant+actor SELECT/UPDATE isolation probe. | Final restrictive tenant+actor SELECT policy passed both catalog and behavior checks; other actor/tenant refresh rows were not visible. |
 | Audit and SCD2 prerequisites | Provides disposable test definitions needed to install the OAuth migration on a fresh cluster. The SCD2 function is intentionally a no-op because this runner does not test OAuth client SCD2 updates. | Fixture-only; not production audit or SCD2 evidence. |
-| W16 report | Records the local PostgreSQL run, its failing gate, preserved evidence, and known limits. | Updated. |
+| W16 report | Records the local PostgreSQL run, its failing gate, preserved evidence, and known limits. | Updated with final acceptance run, exact residual gaps and preserved historical failures. |
 
 The backend reader contract supplied for integration is `SET LOCAL ROLE star_engineering_directory_owner` in the short device-read transaction, with tenant and actor scope applied before the query. The runtime remains `NOINHERIT` and receives no direct device-table grant. The route-test lane owns the JWT helper changes; this harness seeds the matching identities.
 
@@ -37,32 +37,33 @@ The initial database run below is historical evidence from base `eeeda771`, befo
 | Historical `postgres-device-reader-owner-select-check` | FAIL; owner role lacked `SELECT` on `public.oauth_device_bindings` in the pre-integration migration. |
 | Historical authenticated HTTP phases | NOT RUN; the reader gate stopped the old runner before device seeding and HTTP calls. |
 | Current Python AST syntax parse | PASS |
-| Legacy weak same-name refresh pair constraint upgrade fixture | Implemented before W16 migration; real PostgreSQL replacement-path result NOT RUN. |
+| Legacy weak same-name refresh pair constraint upgrade fixture | PASS; replacement path executed against isolated PostgreSQL 18 in run `6af04e5a765446c8b3baaffff126bd52`. |
 | Current runner `--help` dry run | PASS |
 | Current runner unit tests | PASS; 9 tests. |
 | Current `rtk proxy git diff --check` | PASS |
 | Current CypherGraph Guardian `--changed --stamp` | PASS; two source files checked. |
-| Current PostgreSQL Directory lock and denied-UPDATE behavior probe | NOT RUN; pending rebase onto source commit df0870d1 and DB run. |
-| Current admin invalid-pair constraint and rollback probe | NOT RUN; pending rebase onto source commit df0870d1 and DB run. |
-| Current device repository PostgreSQL tests and authenticated HTTP phases | NOT RUN; pending rebase onto source commit df0870d1 and DB run. |
+| Current PostgreSQL Directory lock and denied-UPDATE behavior probe | PASS; isolated PostgreSQL 18 run `6af04e5a765446c8b3baaffff126bd52`. This was a single-transaction probe, not concurrent revoke contention. |
+| Current admin invalid-pair constraint and rollback probe | PASS; rejected invalid pair and rolled back in isolated PostgreSQL 18 run `6af04e5a765446c8b3baaffff126bd52`. |
+| Current device repository PostgreSQL tests and authenticated HTTP phases | PASS; `device_auth_pg` 2/2; selected binding HTTP hostless, race, rollback and detach scenarios passed in the same run. These HTTP scenarios are not Canvas device-auth E2E. |
+| Final isolated PostgreSQL 18 acceptance | PASS; 70/70 steps, 0 failures, loopback `127.0.0.1:52449`, shutdown exit 0; target database untouched; no Multipass or Docker used. |
 
 The historical full command was `py -3 scripts/automation/phase9f2_binding_http_acceptance.py --run-unit-tests`; it returned exit 1 at `postgres-device-reader-owner-select-check`. PostgreSQL ran only on `127.0.0.1:64637`. The summary records `target_database_touched: false` and `multipass_or_docker_used: false`. The runner stopped the server successfully and preserved the failed cluster and logs under `.cache/wld0-binding-http-positive-20261023/runs/34be06a94028437c94bf02c5dea94fa3/`; the acceptance summary is in its `logs/a7748f6524094744ad5104264e22a11d/` directory. The role-membership and no-direct-ACL steps each have their own exit-0 result. The owner-role SELECT step failed with `engineering directory owner is missing scoped device-binding SELECT`. This run is on base `eeeda771`, whose checked-out W16 migration predates the separate code lane's owner SELECT grant; it is not a result against final integrated code. The unknown stopped Multipass instance was not touched.
 
-Current static checks were run on the revised runner after adding the two review regressions. The harness remains uncommitted on its private lane; no rebase or PostgreSQL process was started for this revision.
+Current acceptance run: `py -3 scripts/automation/phase9f2_binding_http_acceptance.py --run-unit-tests` produced summary `.cache/wld0-binding-http-positive-20261023/runs/6af04e5a765446c8b3baaffff126bd52/logs/fffb4db94dbf40b5881e45bf84d0f8d3/acceptance-summary.json`. It records `final_status: 0`, 70 result steps and no failed step. PostgreSQL listened only on loopback port `52449`; the runner stopped PostgreSQL successfully and removed its owned temporary data directory while preserving the run summary/logs under `.cache`. `target_database_touched` and `multipass_or_docker_used` are both false. Historical failed-run artifacts remain preserved separately.
 
 ## §3 Known gaps
 
 1. In base `eeeda771`, the runtime membership predicate passed, and the separate direct-ACL query found no `SELECT` grant to the runtime login or `PUBLIC`.
-2. The accepted lock-role ACL must be table-level `SELECT` plus column-level `UPDATE(generation)` only; the tenant/actor-scoped restrictive UPDATE policy permits the row lock while `WITH CHECK (false)` rejects a direct update with SQLSTATE `42501`. The revised real PostgreSQL probe is pending.
-3. The old local run stopped before device rows were inserted and before authenticated HTTP phases. The revised full run is pending rebase onto the accepted source migration and real PostgreSQL execution.
-4. The legacy weak same-name CHECK replacement path, new device-generation pair catalog, and admin rollback checks are statically present but have not run against PostgreSQL; they do not grant extra runtime privileges.
+2. The accepted lock-role ACL is table-level `SELECT` plus column-level `UPDATE(generation)` only; tenant/actor restrictive UPDATE `USING` permits the scoped row lock while `WITH CHECK (false)` rejects a direct update. The final PostgreSQL probe passed the scoped `FOR SHARE`, isolation, 42501 and unchanged-generation assertions. It used one transaction, so a second-session concurrent revoke wait remains OPEN.
+3. The old local run stopped before device rows and HTTP scenarios; the final run subsequently applied the accepted source migration and passed the selected PG/HTTP paths. It does not close full Canvas device-auth E2E or OAuth single-winner tests.
+4. The legacy weak same-name CHECK upgrade path, new device-generation pair catalog, and admin rollback rejection all passed in the final isolated PostgreSQL 18 run; no extra runtime privilege was granted.
 5. The audit and SCD2 objects are local prerequisites; they do not establish the production platform audit schema or SCD2 behavior.
 6. Missing, stale, and revoked device-token cases remain the route-test lane's responsibility. This fixture seeds only the active identities required by the successful and authorization-negative actor paths.
-7. The local run did not inspect Neon/Vercel, K3s, or Multipass deployment state. Rust gates and execution-admission readiness were not evaluated; execution remains closed. The one-transaction Directory probe does not open a second connection to verify that concurrent generation update/revocation waits for the shared row lock; keep that race acceptance open.
+7. The run did not inspect Neon/Vercel, K3s, or Multipass deployment. Production role contracts, execution admission, complete OAuth single-winner behavior, Canvas read/subscribe/resolve, SSE revoke invalidation, and cross-node recovery remain unverified; execution remains closed.
 
 ## §4 Subagent failure and takeover
 
-The earlier harness worker disconnected before returning; its uncommitted runner changes, brief/report/WBS dispatch record, and `.cache` evidence were preserved. The coordinator added the revised PostgreSQL lock/denied-update and NULL-pair probes plus a pre-migration legacy weak CHECK fixture that exercises the replacement path; static checks were rerun. The historical host-local run completed migrations, role setup, membership, and direct-ACL predicates, then stopped at the old owner-role SELECT gate; the server shut down cleanly and its evidence remains preserved. A later run failed the policy catalog gate because this harness lane still had the pre-fix source migration (`USING (false)`); it confirmed the tenant/actor-scoped policy was absent in that stale checkout and did not reach behavioral probes. Intermediate migration-order and fixture-context failures are recorded in preserved `.cache` summaries. Rebase the harness onto source commit `df0870d1` before the final database run. Revised HTTP acceptance remains NOT RUN.
+The earlier harness worker disconnected before returning; its runner edits and `.cache` evidence were preserved. After the source lane fixes and harness revisions, run `6af04e5a765446c8b3baaffff126bd52` completed all 70 steps successfully, including real PostgreSQL owner/RLS checks, device repository tests, legacy constraint upgrade, invalid-pair rollback, and selected Run/Worktree binding HTTP scenarios. Historical ACL, `USING(false)` lock, refresh actor-scope, migration-order and fixture-context failures remain documented in preserved `.cache` artifacts. The final run validates only the stated local boundary; concurrent revoke contention, full Canvas device-auth, OAuth single-winner, SSE cross-node invalidation, production audit/SCD2 and Neon/Multipass/K3s remain open.
 
 ## §5 Guardrails
 
@@ -91,10 +92,10 @@ The earlier harness worker disconnected before returning; its uncommitted runner
 | Role | Review |
 |---|---|
 | Architecture | 🟢 Mavis 接手终审 — device identity remains actor/tenant scoped; execution remains closed. |
-| SRE Lead | 🟢 Mavis 接手终审 — historical local PostgreSQL stopped cleanly; revised database and HTTP acceptance remain NOT RUN. |
-| Platform | 🟢 Mavis 接手终审 — static ACL/policy and new behavioral probes are recorded; actual backend migration execution is pending. |
-| Review chair | 🟢 Mavis 接手终审 — AST, help, 9 unit tests, diff-check and CGG pass; historical pre-integration owner-SELECT failure is retained. |
-| Product manager | 🟢 Mavis 接手终审 — this interim harness result does not mark the full acceptance phase complete. |
+| SRE Lead | Final local PostgreSQL 18/selected HTTP acceptance passed; production Neon and Multipass/K3s deployment acceptance remains OPEN. |
+| Platform | Owner grants and selected local RLS behavior passed; production audit/SCD2 and full identity lifecycle contract remain OPEN. |
+| Review chair | Final runner 70/70 steps passed; race contention and full E2E-COLLAB-12..14 remain open. |
+| Product manager | This accepted database/HTTP slice does not close W16-A, W16, WLD-7 or PT-09/10. |
 
 ## §7 Revision history
 
@@ -106,3 +107,4 @@ The earlier harness worker disconnected before returning; its uncommitted runner
 | v0.4 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add exact Directory table/column ACL, false restrictive UPDATE, real `FOR SHARE` plus zero-row unchanged-generation behavior, and admin rollback rejection of the invalid device/generation pair; preserve the historical failing run and report current static checks while awaiting backend commit. |
 | v0.5 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Add a legacy weak same-name CHECK before applying the current W16 migration to exercise replacement logic; rerun AST, --help, 8 unit tests, CGG, and diff checks. Real migration/HTTP behavior remains NOT_RUN until the source fix is rebased. |
 | v0.6 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Correct the Directory policy contract to tenant/actor-scoped USING with false WITH CHECK; add a same-actor cross-tenant device row and device-ID-only RLS probes for actor and tenant isolation; record 9 passing unit tests and keep PostgreSQL execution pending rebase onto df0870d1. Concurrent revoke contention remains an open acceptance gap. |
+| v0.7 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record final isolated PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52`: 70/70 steps, device repository 2/2, selected owner/RLS and binding HTTP paths pass; preserve concurrent revoke, complete Canvas device-auth, OAuth single-winner, SSE and production deployment gaps. | Final source migration and refresh owner-scope policy pass the disposable-cluster runner. |
