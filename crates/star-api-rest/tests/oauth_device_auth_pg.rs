@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=df982c1143ec4df4c5c2e69c8025c72a3bb29bb9f874d0c072340a070249566e
+@cypher schema=1 source_sha256=966e8843f5fcd2146eb9dd1e358c9f8a2aa722798b285e60ff28926f5f5e5c69
 MERGE (self:File {path:"crates/star-api-rest/tests/oauth_device_auth_pg.rs"})
 MERGE (challengeTest:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::mock_device_challenge_creation_enforces_actor_scoped_cap",kind:"test"})
 MERGE (challengeFactory:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::device_enrollment_challenge",kind:"function"})
@@ -10,11 +10,24 @@ MERGE (refreshTest:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.r
 MERGE (rotationTest:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::mock_refresh_rotation_persists_one_successor_and_rejects_replay",kind:"test"})
 MERGE (pgTest:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::postgres_oauth_credentials_have_one_winner_when_test_database_is_configured",kind:"test"})
 MERGE (pgRedemption:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::postgres_auth_code_redemption_persists_tokens_with_consumption",kind:"test"})
+MERGE (pgRotation:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::postgres_refresh_rotation_commits_one_successor_with_the_consume",kind:"test"})
+MERGE (refreshConsume:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::consume_if_active",kind:"method"})
+MERGE (collectWinners:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::collect_winners",kind:"function"})
+MERGE (authorizationCode:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::authorization_code",kind:"function"})
+MERGE (accessForCode:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::access_token_for_code",kind:"function"})
+MERGE (accessForRefresh:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::access_token_for_refresh",kind:"function"})
+MERGE (refreshForTenant:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::refresh_token_for_tenant",kind:"function"})
+MERGE (barrier:Type {id:"tokio::sync::Barrier",kind:"type"})
 MERGE (deviceRepo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
 MERGE (codeRepo:Type {id:"star_pg_adapter::repository::OAuthAuthorizationCodeRepository",kind:"trait"})
 MERGE (refreshRepo:Type {id:"star_pg_adapter::repository::OAuthRefreshTokenRepository",kind:"trait"})
-MERGE (self)-[:DEFINES]->(challengeTest),(self)-[:DEFINES]->(challengeFactory),(self)-[:DEFINES]->(codeTest),(self)-[:DEFINES]->(atomicCodeTest),(self)-[:DEFINES]->(refreshTest),(self)-[:DEFINES]->(rotationTest),(self)-[:DEFINES]->(pgTest),(self)-[:DEFINES]->(pgRedemption)
-MERGE (challengeTest)-[:CALLS]->(challengeFactory),(challengeTest)-[:TESTS]->(deviceRepo),(codeTest)-[:TESTS]->(codeRepo),(atomicCodeTest)-[:TESTS]->(codeRepo),(refreshTest)-[:TESTS]->(refreshRepo),(rotationTest)-[:TESTS]->(refreshRepo),(pgTest)-[:TESTS]->(codeRepo),(pgTest)-[:TESTS]->(refreshRepo),(pgRedemption)-[:TESTS]->(codeRepo)
+MERGE (authCodes:Table {id:"public.oauth_authorization_codes",kind:"table"})
+MERGE (accessTokens:Table {id:"public.oauth_access_tokens",kind:"table"})
+MERGE (refreshTokens:Table {id:"public.oauth_refresh_tokens",kind:"table"})
+MERGE (self)-[:DEFINES]->(challengeTest),(self)-[:DEFINES]->(challengeFactory),(self)-[:DEFINES]->(codeTest),(self)-[:DEFINES]->(atomicCodeTest),(self)-[:DEFINES]->(refreshTest),(self)-[:DEFINES]->(rotationTest),(self)-[:DEFINES]->(pgTest),(self)-[:DEFINES]->(pgRedemption),(self)-[:DEFINES]->(pgRotation),(self)-[:DEFINES]->(collectWinners),(self)-[:DEFINES]->(authorizationCode),(self)-[:DEFINES]->(accessForCode),(self)-[:DEFINES]->(accessForRefresh),(self)-[:DEFINES]->(refreshForTenant)
+MERGE (challengeTest)-[:CALLS]->(challengeFactory),(challengeTest)-[:TESTS]->(deviceRepo),(codeTest)-[:TESTS]->(codeRepo),(atomicCodeTest)-[:TESTS]->(codeRepo),(refreshTest)-[:TESTS]->(refreshRepo),(refreshTest)-[:CALLS]->(refreshConsume),(refreshTest)-[:USES_TYPE]->(barrier),(rotationTest)-[:TESTS]->(refreshRepo),(pgTest)-[:TESTS]->(codeRepo),(pgTest)-[:TESTS]->(refreshRepo),(pgTest)-[:CALLS]->(refreshConsume),(pgTest)-[:USES_TYPE]->(barrier),(pgRedemption)-[:TESTS]->(codeRepo),(pgRotation)-[:TESTS]->(refreshRepo)
+MERGE (pgTest)-[:CALLS]->(authorizationCode),(pgTest)-[:CALLS]->(refreshForTenant),(pgTest)-[:CALLS]->(collectWinners),(pgRedemption)-[:CALLS]->(authorizationCode),(pgRedemption)-[:CALLS]->(accessForCode),(pgRedemption)-[:CALLS]->(refreshForTenant),(pgRedemption)-[:CALLS]->(collectWinners),(pgRedemption)-[:USES_TYPE]->(barrier),(pgRotation)-[:CALLS]->(refreshForTenant),(pgRotation)-[:CALLS]->(accessForRefresh),(pgRotation)-[:CALLS]->(collectWinners),(pgRotation)-[:USES_TYPE]->(barrier)
+MERGE (pgTest)-[:READS]->(authCodes),(pgTest)-[:READS]->(refreshTokens),(pgRedemption)-[:READS]->(accessTokens),(pgRedemption)-[:READS]->(refreshTokens),(pgRedemption)-[:WRITES]->(authCodes),(pgRedemption)-[:WRITES]->(accessTokens),(pgRedemption)-[:WRITES]->(refreshTokens),(pgRotation)-[:READS]->(accessTokens),(pgRotation)-[:READS]->(refreshTokens),(pgRotation)-[:WRITES]->(accessTokens),(pgRotation)-[:WRITES]->(refreshTokens)
 @endcypher
 */
 //! Replay and single-consumer regression checks for OAuth credentials.
@@ -170,14 +183,17 @@ async fn mock_refresh_token_has_exactly_one_concurrent_winner_and_rejects_replay
         .insert(&token)
         .await
         .expect("seed refresh");
-    let hash = token.token_hash;
+    let token = Arc::new(token);
     let mut tasks = tokio::task::JoinSet::new();
+    let barrier = Arc::new(tokio::sync::Barrier::new(24));
     for _ in 0..24 {
         let repository = Arc::clone(&bundles.refresh_token_repo);
-        let hash = hash.clone();
+        let token = Arc::clone(&token);
+        let barrier = Arc::clone(&barrier);
         tasks.spawn(async move {
+            barrier.wait().await;
             repository
-                .consume_if_active(Uuid::nil(), &hash, now)
+                .consume_if_active(&token, now)
                 .await
                 .expect("mock consume")
                 .is_some()
@@ -191,7 +207,7 @@ async fn mock_refresh_token_has_exactly_one_concurrent_winner_and_rejects_replay
     assert!(
         bundles
             .refresh_token_repo
-            .consume_if_active(Uuid::nil(), &hash, now + Duration::seconds(1))
+            .consume_if_active(&token, now + Duration::seconds(1))
             .await
             .expect("replay query")
             .is_none()
@@ -305,12 +321,26 @@ async fn postgres_oauth_credentials_have_one_winner_when_test_database_is_config
         .insert(&refresh)
         .await
         .expect("insert refresh fixture");
+    let refresh = Arc::new(refresh);
+
+    let mut stale_snapshot = (*refresh).clone();
+    stale_snapshot.scope.push_str(" stale");
+    assert!(
+        refresh_repo
+            .consume_if_active(&stale_snapshot, now)
+            .await
+            .expect("reject refresh token snapshot mismatch")
+            .is_none()
+    );
 
     let mut tasks = tokio::task::JoinSet::new();
+    let code_barrier = Arc::new(tokio::sync::Barrier::new(24));
     for _ in 0..24 {
         let code_repo = Arc::clone(&code_repo);
         let code_hash = code_hash.clone();
+        let barrier = Arc::clone(&code_barrier);
         tasks.spawn(async move {
+            barrier.wait().await;
             code_repo
                 .consume_if_active(tenant_id, &code_hash, now)
                 .await
@@ -321,12 +351,15 @@ async fn postgres_oauth_credentials_have_one_winner_when_test_database_is_config
     let code_winners = collect_winners(&mut tasks).await;
     assert_eq!(code_winners, 1);
 
+    let refresh_barrier = Arc::new(tokio::sync::Barrier::new(24));
     for _ in 0..24 {
         let refresh_repo = Arc::clone(&refresh_repo);
-        let refresh_hash = refresh_hash.clone();
+        let refresh = Arc::clone(&refresh);
+        let barrier = Arc::clone(&refresh_barrier);
         tasks.spawn(async move {
+            barrier.wait().await;
             refresh_repo
-                .consume_if_active(tenant_id, &refresh_hash, now)
+                .consume_if_active(&refresh, now)
                 .await
                 .expect("atomic PostgreSQL refresh consume")
                 .is_some()
@@ -350,28 +383,61 @@ async fn postgres_auth_code_redemption_persists_tokens_with_consumption() {
     let tenant_id = Uuid::new_v4();
     let now = Utc::now();
     let hash = format!("w16-atomic-code-{}", Uuid::new_v4());
-    let repository = PgOAuthAuthorizationCodeRepository::new(pool.clone());
+    let repository = Arc::new(PgOAuthAuthorizationCodeRepository::new(pool.clone()));
     let code = authorization_code(tenant_id, &hash, now);
     repository.insert(&code).await.expect("insert code fixture");
-    let access = access_token_for_code(&code, Uuid::new_v4());
-    let mut refresh = refresh_token_for_tenant(
+    let mut tasks = tokio::task::JoinSet::new();
+    let barrier = Arc::new(tokio::sync::Barrier::new(24));
+    let mut access_ids = Vec::new();
+    let mut refresh_hashes = Vec::new();
+    for _ in 0..24 {
+        let repository = Arc::clone(&repository);
+        let code = code.clone();
+        let barrier = Arc::clone(&barrier);
+        let access = access_token_for_code(&code, Uuid::new_v4());
+        let mut refresh = refresh_token_for_tenant(
+            tenant_id,
+            &format!("w16-atomic-refresh-{}", Uuid::new_v4()),
+            now + Duration::days(30),
+        );
+        refresh.user_id = code.user_id;
+        refresh.access_token_id = access.id;
+        access_ids.push(access.id);
+        refresh_hashes.push(refresh.token_hash.clone());
+        tasks.spawn(async move {
+            barrier.wait().await;
+            repository
+                .consume_and_issue_if_active(
+                    &code.code_hash,
+                    &code.client_id,
+                    now,
+                    &access,
+                    &refresh,
+                )
+                .await
+                .expect("atomic PostgreSQL authorization-code redemption")
+                .is_some()
+        });
+    }
+    assert_eq!(collect_winners(&mut tasks).await, 1);
+
+    let replay_access = access_token_for_code(&code, Uuid::new_v4());
+    let mut replay_refresh = refresh_token_for_tenant(
         tenant_id,
-        &format!("w16-atomic-refresh-{}", Uuid::new_v4()),
+        &format!("w16-atomic-replay-{}", Uuid::new_v4()),
         now + Duration::days(30),
     );
-    refresh.user_id = code.user_id;
-    refresh.access_token_id = access.id;
-
+    replay_refresh.user_id = code.user_id;
+    replay_refresh.access_token_id = replay_access.id;
     assert!(
         repository
-            .consume_and_issue_if_active(&hash, &code.client_id, now, &access, &refresh)
-            .await
-            .expect("consume and issue token pair in one transaction")
-            .is_some()
-    );
-    assert!(
-        repository
-            .consume_and_issue_if_active(&hash, &code.client_id, now, &access, &refresh)
+            .consume_and_issue_if_active(
+                &hash,
+                &code.client_id,
+                now + Duration::seconds(1),
+                &replay_access,
+                &replay_refresh,
+            )
             .await
             .expect("reject consumed code replay")
             .is_none()
@@ -385,24 +451,45 @@ async fn postgres_auth_code_redemption_persists_tokens_with_consumption() {
         .await
         .expect("set owner RLS scope");
     let access_count = sqlx::query_scalar::<_, i64>(
-        "SELECT count(*) FROM oauth_access_tokens WHERE tenant_id=$1 AND id=$2",
+        "SELECT count(*) FROM oauth_access_tokens WHERE tenant_id=$1 AND id=ANY($2)",
     )
     .bind(tenant_id)
-    .bind(access.id)
+    .bind(access_ids.clone())
     .fetch_one(&mut *tx)
     .await
     .expect("count persisted access token");
-    let refresh_count = sqlx::query_scalar::<_, i64>(
-        "SELECT count(*) FROM oauth_refresh_tokens WHERE tenant_id=$1 AND token_hash=$2",
+    let code_consumed = sqlx::query_scalar::<_, bool>(
+        "SELECT consumed_at IS NOT NULL FROM oauth_authorization_codes WHERE tenant_id=$1 AND id=$2",
     )
     .bind(tenant_id)
-    .bind(&refresh.token_hash)
+    .bind(code.id)
+    .fetch_one(&mut *tx)
+    .await
+    .expect("check consumed authorization code");
+    let refresh_count = sqlx::query_scalar::<_, i64>(
+        "SELECT count(*) FROM oauth_refresh_tokens WHERE tenant_id=$1 AND token_hash=ANY($2)",
+    )
+    .bind(tenant_id)
+    .bind(refresh_hashes.clone())
     .fetch_one(&mut *tx)
     .await
     .expect("count persisted refresh token");
+    let paired_count = sqlx::query_scalar::<_, i64>(
+        "SELECT count(*) FROM oauth_refresh_tokens AS r \
+         JOIN oauth_access_tokens AS a ON a.tenant_id=r.tenant_id AND a.id=r.access_token_id \
+         WHERE r.tenant_id=$1 AND r.token_hash=ANY($2) AND a.id=ANY($3)",
+    )
+    .bind(tenant_id)
+    .bind(refresh_hashes)
+    .bind(access_ids)
+    .fetch_one(&mut *tx)
+    .await
+    .expect("count persisted access/refresh pairs");
     tx.commit().await.expect("commit token-row assertion");
     assert_eq!(access_count, 1);
     assert_eq!(refresh_count, 1);
+    assert_eq!(paired_count, 1);
+    assert!(code_consumed);
     pool.close().await;
 }
 
@@ -431,9 +518,11 @@ async fn postgres_refresh_rotation_commits_one_successor_with_the_consume() {
 
     let mut candidates = Vec::new();
     let mut tasks = tokio::task::JoinSet::new();
+    let barrier = Arc::new(tokio::sync::Barrier::new(24));
     for _ in 0..24 {
         let repository = Arc::clone(&repository);
         let original = original.clone();
+        let barrier = Arc::clone(&barrier);
         let access_id = Uuid::new_v4();
         let access = access_token_for_refresh(&original, access_id);
         let mut successor = original.clone();
@@ -445,6 +534,7 @@ async fn postgres_refresh_rotation_commits_one_successor_with_the_consume() {
         successor.revoked_at = None;
         candidates.push((successor.token_hash.clone(), access_id));
         tasks.spawn(async move {
+            barrier.wait().await;
             repository
                 .rotate_if_active(
                     &original.token_hash,
@@ -476,7 +566,7 @@ async fn postgres_refresh_rotation_commits_one_successor_with_the_consume() {
         "SELECT count(*) FROM oauth_refresh_tokens WHERE tenant_id=$1 AND token_hash=ANY($2)",
     )
     .bind(tenant_id)
-    .bind(hashes)
+    .bind(hashes.clone())
     .fetch_one(&mut *tx)
     .await
     .expect("count persisted successors");
@@ -484,13 +574,34 @@ async fn postgres_refresh_rotation_commits_one_successor_with_the_consume() {
         "SELECT count(*) FROM oauth_access_tokens WHERE tenant_id=$1 AND id=ANY($2)",
     )
     .bind(tenant_id)
-    .bind(access_ids)
+    .bind(access_ids.clone())
     .fetch_one(&mut *tx)
     .await
     .expect("count persisted access successors");
+    let paired_count = sqlx::query_scalar::<_, i64>(
+        "SELECT count(*) FROM oauth_refresh_tokens AS r \
+         JOIN oauth_access_tokens AS a ON a.tenant_id=r.tenant_id AND a.id=r.access_token_id \
+         WHERE r.tenant_id=$1 AND r.token_hash=ANY($2) AND a.id=ANY($3)",
+    )
+    .bind(tenant_id)
+    .bind(hashes)
+    .bind(access_ids)
+    .fetch_one(&mut *tx)
+    .await
+    .expect("count persisted successor/access pairs");
+    let original_revoked = sqlx::query_scalar::<_, bool>(
+        "SELECT revoked_at IS NOT NULL FROM oauth_refresh_tokens WHERE tenant_id=$1 AND token_hash=$2",
+    )
+    .bind(tenant_id)
+    .bind(&original.token_hash)
+    .fetch_one(&mut *tx)
+    .await
+    .expect("check consumed original refresh token");
     tx.commit().await.expect("commit successor assertion");
     assert_eq!(successor_count, 1);
     assert_eq!(access_count, 1);
+    assert_eq!(paired_count, 1);
+    assert!(original_revoked);
     pool.close().await;
 }
 

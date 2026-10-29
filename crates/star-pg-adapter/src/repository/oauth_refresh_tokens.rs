@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=74dc3f76263188ed006425bb30759372c82edba900a509160e5d727436ae8305
+@cypher schema=1 source_sha256=5249ac19df168cd8885ef1ea7401a7eb6c6fe36337dbb0369bf1b9751b7f171c
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs"})
 MERGE (find:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::find_by_token_hash",kind:"method"})
+MERGE (consume:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::consume_if_active",kind:"method"})
 MERGE (rotate:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::rotate_if_active",kind:"method"})
+MERGE (refreshToken:Type {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::OAuthRefreshToken",kind:"struct"})
 MERGE (resolver:Symbol {id:"db/migrations/2026-10-28-w16-device-auth.sql::w16_resolve_oauth_refresh_token",kind:"database_function"})
 MERGE (accessInsert:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::insert_access_token",kind:"function"})
 MERGE (refreshInsert:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::insert_refresh_token",kind:"function"})
 MERGE (bindings:Table {name:"oauth_device_bindings"})
 MERGE (refreshRows:Table {name:"oauth_refresh_tokens"})
 MERGE (self)-[:DEFINES]->(find)
+MERGE (self)-[:DEFINES]->(consume)
 MERGE (self)-[:DEFINES]->(rotate)
 MERGE (find)-[:CALLS]->(resolver)
+MERGE (consume)-[:USES_TYPE]->(refreshToken)
+MERGE (consume)-[:READS]->(refreshRows)
+MERGE (consume)-[:WRITES]->(refreshRows)
 MERGE (rotate)-[:CALLS]->(resolver)
 MERGE (rotate)-[:READS]->(bindings)
 MERGE (rotate)-[:WRITES]->(refreshRows)
@@ -98,8 +104,7 @@ pub trait OAuthRefreshTokenRepository: Send + Sync {
     /// Atomically revoke one unexpired refresh token and return it only to the winner.
     async fn consume_if_active(
         &self,
-        tenant_id: Uuid,
-        token_hash: &str,
+        expected: &OAuthRefreshToken,
         revoked_at: DateTime<Utc>,
     ) -> Result<Option<OAuthRefreshToken>, PgAdapterError>;
     /// Consume a refresh token and persist its access/refresh successors in one transaction.
@@ -169,8 +174,7 @@ impl OAuthRefreshTokenRepository for PgOAuthRefreshTokenRepository {
 
     async fn consume_if_active(
         &self,
-        tenant_id: Uuid,
-        token_hash: &str,
+        expected: &OAuthRefreshToken,
         revoked_at: DateTime<Utc>,
     ) -> Result<Option<OAuthRefreshToken>, PgAdapterError> {
         let mut tx = self
@@ -179,7 +183,7 @@ impl OAuthRefreshTokenRepository for PgOAuthRefreshTokenRepository {
             .await
             .map_err(|e| PgAdapterError::Query(format!("consume_if_active begin: {}", e)))?;
         sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
-            .bind(tenant_id.to_string())
+            .bind(expected.tenant_id.to_string())
             .execute(&mut *tx)
             .await
             .map_err(|e| PgAdapterError::Query(format!("consume_if_active tenant scope: {}", e)))?;
@@ -200,9 +204,14 @@ impl OAuthRefreshTokenRepository for PgOAuthRefreshTokenRepository {
                       trace_id
             "#,
         )
-        .bind(tenant_id)
-        .bind(token_hash)
+        .bind(expected.tenant_id)
+        .bind(&expected.token_hash)
         .bind(revoked_at)
+        .bind(&expected.client_id)
+        .bind(expected.user_id)
+        .bind(&expected.scope)
+        .bind(expected.device_id)
+        .bind(expected.device_generation)
         .fetch_optional(&mut *tx)
         .await
         .map_err(|e| PgAdapterError::Query(format!("consume_if_active: {}", e)))?;

@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=7ea4f88beba95b0fcaf514f0d9a1968e80762f4c9936e41fb1bba22778258791
+@cypher schema=1 source_sha256=7483c0180641ef22a974d760e0b801776ae1524ee211b745e603f1a2f49bf92d
 MERGE (self:File {path:"crates/star-api-rest/tests/common/mod.rs"})
 MERGE (mockCode:Type {id:"crates/star-api-rest/tests/common/mod.rs::MockOAuthAuthorizationCodeRepository",kind:"struct"})
 MERGE (mockRefresh:Type {id:"crates/star-api-rest/tests/common/mod.rs::MockOAuthRefreshTokenRepository",kind:"struct"})
+MERGE (mockRefreshConsume:Symbol {id:"crates/star-api-rest/tests/common/mod.rs::MockOAuthRefreshTokenRepository.consume_if_active",kind:"method"})
 MERGE (mockDevice:Type {id:"crates/star-api-rest/tests/common/mod.rs::MockDeviceBindingRepository",kind:"struct"})
 MERGE (codeRepo:Type {id:"star_pg_adapter::repository::OAuthAuthorizationCodeRepository",kind:"trait"})
 MERGE (refreshRepo:Type {id:"star_pg_adapter::repository::OAuthRefreshTokenRepository",kind:"trait"})
+MERGE (refreshConsume:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::consume_if_active",kind:"method"})
+MERGE (refreshToken:Type {id:"crates/star-pg-adapter/src/repository/oauth_refresh_tokens.rs::OAuthRefreshToken",kind:"struct"})
 MERGE (deviceRepo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
 MERGE (mockCode)-[:IMPLEMENTS]->(codeRepo)
 MERGE (mockRefresh)-[:IMPLEMENTS]->(refreshRepo)
+MERGE (mockRefresh)-[:DEFINES]->(mockRefreshConsume)
+MERGE (mockRefreshConsume)-[:IMPLEMENTS]->(refreshConsume)
+MERGE (mockRefreshConsume)-[:USES_TYPE]->(refreshToken)
+MERGE (mockRefreshConsume)-[:READS]->(mockRefresh)
+MERGE (mockRefreshConsume)-[:WRITES]->(mockRefresh)
 MERGE (mockDevice)-[:IMPLEMENTS]->(deviceRepo)
 MERGE (self)-[:DEFINES]->(mockCode)
 MERGE (self)-[:DEFINES]->(mockRefresh)
@@ -313,15 +321,22 @@ impl OAuthRefreshTokenRepository for MockOAuthRefreshTokenRepository {
 
     async fn consume_if_active(
         &self,
-        _tenant_id: Uuid,
-        token_hash: &str,
+        expected: &OAuthRefreshToken,
         revoked_at: DateTime<Utc>,
     ) -> Result<Option<OAuthRefreshToken>, PgAdapterError> {
         let mut map = self.inner.lock().expect("poisoned");
-        let Some(token) = map.get_mut(token_hash) else {
+        let Some(token) = map.get_mut(&expected.token_hash) else {
             return Ok(None);
         };
-        if token.revoked_at.is_some() || token.expires_at <= revoked_at {
+        if token.tenant_id != expected.tenant_id
+            || token.client_id != expected.client_id
+            || token.user_id != expected.user_id
+            || token.scope != expected.scope
+            || token.device_id != expected.device_id
+            || token.device_generation != expected.device_generation
+            || token.revoked_at.is_some()
+            || token.expires_at <= revoked_at
+        {
             return Ok(None);
         }
         token.revoked_at = Some(revoked_at);
