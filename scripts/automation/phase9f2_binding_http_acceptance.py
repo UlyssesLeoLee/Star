@@ -1,6 +1,6 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=0efec36be57f3a3c3594c77891b898ba2ce34f4c36faa71ec03b20e9cfbf6c35
+# @cypher schema=1 source_sha256=5072571d37c684b34bdb36ecc71f5e432df9e720c40c77916522d4328dc9879a
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
@@ -337,7 +337,7 @@ def apply_migrations(bin_dir: Path, port: int, environment: dict[str, str],
           payload jsonb NOT NULL,
           occurred_at timestamptz NOT NULL
         );
-        CREATE FUNCTION public.audit_audit_event() RETURNS trigger LANGUAGE plpgsql AS $$
+        CREATE FUNCTION public.audit_audit_event() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
         BEGIN
           INSERT INTO public.audit_audit_event(event_type,resource_id,tenant_id,payload,occurred_at)
           VALUES (TG_OP,NEW.id,NEW.tenant_id,to_jsonb(NEW),transaction_timestamp());

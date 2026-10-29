@@ -1,6 +1,6 @@
 """Bounded unit checks for the isolated authenticated HTTP acceptance runner."""
 
-# @cypher schema=1 source_sha256=b38d75cb04d9502efd4cec6487b81db147523495c9cb22912d6759aa99d76af0
+# @cypher schema=1 source_sha256=1f5c1d1d080e9715b0a8d55622e85bbbc90b807e654b4ce7223de59b97caca84
 # MERGE (self:File {path:"scripts/automation/test_phase9f2_binding_http_acceptance.py"})
 # MERGE (sanitization:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_sanitized_environment_removes_database_overrides",kind:"test"})
 # MERGE (loopback:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_loopback_port_avoids_protected_ports",kind:"test"})
@@ -10,6 +10,7 @@
 # MERGE (stopFailure:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_stop_failure_preserves_private_data_directory",kind:"test"})
 # MERGE (acceptanceFailure:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_acceptance_failure_preserves_data_directory_after_stop",kind:"test"})
 # MERGE (policyProof:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_all_lock_policy_proofs_require_sqlstate_42501",kind:"test"})
+# MERGE (auditFixture:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_audit_prerequisite_uses_security_definer",kind:"test"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::sanitized_environment",kind:"function"})
 # MERGE (port:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::select_loopback_port",kind:"function"})
 # MERGE (assertion:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::assert_snapshot_delta",kind:"function"})
@@ -23,6 +24,7 @@
 # MERGE (self)-[:DEFINES]->(stopFailure)
 # MERGE (self)-[:DEFINES]->(acceptanceFailure)
 # MERGE (self)-[:DEFINES]->(policyProof)
+# MERGE (self)-[:DEFINES]->(auditFixture)
 # MERGE (sanitization)-[:CALLS]->(main)
 # MERGE (loopback)-[:CALLS]->(port)
 # MERGE (delta)-[:CALLS]->(assertion)
@@ -179,6 +181,11 @@ class BindingHttpAcceptanceRunnerTests(unittest.TestCase):
         self.assertIn("{TENANT_C}','{ACTOR_A}','{DEVICE_D}", seed_source)
         self.assertIn("WHERE device_id='{DEVICE_B}'", seed_source)
         self.assertIn("WHERE device_id='{DEVICE_D}'", seed_source)
+
+    def test_audit_prerequisite_uses_security_definer(self) -> None:
+        migration_source = inspect.getsource(runner.apply_migrations)
+        self.assertIn("LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public", migration_source)
+        self.assertIn("INSERT INTO public.audit_audit_event", migration_source)
 
 
 if __name__ == "__main__":
