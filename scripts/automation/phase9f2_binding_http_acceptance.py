@@ -1,9 +1,10 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=a277dd8c2bb66429f683a8a35db60f380af893372614d2fff6f6f70ad7b97b0b
+# @cypher schema=1 source_sha256=27a76dc5ddc71ac2e6fed2068c7cc513f4bef92a876ce5661fc0d93e8a844817
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
+# MERGE (deviceTestUrl:Config {id:"STAR_W16_DEVICE_AUTH_TEST_DATABASE_URL",kind:"environment_variable"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::main",kind:"function"})
 # MERGE (port:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::select_loopback_port",kind:"function"})
 # MERGE (environment:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::sanitized_environment",kind:"function"})
@@ -13,6 +14,8 @@
 # MERGE (sql:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::run_sql",kind:"function"})
 # MERGE (migrations:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::apply_migrations",kind:"function"})
 # MERGE (fixture:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::seed_fixture",kind:"function"})
+# MERGE (deviceChecks:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::device_owner_catalog_checks",kind:"function"})
+# MERGE (devicePgTest:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::run_device_auth_pg_tests",kind:"function"})
 # MERGE (snapshot:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::read_snapshot",kind:"function"})
 # MERGE (assertion:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::assert_snapshot_delta",kind:"function"})
 # MERGE (test:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::run_rust_phase",kind:"function"})
@@ -29,6 +32,8 @@
 # MERGE (self)-[:DEFINES]->(sql)
 # MERGE (self)-[:DEFINES]->(migrations)
 # MERGE (self)-[:DEFINES]->(fixture)
+# MERGE (self)-[:DEFINES]->(deviceChecks)
+# MERGE (self)-[:DEFINES]->(devicePgTest)
 # MERGE (self)-[:DEFINES]->(snapshot)
 # MERGE (self)-[:DEFINES]->(assertion)
 # MERGE (self)-[:DEFINES]->(test)
@@ -36,10 +41,12 @@
 # MERGE (self)-[:DEFINES]->(stop)
 # MERGE (main)-[:CALLS]->(port)
 # MERGE (main)-[:CALLS]->(environment)
+# MERGE (environment)-[:READS]->(deviceTestUrl)
 # MERGE (main)-[:CALLS]->(step)
 # MERGE (main)-[:CALLS]->(cluster)
 # MERGE (main)-[:CALLS]->(migrations)
 # MERGE (main)-[:CALLS]->(fixture)
+# MERGE (main)-[:CALLS]->(devicePgTest)
 # MERGE (main)-[:CALLS]->(snapshot)
 # MERGE (main)-[:CALLS]->(assertion)
 # MERGE (main)-[:CALLS]->(test)
@@ -53,6 +60,11 @@
 # MERGE (sql)-[:CALLS]->(psql)
 # MERGE (migrations)-[:CALLS]->(sql)
 # MERGE (fixture)-[:CALLS]->(sql)
+# MERGE (fixture)-[:CALLS]->(deviceChecks)
+# MERGE (deviceChecks)-[:CALLS]->(sql)
+# MERGE (devicePgTest)-[:CALLS]->(step)
+# MERGE (devicePgTest)-[:CONFIGURES]->(deviceTestUrl)
+# MERGE (devicePgTest)-[:TESTS]->(deviceAuthPgTests)
 # MERGE (snapshot)-[:CALLS]->(sql)
 # MERGE (assertion)-[:CALLS]->(snapshot)
 # MERGE (test)-[:CALLS]->(step)
@@ -79,6 +91,33 @@
 # MERGE (fixture)-[:READS_AND_LOCKS]->(:Table {id:"permission.engineering_run_role_binding",kind:"table"})
 # MERGE (fixture)-[:TESTS_POLICY]->(:Policy {id:"multica.engineering_run_revision::engineering_directory_owner_no_run_revision_update",kind:"row_level_security"})
 # MERGE (fixture)-[:TESTS_POLICY]->(:Policy {id:"permission.engineering_run_role_binding::engineering_directory_owner_no_run_grant_update",kind:"row_level_security"})
+# MERGE (oauthBaseMigration:File {path:"db/migrations/2026-09-09-oauth2-server.sql"})
+# MERGE (deviceMigration:File {path:"db/migrations/2026-10-28-w16-device-auth.sql"})
+# MERGE (deviceBindings:Table {id:"public.oauth_device_bindings",kind:"table"})
+# MERGE (deviceChallenges:Table {id:"public.oauth_device_enrollment_challenges",kind:"table"})
+# MERGE (deviceAudit:Table {id:"public.oauth_device_binding_audit",kind:"table"})
+# MERGE (refreshTokens:Table {id:"public.oauth_refresh_tokens",kind:"table"})
+# MERGE (refreshDevicePair:Constraint {id:"public.oauth_refresh_tokens::oauth_refresh_tokens_device_generation_pair",kind:"check"})
+# MERGE (oauthOwner:Role {name:"star_oauth_credential_owner",kind:"postgres_role"})
+# MERGE (directoryOwner:Role {name:"star_engineering_directory_owner",kind:"postgres_role"})
+# MERGE (deviceAuthPgTests:File {path:"crates/star-pg-adapter/tests/device_auth_pg.rs"})
+# MERGE (auditEvents:Table {id:"public.audit_audit_event",kind:"table"})
+# MERGE (migrations)-[:DEPENDS_ON]->(oauthBaseMigration)
+# MERGE (migrations)-[:DEPENDS_ON]->(deviceMigration)
+# MERGE (migrations)-[:CREATES]->(auditEvents)
+# MERGE (fixture)-[:READS]->(deviceBindings)
+# MERGE (fixture)-[:READS_AND_LOCKS]->(deviceBindings)
+# MERGE (fixture)-[:READS]->(refreshTokens)
+# MERGE (fixture)-[:WRITES]->(deviceBindings)
+# MERGE (fixture)-[:WRITES]->(refreshTokens)
+# MERGE (fixture)-[:TESTS_POLICY]->(:Policy {id:"public.oauth_device_bindings::engineering_directory_owner_no_oauth_device_binding_update",kind:"row_level_security"})
+# MERGE (fixture)-[:TESTS]->(refreshDevicePair)
+# MERGE (deviceChecks)-[:TESTS]->(deviceBindings)
+# MERGE (deviceChecks)-[:TESTS]->(deviceChallenges)
+# MERGE (deviceChecks)-[:TESTS]->(deviceAudit)
+# MERGE (deviceChecks)-[:TESTS]->(refreshTokens)
+# MERGE (deviceChecks)-[:TESTS]->(oauthOwner)
+# MERGE (deviceChecks)-[:TESTS]->(directoryOwner)
 # @endcypher
 
 from __future__ import annotations
@@ -101,12 +140,20 @@ RUNNER_ROOT = (
 )
 PROTECTED_LOOPBACK_PORTS = frozenset({5432, 5555})
 RUNTIME_ROLE = "erun_directory_api_test"
+OAUTH_OWNER_ROLE = "star_oauth_credential_owner"
+DIRECTORY_OWNER_ROLE = "star_engineering_directory_owner"
 TENANT_A = "10000000-0000-0000-0000-000000000001"
+TENANT_C = "10000000-0000-0000-0000-000000000002"
 ACTOR_A = "30000000-0000-0000-0000-000000000001"
+ACTOR_B = "30000000-0000-0000-0000-000000000002"
+ACTOR_C = "30000000-0000-0000-0000-000000000003"
 PROJECT_A = "20000000-0000-0000-0000-000000000001"
 RUN_A = "60000000-0000-0000-0000-000000000001"
 WORKTREE_A = "90000000-0000-0000-0000-000000000001"
 PROJECT_BINDING = "50000000-0000-0000-0000-000000000001"
+DEVICE_A = "a0000000-0000-0000-0000-000000000001"
+DEVICE_B = "a0000000-0000-0000-0000-000000000002"
+DEVICE_C = "a0000000-0000-0000-0000-000000000003"
 
 
 def sanitized_environment() -> dict[str, str]:
@@ -115,7 +162,7 @@ def sanitized_environment() -> dict[str, str]:
     for key in list(environment):
         if key.upper().startswith("PG") or key.upper() in {
             "DATABASE_URL", "STAR_DATABASE_URL", "STAR_BINDING_HTTP_TEST_DATABASE_URL",
-            "STAR_BINDING_HTTP_TEST_PHASE", "SQLX_OFFLINE",
+            "STAR_BINDING_HTTP_TEST_PHASE", "STAR_W16_DEVICE_AUTH_TEST_DATABASE_URL", "SQLX_OFFLINE",
         }:
             environment.pop(key, None)
     environment["CARGO_TERM_COLOR"] = "never"
@@ -274,15 +321,41 @@ def wait_for_postgres(bin_dir: Path, port: int, environment: dict[str, str],
 
 def apply_migrations(bin_dir: Path, port: int, environment: dict[str, str],
                      output_dir: Path) -> list[dict]:
-    """Apply and fingerprint the reviewed Run Directory migration chain in order."""
+    """Apply OAuth, Run Directory, and W16 migrations in dependency order."""
     sys.path.insert(0, str(ROOT / "scripts" / "automation"))
     import engineering_run_directory as directory
 
     results = [run_sql(
-        "postgres-legacy-audit-prerequisite-fixture", bin_dir, port, environment, output_dir,
-        sql="CREATE FUNCTION public.audit_trigger_func() RETURNS trigger LANGUAGE plpgsql "
-            "AS $$ BEGIN RETURN COALESCE(NEW, OLD); END $$;",
+        "postgres-oauth-audit-prerequisite-fixture", bin_dir, port, environment, output_dir,
+        sql="""-- Test-only dependencies normally supplied by the platform audit schema.
+        CREATE TABLE public.audit_audit_event (
+          audit_event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          event_type text NOT NULL,
+          resource_id uuid,
+          tenant_id uuid,
+          payload jsonb NOT NULL,
+          occurred_at timestamptz NOT NULL
+        );
+        CREATE FUNCTION public.audit_audit_event() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          INSERT INTO public.audit_audit_event(event_type,resource_id,tenant_id,payload,occurred_at)
+          VALUES (TG_OP,NEW.id,NEW.tenant_id,to_jsonb(NEW),transaction_timestamp());
+          RETURN NEW;
+        END $$;
+        -- The OAuth migration installs this trigger but this harness does not exercise SCD2 writes.
+        CREATE FUNCTION public.scd_type2_close() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RETURN NEW; END $$;
+        -- Legacy prerequisite for the existing Run Directory migration chain.
+        CREATE FUNCTION public.audit_trigger_func() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RETURN COALESCE(NEW, OLD); END $$;""",
     )]
+    if results[-1]["exit_code"]:
+        return results
+    oauth_base = ROOT / "db" / "migrations" / "2026-09-09-oauth2-server.sql"
+    results.append(run_sql(
+        "postgres-oauth-base-migration", bin_dir, port, environment, output_dir,
+        file=oauth_base,
+    ))
     if results[-1]["exit_code"]:
         return results
     for name, migration in directory.directory_migration_plan(run_binding=True):
@@ -296,12 +369,370 @@ def apply_migrations(bin_dir: Path, port: int, environment: dict[str, str],
         ))
         if results[-1]["exit_code"]:
             return results
+    # Model an installation that already has the original weak W16 CHECK.
+    # The current migration must replace it with the NULL-safe constraint.
+    results.append(run_sql(
+        "postgres-w16-legacy-weak-refresh-device-generation-pair",
+        bin_dir, port, environment, output_dir,
+        sql="""ALTER TABLE public.oauth_refresh_tokens ADD COLUMN device_id UUID;
+        ALTER TABLE public.oauth_refresh_tokens ADD COLUMN device_generation BIGINT;
+        ALTER TABLE public.oauth_refresh_tokens
+          ADD CONSTRAINT oauth_refresh_tokens_device_generation_pair
+          CHECK ((device_id IS NULL AND device_generation IS NULL)
+                 OR (device_id IS NOT NULL AND device_generation > 0));""",
+    ))
+    if results[-1]["exit_code"]:
+        return results
+
+    results.append(run_sql(
+        "postgres-w16-device-auth-migration", bin_dir, port, environment, output_dir,
+        file=ROOT / "db" / "migrations" / "2026-10-28-w16-device-auth.sql",
+    ))
+    if results[-1]["exit_code"]:
+        return results
+    return results
+
+
+def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str, str],
+                                output_dir: Path) -> list[dict]:
+    """Grant only role membership, then verify explicit OAuth and Directory ACL contracts."""
+    results = [run_sql(
+        "postgres-runtime-oauth-owner-role-membership-grant", bin_dir, port,
+        environment, output_dir,
+        sql=f"GRANT {OAUTH_OWNER_ROLE} TO {RUNTIME_ROLE};",
+    )]
+    if results[-1]["exit_code"]:
+        return results
+
+    membership_check = f"""DO $verify$
+    DECLARE runtime_is_safe boolean;
+            oauth_owner_is_safe boolean;
+    BEGIN
+      SELECT rolcanlogin AND NOT rolsuper AND NOT rolinherit AND NOT rolbypassrls
+        INTO runtime_is_safe FROM pg_roles WHERE rolname='{RUNTIME_ROLE}';
+      IF runtime_is_safe IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION 'runtime login must be login, non-superuser, NOINHERIT, and NOBYPASSRLS';
+      END IF;
+      SELECT NOT rolcanlogin AND NOT rolsuper AND NOT rolinherit AND NOT rolbypassrls
+        INTO oauth_owner_is_safe FROM pg_roles WHERE rolname='{OAUTH_OWNER_ROLE}';
+      IF oauth_owner_is_safe IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION 'OAuth owner must be NOLOGIN, NOSUPERUSER, NOINHERIT, and NOBYPASSRLS';
+      END IF;
+      IF NOT pg_has_role('{RUNTIME_ROLE}','{OAUTH_OWNER_ROLE}','MEMBER')
+         OR NOT pg_has_role('{RUNTIME_ROLE}','{OAUTH_OWNER_ROLE}','SET') THEN
+        RAISE EXCEPTION 'runtime login must be able to SET ROLE to the OAuth owner';
+      END IF;
+      IF NOT pg_has_role('{RUNTIME_ROLE}','{DIRECTORY_OWNER_ROLE}','MEMBER')
+         OR NOT pg_has_role('{RUNTIME_ROLE}','{DIRECTORY_OWNER_ROLE}','SET') THEN
+        RAISE EXCEPTION 'runtime login must be able to SET ROLE to the Directory lock owner';
+      END IF;
+    END
+    $verify$;"""
+    results.append(run_sql(
+        "postgres-runtime-oauth-and-directory-role-membership-check", bin_dir, port,
+        environment, output_dir, sql=membership_check,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+
+    no_direct_acl_check = f"""DO $verify$
+    BEGIN
+      IF EXISTS (
+        WITH protected(relid) AS (VALUES
+          ('public.oauth_device_enrollment_challenges'::regclass::oid),
+          ('public.oauth_device_bindings'::regclass::oid),
+          ('public.oauth_device_binding_audit'::regclass::oid),
+          ('public.oauth_refresh_tokens'::regclass::oid)
+        )
+        SELECT 1 FROM protected AS p JOIN pg_class AS c ON c.oid=p.relid
+        CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) AS acl
+        WHERE acl.grantee IN (0::oid,'{RUNTIME_ROLE}'::regrole::oid)
+      ) OR EXISTS (
+        WITH protected(relid) AS (VALUES
+          ('public.oauth_device_enrollment_challenges'::regclass::oid),
+          ('public.oauth_device_bindings'::regclass::oid),
+          ('public.oauth_device_binding_audit'::regclass::oid),
+          ('public.oauth_refresh_tokens'::regclass::oid)
+        )
+        SELECT 1 FROM protected AS p JOIN pg_attribute AS a ON a.attrelid=p.relid
+        CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+        WHERE a.attnum>0 AND NOT a.attisdropped
+          AND acl.grantee IN (0::oid,'{RUNTIME_ROLE}'::regrole::oid)
+      ) THEN
+        RAISE EXCEPTION 'runtime login or PUBLIC has a direct OAuth device/refresh-token table or column ACL';
+      END IF;
+    END
+    $verify$;"""
+    results.append(run_sql(
+        "postgres-runtime-no-direct-oauth-table-or-column-acl-check", bin_dir, port,
+        environment, output_dir, sql=no_direct_acl_check,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+
+    owner_grant_check = f"""DO $verify$
+    DECLARE relation_contract record;
+            privilege_name text;
+            column_contract record;
+            actual_table_acl text[];
+    BEGIN
+      FOR relation_contract IN
+        SELECT relid, allowed_table_privileges, allowed_update_columns
+        FROM (VALUES
+          ('public.oauth_device_enrollment_challenges'::regclass::oid,
+           ARRAY['SELECT','INSERT','DELETE']::text[], ARRAY['consumed_at']::text[]),
+          ('public.oauth_device_bindings'::regclass::oid,
+           ARRAY['SELECT','INSERT']::text[], ARRAY['generation','status','revoked_at']::text[]),
+          ('public.oauth_device_binding_audit'::regclass::oid,
+           ARRAY['INSERT']::text[], ARRAY[]::text[]),
+          ('public.oauth_refresh_tokens'::regclass::oid,
+           ARRAY['SELECT']::text[], ARRAY['revoked_at']::text[])
+        ) AS expected(relid, allowed_table_privileges, allowed_update_columns)
+      LOOP
+        IF (SELECT relowner FROM pg_class WHERE oid=relation_contract.relid)
+             = '{OAUTH_OWNER_ROLE}'::regrole::oid THEN
+          RAISE EXCEPTION 'OAuth owner must not own %', relation_contract.relid::regclass;
+        END IF;
+
+        FOREACH privilege_name IN ARRAY
+          ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']::text[]
+        LOOP
+          IF has_table_privilege('{OAUTH_OWNER_ROLE}', relation_contract.relid, privilege_name)
+             IS DISTINCT FROM (privilege_name = ANY(relation_contract.allowed_table_privileges)) THEN
+            RAISE EXCEPTION 'OAuth owner table privilege % does not match allowlist for %',
+              privilege_name, relation_contract.relid::regclass;
+          END IF;
+        END LOOP;
+
+        SELECT coalesce(array_agg(DISTINCT acl.privilege_type ORDER BY acl.privilege_type), ARRAY[]::text[])
+          INTO actual_table_acl
+        FROM pg_class AS c
+        CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+        WHERE c.oid=relation_contract.relid
+          AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
+          AND NOT acl.is_grantable;
+        IF actual_table_acl IS DISTINCT FROM
+           (SELECT coalesce(array_agg(allowed.privilege_name ORDER BY allowed.privilege_name), ARRAY[]::text[])
+            FROM unnest(relation_contract.allowed_table_privileges) AS allowed(privilege_name)) THEN
+          RAISE EXCEPTION 'OAuth owner direct table ACL does not match allowlist for %',
+            relation_contract.relid::regclass;
+        END IF;
+        IF EXISTS (
+          SELECT 1
+          FROM pg_class AS c
+          CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+          WHERE c.oid=relation_contract.relid
+            AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
+            AND acl.is_grantable
+        ) THEN
+          RAISE EXCEPTION 'OAuth owner has table grant options on %', relation_contract.relid::regclass;
+        END IF;
+
+        FOR column_contract IN
+          SELECT a.attname
+          FROM pg_attribute AS a
+          WHERE a.attrelid=relation_contract.relid AND a.attnum>0 AND NOT a.attisdropped
+        LOOP
+          IF has_column_privilege('{OAUTH_OWNER_ROLE}', relation_contract.relid,
+                                  column_contract.attname, 'UPDATE')
+             IS DISTINCT FROM (column_contract.attname = ANY(relation_contract.allowed_update_columns)) THEN
+            RAISE EXCEPTION 'OAuth owner UPDATE column % does not match allowlist for %',
+              column_contract.attname, relation_contract.relid::regclass;
+          END IF;
+        END LOOP;
+
+        IF EXISTS (
+          SELECT 1
+          FROM pg_attribute AS a
+          CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+          WHERE a.attrelid=relation_contract.relid AND a.attnum>0 AND NOT a.attisdropped
+            AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
+            AND (acl.privilege_type <> 'UPDATE'
+                 OR NOT (a.attname = ANY(relation_contract.allowed_update_columns))
+                 OR acl.is_grantable)
+        ) THEN
+          RAISE EXCEPTION 'OAuth owner has a non-allowlisted or grantable column ACL on %',
+            relation_contract.relid::regclass;
+        END IF;
+        IF EXISTS (
+          SELECT 1
+          FROM unnest(relation_contract.allowed_update_columns) AS expected_column(attname)
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM pg_attribute AS a
+            CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+            WHERE a.attrelid=relation_contract.relid
+              AND a.attnum>0 AND NOT a.attisdropped
+              AND a.attname=expected_column.attname
+              AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
+              AND acl.privilege_type='UPDATE'
+              AND NOT acl.is_grantable
+          )
+        ) THEN
+          RAISE EXCEPTION 'OAuth owner is missing a direct allowlisted column UPDATE ACL on %',
+            relation_contract.relid::regclass;
+        END IF;
+      END LOOP;
+    END
+    $verify$;"""
+    results.append(run_sql(
+        "postgres-oauth-owner-table-and-column-grant-check", bin_dir, port,
+        environment, output_dir, sql=owner_grant_check,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+
+    directory_read_check = f"""DO $verify$
+    DECLARE privilege_name text;
+            column_contract record;
+            matched_policies integer;
+    BEGIN
+      FOREACH privilege_name IN ARRAY
+        ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']::text[]
+      LOOP
+        IF has_table_privilege('{DIRECTORY_OWNER_ROLE}',
+                               'public.oauth_device_bindings'::regclass::oid,
+                               privilege_name)
+           IS DISTINCT FROM (privilege_name = 'SELECT') THEN
+          RAISE EXCEPTION 'Directory owner table privilege % violates the table ACL allowlist',
+            privilege_name;
+        END IF;
+      END LOOP;
+      FOR column_contract IN
+        SELECT a.attname
+        FROM pg_attribute AS a
+        WHERE a.attrelid='public.oauth_device_bindings'::regclass::oid
+          AND a.attnum>0 AND NOT a.attisdropped
+      LOOP
+        IF has_column_privilege('{DIRECTORY_OWNER_ROLE}',
+                                'public.oauth_device_bindings'::regclass::oid,
+                                column_contract.attname, 'UPDATE')
+           IS DISTINCT FROM (column_contract.attname = 'generation') THEN
+          RAISE EXCEPTION 'Directory owner UPDATE column % violates the generation-only allowlist',
+            column_contract.attname;
+        END IF;
+      END LOOP;
+      IF (SELECT relowner FROM pg_class
+          WHERE oid='public.oauth_device_bindings'::regclass::oid)
+           = '{DIRECTORY_OWNER_ROLE}'::regrole::oid
+         OR NOT EXISTS (
+          SELECT 1
+          FROM pg_class AS c
+          CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+          WHERE c.oid='public.oauth_device_bindings'::regclass::oid
+            AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
+            AND acl.privilege_type='SELECT' AND NOT acl.is_grantable
+         )
+         OR EXISTS (
+          SELECT 1
+          FROM pg_class AS c
+          CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+          WHERE c.oid='public.oauth_device_bindings'::regclass::oid
+            AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
+            AND (acl.privilege_type <> 'SELECT' OR acl.is_grantable)
+         ) THEN
+        RAISE EXCEPTION 'Directory owner table-level ACL must be SELECT only; UPDATE is allowed only on generation';
+      END IF;
+      IF EXISTS (
+        SELECT 1
+        FROM pg_attribute AS a
+        CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+        WHERE a.attrelid='public.oauth_device_bindings'::regclass::oid
+          AND a.attnum>0 AND NOT a.attisdropped
+          AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
+          AND (acl.privilege_type <> 'UPDATE' OR a.attname <> 'generation' OR acl.is_grantable)
+      ) THEN
+        RAISE EXCEPTION 'Directory owner direct column ACLs must be non-grantable UPDATE(generation) only';
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_attribute AS a
+        CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+        WHERE a.attrelid='public.oauth_device_bindings'::regclass::oid
+          AND a.attname='generation' AND a.attnum>0 AND NOT a.attisdropped
+          AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
+          AND acl.privilege_type='UPDATE' AND NOT acl.is_grantable
+      ) THEN
+        RAISE EXCEPTION 'Directory owner is missing direct UPDATE(generation) for FOR SHARE locking';
+      END IF;
+      SELECT count(*) INTO matched_policies
+      FROM pg_policies AS p
+      WHERE p.schemaname='public' AND p.tablename='oauth_device_bindings'
+        AND p.policyname='engineering_directory_owner_no_oauth_device_binding_update'
+        AND p.permissive='RESTRICTIVE' AND p.cmd='UPDATE'
+        AND p.roles @> ARRAY['{DIRECTORY_OWNER_ROLE}']::name[]
+        AND p.qual='false' AND p.with_check='false';
+      IF matched_policies <> 1 THEN
+        RAISE EXCEPTION 'expected the named Directory owner restrictive deny-update policy with false USING/WITH CHECK; found %',
+          matched_policies;
+      END IF;
+      IF NOT has_table_privilege('{DIRECTORY_OWNER_ROLE}',
+                                 'public.oauth_device_bindings'::regclass::oid,
+                                 'SELECT') THEN
+        RAISE EXCEPTION 'Directory owner is missing read access for Run/Worktree lock paths';
+      END IF;
+    END
+    $verify$;"""
+    results.append(run_sql(
+        "postgres-directory-owner-device-binding-read-only-check", bin_dir, port,
+        environment, output_dir, sql=directory_read_check,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+
+    rls_check = f"""DO $verify$
+    DECLARE refresh_policies integer;
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_class AS c
+        WHERE c.oid IN (
+          'public.oauth_device_enrollment_challenges'::regclass,
+          'public.oauth_device_bindings'::regclass,
+          'public.oauth_device_binding_audit'::regclass,
+          'public.oauth_refresh_tokens'::regclass
+        ) AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity)
+      ) THEN
+        RAISE EXCEPTION 'device and refresh-token tables must ENABLE and FORCE row-level security';
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_policies AS p
+        WHERE p.schemaname='public' AND p.tablename='oauth_refresh_tokens'
+          AND p.permissive='PERMISSIVE' AND p.cmd IN ('UPDATE','ALL')
+          AND p.roles @> ARRAY['{OAUTH_OWNER_ROLE}']::name[]
+      ) THEN
+        RAISE EXCEPTION 'OAuth owner-targeted permissive refresh-token policy is missing';
+      END IF;
+      SELECT count(*) INTO refresh_policies FROM pg_policies AS p
+      WHERE p.schemaname='public' AND p.tablename='oauth_refresh_tokens'
+        AND p.permissive='RESTRICTIVE' AND p.cmd IN ('UPDATE','ALL')
+        AND (p.roles @> ARRAY['{OAUTH_OWNER_ROLE}']::name[] OR p.roles @> ARRAY['public']::name[])
+        AND lower(coalesce(p.qual,'')) LIKE '%tenant_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%app.tenant_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%user_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%app.actor_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '% and %'
+        AND lower(coalesce(p.qual,'')) NOT LIKE '% or %'
+        AND lower(coalesce(p.with_check,'')) LIKE '%tenant_id%'
+        AND lower(coalesce(p.with_check,'')) LIKE '%app.tenant_id%'
+        AND lower(coalesce(p.with_check,'')) LIKE '%user_id%'
+        AND lower(coalesce(p.with_check,'')) LIKE '%app.actor_id%'
+        AND lower(coalesce(p.with_check,'')) LIKE '% and %'
+        AND lower(coalesce(p.with_check,'')) NOT LIKE '% or %';
+      IF refresh_policies <> 1 THEN
+        RAISE EXCEPTION 'expected one restrictive tenant+actor refresh-token policy; found %', refresh_policies;
+      END IF;
+    END
+    $verify$;"""
+    results.append(run_sql(
+        "postgres-device-refresh-token-rls-policy-catalog-check", bin_dir, port,
+        environment, output_dir, sql=rls_check,
+    ))
     return results
 
 
 def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
                  output_dir: Path) -> list[dict]:
-    """Seed one hostless Run, one Project-authorized Worktree, and a real runtime login."""
+    """Seed scoped device identities, one hostless Run, and a real runtime login."""
     sys.path.insert(0, str(ROOT / "scripts" / "automation"))
     import engineering_run_directory as directory
 
@@ -365,6 +796,9 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
     ))
     if results[-1]["exit_code"]:
         return results
+    results.extend(device_owner_catalog_checks(bin_dir, port, environment, output_dir))
+    if any(result["exit_code"] for result in results):
+        return results
     results.append(run_sql(
         "postgres-runtime-role-grants-rls-acceptance", bin_dir, port, environment, output_dir,
         sql=directory.run_binding_role_acceptance_sql(), login=RUNTIME_ROLE,
@@ -372,10 +806,24 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
     if results[-1]["exit_code"]:
         return results
 
+    refresh_rls_hashes = [f"w16-device-rls-{uuid.uuid4().hex}" for _ in range(3)]
+    refresh_rls_access_ids = [str(uuid.uuid4()) for _ in range(3)]
     seed_sql = f"""BEGIN;
     SELECT set_config('app.tenant_id','{TENANT_A}',true),
            set_config('app.actor_id','{ACTOR_A}',true),
            set_config('app.correlation_id','10000000-0000-0000-0000-000000000099',true);
+    INSERT INTO public.oauth_device_bindings
+      (tenant_id,actor_id,device_id,public_key_fingerprint,generation,status)
+    VALUES
+      ('{TENANT_A}','{ACTOR_A}','{DEVICE_A}','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,'active'),
+      ('{TENANT_A}','{ACTOR_B}','{DEVICE_B}','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,'active'),
+      ('{TENANT_C}','{ACTOR_C}','{DEVICE_C}','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',1,'active');
+    INSERT INTO public.oauth_refresh_tokens
+      (tenant_id,token_hash,client_id,user_id,access_token_id,scope,expires_at)
+    VALUES
+      ('{TENANT_A}','{refresh_rls_hashes[0]}','w16-device-rls-fixture','{ACTOR_A}','{refresh_rls_access_ids[0]}','canvas:read',now()+interval '1 day'),
+      ('{TENANT_A}','{refresh_rls_hashes[1]}','w16-device-rls-fixture','{ACTOR_B}','{refresh_rls_access_ids[1]}','canvas:read',now()+interval '1 day'),
+      ('{TENANT_C}','{refresh_rls_hashes[2]}','w16-device-rls-fixture','{ACTOR_C}','{refresh_rls_access_ids[2]}','canvas:read',now()+interval '1 day');
     INSERT INTO multica.worktree_project_binding
       (binding_id,tenant_id,project_id,worktree_id,assigned_by,valid_from,version)
     VALUES ('{PROJECT_BINDING}','{TENANT_A}','{PROJECT_A}','{WORKTREE_A}','{ACTOR_A}',now()-interval '1 second',1);
@@ -395,6 +843,123 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
     COMMIT;"""
     results.append(run_sql("postgres-hostless-http-fixture", bin_dir, port,
                            environment, output_dir, sql=seed_sql))
+    if results[-1]["exit_code"]:
+        return results
+    directory_device_lock_probe = f"""BEGIN;
+    SET LOCAL ROLE {DIRECTORY_OWNER_ROLE};
+    SELECT set_config('app.tenant_id','{TENANT_A}',true),
+           set_config('app.actor_id','{ACTOR_A}',true);
+    DO $verify$
+    DECLARE locked_generation bigint;
+            updated_rows integer;
+            observed_generation bigint;
+    BEGIN
+      SELECT generation INTO locked_generation
+      FROM public.oauth_device_bindings
+      WHERE tenant_id='{TENANT_A}' AND device_id='{DEVICE_A}'
+      FOR SHARE;
+      IF locked_generation IS DISTINCT FROM 1 THEN
+        RAISE EXCEPTION 'Directory owner FOR SHARE must lock its scoped device generation; found %',
+          locked_generation;
+      END IF;
+      UPDATE public.oauth_device_bindings
+         SET generation=generation+1
+       WHERE tenant_id='{TENANT_A}' AND device_id='{DEVICE_A}';
+      GET DIAGNOSTICS updated_rows = ROW_COUNT;
+      IF updated_rows <> 0 THEN
+        RAISE EXCEPTION 'Directory owner restrictive UPDATE policy must affect zero rows; updated %',
+          updated_rows;
+      END IF;
+      SELECT generation INTO observed_generation
+      FROM public.oauth_device_bindings
+      WHERE tenant_id='{TENANT_A}' AND device_id='{DEVICE_A}';
+      IF observed_generation IS DISTINCT FROM locked_generation THEN
+        RAISE EXCEPTION 'denied Directory owner UPDATE changed generation from % to %',
+          locked_generation, observed_generation;
+      END IF;
+    END
+    $verify$;
+    ROLLBACK;"""
+    results.append(run_sql(
+        "postgres-directory-owner-device-generation-for-share-and-denied-update-check",
+        bin_dir, port, environment, output_dir,
+        sql=directory_device_lock_probe, login=RUNTIME_ROLE,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+    refresh_pair_constraint_catalog_check = """DO $verify$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint AS c
+        WHERE c.conrelid='public.oauth_refresh_tokens'::regclass
+          AND c.conname='oauth_refresh_tokens_device_generation_pair'
+          AND c.convalidated
+          AND pg_get_constraintdef(c.oid) ~* 'device_generation\\s+IS\\s+NOT\\s+NULL'
+      ) THEN
+        RAISE EXCEPTION 'refresh-token device pair constraint must explicitly require non-null generation';
+      END IF;
+    END
+    $verify$;"""
+    results.append(run_sql(
+        "postgres-refresh-token-device-generation-pair-constraint-catalog-check",
+        bin_dir, port, environment, output_dir,
+        sql=refresh_pair_constraint_catalog_check,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+    refresh_pair_constraint_behavior_check = f"""BEGIN;
+    DO $verify$
+    BEGIN
+      BEGIN
+        INSERT INTO public.oauth_refresh_tokens
+          (tenant_id,token_hash,client_id,user_id,access_token_id,scope,expires_at,
+           device_id,device_generation)
+        VALUES
+          ('{TENANT_A}','w16-invalid-device-generation-{uuid.uuid4().hex}',
+           'w16-device-pair-constraint-check','{ACTOR_A}',
+           '50000000-0000-0000-0000-000000000099','canvas:read',now()+interval '1 day',
+           '{DEVICE_A}',NULL);
+        RAISE EXCEPTION 'device_id without device_generation unexpectedly passed the pair constraint';
+      EXCEPTION WHEN check_violation THEN
+        RAISE NOTICE 'device_id with NULL device_generation rejected by check constraint';
+      END;
+    END
+    $verify$;
+    ROLLBACK;"""
+    results.append(run_sql(
+        "postgres-refresh-token-invalid-device-generation-pair-admin-rollback-check",
+        bin_dir, port, environment, output_dir,
+        sql=refresh_pair_constraint_behavior_check, login="erun_validation",
+    ))
+    if results[-1]["exit_code"]:
+        return results
+    refresh_rls_probe = f"""BEGIN;
+    SET LOCAL ROLE {OAUTH_OWNER_ROLE};
+    SELECT set_config('app.tenant_id','{TENANT_A}',true),
+           set_config('app.actor_id','{ACTOR_A}',true);
+    DO $verify$
+    DECLARE visible_rows integer;
+            updated_rows integer;
+    BEGIN
+      SELECT count(*) INTO visible_rows FROM public.oauth_refresh_tokens
+       WHERE token_hash IN ('{refresh_rls_hashes[0]}','{refresh_rls_hashes[1]}','{refresh_rls_hashes[2]}');
+      IF visible_rows <> 1 THEN
+        RAISE EXCEPTION 'refresh-token tenant+actor scope expected 1 visible row; found %', visible_rows;
+      END IF;
+      UPDATE public.oauth_refresh_tokens SET revoked_at=clock_timestamp()
+       WHERE token_hash IN ('{refresh_rls_hashes[0]}','{refresh_rls_hashes[1]}','{refresh_rls_hashes[2]}');
+      GET DIAGNOSTICS updated_rows = ROW_COUNT;
+      IF updated_rows <> 1 THEN
+        RAISE EXCEPTION 'refresh-token tenant+actor update expected 1 row; updated %', updated_rows;
+      END IF;
+    END
+    $verify$;
+    ROLLBACK;"""
+    results.append(run_sql(
+        "postgres-device-refresh-token-tenant-actor-rls-behavior-check", bin_dir,
+        port, environment, output_dir, sql=refresh_rls_probe, login=RUNTIME_ROLE,
+    ))
     if results[-1]["exit_code"]:
         return results
     grant_lock_probe = f"""BEGIN;
@@ -761,6 +1326,19 @@ def run_rust_phase(cargo: Path, phase: str, port: int, environment: dict[str, st
     return run_step(f"rust-http-{phase}", command, phase_environment, output_dir, 3600)
 
 
+def run_device_auth_pg_tests(cargo: Path, port: int, environment: dict[str, str],
+                             output_dir: Path) -> dict:
+    """Run the ignored W16 adapter PostgreSQL tests against this disposable cluster."""
+    test_environment = environment.copy()
+    test_environment["STAR_W16_DEVICE_AUTH_TEST_DATABASE_URL"] = (
+        f"postgres://{RUNTIME_ROLE}@127.0.0.1:{port}/postgres"
+    )
+    command = ["rtk", "proxy", str(cargo), "+1.99.0", "test", "-j", "4", "--locked",
+               "-p", "star-pg-adapter", "--test", "device_auth_pg", "--",
+               "--ignored", "--test-threads=1", "--nocapture"]
+    return run_step("rust-device-auth-pg", command, test_environment, output_dir, 3600)
+
+
 def set_detach_failure(bin_dir: Path, port: int, environment: dict[str, str],
                        output_dir: Path, enabled: bool) -> dict:
     if enabled:
@@ -856,6 +1434,9 @@ def main() -> int:
             return 1
         results.extend(seed_fixture(options.postgres_bin, port, environment, log_dir))
         if any(row["exit_code"] for row in results):
+            return 1
+        results.append(run_device_auth_pg_tests(options.cargo, port, environment, log_dir))
+        if results[-1]["exit_code"]:
             return 1
         results.append(run_rust_phase(options.cargo, "hostless-run", port, environment, log_dir))
         if results[-1]["exit_code"]:
