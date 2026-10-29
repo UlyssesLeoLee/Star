@@ -1,6 +1,6 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=27a76dc5ddc71ac2e6fed2068c7cc513f4bef92a876ce5661fc0d93e8a844817
+# @cypher schema=1 source_sha256=a4df91b87904557cbda310ce34acc448923d9fbfdacd4705b670725d0feadbc4
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
@@ -103,7 +103,7 @@
 # MERGE (deviceAuthPgTests:File {path:"crates/star-pg-adapter/tests/device_auth_pg.rs"})
 # MERGE (auditEvents:Table {id:"public.audit_audit_event",kind:"table"})
 # MERGE (migrations)-[:DEPENDS_ON]->(oauthBaseMigration)
-# MERGE (migrations)-[:DEPENDS_ON]->(deviceMigration)
+# MERGE (fixture)-[:DEPENDS_ON]->(deviceMigration)
 # MERGE (migrations)-[:CREATES]->(auditEvents)
 # MERGE (fixture)-[:READS]->(deviceBindings)
 # MERGE (fixture)-[:READS_AND_LOCKS]->(deviceBindings)
@@ -154,6 +154,7 @@ PROJECT_BINDING = "50000000-0000-0000-0000-000000000001"
 DEVICE_A = "a0000000-0000-0000-0000-000000000001"
 DEVICE_B = "a0000000-0000-0000-0000-000000000002"
 DEVICE_C = "a0000000-0000-0000-0000-000000000003"
+DEVICE_D = "a0000000-0000-0000-0000-000000000004"
 
 
 def sanitized_environment() -> dict[str, str]:
@@ -321,7 +322,7 @@ def wait_for_postgres(bin_dir: Path, port: int, environment: dict[str, str],
 
 def apply_migrations(bin_dir: Path, port: int, environment: dict[str, str],
                      output_dir: Path) -> list[dict]:
-    """Apply OAuth, Run Directory, and W16 migrations in dependency order."""
+    """Apply OAuth and Run Directory migrations before owner-role setup."""
     sys.path.insert(0, str(ROOT / "scripts" / "automation"))
     import engineering_run_directory as directory
 
@@ -384,12 +385,6 @@ def apply_migrations(bin_dir: Path, port: int, environment: dict[str, str],
     if results[-1]["exit_code"]:
         return results
 
-    results.append(run_sql(
-        "postgres-w16-device-auth-migration", bin_dir, port, environment, output_dir,
-        file=ROOT / "db" / "migrations" / "2026-10-28-w16-device-auth.sql",
-    ))
-    if results[-1]["exit_code"]:
-        return results
     return results
 
 
@@ -445,7 +440,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
           ('public.oauth_refresh_tokens'::regclass::oid)
         )
         SELECT 1 FROM protected AS p JOIN pg_class AS c ON c.oid=p.relid
-        CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) AS acl
+        CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(c.relacl)>0 THEN c.relacl END) AS acl
         WHERE acl.grantee IN (0::oid,'{RUNTIME_ROLE}'::regrole::oid)
       ) OR EXISTS (
         WITH protected(relid) AS (VALUES
@@ -455,7 +450,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
           ('public.oauth_refresh_tokens'::regclass::oid)
         )
         SELECT 1 FROM protected AS p JOIN pg_attribute AS a ON a.attrelid=p.relid
-        CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+        CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(a.attacl)>0 THEN a.attacl END) AS acl
         WHERE a.attnum>0 AND NOT a.attisdropped
           AND acl.grantee IN (0::oid,'{RUNTIME_ROLE}'::regrole::oid)
       ) THEN
@@ -507,7 +502,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
         SELECT coalesce(array_agg(DISTINCT acl.privilege_type ORDER BY acl.privilege_type), ARRAY[]::text[])
           INTO actual_table_acl
         FROM pg_class AS c
-        CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+        CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(c.relacl)>0 THEN c.relacl END) AS acl
         WHERE c.oid=relation_contract.relid
           AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
           AND NOT acl.is_grantable;
@@ -520,7 +515,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
         IF EXISTS (
           SELECT 1
           FROM pg_class AS c
-          CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+          CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(c.relacl)>0 THEN c.relacl END) AS acl
           WHERE c.oid=relation_contract.relid
             AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
             AND acl.is_grantable
@@ -544,7 +539,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
         IF EXISTS (
           SELECT 1
           FROM pg_attribute AS a
-          CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+          CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(a.attacl)>0 THEN a.attacl END) AS acl
           WHERE a.attrelid=relation_contract.relid AND a.attnum>0 AND NOT a.attisdropped
             AND acl.grantee='{OAUTH_OWNER_ROLE}'::regrole::oid
             AND (acl.privilege_type <> 'UPDATE'
@@ -560,7 +555,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
           WHERE NOT EXISTS (
             SELECT 1
             FROM pg_attribute AS a
-            CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+            CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(a.attacl)>0 THEN a.attacl END) AS acl
             WHERE a.attrelid=relation_contract.relid
               AND a.attnum>0 AND NOT a.attisdropped
               AND a.attname=expected_column.attname
@@ -618,7 +613,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
          OR NOT EXISTS (
           SELECT 1
           FROM pg_class AS c
-          CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+          CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(c.relacl)>0 THEN c.relacl END) AS acl
           WHERE c.oid='public.oauth_device_bindings'::regclass::oid
             AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
             AND acl.privilege_type='SELECT' AND NOT acl.is_grantable
@@ -626,7 +621,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
          OR EXISTS (
           SELECT 1
           FROM pg_class AS c
-          CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,'{{}}'::aclitem[])) AS acl
+          CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(c.relacl)>0 THEN c.relacl END) AS acl
           WHERE c.oid='public.oauth_device_bindings'::regclass::oid
             AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
             AND (acl.privilege_type <> 'SELECT' OR acl.is_grantable)
@@ -636,7 +631,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
       IF EXISTS (
         SELECT 1
         FROM pg_attribute AS a
-        CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+        CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(a.attacl)>0 THEN a.attacl END) AS acl
         WHERE a.attrelid='public.oauth_device_bindings'::regclass::oid
           AND a.attnum>0 AND NOT a.attisdropped
           AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
@@ -647,7 +642,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
       IF NOT EXISTS (
         SELECT 1
         FROM pg_attribute AS a
-        CROSS JOIN LATERAL aclexplode(coalesce(a.attacl,'{{}}'::aclitem[])) AS acl
+        CROSS JOIN LATERAL aclexplode(CASE WHEN cardinality(a.attacl)>0 THEN a.attacl END) AS acl
         WHERE a.attrelid='public.oauth_device_bindings'::regclass::oid
           AND a.attname='generation' AND a.attnum>0 AND NOT a.attisdropped
           AND acl.grantee='{DIRECTORY_OWNER_ROLE}'::regrole::oid
@@ -661,9 +656,15 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
         AND p.policyname='engineering_directory_owner_no_oauth_device_binding_update'
         AND p.permissive='RESTRICTIVE' AND p.cmd='UPDATE'
         AND p.roles @> ARRAY['{DIRECTORY_OWNER_ROLE}']::name[]
-        AND p.qual='false' AND p.with_check='false';
+        AND lower(coalesce(p.qual,'')) LIKE '%tenant_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%app.tenant_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%actor_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%app.actor_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '% and %'
+        AND lower(coalesce(p.qual,'')) NOT LIKE '% or %'
+        AND p.with_check='false';
       IF matched_policies <> 1 THEN
-        RAISE EXCEPTION 'expected the named Directory owner restrictive deny-update policy with false USING/WITH CHECK; found %',
+        RAISE EXCEPTION 'expected the named Directory owner restrictive tenant+actor USING and false WITH CHECK policy; found %',
           matched_policies;
       END IF;
       IF NOT has_table_privilege('{DIRECTORY_OWNER_ROLE}',
@@ -762,6 +763,14 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
     ))
     if results[-1]["exit_code"]:
         return results
+    # This legacy owner-role migration revokes all public-schema table ACLs.
+    # Apply W16 afterward so its device-binding grants describe the final ACL.
+    results.append(run_sql(
+        "postgres-w16-device-auth-migration", bin_dir, port, environment, output_dir,
+        file=ROOT / "db" / "migrations" / "2026-10-28-w16-device-auth.sql",
+    ))
+    if results[-1]["exit_code"]:
+        return results
     policy_catalog_check = """DO $verify$
     DECLARE matched_policies integer;
     BEGIN
@@ -817,13 +826,19 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
     VALUES
       ('{TENANT_A}','{ACTOR_A}','{DEVICE_A}','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,'active'),
       ('{TENANT_A}','{ACTOR_B}','{DEVICE_B}','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,'active'),
-      ('{TENANT_C}','{ACTOR_C}','{DEVICE_C}','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',1,'active');
+      ('{TENANT_C}','{ACTOR_C}','{DEVICE_C}','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',1,'active'),
+      ('{TENANT_C}','{ACTOR_A}','{DEVICE_D}','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',1,'active');
     INSERT INTO public.oauth_refresh_tokens
       (tenant_id,token_hash,client_id,user_id,access_token_id,scope,expires_at)
     VALUES
       ('{TENANT_A}','{refresh_rls_hashes[0]}','w16-device-rls-fixture','{ACTOR_A}','{refresh_rls_access_ids[0]}','canvas:read',now()+interval '1 day'),
       ('{TENANT_A}','{refresh_rls_hashes[1]}','w16-device-rls-fixture','{ACTOR_B}','{refresh_rls_access_ids[1]}','canvas:read',now()+interval '1 day'),
       ('{TENANT_C}','{refresh_rls_hashes[2]}','w16-device-rls-fixture','{ACTOR_C}','{refresh_rls_access_ids[2]}','canvas:read',now()+interval '1 day');
+    -- The OAuth locator trigger scopes each inserted token; restore the directory
+    -- writer context after this deliberately multi-tenant fixture batch.
+    SELECT set_config('app.tenant_id','{TENANT_A}',true),
+           set_config('app.actor_id','{ACTOR_A}',true),
+           set_config('app.correlation_id','10000000-0000-0000-0000-000000000099',true);
     INSERT INTO multica.worktree_project_binding
       (binding_id,tenant_id,project_id,worktree_id,assigned_by,valid_from,version)
     VALUES ('{PROJECT_BINDING}','{TENANT_A}','{PROJECT_A}','{WORKTREE_A}','{ACTOR_A}',now()-interval '1 second',1);
@@ -851,7 +866,9 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
            set_config('app.actor_id','{ACTOR_A}',true);
     DO $verify$
     DECLARE locked_generation bigint;
-            updated_rows integer;
+            out_of_scope_generation bigint;
+            cross_tenant_generation bigint;
+            update_sqlstate text := NULL;
             observed_generation bigint;
     BEGIN
       SELECT generation INTO locked_generation
@@ -862,13 +879,33 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
         RAISE EXCEPTION 'Directory owner FOR SHARE must lock its scoped device generation; found %',
           locked_generation;
       END IF;
-      UPDATE public.oauth_device_bindings
-         SET generation=generation+1
-       WHERE tenant_id='{TENANT_A}' AND device_id='{DEVICE_A}';
-      GET DIAGNOSTICS updated_rows = ROW_COUNT;
-      IF updated_rows <> 0 THEN
-        RAISE EXCEPTION 'Directory owner restrictive UPDATE policy must affect zero rows; updated %',
-          updated_rows;
+      SELECT generation INTO out_of_scope_generation
+      FROM public.oauth_device_bindings
+      WHERE device_id='{DEVICE_B}'
+      FOR SHARE;
+      IF out_of_scope_generation IS NOT NULL THEN
+        RAISE EXCEPTION 'Directory owner FOR SHARE exposed another actor device generation %',
+          out_of_scope_generation;
+      END IF;
+      SELECT generation INTO cross_tenant_generation
+      FROM public.oauth_device_bindings
+      WHERE device_id='{DEVICE_D}'
+      FOR SHARE;
+      IF cross_tenant_generation IS NOT NULL THEN
+        RAISE EXCEPTION 'Directory owner FOR SHARE exposed the same actor device from another tenant: %',
+          cross_tenant_generation;
+      END IF;
+      BEGIN
+        UPDATE public.oauth_device_bindings
+           SET generation=generation+1
+         WHERE tenant_id='{TENANT_A}' AND device_id='{DEVICE_A}';
+      EXCEPTION WHEN SQLSTATE '42501' THEN
+        GET STACKED DIAGNOSTICS update_sqlstate = RETURNED_SQLSTATE;
+        RAISE NOTICE 'Directory owner UPDATE rejected with SQLSTATE %', update_sqlstate;
+      END;
+      IF update_sqlstate IS DISTINCT FROM '42501' THEN
+        RAISE EXCEPTION 'Directory owner direct UPDATE must fail closed with SQLSTATE 42501; got %',
+          update_sqlstate;
       END IF;
       SELECT generation INTO observed_generation
       FROM public.oauth_device_bindings

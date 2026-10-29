@@ -1,6 +1,6 @@
 """Bounded unit checks for the isolated authenticated HTTP acceptance runner."""
 
-# @cypher schema=1 source_sha256=2144292fc224ea50da752e8e25771cb85dd65fbae0b275ab957f0f6e54b34d35
+# @cypher schema=1 source_sha256=b38d75cb04d9502efd4cec6487b81db147523495c9cb22912d6759aa99d76af0
 # MERGE (self:File {path:"scripts/automation/test_phase9f2_binding_http_acceptance.py"})
 # MERGE (sanitization:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_sanitized_environment_removes_database_overrides",kind:"test"})
 # MERGE (loopback:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_loopback_port_avoids_protected_ports",kind:"test"})
@@ -169,10 +169,16 @@ class BindingHttpAcceptanceRunnerTests(unittest.TestCase):
 
     def test_all_lock_policy_proofs_require_sqlstate_42501(self) -> None:
         seed_source = inspect.getsource(runner.seed_fixture)
-        self.assertEqual(seed_source.count("EXCEPTION WHEN SQLSTATE '42501'"), 5)
-        self.assertEqual(seed_source.count("update_sqlstate IS DISTINCT FROM '42501'"), 5)
+        self.assertEqual(seed_source.count("EXCEPTION WHEN SQLSTATE '42501'"), 6)
+        self.assertEqual(seed_source.count("update_sqlstate IS DISTINCT FROM '42501'"), 6)
         self.assertNotIn("EXCEPTION WHEN insufficient_privilege", seed_source)
         self.assertIn("p.permissive='RESTRICTIVE'", seed_source)
+
+    def test_device_rls_probe_checks_actor_and_tenant_without_query_filters(self) -> None:
+        seed_source = inspect.getsource(runner.seed_fixture)
+        self.assertIn("{TENANT_C}','{ACTOR_A}','{DEVICE_D}", seed_source)
+        self.assertIn("WHERE device_id='{DEVICE_B}'", seed_source)
+        self.assertIn("WHERE device_id='{DEVICE_D}'", seed_source)
 
 
 if __name__ == "__main__":
