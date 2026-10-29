@@ -6,7 +6,7 @@
 -- MERGE (refresh:Table {name:"oauth_refresh_tokens",type:"table",class:"T_worm"})
 -- MERGE (engineeringOwner:Type {id:"star_engineering_directory_owner",kind:"database_role"})
 -- MERGE (oauthOwner:Type {id:"star_oauth_credential_owner",kind:"database_role"})
--- MERGE (deviceLockPolicy:Policy {id:"oauth_device_bindings::engineering_directory_owner_no_device_binding_update",kind:"row_level_security"})
+-- MERGE (deviceLockPolicy:Policy {id:"oauth_device_bindings::engineering_directory_owner_no_oauth_device_binding_update",kind:"row_level_security"})
 -- MERGE (refreshRevokePolicy:Policy {id:"oauth_refresh_tokens::oauth_owner_device_revoke_scope",kind:"row_level_security"})
 -- MERGE (self)-[:CREATES]->(challenges),(self)-[:CREATES]->(bindings),(self)-[:CREATES]->(audit)
 -- MERGE (self)-[:CONFIGURES]->(refresh)
@@ -18,7 +18,7 @@
 -- One physical SQL statement per line for the repository migration runner.
 ALTER TABLE oauth_refresh_tokens ADD COLUMN IF NOT EXISTS device_id UUID;
 ALTER TABLE oauth_refresh_tokens ADD COLUMN IF NOT EXISTS device_generation BIGINT;
-DO $constraint$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='oauth_refresh_tokens_device_generation_pair') THEN ALTER TABLE oauth_refresh_tokens ADD CONSTRAINT oauth_refresh_tokens_device_generation_pair CHECK ((device_id IS NULL AND device_generation IS NULL) OR (device_id IS NOT NULL AND device_generation > 0)); END IF; END $constraint$;
+DO $constraint$ DECLARE current_definition TEXT; current_is_validated BOOLEAN; BEGIN SELECT pg_get_constraintdef(oid), convalidated INTO current_definition, current_is_validated FROM pg_constraint WHERE conrelid='oauth_refresh_tokens'::regclass AND conname='oauth_refresh_tokens_device_generation_pair'; IF current_definition IS NULL THEN ALTER TABLE oauth_refresh_tokens ADD CONSTRAINT oauth_refresh_tokens_device_generation_pair CHECK ((device_id IS NULL AND device_generation IS NULL) OR (device_id IS NOT NULL AND device_generation IS NOT NULL AND device_generation > 0)); ELSIF NOT current_is_validated OR position('device_generation is not null' in lower(current_definition))=0 THEN ALTER TABLE oauth_refresh_tokens DROP CONSTRAINT oauth_refresh_tokens_device_generation_pair; ALTER TABLE oauth_refresh_tokens ADD CONSTRAINT oauth_refresh_tokens_device_generation_pair CHECK ((device_id IS NULL AND device_generation IS NULL) OR (device_id IS NOT NULL AND device_generation IS NOT NULL AND device_generation > 0)); END IF; END $constraint$;
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_device_active ON oauth_refresh_tokens(tenant_id,user_id,device_id) WHERE revoked_at IS NULL AND device_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS oauth_device_enrollment_challenges (challenge_id UUID PRIMARY KEY, tenant_id UUID NOT NULL CHECK (tenant_id <> '00000000-0000-0000-0000-000000000000'), actor_id UUID NOT NULL CHECK (actor_id <> '00000000-0000-0000-0000-000000000000'), challenge_hash BYTEA NOT NULL CHECK (octet_length(challenge_hash)=32), public_key BYTEA NOT NULL CHECK (octet_length(public_key)=32), public_key_fingerprint TEXT NOT NULL CHECK (public_key_fingerprint ~ '^[0-9a-f]{64}$'), expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT transaction_timestamp(), CHECK (expires_at > created_at), CHECK (consumed_at IS NULL OR consumed_at >= created_at));
 CREATE INDEX IF NOT EXISTS idx_oauth_device_enrollment_challenges_expiry ON oauth_device_enrollment_challenges(expires_at) WHERE consumed_at IS NULL;
@@ -59,9 +59,10 @@ GRANT UPDATE (consumed_at) ON TABLE oauth_device_enrollment_challenges TO star_o
 GRANT SELECT, INSERT ON TABLE oauth_device_bindings TO star_oauth_credential_owner;
 GRANT UPDATE (generation, status, revoked_at) ON TABLE oauth_device_bindings TO star_oauth_credential_owner;
 GRANT INSERT ON TABLE oauth_device_binding_audit TO star_oauth_credential_owner;
--- Engineering Directory only takes a shared row lock for Run/Worktree writes; it is not an identity-state writer.
+-- PostgreSQL requires UPDATE privilege on a selected column for SELECT ... FOR SHARE; this column-only ACL enables the generation lock, while the restrictive RLS policy below prevents all actual Directory-role updates.
 REVOKE ALL ON TABLE oauth_device_bindings FROM star_engineering_directory_owner;
 GRANT SELECT ON TABLE oauth_device_bindings TO star_engineering_directory_owner;
+GRANT UPDATE (generation) ON TABLE oauth_device_bindings TO star_engineering_directory_owner;
 DROP POLICY IF EXISTS engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings;
 CREATE POLICY engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings AS RESTRICTIVE FOR UPDATE TO star_engineering_directory_owner USING (false) WITH CHECK (false);
 CREATE TABLE IF NOT EXISTS oauth_credential_tenant_locator (credential_kind TEXT NOT NULL CHECK (credential_kind IN ('authorization_code','refresh_token')), token_hash TEXT NOT NULL, tenant_id UUID NOT NULL, actor_id UUID NOT NULL, client_id TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT transaction_timestamp(), PRIMARY KEY (credential_kind,token_hash));

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=f88731b16974b03d19826b35eeca8973ed643bf85a51ded194f5141ab6633bc9
+@cypher schema=1 source_sha256=52147cb7f4d4987a95a64c82564696f9ba0eee1861768bddd5e19e05d4a3da90
 MERGE (self:File {path:"crates/star-pg-adapter/tests/device_auth_pg.rs"})
 MERGE (test:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_proof_generation_and_revocation",kind:"test"})
 MERGE (capTest:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_challenge_creation_enforces_actor_cap_under_concurrency",kind:"test"})
@@ -17,10 +17,10 @@ MERGE (self)-[:DEFINES]->(roleTest)
 //! PostgreSQL proof of durable device enrollment, owner scoping, generation checks, and revocation.
 
 use chrono::{Duration, Utc};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use star_pg_adapter::repository::{
     DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
-    PgDeviceBindingRepository, MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES,
+    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, PgDeviceBindingRepository,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -58,11 +58,13 @@ async fn postgres_device_proof_generation_and_revocation() {
         .await
         .expect("create owner-scoped challenge");
 
-    assert!(repository
-        .find_challenge(Uuid::new_v4(), actor_id, challenge_id)
-        .await
-        .expect("cross-tenant challenge read")
-        .is_none());
+    assert!(
+        repository
+            .find_challenge(Uuid::new_v4(), actor_id, challenge_id)
+            .await
+            .expect("cross-tenant challenge read")
+            .is_none()
+    );
 
     let loaded = repository
         .find_challenge(tenant_id, actor_id, challenge_id)
@@ -100,10 +102,12 @@ async fn postgres_device_proof_generation_and_revocation() {
     assert_eq!(winners, 1, "one challenge must activate at most one device");
     let binding = winner.expect("activated binding");
     assert_eq!(binding.generation, 1);
-    assert!(repository
-        .is_active(tenant_id, actor_id, binding.device_id, 1)
-        .await
-        .expect("active generation check"));
+    assert!(
+        repository
+            .is_active(tenant_id, actor_id, binding.device_id, 1)
+            .await
+            .expect("active generation check")
+    );
 
     insert_refresh_fixture(&pool, tenant_id, actor_id, binding.device_id).await;
     let revoked = repository
@@ -113,10 +117,12 @@ async fn postgres_device_proof_generation_and_revocation() {
         .expect("device was active");
     assert_eq!(revoked.generation, 2);
     assert_eq!(revoked.status, "revoked");
-    assert!(!repository
-        .is_active(tenant_id, actor_id, binding.device_id, 1)
-        .await
-        .expect("revoked generation check"));
+    assert!(
+        !repository
+            .is_active(tenant_id, actor_id, binding.device_id, 1)
+            .await
+            .expect("revoked generation check")
+    );
     assert!(refresh_fixture_is_revoked(&pool, tenant_id, actor_id, binding.device_id).await);
     pool.close().await;
 }

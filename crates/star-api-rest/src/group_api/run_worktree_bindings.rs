@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2a95384101a9c091f235302840241ab750a09ace1920b4b61d13463f99376f7f
+@cypher schema=1 source_sha256=03e034c96964c6fd5a24da47eee194ebabfe7dd631884a17dde8807cc378d6c5
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::module",kind:"module"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::router",kind:"function"})
@@ -141,26 +141,26 @@ MERGE (emit)-[:WRITES]->(:Table {id:"multica.engineering_run_outbox",kind:"table
 //! Worktree checkout remains the managed object and execution admission stays off.
 
 use axum::{
+    Json, Router,
     extract::{DefaultBodyLimit, Path, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::map_response,
     response::{IntoResponse, Response},
     routing::put,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::auth::DeviceTokenContext;
 
 use super::{
+    AuthUser, AuthenticatedDeviceContext, GroupApiError, GroupApiState, ProjectBinding,
     active_binding,
-    engineering_runs::{authorize_run_owned_task_scope, RunOwnedTaskScope},
+    engineering_runs::{RunOwnedTaskScope, authorize_run_owned_task_scope},
     require_scope, set_tenant, validate_actor,
     work_items::{idempotency_key, request_hash},
-    AuthUser, AuthenticatedDeviceContext, GroupApiError, GroupApiState, ProjectBinding,
 };
 
 const MAX_WRITE_BODY_BYTES: usize = 16 * 1024;
@@ -1072,13 +1072,15 @@ mod tests {
             .unwrap(),
             MutationAction::Bind
         );
-        assert!(validate_transition(
-            MutationKind::Put,
-            target,
-            &ExpectedBinding::Unassigned,
-            Some(&snapshot(Uuid::from_u128(2), 1)),
-        )
-        .is_err());
+        assert!(
+            validate_transition(
+                MutationKind::Put,
+                target,
+                &ExpectedBinding::Unassigned,
+                Some(&snapshot(Uuid::from_u128(2), 1)),
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1097,16 +1099,18 @@ mod tests {
         assert!(
             validate_transition(MutationKind::Put, source_run, &expected, Some(&current),).is_err()
         );
-        assert!(validate_transition(
-            MutationKind::Put,
-            target_run,
-            &ExpectedBinding::Bound {
-                binding_id: current.binding_id,
-                version: current.version + 1,
-            },
-            Some(&current),
-        )
-        .is_err());
+        assert!(
+            validate_transition(
+                MutationKind::Put,
+                target_run,
+                &ExpectedBinding::Bound {
+                    binding_id: current.binding_id,
+                    version: current.version + 1,
+                },
+                Some(&current),
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1121,20 +1125,24 @@ mod tests {
             validate_transition(MutationKind::Detach, run_id, &expected, Some(&current),).unwrap(),
             MutationAction::Detach
         );
-        assert!(validate_transition(
-            MutationKind::Detach,
-            Uuid::from_u128(5),
-            &expected,
-            Some(&current),
-        )
-        .is_err());
-        assert!(validate_transition(
-            MutationKind::Detach,
-            run_id,
-            &ExpectedBinding::Unassigned,
-            None,
-        )
-        .is_err());
+        assert!(
+            validate_transition(
+                MutationKind::Detach,
+                Uuid::from_u128(5),
+                &expected,
+                Some(&current),
+            )
+            .is_err()
+        );
+        assert!(
+            validate_transition(
+                MutationKind::Detach,
+                run_id,
+                &ExpectedBinding::Unassigned,
+                None,
+            )
+            .is_err()
+        );
     }
 
     #[test]

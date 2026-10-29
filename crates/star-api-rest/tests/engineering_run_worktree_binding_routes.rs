@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=72d6015909335c8dbde7dc305a36e267aacaa76e3178789820b32b0c4392d2eb
+@cypher schema=1 source_sha256=1eb6bc73db10a992084e5190eebd2d628fe4b724a5cc81b63eeb1aa10d7e7c79
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})
@@ -9,7 +9,8 @@ MERGE (testToken:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree
 MERGE (tokenForActor:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::route_test_token_for_actor",kind:"function"})
 MERGE (deviceTokenForActor:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::route_test_device_token_for_actor",kind:"function"})
 MERGE (deviceForActor:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::acceptance_device_for_actor",kind:"function"})
-MERGE (deviceRoleProbe:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::assert_runtime_can_set_device_reader_role",kind:"function"})
+MERGE (deviceRoleProbe:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::assert_directory_role_locks_device_generation_without_mutating",kind:"function"})
+MERGE (deviceUpdateDenyPolicy:Policy {id:"oauth_device_bindings::engineering_directory_owner_no_oauth_device_binding_update",kind:"row_level_security"})
 MERGE (sendMutation:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::send_binding_mutation",kind:"function"})
 MERGE (assertPrivate:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::assert_private_response",kind:"function"})
 MERGE (mutationBody:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::mutation_body",kind:"function"})
@@ -85,6 +86,8 @@ MERGE (ownerScopeProbe)-[:READS]->(:Table {id:"multica.engineering_run_revision"
 MERGE (ownerScopeProbe)-[:READS]->(:Table {id:"permission.engineering_run_role_binding",kind:"table"})
 MERGE (ownerScopeProbe)-[:READS]->(:Table {id:"public.worktree_canvas_worktree",kind:"table"})
 MERGE (ownerScopeProbe)-[:READS]->(:Table {id:"multica.worktree_project_binding",kind:"table"})
+MERGE (deviceRoleProbe)-[:READS]->(:Table {id:"public.oauth_device_bindings",kind:"table"})
+MERGE (deviceRoleProbe)-[:TESTS]->(deviceUpdateDenyPolicy)
 MERGE (test)-[:TESTS]->(putEndpoint)
 MERGE (test)-[:TESTS]->(deleteEndpoint)
 MERGE (scopeTest)-[:TESTS]->(putEndpoint)
@@ -102,15 +105,15 @@ MERGE (httpAcceptance)-[:TESTS]->(runContextEndpoint)
 use std::sync::Arc;
 
 use axum::{
-    body::{to_bytes, Body},
-    http::{header, Method, Request, StatusCode},
     Router,
+    body::{Body, to_bytes},
+    http::{Method, Request, StatusCode, header},
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::postgres::PgPoolOptions;
 use star_api_rest::{
-    auth::{issue_token, issue_token_with_device_context, DeviceTokenContext, JwtConfig},
-    group_api::{build_group_router, GroupApiState},
+    auth::{DeviceTokenContext, JwtConfig, issue_token, issue_token_with_device_context},
+    group_api::{GroupApiState, build_group_router},
 };
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -439,7 +442,7 @@ async fn owner_scope_probe(pool: &sqlx::PgPool) -> Value {
     diagnostic
 }
 
-async fn assert_runtime_can_set_device_reader_role(pool: &sqlx::PgPool) {
+async fn assert_directory_role_locks_device_generation_without_mutating(pool: &sqlx::PgPool) {
     let mut tx = pool
         .begin()
         .await
@@ -454,18 +457,53 @@ async fn assert_runtime_can_set_device_reader_role(pool: &sqlx::PgPool) {
         .execute(&mut *tx)
         .await
         .expect("device role probe should establish tenant and actor RLS scope");
-    let (current_role, generation): (String, Option<i64>) = sqlx::query_as(
-        "SELECT current_user::text, (SELECT generation FROM oauth_device_bindings \
-         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL)",
+    let current_role: String = sqlx::query_scalar("SELECT current_user::text")
+        .fetch_one(&mut *tx)
+        .await
+        .expect("device role probe should identify the effective role");
+    let generation: Option<i64> = sqlx::query_scalar(
+        "SELECT generation FROM oauth_device_bindings \
+         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL \
+         FOR SHARE",
     )
     .bind(ACCEPTANCE_TENANT)
     .bind(ACCEPTANCE_ACTOR)
     .bind(ACCEPTANCE_DEVICE_ACTOR)
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await
-    .expect("owner role must read the active binding under RLS");
+    .expect("Directory role must obtain a shared lock on the active binding under RLS");
     assert_eq!(current_role, "star_engineering_directory_owner");
     assert_eq!(generation, Some(1));
+    let update = sqlx::query(
+        "UPDATE oauth_device_bindings SET generation=generation+1 \
+         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL",
+    )
+    .bind(ACCEPTANCE_TENANT)
+    .bind(ACCEPTANCE_ACTOR)
+    .bind(ACCEPTANCE_DEVICE_ACTOR)
+    .execute(&mut *tx)
+    .await
+    .expect("restrictive RLS must deny direct generation updates without an SQL error");
+    assert_eq!(
+        update.rows_affected(),
+        0,
+        "Directory role must not mutate device state"
+    );
+    let generation_after: Option<i64> = sqlx::query_scalar(
+        "SELECT generation FROM oauth_device_bindings \
+         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL",
+    )
+    .bind(ACCEPTANCE_TENANT)
+    .bind(ACCEPTANCE_ACTOR)
+    .bind(ACCEPTANCE_DEVICE_ACTOR)
+    .fetch_optional(&mut *tx)
+    .await
+    .expect("device role should retain scoped generation read access");
+    assert_eq!(
+        generation_after,
+        Some(1),
+        "generation must remain unchanged"
+    );
     tx.commit()
         .await
         .expect("device role membership probe should commit");
@@ -572,7 +610,7 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             .expect("runtime connection identity should be readable");
     assert_eq!(session_user, "erun_directory_api_test");
     assert_eq!(current_user, "erun_directory_api_test");
-    assert_runtime_can_set_device_reader_role(&pool).await;
+    assert_directory_role_locks_device_generation_without_mutating(&pool).await;
     let scope_probe = owner_scope_probe(&pool).await;
 
     let jwt = route_test_jwt_config();
@@ -696,10 +734,12 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             .await;
             assert_eq!(member_list.status, StatusCode::OK, "{:?}", member_list.body);
             assert_directory_response(&member_list);
-            assert!(member_list.body["engineering_runs"]
-                .as_array()
-                .unwrap()
-                .is_empty());
+            assert!(
+                member_list.body["engineering_runs"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
 
             let member_open = send_project_run_request(
                 app,
