@@ -1,6 +1,6 @@
 # DD-W16-PAYLOAD-SECURITY-001 — 设备身份与协作载荷 envelope 详细设计
 
-> 状态：Draft v0.2；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。W16-C branch 已增加 provider-neutral envelope core，但接口、schema 与算法仍须独立安全 review；当前无生产实现。
+> 状态：Draft v0.3；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。W16-A 部分 device/auth owner 与 PG/RLS 切片已经本地 PostgreSQL 验证；W16-C provider-neutral envelope core 仍未接入生产 owner.
 
 ## 1. 模块边界
 
@@ -101,6 +101,8 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 
 应用和 provider 日志只能记录 operation ID、profile/key opaque id、结果码、耗时分桶和字节数分桶。禁止记录正文、DEK、access/refresh token、enrollment proof、provider credentials、未脱敏 headers 或完整 KMS request/response。
 
+**当前实现状态（2026-10-29）**：W16-A 隔离 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 完成 70/70 步骤，包含 device repository PG tests 2/2、迁移与 owner/ACL/RLS、设备 generation `FOR SHARE` 与拒绝 UPDATE、refresh-token tenant+actor 隔离及配对 CHECK 弱约束升级/非法值回滚。Run/Worktree binding HTTP 测试也通过，但不代表 Canvas device-auth 请求面验收。尚未覆盖目录 row lock 与并发撤销争用、OAuth 单赢家、Canvas 共享 read/write/resolve、SSE 跨节点失效、生产 audit/SCD2、Neon/Multipass/K3s、KMS 持久恢复或性能。
+
 ## 6. 验证映射与实施门
 
 | Gate | 必须证明 |
@@ -111,7 +113,7 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 | Owner/RLS | Neon 或真实 PostgreSQL 的 RLS、owner transaction、idempotency、retention 与只含 metadata 的 Outbox；两 actor 互读 scope 被拒绝。 |
 | Bounded runtime | 固定 Collaboration Profile 与 workload 下 KMS 请求频次、缓冲/队列上限、RSS/CPU、取消、慢消费者与 PT-09 p99 结果。 |
 
-测试环境最多两个 Multipass inventory 实例；这只支持可重建验证，不证明两节点 HA。Vercel 路径使用 Neon 并单独核验云身份。没有真实 provider、数据库/RLS、撤销、恢复和 profile 性能证据时，W16、WLD-7、PT-09/10 保持 OPEN/NOT_RUN。
+测试环境最多两个 Multipass inventory 实例；这只支持可重建验证，不证明两节点 HA。Vercel 路径使用 Neon 并单独核验云身份。没有生产 provider、Canvas 读写/订阅撤销、并发竞争、持久恢复和 profile 性能证据时，W16、WLD-7、PT-09/10 继续保持 OPEN/PARTIAL/NOT_RUN。
 
 ## 7. 修订历史
 
@@ -119,3 +121,4 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义认证设备链、原子 OAuth 凭据消费、canonical AAD、envelope 字段、撤销、轮换/恢复、错误语义及资源有界验证门；未批准物理 DDL/provider。 | W16 device 与 KMS 审计。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在旧 AAD 字段基础上显式加入 optional Worktree（位于 Run 之后），固定二进制编码/tag/端序与长度；记录 W16-C core API、边界和未验证的生产/清零/持久化能力。 | W16-C envelope core 实施与 DD 对照。 |
+| v0.3 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16-A 已通过的本地 PG18 owner/RLS、设备 repository 和 Run/Worktree binding HTTP 切片，并列出未覆盖的并发撤销、OAuth 单赢家、Canvas 设备请求面、生产 SCD2/KMS、云/VM 部署与性能验收。 | W16-A PG18 acceptance 70/70 步骤完成。 |

@@ -1,6 +1,6 @@
 # BD-W16-PAYLOAD-SECURITY-001 — 协作载荷安全基本设计
 
-> 状态：Draft v0.2；补充 `BD-CANVAS-AGENT-001` v0.2 的 W16 安全边界，不取代其 Run/owner 结构。W16-C branch 有 provider-neutral envelope core 的局部实现；生产协作链仍未实现。
+> 状态：Draft v0.3；补充 `BD-CANVAS-AGENT-001` v0.2 的 W16 安全边界，不取代其 Run/owner 结构。W16-A 的部分设备身份与 PostgreSQL owner/RLS 切片已验收；W16-C 只有 provider-neutral envelope core，生产协作链仍未闭合。
 
 ## 1. 目标与边界
 
@@ -19,14 +19,14 @@
 
 | 逻辑记录 | 主分类 | 生命周期与约束 |
 |---|---|---|
-| Device binding / public credential / generation | Master | SCD Type 2；撤销不物理删除；按 tenant/user RLS；凭据私钥不上传。 |
+| Device binding / public credential / generation | Master | 目标为 SCD Type 2；撤销不物理删除；按 tenant/user RLS；凭据私钥不上传。当前 W16-A migration 只保留当前 binding 行并原位推进 generation/status，尚无历史版本表或有效期列，SCD Type 2 仍未实现，需在 DDD 决策前维持此差异。 |
 | Device enrollment challenge 与短期兑换状态 | Work | 短 TTL、有限尝试次数、过期删除；不记录 proof secret。 |
 | Device revoke / auth replay audit | Transaction | append-only、物理删除禁止、审计必携、RLS；只写 opaque identity 与结果。 |
 | Protected draft checkpoint metadata | Work | 有明示 retention；正文密文以受控 blob/payload reference 保存；不可在主表放明文。 |
 | Conflict / canonical revision / idempotency receipt / Outbox | Transaction | append-only 事实或受控状态版本；原子 owner 事务、幂等、RLS；Outbox 只有资源/版本/事实 ID。 |
 | KMS profile 与可用 key identity 映射 | Master | 版本化、SCD Type 2、无 secret；密钥生命周期由 provider 管理。 |
 
-这是逻辑分类，不是已批准的 DDL。新增物理表须逐表补齐 retention、RLS 与审计策略后才能实施。
+这是逻辑分类，不是已批准的 DDL。新增物理表须逐表补齐 retention、RLS 与审计策略后才能实施。当前设备 binding 的原位状态模型与 Master 的 SCD Type 2 目标存在实现差异；不得据此宣称历史状态可查询。
 
 ## 4. 保护与持久化边界
 
@@ -43,6 +43,12 @@
 - 单对象上限为明文 256 KiB、wrapped DEK 64 KiB、JSON envelope 1 MiB。该固定上限限制单次编码/加密对象，但不能证明并发 RSS、队列、取消、进程内密钥清零或生产 workload 达标。
 - `SecretDataKey` 当前仅有 best-effort 清除行为；没有启用经审计的 zeroize 依赖/feature。AES 实现内部临时副本也没有清零保证。生产启用保持阻断。
 - 该类型尚未接入 `TranscriptBodyProtector`、REST、owner transaction、RLS、持久 KMS provider、profile resolver 或跨重启恢复；不得把 branch 级实现标为共享协作可用。
+
+### 4.2 W16-A 已验证切片与边界
+
+- 隔离本地 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 共 70 步、失败 0；覆盖 W16 migration 顺序、owner role/ACL、设备 generation `FOR SHARE` 与拒写、tenant+actor refresh-token RLS、NULL generation 约束及旧弱同名 CHECK 升级。
+- Rust `device_auth_pg` 两项 PostgreSQL 测试通过，覆盖 proof/revoke repository 行为与并发 enrollment challenge 上限；独立 Run/Worktree binding HTTP 场景验证其自身的绑定、并发、回滚与 detach 路径。后者不证明 Canvas 设备身份端到端。
+- 此切片未证明目录锁与并发 revoke 的阻塞关系、OAuth code/refresh 并发单赢家、全体共享读写/订阅/resolve、SSE 撤销传播、生产 audit/SCD2、真实 Neon/Multipass/K3s 部署、KMS 持久化恢复或 PT-09/10。相关 W16 门继续 OPEN/PARTIAL。
 
 ## 5. Provider 与部署策略
 
@@ -71,3 +77,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增身份 owner、协作 owner、provider adapter、W/T/M 逻辑分类、密文边界、失败策略和最多两个 Multipass 测试实例约束。未定义或声称已实施 DDL/provider。 | W16 认证与 KMS 前置审计及 provider 研究。 |
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W16-C 单对象有界 envelope core 的实际状态、AES-GCM/RNG 语义与未通过的生产/清零/并发/恢复限制；optional Worktree 纳入 AAD 上下文。 | W16-C envelope core 实施与源文档对照。 |
+| v0.3 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 W16-A 的部分 PostgreSQL 18 owner/RLS 验收，并明确 Device binding 尚未实现 SCD Type 2；其它端到端撤销、OAuth 并发、生产 KMS、恢复与性能门继续开放。 | W16-A PG18 acceptance 及 SCD2 实现差异复核。 |
