@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=52147cb7f4d4987a95a64c82564696f9ba0eee1861768bddd5e19e05d4a3da90
+@cypher schema=1 source_sha256=2e4b2541a880deafb8f2210e310d8b7b8d3205c4df9df6c250083d1ef697c798
 MERGE (self:File {path:"crates/star-pg-adapter/tests/device_auth_pg.rs"})
 MERGE (test:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_proof_generation_and_revocation",kind:"test"})
 MERGE (capTest:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_challenge_creation_enforces_actor_cap_under_concurrency",kind:"test"})
 MERGE (roleTest:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::assert_oauth_owner_role_contract",kind:"function"})
+MERGE (refreshFixture:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::insert_refresh_fixture",kind:"function"})
+MERGE (fixtureHelper:Database {id:"public.w16_test_insert_device_bound_refresh_fixture",kind:"test-only function"})
 MERGE (repo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
 MERGE (test)-[:TESTS]->(repo)
 MERGE (capTest)-[:TESTS]->(repo)
-MERGE (test)-[:CALLS]->(roleTest),(capTest)-[:CALLS]->(roleTest)
+MERGE (test)-[:CALLS]->(roleTest),(capTest)-[:CALLS]->(roleTest),(test)-[:CALLS]->(refreshFixture)
+MERGE (refreshFixture)-[:CALLS]->(fixtureHelper)
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(capTest)
 MERGE (self)-[:DEFINES]->(roleTest)
+MERGE (self)-[:DEFINES]->(refreshFixture)
 @endcypher
 */
 //! PostgreSQL proof of durable device enrollment, owner scoping, generation checks, and revocation.
@@ -195,20 +199,13 @@ async fn postgres_device_challenge_creation_enforces_actor_cap_under_concurrency
 
 async fn insert_refresh_fixture(pool: &PgPool, tenant_id: Uuid, actor_id: Uuid, device_id: Uuid) {
     let mut tx = pool.begin().await.expect("begin refresh fixture");
-    set_owner_scope(&mut tx, tenant_id, actor_id).await;
-    sqlx::query(
-        "INSERT INTO oauth_refresh_tokens \
-         (tenant_id,token_hash,client_id,user_id,access_token_id,scope,expires_at,device_id,device_generation) \
-         VALUES ($1,$2,'w16-pg-fixture',$3,$4,'canvas:read',now()+interval '1 day',$5,1)",
-    )
-    .bind(tenant_id)
-    .bind(format!("w16-refresh-fixture-{}", Uuid::new_v4()))
-    .bind(actor_id)
-    .bind(Uuid::new_v4())
-    .bind(device_id)
-    .execute(&mut *tx)
-    .await
-    .expect("insert device-bound refresh fixture");
+    sqlx::query("SELECT public.w16_test_insert_device_bound_refresh_fixture($1,$2,$3)")
+        .bind(tenant_id)
+        .bind(actor_id)
+        .bind(device_id)
+        .fetch_one(&mut *tx)
+        .await
+        .expect("insert device-bound refresh fixture");
     tx.commit().await.expect("commit refresh fixture");
 }
 
