@@ -1,6 +1,6 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=a4df91b87904557cbda310ce34acc448923d9fbfdacd4705b670725d0feadbc4
+# @cypher schema=1 source_sha256=0efec36be57f3a3c3594c77891b898ba2ce34f4c36faa71ec03b20e9cfbf6c35
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
@@ -683,6 +683,7 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
 
     rls_check = f"""DO $verify$
     DECLARE refresh_policies integer;
+            refresh_select_policies integer;
     BEGIN
       IF EXISTS (
         SELECT 1 FROM pg_class AS c
@@ -721,6 +722,19 @@ def device_owner_catalog_checks(bin_dir: Path, port: int, environment: dict[str,
         AND lower(coalesce(p.with_check,'')) NOT LIKE '% or %';
       IF refresh_policies <> 1 THEN
         RAISE EXCEPTION 'expected one restrictive tenant+actor refresh-token policy; found %', refresh_policies;
+      END IF;
+      SELECT count(*) INTO refresh_select_policies FROM pg_policies AS p
+      WHERE p.schemaname='public' AND p.tablename='oauth_refresh_tokens'
+        AND p.permissive='RESTRICTIVE' AND p.cmd IN ('SELECT','ALL')
+        AND p.roles @> ARRAY['{OAUTH_OWNER_ROLE}']::name[]
+        AND lower(coalesce(p.qual,'')) LIKE '%tenant_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%app.tenant_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%user_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '%app.actor_id%'
+        AND lower(coalesce(p.qual,'')) LIKE '% and %'
+        AND lower(coalesce(p.qual,'')) NOT LIKE '% or %';
+      IF refresh_select_policies <> 1 THEN
+        RAISE EXCEPTION 'expected one owner-targeted restrictive tenant+actor refresh-token SELECT policy; found %', refresh_select_policies;
       END IF;
     END
     $verify$;"""
