@@ -8,10 +8,12 @@
 -- MERGE (oauthOwner:Type {id:"star_oauth_credential_owner",kind:"database_role"})
 -- MERGE (deviceLockPolicy:Policy {id:"oauth_device_bindings::engineering_directory_owner_no_oauth_device_binding_update",kind:"row_level_security"})
 -- MERGE (refreshRevokePolicy:Policy {id:"oauth_refresh_tokens::oauth_owner_device_revoke_scope",kind:"row_level_security"})
+-- MERGE (refreshSelectPolicy:Policy {id:"oauth_refresh_tokens::oauth_credential_owner_device_revoke_refresh_select_scope",kind:"row_level_security"})
 -- MERGE (self)-[:CREATES]->(challenges),(self)-[:CREATES]->(bindings),(self)-[:CREATES]->(audit)
 -- MERGE (self)-[:CONFIGURES]->(refresh)
 -- MERGE (self)-[:GRANTS_TO]->(engineeringOwner),(self)-[:GRANTS_TO]->(oauthOwner)
 -- MERGE (self)-[:CONFIGURES]->(deviceLockPolicy),(self)-[:CONFIGURES]->(refreshRevokePolicy)
+-- MERGE (self)-[:CONFIGURES]->(refreshSelectPolicy),(refreshSelectPolicy)-[:PROTECTS]->(refresh),(refreshSelectPolicy)-[:USES_TYPE]->(oauthOwner)
 -- MERGE (deviceLockPolicy)-[:PROTECTS]->(bindings)
 -- MERGE (refreshRevokePolicy)-[:PROTECTS]->(refresh)
 -- @endcypher
@@ -83,6 +85,9 @@ GRANT SELECT ON oauth_authorization_codes TO star_oauth_credential_owner;
 REVOKE ALL ON TABLE oauth_refresh_tokens FROM star_oauth_credential_owner;
 GRANT SELECT ON oauth_refresh_tokens TO star_oauth_credential_owner;
 GRANT UPDATE (revoked_at) ON oauth_refresh_tokens TO star_oauth_credential_owner;
+-- Restrict direct OAuth-owner reads to the current transaction's tenant and actor; older tenant-wide policies remain permissive.
+DROP POLICY IF EXISTS oauth_credential_owner_device_revoke_refresh_select_scope ON oauth_refresh_tokens;
+CREATE POLICY oauth_credential_owner_device_revoke_refresh_select_scope ON oauth_refresh_tokens AS RESTRICTIVE FOR SELECT TO star_oauth_credential_owner USING (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID);
 DROP POLICY IF EXISTS oauth_credential_owner_device_revoke_refresh ON oauth_refresh_tokens;
 CREATE POLICY oauth_credential_owner_device_revoke_refresh ON oauth_refresh_tokens FOR UPDATE TO star_oauth_credential_owner USING (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID) WITH CHECK (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID);
 DROP POLICY IF EXISTS oauth_credential_owner_device_revoke_refresh_scope ON oauth_refresh_tokens;
