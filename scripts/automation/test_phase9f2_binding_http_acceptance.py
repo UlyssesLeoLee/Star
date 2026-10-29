@@ -1,6 +1,6 @@
 """Bounded unit checks for the isolated authenticated HTTP acceptance runner."""
 
-# @cypher schema=1 source_sha256=1f5c1d1d080e9715b0a8d55622e85bbbc90b807e654b4ce7223de59b97caca84
+# @cypher schema=1 source_sha256=2cc1a0ead22468e9888c4260a5fff460fb1871deab7b4ff108d9c2b9543e6afb
 # MERGE (self:File {path:"scripts/automation/test_phase9f2_binding_http_acceptance.py"})
 # MERGE (sanitization:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_sanitized_environment_removes_database_overrides",kind:"test"})
 # MERGE (loopback:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_loopback_port_avoids_protected_ports",kind:"test"})
@@ -11,6 +11,7 @@
 # MERGE (acceptanceFailure:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_acceptance_failure_preserves_data_directory_after_stop",kind:"test"})
 # MERGE (policyProof:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_all_lock_policy_proofs_require_sqlstate_42501",kind:"test"})
 # MERGE (auditFixture:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_audit_prerequisite_uses_security_definer",kind:"test"})
+# MERGE (refreshFixture:Symbol {id:"scripts/automation/test_phase9f2_binding_http_acceptance.py::test_refresh_fixture_helper_is_not_public",kind:"test"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::sanitized_environment",kind:"function"})
 # MERGE (port:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::select_loopback_port",kind:"function"})
 # MERGE (assertion:Symbol {id:"scripts/automation/phase9f2_binding_http_acceptance.py::assert_snapshot_delta",kind:"function"})
@@ -25,6 +26,7 @@
 # MERGE (self)-[:DEFINES]->(acceptanceFailure)
 # MERGE (self)-[:DEFINES]->(policyProof)
 # MERGE (self)-[:DEFINES]->(auditFixture)
+# MERGE (self)-[:DEFINES]->(refreshFixture)
 # MERGE (sanitization)-[:CALLS]->(main)
 # MERGE (loopback)-[:CALLS]->(port)
 # MERGE (delta)-[:CALLS]->(assertion)
@@ -186,6 +188,12 @@ class BindingHttpAcceptanceRunnerTests(unittest.TestCase):
         migration_source = inspect.getsource(runner.apply_migrations)
         self.assertIn("LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public", migration_source)
         self.assertIn("INSERT INTO public.audit_audit_event", migration_source)
+
+    def test_refresh_fixture_helper_is_not_public(self) -> None:
+        fixture_source = inspect.getsource(runner.seed_fixture)
+        self.assertIn("w16_test_insert_device_bound_refresh_fixture", fixture_source)
+        self.assertIn("REVOKE ALL ON FUNCTION public.w16_test_insert_device_bound_refresh_fixture", fixture_source)
+        self.assertIn("TO {RUNTIME_ROLE}", fixture_source)
 
 
 if __name__ == "__main__":

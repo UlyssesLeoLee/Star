@@ -1,6 +1,6 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=5072571d37c684b34bdb36ecc71f5e432df9e720c40c77916522d4328dc9879a
+# @cypher schema=1 source_sha256=7094f0dab0ed3beb5d991201d7abd4a1df43cf6d58c2dac80a55d6393ceb1938
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
@@ -825,6 +825,26 @@ def seed_fixture(bin_dir: Path, port: int, environment: dict[str, str],
     results.append(run_sql(
         "postgres-runtime-role-grants-rls-acceptance", bin_dir, port, environment, output_dir,
         sql=directory.run_binding_role_acceptance_sql(), login=RUNTIME_ROLE,
+    ))
+    if results[-1]["exit_code"]:
+        return results
+    results.append(run_sql(
+        "postgres-test-only-refresh-fixture-helper", bin_dir, port, environment, output_dir,
+        sql=f"""CREATE OR REPLACE FUNCTION public.w16_test_insert_device_bound_refresh_fixture(
+          p_tenant_id uuid, p_actor_id uuid, p_device_id uuid
+        ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $fixture$
+        BEGIN
+          PERFORM set_config('app.tenant_id',p_tenant_id::text,true);
+          PERFORM set_config('app.actor_id',p_actor_id::text,true);
+          INSERT INTO public.oauth_refresh_tokens
+            (tenant_id,token_hash,client_id,user_id,access_token_id,scope,expires_at,device_id,device_generation)
+          VALUES
+            (p_tenant_id,'w16-refresh-fixture-'||replace(gen_random_uuid()::text,'-',''),
+             'w16-pg-fixture',p_actor_id,gen_random_uuid(),'canvas:read',
+             transaction_timestamp()+interval '1 day',p_device_id,1);
+        END $fixture$;
+        REVOKE ALL ON FUNCTION public.w16_test_insert_device_bound_refresh_fixture(uuid,uuid,uuid) FROM PUBLIC;
+        GRANT EXECUTE ON FUNCTION public.w16_test_insert_device_bound_refresh_fixture(uuid,uuid,uuid) TO {RUNTIME_ROLE};""",
     ))
     if results[-1]["exit_code"]:
         return results
