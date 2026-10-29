@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=686cfc4eb737c7e31755faaf726ca0ae2a84a94394c36f81412f4dd0a3b34af6
+@cypher schema=1 source_sha256=bd20841a22d06929af327418fe4b595c607181b068af747cce3f5f5137cffacf
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})
@@ -463,7 +463,8 @@ async fn assert_directory_role_locks_device_generation_without_mutating(pool: &s
         .expect("device role probe should identify the effective role");
     let generation: Option<i64> = sqlx::query_scalar(
         "SELECT generation FROM oauth_device_bindings \
-         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL \
+         WHERE tenant_id=$1::uuid AND actor_id=$2::uuid AND device_id=$3::uuid \
+           AND status='active' AND revoked_at IS NULL \
          FOR SHARE",
     )
     .bind(ACCEPTANCE_TENANT)
@@ -480,7 +481,8 @@ async fn assert_directory_role_locks_device_generation_without_mutating(pool: &s
         .expect("device update denial probe should create a savepoint");
     let update_error = sqlx::query(
         "UPDATE oauth_device_bindings SET generation=generation+1 \
-         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL",
+         WHERE tenant_id=$1::uuid AND actor_id=$2::uuid AND device_id=$3::uuid \
+           AND status='active' AND revoked_at IS NULL",
     )
     .bind(ACCEPTANCE_TENANT)
     .bind(ACCEPTANCE_ACTOR)
@@ -502,7 +504,8 @@ async fn assert_directory_role_locks_device_generation_without_mutating(pool: &s
         .expect("failed direct update should roll back to the diagnostic savepoint");
     let generation_after: Option<i64> = sqlx::query_scalar(
         "SELECT generation FROM oauth_device_bindings \
-         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL",
+         WHERE tenant_id=$1::uuid AND actor_id=$2::uuid AND device_id=$3::uuid \
+           AND status='active' AND revoked_at IS NULL",
     )
     .bind(ACCEPTANCE_TENANT)
     .bind(ACCEPTANCE_ACTOR)
