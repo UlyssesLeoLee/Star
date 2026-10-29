@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=792d3dcd1e171bf4260025509680985dbf1280203c3bbcaca39ad5a2aac47bf7
+@cypher schema=1 source_sha256=f88731b16974b03d19826b35eeca8973ed643bf85a51ded194f5141ab6633bc9
 MERGE (self:File {path:"crates/star-pg-adapter/tests/device_auth_pg.rs"})
 MERGE (test:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_proof_generation_and_revocation",kind:"test"})
 MERGE (capTest:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_challenge_creation_enforces_actor_cap_under_concurrency",kind:"test"})
+MERGE (roleTest:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::assert_oauth_owner_role_contract",kind:"function"})
 MERGE (repo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
 MERGE (test)-[:TESTS]->(repo)
 MERGE (capTest)-[:TESTS]->(repo)
+MERGE (test)-[:CALLS]->(roleTest),(capTest)-[:CALLS]->(roleTest)
 MERGE (self)-[:DEFINES]->(test)
 MERGE (self)-[:DEFINES]->(capTest)
+MERGE (self)-[:DEFINES]->(roleTest)
 @endcypher
 */
 //! PostgreSQL proof of durable device enrollment, owner scoping, generation checks, and revocation.
 
 use chrono::{Duration, Utc};
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use star_pg_adapter::repository::{
     DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
-    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, PgDeviceBindingRepository,
+    PgDeviceBindingRepository, MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -32,6 +35,7 @@ async fn postgres_device_proof_generation_and_revocation() {
         .connect(&database_url)
         .await
         .expect("dedicated W16 test PostgreSQL endpoint");
+    assert_oauth_owner_role_contract(&pool).await;
     let repository = Arc::new(PgDeviceBindingRepository::new(pool.clone()));
     let tenant_id = Uuid::new_v4();
     let actor_id = Uuid::new_v4();
@@ -54,13 +58,11 @@ async fn postgres_device_proof_generation_and_revocation() {
         .await
         .expect("create owner-scoped challenge");
 
-    assert!(
-        repository
-            .find_challenge(Uuid::new_v4(), actor_id, challenge_id)
-            .await
-            .expect("cross-tenant challenge read")
-            .is_none()
-    );
+    assert!(repository
+        .find_challenge(Uuid::new_v4(), actor_id, challenge_id)
+        .await
+        .expect("cross-tenant challenge read")
+        .is_none());
 
     let loaded = repository
         .find_challenge(tenant_id, actor_id, challenge_id)
@@ -98,12 +100,10 @@ async fn postgres_device_proof_generation_and_revocation() {
     assert_eq!(winners, 1, "one challenge must activate at most one device");
     let binding = winner.expect("activated binding");
     assert_eq!(binding.generation, 1);
-    assert!(
-        repository
-            .is_active(tenant_id, actor_id, binding.device_id, 1)
-            .await
-            .expect("active generation check")
-    );
+    assert!(repository
+        .is_active(tenant_id, actor_id, binding.device_id, 1)
+        .await
+        .expect("active generation check"));
 
     insert_refresh_fixture(&pool, tenant_id, actor_id, binding.device_id).await;
     let revoked = repository
@@ -113,12 +113,10 @@ async fn postgres_device_proof_generation_and_revocation() {
         .expect("device was active");
     assert_eq!(revoked.generation, 2);
     assert_eq!(revoked.status, "revoked");
-    assert!(
-        !repository
-            .is_active(tenant_id, actor_id, binding.device_id, 1)
-            .await
-            .expect("revoked generation check")
-    );
+    assert!(!repository
+        .is_active(tenant_id, actor_id, binding.device_id, 1)
+        .await
+        .expect("revoked generation check"));
     assert!(refresh_fixture_is_revoked(&pool, tenant_id, actor_id, binding.device_id).await);
     pool.close().await;
 }
@@ -133,6 +131,7 @@ async fn postgres_device_challenge_creation_enforces_actor_cap_under_concurrency
         .connect(&database_url)
         .await
         .expect("dedicated W16 test PostgreSQL endpoint");
+    assert_oauth_owner_role_contract(&pool).await;
     let repository = Arc::new(PgDeviceBindingRepository::new(pool.clone()));
     let tenant_id = Uuid::new_v4();
     let actor_id = Uuid::new_v4();
@@ -234,12 +233,37 @@ async fn set_owner_scope(
     tenant_id: Uuid,
     actor_id: Uuid,
 ) {
+    sqlx::query("SET LOCAL ROLE star_oauth_credential_owner")
+        .execute(&mut **tx)
+        .await
+        .expect("test login can explicitly assume the OAuth owner role");
     sqlx::query("SELECT set_config('app.tenant_id',$1,true), set_config('app.actor_id',$2,true)")
         .bind(tenant_id.to_string())
         .bind(actor_id.to_string())
         .execute(&mut **tx)
         .await
         .expect("set database owner scope");
+}
+
+async fn assert_oauth_owner_role_contract(pool: &PgPool) {
+    let mut tx = pool.begin().await.expect("begin OAuth owner role probe");
+    sqlx::query("SET LOCAL ROLE star_oauth_credential_owner")
+        .execute(&mut *tx)
+        .await
+        .expect("NOINHERIT test login can explicitly assume OAuth owner role");
+    let (current_role, owner_super, owner_bypass_rls, owner_login, owner_inherit, login_inherit) =
+        sqlx::query_as::<_, (String, bool, bool, bool, bool, bool)>(
+            "SELECT current_user::text, owner.rolsuper, owner.rolbypassrls, owner.rolcanlogin, \
+             owner.rolinherit, login.rolinherit FROM pg_roles AS owner, pg_roles AS login \
+             WHERE owner.rolname=current_user AND login.rolname=session_user",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .expect("read OAuth owner and test login role flags");
+    assert_eq!(current_role, "star_oauth_credential_owner");
+    assert!(!owner_super && !owner_bypass_rls && !owner_login && !owner_inherit);
+    assert!(!login_inherit, "acceptance login must remain NOINHERIT");
+    tx.commit().await.expect("commit OAuth owner role probe");
 }
 
 fn sha256(value: &[u8]) -> [u8; 32] {

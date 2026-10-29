@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=cb62de59a6a930dd641ce5604a6449ebdc89534a05aa67f99d2c863727859bae
+@cypher schema=1 source_sha256=72d6015909335c8dbde7dc305a36e267aacaa76e3178789820b32b0c4392d2eb
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})
@@ -7,14 +7,22 @@ MERGE (httpAcceptance:Symbol {id:"crates/star-api-rest/tests/engineering_run_wor
 MERGE (testJwt:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::route_test_jwt_config",kind:"function"})
 MERGE (testToken:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::route_test_token",kind:"function"})
 MERGE (tokenForActor:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::route_test_token_for_actor",kind:"function"})
+MERGE (deviceTokenForActor:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::route_test_device_token_for_actor",kind:"function"})
+MERGE (deviceForActor:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::acceptance_device_for_actor",kind:"function"})
+MERGE (deviceRoleProbe:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::assert_runtime_can_set_device_reader_role",kind:"function"})
 MERGE (sendMutation:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::send_binding_mutation",kind:"function"})
 MERGE (assertPrivate:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::assert_private_response",kind:"function"})
 MERGE (mutationBody:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::mutation_body",kind:"function"})
 MERGE (currentBinding:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::current_binding",kind:"function"})
 MERGE (ownerScopeProbe:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::owner_scope_probe",kind:"function"})
 MERGE (issueToken:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token",kind:"function"})
+MERGE (issueDeviceToken:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token_with_device_context",kind:"function"})
+MERGE (deviceTokenContext:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
 MERGE (databaseUrl:Config {id:"STAR_BINDING_HTTP_TEST_DATABASE_URL",kind:"environment_variable"})
 MERGE (phase:Config {id:"STAR_BINDING_HTTP_TEST_PHASE",kind:"environment_variable"})
+MERGE (deviceFixtureA:Config {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::ACCEPTANCE_DEVICE_ACTOR",kind:"constant"})
+MERGE (deviceFixtureB:Config {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::ACCEPTANCE_DEVICE_DEVELOPER",kind:"constant"})
+MERGE (deviceFixtureC:Config {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::ACCEPTANCE_DEVICE_OTHER_TENANT",kind:"constant"})
 MERGE (jwtPrivate:File {path:"crates/star-api-rest/tests/fixtures/schedule-route-test-private.pem"})
 MERGE (jwtPublic:File {path:"crates/star-api-rest/tests/fixtures/schedule-route-test-public.pem"})
 MERGE (putEndpoint:Endpoint {id:"PUT /api/v1/projects/{project_id}/engineering-runs/{run_id}/worktrees/{worktree_id}",kind:"http_route"})
@@ -30,6 +38,9 @@ MERGE (self)-[:DEFINES]->(httpAcceptance)
 MERGE (self)-[:DEFINES]->(testJwt)
 MERGE (self)-[:DEFINES]->(testToken)
 MERGE (self)-[:DEFINES]->(tokenForActor)
+MERGE (self)-[:DEFINES]->(deviceTokenForActor)
+MERGE (self)-[:DEFINES]->(deviceForActor)
+MERGE (self)-[:DEFINES]->(deviceRoleProbe)
 MERGE (self)-[:DEFINES]->(sendMutation)
 MERGE (self)-[:DEFINES]->(assertPrivate)
 MERGE (self)-[:DEFINES]->(mutationBody)
@@ -49,16 +60,24 @@ MERGE (httpAcceptance)-[:CALLS]->(assertPrivate)
 MERGE (httpAcceptance)-[:CALLS]->(mutationBody)
 MERGE (httpAcceptance)-[:CALLS]->(currentBinding)
 MERGE (httpAcceptance)-[:CALLS]->(ownerScopeProbe)
+MERGE (httpAcceptance)-[:CALLS]->(deviceRoleProbe)
 MERGE (httpAcceptance)-[:CALLS]->(runDirectoryRequest)
 MERGE (httpAcceptance)-[:CALLS]->(assertDirectory)
-MERGE (runDirectoryRequest)-[:CALLS]->(tokenForActor)
-MERGE (sendMutation)-[:CALLS]->(tokenForActor)
-MERGE (testToken)-[:CALLS]->(issueToken)
+MERGE (runDirectoryRequest)-[:CALLS]->(tokenForActor),(runDirectoryRequest)-[:CALLS]->(deviceTokenForActor),(runDirectoryRequest)-[:CALLS]->(deviceForActor)
+MERGE (sendMutation)-[:CALLS]->(deviceTokenForActor)
+MERGE (sendMutation)-[:CALLS]->(deviceForActor)
+MERGE (testToken)-[:CALLS]->(issueDeviceToken)
 MERGE (tokenForActor)-[:CALLS]->(issueToken)
+MERGE (deviceTokenForActor)-[:CALLS]->(issueDeviceToken)
+MERGE (deviceForActor)-[:READS]->(deviceFixtureA),(deviceForActor)-[:READS]->(deviceFixtureB),(deviceForActor)-[:READS]->(deviceFixtureC)
+MERGE (testToken)-[:USES_TYPE]->(deviceTokenContext)
+MERGE (deviceTokenForActor)-[:USES_TYPE]->(deviceTokenContext)
+MERGE (deviceTokenForActor)-[:READS]->(deviceFixtureA),(deviceTokenForActor)-[:READS]->(deviceFixtureB),(deviceTokenForActor)-[:READS]->(deviceFixtureC)
 MERGE (testJwt)-[:READS]->(jwtPrivate)
 MERGE (testJwt)-[:READS]->(jwtPublic)
 MERGE (httpAcceptance)-[:READS]->(databaseUrl)
 MERGE (httpAcceptance)-[:READS]->(phase)
+MERGE (httpAcceptance)-[:READS]->(deviceFixtureA),(httpAcceptance)-[:READS]->(deviceFixtureB),(httpAcceptance)-[:READS]->(deviceFixtureC)
 MERGE (currentBinding)-[:READS]->(:Table {id:"multica.engineering_run_worktree_binding",kind:"table"})
 MERGE (ownerScopeProbe)-[:READS]->(:Table {id:"permission.project_role_binding",kind:"table"})
 MERGE (ownerScopeProbe)-[:READS]->(:Table {id:"multica.engineering_run",kind:"table"})
@@ -83,15 +102,15 @@ MERGE (httpAcceptance)-[:TESTS]->(runContextEndpoint)
 use std::sync::Arc;
 
 use axum::{
+    body::{to_bytes, Body},
+    http::{header, Method, Request, StatusCode},
     Router,
-    body::{Body, to_bytes},
-    http::{Method, Request, StatusCode, header},
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::postgres::PgPoolOptions;
 use star_api_rest::{
-    auth::{JwtConfig, issue_token},
-    group_api::{GroupApiState, build_group_router},
+    auth::{issue_token, issue_token_with_device_context, DeviceTokenContext, JwtConfig},
+    group_api::{build_group_router, GroupApiState},
 };
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -104,6 +123,9 @@ const ACCEPTANCE_DEVELOPER: &str = "30000000-0000-0000-0000-000000000002";
 const ACCEPTANCE_OTHER_ACTOR: &str = "30000000-0000-0000-0000-000000000003";
 const ACCEPTANCE_RUN: &str = "60000000-0000-0000-0000-000000000001";
 const ACCEPTANCE_WORKTREE: &str = "90000000-0000-0000-0000-000000000001";
+const ACCEPTANCE_DEVICE_ACTOR: &str = "a0000000-0000-0000-0000-000000000001";
+const ACCEPTANCE_DEVICE_DEVELOPER: &str = "a0000000-0000-0000-0000-000000000002";
+const ACCEPTANCE_DEVICE_OTHER_TENANT: &str = "a0000000-0000-0000-0000-000000000003";
 const ACCEPTANCE_BINDING_SCOPE: &str = "project:write worktree:manage";
 
 fn route_test_jwt_config() -> Arc<JwtConfig> {
@@ -117,14 +139,18 @@ fn route_test_jwt_config() -> Arc<JwtConfig> {
 }
 
 fn route_test_token(config: &JwtConfig, scope: &str) -> String {
-    issue_token(
+    issue_token_with_device_context(
         config,
         Uuid::new_v4(),
         Uuid::new_v4(),
         vec!["developer".to_owned()],
         scope.to_owned(),
+        Some(DeviceTokenContext {
+            device_id: Uuid::new_v4(),
+            generation: 1,
+        }),
     )
-    .expect("fixed test-only RSA key should sign route test tokens")
+    .expect("fixed test-only RSA key should sign device-bound route test tokens")
     .0
 }
 
@@ -143,6 +169,37 @@ fn route_test_token_for_actor(
     )
     .expect("fixed test-only RSA key should sign acceptance tokens")
     .0
+}
+
+fn route_test_device_token_for_actor(
+    config: &JwtConfig,
+    actor_id: &str,
+    tenant_id: &str,
+    device_id: &str,
+    scope: &str,
+) -> String {
+    issue_token_with_device_context(
+        config,
+        Uuid::parse_str(actor_id).expect("acceptance actor UUID is valid"),
+        Uuid::parse_str(tenant_id).expect("acceptance tenant UUID is valid"),
+        vec!["developer".to_owned()],
+        scope.to_owned(),
+        Some(DeviceTokenContext {
+            device_id: Uuid::parse_str(device_id).expect("acceptance device UUID is valid"),
+            generation: 1,
+        }),
+    )
+    .expect("fixed test-only RSA key should sign device-bound acceptance tokens")
+    .0
+}
+
+fn acceptance_device_for_actor(actor_id: &str, tenant_id: &str) -> &'static str {
+    match (tenant_id, actor_id) {
+        (ACCEPTANCE_TENANT, ACCEPTANCE_ACTOR) => ACCEPTANCE_DEVICE_ACTOR,
+        (ACCEPTANCE_TENANT, ACCEPTANCE_DEVELOPER) => ACCEPTANCE_DEVICE_DEVELOPER,
+        (ACCEPTANCE_OTHER_TENANT, ACCEPTANCE_OTHER_ACTOR) => ACCEPTANCE_DEVICE_OTHER_TENANT,
+        _ => panic!("acceptance fixture has no device for this tenant/actor pair"),
+    }
 }
 
 struct MutationReply {
@@ -169,7 +226,14 @@ async fn send_binding_mutation(
     idempotency_key: &str,
     body: &Value,
 ) -> MutationReply {
-    let token = route_test_token_for_actor(config, actor_id, tenant_id, ACCEPTANCE_BINDING_SCOPE);
+    let device_id = acceptance_device_for_actor(actor_id, tenant_id);
+    let token = route_test_device_token_for_actor(
+        config,
+        actor_id,
+        tenant_id,
+        device_id,
+        ACCEPTANCE_BINDING_SCOPE,
+    );
     let path = format!(
         "/api/v1/projects/{ACCEPTANCE_PROJECT}/engineering-runs/{ACCEPTANCE_RUN}/worktrees/{ACCEPTANCE_WORKTREE}"
     );
@@ -223,7 +287,12 @@ async fn send_project_run_request(
     idempotency_key: Option<&str>,
     body: Option<&Value>,
 ) -> MutationReply {
-    let token = route_test_token_for_actor(config, actor_id, tenant_id, scope);
+    let token = if method == Method::GET || method == Method::HEAD || method == Method::OPTIONS {
+        route_test_token_for_actor(config, actor_id, tenant_id, scope)
+    } else {
+        let device_id = acceptance_device_for_actor(actor_id, tenant_id);
+        route_test_device_token_for_actor(config, actor_id, tenant_id, device_id, scope)
+    };
     let mut request = Request::builder()
         .method(method)
         .uri(uri)
@@ -370,6 +439,38 @@ async fn owner_scope_probe(pool: &sqlx::PgPool) -> Value {
     diagnostic
 }
 
+async fn assert_runtime_can_set_device_reader_role(pool: &sqlx::PgPool) {
+    let mut tx = pool
+        .begin()
+        .await
+        .expect("device role membership probe should start a transaction");
+    sqlx::query("SET LOCAL ROLE star_engineering_directory_owner")
+        .execute(&mut *tx)
+        .await
+        .expect("NOINHERIT runtime login must be able to explicitly SET ROLE");
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true), set_config('app.actor_id',$2,true)")
+        .bind(ACCEPTANCE_TENANT)
+        .bind(ACCEPTANCE_ACTOR)
+        .execute(&mut *tx)
+        .await
+        .expect("device role probe should establish tenant and actor RLS scope");
+    let (current_role, generation): (String, Option<i64>) = sqlx::query_as(
+        "SELECT current_user::text, (SELECT generation FROM oauth_device_bindings \
+         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 AND status='active' AND revoked_at IS NULL)",
+    )
+    .bind(ACCEPTANCE_TENANT)
+    .bind(ACCEPTANCE_ACTOR)
+    .bind(ACCEPTANCE_DEVICE_ACTOR)
+    .fetch_one(&mut *tx)
+    .await
+    .expect("owner role must read the active binding under RLS");
+    assert_eq!(current_role, "star_engineering_directory_owner");
+    assert_eq!(generation, Some(1));
+    tx.commit()
+        .await
+        .expect("device role membership probe should commit");
+}
+
 #[tokio::test]
 async fn run_worktree_binding_mutations_require_authentication() {
     let jwt = route_test_jwt_config();
@@ -471,6 +572,7 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             .expect("runtime connection identity should be readable");
     assert_eq!(session_user, "erun_directory_api_test");
     assert_eq!(current_user, "erun_directory_api_test");
+    assert_runtime_can_set_device_reader_role(&pool).await;
     let scope_probe = owner_scope_probe(&pool).await;
 
     let jwt = route_test_jwt_config();
@@ -594,12 +696,10 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             .await;
             assert_eq!(member_list.status, StatusCode::OK, "{:?}", member_list.body);
             assert_directory_response(&member_list);
-            assert!(
-                member_list.body["engineering_runs"]
-                    .as_array()
-                    .unwrap()
-                    .is_empty()
-            );
+            assert!(member_list.body["engineering_runs"]
+                .as_array()
+                .unwrap()
+                .is_empty());
 
             let member_open = send_project_run_request(
                 app,
@@ -730,7 +830,7 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             )
             .await;
             assert_private_response(&unauthorized);
-            assert_eq!(unauthorized.status, StatusCode::NOT_FOUND);
+            assert_eq!(unauthorized.status, StatusCode::FORBIDDEN);
 
             let cross_tenant = send_binding_mutation(
                 app,
@@ -743,7 +843,7 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             )
             .await;
             assert_private_response(&cross_tenant);
-            assert_eq!(cross_tenant.status, StatusCode::NOT_FOUND);
+            assert_eq!(cross_tenant.status, StatusCode::FORBIDDEN);
 
             let mut tx = pool
                 .begin()

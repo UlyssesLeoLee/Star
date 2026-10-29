@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.71。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究、安全设计增量、测试设计 v1.8 与 W16-C envelope-core 部分实现，以及集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.72。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究、安全设计增量、测试设计 v1.8、W16-C envelope-core 与 W16-A 设备 owner 部分实现，以及集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
 
 ## 0. 目的与计划边界
 
@@ -278,6 +278,8 @@ flowchart TD
 | v0.68 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 authenticated device identity、生产持久 KMS/envelope-encryption protector 的实现前置门；只读审计 E:\AssetsLake 的 dirty 状态、AGPL-3.0 声明及相关文件 hash；调整 W16 依赖顺序，保持 fail-closed 与 OPEN/PARTIAL/NOT_RUN。 | W16 事件推送已集成，但 owner-local durable draft/conflict 尚无可信 device identity 与生产正文保护实现。 |
 | v0.69 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纳入 W16 设备身份、KMS 来源与 provider 并行审计证据；新增 payload security SRS/基本设计/详细设计 companion 与 W16-A..E 阶段门。所有内容均为目标设计/审计，不代表实现、provider 批准或数据库验收。 | W16 payload readiness 审计明确共享正文写入前置安全门。 |
 | v0.70 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 TEST-DESIGN-WORKTREE-CANVAS-001 v1.8：新增 W16 UT/IT、E2E-COLLAB-12..19、PT-10 与 W14 profile gate；修订阶段报告记录测试设计审阅与本地 dev 集成。新增用例均未实现/执行，PT-09 语义保持不变，W16/WLD-7/PT-09/10 仍 OPEN/NOT_RUN。 | W16 测试设计并行 lane 完成，完成后需使测试追踪与 WBS/阶段报告一致。 |
+| v0.71 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16-C provider-neutral envelope core、canonical AAD、单对象边界与 21/21 focused unit tests；生产 provider、owner/RLS、持久化、恢复与性能仍 OPEN。 | W16-C envelope-core implementation slice 与本地 dev 集成。 |
+| v0.72 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16-A OAuth/device owner 最小授权与 Run/Worktree 写事务 generation 复验的部分源码实现；真实 PG/RLS、其他共享读取/订阅/resolve、refresh 并发与 SSE 撤销验收保持 OPEN/NOT_RUN。 | W16-A implementation lane 修复 owner role/ACL 后对照实际代码与验证结果。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -717,3 +719,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - 当前单对象界限：plaintext 256 KiB、wrapped DEK 64 KiB、JSON envelope 1 MiB；这些界限不表示并发 RSS、队列、性能或取消预算已经验收。`ThreadRng` 由 `SysRng/getrandom` seed 并支持 reseed，不应写成每字节直接来自 OS RNG。SecretDataKey 只有 best-effort 清理，不构成可靠 zeroization。focused `domain-kms --lib` 单测以 lane 专属 target 21/21 通过；这不能关闭其余 W16 安全/生产验收门。
 - 本 lane 仅为 provider-neutral core 层及单元测试；尚未接入 `TranscriptBodyProtector`、真实 provider/profile resolver、REST、owner transaction、RLS、持久化、跨重启恢复、轮换/备份恢复。测试/格式/差异门的最终结果以 `PHASE-W16-C-ENVELOPE-CORE-20261028.md` 为准，缺失证据不得标 PASS。
 - 协调者已完成独立代码审查；Rust 1.99.0 lane 专属 `domain-kms --lib` 测试在候选与目标 `dev` 各 21/21，包级格式和 manifest/diff 检查通过；提交 `7db36f6f2fbeb09f3b6d31917b33c0490239510e` 已快进合入本地 `dev`。代码仍是 provider-neutral core；生产 provider/owner protector、目标 DB/RLS、跨重启恢复与密钥轮换仍是 W16-C 的后续门，全部通过前不得开始 W16-D durable drafts/conflicts。
+
+### 23.11 2026-10-28 W16-A device identity / database owner 部分源码闭环
+
+- `PgDeviceBindingRepository` 五个事务入口（create challenge、find challenge、complete proof、active-generation check、revoke）统一先切换 `star_oauth_credential_owner`，再在同事务设置 tenant/actor scope。迁移只授予 challenge SELECT/INSERT/DELETE + `consumed_at` UPDATE、binding SELECT/INSERT + generation/status/revoked_at UPDATE、audit INSERT、refresh SELECT + `revoked_at` UPDATE；refresh UPDATE 同时受 actor+tenant scoped permissive 与 restrictive RLS policy 保护。
+- Run/Worktree binding mutation 另使用 `star_engineering_directory_owner`，在同一写事务内对 active device generation 执行 `FOR SHARE` 后才继续写；该角色对 `oauth_device_bindings` 只保留 SELECT，更新权限被撤销并保留 restrictive deny policy。隔离 acceptance fixture 需显式配置 role membership；此处不授予 runtime login 直接表 ACL，且 fixture 尚待真实 PG 运行。
+- 只将“Run/Worktree 写请求的事务内 device-generation 复验 + owner-role 源码隔离”记录为已实现。Enrollment/proof/revoke 的源码不是 PostgreSQL acceptance；其它共享读取、订阅、OAuth resolve、refresh 并发赢家和 SSE 撤销联动仍 Partial/OPEN。E2E-COLLAB-12/13/14、PG/RLS、目标部署和 W16-A 阶段门不关闭。
+- Rust 1.99.0 `star-pg-adapter --all-targets` 检查通过；adapter lib tests 35/35；Run/Worktree route tests 2 passed/1 ignored；CGG 四个 source file 通过。包级 Cargo fmt 检查发现四个未修改文件的既有差异，改动文件定向 rustfmt 检查通过。未配置 `STAR_W16_DEVICE_AUTH_TEST_DATABASE_URL`，真实 device-auth PG migration/RLS tests 未运行。详细 evidence 与风险见 `PHASE-W16-A-DEVICE-AUTH-IMPLEMENTATION-20261028.md`。

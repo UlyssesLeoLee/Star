@@ -4,8 +4,16 @@
 -- MERGE (bindings:Table {name:"oauth_device_bindings",type:"table",class:"T_mutable_security_state"})
 -- MERGE (audit:Table {name:"oauth_device_binding_audit",type:"table",class:"T_append_only"})
 -- MERGE (refresh:Table {name:"oauth_refresh_tokens",type:"table",class:"T_worm"})
+-- MERGE (engineeringOwner:Type {id:"star_engineering_directory_owner",kind:"database_role"})
+-- MERGE (oauthOwner:Type {id:"star_oauth_credential_owner",kind:"database_role"})
+-- MERGE (deviceLockPolicy:Policy {id:"oauth_device_bindings::engineering_directory_owner_no_device_binding_update",kind:"row_level_security"})
+-- MERGE (refreshRevokePolicy:Policy {id:"oauth_refresh_tokens::oauth_owner_device_revoke_scope",kind:"row_level_security"})
 -- MERGE (self)-[:CREATES]->(challenges),(self)-[:CREATES]->(bindings),(self)-[:CREATES]->(audit)
 -- MERGE (self)-[:CONFIGURES]->(refresh)
+-- MERGE (self)-[:GRANTS_TO]->(engineeringOwner),(self)-[:GRANTS_TO]->(oauthOwner)
+-- MERGE (self)-[:CONFIGURES]->(deviceLockPolicy),(self)-[:CONFIGURES]->(refreshRevokePolicy)
+-- MERGE (deviceLockPolicy)-[:PROTECTS]->(bindings)
+-- MERGE (refreshRevokePolicy)-[:PROTECTS]->(refresh)
 -- @endcypher
 -- One physical SQL statement per line for the repository migration runner.
 ALTER TABLE oauth_refresh_tokens ADD COLUMN IF NOT EXISTS device_id UUID;
@@ -43,6 +51,19 @@ COMMENT ON TABLE oauth_device_bindings IS 'T: mutable security owner state; devi
 COMMENT ON TABLE oauth_device_binding_audit IS 'T: append-only device enrollment/revocation facts; contains fingerprint only, never proof material or private credentials.';
 -- Dedicated, non-login roles: the owner can read only credential rows needed by hash resolution; runtime receives EXECUTE only after the deployment login is explicitly granted membership.
 DO $w16_oauth_roles$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='star_oauth_credential_owner') THEN CREATE ROLE star_oauth_credential_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT; ELSE ALTER ROLE star_oauth_credential_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT; END IF; IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='star_oauth_token_runtime') THEN CREATE ROLE star_oauth_token_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT; ELSE ALTER ROLE star_oauth_token_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT; END IF; END $w16_oauth_roles$;
+-- Device/OAuth repository transactions explicitly SET LOCAL ROLE star_oauth_credential_owner; deployment login membership is provisioned separately.
+REVOKE ALL ON TABLE oauth_device_enrollment_challenges, oauth_device_bindings, oauth_device_binding_audit FROM PUBLIC;
+REVOKE ALL ON TABLE oauth_device_enrollment_challenges, oauth_device_bindings, oauth_device_binding_audit FROM star_oauth_credential_owner;
+GRANT SELECT, INSERT, DELETE ON TABLE oauth_device_enrollment_challenges TO star_oauth_credential_owner;
+GRANT UPDATE (consumed_at) ON TABLE oauth_device_enrollment_challenges TO star_oauth_credential_owner;
+GRANT SELECT, INSERT ON TABLE oauth_device_bindings TO star_oauth_credential_owner;
+GRANT UPDATE (generation, status, revoked_at) ON TABLE oauth_device_bindings TO star_oauth_credential_owner;
+GRANT INSERT ON TABLE oauth_device_binding_audit TO star_oauth_credential_owner;
+-- Engineering Directory only takes a shared row lock for Run/Worktree writes; it is not an identity-state writer.
+REVOKE ALL ON TABLE oauth_device_bindings FROM star_engineering_directory_owner;
+GRANT SELECT ON TABLE oauth_device_bindings TO star_engineering_directory_owner;
+DROP POLICY IF EXISTS engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings;
+CREATE POLICY engineering_directory_owner_no_oauth_device_binding_update ON oauth_device_bindings AS RESTRICTIVE FOR UPDATE TO star_engineering_directory_owner USING (false) WITH CHECK (false);
 CREATE TABLE IF NOT EXISTS oauth_credential_tenant_locator (credential_kind TEXT NOT NULL CHECK (credential_kind IN ('authorization_code','refresh_token')), token_hash TEXT NOT NULL, tenant_id UUID NOT NULL, actor_id UUID NOT NULL, client_id TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT transaction_timestamp(), PRIMARY KEY (credential_kind,token_hash));
 CREATE INDEX IF NOT EXISTS idx_oauth_credential_tenant_locator_expiry ON oauth_credential_tenant_locator(expires_at);
 ALTER TABLE oauth_credential_tenant_locator ENABLE ROW LEVEL SECURITY;
@@ -53,8 +74,18 @@ DROP POLICY IF EXISTS oauth_credential_locator_insert_owner ON oauth_credential_
 CREATE POLICY oauth_credential_locator_insert_owner ON oauth_credential_tenant_locator FOR INSERT WITH CHECK (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND actor_id=NULLIF(current_setting('app.actor_id',true),'')::UUID);
 REVOKE ALL ON oauth_credential_tenant_locator FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO star_oauth_credential_owner, star_oauth_token_runtime;
+DO $w16_oauth_no_table_ownership$ BEGIN IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relowner='star_oauth_credential_owner'::regrole AND n.nspname='public' AND c.relname IN ('oauth_device_enrollment_challenges','oauth_device_bindings','oauth_device_binding_audit','oauth_refresh_tokens','oauth_authorization_codes','oauth_credential_tenant_locator')) THEN RAISE EXCEPTION 'star_oauth_credential_owner must not own OAuth/device tables'; END IF; END $w16_oauth_no_table_ownership$;
+REVOKE ALL ON TABLE oauth_credential_tenant_locator FROM star_oauth_credential_owner;
 GRANT SELECT, INSERT ON oauth_credential_tenant_locator TO star_oauth_credential_owner;
-GRANT SELECT ON oauth_authorization_codes, oauth_refresh_tokens TO star_oauth_credential_owner;
+REVOKE ALL ON TABLE oauth_authorization_codes FROM star_oauth_credential_owner;
+GRANT SELECT ON oauth_authorization_codes TO star_oauth_credential_owner;
+REVOKE ALL ON TABLE oauth_refresh_tokens FROM star_oauth_credential_owner;
+GRANT SELECT ON oauth_refresh_tokens TO star_oauth_credential_owner;
+GRANT UPDATE (revoked_at) ON oauth_refresh_tokens TO star_oauth_credential_owner;
+DROP POLICY IF EXISTS oauth_credential_owner_device_revoke_refresh ON oauth_refresh_tokens;
+CREATE POLICY oauth_credential_owner_device_revoke_refresh ON oauth_refresh_tokens FOR UPDATE TO star_oauth_credential_owner USING (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID) WITH CHECK (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID);
+DROP POLICY IF EXISTS oauth_credential_owner_device_revoke_refresh_scope ON oauth_refresh_tokens;
+CREATE POLICY oauth_credential_owner_device_revoke_refresh_scope ON oauth_refresh_tokens AS RESTRICTIVE FOR UPDATE TO star_oauth_credential_owner USING (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID) WITH CHECK (tenant_id=NULLIF(current_setting('app.tenant_id',true),'')::UUID AND user_id=NULLIF(current_setting('app.actor_id',true),'')::UUID);
 DROP FUNCTION IF EXISTS public.w16_resolve_oauth_authorization_code(UUID,TEXT,TEXT);
 DROP FUNCTION IF EXISTS public.w16_resolve_oauth_refresh_token(UUID,TEXT);
 CREATE OR REPLACE FUNCTION public.w16_index_oauth_authorization_code() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $function$ BEGIN PERFORM set_config('app.tenant_id',NEW.tenant_id::text,true); PERFORM set_config('app.actor_id',NEW.user_id::text,true); PERFORM set_config('app.oauth_credential_kind','authorization_code',true); PERFORM set_config('app.oauth_credential_hash',NEW.code_hash,true); INSERT INTO public.oauth_credential_tenant_locator (credential_kind,token_hash,tenant_id,actor_id,client_id,expires_at) VALUES ('authorization_code',NEW.code_hash,NEW.tenant_id,NEW.user_id,NEW.client_id,NEW.expires_at); RETURN NEW; END; $function$;

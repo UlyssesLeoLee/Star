@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=7a8762e29397faaf17614138ac1af35f9d8c5725f75be44ec29d5a531d20500e
+@cypher schema=1 source_sha256=d5b70681fa6eab10551855109da248b6b30aa566691fe48c8485a807af414ced
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/device_bindings.rs"})
 MERGE (repo:Type {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::PgDeviceBindingRepository",kind:"struct"})
 MERGE (trait:Type {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::DeviceBindingRepository",kind:"trait"})
@@ -14,14 +14,17 @@ MERGE (complete:Symbol {id:"crates/star-pg-adapter/src/repository/device_binding
 MERGE (active:Symbol {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::PgDeviceBindingRepository.is_active",kind:"method"})
 MERGE (revoke:Symbol {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::PgDeviceBindingRepository.revoke",kind:"method"})
 MERGE (scope:Symbol {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::set_actor_scope",kind:"function"})
+MERGE (oauthOwnerRole:Type {id:"star_oauth_credential_owner",kind:"database_role"})
+MERGE (ownerScope:Symbol {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::set_oauth_owner_scope",kind:"function"})
 MERGE (self)-[:DEFINES]->(repo),(self)-[:DEFINES]->(trait),(self)-[:DEFINES]->(challenge),(self)-[:DEFINES]->(binding),(self)-[:DEFINES]->(createResult),(self)-[:DEFINES]->(challengeCap)
 MERGE (repo)-[:IMPLEMENTS]->(trait)
 MERGE (repo)-[:HAS_METHOD]->(create),(repo)-[:HAS_METHOD]->(findChallenge),(repo)-[:HAS_METHOD]->(complete),(repo)-[:HAS_METHOD]->(active),(repo)-[:HAS_METHOD]->(revoke)
-MERGE (create)-[:CALLS]->(scope),(findChallenge)-[:CALLS]->(scope),(complete)-[:CALLS]->(scope),(active)-[:CALLS]->(scope),(revoke)-[:CALLS]->(scope)
-MERGE (create)-[:CALLS]->(scope),(create)-[:USES_TYPE]->(createResult),(create)-[:READS]->(challenges:Table {name:"oauth_device_enrollment_challenges",type:"table"}),(create)-[:WRITES]->(challenges),(create)-[:USES_TYPE]->(challengeCap)
+MERGE (create)-[:CALLS]->(ownerScope),(findChallenge)-[:CALLS]->(ownerScope),(complete)-[:CALLS]->(ownerScope),(active)-[:CALLS]->(ownerScope),(revoke)-[:CALLS]->(ownerScope)
+MERGE (create)-[:USES_TYPE]->(createResult),(create)-[:READS]->(challenges:Table {name:"oauth_device_enrollment_challenges",type:"table"}),(create)-[:WRITES]->(challenges),(create)-[:USES_TYPE]->(challengeCap)
 MERGE (findChallenge)-[:READS]->(challenges)
 MERGE (complete)-[:WRITES]->(challenges),(complete)-[:WRITES]->(bindings:Table {name:"oauth_device_bindings",type:"table"}),(complete)-[:WRITES]->(audit:Table {name:"oauth_device_binding_audit",type:"table"})
 MERGE (active)-[:READS]->(bindings)
+MERGE (ownerScope)-[:CONFIGURES]->(oauthOwnerRole),(ownerScope)-[:CALLS]->(scope)
 MERGE (revoke)-[:WRITES]->(bindings),(revoke)-[:WRITES]->(audit),(revoke)-[:WRITES]->(refresh:Table {name:"oauth_refresh_tokens",type:"table"})
 MERGE (self)-[:DEFINES]->(scope)
 @endcypher
@@ -157,7 +160,7 @@ impl DeviceBindingRepository for PgDeviceBindingRepository {
             .begin()
             .await
             .map_err(query_error("begin challenge"))?;
-        set_actor_scope(&mut tx, challenge.tenant_id, challenge.actor_id).await?;
+        set_oauth_owner_scope(&mut tx, challenge.tenant_id, challenge.actor_id).await?;
 
         let owner_lock = format!("{}:{}", challenge.tenant_id, challenge.actor_id);
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
@@ -226,7 +229,7 @@ impl DeviceBindingRepository for PgDeviceBindingRepository {
             .begin()
             .await
             .map_err(query_error("begin challenge lookup"))?;
-        set_actor_scope(&mut tx, tenant_id, actor_id).await?;
+        set_oauth_owner_scope(&mut tx, tenant_id, actor_id).await?;
         let challenge = sqlx::query_as::<_, DeviceEnrollmentChallenge>(
             "SELECT challenge_id, tenant_id, actor_id, challenge_hash, public_key, \
              public_key_fingerprint, expires_at FROM oauth_device_enrollment_challenges \
@@ -259,7 +262,7 @@ impl DeviceBindingRepository for PgDeviceBindingRepository {
             .begin()
             .await
             .map_err(query_error("begin enrollment"))?;
-        set_actor_scope(&mut tx, tenant_id, actor_id).await?;
+        set_oauth_owner_scope(&mut tx, tenant_id, actor_id).await?;
         let challenge = sqlx::query_as::<_, DeviceEnrollmentChallenge>(
             "UPDATE oauth_device_enrollment_challenges SET consumed_at=$5 \
              WHERE tenant_id=$1 AND actor_id=$2 AND challenge_id=$3 \
@@ -316,7 +319,7 @@ impl DeviceBindingRepository for PgDeviceBindingRepository {
             .begin()
             .await
             .map_err(query_error("begin device check"))?;
-        set_actor_scope(&mut tx, tenant_id, actor_id).await?;
+        set_oauth_owner_scope(&mut tx, tenant_id, actor_id).await?;
         let active = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS (SELECT 1 FROM oauth_device_bindings \
              WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 \
@@ -347,7 +350,7 @@ impl DeviceBindingRepository for PgDeviceBindingRepository {
             .begin()
             .await
             .map_err(query_error("begin device revoke"))?;
-        set_actor_scope(&mut tx, tenant_id, actor_id).await?;
+        set_oauth_owner_scope(&mut tx, tenant_id, actor_id).await?;
         let binding = sqlx::query_as::<_, DeviceBinding>(
             "UPDATE oauth_device_bindings SET generation=generation+1, status='revoked', revoked_at=$4 \
              WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 \
@@ -388,17 +391,23 @@ impl DeviceBindingRepository for PgDeviceBindingRepository {
     }
 }
 
-async fn set_actor_scope(
+async fn set_oauth_owner_scope(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
     actor_id: Uuid,
 ) -> Result<(), PgAdapterError> {
+    // The deployment login is NOINHERIT and receives this dedicated role only
+    // through deployment membership; never grant OAuth/device table ACLs to it.
+    sqlx::query("SET LOCAL ROLE star_oauth_credential_owner")
+        .execute(&mut **tx)
+        .await
+        .map_err(query_error("set OAuth credential owner role"))?;
     sqlx::query("SELECT set_config('app.tenant_id',$1,true), set_config('app.actor_id',$2,true)")
         .bind(tenant_id.to_string())
         .bind(actor_id.to_string())
         .execute(&mut **tx)
         .await
-        .map_err(query_error("set device owner scope"))?;
+        .map_err(query_error("set OAuth device owner scope"))?;
     Ok(())
 }
 
