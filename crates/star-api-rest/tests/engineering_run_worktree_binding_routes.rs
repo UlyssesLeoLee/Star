@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=bd20841a22d06929af327418fe4b595c607181b068af747cce3f5f5137cffacf
+@cypher schema=1 source_sha256=b292c506da9876901eada07fe0ce15b8cb4ada6e9bec6d03633b9104a87dccc2
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})
@@ -884,7 +884,7 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             )
             .await;
             assert_private_response(&unauthorized);
-            assert_eq!(unauthorized.status, StatusCode::FORBIDDEN);
+            assert_eq!(unauthorized.status, StatusCode::NOT_FOUND);
 
             let cross_tenant = send_binding_mutation(
                 app,
@@ -897,7 +897,7 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             )
             .await;
             assert_private_response(&cross_tenant);
-            assert_eq!(cross_tenant.status, StatusCode::FORBIDDEN);
+            assert_eq!(cross_tenant.status, StatusCode::NOT_FOUND);
 
             let mut tx = pool
                 .begin()
