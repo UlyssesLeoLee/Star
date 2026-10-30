@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.78。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 部署决策；§14–§22 记录既有 W8/W14/W16/WLD1、UI、VCD-0 与 WLD-7 证据；§17 纳入 W14 UI-1 独立复核和静态原型修正；§23 更新 W11/PR-2 的 Multipass/K3s 生产差距、本机 Rust 服务复用盘点、W11-A hostless 设计同步状态、W16 事件唤醒代码集成、payload readiness 审计、身份/KMS 研究、安全设计增量、测试设计 v2.0、W16-C envelope-core 与 W16-A 设备/RLS/OAuth repository 局部 PG18 验收及 Canvas candidate 资源中断状态，以及集成快照和实施顺序。W11/PR-2、W8、W14、VCD-0、WLD-7 与 W16 均未关闭；报告或静态审查不代表产品验收完成。
+> 状态：🟡 计划稿 v0.79。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 决策；§14–§22 和 §23.1–§23.13 保留历史审计及实现证据；§23.14 记录 2026-10-30 W8/W16 当前状态、验收边界与下一步顺序。W8 保持 OPEN / FAILED-TEST；W11/PR-2、W14、VCD-0、WLD-7 与 W16 均未关闭。静态审查与局部 PostgreSQL 证据不等于产品闭环。
 
 ## 0. 目的与计划边界
 
@@ -54,7 +54,7 @@ Project
 | W5 | P1 | **原生 Hook 与策略 UI**：Advanced Settings → Hooks typed editor、策略继承/快照/发布/回滚、Rust evaluator 接入所有写入和执行门、BI evidence | W2、W3、W4 | evaluator、policy API、archive gate、source-only metrics 有局部实现 | 无代码配置可预演/解释；所有强制入口执行同一版本化 HookSet；缺失/过期/无法解释时拒绝；事件可追溯到 Worktree/Run/BI |
 | W6 | P1 | **任务管理和 Task Card 生命周期**：Run owner list/create/transition/review、幂等回执、migration/grants、Canvas EntityRef 组合命令、事件发布 | W2、W4 | bounded API/UI 和 owner source 已有；目标 DB/RLS、dispatcher/consumer 未完成 | 真实 Run 读写、状态/audit/outbox 一致；Canvas 双向互动不绕过 owner；无 seed/mock 回退；撤权/并发/CAS/replay 有测试 |
 | W7 | P1 | **Agent CLI 执行闭环**：卡内 CLI、Agent 自动分配、Runtime provisioner、隔离 sandbox、工具调用和文件 claim、流输出、取消/恢复、独立验证及结果回写 | W3、W5、W6、W8、W12 | CLI UI 明确禁用；只存在 admission/fence/helper 等源切片 | 从真实 Task Card 到授权 Agent、版本化能力 profile、受限执行、Hook 检查、budget admission、取消恢复、独立验证与结果 evidence 全链路通过；无任意 host shell 或未经授权 mount |
-| W8 | P1 | **事件传输与 owner settlement**：BI/Task 原生 adapter、immutable route pin、sender、receiver Inbox、事务提交后 ACK、accepted/retry/dead-letter、recovery/checkpoint；保持 NATS 可替换 adapter | W4 | 9F4I 原生 event 授权基础完成；真实 BI network chain 未完成 | 接收 owner commit 前不 ACK；重放幂等、身份冲突不误确认、租约 fencing 有效；profile/identity/target DB grants/RLS/recovery 有实证；传输切换/回滚不改业务 owner 契约 |
+| W8 | P1 | **事件传输与 owner settlement**：BI/Task 原生 adapter、immutable route pin、sender、receiver Inbox、事务提交后 ACK、accepted/retry/dead-letter、recovery/checkpoint；保持 NATS 可替换 adapter | W4 | 当前 dev 使用 v2 Inbox API；2026-10-30 候选审计确认 v3 source-origin 与 source-position 修复依赖匹配的返回 schema、共享 claim migration、Inbox/quarantine 仲裁和权限，未发现可独立安全摘取内容。W8 保持 OPEN / FAILED-TEST，见 §23.14。 | owner commit 前不 ACK；重放幂等、身份冲突不误确认、租约 fencing 有效；Profile/identity/目标 DB grants/RLS/recovery 有实证；传输切换/回滚不改业务 owner 契约 |
 | W9 | P1 | **Schedule / Loop Worker**：occurrence 生成、run-as 复验、规则 version/profile pin、Run admission、预算/容量预留、checkpoint、暂停/取消/补偿与结果确认 | W2、W5、W8、W11、W12 | Schedule API/owner contract 部分完成；无人值守执行链未闭合 | 每次 trigger/retry/resume 实时复验权限与能力；只有 Run profile 选择基础设施 placement 时才解析并固定当前 cluster binding，hostless 模式不因缺少远端 Branch/集群绑定而失效；按固定的 Memory/Skill/Context/Validation/Loop capability profile 运行；撤权、所需容量未知或 Hook 缺失则拒绝；重复副作用受幂等键和 owner receipt 控制 |
 | W10 | P2 | **BI/Benchmark 产品闭环**：可信事件投影、消费 checkpoint、指标定义/版本/数据集、质量/性能分析、Benchmark evidence、留存/恢复 | W5、W8、W9 | 9F4E–9F4I 源码切片完成到 native event authorization；9F4J 之后的可信适配与 E2E 尚待开始/核实 | BI 只读 owner projection；显示完整性/新鲜度 unknown/partial/complete 的依据；Benchmark 可重放、可比较、不可篡改；并发/恢复/长期留存和目标 DB 通过 |
 | W11 | P1 | **Multipass/K3s Infrastructure Manager**：trusted resolver/profile、跨租户物理 Host/cluster ledger、独立 reservations、delivery consumers、VM provider、K3s readiness、workspace bridge | W2、W4、W8 | W11 审计报告已合入；PowerShell bootstrap 路径有两记录限制与锁，但 Rust adapter 仅只读，原生 Manager/provider、target DB/readiness/sandbox/bridge 尚未验收；hostless Run 与必填 Cloud Branch 语义冲突待先修 | 只由 Rust Manager 调 Multipass；所有测试 inventory 入口合计不超过 2 条且含 Stopped/Deleted、不自动 purge；仅选择基础设施 placement 的 Run 固定 cluster ID+generation，hostless Run 无需远端 Branch 或该 binding；Host 与 cluster 双预约可对账；sandbox/权限/资源限制满足后才启动 Agent |
@@ -62,7 +62,7 @@ Project
 | W13 | P2 | **跨 App 导航与交互**：Inbox、Task、Canvas、Workflow、BI/Benchmark、Plugins 同级 tabs；CLI 只从卡内启动；深链、错误态、无焦点/未绑定态统一 | W2、W3、W5、W6、W10、W12、W16 | Task/BI 部分 UI；其余 Run Apps 与真实数据链路不完整 | 同 Run 切换 Worktree 不改变 App owner；跨 Run/Project/tenant 引用拒绝；直接深链重新授权；UI 无虚假连接器、mock 事实或过期 scope 闪现；跨 App 内容更新由授权资源事件触发 |
 | W14 | P2 | Rust 桌面内存/并行验收：缓存、虚拟化、日志、IPC、Tokio 队列、公平调度、背压、取消/drain、RSS 与 p95 benchmark | W3、W7、W11、W13、W16 | UI-0/UI-1 文档与静态原型已集成；UI-2 设备/数据/workload/采样协议审查已完成，但设备、真实 provider、数据 manifest、并发档位和预算仍未冻结。当前 Tauri+React 是待测基线；egui/eframe 与 Slint 仍为对比候选 | 下一步由产品/工程 owner 确认目标 Windows 设备、真实授权 workload、build、profile 与预算责任人；先对当前产品路径执行 pilot 并保存原始进程/资源/交互证据，再完成 UI-2 可复现测量。UI-3 才能用同一 manifest 比较 Rust-native，UI-4 再按证据决定迁移或维持。候选 Agent 档位不构成容量承诺；W14 继续 OPEN，测量前不宣称低内存或并行容量达标 |
 | W15 | P3 | **商业发布与系统验收**：Windows 桌面打包、目标 DB 部署、身份/RLS、升级/回滚、故障恢复、SBOM/NOTICE、support diagnostics、跨 App E2E | W2–W14、W16 | 未启动完整验收 | 一条可重复商业使用链覆盖创建 Project/Run→绑定 Worktree→分配 Agent→卡内 CLI→验证→合并/安全清理→BI 证据；部署、升级、备份恢复、权限和性能全部有可追溯证据 |
-| W16 | P1 | **低消耗实时协作、草稿与冲突闭环**：资源 scoped push、owner revision/CAS、双方草稿、冲突可读/显式解决、跨实例 Outbox fan-out、cursor recovery、离线 conflict inbox | W2、W4、W6、W8 | Rust transactional Outbox wake trigger、每进程单一 `PgListener`/有界 Worktree SSE hub 与前端每 Worktree 单连接、授权 Outbox catch-up 已合入本地 `dev@95732e7c`；star-api-rest 全目标编译和唤醒单测通过。PostgreSQL 事务触发 fixture 因缺隔离数据库/Worktree 被忽略；durable draft/conflict、双边持久提醒、Resolve/CAS、真实多实例与性能验收仍未完成 | 客户端常态无固定轮询，Outbox 正常发布由 owner commit wake-up 驱动；冲突按 base revision + 重叠范围判定（1 秒不是轮询/冲突窗口）；同字段冲突保留双方精确 draft revision 并向双方推送同一 `conflict_id` 的持久未读提醒，从冲突 commit 到双方显示提醒并可读首个有界 base/current/mine/theirs 差异页的 p99 ≤1s；用户查看前提醒不清除，各自草稿可恢复；离线/gap 可恢复。每窗口单 multiplexed connection；订阅数及发送队列限额由版本化 Collaboration Profile 固定（100 subscriptions、64 events/128 KiB 仅候选初始值，须目标环境测量）；patch/frame ≤16 KiB 是协议上限。resource fence 竞态测试、RLS/retention、背压、RSS/CPU 与跨实例恢复验收通过 |
+| W16 | P1 | **低消耗实时协作、草稿与冲突闭环**：资源 scoped push、owner revision/CAS、双方草稿、冲突可读/显式解决、跨实例 Outbox fan-out、cursor recovery、离线 conflict inbox | W2、W4、W6、W8 | 2026-10-30 快照有三项局部 PostgreSQL 证据：设备/绑定 run 70/70 步骤、OAuth repository 3/3 定向测试、Canvas SSE 撤销用例 1/1；仍未发现 authenticated HTTP device-revoke/audit acceptance。Outbox owner 归属冲突、生产 grants/RLS、跨实例恢复与性能未关闭。W16/WLD-7 仍 OPEN / PARTIAL，见 §23.14。 | 客户端常态无固定轮询，Outbox 正常发布由 owner commit wake-up 驱动；冲突按 base revision + 重叠范围判定（1 秒不是轮询/冲突窗口）；同字段冲突保留双方精确 draft revision 并向双方推送同一 `conflict_id` 的持久未读提醒，从冲突 commit 到双方显示提醒并可读首个有界 base/current/mine/theirs 差异页的 p99 ≤1s；用户查看前提醒不清除，各自草稿可恢复；离线/gap 可恢复。每窗口单 multiplexed connection；订阅数及发送队列限额由版本化 Collaboration Profile 固定（100 subscriptions、64 events/128 KiB 仅候选初始值，须目标环境测量）；patch/frame ≤16 KiB 是协议上限。resource fence 竞态测试、RLS/retention、背压、RSS/CPU 与跨实例恢复验收通过 |
 
 ### 2.1 端到端未完成设计里程碑
 
@@ -114,7 +114,7 @@ flowchart TD
 
 ## 4. 建议的下一步执行批次
 
-> 本节及其中 2026-10-19 执行记录保留为历史计划/证据；当前实施顺序由 §10 的最新快照和工作序列决定，不能继续把 9F4J 当作当前唯一下一步。
+> 本节及其中 2026-10-19 执行记录保留为历史计划/证据；当前 W8/W16 次序以 §23.14 的 2026-10-30 快照为准；9F4J 计划仍是历史计划，不是当前唯一下一步。
 
 ### 批次 0：下一实施切片（建议 9F4J）
 
@@ -190,6 +190,8 @@ flowchart TD
 - 商业开源验收不得按行业、用途、席位、用量或付费档限制商业使用；对复制、链接、捆绑和分发义务逐项履行，并随完整发行闭包核验 SBOM/NOTICE。
 
 ## 6. 现状与阻塞
+
+> 本表保留较早执行快照，不代表当前 checkout、owner 或集成状态；2026-10-30 W8/W16 当前结论与本地 dev 快照见 §23.14。
 
 | 项目 | 现状 |
 |---|---|
@@ -285,6 +287,7 @@ flowchart TD
 | v0.75 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 根据真实 PostgreSQL 18 语义，修正 Directory owner 的设备行锁策略：UPDATE USING 按当前 tenant/actor 限定可锁行，WITH CHECK(false) 拒绝直接更新；测试改为验证越权行不可见、直接 UPDATE 返回 SQLSTATE 42501 且 generation 不变。旧 `USING(false)` 会连 `SELECT FOR SHARE` 一起过滤，不能用于此锁路径。复验仍待最新 runner 完成，W16-A 保持 OPEN/PARTIAL。 | 本地 PostgreSQL 实跑发现 `FOR SHARE` 同时应用 UPDATE USING，旧策略使设备行不可锁。 |
 | v0.76 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 首轮 PostgreSQL 18 完成设备行锁、越权设备隔离、拒绝直接更新及 refresh device-generation 配对探针；refresh-token tenant+actor SELECT probe 随后失败（预期 1 行、实际 2 行），暴露旧 tenant-wide permissive policy 的读取越权。迁移新增 OAuth owner 专属 restrictive tenant+actor SELECT policy，harness 加入对应 catalog assertion；尚待完整 runner 重跑，W16-A 保持 OPEN/PARTIAL。 | 隔离 PostgreSQL 真实 RLS 行为发现同租户其他 actor 的 refresh token 可见。 |
 | v0.77 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录最终隔离 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 的 70/70 步骤、owner/RLS/约束与设备 repository/绑定 HTTP 结果；明确并发 revoke、完整 Canvas 身份与 SSE、OAuth 单赢家及生产环境/性能仍开放；将测试设计同步至 v1.9。 | W16-A 最新 migration 与 owner RLS 修复全部进入最终 PG18 runner 并通过。 |
+| v0.79 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 W8 与 W16 就绪度审计：W8 v2/v3 依赖不允许单行摘取；W16 将 device-revoke HTTP/audit PG acceptance 定为下一窄切片，并记录 Outbox owner 冲突、Canvas SSE 单测范围与 SRS/BD/DD 状态漂移。保持 W8 OPEN / FAILED-TEST、W16/WLD-7 OPEN / PARTIAL。 | WBS-W8-CURRENT-TRIAGE-20261030 与 WBS-W16-NEXT-AUDIT-20261030 两份审查完成并通过协调者复核。 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -748,3 +751,18 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - 当前结论：Canvas SSE device-revocation 单用例由 NOT_RUN 更新为 PASS；phase report、Canvas test design v2.1、runner briefs、automation design §4.104 与 registry 已同步。此记录与历史 §23.12 并存，不覆盖之前因资源阈值中断的 compile 或失败的 runner 尝试。
 - 验收边界：外部 build attestation 是未签名的 coordinator/operator assertion，并非 CI provenance；PG 测试池使用 disposable postgres superuser，audit/SCD2 为 no-op test-only prerequisite。此 run 不证明 production grants/NOBYPASSRLS/行为 RLS/audit、OAuth HTTP revoke/audit endpoint、replay-offset migration、多实例/listener-loss/client catch-up、Neon/Vercel、Multipass/K3s、生产 p99 或全量 E2E。五秒只是在单用例内的终止 deadline。
 - 集成状态：已于 2026-10-30 将候选 `codex/w16a-canvas-sse-pg-acceptance-20261029`（最终提交 `4bd9b6704e4866f052dc97d6b2cf8394c847b43a`）快进合入本地 `dev`，由 `9b46c92e57fb52865c228c24787f76fe89171505` 前进至 `4bd9b6704e4866f052dc97d6b2cf8394c847b43a`；MAGOS check 为 `allow / OK`，目标 checkout 合并前干净且无活动终端或代理。不改 main，不 push。W16-A、E2E-COLLAB、生产身份与角色/RLS 和目标部署验收继续 OPEN / PARTIAL / NOT_RUN。
+
+### 23.14 2026-10-30 W8/W16 就绪度审计与下一步顺序
+
+- **集成快照**：本次基线为本地 dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007，HEAD 为 313e5741fb0dc557874e5a37bc05e8839211cd90；检查时工作树干净，本地 origin/dev 跟踪 ref 比较显示 dev ahead 154。未 fetch、未 push，远端 refs 新鲜度未知；本 lane 不检查或改动 main 与 D:\Star 用户工作树。
+- **W8 当前状态**：当前 dev 的 BI Inbox 调用 commit_task_event_v2。source-position 候选读取 source_sequence 依赖 v3 返回 schema；transport candidate、v3 migration、共享 Inbox/quarantine claim migration、权限和测试形成依赖闭包。只摘一行 SQLx 解码会造成 API/schema 不一致。2026-10-30 W8 review commit f882c92907833961dcaa20ca5d9ed224e21a5edd 未建议合并任何候选；W8 保持 OPEN / FAILED-TEST，历史 §14.1、§20.1 不覆盖。
+- **W16 当前状态**：review lane 最终提交 9cb7ca2104470177c4447e73573f0ce920cb2fb5（包含只补 EOF 换行的 follow-up）。现有报告记录本地 disposable PostgreSQL 的设备/绑定 run 6af04e5a765446c8b3baaffff126bd52（70/70 runner steps）、OAuth repository run 1b4673269a04435daa1fab5c93333133（3 个定向测试通过），以及 Canvas SSE 单用例 run 49b512fbfe334f0e98e46fe7eae7ea39（41/41 runner steps，目标用例 1 passed/0 failed/0 ignored）。这些只证明报告所列局部行为，不证明 authenticated HTTP revoke/audit、production RLS/grants、跨实例或完整 E2E。W16 review 未发现目标 HTTP revoke route/audit 的直接 PG/API acceptance；W16 与 WLD-7 保持 OPEN / PARTIAL。
+- **W16 durable event 阻塞**：DD §1 将 Outbox 事实归属 Collaboration owner，DD §2.3 又要求 Identity owner 在 revoke 事务写 Outbox。当前 pg_notify wake-up 不是持久 Outbox。先通过独立设计审查统一 owner、版本化事件、replay/cursor、权限及 gap recovery；不得静默跨 owner 写表，也不得把 NOTIFY 当作 durable delivery。
+- **W16 SRS/BD/DD 状态漂移**：SRS/BD/DD v0.4 仍有 Canvas SSE candidate 未合入或 NOT_RUN 的旧状态；WBS §23.13 和测试设计 v2.1 已记录窄 PG18 用例通过。需要单独、限定范围的规范同步，只把该单用例标 PASS，保留 HTTP revoke/audit、目标环境与其它未验证门开放。
+- **有序后续工作**：
+  1. **W16-A HTTP revoke + audit PG acceptance**：在最新 dev 上重新执行 MAGOS check/plan 后登记独立 lane；审计建议的 9 个文件为 crates/star-api-rest/tests/device_revocation_http_pg.rs、scripts/automation/w16a_device_revocation_http_pg_acceptance.py、scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py、docs/automation-design.md、scripts/automation/registry.md、docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md、brief、phase report 与 dispatcher log。验证真实 authenticated route、同事务 generation/status + refresh family + 恰一条 audit、拒绝/回滚/并发行为及受限 app role。重复请求响应契约须先冻结；若发现源码缺陷，先停下并重新申请 manifest。
+  2. **W8 API/source-position 设计决策**：在另一个新隔离 lane 明确保持 v2 并修复其真实契约，或版本化迁移到 v3；完整覆盖 API/return schema、Inbox/quarantine shared claim、migration/授权与 PG 验收。重新登记前复核 owner 与候选状态，禁止 query-only cherry-pick。
+  3. **W16 规范状态同步**：单独登记 SRS/BD/DD lane，对齐 Canvas SSE 已有局部证据和 HTTP revoke/audit 尚未验收状态；保留 §23.12、§23.13 历史快照，不重写历史。
+  4. **并行门**：W16 HTTP acceptance 与 W8 设计/实现准备可在各自 fresh MAGOS check 确认无路径重叠、brief 和 owner 明确后并行；SRS/BD/DD lane 需独立 manifest。所有 lane 通过 review/验证后再串行集成到 dev。
+  5. **更后续门**：先解决 Outbox owner 契约，再验证 production-like grants/RLS、durable fan-out、两实例恢复及明确的资源/p99 指标；W16-A–C 的必要安全门通过后才开放 W16-D drafts/conflicts。Neon 路径与 Multipass/K3s 路径仍须分别验证，测试阶段 Multipass inventory 总数最多 2。
+- **范围与未处理项**：本次只读两份审查报告及 phase report并修改 WBS；W8 audit lane 为 f882c92907833961dcaa20ca5d9ed224e21a5edd，W16 audit lane 最终 HEAD 为 9cb7ca2104470177c4447e73573f0ce920cb2fb5。W16 报告记录一次默认目录 Add File 可能写入两个同名文档路径；本 lane 未检查、修改或清理该内容，协调者应在既定数据保留边界内另行处理。未运行测试、Cargo、数据库、Multipass/K3s、浏览器、桌面或性能门。
