@@ -1,6 +1,6 @@
 # DD-W16-PAYLOAD-SECURITY-001 — 设备身份与协作载荷 envelope 详细设计
 
-> 状态：Draft v0.4；补充 `DD-CANVAS-AGENT-001` v0.2 §8.7。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas SSE candidate compile 受资源门中断；W16-C provider-neutral envelope core 仍未接入生产 owner。
+> 状态：Draft v0.5；补充 DD-CANVAS-AGENT-001 v0.2 §8.7。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas 单个已连接 SSE 流的设备撤销关闭用例已在当前 dev 基线上通过（run 6d23b8ceb1f0499091885c42271c2fb0），生产 owner/KMS 闭环仍未完成；W16-C provider-neutral envelope core 尚未接入生产 owner。
 
 ## 1. 模块边界
 
@@ -33,7 +33,7 @@
 ### 2.4 当前 OAuth / Canvas 验收切片边界
 
 - OAuth repository implementation 在本地 disposable PostgreSQL 18.6 上通过三项 ignored tests：auth-code 竞争最多一个胜者且消费/令牌对持久化；refresh 竞争最多一个胜者、唯一 successor 与旧 token 撤销；stale token snapshot 不能消费新状态。run `1b4673269a04435daa1fab5c93333133` 的测试进程以 disposable cluster superuser 连接，并依赖测试专用 role/audit/SCD2 migration prerequisites。该结果只验 repository transaction slice，不替代生产 grants/RLS、认证 HTTP flow、目标数据库或完整 E2E-COLLAB-14。
-- Canvas SSE device-revocation test 仍是 isolated candidate source，focused `--no-run` compile 因 free-memory guard 低于 2,560 MiB（观察值 2,551 MiB）而 exit 1；状态为 `RESOURCE_INTERRUPTED / NOT_RUN`，未生成可执行测试 binary，未启动 PostgreSQL，candidate 未合入 `dev`。不得据此把 SSE revocation 或 W16-A compile/runtime 标为 PASS。
+- 当前 dev 基线上的 crates/star-api-rest/tests/canvas_device_auth_pg.rs::active_canvas_sse_closes_after_device_binding_revocation 已通过 Rust 1.99.0 focused build 与 PostgreSQL 18.6 disposable loopback acceptance（run 6d23b8ceb1f0499091885c42271c2fb0）：41/41 runner steps exit 0，exact test 1 passed/0 failed/0 ignored/3 filtered，0.16s。仅该活动 SSE stream 撤销关闭切片为 PASS；runner 使用 disposable postgres superuser、test-only no-op audit/SCD2 prerequisites，build attestation unsigned，且未应用 replay-offset migration。不得把此结果扩大为生产权限、生产审计、完整 W16-A 或部署验收。
 
 ## 3. Envelope 数据与密码学契约
 
@@ -106,7 +106,7 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 
 应用和 provider 日志只能记录 operation ID、profile/key opaque id、结果码、耗时分桶和字节数分桶。禁止记录正文、DEK、access/refresh token、enrollment proof、provider credentials、未脱敏 headers 或完整 KMS request/response。
 
-**当前实现状态（2026-10-29）**：W16-A 隔离 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 完成 70/70 步骤，包含 device repository PG tests 2/2、迁移与 owner/ACL/RLS、设备 generation `FOR SHARE` 与拒绝 UPDATE、refresh-token tenant+actor 隔离及配对 CHECK 弱约束升级/非法值回滚。OAuth repository 的独立 disposable PostgreSQL 18.6 run `1b4673269a04435daa1fab5c93333133` 通过 3/3 named tests，但以 disposable superuser 和 test-only migration prerequisites 运行，不证明 production grants/RLS、audit/SCD2 或 OAuth HTTP flow。Run/Worktree binding HTTP 测试也通过，但不代表 Canvas device-auth 请求面验收。Canvas SSE candidate compile 因 2,551 MiB 低于 guard 中断，未运行数据库且未合入 dev。尚未覆盖目录 row lock 与并发撤销争用、Canvas 共享 read/write/resolve、SSE 跨节点失效、生产 audit/SCD2、Neon/Multipass/K3s、KMS 持久恢复或性能。
+**当前实现状态（2026-10-30）**：W16-A 隔离 PostgreSQL 18 acceptance run 6af04e5a765446c8b3baaffff126bd52 完成 70/70 步骤，包含 device repository PG tests 2/2、迁移与 owner/ACL/RLS、设备 generation FOR SHARE 与拒绝 UPDATE、refresh-token tenant+actor 隔离及配对 CHECK 弱约束升级/非法值回滚。OAuth repository 的独立 disposable PostgreSQL 18.6 run 1b4673269a04435daa1fab5c93333133 通过 3/3 named tests，但以 disposable superuser 和 test-only migration prerequisites 运行，不证明 production grants/RLS、audit/SCD2 或 OAuth HTTP flow。Run/Worktree binding HTTP 测试也通过，但不代表 Canvas device-auth 请求面验收。当前 dev 基线 622b099f5e56e0edf2d4a4637bf0bd4f3d9401ba 上的 Canvas SSE 活动流撤销用例 run 6d23b8ceb1f0499091885c42271c2fb0 通过：41/41 runner steps exit 0；Rust 1.99.0 focused build exit 0；exact test 1 passed/0 failed/0 ignored/3 filtered，0.16s。它使用 disposable PostgreSQL 18.6 IPv4 loopback cluster 的 postgres superuser、test-only no-op audit/SCD2 prerequisites 和 unsigned operator build attestation，且未应用 replay-offset migration；因此只证明本地单流撤销关闭。尚未覆盖目录 row lock 与并发撤销争用、Canvas 共享 read/write/resolve、多实例失效/恢复、生产 audit/SCD2、Neon/Multipass/K3s、KMS 持久恢复或性能。
 
 ## 6. 验证映射与实施门
 
@@ -118,7 +118,7 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 | Owner/RLS | Neon 或真实 PostgreSQL 的 RLS、owner transaction、idempotency、retention 与只含 metadata 的 Outbox；两 actor 互读 scope 被拒绝。 |
 | Bounded runtime | 固定 Collaboration Profile 与 workload 下 KMS 请求频次、缓冲/队列上限、RSS/CPU、取消、慢消费者与 PT-09 p99 结果。 |
 
-测试环境最多两个 Multipass inventory 实例；这只支持可重建验证，不证明两节点 HA。Vercel 路径使用 Neon 并单独核验云身份。没有生产 provider、Canvas 读写/订阅撤销、并发竞争、持久恢复和 profile 性能证据时，W16、WLD-7、PT-09/10 继续保持 OPEN/PARTIAL/NOT_RUN。
+测试环境最多两个 Multipass inventory 实例；这只支持可重建验证，不证明两节点 HA。Vercel 路径使用 Neon 并单独核验云身份。Canvas 单个 SSE 撤销关闭用例已有本地 PG18.6 证据，但生产 provider、Canvas 共享读写/resolve、多实例恢复、并发竞争、持久恢复和 profile 性能证据仍缺；W16、WLD-7、PT-09/10 继续保持 OPEN/PARTIAL/NOT_RUN。
 
 ## 7. 修订历史
 
@@ -128,3 +128,4 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 | v0.2 | 2026-10-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在旧 AAD 字段基础上显式加入 optional Worktree（位于 Run 之后），固定二进制编码/tag/端序与长度；记录 W16-C core API、边界和未验证的生产/清零/持久化能力。 | W16-C envelope core 实施与 DD 对照。 |
 | v0.3 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W16-A 已通过的本地 PG18 owner/RLS、设备 repository 和 Run/Worktree binding HTTP 切片，并列出未覆盖的并发撤销、OAuth 单赢家、Canvas 设备请求面、生产 SCD2/KMS、云/VM 部署与性能验收。 | W16-A PG18 acceptance 70/70 步骤完成。 |
 | v0.4 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 repository OAuth PG18.6 3/3 slice 的准确范围与生产授权限制；标记 Canvas SSE candidate compile 为资源中断、未运行 DB/未入 dev；保持 E2E 与 W16-A 开放。 | W16-A OAuth acceptance 和 Canvas compile 状态复核。 |
+| v0.5 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步当前 dev 基线 Canvas SSE 设备撤销单用例 PG18.6 acceptance（run 6d23b8ceb1f0499091885c42271c2fb0）与 Rust 1.99.0 focused build，保留其本地 superuser/test-only/unsigned 限制；生产授权、HTTP audit、恢复、多实例、性能和部署门继续 OPEN。 | 当前 dev focused acceptance 与 DD 实现状态复核。
