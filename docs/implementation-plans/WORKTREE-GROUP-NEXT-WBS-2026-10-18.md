@@ -739,3 +739,12 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - Canvas SSE revocation candidate 的源码仍只存在于隔离 lane，尚未合入 `dev`。授权的 `cargo +1.99.0 test -p star-api-rest --test canvas_device_auth_pg --no-run --locked --offline -j 4` 在可用内存下降至 2,551 MiB（低于 2,560 MiB guard）时中止并返回 exit 1；未生成测试 binary、未启动 PostgreSQL。状态为 `RESOURCE_INTERRUPTED / NOT_RUN`，不得记作编译或运行通过。
 - 本次文档同步将 companion SRS/BD/DD 更新至 v0.4、测试设计更新至 v2.0；只登记 OAuth repository 的三项局部 PostgreSQL 测试结果，明确 Canvas candidate 的隔离与资源中断，并保留 E2E-COLLAB-12..19、生产 role/RLS、Canvas 共享操作/实时撤销、provider/KMS、恢复、Neon/Multipass/K3s 与性能门为 OPEN/PARTIAL/NOT_RUN。不得据此关闭 W16-A。
 - 后续顺序：先在内存满足 guard 时重试 Canvas 定向 compile，不与其它 Cargo build 并行；compile 通过后再按独立授权运行 disposable PostgreSQL 场景；随后补齐 production-like role/RLS 与完整认证/撤销 HTTP 路径。只有全部 W16-A 入口、目标环境和剩余依赖验收后，才重新评估阶段关闭。
+
+### 23.13 2026-10-30 W16-A Canvas SSE device-revocation PG18 acceptance
+
+- Canvas runner 已修复 PostgreSQL detached startup 继承 stdout pipe 导致 supervisor 等待超时的问题：仅 postgres-start 使用 capture_output=False，并由单独的 psql readiness/version 步骤确认服务器可用。超时/中断仍只保证尽力结束直接子进程，不宣称 Windows process-tree/job-object 终止。
+- 候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 下 Rust 1.99.0 focused test binary 编译通过；Python runner suite 25/25、py_compile、CypherGraph Guardian 与先前的 focused formatting gate 通过。Rust 构建证明绑定的 SHA-256 与命令见 docs/reports/PHASE-W16-A-CANVAS-SSE-REVOCATION-20261029.md。
+- 新鲜本地 disposable PostgreSQL 18.6 run 49b512fbfe334f0e98e46fe7eae7ea39 记录 41/41 runner steps exit 0。唯一精确用例 active_canvas_sse_closes_after_device_binding_revocation 为 1 passed、0 failed、0 ignored、3 filtered，耗时 0.17 秒；PostgreSQL stop exit 0 且确认 server stopped，仅在确认关闭后移除本 run 的 data directory。摘要保留于 C:\Users\leo19\AppData\Local\Temp\star-w16a-canvas-sse-pg-acceptance\runs\49b512fbfe334f0e98e46fe7eae7ea39\acceptance-summary.json，数据库 URL 未记入摘要。
+- 当前结论：Canvas SSE device-revocation 单用例由 NOT_RUN 更新为 PASS；phase report、Canvas test design v2.1、runner briefs、automation design §4.104 与 registry 已同步。此记录与历史 §23.12 并存，不覆盖之前因资源阈值中断的 compile 或失败的 runner 尝试。
+- 验收边界：外部 build attestation 是未签名的 coordinator/operator assertion，并非 CI provenance；PG 测试池使用 disposable postgres superuser，audit/SCD2 为 no-op test-only prerequisite。此 run 不证明 production grants/NOBYPASSRLS/行为 RLS/audit、OAuth HTTP revoke/audit endpoint、replay-offset migration、多实例/listener-loss/client catch-up、Neon/Vercel、Multipass/K3s、生产 p99 或全量 E2E。五秒只是在单用例内的终止 deadline。
+- 集成状态：该候选尚待最终 diff/MAGOS/目标 worktree 复核并快进到本地 dev；不改 main，不 push。W16-A、E2E-COLLAB、生产身份与角色/RLS 和目标部署验收继续 OPEN / PARTIAL / NOT_RUN。

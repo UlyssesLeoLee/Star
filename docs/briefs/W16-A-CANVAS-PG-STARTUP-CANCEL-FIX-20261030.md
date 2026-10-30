@@ -18,6 +18,10 @@ Read-only. Do not edit/commit; do not run Cargo, PostgreSQL, or inspect run data
 - No high-severity blocker remains for the controlled rerun. Residual limits: no Windows process-tree/job-object termination guarantee; the outer cleanup attempts `pg_ctl stop` and preserves the data directory unless shutdown is confirmed; a second Ctrl+C during the timeout wait may interrupt after kill was issued.
 - Review was read-only. No tests, Cargo, PostgreSQL, or run-data inspection were performed by the reviewer.
 
+## Coordinator acceptance follow-up
+
+The controlled rerun passed in run `49b512fbfe334f0e98e46fe7eae7ea39` on PostgreSQL 18.6. All 41 recorded steps exited 0; the exact Canvas device-revocation case passed 1/1 with 0 failed and 0 ignored. PostgreSQL stopped cleanly and the run-owned data directory was removed after shutdown confirmation. This verifies the bounded cancellation/startup fix in this accepted run, but not Windows process-tree termination, production grants/RLS, multi-instance recovery, production p99, or W16-A closure.
+
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)

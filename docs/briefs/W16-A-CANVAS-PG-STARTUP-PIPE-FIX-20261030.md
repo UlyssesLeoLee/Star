@@ -18,6 +18,10 @@ Read-only. Do not edit or commit files; do not run Cargo, PostgreSQL, or inspect
 - Residual limits are direct-child-only termination (no Windows process-tree/job-object guarantee), possible surviving descendants or failed kill, and a second Ctrl+C interrupting the bounded timeout wait after kill is issued. Main cleanup attempts `pg_ctl stop` using the validated data directory and retains data unless shutdown is confirmed.
 - Review was read-only. No Cargo, PostgreSQL, or run-data inspection was performed.
 
+## Coordinator acceptance follow-up
+
+The approved rerun passed in run `49b512fbfe334f0e98e46fe7eae7ea39` on PostgreSQL 18.6. All 41 recorded steps exited 0; the exact Canvas device-revocation case passed 1/1 with 0 failed and 0 ignored. PostgreSQL stopped cleanly and the run-owned data directory was removed after shutdown confirmation. The separate readiness/version check remained the server-start proof. This does not prove process-tree termination on Windows, production grants/RLS, multi-instance recovery, production p99, or W16-A closure.
+
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)

@@ -776,6 +776,7 @@ The disposable PostgreSQL 18.6 schema-only runner passed **83/83 steps**; D20 mi
 | v1.11 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Index the focused W16-A OAuth PG18.6 repository acceptance runner at automation-design §4.103; record its 3/3 disposable-cluster result and retain production grants/RLS, HTTP, Canvas revocation and full W16-A as open | W16-A OAuth PostgreSQL acceptance and companion-document synchronization |
 | v1.06 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Record WLD-0 privilege/membership drift injection, migration replay normalization, stable fingerprint and 34/34 PostgreSQL result; verify role-owned schema rejection and preserve production gates | Final owner-role replay acceptance and documentation synchronization |
 | v1.04 | 2026-10-20 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Extend the WLD-0 index for the NOLOGIN Directory owner role, lock-only column grants, restrictive RLS policies and the verified non-superuser acceptance harness; keep target DB, production membership, authenticated API and Rust 1.99.0 gates open | Owner-role/RLS acceptance implementation |
+| v1.12 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Register the Canvas SSE PostgreSQL 18.6 acceptance runner at automation-design §4.104; record 41/41 runner steps and the exact 1/1 device-revocation case while retaining unsigned-attestation, test-only-role, production grants/RLS and full W16-A gates | W16-A Canvas SSE device-revocation acceptance |
 
 
 ## Phase 9F4I
