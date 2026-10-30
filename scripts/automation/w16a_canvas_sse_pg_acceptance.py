@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run one Canvas SSE revocation test on an owned disposable PostgreSQL 18 cluster."""
 
-# @cypher schema=1 source_sha256=9da36682ba736b8d7dd170dfd0bff873c4fae398dc8ee82641bc824bc9e49807
+# @cypher schema=1 source_sha256=96303fe00e63e064f99689e4336a2067e28259e8c98774b031e5db088f46ed25
 # MERGE (self:File {path:"scripts/automation/w16a_canvas_sse_pg_acceptance.py"})
 # MERGE (root:Config {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::ROOT",kind:"path"})
 # MERGE (runsRoot:Config {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::RUNS_ROOT",kind:"external_temp_path"})
@@ -371,8 +371,10 @@ def run_step(
     environment: Mapping[str, str],
     logs_dir: Path,
     timeout_seconds: int,
+    *,
+    capture_output: bool = True,
 ) -> dict[str, object]:
-    """Persist only incrementally redacted subprocess output under bounded backpressure."""
+    """Capture redacted output by default; suppress streams for detached service startup."""
     if re.fullmatch(r"[A-Za-z0-9_-]+", name) is None:
         raise ValueError("step name contains unsafe path characters")
     if timeout_seconds <= 0:
@@ -387,7 +389,7 @@ def run_step(
                     command,
                     cwd=ROOT,
                     env=dict(environment),
-                    stdout=subprocess.PIPE,
+                    stdout=subprocess.PIPE if capture_output else subprocess.DEVNULL,
                     stderr=subprocess.STDOUT,
                     bufsize=0,
                     shell=False,
@@ -413,11 +415,44 @@ def run_step(
                 }
             else:
                 try:
-                    return_code, timed_out, capture_failed = supervise_subprocess(
-                        process,
-                        output,
-                        timeout_seconds,
-                    )
+                    if capture_output:
+                        return_code, timed_out, capture_failed = supervise_subprocess(
+                            process,
+                            output,
+                            timeout_seconds,
+                        )
+                    else:
+                        output.write(
+                            b"Subprocess stdout/stderr redirected to the null device; "
+                            b"service readiness is checked by a separate step.\n"
+                        )
+                        try:
+                            return_code = process.wait(timeout=timeout_seconds)
+                            timed_out = False
+                        except subprocess.TimeoutExpired:
+                            timed_out = True
+                            try:
+                                process.kill()
+                            except OSError:
+                                pass
+                            try:
+                                process.wait(timeout=PROCESS_KILL_GRACE_SECONDS)
+                            except (OSError, subprocess.TimeoutExpired):
+                                pass
+                            return_code = 124
+                        except BaseException:
+                            try:
+                                process.kill()
+                            except BaseException:
+                                pass
+                            try:
+                                process.wait(timeout=PROCESS_KILL_GRACE_SECONDS)
+                            except BaseException:
+                                pass
+                            raise
+                        capture_failed = False
+                        if return_code is None:
+                            return_code = 124 if timed_out else 125
                     if capture_failed and not timed_out:
                         return_code = 125
                         output.seek(0)
@@ -1311,6 +1346,7 @@ def main(argv: list[str] | None = None) -> int:
             environment,
             logs_dir,
             timeout_seconds=240,
+            capture_output=False,
         )
         steps.append(start)
         if start["exit_code"] != 0:

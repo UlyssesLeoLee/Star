@@ -1,6 +1,6 @@
 """Unit checks for the Canvas SSE runner's fail-closed guards."""
 
-# @cypher schema=1 source_sha256=7d13373fc862c6644f89bca19fa1b2dd15a68c5f0fde212bb06bdae892321690
+# @cypher schema=1 source_sha256=f016805bcb9fc3e6ee826242b5a8159527f1fae339a73ed7f940744a075dfb0d
 # MERGE (self:File {path:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py"})
 # MERGE (runner:File {path:"scripts/automation/w16a_canvas_sse_pg_acceptance.py"})
 # MERGE (environmentTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_environment_sanitization_removes_inherited_database_targets",kind:"test"})
@@ -24,10 +24,12 @@
 # MERGE (redactionFailureTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_redaction_failure_suppresses_raw_output_and_cleans_temp",kind:"test"})
 # MERGE (liveRedactionTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_run_step_persists_only_redacted_output_while_producer_is_active",kind:"test"})
 # MERGE (timeoutTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_run_step_kills_timed_out_process_and_keeps_partial_url_redacted",kind:"test"})
+# MERGE (suppressedOutputTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_run_step_suppresses_detached_service_output",kind:"test"})
+# MERGE (suppressedOutputInterruptTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_run_step_kills_detached_service_on_interrupt",kind:"test"})
 # MERGE (cleanupTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_failed_shutdown_preserves_only_owned_data",kind:"test"})
 # MERGE (cleanupDecisionTest:Symbol {id:"scripts/automation/test_w16a_canvas_sse_pg_acceptance.py::test_data_cleanup_requires_pass_shutdown_and_ownership",kind:"test"})
 # MERGE (self)-[:DEFINES]->(environmentTest),(self)-[:DEFINES]->(generatedUrlTest),(self)-[:DEFINES]->(pathTest),(self)-[:DEFINES]->(portTest),(self)-[:DEFINES]->(migrationTest),(self)-[:DEFINES]->(binaryTest),(self)-[:DEFINES]->(binaryPathTest),(self)-[:DEFINES]->(externalBinaryTest),(self)-[:DEFINES]->(binaryLayoutTest),(self)-[:DEFINES]->(attestationTest),(self)-[:DEFINES]->(cleanupPathsTest),(self)-[:DEFINES]->(cleanupRecheckTest),(self)-[:DEFINES]->(summaryTest),(self)-[:DEFINES]->(tailTest),(self)-[:DEFINES]->(redactionTest),(self)-[:DEFINES]->(streamRedactionTest),(self)-[:DEFINES]->(redactionFailureTest),(self)-[:DEFINES]->(cleanupTest),(self)-[:DEFINES]->(cleanupDecisionTest)
-# MERGE (self)-[:DEFINES]->(oauthBaseTest),(self)-[:DEFINES]->(attestationSizeTest),(self)-[:DEFINES]->(liveRedactionTest),(self)-[:DEFINES]->(timeoutTest)
+# MERGE (self)-[:DEFINES]->(oauthBaseTest),(self)-[:DEFINES]->(attestationSizeTest),(self)-[:DEFINES]->(liveRedactionTest),(self)-[:DEFINES]->(timeoutTest),(self)-[:DEFINES]->(suppressedOutputTest),(self)-[:DEFINES]->(suppressedOutputInterruptTest)
 # MERGE (environmentTest)-[:TESTS]->(runner),(environmentTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::sanitized_environment",kind:"function"})
 # MERGE (generatedUrlTest)-[:TESTS]->(runner),(generatedUrlTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::test_environment",kind:"function"})
 # MERGE (pathTest)-[:TESTS]->(runner),(pathTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::run_paths",kind:"function"}),(pathTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::is_inside",kind:"function"})
@@ -49,6 +51,8 @@
 # MERGE (redactionFailureTest)-[:TESTS]->(runner),(redactionFailureTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::run_step",kind:"function"})
 # MERGE (liveRedactionTest)-[:TESTS]->(runner),(liveRedactionTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::run_step",kind:"function"})
 # MERGE (timeoutTest)-[:TESTS]->(runner),(timeoutTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::run_step",kind:"function"})
+# MERGE (suppressedOutputTest)-[:TESTS]->(runner),(suppressedOutputTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::run_step",kind:"function"})
+# MERGE (suppressedOutputInterruptTest)-[:TESTS]->(runner),(suppressedOutputInterruptTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::run_step",kind:"function"})
 # MERGE (cleanupTest)-[:TESTS]->(runner),(cleanupTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::stop_and_cleanup",kind:"function"})
 # MERGE (cleanupDecisionTest)-[:TESTS]->(runner),(cleanupDecisionTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_canvas_sse_pg_acceptance.py::should_remove_data",kind:"function"})
 # @endcypher
@@ -540,6 +544,98 @@ class W16ACanvasSseRunnerTests(unittest.TestCase):
             self.assertIn("timed out", result["error"])
             self.assertNotIn(raw_prefix, retained)
             self.assertIn(b"<redacted-database-url>", retained)
+
+    def test_run_step_suppresses_detached_service_output(self) -> None:
+        class CompletedProcess:
+            def wait(self, timeout: float | None = None) -> int:
+                self.assert_wait_timeout = timeout
+                return 0
+
+        process = CompletedProcess()
+        with tempfile.TemporaryDirectory() as temporary:
+            logs_dir = Path(temporary) / "logs"
+            with patch.object(acceptance.subprocess, "Popen", return_value=process) as popen:
+                result = acceptance.run_step(
+                    "detached-service",
+                    ["fake-service-start"],
+                    {},
+                    logs_dir,
+                    30,
+                    capture_output=False,
+                )
+
+            kwargs = popen.call_args.kwargs
+            self.assertEqual(kwargs["stdout"], acceptance.subprocess.DEVNULL)
+            self.assertEqual(kwargs["stderr"], acceptance.subprocess.STDOUT)
+            self.assertEqual(process.assert_wait_timeout, 30)
+            self.assertEqual(result["exit_code"], 0)
+            self.assertIn("null device", str(result["output_tail"]))
+
+            class TimedOutProcess:
+                def __init__(self) -> None:
+                    self.wait_calls = 0
+                    self.was_killed = False
+
+                def wait(self, timeout: float | None = None) -> int:
+                    self.wait_calls += 1
+                    if self.wait_calls == 1:
+                        raise acceptance.subprocess.TimeoutExpired("fake-service-start", timeout)
+                    return -9
+
+                def kill(self) -> None:
+                    self.was_killed = True
+
+                def poll(self) -> int | None:
+                    return -9 if self.was_killed else None
+
+            timed_out_process = TimedOutProcess()
+            with patch.object(acceptance.subprocess, "Popen", return_value=timed_out_process) as popen:
+                timed_out_result = acceptance.run_step(
+                    "detached-service-timeout",
+                    ["fake-service-start"],
+                    {},
+                    logs_dir,
+                    1,
+                    capture_output=False,
+                )
+
+            self.assertEqual(popen.call_args.kwargs["stdout"], acceptance.subprocess.DEVNULL)
+            self.assertTrue(timed_out_process.was_killed)
+            self.assertEqual(timed_out_result["exit_code"], 124)
+            self.assertIn("timed out", timed_out_result["error"])
+
+    def test_run_step_kills_detached_service_on_interrupt(self) -> None:
+        class InterruptedProcess:
+            def __init__(self) -> None:
+                self.wait_calls = 0
+                self.was_killed = False
+
+            def wait(self, timeout: float | None = None) -> int:
+                self.wait_calls += 1
+                if self.wait_calls == 1:
+                    raise KeyboardInterrupt()
+                return -9
+
+            def kill(self) -> None:
+                self.was_killed = True
+
+        process = InterruptedProcess()
+        with tempfile.TemporaryDirectory() as temporary:
+            logs_dir = Path(temporary) / "logs"
+            with patch.object(acceptance.subprocess, "Popen", return_value=process) as popen:
+                with self.assertRaises(KeyboardInterrupt):
+                    acceptance.run_step(
+                        "detached-service-interrupt",
+                        ["fake-service-start"],
+                        {},
+                        logs_dir,
+                        30,
+                        capture_output=False,
+                    )
+
+            self.assertEqual(popen.call_args.kwargs["stdout"], acceptance.subprocess.DEVNULL)
+            self.assertTrue(process.was_killed)
+            self.assertEqual(process.wait_calls, 2)
 
     def test_failed_shutdown_preserves_only_owned_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
