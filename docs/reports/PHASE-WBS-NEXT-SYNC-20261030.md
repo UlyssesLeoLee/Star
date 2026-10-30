@@ -11,7 +11,7 @@
 
 | 路径 | 改动 | 状态 |
 |---|---|---|
-| docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md | 计划稿升至 v0.79；同步顶层摘要及 W8/W16 当前状态；为 §4 旧 9F4J 顺序和 §6 较早阻塞快照增加历史说明；保留既有 §23.12/§23.13，新增 §23.14 与有序后续工作 | 完成 |
+| docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md | 计划稿升至 v0.79；同步顶层摘要及 W8/W16 当前状态，并仅更新 W16 当前状态列、原样保留父提交的完整 W16 完成门；为 §4 旧 9F4J 顺序和 §6 较早阻塞快照增加历史说明；保留既有 §23.12/§23.13，新增 §23.14 与有序后续工作 | 完成 |
 | docs/briefs/WBS-NEXT-SYNC-20261030.md | 本 lane 的 dispatcher brief | 预登记；未改 |
 | docs/reports/WBS-DISPATCH-WBS-NEXT-SYNC-20261030.jsonl | brief 派发记录 | 预登记；未改 |
 | docs/reports/PHASE-WBS-NEXT-SYNC-20261030.md | 本阶段范围、证据、门禁和修订记录 | 完成 |
