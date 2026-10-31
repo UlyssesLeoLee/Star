@@ -3,6 +3,15 @@
 // Vitest test — BoardView 集成组件 (PR-252)
 // 8 tests: 集成 IPC + KanbanBoard + WASM hooks + view mode + DSL filter + transition + refresh
 // =====================================================================
+
+/*
+@cypher schema=1 source_sha256=f1668534f22a2a2417407aa1898bce7b086c9d847b5dec6610f8f76730effdae
+MERGE (self:File {path:"crates/star-desktop/frontend/tests/BoardView.test.tsx"})
+MERGE (board:File {path:"crates/star-desktop/frontend/src/components/BoardView.tsx"})
+MERGE (self)-[:TESTS]->(board)
+@endcypher
+*/
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -25,7 +34,6 @@ const mockWorkItems = [
 
 describe('BoardView (PR-252)', () => {
   beforeEach(() => {
-    // @ts-ignore
     globalThis.__TAURI_INTERNALS__ = {
       invoke: vi.fn().mockResolvedValue(mockWorkItems),
     };
@@ -87,22 +95,22 @@ describe('BoardView (PR-252)', () => {
     });
   });
 
-  it('filters work items by DSL', async () => {
+  it('filters completed work items with the supported show DSL keyword', async () => {
     render(
       <MemoryRouter>
-        <BoardView initialDsl="bug" />
+        <BoardView initialDsl="show" />
       </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByTestId('dsl-filter-input')).toBeDefined();
     });
-    // 'bug' 关键字 → 只显示 kind=bug (TEST-002)
+    // `show` filters out completed work items.
     const input = screen.getByTestId('dsl-filter-input');
-    fireEvent.change(input, { target: { value: 'bug' } });
+    fireEvent.change(input, { target: { value: 'show' } });
     await waitFor(() => {
-      expect(screen.getByTestId('board-meta').textContent).toMatch(/1 items/);
+      expect(screen.getByTestId('board-meta').textContent).toMatch(/2 items/);
     });
-    expect(screen.queryByText('TEST-001')).toBeNull(); // story filtered out
+    expect(screen.queryByText('TEST-003')).toBeNull(); // completed item filtered out
   });
 
   it('refreshes work items on Refresh button click', async () => {
@@ -129,9 +137,9 @@ describe('BoardView (PR-252)', () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByTestId('kanban-column-review')).toBeDefined();
+      expect(screen.getAllByTestId('kanban-column-review')).toHaveLength(3);
     });
-    const reviewColumn = screen.getByTestId('kanban-column-review');
+    const reviewColumn = screen.getAllByTestId('kanban-column-review')[0];
     const dataTransfer = { getData: vi.fn(() => 'test-wi-001') };
     fireEvent.drop(reviewColumn, { dataTransfer });
     await waitFor(() => {
@@ -141,7 +149,6 @@ describe('BoardView (PR-252)', () => {
   });
 
   it('shows error state on Tauri IPC failure', async () => {
-    // @ts-ignore
     globalThis.__TAURI_INTERNALS__ = {
       invoke: vi.fn().mockRejectedValue(new Error('Tauri runtime error')),
     };

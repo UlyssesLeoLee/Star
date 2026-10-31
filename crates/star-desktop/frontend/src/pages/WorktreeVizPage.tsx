@@ -16,6 +16,14 @@
 //   - Toolbar: slider + select + meta
 // =====================================================================
 
+/*
+@cypher schema=1 source_sha256=abee95268497d1ac2721fec2eaebeede676c22273ac06ac4b186a3e421071ba5
+MERGE (self:File {path:"crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx"})
+MERGE (layout:File {path:"crates/star-desktop/frontend/src/hooks/useLayoutEngine.ts"})
+MERGE (self)-[:IMPORTS]->(layout)
+@endcypher
+*/
+
 import { useState, useMemo } from 'react';
 import { useLayoutEngine, type ViewMode } from '../hooks/useLayoutEngine';
 
@@ -43,7 +51,7 @@ function makeMockNodes(count: number): WorktreeNode[] {
 }
 
 // Hand-rolled radial layout: x/y 由 depth + index 决定 (0 d3)
-function layoutNodes(nodes: WorktreeNode[], visualDistance: (n: number) => number) {
+function layoutNodes(nodes: WorktreeNode[]) {
   const byDepth = new Map<number, WorktreeNode[]>();
   for (const node of nodes) {
     if (!byDepth.has(node.depth)) byDepth.set(node.depth, []);
@@ -81,7 +89,7 @@ export default function WorktreeVizPage() {
     [layout, viewMode, nodes.length],
   );
   const positions = useMemo(
-    () => layoutNodes(nodes, layout.visualDistance),
+    () => layoutNodes(nodes),
     [nodes, layout],
   );
 
