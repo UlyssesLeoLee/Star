@@ -1,6 +1,6 @@
 # PHASE-STAR-STABLE-W2-DESKTOP-ATTEST-20261031
 
-> **版本**：v0.4 · **日期**：2026-10-31 · **分支**：`agent/stable-release-wave2/desktop-attest` · **基线**：`319026f8`（前一 Desktop lane commit） · **范围**：仅 Desktop stable workflow、此 lane brief、此阶段报告及 dispatcher JSONL。
+> **版本**：v0.5 · **日期**：2026-10-31 · **分支**：`agent/stable-release-wave2/desktop-attest` · **基线**：`4ea04c56`（前一 Desktop lane commit） · **范围**：仅 Desktop stable workflow、此 lane brief、此阶段报告及 dispatcher JSONL。
 > **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 
 ## §0 目的
@@ -11,7 +11,7 @@
 
 | 文件 | 改动 | 状态 |
 |---|---|---|
-| `.github/workflows/star-stable-desktop.yml` | Linux/Windows/macOS 各生成 package-scoped Rust SPDX 2.3 与 frontend SPDX 2.3；校验 JSON/schema 基本字段及空输入，拒绝 SBOM 中出现 retired `star-game` 标记；上传 unsigned bundles + SBOM；仅在 `workflow_dispatch`、精确确认 `APPROVED` 且 ref 为 `v*` tag 时运行共享 MIT license metadata gate，随后每个平台的 `star-stable-release` environment job 才能建立 provenance 与两份语言级 SBOM predicate。 | 已实施；本地静态检查通过 |
+| `.github/workflows/star-stable-desktop.yml` | Linux/Windows/macOS 各生成 package-scoped Rust SPDX 2.3 与 frontend SPDX 2.3；校验 JSON/schema plus non-empty arrays, expected roots, and package floors 基本字段及空输入，拒绝 SBOM 中出现 retired `star-game` 标记；上传 unsigned bundles + SBOM；仅在 `workflow_dispatch`、精确确认 `APPROVED` 且 ref 为 `v*` tag 时运行共享 MIT license metadata gate，随后每个平台的 `star-stable-release` environment job 才能建立 provenance 与两份语言级 SBOM predicate。 | 已实施；本地静态检查通过 |
 | `docs/briefs/STAR-STABLE-W2-DESKTOP-ATTEST-20261031.md` | 记录 SBOM 按生态系统拆分、权限隔离、显式批准/命名环境双门，以及当前许可证元数据不一致会阻断证明的事实。 | 已更新 |
 | `docs/reports/PHASE-STAR-STABLE-W2-DESKTOP-ATTEST-20261031.md` | 本报告：差异、验证结果、外部阻塞与发布门。 | 已新增 |
 | `docs/reports/WBS-DISPATCH-STAR-STABLE-W2-DESKTOP-ATTEST-20261031.jsonl` | 通过 dispatcher 追加静态验证完成记录。 | 已追加 |
@@ -26,12 +26,15 @@
 | `git diff --check` | PASS：无空白/补丁格式错误。 |
 | Frontend SPDX generation command | PASS locally with npm 10.9.3: generated SPDX 2.3 JSON from the committed lockfile with 225 packages and no retired `star-game` package. The configured hosted runtime is Node.js 24.22.2, so this is command-level evidence, not hosted-version parity. |
 | Release license metadata gate | PASS fail-closed behavior: executed the exact Python heredoc extracted from workflow; root `[workspace.package].license` is `Apache-2.0`, while `LICENSE` begins `MIT License`; script exits nonzero on the selected MIT mismatch. |
-| Cypher relationship header | PASS: source digest matches `599cff6ca6747565b8d05b9a31ce6be003fff5b31b49c08c3a7042f8e8989f67`; `cgg_guard --changed --stamp` reported 0 code files because workflow YAML is excluded, so Guardian `source_digest` was checked directly. Cypher references were parsed and all 5 pinned action identities plus 3 new gate configs matched the workflow. |
+| Cypher relationship header | PASS: Guardian source digest is 73e2dff4a4a95468e914a64dc60edd6181fe2070a8338a8c3d9c5714a4d4be2b. The standard changed-source scan reports 0 files because workflow YAML is excluded; the Guardian validate_file routine was also run directly against this workflow with source filtering enabled and returned no errors. The graph now includes the SPDX validation Config and its CONFIGURES edge. |
 | Dispatcher validation record | PASS: final lane validation is appended through `SubagentDispatcher._audit`; hosted CI, actual attestations, and consumer verification remain explicitly unrun. |
 | Dispatcher final validation record | PASS: appended through `SubagentDispatcher._audit`; records 7 jobs, 22 pinned actions, tag checks, subject scope, expected license block, and hosted-only gaps. |
+| Dispatcher SBOM validation record | PASS: final validator, package-floor, Cypher Guardian, and hosted-gate status appended using SubagentDispatcher._audit. |
 | Hosted CI / 实际产物 / 消费者验证 | 未执行；不得标记通过。 |
 | `actionlint` | 本机未安装；以 PyYAML 语法解析及定向结构断言替代，仍需 hosted run 补足 GitHub workflow 语义验证。 |
 | Rust SBOM 生成器 / Cargo build | 未在本机运行：Cargo 1.99.0 CLI 存在，但所选 toolchain 缺少 `rustc` component，且 `cargo-sbom` 未安装。CI 会安装固定版本 `cargo-sbom 0.10.0` 并在 hosted runner 实际执行。 |
+| SBOM validator mutation/control verification | PASS: PyYAML extraction confirmed the identical 1,807-character JavaScript body in all six jobs. rtk npm --prefix crates/star-desktop/frontend sbom --package-lock-only --sbom-format=spdx produced 225 packages/315 relationships with the expected frontend root and DESCRIBES link. The exact body ran via rtk node -e with that npm SBOM and a Rust root fixture; empty arrays and the 224-package mutation were rejected, while valid Rust and 225-package frontend controls passed. |
+| SBOM package floor | PASS: frontend floor is 225 based on the committed npm lock evidence. Rust floor is 1 to require the selected star-desktop root only; no Rust transitive package count is claimed. |
 
 核对资料：GitHub [Artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)、[workflow_dispatch inputs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)、[environment protection rules](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)、官方 [`actions/attest` v4.2.2](https://github.com/actions/attest/releases/tag/v4.2.2)、官方 [`actions/download-artifact` v8.0.2](https://github.com/actions/download-artifact/releases/tag/v8.0.2)、[npm SBOM CLI](https://docs.npmjs.com/cli/commands/npm-sbom/)、[`cargo-sbom` 0.10.0 README](https://docs.rs/crate/cargo-sbom/0.10.0/source/README.md) 与[上游仓库](https://github.com/psastras/sbom-rs)。cargo-sbom 文档允许按 `--cargo-package star-desktop` 选定 Cargo workspace 成员，默认 SPDX JSON 2.3；上游使用 MIT 许可证，0.10.0 于 2025-06-17 发布。GitHub 的 [Rust BOM topic 索引](https://github.com/topics/bom?l=rust&o=desc&s=forks)显示上游项目 2026-09-18 更新，满足本轮 12 个月活动核验窗口。Context7 的 GitHub Actions 文档用于核对 dispatch choice 输入、job if 条件及环境审批机制；Cargo 文档用于核对外部子命令传参。Context7 未提供 cargo-sbom 专用条目，具体参数以该 crate 上游 README 为准。
 
@@ -47,9 +50,10 @@
 8. 当前 lane 只能在工作流中引用 `star-stable-release`；仓库 Settings 中该 environment 是否已配置 Required reviewers / Prevent self-review 未核验。Stable-release gate 关闭前必须由仓库管理员确认 required reviewer protection 生效，否则 GitHub environment 名称本身不会暂停 job。
 9. 当前许可证元数据冲突已实证：用户选择 MIT；`Cargo.toml` 的 `[workspace.package].license` 是 `Apache-2.0`，`LICENSE` 首行是 `MIT License`，且 metadata 由其他 owner 持有。本 lane 不修改共享许可证字段；共享 tag gate 会在证明 job 前 fail closed，直至责任 owner 解决冲突并两项均匹配 MIT。当前稳定版不得生成 artifact attestation。
 
+10. Rust transitive package inventory is not locally verified: Cargo SBOM/tree enumeration is blocked by the missing rustc component. The workflow's minimum of one package proves only that the selected star-desktop root exists. Hosted builds must validate the generated Rust dependency SBOM; hosted validation remains open.
 ## §4 子代理失败接手清单
 
-本 lane 未派发子代理；没有待接手的子代理失败产出。主代理只在登记 worktree 和文件范围内实施。
+The prior desktop worker transport-failed after its first commit. The parent then assigned this bounded SBOM validator remediation to desktop_sbom_fix through a dispatcher brief. This worker completed the replacement, mutation/control validation, report/audit updates, and commit in the registered lane; no additional subagent outputs were used.
 
 ## §5 守门规则
 
@@ -81,3 +85,4 @@
 | v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 加入默认 NO 的 dispatch choice，要求精确 APPROVED；所有证明任务引用 star-stable-release environment，并记录 Required reviewers 外部配置门。 | 父级独立评审反馈 |
 | v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 增加共享许可证门；当前 Cargo workspace 仍为 Apache-2.0，而 LICENSE heading 为 MIT，证明任务按预期阻止。 | 父级许可证门评审反馈 |
 | v0.4 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 记录最终上游 SHA/subject 复核、Cypher YAML digest 的手动核验边界及最终 dispatcher audit；保持许可证冲突和 hosted-only gate 明确未关闭。 | 本轮最终复核 |
+| v0.5 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | SBOM validators updated across six build and attestation jobs; package floors, root relationship checks, mutation/control results, and Rust transitive-count limitation recorded; section 4 now records the prior worker transport failure and parent handoff accurately. | Validator review |

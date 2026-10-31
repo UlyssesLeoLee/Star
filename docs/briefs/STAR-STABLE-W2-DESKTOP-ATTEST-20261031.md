@@ -1,8 +1,8 @@
 # Brief: STAR-STABLE-W2-DESKTOP-ATTEST-20261031
 
-**Agent**: worker
-**Phase**: STABLE-RELEASE-W2-DESKTOP-ATTEST
-**Created**: 2026-10-31 15:06:51
+**Agent**: desktop_sbom_fix
+**Phase**: STABLE-RELEASE-WAVE2
+**Created**: 2026-10-31 16:27:07
 
 ---
 
@@ -26,6 +26,11 @@ Graph evidence: CodeGraph broad WBS queries returned irrelevant code symbols; th
 - Add a shared tag-release gate that compares root `[workspace.package].license` and the first-line `LICENSE` heading against the user-selected MIT license. The workspace currently says Apache-2.0 while `LICENSE` says MIT License, so the gate must block attestation until the responsible owners resolve that mismatch; this lane does not rewrite shared license metadata.
 - Attest Linux `.deb`/AppImage, Windows MSI, and macOS universal DMG individually through their actual paths. These attestations establish provenance and SBOM predicates; they do not sign installers or notarize macOS output.
 - The SBOM inventory is split by package ecosystem, and the npm lockfile view includes development/build dependencies. License/NOTICE closure and consumer-side verification remain release gates.
+- All six build/attestation validators reject empty SPDX package and relationship arrays, require the expected root package and document DESCRIBES relationship, and enforce the manually checked npm lock floor of 225 packages. Rust validation requires only the selected star-desktop root (minimum 1); no Rust transitive package count is asserted because local rustc is unavailable. Hosted Rust SBOM generation and validation remain open.
+
+
+## Review follow-up: shared SBOM validator
+Replace the six oversized inline validators with concise workflow validation in the already-claimed workflow file; do not add a helper file or expand manifest paths. All six validation sites must reject empty SPDX package and relationship arrays, require the expected root package and its SPDX DESCRIBES link, and enforce the manually audited 225-package npm lock floor. Local Rust transitive enumeration is blocked by the unavailable rustc, so do not invent a Rust count; require the selected star-desktop root and report the gap. Run mutation/control tests against the exact validation logic (empty packages rejected, empty relationships rejected, valid Rust/frontend controls pass, 224 npm packages rejected, 225-package control passes), then update the phase report and WBS dispatch JSONL with actual commands/results. Preserve the current MIT fail-closed gate and all existing scope. Run CypherGraph Guardian and diff checks; commit only the four registered files. Do not merge, push, tag, release or clean the lane.
 
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
