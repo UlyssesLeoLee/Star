@@ -55,6 +55,8 @@ stable-hardening 首轮四个已审查 lane 已合入本地 `dev`：license-poli
 
 集成后的 `git diff --check` 通过，容器构建/部署输入静态扫描仅发现用于排除 `star-game` 的断言和 `.dockerignore` 规则。相应 lane 的本地构建、测试与静态审查见各阶段报告；本次没有重新运行完整发行构建、hosted CI、签名/安装、真实 Vercel 部署或 OCI/K3s 验收。W0–W9 状态不变，稳定产品发行仍为 OPEN；没有创建 tag/release、构建或发布制品、部署或 push。
 
+四个 lane 工作树及其四个来源分支、集成分支均已在确认干净、无人使用且提交已包含于 `dev` 后清理；其他工作树与分支未触碰。
+
 ## 外部约束依据（截至 2026-10-31）
 
 - Rust 官方 notes 显示 1.99.1 于 2026-10-15 发布；Star baseline 1.99.0仍是用户声明的最低版本，但是否升 patch 需在 W2 决策。[Rust Release Notes](https://doc.rust-lang.org/releases.html)
@@ -75,3 +77,4 @@ stable-hardening 首轮四个已审查 lane 已合入本地 `dev`：license-poli
 | v0.7 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 stable-hardening revision 24 的实际切片：Chart/deny 为 MIT，桌面隔离 lock/build/frontend tests 已实现，Vercel 配置通过首轮审查；桌面 CI 与 Canvas 发布审批 follow-up 正在进行。按证据更新 W1/W2/W5/W6/W7；所有 hosted CI、法律/NOTICE、签名、部署、OCI digest 和两实例验收仍开放。 | 用户确认范围与许可证后，四条并行 lane 已完成首轮 |
 | v0.8 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 stable-hardening revision 28 的独立审查结果：桌面三平台 workflow 在 Node 24 构建前运行 Vitest 并关闭 checkout 凭据持久化；Canvas tag push 不再自动发布，只有版本 tag 的明确批准 dispatch 可请求发布并绑定外部保护 environment。工作流静态检查通过，hosted CI 与外部 environment 配置仍未核实；WBS 将 W5/W7 缺口和 lane 状态更新为集成前快照。 | 独立 lane 审查发现发布 workflow 缺少相应门禁 |
 | v0.9 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 stable-hardening 四个已审查 lane 按序进入集成分支并快进到本地 dev@782a730；MAGOS GitPlan set 已释放。记录集成差异检查及 `star-game` 排除扫描结果，同时保持 W0–W9 未闭合项与稳定发行 OPEN；未创建 tag、发布、部署或 push。 | 四个 stable-hardening lane 完成 dev 集成 |
+| v1.0 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录四个 lane 工作树及五个已合入本地 `dev` 的 lane/集成分支已按清理门禁移除；其余 worktree、`main` 和远端均未修改。 | 四个 stable-hardening lane 完成合并清理 |
