@@ -12,6 +12,7 @@
 | 稳定版执行 WBS | 更新完成；发行范围与 MIT 选择已确定，W0/W1 部分决策锁定，其余证据门保持 OPEN | `docs/implementation-plans/WBS-STAR-STABLE-RELEASE-20261031.md` |
 | Lane brief | 已通过 SubagentDispatcher 追加用户范围/许可证决策和条件推送边界 | `docs/briefs/W16-B-RELEASE-CLOSURE-REFRESH-20261031.md` |
 | Dispatcher audit log | brief 与本 lane 完成事件均已写入 | `docs/reports/WBS-DISPATCH-W16-B-RELEASE-CLOSURE-REFRESH-20261031.jsonl` |
+| 本地 dev 集成 | 父级审阅后 fast-forward 完成，`dev` 指向 `163f715bb68bae1d0605300b705fac03b7dad192` | 本地 Git + Orca worktree/terminal 状态 |
 
 ## §2 验证摘要
 
@@ -58,10 +59,10 @@
 | 架构 | 发行面由用户确认；canonical version/source commit/tag owner 映射尚未闭合。 |
 | SRE Lead | 远端 CI required checks/部署/保留策略未核验。 |
 | 平台 | root/ACI metadata 可解析；BFF metadata 不满足 `--locked`；制品级供应链证明未见。 |
-| 评审主持 | 发行许可、NOTICE、SBOM 仍 OPEN。 |
+| 评审主持 | 本 lane 文档差异、决策同步和目标状态已复核并快进集成；发行许可、NOTICE、SBOM 仍 OPEN。 |
 | PM | 发行面与 MIT 选择已由用户确认；`v1.0.5` local tag 与 `0.1.0` manifests 的版本映射未决。稳定版推送仅在全部门禁通过后执行。 |
 
-**签批状态：** 本阶段报告只记录子代理执行的证据和结论；协调者/Mavis 的最终集成 review 尚未发生。本文不批准商业发行。用户已条件授权：只有稳定发行 WBS 全部门禁通过并完成最终复核后才推送稳定版本；当前不执行 release、tag、build、publish、deploy 或 push。
+**签批状态：** 父级已审阅本 lane 的 WBS/审计/派发记录，并于 2026-10-31 将提交 `163f715bb68bae1d0605300b705fac03b7dad192` fast-forward 集成到本地 `dev`。本文不批准商业发行。用户已条件授权：只有稳定发行 WBS 全部门禁通过并完成最终复核后才推送稳定版本；当前不执行 release、tag、build、publish、deploy 或 push。
 
 ## §7 修订历史
 
@@ -69,3 +70,4 @@
 |---|---|---|---|
 | v0.1 | 2026-10-31 | W16-B 子代理（Mavis 接手审核待协调者复核） | 建立本阶段报告；列出实际命令、未验证外部状态与未关闭发行门。 |
 | v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步用户已确认的 Desktop/Web/Vercel/Star Canvas 镜像发行面和 MIT canonical license；W5–W7 保持 P0，稳定版 push 仅在全部门禁闭合后进行。 | 用户完成发行范围与许可证决策 |
+| v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录父级审阅、目标 dev 干净/无 Orca terminal 的 freshness 检查，以及 W16-B 提交在本地 dev 的 fast-forward 结果；不改变稳定发行 OPEN 状态。 | W16-B 文档 lane 完成集成 |

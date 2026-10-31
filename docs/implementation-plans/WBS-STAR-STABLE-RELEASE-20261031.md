@@ -2,7 +2,7 @@
 
 > **状态：OPEN / 不可发布。** 此 WBS 先闭合真实发行范围和证据。用户已条件授权：全部稳定版门禁通过并完成最终复核后可推送一个稳定版本；在此之前不创建 release/tag、不构建或发布 artifact，也不 push。
 >
-> 审计快照基线：`dev@f34866b8658ad6a226c648a6f88c745d7195ab74`。当前本地 `dev` 已集成 W16-A 到 `ea7058e1d5ecf9e41d3aa99e4471a07cc8265d11`；本次决策同步只更新发行 WBS，不声称重新运行发行构建或部署审计。
+> 审计快照基线：`dev@f34866b8658ad6a226c648a6f88c745d7195ab74`。当前本地 `dev` 已集成 W16-A（`ea7058e1d5ecf9e41d3aa99e4471a07cc8265d11`）和 W16-B 发行范围/MIT 决策 WBS（`163f715bb68bae1d0605300b705fac03b7dad192`）；没有因此重新运行发行构建或部署审计。
 > 审计：[`W16-B-RELEASE-CLOSURE-AUDIT-20261031.md`](../reviews/W16-B-RELEASE-CLOSURE-AUDIT-20261031.md)
 
 ## 已确认的发行决策（2026-10-31）
@@ -49,3 +49,4 @@ W1 法律/NOTICE、W2 锁与构建闭包、W3 SBOM/provenance、W5 桌面闭环�
 |---|---|---|---|
 | v0.1 | 2026-10-31 | W16-B 子代理（Mavis 接手审核待协调者复核） | 按 W16-B 审计发现制定稳定发行 WBS；所有构建、发布和部署证据保持 OPEN。 |
 | v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Desktop + Web/Vercel + 三份 Star Canvas 镜像发行面及 MIT canonical license；把 W5–W7 标为无条件 P0、W8 的两实例运行验收保持 OPEN，并记录仅在所有门禁通过后推送稳定版的条件授权。 | 用户完成发行范围与许可证决策 |
+| v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | W16-B 审计/WBS 已经父级审阅并快进集成到本地 `dev@163f715`；稳定版门禁仍为 OPEN。 | W16-B 文档 lane 完成集成 |
