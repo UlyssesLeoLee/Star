@@ -1,6 +1,6 @@
 name: Star Desktop stable bundle checks
 
-# @cypher schema=1 source_sha256=957bd2f1aeb517d7e46f27acadb83ad211b449cb21f79eaa28362773f16b4997
+# @cypher schema=1 source_sha256=599cff6ca6747565b8d05b9a31ce6be003fff5b31b49c08c3a7042f8e8989f67
 # MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
 # MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
 # MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
@@ -9,6 +9,9 @@ name: Star Desktop stable bundle checks
 # MERGE (download_artifact:ExternalService {id:"actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",name:"actions/download-artifact v8.0.2"})
 # MERGE (cargo_sbom:ExternalService {id:"cargo-sbom@0.10.0",name:"cargo-sbom 0.10.0 SPDX JSON"})
 # MERGE (npm_sbom:ExternalService {id:"npm-sbom",name:"npm sbom SPDX generator"})
+# MERGE (release_confirmation:Config {id:"workflow-dispatch.release-confirmation",name:"required APPROVED release confirmation"})
+# MERGE (release_environment:Config {id:"github-environment.star-stable-release",name:"protected star-stable-release environment"})
+# MERGE (release_license_gate:Config {id:"release-license.mit-metadata-match",name:"MIT workspace metadata and LICENSE heading must match"})
 # MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.0"})
 # MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
 # MERGE (frontend_tests:Config {id:"frontend-tests.desktop-stable",name:"npm test -- --reporter=dot on Node.js 24.22.2"})
@@ -22,6 +25,9 @@ name: Star Desktop stable bundle checks
 # MERGE (self)-[:CONFIGURES]->(node_runtime)
 # MERGE (self)-[:CALLS]->(cargo_sbom)
 # MERGE (self)-[:CALLS]->(npm_sbom)
+# MERGE (self)-[:CONFIGURES]->(release_confirmation)
+# MERGE (self)-[:CONFIGURES]->(release_environment)
+# MERGE (self)-[:CONFIGURES]->(release_license_gate)
 # @endcypher
 
 on:
@@ -42,6 +48,15 @@ on:
       - "crates/**"
       - "scripts/build-desktop.sh"
   workflow_dispatch:
+    inputs:
+      release_confirmation:
+        description: "Select APPROVED only when authorizing stable release attestations; keep NO for routine checks."
+        required: true
+        type: choice
+        default: NO
+        options:
+          - NO
+          - APPROVED
 
 permissions:
   contents: read
@@ -313,11 +328,49 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  release_metadata_gate:
+    name: Verify stable release license metadata
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require MIT workspace metadata and license heading
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          cargo = tomllib.loads(Path("Cargo.toml").read_text(encoding="utf-8"))
+          workspace_license = cargo.get("workspace", {}).get("package", {}).get("license")
+          license_lines = Path("LICENSE").read_text(encoding="utf-8").splitlines()
+          license_heading = license_lines[0].strip() if license_lines else ""
+          failures = []
+          if workspace_license != "MIT":
+              failures.append(f"[workspace.package].license must be MIT; found {workspace_license!r}")
+          if license_heading != "MIT License":
+              failures.append(f"LICENSE heading must be 'MIT License'; found {license_heading!r}")
+          if failures:
+              print("Stable-release attestation blocked: " + "; ".join(failures), file=sys.stderr)
+              raise SystemExit(1)
+          print("PASS: Cargo workspace license metadata and LICENSE heading both identify MIT.")
+          PY
+
   attest_linux:
     name: Attest Linux bundles
-    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
-    needs: linux
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, release_metadata_gate]
     runs-on: ubuntu-24.04
+    environment:
+      name: star-stable-release
     permissions:
       contents: read
       id-token: write
@@ -366,9 +419,11 @@ jobs:
 
   attest_windows:
     name: Attest Windows installer
-    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
-    needs: windows
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, release_metadata_gate]
     runs-on: ubuntu-24.04
+    environment:
+      name: star-stable-release
     permissions:
       contents: read
       id-token: write
@@ -409,9 +464,11 @@ jobs:
 
   attest_macos:
     name: Attest macOS universal installer
-    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
-    needs: macos
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, release_metadata_gate]
     runs-on: ubuntu-24.04
+    environment:
+      name: star-stable-release
     permissions:
       contents: read
       id-token: write
