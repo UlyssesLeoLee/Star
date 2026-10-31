@@ -1,3 +1,20 @@
+/*
+@cypher schema=1 source_sha256=a7e35cdbde297b56478abe5b5050c01693cb9b548228fc8ef25052e9cf471985
+MERGE (self:File {path:"frontend/src/components/agent-view/AgentCanvasView.test.tsx"})
+MERGE (agentCanvasView:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"})
+MERGE (store:File {path:"frontend/src/lib/store.ts"})
+MERGE (i18n:File {path:"frontend/src/lib/i18n/index.ts"})
+MERGE (canvasTypes:File {path:"frontend/src/lib/agent-view/types.ts"})
+MERGE (ids:File {path:"frontend/src/types/ids.ts"})
+MERGE (self)-[:IMPORTS]->(agentCanvasView)
+MERGE (self)-[:IMPORTS]->(store)
+MERGE (self)-[:IMPORTS]->(i18n)
+MERGE (self)-[:IMPORTS]->(canvasTypes)
+MERGE (self)-[:IMPORTS]->(ids)
+MERGE (self)-[:TESTS]->(agentCanvasView)
+@endcypher
+*/
+
 // =====================================================================
 // AgentCanvasView.test.tsx — smoke 测试
 // =====================================================================
@@ -119,6 +136,25 @@ describe("AgentCanvasView", () => {
     expect(screen.getByTestId("agent-canvas-node-n-wi-test-wi-001")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-connector-c1")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-connector-c2")).toBeTruthy();
+  });
+
+  it("节点展示 Agent 的当前步骤与状态", () => {
+    const canvas: AgentCanvasType = {
+      agentId: "ag-001",
+      nodes: [
+        { id: "n-agent-ag-001", kind: "agent", x: 0, y: 0, width: 220, height: 110, ref: { kind: "agent", agentId: "ag-001" } },
+      ],
+      connectors: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      derivedAt: "2026-09-05T11:00:00Z",
+    };
+
+    renderWithI18n(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
+
+    const agentNode = screen.getByTestId("agent-canvas-node-n-agent-ag-001");
+    expect(agentNode.textContent).toContain("ag-001");
+    expect(agentNode.textContent).toContain("tool.call:grep");
+    expect(agentNode.textContent).toContain("executing");
   });
 
   it("zoom 数字显示在 toolbar", () => {

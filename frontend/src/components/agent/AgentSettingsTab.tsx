@@ -1,10 +1,16 @@
 /*
-@cypher schema=1 source_sha256=0535900695f618d11118ae27becfdd8c66d8803a91689f70912bb95ffb1cc965
-MERGE (self:File {path:"frontend/src/components/agent-game/AgentSettingsTab.tsx"})
+@cypher schema=1 source_sha256=624d0f963796a3b54ae1546ae42e06398efb02243934aeadc8df6038eab9a58f
+MERGE (self:File {path:"frontend/src/components/agent/AgentSettingsTab.tsx"})
+MERGE (settings:File {path:"frontend/src/lib/agent/settings.ts"})
+MERGE (store:File {path:"frontend/src/lib/store.ts"})
+MERGE (statusPill:File {path:"frontend/src/components/StatusPill.tsx"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
 MERGE (agentSettingsTab:Function {name:"AgentSettingsTab", language:"typescript", visibility:"public"})
 MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (self)-[:IMPORTS]->(settings)
+MERGE (self)-[:IMPORTS]->(store)
+MERGE (self)-[:IMPORTS]->(statusPill)
 MERGE (self)-[:DEFINES]->(agentSettingsTab)
 MERGE (agentSettingsTab)-[:CALLS]->(agentKindDisplayLabel)
 @endcypher
@@ -12,9 +18,9 @@ MERGE (agentSettingsTab)-[:CALLS]->(agentKindDisplayLabel)
 "use client";
 
 // =====================================================================
-// AgentSettingsTab — 给每个 agent 配 API / 模型 / 提示 (per 9/5 23:00 JST 拍板)
+// AgentSettingsTab — local Agent configuration draft
 // =====================================================================
-// 3 个 tab 之一 (Canvas v1 / Roguelike v2 / Agent 设置):
+// Part of the Agent workspace settings view:
 //   - 左侧 12 agents 列表 (per store.agentSessions)
 //   - 右侧 form (API key / model select / maxTokens / temperature /
 //     systemPrompt / baseUrl / enabled toggle)
@@ -27,7 +33,7 @@ import { useStore } from "@/lib/store";
 import {
   validateSettings, modelOptionsFor,
   type AgentSettings,
-} from "@/lib/agent-game/settings";
+} from "@/lib/agent/settings";
 import { StatusPill } from "@/components/StatusPill";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 import { Check, Key, Cpu, Zap, FileText, Globe, Power, Save, AlertCircle, Bot } from "lucide-react";
@@ -122,6 +128,9 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
           <div className="text-center text-ink-mute text-xs py-12">选择左侧 agent 配置 API</div>
         ) : (
           <div className="max-w-2xl mx-auto" data-testid="agent-settings-form">
+            <div id="agent-settings-notice" role="note" className="mb-4 rounded border border-warn/30 bg-warn/5 p-3 text-xs text-ink-dim">
+              这是本地配置草稿，不会启动 Agent 或调用模型。当前没有安全凭据存储；请勿输入真实 API 密钥。
+            </div>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-base font-semibold flex items-center gap-2">
@@ -146,15 +155,16 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
               <FieldRow
                 icon={<Key size={12} />}
                 label="API Key"
-                hint="Mock 模式, 实际不调用"
+                hint="安全凭据存储未接入"
                 testId="agent-settings-field-apikey"
               >
                 <input
                   data-testid="agent-settings-input-apikey"
                   type="password"
                   value={settings.apiKey}
-                  onChange={(e) => updateAgentSetting(selected.id, "apiKey", e.target.value)}
-                  className="input text-xs font-mono w-full"
+                  disabled
+                  aria-describedby="agent-settings-notice"
+                  className="input text-xs font-mono w-full opacity-60"
                 />
               </FieldRow>
 

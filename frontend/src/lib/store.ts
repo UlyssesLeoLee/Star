@@ -1,6 +1,8 @@
 /*
-@cypher schema=1 source_sha256=75a2cd0d73d445387b91d7e83bd57a00d181777c779862313a79543895843655
+@cypher schema=1 source_sha256=f6d38de02f5f101a4b011b7a934d906b74b50713b025e228d00f09f4cbc3aff8
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
+MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
+MERGE (self)-[:IMPORTS]->(agentSettings)
 @endcypher
 */
 
@@ -33,35 +35,9 @@ import type {
   RefactorRound, RefactorCard, RefactorColumn, RefactorBoardConfig, RefactorStatus,
   Uuid,
 } from "@/types/ids";
-import type { AgentGameState, PerkId } from "@/lib/agent-game/types";
-import {
-  createInitialGameState,
-  computeClaim,
-  applyClaim,
-  applyPerkChoice,
-  applyCostSpend,
-  applyDeath,
-  applyRevive,
-  applyRestart,
-} from "@/lib/agent-game/leveling";
-import type { GameMap, MapCell } from "@/lib/agent-game/mapgen";
-import { generateMap } from "@/lib/agent-game/mapgen";
-import { moveAgent, type MoveResult } from "@/lib/agent-game/movement";
-import type { AgentSettings } from "@/lib/agent-game/settings";
-import { createInitialAgentSettings } from "@/lib/agent-game/settings";
+import type { AgentSettings } from "@/lib/agent/settings";
+import { createInitialAgentSettings } from "@/lib/agent/settings";
 
-/** claimReward 戻り値 (per 拍板) */
-export type ClaimResult =
-  | { ok: true; xp: number; coins: number; leveledUp: boolean; levelsGained: number; isMaxLevel: boolean }
-  | { ok: false; reason: "work_item_not_found" | "already_claimed" | "not_done" | "agent_dead" };
-
-/** spendCost 戻り値 (per 拍板) */
-export type SpendResult =
-  | { ok: true; died: boolean; hpAfter: number; triggerCostRatio: number }
-  | { ok: false; reason: "agent_not_found" };
-
-/** reviveAgent 戻り値 */
-export type ReviveResult = { ok: true } | { ok: false; reason: string };
 import { TODO_FALLBACK_STATUS, isFallbackStatus } from "@/components/board/constants";
 import {
   REFACTOR_DEFAULT_BATCH_SIZE,
@@ -191,14 +167,7 @@ interface StoreState {
   /** per-project 重构看板配置 (列定义 + batch_size) */
   refactorBoardConfigs: Record<Uuid, RefactorBoardConfig>;
 
-  // ── Agent Game (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化) ──
-  /** per-agent 游戏化状态 (level / xp / coins / hp / perks) */
-  agentGameStates: Record<Uuid, AgentGameState>;
-  /** per-agent Roguelike map (per 2026-09-05 12:23 JST 拍板, ask_8a60a3bc...) */
-  agentMaps: Record<Uuid, GameMap>;
-  /** per-agent 当前在 map 上的位置 (per 拍板 #3, 4-邻接移动) */
-  agentPositions: Record<Uuid, { x: number; y: number }>;
-  /** per-agent API / 模型 / 提示配置 (per 2026-09-05 23:00 JST 拍板, Agent 设置 tab) */
+  // Per-agent settings draft; execution credentials are not stored here.
   agentSettings: Record<Uuid, AgentSettings>;
 
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
@@ -361,26 +330,6 @@ interface StoreState {
   addCanvasConnector: (connector: CanvasConnector) => void;
   setCanvasViewport: (canvasId: string, x: number, y: number, zoom: number) => void;
 
-  // Agent Game (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化)
-  /** 初始化/重置某 agent 的 game state (Lv 1, HP 满, perks 清零) */
-  initAgentGame: (agentId: Uuid, budgetUsd: number) => void;
-  /** 领取 work-item 完成奖励 (xp + coins), 内部触发升级和死亡检测 */
-  claimReward: (agentId: Uuid, workItemId: Uuid) => ClaimResult;
-  /** 选 perk (5 选 1, 升级时调) */
-  choosePerk: (agentId: Uuid, perkId: PerkId) => void;
-  /** 消耗 cost (HP 扣血, 可能触发死亡) */
-  spendCost: (agentId: Uuid, costDelta: number) => SpendResult;
-  /** 复活 (扣 50 金币, 重置 Lv 1) */
-  reviveAgent: (agentId: Uuid) => { ok: boolean; reason?: string };
-  /** 重开 (不扣币) */
-  restartAgent: (agentId: Uuid) => void;
-  /** Roguelike: 生成 map (per 拍板 #2) */
-  generateAgentMap: (agentId: Uuid, width: number, height: number, seed: number) => GameMap;
-  /** Roguelike: 移动到 (x, y), 内部 cost + cell 效果 + 死亡检测 */
-  moveAgentOnMap: (agentId: Uuid, targetPos: { x: number; y: number }) => MoveResult;
-  /** Roguelike: 重置 map + 位置 (新一局) */
-  resetAgentMap: (agentId: Uuid) => void;
-
   // Agent Settings (per 2026-09-05 23:00 JST 拍板, Agent 设置 tab)
   /** 初始化/重置 1 个 agent 的 settings (lazy, 首次访问时) */
   initAgentSettings: (agentId: Uuid) => void;
@@ -442,13 +391,6 @@ const initialState = (set: any, get?: any): StoreState => ({
   refactorRounds: [] as RefactorRound[],
   refactorBoardConfigs: {} as Record<Uuid, RefactorBoardConfig>,
 
-  // Agent Game (per 2026-09-05 11:42 JST 拍板)
-  //   - per-agent 状态, 首次 claimReward / initAgentGame 时 lazy init
-  agentGameStates: {} as Record<Uuid, AgentGameState>,
-  // Roguelike map (per 2026-09-05 12:23 JST 拍板)
-  //   - per-agent, 首次 generateAgentMap 时 lazy init
-  agentMaps: {} as Record<Uuid, GameMap>,
-  agentPositions: {} as Record<Uuid, { x: number; y: number }>,
   // Agent Settings (per 2026-09-05 23:00 JST 拍板)
   //   - per-agent, 首次 initAgentSettings 时 lazy init
   agentSettings: {} as Record<Uuid, AgentSettings>,
@@ -927,164 +869,6 @@ const initialState = (set: any, get?: any): StoreState => ({
     set((s: StoreState) => ({
       canvases: s.canvases.map((c) => c.id === canvasId ? { ...c, viewport: { x, y, zoom } } : c),
     })),
-
-  // ===================================================================
-  // Agent Game 7 个 action (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化)
-  //   - lazy init: 首次访问某 agent 时自动建 game state
-  //   - claimReward 内部触发 applyClaim / applyDeath (cost 触发死亡)
-  //   - choosePerk 调 applyPerkChoice 累积
-  //   - 复活 / 重开 走 守门 #9 v9 派生规, 不静默 commit
-  // ===================================================================
-
-  initAgentGame: (agentId, budgetUsd) =>
-    set((s: StoreState) => ({
-      agentGameStates: {
-        ...s.agentGameStates,
-        [agentId]: createInitialGameState(agentId, budgetUsd),
-      },
-    })),
-
-  claimReward: (agentId, workItemId) => {
-    const s = useStore.getState();
-    const gs = s.agentGameStates[agentId] ?? createInitialGameState(agentId, 0);
-    const wi = s.workItems.find((w) => w.id === workItemId);
-    if (!wi) return { ok: false, reason: "work_item_not_found" } as const;
-    if (gs.lastClaimAt[workItemId]) return { ok: false, reason: "already_claimed" } as const;
-    if (wi.status !== "done") return { ok: false, reason: "not_done" } as const;
-    if (!gs.alive) return { ok: false, reason: "agent_dead" } as const;
-    const reward = computeClaim(wi, gs.perks, Math.random());
-    const r = applyClaim(gs, reward.xp, reward.coins, Math.random());
-    const finalState = {
-      ...r.state,
-      lastClaimAt: { ...gs.lastClaimAt, [workItemId]: new Date().toISOString() },
-    };
-    useStore.setState({
-      agentGameStates: { ...s.agentGameStates, [agentId]: finalState },
-    });
-    return {
-      ok: true as const,
-      xp: reward.xp,
-      coins: reward.coins,
-      leveledUp: r.leveledUp,
-      levelsGained: r.levelsGained,
-      isMaxLevel: r.isMaxLevel,
-    };
-  },
-
-  choosePerk: (agentId, perkId) =>
-    set((s: StoreState) => {
-      const gs = s.agentGameStates[agentId];
-      if (!gs || !gs.alive) return s;
-      return {
-        agentGameStates: {
-          ...s.agentGameStates,
-          [agentId]: applyPerkChoice(gs, perkId),
-        },
-      };
-    }),
-
-  spendCost: (agentId, costDelta) => {
-    const s = useStore.getState();
-    const gs = s.agentGameStates[agentId] ?? createInitialGameState(agentId, 0);
-    const agent = s.agentSessions.find((a) => a.id === agentId);
-    if (!agent) return { ok: false, died: false, reason: "agent_not_found" } as const;
-    const r = applyCostSpend(gs, costDelta, agent.cost_summary.budget_usd);
-    let finalState = r.state;
-    if (r.died) {
-      finalState = applyDeath(r.state);
-    }
-    useStore.setState({
-      agentGameStates: { ...s.agentGameStates, [agentId]: finalState },
-    });
-    return {
-      ok: true as const,
-      died: r.died,
-      hpAfter: finalState.hp,
-      triggerCostRatio: r.triggerCostRatio,
-    };
-  },
-
-  reviveAgent: (agentId) => {
-    const s = useStore.getState();
-    const gs = s.agentGameStates[agentId];
-    if (!gs) return { ok: false, reason: "not_initialized" };
-    const r = applyRevive(gs);
-    if (!r.ok) return { ok: false, reason: r.reason ?? "unknown" };
-    useStore.setState({
-      agentGameStates: { ...s.agentGameStates, [agentId]: r.state },
-    });
-    return { ok: true };
-  },
-
-  restartAgent: (agentId) =>
-    set((s: StoreState) => {
-      const gs = s.agentGameStates[agentId];
-      if (!gs) return s;
-      return {
-        agentGameStates: {
-          ...s.agentGameStates,
-          [agentId]: applyRestart(gs),
-        },
-      };
-    }),
-
-  // ===================================================================
-  // Roguelike map 3 个 action (per 2026-09-05 12:23 JST 拍板)
-  //   - generateAgentMap: 程序生成 map, 设置 position = start
-  //   - moveAgentOnMap: 4-邻接 step, 触发 cost + cell 效果
-  //   - resetAgentMap: 重开一局 (新 map + 重置 position)
-  // ===================================================================
-
-  generateAgentMap: (agentId, width, height, seed) => {
-    const s = useStore.getState();
-    const wis = s.workItems.filter((w) => w.status !== "done");
-    const map = generateMap({ width, height, seed, workItems: wis });
-    useStore.setState({
-      agentMaps: { ...s.agentMaps, [agentId]: map },
-      agentPositions: { ...s.agentPositions, [agentId]: map.startPos },
-    });
-    return map;
-  },
-
-  moveAgentOnMap: (agentId, targetPos) => {
-    const s = useStore.getState();
-    const map = s.agentMaps[agentId] ?? null;
-    const pos = s.agentPositions[agentId] ?? null;
-    const gs = s.agentGameStates[agentId] ?? null;
-    const agent = s.agentSessions.find((a) => a.id === agentId);
-    if (!gs || !agent) {
-      return { ok: false as const, reason: "no_map" as const };
-    }
-    const r = moveAgent(gs, map, pos, targetPos, agent.cost_summary.budget_usd);
-    if (!r.ok) return r;
-    // 应用 state 更新
-    let newState = { ...gs, hp: r.hpAfter, coins: r.coinsAfter };
-    if (r.died) {
-      newState = applyDeath(newState);
-    }
-    useStore.setState({
-      agentGameStates: { ...s.agentGameStates, [agentId]: newState },
-      agentPositions: { ...s.agentPositions, [agentId]: targetPos },
-    });
-    return r;
-  },
-
-  resetAgentMap: (agentId) =>
-    set((s: StoreState) => {
-      const oldMap = s.agentMaps[agentId];
-      if (!oldMap) return s;
-      // 用同尺寸 + 不同 seed 重生 (Date.now 取 seed)
-      const newMap = generateMap({
-        width: oldMap.width,
-        height: oldMap.height,
-        seed: Date.now() % 0x7fffffff,
-        workItems: s.workItems.filter((w) => w.status !== "done"),
-      });
-      return {
-        agentMaps: { ...s.agentMaps, [agentId]: newMap },
-        agentPositions: { ...s.agentPositions, [agentId]: newMap.startPos },
-      };
-    }),
 
   // ===================================================================
   // Agent Settings 4 个 action (per 2026-09-05 23:00 JST 拍板)

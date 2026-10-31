@@ -1,10 +1,34 @@
 /*
-@cypher schema=1 source_sha256=e3512549721e244b70b6d116c1d8f1446c69ab23e2b8935f41c4085f15dec1f5
+@cypher schema=1 source_sha256=0bdcf540a108f92567f0d76678b968f401646f4ae8cd130d5e5c39e4a3344c9a
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
+MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
+MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
+MERGE (agentCanvasTypes:File {path:"frontend/src/lib/agent-view/types.ts"})
+MERGE (agentAnnotations:File {path:"frontend/src/lib/agent-view/annotationApi.ts"})
+MERGE (agentAnnotationHistory:File {path:"frontend/src/lib/agent-view/annotationHistory.ts"})
+MERGE (agentCanvasComponent:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"})
+MERGE (agentFilter:File {path:"frontend/src/components/agent-view/AgentFilter.tsx"})
+MERGE (agentSettingsTab:File {path:"frontend/src/components/agent/AgentSettingsTab.tsx"})
+MERGE (pageHeader:File {path:"frontend/src/components/PageHeader.tsx"})
+MERGE (store:File {path:"frontend/src/lib/store.ts"})
+MERGE (agentRelationships:File {path:"frontend/src/app/(app)/agent-relationships/AgentViewTab.tsx"})
+MERGE (i18n:File {path:"frontend/src/lib/i18n/index.ts"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
 MERGE (agentViewPage:Function {name:"AgentViewPage", language:"typescript", visibility:"public"})
 MERGE (self)-[:IMPORTS]->(agentTypes)
+MERGE (self)-[:IMPORTS]->(agentSelectors)
+MERGE (self)-[:IMPORTS]->(agentCanvasLayout)
+MERGE (self)-[:IMPORTS]->(agentCanvasTypes)
+MERGE (self)-[:IMPORTS]->(agentAnnotations)
+MERGE (self)-[:IMPORTS]->(agentAnnotationHistory)
+MERGE (self)-[:IMPORTS]->(agentCanvasComponent)
+MERGE (self)-[:IMPORTS]->(agentFilter)
+MERGE (self)-[:IMPORTS]->(agentSettingsTab)
+MERGE (self)-[:IMPORTS]->(pageHeader)
+MERGE (self)-[:IMPORTS]->(store)
+MERGE (self)-[:IMPORTS]->(agentRelationships)
+MERGE (self)-[:IMPORTS]->(i18n)
 MERGE (agentViewPage)-[:CALLS]->(agentKindDisplayLabel)
 @endcypher
 */
@@ -13,21 +37,9 @@ MERGE (agentViewPage)-[:CALLS]->(agentKindDisplayLabel)
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 // =====================================================================
-// /agent-view — Agent 视图 (无限画布, 当前工作 agent 筛选, 拟人化游戏化)
+// /agent-view — Agent 工作区画布、关系和配置视图
 // =====================================================================
-// Per 2026-09-05 11:25 JST 用户发令 + 拍板 #1/#2/#3:
-//   1. 形式 = 无限画布 (自由散开)
-//   2. 筛选 = 当前工作 agent (auto 选最近 active, 用户可手动覆盖)
-//   3. 数据 = 跟 kanban 等界面共享 store (workItems / worktrees / agentSessions)
-//   4. 路由 = /agent-view
-//   5. 界面名 = "Agent"
-//
-// Per 2026-09-05 11:42 JST 拍板 (游戏化):
-//   - Lv 1..10 升级 (完成 work-item → xp + coins)
-//   - 死亡 (cost 超支) → 回 Lv 1, 保留 50% 金币, 可花 50 复活
-//   - 重开 (不扣币) 作为没钱的备选
-//   - 5 选 1 Power-up (per-life, 升级时弹 PerkPicker)
-//   - Lv 1..10 视觉渐进 (色/大小/光环/装饰 emoji)
+// Agent、Worktree、Task 和关系视图复用当前共享 store 数据。
 // =====================================================================
 
 import { useMemo, useCallback, useEffect, useState, Suspense } from "react";
@@ -55,16 +67,9 @@ import {
 } from "@/lib/agent-view/annotationHistory";
 import { AgentCanvasView } from "@/components/agent-view/AgentCanvasView";
 import { AgentFilter } from "@/components/agent-view/AgentFilter";
-import { GameHUD } from "@/components/agent-game/GameHUD";
-import { PerkPicker } from "@/components/agent-game/PerkPicker";
-import { DeathModal } from "@/components/agent-game/DeathModal";
-import { AgentSettingsTab } from "@/components/agent-game/AgentSettingsTab";
-import { useAgentGame } from "@/components/agent-game/useAgentGame";
-import { getPerkChoices } from "@/lib/agent-game/perks";
+import { AgentSettingsTab } from "@/components/agent/AgentSettingsTab";
 import { PageHeader } from "@/components/PageHeader";
-import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
-import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Settings, Network } from "lucide-react";
-import type { PerkId } from "@/lib/agent-game/types";
+import { Bot, AlertTriangle, Maximize2, LayoutDashboard, Settings, Network } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { AgentViewTab } from "@/app/(app)/agent-relationships/AgentViewTab";
 
@@ -80,7 +85,6 @@ function AgentViewContent() {
   const agents = useStore((s) => s.agentSessions);
   const worktrees = useStore((s) => s.worktrees);
   const workItems = useStore((s) => s.workItems);
-  const initAgentGame = useStore((s) => s.initAgentGame);
 
   // URL 参数: ?agent=ag-XXX
   const urlAgentId = searchParams.get("agent");
@@ -102,12 +106,7 @@ function AgentViewContent() {
     [workItems, resolution, worktree],
   );
 
-  // 拟人化游戏化 (per 2026-09-05 11:42 JST 拍板)
-  const { gameState, claim, spend, revive, restart, pickPerk, init } = useAgentGame(resolution?.agentId ?? null);
-
-  // View 模式 (URL 持久化, 默认 Canvas v1)
-  // per a539816: core3d/roguelike 模式已被删 (跟 sidebar 重复, 9/7 02:38 JST 用户拍板),
-  // 残留 celPalette/celBands/autoSagaGuard state 是死代码, 跟 useState 行一起砍掉
+  // View 模式通过 URL 保留，默认显示工作画布。
   const [viewMode, setViewMode] = useState<ViewMode>(
     urlView === "settings"
       ? "settings"
@@ -155,25 +154,6 @@ function AgentViewContent() {
   const [canvasHydrated, setCanvasHydrated] = useState(false);
   useEffect(() => { setCanvasHydrated(true); }, []);
 
-  // Modal 状态
-  const [pendingPerkLevel, setPendingPerkLevel] = useState<number | null>(null);
-  const [deathEvent, setDeathEvent] = useState<{
-    agentId: string; triggerCostRatio: number; snapshotCoins: number; snapshotLevel: number; snapshotHp: number; canRevive: boolean; timestamp: string;
-  } | null>(null);
-
-  // 首次访问某 agent: 自动 lazy init
-  useEffect(() => {
-    if (resolution && !gameState) {
-      init(resolution.agent.cost_summary.budget_usd);
-    }
-  }, [resolution, gameState, init]);
-
-  // 切换 agent 时, 清 pendingPerk + death (避免 stale)
-  useEffect(() => {
-    setPendingPerkLevel(null);
-    setDeathEvent(null);
-  }, [resolution?.agentId]);
-
   // 派生 canvas (layout + fit-to-content viewport)
   const canvas: AgentCanvas | null = useMemo(() => {
     if (!resolution) return null;
@@ -218,60 +198,13 @@ function AgentViewContent() {
     [router, pathname, searchParams],
   );
 
-  // Claim 回调
-  const handleClaim = useCallback((workItemId: string) => {
-    const r = claim(workItemId);
-    if (!r || !r.ok) return;
-    if (r.leveledUp) {
-      // 升级 → 弹 PerkPicker (per 拍板 #2, 5 选 1)
-      setPendingPerkLevel(r.levelsGained);
-    }
-  }, [claim]);
-
-  // Spend cost 回调 (消耗资源模拟)
-  const handleSpend = useCallback(() => {
-    if (!resolution) return;
-    const r = spend(0.1);  // 模拟每次执行 step +0.1 usd
-    if (!r || !r.ok) return;
-    if (r.died) {
-      const gs = useStore.getState().agentGameStates[resolution.agentId];
-      setDeathEvent({
-        agentId: resolution.agentId,
-        triggerCostRatio: r.triggerCostRatio,
-        snapshotCoins: gs?.coins ?? 0,
-        snapshotLevel: gs?.highestLevel ?? 1,
-        snapshotHp: 0,
-        canRevive: (gs?.coins ?? 0) >= 50,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }, [resolution, spend]);
-
-  // Pick perk 回调
-  const handlePickPerk = useCallback((perkId: PerkId) => {
-    pickPerk(perkId);
-    setPendingPerkLevel(null);
-  }, [pickPerk]);
-
-  // Revive 回调
-  const handleRevive = useCallback(() => {
-    revive();
-    setDeathEvent(null);
-  }, [revive]);
-
-  // Restart 回调 (死亡 = all agents freeze, 玩家主动重开)
-  const handleRestart = useCallback(() => {
-    restart();
-    setDeathEvent(null);
-  }, [restart]);
-
   // ---- 空状态 ----
   if (agents.length === 0) {
     return (
       <div className="max-w-3xl">
         <PageHeader
           title={t.pageTitles['/agent-view'].title}
-          subtitle="无限画布 + 当前工作 agent 筛选 + 拟人化游戏化 · 数据对应 kanban / worktree 视图"
+          subtitle="查看当前 Agent、Worktree 与关联任务。此页面不启动 Agent 执行。"
           icon={<Bot className="text-accent" size={20} />}
           track="F"
         />
@@ -291,7 +224,7 @@ function AgentViewContent() {
       <div className="max-w-3xl">
         <PageHeader
           title={t.pageTitles['/agent-view'].title}
-          subtitle="无限画布 + 当前工作 agent 筛选 + 拟人化游戏化 · 数据对应 kanban / worktree 视图"
+          subtitle="查看当前 Agent、Worktree 与关联任务。此页面不启动 Agent 执行。"
           icon={<Bot className="text-accent" size={20} />}
           track="F"
         />
@@ -316,61 +249,31 @@ function AgentViewContent() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Game HUD (per 拍板, 拟人化游戏化) */}
-          <GameHUD
-            gameState={gameState}
-            onRevive={handleRevive}
-            onRestart={handleRestart}
-            onPickPerk={() => setPendingPerkLevel(0)}
-            pendingPerkChoice={pendingPerkLevel !== null}
-          />
           <AgentFilter
             agents={agents}
             selectedId={resolution.agentId}
             auto={resolution.auto}
             onChange={handleAgentChange}
           />
-          {/* Spend cost 模拟 (per 拍板, 触发死亡检测) */}
-          <span className="relative inline-block">
-            <button
-              data-testid="agent-view-spend-cost"
-              onClick={handleSpend}
-              disabled={!gameState?.alive}
-              className="btn text-xs py-1.5 px-3 min-h-[34px] disabled:opacity-50 relative"
-              title="模拟执行 1 step (cost +$0.1)"
-            >
-              <Zap size={12} /> Step
-            </button>
-            {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 4: agent 下一步 step 按钮) */}
-            <GasParticlesHint
-              variant="rise"
-              color="ok"
-              density={0.45}
-              width={80}
-              height={60}
-              offsetX={-4}
-              offsetY={-22}
-            />
-          </span>
           <a
             href={`/board?assignee_id=&worktree_id=${agent.worktree_id}`}
             className="btn text-xs py-1.5 px-3 min-h-[34px] hidden md:inline-flex"
             data-testid="agent-view-jump-board"
-            title="在 Kanban Board 视图查看关联 work-items"
+            title="在 Board 视图查看关联任务"
           >
-            <Maximize2 size={12} /> Kanban
+            <Maximize2 size={12} /> Board
           </a>
         </div>
       </div>
 
-      {/* View Mode Tab (per 2026-09-06 拍板: Canvas v1 / Agent 设置 — 3D 战术核心 + Roguelike 移除) */}
+      {/* Agent workspace views */}
       <div className="border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)] px-6 py-2.5 flex items-center gap-2.5 cel-shadow" data-testid="view-mode-tabs">
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Sparkles size={13} /> Canvas <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v1</span>
+          <LayoutDashboard size={13} /> Canvas
         </button>
         <button
           data-testid="view-mode-relationships"
@@ -388,7 +291,7 @@ function AgentViewContent() {
         </button>
       </div>
 
-      {/* Content (按 viewMode 切换) */}
+      {/* Content (switch by viewMode) */}
       {viewMode === "canvas" ? (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--cel-surface-card,#0f1422)] border-b border-black">
@@ -448,8 +351,6 @@ function AgentViewContent() {
                 canvas={canvas}
                 agent={agent}
                 worktree={worktree}
-                gameState={gameState}
-                onClaim={handleClaim}
                 readOnly={!editMode}
                 annotations={localAnns}
                 freeConnectors={localConns}
@@ -499,39 +400,20 @@ function AgentViewContent() {
       {/* 说明 footer */}
       <div className="border-t border-line bg-bg-soft/40 px-6 py-1.5 text-[10px] text-ink-mute font-mono flex items-center justify-between">
         <span>
-          V/H 切换 select/pan · +/- 缩放 · 1 适配 · 双击节点跳详情 · 完成 work-item 点 💰 Claim 升级 · 点 Step 消耗 cost
+          V/H 切换 select/pan · +/- 缩放 · 1 适配 · 双击节点打开关联详情
         </span>
         <span>
           nodes {canvas?.nodes.length ?? 0} · connectors {canvas?.connectors.length ?? 0} · derived {canvas?.derivedAt ? canvas.derivedAt.slice(11, 19) : "—"}
         </span>
       </div>
 
-      {/* Modals (per 拍板) */}
-      {pendingPerkLevel !== null && gameState && (
-        <PerkPicker
-          gameState={gameState}
-          choices={getPerkChoices()}
-          onPick={handlePickPerk}
-          onClose={() => setPendingPerkLevel(null)}
-        />
-      )}
-
-      {deathEvent && gameState && (
-        <DeathModal
-          event={deathEvent}
-          gameState={gameState}
-          onRevive={handleRevive}
-          onRestart={handleRestart}
-          onClose={() => setDeathEvent(null)}
-        />
-      )}
     </div>
   );
 }
 
 export default function AgentViewPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-ink-dim">Loading Tactical Agent View...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-ink-dim">Loading Agent workspace…</div>}>
       <AgentViewContent />
     </Suspense>
   );
