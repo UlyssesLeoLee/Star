@@ -52,6 +52,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -281,6 +283,24 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      - name: Validate immutable image digest
+        shell: bash
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Build did not return a valid immutable sha256 image digest." >&2
+            exit 1
+          fi
+
+      - name: Attest the immutable Canvas image
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/star-${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
       - name: Record immutable image reference
         shell: pwsh
         env:
@@ -289,3 +309,4 @@ jobs:
         run: |
           $image = "$env:REGISTRY/$env:IMAGE_NAMESPACE/star-$env:CANVAS_IMAGE@$env:IMAGE_DIGEST"
           "Immutable image: ``$image``" | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          "Verify provenance: ``gh attestation verify oci://$image --repo $env:GITHUB_REPOSITORY``" | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
