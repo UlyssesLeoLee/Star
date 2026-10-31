@@ -26,12 +26,12 @@ Delivery lane 提供的目标镜像引用为 `ghcr.io/ulyssesleolee/star-canvas-
 
 | WBS | 工作 | 负责 lane | 依赖 | 验收标准 | 状态 |
 |---|---|---|---|---|---|
-| D0 | 固定当前支持清单、资源计数口径与活动路径 | 协调者 | 无 | 文档统一区分 package/bin/workload/Service object/health endpoint；服务身份与固定路径一致 | OPEN |
-| D1 | 移除退役 `canvas-game` Rust package/binary 及其仅游戏专属的活动构建依赖 | Rust/runtime cleanup | D0 | `cargo +1.99.0 metadata --no-deps --format-version 1` 确认 workspace 为 109 packages、9 binaries、3 Canvas binaries；不得把该数量解释为已部署服务数 | OPEN |
-| D2 | 清理活动 OCI 镜像、workflow、K3s manifest、启动和验收脚本 | Delivery cleanup | D0 | 文件名为 `.github/workflows/publish-star-canvas-services.yml`、`deploy/star-canvas-services-k3s.yaml`、`scripts/start-star-backend.ps1`、`scripts/verify-star-services.sh`、`docs/deployment/star-canvas-services-deploy.md`；只定义三个 Canvas 后端与 Envoy 入口；镜像为 Star 服务身份；不包含游戏 Deployment、Service、HPA、PDB、路由、配置或 secret | OPEN |
-| D3 | 同步活动设计/拓扑、将旧游戏规格归档为历史记录、建立 WBS 和阶段报告 | Docs retirement | D0、D1、D2 的服务清单 | 基本设计、架构图、性能指南和 guard 文档使用同一服务清单与路径；本 lane 的 HTML 解析、diff whitespace 与活动旧引用扫描已通过；旧 SRS/BD/DD/计划/ADR 保留原文并在开头标记“已退役/非当前范围”；新链接指向活动路径，待最终跨 lane 核对 | IN PROGRESS |
-| D4 | 静态及构建验收 | Runtime + Delivery + Docs | D1–D3 | 对活动交付范围做 `canvas-game` 引用扫描；新 manifest/workflow 可解析；镜像名、image-build target 与服务身份一致；Rust 1.99 metadata/build evidence 与最终包数一致；文档链接有效、活动文档不把历史五服务清单描述为现状 | OPEN |
-| D5 | 集成并复核最终版本 | 协调者 | D4 | 只集成已审查、通过其 lane 验收的提交到本地 `dev`；确认最终 `dev` 文档与代码一致；本 WBS 与 phase report 记录 SHA、验证命令/结果和未关闭缺口 | OPEN |
+| D0 | 固定当前支持清单、资源计数口径与活动路径 | 协调者 | 无 | 文档统一区分 package/bin/workload/Service object/health endpoint；服务身份与固定路径一致 | COMPLETE |
+| D1 | 移除退役 Canvas 游戏 Rust package/binary 及其仅游戏专属的活动构建依赖 | Rust/runtime cleanup | D0 | cargo +1.99.0 metadata 确认 workspace 为 109 packages、9 binaries、3 Canvas binaries；不得把该数量解释为已部署服务数 | COMPLETE；构建门禁在 D4 单独跟踪 |
+| D2 | 清理活动 OCI 镜像、workflow、K3s manifest、启动和验收脚本 | Delivery cleanup | D0 | 固定 Star 路径、4 Deployments/4 Services、3 个 GHCR 镜像均以 star- 开头、workflow/manifest/Kargo 一致；活动交付扫描无退役游戏引用 | COMPLETE；无镜像发布或集群部署声明 |
+| D3 | 同步活动设计/拓扑、将旧游戏规格归档为历史记录、建立 WBS 和阶段报告 | Docs retirement | D0、D1、D2 的服务清单 | 基本设计、架构图、性能指南和 guard 文档使用同一服务清单与路径；HTML 解析和活动文档旧名称扫描通过；旧规格/计划/ADR 保留并标为退役历史 | COMPLETE；全站 arch-live 计数漂移单列跟踪 |
+| D4 | 静态及构建验收 | Runtime + Delivery + Docs | D1–D3 | 活动交付扫描、YAML 解析、镜像矩阵和脚本语法检查通过；Rust workspace build、镜像 build 与 K3s endpoint 仍需证据 | OPEN；Windows rustc 被安全软件以 OS error 225 阻止，镜像/K3s 未运行 |
+| D5 | 集成并复核最终版本 | 协调者 | D4 | Runtime、Delivery、Docs 三条已审查 lane 已 rebase 并 fast-forward 合入本地 dev；最终 build/部署证据补齐后关闭 | PARTIAL；本地集成完成，等待 D4 闭环 |
 
 ## 3. 活动交付接口
 
