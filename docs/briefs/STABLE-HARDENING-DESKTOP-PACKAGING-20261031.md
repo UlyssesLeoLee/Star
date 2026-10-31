@@ -11,3 +11,7 @@
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
+
+## 补充范围 v0.2（MAGOS stable-hardening revision 16）
+
+为关闭 Desktop 发布路径的本地构建阻塞，本 lane 增加 `crates/star-desktop/frontend/tsconfig.json`、`src/constants.ts`、`src/hooks/useTauriKeyboardLayout.ts`、`src/pages/WorktreeVizPage.tsx` 与测试文件 `tests/BoardView.test.tsx`、`tests/setup.ts`、`tests/KanbanBoard.test.tsx`、`tests/WorktreePage.test.tsx`、`tests/WorktreeVizPage.test.tsx`。同时将 Vite/Vitest/官方 React 插件升级到通过安全审计的兼容版本。验收增加 frontend production build、完整 Vitest suite 与 npm audit；不扩大到旧桌面工作流 owner 文件，不授权发布、签名或部署。

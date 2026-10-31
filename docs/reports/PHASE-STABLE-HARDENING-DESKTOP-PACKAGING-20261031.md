@@ -1,125 +1,97 @@
 # PHASE-STABLE-HARDENING-DESKTOP-PACKAGING-REPORT
 
-**阶段**：STABLE-HARDENING / Desktop Packaging
-
-**状态**：`IMPLEMENTED_WITH_BLOCKERS`；不得标为 READY
-
-**基线**：`dev@04d8b7a84514dcb454874eb852651778e1452dea`
-
-**分支**：`agent/stable-hardening/desktop-packaging`
-
-**范围**：仅桌面构建工作流、Tauri 打包配置、前端依赖锁文件、构建脚本和本 lane 报告/派发记录。
+- **阶段**：STABLE-HARDENING / Desktop Packaging
+- **状态**：`READY_FOR_INTEGRATION_WITH_RELEASE_GATES_OPEN`
+- **基线**：`dev@04d8b7a84514dcb454874eb852651778e1452dea`
+- **分支**：`agent/stable-hardening/desktop-packaging`
 
 ## 0. 目的
 
-为 Star Desktop 建立可复现、按操作系统构建并在制品缺失时失败的打包路径。CI 仅生成短期保留的未签名验证制品；本阶段没有发布、创建 tag、部署或推送，也没有宣称已形成可安装的稳定发行版。
+为 Star Desktop 建立可复现、按操作系统构建且制品缺失时失败的打包路径。本阶段修复了阻止前端打包的类型错误和过时的测试，并升级有安全公告的 Vite 工具链。此 lane 可集成；这不代表已生成可安装、已签名或已发布的稳定版。本阶段没有创建 tag、发布、部署或 push。
 
 ## 1. 改动矩阵
 
-| 文件 | 改动 | 结果与边界 |
-|---|---|---|
-| `.github/workflows/star-stable-desktop.yml` | 新增 Linux `.deb`/AppImage、Windows MSI、macOS universal DMG job；固定 Node.js 24.22.2 与 Rust 1.99.0；将 Cargo 并行度限制为 2；第三方 actions 以已核验的完整提交 SHA 固定；上传制品前要求目标文件存在且非空，上传缺文件设置为 `error`，保留 7 天 | 只在 `dev` PR/push 或手动触发；权限为 `contents: read`；没有 release/tag/deploy/publish job；制品名称明确标为 unsigned |
-| `crates/star-desktop/frontend/package.json` | 最低 Node.js 版本改为 `>=24` | 淘汰该新打包路径中的 EOL Node 20 |
-| `crates/star-desktop/frontend/package-lock.json` | 新增 npm lockfile v3 | `npm ci` 成功使用锁文件安装 174 个包；依赖许可闭包不在本 lane 的核验范围内 |
-| `crates/star-desktop/src-tauri/tauri.conf.json` | 修正前端命令路径；删除启用状态却使用占位公钥的 updater 配置；显式关闭 updater artifact 创建 | 不生成伪签名更新制品；自动更新保持未配置 |
-| `crates/star-desktop/src-tauri/Cargo.toml` | 将过时的 PoC 产品描述改成中性桌面客户端描述 | 没有升级 Cargo 依赖或改动 workspace license |
-| `scripts/build-desktop.sh` | 改为 lockfile 驱动的 `npm ci`；只在当前宿主系统构建；将选项映射到 Tauri bundle 类型；验证所选 bundle 目录内存在非空安装包 | 删除了跨平台打包失败后仍返回成功的行为；跨系统制品交给独立 CI runner |
-| `docs/reports/PHASE-STABLE-HARDENING-DESKTOP-PACKAGING-20261031.md` | 新增本报告 | 记录真实验证结果和未关闭风险 |
-| `docs/briefs/STABLE-HARDENING-DESKTOP-PACKAGING-20261031.md`、`docs/reports/WBS-DISPATCH-STABLE-HARDENING-DESKTOP-PACKAGING-20261031.jsonl` | 本 lane 原有 dispatcher brief 与派发记录 | 保留原 brief；派发记录追加本阶段结果 |
+| 文件/范围 | 改动与结果 |
+|---|---|
+| `.github/workflows/star-stable-desktop.yml` | 增加 Linux `.deb`/AppImage、Windows MSI、macOS universal DMG job；固定 Node.js 24.22.2 与 Rust 1.99.0；Cargo 并行度为 2；actions 固定完整 SHA；缺少或空制品时失败；仅上传标记为 unsigned、保留 7 天的验证制品；无发布权限或发布步骤。 |
+| `crates/star-desktop/frontend/package.json`、`package-lock.json` | `npm ci` 锁文件安装；依赖升级至 Vite 7、Vitest 5、`@vitejs/plugin-react` 5；解决 npm 审计发现的 Vite/Vitest/esbuild 漏洞。三个直接包均为 MIT。全依赖法律闭包仍待 SPDX/SBOM 审查。 |
+| `crates/star-desktop/frontend/tsconfig.json` | 保留 Vitest 与 Testing Library 全局类型，并加入 `vite/client`，使 Vite CSS Modules 声明可见。 |
+| `crates/star-desktop/frontend/src/constants.ts` | 从唯一来源 `types/ids.ts` 重新导出 `DEFAULT_KANBAN_COLUMNS`，供看板消费者使用。 |
+| `crates/star-desktop/frontend/src/hooks/useTauriKeyboardLayout.ts` | 从定义它的 `types/ids.ts` 导入 `DEFAULT_SWIMLANES`；运行时默认值不变。 |
+| `crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx` | 从纯布局函数移除未使用参数；节点半径仍由渲染处单独计算，位置计算行为不变。 |
+| `crates/star-desktop/frontend/tests/setup.ts`、`tests/BoardView.test.tsx` | 增加测试专用的窄 IPC mock 类型和每项测试后的 DOM 清理；删除行级类型抑制；将 DSL 测试改为支持的 `show` 关键字，并按三个泳道的真实 DOM 查询重复列。 |
+| `crates/star-desktop/frontend/tests/KanbanBoard.test.tsx`、`tests/WorktreePage.test.tsx`、`tests/WorktreeVizPage.test.tsx` | 对齐现行看板页面和泳道结构；移除已过时的 mock 表格断言；修正可视化节点选择器，避免把节点数滑块计入 SVG 节点。 |
+| `crates/star-desktop/src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、`scripts/build-desktop.sh` | 修正前端命令路径，关闭未配置真实公钥的 updater artifacts，使用 `npm ci`，只构建当前宿主平台并检查非空安装包。 |
 
-`.github/workflows/star-desktop-build.yml` 未修改；它仍使用 Node 20，因其已有 Dependabot owner，后续需由该 owner 单独收敛。
+旧工作流 `.github/workflows/star-desktop-build.yml` 未修改；该文件仍由既有 owner 管理。
 
 ## 2. 验证摘要
 
-| 验证 | 结果 | 实测细节 |
+| 验证 | 结果 | 证据与限制 |
 |---|---|---|
-| `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` | 通过，退出码 0 | 在 `crates/star-desktop/frontend` 生成锁文件；本机 Node.js 22.19.0/npm 10.9.3 因项目要求 Node `>=24` 打出 `EBADENGINE` 警告；命令约 6 分钟完成 |
-| `npm ci --no-audit --no-fund` | 通过，退出码 0 | 安装 174 个包；同样报告本机 Node 22 低于目标版本，并报告 `whatwg-encoding@3.1.1` 弃用提示；约 2 分钟完成 |
-| `npm run build` | 失败，退出码 1 | `tsc --noEmit` 报 15 个错误，涉及 6 个未修改文件，详细列于 §3；工作流会在该步骤停止，后续 Tauri 打包与上传步骤不会运行 |
-| Tauri CLI `--version` | 通过，退出码 0 | `tauri-cli 2.12.4` |
-| Tauri CLI `info` | 通过，退出码 0 | 识别到 `tauri 2.12.1`、`tauri-build 2.7.1`、WebView2 与 MSVC；本机 Rust 信息中 `rustc` 为空，只有 Cargo 1.99.0 |
-| `tauri build --bundles msi` | 失败，退出码 1 | 本机 CLI 在 `crates\tauri-cli\src\interface\rust.rs:1145:14` 因 `Option::unwrap()` panic；未生成 MSI。环境信息显示 `rustc` 组件不可用，不能视为构建通过 |
-| `bash -n scripts/build-desktop.sh` | 通过，退出码 0 | Shell 语法通过 |
-| ShellCheck 0.11.0 | 通过，退出码 0 | 无 shell lint 错误 |
-| JSON/TOML/YAML 解析 | 通过，退出码 0 | `package.json`、lockfile、Tauri JSON、Cargo TOML 与工作流 YAML 均成功解析 |
-| CypherGraph Guardian `--changed` | 通过，退出码 0 | 1 个变更源文件通过；工作流 YAML 的关系头另按同一哈希算法校验 |
-| `cargo metadata --no-deps --format-version 1` | 通过，退出码 0 | 只证明 workspace manifest 可解析，不证明编译或打包 |
-| GitHub Actions hosted CI | 未运行 | 没有本地 hosted runner 结果；本地没有安装 `actionlint`，因此只做 YAML 语法解析，未完成 GitHub 工作流语义 lint |
-
-### 前端 TypeScript 错误清单
-
-| 文件 | 实测问题 |
-|---|---|
-| `crates/star-desktop/frontend/src/App.tsx` | 1 × TS2307：找不到 `./App.module.css` 的 TypeScript 模块声明。CSS 文件本身存在。 |
-| `crates/star-desktop/frontend/src/components/KanbanBoard.tsx` | 10 条：1 × TS2459（`DEFAULT_KANBAN_COLUMNS` 在 `constants.ts` 中导入但未导出）；5 × TS7006（回调参数隐式 `any`）；4 × TS7053（`Record<WorkItemStatus, WorkItem[]>` 索引类型为 `any`）。后 9 条很可能是无效导入导致的级联错误，尚未通过修复后重跑确认。 |
-| `crates/star-desktop/frontend/src/hooks/useTauriKeyboardLayout.ts` | 1 × TS2305：`constants.ts` 未导出 `DEFAULT_SWIMLANES`。该常量实际存在于 `types/ids.ts`。 |
-| `crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx` | 1 × TS6133：`layoutNodes` 参数 `visualDistance` 声明后未使用。 |
-| `crates/star-desktop/frontend/tests/BoardView.test.tsx` | 1 × TS7017：读取 `globalThis.__TAURI_INTERNALS__` 时缺少属性类型声明。 |
-| `crates/star-desktop/frontend/tests/setup.ts` | 1 × TS7017：给 `globalThis.__TAURI_INTERNALS__` 赋值时缺少属性类型声明。 |
-
-### 只读修复审查（仅建议）
-
-以下结论只基于源文件和类型配置核对；没有修改这些文件，也没有用临时 patch 验证修复效果。
-
-| 根因 | 源码证据 | 最小安全修复候选 | 风险与复验 |
-|---|---|---|---|
-| CSS Modules 声明未纳入 TypeScript | `src/App.module.css` 存在；`tsconfig.json` 的 `types` 只有 `vitest/globals` 和 `@testing-library/react`，前端目录未找到 `.d.ts` 声明文件 | 引入 Vite 的 `vite/client` 类型（在 `tsconfig` 类型列表中加入，或新增仅包含该 reference 的 `src/vite-env.d.ts`）；保留现有 CSS Modules import | 需在相同 tsconfig 下重跑 `tsc --noEmit`，确认 CSS Modules 类型被加载 |
-| `DEFAULT_KANBAN_COLUMNS` API 未从 constants 导出 | 定义在 `src/types/ids.ts`；`src/constants.ts` 导入并使用但没有 re-export；`KanbanBoard.tsx` 注释明确其消费者从 `constants.ts` 导入 | 在 `src/constants.ts` 添加 `export { DEFAULT_KANBAN_COLUMNS } from "./types/ids";`，保持单一常量来源 | 这应先消除 TS2459；5 条 TS7006 与 4 条 TS7053 很可能随类型恢复一并消失，但只能由修复后编译确认 |
-| `DEFAULT_SWIMLANES` 从错误模块导入 | `src/types/ids.ts` 定义并导出 `DEFAULT_SWIMLANES: Wtm[]`；`src/constants.ts` 只导出 `SWIMLANE_ORDER` | 将 `useTauriKeyboardLayout.ts` 中 `DEFAULT_SWIMLANES` 的 import 来源改为 `../types/ids`；其他常量仍从 `../constants` 导入 | 直接复用已存在的可变 `Wtm[]`，不改默认顺序或运行时行为；重跑 typecheck |
-| 布局函数多余参数 | `layoutNodes` 内未读取 `visualDistance`；调用处传入 `layout.visualDistance`，节点半径则在渲染处单独使用 | 从 `layoutNodes` 的参数和调用中移除 `visualDistance` | 当前不会改变布局或半径，因为该参数未被函数读取；运行前后需比较同一视图输出并重跑 typecheck |
-| 测试全局 mock 缺失类型 | 报错点都在测试中；`globalThis.__TAURI_INTERNALS__` 是测试 IPC mock，`BoardView.test.tsx` 在赋值处已有行级忽略，但读取处没有类型 | 在测试类型中为 mock 定义窄接口，或只在这两处将 `globalThis` 转成带可选 `__TAURI_INTERNALS__` 的交叉类型；不修改 production Tauri API 类型 | 避免扩大为 `any` 或改生产契约；重跑 typecheck 和 Vitest，检查 mock 的 invoke 签名 |
-
-这些文件不在 desktop packaging lane manifest 内，本 lane 未修改它们。工作流保留严格的 frontend build 门，不通过跳过 typecheck 来掩盖这些问题。
+| `npm ci` | 通过 | 从锁文件安装 163 个包；本机 Node 22.19.0 低于 package 要求的 Node 24，因此 npm 发出 `EBADENGINE`；另有 `whatwg-encoding@3.1.1` 弃用提示。CI 固定 Node 24.22.2，尚未取得 hosted runner 结果。 |
+| `npm run build` | 通过 | `tsc --noEmit` 与 Vite 7.3.7 production build 均通过；55 个模块转换完成。 |
+| `npm test -- --reporter=dot` | 通过 | Vitest 5.0.5：13 个测试文件、62 项测试全部通过。 |
+| `npm audit` | 通过 | 升级前审计发现 6 个漏洞（含 2 个 Critical、1 个 High）；安全兼容升级后审计为 0 个漏洞。 |
+| `npm ls vite vitest @vitejs/plugin-react` | 通过 | Vite 7.3.7、Vitest 5.0.5、`@vitejs/plugin-react` 5.1.4；Vite 7 与 Vitest 5 的最低 Node 要求满足当前 Node 22.19，产品包自身仍要求 Node 24。 |
+| `bash -n scripts/build-desktop.sh` / ShellCheck 0.11.0 | 通过 | 脚本语法和静态检查无错误。 |
+| JSON/TOML/YAML 解析 | 通过 | package manifest、lock、Tauri config、Cargo manifest 与 workflow 可解析。 |
+| CypherGraph Guardian `--changed --stamp` | 通过 | 8 个修改的 TypeScript/TSX 源文件通过结构检查；代码关系已逐项按导入和测试引用核对。 |
+| `cargo metadata --no-deps --format-version 1` | 通过 | 只证明 Cargo manifest 可解析，不证明 Rust 编译或桌面打包。 |
+| Tauri CLI `--version` / `info` | 通过 | CLI 2.12.4；识别到 tauri 2.12.1、tauri-build 2.7.1、WebView2 与 MSVC。 |
+| `tauri build --bundles msi` | 未通过 | 本机 `rustc` 组件不可用；CLI 在 Rust 信息读取处 panic，未生成 MSI。不能视为构建通过。 |
+| GitHub hosted CI / actionlint | 未验证 | 未运行 hosted workflow；本机未安装 actionlint。 |
 
 ## 3. 已知缺口
 
-1. **当前阻断项**：上述 15 个 TypeScript 错误使 frontend build 返回非零；CI 在制品上传前停止。应由拥有相关前端文件的 lane 修复并重新运行该工作流。
-2. **Rust 构建证据缺失**：本机 Tauri build 因 `rustc` 组件缺失而 panic；必须由 CI 中 Rust 1.99.0 的真实 runner 重新验证。
-3. **平台产物尚未验证**：尚未运行 Linux、Windows、macOS hosted jobs；没有 `.deb`、AppImage、MSI 或 DMG 的真实构建、上传、下载、安装/卸载和启动冒烟证据。
-4. **签名与更新未就绪**：没有 Windows Authenticode 证书、Apple Developer ID/签名/公证凭据或真实 updater 公钥。本阶段移除了占位 updater 配置并关闭 updater artifact 创建；所有工作流制品均未签名，不能对外称为可自动更新的稳定发行版。
-5. **旧工作流仍使用 Node 20**：`star-desktop-build.yml` 保持不变，需在原 owner 允许的独立 lane 中更新或退休。
-6. **商业许可闭包未审计**：本 lane 生成了 npm lockfile，但没有对 npm 完整传递依赖做 SPDX/SBOM 与商业再分发许可审核；根级许可证闭包 lane 仍须给出结论。
-7. **包的实际安装策略未验收**：Windows WebView2、Windows MSI 所需的 VBSCRIPT optional feature/WiX 环境、Linux 系统库和 macOS Gatekeeper 体验仍需在各平台安装验证中确认。Tauri 官方文档说明构建 MSI 需要启用 VBSCRIPT（[Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/#vbscript-for-msi-installers)）；当前 hosted runner 尚未实测此条件。
-8. **稳定版本未发布**：没有发布、tag、部署或 push 动作。
+1. **真实打包门仍未闭合**：本机 Rust toolchain 缺少可用 `rustc`。必须由 Node 24.22.2 / Rust 1.99.0 hosted runner 实际生成 Linux、Windows、macOS 制品。
+2. **安装验收未做**：`.deb`、AppImage、MSI、DMG 均未实际下载、安装、启动和卸载验证；VBSCRIPT/WiX、WebView2、Linux 系统库和 macOS Gatekeeper 仍需核对。
+3. **签名和更新未就绪**：没有 Authenticode、Apple Developer ID/公证凭据或真实 updater 公钥；所有制品均未签名，updater artifact 保持关闭。
+4. **旧工作流仍使用 Node 20**：`star-desktop-build.yml` 未改，需由该工作流 owner 处理或明确退休。
+5. **法律闭包仍开放**：本轮确认三个新增/升级直接工具为 MIT，但尚未对 npm 完整传递依赖、分发制品、安装器和容器闭包生成 SPDX/SBOM 并完成再分发义务审核。
+6. **稳定版整体仍开放**：Web/Vercel 真实部署与回滚、Canvas 镜像实际构建和 digest、最多两个 Multipass 实例上的 K3s 验收、Cargo MIT 权利闭包及 release CI 必需检查尚未完成。
+7. **本地运行时与目标 CI 有差异**：本机 Node 22.19.0 可运行升级后的 Vite/Vitest，但 package 要求 Node 24；需要在固定 Node 24 hosted runner 复验。
+8. **没有发布动作**：本阶段没有创建 tag、发布、部署或 push；不能宣称稳定版已发布。
 
 ## 4. 子代理失败接手清单
 
-本 lane 未派生子代理。实现工作由本 lane worker 完成；工作流语法校验工具 `actionlint` 不在当前环境中，因此未声称通过该检查。根协调者在接收前仍需复核当前前端 blocker、Cargo/Rust 构建缺口、旧 Node 20 工作流 owner 与签名/许可门。
+Desktop lane 子代理因 usage limit 中断，未完成后续修复。主协调者在已登记、隔离的 Desktop worktree 内按报告复现错误、完成修复并独立验证。未将子代理状态本身视为完成证据。Web lane 子代理的结果另按其自身报告审查。
 
 ## 5. 守门规则
 
-| # | 本 lane 执行的守门规则 | 结果 |
+| # | 守门 | 结果 |
 |---:|---|---|
-| 1 | 仅改 MAGOS manifest 内的 desktop packaging 文件与本 lane 报告/派发记录 | 符合 |
-| 2 | 以记录的 `dev@04d8b7a84514dcb454874eb852651778e1452dea` 为基线 | 符合 |
-| 3 | 不改由 Dependabot owner 占用的 `star-desktop-build.yml` | 符合 |
-| 4 | 新工作流不使用 Node 20 | 符合，固定 Node 24.22.2 |
-| 5 | Cargo build 使用仓库 Rust baseline | 配置为 Rust 1.99.0；hosted runner 尚未验证 |
-| 6 | npm 构建严格使用 lockfile | 符合，使用 `npm ci` |
-| 7 | 不将跨操作系统打包伪装为一次本地 build | 符合，每个平台由本地 runner 构建 |
-| 8 | 缺少任一选定产物时 job 必须非零失败 | 符合，构建后显式检查非空文件，上传使用 `if-no-files-found: error` |
-| 9 | 工作流只上传短期验证 artifact | 符合，保留 7 天，名称标注 unsigned |
-| 10 | 仓库权限采用最小权限 | 符合，`contents: read` |
-| 11 | GitHub actions 固定到完整 commit SHA | 符合，checkout/setup-node/upload-artifact 均固定 |
-| 12 | 不把 updater placeholder 当成有效密钥 | 符合，删除 updater placeholder 配置并关闭 updater artifacts |
-| 13 | 不生成或声称拥有签名凭据 | 符合 |
-| 14 | 不以跳过 TypeScript 检查换取表面打包成功 | 符合，失败会终止 job |
+| 1 | 只修改 MAGOS revision 16 Desktop manifest 内文件 | 符合 |
+| 2 | 基线为记录的 `dev@04d8b7a84514dcb454874eb852651778e1452dea` | 符合 |
+| 3 | 保留 `star-desktop-build.yml` 现有 owner 内容 | 符合 |
+| 4 | 新打包工作流使用 Node 24 | 符合，固定 24.22.2 |
+| 5 | Rust 工作流使用项目 baseline | 配置 Rust 1.99.0；runner 尚未实测 |
+| 6 | npm 安装锁定依赖 | 符合，`npm ci` |
+| 7 | 逐平台构建，不伪装跨平台本地构建 | 符合 |
+| 8 | 缺少制品时失败 | 符合 |
+| 9 | 仅上传短期验证制品且标为 unsigned | 符合，保留 7 天 |
+| 10 | 使用最小 GitHub 权限 | 符合，`contents: read` |
+| 11 | GitHub actions 固定完整 SHA | 符合 |
+| 12 | 不使用 placeholder updater key | 符合，updater artifacts 关闭 |
+| 13 | 不编造签名或公证凭据 | 符合 |
+| 14 | 不跳过 TypeScript 检查 | 符合，typecheck 是 build 第一门 |
 | 15 | 不发布、打 tag、部署或 push | 符合 |
-| 16 | 代码/脚本 Cypher 图关系与源码一致 | 符合，CypherGraph Guardian 检查通过 |
-| 17 | 对未执行的平台、签名、安装与授权审查明确标缺口 | 符合，详见 §2–§3 |
+| 16 | 源码图关系有代码证据且 freshness stamp 通过 | 符合，8 个源文件通过 CGG |
+| 17 | 真实 runner、安装、签名、许可与集群证据缺失时明确标记 | 符合，见 §2–§3 |
 
 ## 6. 审查栏
 
 | 角色 | 状态 |
 |---|---|
-| 架构 | Mavis 接手审核；等待根协调者按当前 dev 基线复核 |
-| SRE Lead | Mavis 接手审核；真实 hosted runner 与签名证据待验证 |
-| 平台 | Mavis 接手审核；Cargo build 与平台依赖待验证 |
-| 评审主持 | Mavis 接手审核；本报告未将 lane 标为 READY |
-| PM | Mavis 接手审核；稳定版本整体闭环仍依赖其他 lane |
+| 架构 | Mavis 接手审核；按当前 dev 基线集成前复核 |
+| SRE Lead | Mavis 接手审核；hosted runner、签名和安装证据待补 |
+| 平台 | Mavis 接手审核；本机 Rust 构建受工具链阻塞 |
+| 评审主持 | Mavis 接手审核；Desktop lane 可集成，release gates 仍开放 |
+| PM | Mavis 接手审核；稳定版整体 W0–W9 未关闭 |
 
 ## 7. 修订历史
 
 | 版本 | 日期 | 修订人 | 内容 |
 |---|---|---|---|
-| v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 desktop packaging 实施与验证报告；记录前端 typecheck、Rust toolchain、hosted CI、签名和许可闭环缺口 |
+| v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初始 desktop packaging 报告；记录打包和签名缺口。 |
+| v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 Vite 类型、常量引用和 test-only 类型问题；矫正过时 UI 测试；升级 Vite/Vitest 安全版本；本地 build、62 项 Vitest 与 npm audit 通过。保留 hosted runner、平台制品、安装、签名和法律闭包缺口。 |
