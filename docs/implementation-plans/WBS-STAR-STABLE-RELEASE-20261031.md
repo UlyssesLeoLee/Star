@@ -58,9 +58,9 @@ W1 法律/NOTICE、W2 锁与构建闭包、W3 SBOM/provenance、W5 桌面闭环�
 
 ## 修订历史
 
-| 版本 | 日期 | 修订人 | 内容 |
-|---|---|---|---|
-| v0.1 | 2026-10-31 | W16-B 子代理（Mavis 接手审核待协调者复核） | 按 W16-B 审计发现制定稳定发行 WBS；所有构建、发布和部署证据保持 OPEN。 |
+| 版本 | 日期 | 修订人 | 内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-10-31 | W16-B 子代理（Mavis 接手审核待协调者复核） | 按 W16-B 审计发现制定稳定发行 WBS；所有构建、发布和部署证据保持 OPEN。 | W16-B audit |
 | v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Desktop + Web/Vercel + 三份 Star Canvas 镜像发行面及 MIT canonical license；把 W5–W7 标为无条件 P0、W8 的两实例运行验收保持 OPEN，并记录仅在所有门禁通过后推送稳定版的条件授权。 | 用户完成发行范围与许可证决策 |
 | v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | W16-B 审计/WBS 已经父级审阅并快进集成到本地 `dev@163f715`；稳定版门禁仍为 OPEN。 | W16-B 文档 lane 完成集成 |
 | v0.4 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记并启动 stable-hardening 首轮四个隔离 lane；按 MAGOS 实际 owner 冲突证据收窄清单，完整标明未解除的 Cargo/license workflow 与 Dependabot 锁文件阻塞；没有关闭稳定版门禁。 | 用户确认发行范围与 MIT，并要求整理后发布稳定版 |
