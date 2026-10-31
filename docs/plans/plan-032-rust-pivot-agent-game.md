@@ -1,7 +1,9 @@
 # plan-032: 2026-Q3 Rust Pivot + Agent 小游戏开发计划
 
+> **当前状态（2026-10-30）**：游戏服务计划已退役，不属于当前 Star 产品或发布范围。保留原计划内容用于历史审计，不作为可执行 WBS。
+
 > **计划 ID**: plan-032
-> **状态**: 🟢 Active v0.2 (2026-09-12, 阶段性收官: R5 阶段 3 + R9 阶段 3 落档, 12/13 阶段基本完成, 2 个 🟢 MILESTONE)
+> **状态**: ⚫ Retired Historical Record (2026-10-30；不作为当前执行计划)
 > **日期**: 2026-09-11
 > **周期**: 2026-Q3 (2026-09-11 ~ 2026-12-31)
 > **关联 ADR**: [ADR-0027 Rust Pivot + Agent 小游戏核心理念 + Jira/Miro/MS Project 整合](../adr/0027-rust-pivot-agent-game.md) v0.1

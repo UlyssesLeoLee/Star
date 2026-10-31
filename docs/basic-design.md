@@ -25,11 +25,11 @@
 | 1 | [架构总览](#1-架构总览) | 117 | Star 5 大领域 / 模块依赖 / 数据流 |
 | 2 | [Domain / Module 划分](#2-domain--module-划分) | 312 | 27 域 + 23 service + 1 Tauri + 3 WASM (per PR-272 actualize) |
 | 3 | [Context Map](#3-context-mapdomain-间解耦) | 475 | Domain 间解耦 + ACL 边界 |
-| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 663 | canvas-game / canvas-engine / canvas-realtime / domain-canvas |
+| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 663 | Star Canvas 服务：canvas-engine / domain-canvas / canvas-realtime |
 | 5 | [数据架构](#5-数据架构) | 2287 | DB schema + 索引 + 备份 |
 | 6 | [安全边界](#6-安全边界) | 2451 | 认证 / 授权 / 加密 / 审计 |
 | 7 | [关键状态机](#7-关键状态机) | 2624 | Workflow / Canvas / Worktree / Run |
-| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2779 | k3s + 5 services + Service mesh |
+| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2779 | Star API + 3 Canvas 后端服务 + ingress / Service mesh |
 | 9 | [Traceability & AI Audit](#9-traceability--ai-audit) | 2961 | ADR ↔ SRS ↔ 代码追溯 |
 | 10 | [ADR 草案](#10-adr-草案对应-32-adr-016030) | 3101 | ADR-016 ~ ADR-030 |
 | 11 | [PoC 实施计划](#11-poc-实施计划对应-31-poc-016030) | 3329 | POC-016 ~ POC-030 |
@@ -2804,6 +2804,8 @@ DRAFT → OPEN → REVIEWING
 ## 8. 部署与运行时拓扑
 
 ### 8.1 K3s 集群布局
+
+当前 Star Canvas 服务范围为 `canvas-engine`、`domain-canvas`、`canvas-realtime` 三个后端；Envoy 是边缘入口，不计为 Canvas 应用服务。三个后端镜像由 [Canvas 发布 workflow](../.github/workflows/publish-star-canvas-services.yml) 构建和发布，再由 [`deploy/star-canvas-services-k3s.yaml`](../deploy/star-canvas-services-k3s.yaml) 部署；操作流程见 [Canvas 服务部署指南](deployment/star-canvas-services-deploy.md)。`star-api-rest` 使用独立部署清单，不并入 Canvas manifest；当前联通性检查覆盖三个 Canvas 后端与独立 Star API，详见 [`scripts/verify-star-services.sh`](../scripts/verify-star-services.sh)。
 
 ```mermaid
 flowchart TB

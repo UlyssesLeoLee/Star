@@ -6,6 +6,8 @@
 > **scope**: Star monorepo app 端 (30 个 Next.js page + 8 个 Rust bin 服务)
 > **goal**: 系统化评估 Rust 化 app 端的 ROI + 选型 + 实施路径
 
+> **历史快照说明（2026-10-30）**：本研究记录的 crate/bin 数量及下方包含 `canvas-game` 的运行时列表，均是 2026-09-29 时点的历史数据，不代表当前支持的发布范围。当前 Canvas 后端仅为 `canvas-engine`、`domain-canvas`、`canvas-realtime`；`star-api-rest` 独立部署。活动运行资产与验证方式以 [`docs/deployment/star-canvas-services-deploy.md`](../../deployment/star-canvas-services-deploy.md)、[`deploy/star-canvas-services-k3s.yaml`](../../../deploy/star-canvas-services-k3s.yaml) 和 [`scripts/verify-star-services.sh`](../../../scripts/verify-star-services.sh) 为准。
+
 ---
 
 ## 0. 现状分析

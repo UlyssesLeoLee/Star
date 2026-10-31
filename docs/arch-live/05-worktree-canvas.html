@@ -144,21 +144,18 @@
     目的是让"A 域为什么能读 B 域的数据"在代码里可查，而不是靠口头约定。
   </div>
 
-  <h2 class="sec">04 Canvas 四进程 + 端口</h2>
-  <p>这 4 个 crate 各自带 axum server，<b>独立 Deployment</b>，与主 web 进程物理隔离。镜像来自 GHCR（owner <code>SayAtelier</code>，tag <code>:dev</code>）。</p>
+  <h2 class="sec">04 Star Canvas 三个后端服务</h2>
+  <p>当前支持的 Canvas 后端服务为 <code>canvas-engine</code>、<code>domain-canvas</code> 与 <code>canvas-realtime</code>。三项服务由 <code>deploy/star-canvas-services-k3s.yaml</code> 管理；Star API 单独部署，不计入 Canvas 服务清单。发布和运行细节见 <a href="../deployment/star-canvas-services-deploy.md">Star Canvas services deployment</a>。</p>
   <div class="tbl-wrap rv"><table class="tbl">
-    <thead><tr><th>进程</th><th>端口</th><th>镜像</th><th>职责</th><th>阶段</th></tr></thead>
+    <thead><tr><th>服务</th><th>端口</th><th>Star 镜像</th><th>职责</th><th>部署来源</th></tr></thead>
     <tbody>
-      <tr><td class="mono">canvas-engine</td><td class="mono">8080</td><td class="mono">ghcr.io/sayatelier/star-canvas-engine:dev</td><td>Canvas 引擎（共享能力）</td><td>阶段 1 骨架：<code>/healthz</code> <code>/ready</code> <code>/version</code></td></tr>
-      <tr><td class="mono">domain-canvas</td><td class="mono">8081</td><td class="mono">ghcr.io/sayatelier/star-domain-canvas:dev</td><td>Canvas 业务域（26 表 W/T/M + 5 角色 CRUD）</td><td>阶段 1 骨架：<code>/api/v1/canvas</code> 占位</td></tr>
-      <tr><td class="mono">canvas-realtime</td><td class="mono">8082 + 8083 WSS</td><td class="mono">ghcr.io/sayatelier/star-canvas-realtime:dev</td><td>实时协作</td><td>阶段 1：WSS echo；阶段 2 接 Yjs/yrs CRDT</td></tr>
-      <tr><td class="mono">canvas-game</td><td class="mono">8084</td><td class="mono">ghcr.io/sayatelier/star-canvas-game:dev</td><td>Canvas 上的游戏层</td><td>阶段 1 骨架：<code>/api/v1/gameplay</code> 占位</td></tr>
+      <tr><td class="mono">canvas-engine</td><td class="mono">8080</td><td class="mono">ghcr.io/ulyssesleolee/star-canvas-engine</td><td>Canvas 引擎共享能力</td><td><code>deploy/star-canvas-services-k3s.yaml</code></td></tr>
+      <tr><td class="mono">domain-canvas</td><td class="mono">8081</td><td class="mono">ghcr.io/ulyssesleolee/star-domain-canvas</td><td>Canvas 业务域</td><td><code>deploy/star-canvas-services-k3s.yaml</code></td></tr>
+      <tr><td class="mono">canvas-realtime</td><td class="mono">8082 HTTP + 8083 WSS</td><td class="mono">ghcr.io/ulyssesleolee/star-canvas-realtime</td><td>实时协作传输</td><td><code>deploy/star-canvas-services-k3s.yaml</code></td></tr>
     </tbody>
   </table></div>
   <div class="note err">
-    <b>重要提醒：这 4 个进程目前都是骨架。</b>只有 <code>canvas-realtime</code> 的 WSS echo 端点是真实可交互的，
-    其余端点是 health/version 占位。<strong>不要把"端口通"当成"Canvas 功能可用"</strong>——这正是仓库
-    "仅有 UI、mock、seed、预览适配器或 REST 契约不得标为可用闭环"约束要防的事。
+    <b>部署清单仅定义服务身份、镜像与运行配置。</b>健康检查通过只证明进程就绪；产品功能闭环仍须按对应验收标准独立验证。
   </div>
 
   <h2 class="sec">05 终端栈与凭证库</h2>
@@ -186,9 +183,9 @@
         <li>14 crate 职责表：直接摘自 <code>crates/worktree-canvas/src/lib.rs</code> 头部的模块清单表（含 DD 章节号与不变量编号）。</li>
         <li>WASM 暴露的函数名：来自 <code>Cargo.toml</code> members 段三个 <code>*-wasm</code> 条目的注释（标注 ULYS-228/229/235）。</li>
         <li>ARG 三层组件名：<code>Cargo.toml</code> 中 <code>arg</code> / <code>arg-bridge</code> / <code>arg-effect</code> 三条注册注释。</li>
-        <li>Canvas 4 进程端口与镜像：<code>deploy/canvas-game-k3s.yaml</code> 头部说明块（GHCR owner、tag、端口一一对应）。</li>
+        <li>Canvas 服务部署与镜像：<code>deploy/star-canvas-services-k3s.yaml</code>；操作指南：<code>docs/deployment/star-canvas-services-deploy.md</code>。</li>
         <li>terminal-stack / ai-vault 范围：<code>Cargo.toml</code> 中 ULYS-200 / ULYS-157 注册注释（明示 P1 followup 边界）。</li>
-        <li>端口发布 workflow：<code>.github/workflows/publish-canvas-game.yml</code>。</li>
+        <li>服务镜像发布 workflow：<code>.github/workflows/publish-star-canvas-services.yml</code>。</li>
       </ul>
     </div>
   </details>
