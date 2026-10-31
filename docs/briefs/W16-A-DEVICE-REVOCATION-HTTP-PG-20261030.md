@@ -2,6 +2,14 @@
 
 **Agent**: worker
 **Phase**: W16-A-device-revoke-http-pg
+**Created**: 2026-10-31 07:11:51
+
+---
+
+# Brief: W16-A-DEVICE-REVOCATION-HTTP-PG-20261030
+
+**Agent**: worker
+**Phase**: W16-A-device-revoke-http-pg
 **Created**: 2026-10-31 03:52:40
 
 ---
@@ -35,7 +43,11 @@ Run the focused runner/test and Rust integration acceptance only when disposable
 
 ## Execution update (2026-10-31, latest)
 
-Run 20261031T034802-cda7dbb9b0 passed all four named authenticated HTTP acceptance cases on runner-owned disposable PostgreSQL 18 loopback with explicitly selected Rust/Cargo 1.99.1. All 10 runner steps succeeded; PostgreSQL stopped cleanly and only this run data directory was removed. Focused runner unit tests passed 15/15, including a subprocess check that writes 2 MiB on each stream while each saved log remains at most 1 MiB. Rust formatting passed; CypherGraph Guardian passed on the three source files. Automation registry check exited 0 with 0 errors and 205 repository-wide warnings. Exact workspace baseline Rust 1.99.0 compatibility remains NOT_RUN. Test-only global audit/SCD2 prerequisites do not prove production grants/RLS, production audit/SCD2, deployment, recovery, full W16-A, or performance.
+Runner acceptance `20261031T040054-beaa32cb49` **PASS** on a runner-owned disposable PostgreSQL 18 loopback cluster with explicitly selected Rust/Cargo 1.99.1: all 10 setup/test/cleanup steps succeeded and all four named HTTP cases were accepted. Cleanup stopped PostgreSQL and removed only this run's data directory. The focused runner unit suite is **16/16 PASS**, including bounded 1 MiB-per-stream logs and a Windows timeout test proving child-process-tree termination.
+
+Intermediate run `20261031T035915-36eb4844cd` failed closed with exit 125 before database readiness because the detached PostgreSQL start inherited captured output pipes; the runner now disables capture for that start command. The run-owned cluster/data were cleaned. This was a harness capture issue, not a product test result.
+
+Rust 1.99.0 baseline compatibility remains NOT_RUN. Test-only audit/SCD2 fixtures do not prove production RLS/grants/audit, deployment, recovery, full W16-A, or performance; those gates remain OPEN.
 
 
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)

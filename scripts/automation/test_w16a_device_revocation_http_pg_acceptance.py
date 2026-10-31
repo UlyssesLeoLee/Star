@@ -1,6 +1,6 @@
 """Unit tests for fail-closed W16 HTTP PostgreSQL acceptance runner guards."""
 
-# @cypher schema=1 source_sha256=438f9e104ebde3c7b7bca5cc7f4e1678b03c0e7744296bbe5d646e4abffb58fe
+# @cypher schema=1 source_sha256=63a61177487488c6750064cb42e16ae44524ef80433b0cf9b817a08b263d74c2
 # MERGE (self:File {path:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py"})
 # MERGE (tests:Type {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests",kind:"test_class"})
 # MERGE (envTest:Symbol {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests.test_environment_sanitization_removes_external_targets",kind:"test"})
@@ -18,8 +18,9 @@
 # MERGE (prereqTest:Symbol {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests.test_required_tools_include_rustc_preflight_error",kind:"test"})
 # MERGE (blockedSummaryTest:Symbol {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests.test_missing_toolchain_writes_blocked_summary_without_starting_postgres",kind:"test"})
 # MERGE (boundedTailTest:Symbol {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests.test_child_logs_are_bounded",kind:"test"})
+# MERGE (timeoutTreeTest:Symbol {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests.test_timeout_kills_child_process_tree",kind:"test"})
 # MERGE (runner:File {path:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py"})
-# MERGE (self)-[:DEFINES]->(tests),(tests)-[:DEFINES]->(envTest),(tests)-[:DEFINES]->(urlTest),(tests)-[:DEFINES]->(outputTest),(tests)-[:DEFINES]->(commandTest),(tests)-[:DEFINES]->(pathTest),(tests)-[:DEFINES]->(cleanupTest),(tests)-[:DEFINES]->(stoppedTest),(tests)-[:DEFINES]->(unknownTest),(tests)-[:DEFINES]->(toolchainTest),(tests)-[:DEFINES]->(toolchainOkTest),(tests)-[:DEFINES]->(cargoToolchainTest),(tests)-[:DEFINES]->(versionTest),(tests)-[:DEFINES]->(prereqTest),(tests)-[:DEFINES]->(blockedSummaryTest),(tests)-[:DEFINES]->(boundedTailTest)
+# MERGE (self)-[:DEFINES]->(tests),(tests)-[:DEFINES]->(envTest),(tests)-[:DEFINES]->(urlTest),(tests)-[:DEFINES]->(outputTest),(tests)-[:DEFINES]->(commandTest),(tests)-[:DEFINES]->(pathTest),(tests)-[:DEFINES]->(cleanupTest),(tests)-[:DEFINES]->(stoppedTest),(tests)-[:DEFINES]->(unknownTest),(tests)-[:DEFINES]->(toolchainTest),(tests)-[:DEFINES]->(toolchainOkTest),(tests)-[:DEFINES]->(cargoToolchainTest),(tests)-[:DEFINES]->(versionTest),(tests)-[:DEFINES]->(prereqTest),(tests)-[:DEFINES]->(blockedSummaryTest),(tests)-[:DEFINES]->(boundedTailTest),(tests)-[:DEFINES]->(timeoutTreeTest)
 # MERGE (envTest)-[:TESTS]->(runner),(envTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::sanitized_environment",kind:"function"})
 # MERGE (urlTest)-[:TESTS]->(runner),(urlTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::database_urls",kind:"function"})
 # MERGE (outputTest)-[:TESTS]->(runner),(outputTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::accepted_test_output",kind:"function"})
@@ -35,9 +36,11 @@
 # MERGE (prereqTest)-[:TESTS]->(runner),(prereqTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::required_tools_missing",kind:"function"})
 # MERGE (blockedSummaryTest)-[:TESTS]->(runner),(blockedSummaryTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::main",kind:"function"})
 # MERGE (boundedTailTest)-[:TESTS]->(runner),(boundedTailTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::run_step",kind:"function"})
+# MERGE (timeoutTreeTest)-[:TESTS]->(runner),(timeoutTreeTest)-[:CALLS]->(:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::run_step",kind:"function"})
 # @endcypher
 
 import json
+import os
 import sys
 from pathlib import Path
 import tempfile
@@ -70,6 +73,43 @@ class RunnerGuardTests(unittest.TestCase):
             self.assertLessEqual(len(stderr), acceptance.MAX_LOG_BYTES)
             self.assertTrue(stdout.endswith(b"x" * 32))
             self.assertTrue(stderr.endswith(b"y" * 32))
+
+    @unittest.skipUnless(os.name == "nt", "the disposable runner process-tree guard is Windows-specific")
+    def test_timeout_kills_child_process_tree(self) -> None:
+        parent = (
+            "import subprocess, sys, time; "
+            "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+            "print(f'spawned_pid={child.pid}', flush=True); time.sleep(60)"
+        )
+        with tempfile.TemporaryDirectory(dir=acceptance.ROOT) as temporary:
+            logs = Path(temporary) / "logs"
+            result = acceptance.run_step(
+                "timeout-tree",
+                [sys.executable, "-c", parent],
+                acceptance.sanitized_environment({}),
+                logs,
+                timeout=1,
+            )
+            self.assertEqual(result["exit_code"], 124)
+            self.assertNotIn("capture_error", result)
+            stdout = (logs / "timeout-tree.stdout.log").read_text(encoding="utf-8")
+            pid = int(stdout.split("spawned_pid=", 1)[1].splitlines()[0])
+            try:
+                check = acceptance.subprocess.run(
+                    ["tasklist.exe", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertNotIn(str(pid), check.stdout)
+            finally:
+                acceptance.subprocess.run(
+                    ["taskkill.exe", "/PID", str(pid), "/T", "/F"],
+                    stdin=acceptance.subprocess.DEVNULL,
+                    stdout=acceptance.subprocess.DEVNULL,
+                    stderr=acceptance.subprocess.DEVNULL,
+                    check=False,
+                )
 
     def test_environment_sanitization_removes_external_targets(self) -> None:
         clean = acceptance.sanitized_environment(

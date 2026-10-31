@@ -1,6 +1,6 @@
 """Run authenticated device-revocation HTTP acceptance on disposable PostgreSQL 18."""
 
-# @cypher schema=1 source_sha256=b6957ecfd4ecd7d7082eb476386c958d970621818fd1066f4a0ba5a9916ec64e
+# @cypher schema=1 source_sha256=31ac4ff986af7020cc76891deea60cbfa26d1716e280a07b52e6410744a46ce4
 # MERGE (self:File {path:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py"})
 # MERGE (main:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::main",kind:"function"})
 # MERGE (sanitize:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::sanitized_environment",kind:"function"})
@@ -20,11 +20,12 @@
 # MERGE (stop:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::stop_cluster",kind:"function"})
 # MERGE (tail:Type {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::BoundedTail",kind:"class"})
 # MERGE (capture:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::capture_pipe",kind:"function"})
+# MERGE (terminate:Symbol {id:"scripts/automation/w16a_device_revocation_http_pg_acceptance.py::terminate_process_tree",kind:"function"})
 # MERGE (testBinary:File {path:"crates/star-api-rest/tests/device_revocation_http_pg.rs"})
 # MERGE (db:Database {id:"PostgreSQL 18 disposable loopback cluster",kind:"database_server"})
-# MERGE (self)-[:DEFINES]->(main),(self)-[:DEFINES]->(sanitize),(self)-[:DEFINES]->(port),(self)-[:DEFINES]->(inside),(self)-[:DEFINES]->(step),(self)-[:DEFINES]->(psql),(self)-[:DEFINES]->(migrate),(self)-[:DEFINES]->(parseToolchain),(self)-[:DEFINES]->(selectToolchain),(self)-[:DEFINES]->(componentProbe),(self)-[:DEFINES]->(rustProbe),(self)-[:DEFINES]->(cargoProbe),(self)-[:DEFINES]->(prereqs),(self)-[:DEFINES]->(output),(self)-[:DEFINES]->(cargo),(self)-[:DEFINES]->(stop),(self)-[:DEFINES]->(tail),(self)-[:DEFINES]->(capture)
+# MERGE (self)-[:DEFINES]->(main),(self)-[:DEFINES]->(sanitize),(self)-[:DEFINES]->(port),(self)-[:DEFINES]->(inside),(self)-[:DEFINES]->(step),(self)-[:DEFINES]->(psql),(self)-[:DEFINES]->(migrate),(self)-[:DEFINES]->(parseToolchain),(self)-[:DEFINES]->(selectToolchain),(self)-[:DEFINES]->(componentProbe),(self)-[:DEFINES]->(rustProbe),(self)-[:DEFINES]->(cargoProbe),(self)-[:DEFINES]->(prereqs),(self)-[:DEFINES]->(output),(self)-[:DEFINES]->(cargo),(self)-[:DEFINES]->(stop),(self)-[:DEFINES]->(tail),(self)-[:DEFINES]->(capture),(self)-[:DEFINES]->(terminate)
 # MERGE (main)-[:CALLS]->(sanitize),(main)-[:CALLS]->(port),(main)-[:CALLS]->(migrate),(main)-[:CALLS]->(step),(main)-[:CALLS]->(stop),(main)-[:CALLS]->(prereqs)
-# MERGE (step)-[:CALLS]->(capture),(capture)-[:USES]->(tail)
+# MERGE (step)-[:CALLS]->(capture),(capture)-[:USES]->(tail),(step)-[:CALLS]->(terminate)
 # MERGE (prereqs)-[:CALLS]->(rustProbe),(prereqs)-[:CALLS]->(cargoProbe)
 # MERGE (rustProbe)-[:CALLS]->(componentProbe),(cargoProbe)-[:CALLS]->(componentProbe)
 # MERGE (componentProbe)-[:CALLS]->(selectToolchain),(componentProbe)-[:CALLS]->(parseToolchain)
@@ -151,33 +152,71 @@ def capture_pipe(stream: BinaryIO, tail: BoundedTail) -> None:
         stream.close()
 
 
-def run_step(name: str, command: list[str], env: Mapping[str, str], logs: Path, timeout: int) -> dict[str, object]:
+def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
+    """Stop the owned Windows process tree, then ensure the direct child is reaped."""
+    if os.name == "nt" and process.poll() is None:
+        try:
+            subprocess.run(
+                ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=15,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+    if process.poll() is None:
+        process.kill()
+    process.wait()
+
+
+def run_step(
+    name: str,
+    command: list[str],
+    env: Mapping[str, str],
+    logs: Path,
+    timeout: int,
+    *,
+    capture_output: bool = True,
+) -> dict[str, object]:
     logs.mkdir(parents=True, exist_ok=True)
     stdout_path, stderr_path = logs / f"{name}.stdout.log", logs / f"{name}.stderr.log"
     print(f"COMMAND[{name}] {subprocess.list2cmdline(command)}", flush=True)
     stdout_tail, stderr_tail = BoundedTail(), BoundedTail()
     readers: list[threading.Thread] = []
+    process: subprocess.Popen[bytes] | None = None
+    capture_error: str | None = None
     try:
-        process = subprocess.Popen(command, cwd=ROOT, env=dict(env), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        assert process.stdout is not None and process.stderr is not None
-        readers = [
-            threading.Thread(target=capture_pipe, args=(process.stdout, stdout_tail), daemon=True),
-            threading.Thread(target=capture_pipe, args=(process.stderr, stderr_tail), daemon=True),
-        ]
-        for reader in readers:
-            reader.start()
+        if capture_output:
+            process = subprocess.Popen(command, cwd=ROOT, env=dict(env), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            assert process.stdout is not None and process.stderr is not None
+            readers = [
+                threading.Thread(target=capture_pipe, args=(process.stdout, stdout_tail), daemon=True),
+                threading.Thread(target=capture_pipe, args=(process.stderr, stderr_tail), daemon=True),
+            ]
+            for reader in readers:
+                reader.start()
+        else:
+            process = subprocess.Popen(command, cwd=ROOT, env=dict(env), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             code = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+            terminate_process_tree(process)
             code = 124
     except FileNotFoundError as error:
         stderr_tail.append(str(error).encode("utf-8", errors="replace"))
         code = 127
     finally:
         for reader in readers:
-            reader.join(timeout=5)
+            reader.join(timeout=10)
+        if any(reader.is_alive() for reader in readers) and process is not None:
+            terminate_process_tree(process)
+            for reader in readers:
+                reader.join(timeout=10)
+        if any(reader.is_alive() for reader in readers):
+            capture_error = "child output pipe did not close after process-tree termination"
+            code = 125
         stdout_path.write_bytes(stdout_tail.value())
         stderr_path.write_bytes(stderr_tail.value())
     result: dict[str, object] = {
@@ -189,6 +228,8 @@ def run_step(name: str, command: list[str], env: Mapping[str, str], logs: Path, 
         "stdout_tail": read_tail(stdout_path),
         "stderr_tail": read_tail(stderr_path),
     }
+    if capture_error:
+        result["capture_error"] = capture_error
     if code:
         print(f"EXIT[{name}] {code}\n{result['stderr_tail']}", flush=True)
     return result
@@ -514,7 +555,7 @@ def main() -> int:
         steps.append(init)
         if init["exit_code"] == 0:
             start_attempted = True
-            start = run_step("postgres-start", [str(args.postgres_bin / "pg_ctl.exe"), "-D", str(data), "-l", str(data / "postgres-server.log"), "-o", f"-h 127.0.0.1 -p {port}", "-w", "start"], env, logs, 240)
+            start = run_step("postgres-start", [str(args.postgres_bin / "pg_ctl.exe"), "-D", str(data), "-l", str(data / "postgres-server.log"), "-o", f"-h 127.0.0.1 -p {port}", "-w", "start"], env, logs, 240, capture_output=False)
             steps.append(start)
             if start["exit_code"] == 0:
                 ready = run_step("postgres-ready", psql(args.postgres_bin, port, "postgres", sql="SELECT 1;"), env, logs, 30)
