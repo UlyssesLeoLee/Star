@@ -1,10 +1,14 @@
 name: Star Desktop stable bundle checks
 
-# @cypher schema=1 source_sha256=fe0311634e4bdcd8cbd6452146ce1385fe5798d99a85ff4515b15c5dc770b8c4
+# @cypher schema=1 source_sha256=957bd2f1aeb517d7e46f27acadb83ad211b449cb21f79eaa28362773f16b4997
 # MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
 # MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
 # MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
 # MERGE (upload_artifact:ExternalService {id:"actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",name:"actions/upload-artifact v7.0.2"})
+# MERGE (attest:ExternalService {id:"actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",name:"actions/attest v4.2.2"})
+# MERGE (download_artifact:ExternalService {id:"actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",name:"actions/download-artifact v8.0.2"})
+# MERGE (cargo_sbom:ExternalService {id:"cargo-sbom@0.10.0",name:"cargo-sbom 0.10.0 SPDX JSON"})
+# MERGE (npm_sbom:ExternalService {id:"npm-sbom",name:"npm sbom SPDX generator"})
 # MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.0"})
 # MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
 # MERGE (frontend_tests:Config {id:"frontend-tests.desktop-stable",name:"npm test -- --reporter=dot on Node.js 24.22.2"})
@@ -12,8 +16,12 @@ name: Star Desktop stable bundle checks
 # MERGE (self)-[:CALLS]->(checkout)
 # MERGE (self)-[:CALLS]->(setup_node)
 # MERGE (self)-[:CALLS]->(upload_artifact)
+# MERGE (self)-[:CALLS]->(download_artifact)
+# MERGE (self)-[:CALLS]->(attest)
 # MERGE (self)-[:CONFIGURES]->(toolchain)
 # MERGE (self)-[:CONFIGURES]->(node_runtime)
+# MERGE (self)-[:CALLS]->(cargo_sbom)
+# MERGE (self)-[:CALLS]->(npm_sbom)
 # @endcypher
 
 on:
@@ -21,17 +29,17 @@ on:
     branches: [dev]
     paths:
       - ".github/workflows/star-stable-desktop.yml"
-      - "crates/star-desktop/frontend/package.json"
-      - "crates/star-desktop/frontend/package-lock.json"
-      - "crates/star-desktop/src-tauri/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
       - "scripts/build-desktop.sh"
   push:
     branches: [dev]
     paths:
       - ".github/workflows/star-stable-desktop.yml"
-      - "crates/star-desktop/frontend/package.json"
-      - "crates/star-desktop/frontend/package-lock.json"
-      - "crates/star-desktop/src-tauri/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
       - "scripts/build-desktop.sh"
   workflow_dispatch:
 
@@ -84,6 +92,9 @@ jobs:
       - name: Install Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
 
+      - name: Install pinned Rust SBOM generator
+        run: cargo install cargo-sbom --version 0.10.0 --locked
+
       - name: Install locked frontend dependencies
         working-directory: crates/star-desktop/frontend
         run: npm ci --no-audit --no-fund
@@ -110,6 +121,26 @@ jobs:
           test -n "$appimage" || { echo "Missing non-empty AppImage artifact" >&2; exit 1; }
           printf '%s\n%s\n' "$deb" "$appimage"
 
+      - name: Generate Rust dependency SBOM
+        shell: bash
+        run: cargo sbom --project-directory . --cargo-package star-desktop --output-format spdx_json_2_3 > crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Generate frontend dependency SBOM
+        working-directory: crates/star-desktop/frontend
+        shell: bash
+        run: npm sbom --package-lock-only --sbom-format=spdx > star-desktop-frontend.spdx.json
+
+      - name: Validate Linux SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust_sbom="crates/star-desktop/src-tauri/star-desktop-rust.spdx.json"
+          frontend_sbom="crates/star-desktop/frontend/star-desktop-frontend.spdx.json"
+          test -s "$rust_sbom"
+          test -s "$frontend_sbom"
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) { const sbom=JSON.parse(fs.readFileSync(file,"utf8")); if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages) || !Array.isArray(sbom.relationships)) throw new Error(`Invalid SPDX 2.3 SBOM: ${file}`); }' "$rust_sbom" "$frontend_sbom"
+          if grep -Eiq 'star[-_]game' "$rust_sbom" "$frontend_sbom"; then echo "Unexpected retired game package in Desktop SBOM" >&2; exit 1; fi
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -117,6 +148,8 @@ jobs:
           path: |
             crates/star-desktop/src-tauri/target/release/bundle/deb/*.deb
             crates/star-desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+            crates/star-desktop/frontend/star-desktop-frontend.spdx.json
           if-no-files-found: error
           retention-days: 7
 
@@ -140,6 +173,9 @@ jobs:
 
       - name: Install Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
+
+      - name: Install pinned Rust SBOM generator
+        run: cargo install cargo-sbom --version 0.10.0 --locked
 
       - name: Install locked frontend dependencies
         working-directory: crates/star-desktop/frontend
@@ -165,11 +201,34 @@ jobs:
           if ($installers.Count -eq 0) { throw "Missing non-empty MSI under $bundleDirectory" }
           $installers | ForEach-Object { $_.FullName }
 
+      - name: Generate Rust dependency SBOM
+        shell: bash
+        run: cargo sbom --project-directory . --cargo-package star-desktop --output-format spdx_json_2_3 > crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Generate frontend dependency SBOM
+        working-directory: crates/star-desktop/frontend
+        shell: bash
+        run: npm sbom --package-lock-only --sbom-format=spdx > star-desktop-frontend.spdx.json
+
+      - name: Validate Windows SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust_sbom="crates/star-desktop/src-tauri/star-desktop-rust.spdx.json"
+          frontend_sbom="crates/star-desktop/frontend/star-desktop-frontend.spdx.json"
+          test -s "$rust_sbom"
+          test -s "$frontend_sbom"
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) { const sbom=JSON.parse(fs.readFileSync(file,"utf8")); if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages) || !Array.isArray(sbom.relationships)) throw new Error(`Invalid SPDX 2.3 SBOM: ${file}`); }' "$rust_sbom" "$frontend_sbom"
+          if grep -Eiq 'star[-_]game' "$rust_sbom" "$frontend_sbom"; then echo "Unexpected retired game package in Desktop SBOM" >&2; exit 1; fi
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: star-desktop-windows-unsigned
-          path: crates/star-desktop/src-tauri/target/release/bundle/msi/*.msi
+          path: |
+            crates/star-desktop/src-tauri/target/release/bundle/msi/*.msi
+            crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+            crates/star-desktop/frontend/star-desktop-frontend.spdx.json
           if-no-files-found: error
           retention-days: 7
 
@@ -196,6 +255,9 @@ jobs:
           rustup toolchain install 1.99.0 --profile minimal
           rustup target add --toolchain 1.99.0 aarch64-apple-darwin x86_64-apple-darwin
 
+      - name: Install pinned Rust SBOM generator
+        run: cargo install cargo-sbom --version 0.10.0 --locked
+
       - name: Install locked frontend dependencies
         working-directory: crates/star-desktop/frontend
         run: npm ci --no-audit --no-fund
@@ -220,10 +282,170 @@ jobs:
           test -n "$dmg" || { echo "Missing non-empty universal macOS DMG" >&2; exit 1; }
           printf '%s\n' "$dmg"
 
+      - name: Generate Rust dependency SBOM
+        shell: bash
+        run: cargo sbom --project-directory . --cargo-package star-desktop --output-format spdx_json_2_3 > crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Generate frontend dependency SBOM
+        working-directory: crates/star-desktop/frontend
+        shell: bash
+        run: npm sbom --package-lock-only --sbom-format=spdx > star-desktop-frontend.spdx.json
+
+      - name: Validate macOS SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust_sbom="crates/star-desktop/src-tauri/star-desktop-rust.spdx.json"
+          frontend_sbom="crates/star-desktop/frontend/star-desktop-frontend.spdx.json"
+          test -s "$rust_sbom"
+          test -s "$frontend_sbom"
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) { const sbom=JSON.parse(fs.readFileSync(file,"utf8")); if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages) || !Array.isArray(sbom.relationships)) throw new Error(`Invalid SPDX 2.3 SBOM: ${file}`); }' "$rust_sbom" "$frontend_sbom"
+          if grep -Eiq 'star[-_]game' "$rust_sbom" "$frontend_sbom"; then echo "Unexpected retired game package in Desktop SBOM" >&2; exit 1; fi
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: star-desktop-macos-universal-unsigned
-          path: crates/star-desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          path: |
+            crates/star-desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+            crates/star-desktop/frontend/star-desktop-frontend.spdx.json
           if-no-files-found: error
           retention-days: 7
+
+  attest_linux:
+    name: Attest Linux bundles
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+    needs: linux
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download Linux build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-linux-unsigned
+          path: artifacts/linux
+
+      - name: Require Linux attestation subjects and SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="artifacts/linux/src-tauri/target/release/bundle/deb"
+          appimage="artifacts/linux/src-tauri/target/release/bundle/appimage"
+          test -n "$(find "$deb" -maxdepth 1 -type f -name '*.deb' -size +0c -print -quit)"
+          test -n "$(find "$appimage" -maxdepth 1 -type f -name '*.AppImage' -size +0c -print -quit)"
+          test -s artifacts/linux/src-tauri/star-desktop-rust.spdx.json
+          test -s artifacts/linux/frontend/star-desktop-frontend.spdx.json
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) { const sbom=JSON.parse(fs.readFileSync(file,"utf8")); if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages)) throw new Error(`Invalid SPDX 2.3 SBOM: ${file}`); }' artifacts/linux/src-tauri/star-desktop-rust.spdx.json artifacts/linux/frontend/star-desktop-frontend.spdx.json
+
+      - name: Attest Linux build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/linux/src-tauri/target/release/bundle/deb/*.deb
+            artifacts/linux/src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Attest Linux Rust SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/linux/src-tauri/target/release/bundle/deb/*.deb
+            artifacts/linux/src-tauri/target/release/bundle/appimage/*.AppImage
+          sbom-path: artifacts/linux/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Attest Linux frontend SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/linux/src-tauri/target/release/bundle/deb/*.deb
+            artifacts/linux/src-tauri/target/release/bundle/appimage/*.AppImage
+          sbom-path: artifacts/linux/frontend/star-desktop-frontend.spdx.json
+
+  attest_windows:
+    name: Attest Windows installer
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+    needs: windows
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-windows-unsigned
+          path: artifacts/windows
+
+      - name: Require Windows attestation subjects and SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          msi="artifacts/windows/src-tauri/target/release/bundle/msi"
+          test -n "$(find "$msi" -maxdepth 1 -type f -name '*.msi' -size +0c -print -quit)"
+          test -s artifacts/windows/src-tauri/star-desktop-rust.spdx.json
+          test -s artifacts/windows/frontend/star-desktop-frontend.spdx.json
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) { const sbom=JSON.parse(fs.readFileSync(file,"utf8")); if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages)) throw new Error(`Invalid SPDX 2.3 SBOM: ${file}`); }' artifacts/windows/src-tauri/star-desktop-rust.spdx.json artifacts/windows/frontend/star-desktop-frontend.spdx.json
+
+      - name: Attest Windows build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/windows/src-tauri/target/release/bundle/msi/*.msi
+
+      - name: Attest Windows Rust SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/windows/src-tauri/target/release/bundle/msi/*.msi
+          sbom-path: artifacts/windows/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Attest Windows frontend SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/windows/src-tauri/target/release/bundle/msi/*.msi
+          sbom-path: artifacts/windows/frontend/star-desktop-frontend.spdx.json
+
+  attest_macos:
+    name: Attest macOS universal installer
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+    needs: macos
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download macOS build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-macos-universal-unsigned
+          path: artifacts/macos
+
+      - name: Require macOS attestation subjects and SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg"
+          test -n "$(find "$dmg" -maxdepth 1 -type f -name '*.dmg' -size +0c -print -quit)"
+          test -s artifacts/macos/src-tauri/star-desktop-rust.spdx.json
+          test -s artifacts/macos/frontend/star-desktop-frontend.spdx.json
+          node -e 'const fs=require("node:fs"); for (const file of process.argv.slice(1)) { const sbom=JSON.parse(fs.readFileSync(file,"utf8")); if (sbom.spdxVersion !== "SPDX-2.3" || !Array.isArray(sbom.packages)) throw new Error(`Invalid SPDX 2.3 SBOM: ${file}`); }' artifacts/macos/src-tauri/star-desktop-rust.spdx.json artifacts/macos/frontend/star-desktop-frontend.spdx.json
+
+      - name: Attest macOS build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Attest macOS Rust SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          sbom-path: artifacts/macos/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Attest macOS frontend SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          sbom-path: artifacts/macos/frontend/star-desktop-frontend.spdx.json

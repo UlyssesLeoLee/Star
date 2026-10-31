@@ -18,6 +18,13 @@ Run focused YAML/workflow/static checks and `git diff --check`; run tests only i
 
 Graph evidence: CodeGraph broad WBS queries returned irrelevant code symbols; there is no `check_index_coverage` tool available. This lane is workflow configuration, so inspect only its exact workflow and official GitHub docs. Context7 documentation consulted: GitHub attestations use `actions/attest@v4`; binary subjects use `subject-path`, with required `attestations: write` and `id-token: write` permissions. Verify exact current action SHA before use.
 
+## Implementation decisions
+
+- Produce separate SPDX 2.3 dependency documents for the selected `star-desktop` Cargo package and the locked Desktop frontend package. The Cargo generator is scoped by package name; npm reads only the committed package lock. Each document is attached to the exact platform bundle subjects with an SBOM attestation.
+- Keep build/test jobs at read-only repository permissions. Move OIDC and attestation write permissions to three tag-dispatch-only jobs that download the already-built bundles and SBOMs, so build scripts and PR code do not receive those capabilities.
+- Attest Linux `.deb`/AppImage, Windows MSI, and macOS universal DMG individually through their actual paths. These attestations establish provenance and SBOM predicates; they do not sign installers or notarize macOS output.
+- The SBOM inventory is split by package ecosystem, and the npm lockfile view includes development/build dependencies. License/NOTICE closure and consumer-side verification remain release gates.
+
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
