@@ -67,7 +67,7 @@
 4. **签名与更新未就绪**：没有 Windows Authenticode 证书、Apple Developer ID/签名/公证凭据或真实 updater 公钥。本阶段移除了占位 updater 配置并关闭 updater artifact 创建；所有工作流制品均未签名，不能对外称为可自动更新的稳定发行版。
 5. **旧工作流仍使用 Node 20**：`star-desktop-build.yml` 保持不变，需在原 owner 允许的独立 lane 中更新或退休。
 6. **商业许可闭包未审计**：本 lane 生成了 npm lockfile，但没有对 npm 完整传递依赖做 SPDX/SBOM 与商业再分发许可审核；根级许可证闭包 lane 仍须给出结论。
-7. **包的实际安装策略未验收**：Windows WebView2、Linux 系统库和 macOS Gatekeeper 体验仍需在各平台安装验证中确认。
+7. **包的实际安装策略未验收**：Windows WebView2、Windows MSI 所需的 VBSCRIPT optional feature/WiX 环境、Linux 系统库和 macOS Gatekeeper 体验仍需在各平台安装验证中确认。Tauri 官方文档说明构建 MSI 需要启用 VBSCRIPT（[Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/#vbscript-for-msi-installers)）；当前 hosted runner 尚未实测此条件。
 8. **稳定版本未发布**：没有发布、tag、部署或 push 动作。
 
 ## 4. 子代理失败接手清单
