@@ -1,0 +1,145 @@
+name: Star Web stable build evidence
+
+# This workflow creates a lockfile-driven Next.js build evidence bundle. It does
+# not deploy to Vercel or claim that the bundle is a Vercel deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      release_gate_confirmation:
+        description: Confirm the stable release gates are closed before generating evidence
+        required: true
+        type: choice
+        options: [NO, APPROVED]
+        default: NO
+
+permissions:
+  contents: read
+
+concurrency:
+  group: star-stable-web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-attest:
+    name: Build and attest the Star Web evidence bundle
+    runs-on: ubuntu-24.04
+    environment: star-stable-release
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require approved version tag
+        shell: bash
+        env:
+          RELEASE_GATE_CONFIRMATION: ${{ inputs.release_gate_confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "Stable Web evidence can only be generated from a version tag." >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_GATE_CONFIRMATION" != APPROVED ]]; then
+            echo "Stable Web evidence requires explicit APPROVED confirmation." >&2
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        run: npm test -- --reporter=dot
+
+      - name: Build Next.js output
+        run: npm run build
+
+      - name: Generate and validate SPDX SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/star-web-build-evidence
+          npm sbom --sbom-format=spdx > dist/star-web-build-evidence/sbom.spdx.json
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const sbomPath = "dist/star-web-build-evidence/sbom.spdx.json";
+          const sbom = JSON.parse(fs.readFileSync(sbomPath, "utf8"));
+          if (sbom.spdxVersion !== "SPDX-2.3") {
+            throw new Error(`Expected SPDX-2.3, got ${sbom.spdxVersion ?? "missing version"}`);
+          }
+          if (!Array.isArray(sbom.packages) || sbom.packages.length === 0) {
+            throw new Error("The npm SBOM has no package records.");
+          }
+          NODE
+
+      - name: Pack Web build evidence with normalized archive metadata
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          bundle="dist/star-web-build-evidence"
+          test -s .next/BUILD_ID
+          test -d public
+          cp -a .next "$bundle/.next"
+          cp -a public "$bundle/public"
+          cp package.json package-lock.json next.config.js vercel.json "$bundle/"
+          {
+            printf 'source_commit=%s\n' "$SOURCE_COMMIT"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'npm=%s\n' "$(npm --version)"
+            printf 'package_lock_sha256=%s\n' "$(sha256sum package-lock.json | cut -d ' ' -f 1)"
+          } > "$bundle/build-info.txt"
+          source_date_epoch="$(git -C .. show -s --format=%ct "$SOURCE_COMMIT")"
+          test -n "$source_date_epoch"
+          tar --sort=name --mtime="@$source_date_epoch" --owner=0 --group=0 --numeric-owner \
+            -cf - -C dist star-web-build-evidence | gzip -n > dist/star-web-build-evidence.tar.gz
+          test -s dist/star-web-build-evidence.tar.gz
+          (cd dist && sha256sum star-web-build-evidence.tar.gz > star-web-build-evidence.tar.gz.sha256)
+
+      - name: Upload stable Web evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-web-build-evidence-${{ github.sha }}
+          path: |
+            frontend/dist/star-web-build-evidence.tar.gz
+            frontend/dist/star-web-build-evidence.tar.gz.sha256
+            frontend/dist/star-web-build-evidence/sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attest Web build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: frontend/dist/star-web-build-evidence.tar.gz
+
+      - name: Attest Web SBOM for the build archive
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: frontend/dist/star-web-build-evidence.tar.gz
+          sbom-path: frontend/dist/star-web-build-evidence/sbom.spdx.json
+
+      - name: Record consumer verification guidance
+        shell: bash
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: |
+          {
+            echo "The uploaded archive is a build evidence bundle, not a Vercel deployment."
+            echo "Verify the downloaded archive with: gh attestation verify star-web-build-evidence.tar.gz --repo $SOURCE_REPOSITORY"
+            echo "Verify its SHA-256 using star-web-build-evidence.tar.gz.sha256."
+          } >> "$GITHUB_STEP_SUMMARY"
