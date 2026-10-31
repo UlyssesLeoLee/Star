@@ -49,6 +49,12 @@ W1 法律/NOTICE、W2 锁与构建闭包、W3 SBOM/provenance、W5 桌面闭环�
 
 保留边界：根 Cargo.toml 与 license-gate.yml 保持其活动 owner 所有权；Web 根 package-lock 仍属于活跃依赖 owner。桌面 lane 只更新隔离的桌面 package lock 并新增独立稳定构建 workflow，不覆盖旧桌面 workflow/owner 文件。Canvas 发布现需显式手动确认并绑定 star-stable-release environment，但仓库侧审查人/分支限制尚未验证；第三方依赖许可证/NOTICE 与真实 OCI/K3s readiness 仍未验证。W3 SBOM/provenance、W4 required-check 与 Action pin 证据、W8 D2/D4 的 Multipass 两实例真实验收、W9 candidate 验收仍 OPEN/BLOCKED。D4 活动终端及所有 W8、D2 文件保持原样。
 
+## 最新集成状态（2026-10-31）
+
+stable-hardening 首轮四个已审查 lane 已合入本地 `dev`：license-policy（`785155322e0f003c5cc6c5340d609d9e2673a680`）、desktop-packaging（`08a7b4fdb9db0d9c4ed0c0ff773d8833ccf8290e`）、web-vercel-config（`3880dc943775e68c40b5ee8553444135f0e64048`）、canvas-oci（`00404e38173801fd1b143c213eadbef2958093db`）。四个来源先以非快进合并进入 `agent/stable-hardening/integration`，再从原基线 `04d8b7a84514dcb454874eb852651778e1452dea` 快进到 `dev@782a7309997fe4fff7e522bb74639968431a51f6`；MAGOS GitPlan set 已释放。
+
+集成后的 `git diff --check` 通过，容器构建/部署输入静态扫描仅发现用于排除 `star-game` 的断言和 `.dockerignore` 规则。相应 lane 的本地构建、测试与静态审查见各阶段报告；本次没有重新运行完整发行构建、hosted CI、签名/安装、真实 Vercel 部署或 OCI/K3s 验收。W0–W9 状态不变，稳定产品发行仍为 OPEN；没有创建 tag/release、构建或发布制品、部署或 push。
+
 ## 外部约束依据（截至 2026-10-31）
 
 - Rust 官方 notes 显示 1.99.1 于 2026-10-15 发布；Star baseline 1.99.0仍是用户声明的最低版本，但是否升 patch 需在 W2 决策。[Rust Release Notes](https://doc.rust-lang.org/releases.html)
@@ -68,3 +74,4 @@ W1 法律/NOTICE、W2 锁与构建闭包、W3 SBOM/provenance、W5 桌面闭环�
 | v0.6 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 `cargo-deny 0.20.2` 在 Rust 1.99.1 诊断扫描中发现 `webpki-roots 1.0.9` / `RUSTSEC-2026-0381`；声明该结果不替代 Rust 1.99.0 基线验收，且锁文件修复需要 owner 审查。 | 本轮 W1 policy 复核发现现有 advisory 阻塞 |
 | v0.7 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 stable-hardening revision 24 的实际切片：Chart/deny 为 MIT，桌面隔离 lock/build/frontend tests 已实现，Vercel 配置通过首轮审查；桌面 CI 与 Canvas 发布审批 follow-up 正在进行。按证据更新 W1/W2/W5/W6/W7；所有 hosted CI、法律/NOTICE、签名、部署、OCI digest 和两实例验收仍开放。 | 用户确认范围与许可证后，四条并行 lane 已完成首轮 |
 | v0.8 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 stable-hardening revision 28 的独立审查结果：桌面三平台 workflow 在 Node 24 构建前运行 Vitest 并关闭 checkout 凭据持久化；Canvas tag push 不再自动发布，只有版本 tag 的明确批准 dispatch 可请求发布并绑定外部保护 environment。工作流静态检查通过，hosted CI 与外部 environment 配置仍未核实；WBS 将 W5/W7 缺口和 lane 状态更新为集成前快照。 | 独立 lane 审查发现发布 workflow 缺少相应门禁 |
+| v0.9 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 stable-hardening 四个已审查 lane 按序进入集成分支并快进到本地 dev@782a730；MAGOS GitPlan set 已释放。记录集成差异检查及 `star-game` 排除扫描结果，同时保持 W0–W9 未闭合项与稳定发行 OPEN；未创建 tag、发布、部署或 push。 | 四个 stable-hardening lane 完成 dev 集成 |
