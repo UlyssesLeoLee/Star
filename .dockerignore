@@ -1,0 +1,13 @@
+# Canvas images are built from explicit per-service contexts assembled by
+# .github/workflows/publish-star-canvas-services.yml. Keep this denylist in
+# each context as defense in depth for accidental future additions.
+.git
+**/.git
+target
+**/target
+node_modules
+**/node_modules
+star-game
+**/star-game
+game-legacy
+**/game-legacy

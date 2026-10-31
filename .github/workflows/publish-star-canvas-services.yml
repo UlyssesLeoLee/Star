@@ -1,9 +1,10 @@
-# Publish the three maintained Star Canvas backend images to the existing GHCR namespace.
-# Pushes publish branch and commit tags; version tags and manual dispatch are also supported.
-# GHCR_TOKEN must be configured as a repository secret with package write permission.
-# Never pass registry credentials as workflow dispatch inputs or print credential values.
+# Publish only the three maintained Star Canvas service images.
+# Every image is built from an allowlisted, per-service Cargo context; the full
+# monorepo and unrelated workspace members are never sent to BuildKit.
+# GHCR_TOKEN must be configured as a repository secret with package write access.
+# Never pass registry credentials as workflow dispatch inputs or print secrets.
 
-name: Publish Star Canvas services (3 crates → GHCR)
+name: Publish Star Canvas services
 
 on:
   push:
@@ -13,86 +14,270 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  packages: none
 
 env:
   REGISTRY: ghcr.io
-  # GitHub login names preserve account casing; OCI image namespaces are lowercase.
   IMAGE_OWNER: UlyssesLeoLee
   IMAGE_NAMESPACE: ulyssesleolee
-  # Image names are kept aligned with deploy/star-canvas-services-k3s.yaml.
-  IMAGES: >-
-    canvas-engine
-    domain-canvas
-    canvas-realtime
 
 jobs:
   test:
-    name: cargo test (3 Canvas crates)
+    name: Check and test the three Canvas crates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@ff7f6a3374ce205788da40198ec918bd5d67aea7 # 1.99.0
         with:
           components: clippy, rustfmt
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
-      - name: cargo check --workspace --all-targets
-        # 守门 #1 v25: 0 err 才推 GHCR
-        run: cargo check --workspace --all-targets -j 4
-      - name: cargo test (three Canvas crates)
-        # 守门 #1 v25 cargo test 单 crate 实证
-        run: cargo test -p canvas-engine -p domain-canvas -p canvas-realtime -j 4
+      - name: Check Canvas crates only
+        run: cargo check -p canvas-engine -p domain-canvas -p canvas-realtime --all-targets --locked -j 4
+      - name: Test Canvas crates only
+        run: cargo test -p canvas-engine -p domain-canvas -p canvas-realtime --locked -j 4
 
   build-and-push:
-    name: build + push (${{ matrix.image }})
+    name: Build and publish ${{ matrix.image }}
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
         image: ${{ fromJSON('["canvas-engine","domain-canvas","canvas-realtime"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Block stable tags until package license metadata matches the selected license
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $license = python -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['license'])"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read Cargo workspace license metadata.' }
+          $licenseHeading = Get-Content LICENSE -TotalCount 1
+          if ($license -cne 'MIT' -or $licenseHeading -cne 'MIT License') {
+            throw "Stable release is blocked: Cargo workspace package license is '$license' and LICENSE heading is '$licenseHeading'; both must match the selected MIT license before publishing a version tag."
+          }
+
+      - name: Assemble and verify a minimal per-service Cargo context
+        id: context
+        shell: pwsh
+        env:
+          CANVAS_IMAGE: ${{ matrix.image }}
+        run: |
+          @'
+          import json
+          import os
+          import re
+          import shutil
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          allowed = {"canvas-engine", "domain-canvas", "canvas-realtime"}
+          image = os.environ["CANVAS_IMAGE"]
+          if image not in allowed:
+              raise SystemExit(f"Refusing unapproved Canvas image: {image}")
+
+          repo = Path(os.environ["GITHUB_WORKSPACE"])
+          context = Path(os.environ["RUNNER_TEMP"]) / "star-canvas-oci" / image
+          context.mkdir(parents=True, exist_ok=True)
+          source_crate = repo / "crates" / image
+          crate_manifest_path = source_crate / "Cargo.toml"
+          root_manifest = tomllib.loads((repo / "Cargo.toml").read_text(encoding="utf-8"))
+          crate_manifest = tomllib.loads(crate_manifest_path.read_text(encoding="utf-8"))
+          lock_text = (repo / "Cargo.lock").read_text(encoding="utf-8")
+          package = crate_manifest["package"]
+          if package["name"] != image or package.get("build") or (source_crate / "build.rs").exists():
+              raise SystemExit("Service manifest name/build script is outside this image allowlist.")
+
+          dependency_groups = ("dependencies", "dev-dependencies", "build-dependencies")
+          inherited = set()
+          for group in dependency_groups:
+              for name, value in crate_manifest.get(group, {}).items():
+                  if isinstance(value, dict) and value.get("path"):
+                      raise SystemExit(f"Local path dependency is not allowed in isolated image context: {name}")
+                  if isinstance(value, dict) and value.get("workspace") is True:
+                      inherited.add(name)
+
+          workspace = root_manifest["workspace"]
+          workspace_dependencies = workspace["dependencies"]
+          missing = inherited - workspace_dependencies.keys()
+          if missing:
+              raise SystemExit(f"Workspace dependencies are missing: {sorted(missing)}")
+          for name in inherited:
+              value = workspace_dependencies[name]
+              if isinstance(value, dict) and value.get("path"):
+                  raise SystemExit(f"Workspace dependency resolves to a local product crate: {name}")
+
+          def toml_value(value):
+              if isinstance(value, str):
+                  return json.dumps(value, ensure_ascii=False)
+              if isinstance(value, bool):
+                  return "true" if value else "false"
+              if isinstance(value, int):
+                  return str(value)
+              if isinstance(value, list):
+                  return "[" + ", ".join(toml_value(item) for item in value) + "]"
+              if isinstance(value, dict):
+                  return "{ " + ", ".join(
+                      f"{key} = {toml_value(item)}" for key, item in value.items()
+                  ) + " }"
+              raise TypeError(f"Unsupported TOML value: {type(value).__name__}")
+
+          def toml_table(name, values):
+              return "[" + name + "]\n" + "".join(
+                  f"{key} = {toml_value(value)}\n" for key, value in values.items()
+              )
+
+          generated_manifest = [
+              "[workspace]",
+              f"resolver = {toml_value(workspace['resolver'])}",
+              f"members = {toml_value(['crates/' + image])}",
+              "",
+              toml_table("workspace.package", workspace["package"]),
+              toml_table(
+                  "workspace.dependencies",
+                  {name: workspace_dependencies[name] for name in sorted(inherited)},
+              ),
+          ]
+          for table_name, values in workspace.get("lints", {}).items():
+              generated_manifest.append(toml_table("workspace.lints." + table_name, values))
+          generated_manifest_path = context / "Cargo.toml"
+          generated_manifest_path.write_text("\n".join(generated_manifest), encoding="utf-8")
+          tomllib.loads(generated_manifest_path.read_text(encoding="utf-8"))
+
+          # Parse Cargo's locked package identities and dependency references.
+          lock_prefix, *lock_chunks = lock_text.split("[[package]]")
+          packages = []
+          for chunk in lock_chunks:
+              parsed = tomllib.loads("[[package]]\n" + chunk)["package"][0]
+              packages.append((parsed, "[[package]]" + chunk))
+          by_identity = {
+              (item["name"], item["version"], item.get("source")): item
+              for item, _ in packages
+          }
+          by_name = {}
+          for identity in by_identity:
+              by_name.setdefault(identity[0], []).append(identity)
+          roots = [identity for identity in by_identity if identity[0] == image and identity[2] is None]
+          if len(roots) != 1:
+              raise SystemExit(f"Expected exactly one locked local package for {image}, found {len(roots)}")
+
+          dependency_pattern = re.compile(r"^([^ ]+)(?: ([0-9][^ ]*))?(?: \(([^)]+)\))?$")
+          edges = {}
+          for identity, item in by_identity.items():
+              resolved = []
+              for reference in item.get("dependencies", []):
+                  match = dependency_pattern.fullmatch(reference)
+                  if not match:
+                      raise SystemExit(f"Unrecognized Cargo.lock dependency reference: {reference}")
+                  name, version, source = match.groups()
+                  candidates = [
+                      candidate
+                      for candidate in by_name.get(name, [])
+                      if (version is None or candidate[1] == version)
+                      and (source is None or candidate[2] == source)
+                  ]
+                  if len(candidates) != 1:
+                      raise SystemExit(
+                          f"Cargo.lock dependency reference is not uniquely resolvable: {identity} -> {reference}"
+                      )
+                  resolved.append(candidates[0])
+              edges[identity] = resolved
+
+          included = set()
+          pending = list(roots)
+          while pending:
+              identity = pending.pop()
+              if identity in included:
+                  continue
+              included.add(identity)
+              pending.extend(edges[identity])
+
+          local_dependencies = [
+              identity for identity in included
+              if identity[2] is None and identity[0] not in allowed
+          ]
+          if local_dependencies:
+              raise SystemExit(f"Canvas package closure reaches non-Canvas workspace members: {local_dependencies}")
+          if any(identity[0] == "star-game" for identity in included):
+              raise SystemExit("Canvas package closure unexpectedly includes star-game.")
+
+          filtered_lock = lock_prefix + "".join(
+              block for item, block in packages
+              if (item["name"], item["version"], item.get("source")) in included
+          )
+          parsed_filtered_lock = tomllib.loads(filtered_lock)
+          filtered_names = {item["name"] for item in parsed_filtered_lock["package"]}
+          if "star-game" in filtered_names or len(parsed_filtered_lock["package"]) != len(included):
+              raise SystemExit("Filtered Cargo.lock failed the isolated package closure check.")
+          (context / "Cargo.lock").write_text(filtered_lock, encoding="utf-8")
+
+          shutil.copy2(repo / "rust-toolchain.toml", context / "rust-toolchain.toml")
+          shutil.copy2(repo / "LICENSE", context / "LICENSE")
+          shutil.copy2(repo / ".dockerignore", context / ".dockerignore")
+          destination = context / "crates" / image
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(crate_manifest_path, destination / "Cargo.toml")
+          shutil.copytree(source_crate / "src", destination / "src", dirs_exist_ok=True)
+          shutil.copy2(source_crate / "Dockerfile", context / "Dockerfile")
+
+          files = sorted(path.relative_to(context).as_posix() for path in context.rglob("*") if path.is_file())
+          forbidden = [path for path in files if "game" in path.lower() or path.startswith((".git/", "target/"))]
+          if forbidden:
+              raise SystemExit(f"Unexpected files in image context: {forbidden}")
+          if any(path.startswith("crates/") and not path.startswith(f"crates/{image}/") for path in files):
+              raise SystemExit("Image context contains a crate outside the allowlisted service.")
+          print(f"Verified {image}: {len(included)} locked packages; {len(files)} files; no game or foreign workspace sources.")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"directory={context.as_posix()}\n")
+          '@ | python3 -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.IMAGE_OWNER }}
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: Extract metadata (tags + labels)
+      - name: Extract immutable commit tag
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/star-${{ matrix.image }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            type=sha,format=long
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-          flavor: |
-            latest=auto
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
-          context: .
-          file: crates/${{ matrix.image }}/Dockerfile
+          context: ${{ steps.context.outputs.directory }}
+          file: ${{ steps.context.outputs.directory }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=star-canvas-oci-context-v1-${{ matrix.image }}
+          cache-to: type=gha,scope=star-canvas-oci-context-v1-${{ matrix.image }},mode=max
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
 
-      - name: Image digest
-        id: digest
-        run: echo "digest=${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT
+      - name: Record immutable image reference
+        shell: pwsh
+        env:
+          CANVAS_IMAGE: ${{ matrix.image }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          $image = "$env:REGISTRY/$env:IMAGE_NAMESPACE/star-$env:CANVAS_IMAGE@$env:IMAGE_DIGEST"
+          "Immutable image: ``$image``" | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
