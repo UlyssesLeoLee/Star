@@ -13,7 +13,7 @@
 
 | 文件 | 改动 | 状态 |
 |---|---|---|
-| `.github/workflows/publish-star-canvas-services.yml` | main/dev push 与 workflow dispatch 仍跑测试；只有 `refs/tags/v*` 可启动发布 job；移除 workspace 级检查与 cargo artifact cache；按 crate 从 `Cargo.lock` 生成过滤后的最小 context；验证闭包无其他本地 workspace member；限定缓存 scope；固定 GitHub Actions commit；提交构建 provenance/SBOM；发布完整 commit SHA 与精确 semver 标签并记录 Buildx digest，不发布分支或 latest 标签；`v*` 稳定发布检查 Cargo 与 `LICENSE` 均为 MIT | 完成，未运行 CI |
+| `.github/workflows/publish-star-canvas-services.yml` | main/dev 与 tag push 只运行测试；手动 workflow_dispatch 需从 `refs/tags/v*` 运行且将必填确认选为 `APPROVED` 才可请求发布；发布 job 绑定 `star-stable-release` environment；其余最小 context、lock 闭包、独立缓存、SHA 固定 Actions、provenance/SBOM、commit+semver 标签与 MIT 元数据检查保持不变 | 完成静态更新，CI 和 environment protection 未验证 |
 | `crates/canvas-engine/Dockerfile`、`crates/domain-canvas/Dockerfile`、`crates/canvas-realtime/Dockerfile` | 分别只复制本服务 crate；固定 Rust 1.99.0 与 Debian Bookworm 基础镜像 digest；使用 `--locked`；随镜像包含仓库 MIT `LICENSE` 并设置 OCI license label；以 UID/GID 10001 运行 | 完成，未运行 Buildx |
 | `.dockerignore` | 对 `.git`、target、node_modules、`star-game` 与 game-legacy 路径设置防御性排除 | 完成 |
 | `deploy/star-canvas-services-k3s.yaml` | 三个 Canvas image 设置显式 digest 输入位；固定 Envoy 到 registry manifest digest；将 GHCR `imagePullSecrets` 移至 Pod spec | 完成模板；缺实际 Canvas digest，不可直接部署 |
@@ -37,22 +37,23 @@
 
 ## §3 已知缺口
 
-1. **稳定发布被许可证元数据门禁阻止。** 当前 `Cargo.toml` 的 `[workspace.package].license` 仍为 `Apache-2.0`，根 `LICENSE` 为 `MIT License`，与用户确认的 Star 统一 MIT 身份不一致。依照 owner 边界，本 lane 未改 `Cargo.toml`；main/dev push 与非 tag 的手动触发只运行测试并跳过镜像发布 job。只有 `v*` tag 会启动发布 job，且会在 GHCR 登录前 fail closed，直到 Cargo metadata 与根 `LICENSE` 都匹配 MIT。
+1. **稳定发布仍被许可证元数据门禁阻止。** 当前 `Cargo.toml` 的 `[workspace.package].license` 仍为 `Apache-2.0`，根 `LICENSE` 为 `MIT License`，与用户确认的 Star 统一 MIT 身份不一致。依照 owner 边界，本 lane 未改 `Cargo.toml`。所有分支、tag push 和未批准的手动触发只运行测试；只有从 `refs/tags/v*` 手动运行且将必填 `release_gate_confirmation` 选为 `APPROVED`，才会尝试进入绑定 `star-stable-release` environment 的发布 job。该 environment 的必需审查人、分支规则及 W0-W9 证据核验尚未在 GitHub 配置/验证，必须由仓库 owner 设置并实测；即使流程条件满足，MIT 元数据检查仍会在 GHCR 登录前 fail closed。
 2. **三个 Star Canvas image digest 尚不存在于本 lane 可读取证据中。** GHCR package-version 查询返回 403（当前凭据缺少 `read:packages`），并且本 lane 禁止实际 publish。K3s 清单的三个占位符必须在获准发行后替换为对应 Buildx 输出的 `sha256` digest；当前文件是渲染模板，不能直接部署。没有以伪造 digest 或 mutable tag 代替。
 3. **Cargo 编译、OCI 镜像构建、K3s readiness 与多架构运行未验证。** 工作流设定 `linux/amd64`；当前环境没有可用的允许运行证据。需要在 GitHub Actions 与目标 Multipass/K3s 环境实测。
 4. Envoy 的 digest 固定了当前原清单指向的 `v1.28-latest` 对应内容；本阶段仅完成不可变引用，没有评估 Envoy 版本生命周期或升级兼容性。
+5. **第三方许可证与 NOTICE 未随镜像闭合。** 三份 Dockerfile 只包含 Star 根 `LICENSE`；Cargo SBOM/provenance 不代表第三方依赖许可证清单、NOTICE、版权/专利声明或再分发义务已满足。需针对实际过滤后的依赖闭包生成并复核合规材料，完成前不能发布。
 
 ## §4 子代理失败接手清单
 
-本 lane 未派发子代理；没有子代理 RPC 结果或未接手子代理改动。CodeRabbit 二次审查未能运行：本机入口最终调用 `/root/.local/bin/coderabbit` 并返回 `Permission denied`；不将其记录为通过。已由协调 agent 直接检查 diff，并执行本地静态验证。
+初始 Canvas OCI lane 未派发子代理。本次 STABLE-CANVAS-RELEASE-GATE-20261031 后续审查已由协调者派发给独立 worker；本报告记录其完成结果，没有未接手的子代理输出。CodeRabbit 二次审查未能运行：本机入口最终调用 `/root/.local/bin/coderabbit` 并返回 `Permission denied`；不将其记录为通过。已由协调 agent 直接检查 diff，并执行本地静态验证。
 
 ## §5 守门规则
 
 1. BuildKit context 由三项 allowlist 生成；只复制该 service 的 `Cargo.toml` 与 `src/`、最小 workspace metadata、对应 lock 闭包、MIT `LICENSE` 和 Dockerfile。上下文生成器拒绝未知镜像名、本地 path dependency、额外本地 workspace package、`star-game`、不完整 lock closure 及 game 路径。
 2. 不调用 workspace 全量 Cargo 构建，不保留 Swatinem cargo artifact cache；BuildKit GHA cache 按服务隔离，新的 scope 不读取旧全仓构建缓存。
 3. 镜像基础层固定 digest；K3s 不使用 `dev`、`latest` 或版本 tag 部署 Star Canvas 镜像。
-4. GHCR 写权限只存在于发布 job；stable tag 在 GHCR 登录前检查 MIT 元数据。Buildx provenance 与 SBOM 开启。
-5. main/dev push 与无 tag 的 workflow dispatch 仅执行测试；只有版本 tag `refs/tags/v*` 可以进入 GHCR 发布 job。版本 tag 的 `workflow_dispatch` 仍适用相同门禁。
+4. GHCR 写权限只存在于发布 job；MIT 元数据检查在 GHCR 登录前运行。Buildx provenance 与 SBOM 开启，但它们不等于第三方依赖许可证/NOTICE 清单或再分发义务审查。
+5. main/dev 与版本 tag push 以及普通 workflow_dispatch 只执行测试；只有从版本 tag 手动 workflow_dispatch 且必填确认值为 `APPROVED` 才能请求发布，并要求 `star-stable-release` environment 审查。GitHub environment 的必需审查人和限制仍需外部配置并验证。
 6. 缺少真实发行 digest 时，K3s 文件明确保留未解析占位符，不宣称已可部署或已发布。
 7. 没有执行 Docker Desktop、镜像推送、tag 创建、部署或远端 K3s 操作。
 
@@ -71,3 +72,4 @@
 | 版本 | 日期 | 修订人 | 内容 |
 |---|---|---|---|
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初版：隔离 Cargo/OCI 上下文、基础镜像 digest、最小缓存范围、非 root 镜像、digest-input 模板和稳定许可证发布门禁。 |
+| v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 取消版本 tag push 的自动 GHCR 发布；改为需要 tag ref 上手动确认并绑定外部保护 environment 的发布请求，同时澄清环境审查人配置、第三方 license/NOTICE 义务和所有远端发布证据仍待核验。触发原因：独立审查发现 tag push 可直接触发发布。 |
