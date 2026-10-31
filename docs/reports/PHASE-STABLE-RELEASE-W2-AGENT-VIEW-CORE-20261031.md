@@ -29,6 +29,8 @@
 
 ## §3 已知缺口
 
+生产数据证据边界：Agent View 当前从 useStore(s => s.agentSessions) 读取会话，frontend/src/lib/store.ts 将其初始化为 seed.agentSessions，受跟踪的 frontend/src/lib/seed.ts 定义演示会话。移除旧游戏机制及生产 bundle 扫描不代表实时 Agent/工作项数据已接入。具备 Run/Worktree 授权范围的实时 provider，或 provider/数据缺失时的真实空状态，仍是开放工作；seed、UI 和 bundle 证据均不能作为生产数据或 Agent 执行能力的证明。
+
 1. Agent Settings 仍是本地配置草稿。安全凭据存储、模型调用、Agent runtime、CLI 执行、取消/恢复和独立验证不属于本阶段，页面明确提示不会启动 Agent。
 2. 旧版本浏览器 `star-store:v1` 的本地存储可能仍含有旧 Agent Settings 字段。此 lane 让新设置默认凭据为空且禁用编辑，但未迁移或清除既有本地值；清理必须单独评估兼容性与数据迁移策略，不能宣称旧客户端存储已完成安全清理。
 3. 生产构建与 route bundle scan 只证明当前 Web Agent View 可构建且不携带被移除的游戏模块；没有运行浏览器 E2E、远端部署、生产 smoke、Canvas 大规模数据性能基准或整个 Web 应用测试套件。
@@ -75,3 +77,4 @@
 | 版本 | 日期 | 修订人 | 内容 |
 |---|---|---|---|
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 移除 Agent View 旧游戏循环和专用前端模块；保留运行上下文、关系画布与非执行设置草稿；记录测试、构建、bundle 扫描及剩余限制。 |
+| v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 只读规格复核发现 route/store/seed 链路；明确 Agent/工作项 seed 数据不是生产证据，实时授权 provider 或真实空状态仍开放。 |
