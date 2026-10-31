@@ -10,7 +10,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "domain-canvas: 业务域 画布 (per ULYS-160 §2 阶段 1 骨架, per SRS-STAR-CANVAS-GAME-001 v0.1 §4.2 + BD-STAR-CANVAS-GAME-001 v0.1 §6 + deploy/canvas-game-k3s.yaml containerPort 8081) — 阶段 1 axum HTTP server healthz + /ready + /version + 占位 endpoint, 阶段 2 落地 26 表 W/T/M + 5 角色 业务 logic"
+description = "Star Canvas domain service exposing health, readiness, version, and Canvas API endpoints."
 
 [[bin]]
 name = "domain-canvas"

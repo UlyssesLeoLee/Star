@@ -15,6 +15,20 @@ Usage:
 
 Refs: docs/worktree-group-guard.md
 """
+# @cypher schema=1 source_sha256=dcfb8836cd9dc1e5a04db2f927b47ca4bb9f4acd6679c1e220141b7a9561a7e0
+# MERGE (self:File {path:"scripts/automation/group_guard.py"})
+# MERGE (ranges:Config {id:"scripts/automation/group_guard.py::GROUP_RANGES"})
+# MERGE (detect:Symbol {id:"scripts/automation/group_guard.py::detect_group_from_branch",kind:"function"})
+# MERGE (check:Symbol {id:"scripts/automation/group_guard.py::check_group_boundary",kind:"function"})
+# MERGE (main:Symbol {id:"scripts/automation/group_guard.py::main",kind:"function"})
+# MERGE (self)-[:DEFINES]->(ranges)
+# MERGE (self)-[:DEFINES]->(detect)
+# MERGE (self)-[:DEFINES]->(check)
+# MERGE (self)-[:DEFINES]->(main)
+# MERGE (check)-[:READS]->(ranges)
+# MERGE (main)-[:CALLS]->(detect)
+# MERGE (main)-[:CALLS]->(check)
+# @endcypher
 import argparse
 import json
 import os
@@ -28,11 +42,10 @@ GROUP_RANGES = {
     "canvas": [
         # canvas group can modify:
         "crates/canvas-engine/",
-        "crates/canvas-game/",
         "crates/canvas-realtime/",
         "crates/domain-canvas/",
-        "deploy/canvas-game-k3s.yaml",
-        ".github/workflows/publish-canvas-game.yml",
+        "deploy/star-canvas-services-k3s.yaml",
+        ".github/workflows/publish-star-canvas-services.yml",
         "frontend/src/app/(app)/canvas/",  # canvas-specific frontend
     ],
     "domain": [

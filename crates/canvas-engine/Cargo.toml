@@ -10,7 +10,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "canvas-engine: 跨 5 domain 共享 平台能力 (per ULYS-160 §1 阶段 1 骨架, per SRS-STAR-CANVAS-GAME-001 v0.1 §4.1 + BD-STAR-CANVAS-GAME-001 v0.1 §6 + deploy/canvas-game-k3s.yaml containerPort 8080) — 阶段 1 axum HTTP server healthz + /ready + /version + 服务名版本元信息 endpoint, 阶段 2 落地 平台能力 + 5 domain 共享 API"
+description = "Star Canvas platform service exposing health, readiness, version, and service metadata endpoints."
 
 [[bin]]
 name = "canvas-engine"

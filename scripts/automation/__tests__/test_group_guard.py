@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
 """Tests for group_guard.py — 守门 #32/#33/#34 unit tests."""
+# @cypher schema=1 source_sha256=87ea573fbc188868d24c61d855e819cade0ecf783353b65ff52d2580aa5aa24a
+# MERGE (self:File {path:"scripts/automation/__tests__/test_group_guard.py"})
+# MERGE (guard:File {path:"scripts/automation/group_guard.py"})
+# MERGE (canvas_test:Symbol {id:"scripts/automation/__tests__/test_group_guard.py::test_check_group_boundary_canvas",kind:"test"})
+# MERGE (retired_test:Symbol {id:"scripts/automation/__tests__/test_group_guard.py::test_check_group_boundary_canvas_rejects_retired_game_paths",kind:"test"})
+# MERGE (branch_test:Symbol {id:"scripts/automation/__tests__/test_group_guard.py::test_detect_group_canvas",kind:"test"})
+# MERGE (self)-[:IMPORTS]->(guard)
+# MERGE (self)-[:DEFINES]->(canvas_test)
+# MERGE (self)-[:DEFINES]->(retired_test)
+# MERGE (self)-[:DEFINES]->(branch_test)
+# MERGE (canvas_test)-[:TESTS]->(:Symbol {id:"scripts/automation/group_guard.py::check_group_boundary",kind:"function"})
+# MERGE (retired_test)-[:TESTS]->(:Symbol {id:"scripts/automation/group_guard.py::check_group_boundary",kind:"function"})
+# MERGE (branch_test)-[:TESTS]->(:Symbol {id:"scripts/automation/group_guard.py::detect_group_from_branch",kind:"function"})
+# @endcypher
 import os
 import sys
 from pathlib import Path
@@ -29,11 +43,22 @@ def test_check_group_boundary_canvas():
     """canvas-group 改 canvas-* OK, 改 domain-* FAIL."""
     files_canvas = [
         "crates/canvas-engine/src/lib.rs",
-        "deploy/canvas-game-k3s.yaml",
+        "deploy/star-canvas-services-k3s.yaml",
     ]
     passed, violations = group_guard.check_group_boundary("canvas", files_canvas)
     assert passed, f"canvas-group canvas files should pass: {violations}"
     assert len(violations) == 0
+
+
+def test_check_group_boundary_canvas_rejects_retired_game_paths():
+    files = [
+        "crates/canvas-" + "game/src/lib.rs",
+        "deploy/canvas-" + "game-k3s.yaml",
+        ".github/workflows/publish-canvas-" + "game.yml",
+    ]
+    passed, violations = group_guard.check_group_boundary("canvas", files)
+    assert not passed
+    assert len(violations) == len(files)
 
 
 def test_check_group_boundary_canvas_violation():
@@ -81,7 +106,7 @@ def test_check_group_boundary_core():
 
 
 def test_detect_group_canvas():
-    branch = "codex/worktree-group-canvas-engine-gameplay"
+    branch = "codex/worktree-group-canvas-engine"
     assert group_guard.detect_group_from_branch(branch) == "canvas"
 
 

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9375e85d33e874e8c56c7a93ce25afed371b946c85ca9aa32a957d033aefa349
+@cypher schema=1 source_sha256=f3054f448968dee0edb6866cfdcbcd52ace1388c8547968203bd357d91fd64ec
 MERGE (self:File {path:"crates/star-desktop/src-tauri/src/lib.rs"})
 MERGE (db_module:File {path:"crates/star-desktop/src-tauri/src/db_adapter.rs"})
 MERGE (ipc_module:File {path:"crates/star-desktop/src-tauri/src/ipc_adapter.rs"})
@@ -315,7 +315,7 @@ mod tests {
     fn list_worktree_groups_returns_four_mock_groups() {
         let groups = list_worktree_groups();
         assert_eq!(groups.len(), 4);
-        assert_eq!(groups[0].name, "wt-canvas-game");
+        assert_eq!(groups[0].name, "wt-star-api");
         assert!(groups[0].active);
         assert!(!groups[2].active);
     }

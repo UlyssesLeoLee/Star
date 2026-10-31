@@ -774,22 +774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "canvas-game"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "http-body-util",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tower",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "canvas-realtime"
 version = "0.1.0"
 dependencies = [
