@@ -25,7 +25,7 @@
 | W1 | P0 | **项目法律身份与 NOTICE** — 权利 owner + OSS/compliance | W0 | Star 自有项目 canonical license 已由用户确定为 MIT，与根 `LICENSE` 正文一致。将根 Cargo workspace、Helm metadata、各 crate/package 与发行 payload 声明统一为 MIT；逐发行目标核验实际源码许可、授权来源、专利/版权/NOTICE/修改/再分发/安装信息义务。重生成同一 commit + lock + features/target 口径的 NOTICE/license inventory，并人工复核 RustGameServer adapter 权属及完整分发依赖闭包。验收为可追溯的用户决策记录、metadata diff、各 artifact payload 清单、notice diff 与依赖/权属审阅证据。 | OPEN：canonical 选择已定；metadata 和权利闭包未验证。 |
 | W2 | P0 | **Rust/JS 锁与目标依赖闭包** — Build/Runtime owners | W0、W1 | 让实际发行目标使用的 root/BFF/ACI Cargo workspaces 在 locked offline metadata 下通过；修复 BFF lock mismatch；标明 ACI 是 CI/build-only 或发行闭包依赖，并处理其 MSRV 1.77 与 Star 1.99.0 基线的边界。Web 与 Desktop 分别指定唯一 JS package manager/lockfile、维护中的 Node LTS 和 lock-driven install。验收含每目标 cargo metadata/feature graph、JS frozen install、MSRV/target 结果及锁文件审阅。 | OPEN |
 | W3 | P0 | **BOM、签名与 provenance** — Supply-chain owner | W0–W2 | 为每个选定发行物（Desktop 安装包、Web/Vercel build、三份 Canvas 镜像）及其实际依赖闭包生成 schema-valid SPDX 或核准 BOM；每份 BOM 绑定 artifact SHA-256/image digest。配置并运行 build provenance/签名/attestation，提供独立 consumer 验证输出。license inventory 仅作补充材料。生成/上传/验证任一步缺失均令 release gate 失败。验收为 artifact、BOM、attestation bundle 与验证记录的同一 release ID。 | OPEN |
-| W4 | P0 | **强制 CI 与 Action/工具完整性** — CI owner + GitHub repo owner | W0、W2、W3 | 将 cargo-audit placeholder digest 替换为经上游校验值；对发行闭包运行 license/advisory；确认 required-check 与最小权限；第三方 Actions 固定审核过的完整 SHA；上传/SBOM/attestation 缺失不得 `continue-on-error`。验收为源码 diff、所有目标 workflow 实际成功 runs，以及 branch protection required-check 证据。 | OPEN |
+| W4 | P0 | **强制 CI 与 Action/工具完整性** — CI owner + GitHub repo owner | W0、W2、W3 | 将 cargo-audit placeholder digest 替换为经上游校验值；对发行闭包运行 license/advisory；确认 required-check 与最小权限；第三方 Actions 固定审核过的完整 SHA；上传/SBOM/attestation 缺失不得 `continue-on-error`。验收为源码 diff、所有目标 workflow 实际成功 runs，以及 branch protection required-check 证据。 | OPEN：2026-10-31 本地 cargo-deny 诊断另发现 `webpki-roots 1.0.9` 命中 `RUSTSEC-2026-0381`；需 owner 核准锁文件修复并在 Rust 1.99.0 基线上复验。 |
 | W5 | P0 | **桌面发行闭环** — Desktop owner | W0–W4 | 将 EOL 的 Node 20 换为受维护 LTS；锁定桌面 JS；为 Linux/Windows/macOS 输出稳定命名资产并上传到同一不可变 release；配置 updater 公钥与签名密钥管理（不在仓库内存 secret）；验证安装、更新、签名和回滚。Linux artifact 上传不得注释或 `|| true`。验收为三 OS 可下载签名 assets + BOM/attestation + 真实安装/升级测试原始记录。 | OPEN：已是选定发行面，不能条件跳过。 |
 | W6 | P0 | **Web/Vercel 发布闭环** — Web owner | W0、W2–W4 | 统一 Web package manager/lockfile、Node 与构建命令；记录部署 source commit、build/runtime config、依赖/BOM 与 rollback 证据。验收需实际 Vercel deployment record 与消费侧验证；不得用静态配置推断部署已就绪。 | OPEN：已是选定发行面，不能条件跳过。 |
 | W7 | P0 | **Star 容器/部署供应链** — Container + Infra owners | W0–W4 | 覆盖三份 Star Canvas 镜像，并审查 Envoy 等实际运行依赖；固定/记录 Rust 与 OS base image digest、OS package snapshot 与 Action SHA；生成每镜像 BOM/provenance/signature。将部署中的 `:dev`、`envoyproxy/envoy:v1.28-latest` 换为审核后的固定摘要/版本。收窄 Docker build context/`COPY` 到目标 Star 服务和已列明共享依赖，证明 `star-game` 等遗留源码不进入 builder context/cache，且 final layer 仅含目标 Star service/runtime dependencies。验收：构建输入 inventory、镜像 digest、独立 provenance/SBOM verify、K3s rendered manifest 指向同一 digest且无 game workload。 | OPEN：已是选定发行面，不能条件跳过。 |
@@ -35,6 +35,19 @@
 ## 当前可以并行的工作包
 
 W1 法律/NOTICE、W2 锁与构建闭包、W3 SBOM/provenance、W5 桌面闭环、W6 Web/Vercel、W7 容器供应链可在隔离 lane 并行推进。发行面已固定；W0 剩余的 canonical version/tag/commit 映射必须在生成发行制品前闭合。任何 lane 当前都不得提前创建 release/tag 或发布 artifact。变更 rebase/merge 进入 dev 后重新运行相应验收。W8 文档由 D2 lane 负责；D4 正在活动的 Multipass owner 文件不得被并行修改。
+
+### 已登记的首轮并行 lane（stable-hardening manifest revision 3）
+
+基线为本地 dev@04d8b7a84514dcb454874eb852651778e1452dea；本轮仅做发布闭环硬化，不关闭稳定版 WBS，也不执行 tag、发布、部署或 push。首个宽清单被 MAGOS 拒绝后，按 owner 冲突证据收窄 manifest；没有修改或清理被占用的分支/工作树。状态列对应本次 WBS 同步时的 MAGOS set 状态；最终集成以 set-show 与集成记录为准。
+
+| Lane | 当前状态 | 分支 / 工作树 | 文件范围 | 目标与验收 |
+|---|---|---|---|---|
+| license-policy | 进行中 | agent/stable-hardening/license-policy / D:/orcaWork/Star/star-stable-hardening-license-policy | Chart.yaml、deny.toml、本 WBS、lane brief/report/audit | 目标：首方 Helm 元数据设为 MIT；保留完整依赖权利/NOTICE 审阅缺口。 |
+| desktop-packaging | 进行中 | agent/stable-hardening/desktop-packaging / D:/orcaWork/Star/star-stable-hardening-desktop-packaging | 新稳定桌面 workflow、Tauri 前端 package/lock/config/build script、lane brief/report/audit | 目标：Node LTS、锁驱动安装、跨平台制品缺失即失败；签名密钥和真实安装升级另验。 |
+| web-vercel-config | 静态配置已验收，待集成 | agent/stable-hardening/web-vercel-config / D:/orcaWork/Star/star-stable-hardening-web-vercel-config | frontend/vercel.json、lane brief/report/audit | 显式 Vercel 构建合同；不改活跃依赖 lock owner 文件；真实 deployment 另验。 |
+| canvas-oci | 进行中 | agent/stable-hardening/canvas-oci / D:/orcaWork/Star/star-stable-hardening-canvas-oci | 三份 Canvas Dockerfile、发布 workflow、K3s 镜像 manifest、.dockerignore、lane brief/report/audit | 目标：只含 Star Canvas 服务依赖，builder/context/cache 排除 star-game，部署固定 digest；OCI/K3s 实验另验。 |
+
+保留边界：根 Cargo.toml 与 license-gate.yml 有 W8/Dependabot owner 重叠；现有桌面 workflow 与 Node lockfiles 也有 Dependabot owner 重叠。本轮不覆盖这些文件，后续要等 source branch 审查/收敛后再单独规划。W3 SBOM/provenance、W4 required-check 与 Action pin 证据、W8 D2/D4 的 Multipass 两实例真实验收、W9 candidate 验收仍 OPEN/BLOCKED。D4 活动终端及所有 W8、D2 文件保持原样。
 
 ## 外部约束依据（截至 2026-10-31）
 
@@ -50,3 +63,6 @@ W1 法律/NOTICE、W2 锁与构建闭包、W3 SBOM/provenance、W5 桌面闭环�
 | v0.1 | 2026-10-31 | W16-B 子代理（Mavis 接手审核待协调者复核） | 按 W16-B 审计发现制定稳定发行 WBS；所有构建、发布和部署证据保持 OPEN。 |
 | v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认的 Desktop + Web/Vercel + 三份 Star Canvas 镜像发行面及 MIT canonical license；把 W5–W7 标为无条件 P0、W8 的两实例运行验收保持 OPEN，并记录仅在所有门禁通过后推送稳定版的条件授权。 | 用户完成发行范围与许可证决策 |
 | v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | W16-B 审计/WBS 已经父级审阅并快进集成到本地 `dev@163f715`；稳定版门禁仍为 OPEN。 | W16-B 文档 lane 完成集成 |
+| v0.4 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 登记并启动 stable-hardening 首轮四个隔离 lane；按 MAGOS 实际 owner 冲突证据收窄清单，完整标明未解除的 Cargo/license workflow 与 Dependabot 锁文件阻塞；没有关闭稳定版门禁。 | 用户确认发行范围与 MIT，并要求整理后发布稳定版 |
+| v0.5 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 stable-hardening manifest revision 3 与当前执行状态：Web/Vercel 静态配置 lane 已 ready、待集成；license、desktop、Canvas OCI 仍进行中；release gates 不变且仍 OPEN/BLOCKED。 | Web lane 完成独立静态复核 |
+| v0.6 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 `cargo-deny 0.20.2` 在 Rust 1.99.1 诊断扫描中发现 `webpki-roots 1.0.9` / `RUSTSEC-2026-0381`；声明该结果不替代 Rust 1.99.0 基线验收，且锁文件修复需要 owner 审查。 | 本轮 W1 policy 复核发现现有 advisory 阻塞 |

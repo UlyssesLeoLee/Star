@@ -10,4 +10,4 @@ maintainers:
     email: ulysses@mavis.local
 annotations:
   category: Application
-  licenses: Apache-2.0
+  licenses: MIT

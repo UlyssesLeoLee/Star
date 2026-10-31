@@ -80,7 +80,7 @@ allow = [
 # 这正是 AGENTS.md §0 "不得仅因其为 GPL/AGPL/LGPL 而一概排除"的机器可读表达。
 # 引入此类依赖时仍须人工履行源码/许可证/NOTICE 义务并在 ADR 记录 (见 ADR-0054 §2.2)。
 
-# workspace 内部 crate 不参与许可门禁 (本仓自有代码, 由本仓许可 Apache-2.0 覆盖)。
+# workspace 内部 crate 不参与第三方许可白名单判定；Star canonical license 已由用户确认为 MIT。
 # 0.20 要求单表形式, 非数组。
 private = { ignore = true }
 
