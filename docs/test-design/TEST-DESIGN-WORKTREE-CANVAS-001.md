@@ -1,8 +1,8 @@
 # TEST-DESIGN-WORKTREE-CANVAS-001 — AI Worktree Graph Canvas 测试设计书
 
-> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v2.1** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
+> **AI Worktree Graph Canvas — 无限画布模块 5 级别测试设计书 v2.2** (per 日本 IPA SEC 標準 / V モデル / テスト設計書 テンプレート + internal work item ULYS-57 request "开子任务推进开发并且制作各级测试设计书")
 >
-> - 状态: 🟡 Draft v2.1 (2026-10-30 同步 Canvas SSE revocation PG18.6 单用例验收；完整 E2E、KMS/恢复与性能验收仍未完成)
+> - 状态: 🟡 Draft v2.2 (2026-10-31 增加 authenticated device-revocation HTTP/PG acceptance；Rust acceptance 受本机 1.99.0 compiler resolution 阻断，完整 E2E、KMS/恢复与性能验收仍未完成)
 > - 关联工作项: `ULYS-57` (制作 Worktree 页面各级文档) parent + 5 子任务推进开发
 > - 关联文档 (上游 4 份同步落档, 评审已通过):
 >   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR = 126 唯一 ID)
@@ -16,7 +16,7 @@
 > - 受众: 実装エンジニア / テストエンジニア / アーキテクト / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 守门 #14 v3 + v0.62 反转 v4)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008)
-> - 日期: 2026-10-28 JST
+> - 日期: 2026-10-31 JST
 > - 模板参考: [`docs/test-design/TEST-DESIGN-SANDBOX-002.md`](TEST-DESIGN-SANDBOX-002.md) v0.1 (单文档分章, 5 级别 UT/IT/E2E/PT/UAT 模式) + `TEST-DESIGN-OPS-001.md` v0.2
 
 ---
@@ -587,6 +587,14 @@ IT 共 **10 项既有基线**, 覆盖跨 crate 联动 8 项 + DB 集成 2 项 + 
 
 SRS-W16-PAYLOAD-01..08 与 E2E-COLLAB-12..19/PT-10 的完整目标验收仍未完成。已有 device/RLS PG18 slice（run `6af04e5a765446c8b3baaffff126bd52`）、OAuth repository slice（run `1b4673269a04435daa1fab5c93333133`）与 Canvas SSE device-revocation slice（run `49b512fbfe334f0e98e46fe7eae7ea39`）各自只关闭其表内的局部断言；OAuth 与 Canvas 均使用 disposable superuser 及 test-only migration prerequisites。Canvas 用例通过 1/1 exact test，但未验证生产 grants/RLS、HTTP revoke/audit、多实例/listener-loss、replay offsets 或 p99。完整 Canvas device-auth、生产授权与 RLS、OAuth HTTP 流程、跨实例 SSE 恢复、真实 provider/KMS、备份恢复和性能门均保持 OPEN/PARTIAL/NOT_RUN。
 
+#### 6.2.8 W16-A authenticated device-revocation HTTP acceptance mapping
+
+| W16 requirement / test | Automation evidence | Acceptance condition | Current status |
+|---|---|---|---|
+| SRS-W16-PAYLOAD-02 / IT-W16-DEVICE-REVOKE-HTTP-PG-01 | `device_revocation_http_pg` on runner-owned PostgreSQL 18; authenticated `POST /oauth/device/{device_id}/revoke`, a constrained app login, actual OAuth/W16 migrations, exact audit failure injection | Unauthenticated request is rejected; only the bound owner revokes; first revoke is 204, repeat is 400 `InvalidGrant` with no duplicate audit row; two concurrent calls yield one 204/one 400 and exactly one audit fact; audit insertion failure rolls back device and refresh-token changes | **PASS, 4/4** on run `20261031T034802-cda7dbb9b0` (10/10 runner steps), disposable PostgreSQL 18 loopback, Rust/Cargo 1.99.1. The workspace baseline 1.99.0 is not verified by this later toolchain. |
+
+Repeat semantics come from the current route/repository behavior: the route maps a second repository `None` result to HTTP 400 `InvalidGrant`; the test asserts one audit fact remains. The global audit and SCD2 prerequisites are test-only placeholders, and the W16 device audit table is created by the real W16 migration. This local slice cannot prove exact Rust 1.99.0 compatibility, production grants/RLS, production audit/SCD2, deployment readiness, multi-instance recovery, full identity/E2E, or performance.
+
 ### 6.3 5 域 Lead 真人到位后追溯签字 (per 守门 #14 v3 Mavis 临时代签 + v0.62 反转 v4)
 | 角色 | 责任人 | 签字 | 状态 |
 |---|---|---|---|
@@ -671,6 +679,8 @@ UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文�
 | **v1.9** | **2026-10-29 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 IT-W16-IDENTITY-PG-01、IT-W16-DIRECTORY-RLS-01、IT-W16-REFRESH-RLS-01 的已执行 PG18 切片记录；同步 W16 companion SRS/BD/DD v0.3 与部分实现状态；完整 E2E-COLLAB-12..19、OAuth 并发、KMS/恢复及 PT-10 继续 OPEN/NOT_RUN。** | **W16-A isolated PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52`** |
 | **v2.0** | **2026-10-29 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **记录 OAuth repository PG18.6 3/3 tests 的边界；增加 Canvas SSE revocation candidate 的 RESOURCE_INTERRUPTED / NOT_RUN 状态（2,551 MiB 触发 compile guard、未启动 PG、未合入 dev）；更新 W16 SRS/BD/DD v0.4 与保持开放的完整 E2E/PT 验收。** | **W16-A OAuth PG acceptance run `1b4673269a04435daa1fab5c93333133` 与 Canvas compile 中断结果。** |
 | **v2.1** | **2026-10-30 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **更新 IT-W16-CANVAS-SSE-REVOCATION-PG-01 为 PostgreSQL 18.6 单用例 PASS，记录 41/41 runner steps、准确测试结果与未签名 build attestation/test-only-role 限制；完整 W16 E2E、生产 RLS、端点审计和性能门继续开放。** | **W16-A Canvas SSE revocation acceptance run `49b512fbfe334f0e98e46fe7eae7ea39`。** |
+| **v2.2** | **2026-10-31 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 IT-W16-DEVICE-REVOKE-HTTP-PG-01 与明确的重复撤权状态码/审计/并发/rollback 条件；初次本机 acceptance 因 Rust 1.99.0 解析失败而 BLOCKED/NOT_RUN。** | **W16-A authenticated device-revocation HTTP/PG runner and toolchain failure evidence.** |
+| **v2.3** | **2026-10-31 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **更新为 run `20261031T034802-cda7dbb9b0` 在 disposable PostgreSQL 18、Rust 1.99.1 下 4/4 PASS；准确保留 1.99.0 基线兼容性、生产 RLS、部署和完整 W16 为 OPEN/NOT_RUN。** | **W16-A authenticated device-revocation HTTP/PG successful rerun.** |
 
 ---
 
