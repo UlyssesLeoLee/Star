@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=4defca6769134cd2e661cce27b8b762169d08e1ebf5862938786cd8d6a25f039
+MERGE (self:File {path:"frontend/src/lib/agent/settings.test.ts"})
+MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
+MERGE (ids:File {path:"frontend/src/types/ids.ts"})
+MERGE (self)-[:IMPORTS]->(agentSettings)
+MERGE (self)-[:IMPORTS]->(ids)
+MERGE (self)-[:TESTS]->(agentSettings)
+@endcypher
+*/
+
 // =====================================================================
 // settings.test.ts — Agent Settings 纯函数
 // =====================================================================
@@ -59,10 +70,9 @@ describe("createInitialAgentSettings", () => {
     expect(s.updatedAt).toBeTruthy();
   });
 
-  it("apiKey 是 mock (per agentId)", () => {
+  it("starts without a credential until secure storage is available", () => {
     const s = createInitialAgentSettings(baseAgent);
-    expect(s.apiKey).toContain("ag-001");
-    expect(s.apiKey).toContain("mock");
+    expect(s.apiKey).toBe("");
   });
 });
 
@@ -72,13 +82,6 @@ describe("validateSettings", () => {
     const r = validateSettings(s);
     expect(r.ok).toBe(true);
     expect(r.errors).toEqual([]);
-  });
-
-  it("apiKey 短 (< 8) 失败", () => {
-    const s = { ...createInitialAgentSettings(baseAgent), apiKey: "abc" };
-    const r = validateSettings(s);
-    expect(r.ok).toBe(false);
-    expect(r.errors.some((e) => e.includes("apiKey"))).toBe(true);
   });
 
   it("maxTokens 越界 (< 1 或 > 200000) 失败", () => {

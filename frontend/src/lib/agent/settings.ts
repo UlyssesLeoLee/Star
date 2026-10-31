@@ -1,15 +1,25 @@
+/*
+@cypher schema=1 source_sha256=9f30e5f18885de1c0582ab73dbc33125b5a4dac1faee924064b76f4f52b78b61
+MERGE (self:File {path:"frontend/src/lib/agent/settings.ts"})
+MERGE (agentSettings:Type {id:"frontend/src/lib/agent/settings.ts::AgentSettings", kind:"interface"})
+MERGE (agentSession:File {path:"frontend/src/types/ids.ts"})
+MERGE (createInitial:Function {name:"createInitialAgentSettings", language:"typescript", visibility:"public"})
+MERGE (validateSettings:Function {name:"validateSettings", language:"typescript", visibility:"public"})
+MERGE (modelOptionsFor:Function {name:"modelOptionsFor", language:"typescript", visibility:"public"})
+MERGE (self)-[:DEFINES]->(agentSettings)
+MERGE (self)-[:IMPORTS]->(agentSession)
+MERGE (self)-[:DEFINES]->(createInitial)
+MERGE (self)-[:DEFINES]->(validateSettings)
+MERGE (self)-[:DEFINES]->(modelOptionsFor)
+@endcypher
+*/
+
 // =====================================================================
-// Agent Game — Settings (每个 agent 的 API / 模型 / 提示配置)
+// Agent Settings — local configuration draft
 // =====================================================================
-// Per 2026-09-05 23:00 JST 拍板: 3 个 tab — Canvas v1 / Roguelike v2 / Agent 设置
-//   - Agent 设置 tab: 给每个 agent 配置 API key / model / max tokens /
-//     temperature / system prompt (per agent, 跟 store 同步)
-//   - 默认 view 仍是 Canvas (现状)
-//   - 跟现有 mock 数据保持一致 (in-memory + zustand persist)
+// The current view is only a local draft. It does not execute an Agent or call a model.
 //
-// 已知缺口:
-//   - 不实际调 LLM (mock, per ids.ts agent_kind + apiKeyModel map)
-//   - 真实后端 D.6+ 接入时, settings 改走 server-side config + agent_id 关联
+// Credentials must be wired to a secure provider before this draft can be used for execution.
 // =====================================================================
 
 import type { AgentSession } from "@/types/ids";
@@ -17,7 +27,7 @@ import type { AgentSession } from "@/types/ids";
 /** Agent 设置 (每个 agent 1 份, 跟 store 同步) */
 export interface AgentSettings {
   agentId: string;
-  /** API key (mock 模式, 实际不调) */
+/** Configured API credential; unavailable until secure storage is integrated. */
   apiKey: string;
   /** model (claude-sonnet / gpt-4o / codex / internal-vibe-coder) */
   model: string;
@@ -73,7 +83,7 @@ export function createInitialAgentSettings(agent: AgentSession): AgentSettings {
   const now = new Date().toISOString();
   return {
     agentId: agent.id,
-    apiKey: `sk-mock-${agent.id}-${agent.agent_kind}`,  // mock, 不真
+    apiKey: "", // Credentials are unavailable until secure storage is integrated.
     model: defaults.model ?? agent.agent_kind,
     baseUrl: defaults.baseUrl ?? "https://api.example.com/v1",
     maxTokens: defaults.maxTokens ?? 4000,
@@ -87,7 +97,6 @@ export function createInitialAgentSettings(agent: AgentSession): AgentSettings {
 /** 校验 settings (per 拍板, 保存前必检) */
 export function validateSettings(s: AgentSettings): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (s.apiKey.length < 8) errors.push("apiKey too short (min 8 chars)");
   if (s.maxTokens < 1 || s.maxTokens > 200000) errors.push(`maxTokens out of range (1..200000), got ${s.maxTokens}`);
   if (s.temperature < 0 || s.temperature > 2) errors.push(`temperature out of range (0..2), got ${s.temperature}`);
   if (s.baseUrl.length < 1) errors.push("baseUrl empty");
