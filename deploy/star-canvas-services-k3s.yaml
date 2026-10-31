@@ -1,0 +1,442 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: star-system
+  labels:
+    name: star-system
+    istio-injection: disabled
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: star-canvas-config
+  namespace: star-system
+data:
+  RUST_LOG: info,canvas_engine=debug,domain_canvas=debug,canvas_realtime=debug
+  RUST_BACKTRACE: '1'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-engine
+  namespace: star-system
+  labels:
+    app: canvas-engine
+    tier: shared
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canvas-engine
+  template:
+    metadata:
+      labels:
+        app: canvas-engine
+        tier: shared
+        version: v0.1
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: canvas-engine
+        image: ghcr.io/ulyssesleolee/star-canvas-engine:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: star-canvas-config
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-engine
+  namespace: star-system
+  labels:
+    app: canvas-engine
+spec:
+  selector:
+    app: canvas-engine
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-canvas
+  namespace: star-system
+  labels:
+    app: domain-canvas
+    tier: business
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: domain-canvas
+  template:
+    metadata:
+      labels:
+        app: domain-canvas
+        tier: business
+        version: v0.1
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: domain-canvas
+        image: ghcr.io/ulyssesleolee/star-domain-canvas:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8081
+        envFrom:
+        - configMapRef:
+            name: star-canvas-config
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: domain-canvas
+  namespace: star-system
+  labels:
+    app: domain-canvas
+spec:
+  selector:
+    app: domain-canvas
+  ports:
+  - name: http
+    port: 8081
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-realtime
+  namespace: star-system
+  labels:
+    app: canvas-realtime
+    tier: realtime
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canvas-realtime
+  template:
+    metadata:
+      labels:
+        app: canvas-realtime
+        tier: realtime
+        version: v0.1
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: canvas-realtime
+        image: ghcr.io/ulyssesleolee/star-canvas-realtime:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8082
+        - name: ws
+          containerPort: 8083
+        envFrom:
+        - configMapRef:
+            name: star-canvas-config
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-realtime
+  namespace: star-system
+  labels:
+    app: canvas-realtime
+spec:
+  clusterIP: None
+  selector:
+    app: canvas-realtime
+  ports:
+  - name: http
+    port: 8082
+    targetPort: http
+  - name: ws
+    port: 8083
+    targetPort: ws
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: canvas-realtime-hpa
+  namespace: star-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: canvas-realtime
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: star-canvas-default-deny
+  namespace: star-system
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+  - to:
+    - podSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - canvas-engine
+          - domain-canvas
+          - canvas-realtime
+    ports:
+    - port: 8080
+      protocol: TCP
+    - port: 8081
+      protocol: TCP
+    - port: 8082
+      protocol: TCP
+    - port: 8083
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: star-canvas-from-envoy
+  namespace: star-system
+spec:
+  podSelector:
+    matchExpressions:
+    - key: tier
+      operator: In
+      values:
+      - shared
+      - business
+      - realtime
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: envoy-edge
+    ports:
+    - port: 8080
+      protocol: TCP
+    - port: 8081
+      protocol: TCP
+    - port: 8082
+      protocol: TCP
+    - port: 8083
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy-edge
+  namespace: star-system
+  labels:
+    app: envoy-edge
+    tier: edge
+    version: v1.28-latest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy-edge
+  template:
+    metadata:
+      labels:
+        app: envoy-edge
+        tier: edge
+        version: v1.28-latest
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:v1.28-latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 10000
+        - name: admin
+          containerPort: 9901
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: admin
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        envFrom: []
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: envoy-edge-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-edge
+  namespace: star-system
+  labels:
+    app: envoy-edge
+spec:
+  type: LoadBalancer
+  selector:
+    app: envoy-edge
+  ports:
+  - name: http
+    port: 10080
+    targetPort: http
+    nodePort: 30080
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-edge-config
+  namespace: star-system
+data:
+  envoy.yaml: "admin:\n  address:\n    socket_address:\n      address: 0.0.0.0\n      port_value: 9901\nstatic_resources:\n\
+    \  listeners:\n  - name: canvas_listener\n    address:\n      socket_address:\n        address: 0.0.0.0\n        port_value:\
+    \ 10000\n    filter_chains:\n    - filters:\n      - name: envoy.http_connection_manager\n        typed_config:\n    \
+    \      '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager\n\
+    \          stat_prefix: canvas_ingress\n          route_config:\n            virtual_hosts:\n            - name: canvas_backend\n\
+    \              domains:\n              - '*'\n              routes:\n              - match:\n                  prefix:\
+    \ /v1/canvases\n                route:\n                  cluster: canvas_engine\n                  timeout: 30s\n   \
+    \           - match:\n                  prefix: /v1/mcp\n                route:\n                  cluster: domain_canvas\n\
+    \                  timeout: 60s\n              - match:\n                  prefix: /ws/canvas\n                route:\n\
+    \                  cluster: canvas_realtime_ws\n                  timeout: 0s\n          http_filters:\n          - name:\
+    \ envoy.router\n            typed_config:\n              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router\n\
+    \  clusters:\n  - name: canvas_engine\n    type: STRICT_DNS\n    lb_policy: ROUND_ROBIN\n    dns_lookup_family: V4_ONLY\n\
+    \    connect_timeout_ms: 5000\n    load_assignment:\n      cluster_name: canvas_engine\n      endpoints:\n      - lb_endpoints:\n\
+    \        - endpoint:\n            address:\n              socket_address:\n                address: canvas-engine.star-system.svc.cluster.local\n\
+    \                port_value: 8080\n  - name: domain_canvas\n    type: STRICT_DNS\n    lb_policy: ROUND_ROBIN\n    dns_lookup_family:\
+    \ V4_ONLY\n    connect_timeout_ms: 5000\n    load_assignment:\n      cluster_name: domain_canvas\n      endpoints:\n \
+    \     - lb_endpoints:\n        - endpoint:\n            address:\n              socket_address:\n                address:\
+    \ domain-canvas.star-system.svc.cluster.local\n                port_value: 8081\n  - name: canvas_realtime_ws\n    type:\
+    \ STRICT_DNS\n    lb_policy: ROUND_ROBIN\n    dns_lookup_family: V4_ONLY\n    connect_timeout_ms: 5000\n    load_assignment:\n\
+    \      cluster_name: canvas_realtime_ws\n      endpoints:\n      - lb_endpoints:\n        - endpoint:\n            address:\n\
+    \              socket_address:\n                address: canvas-realtime.star-system.svc.cluster.local\n             \
+    \   port_value: 8083\n"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: star-canvas-services-monitor
+  namespace: star-system
+  labels:
+    app: star-canvas-services
+    release: prometheus
+spec:
+  selector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - canvas-engine
+      - domain-canvas
+      - canvas-realtime
+  namespaceSelector:
+    matchNames:
+    - star-system
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s

@@ -1,0 +1,98 @@
+# Publish the three maintained Star Canvas backend images to the existing GHCR namespace.
+# Pushes publish branch and commit tags; version tags and manual dispatch are also supported.
+# GHCR_TOKEN must be configured as a repository secret with package write permission.
+# Never pass registry credentials as workflow dispatch inputs or print credential values.
+
+name: Publish Star Canvas services (3 crates → GHCR)
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  # GitHub login names preserve account casing; OCI image namespaces are lowercase.
+  IMAGE_OWNER: UlyssesLeoLee
+  IMAGE_NAMESPACE: ulyssesleolee
+  # Image names are kept aligned with deploy/star-canvas-services-k3s.yaml.
+  IMAGES: >-
+    canvas-engine
+    domain-canvas
+    canvas-realtime
+
+jobs:
+  test:
+    name: cargo test (3 Canvas crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: clippy, rustfmt
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: cargo check --workspace --all-targets
+        # 守门 #1 v25: 0 err 才推 GHCR
+        run: cargo check --workspace --all-targets -j 4
+      - name: cargo test (three Canvas crates)
+        # 守门 #1 v25 cargo test 单 crate 实证
+        run: cargo test -p canvas-engine -p domain-canvas -p canvas-realtime -j 4
+
+  build-and-push:
+    name: build + push (${{ matrix.image }})
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON('["canvas-engine","domain-canvas","canvas-realtime"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.IMAGE_OWNER }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/star-${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+          flavor: |
+            latest=auto
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: crates/${{ matrix.image }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image digest
+        id: digest
+        run: echo "digest=${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT
