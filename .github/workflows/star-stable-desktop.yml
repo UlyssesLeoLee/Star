@@ -1,12 +1,14 @@
 name: Star Desktop stable bundle checks
 
-# @cypher schema=1 source_sha256=996a921837dcc850141c2d124aae048896beff2fef959987944732cc4107b2ae
+# @cypher schema=1 source_sha256=fe0311634e4bdcd8cbd6452146ce1385fe5798d99a85ff4515b15c5dc770b8c4
 # MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
 # MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
 # MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
 # MERGE (upload_artifact:ExternalService {id:"actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",name:"actions/upload-artifact v7.0.2"})
 # MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.0"})
 # MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
+# MERGE (frontend_tests:Config {id:"frontend-tests.desktop-stable",name:"npm test -- --reporter=dot on Node.js 24.22.2"})
+# MERGE (self)-[:CONFIGURES]->(frontend_tests)
 # MERGE (self)-[:CALLS]->(checkout)
 # MERGE (self)-[:CALLS]->(setup_node)
 # MERGE (self)-[:CALLS]->(upload_artifact)
@@ -53,6 +55,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -83,6 +87,10 @@ jobs:
       - name: Install locked frontend dependencies
         working-directory: crates/star-desktop/frontend
         run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        working-directory: crates/star-desktop/frontend
+        run: npm test -- --reporter=dot
 
       - name: Build frontend
         working-directory: crates/star-desktop/frontend
@@ -120,6 +128,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -134,6 +144,10 @@ jobs:
       - name: Install locked frontend dependencies
         working-directory: crates/star-desktop/frontend
         run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        working-directory: crates/star-desktop/frontend
+        run: npm test -- --reporter=dot
 
       - name: Build frontend
         working-directory: crates/star-desktop/frontend
@@ -167,6 +181,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -183,6 +199,10 @@ jobs:
       - name: Install locked frontend dependencies
         working-directory: crates/star-desktop/frontend
         run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        working-directory: crates/star-desktop/frontend
+        run: npm test -- --reporter=dot
 
       - name: Build frontend
         working-directory: crates/star-desktop/frontend

@@ -13,7 +13,7 @@
 
 | 文件/范围 | 改动与结果 |
 |---|---|
-| `.github/workflows/star-stable-desktop.yml` | 增加 Linux `.deb`/AppImage、Windows MSI、macOS universal DMG job；固定 Node.js 24.22.2 与 Rust 1.99.0；Cargo 并行度为 2；actions 固定完整 SHA；缺少或空制品时失败；仅上传标记为 unsigned、保留 7 天的验证制品；无发布权限或发布步骤。 |
+| `.github/workflows/star-stable-desktop.yml` | 增加 Linux `.deb`/AppImage、Windows MSI、macOS universal DMG job；固定 Node.js 24.22.2 与 Rust 1.99.0；Cargo 并行度为 2；actions 固定完整 SHA；三平台在生产构建前运行 Vitest；checkout 显式关闭凭据持久化；缺少或空制品时失败；仅上传标记为 unsigned、保留 7 天的验证制品；无发布权限或发布步骤。 |
 | `crates/star-desktop/frontend/package.json`、`package-lock.json` | `npm ci` 锁文件安装；依赖升级至 Vite 7、Vitest 5、`@vitejs/plugin-react` 5；解决 npm 审计发现的 Vite/Vitest/esbuild 漏洞。三个直接包均为 MIT。全依赖法律闭包仍待 SPDX/SBOM 审查。 |
 | `crates/star-desktop/frontend/tsconfig.json` | 保留 Vitest 与 Testing Library 全局类型，并加入 `vite/client`，使 Vite CSS Modules 声明可见。 |
 | `crates/star-desktop/frontend/src/constants.ts` | 从唯一来源 `types/ids.ts` 重新导出 `DEFAULT_KANBAN_COLUMNS`，供看板消费者使用。 |
@@ -40,6 +40,7 @@
 | `cargo metadata --no-deps --format-version 1` | 通过 | 只证明 Cargo manifest 可解析，不证明 Rust 编译或桌面打包。 |
 | Tauri CLI `--version` / `info` | 通过 | CLI 2.12.4；识别到 tauri 2.12.1、tauri-build 2.7.1、WebView2 与 MSVC。 |
 | `tauri build --bundles msi` | 未通过 | 本机 `rustc` 组件不可用；CLI 在 Rust 信息读取处 panic，未生成 MSI。不能视为构建通过。 |
+| 工作流安全配置审查 | 通过（静态） | 三个平台均在前端 build 前执行 `npm test -- --reporter=dot`；全部 checkout 设置 `persist-credentials: false`；尚未运行 GitHub hosted workflow。 |
 | GitHub hosted CI / actionlint | 未验证 | 未运行 hosted workflow；本机未安装 actionlint。 |
 
 ## 3. 已知缺口
@@ -47,15 +48,17 @@
 1. **真实打包门仍未闭合**：本机 Rust toolchain 缺少可用 `rustc`。必须由 Node 24.22.2 / Rust 1.99.0 hosted runner 实际生成 Linux、Windows、macOS 制品。
 2. **安装验收未做**：`.deb`、AppImage、MSI、DMG 均未实际下载、安装、启动和卸载验证；VBSCRIPT/WiX、WebView2、Linux 系统库和 macOS Gatekeeper 仍需核对。
 3. **签名和更新未就绪**：没有 Authenticode、Apple Developer ID/公证凭据或真实 updater 公钥；所有制品均未签名，updater artifact 保持关闭。
-4. **旧工作流仍使用 Node 20**：`star-desktop-build.yml` 未改，需由该工作流 owner 处理或明确退休。
+4. **旧工作流仍使用 Node 20**：`star-desktop-build.yml` 未改，需由该工作流 owner 处理或明确退休。新稳定工作流已固定 Node 24.22.2，但 hosted runner 尚未实际运行。
 5. **法律闭包仍开放**：本轮确认三个新增/升级直接工具为 MIT，但尚未对 npm 完整传递依赖、分发制品、安装器和容器闭包生成 SPDX/SBOM 并完成再分发义务审核。
 6. **稳定版整体仍开放**：Web/Vercel 真实部署与回滚、Canvas 镜像实际构建和 digest、最多两个 Multipass 实例上的 K3s 验收、Cargo MIT 权利闭包及 release CI 必需检查尚未完成。
-7. **本地运行时与目标 CI 有差异**：本机 Node 22.19.0 可运行升级后的 Vite/Vitest，但 package 要求 Node 24；需要在固定 Node 24 hosted runner 复验。
-8. **没有发布动作**：本阶段没有创建 tag、发布、部署或 push；不能宣称稳定版已发布。
+7. **本地运行时与目标 CI 有差异**：本机 Node 22.19.0 低于 package 要求的 Node 24；此前的 npm ci/build/62 项测试是在 Node 22.19.0 上得到的，不能替代目标 Node 24 hosted runner 复验。当前机器无 Node 24，因此本轮没有重复运行 npm test/build。
+8. **Tauri CSP 尚未配置**：现有 `src-tauri/tauri.conf.json` 中 `app.security.csp` 为 `null`（本 lane 未新增此设置）；发布前需审查前端所需来源并配置生产 CSP。
+9. **checkout 凭据防护**：本轮已为新稳定工作流中的三个 checkout 设置 `persist-credentials: false`；旧 workflow 的 credential 设置仍由其 owner 单独审查。
+10. **没有发布动作**：本阶段没有创建 tag、发布、部署或 push；不能宣称稳定版已发布。
 
 ## 4. 子代理失败接手清单
 
-Desktop lane 子代理因 usage limit 中断，未完成后续修复。主协调者在已登记、隔离的 Desktop worktree 内按报告复现错误、完成修复并独立验证。未将子代理状态本身视为完成证据。Web lane 子代理的结果另按其自身报告审查。
+初始 Desktop 实施 worker 因 usage limit 中断；协调者完成原前端修复后，对当前稳定工作流又执行独立 review，并按 findings 增加 Node 24 测试步骤及 checkout 凭据限制。未把 worker 状态作为验证证据；本轮工作流 hosted 结果仍未取得。
 
 ## 5. 守门规则
 
@@ -78,6 +81,7 @@ Desktop lane 子代理因 usage limit 中断，未完成后续修复。主协调
 | 15 | 不发布、打 tag、部署或 push | 符合 |
 | 16 | 源码图关系有代码证据且 freshness stamp 通过 | 符合，8 个源文件通过 CGG |
 | 17 | 真实 runner、安装、签名、许可与集群证据缺失时明确标记 | 符合，见 §2–§3 |
+| 18 | 新稳定工作流每平台在 build 前运行 Vitest；checkout 不保留执行 PR 代码所需的凭据 | 符合，静态检查通过；hosted 运行仍待验证 |
 
 ## 6. 审查栏
 
@@ -95,3 +99,4 @@ Desktop lane 子代理因 usage limit 中断，未完成后续修复。主协调
 |---|---|---|---|
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 初始 desktop packaging 报告；记录打包和签名缺口。 |
 | v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 Vite 类型、常量引用和 test-only 类型问题；矫正过时 UI 测试；升级 Vite/Vitest 安全版本；本地 build、62 项 Vitest 与 npm audit 通过。保留 hosted runner、平台制品、安装、签名和法律闭包缺口。 |
+| v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 根据独立审查在 Node 24 工作流的 Linux/Windows/macOS job 中加入 Vitest，并对三个 checkout 均关闭凭据持久化；更新报告记录 Node 22 本地结果限制及既有 Tauri CSP 缺口。未运行 hosted CI，stable release gates 继续开放。 |
