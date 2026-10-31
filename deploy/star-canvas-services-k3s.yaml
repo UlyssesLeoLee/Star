@@ -1,3 +1,7 @@
+# Release render template. Before applying, replace each CANVAS_* digest marker
+# with the exact sha256 digest printed by the successful Buildx release job.
+# This file is deliberately not directly deployable while those release
+# artifacts do not yet exist; never substitute mutable branch/latest tags.
 ---
 apiVersion: v1
 kind: Namespace
@@ -38,11 +42,11 @@ spec:
         version: v0.1
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+      - name: ghcr-pull-secret
       containers:
       - name: canvas-engine
-        image: ghcr.io/ulyssesleolee/star-canvas-engine:dev
-        imagePullSecrets:
-        - name: ghcr-pull-secret
+        image: ghcr.io/ulyssesleolee/star-canvas-engine@sha256:__CANVAS_ENGINE_DIGEST_REQUIRED__
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
@@ -107,11 +111,11 @@ spec:
         version: v0.1
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+      - name: ghcr-pull-secret
       containers:
       - name: domain-canvas
-        image: ghcr.io/ulyssesleolee/star-domain-canvas:dev
-        imagePullSecrets:
-        - name: ghcr-pull-secret
+        image: ghcr.io/ulyssesleolee/star-domain-canvas@sha256:__DOMAIN_CANVAS_DIGEST_REQUIRED__
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
@@ -176,11 +180,11 @@ spec:
         version: v0.1
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+      - name: ghcr-pull-secret
       containers:
       - name: canvas-realtime
-        image: ghcr.io/ulyssesleolee/star-canvas-realtime:dev
-        imagePullSecrets:
-        - name: ghcr-pull-secret
+        image: ghcr.io/ulyssesleolee/star-canvas-realtime@sha256:__CANVAS_REALTIME_DIGEST_REQUIRED__
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
@@ -325,7 +329,6 @@ metadata:
   labels:
     app: envoy-edge
     tier: edge
-    version: v1.28-latest
 spec:
   replicas: 1
   selector:
@@ -336,12 +339,11 @@ spec:
       labels:
         app: envoy-edge
         tier: edge
-        version: v1.28-latest
     spec:
       automountServiceAccountToken: false
       containers:
       - name: envoy
-        image: envoyproxy/envoy:v1.28-latest
+        image: envoyproxy/envoy@sha256:2ff39d93964ddadfc74e7db0ec62bf433d91dcafa6c3542a6754715a60ba6b3c
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
