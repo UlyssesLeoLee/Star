@@ -50,12 +50,24 @@
 
 | 文件 | 实测问题 |
 |---|---|
-| `crates/star-desktop/frontend/src/App.tsx` | 找不到 `./App.module.css` 模块声明（TS2307） |
-| `crates/star-desktop/frontend/src/components/KanbanBoard.tsx` | `DEFAULT_KANBAN_COLUMNS` 未导出（TS2459）；若干参数隐式 `any`（TS7006）；若干 `Record<WorkItemStatus, WorkItem[]>` 索引为 `any`（TS7053） |
-| `crates/star-desktop/frontend/src/hooks/useTauriKeyboardLayout.ts` | `constants` 未导出 `DEFAULT_SWIMLANES`（TS2305） |
-| `crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx` | `visualDistance` 声明后未使用（TS6133） |
-| `crates/star-desktop/frontend/tests/BoardView.test.tsx` | `globalThis` 属性索引签名错误（TS7017） |
-| `crates/star-desktop/frontend/tests/setup.ts` | `globalThis` 属性索引签名错误（TS7017） |
+| `crates/star-desktop/frontend/src/App.tsx` | 1 × TS2307：找不到 `./App.module.css` 的 TypeScript 模块声明。CSS 文件本身存在。 |
+| `crates/star-desktop/frontend/src/components/KanbanBoard.tsx` | 10 条：1 × TS2459（`DEFAULT_KANBAN_COLUMNS` 在 `constants.ts` 中导入但未导出）；5 × TS7006（回调参数隐式 `any`）；4 × TS7053（`Record<WorkItemStatus, WorkItem[]>` 索引类型为 `any`）。后 9 条很可能是无效导入导致的级联错误，尚未通过修复后重跑确认。 |
+| `crates/star-desktop/frontend/src/hooks/useTauriKeyboardLayout.ts` | 1 × TS2305：`constants.ts` 未导出 `DEFAULT_SWIMLANES`。该常量实际存在于 `types/ids.ts`。 |
+| `crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx` | 1 × TS6133：`layoutNodes` 参数 `visualDistance` 声明后未使用。 |
+| `crates/star-desktop/frontend/tests/BoardView.test.tsx` | 1 × TS7017：读取 `globalThis.__TAURI_INTERNALS__` 时缺少属性类型声明。 |
+| `crates/star-desktop/frontend/tests/setup.ts` | 1 × TS7017：给 `globalThis.__TAURI_INTERNALS__` 赋值时缺少属性类型声明。 |
+
+### 只读修复审查（仅建议）
+
+以下结论只基于源文件和类型配置核对；没有修改这些文件，也没有用临时 patch 验证修复效果。
+
+| 根因 | 源码证据 | 最小安全修复候选 | 风险与复验 |
+|---|---|---|---|
+| CSS Modules 声明未纳入 TypeScript | `src/App.module.css` 存在；`tsconfig.json` 的 `types` 只有 `vitest/globals` 和 `@testing-library/react`，前端目录未找到 `.d.ts` 声明文件 | 引入 Vite 的 `vite/client` 类型（在 `tsconfig` 类型列表中加入，或新增仅包含该 reference 的 `src/vite-env.d.ts`）；保留现有 CSS Modules import | 需在相同 tsconfig 下重跑 `tsc --noEmit`，确认 CSS Modules 类型被加载 |
+| `DEFAULT_KANBAN_COLUMNS` API 未从 constants 导出 | 定义在 `src/types/ids.ts`；`src/constants.ts` 导入并使用但没有 re-export；`KanbanBoard.tsx` 注释明确其消费者从 `constants.ts` 导入 | 在 `src/constants.ts` 添加 `export { DEFAULT_KANBAN_COLUMNS } from "./types/ids";`，保持单一常量来源 | 这应先消除 TS2459；5 条 TS7006 与 4 条 TS7053 很可能随类型恢复一并消失，但只能由修复后编译确认 |
+| `DEFAULT_SWIMLANES` 从错误模块导入 | `src/types/ids.ts` 定义并导出 `DEFAULT_SWIMLANES: Wtm[]`；`src/constants.ts` 只导出 `SWIMLANE_ORDER` | 将 `useTauriKeyboardLayout.ts` 中 `DEFAULT_SWIMLANES` 的 import 来源改为 `../types/ids`；其他常量仍从 `../constants` 导入 | 直接复用已存在的可变 `Wtm[]`，不改默认顺序或运行时行为；重跑 typecheck |
+| 布局函数多余参数 | `layoutNodes` 内未读取 `visualDistance`；调用处传入 `layout.visualDistance`，节点半径则在渲染处单独使用 | 从 `layoutNodes` 的参数和调用中移除 `visualDistance` | 当前不会改变布局或半径，因为该参数未被函数读取；运行前后需比较同一视图输出并重跑 typecheck |
+| 测试全局 mock 缺失类型 | 报错点都在测试中；`globalThis.__TAURI_INTERNALS__` 是测试 IPC mock，`BoardView.test.tsx` 在赋值处已有行级忽略，但读取处没有类型 | 在测试类型中为 mock 定义窄接口，或只在这两处将 `globalThis` 转成带可选 `__TAURI_INTERNALS__` 的交叉类型；不修改 production Tauri API 类型 | 避免扩大为 `any` 或改生产契约；重跑 typecheck 和 Vitest，检查 mock 的 invoke 签名 |
 
 这些文件不在 desktop packaging lane manifest 内，本 lane 未修改它们。工作流保留严格的 frontend build 门，不通过跳过 typecheck 来掩盖这些问题。
 
