@@ -24,7 +24,7 @@
 | `crates/star-desktop/src-tauri/tauri.conf.json` | 修正前端命令路径；删除启用状态却使用占位公钥的 updater 配置；显式关闭 updater artifact 创建 | 不生成伪签名更新制品；自动更新保持未配置 |
 | `crates/star-desktop/src-tauri/Cargo.toml` | 将过时的 PoC 产品描述改成中性桌面客户端描述 | 没有升级 Cargo 依赖或改动 workspace license |
 | `scripts/build-desktop.sh` | 改为 lockfile 驱动的 `npm ci`；只在当前宿主系统构建；将选项映射到 Tauri bundle 类型；验证所选 bundle 目录内存在非空安装包 | 删除了跨平台打包失败后仍返回成功的行为；跨系统制品交给独立 CI runner |
-| `docs/reports/PHASE-STABLE-HARDENING-DESKTOP-PACKAGING-REPORT.md` | 新增本报告 | 记录真实验证结果和未关闭风险 |
+| `docs/reports/PHASE-STABLE-HARDENING-DESKTOP-PACKAGING-20261031.md` | 新增本报告 | 记录真实验证结果和未关闭风险 |
 | `docs/briefs/STABLE-HARDENING-DESKTOP-PACKAGING-20261031.md`、`docs/reports/WBS-DISPATCH-STABLE-HARDENING-DESKTOP-PACKAGING-20261031.jsonl` | 本 lane 原有 dispatcher brief 与派发记录 | 保留原 brief；派发记录追加本阶段结果 |
 
 `.github/workflows/star-desktop-build.yml` 未修改；它仍使用 Node 20，因其已有 Dependabot owner，后续需由该 owner 单独收敛。
