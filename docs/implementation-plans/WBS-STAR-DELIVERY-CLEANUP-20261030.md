@@ -28,9 +28,9 @@ Delivery lane 提供的目标镜像引用为 `ghcr.io/ulyssesleolee/star-canvas-
 |---|---|---|---|---|---|
 | D0 | 固定当前支持清单、资源计数口径与活动路径 | 协调者 | 无 | 文档统一区分 package/bin/workload/Service object/health endpoint；服务身份与固定路径一致 | COMPLETE |
 | D1 | 移除退役 Canvas 游戏 Rust package/binary 及其仅游戏专属的活动构建依赖 | Rust/runtime cleanup | D0 | cargo +1.99.0 metadata 确认 workspace 为 109 packages、9 binaries、3 Canvas binaries；不得把该数量解释为已部署服务数 | COMPLETE；构建门禁在 D4 单独跟踪 |
-| D2 | 清理活动 OCI 镜像、workflow、K3s manifest、启动和验收脚本 | Delivery cleanup | D0 | 固定 Star 路径、4 Deployments/4 Services、3 个 GHCR 镜像均以 star- 开头、workflow/manifest/Kargo 一致；活动交付扫描无退役游戏引用 | COMPLETE；无镜像发布或集群部署声明 |
+| D2 | 清理活动 OCI 镜像、workflow、K3s manifest、启动和验收脚本 | Delivery cleanup | D0 | 固定 Star 路径、4 Deployments/4 Services、3 个 GHCR 镜像均以 star- 开头、workflow/manifest/Kargo 一致；活动交付扫描无退役游戏引用 | PARTIAL / OPEN；受控 Canvas workflow/Dockerfile/K3s/Kargo 镜像身份静态核对通过；但活动 `maintenance/update-backend-k3s.bat:13` 仍含旧 registry，并调用旧 updater 脚本，需另行扩 manifest 修复活动维护链；未完成“无退役游戏引用”验收 |
 | D3 | 同步活动设计/拓扑、将旧游戏规格归档为历史记录、建立 WBS 和阶段报告 | Docs retirement | D0、D1、D2 的服务清单 | 基本设计、架构图、性能指南和 guard 文档使用同一服务清单与路径；HTML 解析和活动文档旧名称扫描通过；旧规格/计划/ADR 保留并标为退役历史 | COMPLETE；全站 arch-live 计数漂移单列跟踪 |
-| D4 | 静态及构建验收 | Runtime + Delivery + Docs | D1–D3 | 活动交付扫描、YAML 解析、镜像矩阵和脚本语法检查通过；Rust workspace build、镜像 build 与 K3s endpoint 仍需证据 | OPEN；Windows rustc 被安全软件以 OS error 225 阻止，镜像/K3s 未运行 |
+| D4 | 静态及构建验收 | Runtime + Delivery + Docs | D1–D3 | 活动交付扫描、YAML 解析、镜像矩阵和脚本语法检查通过；Rust workspace build、镜像 build 与 K3s endpoint 仍需证据 | PARTIAL / BLOCKED；本 lane 的 YAML、镜像矩阵、Bash/PowerShell 静态检查通过；活动旧 updater 调用链超出已登记 manifest，Rust build、镜像 build 与 K3s endpoint 仍 OPEN |
 | D5 | 集成并复核最终版本 | 协调者 | D4 | Runtime、Delivery、Docs 三条已审查 lane 已 rebase 并 fast-forward 合入本地 dev；最终 build/部署证据补齐后关闭 | PARTIAL；本地集成完成，等待 D4 闭环 |
 
 ## 3. 活动交付接口
@@ -57,3 +57,5 @@ Delivery lane 提供的目标镜像引用为 `ghcr.io/ulyssesleolee/star-canvas-
 | 版本 | 日期 | 修订人 | 变更 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 建立 Star-only delivery retirement WBS、口径、lane 与验收门；所有并行实施和验证初始标为 OPEN | 用户要求活动容器/部署只含 Star 支持服务，并清理旧游戏遗留项 |
+| v0.2 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | D4 静态核查通过 YAML、三镜像身份矩阵及 Bash/PowerShell 语法门；修复 Helm 占位 Chart YAML 并统一 registry；因活动旧 updater 及其调用链缺少 manifest，D4 标为 PARTIAL / BLOCKED；构建、镜像发布及 K3s 运行门保持 OPEN | D4 静态 lane 实测及活动调用链范围复核 |
+| v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更正 D2 为 PARTIAL / OPEN：受控 Star 镜像交付面静态核对通过，但活动旧 updater 仍含旧 registry/旧调用链，未满足无退役游戏引用的验收；D4 保持 PARTIAL / BLOCKED | 活动维护调用链复核否定 D2 原 COMPLETE 状态 |

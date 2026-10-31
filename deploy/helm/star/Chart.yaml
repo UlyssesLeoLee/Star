@@ -1,6 +1,6 @@
 apiVersion: v2
 name: star
-description: Star Helm chart — Phase I production rollout (8 services: cli/mcp/context/sa/sse/webhook/cache/saga)
+description: "Deprecated Star Helm placeholder; it has no active workload templates and is not used for deployment."
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
