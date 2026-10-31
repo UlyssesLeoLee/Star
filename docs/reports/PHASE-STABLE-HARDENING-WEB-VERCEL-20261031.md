@@ -10,7 +10,7 @@
 |---|---|---|
 | `frontend/vercel.json` | 显式声明 Next.js framework、`npm ci` 和现有 `npm run build` | 完成 |
 | `docs/briefs/STABLE-HARDENING-WEB-VERCEL-20261031.md` | dispatcher 记录的工作 brief | 已存在 |
-| `docs/reports/WBS-DISPATCH-STABLE-HARDENING-WEB-VERCEL-CONFIG-20261031.jsonl` | brief 与本阶段静态核验事件 | 本阶段记录 |
+| `docs/reports/WBS-DISPATCH-STABLE-HARDENING-WEB-VERCEL-20261031.jsonl` | brief、本阶段静态核验与 manifest 路径对齐事件 | 本阶段记录 |
 
 ## §2 验证摘要
 
