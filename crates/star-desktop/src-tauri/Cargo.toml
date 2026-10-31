@@ -10,7 +10,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Star Desktop — Tauri 2.0 + 1 page board (PoC P0, per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)"
+description = "Star Desktop client built with Tauri"
 
 [lib]
 name = "star_desktop_lib"

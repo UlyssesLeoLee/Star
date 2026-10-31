@@ -1,0 +1,209 @@
+name: Star Desktop stable bundle checks
+
+# @cypher schema=1 source_sha256=996a921837dcc850141c2d124aae048896beff2fef959987944732cc4107b2ae
+# MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
+# MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
+# MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
+# MERGE (upload_artifact:ExternalService {id:"actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",name:"actions/upload-artifact v7.0.2"})
+# MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.0"})
+# MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
+# MERGE (self)-[:CALLS]->(checkout)
+# MERGE (self)-[:CALLS]->(setup_node)
+# MERGE (self)-[:CALLS]->(upload_artifact)
+# MERGE (self)-[:CONFIGURES]->(toolchain)
+# MERGE (self)-[:CONFIGURES]->(node_runtime)
+# @endcypher
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/star-stable-desktop.yml"
+      - "crates/star-desktop/frontend/package.json"
+      - "crates/star-desktop/frontend/package-lock.json"
+      - "crates/star-desktop/src-tauri/**"
+      - "scripts/build-desktop.sh"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/workflows/star-stable-desktop.yml"
+      - "crates/star-desktop/frontend/package.json"
+      - "crates/star-desktop/frontend/package-lock.json"
+      - "crates/star-desktop/src-tauri/**"
+      - "scripts/build-desktop.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: star-stable-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUSTUP_TOOLCHAIN: "1.99.0"
+  CARGO_BUILD_JOBS: "2"
+
+jobs:
+  linux:
+    name: Linux .deb and AppImage
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/crates/star-desktop/src-tauri/target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: crates/star-desktop/frontend/package-lock.json
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            libssl-dev \
+            librsvg2-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            wget
+
+      - name: Install Rust 1.99.0
+        run: rustup toolchain install 1.99.0 --profile minimal
+
+      - name: Install locked frontend dependencies
+        working-directory: crates/star-desktop/frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: crates/star-desktop/frontend
+        run: npm run build
+
+      - name: Build desktop bundles
+        working-directory: crates/star-desktop
+        run: frontend/node_modules/.bin/tauri build --bundles deb,appimage
+
+      - name: Require non-empty Linux bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find "$CARGO_TARGET_DIR/release/bundle/deb" -maxdepth 1 -type f -name '*.deb' -size +0c -print -quit)"
+          appimage="$(find "$CARGO_TARGET_DIR/release/bundle/appimage" -maxdepth 1 -type f -name '*.AppImage' -size +0c -print -quit)"
+          test -n "$deb" || { echo "Missing non-empty .deb artifact" >&2; exit 1; }
+          test -n "$appimage" || { echo "Missing non-empty AppImage artifact" >&2; exit 1; }
+          printf '%s\n%s\n' "$deb" "$appimage"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-desktop-linux-unsigned
+          path: |
+            crates/star-desktop/src-tauri/target/release/bundle/deb/*.deb
+            crates/star-desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    name: Windows MSI
+    runs-on: windows-2025
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}\crates\star-desktop\src-tauri\target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: crates/star-desktop/frontend/package-lock.json
+
+      - name: Install Rust 1.99.0
+        run: rustup toolchain install 1.99.0 --profile minimal
+
+      - name: Install locked frontend dependencies
+        working-directory: crates/star-desktop/frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: crates/star-desktop/frontend
+        run: npm run build
+
+      - name: Build Windows MSI
+        working-directory: crates/star-desktop
+        run: frontend/node_modules/.bin/tauri.cmd build --bundles msi
+
+      - name: Require non-empty MSI
+        shell: pwsh
+        run: |
+          $bundleDirectory = Join-Path $env:CARGO_TARGET_DIR 'release\bundle\msi'
+          $installers = @(Get-ChildItem -LiteralPath $bundleDirectory -Filter '*.msi' -File -ErrorAction Stop | Where-Object { $_.Length -gt 0 })
+          if ($installers.Count -eq 0) { throw "Missing non-empty MSI under $bundleDirectory" }
+          $installers | ForEach-Object { $_.FullName }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-desktop-windows-unsigned
+          path: crates/star-desktop/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    name: macOS universal DMG
+    runs-on: macos-15
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/crates/star-desktop/src-tauri/target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: crates/star-desktop/frontend/package-lock.json
+
+      - name: Install Rust 1.99.0 and universal targets
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal
+          rustup target add --toolchain 1.99.0 aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install locked frontend dependencies
+        working-directory: crates/star-desktop/frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: crates/star-desktop/frontend
+        run: npm run build
+
+      - name: Build universal macOS DMG
+        working-directory: crates/star-desktop
+        run: frontend/node_modules/.bin/tauri build --target universal-apple-darwin --bundles dmg
+
+      - name: Require non-empty macOS DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="$(find "$CARGO_TARGET_DIR/universal-apple-darwin/release/bundle/dmg" -maxdepth 1 -type f -name '*.dmg' -size +0c -print -quit)"
+          test -n "$dmg" || { echo "Missing non-empty universal macOS DMG" >&2; exit 1; }
+          printf '%s\n' "$dmg"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-desktop-macos-universal-unsigned
+          path: crates/star-desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
