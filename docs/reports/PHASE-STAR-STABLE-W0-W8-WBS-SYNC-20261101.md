@@ -1,7 +1,7 @@
 # PHASE-STAR-STABLE-W0-W8-WBS-SYNC-20261101
 
-> **Status:** WBS sync committed on an isolated candidate branch; stable release remains OPEN / not releasable.
-> **Base:** local dev at 2a57fa0d329be830735d6657677236e195673362.
+> **Status:** W0 and W8 audit lanes are integrated into local dev; this WBS lane is rebased onto their resulting dev head. Stable release remains OPEN / not releasable.
+> **Initial audit base:** local dev at 2a57fa0d329be830735d6657677236e195673362; WBS lane rebased onto dev after W0/W8 integration at c57df8a294c13a2f3affc4a2d1a0a383f55a0a79.
 > **WBS commits:** initial sync `9937ac99b130a180a25e8600a4145dc39cf174d3`; latest update before this report revision `f02b47c1ee151f7724f1480295a8756e28110c26`.
 > **Accepted audit sources:** W0 report 6e1bdfa3c7205c3e67215f1000da78bd79404731 and coordinator brief 268f21217f21ce90e47644ff5535b9951d780e52; W8 original 82d8ebcb0be2c3117b62f4e32cda47d4e28bc711 and correction d4d84c8be6ad1726dfc013c162696d63a9af4be2.
 > **Scope:** One WBS file and this phase report. No product implementation, tag, release, deployment, push, or Multipass lifecycle operation.
@@ -25,12 +25,12 @@ Synchronize the stable-release plan with the user-confirmed v1.0.6 Git-tag polic
 
 | Check | Result | Boundary |
 |---|---|---|
-| W0 and W8 source reports | Each report has sections §0–§7; source report paths exist in their respective isolated worktrees. | W0/W8 remain audit candidates, not merged into dev. |
+| W0 and W8 source reports | Each report has sections §0–§7 and is now integrated into local dev; W0 tip `268f21217f21ce90e47644ff5535b9951d780e52` fast-forwarded, W8 merge commit `c57df8a294c13a2f3affc4a2d1a0a383f55a0a79`. | Static audits only; both gates remain open. |
 | W8 version chronology | Report now states v1.17.0 GA on 2026-10-19 and HCS default; local host remains 1.16.4+win/Hyper-V. | No upgrade or migration was tested. |
-| WBS structure | W0-W9 appear once; history rows v1.10-v1.13 record the latest audit decisions; release status remains OPEN; W0/W8 commits are recorded. | Structural consistency only. |
-| Document diff | WBS isolated worktree passed git diff --check; prior WBS commits contain only the WBS plan. | No product builds or tests were run. |
-| Current dev checkout | Rechecked clean at 2a57fa0d329be830735d6657677236e195673362; ahead of origin/dev by 229 on the local tracking ref. No write was made. | Remote tracking was not refreshed. |
-| Orca owner-query diagnostic | Installed Orca 1.4.245.0 direct `orca.exe --help` reproduced exit `-1073741795` (`0xC000001D`); `Get-Process Orca` returned 0. The only matching recent WER event identifies an older 1.4.205.0 AppHang, not this failure. | A zero process count does not prove no terminal/agent owner. Orca CLI cannot confirm owner; protected checkout remains unchanged. WER archive `Report.wer` access was denied, so no current exception module/stack evidence was available. |
+| WBS structure | W0-W9 appear once; history rows v1.10-v1.14 record the latest audit decisions; release status remains OPEN; W0/W8 commits are recorded. | Structural consistency only. |
+| Document diff | WBS lane was clean before rebase; rebase onto c57df8a2 completed without conflicts. The revised WBS/report passed `git diff --check` before fast-forward integration. | Documentation-only validation; no product builds or tests were run. |
+| Current dev checkout | Rechecked clean at the WBS rebase baseline `c57df8a294c13a2f3affc4a2d1a0a383f55a0a79`; local tracking showed ahead of origin/dev by 234. Orca confirmed no active writer in dev or the WBS worktree. | Remote tracking was not refreshed; this is not remote state. |
+| Orca owner-query diagnostic | Orca CLI/runtime was restored; `orca worktree ps --json` returned the dev and WBS worktrees as inactive with zero live terminals, attached PTYs, unverifiable terminals, or agents. | Read-only owner check at integration time; no workspace contents were read from Orca output beyond these fields. |
 
 ## §3 Known gaps
 
@@ -41,14 +41,14 @@ Synchronize the stable-release plan with the user-confirmed v1.0.6 Git-tag polic
 5. W7's separate deploy/k3s-local context is still broad and awaits D2 owner classification; no static Canvas result proves that context safe.
 6. W8 remains OPEN: no owner-approved host/guest profile, no two-instance run, no K3s version/digest pin, and no runtime/readiness/recovery proof.
 7. W9 is blocked on W0-W8. No tag/release/artifact/deployment/push was performed.
-8. The W0, W8, and WBS commits are isolated candidates; none has been integrated into dev. The dev checkout is clean, but shared owner confirmation is still absent: Orca 1.4.245.0 CLI fails with `0xC000001D`, and a zero process count cannot prove all terminal/agent owners have exited. MAGOS policy also requires an explicit integration command for branch writes.
+8. W0 and W8 documentation lanes are integrated into local dev; the WBS lane was rebased onto their resulting tip and is integrated with this revision. The target owner check is clear and MAGOS returned allow for the registered WBS files at `dev@c57df8a294c13a2f3affc4a2d1a0a383f55a0a79`. Other stable-release candidates are not included in this integration; no product build, hosted release, tag, publish, or deployment was performed.
 
 ## §4 Subagent outcome and handoff
 
 - W0 version-map audit report/dispatch committed at 6e1bdfa3; the coordinator-owned brief was subsequently committed as 268f2121, leaving the W0 worktree clean.
 - W8 provenance audit and chronology correction completed in isolated worktree; commits 82d8ebcb and d4d84c8b. The worktree is clean.
 - No subagent failed. The W8 correction was independently prompted after a source review found the initial chronology stale; it corrected the report without changing product files or VM state.
-- Handoff: after explicit MAGOS integration selection and dev-owner confirmation, integrate W0/W8 audit reports before this WBS commit so its relative report links resolve. Keep W5/W7 and all other active/dirty lanes under their existing ownership.
+- Handoff: W0 and W8 audit reports were integrated before this WBS revision so its relative report links resolve. The dev-owner check and current MAGOS file-scope check passed. W5/W7 and all other active or dirty lanes remain under their existing ownership.
 
 ## §5 Guard rules
 
@@ -76,3 +76,4 @@ Synchronize the stable-release plan with the user-confirmed v1.0.6 Git-tag polic
 | 0.1 | 2026-11-01 | Mavis review | Synchronize stable-release WBS with W0 version mapping, corrected W8 Multipass/K3s provenance, and updated dependency-ordered work. | W0/W8 audit lanes completed and independently reviewed. |
 | 0.2 | 2026-11-01 | Mavis review | Record the coordinator-owned W0 audit brief commit and clean branch HEAD 268f2121; keep the audit and release gates open. | W0 brief retained on its registered lane before integration review. |
 | 0.3 | 2026-11-01 | Mavis review | Record the latest W7 context-candidate HEAD and the reproduced Orca 1.4.245.0 CLI failure; keep dev untouched and owner verification/integration gates open. | W7 Cargo lock correction and current read-only dev/Orca recheck. |
+| 0.4 | 2026-11-01 | Mavis review | Record repaired Orca owner visibility, W0 fast-forward and W8 merge integration, and the WBS lane rebase onto the resulting dev head; retain all release gates as open. | User authorized reviewed completed lanes to be integrated into local dev; MAGOS registered-path checks returned allow. |
