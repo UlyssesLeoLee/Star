@@ -36,6 +36,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-tags: true
 
       - name: Require approved version tag
         shell: bash
@@ -49,6 +50,23 @@ jobs:
           fi
           if [[ "$RELEASE_GATE_CONFIRMATION" != APPROVED ]]; then
             echo "Stable Web evidence requires explicit APPROVED confirmation." >&2
+            exit 1
+          fi
+
+      - name: Resolve canonical release tag, version, and source SHA
+        id: resolve-release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 ../scripts/release/resolve_star_version.py \
+            --tag "$RELEASE_TAG" \
+            --repo .. \
+            --output "$GITHUB_OUTPUT"
+          resolved_source_sha="$(git -C .. rev-parse --verify "refs/tags/$RELEASE_TAG^{}")"
+          if [[ "$resolved_source_sha" != "$GITHUB_SHA" ]]; then
+            echo "Stable Web evidence is blocked: the exact tag target does not match the workflow source SHA." >&2
             exit 1
           fi
 
@@ -70,16 +88,21 @@ jobs:
 
       - name: Generate and validate SPDX SBOM
         shell: bash
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}
         run: |
           set -euo pipefail
-          mkdir -p dist/star-web-build-evidence
-          npm sbom --sbom-format=spdx > dist/star-web-build-evidence/sbom.spdx.json
-          node - <<'NODE'
+          bundle_name="star-web-build-evidence-$STAR_RELEASE_TAG-$STAR_RELEASE_VERSION-$STAR_RELEASE_SOURCE_SHA"
+          mkdir -p "dist/$bundle_name"
+          npm sbom --sbom-format=spdx > "dist/$bundle_name/sbom.spdx.json"
+          node - "dist/$bundle_name/sbom.spdx.json" <<'NODE'
           const fs = require("node:fs");
-          const sbomPath = "dist/star-web-build-evidence/sbom.spdx.json";
+          const sbomPath = process.argv[2];
           const sbom = JSON.parse(fs.readFileSync(sbomPath, "utf8"));
           if (sbom.spdxVersion !== "SPDX-2.3") {
-            throw new Error(`Expected SPDX-2.3, got ${sbom.spdxVersion ?? "missing version"}`);
+            throw new Error("Expected SPDX-2.3, got " + (sbom.spdxVersion ?? "missing version"));
           }
           if (!Array.isArray(sbom.packages) || sbom.packages.length === 0) {
             throw new Error("The npm SBOM has no package records.");
@@ -87,18 +110,24 @@ jobs:
           NODE
 
       - name: Pack Web build evidence with normalized archive metadata
+        id: pack-evidence
         shell: bash
         env:
-          SOURCE_COMMIT: ${{ github.sha }}
+          STAR_RELEASE_TAG: ${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}
+          SOURCE_COMMIT: ${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}
         run: |
           set -euo pipefail
-          bundle="dist/star-web-build-evidence"
+          bundle_name="star-web-build-evidence-$STAR_RELEASE_TAG-$STAR_RELEASE_VERSION-$SOURCE_COMMIT"
+          bundle="dist/$bundle_name"
           test -s .next/BUILD_ID
           test -d public
           cp -a .next "$bundle/.next"
           cp -a public "$bundle/public"
           cp package.json package-lock.json next.config.js vercel.json "$bundle/"
           {
+            printf 'release_tag=%s\n' "$STAR_RELEASE_TAG"
+            printf 'release_version=%s\n' "$STAR_RELEASE_VERSION"
             printf 'source_commit=%s\n' "$SOURCE_COMMIT"
             printf 'node=%s\n' "$(node --version)"
             printf 'npm=%s\n' "$(npm --version)"
@@ -106,40 +135,49 @@ jobs:
           } > "$bundle/build-info.txt"
           source_date_epoch="$(git -C .. show -s --format=%ct "$SOURCE_COMMIT")"
           test -n "$source_date_epoch"
+          archive="$bundle.tar.gz"
           tar --sort=name --mtime="@$source_date_epoch" --owner=0 --group=0 --numeric-owner \
-            -cf - -C dist star-web-build-evidence | gzip -n > dist/star-web-build-evidence.tar.gz
-          test -s dist/star-web-build-evidence.tar.gz
-          (cd dist && sha256sum star-web-build-evidence.tar.gz > star-web-build-evidence.tar.gz.sha256)
+            -cf - -C dist "$bundle_name" | gzip -n > "$archive"
+          test -s "$archive"
+          (cd dist && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
 
       - name: Upload stable Web evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: star-web-build-evidence-${{ github.sha }}
+          name: star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}
           path: |
-            frontend/dist/star-web-build-evidence.tar.gz
-            frontend/dist/star-web-build-evidence.tar.gz.sha256
-            frontend/dist/star-web-build-evidence/sbom.spdx.json
+            frontend/dist/star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}.tar.gz
+            frontend/dist/star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}.tar.gz.sha256
+            frontend/dist/star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}/sbom.spdx.json
           if-no-files-found: error
           retention-days: 14
 
       - name: Attest Web build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: frontend/dist/star-web-build-evidence.tar.gz
+          subject-path: frontend/dist/star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}.tar.gz
 
       - name: Attest Web SBOM for the build archive
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: frontend/dist/star-web-build-evidence.tar.gz
-          sbom-path: frontend/dist/star-web-build-evidence/sbom.spdx.json
+          subject-path: frontend/dist/star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}.tar.gz
+          sbom-path: frontend/dist/star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}/sbom.spdx.json
 
       - name: Record consumer verification guidance
         shell: bash
         env:
           SOURCE_REPOSITORY: ${{ github.repository }}
+          STAR_RELEASE_TAG: ${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}
         run: |
+          bundle_name="star-web-build-evidence-$STAR_RELEASE_TAG-$STAR_RELEASE_VERSION-$STAR_RELEASE_SOURCE_SHA"
+          archive="$bundle_name.tar.gz"
           {
+            echo "Release tag: $STAR_RELEASE_TAG"
+            echo "Release version: $STAR_RELEASE_VERSION"
+            echo "Source commit: $STAR_RELEASE_SOURCE_SHA"
             echo "The uploaded archive is a build evidence bundle, not a Vercel deployment."
-            echo "Verify the downloaded archive with: gh attestation verify star-web-build-evidence.tar.gz --repo $SOURCE_REPOSITORY"
-            echo "Verify its SHA-256 using star-web-build-evidence.tar.gz.sha256."
+            echo "Verify the downloaded archive with: gh attestation verify $archive --repo $SOURCE_REPOSITORY"
+            echo "Verify its SHA-256 using $archive.sha256."
           } >> "$GITHUB_STEP_SUMMARY"
