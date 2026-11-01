@@ -38,6 +38,7 @@ exports[`mock snapshot (lock fixture output) > KANBAN_COLUMNS stable 1`] = `
   "todo",
   "in_progress",
   "review",
+  "blocked",
   "done",
 ]
 `;
