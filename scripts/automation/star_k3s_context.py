@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=d86bf702caa5ff375e64d4f2624b29e571d6f5b352f347f067bccdb27a48ac2d
+# @cypher schema=1 source_sha256=f01d7a30b7030057e1104519252327fd1453107ebb5ef4326d66ea95945887ef
 # MERGE (self:File {path:"scripts/automation/star_k3s_context.py"})
 # MERGE (forbidden_check:Symbol {id:"scripts/automation/star_k3s_context.py::_is_forbidden", kind:"function"})
 # MERGE (identity:Symbol {id:"scripts/automation/star_k3s_context.py::_identity", kind:"function"})
@@ -17,9 +17,7 @@
 # MERGE (load:Symbol {id:"scripts/automation/star_k3s_context.py::load_metadata", kind:"function"})
 # MERGE (select:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
 # MERGE (parse_lock:Symbol {id:"scripts/automation/star_k3s_context.py::_parse_lockfile", kind:"function"})
-# MERGE (resolve_lock:Symbol {id:"scripts/automation/star_k3s_context.py::_resolve_lock_reference", kind:"function"})
-# MERGE (replace_deps:Symbol {id:"scripts/automation/star_k3s_context.py::_replace_lock_dependencies", kind:"function"})
-# MERGE (lock:Symbol {id:"scripts/automation/star_k3s_context.py::filter_lockfile", kind:"function"})
+# MERGE (regenerate_lock:Symbol {id:"scripts/automation/star_k3s_context.py::_regenerate_context_lock", kind:"function"})
 # MERGE (manifest:Symbol {id:"scripts/automation/star_k3s_context.py::filtered_workspace_manifest", kind:"function"})
 # MERGE (copy_package:Symbol {id:"scripts/automation/star_k3s_context.py::_copy_local_package", kind:"function"})
 # MERGE (validate_context:Symbol {id:"scripts/automation/star_k3s_context.py::_validate_context", kind:"function"})
@@ -44,9 +42,7 @@
 # MERGE (self)-[:DEFINES]->(strip_dev)
 # MERGE (self)-[:DEFINES]->(select)
 # MERGE (self)-[:DEFINES]->(parse_lock)
-# MERGE (self)-[:DEFINES]->(resolve_lock)
-# MERGE (self)-[:DEFINES]->(replace_deps)
-# MERGE (self)-[:DEFINES]->(lock)
+# MERGE (self)-[:DEFINES]->(regenerate_lock)
 # MERGE (self)-[:DEFINES]->(manifest)
 # MERGE (self)-[:DEFINES]->(copy_package)
 # MERGE (self)-[:DEFINES]->(validate_context)
@@ -63,13 +59,9 @@
 # MERGE (select)-[:USES]->(service)
 # MERGE (select)-[:CALLS]->(relative)
 # MERGE (select)-[:CALLS]->(forbidden_check)
-# MERGE (parse_lock)-[:CALLS]->(lock)
-# MERGE (resolve_lock)-[:USES]->(lock)
-# MERGE (replace_deps)-[:USES]->(lock)
-# MERGE (lock)-[:CALLS]->(parse_lock)
-# MERGE (lock)-[:CALLS]->(resolve_lock)
-# MERGE (lock)-[:CALLS]->(replace_deps)
-# MERGE (lock)-[:USES]->(forbidden_check)
+# MERGE (regenerate_lock)-[:CALLS]->(parse_lock)
+# MERGE (regenerate_lock)-[:CALLS]->(identity)
+# MERGE (regenerate_lock)-[:CALLS]->(forbidden_check)
 # MERGE (manifest)-[:USES]->(service)
 # MERGE (manifest)-[:CALLS]->(relative)
 # MERGE (manifest)-[:CALLS]->(forbidden_check)
@@ -99,6 +91,7 @@
 # MERGE (copy)-[:CALLS]->(lock)
 # MERGE (copy)-[:CALLS]->(manifest)
 # MERGE (copy)-[:CALLS]->(copy_package)
+# MERGE (copy)-[:CALLS]->(regenerate_lock)
 # MERGE (copy)-[:CALLS]->(validate_context)
 # MERGE (copy)-[:CALLS]->(relative)
 # MERGE (copy)-[:CALLS]->(forbidden_check)
@@ -134,7 +127,6 @@ from typing import Any
 
 SERVICE_PACKAGE = "star-api-rest"
 FORBIDDEN_TERMS = ("game", "legacy")
-_LOCK_DEPENDENCY = re.compile(r"^([^ ]+)(?: ([0-9][^ ]*))?(?: \(([^()]+)\))?$")
 _COPY_MARKERS = ("# @star-local-crates-begin", "# @star-local-crates-end")
 _IGNORED_DIRS = {".git", "target", "node_modules"}
 _DOCKERIGNORE = ".git\n**/.git\ntarget\n**/target\nnode_modules\n**/node_modules\n"
@@ -200,9 +192,8 @@ def load_metadata(repo_root: Path, target_triple: str) -> dict[str, Any]:
         "--offline",
         "--manifest-path",
         "crates/star-api-rest/Cargo.toml",
-        "--filter-platform",
-        target_triple,
     ]
+    command.extend(["--filter-platform", target_triple])
     result = subprocess.run(command, cwd=repo_root, capture_output=True, check=False)
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace")[-1200:]
@@ -291,91 +282,54 @@ def _parse_lockfile(lock_text: str) -> tuple[str, list[tuple[dict[str, Any], str
     return prefix, blocks
 
 
-def _resolve_lock_reference(reference: str, by_name: dict[str, list[tuple[str, str, str | None]]]) -> tuple[str, str, str | None]:
-    match = _LOCK_DEPENDENCY.fullmatch(reference)
-    if match is None:
-        raise ContextError(f"Unrecognized Cargo.lock dependency reference: {reference}")
-    name, version, source = match.groups()
-    candidates = [
-        identity
-        for identity in by_name.get(name, [])
-        if (version is None or identity[1] == version) and (source is None or identity[2] == source)
-    ]
-    if len(candidates) != 1:
-        raise ContextError(f"Cargo.lock reference is not uniquely resolvable: {reference}")
-    return candidates[0]
-
-
-def _replace_lock_dependencies(block: str, dependencies: list[str]) -> str:
-    match = re.search(r"(?m)^dependencies\s*=\s*\[", block)
-    if match is None:
-        return block
-    start = match.end() - 1
-    depth = 0
-    quoted = False
-    escaped = False
-    end = None
-    for index in range(start, len(block)):
-        char = block[index]
-        if quoted:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                quoted = False
-            continue
-        if char == '"':
-            quoted = True
-        elif char == "[":
-            depth += 1
-        elif char == "]":
-            depth -= 1
-            if depth == 0:
-                end = index + 1
-                break
-    if end is None:
-        raise ContextError("Cargo.lock has an unterminated dependency array")
-    rendered = "dependencies = [\n" + "".join(f"    {json.dumps(value, ensure_ascii=False)},\n" for value in dependencies) + "]"
-    return block[: match.start()] + rendered + block[end:]
-
-
-def filter_lockfile(lock_text: str, selected_packages: list[dict[str, Any]]) -> str:
-    """Keep only lock identities in Cargo's selected normal/build dependency graph."""
-    prefix, blocks = _parse_lockfile(lock_text)
-    wanted = {_identity(package) for package in selected_packages}
-    by_identity: dict[tuple[str, str, str | None], tuple[dict[str, Any], str]] = {}
-    by_name: dict[str, list[tuple[str, str, str | None]]] = {}
-    for package, block in blocks:
+def _regenerate_context_lock(
+    context: Path,
+    source_lock_text: str,
+    expected_local_packages: list[dict[str, Any]],
+) -> None:
+    """Ask Cargo to project the lockfile, then prove versions/checksums came from the source lock."""
+    _prefix, source_blocks = _parse_lockfile(source_lock_text)
+    source_by_identity: dict[tuple[str, str, str | None], dict[str, Any]] = {}
+    for package, _block in source_blocks:
         identity = _identity(package)
-        if identity in by_identity:
-            raise ContextError(f"Cargo.lock contains a duplicate package identity: {identity}")
-        by_identity[identity] = (package, block)
-        by_name.setdefault(identity[0], []).append(identity)
-    missing = wanted - by_identity.keys()
-    if missing:
-        raise ContextError(f"Selected package identities are missing from Cargo.lock: {sorted(missing)}")
-    if any(_is_forbidden(identity[0]) for identity in wanted):
-        raise ContextError("Cargo lock selection contains game/legacy package identities")
+        if identity in source_by_identity:
+            raise ContextError(f"Source Cargo.lock contains a duplicate package identity: {identity}")
+        source_by_identity[identity] = package
 
-    filtered: list[str] = []
-    for identity in sorted(wanted, key=lambda value: (value[0], value[1], value[2] or "")):
-        package, block = by_identity[identity]
-        retained = []
-        for reference in package.get("dependencies", []):
-            target = _resolve_lock_reference(reference, by_name)
-            if target in wanted:
-                retained.append(reference)
-        filtered.append(_replace_lock_dependencies(block, retained))
-    output = prefix + "".join(filtered)
+    expected_local = {_identity(package) for package in expected_local_packages}
+    lock_path = context / "Cargo.lock"
+    lock_path.write_text(source_lock_text, encoding="utf-8", newline="\n")
+    result = subprocess.run(
+        ["cargo", "metadata", "--format-version", "1", "--offline", "--manifest-path", "Cargo.toml"],
+        cwd=context,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace")[-1600:]
+        raise ContextError(f"Cargo could not regenerate the filtered lockfile offline: {detail}")
+
     try:
-        parsed = tomllib.loads(output)
-    except tomllib.TOMLDecodeError as error:
-        raise ContextError("Filtered Cargo.lock is invalid TOML") from error
-    names = [package["name"] for package in parsed.get("package", [])]
-    if len(names) != len(wanted) or any(_is_forbidden(name) for name in names):
-        raise ContextError("Filtered Cargo.lock failed package-count or forbidden-name checks")
-    return output
+        _prefix, generated_blocks = _parse_lockfile(lock_path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ContextError("Cargo did not produce a context Cargo.lock") from error
+    generated_identities: set[tuple[str, str, str | None]] = set()
+    for package, _block in generated_blocks:
+        identity = _identity(package)
+        if identity in generated_identities:
+            raise ContextError(f"Generated Cargo.lock contains a duplicate package identity: {identity}")
+        generated_identities.add(identity)
+        if _is_forbidden(identity[0]):
+            raise ContextError(f"Generated Cargo.lock contains a forbidden package: {identity[0]}")
+        if identity[2] is None:
+            if identity not in expected_local:
+                raise ContextError(f"Generated Cargo.lock contains an unapproved local package: {identity}")
+            continue
+        source_package = source_by_identity.get(identity)
+        if source_package is None:
+            raise ContextError(f"Generated Cargo.lock introduced a package absent from the source lock: {identity}")
+        if source_package.get("checksum") != package.get("checksum"):
+            raise ContextError(f"Generated Cargo.lock checksum differs from the source lock: {identity}")
 
 
 def _dependency_entries(manifest: dict[str, Any]) -> list[tuple[str, Any]]:
@@ -410,17 +364,24 @@ def _validate_local_dependencies(
     package_by_id: dict[str, dict[str, Any]],
     root_manifest: dict[str, Any],
     repo_root: Path,
-) -> set[str]:
-    """Require every declared non-dev local path dependency to be in the selected closure."""
+) -> tuple[set[str], list[dict[str, Any]]]:
+    """Collect workspace aliases and local manifests Cargo must parse for the selected closure."""
     selected_manifests = {
         Path(package["manifest_path"]).resolve()
         for package_id, package in package_by_id.items()
         if package_id in selected_ids and package.get("source") is None
     }
     inherited_names: set[str] = set()
+    supplemental_by_manifest: dict[Path, dict[str, Any]] = {}
     workspace_dependencies = root_manifest.get("workspace", {}).get("dependencies", {})
-    for package in local_packages:
+    pending = list(local_packages)
+    visited_manifests: set[Path] = set()
+    while pending:
+        package = pending.pop()
         manifest_path = Path(package["manifest_path"]).resolve()
+        if manifest_path in visited_manifests:
+            continue
+        visited_manifests.add(manifest_path)
         try:
             manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, tomllib.TOMLDecodeError) as error:
@@ -433,15 +394,47 @@ def _validate_local_dependencies(
                 definition = workspace_dependencies.get(name)
                 if definition is None:
                     raise ContextError(f"Workspace dependency is missing: {name}")
-                if isinstance(definition, dict) and "path" in definition:
-                    target_manifest = _local_dependency_manifest_path(repo_root, definition, repo_root)
-                    if target_manifest not in selected_manifests:
-                        raise ContextError(f"Workspace path dependency is outside the selected closure: {name}")
+                dependency_definition = definition
             elif "path" in dependency:
-                target_manifest = _local_dependency_manifest_path(manifest_path.parent, dependency, repo_root)
-                if target_manifest not in selected_manifests:
-                    raise ContextError(f"Local path dependency is outside the selected closure: {name}")
-    return inherited_names
+                dependency_definition = dependency
+            else:
+                continue
+            if not isinstance(dependency_definition, dict) or "path" not in dependency_definition:
+                continue
+            target_manifest = _local_dependency_manifest_path(
+                repo_root if dependency.get("workspace") is True else manifest_path.parent,
+                dependency_definition,
+                repo_root,
+            )
+            if target_manifest in selected_manifests or target_manifest in visited_manifests:
+                continue
+            relative = _repo_relative(repo_root, str(target_manifest))
+            if relative.parts[:1] != ("crates",) or relative.name != "Cargo.toml":
+                raise ContextError(f"Manifest-required local package is outside crates/: {relative}")
+            try:
+                target_package = tomllib.loads(target_manifest.read_text(encoding="utf-8")).get("package", {})
+            except (OSError, tomllib.TOMLDecodeError) as error:
+                raise ContextError(f"Manifest-required local package is unreadable: {relative}") from error
+            target_name = target_package.get("name")
+            if not isinstance(target_name, str) or _is_forbidden(target_name):
+                raise ContextError(f"Manifest-required local package has an invalid or forbidden name: {target_name}")
+            target_version = target_package.get("version")
+            if not isinstance(target_version, str) or not target_version:
+                raise ContextError(f"Manifest-required local package has no version: {relative}")
+            supplemental = {
+                "id": f"manifest-only:{relative.as_posix()}",
+                "name": target_name,
+                "version": target_version,
+                "manifest_path": str(target_manifest),
+                "source": None,
+            }
+            supplemental_by_manifest[target_manifest] = supplemental
+            pending.append(supplemental)
+    supplemental_packages = sorted(
+        supplemental_by_manifest.values(),
+        key=lambda package: _repo_relative(repo_root, package["manifest_path"]).as_posix(),
+    )
+    return inherited_names, supplemental_packages
 
 
 def _toml_key(value: str) -> str:
@@ -502,7 +495,7 @@ def filtered_workspace_manifest(
     selected_ids: set[str],
     package_by_id: dict[str, dict[str, Any]],
     repo_root: Path,
-) -> str:
+) -> tuple[str, list[dict[str, Any]]]:
     """Render only selected workspace members and inherited dependencies."""
     try:
         root_manifest = tomllib.loads(root_manifest_text)
@@ -522,7 +515,9 @@ def filtered_workspace_manifest(
             for package in local_packages
         }
     )
-    inherited_names = _validate_local_dependencies(local_packages, selected_ids, package_by_id, root_manifest, repo_root)
+    inherited_names, supplemental_packages = _validate_local_dependencies(
+        local_packages, selected_ids, package_by_id, root_manifest, repo_root
+    )
     all_workspace_dependencies = workspace.get("dependencies", {})
     missing = inherited_names - all_workspace_dependencies.keys()
     if missing:
@@ -537,7 +532,12 @@ def filtered_workspace_manifest(
     rows.append("members = [")
     rows.extend(f"    {_toml_value(path)}," for path in member_paths)
     rows.append("]")
-    exclusions = [path for path in workspace.get("exclude", []) if not _is_forbidden(path)]
+    exclusion_set = {path for path in workspace.get("exclude", []) if not _is_forbidden(path)}
+    for package in supplemental_packages:
+        path = _repo_relative(repo_root, package["manifest_path"]).parent.as_posix()
+        if path not in member_paths:
+            exclusion_set.add(path)
+    exclusions = sorted(exclusion_set)
     if exclusions:
         rows.append(f"exclude = {_toml_value(exclusions)}")
     output = "\n".join(rows) + "\n\n"
@@ -557,7 +557,7 @@ def filtered_workspace_manifest(
         raise ContextError("Filtered Cargo.toml members do not match the selected local packages")
     if any(_is_forbidden(path) for path in parsed["workspace"]["members"]):
         raise ContextError("Filtered Cargo.toml retained a game/legacy workspace path")
-    return output
+    return output, supplemental_packages
 
 
 def _copy_local_package(repo_root: Path, package: dict[str, Any], output: Path) -> None:
@@ -598,7 +598,11 @@ def _copy_local_package(repo_root: Path, package: dict[str, Any], output: Path) 
                 shutil.copy2(source, target)
 
 
-def copy_context(repo_root: Path, output: Path, metadata: dict[str, Any]) -> tuple[list[str], str]:
+def copy_context(
+    repo_root: Path,
+    output: Path,
+    metadata: dict[str, Any],
+) -> tuple[list[str], str]:
     """Materialize a deterministic source context limited to the resolved Star closure."""
     repo_root = repo_root.resolve()
     output = output.resolve()
@@ -613,27 +617,35 @@ def copy_context(repo_root: Path, output: Path, metadata: dict[str, Any]) -> tup
 
     selected_ids, local_packages = select_packages(metadata, repo_root)
     package_by_id = {package["id"]: package for package in metadata["packages"]}
-    selected_packages = [package_by_id[package_id] for package_id in sorted(selected_ids)]
     root_manifest_path = _repo_file(repo_root, "Cargo.toml")
     lock_path = _repo_file(repo_root, "Cargo.lock")
     rust_toolchain_path = _repo_file(repo_root, "rust-toolchain.toml")
     license_path = _repo_file(repo_root, "LICENSE")
 
-    root_manifest = filtered_workspace_manifest(
+    root_manifest, supplemental_packages = filtered_workspace_manifest(
         root_manifest_path.read_text(encoding="utf-8"),
         local_packages,
         selected_ids,
         package_by_id,
         repo_root,
     )
-    lock_text = filter_lockfile(lock_path.read_text(encoding="utf-8"), selected_packages)
+    lock_text = lock_path.read_text(encoding="utf-8")
+    expected_local_packages = [
+        package_by_id[package_id]
+        for package_id in selected_ids
+        if package_by_id[package_id].get("source") is None
+    ] + supplemental_packages
     dockerfile_source = _repo_file(repo_root, "deploy/k3s-local/Dockerfile")
     dockerfile = dockerfile_source.read_text(encoding="utf-8")
     if dockerfile.count(_COPY_MARKERS[0]) != 1 or dockerfile.count(_COPY_MARKERS[1]) != 1:
         raise ContextError("K3s Dockerfile must contain one pair of local-crate copy markers")
+    context_packages = local_packages + supplemental_packages
     copy_lines = "".join(
         f"COPY {path.as_posix()}/ {path.as_posix()}/\n"
-        for path in sorted((Path(_repo_relative(repo_root, package["manifest_path"]).parent) for package in local_packages), key=lambda path: path.as_posix())
+        for path in sorted(
+            {Path(_repo_relative(repo_root, package["manifest_path"]).parent) for package in context_packages},
+            key=lambda path: path.as_posix(),
+        )
     )
     dockerfile = dockerfile.replace(_COPY_MARKERS[0] + "\n" + _COPY_MARKERS[1], copy_lines.rstrip("\n"))
     if "COPY crates ./crates" in dockerfile or "star-game" in dockerfile.casefold():
@@ -648,9 +660,10 @@ def copy_context(repo_root: Path, output: Path, metadata: dict[str, Any]) -> tup
     dockerfile_output.parent.mkdir(parents=True)
     dockerfile_output.write_text(dockerfile, encoding="utf-8", newline="\n")
     (output / ".dockerignore").write_text(_DOCKERIGNORE, encoding="utf-8", newline="\n")
-    for package in local_packages:
+    for package in context_packages:
         _copy_local_package(repo_root, package, output)
 
+    _regenerate_context_lock(output, lock_text, expected_local_packages)
     files = _validate_context(output)
     digest = _context_digest(output, files)
     return files, digest
@@ -698,6 +711,11 @@ def _validate_context(context: Path) -> list[str]:
     if not isinstance(members, list) or not members:
         raise ContextError("Generated workspace has no explicit member allowlist")
     expected_crates = set(members)
+    excludes = manifest.get("workspace", {}).get("exclude", [])
+    if not isinstance(excludes, list) or any(not isinstance(path, str) or _is_forbidden(path) for path in excludes):
+        raise ContextError("Generated workspace has invalid or forbidden exclude paths")
+    excluded_crates = {path for path in excludes if path.startswith("crates/")}
+    allowed_crates = expected_crates | excluded_crates
     allowed_root_entries = required | {"crates", "deploy"}
     unexpected_root_entries = {path.name for path in context.iterdir()} - allowed_root_entries
     if unexpected_root_entries:
@@ -705,8 +723,8 @@ def _validate_context(context: Path) -> list[str]:
     for relative in files:
         parts = Path(relative).parts
         if parts[0] == "crates":
-            if len(parts) < 3 or Path(*parts[:2]).as_posix() not in expected_crates:
-                raise ContextError(f"Build context contains a file outside selected crate members: {relative}")
+            if len(parts) < 3 or Path(*parts[:2]).as_posix() not in allowed_crates:
+                raise ContextError(f"Build context contains a file outside selected or manifest-required crates: {relative}")
         elif parts[0] == "deploy":
             if relative != "deploy/k3s-local/Dockerfile":
                 raise ContextError(f"Build context contains an unexpected deployment input: {relative}")
@@ -729,7 +747,10 @@ def _validate_context(context: Path) -> list[str]:
         for path in context.glob("crates/**/Cargo.toml")
         if path.is_file()
     }
-    foreign_manifests = {path for path in crate_manifests if not any(path == member or path.startswith(f"{member}/") for member in expected_crates)}
+    foreign_manifests = {
+        path for path in crate_manifests
+        if not any(path == member or path.startswith(f"{member}/") for member in allowed_crates)
+    }
     if foreign_manifests:
         raise ContextError(f"Build context contains crate manifests outside the workspace allowlist: {sorted(foreign_manifests)}")
     if any(_is_forbidden(package.get("name", "")) for package in lock.get("package", [])):

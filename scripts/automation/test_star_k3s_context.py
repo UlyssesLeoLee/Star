@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=ac66a4f442ed3b799fbff3f184f43da84edb4d4e9c8fdaf1d82b70d62037929f
+# @cypher schema=1 source_sha256=0559da9111c06847c4405e68f66bbd21c1187f4701aced27b716af47dd666b50
 # MERGE (self:File {path:"scripts/automation/test_star_k3s_context.py"})
 # MERGE (suite:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests", kind:"class"})
 # MERGE (write_fixture:Symbol {id:"scripts/automation/test_star_k3s_context.py::write_fixture", kind:"function"})
@@ -17,6 +17,7 @@
 # MERGE (multipass:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_invokes_multipass_not_host_docker", kind:"method"})
 # MERGE (tamper:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_rejects_context_tampering", kind:"method"})
 # MERGE (unlisted:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_rejects_unlisted_context_changes", kind:"method"})
+# MERGE (lock_drift:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_rejects_source_lock_identity_or_checksum_drift", kind:"method"})
 # MERGE (self)-[:DEFINES]->(suite)
 # MERGE (self)-[:DEFINES]->(write_fixture)
 # MERGE (self)-[:DEFINES]->(tree_digest)
@@ -32,10 +33,10 @@
 # MERGE (suite)-[:HAS_METHOD]->(multipass)
 # MERGE (suite)-[:HAS_METHOD]->(tamper)
 # MERGE (suite)-[:HAS_METHOD]->(unlisted)
+# MERGE (suite)-[:HAS_METHOD]->(lock_drift)
 # MERGE (setup)-[:CALLS]->(write_fixture)
 # MERGE (allowed)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
 # MERGE (allowed)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
-# MERGE (allowed)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::filter_lockfile", kind:"function"})
 # MERGE (reject_game)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
 # MERGE (reject_missing)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
 # MERGE (reject_manifest)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
@@ -47,6 +48,7 @@
 # MERGE (multipass)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
 # MERGE (tamper)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::build_in_multipass", kind:"function"})
 # MERGE (unlisted)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::build_in_multipass", kind:"function"})
+# MERGE (lock_drift)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::_regenerate_context_lock", kind:"function"})
 # @endcypher
 
 """Focused tests for the fail-closed local K3s image context."""
@@ -62,13 +64,19 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.automation.star_k3s_context import ContextError, build_in_multipass, copy_context, filter_lockfile, select_packages
+from scripts.automation.star_k3s_context import (
+    ContextError,
+    _regenerate_context_lock,
+    build_in_multipass,
+    copy_context,
+    select_packages,
+)
 
 
 def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None) -> tuple[dict[str, object], str]:
-    """Create a small workspace with two Star crates, a registry crate, and an excluded game crate."""
+    """Create a selected Star closure, an optional local crate, and an excluded game crate."""
     package_id_overrides = package_id_overrides or {}
-    members = ["crates/star-api-rest", "crates/domain-project", "crates/domain-tenant", "crates/star-game"]
+    members = ["crates/star-api-rest", "crates/domain-project", "crates/domain-tenant", "crates/star-optional-proto", "crates/star-game"]
     workspace_lines = [
         "[workspace]",
         'resolver = "2"',
@@ -81,9 +89,6 @@ def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None
         'edition = "2024"',
         'version = "1.0.0"',
         'license = "MIT"',
-        "",
-        "[workspace.dependencies]",
-        'serde = "1.0.219"',
         "",
         "[workspace.lints.rust]",
         'unsafe_code = "forbid"',
@@ -111,9 +116,10 @@ def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None
     (root / "deploy" / "k3s-local" / "Dockerfile").write_text(dockerfile, encoding="utf-8")
 
     crate_specs = {
-        "star-api-rest": ('domain-project = { path = "../domain-project" }\nserde = { workspace = true }', 'star-game = { path = "../star-game" }'),
+        "star-api-rest": ('domain-project = { path = "../domain-project" }\nstar-optional-proto = { path = "../star-optional-proto", optional = true }', 'star-game = { path = "../star-game" }'),
         "domain-project": ('domain-tenant = { path = "../domain-tenant" }', ""),
-        "domain-tenant": ('serde = { workspace = true }', ""),
+        "domain-tenant": ("", ""),
+        "star-optional-proto": ("", ""),
         "star-game": ("", ""),
     }
     package_ids = {}
@@ -128,9 +134,10 @@ def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None
             manifest += f'\n[dependencies]\n{dependency}\n'
         if dev_dependency:
             manifest += f'\n[dev-dependencies]\n{dev_dependency}\n'
+        if name == "star-api-rest":
+            manifest += '\n[features]\nnative-proto = ["dep:star-optional-proto"]\n'
         (crate_root / "Cargo.toml").write_text(manifest, encoding="utf-8")
 
-    registry_id = "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.219"
     metadata_packages = [
         {
             "id": package_ids[name],
@@ -141,36 +148,29 @@ def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None
         }
         for name in crate_specs
     ]
-    metadata_packages.append(
-        {"id": registry_id, "name": "serde", "version": "1.0.219", "source": "registry+https://github.com/rust-lang/crates.io-index", "manifest_path": ""}
-    )
     nodes = [
         {
             "id": package_ids["star-api-rest"],
             "deps": [
                 {"pkg": package_ids["domain-project"], "dep_kinds": [{"kind": None, "target": None}]},
                 {"pkg": package_ids["star-game"], "dep_kinds": [{"kind": "dev", "target": None}]},
-                {"pkg": registry_id, "dep_kinds": [{"kind": None, "target": None}]},
             ],
         },
         {
             "id": package_ids["domain-project"],
             "deps": [{"pkg": package_ids["domain-tenant"], "dep_kinds": [{"kind": None, "target": None}]}],
         },
-        {
-            "id": package_ids["domain-tenant"],
-            "deps": [{"pkg": registry_id, "dep_kinds": [{"kind": None, "target": None}]}],
-        },
+        {"id": package_ids["domain-tenant"], "deps": []},
+        {"id": package_ids["star-optional-proto"], "deps": []},
         {"id": package_ids["star-game"], "deps": []},
-        {"id": registry_id, "deps": []},
     ]
     metadata = {"packages": metadata_packages, "resolve": {"nodes": nodes}}
     lock_blocks = [
         "version = 4\n\n",
-        '[[package]]\nname = "star-api-rest"\nversion = "0.1.0"\ndependencies = ["domain-project 0.1.0", "serde 1.0.219", "star-game 0.1.0"]\n\n',
+        '[[package]]\nname = "star-api-rest"\nversion = "0.1.0"\ndependencies = ["domain-project 0.1.0", "star-game 0.1.0", "star-optional-proto 0.1.0"]\n\n',
         '[[package]]\nname = "domain-project"\nversion = "0.1.0"\ndependencies = ["domain-tenant 0.1.0"]\n\n',
-        '[[package]]\nname = "domain-tenant"\nversion = "0.1.0"\ndependencies = ["serde 1.0.219"]\n\n',
-        '[[package]]\nname = "serde"\nversion = "1.0.219"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n\n',
+        '[[package]]\nname = "domain-tenant"\nversion = "0.1.0"\n\n',
+        '[[package]]\nname = "star-optional-proto"\nversion = "0.1.0"\n\n',
         '[[package]]\nname = "star-game"\nversion = "0.1.0"\n\n',
     ]
     return metadata, "".join(lock_blocks)
@@ -200,20 +200,53 @@ class StarK3sContextTests(unittest.TestCase):
     def test_generates_only_the_resolved_star_closure(self) -> None:
         selected, local = select_packages(self.metadata, self.repo)
         self.assertEqual({package["name"] for package in local}, {"star-api-rest", "domain-project", "domain-tenant"})
-        filtered = filter_lockfile(self.lock_text, [package for package in self.metadata["packages"] if package["id"] in selected])
-        self.assertNotIn("star-game", filtered)
+        self.assertNotIn("star-game", {package["name"] for package in self.metadata["packages"] if package["id"] in selected})
         output = self.base / "context"
         files, _digest = copy_context(self.repo, output, self.metadata)
         manifest = (output / "Cargo.toml").read_text(encoding="utf-8")
         api_manifest = (output / "crates" / "star-api-rest" / "Cargo.toml").read_text(encoding="utf-8")
         dockerfile = (output / "deploy" / "k3s-local" / "Dockerfile").read_text(encoding="utf-8")
         self.assertEqual(tomllib.loads(manifest)["workspace"]["members"], ["crates/domain-project", "crates/domain-tenant", "crates/star-api-rest"])
+        self.assertIn("crates/star-optional-proto", tomllib.loads(manifest)["workspace"]["exclude"])
         self.assertIn("COPY crates/domain-project/ crates/domain-project/", dockerfile)
         self.assertIn("COPY crates/domain-tenant/ crates/domain-tenant/", dockerfile)
+        self.assertIn("COPY crates/star-optional-proto/ crates/star-optional-proto/", dockerfile)
         self.assertNotIn("COPY crates ./crates", dockerfile)
+        self.assertNotIn("star-game", (output / "Cargo.lock").read_text(encoding="utf-8"))
         self.assertFalse(any("game" in path.casefold() or "legacy" in path.casefold() for path in files))
         self.assertFalse((output / "crates" / "star-game").exists())
+        self.assertTrue((output / "crates" / "star-optional-proto" / "Cargo.toml").is_file())
         self.assertNotIn("star-game", api_manifest)
+
+    def test_rejects_source_lock_identity_or_checksum_drift(self) -> None:
+        source_lock = (
+            'version = 4\n\n[[package]]\nname = "serde"\nversion = "1.0.219"\n'
+            'source = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "source-checksum"\n'
+        )
+        generated_locks = [
+            (
+                'version = 4\n\n[[package]]\nname = "serde"\nversion = "1.0.219"\n'
+                'source = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "changed-checksum"\n',
+                "checksum differs",
+            ),
+            (
+                source_lock + '\n[[package]]\nname = "unlocked-extra"\nversion = "1.0.0"\n'
+                'source = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "extra-checksum"\n',
+                "introduced a package absent from the source lock",
+            ),
+        ]
+        for index, (generated_lock, error) in enumerate(generated_locks):
+            with self.subTest(error=error):
+                context = self.base / f"lock-drift-{index}"
+                context.mkdir()
+
+                def fake_cargo(_command: list[str], *, cwd: Path, **_kwargs: object) -> subprocess.CompletedProcess[bytes]:
+                    (cwd / "Cargo.lock").write_text(generated_lock, encoding="utf-8")
+                    return subprocess.CompletedProcess([], 0, stdout=b"{}", stderr=b"")
+
+                with patch("scripts.automation.star_k3s_context.subprocess.run", side_effect=fake_cargo):
+                    with self.assertRaisesRegex(ContextError, error):
+                        _regenerate_context_lock(context, source_lock, [])
 
     def test_rejects_game_dependency(self) -> None:
         self.metadata["resolve"]["nodes"][0]["deps"].append(
