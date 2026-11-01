@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a33ecf327ca4a9a3c0933b806d9122990482d6edee094c50f146e7400e8cb11b
+@cypher schema=1 source_sha256=d8a28c53197a235adc433e15ba02b135576f4701dce4c6d54350584ffd25ca1e
 MERGE (self:File {path:"frontend/src/components/board/KanbanBoard.tsx"})
 @endcypher
 */
@@ -9,7 +9,7 @@ MERGE (self:File {path:"frontend/src/components/board/KanbanBoard.tsx"})
 // KanbanBoard — Kanban 看板列容器 (per dynamic-interaction-design.md §3.4)
 // =====================================================================
 // 职责:
-//   1. 渲染 4 列 (todo / in_progress / review / done) per seed.ts board 数据
+//   1. 渲染 board.columns 提供的状态列; 默认列顺序由 KANBAN_COLUMNS 管理
 //   2. 列 onDragOver + onDrop 接收卡片拖动, 触发 onTransition(id, toStatus)
 //   3. drop zone 高亮 (蓝边 2px + bg-accent/10) when dropTarget === status
 //   4. WIP limit 超限显示 (per seed.ts wip_limit 字段)
@@ -436,7 +436,7 @@ export function KanbanBoard({
                 const groups = order.map((cat) => ({
                   cat,
                   items: cards.filter((w) => wtm(w) === cat),
-                }));
+                })).filter((group) => group.items.length > 0);
                 const uncat = cards.filter((w) => wtm(w) === "uncategorized");
                 return (
                   <>
