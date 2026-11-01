@@ -1,7 +1,7 @@
 # PHASE — Star Stable W7 local K3s context filter
 
 **阶段状态：** Star-only context 过滤实现与静态审阅已通过 fast-forward 集成到本地 dev，集成提交 `42082bccd9ae6fd24cf609f5697b2b964a568002`。Rust 1.99.0 基线、Multipass 镜像构建、最终镜像审查与部署未验证；W7 和 stable release 仍 OPEN / 不可发布。
-**工作基线：** 原始实现基于 `dev@2a57fa0d329be830735d6657677236e195673362`；集成前 dev 基线 `646e1e3e354be2eddd3345c928adf8c591d5ac49`；W7 集成提交与当前 dev tip `42082bccd9ae6fd24cf609f5697b2b964a568002`。
+**工作基线：** 原始实现基于 `dev@2a57fa0d329be830735d6657677236e195673362`；集成前 dev 基线 `646e1e3e354be2eddd3345c928adf8c591d5ac49`；W7 代码集成提交 `42082bccd9ae6fd24cf609f5697b2b964a568002`；后续 WBS/阶段报告回执提交 `6115b4832adf92089c7d6207eea96588d450d3f3`。
 **发行范围：** Desktop、Web/Vercel、三份 Star Canvas 服务镜像；本 lane 只处理供本地 K3s 使用的 `star-api-rest` build context。
 
 **当前审阅结论：** 所修改的本地 K3s API build path 已从宽泛 crates 输入改为 Cargo 解析闭包生成的逐 crate context；该静态改动已集成到 dev。`deploy/k3s-local` 仍属开发/测试路径，不加入本次稳定版镜像矩阵。D2 worktree 中同路径未提交的 README 草稿保持原样，不将其视为已接受的支持范围决定。
@@ -79,3 +79,4 @@ W7 lane 曾由子代理实施。首次派发前没有落地 dispatcher brief；b
 | v0.5 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 协调者复核 | 记录 D2 活动 worktree 的未提交 README 将 `deploy/k3s-local` 标为退役，与 W7 API image candidate 的支持范围冲突；W7 暂不集成到 dev，等待 owner 完成范围裁决。 | D2 worktree 只读检查发现同一路径的活动 owner 改动。 |
 | v0.6 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将候选 rebase 到 `dev@646e1e3e` 后复核：`deploy/k3s-local/Dockerfile` 不再包含宽泛 crates COPY，生成器仅从解析的 Star API 本地依赖闭包组装 context；同步主 WBS。D2 未提交 README 草稿继续保留，API 路径支持/退役仍需独立裁决。Rust 1.99.0、Multipass 镜像构建、最终镜像/SBOM/provenance、K3s rollout/rollback 未验证，W7 与稳定版保持 OPEN/NO-GO。 | 用户要求 Docker/build context 不携带 game 等遗留内容；对候选的当前 dev 集成审查。 |
 | v0.7 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录本 lane 的 8 个登记文件已从 `dev@646e1e3e` fast-forward 到 `dev@42082bcc`；W6 审阅文档已在 dev ancestry 中，因此未重复 cherry-pick。复验 11 项 context tests：10 passed、1 skipped（WinError 1314）；CodeRabbit CLI 因操作系统权限错误不可用，协调者完成本地静态审查。Rust 1.99.0、真实 Multipass image build、最终 payload/SBOM/provenance、K3s rollout/rollback 仍未通过，W7 和稳定版保持 OPEN/NO-GO。 | W7 lane 成功快进集成后补记 dev 结果与未关闭门禁。 |
+| v0.8 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 WBS/阶段报告的集成回执提交 `6115b483`；W7 实现提交仍为 `42082bcc`，所有功能改动已在 dev，WBS 和 dispatch 记录随后追加。W7 与稳定版仍 OPEN/NO-GO；剩余生产构建与部署门禁未变。 | 为准确反映 post-integration receipt commit 更新基线。 |
