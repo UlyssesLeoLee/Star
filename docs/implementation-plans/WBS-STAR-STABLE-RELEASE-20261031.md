@@ -149,6 +149,23 @@ deploy/k3s-local 属 development-only，且不在获批的三份 Star Canvas ima
 - Multipass 官方 1.17.0 发布记录给出具体 GA 日期；Canonical release-notes 文档版本表中仍含 September XX 占位，日期证据以 GitHub release entry 为准。
 - GitHub 可对 binary/container artifact 生成 provenance/SBOM attestation，但要求把实际 artifact path 或 image digest 与 BOM 绑定；这只说明平台支持，不证明 Star 已实现。[GitHub how-to](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
 
+## GitHub 远端 Dev 发布门再核（2026-11-01；API snapshot）
+
+本节补充新一轮只读 API 快照，不覆盖上方 v1.33 的历史查询范围。
+
+| 项目 | 本轮 API 观测 | 发布判定 |
+|---|---|---|
+| GitHub 可见 dev | 仍指向 40a84c1aaf804267ee25e02384e99276c3151906，提交时间 2026-10-24T23:16:08Z | 与本地 dev@3726c977 不同，不能证明本地候选已推送 |
+| Branch protection | protected=false、protection.enabled=false；required status checks enforcement=off，contexts/checks 为空 | 远端 dev 无可见强制检查保护；W4 OPEN/BLOCKED |
+| 最新 Actions runs | /actions/runs?branch=dev&per_page=10 返回 total_count=497；最新十项中四项对应 40a84c1 | 只读第一页，不代表全量历史 |
+| 当前远端 SHA 执行 | CI 40142045777 failure；License & Advisory Gate 40142045790 failure；Publish canvas-game (4 crates → GHCR) 40142045772 failure；advisory Coverage 40142045770 success，均创建于 2026-10-24T23:16:21Z | 三项失败；advisory success 不抵消失败 |
+| 本地 dev 基线 SHA | /actions/runs?head_sha=3726c977984c69792dc21f0be97228e7a33e7659&per_page=10 返回 total_count=0 | 该提交无本轮 API 可见 hosted run |
+| v1.0.6 tag/release | git/ref/tags/v1.0.6 与 releases/tags/v1.0.6 均返回 HTTP 404 | 本轮 API 查询未找到 tag/ref 或对应 release |
+| Release 状态 | 无本地候选 hosted run、tag、artifact、digest 或 consumer 证据 | W0–W9 OPEN；v1.0.6 NO-GO |
+
+详见 [W4 远端 CI 复核报告](../reports/PHASE-STAR-STABLE-REMOTE-CI-RECHECK-20261101.md)。本次仅记录 GitHub API 观察；没有 fetch、push、tag、build、publish 或 deploy。
+
+
 ## 修订历史
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -196,3 +213,5 @@ deploy/k3s-local 属 development-only，且不在获批的三份 Star Canvas ima
 | v1.31 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W5 五条前端修复 lane 已集成到本地 dev@7c3ee0998027653ee5719ccfdeb23594085088be；完整前端测试 111 files/950 tests 通过，typecheck 与 diff check 通过。W5 Desktop 的 Node 24 hosted、Rust/Tauri 发布包、BOM/attestation、签名/公证、安装升级/回滚与 CSP 验收仍 OPEN，稳定版仍 NO-GO。W6 四份审阅文件已在 dev ancestry，本轮不重复合并；W5 五个功能分支与 integration branch 在工作树清理后确认已并入 dev 并删除。未修改 main、未 push、未创建 tag/release。 | dev@7c3ee099 前端套件与 typecheck/diff-check 结果、W6 ancestry 及 Orca/Git 清理复核 |
 | v1.32 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 以固定 dev@4ee0a767 为审查基线，记录 W1 BLOCKED、W4 候选 HOLD 与 W6 文件 ancestry；补充 W0 focused test 的有限证据、Star-only Docker context 未验收边界和更新后的依赖顺序。稳定发行仍 NO-GO，未更改源码或发布状态。 | W1/W4 固定提交审阅与 WBS sync lane |
 | v1.33 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 GitHub API 可见的远端 dev@40a84c1、created_at、空 combined-status/workflow-run 响应的查询边界，以及本地 dev@348f756 未被 API 找到；空列表不等于 CI 通过。更新稳定版远端基线报告与审查，W0–W9/稳定发行继续 NO-GO；未 fetch、未 push、未改 main、未创建 tag/release。 | 对当前本地 dev 与 GitHub 远端 dev ref 的只读复核 |
+| v1.34 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新 GitHub 远端 dev 分支保护与 Actions push-run 快照：远端仍为 40a84c1，branch protection 与 required checks 未启用；最新远端 SHA 上 CI、License & Advisory Gate、旧 canvas-game workflow 均失败，advisory Coverage 成功。远端与本地 dev@3726c977 不同；W4/W0–W9 与稳定版维持 OPEN/NO-GO；未修改 main、未 fetch/push、未创建 tag/release。 | 2026-11-01 GitHub branch API 与 Actions runs API 只读复核 |
+| v1.35 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 追加 exact SHA workflow 查询与 v1.0.6 Git ref/release 查询：本地 dev 基线的 Actions runs 返回 total_count=0，tag/ref 与按 tag 查询 release 返回 404。保持这些 endpoint 的证据边界；W4 与整体发布继续 NO-GO。 | GitHub API exact head_sha 与 tag/release 只读复核 |
