@@ -126,7 +126,7 @@ jobs:
 
       - name: Build desktop bundles
         working-directory: crates/star-desktop
-        run: frontend/node_modules/.bin/tauri build --bundles deb,appimage
+        run: frontend/node_modules/.bin/tauri build --bundles deb,appimage -- --locked
 
       - name: Require non-empty Linux bundles
         shell: bash
@@ -208,7 +208,7 @@ jobs:
 
       - name: Build Windows MSI
         working-directory: crates/star-desktop
-        run: frontend/node_modules/.bin/tauri.cmd build --bundles msi
+        run: frontend/node_modules/.bin/tauri.cmd build --bundles msi -- --locked
 
       - name: Require non-empty MSI
         shell: pwsh
@@ -289,7 +289,7 @@ jobs:
 
       - name: Build universal macOS DMG
         working-directory: crates/star-desktop
-        run: frontend/node_modules/.bin/tauri build --target universal-apple-darwin --bundles dmg
+        run: frontend/node_modules/.bin/tauri build --target universal-apple-darwin --bundles dmg -- --locked
 
       - name: Require non-empty macOS DMG
         shell: bash
