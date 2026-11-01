@@ -56,17 +56,19 @@
 
 | 角色 | 状态 |
 |---|---|
-| 架构 | Mavis/协调者独立复核待完成 |
-| SRE Lead | Mavis/协调者独立复核待完成 |
-| 平台 | Mavis/协调者独立复核待完成 |
-| 评审主持 | Mavis/协调者独立复核待完成 |
-| PM | Mavis/协调者独立复核待完成 |
+| 架构 | 架构师 (Mavis 接手 agent per DEC-008) — 本阶段 WBS 文档范围终审通过；不代表稳定版 release 批准。 |
+| SRE Lead | 本阶段不适用：未执行运行、服务容量或恢复验收；对应稳定版门保持 OPEN/BLOCKED。 |
+| 平台 | 本阶段不适用：未执行构建、hosted CI、签名、部署或消费侧验证；对应稳定版门保持 OPEN/BLOCKED。 |
+| 评审主持 | Mavis 接手已复核本阶段 WBS、报告和证据边界；此审核仅限文档范围，不构成 release 批准。 |
+| PM | 本阶段不适用：未修改发行范围或 release 授权；没有稳定版发布批准。 |
 
+**阶段文档终审：** 架构师 (Mavis 接手 agent per DEC-008) 通过。
 **修订人：** Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-**发布审批：** 未申请；WBS 不可发布。
+**发布审批：** 未申请；本次文档终审不等于稳定版 release 批准，WBS 仍不可发布。
 
 ## §7 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 按已接受的 W1/W2 证据更新 stable-release WBS、W1/W2/W7 当前状态、Docker context 边界与后续依赖顺序；保持 W0–W9 未关闭。 | W1 metadata 与 W2 fixture lanes 已被接受，需要同步发布计划 |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 架构师 Mavis 完成本阶段文档范围终审并通过；明确该文档签核不代表稳定版 release 批准。原有未运行测试、MSRV/PG、平台/制品及 W0–W9 发布门状态全部保持未验证/未关闭。 | 本次 Mavis 独立终审 |
