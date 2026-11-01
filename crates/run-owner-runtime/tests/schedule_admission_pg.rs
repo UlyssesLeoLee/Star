@@ -1386,7 +1386,9 @@ async fn seed_directory(
     let tenant = command.tenant_id;
     let actor = command.occurrence.run_as_actor_id;
     let project = t.project_id;
-    let branch = t.branch_id;
+    let branch = t
+        .branch_id
+        .expect("admission fixtures require a remote Branch");
     let run = t.engineering_run_id;
     let repo = t.repository_id;
     // Generated UUIDs and allowlisted state only; no external/user strings enter SQL.
@@ -1417,7 +1419,9 @@ async fn seed_task_binding(
     let tenant = command.tenant_id;
     let actor = command.occurrence.run_as_actor_id;
     let project = t.project_id;
-    let branch = t.branch_id;
+    let branch = t
+        .branch_id
+        .expect("admission fixtures require a remote Branch");
     let run = t.engineering_run_id;
     let repo = t.repository_id;
     let worktree = t.worktree_id;
