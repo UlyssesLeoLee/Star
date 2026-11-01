@@ -75,6 +75,10 @@ jobs:
   linux:
     name: Linux .deb and AppImage
     runs-on: ubuntu-24.04
+    outputs:
+      release_tag: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+      release_version: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+      release_source_sha: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/crates/star-desktop/src-tauri/target
     steps:
@@ -82,6 +86,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Resolve exact stable tag before build mutations
+        id: resolve_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: python scripts/release/resolve_star_version.py --tag "$GITHUB_REF_NAME" --output "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -124,9 +134,39 @@ jobs:
         working-directory: crates/star-desktop/frontend
         run: npm run build
 
-      - name: Build desktop bundles
+      - name: Build desktop bundles with canonical release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: crates/star-desktop
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${STAR_RELEASE_TAG:?missing resolver tag}"
+          : "${STAR_RELEASE_VERSION:?missing resolver version}"
+          : "${STAR_RELEASE_SOURCE_SHA:?missing resolver source SHA}"
+          frontend/node_modules/.bin/tauri build --config "{\"version\":\"${STAR_RELEASE_VERSION}\"}" --bundles deb,appimage -- --locked
+
+      - name: Build desktop bundles with the development crate version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         working-directory: crates/star-desktop
         run: frontend/node_modules/.bin/tauri build --bundles deb,appimage -- --locked
+
+      - name: Write Linux build identity
+        shell: bash
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$STAR_RELEASE_TAG" ]]; then
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"stable","tag":os.environ["STAR_RELEASE_TAG"],"version":os.environ["STAR_RELEASE_VERSION"],"source_sha":os.environ["STAR_RELEASE_SOURCE_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          else
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"development","source_sha":os.environ["GITHUB_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          fi
 
       - name: Require non-empty Linux bundles
         shell: bash
@@ -161,8 +201,9 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: star-desktop-linux-unsigned
+          name: star-desktop-linux-${{ steps.resolve_release.outputs.STAR_RELEASE_TAG || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA || github.sha }}-unsigned
           path: |
+            crates/star-desktop/star-desktop-release-identity.json
             crates/star-desktop/src-tauri/target/release/bundle/deb/*.deb
             crates/star-desktop/src-tauri/target/release/bundle/appimage/*.AppImage
             crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
@@ -173,6 +214,10 @@ jobs:
   windows:
     name: Windows MSI
     runs-on: windows-2025
+    outputs:
+      release_tag: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+      release_version: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+      release_source_sha: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}\crates\star-desktop\src-tauri\target
     steps:
@@ -180,6 +225,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Resolve exact stable tag before build mutations
+        id: resolve_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: py -3 scripts/release/resolve_star_version.py --tag "$env:GITHUB_REF_NAME" --output "$env:GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -206,9 +257,46 @@ jobs:
         working-directory: crates/star-desktop/frontend
         run: npm run build
 
-      - name: Build Windows MSI
+      - name: Build Windows MSI with canonical release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: crates/star-desktop
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:STAR_RELEASE_TAG)) { throw "Missing resolver tag" }
+          if ([string]::IsNullOrWhiteSpace($env:STAR_RELEASE_VERSION)) { throw "Missing resolver version" }
+          if ([string]::IsNullOrWhiteSpace($env:STAR_RELEASE_SOURCE_SHA)) { throw "Missing resolver source SHA" }
+          frontend/node_modules/.bin/tauri.cmd build --config ('{"version":"' + $env:STAR_RELEASE_VERSION + '"}') --bundles msi -- --locked
+
+      - name: Build Windows MSI with the development crate version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         working-directory: crates/star-desktop
         run: frontend/node_modules/.bin/tauri.cmd build --bundles msi -- --locked
+
+      - name: Write Windows build identity
+        shell: pwsh
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          if ($env:STAR_RELEASE_TAG) {
+            $identity = [ordered]@{
+              channel = 'stable'
+              tag = $env:STAR_RELEASE_TAG
+              version = $env:STAR_RELEASE_VERSION
+              source_sha = $env:STAR_RELEASE_SOURCE_SHA
+            }
+          } else {
+            $identity = [ordered]@{
+              channel = 'development'
+              source_sha = $env:GITHUB_SHA
+            }
+          }
+          $identity | ConvertTo-Json -Compress | Set-Content -LiteralPath 'crates/star-desktop/star-desktop-release-identity.json' -Encoding utf8NoBOM
 
       - name: Require non-empty MSI
         shell: pwsh
@@ -241,8 +329,9 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: star-desktop-windows-unsigned
+          name: star-desktop-windows-${{ steps.resolve_release.outputs.STAR_RELEASE_TAG || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA || github.sha }}-unsigned
           path: |
+            crates/star-desktop/star-desktop-release-identity.json
             crates/star-desktop/src-tauri/target/release/bundle/msi/*.msi
             crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
             crates/star-desktop/frontend/star-desktop-frontend.spdx.json
@@ -252,6 +341,10 @@ jobs:
   macos:
     name: macOS universal DMG
     runs-on: macos-15
+    outputs:
+      release_tag: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+      release_version: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+      release_source_sha: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/crates/star-desktop/src-tauri/target
     steps:
@@ -259,6 +352,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Resolve exact stable tag before build mutations
+        id: resolve_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: python scripts/release/resolve_star_version.py --tag "$GITHUB_REF_NAME" --output "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -287,9 +386,39 @@ jobs:
         working-directory: crates/star-desktop/frontend
         run: npm run build
 
-      - name: Build universal macOS DMG
+      - name: Build universal macOS DMG with canonical release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: crates/star-desktop
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${STAR_RELEASE_TAG:?missing resolver tag}"
+          : "${STAR_RELEASE_VERSION:?missing resolver version}"
+          : "${STAR_RELEASE_SOURCE_SHA:?missing resolver source SHA}"
+          frontend/node_modules/.bin/tauri build --config "{\"version\":\"${STAR_RELEASE_VERSION}\"}" --target universal-apple-darwin --bundles dmg -- --locked
+
+      - name: Build universal macOS DMG with the development crate version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         working-directory: crates/star-desktop
         run: frontend/node_modules/.bin/tauri build --target universal-apple-darwin --bundles dmg -- --locked
+
+      - name: Write macOS build identity
+        shell: bash
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$STAR_RELEASE_TAG" ]]; then
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"stable","tag":os.environ["STAR_RELEASE_TAG"],"version":os.environ["STAR_RELEASE_VERSION"],"source_sha":os.environ["STAR_RELEASE_SOURCE_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          else
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"development","source_sha":os.environ["GITHUB_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          fi
 
       - name: Require non-empty macOS DMG
         shell: bash
@@ -322,8 +451,9 @@ jobs:
       - name: Upload macOS artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: star-desktop-macos-universal-unsigned
+          name: star-desktop-macos-${{ steps.resolve_release.outputs.STAR_RELEASE_TAG || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA || github.sha }}-unsigned
           path: |
+            crates/star-desktop/star-desktop-release-identity.json
             crates/star-desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
             crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
             crates/star-desktop/frontend/star-desktop-frontend.spdx.json
@@ -381,11 +511,15 @@ jobs:
       - name: Download Linux build artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: star-desktop-linux-unsigned
+          name: star-desktop-linux-${{ needs.linux.outputs.release_tag }}-${{ needs.linux.outputs.release_version }}-${{ needs.linux.outputs.release_source_sha }}-unsigned
           path: artifacts/linux
 
       - name: Require Linux attestation subjects and SBOMs
         shell: bash
+        env:
+          EXPECTED_RELEASE_TAG: ${{ needs.linux.outputs.release_tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.linux.outputs.release_version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.linux.outputs.release_source_sha }}
         run: |
           set -euo pipefail
           deb="artifacts/linux/src-tauri/target/release/bundle/deb"
@@ -394,6 +528,21 @@ jobs:
           test -n "$(find "$appimage" -maxdepth 1 -type f -name '*.AppImage' -size +0c -print -quit)"
           test -s artifacts/linux/src-tauri/star-desktop-rust.spdx.json
           test -s artifacts/linux/frontend/star-desktop-frontend.spdx.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "channel": "stable",
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          actual = json.loads(Path("artifacts/linux/star-desktop-release-identity.json").read_text(encoding="utf-8"))
+          if actual != expected:
+              raise SystemExit(f"Linux release identity mismatch: {actual!r} != {expected!r}")
+          PY
           node -e 'const fs=require("node:fs"),check=(s,n,m)=>{if(!s||s.spdxVersion!=="SPDX-2.3")throw Error("SPDX-2.3");if(!Array.isArray(s.packages)||!s.packages.length)throw Error("packages");if(!Array.isArray(s.relationships)||!s.relationships.length)throw Error("relationships");if(s.packages.length<m)throw Error("minimum");const r=s.packages.find(p=>p&&p.name===n&&p.SPDXID);if(!r)throw Error("root");if(!s.relationships.some(x=>x&&x.spdxElementId==="SPDXRef-DOCUMENT"&&x.relationshipType==="DESCRIBES"&&x.relatedSpdxElement===r.SPDXID))throw Error("DESCRIBES")},reject=(s,n,m,k)=>{try{check(s,n,m)}catch(e){if(e.message===k)return;throw e}throw Error("self-test "+k)},r={spdxVersion:"SPDX-2.3",packages:[{name:"star-desktop",SPDXID:"SPDXRef-Package-star-desktop"}],relationships:[{spdxElementId:"SPDXRef-DOCUMENT",relationshipType:"DESCRIBES",relatedSpdxElement:"SPDXRef-Package-star-desktop"}]};reject({...r,packages:[]},"star-desktop",1,"packages");reject({...r,relationships:[]},"star-desktop",1,"relationships");check(r,"star-desktop",1);const ps=Array.from({length:225},(_,i)=>({name:i===0?"star-desktop-frontend":"p"+i,SPDXID:"SPDXRef-Package-"+i})),f={spdxVersion:"SPDX-2.3",packages:ps,relationships:[{spdxElementId:"SPDXRef-DOCUMENT",relationshipType:"DESCRIBES",relatedSpdxElement:ps[0].SPDXID}]};check(f,"star-desktop-frontend",225);reject({...f,packages:ps.slice(0,224)},"star-desktop-frontend",225,"minimum");const a=process.argv.slice(1);if(a.length!==2)throw Error("expected Rust and frontend SBOM paths");check(JSON.parse(fs.readFileSync(a[0],"utf8")),"star-desktop",1);check(JSON.parse(fs.readFileSync(a[1],"utf8")),"star-desktop-frontend",225);console.log("PASS: empty-array mutations rejected; valid SPDX 2.3 controls passed; 224 npm packages rejected; 225-package control and actual SBOMs passed.")' artifacts/linux/src-tauri/star-desktop-rust.spdx.json artifacts/linux/frontend/star-desktop-frontend.spdx.json
 
       - name: Attest Linux build provenance
@@ -434,17 +583,36 @@ jobs:
       - name: Download Windows build artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: star-desktop-windows-unsigned
+          name: star-desktop-windows-${{ needs.windows.outputs.release_tag }}-${{ needs.windows.outputs.release_version }}-${{ needs.windows.outputs.release_source_sha }}-unsigned
           path: artifacts/windows
 
       - name: Require Windows attestation subjects and SBOMs
         shell: bash
+        env:
+          EXPECTED_RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.windows.outputs.release_version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.windows.outputs.release_source_sha }}
         run: |
           set -euo pipefail
           msi="artifacts/windows/src-tauri/target/release/bundle/msi"
           test -n "$(find "$msi" -maxdepth 1 -type f -name '*.msi' -size +0c -print -quit)"
           test -s artifacts/windows/src-tauri/star-desktop-rust.spdx.json
           test -s artifacts/windows/frontend/star-desktop-frontend.spdx.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "channel": "stable",
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          actual = json.loads(Path("artifacts/windows/star-desktop-release-identity.json").read_text(encoding="utf-8"))
+          if actual != expected:
+              raise SystemExit(f"Windows release identity mismatch: {actual!r} != {expected!r}")
+          PY
           node -e 'const fs=require("node:fs"),check=(s,n,m)=>{if(!s||s.spdxVersion!=="SPDX-2.3")throw Error("SPDX-2.3");if(!Array.isArray(s.packages)||!s.packages.length)throw Error("packages");if(!Array.isArray(s.relationships)||!s.relationships.length)throw Error("relationships");if(s.packages.length<m)throw Error("minimum");const r=s.packages.find(p=>p&&p.name===n&&p.SPDXID);if(!r)throw Error("root");if(!s.relationships.some(x=>x&&x.spdxElementId==="SPDXRef-DOCUMENT"&&x.relationshipType==="DESCRIBES"&&x.relatedSpdxElement===r.SPDXID))throw Error("DESCRIBES")},reject=(s,n,m,k)=>{try{check(s,n,m)}catch(e){if(e.message===k)return;throw e}throw Error("self-test "+k)},r={spdxVersion:"SPDX-2.3",packages:[{name:"star-desktop",SPDXID:"SPDXRef-Package-star-desktop"}],relationships:[{spdxElementId:"SPDXRef-DOCUMENT",relationshipType:"DESCRIBES",relatedSpdxElement:"SPDXRef-Package-star-desktop"}]};reject({...r,packages:[]},"star-desktop",1,"packages");reject({...r,relationships:[]},"star-desktop",1,"relationships");check(r,"star-desktop",1);const ps=Array.from({length:225},(_,i)=>({name:i===0?"star-desktop-frontend":"p"+i,SPDXID:"SPDXRef-Package-"+i})),f={spdxVersion:"SPDX-2.3",packages:ps,relationships:[{spdxElementId:"SPDXRef-DOCUMENT",relationshipType:"DESCRIBES",relatedSpdxElement:ps[0].SPDXID}]};check(f,"star-desktop-frontend",225);reject({...f,packages:ps.slice(0,224)},"star-desktop-frontend",225,"minimum");const a=process.argv.slice(1);if(a.length!==2)throw Error("expected Rust and frontend SBOM paths");check(JSON.parse(fs.readFileSync(a[0],"utf8")),"star-desktop",1);check(JSON.parse(fs.readFileSync(a[1],"utf8")),"star-desktop-frontend",225);console.log("PASS: empty-array mutations rejected; valid SPDX 2.3 controls passed; 224 npm packages rejected; 225-package control and actual SBOMs passed.")' artifacts/windows/src-tauri/star-desktop-rust.spdx.json artifacts/windows/frontend/star-desktop-frontend.spdx.json
 
       - name: Attest Windows build provenance
@@ -479,17 +647,36 @@ jobs:
       - name: Download macOS build artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: star-desktop-macos-universal-unsigned
+          name: star-desktop-macos-${{ needs.macos.outputs.release_tag }}-${{ needs.macos.outputs.release_version }}-${{ needs.macos.outputs.release_source_sha }}-unsigned
           path: artifacts/macos
 
       - name: Require macOS attestation subjects and SBOMs
         shell: bash
+        env:
+          EXPECTED_RELEASE_TAG: ${{ needs.macos.outputs.release_tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.macos.outputs.release_version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.macos.outputs.release_source_sha }}
         run: |
           set -euo pipefail
           dmg="artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg"
           test -n "$(find "$dmg" -maxdepth 1 -type f -name '*.dmg' -size +0c -print -quit)"
           test -s artifacts/macos/src-tauri/star-desktop-rust.spdx.json
           test -s artifacts/macos/frontend/star-desktop-frontend.spdx.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "channel": "stable",
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          actual = json.loads(Path("artifacts/macos/star-desktop-release-identity.json").read_text(encoding="utf-8"))
+          if actual != expected:
+              raise SystemExit(f"macOS release identity mismatch: {actual!r} != {expected!r}")
+          PY
           node -e 'const fs=require("node:fs"),check=(s,n,m)=>{if(!s||s.spdxVersion!=="SPDX-2.3")throw Error("SPDX-2.3");if(!Array.isArray(s.packages)||!s.packages.length)throw Error("packages");if(!Array.isArray(s.relationships)||!s.relationships.length)throw Error("relationships");if(s.packages.length<m)throw Error("minimum");const r=s.packages.find(p=>p&&p.name===n&&p.SPDXID);if(!r)throw Error("root");if(!s.relationships.some(x=>x&&x.spdxElementId==="SPDXRef-DOCUMENT"&&x.relationshipType==="DESCRIBES"&&x.relatedSpdxElement===r.SPDXID))throw Error("DESCRIBES")},reject=(s,n,m,k)=>{try{check(s,n,m)}catch(e){if(e.message===k)return;throw e}throw Error("self-test "+k)},r={spdxVersion:"SPDX-2.3",packages:[{name:"star-desktop",SPDXID:"SPDXRef-Package-star-desktop"}],relationships:[{spdxElementId:"SPDXRef-DOCUMENT",relationshipType:"DESCRIBES",relatedSpdxElement:"SPDXRef-Package-star-desktop"}]};reject({...r,packages:[]},"star-desktop",1,"packages");reject({...r,relationships:[]},"star-desktop",1,"relationships");check(r,"star-desktop",1);const ps=Array.from({length:225},(_,i)=>({name:i===0?"star-desktop-frontend":"p"+i,SPDXID:"SPDXRef-Package-"+i})),f={spdxVersion:"SPDX-2.3",packages:ps,relationships:[{spdxElementId:"SPDXRef-DOCUMENT",relationshipType:"DESCRIBES",relatedSpdxElement:ps[0].SPDXID}]};check(f,"star-desktop-frontend",225);reject({...f,packages:ps.slice(0,224)},"star-desktop-frontend",225,"minimum");const a=process.argv.slice(1);if(a.length!==2)throw Error("expected Rust and frontend SBOM paths");check(JSON.parse(fs.readFileSync(a[0],"utf8")),"star-desktop",1);check(JSON.parse(fs.readFileSync(a[1],"utf8")),"star-desktop-frontend",225);console.log("PASS: empty-array mutations rejected; valid SPDX 2.3 controls passed; 224 npm packages rejected; 225-package control and actual SBOMs passed.")' artifacts/macos/src-tauri/star-desktop-rust.spdx.json artifacts/macos/frontend/star-desktop-frontend.spdx.json
 
       - name: Attest macOS build provenance

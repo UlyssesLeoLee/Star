@@ -35,6 +35,13 @@ Do not edit root Cargo.toml, Cargo.lock, tauri.conf.json, package manifests, oth
 ## Integration boundary
 Work only on this lane from dev@6c394465635d86894312700ed79eb583c79bd804. Commit the lane result and report. Do not rebase, merge, push, create release tags, or alter any other branch/worktree; the coordinator will review and integrate accepted commits.
 
+## Implementation status
+- The three platform workflows resolve the exact stable tag immediately after checkout, then use that resolver version for both Tauri bundle configuration and the Rust STAR_RELEASE_VERSION compile-time value.
+- Stable artifact names and an included release identity JSON carry the resolver tag, version, and source SHA; attestation jobs compare the identity JSON with the originating build job outputs.
+- Development builds retain the Cargo package version.
+- Focused format, YAML structure, diff, and Cypher header checks passed. Rust tests could not start because the installed Rust 1.99.0 Windows toolchain has no usable rustc.exe; actionlint is unavailable. See docs/reports/PHASE-STAR-STABLE-W0-DESKTOP-VERSION-20261101.md.
+- W0 implementation is ready for coordinator review, but Rust/CI build verification remains open. No release, signing, notarization, rebase, merge, or push was performed.
+
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
