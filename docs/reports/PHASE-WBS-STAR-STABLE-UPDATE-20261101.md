@@ -1,8 +1,8 @@
 # PHASE-WBS-STAR-STABLE-UPDATE-20261101
 
 **阶段状态：** WBS 快照与依赖证据已同步；稳定发行仍为 OPEN / 不可发布。
-**工作基线：** dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e。
-**采用证据快照：** agent/star-stable-followup/integration@cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe2。目标 dev 尚未包含该集成候选或本 WBS lane。
+**工作基线：** dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e（记录 W1/W2 证据快照时的目标基线，不表示后续 dev HEAD）。
+**采用证据快照：** agent/star-stable-followup/integration@cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe2。记录该快照时，目标 dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e 尚未包含此集成候选或本 WBS lane。
 
 ## §0 目的
 
@@ -46,7 +46,7 @@
 ## §5 守门规则
 
 - 只改登记的 WBS、brief、phase report 与 dispatcher audit 四个文件。
-- WBS 采用 dev@bde4e9d8 和 coordinator accepted integration@cdb66b5b 的提交/报告证据；不将候选 integration 描述为已进入 dev。
+- WBS 采用记录 W1/W2 证据快照时的 dev@bde4e9d8 基线和 coordinator accepted integration@cdb66b5b 的提交/报告证据；该历史快照不表示当前 dev HEAD，也不将候选 integration 描述为已进入 dev。
 - W0–W9 均未关闭，所有静态或局部证据不替代发布构建、目标平台、许可证、签名、部署和 PostgreSQL 验收。
 - 发行面仍是 Desktop、Web/Vercel、三份 Star Canvas 镜像；Multipass guest image 与开发工具不作为公开制品。
 - Canvas 工作流的过滤上下文不外推到其他 Dockerfile；local K3s context 未验证前不宣称全仓 Docker payload 已排除 game/legacy 内容。
