@@ -8,7 +8,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true
 authors = ["Star Team"]
-license = "Apache-2.0"
+license = "MIT"
 description = "Star dashboard: 12-grid layout, 10 gadget types, Wallboard mode, share/subscribe"
 repository = "https://github.com/UlyssesLeoLee/Star"
 
