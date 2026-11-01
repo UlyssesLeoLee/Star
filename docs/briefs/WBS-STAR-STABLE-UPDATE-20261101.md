@@ -7,7 +7,7 @@
 ---
 
 ## Assignment
-Synchronize the stable-release WBS on branch agent/star-stable-followup/wbs-sync, based on dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313c.
+Synchronize the stable-release WBS on branch agent/star-stable-followup/wbs-sync, based on dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e.
 
 ## Owned scope
 Only these registered paths may be edited:
