@@ -2,6 +2,8 @@
 
 **结论：ADAPT。** 此阶段仅完成固定提交的只读文档验收审阅；没有修改或集成候选，不构成 hosted release acceptance。
 
+> **基线更新（2026-11-01）：** 本报告的候选差异审查快照是 `dev@a272e9794e1a1975781720c9b3775c914f47f546`。当前本地 dev 已推进至 `85ef753d6d20d2d156569597f114bb3974be3864`，并集成 W0 Web、Desktop 与 Canvas 的 Git-tag 版本绑定实现。该集成没有提供 Neon/Owner 运行证据、Vercel hosted deployment、consumer/rollback 或当前 canonical DD/TD 的新一轮逐项审查；本报告的 ADAPT 决策维持。
+
 ## §0 目的
 
 按 brief docs/briefs/W6-VCD0-CANDIDATE-REVIEW-20261101.md，对 Vercel canonical detail/test candidate 进行独立只读审阅，并形成可追溯的 WBS 决策。评审目标为分支 codex/vcd0-canonical-detail-test-20261024 的精确 HEAD 4f0ceae9818b7bd2b3b25d9164d6e43303121689，与当前 dev 基线 a272e9794e1a1975781720c9b3775c914f47f546 比较。
@@ -100,3 +102,4 @@ CodeRabbit 命令尝试未能启动，错误为 /root/.local/bin/coderabbit: Per
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对 pinned Vercel candidate 与 current dev/Stable Release 基线做只读验收；建议 ADAPT，记录 WLD1、Neon profile、W16 push collaboration、版本/MIT 与 hosted evidence 缺口。未运行测试或 hosted validation；未集成候选。 | brief docs/briefs/W6-VCD0-CANDIDATE-REVIEW-20261101.md |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补记 W0 Web/Desktop/Canvas 版本绑定已合入当前 dev 的基线更新，并明确 ADAPT 仅对应原候选审查快照 | rebase 前的当前 dev 基线复核 |

@@ -2,6 +2,8 @@
 
 **状态：ADAPT — 不接受 pinned candidate 作为当前 canonical VCD-0 文档包。** 本结论只评审设计与测试文档，不是合并授权；当前 dev 已有更新版本和新的依赖文档，后续若继续 VCD-0，应以当前 dev 为基线修订并重新审阅。
 
+> **审查快照：** 下文固定比较的是候选 `4f0ceae9818b7bd2b3b25d9164d6e43303121689` 与当时的 dev `a272e9794e1a1975781720c9b3775c914f47f546`。本次集成前，dev 已推进至 `85ef753d6d20d2d156569597f114bb3974be3864`，其中含 W0 Web、Desktop 与 Canvas 的 Git-tag 版本绑定实现。ADAPT 结论只保留为已记录的候选审查决策；当前 canonical Vercel DD/TD 如需继续实施仍须以最新 dev 重新核对并更新。
+
 ## §0 目的
 
 独立评估分支 codex/vcd0-canonical-detail-test-20261024 的精确候选提交 4f0ceae9818b7bd2b3b25d9164d6e43303121689，是否可纳入当前 dev 基线 a272e9794e1a1975781720c9b3775c914f47f546 的 Vercel 设计/测试与 Star Stable Release 文档集。评审只读；未修改候选、要求/设计/WBS，也未执行 cherry-pick、merge 或 hosted validation。
@@ -49,3 +51,10 @@
 ## §6 证据与限制
 
 本评审只对固定 Git 对象中的文档做定向读取与差异检查。未运行 Rust/Node tests、build、数据库测试、Vercel/Neon/K3s/Multipass 操作、GitHub hosted workflow、部署或发布。候选文件的关键词搜索仅能说明限定两份文档未明确写出对应协作验收，不代表全仓负面证明。CodeGraph 本轮未提供 generation 与 coverage API；没有声称图索引完整。CodeRabbit CLI shim 返回 Permission denied，未产生独立审阅结果。
+
+## §7 修订历史
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Vercel candidate `4f0ceae` 与当时 dev `a272e979` 的只读差异审查，决定 ADAPT | WBS VCD0 integration review |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 标明当前 dev 已前进到 `85ef753d`，此报告的候选比较仍是历史快照，后续实施以最新 canonical 文档重新审查 | W0 版本绑定 lanes 已集成 |
