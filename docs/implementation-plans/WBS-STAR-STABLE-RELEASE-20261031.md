@@ -124,6 +124,10 @@ deploy/k3s-local 属 development-only，且不在获批的三份 Star Canvas ima
 
 整体发行结论为 NO-GO；W0 PARTIAL、W1 BLOCKED、W3 OPEN/BLOCKED、W6 ADAPT。W0–W9 没有因本次文档同步而关闭。本 lane 不创建 tag/release，不构建、发布或部署 artifact，也不 push。
 
+## W2 Schedule 编译复核（2026-11-01；基线 dev@6e7d51a7）
+
+提交 `eb1e91f4` 修复了 Schedule PG fixture 中 `Option<Uuid>` 的 SQL 插值问题。协调者在当前 dev 上运行 `rtk proxy cargo +1.99.1 check -p run-owner-runtime --all-targets --locked -j 4`：exit 0，52.76 秒；观察到 `domain-kms` 的 unused/deprecation warnings。该结果只作 1.99.1 诊断证据，不关闭最低支持版本门。正式 Rust 1.99.0 的 rustc 组件最初缺少可用 rustc.exe；移除损坏登记后，rustup 重装下载停滞并停止，compiler 未恢复，原有两个 .broken 备份目录保留。未运行 PostgreSQL 集成测试。W2 仍 OPEN/BLOCKED，BFF 锁文件与发行依赖闭包仍待复核；稳定发行仍 NO-GO。
+
 ## 外部约束依据（截至 2026-10-31）
 
 - Rust 官方 notes 显示 1.99.1 于 2026-10-15 发布；Star baseline 1.99.0仍是用户声明的最低版本，但是否升 patch 需在 W2 决策。[Rust Release Notes](https://doc.rust-lang.org/releases.html)
@@ -169,3 +173,4 @@ deploy/k3s-local 属 development-only，且不在获批的三份 Star Canvas ima
 | v1.21 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 纠正 W6 文档集成状态（四份文件已在 dev 历史中，不重复摘取），并同步 W7 local K3s API context 的当前候选证据：按 Star API 的 Cargo 闭包生成逐 crate context，解决静态 broad COPY 风险；D2 dirty draft 原样保留。Rust 1.99.0、真实 Multipass build、image digest/provenance、K3s rollout/rollback 未验证，W7 与稳定版仍 OPEN/NO-GO。 | W6 文件 ancestry 与 W7 rebased candidate 逐项复核 |
 | v1.22 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W7 的 8 个已登记文件以 fast-forward 提交 42082bccd9ae6fd24cf609f5697b2b964a568002 集成到本地 dev，并同步阶段报告与 dispatch 审计；确认本次只关闭静态 broad-COPY 输入过滤问题，不关闭 W7 真实发行门。W6 四份审阅文件已在 dev ancestry，未重复 cherry-pick。Rust 1.99.0、Multipass 构建、image digest/SBOM/provenance、K3s rollout/rollback 和稳定版仍 OPEN/NO-GO。 | W7 目标 checkout 最终状态复核通过并完成 fast-forward |
 | v1.23 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 WBS 快照更新到已核验的 post-integration receipt dev@6115b483，并同步 W7 报告 v0.8 与 dispatch 回执。W7 代码于 42082bcc 集成，文档回执于 6115b483 集成；工作树仍干净，准备按 MAGOS/Orca 流程释放 claim 并清理已完成 lane。W7 生产门与稳定发行门仍 OPEN/NO-GO。 | 第二次 fast-forward 后复核 WBS 当前 HEAD 与报告所述提交关系 |
+| v1.24 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W2 Schedule 在当前 dev 上通过 Rust 1.99.1 all-targets 诊断编译，并纠正已修复的 PG fixture 阻塞表述；Rust 1.99.0、BFF lock 审查、PostgreSQL 和其他发行依赖仍未闭合，稳定版保持 NO-GO。 | 当前 dev 对 W2 Schedule 编译门重新验证 |

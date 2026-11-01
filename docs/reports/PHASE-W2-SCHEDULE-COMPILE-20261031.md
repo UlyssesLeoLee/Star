@@ -26,12 +26,26 @@
 | `git diff --check` | 0 | 通过；Git 提示该源码工作副本的 CRLF 将在后续 Git 操作时转换为 LF。 |
 | `python C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py --changed --stamp` | 0 | `PASS (1 source file checked)`。仓库内未提供 `.agents/skills/cypher-graph-guardian` 副本，因此按该 Skill 指示从安装目录运行。 |
 
-**结论边界：**生产 library 与定向单元测试通过（诊断工具链 1.99.1）；Rust 1.99.0 all-targets 验收未通过，且 1.99.1 all-targets 仍被独立 PG test fixture 类型错误阻断。因此不能把此 lane 标记为稳定版 Rust gate 已通过。PG 集成测试没有运行；它的测试目标在编译期即失败。
+**当时结论边界（历史快照）：**生产 library 与定向单元测试通过（诊断工具链 1.99.1）；Rust 1.99.0 all-targets 验收未通过，且 1.99.1 all-targets 当时被独立 PG test fixture 类型错误阻断。因此不能把此 lane 标记为稳定版 Rust gate 已通过。PG 集成测试没有运行；它的测试目标在编译期即失败。
+
+## §2.1 2026-11-01 current-dev revalidation
+
+本节补充当前 `dev@6e7d51a7088aa978d67f75197fadf0597db2925f` 的复核结果；§2 的原始输出保留为该 lane 当时的历史快照。
+
+| 检查 | 结果 |
+|---|---|
+| `rtk proxy cargo +1.99.1 check -p run-owner-runtime --all-targets --locked -j 4` | ✅ exit 0，52.76 秒。此前报告记录的 PG fixture `Option<Uuid>` 插值问题已由当前 dev 中的提交 `eb1e91f4` 修复；该诊断编译现在通过。 |
+| 编译 warning | ⚠️ `domain-kms` 输出 4 条 warning：1 条 unused import（`SecretDataKey`）和 3 条 `Nonce::from_slice` deprecation；它们未阻断本次检查，未在本 lane 修改。 |
+| Rust 1.99.0 最低版本门 | ⛔ 未通过/未验证。最初 exact check 因 rustc 组件不适用于该 toolchain 而未进入编译。移除已确认缺少可用 rustc.exe 的损坏登记项后尝试通过 rustup 重装；下载长时间无进度输出后主动停止。原有两个 .broken 备份目录保留；当前未恢复出可验证的 1.99.0 compiler，不能据此断定下载停滞的原因。 |
+| PostgreSQL 集成测试 | 未运行；本次只执行 `cargo check`，不得视为数据库验收。 |
+| 源码/manifest/lock | 未修改。本 lane 仅更新证据文档与审计记录。 |
+
+**状态更新：**此前 §3 “PG fixture 两处插值错误待修复”已被 `eb1e91f4` 消除；这只关闭该编译阻塞。W2 仍 OPEN/BLOCKED：Rust 1.99.0 精确版本门、BFF lockfile 的 locked metadata/review、其他发行目标依赖闭包与 PostgreSQL 集成验收均未完成。整体稳定版保持 NO-GO。
 
 ## §3 已知缺口
 
-1. Rust 1.99.0 当前安装的 rustc 组件无法启动，需修复 toolchain 后重跑最低版本验收。
-2. `schedule_admission_pg.rs` 的两处 `Option<Uuid>` 格式化问题位于 lane 外，需由其 owner 修复；修复后重跑 `--all-targets` 与 PostgreSQL 集成测试。
+1. Rust 1.99.0 最低版本验收仍未通过：初始登记项缺少可用 rustc.exe；移除该损坏登记后，rustup 重装下载未完成。之前的两个 .broken 备份目录保留。需取得可运行的 1.99.0 compiler 后重跑验收。
+2. 此前发现的 `schedule_admission_pg.rs` 两处 `Option<Uuid>` 格式化问题已由 dev 提交 `eb1e91f4` 修复；当前 dev 的 1.99.1 `--all-targets` 诊断编译通过。PostgreSQL 集成测试仍需执行。
 3. 真实 PostgreSQL 执行结果未知；本轮未声称数据库行为已验收。
 4. Schedule 的 branchless/hostless target 支持仍未实现。本 lane 按当前契约 fail closed；实现它需要独立的需求、授权、SQL 和测试设计。
 5. 根 Cargo metadata 与 MIT 权利闭包、cargo-audit workflow pin、桌面/Web/Canvas hosted build、制品证明与真实部署仍是稳定版 WBS 的独立门禁。
@@ -41,7 +55,7 @@
 本 lane 未再派生子代理。后续交接项：
 
 - Rust toolchain owner：恢复 Rust 1.99.0 编译器组件，并重跑本报告中的最低版本命令。
-- PG test owner：修正 `schedule_admission_pg.rs` 第 1405、1436 行的 `Option<Uuid>` 插值，再运行 all-targets 与相应 PG 集成测试。
+- PG test owner：fixture 编译错误已由 dev 提交 `eb1e91f4` 修复；仍需运行相应 PostgreSQL 集成测试并记录结果。
 - 根协调者：审查本 lane commit 和报告后，决定是否进入 MAGOS integration；不得将 1.99.1 诊断结果记作 1.99.0 release gate 通过。
 
 ## §5 守门规则
@@ -79,3 +93,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 agent | 记录 Schedule admission 单行 branch binding 修复、运行证据与尚未解除的工具链/PG fixture 门禁。 | W2 stable release follow-up lane |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 追加当前 dev 的 1.99.1 all-targets 诊断通过证据；说明旧 PG fixture 编译阻塞已由 eb1e91f4 修复，同时保留 Rust 1.99.0、PostgreSQL 与发行依赖门禁开放。 | 当前 dev 重新执行 W2 Schedule all-targets 编译检查 |
