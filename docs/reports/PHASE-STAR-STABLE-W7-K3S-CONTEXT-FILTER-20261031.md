@@ -1,8 +1,10 @@
 # PHASE — Star Stable W7 local K3s context filter
 
-**阶段状态：** 实现、夹具、真实 Cargo 图与生成 context 的锁文件复核通过（Rust 1.99.1 诊断）；Rust 1.99.0 基线、Multipass 镜像构建与部署未验证。W7 和 stable release 仍 OPEN / 不可发布。
-**工作基线：** `dev@2a57fa0d329be830735d6657677236e195673362`。
+**阶段状态：** Star-only context 过滤实现与静态审阅已完成，候选已 rebase 到 `dev@646e1e3e354be2eddd3345c928adf8c591d5ac49`，待最终检查后快进集成。Rust 1.99.0 基线、Multipass 镜像构建、最终镜像审查与部署未验证；W7 和 stable release 仍 OPEN / 不可发布。
+**工作基线：** 原始实现基于 `dev@2a57fa0d329be830735d6657677236e195673362`；当前集成候选基于 `dev@646e1e3e354be2eddd3345c928adf8c591d5ac49`，lane tip `f8b06884775853b5518f36a8d5320ce552c69538`（文档同步前）。
 **发行范围：** Desktop、Web/Vercel、三份 Star Canvas 服务镜像；本 lane 只处理供本地 K3s 使用的 `star-api-rest` build context。
+
+**当前审阅结论：** 所修改的本地 K3s API build path 已从宽泛 crates 输入改为 Cargo 解析闭包生成的逐 crate context；该静态改动准备集成到 dev。`deploy/k3s-local` 仍属开发/测试路径，不加入本次稳定版镜像矩阵。D2 worktree 中同路径未提交的 README 草稿保持原样，不将其视为已接受的支持范围决定。
 
 ## §0 目的
 
@@ -15,7 +17,7 @@
 | `deploy/k3s-local/Dockerfile` | 锁定 Rust builder image 到 1.99.0；把宽泛 crates 复制替换为由生成器展开的 crate COPY 标记；构建使用 `--locked`。 | 此文件是 context generator 模板，直接用仓库根目录作为构建 context 不受支持。实际 COPY 列表仅在生成 context 中产生。 |
 | `scripts/automation/star_k3s_context.py` | 新增 Cargo metadata 解析、普通/build 依赖闭包选择、workspace 白名单、开发依赖移除、仓库路径与符号链接检查、确定性 context 摘要和显式 Multipass guest build。对 Cargo 必须读取但未启用的可选 path crate，只复制经验证的 manifest 依赖并排除在 workspace members 之外。 | 输出目录中以源 `Cargo.lock` 为种子让 Cargo 离线生成新锁文件，再逐项校验 registry package identity/checksum 和本地 package identity；拒绝新增 registry 身份、未批准本地 crate 和 game/legacy 包。Multipass 构建使用 argv 调用 `transfer` 与 `exec`，不调用宿主 Docker；传输前校验生成时摘要和归档内容一致，不创建或清理 VM。 |
 | `scripts/automation/test_star_k3s_context.py` | 增加 11 项标准库单元测试。 | 覆盖依赖闭包、开发依赖排除、game 依赖拒绝、缺失节点/manifest、路径越界、输出稳定性、源 Cargo.lock identity/checksum 漂移拒绝、context 篡改拒绝、仓库输入符号链接拒绝及 Multipass 命令构造。Windows 未授予创建符号链接的权限，因此该项被跳过；构造图为 fixture，不是生产依赖证据。 |
-| 本 lane brief/report/dispatch | 记录范围、验收、实际测试与门禁状态。 | 本报告不更新主 WBS，也不表示 W7、W2 或稳定版发布门关闭。 |
+| 本 lane brief/report/dispatch/WBS | 记录范围、验收、实际测试、当前 dev 基线和门禁状态。 | 本次同步主 WBS 只记录本 lane 的静态实现与证据；不表示 W7、W2 或稳定版发布门关闭。 |
 
 ## §2 验证摘要
 
@@ -35,8 +37,8 @@
 - Rust 1.99.1 诊断已证明真实 workspace closure、生成文件清单和输出锁文件可被 Cargo 校验；这不能替代 Rust 1.99.0 pinned baseline，需修复/恢复该 toolchain 后重跑相同门禁。
 - 未验证生成 Cargo workspace 是否在容器内通过 `cargo build --release --locked -p star-api-rest`；宿主 Linux 镜像 tag、目标平台和网络/依赖缓存也未作真实构建验证。
 - 未构建并检查 Multipass guest 中的最终 image layers、digest、SBOM/provenance，也未执行 K3s rollout、健康检查或回滚。
-- W7 的完整 Star-only payload 门仍 OPEN；Canvas OCI workflow 的静态筛选证据不能外推到此 local K3s build path。
-- 与 D2 活动 lane 存在待协调的产品范围冲突：`D:\\orcaWork\\Star\\star-delivery-d2-multipass-maintenance-20261031` 当前仍有脏改动，其中 `deploy/k3s-local/README.md` 将 API image/build/deploy 标为退役且不受支持。该内容尚未提交或审阅；因此本 lane 的过滤生成器只是候选 remediation，不能作为当前受支持功能或 release evidence，也不应集成，直到 D2 owner 完成并审查该范围决策。
+- W7 的完整 Star-only payload 门仍 OPEN；Canvas OCI workflow 的静态筛选证据不能外推到此 local K3s build path。当前只证明生成的 Cargo 输入闭包排除 game/legacy 项，不证明容器镜像最终层、SBOM/provenance 或活动部署载荷已合格。
+- `D:\\orcaWork\\Star\\star-delivery-d2-multipass-maintenance-20261031` 中 `deploy/k3s-local/README.md` 的未提交退役草稿仍由原 worktree 保留且未合入；本 lane 不修改该草稿，也不把它当作已批准的产品支持决策。生成器作为开发/测试路径的静态防护可独立集成，但该路径的长期支持/退役决定仍待 D2 设计审查。
 - stable release W0–W9 均须由主 WBS 与实际目标平台证据另行审核，本 lane 不选择版本、不发布、不推送。
 
 ## §4 子代理失败接手清单
@@ -51,8 +53,8 @@ W7 lane 曾由子代理实施。首次派发前没有落地 dispatcher brief；b
 - 生成文件中必须没有 game/legacy package/path、任意 symlink、未解析 marker 或 broad crate copy；交给 Multipass 前再次扫描以防 context 被修改。
 - 镜像构建只能通过用户显式选择的 Multipass 实例由 `multipass exec` 在 guest 内执行；不调用宿主 Docker、不创建/销毁实例、不推送或发布镜像。
 - fixture 测试与模拟 Multipass argv 不是实际 dependency/build/deploy 证明；symlink test 在此 Windows 主机因 WinError 1314 被跳过；W7 和 release 保持 OPEN。
-- 与主 WBS 的冲突或更优设计需在父级集成前复核；不得修改 WBS、D2 文件或 `D:\Star` 用户内容。
-- D2 当前脏 README 与 W7 local API build candidate 冲突；按 owner 保留门禁，不覆盖 D2、不合并 W7 到 `dev`，将 W7 保持 OPEN/待范围裁决。
+- 与主 WBS 的冲突或更优设计需在父级集成前复核；本次只在已登记 WBS 路径内同步 W7 状态，不修改 D2 文件或 `D:\Star` 用户内容。
+- D2 脏 README 草稿与该 API 路径的长期支持状态有关，但不要求放宽 Star-only 输入过滤；保留草稿原样，并将支持/退役裁决与本次安全构建上下文改动分开记录。
 
 ## §6 签字栏
 
@@ -61,7 +63,7 @@ W7 lane 曾由子代理实施。首次派发前没有落地 dispatcher brief；b
 | 架构 | 协调者已完成静态代码、清单范围和 fixture 结果复核；Cargo 图与真实 guest build 仍待验证。 |
 | SRE Lead | 不适用：未运行 guest build、集群部署、容量或恢复验收。 |
 | 平台 | 不适用：未运行真实 Cargo、镜像构建或制品验证。 |
-| 评审主持 | 协调者静态整合审查完成；W7 的生产验收和 dev 集成仍未完成。 |
+| 评审主持 | 协调者静态整合审查完成；候选已 rebase 到当前 dev，待目标 checkout 最终状态复核后快进集成。W7 的生产验收仍未完成。 |
 | PM | 不适用：未修改发行范围、版本或发布授权。 |
 
 **发布审批：** 未申请；W7 与 stable release 仍不可发布。
@@ -75,3 +77,4 @@ W7 lane 曾由子代理实施。首次派发前没有落地 dispatcher brief；b
 | v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 协调者复核 | 移除不完整的自制 Cargo lock 依赖投影；改为在隔离输出内由 Cargo 离线生成 lock，并验证源锁 identity/checksum、本地包白名单。Rust 1.99.1 下真实 workspace metadata、333 文件 context 和输出 `--locked --offline` metadata 通过；明确 Rust 1.99.0、Multipass build 与 K3s rollout 仍未验证。 | 真实 Cargo 工作区发现按单平台 resolve graph 直接裁剪 lock 不能通过生成 context 的 locked metadata。 |
 | v0.4 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 协调者复核 | 增加源 lock package identity/checksum 漂移拒绝测试；当前单测 10 passed、1 skipped，代码图守门通过。更新 brief/report 的锁文件算法和证据边界；release context digest 不变。 | 独立复核要求覆盖 lock 校验拒绝路径并同步测试数量。 |
 | v0.5 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 协调者复核 | 记录 D2 活动 worktree 的未提交 README 将 `deploy/k3s-local` 标为退役，与 W7 API image candidate 的支持范围冲突；W7 暂不集成到 dev，等待 owner 完成范围裁决。 | D2 worktree 只读检查发现同一路径的活动 owner 改动。 |
+| v0.6 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将候选 rebase 到 `dev@646e1e3e` 后复核：`deploy/k3s-local/Dockerfile` 不再包含宽泛 crates COPY，生成器仅从解析的 Star API 本地依赖闭包组装 context；同步主 WBS。D2 未提交 README 草稿继续保留，API 路径支持/退役仍需独立裁决。Rust 1.99.0、Multipass 镜像构建、最终镜像/SBOM/provenance、K3s rollout/rollback 未验证，W7 与稳定版保持 OPEN/NO-GO。 | 用户要求 Docker/build context 不携带 game 等遗留内容；对候选的当前 dev 集成审查。 |
