@@ -19,9 +19,10 @@ Implement the strict Git-tag-derived Star release version resolver for W0. The o
 ## Requirements
 - Accept only canonical `vMAJOR.MINOR.PATCH` stable tags (reject prerelease/build metadata, missing components, whitespace, and leading zeroes except `0`).
 - Resolve the named tag to a commit using safe argument-list subprocess calls, no shell. Confirm the exact tag ref exists, peeled object is a commit, and checked-out `HEAD` equals the resolved commit.
+- Require a clean checkout before producing release provenance. Use `git status --porcelain=v1 --untracked-files=all --ignore-submodules=none`; staged or unstaged tracked changes, untracked files, and dirty submodules must fail before JSON or GitHub output is written. Ignored files are excluded from this check and must be documented as an explicit packaging limitation.
 - Emit machine-readable JSON containing tag, normalized release version, and source SHA. Optionally append `STAR_RELEASE_TAG`, `STAR_RELEASE_VERSION`, and `STAR_RELEASE_SOURCE_SHA` to an explicitly supplied GitHub output file only after all checks pass.
 - Fail with actionable errors and nonzero exit for malformed tag, missing tag, non-commit target, or HEAD mismatch. Avoid printing secrets or rewriting Git refs.
-- Keep dependencies to Python standard library. Add focused tests for valid annotated/lightweight tags and invalid values, missing refs, and mismatched HEAD. Use an isolated temporary Git repo in tests.
+- Keep dependencies to Python standard library. Add focused tests for valid annotated/lightweight tags and invalid values, missing refs, non-commit targets, mismatched HEAD, staged/unstaged tracked changes, untracked files, and dirty submodules. Verify dirty-checkout rejection leaves an existing GitHub output file unchanged. Use isolated temporary Git repos in tests.
 - Do not modify any workflow, Cargo manifest/lockfile, K3s template, WBS main document, `main`, or other worktree. W0 remains partial until release surfaces are wired and hosted artifact verification is complete.
 
 ## Validation and report

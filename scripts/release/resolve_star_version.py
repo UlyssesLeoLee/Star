@@ -1,27 +1,33 @@
 #!/usr/bin/env python3
 """Resolve a stable Star release version from an exact Git tag."""
 
-# @cypher schema=1 source_sha256=a350eec137baf112e6672ba09de418fbcf16d12431093606cd9e0635aa2100ca
+# @cypher schema=1 source_sha256=7576629a1cbde7b1a15b80603aa9c93fda784edae8b33a6d86c837cf3462ee0b
 # MERGE (self:File {path:"scripts/release/resolve_star_version.py"})
 # MERGE (pattern:Config {id:"canonical-stable-tag-pattern"})
 # MERGE (output:Config {id:"github-output-file"})
 # MERGE (validate:Symbol {id:"scripts/release/resolve_star_version.py::validate_tag",kind:"function"})
 # MERGE (run_git:Symbol {id:"scripts/release/resolve_star_version.py::_run_git",kind:"function"})
+# MERGE (ensure_clean:Symbol {id:"scripts/release/resolve_star_version.py::_ensure_clean_checkout",kind:"function"})
 # MERGE (resolve:Symbol {id:"scripts/release/resolve_star_version.py::resolve_release",kind:"function"})
 # MERGE (append_output:Symbol {id:"scripts/release/resolve_star_version.py::_append_github_output",kind:"function"})
 # MERGE (build_parser:Symbol {id:"scripts/release/resolve_star_version.py::build_parser",kind:"function"})
 # MERGE (main:Symbol {id:"scripts/release/resolve_star_version.py::main",kind:"function"})
 # MERGE (git_cli:ExternalService {id:"git-cli"})
+# MERGE (status_check:Config {id:"git-status-clean-check"})
 # MERGE (self)-[:DEFINES]->(validate)
 # MERGE (self)-[:DEFINES]->(run_git)
+# MERGE (self)-[:DEFINES]->(ensure_clean)
 # MERGE (self)-[:DEFINES]->(resolve)
 # MERGE (self)-[:DEFINES]->(append_output)
 # MERGE (self)-[:DEFINES]->(build_parser)
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (validate)-[:READS]->(pattern)
 # MERGE (run_git)-[:CALLS]->(git_cli)
+# MERGE (ensure_clean)-[:CALLS]->(run_git)
+# MERGE (ensure_clean)-[:READS]->(status_check)
 # MERGE (resolve)-[:CALLS]->(validate)
 # MERGE (resolve)-[:CALLS]->(run_git)
+# MERGE (resolve)-[:CALLS]->(ensure_clean)
 # MERGE (append_output)-[:WRITES]->(output)
 # MERGE (main)-[:CALLS]->(build_parser)
 # MERGE (main)-[:CALLS]->(resolve)
@@ -75,6 +81,30 @@ def _run_git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[s
         ) from error
 
 
+def _ensure_clean_checkout(repository: Path) -> None:
+    """Reject tracked, untracked, or submodule changes before emitting provenance.
+
+    Ignored files are excluded by this status check. Release packaging must use
+    commit-tracked inputs or validate ignored inputs separately.
+    """
+    status_result = _run_git(
+        repository,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+    if status_result.returncode != 0:
+        raise ResolverError(
+            f"could not inspect checkout status in {repository}; confirm --repo is a Git checkout"
+        )
+    if status_result.stdout:
+        raise ResolverError(
+            "working tree must be clean; staged, unstaged, untracked, or dirty submodule "
+            "changes were detected"
+        )
+
+
 def resolve_release(repository: Path, tag: str) -> dict[str, str]:
     """Resolve the exact stable tag and require it to identify checked-out HEAD."""
     version = validate_tag(tag)
@@ -126,6 +156,7 @@ def resolve_release(repository: Path, tag: str) -> dict[str, str]:
             "check out the tagged commit before resolving the release"
         )
 
+    _ensure_clean_checkout(repository)
     return {"tag": tag, "version": version, "source_sha": source_sha}
 
 
