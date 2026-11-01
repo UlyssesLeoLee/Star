@@ -47,6 +47,15 @@
 - 本次没有查询 GitHub Releases、GHCR、Vercel、远端 tag protection 或 environment reviewers；不得把本地 ref 状态升级成远端发布证据。
 - W1 仍被根 Cargo workspace license `Apache-2.0` 与用户选择的 MIT 冲突阻塞；该问题不由 W0 审计解决。
 
+## §3.1 用户决策与当前状态更新（2026-11-01）
+
+本节更新上述历史审计之后已确认的决策，不改写 §2 对 `dev@2a57fa0d329be830735d6657677236e195673362` 的观察结果：
+
+- 用户已确认 Git tag 为 Star 产品发行版本的唯一来源，目标稳定版为 `v1.0.6`，规范版本字符串为 `1.0.6`。
+- 用户已指定 Codex/assistant 为 accountable release owner，并条件授权在全部必需发行门禁通过且最终复核完成后发布一个稳定版本。
+- 因此 §3 的两个用户决策项已解决；版本映射、冻结 source commit、tag 保护/不可变性、hosted build、Vercel deployment、Canvas digest/attestation 与 consumer/rollback 证据仍需验证。W0 仍为 PARTIAL，stable release 仍 NO-GO。
+- 后续集成的 [W0 版本映射报告](PHASE-STAR-STABLE-W0-VERSION-MAP-20261101.md) 与 [W0 集成同步报告](PHASE-STAR-STABLE-W0-INTEGRATION-SYNC-20261101.md) 已记录当前 dev 的版本 resolver 和 Desktop、Web、Canvas 接线；它们取代本报告中对旧 workflow 状态的当前性判断。本报告只作为 `dev@2a57fa0d` 的历史证据，不代表当前实现状态。
+
 ## §4 子代理失败接手清单
 
 本 lane 为单个只读审计 worker；没有继续派生子代理，也没有子代理失败。没有产品代码、版本元数据或 workflow 实施任务交接。本阶段报告和结论需要协调者在纳入 WBS 前独立复核。
@@ -67,7 +76,7 @@
 | SRE Lead | 本阶段未运行平台、容量或恢复验收；对应 WBS 门保持 OPEN。 |
 | 平台 | 本阶段未构建、签名、部署或验证消费者；对应 WBS 门保持 OPEN。 |
 | 评审主持 | 审计范围内证据与结论一致；远端发布状态明确标记为未核实。 |
-| PM | 用户已确认发行产品面；canonical version 与 accountable release owner 尚未决定，不能关闭 W0。 |
+| PM | 用户已确认发行面、唯一 tag 版本源 `v1.0.6`、Codex/assistant accountable release owner 与条件发行授权；这些决策不等于 W0 技术验收完成。 |
 
 **稳定版审批：** 未申请；此阶段文档审阅不构成 release 批准。
 
@@ -76,3 +85,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Rust/JS/Desktop/Canvas 当前声明、tag 与 workflow 关联、W0 的用户决策和可自动验证的关闭条件；不改变产品或发布状态。 | Stable release WBS 下一项 W0 version/owner audit |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补记用户已确认的 `v1.0.6` 唯一 tag 版本源、Codex/assistant release owner 与条件授权，并将后续 W0 版本映射报告标为当前 dev 依据；明确本报告仅为历史基线证据。W0 与稳定版门禁保持开放。 | 与当前 W0 文档和用户决策复核时发现原决策状态已过时 |
