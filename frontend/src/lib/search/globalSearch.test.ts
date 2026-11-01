@@ -2,11 +2,22 @@
 // globalSearch.test.ts — 微信式 type-chip 过滤 + 多 type 搜索 (per 2026-10-01 OOB)
 // =====================================================================
 import { describe, it, expect } from "vitest";
+/*
+@cypher schema=1 source_sha256=c0a934aed9a43401cea98f24cb4b07858d899e002956099d6683878aed1d4958
+MERGE (self:File {path:"frontend/src/lib/search/globalSearch.test.ts"})
+MERGE (searchAll:Function {name:"searchAll", language:"typescript", visibility:"public"})
+MERGE (searchIndexEntries:Function {name:"searchIndexEntries", language:"typescript", visibility:"public"})
+MERGE (self)-[:TESTS]->(searchAll)
+MERGE (self)-[:TESTS]->(searchIndexEntries)
+@endcypher
+*/
 import {
   searchAll,
   TYPE_FILTERS,
   TYPE_LABEL,
   getSearchIndex,
+  searchIndexEntries,
+  type IndexEntry,
   type SearchType,
 } from "./globalSearch";
 
@@ -34,12 +45,23 @@ describe("globalSearch", () => {
     expect(inbox?.href).toBe("/inbox");
   });
 
-  it("D. query 'implement' 命中 work_items (含 'Implement Worktree 17-state machine')", () => {
-    const r = searchAll("implement");
+  it("D. task entries are searchable without relying on removed demo seed tasks", () => {
+    const fixture: IndexEntry = {
+      hit: {
+        id: "task:test-fixture",
+        type: "task",
+        label: "Implement branch reconciliation",
+        subLabel: "engineering · normal · todo",
+        href: "/work-items/test-fixture",
+        score: 0,
+      },
+      haystack: "implement branch reconciliation\nengineering · normal · todo",
+    };
+    const r = searchIndexEntries("implement", [fixture]);
     const tasks = r.groups.find((g) => g.type === "task");
     expect(tasks).toBeDefined();
-    expect(tasks!.hits.length).toBeGreaterThan(0);
-    expect(tasks!.hits.some((h) => /implement/i.test(h.label))).toBe(true);
+    expect(tasks?.hits).toHaveLength(1);
+    expect(tasks?.hits[0].label).toBe("Implement branch reconciliation");
   });
 
   it("E. query 'wt-001' 命中 worktree (按 id)", () => {

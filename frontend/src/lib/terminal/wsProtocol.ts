@@ -12,6 +12,26 @@
 // - tag = "type" / rename_all = "snake_case" (per server contract)
 // =====================================================================
 
+/*
+@cypher schema=1 source_sha256=a9d1a6404b94c0304184e1079bc7acf8a2f1e113ba7a5f53f6399c757f15f316
+MERGE (self:File {path:"frontend/src/lib/terminal/wsProtocol.ts"})
+MERGE (clientMessage:Type {name:"ClientMessage", language:"typescript"})
+MERGE (serverMessage:Type {name:"ServerMessage", language:"typescript"})
+MERGE (decodeTaggedMessage:Function {name:"decodeTaggedMessage", language:"typescript", visibility:"private"})
+MERGE (decodeClientMessage:Function {name:"decodeClientMessage", language:"typescript", visibility:"public"})
+MERGE (decodeServerMessage:Function {name:"decodeServerMessage", language:"typescript", visibility:"public"})
+MERGE (self)-[:DEFINES]->(clientMessage)
+MERGE (self)-[:DEFINES]->(serverMessage)
+MERGE (self)-[:DEFINES]->(decodeTaggedMessage)
+MERGE (self)-[:DEFINES]->(decodeClientMessage)
+MERGE (self)-[:DEFINES]->(decodeServerMessage)
+MERGE (decodeClientMessage)-[:CALLS]->(decodeTaggedMessage)
+MERGE (decodeServerMessage)-[:CALLS]->(decodeTaggedMessage)
+MERGE (decodeClientMessage)-[:USES_TYPE]->(clientMessage)
+MERGE (decodeServerMessage)-[:USES_TYPE]->(serverMessage)
+@endcypher
+*/
+
 // =====================================================================
 // 1. Mirror types (per crates/terminal-stack/src/scrollback_buffer.rs + split_pane.rs)
 // =====================================================================
@@ -141,12 +161,41 @@ export type ServerMessage =
       message: string;
     };
 
+const CLIENT_MESSAGE_TYPES = ["stdin", "resize", "ping"] as const;
+const SERVER_MESSAGE_TYPES = [
+  "hello",
+  "snapshot",
+  "output",
+  "resize_ack",
+  "split_update",
+  "pty_exit",
+  "pong",
+  "error",
+] as const;
+
+function decodeTaggedMessage<T extends string>(
+  serialized: string,
+  allowedTypes: readonly T[],
+  direction: "client" | "server",
+): { type: T } {
+  const decoded: unknown = JSON.parse(serialized);
+  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new TypeError(`Expected ${direction} message object`);
+  }
+
+  const type = (decoded as { type?: unknown }).type;
+  if (typeof type !== "string" || !allowedTypes.includes(type as T)) {
+    throw new TypeError(`Unknown ${direction} message type: ${String(type)}`);
+  }
+  return decoded as { type: T };
+}
+
 // =====================================================================
 // 4. Round-trip helpers (per AC-6)
 // =====================================================================
 
 export function decodeClientMessage(s: string): ClientMessage {
-  return JSON.parse(s) as ClientMessage;
+  return decodeTaggedMessage(s, CLIENT_MESSAGE_TYPES, "client") as ClientMessage;
 }
 
 export function encodeClientMessage(msg: ClientMessage): string {
@@ -154,7 +203,7 @@ export function encodeClientMessage(msg: ClientMessage): string {
 }
 
 export function decodeServerMessage(s: string): ServerMessage {
-  return JSON.parse(s) as ServerMessage;
+  return decodeTaggedMessage(s, SERVER_MESSAGE_TYPES, "server") as ServerMessage;
 }
 
 export function encodeServerMessage(msg: ServerMessage): string {

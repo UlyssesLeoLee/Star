@@ -6,6 +6,22 @@
 // 日漫风格 Charisma 科技美学 + 低认知负荷选项卡架构
 // =====================================================================
 
+/*
+@cypher schema=1 source_sha256=97b8c2e69493c8e3a415dc51e465faa9f0ed2c2472203a526249a45c478ed70d
+MERGE (self:File {path:"frontend/src/app/(app)/analytics/page.tsx"})
+MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
+MERGE (analyticsPage:Function {name:"AnalyticsPage", language:"typescript", visibility:"public"})
+MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
+MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (differenceInUtcCalendarDays:Function {name:"differenceInUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(dateUtils)
+MERGE (self)-[:DEFINES]->(analyticsPage)
+MERGE (analyticsPage)-[:CALLS]->(toUtcCalendarDate)
+MERGE (analyticsPage)-[:CALLS]->(addUtcCalendarDays)
+MERGE (analyticsPage)-[:CALLS]->(differenceInUtcCalendarDays)
+@endcypher
+*/
+
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { Tabs } from "@/components/Tabs";
@@ -21,12 +37,16 @@ import {
   DollarSign,
   Cpu,
 } from "lucide-react";
-import { addDays, format, parseISO, differenceInDays } from "date-fns";
 import { MOCK_KPI_FALLBACK, COST_SERIES_FALLBACK } from "@/mocks/data";
 import type { KpiCard, CostPoint } from "@/mocks/schemas/analytics";
 import { useTranslation } from "@/lib/i18n";
 import { CelButton3D } from "@/components/effects/Cel3DUI";
 import { CelCard3D } from "@/components/effects/CelCard3D";
+import {
+  addUtcCalendarDays,
+  differenceInUtcCalendarDays,
+  toUtcCalendarDate,
+} from "@/lib/gantt/dateUtils";
 
 function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
   const { t } = useTranslation();
@@ -121,21 +141,21 @@ export default function AnalyticsPage() {
 
   const dateRange = useMemo(() => {
     const all = [
-      ...sprints.flatMap((s) => [parseISO(s.start_date), parseISO(s.end_date)]),
-      ...milestones.map((m) => parseISO(m.due_date)),
+      ...sprints.flatMap((s) => [toUtcCalendarDate(s.start_date), toUtcCalendarDate(s.end_date)]),
+      ...milestones.map((m) => toUtcCalendarDate(m.due_date)),
     ];
     if (all.length === 0) {
-      const today = new Date();
-      return { start: format(today, "yyyy-MM-dd"), end: format(addDays(today, 60), "yyyy-MM-dd") };
+      const today = toUtcCalendarDate(new Date().toISOString());
+      return { start: today, end: addUtcCalendarDays(today, 60) };
     }
     const min = all.reduce((a, b) => (a < b ? a : b));
     const max = all.reduce((a, b) => (a > b ? a : b));
-    const start = addDays(min, -7);
-    const end = addDays(max, 7);
-    if (differenceInDays(end, start) > 180) {
-      return { start: format(start, "yyyy-MM-dd"), end: format(addDays(start, 180), "yyyy-MM-dd") };
+    const start = addUtcCalendarDays(min, -7);
+    const end = addUtcCalendarDays(max, 7);
+    if (differenceInUtcCalendarDays(end, start) > 180) {
+      return { start, end: addUtcCalendarDays(start, 180) };
     }
-    return { start: format(start, "yyyy-MM-dd"), end: format(end, "yyyy-MM-dd") };
+    return { start, end };
   }, [sprints, milestones]);
 
   const handleMilestoneUpdate = (id: string, newDueDate: string) => {
