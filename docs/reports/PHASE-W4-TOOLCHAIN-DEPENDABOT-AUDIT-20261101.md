@@ -54,6 +54,9 @@
 10. 不将静态审查等同于 hosted workflow 成功、PR 合并或 W4 关闭。
 11. remote-tracking ref 可能过期；无 fetch 时不得声称 live 远端状态。
 12. 只集成本 lane 审查文档；不得覆盖或回滚其他 worker 的工作。
+13. 区分官方最新 Rust release 与 Star 当前 MSRV：官方新版本公告本身不会更改 `rust-toolchain.toml`、Cargo `rust-version` 或 CI 基线；基线调整必须另行决策并完成对应 gates。
+14. commit 中的 `dependabot[bot]` author、候选 ref 名称和提交说明不证明 live Dependabot alert 或 PR 的存在、状态或审查结果；需要作 PR 层面判断时须取得独立 GitHub 证据。
+15. `HOLD` 仅表示本候选不予接纳，不等于 W4 完成、稳定版全局 NO-GO 或 release 状态变更；WBS 任务状态必须依据其自身验收证据和协调者决策单独维护。
 
 ## §6 签字栏
 
@@ -70,3 +73,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 完成 W4 toolchain candidate 固定提交审查；结论 HOLD，记录八个 workflow、官方 action/Rust release 证据和未执行项。 | `docs/briefs/W4-TOOLCHAIN-DEPENDABOT-AUDIT-20261101.md` |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 §5 守门规则扩为 15 项，补充 MSRV 与官方 release 事实分离、Dependabot/PR 状态未证实及 HOLD/WBS/release 状态边界。 | 协调者复核要求 PHASE 报告 §5 达到 15–17 项 |
