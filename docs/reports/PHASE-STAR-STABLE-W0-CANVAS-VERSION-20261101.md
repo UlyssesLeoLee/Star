@@ -75,7 +75,7 @@
 | Rust release validation 只用 1.99.0；工具链缺件不以其他版本替代 | ✅ 明确记录 Cargo blocker |
 | 不创建版本 tag、OCI 镜像或 Kubernetes rollout | ✅ 未执行 |
 | 不改 main/dev、其他 worktree、remote、Dockerfiles、Cargo manifests/lock、`deploy/k3s-local` | ✅ |
-| dispatcher brief 路径包含在 lane commit message；源码 header SHA 在提交前刷新 | ⏳ 提交前核对 |
+| dispatcher brief 路径包含在 lane commit message；新增源码 header SHA 已由 Cypher Graph Guardian 刷新 | ✅ commit `fc7cbe3e5b002328910a54b713d7a0996f5dc7f8` 与 source headers 已复核 |
 
 ## 6. 签字栏
 
@@ -84,7 +84,7 @@
 | 架构负责人 | 架构师 (Mavis 接手 agent per DEC-008) | 🟡 版本绑定设计自审；W0 hosted proof 开放 |
 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 🟡 未执行 Buildx、镜像运行与部署验收 |
 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 🟡 根 license gate/W1 未关闭 |
-| 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 🟡 等待 coordinator 独立 review |
+| 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 🟢 coordinator 独立审查通过；renderer/resolver focused tests 通过；Rust 1.99.0 编译与 hosted Buildx 验收仍开放 |
 | 项目负责人（PM） | 架构师 (Mavis 接手 agent per DEC-008) | 🟡 不构成稳定发行批准 |
 
 ## 7. 修订历史
@@ -92,3 +92,4 @@
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Canvas runtime/tag/digest/manifest 静态绑定、focused tests、工具链阻塞与 W0/W3/W7 已知缺口 | dispatcher brief `docs/briefs/STAR-STABLE-W0-CANVAS-VERSION-20261101.md` |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录协调者对 renderer/workflow 的独立审查和 rebase 后 focused tests；保留 Rust 1.99.0 与 hosted Buildx 发布阻断 | 协调者集成前审查 |
