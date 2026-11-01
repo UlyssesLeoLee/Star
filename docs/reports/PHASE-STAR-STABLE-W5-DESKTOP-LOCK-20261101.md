@@ -27,12 +27,24 @@
 
 曾用 PyYAML `safe_load` 做显示键排序，YAML 1.1 将 `on` 解析为布尔值导致排序表达式报 `TypeError`；YAML 文件已被 `BaseLoader` 成功解析，前一错误是诊断显示代码问题，不是 YAML 解析失败。
 
+### 2026-11-01 frontend suite diagnostic
+
+This is the repository-level Web frontend diagnostic, not the desktop-embedded frontend package or the Node 24 hosted release run.
+
+| Check | Result |
+|---|---|
+| Command/environment | rtk proxy npm test from frontend/; Node 22.19.0, npm 10.9.3, Vitest 5.0.1; exit 1; 69.66 s. |
+| Test discovery | 4 Playwright e2e spec files failed collection because Vitest imported Playwright test.describe() outside its runner context. |
+| Assertions | 947 tests: 929 passed, 18 failed. 115 files: 100 passed, 15 failed. Failures span Kanban columns/board, Run Task Cards/auth state, I18n, Gantt, SessionCard, global search, terminal protocol, and query-engine fallback. |
+| Release interpretation | Reproduced local Node 22 baseline only; it is not a passing gate and does not substitute for the Node 24 hosted workflow. |
+
 ## §3 已知缺口
 
 1. 这只强制 Desktop Tauri 的 Cargo 命令锁定依赖；不表示 Rust 1.99.0 基线、workspace all-targets、license/advisory、签名、公证或安装回滚验收已通过。
 2. `actionlint` 和本机安装的 Tauri CLI 不可用；仅执行了 YAML 解析、静态命令检查与 diff 检查。
 3. 无候选 source commit 的 hosted run；本地 diff 不能替代三个操作系统的真实构建与消费者安装验证。
 4. 用户指定的 canonical tag `v1.0.6` 与 accountable release owner 已记录于主 WBS；本 lane 不产生 tag，也不证明包元数据与该 tag 已一致。
+5. Repository-level frontend full-suite diagnostic currently has 18 assertion failures and 4 Playwright collection errors; repair and rerun on Node 22, then require the independent Node 24 hosted result. The diagnostic does not validate Desktop embedded frontend packaging.
 
 ## §4 子代理失败接手清单
 
@@ -73,3 +85,4 @@
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 给三个稳定 Desktop 打包命令追加 Cargo `--locked` runner 参数，并记录 pinned CLI 上游源码依据与未完成的 hosted/原生打包验收。 | W5 stable release workflow lock audit |
+| v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 dev 上完整 frontend Vitest 的可复现诊断：Node 22.19.0/npm 10.9.3/Vitest 5.0.1，947 tests 中 929 通过、18 失败；115 个测试文件中 100 通过、15 失败，另有 4 个 Playwright E2E 文件因 Vitest runner context 错误未能收集。结果只作本地诊断，Node 24 hosted 发行门仍未执行。 | 按 W5 WBS 复现此前未验证的全量前端失败线索 |
