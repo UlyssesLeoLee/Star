@@ -7,7 +7,7 @@
 ---
 
 ## Assignment
-Implement and document the W1 license metadata follow-up on branch agent/star-stable-followup/license-metadata, based on dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313c.
+Implement and document the W1 license metadata follow-up on branch agent/star-stable-followup/license-metadata, based on dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e.
 
 ## Owned scope
 Only these registered paths may be edited:

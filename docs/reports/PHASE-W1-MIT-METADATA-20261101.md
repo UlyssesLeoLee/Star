@@ -1,7 +1,7 @@
 # PHASE-W1-MIT-METADATA-20261101 — Star Cargo license metadata alignment
 
 **Status:** Implemented in this lane; W1 remains OPEN/BLOCKED pending broader release-license evidence and the contested root workspace declaration.
-**Base:** `dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313c`
+**Base:** `dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e`
 **Branch:** `agent/star-stable-followup/license-metadata`
 **Date:** 2026-11-01
 
