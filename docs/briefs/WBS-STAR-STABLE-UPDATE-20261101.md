@@ -35,7 +35,7 @@ Commit only changed files from the owned manifest with author Ulysses <ulysses@m
 ## 协调者接受的依赖证据（2026-11-01）
 
 - W1：源提交 9083742a63306f310976b820faaa02a400a17ab8，修正提交 ab7b0389ba68422725348bbe5811aff89efd1637，集成提交 393c98ce3b5562e64ef5e82e58dd46e09fe6c3f2。13 个 Star 自有 package metadata 已对齐 MIT；根 Cargo declaration、NOTICE、第三方权属/授权与各平台制品闭包仍未完成。
-- W2：源提交 eb1e91f47a3b6d19483990942114caa742407b9d，集成候选 cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe2。两处 PostgreSQL fixture 要求具体远端 Branch UUID；Rust 1.99.0 检查未开始；rustfmt 组件缺失；PostgreSQL 集成未运行。
+- W2：源提交 eb1e91f47a3b6d19483990942114caa742407b9d，集成候选 cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe。两处 PostgreSQL fixture 要求具体远端 Branch UUID；Rust 1.99.0 检查未开始；rustfmt 组件缺失；PostgreSQL 集成未运行。
 - dev 基线为 bde4e9d8e9dac0e25f7d983814d37fb27bc9313e；accepted integration 尚未合入 dev。本 WBS lane 只记录证据，不执行 rebase、merge 或 cherry-pick。
 - main 的五个独有提交经 git cherry 全部为 patch-equivalent，没有可安全摘取的唯一领先内容。
 - Canvas OCI workflow 静态过滤三个 Canvas 服务；另一个 deploy/k3s-local/Dockerfile 仍 COPY crates，且 star-game workspace 成员在 .dockerignore 被排除。后者上下文兼容性未实际 build，W7 保持 OPEN。

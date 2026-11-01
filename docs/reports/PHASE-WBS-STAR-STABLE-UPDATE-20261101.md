@@ -2,7 +2,7 @@
 
 **阶段状态：** WBS 快照与依赖证据已同步；稳定发行仍为 OPEN / 不可发布。
 **工作基线：** dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e（记录 W1/W2 证据快照时的目标基线，不表示后续 dev HEAD）。
-**采用证据快照：** agent/star-stable-followup/integration@cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe2。记录该快照时，目标 dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e 尚未包含此集成候选或本 WBS lane。
+**采用证据快照：** agent/star-stable-followup/integration@cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe。记录该快照时，目标 dev@bde4e9d8e9dac0e25f7d983814d37fb27bc9313e 尚未包含此集成候选或本 WBS lane。
 
 ## §0 目的
 
@@ -12,7 +12,7 @@
 
 | 文件/对象 | 变更 | 证据与边界 |
 |---|---|---|
-| docs/implementation-plans/WBS-STAR-STABLE-RELEASE-20261031.md | 新增最新 accepted integration 快照；刷新 W1、W2、W7 状态；重排后续工作顺序；新增 v1.2 修订记录。 | W1 源提交 9083742a63306f310976b820faaa02a400a17ab8，纠正提交 ab7b0389ba68422725348bbe5811aff89efd1637，集成提交 393c98ce3b5562e64ef5e82e58dd46e09fe6c3f2。W2 源提交 eb1e91f47a3b6d19483990942114caa742407b9d，集成候选 cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe2。W1 remains BLOCKED，W2 remains OPEN/BLOCKED。 |
+| docs/implementation-plans/WBS-STAR-STABLE-RELEASE-20261031.md | 新增最新 accepted integration 快照；刷新 W1、W2、W7 状态；重排后续工作顺序；新增 v1.2 修订记录。 | W1 源提交 9083742a63306f310976b820faaa02a400a17ab8，纠正提交 ab7b0389ba68422725348bbe5811aff89efd1637，集成提交 393c98ce3b5562e64ef5e82e58dd46e09fe6c3f2。W2 源提交 eb1e91f47a3b6d19483990942114caa742407b9d，集成候选 cdb66b5b4445aa57c7d1c60d3c5e6acf0f50a9fe。W1 remains BLOCKED，W2 remains OPEN/BLOCKED。 |
 | W1 报告 PHASE-W1-MIT-METADATA-20261101.md | 13 个 Star 自有 Cargo package 的 license metadata 已改为 MIT；ACI emitter 保留独立项目的双许可，BFF 源文件 SPDX 仍为 MIT OR Apache-2.0。 | 报告记载 13 份 TOML 解析及 MIT 字段断言通过、git diff --check 通过。Rust 1.99.0 rustc 不可用，Cargo metadata 未验证；根 Cargo 声明、NOTICE、第三方权属/授权、SBOM 与实际 Desktop/Web/Vercel/Canvas 制品均未闭合。 |
 | W2 报告 PHASE-W2-SCHEDULE-PG-FIXTURE-20261101.md | seed_directory 与 seed_task_binding 在构造 SQL 前要求具体远端 Branch UUID，保留原 fixture 约束。 | 报告记载 git diff --check 通过；Rust 1.99.0 all-targets check 未开始；1.99.1 诊断等待既有 Cargo 锁 60 秒后停止，没有编译结论；rustfmt 未安装；STAR_RUN_OWNER_TEST_DATABASE_URL 未设置，PG 集成未运行。 |
 | W7 静态发行与部署输入 | 记录 Canvas 专用 build-context 静态保护，以及独立 local K3s Dockerfile 的未验证上下文边界。 | Canvas 发布 workflow allowlist 三个服务并生成筛选上下文，拒绝非 Canvas 本地依赖和含 game 的路径，配置 SBOM/provenance；三份 Canvas Dockerfile 只复制对应 crate 与生成的 workspace/lock/license。deploy/k3s-local/Dockerfile 仍 COPY crates；Cargo workspace 含 star-game，而 .dockerignore 排除 star-game。该本地上下文兼容性/排除效果未 build 验证。helm/star 为弃用占位 Chart，活动 Canvas manifest 保留 digest placeholder。 |
