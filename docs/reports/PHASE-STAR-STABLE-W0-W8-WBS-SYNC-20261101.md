@@ -3,7 +3,7 @@
 > **Status:** WBS sync committed on an isolated candidate branch; stable release remains OPEN / not releasable.
 > **Base:** local dev at 2a57fa0d329be830735d6657677236e195673362.
 > **WBS commit:** 9937ac99b130a180a25e8600a4145dc39cf174d3.
-> **Accepted audit sources:** W0 6e1bdfa3c7205c3e67215f1000da78bd79404731; W8 original 82d8ebcb0be2c3117b62f4e32cda47d4e28bc711 and correction d4d84c8be6ad1726dfc013c162696d63a9af4be2.
+> **Accepted audit sources:** W0 report 6e1bdfa3c7205c3e67215f1000da78bd79404731 and coordinator brief 268f21217f21ce90e47644ff5535b9951d780e52; W8 original 82d8ebcb0be2c3117b62f4e32cda47d4e28bc711 and correction d4d84c8be6ad1726dfc013c162696d63a9af4be2.
 > **Scope:** One WBS file and this phase report. No product implementation, tag, release, deployment, push, or Multipass lifecycle operation.
 
 ## §0 Purpose
@@ -44,7 +44,7 @@ Synchronize the stable-release plan with the user-confirmed v1.0.6 Git-tag polic
 
 ## §4 Subagent outcome and handoff
 
-- W0 version-map audit completed in isolated worktree and committed 6e1bdfa3; its coordinator-owned brief remains untracked and preserved.
+- W0 version-map audit report/dispatch committed at 6e1bdfa3; the coordinator-owned brief was subsequently committed as 268f2121, leaving the W0 worktree clean.
 - W8 provenance audit and chronology correction completed in isolated worktree; commits 82d8ebcb and d4d84c8b. The worktree is clean.
 - No subagent failed. The W8 correction was independently prompted after a source review found the initial chronology stale; it corrected the report without changing product files or VM state.
 - Handoff: after explicit MAGOS integration selection and dev-owner confirmation, integrate W0/W8 audit reports before this WBS commit so its relative report links resolve. Keep W5/W7 and all other active/dirty lanes under their existing ownership.
@@ -73,3 +73,4 @@ Synchronize the stable-release plan with the user-confirmed v1.0.6 Git-tag polic
 | Version | Date | Reviewer | Change | Trigger |
 |---|---|---|---|---|
 | 0.1 | 2026-11-01 | Mavis review | Synchronize stable-release WBS with W0 version mapping, corrected W8 Multipass/K3s provenance, and updated dependency-ordered work. | W0/W8 audit lanes completed and independently reviewed. |
+| 0.2 | 2026-11-01 | Mavis review | Record the coordinator-owned W0 audit brief commit and clean branch HEAD 268f2121; keep the audit and release gates open. | W0 brief retained on its registered lane before integration review. |
