@@ -47,3 +47,9 @@ Work only on this lane from dev@6c394465635d86894312700ed79eb583c79bd804. Commit
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
+
+## Implementation status (2026-11-01)
+
+Implemented in this isolated lane and recorded in `docs/reports/PHASE-STAR-STABLE-W0-CANVAS-VERSION-20261101.md`. The resolver output now supplies each filtered Cargo workspace/root-lock version, OCI version/source tags and labels, per-service immutable digest evidence, and the final rendered K3s manifest artifact. The active template remains non-deployable until the renderer receives all exact release inputs.
+
+Focused Python tests and static workflow/context checks pass. Rust 1.99.0 Cargo validation is blocked because the installed toolchain lacks an applicable `rustc.exe`; no alternate toolchain is release evidence. No real tag, image, hosted workflow, deployment, or remote change was created. W1 license mismatch and hosted W3/W7 artifact verification remain open. `deploy/k3s-local` still needs independent payload classification/filtering before claiming all container payloads are Star-only.

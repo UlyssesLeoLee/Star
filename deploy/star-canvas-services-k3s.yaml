@@ -1,7 +1,6 @@
-# Release render template. Before applying, replace each CANVAS_* digest marker
-# with the exact sha256 digest printed by the successful Buildx release job.
-# This file is deliberately not directly deployable while those release
-# artifacts do not yet exist; never substitute mutable branch/latest tags.
+# Release render template. Use scripts/release/render_star_canvas_manifest.py
+# with the exact resolver record and all three Buildx digest records before
+# deployment. This template is deliberately non-deployable until rendered.
 ---
 apiVersion: v1
 kind: Namespace
@@ -28,7 +27,7 @@ metadata:
   labels:
     app: canvas-engine
     tier: shared
-    version: v0.1
+    version: __STAR_RELEASE_TAG_REQUIRED__
 spec:
   replicas: 1
   selector:
@@ -39,7 +38,7 @@ spec:
       labels:
         app: canvas-engine
         tier: shared
-        version: v0.1
+        version: __STAR_RELEASE_TAG_REQUIRED__
     spec:
       automountServiceAccountToken: false
       imagePullSecrets:
@@ -97,7 +96,7 @@ metadata:
   labels:
     app: domain-canvas
     tier: business
-    version: v0.1
+    version: __STAR_RELEASE_TAG_REQUIRED__
 spec:
   replicas: 1
   selector:
@@ -108,7 +107,7 @@ spec:
       labels:
         app: domain-canvas
         tier: business
-        version: v0.1
+        version: __STAR_RELEASE_TAG_REQUIRED__
     spec:
       automountServiceAccountToken: false
       imagePullSecrets:
@@ -166,7 +165,7 @@ metadata:
   labels:
     app: canvas-realtime
     tier: realtime
-    version: v0.1
+    version: __STAR_RELEASE_TAG_REQUIRED__
 spec:
   replicas: 1
   selector:
@@ -177,7 +176,7 @@ spec:
       labels:
         app: canvas-realtime
         tier: realtime
-        version: v0.1
+        version: __STAR_RELEASE_TAG_REQUIRED__
     spec:
       automountServiceAccountToken: false
       imagePullSecrets:

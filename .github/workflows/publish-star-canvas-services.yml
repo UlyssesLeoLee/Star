@@ -43,10 +43,41 @@ jobs:
       - name: Test Canvas crates only
         run: cargo test -p canvas-engine -p domain-canvas -p canvas-realtime --locked -j 4
 
+  resolve_release:
+    name: Resolve the exact stable tag
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_gate_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.resolve.outputs.STAR_RELEASE_TAG }}
+      version: ${{ steps.resolve.outputs.STAR_RELEASE_VERSION }}
+      source_sha: ${{ steps.resolve.outputs.STAR_RELEASE_SOURCE_SHA }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Resolve exact tag, version, and source commit
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/release/resolve_star_version.py \
+            --tag "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_WORKSPACE" \
+            --output "$GITHUB_OUTPUT" \
+            > "$RUNNER_TEMP/star-release.json"
+      - name: Upload resolver evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-canvas-release-identity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/star-release.json
+          if-no-files-found: error
+          retention-days: 14
+
   build-and-push:
     name: Build and publish ${{ matrix.image }}
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_gate_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
-    needs: test
+    needs: [test, resolve_release]
     runs-on: ubuntu-latest
     concurrency:
       group: star-canvas-publish-${{ github.workflow }}-${{ github.ref }}-${{ matrix.image }}
@@ -65,6 +96,16 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Verify this build checkout is the resolved release commit
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.resolve_release.outputs.tag }}
+          RELEASE_SOURCE_SHA: ${{ needs.resolve_release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "$RELEASE_TAG"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
+
       - name: Block stable tags until package license metadata matches the selected license
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
@@ -81,6 +122,9 @@ jobs:
         shell: pwsh
         env:
           CANVAS_IMAGE: ${{ matrix.image }}
+          STAR_RELEASE_TAG: ${{ needs.resolve_release.outputs.tag }}
+          STAR_RELEASE_VERSION: ${{ needs.resolve_release.outputs.version }}
+          STAR_RELEASE_SOURCE_SHA: ${{ needs.resolve_release.outputs.source_sha }}
         run: |
           @'
           import json
@@ -95,6 +139,15 @@ jobs:
           image = os.environ["CANVAS_IMAGE"]
           if image not in allowed:
               raise SystemExit(f"Refusing unapproved Canvas image: {image}")
+          release_tag = os.environ["STAR_RELEASE_TAG"]
+          release_version = os.environ["STAR_RELEASE_VERSION"]
+          release_source_sha = os.environ["STAR_RELEASE_SOURCE_SHA"]
+          if not re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", release_tag):
+              raise SystemExit("Resolver output is not a canonical stable tag.")
+          if release_tag[1:] != release_version:
+              raise SystemExit("Resolver tag and normalized version disagree.")
+          if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", release_source_sha):
+              raise SystemExit("Resolver output has an invalid source commit id.")
 
           repo = Path(os.environ["GITHUB_WORKSPACE"])
           context = Path(os.environ["RUNNER_TEMP"]) / "star-canvas-oci" / image
@@ -107,6 +160,8 @@ jobs:
           package = crate_manifest["package"]
           if package["name"] != image or package.get("build") or (source_crate / "build.rs").exists():
               raise SystemExit("Service manifest name/build script is outside this image allowlist.")
+          if package.get("version") != {"workspace": True}:
+              raise SystemExit("Canvas service version must inherit the generated tag-derived workspace version.")
 
           dependency_groups = ("dependencies", "dev-dependencies", "build-dependencies")
           inherited = set()
@@ -152,7 +207,10 @@ jobs:
               f"resolver = {toml_value(workspace['resolver'])}",
               f"members = {toml_value(['crates/' + image])}",
               "",
-              toml_table("workspace.package", workspace["package"]),
+              toml_table(
+                  "workspace.package",
+                  {**workspace["package"], "version": release_version},
+              ),
               toml_table(
                   "workspace.dependencies",
                   {name: workspace_dependencies[name] for name in sorted(inherited)},
@@ -162,7 +220,9 @@ jobs:
               generated_manifest.append(toml_table("workspace.lints." + table_name, values))
           generated_manifest_path = context / "Cargo.toml"
           generated_manifest_path.write_text("\n".join(generated_manifest), encoding="utf-8")
-          tomllib.loads(generated_manifest_path.read_text(encoding="utf-8"))
+          generated_workspace = tomllib.loads(generated_manifest_path.read_text(encoding="utf-8"))
+          if generated_workspace["workspace"]["package"]["version"] != release_version:
+              raise SystemExit("Generated Cargo workspace version does not match the resolver output.")
 
           # Parse Cargo's locked package identities and dependency references.
           lock_prefix, *lock_chunks = lock_text.split("[[package]]")
@@ -221,14 +281,32 @@ jobs:
           if any(identity[0] == "star-game" for identity in included):
               raise SystemExit("Canvas package closure unexpectedly includes star-game.")
 
-          filtered_lock = lock_prefix + "".join(
-              block for item, block in packages
-              if (item["name"], item["version"], item.get("source")) in included
-          )
+          filtered_blocks = []
+          for item, block in packages:
+              identity = (item["name"], item["version"], item.get("source"))
+              if identity not in included:
+                  continue
+              if identity == roots[0]:
+                  block, replacements = re.subn(
+                      r'(?m)^version = "[^"]+"$',
+                      f'version = "{release_version}"',
+                      block,
+                      count=1,
+                  )
+                  if replacements != 1:
+                      raise SystemExit("Could not bind the filtered Canvas lock root to the resolved tag version.")
+              filtered_blocks.append(block)
+          filtered_lock = lock_prefix + "".join(filtered_blocks)
           parsed_filtered_lock = tomllib.loads(filtered_lock)
           filtered_names = {item["name"] for item in parsed_filtered_lock["package"]}
           if "star-game" in filtered_names or len(parsed_filtered_lock["package"]) != len(included):
               raise SystemExit("Filtered Cargo.lock failed the isolated package closure check.")
+          release_roots = [
+              item for item in parsed_filtered_lock["package"]
+              if item["name"] == image and item.get("source") is None
+          ]
+          if len(release_roots) != 1 or release_roots[0]["version"] != release_version:
+              raise SystemExit("Filtered Cargo.lock root does not match the resolved release version.")
           (context / "Cargo.lock").write_text(filtered_lock, encoding="utf-8")
 
           shutil.copy2(repo / "rust-toolchain.toml", context / "rust-toolchain.toml")
@@ -271,8 +349,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/star-${{ matrix.image }}
           tags: |
-            type=sha,format=long
-            type=semver,pattern={{version}}
+            type=raw,value=${{ needs.resolve_release.outputs.version }}
+            type=raw,value=${{ needs.resolve_release.outputs.source_sha }}
 
       - name: Build and push
         id: build
@@ -282,7 +360,10 @@ jobs:
           file: ${{ steps.context.outputs.directory }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ needs.resolve_release.outputs.version }}
+            org.opencontainers.image.revision=${{ needs.resolve_release.outputs.source_sha }}
           cache-from: type=gha,scope=star-canvas-oci-context-v1-${{ matrix.image }}
           cache-to: type=gha,scope=star-canvas-oci-context-v1-${{ matrix.image }},mode=max
           platforms: linux/amd64
@@ -300,6 +381,61 @@ jobs:
             exit 1
           fi
 
+      - name: Create per-service resolver-bound digest record
+        shell: bash
+        env:
+          CANVAS_IMAGE: ${{ matrix.image }}
+          RELEASE_TAG: ${{ needs.resolve_release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.resolve_release.outputs.version }}
+          RELEASE_SOURCE_SHA: ${{ needs.resolve_release.outputs.source_sha }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
+          DIGEST_RECORD_PATH: ${{ runner.temp }}/star-canvas-digests/${{ matrix.image }}.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          service = os.environ["CANVAS_IMAGE"]
+          allowed = {"canvas-engine", "domain-canvas", "canvas-realtime"}
+          if service not in allowed:
+              raise SystemExit(f"Refusing unapproved Canvas digest record: {service}")
+          tag = os.environ["RELEASE_TAG"]
+          version = os.environ["RELEASE_VERSION"]
+          source_sha = os.environ["RELEASE_SOURCE_SHA"]
+          digest = os.environ["IMAGE_DIGEST"]
+          if tag != f"v{version}" or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", source_sha):
+              raise SystemExit("Resolver tag, version, or source identity is malformed.")
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+              raise SystemExit("Build did not return an immutable sha256 image digest.")
+          repository = f"{os.environ['REGISTRY']}/{os.environ['IMAGE_NAMESPACE']}/star-{service}"
+          record = {
+              "service": service,
+              "tag": tag,
+              "version": version,
+              "source_sha": source_sha,
+              "version_ref": f"{repository}:{version}",
+              "source_ref": f"{repository}:{source_sha}",
+              "image_ref": f"{repository}@{digest}",
+              "digest": digest,
+          }
+          path = Path(os.environ["DIGEST_RECORD_PATH"])
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload per-service immutable digest record
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-canvas-digest-${{ matrix.image }}
+          path: ${{ runner.temp }}/star-canvas-digests/${{ matrix.image }}.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Attest the immutable Canvas image
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -316,3 +452,55 @@ jobs:
           $image = "$env:REGISTRY/$env:IMAGE_NAMESPACE/star-$env:CANVAS_IMAGE@$env:IMAGE_DIGEST"
           "Immutable image: ``$image``" | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
           "Verify provenance: ``gh attestation verify oci://$image --repo $env:GITHUB_REPOSITORY``" | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  render-release-manifest:
+    name: Render versioned digest-pinned Canvas manifest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_gate_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [test, resolve_release, build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify rendered template checkout is the resolved release commit
+        shell: bash
+        env:
+          RELEASE_SOURCE_SHA: ${{ needs.resolve_release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
+      - name: Download exact resolver output
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-canvas-release-identity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/star-canvas-release-identity
+      - name: Download all three service digest records
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: star-canvas-digest-*
+          path: ${{ runner.temp }}/star-canvas-digest-records
+          merge-multiple: true
+      - name: Render the deployable manifest
+        env:
+          OUTPUT_PATH: ${{ runner.temp }}/star-canvas-rendered/star-canvas-services-k3s.yaml
+        run: |
+          set -euo pipefail
+          python3 scripts/release/render_star_canvas_manifest.py \
+            --release-json "$RUNNER_TEMP/star-canvas-release-identity/star-release.json" \
+            --digest-record "$RUNNER_TEMP/star-canvas-digest-records/canvas-engine.json" \
+            --digest-record "$RUNNER_TEMP/star-canvas-digest-records/domain-canvas.json" \
+            --digest-record "$RUNNER_TEMP/star-canvas-digest-records/canvas-realtime.json" \
+            --template deploy/star-canvas-services-k3s.yaml \
+            --output "$OUTPUT_PATH"
+          printf 'Rendered Canvas release manifest for %s (%s, %s).\n' \
+            '${{ needs.resolve_release.outputs.tag }}' \
+            '${{ needs.resolve_release.outputs.version }}' \
+            '${{ needs.resolve_release.outputs.source_sha }}' \
+            >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload digest-pinned Canvas release manifest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-canvas-k3s-manifest-${{ needs.resolve_release.outputs.tag }}-${{ needs.resolve_release.outputs.source_sha }}
+          path: ${{ runner.temp }}/star-canvas-rendered/star-canvas-services-k3s.yaml
+          if-no-files-found: error
+          retention-days: 30
