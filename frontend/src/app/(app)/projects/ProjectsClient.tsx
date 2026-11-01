@@ -1,6 +1,16 @@
 /*
-@cypher schema=1 source_sha256=2f4f4ba4ece90ff429519daef938c735106cdfd4c6395541bd10d5986abd472c
+@cypher schema=1 source_sha256=fc29ccb3bd9f8fb437e8b83a0d8a6be25698abd1f301f6e487ed9b6223bbc3ad
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
+MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
+MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
+MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
+MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (differenceInUtcCalendarDays:Function {name:"differenceInUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(dateUtils)
+MERGE (self)-[:DEFINES]->(projectsClient)
+MERGE (projectsClient)-[:CALLS]->(toUtcCalendarDate)
+MERGE (projectsClient)-[:CALLS]->(addUtcCalendarDays)
+MERGE (projectsClient)-[:CALLS]->(differenceInUtcCalendarDays)
 @endcypher
 */
 "use client";
@@ -81,7 +91,12 @@ import {
   Clock,
   GitBranch,
 } from "lucide-react";
-import { addDays, format, parseISO, differenceInDays } from "date-fns";
+import { format } from "date-fns";
+import {
+  addUtcCalendarDays,
+  differenceInUtcCalendarDays,
+  toUtcCalendarDate,
+} from "@/lib/gantt/dateUtils";
 import type {
   Board, Project, WorkItem, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
 } from "@/types/ids";
@@ -322,22 +337,22 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
 
   // ---- ProjectTimeline: Gantt date range ----
   const ganttDateRange = useMemo(() => {
-    const all: Date[] = [
-      ...projectSprints.flatMap((s) => [parseISO(s.start_date), parseISO(s.end_date)]),
-      ...projectMilestones.map((m) => parseISO(m.due_date)),
+    const all = [
+      ...projectSprints.flatMap((s) => [toUtcCalendarDate(s.start_date), toUtcCalendarDate(s.end_date)]),
+      ...projectMilestones.map((m) => toUtcCalendarDate(m.due_date)),
     ];
     if (all.length === 0) {
-      const today = new Date();
-      return { start: format(today, "yyyy-MM-dd"), end: format(addDays(today, 60), "yyyy-MM-dd") };
+      const today = toUtcCalendarDate(new Date().toISOString());
+      return { start: today, end: addUtcCalendarDays(today, 60) };
     }
     const min = all.reduce((a, b) => (a < b ? a : b));
     const max = all.reduce((a, b) => (a > b ? a : b));
-    const start = addDays(min, -7);
-    const end = addDays(max, 7);
-    if (differenceInDays(end, start) > 180) {
-      return { start: format(start, "yyyy-MM-dd"), end: format(addDays(start, 180), "yyyy-MM-dd") };
+    const start = addUtcCalendarDays(min, -7);
+    const end = addUtcCalendarDays(max, 7);
+    if (differenceInUtcCalendarDays(end, start) > 180) {
+      return { start, end: addUtcCalendarDays(start, 180) };
     }
-    return { start: format(start, "yyyy-MM-dd"), end: format(end, "yyyy-MM-dd") };
+    return { start, end };
   }, [projectSprints, projectMilestones]);
 
   // ---- Gantt handlers (per 已知缺口 #2: 走 useStore.setState, 后端 PATCH D.6+) ----

@@ -1,15 +1,15 @@
 "use client";
 
 /*
-@cypher schema=1 source_sha256=45ac1128c91f303056ebd9e6aacc3d39fc6e9fd7fb6786babf7dc592c546f7fe
+@cypher schema=1 source_sha256=e8cfb839f4edb7c06a87f3c79531dc35f484632882de7b7db9f75f97fca1a647
 MERGE (self:File {path:"frontend/src/components/gantt/GanttChart.tsx"})
-MERGE (toCalendarDate:Function {name:"toCalendarDate", language:"typescript", visibility:"private"})
-MERGE (addCalendarDays:Function {name:"addCalendarDays", language:"typescript", visibility:"private"})
+MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (ganttChart:Function {name:"GanttChart", language:"typescript", visibility:"public"})
-MERGE (ganttChart)-[:CALLS]->(toCalendarDate)
-MERGE (ganttChart)-[:CALLS]->(addCalendarDays)
-MERGE (self)-[:DEFINES]->(toCalendarDate)
-MERGE (self)-[:DEFINES]->(addCalendarDays)
+MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
+MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(dateUtils)
+MERGE (ganttChart)-[:CALLS]->(toUtcCalendarDate)
+MERGE (ganttChart)-[:CALLS]->(addUtcCalendarDays)
 MERGE (self)-[:DEFINES]->(ganttChart)
 @endcypher
 */
@@ -41,7 +41,8 @@ MERGE (self)-[:DEFINES]->(ganttChart)
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { addDays, differenceInDays, format, parseISO } from "date-fns";
+import { differenceInDays, parseISO } from "date-fns";
+import { addUtcCalendarDays, toUtcCalendarDate } from "@/lib/gantt/dateUtils";
 import type { Sprint, Milestone, WorkItem, WorkItemStatus, SprintStatus } from "@/types/ids";
 import { GanttBar, type GanttBarStatus } from "./GanttBar";
 import { GanttHeader } from "./GanttHeader";
@@ -69,17 +70,6 @@ const PX_PER_DAY: Record<ZoomLevel, number> = {
 };
 
 const ZOOM_ORDER: ZoomLevel[] = ["week", "month", "quarter"];
-
-function toCalendarDate(value: string): string {
-  const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp)
-    ? value.slice(0, 10)
-    : new Date(timestamp).toISOString().slice(0, 10);
-}
-
-function addCalendarDays(value: string, days: number): string {
-  return format(addDays(parseISO(toCalendarDate(value)), days), "yyyy-MM-dd");
-}
 
 function sprintStatusToBarStatus(s: SprintStatus): GanttBarStatus {
   // sprint 状态映射 (sprint 用同一套颜色)
@@ -128,8 +118,8 @@ export function GanttChart(props: GanttChartProps) {
   }, [zoom]);
   const pxPerDay = PX_PER_DAY[zoom];
 
-  const start = parseISO(toCalendarDate(dateRange.start));
-  const end = parseISO(toCalendarDate(dateRange.end));
+  const start = parseISO(toUtcCalendarDate(dateRange.start));
+  const end = parseISO(toUtcCalendarDate(dateRange.end));
   const totalDays = Math.max(1, differenceInDays(end, start) + 1);
   const totalWidth = totalDays * pxPerDay;
 
@@ -153,14 +143,14 @@ export function GanttChart(props: GanttChartProps) {
     // 对每个 workItem, 它在 gantt 的 y 坐标 = sprint 行 (因为 wi 是 sprint 的子元素, 但实际
     // 渲染在 sprint 行内顶部, 这里用 sprint row top)
     // 但 wi 有 sprint_id 也有 start_date/end_date, 跨 sprint 拖动时用 sprint 索引
-    const chartStart = parseISO(toCalendarDate(dateRange.start));
+    const chartStart = parseISO(toUtcCalendarDate(dateRange.start));
 
     const result: Record<string, { x: number; y: number; end_x: number; rowTop: number }> = {};
     for (const sp of sprints) {
       const i = sprintIdx.get(sp.id) ?? 0;
       const top = i * (ROW.sprint + ROW.gap);
-      const spStart = parseISO(toCalendarDate(sp.start_date));
-      const spEnd = parseISO(addCalendarDays(sp.end_date, 1));
+      const spStart = parseISO(toUtcCalendarDate(sp.start_date));
+      const spEnd = parseISO(addUtcCalendarDays(sp.end_date, 1));
       result[sp.id] = {
         x: Math.max(0, differenceInDays(spStart, chartStart)) * pxPerDay,
         y: top + ROW.sprint / 2,
@@ -171,7 +161,7 @@ export function GanttChart(props: GanttChartProps) {
     for (const ms of milestones) {
       const i = msIdx.get(ms.id) ?? 0;
       const top = sprints.length * (ROW.sprint + ROW.gap) + ROW.gap + i * (ROW.ms + ROW.gap);
-      const msDate = parseISO(toCalendarDate(ms.due_date));
+      const msDate = parseISO(toUtcCalendarDate(ms.due_date));
       result[ms.id] = {
         x: Math.max(0, differenceInDays(msDate, chartStart)) * pxPerDay,
         y: top + ROW.ms / 2,
@@ -409,9 +399,9 @@ export function GanttChart(props: GanttChartProps) {
                       label: sp.name,
                       status: sprintStatusToBarStatus(sp.status),
                     }}
-                    startDate={toCalendarDate(sp.start_date)}
-                    endDate={toCalendarDate(sp.end_date)}
-                    dateRangeStart={dateRange.start}
+                    startDate={toUtcCalendarDate(sp.start_date)}
+                    endDate={toUtcCalendarDate(sp.end_date)}
+                    dateRangeStart={toUtcCalendarDate(dateRange.start)}
                     pxPerDay={pxPerDay}
                     variant="sprint"
                     onCheckConflict={undefined /* sprint 不检查 predecessor, 见 workItem 渲染分支 */}
@@ -484,9 +474,9 @@ export function GanttChart(props: GanttChartProps) {
                       label: ms.name,
                       status: critical ? "blocked" : "done",
                     }}
-                    startDate={toCalendarDate(ms.due_date)}
-                    endDate={toCalendarDate(ms.due_date)}
-                    dateRangeStart={dateRange.start}
+                    startDate={toUtcCalendarDate(ms.due_date)}
+                    endDate={toUtcCalendarDate(ms.due_date)}
+                    dateRangeStart={toUtcCalendarDate(dateRange.start)}
                     pxPerDay={pxPerDay}
                     variant="milestone"
                     isCritical={critical}
@@ -687,9 +677,9 @@ export function GanttChart(props: GanttChartProps) {
                           >
                             <GanttBar
                               item={{ id: sp.id, label: sp.name, status: sprintStatusToBarStatus(sp.status) }}
-                              startDate={toCalendarDate(sp.start_date)}
-                              endDate={toCalendarDate(sp.end_date)}
-                              dateRangeStart={dateRange.start}
+                              startDate={toUtcCalendarDate(sp.start_date)}
+                              endDate={toUtcCalendarDate(sp.end_date)}
+                              dateRangeStart={toUtcCalendarDate(dateRange.start)}
                               pxPerDay={mPxPerDay}
                               variant="sprint"
                               onCheckConflict={undefined}
@@ -735,9 +725,9 @@ export function GanttChart(props: GanttChartProps) {
                           >
                             <GanttBar
                               item={{ id: ms.id, label: ms.name, status: critical ? "blocked" : "done" }}
-                              startDate={toCalendarDate(ms.due_date)}
-                              endDate={toCalendarDate(ms.due_date)}
-                              dateRangeStart={dateRange.start}
+                              startDate={toUtcCalendarDate(ms.due_date)}
+                              endDate={toUtcCalendarDate(ms.due_date)}
+                              dateRangeStart={toUtcCalendarDate(dateRange.start)}
                               pxPerDay={mPxPerDay}
                               variant="milestone"
                               isCritical={critical}

@@ -9,15 +9,28 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 /*
-@cypher schema=1 source_sha256=e0ce3789189616a6d9d21b8b94581983e52f49df3dcc723ba764f6d6f374abc4
+@cypher schema=1 source_sha256=28141bac0eaf54631278c955f8c0c5ebb5e53e27fd76664aae55f20d02a133f1
 MERGE (self:File {path:"frontend/src/components/gantt/GanttChart.test.tsx"})
 MERGE (ganttChart:Function {name:"GanttChart", language:"typescript", visibility:"public"})
+MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
+MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (differenceInUtcCalendarDays:Function {name:"differenceInUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
 MERGE (self)-[:TESTS]->(ganttChart)
+MERGE (self)-[:TESTS]->(addUtcCalendarDays)
+MERGE (self)-[:TESTS]->(differenceInUtcCalendarDays)
+MERGE (self)-[:TESTS]->(toUtcCalendarDate)
+MERGE (self)-[:IMPORTS]->(dateUtils)
 @endcypher
 */
 import { render, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { GanttChart } from "./GanttChart";
+import {
+  addUtcCalendarDays,
+  differenceInUtcCalendarDays,
+  toUtcCalendarDate,
+} from "@/lib/gantt/dateUtils";
 import type { Sprint, Milestone, WorkItem } from "@/types/ids";
 import { I18nProvider } from "@/lib/i18n";
 
@@ -136,6 +149,13 @@ describe("GanttChart", () => {
     if (typeof window !== "undefined") {
       window.localStorage.clear();
     }
+  });
+
+  it("normalizes timestamp offsets and date arithmetic to UTC calendar days", () => {
+    expect(toUtcCalendarDate("2026-02-10T00:00:00Z")).toBe("2026-02-10");
+    expect(toUtcCalendarDate("2026-02-10T23:30:00-02:00")).toBe("2026-02-11");
+    expect(addUtcCalendarDays("2026-03-08T00:00:00Z", 1)).toBe("2026-03-09");
+    expect(differenceInUtcCalendarDays("2026-03-09", "2026-03-08")).toBe(1);
   });
 
   it("renders sprint rows and milestone rows", () => {
