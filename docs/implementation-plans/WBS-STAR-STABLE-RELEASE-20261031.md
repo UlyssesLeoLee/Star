@@ -91,6 +91,10 @@ Wave 2 四个 lane 已按 MAGOS 计划合入本地 `dev@c2b3e5f07691bc657a3e7f67
 
 本轮未把上述候选合入 dev，未修改 main、D2 或用户脏文件；未 push、创建 tag/release、构建/发布制品或部署。稳定版继续 OPEN/不可发布。
 
+### 2026-11-01 MAGOS lane 预检
+
+尝试为根 MIT metadata（W1）与 CI gate（W4）登记一个依赖有向的并行 set `stable-release-wave3`，以 `dev@2a57fa0d329be830735d6657677236e195673362` 为 base。MAGOS `set-plan --dry-run` 返回 `CONFLICT`（exit 10），未登记任何 claim，也未创建分支或工作树。W1 的 `Cargo.toml` 与 `UlyssesLeoLee/w8-source-position-claim-fix-20261025`、`codex/wbs-w8-transport-remediation-20261025`、`origin/dependabot/cargo/rust-dependencies-fe3c6ef10d` 的已提交改动，以及 detached `wbs-w8-bi-native-adapter-20261024` 的未提交改动重叠；W4 的 `.github/workflows/ci.yml` 和 `.github/workflows/license-gate.yml` 与 `origin/dependabot/github_actions/dtolnay/rust-toolchain-1.120.0` 重叠。旧 lane 与用户数据保持不动，不用 override 或改名绕开。先由来源分支 owner 审查/集成这些改动，或待冲突状态有证据变化后再重新规划 W1/W4。
+
 ## 外部约束依据（截至 2026-10-31）
 
 - Rust 官方 notes 显示 1.99.1 于 2026-10-15 发布；Star baseline 1.99.0仍是用户声明的最低版本，但是否升 patch 需在 W2 决策。[Rust Release Notes](https://doc.rust-lang.org/releases.html)
@@ -118,3 +122,4 @@ Wave 2 四个 lane 已按 MAGOS 计划合入本地 `dev@c2b3e5f07691bc657a3e7f67
 | v1.4 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 精确记录三份 Canvas 的 workflow/Dockerfile 静态过滤边界、活动 digest-pinned K3s 清单中的占位符、无 workload 的 Helm placeholder，以及未纳入 Canvas release matrix 的宽泛 `k3s-local` Docker context 和其有限 `.dockerignore` 排除项；D2 退役说明仍为未提交 owner draft。稳定版继续 OPEN，不发布。 | 复核发布载荷审计，明确 Canvas 静态证明不可外推到其他 Docker context |
 | v1.5 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录用户确认 Git tag 为唯一版本源、稳定版目标 `v1.0.6`，并指定 Codex 协调者为 accountable release owner；将 W0 剩余工作限定为各产品版本映射、最终 source commit 与 release procedure 的验证。未创建 tag，W0–W9 与稳定版仍 OPEN。 | 用户完成 W0 版本源和发行责任决策 |
 | v1.6 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将独立 W0 审计行明确标为用户决策前快照，防止它与 v1.5 的 `v1.0.6` 与 accountable owner 决策冲突；其旧工作树保持原样。最终 source commit、产品版本映射、真实 release procedure 与所有其他门禁未通过，整体仍不可发布。 | 对照 W0 原报告与用户后续版本决策做一致性复核 |
+| v1.7 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 W1/W4 并行实现 lane 的 MAGOS 预检冲突及精确来源；确认此次尝试没有登记 claim、创建分支/工作树或改动旧 lane。W1 root license 与 W4 通用 CI 修正等待现存来源冲突解决；稳定版仍 OPEN，不发布。 | MAGOS set-plan 检测到 Cargo.toml 与 CI workflow 文件重叠 |
