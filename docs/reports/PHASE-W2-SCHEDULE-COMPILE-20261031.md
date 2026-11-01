@@ -36,7 +36,7 @@
 |---|---|
 | `rtk proxy cargo +1.99.1 check -p run-owner-runtime --all-targets --locked -j 4` | ✅ exit 0，52.76 秒。此前报告记录的 PG fixture `Option<Uuid>` 插值问题已由当前 dev 中的提交 `eb1e91f4` 修复；该诊断编译现在通过。 |
 | 编译 warning | ⚠️ `domain-kms` 输出 4 条 warning：1 条 unused import（`SecretDataKey`）和 3 条 `Nonce::from_slice` deprecation；它们未阻断本次检查，未在本 lane 修改。 |
-| Rust 1.99.0 最低版本门 | ⛔ 未通过/未验证。最初 exact check 因 rustc 组件不适用于该 toolchain 而未进入编译。移除已确认缺少可用 rustc.exe 的损坏登记项后尝试通过 rustup 重装；下载长时间无进度输出后主动停止。原有两个 .broken 备份目录保留；当前未恢复出可验证的 1.99.0 compiler，不能据此断定下载停滞的原因。 |
+| Rust 1.99.0 最低版本门 | ⛔ 未通过/未验证。最初 exact check 因 rustc 组件不适用于该 toolchain 而未进入编译。2026-11-01 再次运行 `rtk proxy rustup toolchain install 1.99.0-x86_64-pc-windows-msvc --profile minimal`；rustup 报告恢复部分安装，选择 2026-10-01 的 1.99.0 manifest，清理旧组件并开始下载 6 个组件。约 60 秒没有新输出后停止；遗留的同一安装子进程已按命令行核实并终止。随后检查确认 toolchain 目录仍缺 `multirust-channel-manifest.toml` 与 `bin/rustc.exe`，且没有该安装进程在运行。两个 `.broken` 备份仍在。观察到下载停滞，但不推断其根因。 |
 | PostgreSQL 集成测试 | 未运行；本次只执行 `cargo check`，不得视为数据库验收。 |
 | 源码/manifest/lock | 未修改。本 lane 仅更新证据文档与审计记录。 |
 
@@ -44,7 +44,7 @@
 
 ## §3 已知缺口
 
-1. Rust 1.99.0 最低版本验收仍未通过：初始登记项缺少可用 rustc.exe；移除该损坏登记后，rustup 重装下载未完成。之前的两个 .broken 备份目录保留。需取得可运行的 1.99.0 compiler 后重跑验收。
+1. Rust 1.99.0 最低版本验收仍未通过：toolchain directory 存在，但缺少可用 `rustc.exe` 和 channel manifest。两次官方 rustup 安装/恢复均未完成；最新 minimal-profile 尝试下载 6 个组件后约 60 秒无进展而停止，两个 `.broken` 备份目录保留。需恢复可运行的 1.99.0 compiler 后重跑验收；下载停滞原因未知。
 2. 此前发现的 `schedule_admission_pg.rs` 两处 `Option<Uuid>` 格式化问题已由 dev 提交 `eb1e91f4` 修复；当前 dev 的 1.99.1 `--all-targets` 诊断编译通过。PostgreSQL 集成测试仍需执行。
 3. 真实 PostgreSQL 执行结果未知；本轮未声称数据库行为已验收。
 4. Schedule 的 branchless/hostless target 支持仍未实现。本 lane 按当前契约 fail closed；实现它需要独立的需求、授权、SQL 和测试设计。
@@ -56,7 +56,7 @@
 
 - Rust toolchain owner：恢复 Rust 1.99.0 编译器组件，并重跑本报告中的最低版本命令。
 - PG test owner：fixture 编译错误已由 dev 提交 `eb1e91f4` 修复；仍需运行相应 PostgreSQL 集成测试并记录结果。
-- 根协调者：审查本 lane commit 和报告后，决定是否进入 MAGOS integration；不得将 1.99.1 诊断结果记作 1.99.0 release gate 通过。
+- 根协调者：W2 文档 lane commit `2f30c52c49f0994e2f37d394a8e04f3ef2b9f88b` 已经审查并快进合入本地 dev，MAGOS claim 已释放且 lane 已清理；不得将 1.99.1 诊断结果记作 1.99.0 release gate 通过。W2 BFF lockfile 是独立 lane，继续保留其未提交内容等待 owner 的 locked recheck。
 
 ## §5 守门规则
 
@@ -94,3 +94,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 agent | 记录 Schedule admission 单行 branch binding 修复、运行证据与尚未解除的工具链/PG fixture 门禁。 | W2 stable release follow-up lane |
 | v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 追加当前 dev 的 1.99.1 all-targets 诊断通过证据；说明旧 PG fixture 编译阻塞已由 eb1e91f4 修复，同时保留 Rust 1.99.0、PostgreSQL 与发行依赖门禁开放。 | 当前 dev 重新执行 W2 Schedule all-targets 编译检查 |
+| v0.3 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录第二次 Rust 1.99.0 minimal-profile 安装恢复尝试、下载停滞后的安全停止、toolchain manifest/rustc 缺失复查及 W2 文档 lane 已集成清理的事实；W2 与稳定发行仍未关闭。 | 当前 toolchain 重试结果与 W2 lane 集成回执 |
