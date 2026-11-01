@@ -1,24 +1,34 @@
 /*
-@cypher schema=1 source_sha256=2d49617fb9cdf380a09da4660855090dfd1e5ae64d7e580ff22679a7316e0366
+@cypher schema=1 source_sha256=9cfd2d9ff5e2ae5877647cdc2e9e0d7fce6adc0c5f06dafff14846f23432e022
 MERGE (self:File {path:"frontend/src/lib/run/runDirectorySession.test.tsx"})
 MERGE (provider:Symbol {id:"frontend/src/lib/run/runDirectorySession.tsx::RunDirectoryProvider", kind:"function"})
 MERGE (hook:Symbol {id:"frontend/src/lib/run/runDirectorySession.tsx::useRunDirectory", kind:"function"})
 MERGE (client:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listProjects", kind:"method"})
 MERGE (missing:Symbol {id:"frontend/src/lib/run/runDirectorySession.test.tsx::missing host session remains fail closed", kind:"test"})
+MERGE (missingToken:Symbol {id:"frontend/src/lib/run/runDirectorySession.test.tsx::missing host token invalidates the directory before fetching", kind:"test"})
 MERGE (ready:Symbol {id:"frontend/src/lib/run/runDirectorySession.test.tsx::host session exposes a ready client and Run focus", kind:"test"})
 MERGE (invalidated:Symbol {id:"frontend/src/lib/run/runDirectorySession.test.tsx::authorization invalidation blocks the directory and clears focus", kind:"test"})
+MERGE (forbidden:Symbol {id:"frontend/src/lib/run/runDirectorySession.test.tsx::scoped 403 keeps the host session and current focus", kind:"test"})
 MERGE (replaced:Symbol {id:"frontend/src/lib/run/runDirectorySession.test.tsx::session generation replacement clears focus and disposes the old client", kind:"test"})
 MERGE (self)-[:DEFINES]->(missing)
+MERGE (self)-[:DEFINES]->(missingToken)
 MERGE (self)-[:DEFINES]->(ready)
 MERGE (self)-[:DEFINES]->(invalidated)
+MERGE (self)-[:DEFINES]->(forbidden)
 MERGE (self)-[:DEFINES]->(replaced)
 MERGE (missing)-[:TESTS]->(provider)
 MERGE (missing)-[:TESTS]->(hook)
+MERGE (missingToken)-[:TESTS]->(provider)
+MERGE (missingToken)-[:TESTS]->(hook)
+MERGE (missingToken)-[:CALLS]->(client)
 MERGE (ready)-[:TESTS]->(provider)
 MERGE (ready)-[:TESTS]->(hook)
 MERGE (invalidated)-[:TESTS]->(provider)
 MERGE (invalidated)-[:TESTS]->(hook)
 MERGE (invalidated)-[:CALLS]->(client)
+MERGE (forbidden)-[:TESTS]->(provider)
+MERGE (forbidden)-[:TESTS]->(hook)
+MERGE (forbidden)-[:CALLS]->(client)
 MERGE (replaced)-[:TESTS]->(provider)
 MERGE (replaced)-[:TESTS]->(hook)
 MERGE (replaced)-[:CALLS]->(client)
@@ -129,6 +139,31 @@ describe("RunDirectoryProvider host session", () => {
     expect(result.current.focus).toBeNull();
   });
 
+  it("invalidates the directory before fetching when the host has no access token", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response("{}", { status: 200 }));
+    const session = createHostSession("generation-1", fetcher);
+    session.getAccessToken = vi.fn(async () => null);
+    const { result } = renderHook(() => useRunDirectory(), { wrapper: wrapperFor(session) });
+    act(() => result.current.setFocus(contextFixture()));
+
+    let requestError: unknown;
+    await act(async () => {
+      try {
+        await result.current.client!.listProjects();
+      } catch (error) {
+        requestError = error;
+      }
+    });
+
+    expect(requestError).toMatchObject({ code: "session_required", status: 401 });
+    expect(fetcher).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(result.current.status).toBe("blocked");
+      expect(result.current.client).toBeNull();
+      expect(result.current.focus).toBeNull();
+    });
+  });
+
   it("exposes a ready client and accepts Run focus from a host session", () => {
     const { result } = renderHook(() => useRunDirectory(), { wrapper: wrapperFor(createHostSession("generation-1")) });
     const focus = contextFixture();
@@ -154,12 +189,35 @@ describe("RunDirectoryProvider host session", () => {
       }
     });
 
-    expect(requestError).toMatchObject({ code: "authorization_failed", status: 401 });
+    expect(requestError).toMatchObject({ code: "session_expired", status: 401 });
     await waitFor(() => {
       expect(result.current.status).toBe("blocked");
       expect(result.current.client).toBeNull();
       expect(result.current.focus).toBeNull();
     });
+  });
+
+  it("keeps the host session and current focus after a scoped 403", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(null, { status: 403 }));
+    const { result } = renderHook(() => useRunDirectory(), { wrapper: wrapperFor(createHostSession("generation-1", fetcher)) });
+    const client = result.current.client!;
+    const focus = contextFixture();
+    act(() => result.current.setFocus(focus));
+
+    let requestError: unknown;
+    await act(async () => {
+      try {
+        await client.listProjects();
+      } catch (error) {
+        requestError = error;
+      }
+    });
+
+    expect(requestError).toMatchObject({ code: "forbidden", status: 403 });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(result.current.status).toBe("ready");
+    expect(result.current.client).toBe(client);
+    expect(result.current.focus).toBe(focus);
   });
 
   it("clears focus and disposes the old client when the host session generation changes", async () => {

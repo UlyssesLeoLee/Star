@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a10f6fcc98a3ee3d1b0c2fea3f02cb2589616831e315a22748aed8028763c9c7
+@cypher schema=1 source_sha256=bf97f419b1605c95c71ab7c89f939125ec35dcc147300573bab6da9c37b10354
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.test.tsx"})
 MERGE (create:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::creates a Run-owned Task Card against the current authorized focus and refreshes the Run list",kind:"test"})
 MERGE (hostless:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::lists and creates hostless Run Task Cards without a Worktree focus",kind:"test"})
@@ -233,6 +233,12 @@ describe("RunTaskCardsPanel", () => {
   it("lists and creates hostless Run Task Cards without a Worktree focus", async () => {
     const fixture = clientFixture();
     const context = contextFixture();
+    const createdCard = { ...cardFixture(), work_item_id: "20000000-0000-4000-8000-000000000009", title: "Hostless card" };
+    let created = false;
+    fixture.listRunWorkItems.mockImplementation(async () => ({
+      rows: created ? [createdCard] : [], limit: RUN_TASK_CARD_PAGE_SIZE, next_after: null,
+    }));
+    fixture.createRunTaskCard.mockImplementation(async () => { created = true; return createdCard; });
     context.engineering_run = { ...context.engineering_run, repository_id: null, branch_id: null };
     context.run_context.repository_id = null;
     context.run_context.branch_id = null;
@@ -240,10 +246,9 @@ describe("RunTaskCardsPanel", () => {
     context.branch = null;
     context.focus = null;
     context.focus_version = null;
-    fixture.createRunTaskCard.mockResolvedValue({ ...cardFixture(), title: "Hostless card" });
     render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
 
-    expect(await screen.findByText("Real Run task")).toBeInTheDocument();
+    expect(await screen.findByText(/此 Engineering Run 当前没有已归属的任务/)).toBeInTheDocument();
     await clickNewTaskCard();
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Hostless card" } });
     fireEvent.click(screen.getByRole("button", { name: "创建任务卡" }));
@@ -251,6 +256,7 @@ describe("RunTaskCardsPanel", () => {
     expect(await screen.findByText("Hostless card")).toBeInTheDocument();
     expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
     expect(fixture.createLegacyRunTaskCard).not.toHaveBeenCalled();
+    await waitFor(() => expect(fixture.listRunWorkItems).toHaveBeenCalledTimes(2));
   });
 
   it("creates a Run-owned Task Card against the current authorized focus and refreshes the Run list", async () => {
@@ -324,7 +330,7 @@ describe("RunTaskCardsPanel", () => {
     changed.focus = { ...changed.focus!, worktree_id: "30000000-0000-4000-8000-000000000009" };
     view.rerender(<RunTaskCardsPanel client={fixture.client} context={changed} available recoveryStore={recoveryStore} />);
 
-    expect(await screen.findByText(/当前 Worktree、Run binding 或授权版本不同/)).toBeInTheDocument();
+    expect(await screen.findByText(/当前 Run、焦点 Worktree、binding 或授权版本不同/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用同一请求重试" })).toBeDisabled();
     expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
   });
@@ -390,7 +396,7 @@ describe("RunTaskCardsPanel", () => {
     changedContext.run_context.authorization.engineering_run.version += 1;
     first.rerender(<RunTaskCardsPanel client={fixture.client} context={changedContext} available recoveryStore={recoveryStore} />);
 
-    expect(await screen.findByText(/当前 Worktree、Run binding 或授权版本不同/)).toBeInTheDocument();
+    expect(await screen.findByText(/当前 Run、焦点 Worktree、binding 或授权版本不同/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用同一请求重试" })).toBeDisabled();
     expect(fixture.createRunTaskCard).toHaveBeenCalledOnce();
   });
