@@ -30,13 +30,14 @@
 
 ## §2.1 2026-11-01 current-dev revalidation
 
-本节补充当前 `dev@6e7d51a7088aa978d67f75197fadf0597db2925f` 的复核结果；§2 的原始输出保留为该 lane 当时的历史快照。
+本节记录当时 dev@6e7d51a7088aa978d67f75197fadf0597db2925f 的复核结果；§2 的原始输出保留为该 lane 当时的历史快照。
 
 | 检查 | 结果 |
 |---|---|
 | `rtk proxy cargo +1.99.1 check -p run-owner-runtime --all-targets --locked -j 4` | ✅ exit 0，52.76 秒。此前报告记录的 PG fixture `Option<Uuid>` 插值问题已由当前 dev 中的提交 `eb1e91f4` 修复；该诊断编译现在通过。 |
 | 编译 warning | ⚠️ `domain-kms` 输出 4 条 warning：1 条 unused import（`SecretDataKey`）和 3 条 `Nonce::from_slice` deprecation；它们未阻断本次检查，未在本 lane 修改。 |
 | Rust 1.99.0 最低版本门 | ⛔ 未通过/未验证。最初 exact check 因 rustc 组件不适用于该 toolchain 而未进入编译。2026-11-01 再次运行 `rtk proxy rustup toolchain install 1.99.0-x86_64-pc-windows-msvc --profile minimal`；rustup 报告恢复部分安装，选择 2026-10-01 的 1.99.0 manifest，清理旧组件并开始下载 6 个组件。约 60 秒没有新输出后停止；遗留的同一安装子进程已按命令行核实并终止。随后检查确认 toolchain 目录仍缺 `multirust-channel-manifest.toml` 与 `bin/rustc.exe`，且没有该安装进程在运行。两个 `.broken` 备份仍在。观察到下载停滞，但不推断其根因。 |
+| Rust 1.99.0 toolchain recovery retest (2026-11-01) | ⛔ blocked before compilation | Rustup partial-install recovery completed and the installed-component list showed all six components; cargo +1.99.0 --version returned success. rustc +1.99.0 --version was denied by Windows with OS error 225 (the message identified a virus or potentially unwanted software); a subsequent exact-path check found bin/rustc.exe absent. The antivirus disposition was not independently confirmed. No 1.99.0 Cargo check was run. |
 | PostgreSQL 集成测试 | 未运行；本次只执行 `cargo check`，不得视为数据库验收。 |
 | 源码/manifest/lock | 未修改。本 lane 仅更新证据文档与审计记录。 |
 
@@ -44,7 +45,7 @@
 
 ## §3 已知缺口
 
-1. Rust 1.99.0 最低版本验收仍未通过：toolchain directory 存在，但缺少可用 `rustc.exe` 和 channel manifest。两次官方 rustup 安装/恢复均未完成；最新 minimal-profile 尝试下载 6 个组件后约 60 秒无进展而停止，两个 `.broken` 备份目录保留。需恢复可运行的 1.99.0 compiler 后重跑验收；下载停滞原因未知。
+1. Rust 1.99.0 最低版本验收仍未通过：恢复后的组件清单列出 rustc，但实际 rustc +1.99.0 --version 启动被 Windows 以 OS error 225 拒绝，随后 bin/rustc.exe 精确路径不存在。具体安全软件处置尚未确认；不得绕过拦截。准确版本 all-targets 编译尚未运行。
 2. 此前发现的 `schedule_admission_pg.rs` 两处 `Option<Uuid>` 格式化问题已由 dev 提交 `eb1e91f4` 修复；当前 dev 的 1.99.1 `--all-targets` 诊断编译通过。PostgreSQL 集成测试仍需执行。
 3. 真实 PostgreSQL 执行结果未知；本轮未声称数据库行为已验收。
 4. Schedule 的 branchless/hostless target 支持仍未实现。本 lane 按当前契约 fail closed；实现它需要独立的需求、授权、SQL 和测试设计。
@@ -95,3 +96,4 @@
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 agent | 记录 Schedule admission 单行 branch binding 修复、运行证据与尚未解除的工具链/PG fixture 门禁。 | W2 stable release follow-up lane |
 | v0.2 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 追加当前 dev 的 1.99.1 all-targets 诊断通过证据；说明旧 PG fixture 编译阻塞已由 eb1e91f4 修复，同时保留 Rust 1.99.0、PostgreSQL 与发行依赖门禁开放。 | 当前 dev 重新执行 W2 Schedule all-targets 编译检查 |
 | v0.3 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录第二次 Rust 1.99.0 minimal-profile 安装恢复尝试、下载停滞后的安全停止、toolchain manifest/rustc 缺失复查及 W2 文档 lane 已集成清理的事实；W2 与稳定发行仍未关闭。 | 当前 toolchain 重试结果与 W2 lane 集成回执 |
+| v0.4 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新第二次工具链恢复后的真实结果：Rustup 的部分安装恢复结束并列出六个组件；cargo +1.99.0 --version 成功，但 rustc +1.99.0 --version 被 Windows OS error 225 拒绝，随后目标 bin/rustc.exe 不存在。未确认安全软件具体处置，不绕过拦截；未运行 Rust 1.99.0 all-targets，W2 与稳定发行继续 BLOCKED/NO-GO。 | Rustup 恢复进程、组件列表、版本命令错误与目标文件复核 |
