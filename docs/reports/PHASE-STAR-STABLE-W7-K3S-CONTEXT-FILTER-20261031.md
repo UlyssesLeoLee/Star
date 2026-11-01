@@ -1,10 +1,10 @@
 # PHASE — Star Stable W7 local K3s context filter
 
-**阶段状态：** Star-only context 过滤实现与静态审阅已完成，候选已 rebase 到 `dev@646e1e3e354be2eddd3345c928adf8c591d5ac49`，待最终检查后快进集成。Rust 1.99.0 基线、Multipass 镜像构建、最终镜像审查与部署未验证；W7 和 stable release 仍 OPEN / 不可发布。
-**工作基线：** 原始实现基于 `dev@2a57fa0d329be830735d6657677236e195673362`；当前集成候选基于 `dev@646e1e3e354be2eddd3345c928adf8c591d5ac49`，lane tip `f8b06884775853b5518f36a8d5320ce552c69538`（文档同步前）。
+**阶段状态：** Star-only context 过滤实现与静态审阅已通过 fast-forward 集成到本地 dev，集成提交 `42082bccd9ae6fd24cf609f5697b2b964a568002`。Rust 1.99.0 基线、Multipass 镜像构建、最终镜像审查与部署未验证；W7 和 stable release 仍 OPEN / 不可发布。
+**工作基线：** 原始实现基于 `dev@2a57fa0d329be830735d6657677236e195673362`；集成前 dev 基线 `646e1e3e354be2eddd3345c928adf8c591d5ac49`；W7 集成提交与当前 dev tip `42082bccd9ae6fd24cf609f5697b2b964a568002`。
 **发行范围：** Desktop、Web/Vercel、三份 Star Canvas 服务镜像；本 lane 只处理供本地 K3s 使用的 `star-api-rest` build context。
 
-**当前审阅结论：** 所修改的本地 K3s API build path 已从宽泛 crates 输入改为 Cargo 解析闭包生成的逐 crate context；该静态改动准备集成到 dev。`deploy/k3s-local` 仍属开发/测试路径，不加入本次稳定版镜像矩阵。D2 worktree 中同路径未提交的 README 草稿保持原样，不将其视为已接受的支持范围决定。
+**当前审阅结论：** 所修改的本地 K3s API build path 已从宽泛 crates 输入改为 Cargo 解析闭包生成的逐 crate context；该静态改动已集成到 dev。`deploy/k3s-local` 仍属开发/测试路径，不加入本次稳定版镜像矩阵。D2 worktree 中同路径未提交的 README 草稿保持原样，不将其视为已接受的支持范围决定。
 
 ## §0 目的
 
@@ -63,7 +63,7 @@ W7 lane 曾由子代理实施。首次派发前没有落地 dispatcher brief；b
 | 架构 | 协调者已完成静态代码、清单范围和 fixture 结果复核；Cargo 图与真实 guest build 仍待验证。 |
 | SRE Lead | 不适用：未运行 guest build、集群部署、容量或恢复验收。 |
 | 平台 | 不适用：未运行真实 Cargo、镜像构建或制品验证。 |
-| 评审主持 | 协调者静态整合审查完成；候选已 rebase 到当前 dev，待目标 checkout 最终状态复核后快进集成。W7 的生产验收仍未完成。 |
+| 评审主持 | 协调者完成静态整合审查并快进集成到本地 dev@42082bcc；W7 的生产验收仍未完成。 |
 | PM | 不适用：未修改发行范围、版本或发布授权。 |
 
 **发布审批：** 未申请；W7 与 stable release 仍不可发布。
@@ -78,3 +78,4 @@ W7 lane 曾由子代理实施。首次派发前没有落地 dispatcher brief；b
 | v0.4 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 协调者复核 | 增加源 lock package identity/checksum 漂移拒绝测试；当前单测 10 passed、1 skipped，代码图守门通过。更新 brief/report 的锁文件算法和证据边界；release context digest 不变。 | 独立复核要求覆盖 lock 校验拒绝路径并同步测试数量。 |
 | v0.5 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 协调者复核 | 记录 D2 活动 worktree 的未提交 README 将 `deploy/k3s-local` 标为退役，与 W7 API image candidate 的支持范围冲突；W7 暂不集成到 dev，等待 owner 完成范围裁决。 | D2 worktree 只读检查发现同一路径的活动 owner 改动。 |
 | v0.6 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将候选 rebase 到 `dev@646e1e3e` 后复核：`deploy/k3s-local/Dockerfile` 不再包含宽泛 crates COPY，生成器仅从解析的 Star API 本地依赖闭包组装 context；同步主 WBS。D2 未提交 README 草稿继续保留，API 路径支持/退役仍需独立裁决。Rust 1.99.0、Multipass 镜像构建、最终镜像/SBOM/provenance、K3s rollout/rollback 未验证，W7 与稳定版保持 OPEN/NO-GO。 | 用户要求 Docker/build context 不携带 game 等遗留内容；对候选的当前 dev 集成审查。 |
+| v0.7 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录本 lane 的 8 个登记文件已从 `dev@646e1e3e` fast-forward 到 `dev@42082bcc`；W6 审阅文档已在 dev ancestry 中，因此未重复 cherry-pick。复验 11 项 context tests：10 passed、1 skipped（WinError 1314）；CodeRabbit CLI 因操作系统权限错误不可用，协调者完成本地静态审查。Rust 1.99.0、真实 Multipass image build、最终 payload/SBOM/provenance、K3s rollout/rollback 仍未通过，W7 和稳定版保持 OPEN/NO-GO。 | W7 lane 成功快进集成后补记 dev 结果与未关闭门禁。 |
