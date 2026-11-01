@@ -6,6 +6,15 @@
 // =====================================================================
 
 import { describe, it, expect } from "vitest";
+/*
+@cypher schema=1 source_sha256=9125ab33a78da252275abf919e873cd105c3d4b120b7bc3a662b4080f845c5ba
+MERGE (self:File {path:"frontend/src/lib/terminal/wsProtocol.test.ts"})
+MERGE (decodeClientMessage:Function {name:"decodeClientMessage", language:"typescript", visibility:"public"})
+MERGE (decodeServerMessage:Function {name:"decodeServerMessage", language:"typescript", visibility:"public"})
+MERGE (self)-[:TESTS]->(decodeClientMessage)
+MERGE (self)-[:TESTS]->(decodeServerMessage)
+@endcypher
+*/
 import {
   type ClientMessage,
   type ServerMessage,
@@ -179,9 +188,13 @@ describe("wsProtocol (PR #98.5 修复 schema 对齐)", () => {
     expect(() => decodeServerMessage("{not valid")).toThrow();
   });
 
-  it("M. unknown message type returns error", () => {
-    const bad = '{"type":"unknown_msg","data":"x"}';
-    expect(() => decodeClientMessage(bad)).toThrow();
+  it("M. unknown client and server message types are rejected like the Rust tagged enums", () => {
+    expect(() => decodeClientMessage('{"type":"fly_to_mars","speed":3}')).toThrow(
+      /Unknown client message type/,
+    );
+    expect(() => decodeServerMessage('{"type":"unknown_msg","data":"x"}')).toThrow(
+      /Unknown server message type/,
+    );
   });
 
   it("N. EXAMPLE_SERVER_HELLO decodes correctly (PR #106 contract smoke)", () => {

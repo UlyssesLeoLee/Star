@@ -1,5 +1,19 @@
 "use client";
 
+/*
+@cypher schema=1 source_sha256=45ac1128c91f303056ebd9e6aacc3d39fc6e9fd7fb6786babf7dc592c546f7fe
+MERGE (self:File {path:"frontend/src/components/gantt/GanttChart.tsx"})
+MERGE (toCalendarDate:Function {name:"toCalendarDate", language:"typescript", visibility:"private"})
+MERGE (addCalendarDays:Function {name:"addCalendarDays", language:"typescript", visibility:"private"})
+MERGE (ganttChart:Function {name:"GanttChart", language:"typescript", visibility:"public"})
+MERGE (ganttChart)-[:CALLS]->(toCalendarDate)
+MERGE (ganttChart)-[:CALLS]->(addCalendarDays)
+MERGE (self)-[:DEFINES]->(toCalendarDate)
+MERGE (self)-[:DEFINES]->(addCalendarDays)
+MERGE (self)-[:DEFINES]->(ganttChart)
+@endcypher
+*/
+
 // =====================================================================
 // GanttChart — 主容器 (per W2 任务 §1 + design §4.3)
 //
@@ -56,6 +70,17 @@ const PX_PER_DAY: Record<ZoomLevel, number> = {
 
 const ZOOM_ORDER: ZoomLevel[] = ["week", "month", "quarter"];
 
+function toCalendarDate(value: string): string {
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp)
+    ? value.slice(0, 10)
+    : new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function addCalendarDays(value: string, days: number): string {
+  return format(addDays(parseISO(toCalendarDate(value)), days), "yyyy-MM-dd");
+}
+
 function sprintStatusToBarStatus(s: SprintStatus): GanttBarStatus {
   // sprint 状态映射 (sprint 用同一套颜色)
   return s;
@@ -103,8 +128,8 @@ export function GanttChart(props: GanttChartProps) {
   }, [zoom]);
   const pxPerDay = PX_PER_DAY[zoom];
 
-  const start = parseISO(dateRange.start);
-  const end = parseISO(dateRange.end);
+  const start = parseISO(toCalendarDate(dateRange.start));
+  const end = parseISO(toCalendarDate(dateRange.end));
   const totalDays = Math.max(1, differenceInDays(end, start) + 1);
   const totalWidth = totalDays * pxPerDay;
 
@@ -128,14 +153,14 @@ export function GanttChart(props: GanttChartProps) {
     // 对每个 workItem, 它在 gantt 的 y 坐标 = sprint 行 (因为 wi 是 sprint 的子元素, 但实际
     // 渲染在 sprint 行内顶部, 这里用 sprint row top)
     // 但 wi 有 sprint_id 也有 start_date/end_date, 跨 sprint 拖动时用 sprint 索引
-    const chartStart = parseISO(dateRange.start);
+    const chartStart = parseISO(toCalendarDate(dateRange.start));
 
     const result: Record<string, { x: number; y: number; end_x: number; rowTop: number }> = {};
     for (const sp of sprints) {
       const i = sprintIdx.get(sp.id) ?? 0;
       const top = i * (ROW.sprint + ROW.gap);
-      const spStart = parseISO(sp.start_date);
-      const spEnd = parseISO(addDays(parseISO(sp.end_date), 1).toISOString());
+      const spStart = parseISO(toCalendarDate(sp.start_date));
+      const spEnd = parseISO(addCalendarDays(sp.end_date, 1));
       result[sp.id] = {
         x: Math.max(0, differenceInDays(spStart, chartStart)) * pxPerDay,
         y: top + ROW.sprint / 2,
@@ -146,7 +171,7 @@ export function GanttChart(props: GanttChartProps) {
     for (const ms of milestones) {
       const i = msIdx.get(ms.id) ?? 0;
       const top = sprints.length * (ROW.sprint + ROW.gap) + ROW.gap + i * (ROW.ms + ROW.gap);
-      const msDate = parseISO(ms.due_date);
+      const msDate = parseISO(toCalendarDate(ms.due_date));
       result[ms.id] = {
         x: Math.max(0, differenceInDays(msDate, chartStart)) * pxPerDay,
         y: top + ROW.ms / 2,
@@ -384,18 +409,15 @@ export function GanttChart(props: GanttChartProps) {
                       label: sp.name,
                       status: sprintStatusToBarStatus(sp.status),
                     }}
-                    startDate={sp.start_date}
-                    endDate={addDays(parseISO(sp.end_date), 1).toISOString()}
+                    startDate={toCalendarDate(sp.start_date)}
+                    endDate={toCalendarDate(sp.end_date)}
                     dateRangeStart={dateRange.start}
                     pxPerDay={pxPerDay}
                     variant="sprint"
                     onCheckConflict={undefined /* sprint 不检查 predecessor, 见 workItem 渲染分支 */}
                     onClick={() => handleSprintClick(sp.id)}
                     onDragEnd={(newStart, newEnd) => {
-                      // newEnd 是 +1 day (GanttBar 内部 exclusive end), 转回 inclusive
-                      // 用 date-fns format 保持 local date 一致 (避免 toISOString 时区漂移)
-                      const inclusiveEnd = format(addDays(parseISO(newEnd), -1), "yyyy-MM-dd");
-                      onSprintUpdate?.(sp.id, newStart, inclusiveEnd);
+                      onSprintUpdate?.(sp.id, newStart, newEnd);
                     }}
                   />
                   {/* work items: 在 sprint 行底部小条 (供跨 sprint 拖) */}
@@ -462,8 +484,8 @@ export function GanttChart(props: GanttChartProps) {
                       label: ms.name,
                       status: critical ? "blocked" : "done",
                     }}
-                    startDate={ms.due_date}
-                    endDate={addDays(parseISO(ms.due_date), 1).toISOString()}
+                    startDate={toCalendarDate(ms.due_date)}
+                    endDate={toCalendarDate(ms.due_date)}
                     dateRangeStart={dateRange.start}
                     pxPerDay={pxPerDay}
                     variant="milestone"
@@ -665,17 +687,14 @@ export function GanttChart(props: GanttChartProps) {
                           >
                             <GanttBar
                               item={{ id: sp.id, label: sp.name, status: sprintStatusToBarStatus(sp.status) }}
-                              startDate={sp.start_date}
-                              endDate={addDays(parseISO(sp.end_date), 1).toISOString()}
+                              startDate={toCalendarDate(sp.start_date)}
+                              endDate={toCalendarDate(sp.end_date)}
                               dateRangeStart={dateRange.start}
                               pxPerDay={mPxPerDay}
                               variant="sprint"
                               onCheckConflict={undefined}
                               onClick={() => handleSprintClick(sp.id)}
-                              onDragEnd={(newStart, newEnd) => {
-                                const inclusiveEnd = format(addDays(parseISO(newEnd), -1), "yyyy-MM-dd");
-                                onSprintUpdate?.(sp.id, newStart, inclusiveEnd);
-                              }}
+                              onDragEnd={(newStart, newEnd) => onSprintUpdate?.(sp.id, newStart, newEnd)}
                             />
                             {wiList.slice(0, 4).map((wi, i) => (
                               <div
@@ -716,8 +735,8 @@ export function GanttChart(props: GanttChartProps) {
                           >
                             <GanttBar
                               item={{ id: ms.id, label: ms.name, status: critical ? "blocked" : "done" }}
-                              startDate={ms.due_date}
-                              endDate={addDays(parseISO(ms.due_date), 1).toISOString()}
+                              startDate={toCalendarDate(ms.due_date)}
+                              endDate={toCalendarDate(ms.due_date)}
                               dateRangeStart={dateRange.start}
                               pxPerDay={mPxPerDay}
                               variant="milestone"

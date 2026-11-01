@@ -8,6 +8,13 @@
 // =====================================================================
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+/*
+@cypher schema=1 source_sha256=e0ce3789189616a6d9d21b8b94581983e52f49df3dcc723ba764f6d6f374abc4
+MERGE (self:File {path:"frontend/src/components/gantt/GanttChart.test.tsx"})
+MERGE (ganttChart:Function {name:"GanttChart", language:"typescript", visibility:"public"})
+MERGE (self)-[:TESTS]->(ganttChart)
+@endcypher
+*/
 import { render, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { GanttChart } from "./GanttChart";
@@ -227,9 +234,8 @@ describe("GanttChart", () => {
     const msBar = container.querySelector('[data-bar-id="ms-001"]') as HTMLElement;
     expect(msBar).toBeTruthy();
     expect(msBar.dataset.barVariant).toBe("milestone");
-
     // Week zoom (60 px/day) -> drag +60px = +1 day from 2026-02-10 -> 2026-02-11
-    fireEvent.mouseDown(msBar, { clientX: 100, preventDefault: () => {}, stopPropagation: () => {} });
+    fireEvent.mouseDown(msBar, { clientX: 100 });
     fireEvent.mouseMove(document, { clientX: 160 });
     fireEvent.mouseUp(document);
 
@@ -255,7 +261,7 @@ describe("GanttChart", () => {
     expect(sprintBar.dataset.barVariant).toBe("sprint");
 
     // Week zoom: drag +120px = +2 days
-    fireEvent.mouseDown(sprintBar, { clientX: 200, preventDefault: () => {}, stopPropagation: () => {} });
+    fireEvent.mouseDown(sprintBar, { clientX: 200 });
     fireEvent.mouseMove(document, { clientX: 320 });
     fireEvent.mouseUp(document);
 

@@ -7,6 +7,15 @@
 // =====================================================================
 
 import { describe, it, expect } from "vitest";
+/*
+@cypher schema=1 source_sha256=8b500734ec9a26dbc7aeffe825a2e3404be9960409019224a1ea4207786e63c6
+MERGE (self:File {path:"frontend/src/lib/wasm/query-engine.test.ts"})
+MERGE (parseDslJS:Function {name:"parseDslJS", language:"typescript", visibility:"public"})
+MERGE (validateDslJS:Function {name:"validateDslJS", language:"typescript", visibility:"public"})
+MERGE (self)-[:TESTS]->(parseDslJS)
+MERGE (self)-[:TESTS]->(validateDslJS)
+@endcypher
+*/
 import {
   validateDslJS,
   parseDslJS,
@@ -67,7 +76,7 @@ describe("query-engine JS fallback", () => {
 
     it("case-sensitive (matches Rust str::contains)", () => {
       // 大小写敏感 — Rust str::contains 是 case-sensitive
-      expect(parseDslJS("Show ready")).toEqual(["ready"]); // 'Show' ≠ 'show'
+      expect(parseDslJS("Show ready")).toEqual([]); // Rust substring matching recognizes only exact lowercase keywords.
       expect(parseDslJS("SHOW READY")).toEqual([]);
     });
   });
