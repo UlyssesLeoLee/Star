@@ -1,14 +1,14 @@
 # PHASE-STAR-STABLE-W7-CANVAS-BUILDX-20261101
 
-**Version:** v0.1  
-**Date:** 2026-10-31  
-**Lane:** `agent/stable-release-wave4/canvas-buildx`  
-**Base:** `dev@2a57fa0d329be830735d6657677236e195673362`  
+**Version:** v0.3
+**Date:** 2026-11-01
+**Lane:** `agent/stable-release-wave4/canvas-buildx`
+**Base:** `dev@2a57fa0d329be830735d6657677236e195673362`
 **Status:** Implementation and focused static checks complete; lane commit created; coordinator integration pending.
 
 ## §0 Purpose
 
-Pin the Buildx binary used by the Star Canvas release workflow and serialize release jobs per release ref, commit SHA, and service image. The lane changes release controls only. It does not establish that the stable release is ready or prove a hosted image build.
+Pin the Buildx binary used by the Star Canvas release workflow and serialize release jobs per workflow, release ref/tag, and service image. The concurrency key uses `github.ref` and is shared across commit SHAs for the same workflow, tag/ref, and image. The lane changes release controls only. It does not establish that the stable release is ready or prove a hosted image build.
 
 ## §1 Change matrix
 
@@ -81,3 +81,4 @@ No Cargo commands were needed because no Rust source or manifest changed. No wor
 |---|---|---|---|
 | v0.1 | 2026-10-31 | Added Buildx version pin, per-ref/SHA/image non-canceling concurrency, static evidence, and explicit release limitations. | Implemented by lane agent; coordinator review pending. |
 | v0.2 | 2026-10-31 | Keyed concurrency to workflow/ref/image so a tag stays serialized across SHA changes; enabled the documented `queue: max` behavior and recorded its 100-pending bound and ordering semantics. | Implemented by lane agent; coordinator review pending. |
+| v0.3 | 2026-11-01 | Corrected the purpose statement to match the workflow/ref/image key across SHA changes, clarified that tag immutability is repository-governance policy, and removed trailing whitespace after revalidation. | Implemented by lane agent; coordinator review pending. |
