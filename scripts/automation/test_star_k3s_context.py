@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=2407a5cb997f8d0dbc130f547ede817f0fe1e7da263ffddf1ab33ccfd7b17dc2
+# @cypher schema=1 source_sha256=69b2b1790f79ba77c012294cb5a876c2917ea8e94c91763eb22db401c751ad66
 # MERGE (self:File {path:"scripts/automation/test_star_k3s_context.py"})
 # MERGE (copy_fixture_context:Symbol {id:"scripts/automation/test_star_k3s_context.py::_copy_fixture_context", kind:"function"})
 # MERGE (guest_deploy:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_import_and_deploy_target_selected_guest", kind:"method"})
@@ -20,6 +20,7 @@
 # MERGE (reject_manifest:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_rejects_missing_local_manifest", kind:"method"})
 # MERGE (reject_escape:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_rejects_path_escape", kind:"method"})
 # MERGE (reject_symlink:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_rejects_symlinked_root_input", kind:"method"})
+# MERGE (reject_junction:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_rejects_junction_inside_selected_package", kind:"method"})
 # MERGE (stable:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_output_is_stable", kind:"method"})
 # MERGE (tamper:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_rejects_context_tampering", kind:"method"})
 # MERGE (unlisted:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_rejects_unlisted_context_changes", kind:"method"})
@@ -43,6 +44,7 @@
 # MERGE (suite)-[:HAS_METHOD]->(reject_manifest)
 # MERGE (suite)-[:HAS_METHOD]->(reject_escape)
 # MERGE (suite)-[:HAS_METHOD]->(reject_symlink)
+# MERGE (suite)-[:HAS_METHOD]->(reject_junction)
 # MERGE (suite)-[:HAS_METHOD]->(stable)
 # MERGE (suite)-[:HAS_METHOD]->(guest_deploy)
 # MERGE (suite)-[:HAS_METHOD]->(reject_instance)
@@ -63,6 +65,8 @@
 # MERGE (reject_manifest)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
 # MERGE (reject_escape)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::select_packages", kind:"function"})
 # MERGE (reject_symlink)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
+# MERGE (reject_junction)-[:CALLS]->(copy_fixture_context)
+# MERGE (reject_junction)-[:TESTS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::_copy_local_package", kind:"function"})
 # MERGE (stable)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
 # MERGE (stable)-[:CALLS]->(tree_digest)
 # MERGE (guest_deploy)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::deploy_in_multipass", kind:"function"})
@@ -85,6 +89,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import subprocess
 import tempfile
 import tomllib
@@ -341,8 +346,35 @@ class StarK3sContextTests(unittest.TestCase):
             license_path.symlink_to(outside)
         except OSError as error:
             self.skipTest(f"symbolic links are unavailable in this environment: {error}")
-        with self.assertRaisesRegex(ContextError, "Symlink is not permitted"):
+        with self.assertRaisesRegex(ContextError, "Symlink or reparse point is not permitted"):
             _copy_fixture_context(self.repo, self.base / "symlink-context", self.metadata)
+
+    @unittest.skipUnless(os.name == "nt", "Windows directory junctions are not available")
+    def test_rejects_junction_inside_selected_package(self) -> None:
+        outside = self.base / "outside-package-payload"
+        outside.mkdir()
+        (outside / "must-not-copy.txt").write_text("outside repository payload\n", encoding="utf-8")
+        junction = self.repo / "crates" / "domain-project" / "external"
+        junction_path = "'" + str(junction).replace("'", "''") + "'"
+        outside_path = "'" + str(outside).replace("'", "''") + "'"
+        command = (
+            "$ErrorActionPreference = 'Stop'; "
+            f"New-Item -ItemType Junction -Path {junction_path} -Target {outside_path} | Out-Null"
+        )
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, f"Could not create Windows junction: {result.stdout}\n{result.stderr}")
+        try:
+            output = self.base / "junction-context"
+            with self.assertRaisesRegex(ContextError, "Symlink or reparse point is not permitted"):
+                _copy_fixture_context(self.repo, output, self.metadata)
+            self.assertFalse((output / "crates" / "domain-project" / "external" / "must-not-copy.txt").exists())
+        finally:
+            junction.rmdir()
 
     def test_output_is_stable(self) -> None:
         first = self.base / "context-a"

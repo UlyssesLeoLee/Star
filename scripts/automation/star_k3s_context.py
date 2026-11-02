@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=12fe51e60543871c0b0b25e0ce0a5d929d5c8b993d6b8c5b38dea19f62525496
+# @cypher schema=1 source_sha256=192dd16d012aacdfd2928ab325c845f99b25d71514eae9679a883faf46123501
 # MERGE (self:File {path:"scripts/automation/star_k3s_context.py"})
 # MERGE (running_instance:Symbol {id:"scripts/automation/star_k3s_context.py::_require_running_instance", kind:"function"})
 # MERGE (guest_command:Symbol {id:"scripts/automation/star_k3s_context.py::_guest_command", kind:"function"})
@@ -9,6 +9,8 @@
 # MERGE (image_import:Symbol {id:"scripts/automation/star_k3s_context.py::_stream_image_to_k3s", kind:"function"})
 # MERGE (deploy:Symbol {id:"scripts/automation/star_k3s_context.py::deploy_in_multipass", kind:"function"})
 # MERGE (forbidden_check:Symbol {id:"scripts/automation/star_k3s_context.py::_is_forbidden", kind:"function"})
+# MERGE (reparse_check:Symbol {id:"scripts/automation/star_k3s_context.py::_is_reparse_point", kind:"function"})
+# MERGE (stat_module:Symbol {id:"scripts/automation/star_k3s_context.py::stat", kind:"module"})
 # MERGE (identity:Symbol {id:"scripts/automation/star_k3s_context.py::_identity", kind:"function"})
 # MERGE (relative:Symbol {id:"scripts/automation/star_k3s_context.py::_repo_relative", kind:"function"})
 # MERGE (repo_file:Symbol {id:"scripts/automation/star_k3s_context.py::_repo_file", kind:"function"})
@@ -40,6 +42,8 @@
 # MERGE (forbidden:Symbol {id:"scripts/automation/star_k3s_context.py::FORBIDDEN_TERMS", kind:"constant"})
 # MERGE (self)-[:DEFINES]->(load)
 # MERGE (self)-[:DEFINES]->(forbidden_check)
+# MERGE (self)-[:DEFINES]->(reparse_check)
+# MERGE (self)-[:IMPORTS]->(stat_module)
 # MERGE (self)-[:DEFINES]->(identity)
 # MERGE (self)-[:DEFINES]->(relative)
 # MERGE (self)-[:DEFINES]->(repo_file)
@@ -80,7 +84,10 @@
 # MERGE (self)-[:DEFINES]->(service)
 # MERGE (self)-[:DEFINES]->(forbidden)
 # MERGE (forbidden_check)-[:USES]->(forbidden)
+# MERGE (reparse_check)-[:USES_TYPE]->(:Type {name:"pathlib.Path"})
+# MERGE (reparse_check)-[:READS]->(:ExternalService {name:"filesystem path metadata"})
 # MERGE (relative)-[:CALLS]->(forbidden_check)
+# MERGE (relative)-[:CALLS]->(reparse_check)
 # MERGE (repo_file)-[:CALLS]->(relative)
 # MERGE (local_dependency)-[:CALLS]->(relative)
 # MERGE (select)-[:USES]->(service)
@@ -111,6 +118,7 @@
 # MERGE (copy_package)-[:CALLS]->(relative)
 # MERGE (copy_package)-[:CALLS]->(forbidden_check)
 # MERGE (copy_package)-[:CALLS]->(strip_dev)
+# MERGE (copy_package)-[:CALLS]->(reparse_check)
 # MERGE (validate_context)-[:CALLS]->(forbidden_check)
 # MERGE (validate_context)-[:CALLS]->(relative)
 # MERGE (copy)-[:CALLS]->(select)
@@ -142,6 +150,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -169,6 +178,27 @@ def _is_forbidden(value: str) -> bool:
     return any(term in part for part in parts for term in FORBIDDEN_TERMS)
 
 
+def _is_reparse_point(path: Path) -> bool:
+    """Detect symbolic links and Windows reparse points without following them."""
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError as error:
+        raise ContextError(f"Unable to inspect repository input path: {path}") from error
+
+    if stat.S_ISLNK(metadata.st_mode):
+        return True
+    if os.name != "nt":
+        return False
+
+    file_attributes = getattr(metadata, "st_file_attributes", None)
+    if file_attributes is None:
+        raise ContextError(f"Unable to classify Windows reparse point: {path}")
+    reparse_point_attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(file_attributes & reparse_point_attribute)
+
+
 def _identity(package: dict[str, Any]) -> tuple[str, str, str | None]:
     return (package["name"], package["version"], package.get("source"))
 
@@ -186,8 +216,8 @@ def _repo_relative(root: Path, value: str) -> Path:
     current = root_path
     for part in relative.parts:
         current = current / part
-        if current.is_symlink():
-            raise ContextError(f"Symlink is not permitted in a repository input path: {relative}")
+        if _is_reparse_point(current):
+            raise ContextError(f"Symlink or reparse point is not permitted in a repository input path: {relative}")
     path = candidate.resolve()
     try:
         relative = path.relative_to(root_path)
@@ -604,8 +634,8 @@ def _copy_local_package(repo_root: Path, package: dict[str, Any], output: Path) 
             child = current_path / name
             if name in _IGNORED_DIRS:
                 continue
-            if child.is_symlink():
-                raise ContextError(f"Symlink is not permitted in the build context: {child}")
+            if _is_reparse_point(child):
+                raise ContextError(f"Symlink or reparse point is not permitted in the build context: {child}")
             if _is_forbidden(name):
                 raise ContextError(f"Game/legacy source directory found: {child}")
             kept_dirs.append(name)
@@ -615,8 +645,8 @@ def _copy_local_package(repo_root: Path, package: dict[str, Any], output: Path) 
             relative_file = source.relative_to(source_root)
             if _is_forbidden(relative_file.as_posix()):
                 raise ContextError(f"Game/legacy source file found: {source}")
-            if source.is_symlink():
-                raise ContextError(f"Symlink is not permitted in the build context: {source}")
+            if _is_reparse_point(source):
+                raise ContextError(f"Symlink or reparse point is not permitted in the build context: {source}")
             target = destination / relative_file
             target.parent.mkdir(parents=True, exist_ok=True)
             if relative_file.as_posix() == "Cargo.toml":
