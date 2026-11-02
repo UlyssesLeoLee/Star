@@ -10,8 +10,8 @@
 
 | 文件 | 变更 | 状态 |
 |---|---|---|
-| `tools/star-flash-mock/scripts/README.md` | 将 UAT 安装示例改为 `npm ci` 与 `npm exec -- playwright install chromium`；将执行示例改为 `npm run test:e2e -- ...` | 完成 |
-| `tools/star-flash-mock/scripts/uat-3000-regression.ps1` | 将本地 Next.js 与 Playwright 执行命令改为 npm 调用，保留端口、用例路径、日志与原有服务检测 | 完成 |
+| `tools/star-flash-mock/scripts/README.md` | 将 UAT 安装示例改为 `npm ci` 与本地 `./node_modules/.bin/playwright` shim；将执行示例改为 `npm run test:e2e -- ...` | 完成 |
+| `tools/star-flash-mock/scripts/uat-3000-regression.ps1` | 将 Next.js 改为显式调用 `frontend/node_modules/.bin/next.cmd`，避免 npm exec 缓存回退；Playwright 通过现有 npm script 调用，保留端口、用例路径、日志与服务检测 | 完成 |
 | `docs/briefs/STAR-STABLE-W6-UAT-NPM-20261102.md` | 本 lane brief，含 Read COMMENTS | 完成 |
 | `docs/reports/WBS-DISPATCH-STAR-STABLE-W6-UAT-NPM-20261102.jsonl` | 由 dispatcher 写入 brief 审计记录 | 完成 |
 | 本报告与 `docs/reviews/WBS-STAR-STABLE-W6-UAT-NPM-REVIEW-20261102.md` | 阶段事实与待协调者复核记录 | 完成 |
@@ -31,9 +31,10 @@
 1. W6 的核心 package manager 收敛尚未完成：`frontend/package-lock.json` 与 `frontend/pnpm-lock.yaml` 仍共存；`frontend/package.json` 未声明唯一 package manager。
 2. `.github/workflows/p1e-integration.yml` 仍有 pnpm install/exec，且 Node 22 与 stable Web workflow 的 Node 24.22.2 不同。通用 CI 仍选择 Node 22。
 3. 首次完整 manifest 因与两个本地 remote-tracking Dependabot refs 的文件重叠，MAGOS `check` 返回 CONFLICT；本 lane 已缩至无冲突的 UAT 文件。没有使用 override。
-4. WBS 文件由在途 Star Delivery lane 登记持有，本 lane 未改 WBS；父 agent 需在该 claim 释放后再更新 WBS 的 W6 进展。
-5. Vercel production deployment、Neon/Owner runtime、真实消费者/协作路径、rollback 与稳定发行证据仍未提供。
-6. UAT 脚本仍指向历史 worktree 路径，且依赖 WSL/K3s 宿主状态；按 brief 不作无关改写。
+4. Parent review 指出 `npm exec --offline` 仍可能从 npm cache 运行二进制，不能证明来源于本项目 lockfile。已将自动启动命令改为显式 `frontend/node_modules/.bin/next.cmd`，README 浏览器安装改为显式本地 Playwright shim；缺少 shim 时命令直接失败。此修正仅有静态验证，没有运行服务或安装依赖。
+5. WBS 文件由在途 Star Delivery lane 登记持有，本 lane 未改 WBS；父 agent 需在该 claim 释放后再更新 WBS 的 W6 进展。
+6. Vercel production deployment、Neon/Owner runtime、真实消费者/协作路径、rollback 与稳定发行证据仍未提供。
+7. UAT 脚本仍指向历史 worktree 路径，且依赖 WSL/K3s 宿主状态；按 brief 不作无关改写。
 
 **当前判定：** 此 lane 的两份本地 UAT 文件迁移完成；W6 仍 ADAPT/OPEN，v1.0.6 仍 NO-GO。
 
