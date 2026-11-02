@@ -14,10 +14,10 @@
 
 ## §2 验证摘要
 - WBS 当前同步目标为本地 dev@21f60cf99ec89803211bf20b130476dc74e8adda。
-- W3 report/review commit `52b9f4f06c4db3f1f058e820306a4d94f1728596`；其审计基线为 dev@3726c977984c69792dc21f0be97228e7a33e7659。无该 SHA hosted run、无 v1.0.6 tag/release、Desktop unsigned、Web workflow 不部署 Vercel、Canvas digest/attestation/consumer 验证未见。受限 artifact/package endpoint 记为不可查询，不能说库存为空。W3 保持 OPEN/BLOCKED。
-- W4 remote evidence commit `b7c44c04f1b4d0ff5f246b7d422a0098e9eb7141` 已在 v1.34/v1.35 记录远端 dev、Actions、required-check/tag/release 观察；本次不覆盖其既有事实。W4 保持 OPEN/BLOCKED。
-- W6 report/review commit `6cb4d0c6ec83d77aae66069bba91df64a5998353`，审计基线同为 dev@3726c977。GitHub Deployments 空响应不覆盖外部 Vercel 控制面；local workflow 仅构建证据包，不部署；无 Vercel/Neon Owner runtime、consumer、rollback 运行证据。W6 保持 ADAPT/OPEN。
-- W8 report/review commit `21f60cf99ec89803211bf20b130476dc74e8adda`，审计基线同为 dev@3726c977。Multipass 1.16.4+win，inventory 一条 Stopped Ubuntu 26.04；未做 VM 操作，未检查 driver/K3s。脚本的 `{}` 未识别空对象路径返回 0 条，可误认为空 inventory；无 parser/cap/lock 专项测试。两实例 K3s health/升级/恢复仍无证据，W8 保持 OPEN。
+- W3 report/review commit `52b9f4f06c4db3f1f058e820306a4d94f1728596`；本地代码/配置及精确 SHA 查询参照 dev@3726c977984c69792dc21f0be97228e7a33e7659。报告日期的 GitHub 查询未见该 SHA hosted run 或 v1.0.6 tag/release；Desktop unsigned、Web workflow 不部署 Vercel、Canvas digest/attestation/consumer 验证未见。受限 artifact/package endpoint 记为不可查询，不能说库存为空。W3 保持 OPEN/BLOCKED。
+- W4 remote evidence commit `b7c44c04f1b4d0ff5f246b7d422a0098e9eb7141` 已在 v1.34/v1.35 记录外部 GitHub dev、Actions、required-check/tag/release 的查询日观察；本次不覆盖其既有事实。W4 报告的本地候选及精确 SHA 比较参照 dev@3726c977。W4 保持 OPEN/BLOCKED。
+- W6 report/review commit `6cb4d0c6ec83d77aae66069bba91df64a5998353` 的本地配置和 workflow 静态检查参照 dev@3726c977。GitHub workflow/deployment API 是报告日期的外部快照；空响应不覆盖外部 Vercel 控制面。Local workflow 仅构建证据包，不部署；无 Vercel/Neon Owner runtime、consumer、rollback 运行证据。W6 保持 ADAPT/OPEN。
+- W8 report/review commit `21f60cf99ec89803211bf20b130476dc74e8adda` 的脚本静态审阅参照 dev@3726c977；Multipass 1.16.4+win 与一条 Stopped Ubuntu 26.04 inventory 是 2026-11-01 宿主只读快照。未做 VM 操作，未检查 driver/K3s。脚本的 `{}` 未识别空对象路径返回 0 条，可误认为空 inventory；无 parser/cap/lock 专项测试。两实例 K3s health/升级/恢复仍无证据，W8 保持 OPEN。
 - 验证范围为文档 diff、状态行/修订号一致性、§0–§7 标题、JSONL 解析及改动路径。未运行产品测试、VM 生命周期、build、deploy 或 release。
 
 ## §3 已知缺口
@@ -31,7 +31,7 @@
 本 WBS 文档 lane 没有派生子代理，无新的子代理故障或遗留输出。已集成 W3/W4/W6/W8 审计均按其原报告边界引用；W8 故障由后续独立实现 lane 处理，不在本任务范围内。
 
 ## §5 守门规则
-1. W3、W4、W6、W8 审计均以历史 dev@3726c977 为观测基线，不能表述为 dev@21f60 当前构建/运行验证。
+1. W3/W4/W6 本地代码、配置或精确 SHA 比较参照历史 dev@3726c977；W4/W6 GitHub API 与 W3 外部 API 查询按各报告日期理解。W8 脚本静态审阅参照 dev@3726c977，Multipass 宿主数据是 2026-11-01 快照；不得把它们表述为 dev@21f60 当前构建/运行验证或当前外部状态。
 2. W3 artifact/package API 不可查询不等于库存为空。
 3. GitHub Deployments endpoint 空结果不代表 Vercel 控制面没有部署。
 4. build-evidence workflow 不是生产部署证据。
@@ -54,3 +54,4 @@
 | 版本 | 日期 | 修订人 | 内容 |
 |---|---|---|---|
 | v0.1 | 2026-11-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 W3/W6/W8 新审计证据，保留 W4 既有远端证据；所有门禁保持开放。 |
+| v0.2 | 2026-11-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 区分 W3/W4/W6 的本地代码基线、报告日期的外部 GitHub/API 快照，以及 W8 的脚本基线与 Multipass 宿主快照，避免将外部观测错误绑定至一个 Git SHA。 |
