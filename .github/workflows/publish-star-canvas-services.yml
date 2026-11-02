@@ -331,6 +331,18 @@ jobs:
               raise SystemExit("Filtered Cargo.lock root does not match the resolved release version.")
           (context / "Cargo.lock").write_text(filtered_lock, encoding="utf-8")
 
+          # copy2/copytree follow links, so a benign-named symlink or junction could
+          # copy retired game/legacy content into the context under an accepted name.
+          enforce(lambda: canvas_policy.ensure_link_free_sources(
+              [
+                  source_crate,
+                  repo / "rust-toolchain.toml",
+                  repo / "LICENSE",
+                  repo / ".dockerignore",
+              ],
+              allowed_root=repo,
+          ))
+
           shutil.copy2(repo / "rust-toolchain.toml", context / "rust-toolchain.toml")
           shutil.copy2(repo / "LICENSE", context / "LICENSE")
           shutil.copy2(repo / ".dockerignore", context / ".dockerignore")

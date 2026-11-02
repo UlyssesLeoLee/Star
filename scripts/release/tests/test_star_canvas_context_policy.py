@@ -1,6 +1,6 @@
 """Focused fail-closed tests for the Star Canvas game/legacy context policy."""
 
-# @cypher schema=1 source_sha256=c5565a6f45bb9a62282c2a76d5b82f74ebbedc6802e28bd2152d33b2b0862f84
+# @cypher schema=1 source_sha256=a9cfb55c555bd4a7168fe7d8022f32e8f50c45a173679176cf8aef38da5e06eb
 # MERGE (self:File {path:"scripts/release/tests/test_star_canvas_context_policy.py"})
 # MERGE (policy:File {path:"scripts/release/star_canvas_context_policy.py"})
 # MERGE (workflow:Config {id:"publish-star-canvas-services-workflow"})
@@ -15,6 +15,12 @@
 # MERGE (paths:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::PolicyRuleTests.test_rejects_forbidden_context_paths",kind:"method"})
 # MERGE (determinism:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::PolicyRuleTests.test_rejections_are_deterministic",kind:"method"})
 # MERGE (uses:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowWiringTests.test_workflow_uses_the_shared_policy_and_keeps_existing_gates",kind:"method"})
+# MERGE (linksuite:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::LinkPolicyTests",kind:"class"})
+# MERGE (linkcontrol:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_benign_named_link_would_smuggle_content_without_the_gate",kind:"method"})
+# MERGE (linksmuggle:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_rejects_benign_named_link_that_would_smuggle_game_content",kind:"method"})
+# MERGE (linkparentcontrol:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_internal_parent_link_would_smuggle_content_without_the_gate",kind:"method"})
+# MERGE (linkparent:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_rejects_internal_parent_link_before_copying_payload",kind:"method"})
+# MERGE (linkancestor:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::LinkPolicyTests.test_linked_ancestor_inside_the_checkout_fails_closed",kind:"method"})
 # MERGE (self)-[:DEFINES]->(suite)
 # MERGE (self)-[:DEFINES]->(wiring)
 # MERGE (suite)-[:DEFINES]->(matches)
@@ -31,6 +37,13 @@
 # MERGE (self)-[:DEFINES]->(execution)
 # MERGE (execution)-[:TESTS]->(workflow)
 # MERGE (execution)-[:TESTS]->(policy)
+# MERGE (self)-[:DEFINES]->(linksuite)
+# MERGE (linksuite)-[:TESTS]->(policy)
+# MERGE (linksuite)-[:DEFINES]->(linkancestor)
+# MERGE (execution)-[:DEFINES]->(linkcontrol)
+# MERGE (execution)-[:DEFINES]->(linksmuggle)
+# MERGE (execution)-[:DEFINES]->(linkparentcontrol)
+# MERGE (execution)-[:DEFINES]->(linkparent)
 # @endcypher
 
 from __future__ import annotations
@@ -203,6 +216,8 @@ class WorkflowWiringTests(unittest.TestCase):
             "enforce(lambda: canvas_policy.ensure_allowed_image(image, allowed))",
             "enforce(lambda: canvas_policy.ensure_clean_package_identities(included))",
             "enforce(lambda: canvas_policy.ensure_clean_package_names(filtered_names))",
+            "enforce(lambda: canvas_policy.ensure_link_free_sources(",
+            "allowed_root=repo,",
             "enforce(lambda: canvas_policy.ensure_clean_context_paths(files))",
             # pre-existing allowlist and lock/closure gates are untouched
             'allowed = {"canvas-engine", "domain-canvas", "canvas-realtime"}',
@@ -232,6 +247,7 @@ class WorkflowWiringTests(unittest.TestCase):
             "ensure_allowed_image",
             "ensure_clean_package_identities",
             "ensure_clean_package_names",
+            "ensure_link_free_sources",
             "ensure_clean_context_paths",
         ):
             with self.subTest(call=call):
@@ -318,6 +334,32 @@ def _fixture_lock(root_dependencies: tuple[str, ...], extra_packages: tuple[str,
     )
 
 
+SMUGGLED_MARKER = "SMUGGLED-GAME-LEGACY-PAYLOAD"
+
+
+def _create_directory_link(target: Path, link: Path) -> str | None:
+    """Create a directory link and report its kind, or None if the platform refuses.
+
+    Windows directory junctions need no privilege and are the harder case, because
+    ``Path.is_symlink()`` reports them as ordinary directories while
+    ``shutil.copytree`` still follows them. Real symlinks are used elsewhere; on
+    Windows they require Developer Mode or elevation.
+    """
+    if sys.platform == "win32":
+        try:
+            import _winapi
+
+            _winapi.CreateJunction(str(target), str(link))
+            return "junction"
+        except (ImportError, OSError):
+            pass
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+        return "symlink"
+    except (OSError, NotImplementedError, TypeError):
+        return None
+
+
 class WorkflowExecutionTests(unittest.TestCase):
     """Run the workflow's real context gate so mutations prove the rule bites."""
 
@@ -337,7 +379,12 @@ class WorkflowExecutionTests(unittest.TestCase):
         extra_packages: tuple[str, ...] = (),
         src_files: tuple[str, ...] = ("lib.rs",),
         include_policy: bool = True,
-    ) -> None:
+        smuggle_link: str | None = None,
+        crates_link_target: str | None = None,
+        marker_files: tuple[str, ...] = (),
+    ) -> dict[str, str]:
+        """Build a workspace and report which links were actually created."""
+        links: dict[str, str] = {}
         (root / "Cargo.toml").write_text(_FIXTURE_ROOT_CARGO, encoding="utf-8")
         (root / "Cargo.lock").write_text(
             _fixture_lock(root_dependencies, extra_packages), encoding="utf-8"
@@ -346,15 +393,40 @@ class WorkflowExecutionTests(unittest.TestCase):
         (root / "LICENSE").write_text("MIT License\n", encoding="utf-8")
         (root / ".dockerignore").write_text("target\n", encoding="utf-8")
         crate = root / "crates" / "canvas-engine"
-        (crate / "src").mkdir(parents=True)
+        if crates_link_target is None:
+            (crate / "src").mkdir(parents=True)
+        else:
+            # "crates" itself becomes a link to another directory that is still
+            # inside the checkout, so realpath stays contained and os.walk sees
+            # ordinary children. Only an ancestor check can catch this.
+            real_parent = root / crates_link_target
+            (real_parent / "canvas-engine" / "src").mkdir(parents=True)
+            created = _create_directory_link(real_parent, root / "crates")
+            if created:
+                links["crates"] = created
         (crate / "Cargo.toml").write_text(_FIXTURE_CRATE_CARGO, encoding="utf-8")
         (crate / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
         for name in src_files:
             (crate / "src" / name).write_text("// fixture source\n", encoding="utf-8")
+        for name in marker_files:
+            (crate / "src" / name).write_text(
+                f"// {SMUGGLED_MARKER} retired payload, benign filename\n", encoding="utf-8"
+            )
         if include_policy:
             policy_dir = root / "scripts" / "release"
             policy_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(MODULE_PATH, policy_dir / MODULE_PATH.name)
+        if smuggle_link is not None:
+            # Retired payload lives outside the checkout, exactly like crates/star-game.
+            outside = root.parent / "outside" / "star-game-src"
+            outside.mkdir(parents=True)
+            (outside / "lib.rs").write_text(
+                f"// {SMUGGLED_MARKER} from star-game\n", encoding="utf-8"
+            )
+            created = _create_directory_link(outside, crate / "src" / smuggle_link)
+            if created:
+                links["smuggle"] = created
+        return links
 
     def run_gate(self, workspace: Path, image: str = "canvas-engine") -> subprocess.CompletedProcess[str]:
         runner_temp = workspace.parent / "runner-temp"
@@ -495,6 +567,204 @@ class WorkflowExecutionTests(unittest.TestCase):
                 self.assertNotEqual(name, "star-game")
                 self.assertEqual(POLICY.forbidden_matches(name), POLICY.forbidden_matches(name.lower()))
                 self.assertNotEqual(POLICY.forbidden_matches(name), ())
+
+    def test_benign_named_link_would_smuggle_content_without_the_gate(self) -> None:
+        """Control: prove the fixture models a real bypass, not a harmless tree.
+
+        ``shutil.copytree`` is what the workflow uses, so copying the same fixture
+        without the new gate must actually pull the retired payload in under the
+        benign name. If this ever stops reproducing, the rejection test below
+        would be proving nothing.
+        """
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            links = self.build_fixture(workspace, smuggle_link="vendor")
+            if "smuggle" not in links:
+                self.skipTest("platform refuses link creation; no link fixture possible")
+            destination = Path(temporary) / "copied-without-gate"
+            shutil.copytree(workspace / "crates" / "canvas-engine" / "src", destination)
+            copied = {
+                path.relative_to(destination).as_posix(): path.read_text(encoding="utf-8")
+                for path in destination.rglob("*")
+                if path.is_file()
+            }
+        self.assertIn("vendor/lib.rs", copied)
+        self.assertIn(SMUGGLED_MARKER, copied["vendor/lib.rs"])
+        self.assertNotIn("game", "vendor/lib.rs")
+        self.assertNotIn("legacy", "vendor/lib.rs")
+
+    def test_rejects_benign_named_link_that_would_smuggle_game_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            links = self.build_fixture(workspace, smuggle_link="vendor")
+            if "smuggle" not in links:
+                self.skipTest("platform refuses link creation; no link fixture possible")
+            result = self.run_gate(workspace)
+            context = (
+                workspace.parent / "runner-temp" / "star-canvas-oci" / "canvas-engine"
+            )
+            smuggled = [
+                path.relative_to(context).as_posix()
+                for path in context.rglob("*")
+                if path.is_file()
+                and SMUGGLED_MARKER in path.read_text(encoding="utf-8", errors="replace")
+            ]
+        self.assert_rejected(
+            result, "image context sources are not link-free", "vendor", links["smuggle"]
+        )
+        self.assertEqual(smuggled, [], msg="retired payload reached the generated context")
+
+    def test_internal_parent_link_would_smuggle_content_without_the_gate(self) -> None:
+        """Control: a linked `crates` parent stays inside the checkout, so
+        realpath containment and os.walk both see ordinary children."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            links = self.build_fixture(
+                workspace,
+                crates_link_target="legacy-source",
+                src_files=(),
+                marker_files=("payload.rs",),
+            )
+            if "crates" not in links:
+                self.skipTest("platform refuses link creation; no link fixture possible")
+            crate = workspace / "crates" / "canvas-engine"
+            # The linked parent resolves inside the checkout: containment alone passes.
+            self.assertTrue(
+                Path(os.path.realpath(crate)).is_relative_to(Path(os.path.realpath(workspace)))
+            )
+            self.assertFalse((workspace / "crates").is_symlink())
+            destination = Path(temporary) / "copied-without-gate"
+            shutil.copytree(crate / "src", destination)
+            copied = {
+                path.relative_to(destination).as_posix(): path.read_text(encoding="utf-8")
+                for path in destination.rglob("*")
+                if path.is_file()
+            }
+        self.assertIn("payload.rs", copied)
+        self.assertIn(SMUGGLED_MARKER, copied["payload.rs"])
+        self.assertNotIn("game", "payload.rs")
+        self.assertNotIn("legacy", "payload.rs")
+
+    def test_rejects_internal_parent_link_before_copying_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            links = self.build_fixture(
+                workspace,
+                crates_link_target="legacy-source",
+                src_files=(),
+                marker_files=("payload.rs",),
+            )
+            if "crates" not in links:
+                self.skipTest("platform refuses link creation; no link fixture possible")
+            result = self.run_gate(workspace)
+            context = (
+                workspace.parent / "runner-temp" / "star-canvas-oci" / "canvas-engine"
+            )
+            smuggled = [
+                path.relative_to(context).as_posix()
+                for path in context.rglob("*")
+                if path.is_file()
+                and SMUGGLED_MARKER in path.read_text(encoding="utf-8", errors="replace")
+            ]
+        self.assert_rejected(
+            result, "image context sources are not link-free", "crates", links["crates"]
+        )
+        self.assertEqual(smuggled, [], msg="rejection must happen before any payload copy")
+
+
+class LinkPolicyTests(unittest.TestCase):
+    """Unit-level checks for the link/escape rule used before any copy."""
+
+    def setUp(self) -> None:
+        self._temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self._temporary.cleanup)
+        self.root = Path(self._temporary.name)
+        self.allowed = self.root / "checkout"
+        (self.allowed / "crates" / "canvas-engine" / "src").mkdir(parents=True)
+        (self.allowed / "crates" / "canvas-engine" / "src" / "lib.rs").write_text(
+            "// benign\n", encoding="utf-8"
+        )
+        self.outside = self.root / "outside"
+        self.outside.mkdir()
+
+    def test_clean_tree_is_accepted(self) -> None:
+        crate = self.allowed / "crates" / "canvas-engine"
+        self.assertEqual(POLICY.find_link_violations(crate, allowed_root=self.allowed), ())
+        checked = POLICY.ensure_link_free_sources([crate], allowed_root=self.allowed)
+        self.assertEqual(len(checked), 1)
+
+    def test_missing_path_fails_closed(self) -> None:
+        missing = self.allowed / "crates" / "canvas-realtime"
+        self.assertEqual(
+            POLICY.find_link_violations(missing, allowed_root=self.allowed),
+            ("canvas-realtime (missing)",),
+        )
+
+    def test_path_outside_the_checkout_fails_closed(self) -> None:
+        violations = POLICY.find_link_violations(self.outside, allowed_root=self.allowed)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("escapes the checkout", violations[0])
+        with self.assertRaises(POLICY.CanvasContextError):
+            POLICY.ensure_link_free_sources([self.outside], allowed_root=self.allowed)
+
+    def test_link_inside_the_source_tree_fails_closed(self) -> None:
+        src = self.allowed / "crates" / "canvas-engine" / "src"
+        kind = _create_directory_link(self.outside, src / "vendor")
+        if kind is None:
+            self.skipTest("platform refuses link creation; no link fixture possible")
+        violations = POLICY.find_link_violations(src.parent, allowed_root=self.allowed)
+        self.assertEqual(violations, (f"src/vendor ({kind})",))
+        with self.assertRaises(POLICY.CanvasContextError) as caught:
+            POLICY.ensure_link_free_sources([src.parent], allowed_root=self.allowed)
+        self.assertIn("not link-free", str(caught.exception))
+        self.assertIn("src/vendor", str(caught.exception))
+
+    def test_linked_ancestor_inside_the_checkout_fails_closed(self) -> None:
+        """A linked parent keeps realpath contained, so only the ancestor chain catches it."""
+        checkout = self.root / "checkout2"
+        (checkout / "legacy-source" / "canvas-engine" / "src").mkdir(parents=True)
+        (checkout / "legacy-source" / "canvas-engine" / "src" / "payload.rs").write_text(
+            "// benign filename, retired payload inside\n", encoding="utf-8"
+        )
+        kind = _create_directory_link(checkout / "legacy-source", checkout / "crates")
+        if kind is None:
+            self.skipTest("platform refuses link creation; no link fixture possible")
+        crate = checkout / "crates" / "canvas-engine"
+        self.assertTrue(
+            Path(os.path.realpath(crate)).is_relative_to(Path(os.path.realpath(checkout)))
+        )
+        self.assertFalse(crate.is_symlink())
+        self.assertEqual(POLICY.find_link_violations(crate, allowed_root=checkout), (f"crates ({kind})",))
+        with self.assertRaises(POLICY.CanvasContextError) as caught:
+            POLICY.ensure_link_free_sources([crate], allowed_root=checkout)
+        self.assertIn("crates", str(caught.exception))
+
+    def test_junction_is_detected_even_though_is_symlink_is_false(self) -> None:
+        """Windows junctions are the case a symlink-only check would miss."""
+        if sys.platform != "win32":
+            self.skipTest("junctions are a Windows reparse point")
+        src = self.allowed / "crates" / "canvas-engine" / "src"
+        kind = _create_directory_link(self.outside, src / "vendor")
+        if kind is None:
+            self.skipTest("platform refuses link creation; no link fixture possible")
+        link = src / "vendor"
+        self.assertFalse(link.is_symlink())
+        self.assertEqual(POLICY._link_kind(link), "junction")
+        self.assertNotEqual(POLICY.find_link_violations(src.parent, allowed_root=self.allowed), ())
+
+    def test_link_violations_are_deterministic(self) -> None:
+        src = self.allowed / "crates" / "canvas-engine" / "src"
+        if _create_directory_link(self.outside, src / "zeta") is None:
+            self.skipTest("platform refuses link creation; no link fixture possible")
+        _create_directory_link(self.outside, src / "alpha")
+        results = {
+            POLICY.find_link_violations(src.parent, allowed_root=self.allowed) for _ in range(3)
+        }
+        self.assertEqual(len(results), 1)
 
 
 if __name__ == "__main__":
