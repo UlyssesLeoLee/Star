@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=f01d7a30b7030057e1104519252327fd1453107ebb5ef4326d66ea95945887ef
+# @cypher schema=1 source_sha256=12fe51e60543871c0b0b25e0ce0a5d929d5c8b993d6b8c5b38dea19f62525496
 # MERGE (self:File {path:"scripts/automation/star_k3s_context.py"})
+# MERGE (running_instance:Symbol {id:"scripts/automation/star_k3s_context.py::_require_running_instance", kind:"function"})
+# MERGE (guest_command:Symbol {id:"scripts/automation/star_k3s_context.py::_guest_command", kind:"function"})
+# MERGE (guest_prerequisites:Symbol {id:"scripts/automation/star_k3s_context.py::_require_guest_prerequisites", kind:"function"})
+# MERGE (deployment_manifest:Symbol {id:"scripts/automation/star_k3s_context.py::_render_deployment_manifest", kind:"function"})
+# MERGE (image_import:Symbol {id:"scripts/automation/star_k3s_context.py::_stream_image_to_k3s", kind:"function"})
+# MERGE (deploy:Symbol {id:"scripts/automation/star_k3s_context.py::deploy_in_multipass", kind:"function"})
 # MERGE (forbidden_check:Symbol {id:"scripts/automation/star_k3s_context.py::_is_forbidden", kind:"function"})
 # MERGE (identity:Symbol {id:"scripts/automation/star_k3s_context.py::_identity", kind:"function"})
 # MERGE (relative:Symbol {id:"scripts/automation/star_k3s_context.py::_repo_relative", kind:"function"})
@@ -23,8 +29,13 @@
 # MERGE (validate_context:Symbol {id:"scripts/automation/star_k3s_context.py::_validate_context", kind:"function"})
 # MERGE (copy:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
 # MERGE (context_digest:Symbol {id:"scripts/automation/star_k3s_context.py::_context_digest", kind:"function"})
-# MERGE (build:Symbol {id:"scripts/automation/star_k3s_context.py::build_in_multipass", kind:"function"})
 # MERGE (main:Symbol {id:"scripts/automation/star_k3s_context.py::main", kind:"function"})
+# MERGE (self)-[:DEFINES]->(running_instance)
+# MERGE (self)-[:DEFINES]->(guest_command)
+# MERGE (self)-[:DEFINES]->(guest_prerequisites)
+# MERGE (self)-[:DEFINES]->(deployment_manifest)
+# MERGE (self)-[:DEFINES]->(image_import)
+# MERGE (self)-[:DEFINES]->(deploy)
 # MERGE (service:Symbol {id:"scripts/automation/star_k3s_context.py::SERVICE_PACKAGE", kind:"constant"})
 # MERGE (forbidden:Symbol {id:"scripts/automation/star_k3s_context.py::FORBIDDEN_TERMS", kind:"constant"})
 # MERGE (self)-[:DEFINES]->(load)
@@ -48,8 +59,24 @@
 # MERGE (self)-[:DEFINES]->(validate_context)
 # MERGE (self)-[:DEFINES]->(copy)
 # MERGE (self)-[:DEFINES]->(context_digest)
-# MERGE (self)-[:DEFINES]->(build)
 # MERGE (self)-[:DEFINES]->(main)
+# MERGE (running_instance)-[:READS]->(:ExternalService {name:"Multipass instance inventory"})
+# MERGE (guest_command)-[:USES]->(:ExternalService {name:"Multipass exec"})
+# MERGE (guest_prerequisites)-[:CALLS]->(guest_command)
+# MERGE (guest_prerequisites)-[:USES]->(:ExternalService {name:"Guest Docker engine and K3s API"})
+# MERGE (deployment_manifest)-[:READS]->(:Config {path:"deploy/k3s-local/star-api-rest-deploy.yaml"})
+# MERGE (deployment_manifest)-[:USES]->(service)
+# MERGE (image_import)-[:CALLS]->(guest_command)
+# MERGE (deploy)-[:CALLS]->(running_instance)
+# MERGE (deploy)-[:CALLS]->(guest_prerequisites)
+# MERGE (deploy)-[:CALLS]->(deployment_manifest)
+# MERGE (deploy)-[:CALLS]->(guest_command)
+# MERGE (deploy)-[:USES]->(service)
+# MERGE (deploy)-[:CALLS]->(image_import)
+# MERGE (deploy)-[:CALLS]->(validate_context)
+# MERGE (deploy)-[:CALLS]->(context_digest)
+# MERGE (deploy)-[:USES]->(:ExternalService {name:"Multipass transfer"})
+# MERGE (deploy)-[:USES]->(:ExternalService {name:"K3s kubectl"})
 # MERGE (self)-[:DEFINES]->(service)
 # MERGE (self)-[:DEFINES]->(forbidden)
 # MERGE (forbidden_check)-[:USES]->(forbidden)
@@ -88,7 +115,6 @@
 # MERGE (validate_context)-[:CALLS]->(relative)
 # MERGE (copy)-[:CALLS]->(select)
 # MERGE (copy)-[:CALLS]->(repo_file)
-# MERGE (copy)-[:CALLS]->(lock)
 # MERGE (copy)-[:CALLS]->(manifest)
 # MERGE (copy)-[:CALLS]->(copy_package)
 # MERGE (copy)-[:CALLS]->(regenerate_lock)
@@ -97,20 +123,21 @@
 # MERGE (copy)-[:CALLS]->(forbidden_check)
 # MERGE (copy)-[:CALLS]->(toml_value)
 # MERGE (copy)-[:CALLS]->(context_digest)
-# MERGE (build)-[:CALLS]->(copy)
-# MERGE (build)-[:CALLS]->(validate_context)
-# MERGE (build)-[:CALLS]->(context_digest)
+# MERGE (main)-[:CALLS]->(running_instance)
+# MERGE (main)-[:CALLS]->(guest_prerequisites)
 # MERGE (main)-[:CALLS]->(load)
 # MERGE (main)-[:CALLS]->(copy)
-# MERGE (main)-[:CALLS]->(build)
+# MERGE (main)-[:CALLS]->(deploy)
 # @endcypher
 
-"""Create a Star-only Cargo context and optionally build it inside Multipass."""
+"""Create a verified Star-only context and optionally deploy it through Multipass."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import io
 import json
 import os
 import re
@@ -772,21 +799,157 @@ def _validate_context(context: Path) -> list[str]:
     return files
 
 
-def build_in_multipass(context: Path, instance: str, image_tag: str, expected_digest: str) -> None:
-    """Transfer the filtered tarball and build only inside an explicitly named VM."""
+def _guest_command(instance: str, *arguments: str) -> list[str]:
+    """Build one fixed-argument command for an explicitly selected guest."""
+    return ["multipass", "exec", instance, "--", *arguments]
+
+
+def _require_running_instance(instance: str) -> None:
+    """Fail closed unless Multipass inventory has exactly one matching Running instance."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", instance):
+        raise ContextError("Multipass instance name has an invalid format")
+    result = subprocess.run(
+        ["multipass", "list", "--format", "csv"],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    reader = csv.DictReader(io.StringIO(result.stdout))
+    if not reader.fieldnames or not {"Name", "State"}.issubset(reader.fieldnames):
+        raise ContextError("Multipass CSV inventory is missing the Name or State column")
+    matches = [row for row in reader if row.get("Name") == instance]
+    if len(matches) != 1:
+        raise ContextError(f"Multipass instance is missing or ambiguous: {instance}")
+    if matches[0].get("State") != "Running":
+        raise ContextError(f"Multipass instance is not Running: {instance}")
+
+
+def _require_guest_prerequisites(instance: str) -> None:
+    """Check existing guest build and K3s readiness without installing or starting tools."""
+    docker = subprocess.run(
+        _guest_command(instance, "docker", "info", "--format", "{{.ServerVersion}}"),
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if docker.returncode != 0 or not docker.stdout.strip():
+        raise ContextError("Selected Multipass guest has no ready Docker build engine; install/start nothing automatically")
+    k3s = subprocess.run(
+        _guest_command(
+            instance,
+            "sudo",
+            "-n",
+            "/usr/local/bin/k3s",
+            "kubectl",
+            "get",
+            "nodes",
+            "-o",
+            "json",
+            "--request-timeout=10s",
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if k3s.returncode != 0:
+        raise ContextError("Selected Multipass guest has no ready K3s API; the helper will not start or repair it")
+    try:
+        node_list = json.loads(k3s.stdout)
+    except json.JSONDecodeError as error:
+        raise ContextError("Selected Multipass guest returned invalid K3s node readiness data") from error
+    nodes = node_list.get("items") if isinstance(node_list, dict) else None
+    if not isinstance(nodes, list) or not nodes:
+        raise ContextError("Selected Multipass guest has no K3s nodes")
+    unready_nodes = []
+    for node in nodes:
+        metadata = node.get("metadata") if isinstance(node, dict) else None
+        name = metadata.get("name", "<unknown>") if isinstance(metadata, dict) else "<unknown>"
+        status = node.get("status") if isinstance(node, dict) else None
+        conditions = status.get("conditions", []) if isinstance(status, dict) else []
+        ready = any(
+            isinstance(condition, dict)
+            and condition.get("type") == "Ready"
+            and condition.get("status") == "True"
+            for condition in conditions
+        )
+        if not ready:
+            unready_nodes.append(name)
+    if unready_nodes:
+        raise ContextError(f"Selected Multipass guest has K3s nodes that are not Ready: {', '.join(unready_nodes)}")
+
+
+def _render_deployment_manifest(source: Path, destination: Path, image: str) -> None:
+    """Pin the local deployment manifest to the exact image built for this run."""
+    if source.is_symlink() or not source.is_file():
+        raise ContextError(f"Deployment manifest is missing or is a symlink: {source}")
+    original = source.read_text(encoding="utf-8")
+    placeholder = f"image: {SERVICE_PACKAGE}:local"
+    if original.count(placeholder) != 1:
+        raise ContextError("Deployment manifest must contain exactly one Star local-image placeholder")
+    destination.write_text(original.replace(placeholder, f"image: {image}"), encoding="utf-8", newline="\n")
+
+
+def _stream_image_to_k3s(instance: str, image: str) -> None:
+    """Stream image bytes between fixed guest commands without buffering in host memory."""
+    exporter = subprocess.Popen(
+        _guest_command(instance, "docker", "save", image),
+        stdout=subprocess.PIPE,
+    )
+    if exporter.stdout is None:
+        exporter.wait()
+        raise ContextError("Multipass image export did not provide a stream")
+    try:
+        importer = subprocess.Popen(
+            _guest_command(
+                instance,
+                "sudo",
+                "-n",
+                "/usr/local/bin/k3s",
+                "ctr",
+                "-n",
+                "k8s.io",
+                "images",
+                "import",
+                "-",
+            ),
+            stdin=exporter.stdout,
+        )
+    except BaseException:
+        exporter.stdout.close()
+        exporter.terminate()
+        exporter.wait()
+        raise
+    exporter.stdout.close()
+    import_status = importer.wait()
+    export_status = exporter.wait()
+    if export_status != 0 or import_status != 0:
+        raise ContextError("Guest image export/import failed; the image was not accepted by K3s")
+
+
+def deploy_in_multipass(context: Path, instance: str, image_tag: str, expected_digest: str, manifest_path: Path) -> None:
+    """Transfer the filtered context, build/import the image, and deploy inside one existing guest."""
     files = _validate_context(context)
     if not re.fullmatch(r"[0-9a-f]{64}", expected_digest) or _context_digest(context, files) != expected_digest:
         raise ContextError("Build context no longer matches the digest produced during generation")
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", instance):
-        raise ContextError("Multipass instance name has an invalid format")
+    _require_running_instance(instance)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", image_tag):
         raise ContextError("Image tag must be a local tag token, without a registry or repository")
+    _require_guest_prerequisites(instance)
     token = uuid.uuid4().hex
     guest_dir = f"/tmp/star-k3s-context-{token}"
     guest_archive = f"{guest_dir}.tar.gz"
-    image = f"star-api-rest:{image_tag}"
+    guest_manifest = f"{guest_dir}/star-api-rest-deploy.yaml"
+    image = f"{SERVICE_PACKAGE}:{image_tag}"
     with tempfile.TemporaryDirectory(prefix="star-k3s-context-") as temporary:
         archive_path = Path(temporary) / "context.tar.gz"
+        manifest_copy = Path(temporary) / "star-api-rest-deploy.yaml"
+        _render_deployment_manifest(manifest_path, manifest_copy, image)
         with tarfile.open(archive_path, "w:gz") as archive:
             for relative in files:
                 path = context / relative
@@ -812,31 +975,81 @@ def build_in_multipass(context: Path, instance: str, image_tag: str, expected_di
             if archive_digest.hexdigest() != expected_digest:
                 raise ContextError("Multipass archive content differs from the verified context")
         try:
-            subprocess.run(["multipass", "exec", instance, "--", "mkdir", "-p", guest_dir], check=True)
+            _require_running_instance(instance)
+            _require_guest_prerequisites(instance)
+            subprocess.run(_guest_command(instance, "mkdir", "-p", guest_dir), check=True)
             subprocess.run(["multipass", "transfer", str(archive_path), f"{instance}:{guest_archive}"], check=True)
-            subprocess.run(["multipass", "exec", instance, "--", "tar", "-xzf", guest_archive, "-C", guest_dir], check=True)
+            subprocess.run(["multipass", "transfer", str(manifest_copy), f"{instance}:{guest_manifest}"], check=True)
+            subprocess.run(_guest_command(instance, "tar", "-xzf", guest_archive, "-C", guest_dir), check=True)
             subprocess.run(
-                [
-                    "multipass",
-                    "exec",
-                    "-d",
-                    guest_dir,
+                _guest_command(
                     instance,
-                    "--",
                     "docker",
                     "build",
                     "--tag",
                     image,
                     "--file",
-                    "deploy/k3s-local/Dockerfile",
-                    ".",
-                ],
+                    f"{guest_dir}/deploy/k3s-local/Dockerfile",
+                    guest_dir,
+                ),
+                check=True,
+            )
+            _stream_image_to_k3s(instance, image)
+            runtime_images = subprocess.run(
+                _guest_command(instance, "sudo", "-n", "/usr/local/bin/k3s", "crictl", "images"),
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            ).stdout
+            if not any(
+                fields[:2] == [f"docker.io/library/{SERVICE_PACKAGE}", image_tag]
+                for fields in (line.split() for line in runtime_images.splitlines())
+            ):
+                raise ContextError(f"K3s CRI cannot see {image}; deployment is stopped")
+            subprocess.run(
+                _guest_command(instance, "sudo", "-n", "/usr/local/bin/k3s", "kubectl", "apply", "-f", guest_manifest),
+                check=True,
+            )
+            subprocess.run(
+                _guest_command(
+                    instance,
+                    "sudo",
+                    "-n",
+                    "/usr/local/bin/k3s",
+                    "kubectl",
+                    "-n",
+                    "star-system",
+                    "rollout",
+                    "status",
+                    "deployment/star-api-rest",
+                    "--timeout=120s",
+                ),
+                check=True,
+            )
+            subprocess.run(
+                _guest_command(
+                    instance,
+                    "sudo",
+                    "-n",
+                    "/usr/local/bin/k3s",
+                    "kubectl",
+                    "-n",
+                    "star-system",
+                    "get",
+                    "pods",
+                    "-o",
+                    "wide",
+                    "-l",
+                    "app=star-api-rest",
+                ),
                 check=True,
             )
         finally:
             try:
                 cleanup = subprocess.run(
-                    ["multipass", "exec", instance, "--", "rm", "-rf", "--", guest_dir, guest_archive],
+                    _guest_command(instance, "rm", "-rf", "--", guest_dir, guest_archive),
                     check=False,
                     capture_output=True,
                 )
@@ -852,12 +1065,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", type=Path, default=Path.cwd(), help="Star repository root")
     parser.add_argument("--target-triple", default="x86_64-unknown-linux-gnu")
     parser.add_argument("--output", type=Path, help="New output directory; must not already exist")
-    parser.add_argument("--build-in-multipass", metavar="INSTANCE", help="Build the generated context in this Multipass guest")
+    parser.add_argument("--build-in-multipass", metavar="INSTANCE", help="Build and deploy in this existing, running Multipass guest")
     parser.add_argument("--image-tag", help="Local tag token required with --build-in-multipass")
     args = parser.parse_args(argv)
     try:
         if bool(args.build_in_multipass) != bool(args.image_tag):
             raise ContextError("--build-in-multipass and --image-tag must be supplied together")
+        if args.build_in_multipass:
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", args.image_tag):
+                raise ContextError("Image tag must be a local tag token, without a registry or repository")
+            _require_running_instance(args.build_in_multipass)
+            _require_guest_prerequisites(args.build_in_multipass)
         if args.output is None and args.build_in_multipass is None:
             raise ContextError("Provide --output to generate a context or --build-in-multipass to build locally in a guest")
         metadata = load_metadata(args.repo, args.target_triple)
@@ -866,13 +1084,25 @@ def main(argv: list[str] | None = None) -> int:
             files, digest = copy_context(args.repo, context, metadata)
             print(f"Verified Star K3s context: {len(files)} files; sha256={digest}; no game/legacy inputs.")
             if args.build_in_multipass:
-                build_in_multipass(context, args.build_in_multipass, args.image_tag, digest)
+                deploy_in_multipass(
+                    context,
+                    args.build_in_multipass,
+                    args.image_tag,
+                    digest,
+                    args.repo / "deploy" / "k3s-local" / "star-api-rest-deploy.yaml",
+                )
         else:
             with tempfile.TemporaryDirectory(prefix="star-k3s-context-") as temporary:
                 context = Path(temporary) / "context"
                 files, digest = copy_context(args.repo, context, metadata)
                 print(f"Verified Star K3s context: {len(files)} files; sha256={digest}; no game/legacy inputs.")
-                build_in_multipass(context, args.build_in_multipass, args.image_tag, digest)
+                deploy_in_multipass(
+                    context,
+                    args.build_in_multipass,
+                    args.image_tag,
+                    digest,
+                    args.repo / "deploy" / "k3s-local" / "star-api-rest-deploy.yaml",
+                )
         return 0
     except (ContextError, OSError, subprocess.SubprocessError, tomllib.TOMLDecodeError) as error:
         print(f"star-k3s-context: {error}", file=sys.stderr)
