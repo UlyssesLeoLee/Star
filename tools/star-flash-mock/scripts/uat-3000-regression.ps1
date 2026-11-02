@@ -16,7 +16,7 @@ if (-not $port3001) {
     Write-Host "[FAIL] 3001 端口未 LISTEN, next dev 没启" -ForegroundColor Red
     # 试拉起 next dev (守门 v29 适用)
     Write-Host "[auto-restart] 启 next dev -p 3001"
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "cd /d $WORKTREE\frontend && pnpm exec next dev -p 3001 > $WORKTREE\frontend\next-dev-3001.log 2>&1" -WindowStyle Hidden
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "cd /d $WORKTREE\frontend && npm exec --offline -- next dev -p 3001 > $WORKTREE\frontend\next-dev-3001.log 2>&1" -WindowStyle Hidden
     Start-Sleep -Seconds 15
     $port3001 = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue
     if (-not $port3001) {
@@ -42,7 +42,7 @@ try {
 }
 
 # 3. 跑 Playwright UAT 3 case (S26/S27/S28, per 5ce001d spec 改成接受 proxy 模式 + apiserver paths 兜底)
-$playwrightOut = & cd $WORKTREE\frontend; pnpm exec playwright test e2e/uat-3000-restore.spec.ts --reporter=line 2>&1 | Out-String
+$playwrightOut = & cd $WORKTREE\frontend; npm run test:e2e -- e2e/uat-3000-restore.spec.ts --reporter=line 2>&1 | Out-String
 $playwrightPass = if ($playwrightOut -match '3 passed') { 'PASS' } elseif ($playwrightOut -match '(\d+) failed') { 'FAIL:' + $Matches[1] } else { 'UNKNOWN' }
 
 # 4. 写 log

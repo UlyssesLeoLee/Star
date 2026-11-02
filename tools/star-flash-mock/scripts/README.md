@@ -72,10 +72,10 @@ UAT 闭环最后一步, 3 case 守门 (per frontend/e2e/uat-3000-restore.spec.ts
 # 前置: verify-k3s-uat-3000.ps1 5 步全过
 
 # 装 Playwright 浏览器 (一次性, 守门 #6 不可 auto-install, 需用户确认)
-# cd frontend && pnpm install && pnpm exec playwright install chromium
+# cd frontend && npm ci && npm exec -- playwright install chromium
 
 # 跑 UAT 闭环 3 case
-cd frontend && pnpm test:e2e -- uat-3000-restore
+cd frontend && npm run test:e2e -- uat-3000-restore
 # 预期: 3/3 passed, screenshot.png 生成
 ```
 
