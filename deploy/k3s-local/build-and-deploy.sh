@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# @cypher schema=1 source_sha256=f898924c7bd2d8aa98c464c671ba6b27931bd98aaab594cc09f8467a463d2933
+# MERGE (self:File {path:"deploy/k3s-local/build-and-deploy.sh"})
+# MERGE (context_generator:File {path:"scripts/automation/star_k3s_context.py"})
+# MERGE (deployment_manifest:Config {path:"deploy/k3s-local/star-api-rest-deploy.yaml"})
+# MERGE (dockerfile:Config {path:"deploy/k3s-local/Dockerfile"})
+# MERGE (self)-[:DEPENDS_ON]->(context_generator)
+# MERGE (self)-[:READS]->(deployment_manifest)
+# MERGE (self)-[:READS]->(dockerfile)
+# @endcypher
 # 一键构建 + 导入 + 部署 star-api-rest 到本机 k3s (namespace: star-system)
 #
 # 前提:
@@ -18,16 +27,15 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 IMAGE="star-api-rest:local"   # 必须和 star-api-rest-deploy.yaml 里的 image: 字段一致
 MANIFEST="${SCRIPT_DIR}/star-api-rest-deploy.yaml"
 
-BUILD_CTX="$(mktemp -d)"
-trap 'rm -rf "${BUILD_CTX}"' EXIT
-# 关键坑: 不能直接拿 REPO_ROOT 当 docker build context —— 仓库根目录混了大量
-# 与镜像构建无关的内容 (docs/、.git/ 等), 且经 /mnt drvfs 访问巨慢。这里现拼一个
-# 只含 Dockerfile 实际需要的 4 项的临时目录 (Cargo.toml/Cargo.lock/rust-toolchain.toml/crates/)。
-cp "${REPO_ROOT}/Cargo.toml" "${REPO_ROOT}/Cargo.lock" "${REPO_ROOT}/rust-toolchain.toml" "${BUILD_CTX}/"
-cp -r "${REPO_ROOT}/crates" "${BUILD_CTX}/crates"
+BUILD_ROOT="$(mktemp -d)"
+BUILD_CTX="${BUILD_ROOT}/filtered-context"
+trap 'rm -rf "${BUILD_ROOT}"' EXIT
+# Never stage the whole workspace: the generator resolves the Star API Cargo closure,
+# filters game/legacy inputs, expands the Dockerfile allowlist, and validates the context.
+python3 "${REPO_ROOT}/scripts/automation/star_k3s_context.py" --repo "${REPO_ROOT}" --output "${BUILD_CTX}"
 
-echo "==> [1/4] docker build -t ${IMAGE}  (context: ${BUILD_CTX}, staged from ${REPO_ROOT})"
-docker build -t "${IMAGE}" -f "${SCRIPT_DIR}/Dockerfile" "${BUILD_CTX}"
+echo "==> [1/4] docker build -t ${IMAGE} from the verified Star context ${BUILD_CTX}"
+docker build -t "${IMAGE}" -f "${BUILD_CTX}/deploy/k3s-local/Dockerfile" "${BUILD_CTX}"
 
 echo "==> [2/4] 导入镜像到 k3s containerd 的 k8s.io namespace"
 # 关键坑: `k3s ctr images import` 默认落 containerd 的 "default" namespace,

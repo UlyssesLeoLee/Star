@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=0559da9111c06847c4405e68f66bbd21c1187f4701aced27b716af47dd666b50
+# @cypher schema=1 source_sha256=66275dff2dd06d38a56ea0d79d879243b4d228c44b3fe5bb6b471bdd0bf1e687
 # MERGE (self:File {path:"scripts/automation/test_star_k3s_context.py"})
 # MERGE (suite:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests", kind:"class"})
 # MERGE (write_fixture:Symbol {id:"scripts/automation/test_star_k3s_context.py::write_fixture", kind:"function"})
@@ -17,6 +17,7 @@
 # MERGE (multipass:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_invokes_multipass_not_host_docker", kind:"method"})
 # MERGE (tamper:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_rejects_context_tampering", kind:"method"})
 # MERGE (unlisted:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_rejects_unlisted_context_changes", kind:"method"})
+# MERGE (deploy_context:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_deploy_script_uses_filtered_context_generator", kind:"method"})
 # MERGE (lock_drift:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_rejects_source_lock_identity_or_checksum_drift", kind:"method"})
 # MERGE (self)-[:DEFINES]->(suite)
 # MERGE (self)-[:DEFINES]->(write_fixture)
@@ -33,6 +34,7 @@
 # MERGE (suite)-[:HAS_METHOD]->(multipass)
 # MERGE (suite)-[:HAS_METHOD]->(tamper)
 # MERGE (suite)-[:HAS_METHOD]->(unlisted)
+# MERGE (suite)-[:HAS_METHOD]->(deploy_context)
 # MERGE (suite)-[:HAS_METHOD]->(lock_drift)
 # MERGE (setup)-[:CALLS]->(write_fixture)
 # MERGE (allowed)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
@@ -48,6 +50,7 @@
 # MERGE (multipass)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::copy_context", kind:"function"})
 # MERGE (tamper)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::build_in_multipass", kind:"function"})
 # MERGE (unlisted)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::build_in_multipass", kind:"function"})
+# MERGE (deploy_context)-[:TESTS]->(:File {path:"deploy/k3s-local/build-and-deploy.sh"})
 # MERGE (lock_drift)-[:CALLS]->(:Symbol {id:"scripts/automation/star_k3s_context.py::_regenerate_context_lock", kind:"function"})
 # @endcypher
 
@@ -308,6 +311,16 @@ class StarK3sContextTests(unittest.TestCase):
         self.assertEqual(docker_build[docker_build.index("docker") + 1], "build")
         self.assertIn("deploy/k3s-local/Dockerfile", docker_build)
         self.assertNotIn("docker", [command[0] for command in commands])
+
+    def test_deploy_script_uses_filtered_context_generator(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script = (repo_root / "deploy" / "k3s-local" / "build-and-deploy.sh").read_text(encoding="utf-8")
+
+        self.assertIn('star_k3s_context.py" --repo "${REPO_ROOT}" --output "${BUILD_CTX}"', script)
+        self.assertIn('-f "${BUILD_CTX}/deploy/k3s-local/Dockerfile" "${BUILD_CTX}"', script)
+        self.assertNotIn('cp -r "${REPO_ROOT}/crates"', script)
+        self.assertIn('docker save "${IMAGE}" | sudo -n /usr/local/bin/k3s ctr -n k8s.io images import -', script)
+        self.assertIn('${KUBECTL} apply -f "${MANIFEST}"', script)
 
     def test_build_rejects_context_tampering(self) -> None:
         context = self.base / "tampered-context"
