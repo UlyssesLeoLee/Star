@@ -40,7 +40,7 @@
 
 ## 4. 子代理失败接手清单
 
-本 lane 由单一 worker 执行，无派生子代理失败项。最终合入前由 parent agent 对 diff、brief、审计日志、报告和审阅记录进行独立复核；在此之前状态不是 READY/APPROVED。
+本 lane 由单一 worker 执行，无派生子代理失败项。Parent agent 已独立复核 diff、brief、审计日志、报告和审阅记录，并接受本 lane 的受限范围。该 ACCEPT 不扩大到未修改的 W6 核心包管理器或稳定版发布门。
 
 ## 5. 守门规则
 
@@ -64,10 +64,10 @@
 
 ## 6. 签字栏
 
-- 架构：本 lane 不改变架构；Mavis 接手终审待 parent review。
+- 架构：本 lane 不改变架构；Mavis 接手复核通过（限本 lane）。
 - SRE Lead：本 lane 未运行服务或集群；无需运行审批。
-- 平台：本 lane 仅调整本地 UAT 工具命令；Mavis 接手复核待完成。
-- 评审主持：parent agent 独立审阅待完成。
+- 平台：本 lane 仅调整本地 UAT 工具命令；Mavis 接手复核通过（限本 lane）。
+- 评审主持：parent agent 独立审阅完成；初版 `npm exec --offline` 的缓存回退风险已修正为本地 shim。
 - PM / Release owner：用户仍为 accountable release owner；此报告不构成发布审批。
 
 ## 7. 修订历史
@@ -75,3 +75,4 @@
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 记录受限 UAT package-manager 迁移和未关闭的 W6 发布门 | WBS W6 指出 UAT 脚本仍使用 pnpm |
+| v0.2 | 2026-11-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 记录 parent 独立复核 ACCEPT（仅本 lane），并补充 `npm exec` cache 回退问题的修正；W6 与稳定版仍 OPEN | Parent review 完成与受限范围确认 |

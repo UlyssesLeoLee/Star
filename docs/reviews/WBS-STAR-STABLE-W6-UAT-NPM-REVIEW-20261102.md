@@ -2,7 +2,7 @@
 
 ## 审阅状态
 
-**PENDING_PARENT_REVIEW**。候选已回应 parent review 的 npm cache 回退问题；最终独立审阅由 parent agent 完成，完成前不批准集成。
+**ACCEPT（仅限本 lane 范围）**。候选已回应 parent review 的 npm cache 回退问题；parent agent 已独立复核实现差异、manifest 与验证结果。此结论不表示 W6 或 v1.0.6 稳定发行门通过。
 
 ## 审阅基线与范围
 
@@ -40,12 +40,14 @@ README 安装示例使用 `npm ci`，然后直接调用本地 `./node_modules/.b
 
 ## 协调者复核清单
 
-- [ ] 确认 diff 仅含登记路径且两份实现文件以外仅有 lane 文档。
-- [ ] 确认 Next 与 Playwright setup 指向 `npm ci` 创建的本地 shim，缺失时不回退到外部包。
-- [ ] 核对 PowerShell 调用工作目录为 `frontend`，参数和原命令效果一致。
-- [ ] 核实 brief、dispatch audit、报告与本审阅文件准确记录未执行 UAT 和仍阻塞的 W6 范围。
-- [ ] 完成独立 review 后再集成；WBS 由其登记 owner 释放后另行更新。
+- [x] diff 仅含登记路径，两份实现文件以外只有 lane brief、dispatch audit、阶段报告和本审阅记录。
+- [x] Next 与 Playwright setup 指向 `npm ci` 创建的本地 shim，缺失时不会回退到 npm cache 包。
+- [x] PowerShell 调用在 `frontend` 工作目录运行，保留原端口、测试 spec 路径、报告提取与服务检测。
+- [x] brief、dispatch audit、报告与本审阅文件准确记录未执行 UAT 和仍阻塞的 W6 范围。
+- [x] WBS 文件仍由 Star Delivery lane claim 持有；另行更新，不扩大本 lane 范围。
+
+Parent agent 独立复核还确认：`Parser.ParseFile` 0 errors、两份实现文件搜索 `pnpm|npm exec` 无命中、候选与 dev 的 `git diff --check` 通过。CodeRabbit CLI 未能在此主机启动（执行入口返回 permission denied）；本结论基于上述实际差异及静态验证，没有把它记作外部自动审查通过。
 
 ## 判定
 
-尚无独立 parent review 结论。候选未达到集成批准状态。协调者审阅后补充审阅者、发现项及 ACCEPT/REJECT 结论。
+**ACCEPT（仅本 lane）。** Parent agent 于 2026-11-02 完成独立审阅。初版曾使用 `npm exec --offline`，因 npm 仍可能解析缓存二进制而被退回；修订后改为直接调用本地依赖 shim，验证通过。可将本 lane 两份 UAT 文件及四份配套文档集成到 dev。W6 其余 package manager/lockfile/CI/Node/Vercel/Neon/Owner 验收仍开放；WBS 更新须待其登记 owner 释放。
