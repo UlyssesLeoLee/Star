@@ -135,10 +135,29 @@ jobs:
           import tomllib
           from pathlib import Path
 
+          # Shared fail-closed game/legacy filter. The publish gate must never run
+          # with a missing or unimportable policy helper, so this fails closed too.
+          policy_root = Path(os.environ["GITHUB_WORKSPACE"])
+          sys.path.insert(0, (policy_root / "scripts" / "release").as_posix())
+          try:
+              import star_canvas_context_policy as canvas_policy
+          except BaseException as policy_error:
+              raise SystemExit(
+                  f"Star Canvas context policy helper is unavailable: {policy_error}"
+              )
+
+          def enforce(policy_check):
+              """Report a policy rejection as a build failure, not a traceback."""
+              try:
+                  return policy_check()
+              except canvas_policy.CanvasContextError as error:
+                  raise SystemExit(f"Star Canvas context policy rejected this build: {error}")
+
           allowed = {"canvas-engine", "domain-canvas", "canvas-realtime"}
           image = os.environ["CANVAS_IMAGE"]
           if image not in allowed:
               raise SystemExit(f"Refusing unapproved Canvas image: {image}")
+          enforce(lambda: canvas_policy.ensure_allowed_image(image, allowed))
           release_tag = os.environ["STAR_RELEASE_TAG"]
           release_version = os.environ["STAR_RELEASE_VERSION"]
           release_source_sha = os.environ["STAR_RELEASE_SOURCE_SHA"]
@@ -272,6 +291,8 @@ jobs:
               included.add(identity)
               pending.extend(edges[identity])
 
+          enforce(lambda: canvas_policy.ensure_clean_package_identities(included))
+
           local_dependencies = [
               identity for identity in included
               if identity[2] is None and identity[0] not in allowed
@@ -301,6 +322,7 @@ jobs:
           filtered_names = {item["name"] for item in parsed_filtered_lock["package"]}
           if "star-game" in filtered_names or len(parsed_filtered_lock["package"]) != len(included):
               raise SystemExit("Filtered Cargo.lock failed the isolated package closure check.")
+          enforce(lambda: canvas_policy.ensure_clean_package_names(filtered_names))
           release_roots = [
               item for item in parsed_filtered_lock["package"]
               if item["name"] == image and item.get("source") is None
@@ -323,9 +345,10 @@ jobs:
           forbidden = [path for path in files if "game" in path.lower() or path.startswith((".git/", "target/"))]
           if forbidden:
               raise SystemExit(f"Unexpected files in image context: {forbidden}")
+          enforce(lambda: canvas_policy.ensure_clean_context_paths(files))
           if any(path.startswith("crates/") and not path.startswith(f"crates/{image}/") for path in files):
               raise SystemExit("Image context contains a crate outside the allowlisted service.")
-          print(f"Verified {image}: {len(included)} locked packages; {len(files)} files; no game or foreign workspace sources.")
+          print(f"Verified {image}: {len(included)} locked packages; {len(files)} files; no game/legacy or foreign workspace sources.")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"directory={context.as_posix()}\n")
           '@ | python3 -
