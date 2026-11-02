@@ -18,6 +18,14 @@
 
 diff 为纯增量（累计 +36 / −1）。唯一删除行是结尾 `print` 文案；全部既有 allowlist、path 依赖、workspace 依赖、lock 闭包唯一可解析、`star-game` 精确检查、过滤锁一致性、root 版本绑定与 `.git/` / `target/` 前缀检查逐项保留。allowlist 未被放宽——策略模块自身不持有任何镜像名单，只校验调用方传入的集合。
 
+**条件性 P2（独立评审第二轮）已确认并修复。** `_link_kind()` 原以 `getattr(Path, "is_junction", None)` 探测能力，API 缺失时返回 `None`，即把路径当作「不是链接」。`Path.is_junction()` 自 Python 3.12 才有，因此在 **Windows + Python ≤3.11** 上 junction 完全不被检测——恰好在唯一存在 junction 的操作系统上失败开放。现改为两个模块级能力位 `_IS_WINDOWS = os.name == "nt"` 与 `_JUNCTION_API_AVAILABLE = hasattr(Path, "is_junction")`：
+
+- Windows 且 API 不可用 → `_link_kind()` 返回 `junction-check-unavailable`，该路径判为违规，门禁拒绝组装上下文（宁可拒绝，不放行无法证明的载荷）。
+- **非 Windows 且 API 不可用 → 不视为违规**，普通路径照常通过。这条边界是必需的：实际发布跑在 Linux runner 上，若不分平台一律失败关闭，会把三个服务的正常发布全部打断。两侧都有专门测试锁定。
+- 端到端 M11 通过改写 fixture 中被复制的策略副本的两个能力位来模拟旧解释器，跑真实内联脚本，断言 exit≠0、报 `junction-check-unavailable`、`GITHUB_OUTPUT` 为空、`crates/` 下 0 个文件被复制；并断言改写**确实生效**（`assertNotEqual(patched, text)` 加两条 `assertIn`），避免常量声明形式变更后模拟静默失效而使测试「因错误原因通过」。
+
+本轮改动**未触碰 workflow 文件**（仍为 541 行、5 处策略调用），只在策略模块与其测试内。评审已确认当前实现无其他链接 / junction / 祖先绕过。
+
 ## 来源与边界
 
 - 审阅对象为 lane worktree `D:\orcaWork\Star\star-stable-w3-legacy-context-20261102`，基线 HEAD 与 `dev` 同为 `09b4eead99b047759be271ade2f5b06c0612ffb1`。未 fetch、未 push、未 rebase、未 merge、未打 tag、未发布、未部署；`main`、`D:\Star`、远端 ref 与其他 worktree 未触碰。
@@ -38,17 +46,21 @@ diff 为纯增量（累计 +36 / −1）。唯一删除行是结尾 `print` 文�
 | allowlist 是否被放宽 | 否；两处 `allowed = {…}` 与 matrix `fromJSON([...])` 经精确行断言仍为三项 |
 | 大小写不敏感 | 是；M2（`GAME_UTILS`）、M5（`LegacyCompat.rs`）实测被拒 |
 | 失败关闭 | 是；M8（策略模块缺失）实测 exit≠0 且 `GITHUB_OUTPUT` 为空 |
-| 变异测试 + 对照组（守门 v30） | 10 个变异全红，对照组绿（`2 locked packages; 8 files`，写出 `directory=`） |
+| 变异测试 + 对照组（守门 v30） | 11 个变异全红，对照组绿（`2 locked packages; 8 files`，写出 `directory=`） |
 | 链接绕过是否真实可复现（对照） | 是；不经门禁直接 `copytree` 时，外部 junction 产出 `vendor/lib.rs`、内部祖先链接产出 `payload.rs`，两者内容均含走私标记，且生成名不含 `game` / `legacy` |
 | 良性名链接是否被拒（M9） | 是；exit≠0，报 `image context sources are not link-free` 与 `src/vendor (junction)`，且生成上下文中检索不到走私标记 |
 | 内部祖先链接是否被拒（M10） | 是；`repo/crates` → `repo/legacy-source` 场景 exit≠0，报 `crates (junction)`；对照测试同时断言 `realpath` 仍在 checkout 内且 `is_symlink()` 为 False，即包含性与朴素 symlink 检查都会放过它 |
 | 拒绝是否发生在载荷复制之前 | 是；M9 / M10 均断言生成上下文内检索不到走私标记，`GITHUB_OUTPUT` 为空 |
 | junction 是否被单独识别 | 是；实测 `is_symlink()=False` / `islink()=False` / `is_junction()=True`，`_link_kind()` 返回 `junction` |
+| `Path.is_junction` 缺失时是否失败关闭（P2） | 是；模拟 `_IS_WINDOWS=True` / `_JUNCTION_API_AVAILABLE=False` 后 `_link_kind()` 返回 `junction-check-unavailable`，`ensure_link_free_sources` 抛 `CanvasContextError`；端到端 M11 exit≠0、`GITHUB_OUTPUT` 为空、`crates/` 下 0 文件被复制 |
+| 能力 fail-closed 是否误伤非 Windows | 否；模拟 `_IS_WINDOWS=False` / `_JUNCTION_API_AVAILABLE=False` 时普通路径照常通过（`_link_kind()` 返回 `None`、`find_link_violations` 返回 `()`），Linux 发布 runner 不受影响 |
+| M11 模拟是否确实生效 | 是；测试内 `assertNotEqual(patched, text)` 与两条 `assertIn` 锁定改写生效，防止常量声明形式变更后模拟静默失效而「因错误原因通过」 |
 | 真实仓库是否被新门禁误伤 | 否；对 6 个真实输入调用 `ensure_link_free_sources` 返回 6/6 clean 且未抛异常；`git ls-files -s` 无 mode 120000 |
 | 真实仓库三镜像上下文门 | 修复前 3/3 exit=0（119 / 119 / 136 锁定包，各 9 files）；修复后未重跑完整内联脚本，见 P0 缺口 |
 | 真实闭包是否被误伤 | 否；根 `Cargo.lock:7165` 存在 `star-game`，但三个闭包中无含 game / legacy 的 name / version / source |
-| 本机测试 | 定向 `Ran 32 tests in 1.869s` → `OK`（0 skip）；release 三模块合计 `Ran 50 tests in 40.034s` → `OK`（32 新增 + 18 既有） |
-| `@cypher` header 盖章 | Guardian `"ok": true`，`"errors": []`；最终盖章 `44a4f339…` / `a9cfb55c…`；使用已安装 skill 路径 validator（仓库内无 canonical），已在报告 §6 说明 |
+| 本机测试 | 定向 `Ran 35 tests in 2.320s` → `OK`（0 skip）；release 三模块合计 `Ran 53 tests in 46.192s` → `OK`（35 新增 + 18 既有） |
+| 平台能力位实测 | `_IS_WINDOWS=True`、`_JUNCTION_API_AVAILABLE=True`（本机 Python 3.13.7，走真实 junction 检测路径） |
+| `@cypher` header 盖章 | Guardian `"ok": true`，`"errors": []`；P2 修复后最终盖章 `f817fa71…` / `4435f818…`；使用已安装 skill 路径 validator（仓库内无 canonical），已在报告 §6 说明 |
 | `git diff --check` | clean |
 | workflow YAML 可解析 | 4 jobs，`build-and-push` 13 steps |
 | 范围核对 | `git diff --name-only -- docs/implementation-plans AGENTS.md` 为空；未 push / rebase / merge |
@@ -61,6 +73,8 @@ diff 为纯增量（累计 +36 / −1）。唯一删除行是结尾 `print` 文�
 - 新规则对第三方依赖是硬失败：未来若引入名字含 `game` 或 `legacy` 的合法 crates.io 依赖，发布门禁会拒绝。这是有意的 fail-closed 行为，不应加静默豁免；真出现时需 owner 显式决策。
 - 链接门禁只覆盖 workflow 显式复制的 6 个输入。若将来上下文组装新增复制项而未同步扩清单，新输入不受链接检查保护；目前清单完整性仅由静态接线断言保证，不会自动跟随新增项。
 - 真 symlink 分支未在 POSIX 实测：本机 `WinError 1314` 无特权创建 symlink，链接类测试实际以 Windows junction 执行（`is_symlink()` 为 False 的更难形态）。`os.symlink` → `"symlink"` 分支只有代码路径，需一次 Linux runner 执行确认 0 skip。
+- 能力 fail-closed 是刻意的「宁可拒绝」：Windows + Python ≤3.11 上门禁会把全部输入判为 `junction-check-unavailable` 并拒绝组装上下文，因此该组合下无法本地产出 Canvas 上下文。若将来需要支持，正确做法是补一个不依赖 3.12 的 reparse-point 检测（`os.lstat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT`，Windows 上自 Python 3.5 可用），而不是放宽门禁；本次未实现。发布路径跑在 Linux runner，不受影响。
+- 独立评审已确认当前实现无其他链接 / junction / 祖先绕过；上述两条属能力与平台覆盖边界，不是已知绕过。
 - 检查与复制之间非原子（TOCTOU）。CI checkout 在门禁运行时静态，风险低，未加二次复验。
 - 仓库内现有两处禁止词规则（本 lane 的整值匹配、W7 `star_k3s_context.py` 的逐段匹配），语义强度不同；且 W7 侧无链接检查。跨 lane 去重与链接规则推广应由协调者决定，本 lane 未越界统一。
 - 上下文过滤通过**不等于**最终镜像内容合格。W3 闭合仍需真实 gated run 产生的三个不可变 digest、逐文件 context 清单与哈希、最终镜像 rootfs 检查、SBOM / provenance / attestation，以及 digest 固定的 Envoy 运行时依赖证据。
@@ -72,3 +86,4 @@ diff 为纯增量（累计 +36 / −1）。唯一删除行是结尾 `print` 文�
 |---|---|---|
 | v0.1 | 2026-11-02 | 确认 legacy 过滤缺口真实存在并已关闭；记录纯增量 diff、8 变异全红 + 对照组绿、真实仓库三镜像 3/3 通过、39/39 本机测试与 Guardian 盖章；同时保留 hosted run、CI 覆盖、镜像/SBOM/provenance 与 license/version 阻塞缺口，W3 OPEN、v1.0.6 NO-GO。 |
 | v0.2 | 2026-11-02 | 确认并关闭独立评审提出的 P1 链接绕过：`copytree` / `copy2` 跟随链接，良性名链接可走私退役载荷。新增复制前的 `ensure_link_free_sources` 门禁，识别 symlink 与 Windows junction，并检查 `allowed_root`→源的每个词法祖先分量（拦住 realpath 仍在 checkout 内的内部祖先链接），逃逸目录剪枝。变异 8→10（M9 外部链接 / M10 内部祖先链接，各配「无门禁确实能走私」对照），定向测试 21→32、release 套件 39→50 全过 0 skip，真实仓库 6/6 输入链接自由且索引无 mode 120000，Guardian 重新盖章 `ok: true`。记录范围纠正（撤销越界全局记忆写入、删除 `%TEMP%` scratch harness）与新增缺口：完整真实仓库端到端未重跑、真 symlink 分支未在 POSIX 实测、链接清单不自动跟随新增复制项、TOCTOU。allowlist 与既有门禁未改动；未 push / rebase / merge；共享 WBS、`AGENTS.md`、W7 文件未触碰。W3 仍 OPEN、v1.0.6 仍 NO-GO。 |
+| v0.3 | 2026-11-02 | 确认并关闭独立评审的条件性 P2：`_link_kind()` 原以 `getattr(Path, "is_junction", None)` 探测，API 缺失（Windows + Python ≤3.11）时把路径当作非链接，即在唯一存在 junction 的平台上失败开放。改为模块级能力位 `_IS_WINDOWS` / `_JUNCTION_API_AVAILABLE`：Windows 且 API 不可用 → 返回 `junction-check-unavailable` 并拒绝组装上下文；非 Windows 且 API 不可用 → 不视为违规，避免打断实际发布用的 Linux runner（两侧均有测试锁定）。新增 3 个测试，含端到端 M11（改写 fixture 内策略副本能力位后跑真实内联脚本，断言 exit≠0 + `junction-check-unavailable` + `crates/` 下 0 文件被复制，并断言改写确实生效）。变异 10→11，定向测试 32→35、release 套件 50→53 全过 0 skip；真实仓库 6/6 仍 clean（实测 `_IS_WINDOWS=True`、`_JUNCTION_API_AVAILABLE=True`）；Guardian 重新盖章 `ok: true`（`f817fa71…` / `4435f818…`）；`git diff --check` clean。本轮**未改动 workflow 文件**；allowlist 与既有门禁未改动；未 push / rebase / merge；共享 WBS、`AGENTS.md`、W7 文件未触碰；manifest 仍为 7 个路径。新增 P2 缺口：Windows + ≤3.11 下门禁拒绝全部输入（刻意宁可拒绝），正确解法是补 `st_file_attributes & FILE_ATTRIBUTE_REPARSE_POINT` 检测而非放宽门禁。评审确认无其他链接 / junction / 祖先绕过。W3 仍 OPEN、v1.0.6 仍 NO-GO。 |

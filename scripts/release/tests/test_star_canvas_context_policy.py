@@ -1,6 +1,6 @@
 """Focused fail-closed tests for the Star Canvas game/legacy context policy."""
 
-# @cypher schema=1 source_sha256=a9cfb55c555bd4a7168fe7d8022f32e8f50c45a173679176cf8aef38da5e06eb
+# @cypher schema=1 source_sha256=4435f818ae636e316207576da5317c04c8567382aa780158d6acac7895f5a2a3
 # MERGE (self:File {path:"scripts/release/tests/test_star_canvas_context_policy.py"})
 # MERGE (policy:File {path:"scripts/release/star_canvas_context_policy.py"})
 # MERGE (workflow:Config {id:"publish-star-canvas-services-workflow"})
@@ -21,6 +21,9 @@
 # MERGE (linkparentcontrol:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_internal_parent_link_would_smuggle_content_without_the_gate",kind:"method"})
 # MERGE (linkparent:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_rejects_internal_parent_link_before_copying_payload",kind:"method"})
 # MERGE (linkancestor:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::LinkPolicyTests.test_linked_ancestor_inside_the_checkout_fails_closed",kind:"method"})
+# MERGE (linkcapwin:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::LinkPolicyTests.test_windows_without_junction_api_fails_closed",kind:"method"})
+# MERGE (linkcapposix:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::LinkPolicyTests.test_non_windows_without_junction_api_still_accepts_ordinary_paths",kind:"method"})
+# MERGE (linkcapm11:Symbol {id:"scripts/release/tests/test_star_canvas_context_policy.py::WorkflowExecutionTests.test_gate_fails_closed_without_junction_api_on_windows",kind:"method"})
 # MERGE (self)-[:DEFINES]->(suite)
 # MERGE (self)-[:DEFINES]->(wiring)
 # MERGE (suite)-[:DEFINES]->(matches)
@@ -44,6 +47,9 @@
 # MERGE (execution)-[:DEFINES]->(linksmuggle)
 # MERGE (execution)-[:DEFINES]->(linkparentcontrol)
 # MERGE (execution)-[:DEFINES]->(linkparent)
+# MERGE (execution)-[:DEFINES]->(linkcapm11)
+# MERGE (linksuite)-[:DEFINES]->(linkcapwin)
+# MERGE (linksuite)-[:DEFINES]->(linkcapposix)
 # @endcypher
 
 from __future__ import annotations
@@ -675,6 +681,39 @@ class WorkflowExecutionTests(unittest.TestCase):
         )
         self.assertEqual(smuggled, [], msg="rejection must happen before any payload copy")
 
+    def test_gate_fails_closed_without_junction_api_on_windows(self) -> None:
+        """End-to-end M11: a pre-3.12 Windows interpreter cannot rule out junctions,
+        so the real workflow gate must refuse to assemble the context at all."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            self.build_fixture(workspace)
+            policy_copy = workspace / "scripts" / "release" / MODULE_PATH.name
+            text = policy_copy.read_text(encoding="utf-8")
+            patched = text.replace(
+                '_IS_WINDOWS: bool = os.name == "nt"', "_IS_WINDOWS: bool = True"
+            ).replace(
+                "_JUNCTION_API_AVAILABLE: bool = hasattr(Path, \"is_junction\")",
+                "_JUNCTION_API_AVAILABLE: bool = False",
+            )
+            # Prove the simulation actually applied; otherwise this test would pass
+            # for the wrong reason on an interpreter that still has the API.
+            self.assertNotEqual(patched, text, "capability simulation did not apply")
+            self.assertIn("_IS_WINDOWS: bool = True", patched)
+            self.assertIn("_JUNCTION_API_AVAILABLE: bool = False", patched)
+            policy_copy.write_text(patched, encoding="utf-8")
+            result = self.run_gate(workspace)
+            context = (
+                workspace.parent / "runner-temp" / "star-canvas-oci" / "canvas-engine"
+            )
+            copied = (
+                [p.relative_to(context).as_posix() for p in context.rglob("crates/*")]
+                if context.exists()
+                else []
+            )
+        self.assert_rejected(result, "not link-free", "junction-check-unavailable")
+        self.assertEqual(copied, [], msg="no crate content may be copied when links are unverifiable")
+
 
 class LinkPolicyTests(unittest.TestCase):
     """Unit-level checks for the link/escape rule used before any copy."""
@@ -742,6 +781,37 @@ class LinkPolicyTests(unittest.TestCase):
         with self.assertRaises(POLICY.CanvasContextError) as caught:
             POLICY.ensure_link_free_sources([crate], allowed_root=checkout)
         self.assertIn("crates", str(caught.exception))
+
+    def test_windows_without_junction_api_fails_closed(self) -> None:
+        """Python <=3.11 on Windows has no Path.is_junction, so a junction cannot
+        be ruled out; the gate must reject rather than report the path as clean."""
+        crate = self.allowed / "crates" / "canvas-engine"
+        original = (POLICY._IS_WINDOWS, POLICY._JUNCTION_API_AVAILABLE)
+        self.addCleanup(setattr, POLICY, "_IS_WINDOWS", original[0])
+        self.addCleanup(setattr, POLICY, "_JUNCTION_API_AVAILABLE", original[1])
+        POLICY._IS_WINDOWS = True
+        POLICY._JUNCTION_API_AVAILABLE = False
+        self.assertEqual(POLICY._link_kind(crate), "junction-check-unavailable")
+        violations = POLICY.find_link_violations(crate, allowed_root=self.allowed)
+        self.assertNotEqual(violations, ())
+        self.assertTrue(all("junction-check-unavailable" in item for item in violations))
+        with self.assertRaises(POLICY.CanvasContextError) as caught:
+            POLICY.ensure_link_free_sources([crate], allowed_root=self.allowed)
+        self.assertIn("not link-free", str(caught.exception))
+        self.assertIn("junction-check-unavailable", str(caught.exception))
+
+    def test_non_windows_without_junction_api_still_accepts_ordinary_paths(self) -> None:
+        """Junctions do not exist off Windows, so the fail-closed branch must stay
+        scoped to nt and must not break the Linux runners that publish images."""
+        crate = self.allowed / "crates" / "canvas-engine"
+        original = (POLICY._IS_WINDOWS, POLICY._JUNCTION_API_AVAILABLE)
+        self.addCleanup(setattr, POLICY, "_IS_WINDOWS", original[0])
+        self.addCleanup(setattr, POLICY, "_JUNCTION_API_AVAILABLE", original[1])
+        POLICY._IS_WINDOWS = False
+        POLICY._JUNCTION_API_AVAILABLE = False
+        self.assertIsNone(POLICY._link_kind(crate))
+        self.assertEqual(POLICY.find_link_violations(crate, allowed_root=self.allowed), ())
+        self.assertEqual(len(POLICY.ensure_link_free_sources([crate], allowed_root=self.allowed)), 1)
 
     def test_junction_is_detected_even_though_is_symlink_is_false(self) -> None:
         """Windows junctions are the case a symlink-only check would miss."""

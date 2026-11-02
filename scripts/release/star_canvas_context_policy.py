@@ -12,7 +12,7 @@ never normalizes a rejected value into an accepted one, and reports every
 violation it finds in sorted order so a failed gate is reproducible.
 """
 
-# @cypher schema=1 source_sha256=44a4f33957e0d953164a258b7fb49cf4731fb81ff15adaeb4890af6895b39ec4
+# @cypher schema=1 source_sha256=f817fa711856a6bdf02e9c7f59f43436a0946e093a8efa7096d8b592b80a6da7
 # MERGE (self:File {path:"scripts/release/star_canvas_context_policy.py"})
 # MERGE (terms:Config {id:"scripts/release/star_canvas_context_policy.py::FORBIDDEN_TERMS"})
 # MERGE (prefixes:Config {id:"scripts/release/star_canvas_context_policy.py::FORBIDDEN_PATH_PREFIXES"})
@@ -26,6 +26,8 @@ violation it finds in sorted order so a failed gate is reproducible.
 # MERGE (chain:Symbol {id:"scripts/release/star_canvas_context_policy.py::_descendant_chain",kind:"function"})
 # MERGE (violations:Symbol {id:"scripts/release/star_canvas_context_policy.py::find_link_violations",kind:"function"})
 # MERGE (linkfree:Symbol {id:"scripts/release/star_canvas_context_policy.py::ensure_link_free_sources",kind:"function"})
+# MERGE (iswin:Config {id:"scripts/release/star_canvas_context_policy.py::_IS_WINDOWS"})
+# MERGE (junctionapi:Config {id:"scripts/release/star_canvas_context_policy.py::_JUNCTION_API_AVAILABLE"})
 # MERGE (self)-[:DEFINES]->(terms)
 # MERGE (self)-[:DEFINES]->(prefixes)
 # MERGE (self)-[:DEFINES]->(error)
@@ -47,6 +49,10 @@ violation it finds in sorted order so a failed gate is reproducible.
 # MERGE (violations)-[:CALLS]->(linkkind)
 # MERGE (violations)-[:CALLS]->(chain)
 # MERGE (linkfree)-[:CALLS]->(violations)
+# MERGE (self)-[:DEFINES]->(iswin)
+# MERGE (self)-[:DEFINES]->(junctionapi)
+# MERGE (linkkind)-[:READS]->(iswin)
+# MERGE (linkkind)-[:READS]->(junctionapi)
 # @endcypher
 
 from __future__ import annotations
@@ -59,6 +65,12 @@ from typing import Any
 
 FORBIDDEN_TERMS: tuple[str, ...] = ("game", "legacy")
 FORBIDDEN_PATH_PREFIXES: tuple[str, ...] = (".git/", "target/")
+
+# Platform capability seams. ``Path.is_junction()`` arrived in Python 3.12; on
+# Windows without it a junction cannot be ruled out, so link classification fails
+# closed. Both are module attributes so a test can simulate an older interpreter.
+_IS_WINDOWS: bool = os.name == "nt"
+_JUNCTION_API_AVAILABLE: bool = hasattr(Path, "is_junction")
 
 
 class CanvasContextError(RuntimeError):
@@ -211,14 +223,20 @@ def _link_kind(path: Path) -> str | None:
 
     Windows directory junctions are reparse points that ``is_symlink()`` reports
     as ordinary directories while ``shutil.copytree`` still follows them, so they
-    are detected separately. Anything that cannot be classified fails closed.
+    are detected separately. ``Path.is_junction()`` only exists on Python 3.12+;
+    on Windows without it a junction cannot be ruled out, so the path is reported
+    as unverifiable instead of clean. Anything that cannot be classified fails
+    closed. On non-Windows platforms junctions do not exist, so a missing API is
+    not treated as a violation and ordinary paths stay acceptable.
     """
     try:
         if path.is_symlink():
             return "symlink"
-        is_junction = getattr(Path, "is_junction", None)
-        if is_junction is not None and is_junction(path):
-            return "junction"
+        if _IS_WINDOWS:
+            if not _JUNCTION_API_AVAILABLE:
+                return "junction-check-unavailable"
+            if Path.is_junction(path):
+                return "junction"
     except OSError:
         return "unresolved-link"
     return None
