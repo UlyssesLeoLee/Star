@@ -4,6 +4,23 @@
 # GHCR_TOKEN must be configured as a repository secret with package write access.
 # Never pass registry credentials as workflow dispatch inputs or print secrets.
 
+# @cypher schema=1 source_sha256=0aae97d51b0afea824d9f86d028a33395044b153329442035521bbb98ca7f7a2
+# MERGE (self:File {path:".github/workflows/publish-star-canvas-services.yml"})
+# MERGE (consumer_verification:Config {id:"canvas.oci-consumer-attestation-verification",name:"verify all three digest-pinned Canvas OCI attestations before manifest rendering"})
+# MERGE (consumer_permissions:Config {id:"canvas.oci-consumer-verification-permissions",name:"contents read, attestations read, packages read; no writes or id-token"})
+# MERGE (release_identity:Config {id:"canvas.release-identity-artifact",name:"run-scoped canonical tag version and source SHA artifact"})
+# MERGE (digest_records:Config {id:"canvas.image-digest-records",name:"run-scoped allowlisted immutable image references and sha256 digests"})
+# MERGE (verify_attested_release:File {path:"scripts/release/verify_attested_release.py"})
+# MERGE (render_star_canvas_manifest:File {path:"scripts/release/render_star_canvas_manifest.py"})
+# MERGE (self)-[:CONFIGURES]->(consumer_verification)
+# MERGE (self)-[:CONFIGURES]->(consumer_permissions)
+# MERGE (self)-[:READS]->(release_identity)
+# MERGE (self)-[:READS]->(digest_records)
+# MERGE (self)-[:CALLS]->(verify_attested_release)
+# MERGE (self)-[:IMPORTS]->(render_star_canvas_manifest)
+# MERGE (self)-[:CALLS]->(render_star_canvas_manifest)
+# @endcypher
+
 name: Publish Star Canvas services
 
 on:
@@ -495,6 +512,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      attestations: read
+      packages: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify rendered template checkout is the resolved release commit
@@ -515,6 +534,86 @@ jobs:
           pattern: star-canvas-digest-*
           path: ${{ runner.temp }}/star-canvas-digest-records
           merge-multiple: true
+      - name: Verify each immutable Canvas attestation as a consumer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_RELEASE_TAG: ${{ needs.resolve_release.outputs.tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.resolve_release.outputs.version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.resolve_release.outputs.source_sha }}
+          RESOLVER_JSON: ${{ runner.temp }}/star-canvas-release-identity/star-release.json
+          DIGEST_RECORD_DIR: ${{ runner.temp }}/star-canvas-digest-records
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          from scripts.release.render_star_canvas_manifest import (
+              RenderError,
+              validate_digest_records,
+              validate_release,
+          )
+
+          release_path = Path(os.environ["RESOLVER_JSON"])
+          record_dir = Path(os.environ["DIGEST_RECORD_DIR"])
+          try:
+              release = validate_release(json.loads(release_path.read_text(encoding="utf-8")))
+              records = [
+                  json.loads((record_dir / name).read_text(encoding="utf-8"))
+                  for name in (
+                      "canvas-engine.json",
+                      "domain-canvas.json",
+                      "canvas-realtime.json",
+                  )
+              ]
+          except (OSError, json.JSONDecodeError, RenderError) as error:
+              raise SystemExit(f"Release identity or Canvas digest record is invalid: {error}") from error
+
+          expected_release = {
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          if release != expected_release:
+              raise SystemExit("Downloaded resolver identity does not match the approved release job outputs.")
+
+          try:
+              image_refs = validate_digest_records(records, release)
+          except RenderError as error:
+              raise SystemExit(f"Canvas digest records do not match the resolver identity: {error}") from error
+
+          record_by_service = {record["service"]: record for record in records}
+          for service in sorted(image_refs):
+              record = record_by_service[service]
+              command = [
+                  sys.executable,
+                  "scripts/release/verify_attested_release.py",
+                  "--kind",
+                  "canvas",
+                  "--repo",
+                  os.environ["GITHUB_REPOSITORY"],
+                  "--tag",
+                  release["tag"],
+                  "--source-commit",
+                  release["source_sha"],
+                  "--subject",
+                  f"oci://{record['image_ref']}",
+                  "--expected-digest",
+                  record["digest"],
+              ]
+              subprocess.run(command, check=True, env=os.environ.copy())
+              print(f"Consumer attestation verified: {service} {record['digest']}")
+
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+              summary.write(
+                  "Verified all three digest-pinned Canvas image attestations as a separate consumer. "
+                  "This does not claim a Multipass/K3s deployment or rollout.\n"
+              )
+          PY
       - name: Render the deployable manifest
         env:
           OUTPUT_PATH: ${{ runner.temp }}/star-canvas-rendered/star-canvas-services-k3s.yaml
