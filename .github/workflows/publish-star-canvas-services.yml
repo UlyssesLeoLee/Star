@@ -4,9 +4,9 @@
 # GHCR_TOKEN must be configured as a repository secret with package write access.
 # Never pass registry credentials as workflow dispatch inputs or print secrets.
 
-# @cypher schema=1 source_sha256=0aae97d51b0afea824d9f86d028a33395044b153329442035521bbb98ca7f7a2
+# @cypher schema=1 source_sha256=04425d48d32a36acb8f88a485fb6f950548a76134ae7535b7cd6c24ee9f2b1d5
 # MERGE (self:File {path:".github/workflows/publish-star-canvas-services.yml"})
-# MERGE (consumer_verification:Config {id:"canvas.oci-consumer-attestation-verification",name:"verify all three digest-pinned Canvas OCI attestations before manifest rendering"})
+# MERGE (consumer_verification:Config {id:"canvas.oci-consumer-attestation-verification",name:"independently verify GitHub SLSA provenance only for all three digest-pinned Canvas OCI subjects before manifest rendering; Buildx SBOM attestations are not independently verified here"})
 # MERGE (consumer_permissions:Config {id:"canvas.oci-consumer-verification-permissions",name:"contents read, attestations read, packages read; no writes or id-token"})
 # MERGE (release_identity:Config {id:"canvas.release-identity-artifact",name:"run-scoped canonical tag version and source SHA artifact"})
 # MERGE (digest_records:Config {id:"canvas.image-digest-records",name:"run-scoped allowlisted immutable image references and sha256 digests"})
@@ -534,7 +534,7 @@ jobs:
           pattern: star-canvas-digest-*
           path: ${{ runner.temp }}/star-canvas-digest-records
           merge-multiple: true
-      - name: Verify each immutable Canvas attestation as a consumer
+      - name: Verify each immutable Canvas SLSA provenance attestation as a consumer
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -606,11 +606,12 @@ jobs:
                   record["digest"],
               ]
               subprocess.run(command, check=True, env=os.environ.copy())
-              print(f"Consumer attestation verified: {service} {record['digest']}")
+              print(f"GitHub SLSA provenance verified as a consumer: {service} {record['digest']}")
 
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
               summary.write(
-                  "Verified all three digest-pinned Canvas image attestations as a separate consumer. "
+                  "Independently verified GitHub SLSA provenance for all three digest-pinned Canvas image subjects. "
+                  "Buildx SBOM attestations are not independently verified here. "
                   "This does not claim a Multipass/K3s deployment or rollout.\n"
               )
           PY

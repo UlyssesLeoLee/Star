@@ -36,6 +36,7 @@
 2. 没有真实 Canvas build、GHCR digest、最终 OCI image inspection、SBOM/provenance 独立消费结果或 K3s rollout 证据。
 3. 这项验证不覆盖 Multipass inventory、Infrastructure reservation、Run binding、guest runtime readiness、部署、回滚或负载验证。
 4. W1 Cargo workspace license 与用户选择的 MIT 仍不一致；其他稳定发行门禁也未关闭。v1.0.6 保持 NO-GO。
+5. 本 job 仅独立验证 GitHub SLSA provenance；Buildx SBOM attestation 未在此处独立验证，仍是未关闭的稳定发行证据缺口。
 
 ## §4 子代理失败接手清单
 
