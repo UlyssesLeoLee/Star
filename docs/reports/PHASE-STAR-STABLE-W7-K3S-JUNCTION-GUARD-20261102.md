@@ -5,7 +5,7 @@
 修复 Star K3s filtered build context 在 Windows 下跟随 package 子目录 junction、复制仓库外内容的缺口。本报告只覆盖生成器的路径安全与本机回归测试；W7 与 v1.0.6 发行门仍开放。
 
 基线：`dev@789392b67a90998bfa59ed49c3deaab31a012269`。
-代码提交：`ca61ab93`（reparse-point 检查），`83bf3f96`（junction 与缺失元数据回归）。
+实现提交经 rebase 后为：`86368147`（reparse-point 检查与真实 junction 回归），`a1eb5821`（缺失 Windows 元数据回归）；两项已随 `0d3b9f8a` 首次快进到本地 dev。原始提交 `ca61ab93`、`83bf3f96` 已由 rebase 替换。
 实现工作树：`D:\\orcaWork\\Star\\star-stable-w7-k3s-junction-guard-20261102`。
 
 ## §1 改动矩阵
@@ -73,3 +73,4 @@ W7 实现代理在开始编辑前因平台用量上限退出，没有留下源�
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 K3s filtered context 的 Windows junction 绕过，加入真实 junction 与缺失元数据测试；明确 W7 与 release gate 仍开放 | STAR-STABLE-W7-K3S-JUNCTION-GUARD-20261102 brief |
+| v0.2 | 2026-11-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将代码提交号更新为 rebase 后的 `86368147` / `a1eb5821`，记录其已快进到 `dev@0d3b9f8a`；复验 20 项测试为 19 通过、1 项既有 symlink 权限 skip，W7 与 v1.0.6 发布门仍开放。 | W7 review 文档进入 dev 后按用户要求 rebase 并集成实现 lane |

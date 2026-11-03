@@ -2,7 +2,7 @@
 
 ## Scope
 
-Independently reviewed implementation commits `ca61ab93` and `83bf3f96`, the test design, and the focused Python test output against the registered W7 junction-guard brief. Scope is the filtered K3s context generator and its regression tests.
+Reviewed implementation commits `86368147` and `a1eb5821` after rebase onto the integrated W7 context-audit report, along with the test design and focused Python test output against the registered W7 junction-guard brief. Scope is the filtered K3s context generator and its regression tests.
 
 ## Findings
 
@@ -31,3 +31,4 @@ Independently reviewed implementation commits `ca61ab93` and `83bf3f96`, the tes
 | Version | Date | Reviewer | Result |
 |---|---|---|---|
 | v0.1 | 2026-11-02 | 架构师（Mavis 接手 agent per DEC-008）— independent review | Accept local fix; W7 / release remain OPEN |
+| v0.2 | 2026-11-03 | 架构师（Mavis 接手 agent per DEC-008）— integration re-review | 更新 rebase 后的实现提交号 `86368147` / `a1eb5821`；复验 20 项测试为 19 通过、1 项既有 symlink 权限 skip。W7 / release remain OPEN。 |
