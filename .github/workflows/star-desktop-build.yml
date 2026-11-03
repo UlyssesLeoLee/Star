@@ -93,10 +93,10 @@ jobs:
         with:
           workspaces: "crates/star-desktop/src-tauri"
 
-      - name: Install Node.js 20
+      - name: Install Node.js 24.22.2
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.22.2'
 
       - name: cargo check -p star-desktop
         shell: bash
@@ -152,10 +152,10 @@ jobs:
         with:
           workspaces: "crates/star-desktop/src-tauri"
 
-      - name: Install Node.js 20
+      - name: Install Node.js 24.22.2
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.22.2'
 
       - name: cargo check -p star-desktop
         run: |
