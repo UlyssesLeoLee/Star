@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_AUDIT_VERSION: "0.22.2"
-      CARGO_AUDIT_SHA256: "REPLACE_WITH_UPSTREAM_SHA256_FOR_0.22.2"
+      CARGO_AUDIT_SHA256: "7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428"
     steps:
       - uses: actions/checkout@v4
 
@@ -101,9 +101,9 @@ jobs:
         uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Fetch cargo-audit (pinned)
-        # 同样的预编译 + 校验策略。SHA256 需从上游 release .sha256 文件取:
-        #   curl -fsSL https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-v${CARGO_AUDIT_VERSION}-x86_64-unknown-linux-musl.tar.gz.sha256
-        # 占位未填是**有意为之**: 未经本机实跑校验的校验和不得写入门禁 (per 缺标比错标安全)
+        # 资产名与摘要来自 RustSec v0.22.2 官方 release API，并由直接下载 SHA-256 复核。
+        # 证据与本地核对范围见 docs/reviews/WBS-STAR-STABLE-W4-UPSTREAM-ASSET-REVIEW-20261102.md。
+        # 占位值检查保留为 fail-closed 防线，避免配置回退时跳过完整性校验。
         run: |
           set -euo pipefail
           if [ "${CARGO_AUDIT_SHA256}" = "REPLACE_WITH_UPSTREAM_SHA256_FOR_0.22.2" ]; then
@@ -111,7 +111,7 @@ jobs:
             echo "::error::在填入前, 本 job 恒定失败 (fail-closed), 不会假装通过。"
             exit 2
           fi
-          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-v${CARGO_AUDIT_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}.tgz"
           curl -fsSL "$url" -o /tmp/cargo-audit.tar.gz
           echo "${CARGO_AUDIT_SHA256}  /tmp/cargo-audit.tar.gz" | sha256sum -c -
           tar -xzf /tmp/cargo-audit.tar.gz -C /usr/local/bin
