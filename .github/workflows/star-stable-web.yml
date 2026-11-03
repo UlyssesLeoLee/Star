@@ -1,4 +1,30 @@
 name: Star Web stable build evidence
+# @cypher schema=1 source_sha256=03f962058835abc78a0aaf53b772d784fcd1ec4cdbe5d0b3b61632ed04da5ab4
+# MERGE (self:File {path:".github/workflows/star-stable-web.yml"})
+# MERGE (verify_job:Symbol {id:".github/workflows/star-stable-web.yml::jobs.verify-consumer",kind:"job"})
+# MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
+# MERGE (download_artifact:ExternalService {id:"actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",name:"actions/download-artifact v8.0.2"})
+# MERGE (resolver:File {path:"scripts/release/resolve_star_version.py"})
+# MERGE (verifier:File {path:"scripts/release/verify_attested_release.py"})
+# MERGE (approval_gate:Config {id:"workflow_dispatch.release_gate_confirmation",name:"APPROVED version-tag gate"})
+# MERGE (permissions:Config {id:"jobs.verify-consumer.permissions",name:"contents:read, attestations:read"})
+# MERGE (token:Config {id:"jobs.verify-consumer.GH_TOKEN",name:"github.token"})
+# MERGE (spdx_verifier:ExternalService {id:"gh attestation verify",name:"GitHub CLI attestation verifier"})
+# MERGE (spdx_predicate:Config {id:"https://spdx.dev/Document/v2.3",name:"SPDX 2.3 attestation predicate"})
+# MERGE (spdx_json_assertion:Symbol {id:".github/workflows/star-stable-web.yml::jobs.verify-consumer.spdx-json-predicate-assertion",kind:"inline-script"})
+# MERGE (verify_job)-[:CALLS]->(spdx_verifier)
+# MERGE (verify_job)-[:CALLS]->(spdx_json_assertion)
+# MERGE (spdx_verifier)-[:CONFIGURES]->(spdx_predicate)
+# MERGE (spdx_json_assertion)-[:CONFIGURES]->(spdx_predicate)
+# MERGE (self)-[:DEFINES]->(verify_job)
+# MERGE (verify_job)-[:CALLS]->(checkout)
+# MERGE (verify_job)-[:CALLS]->(download_artifact)
+# MERGE (verify_job)-[:CALLS]->(resolver)
+# MERGE (verify_job)-[:CALLS]->(verifier)
+# MERGE (verify_job)-[:CONFIGURES]->(approval_gate)
+# MERGE (verify_job)-[:CONFIGURES]->(permissions)
+# MERGE (verify_job)-[:CONFIGURES]->(token)
+# @endcypher
 
 # This workflow creates a lockfile-driven Next.js build evidence bundle. It does
 # not deploy to Vercel or claim that the bundle is a Vercel deployment.
@@ -180,4 +206,108 @@ jobs:
             echo "The uploaded archive is a build evidence bundle, not a Vercel deployment."
             echo "Verify the downloaded archive with: gh attestation verify $archive --repo $SOURCE_REPOSITORY"
             echo "Verify its SHA-256 using $archive.sha256."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify-consumer:
+    name: Independently verify the Web evidence attestation
+    if: ${{ inputs.release_gate_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v') }}
+    needs: [build-and-attest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-tags: true
+
+      - name: Re-resolve exact release identity
+        id: resolve-release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/resolve_star_version.py \
+            --tag "$RELEASE_TAG" \
+            --repo . \
+            --output "$GITHUB_OUTPUT"
+          resolved_source_sha="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{}")"
+          if [[ "$resolved_source_sha" != "$GITHUB_SHA" ]]; then
+            echo "Consumer verification is blocked: tag target does not match this workflow source SHA." >&2
+            exit 1
+          fi
+
+      - name: Download exact Web evidence artifact from the producer job
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-web-build-evidence-${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}-${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}-${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}
+          path: artifacts/web
+
+      - name: Verify downloaded archive, checksum, and attestation
+        shell: bash
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve-release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve-release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve-release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          bundle_name="star-web-build-evidence-$STAR_RELEASE_TAG-$STAR_RELEASE_VERSION-$STAR_RELEASE_SOURCE_SHA"
+          archive="artifacts/web/$bundle_name.tar.gz"
+          checksum_file="$archive.sha256"
+          sbom="artifacts/web/$bundle_name/sbom.spdx.json"
+          test -s "$archive"
+          test -s "$checksum_file"
+          test -s "$sbom"
+          (cd artifacts/web && sha256sum --check "$(basename "$checksum_file")")
+          expected_digest="sha256:$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          python3 scripts/release/verify_attested_release.py \
+            --kind web \
+            --repo "$GITHUB_REPOSITORY" \
+            --tag "$STAR_RELEASE_TAG" \
+            --source-commit "$STAR_RELEASE_SOURCE_SHA" \
+            --subject "$archive" \
+            --expected-digest "$expected_digest" \
+            --timeout 240
+          sbom_attestation_json="$RUNNER_TEMP/star-web-spdx-attestation.json"
+          gh attestation verify "$archive" \
+            --repo "$GITHUB_REPOSITORY" \
+            --source-digest "$STAR_RELEASE_SOURCE_SHA" \
+            --source-ref "refs/tags/$STAR_RELEASE_TAG" \
+            --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/star-stable-web.yml" \
+            --predicate-type "https://spdx.dev/Document/v2.3" \
+            --format json > "$sbom_attestation_json"
+          python3 - "$sbom_attestation_json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          predicate_type = "https://spdx.dev/Document/v2.3"
+          with Path(sys.argv[1]).open(encoding="utf-8") as stream:
+              results = json.load(stream)
+          if not isinstance(results, list) or not results:
+              raise SystemExit("gh attestation verify returned no verified SPDX attestations.")
+          verified_spdx = [
+              entry
+              for entry in results
+              if isinstance(entry, dict)
+              and isinstance(entry.get("attestation"), dict)
+              and isinstance(entry.get("verificationResult"), dict)
+              and isinstance(entry["verificationResult"].get("statement"), dict)
+              and entry["verificationResult"]["statement"].get("predicateType") == predicate_type
+          ]
+          if not verified_spdx:
+              raise SystemExit("No successfully verified SPDX 2.3 attestation was present in gh JSON output.")
+          print(f"Verified {len(verified_spdx)} SPDX 2.3 attestation(s) for the Web evidence archive.")
+          PY
+          {
+            echo "Consumer provenance and SPDX attestation verification passed for $bundle_name."
+            echo "Verified archive digest: $expected_digest"
+            echo "Verified source: $STAR_RELEASE_SOURCE_SHA ($STAR_RELEASE_TAG)."
+            echo "This validates the build-evidence archive attestation; it does not deploy to Vercel or prove a production deployment."
           } >> "$GITHUB_STEP_SUMMARY"
