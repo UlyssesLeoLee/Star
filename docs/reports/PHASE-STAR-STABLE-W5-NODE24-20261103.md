@@ -24,7 +24,7 @@ Baseline: `dev@92f98f4a8699990227465722777a9edb9baab670`
 |---|---|
 | PyYAML YAML 解析与固定版本断言 | 通过：workflow 可解析，两个 `node-version` 值均为 `24.22.2`；对应两个显示名称也已同步 |
 | Node 20 输入检查 | 通过：workflow 中无 `node-version: '20'` |
-| `rtk proxy git diff --check` | 通过；仅报告工作树 CRLF 将在 Git 写入时规范为 LF 的提示 |
+| `rtk proxy git diff --check` | 通过；仅报告工作树 CRLF 将在 Git 写入时规范为 LF 的提示 |`r`n| 协调者独立复核 | 通过：只含 brief 授权的三个实现文件，Node 版本和标签、WBS 标题/行数/修订号正确；无范围外改动 |`r`n| CodeRabbit 第二意见 | 未能运行：CLI 启动返回 `/root/.local/bin/coderabbit: Permission denied`；由协调者直接审阅差异与静态验证 |
 | `actionlint` 可用性 | 不可用：当前 PATH 没有 actionlint，未能执行 action 专项静态分析 |
 | 产品测试与 hosted workflow | 未运行，按任务 brief 明确排除 |
 
@@ -39,7 +39,7 @@ Baseline: `dev@92f98f4a8699990227465722777a9edb9baab670`
 
 ## §4 子代理失败接手清单
 
-本 lane 由指定 worker 直接实施，没有额外派发子代理，故无子代理失败待接手项。协调者仍须独立审查精确 diff、WBS 证据和目标 dev 的集成状态；worker commit 本身不表示已集成或已关闭 W5。
+本 lane 由指定 worker 直接实施，没有额外派发子代理，故无子代理失败待接手项。协调者已独立审查精确 diff 与 WBS 证据；目标 dev 快进集成及 worktree 回收仍待完成。worker commit 本身不表示已集成或已关闭 W5。
 
 ## §5 守门规则
 
@@ -67,7 +67,7 @@ Baseline: `dev@92f98f4a8699990227465722777a9edb9baab670`
 | 架构 | 架构师（Mavis 接手审核）— W5 仅更新 Node 版本输入和对应步骤标签 |
 | SRE Lead | SRE Lead（Mavis 接手审核）— 未运行 hosted workflow，运行态仍待验证 |
 | 平台 | 平台（Mavis 接手审核）— PyYAML 与版本断言通过；actionlint 不可用 |
-| 评审主持 | 评审主持（Mavis 接手审核）— worker 自检完成，协调者独立复核待执行 |
+| 评审主持 | 评审主持（Mavis 接手审核）— worker 自检与协调者独立复核完成，dev 集成和 worktree 回收待执行 |
 | PM | PM（Mavis 接手审核）— W5 OPEN，v1.0.6 NO-GO |
 
 ## §7 修订历史
