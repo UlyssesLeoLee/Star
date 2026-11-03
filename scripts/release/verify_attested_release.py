@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Verify a downloaded Star release artifact against GitHub attestations."""
 
-# @cypher schema=1 source_sha256=e0e5e3787b2227fec1744f604bf5b9abb93503812c665d44af9b1fc49e81f5d9
+# @cypher schema=1 source_sha256=64da72ae5a01416078a219c322540d8ec18a65d79f130a9c8327c813718cecfa
 # MERGE (self:File {path:"scripts/release/verify_attested_release.py"})
 # MERGE (error:Symbol {id:"scripts/release/verify_attested_release.py::VerificationError",kind:"class"})
 # MERGE (validate_identity:Symbol {id:"scripts/release/verify_attested_release.py::_validate_release_identity",kind:"function"})
 # MERGE (validate_subject:Symbol {id:"scripts/release/verify_attested_release.py::_prepare_subject",kind:"function"})
 # MERGE (hash_file:Symbol {id:"scripts/release/verify_attested_release.py::_hash_file",kind:"function"})
 # MERGE (parse_result:Symbol {id:"scripts/release/verify_attested_release.py::_validate_attestation_result",kind:"function"})
+# MERGE (run_gh:Symbol {id:"scripts/release/verify_attested_release.py::_run_bounded_gh",kind:"function"})
 # MERGE (verify:Symbol {id:"scripts/release/verify_attested_release.py::verify_attested_release",kind:"function"})
 # MERGE (build_parser:Symbol {id:"scripts/release/verify_attested_release.py::build_parser",kind:"function"})
 # MERGE (main:Symbol {id:"scripts/release/verify_attested_release.py::main",kind:"function"})
@@ -21,6 +22,7 @@
 # MERGE (self)-[:DEFINES]->(validate_subject)
 # MERGE (self)-[:DEFINES]->(hash_file)
 # MERGE (self)-[:DEFINES]->(parse_result)
+# MERGE (self)-[:DEFINES]->(run_gh)
 # MERGE (self)-[:DEFINES]->(verify)
 # MERGE (self)-[:DEFINES]->(build_parser)
 # MERGE (self)-[:DEFINES]->(main)
@@ -28,11 +30,13 @@
 # MERGE (validate_subject)-[:CALLS]->(hash_file)
 # MERGE (hash_file)-[:READS]->(self)
 # MERGE (parse_result)-[:READS]->(output_limit)
+# MERGE (run_gh)-[:CALLS]->(gh)
+# MERGE (run_gh)-[:READS]->(timeout)
+# MERGE (run_gh)-[:READS]->(output_limit)
 # MERGE (verify)-[:CALLS]->(validate_identity)
 # MERGE (verify)-[:CALLS]->(validate_subject)
 # MERGE (verify)-[:CALLS]->(parse_result)
-# MERGE (verify)-[:CALLS]->(gh)
-# MERGE (verify)-[:READS]->(timeout)
+# MERGE (verify)-[:CALLS]->(run_gh)
 # MERGE (verify)-[:READS]->(predicate)
 # MERGE (main)-[:CALLS]->(build_parser)
 # MERGE (main)-[:CALLS]->(verify)
@@ -46,7 +50,9 @@ import json
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
+from typing import BinaryIO
 
 
 TAG_PATTERN = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
@@ -175,6 +181,83 @@ def _validate_attestation_result(stdout: str) -> int:
     return len(result)
 
 
+def _run_bounded_gh(command: list[str], timeout: int) -> tuple[int, str]:
+    """Run gh while retaining at most MAX_RESULT_BYTES of stdout in memory."""
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+        )
+    except OSError as error:
+        raise VerificationError("could not start GitHub CLI; install gh and confirm it is on PATH") from error
+
+    output_pipe: BinaryIO | None = process.stdout
+    if output_pipe is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
+        process.wait()
+        raise VerificationError("gh attestation verify stdout pipe was unavailable")
+
+    captured = bytearray()
+    output_limit_exceeded = threading.Event()
+    reader_errors: list[OSError] = []
+
+    def read_output() -> None:
+        try:
+            while True:
+                chunk = output_pipe.read(64 * 1024)
+                if not chunk:
+                    return
+                remaining = MAX_RESULT_BYTES - len(captured)
+                if len(chunk) > remaining:
+                    if remaining > 0:
+                        captured.extend(chunk[:remaining])
+                    output_limit_exceeded.set()
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+                    return
+                captured.extend(chunk)
+        except OSError as error:
+            reader_errors.append(error)
+            try:
+                process.kill()
+            except OSError:
+                pass
+        finally:
+            try:
+                output_pipe.close()
+            except OSError:
+                pass
+
+    reader = threading.Thread(target=read_output, name="gh-attestation-output", daemon=True)
+    reader.start()
+    try:
+        return_code = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        try:
+            process.kill()
+        except OSError:
+            pass
+        process.wait()
+        reader.join()
+        raise VerificationError("gh attestation verify exceeded its timeout") from error
+    reader.join()
+
+    if output_limit_exceeded.is_set():
+        raise VerificationError("gh attestation JSON result exceeds the configured size limit")
+    if reader_errors:
+        raise VerificationError("could not read gh attestation JSON output") from reader_errors[0]
+    stdout = bytes(captured).decode("utf-8", errors="replace")
+    return return_code, stdout
+
+
 def verify_attested_release(
     *,
     kind: str,
@@ -213,38 +296,25 @@ def verify_attested_release(
         "--format",
         "json",
     ]
-    try:
-        result = subprocess.run(
-            command,
-            check=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            shell=False,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise VerificationError("gh attestation verify exceeded its timeout") from error
-    except OSError as error:
-        raise VerificationError("could not start GitHub CLI; install gh and confirm it is on PATH") from error
-
-    if result.returncode != 0:
+    return_code, stdout = _run_bounded_gh(command, timeout)
+    if return_code != 0:
         raise VerificationError(
-            f"gh attestation verify failed with exit status {result.returncode}; stderr was discarded"
+            f"gh attestation verify failed with exit status {return_code}; stderr was discarded"
         )
-    if not isinstance(result.stdout, str):
-        raise VerificationError("gh attestation verify returned no JSON output")
-    record_count = _validate_attestation_result(result.stdout)
+    record_count = _validate_attestation_result(stdout)
+    if kind != "canvas":
+        verified_digest = _hash_file(Path(subject))
+        if verified_digest != actual_digest:
+            raise VerificationError("local artifact changed while GitHub attestation verification was running")
     return {
         "kind": kind,
         "subject": safe_subject,
         "digest": actual_digest,
         "repository": repository,
         "tag": tag,
+        "source_ref": source_ref,
         "source_commit": source_commit,
+        "predicate_type": PREDICATE_TYPE,
         "signer_workflow": signer_workflow,
         "attestation_records": record_count,
     }
