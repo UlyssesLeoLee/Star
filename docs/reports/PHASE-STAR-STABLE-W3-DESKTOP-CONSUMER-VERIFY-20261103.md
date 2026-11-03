@@ -15,7 +15,7 @@ This change creates a consumer-verification step in the workflow definition. It 
 
 | File | Change | Result |
 |---|---|---|
-| `.github/workflows/star-stable-desktop.yml` | Added a separate approved-tag consumer job; downloads all three platform artifacts, requires matching resolver outputs and exact tag checkout, hashes every installer subject, verifies SLSA provenance through the existing release verifier, then runs a constrained SPDX 2.3 consumer query and parses its JSON. For each subject, require its matching digest and the two SPDX roots `star-desktop` and `star-desktop-frontend`, with non-empty package/relationship arrays. Updated the Cypher relationship header. | Implemented locally; hosted execution not run. |
+| `.github/workflows/star-stable-desktop.yml` | Added a separate approved-tag consumer job; downloads all three platform artifacts, requires matching resolver outputs and exact tag checkout, recursively finds installers beneath each artifact root, hashes every installer subject, verifies SLSA provenance through the existing release verifier, then runs a constrained SPDX 2.3 consumer query and parses its JSON. For each subject, require its matching digest and the two SPDX roots `star-desktop` and `star-desktop-frontend`, with non-empty package/relationship arrays. Updated the Cypher relationship header. | Implemented locally; hosted execution not run. |
 | `docs/briefs/STAR-STABLE-W3-DESKTOP-CONSUMER-VERIFY-20261103.md` | Records lane scope and constraints. | Created before worker dispatch. |
 | `docs/reports/PHASE-STAR-STABLE-W3-DESKTOP-CONSUMER-VERIFY-20261103.md` | Records implementation, evidence, remaining gates, and revision. | This report. |
 
@@ -42,6 +42,7 @@ The job uses `contents: read` and `attestations: read` only. It does not receive
 
 - No nested subagent was dispatched by this lane.
 - The original worker terminally disconnected twice. This recovery continued in the already-existing worktree, preserving its dirty workflow and untracked lane records without recreating, reverting, or overwriting them.
+- Independent coordinator review identified that downloaded installers are nested under the `src-tauri/target/...` artifact paths; recovery removed the overly restrictive top-level `find` depth limit and recorded the correction below.
 - No nested subagent was dispatched during recovery. The coordinator owns the independent review and central WBS synchronization.
 
 ## §5 Guard rules
@@ -55,7 +56,7 @@ The job uses `contents: read` and `attestations: read` only. It does not receive
 7. Linux verification requires at least one non-empty AppImage package.
 8. Windows verification requires at least one non-empty MSI package.
 9. macOS verification requires at least one non-empty DMG package.
-10. Every matching installer file is hashed and verified; a missing or empty subject fails closed.
+10. Every matching installer file is found recursively beneath the preserved artifact root, hashed, and verified; a missing or empty subject fails closed.
 11. Attestation verification binds the artifact digest to the exact source commit and tag ref.
 12. SLSA provenance verification restricts the signer to the approved Desktop workflow and the SLSA provenance predicate.
 13. SPDX SBOM verification binds the same installer SHA-256 to repository, exact tag ref, source commit, approved Desktop signer workflow, and the `https://spdx.dev/Document/v2.3` predicate.
@@ -80,3 +81,4 @@ The job uses `contents: read` and `attestations: read` only. It does not receive
 |---|---|---|---|
 | v0.1 | 2026-11-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Added an independent Desktop artifact-attestation consumer job. No tests or hosted workflow were run. |
 | v0.2 | 2026-11-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Added digest/source/tag/signer-bound SPDX 2.3 SBOM attestation verification for each installer; parsed the verified statement JSON fail-closed for expected subject digest and Rust/frontend roots; recorded recovery after two terminal worker disconnects. W3/W5 remain open and v1.0.6 remains NO-GO. |
+| v0.3 | 2026-11-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Fixed the coordinator-reviewed artifact-layout bug by finding installer subjects recursively beneath the downloaded bundle root; recorded that tests and hosted workflow remain unrun. |

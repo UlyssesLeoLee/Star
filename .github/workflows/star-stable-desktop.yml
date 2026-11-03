@@ -1,6 +1,6 @@
 name: Star Desktop stable bundle checks
 
-# @cypher schema=1 source_sha256=8435c4471d72260f203a6f971331d5f14ad383502bf4dd3c9e8f18335a5a2495
+# @cypher schema=1 source_sha256=8e39e4b1f597bed0d262216ef91d2ce2b9602c9848bc8ac4d51d2cf30c535cc4
 # MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
 # MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
 # MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
@@ -790,7 +790,7 @@ jobs:
             local bundle_dir="$2"
             local pattern="$3"
             local -a subjects=()
-            mapfile -d '' subjects < <(find "$bundle_dir" -maxdepth 1 -type f -name "$pattern" -size +0c -print0)
+            mapfile -d '' subjects < <(find "$bundle_dir" -type f -name "$pattern" -size +0c -print0)
             if (( ${#subjects[@]} == 0 )); then
               echo "No non-empty $platform release subjects found under $bundle_dir" >&2
               return 1
