@@ -1,8 +1,8 @@
 # Phase Report: W3 Desktop Consumer Verification
 
-**Phase:** STAR-STABLE-W3-DESKTOP-CONSUMER-VERIFY-20261103  
-**Branch:** `codex/star-stable-w3-desktop-consumer-20261103`  
-**Base:** `dev@391ac9029662735e13741ee92464fade1acb0667`  
+**Phase:** STAR-STABLE-W3-DESKTOP-CONSUMER-VERIFY-20261103
+**Branch:** `codex/star-stable-w3-desktop-consumer-20261103`
+**Base:** `dev@391ac9029662735e13741ee92464fade1acb0667`
 **Status:** Local workflow implementation complete; hosted verification not run. W3 remains OPEN/BLOCKED; W5 remains OPEN; v1.0.6 remains NO-GO.
 
 ## §0 Purpose
