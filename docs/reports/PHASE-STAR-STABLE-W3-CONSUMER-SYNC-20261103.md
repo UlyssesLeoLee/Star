@@ -16,7 +16,7 @@ Record the recently integrated Canvas, Web, and Desktop consumer workflow lanes 
 | Canvas | `d1c9c802ce09a98e3685d737c4f1af6b6f6cbcdc`; `1f022fa1b5e5dd503bbcaaa5fafbb45f8d737d89` | `94910a756e749e60c764718d045c1f3b492a0233` | Validate resolver identity and three immutable OCI digest records; verify provenance before manifest rendering. Buildx SBOM is not independently verified. |
 | Web | `72ddfc2ba420fb8356c454add66b30d96a72f5a7` | `65776e4b29b87c139920d80a49e23f029de4c117` | Download same-run evidence, check checksum, provenance and SPDX 2.3 attestation. No Vercel deployment. |
 | Desktop | `486e385032355fd79921c160aff8717bdcb0ee61`; `6c4fcd334cd2eeb416280a22c48b04679dac91c6`; `e8bb91ac817d87f8732f08df11c53c08a00e5020` | `95be18074d0decf7d3aef4f5a50b9dfc8469f99f` | Verify SLSA and SPDX consumers for Linux, Windows and macOS installer subjects; recursively discover nested installer paths beneath each uploaded artifact root. |
-| WBS | `docs/implementation-plans/WBS-STAR-STABLE-RELEASE-20261031.md` | Pending coordinator review | Add W3 lane evidence and a dated snapshot without changing the release decision. |
+| WBS | `docs/implementation-plans/WBS-STAR-STABLE-RELEASE-20261031.md` | Accepted by coordinator reviewer | Add W3 lane evidence and a dated snapshot without changing the release decision. |
 
 The three consumer lane reviews accepted each lane as partial W3 progress. Their review files are `docs/reviews/STAR-STABLE-W3-CANVAS-CONSUMER-VERIFY-20261103.md`, `docs/reviews/STAR-STABLE-W3-WEB-CONSUMER-VERIFY-20261103.md`, and `docs/reviews/STAR-STABLE-W3-DESKTOP-CONSUMER-VERIFY-20261103.md`.
 
@@ -57,10 +57,10 @@ The Canvas and Web lanes completed with their recorded partial reviews. The Desk
 
 | Role | Status | Finding |
 |---|---|---|
-| Architecture | Coordinator review pending | WBS captures consumer ownership and scope. |
-| SRE Lead | Coordinator review pending | Hosted, deployment and rollback evidence remains absent. |
-| Platform | Coordinator review pending | No proof of real SBOM/provenance artifacts. |
-| Review host | Coordinator review pending | The separate checklist records the required review points. |
+| Architecture | Reviewed by Mavis (documentation only) | WBS captures consumer ownership and scope. |
+| SRE Lead | Reviewed by Mavis (documentation only) | Hosted, deployment and rollback evidence remains absent. |
+| Platform | Reviewed by Mavis (documentation only) | No proof of real SBOM/provenance artifacts. |
+| Review host | Reviewed by Mavis (documentation only) | The separate checklist records the review and limitations. |
 | PM / Release Owner | No release approval implied | v1.0.6 remains NO-GO. |
 
 ## §7 Revision history
@@ -68,3 +68,4 @@ The Canvas and Web lanes completed with their recorded partial reviews. The Desk
 | Version | Date | Revised by | Change |
 |---|---|---|---|
 | v0.1 | 2026-11-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Synchronized the W3 consumer lane commits, partial review scope, cleanup evidence and remaining release gates into the WBS. |
+| v0.2 | 2026-11-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Recorded coordinator acceptance of the documentation sync after exact-hash, scope, cleanup and diff-check review; W3 and the release gate remain open. |
