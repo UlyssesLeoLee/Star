@@ -27,7 +27,7 @@ Baseline: dev@67755e31b5693e59678679c60277648fd478cd09
 | 两个 actions/setup-node consumer 结构断言 | 通过：两个 job 均 pin 24.22.2、使用 npm cache，cache dependency 为 frontend/package-lock.json |
 | pnpm/npm 静态断言 | 通过：workflow 中不再有 pnpm；两个 npm ci 和 npm exec 调用均存在 |
 | rtk proxy git diff --check | 通过 |
-| actionlint | 不可用：当前 PATH 未找到 actionlint |
+| actionlint | 不可用：当前 PATH 未找到 actionlint |`r`n| 协调者独立复核 | 通过：两个 job 使用精确 Node/npm 设置；原测试筛选与 worker 数保留；WBS 单锁文件/生产部署缺口仍明确 |`r`n| CodeRabbit 第二意见 | 未能运行：CLI 启动返回 `/root/.local/bin/coderabbit: Permission denied`；已按 npm CLI 官方文档核对 `npm exec --` 参数语义 |
 | 产品测试与 hosted workflow | 未运行；依 brief 排除 |
 
 既往本机 npm 冻结安装验收记录在 Node 22.19.0/npm 10.9.3 上；不是 Node 24.22.2/npm 11.19.1 或 GitHub hosted runner 的实测。本 lane 没有执行 npm ci 或 P1E 浏览器测试。
@@ -42,7 +42,7 @@ Baseline: dev@67755e31b5693e59678679c60277648fd478cd09
 
 ## §4 子代理失败接手清单
 
-本 lane 由指定 worker 实施，没有额外派发子代理，故无子代理失败待接手项。协调者仍须独立审查确切差异、WBS 状态和 dev 集成状态；worker 提交不表示 W6 关闭。
+本 lane 由指定 worker 实施，没有额外派发子代理，故无子代理失败待接手项。协调者已独立审查确切差异与 WBS 状态；dev 集成及 worktree 回收仍待完成。worker 提交不表示 W6 关闭。
 
 ## §5 守门规则
 
@@ -71,7 +71,7 @@ Baseline: dev@67755e31b5693e59678679c60277648fd478cd09
 | 架构 | 架构师（Mavis 接手审核）— 仅将 P1E CI consumer 迁至 npm；完整部署架构仍待验证 |
 | SRE Lead | SRE Lead（Mavis 接手审核）— 未运行 hosted workflow 或浏览器 E2E |
 | 平台 | 平台（Mavis 接手审核）— PyYAML 与静态配置断言通过；actionlint 不可用 |
-| 评审主持 | 评审主持（Mavis 接手审核）— worker 自检已完成，协调者独立复核待执行 |
+| 评审主持 | 评审主持（Mavis 接手审核）— worker 自检与协调者独立复核完成，dev 集成和 worktree 回收待执行 |
 | PM | PM（Mavis 接手审核）— W6 ADAPT/OPEN，v1.0.6 NO-GO |
 
 ## §7 修订历史
