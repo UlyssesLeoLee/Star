@@ -1,6 +1,6 @@
 name: Star Desktop stable bundle checks
 
-# @cypher schema=1 source_sha256=73e2dff4a4a95468e914a64dc60edd6181fe2070a8338a8c3d9c5714a4d4be2b
+# @cypher schema=1 source_sha256=8435c4471d72260f203a6f971331d5f14ad383502bf4dd3c9e8f18335a5a2495
 # MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
 # MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
 # MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
@@ -16,11 +16,21 @@ name: Star Desktop stable bundle checks
 # MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.0"})
 # MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
 # MERGE (frontend_tests:Config {id:"frontend-tests.desktop-stable",name:"npm test -- --reporter=dot on Node.js 24.22.2"})
+# MERGE (consumer_verify:Config {id:"desktop-consumer-attestation-verification",name:"separate read-only consumer verifies SLSA provenance and SPDX 2.3 SBOM attestations for every desktop installer"})
+# MERGE (consumer_sbom:Config {id:"desktop-consumer-spdx-sbom-verification",name:"verify SPDX 2.3 predicate, installer digest, and Rust/frontend SBOM roots"})
+# MERGE (release_verifier:Symbol {id:"scripts/release/verify_attested_release.py::main",kind:"function"})
+# MERGE (gh_attestation_verify:ExternalService {id:"gh-attestation-verify",name:"GitHub CLI gh attestation verify"})
+# MERGE (consumer_permissions:Config {id:"desktop-consumer-token-permissions",name:"contents:read and attestations:read only"})
 # MERGE (self)-[:CONFIGURES]->(frontend_tests)
+# MERGE (self)-[:CONFIGURES]->(consumer_verify)
+# MERGE (self)-[:CONFIGURES]->(consumer_sbom)
+# MERGE (self)-[:CONFIGURES]->(consumer_permissions)
 # MERGE (self)-[:CALLS]->(checkout)
 # MERGE (self)-[:CALLS]->(setup_node)
 # MERGE (self)-[:CALLS]->(upload_artifact)
 # MERGE (self)-[:CALLS]->(download_artifact)
+# MERGE (self)-[:CALLS]->(release_verifier)
+# MERGE (self)-[:CALLS]->(gh_attestation_verify)
 # MERGE (self)-[:CALLS]->(attest)
 # MERGE (self)-[:CONFIGURES]->(toolchain)
 # MERGE (self)-[:CONFIGURES]->(node_runtime)
@@ -695,3 +705,192 @@ jobs:
         with:
           subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
           sbom-path: artifacts/macos/frontend/star-desktop-frontend.spdx.json
+
+  verify_desktop_release_consumers:
+    name: Independently verify Desktop installer provenance and SBOM attestations
+    if: >-
+      ${{ inputs.release_confirmation == 'APPROVED' &&
+          startsWith(github.ref, 'refs/tags/v') &&
+          needs.attest_linux.result == 'success' &&
+          needs.attest_windows.result == 'success' &&
+          needs.attest_macos.result == 'success' }}
+    needs:
+      - linux
+      - windows
+      - macos
+      - attest_linux
+      - attest_windows
+      - attest_macos
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - name: Checkout the exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.linux.outputs.release_tag }}
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Require matching resolver identities
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.linux.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.linux.outputs.release_version }}
+          RELEASE_SOURCE_SHA: ${{ needs.linux.outputs.release_source_sha }}
+          WINDOWS_RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
+          WINDOWS_RELEASE_VERSION: ${{ needs.windows.outputs.release_version }}
+          WINDOWS_RELEASE_SOURCE_SHA: ${{ needs.windows.outputs.release_source_sha }}
+          MACOS_RELEASE_TAG: ${{ needs.macos.outputs.release_tag }}
+          MACOS_RELEASE_VERSION: ${{ needs.macos.outputs.release_version }}
+          MACOS_RELEASE_SOURCE_SHA: ${{ needs.macos.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = tag
+          test "$GITHUB_REF_NAME" = "$RELEASE_TAG"
+          test "$WINDOWS_RELEASE_TAG" = "$RELEASE_TAG"
+          test "$MACOS_RELEASE_TAG" = "$RELEASE_TAG"
+          test "$WINDOWS_RELEASE_VERSION" = "$RELEASE_VERSION"
+          test "$MACOS_RELEASE_VERSION" = "$RELEASE_VERSION"
+          test "$WINDOWS_RELEASE_SOURCE_SHA" = "$RELEASE_SOURCE_SHA"
+          test "$MACOS_RELEASE_SOURCE_SHA" = "$RELEASE_SOURCE_SHA"
+          test "$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{}")" = "$RELEASE_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
+
+      - name: Download Linux release subjects
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-linux-${{ needs.linux.outputs.release_tag }}-${{ needs.linux.outputs.release_version }}-${{ needs.linux.outputs.release_source_sha }}-unsigned
+          path: artifacts/linux
+
+      - name: Download Windows release subjects
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-windows-${{ needs.windows.outputs.release_tag }}-${{ needs.windows.outputs.release_version }}-${{ needs.windows.outputs.release_source_sha }}-unsigned
+          path: artifacts/windows
+
+      - name: Download macOS release subjects
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-macos-${{ needs.macos.outputs.release_tag }}-${{ needs.macos.outputs.release_version }}-${{ needs.macos.outputs.release_source_sha }}-unsigned
+          path: artifacts/macos
+
+      - name: Verify each downloaded installer provenance and SPDX SBOM as a consumer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.linux.outputs.release_tag }}
+          RELEASE_SOURCE_SHA: ${{ needs.linux.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+
+          verify_subjects() {
+            local platform="$1"
+            local bundle_dir="$2"
+            local pattern="$3"
+            local -a subjects=()
+            mapfile -d '' subjects < <(find "$bundle_dir" -maxdepth 1 -type f -name "$pattern" -size +0c -print0)
+            if (( ${#subjects[@]} == 0 )); then
+              echo "No non-empty $platform release subjects found under $bundle_dir" >&2
+              return 1
+            fi
+            for subject in "${subjects[@]}"; do
+              local digest
+              digest="$(sha256sum -- "$subject" | awk '{print $1}')"
+              python3 scripts/release/verify_attested_release.py \
+                --kind desktop \
+                --repo "$GITHUB_REPOSITORY" \
+                --tag "$RELEASE_TAG" \
+                --source-commit "$RELEASE_SOURCE_SHA" \
+                --subject "$subject" \
+                --expected-digest "sha256:$digest"
+
+              EXPECTED_SUBJECT_SHA256="$digest" gh attestation verify "$subject" \
+                --repo "$GITHUB_REPOSITORY" \
+                --source-digest "$RELEASE_SOURCE_SHA" \
+                --source-ref "refs/tags/$RELEASE_TAG" \
+                --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/star-stable-desktop.yml" \
+                --predicate-type "https://spdx.dev/Document/v2.3" \
+                --format json |
+                EXPECTED_SUBJECT_SHA256="$digest" python3 -c '
+          import json
+          import os
+          import sys
+
+          predicate_type = "https://spdx.dev/Document/v2.3"
+          expected_digest = os.environ["EXPECTED_SUBJECT_SHA256"]
+          required_roots = {"star-desktop", "star-desktop-frontend"}
+          max_output_bytes = 64 * 1024 * 1024
+          raw = sys.stdin.buffer.read(max_output_bytes + 1)
+          if len(raw) > max_output_bytes:
+              raise SystemExit("gh attestation JSON exceeds the 64 MiB consumer limit")
+          try:
+              records = json.loads(raw.decode("utf-8"))
+          except (UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"gh attestation returned malformed JSON: {error}") from error
+          if not isinstance(records, list) or not records:
+              raise SystemExit("gh attestation returned no verified SPDX SBOM records")
+
+          verified_roots = set()
+          for index, record in enumerate(records):
+              if not isinstance(record, dict) or not isinstance(record.get("attestation"), dict):
+                  raise SystemExit(f"verified SPDX record {index} is missing its attestation bundle")
+              verification = record.get("verificationResult")
+              statement = verification.get("statement") if isinstance(verification, dict) else None
+              if not isinstance(statement, dict):
+                  raise SystemExit(f"verified SPDX record {index} is missing its statement")
+              if statement.get("predicateType") != predicate_type:
+                  raise SystemExit(f"verified SPDX record {index} has the wrong predicate type")
+
+              subjects = statement.get("subject")
+              if not isinstance(subjects, list) or not any(
+                  isinstance(subject, dict)
+                  and isinstance(subject.get("digest"), dict)
+                  and subject["digest"].get("sha256") == expected_digest
+                  for subject in subjects
+              ):
+                  raise SystemExit(f"verified SPDX record {index} does not bind the installer digest")
+
+              predicate = statement.get("predicate")
+              if not isinstance(predicate, dict) or predicate.get("spdxVersion") != "SPDX-2.3":
+                  raise SystemExit(f"verified SPDX record {index} does not contain an SPDX-2.3 document")
+              packages = predicate.get("packages")
+              relationships = predicate.get("relationships")
+              if not isinstance(packages, list) or not packages:
+                  raise SystemExit(f"verified SPDX record {index} has no packages")
+              if not isinstance(relationships, list) or not relationships:
+                  raise SystemExit(f"verified SPDX record {index} has no relationships")
+
+              described_roots = {
+                  package["name"]
+                  for package in packages
+                  if isinstance(package, dict)
+                  and package.get("name") in required_roots
+                  and isinstance(package.get("SPDXID"), str)
+                  and package.get("SPDXID")
+                  and any(
+                      isinstance(relationship, dict)
+                      and relationship.get("spdxElementId") == "SPDXRef-DOCUMENT"
+                      and relationship.get("relationshipType") == "DESCRIBES"
+                      and relationship.get("relatedSpdxElement") == package["SPDXID"]
+                      for relationship in relationships
+                  )
+              }
+              if len(described_roots) != 1:
+                  raise SystemExit(f"verified SPDX record {index} does not describe exactly one approved Desktop SBOM root")
+              verified_roots.update(described_roots)
+
+          if verified_roots != required_roots:
+              missing = sorted(required_roots - verified_roots)
+              raise SystemExit(f"missing an independently verified Rust/frontend SPDX SBOM root: {missing}")
+          print("Verified SPDX 2.3 SBOM attestations for Rust and frontend roots.")
+          '
+              printf '%s\n' "- Verified SLSA provenance and Rust/frontend SPDX 2.3 SBOMs for $platform subject: \`$subject\` (sha256:$digest)" >> "$GITHUB_STEP_SUMMARY"
+            done
+          }
+
+          verify_subjects linux-deb artifacts/linux/src-tauri/target/release/bundle/deb '*.deb'
+          verify_subjects linux-appimage artifacts/linux/src-tauri/target/release/bundle/appimage '*.AppImage'
+          verify_subjects windows-msi artifacts/windows/src-tauri/target/release/bundle/msi '*.msi'
+          verify_subjects macos-dmg artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg '*.dmg'
