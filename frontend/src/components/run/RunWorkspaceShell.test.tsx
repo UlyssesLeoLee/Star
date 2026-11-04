@@ -1,10 +1,10 @@
 /*
-@cypher schema=1 source_sha256=9aaad51b069ec0310de07bf38df6c40e089078bf66f2c17dd2c9294b238db012
+@cypher schema=1 source_sha256=283652290a81ac68e34f03fbe6bf476a3c361564b918b616618e40f83262e999
 MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.test.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
 MERGE (suite:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::RunWorkspaceShell focus gating",kind:"suite"})
-MERGE (unfocused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::unfocused Run exposes directory choices without mounting Run Apps",kind:"test"})
-MERGE (focused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::verified Worktree focus reveals permitted Run Apps",kind:"test"})
+MERGE (unfocused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::unfocused LANE exposes directory choices without mounting LANE Apps",kind:"test"})
+MERGE (focused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::verified Worktree focus reveals permitted LANE Apps",kind:"test"})
 MERGE (picker:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::bounded picker loads more rows and searches across all loaded rows",kind:"test"})
 MERGE (duplicates:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::rejects duplicate Worktree IDs within a returned page and keeps prior rows",kind:"test"})
 MERGE (oversizedLater:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::rejects an oversized later page without exceeding the picker row budget",kind:"test"})
@@ -120,7 +120,7 @@ function makeEnvelope(focus: RunWorktree | null): RunContextEnvelope {
       project_id: projectId,
       repository_id: null,
       branch_id: null,
-      title: "Run Focus Acceptance",
+      title: "LANE Focus Acceptance",
       state: "active",
       owner_user_id: "99999999-9999-4999-8999-999999999999",
       version: 1,
@@ -151,7 +151,7 @@ function installSession(envelope: RunContextEnvelope) {
 }
 
 describe("RunWorkspaceShell focus gating", () => {
-  it("unfocused Run exposes directory choices without mounting Run Apps", async () => {
+  it("unfocused LANE exposes directory choices without mounting LANE Apps", async () => {
     const client = installSession(makeEnvelope(null));
 
     render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId }} />);
@@ -161,7 +161,7 @@ describe("RunWorkspaceShell focus gating", () => {
       "href",
       `/projects/${projectId}/runs/${runId}/worktrees/${worktreeId}`,
     );
-    expect(screen.queryByRole("tablist", { name: "Engineering Run Apps" })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "LANE Apps" })).toBeNull();
     expect(screen.queryByTestId("task-cards-panel")).toBeNull();
     expect(screen.queryByTestId("run-bi-panel")).toBeNull();
     expect(screen.getByRole("button", { name: "GLOBAL" })).toHaveAttribute("aria-pressed", "true");
@@ -246,12 +246,12 @@ describe("RunWorkspaceShell focus gating", () => {
     expect(screen.queryByRole("list", { name: "已加载的授权 Worktree" })).toBeNull();
   });
 
-  it("verified Worktree focus reveals permitted Run Apps", async () => {
+  it("verified Worktree focus reveals permitted LANE Apps", async () => {
     const client = installSession(makeEnvelope(makeWorktree()));
 
     render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId, worktree_id: worktreeId }} />);
 
-    expect(await screen.findByRole("tablist", { name: "Engineering Run Apps" })).toBeTruthy();
+    expect(await screen.findByRole("tablist", { name: "LANE Apps" })).toBeTruthy();
     expect(await screen.findByTestId("task-cards-panel")).toBeTruthy();
     expect(screen.queryByTestId("run-worktree-selection")).toBeNull();
     expect(screen.getByRole("button", { name: "WORKTREE" })).toHaveAttribute("aria-pressed", "true");

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=db4680229dd05bfc6428e941b11b0400f67d0041807abb809ec66d5dfd6f9215
+@cypher schema=1 source_sha256=eb44e531ca9ccdf57af3ec5757860280bf3729b245eaefaa4a7bf022840c049d
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -258,7 +258,7 @@ function worktreeStatusLabel(worktree: Extract<DirectoryNode, { kind: "worktree"
 function nodeScopeLabel(node: DirectoryNode, labels: RunDirectoryLabels): string {
   switch (node.kind) {
     case "project": return `Project · ${node.entity.role}`;
-    case "run": return `Engineering Run · ${node.entity.state}`;
+    case "run": return `LANE · ${node.entity.state}`;
     case "worktree": return `${labels.localWorktree} · ${worktreeStatusLabel(node.entity, labels).summary}`;
     case "branch": return node.entity.name
       ? `${labels.branchRecord} · ${labels.branchFreshnessUnknown}`

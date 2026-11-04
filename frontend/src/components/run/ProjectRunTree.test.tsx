@@ -1,10 +1,10 @@
 /*
-@cypher schema=1 source_sha256=55b72f76dab3894b76b98133f85bea0a58574669cde3bddfc78d8064dd191244
+@cypher schema=1 source_sha256=53f4ca854a9aa8f302476e71452cca5a3e33905dcb74d71a4f8c922397545c0e
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::ProjectRunTree behavior and localization",kind:"suite"})
 MERGE (selection:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::selecting a Project updates the Project context and clears Worktree focus",kind:"test"})
-MERGE (expansion:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::expanding Project and Run loads descendants without selecting them",kind:"test"})
-MERGE (keyboard:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::ArrowRight expands Project and Run without selecting either",kind:"test"})
+MERGE (expansion:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::expanding Project and LANE loads descendants without selecting them",kind:"test"})
+MERGE (keyboard:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::ArrowRight expands Project and LANE without selecting either",kind:"test"})
 MERGE (localized:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::localizes hierarchy and fail-closed state",kind:"test"})
 MERGE (component:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (api:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient",kind:"type"})
@@ -78,7 +78,7 @@ function installSession() {
       rows: [{ project_id: projectId, role: "owner" }], limit: 50, next_cursor: null,
     }),
     listProjectRuns: vi.fn().mockResolvedValue({
-      rows: [{ project_id: projectId, engineering_run_id: runId, title: "Focused Run", state: "active" }],
+      rows: [{ project_id: projectId, engineering_run_id: runId, title: "Focused LANE", state: "active" }],
       limit: 50,
       next_cursor: null,
     }),
@@ -125,31 +125,31 @@ describe("ProjectRunTree behavior and localization", () => {
     expect(clearFocus).toHaveBeenCalledTimes(1);
   });
 
-  it("expanding Project and Run loads descendants without selecting them", async () => {
+  it("expanding Project and LANE loads descendants without selecting them", async () => {
     const { client } = installSession();
     renderTree();
 
     await screen.findByRole("treeitem", { name: `Select Project ${projectId}` });
     fireEvent.click(screen.getByRole("button", { name: `Expand Project ${projectId}` }));
-    const run = await screen.findByRole("treeitem", { name: "Open Engineering Run Focused Run" });
+    const run = await screen.findByRole("treeitem", { name: "Open LANE Focused LANE" });
     expect(run).toHaveAttribute("href", `/projects/${projectId}/runs/${runId}`);
     expect(run).toHaveAttribute("aria-selected", "false");
     expect(screen.queryByRole("link", { name: /Open Task Cards/ })).toBeNull();
     expect(mocks.nav.setSelectedProjectId).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Expand Focused Run" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand Focused LANE" }));
     await waitFor(() => expect(client.listWorktrees).toHaveBeenCalled());
     expect(client.listProjectRuns).toHaveBeenCalledWith(projectId, undefined, expect.any(AbortSignal));
     expect(mocks.nav.setSelectedProjectId).not.toHaveBeenCalled();
   });
 
-  it("ArrowRight expands Project and Run without selecting either", async () => {
+  it("ArrowRight expands Project and LANE without selecting either", async () => {
     const { client } = installSession();
     renderTree();
 
     const project = await screen.findByRole("treeitem", { name: `Select Project ${projectId}` });
     fireEvent.keyDown(project, { key: "ArrowRight" });
-    const run = await screen.findByRole("treeitem", { name: "Open Engineering Run Focused Run" });
+    const run = await screen.findByRole("treeitem", { name: "Open LANE Focused LANE" });
     fireEvent.keyDown(run, { key: "ArrowRight" });
 
     await waitFor(() => expect(client.listWorktrees).toHaveBeenCalled());
@@ -158,9 +158,9 @@ describe("ProjectRunTree behavior and localization", () => {
   });
 
   it.each([
-    ["en", "Project navigation", "Project → Engineering Run → Worktree → Branch directory", "Engineering Run → Local Worktree → Branch"],
-    ["zh-CN", "Project 导航", "Project → Engineering Run → Worktree → Branch 目录", "Engineering Run → 本地 Worktree → Branch"],
-    ["ja", "Project ナビゲーション", "Project → Engineering Run → Worktree → Branch ディレクトリ", "Engineering Run → ローカル Worktree → Branch"],
+    ["en", "Project navigation", "Project → LANE → Worktree → Branch directory", "LANE → Local Worktree → Branch"],
+    ["zh-CN", "Project 导航", "Project → LANE → Worktree → Branch 目录", "LANE → 本地 Worktree → Branch"],
+    ["ja", "Project ナビゲーション", "Project → LANE → Worktree → Branch ディレクトリ", "LANE → ローカル Worktree → Branch"],
   ] as const)("localizes hierarchy and fail-closed state for %s", (language, navigation, directoryLabel, hierarchy) => {
     renderTree(language as Language);
 
