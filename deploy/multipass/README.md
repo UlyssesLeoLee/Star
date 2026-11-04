@@ -1,5 +1,7 @@
 # Multipass 宿主层 — k3s + Argo CD 三件套本机集群
 
+> **当前边界**：`multipass_k3s_gitops.ps1 -Stage 0` 只做预检；`-Stage all` 会按受控流程创建新 guest，不能用于启动/恢复既有 guest。两条旧 WSL 维护入口已退役。测试 inventory 最多登记 2 个实例（含停止和已删除记录），预检未知或达到上限时 fail closed；脚本使用跨进程独占锁，且不会自动 purge。当前应用部署入口只覆盖已 provision 且可达的 K3s context，见 [`Star Canvas 部署指南`](../../docs/deployment/star-canvas-services-deploy.md)。
+
 > **落地日期**: 2026-10-05 ｜ **实跑**: ✅ 2026-10-05 19:58 JST 三件套 19/19 Pod 跑通（见 §6）
 > **拍板**: per `ask_6da0b2511bcee76deccb5b21` — `mp_route_opt1`（1.17.0-rc1 + hcs 驱动）+ `install_auth_opt1`（用户手动装 MSI）
 > **选型依据**: [ADR-0054](../../../docs/architecture/2026-08-26-upgrade/adr/0054-cd-delivery-stack-argocd-kargo-rollouts.md)（三件套选型）+ 本文 §2（宿主层选型）
@@ -103,7 +105,7 @@ pwsh -File scripts/automation/multipass_k3s_gitops.ps1 -Stage all
 
 | 项 | 值 | 依据 |
 |---|---|---|
-| vCPU | 4 | 本机 24 线程，留足余量给 Windows + Docker Desktop |
+| vCPU | 4 | 本机 24 线程，留足余量给 Windows 与 Star 开发工具 |
 | 内存 | 8 GB | k3s ~1.5G + 三件套 controller ~3G + 业务 ~1G，留 3G buffer |
 | 磁盘 | **28 GB** | 本机 C: 仅剩 **35.9 GB**。刻意留 7.9 GB 给 Windows 自身，避免把宿主盘撑爆导致系统不稳定 |
 

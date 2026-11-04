@@ -1,5 +1,13 @@
 ﻿# =====================================================================
 # start-frontend.ps1 — Star 一键启动前端 dev server
+# @cypher schema=1 source_sha256=1c196c858311c4429c283348cae83bf8328c59ba2a2b8641ac3789d27ac65ec7
+# MERGE (self:File {path:"maintenance/start-frontend.ps1"})
+# MERGE (entry:Symbol {id:"maintenance/start-frontend.ps1::entry",kind:"script_entry"})
+# MERGE (cleanup:Symbol {id:"maintenance/start-frontend.ps1::Stop-TrackedTree",kind:"function"})
+# MERGE (self)-[:DEFINES]->(entry)
+# MERGE (self)-[:DEFINES]->(cleanup)
+# MERGE (entry)-[:CALLS]->(cleanup)
+# @endcypher
 # =====================================================================
 # 职责 (per 2026-09-06 13:21 JST 拍板: 一键启动 = 只起前端):
 #   1. 切到仓库根 (脚本可从任意 cwd 调用)
@@ -14,7 +22,8 @@
 #   - 不拉 git (per 8/31 11:44 JST 拍板: 只装 + 启)
 #   - 不 build (dev 模式不需要)
 #   - 不开新窗口 (同窗口体验)
-#   - 不管后端 (后端更新走 update-backend-k3s.ps1)
+#   - 不管后端; Canvas 部署见 docs/deployment/star-canvas-services-deploy.md,
+#     仅面向已配置且可达的 K3s context
 #
 # 设计原则 (per 环境变量安全 8/27 11:06 JST hard ban):
 #   - 脚本不打印任何 env var 内容, 不读 .env, 只 invoke

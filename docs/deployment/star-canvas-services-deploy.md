@@ -1,6 +1,6 @@
 # Star Canvas services deployment
 
-This guide covers the Star Canvas backend services and their Envoy ingress on an existing K3s cluster. It does not create virtual machines or clusters. For local or CI clusters, select one of the K3s contexts managed through Multipass; keep the current test inventory within the two-instance limit.
+This guide covers the Star Canvas backend services and their Envoy ingress on an existing K3s cluster. It does not create, start, or recover virtual machines or clusters. For local or CI use, select an already provisioned and reachable K3s context managed through Multipass; keep the current test inventory within the two-instance limit. The current Multipass script has a read-only preflight and a guarded new-guest provisioning flow, but no start-existing operation. If the guest is stopped or unreachable, stop here rather than re-running provisioning.
 
 ## Deployed inventory
 
@@ -16,7 +16,7 @@ The manifest is [`deploy/star-canvas-services-k3s.yaml`](../../deploy/star-canva
 | ConfigMaps | 2 | backend logging configuration and Envoy routing |
 | ServiceMonitor | 1 | `star-canvas-services-monitor` |
 
-There are **three Canvas backend services and four Kubernetes Service objects** in this manifest; the fourth Service exposes Envoy. The `star-api-rest` service remains separate and is not included in these counts or this manifest. Its existing image build path is `deploy/k3s-local/Dockerfile`.
+There are **three Canvas backend services and four Kubernetes Service objects** in this manifest; the fourth Service exposes Envoy. The `star-api-rest` service remains separate and is not included in these counts or this manifest. Its legacy build/deployment material under `deploy/k3s-local` is retired; this guide does not provide a supported API image build or deployment path.
 
 The manifest contains no unrelated workloads or service-account permissions. It keeps only the `ghcr-pull-secret` reference needed by private GHCR images; provision that secret through the approved secret manager before deployment. Workload pods do not receive Kubernetes API tokens. Do not place registry credentials in source control or shell history.
 
@@ -38,7 +38,7 @@ The workflow preserves its `main`/`dev`, version-tag, manual-dispatch, and image
 - Namespace `star-system` exists in that context.
 - Secret `ghcr-pull-secret` exists in `star-system` and has read access to the three private GHCR images.
 - The `ServiceMonitor` custom resource definition is installed. Without the Prometheus Operator CRD, applying the complete manifest fails; install the CRD first or use an environment-specific manifest that intentionally omits monitoring.
-- `kubectl` can reach the selected cluster. No Docker Desktop installation is needed by this deployment path.
+- `kubectl` can reach the selected, already provisioned cluster.
 
 ## Deploy
 
@@ -75,6 +75,6 @@ kubectl --context $env:STAR_K3S_CONTEXT -n star-system get deployments,services,
 ## Boundaries
 
 - The publishing workflow does not publish an API image; no new API registry contract is introduced here.
-- The K3s manifest does not provision virtual machines, clusters, databases, or message brokers.
+- The K3s manifest does not provision or recover virtual machines, clusters, databases, or message brokers.
 - Multipass and K3s infrastructure lifecycle remains owned by the host infrastructure workflow. This deployment guide only targets an already provisioned cluster.
 - Applying the manifest may create or update resources in `star-system`; it does not delete the namespace or clean up other cluster resources.
