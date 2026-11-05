@@ -377,7 +377,7 @@ def cargo_test_command(rtk: str, cargo: str) -> list[str]:
         rtk,
         "proxy",
         cargo,
-        "+1.99.0",
+        "+1.99.1",
         "test",
         "-j",
         "4",

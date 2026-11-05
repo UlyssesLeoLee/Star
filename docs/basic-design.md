@@ -1,5 +1,7 @@
 # Star 平台《基本设计書》
 
+> **当前工具链基线（2026-11-05）**：Star 统一采用 Rust **1.99.1** 作为最低支持版本。`rust-toolchain.toml`、workspace/BFF/独立 crate 的 `rust-version`、CI pin、受支持容器基础镜像与验收 runner 默认值必须一致；历史记录中的 Rust 1.99.0 仅保留为历史证据，不得作为当前基线验收。版本切换不等同于 workspace、目标数据库、托管 CI 或生产执行门关闭。
+
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。

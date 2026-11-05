@@ -1,7 +1,7 @@
 # Star Canvas platform service. The workflow supplies a minimal, filtered Cargo
 # workspace as this Dockerfile's context; it must never receive the monorepo.
 
-FROM rust:1.99.0-bookworm@sha256:114c7a4425406451c2866b6aafe69fe29b1b298832db1277d411ac73c82d04d6 AS builder
+FROM rust:1.99.1-bookworm@sha256:cfcbed05398d0f6f81b7c3a24579475c567f97007ae7837ab421f9ca3e66333d AS builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates/canvas-engine ./crates/canvas-engine

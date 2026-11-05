@@ -1511,7 +1511,7 @@ def render_root_cargo_toml(crates: list[str]) -> str:
         "[workspace.package]\n"
         "version = \"0.1.0\"\n"
         "edition = \"2021\"\n"
-        "rust-version = \"1.99.0\"\n"
+        "rust-version = \"1.99.1\"\n"
         "authors = [\"Star Team\"]\n"
         "license = \"Apache-2.0\"\n"
         "repository = \"https://github.com/UlyssesLeoLee/Star\"\n"

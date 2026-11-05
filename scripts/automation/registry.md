@@ -6,6 +6,8 @@
 > **依赖**: `docs/automation-design.md` v2.71 (§4.46 Schedule admission persistence、§4.48 enable-time authorization、§4.49 canonical ACL verification、§4.50 ACL mutation serialization、§4.51 Worktree Canvas cursor runner、§4.52-§4.57 9F4D infrastructure/readiness/capacity/schema/grants gates、§4.71 owner-message contract, §4.72 admission lifecycle schema gate, §4.73 Run binding Master gate, §4.87 D16 admission quarantine verification, §4.88 D17 Transport Profile Master/resolver verification, §4.89 D18 durable-log schema/concurrency verification, §4.90 D19 native server auth, §4.91 D20 native origin verification, §4.92 D20 grants/SQLx origin, §4.93 D19 endpoint binding, §4.94 D20 native-result owner-store test, §4.96-§4.97 WLD-0 DDL and owner-role/RLS gates, §4.99 WLD-5 bounded Hook draft navigation verification, §4.100 ledger/catalog reconciliation preflight, §4.103 W16-A OAuth PG acceptance, §4.104 Canvas SSE revocation, §4.105 authenticated device-revocation HTTP PG acceptance + §6 基类骨架 + §6.8 索引)
 > **校验**: `python scripts/automation/registry_check.py` 校验索引一致性
 
+> **当前工具链基线（2026-11-05）**：新增或重新运行的脚本默认使用 Rust 1.99.1。历史索引中的 1.99.0/1.98.x 仅保留当时的证据与阻断状态，不得被解释为当前基线通过。
+
 ---
 
 ## 0. 索引说明

@@ -13,7 +13,7 @@ name: Star Desktop stable bundle checks
 # MERGE (release_environment:Config {id:"github-environment.star-stable-release",name:"protected star-stable-release environment"})
 # MERGE (release_license_gate:Config {id:"release-license.mit-metadata-match",name:"MIT workspace metadata and LICENSE heading must match"})
 # MERGE (sbom_validation:Config {id:"desktop-sbom.validation",name:"SPDX 2.3 non-empty arrays; expected roots; npm floor 225; Rust root-only floor 1"})
-# MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.0"})
+# MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.1"})
 # MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
 # MERGE (frontend_tests:Config {id:"frontend-tests.desktop-stable",name:"npm test -- --reporter=dot on Node.js 24.22.2"})
 # MERGE (consumer_verify:Config {id:"desktop-consumer-attestation-verification",name:"separate read-only consumer verifies SLSA provenance and SPDX 2.3 SBOM attestations for every desktop installer"})
@@ -78,7 +78,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  RUSTUP_TOOLCHAIN: "1.99.0"
+  RUSTUP_TOOLCHAIN: "1.99.1"
   CARGO_BUILD_JOBS: "2"
 
 jobs:
@@ -126,8 +126,8 @@ jobs:
             patchelf \
             wget
 
-      - name: Install Rust 1.99.0
-        run: rustup toolchain install 1.99.0 --profile minimal
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal
 
       - name: Install pinned Rust SBOM generator
         run: cargo install cargo-sbom --version 0.10.0 --locked
@@ -249,8 +249,8 @@ jobs:
           cache: npm
           cache-dependency-path: crates/star-desktop/frontend/package-lock.json
 
-      - name: Install Rust 1.99.0
-        run: rustup toolchain install 1.99.0 --profile minimal
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal
 
       - name: Install pinned Rust SBOM generator
         run: cargo install cargo-sbom --version 0.10.0 --locked
@@ -376,10 +376,10 @@ jobs:
           cache: npm
           cache-dependency-path: crates/star-desktop/frontend/package-lock.json
 
-      - name: Install Rust 1.99.0 and universal targets
+      - name: Install Rust 1.99.1 and universal targets
         run: |
-          rustup toolchain install 1.99.0 --profile minimal
-          rustup target add --toolchain 1.99.0 aarch64-apple-darwin x86_64-apple-darwin
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target add --toolchain 1.99.1 aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Install pinned Rust SBOM generator
         run: cargo install cargo-sbom --version 0.10.0 --locked

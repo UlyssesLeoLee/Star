@@ -138,12 +138,12 @@ def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None
     ]
     root.mkdir(parents=True, exist_ok=True)
     (root / "Cargo.toml").write_text("\n".join(workspace_lines), encoding="utf-8")
-    (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.99.0"\n', encoding="utf-8")
+    (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.99.1"\n', encoding="utf-8")
     (root / "LICENSE").write_text("MIT\n", encoding="utf-8")
     (root / "deploy" / "k3s-local").mkdir(parents=True)
     dockerfile = "\n".join(
         [
-            "FROM rust:1.99.0-slim-bookworm AS builder",
+            "FROM rust:1.99.1-slim-bookworm AS builder",
             "WORKDIR /build",
             "COPY Cargo.toml Cargo.lock rust-toolchain.toml LICENSE ./",
             "# @star-local-crates-begin",

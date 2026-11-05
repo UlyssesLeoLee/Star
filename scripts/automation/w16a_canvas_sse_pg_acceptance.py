@@ -86,9 +86,9 @@ DATABASE_URL_ENV = "STAR_W16_DEVICE_AUTH_TEST_DATABASE_URL"
 EXPECTED_TEST = "active_canvas_sse_closes_after_device_binding_revocation"
 PG_TEST_BINARY = "canvas_device_auth_pg"
 CANVAS_TEST_SOURCE = ROOT / "crates" / "star-api-rest" / "tests" / "canvas_device_auth_pg.rs"
-EXPECTED_RUSTC_VERSION = "1.99.0 (b940084d7 2026-09-28)"
+EXPECTED_RUSTC_VERSION = "1.99.1 (58cf8f9c3 2026-10-13)"
 EXPECTED_BUILD_COMMAND = (
-    "rtk proxy cargo +1.99.0 test -p star-api-rest --test canvas_device_auth_pg "
+    "rtk proxy cargo +1.99.1 test -p star-api-rest --test canvas_device_auth_pg "
     "--no-run --locked --offline -j 1"
 )
 REQUIRED_POSTGRES_TOOLS = ("initdb.exe", "pg_ctl.exe", "postgres.exe", "psql.exe")
@@ -1052,7 +1052,7 @@ def validate_build_attestation(
     if re.fullmatch(r"[0-9a-f]{40}", current_head) is None or asserted_head != current_head.lower():
         raise AcceptanceError("build attestation HEAD does not match the current repository HEAD")
     if values["rustc_version"] != EXPECTED_RUSTC_VERSION:
-        raise AcceptanceError("build attestation does not name the required Rust 1.99.0 toolchain")
+        raise AcceptanceError("build attestation does not name the required Rust 1.99.1 toolchain")
     if values["build_command"] != EXPECTED_BUILD_COMMAND:
         raise AcceptanceError("build attestation command does not match the fixed locked/offline --no-run command")
     if source_path.is_symlink() or not source_path.is_file():

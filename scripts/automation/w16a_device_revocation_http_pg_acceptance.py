@@ -29,7 +29,7 @@
 # MERGE (prereqs)-[:CALLS]->(rustProbe),(prereqs)-[:CALLS]->(cargoProbe)
 # MERGE (rustProbe)-[:CALLS]->(componentProbe),(cargoProbe)-[:CALLS]->(componentProbe)
 # MERGE (componentProbe)-[:CALLS]->(selectToolchain),(componentProbe)-[:CALLS]->(parseToolchain)
-# MERGE (componentProbe)-[:CONFIGURES]->(:Config {id:"Requested stable Rust toolchain >=1.99.0 selected through RTK proxy; optional stable alias must resolve to exact request",kind:"toolchain"})
+# MERGE (componentProbe)-[:CONFIGURES]->(:Config {id:"Requested stable Rust toolchain >=1.99.1 selected through RTK proxy; optional stable alias must resolve to exact request",kind:"toolchain"})
 # MERGE (step)-[:CALLS]->(inside)
 # MERGE (migrate)-[:CALLS]->(psql),(migrate)-[:CALLS]->(step)
 # MERGE (psql)-[:CONFIGURES]->(db)
@@ -60,7 +60,7 @@ DB = "w16a_device_revoke_http_acceptance"
 APP_ROLE = "star_w16_device_revoke_app"
 TEST_BIN = "device_revocation_http_pg"
 MIN_RUST_TOOLCHAIN = (1, 99, 0)
-DEFAULT_RUST_TOOLCHAIN = "1.99.0"
+DEFAULT_RUST_TOOLCHAIN = "1.99.1"
 CARGO_DEFAULT = shutil.which("cargo") or "cargo"
 RTK_DEFAULT = shutil.which("rtk") or "rtk"
 BASE_MIGRATION = ROOT / "db/migrations/2026-09-09-oauth2-server.sql"
@@ -257,9 +257,9 @@ def parse_stable_toolchain(value: str) -> tuple[int, int, int] | None:
 def selected_toolchain(requested: str, selector: str | None) -> tuple[str | None, str | None]:
     requested_version = parse_stable_toolchain(requested)
     if requested_version is None:
-        return None, "Rust toolchain must be a stable X.Y.Z version >= 1.99.0"
+        return None, "Rust toolchain must be a stable X.Y.Z version >= 1.99.1"
     if requested_version < MIN_RUST_TOOLCHAIN:
-        return None, f"Rust toolchain {requested} is below minimum 1.99.0"
+        return None, f"Rust toolchain {requested} is below minimum 1.99.1"
     selected = selector or requested
     if selected not in {requested, "stable"}:
         return None, "Rust toolchain selector must be the requested version or the explicit 'stable' alias"
@@ -525,7 +525,7 @@ def main() -> int:
     parser.add_argument("--postgres-bin", type=Path, default=PG_BIN_DEFAULT)
     parser.add_argument("--cargo", default=CARGO_DEFAULT)
     parser.add_argument("--rtk", default=RTK_DEFAULT)
-    parser.add_argument("--rust-toolchain", default=DEFAULT_RUST_TOOLCHAIN, help="Stable X.Y.Z compiler version, minimum 1.99.0")
+    parser.add_argument("--rust-toolchain", default=DEFAULT_RUST_TOOLCHAIN, help="Stable X.Y.Z compiler version, minimum 1.99.1")
     parser.add_argument("--rust-toolchain-selector", help="Optional rustup selector; only the requested version or explicit 'stable' alias is accepted")
     args = parser.parse_args()
     run_id = time.strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:10]

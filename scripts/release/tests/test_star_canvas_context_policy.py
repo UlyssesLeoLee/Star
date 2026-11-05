@@ -289,7 +289,7 @@ members = ["crates/canvas-engine"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 
 [workspace.dependencies]
 serde = { version = "1.0.219", features = ["derive"] }
@@ -395,7 +395,7 @@ class WorkflowExecutionTests(unittest.TestCase):
         (root / "Cargo.lock").write_text(
             _fixture_lock(root_dependencies, extra_packages), encoding="utf-8"
         )
-        (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.99.0"\n', encoding="utf-8")
+        (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.99.1"\n', encoding="utf-8")
         (root / "LICENSE").write_text("MIT License\n", encoding="utf-8")
         (root / ".dockerignore").write_text("target\n", encoding="utf-8")
         crate = root / "crates" / "canvas-engine"
