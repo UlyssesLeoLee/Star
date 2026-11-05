@@ -124,7 +124,7 @@ flowchart TD
 2. 将 9F4I 的 native `event` 能力接到 BI sender/receiver composition；禁止用 admission-only request/result adapter 代替 Task event。
 3. BI owner 在单一事务中写 Inbox、fact/conflict 与 durable receipt；只有事务提交后 transport 才 ACK。
 4. 验证 exact replay、same identity/different wire conflict、错误 tenant/Run/Project、profile 撤销、lease 过期、consumer 重启，以及“提交后、ACK 前”崩溃恢复。
-5. 在隔离目标 PostgreSQL 验证 migration、app role grants、RLS/FORCE RLS、WORM、并发和恢复；运行 Rust 1.99.0 owned-crate tests/fmt/Clippy，再做针对性端到端联测。
+5. 在隔离目标 PostgreSQL 验证 migration、app role grants、RLS/FORCE RLS、WORM、并发和恢复；运行 Rust 1.99.1 owned-crate tests/fmt/Clippy，再做针对性端到端联测。
 6. 输出阶段报告并同步需求、基本设计、BI/Transport 详细设计与本 WBS。缺少可信身份或目标 DB 时继续 fail closed，不将 fixture 通过写成生产验收。
 
 #### Phase 9F4J 子工作包与退出门
@@ -138,7 +138,7 @@ flowchart TD
 | **9F4J.5 failure / exact replay / recovery** / BI + Platform owners | 注入 Inbox commit fault/unknown outcome、commit 后 ACK RPC failure/timeout、cancel、revoke、Profile/route/generation drift、redelivery 与 exact duplicate；未确认结果保持 source unacked/redeliverable；同 identity+wire 返回原 receipt 且仅一条 fact；identity/content conflict 不 ACK；poison 仅在 metadata-only quarantine receipt durable 且来源再次授权后 terminal disposition。 | requirements §50.8AS、Task SRS AC-23、Task BD §6.4、Task DD §14.13.6、basic §16.73、plan §6.153、DD-RUST-SERVER-REUSE §12 | disposable test 不代表进程重启/PITR、备份/WAL、生产 checkpoint 或运维恢复策略；未具备 crash/recovery、quarantine retention/capacity 与可信 terminal capability 时维持 fail closed；本切片不打开 accepted settlement、fan-out 或 execution。 |
 | **9F4J.6 target PostgreSQL/RLS/grants** / Platform + BI（分别验收各自 DB/role） | 用 DDL owner、受限 Platform runtime、BI runtime、独立只读 observer 验证 migrations；BI runtime 仅调用固定 BI function，无直接表 DML/跨 owner 权限；Platform runtime 只调用 authenticated native wrappers；验证 FORCE RLS/WORM、PUBLIC execute revoke、固定 search_path/timeout、NOINHERIT/SET ROLE denial、tenant mismatch 与 rollback 负向情况，并区分 disposable grants 和 target grants。 | requirements §§50.8AS/50.8AU、Task BD §§6.3–6.4/6.7、Task DD §§14.13.5–14.13.6/14.13.9、data design 9F4I、plan §§6.153/6.156、9F4I report | Target database 与登录角色 membership/grants 尚未部署/审计；fixture role 不能冒充生产 role。迁移升级/回滚、owner boundary、RLS 负向和独立 commit/ACK observer 缺一不可。 |
 
-**9F4J exit gate**：9F4J.1–9F4J.6 的适用 Rust 1.99.0 fmt/check/test/Clippy、真实 mTLS gRPC + disposable PostgreSQL commit-before-ACK latch，以及各 owner 最小权限/RLS/grants 负向断言都有可复核证据，才关闭本切片。生产身份/control plane/target grants、crash/PITR、durable checkpoint/恢复、quarantine retention/capacity、RSS/p95/p99/fairness、BI/Benchmark fan-out、accepted settlement 与 Schedule/Run execution 是独立门；本切片退出不得解除这些门，BI ingress 与执行继续 fail closed。建议的文档追踪增量为 9F4J 使用新验收 ID `AC-27`、Task BD §6.8、Task DD §14.13.10、basic §16.77、plan §6.157；先检查文档编号后再写入，保留 9F4I `AC-26` 历史不变。
+**9F4J exit gate**：9F4J.1–9F4J.6 的适用 Rust 1.99.1 fmt/check/test/Clippy、真实 mTLS gRPC + disposable PostgreSQL commit-before-ACK latch，以及各 owner 最小权限/RLS/grants 负向断言都有可复核证据，才关闭本切片。生产身份/control plane/target grants、crash/PITR、durable checkpoint/恢复、quarantine retention/capacity、RSS/p95/p99/fairness、BI/Benchmark fan-out、accepted settlement 与 Schedule/Run execution 是独立门；本切片退出不得解除这些门，BI ingress 与执行继续 fail closed。建议的文档追踪增量为 9F4J 使用新验收 ID `AC-27`、Task BD §6.8、Task DD §14.13.10、basic §16.77、plan §6.157；先检查文档编号后再写入，保留 9F4I `AC-26` 历史不变。
 
 ### 批次 A：先恢复可安全集成的工作面
 
@@ -182,7 +182,7 @@ flowchart TD
 
 - 每个 WBS 条目必须有：owner、输入/依赖、变更路径、迁移与授权影响、正/反向验收、Rust/frontend/DB/运行证据、文档回写和已知缺口。
 - 生产身份、目标 DB/RLS、宿主 provider、Runtime sandbox、消息消费或实际执行不可用时，保持功能关闭；隔离 fixture 只证明 fixture 覆盖项。
-- Rust 工具链以 1.99.0 为基线；所有 Rust 门使用 `-j 4`，明确区分 crate 级与 workspace 级、lib 与 all-targets。
+- Rust 工具链以 1.99.1 为基线；所有 Rust 门使用 `-j 4`，明确区分 crate 级与 workspace 级、lib 与 all-targets。
 - 测试阶段 Multipass inventory 不超过 2 条记录（Stopped/Deleted 也计入）；创建经过跨进程锁；达到上限或 inventory 不可核验时 fail closed，不自动 purge。
 - 桌面资源预算必须由实测冻结。测量前标 `TBD-MEASURE`，不得把局部分页/缓存上限写成 RSS 达标。
 - 每阶段对照需求、基本设计、详细设计与实际实现；实现更优时同步更新文档、验收标准、版本与修订履历。
@@ -348,7 +348,7 @@ This section supersedes earlier local lane and cleanup snapshots above. The fact
 ### Next work sequence
 
 1. **Complete WLD1 remediation and report.** Close the current-revision integrity, owner-role grant-drift, and PostgreSQL test-target-identity findings in the existing implementation lane. Preserve its user work and keep it out of dev until re-reviewed.
-2. **Resolve Cargo.lock narrowly.** Use the completed lock review to guide a Cargo 1.99.0-generated update of only the required dependency edge. If the toolchain remains unavailable, preserve the explicit blocker rather than claiming `--locked` readiness.
+2. **Resolve Cargo.lock narrowly.** Use the completed lock review to guide a Cargo 1.99.1-generated update of only the required dependency edge. If the toolchain remains unavailable, preserve the explicit blocker rather than claiming `--locked` readiness.
 3. **Re-review and run available gates.** Review the remediated migration, adapter, test, authorization/RLS and W/T/M obligations against the lane manifest; run available checks and record unavailable Rust/MSRV/PostgreSQL gates accurately.
 4. **Integrate WLD1 serially.** Commit only after remediation, re-review, lockfile resolution and applicable gates; rebase onto current dev, inspect the resulting diff, and fast-forward only if dev remains clean and has no active writer. Preserve main user data and do not push.
 5. **Archive and cleanup.** Remove completed implementation worktrees only after merge/recoverable archive, ignored-data review, owner/active-writer checks, and final clean/HEAD confirmation. WLD5 cleanup remains blocked by the other task's ownership guard.

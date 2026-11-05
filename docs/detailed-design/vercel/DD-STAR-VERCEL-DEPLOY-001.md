@@ -120,7 +120,7 @@ Secrets 通过受控平台环境配置注入，按 Preview/Production 分离并�
 
 在目标 Vercel 账户/套餐以隔离 Project 和无敏感测试数据，验证：
 
-- Rust MSRV 1.99.0 是否可用；构建根、依赖上传和两种既有候选构建形态能否访问 `crates/star-api-rest`。
+- Rust MSRV 1.99.1 是否可用；构建根、依赖上传和两种既有候选构建形态能否访问 `crates/star-api-rest`。
 - 最小 handler 与代表性 adapter 依赖闭包的部署结果及实际包体积；以 250MB 标准预算作保守门。
 - 函数 cold start、首字节延迟、maxDuration、并发、峰值 RSS、请求体、日志/指标、回滚，以及官方表未确认的 streaming/WebSocket 行为。
 - 任何失败不得转为 production Owner 调用、业务写入或执行能力。通用 WebSocket GA 与 Rust 专属能力分别记录。
@@ -307,7 +307,7 @@ chat SSE 的最终部署路由仍未批准：SRS FR-VC-013 允许 Next Route Han
 2. 嵌入宿主的真实 session issuer/audience/cookie contract 以及当前 Run 授权 API 映射。
 3. 生产上游 Star API 地址、路径 allowlist 和每个页面实际依赖的 owner-backed read/write 契约。
 4. Preview 供应商侧保护和 Promotion 审计的实证方式；禁止访问生产 Owner 的负向证明。
-5. Rust Runtime MSRV 1.99.0、Cargo build root、函数包、时长、RSS、并发、streaming/WebSocket、log/metrics 支持矩阵。
+5. Rust Runtime MSRV 1.99.1、Cargo build root、函数包、时长、RSS、并发、streaming/WebSocket、log/metrics 支持矩阵。
 6. PostgreSQL/provider 与 RLS 13 类、事务级池化、连接预算和迁移运行流程；不得据第三方文章认定供应商事实。
 7. FR-VC-009..012 所需的既有 Star Owner/API/Provider 与授权上下文映射、获批迁移作业身份和连接预算。未有书面批准映射及对应验证证据前，§5.2 的 Vercel DB/函数部署/执行能力维持关闭；若既有路径不能满足 FR，先修订 SRS/AC。
 8. TD T-049 所需的真实 Gateway 握手、Preview Origin allow/deny、当前授权/撤权、terminal/noVNC/ARG/Canvas 协议数据流和生命周期证据；chat SSE 则需先批准最终路由（可为 SRS 已允许的 Next Route Handler），并同步 SRS/ADR/BD/DD/TD 与相应真实契约。未完成前相关连接和验收继续关闭/NOT_RUN。

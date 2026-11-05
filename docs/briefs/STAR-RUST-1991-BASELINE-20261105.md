@@ -9,7 +9,7 @@ Move the active Star build, validation, container, and release-toolchain default
 - `rust-toolchain.toml`, workspace/BFF/independent crate `rust-version` declarations.
 - Supported CI workflows (using `dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8` with explicit `toolchain: 1.99.1`), release test fixtures, acceptance-runner defaults, and scaffolding templates.
 - Star Canvas and k3s-local Rust builder images, pinned to verified Rust 1.99.1 image-index digests.
-- Requirements, basic design, detailed design, AGENTS guidance, and stable-release WBS synchronization.
+- Requirements, basic design, detailed design, Vercel SRS/ADR/BD/DD/TD, Infrastructure/Schedule/UI planning, AGENTS guidance, active runner instructions, and stable-release WBS synchronization.
 
 ## Non-goals
 

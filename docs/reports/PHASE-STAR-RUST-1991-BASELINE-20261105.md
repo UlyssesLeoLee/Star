@@ -12,7 +12,7 @@
 | CI/release | Supported workflows use `dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8` (master commit “Add 1.99.1 patch release”) with explicit `toolchain: 1.99.1`; stable desktop labels and test fixtures also align | Implemented |
 | Containers | Canvas `bookworm` image index `sha256:cfcbed05398d0f6f81b7c3a24579475c567f97007ae7837ab421f9ca3e66333d`; k3s-local `slim-bookworm` image index `sha256:7d53bccd41fde2f509a276b37a8ef541f8e75fc3e1f85b059230386f512ed6c1` | Implemented; source digests verified with Docker registry inspection |
 | Runners/templates | Active acceptance defaults and generated Cargo fixtures → 1.99.1 | Implemented |
-| Docs | Requirements/basic/detailed design, AGENTS and stable WBS current-baseline notes synchronized | Implemented |
+| Docs | Requirements/basic/detailed design, AGENTS, stable WBS, Vercel SRS/ADR/BD/DD/TD, Infrastructure/Schedule/UI plans and current runner instructions synchronized | Implemented |
 | Historical records | Earlier phase evidence retained as historical text | Intentional |
 
 ## §2 验证摘要
@@ -26,6 +26,7 @@
 - Python acceptance suites passed: `scripts.automation.test_w16a_device_revocation_http_pg_acceptance` plus `scripts.release.tests.test_star_canvas_context_policy` = 51/51; K3s context suite = 20 run, 1 platform-permission skip.
 - `rtk python -m compileall` for the changed runner/template files and `rtk git diff --check` passed.
 - PyYAML parsed all 14 workflow files; a structural assertion found 19 Rust action steps, all pinned to the audited SHA and explicit 1.99.1 input.
+- Active Vercel design/test documents and current planning/runner instructions were re-audited; remaining 1.99.0 matches are retained only in dated historical evidence, fixtures, or revision history.
 - `rustup component add rustfmt clippy --toolchain 1.99.1` completed; `rtk cargo +1.99.1 fmt --all -- --check` still reports pre-existing repository-wide formatting drift (no files were rewritten).
 - No workspace-wide or production gate is inferred from this version bump.
 
@@ -63,3 +64,4 @@ No sub-agent implementation was used for this lane. The coordinator owns the iso
 | Version | Date | 修订人 | Change |
 |---|---|---|---|
 | v0.1 | 2026-11-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Align active Star toolchain/configuration and document the Rust 1.99.1 baseline; retain historical evidence and open all unrelated release gates. |
+| v0.2 | 2026-11-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Extend the current-baseline synchronization to the Vercel SRS/ADR/BD/DD/TD set, Infrastructure/Schedule/UI planning docs, and active runner instructions; preserve dated 1.99.0 evidence as historical. |

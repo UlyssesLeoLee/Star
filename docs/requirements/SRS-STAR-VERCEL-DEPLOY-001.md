@@ -36,7 +36,7 @@
 | 仓库 | Rust workspace members = 111 个唯一 crate（成员声明 116 条, 含 5 组重复声明: `crates/leads` / `crates/shared-task` / `crates/star-canvas` / `crates/star-scheduler` / `crates/star-workflow`）, 含 5 个常驻 axum 进程（bff/canvas-engine `:8080`、domain-canvas `:8081`、canvas-realtime `:8082` + WSS `:8083`、canvas-game `:8084`） | `Cargo.toml:3-175`（workspace members + 各 crate 注释）; 成员计数 = 成员数组解析实测 |
 | 仓库 | `crates/star-api-rest` 已含 `routes/`、`group_api/`（engineering_runs / canvas / hook_policies / schedule_rules / execution_profiles 等模块）、`auth/oauth/`（keypair + PKCE）、`middleware/`、`rbac.rs` | `crates/star-api-rest/src` 目录实测 |
 | 仓库 | PG 迁移 93 个文件 | `db/migrations` 文件计数 = 93 |
-| 仓库 | Rust 工具链固定 1.99.0（2026-10-01 发布），components = rustfmt + clippy | `rust-toolchain.toml:4-6` + AGENTS.md「Rust toolchain baseline」 |
+| 仓库 | Rust 工具链固定 1.99.1（2026-10-15 发布），components = rustfmt + clippy | `rust-toolchain.toml:4-6` + AGENTS.md「Rust toolchain baseline」 |
 | 仓库 | 既有部署资产全为 K8s / Helm / GitOps / Multipass 轨 | `deploy/k3s-local/`、`deploy/helm/`、`deploy/gitops/`、`deploy/multipass/` |
 | 平台 | Vercel Rust Runtime = 官方 Beta, 全套餐, Fluid compute | vercel.com/docs/functions/runtimes/rust（2026-10-24 检索） |
 | 平台 | Rust runtime 需 `api/` 下每文件一 function + Cargo.toml `[[bin]]` 逐个声明 + `vercel_runtime` v2 (`service_fn`) | 同上 |
@@ -100,7 +100,7 @@
 | WebSocket | 通用 Vercel Functions WebSocket 已于 2026-10-20 GA（全套餐）；要求 Fluid Compute，连接固定到接入实例并受 Function duration 限制，跨实例持久状态需外部协调。Rust Runtime 仍为 Beta，官方 feature-support 表为空且没有 WebSocket 行，因此 Rust 专属 WebSocket/Streaming 能力未确认 | PTY/noVNC/Canvas WSS 仍归 Star 自有执行面；不得依赖 Vercel 函数内存作为连接或协作事实（GAP-02/11） |
 | Cron | Hobby 每日一次且在指定小时内触发；其他团队为分钟级。投递 best-effort，可能漏发、重复、重叠；失败不自动重试；Instant Rollback 会恢复该部署关联的 Cron 定义 | 仅作可重复唤醒/补偿入口；业务事实必须由持久 owner 状态、幂等收据与对账驱动 |
 | 构建 | Rust runtime 走 Cargo 构建 + `[[bin]]` 逐函数声明, **且要求项目根为带 `[package]` 的 manifest** | 仓根是虚拟 manifest, 需先裁决构建形态（GAP-10 / FR-VC-002） |
-| 工具链 | 构建镜像 Rust 版本未公开承诺 | 本仓固定 1.99.0（`rust-toolchain.toml:4`）能否在 Vercel 构建镜像内编译 ⛔ 待验证（GAP-03） |
+| 工具链 | 构建镜像 Rust 版本未公开承诺 | 本仓固定 1.99.1（`rust-toolchain.toml:4`）能否在 Vercel 构建镜像内编译 ⛔ 待验证（GAP-03） |
 
 ---
 
@@ -201,7 +201,7 @@ Phase 1 的「同源 BFF 改造」是 Phase 2 的前置件, 两阶段复用同�
 | NFR-VC-05 | 区域 / 数据驻留 | 固定到已验证且与 PostgreSQL 私网/公网策略、驻留政策相容的函数区域 | 不假定 `iad1` 默认区域；在部署设计中记录选区与故障域 |
 | NFR-VC-06 | 冷启动 | 首字节延迟 SLO **实测后定档**, 不得预设 | 每 endpoint 的实际依赖闭包与函数冷启动叠加；当前无实测 |
 | NFR-VC-07 | 调度精度 | 不承载 SLA 级调度; Run 级定时精度需求由执行面保证 | Cron 精度限制 |
-| NFR-VC-08 | 兼容基线 | Rust MSRV 1.99.0 + edition 2021 保持不变; workspace lint（`unsafe_code = "forbid"` 等）0 放宽 | `rust-toolchain.toml` + `Cargo.toml:178-182` |
+| NFR-VC-08 | 兼容基线 | Rust MSRV 1.99.1 + edition 2021 保持不变; workspace lint（`unsafe_code = "forbid"` 等）0 放宽 | `rust-toolchain.toml` + `Cargo.toml:178-182` |
 
 ---
 
@@ -245,7 +245,7 @@ Phase 1 的「同源 BFF 改造」是 Phase 2 的前置件, 两阶段复用同�
 |---|---|---|---|---|
 | GAP-01 | 按每个 Rust handler 的真实依赖闭包计算函数包体积；不是把 111 个 workspace crate 假定为全部链接进每个函数。标准函数按 250MB 保守预算；Large Functions 5GB Beta 官方只列 Node.js/Python | 影响 Rust adapter 是否能部署；超预算即保留 Rust 控制面在自有运行时 | 最小 handler 与代表性业务 handler 分别构建并测量 `.vercel/output/functions/*`；确认启用的具体限制 | ⛔ |
 | GAP-02 | 通用 Functions WebSocket 已于 2026-10-20 GA；Rust Runtime WebSocket/Streaming 能力仍未确认：Rust 页面标 Beta、feature-support 表留空且没有 WebSocket 行；连接仍受 Function duration 限制，跨实例状态需外部持久化 | 通用 Functions GA 不得外推为 Rust 支持；PTY/Canvas WSS 留在 Star 自有执行面。VCD-2 仅在隔离目标账号/计划中验证 Rust streaming/WebSocket、时长、并发、内存和恢复语义 | 官方 Rust Runtime/WebSocket 文档更新或可复现的目标账号最小部署实测；保留通用 GA 与 Rust 专属能力的区分 | ⛔ |
-| GAP-03 | Vercel 构建镜像的 Rust 版本能否满足 MSRV 1.99.0 | 决定 Phase 2 可行性 | 最小 Rust 工程部署实测 | ⛔ |
+| GAP-03 | Vercel 构建镜像的 Rust 版本能否满足 MSRV 1.99.1 | 决定 Phase 2 可行性 | 最小 Rust 工程部署实测 | ⛔ |
 | GAP-04 | 托管 PG 在事务级池化下与 RLS 13 类 + `SET LOCAL` 的兼容性 | FR-VC-010 的实现细节未定 | spike: 池化 + 双租户并发实测 | ⛔ |
 | GAP-05 | Next.js 16 + TypeScript 7.0.2 + monaco/three 在平台构建镜像的兼容性与构建时长 | 构建超时 / 失败 | 首次构建实测 | ⛔ |
 | GAP-06 | 「Vercel Postgres 已关停并迁 Neon」目前仅第三方来源, 未以 Neon / Marketplace 官方页复核 | 影响 FR-VC-009 的目标选型表述 | 官方页复核 | ⛔ |
