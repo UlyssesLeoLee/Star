@@ -44,8 +44,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain (pinned)
-        # 必须与 rust-toolchain.toml (channel = 1.99.0) 一致, 否则 cargo metadata 解析失败
-        uses: dtolnay/rust-toolchain@1.99.0
+        # 必须与 rust-toolchain.toml (channel = 1.99.1) 一致, 否则 cargo metadata 解析失败
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
 
       - name: Fetch cargo-deny (pinned + checksum-verified)
         # 预编译二进制而非 `cargo install`: cargo install cargo-deny 需完整编译依赖树,
@@ -98,7 +100,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain (pinned)
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
 
       - name: Fetch cargo-audit (pinned)
         # 资产名与摘要来自 RustSec v0.22.2 官方 release API，并由直接下载 SHA-256 复核。
@@ -134,7 +138,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain (pinned)
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
 
       - name: cargo machete
         # advisory 模式: 本仓 workspace.dependencies 采用集中声明 + crate 级引用,
