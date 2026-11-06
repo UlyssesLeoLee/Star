@@ -18,3 +18,12 @@ Review the Rust 1.99.1 implementation candidate against current dev@655f675ad638
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
+
+## Final implementation review (2026-11-06)
+
+- Reviewed the combined implementation lane at `00dbd30076e8c3ac8ab105328c83e4f736bdaadf`, including commits `fac360a904bafdec794247e3dc38c2781785d6ef`, `67e4beb83556d76a89cd256df71b2fb6665c33b8`, and `00dbd30076e8c3ac8ab105328c83e4f736bdaadf`, against base `655f675ad6381ba5838fa37f191d5329a7b2a463`.
+- Combined diff remains exactly 15 registered files; worker tree clean; `git diff --check` passes.
+- Independent focused suites: 111 passed, 1 skipped (Windows symlink privilege), 0 failed. The runner defaults to 1.99.1, rejects 1.99.0 and accepts 1.99.1.
+- WBS forward gates now use 1.99.1 and preserve historical 1.99.0 results. Scaffold incident disclosure now includes possible same-name overwrite and unknown impact; the external path was not inspected or modified.
+- P2 remains for manifest-external requirements/basic/DD/root AGENTS normative wording still at 1.99.0. Track separately before declaring baseline traceability complete.
+- **Disposition:** accept for selective local-dev integration after a fresh allowed MAGOS plan/check. Do not treat as runtime or stable-release closure. No merge, push, or worktree cleanup was performed by the reviewer.

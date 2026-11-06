@@ -1,4 +1,4 @@
-# PHASE — STAR Rust 1.99.1 implementation candidate pre-audit
+# PHASE — STAR Rust 1.99.1 implementation candidate review
 
 ## §0 目的
 
@@ -33,12 +33,12 @@ Before integrating a Rust 1.99.1 baseline change, compare candidate commits c640
 1. MIN_RUST_TOOLCHAIN is still (1, 99, 0) while runner help/error text claims 1.99.1. Add an explicit 1.99.0 rejection test and fix before integration.
 2. Requirements AC-INFRA-002-R/S/U/V/W and related Basic Design §16.44–§16.47 / Group DD acceptance text still name 1.99.0. Preserve dated test results, but update forward-looking requirements or mark the acceptance rows as historical.
 3. The previous phase report's claim that all remaining 1.99.0 strings are historical is overbroad until the normative rows above are reconciled.
-4. The unrelated generated path D:\Star-worktrees\dev-skeleton was reported by the coordinator and not accessed; it does not affect this review. The source branch was clean by tracked Git status after focused suites.
-5. No decision is made here on hosted CI, all-targets/workspace build, final image, target database, Vercel, Multipass/K3s, or release readiness.
+4. The initial scaffold `--help` invocation wrote to the unrelated generated path D:\Star-worktrees\dev-skeleton. This review did not access that path. Read-only inspection of the generator confirms it may have overwritten same-name pre-existing files; their prior contents and actual impact are unknown, and the path remains untouched. The implementation source branch remained clean after focused suites.
+5. The final review does not close hosted CI, all-targets/workspace build, final image, target database, Vercel, Multipass/K3s, or release readiness.
 
 ## §4 子代理失败接手清单
 
-No child agents were dispatched by the review lane. A separate implementation worker owns a different registered worktree; its result has not been reviewed here and remains pending the coordinator's follow-up.
+No child agents were dispatched by the review lane. The separate implementation worker's final combined commits were reviewed after coordinator follow-ups.
 
 ## §5 守门规则
 
@@ -47,7 +47,7 @@ No child agents were dispatched by the review lane. A separate implementation wo
 3. Require the runner to reject Rust 1.99.0 when claiming a 1.99.1 minimum.
 4. Distinguish config/manifest identity checks from actual build, CI, database and runtime acceptance.
 5. Do not integrate the whole branch containing unrelated de29ef04.
-6. Re-review the implementation worker commit against the current dev SHA and manifest before any later integration decision.
+6. The implementation worker commits were reviewed against dev@655f675a and the registered manifest; any later integration still requires a fresh MAGOS check.
 7. Keep unsupported execution/release gates fail closed.
 
 ## §6 签字栏
@@ -57,11 +57,21 @@ No child agents were dispatched by the review lane. A separate implementation wo
 | Architecture | Mavis 接手审核 — the 1.99.1 direction is valid; runner and acceptance-wording adaptations remain open. |
 | SRE Lead | Pending full workspace and hosted CI evidence. |
 | Platform | Pending actual Star image/context build and target runtime evidence. |
-| Review主持 | ADAPT; pre-audit only, not integration approval. |
+| Review主持 | ACCEPT for selective local-dev integration after a fresh allowed MAGOS check; normative docs sync and product/release gates remain open. |
 | PM | User-directed current toolchain is Rust 1.99.1. |
 
 ## §7 修订历史
 
 | Version | Date | 修订人 | Change |
 |---|---|---|---|
+| v0.2 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Review fac360a904bafdec794247e3dc38c2781785d6ef, 67e4beb83556d76a89cd256df71b2fb6665c33b8, and 00dbd30076e8c3ac8ab105328c83e4f736bdaadf; independently rerun six focused suites; confirm 15-path scope, 1.99.0 rejection and preserved historical results; record remaining normative doc gap and side-effect impact as unknown. |
 | v0.1 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Compare c640eb34/be154efb with dev; record file-group dispositions, focused evidence, runner minimum defect, active acceptance-wording drift, and integration holds. |
+
+## 8. Final implementation review
+
+- **Candidate:** implementation lane HEAD `00dbd30076e8c3ac8ab105328c83e4f736bdaadf`; base is `655f675ad6381ba5838fa37f191d5329a7b2a463`. Its three commits change exactly the 15 manifest paths. Worker worktree is clean; `rtk git diff --check` passes.
+- **P0/P1:** none found. Default and minimum are Rust 1.99.1; `selected_toolchain("1.99.0", None)` is rejected and `selected_toolchain("1.99.1", None)` is accepted.
+- **Independent focused tests:** W16A device revocation 16/16; Canvas SSE 25/25; OAuth 5/5; phase 9F2 binding 11/11; K3s context 19 pass/1 WinError 1314 skip; Canvas context policy 35/35. Total 111 passed, 1 skipped, 0 failed. Implementation code did not change in the last two documentation-only commits.
+- **Resolved review findings:** WBS W2/W7 forward-looking gates now say 1.99.1, while recorded 1.99.0 failures and historical WLD-3 47/47 evidence remain unchanged. The report now states that the initial scaffold invocation may have overwritten same-name files under D:\Star-worktrees\dev-skeleton; prior content and impact are unknown, and the path was not inspected or further touched.
+- **Open P2:** requirements AC-INFRA-002-R/S/U/V/W, basic-design §§16.44–16.47, Group DD AC-INFRA-002-U/V, and root AGENTS.md still contain normative 1.99.0 wording outside this lane's manifest. Track a separate registered documentation lane; do not claim baseline traceability complete.
+- **Integration:** ACCEPT the implementation/WBS lane for selective local-dev integration after a fresh allowed MAGOS plan/check. A previous read-only MAGOS check reported overlap with older Rust/W16 lanes; this review does not override it. Full Rust, CI, DB, runtime, Multipass/K3s and release gates remain open. CodeRabbit could not run because its installed executable returned Permission denied; no source was sent externally.

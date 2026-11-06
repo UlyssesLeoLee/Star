@@ -59,3 +59,42 @@ Those old literals may be valid as-run evidence, but the rows are acceptance req
 ## Integration recommendation
 
 Do not integrate yet. After the P1 runner fix and regression test, reconcile the forward-looking AC wording (or explicitly assign a separate docs lane), rerun focused tests, and review the worker's resulting commit against the then-current dev SHA and registered file manifest. Keep all previously recorded 1.99.0 execution results unchanged. This pre-audit does not approve or review the pending implementation worker commit.
+
+## Final implementation review (2026-11-06)
+
+**Candidate:** `codex/rust-1991-harness-baseline-20261106` at `00dbd30076e8c3ac8ab105328c83e4f736bdaadf`, comprising implementation commit `fac360a904bafdec794247e3dc38c2781785d6ef` and documentation follow-ups `67e4beb83556d76a89cd256df71b2fb6665c33b8` and `00dbd30076e8c3ac8ab105328c83e4f736bdaadf`. The implementation commit is a direct child of the reviewed base `655f675ad6381ba5838fa37f191d5329a7b2a463`.
+
+### Scope and conclusion
+
+The combined diff changes exactly the 15 files in the registered lane manifest; the follow-up adds no paths outside that manifest. The worker worktree is clean, and `rtk git diff --check 655f675ad6381ba5838fa37f191d5329a7b2a463 HEAD` passes. No product runtime Rust code, root Cargo metadata, CI workflow, Dockerfile, requirements/basic/detail design, `AGENTS.md`, `main`, or remote was changed.
+
+**Code disposition: ACCEPT for selective local-dev integration after a fresh MAGOS integration check.** No P0 or P1 implementation defects were found. The two lane-local P2 documentation issues identified before `00dbd300` are corrected: active W2/W7 gates now name 1.99.1, and the scaffold incident report states that same-name files may have been overwritten and impact is unknown. Do not treat this as product execution or release closure. The normative requirements/basic/DD/AGENTS baseline remains explicitly outside this lane and must be handled in its own registered documentation lane before traceability is complete.
+
+### Independent validation
+
+I independently reran the six focused suites in the implementation worktree:
+
+| Suite | Result |
+|---|---:|
+| `scripts.automation.test_w16a_device_revocation_http_pg_acceptance` | 16/16 passed |
+| `scripts.automation.test_w16a_canvas_sse_pg_acceptance` | 25/25 passed |
+| `scripts.automation.test_w16a_oauth_pg_acceptance` | 5/5 passed |
+| `scripts.automation.test_phase9f2_binding_http_acceptance` | 11/11 passed |
+| `scripts.automation.test_star_k3s_context` | 19 passed, 1 skipped (Windows symlink privilege, WinError 1314) |
+| `scripts.release.tests.test_star_canvas_context_policy` | 35/35 passed |
+
+Total: 111 passed, 1 skipped, 0 failed. A direct selector probe reports `DEFAULT_RUST_TOOLCHAIN == "1.99.1"`, `MIN_RUST_TOOLCHAIN == (1, 99, 1)`, rejects `selected_toolchain("1.99.0", None)` with “below minimum 1.99.1”, and accepts `selected_toolchain("1.99.1", None)`. No Rust workspace/all-targets/fmt/Clippy, target PostgreSQL/RLS, hosted CI, Multipass/K3s or release gate was run; the phase report accurately leaves these open. The installed 1.99.0 MSVC `rustc.exe` failure is a toolchain availability result, not a passing 1.99.0 gate.
+
+### Findings
+
+| Severity | Finding | Evidence and disposition |
+|---|---|---|
+| P2 (resolved by `00dbd300`) | WBS had forward-looking 1.99.0 language. | W7 table row and local-context row previously described 1.99.0 as the current baseline. The follow-up now labels the failed 1.99.0 Cargo metadata attempt as historical, sets the current target to 1.99.1, and updates the W7 local-context and next-step gates. The historical failure details remain intact. |
+| P2 (resolved by `00dbd300`) | The accidental scaffold invocation's possible overwrite impact needed explicit disclosure. | Read-only source inspection confirms the generator uses `Path.write_text` for generated crate Cargo.toml/lib.rs files and the root workspace Cargo.toml. The phase report and WBS now say those same-name pre-existing files may have been overwritten, prior contents and actual impact are unknown, and the path remains preserved without inspection or further modification. |
+| P2 | Normative requirements/basic/detail design and root AGENTS remain at 1.99.0. | Confirmed at `docs/requirements.md` AC-INFRA-002-R/S/U/V/W (lines 2960/2970/2994/3006/3018), `docs/basic-design.md` AC-INFRA-002-U/V in §§16.45–16.46 (lines 5121/5133), `docs/design/DD-WORKTREE-GROUP-001.md` AC-INFRA-002-U/V (lines 688/700), and root `AGENTS.md` line 36. The implementation report explicitly records this manifest-external documentation gap; do not broaden this lane to modify those files. Open a separate registered docs lane before declaring baseline traceability complete. |
+
+The old 1.99.0 test evidence was not relabeled: for example, WLD-3's 47/47 Schedule runner evidence in `WBS-RUN-LIFECYCLE-EXECUTION-CLOSURE-20261019.md` remains explicitly recorded as Rust/Cargo 1.99.0; historical WBS revisions likewise retain their as-run versions. The edits to current baseline statements do not claim that old runs used 1.99.1.
+
+### Integration gate
+
+The combined implementation and WBS/report lane is suitable for selective local `dev` integration if MAGOS provides a fresh allowed plan/check for the exact registered paths. A prior read-only MAGOS check returned a conflict with older Rust/W16 source lanes; this review neither overrides that result nor authorizes merging or cleanup. The manifest-external requirements/basic/DD/AGENTS synchronization remains an open follow-up and must not be called complete. No worktree, branch, external generated path, `main`, or remote was changed by this review.
