@@ -1,6 +1,6 @@
 # PHASE-WBS-D2-CANDIDATE-REVIEW-20261106
 
-Status: **Review complete / selective integration recommended with two documentation adaptations and one open Star-only artifact-boundary gate.** This is not a deployment or release acceptance.
+Status: **Review rebased to `dev@59c63d1b`; selective integration recommended. Latest dev has a filtered Cargo context generator and fixture tests, but all three deployment-document areas need target-aware adaptation and runtime artifact evidence remains open.** This is not a deployment or release acceptance.
 
 ## §0 目的
 
@@ -11,33 +11,37 @@ Independently review the committed D2 Multipass/K3s maintenance candidate agains
 | Area | Result | Decision |
 |---|---|---|
 | Eight PowerShell/BAT entrypoints | Six PowerShell files parse; retired K3s/backend and start-dev entrypoints now emit errors and exit 2; frontend scripts receive explanatory wording only. | Keep for selective integration. |
-| `deploy/k3s-local/README.md` | Marks the API path unsupported and warns against the retained build script. The Dockerfile and script remain present. | Adapt; warning does not close artifact boundary. |
+| `deploy/k3s-local/README.md` | Candidate retires the old root-context Docker/WSL path; latest dev calls a filtered Cargo-context generator from the Multipass helper. | Adapt to describe the filtered helper as local development/test only; no runtime/release proof. |
 | `deploy/multipass/README.md` | Adds the two-instance and no-resume boundary and removes a Docker Desktop resource reference. | Adapt “Stage all creates a guest”: provider lines 349–376 skip launch for existing names and lines 387–405 can probe for up to 25 minutes; stopped guests are not resumed. Keep 2026-10-05 host evidence historical. |
-| `docs/deployment/star-canvas-services-deploy.md` | Restricts deployment to an already provisioned/reachable context and disclaims API build/deployment support. | Keep. |
+| `docs/deployment/star-canvas-services-deploy.md` | Canvas guide remains limited to Canvas services, but candidate line 19 calls all API build material retired while latest dev has a separate filtered local API helper. | Adapt to distinguish Canvas deployment from the unverified local API development/test helper; no production API publish path is established. |
 | Candidate brief | Added as task provenance. | Keep as provenance only. |
 
-**WBS correction:** `git show --name-only` confirms 12 candidate paths: 8 executable entrypoints (six `maintenance/`, two `scripts/`), 3 changed deployment documents, and 1 provenance brief. Correct “9 maintenance files” to 8 executable entrypoints. Of the three changed deployment documents, only two need adaptation (`deploy/k3s-local/README.md` and `deploy/multipass/README.md`); `docs/deployment/star-canvas-services-deploy.md` is Keep. The review matrix above enumerates each entrypoint and document disposition.
+**WBS correction:** `git show --name-status` confirms 12 candidate paths: 8 executable entrypoints (six `maintenance/`, two `scripts/`), 3 changed deployment documents, and 1 new brief. Correct “9 maintenance files” to 8 executable entrypoints. Latest-dev comparison makes all three deployment-document areas Adapt: in particular, the previously Keep Canvas guide now needs to mention the separate filtered local API helper without presenting it as a production/published route. The review matrix above enumerates each entrypoint and current-target document disposition.
 
 ## §2 验证摘要
 
-- Candidate commit: `56d5c9763d0d85e2f93aee501298e2d670835486`; target: `dev@4ae2efb8cc5cf0185a806d1dd13665f51f692b55`. Ancestry is 211 behind / 1 ahead; fast-forward is unavailable without rebasing or replaying the candidate commit.
-- `rtk git diff --check dev...56d5c976`: passed (exit 0).
+- Candidate commit: `56d5c9763d0d85e2f93aee501298e2d670835486`; target: `dev@59c63d1b272258e7820e2fdf71c62c206afd686a`. Latest dev has 212 commits absent from candidate; candidate has 1 commit absent from dev. Whole-branch fast-forward is unavailable.
+- `rtk git diff --check dev...56d5c976`: passed (exit 0); after rebasing this review lane, `rtk git diff --check dev...HEAD`: passed.
 - PowerShell parser: all 6 changed PowerShell script files in the D2 candidate worktree (including the `.ps1.deprecated` file) parsed without errors.
 - Static scan of the retired PowerShell stubs found no WSL, Docker, Helm, kubectl, Multipass, process-start, process-stop, deletion, or git-pull command lines. The two BAT stubs were read and contain only error messages plus exit code 2.
-- Pointer/file existence checks passed for `scripts/start-star-backend.ps1`, the retained API build script and Dockerfile, and the Canvas manifest. In the candidate source, `deploy/k3s-local/build-and-deploy.sh:21–30` stages the entire `crates/` directory and `deploy/k3s-local/Dockerfile:4–6` copies it wholesale; this leaves the build-context payload gate open (it does not establish final image contents).
+- Stale candidate evidence: `56d5c976:deploy/k3s-local/build-and-deploy.sh:21–30` copies all of `crates/`; its Dockerfile lines 4–6 copies that whole directory. This is not the current dev build path.
+- Current dev evidence: `deploy/k3s-local/build-and-deploy.sh:31–35` invokes `scripts/automation/star_k3s_context.py` with an explicit repo and Multipass instance. `deploy/k3s-local/Dockerfile:5–10` has generated per-crate copy markers instead of `COPY crates ./crates`. Static source inspection shows the generator selects the resolved `star-api-rest` Cargo closure, rejects `game`/`legacy` packages/paths, writes an explicit workspace-member set, validates the file allowlist, and computes/rechecks a streaming context digest (`star_k3s_context.py:165–178, 241–321, 549–617, 658–789, 729–742, 965–970`).
+- `rtk python -m unittest scripts.automation.test_star_k3s_context -v`: 20 tests, 19 passed and 1 skipped because symlink creation is not permitted in this Windows environment (`WinError 1314`). Fixture tests cover closure filtering, game-dependency rejection, path/reparse guards, stable output, tamper detection, and explicit selected-guest contract. They mock Cargo/Multipass/Docker/K3s interactions.
+- `rtk bash -n deploy/k3s-local/build-and-deploy.sh`: passed. The current target `deploy/k3s-local/README.md:43–64` still describes the old direct root-context Docker path and needs adaptation.
 - Read-only inspection of the current Multipass provider confirmed a two-instance constant, exclusive file lock, inventory JSON parsing with fail-closed errors, handling of a returned `Deleted` item, and no explicit start/recover/delete/purge call. A stopped existing instance skips launch and is then probed with `multipass exec`.
 - Canonical documentation lookup supports the documented `multipass list` format and legacy Deleted-state context, but does not establish 1.17.0-rc1 behavior on this host.
 - CodeRabbit CLI review was not run: the available wrapper resolved to `/root/.local/bin/coderabbit` and returned permission denied. No external review result is claimed.
-- No user request or evidence authorized a live Multipass/K3s run, so none was performed.
+- Coordinator follow-up on `dev@59c63d1b` generated a temporary Linux Cargo context: 333 files, 33 local crates, SHA-256 `2480ec80558c17f8ab50031e158162f460ad1c3004266138d150326d65f88b86`, `forbidden_paths=[]`. Temporary output was automatically cleaned; this was not a build from candidate `56d5c976`.
+- No retained context archive, Docker/Multipass image build, final guest image digest, SBOM/provenance, consumer verification, live guest/K3s deployment, rollout, or rollback was produced.
 
 ## §3 已知缺口
 
-1. `deploy/k3s-local/build-and-deploy.sh` and `deploy/k3s-local/Dockerfile` still exist. The former stages all of `crates/` (`:21–30`) and the latter copies it (`:4–6`); filtering plus actual filtered-context/final-image evidence remain separate Star-only release gates. No claim about game payload in the final image was verified.
+1. The broad context applies to the stale candidate only; latest dev has a filtered generator, fixture tests, and a coordinator-run current-dev context-generation pass (333 files / 33 local crates / no forbidden paths). That temporary context was auto-cleaned and is not an archived artifact. Final guest image contents/digest, SBOM/provenance, and consumer verification remain unverified. Do not report the stale path as current dev behavior or fixture/static checks as release acceptance.
 2. No exact-host evidence proves `multipass list --format json` includes legacy Deleted records on the pinned version. The provider logic only proves it counts such records if returned.
 3. `-Stage all` is not a resume operation. Provider lines 349–376 skip launch if the configured name already exists; lines 387–405 may continue probing cloud-init for 25 minutes via `multipass exec`. A stopped guest is not started. Do not describe `-Stage all` as creating a new guest unconditionally or as recovering an existing guest.
 4. The Multipass README includes dated host observations. Treat them as historical and do not use them as current resource-capacity or release evidence.
 5. Actual VM, K3s readiness, final image digest, SBOM/provenance, consumer, and rollback evidence remain NOT RUN.
-6. The D2 source branch is 211 commits behind dev. Its worktree contains separate dirty/untracked WBS/report content; this review did not read or change those files. Review that content separately before any cleanup.
+6. The D2 source branch is 212 commits behind latest dev. Its worktree contains separate dirty/untracked WBS/report content; this review did not read or change those files. Review that content separately before any cleanup.
 
 ## §4 子代理失败接手清单
 
@@ -59,17 +63,17 @@ Independently review the committed D2 Multipass/K3s maintenance candidate agains
 10. Never auto-purge or treat a deployment helper as permission to destroy a guest.
 11. Only deploy to an explicitly selected, already provisioned, reachable K3s context.
 12. Do not expose unrestricted host shell, daemon/socket, or host mounts to agents/tasks.
-13. A README warning does not prove the retained API Docker context is Star-only.
-14. Do not mark runtime/deployment/SBOM/provenance/rollback gates complete from static review.
+13. Keep the current dev filter implementation distinct from the stale candidate's broad `crates/` path.
+14. Fixture tests and static allowlist checks do not prove a generated full-repo context, final image, SBOM/provenance, or rollout.
 15. This lane does not modify main, push, tag, publish, or deploy.
 
 ## §6 签字栏
 
 | 角色 | 决定 |
 |---|---|
-| 架构 | Mavis review: accept the fail-closed retirement subset; documentation and artifact-boundary follow-ups remain open. |
+| 架构 | Mavis review: accept the fail-closed retirement subset; adapt all three docs against filtered-helper behavior. |
 | SRE Lead | Open pending real inventory, two-instance, guest readiness, and recovery evidence. |
-| 平台 | Open pending filtered context, image digest, SBOM/provenance, and deployment verification. |
+| 平台 | Static filter and fixture tests pass; coordinator generated the current-dev temporary context. Retained context archive, image digest, SBOM/provenance, consumer, and deployment verification remain open. |
 | 评审主持 | Mavis review per DEC-008; source worktree remains protected. |
 | PM | Partial; no WBS or stable-release gate closed by this review alone. |
 
@@ -78,5 +82,6 @@ Independently review the committed D2 Multipass/K3s maintenance candidate agains
 | Version | Date | Author | Revision | Trigger |
 |---|---|---|---|---|
 | v0.1 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Reviewed D2 candidate file-by-file; corrected the executable-file count and separated static review from host/runtime acceptance. | User-requested WBS parallel integration review. |
+| v0.2 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Rebased review onto dev@59c63d1b; separated stale candidate-wide-crates context from current filtered-context implementation; recorded 20 fixture tests (19 pass, 1 skipped) and the coordinator's temporary 333-file / 33-crate context generation. Kept retained-context archive, image/SBOM/consumer runtime evidence open. | Coordinator requested latest-dev recheck and supplied context-generation evidence. |
 
 \n
