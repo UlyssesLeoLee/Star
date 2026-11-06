@@ -1,7 +1,7 @@
 # PHASE-WBS-INTEGRATION-LEDGER-20261105
 
 Status: **Partial / audit-only**  
-Target: local `dev` (`a2649d3c`)
+Target: local `dev` (`5f7a0a9a`)
 Scope: parallel WBS lane evidence, selective integration decisions, and safe worktree convergence.  
 This ledger records merge readiness; it does not convert a design, mock, preview, or partial verification into a completed product capability.
 
@@ -21,13 +21,15 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 | W8 native transport | `0ae31044` contains useful adapter direction but has a real PostgreSQL `source_sequence` decode defect and split terminal claims. | **Do not merge** | Build a repair lane with shared-position claim and real PostgreSQL acceptance. |
 | W2 BFF lock | Branch tip is equivalent to dev; the owner worktree has an uncommitted `bff/Cargo.lock` change. | **Preserve** | Owner handoff, dependency/SBOM review, and a new committed artifact. |
 | W16 device revoke | Branch was fully contained in dev; ignored evidence was archived before cleanup. | **Completed / cleaned** | Archive: `C:/Users/leo19/.codex/archives/Star/w16a-device-revoke-20261105`. |
-| Star-only release artifacts | Canvas release workflow allowlists three service images and applies filtered contexts; policy tests pass. The separate `deploy/k3s-local/Dockerfile` still accepts a broad `crates` build context, so it is not yet equivalent evidence. | **Partial / held** | Classify or filter the k3s-local context, then rerun the game/legacy exclusion checks against the actual context and image. |
+| Star-only release artifacts | `PHASE-STAR-ARTIFACT-AUDIT-20261106` (`5f7a0a9a`) verified three Canvas contexts and a 333-file K3s context. Canvas release tests are 64/64, but the workspace `Apache-2.0` metadata conflicts with the root MIT license and the three independent Canvas locks fail `--locked`; K3s filtering passes. README/Helm paths still expose unsupported bypasses. | **Partial / held** | Resolve the license authority and per-service lock generation, require fresh empty contexts, retire stale Helm/README paths, then run image/SBOM/deployment gates. |
+| Product naming neutrality | `PHASE-PRODUCT-NAMING-AUDIT-20261106` (`18dd9f1c`) maps current UI/help/demo/package-description exposure and separates compatibility IDs from user-visible text. | **Audit complete / remediation pending** | Apply the four remediation groups, keep DB/adapter IDs only where required, and rerun browser/CLI/static-package scans before release. |
 
 ## §2 Verification summary
 
 - `cargo +1.99.1 metadata --no-deps --format-version 1 --locked`: exit 0 on current dev.
 - `cargo +1.99.1 check -p star-api-rest --all-targets --locked -j 4`: exit 0, 58.39s; existing warnings only.
-- Canvas release-context policy suite: 35 tests, 35 passed.
+- Canvas release-context and artifact policy suite: 64 tests, 64 passed; K3s context suite: 19 passed, 1 Windows symlink case skipped.
+- Actual artifact evidence: three Canvas contexts were generated, but their independent `cargo metadata --locked` checks failed; the filtered K3s context passed with 333 files and 36 directed `COPY` entries.
 - Current dev worktree: clean; no push or main mutation performed.
 - Main comparison: `git cherry dev main` showed all main-only commits as patch-equivalent (`-`); no main-leading change was copied.
 
@@ -37,8 +39,10 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 2. D2 deployment documentation still needs the current Multipass-only, filtered-context wording; the old “no supported build path” statement is not accepted.
 3. W8 requires shared source-position ownership, the missing SELECT column, and real PostgreSQL/RLS/concurrency evidence.
 4. Vercel build compatibility and hosted install/sign/rollback remain `NOT_RUN`.
-5. The k3s-local Docker path still needs an explicit Star-only context proof; `.dockerignore` alone is not acceptance evidence.
-6. Active W8/WLD1/W16/D2/W2 worktrees contain untracked, ignored, or dirty evidence and remain protected from cleanup.
+5. Canvas license metadata/root LICENSE disagreement and per-service `Cargo.lock` regeneration remain release blockers.
+6. Product-facing legacy names remain in Gantt tooltips, CLI help/default output, demo/delivery pages, and seven non-publish Cargo descriptions; compatibility IDs and historical records need a separate neutralization pass.
+7. The K3s Docker path has filtered-context evidence, but README/Helm/ArgoCD bypasses and real image/SBOM/deployment evidence remain open; `.dockerignore` alone is not acceptance evidence.
+8. Active W8/WLD1/W16/D2/W2 worktrees contain untracked, ignored, or dirty evidence and remain protected from cleanup.
 
 ## §4 Sub-agent handoff record
 
@@ -46,7 +50,8 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 - D2 audit: identified nine reusable maintenance files and three documents requiring adaptation; no files changed.
 - Canvas/WLD7 audit: confirmed the design is compatible in principle but requires current spec/data/test traceability; no files changed.
 - W8 audit: found the PostgreSQL decode and cross-terminal claim blockers; no files changed.
-- Artifact audit: confirmed the Canvas image allowlist and game/legacy fail-closed tests; flagged the k3s-local broad build-context path and README bypass for a separate filtered-context gate.
+- Artifact audit: `PHASE-STAR-ARTIFACT-AUDIT-20261106` verified actual Canvas/K3s filtered directories, license/lock blockers, README/Helm bypasses, and missing image/SBOM/deployment evidence.
+- Product naming audit: `PHASE-PRODUCT-NAMING-AUDIT-20261106` classified user-visible names, compatibility identifiers, historical evidence, and four remediation groups; no product code was changed.
 - One follow-up audit agent later reached its usage limit; no unreviewed code was accepted from that lane.
 
 ## §5 Merge and safety gates
@@ -75,4 +80,5 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 |---|---|---|---|
 | v0.1 | 2026-11-05 | Initial convergence ledger; records merged runtime, protected lanes, and exact next gates. | Ulysses (Mavis review per DEC-008) |
 | v0.2 | 2026-11-05 | Rebased the target reference to current `dev` and recorded the separate k3s-local Star-only artifact gate. | Ulysses (Mavis review per DEC-008) |
+| v0.3 | 2026-11-06 | Linked the product naming and Star-only artifact audits, corrected the K3s finding to actual filtered-context evidence, and recorded license/lock/remediation blockers. | Ulysses (Mavis review per DEC-008) |
 
