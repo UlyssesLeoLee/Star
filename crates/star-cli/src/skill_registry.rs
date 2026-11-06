@@ -1,7 +1,8 @@
-//! `skill_registry.rs` — Skill Registry (per FR-ORCA-034 Skill Registry, §10 v1.0 行 469-471)
+//! `skill_registry.rs` — versioned Skill Registry for agent capability adapters.
 //!
-//! Orca 借鉴点 9 的 Skill Registry 实现: Orca 的能力作为 installable skills
-//! 发布, agent 通过 `npx skills add <url> --skill <name>` 安装.
+//! Skills are installable capability packages. An agent can register a source
+//! URL and an explicit compatibility set while Star keeps default output
+//! limited to its supported runtime identities.
 //!
 //! **MVP v0.1 范围 (本 issue ULYS-196)**:
 //! - Skill 实体 + in-memory registry (与 `domain-local-runtime` CLI Session
@@ -32,7 +33,7 @@ use crate::error::StarError;
 // 1. entity
 // =====================================================================
 
-/// Skill 来源 URL 类型(per FR-ORCA-034 npx skills add <url> --skill <name>)
+/// Skill 来源 URL 类型（`npx skills add <url> --skill <name>` 的兼容输入）
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(transparent)]
 pub(crate) struct SkillSourceUrl(pub(crate) String);
@@ -66,7 +67,7 @@ impl std::fmt::Display for SkillSourceUrl {
     }
 }
 
-/// Skill (per FR-ORCA-034)
+/// Registered agent capability skill.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct Skill {
     /// Skill 名(per `npx skills add --skill <name>`)
@@ -77,8 +78,8 @@ pub(crate) struct Skill {
     pub(crate) version: String,
     /// 描述(供 UI / agent 展示)
     pub(crate) description: Option<String>,
-    /// 兼容 agent 列表(per `SkillRegistry::list_for_agent(agent_type)`
-    /// 调用, MVP v0 默认包含 ["claude-code", "codex", "multica"])
+    /// 兼容 agent 列表（默认包含 Star 支持的 `claude-code`、`codex` 和
+    /// `star-agent-runtime`；显式传入的 adapter ID 原样保留）
     pub(crate) agent_compat: Vec<String>,
     /// 安装时间
     pub(crate) installed_at: DateTime<Utc>,
@@ -159,12 +160,12 @@ impl SkillRegistry {
             return Err(SkillRegistryError::AlreadyExists(name));
         }
 
-        // MVP v0 默认 agent_compat: 若调用方未指定, 包含全部 3 个
+        // 未指定时只注入 Star 的中性 runtime 身份；显式列表不做改写。
         let agent_compat = if agent_compat.is_empty() {
             vec![
                 "claude-code".to_string(),
                 "codex".to_string(),
-                "multica".to_string(),
+                "star-agent-runtime".to_string(),
             ]
         } else {
             agent_compat
@@ -385,14 +386,22 @@ mod tests {
         let mut reg = SkillRegistry::new();
         let url = dummy_url();
         let s1 = reg
-            .install("orca-cli", url.clone(), "0.1.0", None, vec![])
+            .install("sample-skill", url.clone(), "0.1.0", None, vec![])
             .unwrap();
-        assert_eq!(s1.name, "orca-cli");
+        assert_eq!(s1.name, "sample-skill");
         assert_eq!(s1.version, "0.1.0");
-        // 默认 agent_compat: 全部 3 个
-        assert_eq!(s1.agent_compat.len(), 3);
+        assert_eq!(
+            s1.agent_compat,
+            vec![
+                "claude-code".to_string(),
+                "codex".to_string(),
+                "star-agent-runtime".to_string()
+            ]
+        );
+        let default_json = serde_json::to_string(s1).unwrap();
+        assert!(!default_json.contains("legacy-provider"));
         // 同名重复 → AlreadyExists
-        let r2 = reg.install("orca-cli", url, "0.2.0", None, vec![]);
+        let r2 = reg.install("sample-skill", url, "0.2.0", None, vec![]);
         assert!(matches!(r2, Err(SkillRegistryError::AlreadyExists(_))));
     }
 
@@ -479,8 +488,7 @@ mod tests {
             .iter()
             .map(|s| s.name.as_str())
             .collect();
-        // "all-agents" 默认 agent_compat 是 ["claude-code", "codex", "multica"]
-        // 不含 "unknown-agent", 所以 unknown-agent filter 应为空
+        // 默认列表不含 "unknown-agent", 所以 unknown-agent filter 应为空
         assert_eq!(for_unknown, Vec::<&str>::new());
     }
 
@@ -507,10 +515,10 @@ mod tests {
         let mut reg = SkillRegistry::new();
         let url = dummy_url();
         reg.install(
-            "orca-cli",
+            "sample-skill",
             url,
             "0.1.0",
-            Some("Orca CLI skill".to_string()),
+            Some("Sample CLI skill".to_string()),
             vec!["codex".to_string()],
         )
         .unwrap();
@@ -519,8 +527,22 @@ mod tests {
         let json = serde_json::to_string(&reg.list()).unwrap();
         let back: Vec<Skill> = serde_json::from_str(&json).unwrap();
         assert_eq!(back.len(), 1);
-        assert_eq!(back[0].name, "orca-cli");
-        assert_eq!(back[0].description.as_deref(), Some("Orca CLI skill"));
+        assert_eq!(back[0].name, "sample-skill");
+        assert_eq!(back[0].description.as_deref(), Some("Sample CLI skill"));
         assert_eq!(back[0].agent_compat, vec!["codex".to_string()]);
+    }
+
+    #[test]
+    fn explicit_adapter_ids_round_trip_without_default_injection() {
+        let mut reg = SkillRegistry::new();
+        let url = dummy_url();
+        let explicit = vec!["legacy-provider-id".to_string()];
+        let skill = reg
+            .install("explicit-adapter", url, "0.1.0", None, explicit.clone())
+            .unwrap();
+        assert_eq!(skill.agent_compat, explicit);
+        let json = serde_json::to_string(skill).unwrap();
+        assert!(json.contains("legacy-provider-id"));
+        assert!(!json.contains("star-agent-runtime"));
     }
 }
