@@ -21,6 +21,10 @@
 
 An initial `rtk python tools/scaffold_skeleton.py --help` invocation ran the generator because no CLI help parser exists and wrote to its hard-coded output root `D:\Star-worktrees\dev-skeleton`. The directory may have pre-existing content; it was left untouched after the invocation and is preserved as lane-external data. The coordinator was notified. A subsequent safe verification routed output into this worktree's temporary directory.
 
+## Follow-up from coordinator review
+
+The stable-release WBS W2 baseline boundary and W7 next Cargo check were forward-looking Rust 1.99.0 requirements. Both now use 1.99.1. The recorded 1.99.0 checks/failures remain as historical evidence. The remaining normative 1.99.0 references in requirements, basic design, Group DD and root AGENTS.md stay open because those paths are outside this lane manifest.
+
 ## Review disposition
 
 Implementer self-review found no remaining defect within this scope after correcting minimum-version enforcement. This is not an independent review; the separate reviewer lane must confirm the final diff before integration. Do not merge or clean any worktree from this worker lane.

@@ -16,7 +16,7 @@
 | Minimum guard test | 明确断言旧 1.99.0 低于新 minimum；保留 1.99.0 错选 compiler fixture 以验证 exact-version mismatch | 已实现 |
 | Test fixtures | k3s-local Docker/toolchain、Canvas Cargo/toolchain fixtures 对齐 1.99.1 | 已实现 |
 | Scaffold | 生成 workspace 的 `rust-version` 改为 1.99.1 | 已实现 |
-| WBS | 更新当前 WLD/VCD/Rust gates；保留历史 1.99.0 结果并记录规范文档同步缺口 | 已更新 |
+| WBS | 更新当前 WLD/VCD/Rust gates；保留历史 1.99.0 结果、修正稳定版 W2/W7 前瞻门槛并记录规范文档同步缺口 | 已更新 |
 
 本 lane 未修改 Rust crate 源码、根 Cargo metadata、CI workflow、Dockerfile、AGENTS.md、requirements/basic/detail design、main 或 remote。
 
@@ -75,4 +75,5 @@
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v0.2 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 终审发现稳定版 WBS 的 W2/MSRV 边界与 W7 下一步 Cargo 验收仍前瞻引用 1.99.0；已改为 1.99.1，未改写历史 run 结果，并明确 requirements/basic/DD/AGENTS.md 是 manifest 外的规范同步缺口。 | 协调者终审反馈 |
 | v0.1 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 1.99.1 harness 对齐、focused 测试、1.99.0 toolchain 失效、规范文档缺口和 scaffold 输出意外；不关闭产品/发布门 | 用户确定 Rust 1.99.1 为当前版本并授权实施 |
