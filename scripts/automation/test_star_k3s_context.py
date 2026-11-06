@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @cypher schema=1 source_sha256=28e5e053835ef021ab90a7a220b3e3a3831338d5271e37ddcbb18b7178511ec7
+# @cypher schema=1 source_sha256=86662d4b9c9d8f7a7d85787c87df03d7df52009307502ea91afc28e25a80dfff
 # MERGE (self:File {path:"scripts/automation/test_star_k3s_context.py"})
 # MERGE (copy_fixture_context:Symbol {id:"scripts/automation/test_star_k3s_context.py::_copy_fixture_context", kind:"function"})
 # MERGE (guest_deploy:Symbol {id:"scripts/automation/test_star_k3s_context.py::StarK3sContextTests.test_build_import_and_deploy_target_selected_guest", kind:"method"})
@@ -138,12 +138,12 @@ def write_fixture(root: Path, package_id_overrides: dict[str, str] | None = None
     ]
     root.mkdir(parents=True, exist_ok=True)
     (root / "Cargo.toml").write_text("\n".join(workspace_lines), encoding="utf-8")
-    (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.99.0"\n', encoding="utf-8")
+    (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.99.1"\n', encoding="utf-8")
     (root / "LICENSE").write_text("MIT\n", encoding="utf-8")
     (root / "deploy" / "k3s-local").mkdir(parents=True)
     dockerfile = "\n".join(
         [
-            "FROM rust:1.99.0-slim-bookworm AS builder",
+            "FROM rust:1.99.1-slim-bookworm AS builder",
             "WORKDIR /build",
             "COPY Cargo.toml Cargo.lock rust-toolchain.toml LICENSE ./",
             "# @star-local-crates-begin",

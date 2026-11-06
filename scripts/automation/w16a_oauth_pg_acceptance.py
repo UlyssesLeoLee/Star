@@ -1,6 +1,6 @@
 """Run the W16-A OAuth transaction tests against a disposable local PostgreSQL 18 cluster."""
 
-# @cypher schema=1 source_sha256=f12c38363d1c05ffeadba0cea38db9de2a7320ac51f9b664241340da93dbe8f9
+# @cypher schema=1 source_sha256=615342a2de672e8c0f0c58207cfbc2e9ad61dd078949588bcac9c83eaf1378b7
 # MERGE (self:File {path:"scripts/automation/w16a_oauth_pg_acceptance.py"})
 # MERGE (root:Config {id:"scripts/automation/w16a_oauth_pg_acceptance.py::ROOT",kind:"path"})
 # MERGE (runnerCache:Config {id:"scripts/automation/w16a_oauth_pg_acceptance.py::RUNNER_CACHE_ROOT",kind:"path"})
@@ -377,7 +377,7 @@ def cargo_test_command(rtk: str, cargo: str) -> list[str]:
         rtk,
         "proxy",
         cargo,
-        "+1.99.0",
+        "+1.99.1",
         "test",
         "-j",
         "4",

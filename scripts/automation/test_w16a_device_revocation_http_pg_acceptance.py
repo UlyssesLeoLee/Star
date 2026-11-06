@@ -1,6 +1,6 @@
 """Unit tests for fail-closed W16 HTTP PostgreSQL acceptance runner guards."""
 
-# @cypher schema=1 source_sha256=63a61177487488c6750064cb42e16ae44524ef80433b0cf9b817a08b263d74c2
+# @cypher schema=1 source_sha256=2bad75772a52da7d73b45cab57c3215332a87d91e017db12aeb4abff391dc1fd
 # MERGE (self:File {path:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py"})
 # MERGE (tests:Type {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests",kind:"test_class"})
 # MERGE (envTest:Symbol {id:"scripts/automation/test_w16a_device_revocation_http_pg_acceptance.py::RunnerGuardTests.test_environment_sanitization_removes_external_targets",kind:"test"})
@@ -151,7 +151,7 @@ class RunnerGuardTests(unittest.TestCase):
         self.assertEqual(command[:3], ["rtk", "proxy", "cargo"])
         self.assertIn("+stable", command)
         default_command = acceptance.cargo_test_command("rtk", "cargo")
-        self.assertIn("+1.99.0", default_command)
+        self.assertIn("+1.99.1", default_command)
         self.assertEqual(command[command.index("-j") + 1], "4")
         self.assertEqual(command[command.index("--test") + 1], acceptance.TEST_BIN)
         self.assertIn("--locked", command)
@@ -239,9 +239,11 @@ class RunnerGuardTests(unittest.TestCase):
     def test_toolchain_override_requires_stable_semver_at_least_minimum(self) -> None:
         with patch.object(acceptance.subprocess, "run") as run:
             below = acceptance.rust_toolchain_probe("rtk", "rustc", "1.98.9")
+            previous_baseline = acceptance.rust_toolchain_probe("rtk", "rustc", "1.99.0")
             alias = acceptance.rust_toolchain_probe("rtk", "rustc", "stable")
             unapproved = acceptance.rust_toolchain_probe("rtk", "rustc", "1.99.1", "nightly")
-        self.assertIn("below minimum 1.99.0", below["error"] or "")
+        self.assertIn("below minimum 1.99.1", below["error"] or "")
+        self.assertIn("below minimum 1.99.1", previous_baseline["error"] or "")
         self.assertIn("stable X.Y.Z", alias["error"] or "")
         self.assertIn("requested version or the explicit 'stable' alias", unapproved["error"] or "")
         run.assert_not_called()

@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.79。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 决策；§14–§22 和 §23.1–§23.13 保留历史审计及实现证据；§23.14 记录 2026-10-30 W8/W16 当前状态、验收边界与下一步顺序。W8 保持 OPEN / FAILED-TEST；W11/PR-2、W14、VCD-0、WLD-7 与 W16 均未关闭。静态审查与局部 PostgreSQL 证据不等于产品闭环。
+> 状态：🟡 计划稿 v0.80。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 决策；§14–§22 和 §23.1–§23.13 保留历史审计及实现证据；§23.14–§23.15 记录 2026-10-30 W8/W16 当前状态、验收边界与下一步顺序。W8 保持 OPEN / FAILED-TEST；W11/PR-2、W14、VCD-0、WLD-7 与 W16 均未关闭。静态审查与局部 PostgreSQL 证据不等于产品闭环。
 
 ## 0. 目的与计划边界
 
@@ -124,7 +124,7 @@ flowchart TD
 2. 将 9F4I 的 native `event` 能力接到 BI sender/receiver composition；禁止用 admission-only request/result adapter 代替 Task event。
 3. BI owner 在单一事务中写 Inbox、fact/conflict 与 durable receipt；只有事务提交后 transport 才 ACK。
 4. 验证 exact replay、same identity/different wire conflict、错误 tenant/Run/Project、profile 撤销、lease 过期、consumer 重启，以及“提交后、ACK 前”崩溃恢复。
-5. 在隔离目标 PostgreSQL 验证 migration、app role grants、RLS/FORCE RLS、WORM、并发和恢复；运行 Rust 1.99.0 owned-crate tests/fmt/Clippy，再做针对性端到端联测。
+5. 在隔离目标 PostgreSQL 验证 migration、app role grants、RLS/FORCE RLS、WORM、并发和恢复；运行 Rust 1.99.1 owned-crate tests/fmt/Clippy，再做针对性端到端联测。
 6. 输出阶段报告并同步需求、基本设计、BI/Transport 详细设计与本 WBS。缺少可信身份或目标 DB 时继续 fail closed，不将 fixture 通过写成生产验收。
 
 #### Phase 9F4J 子工作包与退出门
@@ -138,7 +138,7 @@ flowchart TD
 | **9F4J.5 failure / exact replay / recovery** / BI + Platform owners | 注入 Inbox commit fault/unknown outcome、commit 后 ACK RPC failure/timeout、cancel、revoke、Profile/route/generation drift、redelivery 与 exact duplicate；未确认结果保持 source unacked/redeliverable；同 identity+wire 返回原 receipt 且仅一条 fact；identity/content conflict 不 ACK；poison 仅在 metadata-only quarantine receipt durable 且来源再次授权后 terminal disposition。 | requirements §50.8AS、Task SRS AC-23、Task BD §6.4、Task DD §14.13.6、basic §16.73、plan §6.153、DD-RUST-SERVER-REUSE §12 | disposable test 不代表进程重启/PITR、备份/WAL、生产 checkpoint 或运维恢复策略；未具备 crash/recovery、quarantine retention/capacity 与可信 terminal capability 时维持 fail closed；本切片不打开 accepted settlement、fan-out 或 execution。 |
 | **9F4J.6 target PostgreSQL/RLS/grants** / Platform + BI（分别验收各自 DB/role） | 用 DDL owner、受限 Platform runtime、BI runtime、独立只读 observer 验证 migrations；BI runtime 仅调用固定 BI function，无直接表 DML/跨 owner 权限；Platform runtime 只调用 authenticated native wrappers；验证 FORCE RLS/WORM、PUBLIC execute revoke、固定 search_path/timeout、NOINHERIT/SET ROLE denial、tenant mismatch 与 rollback 负向情况，并区分 disposable grants 和 target grants。 | requirements §§50.8AS/50.8AU、Task BD §§6.3–6.4/6.7、Task DD §§14.13.5–14.13.6/14.13.9、data design 9F4I、plan §§6.153/6.156、9F4I report | Target database 与登录角色 membership/grants 尚未部署/审计；fixture role 不能冒充生产 role。迁移升级/回滚、owner boundary、RLS 负向和独立 commit/ACK observer 缺一不可。 |
 
-**9F4J exit gate**：9F4J.1–9F4J.6 的适用 Rust 1.99.0 fmt/check/test/Clippy、真实 mTLS gRPC + disposable PostgreSQL commit-before-ACK latch，以及各 owner 最小权限/RLS/grants 负向断言都有可复核证据，才关闭本切片。生产身份/control plane/target grants、crash/PITR、durable checkpoint/恢复、quarantine retention/capacity、RSS/p95/p99/fairness、BI/Benchmark fan-out、accepted settlement 与 Schedule/Run execution 是独立门；本切片退出不得解除这些门，BI ingress 与执行继续 fail closed。建议的文档追踪增量为 9F4J 使用新验收 ID `AC-27`、Task BD §6.8、Task DD §14.13.10、basic §16.77、plan §6.157；先检查文档编号后再写入，保留 9F4I `AC-26` 历史不变。
+**9F4J exit gate**：9F4J.1–9F4J.6 的适用 Rust 1.99.1 fmt/check/test/Clippy、真实 mTLS gRPC + disposable PostgreSQL commit-before-ACK latch，以及各 owner 最小权限/RLS/grants 负向断言都有可复核证据，才关闭本切片。生产身份/control plane/target grants、crash/PITR、durable checkpoint/恢复、quarantine retention/capacity、RSS/p95/p99/fairness、BI/Benchmark fan-out、accepted settlement 与 Schedule/Run execution 是独立门；本切片退出不得解除这些门，BI ingress 与执行继续 fail closed。建议的文档追踪增量为 9F4J 使用新验收 ID `AC-27`、Task BD §6.8、Task DD §14.13.10、basic §16.77、plan §6.157；先检查文档编号后再写入，保留 9F4I `AC-26` 历史不变。
 
 ### 批次 A：先恢复可安全集成的工作面
 
@@ -182,7 +182,7 @@ flowchart TD
 
 - 每个 WBS 条目必须有：owner、输入/依赖、变更路径、迁移与授权影响、正/反向验收、Rust/frontend/DB/运行证据、文档回写和已知缺口。
 - 生产身份、目标 DB/RLS、宿主 provider、Runtime sandbox、消息消费或实际执行不可用时，保持功能关闭；隔离 fixture 只证明 fixture 覆盖项。
-- Rust 工具链以 1.99.0 为基线；所有 Rust 门使用 `-j 4`，明确区分 crate 级与 workspace 级、lib 与 all-targets。
+- Rust 工具链以 1.99.1 为基线；所有 Rust 门使用 `-j 4`，明确区分 crate 级与 workspace 级、lib 与 all-targets。
 - 测试阶段 Multipass inventory 不超过 2 条记录（Stopped/Deleted 也计入）；创建经过跨进程锁；达到上限或 inventory 不可核验时 fail closed，不自动 purge。
 - 桌面资源预算必须由实测冻结。测量前标 `TBD-MEASURE`，不得把局部分页/缓存上限写成 RSS 达标。
 - 每阶段对照需求、基本设计、详细设计与实际实现；实现更优时同步更新文档、验收标准、版本与修订履历。
@@ -287,6 +287,7 @@ flowchart TD
 | v0.75 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 根据真实 PostgreSQL 18 语义，修正 Directory owner 的设备行锁策略：UPDATE USING 按当前 tenant/actor 限定可锁行，WITH CHECK(false) 拒绝直接更新；测试改为验证越权行不可见、直接 UPDATE 返回 SQLSTATE 42501 且 generation 不变。旧 `USING(false)` 会连 `SELECT FOR SHARE` 一起过滤，不能用于此锁路径。复验仍待最新 runner 完成，W16-A 保持 OPEN/PARTIAL。 | 本地 PostgreSQL 实跑发现 `FOR SHARE` 同时应用 UPDATE USING，旧策略使设备行不可锁。 |
 | v0.76 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 首轮 PostgreSQL 18 完成设备行锁、越权设备隔离、拒绝直接更新及 refresh device-generation 配对探针；refresh-token tenant+actor SELECT probe 随后失败（预期 1 行、实际 2 行），暴露旧 tenant-wide permissive policy 的读取越权。迁移新增 OAuth owner 专属 restrictive tenant+actor SELECT policy，harness 加入对应 catalog assertion；尚待完整 runner 重跑，W16-A 保持 OPEN/PARTIAL。 | 隔离 PostgreSQL 真实 RLS 行为发现同租户其他 actor 的 refresh token 可见。 |
 | v0.77 | 2026-10-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录最终隔离 PostgreSQL 18 acceptance run `6af04e5a765446c8b3baaffff126bd52` 的 70/70 步骤、owner/RLS/约束与设备 repository/绑定 HTTP 结果；明确并发 revoke、完整 Canvas 身份与 SSE、OAuth 单赢家及生产环境/性能仍开放；将测试设计同步至 v1.9。 | W16-A 最新 migration 与 owner RLS 修复全部进入最终 PG18 runner 并通过。 |
+| v0.80 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 active Rust 基线要求更新为 1.99.1，记录 harness/fixture/scaffold 的窄范围实现、测试结果及 1.99.0 MSVC toolchain 不可运行限制；不关闭 9F4J、WLD 或产品执行门。详见 [implementation report](../reports/PHASE-STAR-RUST-1991-IMPLEMENTATION-20261106.md)。 | 用户将 Rust 1.99.1 定为当前基线 |
 | v0.79 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 W8 与 W16 就绪度审计：W8 v2/v3 依赖不允许单行摘取；W16 将 device-revoke HTTP/audit PG acceptance 定为下一窄切片，并记录 Outbox owner 冲突、Canvas SSE 单测范围与 SRS/BD/DD 状态漂移。保持 W8 OPEN / FAILED-TEST、W16/WLD-7 OPEN / PARTIAL。 | WBS-W8-CURRENT-TRIAGE-20261030 与 WBS-W16-NEXT-AUDIT-20261030 两份审查完成并通过协调者复核。 |
 
 ## 8. Execution state snapshot (2026-10-23)
@@ -348,7 +349,7 @@ This section supersedes earlier local lane and cleanup snapshots above. The fact
 ### Next work sequence
 
 1. **Complete WLD1 remediation and report.** Close the current-revision integrity, owner-role grant-drift, and PostgreSQL test-target-identity findings in the existing implementation lane. Preserve its user work and keep it out of dev until re-reviewed.
-2. **Resolve Cargo.lock narrowly.** Use the completed lock review to guide a Cargo 1.99.0-generated update of only the required dependency edge. If the toolchain remains unavailable, preserve the explicit blocker rather than claiming `--locked` readiness.
+2. **Resolve Cargo.lock narrowly.** Use the completed lock review to guide a Cargo 1.99.1-generated update of only the required dependency edge. If the toolchain remains unavailable, preserve the explicit blocker rather than claiming `--locked` readiness.
 3. **Re-review and run available gates.** Review the remediated migration, adapter, test, authorization/RLS and W/T/M obligations against the lane manifest; run available checks and record unavailable Rust/MSRV/PostgreSQL gates accurately.
 4. **Integrate WLD1 serially.** Commit only after remediation, re-review, lockfile resolution and applicable gates; rebase onto current dev, inspect the resulting diff, and fast-forward only if dev remains clean and has no active writer. Preserve main user data and do not push.
 5. **Archive and cleanup.** Remove completed implementation worktrees only after merge/recoverable archive, ignored-data review, owner/active-writer checks, and final clean/HEAD confirmation. WLD5 cleanup remains blocked by the other task's ownership guard.
@@ -766,3 +767,8 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
   4. **并行门**：W16 HTTP acceptance 与 W8 设计/实现准备可在各自 fresh MAGOS check 确认无路径重叠、brief 和 owner 明确后并行；SRS/BD/DD lane 需独立 manifest。所有 lane 通过 review/验证后再串行集成到 dev。
   5. **更后续门**：先解决 Outbox owner 契约，再验证 production-like grants/RLS、durable fan-out、两实例恢复及明确的资源/p99 指标；W16-A–C 的必要安全门通过后才开放 W16-D drafts/conflicts。Neon 路径与 Multipass/K3s 路径仍须分别验证，测试阶段 Multipass inventory 总数最多 2。
 - **范围与未处理项**：本次只读两份审查报告及 phase report并修改 WBS；W8 audit lane 为 f882c92907833961dcaa20ca5d9ed224e21a5edd，W16 audit lane 最终 HEAD 为 9cb7ca2104470177c4447e73573f0ce920cb2fb5。W16 报告记录一次默认目录 Add File 可能写入两个同名文档路径；本 lane 未检查、修改或清理该内容，协调者应在既定数据保留边界内另行处理。未运行测试、Cargo、数据库、Multipass/K3s、浏览器、桌面或性能门。
+
+### 23.15 Rust 1.99.1 acceptance-harness alignment (2026-11-06)
+
+- The current dev base already carries Rust 1.99.1 in the root workspace/toolchain, CI and k3s-local builder. This implementation lane aligns only the registered acceptance runners, minimum-version rejection, test fixtures and generated scaffold metadata; it does not change core Rust source or release infrastructure.
+- Focused Python test results, the 1.99.0 toolchain failure, scaffold verification path and preserved out-of-scope generator side effect are recorded in [`PHASE-STAR-RUST-1991-IMPLEMENTATION-20261106.md`](../reports/PHASE-STAR-RUST-1991-IMPLEMENTATION-20261106.md). Rust workspace/all-targets/fmt/Clippy, target DB/RLS and product runtime acceptance remain open. Not every remaining 1.99.0 reference is historical: normative acceptance references remain in `docs/requirements.md` AC-INFRA-002-R/S/U/V/W, `docs/basic-design.md` §16.44–§16.47, and `docs/design/DD-WORKTREE-GROUP-001.md` AC-INFRA-002-U/V; root `AGENTS.md` also states 1.99.0. These are open documentation synchronization gaps outside this lane's manifest and were not changed.

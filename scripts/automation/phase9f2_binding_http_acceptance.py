@@ -1,6 +1,6 @@
 """Run authenticated Run-to-Worktree HTTP acceptance on an isolated local PostgreSQL cluster."""
 
-# @cypher schema=1 source_sha256=7094f0dab0ed3beb5d991201d7abd4a1df43cf6d58c2dac80a55d6393ceb1938
+# @cypher schema=1 source_sha256=4a9d3fa89127231d6dbe95ff502cfbe2b1a7af95a08ed4ecd4c519a834109c1c
 # MERGE (self:File {path:"scripts/automation/phase9f2_binding_http_acceptance.py"})
 # MERGE (runnerRoot:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::RUNNER_ROOT",kind:"path"})
 # MERGE (protectedPorts:Config {id:"scripts/automation/phase9f2_binding_http_acceptance.py::PROTECTED_LOOPBACK_PORTS",kind:"port_set"})
@@ -1390,7 +1390,7 @@ def run_rust_phase(cargo: Path, phase: str, port: int, environment: dict[str, st
         f"postgres://{RUNTIME_ROLE}@127.0.0.1:{port}/postgres"
     )
     phase_environment["STAR_BINDING_HTTP_TEST_PHASE"] = phase
-    command = ["rtk", "proxy", str(cargo), "+1.99.0", "test", "-j", "4", "--locked",
+    command = ["rtk", "proxy", str(cargo), "+1.99.1", "test", "-j", "4", "--locked",
                "-p", "star-api-rest", "--test", "engineering_run_worktree_binding_routes",
                "real_postgres_authenticated_binding_http_acceptance", "--",
                "--ignored", "--exact", "--nocapture"]
@@ -1404,7 +1404,7 @@ def run_device_auth_pg_tests(cargo: Path, port: int, environment: dict[str, str]
     test_environment["STAR_W16_DEVICE_AUTH_TEST_DATABASE_URL"] = (
         f"postgres://{RUNTIME_ROLE}@127.0.0.1:{port}/postgres"
     )
-    command = ["rtk", "proxy", str(cargo), "+1.99.0", "test", "-j", "4", "--locked",
+    command = ["rtk", "proxy", str(cargo), "+1.99.1", "test", "-j", "4", "--locked",
                "-p", "star-pg-adapter", "--test", "device_auth_pg", "--",
                "--ignored", "--test-threads=1", "--nocapture"]
     return run_step("rust-device-auth-pg", command, test_environment, output_dir, 3600)
