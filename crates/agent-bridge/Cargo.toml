@@ -10,7 +10,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "AI Worktree Graph Canvas — Agent Bridge: AgentRuntime Trait + 8 methods + Multica adapter + AgentSession 14-state sync (ULYS-57.2 T6, per DD-WORKTREE-CANVAS-001 §15 + D-AGENT-001 + INV-WC-10)"
+description = "AI Worktree Graph Canvas — Agent Bridge with an AgentRuntime trait and versioned session synchronization"
 
 [lib]
 name = "agent_bridge"

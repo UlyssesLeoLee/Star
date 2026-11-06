@@ -56,11 +56,11 @@ npx --yes http-server -p 8917 -a 127.0.0.1
 - **トースト通知** — すべての保存・削除・移動操作を右下から表示
 - **完全永続化** — フェーズ構成 / タスク状態 / テーマ / 並び替え / **Sprint データ** すべて `localStorage`
 
-### 🏃 Sprint ビュー (P1, 2026-09-03 追加, v0.2 Jira 設計対応)
+### 🏃 Sprint ビュー (P1, 2026-09-03 追加, v0.2 Star workflow rules)
 - **時間盒方式** — デフォルト 2 週間 (1-4 週間可配)、Sprint Goal・開始日・終了日
-- **Jira 設計: Backlog 必須** — Sprint には **Backlog 状態 (`status = backlog`) のタスクのみ** 追加可能。他状態のタスクは Kanban Board の「バックログ」列に戻してから追加
-- **Jira 設計: 外したタスクは Backlog へ** — Sprint Plan modal から外したタスクは自動で `status = backlog` に戻る
-- **Jira 設計: 完了/中止/削除 Sprint は Backlog へ** — 完了した Sprint の未完了タスク、中止/削除した Sprint の全タスクが Backlog に戻る
+- **Star workflow rule: Backlog 必須** — Sprint には **Backlog 状態 (`status = backlog`) のタスクのみ** 追加可能。他状態のタスクは Kanban Board の「バックログ」列に戻してから追加
+- **Star workflow rule: 外したタスクは Backlog へ** — Sprint Plan modal から外したタスクは自動で `status = backlog` に戻る
+- **Star workflow rule: 完了/中止/削除 Sprint は Backlog へ** — 完了した Sprint の未完了タスク、中止/削除した Sprint の全タスクが Backlog に戻る
 - **Sprint 計画** — Backlog からのみ 2 列モーダルでタスクを選択 (ドラッグ & ボタン両対応)
 - **5 列ボード** — Kanban と同 5 状態 (Backlog/ToDo/進行中/レビュー/完了) を継承
 - **Sprint ライフサイクル** — 計画中 → 進行中 (1 個のみ) → 完了 (Velocity 自動計算) / 中止

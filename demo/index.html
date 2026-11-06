@@ -7,7 +7,7 @@
   <style>
     /* ===========================================================
        真实前端颜色变量 (复用 frontend/src/styles/* cel-* 配色)
-       Per GameHUD.tsx: cel-surface-card/cel-crimson/cel-gold/cel-cyan
+       Per AgentHUD.tsx: cel-surface-card/cel-crimson/cel-gold/cel-cyan
        Per PerkPicker.tsx: info/warn/err/ok/accent
        =========================================================== */
     :root {
@@ -20,7 +20,7 @@
       --cel-text-mute: #64748b;
       --cel-border: #000000;
 
-      /* 5 状态色 (per PerkPicker + GameHUD) */
+      /* 5 状态色 (per AgentHUD + runtime controls) */
       --cel-crimson: #ff184c;     /* HP/死亡/death */
       --cel-gold: #ffc400;        /* Coins/Revive */
       --cel-cyan: #00f0ff;        /* RANK/Mana */
@@ -216,7 +216,7 @@
     }
 
     /* ===========================================================
-       Panel 3: 3+2 战术 HUD (per 真实 GameHUD)
+       Panel 3: 3+2 战术 HUD (per 真实 AgentHUD)
        =========================================================== */
     .hud-row {
       display: flex;
@@ -229,7 +229,7 @@
       flex-wrap: wrap;
     }
 
-    /* RANK 徽章 (per 真实 GameHUD) */
+    /* RANK 徽章 (per 真实 AgentHUD) */
     .rank-badge {
       display: flex;
       align-items: center;
@@ -325,7 +325,7 @@
       text-align: right;
     }
 
-    /* Coins 徽章 (per 真实 GameHUD) */
+    /* Resource 徽章 (per 真实 AgentHUD) */
     .coin-badge {
       display: flex;
       align-items: center;
@@ -521,7 +521,7 @@
       transform: none !important;
     }
 
-    /* 扩展 (per 真实 GameHUD 颜色变体) */
+    /* 扩展 (per 真实 AgentHUD 颜色变体) */
     .btn-gold {
       background: var(--cel-gold);
       color: #000;
@@ -880,8 +880,8 @@
 
     .real-link:hover { background: var(--cel-cyan); }
 
-    /* Game log */
-    .game-log {
+    /* Agent runtime log */
+    .runtime-log {
       max-height: 200px;
       overflow-y: auto;
       background: var(--cel-bg);
@@ -932,7 +932,7 @@
     <aside class="sidebar">
       <div class="nav-section">📦 STAR Project</div>
       <a class="tab active" data-tab="agent">
-        <span class="tab-icon">🎮</span> Agent Game
+        <span class="tab-icon">🤖</span> Agent Team Runtime
       </a>
       <a class="tab" data-tab="canvas">
         <span class="tab-icon">🗺️</span> 3+2 Holo-Canvas
@@ -963,10 +963,10 @@
 
     <!-- Main -->
     <main class="main">
-      <!-- Panel 1: Agent Game PoC (per 真实 GameHUD + useAgentGame) -->
+      <!-- Panel 1: Agent Runtime PoC (per 真实 AgentHUD + useAgentRuntime) -->
       <section class="panel active" id="panel-agent">
-        <h2 class="panel-title">🎮 Agent Game PoC · R5 阶段 1+2+3 🟢 MILESTONE 1</h2>
-        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per 真实 frontend/src/components/agent-game/GameHUD.tsx + PerkPicker.tsx</p>
+        <h2 class="panel-title">🤖 Agent Runtime PoC · R5 阶段 1+2+3 🟢 MILESTONE 1</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per 真实 frontend/src/components/agent-view/AgentHUD.tsx + runtime controls</p>
 
         <!-- 3+2 战术 HUD (per 真实) -->
         <div class="card">
@@ -1012,7 +1012,7 @@
           <div class="card">
             <div class="card-title">🎯 Quest (关卡卡)</div>
             <div class="quest-card" id="quest-card">
-              <div class="quest-title" id="quest-title">R5 PoC: verify game loop</div>
+              <div class="quest-title" id="quest-title">R5 PoC: verify agent task loop</div>
               <div class="quest-desc" id="quest-desc">complete this quest to level up your agent</div>
               <div style="display: flex; gap: 0.4rem; margin-bottom: 0.5rem;">
                 <span class="quest-status available" id="quest-status-badge">Available</span>
@@ -1025,7 +1025,7 @@
               <button class="btn btn-crimson" id="btn-fail">❌ Fail</button>
               <button class="btn btn-gold" id="btn-restart">🔄 Restart</button>
             </div>
-            <div class="game-log" id="game-log" style="margin-top: 0.5rem;"></div>
+            <div class="runtime-log" id="runtime-log" style="margin-top: 0.5rem;"></div>
           </div>
         </div>
 
@@ -1072,7 +1072,7 @@
           <div class="card-title">🎨 Tactical Holo-Board 节点 (per R7 §2 + §3.1 字段映射)</div>
           <div class="canvas-grid">
             <div class="view-card">
-              <div class="view-name">📋 Jira (star-workflow)</div>
+              <div class="view-name">📋 Task Workflow (star-workflow)</div>
               <div class="node-grid">
                 <div class="node mapped">Issue.summary</div>
                 <div class="node mapped">Issue.assignee</div>
@@ -1083,7 +1083,7 @@
               </div>
             </div>
             <div class="view-card">
-              <div class="view-name">🎨 Miro (star-canvas)</div>
+              <div class="view-name">🎨 Collaboration Canvas (star-canvas)</div>
               <div class="node-grid">
                 <div class="node mapped">Node.content</div>
                 <div class="node mapped">Node.position 3D</div>
@@ -1094,7 +1094,7 @@
               </div>
             </div>
             <div class="view-card">
-              <div class="view-name">📊 MS Project (star-scheduler)</div>
+              <div class="view-name">📊 Project Schedule (star-scheduler)</div>
               <div class="node-grid">
                 <div class="node mapped">Task.name</div>
                 <div class="node mapped">Task.duration</div>
@@ -1105,7 +1105,7 @@
               </div>
             </div>
             <div class="view-card">
-              <div class="view-name">🎮 agent (star-game)</div>
+              <div class="view-name">🤖 Agent Runtime (agent-runtime)</div>
               <div class="node-grid">
                 <div class="node mapped">Quest.title</div>
                 <div class="node mapped">Quest.description</div>
@@ -1169,9 +1169,9 @@
                 <tr style="background: var(--cel-surface-sub);">
                   <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">字段</th>
                   <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border); color: var(--cel-cyan);">共享 Task</th>
-                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Jira</th>
-                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Miro</th>
-                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">MS Project</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Task Workflow</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Canvas</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Schedule</th>
                   <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">agent</th>
                 </tr>
               </thead>
@@ -1196,7 +1196,7 @@
           <div class="card-title">📝 提交反馈</div>
           <form class="feedback-form" id="feedback-form">
             <select id="feedback-type">
-              <option value="ui">UI/UX 调整 (per 真实 GameHUD/AgentCanvasView 风格)</option>
+              <option value="ui">UI/UX 调整 (per 真实 AgentHUD/AgentCanvasView 风格)</option>
               <option value="data">数据更新 (commit/Lead/milestone 数据)</option>
               <option value="feature">新增功能 (panel/visual/interaction)</option>
               <option value="bug">Bug 报告 (visual/render/data)</option>
@@ -1230,19 +1230,19 @@
   <script>
     // ===========================================================
     // 真实 frontend 颜色变量复用
-    // Per frontend/src/components/agent-game/GameHUD.tsx
+    // Per frontend/src/components/agent-view/AgentHUD.tsx
     // ===========================================================
     const commitData = [
       { hash: 'dbc7cd7', short: 'R1', title: '方向锚定: ADR-0027 Rust pivot + plan-032 R1', status: 'green' },
       { hash: '2f4554f', short: 'R2', title: 'Python obsolescence: 9 文件 @deprecated', status: 'green' },
       { hash: '495d27d', short: 'R3', title: 'star-registry: 5 provider 探测 + MinVersion', status: 'green' },
       { hash: '8c2bde9', short: 'R4', title: 'star-task: 7 态 + 5 reason + 4 类 404', status: 'green' },
-      { hash: 'c0c1b71', short: 'R5.1', title: 'star-game PoC: 6 维属性 + 1 task 闭环', status: 'gold' },
-      { hash: 'ce38e8a', short: 'R5.2', title: 'Physis mock backend: PhysicsEvent + PhysisMockBackend', status: 'green' },
+      { hash: 'c0c1b71', short: 'R5.1', title: 'agent-runtime PoC: 6 维属性 + 1 task 闭环', status: 'gold' },
+      { hash: 'ce38e8a', short: 'R5.2', title: 'Agent runtime backend: PhysicsEvent + RuntimeMockBackend', status: 'green' },
       { hash: 'a55dd9e', short: 'R5.3', title: 'ECS + task lifecycle: hecs 0.10 整合', status: 'green' },
-      { hash: '86a37f5', short: 'R6', title: 'star-workflow: Jira-like 任务流', status: 'green' },
-      { hash: '5365a8e', short: 'R7', title: 'star-canvas: Miro-like 实时白板 3D', status: 'green' },
-      { hash: '0db2085', short: 'R8', title: 'star-scheduler: MS Project-like CPM', status: 'green' },
+      { hash: '86a37f5', short: 'R6', title: 'star-workflow: task workflow', status: 'green' },
+      { hash: '5365a8e', short: 'R7', title: 'star-canvas: real-time collaboration canvas 3D', status: 'green' },
+      { hash: '0db2085', short: 'R8', title: 'star-scheduler: project scheduling CPM', status: 'green' },
       { hash: '520e822', short: 'R9.1', title: 'DD-SHARED-TASK-001 v0.1 设计', status: 'green' },
       { hash: '2ebecf9', short: 'R9.2', title: 'shared-task 整合 6 view crate', status: 'green' },
       { hash: '27726ed', short: 'R9.3', title: '5 milestone benchmark', status: 'gold' },
@@ -1260,10 +1260,10 @@
 
     const milestones = [
       { id: 1, name: '1000 provider 探测', target: '< 200ms', ratio: '10-20x vs Python', crate: 'star-registry', green: true },
-      { id: 2, name: 'CPM 10K task', target: '< 100ms', ratio: '300x vs MS Project', crate: 'star-scheduler', green: true },
-      { id: 3, name: 'CRDT 100 节点', target: '< 50ms', ratio: '10x vs Miro', crate: 'star-canvas', green: true },
-      { id: 4, name: '100K task 吞吐', target: '> 100K/s', ratio: '10x vs Jira', crate: 'star-task', green: true },
-      { id: 5, name: 'Agent ECS 10K entity 60fps', target: '< 16.7ms', ratio: '2x vs Physis', crate: 'star-game', green: true }
+      { id: 2, name: 'CPM 10K task', target: '< 100ms', ratio: 'baseline comparison', crate: 'star-scheduler', green: true },
+      { id: 3, name: 'CRDT 100 节点', target: '< 50ms', ratio: 'baseline comparison', crate: 'star-canvas', green: true },
+      { id: 4, name: '100K task 吞吐', target: '> 100K/s', ratio: 'baseline comparison', crate: 'star-task', green: true },
+      { id: 5, name: 'Agent runtime 10K entity 60fps', target: '< 16.7ms', ratio: 'runtime baseline', crate: 'agent-runtime', green: true }
     ];
 
     const guardians = [
@@ -1287,18 +1287,18 @@
     ];
 
     const schemaFields = [
-      { field: 'id', shared: 'TaskId', jira: 'IssueKey', miro: 'NodeId', msproject: 'TaskId', agent: 'TaskId' },
-      { field: 'title', shared: 'String', jira: 'Issue.summary', miro: 'Node.content', msproject: 'Task.name', agent: 'Quest.title' },
-      { field: 'description', shared: 'String', jira: 'Issue.description', miro: '(content 复用)', msproject: '(无)', agent: 'Quest.description' },
-      { field: 'state', shared: 'TaskState 5 态', jira: 'WorkflowState 5 态', miro: '(position 隐式)', msproject: '(CPM 派生)', agent: 'Quest.status 4 态' },
-      { field: 'assignee', shared: 'Option<String>', jira: 'Issue.assignee', miro: 'Node.created_by', msproject: 'TaskAssignment', agent: 'GameLoop.agent' },
-      { field: 'priority', shared: 'Priority 4 档', jira: 'Issue.priority', miro: '(无)', msproject: '(无)', agent: '(mana 代理)' },
-      { field: 'issue_key', shared: 'Option<String>', jira: 'Issue.key (主键)', miro: 'Node.issue_key', msproject: 'Task.issue_key', agent: 'R9 阶段 2 整合' },
-      { field: 'created_at', shared: 'SystemTime', jira: 'Issue.created_at', miro: '(Cursor 代理)', msproject: '(Schedule 代理)', agent: 'Quest.created_at' }
+      { field: 'id', shared: 'TaskId', workflow: 'TaskKey', canvas: 'NodeId', schedule: 'TaskId', agent: 'TaskId' },
+      { field: 'title', shared: 'String', workflow: 'Task.summary', canvas: 'Node.content', schedule: 'Task.name', agent: 'Quest.title' },
+      { field: 'description', shared: 'String', workflow: 'Task.description', canvas: '(content 复用)', schedule: '(无)', agent: 'Quest.description' },
+      { field: 'state', shared: 'TaskState 5 态', workflow: 'WorkflowState 5 态', canvas: '(position 隐式)', schedule: '(CPM 派生)', agent: 'Quest.status 4 态' },
+      { field: 'assignee', shared: 'Option<String>', workflow: 'Task.assignee', canvas: 'Node.created_by', schedule: 'TaskAssignment', agent: 'AgentRuntime.agent' },
+      { field: 'priority', shared: 'Priority 4 档', workflow: 'Priority', canvas: '(无)', schedule: '(无)', agent: '(resource 代理)' },
+      { field: 'task_key', shared: 'Option<String>', workflow: 'Task.key (主键)', canvas: 'Node.task_key', schedule: 'Task.task_key', agent: 'R9 阶段 2 整合' },
+      { field: 'created_at', shared: 'SystemTime', workflow: 'Task.created_at', canvas: '(Cursor 代理)', schedule: '(Schedule 代理)', agent: 'Quest.created_at' }
     ];
 
     // ===========================================================
-    // 真实 GameHUD 渲染 (per 真实 frontend GameHUD.tsx)
+    // 真实 AgentHUD 渲染 (per 真实 frontend AgentHUD.tsx)
     // ===========================================================
     let game = createGame();
     function createGame() {
@@ -1314,7 +1314,7 @@
       const g = game;
       // RANK
       document.getElementById('hud-rank').textContent = `Lv.${g.level}`;
-      // HP Segments (10 段 per 真实 GameHUD)
+      // HP Segments (10 段 per 真实 AgentHUD)
       const seg = document.getElementById('hp-segments');
       seg.innerHTML = '';
       const total = 10, filled = Math.ceil((g.hp / g.maxHp) * total);
@@ -1383,7 +1383,7 @@
     }
 
     function log(msg, cls = '') {
-      const log = document.getElementById('game-log');
+      const log = document.getElementById('runtime-log');
       const time = new Date().toLocaleTimeString();
       log.innerHTML = `<div class="log-line ${cls}">[${time}] ${msg}</div>` + log.innerHTML;
     }
@@ -1514,9 +1514,9 @@
         <tr>
           <td style="padding: 0.4rem; border: 1px solid var(--cel-border); color: var(--cel-cyan); font-family: monospace;">${f.field}</td>
           <td style="padding: 0.4rem; border: 1px solid var(--cel-border); font-weight: 700;">${f.shared}</td>
-          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.jira}</td>
-          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.miro}</td>
-          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.msproject}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.workflow}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.canvas}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.schedule}</td>
           <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.agent}</td>
         </tr>
       `).join('');
