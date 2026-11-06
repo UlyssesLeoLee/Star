@@ -13,10 +13,10 @@ Independently review the committed D2 Multipass/K3s maintenance candidate agains
 | Eight PowerShell/BAT entrypoints | Six PowerShell files parse; retired K3s/backend and start-dev entrypoints now emit errors and exit 2; frontend scripts receive explanatory wording only. | Keep for selective integration. |
 | `deploy/k3s-local/README.md` | Candidate retires the old root-context Docker/WSL path; latest dev calls a filtered Cargo-context generator from the Multipass helper. | Adapt to describe the filtered helper as local development/test only; no runtime/release proof. |
 | `deploy/multipass/README.md` | Adds the two-instance and no-resume boundary and removes a Docker Desktop resource reference. | Adapt “Stage all creates a guest”: provider lines 349–376 skip launch for existing names and lines 387–405 can probe for up to 25 minutes; stopped guests are not resumed. Keep 2026-10-05 host evidence historical. |
-| `docs/deployment/star-canvas-services-deploy.md` | Canvas guide remains limited to Canvas services, but candidate line 19 calls all API build material retired while latest dev has a separate filtered local API helper. | Adapt to distinguish Canvas deployment from the unverified local API development/test helper; no production API publish path is established. |
+| `docs/deployment/star-canvas-services-deploy.md` | Canvas guide remains limited to Canvas services. Candidate line 19 broadly calls all `deploy/k3s-local` API build material retired; current-dev line 19 still names `deploy/k3s-local/Dockerfile` as the API build path, without mentioning the filtered-context helper. | Adapt both statements: keep this guide explicitly Canvas-only, describe `deploy/k3s-local/build-and-deploy.sh` only as a local development/test helper with generated filtered Cargo context, and leave production publishing/runtime acceptance open. |
 | Candidate brief | Added as task provenance. | Keep as provenance only. |
 
-**WBS correction:** `git show --name-status` confirms 12 candidate paths: 8 executable entrypoints (six `maintenance/`, two `scripts/`), 3 changed deployment documents, and 1 new brief. Correct “9 maintenance files” to 8 executable entrypoints. Latest-dev comparison makes all three deployment-document areas Adapt: in particular, the previously Keep Canvas guide now needs to mention the separate filtered local API helper without presenting it as a production/published route. The review matrix above enumerates each entrypoint and current-target document disposition.
+**WBS correction:** `git show --name-status` confirms 12 candidate paths: 8 executable entrypoints (six `maintenance/`, two `scripts/`), 3 changed deployment documents, and 1 new brief. Correct “9 maintenance files” to 8 executable entrypoints. Latest-dev comparison makes all three deployment-document areas Adapt. For the previously Keep Canvas guide, candidate line 19 says all `deploy/k3s-local` API build material is retired, but current-dev line 19 names the Dockerfile as the API build path without the filtered-helper step. Preserve the guide's Canvas-only scope, name the filtered helper only as local development/test support, and keep publishing/runtime acceptance open. The review matrix above enumerates each entrypoint and current-target document disposition.
 
 ## §2 验证摘要
 
@@ -71,7 +71,7 @@ Independently review the committed D2 Multipass/K3s maintenance candidate agains
 
 | 角色 | 决定 |
 |---|---|
-| 架构 | Mavis review: accept the fail-closed retirement subset; adapt all three docs against filtered-helper behavior. |
+| 架构 | Mavis review: accept the fail-closed retirement subset; adapt the local K3s README for stale root-context instructions, the Multipass README for stopped-guest semantics, and the Canvas guide for conflicting API build descriptions. |
 | SRE Lead | Open pending real inventory, two-instance, guest readiness, and recovery evidence. |
 | 平台 | Static filter and fixture tests pass; coordinator generated the current-dev temporary context. Retained context archive, image digest, SBOM/provenance, consumer, and deployment verification remain open. |
 | 评审主持 | Mavis review per DEC-008; source worktree remains protected. |
@@ -83,5 +83,6 @@ Independently review the committed D2 Multipass/K3s maintenance candidate agains
 |---|---|---|---|---|
 | v0.1 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Reviewed D2 candidate file-by-file; corrected the executable-file count and separated static review from host/runtime acceptance. | User-requested WBS parallel integration review. |
 | v0.2 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Rebased review onto dev@59c63d1b; separated stale candidate-wide-crates context from current filtered-context implementation; recorded 20 fixture tests (19 pass, 1 skipped) and the coordinator's temporary 333-file / 33-crate context generation. Kept retained-context archive, image/SBOM/consumer runtime evidence open. | Coordinator requested latest-dev recheck and supplied context-generation evidence. |
+| v0.3 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Clarified the Canvas deployment-guide adaptation: candidate line 19 broadly retires all API build material, while current dev line 19 names the Dockerfile without the filtered-helper step; documented the exact local-dev/test-only wording needed. | Coordinator requested concrete per-document Adapt reasons against current dev. |
 
 \n
