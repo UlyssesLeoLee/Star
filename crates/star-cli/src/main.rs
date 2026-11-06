@@ -2,9 +2,9 @@
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/cli/01-cli-spec.md` §2
 //!
-//! ULYS-196 加 `star skill add/list/show/remove` 4 子命令 (per FR-ORCA-034 §10.2)
+//! ULYS-196 加 `star skill add/list/show/remove` 4 子命令。
 //!
-//! ULYS-218.2 加 `star worktree start-from-picker <repo>` 子命令 (per FR-ORCA-009 CLI 列表).
+//! ULYS-218.2 加 `star worktree start-from-picker <repo>` 子命令。
 //! 该子命令调 backend `worktree-shared-dir::RealStartFromPicker::list_candidates` /
 //! `resolve`, 需要 tokio runtime. 主入口用 `#[tokio::main(flavor = "current_thread")]`
 //! (轻量、CLI 一次性进程没必要上 multi-thread), 其它 17 个 MVP + Skill 子命令全是 sync,
@@ -57,6 +57,7 @@ enum TopCommand {
     Code(code::CodeCommand),
     #[command(subcommand)]
     Workspace(workspace::WorkspaceCommand),
+    /// Worktree 操作与起点选择
     #[command(subcommand)]
     Worktree(worktree::WorktreeCommand),
     #[command(subcommand)]
@@ -65,7 +66,7 @@ enum TopCommand {
     Test(test::TestCommand),
     #[command(subcommand)]
     Pipeline(pipeline::PipelineCommand),
-    /// ULYS-196: Skill Registry 子命令 (per FR-ORCA-034 §10.2)
+    /// 管理技能注册表
     Skill(skill_registry::SkillCommandArgs),
 }
 

@@ -1,16 +1,16 @@
 //! `star worktree ...` (MVP 17 核心 #11-#13: create / enter / status)
 //!
-//! ULYS-218.2 加 `start-from-picker` 子命令 (per FR-ORCA-009 CLI 列表).
+//! ULYS-218.2 加 `start-from-picker` 子命令。
 //!
 //! ## 子命令概览
 //!
 //! - `star worktree create <id>` — MVP 17 stub (mock JSON 输出)
 //! - `star worktree enter <id>` — MVP 17 stub (stdout 打路径, 供 shell eval)
 //! - `star worktree status` — MVP 17 stub (mock JSON 输出)
-//! - `star worktree start-from-picker <repo>` — ULYS-218.2 新增 (per FR-ORCA-009 CLI).
+//! - `star worktree start-from-picker <repo>` — ULYS-218.2 新增。
 //!   调 backend `worktree-shared-dir::RealStartFromPicker::list_candidates` /
-//!   `resolve`. `<repo>` 是 git repo 本地路径 (后续 Multica 接入 name/UUID
-//!   解析后扩展, MVP 阶段 path 是最诚实的最小契约).
+//!   `resolve`. `<repo>` 是 git repo 本地路径；后续可由 Project registry
+//!   解析 name/UUID，MVP 阶段 path 是最小契约。
 //!
 //! ## DI 简述
 //!
@@ -37,7 +37,7 @@ use worktree_shared_dir::start_from_picker::StartFromPicker;
 use crate::error::StarError;
 use crate::output;
 
-/// `star worktree ...` 顶层 subcommand 枚举
+/// Worktree 操作与起点选择
 #[derive(Debug, Subcommand)]
 pub(crate) enum WorktreeCommand {
     /// MVP 17 核心 #11: stub create (mock JSON)
@@ -46,18 +46,14 @@ pub(crate) enum WorktreeCommand {
     Enter { id: String },
     /// MVP 17 核心 #13: stub status (mock JSON)
     Status,
-    /// ULYS-218.2 / FR-ORCA-009 CLI: 列 4 选 1 start-from picker candidates
+    /// 列出或解析 Worktree 起点候选
     StartFromPicker(StartFromPickerArgs),
 }
 
-/// Start-from Picker 子命令参数 (per FR-ORCA-009 CLI, ULYS-218.2).
-///
-/// `<repo>` 当前是 git repo 本地路径 (`-p` 等同 positional 别名,
-/// 跟 `git -C <path>` 命名风格对齐). 后续 Multica 项目名/UUID 接入后
-/// 扩展 `--repo-id <uuid>` flag.
+/// Worktree 起点选择参数
 #[derive(Debug, Args)]
 pub(crate) struct StartFromPickerArgs {
-    /// git repo 本地路径 (per FR-ORCA-009 CLI 列表)
+    /// 本地 Git 仓库路径
     pub repo: String,
     /// `--resolve <kind>:<value>`: resolve 单个候选, 输出 `StartFrom` JSON.
     /// `kind` ∈ {`repo_base`, `local_branch`, `commit_sha`, `remote_branch`}.
@@ -99,7 +95,7 @@ fn build_picker() -> Arc<RealStartFromPicker> {
     Arc::new(RealStartFromPicker::new(git, registry))
 }
 
-/// 渲染 picker 候选为人类可读 table (per FR-ORCA-009 CLI 默认输出).
+/// 渲染 picker 候选为人类可读 table。
 ///
 /// 4 选 1 分组: REPO BASE REF / LOCAL BRANCH / COMMIT SHA / REMOTE BRANCH.
 /// 每组 prefix 一行 group header, 后续每行 `<label>  <description>`.
@@ -143,9 +139,8 @@ fn render_candidates_table(candidates: &[PickerCandidate]) -> String {
 
 /// 把 `<repo>` 字符串解析成绝对路径. 解析失败或路径不存在抛 `StarError::Picker`.
 ///
-/// MVP 阶段 `<repo>` 必须是 git repo 本地路径 (per FR-ORCA-009 CLI 契约).
-/// 后续 Multica 项目名/UUID 接入后, 这步会先调 project registry 解析,
-/// 再 fallback 到 path.
+/// MVP 阶段 `<repo>` 必须是 git repo 本地路径。
+/// 后续接入 Project registry 后，可先解析项目名/UUID，再回退到 path。
 fn resolve_repo_path(repo: &str) -> Result<PathBuf, StarError> {
     let path = PathBuf::from(repo);
     if !path.exists() {
@@ -236,7 +231,7 @@ fn worktree_status_stub() -> Result<(), StarError> {
     Ok(())
 }
 
-/// `star worktree start-from-picker <repo>` 顶层 handler (per FR-ORCA-009 CLI).
+/// `star worktree start-from-picker <repo>` 顶层 handler。
 ///
 /// 三种模式:
 /// - 默认 (`--resolve` 未传): 调 `list_candidates`, table 或 JSON 输出.
