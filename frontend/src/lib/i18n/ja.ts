@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6c27c790447180e5d05ae1315fdba556f5cfceb647ad3e8849410880a39bfc02
+@cypher schema=1 source_sha256=edd0d6220cb4a60e77b243f68a4d493d42fd256e809f697937668a87bdf3f7e9
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -269,7 +269,7 @@ export const ja: Dictionary = {
     zoom: "ズーム",
     zoomUnit: "{totalDays}日 · {pxPerDay}px/日 · {totalWidth}px",
     linkCount: "🔗 {count} links",
-    linkCountTitle: "タスク依存リンク数: {count} 件 (MS Project task link 準拠)",
+    linkCountTitle: "タスク依存リンク数: {count} 件",
     linkCountSingular: "🔗 {count} link",
     sprintsHeader: "スプリント",
     milestonesHeader: "マイルストーン",

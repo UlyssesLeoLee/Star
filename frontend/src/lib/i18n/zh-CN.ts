@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fa40c18b81809fc6ab4e918243c112185340240828edfcf9dbdc330f0c6ddb9b
+@cypher schema=1 source_sha256=e54eb7b395da421e1055c050f82ebf3f91ea367f622ea2223b1edcbc18e02d23
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -279,7 +279,7 @@ export const zhCN: Dictionary = {
     zoom: "Zoom",
     zoomUnit: "{totalDays}d · {pxPerDay}px/day · {totalWidth}px",
     linkCount: "🔗 {count} links",
-    linkCountTitle: "任务依赖链接数：{count} 条 (per MS Project task link)",
+    linkCountTitle: "任务依赖链接数：{count} 条",
     linkCountSingular: "🔗 {count} link",
     sprintsHeader: "Sprints",
     milestonesHeader: "Milestones",
