@@ -42,7 +42,7 @@
 
 1. 当前用户方向已定为 1.99.1，但受限 manifest 之外仍有规范文档未同步：`docs/requirements.md` AC-INFRA-002-R/S/U/V/W、`docs/basic-design.md` §16.44–§16.47、`docs/design/DD-WORKTREE-GROUP-001.md` AC-INFRA-002-U/V，以及根 `AGENTS.md` 的 1.99.0 要求。本 lane 没有修改这些文件；必须另行登记文档 lane。不得将这些引用一概标作历史结果。
 2. 1.99.1 的全 workspace/all-targets/fmt/Clippy 与每个发行目标的依赖/MSRV、PG/RLS 和 runtime gates 仍未验证；W2 与 v1.0.6 保持 OPEN/NO-GO。
-3. 第一次执行 `rtk python tools/scaffold_skeleton.py --help` 时，脚本没有 help parser，实际运行了 generator，并按其硬编码 ROOT 报告写入 `D:\Star-worktrees\dev-skeleton`。stdout 列出 28 个 crate 的 Cargo/lib 输出和 workspace Cargo.toml。该目录可能已有数据；本 worker 未继续读取、覆盖、清理或删除该目录。协调者已获知并要求将该路径视作保留的 lane 外数据。后续 scaffold 验证通过只读源码确认 ROOT 可覆盖，再把生成写入注册 worktree 内的临时目录并自动清除。
+3. 第一次执行 `rtk python tools/scaffold_skeleton.py --help` 时，脚本没有 help parser，实际运行了 generator，并按其硬编码 ROOT 报告写入 `D:\Star-worktrees\dev-skeleton`。stdout 列出 28 个 crate 的 Cargo/lib 输出和 workspace Cargo.toml。生成器使用 Path.write_text 写入 28 个 crate 的 Cargo.toml/lib.rs 与根 workspace Cargo.toml，因此初始调用可能覆盖同名预存文件；调用前内容与实际影响未知。发现副作用后未再读取、写入、移动、清理或删除该目录，后续仅将其作为 lane 外数据保留。后续 scaffold 验证通过只读源码确认 ROOT 可覆盖，再把生成写入注册 worktree 内的临时目录并自动清除。
 4. Independent reviewer 的代码复核与 dev 集成尚未完成；本阶段报告不代表独立审批或产品准备就绪。
 
 ## 4. 子代理失败接手清单
@@ -77,3 +77,4 @@
 |---|---|---|---|---|
 | v0.2 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 终审发现稳定版 WBS 的 W2/MSRV 边界与 W7 下一步 Cargo 验收仍前瞻引用 1.99.0；已改为 1.99.1，未改写历史 run 结果，并明确 requirements/basic/DD/AGENTS.md 是 manifest 外的规范同步缺口。 | 协调者终审反馈 |
 | v0.1 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 1.99.1 harness 对齐、focused 测试、1.99.0 toolchain 失效、规范文档缺口和 scaffold 输出意外；不关闭产品/发布门 | 用户确定 Rust 1.99.1 为当前版本并授权实施 |
+| v0.3 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 终审进一步校准 W7 当前 Rust 门为 1.99.1，保留 Cargo 1.99.0 as-run 失败；补充 scaffold 初次误调用可能覆盖同名预存文件、原内容和实际影响未知，lane 外目录未检查或触碰。 | 独立终审发现 W7 当前门槛残留并要求准确披露副作用 |

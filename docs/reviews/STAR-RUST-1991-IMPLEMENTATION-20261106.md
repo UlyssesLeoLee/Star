@@ -19,7 +19,7 @@
 
 ## Out-of-scope side effect
 
-An initial `rtk python tools/scaffold_skeleton.py --help` invocation ran the generator because no CLI help parser exists and wrote to its hard-coded output root `D:\Star-worktrees\dev-skeleton`. The directory may have pre-existing content; it was left untouched after the invocation and is preserved as lane-external data. The coordinator was notified. A subsequent safe verification routed output into this worktree's temporary directory.
+An initial `rtk python tools/scaffold_skeleton.py --help` invocation ran the generator because no CLI help parser exists and wrote to its hard-coded output root `D:\Star-worktrees\dev-skeleton`. The generator uses `Path.write_text` for the 28 crate Cargo.toml/lib.rs outputs and root workspace Cargo.toml, so the initial invocation may have overwritten pre-existing files with the same names. Their prior contents and actual impact are unknown. After discovering the side effect, the worker did not read, write, move, clean, or delete that directory; it remains preserved as lane-external data. The coordinator was notified. A subsequent safe verification routed output into this worktree's temporary directory.
 
 ## Follow-up from coordinator review
 
