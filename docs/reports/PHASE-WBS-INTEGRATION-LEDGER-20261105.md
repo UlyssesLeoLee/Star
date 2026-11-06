@@ -1,7 +1,7 @@
 # PHASE-WBS-INTEGRATION-LEDGER-20261105
 
 Status: **Partial / audit-only**  
-Target: local `dev` (`ebdde739`)  
+Target: local `dev` (`a2649d3c`)
 Scope: parallel WBS lane evidence, selective integration decisions, and safe worktree convergence.  
 This ledger records merge readiness; it does not convert a design, mock, preview, or partial verification into a completed product capability.
 
@@ -21,6 +21,7 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 | W8 native transport | `0ae31044` contains useful adapter direction but has a real PostgreSQL `source_sequence` decode defect and split terminal claims. | **Do not merge** | Build a repair lane with shared-position claim and real PostgreSQL acceptance. |
 | W2 BFF lock | Branch tip is equivalent to dev; the owner worktree has an uncommitted `bff/Cargo.lock` change. | **Preserve** | Owner handoff, dependency/SBOM review, and a new committed artifact. |
 | W16 device revoke | Branch was fully contained in dev; ignored evidence was archived before cleanup. | **Completed / cleaned** | Archive: `C:/Users/leo19/.codex/archives/Star/w16a-device-revoke-20261105`. |
+| Star-only release artifacts | Canvas release workflow allowlists three service images and applies filtered contexts; policy tests pass. The separate `deploy/k3s-local/Dockerfile` still accepts a broad `crates` build context, so it is not yet equivalent evidence. | **Partial / held** | Classify or filter the k3s-local context, then rerun the game/legacy exclusion checks against the actual context and image. |
 
 ## §2 Verification summary
 
@@ -36,7 +37,8 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 2. D2 deployment documentation still needs the current Multipass-only, filtered-context wording; the old “no supported build path” statement is not accepted.
 3. W8 requires shared source-position ownership, the missing SELECT column, and real PostgreSQL/RLS/concurrency evidence.
 4. Vercel build compatibility and hosted install/sign/rollback remain `NOT_RUN`.
-5. Active W8/WLD1/W16/D2/W2 worktrees contain untracked, ignored, or dirty evidence and remain protected from cleanup.
+5. The k3s-local Docker path still needs an explicit Star-only context proof; `.dockerignore` alone is not acceptance evidence.
+6. Active W8/WLD1/W16/D2/W2 worktrees contain untracked, ignored, or dirty evidence and remain protected from cleanup.
 
 ## §4 Sub-agent handoff record
 
@@ -44,7 +46,7 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 - D2 audit: identified nine reusable maintenance files and three documents requiring adaptation; no files changed.
 - Canvas/WLD7 audit: confirmed the design is compatible in principle but requires current spec/data/test traceability; no files changed.
 - W8 audit: found the PostgreSQL decode and cross-terminal claim blockers; no files changed.
-- Artifact audit: confirmed the Canvas image allowlist and game/legacy fail-closed tests; flagged the k3s-local README bypass.
+- Artifact audit: confirmed the Canvas image allowlist and game/legacy fail-closed tests; flagged the k3s-local broad build-context path and README bypass for a separate filtered-context gate.
 - One follow-up audit agent later reached its usage limit; no unreviewed code was accepted from that lane.
 
 ## §5 Merge and safety gates
@@ -72,4 +74,5 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 | Version | Date | Revision | Author |
 |---|---|---|---|
 | v0.1 | 2026-11-05 | Initial convergence ledger; records merged runtime, protected lanes, and exact next gates. | Ulysses (Mavis review per DEC-008) |
+| v0.2 | 2026-11-05 | Rebased the target reference to current `dev` and recorded the separate k3s-local Star-only artifact gate. | Ulysses (Mavis review per DEC-008) |
 
