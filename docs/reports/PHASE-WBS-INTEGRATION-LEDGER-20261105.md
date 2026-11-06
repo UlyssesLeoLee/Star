@@ -1,7 +1,7 @@
 # PHASE-WBS-INTEGRATION-LEDGER-20261105
 
 Status: **Partial / audit-only**  
-Target: local `dev` (`26f403cf`)
+Target: local `dev` (`4ae2efb8`)
 Scope: parallel WBS lane evidence, selective integration decisions, and safe worktree convergence.  
 This ledger records merge readiness; it does not convert a design, mock, preview, or partial verification into a completed product capability.
 
@@ -96,4 +96,4 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 | v0.4 | 2026-11-06 | Advanced target to `dev@72fecc30`; recorded accepted web (`d9684285`) and CLI (`72fecc30`) naming remediation, their focused validation, and remaining audit-only gaps. | Ulysses (Mavis review per DEC-008) |
 | v0.5 | 2026-11-06 | Advanced target to `dev@f27c3e6f`; recorded static demo/delivery/package remediation, 97/97 generator checks, locked metadata, and the remaining release/browser gaps. | Ulysses (Mavis review per DEC-008) |
 | v0.6 | 2026-11-06 | Advanced target to `dev@26f403cf`; recorded A4 Skill Registry default neutralization, 23/23 focused tests, and explicit runtime/release gaps. | Ulysses (Mavis review per DEC-008) |
-
+| v0.7 | 2026-11-06 | Advanced the integration baseline to `dev@4ae2efb8`; verified Rust 1.99.1 runtime commit `ebdde739` is reachable from dev, retained the seven-document Rust/Vercel source lane as held, and recorded that release gates remain open. | Ulysses (Mavis review per DEC-008) |
