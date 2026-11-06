@@ -1,7 +1,7 @@
 # PHASE-WBS-INTEGRATION-LEDGER-20261105
 
 Status: **Partial / audit-only**  
-Target: local `dev` (`f27c3e6f`)
+Target: local `dev` (`26f403cf`)
 Scope: parallel WBS lane evidence, selective integration decisions, and safe worktree convergence.  
 This ledger records merge readiness; it does not convert a design, mock, preview, or partial verification into a completed product capability.
 
@@ -26,6 +26,7 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 | Naming web remediation | `d9684285` removes the audited Gantt dependency tooltip brand suffix in `en`, `ja`, and `zh-CN`; count and pluralization contracts remain unchanged. | **Merged to dev / partial verification** | Run browser E2E and re-check analytics relation data; keep the four pre-existing Vitest navigation failures separate. |
 | Naming CLI remediation | `72fecc30` neutralizes CLI help/worktree and workflow public comments/descriptions while preserving command, JSON, state, and transition contracts. | **Merged to dev / focused verification** | Keep compatibility identifiers and non-publish package/demo copy in the remaining audit queue; no remote release claim. |
 | Naming static remediation | `f27c3e6f` neutralizes the standalone demo, delivery page, Sprint generator assertions, and seven non-published Cargo descriptions; visible game/legacy comparison labels are removed while compatibility/history boundaries remain unchanged. | **Merged to dev / static verification** | Browser E2E and release-artifact scans remain open; keep internal compatibility IDs and historical comments scoped. |
+| Naming Skill defaults | `26f403cf` changes implicit Skill Registry compatibility to `claude-code`, `codex`, and `star-agent-runtime`; explicit adapter IDs remain round-trippable and are not injected into default JSON. | **Merged to dev / focused verification** | Skill download/signature/persistence/sandbox and provider authorization remain P1/runtime gates. |
 
 ## §2 Verification summary
 
@@ -36,6 +37,7 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 - Web remediation: targeted TypeScript/Gantt/Cypher checks passed; full Vitest was 946/950 with four failures reproduced from baseline; lint and browser E2E were not accepted as passing, and the analytics Gantt entry currently supplies no relation data.
 - CLI remediation: `cargo +1.99.1 test --locked -p star-cli -p star-workflow --all-targets -j 4` passed 31/31 (18 CLI unit, 4 binary integration, 9 workflow); root, worktree, and nested picker help exited 0. Workspace-wide fmt remains a baseline-difference check, not a clean full-workspace pass.
 - Static remediation: `kanban_sprint_gen.py --strict` passed 97/97; locked metadata returned 109/109 packages and all seven affected manifests retained `publish=[]`; user-facing static scan was clean, with only internal tracking comments and CSS `linear` tokens excluded by scope.
+- Skill defaults remediation: `cargo +1.99.1 test --locked -p star-cli --all-targets -j 4` passed 23/23 (19 unit, 4 binary integration); default and explicit compatibility serialization paths are covered.
 - Current dev worktree: clean; no push or main mutation performed.
 - Main comparison: `git cherry dev main` showed all main-only commits as patch-equivalent (`-`); no main-leading change was copied.
 
@@ -46,7 +48,7 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 3. W8 requires shared source-position ownership, the missing SELECT column, and real PostgreSQL/RLS/concurrency evidence.
 4. Vercel build compatibility and hosted install/sign/rollback remain `NOT_RUN`.
 5. Canvas license metadata/root LICENSE disagreement and per-service `Cargo.lock` regeneration remain release blockers.
-6. The audited Gantt tooltip, CLI help/workflow surfaces, and static demo/delivery/package descriptions are remediated in `dev`; compatibility IDs, historical records, and internal tracking comments remain intentionally scoped and need no user-facing rewrite unless a later audit proves exposure.
+6. The audited Gantt tooltip, CLI help/workflow surfaces, static demo/delivery/package descriptions, and default Skill compatibility output are remediated in `dev`; explicit compatibility IDs, historical records, and internal tracking comments remain intentionally scoped and need no user-facing rewrite unless a later audit proves exposure.
 7. The K3s Docker path has filtered-context evidence, but README/Helm/ArgoCD bypasses and real image/SBOM/deployment evidence remain open; `.dockerignore` alone is not acceptance evidence.
 8. Active W8/WLD1/W16/D2/W2 worktrees contain untracked, ignored, or dirty evidence and remain protected from cleanup.
 
@@ -61,6 +63,7 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 - Web remediation lane: changed only the three locale dictionaries plus its brief/report; integrated as `d9684285` after targeted tests, with full-suite/lint/browser limitations recorded.
 - CLI remediation lane: changed only `star-cli`/`star-workflow` public descriptions and its brief/report; integrated as `72fecc30` after 31/31 focused tests and help smoke checks. Remaining audit hits were consciously left outside this lane.
 - Static remediation lane: changed only the demo/delivery surfaces, generator assertion, seven package descriptions, and its brief/report; integrated as `f27c3e6f` after 97/97 generator checks, 109-package locked metadata, and publish-flag verification.
+- Skill defaults lane: changed only `skill_registry.rs` and its brief/report; integrated as `26f403cf` after 23/23 focused CLI tests, rustfmt, and explicit adapter round-trip checks.
 - One follow-up audit agent later reached its usage limit; no unreviewed code was accepted from that lane.
 
 ## §5 Merge and safety gates
@@ -92,4 +95,5 @@ Provide one current, reviewable ledger for the parallel WBS lanes used during th
 | v0.3 | 2026-11-06 | Linked the product naming and Star-only artifact audits, corrected the K3s finding to actual filtered-context evidence, and recorded license/lock/remediation blockers. | Ulysses (Mavis review per DEC-008) |
 | v0.4 | 2026-11-06 | Advanced target to `dev@72fecc30`; recorded accepted web (`d9684285`) and CLI (`72fecc30`) naming remediation, their focused validation, and remaining audit-only gaps. | Ulysses (Mavis review per DEC-008) |
 | v0.5 | 2026-11-06 | Advanced target to `dev@f27c3e6f`; recorded static demo/delivery/package remediation, 97/97 generator checks, locked metadata, and the remaining release/browser gaps. | Ulysses (Mavis review per DEC-008) |
+| v0.6 | 2026-11-06 | Advanced target to `dev@26f403cf`; recorded A4 Skill Registry default neutralization, 23/23 focused tests, and explicit runtime/release gaps. | Ulysses (Mavis review per DEC-008) |
 
