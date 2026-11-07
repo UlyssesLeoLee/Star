@@ -5,7 +5,7 @@
 > 历史远端比较基线（2026-10-18 JST）：当日通过 rtk git fetch origin main dev 刷新 refs 后核对；origin/dev=6f8d5b8f2d00b1515928c9a25e0762a45cf30e4e，origin/main=8dcb65f7cc5602d4f7c6b681c368d5097bc12a22。git rev-list --left-right --count origin/dev...origin/main 为 121 0。该结果仅代表当日远端快照。
 > 对照基线更新于 2026-10-23：需求 v6.92、基本设计 v6.95、DD-WORKTREE-GROUP-001 v5.17；远端 refs 沿用历史快照，不代表本轮 fetch。
 > 文档集成前快照（2026-10-24）：dev checkout C:\Users\leo19\orca\workspaces\Star\dev-converge-20261007 @ 28a000959abc74702a7ecd92545b0ec9debe9403；D:\Star main @ 94fdc837d19bbeb2d91b85042c06074b174fcb97。dev 跟踪文件干净并保留三份用户 reviewer briefs；main 含用户所有的 dirty/untracked 内容，未触碰。rtk git rev-list --left-right --count refs/heads/dev...refs/heads/main = 79 2。main-only 的 62605314 与 94fdc837 只含 Vercel SRS v0.2，已被 dev 的 v0.4 取代，不 cherry-pick。dev 比本地 origin/dev ahead 19；本轮未 fetch，远端新鲜度未知。执行快照与限制见 §10。
-> 状态：🟡 计划稿 v0.83。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 决策；§14–§22 和 §23.1–§23.13 保留历史审计及实现证据；§23.14–§23.18 保留各自基线的历史快照；§23.19 记录 dev@36eb0230 的当前 WLD-7/W16 设计版本、集成状态、未验收边界与后续门。W8 保持 OPEN / FAILED-TEST；W11/PR-2、W14、VCD-0、WLD-7 与 W16 均未关闭。静态审查与局部 PostgreSQL 证据不等于产品闭环。
+> 状态：🟡 计划稿 v0.84。§13 保留 Project owner、0..N Repository association 与 Neon/Multipass 决策；§14–§22 和 §23.1–§23.13 保留历史审计及实现证据；§23.14–§23.19 保留各自基线的历史快照；§23.20 记录 WBS v0.83 lane 已 fast-forward 集成到 local dev@6c8e9480。W8 保持 OPEN / FAILED-TEST；W11/PR-2、W14、VCD-0、WLD-7 与 W16 均未关闭。静态审查与局部 PostgreSQL 证据不等于产品闭环。
 
 ## 0. 目的与计划边界
 
@@ -293,6 +293,7 @@ flowchart TD
 
 | v0.82 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 以 local dev@6be48b4f 刷新 WLD-7 当前版本、交叉引用、链接与实现门；该快照及其当时版本保留在 §23.18。 | dev 上的 WLD-7 引用/链接检查和 owner-contract 状态同步完成 |
 | v0.83 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 刷新到 local dev@36eb0230；记录 WLD-7 spec v1.5/data v0.7、全量测试设计 v2.8、其中特定 WLD-7 引用仍指 v2.6，以及 W16 v0.9 设计审查与未运行验收；见 §23.19。 | WLD-7 交叉引用更新和 W16 设计决策已进入 dev，需要重排下一阶段门 |
+| v0.84 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 WBS v0.83 lane commit 6c8e9480 从 dev@36eb0230 fast-forward 集成至 local dev，并将 §23.19 保留为当时的基线快照；未改 main、remote 或 W16 的活动 worktree。 | 文档 lane 独立审查通过并完成本地 dev 集成 |
 
 ## 8. Execution state snapshot (2026-10-23)
 
@@ -815,3 +816,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **Current state:** WLD-7 and W16 remain `OPEN / PARTIAL / NOT_RUN`. No implementation, migration deployment, target-role grants/RLS, target PostgreSQL, hosted event delivery, two-instance recovery, Neon/Vercel, Multipass/K3s, or performance acceptance is established by this WBS update. The W16 decision lane’s Git worktree is clean, but Orca still reports one attached PowerShell terminal; keep that branch/worktree and claim until the terminal is closed or its owner explicitly releases it.
 - **Next sequence:** (1) review the WLD-7-specific test-design sections and repair citations only if the v2.8 document/anchors are semantically equivalent; (2) freeze the versioned Identity/Auth revoke event, source-sequence, service identity, lease, idempotency, and replay contract with API/DDL/grants/RLS and retention; (3) implement owner-local Identity/Auth revocation + audit + Outbox and Collaboration Inbox + checkpoint in disjoint lanes, with no cross-owner writes or shared transaction; (4) run target-role PostgreSQL rollback, duplicate-key/digest classification, quarantine-before-ACK, tenant-isolation, gap/replay and recovery acceptance; (5) only then validate SSE delivery/fan-out, bounded memory and performance separately on Neon/Vercel and Multipass/K3s. Multipass test inventory remains capped at two retained instances. Unknown authorization, provider, capacity, or persistence facts remain fail-closed.
 - **Scope and execution boundary:** this lane updates only WBS evidence, its brief, dispatch record, and phase report. It does not alter source requirements/design/test documents or code; it does not execute application tests, Cargo, database, cloud, VM, browser, build, benchmark, release, deployment, or artifact operations; it does not fetch, push, tag, change `main`, or touch the protected candidate or `D:\Star` user changes.
+
+### 23.20 2026-11-07 WLD-7 current WBS lane integration receipt
+
+- **Integration:** reviewed WBS lane commit 6c8e948030118dd38f54429f0c1521902ff6df5f was fast-forwarded from local dev@36eb02309d92671e56c4e325b0b60f637aac4d8b; the resulting local dev is 6c8e948030118dd38f54429f0c1521902ff6df5f. The lane had exactly one commit ahead of its base, so no rebase was needed.
+- **Scope:** the four registered paths only (this WBS, the WLD7 brief, the phase report, and the dispatch JSONL). The commit contains no application code or schema changes.
+- **Validation:** pre-integration target/lane clean and unchanged; lane diff whitespace check passed; independent read-only review APPROVE; Orca showed no terminal or agent on the source or target at integration. The separate W16 worktree retains one attached PowerShell terminal and was not touched.
+- **Boundary:** no main, remote ref, push, tag, release, deployment, database, runtime, or product test operation occurred. WLD-7/W16 remain OPEN / PARTIAL / NOT_RUN; this receipt does not close any product execution or target-environment gate.

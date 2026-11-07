@@ -31,3 +31,10 @@ Bring the current Group WBS snapshot forward after the WLD-7 citation/link lanes
 
 - Read-only review: APPROVE after resolving three findings about append-only history, the W16 integration SHA wording, and revision-author format.
 - Integration gate: ready for a clean, fast-forward-only update to the existing local `dev` checkout; no `main`, remote, push, release, or deployment change.
+
+## Integration follow-up v0.4 — 2026-11-07
+
+- Integrated commit 6c8e948030118dd38f54429f0c1521902ff6df5f by fast-forwarding local dev from 36eb02309d92671e56c4e325b0b60f637aac4d8b to 6c8e948030118dd38f54429f0c1521902ff6df5f.
+- The source was one commit ahead of its exact base; no rebase was required. The four-file manifest and prior review remain unchanged.
+- No main, remote, push, tag, release, or deployment operation occurred. The W16 terminal-owning worktree remains untouched.
+- WBS status is now v0.84 with section 23.20 recording the integration. Product runtime and target database gates remain OPEN / PARTIAL / NOT_RUN.

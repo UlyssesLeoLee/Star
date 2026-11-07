@@ -122,3 +122,58 @@ Preserve the preceding v0.1/v0.2 report as the `dev@6be48b4f` snapshot and appen
 | Version | Date | Editor | Change |
 |---|---|---|---|
 | v0.3 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Append the dev@36eb0230 current snapshot, preserve v0.1/v0.2 evidence and the prior WBS v0.82 record, and record the independent review APPROVE. |
+
+## Integration follow-up v0.4 — 2026-11-07
+
+### §0 Purpose
+
+Record the fast-forward integration of the reviewed WBS lane into local dev; preserve the v0.1–v0.3 reports as historical snapshots.
+
+### §1 Change matrix
+
+| File | Integration follow-up | Status |
+|---|---|---|
+| Group WBS | Bump v0.83 to v0.84 and append section 23.20 with the exact integration receipt | Updated |
+| Brief | Record target/source SHAs and the no-rebase decision | Updated |
+| Dispatch JSONL | Append the coordinator integration event | Appended; JSONL parse 9/9 PASS |
+| Phase report | Append this v0.4 integration follow-up | Updated |
+
+### §2 Verification summary
+
+- Original lane commit 6c8e948030118dd38f54429f0c1521902ff6df5f fast-forwarded dev from 36eb02309d92671e56c4e325b0b60f637aac4d8b; no rebase was needed because the target was unchanged and the lane was one commit ahead.
+- Pre-integration target and source worktrees were clean; source diff contained exactly the four registered paths; git diff --check passed; independent review was APPROVE.
+- Follow-up static validation passed: exact four-path manifest, git diff --check, dispatch JSONL parse 9/9, and WBS v0.84/section 23.20 assertions. No application, Cargo, database, runtime, deployment, or performance tests are included.
+
+### §3 Known gaps
+
+- WLD-7 and W16 remain OPEN / PARTIAL / NOT_RUN; target database, grants/RLS, durable event delivery, recovery, and performance evidence remain outstanding.
+- W16's separate worktree still has an attached terminal; this lane did not alter or clean it.
+
+### §4 Subagent failure and handoff
+
+- No new worker was dispatched for the coordinator-only integration receipt. The preceding WBS lane's independent review remains APPROVE; no uncommitted worker output is reported.
+
+### §5 Guardrails
+
+1. Keep this follow-up within the same four registered paths.
+2. Preserve prior WBS/report/brief/dispatch history; append the integration event and revision only.
+3. Do not alter main, remotes, or user changes under D:\Star.
+4. Do not touch the W16 worktree with its live PowerShell terminal.
+5. Do not claim runtime, database, or product acceptance from documentation checks.
+6. Release and clean only this lane after the follow-up is fast-forwarded and all ownership/data checks pass.
+
+### §6 Sign-off
+
+| Role | Follow-up result |
+|---|---|
+| Architecture | Mavis review records only the verified WBS integration; no architecture change |
+| SRE Lead | Not applicable; no runtime or infrastructure operation |
+| Platform | Not applicable; no target environment changed |
+| Review facilitator | Mavis review complete; final static checks pass |
+| PM | WBS v0.84 is ready for the final local dev fast-forward |
+
+### §7 Revision history
+
+| Version | Date | Editor | Change |
+|---|---|---|---|
+| v0.4 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Append the original lane's local dev fast-forward receipt; no remote or main operation. |
