@@ -27,3 +27,14 @@ dev 的图谱检索命中 PgWorktreeRepository（crates/worktree-service/src/pg_
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
+
+## Current-dev continuation (2026-11-07)
+
+- Current comparison target is local `dev@996ae3ae7d6e4c9c075715f3799f5186734d32f0`; the 2026-10-25 baseline recorded above is historical. Preserve all original brief text and add the continuation findings to the report.
+- The user's later decisions supersede the old open-question wording: Project identity, membership-authorization facts, and Project↔Repository 0..N associations belong to the Star-native Project owner; unlinking a referenced Repository requires migration first; Vercel uses Neon, while K3s uses the database inside Multipass VM(s). These are product decisions, not implementation evidence.
+- Reconcile current dev WBS and source. Do not call the SCM Repository master absent: its migration/adapter are present, but this does not implement Project association authorization. Distinguish current Project-role rows, canonical Project owner API, association, Run repository binding, Host root registry, and read-only Worktree discovery.
+- Report the current owner/deployment decision, actual source integrations, remaining runtime/DB gaps, stale WBS/design references, a minimal dependency DAG, and exact scoped evidence. No code or database writes and no tests.
+
+## 归档说明（2026-11-08）
+
+本 continuation 只核对 `dev@996ae3ae`（2026-11-07）时点；审阅任务已完成，报告中的源码与运行状态不是当前 dev 的重新验证结果。复用前须按新的 dev 基线复核。WLD1 仍为 OPEN，不能据此声明 ProjectRepository、Host root、只读 Worktree provider 或目标数据库验收已完成。
