@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=3d251bf9b8b9c8be1d9d9d90499b5b0079ea5d1b396f2dc3a8c00bd8f02090c3
+@cypher schema=1 source_sha256=91264a5b03031c6a0796fe41fc30331f9b81929798f8a8b7809324648b369091
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
@@ -74,6 +74,8 @@ MERGE (contract)-[:READS]->(commit_function_constant)
 MERGE (contract)-[:READS]->(query_function_constant)
 MERGE (contract)-[:READS]->(quarantine_function_constant)
 MERGE (runtime_principal)-[:TESTS]->(commit_fn)
+MERGE (runtime_principal)-[:TESTS]->(runtime_role)
+MERGE (runtime_principal)-[:TESTS]->(owner_role)
 MERGE (call_commit)-[:READS]->(commit_sql_constant)
 MERGE (privilege_test)-[:CALLS]->(connect)
 MERGE (privilege_test)-[:CALLS]->(contract)
@@ -208,23 +210,74 @@ async fn require_database_identity(pool: &PgPool) {
 }
 
 async fn require_runtime_principal(pool: &PgPool) {
-    let is_runtime: bool = sqlx::query_scalar(
+    let row = sqlx::query(
         r#"
-        SELECT COALESCE(pg_has_role(current_user, 'star_bi_runtime', 'MEMBER'), false)
-           AND COALESCE(
-               has_function_privilege(current_user, to_regprocedure($1)::oid, 'EXECUTE'),
-               false
-           )
+        SELECT EXISTS (
+                   SELECT 1
+                     FROM pg_roles
+                    WHERE rolname = current_user
+                      AND NOT rolsuper
+                      AND NOT rolcreatedb
+                      AND NOT rolcreaterole
+                      AND NOT rolreplication
+                      AND NOT rolbypassrls
+               ) AS current_role_is_restricted,
+               EXISTS (
+                   SELECT 1
+                     FROM pg_roles
+                    WHERE rolname = session_user
+                      AND rolcanlogin
+                      AND NOT rolsuper
+                      AND NOT rolcreatedb
+                      AND NOT rolcreaterole
+                      AND NOT rolreplication
+                      AND NOT rolbypassrls
+               ) AS session_role_is_restricted_login,
+               NOT COALESCE(
+                   pg_has_role(session_user, 'star_bi_owner', 'SET'),
+                   false
+               ) AS session_cannot_set_owner,
+               COALESCE(
+                   pg_has_role(current_user, 'star_bi_runtime', 'MEMBER'),
+                   false
+               ) AS current_role_is_runtime_member,
+               COALESCE(
+                   has_function_privilege(current_user, to_regprocedure($1)::oid, 'EXECUTE'),
+                   false
+               ) AS runtime_can_execute_commit
         "#,
     )
     .bind(COMMIT_FUNCTION)
     .fetch_one(pool)
     .await
     .expect("inspect the authenticated BI runtime principal");
-    assert!(
-        is_runtime,
-        "this probe requires an authenticated BI runtime principal with the BI commit grant"
-    );
+    for (column, expectation) in [
+        (
+            "current_role_is_restricted",
+            "current_user must have restricted role attributes",
+        ),
+        (
+            "session_role_is_restricted_login",
+            "session_user must be a restricted login role",
+        ),
+        (
+            "session_cannot_set_owner",
+            "session_user must not be able to SET ROLE to star_bi_owner",
+        ),
+        (
+            "current_role_is_runtime_member",
+            "current_user must belong to star_bi_runtime",
+        ),
+        (
+            "runtime_can_execute_commit",
+            "current_user must have the BI commit grant",
+        ),
+    ] {
+        let satisfies: bool = row
+            .try_get(column)
+            .unwrap_or_else(|error| panic!("read {column}: {error}"));
+        assert!(satisfies, "{expectation}");
+    }
 }
 
 async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
