@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=1a0a84d67e0b17a4bce1b6e12e4d12be6987d6dfd9dea3d9eb85be6312e19266
+@cypher schema=1 source_sha256=df36e56222125da2e08c0b492768f45abd4f23bc166e84ad14e30bf8e25fe126
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (wire:Type {id:"bi_owner_runtime::TaskEventWireV1",kind:"struct"})
@@ -493,7 +493,8 @@ impl TaskEventInboxStore {
         let mut tx = self.begin_scoped(principal.tenant_id).await?;
         let row = sqlx::query(
             r#"SELECT outcome, receipt_id, committed_at, source_provider_identity,
-                      source_log_id, source_log_generation, source_cursor, source_message_id
+                      source_log_id, source_log_generation, source_sequence,
+                      source_cursor, source_message_id
                  FROM bi.commit_task_event_v3(
                       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
                       $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,

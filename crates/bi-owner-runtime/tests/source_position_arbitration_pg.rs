@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=6ff3d09377586c85398c6b24ae16b726fa15c389a2c20e57cf6f1a0f1c922382
+@cypher schema=1 source_sha256=3fcb3e73ab3cadf3fa083d4fc4626d0666bbd8ed5a5170cdddec640ceebefb2d
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs"})
 MERGE (test:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::pg_source_position_is_unique_across_inbox_and_quarantine",kind:"test"})
 MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::connect_disposable_pool",kind:"function"})
@@ -30,6 +30,7 @@ MERGE (verify_impl:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arb
 MERGE (receiver:Type {id:"bi_owner_runtime::TaskEventReceiver",kind:"struct"})
 MERGE (inbox_store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (quarantine_store:Type {id:"bi_owner_runtime::TaskEventQuarantineStore",kind:"struct"})
+MERGE (source_origin:Type {id:"bi_owner_runtime::TaskEventSourceOrigin",kind:"struct"})
 MERGE (claim_table:Table {id:"bi.task_event_source_position_claim",class:"Transaction"})
 MERGE (origin_table:Table {id:"bi.task_event_source_origin",class:"Transaction"})
 MERGE (quarantine_table:Table {id:"bi.task_event_quarantine",class:"Transaction"})
@@ -71,6 +72,8 @@ MERGE (test)-[:CALLS]->(receiver_helper)
 MERGE (test)-[:CALLS]->(route_helper)
 MERGE (test)-[:CALLS]->(origin_helper)
 MERGE (test)-[:CALLS]->(origin_cursor_helper)
+MERGE (test)-[:USES_TYPE]->(source_origin)
+MERGE (test)-[:CALLS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.source_sequence",kind:"method"})
 MERGE (test)-[:CALLS]->(seed_history)
 MERGE (test)-[:CALLS]->(seed_known_claim)
 MERGE (test)-[:CALLS]->(seed_known_receipt)
@@ -245,6 +248,10 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         matches!(&inbox_result, Ok(TaskEventReceiveOutcome::Committed(_))),
         "unexpected first Inbox result: {inbox_result:?}"
     );
+    let Ok(TaskEventReceiveOutcome::Committed(inbox_receipt)) = &inbox_result else {
+        panic!("the first Inbox delivery must return its durable receipt");
+    };
+    assert_eq!(inbox_receipt.source_origin.source_sequence(), 17);
     assert_eq!(inbox_counts.inbox_ack.load(Ordering::SeqCst), 1);
     assert_eq!(inbox_counts.quarantine_ack.load(Ordering::SeqCst), 0);
 

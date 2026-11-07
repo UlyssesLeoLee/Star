@@ -40,9 +40,14 @@ shared/exclusive lock 对新 claim 的跨事务可见性证明以 PostgreSQL `RE
 | `rtk cargo test -p bi-owner-runtime --test source_position_arbitration_pg -j 4` | exit 0，`0 passed, 1 ignored`。新增的 REPEATABLE READ/SERIALIZABLE 回归只编译，因该集成测试被 ignore 而未执行 |
 | 一次性 PostgreSQL 18.6 migration 链 | exit 0；依序应用 Inbox、projection、quarantine、source-origin 与 shared-position-claim 五份 W8 依赖 migration；使用独立 loopback 测试库，未触碰其他 PostgreSQL 数据目录 |
 | `rtk cargo test -p bi-owner-runtime --test source_position_arbitration_pg -j 4 -- --ignored --nocapture` | **exit 1**；唯一集成测试在首次 Inbox 调用失败：`Err(Inbox(Database(ColumnNotFound("source_sequence"))))`。SQL function 返回该列，但 Rust SELECT 列表漏选；测试的后续 ACK、quarantine、并发与隔离级别断言均未运行 |
+| 2026-11-06 Rust 1.99.1 | `rustc 1.99.1 (58cf8f9c3 2026-10-13)`；`rustfmt 1.10.0-stable (58cf8f9c35 2026-10-13)` |
+| `rtk cargo +1.99.1 fmt -p bi-owner-runtime -- --check` | exit 0 |
+| `rtk cargo +1.99.1 check -p bi-owner-runtime --test source_position_arbitration_pg -j 4` | exit 0，0 errors / 4 existing `async_fn_in_trait` warnings |
+| `rtk cargo +1.99.1 test -p bi-owner-runtime --test source_position_arbitration_pg --no-run -j 4` | exit 0；测试目标成功链接，未执行测试 |
+| Current PostgreSQL endpoint availability | 两个专用连接环境变量均未设置；本次未重跑 ignored PG suite，也未修改用户数据库 |
+| `rtk git diff --check` | 本轮工作树 diff exit 0 |
 | PostgreSQL RLS/grants、双模式并发、exact replay、ACK、mTLS、recovery、settlement | 未验证；migration 成功应用不等同于这些运行时验收通过 |
-| `rtk git diff --check` / 暂存范围 | 当前 diff check exit 0；尚未暂存。将提交的测试诊断与 phase report 均属于已登记路径，source adapter 未修改 |
-| Cypher Graph Guardian | `cgg_guard.py --root <lane> --stamp crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs` exit 0，Rust test header stamp 已刷新；SQL header digest `d2ee89e43fabbc107a5336bdd791e67349b50c879c07b948eee4f762450465e8` 与 canonicalization 结果匹配 |
+| Cypher Graph Guardian | 使用 Guardian 脚本检查并刷新 `task_event_inbox.rs` 与 `source_position_arbitration_pg.rs` 两份 header，exit 0；测试 header 为新类型/调用边补齐目标节点 |
 | CodeRabbit 独立审查 | 未运行：该 CLI 会将 diff 发往外部服务，本任务没有外发授权；本地 CLI 版本/认证检查因 `/root/.local/bin/coderabbit: Permission denied` 未能启动，未上传代码 |
 | 隔离级别回归 | 新增 `REPEATABLE READ` 与 `SERIALIZABLE` 数据库行为断言并已编译；实际 PG suite 在首次 Inbox 查询处失败，尚未到达这些断言 |
 
@@ -50,13 +55,13 @@ shared/exclusive lock 对新 claim 的跨事务可见性证明以 PostgreSQL `RE
 
 ## §3 已知缺口
 
-1. 一次性 PostgreSQL 18.6 测试库已成功应用五份 W8 依赖 migration。真实 ignored 集成测试随后在首次 Inbox SQLx 行解码处失败：`source_sequence` 未被 adapter 的 SELECT 列表选出；本次没有运行到后续双向 mode barrier、隔离级别、并发、exact replay 与 ACK 断言，因此这些行为仍无通过证据。
+1. 一次性 PostgreSQL 18.6 测试库已成功应用五份 W8 依赖 migration。之前的真实 ignored 集成测试在首次 Inbox SQLx 行解码处失败：`source_sequence` 未被 adapter 的 SELECT 列表选出；当前 adapter 已选出该列，测试新增 durable receipt sequence 断言，且两者通过 Rust 1.99.1 编译/链接。由于两个专用 PG endpoint 当前均未设置，修正后没有重跑 ignored PG suite；后续双向 mode barrier、隔离级别、并发、exact replay 与 ACK 断言仍无数据库通过证据。
 2. 该迁移的历史扫描和回填要求具备 RLS bypass 的 migration role。`SET LOCAL row_security=off` 会使缺少此权限的执行明确失败，避免按当前 tenant 策略静默漏检；生产迁移身份尚未在 PostgreSQL 环境验证。
 3. advisory-lock 屏障明确要求可能产生新 claim 的 owner 写事务为 `READ COMMITTED`；`REPEATABLE READ`/`SERIALIZABLE` 下命中新 claim trigger 会 fail closed。Inbox/quarantine exact replay 若从事务 snapshot 读到已提交且全字段匹配的终态记录，会返回旧回执/执行原终态处理，不创建新 receipt/claim；该路径不触发 claim isolation trigger。独立复审确认这不是重复写缺陷，但报告原“含 exact replay 一律拒绝”的承诺与实现不符，故按新 claim 边界修正。`VOLATILE` 只影响函数快照行为，不作为跨隔离级别的可见性保证。真实 PostgreSQL 尚未验证 exact replay 的高隔离行为；仍需复核锁序、既有行回填、共享/排他 advisory-lock key、一致的隔离设置、双向部分索引查询、两个 SECURITY DEFINER trigger 的租户范围与 ACK/终态处理前提交边界。
 4. 独立审查 addendum `e361235f` 将 known-first→cursorless-later fail-open 记为 P1；复审报告 `99d85cb5` 确认双向新 claim 屏障在源码层面关闭了该路径。迁移会保留历史上已存在的 mixed-mode claim rows；exact replay 只有在 disposition、sequence、cursor、message ID、digest 全部匹配时才可通过。其他任何新 claim（包括 known→cursorless 与 cursorless→known）均失败。恢复新写入需使用新的 source-log generation；显式历史协调 API/流程不属于本 lane。该结论仍待真实 PostgreSQL 运行验证。
 5. 对 mixed legacy generation 的 Inbox exact replay 豁免尚未在真实 PostgreSQL 上执行验证；ignored PG suite 构造 owner-scoped 历史数据并走 receiver 回放路径，但本机未运行该数据库测试。known-first→cursorless-later 用 owner-scoped direct trigger fixture 验证 claim/receipt 回滚；该 fixture 不调用 transport ACK，不能作为实际 ACK 行为的数据库证据。高隔离级别的完整 Inbox/quarantine exact replay 也没有独立 PG 回归，目前仅有源代码路径审查。
 6. W8 其他既有门禁仍未完成：mTLS、故障恢复、settlement 及 W8 全链路独立验收；本阶段不修改或替代这些工作。
-7. PostgreSQL 实跑揭示 `crates/bi-owner-runtime/src/task_event_inbox.rs` 的 SQLx SELECT 漏选 `source_sequence`，导致首次 Inbox 行解码失败。将该源文件加入本 lane 的 MAGOS manifest amendment 被拒绝，指纹 `b61e89c47f61`：路径与 `codex/wbs-w8-transport-remediation-20261025` 的已提交改动及 `wbs-w8-bi-native-adapter-20261024` 工作树的未提交改动重叠。Orca 观测两个工作树当前无活动 terminal，但 MAGOS claims 仍存在；本 lane 未改写该文件，须由用户在自己的终端解决该 manifest 冲突后才能继续。
+7. PostgreSQL 实跑揭示 `crates/bi-owner-runtime/src/task_event_inbox.rs` 的 SQLx SELECT 漏选 `source_sequence`，导致首次 Inbox 行解码失败。初次将该源文件加入本 lane 的 MAGOS manifest amendment 被拒绝，指纹 `b61e89c47f61`：路径与 `codex/wbs-w8-transport-remediation-20261025` 的已提交改动及 `wbs-w8-bi-native-adapter-20261024` 工作树的未提交改动重叠。2026-11-06，用户在真实终端登记 fingerprint `94d8b953e690` 后，协调者重跑 MAGOS `plan --amend` 成功；当前 manifest 已登记 migration、PG integration test、phase report 与该 source adapter 共四条路径。此前的登记阻断已解除；此授权不修改两个冲突工作树。本机当前没有两个专用 PG endpoint，修正后的数据库行为仍待受控 PG 验证。
 
 ## §4 子代理失败接手清单
 
@@ -64,7 +69,7 @@ shared/exclusive lock 对新 claim 的跨事务可见性证明以 PostgreSQL `RE
 
 ## §5 守门规则（本阶段适用项）
 
-1. 变更范围仅限登记的 migration、PG integration test、phase report 三条路径。
+1. 变更范围仅限登记的 migration、PG integration test、phase report 与 `crates/bi-owner-runtime/src/task_event_inbox.rs` 四条路径。
 2. sequence 主键与非空 cursor 唯一索引共享同一 claim ledger；两个触发器只在来源事实原 owner transaction 内认领。
 3. `ON CONFLICT DO NOTHING` 之后仅允许同 disposition、sequence、cursor、message ID、digest 完全相同的 replay；跨 disposition 或任一字段不同都抛错并回滚。
 4. PostgreSQL 迁移期必须由具备全租户 RLS bypass 的迁移身份执行；先锁住两个来源表，再检查历史冲突并回填；发现历史重复或权限不足必须 fail closed，不自行挑选赢家或静默漏行。
@@ -106,3 +111,4 @@ shared/exclusive lock 对新 claim 的跨事务可见性证明以 PostgreSQL `RE
 | v0.8 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 独立复审 `99d85cb5` 将“非 READ COMMITTED 下 exact replay 也由 claim trigger 拒绝”的 P2 定性为门禁范围表述不匹配，而非重复写缺陷；修正文档为新 claim 必须 READ COMMITTED，完全匹配且已持久化的 Inbox/quarantine replay 可复用旧回执且不新增 claim。高隔离 exact replay、RLS、并发和 ACK/终态实跑仍未执行，W8 保持 OPEN。 | W8 symmetric claim barrier independent review |
 | v0.9 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录复审 `99d85cb5` 对双向新 claim 屏障的源码级通过；将历史 P1 从“等待复审”改为“源码已确认、PG 待验证”，并补充 mixed-history/high-isolation exact replay 与终态 ACK 的数据库验证缺口。 | W8 remediation review completion |
 | v0.10 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录一次性 PostgreSQL 18.6 已成功应用 W8 依赖 migration；真实集成测试在首次 Inbox 调用因 SQLx SELECT 漏选 `source_sequence` 失败。记录该 adapter 文件扩展 manifest 时的 MAGOS 冲突及未修改源码事实；后续数据库验收保持未通过。 | Disposable PostgreSQL integration run and MAGOS manifest gate |
+| v0.11 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 MAGOS amendment `94d8b953e690` 后 manifest 扩展为四条路径；修正 Inbox SELECT 的 `source_sequence` 投影并增加 durable receipt sequence 回归断言。Rust 1.99.1 fmt/check/no-run 与 Cypher header 检查通过；因专用 PG endpoints 未设置，修正后的数据库行为仍未验证，W8 保持 OPEN。 | W8 decode failure remediation and focused validation |
