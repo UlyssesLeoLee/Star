@@ -1,0 +1,593 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=eb83f367aa1ec0925b86d4da9b9902d2f6a5fdce90e079cfc2937ec84c820d70
+MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
+MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
+MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
+MERGE (set_role_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_owner_set_role_is_denied",kind:"test"})
+MERGE (tenant_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_tenant_mismatch_fails_closed",kind:"test"})
+MERGE (rollback_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_commit_rollback_is_atomic",kind:"test"})
+MERGE (database_url_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::DATABASE_URL_ENV",kind:"constant"})
+MERGE (database_name_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::DATABASE_NAME",kind:"constant"})
+MERGE (commit_function_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::COMMIT_FUNCTION",kind:"constant"})
+MERGE (commit_sql_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::COMMIT_SQL",kind:"constant"})
+MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::disposable_pool",kind:"function"})
+MERGE (identity:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_database_identity",kind:"function"})
+MERGE (runtime_principal:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_runtime_principal",kind:"function"})
+MERGE (contract:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_runtime_contract",kind:"function"})
+MERGE (set_role:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_owner_set_role_denied",kind:"function"})
+MERGE (tenant_mismatch:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_tenant_mismatch_denied",kind:"function"})
+MERGE (rollback:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_rollback_discards_commit",kind:"function"})
+MERGE (fixture:Type {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::CommitFixture",kind:"struct"})
+MERGE (fixture_new:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::CommitFixture::new",kind:"method"})
+MERGE (call_commit:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::call_commit",kind:"function"})
+MERGE (database_url_env:Config {id:"STAR_BI_TASK_EVENT_TEST_DATABASE_URL",kind:"environment_variable"})
+MERGE (database_name:Database {id:"star_bi_task_event_test",kind:"disposable_test_database"})
+MERGE (commit_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
+MERGE (runtime_role:Config {id:"star_bi_runtime",kind:"postgres_role"})
+MERGE (owner_role:Config {id:"star_bi_owner",kind:"postgres_role"})
+MERGE (inbox:Table {id:"bi.task_event_inbox",class:"Transaction"})
+MERGE (fact:Table {id:"bi.task_event_fact",class:"Transaction"})
+MERGE (incident:Table {id:"bi.task_event_integrity_incident",class:"Transaction"})
+MERGE (rust_std:ExternalService {id:"rust::std",kind:"standard_library"})
+MERGE (chrono:ExternalService {id:"chrono",kind:"crate"})
+MERGE (serde_json:ExternalService {id:"serde_json",kind:"crate"})
+MERGE (sqlx:ExternalService {id:"sqlx",kind:"crate"})
+MERGE (uuid:ExternalService {id:"uuid",kind:"crate"})
+MERGE (self)-[:DEFINES]->(module)
+MERGE (self)-[:DEFINES]->(privilege_test)
+MERGE (self)-[:DEFINES]->(set_role_test)
+MERGE (self)-[:DEFINES]->(tenant_test)
+MERGE (self)-[:DEFINES]->(rollback_test)
+MERGE (self)-[:DEFINES]->(database_url_constant)
+MERGE (self)-[:DEFINES]->(database_name_constant)
+MERGE (self)-[:DEFINES]->(commit_function_constant)
+MERGE (self)-[:DEFINES]->(commit_sql_constant)
+MERGE (self)-[:DEFINES]->(connect)
+MERGE (self)-[:DEFINES]->(identity)
+MERGE (self)-[:DEFINES]->(runtime_principal)
+MERGE (self)-[:DEFINES]->(contract)
+MERGE (self)-[:DEFINES]->(set_role)
+MERGE (self)-[:DEFINES]->(tenant_mismatch)
+MERGE (self)-[:DEFINES]->(rollback)
+MERGE (self)-[:DEFINES]->(fixture)
+MERGE (self)-[:DEFINES]->(call_commit)
+MERGE (fixture)-[:DEFINES]->(fixture_new)
+MERGE (self)-[:IMPORTS]->(rust_std)
+MERGE (self)-[:IMPORTS]->(chrono)
+MERGE (self)-[:IMPORTS]->(serde_json)
+MERGE (self)-[:IMPORTS]->(sqlx)
+MERGE (self)-[:IMPORTS]->(uuid)
+MERGE (connect)-[:READS]->(database_url_env)
+MERGE (connect)-[:READS]->(database_url_constant)
+MERGE (connect)-[:CALLS]->(identity)
+MERGE (identity)-[:READS]->(database_name_constant)
+MERGE (identity)-[:TESTS]->(database_name)
+MERGE (contract)-[:READS]->(commit_function_constant)
+MERGE (runtime_principal)-[:TESTS]->(commit_fn)
+MERGE (call_commit)-[:READS]->(commit_sql_constant)
+MERGE (privilege_test)-[:CALLS]->(connect)
+MERGE (privilege_test)-[:CALLS]->(contract)
+MERGE (set_role_test)-[:CALLS]->(connect)
+MERGE (set_role_test)-[:CALLS]->(runtime_principal)
+MERGE (set_role_test)-[:CALLS]->(set_role)
+MERGE (tenant_test)-[:CALLS]->(connect)
+MERGE (tenant_test)-[:CALLS]->(runtime_principal)
+MERGE (tenant_test)-[:CALLS]->(tenant_mismatch)
+MERGE (rollback_test)-[:CALLS]->(connect)
+MERGE (rollback_test)-[:CALLS]->(runtime_principal)
+MERGE (rollback_test)-[:CALLS]->(rollback)
+MERGE (contract)-[:TESTS]->(commit_fn)
+MERGE (contract)-[:TESTS]->(runtime_role)
+MERGE (contract)-[:TESTS]->(owner_role)
+MERGE (contract)-[:TESTS]->(inbox)
+MERGE (contract)-[:TESTS]->(fact)
+MERGE (contract)-[:TESTS]->(incident)
+MERGE (tenant_mismatch)-[:CALLS]->(fixture_new)
+MERGE (tenant_mismatch)-[:CALLS]->(call_commit)
+MERGE (rollback)-[:CALLS]->(fixture_new)
+MERGE (rollback)-[:CALLS]->(call_commit)
+MERGE (call_commit)-[:CALLS]->(commit_fn)
+MERGE (call_commit)-[:USES_TYPE]->(fixture)
+@endcypher
+*/
+//! Opt-in grants and fail-closed checks for the BI Task Event runtime boundary.
+
+use std::{env, net::IpAddr};
+
+use chrono::{DateTime, Utc};
+use serde_json::{json, Value};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions, PgRow},
+    PgPool, Postgres, Row, Transaction,
+};
+use uuid::Uuid;
+
+const DATABASE_URL_ENV: &str = "STAR_BI_TASK_EVENT_TEST_DATABASE_URL";
+const DATABASE_NAME: &str = "star_bi_task_event_test";
+const COMMIT_FUNCTION: &str = "bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea)";
+const COMMIT_SQL: &str = r#"
+    SELECT outcome, receipt_id, committed_at
+      FROM bi.commit_task_event_v2(
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+          $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+      )
+"#;
+
+#[tokio::test]
+#[ignore = "requires the dedicated disposable star_bi_task_event_test PostgreSQL database with BI migrations and runtime grants applied"]
+async fn pg_runtime_privilege_boundary_is_closed() {
+    let pool = disposable_pool().await;
+    let failures = require_runtime_contract(&pool).await;
+    pool.close().await;
+    assert!(
+        failures.is_empty(),
+        "BI runtime contract failures: {}",
+        failures.join("; ")
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the dedicated disposable star_bi_task_event_test PostgreSQL database with BI migrations and runtime grants applied"]
+async fn pg_runtime_owner_set_role_is_denied() {
+    let pool = disposable_pool().await;
+    require_runtime_principal(&pool).await;
+    require_owner_set_role_denied(&pool).await;
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the dedicated disposable star_bi_task_event_test PostgreSQL database with BI migrations and runtime grants applied"]
+async fn pg_runtime_tenant_mismatch_fails_closed() {
+    let pool = disposable_pool().await;
+    require_runtime_principal(&pool).await;
+    require_tenant_mismatch_denied(&pool).await;
+    pool.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the dedicated disposable star_bi_task_event_test PostgreSQL database with BI migrations and runtime grants applied"]
+async fn pg_runtime_commit_rollback_is_atomic() {
+    let pool = disposable_pool().await;
+    require_runtime_principal(&pool).await;
+    require_rollback_discards_commit(&pool).await;
+    pool.close().await;
+}
+
+async fn disposable_pool() -> PgPool {
+    let database_url = env::var(DATABASE_URL_ENV).expect(
+        "BI grants proof requires STAR_BI_TASK_EVENT_TEST_DATABASE_URL for a disposable PostgreSQL database",
+    );
+    let options = database_url
+        .parse::<PgConnectOptions>()
+        .expect("parse the disposable PostgreSQL connection options");
+    let host = options.get_host();
+    let loopback = host == "localhost"
+        || host
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.is_loopback());
+    assert!(
+        loopback && options.get_port() != 5432,
+        "the opt-in BI grants test requires loopback PostgreSQL on a non-default port"
+    );
+
+    let pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(options)
+        .await
+        .expect("connect to the disposable BI Task Event database");
+    require_database_identity(&pool).await;
+    pool
+}
+
+async fn require_database_identity(pool: &PgPool) {
+    let database: String = sqlx::query_scalar("SELECT current_database()")
+        .fetch_one(pool)
+        .await
+        .expect(
+            "read the connected database identity before catalog checks or transactional probes",
+        );
+    assert_eq!(
+        database, DATABASE_NAME,
+        "this test may use only the dedicated disposable BI Task Event database"
+    );
+}
+
+async fn require_runtime_principal(pool: &PgPool) {
+    let is_runtime: bool = sqlx::query_scalar(
+        r#"
+        SELECT COALESCE(pg_has_role(current_user, 'star_bi_runtime', 'MEMBER'), false)
+           AND COALESCE(
+               has_function_privilege(current_user, to_regprocedure($1)::oid, 'EXECUTE'),
+               false
+           )
+        "#,
+    )
+    .bind(COMMIT_FUNCTION)
+    .fetch_one(pool)
+    .await
+    .expect("inspect the authenticated BI runtime principal");
+    assert!(
+        is_runtime,
+        "this probe requires an authenticated BI runtime principal with the fixed commit grant"
+    );
+}
+
+async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
+    let row = sqlx::query(
+        r#"
+        WITH target AS (
+            SELECT to_regprocedure($1)::oid AS function_oid
+        ),
+        bi_functions AS (
+            SELECT p.oid
+              FROM pg_proc AS p
+              JOIN pg_namespace AS n ON n.oid = p.pronamespace
+             WHERE n.nspname = 'bi'
+               AND p.prokind = 'f'
+        )
+        SELECT
+            COALESCE((SELECT function_oid IS NOT NULL FROM target), false)
+                AS commit_function_exists,
+            COALESCE((
+                SELECT has_function_privilege(current_user, function_oid, 'EXECUTE')
+                  FROM target
+            ), false) AS runtime_can_execute_commit,
+            NOT EXISTS (
+                SELECT 1
+                  FROM target AS t
+                  JOIN pg_proc AS p ON p.oid = t.function_oid
+                  CROSS JOIN LATERAL aclexplode(
+                      COALESCE(p.proacl, acldefault('f', p.proowner))
+                  ) AS acl
+                 WHERE acl.grantee = 0::oid
+                   AND acl.privilege_type = 'EXECUTE'
+            ) AS public_cannot_execute_commit,
+            NOT EXISTS (
+                SELECT 1
+                  FROM bi_functions AS f
+                  CROSS JOIN target AS t
+                 WHERE f.oid IS DISTINCT FROM t.function_oid
+                   AND has_function_privilege(current_user, f.oid, 'EXECUTE')
+            ) AS runtime_cannot_execute_other_bi_function,
+            EXISTS (
+                SELECT 1
+                  FROM pg_roles
+                 WHERE rolname = current_user
+                   AND NOT rolsuper
+                   AND NOT rolcreatedb
+                   AND NOT rolcreaterole
+                   AND NOT rolreplication
+                   AND NOT rolbypassrls
+            ) AS current_role_is_restricted,
+            pg_has_role(current_user, 'star_bi_runtime', 'MEMBER')
+                AS current_role_is_runtime_member,
+            NOT pg_has_role(session_user, 'star_bi_owner', 'SET')
+                AS session_cannot_set_owner,
+            EXISTS (
+                SELECT 1
+                  FROM pg_roles
+                 WHERE rolname = 'star_bi_runtime'
+                   AND NOT rolcanlogin
+                   AND NOT rolsuper
+                   AND NOT rolcreatedb
+                   AND NOT rolcreaterole
+                   AND NOT rolreplication
+                   AND NOT rolbypassrls
+                   AND NOT rolinherit
+            ) AS runtime_role_is_locked,
+            EXISTS (
+                SELECT 1
+                  FROM pg_roles
+                 WHERE rolname = 'star_bi_owner'
+                   AND NOT rolcanlogin
+                   AND NOT rolsuper
+                   AND NOT rolcreatedb
+                   AND NOT rolcreaterole
+                   AND NOT rolreplication
+                   AND NOT rolbypassrls
+                   AND NOT rolinherit
+            ) AS owner_role_is_locked,
+            (
+                SELECT count(*) = 3
+                   AND COALESCE(bool_and(relrowsecurity AND relforcerowsecurity), false)
+                  FROM pg_class
+                 WHERE oid IN (
+                     to_regclass('bi.task_event_inbox'),
+                     to_regclass('bi.task_event_fact'),
+                     to_regclass('bi.task_event_integrity_incident')
+                 )
+            ) AS all_tables_force_rls,
+            NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'INSERT')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'UPDATE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'DELETE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'TRUNCATE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'INSERT')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'UPDATE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'DELETE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'TRUNCATE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'INSERT')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'UPDATE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'DELETE')
+                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'TRUNCATE')
+                AS no_direct_table_mutation,
+            COALESCE((
+                SELECT p.prosecdef
+                   AND pg_get_userbyid(p.proowner) = 'star_bi_owner'
+                   AND COALESCE(p.proconfig, ARRAY[]::text[])
+                       @> ARRAY['search_path=pg_catalog', 'row_security=on']::text[]
+                   AND (
+                       SELECT count(*) = 1
+                         FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) AS settings(setting)
+                        WHERE settings.setting LIKE 'search_path=%'
+                          AND settings.setting = 'search_path=pg_catalog'
+                   )
+                  FROM target AS t
+                  JOIN pg_proc AS p ON p.oid = t.function_oid
+            ), false) AS commit_function_has_fixed_security_settings
+        "#,
+    )
+    .bind(COMMIT_FUNCTION)
+    .fetch_one(pool)
+    .await
+    .expect("inspect BI function ACL, runtime roles, table privileges, RLS, and function settings");
+
+    let mut failures = Vec::new();
+    for (column, expectation) in [
+        (
+            "commit_function_exists",
+            "the fixed BI v2 commit function exists",
+        ),
+        (
+            "runtime_can_execute_commit",
+            "the runtime can execute the fixed BI commit function",
+        ),
+        (
+            "public_cannot_execute_commit",
+            "PUBLIC cannot execute the fixed BI commit function",
+        ),
+        (
+            "runtime_cannot_execute_other_bi_function",
+            "the runtime cannot execute any other BI function",
+        ),
+        (
+            "current_role_is_restricted",
+            "the authenticated role is restricted",
+        ),
+        (
+            "current_role_is_runtime_member",
+            "the authenticated role belongs to BI runtime",
+        ),
+        (
+            "session_cannot_set_owner",
+            "the login cannot SET ROLE to the BI owner",
+        ),
+        (
+            "runtime_role_is_locked",
+            "the BI runtime role has locked attributes",
+        ),
+        (
+            "owner_role_is_locked",
+            "the BI owner role has locked attributes",
+        ),
+        (
+            "all_tables_force_rls",
+            "all three BI Task Event tables FORCE ROW LEVEL SECURITY",
+        ),
+        (
+            "no_direct_table_mutation",
+            "the runtime has no direct table mutation privileges",
+        ),
+        (
+            "commit_function_has_fixed_security_settings",
+            "the owner function is SECURITY DEFINER with fixed search_path and row_security",
+        ),
+    ] {
+        match row.try_get::<bool, _>(column) {
+            Ok(true) => {}
+            Ok(false) => failures.push(expectation.to_owned()),
+            Err(error) => failures.push(format!("{expectation}: {error}")),
+        }
+    }
+    failures
+}
+
+async fn require_owner_set_role_denied(pool: &PgPool) {
+    let mut tx = pool
+        .begin()
+        .await
+        .expect("start the SET ROLE probe transaction");
+    let attempt = sqlx::query("SET ROLE star_bi_owner")
+        .execute(&mut *tx)
+        .await;
+    tx.rollback()
+        .await
+        .expect("roll back the SET ROLE probe transaction");
+    let error = attempt.expect_err("the authenticated runtime session must not SET ROLE to owner");
+    let code = error
+        .as_database_error()
+        .and_then(|database| database.code());
+    assert_eq!(
+        code.as_deref(),
+        Some("42501"),
+        "SET ROLE to star_bi_owner must fail with insufficient_privilege"
+    );
+}
+
+async fn require_tenant_mismatch_denied(pool: &PgPool) {
+    let fixture = CommitFixture::new();
+    let active_tenant_id = Uuid::new_v4();
+    assert_ne!(fixture.tenant_id, active_tenant_id);
+
+    let mut tx = pool
+        .begin()
+        .await
+        .expect("start the tenant-mismatch probe transaction");
+    sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
+        .bind(active_tenant_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .expect("scope the tenant-mismatch transaction");
+    let attempt = call_commit(&mut tx, &fixture).await;
+    tx.rollback()
+        .await
+        .expect("roll back the tenant-mismatch probe before asserting its result");
+
+    let error = attempt.expect_err("a tenant mismatch must be rejected before commit");
+    let code = error
+        .as_database_error()
+        .and_then(|database| database.code());
+    assert_eq!(
+        code.as_deref(),
+        Some("42501"),
+        "tenant mismatch must fail with insufficient_privilege"
+    );
+}
+
+async fn require_rollback_discards_commit(pool: &PgPool) {
+    let fixture = CommitFixture::new();
+    let mut tx = pool
+        .begin()
+        .await
+        .expect("start the commit rollback probe transaction");
+    sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
+        .bind(fixture.tenant_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .expect("scope the commit rollback transaction");
+    sqlx::query("SAVEPOINT before_bi_commit_probe")
+        .execute(&mut *tx)
+        .await
+        .expect("create a savepoint before the BI owner call");
+
+    let first_outcome = call_commit(&mut tx, &fixture)
+        .await
+        .and_then(|row| row.try_get::<String, _>("outcome"));
+    let second_outcome = if matches!(first_outcome.as_deref(), Ok("committed")) {
+        let rolled_back_to_savepoint = sqlx::query("ROLLBACK TO SAVEPOINT before_bi_commit_probe")
+            .execute(&mut *tx)
+            .await
+            .is_ok();
+        if rolled_back_to_savepoint {
+            Some(
+                call_commit(&mut tx, &fixture)
+                    .await
+                    .and_then(|row| row.try_get::<String, _>("outcome")),
+            )
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    tx.rollback()
+        .await
+        .expect("roll back every commit rollback probe write");
+
+    assert_eq!(
+        first_outcome.expect("the first owner call should return an outcome"),
+        "committed",
+        "the fixture should be accepted inside the transaction"
+    );
+    assert_eq!(
+        second_outcome
+            .expect("the savepoint rollback should allow a second owner call")
+            .expect("the second owner call should return an outcome"),
+        "committed",
+        "a savepoint rollback must discard the first uncommitted receipt and fact"
+    );
+}
+
+struct CommitFixture {
+    tenant_id: Uuid,
+    project_id: Uuid,
+    run_id: Uuid,
+    event_id: Uuid,
+    work_item_id: Uuid,
+    actor_id: Uuid,
+    correlation_id: Uuid,
+    sender_service_id: Uuid,
+    receiver_service_id: Uuid,
+    transport_profile_id: Uuid,
+    destination_generation: Uuid,
+    occurred_at: DateTime<Utc>,
+    payload: Value,
+}
+
+impl CommitFixture {
+    fn new() -> Self {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let run_id = Uuid::new_v4();
+        let event_id = Uuid::new_v4();
+        let work_item_id = Uuid::new_v4();
+        let payload = json!({
+            "schema_version": 3,
+            "aggregate": {"type": "lifecycle", "version": 7},
+            "work_item_id": work_item_id.to_string(),
+            "owner": {
+                "tenant_id": tenant_id.to_string(),
+                "project_id": project_id.to_string(),
+                "engineering_run_id": run_id.to_string()
+            },
+            "lifecycle": {"status": "in_progress", "review_state": "none"},
+            "change": {
+                "event_type": "task.lifecycle.changed",
+                "from_status": "claimed",
+                "to_status": "in_progress",
+                "private_note": "must not be retained by BI"
+            },
+            "host_context": {"branch_name": "grants-probe-only"}
+        });
+
+        Self {
+            tenant_id,
+            project_id,
+            run_id,
+            event_id,
+            work_item_id,
+            actor_id: Uuid::new_v4(),
+            correlation_id: Uuid::new_v4(),
+            sender_service_id: Uuid::new_v4(),
+            receiver_service_id: Uuid::new_v4(),
+            transport_profile_id: Uuid::new_v4(),
+            destination_generation: Uuid::new_v4(),
+            occurred_at: Utc::now(),
+            payload,
+        }
+    }
+}
+
+async fn call_commit(
+    tx: &mut Transaction<'_, Postgres>,
+    fixture: &CommitFixture,
+) -> Result<PgRow, sqlx::Error> {
+    sqlx::query(COMMIT_SQL)
+        .bind(fixture.tenant_id)
+        .bind(fixture.project_id)
+        .bind(fixture.run_id)
+        .bind(fixture.event_id)
+        .bind(fixture.work_item_id)
+        .bind("lifecycle")
+        .bind(7_i32)
+        .bind("task.lifecycle.changed")
+        .bind(3_i32)
+        .bind(fixture.actor_id)
+        .bind(fixture.correlation_id)
+        .bind(fixture.occurred_at.clone())
+        .bind(fixture.payload.clone())
+        .bind(fixture.sender_service_id)
+        .bind(fixture.receiver_service_id)
+        .bind("star-rust-log")
+        .bind("1.0.0")
+        .bind(fixture.transport_profile_id)
+        .bind(1_i64)
+        .bind(vec![0x42_u8; 32])
+        .bind("bi-event-grants-pg-test")
+        .bind("bi-task-events")
+        .bind(fixture.destination_generation)
+        .bind(vec![0x24_u8; 32])
+        .bind(vec![0x53_u8; 32])
+        .fetch_one(&mut **tx)
+        .await
+}
