@@ -1,6 +1,6 @@
 # SRS-W16-PAYLOAD-SECURITY-001 — 协作载荷身份与持久加密要求
 
-> 状态：Draft v0.7；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。此次补充冻结 Identity/Auth owner → Collaboration owner 的撤销事件所有权、持久收件、回放与授权失效契约；它是设计要求，不是实现或部署验收。W16-A 的设备身份源码、隔离 PostgreSQL owner/RLS 与 OAuth repository 切片已部分验收；Canvas 活跃 SSE 流撤销关闭用例对应的 PostgreSQL 18.6 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39 在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过。该结果只关闭该单用例，生产协作闭环仍未验收；W16-C 只有有界 provider-neutral envelope core。
+> 状态：Draft v0.8；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。此次补充冻结 Identity/Auth owner → Collaboration owner 的撤销事件所有权、持久收件、双身份键重放/隔离与授权失效契约；它是设计要求，不是实现或部署验收。W16-A 的设备身份源码、隔离 PostgreSQL owner/RLS 与 OAuth repository 切片已部分验收；Canvas 活跃 SSE 流撤销关闭用例对应的 PostgreSQL 18.6 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39 在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过。该结果只关闭该单用例，生产协作闭环仍未验收；W16-C 只有有界 provider-neutral envelope core。
 
 ## 0. 目的与范围
 
@@ -20,7 +20,7 @@
 | SRS-W16-PAYLOAD-08 | 保护过程必须有界且可取消。客户端编辑不逐键调用 KMS；owner 仅对已 coalesce 的 checkpoint 执行密钥操作。Envelope core 当前单条正文上限为 256 KiB、wrapped DEK 上限为 64 KiB、JSON envelope 上限为 1 MiB；这些单对象界限不证明进程 RSS、并发、队列或取消预算已通过。指标只记录脱敏的操作/耗时/字节范围。 |
 | SRS-W16-PAYLOAD-09 | Identity/Auth owner 是设备 generation/status/revoke、refresh-family 变化与撤销审计的唯一事实 owner；这些事实必须与该 owner 的 append-only Outbox 事件在同一 owner 事务中提交或回滚。Collaboration owner 只能在自己的事务中持久化 Inbox、幂等回执和用于协作授权失效的本地投影；不得跨 owner 写表或共享事务。 |
 | SRS-W16-PAYLOAD-10 | 撤销事件必须包含稳定 `event_id`、`event_type`、`schema_version`、opaque `tenant_id/actor_id/device_id`、`producer_id`、`stream_id`、owner-local `source_sequence`、新 generation/status、时间、correlation/idempotency identity 与 canonical metadata digest。事件和相邻日志不得包含访问/刷新 token、私钥/证明、协作正文、明文 DEK 或敏感请求体；未知 schema fail closed。 |
-| SRS-W16-PAYLOAD-11 | 跨 owner 传递语义为至少一次。接收端须在一个 Collaboration owner 事务内持久化 Inbox、幂等结果和失效投影，并在事务提交后才确认/推进该传递；exact identity+digest replay 不重复副作用，同一 identity 的不同 digest 必须隔离并告警，不更新授权投影。不得宣称跨服务 exactly-once。 |
+| SRS-W16-PAYLOAD-11 | 跨 owner 传递语义为至少一次。规范重放身份同时由 `(tenant_id, producer_id, stream_id, source_sequence)` 与 `(tenant_id, event_id)` 构成；两键必须解析到同一已存事件且 canonical digest 相同，才是 exact replay。任一键指向不同事件、同一业务键携带不同 event_id、同一 tenant-scoped event_id 携带不同业务键，或双键匹配但 digest 不同，均须持久隔离并告警，不得应用授权投影或产生正常业务 Outbox 副作用。正常 Inbox/投影/回执/自有 Outbox 事务提交后才 ACK；隔离消息须先提交 quarantine 记录（包含可重试的告警意图）再 ACK。quarantine 持久化失败时不得 ACK；按有界策略重试，耗尽后暂停/背压并告警。并发唯一约束冲突须在认证 tenant scope 内重新读取两键并分类，不得泄漏其他 tenant 的存在或数据。不得宣称跨服务 exactly-once。 |
 | SRS-W16-PAYLOAD-12 | 领域 `source_sequence` 与传输 cursor 必须分开；opaque cursor 固定绑定首次 claim 时的 provider/version/profile digest/endpoint identity，所有重试沿用该身份。检测序列缺口、cursor 过期、保留窗口缺口或授权源不可用时，停止使用可能过期的授权投影，执行有界重放或权威状态核验；不能确认当前授权时 fail closed。事件只加速撤权失效，每次业务请求仍须实时复验当前身份、generation 与权限。 |
 | SRS-W16-PAYLOAD-13 | Outbox/Inbox、重试、批量、在途消息、保留期限、事件尺寸与恢复工作必须受版本化资源 profile 限制，并具备背压、取消、幂等恢复与安全日志约束。保留期限须覆盖批准的重试、恢复和备份窗口；profile/预算缺失或边界未知时不得启动消费者或宣称可用。具体阈值由后续 profile/W14 批准，不在本需求中臆造。 |
 
@@ -33,7 +33,7 @@
 | 04–06 | W16-C envelope-core focused unit tests；E2E-COLLAB-15/16/17、真实 provider 故障与 DB/RLS 测试 | domain-kms lib tests 21/21 PASS（lane 专属 Cargo target）；未接 owner/REST/DB，生产 provider、密文持久化与恢复仍 OPEN / NOT_RUN |
 | 07 | E2E-COLLAB-18/19；恢复与轮换测试 | 未实现 / NOT_RUN |
 | 08 | PT-10 与 PT-09-GATE-01；固定 workload/profile 的内存、CPU、队列和 KMS 调用证据 | 未实测 / NOT_RUN |
-| 09–11 | UT-W16-OUTBOX-01/INBOX-01；IT-W16-OWNER-OUTBOX-01、IT-W16-INBOX-DELIVERY-01、IT-W16-INBOX-ISOLATION-01；E2E-COLLAB-20/21 | 仅设计；Owner 原子提交/回滚、接收提交先于 ACK、精确重放/异摘要隔离、并发与跨租户验收均 OPEN / NOT_RUN |
+| 09–11 | UT-W16-OUTBOX-01/INBOX-01/INBOX-02；IT-W16-OWNER-OUTBOX-01、IT-W16-INBOX-DELIVERY-01、IT-W16-INBOX-ISOLATION-01、IT-W16-INBOX-IDENTITY-01、IT-W16-QUARANTINE-ACK-01；E2E-COLLAB-20/21 | 仅设计；Owner 原子提交/回滚、双身份键一致的精确重放、两种键错配/异摘要隔离、隔离记录先于 ACK、并发归类与跨租户不泄漏均 OPEN / NOT_RUN |
 | 12 | IT-W16-RECOVERY-01、IT-W16-AUTH-PROJECTION-01；E2E-COLLAB-22/23；PT-11 | 仅设计；gap/cursor/retention 恢复、跨 provider 身份隔离、当前授权复验与多实例恢复 OPEN / NOT_RUN |
 | 13 | PT-12 与 PT-12-GATE-01；固定 owner/profile/workload 的队列、大小、延迟、RSS、CPU、取消和保留窗口证据 | 仅设计；预算未批准，未实现 / NOT_RUN |
 
@@ -58,3 +58,4 @@ W16-A 隔离本地 PostgreSQL 18 runner 于 2026-10-29 完成 70/70 步骤（run
 | v0.5 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录当前 dev 基线上的 Canvas SSE 撤销单用例 PostgreSQL 18.6 acceptance PASS（run 6d23b8ceb1f0499091885c42271c2fb0）及 Rust 1.99.0 focused build；标明 superuser、test-only no-op audit/SCD2、unsigned attestation 边界；完整身份/E2E、生产 RLS/grants、HTTP revoke/audit、恢复与性能继续 OPEN。 | 当前 dev focused SSE acceptance 复跑与跨层文档核对。
 | v0.6 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Canvas SSE 当前状态更新为最新可核验 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39（候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac，已包含于 dev@0e977306a1aafb031557d28d7fd19795297dd027）；保留 superuser、test-only、unsigned 与完整协作链未验收边界。 | W16-A 规范文档 rebase 到当前 dev 并复核最新 acceptance 报告。 |
 | v0.7 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冻结设备撤销事件的 owner-local Outbox/Inbox、至少一次投递、稳定事件身份/schema、精确重放与异摘要隔离、Inbox commit-before-ack、provider/profile-bound opaque cursor、有限恢复与每次请求的当前授权复验；追加未运行的测试映射并明确本次只更新设计。旧 PG18/18.6 证据和限制原样保留。 | W16 Outbox owner-contract review 与当前 dev 文档一致性核对。 |
+| v0.8 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 exact replay 必须同时匹配业务键、tenant-scoped event_id 并解析到同一记录及相同 digest；补充两种键错配/异摘要隔离、quarantine commit-before-ACK、持久化失败时有界重试/暂停及 tenant 不泄漏要求；增加设计态测试映射，所有新测试保持 NOT_RUN。 | 协调者独立审查指出仅写 identity+digest 未明确双键映射一致性、隔离 ACK 与失败重试语义。 |

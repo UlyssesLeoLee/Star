@@ -1,6 +1,6 @@
 # BD-W16-PAYLOAD-SECURITY-001 — 协作载荷安全基本设计
 
-> 状态：Draft v0.7；补充 BD-CANVAS-AGENT-001 v0.2 的 W16 安全边界，不取代其 Run/owner 结构。此次补充冻结撤销事实 owner-local Outbox 与 Collaboration owner-local Inbox/投影契约，属于目标设计，尚无对应实现或完整验收。W16-A 的部分设备身份与 PostgreSQL owner/RLS 切片已验收，OAuth repository 本地 PG18.6 slice 3/3 通过；Canvas 活跃 SSE 流撤销关闭单用例已在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过（run 49b512fbfe334f0e98e46fe7eae7ea39），生产协作链仍未闭合。W16-C 只有 provider-neutral envelope core。
+> 状态：Draft v0.8；补充 BD-CANVAS-AGENT-001 v0.2 的 W16 安全边界，不取代其 Run/owner 结构。此次补充冻结撤销事实 owner-local Outbox 与 Collaboration owner-local Inbox/投影及双键重放/隔离契约，属于目标设计，尚无对应实现或完整验收。W16-A 的部分设备身份与 PostgreSQL owner/RLS 切片已验收，OAuth repository 本地 PG18.6 slice 3/3 通过；Canvas 活跃 SSE 流撤销关闭单用例已在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过（run 49b512fbfe334f0e98e46fe7eae7ea39），生产协作链仍未闭合。W16-C 只有 provider-neutral envelope core。
 
 ## 1. 目标与边界
 
@@ -18,7 +18,8 @@
 ### 2.1 Owner-local 撤销事件与恢复
 
 - Identity/Auth owner 在同一事务中推进设备 generation/status、撤销 refresh family、写审计事实、分配 owner-local source sequence 并追加自己的 Outbox event；任一步失败则该事务整体回滚。Collaboration 不读取/写入 Identity 表，而由授权消息接口接收事件，在自己的事务内写 Inbox、幂等回执和撤权投影；如需通知下游，只能追加自己的 metadata-only Outbox。
-- 事件至少一次投递。接收端使用 `(tenant_id, producer_id, stream_id, source_sequence)` 与 `event_id` 两组唯一约束定位事件；相同 identity 与 digest 是 exact replay，仅返回既有回执；同 identity 不同 digest 持久隔离并告警，不能改变投影。Inbox、投影及 Collaboration 自有 Outbox 必须在接收确认/推进 checkpoint 之前提交，不宣称跨 owner exactly-once。
+- 事件至少一次投递。Inbox 以 `(tenant_id, producer_id, stream_id, source_sequence)` 业务键和 `(tenant_id, event_id)` tenant-scoped event 键分别唯一；两键必须解析到同一已存事件，且 canonical digest 相同，才可作为 exact replay 只返回既有回执。若业务键已存在但 event_id 不同、event_id 已存在但业务键不同、双键映射到不同记录，或同一双键记录的 digest 不同，均须进入 durable quarantine 并告警，禁止投影和正常业务 Outbox 副作用。quarantine 记录连同待发送的告警意图先在 Collaboration owner 本地事务提交，之后才 ACK poison message；隔离路径不写授权投影或正常业务 Outbox。quarantine 存储失败时不 ACK，按版本化 profile 的有界 retry/backoff 重试；预算耗尽后暂停该 consumer 分区/流并施加背压，告警运维，不推进 cursor。正常接收仍须先提交 Inbox、回执、投影和自有 metadata-only Outbox 再 ACK/checkpoint。不得宣称跨 owner exactly-once。
+- 并发插入由上述两个 tenant-scoped unique constraint 仲裁。遇到唯一冲突时，使用事务安全的冲突处理/新鲜一致性读取，在已认证的 tenant RLS scope 中分别按业务键和 event 键读取，并对两条结果执行同记录+同 digest 的分类；不同记录映射、单键命中或 digest 不同均 quarantine。tenant 身份必须来自认证的 producer/transport context；请求载荷 tenant 不匹配时在任何去重查询前统一拒绝。所有查询受 tenant RLS 限制，外部确认/错误不区分“其他租户已有记录”与其他不可授权状态，避免 tenant 存在性侧信道。
 - 规范事件只包含 `event_id`、`event_type`、`schema_version`、opaque tenant/actor/device identity、producer/stream/source sequence、新 generation/status、occurred time、correlation/idempotency identity 与 canonical metadata digest。不得包含 token、私钥/证明、协作正文、明文 DEK 或敏感请求 body；未知 schema 不应用。
 - source sequence 是业务事件顺序；传输 cursor 是 adapter 不透明恢复位置。首次 claim 将 cursor 固定到 provider/version/profile digest/endpoint identity，重试沿用该 profile；provider 迁移须 drain 旧 profile 后显式完成，不跨 provider 比较 cursor 或复用去重窗口。
 - 发现 source sequence gap、cursor 过期、保留窗口缺口、未知 schema 或授权源不可用时，消费端暂停依赖该投影授权，按固定预算请求权威 owner 的 replay/snapshot；不能确认当前状态则 fail closed。任何恢复后的 API 操作仍重新查验当前 issuer 身份、设备 generation 和 Project/Run capability。租约、批次、重试、事件尺寸、队列/并发及保留值由版本化 profile 指定，profile 未批准时不启用该消费者。
@@ -81,7 +82,7 @@
 | SRS-W16-PAYLOAD-01..03 | DD §2；E2E-COLLAB-12/13/14 |
 | SRS-W16-PAYLOAD-04..07 | DD §3–§5；E2E-COLLAB-15..19 |
 | SRS-W16-PAYLOAD-08 | DD §6；PT-10 + PT-10-GATE-01 |
-| SRS-W16-PAYLOAD-09..11 | DD §1、§2.3、§2.5；UT-W16-OUTBOX-01/INBOX-01；IT-W16-OWNER-OUTBOX-01/INBOX-DELIVERY-01/INBOX-ISOLATION-01；E2E-COLLAB-20/21 |
+| SRS-W16-PAYLOAD-09..11 | DD §1、§2.3、§2.5；UT-W16-OUTBOX-01/INBOX-01/INBOX-02；IT-W16-OWNER-OUTBOX-01/INBOX-DELIVERY-01/INBOX-ISOLATION-01/INBOX-IDENTITY-01/QUARANTINE-ACK-01；E2E-COLLAB-20/21 |
 | SRS-W16-PAYLOAD-12 | DD §2.5、§6；IT-W16-RECOVERY-01/AUTH-PROJECTION-01；E2E-COLLAB-22/23；PT-11 |
 | SRS-W16-PAYLOAD-13 | DD §2.5、§6；PT-12 + PT-12-GATE-01 |
 
@@ -96,3 +97,4 @@
 | v0.5 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步当前 dev 基线上 Canvas SSE 撤销单用例 PG18.6 PASS（run 6d23b8ceb1f0499091885c42271c2fb0）与精确 Rust 测试结果；保留 superuser、test-only no-op audit/SCD2 和 unsigned attestation 限制，生产授权、审计与完整协作链继续 OPEN。 | 当前 dev focused acceptance 与设计状态复核。
 | v0.6 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将当前 Canvas SSE 撤销状态同步到最新可核验 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39（候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac，已包含于 dev@0e977306a1aafb031557d28d7fd19795297dd027）；保持生产授权、审计、多实例恢复和完整协作链 OPEN。 | W16-A 规范文档 rebase 到当前 dev 并复核最新 acceptance 报告。 |
 | v0.7 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Identity/Auth 与 Collaboration 各自拥有 Outbox/Inbox/投影及事务边界；定义至少一次、提交后 ACK、事件身份与异摘要隔离、provider-bound cursor、有限恢复、当前权限复验、安全字段与资源 profile；新增测试追踪，保持未实现/NOT_RUN。 | W16 Outbox owner-contract review 与 SRS/DD/TD 一致性核对。 |
+| v0.8 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 收紧双唯一键 exact replay 判据及并发冲突归类；规定两种 identity 错配与 digest mismatch durable quarantine、隔离告警意图先提交再 ACK、quarantine 写失败时有界不确认重试/暂停，以及 tenant RLS 下不泄漏存在性。新增对应 UT/IT 追踪，仍是设计且 NOT_RUN。 | 协调者独立审查指出重放 identity 映射、隔离 ACK 顺序和 quarantine 存储失败路径未明确。 |

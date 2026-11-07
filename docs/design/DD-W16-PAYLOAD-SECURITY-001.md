@@ -1,6 +1,6 @@
 # DD-W16-PAYLOAD-SECURITY-001 — 设备身份与协作载荷 envelope 详细设计
 
-> 状态：Draft v0.7；补充 DD-CANVAS-AGENT-001 v0.2 §8.7。此次冻结 Identity/Auth → Collaboration owner-local 撤销事件契约，属于设计变更；本 lane 未添加实现、迁移或运行验收。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas 单个已连接 SSE 流的设备撤销关闭用例已在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过（run 49b512fbfe334f0e98e46fe7eae7ea39），生产 owner/KMS 闭环仍未完成；W16-C provider-neutral envelope core 尚未接入生产 owner。
+> 状态：Draft v0.8；补充 DD-CANVAS-AGENT-001 v0.2 §8.7。此次冻结 Identity/Auth → Collaboration owner-local 撤销事件契约，属于设计变更；本 lane 未添加实现、迁移或运行验收。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas 单个已连接 SSE 流的设备撤销关闭用例已在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过（run 49b512fbfe334f0e98e46fe7eae7ea39），生产 owner/KMS 闭环仍未完成；W16-C provider-neutral envelope core 尚未接入生产 owner。
 
 ## 1. 模块边界
 
@@ -37,11 +37,15 @@
 
 ### 2.5 Owner-local Outbox/Inbox 事件、回执与恢复（规范目标，未实现/验收）
 
-Identity/Auth owner 是设备撤销事实的唯一生产者。该事实涉及的设备 generation/status、refresh-family 更新、审计与该 owner Outbox 必须在同一事务提交或回滚。每条事件分配稳定 `event_id` 与 owner-local `source_sequence`；同一 stream 的序号由事务性计数行锁分配并与业务事务一并回滚，使已提交事件流可检测缺口。唯一业务身份键为 `(tenant_id, producer_id, stream_id, source_sequence)`，并对 `event_id` 建唯一约束；不得用非事务序列值解释已提交事件间的跳号。
+Identity/Auth owner 是设备撤销事实的唯一生产者。该事实涉及的设备 generation/status、refresh-family 更新、审计与该 owner Outbox 必须在同一事务提交或回滚。每条事件分配稳定 `event_id` 与 owner-local `source_sequence`；同一 stream 的序号由事务性计数行锁分配并与业务事务一并回滚，使已提交事件流可检测缺口。Inbox 使用两把独立且 tenant-scoped 的唯一键：业务键 `(tenant_id, producer_id, stream_id, source_sequence)` 和事件键 `(tenant_id, event_id)`；不得用非事务序列值解释已提交事件间的跳号。只有这两把键均解析到同一条已存 Inbox 记录且该记录 canonical digest 与收到的 digest 一致，才允许返回 exact replay 回执。
 
 规范事件至少含 `event_type`、`schema_version`、opaque `tenant_id/actor_id/device_id`、`producer_id`、`stream_id`、`source_sequence`、新 generation/status、`occurred_at`、`correlation_id`、`idempotency_key` 与 canonical metadata digest。Digest 对 canonical metadata event bytes 计算。事件/日志不得包含 token、私钥/证明、协作正文、明文 DEK、敏感请求 body 或这些内容的未保护摘要。未知 schema/event type 不可更新授权投影，必须走可审计的拒绝/隔离路径。
 
-Collaboration Inbox 按上述业务身份键与 digest 幂等：identity+digest 完全相同为 exact replay，只返回既有回执，不重复写投影或 Outbox；identity 相同但 digest 不同则持久隔离并告警，不能改写投影。Inbox 唯一约束处理并发重复。Inbox、幂等回执、撤权投影与 Collaboration 自有 metadata-only Outbox 在一个 Collaboration 事务内提交后，才可确认 delivery 或推进 consumer checkpoint；提交前崩溃安全重试，提交后 ACK 丢失按 exact replay 收敛。语义为 at-least-once 加 owner-local 幂等，不是跨服务 exactly-once。
+Collaboration consumer 先由认证 transport/producer context 确定 tenant scope，并校验 event 的 tenant 与之相符；不匹配时在任何 Inbox 查询前以通用未授权结果拒绝。按两键查重后，仅当两键指向同一 Inbox 记录且 digest 相同才是 exact replay，不重复写投影或正常业务 Outbox。以下任一条件必须写入 durable quarantine 并产生可重试运维告警意图，不应用事件：a) 已有业务键但 event_id 不同；b) 同一 tenant-scoped event_id 已存在但业务键不同；c) 两键映射到不同 Inbox 记录；d) 双键映射相同但 canonical digest 不同。quarantine 事务只保存受限身份/digest/分类等 metadata，不写授权投影、幂等成功回执或正常 Collaboration business Outbox；告警意图随 quarantine durable commit 保存，并由独立有界运维告警路径发送。只有 quarantine 记录提交成功后才 ACK poison message，因此持久隔离后即使告警 sink 暂时不可用也不会反复投递 poison；告警继续独立重试。quarantine 持久化失败时绝不 ACK、不推进 cursor，按 profile 的有限 retry/backoff 重试；达到预算后暂停对应 consumer 分区/stream、施加背压并告警，不无限热循环。
+
+两条唯一约束发生竞争时，使用可恢复的事务冲突处理（例如冲突安全插入/保存点后取新鲜一致性快照）并在已认证 tenant RLS scope 内分别读取两键，再分类：只有 same row + same digest 才是 replay；单键冲突、两键指向不同 row、digest 不同均走 quarantine。若冲突后当前 tenant scope 内两键都不可见且无法确认胜者，按暂时性并发/存储失败处理，不 ACK 并执行有界重试。两键都包含 tenant_id，且分类查询不得切换到全局/跨 tenant 查询；对外状态和告警不报告其他 tenant 是否持有相同 event_id/业务键，避免通过唯一冲突泄漏租户存在性。语义为 at-least-once 加 owner-local 幂等，不是跨服务 exactly-once。
+
+正常 Inbox、幂等成功回执、撤权投影与 Collaboration 自有 metadata-only business Outbox 在一个 Collaboration 事务内提交后，才可确认 delivery 或推进 consumer checkpoint；提交前崩溃安全重试，提交后 ACK 丢失按 exact replay 收敛。
 
 source sequence 是业务顺序，transport cursor 是 adapter 提供的不透明恢复位置，两者不可混用。Outbox 首次 claim 固定 provider/version/profile digest/endpoint identity 和 log generation；持久回执保存 opaque durable cursor 与 canonical wire digest，重试沿用首次绑定的 profile。切换 transport 前 drain 原 profile 的待发事件并显式迁移；禁止跨 provider 比较 cursor/log generation 或复用 dedupe window。
 
@@ -118,7 +122,7 @@ retention_policy_revision:u64_be | envelope_format_version:u32_be
 | AAD/context mismatch、tag/ciphertext tamper | 受控 integrity error，安全审计 | 不回传明文，不更新 revision/conflict |
 | queue/buffer/resource limit | backpressure 或 retryable status | canonical revision 不变，pending delta 有界 |
 
-owner-event / Outbox / Inbox 错误按通用可恢复状态返回；digest 冲突与未知 schema 进入隔离并告警，source gap、cursor 失效或 retention 缺口转入有界恢复，恢复未确认时相关授权保持 fail closed。消费者和 relay 必须服从 profile 中的 `max_event_bytes`、batch、in-flight、retry/backoff、queue、dedupe retention、恢复窗口和租户配额；阈值未经批准时不得启用生产消费者，不在本设计中指定未经批准的数值。
+owner-event / Outbox / Inbox 错误按通用可恢复状态返回；双 identity 键错配、digest 冲突与未知 schema 进入 durable quarantine 并产生运维告警意图，但不产生投影或正常业务 Outbox 副作用。只有 quarantine commit 后才 ACK；quarantine 持久化失败时按 profile 有界重试，预算耗尽则暂停并施加背压，不推进 cursor。source gap、cursor 失效或 retention 缺口转入有界恢复，恢复未确认时相关授权保持 fail closed。消费者和 relay 必须服从 profile 中的 `max_event_bytes`、batch、in-flight、retry/backoff、queue、dedupe retention、恢复窗口和租户配额；阈值未经批准时不得启用生产消费者，不在本设计中指定未经批准的数值。
 
 应用和 provider 日志只能记录 operation ID、profile/key opaque id、结果码、耗时分桶和字节数分桶。禁止记录正文、DEK、access/refresh token、enrollment proof、provider credentials、未脱敏 headers 或完整 KMS request/response；owner-event 日志只记录事件 identity、canonical metadata digest 与有限结果码，不复制敏感 request 内容。
 
@@ -132,7 +136,7 @@ owner-event / Outbox / Inbox 错误按通用可恢复状态返回；digest 冲�
 | Envelope | W16-C `domain-kms --lib` unit tests 21/21 PASS，覆盖同 profile 往返、canonical AAD、AAD/ciphertext/tag 篡改、版本/长度上限、profile mismatch 与安全 provider error；重启/第二进程解密、生产 provider、持久化、RLS、key rotation 与 backup restore 仍 OPEN/NOT_RUN。 |
 | KMS lifecycle | unavailable/permission revoked/unknown profile fail closed；key rotation 前后历史读取；database/blob/provider backup restore；有引用时 key deletion 被阻止。 |
 | Owner/RLS | Neon 或真实 PostgreSQL 的 RLS、owner transaction、idempotency 与 retention；Identity revoke facts + audit + its Outbox 原子提交；Collaboration Inbox + projection + its own metadata-only Outbox 原子提交；跨 actor/tenant 越权读取拒绝。 |
-| Outbox/Inbox durability | At-least-once delivery；identity+same digest exact replay；identity+different digest quarantine；并发重复串行化；receiver commit-before-ack/checkpoint；提交前后崩溃恢复；source sequence gap、cursor expiry、retention gap 的 bounded replay；provider/profile identity 在重试期间固定。 |
+| Outbox/Inbox durability | At-least-once；业务键与 `(tenant_id,event_id)` 双键指向同一 Inbox row 且 digest 相同才 exact replay；任一键单独冲突、双键指向不同 row 或 digest 不同均 durable-quarantine/alert；并发唯一冲突在 tenant RLS scope 内分类且不泄漏租户存在；正常接收事务或 quarantine commit 均先于 ACK/checkpoint；quarantine commit 失败时不 ACK、有限重试后暂停；提交前后崩溃恢复；source gap/cursor expiry/retention gap bounded replay；provider/profile identity 固定。 |
 | Authorization projection | 撤销事件仅加速缓存/SSE 失效；每次读/写/resolve 复验权威当前身份、设备 generation 与 Project/Run 权限；过期、不完整或不可用的授权状态 fail closed。 |
 | Bounded runtime | 固定 Collaboration Profile 与 workload 下 KMS 请求频次、缓冲/队列上限、RSS/CPU、取消、慢消费者与 PT-09 p99 结果。 |
 
@@ -149,3 +153,4 @@ owner-event / Outbox / Inbox 错误按通用可恢复状态返回；digest 冲�
 | v0.5 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步当前 dev 基线 Canvas SSE 设备撤销单用例 PG18.6 acceptance（run 6d23b8ceb1f0499091885c42271c2fb0）与 Rust 1.99.0 focused build，保留其本地 superuser/test-only/unsigned 限制；生产授权、HTTP audit、恢复、多实例、性能和部署门继续 OPEN。 | 当前 dev focused acceptance 与 DD 实现状态复核。
 | v0.6 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将当前 Canvas SSE 撤销状态同步到最新可核验 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39（候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac，已包含于 dev@0e977306a1aafb031557d28d7fd19795297dd027）；保留原测试专属权限、无签名证明及生产未验收限制。 | W16-A 规范文档 rebase 到当前 dev 并复核最新 acceptance 报告。 |
 | v0.7 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正模块所有权表与撤销段落冲突，新增 owner-local Outbox/Inbox、事件 identity/schema、at-least-once 与 commit-before-ack、cursor/provider 绑定、序列缺口/过期恢复、安全载荷和资源 profile 设计及其验证门；不表示实现或目标拓扑通过。 | W16 Outbox owner-contract review 与 SRS/BD/TD 一致性核对。 |
+| v0.8 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冻结 Inbox 双唯一身份键必须映射到同一记录及 digest 相同的 exact replay 条件；定义两种键错配/异摘要的 durable quarantine、运维告警意图、隔离 commit-before-ACK、失败时有界重试/暂停、唯一冲突的 tenant-RLS 分类和防租户存在性泄漏；新增验收断言但未实现/运行。 | 协调者独立审查指出原文未充分约束双键映射、poison ACK 和 quarantine 存储失败。 |
