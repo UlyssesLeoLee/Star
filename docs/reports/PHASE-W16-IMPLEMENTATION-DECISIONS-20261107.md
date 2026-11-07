@@ -26,6 +26,9 @@
 | 目标 manifest 文件路径 | PASS | 工作树仅含 MAGOS 登记的 8 个路径；没有 WBS/代码/migration 改动 |
 | Markdown 相对链接 | PASS | 7 份 Markdown 文档检查 16 个链接，0 个缺失 |
 | 注册文件静态格式 | PASS | 8 个登记文件 trailing whitespace=0；dispatch JSONL 解析错误=0 |
+| MAGOS manifest 检查 | PASS（显式路径） | `list` 显示 W16 登记的 8 路径；带精确 `--paths` 的 target=`dev` 检查无重叠。未传路径的检查报告空 manifest，因此未把该错误当作放行 |
+| 本地 `dev` 集成 | PASS | `89f2f5bd` → `6d72dd7` fast-forward；提交父项是集成前 dev HEAD；集成后 dev 干净，仅本地变更 |
+| W16 worktree/branch 清理 | DEFERRED | Orca 显示 lane 有 1 个 attached live terminal、0 个 agent；为保留仍可能使用的终端，不删除 worktree 或 branch |
 | Cargo / PostgreSQL / HTTP / Neon / Multipass / K3s | NOT_RUN | 文档阶段没有实现变更或新验收 |
 
 历史局部 PG18/18.6 与单流 SSE 结果保持原样，不外推为 owner-event 闭环。新增 UT/IT/E2E 均是设计态，未执行；本阶段静态检查结果只说明登记文档自洽，不构成运行验收。
@@ -44,7 +47,8 @@
 
 - 一次只读设计审查在 brief 文件落地前已完成；该次顺序不符合 dispatcher 先 brief 的治理要求，brief 已事后如实记录，没有回写成“事前授权”。
 - 最终只读复审代理核对 SRS/BD/DD v0.9、Test Design v2.8 和阶段报告，给出 APPROVE；明确 pre-READY baseline、NULL floor、READY 后 floor=0/generation-1 event 与行锁竞态边界一致。代理未改文件。
-- 协调者完成精确八路径 manifest、Markdown 相对链接、dispatch JSONL、diff whitespace 检查；这些是静态文档检查，不代表 Rust/数据库/API/部署验收。
+- 协调者核对 MAGOS 登记列表的八条路径、显式路径冲突检查、Markdown 相对链接、dispatch JSONL 与 diff whitespace。MAGOS 不带 `--paths` 的一次检查报告空 manifest；按登记清单显式检查确认无重叠后才继续。
+- Orca 显示 lane 无 agent、但有一个 attached live terminal；dev fast-forward 后 checkout 仍干净。没有关闭终端或删除活跃 worktree/branch，清理留待终端释放后处理。
 
 ## §5 守门规则
 
@@ -82,3 +86,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冻结 W16 owner-event API、顺序、授权、lease、checkpoint 与物理数据决策；同步 SRS/BD/DD/Test Design；新验收全部保留 NOT_RUN。 | W16 Outbox owner-contract review 指出实现前决策缺口。 |
 | v0.2 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 收紧 READY 前的状态事件边界：旧状态进入首个 baseline、不补造事件；READY 后新 binding 从 generation 1/floor 0 启动，pre-READY binding 保持 NULL；同步详细设计与 UT 验收刺激，未执行任何新测试。 | 最终一致性复核发现概括措辞可能误读为 READY 前也发布事件。 |
+| v0.3 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 lane commit `6d72dd7` 已 fast-forward 至本地 dev、集成后 checkout 干净；说明显式 MAGOS 路径检查与默认检查的空 manifest 异常；因 Orca 有一个 attached live terminal，保留 worktree/branch 不删除。新增设计验收仍 NOT_RUN。 | W16 lane 完成复审并集成到本地 dev。 |
