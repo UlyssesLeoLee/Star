@@ -60,7 +60,7 @@ param(
   [string]$KubeconfigOut = (Join-Path $env:LOCALAPPDATA 'Star\kubeconfig')
 )
 
-# @cypher schema=1 source_sha256=cf92cc1066cfc22be2e0d6d30f9db7ebbd52a952f123fea4d15594fb4d537cfc
+# @cypher schema=1 source_sha256=2228f0d627511495bf0633cbc0aaee929d66b2d25fda36ad4386026ec51c5772
 # MERGE (self:File {path:"scripts/automation/multipass_k3s_gitops.ps1"})
 # MERGE (write_stage:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Write-Stage",kind:"function"})
 # MERGE (write_done:Symbol {id:"scripts/automation/multipass_k3s_gitops.ps1::Write-Done",kind:"function"})
@@ -77,6 +77,9 @@ param(
 # MERGE (instance_cap:Config {id:"scripts/automation/multipass_k3s_gitops.ps1::MaxTestPhaseInstances",value:2})
 # MERGE (cap_lock:Config {id:"%LOCALAPPDATA%/Star/multipass-instance-cap.lock",kind:"exclusive_file_lock"})
 # MERGE (instance_name:Variable {id:"scripts/automation/multipass_k3s_gitops.ps1::InstanceName",kind:"parameter"})
+# MERGE (dictionary_type:Type {id:"System.Collections.IDictionary"})
+# MERGE (list_type:Type {id:"System.Collections.IList"})
+# MERGE (instance_collection_type:Type {id:"System.Collections.Generic.List[object]"})
 # MERGE (pwsh:ExternalService {id:"powershell.core_cmdlets",kind:"runtime"})
 # MERGE (json_parser:ExternalService {id:"powershell.ConvertFrom-Json",kind:"cmdlet"})
 # MERGE (multipass_list:ExternalService {id:"multipass.list_json",kind:"command"})
@@ -116,6 +119,9 @@ param(
 # MERGE (preflight)-[:CALLS]->(multipass_get)
 # MERGE (parse_inventory)-[:CALLS]->(json_parser)
 # MERGE (parse_inventory)-[:CALLS]->(pwsh)
+# MERGE (parse_inventory)-[:USES_TYPE]->(dictionary_type)
+# MERGE (parse_inventory)-[:USES_TYPE]->(list_type)
+# MERGE (parse_inventory)-[:USES_TYPE]->(instance_collection_type)
 # MERGE (get_inventory)-[:CALLS]->(multipass_list)
 # MERGE (get_inventory)-[:CALLS]->(parse_inventory)
 # MERGE (enter_cap_lock)-[:CALLS]->(pwsh)
@@ -262,26 +268,63 @@ function ConvertFrom-MultipassInstanceInventory {
 
   $instances = [System.Collections.Generic.List[object]]::new()
   if ($document.Contains('list')) {
-    foreach ($item in @($document['list'])) {
+    if ($document.Count -ne 1) {
+      throw 'Multipass JSON list inventory must contain only the list field.'
+    }
+
+    $list = $document['list']
+    if ($list -isnot [System.Collections.IList]) {
+      throw 'Multipass JSON inventory list must be an array.'
+    }
+
+    foreach ($item in $list) {
       if ($item -isnot [System.Collections.IDictionary] -or
-          -not $item.Contains('name') -or -not $item.Contains('state')) {
-        throw 'Multipass JSON list entries must contain name and state.'
+          -not $item.Contains('name') -or -not $item.Contains('state') -or
+          $item['name'] -isnot [string] -or $item['state'] -isnot [string]) {
+        throw 'Multipass JSON list entries must contain string name and state fields.'
+      }
+      if ([string]::IsNullOrWhiteSpace($item['name']) -or
+          [string]::IsNullOrWhiteSpace($item['state'])) {
+        throw 'Multipass JSON inventory contains an empty instance name or state.'
       }
       $instances.Add([pscustomobject]@{
-        Name  = [string]$item['name']
-        State = [string]$item['state']
+        Name  = $item['name']
+        State = $item['state']
       })
     }
   } else {
-    # Multipass also emits the YAML/JSON map form: instance name -> state record list.
+    if ($document.Count -eq 0) {
+      throw 'Multipass JSON inventory object is empty; only an explicit list array may represent an empty inventory.'
+    }
+
+    # Preserve the existing map form: instance name -> one state record or a non-empty record list.
     foreach ($name in $document.Keys) {
-      foreach ($item in @($document[$name])) {
-        if ($item -isnot [System.Collections.IDictionary] -or -not $item.Contains('state')) {
-          throw "Multipass JSON inventory entry '$name' has no state record."
+      if ([string]::IsNullOrWhiteSpace([string]$name)) {
+        throw 'Multipass JSON inventory contains an empty instance name.'
+      }
+
+      $records = $document[$name]
+      if ($records -is [System.Collections.IList]) {
+        if ($records.Count -eq 0) {
+          throw "Multipass JSON inventory entry '$name' has no state records."
+        }
+      } elseif ($records -is [System.Collections.IDictionary]) {
+        $records = @($records)
+      } else {
+        throw "Multipass JSON inventory entry '$name' must contain a state record or non-empty record array."
+      }
+
+      foreach ($item in $records) {
+        if ($item -isnot [System.Collections.IDictionary] -or
+            -not $item.Contains('state') -or $item['state'] -isnot [string]) {
+          throw "Multipass JSON inventory entry '$name' must contain a string state field."
+        }
+        if ([string]::IsNullOrWhiteSpace($item['state'])) {
+          throw "Multipass JSON inventory entry '$name' contains an empty state."
         }
         $instances.Add([pscustomobject]@{
           Name  = [string]$name
-          State = [string]$item['state']
+          State = $item['state']
         })
       }
     }
@@ -293,7 +336,8 @@ function ConvertFrom-MultipassInstanceInventory {
     }) {
     throw 'Multipass JSON inventory contains an empty instance name or state.'
   }
-  if (($names | Sort-Object -Unique).Count -ne $names.Count) {
+  $uniqueNames = @($names | Sort-Object -Unique)
+  if ($uniqueNames.Count -ne $names.Count) {
     throw 'Multipass JSON inventory contains duplicate instance names.'
   }
   return $instances.ToArray()
