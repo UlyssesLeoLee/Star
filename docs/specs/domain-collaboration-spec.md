@@ -1,6 +1,6 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v1.5 (2026-11-07；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v1.6 (2026-11-07；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–09
 > - 《Basic Design》§2.1(表 24), §5.7, §16.78
@@ -8,8 +8,8 @@
 > - 《API Design》§4 (WebSocket / Realtime 通道)
 > - 《Data Design》§4.17 (`collaboration` schema)
 > - 《Security Design》§3.1-3.4
-> - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.7
-> - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.6 §4.8/§5.2/§6.2.5（计划，未运行）
+> - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.8
+> - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.8 §4.8/§5.2/§6.2.5（计划，未运行；WLD-7 仍 OPEN/NOT_RUN）
 > **下游交付**: Implementation team — Rust crate 路径 `crates/domain-collaboration/`
 > **最后审稿**: 待 RFC 化时
 
@@ -370,7 +370,7 @@ The current code inventory is not a pass for these gates: `CollaborationWssHub` 
 
 ### 13.6 Owner-local schema and test mapping
 
-The schema in `docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` is the logical target for each canonical WorkItem/Canvas owner, not a new Collaboration-owned content store. Draft heads/checkpoints are W with explicit retention; conflict, participant visibility/view receipts, resolution, Audit and Outbox are owner-local T facts. Concrete owner migrations, Data Inventory rows, grants, RLS and target PostgreSQL evidence remain open. The planned double-actor, two-gateway and recovery coverage is in `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.6; its new cases are not implemented or executed. The current client read/poll and process-local gateway paths remain the implementation baseline until replaced and measured.
+The WLD-7 double-actor, two-gateway and recovery acceptance is tracked in `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.8 §4.8, §5.2 and §6.2.5 (including E2E-COLLAB-09 and PT-09); WLD-7 cases remain planned and NOT_RUN. The targeted PG18.6 device-revocation/SSE result recorded in v2.8 does not prove complete WLD-7 multi-user revision push. The current client read/poll and process-local gateway paths remain the implementation baseline until replaced and measured.
 
 Revision v0.4 · 2026-10-24 · Mavis review: reconciled legacy NATS/role/subscription wording with provider-neutral owner events, current resource authorization, cursor-only recovery and the v0.2 push/conflict acceptance gates.
 Revision v0.5 · 2026-10-24 · Mavis review: promoted the resource-scoped push/conflict contract over older transport drafts and recorded that the live Group path still uses interval polling.
@@ -385,3 +385,5 @@ Revision v1.2 · 2026-10-25 · Mavis review: make semantic overlap a durable con
 Revision v1.3 - 2026-11-07 - Mavis review: align the active test-design reference to v2.6 and repair three relative source links; preserve historical v1.2. No implementation or runtime change; WLD-7 remains OPEN/NOT_RUN.
 Revision v1.4 - 2026-11-07 - Mavis review: align the active owner-local data-design reference to v0.5 after its citation-only update; preserve the historical v1.3 record. No data-model, implementation, or runtime change; WLD-7 remains OPEN/NOT_RUN.
 Revision v1.5 - 2026-11-07 - Mavis review: align the active owner-local data-design reference to its current v0.7 revision; preserve the historical v1.4 record. No data-model, implementation, or runtime change; WLD-7 remains OPEN/NOT_RUN.
+
+Revision v1.6 - 2026-11-07 - Mavis review: align the active owner-local data-design reference to v0.8 and the test-design reference to v2.8 §4.8/§5.2/§6.2.5 after comparing against v2.6: WLD-7 E2E-COLLAB-01..11, AC-COLLAB-01..09 and PT-09 are unchanged; added E2E-COLLAB-24 is W16-only. Clarify that the targeted PG18.6 device-revocation/SSE result is not full WLD-7 acceptance. WLD-7 remains OPEN/NOT_RUN. Test-design §9.5 still cites older WLD-7 source versions (spec v1.0/data v0.2); retain that follow-up because test-design is outside this lane. Citation/status clarification only; no implementation or runtime change.

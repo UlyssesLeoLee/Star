@@ -1,8 +1,8 @@
 # WLD-7 多用户实时协作目标数据设计
 
-> 状态：目标逻辑数据设计 v0.7；尚未生成迁移、部署或目标数据库验证。
+> 状态：目标逻辑数据设计 v0.8；尚未生成迁移、部署或目标数据库验证。
 > 适用：Task Card / WorkItem 与 Canvas 等支持协作编辑的 Run 资源。
-> 上游：requirements v7.08 §50.8AW / AC-COLLAB-01–08、basic design v7.12 §16.78、Group DD §8.27、domain collaboration spec v1.5 §13、test design v2.6 E2E-COLLAB-09。
+> 上游：requirements v7.08 §50.8AW / AC-COLLAB-01–08、basic design v7.12 §16.78、Group DD §8.27、domain collaboration spec v1.6 §13、test design v2.8 E2E-COLLAB-09。
 > 此文件定义 owner-local 数据边界，不代表实时协作已实现。
 
 ## 0. 所有权和事实边界
@@ -73,3 +73,5 @@ WLD-7 实施时必须把以上目标实体逐表对齐 Data Inventory、W/T/M、
 修订 v0.5 · 2026-11-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。仅将当前 test design 上游引用更新为 v2.6；保留 v0.4 历史记录，数据模型、W/T/M 分类、迁移、部署、runtime 与目标数据库验收状态均未改变，schema 仍为未迁移、未部署、未验证的逻辑目标。
 修订 v0.6 · 2026-11-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。将当前 collaboration spec 引用更新为 v1.3；保留 v0.5 历史记录。仅同步文档交叉引用，逻辑 schema 仍未迁移、未部署、未验证，WLD-7 运行时仍未实现。
 修订 v0.7 · 2026-11-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。将当前 collaboration spec 引用更新为其 v1.5 版本；保留 v0.6 历史记录。仅同步文档交叉引用，逻辑 schema 仍未迁移、未部署、未验证，WLD-7 运行时仍未实现。
+
+修订 v0.8 · 2026-11-07 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。将当前 test design 引用更新为 v2.8 E2E-COLLAB-09，并同步 collaboration spec 引用至 v1.6；对照 v2.6 后，WLD-7 E2E-COLLAB-01..11、AC-COLLAB-01..09 与 PT-09 内容未变，v2.8 新增的 E2E-COLLAB-24 属于 W16。保留目标 schema 未迁移、未部署、未验证及 WLD-7 OPEN/NOT_RUN 状态；不代表实现或验收通过。
