@@ -1,6 +1,6 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v1.2 (2026-10-25；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v1.3 (2026-11-07；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–09
 > - 《Basic Design》§2.1(表 24), §5.7, §16.78
@@ -9,7 +9,7 @@
 > - 《Data Design》§4.17 (`collaboration` schema)
 > - 《Security Design》§3.1-3.4
 > - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.4
-> - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v1.7 §4.8/§5.2/§6.2.5（计划，未运行）
+> - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.6 §4.8/§5.2/§6.2.5（计划，未运行）
 > **下游交付**: Implementation team — Rust crate 路径 `crates/domain-collaboration/`
 > **最后审稿**: 待 RFC 化时
 
@@ -300,7 +300,7 @@ sequenceDiagram
 
 ## 15. 与其他 domain 协作 (v0.16 协作细化新增)
 
-per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) + [spec/saga/01 v0.2 SagaCoordinationRole](../../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md),本节定义 `collaboration` 与 22 domain 中 4 个 domain 的显式接触面。
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) + [spec/saga/01 v0.2 SagaCoordinationRole](../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md),本节定义 `collaboration` 与 22 domain 中 4 个 domain 的显式接触面。
 
 | 源 Domain | 目标 Domain | 接触方式 | 接触点 |
 |---|---|---|---|
@@ -370,7 +370,7 @@ The current code inventory is not a pass for these gates: `CollaborationWssHub` 
 
 ### 13.6 Owner-local schema and test mapping
 
-The schema in `docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` is the logical target for each canonical WorkItem/Canvas owner, not a new Collaboration-owned content store. Draft heads/checkpoints are W with explicit retention; conflict, participant visibility/view receipts, resolution, Audit and Outbox are owner-local T facts. Concrete owner migrations, Data Inventory rows, grants, RLS and target PostgreSQL evidence remain open. The planned double-actor, two-gateway and recovery coverage is in `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md`; its new cases are not implemented or executed. The current client read/poll and process-local gateway paths remain the implementation baseline until replaced and measured.
+The schema in `docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` is the logical target for each canonical WorkItem/Canvas owner, not a new Collaboration-owned content store. Draft heads/checkpoints are W with explicit retention; conflict, participant visibility/view receipts, resolution, Audit and Outbox are owner-local T facts. Concrete owner migrations, Data Inventory rows, grants, RLS and target PostgreSQL evidence remain open. The planned double-actor, two-gateway and recovery coverage is in `docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.6; its new cases are not implemented or executed. The current client read/poll and process-local gateway paths remain the implementation baseline until replaced and measured.
 
 Revision v0.4 · 2026-10-24 · Mavis review: reconciled legacy NATS/role/subscription wording with provider-neutral owner events, current resource authorization, cursor-only recovery and the v0.2 push/conflict acceptance gates.
 Revision v0.5 · 2026-10-24 · Mavis review: promoted the resource-scoped push/conflict contract over older transport drafts and recorded that the live Group path still uses interval polling.
@@ -382,3 +382,4 @@ Revision v0.9 · 2026-10-24 · Mavis review: align INV-CB-07 with the unique cur
 Revision v1.0 · 2026-10-24 · Mavis review: synchronize the active owner-local schema reference to data design v0.2 and the test design to v1.5, which adds a mandatory versioned Collaboration Profile and measured workload/host/database/gateway baseline before PT-09 can pass. Runtime remains polling/process-local and WLD-7 remains OPEN/NOT_RUN; no benchmark or implementation is claimed.
 Revision v1.1 · 2026-10-25 · Mavis review: define immediate owner conflict handling for complete overlapping draft heads accepted within ≤1000 ms, forbid a one-second debounce/holdback, retain semantic overlap detection at longer intervals, and add the dedicated E2E-COLLAB-09 gate. Synchronize requirements v7.08, basic design v7.11, owner-local data design v0.3 and test design v1.6. Runtime remains polling/process-local; no implementation or performance result is claimed.
 Revision v1.2 · 2026-10-25 · Mavis review: make semantic overlap a durable conflict even when OT can mechanically transform the edits; permit OT only as an explicit resolution preview and require user choice plus current-revision CAS before canonical write. Synchronize requirements v7.08, basic design v7.12, owner-local data v0.4 and test design v1.7. Runtime remains OPEN/NOT_RUN.
+Revision v1.3 - 2026-11-07 - Mavis review: align the active test-design reference to v2.6 and repair three relative source links; preserve historical v1.2. No implementation or runtime change; WLD-7 remains OPEN/NOT_RUN.
