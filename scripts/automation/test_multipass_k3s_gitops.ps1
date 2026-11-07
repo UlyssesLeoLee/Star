@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 #requires -Version 7.0
-# @cypher schema=1 source_sha256=d4c0869999e63685eafc80d1bee6d45751277ce27cd6e2532f088b1f72678d85
+# @cypher schema=1 source_sha256=b5d2aaf48508fc60eb2c03cad7c4b38a1cf9117b79d28968c3b77e47b8c4bc2a
 # MERGE (self:File {path:"scripts/automation/test_multipass_k3s_gitops.ps1"})
 # MERGE (suite:Symbol {id:"scripts/automation/test_multipass_k3s_gitops.ps1::Invoke-ParserTests",kind:"function"})
 # MERGE (load_function:Symbol {id:"scripts/automation/test_multipass_k3s_gitops.ps1::Get-SourceFunctionText",kind:"function"})
@@ -137,7 +137,9 @@ function Invoke-ParserTests {
     @{ Name = 'duplicate names'; Json = '{"list":[{"name":"star-a","state":"Running"},{"name":"star-a","state":"Stopped"}]}' },
     @{ Name = 'empty map records'; Json = '{"star-a":[]}' },
     @{ Name = 'null map records'; Json = '{"star-a":null}' },
+    @{ Name = 'blank map instance name'; Json = '{"   ":[{"state":"Running"}]}' },
     @{ Name = 'map record without state'; Json = '{"star-a":[{}]}' },
+    @{ Name = 'non-string map state'; Json = '{"star-a":[{"state":1}]}' },
     @{ Name = 'map record with blank state'; Json = '{"star-a":[{"state":" "}]}' },
     @{ Name = 'malformed JSON'; Json = '{"list":' }
   )

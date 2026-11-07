@@ -16,7 +16,7 @@
 |---|---|---|
 | Inventory parser | 仅显式 `{"list":[]}` 可表示零实例；拒绝空根对象、null、额外 list 顶层字段、错误容器、错误记录、空名称/状态及重复名称 | 已实现并通过合成 parser 测试 |
 | 既有 map 形态 | 保留非空的实例名到单条/多条状态记录形式；空记录、错误记录或缺失状态失败关闭 | 已实现；尚无当前 Multipass 主机响应的实测证据 |
-| 创建路径 | 保留原有二实例上限与跨进程锁；测试通过本地函数替身确认 parser 异常在 `multipass launch` 前返回失败 | 已实现并通过 29 项合成断言 |
+| 创建路径 | 保留原有二实例上限与跨进程锁；测试通过本地函数替身确认 parser 异常在 `multipass launch` 前返回失败 | 已实现并通过 31 项合成断言 |
 | 测试 | 从部署脚本 AST 只载入 parser 与创建函数；整个脚本入口和真实 CLI 均不执行 | 已实现 |
 | Graph headers | 更新 parser 类型关系；新增测试的 AST/测试边；刷新两个 PowerShell 文件 source hash | CypherGraph Guardian 通过 |
 | WBS 主文件 | 不在登记清单内，本 lane 未修改 | W8 仍 OPEN；需协调者在独立同步中记录本切片 |
@@ -27,12 +27,12 @@
 
 | 命令 | 结果 |
 |---|---|
-| `rtk proxy pwsh -NoProfile -File 'D:\orcaWork\Star\wbs-w8-multipass-inventory-parser-20261107\scripts\automation\test_multipass_k3s_gitops.ps1'` | PASS，`PASS: 29 parser and fail-closed create-path assertions.` |
+| `rtk proxy pwsh -NoProfile -File 'D:\orcaWork\Star\wbs-w8-multipass-inventory-parser-20261107\scripts\automation\test_multipass_k3s_gitops.ps1'` | PASS，`PASS: 31 parser and fail-closed create-path assertions.` |
 | `rtk proxy python 'C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py' --root 'D:\orcaWork\Star\wbs-w8-multipass-inventory-parser-20261107' --stamp scripts/automation/multipass_k3s_gitops.ps1 scripts/automation/test_multipass_k3s_gitops.ps1` | PASS，`CypherGraph Guardian: PASS (2 source file(s) checked)` |
 | `rtk proxy python 'C:\Users\leo19\.codex\skills\CypherGraph-Guardian\skill\cypher-graph-guardian\scripts\cgg_guard.py' --root 'D:\orcaWork\Star\wbs-w8-multipass-inventory-parser-20261107' scripts/automation/multipass_k3s_gitops.ps1 scripts/automation/test_multipass_k3s_gitops.ps1` | PASS，2 个 PowerShell source files checked |
 | `rtk proxy git -C 'D:\orcaWork\Star\wbs-w8-multipass-inventory-parser-20261107' diff --check` | PASS，exit 0，无空白错误 |
 
-测试覆盖显式空 list、list/非空 map 有效记录、空根对象、JSON null、非对象根、null/非数组 list、额外 list 字段、null/字段缺失/类型错误/名称或状态为空/重复名称的 list 记录、空或 null map 记录、map 状态缺失/空值以及错误 JSON。创建路径测试以替身注入 `{}` 解析失败，并断言结果失败、记录拒绝原因且 Multipass 命令计数仍为 0。
+测试覆盖显式空 list、list/非空 map 有效记录、空根对象、JSON null、非对象根、null/非数组 list、额外 list 字段、null/字段缺失/类型错误/名称或状态为空/重复名称的 list 记录、空或 null map 记录、空白 map 名称、map 状态缺失/非字符串/空值以及错误 JSON。创建路径测试以替身注入 `{}` 解析失败，并断言结果失败、记录拒绝原因且 Multipass 命令计数仍为 0。
 
 以上均为**合成输入的 parser-only 测试**，不证明某个当前 Multipass 版本的实际 JSON 响应、实例库存、跨进程竞争、VM 创建、K3s 就绪或磁盘占用行为。未运行 Cargo、Pester 或 Multipass。
 
@@ -82,3 +82,4 @@
 | 版本 | 日期 | 修订内容 | 触发与证据 |
 |---|---|---|---|
 | v0.1 | 2026-11-07 | 加固 Multipass inventory parser；新增 29 项无真实基础设施副作用的 PowerShell 断言；更新 Cypher graph headers 与阶段报告 | W8 容量复核记录 `{}` 被误判为空库存及 parser 专项测试缺失；本报告 §2 列明实测命令 |
+| v0.2 | 2026-11-07 | 补充空白 map 实例名与非字符串 map 状态拒绝断言；当前 suite 共 31 项，无生产代码变化 | 独立规格审查指出原 29 项未覆盖这两个 map 拒绝分支；重新执行聚焦测试与 source graph 校验 |

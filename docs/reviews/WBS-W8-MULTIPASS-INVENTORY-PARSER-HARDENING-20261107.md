@@ -15,7 +15,7 @@ The regression harness parses the script AST and loads only `ConvertFrom-Multipa
 
 ## Verification evidence
 
-- PowerShell 7.6.9 focused run: PASS, 29 assertions.
+- PowerShell 7.6.9 focused run: PASS, 31 assertions, including rejection of a whitespace-only map instance name and a non-string map state.
 - CypherGraph Guardian: PASS, both source headers valid and source hashes current.
 - Git whitespace check: PASS.
 - No actual Multipass command or VM/K3s operation was run.
