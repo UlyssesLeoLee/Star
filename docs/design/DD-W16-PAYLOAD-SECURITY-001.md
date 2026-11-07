@@ -1,6 +1,6 @@
 # DD-W16-PAYLOAD-SECURITY-001 — 设备身份与协作载荷 envelope 详细设计
 
-> 状态：Draft v0.8；补充 DD-CANVAS-AGENT-001 v0.2 §8.7。此次冻结 Identity/Auth → Collaboration owner-local 撤销事件契约，属于设计变更；本 lane 未添加实现、迁移或运行验收。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas 单个已连接 SSE 流的设备撤销关闭用例已在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过（run 49b512fbfe334f0e98e46fe7eae7ea39），生产 owner/KMS 闭环仍未完成；W16-C provider-neutral envelope core 尚未接入生产 owner。
+> 状态：Draft v0.9；补充 DD-CANVAS-AGENT-001 v0.2 §8.7。此次冻结 Identity/Auth → Collaboration 的 generation/source-sequence、snapshot/replay、服务授权、lease、连续 checkpoint 与物理数据边界，属于设计变更；本 lane 未添加实现、迁移或运行验收。W16-A 部分 device/auth owner 与 PG/RLS 切片已在本地 PostgreSQL 验证，OAuth repository slice 3/3 通过；Canvas 单个已连接 SSE 流的设备撤销关闭用例已在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过（run 49b512fbfe334f0e98e46fe7eae7ea39），生产 owner/KMS 闭环仍未完成；W16-C provider-neutral envelope core 尚未接入生产 owner。
 
 ## 1. 模块边界
 
@@ -28,7 +28,7 @@
 
 ### 2.3 撤销与活跃 stream
 
-撤销由 Identity/Auth owner 在一个本地事务内推进 device generation/status、撤销 refresh family、追加审计并写入该 owner 的 Outbox；任一写入失败整体回滚。Outbox relay 至少一次传递。Collaboration consumer 认证事件后，在自己的单一 owner 事务中提交 Inbox、幂等回执与用于拒绝该设备的本地授权投影；事务提交之后才确认消息或推进 consumer checkpoint。两 owner 之间不共享事务，也不由 Collaboration 写 Identity/Auth 表。每个 API 请求仍在 owner 授权前实时核验当前 identity/generation/status 与 Project/Run 权限；失效投影只用于加速拒绝，不可成为授予权限的依据。SSE 订阅收到撤销失效即关闭，连接重建必须重新认证与授权。缓存有界且事件驱动失效；事件丢失时的授权租约上限由已批准 profile 固定，撤销检查无法完成时拒绝读写。
+撤销由 Identity/Auth owner 在一个本地事务内推进 device generation/status、撤销 refresh family、追加审计；只有 event-contract readiness 已为 `READY` 时，generation 推进才同时写入该 owner 的 Outbox，任一要求写入失败整体回滚。`NOT_READY` 期间仍可完成授权状态变化和审计，但不发设备授权事件；这些既有状态纳入首次 post-READY snapshot baseline，不伪造上线前的事件历史。READY 后的 Outbox relay 至少一次传递。设备授权 stream 使用 `stream_id=device_id`、`source_sequence=device_generation`，generation 从 1 开始；每个 post-READY 授权相关 generation 转换必须恰好产生一个同序号事件，重复撤销不得增加 generation 或事件。普通 refresh-token 轮换若没有设备授权 generation 变化，只更新 refresh-family 事实及其适用审计，不生成设备授权事件；设备授权 Outbox 只记录 READY 后设备 generation 转换。READY 前创建的 binding（包括 enrollment）保持 NULL floor，切换 READY 后由首次 snapshot、首次授权变更或可选 backfill 以当前 generation G 建立 baseline。Collaboration consumer 认证事件后，在自己的单一 owner 事务中提交 Inbox、幂等回执与用于拒绝该设备的本地授权投影；事务提交之后才确认消息或推进 consumer checkpoint。两 owner 之间不共享事务，也不由 Collaboration 写 Identity/Auth 表。每个 API 请求仍在 owner 授权前实时核验当前 identity/generation/status 与 Project/Run 权限；失效投影只用于加速拒绝，不可成为授予权限的依据。SSE 订阅收到撤销失效即关闭，连接重建必须重新认证与授权。缓存有界且事件驱动失效；事件丢失时的撤权 freshness lease 由 Identity/Auth policy 给出硬上限，Collaboration profile 只能缩短；lease 到期无法重新核验时关闭 SSE 并 fail closed。
 
 ### 2.4 当前 OAuth / Canvas 验收切片边界
 
@@ -37,7 +37,7 @@
 
 ### 2.5 Owner-local Outbox/Inbox 事件、回执与恢复（规范目标，未实现/验收）
 
-Identity/Auth owner 是设备撤销事实的唯一生产者。该事实涉及的设备 generation/status、refresh-family 更新、审计与该 owner Outbox 必须在同一事务提交或回滚。每条事件分配稳定 `event_id` 与 owner-local `source_sequence`；同一 stream 的序号由事务性计数行锁分配并与业务事务一并回滚，使已提交事件流可检测缺口。Inbox 使用两把独立且 tenant-scoped 的唯一键：业务键 `(tenant_id, producer_id, stream_id, source_sequence)` 和事件键 `(tenant_id, event_id)`；不得用非事务序列值解释已提交事件间的跳号。只有这两把键均解析到同一条已存 Inbox 记录且该记录 canonical digest 与收到的 digest 一致，才允许返回 exact replay 回执。
+Identity/Auth owner 是设备撤销事实的唯一生产者。设备 generation/status、refresh-family 更新及适用审计在 Identity/Auth owner 的事务中提交或回滚；event contract 为 `READY` 后，只有设备 generation 推进时才在同一事务写设备授权 Outbox 事件，普通 refresh-token 轮换不产生此类事件。READY 前的 generation 推进不写设备授权事件，只作为切换基线；READY 后新 binding 的 activation 以 generation 1 与 floor 0 同事务提交。设备授权事件不增加额外 counter 表或锁：`source_sequence` 等于 binding 当前 `generation`，其语义由“READY 后每次授权相关 generation 推进恰好写一个事件”保证。READY 前创建（包括 enrollment）的 binding 保持 NULL floor，切换后首次 snapshot/授权变更/backfill 才以当时 generation G 建立 baseline；不回放或伪造历史事件。generation 溢出或 READY 后无法保证同事务事件时拒绝状态变更并 fail closed。Inbox 使用两把独立且 tenant-scoped 的唯一键：业务键 `(tenant_id, producer_id, stream_id, source_sequence)` 和事件键 `(tenant_id, event_id)`。只有这两把键均解析到同一条已存 Inbox 记录且该记录 canonical digest 与收到的 digest 一致，才允许返回 exact replay 回执。
 
 规范事件至少含 `event_type`、`schema_version`、opaque `tenant_id/actor_id/device_id`、`producer_id`、`stream_id`、`source_sequence`、新 generation/status、`occurred_at`、`correlation_id`、`idempotency_key` 与 canonical metadata digest。Digest 对 canonical metadata event bytes 计算。事件/日志不得包含 token、私钥/证明、协作正文、明文 DEK、敏感请求 body 或这些内容的未保护摘要。未知 schema/event type 不可更新授权投影，必须走可审计的拒绝/隔离路径。
 
@@ -49,9 +49,60 @@ Collaboration consumer 先由认证 transport/producer context 确定 tenant sco
 
 source sequence 是业务顺序，transport cursor 是 adapter 提供的不透明恢复位置，两者不可混用。Outbox 首次 claim 固定 provider/version/profile digest/endpoint identity 和 log generation；持久回执保存 opaque durable cursor 与 canonical wire digest，重试沿用首次绑定的 profile。切换 transport 前 drain 原 profile 的待发事件并显式迁移；禁止跨 provider 比较 cursor/log generation 或复用 dedupe window。
 
-检测 source sequence gap、过期/不匹配 cursor、Outbox retention 缺口、未知 schema 或授权源不可用时，consumer 暂停应用后续投影并将相关 scope 视为授权未知/失效；通过有界 replay 或向权威 Identity/Auth owner 请求 snapshot recovery。恢复完成前不得依据陈旧投影允许协作操作；权威状态无法确认则 fail closed。事件可加速 SSE 关闭与缓存失效，但不能替代每次请求的实时身份、generation 与 Project/Run capability 复验。
+检测 source sequence gap、过期/不匹配 cursor、历史归档不可读、未知 schema 或授权源不可用时，consumer 暂停应用后续投影并将相关 scope 视为授权未知/失效；先按有界 replay 修补，只有 bootstrap floor/过期 checkpoint 要求时才以权威 snapshot 重建当前投影。已启用序列中出现无法解释的 gap 是完整性异常，snapshot 不得静默掩盖该异常：持久审计告警并暂停对应 stream，直到 owner 修复确认。恢复完成前不得依据陈旧投影允许协作操作；权威状态无法确认则 fail closed。事件可加速 SSE 关闭与缓存失效，但不能替代每次请求的实时身份、generation 与 Project/Run capability 复验。
 
-消费者/relay 的 `max_event_bytes`、batch、in-flight、retry/backoff、队列、dedupe retention、恢复窗口与租户配额由版本化 profile 固定，retention 须覆盖已批准的重试、恢复及备份恢复窗口。缺少 profile/预算时 fail closed，不用内存队列冒充 durable acceptance。NOTIFY/SSE 只能唤醒 durable log 消费者，不能成为事件真相。Neon/Vercel 与 Multipass 管理的 K3s 为独立部署/验收路径；本地测试 inventory 最多 2 个实例，这不构成 HA 证明。
+消费者/relay 的 `max_event_bytes`、page/batch、in-flight、retry/backoff、队列、Work TTL、恢复窗口与租户配额由版本化 profile 固定。Transaction 事件、Inbox identity receipt 与 quarantine 不自动 TTL/物理删除；低频 metadata-only 的 append-only 成本需通过分区/索引与存储预算管理。Work checkpoint/projection/lease/delivery 状态按批准 TTL 过期；缺失 checkpoint 时 snapshot bootstrap，缺少 profile/预算时 fail closed，不用内存队列冒充 durable acceptance。NOTIFY/SSE 只能唤醒 durable log 消费者，不能成为事件真相。Neon/Vercel 与 Multipass 管理的 K3s 为独立部署/验收路径；本地测试 inventory 最多 2 个实例，这不构成 HA 证明。
+
+### 2.5.1 权威 Snapshot/Replay API 与服务授权
+
+Identity/Auth owner 暴露 transport-neutral 的版本化应用接口；REST、gRPC 或未来 Star Rust transport 只能作为 adapter，不改变语义。当前 contract 形状如下，属于目标 DTO，尚无 route/handler：
+
+```text
+DeviceAuthorizationSnapshotRequestV1 { device_id }
+DeviceAuthorizationSnapshotV1 {
+  device_id, status, generation,
+  through_source_sequence, replay_floor, policy_version
+}
+DeviceAuthorizationReplayRequestV1 { device_id, after_source_sequence }
+DeviceAuthorizationReplayPageV1 {
+  events[], next_after_source_sequence, high_watermark,
+  replay_floor, has_more, reset_required
+}
+```
+
+`replay_floor` 是 Identity/Auth owner 在 `oauth_device_bindings.authorization_event_replay_floor` 持久化的每-device-stream 基线，不是 consumer cursor，也不由 `MAX(outbox.sequence)` 临时猜测。READY 后新建的 binding 在 generation 1 activation event 前写入 floor `0`；READY 前创建（包括 enrollment）的 binding 保持 NULL，不得把它们描述为已有 generation 1 Outbox 事件。旧 writer 全部停止、既有 DB session drain/关闭且旧 writer 凭据撤销前，契约 readiness 必须保持 `NOT_READY`；此时事件 API/consumer 关闭，禁止 snapshot、首次 mutation 或 backfill 初始化 floor。控制关系切至 `READY` 后，所有 generation writer 已升级且不能由旧进程重连。Ready gate 在 `identity_device_authorization_event_contract` 中版本化；每次 generation mutation、floor initialization/backfill 事务按固定顺序先以共享锁读取该 control row，再锁 binding row；READY 转换取得独占行锁，等待兼容 writer 在途事务结束后提交。NOT_READY 时可以完成普通授权写入，但不得初始化 floor/发布事件；这些变化由首个 post-READY baseline 吸收；READY 后所有 generation 变更必须同事务推进 generation 并追加 Outbox，失败即回滚。
+
+READY 后的旧 binding 可由首次 snapshot、首次授权相关 generation 变更或可选 backfill 初始化：事务先锁 control row、再锁 binding row；若 floor 为 NULL，初始化前还必须确认该 stream 没有已存 Outbox 事件，否则按完整性异常审计并 fail closed，禁止用 snapshot 掩盖。通过检查后读取当前 generation `G` 并将 floor 置为 `G`。授权变更继续在此事务内推进至 `G+1` 并写 source sequence=`G+1` 的 Outbox 事件；snapshot 则以同一写事务返回 state、watermark=`G` 与 floor=`G`。因此变更先取得 binding lock 时会先定 floor 并原子写事件；snapshot/backfill 先取得 binding lock 时会先定 floor，随后变更写下一序号事件，不存在 floor 初始化与 generation 变化之间的无事件窗口。backfill 对每行按此规则处理，已非 NULL 的 floor 不覆盖/前移。未知/null floor、lock/Outbox 失败时该操作 fail closed；READY 后 floor 不得回退或自动推进。消费者以 snapshot state 建立 checkpoint 后从 `after_source_sequence=through_source_sequence` 开始 replay。Replay 请求 `after_source_sequence < replay_floor` 返回 `reset_required`；对允许的请求，事件序列必须覆盖 `after_source_sequence+1..high_watermark` 连续范围（已归档记录仍须可读），任何内部缺口均为完整性异常并 fail closed。Outbox transaction facts 不设置自动 TTL；若记录/归档不可读，不得提高 floor 来掩盖缺失。
+
+`tenant_id` 取自由所选认证 adapter 验证的 Star service principal scope；如果 adapter 传入 tenant，只作为一致性检查，不可作为授权输入。caller 必须有固定 `service_id` 和 `identity.device_authorization.read` capability/audience；该 capability 不授予设备修改、任意 Identity 查询或跨 tenant 扫描。Identity API 在访问 binding/Outbox 前检查服务身份、profile、capability 与 tenant scope；失败统一返回不可枚举错误。这里定义的是 proposed adapter contract：mTLS 可作为一种传输身份机制，但具体机制、现有 Rust adapter 是否满足要求及其可复用范围都待源码和威胁模型核验；本设计不假设已有 mTLS peer/service identity 实现。所有 adapter 必须映射到版本化 Service Identity Profile。禁止 Agent、Plugin、任务 CLI 或浏览器用户直接使用该内部 capability。
+
+若 control row 非 `READY`，snapshot/replay API 返回不可用且不得初始化 floor。READY 后，NULL-floor snapshot 必须使用可写 Identity/Auth owner transaction：按 control→binding lock order 获取锁，检查 Outbox 尚无该 stream 事件，以 `UPDATE ... RETURNING`/等价原子 DML 将 floor 设置为当前 generation，再从该写事务返回 state、`through_source_sequence` 与 floor；这一步将 READY 前已有状态作为 baseline，不产生历史事件。发现已有事件但 floor=NULL 时审计完整性异常并 fail closed。只有 floor 已初始化后，snapshot 才可用单一 SQL statement 或 read-only `REPEATABLE READ` transaction 读取 binding state、generation、floor，因此 `generation == through_source_sequence`。消费者先 snapshot，再 `replay(after=through_source_sequence)`；提交间发生的新撤权必出现在后续 replay 中。Replay 严格按 source sequence 升序，服务器端限制行数和总字节；请求水位大于当前 generation 为无效恢复请求，低于 `replay_floor` 返回 `reset_required` 而不返回局部猜测数据。READY 后新 binding 的 enrollment/activation event 从 sequence 1 发出且 floor 为 0；READY 前 enrollment 的状态由首次 post-READY baseline 吸收。激活后出现的序号缺口不是正常 retention 行为，须作为 owner 完整性异常审计并暂停；append-only 事件可转冷分区但不可丢弃或降低可恢复性。
+
+### 2.5.2 Lease、顺序消费与持久 Checkpoint
+
+Identity/Auth `DeviceAuthorizationPolicyV1` 定义最大撤权 freshness lease；Collaboration `CollaborationRuntimeProfileV1` 可以给更短的本地上限，effective lease 取两者最小值。事件到达可提前失效缓存或关闭 SSE，但不能单独延长 lease；续租需重新读取权威设备状态。lease 不授权业务读写，所有 Project/Run API 都重新检查当前身份、generation/status 与业务 capability。到期且 Identity/Auth 不可用时，关闭 live stream、将共享内容置为不可用并保留本地草稿。
+
+Collaboration checkpoint 仅推进已连续提交的 source sequence。每条 `(tenant_id, producer_id, stream_id)` 同时最多一个事件正在应用；N+1 先到时 consumer 从 `applied_source_sequence` 发起 bounded replay 补齐 N，未补齐前不应用 N+1、不 ACK 且不前移水位。恢复预算耗尽时只暂停该 stream 并背压，其他 stream 按公平并发预算继续。接收事务将 Inbox、幂等回执、授权投影、连续水位和需要的 Collaboration Outbox 一起提交后才 ACK；提交后 ACK 丢失通过双键 exact replay 收敛。checkpoint 过期/丢失后不恢复旧 provider cursor，必须取得 snapshot，重置本地水位并以新的 pinned profile 建立订阅。
+
+若 snapshot 已把 checkpoint 推进至 watermark `W`，随后才到达经过 producer 身份、tenant、schema 与 digest 验证且 `replay_floor < source_sequence <= W` 的延迟事件：若其双键与 digest 精确匹配已存 Inbox 行，按 exact replay 幂等确认；若尚无对应 Inbox 行，则在 Collaboration owner 事务中追加 `superseded_by_snapshot` Inbox receipt 后确认，不改变授权投影，也不降低或重置 checkpoint。低于或等于 replay_floor 的事件不可能属于已启用的 event stream，必须 quarantine。业务键/event_id 映射冲突、digest 不同或未知 schema 仍须 quarantine；绝不能以旧事件回滚 snapshot 状态。receipt 提交后才 ACK。
+
+### 2.5.3 目标物理关系、RLS 与授权
+
+以下关系名与 key/index/grant 是 implementation target，不是现有 DDL；新 migration 前须完成 DDD/RLS review。所有 tenant-bearing 表 `ENABLE` + `FORCE ROW LEVEL SECURITY`，应用 role 不具备 `BYPASSRLS`；global event-contract control relation 也必须 FORCE RLS 并由已认证 service scope 限定。可信认证 adapter 在事务内设置 tenant/actor/service scope；不得从不可信 payload 直接设置。跨 owner 不授予数据库读写权，只经认证 API/事件传输协作。
+
+| Owner / relation | W/T/M | 主键/索引与保留 | 最小 grant |
+|---|---|---|---|
+| Identity `identity_device_authorization_event_contract` | M | 单例、版本化 `NOT_READY/READY`、writer contract/release digest 与 cutover audit reference；READY 单向；旧 writer drain/credential revoke 前不得 READY。FORCE RLS 由 Identity/Auth control-plane service scope 限制；无 TTL。 | Identity/Auth runtime `SELECT/lock`；release control-plane only `UPDATE`; no tenant/client access |
+| Identity `oauth_device_bindings` | M | 现有 binding PK/tenant+actor RLS；目标新增 per-device `authorization_event_replay_floor`。新 binding=`0`；READY 后仅当不存在既存 stream 事件时，存量 NULL floor 可由 snapshot、首次授权变更或可选 backfill 在绑定行锁下设为当时 generation，之后不可回退/前移；发现事件但无 floor 时 fail closed。 | OAuth owner `SELECT/UPDATE`；认证内部 API 经 OAuth owner 按授权 tenant读取，无跨 tenant access |
+| Identity `oauth_device_authorization_outbox` | T | PK `(tenant_id,event_id)`；UNIQUE `(tenant_id,producer_id,stream_id,source_sequence)`；按 tenant/stream/sequence 读取；metadata-only、append-only、无自动 TTL | OAuth owner `INSERT/SELECT`；专用 relay 按 tenant `SELECT`，无 UPDATE/DELETE |
+| Identity `oauth_device_authorization_delivery_work` | W | PK `(tenant_id,event_id,receiver_service_id)`；pending partial index `(next_attempt_at,created_at)`；保存 first-claim route pin、lease/retry；终态 receipt 先落 T，再按批准 TTL 清理 | relay 仅限事务 claim/renew/settle 与受控 cleanup |
+| Identity `oauth_device_authorization_delivery_receipt` | T | PK `(tenant_id,event_id,receiver_service_id)`；固定 provider/version/profile digest/endpoint/log generation、opaque durable cursor、canonical wire digest；append-only、无 TTL | relay `INSERT/SELECT`；OAuth owner read-only |
+| Collaboration `collaboration_device_authorization_inbox` | T | PK `(tenant_id,event_id)`；UNIQUE `(tenant_id,producer_id,stream_id,source_sequence)`；digest/处理结果 metadata（包括 `superseded_by_snapshot`）；append-only、无 TTL | Collaboration consumer `INSERT/SELECT`，无 UPDATE/DELETE |
+| Collaboration `collaboration_device_authorization_quarantine` | T | tenant-scoped event/业务身份、分类、digest 与 alert-intent key；按 tenant/stream/received time 检索；append-only、无 TTL | consumer `INSERT/SELECT`；运维告警 relay 只读可发送意图，不读其他 tenant |
+| Collaboration `collaboration_device_authorization_projection` | W | PK `(tenant_id,device_id)`；状态、generation、last-confirmed、expires-at；可重建，lease 过期即未知/拒绝，按批准 TTL cleanup | Collaboration owner `SELECT/UPSERT`; no direct grant to clients |
+| Collaboration `collaboration_device_authorization_checkpoint` | W | PK `(tenant_id,producer_id,stream_id)`；contiguous sequence、provider/version/profile digest/endpoint/log generation/opaque cursor、expiry；缺失或过期触发 snapshot | Collaboration consumer `SELECT/UPSERT`; cleanup role only past-TTL DELETE |
+
+T relation 不物理删除，backup/冷分区须保留读取与审计能力；不得按时间 drop partition。W relation 必须写出 `expires_at` 与版本化保留来源；cleanup 只删除已过期且 owner 确认可恢复的数据。所有 grant、RLS policy、index 与 TTL 必须在目标 PostgreSQL/Neon 以非 superuser 应用 role 实际验收；当前没有该 migration，以上状态仍是设计/NOT_RUN。
 
 ## 3. Envelope 数据与密码学契约
 
@@ -153,4 +204,4 @@ owner-event / Outbox / Inbox 错误按通用可恢复状态返回；双 identity
 | v0.5 | 2026-10-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步当前 dev 基线 Canvas SSE 设备撤销单用例 PG18.6 acceptance（run 6d23b8ceb1f0499091885c42271c2fb0）与 Rust 1.99.0 focused build，保留其本地 superuser/test-only/unsigned 限制；生产授权、HTTP audit、恢复、多实例、性能和部署门继续 OPEN。 | 当前 dev focused acceptance 与 DD 实现状态复核。
 | v0.6 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将当前 Canvas SSE 撤销状态同步到最新可核验 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39（候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac，已包含于 dev@0e977306a1aafb031557d28d7fd19795297dd027）；保留原测试专属权限、无签名证明及生产未验收限制。 | W16-A 规范文档 rebase 到当前 dev 并复核最新 acceptance 报告。 |
 | v0.7 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正模块所有权表与撤销段落冲突，新增 owner-local Outbox/Inbox、事件 identity/schema、at-least-once 与 commit-before-ack、cursor/provider 绑定、序列缺口/过期恢复、安全载荷和资源 profile 设计及其验证门；不表示实现或目标拓扑通过。 | W16 Outbox owner-contract review 与 SRS/BD/TD 一致性核对。 |
-| v0.8 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冻结 Inbox 双唯一身份键必须映射到同一记录及 digest 相同的 exact replay 条件；定义两种键错配/异摘要的 durable quarantine、运维告警意图、隔离 commit-before-ACK、失败时有界重试/暂停、唯一冲突的 tenant-RLS 分类和防租户存在性泄漏；新增验收断言但未实现/运行。 | 协调者独立审查指出原文未充分约束双键映射、poison ACK 和 quarantine 存储失败。 |
+| v0.9 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 冻结 `source_sequence=device_generation` 与 READY 后每次授权状态推进一对一；READY 前状态只纳入 baseline、不补造事件；legacy writer/session drain 后的 readiness control、绑定行锁下的新/存量 replay-floor 初始化及 mutation/snapshot/backfill 并发边界、NULL-floor snapshot 写事务与已有 floor 的只读路径、待验证的服务授权 adapter contract、原子 watermark snapshot、bounded replay、Identity/Auth lease 上限、连续 per-stream checkpoint、snapshot 后延迟旧事件的幂等接收与不回退投影规则、gap fail-closed 与物理 relation/index/RLS/grant/TTL 草案；明确普通 refresh-token 轮换不产生设备授权事件；无实现、DDL 或新验收。 | W16 implementation-decision review 与当前源码边界核对。 |
