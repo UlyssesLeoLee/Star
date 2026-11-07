@@ -11,7 +11,7 @@
 | [Stable Release WBS](../implementation-plans/WBS-STAR-STABLE-RELEASE-20261031.md) | 追加 W2 归档元数据与 Cargo 1.99.1 缺口；记录 W4/W8 brief-only；链接当前 VCD-0 review。 | W2 OPEN/BLOCKED；W4 OPEN/BLOCKED；W6 ADAPT/OPEN；W8 OPEN；v1.0.6 NO-GO。 |
 | [Worktree Group WBS](../implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md) | 更新 W16 owner boundary、WLD-7 活跃引用，增加 §23.16 当前快照和后续顺序。 | W16/WLD-7 保持 OPEN/PARTIAL/NOT_RUN；TD 引用漂移单列为待修。 |
 | [VCD-0 current-dev review](../reviews/WBS-VCD0-CURRENT-DEV-REVALIDATION-20261106.md) | 将基线更新至 fb6fbb7，记录 ancestry 384/5；保留不接纳候选提交结论。 | W6 ADAPT/OPEN；候选 5 个独有提交不接纳。 |
-| 本阶段报告 | 记录证据来源、验证范围、已知缺口与守门项。 | 文档同步不关闭任何产品或发行门。 |
+| 本阶段报告 | 记录证据来源、验证范围、已知缺口、守门项及集成/清理结果。 | 本 lane 已独立审阅并 fast-forward 到本地 dev；不关闭任何产品或发行门。 |
 
 W2 归档只引用已审阅的 archive metadata hashes；未打开归档 Cargo.lock。W16 owner 建议来自[2026-11-06 review](PHASE-W16-OUTBOX-OWNER-CONTRACT-REVIEW-20261106.md)。
 
@@ -23,6 +23,8 @@ W2 归档只引用已审阅的 archive metadata hashes；未打开归档 Cargo.l
 - 当前 WLD-7 设计头核对为 requirements v7.08、basic v7.12、Group DD v5.33、collaboration spec v1.2、data design v0.4、test design v2.2。Spec/data 仍引用 test design v1.7；该项记录为未修复的来源文档漂移。
 - 本次新增的 6 个相对 Markdown 链接均存在（6/6）：Stable W6 review、Group W16 review 与 phase report 的 4 个引用目标。
 - rtk proxy git diff --check：通过，exit code 0，无 whitespace error 输出。
+- 集成结果：lane `codex/wbs-current-dev-audit-sync-20261106` 的三个提交在 `dev@fb6fbb7bddbd2af605b97d70b4e394539b01fe0d` 未变化且工作树干净时，经 `--ff-only` 集成；lane tip 为 `5d022c273b16e4aaec9558d8e9c4b7e5b61b71d2`。合入范围与六文件 manifest 完全一致，合入后 `git diff --check` 通过。
+- 收敛结果：MAGOS lane claim 已释放；Orca 正常移除已合并工作树并删除已合并的本地 lane branch。最终复核时 dev 工作树干净，main 仍为 `02e0cbd8f87a8422100d4fdd83d54e7838ab1fff`；其他工作树、远端与 `main` 均未修改。
 - 未运行 Cargo、应用测试、数据库/RLS、Vercel、Multipass/K3s、构建、hosted workflow、artifact、release、部署或性能测试；未 fetch/push、修改 main 或合并候选。
 
 ## §3 已知缺口
@@ -36,7 +38,7 @@ W2 归档只引用已审阅的 archive metadata hashes；未打开归档 Cargo.l
 
 ## §4 子代理失败接手清单
 
-本 lane 由协调者派发独立写入 worker 子代理完成文档修改与局部检查；没有其它子代理产出或失败需要接手。父层独立审查及后续集成仍待协调者执行。
+本 lane 由协调者派发独立写入 worker 子代理完成文档修改与局部检查；Orca Codex launch 因 agent disabled 未启动，精确重试无副作用，随后 worker 子代理完成并提交。父层协调者独立审阅六文件 manifest、文档差异、链接、lane/target HEAD 与工作树状态后，以 `--ff-only` 集成；MAGOS claim 已释放，Orca 已正常回收 lane 工作树和分支。无待接手的代理输出。
 
 ## §5 守门规则
 
@@ -56,7 +58,7 @@ W2 归档只引用已审阅的 archive metadata hashes；未打开归档 Cargo.l
 | 架构 / 报告审阅 | 架构师（Mavis 接手 agent per DEC-008）；本报告仅审阅文档同步与证据边界。 |
 | SRE Lead | 未执行宿主、数据库、部署或恢复操作；不在本 lane 签署范围。 |
 | 平台 | 未实施事件传输或运行时；不在本 lane 签署范围。 |
-| 评审主持 | 提交前由父层协调者独立审阅差异与证据。 |
+| 评审主持 | 父层协调者已独立审阅差异与证据，并完成本地 dev fast-forward 集成。 |
 | PM | 稳定版仍 NO-GO；release owner 责任与既有用户决策不变。 |
 | 修订人 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。 |
 
@@ -65,3 +67,4 @@ W2 归档只引用已审阅的 archive metadata hashes；未打开归档 Cargo.l
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 首次同步当前 dev WBS/WLD-7/VCD-0 状态；保留未执行与未验收边界。 | 当前 dev 与 WBS 状态需要复核同步。 |
+| v0.2 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 main 五个独有提交均为 dev 已有的 patch-equivalent；记录本 lane 三个提交 fast-forward 到 dev@5d022c27，并完成 MAGOS claim、worktree 与 branch 清理；产品/发行验收状态保持开放。 | 父层独立审阅、集成及收敛完成。 |
