@@ -1,7 +1,7 @@
 # VCD-0 Candidate Revalidation Against Current Dev
 
-**Review date:** 2026-11-06
-**Target:** local `dev@d95fbfe315625e028110b5ae6ff9d8f1255de0d9`
+**Review date:** 2026-11-07
+**Target:** local `dev@fb6fbb7bddbd2af605b97d70b4e394539b01fe0d`
 **Candidate:** `codex/vcd0-canonical-detail-test-20261024@4f0ceae9818b7bd2b3b25d9164d6e43303121689`
 **Disposition:** **ADAPT — do not merge the stale candidate commits.**
 
@@ -13,7 +13,7 @@ Revalidate the VCD-0 candidate against current `dev` and record what remains ope
 
 | Review area | Current evidence | Decision |
 |---|---|---|
-| Candidate freshness | `dev` is 380 commits ahead of the candidate and the candidate has 5 commits absent from `dev`. The candidate only carries Vercel DD/TD documents; its DD and TD identify themselves as v0.1. Current dev uses SRS v0.4, ADR v0.2, BD v0.3, DD v0.3, and TD v0.4. | **Not a drop-in.** Do not cherry-pick the candidate's five commits. Adapt only individually reviewed ideas to current canonical documents. |
+| Candidate freshness | `dev` is 384 commits ahead of the candidate and the candidate has 5 commits absent from `dev`. The existing 2026-11-06 review records that the candidate carries Vercel DD/TD documents and those candidate documents identify as v0.1; this lane did not reopen candidate source files. Current dev uses SRS v0.4, ADR v0.2, BD v0.3, DD v0.3, and TD v0.4. | **Not a drop-in.** Do not cherry-pick the candidate's five commits. Adapt only individually reviewed ideas to current canonical documents. |
 | Project and resource ownership | Current decisions keep Star as the Project/Run authority, allow 0..N repositories, support Runs without a host Branch, keep provider association optional, and require migrate-before-unlink for an active repository. | The candidate does not fully trace these states into the Vercel authorization and acceptance paths. Add the existing SRS/BD/DD identifiers to the VCD-0 trace; do not create a second owner or make a host identity a prerequisite. |
 | Remote interaction boundary | Current tests distinguish the terminal/PTY path, remote file-browser, noVNC, Canvas channels, and chat SSE. T-049 is a transport/session check and requires an authenticated principal without target Run capability to see no protected data. | The candidate's route and acceptance text is not aligned with the latest route/security decisions. Resolve Gateway versus route-handler placement and specify fresh authorization, Origin/session checks, revocation, cancel, disconnect, and bounded reconnect recovery before marking the path ready. |
 | Multi-user collaboration | The current collaboration contract requires owner-committed push events, bounded wake-up delivery, durable cursor catch-up only after a gap/reconnect, both users' saved drafts, shared conflict identity, and participant-authorized counterpart diffs. | The candidate is not end-to-end collaboration evidence. Keep the existing WLD/W16 acceptance as the source and do not use a successful SSE handshake as proof of durable collaboration. |
@@ -24,9 +24,9 @@ The broader historical comparison is retained in [WBS-VCD0-CURRENT-DEV-INTEGRATI
 
 ## §2 Verification summary
 
-- Read-only Git comparison confirmed target `dev@d95fbfe315625e028110b5ae6ff9d8f1255de0d9`, candidate `4f0ceae9818b7bd2b3b25d9164d6e43303121689`, a 380/5 commit divergence, and the current versus candidate DD/TD headers.
-- Current canonical document headers were read directly: SRS v0.4, ADR v0.2, BD v0.3, DD v0.3, TD v0.4. Candidate DD/TD are v0.1.
-- The current-dev W6 row and VCD-0 historical review were compared. The row already keeps multi-repository/hostless Run, optional provider association, Neon/Owner/RLS, collaboration, and hosted deployment gates open; this revalidation adds a current-baseline report link.
+- Read-only Git ancestry comparison on 2026-11-07 confirmed target `dev@fb6fbb7bddbd2af605b97d70b4e394539b01fe0d`, candidate `4f0ceae9818b7bd2b3b25d9164d6e43303121689`, and a 384/5 divergence. Candidate source files were not reopened; the candidate DD/TD freshness statements remain attributed to the existing 2026-11-06 review.
+- Current canonical Vercel document headers were read directly: SRS v0.4, ADR v0.2, BD v0.3, DD v0.3, TD v0.4. The candidate DD/TD v0.1 finding is inherited from the existing 2026-11-06 review and was not reverified by opening candidate files.
+- The W6 row on this current dev base and the existing VCD-0 review were compared. The row keeps multi-repository/hostless Run, optional provider association, Neon/Owner/RLS, collaboration, hosted deployment, consumer, and rollback gates open; this revalidation adds a current-baseline review link.
 - No Node/Rust tests, database migration, PostgreSQL/RLS test, Vercel deployment, Multipass/K3s operation, hosted workflow, artifact build, consumer check, or rollback was run in this review.
 
 ## §3 Known gaps and next work
@@ -75,3 +75,4 @@ The prior bounded VCD-0 review was read-only and completed. This revalidation wa
 | Version | Date | 修订人 | Change | Trigger |
 |---|---|---|---|---|
 | v0.1 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Revalidate VCD-0 candidate freshness against `dev@d95fbfe3`; retain ADAPT, reject stale commits, and preserve hosted/runtime release gates. | Stable-release W6 continuation and current-dev comparison. |
+| v0.2 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Updated the review target to local dev@fb6fbb7 and refreshed Git ancestry to 384 commits ahead / 5 candidate-only. Kept the stale candidate rejected; candidate file claims remain attributed to v0.1 and were not re-read. W6 stays ADAPT/OPEN and v1.0.6 stays NO-GO. | Current-dev WBS revalidation on the exact assigned base; read-only Git ancestry check |
