@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=eb83f367aa1ec0925b86d4da9b9902d2f6a5fdce90e079cfc2937ec84c820d70
+@cypher schema=1 source_sha256=3d251bf9b8b9c8be1d9d9d90499b5b0079ea5d1b396f2dc3a8c00bd8f02090c3
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
@@ -10,6 +10,8 @@ MERGE (rollback_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_
 MERGE (database_url_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::DATABASE_URL_ENV",kind:"constant"})
 MERGE (database_name_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::DATABASE_NAME",kind:"constant"})
 MERGE (commit_function_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::COMMIT_FUNCTION",kind:"constant"})
+MERGE (query_function_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::QUERY_FUNCTION",kind:"constant"})
+MERGE (quarantine_function_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::QUARANTINE_FUNCTION",kind:"constant"})
 MERGE (commit_sql_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::COMMIT_SQL",kind:"constant"})
 MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::disposable_pool",kind:"function"})
 MERGE (identity:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_database_identity",kind:"function"})
@@ -24,11 +26,14 @@ MERGE (call_commit:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_ru
 MERGE (database_url_env:Config {id:"STAR_BI_TASK_EVENT_TEST_DATABASE_URL",kind:"environment_variable"})
 MERGE (database_name:Database {id:"star_bi_task_event_test",kind:"disposable_test_database"})
 MERGE (commit_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
+MERGE (query_fn:Database {id:"bi.list_task_event_page_v1",kind:"stored_function"})
+MERGE (quarantine_fn:Database {id:"bi.record_task_event_quarantine_v1",kind:"stored_function"})
 MERGE (runtime_role:Config {id:"star_bi_runtime",kind:"postgres_role"})
 MERGE (owner_role:Config {id:"star_bi_owner",kind:"postgres_role"})
 MERGE (inbox:Table {id:"bi.task_event_inbox",class:"Transaction"})
 MERGE (fact:Table {id:"bi.task_event_fact",class:"Transaction"})
 MERGE (incident:Table {id:"bi.task_event_integrity_incident",class:"Transaction"})
+MERGE (quarantine_table:Table {id:"bi.task_event_quarantine",class:"Transaction"})
 MERGE (rust_std:ExternalService {id:"rust::std",kind:"standard_library"})
 MERGE (chrono:ExternalService {id:"chrono",kind:"crate"})
 MERGE (serde_json:ExternalService {id:"serde_json",kind:"crate"})
@@ -42,6 +47,8 @@ MERGE (self)-[:DEFINES]->(rollback_test)
 MERGE (self)-[:DEFINES]->(database_url_constant)
 MERGE (self)-[:DEFINES]->(database_name_constant)
 MERGE (self)-[:DEFINES]->(commit_function_constant)
+MERGE (self)-[:DEFINES]->(query_function_constant)
+MERGE (self)-[:DEFINES]->(quarantine_function_constant)
 MERGE (self)-[:DEFINES]->(commit_sql_constant)
 MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(identity)
@@ -64,6 +71,8 @@ MERGE (connect)-[:CALLS]->(identity)
 MERGE (identity)-[:READS]->(database_name_constant)
 MERGE (identity)-[:TESTS]->(database_name)
 MERGE (contract)-[:READS]->(commit_function_constant)
+MERGE (contract)-[:READS]->(query_function_constant)
+MERGE (contract)-[:READS]->(quarantine_function_constant)
 MERGE (runtime_principal)-[:TESTS]->(commit_fn)
 MERGE (call_commit)-[:READS]->(commit_sql_constant)
 MERGE (privilege_test)-[:CALLS]->(connect)
@@ -78,11 +87,14 @@ MERGE (rollback_test)-[:CALLS]->(connect)
 MERGE (rollback_test)-[:CALLS]->(runtime_principal)
 MERGE (rollback_test)-[:CALLS]->(rollback)
 MERGE (contract)-[:TESTS]->(commit_fn)
+MERGE (contract)-[:TESTS]->(query_fn)
+MERGE (contract)-[:TESTS]->(quarantine_fn)
 MERGE (contract)-[:TESTS]->(runtime_role)
 MERGE (contract)-[:TESTS]->(owner_role)
 MERGE (contract)-[:TESTS]->(inbox)
 MERGE (contract)-[:TESTS]->(fact)
 MERGE (contract)-[:TESTS]->(incident)
+MERGE (contract)-[:TESTS]->(quarantine_table)
 MERGE (tenant_mismatch)-[:CALLS]->(fixture_new)
 MERGE (tenant_mismatch)-[:CALLS]->(call_commit)
 MERGE (rollback)-[:CALLS]->(fixture_new)
@@ -106,6 +118,8 @@ use uuid::Uuid;
 const DATABASE_URL_ENV: &str = "STAR_BI_TASK_EVENT_TEST_DATABASE_URL";
 const DATABASE_NAME: &str = "star_bi_task_event_test";
 const COMMIT_FUNCTION: &str = "bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea)";
+const QUERY_FUNCTION: &str = "bi.list_task_event_page_v1(uuid,uuid,uuid,timestamptz,uuid,integer)";
+const QUARANTINE_FUNCTION: &str = "bi.record_task_event_quarantine_v1(uuid,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,varchar,varchar,uuid,bigint,uuid,bytea,integer,varchar)";
 const COMMIT_SQL: &str = r#"
     SELECT outcome, receipt_id, committed_at
       FROM bi.commit_task_event_v2(
@@ -209,47 +223,75 @@ async fn require_runtime_principal(pool: &PgPool) {
     .expect("inspect the authenticated BI runtime principal");
     assert!(
         is_runtime,
-        "this probe requires an authenticated BI runtime principal with the fixed commit grant"
+        "this probe requires an authenticated BI runtime principal with the BI commit grant"
     );
 }
 
 async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
     let row = sqlx::query(
         r#"
-        WITH target AS (
+        WITH commit_target AS (
             SELECT to_regprocedure($1)::oid AS function_oid
         ),
+        allowlist AS (
+            SELECT function_oid FROM commit_target
+            UNION ALL
+            SELECT to_regprocedure($2)::oid
+            UNION ALL
+            SELECT to_regprocedure($3)::oid
+        ),
         bi_functions AS (
-            SELECT p.oid
+            SELECT p.oid, p.proacl, p.proowner, p.prosecdef, p.proconfig
               FROM pg_proc AS p
               JOIN pg_namespace AS n ON n.oid = p.pronamespace
              WHERE n.nspname = 'bi'
                AND p.prokind = 'f'
+        ),
+        principals AS (
+            SELECT current_user AS role_name
+            UNION
+            SELECT session_user AS role_name
         )
         SELECT
-            COALESCE((SELECT function_oid IS NOT NULL FROM target), false)
-                AS commit_function_exists,
-            COALESCE((
-                SELECT has_function_privilege(current_user, function_oid, 'EXECUTE')
-                  FROM target
-            ), false) AS runtime_can_execute_commit,
+            (
+                SELECT count(*) = 3 AND COALESCE(bool_and(function_oid IS NOT NULL), false)
+                  FROM allowlist
+            ) AS allowlist_functions_exist,
             NOT EXISTS (
                 SELECT 1
-                  FROM target AS t
-                  JOIN pg_proc AS p ON p.oid = t.function_oid
+                  FROM allowlist AS allowed
+                 WHERE allowed.function_oid IS NULL
+                    OR NOT COALESCE(
+                        has_function_privilege(current_user, allowed.function_oid, 'EXECUTE'),
+                        false
+                    )
+            ) AS runtime_can_execute_allowlist,
+            NOT EXISTS (
+                SELECT 1
+                  FROM allowlist AS allowed
+                  JOIN pg_proc AS p ON p.oid = allowed.function_oid
                   CROSS JOIN LATERAL aclexplode(
                       COALESCE(p.proacl, acldefault('f', p.proowner))
                   ) AS acl
                  WHERE acl.grantee = 0::oid
                    AND acl.privilege_type = 'EXECUTE'
-            ) AS public_cannot_execute_commit,
-            NOT EXISTS (
-                SELECT 1
+            ) AS public_cannot_execute_allowlist,
+            COALESCE((
+                SELECT string_agg(
+                    DISTINCT f.oid::regprocedure::text,
+                    ', ' ORDER BY f.oid::regprocedure::text
+                )
                   FROM bi_functions AS f
-                  CROSS JOIN target AS t
-                 WHERE f.oid IS DISTINCT FROM t.function_oid
-                   AND has_function_privilege(current_user, f.oid, 'EXECUTE')
-            ) AS runtime_cannot_execute_other_bi_function,
+                  CROSS JOIN principals
+                 WHERE COALESCE(
+                           has_function_privilege(principals.role_name, f.oid, 'EXECUTE'),
+                           false
+                       )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM allowlist AS allowed
+                        WHERE allowed.function_oid = f.oid
+                   )
+            ), '') AS runtime_unexpected_bi_functions,
             EXISTS (
                 SELECT 1
                   FROM pg_roles
@@ -260,6 +302,17 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
                    AND NOT rolreplication
                    AND NOT rolbypassrls
             ) AS current_role_is_restricted,
+            EXISTS (
+                SELECT 1
+                  FROM pg_roles
+                 WHERE rolname = session_user
+                   AND rolcanlogin
+                   AND NOT rolsuper
+                   AND NOT rolcreatedb
+                   AND NOT rolcreaterole
+                   AND NOT rolreplication
+                   AND NOT rolbypassrls
+            ) AS session_role_is_restricted,
             pg_has_role(current_user, 'star_bi_runtime', 'MEMBER')
                 AS current_role_is_runtime_member,
             NOT pg_has_role(session_user, 'star_bi_owner', 'SET')
@@ -289,28 +342,33 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
                    AND NOT rolinherit
             ) AS owner_role_is_locked,
             (
-                SELECT count(*) = 3
+                SELECT count(*) = 4
                    AND COALESCE(bool_and(relrowsecurity AND relforcerowsecurity), false)
                   FROM pg_class
                  WHERE oid IN (
                      to_regclass('bi.task_event_inbox'),
                      to_regclass('bi.task_event_fact'),
-                     to_regclass('bi.task_event_integrity_incident')
+                     to_regclass('bi.task_event_integrity_incident'),
+                     to_regclass('bi.task_event_quarantine')
                  )
             ) AS all_tables_force_rls,
-            NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'INSERT')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'UPDATE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'DELETE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_inbox', 'TRUNCATE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'INSERT')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'UPDATE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'DELETE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_fact', 'TRUNCATE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'INSERT')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'UPDATE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'DELETE')
-                AND NOT has_table_privilege(current_user, 'bi.task_event_integrity_incident', 'TRUNCATE')
-                AS no_direct_table_mutation,
+            NOT EXISTS (
+                SELECT 1
+                  FROM principals
+                  CROSS JOIN (VALUES
+                      ('bi.task_event_inbox'),
+                      ('bi.task_event_fact'),
+                      ('bi.task_event_integrity_incident'),
+                      ('bi.task_event_quarantine')
+                  ) AS protected_tables(table_name)
+                  CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'))
+                      AS mutations(privilege_name)
+                 WHERE has_table_privilege(
+                           principals.role_name,
+                           protected_tables.table_name,
+                           mutations.privilege_name
+                       )
+            ) AS no_direct_table_mutation,
             COALESCE((
                 SELECT p.prosecdef
                    AND pg_get_userbyid(p.proowner) = 'star_bi_owner'
@@ -322,38 +380,39 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
                         WHERE settings.setting LIKE 'search_path=%'
                           AND settings.setting = 'search_path=pg_catalog'
                    )
-                  FROM target AS t
+                  FROM commit_target AS t
                   JOIN pg_proc AS p ON p.oid = t.function_oid
             ), false) AS commit_function_has_fixed_security_settings
         "#,
     )
     .bind(COMMIT_FUNCTION)
+    .bind(QUERY_FUNCTION)
+    .bind(QUARANTINE_FUNCTION)
     .fetch_one(pool)
     .await
-    .expect("inspect BI function ACL, runtime roles, table privileges, RLS, and function settings");
+    .expect(
+        "inspect BI function allowlist, principals, table privileges, RLS, and function settings",
+    );
 
     let mut failures = Vec::new();
     for (column, expectation) in [
         (
-            "commit_function_exists",
-            "the fixed BI v2 commit function exists",
+            "allowlist_functions_exist",
+            "all three allowlisted BI functions exist with their fixed signatures",
         ),
         (
-            "runtime_can_execute_commit",
-            "the runtime can execute the fixed BI commit function",
+            "runtime_can_execute_allowlist",
+            "the runtime can execute all three allowlisted BI functions",
         ),
         (
-            "public_cannot_execute_commit",
-            "PUBLIC cannot execute the fixed BI commit function",
-        ),
-        (
-            "runtime_cannot_execute_other_bi_function",
-            "the runtime cannot execute any other BI function",
+            "public_cannot_execute_allowlist",
+            "PUBLIC cannot execute any allowlisted BI function",
         ),
         (
             "current_role_is_restricted",
-            "the authenticated role is restricted",
+            "the authenticated runtime role is restricted",
         ),
+        ("session_role_is_restricted", "the login role is restricted"),
         (
             "current_role_is_runtime_member",
             "the authenticated role belongs to BI runtime",
@@ -372,11 +431,11 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
         ),
         (
             "all_tables_force_rls",
-            "all three BI Task Event tables FORCE ROW LEVEL SECURITY",
+            "all four BI Task Event tables FORCE ROW LEVEL SECURITY",
         ),
         (
             "no_direct_table_mutation",
-            "the runtime has no direct table mutation privileges",
+            "the runtime and login roles have no direct protected-table mutation privileges",
         ),
         (
             "commit_function_has_fixed_security_settings",
@@ -388,6 +447,14 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
             Ok(false) => failures.push(expectation.to_owned()),
             Err(error) => failures.push(format!("{expectation}: {error}")),
         }
+    }
+    let unexpected_functions: String = row
+        .try_get("runtime_unexpected_bi_functions")
+        .expect("read unexpected BI function identities");
+    if !unexpected_functions.is_empty() {
+        failures.push(format!(
+            "runtime principals have EXECUTE on non-allowlisted BI functions: {unexpected_functions}"
+        ));
     }
     failures
 }
