@@ -120,3 +120,7 @@ Do not integrate the eight-commit branch as-is. The review found one P2 behavior
 | Read-only validation | Current diff `--check` passed |
 | Rebase / merge / push / cleanup | None |
 | Decision | Hold for P2 contract fix and dedicated PostgreSQL evidence; keep W8 OPEN |
+
+### Same-path integration guard
+
+The current dev tree already tracks both `docs/briefs/WBS-W8-CANDIDATE-REVIEW-20261025.md` and `docs/reviews/WBS-W8-CANDIDATE-REVIEW-20261025.md`, while this review lane's old base does not. Do not fast-forward or rebase this lane expecting a clean add: both paths need same-path content reconciliation. If accepted, compare current dev's versions and selectively apply only this dated continuation, preserving current dev text and any newer findings.
