@@ -1,6 +1,6 @@
 # PHASE-WBS-STAR-DELIVERY-CLEANUP-20261030
 
-> **状态：OPEN / PENDING EVIDENCE**（2026-10-31）。Runtime、Delivery、Docs 三条已审查 lane 已 rebase 并 fast-forward 集成到本地 dev；当前 D2 maintenance 修复仍在隔离 worktree，尚未集成。四个旧 K3s maintenance 入口已 fail-closed，但发现未登记的 star-api-rest 部署脚本仍可执行；Rust 构建、镜像构建和 K3s 运行验收仍未完成。
+> **状态：OPEN / PENDING EVIDENCE**（2026-11-06）。Runtime、Delivery、Docs 三条 lane 与 D2 maintenance lane 均已审查并 rebase/fast-forward 集成到本地 dev。D2 只关闭四个旧 K3s maintenance 入口；未登记的 star-api-rest 部署脚本仍可执行，Rust 1.99.1 构建、镜像构建和 Multipass K3s 运行验收仍未完成。
 
 > **当前工具链目标复核（2026-11-06）**：用户已指定 Rust 1.99.1 作为目标基线；本 lane 起始 checkout 的 `rust-toolchain.toml` 与根 `Cargo.toml` 仍固定 1.99.0，且本 lane 未修改工具链文件。下方 Rust 1.99.0 metadata 记录是历史证据，不代表 1.99.1 已配置或通过；本阶段尚无 1.99.1 metadata/build 结果。
 
@@ -31,7 +31,7 @@
 | Container build / image identity | 4 Deployments/4 Services；镜像矩阵与 workflow 三个构建目标一致，三个 GHCR image basename 均为 star- 前缀 | 静态 PASS；未执行镜像构建或发布 |
 | Manifest/workflow parse 与 endpoint checks | Workflow、K3s、Kargo YAML parse；Bash 与 PowerShell 解析通过；Canvas guard tests 21 passed | 静态 PASS；K3s 和 endpoint 未运行 |
 | D2 maintenance 静态门 | 本次复核重跑 PowerShell AST 6/6、两个 batch fail-closed/指南引用检查、Multipass cap/lock/inventory/no-auto-purge 源码核对、chart NOTES/templates 核对及 `git diff --check`；旧路径扫描与 CypherGraph freshness 结果沿用 D2 lane 原报告，未在本次重跑。没有执行 Multipass、Docker、kubectl、Helm 或 VM 操作 | 本次复核范围 PASS；旧扫描/graph 结果为 lane 原报告；不代表部署或 build 通过 |
-| 最终 dev 对照 | 此 maintenance lane 基于隔离 worktree 的 dev snapshot `f34866b8`；本 lane 尚未集成。此前三条 lane 已集成；本次未触及 main/remote | 待父级审查与集成 |
+| 最终 dev 对照 | D2 lane 的 rebase/fast-forward 集成点为 `1ce184aecde0c94bab386b4435c39852d00e66b2`；本次阶段证据同步在该集成点之后提交。没有修改 main 或 push | 集成完成；D2/D4 仍 OPEN |
 
 ## §3 已知缺口
 
@@ -46,7 +46,7 @@
 ## §4 子代理失败 / 接手清单
 
 - Runtime、Delivery、Docs lanes 的差异已分别审阅；runtime 发现的旧 CI/K3s 引用由 Delivery lane 原子替换后，三条提交按依赖顺序集成。
-- D2 maintenance lane 的四个旧 K3s 入口已在隔离 worktree fail-closed；需父级独立审阅并决定是否集成。超出 manifest 的 star-api-rest build/deploy 脚本仍列为独立待决项。
+- D2 maintenance lane 的四个旧 K3s 入口已由父级独立审阅并合入 dev；超出 manifest 的 star-api-rest build/deploy 脚本仍列为独立待决项。
 - Cargo 构建阻断、全站 arch-live 数量漂移、镜像/集群验收和桌面 MockDb 跟进已列入 §3。
 
 ## §5 守门规则
@@ -77,3 +77,4 @@
 | v0.3 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Runtime/Delivery/Docs 三条 lane rebase 并 fast-forward 到本地 dev、Star-only 静态验收及 Cargo OS error 225 阻断；阶段保持 OPEN，列出未完成构建、Multipass K3s endpoint、arch-live 计数漂移和桌面 MockDb 跟进 | 完成三条 lane 集成后的验收与 WBS 同步 |
 | v0.4 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D2 maintenance 隔离 lane 的四个旧 K3s 入口 fail-closed 处理；分别列明 (1) 未登记、仍可执行并调用 Docker CLI/本机 k3s/containerd/kubectl 的 API 脚本，(2) 缺少 Deployment/Service templates 但 NOTES 仍误报 8 服务的旧 Chart 文案；两项若影响稳定发行须另行登记。D2 保持 PARTIAL / OPEN；当前 lane 尚未集成，build、发布及真实 K3s endpoint 门保持 OPEN | D2 maintenance 源码审查与活动入口扫描 |
 | v0.5 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Rust 1.99.1 是用户指定的目标基线，同时注明该 lane 起始 checkout 仍固定 1.99.0；将 1.99.0 metadata 与未记录 toolchain 版本的 OS error 225 标为历史证据；当前目标版本 workspace build、镜像、K3s endpoint 与 D2 未登记入口仍开放 | 当前工具链目标与 D2 WBS 证据复核 |
+| v0.6 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 D2 lane 已经父级审查并 rebase/fast-forward 集成到本地 dev；验证范围仅含脚本语法、fail-closed 文本行为、Multipass 静态约束和差异检查。D2/D4 保持 OPEN，未登记 API 脚本、Rust 1.99.1 build、镜像和 K3s endpoint 仍未关闭 | 完成 D2 lane 本地集成与 WBS/阶段报告同步 |

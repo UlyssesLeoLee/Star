@@ -2,7 +2,7 @@
 
 > **状态：PARTIAL / OPEN**（2026-10-31）。四个旧 K3s maintenance 入口已改为 fail-closed；Canvas 部署文档要求使用既有、可达的 K3s context。独立 `star-api-rest` 的旧 `build-and-deploy.sh` 不在本 lane manifest，仍可执行，因此本轮不宣称全部旧部署入口已禁用。
 
-> **当前状态复核（2026-11-06）**：用户已指定 Rust 1.99.1 作为目标基线；该 lane 起始 checkout 的 `rust-toolchain.toml` 与根 `Cargo.toml` 仍固定 1.99.0，且本 lane 未修改工具链文件。因此本 lane 未在目标 1.99.1 上重新运行 workspace metadata/build，D4 继续 OPEN。本 worktree 尚未 rebase/集成，集成状态由协调者复核。
+> **当前状态复核（2026-11-06）**：用户已指定 Rust 1.99.1 作为目标基线；该 lane 起始 checkout 固定 1.99.0，后续 rebase 到 dev 后当前 checkout 使用 1.99.1，但 lane 未运行 workspace metadata/build，D4 继续 OPEN。经父级审查，lane 的两笔提交已 rebase 并 fast-forward 到本地 dev；集成提交为 `1ce184aecde0c94bab386b4435c39852d00e66b2`。
 
 ## §0 目的
 
@@ -44,7 +44,7 @@
 ## §4 子代理失败 / 接手清单
 
 - 本次由独立 worker 接手复核既有 D2 worktree，未重写或清理此前工作；修改限于 WBS 与阶段报告的工具链证据和状态说明。
-- 本 lane 的实现/文档差异仍需父级独立审阅并 rebase/集成；`deploy/k3s-local/build-and-deploy.sh` 的处理由父级结合稳定发布审计评估并单独登记，不由本 lane 擅自扩大范围。
+- 父级已独立审阅 16 个登记路径，检查了 fail-closed 脚本行为、Multipass cap/lock/inventory 静态边界、WBS 与阶段证据，并将 lane rebase/fast-forward 到本地 dev。独立 CodeRabbit 服务未能启动，未计作通过；`deploy/k3s-local/build-and-deploy.sh` 仍在 lane 外，需单独登记审查。
 
 ## §5 守门规则
 
@@ -59,10 +59,10 @@
 
 | 角色 | 结论 |
 |---|---|
-| 架构师 | 本 lane 实现自审完成；父级独立审阅待完成 |
+| 架构师 | 父级独立审阅完成；16 个登记路径已集成，D2 仍保持 PARTIAL / OPEN |
 | SRE Lead | 未进行集群生命周期或部署验收；不声明通过 |
 | 平台 | PowerShell 静态解析通过；Rust/镜像 build 未运行 |
-| 评审主持 | diff、graph 与静态引用门待父级复核 |
+| 评审主持 | 差异、PowerShell AST、batch fail-closed 和 whitespace 检查完成；CypherGraph 与活动路径扫描沿用 lane 报告证据 |
 | PM | D2 保持 PARTIAL / OPEN，等待 API 遗留脚本另行登记与 D4 运行门 |
 
 ## §7 修订历史
@@ -71,3 +71,4 @@
 |---|---|---|---|---|
 | v0.1 | 2026-10-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录四个旧 K3s maintenance 入口 fail-closed、Canvas 部署边界、Multipass inventory invariants 静态核对及 star-api-rest 旧脚本超出 manifest 的已知缺口；未声明 build/runtime 通过 | D2 Multipass maintenance lane 实施与静态审阅 |
 | v0.2 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Rust 1.99.1 为用户指定目标，但此 lane 起始 checkout 仍固定 1.99.0；保持目标版本 metadata/build、镜像、K3s endpoint、未登记 API 部署脚本及旧 Helm NOTES 的缺口开放；记录本 lane 尚待父级独立审阅和集成 | 用户选择工具链目标与 D2 lane 当前状态复核 |
+| v0.3 | 2026-11-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录父级已独立审阅 16 个登记路径、重新运行 AST/batch/diff 检查，并将 lane 两笔提交 rebase/fast-forward 到本地 dev；当前 checkout 使用 Rust 1.99.1，但 D2 lane 未运行 workspace gate；D2/D4 仍开放，未登记 API 部署脚本、镜像和实际 Multipass K3s endpoint 仍未验收 | 完成 D2 lane 审查、集成与工具链状态复核 |
