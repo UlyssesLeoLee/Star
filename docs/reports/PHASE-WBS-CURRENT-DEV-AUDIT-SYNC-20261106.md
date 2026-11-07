@@ -18,6 +18,7 @@ W2 归档只引用已审阅的 archive metadata hashes；未打开归档 Cargo.l
 ## §2 验证摘要
 
 - 固定 worktree HEAD 为 fb6fbb7bddbd2af605b97d70b4e394539b01fe0d。
+- 对本地 `main` 的五个 branch-only commits 执行只读 patch-equivalence 检查：`git cherry -v dev main` 对 `62605314`、`94fdc837`、`21416a7e`、`08e883cf`、`02e0cbd8` 均返回 `-`；这些补丁已存在于 `dev`，本次无需 cherry-pick。未移动或修改 `main`。
 - 只读 ancestry 命令结果：dev...candidate = 384 5；候选 HEAD 为 4f0ceae9818b7bd2b3b25d9164d6e43303121689。未读取候选工作树文件。
 - 当前 WLD-7 设计头核对为 requirements v7.08、basic v7.12、Group DD v5.33、collaboration spec v1.2、data design v0.4、test design v2.2。Spec/data 仍引用 test design v1.7；该项记录为未修复的来源文档漂移。
 - 本次新增的 6 个相对 Markdown 链接均存在（6/6）：Stable W6 review、Group W16 review 与 phase report 的 4 个引用目标。
