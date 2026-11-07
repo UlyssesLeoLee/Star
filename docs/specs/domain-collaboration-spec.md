@@ -1,6 +1,6 @@
 # domain-collaboration 实施 spec
 
-> **状态**: Draft v1.3 (2026-11-07；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
+> **状态**: Draft v1.4 (2026-11-07；push/conflict 与 owner-local schema 契约优先于下方旧接口/传输草稿)
 > **上游依赖**:
 > - 《Requirements》§15, REQ-RT-001~003, §50.8AW / AC-COLLAB-01–09
 > - 《Basic Design》§2.1(表 24), §5.7, §16.78
@@ -8,7 +8,7 @@
 > - 《API Design》§4 (WebSocket / Realtime 通道)
 > - 《Data Design》§4.17 (`collaboration` schema)
 > - 《Security Design》§3.1-3.4
-> - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.4
+> - Owner-local target schema：`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.5
 > - 验收计划：`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v2.6 §4.8/§5.2/§6.2.5（计划，未运行）
 > **下游交付**: Implementation team — Rust crate 路径 `crates/domain-collaboration/`
 > **最后审稿**: 待 RFC 化时
@@ -383,3 +383,4 @@ Revision v1.0 · 2026-10-24 · Mavis review: synchronize the active owner-local 
 Revision v1.1 · 2026-10-25 · Mavis review: define immediate owner conflict handling for complete overlapping draft heads accepted within ≤1000 ms, forbid a one-second debounce/holdback, retain semantic overlap detection at longer intervals, and add the dedicated E2E-COLLAB-09 gate. Synchronize requirements v7.08, basic design v7.11, owner-local data design v0.3 and test design v1.6. Runtime remains polling/process-local; no implementation or performance result is claimed.
 Revision v1.2 · 2026-10-25 · Mavis review: make semantic overlap a durable conflict even when OT can mechanically transform the edits; permit OT only as an explicit resolution preview and require user choice plus current-revision CAS before canonical write. Synchronize requirements v7.08, basic design v7.12, owner-local data v0.4 and test design v1.7. Runtime remains OPEN/NOT_RUN.
 Revision v1.3 - 2026-11-07 - Mavis review: align the active test-design reference to v2.6 and repair three relative source links; preserve historical v1.2. No implementation or runtime change; WLD-7 remains OPEN/NOT_RUN.
+Revision v1.4 - 2026-11-07 - Mavis review: align the active owner-local data-design reference to v0.5 after its citation-only update; preserve the historical v1.3 record. No data-model, implementation, or runtime change; WLD-7 remains OPEN/NOT_RUN.
