@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=3fcb3e73ab3cadf3fa083d4fc4626d0666bbd8ed5a5170cdddec640ceebefb2d
+@cypher schema=1 source_sha256=b7c39a10693951a607379b154453d7d16316a6afc8e97549adb09e83bb1624bf
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs"})
 MERGE (test:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::pg_source_position_is_unique_across_inbox_and_quarantine",kind:"test"})
 MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::connect_disposable_pool",kind:"function"})
@@ -9,6 +9,7 @@ MERGE (same_db:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitra
 MERGE (schema:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::require_shared_claim_contract",kind:"function"})
 MERGE (assert_counts:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::assert_terminal_counts",kind:"function"})
 MERGE (terminal_counts:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::terminal_counts",kind:"function"})
+MERGE (quarantine_timestamp:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::quarantine_recorded_at",kind:"function"})
 MERGE (seed_history:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::seed_cursorless_quarantine_history",kind:"function"})
 MERGE (seed_known_claim:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::seed_legacy_nonnull_quarantine_claim",kind:"function"})
 MERGE (seed_known_receipt:Symbol {id:"crates/bi-owner-runtime/tests/source_position_arbitration_pg.rs::seed_legacy_nonnull_quarantine_receipt",kind:"function"})
@@ -42,6 +43,7 @@ MERGE (self)-[:DEFINES]->(same_db)
 MERGE (self)-[:DEFINES]->(schema)
 MERGE (self)-[:DEFINES]->(assert_counts)
 MERGE (self)-[:DEFINES]->(terminal_counts)
+MERGE (self)-[:DEFINES]->(quarantine_timestamp)
 MERGE (self)-[:DEFINES]->(seed_history)
 MERGE (self)-[:DEFINES]->(seed_known_claim)
 MERGE (self)-[:DEFINES]->(seed_known_receipt)
@@ -68,6 +70,7 @@ MERGE (test)-[:CALLS]->(identity)
 MERGE (test)-[:CALLS]->(same_db)
 MERGE (test)-[:CALLS]->(schema)
 MERGE (test)-[:CALLS]->(assert_counts)
+MERGE (test)-[:CALLS]->(quarantine_timestamp)
 MERGE (test)-[:CALLS]->(receiver_helper)
 MERGE (test)-[:CALLS]->(route_helper)
 MERGE (test)-[:CALLS]->(origin_helper)
@@ -84,6 +87,7 @@ MERGE (assert_counts)-[:CALLS]->(terminal_counts)
 MERGE (terminal_counts)-[:READS]->(claim_table)
 MERGE (terminal_counts)-[:READS]->(origin_table)
 MERGE (terminal_counts)-[:READS]->(quarantine_table)
+MERGE (quarantine_timestamp)-[:READS]->(quarantine_table)
 MERGE (seed_history)-[:WRITES]->(quarantine_table)
 MERGE (seed_history)-[:USES]->(isolation_levels)
 MERGE (seed_known_claim)-[:WRITES]->(claim_table)
@@ -213,8 +217,8 @@ impl TaskEventReceiveAuthorization for AllowAuthorization {
 #[tokio::test]
 #[ignore = "requires the dedicated star_bi_task_event_test PostgreSQL database with all BI migrations and runtime grants applied"]
 async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
-    let pool = connect_disposable_pool(DATABASE_URL_ENV, "star_bi_runtime").await;
-    let audit_pool = connect_disposable_pool(DATABASE_AUDIT_URL_ENV, "star_bi_owner").await;
+    let pool = connect_disposable_pool(DATABASE_URL_ENV, "star_bi_runtime", None).await;
+    let audit_pool = connect_disposable_pool(DATABASE_AUDIT_URL_ENV, "star_bi_owner", None).await;
     require_database_identity(&pool).await;
     require_database_identity(&audit_pool).await;
     require_same_database(&pool, &audit_pool).await;
@@ -779,6 +783,109 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
         1
     );
 
+    // A fully persisted quarantine receipt may be replayed at higher isolation only when both
+    // the unique receipt and its matching shared claim are visible in the fixed snapshot. This
+    // exercises TaskEventReceiver's terminal ACK callback through PgDelivery; external transport
+    // ACK durability remains outside this test. The receipt ID/timestamp are independently
+    // checked through the restricted owner audit pool.
+    for (sequence, isolation) in [(63, "repeatable read"), (64, "serializable")] {
+        let isolation_pin = route_pin();
+        let isolation_route = TaskEventReceiveRoute::new(tenant, isolation_pin.clone())
+            .expect("high-isolation quarantine replay route");
+        let message_id = Uuid::new_v4();
+        let cursor = format!("high-isolation-replay-{sequence}").into_bytes();
+        let wire = b"{".to_vec();
+        let digest: [u8; 32] = Sha256::digest(&wire).into();
+        seed_legacy_nonnull_quarantine_claim(
+            &audit_pool,
+            tenant,
+            &isolation_pin,
+            sequence,
+            &cursor,
+            message_id,
+            digest,
+        )
+        .await;
+        let receipt_id = seed_legacy_nonnull_quarantine_receipt(
+            &audit_pool,
+            tenant,
+            &isolation_pin,
+            sequence,
+            &cursor,
+            message_id,
+            &wire,
+            digest,
+        )
+        .await;
+        let original_recorded_at = quarantine_recorded_at(&audit_pool, tenant, receipt_id).await;
+
+        let isolation_pool =
+            connect_disposable_pool(DATABASE_URL_ENV, "star_bi_runtime", Some(isolation)).await;
+        require_database_identity(&isolation_pool).await;
+        let configured_isolation: String =
+            sqlx::query_scalar("SELECT current_setting('transaction_isolation')")
+                .fetch_one(&isolation_pool)
+                .await
+                .expect("verify the isolated receiver connection transaction level");
+        assert_eq!(configured_isolation, isolation);
+
+        let origin =
+            source_origin_with_cursor(&isolation_pin, message_id, sequence, cursor.clone());
+        let (replay_result, replay_counts) = receive_one(
+            isolation_route.clone(),
+            &isolation_pool,
+            &isolation_pin,
+            wire.clone(),
+            origin.clone(),
+            None,
+        )
+        .await;
+        assert!(matches!(
+            replay_result,
+            Ok(TaskEventReceiveOutcome::Quarantined { receipt, .. })
+                if receipt.quarantine_id == receipt_id
+        ));
+        assert_eq!(replay_counts.inbox_ack.load(Ordering::SeqCst), 0);
+        assert_eq!(replay_counts.quarantine_ack.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            quarantine_recorded_at(&audit_pool, tenant, receipt_id).await,
+            original_recorded_at,
+            "an exact replay must preserve the original durable receipt timestamp"
+        );
+        assert_terminal_counts(&audit_pool, tenant, &isolation_pin, sequence, 1, 0, 1).await;
+
+        // Same source position and route, changed wire digest/length: the trigger must reject it
+        // before a durable INSERT, and TaskEventReceiver must not invoke its terminal ACK callback.
+        let (conflict_result, conflict_counts) = receive_one(
+            isolation_route,
+            &isolation_pool,
+            &isolation_pin,
+            b"{ ".to_vec(),
+            origin,
+            None,
+        )
+        .await;
+        let Err(TaskEventReceiveError::QuarantineDatabase(database_error)) = conflict_result else {
+            panic!("a changed high-isolation replay must fail at its durable receipt check");
+        };
+        let database_error = database_error
+            .as_database_error()
+            .expect("changed replay should be rejected by the PostgreSQL trigger");
+        assert_eq!(database_error.code().as_deref(), Some("23505"));
+        assert!(database_error
+            .message()
+            .contains("does not match one durable receipt and claim"));
+        assert_eq!(conflict_counts.inbox_ack.load(Ordering::SeqCst), 0);
+        assert_eq!(conflict_counts.quarantine_ack.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            quarantine_recorded_at(&audit_pool, tenant, receipt_id).await,
+            original_recorded_at,
+            "a conflicting replay must not replace or append a quarantine receipt"
+        );
+        assert_terminal_counts(&audit_pool, tenant, &isolation_pin, sequence, 1, 0, 1).await;
+        isolation_pool.close().await;
+    }
+
     let mixed_known_event = Uuid::new_v4();
     let mixed_known_origin = source_origin_with_cursor(
         &mixed_pin,
@@ -879,7 +986,11 @@ async fn pg_source_position_is_unique_across_inbox_and_quarantine() {
     audit_pool.close().await;
 }
 
-async fn connect_disposable_pool(env_name: &str, expected_role: &str) -> PgPool {
+async fn connect_disposable_pool(
+    env_name: &str,
+    expected_role: &str,
+    isolation: Option<&'static str>,
+) -> PgPool {
     let database_url = env::var(env_name).unwrap_or_else(|_| {
         panic!("BI source-position proof requires {env_name} for the dedicated disposable PostgreSQL database")
     });
@@ -896,10 +1007,30 @@ async fn connect_disposable_pool(env_name: &str, expected_role: &str) -> PgPool 
         "this test may write only to loopback PostgreSQL on a non-default port"
     );
     let pool = PgPoolOptions::new()
-        .max_connections(4)
+        .max_connections(if isolation.is_some() { 1 } else { 4 })
         .connect_with(options)
         .await
         .expect("connect to the disposable BI persistence database");
+    if let Some(isolation) = isolation {
+        let isolation_sql = match isolation {
+            "repeatable read" => {
+                "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+            }
+            "serializable" => {
+                "SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"
+            }
+            _ => panic!("unsupported test transaction isolation: {isolation}"),
+        };
+        let mut connection = pool
+            .acquire()
+            .await
+            .expect("acquire the single isolated receiver connection");
+        sqlx::query(isolation_sql)
+            .execute(&mut *connection)
+            .await
+            .expect("set isolated receiver connection transaction level");
+        drop(connection);
+    }
     let current_user: String = sqlx::query_scalar("SELECT current_user")
         .fetch_one(&pool)
         .await
@@ -1042,6 +1173,31 @@ async fn assert_terminal_counts(
         quarantine_receipts, expected_quarantine_receipts,
         "quarantine receipt count"
     );
+}
+
+async fn quarantine_recorded_at(audit_pool: &PgPool, tenant: Uuid, quarantine_id: Uuid) -> String {
+    let mut transaction = audit_pool
+        .begin()
+        .await
+        .expect("begin tenant-scoped quarantine timestamp audit");
+    sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
+        .bind(tenant.to_string())
+        .execute(&mut *transaction)
+        .await
+        .expect("set tenant scope before reading the quarantine timestamp");
+    let recorded_at = sqlx::query_scalar::<_, String>(
+        "SELECT recorded_at::text FROM bi.task_event_quarantine WHERE tenant_id = $1 AND quarantine_id = $2",
+    )
+    .bind(tenant)
+    .bind(quarantine_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .expect("read the existing durable quarantine receipt timestamp");
+    transaction
+        .commit()
+        .await
+        .expect("commit read-only quarantine timestamp audit");
+    recorded_at
 }
 
 async fn terminal_counts(

@@ -1,4 +1,4 @@
--- @cypher schema=1 source_sha256=d2ee89e43fabbc107a5336bdd791e67349b50c879c07b948eee4f762450465e8
+-- @cypher schema=1 source_sha256=28be7ddc8bd83850ca3e2a23b03f9cdfd7be2f5403af5e34f5a7ecd8806f92ab
 -- MERGE (self:File {path:"db/migrations/2026-10-25-bi-task-event-shared-position-claim.sql"})
 -- MERGE (claim:Table {id:"bi.task_event_source_position_claim",class:"Transaction"})
 -- MERGE (source_origin:Table {id:"bi.task_event_source_origin",class:"Transaction"})
@@ -165,7 +165,9 @@ CREATE FUNCTION bi.claim_task_event_source_position()
 RETURNS TRIGGER
 LANGUAGE plpgsql SECURITY DEFINER
 -- VOLATILE does not refresh a REPEATABLE READ/SERIALIZABLE transaction snapshot. The advisory-lock
--- visibility proof below therefore accepts claim writes only under READ COMMITTED.
+-- visibility proof below therefore accepts new claim writes only under READ COMMITTED. A narrow
+-- quarantine-only exception verifies a unique, fully matching receipt and claim already visible
+-- in the fixed snapshot before suppressing the duplicate receipt INSERT.
 VOLATILE
 SET search_path = pg_catalog
 SET row_security = on
@@ -184,15 +186,14 @@ DECLARE
     source_history_lock_key BIGINT;
     inserted_count INTEGER;
     matching_count INTEGER;
+    matching_receipts BIGINT;
+    exact_receipts BIGINT;
+    matching_claims BIGINT;
+    exact_claims BIGINT;
     stored_row bi.task_event_source_position_claim%ROWTYPE;
 BEGIN
     IF active_tenant IS NULL OR active_tenant IS DISTINCT FROM NEW.tenant_id THEN
         RAISE EXCEPTION 'BI tenant scope mismatch for source-position claim' USING ERRCODE = '42501';
-    END IF;
-
-    IF current_setting('transaction_isolation') IS DISTINCT FROM 'read committed' THEN
-        RAISE EXCEPTION 'BI source-position claims require READ COMMITTED transaction isolation'
-            USING ERRCODE = '0A000';
     END IF;
 
     IF TG_TABLE_SCHEMA <> 'bi' THEN
@@ -228,6 +229,79 @@ BEGIN
         source_disposition := 'quarantine';
     ELSE
         RAISE EXCEPTION 'unexpected BI source-position trigger relation' USING ERRCODE = '23514';
+    END IF;
+
+    IF current_setting('transaction_isolation') IS DISTINCT FROM 'read committed' THEN
+        IF TG_TABLE_NAME <> 'task_event_quarantine' THEN
+            RAISE EXCEPTION 'BI source-position claims require READ COMMITTED transaction isolation'
+                USING ERRCODE = '0A000';
+        END IF;
+
+        -- Under a fixed transaction snapshot, only a complete quarantine replay already visible
+        -- in that snapshot may pass. Suppress the duplicate row with RETURN NULL so the outer
+        -- writer can use its existing exact-replay comparison to return the original ID/timestamp;
+        -- this trigger must not create a second claim or make an unmatched claim visible. Count
+        -- every same-position candidate so
+        -- sequence/cursor disagreement, duplicate history, or a partial mismatch fails closed.
+        SELECT count(*), count(*) FILTER (WHERE
+                   saved.sender_service_id IS NOT DISTINCT FROM NEW.sender_service_id
+               AND saved.receiver_service_id IS NOT DISTINCT FROM NEW.receiver_service_id
+               AND saved.transport_provider_id IS NOT DISTINCT FROM NEW.transport_provider_id
+               AND saved.transport_provider_version IS NOT DISTINCT FROM NEW.transport_provider_version
+               AND saved.transport_profile_id IS NOT DISTINCT FROM NEW.transport_profile_id
+               AND saved.transport_profile_revision IS NOT DISTINCT FROM NEW.transport_profile_revision
+               AND saved.transport_profile_digest IS NOT DISTINCT FROM NEW.transport_profile_digest
+               AND saved.endpoint_identity IS NOT DISTINCT FROM NEW.endpoint_identity
+               AND saved.destination_id IS NOT DISTINCT FROM NEW.destination_id
+               AND saved.destination_generation IS NOT DISTINCT FROM NEW.destination_generation
+               AND saved.source_sequence IS NOT DISTINCT FROM NEW.source_sequence
+               AND saved.source_cursor IS NOT DISTINCT FROM NEW.source_cursor
+               AND saved.message_id IS NOT DISTINCT FROM NEW.message_id
+               AND saved.wire_sha256 IS NOT DISTINCT FROM NEW.wire_sha256
+               AND saved.wire_length IS NOT DISTINCT FROM NEW.wire_length
+               AND saved.fault_code IS NOT DISTINCT FROM NEW.fault_code)
+          INTO matching_receipts, exact_receipts
+          FROM bi.task_event_quarantine AS saved
+         WHERE saved.tenant_id = NEW.tenant_id
+           AND saved.consumer_id = NEW.consumer_id
+           AND saved.origin_provider_identity = NEW.origin_provider_identity
+           AND saved.source_log_id = NEW.source_log_id
+           AND saved.source_log_generation = NEW.source_log_generation
+           AND (saved.source_sequence = NEW.source_sequence
+                OR (NEW.source_cursor IS NOT NULL AND saved.source_cursor = NEW.source_cursor));
+
+        IF matching_receipts = 0 THEN
+            RAISE EXCEPTION 'BI source-position claims require READ COMMITTED transaction isolation'
+                USING ERRCODE = '0A000';
+        END IF;
+        IF matching_receipts <> 1 OR exact_receipts <> 1 THEN
+            RAISE EXCEPTION 'BI high-isolation quarantine replay does not match one durable receipt and claim'
+                USING ERRCODE = '23505';
+        END IF;
+
+        SELECT count(*), count(*) FILTER (WHERE
+                   claim.disposition IS NOT DISTINCT FROM 'quarantine'
+               AND claim.source_sequence IS NOT DISTINCT FROM NEW.source_sequence
+               AND claim.source_cursor IS NOT DISTINCT FROM NEW.source_cursor
+               AND claim.source_message_id IS NOT DISTINCT FROM
+                   NULLIF(NEW.message_id, '00000000-0000-0000-0000-000000000000'::UUID)
+               AND claim.wire_sha256 IS NOT DISTINCT FROM NEW.wire_sha256)
+          INTO matching_claims, exact_claims
+          FROM bi.task_event_source_position_claim AS claim
+         WHERE claim.tenant_id = NEW.tenant_id
+           AND claim.consumer_id = NEW.consumer_id
+           AND claim.provider_identity = NEW.origin_provider_identity
+           AND claim.source_log_id = NEW.source_log_id
+           AND claim.source_log_generation = NEW.source_log_generation
+           AND (claim.source_sequence = NEW.source_sequence
+                OR (NEW.source_cursor IS NOT NULL AND claim.source_cursor = NEW.source_cursor));
+
+        IF matching_claims <> 1 OR exact_claims <> 1 THEN
+            RAISE EXCEPTION 'BI high-isolation quarantine replay does not match one durable receipt and claim'
+                USING ERRCODE = '23505';
+        END IF;
+
+        RETURN NULL;
     END IF;
 
     -- Claims in one source generation must not mix known and unknown cursor modes. Known-cursor
