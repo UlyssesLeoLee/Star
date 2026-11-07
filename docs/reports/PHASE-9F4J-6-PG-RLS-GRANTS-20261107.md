@@ -89,4 +89,5 @@ runtime allowlist 使用迁移与现有 adapter 的完整签名：
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新建独立 ignored PG grants 测试，记录 package test compile 结果、NOT_RUN 数据库状态及 trigger function PUBLIC EXECUTE 缺口 | WBS-9F4J-6 brief 与登记范围 |
-| v0.2 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 根据独立复核改为三函数 allowlist，加入非 allowlist BI 函数 identity 诊断、session_user 检查及 quarantine 表 DML/RLS；扩充 §5 为 15 条守门项 | 固定 commit 6c1b31b0 的 REVISE 复核要求 |
+| v0.2 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 根据独立复核改为三函数 allowlist，加入非 allowlist BI 函数 identity 诊断、session_user 检查及 quarantine 表 DML/RLS；扩充 §5 为 16 条守门项 | 固定 commit 6c1b31b0 的 REVISE 复核要求 |
+| v0.3 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 复点 §5 表格确有 16 项，统一修正守门项计数；目标 PostgreSQL acceptance 仍为 NOT_RUN | 独立复审发现报告与 dispatch 计数不一致 |
