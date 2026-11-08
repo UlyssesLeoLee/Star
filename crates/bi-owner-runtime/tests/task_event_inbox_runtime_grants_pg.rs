@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=91264a5b03031c6a0796fe41fc30331f9b81929798f8a8b7809324648b369091
+@cypher schema=1 source_sha256=5f8ffe464a1b430c8c9ffe83583e19d3ca4afa586415e742c6b314a375199fc8
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
 MERGE (set_role_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_owner_set_role_is_denied",kind:"test"})
+MERGE (cross_domain_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_cross_domain_privileges_are_denied",kind:"test"})
 MERGE (tenant_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_tenant_mismatch_fails_closed",kind:"test"})
 MERGE (rollback_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_commit_rollback_is_atomic",kind:"test"})
 MERGE (database_url_constant:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::DATABASE_URL_ENV",kind:"constant"})
@@ -17,6 +18,7 @@ MERGE (connect:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtim
 MERGE (identity:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_database_identity",kind:"function"})
 MERGE (runtime_principal:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_runtime_principal",kind:"function"})
 MERGE (contract:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_runtime_contract",kind:"function"})
+MERGE (cross_domain_boundary:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_cross_domain_privilege_boundary",kind:"function"})
 MERGE (set_role:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_owner_set_role_denied",kind:"function"})
 MERGE (tenant_mismatch:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_tenant_mismatch_denied",kind:"function"})
 MERGE (rollback:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::require_rollback_discards_commit",kind:"function"})
@@ -30,6 +32,14 @@ MERGE (query_fn:Database {id:"bi.list_task_event_page_v1",kind:"stored_function"
 MERGE (quarantine_fn:Database {id:"bi.record_task_event_quarantine_v1",kind:"stored_function"})
 MERGE (runtime_role:Config {id:"star_bi_runtime",kind:"postgres_role"})
 MERGE (owner_role:Config {id:"star_bi_owner",kind:"postgres_role"})
+MERGE (transport_runtime_role:Config {id:"star_platform_transport_runtime",kind:"postgres_role"})
+MERGE (append_authenticated:Database {id:"platform_transport.append_authenticated(bytea,bytea,uuid,text,uuid,bytea,bytea)",kind:"stored_function"})
+MERGE (pull_authenticated:Database {id:"platform_transport.pull_authenticated(bytea,bytea,uuid,text,integer)",kind:"stored_function"})
+MERGE (ack_authenticated:Database {id:"platform_transport.acknowledge_authenticated(bytea,bytea,uuid,text,text,uuid,bigint,uuid,uuid,bytea)",kind:"stored_function"})
+MERGE (append_message:Database {id:"platform_transport.append_message(text,uuid,uuid,text,uuid,bytea,bytea)",kind:"stored_function"})
+MERGE (pull_one:Database {id:"platform_transport.pull_one(text,uuid,integer)",kind:"stored_function"})
+MERGE (ack_one:Database {id:"platform_transport.acknowledge_one(text,uuid,bigint,uuid,uuid,bytea)",kind:"stored_function"})
+MERGE (purge_terminal:Database {id:"platform_transport.purge_terminal(text,uuid,integer)",kind:"stored_function"})
 MERGE (inbox:Table {id:"bi.task_event_inbox",class:"Transaction"})
 MERGE (fact:Table {id:"bi.task_event_fact",class:"Transaction"})
 MERGE (incident:Table {id:"bi.task_event_integrity_incident",class:"Transaction"})
@@ -42,6 +52,7 @@ MERGE (uuid:ExternalService {id:"uuid",kind:"crate"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (self)-[:DEFINES]->(privilege_test)
 MERGE (self)-[:DEFINES]->(set_role_test)
+MERGE (self)-[:DEFINES]->(cross_domain_test)
 MERGE (self)-[:DEFINES]->(tenant_test)
 MERGE (self)-[:DEFINES]->(rollback_test)
 MERGE (self)-[:DEFINES]->(database_url_constant)
@@ -54,6 +65,7 @@ MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(identity)
 MERGE (self)-[:DEFINES]->(runtime_principal)
 MERGE (self)-[:DEFINES]->(contract)
+MERGE (self)-[:DEFINES]->(cross_domain_boundary)
 MERGE (self)-[:DEFINES]->(set_role)
 MERGE (self)-[:DEFINES]->(tenant_mismatch)
 MERGE (self)-[:DEFINES]->(rollback)
@@ -82,6 +94,8 @@ MERGE (privilege_test)-[:CALLS]->(contract)
 MERGE (set_role_test)-[:CALLS]->(connect)
 MERGE (set_role_test)-[:CALLS]->(runtime_principal)
 MERGE (set_role_test)-[:CALLS]->(set_role)
+MERGE (cross_domain_test)-[:CALLS]->(connect)
+MERGE (cross_domain_test)-[:CALLS]->(cross_domain_boundary)
 MERGE (tenant_test)-[:CALLS]->(connect)
 MERGE (tenant_test)-[:CALLS]->(runtime_principal)
 MERGE (tenant_test)-[:CALLS]->(tenant_mismatch)
@@ -93,6 +107,15 @@ MERGE (contract)-[:TESTS]->(query_fn)
 MERGE (contract)-[:TESTS]->(quarantine_fn)
 MERGE (contract)-[:TESTS]->(runtime_role)
 MERGE (contract)-[:TESTS]->(owner_role)
+MERGE (cross_domain_boundary)-[:TESTS]->(runtime_role)
+MERGE (cross_domain_boundary)-[:TESTS]->(transport_runtime_role)
+MERGE (cross_domain_boundary)-[:TESTS]->(append_authenticated)
+MERGE (cross_domain_boundary)-[:TESTS]->(pull_authenticated)
+MERGE (cross_domain_boundary)-[:TESTS]->(ack_authenticated)
+MERGE (cross_domain_boundary)-[:TESTS]->(append_message)
+MERGE (cross_domain_boundary)-[:TESTS]->(pull_one)
+MERGE (cross_domain_boundary)-[:TESTS]->(ack_one)
+MERGE (cross_domain_boundary)-[:TESTS]->(purge_terminal)
 MERGE (contract)-[:TESTS]->(inbox)
 MERGE (contract)-[:TESTS]->(fact)
 MERGE (contract)-[:TESTS]->(incident)
@@ -139,6 +162,19 @@ async fn pg_runtime_privilege_boundary_is_closed() {
     assert!(
         failures.is_empty(),
         "BI runtime contract failures: {}",
+        failures.join("; ")
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the dedicated disposable star_bi_task_event_test PostgreSQL database with BI and platform transport migrations applied"]
+async fn pg_runtime_cross_domain_privileges_are_denied() {
+    let pool = disposable_pool().await;
+    let failures = require_cross_domain_privilege_boundary(&pool).await;
+    pool.close().await;
+    assert!(
+        failures.is_empty(),
+        "BI runtime cross-domain privilege failures: {}",
         failures.join("; ")
     );
 }
@@ -507,6 +543,150 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
     if !unexpected_functions.is_empty() {
         failures.push(format!(
             "runtime principals have EXECUTE on non-allowlisted BI functions: {unexpected_functions}"
+        ));
+    }
+    failures
+}
+
+async fn require_cross_domain_privilege_boundary(pool: &PgPool) -> Vec<String> {
+    let row = sqlx::query(
+        r#"
+        WITH principals AS (
+            SELECT session_user AS principal_name
+            UNION
+            SELECT current_user AS principal_name
+        ),
+        transport_function_signatures(signature) AS (
+            VALUES
+                ('platform_transport.append_authenticated(bytea,bytea,uuid,text,uuid,bytea,bytea)'::text),
+                ('platform_transport.pull_authenticated(bytea,bytea,uuid,text,integer)'::text),
+                ('platform_transport.acknowledge_authenticated(bytea,bytea,uuid,text,text,uuid,bigint,uuid,uuid,bytea)'::text),
+                ('platform_transport.append_message(text,uuid,uuid,text,uuid,bytea,bytea)'::text),
+                ('platform_transport.pull_one(text,uuid,integer)'::text),
+                ('platform_transport.acknowledge_one(text,uuid,bigint,uuid,uuid,bytea)'::text),
+                ('platform_transport.purge_terminal(text,uuid,integer)'::text)
+        ),
+        resolved_transport_functions AS (
+            SELECT signature, to_regprocedure(signature)::oid AS function_oid
+              FROM transport_function_signatures
+        ),
+        unexpected_star_memberships AS (
+            SELECT principals.principal_name, roles.rolname
+              FROM principals
+              JOIN pg_roles AS roles
+                ON roles.rolname ~ '^star_'
+               AND roles.rolname <> 'star_bi_runtime'
+             WHERE COALESCE(
+                       pg_has_role(principals.principal_name, roles.rolname, 'MEMBER'),
+                       false
+                   )
+                OR COALESCE(
+                       pg_has_role(principals.principal_name, roles.rolname, 'SET'),
+                       false
+                   )
+        ),
+        unexpected_transport_execute AS (
+            SELECT principals.principal_name, functions.signature
+              FROM principals
+              CROSS JOIN resolved_transport_functions AS functions
+             WHERE functions.function_oid IS NOT NULL
+               AND COALESCE(
+                       has_function_privilege(
+                           principals.principal_name,
+                           functions.function_oid,
+                           'EXECUTE'
+                       ),
+                       false
+                   )
+        )
+        SELECT EXISTS (
+                   SELECT 1 FROM pg_roles
+                    WHERE rolname = 'star_platform_transport_runtime'
+               ) AS transport_runtime_role_exists,
+               (
+                   SELECT count(*) = 7
+                      AND COALESCE(bool_and(function_oid IS NOT NULL), false)
+                     FROM resolved_transport_functions
+               ) AS all_transport_functions_exist,
+               NOT EXISTS (
+                   SELECT 1
+                     FROM principals
+                    WHERE NOT COALESCE(
+                        pg_has_role(principal_name, 'star_bi_runtime', 'MEMBER'),
+                        false
+                    )
+               ) AS all_principals_are_bi_runtime_members,
+               COALESCE((
+                   SELECT string_agg(
+                       DISTINCT format('%s via principal %s', rolname, principal_name),
+                       ', ' ORDER BY format('%s via principal %s', rolname, principal_name)
+                   )
+                     FROM unexpected_star_memberships
+               ), '') AS unexpected_star_role_memberships,
+               COALESCE((
+                   SELECT string_agg(
+                       DISTINCT format('%s via principal %s', signature, principal_name),
+                       ', ' ORDER BY format('%s via principal %s', signature, principal_name)
+                   )
+                     FROM unexpected_transport_execute
+               ), '') AS unexpected_transport_function_execute,
+               COALESCE((
+                   SELECT string_agg(signature, ', ' ORDER BY signature)
+                     FROM resolved_transport_functions
+                    WHERE function_oid IS NULL
+               ), '') AS missing_transport_function_signatures
+        "#,
+    )
+    .fetch_one(pool)
+    .await
+    .expect("inspect the BI runtime's cross-domain role and function privileges");
+
+    let mut failures = Vec::new();
+    for (column, expectation) in [
+        (
+            "transport_runtime_role_exists",
+            "the platform transport runtime role exists in the migrated database",
+        ),
+        (
+            "all_transport_functions_exist",
+            "all seven platform transport functions exist with the reviewed signatures",
+        ),
+        (
+            "all_principals_are_bi_runtime_members",
+            "both session_user and current_user belong to the BI runtime role",
+        ),
+    ] {
+        match row.try_get::<bool, _>(column) {
+            Ok(true) => {}
+            Ok(false) => failures.push(expectation.to_owned()),
+            Err(error) => failures.push(format!("{expectation}: {error}")),
+        }
+    }
+
+    let unexpected_roles: String = row
+        .try_get("unexpected_star_role_memberships")
+        .expect("read unexpected Star role memberships");
+    if !unexpected_roles.is_empty() {
+        failures.push(format!(
+            "BI principals have non-allowlisted Star role membership or SET paths: {unexpected_roles}"
+        ));
+    }
+
+    let unexpected_functions: String = row
+        .try_get("unexpected_transport_function_execute")
+        .expect("read unexpected platform transport EXECUTE privileges");
+    if !unexpected_functions.is_empty() {
+        failures.push(format!(
+            "BI principals have cross-domain platform transport EXECUTE: {unexpected_functions}"
+        ));
+    }
+
+    let missing_functions: String = row
+        .try_get("missing_transport_function_signatures")
+        .expect("read missing platform transport function signatures");
+    if !missing_functions.is_empty() {
+        failures.push(format!(
+            "platform transport migrations are incomplete; missing functions: {missing_functions}"
         ));
     }
     failures
