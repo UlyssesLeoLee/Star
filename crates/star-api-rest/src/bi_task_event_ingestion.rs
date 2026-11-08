@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=24b3e50817fdea065ef35eca22052b08cd38cf1c287642a440207d51d815985d
+@cypher schema=1 source_sha256=500e33c42f29f5ded63a297a50d43aa06f1e06270cf6566388c43fdd06bbd714
 MERGE (self:File {path:"crates/star-api-rest/src/bi_task_event_ingestion.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::bi_task_event_ingestion",kind:"module"})
 MERGE (runtime:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion",kind:"struct"})
@@ -158,13 +158,13 @@ use std::{
     path::PathBuf,
     str::FromStr,
     sync::{
-        Arc, Mutex,
         atomic::{AtomicU8, Ordering},
+        Arc, Mutex,
     },
     time::Duration,
 };
 
-use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use bi_owner_runtime::{
     TaskEventInboxStore, TaskEventQuarantineStore, TaskEventReceiveAuthorization,
     TaskEventReceiveDelivery, TaskEventReceiveError, TaskEventReceiveOrigin, TaskEventReceiveRoute,
@@ -184,13 +184,13 @@ use platform_messaging_runtime::{
 };
 use sha2::{Digest, Sha256};
 use sqlx::{
-    PgPool, Row,
     postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Row,
 };
 use tokio::{
-    sync::{RwLock, watch},
+    sync::{watch, RwLock},
     task::JoinHandle,
-    time::{Instant, sleep, timeout},
+    time::{sleep, timeout, Instant},
 };
 use tracing::warn;
 use uuid::Uuid;
@@ -1434,10 +1434,10 @@ mod tests {
     };
     use std::collections::HashMap;
     use std::sync::{
-        Arc,
         atomic::{AtomicBool, AtomicU8, Ordering},
+        Arc,
     };
-    use tokio::sync::{RwLock, watch};
+    use tokio::sync::{watch, RwLock};
     use uuid::Uuid;
 
     fn restricted_capabilities() -> WriteDatabaseCapabilities {
@@ -1667,35 +1667,21 @@ mod tests {
     #[test]
     fn write_role_query_checks_truncate_and_authenticated_session_privileges() {
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("'TRUNCATE'::text"));
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(current_user, owner_role.rolname, 'MEMBER')")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(session_user, owner_role.rolname, 'SET')")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(current_user, star_role.rolname, 'MEMBER')")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(current_user, star_role.rolname, 'SET')")
-        );
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(current_user, owner_role.rolname, 'MEMBER')"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(session_user, owner_role.rolname, 'SET')"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(current_user, star_role.rolname, 'MEMBER')"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(current_user, star_role.rolname, 'SET')"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("star_role.rolname <> 'star_bi_runtime'"));
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(session_user, 'star_bi_runtime', 'MEMBER')")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(session_user, star_role.rolname, 'MEMBER')")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("pg_has_role(session_user, star_role.rolname, 'SET')")
-        );
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(session_user, 'star_bi_runtime', 'MEMBER')"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(session_user, star_role.rolname, 'MEMBER')"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("pg_has_role(session_user, star_role.rolname, 'SET')"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("AS effective_non_bi_star_role_member"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("AS effective_transport_execute"));
         assert!(
@@ -1705,18 +1691,12 @@ mod tests {
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("WHERE star_role.rolname ~ '^star_'"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("AND star_role.rolname <> current_user"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("AND star_role.rolname <> session_user"));
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("AND authenticated_role.rolname = session_user")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("has_function_privilege(\n                   current_user,")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("has_function_privilege(\n                   session_user,")
-        );
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("AND authenticated_role.rolname = session_user"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("has_function_privilege(\n                   current_user,"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("has_function_privilege(\n                   session_user,"));
         for signature in [
             "platform_transport.append_authenticated(bytea,bytea,uuid,text,uuid,bytea,bytea)",
             "platform_transport.pull_authenticated(bytea,bytea,uuid,text,integer)",
@@ -1728,29 +1708,17 @@ mod tests {
         ] {
             assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains(signature));
         }
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY.contains("right(owner_role.rolname, 6) = '_owner'")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("authenticated_role.rolcreaterole AS authenticated_can_manage_roles")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("effective_role.rolcreatedb AS effective_can_create_databases")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("effective_role.rolreplication AS effective_can_replicate")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("authenticated_role.rolcreatedb AS authenticated_can_create_databases")
-        );
-        assert!(
-            WRITE_DATABASE_CAPABILITY_QUERY
-                .contains("authenticated_role.rolreplication AS authenticated_can_replicate")
-        );
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("right(owner_role.rolname, 6) = '_owner'"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("authenticated_role.rolcreaterole AS authenticated_can_manage_roles"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("effective_role.rolcreatedb AS effective_can_create_databases"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("effective_role.rolreplication AS effective_can_replicate"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("authenticated_role.rolcreatedb AS authenticated_can_create_databases"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("authenticated_role.rolreplication AS authenticated_can_replicate"));
     }
 
     #[test]
