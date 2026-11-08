@@ -1,6 +1,6 @@
 # PHASE-9F4J-3 — BI Task Event Application Composition
 
-> **状态：PARTIAL / INTEGRATION PENDING** · 修订 v0.8 · 2026-11-07
+> **状态：PARTIAL / INTEGRATION PENDING** · 修订 v0.9 · 2026-11-07
 > 当前 lane：`codex/9f4j-3-native-composition-20261107` · 分支基点：`e22d92bc` · 当前计划集成目标：本地 `dev@90505991da53df9131df20d1dac8494c6f32abdb`
 
 ## §0 目的
@@ -31,6 +31,7 @@
 | `git diff --check` | PASS | 当前候选差异无空白错误 |
 | `cargo check -p star-api-rest --all-targets -j 4` | PASS | exit 0；0 errors，28 warnings；警告来自既有 crate/test fixture |
 | `cargo test -p star-api-rest --test bi_task_event_ingestion -j 4` | PASS | 16 tests passed；新增 Serve future drop/error 与 bind-before-startup 语义测试，不证明 PostgreSQL、真实连接取消或部署闭环 |
+| `cargo clippy -p star-api-rest --all-targets -j 4` | PASS | exit 0; RTK reported 465 warnings; -D warnings was not enabled; warning ownership was not established. |
 | DB capability alias/field 静态核对 | PASS | SQL boolean alias、Rust field、row read 与 predicate 保持一致；覆盖 `current_user`/`session_user`、允许的 `star_bi_runtime` membership、非 BI Star role MEMBER/SET 和七个精确 transport function signatures；未运行真实角色矩阵 |
 | PostgreSQL / grants / RLS / receiver E2E | NOT RUN | 无目标测试数据库与可验证的部署身份；本阶段不宣称数据库或生产接收闭环通过 |
 
@@ -100,3 +101,4 @@
 | v0.6 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复非 BI `star_*` MEMBER/SET 与七个 transport EXECUTE 权限检查；shutdown JoinError/timeout 传播到进程错误结果并增加 focused tests；同步 13 项测试、all-targets、rustfmt、CGG、diff-check 及 PostgreSQL NOT_RUN 状态；当时的 dev 目标快照为 `eccdd6f5` | 第二轮独立复审 P1/P2 与源 lane 聚焦验证 |
 | v0.7 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | listener bind 前移到服务资源启动之前；signal 到达后丢弃 Axum Serve future，再执行 bounded BI drain；记录 spawned HTTP/SSE handlers 由 Tokio runtime teardown 取消；增加 bind-order、Serve drop/error 测试；记录外部 PG harness self-role false-positive 且未触碰 | 第二轮复审的新 P2 发现、spec reviewer 对 source self-exclusion 的确认与本轮 16 项 focused tests |
 | v0.8 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新当前计划 dev baseline 为 `90505991da53df9131df20d1dac8494c6f32abdb`，保留 `eccdd6f5` 为历史快照；精确说明 helper 保留 Serve future `Err`，Axum 0.8.9 TCP accept 错误由内部记录/重试、不传播给 main；记录 spec review 无 P0/P1、关停 findings 已关闭，PostgreSQL acceptance 仍 NOT_RUN | 协调者提供的新 dev baseline 与 Axum 0.8.9 错误语义复核 |
+| v0.9 | 2026-11-07 | Ulysses (12-role company per DEC-008) - Mavis review | Rebased the three reviewed commits onto dev@90505991; recorded post-rebase all-targets check/test/clippy/rustfmt/diff results. PostgreSQL acceptance remains NOT RUN; integration remains pending. | Rebase candidate validation |
