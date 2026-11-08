@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=63ec64a423d18cf0183cfdce788b96ba501bd83521dbb0c285a0432ecb6f2867
+@cypher schema=1 source_sha256=3189ac212df7005337d702fcdda4cf227384e990e8e275e4e2bf3c94033b612b
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -15,6 +15,7 @@ MERGE (configure_ingestion:Symbol {id:"crates/star-api-rest/src/bi_task_event_in
 MERGE (readiness_router:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.readiness_router",kind:"method"})
 MERGE (shutdown_signal:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown_signal",kind:"method"})
 MERGE (shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown",kind:"method"})
+MERGE (serve_until_shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::serve_until_shutdown",kind:"function"})
 MERGE (self)-[:DEFINES]->(main)
 MERGE (main)-[:USES_TYPE]->(store)
 MERGE (main)-[:USES_TYPE]->(port)
@@ -25,6 +26,7 @@ MERGE (main)-[:CALLS]->(configure_ingestion)
 MERGE (main)-[:CALLS]->(readiness_router)
 MERGE (main)-[:CALLS]->(shutdown_signal)
 MERGE (main)-[:CALLS]->(shutdown)
+MERGE (main)-[:CALLS]->(serve_until_shutdown)
 MERGE (main)-[:USES_TYPE]->(wakeHub)
 MERGE (main)-[:USES_TYPE]->(ingestion)
 MERGE (ingestion)-[:HAS_METHOD]->(configure_ingestion)
@@ -71,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| "127.0.0.1:8081".to_string())
         .parse()
         .expect("invalid bind addr");
+    let listener = tokio::net::TcpListener::bind(bind_addr).await?;
 
     let jwt = Arc::new(JwtConfig::verifier_from_env().map_err(|error| {
         anyhow::anyhow!("JWT verifier configuration invalid ({})", error.code())
@@ -124,10 +127,11 @@ async fn main() -> anyhow::Result<()> {
     let app = build_group_router(group_api_state).merge(bi_task_event_ingestion.readiness_router());
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
-    let listener = tokio::net::TcpListener::bind(bind_addr).await?;
-    let server_result = axum::serve(listener, app)
-        .with_graceful_shutdown(bi_task_event_ingestion.shutdown_signal())
-        .await;
+    let server_result = bi_task_event_ingestion::serve_until_shutdown(
+        axum::serve(listener, app),
+        bi_task_event_ingestion.shutdown_signal(),
+    )
+    .await;
     let shutdown_result = bi_task_event_ingestion.shutdown().await;
     server_result?;
     shutdown_result

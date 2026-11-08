@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=7549b38a06ba0b7cec7be78718d202cc577d9cd620047e2e6abfadec94ad14fe
+@cypher schema=1 source_sha256=26ef5e521632641721019f3882fa2be31c73c416661f80bc2bd35e91baadb342
 MERGE (self:File {path:"crates/star-api-rest/src/bi_task_event_ingestion.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::bi_task_event_ingestion",kind:"module"})
 MERGE (runtime:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion",kind:"struct"})
@@ -12,6 +12,7 @@ MERGE (configure:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs
 MERGE (shutdown_signal:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown_signal",kind:"method"})
 MERGE (shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown",kind:"method"})
 MERGE (shutdown_with_timeout:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown_with_timeout",kind:"method"})
+MERGE (serve_until_shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::serve_until_shutdown",kind:"function"})
 MERGE (wait_shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::wait_for_shutdown_signal",kind:"function"})
 MERGE (build:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::build_receiver",kind:"function"})
 MERGE (validate_db:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::validate_write_database",kind:"function"})
@@ -41,6 +42,9 @@ MERGE (test_profile_pin:Symbol {id:"crates/star-api-rest/src/bi_task_event_inges
 MERGE (test_capability_query:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.write_role_rejects_other_star_memberships_and_transport_execute",kind:"test"})
 MERGE (test_join_failure:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.shutdown_propagates_consumer_join_failure",kind:"test"})
 MERGE (test_drain_timeout:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.shutdown_propagates_drain_timeout",kind:"test"})
+MERGE (test_serve_drop:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.serve_future_is_dropped_when_shutdown_signal_fires",kind:"test"})
+MERGE (test_serve_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.serve_io_error_is_propagated",kind:"test"})
+MERGE (test_bind_order:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.main_binds_listener_before_starting_service_resources",kind:"test"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:DEFINES]->(runtime)
 MERGE (module)-[:DEFINES]->(config)
@@ -51,6 +55,7 @@ MERGE (module)-[:DEFINES]->(configure)
 MERGE (module)-[:DEFINES]->(shutdown_signal)
 MERGE (module)-[:DEFINES]->(shutdown)
 MERGE (module)-[:DEFINES]->(shutdown_with_timeout)
+MERGE (module)-[:DEFINES]->(serve_until_shutdown)
 MERGE (module)-[:DEFINES]->(wait_shutdown)
 MERGE (module)-[:DEFINES]->(build)
 MERGE (module)-[:DEFINES]->(validate_db)
@@ -77,12 +82,18 @@ MERGE (test_module)-[:DEFINES]->(test_profile_pin)
 MERGE (test_module)-[:DEFINES]->(test_capability_query)
 MERGE (test_module)-[:DEFINES]->(test_join_failure)
 MERGE (test_module)-[:DEFINES]->(test_drain_timeout)
+MERGE (test_module)-[:DEFINES]->(test_serve_drop)
+MERGE (test_module)-[:DEFINES]->(test_serve_error)
+MERGE (test_module)-[:DEFINES]->(test_bind_order)
 MERGE (configure)-[:CALLS]->(build)
 MERGE (configure)-[:CALLS]->(validate_db)
 MERGE (shutdown_signal)-[:CALLS]->(wait_shutdown)
 MERGE (shutdown)-[:CALLS]->(shutdown_with_timeout)
+MERGE (test_serve_drop)-[:EXERCISES]->(serve_until_shutdown)
+MERGE (test_serve_error)-[:EXERCISES]->(serve_until_shutdown)
 MERGE (test_join_failure)-[:EXERCISES]->(shutdown)
 MERGE (test_drain_timeout)-[:EXERCISES]->(shutdown_with_timeout)
+MERGE (test_bind_order)-[:EXERCISES]->(:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (build)-[:USES_TYPE]->(route_pin)
 MERGE (build)-[:USES_TYPE]->(transport)
 MERGE (build)-[:CREATES]->(receiver)
@@ -124,7 +135,8 @@ MERGE (authorize)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveA
 use std::{
     collections::HashMap,
     env,
-    future::Future,
+    future::{Future, IntoFuture},
+    io,
     path::PathBuf,
     str::FromStr,
     sync::{
@@ -569,6 +581,28 @@ impl BiTaskEventIngestion {
             .await;
         }
         shutdown_result
+    }
+}
+
+/// Stop waiting for Axum's accept loop as soon as shutdown starts.
+///
+/// Axum runs connections in spawned Tokio tasks; dropping this accept future does not
+/// drain those tasks. `main` performs the bounded BI drain and then returns, allowing
+/// Tokio runtime teardown to cancel any remaining HTTP/SSE request tasks.
+pub(crate) async fn serve_until_shutdown<S, Shutdown>(
+    serve: S,
+    shutdown_signal: Shutdown,
+) -> io::Result<()>
+where
+    S: IntoFuture<Output = io::Result<()>>,
+    Shutdown: Future<Output = ()>,
+{
+    let serve = serve.into_future();
+    tokio::pin!(serve);
+    tokio::select! {
+        biased;
+        result = &mut serve => result,
+        _ = shutdown_signal => Ok(()),
     }
 }
 
@@ -1369,7 +1403,10 @@ mod tests {
         parse_opt_in, profile_pin_matches, writer_role_is_separate,
     };
     use std::collections::HashMap;
-    use std::sync::{Arc, atomic::AtomicU8};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU8, Ordering},
+    };
     use tokio::sync::{RwLock, watch};
     use uuid::Uuid;
 
@@ -1723,5 +1760,65 @@ mod tests {
             ingestion.readiness.read().await.phase,
             ReadinessPhase::Blocked
         );
+    }
+
+    struct DropObserved(Arc<AtomicBool>);
+
+    impl Drop for DropObserved {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    async fn serve_future_is_dropped_when_shutdown_signal_fires() {
+        let dropped = Arc::new(AtomicBool::new(false));
+        let drop_observed = DropObserved(dropped.clone());
+        let serve = std::future::poll_fn(move |_| {
+            let _ = &drop_observed;
+            std::task::Poll::<std::io::Result<()>>::Pending
+        });
+
+        let result = super::serve_until_shutdown(serve, std::future::ready(())).await;
+
+        assert!(result.is_ok());
+        assert!(dropped.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn serve_io_error_is_propagated() {
+        let serve = std::future::ready(Err(std::io::Error::new(
+            std::io::ErrorKind::BrokenPipe,
+            "simulated server failure",
+        )));
+
+        let error = super::serve_until_shutdown(serve, std::future::ready(()))
+            .await
+            .expect_err("server I/O failures must propagate");
+
+        assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe);
+    }
+
+    #[test]
+    fn main_binds_listener_before_starting_service_resources() {
+        let main_source = include_str!("main.rs");
+        let bind_position = main_source
+            .find("let listener = tokio::net::TcpListener::bind(bind_addr).await?;")
+            .expect("main binds its listener");
+
+        for startup_call in [
+            "JwtConfig::verifier_from_env()",
+            "connect_pool(&pg_config)",
+            "CanvasEventWakeHub::start(pool.clone())",
+            "BiTaskEventIngestion::configure(pool.clone(), bi_query_pool)",
+        ] {
+            let startup_position = main_source
+                .find(startup_call)
+                .unwrap_or_else(|| panic!("main contains {startup_call}"));
+            assert!(
+                bind_position < startup_position,
+                "listener bind must precede {startup_call}"
+            );
+        }
     }
 }
