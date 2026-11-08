@@ -1,4 +1,4 @@
-# W8 Source Position Claim Lane — Integration Readiness Audi
+# W8 Source Position Claim Lane — Integration Readiness Audit
 
 > **状态：HOLD / NOT READY FOR INTEGRATION。** 本报告仅审计 Git、MAGOS 登记、Orca worktree/terminal 状态与现有阶段报告；未读取 W8 源码、SQL 或数据库，也未作代码语义审查。
 > 审计基线：本 lane dev@8c505f36f7679a349d20d3d5b86676cf5e70a393；候选 UlyssesLeoLee/w8-source-position-claim-fix-20261025@fceda75fb554069450214a2a9c0cef8c98a16c4c。
