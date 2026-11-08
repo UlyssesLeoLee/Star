@@ -2,7 +2,7 @@
 
 **Phase:** 9F4J3-RUNTIME-GRANTS-SELF-ROLE-20261108
 **Base:** `dev@6a5c3a46e7fec7e42caad31793b34e67fda8f19f`
-**Status:** Test-only SQL correction and independent review complete. Focused target compilation passes with an isolated Cargo directory. PostgreSQL acceptance remains `NOT_RUN`. Local dev integration is pending coordinator freshness check.
+**Status:** Test-only SQL correction and independent review complete. Focused target compilation passes with an isolated Cargo directory. PostgreSQL acceptance remains `NOT_RUN`. Source commit `620fdd18443565d28f3bb5b8a91d508a6ba39052` was fast-forwarded into local dev.
 
 ## §0 Purpose
 
@@ -30,7 +30,7 @@ This is test-harness-only. It changes no production code, grants, migration, man
 | `git diff --check` | **PASS** | Exit 0. |
 | Independent review | **PASS_WITH_LIMITATION** | Reviewer confirmed the self-role exclusion is narrow; BI membership, other Star role MEMBER/SET checks, and seven exact EXECUTE checks remain. |
 | PostgreSQL acceptance | **NOT_RUN** | `STAR_BI_TASK_EVENT_TEST_DATABASE_URL` is unset and `psql` is unavailable. The ignored PostgreSQL test was not executed; no database or VM was started. |
-| Local dev integration | **PENDING** | Requires a final source HEAD and clean/unchanged `dev` target check. No push or main change is included. |
+| Local dev integration | **PASS** | Fast-forwarded `codex/9f4j3-runtime-grants-self-role-20261108` commit `620fdd18443565d28f3bb5b8a91d508a6ba39052` from `dev@6a5c3a46e7fec7e42caad31793b34e67fda8f19f` to local `dev`; post-integration status was clean and `git diff --check` passed. No push. |
 
 A preliminary build using the shared Cargo cache failed while compiling `sqlx-macros-core` with a core metadata-stub diagnostic. A clean, task-specific target directory then compiled the same test target successfully. The shared cache was left untouched.
 
@@ -63,10 +63,11 @@ A preliminary build using the shared Cargo cache failed while compiling `sqlx-ma
 | Platform / Rust validation | PASS_WITH_LIMITATION: focused compile, format, graph guard, and diff checks pass; shared-cache diagnostic remains unresolved. |
 | Database / SRE acceptance | NOT_RUN: no designated PostgreSQL URL or client. |
 | Independent review | PASS_WITH_LIMITATION: static review found no blocker; PostgreSQL execution remains open. |
-| Product / integration owner | PENDING: local dev integration awaits final freshness check. |
+| Product / integration owner | PASS: local fast-forward recorded; PostgreSQL acceptance remains NOT_RUN. |
 
 ## §7 Revision History
 
 | Version | Revision | Owner |
 |---|---|---|
 | v1.0 | Recorded the self-role SQL exclusion, isolated-target compile, static checks, independent review, and PostgreSQL NOT_RUN status. | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
+| v1.1 | Recorded fast-forward of source commit `620fdd18443565d28f3bb5b8a91d508a6ba39052` into local dev after post-integration cleanliness and diff checks. | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
