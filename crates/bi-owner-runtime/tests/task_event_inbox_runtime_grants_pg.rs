@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=7ec9173bb7b7e5f743587efc34e25a0937f0fd76322d7104208c5d280efd0980
+@cypher schema=1 source_sha256=a5dcea34bf615cde25970483febfa1abb0df52497a98940bb91cdb638f36c62d
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
@@ -639,6 +639,7 @@ async fn require_cross_domain_privilege_boundary(pool: &PgPool) -> Vec<String> {
               JOIN pg_roles AS roles
                 ON roles.rolname ~ '^star_'
                AND roles.rolname <> 'star_bi_runtime'
+               AND roles.rolname <> principals.principal_name
              WHERE COALESCE(
                        pg_has_role(principals.principal_name, roles.rolname, 'MEMBER'),
                        false
