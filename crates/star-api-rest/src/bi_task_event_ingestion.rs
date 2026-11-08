@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=26ef5e521632641721019f3882fa2be31c73c416661f80bc2bd35e91baadb342
+@cypher schema=1 source_sha256=24b3e50817fdea065ef35eca22052b08cd38cf1c287642a440207d51d815985d
 MERGE (self:File {path:"crates/star-api-rest/src/bi_task_event_ingestion.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::bi_task_event_ingestion",kind:"module"})
 MERGE (runtime:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion",kind:"struct"})
@@ -8,6 +8,8 @@ MERGE (config:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::Run
 MERGE (route_pin:Type {id:"bi_owner_runtime::TaskEventRoutePin",kind:"struct"})
 MERGE (receiver:Type {id:"bi_owner_runtime::TaskEventReceiver",kind:"struct"})
 MERGE (transport:Type {id:"platform_messaging_runtime::native_grpc::NativeGrpcEventReceiveTransport",kind:"struct"})
+MERGE (native_receive_error:Type {id:"platform_messaging_runtime::native_grpc::NativeGrpcEventReceiveError",kind:"enum"})
+MERGE (receive_error:Type {id:"bi_owner_runtime::TaskEventReceiveError",kind:"enum"})
 MERGE (configure:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.configure",kind:"method"})
 MERGE (shutdown_signal:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown_signal",kind:"method"})
 MERGE (shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown",kind:"method"})
@@ -21,6 +23,10 @@ MERGE (ready:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::re
 MERGE (adapter:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventTransport",kind:"struct"})
 MERGE (authorize:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventAuthorization",kind:"struct"})
 MERGE (delivery:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventDelivery",kind:"struct"})
+MERGE (native_pull:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventTransport.pull_one",kind:"method"})
+MERGE (native_ack:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventDelivery.acknowledge",kind:"method"})
+MERGE (native_verify:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventAuthorization.verify_origin",kind:"method"})
+MERGE (map_native_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::map_native_receive_error",kind:"function"})
 MERGE (capabilities:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::WriteDatabaseCapabilities",kind:"struct"})
 MERGE (role_separation:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::writer_role_is_separate",kind:"function"})
 MERGE (profile_monitor:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::ProfilePinMonitor",kind:"struct"})
@@ -45,12 +51,17 @@ MERGE (test_drain_timeout:Symbol {id:"crates/star-api-rest/src/bi_task_event_ing
 MERGE (test_serve_drop:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.serve_future_is_dropped_when_shutdown_signal_fires",kind:"test"})
 MERGE (test_serve_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.serve_io_error_is_propagated",kind:"test"})
 MERGE (test_bind_order:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.main_binds_listener_before_starting_service_resources",kind:"test"})
+MERGE (test_native_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.native_event_receive_errors_preserve_auth_and_retryable_transport",kind:"test"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:DEFINES]->(runtime)
 MERGE (module)-[:DEFINES]->(config)
 MERGE (module)-[:DEFINES]->(adapter)
 MERGE (module)-[:DEFINES]->(authorize)
 MERGE (module)-[:DEFINES]->(delivery)
+MERGE (module)-[:DEFINES]->(native_pull)
+MERGE (module)-[:DEFINES]->(native_ack)
+MERGE (module)-[:DEFINES]->(native_verify)
+MERGE (module)-[:DEFINES]->(map_native_error)
 MERGE (module)-[:DEFINES]->(configure)
 MERGE (module)-[:DEFINES]->(shutdown_signal)
 MERGE (module)-[:DEFINES]->(shutdown)
@@ -85,6 +96,7 @@ MERGE (test_module)-[:DEFINES]->(test_drain_timeout)
 MERGE (test_module)-[:DEFINES]->(test_serve_drop)
 MERGE (test_module)-[:DEFINES]->(test_serve_error)
 MERGE (test_module)-[:DEFINES]->(test_bind_order)
+MERGE (test_module)-[:DEFINES]->(test_native_error)
 MERGE (configure)-[:CALLS]->(build)
 MERGE (configure)-[:CALLS]->(validate_db)
 MERGE (shutdown_signal)-[:CALLS]->(wait_shutdown)
@@ -128,6 +140,12 @@ MERGE (test_role_separation)-[:EXERCISES]->(role_separation)
 MERGE (delivery)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveDelivery",kind:"trait"})
 MERGE (adapter)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveTransport",kind:"trait"})
 MERGE (authorize)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveAuthorization",kind:"trait"})
+MERGE (native_pull)-[:CALLS]->(map_native_error)
+MERGE (native_ack)-[:CALLS]->(map_native_error)
+MERGE (native_verify)-[:CALLS]->(map_native_error)
+MERGE (map_native_error)-[:USES_TYPE]->(native_receive_error)
+MERGE (map_native_error)-[:USES_TYPE]->(receive_error)
+MERGE (test_native_error)-[:EXERCISES]->(map_native_error)
 @endcypher
 */
 //! Application-owned, opt-in composition for BI Task-event receive.
@@ -155,9 +173,9 @@ use bi_owner_runtime::{
 use platform_messaging_runtime::{
     admission_delivery::AdmissionTransportProfile,
     native_grpc::{
-        NativeGrpcEventDelivery, NativeGrpcEventOrigin, NativeGrpcEventReceiveAuthorization,
-        NativeGrpcEventReceiveClientConfig, NativeGrpcEventReceiveScope,
-        NativeGrpcEventReceiveTransport, native_provider_identity,
+        native_provider_identity, NativeGrpcEventDelivery, NativeGrpcEventOrigin,
+        NativeGrpcEventReceiveAuthorization, NativeGrpcEventReceiveClientConfig,
+        NativeGrpcEventReceiveError, NativeGrpcEventReceiveScope, NativeGrpcEventReceiveTransport,
     },
     transport_endpoint::{TrustedEndpointConfig, TrustedEndpointResolver},
     transport_profile::{AuthenticatedTransportSession, TransportDirection, TransportMessageKind},
@@ -875,6 +893,17 @@ struct NativeTaskEventTransport {
     origins: NativeOriginCache,
 }
 
+fn map_native_receive_error(error: NativeGrpcEventReceiveError) -> TaskEventReceiveError {
+    match error {
+        NativeGrpcEventReceiveError::Route | NativeGrpcEventReceiveError::Unauthorized => {
+            TaskEventReceiveError::Unauthorized
+        }
+        NativeGrpcEventReceiveError::Contract
+        | NativeGrpcEventReceiveError::Transport
+        | NativeGrpcEventReceiveError::Busy => TaskEventReceiveError::Transport,
+    }
+}
+
 struct NativeTaskEventDelivery {
     inner: NativeGrpcEventDelivery,
     origin: TaskEventReceiveOrigin,
@@ -893,7 +922,7 @@ impl TaskEventReceiveDelivery for NativeTaskEventDelivery {
         self.inner
             .acknowledge()
             .await
-            .map_err(|_| TaskEventReceiveError::Transport)
+            .map_err(map_native_receive_error)
     }
 
     async fn terminate_permanently(&self) -> Result<(), TaskEventReceiveError> {
@@ -918,7 +947,7 @@ impl TaskEventReceiveTransport for NativeTaskEventTransport {
             .inner
             .pull_one(self.scope)
             .await
-            .map_err(|_| TaskEventReceiveError::Transport)?
+            .map_err(map_native_receive_error)?
         else {
             return Ok(None);
         };
@@ -955,7 +984,7 @@ impl TaskEventReceiveAuthorization for NativeTaskEventAuthorization {
         self.inner
             .verify_origin(self.scope, &native_origin, exact_wire)
             .await
-            .map_err(|_| TaskEventReceiveError::Unauthorized)
+            .map_err(map_native_receive_error)
     }
 }
 
@@ -1398,9 +1427,10 @@ fn route_matches_scope(route: &TaskEventReceiveRoute, scope: NativeGrpcEventRece
 #[cfg(test)]
 mod tests {
     use super::{
-        BiTaskEventIngestion, ENABLED_ENV, ReadinessPhase, ReadinessSnapshot, RuntimeConfig,
-        TaskEventRoutePin, WRITE_DATABASE_CAPABILITY_QUERY, WriteDatabaseCapabilities,
-        parse_opt_in, profile_pin_matches, writer_role_is_separate,
+        map_native_receive_error, parse_opt_in, profile_pin_matches, writer_role_is_separate,
+        BiTaskEventIngestion, NativeGrpcEventReceiveError, ReadinessPhase, ReadinessSnapshot,
+        RuntimeConfig, TaskEventReceiveError, TaskEventRoutePin, WriteDatabaseCapabilities,
+        ENABLED_ENV, WRITE_DATABASE_CAPABILITY_QUERY,
     };
     use std::collections::HashMap;
     use std::sync::{
@@ -1428,6 +1458,30 @@ mod tests {
         assert_eq!(parse_opt_in(Some("true")), Ok(true));
         assert_eq!(parse_opt_in(Some("1")), Ok(true));
         assert!(parse_opt_in(Some("yes")).is_err());
+    }
+
+    #[test]
+    fn native_event_receive_errors_preserve_auth_and_retryable_transport() {
+        for error in [
+            NativeGrpcEventReceiveError::Route,
+            NativeGrpcEventReceiveError::Unauthorized,
+        ] {
+            assert!(matches!(
+                map_native_receive_error(error),
+                TaskEventReceiveError::Unauthorized
+            ));
+        }
+
+        for error in [
+            NativeGrpcEventReceiveError::Contract,
+            NativeGrpcEventReceiveError::Transport,
+            NativeGrpcEventReceiveError::Busy,
+        ] {
+            assert!(matches!(
+                map_native_receive_error(error),
+                TaskEventReceiveError::Transport
+            ));
+        }
     }
 
     #[test]
