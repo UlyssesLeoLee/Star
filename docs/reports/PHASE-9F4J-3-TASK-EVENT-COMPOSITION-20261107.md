@@ -1,7 +1,7 @@
 # PHASE-9F4J-3 — BI Task Event Application Composition
 
-> **状态：PARTIAL / INTEGRATION PENDING** · 修订 v0.9 · 2026-11-07
-> 当前 lane：`codex/9f4j-3-native-composition-20261107` · 分支基点：`e22d92bc` · 当前计划集成目标：本地 `dev@90505991da53df9131df20d1dac8494c6f32abdb`
+> **状态：PARTIAL / INTEGRATED TO LOCAL DEV; PG ACCEPTANCE OPEN** · 修订 v1.0 · 2026-11-07
+> Lane: `codex/9f4j-3-native-composition-20261107` - Base: `e22d92bc` - Integrated into local `dev@3b49a2bd176f45d1234403c207bf58f0faeb18fc` by fast-forward.
 
 ## §0 目的
 
@@ -102,3 +102,4 @@
 | v0.7 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | listener bind 前移到服务资源启动之前；signal 到达后丢弃 Axum Serve future，再执行 bounded BI drain；记录 spawned HTTP/SSE handlers 由 Tokio runtime teardown 取消；增加 bind-order、Serve drop/error 测试；记录外部 PG harness self-role false-positive 且未触碰 | 第二轮复审的新 P2 发现、spec reviewer 对 source self-exclusion 的确认与本轮 16 项 focused tests |
 | v0.8 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 更新当前计划 dev baseline 为 `90505991da53df9131df20d1dac8494c6f32abdb`，保留 `eccdd6f5` 为历史快照；精确说明 helper 保留 Serve future `Err`，Axum 0.8.9 TCP accept 错误由内部记录/重试、不传播给 main；记录 spec review 无 P0/P1、关停 findings 已关闭，PostgreSQL acceptance 仍 NOT_RUN | 协调者提供的新 dev baseline 与 Axum 0.8.9 错误语义复核 |
 | v0.9 | 2026-11-07 | Ulysses (12-role company per DEC-008) - Mavis review | Rebased the three reviewed commits onto dev@90505991; recorded post-rebase all-targets check/test/clippy/rustfmt/diff results. PostgreSQL acceptance remains NOT RUN; integration remains pending. | Rebase candidate validation |
+| v1.0 | 2026-11-07 | Ulysses (12-role company per DEC-008) - Mavis review | Integrated the reviewed eight-file candidate into local dev by fast-forward from 90505991 to 3b49a2bd. Post-integration status was clean; code tree matches the validated candidate. PostgreSQL/RLS/grants/receiver E2E remain NOT RUN. | Local dev integration receipt |
