@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=5f8ffe464a1b430c8c9ffe83583e19d3ca4afa586415e742c6b314a375199fc8
+@cypher schema=1 source_sha256=1be23b9af82ea2e007293c3ffbe39a52dfc33c2cbc2478388ea6147839e54d7c
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
@@ -30,6 +30,8 @@ MERGE (database_name:Database {id:"star_bi_task_event_test",kind:"disposable_tes
 MERGE (commit_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
 MERGE (query_fn:Database {id:"bi.list_task_event_page_v1",kind:"stored_function"})
 MERGE (quarantine_fn:Database {id:"bi.record_task_event_quarantine_v1",kind:"stored_function"})
+MERGE (append_only_guard:Database {id:"bi.reject_task_event_mutation()",kind:"trigger_function"})
+MERGE (quarantine_guard:Database {id:"bi.reject_task_event_quarantine_mutation()",kind:"trigger_function"})
 MERGE (runtime_role:Config {id:"star_bi_runtime",kind:"postgres_role"})
 MERGE (owner_role:Config {id:"star_bi_owner",kind:"postgres_role"})
 MERGE (transport_runtime_role:Config {id:"star_platform_transport_runtime",kind:"postgres_role"})
@@ -105,6 +107,8 @@ MERGE (rollback_test)-[:CALLS]->(rollback)
 MERGE (contract)-[:TESTS]->(commit_fn)
 MERGE (contract)-[:TESTS]->(query_fn)
 MERGE (contract)-[:TESTS]->(quarantine_fn)
+MERGE (contract)-[:TESTS]->(append_only_guard)
+MERGE (contract)-[:TESTS]->(quarantine_guard)
 MERGE (contract)-[:TESTS]->(runtime_role)
 MERGE (contract)-[:TESTS]->(owner_role)
 MERGE (cross_domain_boundary)-[:TESTS]->(runtime_role)
@@ -329,6 +333,11 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
             UNION ALL
             SELECT to_regprocedure($3)::oid
         ),
+        trigger_only_functions AS (
+            SELECT to_regprocedure('bi.reject_task_event_mutation()')::oid AS function_oid
+            UNION ALL
+            SELECT to_regprocedure('bi.reject_task_event_quarantine_mutation()')::oid
+        ),
         bi_functions AS (
             SELECT p.oid, p.proacl, p.proowner, p.prosecdef, p.proconfig
               FROM pg_proc AS p
@@ -365,6 +374,23 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
                  WHERE acl.grantee = 0::oid
                    AND acl.privilege_type = 'EXECUTE'
             ) AS public_cannot_execute_allowlist,
+            (
+                SELECT count(*) = 2 AND COALESCE(bool_and(function_oid IS NOT NULL), false)
+                  FROM trigger_only_functions
+            ) AS trigger_functions_exist,
+            COALESCE((
+                SELECT string_agg(
+                    DISTINCT p.oid::regprocedure::text,
+                    ', ' ORDER BY p.oid::regprocedure::text
+                )
+                  FROM trigger_only_functions AS trigger_function
+                  JOIN pg_proc AS p ON p.oid = trigger_function.function_oid
+                  CROSS JOIN LATERAL aclexplode(
+                      COALESCE(p.proacl, acldefault('f', p.proowner))
+                  ) AS acl
+                 WHERE acl.grantee = 0::oid
+                   AND acl.privilege_type = 'EXECUTE'
+            ), '') AS public_trigger_function_execute,
             COALESCE((
                 SELECT string_agg(
                     DISTINCT f.oid::regprocedure::text,
@@ -498,6 +524,10 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
             "PUBLIC cannot execute any allowlisted BI function",
         ),
         (
+            "trigger_functions_exist",
+            "both BI Task Event trigger-only functions exist with their fixed signatures",
+        ),
+        (
             "current_role_is_restricted",
             "the authenticated runtime role is restricted",
         ),
@@ -543,6 +573,14 @@ async fn require_runtime_contract(pool: &PgPool) -> Vec<String> {
     if !unexpected_functions.is_empty() {
         failures.push(format!(
             "runtime principals have EXECUTE on non-allowlisted BI functions: {unexpected_functions}"
+        ));
+    }
+    let public_trigger_functions: String = row
+        .try_get("public_trigger_function_execute")
+        .expect("read PUBLIC EXECUTE grants for BI Task Event trigger functions");
+    if !public_trigger_functions.is_empty() {
+        failures.push(format!(
+            "PUBLIC can execute BI Task Event trigger-only functions: {public_trigger_functions}"
         ));
     }
     failures
