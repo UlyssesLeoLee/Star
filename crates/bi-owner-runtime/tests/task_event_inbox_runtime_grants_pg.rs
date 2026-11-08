@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=1be23b9af82ea2e007293c3ffbe39a52dfc33c2cbc2478388ea6147839e54d7c
+@cypher schema=1 source_sha256=7ec9173bb7b7e5f743587efc34e25a0937f0fd76322d7104208c5d280efd0980
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
@@ -97,6 +97,7 @@ MERGE (set_role_test)-[:CALLS]->(connect)
 MERGE (set_role_test)-[:CALLS]->(runtime_principal)
 MERGE (set_role_test)-[:CALLS]->(set_role)
 MERGE (cross_domain_test)-[:CALLS]->(connect)
+MERGE (cross_domain_test)-[:CALLS]->(runtime_principal)
 MERGE (cross_domain_test)-[:CALLS]->(cross_domain_boundary)
 MERGE (tenant_test)-[:CALLS]->(connect)
 MERGE (tenant_test)-[:CALLS]->(runtime_principal)
@@ -174,6 +175,7 @@ async fn pg_runtime_privilege_boundary_is_closed() {
 #[ignore = "requires the dedicated disposable star_bi_task_event_test PostgreSQL database with BI and platform transport migrations applied"]
 async fn pg_runtime_cross_domain_privileges_are_denied() {
     let pool = disposable_pool().await;
+    require_runtime_principal(&pool).await;
     let failures = require_cross_domain_privilege_boundary(&pool).await;
     pool.close().await;
     assert!(
@@ -262,10 +264,14 @@ async fn require_runtime_principal(pool: &PgPool) {
                       AND NOT rolreplication
                       AND NOT rolbypassrls
                ) AS current_role_is_restricted,
+               current_user = session_user
+                   AND current_user <> 'star_bi_runtime'
+                   AS current_role_is_external_login,
                EXISTS (
                    SELECT 1
                      FROM pg_roles
                     WHERE rolname = session_user
+                      AND rolname <> 'star_bi_runtime'
                       AND rolcanlogin
                       AND NOT rolsuper
                       AND NOT rolcreatedb
@@ -273,6 +279,17 @@ async fn require_runtime_principal(pool: &PgPool) {
                       AND NOT rolreplication
                       AND NOT rolbypassrls
                ) AS session_role_is_restricted_login,
+               EXISTS (
+                   SELECT 1
+                     FROM pg_roles
+                    WHERE rolname = 'star_bi_runtime'
+                      AND NOT rolcanlogin
+                      AND NOT rolsuper
+                      AND NOT rolcreatedb
+                      AND NOT rolcreaterole
+                      AND NOT rolreplication
+                      AND NOT rolbypassrls
+               ) AS bi_runtime_group_is_restricted_nologin,
                NOT COALESCE(
                    pg_has_role(session_user, 'star_bi_owner', 'SET'),
                    false
@@ -297,8 +314,16 @@ async fn require_runtime_principal(pool: &PgPool) {
             "current_user must have restricted role attributes",
         ),
         (
+            "current_role_is_external_login",
+            "current_user must remain the distinct session login and not star_bi_runtime",
+        ),
+        (
             "session_role_is_restricted_login",
-            "session_user must be a restricted login role",
+            "session_user must be a restricted login role distinct from star_bi_runtime",
+        ),
+        (
+            "bi_runtime_group_is_restricted_nologin",
+            "star_bi_runtime must exist as a restricted NOLOGIN group role",
         ),
         (
             "session_cannot_set_owner",
