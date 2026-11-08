@@ -13,3 +13,7 @@ Write only docs/reports/PHASE-VCD0-BD-REVIEW-R2-20261024.md in this lane. Give R
 ## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)
 
 (无任务卡留言)
+
+## 归档说明（2026-11-08）
+
+本 brief 记录的是 2026-10-24 的历史审阅任务。引用的候选设计与当时的 dev 基线均为历史快照；原任务提到的两个 P2 发现来自 task context，brief 未持久化其依据，是否仍适用应以当前 dev 文档复核。历史审阅结论见 `docs/reports/PHASE-VCD0-BD-REVIEW-R2-20261024.md`。当前产品与验收状态以 dev 中最新 SRS、基本设计、详细设计、测试设计和 WBS 为准。本 brief 仅用于审计追溯，不是待执行任务，也不构成部署/运行证据或 VCD-0 完成声明。
