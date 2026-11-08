@@ -1,4 +1,6 @@
-# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.08）
+# Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.09）
+
+> **v7.09 9F4J 原生 BI 事件授权错误分类（2026-11-08）**：Native gRPC Unauthenticated / PermissionDenied 必须映射为 Unauthorized，其他状态映射为脱敏 Transport；应用适配器不得丢失此分类，授权失败必须使接收 worker fail closed 并停止，不能按瞬时传输故障重试或 ACK。该源码切片的定向测试、all-targets 编译、格式检查和独立审查已在来源 lane 完成；目标 PostgreSQL/RLS、真实 mTLS/RPC 与 commit-before-ACK 网络验收未运行，BI ingress 与执行仍保持关闭。详见 §50.8AX、基本设计 §16.79、专属详细设计和 Group WBS §23.21。
 
 > **v7.08 Project Repository 解绑与语义重叠协作规则（2026-10-25）**：Project 可关联 0..N 个 Repository，默认项仅为界面偏好；解绑前先退役并迁移活动 Run/Worktree 引用，逐 owner 收齐幂等回执后才可移除授权关联。文本语义重叠无论 OT 是否可机械变换都形成持久冲突；OT 只可在用户显式解决时作为预览，不得自动写入 canonical revision。同步基本/详细设计、SRS/BD、协作 spec、数据与测试设计及 WBS；运行时和数据库验收仍 OPEN。
 
@@ -3844,3 +3846,15 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 
 修订 v7.07 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：补明确完整重叠提案在服务端一秒内到达时立即进入 owner 冲突事务，不等待时间窗；同时说明语义冲突检测不受一秒间隔限制，并新增 E2E-COLLAB-09。同步 basic v7.11、collaboration spec v1.1、数据设计 v0.3、测试设计 v1.6 与 WBS v0.39。当前实现仍为轮询，全部运行时验收保持 OPEN/NOT_RUN。
 修订 v7.08 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：确认 Project↔Repository 0..N 与迁移先于解绑；增加 retiring、owner-local migration/retire receipt、失败保持冻结及零活动引用复核门；同步实时协作“语义重叠必冲突、OT 仅显式 resolve 预览”的规则和 AC-COLLAB-09。同步 SRS v1.11、basic v7.12、Group DD v5.33、BD v1.12、spec v1.2、data v0.4、test v1.7、Traceability v2.0、WBS v0.45。owner writer、数据库、运行时均 OPEN/NOT_RUN。
+
+### 50.8AX AC-RUN-OUTBOX-13 — Native BI event authorization error classification
+
+本要求只规定事件接收链路的错误分类和处理，不改变 mTLS peer identity、当前 Profile / route pin、destination generation、BI owner 事务、delivery lease 或 exact-replay 身份契约。
+
+1. Native gRPC adapter 必须将 Unauthenticated 与 PermissionDenied 映射为 typed Unauthorized；任何其他 gRPC status 必须映射为 sanitized Transport。Pull、origin verification 与 ACK 共用同一映射，禁止某一操作把授权拒绝降级成通用网络错误。
+2. 应用组合适配器必须保留 Unauthorized。当前 Contract、Transport 与 Busy route error 映射为应用层 Transport；消费端继续使用既有有界 attempt / lease policy，不得引入无界重试。
+3. Unauthorized 必须将消费者置为 Blocked 并停止处理；不得将其当作可重试传输错误，不得 ACK 或执行 terminal disposition。已领取但尚未确认的来源 delivery 保持未确认并依赖租约过期/重投；恢复前重新读取并验证当前身份、Profile、授权和 destination generation。若 owner Inbox 已提交而 ACK 未成功，重投必须通过 exact replay 返回原回执且不重复生成 fact。
+4. 对外错误、日志和指标不得包含 gRPC status message/details、metadata、凭据、证书内容或事件 wire/payload。只允许使用有界的错误类别与操作阶段标签；禁止以 tenant、event 或 correlation ID 等高基数值作为 metric label。
+5. 当前来源 lane 的验收证据包括 Rust 1.99.1 定向 native/app 测试各 1 项、star-api-rest all-targets 检查、变更文件 rustfmt、Cypher 关系检查及独立源码审查。该证据不证明本地 dev 重放后的构建，也不替代 Clippy、目标 PostgreSQL/RLS/grants、真实 mTLS/RPC、ACK 网络联测、部署身份或恢复验收；未完成这些门前 BI ingress 与 execution 必须 fail closed。
+
+修订 v7.09 · 2026-11-08 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：9F4J 原生 BI 事件授权分类源码切片已选择性集成；新增 AC-RUN-OUTBOX-13，明确 Unauthorized 的停止/不 ACK 规则、有限传输重试与错误脱敏边界，并同步基本设计、专属详细设计和 Group WBS。目标 PostgreSQL/RLS、真实 mTLS/RPC、网络 ACK 与生产身份验收仍未运行。

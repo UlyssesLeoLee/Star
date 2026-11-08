@@ -1,5 +1,7 @@
 # Star 平台《基本设计書》
 
+> **9F4J 当前增量（2026-11-08）**：Native gRPC 的 Unauthenticated / PermissionDenied 统一映射为 Unauthorized；其他状态成为不带服务端详情的 Transport。应用适配器保留授权拒绝，消费者遇到该拒绝后进入 Blocked 并停止，不做传输重试或 ACK。定向 Rust 检查与源码审查只证明该分类切片；目标 PostgreSQL/RLS、真实 mTLS/RPC 和 ACK 网络验收未运行，BI 接收与执行保持 fail closed。详见 §16.79 和 DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001。
+
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
@@ -5985,3 +5987,23 @@ WorkItem 与 Canvas 各自在自己的 owner schema 内落实相同的逻辑协�
 
 修订 v7.11 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：将同秒重叠提案明确为立即 owner 冲突事务，禁止一秒聚合/仲裁等待；语义检测不受提案到达间隔限制，客户端 debounce 不得延迟冲突判定；新增 E2E-COLLAB-09 并将无等待行为与 p99 送达测量分开。同步 requirements v7.07、collaboration spec v1.1、数据设计 v0.3、测试设计 v1.6、WBS v0.39。当前轮询/单进程广播、草稿冲突持久化、跨实例推送及性能验收仍未完成。
 修订 v7.12 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 Project→Repository 0..N 与 retiring/migrate-before-unlink owner receipt 流程；修正实时协作语义重叠规则，OT 仅为显式解决预览，未经用户确认与 CAS 不得自动改写 canonical revision。同步 requirements v7.08、Group DD v5.33、SRS v1.11、BD v1.12、collaboration spec v1.2、WLD-7 data v0.4、test design v1.7、WBS v0.45。运行时和数据库验证仍未完成。
+
+## 16.79 — Phase 9F4J Native event authorization error classification
+
+此设计增量把原生 transport 的授权拒绝与可重试传输故障分开传递，不增加数据库表或第二份业务事实，也不改变 event identity、route pin、当前 Profile、mTLS 身份验证及 BI owner Inbox 的责任边界。完整状态机和验收矩阵见 [DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001](detailed-design/DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001.md)。
+
+| 输入错误 | Native adapter 分类 | 应用 adapter 分类 | Task Event consumer 处理 |
+|---|---|---|---|
+| gRPC Unauthenticated / PermissionDenied | Unauthorized | Unauthorized | 标记 Blocked、停止；不当作 transport retry，不 ACK、不 terminal-dispose |
+| 其他 gRPC status | Transport，丢弃服务端 details / metadata | Transport | 沿用既有有界 retry / lease 上限；不得无限重试 |
+| Route Contract / Transport / Busy | 不适用 | 当前统一为 Transport | 维持既有有界 attempt / terminal policy；如需细分永久 contract fault，另行版本化错误契约 |
+
+Pull、origin verification 与 ACK 必须调用相同 native mapper 和应用分类器。分类器只解释 RPC 结果，不授予权限：每次操作仍要从受信 mTLS peer 和当前 Profile / route authorization 得到身份与当前授权。授权查询不可用、身份缺失或当前状态无法证明时 fail closed。
+
+Unauthorized 在 pull 前出现时，消费者停止且不创建 delivery 事实；在 source delivery 已领取后出现时，不确认来源、不写 quarantine terminal disposition，保留 lease/redelivery 路径。若 BI Inbox 与 fact 已在 owner 事务中提交、随后 ACK 遇到授权拒绝，消费者仍停止；授权恢复后由 source redelivery 触发 exact replay，回传原 receipt，不重复产生 fact。只有实时重验当前身份、授权、Profile 与 destination generation 成功后才可恢复消费。
+
+错误边界：RPC 对外结果只暴露稳定类别，不透传 tonic status details、metadata 或底层错误链中的凭据/事件内容；普通日志和指标只记录有界的类别、操作阶段与脱敏原因，不记录 wire、payload、证书内容或高基数业务身份。错误映射不改变 owner commit-before-ACK 顺序，也不把 ACK 响应作为业务 receipt。
+
+本地实现状态：native mapper 与应用适配器定向测试、star-api-rest all-targets 检查、Rust 格式检查和独立源码审查已在来源 lane 通过；集成到 dev 后未在本轮重跑 Rust gates。Clippy、目标 PostgreSQL/RLS/grants、真实 mTLS/RPC、commit-before-ACK latch、服务端授权撤销/轮换与生产恢复仍未验收。9F4J 继续 OPEN/PARTIAL，BI ingress 与 Schedule/Agent execution 不因本切片而启用。
+
+修订 v7.13 · 2026-11-08 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 9F4J 授权错误分类的应用层契约、消费者 fail-closed 行为和当前验证边界；§16.77（WLD-1）与 §16.78（协作）保持原义，新增 §16.79。
