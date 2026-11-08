@@ -1,6 +1,6 @@
 # Phase Report: 9F4J.3 External Login Identity Guard v1.0
 
-> **Status:** Local test-harness change, focused validation, and independent coordinator review complete; not integrated; PostgreSQL acceptance **NOT_RUN**.
+> **Status:** Local test-harness change, focused validation, independent coordinator review, and fast-forward integration into local `dev@f4beb18976bd56d9d47f1e583aa92e36f87b856d` complete; PostgreSQL acceptance **NOT_RUN**.
 >
 > **Date:** 2026-11-08
 >
@@ -31,7 +31,7 @@ The query still checks BI runtime membership, non-allowlisted `star_*` membershi
 | Cypher Graph Guardian | PASS | `cgg_guard.py --changed --stamp`; one Rust source file checked and header hash refreshed. |
 | `git diff --check` | PASS | Exit 0 on the final lane changes. |
 | PostgreSQL grants acceptance | **NOT_RUN** | The dedicated database URL is unset. The ignored test was not executed; no database or VM was created or started. |
-| Integration | NOT_INTEGRATED | Independent coordinator review and local-dev integration remain pending. |
+| Integration | INTEGRATED | Rebased onto local dev and fast-forwarded at `f4beb18976bd56d9d47f1e583aa92e36f87b856d`; no push. |
 
 ## §3 Known Gaps
 
@@ -41,7 +41,7 @@ The query still checks BI runtime membership, non-allowlisted `star_*` membershi
 ## §4 Subagent Failure / Takeover
 
 - The implementation was performed in the registered isolated lane; there was no nested subagent dispatch or failure requiring takeover.
-- Independent coordinator review of the registered Rust change and evidence found no remaining issue. The lane remains not integrated; live PostgreSQL acceptance remains unverified.
+- Independent coordinator review of the registered Rust change and evidence found no remaining issue. The change is integrated into local `dev@f4beb18976bd56d9d47f1e583aa92e36f87b856d`; live PostgreSQL acceptance remains unverified.
 
 ## §5 Guardrails
 
@@ -60,8 +60,8 @@ The query still checks BI runtime membership, non-allowlisted `star_*` membershi
 | Architecture | Implementation self-review complete; live role matrix remains unverified. |
 | SRE Lead | No database or VM was started; acceptance remains `NOT_RUN`. |
 | Platform | Test harness identity guard is scoped to the existing BI runtime contract. |
-| Review Chair | Independent coordinator review passed on the registered Rust diff; no findings. Integration remains pending. |
-| PM | Local lane only; not integrated; PostgreSQL acceptance remains NOT_RUN. |
+| Review Chair | Independent coordinator review passed on the registered Rust diff; no findings; fast-forward integration verified at `f4beb18976bd56d9d47f1e583aa92e36f87b856d`. |
+| PM | Integrated into local `dev`; no push; PostgreSQL acceptance remains NOT_RUN. |
 
 Revision author: Ulysses (12-role company per DEC-008) — Mavis review complete. No human approval or deployment acceptance is claimed.
 
@@ -72,3 +72,4 @@ Revision author: Ulysses (12-role company per DEC-008) — Mavis review complete
 | v1.0 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis handoff review pending | Created the follow-up report for the external-login identity guard; recorded compile as in progress and live PostgreSQL acceptance as NOT_RUN. | WBS §23.21 external grant-harness self-role risk |
 | v1.1 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis handoff review pending | Recorded the focused Rust 1.99.1 test-target compile, final formatting/graph/whitespace checks, and retained live PostgreSQL as NOT_RUN. | Focused validation completed |
 | v1.2 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis review | Independently reviewed the exact registered source diff, confirmed the external LOGIN identity guard and retained the NOT_RUN PostgreSQL boundary; no findings. Integration remains pending. | Coordinator review |
+| v1.3 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis review | Recorded rebase and fast-forward integration to local `dev@f4beb18976bd56d9d47f1e583aa92e36f87b856d`; PostgreSQL acceptance remains NOT_RUN and no push occurred. | Local dev integration |
