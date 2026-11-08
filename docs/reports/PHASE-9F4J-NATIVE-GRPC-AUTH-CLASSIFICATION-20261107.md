@@ -14,7 +14,7 @@
 | `crates/platform-messaging-runtime/src/native_grpc.rs` | `Unauthenticated`/`PermissionDenied` → `Unauthorized`；其他状态 → 不带服务端详情的 `Transport`；pull、origin verification、ACK 共用映射。已实现，提交 `71704ff8`。 |
 | `crates/star-api-rest/src/bi_task_event_ingestion.rs` | `Route/Unauthorized` → 应用 `Unauthorized`；`Contract/Transport/Busy` → 应用 `Transport`；三个操作共用映射且有五变体测试。已实现，提交 `ecb4d482`；本轮全文件格式整理提交 5f3de0c。 |
 | Brief、阶段报告、dispatch | Brief 已提交；本报告与 dispatch 记录本阶段审查、验证和限制，待提交。 |
-| docs/requirements.md、docs/basic-design.md、docs/detailed-design/DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001.md、Group WBS | 尚未修改。requirements.md 仅有事件类别/总体验收要求；基本设计 §16.76 记录 event kind 授权但没有 RPC 状态分类；未找到该原生鉴权分类的专属详细设计。拟补齐四份文档；MAGOS 当前已拒绝登记其中 basic-design 与 WBS 两项。候选 codex/star-rust-1991-baseline-20261105 原样保留。 |
+| docs/requirements.md、docs/basic-design.md、docs/detailed-design/DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001.md、Group WBS | 尚未修改。MAGOS 对完整设计范围的登记返回指纹 8f2094a911d4；与保留候选重叠的路径为 requirements.md、basic-design.md、Group WBS，新增详细设计路径无重叠。候选 codex/star-rust-1991-baseline-20261105 及其 worktree/文件保持原样。 |
 
 独立审查确认消费者对授权拒绝会标记 Blocked 并停止，其他错误仍进入既有重试路径；两份 Rust Cypher 头部没有删除既有 MERGE 关系。native 头部为满足校验器大小上限对既有 MERGE 行做了空白压缩，审查确认关系语义保留。
 
@@ -34,7 +34,7 @@
 ## §3 已知缺口
 
 1. 单测和编译不能替代真实 TLS、服务端授权拒绝、PostgreSQL/RLS、commit-before-ACK 或恢复链路验收。
-2. 需求、基本设计、详细设计及 Group WBS 尚未同步。当前 MAGOS 计划因基本设计和 WBS 同路径登记冲突而拒绝；需先取得精确覆盖，再只更新鉴权分类契约、错误处理序列、验收门及阶段状态。
+2. 需求、基本设计、详细设计及 Group WBS 尚未同步。MAGOS 拒绝扩展 manifest，精确指纹为 8f2094a911d4；重叠来源登记了 requirements.md、basic-design.md 与 Group WBS。新增的专属详细设计路径未发生重叠。等待用户授权后只补齐本阶段状态与分类契约。
 3. 尚未快进到本地 `dev`；没有修改 `main` 或远端。
 4. 应用层 LNK1104 首次失败记录在案；同命令重试通过，未删除共享缓存。
 
