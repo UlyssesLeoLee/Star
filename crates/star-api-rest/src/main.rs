@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=d4e8284a90261ac0ba6610a6f21e76995e95635c13c8bbe4f5eeadd6fb3f935c
+@cypher schema=1 source_sha256=63ec64a423d18cf0183cfdce788b96ba501bd83521dbb0c285a0432ecb6f2867
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -10,13 +10,27 @@ MERGE (install:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.
 MERGE (wakeHub:Type {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub",kind:"struct"})
 MERGE (wakeStart:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub.start",kind:"method"})
 MERGE (wakeInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_canvas_event_wake_hub",kind:"method"})
+MERGE (ingestion:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion",kind:"struct"})
+MERGE (configure_ingestion:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.configure",kind:"method"})
+MERGE (readiness_router:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.readiness_router",kind:"method"})
+MERGE (shutdown_signal:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown_signal",kind:"method"})
+MERGE (shutdown:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown",kind:"method"})
 MERGE (self)-[:DEFINES]->(main)
 MERGE (main)-[:USES_TYPE]->(store)
 MERGE (main)-[:USES_TYPE]->(port)
 MERGE (main)-[:CALLS]->(install)
 MERGE (main)-[:CALLS]->(wakeStart)
 MERGE (main)-[:CALLS]->(wakeInstall)
+MERGE (main)-[:CALLS]->(configure_ingestion)
+MERGE (main)-[:CALLS]->(readiness_router)
+MERGE (main)-[:CALLS]->(shutdown_signal)
+MERGE (main)-[:CALLS]->(shutdown)
 MERGE (main)-[:USES_TYPE]->(wakeHub)
+MERGE (main)-[:USES_TYPE]->(ingestion)
+MERGE (ingestion)-[:HAS_METHOD]->(configure_ingestion)
+MERGE (ingestion)-[:HAS_METHOD]->(readiness_router)
+MERGE (ingestion)-[:HAS_METHOD]->(shutdown_signal)
+MERGE (ingestion)-[:HAS_METHOD]->(shutdown)
 MERGE (wakeStart)-[:USES_TYPE]->(:Type {id:"sqlx::postgres::PgListener",kind:"struct"})
 MERGE (install)-[:USES_TYPE]->(port)
 MERGE (state)-[:HAS_METHOD]->(install)
@@ -43,11 +57,13 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use star_api_rest::{
     auth::JwtConfig,
     group_api::{
-        build_group_router, CanvasEventWakeHub, GroupApiState, PgGroupAppRegistryProvider,
+        CanvasEventWakeHub, GroupApiState, PgGroupAppRegistryProvider, build_group_router,
     },
 };
-use star_pg_adapter::{connect_pool, PgConfig};
+use star_pg_adapter::{PgConfig, connect_pool};
 use tracing::info;
+
+mod bi_task_event_ingestion;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -68,25 +84,32 @@ async fn main() -> anyhow::Result<()> {
         .await
         .map_err(|_| anyhow::anyhow!("Canvas event wake listener setup failed"))?;
 
-    let bi_task_event_query_port: Option<Arc<dyn TaskEventQueryPort>> =
-        match std::env::var("BI_DATABASE_URL") {
-            Ok(database_url) => {
-                if database_url.trim().is_empty() {
-                    return Err(anyhow::anyhow!("BI_DATABASE_URL is empty"));
-                }
-                let connect_options = PgConnectOptions::from_str(&database_url)
-                    .map_err(|_| anyhow::anyhow!("BI_DATABASE_URL is invalid"))?;
-                let bi_pool = PgPoolOptions::new()
-                    .max_connections(2)
-                    .acquire_timeout(Duration::from_secs(2))
-                    .connect_lazy_with(connect_options);
-                Some(Arc::new(PgTaskEventQueryStore::new(bi_pool)))
+    let (bi_task_event_query_port, bi_query_pool): (
+        Option<Arc<dyn TaskEventQueryPort>>,
+        Option<sqlx::PgPool>,
+    ) = match std::env::var("BI_DATABASE_URL") {
+        Ok(database_url) => {
+            if database_url.trim().is_empty() {
+                return Err(anyhow::anyhow!("BI_DATABASE_URL is empty"));
             }
-            Err(std::env::VarError::NotPresent) => None,
-            Err(std::env::VarError::NotUnicode(_)) => {
-                return Err(anyhow::anyhow!("BI_DATABASE_URL must be valid UTF-8"));
-            }
-        };
+            let connect_options = PgConnectOptions::from_str(&database_url)
+                .map_err(|_| anyhow::anyhow!("BI_DATABASE_URL is invalid"))?;
+            let bi_pool = PgPoolOptions::new()
+                .max_connections(2)
+                .acquire_timeout(Duration::from_secs(2))
+                .connect_lazy_with(connect_options);
+            (
+                Some(Arc::new(PgTaskEventQueryStore::new(bi_pool.clone()))),
+                Some(bi_pool),
+            )
+        }
+        Err(std::env::VarError::NotPresent) => (None, None),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(anyhow::anyhow!("BI_DATABASE_URL must be valid UTF-8"));
+        }
+    };
+    let mut bi_task_event_ingestion =
+        bi_task_event_ingestion::BiTaskEventIngestion::configure(pool.clone(), bi_query_pool).await;
 
     let group_app_registry = Arc::new(PgGroupAppRegistryProvider::new(
         pool.clone(),
@@ -98,10 +121,16 @@ async fn main() -> anyhow::Result<()> {
     if let Some(query_port) = bi_task_event_query_port {
         group_api_state = group_api_state.with_bi_task_event_query_port(query_port);
     }
-    let app = build_group_router(group_api_state);
+    let app = build_group_router(group_api_state).merge(bi_task_event_ingestion.readiness_router());
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
-    axum::serve(listener, app).await?;
+    let server_result = axum::serve(listener, app)
+        .with_graceful_shutdown(bi_task_event_ingestion.shutdown_signal())
+        .await;
+    let shutdown_result = bi_task_event_ingestion.shutdown().await;
+    server_result?;
+    shutdown_result
+        .map_err(|reason| anyhow::anyhow!("BI Task-event ingestion shutdown failed ({reason})"))?;
     Ok(())
 }

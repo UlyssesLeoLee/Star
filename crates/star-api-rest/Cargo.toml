@@ -87,6 +87,7 @@ domain-validation = { path = "../domain-validation" }
 domain-hook = { path = "../domain-hook" }
 domain-automation = { path = "../domain-automation" }
 bi-owner-runtime = { path = "../bi-owner-runtime" }
+platform-messaging-runtime = { path = "../platform-messaging-runtime", default-features = false, features = ["native-grpc-adapter"] }
 
 # Webhook 出站 (复用 star-webhook DeliveryStore/RetryPolicy, per spec §7.3)
 star-webhook = { path = "../star-webhook" }
