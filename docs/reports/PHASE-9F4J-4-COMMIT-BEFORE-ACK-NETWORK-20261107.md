@@ -1,7 +1,8 @@
 # PHASE-9F4J-4 — Owner Commit-Before-ACK Network Proof
 
-> **Status: IN PROGRESS / LIVE ACCEPTANCE NOT RUN** · Revision v0.2 · 2026-11-08
+> **Status: LOCAL DEV INTEGRATED / LIVE ACCEPTANCE NOT RUN** · Revision v0.4 · 2026-11-08
 > Lane: codex/9f4j4-network-latch-20261107 · Baseline: dev@4df294046125571ef90de64fb11891eb5002fd34
+> Integrated: dev@05c1c48b8cd083149a4d39e16786169e10501ba3 · local only, not pushed
 
 ## §0 Purpose
 
@@ -11,9 +12,9 @@ Record the test harness and evidence for proving that the BI owner transaction c
 
 | Path | Intended change | State |
 |---|---|---|
-| crates/star-api-rest/tests/bi_task_event_commit_before_ack_pg.rs | Test-only latch immediately before the actual ACK RPC; independent observer checks BI commit and source lease/ACK facts; replay assertion | Implemented; focused build and pure host-guard test pass; independent source review accepts it for local dev integration |
+| crates/star-api-rest/tests/bi_task_event_commit_before_ack_pg.rs | Test-only latch immediately before the actual ACK RPC; independent observer checks BI commit and source lease/ACK facts; replay assertion | Integrated into local dev at 05c1c48; source review accepted the harness |
 | docs/briefs/9F4J-4-COMMIT-BEFORE-ACK-NETWORK-20261107.md | Scope, scenario, preconditions, guardrails | Updated with exact environment inputs and sender/receiver transport boundary |
-| This report | Evidence and remaining gates | Updated to this validation snapshot |
+| This report | Evidence and remaining gates | Updated with local integration and post-integration validation |
 | docs/reviews/9F4J-4-COMMIT-BEFORE-ACK-NETWORK-REVIEW-20261107.md | Independent review record | P1/P2 fixes confirmed; accepted for local dev integration, live acceptance remains open |
 | docs/reports/WBS-DISPATCH-9F4J-4-COMMIT-BEFORE-ACK-NETWORK-20261107.jsonl | Dispatch and validation receipts | Focused validation and independent source-review result recorded |
 
@@ -30,6 +31,8 @@ The lane is restricted to its five MAGOS-registered paths. No production code, m
 | Targeted rustfmt | PASS | `rtk rustfmt --edition 2024 --check crates/star-api-rest/tests/bi_task_event_commit_before_ack_pg.rs` |
 | Cypher Graph Guardian | PASS | `rtk python .../cgg_guard.py --changed --stamp`; one Rust source file checked |
 | git diff --cached --check | PASS | All five registered paths staged and checked; no whitespace errors |
+| Post-integration focused test build | PASS | `rtk cargo +1.99.1 test -p star-api-rest --test bi_task_event_commit_before_ack_pg --no-run -j 4`; passed on retry after one transient Windows LNK1104 open-file failure |
+| Post-integration private/loopback host guard test | PASS | `rtk cargo +1.99.1 test -p star-api-rest --test bi_task_event_commit_before_ack_pg disposable_database_host_allows_loopback_and_multipass_private_addresses -j 4`; 1 passed |
 | PostgreSQL+mTLS commit-before-ACK test | NOT RUN | No designated DB URL or verified certificate set is available in this session; no VM/DB has been started |
 
 ## §3 Known gaps
@@ -40,12 +43,13 @@ The lane is restricted to its five MAGOS-registered paths. No production code, m
 4. The source route must be dedicated and otherwise idle. The test holds a transaction-scoped advisory lock for the fixed route in the source database; environments must point the append fixture and native service at the same source database.
 5. PostgreSQL role/grant/RLS, crash recovery beyond this single interruption point, backup/PITR, production identity, workload performance, and deployment readiness remain open.
 6. No schema, Cargo manifest, lockfile, production source, or cross-domain acceptance harness change is included in this lane.
+7. The integration is local to dev and has not been pushed; no release or deployment was performed.
 
 ## §4 Subagent review and takeover
 
 - The implementation worker is assigned only the registered integration test path. The coordinator owns the four registered documentation paths and will review the resulting test independently.
 - Preliminary read-only architecture review found the proof feasible with the real receiver and native transport, using a test-side latch at the ACK boundary and a separate PostgreSQL observer. It also identified missing live DB/certificate prerequisites; no acceptance was executed.
-- The independent reviewer confirmed the proof structure, identified the host-ordering and fixed-route concurrency issues, and confirmed both scoped fixes on re-review. The lane is accepted for local dev integration; this does not certify live PostgreSQL/mTLS behavior.
+- The independent reviewer confirmed the proof structure, identified the host-ordering and fixed-route concurrency issues, and confirmed both scoped fixes on re-review. The lane is integrated into local dev; this does not certify live PostgreSQL/mTLS behavior.
 - The source Event is seeded with the existing authenticated database function because the append convenience API does not satisfy the Event-kind boundary. The harness does not claim sender-side mTLS append.
 - A separate release-payload audit is tracked in stable-release WBS work and is not part of this lane.
 
@@ -73,11 +77,11 @@ The lane is restricted to its five MAGOS-registered paths. No production code, m
 
 | Role | Review responsibility | State |
 |---|---|---|
-| Architecture | Mavis reviews owner/transport boundary and commit-before-ACK ordering | Source review accepted for dev integration; live behavior unverified |
+| Architecture | Mavis reviews owner/transport boundary and commit-before-ACK ordering | Integrated into local dev; live behavior unverified |
 | SRE Lead | Mavis reviews bounded waits, lease handling, and failure reporting | Source review accepted; live environment unavailable |
 | Platform | Mavis reviews native gRPC+mTLS and immutable route identity | Source review accepted for harness integration; live handshake not run |
 | Review chair | Mavis reviews scope, diff, and test evidence | Independent re-review passed; candidate file check passed |
-| PM | Mavis reviews status and WBS traceability | IN PROGRESS; PostgreSQL/mTLS acceptance remains NOT RUN |
+| PM | Mavis reviews status and WBS traceability | Local integration recorded; PostgreSQL/mTLS acceptance remains NOT RUN |
 
 Revision author: Ulysses (12-role company per DEC-008) — Mavis review. This is not a claim of human approval or deployment acceptance.
 
@@ -88,3 +92,4 @@ Revision author: Ulysses (12-role company per DEC-008) — Mavis review. This is
 | v0.1 | 2026-11-07 | Ulysses (12-role company per DEC-008) — Mavis review | Created the phase record, fixed the registered five-file boundary, specified the real pre-ACK observation sequence, and recorded missing live DB/mTLS prerequisites as NOT RUN | 9F4J.4 lane start |
 | v0.2 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis review | Recorded Rust 1.99.1 focused build, pure host-guard test, formatting and graph checks; corrected sender-mTLS scope; added pre-connect database host rejection and fixed-route advisory locking; kept live acceptance NOT RUN pending environment and independent re-review | First review findings and focused validation |
 | v0.3 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis review | Recorded independent re-review acceptance for local dev integration, five-path staged whitespace check, and the remaining live PostgreSQL/mTLS acceptance gate | P1/P2 fixes confirmed |
+| v0.4 | 2026-11-08 | Ulysses (12-role company per DEC-008) — Mavis review | Recorded local fast-forward commit 05c1c48, post-integration focused build and host-guard test, local-only/no-push status, and the still-open live PostgreSQL/mTLS gate | Integration completed |
