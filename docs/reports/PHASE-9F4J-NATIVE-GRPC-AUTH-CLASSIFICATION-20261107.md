@@ -1,7 +1,7 @@
 # PHASE-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION
 
-> **状态：PARTIAL**。native gRPC 与应用适配器的授权错误分类已实现、验证并通过独立审查；基本设计/WBS 同步及本地 dev 集成待完成。  
-> Lane：`codex/9f4j-native-auth-errors-20261107`；基线：`dev@8c505f36`；代码提交：`71704ff8`、`ecb4d482`。
+> **状态：PARTIAL**。native gRPC 与应用适配器的授权错误分类已实现、验证并通过独立审查，已选择性集成到本地 dev；基本设计/WBS 同步及数据库、TLS、端到端验收仍未完成。
+> 来源 lane：`codex/9f4j-native-auth-errors-20261107`；源基线：`dev@8c505f36`；源提交：`71704ff8`、`ecb4d482`、`5f3de0c1`、`944ea273`、`a356f239`、`205de9da`。已重放到 `dev` 的对应提交：`b83dfd07`、`2911d103`、`0bfbbfa0`、`3cb1b983`、`383efffa`、`5859027b`。
 
 ## §0 目的
 
@@ -13,8 +13,8 @@
 |---|---|
 | `crates/platform-messaging-runtime/src/native_grpc.rs` | `Unauthenticated`/`PermissionDenied` → `Unauthorized`；其他状态 → 不带服务端详情的 `Transport`；pull、origin verification、ACK 共用映射。已实现，提交 `71704ff8`。 |
 | `crates/star-api-rest/src/bi_task_event_ingestion.rs` | `Route/Unauthorized` → 应用 `Unauthorized`；`Contract/Transport/Busy` → 应用 `Transport`；三个操作共用映射且有五变体测试。已实现，提交 `ecb4d482`；本轮全文件格式整理提交 5f3de0c。 |
-| Brief、阶段报告、dispatch | Brief 已提交；本报告与 dispatch 记录本阶段审查、验证和限制，待提交。 |
-| docs/requirements.md、docs/basic-design.md、docs/detailed-design/DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001.md、Group WBS | 尚未修改。MAGOS 对完整设计范围的登记返回指纹 8f2094a911d4；与保留候选重叠的路径为 requirements.md、basic-design.md、Group WBS，新增详细设计路径无重叠。候选 codex/star-rust-1991-baseline-20261105 及其 worktree/文件保持原样。 |
+| Brief、阶段报告、dispatch | 已提交并集成到本地 `dev`；最终状态仍为 PARTIAL。 |
+| docs/requirements.md、docs/basic-design.md、docs/detailed-design/DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001.md、Group WBS | 尚未修改。集成前的完整设计范围检查曾返回指纹 `8f2094a911d4`，当时登记路径与保留候选重叠；此后 dev 已前进，该指纹已失效。本轮尚未对新基线重新规划完整设计清单。保留候选 `codex/star-rust-1991-baseline-20261105` 及其 worktree/文件原样。 |
 
 独立审查确认消费者对授权拒绝会标记 Blocked 并停止，其他错误仍进入既有重试路径；两份 Rust Cypher 头部没有删除既有 MERGE 关系。native 头部为满足校验器大小上限对既有 MERGE 行做了空白压缩，审查确认关系语义保留。
 
@@ -34,8 +34,8 @@
 ## §3 已知缺口
 
 1. 单测和编译不能替代真实 TLS、服务端授权拒绝、PostgreSQL/RLS、commit-before-ACK 或恢复链路验收。
-2. 需求、基本设计、详细设计及 Group WBS 尚未同步。MAGOS 拒绝扩展 manifest，精确指纹为 8f2094a911d4；重叠来源登记了 requirements.md、basic-design.md 与 Group WBS。新增的专属详细设计路径未发生重叠。等待用户授权后只补齐本阶段状态与分类契约。
-3. 尚未快进到本地 `dev`；没有修改 `main` 或远端。
+2. 需求、基本设计、详细设计及 Group WBS 尚未同步。代码集成前对完整设计范围的 MAGOS 检查返回过指纹 `8f2094a911d4`；由于 dev 已前进，该指纹已失效。当前基线下的完整设计范围尚未重新规划或修改；此前检测到的重叠是 requirements.md、basic-design.md 与 Group WBS，新增的专属详细设计路径当时无重叠。
+3. 六个来源提交已逐项重放到本地 `dev`（提交映射见报告头部）；`main` 与远端均未修改或 push。重放没有重新运行 Rust 构建/测试；验证证据仍来自来源 lane 对相同补丁的实测。
 4. 应用层 LNK1104 首次失败记录在案；同命令重试通过，未删除共享缓存。
 
 ## §4 子代理失败接手清单
@@ -43,7 +43,7 @@
 - Worker 提交 `71704ff8`，范围仅为原生状态映射与测试。
 - 协调者提交 `ecb4d482`，修复 adapter 丢失 native 错误类别的问题。
 - 曾用 `--lib` 过滤应用测试，结果为 0 项，未计作通过；随后用 binary target 精确测试并通过。
-- 独立代码/规格审查无 P0/P1；reviewer 未运行测试。协调者仍需完成受阻文档同步、最终提交、dev freshness 复核与快进。
+- 独立代码/规格审查无 P0/P1；reviewer 未运行测试。协调者已复核目标 `dev` clean/inactive、MAGOS 登记范围无冲突，并完成六个提交的选择性重放；仍需完成受阻设计/WBS 同步和真实环境验收。
 
 ## §5 守门规则
 
@@ -63,7 +63,7 @@
 | SRE Lead | 定向测试与 all-targets 通过；真实运行环境未验证 |
 | 平台 | adapter 分类审查通过；PostgreSQL/RLS 未运行 |
 | 评审主持 | 范围与 Cypher 关系审查通过 |
-| PM | PARTIAL；等待需求、基本设计、详细设计、WBS 登记及本地 dev 集成 |
+| PM | PARTIAL；本地 dev 集成完成，需求/基本设计/详细设计/WBS 同步及真实环境验收待办 |
 
 **审批者**：架构师（Mavis 接手审核）；未作人工部署或生产验收声明。  
 **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。
@@ -73,3 +73,4 @@
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录错误分类实现、验证、独立审查、未完成设计同步及环境验收缺口 | 完成组合 lane 验证 |
+| v0.2 | 2026-11-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录源 lane 六个提交已选择性重放到本地 dev；更新当前设计门禁说明，不将旧指纹当作有效授权，也不把代码级检查提升为生产验收 | 代码 lane 已集成到 dev |
