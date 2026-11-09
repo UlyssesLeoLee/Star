@@ -1,0 +1,20 @@
+[package]
+publish = false
+name = "bi-native-event-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+bi-owner-runtime = { path = "../bi-owner-runtime" }
+platform-messaging-runtime = { path = "../platform-messaging-runtime", default-features = false, features = ["native-grpc-adapter"] }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["rt"] }
+uuid = { workspace = true }
+
+[lints]
+workspace = true
