@@ -2,6 +2,8 @@
 
 > **v7.09 9F4J 原生 BI 事件授权错误分类（2026-11-08）**：Native gRPC Unauthenticated / PermissionDenied 必须映射为 Unauthorized，其他状态映射为脱敏 Transport；应用适配器不得丢失此分类，授权失败必须使接收 worker fail closed 并停止，不能按瞬时传输故障重试或 ACK。该源码切片的定向测试、all-targets 编译、格式检查和独立审查已在来源 lane 完成；目标 PostgreSQL/RLS、真实 mTLS/RPC 与 commit-before-ACK 网络验收未运行，BI ingress 与执行仍保持关闭。详见 §50.8AX、基本设计 §16.79、专属详细设计和 Group WBS §23.21。
 
+> **当前工具链基线（2026-11-05）**：Star 的最低支持 Rust 版本已提升为 **1.99.1**，与 Rust 官方 1.99.1 点版本发布保持一致。根 `Cargo.toml`、BFF、被纳入构建的独立 crate、`rust-toolchain.toml`、CI、Canvas/k3s 构建镜像及受支持的验收 runner 必须使用 1.99.1；历史阶段记录中的 1.99.0 仅作为当时证据保留，不能作为当前基线通过证明。当前版本切换本身不关闭 workspace、目标数据库、托管 CI、发布或执行门禁。
+
 > **v7.08 Project Repository 解绑与语义重叠协作规则（2026-10-25）**：Project 可关联 0..N 个 Repository，默认项仅为界面偏好；解绑前先退役并迁移活动 Run/Worktree 引用，逐 owner 收齐幂等回执后才可移除授权关联。文本语义重叠无论 OT 是否可机械变换都形成持久冲突；OT 只可在用户显式解决时作为预览，不得自动写入 canonical revision。同步基本/详细设计、SRS/BD、协作 spec、数据与测试设计及 WBS；运行时和数据库验收仍 OPEN。
 
 > **v7.07 WLD-7 同秒重叠编辑立即冲突（2026-10-25）**：明确语义重叠不依赖客户端时钟或固定一秒窗口；两份完整、摘要校验通过的重叠提案即使在服务端 1000 ms 内到达，也必须在第二份提案进入 owner 处理后立即通过同一 resource fence 建立冲突事实、固定双方草稿并触发持久提醒。测试设计增加 E2E-COLLAB-09。1 秒仍仅是 conflict commit 至双方提醒/首个有界差异页可读的 p99 目标；当前运行仍轮询，WLD-7 未实施/验收。

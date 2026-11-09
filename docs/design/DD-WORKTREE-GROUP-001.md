@@ -1,5 +1,7 @@
 # DD-WORKTREE-GROUP-001
 
+> **工具链基线修订（2026-11-05）**：当前受支持的 Star Rust 最低版本为 **1.99.1**。所有新构建、CI、容器与 runner 默认必须解析到 1.99.1；本详细设计中早期 Rust 1.99.0/1.98.x 文字只描述当时的历史验证或未完成门禁，不得被引用为当前通过证据。该修订不改变执行 fail-closed、目标数据库、宿主基础设施、BI/Benchmark 或发布门禁。
+
 > **渡口 Project / Engineering Run / Worktree / Branch 与 Run Apps 详细设计 v5.33**
 >
 > - **PR history**: PR-226 (`feat(worktree-group): phases 2b-2d + canvas persistence API PR-5`) merged at `cc840a34` (per PR-272 docs 乖离 audit follow-up PR-276)

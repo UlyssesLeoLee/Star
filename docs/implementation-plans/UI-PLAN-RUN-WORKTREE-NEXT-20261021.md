@@ -206,7 +206,7 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 | UI-4 Infinite Canvas 与协作对象 | Run Canvas、WorkItem/Worktree/Branch/BI typed refs、关系检查器、从 Canvas 建 Task 的复合命令、跳转与回链。 | UI-2；Canvas 与 WorkItem owner contracts；WLD-2 中涉及 Task 的复合命令。 | Canvas 与 Task Card 同级；布局与业务关系分离；引用逐次授权；跨 owner 失败不留孤儿对象；大画布遵守视口/内存界限。 |
 | UI-5 Workflow、Schedule、Hooks 与 Plugin Apps | Workflow/Loop 状态；Schedule Rule 配置与执行分态；高级设置 Hooks 和全局未保存草稿守卫；Plugin Registry/热插拔/capability 可视化、授权撤销。 | UI-2；WLD-3/5；Plugin manifest/runtime contract。 | hostless Run 可配置规则只在 Rust/PostgreSQL acceptance 完成后展示为可用配置；明确它没有触发/Occurrence/执行能力。确认守卫覆盖全部离开路径；checkpoint 不作业务事实；resume/retry 复验权限、策略和幂等；核心 Hook 不可被插件削弱；卸载取消并 drain 在途插件调用。 |
 | UI-6 BI/Benchmark 与 Infrastructure 可视化 | Coverage-aware BI/Benchmark；Run/Host/Cluster/Instance/Reservation/readiness 分层详情和故障深链。 | UI-2；WLD-4/6；版本化指标和 Infrastructure Profile。 | Unknown/partial 不显示成功；host 与 cluster 容量分开；Run 固定 cluster generation；测试 Multipass inventory 仍最多 2 条记录，无自动清理。 |
-| UI-7 发布质量与 Rust 桌面替换 | 主要路径端到端验收、键盘/读屏/缩放、恢复与性能复测、打包/升级/迁移说明、Web/Rust 客户端一致性矩阵。 | UI-0..6；WLD-7 对应产品事实/owner 门关闭。 | Rust 1.99.0 工具链门、授权/目标 DB/runtime、性能与内存预算、恢复/取消、插件隔离和真实数据验收均有证据；未通过的功能在界面中保持禁用。 |
+| UI-7 发布质量与 Rust 桌面替换 | 主要路径端到端验收、键盘/读屏/缩放、恢复与性能复测、打包/升级/迁移说明、Web/Rust 客户端一致性矩阵。 | UI-0..6；WLD-7 对应产品事实/owner 门关闭。 | Rust 1.99.1 工具链门、授权/目标 DB/runtime、性能与内存预算、恢复/取消、插件隔离和真实数据验收均有证据；未通过的功能在界面中保持禁用。 |
 
 ### 8.1 v0.5 UI 规划：先后顺序与可审查产物
 
@@ -475,7 +475,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 - 完成定义：实现基线更新到 `8245b90c`；UI-2 集成状态、WLD-1 API/Provider gap 和所有后续 UI 阶段在计划与 WBS 中一致；Project → Run → Worktree → Branch 导航和无焦点 App mount 门不被改写；无 mock/seed 生产成功表述。
 - 本轮只更新规划文档，不实现新页面、不开放生命周期、任务执行、聊天发送或 BI ingress。
-- Rust 1.99.0、目标 PostgreSQL/RLS、真实 provider、Run↔Worktree 持久绑定、Runtime sandbox 与 UI 性能实测仍未验收；相应 UI capability 必须显示 disabled/unavailable。
+- Rust 1.99.1、目标 PostgreSQL/RLS、真实 provider、Run↔Worktree 持久绑定、Runtime sandbox 与 UI 性能实测仍未验收；相应 UI capability 必须显示 disabled/unavailable。
 
 ## 8.5 v0.9 UI-0 设计包与下一版工作顺序
 
@@ -519,7 +519,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 3. UI-2 已关闭 Web Run Shell 的 no-focus Task Cards 偏差；UI-1 已实现 Project/Run 选择与展开分离，组件测试覆盖 Project Index 导航、Project scope 更新、Run no-focus 导航及展开不隐式选择。浏览器/键盘/读屏仍未验收。Run Worktree picker 最多呈现 4 页/200 条并支持已加载项搜索。右侧完整 App 工作区、Inspector、服务端范围搜索、聊天 Runtime/send、浏览器 Back/Forward、目标 DB、真实 session provisioner、Hook 生命周期和 BI receiver 仍开放。
 4. Rust 前端的跨平台字体/输入法、屏幕阅读、窗口/多显示器、终端渲染以及插件沙箱具体协议，在 UI-0 用目标设备实测确定。
 5. 一份 R3 shared-Web inventory 和三个既有浏览器样本已单独记录；R1/R2 inventory、实际 endpoint provenance、缺失的 R1 warm FCP、完整 target-equivalent Tauri/Rust-native measurements、绝对 RSS/延迟阈值仍待补齐与评审。在此之前不得声称满足性能目标。
-6. WLD-3 hostless Schedule Rule 与 Occurrence snapshot CHECK source slices 尚未通过 Rust 1.99.0 和 PostgreSQL migration/API acceptance；Occurrence 仍只有 JSONB `target_snapshot`，CHECK 约束 JSON path，不新增 Branch 列，也不实现 worker/materializer/admission/executor。
+6. WLD-3 hostless Schedule Rule 与 Occurrence snapshot CHECK source slices 尚未通过 Rust 1.99.1 和 PostgreSQL migration/API acceptance；Occurrence 仍只有 JSONB `target_snapshot`，CHECK 约束 JSON path，不新增 Branch 列，也不实现 worker/materializer/admission/executor。
 7. Project 投影当前只有 ID/role；Run Worktree projection 缺 lock、dirty/ahead/behind、observed-at、Branch freshness 与 assignment receipt。Project Worktree Index 缺 Engineering Run ID，创建/导入也没有 Run binding receipt。补齐 owner/API 合同前，不得把这些字段作为生产事实或开放 Run 级生命周期操作。
 8. 旧 Group 路由可回退至本地 store/预览；当前 BI 面板是任务事件视图，Canvas 未装配到 canonical Run Shell。仅凭这些现象不得声称完整 App 集成、BI/Benchmark 或生产数据闭环。
 9. WLD-1 Run-scoped lifecycle API 还没有真实 provider、Run↔Worktree binding writer 和目标数据库验收；现有 UI 未迁移至这些路径。Run API 与旧 Project API 的表面存在不可作为 UI 可用能力证明。

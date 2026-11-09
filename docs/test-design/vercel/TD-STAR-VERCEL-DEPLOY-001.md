@@ -124,7 +124,7 @@
 
 | 用例 | 前置/操作 | 预期结果 / 留证 | 需求映射 |
 |---|---|---|---|
-| T-028 | 在目标账户/套餐构建最小 Rust handler，验证工具链最低 Rust 1.99.0 和 edition 2021 | 保留实际构建日志、工具链和目标计划；低于 MSRV 或 workspace lint 被放宽时失败 | FR-VC-002/004; NFR-VC-08; AC-VC-007; GAP-03 |
+| T-028 | 在目标账户/套餐构建最小 Rust handler，验证工具链最低 Rust 1.99.1 和 edition 2021 | 保留实际构建日志、工具链和目标计划；低于 MSRV 或 workspace lint 被放宽时失败 | FR-VC-002/004; NFR-VC-08; AC-VC-007; GAP-03 |
 | T-029 | 比较 SRS 指定的构建形态 A 与 B；验证至少一个候选可从 Vercel 构建并访问仓内 crates/star-api-rest | 不复制 domain logic；记录上传根、manifest、产物与失败证据；未通过仍关闭 Phase 2 | FR-VC-002; AC-VC-007; GAP-10 |
 | T-030 | 对最小 handler 和代表性薄 adapter 分别测量每个实际部署函数的 release 依赖包 | 记录包清单/size；超出保守 250MB 则阻断 Rust 部署；不以 workspace crate 总数推算 | FR-VC-004; NFR-VC-03; AC-VC-011; GAP-01 |
 | T-031 | 注入 in-memory repository、进程 EventBus、star-taskqueue 或进程内事实 cache 的配置 | 启动自检 fail closed；保存配置和启动证据 | FR-VC-003; AC-VC-008 |
@@ -235,7 +235,7 @@ T-049 当前状态为 **NOT_RUN**。Star Gateway 的浏览器凭证握手方式�
 | NFR-VC-05 | Verified region and data residency/network compatibility recorded | T-032 |
 | NFR-VC-06 | Cold-start distribution measured and returned to SRS before assigning a target | T-032 |
 | NFR-VC-07 | No SLA scheduling claim; Star owner recovery behavior proven under Cron failure modes | T-020..T-027 |
-| NFR-VC-08 | Rust 1.99.0/edition/lints supported without weakening workspace safety | T-028 |
+| NFR-VC-08 | Rust 1.99.1/edition/lints supported without weakening workspace safety | T-028 |
 
 ### 6.2 Known gaps
 
@@ -243,7 +243,7 @@ T-049 当前状态为 **NOT_RUN**。Star Gateway 的浏览器凭证握手方式�
 |---|---|---|
 | GAP-01 | Per-handler real dependency closure and deployed package size | T-030; NOT_RUN |
 | GAP-02 | Separate general Functions GA from Rust streaming/WebSocket support | T-034; UNKNOWN until proof |
-| GAP-03 | Actual Vercel builder supports Rust MSRV 1.99.0 | T-028; NOT_RUN |
+| GAP-03 | Actual Vercel builder supports Rust MSRV 1.99.1 | T-028; NOT_RUN |
 | GAP-04 | Hosted PG and transaction pooling preserve all approved RLS behavior | T-038/T-042; NOT_RUN |
 | GAP-05 | Next.js 16, TypeScript 7.0.2, Monaco/Three build behavior and duration | T-001; NOT_RUN |
 | GAP-06 | Verify PostgreSQL Marketplace/vendor facts from official provider sources | T-038/T-042 plus source review; NOT_RUN |
@@ -281,7 +281,7 @@ No exit criterion is satisfied by this test design alone.
 - Target account/plan, domains, region and protected Preview settings are not evidenced here.
 - Real host-session contract and Owner authorization API mapping must be provided/verified before hosted auth tests.
 - Owner-backed due-work scan, idempotency lookup, Schedule trigger intake and Outbox consumer fixture remain prerequisite contracts.
-- Rust runtime capability and Vercel build image support for Rust 1.99.0 remain UNKNOWN.
+- Rust runtime capability and Vercel build image support for Rust 1.99.1 remain UNKNOWN.
 - PostgreSQL Marketplace/vendor selection, transaction pooling and RLS compatibility are not established.
 - Test-specific budgets, alert thresholds and data-retention durations need approved operational baselines before execution.
 

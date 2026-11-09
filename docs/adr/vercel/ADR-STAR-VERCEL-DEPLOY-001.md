@@ -46,7 +46,7 @@ Vercel Preview 与 Production 必须隔离凭据、数据和副作用。未信�
 
 1. **VCD-0：** 完成并批准与 SRS v0.4 对齐的 ADR、基本设计、详细设计与测试设计；在此之前不得将 Vercel 部署标为已批准或已完成。
 2. **VCD-1：** 验证受保护前端 Preview/Production、真实登录和 Run 授权、同源 BFF、安全环境变量、构建门、Preview 无生产密钥/数据/副作用及回滚。
-3. **VCD-2：** 只在无生产数据、无业务写入的隔离项目验证 Rust 1.99.0、构建根、包体、目标套餐资源、并发、RSS、冷启动、日志/指标、Streaming/WebSocket（若需要）、数据库连接/RLS 和回滚。未知或失败即保持 Rust 执行能力关闭。
+3. **VCD-2：** 只在无生产数据、无业务写入的隔离项目验证 Rust 1.99.1、构建根、包体、目标套餐资源、并发、RSS、冷启动、日志/指标、Streaming/WebSocket（若需要）、数据库连接/RLS 和回滚。未知或失败即保持 Rust 执行能力关闭。
 4. **VCD-3：** 只有 VCD-2 PASS、VCD-1 完成、WLD-0 授权/Owner 契约通过，以及产生事件时相关 WLD-6 通过后，才评审逐个 allowlist 的薄型 Owner-backed HTTP adapter。每个 endpoint 需遵守现有 Owner 授权、幂等、持久回执、审计和 Outbox/Inbox 语义。
 5. **VCD-4：** 对 Cron 漏发/重复/重叠/失败与回滚后的定义恢复执行对账；Star 的持久 Schedule 与 Owner 授权仍是权威。无人值守触发按固化的 `run_as_actor_id` 实时复验权限；每次触发/重试/恢复解析当时有效的 `RunInfrastructureBinding`。
 

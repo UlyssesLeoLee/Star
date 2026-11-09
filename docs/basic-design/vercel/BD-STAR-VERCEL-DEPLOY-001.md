@@ -165,12 +165,12 @@ Production secret 与 Preview secret 分别管理；任何 secret 不进入 `NEX
 | 区域/驻留 | 固定到与数据可达、驻留策略相容且已验证的区域（NFR-VC-05） | 不预置区域；在部署设计中记录选择与故障域。 |
 | 冷启动 | 实测后定档（NFR-VC-06） | 无测量数据时标记 unknown，不虚构 SLO。 |
 | 调度 | 不承载 SLA 级调度（NFR-VC-07） | Schedule 精度与恢复由 Star 执行面保证。 |
-| 工具链 | Rust MSRV 1.99.0 / edition 2021（NFR-VC-08） | VCD-2 验证目标构建镜像；验证前无 Rust 生产 handler。 |
+| 工具链 | Rust MSRV 1.99.1 / edition 2021（NFR-VC-08） | VCD-2 验证目标构建镜像；验证前无 Rust 生产 handler。 |
 
 ### 6.3 Rust Runtime 与数据库门
 
 - Rust Runtime 当前按 SRS 标记为 Beta。公开通用 Functions WebSocket GA 不证明 Rust Runtime 支持 WebSocket/Streaming；Rust 专属 duration、内存、包体扩展、并发、FD、日志/指标和目标计划资格须单独实测（GAP-02、GAP-09、GAP-11）。
-- VCD-2 使用无生产数据、无业务写入的最小样例及代表性 dependency closure 验证 Rust 1.99.0、两种已列构建形态、`api/*.rs`/`[[bin]]`、部署、限额、RSS/冷启动、连接复用、日志/指标和回滚。任何未知或失败保持 Rust 端点关闭。
+- VCD-2 使用无生产数据、无业务写入的最小样例及代表性 dependency closure 验证 Rust 1.99.1、两种已列构建形态、`api/*.rs`/`[[bin]]`、部署、限额、RSS/冷启动、连接复用、日志/指标和回滚。任何未知或失败保持 Rust 端点关闭。
 - 不在本设计新增数据库、migration owner 或数据权威。任何 Rust/托管 PostgreSQL 接入须先明确它服务于现有 Star Owner 的权威持久化、通过 W/T/M 与 RLS 评审，证明事务级 `SET LOCAL`、连接池复用和租户隔离；否则 Vercel 不直接连数据库，继续经现有 Star API。
 - 迁移不在函数内运行。数据库 schema/迁移 authority 保持在既有 Star 迁移流程；任何托管 PostgreSQL 服务商选择仍受 SRS GAP-06 与 WLD owner review 约束。
 
