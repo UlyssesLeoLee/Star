@@ -42,6 +42,7 @@ import {
   RefreshCw,
   Webhook,
   Code2,
+  Bell,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -451,29 +452,29 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: Terminal,
   },
   {
-    id: "search",
-    label: "Universal Search",
-    code: "SRC",
-    href: "/search",
-    category: "integration",
-    categoryLabel: "Integration & Security",
-    description: "全域跨模块语义检索与索引",
-    icon: Search,
-  },
+      id: "search",
+      label: "Universal Search",
+      code: "SRC",
+      href: "/search",
+      category: "integration",
+      categoryLabel: "Integration & Security",
+      description: "全域跨模块语义检索与索引",
+      icon: Search,
+    },
 
-  // ── System & Meta ────────────────────────────────────────────────
-  {
-    id: "local-runtime",
-    label: "Local Runtime",
-    code: "RUN",
-    href: "/local-runtime",
-    category: "system",
-    categoryLabel: "System & Meta",
-    description: "本地容器执行时与守护进程控制台",
-    icon: Server,
-  },
-  {
-    id: "audit",
+      // ── System & Meta ────────────────────────────────────────────────
+      {
+        id: "local-runtime",
+        label: "Local Runtime",
+        code: "RUN",
+        href: "/local-runtime",
+        category: "system",
+        categoryLabel: "System & Meta",
+        description: "本地容器执行时与守护进程控制台",
+        icon: Server,
+      },
+      {
+        id: "audit",
     label: "Audit Log",
     code: "AUD",
     href: "/audit",
