@@ -78,6 +78,7 @@ describe("AppShell", () => {
       </AppShell>
     );
     const main = screen.getByTestId("app-main");
-    expect(main.style.minHeight).toBe("calc(100vh - 64px)");
+        // calc(-64px + 100vh) 与 calc(100vh - 64px) 数学等价，浏览器标准化后顺序不固定
+        expect(main.style.minHeight).toMatch(/calc\(.*(100vh.*64px|64px.*100vh).*\)/);
   });
 });

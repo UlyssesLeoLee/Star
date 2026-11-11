@@ -82,69 +82,76 @@ describe("StartFromPicker", () => {
   });
 
   it("switching kind updates candidate list", async () => {
-    server.use(
-      http.get("/api/v1/worktree-picker/candidates", () =>
-        HttpResponse.json(MOCK_OK),
-      ),
-    );
-
-    render(
-      <StartFromPicker repoId="repo-1" onSelect={vi.fn()} onCancel={vi.fn()} />,
-    );
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId("start-from-radio-local_branch"),
-      ).toBeInTheDocument();
-    });
-
-    // 切到 local_branch → 显示 1 个 candidate (MOCK_OK.existing_worktrees[0])
-    fireEvent.click(screen.getByTestId("start-from-radio-local_branch"));
-
-    await waitFor(() => {
-      const list = screen.getByTestId("start-from-list");
-      expect(list.getAttribute("data-kind")).toBe("local_branch");
-      expect(
-        list.querySelector(
-          "button[data-testid='start-from-candidate'][data-candidate-id='local_branch:feat-y']",
+      server.use(
+        http.get("/api/v1/worktree-picker/candidates", () =>
+          HttpResponse.json(MOCK_OK),
         ),
-      ).not.toBeNull();
+      );
+
+      render(
+        <StartFromPicker repoId="repo-1" onSelect={vi.fn()} onCancel={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("start-from-radio-local_branch"),
+        ).toBeInTheDocument();
+      });
+
+      // 切到 local_branch → 显示 1 个 candidate (MOCK_OK.existing_worktrees[0])
+          // 受控 radio 的 onChange 硬编码 opt.value，点 label 触发原生单选
+          fireEvent.click(screen.getByTestId("start-from-kind-local_branch"));
+
+      await waitFor(() => {
+        const list = screen.getByTestId("start-from-list");
+        expect(list.getAttribute("data-kind")).toBe("local_branch");
+        expect(
+          list.querySelector(
+            "button[data-testid='start-from-candidate'][data-candidate-id='local_branch:feat-y']",
+          ),
+        ).not.toBeNull();
+      });
     });
-  });
 
-  it("confirms selection with kind + candidate_id + label", async () => {
-    server.use(
-      http.get("/api/v1/worktree-picker/candidates", () =>
-        HttpResponse.json(MOCK_OK),
-      ),
-    );
+    it("confirms selection with kind + candidate_id + label", async () => {
+        server.use(
+          http.get("/api/v1/worktree-picker/candidates", () =>
+            HttpResponse.json(MOCK_OK),
+          ),
+        );
 
-    const onSelect = vi.fn();
-    render(
-      <StartFromPicker
-        repoId="repo-1"
-        onSelect={onSelect}
-        onCancel={vi.fn()}
-      />,
-    );
+        const onSelect = vi.fn();
+        render(
+          <StartFromPicker
+            repoId="repo-1"
+            onSelect={onSelect}
+            onCancel={vi.fn()}
+          />,
+        );
 
-    // 切到 local_branch, 选 feat-y, confirm
-    fireEvent.click(screen.getByTestId("start-from-radio-local_branch"));
-    await waitFor(() => {
-      screen.getByTestId("start-from-list");
-    });
-    const items = screen.getAllByTestId("start-from-candidate");
-    fireEvent.click(items[0]);
+        // 等初始 candidates 加载完成 (repo_base 有 1 个)
+        await waitFor(() => {
+          screen.getByTestId("start-from-list");
+        });
 
-    fireEvent.click(screen.getByTestId("start-from-confirm"));
+        // 切到 local_branch, 选 feat-y, confirm
+        // 受控 radio 的 onChange 硬编码 opt.value，点 label 触发原生单选
+        fireEvent.click(screen.getByTestId("start-from-kind-local_branch"));
+        await waitFor(() => {
+          screen.getByTestId("start-from-list");
+        });
+        const items = screen.getAllByTestId("start-from-candidate");
+        fireEvent.click(items[0]);
 
-    expect(onSelect).toHaveBeenCalledOnce();
-    expect(onSelect).toHaveBeenCalledWith({
-      kind: "local_branch",
-      candidate_id: "local_branch:feat-y",
-      label: "feat-y",
-    });
-  });
+        fireEvent.click(screen.getByTestId("start-from-confirm"));
+
+        expect(onSelect).toHaveBeenCalledOnce();
+        expect(onSelect).toHaveBeenCalledWith({
+          kind: "local_branch",
+          candidate_id: "local_branch:feat-y",
+          label: "feat-y",
+        });
+      });
 
   it("calls onCancel when cancel button clicked", () => {
     const onCancel = vi.fn();
@@ -217,27 +224,33 @@ describe("StartFromPicker", () => {
   });
 
   it("confirm button is disabled until a candidate is picked", async () => {
-    server.use(
-      http.get("/api/v1/worktree-picker/candidates", () =>
-        HttpResponse.json(MOCK_OK),
-      ),
-    );
+      server.use(
+        http.get("/api/v1/worktree-picker/candidates", () =>
+          HttpResponse.json(MOCK_OK),
+        ),
+      );
 
-    render(
-      <StartFromPicker repoId="r1" onSelect={vi.fn()} onCancel={vi.fn()} />,
-    );
+      render(
+        <StartFromPicker repoId="r1" onSelect={vi.fn()} onCancel={vi.fn()} />,
+      );
 
-    const confirm = screen.getByTestId("start-from-confirm");
-    expect(confirm).toBeDisabled();
+      // 等初始 candidates 加载完成
+      await waitFor(() => {
+        screen.getByTestId("start-from-list");
+      });
 
-    // 切到 remote_branch, 选第一项
-    fireEvent.click(screen.getByTestId("start-from-radio-remote_branch"));
-    await waitFor(() => {
-      screen.getByTestId("start-from-list");
+      const confirm = screen.getByTestId("start-from-confirm");
+      expect(confirm).toBeDisabled();
+
+      // 切到 remote_branch, 选第一项
+      // 受控 radio 的 onChange 硬编码 opt.value，点 label 触发原生单选
+      fireEvent.click(screen.getByTestId("start-from-kind-remote_branch"));
+      await waitFor(() => {
+        screen.getByTestId("start-from-list");
+      });
+      const items = screen.getAllByTestId("start-from-candidate");
+      fireEvent.click(items[0]);
+
+      expect(confirm).not.toBeDisabled();
     });
-    const items = screen.getAllByTestId("start-from-candidate");
-    fireEvent.click(items[0]);
-
-    expect(confirm).not.toBeDisabled();
-  });
 });
