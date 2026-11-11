@@ -56,9 +56,11 @@ import {
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
+import { openWorkItemDocument, DOCUMENT_KIND_META } from "@/lib/documents";
 import type {
   WorkItem, WorkItemStatus, WorkItemKind, WorkItemPriority,
   Identity, AgentSession, Worktree,
+  WorkItemDocument,
 } from "@/types/ids";
 
 // ---- Mode discriminator ----
@@ -98,6 +100,12 @@ export function WorkItemDetailDrawer({
   const addWorkItem = useStore((s) => s.addWorkItem);
   const updateWorkItemField = useStore((s) => s.updateWorkItemField);
   const removeWorkItem = useStore((s) => s.removeWorkItem);
+  // per 2026-11-11 用户发令: 任务卡关联多文档 (Drawer 内管理)
+  const addWorkItemDocument = useStore((s) => s.addWorkItemDocument);
+  const removeWorkItemDocument = useStore((s) => s.removeWorkItemDocument);
+  const [newDocTitle, setNewDocTitle] = useState("");
+  const [newDocPath, setNewDocPath] = useState("");
+  const [newDocKind, setNewDocKind] = useState<WorkItemDocument["kind"]>("document");
 
   // ---- view 模式: 当前 workItem ----
   const currentWi = useMemo<WorkItem | null>(() => {
@@ -561,6 +569,105 @@ export function WorkItemDetailDrawer({
               </button>
             </div>
           </div>
+
+          {/* 6b. 关联文档 (per 2026-11-11 用户发令: 一卡多文档, 点击直接打开) */}
+          {!isNew && currentWi && (
+            <div data-testid="work-item-drawer-documents">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-ink-dim block mb-1">
+                <FileText size={9} className="inline mr-1" /> 关联文档 Documents ({(currentWi.documents?.length ?? 0)})
+              </label>
+              <div className="flex flex-col gap-1 mb-1.5">
+                {(currentWi.documents ?? []).map((doc) => (
+                  <div
+                    key={doc.id}
+                    data-testid={`work-item-drawer-doc-${doc.id}`}
+                    className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded border border-line/60 bg-bg-soft"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openWorkItemDocument(doc)}
+                      title={`${doc.path} — 点击打开`}
+                      className={`flex items-center gap-1 flex-1 min-w-0 text-left px-1 py-0.5 rounded hover:brightness-125 transition border ${DOCUMENT_KIND_META[doc.kind].tone}`}
+                    >
+                      <FileText size={10} className="shrink-0" />
+                      <span className="truncate">{doc.title}</span>
+                      <span className="text-[9px] text-ink-mute truncate ml-auto max-w-[40%]">
+                        {doc.path}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeWorkItemDocument(currentWi.id, doc.id)}
+                      className="text-ink-mute hover:text-err"
+                      aria-label={`移除文档 ${doc.title}`}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                {(currentWi.documents?.length ?? 0) === 0 && (
+                  <div className="text-[10px] text-ink-mute px-2 py-1">暂无关联文档</div>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <input
+                  data-testid="work-item-drawer-doc-title"
+                  type="text"
+                  value={newDocTitle}
+                  onChange={(e) => setNewDocTitle(e.target.value)}
+                  placeholder="标题"
+                  className="w-[30%] text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <input
+                  data-testid="work-item-drawer-doc-path"
+                  type="text"
+                  value={newDocPath}
+                  onChange={(e) => setNewDocPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const p = newDocPath.trim();
+                      if (p) {
+                        addWorkItemDocument(currentWi.id, { title: newDocTitle, path: p, kind: newDocKind });
+                        setNewDocTitle("");
+                        setNewDocPath("");
+                      }
+                    }
+                  }}
+                  placeholder="docs/s01/ipa-s01-001.md 或 https://…"
+                  className="flex-1 text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <select
+                  value={newDocKind}
+                  onChange={(e) => setNewDocKind(e.target.value as WorkItemDocument["kind"])}
+                  className="w-[22%] text-[10px] bg-bg-soft border border-line rounded px-1 py-1 text-ink outline-none focus:border-accent"
+                  aria-label="文档类型"
+                >
+                  {(Object.keys(DOCUMENT_KIND_META) as WorkItemDocument["kind"][]).map((k) => (
+                    <option key={k} value={k}>
+                      {DOCUMENT_KIND_META[k].label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  data-testid="work-item-drawer-doc-add"
+                  onClick={() => {
+                    const p = newDocPath.trim();
+                    if (p) {
+                      addWorkItemDocument(currentWi.id, { title: newDocTitle, path: p, kind: newDocKind });
+                      setNewDocTitle("");
+                      setNewDocPath("");
+                    }
+                  }}
+                  className="px-2 py-1 text-[10px] rounded border border-line hover:border-accent text-ink-mute hover:text-accent"
+                  aria-label="关联文档"
+                >
+                  <Plus size={10} />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 7. Comments timeline (view 模式, mock) */}
           {!isNew && currentWi && (

@@ -256,9 +256,23 @@ export interface WorkItem {
   // W/T/M 横展開分類 (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md)
   // 缺省: kind → WT_M_FROM_KIND 派生. 但允许 WorkItem 显式 override (例如 promotion: spike → M 后被改派为 task → T)
   w_t_m?: WtmCategory;
+  // per 2026-11-11 用户发令: 每个任务卡可关联多个文档, 点击直接打开。
+  // 文档 path 支持仓库路径 (docs/…, 打开到 GitHub dev blob) 或完整 http(s) URL。
+  documents?: WorkItemDocument[];
   created_at: Iso8601;
   updated_at: Iso8601;
   }
+
+/** 任务卡关联文档 (per 2026-11-11 用户发令: 一卡多文档, 可直接点开) */
+export interface WorkItemDocument {
+  id: Uuid;
+  title: string;
+  /** 仓库内路径 (docs/s01/ipa-s01-001.md) 或 http(s) 完整 URL */
+  path: string;
+  /** 文档类型徽标 (document / review / approval / evidence / link) */
+  kind: "document" | "review" | "approval" | "evidence" | "link";
+  added_at: Iso8601;
+}
 
 // =====================================================================
 // 5b. design-artifact (per test-design.md §6.3.3 V1 Should-Have Test)

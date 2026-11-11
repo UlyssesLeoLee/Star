@@ -26,7 +26,7 @@ import type {
   AgentSession, AgentStatus,
   Feedback, FeedbackStatus,
   PullRequest, PullRequestStatus,
-  WorkItem, WorkItemStatus,
+  WorkItem, WorkItemStatus, WorkItemDocument,
   ChangeSet, ChangeSetStatus,
   Notification, NotificationStatus,
   Canvas, CanvasElement, CanvasConnector,
@@ -262,6 +262,12 @@ interface StoreState {
   // 错误处理: TMO 调用失败 → fallback 走 addWorkItem 普通流程 (per 缺标比错标)
   // ===================================================================
   createWorkItem: (input: Parameters<StoreState["addWorkItem"]>[0]) => Promise<string>;
+  // per 2026-11-11 用户发令: 每个任务卡关联多个文档, 可直接点开。
+  addWorkItemDocument: (
+    workItemId: Uuid,
+    doc: { title: string; path: string; kind?: WorkItemDocument["kind"] },
+  ) => string; // 返回新文档 id
+  removeWorkItemDocument: (workItemId: Uuid, documentId: Uuid) => void;
 
   // 原地更新 workItem 单字段 (per 2026-08-31 12:07 JST Kanban Drawer 拍板)
   //   - 只改指定字段, 其他字段不变
@@ -502,6 +508,7 @@ const initialState = (set: any, get?: any): StoreState => ({
         workflow_id: input.workflow_id ?? "wf-default",
         due_date: input.due_date,
         worktree_id: input.worktree_id,
+        documents: input.documents ?? [],
         created_at: nowIso,
         updated_at: nowIso,
       };
@@ -524,6 +531,45 @@ const initialState = (set: any, get?: any): StoreState => ({
       };
     });
     return newId;
+  },
+
+  // per 2026-11-11 用户发令: 任务卡关联多个文档 (可直接点开)
+  addWorkItemDocument: (workItemId, doc) => {
+    const newDocId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    set((s: StoreState) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId
+          ? {
+              ...w,
+              documents: [
+                ...(w.documents ?? []),
+                {
+                  id: newDocId,
+                  title: doc.title.trim() || doc.path,
+                  path: doc.path.trim(),
+                  kind: doc.kind ?? "document",
+                  added_at: nowIso,
+                },
+              ],
+            }
+          : w,
+      ),
+    }));
+    return newDocId;
+  },
+
+  removeWorkItemDocument: (workItemId, documentId) => {
+    set((s: StoreState) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId
+          ? { ...w, documents: (w.documents ?? []).filter((d) => d.id !== documentId) }
+          : w,
+      ),
+    }));
   },
   // ===================================================================
   // createWorkItem — 任务卡创建入口 (per ADR-0049 + 2026-09-09 04:57 JST 拍板)

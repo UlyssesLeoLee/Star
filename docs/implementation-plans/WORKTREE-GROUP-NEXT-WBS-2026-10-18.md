@@ -870,3 +870,12 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **IPA-Atomic-Skills 集成 (数据层已生成)**: `D:/IPA-Atomic-Skills/` 目录 (237 skills, 16 组: S01-S09 + S06-UT/IT/ST/UAT + XMG/XRV/XTT/XDL) 由生成脚本转为 `frontend/src/lib/ipa-skills/catalog.ts` — 每个技能含 phase 映射 (S01→P1 … S09→P9, S06-*→P6.1-P6.4) + `workflow-contract.json` 的 required_inputs/required_outputs/人工审批门。项目页每工程列渲染技能专属栏位为后续 slice。
 - **n8n 级工作流构建器 (前端已实装)**: `/agent-view` 新增 `workflow` 视图 — `frontend/src/components/agent-workflow/WorkflowBuilder.tsx` + `frontend/src/lib/agent-workflow/{types,workflowLib}.ts`。节点卡片必带输入/输出端口 (SVG 端口锚点 + 贝塞尔连线 + 端口类型兼容校验 + 输入端口单线占用); 控制流组件完备: trigger / if-else (多规则条件编辑器) / for-loop (固定次数或表达式, Loop/Items/Done 三输出) / switch (顺序路由规则) / merge / code / http / wait; IPA 技能节点端口契约直接取自 workflow-contract (required_inputs→输入端口, required_outputs→输出端口, 人工审批门徽标)。面板: 控制流组件 + IPA 工程分组技能 + 全量搜索。tsc 0 错误。
 - **仍开放**: 前端 identity/admin 页接线与 JWT 存储; 项目页 IPA 技能栏位 UI (数据层已就绪); 工作流持久化 (localStorage/后端); Google OAuth client id 配置 (需用户在 Google Cloud Console 建 OAuth client 并提供 `NEXT_PUBLIC_GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_ID`, 未配置时登录端点 fail-closed 503); 真实后端部署 (Vercel 只承载前端, API 调本地后端仅本地可达); 域名重指新 deployment。
+
+### 23.25 2026-11-11 追加发令: 任务卡关联多文档 (可直接点开)
+
+- **用户发令 (2026-11-11)**: 每一个任务卡都要有关联多个文档功能, 并且可以直接点开。
+- **数据层**: `WorkItem` 新增可选 `documents?: WorkItemDocument[]` (向后兼容); `WorkItemDocument { id, title, path, kind: document|review|approval|evidence|link, added_at }`; store 新增 `addWorkItemDocument(workItemId, {title,path,kind})` / `removeWorkItemDocument(workItemId, documentId)`, `addWorkItem` 构造补 `documents: input.documents ?? []`。
+- **卡片 UI**: `KanbanCard` Row 6 — 文档 chip 行 (前 3 个 + `+N` 溢出), chip 点击 `e.stopPropagation()` 后直接打开 (新标签); 类型徽标色: 文档/审查/批准/证据/链接。
+- **打开语义**: `frontend/src/lib/documents.ts` — 仓库内路径 (docs/s01/ipa-s01-001.md) → GitHub `UlyssesLeoLee/Star/blob/dev/<path>`; http(s) → 原样打开。
+- **Drawer 管理**: `WorkItemDetailDrawer` 新增 6b 关联文档区 — 列表 (点击打开 + 移除)、添加表单 (标题 + path + 类型 select, Enter/+ 提交), testid 齐备。
+- **仍开放**: 文档打开目前跳 GitHub (Vercel 无 markdown 渲染依赖); 站内 markdown 预览器 (react-markdown 或自研) 为后续 slice。

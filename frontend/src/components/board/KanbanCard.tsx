@@ -22,9 +22,10 @@
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { StatusPill } from "@/components/StatusPill";
-import { Flag, User, Network } from "lucide-react";
+import { Flag, User, Network, FileText } from "lucide-react";
 import type { WorkItem, Identity } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
+import { openWorkItemDocument, DOCUMENT_KIND_META } from "@/lib/documents";
 
 export interface KanbanCardProps {
   workItem: WorkItem;
@@ -178,6 +179,34 @@ export function KanbanCard({
               #{l}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Row 6: 关联文档 (per 2026-11-11 用户发令: 一卡多文档, 点击直接打开) */}
+      {(workItem.documents?.length ?? 0) > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1" data-testid={`kanban-card-docs-${workItem.id}`}>
+          {workItem.documents!.slice(0, 3).map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              data-testid={`kanban-card-doc-${workItem.id}-${doc.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                openWorkItemDocument(doc);
+              }}
+              title={`${doc.path} — 点击打开`}
+              className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border bg-bg-card/90 hover:brightness-125 transition ${DOCUMENT_KIND_META[doc.kind].tone}`}
+            >
+              <FileText size={9} />
+              <span className="truncate max-w-[110px]">{doc.title}</span>
+            </button>
+          ))}
+          {(workItem.documents?.length ?? 0) > 3 && (
+            <span className="text-[10px] font-mono text-ink-mute px-1 py-0.5 rounded bg-bg-card/90 border border-line/40">
+              +{workItem.documents!.length - 3}
+            </span>
+          )}
         </div>
       )}
     </div>
