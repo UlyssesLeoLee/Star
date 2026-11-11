@@ -1,3 +1,23 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=a7aaf44725267001330628fb4fde30d855faab6bc00c0f622904f5a318e5210d
+MERGE (self:File {path:"crates/worktree-service/src/lib.rs"})
+MERGE (pg_repo_module:Symbol {id:"crates/worktree-service/src/lib.rs::pg_worktree_repository",kind:"module"})
+MERGE (pg_svc_module:Symbol {id:"crates/worktree-service/src/lib.rs::pg_worktree_service",kind:"module"})
+MERGE (pg_repo:Type {id:"worktree_service::PgWorktreeRepository",kind:"struct"})
+MERGE (pg_svc:Type {id:"worktree_service::PgWorktreeService",kind:"struct"})
+MERGE (row:Type {id:"worktree_service::WorktreeRow",kind:"struct"})
+MERGE (self)-[:DEFINES]->(pg_repo_module)
+MERGE (self)-[:DEFINES]->(pg_svc_module)
+MERGE (pg_repo_module)-[:DEFINES]->(pg_repo)
+MERGE (pg_repo_module)-[:DEFINES]->(row)
+MERGE (pg_svc_module)-[:DEFINES]->(pg_svc)
+MERGE (pg_svc_module)-[:IMPORTS]->(:File {path:"crates/worktree-service/src/pg_worktree_repository.rs"})
+MERGE (self)-[:REEXPORTS]->(pg_repo)
+MERGE (self)-[:REEXPORTS]->(pg_svc)
+MERGE (self)-[:REEXPORTS]->(row)
+@endcypher
+*/
 //! `worktree-service` — AI Worktree Graph Canvas Worktree Service crate.
 //!
 //! Per ULYS-57.2 T3 (2026-09-16):
@@ -46,6 +66,22 @@ pub use start_from_picker::{
     DefaultStartFromPickerSource, PickerCandidate, PickerCandidateKind, PickerCandidates,
     StartFromPickerSource,
 };
+
+// ULYS-195 stage 2 PR #4 (FR-ORCA-011): PG-backed backend.
+// 模块在 `pg` feature 下才声明/再导出, 因为 sqlx 是 optional dep (per Cargo.toml
+// `pg = ["dep:sqlx"]`); 默认构建不链接 sqlx。b905b4b1 只加了文件没挂进 lib.rs,
+// 导致 `tests/pg_worktree_service_integration.rs` 的 root import 永远无法解析
+// (`cargo check --all-targets --all-features` 红, CI workspace job 此前不带
+// --all-features 所以漏检)。
+#[cfg(feature = "pg")]
+pub mod pg_worktree_repository;
+#[cfg(feature = "pg")]
+pub mod pg_worktree_service;
+
+#[cfg(feature = "pg")]
+pub use pg_worktree_repository::{PgWorktreeRepository, WorktreeRow};
+#[cfg(feature = "pg")]
+pub use pg_worktree_service::PgWorktreeService;
 // 注: per-workspace multica-config/config.json 的 shared-dir reader 已在
 // crates/worktree-shared-dir/ (FileBackedConfigSource) 实装, 不在本 crate.
 // ULYS-177 历史 commit ef025c8d 的 `shared_dir_sources.rs` 模块已被替代.

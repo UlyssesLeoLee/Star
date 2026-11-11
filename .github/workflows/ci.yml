@@ -29,7 +29,12 @@ jobs:
         # 守门 #1 v19: -j 4 修正 "cargo workspace 互锁" 误诊 (per AGENTS.md §4.1 v19)
         # Windows 资源耗尽 0xc0000409 + 配额不足 ERROR_NO_SYSTEM_RESOURCES 跨 17 crate 触发
         # 修法: 降并行度 -j 4, 0 err 32.27s 通过
-        run: cargo check --workspace --all-targets -j 4
+        # 守门 #1 v20 (2026-11-09, per WBS §23.23 D4): 加 --all-features。
+        # 实证: v3 source-origin 契约变更后 star-api-rest 生产二进制不编译
+        # (E0061/E0599) 而 CI 仍绿 —— feature-gated 路径从不进 workspace job。
+        # 同跑暴露 worktree-service --all-features 失败 (b905b4b1 只加
+        # pg_worktree_* 文件未挂 lib.rs, 已修), 本机全仓 --all-features 0 err。
+        run: cargo check --workspace --all-targets --all-features -j 4
 
       - name: cargo test
         # 守门 #1 v6: release mode test 100% pass (单 crate) + v3 check + fmt + clippy 不替代 cargo test
