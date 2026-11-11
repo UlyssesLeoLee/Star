@@ -116,7 +116,7 @@ use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
 use star_pg_adapter::repository::{DeviceBindingRepository, PgDeviceBindingRepository};
-// @cypher schema=1 source_sha256=e297f86392d9abd2d41d0c0056f2be2c7867da3b64b7d97a4e0bbc223239677e
+// @cypher schema=1 source_sha256=17aae0fc970d3b1392401e21b81f7254b8e7e120dbede48bd1b8532338a15c18
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -185,6 +185,12 @@ use star_pg_adapter::repository::{DeviceBindingRepository, PgDeviceBindingReposi
 // MERGE (taskState)-[:USES_TYPE]->(biQueryPort)
 // MERGE (taskState)-[:HAS_METHOD]->(biQueryInstall)
 // MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
+// MERGE (deviceRepo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
+// MERGE (testCtor:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.new_with_device_binding_repo",kind:"method"})
+// MERGE (taskState)-[:USES_TYPE]->(deviceRepo)
+// MERGE (taskState)-[:HAS_METHOD]->(testCtor)
+// MERGE (testCtor)-[:USES_TYPE]->(deviceRepo)
+// MERGE (testCtor)-[:CALLS]->(taskStateNew)
 // @endcypher
 
 use serde_json::{Value, json};
@@ -385,6 +391,20 @@ impl GroupApiState {
             bi_task_event_query_port: None,
             canvas_event_wake_hub: None,
         }
+    }
+
+    /// Test seam: same as [`Self::new`] but with a stubbed device-binding repository,
+    /// so route tests can exercise authenticated handlers without a live PostgreSQL
+    /// device-binding table (per W16 device-identity hardening).
+    #[cfg(test)]
+    pub(crate) fn new_with_device_binding_repo(
+        jwt: Arc<JwtConfig>,
+        pool: PgPool,
+        device_binding_repo: Arc<dyn DeviceBindingRepository>,
+    ) -> Self {
+        let mut state = Self::new(jwt, pool);
+        state.device_binding_repo = device_binding_repo;
+        state
     }
 
     /// Install the trusted Local Runtime session provisioner for Task Card CLI routes.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=2026-11-11-google-login-v1
+@cypher schema=1 source_sha256=419bf068d378f7d1af264f9e43b6ff8ea8d8cfa2a3f641f8bcfdfbe06279a043
 MERGE (self:File {path:"crates/star-api-rest/src/auth/google.rs"})
 MERGE (state:Type {id:"crates/star-api-rest/src/auth/google.rs::GoogleAuthState",kind:"struct"})
 MERGE (login:Symbol {id:"crates/star-api-rest/src/auth/google.rs::login_handler",kind:"function"})
@@ -166,6 +166,11 @@ struct GoogleJwk {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+// iss/aud/exp/iat are validated by jsonwebtoken's `Validation` during `decode`
+// (issuer pinned to accounts.google.com, audience pinned to client_id, exp
+// checked with default leeway); the fields stay on the struct to document the
+// verified claim contract even though this code never reads them directly.
+#[allow(dead_code)]
 struct GoogleIdTokenPayload {
     iss: String,
     sub: String,

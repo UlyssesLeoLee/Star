@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=aa38b418d8549c35fa815d51de0bb4dc3b5d862419f0156e661fd24f48fd14b3
+@cypher schema=1 source_sha256=71fdf171830b510648608e6f60e8a13d2579d746e32d1810f97128b2075823f9
 MERGE (self:File {path:"crates/star-api-rest/src/auth/mod.rs"})
 MERGE (claims:Type {id:"crates/star-api-rest/src/auth/mod.rs::Claims",kind:"struct"})
 MERGE (device:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
@@ -293,9 +293,4 @@ impl Claims {
     pub fn expires_at(&self) -> DateTime<Utc> {
         DateTime::from_timestamp(self.exp, 0).unwrap_or_else(Utc::now)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }
