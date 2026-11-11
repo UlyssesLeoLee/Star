@@ -523,6 +523,16 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: Users,
   },
   {
+    id: "admin",
+    label: "Admin Console",
+    code: "ADM",
+    href: "/admin",
+    category: "system",
+    categoryLabel: "System & Meta",
+    description: "管理员后台 (Google 登录 · lidian727@gmail.com 唯一管理员)",
+    icon: ShieldCheck,
+  },
+  {
     id: "tenant",
     label: "Tenant Admin",
     code: "TNT",
