@@ -199,6 +199,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: roles.into_iter().map(String::from).collect(),
             scope: "".to_string(),
+            email: None,
         }
     }
 
@@ -208,6 +209,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec![],
             scope: scope.to_string(),
+            email: None,
         }
     }
 
@@ -312,6 +314,7 @@ mod tests {
         let user = AuthUser {
             user_id: Uuid::nil(),
             tenant_id: Uuid::nil(),
+            email: None,
             roles: vec!["player".to_string()],
             scope: "player:read".to_string(),
         };
@@ -322,6 +325,7 @@ mod tests {
         let user = AuthUser {
             user_id: Uuid::nil(),
             tenant_id: Uuid::nil(),
+            email: None,
             roles: vec!["player".to_string()],
             scope: "player:read player:write".to_string(),
         };

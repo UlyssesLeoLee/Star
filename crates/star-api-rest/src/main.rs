@@ -75,9 +75,15 @@ async fn main() -> anyhow::Result<()> {
         .expect("invalid bind addr");
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
 
-    let jwt = Arc::new(JwtConfig::verifier_from_env().map_err(|error| {
-        anyhow::anyhow!("JWT verifier configuration invalid ({})", error.code())
-    })?);
+    // 2026-11-11 Google 登录: 需要签发 Star JWT ⇒ 优先带私钥的完整 issuer 配置;
+    // 无 JWT_PRIVATE_KEY_PEM 时退回 verifier-only (现有部署兼容, Google 登录返回 503)。
+    let jwt = Arc::new(match JwtConfig::from_env() {
+        Ok(full) => full,
+        Err(_) => JwtConfig::verifier_from_env().map_err(|error| {
+            anyhow::anyhow!("JWT verifier configuration invalid ({})", error.code())
+        })?,
+    });
+    let google_auth = star_api_rest::auth::google::GoogleAuthState::from_env(jwt.clone());
     let pg_config = PgConfig::from_env()
         .map_err(|error| anyhow::anyhow!("PostgreSQL configuration invalid ({})", error.code()))?;
     let pool = connect_pool(&pg_config)
@@ -124,7 +130,9 @@ async fn main() -> anyhow::Result<()> {
     if let Some(query_port) = bi_task_event_query_port {
         group_api_state = group_api_state.with_bi_task_event_query_port(query_port);
     }
-    let app = build_group_router(group_api_state).merge(bi_task_event_ingestion.readiness_router());
+    let app = build_group_router(group_api_state)
+        .merge(bi_task_event_ingestion.readiness_router())
+        .merge(star_api_rest::auth::google::router(google_auth));
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
     let server_result = bi_task_event_ingestion::serve_until_shutdown(

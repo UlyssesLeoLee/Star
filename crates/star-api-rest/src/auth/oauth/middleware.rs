@@ -323,6 +323,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec!["user".to_string()],
             scope: "read write".to_string(),
+            email: None,
         };
         assert!(require_scope(&user, "read").is_ok());
         assert!(require_scope(&user, "write").is_ok());
@@ -368,6 +369,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec!["player".to_string(), "ops".to_string()],
             scope: "".to_string(),
+            email: None,
         };
         assert!(require_role(&user, "player").is_ok());
         assert!(require_role(&user, "ops").is_ok());
@@ -381,6 +383,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec![],
             scope: "".to_string(),
+            email: None,
         };
         assert!(require_scope(&user, "read").is_err());
     }

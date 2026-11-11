@@ -35,6 +35,8 @@ use uuid::Uuid;
 
 // v0.43 §14.12 IV OAuth2 server (per 2026-09-09 20:20 JST 用户拍板 both flows)
 pub mod oauth;
+// 2026-11-11 Google OIDC 登录 + 管理员后台 (per 用户发令)
+pub mod google;
 
 /// JWT 错误 (4-variant, 跟 v0.30 6-field 错误模型一致)
 #[derive(Debug, Error)]
@@ -96,6 +98,10 @@ pub struct Claims {
     /// Monotonic device generation issued by the identity owner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device_generation: Option<i64>,
+    /// Verified login email from the identity provider (e.g. Google login);
+    /// absent for legacy tokens issued before provider-email was carried.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
 }
 
 /// Device identity copied only from a successfully verified issuer token.
@@ -195,6 +201,7 @@ pub fn issue_token_with_device_context(
         scope,
         device_id: device_context.map(|context| context.device_id),
         device_generation: device_context.map(|context| context.generation),
+        email: None,
     };
     let header = Header::new(jsonwebtoken::Algorithm::RS256);
     let encoding_key = EncodingKey::from_rsa_pem(config.private_key_pem.as_bytes())
@@ -219,6 +226,21 @@ pub fn verify_token(config: &JwtConfig, token: &str) -> Result<Claims, JwtError>
     Ok(token_data.claims)
 }
 
+/// Issue a JWT carrying the provider-verified login email (e.g. Google login).
+pub fn issue_provider_token(
+    config: &JwtConfig,
+    sub: Uuid,
+    tenant_id: Uuid,
+    roles: Vec<String>,
+    scope: String,
+    email: String,
+) -> Result<(String, Claims), JwtError> {
+    let (token, mut claims) =
+        issue_token_with_device_context(config, sub, tenant_id, roles, scope, None)?;
+    claims.email = Some(email);
+    Ok((token, claims))
+}
+
 /// Authenticated user (从 JWT claims 提取, 注入 axum request)
 #[derive(Debug, Clone)]
 pub struct AuthUser {
@@ -226,6 +248,8 @@ pub struct AuthUser {
     pub tenant_id: Uuid,
     pub roles: Vec<String>,
     pub scope: String,
+    /// Provider-verified login email; absent for legacy tokens.
+    pub email: Option<String>,
 }
 
 impl From<Claims> for AuthUser {
@@ -235,6 +259,7 @@ impl From<Claims> for AuthUser {
             tenant_id: c.tenant_id,
             roles: c.roles,
             scope: c.scope,
+            email: c.email,
         }
     }
 }
@@ -247,6 +272,7 @@ impl Claims {
             tenant_id: self.tenant_id,
             roles: self.roles.clone(),
             scope: self.scope.clone(),
+            email: self.email.clone(),
         }
     }
 
