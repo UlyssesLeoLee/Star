@@ -892,3 +892,13 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **门禁结果**: tsc 0 errors; next build 全路由 exit 0; CypherGraph Guardian PASS (7 files); workspace `--all-targets --all-features` check 见 CI。
 - **部署**: dev push 后 Vercel `--prod` 重部署 + alias `starcanvas.vercel.app` 重指 + curl 验证。
 - **环境提示**: 用户机器全局 `NODE_ENV=production` 是环境污染 (影响 vitest/next dev); config 守卫已兜底, 建议另择时机在 Windows 用户环境变量中移除。
+
+### 23.27 2026-11-11 文件即任务架构 (.NEMA) + 依赖升级收尾
+
+- **用户发令 (2026-11-11)**: 架构中的 .nema 设计延伸出文件即任务架构 — 所有共同编辑的文件都自动产生一个 .nema 文件, 该文件可以作为 Star 任务打开。
+- **格式对齐**: .NEMA 语法子集对齐 https://nema-sigma.vercel.app/ 规范 — `\!NEMAT1` transport 头、`\?N REV` 5W1H 节 (What/Why/How/Who/When/Where)、`\N REV` Table 节 (`\#` 列名行 + `~` 显式 null + `\ ` 空格转义)、`\>N REV` Graph 节 (节点/边)、前导 N 空格续写第 N 列。parser/serializer 往返单测覆盖。
+- **文件即任务规则**: `registerSharedFile` — editors ≥ 2 (共同编辑) 自动生成 .nema 侧车 (`<file>.nema`), 单人编辑不产生; 同 path 幂等复用 (追加编辑者更新 revision); `openNemaAsStarTask` — 解析 .nema 创建 Star WorkItem (kind=task, labels=[nema,file-as-task], documents 关联 .nema 侧车 + 源文件), 绑定 workItemId 后重复打开幂等。
+- **UI**: `/nema` 页 — 共同编辑文件登记表单 (path/title/editors/purpose) + .nema 任务列表 (5W1H 预览 + 源码展开 + 打开为 Star 任务 → 跳 /work-item/[id]) + 规则统计; nav registry 新增 NEMA Tasks 入口 (agent 域)。zustand persist store (`star-nema-files`)。
+- **依赖升级收尾**: msw 被 pnpm up 升到 3.0.5 (major, listen API 移除 onUnhandledRequest) — 测试基建迁移属独立工作流, 钉回 `^2.15.0`; vitest 5.1 移除 esbuild 选项 (oxc 默认) — vitest.config.ts 删 esbuild block; next 16.4.6 / react 19.3.1 / vite 8.3.8 保持升级。
+- **门禁**: tsc 0 errors; vitest 112 文件 / 957 测试全绿 (含 7 个 nema 新测试); next build 全路由 exit 0 (含 ○ /nema)。
+- **仍开放**: msw 3.0 迁移; .nema 文件的真实文件系统监听 (FS watcher 触发自动生成); WorkItem 与 .nema 双向同步 (任务状态回写 .nema Table)。

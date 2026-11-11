@@ -17,7 +17,7 @@ if (process.env.NODE_ENV && process.env.NODE_ENV !== "test") {
 }
 
 /*
-@cypher schema=1 source_sha256=77edb1a37fc0bccf58672bc3979cda379ba51831ebc595bc9f3cff4cdd20369f
+@cypher schema=1 source_sha256=fe1a4a8fd951ada0b16fa261f6cfb2939c8917fc9da99a226f498db2d1501ba9
 MERGE (self:File {path:"frontend/vitest.config.ts"})
 MERGE (vitest:ExternalService {name:"Vitest"})
 MERGE (config:Symbol {id:"frontend/vitest.config.ts::default", kind:"config"})
@@ -33,9 +33,6 @@ MERGE (self)-[:CONFIGURES]->(redirectSpec)
 */
 
 export default defineConfig({
-  esbuild: {
-    jsx: "automatic",
-  },
   test: {
     environment: "jsdom",
     globals: true,

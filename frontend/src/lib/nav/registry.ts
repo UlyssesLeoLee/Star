@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fea982b39263bf451b1b4c9a24ea3b5950cd10d4503767cf0af1e3a1a2f0f92a
+@cypher schema=1 source_sha256=fdae767af312c24fe5b8fa3888d30e34f1e7b345ebe9770191176bf8d4384735
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -555,6 +555,16 @@ export const ALL_MODULES: ModuleDefinition[] = [
     categoryLabel: "Work Management",
     description: "分批次重构已完成任务 · todo→done 循环, 列可自定义",
     icon: RefreshCw,
+  },
+  {
+    id: "nema",
+    label: "NEMA Tasks",
+    code: "NEMA",
+    href: "/nema",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "文件即任务 · 共同编辑文件自动 .nema 侧车, 可打开为 Star 任务",
+    icon: FileText,
   },
 ];
 
