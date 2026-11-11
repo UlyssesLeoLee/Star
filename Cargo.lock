@@ -6975,6 +6975,7 @@ dependencies = [
  "pkcs8 0.11.0",
  "platform-messaging-runtime",
  "rand_core 0.6.4",
+ "reqwest 0.12.28",
  "ring",
  "rsa",
  "serde",
