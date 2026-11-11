@@ -879,3 +879,16 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **打开语义**: `frontend/src/lib/documents.ts` — 仓库内路径 (docs/s01/ipa-s01-001.md) → GitHub `UlyssesLeoLee/Star/blob/dev/<path>`; http(s) → 原样打开。
 - **Drawer 管理**: `WorkItemDetailDrawer` 新增 6b 关联文档区 — 列表 (点击打开 + 移除)、添加表单 (标题 + path + 类型 select, Enter/+ 提交), testid 齐备。
 - **仍开放**: 文档打开目前跳 GitHub (Vercel 无 markdown 渲染依赖); 站内 markdown 预览器 (react-markdown 或自研) 为后续 slice。
+
+### 23.26 2026-11-11 整体红绿测试与调优 (用户发令: 确认 WBS 后整体红绿测试 → 调优 → 重部署)
+
+- **WBS 完成度确认**: 本轮新发令 (§23.24 Google 登录/后台 + n8n 工作流 + IPA 集成、§23.25 任务卡多文档) 已全部实现并部署。长期 OPEN 项 (W8/W14/W16/WLD-7/VCD-0/9F4J 的目标库/mTLS/真实设备/性能证据, D-01/D-11) 仍需后续 lane, 本轮不关闭。
+- **红 → 绿修复**:
+  1. `schedule_rules` 2 个 lib 测试 (pre-existing, W16 device-identity 硬化后测试未跟进): `AuthenticatedUser` extractor 对 mutating 路由强制 device context → 旧测试 token 无 device → 401。修复: `GroupApiState::new_with_device_binding_repo` (test-only 构造器) + `TestActiveDeviceBindingRepo` stub (is_active→true) + `route_test_token` 改发 `issue_token_with_device_context` 带合成 device (generation=1)。star-api-rest lib 163/2/2 → **165/0/2 全绿** (2 ignored 为 fixture 依赖, 设计如此)。
+  2. vitest 全量 376 failed → 根因 **机器全局 NODE_ENV=production** (react-dom 生产 test-utils 无 act → "React.act is not a function" 全量秒崩)。修复: `vitest.config.ts` 环境守卫 (非 test 强制 test, CI fresh shell 不受影响)。→ 950 测试中仅剩 4 个。
+  3. 剩 4 个为 Run→LANE 产品改名后测试未跟进 (MobileBottomNav 3 + SidebarProjectWorktreeNavigation 1, 期待 "Engineering Run"/"Run binding" 实为 "LANE"/"LANE binding") → 测试文案同步改名。**vitest 111 文件 / 950 测试全绿**。
+  4. node_modules 损坏 (@csstools/css-parser-algorithms 空目录) → `pnpm install --force` 重链修复 (17m39s)。
+  5. 警告清零: google.rs `GoogleIdTokenPayload` 死字段加 `#[allow(dead_code)]` + 注释 (iss/aud/exp/iat 由 jsonwebtoken Validation 在校签时强制); auth/mod.rs 空 tests 模块删除。
+- **门禁结果**: tsc 0 errors; next build 全路由 exit 0; CypherGraph Guardian PASS (7 files); workspace `--all-targets --all-features` check 见 CI。
+- **部署**: dev push 后 Vercel `--prod` 重部署 + alias `starcanvas.vercel.app` 重指 + curl 验证。
+- **环境提示**: 用户机器全局 `NODE_ENV=production` 是环境污染 (影响 vitest/next dev); config 守卫已兜底, 建议另择时机在 Windows 用户环境变量中移除。

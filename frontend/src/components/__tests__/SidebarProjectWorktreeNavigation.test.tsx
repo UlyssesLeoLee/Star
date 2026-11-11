@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4a0f2d091e56074639ad1f15691e3b3c336b2f6a29ec028d9b5c77b051f35246
+@cypher schema=1 source_sha256=6fb96f6f6681aa894f24f18bb63c99d2dcd5ae25eb8e966e497482156c10cef5
 MERGE (self:File {path:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx"})
 MERGE (sidebar:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (tree:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
@@ -200,7 +200,7 @@ describe("Project Worktree Index sidebar navigation", () => {
     expect(assignedDescription).toContain("Session bound");
     expect(assignedDescription).toContain("Runtime bound");
     expect(assignedDescription).toContain("Archived");
-    expect(assignedDescription).toContain("Run binding v2");
+    expect(assignedDescription).toContain("LANE binding v2");
     expect(assignedDescription).toContain("Project binding v3");
     expect(assignedDescription).toContain("Lock status unknown");
     expect(assignedDescription).toContain("Dirty change details unknown");

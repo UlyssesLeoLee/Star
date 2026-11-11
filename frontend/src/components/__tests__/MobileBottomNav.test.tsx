@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f30c7a6b8009f91b5d02491b5e119f4dac7126d9cfa13354319499c490e99121
+@cypher schema=1 source_sha256=184107123b7ce641c654a74e83e07e62e0ca6f29f35a1fe4ec0a4ff38cab017d
 MERGE (self:File {path:"frontend/src/components/__tests__/MobileBottomNav.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/MobileBottomNav.test.tsx::Mobile Project navigation",kind:"suite"})
 MERGE (openDirectory:Symbol {id:"frontend/src/components/__tests__/MobileBottomNav.test.tsx::opens the Project hierarchy and renders its authorized tree",kind:"test"})
@@ -62,9 +62,9 @@ describe("Mobile Project navigation", () => {
   });
 
   it.each([
-    ["zh-CN", "Project 导航", "打开 Project → Engineering Run → Worktree → Branch 导航目录", "Project 目录", "收起"],
-    ["en", "Project navigation", "Open the Project → Engineering Run → Worktree → Branch directory", "Project directory", "Close"],
-    ["ja", "Project ナビゲーション", "Project → Engineering Run → Worktree → Branch ディレクトリを開く", "Project ディレクトリ", "閉じる"],
+    ["zh-CN", "Project 导航", "打开 Project → LANE → Worktree → Branch 导航目录", "Project 目录", "收起"],
+    ["en", "Project navigation", "Open the Project → LANE → Worktree → Branch directory", "Project directory", "Close"],
+    ["ja", "Project ナビゲーション", "Project → LANE → Worktree → Branch ディレクトリを開く", "Project ディレクトリ", "閉じる"],
   ] as const)("localizes navigation labels for %s", (language, navigation, openLabel, directoryTitle, closeLabel) => {
     renderNavigation(language);
     fireEvent.click(screen.getByTestId("mobile-nav-project"));

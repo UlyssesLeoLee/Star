@@ -8,8 +8,16 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 
+// 环境守卫: 部分 Windows 开发机全局设置了 NODE_ENV=production (非 vitest 语义),
+// 会让 react-dom 解析到 production test-utils → "React.act is not a function" 全量秒崩。
+// 测试运行器语义必须是 test; CI (fresh shell) 不受影响, 本行只修本地环境污染。
+if (process.env.NODE_ENV && process.env.NODE_ENV !== "test") {
+  // Object.assign 绕过 @types/node 对 NODE_ENV 的 readonly 声明
+  Object.assign(process.env, { NODE_ENV: "test" });
+}
+
 /*
-@cypher schema=1 source_sha256=81ca156151bc9dc6b78290922f73f66ee1aa9c71f0520e60664e99ada2f79997
+@cypher schema=1 source_sha256=77edb1a37fc0bccf58672bc3979cda379ba51831ebc595bc9f3cff4cdd20369f
 MERGE (self:File {path:"frontend/vitest.config.ts"})
 MERGE (vitest:ExternalService {name:"Vitest"})
 MERGE (config:Symbol {id:"frontend/vitest.config.ts::default", kind:"config"})
