@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=500e33c42f29f5ded63a297a50d43aa06f1e06270cf6566388c43fdd06bbd714
+@cypher schema=1 source_sha256=eaaf08b0d3f022bed85d8e43d5b1b5a706e892ce210d206fcf9b47cf07764aaa
 MERGE (self:File {path:"crates/star-api-rest/src/bi_task_event_ingestion.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::bi_task_event_ingestion",kind:"module"})
 MERGE (runtime:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion",kind:"struct"})
 MERGE (config:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::RuntimeConfig",kind:"struct"})
 MERGE (route_pin:Type {id:"bi_owner_runtime::TaskEventRoutePin",kind:"struct"})
-MERGE (receiver:Type {id:"bi_owner_runtime::TaskEventReceiver",kind:"struct"})
-MERGE (transport:Type {id:"platform_messaging_runtime::native_grpc::NativeGrpcEventReceiveTransport",kind:"struct"})
-MERGE (native_receive_error:Type {id:"platform_messaging_runtime::native_grpc::NativeGrpcEventReceiveError",kind:"enum"})
+MERGE (receiver:Type {id:"bi_native_event_adapter::NativeTaskEventReceiver",kind:"struct"})
+MERGE (adapter_config:Type {id:"bi_native_event_adapter::NativeTaskEventReceiverConfig",kind:"struct"})
+MERGE (adapter_error:Type {id:"bi_native_event_adapter::NativeTaskEventAdapterError",kind:"enum"})
+MERGE (revision:Type {id:"platform_messaging_runtime::TransportProfileRevision",kind:"struct"})
+MERGE (resolved_endpoint:Type {id:"platform_messaging_runtime::ResolvedTransportEndpoint",kind:"struct"})
 MERGE (receive_error:Type {id:"bi_owner_runtime::TaskEventReceiveError",kind:"enum"})
 MERGE (configure:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.configure",kind:"method"})
 MERGE (shutdown_signal:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::BiTaskEventIngestion.shutdown_signal",kind:"method"})
@@ -20,13 +22,6 @@ MERGE (build:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::bu
 MERGE (validate_db:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::validate_write_database",kind:"function"})
 MERGE (run_loop:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::run_consumer",kind:"function"})
 MERGE (ready:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::readiness_endpoint",kind:"function"})
-MERGE (adapter:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventTransport",kind:"struct"})
-MERGE (authorize:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventAuthorization",kind:"struct"})
-MERGE (delivery:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventDelivery",kind:"struct"})
-MERGE (native_pull:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventTransport.pull_one",kind:"method"})
-MERGE (native_ack:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventDelivery.acknowledge",kind:"method"})
-MERGE (native_verify:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::NativeTaskEventAuthorization.verify_origin",kind:"method"})
-MERGE (map_native_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::map_native_receive_error",kind:"function"})
 MERGE (capabilities:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::WriteDatabaseCapabilities",kind:"struct"})
 MERGE (role_separation:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::writer_role_is_separate",kind:"function"})
 MERGE (profile_monitor:Type {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::ProfilePinMonitor",kind:"struct"})
@@ -51,17 +46,9 @@ MERGE (test_drain_timeout:Symbol {id:"crates/star-api-rest/src/bi_task_event_ing
 MERGE (test_serve_drop:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.serve_future_is_dropped_when_shutdown_signal_fires",kind:"test"})
 MERGE (test_serve_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.serve_io_error_is_propagated",kind:"test"})
 MERGE (test_bind_order:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.main_binds_listener_before_starting_service_resources",kind:"test"})
-MERGE (test_native_error:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::tests.native_event_receive_errors_preserve_auth_and_retryable_transport",kind:"test"})
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:DEFINES]->(runtime)
 MERGE (module)-[:DEFINES]->(config)
-MERGE (module)-[:DEFINES]->(adapter)
-MERGE (module)-[:DEFINES]->(authorize)
-MERGE (module)-[:DEFINES]->(delivery)
-MERGE (module)-[:DEFINES]->(native_pull)
-MERGE (module)-[:DEFINES]->(native_ack)
-MERGE (module)-[:DEFINES]->(native_verify)
-MERGE (module)-[:DEFINES]->(map_native_error)
 MERGE (module)-[:DEFINES]->(configure)
 MERGE (module)-[:DEFINES]->(shutdown_signal)
 MERGE (module)-[:DEFINES]->(shutdown)
@@ -96,7 +83,7 @@ MERGE (test_module)-[:DEFINES]->(test_drain_timeout)
 MERGE (test_module)-[:DEFINES]->(test_serve_drop)
 MERGE (test_module)-[:DEFINES]->(test_serve_error)
 MERGE (test_module)-[:DEFINES]->(test_bind_order)
-MERGE (test_module)-[:DEFINES]->(test_native_error)
+MERGE (self)-[:IMPORTS]->(:File {path:"crates/bi-native-event-adapter/src/lib.rs"})
 MERGE (configure)-[:CALLS]->(build)
 MERGE (configure)-[:CALLS]->(validate_db)
 MERGE (shutdown_signal)-[:CALLS]->(wait_shutdown)
@@ -107,9 +94,15 @@ MERGE (test_join_failure)-[:EXERCISES]->(shutdown)
 MERGE (test_drain_timeout)-[:EXERCISES]->(shutdown_with_timeout)
 MERGE (test_bind_order)-[:EXERCISES]->(:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (build)-[:USES_TYPE]->(route_pin)
-MERGE (build)-[:USES_TYPE]->(transport)
-MERGE (build)-[:CREATES]->(receiver)
+MERGE (build)-[:USES_TYPE]->(receiver)
+MERGE (build)-[:USES_TYPE]->(adapter_config)
+MERGE (build)-[:USES_TYPE]->(adapter_error)
+MERGE (build)-[:USES_TYPE]->(revision)
+MERGE (build)-[:USES_TYPE]->(resolved_endpoint)
 MERGE (build)-[:CREATES]->(profile_monitor)
+MERGE (build)-[:CALLS]->(:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::NativeTaskEventReceiver.connect",kind:"method"})
+MERGE (build)-[:CALLS]->(:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileResolver.resolve",kind:"method"})
+MERGE (build)-[:CALLS]->(:Symbol {id:"crates/platform-messaging-runtime/src/transport_endpoint.rs::TrustedEndpointResolver.resolve",kind:"method"})
 MERGE (validate_db)-[:CALLS]->(role_separation)
 MERGE (profile_validate)-[:CALLS]->(:Symbol {id:"crates/platform-messaging-runtime/src/trusted_profile_endpoint.rs::TrustedProfileEndpointResolver.resolve",kind:"method"})
 MERGE (profile_validate)-[:CALLS]->(profile_match)
@@ -119,7 +112,7 @@ MERGE (ready)-[:CALLS]->(effective_ready)
 MERGE (ready)-[:USES_TYPE]->(readiness_state)
 MERGE (test_readiness)-[:EXERCISES]->(effective_ready)
 MERGE (test_profile_pin)-[:EXERCISES]->(profile_match)
-MERGE (run_loop)-[:CALLS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.receive_one",kind:"method"})
+MERGE (run_loop)-[:CALLS]->(:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::NativeTaskEventReceiver.receive_one",kind:"method"})
 MERGE (run_loop)-[:SUBSCRIBES]->(:Endpoint {id:"platform-messaging-runtime.native-grpc.event-log",kind:"native_event_log"})
 MERGE (ready)-[:EXPOSES]->(:Endpoint {id:"/readyz/bi-task-event-ingestion",kind:"http_readiness"})
 MERGE (validate_db)-[:READS]->(:DatabaseRole {id:"star_bi_runtime",kind:"database_role"})
@@ -137,15 +130,7 @@ MERGE (test_elevated_role)-[:EXERCISES]->(capabilities)
 MERGE (test_capability_query)-[:EXERCISES]->(capabilities)
 MERGE (test_query_contract)-[:EXERCISES]->(:Symbol {id:"crates/star-api-rest/src/bi_task_event_ingestion.rs::WRITE_DATABASE_CAPABILITY_QUERY",kind:"constant"})
 MERGE (test_role_separation)-[:EXERCISES]->(role_separation)
-MERGE (delivery)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveDelivery",kind:"trait"})
-MERGE (adapter)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveTransport",kind:"trait"})
-MERGE (authorize)-[:IMPLEMENTS]->(:Type {id:"bi_owner_runtime::TaskEventReceiveAuthorization",kind:"trait"})
-MERGE (native_pull)-[:CALLS]->(map_native_error)
-MERGE (native_ack)-[:CALLS]->(map_native_error)
-MERGE (native_verify)-[:CALLS]->(map_native_error)
-MERGE (map_native_error)-[:USES_TYPE]->(native_receive_error)
-MERGE (map_native_error)-[:USES_TYPE]->(receive_error)
-MERGE (test_native_error)-[:EXERCISES]->(map_native_error)
+MERGE (receive_error)-[:IMPORTED_FROM]->(:File {path:"crates/bi-owner-runtime/src/lib.rs"})
 @endcypher
 */
 //! Application-owned, opt-in composition for BI Task-event receive.
@@ -165,24 +150,19 @@ use std::{
 };
 
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
+use bi_native_event_adapter::{
+    NativeTaskEventAdapterError, NativeTaskEventReceiver, NativeTaskEventReceiverConfig,
+};
 use bi_owner_runtime::{
-    TaskEventInboxStore, TaskEventQuarantineStore, TaskEventReceiveAuthorization,
-    TaskEventReceiveDelivery, TaskEventReceiveError, TaskEventReceiveOrigin, TaskEventReceiveRoute,
-    TaskEventReceiveTransport, TaskEventReceiver, TaskEventRoutePin,
+    TaskEventInboxStore, TaskEventQuarantineStore, TaskEventReceiveError, TaskEventReceiveRoute,
+    TaskEventRoutePin,
 };
 use platform_messaging_runtime::{
-    admission_delivery::AdmissionTransportProfile,
-    native_grpc::{
-        native_provider_identity, NativeGrpcEventDelivery, NativeGrpcEventOrigin,
-        NativeGrpcEventReceiveAuthorization, NativeGrpcEventReceiveClientConfig,
-        NativeGrpcEventReceiveError, NativeGrpcEventReceiveScope, NativeGrpcEventReceiveTransport,
-    },
     transport_endpoint::{TrustedEndpointConfig, TrustedEndpointResolver},
     transport_profile::{AuthenticatedTransportSession, TransportDirection, TransportMessageKind},
     transport_profile_pg::PgTransportProfileResolver,
     trusted_profile_endpoint::TrustedProfileEndpointResolver,
 };
-use sha2::{Digest, Sha256};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     PgPool, Row,
@@ -225,18 +205,25 @@ WITH protected_tables(table_name) AS (
         ('UPDATE'::text),
         ('DELETE'::text),
         ('TRUNCATE'::text)
-), transport_function_signatures(signature) AS (
-    VALUES
-        ('platform_transport.append_authenticated(bytea,bytea,uuid,text,uuid,bytea,bytea)'::text),
-        ('platform_transport.pull_authenticated(bytea,bytea,uuid,text,integer)'::text),
-        ('platform_transport.acknowledge_authenticated(bytea,bytea,uuid,text,text,uuid,bigint,uuid,uuid,bytea)'::text),
-        ('platform_transport.append_message(text,uuid,uuid,text,uuid,bytea,bytea)'::text),
-        ('platform_transport.pull_one(text,uuid,integer)'::text),
-        ('platform_transport.acknowledge_one(text,uuid,bigint,uuid,uuid,bytea)'::text),
-        ('platform_transport.purge_terminal(text,uuid,integer)'::text)
 ), resolved_transport_functions AS (
-    SELECT signature, to_regprocedure(signature)::oid AS function_oid
-      FROM transport_function_signatures
+    -- 2026-11-09 (W8 option-A 接线): 原实现用 to_regprocedure('platform_transport.*') 解析签名,
+    -- 在正确受限的 write role 下抛 42501 (缺 schema USAGE) —— 该 role 本就不该有 platform_transport
+    -- 的 USAGE。改用 pg_proc/pg_namespace catalog join (同 grants 测试的修法), 不产生跨 schema
+    -- 权限依赖, 且 proname+pronargs 对这些函数名无歧义。
+    SELECT function_proc.oid AS function_oid
+      FROM pg_proc AS function_proc
+      JOIN pg_namespace AS function_schema
+        ON function_schema.oid = function_proc.pronamespace
+     WHERE function_schema.nspname = 'platform_transport'
+       AND (function_proc.proname, function_proc.pronargs) IN (
+           ('append_authenticated', 7),
+           ('pull_authenticated', 5),
+           ('acknowledge_authenticated', 10),
+           ('append_message', 7),
+           ('pull_one', 3),
+           ('acknowledge_one', 6),
+           ('purge_terminal', 3)
+       )
 )
 SELECT current_user AS role_name,
        session_user AS session_role_name,
@@ -275,12 +262,12 @@ SELECT current_user AS role_name,
        has_schema_privilege(current_user, 'bi', 'CREATE') AS effective_schema_create,
        COALESCE(has_function_privilege(
            current_user,
-           to_regprocedure('bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea)'),
+           to_regprocedure('bi.commit_task_event_v3(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea,varchar,varchar,uuid,bigint,bytea,uuid)'),
            'EXECUTE'
        ), false) AS effective_can_commit,
        COALESCE(has_function_privilege(
            current_user,
-           to_regprocedure('bi.record_task_event_quarantine_v1(uuid,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,varchar,varchar,uuid,bigint,uuid,bytea,integer,varchar)'),
+           to_regprocedure('bi.record_task_event_quarantine_v2(uuid,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,varchar,varchar,uuid,bigint,bytea,uuid,bytea,integer,varchar)'),
            'EXECUTE'
        ), false) AS effective_can_quarantine,
        EXISTS (
@@ -400,12 +387,7 @@ struct ReadinessRouteState {
     worker_state: SharedWorkerState,
 }
 
-type RuntimeReceiver = TaskEventReceiver<
-    NativeTaskEventTransport,
-    NativeTaskEventAuthorization,
-    TaskEventInboxStore,
-    TaskEventQuarantineStore,
->;
+type RuntimeReceiver = NativeTaskEventReceiver<TaskEventInboxStore, TaskEventQuarantineStore>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ReadinessPhase {
@@ -670,7 +652,6 @@ struct RuntimeConfig {
     tls_server_name: String,
     destination_id: String,
     destination_generation: Uuid,
-    log_id: String,
     server_ca_path: PathBuf,
     client_cert_path: PathBuf,
     client_key_path: PathBuf,
@@ -698,7 +679,6 @@ impl RuntimeConfig {
             "STAR_BI_TASK_EVENT_TLS_SERVER_NAME",
             "STAR_BI_TASK_EVENT_DESTINATION_ID",
             "STAR_BI_TASK_EVENT_DESTINATION_GENERATION",
-            "STAR_BI_TASK_EVENT_LOG_ID",
             "STAR_BI_TASK_EVENT_SERVER_CA_PATH",
             "STAR_BI_TASK_EVENT_CLIENT_CERT_PATH",
             "STAR_BI_TASK_EVENT_CLIENT_KEY_PATH",
@@ -734,7 +714,6 @@ impl RuntimeConfig {
             tls_server_name: required("STAR_BI_TASK_EVENT_TLS_SERVER_NAME")?,
             destination_id: required("STAR_BI_TASK_EVENT_DESTINATION_ID")?,
             destination_generation: parse_id("STAR_BI_TASK_EVENT_DESTINATION_GENERATION")?,
-            log_id: required("STAR_BI_TASK_EVENT_LOG_ID")?,
             server_ca_path: PathBuf::from(required("STAR_BI_TASK_EVENT_SERVER_CA_PATH")?),
             client_cert_path: PathBuf::from(required("STAR_BI_TASK_EVENT_CLIENT_CERT_PATH")?),
             client_key_path: PathBuf::from(required("STAR_BI_TASK_EVENT_CLIENT_KEY_PATH")?),
@@ -836,158 +815,6 @@ impl AuthenticatedTransportSession for TrustedBiTaskEventSession {
     }
 }
 
-#[derive(Clone)]
-struct NativeOriginCache(Arc<Mutex<Option<NativeGrpcEventOrigin>>>);
-
-impl NativeOriginCache {
-    fn new() -> Self {
-        Self(Arc::new(Mutex::new(None)))
-    }
-
-    fn put(&self, origin: NativeGrpcEventOrigin) -> Result<(), TaskEventReceiveError> {
-        let mut current = self
-            .0
-            .lock()
-            .map_err(|_| TaskEventReceiveError::Unauthorized)?;
-        *current = Some(origin);
-        Ok(())
-    }
-
-    fn matching(
-        &self,
-        route: &TaskEventReceiveRoute,
-        expected_pin: &TaskEventRoutePin,
-        expected_scope: NativeGrpcEventReceiveScope,
-        origin: &TaskEventReceiveOrigin,
-        wire: &[u8],
-    ) -> Result<NativeGrpcEventOrigin, TaskEventReceiveError> {
-        if !same_route_pin(route.pin(), expected_pin) || !route_matches_scope(route, expected_scope)
-        {
-            return Err(TaskEventReceiveError::Unauthorized);
-        }
-        let current = self
-            .0
-            .lock()
-            .map_err(|_| TaskEventReceiveError::Unauthorized)?;
-        let native = current
-            .as_ref()
-            .filter(|native| {
-                native.scope() == expected_scope
-                    && native.provider_identity() == origin.provider_identity()
-                    && native.log_id() == origin.log_id()
-                    && native.log_generation() == origin.log_generation()
-                    && native.sequence() == origin.sequence()
-                    && native.message_id() == origin.message_id()
-                    && native.wire_sha256() == <[u8; 32]>::from(Sha256::digest(wire))
-            })
-            .cloned()
-            .ok_or(TaskEventReceiveError::Unauthorized)?;
-        Ok(native)
-    }
-}
-
-struct NativeTaskEventTransport {
-    inner: NativeGrpcEventReceiveTransport,
-    scope: NativeGrpcEventReceiveScope,
-    route_pin: TaskEventRoutePin,
-    origins: NativeOriginCache,
-}
-
-fn map_native_receive_error(error: NativeGrpcEventReceiveError) -> TaskEventReceiveError {
-    match error {
-        NativeGrpcEventReceiveError::Route | NativeGrpcEventReceiveError::Unauthorized => {
-            TaskEventReceiveError::Unauthorized
-        }
-        NativeGrpcEventReceiveError::Contract
-        | NativeGrpcEventReceiveError::Transport
-        | NativeGrpcEventReceiveError::Busy => TaskEventReceiveError::Transport,
-    }
-}
-
-struct NativeTaskEventDelivery {
-    inner: NativeGrpcEventDelivery,
-    origin: TaskEventReceiveOrigin,
-}
-
-impl TaskEventReceiveDelivery for NativeTaskEventDelivery {
-    fn exact_wire(&self) -> &[u8] {
-        self.inner.exact_wire()
-    }
-
-    fn origin(&self) -> &TaskEventReceiveOrigin {
-        &self.origin
-    }
-
-    async fn acknowledge(&self) -> Result<(), TaskEventReceiveError> {
-        self.inner
-            .acknowledge()
-            .await
-            .map_err(map_native_receive_error)
-    }
-
-    async fn terminate_permanently(&self) -> Result<(), TaskEventReceiveError> {
-        // The BI receiver calls this only after the owner quarantine receipt commits and the
-        // native origin is re-verified. Native event delivery has one terminal disposition: ACK.
-        self.acknowledge().await
-    }
-}
-
-impl TaskEventReceiveTransport for NativeTaskEventTransport {
-    type Delivery = NativeTaskEventDelivery;
-
-    async fn pull_one(
-        &self,
-        route: &TaskEventReceiveRoute,
-    ) -> Result<Option<Self::Delivery>, TaskEventReceiveError> {
-        if !same_route_pin(route.pin(), &self.route_pin) || !route_matches_scope(route, self.scope)
-        {
-            return Err(TaskEventReceiveError::Unauthorized);
-        }
-        let Some(inner) = self
-            .inner
-            .pull_one(self.scope)
-            .await
-            .map_err(map_native_receive_error)?
-        else {
-            return Ok(None);
-        };
-        let native_origin = inner.origin().clone();
-        let origin = TaskEventReceiveOrigin::new(
-            native_origin.provider_identity().to_owned(),
-            native_origin.log_id().to_owned(),
-            native_origin.log_generation(),
-            native_origin.sequence(),
-            native_origin.message_id(),
-        )?;
-        self.origins.put(native_origin)?;
-        Ok(Some(NativeTaskEventDelivery { inner, origin }))
-    }
-}
-
-struct NativeTaskEventAuthorization {
-    inner: NativeGrpcEventReceiveAuthorization,
-    scope: NativeGrpcEventReceiveScope,
-    route_pin: TaskEventRoutePin,
-    origins: NativeOriginCache,
-}
-
-impl TaskEventReceiveAuthorization for NativeTaskEventAuthorization {
-    async fn verify_origin(
-        &self,
-        route: &TaskEventReceiveRoute,
-        origin: &TaskEventReceiveOrigin,
-        exact_wire: &[u8],
-    ) -> Result<(), TaskEventReceiveError> {
-        let native_origin =
-            self.origins
-                .matching(route, &self.route_pin, self.scope, origin, exact_wire)?;
-        self.inner
-            .verify_origin(self.scope, &native_origin, exact_wire)
-            .await
-            .map_err(map_native_receive_error)
-    }
-}
-
 async fn build_receiver(
     app_pool: PgPool,
     query_pool: PgPool,
@@ -1013,7 +840,6 @@ async fn build_receiver(
     let endpoints = TrustedEndpointResolver::new(config.deployment_id, vec![endpoint_config])
         .map_err(|_| "trusted_endpoint_invalid")?;
     let profiles = PgTransportProfileResolver::new(app_pool);
-    let resolver = TrustedProfileEndpointResolver::new(profiles, endpoints);
     let session = TrustedBiTaskEventSession {
         deployment_id: config.deployment_id,
         tenant_id: config.tenant_id,
@@ -1022,82 +848,57 @@ async fn build_receiver(
         sender_service_id: config.sender_service_id,
         receiver_service_id: config.receiver_service_id,
     };
-    let endpoint = resolver
+    // 2026-11-09 W8 option-A 接线: 先独立解析完整 profile revision (含 definition / lifecycle /
+    // sender-recipient allowlist) 与受信 endpoint, 再交给共享 adapter crate 在 connect 期做
+    // route-binding 校验 (lifecycle Active / tenant / digest / revision / provider identity /
+    // sender-recipient allowlist 全部由共享实现兜底)。旧的 endpoint identity 直查已由
+    // validate_route_binding 覆盖, 不再重复。
+    let revision = profiles
         .resolve(&session, config.profile_id, TransportMessageKind::Event)
         .await
         .map_err(|_| "current_profile_or_endpoint_unavailable")?;
-    if endpoint.deployment_id() != config.deployment_id
-        || endpoint.tenant_id() != config.tenant_id
-        || endpoint.profile_id() != config.profile_id
-        || endpoint.endpoint_identity() != config.endpoint_identity
-    {
-        return Err("current_profile_or_endpoint_mismatch");
-    }
-    let profile = AdmissionTransportProfile::new(
-        PROVIDER_ID.to_owned(),
-        config.provider_version.clone(),
-        endpoint.profile_digest(),
-        endpoint.endpoint_identity().to_owned(),
-    )
-    .map_err(|_| "current_profile_invalid")?;
-    let scope = NativeGrpcEventReceiveScope::new(
-        config.tenant_id,
-        config.sender_service_id,
-        config.receiver_service_id,
-    )
-    .map_err(|_| "receive_identity_invalid")?;
-    let native_transport =
-        NativeGrpcEventReceiveTransport::connect(NativeGrpcEventReceiveClientConfig {
+    let endpoint = endpoints
+        .resolve(&revision)
+        .map_err(|_| "current_profile_or_endpoint_unavailable")?;
+    let route_pin = TaskEventRoutePin {
+        sender_service_id: config.sender_service_id,
+        receiver_service_id: config.receiver_service_id,
+        // 与共享 adapter 及 BI 库契约一致: pin 的 provider identity 是 definition 的原始
+        // provider_id (如 "star-rust-log"), 不是 native wire 上的 64-hex identity。
+        // 旧内联实现把 native_provider_identity() 的 64-hex 写进 pin —— 与 BI DB 契约不符。
+        transport_provider_id: revision.definition().provider_id().to_owned(),
+        transport_provider_version: config.provider_version.clone(),
+        transport_profile_id: revision.profile_id(),
+        transport_profile_revision: revision.revision(),
+        transport_profile_digest: revision.digest(),
+        endpoint_identity: config.endpoint_identity.clone(),
+        destination_id: config.destination_id.clone(),
+        destination_generation: config.destination_generation,
+    };
+    let route = TaskEventReceiveRoute::new(config.tenant_id, route_pin.clone())
+        .map_err(|_| "receive_route_invalid")?;
+    let receiver = NativeTaskEventReceiver::connect(
+        NativeTaskEventReceiverConfig {
+            route,
             endpoint: &endpoint,
             server_ca_path: &config.server_ca_path,
             client_cert_path: &config.client_cert_path,
             client_key_path: &config.client_key_path,
             connect_timeout: Duration::from_secs(3),
             request_timeout: Duration::from_secs(8),
-            scope,
-            expected_log_id: &config.log_id,
-            expected_log_generation: config.destination_generation,
             lease_seconds: NATIVE_EVENT_LEASE_SECONDS,
-            profile: profile.clone(),
-        })
-        .await
-        .map_err(|_| "native_transport_setup_failed")?;
-
-    let route_pin = TaskEventRoutePin {
-        sender_service_id: config.sender_service_id,
-        receiver_service_id: config.receiver_service_id,
-        transport_provider_id: native_provider_identity(&profile),
-        transport_provider_version: config.provider_version,
-        transport_profile_id: endpoint.profile_id(),
-        transport_profile_revision: endpoint.profile_revision(),
-        transport_profile_digest: endpoint.profile_digest(),
-        endpoint_identity: endpoint.endpoint_identity().to_owned(),
-        destination_id: config.destination_id,
-        destination_generation: config.destination_generation,
-    };
-    let route = TaskEventReceiveRoute::new(config.tenant_id, route_pin.clone())
-        .map_err(|_| "receive_route_invalid")?;
-    let origins = NativeOriginCache::new();
-    let authorization = native_transport.authorization();
-    let receiver = TaskEventReceiver::new(
-        route,
-        NativeTaskEventTransport {
-            inner: native_transport,
-            scope,
-            route_pin: route_pin.clone(),
-            origins: origins.clone(),
-        },
-        NativeTaskEventAuthorization {
-            inner: authorization,
-            scope,
-            route_pin: route_pin.clone(),
-            origins,
+            profile: &revision,
         },
         TaskEventInboxStore::new(write_pool.clone(), config.receiver_service_id),
         TaskEventQuarantineStore::new(write_pool),
-    );
+    )
+    .await
+    .map_err(|error| match error {
+        NativeTaskEventAdapterError::RouteBinding => "route_binding_invalid",
+        NativeTaskEventAdapterError::NativeSetup(_) => "native_transport_setup_failed",
+    })?;
     let profile_pin_monitor = ProfilePinMonitor {
-        resolver,
+        resolver: TrustedProfileEndpointResolver::new(profiles, endpoints),
         session,
         profile_id: config.profile_id,
         expected_deployment_id: config.deployment_id,
@@ -1405,32 +1206,12 @@ fn effective_readiness(
     .unwrap_or((snapshot.phase, snapshot.reason))
 }
 
-fn same_route_pin(left: &TaskEventRoutePin, right: &TaskEventRoutePin) -> bool {
-    left.sender_service_id == right.sender_service_id
-        && left.receiver_service_id == right.receiver_service_id
-        && left.transport_provider_id == right.transport_provider_id
-        && left.transport_provider_version == right.transport_provider_version
-        && left.transport_profile_id == right.transport_profile_id
-        && left.transport_profile_revision == right.transport_profile_revision
-        && left.transport_profile_digest == right.transport_profile_digest
-        && left.endpoint_identity == right.endpoint_identity
-        && left.destination_id == right.destination_id
-        && left.destination_generation == right.destination_generation
-}
-
-fn route_matches_scope(route: &TaskEventReceiveRoute, scope: NativeGrpcEventReceiveScope) -> bool {
-    route.tenant_id() == scope.tenant_id()
-        && route.pin().sender_service_id == scope.sender_service_id()
-        && route.pin().receiver_service_id == scope.receiver_service_id()
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        map_native_receive_error, parse_opt_in, profile_pin_matches, writer_role_is_separate,
-        BiTaskEventIngestion, NativeGrpcEventReceiveError, ReadinessPhase, ReadinessSnapshot,
-        RuntimeConfig, TaskEventReceiveError, TaskEventRoutePin, WriteDatabaseCapabilities,
-        ENABLED_ENV, WRITE_DATABASE_CAPABILITY_QUERY,
+        parse_opt_in, profile_pin_matches, writer_role_is_separate, BiTaskEventIngestion,
+        ReadinessPhase, ReadinessSnapshot, RuntimeConfig, TaskEventRoutePin,
+        WriteDatabaseCapabilities, ENABLED_ENV, WRITE_DATABASE_CAPABILITY_QUERY,
     };
     use std::collections::HashMap;
     use std::sync::{
@@ -1460,29 +1241,9 @@ mod tests {
         assert!(parse_opt_in(Some("yes")).is_err());
     }
 
-    #[test]
-    fn native_event_receive_errors_preserve_auth_and_retryable_transport() {
-        for error in [
-            NativeGrpcEventReceiveError::Route,
-            NativeGrpcEventReceiveError::Unauthorized,
-        ] {
-            assert!(matches!(
-                map_native_receive_error(error),
-                TaskEventReceiveError::Unauthorized
-            ));
-        }
-
-        for error in [
-            NativeGrpcEventReceiveError::Contract,
-            NativeGrpcEventReceiveError::Transport,
-            NativeGrpcEventReceiveError::Busy,
-        ] {
-            assert!(matches!(
-                map_native_receive_error(error),
-                TaskEventReceiveError::Transport
-            ));
-        }
-    }
+    // 2026-11-09 W8 option-A: native receive 错误映射已随内联 transport/authorization 副本
+    // 一起移入共享 adapter crate (bi_native_event_adapter::map_native_error), 本 crate 不再拥有
+    // 该映射, 也不再测试它 —— 映射的语义由 adapter crate 自己的测试兜底。
 
     #[test]
     fn incomplete_or_empty_runtime_identity_cannot_build_a_consumer_config() {
@@ -1697,17 +1458,33 @@ mod tests {
             .contains("has_function_privilege(\n                   current_user,"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY
             .contains("has_function_privilege(\n                   session_user,"));
-        for signature in [
-            "platform_transport.append_authenticated(bytea,bytea,uuid,text,uuid,bytea,bytea)",
-            "platform_transport.pull_authenticated(bytea,bytea,uuid,text,integer)",
-            "platform_transport.acknowledge_authenticated(bytea,bytea,uuid,text,text,uuid,bigint,uuid,uuid,bytea)",
-            "platform_transport.append_message(text,uuid,uuid,text,uuid,bytea,bytea)",
-            "platform_transport.pull_one(text,uuid,integer)",
-            "platform_transport.acknowledge_one(text,uuid,bigint,uuid,uuid,bytea)",
-            "platform_transport.purge_terminal(text,uuid,integer)",
+        // 2026-11-09 W8 option-A: transport 函数解析从 to_regprocedure 签名串改为
+        // pg_proc/pg_namespace catalog join (受限 write role 对 platform_transport 无 USAGE,
+        // to_regprocedure 会 42501)。断言 (proname, pronargs) 匹配对 + schema 限定,
+        // 且确认查询不再用跨 schema 的 to_regprocedure 解析 transport 函数。
+        for function_pair in [
+            "('append_authenticated', 7)",
+            "('pull_authenticated', 5)",
+            "('acknowledge_authenticated', 10)",
+            "('append_message', 7)",
+            "('pull_one', 3)",
+            "('acknowledge_one', 6)",
+            "('purge_terminal', 3)",
         ] {
-            assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains(signature));
+            assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains(function_pair));
         }
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("function_schema.nspname = 'platform_transport'"));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY
+            .contains("(function_proc.proname, function_proc.pronargs) IN ("));
+        // v3/v2 契约 (2026-10-24/25 migration): 旧 v2/v1 签名会导致 to_regprocedure 返回 NULL
+        // 而 capability 门永远 fail closed。
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains(
+            "'bi.commit_task_event_v3(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea,varchar,varchar,uuid,bigint,bytea,uuid)'"
+        ));
+        assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains(
+            "'bi.record_task_event_quarantine_v2(uuid,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,varchar,varchar,uuid,bigint,bytea,uuid,bytea,integer,varchar)'"
+        ));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY.contains("right(owner_role.rolname, 6) = '_owner'"));
         assert!(WRITE_DATABASE_CAPABILITY_QUERY
             .contains("authenticated_role.rolcreaterole AS authenticated_can_manage_roles"));

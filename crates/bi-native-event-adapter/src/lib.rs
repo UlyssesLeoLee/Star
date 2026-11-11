@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=dde0a0cd8095b337347c7a4ee9901ee607c8253809e404e27979bb698f5b04a0
+@cypher schema=1 source_sha256=59eef8f21880e93cd78fb2cfd15ce3b74fd5cd81b7c484dbdcf547e61f7690fc
 MERGE (self:File {path:"crates/bi-native-event-adapter/src/lib.rs"})
 MERGE (config:Type {id:"bi_native_event_adapter::NativeTaskEventReceiverConfig",kind:"struct"})
 MERGE (receiver:Type {id:"bi_native_event_adapter::NativeTaskEventReceiver",kind:"struct"})
@@ -36,6 +36,7 @@ MERGE (route_fixture:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::test
 MERGE (profile_fixture:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::tests.profile_fixture",kind:"function"})
 MERGE (forward_owner_receive:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::forward_owner_receive",kind:"function"})
 MERGE (test_legacy_origin:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::tests.legacy_origin_error_propagates_without_terminal_ack",kind:"test"})
+MERGE (test_map_error:Symbol {id:"crates/bi-native-event-adapter/src/lib.rs::tests.map_native_error_preserves_auth_and_retryable_transport",kind:"test"})
 MERGE (disposition_log:Type {id:"bi_native_event_adapter::tests::DispositionLog",kind:"struct"})
 MERGE (legacy_delivery:Type {id:"bi_native_event_adapter::tests::LegacyOriginDelivery",kind:"struct"})
 MERGE (legacy_transport:Type {id:"bi_native_event_adapter::tests::LegacyOriginTransport",kind:"struct"})
@@ -128,6 +129,7 @@ MERGE (test_binding)-[:TESTS]->(validate_binding)
 MERGE (test_route)-[:TESTS]->(route_matches)
 MERGE (test_origin_key)-[:TESTS]->(key_from_origin)
 MERGE (test_legacy_origin)-[:CALLS]->(forward_owner_receive)
+MERGE (test_map_error)-[:TESTS]->(map_error)
 MERGE (test_legacy_origin)-[:TESTS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.process_one",kind:"method"})
 MERGE (test_legacy_origin)-[:USES_TYPE]->(:Type {id:"bi_owner_runtime::TaskEventInboxError",kind:"enum"})
 MERGE (test_legacy_origin)-[:CALLS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveRoute.new",kind:"method"})
@@ -811,6 +813,32 @@ mod tests {
             ))
         ));
         assert_eq!(log.values(), ["pull", "verify", "commit"]);
+    }
+
+    #[test]
+    fn map_native_error_preserves_auth_and_retryable_transport() {
+        // 2026-11-09 (star-api-rest option-A 接线): 该映射随内联副本移入本 crate 后,
+        // 语义测试一并迁入 (原 star-api-rest 测试已删除)。
+        assert!(matches!(
+            map_native_error(NativeGrpcEventReceiveError::Route),
+            TaskEventReceiveError::InvalidRoute
+        ));
+        assert!(matches!(
+            map_native_error(NativeGrpcEventReceiveError::Unauthorized),
+            TaskEventReceiveError::Unauthorized
+        ));
+        assert!(matches!(
+            map_native_error(NativeGrpcEventReceiveError::Contract),
+            TaskEventReceiveError::InvalidOrigin
+        ));
+        assert!(matches!(
+            map_native_error(NativeGrpcEventReceiveError::Transport),
+            TaskEventReceiveError::Transport
+        ));
+        assert!(matches!(
+            map_native_error(NativeGrpcEventReceiveError::Busy),
+            TaskEventReceiveError::Busy
+        ));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /*
-@cypher schema=1 source_sha256=a8b3c8cf080857f88a0de4b7a72e445f3ee18bd4e3001dc00d73bba8df0c6aa7
+@cypher schema=1 source_sha256=9a497d7ca5cc46e57db164e266d873a6de058a0aeca455447875ca8327493625
 MERGE (self:File {path:"crates/star-api-rest/tests/bi_task_event_commit_before_ack_pg.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/bi_task_event_commit_before_ack_pg.rs::native_event_commits_before_ack_and_exact_replay_is_idempotent",kind:"test"})
 MERGE (receiver:Type {id:"bi_owner_runtime::TaskEventReceiver",kind:"struct"})
@@ -103,7 +103,7 @@ impl OriginKey {
             provider_identity: origin.provider_identity().to_owned(),
             log_id: origin.log_id().to_owned(),
             log_generation: origin.log_generation(),
-            sequence: origin.sequence(),
+            sequence: origin.source_sequence(),
             message_id: origin.message_id(),
             wire_sha256: Sha256::digest(wire).into(),
         }
@@ -226,6 +226,7 @@ impl TaskEventReceiveTransport for LatchedNativeTransport {
             native_origin.log_id().to_owned(),
             native_origin.log_generation(),
             native_origin.sequence(),
+            native_origin.sequence().to_be_bytes().to_vec(),
             native_origin.message_id(),
         )?;
         self.origins.replace(native_origin, inner.exact_wire())?;

@@ -6943,6 +6943,7 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.23.1",
+ "bi-native-event-adapter",
  "bi-owner-runtime",
  "chrono",
  "domain-agent",
