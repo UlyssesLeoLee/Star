@@ -69,11 +69,12 @@ import { AgentCanvasView } from "@/components/agent-view/AgentCanvasView";
 import { AgentFilter } from "@/components/agent-view/AgentFilter";
 import { AgentSettingsTab } from "@/components/agent/AgentSettingsTab";
 import { PageHeader } from "@/components/PageHeader";
-import { Bot, AlertTriangle, Maximize2, LayoutDashboard, Settings, Network } from "lucide-react";
+import { Bot, AlertTriangle, Maximize2, LayoutDashboard, Settings, Network, Workflow } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { AgentViewTab } from "@/app/(app)/agent-relationships/AgentViewTab";
+import { WorkflowBuilder } from "@/components/agent-workflow/WorkflowBuilder";
 
-type ViewMode = "canvas" | "settings" | "relationships";
+type ViewMode = "canvas" | "settings" | "relationships" | "workflow";
 
 function AgentViewContent() {
   const { t } = useTranslation();
@@ -112,7 +113,9 @@ function AgentViewContent() {
       ? "settings"
       : urlView === "relationships"
         ? "relationships"
-        : "canvas",
+        : urlView === "workflow"
+          ? "workflow"
+          : "canvas",
   );
 
   // 用户注释 / 自由连接 (per 2026-10-01 OOB 恢复无限画布画笔) - local-only state + localStorage 持久化 + undo/redo
@@ -283,6 +286,13 @@ function AgentViewContent() {
           <Network size={13} /> Relationship
         </button>
         <button
+          data-testid="view-mode-workflow"
+          onClick={() => handleViewModeChange("workflow")}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "workflow" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+        >
+          <Workflow size={13} /> Workflow 工作流
+        </button>
+        <button
           data-testid="view-mode-settings"
           onClick={() => handleViewModeChange("settings")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "settings" ? "bg-[var(--cel-text-primary,#ffffff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
@@ -387,6 +397,10 @@ function AgentViewContent() {
             </div>
           )}
         </>
+      ) : viewMode === "workflow" ? (
+        <div className="flex-1 min-h-0 p-2" data-testid="agent-view-workflow">
+          <WorkflowBuilder />
+        </div>
       ) : viewMode === "relationships" ? (
         <div className="flex-1 min-h-0 overflow-auto p-4">
           <AgentViewTab />
