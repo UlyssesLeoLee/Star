@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=a5dcea34bf615cde25970483febfa1abb0df52497a98940bb91cdb638f36c62d
+@cypher schema=1 source_sha256=5b2b6846b5eec60f2ff7e95c4315c11620420d218657f9678f847b71a59ddef0
 MERGE (self:File {path:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs"})
 MERGE (module:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::task_event_inbox_runtime_grants_pg",kind:"module"})
 MERGE (privilege_test:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::pg_runtime_privilege_boundary_is_closed",kind:"test"})
@@ -27,9 +27,9 @@ MERGE (fixture_new:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_ru
 MERGE (call_commit:Symbol {id:"crates/bi-owner-runtime/tests/task_event_inbox_runtime_grants_pg.rs::call_commit",kind:"function"})
 MERGE (database_url_env:Config {id:"STAR_BI_TASK_EVENT_TEST_DATABASE_URL",kind:"environment_variable"})
 MERGE (database_name:Database {id:"star_bi_task_event_test",kind:"disposable_test_database"})
-MERGE (commit_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
+MERGE (commit_fn:Database {id:"bi.commit_task_event_v3",kind:"stored_function"})
 MERGE (query_fn:Database {id:"bi.list_task_event_page_v1",kind:"stored_function"})
-MERGE (quarantine_fn:Database {id:"bi.record_task_event_quarantine_v1",kind:"stored_function"})
+MERGE (quarantine_fn:Database {id:"bi.record_task_event_quarantine_v2",kind:"stored_function"})
 MERGE (append_only_guard:Database {id:"bi.reject_task_event_mutation()",kind:"trigger_function"})
 MERGE (quarantine_guard:Database {id:"bi.reject_task_event_quarantine_mutation()",kind:"trigger_function"})
 MERGE (runtime_role:Config {id:"star_bi_runtime",kind:"postgres_role"})
@@ -147,14 +147,14 @@ use uuid::Uuid;
 
 const DATABASE_URL_ENV: &str = "STAR_BI_TASK_EVENT_TEST_DATABASE_URL";
 const DATABASE_NAME: &str = "star_bi_task_event_test";
-const COMMIT_FUNCTION: &str = "bi.commit_task_event_v2(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea)";
+const COMMIT_FUNCTION: &str = "bi.commit_task_event_v3(uuid,uuid,uuid,uuid,uuid,varchar,integer,varchar,integer,uuid,uuid,timestamptz,jsonb,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,bytea,bytea,varchar,varchar,uuid,bigint,bytea,uuid)";
 const QUERY_FUNCTION: &str = "bi.list_task_event_page_v1(uuid,uuid,uuid,timestamptz,uuid,integer)";
-const QUARANTINE_FUNCTION: &str = "bi.record_task_event_quarantine_v1(uuid,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,varchar,varchar,uuid,bigint,uuid,bytea,integer,varchar)";
+const QUARANTINE_FUNCTION: &str = "bi.record_task_event_quarantine_v2(uuid,uuid,uuid,varchar,varchar,uuid,bigint,bytea,varchar,varchar,uuid,varchar,varchar,uuid,bigint,bytea,uuid,bytea,integer,varchar)";
 const COMMIT_SQL: &str = r#"
     SELECT outcome, receipt_id, committed_at
-      FROM bi.commit_task_event_v2(
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-          $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+      FROM bi.commit_task_event_v3(
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+          $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31
       )
 "#;
 
@@ -630,8 +630,24 @@ async fn require_cross_domain_privilege_boundary(pool: &PgPool) -> Vec<String> {
                 ('platform_transport.purge_terminal(text,uuid,integer)'::text)
         ),
         resolved_transport_functions AS (
-            SELECT signature, to_regprocedure(signature)::oid AS function_oid
-              FROM transport_function_signatures
+            -- Resolve through pg_proc rather than to_regprocedure(): a correctly restricted
+            -- BI runtime holds no USAGE on platform_transport, and to_regprocedure() raises
+            -- 42501 for a principal without schema USAGE. The catalog join reads the same
+            -- identities without granting the BI runtime any cross-domain schema access.
+            SELECT signatures.signature, functions.function_oid
+              FROM transport_function_signatures AS signatures
+              LEFT JOIN LATERAL (
+                  SELECT p.oid AS function_oid
+                    FROM pg_proc AS p
+                    JOIN pg_namespace AS n ON n.oid = p.pronamespace
+                   WHERE n.nspname = 'platform_transport'
+                     AND p.proname = split_part(
+                             split_part(signatures.signature, '.', 2), '(', 1)
+                     AND (
+                           SELECT string_agg(format_type(u.argument_type, NULL), ',' ORDER BY u.ordinal)
+                             FROM unnest(p.proargtypes) WITH ORDINALITY AS u(argument_type, ordinal)
+                         ) = split_part(split_part(signatures.signature, '(', 2), ')', 1)
+               ) AS functions ON true
         ),
         unexpected_star_memberships AS (
             SELECT principals.principal_name, roles.rolname
@@ -952,6 +968,12 @@ async fn call_commit(
         .bind(fixture.destination_generation)
         .bind(vec![0x24_u8; 32])
         .bind(vec![0x53_u8; 32])
+        .bind("star-rust-log")
+        .bind("bi-task-events")
+        .bind(fixture.destination_generation)
+        .bind(17_i64)
+        .bind(17_i64.to_be_bytes().to_vec())
+        .bind(fixture.event_id)
         .fetch_one(&mut **tx)
         .await
 }
