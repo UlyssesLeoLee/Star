@@ -584,4 +584,17 @@ export const zhCN: Dictionary = {
     docsCategoryOther: "其他 (briefs / adr / architecture 等)",
     docsEmpty: "该类别暂无可用文档",
   },
+  projectsFilterBar: {
+    calendarSubTabs: "日历子视图",
+    monthView: "月视图",
+    weekView: "周视图",
+    statusGroup: "按状态筛选",
+    priorityGroup: "按优先级筛选",
+    memberGroup: "按成员筛选",
+    statusLabel: "状态",
+    priorityLabel: "优先级",
+    memberLabel: "成员",
+    searchPlaceholder: "搜索标题 / 编号 / 成员…",
+    clearAll: "清除全部筛选",
+  },
 };

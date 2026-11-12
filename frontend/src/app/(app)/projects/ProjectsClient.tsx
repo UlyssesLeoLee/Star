@@ -107,6 +107,16 @@ import type {
 import { useTranslation } from "@/lib/i18n";
 import { CelCard3D } from "@/components/effects/CelCard3D";
 import { CreateProjectDialog } from "@/components/project/CreateProjectDialog";
+import {
+  ProjectsFilterBar,
+  applyKanbanFilter,
+  applyWorktreeFilter,
+  isFilterActive,
+  KANBAN_STATUSES,
+  BACKLOG_PRIORITIES,
+  EMPTY_PROJECTS_FILTER,
+  type ProjectsFilterState,
+} from "./ProjectsFilterBar";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
@@ -214,6 +224,52 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   }, [router]);
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  // ---- 下行 FilterBar 筛选状态 (per WBS §23.32-B: 上下两块标签页区域) ----
+  // 状态存 useState + 写回 URL query (?status=todo,review&member=X&q=...) 保持可分享链接。
+  // 初始值从 URL query 解析一次 (client-only; SSR 不读 window)。
+  const [projectFilter, setProjectFilter] = useState<ProjectsFilterState>(() => {
+    if (typeof window === "undefined") return { ...EMPTY_PROJECTS_FILTER };
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const statuses = (params.get("status") ?? "")
+        .split(",")
+        .filter((s): s is WorkItemStatus => (KANBAN_STATUSES as readonly string[]).includes(s));
+      const priorities = (params.get("priority") ?? "")
+        .split(",")
+        .filter((p) => (BACKLOG_PRIORITIES as readonly string[]).includes(p));
+      const members = (params.get("member") ?? "")
+        .split(",")
+        .filter(Boolean);
+      return { statuses, priorities, memberIds: members, query: params.get("q") ?? "" };
+    } catch {
+      return { ...EMPTY_PROJECTS_FILTER };
+    }
+  });
+
+  // 筛选变化写回 URL query (与 setTab 的 ?tab= 写法一致)
+  const setProjectFilterWithUrl = useCallback(
+    (next: ProjectsFilterState) => {
+      setProjectFilter(next);
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (next.statuses.length > 0) params.set("status", next.statuses.join(","));
+        else params.delete("status");
+        if (next.priorities.length > 0) params.set("priority", next.priorities.join(","));
+        else params.delete("priority");
+        if (next.memberIds.length > 0) params.set("member", next.memberIds.join(","));
+        else params.delete("member");
+        if (next.query.trim()) params.set("q", next.query.trim());
+        else params.delete("q");
+        router.replace(`/projects?${params.toString()}`, { scroll: false });
+      } catch {
+        // jsdom / SSR 环境降级: 只切 state
+      }
+    },
+    [router],
+  );
+
+  // ---- 筛选后的派生数据 (useMemo, per FilterBar 开关) — 声明在 projectWorkItems/projectWorktrees 之后
   const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -246,6 +302,15 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const projectWorktrees = useMemo(
     () => worktrees.filter((w) => w.project_id === selectedProjectId),
     [worktrees, selectedProjectId],
+  );
+  // ---- 筛选后的派生数据 (per WBS §23.32-B 下行 FilterBar) ----
+  const filteredProjectWorkItems = useMemo(
+    () => applyKanbanFilter(projectWorkItems, identities, projectFilter),
+    [projectWorkItems, identities, projectFilter],
+  );
+  const filteredProjectWorktrees = useMemo(
+    () => applyWorktreeFilter(projectWorktrees, projectFilter),
+    [projectWorktrees, projectFilter],
   );
   // per DRIFT-α-009 修复: 当前 project 关联的 canvas (ref_kind === "project")
   const projectCanvases = useMemo(
@@ -533,7 +598,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         </CelCard3D>
       </div>
 
-      {/* ---- Tabs ---- */}
+      {/* ---- Tabs (上行: 切换当前标签页) ---- */}
       <Tabs
         active={tab}
         onChange={(id) => setTab(id as ProjectsTabId)}
@@ -552,6 +617,16 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         }))}
       />
 
+      {/* ---- 下行 FilterBar: 筛选标签页里的内容 + timeline 子标签页 (per WBS §23.32-B) ---- */}
+      <ProjectsFilterBar
+        filter={projectFilter}
+        onChange={setProjectFilterWithUrl}
+        tab={tab}
+        memberChips={projectMembers.map((m) => ({ id: m.id, label: m.display_name }))}
+        calendarView={calendarView}
+        onCalendarViewChange={setCalendarView}
+      />
+
       {/* ---- Tab content (5 tab per 2026-08-29 22:49 JST 拍板: Kanban / Timeline / Backlog / Agents / Worktrees) ---- */}
 
       {tab === "kanban" && (
@@ -559,7 +634,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
           <DomainMarker domain="social" label="social 域 (collaboration/通知)" />
           <KanbanBoard
             board={projectBoard}
-            workItems={projectWorkItems}
+            workItems={filteredProjectWorkItems}
             identities={identities}
             onTransition={handleBoardTransition}
             onAddColumn={addBoardColumn}
@@ -673,8 +748,8 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       {tab === "backlog" && (
         <div data-testid="projects-backlog-tab" className="space-y-2">
           <DomainMarker domain="economy" label="economy 域 (billing/pricing/cost)" />
-          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数)</div>
-          {projectWorkItems.length === 0 ? (
+          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorkItems.length}` : ""})</div>
+          {filteredProjectWorkItems.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no work-items)</div>
           ) : (
             <table className="table">
@@ -689,7 +764,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
                 </tr>
               </thead>
               <tbody>
-                {[...projectWorkItems]
+                {[...filteredProjectWorkItems]
                   .sort((a, b) => {
                     // status 排序: todo > in_progress > review > blocked > done > wontfix (per WorkItemStatus 真实定义)
                     const order: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done", "wontfix"];
@@ -727,7 +802,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         <div data-testid="projects-worktrees-tab" className="space-y-2">
           <DomainMarker domain="admin" label="admin 域 (RBAC/permission/tenant)" />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
+            <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorktrees.length}` : ""})</div>
             <Link href="/worktree" className="btn-primary text-xs" data-testid="open-project-worktree-index">
               打开项目 Worktree 管理
             </Link>
@@ -750,7 +825,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
               ))}
             </div>
           )}
-          {projectWorktrees.length === 0 ? (
+          {filteredProjectWorktrees.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no worktrees)</div>
           ) : (
             <table className="table">
@@ -764,7 +839,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
                 </tr>
               </thead>
               <tbody>
-                {projectWorktrees.map((w) => (
+                {filteredProjectWorktrees.map((w) => (
                   <tr key={w.id} data-testid={`worktree-row-${w.id}`}>
                     <td className="font-mono text-[10px] text-ink-mute">{w.id.slice(0, 8)}</td>
                     <td className="font-mono text-xs">{w.name}</td>

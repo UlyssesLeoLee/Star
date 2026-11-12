@@ -569,4 +569,17 @@ export const en: Dictionary = {
     docsCategoryOther: "Other (briefs / adr / architecture etc.)",
     docsEmpty: "No documents in this category",
   },
+  projectsFilterBar: {
+    calendarSubTabs: "Calendar sub-view",
+    monthView: "Month",
+    weekView: "Week",
+    statusGroup: "Filter by status",
+    priorityGroup: "Filter by priority",
+    memberGroup: "Filter by member",
+    statusLabel: "Status",
+    priorityLabel: "Priority",
+    memberLabel: "Member",
+    searchPlaceholder: "Search title / key / member…",
+    clearAll: "Clear all filters",
+  },
 };

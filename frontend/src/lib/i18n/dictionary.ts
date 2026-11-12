@@ -484,4 +484,18 @@ export interface Dictionary {
     docsCategoryOther: string;
     docsEmpty: string;
   };
+  /** v0.9 (2026-11-13 WBS §23.32-B) 新增: /projects 下行 FilterBar 筛选标签页 */
+  projectsFilterBar: {
+    calendarSubTabs: string;
+    monthView: string;
+    weekView: string;
+    statusGroup: string;
+    priorityGroup: string;
+    memberGroup: string;
+    statusLabel: string;
+    priorityLabel: string;
+    memberLabel: string;
+    searchPlaceholder: string;
+    clearAll: string;
+  };
 }

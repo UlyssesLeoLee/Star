@@ -570,4 +570,17 @@ export const ja: Dictionary = {
     docsCategoryOther: "その他 (briefs / adr / architecture など)",
     docsEmpty: "このカテゴリのドキュメントはありません",
   },
+  projectsFilterBar: {
+    calendarSubTabs: "カレンダーサブビュー",
+    monthView: "月表示",
+    weekView: "週表示",
+    statusGroup: "ステータスで絞り込み",
+    priorityGroup: "優先度で絞り込み",
+    memberGroup: "メンバーで絞り込み",
+    statusLabel: "ステータス",
+    priorityLabel: "優先度",
+    memberLabel: "メンバー",
+    searchPlaceholder: "タイトル / キー / メンバーを検索…",
+    clearAll: "すべての絞り込みを解除",
+  },
 };
