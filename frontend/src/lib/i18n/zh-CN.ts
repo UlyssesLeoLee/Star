@@ -1,6 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b48dcf1bbbafe3428668637583933085f2c6704a4d374889000c48a326d31b92
-MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
+@cypher schema=1 source_sha256=b48dcf1bbbafe3428668637583933085f2c6704a4d374889000c48a326d31b92MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
 MERGE (locale:Symbol {id:"frontend/src/lib/i18n/zh-CN.ts::zhCN",kind:"constant"})
@@ -597,5 +596,52 @@ export const zhCN: Dictionary = {
     memberLabel: "成员",
     searchPlaceholder: "搜索标题 / 编号 / 成员…",
     clearAll: "清除全部筛选",
+  },
+  ipaSkills: {
+    humanGate: "人工审批门",
+    subtaskCount: "子任务 {count}",
+    inputs: "输入",
+    outputs: "输出",
+    useAsTaskCard: "作为任务卡使用",
+    linkedSubtasks: "关联子任务",
+    totalSkills: "总技能 {count}",
+    phaseColumns: "工作流列 {count}",
+    humanGated: "人工审批门 {count}",
+    linkedTaskCards: "已关联任务卡 {count}",
+    everySkillIsTaskCard: "每个技能都是任务卡 · 点击展开契约与子任务",
+    hierarchyNote: "层级: 日本 IPA 开发流程 · 技能 → 任务卡 (同一套 WorkItem 模型, 与 kanban 互通)",
+    contractSource: "契约来自 ../IPA-Atomic-Skills workflow-contract.json",
+  },
+  nema: {
+    pageTitle: "NEMA · 文件即任务",
+    pageSubtitle: "共同编辑的文件自动产生 .nema 侧车 — .nema 可以作为 Star 任务打开",
+    formNotice: "filePath / title / editors 至少填一项",
+    coeditRule: "「{filePath}」当前编辑者 < 2 — 共同编辑才自动产生 .nema (文件即任务规则)",
+    sidecarCreated: "✓ 已自动产生 .nema 侧车: {nemaPath} (编辑者 {count} 人)",
+    nemaTasks: ".nema 任务",
+    boundTasks: "已绑定 Star 任务",
+    autoRule: "自动生成规则",
+    autoRuleValue: "≥2 编辑者",
+    autoRuleHint: "共同编辑触发",
+    format: "格式",
+    localFolderBridge: "本地文件夹 (受控只读桥接)",
+    connecting: "连接中…",
+    bridgeUnavailable: "本地桥接不可用: {error} — 文件关联将降级为 GitHub blob / 快照模式。",
+    parentDir: ".. (上级)",
+    emptyDir: "空目录",
+    registerSharedFile: "登记为共同编辑文件 (.nema)",
+    registerSharedFileAria: "登记为共同编辑文件",
+    registerSectionTitle: "共同编辑文件登记 (自动 .nema 生成)",
+    pathPlaceholder: "文件路径 docs/design/auth.md",
+    titlePlaceholder: "任务标题 (What)",
+    editorsPlaceholder: "共同编辑者 (逗号/空格分隔, ≥2 触发)",
+    purposePlaceholder: "目的 (Why, 可选)",
+    registerButton: "登记文件 (自动生成 .nema)",
+    coeditRuleFootnote: "规则: editors ≥ 2 才自动产生 .nema; 单人编辑不产生 (per 2026-11-11 用户发令)。",
+    nemaTaskListTitle: ".nema 任务 ({count})",
+    emptyList: "暂无共同编辑文件。登记一个 ≥2 编辑者的文件后, 自动产生 .nema 侧车。",
+    openBoundTask: "已绑定 Star 任务 →",
+    openAsStarTask: "打开为 Star 任务",
+    fiveW1H: "5W1H",
   },
 };

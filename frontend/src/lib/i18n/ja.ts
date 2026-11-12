@@ -1,6 +1,5 @@
 /*
-@cypher schema=1 source_sha256=754c358757cd9fa8c9de2a8dcfd1830847340e5758b6c14637ffd8983a8bef3d
-MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
+@cypher schema=1 source_sha256=754c358757cd9fa8c9de2a8dcfd1830847340e5758b6c14637ffd8983a8bef3dMERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
 MERGE (locale:Symbol {id:"frontend/src/lib/i18n/ja.ts::ja",kind:"constant"})
@@ -583,5 +582,52 @@ export const ja: Dictionary = {
     memberLabel: "メンバー",
     searchPlaceholder: "タイトル / キー / メンバーを検索…",
     clearAll: "すべての絞り込みを解除",
+  },
+  ipaSkills: {
+    humanGate: "ヒト承認ゲート",
+    subtaskCount: "サブタスク {count}",
+    inputs: "入力",
+    outputs: "出力",
+    useAsTaskCard: "タスクカードとして使う",
+    linkedSubtasks: "関連サブタスク",
+    totalSkills: "スキル計 {count}",
+    phaseColumns: "ワークフロー列 {count}",
+    humanGated: "ヒト承認ゲート {count}",
+    linkedTaskCards: "関連タスクカード {count}",
+    everySkillIsTaskCard: "すべてのスキルはタスクカード · クリックで契約とサブタスクを展開",
+    hierarchyNote: "階層: 日本 IPA 開発プロセス · スキル → タスクカード (同一の WorkItem モデル, kanban と相互運用)",
+    contractSource: "契約は ../IPA-Atomic-Skills workflow-contract.json 由来",
+  },
+  nema: {
+    pageTitle: "NEMA · ファイル即タスク",
+    pageSubtitle: "共同編集されたファイルは .nema サイドカーを自動生成 — .nema は Star タスクとして開けます",
+    formNotice: "filePath / title / editors のいずれか必須",
+    coeditRule: "「{filePath}」の編集者が 2 人未満 — .nema 自動生成には共同編集が必要です (ファイル即タスク規則)",
+    sidecarCreated: "✓ .nema サイドカー生成: {nemaPath} (編集者 {count} 人)",
+    nemaTasks: ".nema タスク",
+    boundTasks: "バインド済み Star タスク",
+    autoRule: "自動生成ルール",
+    autoRuleValue: "編集者 ≥2",
+    autoRuleHint: "共同編集で発動",
+    format: "フォーマット",
+    localFolderBridge: "ローカルフォルダ (制御付き読み取り専用ブリッジ)",
+    connecting: "接続中…",
+    bridgeUnavailable: "ローカルブリッジ利用不可: {error} — ファイルリンクは GitHub blob / スナップショットモードに降格します。",
+    parentDir: ".. (親)",
+    emptyDir: "空のディレクトリ",
+    registerSharedFile: "共同編集ファイルとして登録 (.nema)",
+    registerSharedFileAria: "共同編集ファイルとして登録",
+    registerSectionTitle: "共同編集ファイル登録 (.nema 自動生成)",
+    pathPlaceholder: "ファイルパス docs/design/auth.md",
+    titlePlaceholder: "タスクタイトル (What)",
+    editorsPlaceholder: "共同編集者 (カンマ/スペース区切り, ≥2 で発動)",
+    purposePlaceholder: "目的 (Why, 任意)",
+    registerButton: "ファイルを登録 (.nema 自動生成)",
+    coeditRuleFootnote: "ルール: 編集者 ≥2 のときのみ .nema 自動生成; 単独編集では生成されません (per 2026-11-11 ユーザー指令)。",
+    nemaTaskListTitle: ".nema タスク ({count})",
+    emptyList: "共同編集ファイルはまだありません。編集者 ≥2 のファイルを登録すると .nema サイドカーが自動生成されます。",
+    openBoundTask: "バインド済み Star タスク →",
+    openAsStarTask: "Star タスクとして開く",
+    fiveW1H: "5W1H",
   },
 };

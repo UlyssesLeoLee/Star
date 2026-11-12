@@ -1,6 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f637cdd5dd663ed5ee0b8107c0b49f3a4dd34129bc5d393edca11ad6b41b3e2e
-MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
+@cypher schema=1 source_sha256=f637cdd5dd663ed5ee0b8107c0b49f3a4dd34129bc5d393edca11ad6b41b3e2eMERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
 MERGE (locale:Symbol {id:"frontend/src/lib/i18n/en.ts::en",kind:"constant"})
@@ -582,5 +581,52 @@ export const en: Dictionary = {
     memberLabel: "Member",
     searchPlaceholder: "Search title / key / member…",
     clearAll: "Clear all filters",
+  },
+  ipaSkills: {
+    humanGate: "Human approval gate",
+    subtaskCount: "{count} subtasks",
+    inputs: "Inputs",
+    outputs: "Outputs",
+    useAsTaskCard: "Use as task card",
+    linkedSubtasks: "Linked subtasks",
+    totalSkills: "{count} skills total",
+    phaseColumns: "{count} workflow columns",
+    humanGated: "{count} human-gated",
+    linkedTaskCards: "{count} linked task cards",
+    everySkillIsTaskCard: "Every skill is a task card · click to expand contract & subtasks",
+    hierarchyNote: "Hierarchy: Japanese IPA dev process · skill → task card (same WorkItem model, interoperable with kanban)",
+    contractSource: "Contract from ../IPA-Atomic-Skills workflow-contract.json",
+  },
+  nema: {
+    pageTitle: "NEMA · Files as tasks",
+    pageSubtitle: "Co-edited files auto-generate a .nema sidecar — a .nema can be opened as a Star task",
+    formNotice: "filePath / title / editors — at least one is required",
+    coeditRule: "\"{filePath}\" has < 2 current editors — co-editing is required to auto-generate .nema (files-as-tasks rule)",
+    sidecarCreated: "✓ .nema sidecar generated: {nemaPath} ({count} editors)",
+    nemaTasks: ".nema tasks",
+    boundTasks: "Bound Star tasks",
+    autoRule: "Auto-generate rule",
+    autoRuleValue: "≥2 editors",
+    autoRuleHint: "Triggers on co-editing",
+    format: "Format",
+    localFolderBridge: "Local folder (controlled read-only bridge)",
+    connecting: "Connecting…",
+    bridgeUnavailable: "Local bridge unavailable: {error} — file links degrade to GitHub blob / snapshot mode.",
+    parentDir: ".. (parent)",
+    emptyDir: "Empty directory",
+    registerSharedFile: "Register as co-edited file (.nema)",
+    registerSharedFileAria: "Register as co-edited file",
+    registerSectionTitle: "Co-edited file registration (auto .nema generation)",
+    pathPlaceholder: "File path docs/design/auth.md",
+    titlePlaceholder: "Task title (What)",
+    editorsPlaceholder: "Co-editors (comma/space separated, ≥2 triggers)",
+    purposePlaceholder: "Purpose (Why, optional)",
+    registerButton: "Register file (auto-generate .nema)",
+    coeditRuleFootnote: "Rule: .nema auto-generates only with ≥2 editors; single-editor files do not (per 2026-11-11 user directive).",
+    nemaTaskListTitle: ".nema tasks ({count})",
+    emptyList: "No co-edited files yet. Register a file with ≥2 editors to auto-generate a .nema sidecar.",
+    openBoundTask: "Bound Star task →",
+    openAsStarTask: "Open as Star task",
+    fiveW1H: "5W1H",
   },
 };

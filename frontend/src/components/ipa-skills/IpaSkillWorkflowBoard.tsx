@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f667487249fc83bfe3a9f8e0c888fe02cd2ed8d5a7af16fcbece9f001a958ff1
+@cypher schema=1 source_sha256=0ef93d4843d53d06a841525b419819e39248b7fbc84c7cf94bb347716eb7b13f
 MERGE (self:File {path:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.tsx"})
 MERGE (board:Function {name:"IpaSkillWorkflowBoard", language:"typescript", visibility:"public"})
 MERGE (slot:Function {name:"IpaSkillSlot", language:"typescript", visibility:"private"})
@@ -20,6 +20,7 @@ MERGE (self)-[:DEFINES]->(column)
 import { useMemo, useState } from "react";
 import { FileText, Users, GitBranch, ShieldAlert, Play, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useTranslation } from "@/lib/i18n";
 import {
   IPA_SKILL_CATALOG,
   IPA_PHASE_COLUMNS,
@@ -97,6 +98,7 @@ function IpaSkillSlot({
   selected: boolean;
   onSelect: (id: string | null) => void;
 } & Pick<IpaSkillWorkflowBoardProps, "projectId" | "tenantId" | "reporterId" | "onOpenTaskCard">) {
+  const { t, tx } = useTranslation();
   const addWorkItem = useStore((s) => s.addWorkItem);
   const workItems = useStore((s) => s.workItems);
   // 该技能的子任务 = 关联了此技能的 WorkItem (与 kanban 同一套内容模型)
@@ -133,7 +135,7 @@ function IpaSkillSlot({
         <div className="flex items-center gap-1.5">
           <span className="font-mono text-[9px] text-cyan-400/90 shrink-0">{skill.id}</span>
           {skill.hasHumanGate && (
-            <span title="人工审批门" className="text-[9px] text-amber-400 shrink-0">
+            <span title={t.ipaSkills.humanGate} className="text-[9px] text-amber-400 shrink-0">
               <ShieldAlert size={10} className="inline" />
             </span>
           )}
@@ -143,7 +145,7 @@ function IpaSkillSlot({
               data-testid={`ipa-skill-subtask-count-${skill.id}`}
               className="text-[9px] font-mono text-emerald-300 border border-emerald-400/40 rounded px-1 shrink-0"
             >
-              子任务 {linkedTasks.length}
+              {tx(t.ipaSkills.subtaskCount, { count: linkedTasks.length })}
             </span>
           )}
         </div>
@@ -160,21 +162,21 @@ function IpaSkillSlot({
             {skill.purpose || "—"}
           </div>
           <div className="text-[9px] font-mono text-ink-mute">
-            输入: {skill.inputs.length > 0 ? skill.inputs.join(", ") : "—"}
+            {t.ipaSkills.inputs}: {skill.inputs.length > 0 ? skill.inputs.join(", ") : "—"}
           </div>
           <div className="text-[9px] font-mono text-ink-mute">
-            输出: {skill.outputs.length > 0 ? skill.outputs.join(", ") : "—"}
+            {t.ipaSkills.outputs}: {skill.outputs.length > 0 ? skill.outputs.join(", ") : "—"}
           </div>
           <button
             data-testid={`ipa-skill-create-task-${skill.id}`}
             onClick={createTaskCard}
             className="btn text-[10px] w-full py-1"
           >
-            <Plus size={10} /> 作为任务卡使用
+            <Plus size={10} /> {t.ipaSkills.useAsTaskCard}
           </button>
           {linkedTasks.length > 0 && (
             <div className="space-y-1" data-testid={`ipa-skill-subtasks-${skill.id}`}>
-              <div className="text-[9px] font-mono text-ink-mute">关联子任务:</div>
+              <div className="text-[9px] font-mono text-ink-mute">{t.ipaSkills.linkedSubtasks}:</div>
               {linkedTasks.map((w) => (
                 <button
                   key={w.id}
@@ -201,6 +203,7 @@ export function IpaSkillWorkflowBoard({
   reporterId,
   onOpenTaskCard,
 }: IpaSkillWorkflowBoardProps) {
+  const { t, tx } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const byPhase = useMemo(() => {
@@ -221,19 +224,19 @@ export function IpaSkillWorkflowBoard({
     <div data-testid="ipa-skill-workflow-board" className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-ink-mute">
         <span className="px-2 py-0.5 rounded border border-line bg-bg-soft/40">
-          总技能 {IPA_SKILL_CATALOG.length}
+          {tx(t.ipaSkills.totalSkills, { count: IPA_SKILL_CATALOG.length })}
         </span>
         <span className="px-2 py-0.5 rounded border border-line bg-bg-soft/40">
-          工作流列 {IPA_PHASE_COLUMNS.length}
+          {tx(t.ipaSkills.phaseColumns, { count: IPA_PHASE_COLUMNS.length })}
         </span>
         <span className="px-2 py-0.5 rounded border border-amber-400/40 bg-amber-400/10 text-amber-300">
-          人工审批门 {humanGated}
+          {tx(t.ipaSkills.humanGated, { count: humanGated })}
         </span>
         <span className="px-2 py-0.5 rounded border border-cyan-400/40 bg-cyan-400/10 text-cyan-300">
-          已关联任务卡 {linkedWorkItems.length}
+          {tx(t.ipaSkills.linkedTaskCards, { count: linkedWorkItems.length })}
         </span>
         <span className="flex items-center gap-1">
-          <FileText size={10} /> 每个技能都是任务卡 · 点击展开契约与子任务
+          <FileText size={10} /> {t.ipaSkills.everySkillIsTaskCard}
         </span>
       </div>
 
@@ -257,9 +260,9 @@ export function IpaSkillWorkflowBoard({
 
       <div className="text-[10px] font-mono text-ink-mute flex items-center gap-2">
         <GitBranch size={10} />
-        层级: 日本 IPA 开发流程 · 技能 → 任务卡 (同一套 WorkItem 模型, 与 kanban 互通)
+        {t.ipaSkills.hierarchyNote}
         <Users size={10} className="ml-2" />
-        契约来自 ../IPA-Atomic-Skills workflow-contract.json
+        {t.ipaSkills.contractSource}
       </div>
     </div>
   );

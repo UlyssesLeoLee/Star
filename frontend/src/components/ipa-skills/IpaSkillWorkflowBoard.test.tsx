@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a23690f59b90a193ce70a09104de17ad34955b5b16d063ae2396792b4ea499fd
+@cypher schema=1 source_sha256=9f2d5e404d630d5ca51a6c3b1011329159ff8fb1ddac2b512dfe15a0b74b7520
 MERGE (self:File {path:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.test.tsx"})
 MERGE (allSkills:Symbol {id:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.test.tsx::renders_all_catalog_skill_slots",kind:"test"})
 MERGE (phases:Symbol {id:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.test.tsx::renders_phase_columns_with_counts",kind:"test"})
@@ -14,6 +14,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { IpaSkillWorkflowBoard } from "./IpaSkillWorkflowBoard";
 import { IPA_SKILL_CATALOG, IPA_PHASE_COLUMNS } from "@/lib/ipa-skills/catalog";
 import { useStore } from "@/lib/store";
+import { I18nProvider } from "@/lib/i18n";
 
 const PROPS = {
   projectId: "00000000-0000-0000-0000-000000000001",
@@ -21,6 +22,11 @@ const PROPS = {
   reporterId: "usr-001",
   onOpenTaskCard: () => {},
 };
+
+// per WBS §23.32-D: IpaSkillWorkflowBoard 已接 useTranslation → 测试须包 I18nProvider
+function renderWithI18n(ui: React.ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 describe("IpaSkillWorkflowBoard — 项目界面 IPA 技能工作流拆分", () => {
   beforeEach(() => {
@@ -30,7 +36,7 @@ describe("IpaSkillWorkflowBoard — 项目界面 IPA 技能工作流拆分", () 
   });
 
   it("渲染 16 个 WBS 工作流列", () => {
-    render(<IpaSkillWorkflowBoard {...PROPS} />);
+    renderWithI18n(<IpaSkillWorkflowBoard {...PROPS} />);
     expect(screen.getByTestId("ipa-phase-board")).toBeInTheDocument();
     for (const col of IPA_PHASE_COLUMNS) {
       expect(screen.getByTestId(`ipa-phase-column-${col.phase}`)).toBeInTheDocument();
@@ -38,7 +44,7 @@ describe("IpaSkillWorkflowBoard — 项目界面 IPA 技能工作流拆分", () 
   });
 
   it("每个技能都有专属栏位 (catalog 全量 237)", () => {
-    render(<IpaSkillWorkflowBoard {...PROPS} />);
+    renderWithI18n(<IpaSkillWorkflowBoard {...PROPS} />);
     let total = 0;
     for (const skill of IPA_SKILL_CATALOG) {
       const slot = screen.queryByTestId(`ipa-skill-slot-${skill.id}`);
@@ -50,7 +56,7 @@ describe("IpaSkillWorkflowBoard — 项目界面 IPA 技能工作流拆分", () 
   it("技能可作为任务卡使用: 创建 WorkItem 并绑定技能 (同一套内容模型)", () => {
     const first = IPA_SKILL_CATALOG[0];
     let openedId = "";
-    render(
+    renderWithI18n(
       <IpaSkillWorkflowBoard {...PROPS} onOpenTaskCard={(id) => (openedId = id)} />,
     );
     fireEvent.click(screen.getByTestId(`ipa-skill-slot-toggle-${first.id}`));
@@ -75,9 +81,19 @@ describe("IpaSkillWorkflowBoard — 项目界面 IPA 技能工作流拆分", () 
       reporter_id: "usr-001",
       ipa_skill_ids: [skill.id],
     });
-    render(<IpaSkillWorkflowBoard {...PROPS} />);
+    renderWithI18n(<IpaSkillWorkflowBoard {...PROPS} />);
     fireEvent.click(screen.getByTestId(`ipa-skill-slot-toggle-${skill.id}`));
     const subtasks = screen.getByTestId(`ipa-skill-subtasks-${skill.id}`);
     expect(subtasks.textContent).toContain("LinkedTask");
+  });
+
+  // per WBS §23.32-D: 三语切换下 IPA 板块文案走字典
+  it("switches IPA board labels with the language dictionary (zh/en/ja)", () => {
+    const { unmount } = renderWithI18n(<IpaSkillWorkflowBoard {...PROPS} />);
+    expect(screen.getByText(/总技能/)).toBeInTheDocument();
+    unmount();
+
+    render(<I18nProvider initialLanguage="en"><IpaSkillWorkflowBoard {...PROPS} /></I18nProvider>);
+    expect(screen.getByText(/skills total/)).toBeInTheDocument();
   });
 });
