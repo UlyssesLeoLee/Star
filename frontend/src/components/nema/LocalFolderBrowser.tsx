@@ -15,6 +15,7 @@ MERGE (self)-[:DEFINES]->(browser)
 
 import { useCallback, useEffect, useState } from "react";
 import { Folder, FileText, ChevronRight, RefreshCw, Eye } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 import {
   isLocalMode,
   listWorkspaceFiles,
@@ -27,6 +28,7 @@ export interface LocalFolderBrowserProps {
 }
 
 export function LocalFolderBrowser({ onPickFile }: LocalFolderBrowserProps) {
+  const { t, tx } = useTranslation();
   const [currentPath, setCurrentPath] = useState("");
   const [listing, setListing] = useState<WorkspaceFileList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +70,9 @@ export function LocalFolderBrowser({ onPickFile }: LocalFolderBrowserProps) {
   return (
     <div className="card mb-5" data-testid="local-folder-browser">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold text-ink">本地文件夹 (受控只读桥接)</span>
+        <span className="text-xs font-semibold text-ink">{t.nema.localFolderBridge}</span>
         <span className="text-[10px] font-mono text-ink-mute truncate max-w-[320px]">
-          {listing ? `${listing.root}/${listing.path}` : "连接中…"}
+          {listing ? `${listing.root}/${listing.path}` : t.nema.connecting}
         </span>
         <button className="btn-ghost p-1 rounded" onClick={() => void load(currentPath)} aria-label="refresh">
           <RefreshCw size={11} />
@@ -79,7 +81,7 @@ export function LocalFolderBrowser({ onPickFile }: LocalFolderBrowserProps) {
 
       {error && (
         <div data-testid="local-folder-error" className="text-[11px] text-warn font-mono mt-1">
-          本地桥接不可用: {error} — 文件关联将降级为 GitHub blob / 快照模式。
+          {tx(t.nema.bridgeUnavailable, { error })}
         </div>
       )}
 
@@ -95,7 +97,7 @@ export function LocalFolderBrowser({ onPickFile }: LocalFolderBrowserProps) {
                 void load(parent);
               }}
             >
-              <ChevronRight size={10} className="inline -rotate-90 mr-1" /> .. (上级)
+              <ChevronRight size={10} className="inline -rotate-90 mr-1" /> {t.nema.parentDir}
             </button>
           )}
           {listing.entries.map((entry) => (
@@ -117,7 +119,7 @@ export function LocalFolderBrowser({ onPickFile }: LocalFolderBrowserProps) {
             </button>
           ))}
           {listing.entries.length === 0 && (
-            <div className="px-2 py-2 text-[10px] text-ink-mute">空目录</div>
+            <div className="px-2 py-2 text-[10px] text-ink-mute">{t.nema.emptyDir}</div>
           )}
         </div>
       )}
@@ -129,9 +131,9 @@ export function LocalFolderBrowser({ onPickFile }: LocalFolderBrowserProps) {
             <button
               className="btn text-[10px] py-0.5"
               onClick={() => onPickFile?.(preview.path)}
-              aria-label="登记为共同编辑文件"
+              aria-label={t.nema.registerSharedFileAria}
             >
-              <Eye size={10} /> 登记为共同编辑文件 (.nema)
+              <Eye size={10} /> {t.nema.registerSharedFile}
             </button>
           </div>
           <pre className="mt-1 max-h-40 overflow-auto rounded border border-line/60 bg-bg-soft p-2 text-[10px] font-mono text-ink-dim whitespace-pre-wrap">

@@ -27,7 +27,7 @@ import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
 import { useTranslation } from "@/lib/i18n";
 
 export default function NemaPage() {
-  const { t } = useTranslation();
+  const { t, tx } = useTranslation();
   const router = useRouter();
   const nemaTasks = useNemaStore((s) => s.nemaTasks);
   const registerSharedFile = useNemaStore((s) => s.registerSharedFile);
@@ -49,14 +49,14 @@ export default function NemaPage() {
       .map((s) => s.trim())
       .filter(Boolean);
     if (!filePath.trim() || !title.trim() || editors.length === 0) {
-      setNotice("filePath / title / editors 至少填一项");
+      setNotice(t.nema.formNotice);
       return;
     }
     const entry = registerSharedFile({ filePath: filePath.trim(), title: title.trim(), editors, purpose });
     if (entry === null) {
-      setNotice(`「${filePath}」当前编辑者 < 2 — 共同编辑才自动产生 .nema (文件即任务规则)`);
+      setNotice(tx(t.nema.coeditRule, { filePath }));
     } else {
-      setNotice(`✓ 已自动产生 .nema 侧车: ${entry.nemaPath} (编辑者 ${editors.length} 人)`);
+      setNotice(tx(t.nema.sidecarCreated, { nemaPath: entry.nemaPath, count: editors.length }));
       setFilePath("");
       setTitle("");
       setEditorsText("");
@@ -74,18 +74,18 @@ export default function NemaPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <PageHeader
-        title="NEMA · 文件即任务"
-        subtitle="共同编辑的文件自动产生 .nema 侧车 — .nema 可以作为 Star 任务打开"
+        title={t.nema.pageTitle}
+        subtitle={t.nema.pageSubtitle}
         icon={<FileText className="text-accent" size={20} />}
         track="D"
         count={`${nemaTasks.length} .nema`}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <Stat label=".nema 任务" value={nemaTasks.length} tone="info" />
-        <Stat label="已绑定 Star 任务" value={boundTasks.length} tone="ok" />
-        <Stat label="自动生成规则" value="≥2 编辑者" tone="default" hint="共同编辑触发" />
-        <Stat label="格式" value=".NEMA v1" tone="default" hint="nema-sigma 规范子集" />
+        <Stat label={t.nema.nemaTasks} value={nemaTasks.length} tone="info" />
+        <Stat label={t.nema.boundTasks} value={boundTasks.length} tone="ok" />
+        <Stat label={t.nema.autoRule} value={t.nema.autoRuleValue} tone="default" hint={t.nema.autoRuleHint} />
+        <Stat label={t.nema.format} value=".NEMA v1" tone="default" hint="nema-sigma" />
       </div>
 
       {/* 本地文件夹桥接 (per 2026-11-11: 网页版关联本地文件夹) */}
@@ -93,40 +93,40 @@ export default function NemaPage() {
 
       {/* 注册共同编辑文件 */}
       <div className="card mb-5" data-testid="nema-register-form">
-        <SectionTitle>共同编辑文件登记 (自动 .nema 生成)</SectionTitle>
+        <SectionTitle>{t.nema.registerSectionTitle}</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
           <input
             data-testid="nema-input-path"
             value={filePath}
             onChange={(e) => setFilePath(e.target.value)}
-            placeholder="文件路径 docs/design/auth.md"
+            placeholder={t.nema.pathPlaceholder}
             className="input text-xs"
           />
           <input
             data-testid="nema-input-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="任务标题 (What)"
+            placeholder={t.nema.titlePlaceholder}
             className="input text-xs"
           />
           <input
             data-testid="nema-input-editors"
             value={editorsText}
             onChange={(e) => setEditorsText(e.target.value)}
-            placeholder="共同编辑者 (逗号/空格分隔, ≥2 触发)"
+            placeholder={t.nema.editorsPlaceholder}
             className="input text-xs"
           />
           <input
             data-testid="nema-input-purpose"
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
-            placeholder="目的 (Why, 可选)"
+            placeholder={t.nema.purposePlaceholder}
             className="input text-xs"
           />
         </div>
         <div className="flex items-center gap-3 mt-3">
           <button data-testid="nema-register-btn" className="btn text-xs" onClick={handleRegister}>
-            <FilePlus2 size={12} /> 登记文件 (自动生成 .nema)
+            <FilePlus2 size={12} /> {t.nema.registerButton}
           </button>
           {notice && (
             <span
@@ -138,16 +138,16 @@ export default function NemaPage() {
           )}
         </div>
         <div className="text-[10px] text-ink-mute font-mono mt-2">
-          规则: editors ≥ 2 才自动产生 .nema; 单人编辑不产生 (per 2026-11-11 用户发令)。
+          {t.nema.coeditRuleFootnote}
         </div>
       </div>
 
       {/* .nema 任务列表 */}
       <div className="card" data-testid="nema-task-list">
-        <SectionTitle>.nema 任务 ({nemaTasks.length})</SectionTitle>
+        <SectionTitle>{tx(t.nema.nemaTaskListTitle, { count: nemaTasks.length })}</SectionTitle>
         {nemaTasks.length === 0 ? (
           <div className="text-xs text-ink-mute py-6 text-center">
-            暂无共同编辑文件。登记一个 ≥2 编辑者的文件后, 自动产生 .nema 侧车。
+            {t.nema.emptyList}
           </div>
         ) : (
           <ul className="divide-y divide-line/50 mt-2">
@@ -177,7 +177,7 @@ export default function NemaPage() {
                           onClick={() => router.push(`/work-item/${entry.workItemId}`)}
                           data-testid={`nema-open-bound-${entry.id}`}
                         >
-                          已绑定 Star 任务 →
+                          {t.nema.openBoundTask}
                         </button>
                       ) : (
                         <button
@@ -185,7 +185,7 @@ export default function NemaPage() {
                           onClick={() => handleOpenAsTask(entry.id)}
                           data-testid={`nema-open-task-${entry.id}`}
                         >
-                          <Play size={10} /> 打开为 Star 任务
+                          <Play size={10} /> {t.nema.openAsStarTask}
                         </button>
                       )}
                       <button
@@ -198,7 +198,7 @@ export default function NemaPage() {
                     </div>
                   </div>
                   <div className="text-[10px] font-mono text-ink-mute mt-1 pl-7">
-                    5W1H: {view.what} · {view.why} · {view.how} · {view.who.join(",")} · {view.when} · {view.where}
+                    {t.nema.fiveW1H}: {view.what} · {view.why} · {view.how} · {view.who.join(",")} · {view.when} · {view.where}
                   </div>
                   {expanded && (
                     <pre
