@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=60a91845bb4b886fe72d20f98848e8747ea4abcfedf0e9be9562c44f9b51d8c7
+@cypher schema=1 source_sha256=9f7b83e06a5165172a5aa759ed62dbb808d586143643c29e2d414c20b6cbf46e
 MERGE (self:File {path:"frontend/src/app/(app)/nema/page.tsx"})
 MERGE (page:Function {name:"NemaPage", language:"typescript", visibility:"public"})
 MERGE (register:Function {name:"SharedFileForm", language:"typescript", visibility:"private"})
@@ -23,6 +23,7 @@ import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { FileText, FilePlus2, Play, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { parseNema, taskViewFromDocument } from "@/lib/nema/nema";
+import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
 import { useTranslation } from "@/lib/i18n";
 
 export default function NemaPage() {
@@ -86,6 +87,9 @@ export default function NemaPage() {
         <Stat label="自动生成规则" value="≥2 编辑者" tone="default" hint="共同编辑触发" />
         <Stat label="格式" value=".NEMA v1" tone="default" hint="nema-sigma 规范子集" />
       </div>
+
+      {/* 本地文件夹桥接 (per 2026-11-11: 网页版关联本地文件夹) */}
+      <LocalFolderBrowser onPickFile={(p) => setFilePath(p)} />
 
       {/* 注册共同编辑文件 */}
       <div className="card mb-5" data-testid="nema-register-form">

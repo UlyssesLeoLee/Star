@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=3189ac212df7005337d702fcdda4cf227384e990e8e275e4e2bf3c94033b612b
+@cypher schema=1 source_sha256=b5003fce1af951ce128062e5c3b0873d6cd87510d63f2fc105216f003f1d6e9c
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -132,7 +132,11 @@ async fn main() -> anyhow::Result<()> {
     }
     let app = build_group_router(group_api_state)
         .merge(bi_task_event_ingestion.readiness_router())
-        .merge(star_api_rest::auth::google::router(google_auth));
+        .merge(star_api_rest::auth::google::router(google_auth))
+        // 2026-11-11 用户发令: 网页版关联本地文件夹 (受控只读, 白名单 STAR_FILE_ROOTS)
+        .merge(star_api_rest::workspace_files::router(
+            star_api_rest::workspace_files::WorkspaceFilesState::from_env(),
+        ));
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
     let server_result = bi_task_event_ingestion::serve_until_shutdown(

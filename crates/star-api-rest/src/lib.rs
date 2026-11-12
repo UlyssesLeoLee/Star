@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=eeec93d59d0ffaa0ba73c27948a238b822d7cfb3a8219608138830aaf489ffd1
+@cypher schema=1 source_sha256=12669d64442fa9a4b70fae372b680b9549e746f05de5311cf1974361a62b9e1e
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
 MERGE (deviceRouter:Symbol {id:"crates/star-api-rest/src/auth/oauth/device_enrollment.rs::router",kind:"function"})
@@ -43,6 +43,7 @@ pub mod middleware;
 pub mod rbac;
 pub mod response;
 pub mod routes;
+pub mod workspace_files;
 
 use axum::{
     Router,
