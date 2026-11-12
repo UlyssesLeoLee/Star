@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e1af232eee37ce700751754f3c77a54e68119646f31628bd7cba942ed5a63f6f
+@cypher schema=1 source_sha256=99675dfe2ab3911cef8e3077a7c24b557c2ec607cf2a4f297d50c36d1e11402b
 MERGE (self:File {path:"frontend/src/app/(app)/projects/page.test.tsx"})
 @endcypher
 */
@@ -13,9 +13,15 @@ MERGE (self:File {path:"frontend/src/app/(app)/projects/page.test.tsx"})
 //   5. 切换到 Members tab 显示成员表
 // =====================================================================
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
+
+// per 2026-11-12 导航切换修复: ProjectsClient 用 useRouter 写回 URL ?tab=
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
 import ProjectsClient from "./ProjectsClient";
 import { I18nProvider } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
@@ -168,5 +174,22 @@ describe("ProjectsPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Timeline|时间线|甘特/i }));
     // 验证 cookie 写入
     expect(document.cookie).toContain("projects-default-tab=timeline");
+  });
+
+  // per 2026-11-12 用户发令: sidebar Timeline/Backlog 跳本页不同 ?tab= 时必须
+  // 正确切换 ("timeline 打开是看板标签页" 根因修复回归测试)
+  it("sidebar jump re-render with new initialTab switches the active tab", () => {
+    const { rerender } = renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    expect(screen.getByTestId("projects-kanban-tab")).toBeTruthy();
+    expect(screen.queryByTestId("projects-timeline-tab")).toBeNull();
+
+    // 模拟 server wrapper 因 URL ?tab=timeline 重渲染传新 initialTab
+    rerender(
+      <I18nProvider initialLanguage="zh-CN">
+        <ProjectsClient initialTab="timeline" />
+      </I18nProvider>,
+    );
+    expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
+    expect(screen.queryByTestId("projects-kanban-tab")).toBeNull();
   });
 });

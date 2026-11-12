@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fdae767af312c24fe5b8fa3888d30e34f1e7b345ebe9770191176bf8d4384735
+@cypher schema=1 source_sha256=15140c5ad3af5a1d98d4b2ee2c677e138e0560fba9e4eccb961e0a7f2e3b1bb2
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -43,6 +43,7 @@ import {
   Webhook,
   Code2,
   Bell,
+  ShieldAlert,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -424,11 +425,11 @@ export const ALL_MODULES: ModuleDefinition[] = [
   {
     id: "developer-console",
     label: "Developer Console",
-    code: "DEV",
+    code: "DC",
     href: "/settings/developer",
     category: "integration",
     categoryLabel: "Integration & Security",
-    description: "Developer API (REST + MCP) + 出站 Webhook 管理 (per 2026-09-02 14:06 JST 拍板)",
+    description: "Developer API (REST + MCP) + 出站 Webhook 管理 (per 2026-09-02 14:06 JST 拍板, 2026-11-12 补建路由)",
     icon: Code2,
   },
   {
@@ -531,7 +532,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     category: "system",
     categoryLabel: "System & Meta",
     description: "管理员后台 (Google 登录 · lidian727@gmail.com 唯一管理员)",
-    icon: ShieldCheck,
+    icon: ShieldAlert,
   },
   {
     id: "tenant",

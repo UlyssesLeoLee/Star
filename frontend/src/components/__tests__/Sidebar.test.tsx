@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=45e9a378cee3baf311ba0a45055a15c072b75a90b1a7479c1f7d8addfcc980ae
+@cypher schema=1 source_sha256=8fe84e3376a742ccb0cef39893f419a85b50a9c370576eb3d0834e06da1a4bda
 MERGE (self:File {path:"frontend/src/components/__tests__/Sidebar.test.tsx"})
 MERGE (sidebar:Symbol {id:"frontend/src/components/Sidebar.tsx::Sidebar",kind:"component"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::Sidebar Project-first navigation",kind:"suite"})
@@ -101,5 +101,41 @@ describe("Sidebar Project-first navigation", () => {
     expect(screen.getByTestId("sidebar-subnav-item-backlog")).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-subnav-item-agents")).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-subnav-item-worktrees")).toBeInTheDocument();
+  });
+
+  // per 2026-11-12 用户发令 (梳理重复导航 / 整合在一起):
+  //   /projects 有 SubNav 时, pinned 的 kanban/timeline (同 pathname)
+  //   不再重复渲染 — SubNav 已是 6 tab 的单一来源。
+  it("hides pinned modules that duplicate the current page's SubNav", () => {
+    mockUsePathname.mockReturnValue("/projects");
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=kanban"));
+    renderWithI18n(<Sidebar />);
+
+    // SubNav 仍然完整
+    expect(screen.getByTestId("sidebar-subnav-item-timeline")).toBeInTheDocument();
+    // pinned kanban/timeline/projects 不在 "other entries" 里重复出现
+    const otherEntries = screen.getByTestId("sidebar-other-entries");
+    expect(within(otherEntries).queryByTestId("sidebar-item-kanban")).toBeNull();
+    expect(within(otherEntries).queryByTestId("sidebar-item-timeline")).toBeNull();
+    expect(within(otherEntries).queryByTestId("sidebar-item-projects")).toBeNull();
+    // 非本页模块保留 (inbox)
+    expect(within(otherEntries).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
+  });
+
+  // per 2026-11-12 用户发令: 带 query 的模块按 query 精确判定 active
+  it("query-carrying modules activate only when the tab matches", () => {
+    useNavStore.setState({
+      sidebarItemIds: [],
+      pinnedViewIds: ["kanban", "webhooks"],
+    });
+    mockUsePathname.mockReturnValue("/settings/developer");
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=webhooks"));
+    renderWithI18n(<Sidebar />);
+
+    const otherEntries = screen.getByTestId("sidebar-other-entries");
+    // 展开态 active 以 active-dot 表示 (SidebarRow 无 data-active 属性)
+    expect(within(otherEntries).getByTestId("sidebar-item-active-dot-webhooks")).toBeInTheDocument();
+    // kanban 指向 /projects, pathname 不同 → inactive (无 active-dot)
+    expect(within(otherEntries).queryByTestId("sidebar-item-active-dot-kanban")).toBeNull();
   });
 });

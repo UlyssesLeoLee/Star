@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5bfb384f46259fbc2affea614d6337261f8bc43bb155473eece50d80143eb1d1
+@cypher schema=1 source_sha256=4db1969f2110e1d954ec656c862e7a6962f3f7e9dedea2bfbd553840e003c0c9
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
@@ -59,6 +59,7 @@ MERGE (projectsClient)-[:CALLS]->(differenceInUtcCalendarDays)
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
@@ -130,6 +131,7 @@ function deriveRole(project: Project): "project_admin" | "developer" | "viewer" 
 
 export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTabId }) {
   const { t } = useTranslation();
+  const router = useRouter();
   // ---- store 订阅 (zustand selectors) ----
   const projects = useStore((s) => s.projects);
   const workItems = useStore((s) => s.workItems);
@@ -187,14 +189,29 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   //   URL ?tab=X > ?canvas= → backlog > cookie > "kanban"
   //   这里 useState 初始值直接用, client hydration 与 SSR HTML 一致
   const [tab, setTabInternal] = useState<ProjectsTabId>(initialTab);
+  // per 2026-11-12 用户发令 (导航切换修复): sidebar Timeline/Backlog/Kanban 等
+  // 跳本页不同 ?tab= 时组件不卸载, useState 初始值不会重跑 → 旧实现 tab 永远
+  // 停在进入时的值 ("timeline 打开是看板标签页" 根因)。这里监听 initialTab
+  // (server wrapper 每次导航都按 URL 重算) 同步状态。
+  useEffect(() => {
+    setTabInternal(initialTab);
+  }, [initialTab]);
   // 切 tab 时同步写 cookie (per 2026-09-01 16:41 JST cookie-default 拍板)
-  //   e2e hook / 内部 setTab 仍走 setTabInternal (不写 cookie, e2e test 不需要持久化)
+  //   同时写回 URL ?tab= 保证 前进/后退/分享链接 与 sidebar 高亮一致
+  //   (per 2026-11-12 用户发令: 每个导航按钮都要正确切换)
   const setTab = useCallback((id: ProjectsTabId) => {
     setTabInternal(id);
     if (isValidProjectsTab(id)) {
       writeProjectsDefaultTabCookie(id);
     }
-  }, []);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", id);
+      router.replace(`/projects?${params.toString()}`, { scroll: false });
+    } catch {
+      // jsdom / SSR 环境无 window.location.search 时降级: 只切 state
+    }
+  }, [router]);
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {

@@ -920,3 +920,21 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **模糊查询**: lib/ipa-skills/search.ts (scoreIpaSkill 1000/900/800/700/600/500/300/200 分级 + searchIpaSkills limit), 5 单测。
 - **坑**: zustand v5 selector 返回新数组引用 → Maximum update depth exceeded 无限循环; 修法: 选 workItems 稳定引用后再 filter。
 - **门禁**: tsc 0 errors; vitest 114 文件 / 966 测试全绿; next build exit 0。
+
+### 23.30 2026-11-12 导航完善 + 重复导航整合 (用户发令: 功能正常可用 / 正确切换)
+
+- **tab 切换根因修复**: ProjectsClient `useState(initialTab)` 在 sidebar Timeline/Backlog 跳本页不同 ?tab= 时不重跑 → "timeline 打开是看板标签页"。修法: `useEffect` 监听 initialTab 同步状态 + setTab 写回 URL (router.replace 保留其他 query), 前进/后退/分享链接与 sidebar 高亮一致。
+- **active 判定统一**: 新增 `lib/nav/activeMatch.ts` `moduleHrefMatches(href, pathname, searchParams)` — 带 ?tab= 的模块按 query 精确判定; Sidebar + AppHeader 共用 (旧 AppHeader `pathname.startsWith(tab.href+"/")` 对 query href 永不命中)。
+- **重复导航整合**: /projects 有 SubNav (6 tab) 时, pinned sidebar 里同 pathname 的模块 (kanban/timeline/backlog/projects) 不再重复渲染 (dedupeBySubNav); 计数徽标同步。AppMatrix/header 钉选不受影响。
+- **死链补建**: registry 里 developer-console (/settings/developer) 与 webhooks (/settings/developer?tab=webhooks) 此前 404 → 补建 `/settings/developer` 页 (双 tab: Developer API 参考 + 出站 Webhook CRUD, localStorage 持久化, demo payload 测试)。
+- **registry 整理**: developer-console code DEV→DC (与 development 去重); admin icon ShieldCheck→ShieldAlert (3 处 ShieldCheck 去重)。
+- **完整性测试**: `nav/registry.integrity.test.ts` fs 扫描全部 page.tsx 断言每个 registry href 可解析 (支持 [param] 动态段 + query 剥离) + id/code 无重复 — 防未来再出 404 死链。
+- **门禁**: tsc 0 errors; vitest 117 文件 / 979 测试全绿 (+5 nav 测试 + 4 developer 页测试); next build exit 0。
+
+### 23.31 2026-11-12 本地文件夹桥接 (用户追问: 网页版能否关联本地文件夹)
+
+- **回答**: Vercel 线上前端够不到本地文件系统; 真关联走**本地桥接** — 后端受控只读 API + 本地模式前端浏览器, 线上无本地后端时优雅降级 (GitHub blob / 快照)。
+- **后端** `crates/star-api-rest/src/workspace_files.rs`: GET `/api/v1/workspace-files` (目录列举) + `/read` (文本 ≤4MiB); 白名单根 `STAR_FILE_ROOTS` (分号分隔, 缺省 `D:/IPA-Atomic-Skills;D:/Star`); 路径规范化拒绝 `..`/盘符 (403); 多根解析优先命中路径实际存在的根 (否则退回第一根保持 404 语义); 仅 127.0.0.1 绑定。3 单测 (逃逸/多根/根外)。
+- **前端** `lib/localFiles.ts` (isLocalMode 私有网段判定 + list/read client) + `/nema` 页 `LocalFolderBrowser` 组件 (目录树浏览 + 文本预览 + "登记为共同编辑文件" 回填表单)。
+- **实测**: 本地 8081 列出 frontend/src ✓ / 读 activeMatch.ts ✓ / `../.env` 与 `D:/Windows/win.ini` 均 403 ✓。
+- **坑**: ① backend 运行中 rebuild 报 LNK1104/拒绝访问 → taskkill 按 PID (8081 LISTENING) 后重建; ② 同 PID 下两个 temp_root 相同 → 测试根目录须加后缀; ③ exe 在 E:/DevCache/cargo/target/debug (target 在 E 盘)。

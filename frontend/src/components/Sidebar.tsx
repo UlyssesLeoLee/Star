@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3e9bb7d698741beaae4e81f118695e97606b43d0576240b254c3f0e69757090c
+@cypher schema=1 source_sha256=2145732d6d5dcae1ecfcb6866ed7d1f4f1a32acd0e8d11cf5c778a303ef77afc
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -28,9 +28,10 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition, type ModuleCategory } from "@/lib/nav/registry";
+import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import {
   findSubNavGroup,
   findActiveSubNavItem,
@@ -101,14 +102,28 @@ export function Sidebar() {
     () => (subNavGroup ? findActiveSubNavItem(subNavGroup, searchString) : null),
     [subNavGroup, searchString]
   );
+
+  // =====================================================================
+  // per 2026-11-12 用户发令 (梳理重复导航 / 整合在一起):
+  //   - 当前 pathname 有 SubNav (e.g. /projects 的 6 tab) 时, 隐藏 pinned/
+  //     sidebar 里指向同一 pathname 的模块 (SubNav 已覆盖, 不再重复展示)
+  //   - 带 query 的模块 (e.g. /projects?tab=timeline) 用 query 精确判定 active
+  // =====================================================================
+  const dedupeBySubNav = (m: ModuleDefinition) =>
+    !subNavGroup || m.href.split("?")[0] !== pathname;
+  const visibleSidebarModules = activeSidebarModules.filter(dedupeBySubNav);
+  const visiblePinnedModules = activePinnedModules.filter(dedupeBySubNav);
+  const isModuleActive = useCallback(
+    (item: ModuleDefinition) => moduleHrefMatches(item.href, pathname, searchParams),
+    [pathname, searchParams]
+  );
   // Project scope stays available in the Project workspace and the Project Worktree Index.
   // A validated Run focus supplies the route hint; the Index still reloads its authorized directory.
   const hasSelectedProject = projectIndexHint.trim().length > 0;
   const isProjectWorkspacePath = pathname === "/projects" || pathname.startsWith("/projects/");
   const isProjectWorktreePath = pathname === "/worktree" || pathname.startsWith("/worktree/");
   const isOtherEntryActive =
-    activeSidebarModules.some((item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))) ||
-    activePinnedModules.some((item) => pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)));
+    visibleSidebarModules.some(isModuleActive) || visiblePinnedModules.some(isModuleActive);
 
   // 键盘快捷键 Ctrl+B 折叠/展开 (per 守门 #11 缺标比错标: shortcut 是 power user
   // 必备延伸, 不强制; 这里落地)
@@ -267,7 +282,7 @@ export function Sidebar() {
               <span className={clsx(isCollapsed && "sr-only")}>{t.sidebar.otherPages}</span>
             </span>
             <span className={clsx("text-[10px] font-mono", isCollapsed && "sr-only")}>
-              {activeSidebarModules.length + activePinnedModules.length}
+              {visibleSidebarModules.length + visiblePinnedModules.length}
             </span>
           </summary>
           <div className="mt-3 space-y-5">
@@ -276,16 +291,16 @@ export function Sidebar() {
                 <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
                   <span>{t.sidebar.groupWorkspaces}</span>
                   <span className="text-[9px] font-mono opacity-70 border border-line px-1.5 py-0.2 rounded">
-                    {activeSidebarModules.length} {t.sidebar.pinned}
+                    {visibleSidebarModules.length} {t.sidebar.pinned}
                   </span>
                 </div>
               )}
               <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-                {activeSidebarModules.map((item) => (
+                {visibleSidebarModules.map((item) => (
                   <SidebarRow
                     key={item.id}
                     module={item}
-                    active={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
+                    active={isModuleActive(item)}
                     onRemove={removeSidebarItem}
                     removeTitle={tx(t.sidebar.removeFromSidebar, { label: "" })}
                     dataTestIdBase="sidebar-item"
@@ -296,7 +311,7 @@ export function Sidebar() {
               </ul>
             </div>
 
-            {activePinnedModules.length > 0 && (
+            {visiblePinnedModules.length > 0 && (
               <div>
                 {!isCollapsed && (
                   <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
@@ -305,11 +320,11 @@ export function Sidebar() {
                   </div>
                 )}
                 <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-                  {activePinnedModules.map((item) => (
+                  {visiblePinnedModules.map((item) => (
                     <SidebarRow
                       key={item.id}
                       module={item}
-                      active={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
+                      active={isModuleActive(item)}
                       onRemove={removePinnedView}
                       removeTitle={tx(t.sidebar.removeFromPinned, { label: "" })}
                       dataTestIdBase="sidebar-item"
