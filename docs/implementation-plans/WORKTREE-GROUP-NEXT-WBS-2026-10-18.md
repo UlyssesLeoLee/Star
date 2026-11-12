@@ -953,3 +953,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **文档依据**: `docs/frontend/design/ui-3pane-arch.md` §1.2 (Settings 属 5 组之管理组); ADR-0048 D43 (L2 MCP Pool); Claude Code MCP 管理模型 (claude mcp add/list/remove, stdio|sse|http 连接类型, user/project 作用域)。
 - **拆分 3 worktree + 主树热修**: (A) 主树热修弹层实色: theme.css 六主题加实色 `--popover-bg`, globals.css 加 `.popover-solid` 工具类, UserMenu + RefactorSettingsPopover 等弹层改实色去 backdrop-blur; (B) wt-settings-capabilities: Skills/MCP/Plugins 三面板实装 (注册表列表/添加移除/启用禁用/连接类型 stdio|sse|http/健康状态徽章, 数据层接口可接后端, web 降级本地注册表, 三语 i18n + 组件测试); (C) wt-mcp-docs: 设计文档 (settings-capabilities-design.md) + API 设计 (MCP server 配置 CRUD) + 测试设计文档。
 - **门禁**: 每 lane tsc 0 + vitest 相关全绿 + Cypher PASS + author=Ulysses。
+
+### 23.34 2026-11-13 Git 绑定 + Worktree→本地目录→远端 branch 自动识别 (用户发令)
+
+- **用户发令 (2026-11-13)**: ① 没绑定 git 时点击 ProjectWorktree Index 应显示绑定各种 git (GitHub/GitLab/自托管, 前期 3 个, 预留后期扩展); ② 绑定好后 Worktree → 本地目录 → 远端 branch 一系列内容都要依照既存功能自动识别好。
+- **既存功能复用**: `Repository.provider` 已含 github/gitlab/gitea/self-host (`types/ids.ts`); seed 有 4 仓库 + 12 PR (repository_id + source_branch 与 Worktree.branch 对齐); 本地目录识别走 `isLocalMode` + workspace-files 白名单桥接 (LocalFolderBrowser 先例)。
+- **设计**: `lib/group/gitBindingStore.ts` — GitBinding 类型 + GIT_PROVIDERS 注册表 (github/gitlab/self-host, 数组注册表模式, 加 provider 只加条目) + localStorage 持久化; `app/worktree/GitBindingPanel.tsx` — 未绑定显示 3 张 provider 卡 + 表单, 已绑定显示绑定行 + 自动识别结果 (每个 Worktree: 本地目录路径 = binding.local_path + wt.name, 远端 branch URL = host/owner/repo/tree/branch, 与 repositories/pullRequests 数据自动匹配); 接线 /worktree page.tsx 无绑定时显示绑定面板。
+- **门禁**: tsc 0 + vitest 全绿 + Cypher PASS + author=Ulysses。
