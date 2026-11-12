@@ -103,11 +103,11 @@ pub use worktree_lifecycle::{
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{FromRef, Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use bi_owner_runtime::TaskEventQueryPort;
 use chrono::{DateTime, Utc};
@@ -193,13 +193,13 @@ use star_pg_adapter::repository::{DeviceBindingRepository, PgDeviceBindingReposi
 // MERGE (testCtor)-[:CALLS]->(taskStateNew)
 // @endcypher
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::auth::{
-    AuthUser, JwtConfig,
     oauth::{AuthenticatedDeviceContext, AuthenticatedUser},
+    AuthUser, JwtConfig,
 };
 
 mod bi_analytics;

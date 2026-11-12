@@ -51,12 +51,16 @@ impl WorkspaceFilesState {
             .filter(|s| !s.is_empty())
             .map(PathBuf::from)
             .collect();
-        Self { roots: Arc::new(roots) }
+        Self {
+            roots: Arc::new(roots),
+        }
     }
 
     #[cfg(test)]
     fn from_roots(roots: Vec<PathBuf>) -> Self {
-        Self { roots: Arc::new(roots) }
+        Self {
+            roots: Arc::new(roots),
+        }
     }
 
     /// 规范化并校验 path 落在白名单根内。返回 (根索引, 相对路径)。
@@ -128,28 +132,50 @@ async fn list_handler(
     };
     let dir = state.full_path(root_index, &rel);
     let Ok(meta) = std::fs::metadata(&dir) else {
-        return (StatusCode::NOT_FOUND, Json(json!({ "error": "PATH_NOT_FOUND" }))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "PATH_NOT_FOUND" })),
+        )
+            .into_response();
     };
     if !meta.is_dir() {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "NOT_A_DIRECTORY" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "NOT_A_DIRECTORY" })),
+        )
+            .into_response();
     }
     let depth = rel.components().count();
     if depth > MAX_TREE_DEPTH {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "TREE_DEPTH_EXCEEDED" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "TREE_DEPTH_EXCEEDED" })),
+        )
+            .into_response();
     }
 
     let mut entries: Vec<serde_json::Value> = Vec::new();
     let Ok(read_dir) = std::fs::read_dir(&dir) else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "READ_DIR_FAILED" }))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "READ_DIR_FAILED" })),
+        )
+            .into_response();
     };
     for entry in read_dir.flatten() {
         if entries.len() >= MAX_TREE_ENTRIES {
             break;
         }
-        let Ok(file_type) = entry.file_type() else { continue };
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
         let name = entry.file_name().to_string_lossy().to_string();
         let is_dir = file_type.is_dir();
-        let size = if is_dir { None } else { entry.metadata().map(|m| m.len()).ok() };
+        let size = if is_dir {
+            None
+        } else {
+            entry.metadata().map(|m| m.len()).ok()
+        };
         entries.push(json!({
             "name": name,
             "is_dir": is_dir,
@@ -157,7 +183,10 @@ async fn list_handler(
         }));
     }
     entries.sort_by(|a, b| {
-        let (a_dir, b_dir) = (a["is_dir"].as_bool() == Some(true), b["is_dir"].as_bool() == Some(true));
+        let (a_dir, b_dir) = (
+            a["is_dir"].as_bool() == Some(true),
+            b["is_dir"].as_bool() == Some(true),
+        );
         match (a_dir, b_dir) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
@@ -183,10 +212,18 @@ async fn read_handler(
     };
     let full = state.full_path(root_index, &rel);
     let Ok(meta) = std::fs::metadata(&full) else {
-        return (StatusCode::NOT_FOUND, Json(json!({ "error": "PATH_NOT_FOUND" }))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "PATH_NOT_FOUND" })),
+        )
+            .into_response();
     };
     if !meta.is_file() {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "NOT_A_FILE" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "NOT_A_FILE" })),
+        )
+            .into_response();
     }
     if meta.len() > MAX_FILE_BYTES {
         return (
@@ -204,7 +241,11 @@ async fn read_handler(
             )
                 .into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "READ_FAILED" }))).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "READ_FAILED" })),
+        )
+            .into_response(),
     }
 }
 

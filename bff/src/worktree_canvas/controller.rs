@@ -49,16 +49,24 @@ use super::WorktreeCanvasState;
 pub fn rest_routes(state: Arc<WorktreeCanvasState>) -> Router {
     Router::new()
         .route("/v1/worktree-canvas/repositories", get(list_repositories))
-        .route("/v1/worktree-canvas/worktrees", get(list_worktrees).post(create_worktree))
+        .route(
+            "/v1/worktree-canvas/worktrees",
+            get(list_worktrees).post(create_worktree),
+        )
         .route(
             "/v1/worktree-canvas/worktrees/{id}",
-            get(get_worktree).patch(update_worktree).delete(delete_worktree),
+            get(get_worktree)
+                .patch(update_worktree)
+                .delete(delete_worktree),
         )
         .route(
             "/v1/worktree-canvas/worktrees/{id}/actions/{action_type}",
             post(execute_action),
         )
-        .route("/v1/worktree-canvas/worktrees/{id}/graph", get(get_worktree_graph))
+        .route(
+            "/v1/worktree-canvas/worktrees/{id}/graph",
+            get(get_worktree_graph),
+        )
         .route("/v1/worktree-canvas/risks", get(list_risks))
         .route("/v1/worktree-canvas/health", get(get_health))
         .route("/v1/worktree-canvas/search", post(search))
@@ -113,7 +121,9 @@ async fn create_worktree(
     State(state): State<Arc<WorktreeCanvasState>>,
     Json(req): Json<CreateWorktreeRequest>,
 ) -> Result<(StatusCode, Json<ActionResponse>), WorktreeApiError> {
-    state.permission.require_action(WorktreeAction::CreateWorktree)?;
+    state
+        .permission
+        .require_action(WorktreeAction::CreateWorktree)?;
 
     // Idempotency 重放检查.
     if let Some(cached) = state.idempotency.lookup(req.idempotency_key) {
@@ -133,14 +143,12 @@ async fn create_worktree(
     };
 
     // Idempotency 缓存.
-    state
-        .idempotency
-        .store(
-            req.idempotency_key,
-            state.actor_id,
-            WorktreeAction::CreateWorktree.as_str().to_string(),
-            serde_json::to_value(&resp).unwrap_or(serde_json::Value::Null),
-        )?;
+    state.idempotency.store(
+        req.idempotency_key,
+        state.actor_id,
+        WorktreeAction::CreateWorktree.as_str().to_string(),
+        serde_json::to_value(&resp).unwrap_or(serde_json::Value::Null),
+    )?;
 
     // Audit (Safe, 不强制写).
     let audit_event = WorktreeAuditEvent::new(
@@ -238,9 +246,16 @@ async fn execute_action(
     }
 
     // Destructive: 必须 confirm=true (per DD §20.2 + spec §4.4).
-    if matches!(action.danger(), super::permission::ActionDanger::Destructive) && !req.confirm {
+    if matches!(
+        action.danger(),
+        super::permission::ActionDanger::Destructive
+    ) && !req.confirm
+    {
         return Err(WorktreeApiError::conflict(
-            format!("destructive action {} requires confirm=true", action.as_str()),
+            format!(
+                "destructive action {} requires confirm=true",
+                action.as_str()
+            ),
             "controller::execute_action",
         ));
     }
@@ -256,14 +271,12 @@ async fn execute_action(
     };
 
     // Idempotency 缓存.
-    state
-        .idempotency
-        .store(
-            req.idempotency_key,
-            state.actor_id,
-            action.as_str().to_string(),
-            serde_json::to_value(&resp).unwrap_or(serde_json::Value::Null),
-        )?;
+    state.idempotency.store(
+        req.idempotency_key,
+        state.actor_id,
+        action.as_str().to_string(),
+        serde_json::to_value(&resp).unwrap_or(serde_json::Value::Null),
+    )?;
 
     // Audit (per 守门 #13 d: 100% Destructive/Warning/Lock/Unlock 写路径过 audit).
     if WorktreeAudit::is_required(action) {
@@ -408,7 +421,9 @@ mod tests {
             confirm: true,
             idempotency_key: Uuid::new_v4(),
         };
-        assert!(execute_action(State(state), Path(p), Json(req)).await.is_err());
+        assert!(execute_action(State(state), Path(p), Json(req))
+            .await
+            .is_err());
     }
 
     #[tokio::test]
@@ -483,7 +498,11 @@ mod tests {
             idempotency_key: Uuid::new_v4(),
         };
         let r = execute_action(State(state), Path(p), Json(req)).await;
-        assert!(r.is_ok(), "merge with confirm should succeed: {:?}", r.err());
+        assert!(
+            r.is_ok(),
+            "merge with confirm should succeed: {:?}",
+            r.err()
+        );
     }
 
     #[tokio::test]

@@ -218,9 +218,7 @@ mod tests {
 
     #[test]
     fn describe_start_from_short_sha_handles_short_input() {
-        let s = describe_start_from(&StartFrom::CommitSha {
-            sha: "abc".into(),
-        });
+        let s = describe_start_from(&StartFrom::CommitSha { sha: "abc".into() });
         assert_eq!(s, "commit sha: abc");
     }
 
@@ -285,11 +283,8 @@ impl StartFromPickerError {
     /// 转 `SharedDirError`.
     pub fn into_shared_dir_error(self, trace_id: impl Into<String>) -> SharedDirError {
         // SharedDirError::new 第一个参数是 &str, self.code 是 String — 借用.
-        SharedDirError::new(&self.code, self.message, trace_id).with_source(
-            self.source
-                .as_deref()
-                .unwrap_or("StartFromPicker"),
-        )
+        SharedDirError::new(&self.code, self.message, trace_id)
+            .with_source(self.source.as_deref().unwrap_or("StartFromPicker"))
     }
 }
 
@@ -451,7 +446,8 @@ pub struct RealStartFromPicker {
 
 impl std::fmt::Debug for RealStartFromPicker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RealStartFromPicker").finish_non_exhaustive()
+        f.debug_struct("RealStartFromPicker")
+            .finish_non_exhaustive()
     }
 }
 
@@ -539,14 +535,20 @@ impl StartFromPicker for RealStartFromPicker {
             out.push(PickerCandidate {
                 id: format!("repo_base:{}", mainline.name),
                 label: format!("{} (default)", mainline.name),
-                description: format!("Repo base @ {}", &mainline.head_sha[..7.min(mainline.head_sha.len())]),
+                description: format!(
+                    "Repo base @ {}",
+                    &mainline.head_sha[..7.min(mainline.head_sha.len())]
+                ),
                 kind: PickerCandidateKind::RepoBase,
             });
         } else if let Some(first) = branches.first() {
             out.push(PickerCandidate {
                 id: format!("repo_base:{}", first.name),
                 label: format!("{} (default fallback)", first.name),
-                description: format!("Repo base @ {}", &first.head_sha[..7.min(first.head_sha.len())]),
+                description: format!(
+                    "Repo base @ {}",
+                    &first.head_sha[..7.min(first.head_sha.len())]
+                ),
                 kind: PickerCandidateKind::RepoBase,
             });
         }
@@ -583,23 +585,17 @@ impl StartFromPicker for RealStartFromPicker {
                     ref_name: format!("refs/heads/{value}"),
                 })
             }
-            PickerCandidateKind::LocalBranch => Ok(StartFrom::LocalBranch {
-                branch: value,
-            }),
+            PickerCandidateKind::LocalBranch => Ok(StartFrom::LocalBranch { branch: value }),
             PickerCandidateKind::CommitSha => {
                 // 验证 SHA 存在 + 拿完整 SHA
-                let sha = self
-                    .git
-                    .head(&handle, &path)
-                    .await
-                    .map_err(|e| {
-                        SharedDirError::new(
-                            "WSD.PICKER_GIT_HEAD_FAIL",
-                            format!("git head failed: {e}"),
-                            "wsd-picker-trace",
-                        )
-                        .with_source(e.to_string())
-                    })?;
+                let sha = self.git.head(&handle, &path).await.map_err(|e| {
+                    SharedDirError::new(
+                        "WSD.PICKER_GIT_HEAD_FAIL",
+                        format!("git head failed: {e}"),
+                        "wsd-picker-trace",
+                    )
+                    .with_source(e.to_string())
+                })?;
                 let candidate_sha = if value.len() >= 40 {
                     value.clone()
                 } else {

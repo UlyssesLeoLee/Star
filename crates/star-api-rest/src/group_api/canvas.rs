@@ -116,29 +116,29 @@ MERGE (createTask)-[:USES_TYPE]->(taskAdapter)@endcypher
 use std::collections::HashSet;
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, post, put},
+    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use domain_work_item::run_task_card::{
     CreateRunTaskCardCommand, RunTaskCardAiData, RunTaskCardItemType, RunTaskCardPriority,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{
-    AiTaskData, CreateWorkItemBody, WorktreeScope, authorize_task_run_for_worktree,
-    authorize_worktree, idempotency_key, lookup_idempotency, map_run_task_card_error, parse_id,
-    request_hash, require_task_writer, run_task_card_context, save_idempotency,
-    validate_ai_task_scope, validate_create_body,
+    authorize_task_run_for_worktree, authorize_worktree, idempotency_key, lookup_idempotency,
+    map_run_task_card_error, parse_id, request_hash, require_task_writer, run_task_card_context,
+    save_idempotency, validate_ai_task_scope, validate_create_body, AiTaskData, CreateWorkItemBody,
+    WorktreeScope,
 };
 use super::{
-    AuthUser, AuthenticatedDeviceContext, GroupApiError, GroupApiState, active_binding,
-    require_scope, validate_actor,
+    active_binding, require_scope, validate_actor, AuthUser, AuthenticatedDeviceContext,
+    GroupApiError, GroupApiState,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -2253,8 +2253,8 @@ fn empty_object() -> Value {
 #[cfg(test)]
 mod canvas_events_tests {
     use super::{
-        CanvasEventsQuery, WorktreeCanvasEventsQuery, validated_cursor_and_limit,
-        validated_worktree_cursor_and_limit,
+        validated_cursor_and_limit, validated_worktree_cursor_and_limit, CanvasEventsQuery,
+        WorktreeCanvasEventsQuery,
     };
     use chrono::{DateTime, Utc};
     use uuid::Uuid;
@@ -2317,44 +2317,36 @@ mod canvas_events_tests {
         assert_eq!(max_limit, 200);
 
         for invalid_limit in [0, 201] {
-            assert!(
-                validated_cursor_and_limit(CanvasEventsQuery {
-                    cursor_at: None,
-                    cursor_event_id: None,
-                    limit: Some(invalid_limit),
-                })
-                .is_err()
-            );
+            assert!(validated_cursor_and_limit(CanvasEventsQuery {
+                cursor_at: None,
+                cursor_event_id: None,
+                limit: Some(invalid_limit),
+            })
+            .is_err());
         }
     }
 
     #[test]
     fn canvas_event_cursor_requires_timestamp_and_event_id_together() {
         let cursor_at: DateTime<Utc> = "2026-09-29T00:00:00Z".parse().unwrap();
-        assert!(
-            validated_cursor_and_limit(CanvasEventsQuery {
-                cursor_at: Some(cursor_at),
-                cursor_event_id: None,
-                limit: None,
-            })
-            .is_err()
-        );
-        assert!(
-            validated_cursor_and_limit(CanvasEventsQuery {
-                cursor_at: None,
-                cursor_event_id: Some(Uuid::new_v4()),
-                limit: None,
-            })
-            .is_err()
-        );
+        assert!(validated_cursor_and_limit(CanvasEventsQuery {
+            cursor_at: Some(cursor_at),
+            cursor_event_id: None,
+            limit: None,
+        })
+        .is_err());
+        assert!(validated_cursor_and_limit(CanvasEventsQuery {
+            cursor_at: None,
+            cursor_event_id: Some(Uuid::new_v4()),
+            limit: None,
+        })
+        .is_err());
 
-        assert!(
-            validated_cursor_and_limit(CanvasEventsQuery {
-                cursor_at: Some(cursor_at),
-                cursor_event_id: Some(Uuid::new_v4()),
-                limit: Some(1),
-            })
-            .is_ok()
-        );
+        assert!(validated_cursor_and_limit(CanvasEventsQuery {
+            cursor_at: Some(cursor_at),
+            cursor_event_id: Some(Uuid::new_v4()),
+            limit: Some(1),
+        })
+        .is_ok());
     }
 }

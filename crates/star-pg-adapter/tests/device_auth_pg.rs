@@ -21,10 +21,10 @@ MERGE (self)-[:DEFINES]->(refreshFixture)
 //! PostgreSQL proof of durable device enrollment, owner scoping, generation checks, and revocation.
 
 use chrono::{Duration, Utc};
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use star_pg_adapter::repository::{
     DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
-    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, PgDeviceBindingRepository,
+    PgDeviceBindingRepository, MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -62,13 +62,11 @@ async fn postgres_device_proof_generation_and_revocation() {
         .await
         .expect("create owner-scoped challenge");
 
-    assert!(
-        repository
-            .find_challenge(Uuid::new_v4(), actor_id, challenge_id)
-            .await
-            .expect("cross-tenant challenge read")
-            .is_none()
-    );
+    assert!(repository
+        .find_challenge(Uuid::new_v4(), actor_id, challenge_id)
+        .await
+        .expect("cross-tenant challenge read")
+        .is_none());
 
     let loaded = repository
         .find_challenge(tenant_id, actor_id, challenge_id)
@@ -106,12 +104,10 @@ async fn postgres_device_proof_generation_and_revocation() {
     assert_eq!(winners, 1, "one challenge must activate at most one device");
     let binding = winner.expect("activated binding");
     assert_eq!(binding.generation, 1);
-    assert!(
-        repository
-            .is_active(tenant_id, actor_id, binding.device_id, 1)
-            .await
-            .expect("active generation check")
-    );
+    assert!(repository
+        .is_active(tenant_id, actor_id, binding.device_id, 1)
+        .await
+        .expect("active generation check"));
 
     insert_refresh_fixture(&pool, tenant_id, actor_id, binding.device_id).await;
     let revoked = repository
@@ -121,12 +117,10 @@ async fn postgres_device_proof_generation_and_revocation() {
         .expect("device was active");
     assert_eq!(revoked.generation, 2);
     assert_eq!(revoked.status, "revoked");
-    assert!(
-        !repository
-            .is_active(tenant_id, actor_id, binding.device_id, 1)
-            .await
-            .expect("revoked generation check")
-    );
+    assert!(!repository
+        .is_active(tenant_id, actor_id, binding.device_id, 1)
+        .await
+        .expect("revoked generation check"));
     assert!(refresh_fixture_is_revoked(&pool, tenant_id, actor_id, binding.device_id).await);
     pool.close().await;
 }

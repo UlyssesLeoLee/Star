@@ -1349,17 +1349,17 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        AutomationOccurrenceKey, AutomationOccurrenceLeaseFenceV1, AutomationOccurrenceSnapshotV1,
-        AutomationScheduleRuleRevisionV1, MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES,
-        SCHEDULE_ADMISSION_SCHEMA_VERSION, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
-        ScheduleAdmissionCompensationReasonV1, ScheduleAdmissionContractError,
-        ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionResolutionKindV1, ScheduleContractError,
-        ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1, ScheduleMaterializationError,
-        ScheduleMisfirePolicyV1, ScheduleOccurrenceDispositionV1, ScheduleOverlapPolicyV1,
-        SchedulePausePolicyV1, ScheduleRetryPolicyV1, ScheduleRunAdmissionCommandV1,
-        ScheduleRunAdmissionOutcomeV1, ScheduleRunAdmissionResolutionV1,
-        ScheduleRunAdmissionResultV1, ScheduleTargetV1, materialize_schedule_window,
-        validate_schedule_recurrence,
+        materialize_schedule_window, validate_schedule_recurrence, AutomationOccurrenceKey,
+        AutomationOccurrenceLeaseFenceV1, AutomationOccurrenceSnapshotV1,
+        AutomationScheduleRuleRevisionV1, ScheduleAdmissionCompensationReasonV1,
+        ScheduleAdmissionContractError, ScheduleAdmissionRejectionCodeV1,
+        ScheduleAdmissionResolutionKindV1, ScheduleContractError, ScheduleDstFoldPolicyV1,
+        ScheduleDstGapPolicyV1, ScheduleMaterializationError, ScheduleMisfirePolicyV1,
+        ScheduleOccurrenceDispositionV1, ScheduleOverlapPolicyV1, SchedulePausePolicyV1,
+        ScheduleRetryPolicyV1, ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionOutcomeV1,
+        ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1, ScheduleTargetV1,
+        MAX_SCHEDULE_ADMISSION_MESSAGE_BYTES, SCHEDULE_ADMISSION_SCHEMA_VERSION,
+        SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
     };
     use crate::RuleId;
 
@@ -1490,16 +1490,14 @@ mod tests {
         let mut rule = schedule_rule();
         rule.target.branch_id = None;
         assert!(rule.validate().is_ok());
-        assert!(
-            validate_schedule_recurrence(
-                &rule,
-                utc("2026-10-04T23:00:00Z"),
-                utc("2026-10-05T01:00:00Z"),
-                utc("2026-10-04T23:30:00Z"),
-                16,
-            )
-            .is_ok()
-        );
+        assert!(validate_schedule_recurrence(
+            &rule,
+            utc("2026-10-04T23:00:00Z"),
+            utc("2026-10-05T01:00:00Z"),
+            utc("2026-10-04T23:30:00Z"),
+            16,
+        )
+        .is_ok());
 
         let batch = materialize_schedule_window(
             &rule,

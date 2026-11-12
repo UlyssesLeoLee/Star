@@ -59,12 +59,12 @@ use axum::{
 };
 use futures_util::StreamExt;
 use sqlx::{
-    Row,
     postgres::{PgConnectOptions, PgListener, PgPoolOptions},
+    Row,
 };
 use star_api_rest::{
-    auth::{JwtConfig, issue_token},
-    group_api::{CanvasEventWakeHub, GroupApiState, build_group_router},
+    auth::{issue_token, JwtConfig},
+    group_api::{build_group_router, CanvasEventWakeHub, GroupApiState},
 };
 use tower::ServiceExt;
 use uuid::Uuid;

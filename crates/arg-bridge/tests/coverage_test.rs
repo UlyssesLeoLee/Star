@@ -18,7 +18,10 @@ fn bridge_error_display_bolt_subscribe_failed() {
 fn bridge_error_display_langgraph_reducer_failed() {
     let e = BridgeError::LangGraphReducerFailed("pyo3 panic".to_string());
     let msg = format!("{e}");
-    assert!(msg.contains("LangGraph") || msg.contains("Reducer"), "msg: {msg}");
+    assert!(
+        msg.contains("LangGraph") || msg.contains("Reducer"),
+        "msg: {msg}"
+    );
     assert!(msg.contains("pyo3 panic"), "msg: {msg}");
 }
 
@@ -26,7 +29,10 @@ fn bridge_error_display_langgraph_reducer_failed() {
 fn bridge_error_display_flush_timeout() {
     let e = BridgeError::FlushTimeout(Duration::from_secs(30));
     let msg = format!("{e}");
-    assert!(msg.contains("flush") || msg.contains("timed out"), "msg: {msg}");
+    assert!(
+        msg.contains("flush") || msg.contains("timed out"),
+        "msg: {msg}"
+    );
     assert!(msg.contains("30s"), "msg: {msg}");
 }
 
@@ -34,7 +40,10 @@ fn bridge_error_display_flush_timeout() {
 fn bridge_error_display_offline_persist_failed() {
     let e = BridgeError::OfflinePersistFailed("disk full".to_string());
     let msg = format!("{e}");
-    assert!(msg.contains("persist") || msg.contains("Offline") || msg.contains("disk"), "msg: {msg}");
+    assert!(
+        msg.contains("persist") || msg.contains("Offline") || msg.contains("disk"),
+        "msg: {msg}"
+    );
 }
 
 #[test]
@@ -42,8 +51,10 @@ fn bridge_error_display_memgraph_down() {
     let e = BridgeError::MemgraphDown("connection lost".to_string());
     let msg = format!("{e}");
     assert!(!msg.is_empty(), "msg should not be empty");
-    assert!(msg.to_lowercase().contains("memgraph") || msg.to_lowercase().contains("down"),
-        "msg: {msg}");
+    assert!(
+        msg.to_lowercase().contains("memgraph") || msg.to_lowercase().contains("down"),
+        "msg: {msg}"
+    );
 }
 
 #[test]

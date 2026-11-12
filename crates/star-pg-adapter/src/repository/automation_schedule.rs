@@ -86,7 +86,6 @@ MERGE (result_admission)-[:READS]->(request_outbox:Table {id:"automation.run_adm
 //! PostgreSQL persistence and fenced dispatch operations for Schedule occurrences.
 
 use chrono::{DateTime, Duration, Utc};
-use domain_automation::RuleId;
 use domain_automation::schedule::{
     AutomationOccurrenceLeaseFenceV1, AutomationScheduleRuleRevisionV1,
     MaterializedScheduleOccurrenceV1, ScheduleDstFoldPolicyV1, ScheduleDstGapPolicyV1,
@@ -95,6 +94,7 @@ use domain_automation::schedule::{
     ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1,
     ScheduleTargetV1,
 };
+use domain_automation::RuleId;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::postgres::PgRow;

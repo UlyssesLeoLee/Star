@@ -52,13 +52,24 @@ impl ThemeId {
     pub fn is_dark(&self) -> bool {
         matches!(
             self,
-            ThemeId::Dark | ThemeId::Christmas | ThemeId::Charisma | ThemeId::HighContrast | ThemeId::Solarized
+            ThemeId::Dark
+                | ThemeId::Christmas
+                | ThemeId::Charisma
+                | ThemeId::HighContrast
+                | ThemeId::Solarized
         )
     }
 
     /// 内置(非扩展位)主题列表
     pub fn all_builtin() -> &'static [ThemeId] {
-        &[ThemeId::Light, ThemeId::Dark, ThemeId::Christmas, ThemeId::Charisma, ThemeId::Shanghai, ThemeId::Cel]
+        &[
+            ThemeId::Light,
+            ThemeId::Dark,
+            ThemeId::Christmas,
+            ThemeId::Charisma,
+            ThemeId::Shanghai,
+            ThemeId::Cel,
+        ]
     }
 }
 

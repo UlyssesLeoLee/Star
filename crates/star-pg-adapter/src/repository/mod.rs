@@ -55,7 +55,7 @@ pub use automation_schedule::{
 };
 pub use device_bindings::{
     DeviceBinding, DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
-    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, PgDeviceBindingRepository,
+    PgDeviceBindingRepository, MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES,
 };
 pub use ops_cluster_action_log::{
     OpsClusterActionLog, OpsClusterActionLogRepository, PgOpsClusterActionLogRepository,

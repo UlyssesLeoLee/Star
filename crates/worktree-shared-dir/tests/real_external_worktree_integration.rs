@@ -217,7 +217,11 @@ async fn real_cleanup_stale_removes_removed_worktree() {
     // → 应精确返回 [wt_path] (per Real impl §2.2 cleanup_stale 逻辑, 只 diff
     // managed, 不碰主仓 registry path).
     let stale = real.cleanup_stale(repo_id).await.unwrap();
-    assert_eq!(stale, vec![wt_path.clone()], "应精确返回被外部删除的 wt-removed");
+    assert_eq!(
+        stale,
+        vec![wt_path.clone()],
+        "应精确返回被外部删除的 wt-removed"
+    );
     assert!(
         real.managed_paths(repo_id).is_empty(),
         "cleanup_stale 后 wt-removed 应从 managed 里摘掉"
@@ -258,8 +262,5 @@ async fn real_import_marks_managed_true_via_real_git_workflow() {
         .iter()
         .find(|w| w.path == wt_path)
         .expect("wt-import 应仍在 scan 里");
-    assert!(
-        imported.is_managed,
-        "import 后 scan 应标 is_managed=true"
-    );
+    assert!(imported.is_managed, "import 后 scan 应标 is_managed=true");
 }

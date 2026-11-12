@@ -40,12 +40,12 @@ use uuid::Uuid;
 // `#[serde(tag = "kind")]` 派生); lib 不直接用 bare name, 但 tests `use super::*`
 // 会拉到 `StartFrom::RepoBaseRef` 等 variant. 加 `#[allow(unused_imports)]` 消
 // warning, 同时保留 test 可用性.
+use worktree_shared_dir::start_from_picker::StartFromPicker;
 #[allow(unused_imports)]
 use worktree_shared_dir::{
     InMemoryStartFromPicker, PickerCandidate, PickerCandidateKind, StartFrom,
     StartFromPickerRegistry,
 };
-use worktree_shared_dir::start_from_picker::StartFromPicker;
 
 use crate::error::RestError;
 use crate::response::RestResponse;
@@ -207,7 +207,8 @@ pub async fn resolve(
     if body.value.trim().is_empty() {
         return Err(RestError::validation(
             "value is required".to_string(),
-            "Provide a non-empty value (kind-specific, e.g. branch name / SHA / remote/branch)".to_string(),
+            "Provide a non-empty value (kind-specific, e.g. branch name / SHA / remote/branch)"
+                .to_string(),
         ));
     }
 

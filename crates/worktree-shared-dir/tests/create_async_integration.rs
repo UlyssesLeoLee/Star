@@ -15,18 +15,18 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use graph_core::types::RepoId;
 use git_adapter::Libgit2Provider;
+use graph_core::types::RepoId;
 use tempfile::TempDir;
 
-use worktree_shared_dir::worktree_create_async::{
-    RealWorktreeCreateAsync, WorktreeCreateAsync, WorktreeCreateRequest, WorktreeEvent,
-};
 use worktree_shared_dir::shared_dir_resolver::{
     InMemorySharedDirResolver, NoopConfigSource, NoopPerUserSource, NoopWorkspaceSource,
 };
 use worktree_shared_dir::shared_dir_types::{
     SharedDirPriority, SharedDirSource, SharedDirectory, SharedMountStrategy,
+};
+use worktree_shared_dir::worktree_create_async::{
+    RealWorktreeCreateAsync, WorktreeCreateAsync, WorktreeCreateRequest, WorktreeEvent,
 };
 use worktree_shared_dir::ResolvedSharedDirs;
 
@@ -50,12 +50,23 @@ fn create_test_repo() -> (TempDir, PathBuf) {
         String::from_utf8_lossy(&output.stderr)
     );
     // write + add + commit (同样用 -C <path>)
-    std::fs::write(path.join("README.md"), "# test repo
-").unwrap();
+    std::fs::write(
+        path.join("README.md"),
+        "# test repo
+",
+    )
+    .unwrap();
     let output = std::process::Command::new("git")
         .args(["-C"])
         .arg(&path)
-        .args(["-c", "user.email=test@example.com", "-c", "user.name=test", "add", "README.md"])
+        .args([
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "user.name=test",
+            "add",
+            "README.md",
+        ])
         .output()
         .expect("git add must succeed");
     assert!(
@@ -66,7 +77,15 @@ fn create_test_repo() -> (TempDir, PathBuf) {
     let output = std::process::Command::new("git")
         .args(["-C"])
         .arg(&path)
-        .args(["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "initial commit"])
+        .args([
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "user.name=test",
+            "commit",
+            "-m",
+            "initial commit",
+        ])
         .output()
         .expect("git commit must succeed");
     assert!(
@@ -126,7 +145,7 @@ async fn real_git_worktree_add_succeeds() {
                 }
                 _ => {}
             },
-            Ok(None) => break, // channel closed
+            Ok(None) => break,  // channel closed
             Err(_) => continue, // timeout: keep polling
         }
     }
@@ -174,7 +193,9 @@ async fn real_git_worktree_add_with_symlink_succeeds() {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
     while std::time::Instant::now() < deadline {
         match tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv()).await {
-            Ok(Some(WorktreeEvent::ProvisioningCompleted { worktree_path: p, .. })) => {
+            Ok(Some(WorktreeEvent::ProvisioningCompleted {
+                worktree_path: p, ..
+            })) => {
                 saw_completed = true;
                 last_events.push(format!("completed:{}", p.display()));
                 break;
@@ -196,8 +217,8 @@ async fn real_git_worktree_add_with_symlink_succeeds() {
     #[cfg(unix)]
     {
         let link = worktree_path.join("shared");
-        let meta = std::fs::symlink_metadata(&link)
-            .expect("symlink should exist after provisioning");
+        let meta =
+            std::fs::symlink_metadata(&link).expect("symlink should exist after provisioning");
         assert!(
             meta.file_type().is_symlink(),
             "expected symlink on Unix, got {:?}",
@@ -217,7 +238,11 @@ async fn real_git_worktree_add_with_symlink_succeeds() {
         if !target.exists() {
             // list parent to see what was created
             let parent = worktree_path.parent().unwrap();
-            eprintln!("DIAG: worktree_path={}, exists={}", worktree_path.display(), worktree_path.exists());
+            eprintln!(
+                "DIAG: worktree_path={}, exists={}",
+                worktree_path.display(),
+                worktree_path.exists()
+            );
             if let Ok(entries) = std::fs::read_dir(worktree_path) {
                 for entry in entries.flatten() {
                     eprintln!("DIAG entry: {}", entry.path().display());

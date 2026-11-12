@@ -14,14 +14,14 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     sync::{
-        Arc, Mutex, RwLock,
         atomic::{AtomicU64, Ordering},
+        Arc, Mutex, RwLock,
     },
     thread,
     time::Duration,
 };
 
-use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use tokio::sync::{mpsc, watch};
 use uuid::Uuid;
 
@@ -315,22 +315,20 @@ fn start_child_monitor(
 ) -> Result<(), TaskPtyError> {
     thread::Builder::new()
         .name("task-pty-child-monitor".to_string())
-        .spawn(move || {
-            loop {
-                let result = child
-                    .lock()
-                    .map_err(|_| ())
-                    .and_then(|mut child| child.try_wait().map_err(|_| ()));
-                match result {
-                    Ok(Some(status)) => {
-                        exit_tx.send_replace(Some(i32::try_from(status.exit_code()).unwrap_or(-1)));
-                        break;
-                    }
-                    Ok(None) => thread::sleep(Duration::from_millis(100)),
-                    Err(()) => {
-                        exit_tx.send_replace(Some(-1));
-                        break;
-                    }
+        .spawn(move || loop {
+            let result = child
+                .lock()
+                .map_err(|_| ())
+                .and_then(|mut child| child.try_wait().map_err(|_| ()));
+            match result {
+                Ok(Some(status)) => {
+                    exit_tx.send_replace(Some(i32::try_from(status.exit_code()).unwrap_or(-1)));
+                    break;
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(100)),
+                Err(()) => {
+                    exit_tx.send_replace(Some(-1));
+                    break;
                 }
             }
         })

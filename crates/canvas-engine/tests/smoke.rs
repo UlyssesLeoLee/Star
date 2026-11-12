@@ -30,11 +30,18 @@ async fn router_healthz_returns_ok() {
     use tower::ServiceExt;
     let app = canvas_engine::router();
     let response = app
-        .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/healthz")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    let body_bytes = axum::body::to_bytes(response.into_body(), 1024).await.unwrap();
+    let body_bytes = axum::body::to_bytes(response.into_body(), 1024)
+        .await
+        .unwrap();
     assert_eq!(&body_bytes[..], b"ok");
 }
 
@@ -45,11 +52,18 @@ async fn router_version_returns_json_with_service_name() {
     use tower::ServiceExt;
     let app = canvas_engine::router();
     let response = app
-        .oneshot(Request::builder().uri("/version").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/version")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    let body_bytes = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
+    let body_bytes = axum::body::to_bytes(response.into_body(), 4096)
+        .await
+        .unwrap();
     let v: serde_json::Value = serde_json::from_slice(&body_bytes).expect("json");
     assert_eq!(v["service"], "canvas-engine");
     assert_eq!(v["phase"], "Skeleton");

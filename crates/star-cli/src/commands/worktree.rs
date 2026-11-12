@@ -28,11 +28,11 @@ use uuid::Uuid;
 
 use git_adapter::provider::GitProvider;
 use git_adapter::CliGitProvider;
+use worktree_shared_dir::start_from_picker::StartFromPicker;
 use worktree_shared_dir::{
     parse_candidate_id, PickerCandidate, RealStartFromPicker, SharedDirError,
     StartFromPickerRegistry,
 };
-use worktree_shared_dir::start_from_picker::StartFromPicker;
 
 use crate::error::StarError;
 use crate::output;
@@ -110,8 +110,7 @@ fn render_candidates_table(candidates: &[PickerCandidate]) -> String {
     ];
     let mut out = String::new();
     for (kind, header) in HEADERS {
-        let group: Vec<&PickerCandidate> =
-            candidates.iter().filter(|c| c.kind == *kind).collect();
+        let group: Vec<&PickerCandidate> = candidates.iter().filter(|c| c.kind == *kind).collect();
         if group.is_empty() {
             continue;
         }
@@ -251,7 +250,10 @@ async fn run_start_from_picker(args: StartFromPickerArgs) -> Result<(), StarErro
             description: String::new(),
             kind,
         };
-        let resolved = picker.resolve(repo_id, candidate).await.map_err(picker_err)?;
+        let resolved = picker
+            .resolve(repo_id, candidate)
+            .await
+            .map_err(picker_err)?;
         println!(
             "{}",
             output::json_pretty(serde_json::json!({
@@ -267,10 +269,7 @@ async fn run_start_from_picker(args: StartFromPickerArgs) -> Result<(), StarErro
     }
 
     // mode 2: 列 candidates
-    let candidates = picker
-        .list_candidates(repo_id)
-        .await
-        .map_err(picker_err)?;
+    let candidates = picker.list_candidates(repo_id).await.map_err(picker_err)?;
 
     if args.json {
         println!(
@@ -308,7 +307,10 @@ mod tests {
     fn parse_candidate_id_recognizes_all_four_kinds() {
         assert_eq!(
             parse_candidate_id("repo_base:main").unwrap(),
-            (worktree_shared_dir::PickerCandidateKind::RepoBase, "main".into())
+            (
+                worktree_shared_dir::PickerCandidateKind::RepoBase,
+                "main".into()
+            )
         );
         assert_eq!(
             parse_candidate_id("local_branch:feat-x").unwrap(),
@@ -373,12 +375,27 @@ mod tests {
             },
         ];
         let table = render_candidates_table(&candidates);
-        assert!(table.contains("REPO BASE REF"), "should have REPO BASE REF header: {table}");
-        assert!(table.contains("main (default)"), "should list main: {table}");
-        assert!(table.contains("LOCAL BRANCH"), "should have LOCAL BRANCH header: {table}");
+        assert!(
+            table.contains("REPO BASE REF"),
+            "should have REPO BASE REF header: {table}"
+        );
+        assert!(
+            table.contains("main (default)"),
+            "should list main: {table}"
+        );
+        assert!(
+            table.contains("LOCAL BRANCH"),
+            "should have LOCAL BRANCH header: {table}"
+        );
         assert!(table.contains("feat-x"), "should list feat-x: {table}");
-        assert!(table.contains("REMOTE BRANCH"), "should have REMOTE BRANCH header: {table}");
-        assert!(!table.contains("COMMIT SHA"), "should skip empty COMMIT SHA group: {table}");
+        assert!(
+            table.contains("REMOTE BRANCH"),
+            "should have REMOTE BRANCH header: {table}"
+        );
+        assert!(
+            !table.contains("COMMIT SHA"),
+            "should skip empty COMMIT SHA group: {table}"
+        );
     }
 
     /// Test 5: `render_candidates_table` 空输入返回空串 (避免空 header 噪音)
@@ -399,8 +416,14 @@ mod tests {
         let cli_err = picker_err(backend_err);
         match cli_err {
             StarError::Picker(msg) => {
-                assert!(msg.contains("WSD.PICKER_GIT_OPEN_FAIL"), "code should be in msg: {msg}");
-                assert!(msg.contains("git open_repo failed"), "message should be in msg: {msg}");
+                assert!(
+                    msg.contains("WSD.PICKER_GIT_OPEN_FAIL"),
+                    "code should be in msg: {msg}"
+                );
+                assert!(
+                    msg.contains("git open_repo failed"),
+                    "message should be in msg: {msg}"
+                );
             }
             _ => panic!("expected StarError::Picker, got something else"),
         }
@@ -412,7 +435,10 @@ mod tests {
         let result = resolve_repo_path("/this/path/should/not/exist/abc-xyz");
         match result {
             Err(StarError::Picker(msg)) => {
-                assert!(msg.contains("does not exist"), "msg should mention missing: {msg}");
+                assert!(
+                    msg.contains("does not exist"),
+                    "msg should mention missing: {msg}"
+                );
             }
             Ok(p) => panic!("expected error for missing path, got Ok({p:?})"),
             Err(other) => panic!("expected Picker error, got {other:?}"),

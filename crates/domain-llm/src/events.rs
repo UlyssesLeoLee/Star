@@ -565,10 +565,7 @@ mod tests {
         };
         // Inspect fields by reference (no partial move).
         match &e {
-            AgentStreamEvent::StreamStart {
-                id: got_id,
-                model,
-            } => {
+            AgentStreamEvent::StreamStart { id: got_id, model } => {
                 assert_eq!(*got_id, id);
                 assert_eq!(model, "claude-sonnet-4-5");
             }
@@ -783,7 +780,7 @@ mod tests {
     #[test]
     fn text_delta_concat_four_byte_emoji_with_empty_interleavings() {
         let s = "go\u{1F600}!"; // "go😀!" -- 7 bytes: 2 ASCII + 4 emoji + 1 ASCII
-        // Split char-by-char: "g" / "o" / "\u{1F600}" / "!"
+                                // Split char-by-char: "g" / "o" / "\u{1F600}" / "!"
         let chars: Vec<String> = s.chars().map(|c| c.to_string()).collect();
         assert_eq!(chars.len(), 4);
         let stream = [
@@ -827,10 +824,7 @@ mod tests {
             recoverable: true,
         };
         match e {
-            AgentStreamEvent::Error {
-                error,
-                recoverable,
-            } => {
+            AgentStreamEvent::Error { error, recoverable } => {
                 assert!(recoverable);
                 assert_eq!(error.kind, "http_429");
                 assert_eq!(error.http_status, Some(429));
@@ -844,18 +838,11 @@ mod tests {
     #[test]
     fn agent_stream_event_error_sdk_panic_is_not_recoverable() {
         let e = AgentStreamEvent::Error {
-            error: StreamError::new(
-                "sdk_panic",
-                "provider returned malformed SSE frame",
-                false,
-            ),
+            error: StreamError::new("sdk_panic", "provider returned malformed SSE frame", false),
             recoverable: false,
         };
         match e {
-            AgentStreamEvent::Error {
-                error,
-                recoverable,
-            } => {
+            AgentStreamEvent::Error { error, recoverable } => {
                 assert!(!recoverable);
                 assert_eq!(error.kind, "sdk_panic");
                 assert!(error.message.contains("malformed SSE"));

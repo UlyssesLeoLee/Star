@@ -397,9 +397,8 @@ impl PostgresScheduleAdmissionStore {
         if row.try_get::<Uuid, _>("source_schedule_service_id")? != source.schedule_service_id {
             return Err(ScheduleAdmissionStoreError::UntrustedScope);
         }
-        let (command, _) = decode_branch_bound_schedule_command(
-            &row.try_get::<Vec<u8>, _>("command_wire")?,
-        )?;
+        let (command, _) =
+            decode_branch_bound_schedule_command(&row.try_get::<Vec<u8>, _>("command_wire")?)?;
         let result =
             ScheduleRunAdmissionResultV1::decode_json(&row.try_get::<Vec<u8>, _>("result_wire")?)?;
         result.validate_for_command(&command)?;
@@ -790,8 +789,7 @@ impl ScheduleAdmissionTransaction {
 mod tests {
     use super::{
         decode_branch_bound_schedule_command, hostless_schedule_target_in_wire,
-        required_schedule_branch_id,
-        ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionStoreError,
+        required_schedule_branch_id, ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionStoreError,
     };
     use uuid::Uuid;
 

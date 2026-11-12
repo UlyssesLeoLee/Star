@@ -76,25 +76,25 @@ MERGE (authorizeOwnedTask)-[:USES_TYPE]->(ownedTaskScope)
 //! (context)-[:CALLS]->(parse),(context)-[:CALLS]->(commit),(context)-[:CALLS]->(reply),(context)-[:CALLS]->(internal),(legacy)-[:CALLS]->(parse),(legacy)-[:CALLS]->(sqlScalar),(legacy)-[:CALLS]->(bind),(legacy)-[:CALLS]->(fetch),(legacy)-[:CALLS]->(scope),(legacy)-[:CALLS]->(commit),(legacy)-[:CALLS]->(reply),(legacy)-[:CALLS]->(internal),(legacy)-[:CALLS]->(missing),
 //! (envelope)-[:CALLS]->(format),(envelope)-[:CALLS]->(json),(envelope)-[:CALLS]->(clock),(envelope)-[:CALLS]->(uuid),(permission)-[:CALLS]->(json),(router)-[:CALLS]->(new),(router)-[:CALLS]->(route),(router)-[:CALLS]->(get),(reply)-[:CALLS]->(wrap);
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::{
-        HeaderMap, HeaderName,
         header::{CACHE_CONTROL, VARY},
+        HeaderMap, HeaderName,
     },
     routing::get,
+    Json, Router,
 };
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{idempotency_key, request_hash};
 use super::{
-    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, ProjectBinding, active_binding,
-    require_scope, set_tenant, validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
+    GroupApiError, GroupApiState, ProjectBinding,
 };
 
 #[derive(Default, Deserialize)]

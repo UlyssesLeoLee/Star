@@ -950,10 +950,7 @@ impl CommentServiceAdapter {
     }
 
     /// 构造 adapter,使用指定的 runtime handle(用于测试 / 多 runtime 场景)
-    pub fn with_handle(
-        svc: Arc<dyn CommentCommandPort>,
-        rt: tokio::runtime::Handle,
-    ) -> Self {
+    pub fn with_handle(svc: Arc<dyn CommentCommandPort>, rt: tokio::runtime::Handle) -> Self {
         Self { svc, rt }
     }
 
@@ -969,8 +966,8 @@ impl SteeringCommentSink for CommentServiceAdapter {
         // 同步 sink 调异步 service:用 captured runtime handle block_on
         let svc = self.svc.clone();
         let rt = self.rt.clone();
-        let actor = ActorContext::new(cmd.agent_id.as_uuid(), cmd.tenant_id.0)
-            .with_agent_session(true);
+        let actor =
+            ActorContext::new(cmd.agent_id.as_uuid(), cmd.tenant_id.0).with_agent_session(true);
         let body = format!(
             "[steering] task {} preempted by task {}\ncurrent: {}\nincoming: {}",
             cmd.current_task_id,
@@ -1039,17 +1036,13 @@ impl CommentServiceAdapter {
         };
         // 同步 sink → 异步 service:用 captured runtime handle block_on
         let svc = self.svc.clone();
-        let actor = ActorContext::new(cmd.agent_id.as_uuid(), cmd.tenant_id.0)
-            .with_agent_session(true);
+        let actor =
+            ActorContext::new(cmd.agent_id.as_uuid(), cmd.tenant_id.0).with_agent_session(true);
         let create_clone = create.clone();
         self.rt
-            .spawn(async move {
-                svc.create_comment(create_clone, &actor).await
-            })
+            .spawn(async move { svc.create_comment(create_clone, &actor).await })
             .await
-            .map_err(|join_err| {
-                CommentError::Internal(format!("tokio join failed: {join_err}"))
-            })?
+            .map_err(|join_err| CommentError::Internal(format!("tokio join failed: {join_err}")))?
     }
 }
 

@@ -40,16 +40,16 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use star_api_rest::auth::JwtConfig;
-use star_api_rest::auth::oauth::OAuth2State;
 use star_api_rest::auth::oauth::keypair::OAuthKeyManager;
-use star_pg_adapter::PgAdapterError;
+use star_api_rest::auth::oauth::OAuth2State;
+use star_api_rest::auth::JwtConfig;
 use star_pg_adapter::repository::{
     DeviceBinding, DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
-    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, OAuthAccessToken, OAuthAccessTokenRepository,
-    OAuthAuthorizationCode, OAuthAuthorizationCodeRepository, OAuthClient, OAuthClientRepository,
-    OAuthRefreshToken, OAuthRefreshTokenRepository,
+    OAuthAccessToken, OAuthAccessTokenRepository, OAuthAuthorizationCode,
+    OAuthAuthorizationCodeRepository, OAuthClient, OAuthClientRepository, OAuthRefreshToken,
+    OAuthRefreshTokenRepository, MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES,
 };
+use star_pg_adapter::PgAdapterError;
 
 type AccessTokenStore = Arc<Mutex<HashMap<String, OAuthAccessToken>>>;
 type RefreshTokenStore = Arc<Mutex<HashMap<String, OAuthRefreshToken>>>;

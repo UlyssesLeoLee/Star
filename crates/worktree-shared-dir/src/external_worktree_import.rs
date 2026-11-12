@@ -244,13 +244,19 @@ impl InMemoryExternalWorktreeImport {
 
     /// 注册 repo_id → path (per FR-ORCA-011 caller 检查).
     pub fn register_repo(&self, repo_id: RepoId, path: PathBuf) {
-        let mut s = self.inner.write().expect("InMemoryExternalWorktreeImport lock poisoned");
+        let mut s = self
+            .inner
+            .write()
+            .expect("InMemoryExternalWorktreeImport lock poisoned");
         s.registry.insert(repo_id, path);
     }
 
     /// 注入一份 external worktrees (测试 + dry-run 用).
     pub fn seed(&self, repo_id: RepoId, items: Vec<ExternalWorktree>) {
-        let mut s = self.inner.write().expect("InMemoryExternalWorktreeImport lock poisoned");
+        let mut s = self
+            .inner
+            .write()
+            .expect("InMemoryExternalWorktreeImport lock poisoned");
         s.worktrees.insert(repo_id, items);
     }
 }
@@ -258,7 +264,10 @@ impl InMemoryExternalWorktreeImport {
 #[async_trait]
 impl ExternalWorktreeImport for InMemoryExternalWorktreeImport {
     async fn scan(&self, repo_id: RepoId) -> ExternalWorktreeImportResult<Vec<ExternalWorktree>> {
-        let s = self.inner.read().expect("InMemoryExternalWorktreeImport lock poisoned");
+        let s = self
+            .inner
+            .read()
+            .expect("InMemoryExternalWorktreeImport lock poisoned");
         // repo_id 必须注册过 (per FR-ORCA-011 caller 检查, 真实 git 也走 lookup)
         if !s.registry.contains_key(&repo_id) {
             return Err(ExternalWorktreeImportError::RepoNotFound {
@@ -270,7 +279,10 @@ impl ExternalWorktreeImport for InMemoryExternalWorktreeImport {
     }
 
     async fn import(&self, repo_id: RepoId, path: PathBuf) -> ExternalWorktreeImportResult<RepoId> {
-        let mut s = self.inner.write().expect("InMemoryExternalWorktreeImport lock poisoned");
+        let mut s = self
+            .inner
+            .write()
+            .expect("InMemoryExternalWorktreeImport lock poisoned");
         if !s.registry.contains_key(&repo_id) {
             return Err(ExternalWorktreeImportError::RepoNotFound {
                 repo_id,
@@ -296,7 +308,10 @@ impl ExternalWorktreeImport for InMemoryExternalWorktreeImport {
     }
 
     async fn cleanup_stale(&self, repo_id: RepoId) -> ExternalWorktreeImportResult<Vec<PathBuf>> {
-        let mut s = self.inner.write().expect("InMemoryExternalWorktreeImport lock poisoned");
+        let mut s = self
+            .inner
+            .write()
+            .expect("InMemoryExternalWorktreeImport lock poisoned");
         if !s.registry.contains_key(&repo_id) {
             return Err(ExternalWorktreeImportError::RepoNotFound {
                 repo_id,
@@ -382,7 +397,10 @@ mod tests {
         picker.register_repo(repo, PathBuf::from("/tmp/repo"));
         picker.seed(repo, vec![ext("/tmp/wt1", Some("feat-a"), false)]);
 
-        let _id = picker.import(repo, PathBuf::from("/tmp/wt1")).await.unwrap();
+        let _id = picker
+            .import(repo, PathBuf::from("/tmp/wt1"))
+            .await
+            .unwrap();
 
         let after = picker.scan(repo).await.unwrap();
         assert_eq!(after.len(), 1);
@@ -396,7 +414,10 @@ mod tests {
         picker.register_repo(repo, PathBuf::from("/tmp/repo"));
         picker.seed(repo, vec![ext("/tmp/wt1", Some("feat-a"), false)]);
 
-        let err = picker.import(repo, PathBuf::from("/tmp/nope")).await.unwrap_err();
+        let err = picker
+            .import(repo, PathBuf::from("/tmp/nope"))
+            .await
+            .unwrap_err();
         match err {
             ExternalWorktreeImportError::PathNotInScan { path } => {
                 assert_eq!(path, PathBuf::from("/tmp/nope"));
@@ -409,7 +430,10 @@ mod tests {
     async fn import_unregistered_repo_errors_repo_not_found() {
         let picker = InMemoryExternalWorktreeImport::new();
         let unregistered = RepoId::new_v4();
-        let err = picker.import(unregistered, PathBuf::from("/tmp/x")).await.unwrap_err();
+        let err = picker
+            .import(unregistered, PathBuf::from("/tmp/x"))
+            .await
+            .unwrap_err();
         match err {
             ExternalWorktreeImportError::RepoNotFound { .. } => {}
             _ => panic!("expected RepoNotFound, got {err:?}"),
@@ -477,7 +501,10 @@ mod tests {
             }],
         );
 
-        let _id = picker.import(repo, PathBuf::from("/tmp/wt1")).await.unwrap();
+        let _id = picker
+            .import(repo, PathBuf::from("/tmp/wt1"))
+            .await
+            .unwrap();
         let after = picker.scan(repo).await.unwrap();
         assert_eq!(after[0].head_commit, original_sha, "head_commit 应保留");
         assert!(after[0].is_managed);
@@ -658,13 +685,10 @@ impl RealExternalWorktreeImport {
         repo_id: RepoId,
     ) -> Result<(RepoHandle, PathBuf), ExternalWorktreeImportError> {
         let path = self.registry.lookup(repo_id)?;
-        let handle = self
-            .git
-            .open_repo(&path)
-            .await
-            .map_err(|e| ExternalWorktreeImportError::GitCommand(
-                git_err_to_string(&e, &path),
-            ))?;
+        let handle =
+            self.git.open_repo(&path).await.map_err(|e| {
+                ExternalWorktreeImportError::GitCommand(git_err_to_string(&e, &path))
+            })?;
         Ok((handle, path))
     }
 
@@ -691,18 +715,11 @@ fn git_err_to_string(e: &git_adapter::GitError, path: &std::path::Path) -> Strin
 
 #[async_trait]
 impl ExternalWorktreeImport for RealExternalWorktreeImport {
-    async fn scan(
-        &self,
-        repo_id: RepoId,
-    ) -> ExternalWorktreeImportResult<Vec<ExternalWorktree>> {
+    async fn scan(&self, repo_id: RepoId) -> ExternalWorktreeImportResult<Vec<ExternalWorktree>> {
         let (handle, _path) = self.open_repo(repo_id).await?;
-        let infos = self
-            .git
-            .list_worktrees(&handle)
-            .await
-            .map_err(|e| ExternalWorktreeImportError::GitCommand(format!(
-                "git worktree list failed: {e}"
-            )))?;
+        let infos = self.git.list_worktrees(&handle).await.map_err(|e| {
+            ExternalWorktreeImportError::GitCommand(format!("git worktree list failed: {e}"))
+        })?;
 
         let managed = self
             .managed
@@ -734,11 +751,7 @@ impl ExternalWorktreeImport for RealExternalWorktreeImport {
             .collect())
     }
 
-    async fn import(
-        &self,
-        repo_id: RepoId,
-        path: PathBuf,
-    ) -> ExternalWorktreeImportResult<RepoId> {
+    async fn import(&self, repo_id: RepoId, path: PathBuf) -> ExternalWorktreeImportResult<RepoId> {
         // 1. 校验 path 在 scan 输出里 (per AC-2 caller 检查)
         let scanned = self.scan(repo_id).await?;
         if !scanned.iter().any(|w| w.path == path) {
@@ -760,21 +773,13 @@ impl ExternalWorktreeImport for RealExternalWorktreeImport {
         Ok(RepoId::from(worktree_id))
     }
 
-    async fn cleanup_stale(
-        &self,
-        repo_id: RepoId,
-    ) -> ExternalWorktreeImportResult<Vec<PathBuf>> {
+    async fn cleanup_stale(&self, repo_id: RepoId) -> ExternalWorktreeImportResult<Vec<PathBuf>> {
         // 1. 重新 scan 拿当前 porcelain
         let (handle, _path) = self.open_repo(repo_id).await?;
-        let infos = self
-            .git
-            .list_worktrees(&handle)
-            .await
-            .map_err(|e| ExternalWorktreeImportError::GitCommand(format!(
-                "git worktree list failed: {e}"
-            )))?;
-        let porcelain_paths: HashSet<PathBuf> =
-            infos.into_iter().map(|i| i.path).collect();
+        let infos = self.git.list_worktrees(&handle).await.map_err(|e| {
+            ExternalWorktreeImportError::GitCommand(format!("git worktree list failed: {e}"))
+        })?;
+        let porcelain_paths: HashSet<PathBuf> = infos.into_iter().map(|i| i.path).collect();
 
         // 2. 收集本 impl 跟踪的 "已 managed" (即 import 过) path 中, 已经不在
         //    porcelain 里的 (stale) — 即用户在 Orca 外直接 `git worktree
@@ -864,27 +869,13 @@ mod real_tests {
             // unimplemented!() 就够了.
             unimplemented!()
         }
-        async fn diff(
-            &self,
-            _: &RepoHandle,
-            _: &str,
-            _: &str,
-        ) -> Result<Diff, GitError> {
+        async fn diff(&self, _: &RepoHandle, _: &str, _: &str) -> Result<Diff, GitError> {
             unimplemented!()
         }
-        async fn merge_base(
-            &self,
-            _: &RepoHandle,
-            _: &str,
-            _: &str,
-        ) -> Result<String, GitError> {
+        async fn merge_base(&self, _: &RepoHandle, _: &str, _: &str) -> Result<String, GitError> {
             unimplemented!()
         }
-        async fn rev_list_count(
-            &self,
-            _: &RepoHandle,
-            _: &str,
-        ) -> Result<u32, GitError> {
+        async fn rev_list_count(&self, _: &RepoHandle, _: &str) -> Result<u32, GitError> {
             unimplemented!()
         }
         async fn status(&self, _: &RepoHandle) -> Result<Vec<StatusEntry>, GitError> {
@@ -919,10 +910,7 @@ mod real_tests {
         ) -> Result<DateTime<Utc>, GitError> {
             unimplemented!()
         }
-        async fn list_branches(
-            &self,
-            _: &RepoHandle,
-        ) -> Result<Vec<BranchInfo>, GitError> {
+        async fn list_branches(&self, _: &RepoHandle) -> Result<Vec<BranchInfo>, GitError> {
             unimplemented!()
         }
     }
@@ -971,7 +959,10 @@ mod real_tests {
         let (real, _reg, _repo_id, _path) = make_real();
         let unregistered = RepoId::new_v4();
         let err = real.scan(unregistered).await.unwrap_err();
-        assert!(matches!(err, ExternalWorktreeImportError::RepoNotFound { .. }));
+        assert!(matches!(
+            err,
+            ExternalWorktreeImportError::RepoNotFound { .. }
+        ));
     }
 
     #[tokio::test]
@@ -1088,7 +1079,10 @@ mod real_tests {
             .import(unregistered, PathBuf::from("/tmp/x"))
             .await
             .unwrap_err();
-        assert!(matches!(err, ExternalWorktreeImportError::RepoNotFound { .. }));
+        assert!(matches!(
+            err,
+            ExternalWorktreeImportError::RepoNotFound { .. }
+        ));
     }
 
     #[tokio::test]
@@ -1160,7 +1154,10 @@ mod real_tests {
         let (real, _reg, _repo_id, _path) = make_real();
         let unregistered = RepoId::new_v4();
         let err = real.cleanup_stale(unregistered).await.unwrap_err();
-        assert!(matches!(err, ExternalWorktreeImportError::RepoNotFound { .. }));
+        assert!(matches!(
+            err,
+            ExternalWorktreeImportError::RepoNotFound { .. }
+        ));
     }
 
     #[tokio::test]

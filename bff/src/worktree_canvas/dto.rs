@@ -260,7 +260,7 @@ pub struct WorktreeGraphResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNodeDto {
-    pub id: Uuid, // node ID, not worktree ID
+    pub id: Uuid,     // node ID, not worktree ID
     pub kind: String, // 11 Node kinds per DD §7
     pub label: String,
     pub properties: serde_json::Value,
@@ -465,7 +465,12 @@ impl std::error::Error for WorktreeApiError {}
 
 impl WorktreeApiError {
     /// Construct a new error.
-    pub fn new(code: impl Into<String>, message: impl Into<String>, source: impl Into<String>, location: impl Into<String>) -> Self {
+    pub fn new(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        source: impl Into<String>,
+        location: impl Into<String>,
+    ) -> Self {
         Self {
             code: code.into(),
             message: message.into(),
@@ -490,7 +495,12 @@ impl WorktreeApiError {
     }
 
     pub fn conflict(message: impl Into<String>, location: impl Into<String>) -> Self {
-        Self::new("CONFLICT_REQUIRED", message, "bff.worktree_canvas", location)
+        Self::new(
+            "CONFLICT_REQUIRED",
+            message,
+            "bff.worktree_canvas",
+            location,
+        )
     }
 
     /// 6-field 完整性守门 (per 守门 #6 v2).

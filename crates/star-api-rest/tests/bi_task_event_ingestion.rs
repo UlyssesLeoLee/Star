@@ -21,7 +21,7 @@ MERGE (blocked_test)-[:TESTS]->(:Endpoint {id:"/readyz/bi-task-event-ingestion",
 mod bi_task_event_ingestion;
 
 use axum::{
-    body::{Body, to_bytes},
+    body::{to_bytes, Body},
     http::{Request, StatusCode},
 };
 use bi_task_event_ingestion::{BiTaskEventIngestion, READINESS_PATH};

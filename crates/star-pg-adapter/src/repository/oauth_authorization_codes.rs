@@ -31,7 +31,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::oauth_access_tokens::OAuthAccessToken;
-use super::oauth_refresh_tokens::{OAuthRefreshToken, insert_access_token, insert_refresh_token};
+use super::oauth_refresh_tokens::{insert_access_token, insert_refresh_token, OAuthRefreshToken};
 use crate::PgAdapterError;
 
 /// OAuthAuthorizationCode (W/T/M = T, 跟 DDL oauth_authorization_codes 100% 对齐)

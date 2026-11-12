@@ -589,10 +589,7 @@ mod tests {
     #[test]
     fn serialize_read_request_rejected() {
         let c = Osc52Clipboard::read();
-        assert_eq!(
-            c.serialize(),
-            Err(Osc52Error::ReadRequestNotSerializable)
-        );
+        assert_eq!(c.serialize(), Err(Osc52Error::ReadRequestNotSerializable));
     }
 
     #[test]

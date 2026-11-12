@@ -14,14 +14,16 @@ use uuid::Uuid;
 use graph_core::state::{HumanState, MergeStrategy, TestState};
 use graph_core::types::{RepoId, UserId, WorktreeId};
 
-use worktree_shared_dir::{NoopPostImportHook, PostImportHook};
 use crate::error::ServiceError;
 use crate::lifecycle::{transition as lifecycle_transition, WorktreeEvent, WorktreeSnapshot};
 use crate::projection::{StatusObservedPoint, WorktreeStatusObserved};
 use crate::service::{
     SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate,
 };
-use crate::start_from_picker::{pick_start_from_candidates, PickerCandidates, StartFromPickerSource};
+use crate::start_from_picker::{
+    pick_start_from_candidates, PickerCandidates, StartFromPickerSource,
+};
+use worktree_shared_dir::{NoopPostImportHook, PostImportHook};
 
 /// In-memory Worktree service 实装
 ///
@@ -564,26 +566,25 @@ impl WorktreeService for InMemoryWorktreeService {
         // 调 git (in-memory impl 不在 stage 1 调 git CLI;
         //    测试可走 parse_porcelain 注入 fake 数据, prod 走 scan_external_worktrees)
         //    这里走 scan_external_worktrees — 失败时 ImportError → ServiceError.
-        let externals = match crate::external_worktree_import::scan_external_worktrees(repo_path)
-            .await
-        {
-            Ok(v) => v,
-            // porcelain_v1 fallback: 若 --porcelain 不被 git 旧版支持, 退到 v1 输出解析
-            // (此处 e2e 路径默认用 v2, 测试路径直接走 parse_porcelain)
-            Err(ImportError::GitCommand(msg)) if msg.contains("unknown option") => {
-                return Err(ServiceError::new(
-                    "WT.GIT_FAIL",
-                    format!("git worktree list --porcelain unsupported: {msg}"),
-                    "trace",
-                ));
-            }
-            Err(e) => {
-                return Err(e.into_service_error(format!(
-                    "import_external_worktrees:{}",
-                    uuid::Uuid::new_v4()
-                )));
-            }
-        };
+        let externals =
+            match crate::external_worktree_import::scan_external_worktrees(repo_path).await {
+                Ok(v) => v,
+                // porcelain_v1 fallback: 若 --porcelain 不被 git 旧版支持, 退到 v1 输出解析
+                // (此处 e2e 路径默认用 v2, 测试路径直接走 parse_porcelain)
+                Err(ImportError::GitCommand(msg)) if msg.contains("unknown option") => {
+                    return Err(ServiceError::new(
+                        "WT.GIT_FAIL",
+                        format!("git worktree list --porcelain unsupported: {msg}"),
+                        "trace",
+                    ));
+                }
+                Err(e) => {
+                    return Err(e.into_service_error(format!(
+                        "import_external_worktrees:{}",
+                        uuid::Uuid::new_v4()
+                    )));
+                }
+            };
 
         let _ = parse_porcelain; // suppress unused warning if compile-only path skips
         let existing = {
@@ -623,9 +624,10 @@ impl WorktreeService for InMemoryWorktreeService {
                 // force=true: 更新内部 Worktree.branch 指向新 path (path 单独 record_observed)
                 let mut guard = self.inner.write().await;
                 if let Some(stored) = guard.worktrees.get_mut(&conflict.id) {
-                    stored.branch = ext.branch.clone().unwrap_or_else(|| {
-                        ext.head_commit.chars().take(7).collect()
-                    });
+                    stored.branch = ext
+                        .branch
+                        .clone()
+                        .unwrap_or_else(|| ext.head_commit.chars().take(7).collect());
                     stored.path = ext.worktree_path.clone();
                     stored.last_activity = now;
                     outcome.updated.push(stored.clone());
@@ -669,12 +671,7 @@ impl WorktreeService for InMemoryWorktreeService {
         let updated_ids: Vec<worktree_shared_dir::WorktreeId> =
             outcome.updated.iter().map(|w| w.id).collect();
         self.post_import_hook
-            .on_import_complete(
-                repo_id,
-                &imported_ids,
-                &updated_ids,
-                &outcome.skipped,
-            )
+            .on_import_complete(repo_id, &imported_ids, &updated_ids, &outcome.skipped)
             .await;
 
         Ok(outcome)
@@ -874,10 +871,11 @@ mod tests {
         }
 
         let counter = HookCounter::default();
-        let svc = InMemoryWorktreeService::new()
-            .with_post_import_hook(std::sync::Arc::new(HookCounter {
+        let svc = InMemoryWorktreeService::new().with_post_import_hook(std::sync::Arc::new(
+            HookCounter {
                 count: std::sync::Arc::clone(&counter.count),
-            }));
+            },
+        ));
         let repo_id = RepoId::new_v4();
         let outcome = svc
             .import_external_worktrees(repo_id, &tmp, false)

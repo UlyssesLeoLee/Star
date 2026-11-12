@@ -111,10 +111,7 @@ pub trait TerminalBackend {
     /// (`Ps == 0`) may override.
     fn apply_kitty_set(&mut self, flags: KittyKeyboardFlags) -> Vec<u8> {
         let wire = KittyKeyboardProtocol::Set(flags).serialize();
-        self.update_kitty_state(|_| KittyProgressiveState::Active {
-            flags,
-            depth: 1,
-        });
+        self.update_kitty_state(|_| KittyProgressiveState::Active { flags, depth: 1 });
         wire
     }
 
@@ -187,7 +184,10 @@ impl MockBackend {
     /// [`Osc52ReadResult::Inline`] with these bytes; otherwise they will
     /// return [`Osc52ReadResult::Forwarded`].
     pub fn set_read_response(&self, response: Vec<u8>) {
-        *self.read_response.lock().expect("mock backend mutex poisoned") = Some(response);
+        *self
+            .read_response
+            .lock()
+            .expect("mock backend mutex poisoned") = Some(response);
     }
 
     /// Take a snapshot of the wire bytes recorded so far.
@@ -350,8 +350,8 @@ impl TerminalBackend for MockBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::osc52::Osc52Selector;
     use crate::kitty_kbd::KittyKeyboardFlag;
+    use crate::osc52::Osc52Selector;
 
     #[test]
     fn mock_backend_records_osc52_write() {
@@ -362,7 +362,10 @@ mod tests {
         };
         let result = b.apply_osc52(op.clone());
         assert_eq!(result, Osc52ReadResult::Forwarded);
-        assert_eq!(b.snapshot_osc52_calls(), vec![(Osc52Clipboard { operation: op }, Osc52ReadResult::Forwarded)]);
+        assert_eq!(
+            b.snapshot_osc52_calls(),
+            vec![(Osc52Clipboard { operation: op }, Osc52ReadResult::Forwarded)]
+        );
     }
 
     #[test]
@@ -405,13 +408,7 @@ mod tests {
         assert_eq!(wire, b"\x1b[>5u".to_vec());
 
         let state = b.kitty_state().unwrap();
-        assert_eq!(
-            state,
-            KittyProgressiveState::Active {
-                flags,
-                depth: 1
-            }
-        );
+        assert_eq!(state, KittyProgressiveState::Active { flags, depth: 1 });
         assert_eq!(
             b.snapshot_kitty_ops(),
             vec![KittyKeyboardProtocol::Push(flags)]
@@ -436,29 +433,25 @@ mod tests {
         assert_eq!(wire, b"\x1b[=9;1u".to_vec());
         assert_eq!(
             b.kitty_state().unwrap(),
-            KittyProgressiveState::Active {
-                flags,
-                depth: 1
-            }
+            KittyProgressiveState::Active { flags, depth: 1 }
         );
     }
 
     #[test]
     fn mock_backend_handle_incoming_records_messages() {
         let mut b = MockBackend::new();
-        let msg = IncomingProtocolMessage::KittyQueryReply(KittyKeyboardFlags::from_bits_truncate(
-            0x05,
-        ));
+        let msg =
+            IncomingProtocolMessage::KittyQueryReply(KittyKeyboardFlags::from_bits_truncate(0x05));
         b.handle_incoming(msg.clone());
-        assert_eq!(b.recorded_incoming.lock().unwrap().clone(), vec![msg.clone()]);
+        assert_eq!(
+            b.recorded_incoming.lock().unwrap().clone(),
+            vec![msg.clone()]
+        );
 
         let osc = Osc52Clipboard::write(b"hi".to_vec());
         let msg2 = IncomingProtocolMessage::Osc52(osc.clone());
         b.handle_incoming(msg2.clone());
-        assert_eq!(
-            b.recorded_incoming.lock().unwrap().clone(),
-            vec![msg, msg2]
-        );
+        assert_eq!(b.recorded_incoming.lock().unwrap().clone(), vec![msg, msg2]);
     }
 
     #[test]

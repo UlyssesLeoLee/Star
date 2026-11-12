@@ -118,8 +118,7 @@ pub fn parse_full_dsl(input: &str) -> Result<String, JsError> {
     let filters = parser
         .parse(input)
         .map_err(|e| JsError::new(&format!("DslParser error: {e:?}")))?;
-    serde_json::to_string(&filters)
-        .map_err(|e| JsError::new(&format!("serialize error: {e}")))
+    serde_json::to_string(&filters).map_err(|e| JsError::new(&format!("serialize error: {e}")))
 }
 
 /// `operator_count() -> u32`
@@ -159,8 +158,7 @@ pub fn dsl_to_cypher_json(dsl: &str) -> Result<String, JsError> {
     let result = engine
         .dsl_to_cypher_sync(dsl)
         .map_err(|e| JsError::new(&format!("dsl_to_cypher error: {e:?}")))?;
-    serde_json::to_string(&result)
-        .map_err(|e| JsError::new(&format!("serialize error: {e}")))
+    serde_json::to_string(&result).map_err(|e| JsError::new(&format!("serialize error: {e}")))
 }
 
 /// `cypher_param_count(cypher_json: &str) -> u32`
@@ -369,7 +367,10 @@ mod wasm_tests {
         assert!(cypher.starts_with("MATCH (w:Worktree)"));
         // should have at least 1 param for show filter
         let params = parsed.get("params").unwrap().as_object().unwrap();
-        assert!(!params.is_empty(), "params should not be empty for show filter");
+        assert!(
+            !params.is_empty(),
+            "params should not be empty for show filter"
+        );
     }
 
     #[wasm_bindgen_test]

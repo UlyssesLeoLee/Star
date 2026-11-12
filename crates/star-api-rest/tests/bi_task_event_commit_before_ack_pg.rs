@@ -31,8 +31,8 @@ use std::{
     net::IpAddr,
     path::{Path, PathBuf},
     sync::{
-        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -47,9 +47,9 @@ use chrono::Utc;
 use platform_messaging_runtime::{
     admission_delivery::AdmissionTransportProfile,
     native_grpc::{
-        NativeGrpcEventDelivery, NativeGrpcEventOrigin, NativeGrpcEventReceiveAuthorization,
-        NativeGrpcEventReceiveClientConfig, NativeGrpcEventReceiveScope,
-        NativeGrpcEventReceiveTransport, native_provider_identity,
+        native_provider_identity, NativeGrpcEventDelivery, NativeGrpcEventOrigin,
+        NativeGrpcEventReceiveAuthorization, NativeGrpcEventReceiveClientConfig,
+        NativeGrpcEventReceiveScope, NativeGrpcEventReceiveTransport,
     },
     transport_endpoint::{TrustedEndpointConfig, TrustedEndpointResolver},
     transport_profile::{
@@ -60,8 +60,8 @@ use platform_messaging_runtime::{
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{
-    PgPool, Row,
     postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Row,
 };
 use tokio::sync::Notify;
 use uuid::Uuid;
@@ -528,12 +528,10 @@ async fn native_event_commits_before_ack_and_exact_replay_is_idempotent() {
 
     // Simulate a process interruption after the owner commit but before the first ACK RPC.
     first_attempt.abort();
-    assert!(
-        first_attempt
-            .await
-            .expect_err("pre-ACK receiver task must be aborted")
-            .is_cancelled()
-    );
+    assert!(first_attempt
+        .await
+        .expect_err("pre-ACK receiver task must be aborted")
+        .is_cancelled());
 
     let lease_remaining = Duration::from_millis(source_before_ack.lease_remaining_ms.max(0) as u64);
     assert!(

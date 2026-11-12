@@ -133,9 +133,8 @@ pub use schedule_policy::SchedulePolicySnapshot;
 pub use schedule_catalog::ScheduleExecutionSnapshot;
 
 pub use task_outbox_delivery::{
-    PreparedTaskRunOutboxDelivery, TaskRunOutboxDeliveryClaim,
-    TaskRunOutboxDeliveryError, TaskRunOutboxDeliveryRoute, TaskRunOutboxDeliveryStore,
-    TaskRunOutboxInvalidEnvelopeProof,
+    PreparedTaskRunOutboxDelivery, TaskRunOutboxDeliveryClaim, TaskRunOutboxDeliveryError,
+    TaskRunOutboxDeliveryRoute, TaskRunOutboxDeliveryStore, TaskRunOutboxInvalidEnvelopeProof,
 };
 
 pub use schedule_capacity::ScheduleProjectCapacitySnapshot;

@@ -38,9 +38,9 @@ use chrono::{Duration, Utc};
 use common::{MockDeviceBindingRepository, MockOAuth2Bundles};
 use star_pg_adapter::repository::{
     DeviceBindingRepository, DeviceChallengeCreateResult, DeviceEnrollmentChallenge,
-    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES, OAuthAccessToken, OAuthAuthorizationCode,
-    OAuthAuthorizationCodeRepository, OAuthRefreshToken, OAuthRefreshTokenRepository,
-    PgOAuthAuthorizationCodeRepository, PgOAuthRefreshTokenRepository,
+    OAuthAccessToken, OAuthAuthorizationCode, OAuthAuthorizationCodeRepository, OAuthRefreshToken,
+    OAuthRefreshTokenRepository, PgOAuthAuthorizationCodeRepository, PgOAuthRefreshTokenRepository,
+    MAX_ACTIVE_DEVICE_ENROLLMENT_CHALLENGES,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -121,14 +121,12 @@ async fn mock_auth_code_has_exactly_one_concurrent_winner_and_rejects_replay() {
         winners += usize::from(result.expect("task result"));
     }
     assert_eq!(winners, 1);
-    assert!(
-        bundles
-            .auth_code_repo
-            .consume_if_active(Uuid::nil(), &hash, now + Duration::seconds(1))
-            .await
-            .expect("replay query")
-            .is_none()
-    );
+    assert!(bundles
+        .auth_code_repo
+        .consume_if_active(Uuid::nil(), &hash, now + Duration::seconds(1))
+        .await
+        .expect("replay query")
+        .is_none());
 }
 
 #[tokio::test]
@@ -204,14 +202,12 @@ async fn mock_refresh_token_has_exactly_one_concurrent_winner_and_rejects_replay
         winners += usize::from(result.expect("task result"));
     }
     assert_eq!(winners, 1);
-    assert!(
-        bundles
-            .refresh_token_repo
-            .consume_if_active(&token, now + Duration::seconds(1))
-            .await
-            .expect("replay query")
-            .is_none()
-    );
+    assert!(bundles
+        .refresh_token_repo
+        .consume_if_active(&token, now + Duration::seconds(1))
+        .await
+        .expect("replay query")
+        .is_none());
 }
 
 #[tokio::test]
@@ -259,28 +255,24 @@ async fn mock_refresh_rotation_persists_one_successor_and_rejects_replay() {
         }
     }
     assert_eq!(winning_hashes.len(), 1);
-    assert!(
-        bundles
-            .refresh_token_repo
-            .find_by_token_hash(&winning_hashes[0], &original.client_id)
-            .await
-            .expect("find persisted successor")
-            .is_some()
-    );
-    assert!(
-        bundles
-            .refresh_token_repo
-            .rotate_if_active(
-                &original.token_hash,
-                &original.client_id,
-                now + Duration::seconds(1),
-                &access_token_for_refresh(&original, Uuid::new_v4()),
-                &refresh_token("replay-successor", now + Duration::days(1)),
-            )
-            .await
-            .expect("reject replay")
-            .is_none()
-    );
+    assert!(bundles
+        .refresh_token_repo
+        .find_by_token_hash(&winning_hashes[0], &original.client_id)
+        .await
+        .expect("find persisted successor")
+        .is_some());
+    assert!(bundles
+        .refresh_token_repo
+        .rotate_if_active(
+            &original.token_hash,
+            &original.client_id,
+            now + Duration::seconds(1),
+            &access_token_for_refresh(&original, Uuid::new_v4()),
+            &refresh_token("replay-successor", now + Duration::days(1)),
+        )
+        .await
+        .expect("reject replay")
+        .is_none());
 }
 
 #[tokio::test]
@@ -309,13 +301,11 @@ async fn postgres_oauth_credentials_have_one_winner_when_test_database_is_config
         .await
         .expect("resolve auth code through owner-scoped locator");
     assert_eq!(resolved.as_ref().map(|row| row.tenant_id), Some(tenant_id));
-    assert!(
-        code_repo
-            .find_by_code_hash(&code_hash, "wrong-client")
-            .await
-            .expect("reject mismatched client")
-            .is_none()
-    );
+    assert!(code_repo
+        .find_by_code_hash(&code_hash, "wrong-client")
+        .await
+        .expect("reject mismatched client")
+        .is_none());
     let refresh = refresh_token_for_tenant(tenant_id, &refresh_hash, now + Duration::days(1));
     refresh_repo
         .insert(&refresh)
@@ -325,13 +315,11 @@ async fn postgres_oauth_credentials_have_one_winner_when_test_database_is_config
 
     let mut stale_snapshot = (*refresh).clone();
     stale_snapshot.scope.push_str(" stale");
-    assert!(
-        refresh_repo
-            .consume_if_active(&stale_snapshot, now)
-            .await
-            .expect("reject refresh token snapshot mismatch")
-            .is_none()
-    );
+    assert!(refresh_repo
+        .consume_if_active(&stale_snapshot, now)
+        .await
+        .expect("reject refresh token snapshot mismatch")
+        .is_none());
 
     let mut tasks = tokio::task::JoinSet::new();
     let code_barrier = Arc::new(tokio::sync::Barrier::new(24));
@@ -429,19 +417,17 @@ async fn postgres_auth_code_redemption_persists_tokens_with_consumption() {
     );
     replay_refresh.user_id = code.user_id;
     replay_refresh.access_token_id = replay_access.id;
-    assert!(
-        repository
-            .consume_and_issue_if_active(
-                &hash,
-                &code.client_id,
-                now + Duration::seconds(1),
-                &replay_access,
-                &replay_refresh,
-            )
-            .await
-            .expect("reject consumed code replay")
-            .is_none()
-    );
+    assert!(repository
+        .consume_and_issue_if_active(
+            &hash,
+            &code.client_id,
+            now + Duration::seconds(1),
+            &replay_access,
+            &replay_refresh,
+        )
+        .await
+        .expect("reject consumed code replay")
+        .is_none());
 
     let mut tx = pool.begin().await.expect("begin token-row assertion");
     sqlx::query("SELECT set_config('app.tenant_id',$1,true), set_config('app.actor_id',$2,true)")

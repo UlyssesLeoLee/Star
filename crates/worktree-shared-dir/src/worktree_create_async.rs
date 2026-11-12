@@ -287,7 +287,8 @@ pub struct InMemoryWorktreeCreateAsync {
 
 impl std::fmt::Debug for InMemoryWorktreeCreateAsync {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InMemoryWorktreeCreateAsync").finish_non_exhaustive()
+        f.debug_struct("InMemoryWorktreeCreateAsync")
+            .finish_non_exhaustive()
     }
 }
 
@@ -346,7 +347,8 @@ pub struct RealWorktreeCreateAsync {
 
 impl std::fmt::Debug for RealWorktreeCreateAsync {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RealWorktreeCreateAsync").finish_non_exhaustive()
+        f.debug_struct("RealWorktreeCreateAsync")
+            .finish_non_exhaustive()
     }
 }
 
@@ -772,8 +774,13 @@ impl WorktreeCreateAsync for RealWorktreeCreateAsync {
                     },
                 )
                 .await;
-                if let Err(e) =
-                    apply_mount_strategy(entry.mount_strategy, &worktree_path, &entry.path, &entry.label).await
+                if let Err(e) = apply_mount_strategy(
+                    entry.mount_strategy,
+                    &worktree_path,
+                    &entry.path,
+                    &entry.label,
+                )
+                .await
                 {
                     let code = match e.code.as_str() {
                         "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED" => "WCA.MOUNT_NOT_IMPLEMENTED",
@@ -1345,10 +1352,7 @@ mod tests {
         )
         .await;
         assert!(res.is_err());
-        assert_eq!(
-            res.unwrap_err().code,
-            "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED"
-        );
+        assert_eq!(res.unwrap_err().code, "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED");
     }
 
     #[tokio::test]
@@ -1361,10 +1365,7 @@ mod tests {
         )
         .await;
         assert!(res.is_err());
-        assert_eq!(
-            res.unwrap_err().code,
-            "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED"
-        );
+        assert_eq!(res.unwrap_err().code, "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED");
     }
 
     #[tokio::test]
@@ -1377,10 +1378,7 @@ mod tests {
         )
         .await;
         assert!(res.is_err());
-        assert_eq!(
-            res.unwrap_err().code,
-            "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED"
-        );
+        assert_eq!(res.unwrap_err().code, "WCA.MOUNT_STRATEGY_NOT_IMPLEMENTED");
     }
 
     #[tokio::test]
@@ -1395,13 +1393,9 @@ mod tests {
             let worktree = tmp.path().join("worktree");
             std::fs::create_dir_all(&worktree).unwrap();
             // 调用 apply (Unix 分支)
-            let res = apply_mount_strategy(
-                SharedMountStrategy::Symlink,
-                &worktree,
-                &source,
-                "source",
-            )
-            .await;
+            let res =
+                apply_mount_strategy(SharedMountStrategy::Symlink, &worktree, &source, "source")
+                    .await;
             assert!(res.is_ok(), "got {:?}", res.err());
             let link = worktree.join("source");
             assert!(link.exists() || link.symlink_metadata().is_ok());
@@ -1433,13 +1427,8 @@ mod tests {
         {
             std::fs::create_dir_all(worktree.join("source")).unwrap();
         }
-        let res = apply_mount_strategy(
-            SharedMountStrategy::Symlink,
-            &worktree,
-            &source,
-            "source",
-        )
-        .await;
+        let res =
+            apply_mount_strategy(SharedMountStrategy::Symlink, &worktree, &source, "source").await;
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().code, "WCA.MOUNT_TARGET_EXISTS");
     }

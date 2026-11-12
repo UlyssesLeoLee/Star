@@ -37,11 +37,11 @@
 #![allow(clippy::result_large_err)]
 
 use graph_core::edge::EdgeKind;
-use relationship_engine::edge_ops::validate_kind;
-use relationship_engine::n_hop::NHopQuery;
 use graph_core::edge::EdgePayload;
 use graph_core::node::NodePayload;
 use graph_core::types::WorktreeId; // type alias for Uuid (transparent)
+use relationship_engine::edge_ops::validate_kind;
+use relationship_engine::n_hop::NHopQuery;
 use wasm_bindgen::prelude::*;
 
 // =====================================================================
@@ -73,18 +73,18 @@ pub fn edge_kind_count() -> u32 {
 pub fn edge_kind_at(idx: u32) -> String {
     let kinds = [
         "based_on",        // 0
-        "uses_branch",      // 1
-        "derived_from",     // 2
-        "works_on",         // 3
+        "uses_branch",     // 1
+        "derived_from",    // 2
+        "works_on",        // 3
         "implemented_in",  // 4
-        "modifies",         // 5
-        "modifies_symbol",  // 6
+        "modifies",        // 5
+        "modifies_symbol", // 6
         "conflicts_with",  // 7
-        "overlaps_with",    // 8
-        "depends_on",       // 9
-        "blocks",           // 10
-        "supersedes",       // 11
-        "merged_into",      // 12
+        "overlaps_with",   // 8
+        "depends_on",      // 9
+        "blocks",          // 10
+        "supersedes",      // 11
+        "merged_into",     // 12
     ];
     kinds
         .get(idx as usize)
@@ -172,11 +172,7 @@ pub fn version() -> String {
 /// start_id_str: UUID 字符串 (例如 "550e8400-e29b-41d4-a716-446655440000")
 /// 返回: JSON 序列化的 NHopResult ({start_id, hop, nodes_count, edges_count, visited_count, duration_ms})
 #[wasm_bindgen]
-pub fn bfs_n_hop_json(
-    input_json: &str,
-    start_id_str: &str,
-    hop: u8,
-) -> Result<String, JsError> {
+pub fn bfs_n_hop_json(input_json: &str, start_id_str: &str, hop: u8) -> Result<String, JsError> {
     // Parse input JSON
     #[derive(serde::Deserialize)]
     struct Input {
@@ -249,7 +245,11 @@ mod tests {
     fn edge_kind_at_all_thirteen() {
         // 0-12 should all return non-empty strings
         for i in 0..13 {
-            assert!(!edge_kind_at(i).is_empty(), "edge_kind_at({}) returned empty", i);
+            assert!(
+                !edge_kind_at(i).is_empty(),
+                "edge_kind_at({}) returned empty",
+                i
+            );
         }
     }
 

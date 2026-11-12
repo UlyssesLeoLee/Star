@@ -56,13 +56,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::{TenantId, UserId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
 use thiserror::Error;
 use tokio::sync::RwLock;
-use crate::{TenantId, UserId};
 
 // =====================================================================
 // 强类型 ID(复用 lib.rs 的 macro_rules)
@@ -900,7 +900,9 @@ impl MultiProviderIdentityCommandPort for InMemoryMultiProviderIdentityService {
             ));
         }
         if source.provider.is_future_extension() {
-            return Err(MultiProviderIdentityError::UnsupportedProvider(source.provider));
+            return Err(MultiProviderIdentityError::UnsupportedProvider(
+                source.provider,
+            ));
         }
 
         // INV-MPI-05:仅产 delta,不真正调 provider
@@ -1041,7 +1043,9 @@ impl MultiProviderIdentityQueryPort for InMemoryMultiProviderIdentityService {
         let store = self.identities.read().await;
         let identity = store
             .get(&id)
-            .ok_or_else(|| MultiProviderIdentityError::NotFound(format!("identity:{}", id.as_uuid())))?
+            .ok_or_else(|| {
+                MultiProviderIdentityError::NotFound(format!("identity:{}", id.as_uuid()))
+            })?
             .clone();
         if identity.tenant_id != tenant_id {
             return Err(MultiProviderIdentityError::TenantMismatch(format!(
@@ -1116,9 +1120,7 @@ impl MultiProviderIdentityPort for InMemoryMultiProviderIdentityService {
 // =====================================================================
 
 /// INV-MPI-01:tenant_id 必填(对齐 INV-SCM-04)
-pub fn check_invariant_01_tenant(
-    i: &ProviderIdentity,
-) -> Result<(), MultiProviderIdentityError> {
+pub fn check_invariant_01_tenant(i: &ProviderIdentity) -> Result<(), MultiProviderIdentityError> {
     if i.tenant_id.0.is_nil() {
         return Err(MultiProviderIdentityError::TenantMismatch(
             "tenant_id must not be nil".to_string(),
@@ -1181,10 +1183,7 @@ mod unit_tests {
             email: Some("octo@example.com".to_string()),
             url: "https://github.com/octocat".to_string(),
         };
-        let id = svc
-            .register_provider_identity(cmd, actor)
-            .await
-            .unwrap();
+        let id = svc.register_provider_identity(cmd, actor).await.unwrap();
         assert_eq!(id.provider, IdentityProvider::Github);
         assert_eq!(id.external_id, "1234567");
         assert_eq!(id.lock_version, 1);
@@ -1208,8 +1207,13 @@ mod unit_tests {
             email: None,
             url: "https://example.com/u".to_string(),
         };
-        svc.register_provider_identity(mk(), actor.clone()).await.unwrap();
-        let err = svc.register_provider_identity(mk(), actor).await.unwrap_err();
+        svc.register_provider_identity(mk(), actor.clone())
+            .await
+            .unwrap();
+        let err = svc
+            .register_provider_identity(mk(), actor)
+            .await
+            .unwrap_err();
         assert!(matches!(err, MultiProviderIdentityError::Duplicate { .. }));
         assert_eq!(err.code(), "MPI_DUPLICATE");
     }
@@ -1231,7 +1235,10 @@ mod unit_tests {
             email: None,
             url: "https://linear.app/u".to_string(),
         };
-        let err = svc.register_provider_identity(cmd, actor).await.unwrap_err();
+        let err = svc
+            .register_provider_identity(cmd, actor)
+            .await
+            .unwrap_err();
         assert!(matches!(
             err,
             MultiProviderIdentityError::UnsupportedProvider(IdentityProvider::Linear)
@@ -1295,10 +1302,7 @@ mod unit_tests {
             local_user_id: UserId(Uuid::new_v4()),
             identity_ids: vec![identity.id],
         };
-        let err = svc
-            .link_identities(link_cmd, actor_b)
-            .await
-            .unwrap_err();
+        let err = svc.link_identities(link_cmd, actor_b).await.unwrap_err();
         assert!(matches!(err, MultiProviderIdentityError::TenantMismatch(_)));
     }
 }

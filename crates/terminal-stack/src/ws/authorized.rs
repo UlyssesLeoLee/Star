@@ -13,13 +13,13 @@ use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use axum::{
-    Router,
     extract::{
-        Path, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
+        Path, State,
     },
     response::IntoResponse,
     routing::get,
+    Router,
 };
 use serde::Deserialize;
 use thiserror::Error;
@@ -161,7 +161,7 @@ fn parse_authorization_frame(text: &str) -> Result<String, WsAttachmentError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{WsAttachmentError, parse_authorization_frame};
+    use super::{parse_authorization_frame, WsAttachmentError};
 
     #[test]
     fn valid_authorization_frame_is_accepted() {
