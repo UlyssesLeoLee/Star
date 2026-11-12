@@ -73,7 +73,7 @@ export function RefactorSettingsPopover({
       {open && (
         <div
           data-testid="refactor-settings-popover"
-          className="absolute right-0 top-full mt-2 z-30 w-72 card border-accent/40 shadow-[0_4px_24px_rgba(0,0,0,0.4)] space-y-3"
+          className="popover-solid absolute right-0 top-full mt-2 z-30 w-72 card border-accent/40 shadow-[0_4px_24px_rgba(0,0,0,0.4)] space-y-3"
         >
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-mono uppercase tracking-wider text-ink-dim font-bold">
