@@ -76,6 +76,7 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.tsx",type:"f
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { clsx } from "clsx";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
 import {
   getTaskCardCreateRecoveryStore,
@@ -104,6 +105,14 @@ import {
 type RunTaskCardMutation =
   | { kind: "lifecycle"; input: Omit<RunTaskCardLifecycleCommand, "expected_version" | "correlation_id"> }
   | { kind: "review"; input: Omit<RunTaskCardReviewCommand, "expected_version" | "correlation_id"> };
+
+/** 任务卡内嵌终端 shell 类型 (per WBS §23.32-C: PowerShell / cmd / bash) */
+type TaskCardShellKind = "powershell" | "cmd" | "bash";
+const TASK_CARD_SHELLS: Array<{ id: TaskCardShellKind; label: string; hint: string }> = [
+  { id: "powershell", label: "PowerShell", hint: "Windows PowerShell 7+ 会话" },
+  { id: "cmd", label: "cmd", hint: "Windows 命令提示符" },
+  { id: "bash", label: "bash", hint: "git-bash / MSYS 会话" },
+];
 
 interface RunTaskCardsPanelProps {
   client: RunDirectoryApiClient;
@@ -139,6 +148,9 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   const [commandSuccess, setCommandSuccess] = useState<string | null>(null);
   const [rejectingCardId, setRejectingCardId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  // 任务卡终端标签页 (per WBS §23.32-C: 卡片内嵌 terminal tab, PowerShell/cmd/bash)
+  const [terminalCardId, setTerminalCardId] = useState<string | null>(null);
+  const [shellSelections, setShellSelections] = useState<Record<string, TaskCardShellKind>>({});
   const [pendingCreate, setPendingCreate] = useState<PendingTaskCardCreate | null>(null);
   const [recoveryState, setRecoveryState] = useState<{
     scope_key: string | null;
@@ -415,7 +427,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
     {createSuccess && <p className="mt-3 text-sm" role="status">{createSuccess}</p>}
     {commandSuccess && <p className="mt-3 text-sm" role="status">{commandSuccess}</p>}
     {commandError && <p className="mt-3 text-sm" role="alert">{commandError}</p>}
-    {createFormOpen && <form onSubmit={submitTaskCardCreate} className="mt-4 grid gap-3 rounded border border-line bg-bg-soft p-3">
+    {createFormOpen && <form onSubmit={submitTaskCardCreate} className="mt-4 grid gap-3 rounded border border-line bg-bg-card p-3 shadow-soft">
       <p className="text-xs text-ink-mute">{pendingCreate ? "已恢复原请求；字段固定，不会生成新的请求正文或幂等键。" : "新卡属于当前 LANE；可选 Worktree 焦点只记录为初始 checkout 关联。"}</p>
       <fieldset disabled={createPhase === "submitting" || Boolean(pendingCreate) || !canCreateTaskCard} className="grid gap-3">
         <label className="grid gap-1 text-sm">标题
@@ -444,14 +456,22 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
     {phase === "ready" && page?.rows.length === 0 && <p className="mt-4 text-sm text-ink-mute">此 LANE 当前没有已归属的任务。未归属历史任务不会自动迁入。</p>}
     {phase === "ready" && page && page.rows.length > 0 && <>
       <ul className="mt-4 grid gap-3">
-        {page.rows.map((card) => <li key={card.work_item_id} className="rounded border border-line bg-bg-soft p-3" data-work-item-id={card.work_item_id}>
+        {page.rows.map((card) => <li key={card.work_item_id} className="rounded border border-line bg-bg-card p-3 shadow-soft" data-work-item-id={card.work_item_id}>
           <article>
             <header className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="break-words font-medium">{card.title}</h3>
                 <p className="mt-1 text-xs text-ink-mute">{card.item_type} · {card.priority} · {card.lifecycle.status} · Review {card.lifecycle.review_state}</p>
               </div>
-              <button type="button" disabled aria-label={`在任务卡 ${card.title} 内打开 CLI（尚未启用）`} title="执行准入、Runtime sandbox、独立验证与结果回写尚未装配" className="shrink-0 rounded border border-line px-3 py-1 text-xs text-ink-mute disabled:cursor-not-allowed disabled:opacity-50">打开 CLI · 暂不可用</button>
+              <button
+                type="button"
+                aria-expanded={terminalCardId === card.work_item_id}
+                aria-label={`在任务卡 ${card.title} 内打开终端`}
+                onClick={() => setTerminalCardId(terminalCardId === card.work_item_id ? null : card.work_item_id)}
+                className="shrink-0 rounded border border-line px-3 py-1 text-xs hover:border-accent hover:text-accent"
+              >
+                {terminalCardId === card.work_item_id ? "收起终端" : "终端"}
+              </button>
             </header>
             {card.labels.length > 0 && <ul aria-label="任务标签" className="mt-2 flex flex-wrap gap-1">{card.labels.slice(0, 8).map((label) => <li key={label} className="rounded bg-bg px-2 py-0.5 text-[11px]">{label}</li>)}{card.labels.length > 8 && <li className="text-[11px] text-ink-mute">+{card.labels.length - 8}</li>}</ul>}
             {card.description && <details className="mt-2 text-sm"><summary className="cursor-pointer text-xs text-ink-mute">任务描述</summary><p className="mt-2 whitespace-pre-wrap break-words">{card.description}</p></details>}
@@ -497,6 +517,41 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
               {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && !canReviewTaskCards && <p className="self-center text-xs text-ink-mute">等待具有 LANE 审查权限的成员处理。</p>}
               {card.lifecycle.status === "failed" && <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "pending" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">重新排队</button>}
             </div>}
+            {terminalCardId === card.work_item_id && (
+              <div data-testid={`task-card-terminal-${card.work_item_id}`} className="mt-3 rounded border border-line bg-bg-card">
+                <div className="flex flex-wrap items-center gap-1 border-b border-line px-2 py-1.5" role="tablist" aria-label={`任务卡 ${card.title} 终端 shell 类型`}>
+                  {TASK_CARD_SHELLS.map((shell) => {
+                    const selected = (shellSelections[card.work_item_id] ?? "powershell") === shell.id;
+                    return (
+                      <button
+                        key={shell.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        title={shell.hint}
+                        data-testid={`task-card-shell-${card.work_item_id}-${shell.id}`}
+                        onClick={() => setShellSelections((prev) => ({ ...prev, [card.work_item_id]: shell.id }))}
+                        className={clsx(
+                          "px-2 py-0.5 text-[10px] font-mono rounded border transition-colors",
+                          selected
+                            ? "border-accent bg-accent/15 text-accent font-bold"
+                            : "border-line text-ink-mute hover:text-ink hover:border-accent/50",
+                        )}
+                      >
+                        {shell.label}
+                      </button>
+                    );
+                  })}
+                  <span className="ml-auto text-[10px] font-mono text-ink-mute">CLI 会话</span>
+                </div>
+                <div className="h-48 overflow-y-auto bg-[#0d1117] p-3 font-mono text-xs text-[#d1fae5]">
+                  <p data-testid="task-card-terminal-placeholder">
+                    终端不可用（需后端 CLI session）— 已选 shell: {TASK_CARD_SHELLS.find((s) => s.id === (shellSelections[card.work_item_id] ?? "powershell"))?.label}。
+                  </p>
+                  <p className="mt-1 text-[#94a3b8]">可在真实 CLI 会话接入后运行各种命令（git / cargo / pnpm / npm 等）。</p>
+                </div>
+              </div>
+            )}
           </article>
         </li>)}
       </ul>
