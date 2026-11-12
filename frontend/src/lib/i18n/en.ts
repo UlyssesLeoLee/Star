@@ -150,6 +150,7 @@ export const en: Dictionary = {
     done: "Done",
     pinToSidebar: "Pin to sidebar",
     unpinFromSidebar: "Remove from sidebar",
+    indexOwnedHint: "This module is owned by the Project Worktree Index — open it from the project tree on the left",
     pinToHeader: "Pin to header",
     unpinFromHeader: "Remove from header tabs",
     openNow: "Open this module now",

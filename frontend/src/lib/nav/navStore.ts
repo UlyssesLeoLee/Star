@@ -63,8 +63,13 @@ export interface NavState {
 }
 
 export const DEFAULT_SIDEBAR_ITEMS = ["inbox", "issues", "projects", "agents", "advanced-settings"];
-export const DEFAULT_PINNED_VIEWS = ["kanban", "timeline"];
+// per WBS §23.32-A (2026-11-13 用户发令): kanban/timeline/backlog 归入"其他入口"折叠区;
+// worktree 模块集中在 Project Worktree Index (/worktree), 不允许进入 pinned/sidebar
+export const DEFAULT_PINNED_VIEWS = ["kanban", "timeline", "backlog"];
 export const DEFAULT_HEADER_TABS = ["inbox", "issues", "projects", "agents", "analytics"];
+
+/** 由 Project Worktree Index 承载的模块 id — 不允许出现在 sidebar/pinned/其他入口 */
+export const WORKTREE_INDEX_OWNED_MODULES = ["worktree"] as const;
 
 type PersistedNavState = Pick<
   NavState,
@@ -81,14 +86,28 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
   const storedSidebarItems = Array.isArray(persisted?.sidebarItemIds)
     ? persisted.sidebarItemIds
     : DEFAULT_SIDEBAR_ITEMS;
+  const storedPinnedViews = Array.isArray(persisted?.pinnedViewIds)
+    ? persisted.pinnedViewIds
+    : DEFAULT_PINNED_VIEWS;
+
+  // per WBS §23.32-A: worktree 模块由 Project Worktree Index 承载,
+  // 从 sidebar/pinned 双区清理; kanban/timeline/backlog 补齐到 pinned (去重)
+  const cleanedSidebar = storedSidebarItems.filter(
+    (id) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)
+  );
+  const cleanedPinned = storedPinnedViews.filter(
+    (id) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)
+  );
+  const mergedPinned = [...cleanedPinned];
+  for (const id of DEFAULT_PINNED_VIEWS) {
+    if (!mergedPinned.includes(id)) mergedPinned.push(id);
+  }
 
   return {
-    sidebarItemIds: storedSidebarItems.includes("advanced-settings")
-      ? storedSidebarItems
-      : [...storedSidebarItems, "advanced-settings"],
-    pinnedViewIds: Array.isArray(persisted?.pinnedViewIds)
-      ? persisted.pinnedViewIds
-      : DEFAULT_PINNED_VIEWS,
+    sidebarItemIds: cleanedSidebar.includes("advanced-settings")
+      ? cleanedSidebar
+      : [...cleanedSidebar, "advanced-settings"],
+    pinnedViewIds: mergedPinned,
     headerTabIds: Array.isArray(persisted?.headerTabIds)
       ? persisted.headerTabIds
       : DEFAULT_HEADER_TABS,
@@ -115,6 +134,8 @@ export const useNavStore = create<NavState>()(
       toggleMatrix: () => set((s) => ({ isMatrixOpen: !s.isMatrixOpen })),
 
       addSidebarItem: (id: string) => {
+        // per WBS §23.32-A: worktree 集中在 Project Worktree Index, 禁止进 sidebar
+        if ((WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)) return;
         if (!get().sidebarItemIds.includes(id)) {
           set((s) => ({ sidebarItemIds: [...s.sidebarItemIds, id] }));
         }
@@ -134,6 +155,8 @@ export const useNavStore = create<NavState>()(
       },
 
       addPinnedView: (id: string) => {
+        // per WBS §23.32-A: worktree 集中在 Project Worktree Index, 禁止进 pinned
+        if ((WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)) return;
         if (!get().pinnedViewIds.includes(id)) {
           set((s) => ({ pinnedViewIds: [...s.pinnedViewIds, id] }));
         }
@@ -186,9 +209,9 @@ export const useNavStore = create<NavState>()(
       },
     }),
     {
-      // bump v2: 加 sidebarFold + sidebarScope + selectedProjectId 持久化 (per 2026-09-03)
+      // bump v4: WBS §23.32-A — worktree 模块移出 sidebar/pinned, kanban/timeline/backlog 归并 pinned
       name: "star-nav-store:v2",
-      version: 3,
+      version: 4,
       migrate: (persistedState) => migratePersistedNavState(persistedState),
       storage: createJSONStorage(() => (typeof window !== "undefined" ? localStorage : {
         getItem: () => null,

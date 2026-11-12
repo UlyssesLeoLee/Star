@@ -185,4 +185,47 @@ describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
     await useNavStore.persist.rehydrate();
     expect(useNavStore.getState().sidebarItemIds).toEqual(["inbox", "projects"]);
   });
+
+  // per WBS §23.32-A: worktree 由 Project Worktree Index 承载 — migrate 时从
+  // sidebar/pinned 双区清理; kanban/timeline/backlog 归并进 pinned (去重)。
+  it("migrates v3 state: strips worktree from sidebar/pinned, merges kanban/timeline/backlog into pinned", async () => {
+    window.localStorage.setItem(
+      "star-nav-store:v2",
+      JSON.stringify({
+        state: {
+          sidebarItemIds: ["inbox", "projects", "worktree"],
+          pinnedViewIds: ["worktree", "webhooks"],
+          headerTabIds: ["projects"],
+          sidebarFold: "expanded",
+          sidebarScope: "main",
+          selectedProjectId: "",
+        },
+        version: 3,
+      })
+    );
+
+    await useNavStore.persist.rehydrate();
+
+    const s = useNavStore.getState();
+    expect(s.sidebarItemIds).not.toContain("worktree");
+    expect(s.sidebarItemIds).toContain("inbox");
+    expect(s.sidebarItemIds).toContain("advanced-settings");
+    expect(s.pinnedViewIds).not.toContain("worktree");
+    // 用户已有的 webhooks 保留, 且 kanban/timeline/backlog 补齐
+    expect(s.pinnedViewIds).toContain("webhooks");
+    expect(s.pinnedViewIds).toContain("kanban");
+    expect(s.pinnedViewIds).toContain("timeline");
+    expect(s.pinnedViewIds).toContain("backlog");
+  });
+
+  // per WBS §23.32-A: worktree 禁止写回 sidebar/pinned — 走 add 入口也拦
+  it("refuses to add worktree module to sidebar or pinned views", () => {
+    useNavStore.getState().addSidebarItem("worktree");
+    expect(useNavStore.getState().sidebarItemIds).not.toContain("worktree");
+    useNavStore.getState().addPinnedView("worktree");
+    expect(useNavStore.getState().pinnedViewIds).not.toContain("worktree");
+    // 正常模块不受影响
+    useNavStore.getState().addSidebarItem("scm");
+    expect(useNavStore.getState().sidebarItemIds).toContain("scm");
+  });
 });

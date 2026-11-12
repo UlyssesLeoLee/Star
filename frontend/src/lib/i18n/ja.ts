@@ -151,6 +151,7 @@ export const ja: Dictionary = {
     done: "完了",
     pinToSidebar: "サイドバーにピン留め",
     unpinFromSidebar: "サイドバーから削除",
+    indexOwnedHint: "このモジュールは Project Worktree Index が管轄します — 左のプロジェクトツリーから開いてください",
     pinToHeader: "ヘッダーにピン留め",
     unpinFromHeader: "ヘッダーから削除",
     openNow: "このモジュールを開く",

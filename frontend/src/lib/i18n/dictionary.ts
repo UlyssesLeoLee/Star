@@ -233,6 +233,7 @@ export interface Dictionary {
     done: string;                  // "完成定制 (Done)"
     pinToSidebar: string;          // "钉选到左侧导航"
     unpinFromSidebar: string;      // "从左侧导航移除"
+    indexOwnedHint: string;        // "该模块由 Project Worktree Index 承载，请从左侧项目树进入"
     pinToHeader: string;           // "钉选到顶部标签"
     unpinFromHeader: string;       // "从顶部标签移除"
     openNow: string;               // "立即打开该模块"

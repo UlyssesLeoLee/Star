@@ -29,7 +29,7 @@ import {
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useNavStore } from "@/lib/nav/navStore";
+import { useNavStore, WORKTREE_INDEX_OWNED_MODULES } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition, type ModuleCategory } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import {
@@ -81,11 +81,13 @@ export function Sidebar() {
   // 解析当前用户钉选到左侧的模块对象
   const activeSidebarModules = sidebarItemIds
     .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m));
+    .filter((m): m is ModuleDefinition => Boolean(m))
+    .filter((m) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id));
 
   const activePinnedModules = pinnedViewIds
     .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m));
+    .filter((m): m is ModuleDefinition => Boolean(m))
+    .filter((m) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id));
 
   // =====================================================================
   // Project scope 数据源 (per 2026-09-03 12:36 JST 拍板 #1 复用 SubNav 数据源)
