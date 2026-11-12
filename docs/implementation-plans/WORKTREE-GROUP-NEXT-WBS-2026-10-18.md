@@ -909,3 +909,14 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **实现**: `/projects` 新增第 6 个 tab "IPA 技能" (cookies VALID_PROJECTS_TABS + TAB_ITEMS + badge=237), 渲染 `IpaSkillWorkflowBoard` — 16 个 WBS 工作流列 (P1~P9 + P6.1~P6.4 + PX-MG/RV/TT/DL), 每列内 237 个技能各占一个专属栏位 (skill id + titleJa + in/out 端口数 + mode + 人工审批门徽标; 点击展开 purpose + required_inputs/outputs 契约)。数据源 catalog.ts (生成自 D:/IPA-Atomic-Skills workflow-contract.json), 无虚构内容。
 - **测试**: IpaSkillWorkflowBoard.test.tsx 4 用例 — 16 列渲染 / 237 栏位全量渲染 / 点击展开契约 / 人工审批门统计。
 - **门禁**: tsc 0 errors; vitest 113 文件 / 961 测试全绿; next build exit 0。
+
+### 23.29 2026-11-11 IPA 技能 = 任务卡 + 子任务层级 + 文件即任务 (任务卡互通)
+
+- **用户发令 (2026-11-11)**: IPA 技能界面每个流程都可当任务卡用; 任务卡允许开子任务, 与现有 kanban 任务卡同一套内容; kanban 界面保持现状, 任务卡里可关联 IPA 技能内容 (模糊查询), 并出现在关联技能的子任务里; 任务卡可关联文件, 文件也可作为任务卡子任务 (文件即任务的一种形式)。
+- **数据层**: WorkItem 新增 `parent_id?` (子任务层级) / `ipa_skill_ids?` (关联技能) / `file_path?` (文件即任务) — 全部向后兼容, addWorkItem 构造透传。
+- **store 动作**: `addSubTask` (继承父卡 tenant/project/reporter, labels +sub-task) / `linkIpaSkill` / `unlinkIpaSkill` / `addFileSubTask` (file_path + documents 同步, labels +file-as-task)。
+- **IPA 界面**: 技能栏位展开 → "作为任务卡使用" (创建 WorkItem 绑定 ipa_skill_ids 并打开 drawer); 关联该技能的任务卡出现在栏位 "关联子任务" 列表 (计数徽标 + 点击打开) — 与 kanban 同一套 WorkItem。
+- **任务卡 Drawer**: 6c 子任务区 (parent_id 层级, 列表 + Enter 创建 + 点击子卡切换) / 6d 文件子任务区 (标题 + path → file-as-task 子任务) / 6e IPA 技能关联区 (模糊查询 searchIpaSkills — id 全等/前缀/子串 + 标题 + 工程, 排序打分, 已关联置灰)。
+- **模糊查询**: lib/ipa-skills/search.ts (scoreIpaSkill 1000/900/800/700/600/500/300/200 分级 + searchIpaSkills limit), 5 单测。
+- **坑**: zustand v5 selector 返回新数组引用 → Maximum update depth exceeded 无限循环; 修法: 选 workItems 稳定引用后再 filter。
+- **门禁**: tsc 0 errors; vitest 114 文件 / 966 测试全绿; next build exit 0。

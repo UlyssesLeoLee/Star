@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e03a0e4c9fedd5617bea5e4646ba73b7f738a289a2b08dd8859f066ba3d77017
+@cypher schema=1 source_sha256=5bfb384f46259fbc2affea614d6337261f8bc43bb155473eece50d80143eb1d1
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
@@ -561,6 +561,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             projectKey={selectedProject?.key}
             tenantId={selectedProject?.tenant_id}
             reporterId={selectedProject?.owner_id}
+            onOpenChildTask={(childId) => setWorkItemDrawer({ kind: "view", workItemId: childId })}
           />
           {/* 架构查看器 (per ADR-0041-arch-agent-graph-viewer v0.1) */}
           {arch.modalProps && (
@@ -767,8 +768,21 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
 
       {tab === "ipa" && (
         <div data-testid="projects-ipa-tab">
-          <DomainMarker domain="match" label="IPA 技能工作流 (per 2026-11-11 用户发令: 项目界面按 IPA 技能拆分)" />
-          <IpaSkillWorkflowBoard />
+          <DomainMarker domain="match" label="IPA 技能工作流 (per 2026-11-11 用户发令: 技能 = 任务卡, 与 kanban 同一套内容)" />
+          <IpaSkillWorkflowBoard
+            projectId={selectedProjectId}
+            tenantId={selectedProject?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
+            reporterId={selectedProject?.owner_id}
+            onOpenTaskCard={(workItemId) => setWorkItemDrawer({ kind: "view", workItemId })}
+          />
+          <WorkItemDetailDrawer
+            open={workItemDrawer}
+            onClose={() => setWorkItemDrawer(null)}
+            projectId={selectedProjectId}
+            projectKey={selectedProject?.key}
+            tenantId={selectedProject?.tenant_id}
+            reporterId={selectedProject?.owner_id}
+          />
         </div>
       )}
     </div>

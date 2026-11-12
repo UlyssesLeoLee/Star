@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f6d38de02f5f101a4b011b7a934d906b74b50713b025e228d00f09f4cbc3aff8
+@cypher schema=1 source_sha256=66069864d841775e596e08bc68d0b2caf32f480c47465d43613ffeed2f71ee82
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
 MERGE (self)-[:IMPORTS]->(agentSettings)
@@ -268,6 +268,18 @@ interface StoreState {
     doc: { title: string; path: string; kind?: WorkItemDocument["kind"] },
   ) => string; // 返回新文档 id
   removeWorkItemDocument: (workItemId: Uuid, documentId: Uuid) => void;
+  // per 2026-11-11 用户发令: 任务卡开子任务 / 关联 IPA 技能 / 文件即任务。
+  // 子任务与父卡共用同一套 WorkItem 内容模型 (parent_id 表示层级)。
+  addSubTask: (
+    parentId: Uuid,
+    input: { title: string; kind?: WorkItem["kind"]; priority?: WorkItem["priority"] },
+  ) => string; // 返回子任务 id
+  linkIpaSkill: (workItemId: Uuid, skillId: string) => void;
+  unlinkIpaSkill: (workItemId: Uuid, skillId: string) => void;
+  addFileSubTask: (
+    parentId: Uuid,
+    input: { title: string; path: string },
+  ) => string; // 文件作为子任务 (file_path + documents 同步)
 
   // 原地更新 workItem 单字段 (per 2026-08-31 12:07 JST Kanban Drawer 拍板)
   //   - 只改指定字段, 其他字段不变
@@ -509,6 +521,9 @@ const initialState = (set: any, get?: any): StoreState => ({
         due_date: input.due_date,
         worktree_id: input.worktree_id,
         documents: input.documents ?? [],
+        parent_id: input.parent_id,
+        ipa_skill_ids: input.ipa_skill_ids,
+        file_path: input.file_path,
         created_at: nowIso,
         updated_at: nowIso,
       };
@@ -570,6 +585,88 @@ const initialState = (set: any, get?: any): StoreState => ({
           : w,
       ),
     }));
+  },
+
+  // per 2026-11-11 用户发令: 任务卡开子任务 (与父卡同一套 WorkItem 内容模型)
+  addSubTask: (parentId, input) => {
+    const parent = useStore.getState().workItems.find((w) => w.id === parentId);
+    if (!parent) return "";
+    const childId = useStore
+      .getState()
+      .addWorkItem({
+        tenant_id: parent.tenant_id,
+        project_id: parent.project_id,
+        title: input.title,
+        kind: input.kind ?? "task",
+        status: "todo",
+        priority: input.priority ?? parent.priority ?? "p2",
+        reporter_id: parent.reporter_id,
+        assignee_id: parent.assignee_id,
+        parent_id: parentId,
+        labels: [...parent.labels, "sub-task"],
+        worktree_id: parent.worktree_id,
+      });
+    return childId;
+  },
+
+  linkIpaSkill: (workItemId, skillId) => {
+    set((s: StoreState) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId
+          ? {
+              ...w,
+              ipa_skill_ids: w.ipa_skill_ids?.includes(skillId)
+                ? w.ipa_skill_ids
+                : [...(w.ipa_skill_ids ?? []), skillId],
+            }
+          : w,
+      ),
+    }));
+  },
+
+  unlinkIpaSkill: (workItemId, skillId) => {
+    set((s: StoreState) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId
+          ? {
+              ...w,
+              ipa_skill_ids: (w.ipa_skill_ids ?? []).filter((id) => id !== skillId),
+            }
+          : w,
+      ),
+    }));
+  },
+
+  addFileSubTask: (parentId, input) => {
+    const parent = useStore.getState().workItems.find((w) => w.id === parentId);
+    if (!parent) return "";
+    const nowIso = new Date().toISOString();
+    const docId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const childId = useStore.getState().addWorkItem({
+      tenant_id: parent.tenant_id,
+      project_id: parent.project_id,
+      title: input.title,
+      kind: "task",
+      status: "todo",
+      priority: parent.priority ?? "p2",
+      reporter_id: parent.reporter_id,
+      parent_id: parentId,
+      labels: [...parent.labels, "file-as-task"],
+      file_path: input.path,
+      documents: [
+        {
+          id: docId,
+          title: input.title,
+          path: input.path,
+          kind: "document",
+          added_at: nowIso,
+        },
+      ],
+    });
+    return childId;
   },
   // ===================================================================
   // createWorkItem — 任务卡创建入口 (per ADR-0049 + 2026-09-09 04:57 JST 拍板)

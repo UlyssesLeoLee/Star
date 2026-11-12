@@ -1,6 +1,15 @@
 // =====================================================================
 // Star Platform — Shared Type Definitions
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=ff2da2656c3ddeaa670921871d23a1532aa1c1262c4aa646ab7c531bb7ca9824
+MERGE (self:File {path:"frontend/src/types/ids.ts"})
+MERGE (workItem:Type {id:"frontend/src/types/ids.ts::WorkItem",kind:"interface"})
+MERGE (workItemDoc:Type {id:"frontend/src/types/ids.ts::WorkItemDocument",kind:"interface"})
+MERGE (self)-[:DEFINES]->(workItem)
+MERGE (self)-[:DEFINES]->(workItemDoc)
+@endcypher
+*/
 // 来源: docs/api-design.md §2.1 (25 Module Resource Model) +
 //       docs/specs/* (25 个 domain spec) + docs/basic-design.md §7
 //       (5 状态机: Worktree 17 / WorkItem 3-5 / Feedback 6 / Agent 14 / PR 7)
@@ -259,6 +268,13 @@ export interface WorkItem {
   // per 2026-11-11 用户发令: 每个任务卡可关联多个文档, 点击直接打开。
   // 文档 path 支持仓库路径 (docs/…, 打开到 GitHub dev blob) 或完整 http(s) URL。
   documents?: WorkItemDocument[];
+  // per 2026-11-11 用户发令: 任务卡可开子任务 (parent_id 指向父任务卡);
+  // 文件与 IPA 技能内容都可以作为子任务/关联内容 (同一套 WorkItem 内容模型)。
+  parent_id?: Uuid;
+  // 关联的 IPA 技能 id (catalog.ts skill id, e.g. "ipa-s01-001")
+  ipa_skill_ids?: string[];
+  // 文件即任务: 该任务卡代表一个文件 (path 为仓库路径或 URL)
+  file_path?: string;
   created_at: Iso8601;
   updated_at: Iso8601;
   }
