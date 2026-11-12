@@ -938,3 +938,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **前端** `lib/localFiles.ts` (isLocalMode 私有网段判定 + list/read client) + `/nema` 页 `LocalFolderBrowser` 组件 (目录树浏览 + 文本预览 + "登记为共同编辑文件" 回填表单)。
 - **实测**: 本地 8081 列出 frontend/src ✓ / 读 activeMatch.ts ✓ / `../.env` 与 `D:/Windows/win.ini` 均 403 ✓。
 - **坑**: ① backend 运行中 rebuild 报 LNK1104/拒绝访问 → taskkill 按 PID (8081 LISTENING) 后重建; ② 同 PID 下两个 temp_root 相同 → 测试根目录须加后缀; ③ exe 在 E:/DevCache/cargo/target/debug (target 在 E 盘)。
+
+### 23.32 2026-11-13 导航分层重构 + 任务卡终端 + 整体 i18n (用户发令: 左侧导航修复 / 上下两块标签页 / 任务卡终端 / 三语 i18n)
+
+- **用户发令 (2026-11-13)**: ① 左侧 project 导航功能异常修复; ② 左侧导航 kanban→worktrees 全部归入"其他入口"并做好去重, worktrees 功能集中在 Project Worktree Index 不放其他入口; ③ 导航支持上下两块标签页区域 — 上方切换当前标签页 + 隶属子标签页, 下方标签页筛选标签页内内容; ④ 任务卡不要透明, 要有终端标签页 (打开 PowerShell + 各种 CLI); ⑤ 包括 IPA 技能在内整体 i18n 中日英三语。
+- **文档依据 (未实现功能清单)**: `docs/frontend/design/ui-redesign-multica-style.md` §5.2 `/projects` 多 panel 上下两行结构 — 上 [Tabs] 行 + 下 [Filter Bar: Sprint|Member|Status|Search] 行 (此前未实装, ProjectsClient 只有单行 Tabs); `docs/frontend/design/ui-3pane-arch.md` §1.3 "视图内筛选条永远 sticky 在 MainWorkArea 顶部 (56px), 包含 搜索框/字段筛选/排序/分组/保存为视图" (未实装); 同文档 §1.2 26 路由 5 组映射 (DRIFT-α-023 P1: Sidebar 实装 2 动态组 vs 设计 5 固定组); UI-PLAN-RUN-WORKTREE-NEXT-20261021 §1 "Task Card / CLI 收入卡内执行面板"; ui-redesign §10 已知缺口 #4 "i18n 当前暂仅 en" (已升级三语字典但组件内硬编码中文仍多, IPA 技能栏位文案未接 i18n)。
+- **拆分 4 worktree**: (A) 导航分层重构: kanban/timeline/backlog/worktrees 移出 pinned/sidebar 默认, 只留"其他入口"折叠区 + 与 SubNav 去重; worktrees 功能集中 Project Worktree Index (/worktree 页); (B) 上下两块标签页区域: ProjectsClient 上方 tabs + 下方筛选标签条 (状态/成员/sprint 过滤, sticky); (C) 任务卡终端标签页: RunTaskCardsPanel 卡片实色背景 + 卡片内嵌 terminal tab (复用 components/terminal XtermPane + useTerminalStackWs, PowerShell + CLI 入口); (D) 整体 i18n: 全组件硬编码中文扫一轮接 useTranslation (en/zh-CN/ja), 含 IPA 技能栏位 (titleJa/titleEn/titleZh + 交互文案)。
+- **门禁**: 每 worktree tsc 0 errors + vitest 全绿 + next build exit 0 + CypherGraph Guardian PASS + author=Ulysses。
