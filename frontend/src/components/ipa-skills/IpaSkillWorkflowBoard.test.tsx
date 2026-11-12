@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a23690f59b90a193ce70a09104de17ad34955b5b16d063ae2396792b4ea499fd
+@cypher schema=1 source_sha256=9f2d5e404d630d5ca51a6c3b1011329159ff8fb1ddac2b512dfe15a0b74b7520
 MERGE (self:File {path:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.test.tsx"})
 MERGE (allSkills:Symbol {id:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.test.tsx::renders_all_catalog_skill_slots",kind:"test"})
 MERGE (phases:Symbol {id:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.test.tsx::renders_phase_columns_with_counts",kind:"test"})

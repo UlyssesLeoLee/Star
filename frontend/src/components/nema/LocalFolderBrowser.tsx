@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b0505665bed991a21e01363546901c4e167e43eebd8780388bdb1ef73c2ed952
+@cypher schema=1 source_sha256=e9033113c5ae33dbf44bc48c7a9f103b9600063288e9ea4b70d5b64276914f94
 MERGE (self:File {path:"frontend/src/components/nema/LocalFolderBrowser.tsx"})
 MERGE (browser:Function {name:"LocalFolderBrowser", language:"typescript", visibility:"public"})
 MERGE (self)-[:DEFINES]->(browser)

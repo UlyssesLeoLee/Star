@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f667487249fc83bfe3a9f8e0c888fe02cd2ed8d5a7af16fcbece9f001a958ff1
+@cypher schema=1 source_sha256=0ef93d4843d53d06a841525b419819e39248b7fbc84c7cf94bb347716eb7b13f
 MERGE (self:File {path:"frontend/src/components/ipa-skills/IpaSkillWorkflowBoard.tsx"})
 MERGE (board:Function {name:"IpaSkillWorkflowBoard", language:"typescript", visibility:"public"})
 MERGE (slot:Function {name:"IpaSkillSlot", language:"typescript", visibility:"private"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4f6a8b0c2d4e6f8a0b1c3d5e7f9a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e0f2a
+@cypher schema=1 source_sha256=488c038b64b69e309e5b20c0cd47852babac955a74c3dc3b713f648aefc9c8c6
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionaryConsistency.test.ts"})
 MERGE (suite:Symbol {id:"frontend/src/lib/i18n/dictionaryConsistency.test.ts::dictionary consistency",kind:"suite"})
 MERGE (en:File {path:"frontend/src/lib/i18n/en.ts"})
