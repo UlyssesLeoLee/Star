@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fc29ccb3bd9f8fb437e8b83a0d8a6be25698abd1f301f6e487ed9b6223bbc3ad
+@cypher schema=1 source_sha256=e03a0e4c9fedd5617bea5e4646ba73b7f738a289a2b08dd8859f066ba3d77017
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
@@ -73,6 +73,8 @@ import { KanbanBoard } from "@/components/board/KanbanBoard";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { ArchGraphModal, useArchGraphTrigger } from "@/components/board/ArchGraphModal";
 import { GanttChart } from "@/components/gantt";
+import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
+import { IPA_SKILL_CATALOG } from "@/lib/ipa-skills/catalog";
 import { MonthView } from "@/components/calendar/MonthView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
@@ -90,6 +92,7 @@ import {
   Activity,
   Clock,
   GitBranch,
+  Workflow,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -111,6 +114,7 @@ const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode
   { id: "backlog",   label: "Backlog",   icon: <LayoutDashboard size={12} /> },
   { id: "agents",    label: "Agents",    icon: <Users size={12} /> },
   { id: "worktrees", label: "Worktrees", icon: <GitBranch size={12} /> },
+  { id: "ipa",       label: "IPA 技能",  icon: <Workflow size={12} /> },
 ];
 
 // Kanban 5 列 (per KANBAN_COLUMNS in mocks/data/kanban.ts, blocked 状态列入主面板)
@@ -526,6 +530,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             t.id === "backlog" ? projectWorkItems.filter((w) => w.status === "todo").length :
             t.id === "agents" ? projectMembers.length :
             t.id === "worktrees" ? projectWorktrees.length :
+            t.id === "ipa" ? IPA_SKILL_CATALOG.length :
             undefined,
         }))}
       />
@@ -757,6 +762,13 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {tab === "ipa" && (
+        <div data-testid="projects-ipa-tab">
+          <DomainMarker domain="match" label="IPA 技能工作流 (per 2026-11-11 用户发令: 项目界面按 IPA 技能拆分)" />
+          <IpaSkillWorkflowBoard />
         </div>
       )}
     </div>

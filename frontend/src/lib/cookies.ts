@@ -17,6 +17,19 @@
 //   引用任何 import "next/headers" 的文件, 即使实际不调用 server 函数. 拆出
 //   cookies.server.ts 加 import "server-only" 让 client bundle 完全不含 next/headers.
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=258e928ee84b0bc6746332207a0dafcebb82bb4238202848710d8426568e8d14
+MERGE (self:File {path:"frontend/src/lib/cookies.ts"})
+MERGE (tabType:Type {id:"frontend/src/lib/cookies.ts::ProjectsTabId",kind:"type"})
+MERGE (validTabs:Symbol {id:"frontend/src/lib/cookies.ts::VALID_PROJECTS_TABS",kind:"constant"})
+MERGE (write:Symbol {id:"frontend/src/lib/cookies.ts::writeProjectsDefaultTabCookie",kind:"function"})
+MERGE (resolve:Symbol {id:"frontend/src/lib/cookies.ts::resolveInitialTab",kind:"function"})
+MERGE (self)-[:DEFINES]->(tabType)
+MERGE (self)-[:DEFINES]->(validTabs)
+MERGE (self)-[:DEFINES]->(write)
+MERGE (self)-[:DEFINES]->(resolve)
+@endcypher
+*/
 
 export const PROJECTS_DEFAULT_TAB_COOKIE = "projects-default-tab";
 
@@ -26,6 +39,7 @@ export const VALID_PROJECTS_TABS = [
   "backlog",
   "agents",
   "worktrees",
+  "ipa",
 ] as const;
 
 export type ProjectsTabId = (typeof VALID_PROJECTS_TABS)[number];

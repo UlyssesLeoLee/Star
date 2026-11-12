@@ -902,3 +902,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **依赖升级收尾**: msw 被 pnpm up 升到 3.0.5 (major, listen API 移除 onUnhandledRequest) — 测试基建迁移属独立工作流, 钉回 `^2.15.0`; vitest 5.1 移除 esbuild 选项 (oxc 默认) — vitest.config.ts 删 esbuild block; next 16.4.6 / react 19.3.1 / vite 8.3.8 保持升级。
 - **门禁**: tsc 0 errors; vitest 112 文件 / 957 测试全绿 (含 7 个 nema 新测试); next build 全路由 exit 0 (含 ○ /nema)。
 - **仍开放**: msw 3.0 迁移; .nema 文件的真实文件系统监听 (FS watcher 触发自动生成); WorkItem 与 .nema 双向同步 (任务状态回写 .nema Table)。
+
+### 23.28 2026-11-11 项目界面按 IPA 技能拆分工作流 (237 栏位)
+
+- **用户发令 (2026-11-11)**: 项目界面没有按 ipaskill 拆分出一百多个工作流 — 每个技能在其专属日本 IPA 开发流程工作流列中有专属栏位 (此前 §23.24 登记为"后续 slice", 本轮落地)。
+- **实现**: `/projects` 新增第 6 个 tab "IPA 技能" (cookies VALID_PROJECTS_TABS + TAB_ITEMS + badge=237), 渲染 `IpaSkillWorkflowBoard` — 16 个 WBS 工作流列 (P1~P9 + P6.1~P6.4 + PX-MG/RV/TT/DL), 每列内 237 个技能各占一个专属栏位 (skill id + titleJa + in/out 端口数 + mode + 人工审批门徽标; 点击展开 purpose + required_inputs/outputs 契约)。数据源 catalog.ts (生成自 D:/IPA-Atomic-Skills workflow-contract.json), 无虚构内容。
+- **测试**: IpaSkillWorkflowBoard.test.tsx 4 用例 — 16 列渲染 / 237 栏位全量渲染 / 点击展开契约 / 人工审批门统计。
+- **门禁**: tsc 0 errors; vitest 113 文件 / 961 测试全绿; next build exit 0。
