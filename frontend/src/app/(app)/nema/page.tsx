@@ -164,7 +164,7 @@ export default function NemaPage() {
                     >
                       {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
-                    <FileText size={13} className="text-cyan-400 shrink-0" />
+                    <FileText size={13} className="text-accent shrink-0" />
                     <span className="text-sm font-semibold text-ink">{entry.title}</span>
                     <span className="text-[10px] font-mono text-ink-dim">{entry.nemaPath}</span>
                     <span className="flex items-center gap-1 text-[10px] font-mono text-violet-300">

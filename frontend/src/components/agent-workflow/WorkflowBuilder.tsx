@@ -468,14 +468,14 @@ function SkillSlot({ skill, onAdd }: { skill: IpaSkillEntry; onAdd: (skill: IpaS
   return (
     <button
       data-testid={`workflow-add-skill-${skill.id}`}
-      className="w-full flex items-center gap-2 rounded border border-line/60 bg-bg-soft/30 hover:border-cyan-400/50 px-2 py-1 text-left"
+      className="w-full flex items-center gap-2 rounded border border-line/60 bg-bg-soft/30 hover:border-accent/50 px-2 py-1 text-left"
       onClick={() => onAdd(skill)}
       title={skill.purpose}
     >
       <span className="font-mono text-[10px] text-ink-dim shrink-0">{skill.id}</span>
       <span className="text-[11px] text-ink truncate">{skill.titleJa}</span>
       <span className="ml-auto flex items-center gap-0.5 shrink-0">
-        <span className="text-[9px] font-mono text-cyan-400/80">in{skill.inputs.length}</span>
+        <span className="text-[9px] font-mono text-accent">in{skill.inputs.length}</span>
         <span className="text-[9px] font-mono text-emerald-400/80">out{skill.outputs.length}</span>
         {skill.hasHumanGate && <span className="text-[9px] text-amber-400">👤</span>}
       </span>
@@ -617,7 +617,7 @@ function WorkflowEditorPanel({
 
       {node.kind === "if-else" && (
         <div className="space-y-3">
-          <div className="text-xs font-semibold text-amber-300">条件规则 (全部满足才走 True)</div>
+          <div className="text-xs font-semibold text-warn">条件规则 (全部满足才走 True)</div>
           {(config.rules as WorkflowConditionRule[]).map((rule, index) => (
             <div key={index} className="card !p-2 space-y-1.5">
               <div className="grid grid-cols-3 gap-1.5">
@@ -819,7 +819,7 @@ function WorkflowEditorPanel({
 
       {node.kind === "code" && (
         <div className="space-y-3">
-          <div className="text-xs font-semibold text-emerald-300">代码节点</div>
+          <div className="text-xs font-semibold text-ok">代码节点</div>
           <select
             className="input text-xs"
             value={(config.language as string) ?? "javascript"}
@@ -852,11 +852,11 @@ function WorkflowEditorPanel({
 
       {node.kind === "ipa-skill" && (
         <div className="space-y-3">
-          <div className="text-xs font-semibold text-cyan-300">IPA 工序节点</div>
+          <div className="text-xs font-semibold text-accent">IPA 工序节点</div>
           <div className="text-[11px] text-ink-dim font-mono">{node.skillId}</div>
           <div className="text-[10px] text-ink-mute">mode: {(config.mode as string) ?? "-"}</div>
           {config.hasHumanGate ? (
-            <div className="text-[10px] text-amber-300 border border-amber-400/40 rounded p-2">
+            <div className="text-[10px] text-warn border border-warn/40 rounded p-2">
               👤 人工审批门: 签名与批准不可由 AI 代行
             </div>
           ) : null}

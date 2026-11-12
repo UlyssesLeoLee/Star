@@ -313,7 +313,7 @@ export function KanbanBoard({
                 isDropTarget && "ring-2 ring-accent bg-accent/10",
                 // 列重排 drop 高亮 (per 2026-08-29 19:09 JST)
                 isColDragging && "opacity-50",
-                isColDropTarget && "ring-2 ring-cyan-400 bg-cyan-500/10",
+                isColDropTarget && "ring-2 ring-accent bg-accent/10",
               )}
             >
               {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 2: 下一步状态列) */}

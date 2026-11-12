@@ -62,11 +62,11 @@ const TYPE_BADGE: Record<RelationshipType, string> = {
   COLLABORATES_WITH: "border-ok/40 text-ok bg-ok/10",
   REPORTS_TO: "border-warn/40 text-warn bg-warn/10",
   MENTORS: "border-purple-400/40 text-purple-300 bg-purple-400/10",
-  PEER_REVIEWS: "border-cyan-400/40 text-cyan-300 bg-cyan-400/10",
+  PEER_REVIEWS: "border-accent/40 text-accent bg-accent/10",
   STAND_IN_FOR: "border-pink-400/40 text-pink-300 bg-pink-400/10",
   SHADOWS: "border-slate-400/40 text-slate-300 bg-slate-400/10",
   CHALLENGES: "border-red-400/40 text-red-300 bg-red-400/10",
-  TRUSTS: "border-emerald-400/40 text-emerald-300 bg-emerald-400/10",
+  TRUSTS: "border-ok/40 text-ok bg-ok/10",
 };
 
 export function EdgeTypeSelector({

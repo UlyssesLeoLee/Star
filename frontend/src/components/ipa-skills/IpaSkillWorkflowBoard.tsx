@@ -56,11 +56,11 @@ function PhaseColumn({
   return (
     <div
       data-testid={`ipa-phase-column-${phase}`}
-      className="w-64 shrink-0 rounded-lg border border-line bg-[var(--cel-surface-card,#0f1422)] flex flex-col max-h-[64vh]"
+      className="w-64 shrink-0 rounded-lg border border-line bg-[var(--cel-surface-card,var(--color-surface-2))] flex flex-col max-h-[64vh]"
     >
       <div className="px-3 py-2 border-b border-line shrink-0">
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-xs font-bold text-cyan-300">{phase}</span>
+          <span className="font-mono text-xs font-bold text-accent">{phase}</span>
           <span className="text-[11px] text-ink font-semibold truncate">{ja}</span>
         </div>
         <div className="text-[9px] font-mono text-ink-mute truncate">
@@ -123,7 +123,7 @@ function IpaSkillSlot({
     <div
       data-testid={`ipa-skill-slot-${skill.id}`}
       className={`rounded border transition-colors ${
-        selected ? "border-cyan-400/80 bg-cyan-400/10" : "border-line/60 bg-bg-soft/30"
+        selected ? "border-accent/80 bg-accent/10" : "border-line/60 bg-bg-soft/30"
       }`}
     >
       <button
@@ -133,9 +133,9 @@ function IpaSkillSlot({
         className="w-full text-left px-2 pt-1.5 pb-1"
       >
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[9px] text-cyan-400/90 shrink-0">{skill.id}</span>
+          <span className="font-mono text-[9px] text-accent shrink-0">{skill.id}</span>
           {skill.hasHumanGate && (
-            <span title={t.ipaSkills.humanGate} className="text-[9px] text-amber-400 shrink-0">
+            <span title={t.ipaSkills.humanGate} className="text-[9px] text-warn shrink-0">
               <ShieldAlert size={10} className="inline" />
             </span>
           )}
@@ -143,15 +143,15 @@ function IpaSkillSlot({
           {linkedTasks.length > 0 && (
             <span
               data-testid={`ipa-skill-subtask-count-${skill.id}`}
-              className="text-[9px] font-mono text-emerald-300 border border-emerald-400/40 rounded px-1 shrink-0"
+              className="text-[9px] font-mono text-ok border border-ok/40 rounded px-1 shrink-0"
             >
               {tx(t.ipaSkills.subtaskCount, { count: linkedTasks.length })}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5 text-[8px] font-mono text-ink-mute">
-          <span className="text-emerald-400/90">in{skill.inputs.length}</span>
-          <span className="text-sky-400/90">out{skill.outputs.length}</span>
+          <span className="text-ok">in{skill.inputs.length}</span>
+          <span className="text-info">out{skill.outputs.length}</span>
           <span className="truncate flex-1">{skill.mode}</span>
         </div>
       </button>
@@ -182,9 +182,9 @@ function IpaSkillSlot({
                   key={w.id}
                   data-testid={`ipa-skill-subtask-${skill.id}-${w.id}`}
                   onClick={() => onOpenTaskCard(w.id)}
-                  className="w-full text-left text-[9px] font-mono px-2 py-1 rounded border border-line/50 bg-bg-soft/40 hover:border-cyan-400/60 flex items-center gap-1.5"
+                  className="w-full text-left text-[9px] font-mono px-2 py-1 rounded border border-line/50 bg-bg-soft/40 hover:border-accent/60 flex items-center gap-1.5"
                 >
-                  <Play size={8} className="text-cyan-400 shrink-0" />
+                  <Play size={8} className="text-accent shrink-0" />
                   <span className="text-ink truncate flex-1">{w.key}</span>
                   <span className="text-ink-dim truncate max-w-[55%]">{w.title}</span>
                 </button>
@@ -229,10 +229,10 @@ export function IpaSkillWorkflowBoard({
         <span className="px-2 py-0.5 rounded border border-line bg-bg-soft/40">
           {tx(t.ipaSkills.phaseColumns, { count: IPA_PHASE_COLUMNS.length })}
         </span>
-        <span className="px-2 py-0.5 rounded border border-amber-400/40 bg-amber-400/10 text-amber-300">
+        <span className="px-2 py-0.5 rounded border border-warn/40 bg-warn/10 text-warn">
           {tx(t.ipaSkills.humanGated, { count: humanGated })}
         </span>
-        <span className="px-2 py-0.5 rounded border border-cyan-400/40 bg-cyan-400/10 text-cyan-300">
+        <span className="px-2 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent">
           {tx(t.ipaSkills.linkedTaskCards, { count: linkedWorkItems.length })}
         </span>
         <span className="flex items-center gap-1">

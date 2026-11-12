@@ -104,7 +104,7 @@ export default function AdminPage() {
       <PageHeader
         title="Admin Console 后台管理"
         subtitle="系统状态 · 认证配置 · 唯一管理员"
-        icon={<ShieldCheck className="text-amber-300" size={20} />}
+        icon={<ShieldCheck className="text-warn" size={20} />}
         track="D"
         count={session.payload.email ?? session.payload.sub}
       />
@@ -139,7 +139,7 @@ export default function AdminPage() {
               <span className="ml-auto text-ink">{status.server_time}</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded border border-line bg-bg-soft/40">
-              <ShieldCheck size={12} className="text-amber-300" />
+              <ShieldCheck size={12} className="text-warn" />
               <span className="text-ink-dim">admin.email</span>
               <span className="ml-auto text-ink">{status.admin.email}</span>
             </div>

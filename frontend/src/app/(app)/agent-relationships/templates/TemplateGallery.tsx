@@ -29,9 +29,9 @@ const TEMPLATE_BLURB: Record<TemplateId, string> = {
 const CATEGORY_BADGE: Record<string, string> = {
   standard: "border-info/40 text-info bg-info/10",
   high_density: "border-purple-400/40 text-purple-300 bg-purple-400/10",
-  pipeline: "border-cyan-400/40 text-cyan-300 bg-cyan-400/10",
-  management: "border-amber-400/40 text-amber-300 bg-amber-400/10",
-  decision: "border-emerald-400/40 text-emerald-300 bg-emerald-400/10",
+  pipeline: "border-accent/40 text-accent bg-accent/10",
+  management: "border-warn/40 text-warn bg-warn/10",
+  decision: "border-ok/40 text-ok bg-ok/10",
 };
 
 export interface TemplateGalleryProps {

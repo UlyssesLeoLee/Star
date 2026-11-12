@@ -162,8 +162,8 @@ export default function IdentityPage() {
             <div
               className={`flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs ${
                 me.is_admin
-                  ? "border-amber-400/60 bg-amber-400/10 text-amber-300"
-                  : "border-cyan-400/60 bg-cyan-400/10 text-cyan-300"
+                  ? "border-warn/60 bg-warn/10 text-warn"
+                  : "border-accent/60 bg-accent/10 text-accent"
               }`}
               data-testid="identity-admin-badge"
             >
@@ -291,11 +291,11 @@ export default function IdentityPage() {
             <SectionTitle>Role Access Matrix (RBAC 策略)</SectionTitle>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
               <div className="p-3 rounded border border-amber-400/50 bg-bg-soft/40">
-                <div className="text-sm font-semibold text-amber-300 mb-1">
+                <div className="text-sm font-semibold text-warn mb-1">
                   admin <span className="text-[10px] font-mono text-ink-dim">(lidian727@gmail.com)</span>
                 </div>
                 <p className="text-xs text-ink-dim mb-2">唯一管理员 — 后台管理、全量读写与审计。由 STAR_ADMIN_EMAIL 邮箱全等判定。</p>
-                <div className="text-[10px] font-mono text-amber-300">✓ Full Write · ✓ Admin Console · ✓ Audit View</div>
+                <div className="text-[10px] font-mono text-warn">✓ Full Write · ✓ Admin Console · ✓ Audit View</div>
               </div>
               <div className="p-3 rounded border border-line bg-bg-soft/40">
                 <div className="text-sm font-semibold text-info mb-1">user</div>
