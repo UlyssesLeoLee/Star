@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2145732d6d5dcae1ecfcb6866ed7d1f4f1a32acd0e8d11cf5c778a303ef77afc
+@cypher schema=1 source_sha256=9932c6caac9a775ccd4788c27391d80c4cddb50aad20387df0f0980310551f42
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})

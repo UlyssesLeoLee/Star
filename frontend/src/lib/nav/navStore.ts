@@ -1,3 +1,20 @@
+/*
+@cypher schema=1 source_sha256=8a949a4904895fd01d62b6b7ae20c2699c959ef40deac0a25115e238e989fafa
+MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
+MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
+MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})
+MERGE (defaultPinned:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_PINNED_VIEWS",kind:"constant"})
+MERGE (defaultTabs:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_HEADER_TABS",kind:"constant"})
+MERGE (indexOwned:Symbol {id:"frontend/src/lib/nav/navStore.ts::WORKTREE_INDEX_OWNED_MODULES",kind:"constant"})
+MERGE (registry:File {path:"frontend/src/lib/nav/registry.ts"})
+MERGE (self)-[:DEFINES]->(store)
+MERGE (self)-[:DEFINES]->(defaults)
+MERGE (self)-[:DEFINES]->(defaultPinned)
+MERGE (self)-[:DEFINES]->(defaultTabs)
+MERGE (self)-[:DEFINES]->(indexOwned)
+MERGE (self)-[:IMPORTS]->(registry)
+@endcypher
+*/
 "use client";
 
 import { create } from "zustand";

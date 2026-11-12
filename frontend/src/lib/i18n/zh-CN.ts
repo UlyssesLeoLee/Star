@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e54eb7b395da421e1055c050f82ebf3f91ea367f622ea2223b1edcbc18e02d23
+@cypher schema=1 source_sha256=4a8611a5676f8c129d20694aa17eebddf98612fc9ddc9f0d2a76d6a890fc55e5
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)

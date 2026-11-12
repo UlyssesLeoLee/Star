@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=7cdc24142a24a5b4cf18a590899b64be9b09ceb3d887eaf7e9e869bc495acbed
+MERGE (self:File {path:"frontend/src/lib/nav/__tests__/navStore.test.ts"})
+MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
+MERGE (suite:Symbol {id:"frontend/src/lib/nav/__tests__/navStore.test.ts::navStore customization",kind:"suite"})
+MERGE (self)-[:DEFINES]->(suite)
+MERGE (suite)-[:TESTS]->(store)
+@endcypher
+*/
 import { describe, it, expect, beforeEach } from "vitest";
 import { useNavStore, DEFAULT_SIDEBAR_ITEMS, DEFAULT_HEADER_TABS } from "../navStore";
 import { ALL_MODULES, MODULE_MAP } from "../registry";

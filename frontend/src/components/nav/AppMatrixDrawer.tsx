@@ -1,7 +1,7 @@
 "use client";
 
 /*
-@cypher schema=1 source_sha256=777fb6104130cbce33b2949e1f00bd69f884abc22765b41f6b8494bb766e8712
+@cypher schema=1 source_sha256=ecbe7332e33d319d59fc87bd782778ffef6e75cae18b3e9ed26219629fa5caae
 MERGE (self:File {path:"frontend/src/components/nav/AppMatrixDrawer.tsx"})
 MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
