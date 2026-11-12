@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d93e4145c6967663df87b293e87790f59f52dd82f629955aea1ad06e7b66a9c6
+@cypher schema=1 source_sha256=f637cdd5dd663ed5ee0b8107c0b49f3a4dd34129bc5d393edca11ad6b41b3e2e
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -150,7 +150,6 @@ export const en: Dictionary = {
     done: "Done",
     pinToSidebar: "Pin to sidebar",
     unpinFromSidebar: "Remove from sidebar",
-    indexOwnedHint: "This module is owned by the Project Worktree Index — open it from the project tree on the left",
     pinToHeader: "Pin to header",
     unpinFromHeader: "Remove from header tabs",
     openNow: "Open this module now",
@@ -569,5 +568,18 @@ export const en: Dictionary = {
     docsCategoryReport: "Reports (PHASE / PR / Risk / Fix)",
     docsCategoryOther: "Other (briefs / adr / architecture etc.)",
     docsEmpty: "No documents in this category",
+  },
+  projectsFilterBar: {
+    calendarSubTabs: "Calendar sub-view",
+    monthView: "Month",
+    weekView: "Week",
+    statusGroup: "Filter by status",
+    priorityGroup: "Filter by priority",
+    memberGroup: "Filter by member",
+    statusLabel: "Status",
+    priorityLabel: "Priority",
+    memberLabel: "Member",
+    searchPlaceholder: "Search title / key / member…",
+    clearAll: "Clear all filters",
   },
 };

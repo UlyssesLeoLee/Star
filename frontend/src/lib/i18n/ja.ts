@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a299de7481259e506e116a5e8d6071d605e0d0803266bd9cc6c12012ae47aef0
+@cypher schema=1 source_sha256=754c358757cd9fa8c9de2a8dcfd1830847340e5758b6c14637ffd8983a8bef3d
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -151,7 +151,6 @@ export const ja: Dictionary = {
     done: "完了",
     pinToSidebar: "サイドバーにピン留め",
     unpinFromSidebar: "サイドバーから削除",
-    indexOwnedHint: "このモジュールは Project Worktree Index が管轄します — 左のプロジェクトツリーから開いてください",
     pinToHeader: "ヘッダーにピン留め",
     unpinFromHeader: "ヘッダーから削除",
     openNow: "このモジュールを開く",
@@ -570,5 +569,18 @@ export const ja: Dictionary = {
     docsCategoryReport: "レポート (PHASE / PR / リスク / 修正)",
     docsCategoryOther: "その他 (briefs / adr / architecture など)",
     docsEmpty: "このカテゴリのドキュメントはありません",
+  },
+  projectsFilterBar: {
+    calendarSubTabs: "カレンダーサブビュー",
+    monthView: "月表示",
+    weekView: "週表示",
+    statusGroup: "ステータスで絞り込み",
+    priorityGroup: "優先度で絞り込み",
+    memberGroup: "メンバーで絞り込み",
+    statusLabel: "ステータス",
+    priorityLabel: "優先度",
+    memberLabel: "メンバー",
+    searchPlaceholder: "タイトル / キー / メンバーを検索…",
+    clearAll: "すべての絞り込みを解除",
   },
 };

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4a8611a5676f8c129d20694aa17eebddf98612fc9ddc9f0d2a76d6a890fc55e5
+@cypher schema=1 source_sha256=b48dcf1bbbafe3428668637583933085f2c6704a4d374889000c48a326d31b92
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -161,7 +161,6 @@ export const zhCN: Dictionary = {
     done: "完成定制 (Done)",
     pinToSidebar: "钉选到左侧导航",
     unpinFromSidebar: "从左侧导航移除",
-    indexOwnedHint: "该模块由 Project Worktree Index 承载，请从左侧项目树进入",
     pinToHeader: "钉选到顶部标签",
     unpinFromHeader: "从顶部标签移除",
     openNow: "立即打开该模块",
@@ -584,5 +583,18 @@ export const zhCN: Dictionary = {
     docsCategoryReport: "报告 (PHASE / PR / 风险 / 修复)",
     docsCategoryOther: "其他 (briefs / adr / architecture 等)",
     docsEmpty: "该类别暂无可用文档",
+  },
+  projectsFilterBar: {
+    calendarSubTabs: "日历子视图",
+    monthView: "月视图",
+    weekView: "周视图",
+    statusGroup: "按状态筛选",
+    priorityGroup: "按优先级筛选",
+    memberGroup: "按成员筛选",
+    statusLabel: "状态",
+    priorityLabel: "优先级",
+    memberLabel: "成员",
+    searchPlaceholder: "搜索标题 / 编号 / 成员…",
+    clearAll: "清除全部筛选",
   },
 };

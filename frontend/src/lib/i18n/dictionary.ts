@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=a747fc0c50ad5749221b58934ddca46acf014f385129cd4c417fef2bac77235f
+@cypher schema=1 source_sha256=775b9e87658c8d8d4f5635b17b29939da2836edcc57982042dc0c91a3f197c7d
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -233,7 +233,6 @@ export interface Dictionary {
     done: string;                  // "完成定制 (Done)"
     pinToSidebar: string;          // "钉选到左侧导航"
     unpinFromSidebar: string;      // "从左侧导航移除"
-    indexOwnedHint: string;        // "该模块由 Project Worktree Index 承载，请从左侧项目树进入"
     pinToHeader: string;           // "钉选到顶部标签"
     unpinFromHeader: string;       // "从顶部标签移除"
     openNow: string;               // "立即打开该模块"
@@ -484,5 +483,19 @@ export interface Dictionary {
     docsCategoryReport: string;
     docsCategoryOther: string;
     docsEmpty: string;
+  };
+  /** v0.9 (2026-11-13 WBS §23.32-B) 新增: /projects 下行 FilterBar 筛选标签页 */
+  projectsFilterBar: {
+    calendarSubTabs: string;
+    monthView: string;
+    weekView: string;
+    statusGroup: string;
+    priorityGroup: string;
+    memberGroup: string;
+    statusLabel: string;
+    priorityLabel: string;
+    memberLabel: string;
+    searchPlaceholder: string;
+    clearAll: string;
   };
 }
