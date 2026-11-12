@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=1ba481fd93046ebdea44cb24c70f893919c65ade5e4eed839d9b3536e5f1ec4b
+@cypher schema=1 source_sha256=6d1344a584c3c1092425cdfa20b5bb9354326f2b4d2c099fd1a4704f67584a77
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -546,5 +546,72 @@ export interface Dictionary {
     openBoundTask: string;          // "已绑定 Star 任务 →"
     openAsStarTask: string;         // "打开为 Star 任务"
     fiveW1H: string;                // "5W1H"
+  };
+  /** v0.10 (2026-11-13 WBS §23.33-B) 新增: Settings 能力管理面板 (MCP/Skills/Plugins) */
+  settingsCapabilities: {
+    mcp: {
+      title: string;
+      description: string;
+      enabledCount: string;
+      addServer: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      nameRequired: string;
+      transportLabel: string;
+      transportStdio: string;
+      transportSse: string;
+      transportHttp: string;
+      commandLabel: string;
+      commandPlaceholderStdio: string;
+      urlPlaceholder: string;
+      commandRequired: string;
+      argsLabel: string;
+      argsPlaceholder: string;
+      scopeLabel: string;
+      scopeUser: string;
+      scopeProject: string;
+      scopeUserShort: string;
+      scopeProjectShort: string;
+      addButton: string;
+      cancel: string;
+      empty: string;
+      healthLabel: string;
+      lastError: string;
+      enable: string;
+      disable: string;
+      on: string;
+      off: string;
+      removeAria: string;
+    };
+    skills: {
+      title: string;
+      description: string;
+      addSkill: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      nameRequired: string;
+      versionLabel: string;
+      descriptionLabel: string;
+      scopeLabel: string;
+      addButton: string;
+      empty: string;
+      removeAria: string;
+    };
+    plugins: {
+      title: string;
+      description: string;
+      addPlugin: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      nameRequired: string;
+      versionLabel: string;
+      permissionsLabel: string;
+      permissionsPlaceholder: string;
+      descriptionLabel: string;
+      scopeLabel: string;
+      addButton: string;
+      empty: string;
+      removeAria: string;
+    };
   };
 }
