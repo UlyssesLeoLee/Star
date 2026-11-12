@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=7e472b28c4604c18604430aceae1b7631cbe270f508ca7f67990fa3cbdfa82a9
+MERGE (self:File {path:"frontend/src/components/refactor/RefactorSettingsPopover.tsx"})
+MERGE (popover:Symbol {id:"frontend/src/components/refactor/RefactorSettingsPopover.tsx::RefactorSettingsPopover",kind:"component"})
+MERGE (self)-[:DEFINES]->(popover)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
