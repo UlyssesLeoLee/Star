@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ff5a9fbe0ca1be9076eab9352e85089005df474e65509068c4552abf148e10cb
+@cypher schema=1 source_sha256=faabc911bc5b69bfa3f969560fd612635c510b941eb239f59c999b1e735a996a
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.test.tsx"})
 MERGE (create:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::creates a LANE-owned Task Card against the current authorized focus and refreshes the LANE list",kind:"test"})
 MERGE (hostless:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.test.tsx::lists and creates hostless LANE Task Cards without a Worktree focus",kind:"test"})
@@ -221,13 +221,40 @@ describe("RunTaskCardsPanel", () => {
     expect(fixture.createRunTaskCard).not.toHaveBeenCalled();
   });
 
-  it("renders authorized LANE tasks while leaving task CLI disabled", async () => {
+  it("renders authorized LANE tasks with an expandable terminal tab (per WBS §23.32-C)", async () => {
     const fixture = clientFixture();
     render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available recoveryStore={recoveryStoreFixture()} />);
 
     expect(await screen.findByText("Real LANE task")).toBeInTheDocument();
     expect(fixture.listRunWorkItems).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: /打开 CLI/ })).toBeDisabled();
+    // 终端按钮存在且可用 (不再是 disabled CLI 占位)
+    const terminalButton = screen.getByRole("button", { name: /在任务卡 Real LANE task 内打开终端/ });
+    expect(terminalButton).toBeEnabled();
+    // 展开后显示 shell 类型 chip + 无 session 降级占位
+    fireEvent.click(terminalButton);
+    expect(screen.getAllByTestId(/task-card-terminal-/).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("tab", { name: "PowerShell" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("tab", { name: "cmd" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("tab", { name: "bash" }).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("task-card-terminal-placeholder")).toHaveTextContent(/终端不可用/);
+  });
+
+  it("keeps task cards opaque and switches the in-card shell type", async () => {
+    const fixture = clientFixture();
+    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available recoveryStore={recoveryStoreFixture()} />);
+
+    await screen.findByText("Real LANE task");
+    // 实色背景 class (不透明, 不用 bg-bg-soft 半透明)
+    const cardLi = screen.getByText("Real LANE task").closest("li");
+    expect(cardLi?.className).toContain("bg-bg-card");
+    expect(cardLi?.className).not.toContain("bg-bg-soft");
+    // 展开终端 → 默认 PowerShell 选中 → 切到 bash → 占位文案跟随
+    fireEvent.click(screen.getByRole("button", { name: /内打开终端/ }));
+    const powershellTab = screen.getByRole("tab", { name: "PowerShell" });
+    expect(powershellTab.getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: "bash" }));
+    expect(screen.getByRole("tab", { name: "bash" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("task-card-terminal-placeholder")).toHaveTextContent(/bash/);
   });
 
   it("lists and creates hostless LANE Task Cards without a Worktree focus", async () => {
