@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4db1969f2110e1d954ec656c862e7a6962f3f7e9dedea2bfbd553840e003c0c9
+@cypher schema=1 source_sha256=890be4f6f2c626bb4b0b23ef2b6d3acfd45775de40321ada37ec9d1f0b0973d9
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9b2d4f6a8c0e1d3b5f7a9c2e4d6f8a0b1c3d5e7f9a0b2c4d6e8f0a1b3d5e7f9
+@cypher schema=1 source_sha256=db1d97b8c21900058573b5b53b06a370234f6177bd835176618db88b58f68785
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsFilterBar.test.tsx"})
 MERGE (filterBar:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::ProjectsFilterBar",kind:"component"})
 MERGE (applyKanban:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::applyKanbanFilter",kind:"function"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5f3a1c9e7b2d4f6a8c0e1d3b5f7a9c2e4d6f8a0b1c3d5e7f9a0b2c4d6e8f0a
+@cypher schema=1 source_sha256=2590e97b9f2faf118f4fd9231182a1141fff1621167b45bc75cc4ae3b0e7ecb7
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx"})
 MERGE (filterBar:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::ProjectsFilterBar",kind:"component"})
 MERGE (useTranslation:Symbol {id:"frontend/src/lib/i18n/index.ts::useTranslation",kind:"hook"})
