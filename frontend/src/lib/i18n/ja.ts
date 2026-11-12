@@ -1,5 +1,6 @@
 /*
-@cypher schema=1 source_sha256=754c358757cd9fa8c9de2a8dcfd1830847340e5758b6c14637ffd8983a8bef3dMERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
+@cypher schema=1 source_sha256=083cbbf3ff2c5f8b4cab062f9b8f3466a052224c00210b0ae9a654d57de550a3
+MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
 MERGE (locale:Symbol {id:"frontend/src/lib/i18n/ja.ts::ja",kind:"constant"})
