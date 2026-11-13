@@ -975,3 +975,11 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **P0 实现 (前端可玩版, 不引入后端)**: `lib/canvas-game/` 纯 TS 模块 — types (PlayerRobot/Bullet/Enemy/GameState) + robotController (WASD + 5 状态机 idle/moving/attacking/rolling/dying) + bulletSystem (子弹池 + aimed/radial 2 模式起步) + collision (AABB) + enemySpawner (从 canvas work_item/agent 节点生成敌人) + useCanvasGame (rAF 游戏循环 hook); `components/canvas-game/CanvasGameOverlay.tsx` (像素风 HUD: HP/SP/击杀数 + 像素爆炸粒子 + enemy 像素精灵, 全部 SVG crispEdges); `/canvas/[id]` 加 game 模式切换 (query ?mode=game + 按钮)。
 - **像素风**: 全部 SVG rect 矩阵渲染 (复用 agent_cursor 16x16 风格), 玩家机器人 idle/move 2 帧起步, 敌人 3 色变体, 爆炸 8x8 粒子矩阵。
 - **门禁**: tsc 0 + vitest 全绿 (核心模块单测) + Cypher PASS + author=Ulysses。
+
+### 23.37 2026-11-13 左侧导航按设计文档 5 组结构重排 (用户反馈: 与所述设计不符)
+
+- **用户反馈 (2026-11-13)**: "左侧导航的设计看起来还是和我说的不一样"
+- **文档依据**: `docs/frontend/design/ui-3pane-arch.md` §1.2 v0.2 (5 组: Home 核心区常驻置顶/个人折叠/项目/视图/管理 4 子组) + §1.2.1 (26 路由映射表)。
+- **实现 (2026-11-13)**: `registry.ts` 加 NAV_GROUPS/NAV_GROUP_ORDER (home-core/home-personal/project/view/admin-org/admin-integration/admin-ops/admin-dev/other); Sidebar 重排为: 项目上下文 (RunTree/SubNav/WorktreeIndexLink) → Home 核心区 (agents/feedback/validation 常驻 + core 徽标, worktree 由 WorktreeIndexLink 承担 per 去重) → 个人折叠 (inbox) → 视图 (kanban/timeline/backlog) → 管理 4 子组 → 其他入口兜底 (未映射模块 + 钉选自定义); 新增 NavGroupSection/NavModuleRow 渲染组件。
+- **缺标 (per 守门 #11)**: Review 核心项无独立路由 / 个人区提及我-已关注-草稿无页面 / 视图组列表-日历-概览无页面 / 管理-集成 notification 无模块 — 全部不落 UI, 设计映射表未覆盖模块 (issues/analytics/settings/agent-windows/agent-view) 兜底进其他入口不消失。
+- **门禁**: tsc 0 + nav/Sidebar 测试 50/50 + 全量 vitest + Cypher PASS + author=Ulysses。
