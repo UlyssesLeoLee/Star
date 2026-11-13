@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2].parent))
 
 from dispatcher import (
-    SubagentDispatcher, Comment, BlockedByCommentError, DispatchBlockedError,
+    SubagentDispatcher, BlockedByCommentError,
 )
 
 

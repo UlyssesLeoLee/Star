@@ -15,20 +15,15 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
-import time
 import unittest
 from pathlib import Path
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from guardian.sandbox import (  # noqa: E402
     SandboxLimits,
-    _SandboxResult,
     is_available,
     make_default_sandbox_limits,
     run_with_sandbox,
@@ -43,7 +38,7 @@ class TestIsAvailable(unittest.TestCase):
         self.assertIsInstance(result, bool)
         if sys.platform == "win32":
             try:
-                import win32job  # noqa: F401
+                __import__("win32job")
                 self.assertTrue(result, "Windows + win32job should be available")
             except ImportError:
                 self.assertFalse(result, "win32job missing, should be unavailable")

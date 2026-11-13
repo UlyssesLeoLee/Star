@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from guardian.rule_database import RuleDatabase, _validate_schema, Rule
+from guardian.rule_database import RuleDatabase, _validate_schema
 
 GUARDIAN_DIR = Path(__file__).resolve().parents[1]
 RULES_PATH = GUARDIAN_DIR / "rules" / "pre_tool_use_rules.json"

@@ -12,7 +12,6 @@ status: 待 Ulysses 拍板激活.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 import argparse
-import re
 import subprocess
 import sys
 from pathlib import Path
