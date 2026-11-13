@@ -42,7 +42,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
+          # cryptography: guardian/comment_signing.py 与 tests/test_comment_signing.py 的硬依赖,
+          # 缺它时 pytest 在收集阶段即 ModuleNotFoundError (PR #301 实测), 整个 job 无法运行
+          pip install pytest pytest-cov cryptography
           # watchdog 可选 (graceful fallback if missing)
           pip install watchdog || echo "watchdog install failed, continuing without it"
 

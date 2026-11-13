@@ -36,7 +36,7 @@
 | `star-api-rest` 的 2 个单测 | Linux 下失败（已在 CI 中 `--skip`） | `workspace_files.rs` 的 `resolve_blocks_parent_escape`、`resolve_rejects_path_outside_roots` 假定 Windows 盘符路径；Linux 上应先决定「盘符路径在 Linux 上是否也必须被拒绝」，再修实现或用例 | 该文件在仓库主工作区另有未提交改动，故未触碰 |
 | `wasm-build.yml` | 改动 `crates/*-wasm/**` 时 | Rust→WASM 构建 | 否（**已知问题**，见 §7） |
 | `pre-tool-use-guard.yml` | 改动 guardian 脚本时 | guardian 的 pytest/lint | 否（**已知问题**，见 §7） |
-| `mock-switch-validate.yml` | 改动 mock 工具时 | 跨项目 mock 切换校验 | 否（**已知问题**，见 §7） |
+| `mock-switch-validate.yml` | 改动 mock 工具时 | 跨项目 mock 切换校验 | 否 |
 | `p1e-integration.yml`、`star-flash-mock-regression.yml` | 路径过滤 | 专项集成/回归 | 否 |
 
 所有 workflow：`permissions` 默认 `contents: read`；第三方 action 全部固定到 commit SHA
@@ -155,8 +155,8 @@ bash scripts/ci/apply_rulesets.sh             # 创建/更新（按 name 幂等�
 | 项 | 现象 | 根因 | 备注 |
 |---|---|---|---|
 | `wasm-build.yml` | 自 2026-10-11 起失败 | `graph-core` 依赖 workspace 的 `tokio`（`features=["full"]`）拖入 `mio`，`mio` 无法编译到 `wasm32-unknown-unknown`；之后还有 `uuid` 在 wasm32 缺随机源、`relationship-engine-wasm` 直接依赖 `tokio` | 产品代码的依赖策略问题，非 CI。详见该 workflow 文件头注释 |
-| `pre-tool-use-guard.yml` | 失败 | guardian 测试目录的 flake8 未使用导入；`test_comment_signing.py` 收集期出错 | 仅在改动 guardian 脚本时触发 |
-| `mock-switch-validate.yml` | 失败（`fail=7`） | 校验的是跨项目 mock 集群，依赖 runner 上不存在的其他项目 | 本质是本机工具，不适合在 runner 上跑 |
+| `pre-tool-use-guard.yml` | 仍失败（仅在改动 guardian 脚本或该 workflow 本身时触发） | 三层原因，逐层实测（PR #301）：① 缺 `cryptography`，`test_comment_signing.py` 收集期 `ModuleNotFoundError`——**已在 workflow 里补装**，补装后 297 个用例全部通过；② `pyflakes` 对 `scripts/automation/guardian/` 报约 24 处（未使用的导入/变量、f-string 无占位符，含 `sandbox.py` 里按平台条件导入的 `win32job`）；③ 覆盖率 76.84%，低于 workflow 的 `--cov-fail-under=85`（`v27_rpc_fallback.py`、`v28_recommendation.py`、`v29_docs_saturation.py` 三个模块 0% 覆盖） | ②③ 是 guardian 代码在 workflow 写成之后继续增长造成的，需要补测试或清理代码，或由负责人决定是否调整 85% 门槛；我没有替你降低门槛 |
+| `mock-switch-validate.yml` | 已修（PR #301） | 工具把 Star 自己的 mock 也写死成 `D:/Star/tools/star-flash-mock`，runner 上没有 D: 盘，于是 7 个项目全部 FAIL，而 workflow 的判定本来是「只有 Star mock 自身 FAIL 才 fail CI」。现改为相对脚本位置解析；其余 6 个是其他仓库在作者本机上的绝对路径，在 runner 上仍预期 FAIL=6（workflow 注释里早有说明，不致失败） | 本机验证：`star-flash-mock cluster_ok=True` |
 | `Advisories (cargo-audit)` | 修复取工具问题后首次真正执行（2026-11-13）：cargo-audit 报 **3 个真实漏洞** | `crypto-bigint` 0.5.5 时序问题 RUSTSEC-2026-0387；`libsqlite3-sys` 0.30.1 捆绑的 SQLite RUSTSEC-2026-0459（中危 6.8，经 `rusqlite` 0.32.1 引入）；`rsa` Marvin 时序侧信道 RUSTSEC-2023-0071（`deny.toml` 已有评估后的 ignore，cargo-audit 不读该清单）。另有 4 条 unmaintained/unsound 警告（fxhash、instant、proc-macro-error、glib） | 需要你决定「升级依赖」还是「在 `deny.toml` 登记评估后的 ignore」；该 job 非必需，不会拦合并 |
 | macOS 桌面打包 | 排队后 "job was not acquired" | GitHub macOS arm64 runner 容量不足 | 基础设施问题 |
 | `star-stable-desktop` | 修复 tauri 工作目录后，Linux / Windows / macOS 三个平台都已能真实打出安装包（.deb / AppImage / MSI / universal DMG），但都在 **Validate … SBOMs** 步骤失败（`Error: DESCRIBES`，run 43338735139） | `cargo-sbom` 0.10.0 对 `star-desktop` 生成的 SPDX 2.3 是 `SPDXRef-DOCUMENT DESCRIBES SPDXRef-File-star-desktop`，且该 File 以 `GENERATED_FROM` 指向根 Package；而 workflow 内联 JS 校验器要求 DOCUMENT 直接 `DESCRIBES` 根 **Package**（`npm sbom` 的输出是这种形态，所以前端 SBOM 通过、Rust SBOM 不通过）。本机用同版本 cargo-sbom 复现，456 个 package、关系类型仅 `DEPENDS_ON`/`DESCRIBES`/`GENERATED_FROM` | **未修**：同一段校验逻辑复制在 6 个 job 的内联 JS（Linux/Windows/macOS 的 Validate + 三个 Attest）及 consumer 验证的 Python（约 875 行）里，属于 fail-closed 的发布证明通道，且有 `PHASE-STAR-STABLE-W2-DESKTOP-ATTEST-20261031` 记录的变异/对照验证。建议的修法：接受「DOCUMENT DESCRIBES File，且该 File GENERATED_FROM 根 Package」作为等价形态，并重跑该报告里的变异测试；需要负责人确认 |
