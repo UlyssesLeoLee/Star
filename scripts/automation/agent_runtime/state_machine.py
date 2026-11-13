@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=d2645692df519b248b0b1e17fb252e3cbd2ddb500e8b356b2eab4681888285d9
+# MERGE (self:File {path:"scripts/automation/agent_runtime/state_machine.py"})
+# @endcypher
 """agent_runtime.state_machine — Agent 状态机 + Lifecycle 状态机
 (per 03-DD §3.1 / §3.2 + SRS §48 REQ-STATE-001 / §24 REQ-LC-TRANS)。
 

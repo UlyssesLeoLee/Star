@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=12b11562dc7cdb0a5432a53639c8f69324fdcdf6137be5edb73db7786304a23d
+MERGE (self:File {path:"crates/sandboxd/src/policy/network.rs"})
+@endcypher
+*/
 //! policy::network — 网络维隔离策略 (per FR-3.2, 决策点 D-3 已拍板)
 //!
 //! 策略: **allowlist 默认** (子代理常要 git / cargo / crates.io 域名)。

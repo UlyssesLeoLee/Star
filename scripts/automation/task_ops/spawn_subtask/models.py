@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=dad6b5678aa9016180d297dfe726874e111c1a51672b1a3eb071c3fc65243ea1
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/models.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/models.py
 # spawn_subtask 入参/出参 model (per 02-basic-design.md §2.7.4 协议 + 03-detailed §3.3.1.1)
 #

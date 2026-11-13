@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=aacf74be8f7fcbbd6ad5ae88937334acd608b0e138dcaedfa848b19660b074de
+# MERGE (self:File {path:"scripts/automation/task_ops/__init__.py"})
+# @endcypher
 # scripts/automation/task_ops/__init__.py
 # TMO (Task Management Operations) Python 化基类 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6)
 #

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=913c1e508b4170695cdfb880121cfd72fbfb9017369c1041c8ce0cf19951cc27
+MERGE (self:File {path:"crates/star-agent-runtime/src/rate_limiter.rs"})
+@endcypher
+*/
 //! Token Bucket 速率控制 (per 02-BD §3.1 RateLimiter + SRS §42/§56)。
 //!
 //! per-tenant 独立桶 (per SRS §56: 不得允许单 Tenant 独占所有资源)。

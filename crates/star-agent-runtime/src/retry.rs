@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=d5d06b1d0579bc3c4e6ae3d554825b732c0273be0b67e3c044ce7bb57db12421
+MERGE (self:File {path:"crates/star-agent-runtime/src/retry.rs"})
+@endcypher
+*/
 //! 有限重试 + 指数退避 (per SRS §51 REQ-RETRY-001 + 03-DD §7)。
 //!
 //! 错误分类 (per 03-DD §7.1): Retryable → max_retry + backoff (1s, 2s, 4s);

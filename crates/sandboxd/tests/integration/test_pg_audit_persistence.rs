@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=7ade7aef8467759de15b4928ec7d6e5cba62205159eac2ef28823244ea54f505
+MERGE (self:File {path:"crates/sandboxd/tests/integration/test_pg_audit_persistence.rs"})
+@endcypher
+*/
 //! tests/integration/test_pg_audit_persistence.rs — PG audit 持久化 (per DD §5.2: 5 TC)
 //!
 //! 需要 `DATABASE_URL` 环境变量 + sandboxd 4 表已迁移 (migrations/ 001~005)。

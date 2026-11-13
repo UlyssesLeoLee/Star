@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=fd54a4aef2e241ba4cf8c28a35903209dd323a5f43c5fc3345055bfe60973065
+MERGE (self:File {path:"crates/star-agent-runtime/src/lib.rs"})
+@endcypher
+*/
 //! star-agent-runtime — STAR Agent Runtime ECS 骨架 (WBS 6.2)
 //!
 //! 按 [`SRS-STAR-AGENT-RUNTIME-001`] + 02-basic-design / 03-detailed-design 落地

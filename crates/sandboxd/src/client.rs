@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=14da1f3712058e25aa42e6518c38f8ffccaa3b80d251f0dca7b22803dbc8a319
+MERGE (self:File {path:"crates/sandboxd/src/client.rs"})
+@endcypher
+*/
 //! `sandboxd` client 模块 (per FR-7.1 fail-open + BD-002 §3.3 Rust client)
 //!
 //! Rust gRPC client + fail-open 降级:

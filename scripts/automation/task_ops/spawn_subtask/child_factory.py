@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=6584aa1d4e3bffd4cd9d31f604022e8861d72160e4b26fedb90464d1a3cd9b38
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/child_factory.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/child_factory.py
 # M-31 ChildSubAgentFactory (C-27)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.6

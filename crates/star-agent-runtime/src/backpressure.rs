@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=7dabd393f6ea4032f8c029104599531a172c5e2a2d0717f3ce277a1e930ab55a
+MERGE (self:File {path:"crates/star-agent-runtime/src/backpressure.rs"})
+@endcypher
+*/
 //! Backpressure + Queue Overflow (per SRS §46-§47 + 03-DD §6.3)。
 //!
 //! 队列必须 bounded (per SRS §47); 溢出策略必须可配置:

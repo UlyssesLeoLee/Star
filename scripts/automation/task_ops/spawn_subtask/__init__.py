@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=b11c907c2167c4883620986e35a43c60ad5cfff62a131a884e073459ecfe23cb
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/__init__.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/__init__.py
 # spawn_subtask 子包 — M-N8 Sub-task Binding 实装 (WBS 6.3)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §1 (M-26..M-33)

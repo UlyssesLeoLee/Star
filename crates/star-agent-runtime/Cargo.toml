@@ -6,14 +6,8 @@ rust-version = "1.99.1"
 description = "STAR Agent Runtime ECS skeleton (WBS 6.2) — Agent-oriented minimal ECS + Runtime 双模式, per SRS-STAR-AGENT-RUNTIME-001 + docs/architecture/2026-09-03-agent-runtime/"
 license = "Apache-2.0"
 
-# 独立 workspace: 本 crate 暂未注册进根 Cargo.toml members (根 Cargo.toml 在
-# MAGOS 文件域之外, per TASK WBS 6.2 manifest), 以独立 workspace 落地。
-# cargo check/test 等价验证命令:
-#   cargo check  --manifest-path crates/star-agent-runtime/Cargo.toml
-#   cargo test   --manifest-path crates/star-agent-runtime/Cargo.toml
-# 后续注册进根 workspace 时移除本 [workspace] 段 + 追加 members 行即可
-# (per 守门 #12 缺标比错标: 未注册状态显式声明)。
-[workspace]
+# 2026-11-14: 已注册进根 Cargo.toml workspace members (merge 收尾时追加, 见根 Cargo.toml WBS 6.2 注释)。
+# 原独立 [workspace] 段已移除 (嵌套 workspace 会让 cargo metadata 失败)。
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=2b9f3260fe1994c6639bad1fb7a619fa6d7404340556b22a9deae407b0f6f5f3
+# MERGE (self:File {path:"scripts/automation/task_ops/dag_validator.py"})
+# @endcypher
 """
 scripts/automation/task_ops/dag_validator.py — DAGValidator
 (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md §3.2.1.1 cycle detection)

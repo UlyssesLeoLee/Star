@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=e23b35dabe39f4ac08e42f707b3e5bf550ec97b14e526da395e403dbbbbf9c53
+# MERGE (self:File {path:"scripts/automation/agent_runtime/task_queue.py"})
+# @endcypher
 """agent_runtime.task_queue — L0 SQLite WAL 任务队列 (per 03-DD §5.1/§5.2)。
 
 Schema (per 03-DD §5.1 task_queue, W 类 per 守门 #13 DB 三類横展開):

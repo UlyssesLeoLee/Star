@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=299bb6a368a04ec687d2ab0c00f8fb19fe8a3a862a1e75f542bb2ae107c52272
+MERGE (self:File {path:"crates/sandboxd/src/backend/mod.rs"})
+@endcypher
+*/
 //! `sandboxd` backend 模块 — 跨平台隔离后端 (per FR-5, DD-SANDBOX-002 §2.1)
 //!
 //! | 平台 | Resource | Network | FS | Capability |

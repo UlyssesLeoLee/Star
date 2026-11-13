@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=0cf3461ac6e1714bc3b8d9b40358eb63698ecfde617958cd2ac143db351f1b55
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_m26_spawn_subtask_node.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_m26_spawn_subtask_node.py
 # M-26 M-N8 spawn_subtask_node 7 步原子化测试 (happy path + 5 类失败模式 + 守门集成)
 # 覆盖 IT-13 语义的进程内版本 (PostgreSQL/LangGraph/console_server 集成待 Tier 3)

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=4539a9f02472ce70cb97ef06356722b5e808dfa0bbc11e622ba55f7f9ba7d715
+MERGE (self:File {path:"crates/star-agent-runtime/src/identity.rs"})
+@endcypher
+*/
 //! AgentIdentity (per SRS §9 REQ-ECS-001 + 03-DD §2.1)。
 
 use std::time::SystemTime;

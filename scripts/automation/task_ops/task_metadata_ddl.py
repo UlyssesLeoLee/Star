@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=685cd5777fbca3b587418c716caa82b54bcd3fddbcb5c7e64d65a180ad0aa982
+# MERGE (self:File {path:"scripts/automation/task_ops/task_metadata_ddl.py"})
+# @endcypher
 """
 scripts/automation/task_ops/task_metadata_ddl.py
 task_metadata SQLite DDL 落地 (per G-TMO-04, 守门 #13 c Master RLS + 守门 #13 d SCD Type 2)

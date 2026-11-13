@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=76fb5d3bc57933545304929425e538b48b31125046d643bf84e6ff3feaccec3a
+MERGE (self:File {path:"crates/star-agent-runtime/src/runtime_mode.rs"})
+@endcypher
+*/
 //! Runtime 双模式管理 (per SRS §6-§7)。
 //!
 //! 规则 (per SRS §7.1 STAR 适配: L0 调度层永远在, 模式切换只针对 L1):

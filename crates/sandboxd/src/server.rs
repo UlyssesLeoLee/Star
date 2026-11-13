@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=b17ba1c3b91665b34ed74bb5c01c4aa893a90b5a5b925e854fa0840d91b468d9
+MERGE (self:File {path:"crates/sandboxd/src/server.rs"})
+@endcypher
+*/
 //! `sandboxd` gRPC server 模块 (per FR-2, DD-SANDBOX-002 §2.2)
 //!
 //! - `SandboxServiceImpl`: tonic 0.12 生成的 `SandboxService` 4 RPC 实现

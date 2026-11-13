@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=06a95f84e324ef9e3a4defcb15f25435cef931a0fc3ba40043ab32a8b2c08c2d
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_metrics.rs"})
+@endcypher
+*/
 //! tests/unit/test_metrics.rs — Prometheus 指标单测 (per DD §5.1: 4 TC)
 //!
 //! 8 指标注册 / label 组合 / 累加 / 文本渲染。

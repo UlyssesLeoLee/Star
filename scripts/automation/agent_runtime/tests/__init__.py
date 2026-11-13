@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=71c1bbd2d40287f971fcfe5c352738dc6bd015f082af5fc27f199088a1fa80ec
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/__init__.py"})
+# @endcypher
 """agent_runtime.tests — 单测包 (unittest, pytest 兼容)。
 
 sys.path bootstrap: 保证 `automation.agent_runtime` 在 pytest 与

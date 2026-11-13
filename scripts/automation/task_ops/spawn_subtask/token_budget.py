@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=c3d63f792f90eeafd63f49fb806995177c8d49028af6d7644a3d815077b5cb38
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/token_budget.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/token_budget.py
 # M-33 SubTaskTokenBudget (C-29)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.8

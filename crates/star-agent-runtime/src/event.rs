@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=bdc5712398e0a139914118504f48ba48cf567b4ddfcb77c57e052f33163def2d
+MERGE (self:File {path:"crates/star-agent-runtime/src/event.rs"})
+@endcypher
+*/
 //! Event Driven + Mailbox (per SRS §26-§28 + 03-DD §4.2/§4.3)。
 //!
 //! 处理链 (per SRS §26): `Event → Event Bus → Event Router → Mailbox → Scheduler

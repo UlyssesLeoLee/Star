@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=4fb96eaff595371f241eb6d4f019873c39db1bce644e92d69786aa68417c63c6
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_31_lifecycle_linkage.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_31_lifecycle_linkage.py
 # UT-31: LifecycleLinkageManager.on_parent_state_change 5 联动 (per 03-detailed §4.4)
 # 联动表 (per 01 §2 F-29): cancel/pause/resume/fail + child 独立 cancel 不向上传播

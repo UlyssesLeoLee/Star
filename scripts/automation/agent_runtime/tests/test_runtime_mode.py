@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=e4b1b8b24e878b5726104edcdff828821e438006424730a8dbc338df36b3516a
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_runtime_mode.py"})
+# @endcypher
 """test_runtime_mode — 双模式切换 (per SRS §7.1-§7.5)。"""
 
 import unittest

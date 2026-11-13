@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=39149464ce8e45f17e213645783dabf5db88c93e5ffb4a0911de8b0a5e03a49f
+MERGE (self:File {path:"crates/sandboxd/src/metrics.rs"})
+@endcypher
+*/
 //! `sandboxd` metrics 模块 (per FR-6.1, DD-SANDBOX-002 §2.4)
 //!
 //! 9 Prometheus 指标 (跟 FR-6.1 1:1):

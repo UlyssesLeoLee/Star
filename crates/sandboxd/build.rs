@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=75b02c3a93f60390ba6a0ee55285a7a5cff86a069063004be91daff62aad74a7
+MERGE (self:File {path:"crates/sandboxd/build.rs"})
+@endcypher
+*/
 //! tonic-build 构建脚本 (per DD-SANDBOX-002 §1.1)
 //!
 //! - `proto/sandboxd.proto` → OUT_DIR (prost 0.13 + tonic 0.12 codegen)

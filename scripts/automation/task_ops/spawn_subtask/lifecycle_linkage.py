@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=d7ae7ce60abf4e91ce5e99999e8734a5adf7cd543352cb52bf09de1854e1d233
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/lifecycle_linkage.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/lifecycle_linkage.py
 # M-27 LifecycleLinkageManager (C-23)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.2

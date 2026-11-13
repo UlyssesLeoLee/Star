@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=706f738172c0341302a88f4b83dab4d2cc0c202f8ad787fc2af3c92e2f298dda
+# MERGE (self:File {path:"scripts/automation/task_ops/compat.py"})
+# @endcypher
 # scripts/automation/task_ops/compat.py
 # 既有模块最小接口 stub (WBS 6.3 Sub-task Binding 实装)
 #

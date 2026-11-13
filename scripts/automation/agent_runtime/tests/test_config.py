@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=5922de0e53121456a02279f72811a5fe856c1ec1654e2d96afc081efe013efb0
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_config.py"})
+# @endcypher
 """test_config — RuntimeConfig Fail Safe 校验 (per SRS §100-§101)。"""
 
 import unittest

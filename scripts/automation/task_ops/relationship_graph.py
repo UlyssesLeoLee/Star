@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=5f02190f5e8d8611c41470cfec7db6ea06908fd360bb108647fcf415ce80749e
+# MERGE (self:File {path:"scripts/automation/task_ops/relationship_graph.py"})
+# @endcypher
 """
 scripts/automation/task_ops/relationship_graph.py — TaskRelationshipGraph
 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md §2.6.1 + 03-detailed-design.md §3.2.1)

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=6c633211b3f23235c3ddc0a99fee3a60128661a54cbb529717a204ecac47a380
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_policy_network.rs"})
+@endcypher
+*/
 //! tests/unit/test_policy_network.rs — network 维策略单测 (per DD §5.1: 8 TC)
 //!
 //! allowlist 匹配 / 通配符 / IP CIDR / BlockAll / Passthrough / 校验。

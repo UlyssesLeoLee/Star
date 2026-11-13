@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=e16a9bb52fa21b99077052a2e93e2db37a7cb5d2cd81494c40b2a7d827f1821c
+MERGE (self:File {path:"crates/sandboxd/src/lib.rs"})
+@endcypher
+*/
 //! `sandboxd` crate (WBS 6.5.2 实装)
 //!
 //! **Sandbox-as-a-Service 独立 daemon** — gRPC IPC + 4 维隔离 (resource / network / fs /

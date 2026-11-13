@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=57fd4578ab12eec27ced7ef498785fa72d6f1a810ba5e969b875ff08956175d6
+MERGE (self:File {path:"crates/sandboxd/src/policy/capability.rs"})
+@endcypher
+*/
 //! policy::capability — capability 维隔离策略 (per FR-3.4, 决策点 D-8 已拍板)
 //!
 //! - Linux: libcap 三模式 (DropAll / AllowNetBindService / Custom), 后端经 `capsh` 应用

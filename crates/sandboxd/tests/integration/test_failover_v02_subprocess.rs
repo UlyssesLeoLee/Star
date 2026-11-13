@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=372434858b42d278c5c0f56a3f8f97cd2417fe23c2c5ac4082217f0eb4ce843a
+MERGE (self:File {path:"crates/sandboxd/tests/integration/test_failover_v02_subprocess.rs"})
+@endcypher
+*/
 //! tests/integration/test_failover_v02_subprocess.rs — SANDBOX-001 v0.2 降级路径 (per DD §5.2: 4 TC)
 //!
 //! FR-7.1: sandboxd 不可用 → 走 SANDBOX-001 v0.2 subprocess 降级 (仅 resource 维隔离)。

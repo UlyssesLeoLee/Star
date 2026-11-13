@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=4f01750d28257ee6137803e6c97c674df3754eb7b5bc039e86be5efade51cfb5
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/split_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/split_node.py
 # TMO M-N2 split_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #

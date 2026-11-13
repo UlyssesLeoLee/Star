@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=e46ff56e434cc751a6ff1fbecf33b94f6f5cfd259bcb7850397c87f28c8a91a1
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_policy_fs.rs"})
+@endcypher
+*/
 //! tests/unit/test_policy_fs.rs — fs 维策略单测 (per DD §5.1: 7 TC)
 //!
 //! glob 匹配 (`**`/`*`/`?`) / 模式 / 读写判定 / 边界。

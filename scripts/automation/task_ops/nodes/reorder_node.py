@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=eaaec803da112691554ed9a56bb4c0ea676f721fcfbf2666d87d42454ef8ee53
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/reorder_node.py"})
+# @endcypher
 """
 scripts/automation/task_ops/nodes/reorder_node.py — M-N3 reorder_node
 (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md §3.2.1.1 + 02-basic-design.md §2.6.2)

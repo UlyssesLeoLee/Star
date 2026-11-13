@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=e28ad0d0707252aefd6ae6c2a0cfaee1aa93bedfc87978ec14136cbacb0e1068
+MERGE (self:File {path:"crates/star-agent-runtime/src/task.rs"})
+@endcypher
+*/
 //! L0 Task (per 03-DD §5.1 task_queue 业务投影 + SRS §52 幂等)。
 
 use std::time::SystemTime;

@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=e82cce15e16e5f019328fa41e9bdf176b4ebe8ed2b5e12a992f3faf3defe1195
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/exceptions.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/exceptions.py
 # spawn_subtask 6 异常类 (per docs/architecture/2026-09-09-subtask-binding/
 # 03-detailed-design.md §3.3.1.1 + 02-basic-design.md §2.7.1 失败模式)

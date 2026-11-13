@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=f4e6b42324a8b4d3a9b0b0837e5a1b208279096db71d0643c05f3e19bcefe226
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/reassign_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/reassign_node.py
 # TMO M-N6 reassign_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #

@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=5ff33f36275dff83ef288290a721f3ef4666328dd9f5e8fd5ab2356f7edbde70
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/spawn_validator.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/spawn_validator.py
 # M-30 SpawnSubtaskValidator (C-26)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.5

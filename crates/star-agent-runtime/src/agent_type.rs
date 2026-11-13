@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=30ad04005f8757f09a934b824181e53733738f2608682f42c0daf0d850847ec9
+MERGE (self:File {path:"crates/star-agent-runtime/src/agent_type.rs"})
+@endcypher
+*/
 //! AgentType — 9 SA Type (per LangGraph 9/3 02 §3, 引用不重写)。
 //!
 //! LangGraph view 的 SA-01..SA-09 是接口而非实现 (per 02-BD §1.3):

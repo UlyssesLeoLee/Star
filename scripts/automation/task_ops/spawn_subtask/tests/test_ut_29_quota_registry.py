@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=2dc5415f6f9e23be85f81debd06c09cec8fb665097c39ae929e7f354eae14dba
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_29_quota_registry.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_29_quota_registry.py
 # UT-29: SubTaskQuotaRegistry.query / increment / decrement (per 03-detailed §4.4)
 # + SCD Type 2 留痕 (对齐 003_task_quota_config.sql 语义)

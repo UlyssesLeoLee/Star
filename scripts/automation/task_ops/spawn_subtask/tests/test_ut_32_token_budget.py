@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=95ad2efac8e44bae49264552ffdfd228d70c20cddb86e5cd7e2e9d90fdb33d57
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_32_token_budget.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_32_token_budget.py
 # UT-32: SubTaskTokenBudget.record 100K 预算触发 SubTaskTokenBudgetExhausted
 # (per 03-detailed §4.4 + NFR-SB-04: 累计 = 100K 时抛异常)

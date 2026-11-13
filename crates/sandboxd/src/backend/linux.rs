@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=3dcac25964f81764e45ca84699c57d00c449919e91d891b54d2de143a5ed2404
+MERGE (self:File {path:"crates/sandboxd/src/backend/linux.rs"})
+@endcypher
+*/
 //! backend::linux — Linux 隔离后端 (per FR-5.2)
 //!
 //! | 维 | 实装 | 机制 |

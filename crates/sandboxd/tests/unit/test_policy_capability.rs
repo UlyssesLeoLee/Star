@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=ade18f6b1b867576c6f3c6e647c55d3f556c6bf077970d1397b0d6d0ba4b3856
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_policy_capability.rs"})
+@endcypher
+*/
 //! tests/unit/test_policy_capability.rs — capability 维策略单测 (per DD §5.1: 5 TC)
 //!
 //! DropAll / AllowNetBindService / Custom / 字典查询 / 5 域模板 (per D-10)。

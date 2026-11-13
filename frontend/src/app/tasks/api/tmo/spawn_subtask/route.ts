@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+MERGE (self:File {path:"frontend/src/app/tasks/api/tmo/spawn_subtask/route.ts"})
+@endcypher
+*/
 /**
  * /tasks/api/tmo/spawn_subtask proxy → FastAPI 8080
  * (per docs/architecture/2026-09-09-subtask-binding/02-basic-design.md §5 第 9 端点

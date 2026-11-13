@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=e037c5234ce7ff07e10cb8acbe086ecded86953fd07507228f670bffc9f402c5
+MERGE (self:File {path:"crates/sandboxd/tests/integration/test_grpc_create_run_destroy.rs"})
+@endcypher
+*/
 //! tests/integration/test_grpc_create_run_destroy.rs — gRPC 4 RPC 端到端 (per DD §5.2: 8 TC)
 //!
 //! 进程内启动 tonic server (127.0.0.1:0) + 真实 client 全流程:

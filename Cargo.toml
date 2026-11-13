@@ -62,6 +62,8 @@ members = [
     "crates/star-mcp",
     # WBS 6.5.2 (2026-11-14) 新增 crates/sandboxd (Sandbox-as-a-Service 独立 daemon, per SRS-SANDBOX-002 / BD-SANDBOX-002 / DD-SANDBOX-002 / docs/architecture/SANDBOX-002.md)
     "crates/sandboxd",
+    # WBS 6.2 (2026-11-14) 新增 crates/star-agent-runtime (STAR Agent Runtime 双模式骨架, per SRS-STAR-AGENT-RUNTIME-001 / ADR-0044)
+    "crates/star-agent-runtime",
     # Phase OPS-INTRY: 2026-09-08 新增 crates/star-ops (Ops Console MVP-骨架, per SRS-STAR-OPS-001.md v0.1)
     "crates/star-ops",
     # v0.38: PG 持久化 adapter (per WBS v0.37 §14.10.4 缺口 #4 app 端 PG 持久化, F-05b 立新工作项)

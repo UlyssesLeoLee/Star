@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=a6897839a478cde6c1a89ec9a28bba171463b9c9d60a88cf644fb1836eba4dc7
+MERGE (self:File {path:"crates/sandboxd/src/config.rs"})
+@endcypher
+*/
 //! `sandboxd` 配置模块 (per FR-1.1, DD-SANDBOX-002 §2.3)
 //!
 //! YAML 配置文件加载 + 校验:

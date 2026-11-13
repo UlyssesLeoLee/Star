@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=e78c93085508a80c23c9718f1235bbb9e07f433b3dd350931b9ebca80baeffcf
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_scheduler.py"})
+# @endcypher
 """test_scheduler — 调度器 (per SRS §42-§44 + 03-DD §6.1/§6.4)。"""
 
 import unittest

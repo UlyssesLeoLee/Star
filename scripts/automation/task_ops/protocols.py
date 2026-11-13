@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=c37e0016ac96318140cd872a8e843fa8c9f655778a2c52fde8985d3ac5204172
+# MERGE (self:File {path:"scripts/automation/task_ops/protocols.py"})
+# @endcypher
 # scripts/automation/task_ops/protocols.py
 # TMO 7 协议 TypedDict (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.2)
 #

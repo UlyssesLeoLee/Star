@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=4cf283860b5ab8241942e91c700414e20be0c24aee11fc7273384c8e62bfbd8e
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_events.py"})
+# @endcypher
 """test_events — EventBus + Mailbox (per SRS §26-§28 + 02-BD §5.3)。"""
 
 import unittest

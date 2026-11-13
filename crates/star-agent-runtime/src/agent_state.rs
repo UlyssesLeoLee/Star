@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=933203e9280800e18ec0c2c2307b064b08606b1c3139f0479bdffaabe6aa2e72
+MERGE (self:File {path:"crates/star-agent-runtime/src/agent_state.rs"})
+@endcypher
+*/
 //! AgentState — Agent 12 状态 + 状态机 (per SRS §10 REQ-ECS-002 + 03-DD §3.1)。
 //!
 //! 转换图 (per 03-DD §3.1):

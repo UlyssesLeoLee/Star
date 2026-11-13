@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=6ee1d08e171b88f5bda535fbf30c3a6c37d2ca1ddb3ae45bf3ac10965903749a
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_process_pool.py"})
+# @endcypher
 """test_process_pool — bounded subprocess 池 (per 02-BD §3.1 + 守门 #24)。"""
 
 import sys

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=0cc04af10a5b59c48dc0c369cb3563c926b21b05d44fad0849784ebe40c3f15b
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_orchestrator.rs"})
+@endcypher
+*/
 //! tests/unit/test_orchestrator.rs — orchestrator 单测 (per DD §5.1: 12 TC)
 //!
 //! session 创建 / 销毁 / 池化 / 容量 / 超时 / 状态机 / fail-closed (mock backend)。

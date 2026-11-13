@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=ecfcd156024f01f7b07a8ab910f33f3d1524ee5192c97fdc62ebe650c6f5ad2f
+MERGE (self:File {path:"crates/star-agent-runtime/src/components.rs"})
+@endcypher
+*/
 //! ECS Component 定义 (per SRS §12-§20 + 03-DD §2.1)。
 //!
 //! 数据原则 (per SRS §70 REQ-ECS-DATA): Component 应 Small / Flat /

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=cc0cdb4a5308884ce920ab4b9477d480189d5b3aa551590a3b94df024310de57
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_state_machine.py"})
+# @endcypher
 """test_state_machine — Agent 12 状态机 + Lifecycle HOT/WARM/COLD (per 03-DD §3)。"""
 
 import unittest

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=19752bf8ce036a671a967540c37a77e8b2bf69a0e08955ed41798ce1af87f623
+# MERGE (self:File {path:"scripts/automation/agent_runtime/taskgraph.py"})
+# @endcypher
 """agent_runtime.taskgraph — LangGraph 任务图模式 (per LangGraph 9/3 02 + TASK WBS 6.2)。
 
 LangGraph view 跟 Agent Runtime view 平行 (per 02-BD §1.3):

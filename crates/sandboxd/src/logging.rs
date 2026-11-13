@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=4adaebfa4f2c872e4291bd003d638ea4cf2b4a5db03c2a97c4f0eeebae914fd1
+MERGE (self:File {path:"crates/sandboxd/src/logging.rs"})
+@endcypher
+*/
 //! `sandboxd` logging 模块 (per BD-002 §2.1 logging)
 //!
 //! tracing 初始化: EnvFilter 默认 info (RUST_LOG 可覆盖), 含时间戳 + 模块路径。

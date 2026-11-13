@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=f099d57b2c43e650b1a1565b22b92dbd575df25e16a7455ec07757de807f6b28
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_taskgraph.py"})
+# @endcypher
 """test_taskgraph — LangGraph 语义任务图 (per LangGraph 9/3 02 + TASK WBS 6.2)。"""
 
 import unittest

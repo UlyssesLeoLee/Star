@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=0a0e2bb2fa4208a3aa4110231e2d80c4b2024b86ad5da3d676e997a1a1d21a49
+MERGE (self:File {path:"crates/sandboxd/src/policy/fs.rs"})
+@endcypher
+*/
 //! policy::fs — 文件系统维隔离策略 (per FR-3.3, 决策点 D-4 已拍板)
 //!
 //! 策略: **path allowlist 默认** (子代理需要 read worktree + 写 `$WORKTREE/.worktree-cache/`)。

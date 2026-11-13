@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=7906b170a9b02fb544a52c05def762110594b1f2decc46f5369ae0b455e90146
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_audit.rs"})
+@endcypher
+*/
 //! tests/unit/test_audit.rs — audit 模块单测 (per DD §5.1: 6 TC)
 //!
 //! JSON Lines 格式 / append-only / parseable / composite / fail-closed / PG URL 校验。

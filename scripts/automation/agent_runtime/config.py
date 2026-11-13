@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=8218f731e79904a99e7d94fb23933d235e7884e7a932048dac1c7153f9de915d
+# MERGE (self:File {path:"scripts/automation/agent_runtime/config.py"})
+# @endcypher
 """agent_runtime.config — Runtime 配置 (per SRS-STAR-AGENT-RUNTIME-001 §7.4 + §100-§101)。
 
 所有资源控制参数配置化, 不得硬编码进业务逻辑 (per SRS §7.4)。

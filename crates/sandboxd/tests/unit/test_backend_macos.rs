@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=89dfba0ad004f33597b18410a2ad27634eb4a91eff0349fcf11bb9d163890715
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_backend_macos.rs"})
+@endcypher
+*/
 //! tests/unit/test_backend_macos.rs — macOS 后端纯逻辑单测 (仅 macOS CI 跑)
 //!
 //! sandbox-exec profile 生成: network / fs 维过滤器 (per FR-5.3)。

@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=c14df035d14fe36aa3d9b9bb5cfb9284f3151ab8ffc6fa702c943c3ce5b0ce01
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/quota_registry.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/quota_registry.py
 # M-29 SubTaskQuotaRegistry (C-25)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.4

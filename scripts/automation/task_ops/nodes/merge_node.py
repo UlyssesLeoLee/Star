@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=dd4a4d7a544171230ee63cc961d7fc27af9d07d316542bee16eb0ed2b2cfe645
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/merge_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/merge_node.py
 # TMO M-N1 merge_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #

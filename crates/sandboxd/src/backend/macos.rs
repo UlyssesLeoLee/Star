@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=3adcc3369f2d67eb6dc48c75ce4ff8d56bca3b7c238b687e4c6106fe433f8286
+MERGE (self:File {path:"crates/sandboxd/src/backend/macos.rs"})
+@endcypher
+*/
 //! backend::macos — macOS 隔离后端 (per FR-5.3)
 //!
 //! macOS 走 `sandbox-exec` (seatbelt) profile, 一份 profile 覆盖 4 维:

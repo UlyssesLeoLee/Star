@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=bc5ca40c3260a1ed76914e27df125cf7dc1f05e639fd5371d64ea66368887847
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_30_child_factory.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_30_child_factory.py
 # UT-30: ChildSubAgentFactory.create 4 binding 字段写入 (per 03-detailed §4.4)
 

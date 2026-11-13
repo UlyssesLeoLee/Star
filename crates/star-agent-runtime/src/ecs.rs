@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=9c3ef408044e9488b76dc8094f6d3747387a7f4b24c7224843b8b2dc527a4c88
+MERGE (self:File {path:"crates/star-agent-runtime/src/ecs.rs"})
+@endcypher
+*/
 //! 自研 Minimal ECS (per 03-DD §1.3 选型表: 自研 = 备选, 极简)。
 //!
 //! Agent-oriented ECS (per SRS §69): **不是**游戏 ECS, 无 Frame/Scene/Transform/

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=c373a8ec0aceb9c9e1d3ed66240fc6a337c75df277c5a804283a9f405e6890bd
+MERGE (self:File {path:"crates/star-agent-runtime/src/scheduler.rs"})
+@endcypher
+*/
 //! Scheduler — Ready Queue + Priority + Fairness + HOT Slot (per SRS §42-§44
 //! + 03-DD §6.1/§6.4)。
 //!

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=a0c9eb689abda94cc14808a0f180b9607ca19842e595a63e38ce0ec18bf26df6
+# MERGE (self:File {path:"scripts/automation/agent_runtime/scheduler.py"})
+# @endcypher
 """agent_runtime.scheduler — L0/L1 调度器 (per SRS §42-§44 + 03-DD §6.1/§6.4)。
 
 职责 (per SRS §42 REQ-SCH-001):

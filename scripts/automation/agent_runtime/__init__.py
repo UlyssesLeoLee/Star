@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=31cb46242af0e77bed39d6e2ccb6e3eed34d42491eac491811095a23a516adb4
+# MERGE (self:File {path:"scripts/automation/agent_runtime/__init__.py"})
+# @endcypher
 """agent_runtime — STAR Agent Runtime 双模式 Runtime 的 Python 侧实装
 (per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md + 03-detailed-design.md)。
 

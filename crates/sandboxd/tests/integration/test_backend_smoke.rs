@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=81a4059f4383fb1dba6d9e309249d1e7a9b00786b63e67392018026cae5d66e0
+MERGE (self:File {path:"crates/sandboxd/tests/integration/test_backend_smoke.rs"})
+@endcypher
+*/
 //! tests/integration/test_backend_smoke.rs — 真实平台 backend 冒烟 (per FR-5)
 //!
 //! Windows: Job Objects (win32job) 真实子进程 + 超时 + 级联 kill + capability 拦截。

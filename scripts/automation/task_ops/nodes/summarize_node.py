@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=af4d8863f6123e4e5feaff93468f5312f100dc123936ca17df5f2adfb2ea36da
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/summarize_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/summarize_node.py
 # TMO M-N5 summarize_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #

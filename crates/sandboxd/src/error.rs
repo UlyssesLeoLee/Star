@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=edb30e1d03a5c8790409f76698a2f18f48c320f0838982c555ef8476dc7543d2
+MERGE (self:File {path:"crates/sandboxd/src/error.rs"})
+@endcypher
+*/
 //! `sandboxd` 错误模型 (per DD-SANDBOX-002 §2.1)
 //!
 //! 6-field 错误响应 (复用 star-mcp 模式): kind / message / field / details / status / trace_id。

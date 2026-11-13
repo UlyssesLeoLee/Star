@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=bbd7c7475b66aef2b5da68175993a564fb8ab78152745ee357e67baf053194b8
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_cli.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_cli.py
 # cli.py subprocess 入口测试 (per 守门 #19 v19 Python 化 + 守门 #24 v2 subprocess 范式)
 #

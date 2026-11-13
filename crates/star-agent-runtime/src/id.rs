@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=b97d2c6747d15b3368f35855f2afa293ace29d597cb8ad8b5fb78fd7abfe74f2
+MERGE (self:File {path:"crates/star-agent-runtime/src/id.rs"})
+@endcypher
+*/
 //! Newtype ID 类型 (per 03-DD §2.1 类型别名)。
 //!
 //! 03-DD §2.1 定义 `pub type AgentId = Uuid;` 等 14 个别名。本骨架 std-only,

@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=add88486c094645045aea53152a5a07854af27dee96a83e53be791c144cb74d7
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/exclusive_guard.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/exclusive_guard.py
 # M-28 ExclusiveBindingGuard (C-24)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.3

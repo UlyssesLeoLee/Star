@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=6141ba064994e636efe0a723705f8b6b75062c7e5078a4c942ade0815dc9c233
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/spawn_subtask_node.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/spawn_subtask_node.py
 # M-26 M-N8 spawn_subtask_node (C-26 + C-27 协作)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.1.1

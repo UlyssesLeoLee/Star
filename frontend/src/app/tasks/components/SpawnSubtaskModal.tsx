@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+MERGE (self:File {path:"frontend/src/app/tasks/components/SpawnSubtaskModal.tsx"})
+@endcypher
+*/
 "use client";
 
 /**

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=53a3a9e815050661b2e4b123cd63778e623d0e3c744f18cab87c65b4aff8b7de
+MERGE (self:File {path:"crates/sandboxd/src/bin/sandboxd.rs"})
+@endcypher
+*/
 //! `sandboxd` binary 入口 (per FR-1.1, DD-SANDBOX-002 §1.1)
 //!
 //! 启动 daemon: 配置加载 → tracing → audit sink 组装 → orchestrator → gRPC + HTTP serve。

@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=9f7f0ebc214c6933a8f6f50409b9c66e3619c3a87b6e78c573e81a22800241a8
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_27_spawn_validator.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_27_spawn_validator.py
 # UT-27: SpawnSubtaskValidator.check_parent_state (5 state × 2 expected, per 03-detailed §4.4)
 # + check_sa_type / check_self_spawn / check_parent_not_exclusive / check_quota

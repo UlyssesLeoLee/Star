@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=4b5f2015c6ed111a378b61a5d415e20a2bbd69f244a070098d8997029b793d77
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/event_bus.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/event_bus.py
 # M-32 ParentChildEventBus (C-28)
 # per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md §3.3.7

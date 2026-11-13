@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=1c983b6125f101699fe97cdc1f22a10ee04f162929c0983cdefc87140e03d134
+# MERGE (self:File {path:"scripts/automation/agent_runtime/retry.py"})
+# @endcypher
 """agent_runtime.retry — 有限重试 + 指数退避 (per SRS §51 REQ-RETRY-001 + 03-DD §7)。
 
 错误分类 (per 03-DD §7.1):

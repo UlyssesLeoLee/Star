@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=bc96740089570e8ec45ccaff3b2b08324fe34fbe8e67c3324ccd54c49c9c978d
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_models.py"})
+# @endcypher
 """test_models — 数据模型 (per SRS §8-§28 + 03-DD §2.1)。"""
 
 import unittest

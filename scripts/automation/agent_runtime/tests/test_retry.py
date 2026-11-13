@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=c9793506e2b55eb224bf1637635aae2c07414d6baebaf5ca634cc43277574007
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_retry.py"})
+# @endcypher
 """test_retry — 有限重试 + 指数退避 (per SRS §51 + 03-DD §7)。"""
 
 import unittest

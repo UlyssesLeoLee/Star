@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=b932962cd4a331a3e9ef08a1f68cef26afa81c94a5cca4a57a95be35f1264566
+# MERGE (self:File {path:"scripts/automation/agent_runtime/rate_limiter.py"})
+# @endcypher
 """agent_runtime.rate_limiter — Token Bucket 速率控制 (per 02-BD §3.1 RateLimiter)。
 
 职责: per-tenant / per-agent 速率控制 (per SRS §42 调度器职责 + §57 Fair)。

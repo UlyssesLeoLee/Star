@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=f6e1bb6344d0e33cc8612919717dd2890b1b18f3b9d9f61ad61c6b4cb6e28342
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_28_exclusive_guard.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_28_exclusive_guard.py
 # UT-28: ExclusiveBindingGuard.is_exclusive / check_reassign_allowed (per 03-detailed §4.4)
 # + check_merge_allowed / check_split_allowed (per F-28 互斥)

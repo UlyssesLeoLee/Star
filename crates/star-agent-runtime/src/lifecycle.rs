@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=cb5bcc78cf3579ef084579f1e16138cd3acddc0783a9169ea41403009bab8fa7
+MERGE (self:File {path:"crates/star-agent-runtime/src/lifecycle.rs"})
+@endcypher
+*/
 //! LifecycleState — HOT/WARM/COLD + LifecycleManager (per SRS §11/§21-§25
 //! + 03-DD §3.2)。
 //!

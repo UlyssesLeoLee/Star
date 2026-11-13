@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=86d59719d676005854942434c29e65a39da7828000fed6d284312d7184cad761
+MERGE (self:File {path:"crates/sandboxd/src/policy/resource.rs"})
+@endcypher
+*/
 //! policy::resource — 资源维隔离策略 (per FR-3.1)
 //!
 //! `ResourcePolicy` = SANDBOX-001 v0.2 §3.1 `SandboxLimits` 100% 复用:

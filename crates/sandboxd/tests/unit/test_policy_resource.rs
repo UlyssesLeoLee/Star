@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=a3fa6e3d68b6923d6982a6b87c7383a797a1ff90268d174be5ac911bb8fd21dd
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_policy_resource.rs"})
+@endcypher
+*/
 //! tests/unit/test_policy_resource.rs — resource 维策略单测 (per DD §5.1: 8 TC)
 //!
 //! 默认值 / 边界 / 0=不限 / 大值 / 校验 / JSON 序列化 / proto 互转。

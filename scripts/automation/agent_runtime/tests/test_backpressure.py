@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=6ab237e8a1690199dc2658b4fa4beb642e47c5ac6b646a9c1614415f31e0f4f4
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_backpressure.py"})
+# @endcypher
 """test_backpressure — 反压 + 5 溢出策略 (per SRS §46-§47 + 03-DD §6.3)。"""
 
 import unittest

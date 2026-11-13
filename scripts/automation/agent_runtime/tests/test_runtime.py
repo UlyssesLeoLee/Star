@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=0e36221e8bcc7c526bf7be5ded4614a23c13386be075ca2efb41ed47316ee289
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_runtime.py"})
+# @endcypher
 """test_runtime — AgentRuntime facade (per SRS §85 + 03-DD §4.1 UC-01)。"""
 
 import unittest

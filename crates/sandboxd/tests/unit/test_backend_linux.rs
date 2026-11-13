@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=8a5b23bb4c94cd926464a4e6ff2c63f871c34888fb6013da3f4755e12da1ff3c
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_backend_linux.rs"})
+@endcypher
+*/
 //! tests/unit/test_backend_linux.rs — Linux 后端纯逻辑单测 (仅 Linux CI 跑)
 //!
 //! cgroup 限制构造 / netns iptables 脚本 / capsh argv / fs bind 脚本 / wrap argv。

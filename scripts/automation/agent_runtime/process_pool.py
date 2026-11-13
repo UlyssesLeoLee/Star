@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=d21a6feb9c1281ac841407a7bb224c831f3d7cf715b61021230627e449e31921
+# MERGE (self:File {path:"scripts/automation/agent_runtime/process_pool.py"})
+# @endcypher
 """agent_runtime.process_pool — 常驻 subprocess worker 池 (per 02-BD §3.1 ProcessPool)。
 
 职责: 8-16 常驻 worker (per 02-BD §3.1), 替代 RPC 走 subprocess (per 守门 #24)。

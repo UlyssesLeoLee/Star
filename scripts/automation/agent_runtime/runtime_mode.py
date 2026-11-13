@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=b7e996d81c218062d01e1f0caf403f8f11c2ca227bc22ee0d0aa86f74f73e5c1
+# MERGE (self:File {path:"scripts/automation/agent_runtime/runtime_mode.py"})
+# @endcypher
 """agent_runtime.runtime_mode — Runtime 双模式管理 (per SRS §6-§7)。
 
 规则 (per SRS §7.1 STAR 适配: L0 调度层永远在, 模式切换只针对 L1):

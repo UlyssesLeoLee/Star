@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=cf47ab7b050279d14abcdf880e70fc1a7731d6cb7caff8d605e1b8adc8a95fc8
+# MERGE (self:File {path:"scripts/automation/agent_runtime/events.py"})
+# @endcypher
 """agent_runtime.events — EventBus + Mailbox (per SRS §26-§28 + 03-DD §4.3)。
 
 Event Driven (per SRS §26 REQ-EVT-001): Agent 不通过持续轮询保持活跃,

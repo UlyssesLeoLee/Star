@@ -84,12 +84,12 @@
 | 5.5.6 | Rust 原生消息传输 provider（platform-messaging，NATS 可替换 adapter） | Ulysses |  |  |  |  |  | 进行中 |
 | 6 | Agent 与自动化能力实装 | Ulysses |  |  |  |  |  | 进行中 |
 | 6.1 | LangGraph TMO 7 节点、SA-10 与 /api/tmo 端点 | Ulysses |  |  | 2026-09-05 |  | 100 | 已完成 |
-| 6.2 | Agent Runtime 实装（ECS 双模式 Runtime） |  |  |  |  |  | 0 | 未开始 |
-| 6.3 | Sub-task Binding 实装（spawn_subtask 节点与 3 张表） |  |  |  |  |  | 0 | 未开始 |
+| 6.2 | STAR Agent Runtime 双模式实装骨架 (Python LangGraph 语义 28 模块 3943 行 + Rust ECS 骨架 3390 行, 136+52 tests) | Ulysses |  |  | 2026-11-14 |  | 90 | 进行中 |
+| 6.3 | Sub-task Binding 实装 (M-26..M-33 8 模块 + 3 DDL + UI modal/API, 71 tests) | Ulysses |  |  | 2026-11-14 |  | 90 | 进行中 |
 | 6.4 | PreToolUse 安全拦截层（guardian） | Ulysses |  |  | 2026-09-10 |  | 100 | 已完成 |
 | 6.5 | 子代理 Sandbox | Ulysses |  |  |  |  |  | 进行中 |
 | 6.5.1 | Python 软约束 Sandbox（v37） | Ulysses |  |  | 2026-09-10 |  | 100 | 已完成 |
-| 6.5.2 | Rust sandboxd（SBX-01–SBX-08） |  |  |  |  |  | 0 | 未开始 |
+| 6.5.2 | sandboxd 独立 daemon 实装 (tonic 4 RPC + 4 维隔离 + 三平台 backend + 91 tests) | Ulysses |  |  | 2026-11-14 |  | 90 | 进行中 |
 | 6.6 | 自动化 Python 脚本体系与调试控制台 | Ulysses |  |  | 2026-09-02 |  | 100 | 已完成 |
 | 7 | Worktree-first 平台（W0–W16） | Ulysses |  |  |  |  |  | 进行中 |
 | 7.1 | W0 安全收敛基线（main / dev / worktree 收敛） | Ulysses |  |  |  |  |  | 进行中 |
@@ -167,7 +167,7 @@
 | 9.3 | Playwright E2E 与 UAT 固定数据 | Ulysses |  |  | 2026-09-07 |  | 100 | 已完成 |
 | 9.4 | star-flash-mock 回归与跨项目 mock 切换校验 | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 9.5 | 覆盖率基线（tarpaulin，advisory） | Ulysses |  |  | 2026-09-28 |  | 100 | 已完成 |
-| 9.6 | 覆盖率提升至 90%（ULYS-154 PR-2–PR-4） |  |  |  |  |  | 0 | 未开始 |
+| 9.6 | 覆盖率提升至 90% (第一批: 6 crate +252 用例, 5138 行) | Ulysses |  |  | 2026-11-14 |  | 60 | 进行中 |
 | 9.7 | 安全测试执行（租户隔离 / RLS / 载荷安全） | Ulysses |  |  |  |  |  | 进行中 |
 | 9.8 | UAT 实施（UAT-PLAN-OPS-001） |  |  |  |  |  | 0 | 未开始 |
 | 9.9 | 性能测试执行 |  |  |  |  |  | 0 | 未开始 |

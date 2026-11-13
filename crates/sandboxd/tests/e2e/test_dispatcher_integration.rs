@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=d01e16e385ad4c3b020865c01ab5c3cf7a1b9489103b6c9b485b30653354db94
+MERGE (self:File {path:"crates/sandboxd/tests/e2e/test_dispatcher_integration.rs"})
+@endcypher
+*/
 //! tests/e2e/test_dispatcher_integration.rs — dispatcher.py 集成 e2e (per DD §5.3: 4 TC)
 //!
 //! 模拟 dispatcher.py 调用流: 进程内 daemon (真实 backend) + client 全生命周期 +

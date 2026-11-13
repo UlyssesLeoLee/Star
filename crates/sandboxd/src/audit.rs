@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=cc5f1f59ce6cae9be5fc2867e6ea72faaddd0bfc77fdccca0508a647e7b4da68
+MERGE (self:File {path:"crates/sandboxd/src/audit.rs"})
+@endcypher
+*/
 //! `sandboxd` audit 模块 (per FR-6.2, BD-002 §4.4)
 //!
 //! audit log 11 字段 (per FR-6.2): session_id / client_id / task_id / event_type /

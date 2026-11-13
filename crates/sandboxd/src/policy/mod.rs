@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=1be3279e210dee83122edadc2934a46036a07edbe96b87df749276ae7e0b73fe
+MERGE (self:File {path:"crates/sandboxd/src/policy/mod.rs"})
+@endcypher
+*/
 //! `sandboxd` policy 模块 — 4 维隔离策略 (per FR-3, DD-SANDBOX-002 §2.1)
 //!
 //! - [`resource`](resource) 资源维 (per SANDBOX-001 v0.2 §3.1 SandboxLimits, 100% 复用)

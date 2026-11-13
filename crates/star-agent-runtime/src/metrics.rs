@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=8af308ac79c136f867af31effe3fb64aa36433800f4472754b7921b1643b8ead
+MERGE (self:File {path:"crates/star-agent-runtime/src/metrics.rs"})
+@endcypher
+*/
 //! 可观测性指标 (per SRS §61 REQ-OBS-001 + 02-BD §6.4)。
 //!
 //! 指标清单全量落字段 (per SRS §61); Trace (per SRS §62) 由 TraceId 贯穿

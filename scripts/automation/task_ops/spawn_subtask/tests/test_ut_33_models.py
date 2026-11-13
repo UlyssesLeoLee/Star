@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=8e8fe01f59a8603a2de09b707a29f6e550bf8aa6171e733b8320d034c4145361
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/tests/test_ut_33_models.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/tests/test_ut_33_models.py
 # UT-33: SpawnSubtaskRequest 校验拒绝 SA-10 自嵌套 (per 03-detailed §4.4)
 # + 其余字段约束 (per 01 §2 F-27)

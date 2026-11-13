@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=0780ce915d9718b8cd7cea643762a8e03053f52915be6fcd5cefa40726591577
+# MERGE (self:File {path:"scripts/automation/agent_runtime/metrics.py"})
+# @endcypher
 """agent_runtime.metrics — 可观测性指标 (per SRS §61 REQ-OBS-001 + 02-BD §6.4)。
 
 指标清单 (per SRS §61, 全量落字段):

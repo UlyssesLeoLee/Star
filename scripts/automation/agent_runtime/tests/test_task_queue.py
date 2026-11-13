@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=0d2384417adcfcef3a853572d9511237ce9cb094bca2c64737f7c0b666f0943f
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_task_queue.py"})
+# @endcypher
 """test_task_queue — SQLite WAL 任务队列 (per 03-DD §5.1/§5.2 + §2.2)。"""
 
 import unittest

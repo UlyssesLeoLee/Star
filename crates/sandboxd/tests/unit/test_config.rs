@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=2e3c4aa8ae332df822c7dcff54315c709e5db6ef9d14b72b8e55565c67fe70fa
+MERGE (self:File {path:"crates/sandboxd/tests/unit/test_config.rs"})
+@endcypher
+*/
 //! tests/unit/test_config.rs — config 模块单元测试 (per DD §5.1 test_config: 6 TC)
 //!
 //! YAML 加载 / 校验 / 边界 / 缺字段 / 类型错误 / 默认值。

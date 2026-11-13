@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=f2dbc16c671d46520850533694bd997d4704b94d82f4052b6bd58e3f277a634e
+# MERGE (self:File {path:"scripts/automation/task_ops/spawn_subtask/cli.py"})
+# @endcypher
 # scripts/automation/task_ops/spawn_subtask/cli.py
 # spawn_subtask subprocess 入口 (per 守门 #19 v19 agent 交互 Python 化 + 守门 #24 v2
 # subprocess 替代 RPC: console_server.py → subprocess.run 本模块)

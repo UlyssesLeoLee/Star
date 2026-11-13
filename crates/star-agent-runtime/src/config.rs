@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=b5c600e56047d640a3a7e2c59faa33f8f650029c8f43a0caa61bafac3ac4350d
+MERGE (self:File {path:"crates/star-agent-runtime/src/config.rs"})
+@endcypher
+*/
 //! RuntimeConfig (per SRS §100-§101 + §7.4 + §30 + 03-DD §3.2)。
 //!
 //! 所有资源控制参数配置化 (per SRS §100), 默认值 Fail Safe (per SRS §101):

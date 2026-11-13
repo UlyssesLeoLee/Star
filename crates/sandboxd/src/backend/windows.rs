@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=421a53da64bacf269cb63708abeac01f448825f90a91b15b107577c92176c947
+MERGE (self:File {path:"crates/sandboxd/src/backend/windows.rs"})
+@endcypher
+*/
 //! backend::windows — Windows 隔离后端 (per FR-5.1)
 //!
 //! | 维 | v0.1 实装 | v0.2 拍摄 (per DD §5.1 v0.1 简化标注) |

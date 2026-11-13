@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=3ce4f55c1e6fefdb0fcd64bdcb4f61fa601401f1b3d154429bda0ca5ad51d6b8
+MERGE (self:File {path:"crates/sandboxd/src/orchestrator.rs"})
+@endcypher
+*/
 //! `sandboxd` orchestrator 模块 (per FR-1.2 session 池化 + FR-4 session 生命周期, DD §2.1 / §4.1)
 //!
 //! - session 池: `DashMap<Uuid, Arc<Session>>` 并发安全 (per DD §2.1)

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=3c934afd0ab783463bde9a28d06ef7dc5b588016acd062458632ff823be9db9d
+MERGE (self:File {path:"crates/star-agent-runtime/tests/integration.rs"})
+@endcypher
+*/
 //! star-agent-runtime 集成测试 (per 03-DD §9.1 UT 类 + 守门 #1 v25 单 crate 模式)。
 //!
 //! 覆盖: ID / AgentType / Agent 状态机 (12 态) / Lifecycle (HOT/WARM/COLD) /

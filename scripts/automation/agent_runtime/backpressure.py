@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=4a61d799da386e2c28149d5c8bdf931557fb9609dcad4ccba4391ad24d9cf83b
+# MERGE (self:File {path:"scripts/automation/agent_runtime/backpressure.py"})
+# @endcypher
 """agent_runtime.backpressure — 反压 + 队列溢出策略 (per SRS §46-§47 + 03-DD §6.3)。
 
 反压 (per SRS §46 REQ-SCH-004):

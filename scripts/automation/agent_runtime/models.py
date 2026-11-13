@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=4db6d7dc354f0ee56323dca5c767dfd9e2b3932b47e86b852cb3bc2cc0cd68e6
+# MERGE (self:File {path:"scripts/automation/agent_runtime/models.py"})
+# @endcypher
 """agent_runtime.models — 核心数据模型 (per SRS §8-§20 + 03-DD §2.1 关键类型)。
 
 Agent = Identity + State + References + Policies (per SRS §8):

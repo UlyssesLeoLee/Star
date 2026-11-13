@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=aca2ffbe5108ec3cf5885cf2dd5c733f82c50391d8821da290765d5f643d3e54
+MERGE (self:File {path:"crates/sandboxd/src/health.rs"})
+@endcypher
+*/
 //! `sandboxd` health 模块 (per FR-6.3, BD-002 §6.5)
 //!
 //! `/healthz` 返回 `{status, uptime_sec, sessions_active, sessions_total, version}`,

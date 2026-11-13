@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=d0ae07260fe897fb49687b4b536e79462ffec69e000d0ae9b7536646a6af1480
+# MERGE (self:File {path:"scripts/automation/agent_runtime/tests/test_rate_limiter.py"})
+# @endcypher
 """test_rate_limiter — Token Bucket (per 02-BD §3.1 RateLimiter)。"""
 
 import unittest

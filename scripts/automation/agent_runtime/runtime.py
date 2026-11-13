@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=6228a723a393fe0be8f0cd91164c4a9e15752ba3a15a09b78379687dd924eb3c
+# MERGE (self:File {path:"scripts/automation/agent_runtime/runtime.py"})
+# @endcypher
 """agent_runtime.runtime — AgentRuntime facade (per 02-BD §5.1 Runtime API)。
 
 Runtime API (per SRS §85 REQ-API-001 + 02-BD §5.1):
