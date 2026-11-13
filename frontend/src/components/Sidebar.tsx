@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9932c6caac9a775ccd4788c27391d80c4cddb50aad20387df0f0980310551f42
+@cypher schema=1 source_sha256=95a57c941d50b4ad88e7b516a6a73e5a03c007a29c028d166776dfae1674a385
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -30,7 +30,7 @@ import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavStore, WORKTREE_INDEX_OWNED_MODULES } from "@/lib/nav/navStore";
-import { MODULE_MAP, getCategoryStyles, type ModuleDefinition, type ModuleCategory } from "@/lib/nav/registry";
+import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type ModuleCategory, type NavGroupId } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import {
   findSubNavGroup,
@@ -124,8 +124,31 @@ export function Sidebar() {
   const hasSelectedProject = projectIndexHint.trim().length > 0;
   const isProjectWorkspacePath = pathname === "/projects" || pathname.startsWith("/projects/");
   const isProjectWorktreePath = pathname === "/worktree" || pathname.startsWith("/worktree/");
+
+  // =====================================================================
+  // 5 组结构分组解析 (per ui-3pane-arch §1.2 v0.2)
+  // =====================================================================
+  // 组内模块: 按 NAV_GROUPS id 映射, 过滤 WORKTREE_INDEX_OWNED_MODULES
+  // (worktree 等集中在 Project Worktree Index, per 2026-11-12 用户发令去重)
+  const groupModules = (groupId: NavGroupId): ModuleDefinition[] =>
+    NAV_GROUPS[groupId]
+      .map((id) => MODULE_MAP.get(id))
+      .filter((m): m is ModuleDefinition => Boolean(m))
+      .filter((m) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id));
+
+  // 未映射模块 → "其他入口" 兜底 (设计映射表未覆盖, per 守门 #11 不消失)
+  const mappedIds = new Set<string>(Object.values(NAV_GROUPS).flat());
+  const otherModuleIds = [...MODULE_MAP.keys()].filter(
+    (id) => !mappedIds.has(id) && !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id),
+  );
+  const otherModules = otherModuleIds
+    .map((id) => MODULE_MAP.get(id))
+    .filter((m): m is ModuleDefinition => Boolean(m));
+
   const isOtherEntryActive =
-    visibleSidebarModules.some(isModuleActive) || visiblePinnedModules.some(isModuleActive);
+    visibleSidebarModules.some(isModuleActive) ||
+    visiblePinnedModules.some(isModuleActive) ||
+    otherModuleIds.some((id) => isModuleActive(MODULE_MAP.get(id)!));
 
   // 键盘快捷键 Ctrl+B 折叠/展开 (per 守门 #11 缺标比错标: shortcut 是 power user
   // 必备延伸, 不强制; 这里落地)
@@ -246,7 +269,7 @@ export function Sidebar() {
 
       {/* === Scope Toggle (Main / Project) — 仅展开态可见 === */}
       {/* per 2026-09-03 12:36 JST 拍板 #2: 顶部 brand block 下方 */}
-      {/* === Navigation Groups === */}
+      {/* === Navigation Groups (per ui-3pane-arch §1.2 v0.2: 5 组结构) === */}
       <nav
         className={clsx(
           "flex-1 overflow-y-auto text-sm scrollbar-none",
@@ -269,10 +292,92 @@ export function Sidebar() {
             collapsed={isCollapsed}
           />
         )}
-        {!isProjectWorkspacePath && !hasSelectedProject && !isProjectWorktreePath && (
-          <EmptyProjectState collapsed={isCollapsed} />
-        )}
 
+        {/* Home 核心区 (per §1.2: 常驻置顶, 不可折叠, accent 边框 + core 徽标) */}
+        <NavGroupSection
+          testId="sidebar-group-home-core"
+          label={t.sidebar.navHome}
+          modules={groupModules("home-core")}
+          collapsed={isCollapsed}
+          showCoreBadge
+          isActive={isModuleActive}
+        />
+
+        {/* 个人区 (per §1.2: 默认折叠为 1 行摘要) */}
+        <details
+          data-testid="sidebar-group-home-personal"
+          className="border-t border-line/60 pt-3"
+          open={groupModules("home-personal").some(isModuleActive)}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded px-2 py-2 text-xs font-semibold text-ink-mute hover:bg-bg-soft/60 hover:text-ink">
+            <span className={clsx(isCollapsed && "sr-only")}>
+              {t.sidebar.navPersonal} ({groupModules("home-personal").length})
+            </span>
+          </summary>
+          {!isCollapsed && (
+            <NavModuleList modules={groupModules("home-personal")} collapsed={isCollapsed} isActive={isModuleActive} />
+          )}
+        </details>
+
+        {/* 视图组 (per §1.2.1: 项目内视图预设) */}
+        <NavGroupSection
+          testId="sidebar-group-view"
+          label={t.sidebar.navView}
+          modules={groupModules("view")}
+          collapsed={isCollapsed}
+          isActive={isModuleActive}
+        />
+
+        {/* 管理组 (per §1.2.1: 4 个二级子组) */}
+        <details
+          data-testid="sidebar-group-admin"
+          className="border-t border-line/60 pt-3"
+          open={["admin-org", "admin-integration", "admin-ops", "admin-dev"].some((g) =>
+            groupModules(g as NavGroupId).some(isModuleActive),
+          )}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded px-2 py-2 text-xs font-semibold text-ink-mute hover:bg-bg-soft/60 hover:text-ink">
+            <span className={clsx(isCollapsed && "sr-only")}>{t.sidebar.navAdmin}</span>
+          </summary>
+          {!isCollapsed && (
+            <div className="mt-2 space-y-4">
+              <NavGroupSection
+                testId="sidebar-group-admin-org"
+                label={t.sidebar.navAdminOrg}
+                modules={groupModules("admin-org")}
+                collapsed={isCollapsed}
+                sub
+                isActive={isModuleActive}
+              />
+              <NavGroupSection
+                testId="sidebar-group-admin-integration"
+                label={t.sidebar.navAdminIntegration}
+                modules={groupModules("admin-integration")}
+                collapsed={isCollapsed}
+                sub
+                isActive={isModuleActive}
+              />
+              <NavGroupSection
+                testId="sidebar-group-admin-ops"
+                label={t.sidebar.navAdminOps}
+                modules={groupModules("admin-ops")}
+                collapsed={isCollapsed}
+                sub
+                isActive={isModuleActive}
+              />
+              <NavGroupSection
+                testId="sidebar-group-admin-dev"
+                label={t.sidebar.navAdminDev}
+                modules={groupModules("admin-dev")}
+                collapsed={isCollapsed}
+                sub
+                isActive={isModuleActive}
+              />
+            </div>
+          )}
+        </details>
+
+        {/* 其他入口兜底 (设计映射表未覆盖 + 用户钉选自定义, per 守门 #11 不消失) */}
         <details
           data-testid="sidebar-other-entries"
           className="border-t border-line/60 pt-3"
@@ -284,7 +389,7 @@ export function Sidebar() {
               <span className={clsx(isCollapsed && "sr-only")}>{t.sidebar.otherPages}</span>
             </span>
             <span className={clsx("text-[10px] font-mono", isCollapsed && "sr-only")}>
-              {visibleSidebarModules.length + visiblePinnedModules.length}
+              {visibleSidebarModules.length + visiblePinnedModules.length + otherModuleIds.length}
             </span>
           </summary>
           <div className="mt-3 space-y-5">
@@ -331,6 +436,30 @@ export function Sidebar() {
                       removeTitle={tx(t.sidebar.removeFromPinned, { label: "" })}
                       dataTestIdBase="sidebar-item"
                       removeDataTestIdBase="remove-pinned"
+                      collapsed={isCollapsed}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {otherModuleIds.length > 0 && (
+              <div>
+                {!isCollapsed && (
+                  <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
+                    <span>{t.sidebar.navOther}</span>
+                  </div>
+                )}
+                <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
+                  {otherModules.map((item) => (
+                    <SidebarRow
+                      key={item.id}
+                      module={item}
+                      active={isModuleActive(item)}
+                      onRemove={() => undefined}
+                      removeTitle=""
+                      dataTestIdBase="sidebar-item"
+                      removeDataTestIdBase="remove-other"
                       collapsed={isCollapsed}
                     />
                   ))}
@@ -454,6 +583,133 @@ function SubNavGroupRow({ item, href, active, collapsed }: SubNavGroupRowProps) 
         )}
       </Link>
     </li>
+  );
+}
+
+// =====================================================================
+// NavGroupSection / NavModuleList — Sidebar 5 组结构渲染
+// (per ui-3pane-arch §1.2 v0.2, 2026-11-13 用户发令)
+// =====================================================================
+
+interface NavModuleListProps {
+  modules: ModuleDefinition[];
+  collapsed: boolean;
+  isActive: (m: ModuleDefinition) => boolean;
+  showCoreBadge?: boolean;
+}
+
+function NavModuleList({ modules, collapsed, isActive, showCoreBadge }: NavModuleListProps) {
+  return (
+    <ul className={clsx(collapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
+      {modules.map((item) => (
+        <NavModuleRow
+          key={item.id}
+          item={item}
+          active={isActive(item)}
+          collapsed={collapsed}
+          showCoreBadge={showCoreBadge}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function NavModuleRow({
+  item,
+  active,
+  collapsed,
+  showCoreBadge,
+}: {
+  item: ModuleDefinition;
+  active: boolean;
+  collapsed: boolean;
+  showCoreBadge?: boolean;
+}) {
+  const mod = useModuleTranslation(item);
+  const Icon = item.icon;
+  const cs = getCategoryStyles(item.category);
+  return (
+    <li>
+      <Link
+        href={item.href}
+        data-testid={`sidebar-item-${item.id}`}
+        data-active={active ? "true" : "false"}
+        aria-current={active ? "page" : undefined}
+        className={clsx(
+          "relative flex items-center rounded-xl text-sm font-medium transition-all duration-200",
+          collapsed ? "justify-center p-1.5" : "gap-2.5 px-2.5 py-1.5",
+          active
+            ? "bg-bg-soft/80 text-ink border border-line shadow-soft font-semibold"
+            : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink border border-transparent"
+        )}
+      >
+        <div
+          className={clsx(
+            "rounded-lg grid place-items-center shrink-0 border transition-all duration-200",
+            collapsed ? "size-9" : "size-8",
+            cs.bg,
+            cs.border,
+            cs.text,
+            active && clsx(cs.bgActive, cs.borderActive, cs.glow)
+          )}
+          aria-hidden="true"
+        >
+          <Icon size={collapsed ? 16 : 15} strokeWidth={2.25} />
+        </div>
+        {!collapsed && (
+          <>
+            <span className="flex-1 truncate tracking-tight">{mod.label}</span>
+            {/* core 徽标 (per §1.2 核心区 visual treatment) */}
+            {showCoreBadge && (
+              <span
+                data-testid={`sidebar-core-badge-${item.id}`}
+                className="text-[8px] font-mono uppercase px-1 py-0.5 rounded border border-accent/50 bg-accent/10 text-accent"
+              >
+                core
+              </span>
+            )}
+            {item.count !== undefined && item.count > 0 && (
+              <span className="text-[10px] font-mono text-ink-mute px-1.5 py-0.5 rounded border border-line/50 bg-bg/40">
+                {item.count}
+              </span>
+            )}
+            {active && <span className={clsx("size-1.5 rounded-full animate-pulse", cs.dot)} aria-hidden="true" />}
+          </>
+        )}
+        {collapsed && active && (
+          <span className={clsx("absolute top-0.5 right-0.5 size-1.5 rounded-full", cs.dot)} aria-hidden="true" />
+        )}
+      </Link>
+    </li>
+  );
+}
+
+interface NavGroupSectionProps {
+  testId: string;
+  label: string;
+  modules: ModuleDefinition[];
+  collapsed: boolean;
+  isActive: (m: ModuleDefinition) => boolean;
+  showCoreBadge?: boolean;
+  /** 二级子组: 小号 label, 无顶部边框 */
+  sub?: boolean;
+}
+
+function NavGroupSection({ testId, label, modules, collapsed, isActive, showCoreBadge, sub }: NavGroupSectionProps) {
+  return (
+    <section data-testid={testId} className={clsx(!sub && "border-t border-line/60 pt-3")}>
+      {!collapsed && (
+        <div
+          className={clsx(
+            "px-2.5 py-1 font-mono uppercase tracking-wider text-ink-mute",
+            sub ? "text-[9px]" : "text-[10px] font-bold"
+          )}
+        >
+          {label}
+        </div>
+      )}
+      <NavModuleList modules={modules} collapsed={collapsed} isActive={isActive} showCoreBadge={showCoreBadge} />
+    </section>
   );
 }
 

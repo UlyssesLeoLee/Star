@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6d18d3dcdaed823527029c5c420867a217fde5a29d180201137122263bd3fc80
+@cypher schema=1 source_sha256=47dc0ca0316ebac9423cc98dc0f3c3324b2f3709a1d53343e3a871cb46ff1756
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -111,6 +111,15 @@ export const en: Dictionary = {
   sidebar: {
     brandTagline: "VIBE CONTROL PLANE",
     vibeControlPlane: "VIBE CONTROL PLANE",
+    navHome: "Home",
+    navPersonal: "Personal",
+    navView: "Views",
+    navAdmin: "Admin",
+    navAdminOrg: "Organization",
+    navAdminIntegration: "Integration",
+    navAdminOps: "Operations",
+    navAdminDev: "Developer",
+    navOther: "Other entries",
     otherPages: "Other pages",
     projectNavigation: "Project navigation",
     openProjectDirectory: "Open the Project → LANE → Worktree → Branch directory",

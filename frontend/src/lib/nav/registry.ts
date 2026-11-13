@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=15140c5ad3af5a1d98d4b2ee2c677e138e0560fba9e4eccb961e0a7f2e3b1bb2
+@cypher schema=1 source_sha256=eaa7f0f272d151c1e1f69e40dbccc00d22ec22bb9dbe9403bfc7a36aa200cfbe
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -572,3 +572,68 @@ export const ALL_MODULES: ModuleDefinition[] = [
 export const MODULE_MAP = new Map<string, ModuleDefinition>(
   ALL_MODULES.map((m) => [m.id, m])
 );
+
+// =====================================================================
+// NAV_GROUPS — Sidebar 5 组结构 (per docs/frontend/design/ui-3pane-arch.md
+// §1.2 v0.2 + §1.2.1 26 路由映射, 2026-11-13 用户发令 "左侧导航按文档")
+//
+// 组结构: home-core (常驻置顶, 不可折叠) / home-personal (默认折叠)
+//        / project (分组落地页) / view (项目内视图预设)
+//        / admin-org / admin-integration / admin-ops / admin-dev (4 二级子组)
+// 未映射模块 (issues/analytics/settings/agent-windows/agent-view 等)
+// 落 "other" 兜底折叠区 (守门 #11 缺标比错标: 不消失)。
+// =====================================================================
+export type NavGroupId =
+  | "home-core"
+  | "home-personal"
+  | "project"
+  | "view"
+  | "admin-org"
+  | "admin-integration"
+  | "admin-ops"
+  | "admin-dev"
+  | "other";
+
+export const NAV_GROUPS: Record<NavGroupId, string[]> = {
+  // per §1.2 核心区 5 项 (Review 无独立路由 → 缺标, 4 项落地)
+  "home-core": ["worktree", "agents", "feedback", "validation"],
+  // per §1.2 个人区 (提及我/已关注/草稿 无页面 → 缺标, 只留 inbox)
+  "home-personal": ["inbox"],
+  // per §1.2.1 /project + /planning → 项目
+  project: ["projects", "planning"],
+  // per §1.2.1 视图预设 (列表/日历/概览 无独立页 → 缺标)
+  view: ["kanban", "timeline", "backlog"],
+  // per §1.2.1 管理 → 组织
+  "admin-org": ["tenant", "identity", "permission", "admin"],
+  // per §1.2.1 管理 → 集成
+  "admin-integration": ["scm", "integration", "webhooks", "api-keys", "cli-profiles"],
+  // per §1.2.1 管理 → 运维
+  "admin-ops": ["local-runtime", "audit", "automation", "remote"],
+  // per §1.2.1 管理 → 开发者 (过渡)
+  "admin-dev": [
+    "development",
+    "workflow",
+    "relation",
+    "context",
+    "refactor",
+    "nema",
+    "advanced-settings",
+    "developer-console",
+    "search",
+  ],
+  // 兜底: 设计映射表未覆盖 + 用户钉选自定义
+  other: [],
+};
+
+/** 分组显示顺序 (Sidebar 渲染顺序) */
+export const NAV_GROUP_ORDER: NavGroupId[] = [
+  "home-core",
+  "home-personal",
+  "project",
+  "view",
+  "admin-org",
+  "admin-integration",
+  "admin-ops",
+  "admin-dev",
+  "other",
+];

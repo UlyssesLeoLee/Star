@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9bd5b35c45c4d1d8e4409867ad9aa472e88c4465c4f16fbc017ec1c91125ce0f
+@cypher schema=1 source_sha256=f2ebbffb2dc2fb88a1555b6bfb241ddeef5db9bb06771e413521c7f8f17148d3
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -112,6 +112,15 @@ export const ja: Dictionary = {
   sidebar: {
     brandTagline: "VIBE CONTROL PLANE",
     vibeControlPlane: "VIBE CONTROL PLANE",
+    navHome: "ホーム",
+    navPersonal: "個人",
+    navView: "ビュー",
+    navAdmin: "管理",
+    navAdminOrg: "組織",
+    navAdminIntegration: "統合",
+    navAdminOps: "運用",
+    navAdminDev: "開発者",
+    navOther: "その他",
     otherPages: "その他のページ",
     projectNavigation: "Project ナビゲーション",
     openProjectDirectory: "Project → LANE → Worktree → Branch ディレクトリを開く",

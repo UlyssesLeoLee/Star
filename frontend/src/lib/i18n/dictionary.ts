@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=badb843bd1b7a58137b78e2b2fcdd204c0b34b523b90b295859a31b1e8d08360
+@cypher schema=1 source_sha256=c9597a65e5d1eac242329c8e28bcf5c6eb0a62697f3934975eb4571a60d66049
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -195,6 +195,15 @@ export interface Dictionary {
     brandTagline: string;          // "VIBE CONTROL PLANE"
     vibeControlPlane: string;      // alias for brandTagline
     otherPages: string;            // secondary navigation disclosure
+    navHome: string;               // Home 组 (per ui-3pane-arch §1.2)
+    navPersonal: string;           // 个人区
+    navView: string;               // 视图组
+    navAdmin: string;              // 管理组
+    navAdminOrg: string;           // 管理→组织
+    navAdminIntegration: string;   // 管理→集成
+    navAdminOps: string;           // 管理→运维
+    navAdminDev: string;           // 管理→开发者
+    navOther: string;              // 其他入口兜底
     projectNavigation: string;
     openProjectDirectory: string;
     projectDirectory: string;

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=225bd90de432cc7ccb544f5428feca9775314b73ead2429525a1ad837b48c631
+@cypher schema=1 source_sha256=e7440744ce0d50ca876231a5bba878a1c66275ae12148b37d2b97923ff49356c
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -122,6 +122,15 @@ export const zhCN: Dictionary = {
   sidebar: {
     brandTagline: "VIBE CONTROL PLANE",
     vibeControlPlane: "VIBE CONTROL PLANE",
+    navHome: "Home",
+    navPersonal: "个人",
+    navView: "视图",
+    navAdmin: "管理",
+    navAdminOrg: "组织",
+    navAdminIntegration: "集成",
+    navAdminOps: "运维",
+    navAdminDev: "开发者",
+    navOther: "其他入口",
     otherPages: "其他入口",
     projectNavigation: "Project 导航",
     openProjectDirectory: "打开 Project → LANE → Worktree → Branch 导航目录",
