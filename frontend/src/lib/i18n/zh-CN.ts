@@ -749,4 +749,8 @@ export const zhCN: Dictionary = {
       removeAria: "移除 Plugin {name}",
     },
   },
+  markdownPreview: {
+    copy: "复制",
+    copied: "已复制",
+  },
 };

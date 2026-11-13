@@ -654,4 +654,8 @@ export interface Dictionary {
       removeAria: string;
     };
   };
+  markdownPreview: {
+    copy: string;
+    copied: string;
+  };
 }

@@ -734,4 +734,8 @@ export const en: Dictionary = {
       removeAria: "Remove plugin {name}",
     },
   },
+  markdownPreview: {
+    copy: "Copy",
+    copied: "Copied",
+  },
 };

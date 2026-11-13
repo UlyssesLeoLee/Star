@@ -735,4 +735,8 @@ export const ja: Dictionary = {
       removeAria: "Plugin {name} を削除",
     },
   },
+  markdownPreview: {
+    copy: "コピー",
+    copied: "コピーしました",
+  },
 };
