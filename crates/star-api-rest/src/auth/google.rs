@@ -46,20 +46,20 @@ use std::time::{Duration, Instant};
 
 use axum::{
     extract::{FromRef, FromRequestParts, State},
-    http::{StatusCode, header, request::Parts},
+    http::{header, request::Parts, StatusCode},
     response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::Digest;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::auth::{AuthUser, JwtConfig, JwtError, issue_provider_token, verify_token};
+use crate::auth::{issue_provider_token, verify_token, AuthUser, JwtConfig, JwtError};
 
 /// Deterministic placeholder tenant for Google logins until tenant onboarding
 /// exists (per WBS §23.24: tenant mapping is a follow-up lane).
@@ -240,10 +240,7 @@ fn verify_google_id_token_with_jwks(
         .map_err(|_| GoogleAuthError::InvalidToken("bad rsa components".to_string()))?;
 
     let mut validation = Validation::new(Algorithm::RS256);
-    validation.set_issuer(&[
-        "https://accounts.google.com",
-        "accounts.google.com",
-    ]);
+    validation.set_issuer(&["https://accounts.google.com", "accounts.google.com"]);
     if let Some(audience) = client_id {
         validation.set_audience(&[audience]);
     }
@@ -473,9 +470,7 @@ mod tests {
         kid: &str,
         payload: &serde_json::Value,
     ) -> String {
-        let pem = private
-            .to_pkcs8_pem(LineEnding::LF)
-            .expect("pkcs8 pem");
+        let pem = private.to_pkcs8_pem(LineEnding::LF).expect("pkcs8 pem");
         let mut header = Header::new(Algorithm::RS256);
         header.kid = Some(kid.to_string());
         jsonwebtoken::encode(
@@ -503,7 +498,11 @@ mod tests {
     fn valid_google_token_verifies_and_returns_identity() {
         let (private, public) = test_rsa_keypair();
         let jwks = jwks_for(&public, "kid-1");
-        let token = sign_test_id_token(&private, "kid-1", &base_payload("test-client.apps.googleusercontent.com"));
+        let token = sign_test_id_token(
+            &private,
+            "kid-1",
+            &base_payload("test-client.apps.googleusercontent.com"),
+        );
         let payload = verify_google_id_token_with_jwks(
             &jwks,
             Some("test-client.apps.googleusercontent.com"),
@@ -546,7 +545,11 @@ mod tests {
     fn unknown_kid_is_rejected() {
         let (private, public) = test_rsa_keypair();
         let jwks = jwks_for(&public, "kid-1");
-        let token = sign_test_id_token(&private, "kid-2", &base_payload("test-client.apps.googleusercontent.com"));
+        let token = sign_test_id_token(
+            &private,
+            "kid-2",
+            &base_payload("test-client.apps.googleusercontent.com"),
+        );
         assert!(verify_google_id_token_with_jwks(
             &jwks,
             Some("test-client.apps.googleusercontent.com"),
@@ -580,6 +583,9 @@ mod tests {
 
     #[test]
     fn bearer_missing_header_rejects() {
-        assert!(matches!(BearerReject::MissingHeader, BearerReject::MissingHeader));
+        assert!(matches!(
+            BearerReject::MissingHeader,
+            BearerReject::MissingHeader
+        ));
     }
 }

@@ -44,6 +44,7 @@
     "!frontend/node_modules/**",
     "!frontend/.next/**",
     "!frontend/dist/**",
+    "!tools/aci-emitter/**",
     "!**/_ARCHIVED_*.md"
   ]
 }

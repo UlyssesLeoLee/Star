@@ -557,31 +557,27 @@ mod tests {
             None,
         )
         .unwrap();
-        assert!(
-            ProfileChangeRequest::new(
-                Uuid::from_u128(3),
-                Some(0),
-                TransportProfileLifecycle::Active,
-                definition.clone(),
-                Uuid::from_u128(4),
-                Uuid::from_u128(5),
-                None,
-                "profile-revision:1".to_owned(),
-            )
-            .is_err()
-        );
-        assert!(
-            ProfileChangeRequest::new(
-                Uuid::from_u128(3),
-                None,
-                TransportProfileLifecycle::Active,
-                definition,
-                Uuid::from_u128(4),
-                Uuid::from_u128(5),
-                None,
-                "profile-revision:1".to_owned(),
-            )
-            .is_ok()
-        );
+        assert!(ProfileChangeRequest::new(
+            Uuid::from_u128(3),
+            Some(0),
+            TransportProfileLifecycle::Active,
+            definition.clone(),
+            Uuid::from_u128(4),
+            Uuid::from_u128(5),
+            None,
+            "profile-revision:1".to_owned(),
+        )
+        .is_err());
+        assert!(ProfileChangeRequest::new(
+            Uuid::from_u128(3),
+            None,
+            TransportProfileLifecycle::Active,
+            definition,
+            Uuid::from_u128(4),
+            Uuid::from_u128(5),
+            None,
+            "profile-revision:1".to_owned(),
+        )
+        .is_ok());
     }
 }

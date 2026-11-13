@@ -189,11 +189,7 @@ pub struct AuditEventSpec {
 
 impl AuditEventSpec {
     /// 构造一份最小 audit spec (actor/agent/action 三元组).
-    pub fn new(
-        agent_id: Uuid,
-        actor_id: Uuid,
-        action: impl Into<String>,
-    ) -> Self {
+    pub fn new(agent_id: Uuid, actor_id: Uuid, action: impl Into<String>) -> Self {
         Self {
             agent_id,
             actor_id,
@@ -453,7 +449,10 @@ pub fn apply_after_tool_call_hooks(
 /// 合并多个 audit spec: 用最后一个的 action, 把前几个的 context 合并进数组.
 /// (per SRS-PI-BORROW-001 §4 FR-26 + 守门 #13 d 100% audit).
 fn merge_audit_specs(specs: Vec<AuditEventSpec>) -> AuditEventSpec {
-    debug_assert!(!specs.is_empty(), "merge_audit_specs called with empty input");
+    debug_assert!(
+        !specs.is_empty(),
+        "merge_audit_specs called with empty input"
+    );
     let mut iter = specs.into_iter();
     let mut merged = iter.next().expect("non-empty by debug_assert");
     for spec in iter {
@@ -607,8 +606,12 @@ mod tests {
         ) -> PolicyDecision {
             if outcome.success {
                 PolicyDecision::Audit {
-                    event: AuditEventSpec::new(ctx.agent_id, ctx.actor.user_id, "tool_call_succeeded")
-                        .with_tool(ctx.tool.clone()),
+                    event: AuditEventSpec::new(
+                        ctx.agent_id,
+                        ctx.actor.user_id,
+                        "tool_call_succeeded",
+                    )
+                    .with_tool(ctx.tool.clone()),
                 }
             } else {
                 PolicyDecision::Allow

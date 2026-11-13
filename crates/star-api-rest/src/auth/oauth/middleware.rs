@@ -42,13 +42,13 @@ MERGE (userFromParts)-[:USES_TYPE]->(bindingRepo)
 
 use axum::{
     extract::{FromRef, FromRequestParts},
-    http::{Method, StatusCode, header, request::Parts},
+    http::{header, request::Parts, Method, StatusCode},
     response::{IntoResponse, Json, Response},
 };
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::auth::{AuthUser, DeviceTokenContext, JwtConfig, verify_token};
+use crate::auth::{verify_token, AuthUser, DeviceTokenContext, JwtConfig};
 use star_pg_adapter::repository::DeviceBindingRepository;
 
 /// Bearer auth 错误 (per RFC 6750 §3.1, 6-variant)
@@ -420,21 +420,15 @@ mod tests {
     #[test]
     fn www_authenticate_header_per_rfc6750() {
         // per RFC 6750 §3 WWW-Authenticate 格式
-        assert!(
-            BearerError::MissingHeader
-                .www_authenticate()
-                .contains("Bearer")
-        );
-        assert!(
-            BearerError::ExpiredToken
-                .www_authenticate()
-                .contains("invalid_token")
-        );
-        assert!(
-            BearerError::InsufficientScope("admin".to_string())
-                .www_authenticate()
-                .contains("admin")
-        );
+        assert!(BearerError::MissingHeader
+            .www_authenticate()
+            .contains("Bearer"));
+        assert!(BearerError::ExpiredToken
+            .www_authenticate()
+            .contains("invalid_token"));
+        assert!(BearerError::InsufficientScope("admin".to_string())
+            .www_authenticate()
+            .contains("admin"));
     }
 
     #[test]

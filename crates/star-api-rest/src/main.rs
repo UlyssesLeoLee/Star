@@ -59,10 +59,10 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use star_api_rest::{
     auth::JwtConfig,
     group_api::{
-        CanvasEventWakeHub, GroupApiState, PgGroupAppRegistryProvider, build_group_router,
+        build_group_router, CanvasEventWakeHub, GroupApiState, PgGroupAppRegistryProvider,
     },
 };
-use star_pg_adapter::{PgConfig, connect_pool};
+use star_pg_adapter::{connect_pool, PgConfig};
 use tracing::info;
 
 mod bi_task_event_ingestion;

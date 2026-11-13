@@ -246,9 +246,10 @@ async fn send_chat_message(
     let message_id = Uuid::new_v4();
 
     // Lock + append (recover from poisoned mutex — surface as 500).
-    let mut sessions = state.sessions.lock().map_err(|e| {
-        ChatApiError::Internal(format!("chat sessions mutex poisoned: {e}"))
-    })?;
+    let mut sessions = state
+        .sessions
+        .lock()
+        .map_err(|e| ChatApiError::Internal(format!("chat sessions mutex poisoned: {e}")))?;
     let transcript = sessions.entry(session_id).or_default();
     transcript.push(user_msg);
     transcript.push(assistant_msg);
@@ -269,9 +270,10 @@ async fn get_chat_messages(
 ) -> Result<Json<ChatMessagesResp>, ChatApiError> {
     let session_id = q.validate()?;
 
-    let sessions = state.sessions.lock().map_err(|e| {
-        ChatApiError::Internal(format!("chat sessions mutex poisoned: {e}"))
-    })?;
+    let sessions = state
+        .sessions
+        .lock()
+        .map_err(|e| ChatApiError::Internal(format!("chat sessions mutex poisoned: {e}")))?;
     let messages = sessions
         .get(&session_id)
         .cloned()

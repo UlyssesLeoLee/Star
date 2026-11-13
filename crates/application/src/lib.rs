@@ -43,8 +43,8 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
-use uuid::Uuid;
 use std::sync::Arc;
+use uuid::Uuid;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
@@ -1183,12 +1183,13 @@ mod tests {
 #[cfg(test)]
 mod steering_bridge_tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use domain_agent::queue::{CollabCommentSink, CollabSteeringCommand};
-use domain_agent::TenantId;
+    use domain_agent::TenantId;
     use domain_comment::{
-    CommentQueryPort, CommentServiceAdapter, InMemoryCommentService, SteeringCommand,
-                          SteeringCommentSink};
+        CommentQueryPort, CommentServiceAdapter, InMemoryCommentService, SteeringCommand,
+        SteeringCommentSink,
+    };
+    use std::sync::{Arc, Mutex};
 
     /// 记录 sink -- 测试用,记录所有接收到的 `SteeringCommand`
     #[derive(Default)]
@@ -1245,7 +1246,8 @@ use domain_agent::TenantId;
             "agent_id must come from incoming_agent_id (W5)"
         );
         assert_eq!(
-            got.agent_session_id, cmd.incoming_session_id.as_uuid(),
+            got.agent_session_id,
+            cmd.incoming_session_id.as_uuid(),
             "agent_session_id must come from incoming_session_id (W5)"
         );
         // 守门:透传真实值 ≠ 任何 task_id 占位
@@ -1303,13 +1305,16 @@ use domain_agent::TenantId;
             include_deleted: false,
         };
         // 使用真实 user_id (INV-ACT-01 不允许 nil)
-        let actor = ActorContext::new(uuid::Uuid::new_v4(), tenant.as_uuid())
-            .with_agent_session(true);
+        let actor =
+            ActorContext::new(uuid::Uuid::new_v4(), tenant.as_uuid()).with_agent_session(true);
         let list = svc.list_by_parent(q, &actor).await.unwrap();
         assert_eq!(list.len(), 1, "comment should be persisted via sink chain");
         let c = &list[0];
         assert_eq!(c.parent_type, domain_comment::ParentType::AgentSession);
-        assert!(c.author_agent_id.is_some(), "INV-C-05: agent author required");
+        assert!(
+            c.author_agent_id.is_some(),
+            "INV-C-05: agent author required"
+        );
         assert!(c.author_user_id.is_none());
         // **ULYS-207 PI-9 W5**:author_agent_id 用真实 incoming_agent_id
         assert_eq!(
@@ -1321,4 +1326,3 @@ use domain_agent::TenantId;
         assert!(c.body.contains("new"));
     }
 }
-

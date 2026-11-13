@@ -48,24 +48,24 @@ MERGE (apiState)-[:USES_TYPE]->(hub)
 use std::{convert::Infallible, mem::size_of, sync::Arc, time::Duration};
 
 use axum::{
-    Router,
     extract::{Path, State},
-    http::{HeaderName, header::HeaderValue},
+    http::{header::HeaderValue, HeaderName},
     response::{
-        IntoResponse, Response,
         sse::{Event, Sse},
+        IntoResponse, Response,
     },
     routing::get,
+    Router,
 };
 use futures_util::stream;
-use sqlx::{PgPool, postgres::PgListener};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
+use sqlx::{postgres::PgListener, PgPool};
+use tokio::sync::{broadcast, OwnedSemaphorePermit, Semaphore};
 use tracing::warn;
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedDeviceContext, GroupApiError, GroupApiState,
-    canvas::reauthorize_worktree_canvas_read,
+    canvas::reauthorize_worktree_canvas_read, AuthenticatedDeviceContext, GroupApiError,
+    GroupApiState,
 };
 
 const NOTIFY_CHANNEL: &str = "star_canvas_outbox_wake";

@@ -46,10 +46,10 @@ use crate::pg_worktree_repository::{PgWorktreeRepository, WorktreeRow};
 use crate::service::{
     SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate,
 };
+use crate::service_impl::{HealthProvider, NoopPickerSource, RiskProvider};
 use crate::start_from_picker::{
     pick_start_from_candidates, PickerCandidates, StartFromPickerSource,
 };
-use crate::service_impl::{HealthProvider, NoopPickerSource, RiskProvider};
 
 /// PG-backed Worktree service 实装
 ///
@@ -149,8 +149,7 @@ impl WorktreeService for PgWorktreeService {
         filter: Option<WorktreeFilter>,
     ) -> Result<Vec<Worktree>, ServiceError> {
         let rows = self.repo.list_by_repo(repo_id).await?;
-        let mut results: Vec<Worktree> =
-            rows.into_iter().map(WorktreeRow::into_worktree).collect();
+        let mut results: Vec<Worktree> = rows.into_iter().map(WorktreeRow::into_worktree).collect();
 
         if let Some(f) = filter {
             if let Some(states) = f.human_state {
@@ -272,12 +271,11 @@ impl WorktreeService for PgWorktreeService {
                 risk_count: 0,
                 test_state: new_wt.test_state,
             };
-            new_wt.human_state = lifecycle_transition(new_wt.human_state, &e, &snap).map_err(
-                |err| {
+            new_wt.human_state =
+                lifecycle_transition(new_wt.human_state, &e, &snap).map_err(|err| {
                     ServiceError::invalid_transition(prev_state, format!("{:?}", e), "trace")
                         .with_source(format!("{:?}", err))
-                },
-            )?;
+                })?;
         }
         if let Some(lock) = update.lock {
             new_wt.locked = lock;
@@ -335,16 +333,13 @@ impl WorktreeService for PgWorktreeService {
             .await?
             .ok_or_else(|| ServiceError::not_found(id, "trace"))?;
         let wt = row.into_worktree();
-        let provider = self
-            .health_provider
-            .clone()
-            .ok_or_else(|| {
-                ServiceError::new(
-                    "WT.HEALTH_PROVIDER_MISSING",
-                    "health provider not configured",
-                    "trace",
-                )
-            })?;
+        let provider = self.health_provider.clone().ok_or_else(|| {
+            ServiceError::new(
+                "WT.HEALTH_PROVIDER_MISSING",
+                "health provider not configured",
+                "trace",
+            )
+        })?;
         let score = provider.compute(&wt).await?;
 
         // 写回 DB
@@ -465,13 +460,9 @@ impl WorktreeService for PgWorktreeService {
         repo_path: &Path,
         force: bool,
     ) -> Result<ImportOutcome, ServiceError> {
-        let externals =
-            scan_external_worktrees(repo_path).await.map_err(|e| {
-                e.into_service_error(format!(
-                    "pg_import_external_worktrees:{}",
-                    Uuid::new_v4()
-                ))
-            })?;
+        let externals = scan_external_worktrees(repo_path).await.map_err(|e| {
+            e.into_service_error(format!("pg_import_external_worktrees:{}", Uuid::new_v4()))
+        })?;
 
         // existing paths (per DB) — 走 `list_paths_by_repo` 优化版
         // (vs InMemory 走 `list` 全表)
@@ -519,9 +510,10 @@ impl WorktreeService for PgWorktreeService {
                 }
                 // force=true: 重新 update path/branch + emit SSE
                 let mut updated = conflict.clone();
-                updated.branch = ext.branch.clone().unwrap_or_else(|| {
-                    ext.head_commit.chars().take(7).collect()
-                });
+                updated.branch = ext
+                    .branch
+                    .clone()
+                    .unwrap_or_else(|| ext.head_commit.chars().take(7).collect());
                 updated.path = ext.worktree_path.clone();
                 updated.last_activity = Utc::now();
                 let row: WorktreeRow = updated.clone().into();

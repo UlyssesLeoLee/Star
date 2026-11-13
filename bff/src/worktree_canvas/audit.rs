@@ -102,17 +102,19 @@ impl WorktreeAudit {
     /// 阶段 1: 仅 validate event 字段, 返回 `Ok(())`. 阶段 2 业务实装落地真实
     /// WORM append-only `worktree_action_audit` 表写.
     pub async fn write_event(&self, event: WorktreeAuditEvent) -> Result<(), WorktreeApiError> {
-        event.validate().map_err(|e| {
-            WorktreeApiError::bad_request(e, "audit::write_event::validate")
-        })?;
+        event
+            .validate()
+            .map_err(|e| WorktreeApiError::bad_request(e, "audit::write_event::validate"))?;
         // 阶段 1: 占位 0 真实 DB 写. 阶段 2 业务实装落地.
         Ok(())
     }
 
     /// 守门 #13 d 验证 helper: 哪些 action 必须写 audit.
     pub fn is_required(action: WorktreeAction) -> bool {
-        matches!(action.danger(), ActionDanger::Warning | ActionDanger::Destructive)
-            || matches!(action, WorktreeAction::Lock | WorktreeAction::Unlock)
+        matches!(
+            action.danger(),
+            ActionDanger::Warning | ActionDanger::Destructive
+        ) || matches!(action, WorktreeAction::Lock | WorktreeAction::Unlock)
     }
 }
 
@@ -194,7 +196,7 @@ mod tests {
         assert!(WorktreeAudit::is_required(WorktreeAction::SyncMain)); // Warning
         assert!(WorktreeAudit::is_required(WorktreeAction::Lock)); // Safe but required
         assert!(WorktreeAudit::is_required(WorktreeAction::Unlock)); // Safe but required
-        // 其他 Safe: 不必写 (e.g. Focus, OpenWorktree).
+                                                                     // 其他 Safe: 不必写 (e.g. Focus, OpenWorktree).
         assert!(!WorktreeAudit::is_required(WorktreeAction::Focus));
     }
 }

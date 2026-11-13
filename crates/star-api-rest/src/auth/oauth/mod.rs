@@ -38,7 +38,7 @@ pub mod pkce;
 pub use handlers::{OAuth2State, OAuthHandlerError};
 pub use keypair::{Jwk, Jwks, KeyPairError, OAuthKeyManager, OAuthKeyPair};
 pub use middleware::{
-    AuthenticatedDeviceContext, AuthenticatedUser, BearerError, BearerToken, require_role,
-    require_scope,
+    require_role, require_scope, AuthenticatedDeviceContext, AuthenticatedUser, BearerError,
+    BearerToken,
 };
-pub use pkce::{PkceError, verify_pkce};
+pub use pkce::{verify_pkce, PkceError};

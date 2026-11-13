@@ -1,62 +1,189 @@
 name: CI
 
+# ─────────────────────────────────────────────────────────────────────
+# 主 CI (2026-11-13 重构; 设计说明见 docs/ci-cd.md)
+#
+# 结构:
+#   changes        按改动路径决定哪些区域需要跑 (纯文档提交不再触发 Rust/前端全套)
+#   rust-fmt       cargo fmt --check (enforced, 最快失败)
+#   rust-ci        check --all-features / clippy / test star-context (enforced)
+#   rust-test-workspace  全 workspace 单测 (enforced; 已知 2 个 Windows 路径用例被 --skip)
+#   bff-ci         bff 独立 workspace 的 fmt/check/test
+#   cross-platform Linux/Windows/macOS 烟雾
+#   desktop-rust   star-desktop (tauri) 的 check/test, 需要 webkit2gtk 等系统库
+#   frontend-ci    typecheck / vitest / next build (enforced)
+#   workflow-lint  actionlint: workflow 语法/表达式/shellcheck (改 .github/ 才跑)
+#   markdownlint / cargo-doc / cargo-bench-no-run
+#   ci-gate        聚合门禁: 分支 ruleset 只需要求这一个检查名
+#
+# 约束沿用 AGENTS.md: Rust 1.99.1 与 rust-toolchain.toml 对齐; -j 4 修正
+# Windows 资源耗尽误诊 (§4.1 v19); 守门 #1 v20: check 带 --all-features。
+#
+# 为什么 --exclude star-desktop: 它是 tauri 应用, 编译需要 glib/webkit2gtk
+# 等系统库 (run 43329468929: glib-2.0 not found)。它由 desktop-rust job
+# (装好系统库) 和 star-stable-desktop.yml (打包) 单独覆盖, 不拖慢全仓 job。
+# ─────────────────────────────────────────────────────────────────────
+
 on:
   push:
     branches: [dev, main]
   pull_request:
     branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # main 上的每次 push 都要有完整结果; 其余分支/PR 的旧运行没有价值, 直接取消
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # 守门 #1 基础 (existing, per `2f6eb6b`)
+  # 改动路径检测 (判定逻辑与测试: scripts/ci/detect_changes.py)
+  # 任何无法确定的情况都 fail-open (全部区域开启), 绝不会因误判而漏跑。
   # ─────────────────────────────────────────────────────────────
-  rust-ci:
-    name: Rust (check / test / clippy / fmt)
-    runs-on: ubuntu-latest
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.detect.outputs.rust }}
+      bff: ${{ steps.detect.outputs.bff }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+      desktop: ${{ steps.detect.outputs.desktop }}
+      docs: ${{ steps.detect.outputs.docs }}
+      workflows: ${{ steps.detect.outputs.workflows }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Detect changed areas
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: python3 scripts/ci/detect_changes.py
+
+  # ─────────────────────────────────────────────────────────────
+  # Rust
+  # ─────────────────────────────────────────────────────────────
+  rust-fmt:
+    name: Rust fmt (enforced)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: 1.99.1
-          components: clippy, rustfmt
+          components: rustfmt
+
+      - name: cargo fmt --check
+        # 守门 #6: 0 diff 才能 merge。2026-11-13 前全仓积累了 100 个文件的格式债,
+        # 已由独立的 "style: cargo fmt --all" 提交一次性清零。
+        run: cargo fmt --all -- --check
+
+  rust-ci:
+    name: Rust (check / test / clippy)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+          components: clippy
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: cargo check
-        # 守门 #1 v19: -j 4 修正 "cargo workspace 互锁" 误诊 (per AGENTS.md §4.1 v19)
-        # Windows 资源耗尽 0xc0000409 + 配额不足 ERROR_NO_SYSTEM_RESOURCES 跨 17 crate 触发
-        # 修法: 降并行度 -j 4, 0 err 32.27s 通过
-        # 守门 #1 v20 (2026-11-09, per WBS §23.23 D4): 加 --all-features。
-        # 实证: v3 source-origin 契约变更后 star-api-rest 生产二进制不编译
-        # (E0061/E0599) 而 CI 仍绿 —— feature-gated 路径从不进 workspace job。
-        # 同跑暴露 worktree-service --all-features 失败 (b905b4b1 只加
-        # pg_worktree_* 文件未挂 lib.rs, 已修), 本机全仓 --all-features 0 err。
-        run: cargo check --workspace --all-targets --all-features -j 4
+        # 守门 #1 v19: -j 4 (Windows 资源耗尽 0xc0000409 / ERROR_NO_SYSTEM_RESOURCES)
+        # 守门 #1 v20 (2026-11-09, WBS §23.23 D4): --all-features, 否则 feature-gated
+        # 路径 (如 star-api-rest 生产二进制) 破坏时 CI 仍绿。
+        run: cargo check --workspace --exclude star-desktop --all-targets --all-features -j 4
 
-      - name: cargo test
-        # 守门 #1 v6: release mode test 100% pass (单 crate) + v3 check + fmt + clippy 不替代 cargo test
-        # 9/5 拍板 (per ask_user): 跳过 workspace test, 改单 crate 跑 star-context (per PR #12 CI 19 panic 实证 pre-existing)
-        # 本机实证: cargo test -p star-context --lib 21/21 pass
+      - name: cargo test (star-context)
+        # 守门 #1 v25b (9/5 拍板): 全 workspace test 有 star-context 并行 panic 的既有问题
+        # (actor.rs:118), 因此 gate 只强制该 crate; 全量结果见 rust-test-workspace (advisory)。
         run: cargo test -p star-context --lib -j 4
 
-      - name: cargo clippy (advisory)
-        # 守门 #7 v2 派生 (per 9/5 拍板): 改 advisory 模式, 跟 fmt check 一致
-        # 实证: 本机 cargo clippy --workspace --lib 0 err (49.25s, 234 missing_docs warning pre-existing)
-        # 守门 #1 v19: -j 4 修正 Windows 互锁
-        run: cargo clippy --workspace --all-targets -j 4
+      - name: cargo clippy
+        # 未加 -D warnings: 既有 600+ missing_docs 等 warning 尚未清零。
+        # deny 级 lint (clippy::correctness 等) 本身就是 error, 仍会让本步骤失败。
+        run: cargo clippy --workspace --exclude star-desktop --all-targets -j 4
 
-      - name: cargo fmt --check (enforced)
-        # 守门 #6 升级: 从 advisory 改 enforced, 0 diff 才能 merge
-        run: cargo fmt --all -- --check
+  rust-test-workspace:
+    name: Rust workspace tests
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      - name: cargo test --workspace --lib
+        # 2026-11-13 实测 (run 43338583680, ubuntu-24.04): 3033 passed / 2 failed / 8 ignored,
+        # 约 6 分钟; 9/5 记录的 "star-context 并行 panic" 在 CI 上未复现, 故由 advisory 升为 enforced。
+        # 唯一的 2 个失败是 star-api-rest workspace_files 里写死 Windows 盘符路径的用例
+        # ("C:/Windows/system32"、"D:/elsewhere/x.md"): 在 Linux 上它们是相对路径, 解析后仍在
+        # 根目录内, 断言 is_err() 不成立。属于待负责人修复的既有测试问题 (该文件当前另有
+        # 未提交改动), 先精确 --skip 这两个, 其余 crate 的全部用例照常强制。
+        shell: bash
+        run: |
+          set -o pipefail
+          status=0
+          cargo test --workspace --exclude star-desktop --lib --no-fail-fast -j 4 --             --skip workspace_files::tests::resolve_blocks_parent_escape             --skip workspace_files::tests::resolve_rejects_path_outside_roots             2>&1 | tee test.log || status=$?
+          {
+            echo "### Workspace unit tests"
+            echo
+            echo '```'
+            grep -E "^test result:|^error: test failed|FAILED" test.log | sort | uniq -c | sort -rn | head -40 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
   bff-ci:
     name: BFF (Rust 1.99.1)
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.bff == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -65,9 +192,14 @@ jobs:
           components: rustfmt
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: bff -> bff/target
+
+      - name: cargo fmt --check
+        # bff 依赖 path crates, `--all` 同时覆盖它们; 先跑, 格式问题最快暴露
+        working-directory: bff
+        run: cargo fmt --all -- --check
 
       - name: cargo check
         working-directory: bff
@@ -77,17 +209,21 @@ jobs:
         working-directory: bff
         run: cargo test --all-features -j 4
 
-      - name: cargo fmt --check
-        working-directory: bff
-        run: cargo fmt --all -- --check
-
-  e2e-integration:
-    name: e2e Integration (P3-A.5 / wt-w32)
-    runs-on: ubuntu-latest
-    # 仅 main push 触发, PR 不跑(避免频繁)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  cross-platform:
+    name: Cross-platform smoke (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # 固定 runner 镜像版本: ubuntu-latest 已宣布迁到 Ubuntu 26, 系统库包名会漂移
+        os: [ubuntu-24.04, windows-2025, macos-15]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -95,7 +231,75 @@ jobs:
           toolchain: 1.99.1
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      - name: cargo build domain-local-runtime
+        # 该 crate 含按 target_os 分叉的 spawn/kill 实现 (Linux ChildWrapper vs
+        # tokio Child); 只在 Windows 本机开发时 Linux 分支从不编译, 必须靠本 job 兜底。
+        run: cargo build -p domain-local-runtime --lib -j 4
+
+      - name: cargo test domain-local-runtime (skip e2e)
+        # -j 4 必须放在 -- 之前 (顺序错会 Unrecognized option: 'j'); e2e 在独立 job 跑
+        run: cargo test -p domain-local-runtime --lib -j 4 -- --skip e2e_integration
+
+  desktop-rust:
+    name: Desktop crate (check / test)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Linux build dependencies
+        # 与 star-stable-desktop.yml 的依赖清单一致
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            libssl-dev \
+            librsvg2-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      - name: cargo check -p star-desktop
+        run: cargo check -p star-desktop --all-targets -j 4
+
+      - name: cargo test -p star-desktop --lib
+        run: cargo test -p star-desktop --lib -j 4
+
+  e2e-integration:
+    name: e2e Integration (P3-A.5 / wt-w32)
+    needs: changes
+    # 仅 main push 触发, PR 不跑(避免频繁)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: cargo build domain-local-runtime
         run: cargo build -p domain-local-runtime --lib -j 4
@@ -104,86 +308,86 @@ jobs:
         # --test-threads=1 避免并发 e2e 抢端口
         run: cargo test -p domain-local-runtime --lib e2e_integration -- --test-threads=1 --nocapture
 
-  cross-platform:
-    name: Cross-platform smoke (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: 1.99.1
-
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
-
-      - name: cargo build domain-local-runtime
-        # 守门 #1 v19: -j 4 修正 Windows 互锁
-        run: cargo build -p domain-local-runtime --lib -j 4
-
-      - name: cargo test domain-local-runtime (skip e2e)
-        # e2e 在独立 job 跑, 这里只跑单元 test
-        # 9/5 拍板 (per ask_user): -j 4 必须放在 -- 之前, 跟 star-context CI 一致 (顺序错会 Unrecognized option: 'j')
-        run: cargo test -p domain-local-runtime --lib -j 4 -- --skip e2e_integration
-
+  # ─────────────────────────────────────────────────────────────
+  # Frontend
+  # ─────────────────────────────────────────────────────────────
   frontend-ci:
     name: Frontend (typecheck / test / build)
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # 9/5 拍板 (per ask_user): 升级 20 → 22 (LTS), 解决 Node 20 deprecation 警告致 npm ci exit 1
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: npm ci
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
+      # 2026-11-13: 三个步骤此前带 continue-on-error (9/5 因 4 个 tsc 既有错误改为
+      # advisory)。实测 run 43329468929 三步全部真实通过, 恢复为 enforced。
       - name: Typecheck
-        # 9/5 拍板 (per ask_user 4 项推荐扩展): 改 advisory 模式, 跟 clippy/cargo doc 同步反转
-        # 实证: 本机 npx tsc --noEmit 4 err pre-existing (FeatureToggles.tsx + refactor-state-machine + tailwind-merge)
-        # 跨 session 修根因工作量大, 改 advisory
         run: npx tsc --noEmit
-        continue-on-error: true
 
       - name: Test
-        # 9/5 拍板: 改 advisory 模式, 跟 Typecheck 同步
         run: npx vitest run
-        continue-on-error: true
 
       - name: Build
-        # 9/5 拍板: 改 advisory 模式, 跟 Typecheck/Test 同步
         run: npx next build
-        continue-on-error: true
+
+  workflow-lint:
+    name: Workflow lint (actionlint)
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ACTIONLINT_VERSION: "1.7.12"
+      # 上游 release API digest (actionlint_1.7.12_linux_amd64.tar.gz), 2026-11-13 核对
+      ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fetch actionlint (pinned + checksum-verified)
+        run: |
+          bash scripts/ci/install_pinned_binary.sh             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"             "${ACTIONLINT_SHA256}"             actionlint
+
+      - name: actionlint
+        # `concurrency.queue` 是 GitHub 较新的合法键 (publish-star-canvas-services.yml 在用,
+        # 且实跑成功), actionlint 1.7.12 尚不认识, 仅精确忽略这一条。
+        run: actionlint -ignore 'unexpected key "queue" for "concurrency" section'
 
   # ─────────────────────────────────────────────────────────────
-  # D.6 新增 3 job (per WBS §3 D.6 + PHASE-P3-D6-IMPL-REPORT.md)
-  # 触发: 2026-09-01 22:31 JST P3-D.6 真实实装触发 (per ask_user 拍板)
-  # 范围: markdownlint + cargo doc + cargo bench --no-run
-  # 守门 #6 实证: 真实 CI runner 需 Ulysses 拍板 (per WBS §7 阻塞项 #5)
+  # Docs / doc-build
   # ─────────────────────────────────────────────────────────────
-
   markdownlint:
     name: Markdown lint (markdownlint-cli2)
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: markdownlint-cli2
-        uses: DavidAnson/markdownlint-cli2-action@v25
+        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25
         with:
+          # 与 .markdownlint-cli2.jsonc 的 globs 保持一致
           globs: |
             **/*.md
             !node_modules/**
@@ -192,15 +396,19 @@ jobs:
             !frontend/node_modules/**
             !frontend/.next/**
             !frontend/dist/**
-            !_ARCHIVED_*.md
+            !tools/aci-emitter/**
+            !**/_ARCHIVED_*.md
 
   cargo-doc:
     name: Rust doc (cargo doc --no-deps)
-    # 守门 #1 v5: release + doc + bench --no-run 与 debug build 等价守门 (per AGENTS.md §4.1 v5)
-    # 实证: per WBS §0 + A.16 commit `0e6a965` release mode cargo doc 0 warning
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -208,39 +416,67 @@ jobs:
           toolchain: 1.99.1
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
-      - name: cargo doc --workspace --no-deps (advisory)
-        # 守门 #1 v5: release + doc + bench --no-run 与 debug build 等价守门 (per AGENTS.md §4.1 v5)
-        # 9/5 拍板 (per ask_user): 改 advisory 模式, 跟 clippy 同步反转
-        # 实证: per WBS §0 + A.16 commit `0e6a965` release mode cargo doc 0 warning (守门 #1 v5 派生)
-        # 当前 600+ missing_docs pre-existing, 不强求
-        # 守门 #1 v19: -j 4 修正 Windows 互锁
-        run: cargo doc --workspace --no-deps --all-features -j 4
-        continue-on-error: true
+      - name: cargo doc --workspace --no-deps
+        # 守门 #1 v5。2026-11-13 实测 (run 43338583680) 真实通过 (仅 warning), 升为 enforced;
+        # 仍不加 -D warnings (既有 missing_docs 等 warning 未清零), 只有真正的文档构建错误才失败。
+        run: cargo doc --workspace --exclude star-desktop --no-deps --all-features -j 4
 
   cargo-bench-no-run:
-    name: Rust bench --no-run (compile-only)
-    # 守门 #1 v5: release + doc + bench --no-run 与 debug build 等价守门 (per AGENTS.md §4.1 v5)
-    # 实证: per WBS §0 + A.16 commit `0e6a965` release mode cargo bench --no-run 0 err (4 crate 全 0)
-    # 当前 42 crate 全 0 benches (Phase W 之前无 benchmark), 此 job 持续 0 工作
-    # 但保证未来加 benches 时 CI 自动校验 (per A.16 守门承诺)
-    runs-on: ubuntu-latest
+    name: Rust bench --no-run (compile-only, advisory)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: 1.99.1
-          components: rustfmt
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: cargo bench --workspace --no-run
-        # 守门 #1 v19: -j 4 修正 Windows 互锁
-        run: cargo bench --workspace --no-run -j 4
+        # 守门 #1 v5: 当前 0 benches, 此 job 保证未来加 benches 时自动校验编译。
         continue-on-error: true
-        # 0 benches 时 `cargo bench --no-run` 可能因 "no targets" exit 非 0, 容忍之
-        # (具体行为: cargo 对 workspace bench --no-run 0 target 会 exit 0; 显式保留 advisory)
+        run: cargo bench --workspace --exclude star-desktop --no-run -j 4
+
+  # ─────────────────────────────────────────────────────────────
+  # 聚合门禁: 分支 ruleset 只要求 "CI gate (required)" 这一个检查。
+  # skipped (路径过滤) 视为通过; failure / cancelled / 缺结果 视为失败。
+  # advisory job (cargo-bench-no-run) 不在 needs 内。
+  # ─────────────────────────────────────────────────────────────
+  ci-gate:
+    name: CI gate (required)
+    if: always()
+    needs:
+      - changes
+      - rust-fmt
+      - rust-ci
+      - rust-test-workspace
+      - cargo-doc
+      - bff-ci
+      - cross-platform
+      - desktop-rust
+      - e2e-integration
+      - frontend-ci
+      - workflow-lint
+      - markdownlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+
+      - name: Evaluate required jobs
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/ci/gate.py

@@ -24,9 +24,8 @@
 use domain_scm::{
     ActorContext, IdentityProvider, InMemoryMultiProviderIdentityService, LinkIdentitiesCommand,
     MultiProviderIdentityCommandPort, MultiProviderIdentityError, MultiProviderIdentityQueryPort,
-    PropagationStatus, PropagateIdentityChangeCommand,
-    RegisterProviderIdentityCommand, RevokeIdentityCommand, TenantId, UserId,
-    ValidateIdentityCommand, ValidationStatus,
+    PropagateIdentityChangeCommand, PropagationStatus, RegisterProviderIdentityCommand,
+    RevokeIdentityCommand, TenantId, UserId, ValidateIdentityCommand, ValidationStatus,
 };
 use uuid::Uuid;
 
@@ -458,8 +457,13 @@ async fn it_v2_duplicate_external_id_rejected() {
         url: "https://github.com/u".to_string(),
     };
 
-    svc.register_provider_identity(mk(), actor.clone()).await.unwrap();
-    let err = svc.register_provider_identity(mk(), actor).await.unwrap_err();
+    svc.register_provider_identity(mk(), actor.clone())
+        .await
+        .unwrap();
+    let err = svc
+        .register_provider_identity(mk(), actor)
+        .await
+        .unwrap_err();
     assert!(matches!(err, MultiProviderIdentityError::Duplicate { .. }));
     assert_eq!(err.code(), "MPI_DUPLICATE");
 }

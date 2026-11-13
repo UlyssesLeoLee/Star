@@ -288,7 +288,7 @@ impl TerminalStackPersistence {
         Ok(buf)
     }
 
-/// 加载 pane 从 `since_seq` 之后的 scrollback 行 (per seq_no > since_seq, ASC 排序)
+    /// 加载 pane 从 `since_seq` 之后的 scrollback 行 (per seq_no > since_seq, ASC 排序)
     ///
     /// **目的 (per ULYS-221 P1-B Restart Recovery)**: 增量 replay — caller 已知自己拉到 `last_seq`,
     /// 本方法只返回 `seq_no > last_seq` 的行, 跳过重复历史.

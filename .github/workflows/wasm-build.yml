@@ -1,3 +1,14 @@
+# ─────────────────────────────────────────────────────────────────────
+# 已知问题 (2026-11-13 调查, 尚未修复, 本 workflow 不是必需检查):
+#   自 2026-10-11 起在 "Verify Rust crates compile to wasm32" 失败, 根因在产品代码而非 CI:
+#   1. graph-core 依赖 workspace 的 tokio (features=["full"]) 拖入 mio, mio 无法编译到
+#      wasm32-unknown-unknown (run 42634436578: mio 48 errors)。graph-core 的 src 只用
+#      tokio::sync::RwLock, 改为仅 features=["sync"] 可消除 (已本地验证 mio 错误消失)。
+#   2. 之后 uuid 在 wasm32 上需要随机源 (js / rng-getrandom feature)。
+#   3. relationship-engine-wasm 自己也直接依赖 tokio。
+#   需由 wasm 相关负责人决定依赖策略后一并修复; 已移除原先永远不会执行的 "Commit binaries
+#   to PR branch" 步骤 (条件用了不存在的 github.repository_full_name, 且默认 token 无写权限)。
+# ─────────────────────────────────────────────────────────────────────
 # .github/workflows/wasm-build.yml
 # =====================================================================
 # Auto-build Rust→WASM crates on PR push + commit binaries to frontend/public/wasm/
@@ -18,14 +29,17 @@ on:
     paths:
       - 'crates/*-wasm/**'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build WASM + Verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -34,7 +48,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo registry + target
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -47,7 +61,7 @@ jobs:
       - name: Install wasm-pack
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Verify Rust crates compile to wasm32
         run: |
@@ -84,21 +98,8 @@ jobs:
             cargo test --manifest-path "$crate/Cargo.toml" --lib
           done
 
-      - name: Commit binaries to PR branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository_full_name
-        run: |
-          git config user.email "wasm-bot@star.local"
-          git config user.name "WASM Build Bot"
-          git add frontend/public/wasm/
-          if git diff --cached --quiet; then
-            echo "no WASM changes"
-          else
-            git commit -m "ci(wasm): auto-build WASM binaries from PR-${{ github.event.pull_request.number }}"
-            git push
-          fi
-
       - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wasm-binaries
           path: frontend/public/wasm/

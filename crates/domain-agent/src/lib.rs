@@ -60,9 +60,7 @@ define_uuid_id!(AgentPolicyTemplateId);
 // ULYS-207 PI-9 W4 P-B: TenantId 跨 crate 公开 (SteeringSinkBridge 测试需要从
 // domain_comment 构造 TenantId). 手写 pub struct 而非 macro,因为 `pub define_uuid_id!`
 // 在 macro_rules 1.x 不允许。生成的 struct 字段保持与 macro 一致。
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 /// 领域强类型租户 ID(ULYS-207 PI-9 W4 P-B 公开)
 pub struct TenantId(pub Uuid);
@@ -1575,7 +1573,10 @@ mod tests {
             "require_approval": true
         }"#;
         let p: AgentPolicy = serde_json::from_str(legacy_json).unwrap();
-        assert!(p.policy_hooks.is_empty(), "legacy JSON must deserialize with empty hooks");
+        assert!(
+            p.policy_hooks.is_empty(),
+            "legacy JSON must deserialize with empty hooks"
+        );
     }
 
     #[test]
@@ -2166,14 +2167,13 @@ pub mod policy_hooks;
 
 // PI-3 公共符号 re-export (避免 Application 层 `crate::loop_boundary::policy_hooks` 双段路径).
 pub use loop_boundary::{
-    AgentLoopBoundary, BoundaryError, ConvertOutcome, DefaultLoopBoundary, FailureMode,
-    InternalContext, InternalMessage, InternalRole, LoopBoundaryContext, NoThrowProbe,
-    StreamFn, ToolCallRequest, TransformOutcome, default_stream_fn, simulated_failure_stream,
+    default_stream_fn, simulated_failure_stream, AgentLoopBoundary, BoundaryError, ConvertOutcome,
+    DefaultLoopBoundary, FailureMode, InternalContext, InternalMessage, InternalRole,
+    LoopBoundaryContext, NoThrowProbe, StreamFn, ToolCallRequest, TransformOutcome,
 };
 pub use policy_hooks::{
-    AuditEventSpec, AuditSink, NoopAuditSink, PolicyDecision, PolicyHook, PolicyHooks,
-    ToolCallHookContext, ToolCallOutcome, apply_after_tool_call_hooks,
-    apply_before_tool_call_hooks,
+    apply_after_tool_call_hooks, apply_before_tool_call_hooks, AuditEventSpec, AuditSink,
+    NoopAuditSink, PolicyDecision, PolicyHook, PolicyHooks, ToolCallHookContext, ToolCallOutcome,
 };
 
 #[allow(missing_docs)]

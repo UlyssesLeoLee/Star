@@ -41,16 +41,15 @@ pub mod ws;
 pub use audit::{WorktreeAudit, WorktreeAuditEvent};
 pub use controller::{bff_health, rest_routes};
 pub use dto::{
-    ActionRequest, ActionResponse, AgentSummary, BranchName, CommitSha, ConfirmDialog, CreateWorktreeRequest,
-    HealthDeduction, HealthScoreDto, HealthSummaryDto, ImpactDto, ListWorktreesResponse,
-    NlQueryRequest, NlQueryResponse, RepositoryDto, RiskResponse, SearchRequest, SearchResponse,
-    TaskSummary, WorktreeApiError, WorktreeFieldChange, WorktreeGraphResponse, WorktreeResponse,
-    WorktreeSseEvent, WsClientMessage, WsServerMessage, BffHealthDto, GraphEdgeDto, GraphNodeDto,
+    ActionRequest, ActionResponse, AgentSummary, BffHealthDto, BranchName, CommitSha,
+    ConfirmDialog, CreateWorktreeRequest, GraphEdgeDto, GraphNodeDto, HealthDeduction,
+    HealthScoreDto, HealthSummaryDto, ImpactDto, ListWorktreesResponse, NlQueryRequest,
+    NlQueryResponse, RepositoryDto, RiskResponse, SearchRequest, SearchResponse, TaskSummary,
+    WorktreeApiError, WorktreeFieldChange, WorktreeGraphResponse, WorktreeResponse,
+    WorktreeSseEvent, WsClientMessage, WsServerMessage,
 };
 pub use idempotency::{IdempotencyCache, IdempotencyRecord};
-pub use permission::{
-    ActionDanger, PermissionLevel, RoleSet, WorktreeAction, WorktreePermission,
-};
+pub use permission::{ActionDanger, PermissionLevel, RoleSet, WorktreeAction, WorktreePermission};
 pub use sse::{sse_routes, WorktreeSseHub, SSE_KEEPALIVE_INTERVAL, SSE_ROUTE_COUNT};
 pub use ws::{ws_routes, WS_HEARTBEAT_INTERVAL};
 
@@ -180,7 +179,9 @@ mod tests {
 
     #[test]
     fn worktree_canvas_state_has_ten_fields() {
-        let state = WorktreeCanvasState::new(tenant(), actor(), RoleSet::new(), PermissionLevel::View).unwrap();
+        let state =
+            WorktreeCanvasState::new(tenant(), actor(), RoleSet::new(), PermissionLevel::View)
+                .unwrap();
         // 10 字段 (per mod doc).
         let fields = (
             &state.permission,
@@ -199,14 +200,16 @@ mod tests {
 
     #[test]
     fn new_rejects_nil_tenant_id() {
-        let r = WorktreeCanvasState::new(Uuid::nil(), actor(), RoleSet::new(), PermissionLevel::View);
+        let r =
+            WorktreeCanvasState::new(Uuid::nil(), actor(), RoleSet::new(), PermissionLevel::View);
         assert!(r.is_err());
     }
 
     #[test]
     fn build_router_smoke() {
         let state = Arc::new(
-            WorktreeCanvasState::new(tenant(), actor(), RoleSet::new(), PermissionLevel::View).unwrap(),
+            WorktreeCanvasState::new(tenant(), actor(), RoleSet::new(), PermissionLevel::View)
+                .unwrap(),
         );
         let _ = build_router(state);
     }

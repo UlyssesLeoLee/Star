@@ -161,8 +161,13 @@ mod tests {
     fn store_then_lookup_returns_record() {
         let c = IdempotencyCache::new();
         let key = Uuid::new_v4();
-        c.store(key, actor(), "Merge".into(), serde_json::json!({"ok": true}))
-            .unwrap();
+        c.store(
+            key,
+            actor(),
+            "Merge".into(),
+            serde_json::json!({"ok": true}),
+        )
+        .unwrap();
         let r = c.lookup(key).unwrap();
         assert_eq!(r.actor_id, actor());
         assert_eq!(r.action, "Merge");
@@ -172,8 +177,13 @@ mod tests {
     fn lookup_misses_after_ttl_expires() {
         let c = IdempotencyCache::with_ttl(Duration::from_millis(50));
         let key = Uuid::new_v4();
-        c.store(key, actor(), "Lock".into(), serde_json::json!({"locked": true}))
-            .unwrap();
+        c.store(
+            key,
+            actor(),
+            "Lock".into(),
+            serde_json::json!({"locked": true}),
+        )
+        .unwrap();
         std::thread::sleep(Duration::from_millis(100));
         assert!(c.lookup(key).is_none());
     }
@@ -190,7 +200,12 @@ mod tests {
     fn store_rejects_empty_action() {
         let c = IdempotencyCache::new();
         assert!(c
-            .store(Uuid::new_v4(), actor(), String::new(), serde_json::json!({}))
+            .store(
+                Uuid::new_v4(),
+                actor(),
+                String::new(),
+                serde_json::json!({})
+            )
             .is_err());
     }
 

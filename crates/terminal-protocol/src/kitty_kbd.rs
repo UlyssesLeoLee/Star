@@ -266,7 +266,12 @@ impl KittyProgressiveState {
     /// `true` if the application has ever engaged the protocol.
     #[must_use]
     pub const fn is_engaged(self) -> bool {
-        !matches!(self, Self::Virgin { flags: KittyKeyboardFlags::NONE })
+        !matches!(
+            self,
+            Self::Virgin {
+                flags: KittyKeyboardFlags::NONE
+            }
+        )
     }
 
     /// `true` if a flag configuration is currently in effect.
@@ -451,14 +456,12 @@ impl KittyKeyboardProtocol {
         // Trailing ST is optional here — strip if present.
         let trailing_ok = match input.get(i + 1..) {
             None | Some([]) => true,
-            Some([0x07]) => true,  // BEL terminator
+            Some([0x07]) => true,        // BEL terminator
             Some([0x1b, b'\\']) => true, // 7-bit ST
             _ => false,
         };
         if !trailing_ok {
-            return Err(KittyKeyboardParseError::UnknownFinal {
-                got: input[i + 1],
-            });
+            return Err(KittyKeyboardParseError::UnknownFinal { got: input[i + 1] });
         }
 
         // Pull the intermediate byte (must be exactly one of `>`, `<`, `=`).
@@ -482,9 +485,7 @@ impl KittyKeyboardProtocol {
                 }
             })?;
             let n: i32 = s.parse().map_err(|_| {
-                KittyKeyboardParseError::FlagsOutOfRange(
-                    s.parse().unwrap_or(i32::MIN),
-                )
+                KittyKeyboardParseError::FlagsOutOfRange(s.parse().unwrap_or(i32::MIN))
             })?;
             if !(0..=255).contains(&n) {
                 return Err(KittyKeyboardParseError::FlagsOutOfRange(n));
@@ -508,9 +509,7 @@ impl KittyKeyboardProtocol {
                 let ps_bytes = parts.next().unwrap_or(&[]);
                 // Reject a third `;` (the kitty form has at most one).
                 if parts.next().is_some() {
-                    return Err(KittyKeyboardParseError::UnrecognizedParameter {
-                        got: b';',
-                    });
+                    return Err(KittyKeyboardParseError::UnrecognizedParameter { got: b';' });
                 }
                 let flags = parse_u8(flags_bytes)?;
                 let _ps = parse_u8(ps_bytes)?;
@@ -552,7 +551,10 @@ mod tests {
         assert_eq!(KittyKeyboardFlag::ReportAlternateKeys.bit(), 0x04);
         assert_eq!(KittyKeyboardFlag::ReportAllKeysAsEscapeCodes.bit(), 0x08);
         assert_eq!(KittyKeyboardFlag::ReportAssociatedText.bit(), 0x10);
-        assert_eq!(KittyKeyboardFlag::ReportAllKeysAsEscapeAlternate.bit(), 0x20);
+        assert_eq!(
+            KittyKeyboardFlag::ReportAllKeysAsEscapeAlternate.bit(),
+            0x20
+        );
         assert_eq!(KittyKeyboardFlag::ReportMouseEvent.bit(), 0x40);
         assert_eq!(KittyKeyboardFlag::ModifyOtherKeys.bit(), 0x80);
     }
@@ -685,22 +687,22 @@ mod tests {
 
     #[test]
     fn serialize_push_form() {
-        let bytes = KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5))
-            .serialize();
+        let bytes =
+            KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5)).serialize();
         assert_eq!(bytes, b"\x1b[>5u");
     }
 
     #[test]
     fn serialize_pop_form() {
-        let bytes = KittyKeyboardProtocol::Pop(KittyKeyboardFlags::from_bits_truncate(7))
-            .serialize();
+        let bytes =
+            KittyKeyboardProtocol::Pop(KittyKeyboardFlags::from_bits_truncate(7)).serialize();
         assert_eq!(bytes, b"\x1b[<7u");
     }
 
     #[test]
     fn serialize_set_form() {
-        let bytes = KittyKeyboardProtocol::Set(KittyKeyboardFlags::from_bits_truncate(13))
-            .serialize();
+        let bytes =
+            KittyKeyboardProtocol::Set(KittyKeyboardFlags::from_bits_truncate(13)).serialize();
         assert_eq!(bytes, b"\x1b[=13;1u");
     }
 
@@ -710,7 +712,10 @@ mod tests {
     fn parse_push_round_trip() {
         let wire = b"\x1b[>5u";
         let p = KittyKeyboardProtocol::parse(wire).unwrap();
-        assert_eq!(p, KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5)));
+        assert_eq!(
+            p,
+            KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5))
+        );
         // serialize back
         assert_eq!(p.serialize(), wire);
     }
@@ -719,7 +724,10 @@ mod tests {
     fn parse_pop_round_trip() {
         let wire = b"\x1b[<7u";
         let p = KittyKeyboardProtocol::parse(wire).unwrap();
-        assert_eq!(p, KittyKeyboardProtocol::Pop(KittyKeyboardFlags::from_bits_truncate(7)));
+        assert_eq!(
+            p,
+            KittyKeyboardProtocol::Pop(KittyKeyboardFlags::from_bits_truncate(7))
+        );
         assert_eq!(p.serialize(), wire);
     }
 
@@ -727,7 +735,10 @@ mod tests {
     fn parse_set_round_trip() {
         let wire = b"\x1b[=13;1u";
         let p = KittyKeyboardProtocol::parse(wire).unwrap();
-        assert_eq!(p, KittyKeyboardProtocol::Set(KittyKeyboardFlags::from_bits_truncate(13)));
+        assert_eq!(
+            p,
+            KittyKeyboardProtocol::Set(KittyKeyboardFlags::from_bits_truncate(13))
+        );
         assert_eq!(p.serialize(), wire);
     }
 
@@ -735,14 +746,20 @@ mod tests {
     fn parse_tolerates_bel_terminator() {
         let wire = b"\x1b[>5u\x07";
         let p = KittyKeyboardProtocol::parse(wire).unwrap();
-        assert_eq!(p, KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5)));
+        assert_eq!(
+            p,
+            KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5))
+        );
     }
 
     #[test]
     fn parse_tolerates_esc_backslash_terminator() {
         let wire = b"\x1b[>5u\x1b\\";
         let p = KittyKeyboardProtocol::parse(wire).unwrap();
-        assert_eq!(p, KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5)));
+        assert_eq!(
+            p,
+            KittyKeyboardProtocol::Push(KittyKeyboardFlags::from_bits_truncate(5))
+        );
     }
 
     #[test]

@@ -27,7 +27,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::sandbox::{SandboxConfig, SandboxError, SandboxResult, run as sandbox_run};
+use crate::sandbox::{run as sandbox_run, SandboxConfig, SandboxError, SandboxResult};
 
 #[derive(Debug, Error)]
 pub enum ToolError {

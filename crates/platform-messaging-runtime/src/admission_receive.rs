@@ -269,8 +269,11 @@ pub struct AdmissionReceiver<T, H, A> {
     quarantine: Option<std::sync::Arc<dyn AdmissionReceiveQuarantine>>,
 }
 
-impl<T: AdmissionReceiveTransport, H: AdmissionReceiveHandler, A: AdmissionReceiveAuthorization>
-    AdmissionReceiver<T, H, A>
+impl<
+        T: AdmissionReceiveTransport,
+        H: AdmissionReceiveHandler,
+        A: AdmissionReceiveAuthorization,
+    > AdmissionReceiver<T, H, A>
 {
     /// Pin one logical route with explicit transport, owner and authorization implementations.
     pub fn new(

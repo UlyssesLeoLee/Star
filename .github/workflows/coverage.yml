@@ -4,7 +4,7 @@
 #   1. 不挡 merge (advisory): tarpaulin 出错只在日志, fail 不影响 PR 合入
 #   2. 不替代 cargo test: 与 ci.yml 的 cargo test 并存, 仅做覆盖率度量
 #   3. 不污染 release artifact: coverage/ 全在 .gitignore, 只作 workflow artifact
-#   4. 单平台跑 (ubuntu-latest): Windows tarpaulin 对 tokio async 统计偏差大,
+#   4. 单平台跑 (ubuntu-24.04): Windows tarpaulin 对 tokio async 统计偏差大,
 #      macOS GH runner 慢 3x; 与 cargo test 的 cross-platform smoke (ci.yml) 职责分开
 #
 # 触发:
@@ -41,11 +41,11 @@ concurrency:
 jobs:
   tarpaulin-workspace:
     name: cargo-tarpaulin (workspace, advisory)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # ULYS-154 scope: advisory — 不挡 PR 合入, 但跑出真实数据
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -54,7 +54,7 @@ jobs:
           components: rustfmt
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Install cargo-tarpaulin (pinned)
         # ULYS-154 PR-1: 锁版本 0.31.x, 避免 tarpaulin 升级导致覆盖率算法变化、baseline 不可比
@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ github.event.pull_request.number || github.ref_name }}-${{ github.sha }}
           path: |
@@ -111,7 +111,7 @@ jobs:
       - name: Comment PR with baseline delta
         # PR 触发时, 把 baseline 数字写到 PR 评论 (advisory)
         if: github.event_name == 'pull_request' && (success() || failure())
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const fs = require('fs');

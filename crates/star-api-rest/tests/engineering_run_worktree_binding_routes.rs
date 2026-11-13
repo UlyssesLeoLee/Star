@@ -105,15 +105,15 @@ MERGE (httpAcceptance)-[:TESTS]->(runContextEndpoint)
 use std::sync::Arc;
 
 use axum::{
+    body::{to_bytes, Body},
+    http::{header, Method, Request, StatusCode},
     Router,
-    body::{Body, to_bytes},
-    http::{Method, Request, StatusCode, header},
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::postgres::PgPoolOptions;
 use star_api_rest::{
-    auth::{DeviceTokenContext, JwtConfig, issue_token, issue_token_with_device_context},
-    group_api::{GroupApiState, build_group_router},
+    auth::{issue_token, issue_token_with_device_context, DeviceTokenContext, JwtConfig},
+    group_api::{build_group_router, GroupApiState},
 };
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -748,12 +748,10 @@ async fn real_postgres_authenticated_binding_http_acceptance() {
             .await;
             assert_eq!(member_list.status, StatusCode::OK, "{:?}", member_list.body);
             assert_directory_response(&member_list);
-            assert!(
-                member_list.body["engineering_runs"]
-                    .as_array()
-                    .unwrap()
-                    .is_empty()
-            );
+            assert!(member_list.body["engineering_runs"]
+                .as_array()
+                .unwrap()
+                .is_empty());
 
             let member_open = send_project_run_request(
                 app,

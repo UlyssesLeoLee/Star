@@ -46,8 +46,8 @@ pub mod routes;
 pub mod workspace_files;
 
 use axum::{
-    Router,
     routing::{delete, get, patch, post},
+    Router,
 };
 
 /// REST API 版本前缀 (per spec §2.1)
@@ -674,7 +674,7 @@ mod tests {
     /// 真实 DB 不可达, 用 `sqlx::PgPool::connect_lazy` 构造 lazy pool
     /// (handler 调用时才会 connect, 跨 session 续真实 DB).
     async fn mock_oauth2_state() -> auth::oauth::OAuth2State {
-        use auth::oauth::{OAuth2State, keypair::OAuthKeyManager};
+        use auth::oauth::{keypair::OAuthKeyManager, OAuth2State};
         use star_pg_adapter::repository::{
             OAuthAccessTokenRepository, OAuthAuthorizationCodeRepository, OAuthClientRepository,
             OAuthRefreshTokenRepository, PgOAuthAccessTokenRepository,

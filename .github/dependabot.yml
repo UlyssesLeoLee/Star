@@ -29,6 +29,12 @@ updates:
       time: "09:00"
       timezone: "Asia/Tokyo"
     open-pull-requests-limit: 5
+    # 所有 action 已固定到 commit SHA (行尾注释为版本号); Dependabot 会连同注释一起更新。
+    # 合并成一个 PR, 避免每周 N 个 action PR 各自触发一遍完整 CI。
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "ci"
@@ -54,4 +60,44 @@ updates:
       - "frontend"
     commit-message:
       prefix: "chore(frontend)"
+      include: "scope"
+
+  # bff: 独立 workspace, 有自己的 Cargo.lock, 根目录的 cargo 条目不覆盖它
+  - package-ecosystem: "cargo"
+    directory: "/bff"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    groups:
+      bff-rust-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "chore(bff)"
+      include: "scope"
+
+  # npm (desktop frontend): crates/star-desktop/frontend 有独立 package-lock.json
+  - package-ecosystem: "npm"
+    directory: "/crates/star-desktop/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    groups:
+      desktop-npm-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore(desktop)"
       include: "scope"

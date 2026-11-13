@@ -59,9 +59,14 @@ impl WorktreeSseHub {
 
     /// 发布一个 SSE event (阶段 2 由 event-bus 集成).
     pub fn publish(&self, event: WorktreeSseEvent) -> Result<usize, WorktreeApiError> {
-        self.tx
-            .send(event)
-            .map_err(|e| WorktreeApiError::new("BROADCAST", e.to_string(), "bff.worktree_canvas", "sse::publish"))
+        self.tx.send(event).map_err(|e| {
+            WorktreeApiError::new(
+                "BROADCAST",
+                e.to_string(),
+                "bff.worktree_canvas",
+                "sse::publish",
+            )
+        })
     }
 }
 
@@ -95,10 +100,7 @@ pub fn sse_routes(state: Arc<WorktreeCanvasState>) -> Router {
     }
 
     // 健康检查 SSE (per IMPL-PLAN §4.13.2 BFF health endpoint).
-    router = router.route(
-        "/v1/worktree-canvas/health/stream",
-        get(sse_health_stream),
-    );
+    router = router.route("/v1/worktree-canvas/health/stream", get(sse_health_stream));
 
     router.with_state(state)
 }
@@ -106,7 +108,10 @@ pub fn sse_routes(state: Arc<WorktreeCanvasState>) -> Router {
 /// SSE handler (per event 端点) — 阶段 1 占位: 立即返回空 stream + 401 if no permission.
 async fn sse_handler(
     State(state): State<Arc<WorktreeCanvasState>>,
-) -> Result<Sse<impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, Infallible>>>, Response> {
+) -> Result<
+    Sse<impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, Infallible>>>,
+    Response,
+> {
     // RBAC 守门: View 即可订阅 (per DD §44).
     state
         .permission
@@ -139,7 +144,10 @@ async fn sse_handler(
 /// Health stream (per brief T13 健康检查 SSE) — 阶段 1 占位.
 async fn sse_health_stream(
     State(state): State<Arc<WorktreeCanvasState>>,
-) -> Result<Sse<impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, Infallible>>>, Response> {
+) -> Result<
+    Sse<impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, Infallible>>>,
+    Response,
+> {
     state
         .permission
         .require(super::permission::PermissionLevel::View)

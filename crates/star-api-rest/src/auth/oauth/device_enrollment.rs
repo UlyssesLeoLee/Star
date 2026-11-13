@@ -22,12 +22,12 @@ MERGE (self)-[:HANDLES]->(challengeEndpoint),(self)-[:HANDLES]->(enrollEndpoint)
 //! Proof-of-possession device enrollment and owner-scoped revocation endpoints.
 
 use axum::{
-    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::post,
+    Json, Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{Duration, Utc};
 use ring::{
     digest,
@@ -39,9 +39,9 @@ use star_pg_adapter::repository::{DeviceChallengeCreateResult, DeviceEnrollmentC
 use uuid::Uuid;
 
 use super::{
-    OAuth2State,
-    handlers::{OAuthHandlerError, issue_tokens},
+    handlers::{issue_tokens, OAuthHandlerError},
     middleware::AuthenticatedUser,
+    OAuth2State,
 };
 use crate::auth::DeviceTokenContext;
 

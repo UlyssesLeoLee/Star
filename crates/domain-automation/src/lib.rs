@@ -43,7 +43,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
 use thiserror::Error;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
 
 pub mod schedule;

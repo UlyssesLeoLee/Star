@@ -117,10 +117,8 @@ pub trait StartFromPickerSource: Send + Sync {
     /// 实现: 读 per-user allowlist (`~/.star/worktree_shared_dirs.txt` 第 1 行,
     /// 或 per 守门 #6 适配层 fallback 到 `<workspace>/.star/worktree_shared_dirs.txt`).
     /// 阶段 1 简化: 读环境变量 `WORKTREE_LOCAL_PATHS` (逗号分隔) 兜底.
-    async fn list_local_paths(
-        &self,
-        repo_id: RepoId,
-    ) -> Result<Vec<PickerCandidate>, ServiceError>;
+    async fn list_local_paths(&self, repo_id: RepoId)
+        -> Result<Vec<PickerCandidate>, ServiceError>;
 
     /// Empty / Blank 哨兵 (kind 4) — 永远 Some
     fn empty_candidate(&self, repo_id: RepoId) -> PickerCandidate;
@@ -350,7 +348,12 @@ pub async fn pick_start_from_candidates(
         .map(worktree_to_existing_candidate)
         .collect();
 
-    Ok(filter_and_dedupe(github, existing_candidates, local, Some(empty)))
+    Ok(filter_and_dedupe(
+        github,
+        existing_candidates,
+        local,
+        Some(empty),
+    ))
 }
 
 /// 按 PickerCandidate id 挑选 — UI 端 confirm 后回调 (per FR-ORCA-009 §3.3 "用户确认后").
@@ -368,7 +371,10 @@ pub fn select_by_id(cands: &PickerCandidates, id: &str) -> Option<PickerCandidat
 }
 
 /// 按 PickerCandidateKind 收集所有候选 (UI 端可一次性拿全部).
-pub fn collect_by_kind(cands: &PickerCandidates, kind: PickerCandidateKind) -> Vec<PickerCandidate> {
+pub fn collect_by_kind(
+    cands: &PickerCandidates,
+    kind: PickerCandidateKind,
+) -> Vec<PickerCandidate> {
     let mut out = Vec::new();
     match kind {
         PickerCandidateKind::RemoteBranch => out.extend(cands.github_branches.iter().cloned()),
@@ -413,13 +419,13 @@ pub fn contains_id(cands: &PickerCandidates, id: &str) -> bool {
 mod tests {
     use super::*;
 
-    use std::path::Path;
     use chrono::Utc;
     use git_adapter::provider::BranchInfo as GitBranch;
     use git_adapter::{GitError, WorktreeInfo};
     use graph_core::state::{HumanState, TestState};
     use graph_core::types::WorktreeId;
     use serial_test::serial;
+    use std::path::Path;
     use uuid::Uuid;
 
     // --- mock GitProvider (per 守门 #11 缺标比错标, 仅 test scope) ---
@@ -437,10 +443,7 @@ mod tests {
                 repo_id: None,
             })
         }
-        async fn list_worktrees(
-            &self,
-            _repo: &RepoHandle,
-        ) -> Result<Vec<WorktreeInfo>, GitError> {
+        async fn list_worktrees(&self, _repo: &RepoHandle) -> Result<Vec<WorktreeInfo>, GitError> {
             Ok(Vec::new())
         }
         async fn create_worktree(
@@ -476,14 +479,13 @@ mod tests {
         ) -> Result<String, GitError> {
             Ok(String::new())
         }
-        async fn rev_list_count(
-            &self,
-            _repo: &RepoHandle,
-            _range: &str,
-        ) -> Result<u32, GitError> {
+        async fn rev_list_count(&self, _repo: &RepoHandle, _range: &str) -> Result<u32, GitError> {
             Ok(0)
         }
-        async fn status(&self, _repo: &RepoHandle) -> Result<Vec<git_adapter::StatusEntry>, GitError> {
+        async fn status(
+            &self,
+            _repo: &RepoHandle,
+        ) -> Result<Vec<git_adapter::StatusEntry>, GitError> {
             Ok(Vec::new())
         }
         async fn sync_main(
@@ -510,11 +512,7 @@ mod tests {
         ) -> Result<git_adapter::MergeResult, GitError> {
             unimplemented!()
         }
-        async fn head(
-            &self,
-            _repo: &RepoHandle,
-            _wt: &Path,
-        ) -> Result<String, GitError> {
+        async fn head(&self, _repo: &RepoHandle, _wt: &Path) -> Result<String, GitError> {
             Ok(String::new())
         }
         async fn last_commit_at(
@@ -579,7 +577,9 @@ mod tests {
 
         let out = src.list_github_branches(repo_id).await.unwrap();
         assert_eq!(out.len(), 2);
-        assert!(out.iter().all(|c| c.kind == PickerCandidateKind::RemoteBranch));
+        assert!(out
+            .iter()
+            .all(|c| c.kind == PickerCandidateKind::RemoteBranch));
         // ★ prefix on mainline
         assert!(out[0].label.starts_with("★ "), "mainline branch gets star");
         assert!(!out[1].label.starts_with("★ "));
@@ -627,13 +627,21 @@ mod tests {
             ) -> Result<git_adapter::Diff, GitError> {
                 unimplemented!()
             }
-            async fn merge_base(&self, _: &RepoHandle, _: &str, _: &str) -> Result<String, GitError> {
+            async fn merge_base(
+                &self,
+                _: &RepoHandle,
+                _: &str,
+                _: &str,
+            ) -> Result<String, GitError> {
                 unimplemented!()
             }
             async fn rev_list_count(&self, _: &RepoHandle, _: &str) -> Result<u32, GitError> {
                 unimplemented!()
             }
-            async fn status(&self, _: &RepoHandle) -> Result<Vec<git_adapter::StatusEntry>, GitError> {
+            async fn status(
+                &self,
+                _: &RepoHandle,
+            ) -> Result<Vec<git_adapter::StatusEntry>, GitError> {
                 unimplemented!()
             }
             async fn sync_main(
@@ -643,12 +651,7 @@ mod tests {
             ) -> Result<git_adapter::SyncResult, GitError> {
                 unimplemented!()
             }
-            async fn rebase(
-                &self,
-                _: &RepoHandle,
-                _: &Path,
-                _: &str,
-            ) -> Result<(), GitError> {
+            async fn rebase(&self, _: &RepoHandle, _: &Path, _: &str) -> Result<(), GitError> {
                 unimplemented!()
             }
             async fn merge(
@@ -702,7 +705,10 @@ mod tests {
         assert!(names.contains(&"main"));
         assert!(names.contains(&"feat-y"));
         assert!(!names.contains(&"archived-z"), "archived filtered");
-        assert!(out.existing_worktrees.iter().all(|c| c.kind == PickerCandidateKind::LocalBranch));
+        assert!(out
+            .existing_worktrees
+            .iter()
+            .all(|c| c.kind == PickerCandidateKind::LocalBranch));
     }
 
     #[tokio::test]
@@ -740,7 +746,9 @@ mod tests {
         assert!(empty.id.starts_with("empty:"));
 
         // pick_start_from_candidates 总把 empty 放进 output
-        let out = pick_start_from_candidates(repo_id, &[], &src).await.unwrap();
+        let out = pick_start_from_candidates(repo_id, &[], &src)
+            .await
+            .unwrap();
         assert!(out.empty.is_some());
         assert!(out.total() >= 1, "empty alone makes total ≥ 1");
     }
@@ -858,10 +866,22 @@ mod tests {
             empty: Some(em.clone()),
         };
 
-        assert_eq!(select_by_id(&cands, "gh:1").unwrap().kind, PickerCandidateKind::RemoteBranch);
-        assert_eq!(select_by_id(&cands, "wt:1").unwrap().kind, PickerCandidateKind::LocalBranch);
-        assert_eq!(select_by_id(&cands, "lp:1").unwrap().kind, PickerCandidateKind::RepoBase);
-        assert_eq!(select_by_id(&cands, "empty:1").unwrap().kind, PickerCandidateKind::CommitSha);
+        assert_eq!(
+            select_by_id(&cands, "gh:1").unwrap().kind,
+            PickerCandidateKind::RemoteBranch
+        );
+        assert_eq!(
+            select_by_id(&cands, "wt:1").unwrap().kind,
+            PickerCandidateKind::LocalBranch
+        );
+        assert_eq!(
+            select_by_id(&cands, "lp:1").unwrap().kind,
+            PickerCandidateKind::RepoBase
+        );
+        assert_eq!(
+            select_by_id(&cands, "empty:1").unwrap().kind,
+            PickerCandidateKind::CommitSha
+        );
         assert!(select_by_id(&cands, "nope").is_none());
     }
 
@@ -885,10 +905,22 @@ mod tests {
             local_paths: vec![],
             empty: Some(em.clone()),
         };
-        assert_eq!(collect_by_kind(&cands, PickerCandidateKind::RemoteBranch).len(), 1);
-        assert_eq!(collect_by_kind(&cands, PickerCandidateKind::LocalBranch).len(), 0);
-        assert_eq!(collect_by_kind(&cands, PickerCandidateKind::RepoBase).len(), 0);
-        assert_eq!(collect_by_kind(&cands, PickerCandidateKind::CommitSha).len(), 1);
+        assert_eq!(
+            collect_by_kind(&cands, PickerCandidateKind::RemoteBranch).len(),
+            1
+        );
+        assert_eq!(
+            collect_by_kind(&cands, PickerCandidateKind::LocalBranch).len(),
+            0
+        );
+        assert_eq!(
+            collect_by_kind(&cands, PickerCandidateKind::RepoBase).len(),
+            0
+        );
+        assert_eq!(
+            collect_by_kind(&cands, PickerCandidateKind::CommitSha).len(),
+            1
+        );
     }
 
     // ---------- 集成 + edge cases (per spec §6 ≥ 2 integration) ----------
@@ -928,11 +960,16 @@ mod tests {
         let src = DefaultStartFromPickerSource::new(git);
         let repo_id = RepoId::from(Uuid::new_v4());
 
-        let out = pick_start_from_candidates(repo_id, &[], &src).await.unwrap();
+        let out = pick_start_from_candidates(repo_id, &[], &src)
+            .await
+            .unwrap();
         assert!(out.github_branches.is_empty());
         assert!(out.existing_worktrees.is_empty());
         assert!(out.local_paths.is_empty());
-        assert!(out.empty.is_some(), "empty always present (kind 4 启动条件)");
+        assert!(
+            out.empty.is_some(),
+            "empty always present (kind 4 启动条件)"
+        );
         assert_eq!(out.total(), 1);
     }
 
