@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9220d1c7585cb57f8c3779a85bf6da87ac0273aa39b68139534d43ab96babbdb
+@cypher schema=1 source_sha256=e244bff31a51b4b171ccd3cd2ed4ced804c1503219adc9038b3ee3b836a0dbe5
 MERGE (self:File {path:"frontend/src/lib/seed.ts"})
 MERGE (integrations:Symbol {id:"frontend/src/lib/seed.ts::integrations",kind:"constant"})
 MERGE (canvases:Symbol {id:"frontend/src/lib/seed.ts::canvases",kind:"constant"})
@@ -399,9 +399,9 @@ export const canvasElements: CanvasElement[] = [
 
 // Canvas Connector — 演示 Relation 域联动
 export const canvasConnectors: CanvasConnector[] = [
-  { id: "el-cn-004", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-001", to_element_id: "el-ag-001", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
-  { id: "el-cn-005", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-002", to_element_id: "el-ag-002", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
-  { id: "el-cn-006", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-003", to_element_id: "el-ag-003", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
+  { id: "el-cn-004", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-001", to_element_id: "el-ag-001", from_port: "output", to_port: "input", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
+  { id: "el-cn-005", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-002", to_element_id: "el-ag-002", from_port: "output", to_port: "input", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
+  { id: "el-cn-006", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-003", to_element_id: "el-ag-003", from_port: "output", to_port: "input", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
 ];
 
 // =====================================================================

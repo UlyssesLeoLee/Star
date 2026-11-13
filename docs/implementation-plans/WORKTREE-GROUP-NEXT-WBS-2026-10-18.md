@@ -960,3 +960,10 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **既存功能复用**: `Repository.provider` 已含 github/gitlab/gitea/self-host (`types/ids.ts`); seed 有 4 仓库 + 12 PR (repository_id + source_branch 与 Worktree.branch 对齐); 本地目录识别走 `isLocalMode` + workspace-files 白名单桥接 (LocalFolderBrowser 先例)。
 - **设计**: `lib/group/gitBindingStore.ts` — GitBinding 类型 + GIT_PROVIDERS 注册表 (github/gitlab/self-host, 数组注册表模式, 加 provider 只加条目) + localStorage 持久化; `app/worktree/GitBindingPanel.tsx` — 未绑定显示 3 张 provider 卡 + 表单, 已绑定显示绑定行 + 自动识别结果 (每个 Worktree: 本地目录路径 = binding.local_path + wt.name, 远端 branch URL = host/owner/repo/tree/branch, 与 repositories/pullRequests 数据自动匹配); 接线 /worktree page.tsx 无绑定时显示绑定面板。
 - **门禁**: tsc 0 + vitest 全绿 + Cypher PASS + author=Ulysses。
+
+### 23.35 2026-11-13 Canvas 输入/输出端点完善 (用户发令)
+
+- **用户发令 (2026-11-13)**: "Canvas界面的各项功能包括不限于输入输出端点各种组件都要完善到位"
+- **现状**: CanvasView 已有无限画布+viewport+元素(7 种)+连接线(curved/straight/orthogonal)+拖拽/框选/画笔/frames/minimap; 但连接线只挂 from/to element 中心点, 无端口概念。
+- **实现 (2026-11-13)**: `CanvasConnector.from_port/to_port` 可选字段 (兼容旧数据, null 回落中心点); 5 种节点元素 (work_item_card/worktree_node/agent_cursor/automation_node/comment_pin) 渲染 input(左)/output(右) 端点圆点, 选中/hover/有连接时可见; 连接线端点吸附端口坐标; 输出端点 mousedown 拖线→预览虚线→输入端点 mouseup 创建连接 (store.addCanvasConnector, from_port=output/to_port=input); seed 3 条 connectors 加端口字段。shape/image/embed/text/sticky/path/frame 无端口 (非节点类)。
+- **门禁**: tsc 0 + CanvasView.test 8/8 (E-H 端口 4 用例: 渲染/吸附/拖线创建/空白取消) + Cypher PASS + author=Ulysses。

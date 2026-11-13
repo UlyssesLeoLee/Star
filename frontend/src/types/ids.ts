@@ -2,7 +2,7 @@
 // Star Platform — Shared Type Definitions
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=ff2da2656c3ddeaa670921871d23a1532aa1c1262c4aa646ab7c531bb7ca9824
+@cypher schema=1 source_sha256=39c3dd60b0980036a6bf5d1c908856039391fac253295350b8d4d387530d25d1
 MERGE (self:File {path:"frontend/src/types/ids.ts"})
 MERGE (workItem:Type {id:"frontend/src/types/ids.ts::WorkItem",kind:"interface"})
 MERGE (workItemDoc:Type {id:"frontend/src/types/ids.ts::WorkItemDocument",kind:"interface"})
@@ -834,6 +834,13 @@ export interface CanvasConnector {
   kind: CanvasConnectorKind;
   from_element_id: Uuid;
   to_element_id: Uuid;
+  /**
+   * 输入/输出端点 (per WBS §23.35, 2026-11-13 用户发令: Canvas 输入输出端点完善)。
+   * from_port 默认 "output" (源元素输出端点), to_port 默认 "input" (目标元素输入端点);
+   * null = 兼容旧数据, 端点回落元素中心点。
+   */
+  from_port?: "input" | "output" | null;
+  to_port?: "input" | "output" | null;
   routing: "straight" | "curved" | "orthogonal";
   arrow_start: boolean;
   arrow_end: boolean;

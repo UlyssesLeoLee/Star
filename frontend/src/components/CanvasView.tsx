@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d13d309ae3792cd48b723ab0721cfc8584328c1a9ead21c497d39f299a4a2bae
+@cypher schema=1 source_sha256=fea428ac6601c3ae7c1f867a104b7bfd3bc6f2f8a79931419dba0d44b28dbc3c
 MERGE (self:File {path:"frontend/src/components/CanvasView.tsx"})
 MERGE (props:Type {id:"frontend/src/components/CanvasView.tsx::CanvasViewProps",kind:"interface"})
 MERGE (view:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -85,7 +85,7 @@ type CanvasElementView = Pick<CanvasElement,
   "id" | "canvas_id" | "kind" | "x" | "y" | "width" | "height" | "rotation" | "z_index" | "entity_ref" | "content" | "locked" | "hidden"
 > & { version?: number };
 type CanvasConnectorView = Pick<CanvasConnector,
-  "id" | "canvas_id" | "kind" | "from_element_id" | "to_element_id" | "routing" | "arrow_start" | "arrow_end" | "color" | "width" | "label"
+  "id" | "canvas_id" | "kind" | "from_element_id" | "to_element_id" | "from_port" | "to_port" | "routing" | "arrow_start" | "arrow_end" | "color" | "width" | "label"
 >;
 
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
@@ -116,6 +116,10 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragPreview, setDragPreview] = useState<{ elementId: string; x: number; y: number } | null>(null);
   const dragPreviewRef = useRef<{ elementId: string; x: number; y: number } | null>(null);
+  // 输入/输出端点拖线 (per WBS §23.35: 从输出端点拖到输入端点创建连接)
+  const [portDrag, setPortDrag] = useState<{ fromElementId: string; x: number; y: number } | null>(null);
+  const portDragRef = useRef<{ fromElementId: string; x: number; y: number } | null>(null);
+  const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
   const dragState = useRef<{ type: "pan" | "element" | null; startX: number; startY: number; elX: number; elY: number; elId: string | null; expectedVersion: number }>({
     type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null, expectedVersion: 0,
   });
@@ -126,8 +130,72 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const feedbacks = useStore((s) => s.feedbacks);
   const moveCanvasElement = useStore((s) => s.moveCanvasElement);
   const deleteCanvasElement = useStore((s) => s.deleteCanvasElement);
+  const addCanvasConnector = useStore((s) => s.addCanvasConnector);
   const availableWorkItems = groupWorkItems ?? useStore.getState().workItems;
   const availableWorktrees = groupWorktrees ?? worktrees;
+
+  // =====================================================================
+  // 输入/输出端点 (per WBS §23.35)
+  // =====================================================================
+  /** 端点世界坐标: input=左侧中点, output=右侧中点 (多端点时纵向均分, 预留 index) */
+  const portWorldPos = useCallback((el: CanvasElementView, side: "input" | "output", index = 0, count = 1) => {
+    const yFraction = count <= 1 ? 0.5 : (index + 1) / (count + 1);
+    return {
+      x: side === "input" ? el.x : el.x + el.width,
+      y: el.y + el.height * yFraction,
+    };
+  }, []);
+
+  /** 连接线端点坐标: 带 from_port/to_port 时吸附端点, 否则回落中心点 (兼容旧数据) */
+  const connectorEndpoints = useCallback((c: CanvasConnectorView, from: CanvasElementView, to: CanvasElementView) => {
+    const fx = c.from_port === "input" ? portWorldPos(from, "input").x : c.from_port === "output" ? portWorldPos(from, "output").x : from.x + from.width / 2;
+    const fy = c.from_port === "input" ? portWorldPos(from, "input").y : c.from_port === "output" ? portWorldPos(from, "output").y : from.y + from.height / 2;
+    const tx = c.to_port === "input" ? portWorldPos(to, "input").x : c.to_port === "output" ? portWorldPos(to, "output").x : to.x + to.width / 2;
+    const ty = c.to_port === "input" ? portWorldPos(to, "input").y : c.to_port === "output" ? portWorldPos(to, "output").y : to.y + to.height / 2;
+    return { fx, fy, tx, ty };
+  }, [portWorldPos]);
+
+  /** 端点拖线开始 (输出端点 mousedown) */
+  const startPortDrag = useCallback((fromElementId: string, e: React.MouseEvent) => {
+    if (readOnly) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const svgPt = svgPointFromClient(e);
+    if (!svgPt) return;
+    const state = { fromElementId, x: svgPt.x, y: svgPt.y };
+    portDragRef.current = state;
+    setPortDrag(state);
+  }, [readOnly]);
+
+  /** 端点拖线结束 (输入端点 mouseup) → 创建连接 */
+  const finishPortDrag = useCallback((toElementId: string, e: React.MouseEvent) => {
+    const drag = portDragRef.current;
+    portDragRef.current = null;
+    setPortDrag(null);
+    if (!drag || drag.fromElementId === toElementId) return;
+    e.stopPropagation();
+    e.preventDefault();
+    addCanvasConnector({
+      id: `cn-${globalThis.crypto.randomUUID()}`,
+      canvas_id: canvas.id,
+      kind: "dependency",
+      from_element_id: drag.fromElementId,
+      to_element_id: toElementId,
+      from_port: "output",
+      to_port: "input",
+      routing: "curved",
+      arrow_start: false,
+      arrow_end: true,
+      color: "var(--cel-cyan, #2f81f7)",
+      width: 2,
+    });
+  }, [addCanvasConnector, canvas.id]);
+
+  /** 取消拖线 (SVG 空白处 mouseup) */
+  const cancelPortDrag = useCallback(() => {
+    portDragRef.current = null;
+    setPortDrag(null);
+  }, []);
 
   useEffect(() => {
     onSelectionChange?.(selected);
@@ -182,6 +250,13 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
       updateViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
+    } else if (portDragRef.current) {
+      // 端口拖线预览跟随鼠标 (per WBS §23.35)
+      const svgPt = svgPointFromClient(e);
+      if (!svgPt) return;
+      const state = { fromElementId: portDragRef.current.fromElementId, x: svgPt.x, y: svgPt.y };
+      portDragRef.current = state;
+      setPortDrag(state);
     } else if (ds.type === "element" && ds.elId && (!readOnly || onElementPositionChange)) {
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
@@ -217,6 +292,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null, expectedVersion: 0 };
     const preview = dragPreviewRef.current;
     dragPreviewRef.current = null;
+    cancelPortDrag();
     if (ds.type === "element" && ds.elId && ds.expectedVersion > 0 && onElementPositionChange && preview?.elementId === ds.elId) {
       const position = { elementId: ds.elId, x: preview.x, y: preview.y, expectedVersion: ds.expectedVersion };
       if (position.x !== ds.elX || position.y !== ds.elY) {
@@ -416,6 +492,46 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     }
   };
 
+  // =====================================================================
+  // 输入/输出端点渲染 (per WBS §23.35)
+  // 节点类元素: 左=输入端点, 右=输出端点; 选中或已有连接时可见;
+  // 输出端点 mousedown 开始拖线, 输入端点 mouseup 落点创建连接。
+  // =====================================================================
+  const renderPortHandles = (el: CanvasElementView, w: number, h: number) => {
+    const connected = connectors.some((c) => c.from_element_id === el.id || c.to_element_id === el.id);
+    const visible = selected.includes(el.id) || hoveredElementId === el.id || connected;
+    const portR = 5 / viewport.zoom;
+    return (
+      <g
+        data-testid={`canvas-ports-${el.id}`}
+        style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none" }}
+        onMouseEnter={() => setHoveredElementId(el.id)}
+        onMouseLeave={() => setHoveredElementId((current) => (current === el.id ? null : current))}
+      >
+        {/* 输入端点 (左) */}
+        <circle
+          data-testid={`canvas-port-${el.id}-input`}
+          cx={0} cy={h / 2} r={portR}
+          fill="var(--cel-surface-card, #161b22)"
+          stroke="var(--cel-cyan, #2f81f7)"
+          strokeWidth={1.5}
+          style={{ cursor: "crosshair" }}
+          onMouseUp={(e) => finishPortDrag(el.id, e)}
+        />
+        {/* 输出端点 (右) */}
+        <circle
+          data-testid={`canvas-port-${el.id}-output`}
+          cx={w} cy={h / 2} r={portR}
+          fill="var(--cel-surface-card, #161b22)"
+          stroke="var(--cel-cyan, #2f81f7)"
+          strokeWidth={1.5}
+          style={{ cursor: "crosshair" }}
+          onMouseDown={(e) => startPortDrag(el.id, e)}
+        />
+      </g>
+    );
+  };
+
   // render element
   const renderElement = (el: CanvasElementView) => {
     const isHighlighted = el.id === highlightElementId;
@@ -496,6 +612,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             <g transform={`translate(8, ${h - 24 * viewport.zoom})`}>
           <StatusPill value={wi.status} size="xs" />
             </g>
+            {renderPortHandles(el, w, h)}
           </g>
         );
       }
@@ -517,6 +634,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             <g transform={`translate(${w - 90 * viewport.zoom}, ${h - 22 * viewport.zoom})`}>
           <StatusPill value={wt.status} size="xs" />
             </g>
+            {renderPortHandles(el, w, h)}
           </g>
         );
       }
@@ -599,6 +717,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             <text x={w / 2} y={h - Math.max(8, cellSize * 2)} textAnchor="middle" fontSize={Math.max(8, cellSize * 1.2)} fill="var(--cel-text-primary, #e6edf3)" fontFamily="ui-monospace, monospace" style={{ paintOrder: "stroke", stroke: "var(--cel-surface-stage, #0b0d10)", strokeWidth: 2 }}>
           {ag.name}
             </text>
+            {renderPortHandles(el, w, h)}
           </g>
         );
       }
@@ -616,6 +735,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             {au.name}
           </div>
             </foreignObject>
+            {renderPortHandles(el, w, h)}
           </g>
         );
       }
@@ -626,6 +746,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={10 * viewport.zoom} fill="var(--cel-cyan, #79c0ff)" fontFamily="ui-monospace, monospace">
           💬
             </text>
+            {renderPortHandles(el, w, h)}
           </g>
         );
       }
@@ -666,10 +787,8 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     const from = displayElements.find((e) => e.id === c.from_element_id);
     const to = displayElements.find((e) => e.id === c.to_element_id);
     if (!from || !to) return null;
-    const fx = from.x + from.width / 2;
-    const fy = from.y + from.height / 2;
-    const tx = to.x + to.width / 2;
-    const ty = to.y + to.height / 2;
+    // per WBS §23.35: 端点吸附 (from_port/to_port) — 无端口字段回落中心点
+    const { fx, fy, tx, ty } = connectorEndpoints(c, from, to);
     const dx = tx - fx;
     const dy = ty - fy;
     let path: string;
@@ -687,7 +806,6 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       path = `M ${fx} ${fy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${tx} ${ty}`;
     }
     // 转为屏幕坐标
-    const fromScreen = worldToScreen(0, 0);
     const fx_s = (fx - viewport.x) * viewport.zoom;
     const fy_s = (fy - viewport.y) * viewport.zoom;
     const tx_s = (tx - viewport.x) * viewport.zoom;
@@ -887,6 +1005,27 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
 
         {/* Connector(在 element 下面) */}
         {connectors.map(renderConnector)}
+
+        {/* 端口拖线预览 (per WBS §23.35: 输出端点拖出到输入端点) */}
+        {portDrag && (() => {
+          const from = displayElements.find((e) => e.id === portDrag.fromElementId);
+          if (!from) return null;
+          const fx = (from.x + from.width - viewport.x) * viewport.zoom;
+          const fy = (from.y + from.height / 2 - viewport.y) * viewport.zoom;
+          const cx1 = fx + Math.max(40, (portDrag.x - fx) * 0.4);
+          const cx2 = portDrag.x - Math.max(40, (portDrag.x - fx) * 0.4);
+          return (
+            <path
+              data-testid="canvas-port-drag-preview"
+              d={`M ${fx} ${fy} C ${cx1} ${fy}, ${cx2} ${portDrag.y}, ${portDrag.x} ${portDrag.y}`}
+              stroke="var(--cel-cyan, #2f81f7)"
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              fill="none"
+              pointerEvents="none"
+            />
+          );
+        })()}
 
         {/* 自由画笔 in-progress path (per 2026-10-01 OOB 恢复丢失的画笔功能) */}
         {drawingPath && drawingPath.points.length >= 2 && (() => {
