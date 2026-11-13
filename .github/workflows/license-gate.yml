@@ -83,9 +83,14 @@ jobs:
 
       - name: cargo-deny check (licenses / bans / sources)
         # 全 feature 图: 覆盖构建/分发闭包全集 (per deny.toml [graph] all-features = true)
+        #
+        # 只检查 licenses / bans / sources —— 这三项是锁文件的确定性函数, 才适合做
+        # 必需检查。advisories 随 RustSec 数据库每日变化, 一条新公告就会在没有任何
+        # 代码改动时把本检查变红并卡住所有合并, 所以单独放在 advisory-gate job 里。
+        # (2026-11-13 首次真正执行时即发现 2 条新公告, 见 advisory-gate。)
         run: |
           set -euo pipefail
-          cargo-deny --all-features check
+          cargo-deny --all-features check licenses bans sources
 
       - name: Export license inventory (SPDX evidence)
         # 产出可审计的许可清单证据, 供人工逐项复核 (per AGENTS.md §0 "逐版本审查")
@@ -140,6 +145,25 @@ jobs:
         run: |
           set -euo pipefail
           cargo-audit audit
+
+      - name: Fetch cargo-deny (pinned + checksum-verified)
+        # 第二个公告源: deny.toml [advisories] 里有经评估的 ignore 清单 (含复审期限),
+        # 那是本仓的公告处置策略; cargo-audit 不读它, 所以两者都跑。
+        if: always()
+        env:
+          CARGO_DENY_VERSION: "0.20.2"
+          CARGO_DENY_SHA256: "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+        run: |
+          bash scripts/ci/install_pinned_binary.sh \
+            "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            "${CARGO_DENY_SHA256}" \
+            cargo-deny
+
+      - name: cargo-deny check advisories (policy in deny.toml)
+        if: always()
+        run: |
+          set -euo pipefail
+          cargo-deny --all-features check advisories
 
   # ─────────────────────────────────────────────────────────────
   # Job 3: 未使用依赖 (cargo-machete) — 收敛闭包, 减少审查面

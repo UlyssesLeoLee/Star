@@ -100,6 +100,10 @@ cargo test -p star-context --lib -j 4
 
 - 升级工具版本 = 同时改 `*_VERSION` 与 `*_SHA256`，并用上面的命令核对。
 - 不使用 workflow 级 `paths` 过滤：这些 job 是必需检查，过滤后"检查缺失"会让无关 PR 永远无法合并。
+- **必需检查只含确定性项**：`License (cargo-deny)` 只跑 `licenses bans sources`（锁文件的确定性函数）。
+  `advisories` 随 RustSec 数据库每日变化，一条新公告会在没有任何代码改动时把检查变红并卡住所有合并，
+  因此放在非必需的 `Advisories (cargo-audit)` job 里（cargo-audit + `cargo-deny check advisories`，
+  后者使用 `deny.toml` 中带复审期限的 ignore 清单），并每日定时运行。
 - `cargo-machete` 为 advisory（静态分析对 feature 间接使用的依赖会误报），发现项写进 job summary。
 
 ## 5. 发布 (`release.yml`)
@@ -145,6 +149,7 @@ bash scripts/ci/apply_rulesets.sh             # 创建/更新（按 name 幂等�
 | `wasm-build.yml` | 自 2026-10-11 起失败 | `graph-core` 依赖 workspace 的 `tokio`（`features=["full"]`）拖入 `mio`，`mio` 无法编译到 `wasm32-unknown-unknown`；之后还有 `uuid` 在 wasm32 缺随机源、`relationship-engine-wasm` 直接依赖 `tokio` | 产品代码的依赖策略问题，非 CI。详见该 workflow 文件头注释 |
 | `pre-tool-use-guard.yml` | 失败 | guardian 测试目录的 flake8 未使用导入；`test_comment_signing.py` 收集期出错 | 仅在改动 guardian 脚本时触发 |
 | `mock-switch-validate.yml` | 失败（`fail=7`） | 校验的是跨项目 mock 集群，依赖 runner 上不存在的其他项目 | 本质是本机工具，不适合在 runner 上跑 |
+| `Advisories (cargo-audit)` | 修复取工具问题后首次真正执行（2026-11-13）：cargo-audit 报 **3 个真实漏洞** | `crypto-bigint` 0.5.5 时序问题 RUSTSEC-2026-0387；`libsqlite3-sys` 0.30.1 捆绑的 SQLite RUSTSEC-2026-0459（中危 6.8，经 `rusqlite` 0.32.1 引入）；`rsa` Marvin 时序侧信道 RUSTSEC-2023-0071（`deny.toml` 已有评估后的 ignore，cargo-audit 不读该清单）。另有 4 条 unmaintained/unsound 警告（fxhash、instant、proc-macro-error、glib） | 需要你决定「升级依赖」还是「在 `deny.toml` 登记评估后的 ignore」；该 job 非必需，不会拦合并 |
 | macOS 桌面打包 | 排队后 "job was not acquired" | GitHub macOS arm64 runner 容量不足 | 基础设施问题 |
 | `star-stable-desktop` | 此前从未全绿 | 见 §1 的 tauri 工作目录问题；本次修复后需在 runner 上确认 | 以实际运行为准 |
 
