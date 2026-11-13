@@ -13,9 +13,9 @@ import json
 import logging
 import os
 import stat
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 try:
     from guardian.index_builder import (

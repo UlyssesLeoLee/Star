@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from guardian.audit_logger import AuditEvent, AuditLogger
+from guardian.audit_logger import AuditLogger
 from guardian.index_builder import (
     DEFAULT_CHUNK_SIZE,
     build_index,

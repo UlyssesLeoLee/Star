@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2].parent))
 
-from dispatcher import SubagentDispatcher, BlockedByCommentError
+from dispatcher import SubagentDispatcher
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def test_multiple_blocks_partial_resolve(dispatcher):
 
 def test_resolve_without_parent_id_does_not_unblock(dispatcher):
     """解除留言不带 parent_comment_id → 跟 BLOCK 留言无关联, 不解除."""
-    c1 = dispatcher.comment("T7", "BLOCK 留言", blocks=True, author="Ulysses", actor_role="Ulysses")
+    dispatcher.comment("T7", "BLOCK 留言", blocks=True, author="Ulysses", actor_role="Ulysses")
     dispatcher.comment("T7", "随便说说", blocks=False, author="Ulysses", actor_role="Ulysses")  # 无 parent_comment_id
     blocking = dispatcher.check_blocked("T7")
     assert len(blocking) == 1

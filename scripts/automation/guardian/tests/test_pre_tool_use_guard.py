@@ -186,7 +186,6 @@ def test_p50_latency_under_5ms(guard):
         latencies.append((time.perf_counter() - t0) * 1000)
     latencies.sort()
     p50 = latencies[100]
-    p99 = latencies[198]
     assert p50 < 5, f"p50 = {p50:.3f}ms 违反 NFR-P-1 (< 5ms)"
 
 
