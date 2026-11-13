@@ -23,11 +23,15 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
-tokio = { workspace = true }
+tokio = { version = "1.40", default-features = false, features = ["sync"] }
 tracing = { workspace = true }
 futures-util = { workspace = true }
 
 graph-core = { path = "../graph-core" }
+
+# wasm32 目标: uuid v4 随机源用 js (getrandom), per WBS 10.1.5
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1", features = ["v4", "js", "serde"] }
 
 [dev-dependencies]
 tokio = { workspace = true }
