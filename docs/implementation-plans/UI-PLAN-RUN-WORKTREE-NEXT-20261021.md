@@ -262,7 +262,7 @@ Project Worktree Index 提供跨 Run 的表格/列表、搜索、状态筛选和
 
 ### 核心用户流程
 
-~~~mermaid
+```mermaid
 flowchart TD
   P[选择 Project] --> R[展开 Engineering Run]
   R --> W[查看 Worktree 目录与跨 Run 汇总]
@@ -278,7 +278,7 @@ flowchart TD
   T -->|取消/恢复/验证| A
   C -->|打开 canonical owner 页面| A
   L -->|resume 前复验授权/版本| A
-~~~
+```
 
 | 用户任务 | 交互步骤 | 安全与可恢复门 |
 |---|---|---|
