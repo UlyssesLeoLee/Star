@@ -57,9 +57,12 @@ jobs:
             echo "OK: Star mock cluster_switch 校验通过"
 
       - name: Generate cross-project status report
+        # report 子命令在任一项目 FAIL 时返回 1。runner 上另 6 个项目 (其他仓库在作者
+        # 本机上的绝对路径) 必然 FAIL, workflow 的判定在上一步已明确为 "只有 Star mock
+        # 自身 FAIL 才 fail CI", 所以这里只生成报告, 不让预期内的 FAIL 终止后续步骤。
         run: |
           python3 tools/mock-switch-validate.py report \
-            --output docs/mock-switch-status.md
+            --output docs/mock-switch-status.md || echo "report exit=$? (预期: 其他仓库的 mock 在 runner 上不存在)"
           cat docs/mock-switch-status.md
 
       - name: Upload report artifact
