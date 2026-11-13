@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5bd951f49d76d4723aa46dd75c96b71ce069b4979650ffe2e72448f231cab43b
+@cypher schema=1 source_sha256=da84b246a2d63a65804c51ae5133a65702b5ba18822c581c85b2fe5b4ff6b6e9
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -618,6 +618,13 @@ export const ja: Dictionary = {
     boundTasks: "バインド済み Star タスク",
     autoRule: "自動生成ルール",
     autoRuleValue: "編集者 ≥2",
+    watcherTitle: ".nema ファイル監視",
+    watcherActive: "監視中 (ローカル workspace-files ブリッジを 20 秒ごとにポーリング)",
+    watcherInactive: "ローカルモード外 — ファイル監視不可 (localhost/LAN + ローカルバックエンドが必要)",
+    watcherScanned: "スキャン",
+    watcherImported: "新規",
+    watcherUpdated: "更新",
+    watcherScanNow: "今すぐスキャン",
     autoRuleHint: "共同編集で発動",
     format: "フォーマット",
     localFolderBridge: "ローカルフォルダ (制御付き読み取り専用ブリッジ)",

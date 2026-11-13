@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=5eecc117931d88558a775c70c248203ef4b7169126a0dcf3e7732feb19d77a4c
+@cypher schema=1 source_sha256=ab29f3fd71b02079b75ff7073eec3a3b6b8c05e517c59f0e311aac9fb411d415
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -534,7 +534,14 @@ export interface Dictionary {
     boundTasks: string;             // "已绑定 Star 任务"
     autoRule: string;               // "自动生成规则"
     autoRuleValue: string;          // "≥2 编辑者"
-    autoRuleHint: string;           // "共同编辑触发"
+    autoRuleHint: string;
+    watcherTitle: string;          // per WBS 8.4.4 文件系统监听
+    watcherActive: string;
+    watcherInactive: string;
+    watcherScanned: string;
+    watcherImported: string;
+    watcherUpdated: string;
+    watcherScanNow: string;           // "共同编辑触发"
     format: string;                 // "格式"
     localFolderBridge: string;      // "本地文件夹 (受控只读桥接)"
     connecting: string;             // "连接中…"

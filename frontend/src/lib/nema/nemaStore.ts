@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c3dd0856095f2060e53b2b6108ad6bfccbacc59631b2c2193fe89b147b1e509b
+@cypher schema=1 source_sha256=c21320ea8b122a865330eb53d20b31d028e582a9b90c2a5506e51e813e2961d6
 MERGE (self:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::useNemaStore",kind:"hook"})
 MERGE (register:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::registerSharedFile",kind:"function"})
@@ -59,6 +59,8 @@ interface NemaState {
   removeNemaTask: (nemaId: string) => void;
   /** 由 .nema 源码导入任务。 */
   importNemaSource: (nemaPath: string, source: string) => NemaTaskEntry;
+  /** 文件系统监听同步 (per WBS 8.4.4): 磁盘 .nema 内容变化 → 更新记录 + 回写已绑定任务。 */
+  syncNemaSource: (nemaPath: string, source: string) => { action: "imported" | "updated" | "unchanged"; entry: NemaTaskEntry };
 }
 
 function makeId(prefix: string): string {
@@ -173,6 +175,44 @@ export const useNemaStore = create<NemaState>()(
         };
         set((s) => ({ nemaTasks: [...s.nemaTasks, entry] }));
         return entry;
+      },
+
+      syncNemaSource: (nemaPath, source) => {
+        const existing = get().nemaTasks.find((t) => t.nemaPath === nemaPath);
+        if (!existing) {
+          const entry = get().importNemaSource(nemaPath, source);
+          return { action: "imported" as const, entry };
+        }
+        if (existing.source === source) {
+          return { action: "unchanged" as const, entry: existing };
+        }
+        const doc = parseNema(source);
+        const view = taskViewFromDocument(doc);
+        const now = new Date().toISOString();
+        const updated: NemaTaskEntry = {
+          ...existing,
+          title: view.title,
+          editors: view.who,
+          source,
+          updated_at: now,
+        };
+        set((s) => ({
+          nemaTasks: s.nemaTasks.map((t) => (t.id === existing.id ? updated : t)),
+        }));
+        // 任务状态回写 (per WBS 8.4.4): 已绑定 WorkItem 的 .nema 变化 → 同步标题/描述
+        if (existing.workItemId) {
+          const main = useMainStore.getState();
+          const target = main.workItems.find((w) => w.id === existing.workItemId);
+          if (target) {
+            main.updateWorkItemField(existing.workItemId, "title", view.title);
+            main.updateWorkItemField(
+              existing.workItemId,
+              "description",
+              [view.what, view.why, view.how].filter(Boolean).join("\n\n"),
+            );
+          }
+        }
+        return { action: "updated" as const, entry: updated };
       },
     }),
     { name: "star-nema-files" },

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=744122d4acc1f63562206cdf62d8c506940d81e811cc35429f05a7f1c5d4969b
+@cypher schema=1 source_sha256=9ebd61c9cb4f71ce835a901a69f3bfdb8f3cd856fb802ef895f72181f9f07363
 MERGE (self:File {path:"frontend/src/app/(app)/nema/page.tsx"})
 MERGE (page:Function {name:"NemaPage", language:"typescript", visibility:"public"})
 MERGE (register:Function {name:"SharedFileForm", language:"typescript", visibility:"private"})
@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { FileText, FilePlus2, Play, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useNemaStore } from "@/lib/nema/nemaStore";
+import { useNemaWatcher } from "@/lib/nema/nemaWatcher";
 import { parseNema, taskViewFromDocument } from "@/lib/nema/nema";
 import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
 import { useTranslation } from "@/lib/i18n";
@@ -33,6 +34,8 @@ export default function NemaPage() {
   const registerSharedFile = useNemaStore((s) => s.registerSharedFile);
   const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
   const removeNemaTask = useNemaStore((s) => s.removeNemaTask);
+  // 文件系统监听 (per WBS 8.4.4): 本地模式轮询 workspace-files 检测 .nema 变化
+  const nemaWatcher = useNemaWatcher([""]);
 
   const [filePath, setFilePath] = useState("");
   const [title, setTitle] = useState("");
@@ -90,6 +93,31 @@ export default function NemaPage() {
 
       {/* 本地文件夹桥接 (per 2026-11-11: 网页版关联本地文件夹) */}
       <LocalFolderBrowser onPickFile={(p) => setFilePath(p)} />
+
+      {/* .nema 文件系统监听状态 (per WBS 8.4.4: 轮询检测磁盘 .nema 变化 → 任务状态回写) */}
+      <div className="card mb-5" data-testid="nema-watcher-status">
+        <SectionTitle>{t.nema.watcherTitle}</SectionTitle>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-dim">
+          {nemaWatcher.watching ? (
+            <span className="flex items-center gap-1.5 text-ok" data-testid="nema-watcher-active">
+              <span className="size-2 rounded-full bg-ok animate-pulse" />
+              {t.nema.watcherActive}
+            </span>
+          ) : (
+            <span data-testid="nema-watcher-inactive">{t.nema.watcherInactive}</span>
+          )}
+          {nemaWatcher.lastResult && (
+            <span data-testid="nema-watcher-result" className="font-mono">
+              {t.nema.watcherScanned}: {nemaWatcher.lastResult.scanned} · {t.nema.watcherImported}: {nemaWatcher.lastResult.imported} · {t.nema.watcherUpdated}: {nemaWatcher.lastResult.updated}
+            </span>
+          )}
+          {nemaWatcher.watching && (
+            <button type="button" onClick={() => void nemaWatcher.scanNow()} className="btn-ghost text-xs" data-testid="nema-watcher-scan-now">
+              {t.nema.watcherScanNow}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* 注册共同编辑文件 */}
       <div className="card mb-5" data-testid="nema-register-form">

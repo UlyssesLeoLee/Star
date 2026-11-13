@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d092d9ad0c2f9214f0715f5fd35783da98dc308ddbcd85200b61f0b253467bfa
+@cypher schema=1 source_sha256=2bdabc1dc49b56c93a078bfcd883c882594da14df44c811010b085598abfca07
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -632,6 +632,13 @@ export const zhCN: Dictionary = {
     boundTasks: "已绑定 Star 任务",
     autoRule: "自动生成规则",
     autoRuleValue: "≥2 编辑者",
+    watcherTitle: ".nema 文件系统监听",
+    watcherActive: "监听中 (每 20s 轮询本地 workspace-files 桥接)",
+    watcherInactive: "非本地模式 — 文件监听不可用 (需 localhost 或局域网 + 本地后端)",
+    watcherScanned: "扫描",
+    watcherImported: "新导入",
+    watcherUpdated: "更新",
+    watcherScanNow: "立即扫描",
     autoRuleHint: "共同编辑触发",
     format: "格式",
     localFolderBridge: "本地文件夹 (受控只读桥接)",

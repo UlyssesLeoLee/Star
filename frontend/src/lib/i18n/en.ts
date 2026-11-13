@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b3b98d6b64e277d1d408159ac997e07a066b83263dcff0ec9a50fb7f21b6ec63
+@cypher schema=1 source_sha256=0c1bca4404e44cc1207c74a30ae7f2644f2b4031d46ce23ca9c950971292ec12
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -617,6 +617,13 @@ export const en: Dictionary = {
     boundTasks: "Bound Star tasks",
     autoRule: "Auto-generate rule",
     autoRuleValue: "≥2 editors",
+    watcherTitle: ".nema filesystem watcher",
+    watcherActive: "Watching (polls local workspace-files bridge every 20s)",
+    watcherInactive: "Not in local mode — filesystem watch unavailable (requires localhost/LAN + local backend)",
+    watcherScanned: "scanned",
+    watcherImported: "imported",
+    watcherUpdated: "updated",
+    watcherScanNow: "Scan now",
     autoRuleHint: "Triggers on co-editing",
     format: "Format",
     localFolderBridge: "Local folder (controlled read-only bridge)",
