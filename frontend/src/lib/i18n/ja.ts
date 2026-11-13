@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2cb031220df2adedb9a474b55f50563426b3648dc8aad74dda6966251df6120a
+@cypher schema=1 source_sha256=1ca05744eee2c2643d2065ec45ae45387a46bf545e38c14675b615356c771541
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -630,6 +630,25 @@ export const ja: Dictionary = {
     openBoundTask: "バインド済み Star タスク →",
     openAsStarTask: "Star タスクとして開く",
     fiveW1H: "5W1H",
+  },
+  gitBinding: {
+    title: "Git リポジトリをバインド",
+    description: "Git バインドがないと、Worktree はローカルディレクトリやリモート branch を解決できません。バインド後は Worktree → ローカルディレクトリ → リモート branch を自動認識します (既存 Repository/PR データと連動)。",
+    selfHostHint: "セルフホスト Git (Gitea / GitLab CE など)",
+    bindingTo: "バインド先",
+    fullNameLabel: "リポジトリ (owner/repo)",
+    fullNameRequired: "owner/repo 形式で入力してください。",
+    baseUrlLabel: "サーバー URL",
+    baseUrlRequired: "セルフホスト Git はサーバー URL が必須です。",
+    localPathLabel: "ローカルディレクトリ",
+    localPathRequired: "ローカル clone のルートディレクトリを入力してください。",
+    defaultBranchLabel: "デフォルト branch",
+    bindButton: "バインド",
+    cancel: "キャンセル",
+    addMore: "もう一つ追加",
+    removeAria: "{name} を解除",
+    boundTitle: "Git バインド済み",
+    boundDescription: "下の Worktree テーブルが各 branch のローカルディレクトリとリモート URL を自動解決します。",
   },
   settingsCapabilities: {
     mcp: {

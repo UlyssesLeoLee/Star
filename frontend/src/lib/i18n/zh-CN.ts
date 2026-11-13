@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7fe6cb8d7f5ec3a54a6a7159036f17021783a8cebbe5ca52be48c5b1a57e45dd
+@cypher schema=1 source_sha256=eda6e49c1f20417f4b40ca394e7c44c230aa5036a3ee3b9c3a7e4cc2dc465ea4
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -644,6 +644,25 @@ export const zhCN: Dictionary = {
     openBoundTask: "已绑定 Star 任务 →",
     openAsStarTask: "打开为 Star 任务",
     fiveW1H: "5W1H",
+  },
+  gitBinding: {
+    title: "绑定 Git 仓库",
+    description: "未绑定任何 Git 时, Worktree 无法关联本地目录与远端 branch。绑定后索引会自动识别: Worktree → 本地目录 → 远端 branch (与既存 Repository/PR 数据联动)。",
+    selfHostHint: "自建 Git 服务 (Gitea/GitLab CE 等)",
+    bindingTo: "绑定到",
+    fullNameLabel: "仓库 (owner/repo)",
+    fullNameRequired: "请填写 owner/repo 格式的仓库名。",
+    baseUrlLabel: "服务地址",
+    baseUrlRequired: "自托管 Git 必须填写服务地址。",
+    localPathLabel: "本地目录",
+    localPathRequired: "请填写本地 clone 根目录。",
+    defaultBranchLabel: "默认分支",
+    bindButton: "绑定",
+    cancel: "取消",
+    addMore: "再绑一个",
+    removeAria: "解绑 {name}",
+    boundTitle: "已绑定 Git",
+    boundDescription: "下方 Worktree 表格会自动识别每个 branch 的本地目录与远端地址。",
   },
   settingsCapabilities: {
     mcp: {

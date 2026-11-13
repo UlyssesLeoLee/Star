@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ec99b0710b77917d0aebcadc63a1dcff626409bcec36a6da116a5eba62a21d1e
+@cypher schema=1 source_sha256=499496ffd9e50b32760f3e20d82d71ff552e1c8d4d526b585050c4e093bccc1d
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -90,13 +90,15 @@ import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { WORKTREE_SM, type Worktree, type WorktreeStatus } from "@/types/ids";
-import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
+import { GitBranch, GitMerge, Lock, Cpu, AlertCircle, Folder } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
 import { AuthenticatedWorktreeIndex } from "@/components/AuthenticatedWorktreeIndex";
 import dynamic from "next/dynamic";
 import { ProjectWorktreeLifecycleControls } from "./ProjectWorktreeLifecycleControls";
 import { AuthorizedProjectSelector, type AuthorizedProjectDirectoryState } from "./AuthorizedProjectSelector";
+import { GitBindingPanel } from "./GitBindingPanel";
+import { findWorktreeGitBinding, useGitBindings } from "@/lib/group/gitBindingStore";
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 CREATE
@@ -372,6 +374,9 @@ function WorktreePageInner() {
   const searchParams = useSearchParams();
   const worktreeGroupApi = useWorktreeGroupApi();
   const { projects, worktrees, agentSessions, localRuntimes, transitionWorktree } = useStore();
+  // per WBS §23.34: git 绑定 + 自动识别 (Worktree→本地目录→远端 branch)
+  const gitBindings = useGitBindings();
+  const { repositories, pullRequests } = useStore();
   const selectedProjectId = useNavStore((state) => state.selectedProjectId);
   const setSelectedProjectId = useNavStore((state) => state.setSelectedProjectId);
   const [hasMounted, setHasMounted] = useState(false);
@@ -556,13 +561,24 @@ function WorktreePageInner() {
           <h1 className="text-xl font-semibold">{t.runDirectory.projectWorktreeIndexTitle}</h1>
           <p className="mt-1 text-xs text-ink-mute">{t.sidebar.projectDirectory}</p>
         </header>
-        <section className="card space-y-2" role="status">
-          <h2 className="font-semibold">{t.runDirectory.directoryUnavailableTitle}</h2>
-          <p className="text-sm text-ink-dim">{t.runDirectory.directoryUnavailableDescription}</p>
-          <button type="button" className="btn text-xs" onClick={() => window.location.reload()}>
-            {t.runDirectory.refreshDirectory}
-          </button>
-        </section>
+        {/* per WBS §23.34: 未绑定 git 时, ProjectWorktree Index 首先显示绑定入口
+            (GitHub/GitLab/自托管); 绑定后显示绑定行, 表格自动识别本地目录+远端 branch */}
+        <GitBindingPanel />
+        {gitBindings.length === 0 && (
+          <section className="card space-y-2" role="status">
+            <h2 className="font-semibold">{t.runDirectory.directoryUnavailableTitle}</h2>
+            <p className="text-sm text-ink-dim">{t.runDirectory.directoryUnavailableDescription}</p>
+            <button type="button" className="btn text-xs" onClick={() => window.location.reload()}>
+              {t.runDirectory.refreshDirectory}
+            </button>
+          </section>
+        )}
+        {gitBindings.length > 0 && (
+          <section className="card space-y-2" data-testid="git-bound-worktree-hint">
+            <h2 className="font-semibold">{t.gitBinding.boundTitle}</h2>
+            <p className="text-sm text-ink-dim">{t.gitBinding.boundDescription}</p>
+          </section>
+        )}
       </main>
     );
   }
@@ -755,7 +771,29 @@ function WorktreePageInner() {
                       <div className="font-mono text-[10px] text-ink-mute">{w.id}</div>
                       <div className="font-medium">{w.name}</div>
                     </td>
-                    <td className="font-mono text-xs text-info">{w.branch}</td>
+                    <td className="font-mono text-xs text-info">{w.branch}
+                      {/* per WBS §23.34: 绑定 git 后自动识别 本地目录 + 远端 branch */}
+                      {(() => {
+                        const match = findWorktreeGitBinding(w.branch, gitBindings, repositories, pullRequests);
+                        if (!match) return null;
+                        return (
+                          <span className="mt-1 block" data-testid={`worktree-git-target-${w.id}`}>
+                            <span className="block text-[9px] font-mono text-ink-mute">
+                              <Folder size={9} className="inline mr-0.5" />
+                              {match.binding.local_path}/{w.name}
+                            </span>
+                            <a
+                              href={`${match.binding.base_url}/${match.repository.full_name}/tree/${w.branch}`}
+                              target="_blank" rel="noreferrer"
+                              className="block text-[9px] font-mono text-accent underline underline-offset-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {match.binding.base_url}/{match.repository.full_name}/tree/{w.branch}
+                            </a>
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td><StatusPill value={w.status} /></td>
                     <td className="text-[10px] text-ink-mute">本地预览</td>
                     <td className="text-[10px]">

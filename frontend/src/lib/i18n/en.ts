@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1af9c9c79cfa6c86432ffa243455e6a1dfa53565974addb72f625b6f31b3da07
+@cypher schema=1 source_sha256=ae2aada9662c3c003a1ccf8fe96a36a1f18341a5f58943194cb349a9ec04b530
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -629,6 +629,25 @@ export const en: Dictionary = {
     openBoundTask: "Bound Star task →",
     openAsStarTask: "Open as Star task",
     fiveW1H: "5W1H",
+  },
+  gitBinding: {
+    title: "Bind Git repository",
+    description: "Without a Git binding, Worktrees cannot resolve local directories or remote branches. Once bound, the index auto-recognizes: Worktree → local directory → remote branch (linked to existing Repository/PR data).",
+    selfHostHint: "Self-hosted Git (Gitea / GitLab CE etc.)",
+    bindingTo: "Bind to",
+    fullNameLabel: "Repository (owner/repo)",
+    fullNameRequired: "Repository name must use owner/repo format.",
+    baseUrlLabel: "Server URL",
+    baseUrlRequired: "Self-hosted Git requires a server URL.",
+    localPathLabel: "Local directory",
+    localPathRequired: "Local clone root directory is required.",
+    defaultBranchLabel: "Default branch",
+    bindButton: "Bind",
+    cancel: "Cancel",
+    addMore: "Add another",
+    removeAria: "Unbind {name}",
+    boundTitle: "Git bound",
+    boundDescription: "The Worktree table below auto-resolves each branch's local directory and remote URL.",
   },
   settingsCapabilities: {
     mcp: {

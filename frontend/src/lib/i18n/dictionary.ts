@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=6d1344a584c3c1092425cdfa20b5bb9354326f2b4d2c099fd1a4704f67584a77
+@cypher schema=1 source_sha256=4bf8f4477e67ab42c423a910a14765688ad555b49576e326942a25fe4d9c50a7
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -546,6 +546,26 @@ export interface Dictionary {
     openBoundTask: string;          // "已绑定 Star 任务 →"
     openAsStarTask: string;         // "打开为 Star 任务"
     fiveW1H: string;                // "5W1H"
+  };
+  /** v0.11 (2026-11-13 WBS §23.34) 新增: git 绑定面板 */
+  gitBinding: {
+    title: string;
+    description: string;
+    selfHostHint: string;
+    bindingTo: string;
+    fullNameLabel: string;
+    fullNameRequired: string;
+    baseUrlLabel: string;
+    baseUrlRequired: string;
+    localPathLabel: string;
+    localPathRequired: string;
+    defaultBranchLabel: string;
+    bindButton: string;
+    cancel: string;
+    addMore: string;
+    removeAria: string;
+    boundTitle: string;
+    boundDescription: string;
   };
   /** v0.10 (2026-11-13 WBS §23.33-B) 新增: Settings 能力管理面板 (MCP/Skills/Plugins) */
   settingsCapabilities: {
