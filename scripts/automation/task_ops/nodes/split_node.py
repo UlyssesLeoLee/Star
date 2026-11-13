@@ -24,7 +24,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Optional, Sequence
+from typing import Sequence
 
 logger = logging.getLogger("task_ops.nodes.split_node")
 
@@ -101,7 +101,7 @@ async def _snapshot_target(target_id: str, sub_pool) -> str:
     Returns:
         snapshot_checkpoint_id (append-only 永存)
     """
-    handle = sub_pool.get(target_id)
+    sub_pool.get(target_id)
     # 先把状态标 snapshot_pending, 让 UI 显示"拆分中"
     await sub_pool.update(target_id, {
         "status": "snapshot_pending",

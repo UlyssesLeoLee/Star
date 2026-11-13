@@ -331,6 +331,6 @@ class TaskMetadataRepository:
             PermissionError: Master 表物理删除禁止
         """
         raise PermissionError(
-            f"task_metadata_repo: physical DELETE on Master table task_metadata is forbidden "
-            f"(per 守门 #13 c Master 100% RLS 必携 + 物理删除禁止)"
+            "task_metadata_repo: physical DELETE on Master table task_metadata is forbidden "
+            "(per 守门 #13 c Master 100% RLS 必携 + 物理删除禁止)"
         )

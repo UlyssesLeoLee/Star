@@ -43,7 +43,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 # 3-color 标记 (per relationship_graph 中常量一致)
@@ -253,7 +253,7 @@ class DAGValidator:
         order = DAGValidator.topological_sort(graph)
         results["topological_sort_ms"] = round((time.perf_counter() - t0) * 1000, 4)
         t0 = time.perf_counter()
-        back = DAGValidator.find_all_back_edges(graph)
+        DAGValidator.find_all_back_edges(graph)
         results["find_all_back_edges_ms"] = round((time.perf_counter() - t0) * 1000, 4)
         results["is_dag"] = is_dag
         results["has_cycle"] = cycle is not None

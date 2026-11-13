@@ -26,7 +26,7 @@ import argparse
 import sqlite3
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 # ===== DDL Statements (per 守门 #DB-13 W/T/M 分类) =====
 

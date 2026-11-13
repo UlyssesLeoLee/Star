@@ -29,7 +29,7 @@ import logging
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("task_ops.nodes.metadata_node")
 

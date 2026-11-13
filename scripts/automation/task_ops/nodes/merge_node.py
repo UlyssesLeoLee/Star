@@ -23,7 +23,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger("task_ops.nodes.merge_node")
 
@@ -60,7 +60,7 @@ async def _stash_states(target_ids: list[str], sub_pool) -> list[str]:
     """
     stash_ids: list[str] = []
     for tid in target_ids:
-        handle = sub_pool.get(tid)
+        sub_pool.get(tid)
         # 先把状态标 stash_pending, 让 UI 显示"合并中"
         await sub_pool.update(tid, {"status": "stash_pending", "stash_initiated_at": time.time()})
         stash_id = await sub_pool.checkpoint(tid, label=f"merge_stash_{tid}")
