@@ -190,7 +190,7 @@
 | 10.3.1 | 统一发布编排 release.yml（预检与 draft Release） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.3.2 | release.yml 真实发布路径验证 |  |  |  |  |  | 0 | 未开始 |
 | 10.3.3 | star-stable-release GitHub environment 与 required reviewers |  |  |  |  |  | 0 | 未开始 |
-| 10.3.4 | 桌面 SBOM 校验器与 cargo-sbom 输出格式适配 |  |  |  |  |  | 0 | 未开始 |
+| 10.3.4 | 桌面 SBOM 校验器与 cargo-sbom 输出格式适配 (validate_sbom.js 等价形态 DESCRIBES-A/B + 6 处内联 JS 替换) | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.4 | 稳定版发布闭环（v1.0.6，W0–W9） | Ulysses |  |  |  |  |  | 进行中 |
 | 10.4.1 | W0 发行矩阵与版本所有权 | Ulysses |  |  |  |  |  | 进行中 |
 | 10.4.2 | W1 项目法律身份与 NOTICE（统一为 MIT） | Ulysses |  |  |  |  |  | 进行中 |

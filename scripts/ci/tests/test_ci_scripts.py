@@ -3,7 +3,7 @@
 Run: python -m unittest discover -s scripts/ci/tests -v
 """
 
-# @cypher schema=1
+# @cypher schema=1 source_sha256=13de3f6818cae838d736b551b74e594444b296ffd9213217820f6cff123bba31
 # MERGE (self:File {path:"scripts/ci/tests/test_ci_scripts.py"})
 # MERGE (detect:File {path:"scripts/ci/detect_changes.py"})
 # MERGE (gate:File {path:"scripts/ci/gate.py"})
@@ -22,12 +22,17 @@ Run: python -m unittest discover -s scripts/ci/tests -v
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# repo 根 (scripts/ci/tests → scripts/ci → scripts → repo root)
+ROOT = Path(__file__).resolve().parents[3]
 
 import detect_changes  # noqa: E402
 import gate  # noqa: E402
@@ -195,5 +200,71 @@ class ReleasePreflightTests(unittest.TestCase):
         self.assertFalse(ok)
 
 
+
+
+class SbomValidatorTests(unittest.TestCase):
+    """WBS 10.3.4: validate_sbom.js 的 cargo-sbom 等价形态接受 + fail-closed 变异。"""
+
+    SBOM_JS = "scripts/ci/validate_sbom.js"
+
+    def _write_sboms(self, tmp: str, rust: dict, frontend: dict) -> tuple[str, str]:
+        import json
+        rp = os.path.join(tmp, "rust.spdx.json")
+        fp = os.path.join(tmp, "fe.spdx.json")
+        json.dump(rust, open(rp, "w", encoding="utf-8"))
+        json.dump(frontend, open(fp, "w", encoding="utf-8"))
+        return rp, fp
+
+    def _cargo_style(self) -> dict:
+        return {
+            "spdxVersion": "SPDX-2.3",
+            "packages": [{"name": "star-desktop", "SPDXID": "SPDXRef-Package-star-desktop"}],
+            "files": [{"fileName": "./star-desktop", "SPDXID": "SPDXRef-File-star-desktop"}],
+            "relationships": [
+                {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-File-star-desktop"},
+                {"spdxElementId": "SPDXRef-File-star-desktop", "relationshipType": "GENERATED_FROM", "relatedSpdxElement": "SPDXRef-Package-star-desktop"},
+            ],
+        }
+
+    def _npm_style(self) -> dict:
+        return {
+            "spdxVersion": "SPDX-2.3",
+            "packages": [{"name": "star-desktop-frontend" if i == 0 else f"p{i}", "SPDXID": f"SPDXRef-Package-{i}"} for i in range(225)],
+            "relationships": [
+                {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-0"},
+            ],
+        }
+
+    def test_cargo_sbom_equivalent_form_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            rp, fp = self._write_sboms(tmp, self._cargo_style(), self._npm_style())
+            r = subprocess.run(["node", self.SBOM_JS, rp, fp], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("PASS", r.stdout)
+
+    def test_describes_without_generated_from_rejected(self) -> None:
+        cargo = self._cargo_style()
+        cargo["relationships"] = cargo["relationships"][:1]  # 只留 DESCRIBES, 去掉 GENERATED_FROM
+        with tempfile.TemporaryDirectory() as tmp:
+            rp, fp = self._write_sboms(tmp, cargo, self._npm_style())
+            r = subprocess.run(["node", self.SBOM_JS, rp, fp], cwd=ROOT, capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("DESCRIBES", r.stderr)
+
+    def test_retired_game_package_rejected(self) -> None:
+        cargo = self._cargo_style()
+        cargo["packages"].append({"name": "star-game", "SPDXID": "SPDXRef-Package-star-game"})
+        with tempfile.TemporaryDirectory() as tmp:
+            rp, fp = self._write_sboms(tmp, cargo, self._npm_style())
+            r = subprocess.run(["node", self.SBOM_JS, rp, fp], cwd=ROOT, capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("retired game", r.stderr)
+
+    def test_missing_args_fails(self) -> None:
+        r = subprocess.run(["node", self.SBOM_JS], cwd=ROOT, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
+
