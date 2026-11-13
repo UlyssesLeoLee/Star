@@ -1,11 +1,18 @@
 name: License & Advisory Gate
 
 # ─────────────────────────────────────────────────────────────────────
-# 门禁: 商业开源依赖硬约束 (AGENTS.md §0) 首次自动化
+# 门禁: 商业开源依赖硬约束 (AGENTS.md §0) 自动化
 #
 # 2026-10-04 落地。此前 11 个 workflow 中零个包含 license/advisory/SBOM 检查,
 # 即 AGENTS.md §0 "逐版本审查完整构建/分发闭包" 完全依赖人工。
 # 落地依据: ADR-0054 §5.2 + PHASE-CD-SELECTION-REPORT.md
+#
+# 2026-11-13 修复: 该 workflow 在 dev 上连续 37 次全红, 且从未真正执行过门禁本身 ——
+# 三个 job 都死在 "取工具" 这一步 (run 43329468948):
+#   * cargo-deny: 钉死的 SHA256 与上游发布不符 (上游 digest 见 release API)
+#   * cargo-audit: tarball 内二进制在子目录, 直接 `tar -C /usr/local/bin` 后 chmod 失败
+#   * cargo-machete: `cargo install` 编译 ~1 分钟, 且有发现时整个 job 变红
+# 现统一走 scripts/ci/install_pinned_binary.sh (先校验 SHA 再解压, 按名字找二进制)。
 #
 # 设计约束 (per 本次实跑经验):
 #   1. 许可门禁与 advisory 门禁拆为**独立 job**。若合并在一个 job, 前序 step 失败会
@@ -14,9 +21,13 @@ name: License & Advisory Gate
 #   2. 直接调 CLI 而非用第三方 action 转发, 让退出码由 shell 原生传播; 并 echo
 #      工具自己的结论行 (如 "error: ...") 便于从日志核对"门禁真的跑了"。
 #   3. 二进制版本钉死 + SHA256 校验: 门禁判据不应随第三方发版漂移。
+#      SHA256 必须取自上游 release API 的 asset digest, 不得取自下载物本身:
+#        gh api repos/<owner>/<repo>/releases/tags/<tag> --jq '.assets[]|{name,digest}'
 #      (cargo-deny 0.20 移除了 licenses.deny / unlicensed 键, 即版本漂移会静默改语义)
 #   4. 不用 pip install: ubuntu-24.04 runner 的 PEP 668 会拒系统 pip 安装。
 #      此处不涉及 Python 工具, 一并记此以免后续误加。
+#   5. 没有 workflow 级 paths 过滤: 本 workflow 的 job 会被设为必需检查, 过滤后
+#      "检查缺失" 会让无关 PR 永远无法合并。
 # ─────────────────────────────────────────────────────────────────────
 
 on:
@@ -24,11 +35,19 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
+  schedule:
+    # 每日 03:17 UTC: 新 RustSec advisory 不依赖任何提交到来
+    - cron: "17 3 * * *"
 
 # 门禁失败不阻塞其他 workflow (advisory 类问题可先记录后修),
-# 但本 workflow 内两个 job 互不依赖, 都会真实执行。
+# 但本 workflow 内三个 job 互不依赖, 都会真实执行。
 permissions:
   contents: read
+
+concurrency:
+  group: license-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' && github.ref != 'refs/heads/main' }}
 
 jobs:
   # ─────────────────────────────────────────────────────────────
@@ -36,12 +55,16 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   license-gate:
     name: License (cargo-deny)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       CARGO_DENY_VERSION: "0.20.2"
-      CARGO_DENY_SHA256: "975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc"
+      # 上游 release API digest (x86_64-unknown-linux-musl.tar.gz), 2026-11-13 核对
+      CARGO_DENY_SHA256: "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain (pinned)
         # 必须与 rust-toolchain.toml (channel = 1.99.1) 一致, 否则 cargo metadata 解析失败
@@ -53,17 +76,13 @@ jobs:
         # 预编译二进制而非 `cargo install`: cargo install cargo-deny 需完整编译依赖树,
         # 在 runner 上约 5-10 分钟, 远超本门禁应有时长
         run: |
-          set -euo pipefail
-          url="https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          curl -fsSL "$url" -o /tmp/cargo-deny.tar.gz
-          echo "${CARGO_DENY_SHA256}  /tmp/cargo-deny.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/cargo-deny.tar.gz -C /usr/local/bin
-          chmod +x /usr/local/bin/cargo-deny
-          cargo-deny --version
+          bash scripts/ci/install_pinned_binary.sh \
+            "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            "${CARGO_DENY_SHA256}" \
+            cargo-deny
 
       - name: cargo-deny check (licenses / bans / sources)
         # 全 feature 图: 覆盖构建/分发闭包全集 (per deny.toml [graph] all-features = true)
-        # --hide-inclusion-graph 控制日志体积; 诊断文本本身不打码
         run: |
           set -euo pipefail
           cargo-deny --all-features check
@@ -71,6 +90,7 @@ jobs:
       - name: Export license inventory (SPDX evidence)
         # 产出可审计的许可清单证据, 供人工逐项复核 (per AGENTS.md §0 "逐版本审查")
         # 失败不阻塞主门禁: 导出是辅助产物, 门禁判定以上一步为准
+        if: always()
         continue-on-error: true
         run: |
           mkdir -p target/license-gate
@@ -81,7 +101,7 @@ jobs:
       - name: Upload license inventory
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: license-inventory
           path: target/license-gate/
@@ -92,35 +112,29 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   advisory-gate:
     name: Advisories (cargo-audit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       CARGO_AUDIT_VERSION: "0.22.2"
+      # 上游 release API digest (cargo-audit-x86_64-unknown-linux-musl-v0.22.2.tgz)
+      # 证据见 docs/reviews/WBS-STAR-STABLE-W4-UPSTREAM-ASSET-REVIEW-20261102.md
       CARGO_AUDIT_SHA256: "7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain (pinned)
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: 1.99.1
 
-      - name: Fetch cargo-audit (pinned)
-        # 资产名与摘要来自 RustSec v0.22.2 官方 release API，并由直接下载 SHA-256 复核。
-        # 证据与本地核对范围见 docs/reviews/WBS-STAR-STABLE-W4-UPSTREAM-ASSET-REVIEW-20261102.md。
-        # 占位值检查保留为 fail-closed 防线，避免配置回退时跳过完整性校验。
+      - name: Fetch cargo-audit (pinned + checksum-verified)
         run: |
-          set -euo pipefail
-          if [ "${CARGO_AUDIT_SHA256}" = "REPLACE_WITH_UPSTREAM_SHA256_FOR_0.22.2" ]; then
-            echo "::error::CARGO_AUDIT_SHA256 未填。填入上游 .sha256 实测值后本门禁才生效。"
-            echo "::error::在填入前, 本 job 恒定失败 (fail-closed), 不会假装通过。"
-            exit 2
-          fi
-          url="https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}.tgz"
-          curl -fsSL "$url" -o /tmp/cargo-audit.tar.gz
-          echo "${CARGO_AUDIT_SHA256}  /tmp/cargo-audit.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/cargo-audit.tar.gz -C /usr/local/bin
-          chmod +x /usr/local/bin/cargo-audit
-          cargo-audit --version
+          bash scripts/ci/install_pinned_binary.sh \
+            "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}.tgz" \
+            "${CARGO_AUDIT_SHA256}" \
+            cargo-audit
 
       - name: cargo audit
         run: |
@@ -131,19 +145,54 @@ jobs:
   # Job 3: 未使用依赖 (cargo-machete) — 收敛闭包, 减少审查面
   # ─────────────────────────────────────────────────────────────
   unused-dep-gate:
-    name: Unused deps (cargo-machete)
-    runs-on: ubuntu-latest
-    continue-on-error: true
+    name: Unused deps (cargo-machete, advisory)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CARGO_MACHETE_VERSION: "0.9.2"
+      CARGO_MACHETE_SHA256: "48200087f54c55aabcd4db4af1e25742b49846c02a1b1bfa134711945b35b2e9"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain (pinned)
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: 1.99.1
 
+      - name: Fetch cargo-machete (pinned + checksum-verified)
+        run: |
+          bash scripts/ci/install_pinned_binary.sh \
+            "https://github.com/bnjbvr/cargo-machete/releases/download/v${CARGO_MACHETE_VERSION}/cargo-machete-v${CARGO_MACHETE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            "${CARGO_MACHETE_SHA256}" \
+            cargo-machete
+
       - name: cargo machete
         # advisory 模式: 本仓 workspace.dependencies 采用集中声明 + crate 级引用,
         # 静态分析对未直接引用但经 feature 间接使用的依赖会误报。
-        # 实测本机 cargo-machete 0.9.2 结果须人工复核后再收紧为 enforced。
-        run: cargo install cargo-machete --version 0.9.2 --locked && cargo machete
+        # 发现项写入 job summary 并给出 warning, 但不让 job 变红 (job 级
+        # continue-on-error 仍会把 job 显示为失败, 因此改在 step 内吞掉退出码)。
+        shell: bash
+        run: |
+          set +e
+          cargo-machete 2>&1 | tee machete.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::cargo-machete reported possibly-unused dependencies (advisory); see job summary"
+          fi
+          {
+            echo "### cargo-machete (advisory)"
+            echo
+            echo "exit status: ${status} (non-zero = findings; false positives expected)"
+            echo
+            echo '```'
+            cat machete.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # 0 = 无发现, 1 = 有发现 (advisory, 不失败); >=2 = 工具自身出错, 必须失败
+          if [ "$status" -gt 1 ]; then
+            echo "::error::cargo-machete failed to run (exit ${status})"
+            exit "$status"
+          fi
+          exit 0
