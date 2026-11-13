@@ -967,3 +967,11 @@ UI-1 仅表示静态交互原型完成，W14 继续 OPEN。UI-2 的协议建议�
 - **现状**: CanvasView 已有无限画布+viewport+元素(7 种)+连接线(curved/straight/orthogonal)+拖拽/框选/画笔/frames/minimap; 但连接线只挂 from/to element 中心点, 无端口概念。
 - **实现 (2026-11-13)**: `CanvasConnector.from_port/to_port` 可选字段 (兼容旧数据, null 回落中心点); 5 种节点元素 (work_item_card/worktree_node/agent_cursor/automation_node/comment_pin) 渲染 input(左)/output(右) 端点圆点, 选中/hover/有连接时可见; 连接线端点吸附端口坐标; 输出端点 mousedown 拖线→预览虚线→输入端点 mouseup 创建连接 (store.addCanvasConnector, from_port=output/to_port=input); seed 3 条 connectors 加端口字段。shape/image/embed/text/sticky/path/frame 无端口 (非节点类)。
 - **门禁**: tsc 0 + CanvasView.test 8/8 (E-H 端口 4 用例: 渲染/吸附/拖线创建/空白取消) + Cypher PASS + author=Ulysses。
+
+### 23.36 2026-11-13 Canvas 游戏化: 弹幕 Roguelike 像素风 (用户发令: 恢复原设计)
+
+- **用户发令 (2026-11-13)**: "canvas界面元来有一个设计，是游戏化，像素风，没有实现，寻找文档和过去记录wbs等，如果有资源就利用起来，把这个canvas做成我规划里的游戏"
+- **资源盘点 (全部可复用)**: ① `docs/design/BD-STAR-CANVAS-GAME-001.md` (96KB, 弹幕 Roguelike + 3渲2 像素机器人 + WASD/空格攻击/Shift 翻滚/Q 大招 + 5 状态机 + 5 弹幕模式, 文档自标 2026-10-30 退役但用户本轮拍板恢复); ② CanvasView agent_cursor 已有 16x16 像素精灵机器人 (2026-09-06 用户发令 "像素风", SVG rect + crispEdges); ③ `crates/star-game` (ADR-0027 agent 游戏化: 6 维属性 + ECS + GameBackend); ④ frontend 已装 three 0.187 + react-three-fiber (3渲2 备选); ⑤ /canvas/[id] 页面 + canvas elements/connectors 数据 (关卡素材)。
+- **P0 实现 (前端可玩版, 不引入后端)**: `lib/canvas-game/` 纯 TS 模块 — types (PlayerRobot/Bullet/Enemy/GameState) + robotController (WASD + 5 状态机 idle/moving/attacking/rolling/dying) + bulletSystem (子弹池 + aimed/radial 2 模式起步) + collision (AABB) + enemySpawner (从 canvas work_item/agent 节点生成敌人) + useCanvasGame (rAF 游戏循环 hook); `components/canvas-game/CanvasGameOverlay.tsx` (像素风 HUD: HP/SP/击杀数 + 像素爆炸粒子 + enemy 像素精灵, 全部 SVG crispEdges); `/canvas/[id]` 加 game 模式切换 (query ?mode=game + 按钮)。
+- **像素风**: 全部 SVG rect 矩阵渲染 (复用 agent_cursor 16x16 风格), 玩家机器人 idle/move 2 帧起步, 敌人 3 色变体, 爆炸 8x8 粒子矩阵。
+- **门禁**: tsc 0 + vitest 全绿 (核心模块单测) + Cypher PASS + author=Ulysses。
