@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=eda6e49c1f20417f4b40ca394e7c44c230aa5036a3ee3b9c3a7e4cc2dc465ea4
+@cypher schema=1 source_sha256=225bd90de432cc7ccb544f5428feca9775314b73ead2429525a1ad837b48c631
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -644,6 +644,16 @@ export const zhCN: Dictionary = {
     openBoundTask: "已绑定 Star 任务 →",
     openAsStarTask: "打开为 Star 任务",
     fiveW1H: "5W1H",
+  },
+  canvasGame: {
+    playButton: "游戏模式",
+    exit: "退出",
+    move: "移动",
+    attack: "攻击",
+    roll: "翻滚",
+    gameOver: "游戏结束",
+    killsLabel: "击杀数",
+    restart: "再来一局",
   },
   gitBinding: {
     title: "绑定 Git 仓库",

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ae2aada9662c3c003a1ccf8fe96a36a1f18341a5f58943194cb349a9ec04b530
+@cypher schema=1 source_sha256=6d18d3dcdaed823527029c5c420867a217fde5a29d180201137122263bd3fc80
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -629,6 +629,16 @@ export const en: Dictionary = {
     openBoundTask: "Bound Star task →",
     openAsStarTask: "Open as Star task",
     fiveW1H: "5W1H",
+  },
+  canvasGame: {
+    playButton: "Game Mode",
+    exit: "Exit",
+    move: "Move",
+    attack: "Attack",
+    roll: "Roll",
+    gameOver: "GAME OVER",
+    killsLabel: "Kills",
+    restart: "Restart",
   },
   gitBinding: {
     title: "Bind Git repository",

@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=4bf8f4477e67ab42c423a910a14765688ad555b49576e326942a25fe4d9c50a7
+@cypher schema=1 source_sha256=badb843bd1b7a58137b78e2b2fcdd204c0b34b523b90b295859a31b1e8d08360
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -546,6 +546,17 @@ export interface Dictionary {
     openBoundTask: string;          // "已绑定 Star 任务 →"
     openAsStarTask: string;         // "打开为 Star 任务"
     fiveW1H: string;                // "5W1H"
+  };
+  /** v0.12 (2026-11-13 WBS §23.36) 新增: canvas 游戏模式 */
+  canvasGame: {
+    playButton: string;
+    exit: string;
+    move: string;
+    attack: string;
+    roll: string;
+    gameOver: string;
+    killsLabel: string;
+    restart: string;
   };
   /** v0.11 (2026-11-13 WBS §23.34) 新增: git 绑定面板 */
   gitBinding: {

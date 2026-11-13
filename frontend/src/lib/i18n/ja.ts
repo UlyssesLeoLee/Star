@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1ca05744eee2c2643d2065ec45ae45387a46bf545e38c14675b615356c771541
+@cypher schema=1 source_sha256=9bd5b35c45c4d1d8e4409867ad9aa472e88c4465c4f16fbc017ec1c91125ce0f
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -630,6 +630,16 @@ export const ja: Dictionary = {
     openBoundTask: "バインド済み Star タスク →",
     openAsStarTask: "Star タスクとして開く",
     fiveW1H: "5W1H",
+  },
+  canvasGame: {
+    playButton: "ゲームモード",
+    exit: "終了",
+    move: "移動",
+    attack: "攻撃",
+    roll: "回避",
+    gameOver: "ゲームオーバー",
+    killsLabel: "撃破数",
+    restart: "もう一度",
   },
   gitBinding: {
     title: "Git リポジトリをバインド",
