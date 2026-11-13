@@ -144,6 +144,8 @@ bash scripts/ci/apply_rulesets.sh --dry-run   # 预览
 bash scripts/ci/apply_rulesets.sh             # 创建/更新（按 name 幂等，从不删除）
 ```
 
+**状态**：2026-11-13 已启用（`Star main (PR + CI gate)` id 27169779、`Star dev (no delete / force-push)` id 27169776）。启用依据：同一份修复在分支上手动触发的整套 CI（`CI gate (required)` 及全部 enforced job）与 `License (cargo-deny)` 均为 success。注意先后顺序：`dev` 当前的 CI 仍是旧版本的红灯，**须先把 `feat/ci-cd-20261113` 合入 `dev`，之后 `dev → main` 的 PR 才能满足必需检查**；在此之前管理员可用绕过权限合并。
+
 要临时关闭某条规则：把对应 JSON 的 `enforcement` 改为 `disabled`（或 `evaluate`）后重新运行脚本。
 仓库里早先存在两个空壳 ruleset（`StarMain`、`StarMainD`，均为 disabled，仅含删除/force-push 规则），
 本方案未触碰它们。
