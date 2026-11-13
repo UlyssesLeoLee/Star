@@ -1,0 +1,155 @@
+name: Release orchestrator
+
+# ─────────────────────────────────────────────────────────────────────
+# 统一发布入口 (2026-11-13)。设计说明见 docs/ci-cd.md §发布。
+#
+# 此前发布要分别手动运行三个 workflow (桌面 / Web / Canvas 镜像), 每个都要
+# 自己选 tag、自己填 APPROVED, 没有任何地方保证三者对应同一个 tag、同一个
+# 绿色提交。本 workflow 只做编排, **不削弱任何既有门禁**:
+#   * 三个构建 workflow 的 APPROVED 确认、refs/tags/v* 限制、SBOM/attestation
+#     与独立 consumer 验证原样保留, 由本 workflow 以 workflow_dispatch 触发;
+#   * 触发前先做 preflight: tag 文法 / tag 存在且干净 / 提交在 main 上 /
+#     该提交上 "CI gate (required)" 与 "License (cargo-deny)" 均为 success;
+#   * 三个构建全部成功后只创建 **draft** GitHub Release, 发布动作仍由人点击。
+#
+# dry_run 默认 true: 只跑 preflight, 不触发构建、不创建 Release、不需要 APPROVED。
+# ─────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已存在的稳定版 tag, 形如 v1.2.3 (必须指向 main 上的提交)"
+        required: true
+        type: string
+      components:
+        description: "要发布的组件"
+        required: true
+        type: choice
+        default: all
+        options: [all, desktop, web, canvas]
+      release_confirmation:
+        description: "真实发布必须选 APPROVED; dry_run 时可保持 NO"
+        required: true
+        type: choice
+        default: NO
+        options: [NO, APPROVED]
+      dry_run:
+        description: "仅做 preflight 校验, 不触发构建也不创建 Release"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # 同一 tag 的发布不可并行, 也不可被取消 (取消会留下半发布状态)
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Preflight (tag / main / required checks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      source_sha: ${{ steps.resolve.outputs.STAR_RELEASE_SOURCE_SHA }}
+      version: ${{ steps.resolve.outputs.STAR_RELEASE_VERSION }}
+    steps:
+      # 先校验再使用: tag 要进入 checkout 的 ref, 必须先确认它只含合法字符
+      - name: Validate tag grammar
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          tag = os.environ["TAG"]
+          if not re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", tag):
+              print(f"::error::invalid release tag {tag!r}; expected vMAJOR.MINOR.PATCH")
+              sys.exit(1)
+          print(f"ok   tag {tag}")
+          PY
+
+      - name: Checkout tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Resolve exact tag (same resolver the build workflows use)
+        id: resolve
+        run: python3 scripts/release/resolve_star_version.py --tag "${{ inputs.tag }}" --output "$GITHUB_OUTPUT"
+
+      - name: Require the tagged commit to be on main
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if git merge-base --is-ancestor "${{ steps.resolve.outputs.STAR_RELEASE_SOURCE_SHA }}" refs/remotes/origin/main; then
+            echo "ok   ${{ inputs.tag }} (${{ steps.resolve.outputs.STAR_RELEASE_SOURCE_SHA }}) is reachable from main"
+          else
+            echo "::error::${{ inputs.tag }} is not on main; stable releases must be cut from main"
+            exit 1
+          fi
+
+      - name: Require green CI gate and license gate on that commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.resolve.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs?per_page=100" \
+            | python3 scripts/ci/release_preflight.py check-runs
+
+      - name: Summary
+        run: |
+          {
+            echo "### Release preflight passed"
+            echo
+            echo "- tag: \`${{ inputs.tag }}\`"
+            echo "- version: \`${{ steps.resolve.outputs.STAR_RELEASE_VERSION }}\`"
+            echo "- source: \`${{ steps.resolve.outputs.STAR_RELEASE_SOURCE_SHA }}\`"
+            echo "- components: \`${{ inputs.components }}\`"
+            echo "- dry run: \`${{ inputs.dry_run }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Dispatch builds and draft the GitHub Release
+    needs: preflight
+    if: ${{ !inputs.dry_run && inputs.release_confirmation == 'APPROVED' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    environment: star-stable-release
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Dispatch stable-release workflows and wait
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/dispatch_release_workflows.sh "${{ inputs.tag }}" "${{ inputs.components }}"
+
+      - name: Create draft GitHub Release
+        # 只创建 draft: 公开发布仍是一次人工点击。--verify-tag 保证不会凭空创建 tag。
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNS: ${{ steps.dispatch.outputs.runs }}
+        run: |
+          set -euo pipefail
+          printf 'Build and attestation runs:\n\n%s\n' "$RUNS" > notes-extra.md
+          gh release create "${{ inputs.tag }}" \
+            --draft --verify-tag \
+            --title "${{ inputs.tag }}" \
+            --generate-notes \
+            --notes-file notes-extra.md

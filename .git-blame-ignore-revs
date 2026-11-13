@@ -1,0 +1,5 @@
+# Revisions to hide from `git blame` (GitHub honours this file automatically;
+# locally: git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# style: cargo fmt --all (pure formatting, no functional change)
+ddce56a93a3de3d4dc2fa463db5a57afee923cd1
