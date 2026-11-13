@@ -20,13 +20,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .task_metadata_repo import TaskMetadataRepository
 
 logger = logging.getLogger("task_ops.manager")
 
