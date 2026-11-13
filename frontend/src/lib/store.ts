@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=66069864d841775e596e08bc68d0b2caf32f480c47465d43613ffeed2f71ee82
+@cypher schema=1 source_sha256=708f64bb37cff0273f32e2803df7c225053792c28c735a34c5fb9aa33e93ba3f
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
 MERGE (self)-[:IMPORTS]->(agentSettings)
@@ -37,6 +37,16 @@ import type {
 } from "@/types/ids";
 import type { AgentSettings } from "@/lib/agent/settings";
 import { createInitialAgentSettings } from "@/lib/agent/settings";
+import type { WorkflowNode, WorkflowWire } from "@/lib/agent-workflow/types";
+
+/** 命名工作流草稿 (per WBS 8.6.2 工作流持久化) */
+export interface SavedWorkflow {
+  id: string;
+  name: string;
+  nodes: WorkflowNode[];
+  wires: WorkflowWire[];
+  savedAt: string;
+}
 
 import { TODO_FALLBACK_STATUS, isFallbackStatus } from "@/components/board/constants";
 import {
@@ -169,6 +179,11 @@ interface StoreState {
 
   // Per-agent settings draft; execution credentials are not stored here.
   agentSettings: Record<Uuid, AgentSettings>;
+
+  // 工作流持久化 (per WBS 8.6.2, 2026-11-13): WorkflowBuilder 保存的命名工作流
+  savedWorkflows: SavedWorkflow[];
+  saveWorkflowDraft: (name: string, nodes: WorkflowNode[], wires: WorkflowWire[]) => string; // returns id
+  deleteSavedWorkflow: (id: string) => void;
 
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
@@ -412,6 +427,23 @@ const initialState = (set: any, get?: any): StoreState => ({
   // Agent Settings (per 2026-09-05 23:00 JST 拍板)
   //   - per-agent, 首次 initAgentSettings 时 lazy init
   agentSettings: {} as Record<Uuid, AgentSettings>,
+  savedWorkflows: [],
+
+  // 工作流持久化 (per WBS 8.6.2): 同名覆盖, 否则新增; 返回 id
+  saveWorkflowDraft: (name, nodes, wires) => {
+    const trimmed = name.trim();
+    if (!trimmed) return "";
+    const id = `wf-saved-${globalThis.crypto.randomUUID()}`;
+    const draft: SavedWorkflow = { id, name: trimmed, nodes, wires, savedAt: new Date().toISOString() };
+    set((s: StoreState) => ({
+      savedWorkflows: [...s.savedWorkflows.filter((w) => w.name !== trimmed), draft],
+    }));
+    return id;
+  },
+  deleteSavedWorkflow: (id) =>
+    set((s: StoreState) => ({
+      savedWorkflows: s.savedWorkflows.filter((w) => w.id !== id),
+    })),
 
   // 6 状态机 (B.2.5 已有)
   transitionWorktree: (id, to) =>

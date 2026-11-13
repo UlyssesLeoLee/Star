@@ -142,14 +142,14 @@
 | 8.4.2 | 项目页 IPA 技能标签页（237 个专属栏位 × 16 个 WBS 列） | Ulysses |  |  | 2026-11-11 |  | 100 | 已完成 |
 | 8.4.3 | 文件即任务（.NEMA 侧车） | Ulysses |  |  | 2026-11-11 |  | 100 | 已完成 |
 | 8.4.4 | .nema 文件系统监听与任务状态回写 |  |  |  |  |  | 0 | 未开始 |
-| 8.4.5 | 站内 Markdown 预览器 |  |  |  |  |  | 0 | 未开始 |
+| 8.4.5 | 站内 Markdown 预览器 | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 8.5 | Canvas | Ulysses |  |  |  |  |  | 进行中 |
 | 8.5.1 | Canvas 输入 / 输出端点与连接线吸附 | Ulysses |  |  | 2026-11-12 |  | 100 | 已完成 |
 | 8.5.2 | Canvas 游戏化 P0（弹幕 Roguelike 像素风前端可玩版） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 8.5.3 | Canvas 游戏化其余设计范围（5 种弹幕模式、大招、Roguelike 升级） |  |  |  |  |  | 0 | 未开始 |
 | 8.6 | Agent View 与工作流 | Ulysses |  |  |  |  |  | 进行中 |
 | 8.6.1 | n8n 级工作流构建器 UI | Ulysses |  |  | 2026-11-11 |  | 100 | 已完成 |
-| 8.6.2 | 工作流持久化 |  |  |  |  |  | 0 | 未开始 |
+| 8.6.2 | 工作流持久化 (命名保存/加载/删除, localStorage 持久) | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 8.6.3 | Architecture Agent Graph Viewer 前端（Phase 1，MSW mock 数据） | Ulysses |  |  | 2026-09-16 |  | 100 | 已完成 |
 | 8.7 | 设置与管理 | Ulysses |  |  | 2026-11-12 |  | 100 | 已完成 |
 | 8.7.1 | Google 登录前端与管理员后台 | Ulysses |  |  | 2026-11-11 |  | 100 | 已完成 |
@@ -171,21 +171,21 @@
 | 9.7 | 安全测试执行（租户隔离 / RLS / 载荷安全） | Ulysses |  |  |  |  |  | 进行中 |
 | 9.8 | UAT 实施（UAT-PLAN-OPS-001） |  |  |  |  |  | 0 | 未开始 |
 | 9.9 | 性能测试执行 |  |  |  |  |  | 0 | 未开始 |
-| 9.10 | star-api-rest workspace_files 的 2 个 Linux 失败用例修复 |  |  |  |  |  | 0 | 未开始 |
-| 9.11 | guardian 测试覆盖率达到 85% 并清零 pyflakes 告警 |  |  |  |  |  | 0 | 未开始 |
+| 9.10 | star-api-rest workspace_files 的 2 个 Linux 失败用例修复 (CI 实证已解决: Rust workspace tests + 三平台 smoke 全绿) | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
+| 9.11 | guardian 测试覆盖率达到 85% 并清零 pyflakes 告警 (实达 87%) | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10 | CI/CD 与发布 | Ulysses |  |  |  |  |  | 进行中 |
 | 10.1 | CI 流水线 | Ulysses |  |  |  |  |  | 进行中 |
 | 10.1.1 | CI 基线（Rust / e2e / 跨平台 / 前端） | Ulysses |  |  | 2026-08-29 |  | 100 | 已完成 |
 | 10.1.2 | CI 红灯清零（Linux 编译错误、桌面打包路径、全仓格式化、markdownlint） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.1.3 | CI 重构（路径过滤、聚合门禁、actionlint、Action SHA 固定、全 workspace 单测强制） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.1.4 | 分支保护 ruleset（main 需 PR 与必需检查，dev 禁删除与强推） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
-| 10.1.5 | WASM Build 修复（graph-core 的 tokio / mio、uuid 随机源、relationship-engine-wasm 依赖） |  |  |  |  |  | 0 | 未开始 |
-| 10.1.6 | p1e-integration clippy 修复（terminal-stack 文档注释缩进） |  |  |  |  |  | 0 | 未开始 |
+| 10.1.5 | WASM Build 修复（graph-core 的 tokio / mio、uuid 随机源、relationship-engine-wasm 依赖） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
+| 10.1.6 | p1e-integration clippy 修复（terminal-stack 文档注释缩进） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.1.7 | PreToolUse guard CI 通过（pytest 与 lint） | Ulysses |  |  |  |  |  | 进行中 |
 | 10.2 | 供应链门禁 | Ulysses |  |  |  |  |  | 进行中 |
 | 10.2.1 | 许可门禁（cargo-deny licenses / bans / sources） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.2.2 | 漏洞门禁（cargo-audit 与 deny advisories） | Ulysses |  |  |  |  |  | 进行中 |
-| 10.2.3 | 依赖漏洞处置（crypto-bigint、libsqlite3-sys、rsa） |  |  |  |  |  | 0 | 未开始 |
+| 10.2.3 | 依赖漏洞处置（4 advisory audit.toml 显式处置 + followup 计划; rusqlite 升级被 sqlx links 锁死） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.3 | 发布编排 | Ulysses |  |  |  |  |  | 进行中 |
 | 10.3.1 | 统一发布编排 release.yml（预检与 draft Release） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.3.2 | release.yml 真实发布路径验证 |  |  |  |  |  | 0 | 未开始 |
@@ -207,7 +207,7 @@
 | 11.2 | Helm chart（deploy/helm/star） | Ulysses |  |  |  |  |  | 进行中 |
 | 11.3 | GitOps（ArgoCD / Kargo / Rollouts） | Ulysses |  |  |  |  |  | 进行中 |
 | 11.4 | Vercel 前端生产部署 | Ulysses |  |  | 2026-11-11 |  | 100 | 已完成 |
-| 11.5 | Vercel 预览部署失败修复（star-canvas 项目） |  |  |  |  |  | 0 | 未开始 |
+| 11.5 | Vercel 预览部署失败修复（rootDirectory=frontend + .vercelignore） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 11.6 | Neon 数据库部署与运行证明 | Ulysses |  |  |  |  |  | 进行中 |
 | 12 | 项目治理 | Ulysses |  |  |  |  |  | 进行中 |
 | 12.1 | AGENTS.md 守门规则与修订历史体系 | Ulysses |  |  | 2026-11-05 |  | 100 | 已完成 |

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-workflow-builder-v1
+@cypher schema=1 source_sha256=1344db609ea7c00e81c471a9fdc9019bfe1f99b63dabb19613563e2cd96e99a4
 MERGE (self:File {path:"frontend/src/components/agent-workflow/WorkflowBuilder.tsx"})
 MERGE (builder:Function {name:"WorkflowBuilder", language:"typescript", visibility:"public"})
 MERGE (canvas:Function {name:"WorkflowCanvas", language:"typescript", visibility:"private"})
@@ -22,6 +22,7 @@ MERGE (self)-[:DEFINES]->(nodeCard)
 // =====================================================================
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useStore } from "@/lib/store";
 import {
   GitBranch,
   Repeat,
@@ -36,6 +37,7 @@ import {
   ZoomIn,
   ZoomOut,
   Plus,
+  Save,
 } from "lucide-react";
 import type {
   WorkflowNode,
@@ -138,6 +140,27 @@ export function WorkflowBuilder() {
   const [paletteQuery, setPaletteQuery] = useState("");
   const dragRef = useRef<DragState | null>(null);
   const [tempWire, setTempWire] = useState<{ fromX: number; fromY: number; toX: number; toY: number } | null>(null);
+  // 工作流持久化 (per WBS 8.6.2): 命名保存/加载/删除
+  const savedWorkflows = useStore((s) => s.savedWorkflows);
+  const saveWorkflowDraft = useStore((s) => s.saveWorkflowDraft);
+  const deleteSavedWorkflow = useStore((s) => s.deleteSavedWorkflow);
+  const [draftName, setDraftName] = useState("");
+  const [saveFlash, setSaveFlash] = useState(false);
+
+  const onSaveDraft = useCallback(() => {
+    if (!draftName.trim()) return;
+    saveWorkflowDraft(draftName, workflow.nodes, workflow.wires);
+    setSaveFlash(true);
+    window.setTimeout(() => setSaveFlash(false), 1200);
+  }, [draftName, workflow.nodes, workflow.wires, saveWorkflowDraft]);
+
+  const onLoadDraft = useCallback((id: string) => {
+    const draft = useStore.getState().savedWorkflows.find((w) => w.id === id);
+    if (!draft) return;
+    setWorkflow({ nodes: draft.nodes, wires: draft.wires });
+    setDraftName(draft.name);
+    setSelectedNodeId(null);
+  }, []);
 
   const selectedNode = useMemo(
     () => workflow.nodes.find((n) => n.id === selectedNodeId) ?? null,
@@ -336,6 +359,57 @@ export function WorkflowBuilder() {
         </div>
         {paletteOpen && (
           <div className="flex-1 overflow-y-auto p-2 space-y-4">
+            {/* 工作流持久化 (per WBS 8.6.2): 命名保存/加载/删除 */}
+            <div data-testid="workflow-persistence" className="rounded border border-line bg-bg-soft/40 p-2 space-y-1.5">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-ink-dim">工作流持久化</div>
+              <div className="flex gap-1">
+                <input
+                  data-testid="workflow-draft-name"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  placeholder="工作流名称…"
+                  className="input w-full text-xs"
+                />
+                <button
+                  type="button"
+                  data-testid="workflow-save-btn"
+                  onClick={onSaveDraft}
+                  className={`btn p-1.5 shrink-0 ${saveFlash ? "border-ok text-ok" : ""}`}
+                  aria-label="save workflow"
+                >
+                  <Save size={12} />
+                </button>
+              </div>
+              {savedWorkflows.length > 0 && (
+                <ul className="space-y-1 max-h-40 overflow-y-auto">
+                  {savedWorkflows.map((w) => (
+                    <li key={w.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        data-testid={`workflow-load-${w.id}`}
+                        onClick={() => onLoadDraft(w.id)}
+                        className="flex-1 text-left rounded border border-line px-2 py-1 text-[11px] text-ink hover:border-accent/60 hover:bg-accent/10 truncate"
+                        title={w.name}
+                      >
+                        {w.name}
+                        <span className="ml-1 text-[9px] font-mono text-ink-mute">
+                          {new Date(w.savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`workflow-delete-${w.id}`}
+                        onClick={() => deleteSavedWorkflow(w.id)}
+                        className="btn-ghost p-1 text-ink-mute hover:text-danger"
+                        aria-label={`delete ${w.name}`}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <input
               data-testid="workflow-palette-search"
               value={paletteQuery}
