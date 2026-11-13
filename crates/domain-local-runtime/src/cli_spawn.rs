@@ -374,6 +374,12 @@ impl LocalRuntime for RealCliRuntime {
     async fn cancel(&self, id: Uuid) -> Result<(), RuntimeError> {
         let mut map = self.active.lock().await;
         if let Some(mut child) = map.remove(&id) {
+            // Linux: ActiveChild = Box<dyn ChildWrapper>, kill() 返回
+            // Box<dyn Future + Send>(非 Unpin),必须先 into_pin 才能 await。
+            // 其余平台: ActiveChild = tokio::process::Child, kill() 是 async fn。
+            #[cfg(target_os = "linux")]
+            let _ = Box::into_pin(child.kill()).await;
+            #[cfg(not(target_os = "linux"))]
             let _ = child.kill().await;
             Ok(())
         } else {
