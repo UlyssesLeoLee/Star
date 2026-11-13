@@ -128,10 +128,13 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const agentSessions = useStore((s) => s.agentSessions);
   const automationRules = useStore((s) => s.automationRules);
   const feedbacks = useStore((s) => s.feedbacks);
+  // per 2026-11-13 联动修复: workItems 走 selector 订阅 (此前 getState() 渲染路径读,
+  // kanban 拖卡后 canvas 卡片内容不刷新 — 联动断点)
+  const storeWorkItems = useStore((s) => s.workItems);
   const moveCanvasElement = useStore((s) => s.moveCanvasElement);
   const deleteCanvasElement = useStore((s) => s.deleteCanvasElement);
   const addCanvasConnector = useStore((s) => s.addCanvasConnector);
-  const availableWorkItems = groupWorkItems ?? useStore.getState().workItems;
+  const availableWorkItems = groupWorkItems ?? storeWorkItems;
   const availableWorktrees = groupWorktrees ?? worktrees;
 
   // =====================================================================

@@ -10,6 +10,7 @@ MERGE (self)-[:IMPORTS]->(overlay)
 "use client";
 
 import { useStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useRef, Suspense, use as ReactUse } from "react";
 import html2canvas from "html2canvas";
@@ -36,9 +37,9 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
   // 游戏模式 (per WBS §23.36: ?mode=game 或按钮切换)
   const [gameMode, setGameMode] = useState(searchParams.get("mode") === "game");
 
-  const canvas = useStore((s) => s.canvases.find((c) => c.id === canvasId));
-  const elements = useStore((s) => s.canvasElements.filter((e) => e.canvas_id === canvasId));
-  const connectors = useStore((s) => s.canvasConnectors.filter((c) => c.canvas_id === canvasId));
+  const canvas = useStore(useShallow((s) => s.canvases.find((c) => c.id === canvasId)));
+  const elements = useStore(useShallow((s) => s.canvasElements.filter((e) => e.canvas_id === canvasId)));
+  const connectors = useStore(useShallow((s) => s.canvasConnectors.filter((c) => c.canvas_id === canvasId)));
   const worktrees = useStore((s) => s.worktrees);
   const agentSessions = useStore((s) => s.agentSessions);
   const feedbacks = useStore((s) => s.feedbacks);
