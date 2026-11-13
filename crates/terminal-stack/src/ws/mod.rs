@@ -26,8 +26,9 @@
 //! - #7 `unsafe_code = "forbid"` (workspace lint)
 //! - #11 缺标比错标: 所有 dep 来自 [workspace.dependencies] 或 per-crate (axum 0.8 已 per-crate 在 `crates/api` 守门 #48 锁定)
 //! - #13 L0 协调派生 (in-process pub/sub + Mailbox)
-
+//!
 //! CYPHER STRUCTURE MANIFEST.
+//!
 //! CREATE
 //!   (f:File {name:"ws/mod.rs",type:"file",language:"rust"}),(m:Module {name:"ws",type:"module",language:"rust"}),
 //!   (au:Module {name:"authorized",type:"module",language:"rust"}),(ha:Module {name:"handler",type:"module",language:"rust"}),(hu:Module {name:"hub",type:"module",language:"rust"}),(in:Module {name:"integration",type:"module",language:"rust"}),(pr:Module {name:"protocol",type:"module",language:"rust"}),
