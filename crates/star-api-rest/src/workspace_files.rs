@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=47ba4e9306ccf112cb2b961660fe8968cbc68a0b87c87da91437271d5059f2bf
+@cypher schema=1 source_sha256=8a82aaeef4886e5aaafdab59408cfe1fea7b9d9dcfa8bb2b3a93bd6956925911
 MERGE (self:File {path:"crates/star-api-rest/src/workspace_files.rs"})
 MERGE (router:Function {name:"workspace_files::router", language:"rust", visibility:"pub"})
 MERGE (state:Type {id:"workspace_files::WorkspaceFilesState",kind:"struct"})
@@ -51,18 +51,28 @@ impl WorkspaceFilesState {
             .filter(|s| !s.is_empty())
             .map(PathBuf::from)
             .collect();
-        Self { roots: Arc::new(roots) }
+        Self {
+            roots: Arc::new(roots),
+        }
     }
 
     #[cfg(test)]
     fn from_roots(roots: Vec<PathBuf>) -> Self {
-        Self { roots: Arc::new(roots) }
+        Self {
+            roots: Arc::new(roots),
+        }
     }
 
     /// 规范化并校验 path 落在白名单根内。返回 (根索引, 相对路径)。
     /// 多根时优先返回 path 实际存在的根 (e.g. "frontend/src" 在 D:/Star 下
     /// 而不在 D:/IPA-Atomic-Skills 下 → 解析到 D:/Star); 全不存在则退回
     /// 第一个根, 让 list/read 以统一 NOT_FOUND 语义报错。
+    ///
+    /// 词法前缀相同不足以证明目标在根内: 白名单根内的 junction/symlink
+    /// 可以指向根外 (e.g. `D:/Star/node_modules/**` 全是 junction)。因此
+    /// 命中存在的路径后再校验 canonical 真实路径仍在 canonical 根内,
+    /// 否则 fail closed 403 (per domain-local-runtime/src/task_execution.rs
+    /// `canonical_directory` 同款做法)。
     fn resolve(&self, input: &str) -> Result<(usize, PathBuf), StatusCode> {
         let candidate = PathBuf::from(input);
         let mut normalized = PathBuf::new();
@@ -83,6 +93,13 @@ impl WorkspaceFilesState {
                     fallback = Some((index, normalized.clone()));
                 }
                 if full.exists() {
+                    let canonical_root =
+                        std::fs::canonicalize(root).map_err(|_| StatusCode::FORBIDDEN)?;
+                    let canonical_full =
+                        std::fs::canonicalize(&full).map_err(|_| StatusCode::FORBIDDEN)?;
+                    if !canonical_full.starts_with(&canonical_root) {
+                        return Err(StatusCode::FORBIDDEN);
+                    }
                     return Ok((index, normalized));
                 }
             }
@@ -128,28 +145,50 @@ async fn list_handler(
     };
     let dir = state.full_path(root_index, &rel);
     let Ok(meta) = std::fs::metadata(&dir) else {
-        return (StatusCode::NOT_FOUND, Json(json!({ "error": "PATH_NOT_FOUND" }))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "PATH_NOT_FOUND" })),
+        )
+            .into_response();
     };
     if !meta.is_dir() {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "NOT_A_DIRECTORY" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "NOT_A_DIRECTORY" })),
+        )
+            .into_response();
     }
     let depth = rel.components().count();
     if depth > MAX_TREE_DEPTH {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "TREE_DEPTH_EXCEEDED" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "TREE_DEPTH_EXCEEDED" })),
+        )
+            .into_response();
     }
 
     let mut entries: Vec<serde_json::Value> = Vec::new();
     let Ok(read_dir) = std::fs::read_dir(&dir) else {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "READ_DIR_FAILED" }))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "READ_DIR_FAILED" })),
+        )
+            .into_response();
     };
     for entry in read_dir.flatten() {
         if entries.len() >= MAX_TREE_ENTRIES {
             break;
         }
-        let Ok(file_type) = entry.file_type() else { continue };
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
         let name = entry.file_name().to_string_lossy().to_string();
         let is_dir = file_type.is_dir();
-        let size = if is_dir { None } else { entry.metadata().map(|m| m.len()).ok() };
+        let size = if is_dir {
+            None
+        } else {
+            entry.metadata().map(|m| m.len()).ok()
+        };
         entries.push(json!({
             "name": name,
             "is_dir": is_dir,
@@ -157,7 +196,10 @@ async fn list_handler(
         }));
     }
     entries.sort_by(|a, b| {
-        let (a_dir, b_dir) = (a["is_dir"].as_bool() == Some(true), b["is_dir"].as_bool() == Some(true));
+        let (a_dir, b_dir) = (
+            a["is_dir"].as_bool() == Some(true),
+            b["is_dir"].as_bool() == Some(true),
+        );
         match (a_dir, b_dir) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
@@ -183,10 +225,18 @@ async fn read_handler(
     };
     let full = state.full_path(root_index, &rel);
     let Ok(meta) = std::fs::metadata(&full) else {
-        return (StatusCode::NOT_FOUND, Json(json!({ "error": "PATH_NOT_FOUND" }))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "PATH_NOT_FOUND" })),
+        )
+            .into_response();
     };
     if !meta.is_file() {
-        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "NOT_A_FILE" }))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "NOT_A_FILE" })),
+        )
+            .into_response();
     }
     if meta.len() > MAX_FILE_BYTES {
         return (
@@ -204,7 +254,11 @@ async fn read_handler(
             )
                 .into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "READ_FAILED" }))).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "READ_FAILED" })),
+        )
+            .into_response(),
     }
 }
 
@@ -216,6 +270,26 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("star-workspace-files-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("create temp root");
         dir
+    }
+
+    /// 在 `root` 内建一个指向 `outside` 的目录链接 (Windows junction / Unix symlink),
+    /// 用于复现"白名单根内的链接指向根外"的逃逸场景。
+    fn create_dir_link(root: &Path, link_name: &str, outside: &Path) -> bool {
+        let link = root.join(link_name);
+        #[cfg(windows)]
+        {
+            // `mklink /J` 建 junction 不需要管理员权限; 失败时跳过该用例。
+            let result = std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(&link)
+                .arg(outside)
+                .output();
+            return result.map(|o| o.status.success()).unwrap_or(false);
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(outside, &link).is_ok()
+        }
     }
 
     #[test]
@@ -250,5 +324,80 @@ mod tests {
         // 全部不存在 → 退回第一个根 (404 语义而非 403)
         let (index, _rel) = state.resolve("no/such/path.md").unwrap();
         assert_eq!(index, 0);
+    }
+
+    /// 白名单根内的目录链接指向根外时, read 端点不得返回根外文件内容。
+    ///
+    /// 行为契约: 读取只允许落在白名单根内的真实路径 (canonical) ——
+    /// 词法前缀相同不足以证明文件在根内。
+    #[tokio::test]
+    async fn read_refuses_file_reached_through_link_outside_root() {
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+
+        let root = temp_root().join("read_link_root");
+        let outside = temp_root().join("read_link_outside");
+        std::fs::create_dir_all(&root).expect("create root");
+        std::fs::create_dir_all(&outside).expect("create outside");
+        std::fs::write(outside.join("secret.txt"), "OUTSIDE-ROOT-SECRET")
+            .expect("write outside secret");
+        if !create_dir_link(&root, "escape", &outside) {
+            eprintln!("skip: cannot create directory link on this platform");
+            return;
+        }
+
+        let app = router(WorkspaceFilesState::from_roots(vec![root]));
+        let req = Request::builder()
+            .uri("/api/v1/workspace-files/read?path=escape%2Fsecret.txt")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(
+            !body.contains("OUTSIDE-ROOT-SECRET"),
+            "read leaked out-of-root file content: {body}"
+        );
+    }
+
+    /// 白名单根内的目录链接指向根外时, list 端点不得列举根外的条目。
+    #[tokio::test]
+    async fn list_refuses_directory_reached_through_link_outside_root() {
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+
+        let root = temp_root().join("list_link_root");
+        let outside = temp_root().join("list_link_outside");
+        std::fs::create_dir_all(&root).expect("create root");
+        std::fs::create_dir_all(&outside).expect("create outside");
+        std::fs::write(outside.join("secret.txt"), "OUTSIDE-ROOT-SECRET")
+            .expect("write outside secret");
+        if !create_dir_link(&root, "escape", &outside) {
+            eprintln!("skip: cannot create directory link on this platform");
+            return;
+        }
+
+        let app = router(WorkspaceFilesState::from_roots(vec![root]));
+        let req = Request::builder()
+            .uri("/api/v1/workspace-files?path=escape")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(
+            !body.contains("secret.txt"),
+            "list leaked out-of-root directory entries: {body}"
+        );
     }
 }
