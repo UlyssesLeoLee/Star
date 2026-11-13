@@ -33,6 +33,7 @@
 | `star-stable-web.yml` | 手动 | Web 构建证据与 attestation | 否 |
 | `publish-star-canvas-services.yml` | push `main`/`dev`、tag `v*`；手动 | Canvas 服务镜像构建与发布 | 否 |
 | `spawn-e2e.yml` | PR → `main`；手动 | 跨平台进程 spawn/kill e2e | 否 |
+| `star-api-rest` 的 2 个单测 | Linux 下失败（已在 CI 中 `--skip`） | `workspace_files.rs` 的 `resolve_blocks_parent_escape`、`resolve_rejects_path_outside_roots` 假定 Windows 盘符路径；Linux 上应先决定「盘符路径在 Linux 上是否也必须被拒绝」，再修实现或用例 | 该文件在仓库主工作区另有未提交改动，故未触碰 |
 | `wasm-build.yml` | 改动 `crates/*-wasm/**` 时 | Rust→WASM 构建 | 否（**已知问题**，见 §7） |
 | `pre-tool-use-guard.yml` | 改动 guardian 脚本时 | guardian 的 pytest/lint | 否（**已知问题**，见 §7） |
 | `mock-switch-validate.yml` | 改动 mock 工具时 | 跨项目 mock 切换校验 | 否（**已知问题**，见 §7） |
@@ -48,13 +49,15 @@ Ubuntu 26，系统库包名会漂移。
 ```text
 changes ──┬─ rust-fmt ───────────────┐
           ├─ rust-ci ────────────────┤
+          ├─ rust-test-workspace ────┤
+          ├─ cargo-doc ──────────────┤
           ├─ bff-ci ─────────────────┤
           ├─ cross-platform (3 OS) ──┤
           ├─ desktop-rust ───────────┼─► ci-gate  ← 分支保护只要求这一个
           ├─ frontend-ci ────────────┤
           ├─ workflow-lint ──────────┤
           └─ markdownlint ───────────┘
-          (advisory，不进 gate: rust-test-workspace / cargo-doc / cargo-bench-no-run)
+          (advisory，不进 gate: cargo-bench-no-run)
 ```
 
 - **路径过滤**：`scripts/ci/detect_changes.py` 根据改动路径决定各区域是否运行，
@@ -64,14 +67,17 @@ changes ──┬─ rust-fmt ───────────────┐
   空输入 fail-closed。这样路径过滤造成的跳过不会卡住无关 PR。
 - **enforced 与 advisory**：
   - enforced：fmt、`cargo check --all-features`、clippy（deny 级 lint 为 error）、
-    `cargo test -p star-context`、BFF、三平台 smoke、桌面 crate、前端 typecheck/test/build、
+    **全 workspace 单测**、`cargo doc`、BFF、三平台 smoke、桌面 crate、前端 typecheck/test/build、
     workflow lint、markdownlint。
-  - advisory（job 内 `continue-on-error`，结果可见但不拦合并）：全 workspace 单测、
-    `cargo doc`、`cargo bench --no-run`。
+  - advisory（job 内 `continue-on-error`，结果可见但不拦合并）：`cargo bench --no-run`。
 - **并发**：同一 PR/分支的旧运行自动取消；`main` 上的运行不取消。
-- **全 workspace 单测为什么仍是 advisory**：`star-context` 并行 panic 的既有问题
-  （`actor.rs:118`，AGENTS.md §4.1 v25b）。`rust-test-workspace` 每次 push 把各 crate 的
-  `test result` 写进 job summary，用它决定下一批可以升为 enforced 的 crate。
+- **全 workspace 单测**：2026-11-13 在 ubuntu-24.04 实测 3033 通过 / 2 失败 / 8 忽略，约 6 分钟。
+  9/5 记录的「`star-context` 并行 panic」（`actor.rs:118`，AGENTS.md §4.1 v25b）在 CI 上未复现，
+  因此由 advisory 升为 enforced。唯一的 2 个失败是 `star-api-rest` 的
+  `workspace_files::tests::resolve_blocks_parent_escape` / `resolve_rejects_path_outside_roots`：
+  用例写死 Windows 盘符路径（`C:/Windows/system32`、`D:/elsewhere/x.md`），在 Linux 上它们是相对路径，
+  解析后仍在根目录内，`is_err()` 断言不成立。这两个用例被精确 `--skip`（见 §7），其余全部强制。
+  若该单测因并行 panic 偶发失败，应退回 advisory 并记录，而不是重跑到绿。
 
 ### 本地复现
 
@@ -151,7 +157,7 @@ bash scripts/ci/apply_rulesets.sh             # 创建/更新（按 name 幂等�
 | `mock-switch-validate.yml` | 失败（`fail=7`） | 校验的是跨项目 mock 集群，依赖 runner 上不存在的其他项目 | 本质是本机工具，不适合在 runner 上跑 |
 | `Advisories (cargo-audit)` | 修复取工具问题后首次真正执行（2026-11-13）：cargo-audit 报 **3 个真实漏洞** | `crypto-bigint` 0.5.5 时序问题 RUSTSEC-2026-0387；`libsqlite3-sys` 0.30.1 捆绑的 SQLite RUSTSEC-2026-0459（中危 6.8，经 `rusqlite` 0.32.1 引入）；`rsa` Marvin 时序侧信道 RUSTSEC-2023-0071（`deny.toml` 已有评估后的 ignore，cargo-audit 不读该清单）。另有 4 条 unmaintained/unsound 警告（fxhash、instant、proc-macro-error、glib） | 需要你决定「升级依赖」还是「在 `deny.toml` 登记评估后的 ignore」；该 job 非必需，不会拦合并 |
 | macOS 桌面打包 | 排队后 "job was not acquired" | GitHub macOS arm64 runner 容量不足 | 基础设施问题 |
-| `star-stable-desktop` | 此前从未全绿 | 见 §1 的 tauri 工作目录问题；本次修复后需在 runner 上确认 | 以实际运行为准 |
+| `star-stable-desktop` | 修复 tauri 工作目录后，Linux / Windows 已能真实打出 .deb / AppImage / MSI，但在 **Validate … SBOMs** 步骤失败（`Error: DESCRIBES`，run 43338735139） | `cargo-sbom` 0.10.0 对 `star-desktop` 生成的 SPDX 2.3 是 `SPDXRef-DOCUMENT DESCRIBES SPDXRef-File-star-desktop`，且该 File 以 `GENERATED_FROM` 指向根 Package；而 workflow 内联 JS 校验器要求 DOCUMENT 直接 `DESCRIBES` 根 **Package**（`npm sbom` 的输出是这种形态，所以前端 SBOM 通过、Rust SBOM 不通过）。本机用同版本 cargo-sbom 复现，456 个 package、关系类型仅 `DEPENDS_ON`/`DESCRIBES`/`GENERATED_FROM` | **未修**：同一段校验逻辑复制在 6 个 job 的内联 JS（Linux/Windows/macOS 的 Validate + 三个 Attest）及 consumer 验证的 Python（约 875 行）里，属于 fail-closed 的发布证明通道，且有 `PHASE-STAR-STABLE-W2-DESKTOP-ATTEST-20261031` 记录的变异/对照验证。建议的修法：接受「DOCUMENT DESCRIBES File，且该 File GENERATED_FROM 根 Package」作为等价形态，并重跑该报告里的变异测试；需要负责人确认 |
 
 ## 8. 修订历史
 

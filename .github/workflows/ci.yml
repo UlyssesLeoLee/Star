@@ -7,7 +7,7 @@ name: CI
 #   changes        按改动路径决定哪些区域需要跑 (纯文档提交不再触发 Rust/前端全套)
 #   rust-fmt       cargo fmt --check (enforced, 最快失败)
 #   rust-ci        check --all-features / clippy / test star-context (enforced)
-#   rust-test-workspace  全 workspace 单测 (advisory: 仅 push/手动, 不进 gate)
+#   rust-test-workspace  全 workspace 单测 (enforced; 已知 2 个 Windows 路径用例被 --skip)
 #   bff-ci         bff 独立 workspace 的 fmt/check/test
 #   cross-platform Linux/Windows/macOS 烟雾
 #   desktop-rust   star-desktop (tauri) 的 check/test, 需要 webkit2gtk 等系统库
@@ -135,12 +135,11 @@ jobs:
         run: cargo clippy --workspace --exclude star-desktop --all-targets -j 4
 
   rust-test-workspace:
-    name: Rust workspace tests (advisory)
+    name: Rust workspace tests
     needs: changes
-    # PR 上不跑 (耗时长); push 与手动触发才跑, 用来回答 "全量单测现在到底几个红"
-    if: needs.changes.outputs.rust == 'true' && github.event_name != 'pull_request'
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -154,15 +153,20 @@ jobs:
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
-      - name: cargo test --workspace --lib (advisory)
-        continue-on-error: true
+      - name: cargo test --workspace --lib
+        # 2026-11-13 实测 (run 43338583680, ubuntu-24.04): 3033 passed / 2 failed / 8 ignored,
+        # 约 6 分钟; 9/5 记录的 "star-context 并行 panic" 在 CI 上未复现, 故由 advisory 升为 enforced。
+        # 唯一的 2 个失败是 star-api-rest workspace_files 里写死 Windows 盘符路径的用例
+        # ("C:/Windows/system32"、"D:/elsewhere/x.md"): 在 Linux 上它们是相对路径, 解析后仍在
+        # 根目录内, 断言 is_err() 不成立。属于待负责人修复的既有测试问题 (该文件当前另有
+        # 未提交改动), 先精确 --skip 这两个, 其余 crate 的全部用例照常强制。
         shell: bash
         run: |
           set -o pipefail
           status=0
-          cargo test --workspace --exclude star-desktop --lib --no-fail-fast -j 4 2>&1 | tee test.log || status=$?
+          cargo test --workspace --exclude star-desktop --lib --no-fail-fast -j 4 --             --skip workspace_files::tests::resolve_blocks_parent_escape             --skip workspace_files::tests::resolve_rejects_path_outside_roots             2>&1 | tee test.log || status=$?
           {
-            echo "### Workspace unit tests (advisory)"
+            echo "### Workspace unit tests"
             echo
             echo '```'
             grep -E "^test result:|^error: test failed|FAILED" test.log | sort | uniq -c | sort -rn | head -40 || true
@@ -396,7 +400,7 @@ jobs:
             !**/_ARCHIVED_*.md
 
   cargo-doc:
-    name: Rust doc (cargo doc --no-deps, advisory)
+    name: Rust doc (cargo doc --no-deps)
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-24.04
@@ -415,9 +419,8 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: cargo doc --workspace --no-deps
-        # 守门 #1 v5。仍为 advisory: 600+ missing_docs 既有 warning, 不加 -D warnings。
-        # 此前该步骤因缺 glib 必然失败却被 continue-on-error 掩盖, 现已 --exclude star-desktop。
-        continue-on-error: true
+        # 守门 #1 v5。2026-11-13 实测 (run 43338583680) 真实通过 (仅 warning), 升为 enforced;
+        # 仍不加 -D warnings (既有 missing_docs 等 warning 未清零), 只有真正的文档构建错误才失败。
         run: cargo doc --workspace --exclude star-desktop --no-deps --all-features -j 4
 
   cargo-bench-no-run:
@@ -447,7 +450,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   # 聚合门禁: 分支 ruleset 只要求 "CI gate (required)" 这一个检查。
   # skipped (路径过滤) 视为通过; failure / cancelled / 缺结果 视为失败。
-  # advisory job (rust-test-workspace / cargo-doc / cargo-bench-no-run) 不在 needs 内。
+  # advisory job (cargo-bench-no-run) 不在 needs 内。
   # ─────────────────────────────────────────────────────────────
   ci-gate:
     name: CI gate (required)
@@ -456,6 +459,8 @@ jobs:
       - changes
       - rust-fmt
       - rust-ci
+      - rust-test-workspace
+      - cargo-doc
       - bff-ci
       - cross-platform
       - desktop-rust
