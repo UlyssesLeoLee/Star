@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=pending
+@cypher schema=1 source_sha256=218be3c4b982c8fcb9d9cc6e7e435d41c405206aaea5f73ca3d235c14dfc5d75
 MERGE (self:File {path:"frontend/src/components/markdown/MarkdownPreview.tsx"})
 MERGE (c:Symbol {id:"frontend/src/components/markdown/MarkdownPreview.tsx::MarkdownPreview",kind:"component"})
 MERGE (p:Symbol {id:"frontend/src/lib/markdown/markdownParser.ts::markdownToHtml",kind:"function"})

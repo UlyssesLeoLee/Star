@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=c9597a65e5d1eac242329c8e28bcf5c6eb0a62697f3934975eb4571a60d66049
+@cypher schema=1 source_sha256=5eecc117931d88558a775c70c248203ef4b7169126a0dcf3e7732feb19d77a4c
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
