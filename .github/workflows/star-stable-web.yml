@@ -35,8 +35,8 @@ on:
         description: Confirm the stable release gates are closed before generating evidence
         required: true
         type: choice
-        options: [NO, APPROVED]
-        default: NO
+        options: ["NO", "APPROVED"]
+        default: "NO"
 
 permissions:
   contents: read

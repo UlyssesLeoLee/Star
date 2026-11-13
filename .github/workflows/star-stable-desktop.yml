@@ -65,9 +65,9 @@ on:
         description: "Select APPROVED only when authorizing stable release attestations; keep NO for routine checks."
         required: true
         type: choice
-        default: NO
+        default: "NO"
         options:
-          - NO
+          - "NO"
           - APPROVED
 
 permissions:

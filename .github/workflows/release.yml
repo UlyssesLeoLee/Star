@@ -32,8 +32,8 @@ on:
         description: "真实发布必须选 APPROVED; dry_run 时可保持 NO"
         required: true
         type: choice
-        default: NO
-        options: [NO, APPROVED]
+        default: "NO"
+        options: ["NO", "APPROVED"]
       dry_run:
         description: "仅做 preflight 校验, 不触发构建也不创建 Release"
         required: true
