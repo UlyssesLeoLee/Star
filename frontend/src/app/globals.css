@@ -177,6 +177,18 @@ body.cel {
 ::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
 
 @layer components {
+  /* ── 弹层实色 (per WBS §23.33-A) ──
+     popover/dropdown/menu 等浮层一律实色底, 关闭 backdrop-filter,
+     避免艺术主题玻璃令牌透出底下内容干扰阅读 */
+  .popover-solid {
+    background-color: var(--popover-bg, var(--color-surface-2, #ffffff));
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .popover-solid .popover-panel {
+    background-color: color-mix(in srgb, var(--popover-bg, #ffffff) 92%, var(--color-surface-elevated, #ffffff));
+  }
+
   /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
   /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
   .card {

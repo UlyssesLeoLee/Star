@@ -1,0 +1,103 @@
+{
+  "schema": "star.ui-benchmark-fixture",
+  "version": "0.1.0",
+  "profile_id": "UI0-BENCH-001",
+  "captured_date": "2026-10-21",
+  "seed": 20261021,
+  "purpose": "Repeatable synthetic input for comparing UI rendering and resource behavior across the Tauri+React reference, shared Web reference, and Rust-native parity prototype.",
+  "execution_status": "parameters_only_generator_and_measurement_runner_not_implemented",
+  "generation_contract": "Before comparing measured results, a generator must pin its algorithm version, pseudo-random generator, entity ordering, stable IDs, timestamps, and exact terminal byte streams. This manifest alone does not generate a dataset.",
+  "data_policy": {
+    "contains_user_data": false,
+    "contains_real_credentials": false,
+    "is_authorization_evidence": false,
+    "is_production_data": false,
+    "note": "Fixture results measure presentation and resource behavior only. They do not prove owner authorization, durable business operations, production provider readiness, or task execution safety."
+  },
+  "directory": {
+    "projects": 4,
+    "runs_per_project": 5,
+    "parent_scopes": 20,
+    "worktrees_per_run": 220,
+    "worktrees_total": 4400,
+    "branches_per_worktree": 1,
+    "page_size": 50,
+    "available_pages_per_run": 5,
+    "picker_retained_page_limit": 4,
+    "parent_cache_boundary": 16,
+    "state_flag_rules": {
+      "busy_every_nth_worktree": 10,
+      "stale_every_nth_worktree": 7,
+      "dirty_every_nth_worktree": 5,
+      "locked_every_nth_worktree": 20,
+      "unknown_every_nth_worktree": 13,
+      "flags_overlap": true,
+      "index_base": 0
+    }
+  },
+  "concurrency": {
+    "active_runs": 4,
+    "agents_per_active_run": 8,
+    "agents_total": 32,
+    "open_terminal_panes": 8,
+    "note": "These are repeatable benchmark inputs, not product concurrency limits. Also run against the configured supported maximum when that profile is available."
+  },
+  "tasks_and_terminal": {
+    "tasks_per_active_run": 12,
+    "output_bytes_per_pane": 1048576,
+    "stream_modes": [
+      "utf8_ansi_burst",
+      "utf8_ansi_paced",
+      "long_line",
+      "reconnect_snapshot_with_gap",
+      "cancel_and_drain"
+    ]
+  },
+  "canvas": {
+    "node_counts": [
+      500,
+      2000,
+      10000
+    ],
+    "edges_per_node": {
+      "sparse": 0.5,
+      "dense": 4
+    },
+    "operations": [
+      "initial_viewport_load",
+      "pan",
+      "zoom",
+      "drag",
+      "cancel_viewport_load"
+    ]
+  },
+  "bi": {
+    "events_per_page": 50,
+    "pages": 100,
+    "events_total": 5000,
+    "runs_while_ui_is_active": true
+  },
+  "interaction_sequence": {
+    "focus_switch_cycles": 50,
+    "switch_across_parent_scopes": 20,
+    "directory_scroll_and_keyboard_navigation": true,
+    "overlap_canvas_and_bi_background_work": true,
+    "cancel_old_generation_and_wait_for_drain": true
+  },
+  "measurement_repetitions": {
+    "cold_start_runs": 5,
+    "warm_interaction_runs": 30,
+    "report_percentiles": [
+      50,
+      95
+    ],
+    "note": "Preserve raw samples and report sample count. These counts do not define performance pass thresholds."
+  },
+  "measurement_constraints": {
+    "compare_tracks_separately": true,
+    "record_exact_manifest_sha256": true,
+    "record_commit_renderer_runtime_toolchain_and_build_mode": true,
+    "record_display_refresh_dpi_and_power_mode_per_run": true,
+    "do_not_set_thresholds_from_fixture_parameters": true
+  }
+}

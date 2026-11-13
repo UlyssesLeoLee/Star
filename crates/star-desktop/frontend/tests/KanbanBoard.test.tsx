@@ -3,6 +3,15 @@
 // Vitest test — Star Desktop KanbanBoard component (PR-249)
 // 7 tests: 6 columns × W/T/M swimlane + drop zone + drag + WIP limit + onTransition
 // =====================================================================
+
+/*
+@cypher schema=1 source_sha256=21f448fe06316b15cf68a91002ff32b87b538c0583f97ed3f07499ed4147dfc9
+MERGE (self:File {path:"crates/star-desktop/frontend/tests/KanbanBoard.test.tsx"})
+MERGE (board:File {path:"crates/star-desktop/frontend/src/components/KanbanBoard.tsx"})
+MERGE (self)-[:TESTS]->(board)
+@endcypher
+*/
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -39,12 +48,9 @@ function renderBoard(props: Partial<React.ComponentProps<typeof KanbanBoard>> = 
 describe('KanbanBoard (PR-249)', () => {
   it('renders 6 default kanban columns', () => {
     renderBoard();
-    expect(screen.getByTestId('kanban-column-todo')).toBeDefined();
-    expect(screen.getByTestId('kanban-column-in_progress')).toBeDefined();
-    expect(screen.getByTestId('kanban-column-review')).toBeDefined();
-    expect(screen.getByTestId('kanban-column-blocked')).toBeDefined();
-    expect(screen.getByTestId('kanban-column-done')).toBeDefined();
-    expect(screen.getByTestId('kanban-column-wontfix')).toBeDefined();
+    for (const status of ['todo', 'in_progress', 'review', 'blocked', 'done', 'wontfix']) {
+      expect(screen.getAllByTestId(`kanban-column-${status}`)).toHaveLength(3);
+    }
   });
 
   it('renders 3 swimlane labels when enabled', () => {
@@ -56,7 +62,10 @@ describe('KanbanBoard (PR-249)', () => {
 
   it('groups workItems into W/T/M swimlanes', () => {
     renderBoard();
-    const wSwimlane = screen.getByTestId('kanban-column-todo')?.closest('[data-swimlane="W"]');
+    const wSwimlane = screen
+      .getAllByTestId('kanban-column-todo')
+      .find((column) => column.closest('[data-swimlane="W"]'))
+      ?.closest('[data-swimlane="W"]');
     expect(wSwimlane).toBeDefined();
     // TEST-001 should be in W lane todo column
     expect(screen.getByText('TEST-001')).toBeDefined();
@@ -66,12 +75,12 @@ describe('KanbanBoard (PR-249)', () => {
 
   it('marks fallback column (todo) as protected', () => {
     renderBoard();
-    expect(screen.getByText(/\(protected\)/)).toBeDefined();
+    expect(screen.getAllByText(/\(protected\)/)).toHaveLength(3);
   });
 
   it('handles drop zone visual state', () => {
     renderBoard();
-    const column = screen.getByTestId('kanban-column-in_progress');
+    const column = screen.getAllByTestId('kanban-column-in_progress')[0];
     const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => 'test-wi-001'), dropEffect: '' };
     fireEvent.dragOver(column, { dataTransfer });
     expect(column.className).toContain('border-blue-500');
@@ -81,7 +90,7 @@ describe('KanbanBoard (PR-249)', () => {
   it('calls onTransition when card is dropped', () => {
     const onTransition = vi.fn();
     renderBoard({ onTransition });
-    const column = screen.getByTestId('kanban-column-review');
+    const column = screen.getAllByTestId('kanban-column-review')[0];
     const dataTransfer = { getData: vi.fn(() => 'test-wi-001') };
     fireEvent.drop(column, { dataTransfer });
     expect(onTransition).toHaveBeenCalledWith('test-wi-001', 'review');

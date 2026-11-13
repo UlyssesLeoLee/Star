@@ -55,14 +55,13 @@ pub use collab_only as build_full_router;
 
 /// V0.1 collab-only router (per 守门 #19 v19) — collab routes + chat routes.
 pub fn collab_only(state: build_collab_router_state::CollabRouterState) -> axum::Router {
-    build_collab_router(state.into())
-        .merge(routes::chat::chat_routes())
+    build_collab_router(state.into()).merge(routes::chat::chat_routes())
 }
 
 /// Public state placeholder to allow V0.1 + worktree_canvas dual build.
 pub mod build_collab_router_state {
-    pub use std::sync::Arc;
     pub use crate::collaboration::CollaborationState as CollabRouterState;
+    pub use std::sync::Arc;
     impl From<Arc<crate::collaboration::CollaborationState>> for CollabRouterState {
         fn from(s: Arc<crate::collaboration::CollaborationState>) -> Self {
             // SAFETY: CollaborationState is Clone, Arc unwrap is fine.

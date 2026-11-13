@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 import { FileBrowser } from "@/components/remote/FileBrowser";
 import { useTranslation } from "@/lib/i18n";
 
@@ -16,7 +17,7 @@ export default function RemoteFilesPage({
   const { t } = useTranslation();
   // Next 15+: params is a Promise; use() unwraps in client components.
   const { id } = React.use(params);
-  const runtime = useStore((s) => s.localRuntimes.find((r) => r.id === id));
+  const runtime = useStore(useShallow((s) => s.localRuntimes.find((r) => r.id === id)));
 
   if (!runtime) {
     return (

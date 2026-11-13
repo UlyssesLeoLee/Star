@@ -1,8 +1,10 @@
 # SRS-STAR-CANVAS-GAME-001
 
+> **历史状态（2026-10-30）**：已退役，不属于当前 Star 产品需求或发布范围。本文保留原始内容用于审计与历史追溯；当前 Canvas 服务以 `docs/basic-design.md` 和 `docs/deployment/star-canvas-services-deploy.md` 为准。
+
 > **STAR 画布游戏 软件需求规格说明书 v0.1** (弹幕 Roguelike + 3渲2 像素风机器人)
 >
-> - 状态: Requirements Baseline Draft (需求基线草案)
+> - 状态: Retired Historical Record (已退役历史记录；不作为当前产品需求)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 核心语言 (后端): Rust (workspace 已 47 crate, 守门 #1 v12 100% 守门覆盖)
 > - 核心语言 (前端 2D 画布): TypeScript + Next.js 14.2.5 (App Router, 已落地)

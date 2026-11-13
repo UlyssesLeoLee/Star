@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fea982b39263bf451b1b4c9a24ea3b5950cd10d4503767cf0af1e3a1a2f0f92a
+@cypher schema=1 source_sha256=eaa7f0f272d151c1e1f69e40dbccc00d22ec22bb9dbe9403bfc7a36aa200cfbe
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -42,6 +42,8 @@ import {
   RefreshCw,
   Webhook,
   Code2,
+  Bell,
+  ShieldAlert,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -423,11 +425,11 @@ export const ALL_MODULES: ModuleDefinition[] = [
   {
     id: "developer-console",
     label: "Developer Console",
-    code: "DEV",
+    code: "DC",
     href: "/settings/developer",
     category: "integration",
     categoryLabel: "Integration & Security",
-    description: "Developer API (REST + MCP) + 出站 Webhook 管理 (per 2026-09-02 14:06 JST 拍板)",
+    description: "Developer API (REST + MCP) + 出站 Webhook 管理 (per 2026-09-02 14:06 JST 拍板, 2026-11-12 补建路由)",
     icon: Code2,
   },
   {
@@ -451,29 +453,29 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: Terminal,
   },
   {
-    id: "search",
-    label: "Universal Search",
-    code: "SRC",
-    href: "/search",
-    category: "integration",
-    categoryLabel: "Integration & Security",
-    description: "全域跨模块语义检索与索引",
-    icon: Search,
-  },
+      id: "search",
+      label: "Universal Search",
+      code: "SRC",
+      href: "/search",
+      category: "integration",
+      categoryLabel: "Integration & Security",
+      description: "全域跨模块语义检索与索引",
+      icon: Search,
+    },
 
-  // ── System & Meta ────────────────────────────────────────────────
-  {
-    id: "local-runtime",
-    label: "Local Runtime",
-    code: "RUN",
-    href: "/local-runtime",
-    category: "system",
-    categoryLabel: "System & Meta",
-    description: "本地容器执行时与守护进程控制台",
-    icon: Server,
-  },
-  {
-    id: "audit",
+      // ── System & Meta ────────────────────────────────────────────────
+      {
+        id: "local-runtime",
+        label: "Local Runtime",
+        code: "RUN",
+        href: "/local-runtime",
+        category: "system",
+        categoryLabel: "System & Meta",
+        description: "本地容器执行时与守护进程控制台",
+        icon: Server,
+      },
+      {
+        id: "audit",
     label: "Audit Log",
     code: "AUD",
     href: "/audit",
@@ -523,6 +525,16 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: Users,
   },
   {
+    id: "admin",
+    label: "Admin Console",
+    code: "ADM",
+    href: "/admin",
+    category: "system",
+    categoryLabel: "System & Meta",
+    description: "管理员后台 (Google 登录 · lidian727@gmail.com 唯一管理员)",
+    icon: ShieldAlert,
+  },
+  {
     id: "tenant",
     label: "Tenant Admin",
     code: "TNT",
@@ -545,8 +557,83 @@ export const ALL_MODULES: ModuleDefinition[] = [
     description: "分批次重构已完成任务 · todo→done 循环, 列可自定义",
     icon: RefreshCw,
   },
+  {
+    id: "nema",
+    label: "NEMA Tasks",
+    code: "NEMA",
+    href: "/nema",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "文件即任务 · 共同编辑文件自动 .nema 侧车, 可打开为 Star 任务",
+    icon: FileText,
+  },
 ];
 
 export const MODULE_MAP = new Map<string, ModuleDefinition>(
   ALL_MODULES.map((m) => [m.id, m])
 );
+
+// =====================================================================
+// NAV_GROUPS — Sidebar 5 组结构 (per docs/frontend/design/ui-3pane-arch.md
+// §1.2 v0.2 + §1.2.1 26 路由映射, 2026-11-13 用户发令 "左侧导航按文档")
+//
+// 组结构: home-core (常驻置顶, 不可折叠) / home-personal (默认折叠)
+//        / project (分组落地页) / view (项目内视图预设)
+//        / admin-org / admin-integration / admin-ops / admin-dev (4 二级子组)
+// 未映射模块 (issues/analytics/settings/agent-windows/agent-view 等)
+// 落 "other" 兜底折叠区 (守门 #11 缺标比错标: 不消失)。
+// =====================================================================
+export type NavGroupId =
+  | "home-core"
+  | "home-personal"
+  | "project"
+  | "view"
+  | "admin-org"
+  | "admin-integration"
+  | "admin-ops"
+  | "admin-dev"
+  | "other";
+
+export const NAV_GROUPS: Record<NavGroupId, string[]> = {
+  // per §1.2 核心区 5 项 (Review 无独立路由 → 缺标, 4 项落地)
+  "home-core": ["worktree", "agents", "feedback", "validation"],
+  // per §1.2 个人区 (提及我/已关注/草稿 无页面 → 缺标, 只留 inbox)
+  "home-personal": ["inbox"],
+  // per §1.2.1 /project + /planning → 项目
+  project: ["projects", "planning"],
+  // per §1.2.1 视图预设 (列表/日历/概览 无独立页 → 缺标)
+  view: ["kanban", "timeline", "backlog"],
+  // per §1.2.1 管理 → 组织
+  "admin-org": ["tenant", "identity", "permission", "admin"],
+  // per §1.2.1 管理 → 集成
+  "admin-integration": ["scm", "integration", "webhooks", "api-keys", "cli-profiles"],
+  // per §1.2.1 管理 → 运维
+  "admin-ops": ["local-runtime", "audit", "automation", "remote"],
+  // per §1.2.1 管理 → 开发者 (过渡)
+  "admin-dev": [
+    "development",
+    "workflow",
+    "relation",
+    "context",
+    "refactor",
+    "nema",
+    "advanced-settings",
+    "developer-console",
+    "search",
+  ],
+  // 兜底: 设计映射表未覆盖 + 用户钉选自定义
+  other: [],
+};
+
+/** 分组显示顺序 (Sidebar 渲染顺序) */
+export const NAV_GROUP_ORDER: NavGroupId[] = [
+  "home-core",
+  "home-personal",
+  "project",
+  "view",
+  "admin-org",
+  "admin-integration",
+  "admin-ops",
+  "admin-dev",
+  "other",
+];

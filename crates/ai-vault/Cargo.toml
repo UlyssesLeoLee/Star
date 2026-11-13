@@ -10,7 +10,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "AI Vault domain — local-only search policy + clear index (per ULYS-157 P0-C MVP v0 + FR-ORCA-023 桌面索引控制 + FR-ORCA-024 Clear Search Index, spec v1.0 line 347-353)"
+description = "AI Vault domain — local-only search policy and clear-index controls for the desktop workspace"
 
 [lib]
 name = "ai_vault"

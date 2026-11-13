@@ -17,7 +17,7 @@ import re
 import sys
 
 
-RECOMMENDED_TAG = re.compile(r"\(推荐\)|（推荐\)|\(recommended\)|（recommended\)", re.IGNORECASE)
+RECOMMENDED_TAG = re.compile(r"\(推荐\)|（推荐）|\(recommended\)|（recommended）", re.IGNORECASE)
 
 
 def _score(options: list[dict]) -> tuple[int, list[str]]:

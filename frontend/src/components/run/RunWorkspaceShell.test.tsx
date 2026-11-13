@@ -1,23 +1,45 @@
 /*
-@cypher schema=1 source_sha256=70d7d0812dd68afabcbeef01e5f84512295f9e6b39fcd9ed595f6cb0fc72f825
+@cypher schema=1 source_sha256=283652290a81ac68e34f03fbe6bf476a3c361564b918b616618e40f83262e999
 MERGE (self:File {path:"frontend/src/components/run/RunWorkspaceShell.test.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.tsx::RunWorkspaceShell",kind:"function"})
 MERGE (suite:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::RunWorkspaceShell focus gating",kind:"suite"})
-MERGE (unfocused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::unfocused Run exposes directory choices without mounting Run Apps",kind:"test"})
-MERGE (focused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::verified Worktree focus reveals permitted Run Apps",kind:"test"})
+MERGE (unfocused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::unfocused LANE exposes directory choices without mounting LANE Apps",kind:"test"})
+MERGE (focused:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::verified Worktree focus reveals permitted LANE Apps",kind:"test"})
+MERGE (picker:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::bounded picker loads more rows and searches across all loaded rows",kind:"test"})
+MERGE (duplicates:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::rejects duplicate Worktree IDs within a returned page and keeps prior rows",kind:"test"})
+MERGE (oversizedLater:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::rejects an oversized later page without exceeding the picker row budget",kind:"test"})
+MERGE (oversizedFirst:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::rejects an oversized first page before rendering unbounded choices",kind:"test"})
+MERGE (installer:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::installSession",kind:"function"})
+MERGE (makeWorktrees:Symbol {id:"frontend/src/components/run/RunWorkspaceShell.test.tsx::makeWorktrees",kind:"function"})
+MERGE (userEvent:ExternalService {name:"@testing-library/user-event"})
+MERGE (pageSize:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RUN_DIRECTORY_PAGE_SIZE",kind:"constant"})
 MERGE (self)-[:DEFINES]->(suite)
 MERGE (suite)-[:DEFINES]->(unfocused)
 MERGE (suite)-[:DEFINES]->(focused)
+MERGE (suite)-[:DEFINES]->(picker)
+MERGE (suite)-[:DEFINES]->(duplicates)
+MERGE (suite)-[:DEFINES]->(oversizedLater)
+MERGE (suite)-[:DEFINES]->(oversizedFirst)
 MERGE (unfocused)-[:TESTS]->(shell)
 MERGE (focused)-[:TESTS]->(shell)
+MERGE (picker)-[:TESTS]->(shell)
+MERGE (picker)-[:CALLS]->(installer)
+MERGE (duplicates)-[:TESTS]->(shell)
+MERGE (oversizedLater)-[:TESTS]->(shell)
+MERGE (oversizedFirst)-[:TESTS]->(shell)
+MERGE (oversizedLater)-[:CALLS]->(makeWorktrees)
+MERGE (oversizedFirst)-[:CALLS]->(makeWorktrees)
+MERGE (self)-[:IMPORTS]->(userEvent)
+MERGE (self)-[:IMPORTS]->(pageSize)
 @endcypher
 */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { AnchorHTMLAttributes } from "react";
 import { RunWorkspaceShell } from "./RunWorkspaceShell";
-import type { RunContextEnvelope, RunDirectoryApiClient, RunWorktree } from "@/lib/run/runDirectoryApi";
+import { RUN_DIRECTORY_PAGE_SIZE, type RunContextEnvelope, type RunDirectoryApiClient, type RunWorktree } from "@/lib/run/runDirectoryApi";
 
 const mocks = vi.hoisted(() => ({
   session: null as unknown,
@@ -64,6 +86,14 @@ function makeWorktree(): RunWorktree {
   };
 }
 
+function makeWorktrees(count: number): RunWorktree[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...makeWorktree(),
+    worktree_id: `aaaaaaaa-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    name: `bounded-checkout-${index + 1}`,
+  }));
+}
+
 function makeEnvelope(focus: RunWorktree | null): RunContextEnvelope {
   return {
     run_context: {
@@ -90,7 +120,7 @@ function makeEnvelope(focus: RunWorktree | null): RunContextEnvelope {
       project_id: projectId,
       repository_id: null,
       branch_id: null,
-      title: "Run Focus Acceptance",
+      title: "LANE Focus Acceptance",
       state: "active",
       owner_user_id: "99999999-9999-4999-8999-999999999999",
       version: 1,
@@ -121,7 +151,7 @@ function installSession(envelope: RunContextEnvelope) {
 }
 
 describe("RunWorkspaceShell focus gating", () => {
-  it("unfocused Run exposes directory choices without mounting Run Apps", async () => {
+  it("unfocused LANE exposes directory choices without mounting LANE Apps", async () => {
     const client = installSession(makeEnvelope(null));
 
     render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId }} />);
@@ -131,7 +161,7 @@ describe("RunWorkspaceShell focus gating", () => {
       "href",
       `/projects/${projectId}/runs/${runId}/worktrees/${worktreeId}`,
     );
-    expect(screen.queryByRole("tablist", { name: "Engineering Run Apps" })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "LANE Apps" })).toBeNull();
     expect(screen.queryByTestId("task-cards-panel")).toBeNull();
     expect(screen.queryByTestId("run-bi-panel")).toBeNull();
     expect(screen.getByRole("button", { name: "GLOBAL" })).toHaveAttribute("aria-pressed", "true");
@@ -142,12 +172,86 @@ describe("RunWorkspaceShell focus gating", () => {
     expect(mocks.biMounted).not.toHaveBeenCalled();
   });
 
-  it("verified Worktree focus reveals permitted Run Apps", async () => {
+  it("bounded picker loads more rows and searches across all loaded rows", async () => {
+    const secondWorktree = {
+      ...makeWorktree(),
+      worktree_id: "aaaaaaaa-0000-4000-8000-000000000001",
+      name: "telemetry-checkout",
+      branch: "feature/telemetry",
+    };
+    const client = installSession(makeEnvelope(null));
+    vi.mocked(client.listWorktrees)
+      .mockResolvedValueOnce({ rows: [makeWorktree()], limit: 50, next_cursor: "cursor-1" })
+      .mockResolvedValueOnce({ rows: [secondWorktree], limit: 50, next_cursor: null });
+    const user = userEvent.setup();
+
+    render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId }} />);
+
+    const search = await screen.findByRole("searchbox", { name: "搜索已加载的 Worktree" });
+    await user.type(search, "telemetry");
+    expect(await screen.findByText(/没有匹配当前已加载条目的 Worktree/)).toBeTruthy();
+    expect(within(screen.getByTestId("run-worktree-selection")).getAllByRole("status")[0]?.textContent).toContain("搜索范围是已加载条目");
+
+    await user.click(screen.getByRole("button", { name: "加载更多 Worktree" }));
+
+    expect(await screen.findByRole("link", { name: /telemetry-checkout/ })).toHaveAttribute(
+      "href",
+      "/projects/" + projectId + "/runs/" + runId + "/worktrees/" + secondWorktree.worktree_id,
+    );
+    expect(within(screen.getByTestId("run-worktree-selection")).getAllByRole("status")[0]?.textContent).toContain("显示 1 / 2 项");
+    expect(client.listWorktrees).toHaveBeenCalledTimes(2);
+    expect(client.listWorktrees.mock.calls[1]?.[1]).toBe("cursor-1");
+  });
+
+  it("rejects duplicate Worktree IDs within a returned page and keeps prior rows", async () => {
+    const repeatedRow = { ...makeWorktree(), worktree_id: "aaaaaaaa-0000-4000-8000-000000000001", name: "duplicate-checkout" };
+    const client = installSession(makeEnvelope(null));
+    vi.mocked(client.listWorktrees)
+      .mockResolvedValueOnce({ rows: [makeWorktree()], limit: 50, next_cursor: "cursor-1" })
+      .mockResolvedValueOnce({ rows: [repeatedRow, repeatedRow], limit: 50, next_cursor: null });
+    const user = userEvent.setup();
+
+    render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId }} />);
+    await user.click(await screen.findByRole("button", { name: "加载更多 Worktree" }));
+
+    expect(await screen.findByText("Worktree 分页包含重复条目，请刷新目录后重试。")).toBeTruthy();
+    const rows = screen.getByRole("list", { name: "已加载的授权 Worktree" });
+    expect(within(rows).getAllByRole("link")).toHaveLength(1);
+    expect(within(rows).getByRole("link", { name: /feature-checkout/ })).toBeTruthy();
+  });
+
+  it("rejects an oversized later page without exceeding the picker row budget", async () => {
+    const client = installSession(makeEnvelope(null));
+    vi.mocked(client.listWorktrees)
+      .mockResolvedValueOnce({ rows: [makeWorktree()], limit: 50, next_cursor: "cursor-1" })
+      .mockResolvedValueOnce({ rows: makeWorktrees(RUN_DIRECTORY_PAGE_SIZE + 1), limit: 50, next_cursor: null });
+    const user = userEvent.setup();
+
+    render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId }} />);
+    await user.click(await screen.findByRole("button", { name: "加载更多 Worktree" }));
+
+    expect(await screen.findByText("Worktree 分页超过单页或选择器读取上限，请刷新目录后重试。")).toBeTruthy();
+    const rows = screen.getByRole("list", { name: "已加载的授权 Worktree" });
+    expect(within(rows).getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("rejects an oversized first page before rendering unbounded choices", async () => {
+    const client = installSession(makeEnvelope(null));
+    vi.mocked(client.listWorktrees).mockResolvedValueOnce({ rows: makeWorktrees(RUN_DIRECTORY_PAGE_SIZE + 1), limit: 50, next_cursor: null });
+
+    render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId }} />);
+
+    expect(await screen.findByText("Worktree 分页超过单页或选择器读取上限，请刷新目录后重试。")).toBeTruthy();
+    expect(screen.queryByRole("searchbox", { name: "搜索已加载的 Worktree" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "已加载的授权 Worktree" })).toBeNull();
+  });
+
+  it("verified Worktree focus reveals permitted LANE Apps", async () => {
     const client = installSession(makeEnvelope(makeWorktree()));
 
     render(<RunWorkspaceShell route={{ project_id: projectId, engineering_run_id: runId, worktree_id: worktreeId }} />);
 
-    expect(await screen.findByRole("tablist", { name: "Engineering Run Apps" })).toBeTruthy();
+    expect(await screen.findByRole("tablist", { name: "LANE Apps" })).toBeTruthy();
     expect(await screen.findByTestId("task-cards-panel")).toBeTruthy();
     expect(screen.queryByTestId("run-worktree-selection")).toBeNull();
     expect(screen.getByRole("button", { name: "WORKTREE" })).toHaveAttribute("aria-pressed", "true");

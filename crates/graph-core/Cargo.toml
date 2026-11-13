@@ -24,8 +24,14 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
-tokio = { workspace = true }
+# wasm32 目标下 tokio 只需 sync (RwLock), full 的 net/time 会带 mio (wasm 不编译)
+# per WBS 10.1.5: workspace 继承的 features 是并集 (无法移除 full), 故独立声明
+tokio = { version = "1.40", default-features = false, features = ["sync"] }
 tracing = { workspace = true }
+
+# wasm32 目标: uuid v4 随机源用 js (getrandom), per WBS 10.1.5
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1", features = ["v4", "js", "serde"] }
 
 [dev-dependencies]
 # 测试 in-memory adapter + 11 Node + 13 Edge + n-hop 查询

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c5c86afeab17a9ed05526c9f433ff277a7c70a4454f04e078aa3bcdfcd03707c
+@cypher schema=1 source_sha256=95886f782cde62e5c9d024c07b6ba4183653eb9dd6de2c9f1ca8b449610026db
 MERGE (self:File {path:"frontend/src/components/board/WorkItemDetailDrawer.tsx"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
@@ -51,14 +51,18 @@ import { createPortal } from "react-dom";
 import { clsx } from "clsx";
 import {
   X, Trash2, Plus, Flag, Hash, Tag, FileText, User, Bot, Users,
-  GitBranch, AlertTriangle, Save, ChevronDown,
+  GitBranch, AlertTriangle, Save, ChevronDown, ListTodo, Workflow,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
+import { openWorkItemDocument, DOCUMENT_KIND_META } from "@/lib/documents";
+import { searchIpaSkills } from "@/lib/ipa-skills/search";
+import { IPA_SKILL_BY_ID } from "@/lib/ipa-skills/catalog";
 import type {
   WorkItem, WorkItemStatus, WorkItemKind, WorkItemPriority,
   Identity, AgentSession, Worktree,
+  WorkItemDocument,
 } from "@/types/ids";
 
 // ---- Mode discriminator ----
@@ -74,6 +78,8 @@ export interface WorkItemDetailDrawerProps {
   projectKey?: string;
   tenantId?: string;
   reporterId?: string;
+  /** 点击子任务行时打开子任务卡 (per 2026-11-11 子任务层级) */
+  onOpenChildTask?: (workItemId: string) => void;
 }
 
 // ---- Static enums (跟 types/ids.ts 同步) ----
@@ -87,7 +93,7 @@ const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 const DRAWER_W = 480;
 
 export function WorkItemDetailDrawer({
-  open, onClose, projectId, projectKey, tenantId, reporterId,
+  open, onClose, projectId, projectKey, tenantId, reporterId, onOpenChildTask,
 }: WorkItemDetailDrawerProps) {
   // ---- 读 store ----
   const workItems = useStore((s) => s.workItems);
@@ -98,11 +104,32 @@ export function WorkItemDetailDrawer({
   const addWorkItem = useStore((s) => s.addWorkItem);
   const updateWorkItemField = useStore((s) => s.updateWorkItemField);
   const removeWorkItem = useStore((s) => s.removeWorkItem);
+  // per 2026-11-11 用户发令: 任务卡关联多文档 (Drawer 内管理)
+  const addWorkItemDocument = useStore((s) => s.addWorkItemDocument);
+  const removeWorkItemDocument = useStore((s) => s.removeWorkItemDocument);
+  // per 2026-11-11 用户发令: 任务卡开子任务 / 关联 IPA 技能 / 文件即任务
+  const addSubTask = useStore((s) => s.addSubTask);
+  const addFileSubTask = useStore((s) => s.addFileSubTask);
+  const linkIpaSkill = useStore((s) => s.linkIpaSkill);
+  const unlinkIpaSkill = useStore((s) => s.unlinkIpaSkill);
+  const [newDocTitle, setNewDocTitle] = useState("");
+  const [newDocPath, setNewDocPath] = useState("");
+  const [newDocKind, setNewDocKind] = useState<WorkItemDocument["kind"]>("document");
+  const [newSubTaskTitle, setNewSubTaskTitle] = useState("");
+  const [newFileSubTaskTitle, setNewFileSubTaskTitle] = useState("");
+  const [newFileSubTaskPath, setNewFileSubTaskPath] = useState("");
+  const [ipaQuery, setIpaQuery] = useState("");
 
   // ---- view 模式: 当前 workItem ----
   const currentWi = useMemo<WorkItem | null>(() => {
     if (!open || open.kind !== "view") return null;
     return workItems.find((w) => w.id === open.workItemId) ?? null;
+  }, [open, workItems]);
+
+  // ---- 子任务 (per 2026-11-11 用户发令: parent_id 层级, 与父卡同一套内容模型) ----
+  const subTasks = useMemo<WorkItem[]>(() => {
+    if (!open || open.kind !== "view") return [];
+    return workItems.filter((w) => w.parent_id === open.workItemId);
   }, [open, workItems]);
 
   // ---- 草稿态 (Drawer 内编辑缓冲) ----
@@ -561,6 +588,282 @@ export function WorkItemDetailDrawer({
               </button>
             </div>
           </div>
+
+          {/* 6b. 关联文档 (per 2026-11-11 用户发令: 一卡多文档, 点击直接打开) */}
+          {!isNew && currentWi && (
+            <div data-testid="work-item-drawer-documents">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-ink-dim block mb-1">
+                <FileText size={9} className="inline mr-1" /> 关联文档 Documents ({(currentWi.documents?.length ?? 0)})
+              </label>
+              <div className="flex flex-col gap-1 mb-1.5">
+                {(currentWi.documents ?? []).map((doc) => (
+                  <div
+                    key={doc.id}
+                    data-testid={`work-item-drawer-doc-${doc.id}`}
+                    className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded border border-line/60 bg-bg-soft"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openWorkItemDocument(doc)}
+                      title={`${doc.path} — 点击打开`}
+                      className={`flex items-center gap-1 flex-1 min-w-0 text-left px-1 py-0.5 rounded hover:brightness-125 transition border ${DOCUMENT_KIND_META[doc.kind].tone}`}
+                    >
+                      <FileText size={10} className="shrink-0" />
+                      <span className="truncate">{doc.title}</span>
+                      <span className="text-[9px] text-ink-mute truncate ml-auto max-w-[40%]">
+                        {doc.path}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeWorkItemDocument(currentWi.id, doc.id)}
+                      className="text-ink-mute hover:text-err"
+                      aria-label={`移除文档 ${doc.title}`}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                {(currentWi.documents?.length ?? 0) === 0 && (
+                  <div className="text-[10px] text-ink-mute px-2 py-1">暂无关联文档</div>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <input
+                  data-testid="work-item-drawer-doc-title"
+                  type="text"
+                  value={newDocTitle}
+                  onChange={(e) => setNewDocTitle(e.target.value)}
+                  placeholder="标题"
+                  className="w-[30%] text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <input
+                  data-testid="work-item-drawer-doc-path"
+                  type="text"
+                  value={newDocPath}
+                  onChange={(e) => setNewDocPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const p = newDocPath.trim();
+                      if (p) {
+                        addWorkItemDocument(currentWi.id, { title: newDocTitle, path: p, kind: newDocKind });
+                        setNewDocTitle("");
+                        setNewDocPath("");
+                      }
+                    }
+                  }}
+                  placeholder="docs/s01/ipa-s01-001.md 或 https://…"
+                  className="flex-1 text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <select
+                  value={newDocKind}
+                  onChange={(e) => setNewDocKind(e.target.value as WorkItemDocument["kind"])}
+                  className="w-[22%] text-[10px] bg-bg-soft border border-line rounded px-1 py-1 text-ink outline-none focus:border-accent"
+                  aria-label="文档类型"
+                >
+                  {(Object.keys(DOCUMENT_KIND_META) as WorkItemDocument["kind"][]).map((k) => (
+                    <option key={k} value={k}>
+                      {DOCUMENT_KIND_META[k].label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  data-testid="work-item-drawer-doc-add"
+                  onClick={() => {
+                    const p = newDocPath.trim();
+                    if (p) {
+                      addWorkItemDocument(currentWi.id, { title: newDocTitle, path: p, kind: newDocKind });
+                      setNewDocTitle("");
+                      setNewDocPath("");
+                    }
+                  }}
+                  className="px-2 py-1 text-[10px] rounded border border-line hover:border-accent text-ink-mute hover:text-accent"
+                  aria-label="关联文档"
+                >
+                  <Plus size={10} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6c. 子任务 (per 2026-11-11 用户发令: 任务卡允许开子任务, 同一套内容模型) */}
+          {!isNew && currentWi && (
+            <div data-testid="work-item-drawer-subtasks">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-ink-dim block mb-1">
+                <ListTodo size={9} className="inline mr-1" /> 子任务 ({subTasks.length})
+              </label>
+              <div className="flex flex-col gap-1 mb-1.5">
+                {subTasks.map((child) => (
+                  <button
+                    key={child.id}
+                    data-testid={`work-item-drawer-subtask-${child.id}`}
+                    onClick={() => onOpenChildTask?.(child.id)}
+                    className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded border border-line/60 bg-bg-soft text-left hover:border-accent/50"
+                  >
+                    <span className="text-ink">{child.key}</span>
+                    <span className="text-ink-dim truncate">{child.title}</span>
+                    <StatusPill value={child.status} size="xs" translateAs="workItem" />
+                  </button>
+                ))}
+                {subTasks.length === 0 && (
+                  <div className="text-[10px] text-ink-mute px-2 py-1">暂无子任务</div>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <input
+                  data-testid="work-item-drawer-subtask-input"
+                  type="text"
+                  value={newSubTaskTitle}
+                  onChange={(e) => setNewSubTaskTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const v = newSubTaskTitle.trim();
+                      if (v) {
+                        addSubTask(currentWi.id, { title: v });
+                        setNewSubTaskTitle("");
+                      }
+                    }
+                  }}
+                  placeholder="子任务标题, Enter 创建"
+                  className="flex-1 text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  data-testid="work-item-drawer-subtask-add"
+                  onClick={() => {
+                    const v = newSubTaskTitle.trim();
+                    if (v) {
+                      addSubTask(currentWi.id, { title: v });
+                      setNewSubTaskTitle("");
+                    }
+                  }}
+                  className="px-2 py-1 text-[10px] rounded border border-line hover:border-accent text-ink-mute hover:text-accent"
+                  aria-label="加子任务"
+                >
+                  <Plus size={10} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6d. 文件子任务 (per 2026-11-11 用户发令: 文件即任务的又一种形式) */}
+          {!isNew && currentWi && (
+            <div data-testid="work-item-drawer-file-subtasks">
+              <div className="flex gap-1">
+                <input
+                  data-testid="work-item-drawer-file-subtask-title"
+                  type="text"
+                  value={newFileSubTaskTitle}
+                  onChange={(e) => setNewFileSubTaskTitle(e.target.value)}
+                  placeholder="文件子任务标题"
+                  className="w-[35%] text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <input
+                  data-testid="work-item-drawer-file-subtask-path"
+                  type="text"
+                  value={newFileSubTaskPath}
+                  onChange={(e) => setNewFileSubTaskPath(e.target.value)}
+                  placeholder="docs/… 或 https://…"
+                  className="flex-1 text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  data-testid="work-item-drawer-file-subtask-add"
+                  onClick={() => {
+                    const p = newFileSubTaskPath.trim();
+                    if (p) {
+                      addFileSubTask(currentWi.id, {
+                        title: newFileSubTaskTitle.trim() || p,
+                        path: p,
+                      });
+                      setNewFileSubTaskTitle("");
+                      setNewFileSubTaskPath("");
+                    }
+                  }}
+                  className="px-2 py-1 text-[10px] rounded border border-line hover:border-accent text-ink-mute hover:text-accent"
+                  aria-label="文件作为子任务"
+                >
+                  <FileText size={10} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6e. IPA 技能关联 (per 2026-11-11 用户发令: 模糊查询选择关联内容) */}
+          {!isNew && currentWi && (
+            <div data-testid="work-item-drawer-ipa-skills">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-ink-dim block mb-1">
+                <Workflow size={9} className="inline mr-1" /> IPA 技能关联 ({currentWi.ipa_skill_ids?.length ?? 0})
+              </label>
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {(currentWi.ipa_skill_ids ?? []).map((skillId) => {
+                  const skill = IPA_SKILL_BY_ID.get(skillId);
+                  return (
+                    <span
+                      key={skillId}
+                      data-testid={`work-item-drawer-ipa-linked-${skillId}`}
+                      className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-cyan-400/50 bg-cyan-400/10 text-cyan-300"
+                    >
+                      {skillId}
+                      {skill && <span className="text-ink-dim truncate max-w-[120px]">{skill.titleJa}</span>}
+                      <button
+                        type="button"
+                        onClick={() => unlinkIpaSkill(currentWi.id, skillId)}
+                        className="text-ink-mute hover:text-err"
+                        aria-label={`取消关联 ${skillId}`}
+                      >
+                        <X size={9} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              <input
+                data-testid="work-item-drawer-ipa-search"
+                type="text"
+                value={ipaQuery}
+                onChange={(e) => setIpaQuery(e.target.value)}
+                placeholder="模糊查询技能 (id / 名称 / 工程)…"
+                className="w-full text-xs bg-bg-soft border border-line rounded px-2 py-1 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+              />
+              {ipaQuery.trim().length > 0 && (
+                <div
+                  data-testid="work-item-drawer-ipa-results"
+                  className="mt-1 max-h-36 overflow-y-auto rounded border border-line/60 bg-bg-soft/60 divide-y divide-line/40"
+                >
+                  {searchIpaSkills(ipaQuery, 10).map((skill) => {
+                    const linked = currentWi.ipa_skill_ids?.includes(skill.id);
+                    return (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        data-testid={`work-item-drawer-ipa-result-${skill.id}`}
+                        disabled={linked}
+                        onClick={() => {
+                          linkIpaSkill(currentWi.id, skill.id);
+                          setIpaQuery("");
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[10px] font-mono flex items-center gap-2 ${
+                          linked ? "text-ink-mute opacity-50" : "hover:bg-cyan-400/10 text-ink"
+                        }`}
+                      >
+                        <span className="text-cyan-400">{skill.id}</span>
+                        <span className="text-ink-dim truncate flex-1">{skill.titleJa}</span>
+                        <span className="text-[9px] text-ink-mute">{skill.phase}</span>
+                        {linked && <span className="text-emerald-400">已关联</span>}
+                      </button>
+                    );
+                  })}
+                  {searchIpaSkills(ipaQuery, 10).length === 0 && (
+                    <div className="px-2 py-1 text-[10px] text-ink-mute">无匹配技能</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 7. Comments timeline (view 模式, mock) */}
           {!isNew && currentWi && (

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d46af69faae392e45f7344b114cf3afa866e8e1b283011e449f256dbf47e0b76
+@cypher schema=1 source_sha256=7114ab431a29b084c06ab54dd55fbd5df46f900e763a239a21a5638f4885e39b
 MERGE (self:File {path:"frontend/src/components/run/RunTaskCardsPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::RunTaskCardsPanel",kind:"function"})
 MERGE (submit:Symbol {id:"frontend/src/components/run/RunTaskCardsPanel.tsx::submitTaskCardCreate",kind:"function"})
@@ -76,6 +76,7 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.tsx",type:"f
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { clsx } from "clsx";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
 import {
   getTaskCardCreateRecoveryStore,
@@ -104,6 +105,14 @@ import {
 type RunTaskCardMutation =
   | { kind: "lifecycle"; input: Omit<RunTaskCardLifecycleCommand, "expected_version" | "correlation_id"> }
   | { kind: "review"; input: Omit<RunTaskCardReviewCommand, "expected_version" | "correlation_id"> };
+
+/** 任务卡内嵌终端 shell 类型 (per WBS §23.32-C: PowerShell / cmd / bash) */
+type TaskCardShellKind = "powershell" | "cmd" | "bash";
+const TASK_CARD_SHELLS: Array<{ id: TaskCardShellKind; label: string; hint: string }> = [
+  { id: "powershell", label: "PowerShell", hint: "Windows PowerShell 7+ 会话" },
+  { id: "cmd", label: "cmd", hint: "Windows 命令提示符" },
+  { id: "bash", label: "bash", hint: "git-bash / MSYS 会话" },
+];
 
 interface RunTaskCardsPanelProps {
   client: RunDirectoryApiClient;
@@ -139,6 +148,9 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   const [commandSuccess, setCommandSuccess] = useState<string | null>(null);
   const [rejectingCardId, setRejectingCardId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  // 任务卡终端标签页 (per WBS §23.32-C: 卡片内嵌 terminal tab, PowerShell/cmd/bash)
+  const [terminalCardId, setTerminalCardId] = useState<string | null>(null);
+  const [shellSelections, setShellSelections] = useState<Record<string, TaskCardShellKind>>({});
   const [pendingCreate, setPendingCreate] = useState<PendingTaskCardCreate | null>(null);
   const [recoveryState, setRecoveryState] = useState<{
     scope_key: string | null;
@@ -214,8 +226,8 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   if (!available || !taskOwnerAvailable) return <section role="tabpanel" aria-label="Task Cards" className="rounded border border-line p-4">
     <h2 className="font-semibold">Task Cards</h2>
     <p className="mt-2 text-sm text-ink-mute">{available
-      ? "当前 Run 上下文或授权未开放 Task Cards。此处不会读取旧任务投影或本地演示数据。"
-      : "服务端尚未开放 Run-owned Apps。此处不会读取旧任务投影或本地演示数据；Owner migration、数据库角色与 RLS 验收完成后才会加载真实 Run 任务。"}</p>
+      ? "当前 LANE 上下文或授权未开放 Task Cards。此处不会读取旧任务投影或本地演示数据。"
+      : "服务端尚未开放 LANE-owned Apps。此处不会读取旧任务投影或本地演示数据；Owner migration、数据库角色与 RLS 验收完成后才会加载真实 LANE 任务。"}</p>
     {pendingCreate && <p className="mt-2 text-xs" role="status">已保留待确认创建“{pendingCreate.input.title}”；原焦点 Worktree：{pendingCreate.schema_version === 1 ? pendingCreate.target.worktree_id : pendingCreate.target.focus_worktree_id ?? "无"}。恢复匹配上下文前不会重放。</p>}
     {recoveryState.phase === "error" && <p className="mt-2 text-xs" role="alert">本地待恢复请求无法读取：{recoveryState.error} 创建入口保持关闭。</p>}
   </section>;
@@ -282,7 +294,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   }
   async function discardPendingTaskCardCreate() {
     if (!pendingCreate || !recoveryScopeKey || typeof globalThis.confirm !== "function") return;
-    const confirmed = globalThis.confirm("请先在当前 Run 的 Task Cards 列表中核对该任务是否已经创建。确认后将清除本地恢复记录，后续创建会使用新的幂等键。继续？");
+    const confirmed = globalThis.confirm("请先在当前 LANE 的 Task Cards 列表中核对该任务是否已经创建。确认后将清除本地恢复记录，后续创建会使用新的幂等键。继续？");
     if (!confirmed) return;
     try {
       await recoveryStore.removeIfMatches(recoveryScopeKey, pendingCreate.idempotency_key);
@@ -314,7 +326,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
           return;
         }
         if (!currentRecoveryTarget) {
-          setCreateError("当前 Run、授权或 Worktree 焦点上下文无效，不能创建任务卡。");
+          setCreateError("当前 LANE、授权或 Worktree 焦点上下文无效，不能创建任务卡。");
           setCreatePhase("error");
           return;
         }
@@ -341,7 +353,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
         if (stored.idempotency_key !== command.idempotency_key) {
           setPendingCreate(stored);
           setCreateFormOpen(true);
-          setCreateError("此 Run 已有待确认的创建请求。已恢复原请求；请先处理它，再开始新的创建。");
+          setCreateError("此 LANE 已有待确认的创建请求。已恢复原请求；请先处理它，再开始新的创建。");
           setCreatePhase("error");
           return;
         }
@@ -350,13 +362,13 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
         setPendingCreate(command);
       }
       if (!taskCardCreateRecoveryTargetMatchesContext(command, context)) {
-        setCreateError("当前 Run、焦点 Worktree、binding 或授权版本已变化。请恢复原目标与授权状态后，再使用相同请求重试。");
+        setCreateError("当前 LANE、焦点 Worktree、binding 或授权版本已变化。请恢复原目标与授权状态后，再使用相同请求重试。");
         setCreatePhase("error");
         return;
       }
       const ageMs = Date.now() - command.created_at_ms;
       if (ageMs < 0 || ageMs >= TASK_CARD_CREATE_RECOVERY_MAX_AGE_MS) {
-        setCreateError("此恢复请求已超过安全重试期限。请先在 Run Task Cards 列表核对结果，再清除恢复记录。");
+        setCreateError("此恢复请求已超过安全重试期限。请先在 LANE Task Cards 列表核对结果，再清除恢复记录。");
         setCreatePhase("error");
         return;
       }
@@ -379,7 +391,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
       setPendingCreate(null);
       setCreatePhase("idle");
       setCreateFormOpen(false);
-      setCreateSuccess("Task Card 已创建，正在刷新当前 Run 列表。");
+      setCreateSuccess("Task Card 已创建，正在刷新当前 LANE 列表。");
       setCursorStack([undefined]);
       setPageIndex(0);
       setRevision((value) => value + 1);
@@ -394,7 +406,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 className="font-semibold">Task Cards</h2>
-        <p className="mt-1 text-xs text-ink-mute">按 Engineering Run 所有权列出。当前 Worktree 仅是 checkout 焦点。</p>
+        <p className="mt-1 text-xs text-ink-mute">按 LANE 所有权列出。当前 Worktree 仅是 checkout 焦点。</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={!canCreateTaskCard || phase === "loading" || Boolean(pendingCreate) || recoveryState.phase !== "ready" || recoveryState.scope_key !== recoveryScopeKey} onClick={openTaskCardForm} className="rounded border border-line px-3 py-1 text-xs disabled:opacity-50">新建 Task Card</button>
@@ -402,21 +414,21 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
       </div>
     </header>
 
-    {!canCreateTaskCard && <p className="mt-3 text-xs text-ink-mute" role="note">需要当前 Run 的 work-item:write 授权；Worktree 焦点可选，提供时必须属于当前 Run 且未归档。</p>}
+    {!canCreateTaskCard && <p className="mt-3 text-xs text-ink-mute" role="note">需要当前 LANE 的 work-item:write 授权；Worktree 焦点可选，提供时必须属于当前 LANE 且未归档。</p>}
     {recoveryState.phase === "loading" && <p className="mt-3 text-xs text-ink-mute" role="status">正在检查本地待恢复请求；检查完成前创建入口保持关闭。</p>}
     {recoveryState.phase === "error" && <p className="mt-3 text-xs" role="alert">本地待恢复请求无法读取：{recoveryState.error} 为避免丢失幂等键，创建入口保持关闭。</p>}
     {pendingCreate && <div className="mt-3 rounded border border-amber-500/50 bg-amber-500/5 p-3 text-xs" role={pendingTargetMatches && !pendingRetryExpired ? "status" : "alert"}>
       <p>发现待确认创建“{pendingCreate.input.title}”，原焦点 Worktree：{pendingCreate.schema_version === 1 ? pendingCreate.target.worktree_id : pendingCreate.target.focus_worktree_id ?? "无"}。</p>
-      {!pendingTargetMatches && <p className="mt-1">当前 Run、焦点 Worktree、binding 或授权版本不同；不会向当前目标重放。请恢复原目标后重试。</p>}
-      {pendingRetryExpired && <p className="mt-1">该请求已超过安全重试期限；请先核对 Run Task Cards 列表，再清除恢复记录。</p>}
-      {pendingTargetMatches && !pendingRetryExpired && <p className="mt-1">请求正文与幂等键已从本地恢复；重试会使用原 Run target{pendingCreate.schema_version === 1 ? "/Worktree 路由" : "及焦点"}。</p>}
+      {!pendingTargetMatches && <p className="mt-1">当前 LANE、焦点 Worktree、binding 或授权版本不同；不会向当前目标重放。请恢复原目标后重试。</p>}
+      {pendingRetryExpired && <p className="mt-1">该请求已超过安全重试期限；请先核对 LANE Task Cards 列表，再清除恢复记录。</p>}
+      {pendingTargetMatches && !pendingRetryExpired && <p className="mt-1">请求正文与幂等键已从本地恢复；重试会使用原 LANE target{pendingCreate.schema_version === 1 ? "/Worktree 路由" : "及焦点"}。</p>}
       <button type="button" onClick={discardPendingTaskCardCreate} disabled={createPhase === "submitting"} className="mt-2 rounded border border-line px-2 py-1 disabled:opacity-50">我已核对列表，清除恢复记录</button>
     </div>}
     {createSuccess && <p className="mt-3 text-sm" role="status">{createSuccess}</p>}
     {commandSuccess && <p className="mt-3 text-sm" role="status">{commandSuccess}</p>}
     {commandError && <p className="mt-3 text-sm" role="alert">{commandError}</p>}
-    {createFormOpen && <form onSubmit={submitTaskCardCreate} className="mt-4 grid gap-3 rounded border border-line bg-bg-soft p-3">
-      <p className="text-xs text-ink-mute">{pendingCreate ? "已恢复原请求；字段固定，不会生成新的请求正文或幂等键。" : "新卡属于当前 Engineering Run；可选 Worktree 焦点只记录为初始 checkout 关联。"}</p>
+    {createFormOpen && <form onSubmit={submitTaskCardCreate} className="mt-4 grid gap-3 rounded border border-line bg-bg-card p-3 shadow-soft">
+      <p className="text-xs text-ink-mute">{pendingCreate ? "已恢复原请求；字段固定，不会生成新的请求正文或幂等键。" : "新卡属于当前 LANE；可选 Worktree 焦点只记录为初始 checkout 关联。"}</p>
       <fieldset disabled={createPhase === "submitting" || Boolean(pendingCreate) || !canCreateTaskCard} className="grid gap-3">
         <label className="grid gap-1 text-sm">标题
           <input name="title" required maxLength={RUN_TASK_CARD_CREATE_TITLE_MAX_CHARS} defaultValue={pendingCreate?.input.title ?? ""} autoFocus className="rounded border border-line bg-bg px-3 py-2" />
@@ -439,19 +451,27 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
       </div>
     </form>}
 
-    {phase === "loading" && <p className="mt-4 text-sm text-ink-mute" role="status">正在读取 Run 任务…</p>}
+    {phase === "loading" && <p className="mt-4 text-sm text-ink-mute" role="status">正在读取 LANE 任务…</p>}
     {phase === "error" && <div className="mt-4 text-sm" role="alert"><p>{error}</p><button type="button" onClick={retryTaskCardPage} className="mt-2 rounded border border-line px-3 py-1 text-xs">重试</button></div>}
-    {phase === "ready" && page?.rows.length === 0 && <p className="mt-4 text-sm text-ink-mute">此 Engineering Run 当前没有已归属的任务。未归属历史任务不会自动迁入。</p>}
+    {phase === "ready" && page?.rows.length === 0 && <p className="mt-4 text-sm text-ink-mute">此 LANE 当前没有已归属的任务。未归属历史任务不会自动迁入。</p>}
     {phase === "ready" && page && page.rows.length > 0 && <>
       <ul className="mt-4 grid gap-3">
-        {page.rows.map((card) => <li key={card.work_item_id} className="rounded border border-line bg-bg-soft p-3" data-work-item-id={card.work_item_id}>
+        {page.rows.map((card) => <li key={card.work_item_id} className="rounded border border-line bg-bg-card p-3 shadow-soft" data-work-item-id={card.work_item_id}>
           <article>
             <header className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="break-words font-medium">{card.title}</h3>
                 <p className="mt-1 text-xs text-ink-mute">{card.item_type} · {card.priority} · {card.lifecycle.status} · Review {card.lifecycle.review_state}</p>
               </div>
-              <button type="button" disabled aria-label={`在任务卡 ${card.title} 内打开 CLI（尚未启用）`} title="执行准入、Runtime sandbox、独立验证与结果回写尚未装配" className="shrink-0 rounded border border-line px-3 py-1 text-xs text-ink-mute disabled:cursor-not-allowed disabled:opacity-50">打开 CLI · 暂不可用</button>
+              <button
+                type="button"
+                aria-expanded={terminalCardId === card.work_item_id}
+                aria-label={`在任务卡 ${card.title} 内打开终端`}
+                onClick={() => setTerminalCardId(terminalCardId === card.work_item_id ? null : card.work_item_id)}
+                className="shrink-0 rounded border border-line px-3 py-1 text-xs hover:border-accent hover:text-accent"
+              >
+                {terminalCardId === card.work_item_id ? "收起终端" : "终端"}
+              </button>
             </header>
             {card.labels.length > 0 && <ul aria-label="任务标签" className="mt-2 flex flex-wrap gap-1">{card.labels.slice(0, 8).map((label) => <li key={label} className="rounded bg-bg px-2 py-0.5 text-[11px]">{label}</li>)}{card.labels.length > 8 && <li className="text-[11px] text-ink-mute">+{card.labels.length - 8}</li>}</ul>}
             {card.description && <details className="mt-2 text-sm"><summary className="cursor-pointer text-xs text-ink-mute">任务描述</summary><p className="mt-2 whitespace-pre-wrap break-words">{card.description}</p></details>}
@@ -461,7 +481,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
               {card.lifecycle.status === "pending" && <>
                 <button type="button" disabled={commandBusyId !== null || !focus} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "claimed" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">领取到当前 Worktree</button>
                 <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "cancelled" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">取消任务</button>
-                {!focus && <span className="self-center text-xs text-ink-mute">选择 Run 下的 Worktree 后可领取执行。</span>}
+                {!focus && <span className="self-center text-xs text-ink-mute">选择 LANE 下的 Worktree 后可领取执行。</span>}
               </>}
               {card.lifecycle.status === "claimed" && card.lifecycle.active_worktree_id === focus?.worktree_id && <>
                 {card.lifecycle.claimed_by_user_id === context.run_context.actor_id && card.lifecycle.claim_expires_at !== null && Date.parse(card.lifecycle.claim_expires_at) > Date.now()
@@ -494,9 +514,44 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
                   : <button type="button" disabled={commandBusyId !== null} onClick={() => { setRejectingCardId(card.work_item_id); setRejectReason(""); }} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">退回修改</button>}
               </>}
               {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && canReviewTaskCards && card.lifecycle.claimed_by_user_id === context.run_context.actor_id && <p className="self-center text-xs text-ink-mute">执行成员不能审查自己提交的任务。</p>}
-              {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && !canReviewTaskCards && <p className="self-center text-xs text-ink-mute">等待具有 Run 审查权限的成员处理。</p>}
+              {card.lifecycle.status === "in_progress" && card.lifecycle.review_state === "pending_review" && !canReviewTaskCards && <p className="self-center text-xs text-ink-mute">等待具有 LANE 审查权限的成员处理。</p>}
               {card.lifecycle.status === "failed" && <button type="button" disabled={commandBusyId !== null} onClick={() => void mutateRunTaskCard(card, { kind: "lifecycle", input: { target_status: "pending" } })} className="rounded border border-line px-2 py-1 text-xs disabled:opacity-50">重新排队</button>}
             </div>}
+            {terminalCardId === card.work_item_id && (
+              <div data-testid={`task-card-terminal-${card.work_item_id}`} className="mt-3 rounded border border-line bg-bg-card">
+                <div className="flex flex-wrap items-center gap-1 border-b border-line px-2 py-1.5" role="tablist" aria-label={`任务卡 ${card.title} 终端 shell 类型`}>
+                  {TASK_CARD_SHELLS.map((shell) => {
+                    const selected = (shellSelections[card.work_item_id] ?? "powershell") === shell.id;
+                    return (
+                      <button
+                        key={shell.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        title={shell.hint}
+                        data-testid={`task-card-shell-${card.work_item_id}-${shell.id}`}
+                        onClick={() => setShellSelections((prev) => ({ ...prev, [card.work_item_id]: shell.id }))}
+                        className={clsx(
+                          "px-2 py-0.5 text-[10px] font-mono rounded border transition-colors",
+                          selected
+                            ? "border-accent bg-accent/15 text-accent font-bold"
+                            : "border-line text-ink-mute hover:text-ink hover:border-accent/50",
+                        )}
+                      >
+                        {shell.label}
+                      </button>
+                    );
+                  })}
+                  <span className="ml-auto text-[10px] font-mono text-ink-mute">CLI 会话</span>
+                </div>
+                <div className="h-48 overflow-y-auto bg-[#0d1117] p-3 font-mono text-xs text-[#d1fae5]">
+                  <p data-testid="task-card-terminal-placeholder">
+                    终端不可用（需后端 CLI session）— 已选 shell: {TASK_CARD_SHELLS.find((s) => s.id === (shellSelections[card.work_item_id] ?? "powershell"))?.label}。
+                  </p>
+                  <p className="mt-1 text-[#94a3b8]">可在真实 CLI 会话接入后运行各种命令（git / cargo / pnpm / npm 等）。</p>
+                </div>
+              </div>
+            )}
           </article>
         </li>)}
       </ul>

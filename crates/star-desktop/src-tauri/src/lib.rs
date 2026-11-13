@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9375e85d33e874e8c56c7a93ce25afed371b946c85ca9aa32a957d033aefa349
+@cypher schema=1 source_sha256=20fbd354ff3ca1f7927dbd6d5e386dd8dbe4323459c06aa6a55e70e43cb3aa22
 MERGE (self:File {path:"crates/star-desktop/src-tauri/src/lib.rs"})
 MERGE (db_module:File {path:"crates/star-desktop/src-tauri/src/db_adapter.rs"})
 MERGE (ipc_module:File {path:"crates/star-desktop/src-tauri/src/ipc_adapter.rs"})
@@ -8,6 +8,7 @@ MERGE (items:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::list_work_ite
 MERGE (groups:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::list_worktree_groups",kind:"function"})
 MERGE (entities:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::list_canvas_entities",kind:"function"})
 MERGE (app_version:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_app_version",kind:"function"})
+MERGE (version_select:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::app_version_for",kind:"function"})
 MERGE (keyboard:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_keyboard_layout",kind:"function"})
 MERGE (board_info:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_board_info",kind:"function"})
 MERGE (worktree_info:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::get_worktree_info",kind:"function"})
@@ -27,6 +28,8 @@ MERGE (mock_new:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::Moc
 MERGE (list_worktrees:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_worktrees",kind:"method"})
 MERGE (list_canvas:Symbol {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapter.list_canvas_entities",kind:"method"})
 MERGE (test_groups:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::tests.list_worktree_groups_returns_four_mock_groups",kind:"test"})
+MERGE (test_release_version:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::tests.app_version_prefers_the_resolved_release_version",kind:"test"})
+MERGE (test_development_version:Symbol {id:"crates/star-desktop/src-tauri/src/lib.rs::tests.app_version_uses_the_crate_version_outside_release_builds",kind:"test"})
 MERGE (self)-[:IMPORTS]->(db_module)
 MERGE (self)-[:IMPORTS]->(ipc_module)
 MERGE (self)-[:DEFINES]->(run)
@@ -34,6 +37,7 @@ MERGE (self)-[:DEFINES]->(items)
 MERGE (self)-[:DEFINES]->(groups)
 MERGE (self)-[:DEFINES]->(entities)
 MERGE (self)-[:DEFINES]->(app_version)
+MERGE (self)-[:DEFINES]->(version_select)
 MERGE (self)-[:DEFINES]->(keyboard)
 MERGE (self)-[:DEFINES]->(board_info)
 MERGE (self)-[:DEFINES]->(worktree_info)
@@ -46,10 +50,13 @@ MERGE (self)-[:DEFINES]->(board_type)
 MERGE (self)-[:DEFINES]->(worktree_type)
 MERGE (self)-[:DEFINES]->(canvas_type)
 MERGE (self)-[:DEFINES]->(test_groups)
+MERGE (self)-[:DEFINES]->(test_release_version)
+MERGE (self)-[:DEFINES]->(test_development_version)
 MERGE (run)-[:CALLS]->(items)
 MERGE (run)-[:CALLS]->(groups)
 MERGE (run)-[:CALLS]->(entities)
 MERGE (run)-[:CALLS]->(app_version)
+MERGE (app_version)-[:CALLS]->(version_select)
 MERGE (run)-[:CALLS]->(keyboard)
 MERGE (run)-[:CALLS]->(board_info)
 MERGE (run)-[:CALLS]->(worktree_info)
@@ -61,6 +68,8 @@ MERGE (entities)-[:CALLS]->(mock_new)
 MERGE (entities)-[:CALLS]->(list_canvas)
 MERGE (entities)-[:USES_TYPE]->(canvas_entity)
 MERGE (test_groups)-[:TESTS]->(groups)
+MERGE (test_release_version)-[:TESTS]->(version_select)
+MERGE (test_development_version)-[:TESTS]->(version_select)
 MERGE (board_info)-[:CALLS]->(board_adapter)
 MERGE (worktree_info)-[:CALLS]->(worktree_adapter)
 MERGE (canvas_info)-[:CALLS]->(canvas_adapter)
@@ -188,7 +197,18 @@ fn list_canvas_entities() -> Vec<CanvasEntity> {
 /// IPC #4: 返回 star-desktop 版本号 (env! macro from Cargo.toml)
 #[tauri::command]
 fn get_app_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+    app_version_for(
+        option_env!("STAR_RELEASE_VERSION"),
+        env!("CARGO_PKG_VERSION"),
+    )
+    .to_string()
+}
+
+/// Select the tag-derived version for stable builds and the crate version for development.
+fn app_version_for<'a>(release_version: Option<&'a str>, development_version: &'a str) -> &'a str {
+    release_version
+        .filter(|version| !version.is_empty())
+        .unwrap_or(development_version)
 }
 
 /// IPC #5: 返回 W/T/M swimlane 列配置 (per docs/data-design/ipa-detail/tables/board_board_swimlane.md)
@@ -315,7 +335,7 @@ mod tests {
     fn list_worktree_groups_returns_four_mock_groups() {
         let groups = list_worktree_groups();
         assert_eq!(groups.len(), 4);
-        assert_eq!(groups[0].name, "wt-canvas-game");
+        assert_eq!(groups[0].name, "wt-star-api");
         assert!(groups[0].active);
         assert!(!groups[2].active);
     }
@@ -332,9 +352,27 @@ mod tests {
     #[test]
     fn get_app_version_returns_semver_string() {
         let v = get_app_version();
+        assert_eq!(
+            v,
+            app_version_for(
+                option_env!("STAR_RELEASE_VERSION"),
+                env!("CARGO_PKG_VERSION"),
+            )
+        );
         assert!(!v.is_empty());
         // semver contains at least 2 dots (e.g., "0.1.0")
         assert!(v.matches('.').count() >= 2);
+    }
+
+    #[test]
+    fn app_version_prefers_the_resolved_release_version() {
+        assert_eq!(app_version_for(Some("1.0.6"), "0.1.0"), "1.0.6");
+    }
+
+    #[test]
+    fn app_version_uses_the_crate_version_outside_release_builds() {
+        assert_eq!(app_version_for(None, "0.1.0"), "0.1.0");
+        assert_eq!(app_version_for(Some(""), "0.1.0"), "0.1.0");
     }
 
     #[test]

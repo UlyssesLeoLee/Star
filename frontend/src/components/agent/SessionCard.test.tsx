@@ -11,6 +11,13 @@
 //   6. session.restart_available=undefined (字段缺省) 用 QueryClientProvider
 //      包时也不崩; chip 内部走默认 fetcher → 当前 404 → 不假阳地渲染
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=f75e3142cabfa7aedbacbeabb5a3f02ab8539b16ccb00f0941ecd0db79441eb3
+MERGE (self:File {path:"frontend/src/components/agent/SessionCard.test.tsx"})
+MERGE (sessionCard:File {path:"frontend/src/components/agent/SessionCard.tsx"})
+MERGE (self)-[:TESTS]->(sessionCard)
+@endcypher
+*/
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -54,7 +61,7 @@ describe("SessionCard (ULYS-214)", () => {
     expect(screen.getByTestId("session-name").textContent).toBe("PHYSIS-7 closer");
     expect(screen.getByTestId("session-status").textContent).toMatch(/executing/);
     expect(screen.getByTestId("session-duration").textContent).toMatch(/m|s/);
-    expect(screen.getByTestId("session-kind").textContent).toBe("claude-sonnet");
+    expect(screen.getByTestId("session-kind").textContent).toBe("Claude Sonnet");
   });
 
   it("selected=true 时 data-selected=true + ring-2", () => {

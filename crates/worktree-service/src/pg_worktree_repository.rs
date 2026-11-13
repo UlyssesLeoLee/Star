@@ -131,7 +131,13 @@ impl From<Worktree> for WorktreeRow {
             import_source: wt
                 .agent_type
                 .as_deref()
-                .and_then(|s| if s == "external_import" { Some("external".to_string()) } else { None })
+                .and_then(|s| {
+                    if s == "external_import" {
+                        Some("external".to_string())
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or_else(|| "internal".to_string()),
         }
     }
@@ -447,32 +453,60 @@ fn row_to_worktree_row(row: sqlx::postgres::PgRow) -> Result<WorktreeRow, Servic
 
     Ok(WorktreeRow {
         id: row.try_get("id").map_err(|e| map_sqlx_err(e, "trace"))?,
-        repo_id: row.try_get("repo_id").map_err(|e| map_sqlx_err(e, "trace"))?,
+        repo_id: row
+            .try_get("repo_id")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
         name: row.try_get("name").map_err(|e| map_sqlx_err(e, "trace"))?,
-        branch: row.try_get("branch").map_err(|e| map_sqlx_err(e, "trace"))?,
+        branch: row
+            .try_get("branch")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
         path: PathBuf::from(
             row.try_get::<String, _>("path")
                 .map_err(|e| map_sqlx_err(e, "trace"))?,
         ),
         human_state: human_state_from_str(&human_state_str)?,
         ahead: row.try_get("ahead").map_err(|e| map_sqlx_err(e, "trace"))?,
-        behind: row.try_get("behind").map_err(|e| map_sqlx_err(e, "trace"))?,
+        behind: row
+            .try_get("behind")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
         dirty: row.try_get("dirty").map_err(|e| map_sqlx_err(e, "trace"))?,
-        health_score: row.try_get("health_score").map_err(|e| map_sqlx_err(e, "trace"))?,
+        health_score: row
+            .try_get("health_score")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
         last_activity: row
             .try_get("last_activity")
             .map_err(|e| map_sqlx_err(e, "trace"))?,
         test_state: test_state_from_str(&test_state_str)?,
-        risk_count: row.try_get("risk_count").map_err(|e| map_sqlx_err(e, "trace"))?,
-        locked: row.try_get("locked").map_err(|e| map_sqlx_err(e, "trace"))?,
-        archived: row.try_get("archived").map_err(|e| map_sqlx_err(e, "trace"))?,
-        agent_id: row.try_get("agent_id").map_err(|e| map_sqlx_err(e, "trace"))?,
-        task_id: row.try_get("task_id").map_err(|e| map_sqlx_err(e, "trace"))?,
-        parent_id: row.try_get("parent_id").map_err(|e| map_sqlx_err(e, "trace"))?,
-        merged_at: row.try_get("merged_at").map_err(|e| map_sqlx_err(e, "trace"))?,
-        created_at: row.try_get("created_at").map_err(|e| map_sqlx_err(e, "trace"))?,
-        updated_at: row.try_get("updated_at").map_err(|e| map_sqlx_err(e, "trace"))?,
-        locked_by: row.try_get("locked_by").map_err(|e| map_sqlx_err(e, "trace"))?,
+        risk_count: row
+            .try_get("risk_count")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        locked: row
+            .try_get("locked")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        archived: row
+            .try_get("archived")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        agent_id: row
+            .try_get("agent_id")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        task_id: row
+            .try_get("task_id")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        parent_id: row
+            .try_get("parent_id")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        merged_at: row
+            .try_get("merged_at")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        created_at: row
+            .try_get("created_at")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        updated_at: row
+            .try_get("updated_at")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
+        locked_by: row
+            .try_get("locked_by")
+            .map_err(|e| map_sqlx_err(e, "trace"))?,
         import_source: row
             .try_get("import_source")
             .map_err(|e| map_sqlx_err(e, "trace"))?,
@@ -545,10 +579,10 @@ mod tests {
             branch: "main".into(),
             path: PathBuf::from("/tmp/a"),
             human_state: HumanState::Running,
-            ahead: -1,            // DB 列 INT,负数应被 clamp 到 0
+            ahead: -1, // DB 列 INT,负数应被 clamp 到 0
             behind: 5,
             dirty: false,
-            health_score: 200,    // > 100 应被 clamp 到 100
+            health_score: 200, // > 100 应被 clamp 到 100
             last_activity: Utc::now(),
             test_state: TestState::None,
             risk_count: 0,

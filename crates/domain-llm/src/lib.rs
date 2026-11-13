@@ -122,10 +122,7 @@ pub trait LlmProvider: Send + Sync {
     async fn stream_completion_v2(
         &self,
         req: ChatRequest,
-    ) -> Result<
-        BoxStream<'static, AgentStreamEvent>,
-        LlmProviderRegistryError,
-    > {
+    ) -> Result<BoxStream<'static, AgentStreamEvent>, LlmProviderRegistryError> {
         use futures_util::stream::StreamExt;
 
         // Translate v1 chunks → v2 events. If v1 also returns Unimplemented,
@@ -165,9 +162,7 @@ pub trait LlmProvider: Send + Sync {
                             model: chunk.model,
                         }
                     } else {
-                        AgentStreamEvent::TextDelta {
-                            delta: chunk.delta,
-                        }
+                        AgentStreamEvent::TextDelta { delta: chunk.delta }
                     }
                 }
                 Err(e) => AgentStreamEvent::Error {

@@ -215,10 +215,7 @@ impl OpenAiProvider {
         if self.no_network_mode {
             // Deterministic stub (守门 #25 v25): same shape as a real stream.
             return stream::iter(vec![
-                AgentStreamEvent::StreamStart {
-                    id,
-                    model,
-                },
+                AgentStreamEvent::StreamStart { id, model },
                 AgentStreamEvent::text_delta(format!(
                     "[openai stub: stream] {} messages",
                     req.messages.len()
@@ -265,7 +262,10 @@ impl OpenAiProvider {
             "stream_options".to_string(),
             serde_json::json!({ "include_usage": true }),
         );
-        let url = format!("{}/v1/chat/completions", self.base_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/v1/chat/completions",
+            self.base_url.trim_end_matches('/')
+        );
 
         // **守门 #5 v2**: key 只进请求头, 不进 event / log.
         let request = client
@@ -485,7 +485,9 @@ impl LlmProvider for OpenAiProvider {
         &self,
         req: ChatRequest,
     ) -> Result<BoxStream<'static, AgentStreamEvent>, LlmProviderRegistryError> {
-        let inner = stream::once(self.clone().open_stream_v2(req)).flatten().boxed();
+        let inner = stream::once(self.clone().open_stream_v2(req))
+            .flatten()
+            .boxed();
         Ok(sse::no_throw("openai", inner))
     }
 }

@@ -25,7 +25,7 @@ use worktree_service::{
     InMemoryWorktreeService, NoopPickerSource, PickerCandidate, StartFromPickerSource, Worktree,
     WorktreeService,
 };
-use worktree_shared_dir::{PickerCandidateKind as SdKind};
+use worktree_shared_dir::PickerCandidateKind as SdKind;
 
 // =====================================================================
 // StubGit — 满足 GitProvider 全部 14 个方法 (用默认值), 只 list_branches 返回预设
@@ -40,7 +40,10 @@ struct StubGit {
 #[async_trait]
 impl GitProvider for StubGit {
     async fn open_repo(&self, _: &Path) -> Result<RepoHandle, GitError> {
-        Ok(RepoHandle { path: PathBuf::from("/tmp"), repo_id: None })
+        Ok(RepoHandle {
+            path: PathBuf::from("/tmp"),
+            repo_id: None,
+        })
     }
     async fn list_worktrees(&self, _: &RepoHandle) -> Result<Vec<WorktreeInfo>, GitError> {
         Ok(Vec::new())
@@ -54,12 +57,7 @@ impl GitProvider for StubGit {
     ) -> Result<WorktreeInfo, GitError> {
         unimplemented!()
     }
-    async fn remove_worktree(
-        &self,
-        _: &RepoHandle,
-        _: &Path,
-        _: bool,
-    ) -> Result<(), GitError> {
+    async fn remove_worktree(&self, _: &RepoHandle, _: &Path, _: bool) -> Result<(), GitError> {
         Ok(())
     }
     async fn diff(&self, _: &RepoHandle, _: &str, _: &str) -> Result<Diff, GitError> {
@@ -179,8 +177,8 @@ impl StartFromPickerSource for StubPicker {
 // =====================================================================
 
 #[tokio::test]
-    #[serial(env_var)]
-    async fn integration_default_source_via_real_git_provider_shape() {
+#[serial(env_var)]
+async fn integration_default_source_via_real_git_provider_shape() {
     // 集成: DefaultStartFromPickerSource + StubGit 满足 GitProvider 接口,
     // 调 pick_start_from_candidates, 验证 4 分类全走通.
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
@@ -204,8 +202,16 @@ impl StartFromPickerSource for StubPicker {
         .unwrap();
     std::env::remove_var("WORKTREE_LOCAL_PATHS");
 
-    assert_eq!(out.github_branches.len(), 2, "kind 1: github remote branches");
-    assert_eq!(out.existing_worktrees.len(), 1, "kind 2: existing (archived filtered)");
+    assert_eq!(
+        out.github_branches.len(),
+        2,
+        "kind 1: github remote branches"
+    );
+    assert_eq!(
+        out.existing_worktrees.len(),
+        1,
+        "kind 2: existing (archived filtered)"
+    );
     assert_eq!(out.local_paths.len(), 1, "kind 3: local paths from env");
     assert!(out.empty.is_some(), "kind 4: empty always present");
     assert_eq!(out.total(), 5);
@@ -224,7 +230,11 @@ async fn integration_worktree_service_trait_method_picks_with_noop_source() {
     // NoopPickerSource → github/local 都空; existing 来自 InMemoryWorktreeService::list
     assert!(out.github_branches.is_empty());
     assert!(out.local_paths.is_empty());
-    assert_eq!(out.existing_worktrees.len(), 2, "in-memory existing picked up");
+    assert_eq!(
+        out.existing_worktrees.len(),
+        2,
+        "in-memory existing picked up"
+    );
     assert!(out.empty.is_some());
     assert_eq!(out.total(), 3);
 }
@@ -272,8 +282,8 @@ async fn integration_worktree_service_with_custom_picker_source() {
 }
 
 #[tokio::test]
-    #[serial(env_var)]
-    async fn integration_git_provider_failure_returns_empty_for_kind_1_only() {
+#[serial(env_var)]
+async fn integration_git_provider_failure_returns_empty_for_kind_1_only() {
     // 集成: git provider 失败 → 只 kind 1 空, kind 2/3/4 不受影响 (per FR-ORCA-009).
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
         branches: vec![],
@@ -283,19 +293,24 @@ async fn integration_worktree_service_with_custom_picker_source() {
     let repo_id = RepoId::from(Uuid::new_v4());
 
     std::env::set_var("WORKTREE_LOCAL_PATHS", "/tmp/y");
-    let out = pick_start_from_candidates(repo_id, &[], &src).await.unwrap();
+    let out = pick_start_from_candidates(repo_id, &[], &src)
+        .await
+        .unwrap();
     std::env::remove_var("WORKTREE_LOCAL_PATHS");
 
     assert!(out.github_branches.is_empty(), "kind 1 fails → empty");
-    assert!(out.existing_worktrees.is_empty(), "kind 2 from existing → empty");
+    assert!(
+        out.existing_worktrees.is_empty(),
+        "kind 2 from existing → empty"
+    );
     assert_eq!(out.local_paths.len(), 1, "kind 3 from env → 1");
     assert!(out.empty.is_some(), "kind 4 always present");
     assert_eq!(out.total(), 2);
 }
 
 #[tokio::test]
-    #[serial(env_var)]
-    async fn integration_picker_candidate_kind_mapping_correct() {
+#[serial(env_var)]
+async fn integration_picker_candidate_kind_mapping_correct() {
     // 集成: 验证 PickerCandidateKind 复用 worktree-shared-dir enum, 不重复定义.
     // 4 来源 → 4 enum variants.
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
@@ -315,16 +330,22 @@ async fn integration_worktree_service_with_custom_picker_source() {
     // kind 1 → RemoteBranch
     assert!(matches!(out.github_branches[0].kind, SdKind::RemoteBranch));
     // kind 2 → LocalBranch
-    assert!(matches!(out.existing_worktrees[0].kind, SdKind::LocalBranch));
+    assert!(matches!(
+        out.existing_worktrees[0].kind,
+        SdKind::LocalBranch
+    ));
     // kind 3 → RepoBase
     assert!(matches!(out.local_paths[0].kind, SdKind::RepoBase));
     // kind 4 → CommitSha (sentinel Empty)
-    assert!(matches!(out.empty.as_ref().unwrap().kind, SdKind::CommitSha));
+    assert!(matches!(
+        out.empty.as_ref().unwrap().kind,
+        SdKind::CommitSha
+    ));
 }
 
 #[tokio::test]
-    #[serial(env_var)]
-    async fn integration_select_by_id_round_trips_through_all_categories() {
+#[serial(env_var)]
+async fn integration_select_by_id_round_trips_through_all_categories() {
     // 集成: select_by_id 全分类命中 (UI 端 confirm callback 路径).
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
         branches: vec![branch("main", "aaa1111", true)],

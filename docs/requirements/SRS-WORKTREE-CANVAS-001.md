@@ -1,17 +1,17 @@
 # SRS-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 无限画布需求文档 v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
+> **AI Worktree Graph Canvas — 无限画布需求文档 v1.11** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
-> - 状态: Requirements Baseline v1.4 (Project Graph 与 Run Canvas 双对象边界)
+> - 状态: Requirements Baseline v1.11 (Project Graph / Run Canvas 与 Repository identity/persistence source remediation 状态)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 > - 关联 issue: `Multica ULYS-57` (制作 Worktree 页面各级文档)
 > - 上位要件: 无独立上位 SRS (本 SRS 为新领域主册; 平行引用 `SRS-CANVAS-001.md` v1.4 无限画布总册 + `SRS-AGENT-VIEW-001.md` v1.0 个体视图 + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 ARG)
 > - 平行专题 SRS: 0 (本 SRS 为独立专题主册, 不下挂子专题)
-> - 关联后续基本設計: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.4
+> - 关联后续基本設計: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.12
 > - 关联后续詳細設計: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.4 (Project Graph 与 Run Canvas 边界补充)
-> - Run App owner 边界: `docs/design/DD-WORKTREE-GROUP-001.md` v4.25 §1 / §8.1；当前 Worktree-scoped Canvas API 是兼容切片，不代表 Run-owned schema 已迁移
-> - 关联追踪矩阵: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
+> - Run App owner 边界: `docs/design/DD-WORKTREE-GROUP-001.md` v5.33 §1 / §6.1.3；当前 Worktree-scoped Canvas API 是兼容切片，不代表 Run-owned schema 已迁移
+> - 关联追踪矩阵: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v2.0
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
 > - 日期: 2026-09-15 JST
@@ -27,12 +27,12 @@
 |---|---|
 | 文书 ID | SRS-WORKTREE-CANVAS-001 |
 | 文书名 | AI Worktree Graph Canvas — 无限画布 需求定义书 |
-| 版本 | v1.4 (Project Graph 与 Engineering Run Canvas 双对象边界) |
+| 版本 | v1.10 (Project Graph、Engineering Run Canvas 与 Repository identity/persistence remediation status) |
 | 作成日 | 2026-09-15 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
 | 关联 commit | (root 统一 commit 时填, per 守门 #1 v15) |
-| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-GROUP-001.md` v4.25 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 |
+| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.11 + `DD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-GROUP-001.md` v5.24 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.9 |
 | 上位文档 | 无 (新领域主册) |
 | 平行文档 | `SRS-CANVAS-001.md` v1.4 (无限画布总册) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG) |
 | 拍板来源 | 2026-09-15 Multica ULYS-57 issue 创建者发令 "你是一名资深软件架构师...针对一个面向 AI 并行开发场景的 Worktree 无限画布管理模块, 依次生成需求文档 / 基本设计 / 详细设计" |
@@ -45,6 +45,12 @@
 | v1.1 | 2026-09-17 JST | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01..C-04 修正) | 修正: 4 文档总数对齐 **126 唯一 ID**; FR-ACTION-002 Merge 改 Destructive (per self-review C-02); Trace §11 AC 43 项全表化 (per self-review C-03); BD §0.3/§37 总数同步 (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
 | v1.2 | 2026-09-19 JST | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" 措辞 → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
 | v1.4 | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 维持 Project/Repository Worktree Overview Graph 身份；明确 Group Infinite Canvas 与 Task Card 属 Engineering Run 同级 Apps，选中 Worktree 仅为 focus/CLI target；当前 Worktree-scoped API 为兼容实现 | 用户确认右侧 tabs 属于 Engineering Run，点击其中 Worktree 后打开 |
+| v1.5 | 2026-10-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 WTG-026 / AC-WTG-013 Repository identity 与本地 root 来源门禁：SCM master、Project 授权关联、nullable Run binding、HostEnvironment+RepositoryId+generation registry 各由不同 owner 持有；候选可见不等于绑定；当前 source 缺少 master/root provider 的实现仍保持 fail closed | WLD-1 Repository Directory source audit 与 identity contract 对齐 |
+| v1.6 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 WTG-026 / AC-WTG-013 的 SCM master 状态同步到现有 domain/adapter/migration source；记录 disposable PostgreSQL 集成测试工件为 ignored 且本轮未运行，Cargo/MSRV/DB/RLS/并发验证仍待完成，Project/Run/Host/provider 全链路和 admission 继续 fail closed | WLD-1 Repository master persistence slice review |
+| v1.8 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充跨 database owner-role direct ACL dependency 检查（其他 database 的对象 ACL 一律 fail closed）、修正实际 session identity 查询并要求 superuser 身份，并在每次 migration transaction 的实际连接上重复核验目标后才执行 DDL；目标仍须双重 opt-in、准确库名、同一 loopback endpoint 与双 session fixture token。marker 不证明 VM/cluster 可销毁；Cargo/Rust/PostgreSQL 未运行，AC-WTG-013 不关闭 | WLD1 remediation 自检修正 |
+| v1.9 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 PG bootstrap 与 privilege-drift test 在 probe/cleanup 双失败时均保留诊断；核实当前 Cargo.lock 仅增加 adapter 到已存在 `domain-scm` package 的 direct edge，无新增 package entry/无关变更，并同步 16-path manifest；Cargo lock/resolution、Rust 1.99 与 PostgreSQL gates 仍未运行，AC-WTG-013 不关闭 | WLD1 remediation review finding closure |
+| v1.10 | 2026-10-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 explicit PoolConnection 下 identity 与 migration DDL 共用实际物理连接事务、endpoint address/port mismatch 负例与 cleanup error 聚合；Rust 1.99 目标包 locked check/tests、ignored PG test compile 和定向 rustfmt 通过。PostgreSQL runtime、full workspace、Clippy、独立 lock/resolution 仍未验收，AC-WTG-013 不关闭 | WLD1 TOCTOU closure 与 Rust gate validation
+| v1.11 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Project→Repository 0..N、可空 UI-only default 与 retiring/migrate-before-unlink owner receipt 流程；协作文本语义重叠无论 OT 可否变换都进入持久冲突，OT 只能在显式解决流程中预览并经用户选择与 owner CAS 生效。同步 requirements v7.08、basic v7.12、BD v1.12、Group DD v5.33、Traceability v2.0；均为目标设计，运行时未验收 | Project Repository unlink 与 WLD-7 overlap-policy decisions
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -2395,3 +2401,15 @@ Graph Delta + Git Diff + Risk Engine Output
 | Minor | 3 | 见 §B.5/#1, §B.6/#2, §B.12/#3, 均为合理范围, 不修正 |
 
 **Self Review 结论**: SRS v1.0 通过自审, 无 Critical / Major 问题, 进入 STEP 2 基本设计。
+
+## §16 WLD-1 Repository identity 与 Host root 来源需求补充
+
+本节增加的跨领域需求由上位要件 WTG-026 与 AC-WTG-013 追踪，不计入本 SRS 历史 `126` 个 FR/NFR 唯一 ID 的旧统计，避免伪造计数。产品导航仍固定为 Project → Engineering Run → Worktree → Branch；Run 可在没有宿主 Branch 时存在。SCM owner 持有稳定 Repository master，Project owner 持有 0..N 条版本化授权关联；默认 Repository 可空且只作为界面排序/预选，Engineering Run Directory 持有显式可空的 Run→Repository binding，Host Infrastructure owner 持有带 HostEnvironment/RepositoryId/generation 的持久 root registration。
+
+Project/Run 用户看到候选必须同时通过当前 Project membership 与 Run read grant；候选可见只表示可申请绑定，不等于绑定或 Worktree 授权。`repository_id IS NULL` 时不得从 Project default、远端 Branch 或历史 Worktree 推断。Worktree create/import/CLI 还要求当前 Project/Run grants、有效 Project↔Repository link、新鲜匹配的 Host root generation 和真实 lifecycle provider；缺项 fail closed。原始宿主路径不得返回 API/UI、Agent 或 Plugin。
+
+**ProjectRepository 退役目标流程**：解除单条关联前先以 CAS 标记 retiring 并冻结新 Run binding/Worktree create/import；Run Directory 与 Worktree/Host owners 通过 owner-local 命令迁移到同 Project 仍有效的替代 Repository，或显式退役不再需要的 checkout 引用。各 owner 必须在本地事务内幂等完成并回传 revision/零活动引用回执；Project owner 收齐全部回执并完成新鲜对账后才能关闭 link。异常、撤权、超时或引用数未知保持 retiring/fail closed，禁止跨 owner 写表；历史只读 Repository identity 保留。
+
+AC-WTG-014 的设计验收目标是证明 Project 可有 0..N 个 Repository 且 default 不是授权；新增引用在 retiring 后被拒绝；迁移/退役命令、owner 回执与最终解绑均幂等且可恢复；任一 owner 失败/未知时不解绑；活动引用为零后才可最终关闭关联。当前 owner writers、provider 与数据库运行验收未完成。
+
+AC-WTG-013 的设计验收目标是准确区分上述身份/owner 并保持 fail-closed。当前 SCM master source 增加提交时 current revision deferred trigger、owner role 非 SCM 直接 ACL 漂移拒绝与事务回滚回归工件；迁移通过 `pg_shdepend` 检查其他 database 对象 ACL dependency，并保守拒绝该 role 在任何其他 database 上的对象 ACL。PG test 仍标记 `#[ignore]` 且未运行；执行前要求两项显式 opt-in、预置 fixture token、确切测试库名、两条不同实际登录角色、current_user/session_user 一致、admin superuser migration 身份以及同一 loopback server endpoint。实现通过显式 acquire PoolConnection 并在其物理连接上开始事务，实际 admin identity query 与全部 migration DDL 复用该事务；单连接 pool 仅为资源上限，不证明物理连接固定。地址和端口 mismatch helper 负例通过；两个 probe/task 分支均将清理错误与原错误聚合。当前 Cargo.lock diff 仅新增 adapter 到既有 `domain-scm` package 的 direct edge，无新增 package entry/无关改动；Rust 1.99 目标包 locked all-targets check、两个包 35+35 测试、ignored PG test target 编译和四个改动 Rust 文件定向 rustfmt 通过。package fmt check 被四个未改文件阻断；PG runtime 因一次性数据库 fixture 缺失未运行，full workspace、Clippy 与独立 lock/resolution 仍未验收。不得把 source/test compile 记作 AC-WTG-013 完成。WLD1 的 16-path manifest、准确 diff 与验证限制见 PHASE-WLD1-REPOSITORY-MASTER-20261023.md.

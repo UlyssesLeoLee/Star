@@ -8,43 +8,41 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 
+// 环境守卫: 部分 Windows 开发机全局设置了 NODE_ENV=production (非 vitest 语义),
+// 会让 react-dom 解析到 production test-utils → "React.act is not a function" 全量秒崩。
+// 测试运行器语义必须是 test; CI (fresh shell) 不受影响, 本行只修本地环境污染。
+if (process.env.NODE_ENV && process.env.NODE_ENV !== "test") {
+  // Object.assign 绕过 @types/node 对 NODE_ENV 的 readonly 声明
+  Object.assign(process.env, { NODE_ENV: "test" });
+}
+
+/*
+@cypher schema=1 source_sha256=fe1a4a8fd951ada0b16fa261f6cfb2939c8917fc9da99a226f498db2d1501ba9
+MERGE (self:File {path:"frontend/vitest.config.ts"})
+MERGE (vitest:ExternalService {name:"Vitest"})
+MERGE (config:Symbol {id:"frontend/vitest.config.ts::default", kind:"config"})
+MERGE (vitestConfig:ExternalService {name:"vitest/config"})
+MERGE (nodePath:ExternalService {name:"node:path"})
+MERGE (redirectSpec:File {path:"frontend/e2e/redirects.spec.ts"})
+MERGE (self)-[:DEFINES]->(config)
+MERGE (self)-[:IMPORTS]->(vitestConfig)
+MERGE (self)-[:IMPORTS]->(nodePath)
+MERGE (self)-[:CONFIGURES]->(vitest)
+MERGE (self)-[:CONFIGURES]->(redirectSpec)
+@endcypher
+*/
+
 export default defineConfig({
-  esbuild: {
-    jsx: "automatic",
-  },
   test: {
     environment: "jsdom",
     globals: true,
-    include: [
-      "src/**/*.{test,spec}.{ts,tsx}",
-      "e2e/**/*.{test,spec}.{ts,tsx}",
-    ],
+    // Playwright owns the browser suite. Keep only the standalone Vitest
+    // redirect contract that currently lives under e2e/ for legacy reasons.
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "e2e/redirects.spec.ts"],
     exclude: [
       "node_modules",
       ".next",
       "**/node_modules/**",
-      "e2e/cross-domain-5b.spec.ts", // Playwright-only spec (uses @playwright/test), not a vitest test
-      "e2e/remote-mobile.spec.ts", // Playwright-only spec (per 2026-09-01 PHASE-MOBILE-PWA v0.4 mobile viewport e2e)
-      "e2e/debug-mobile.spec.ts", // 临时调试 spec, 仅手动跑
-      "e2e/canvas-view.spec.ts", // Playwright-only spec (per 2026-09-04 canvas e2e 守门补齐, uses @playwright/test)
-      "e2e/canvas-share-export.spec.ts", // Playwright-only spec (per 2026-09-04 canvas Share/Export PNG, uses @playwright/test)
-      "e2e/arg-relationships.spec.ts", // Playwright-only spec (ARG.7 8 E2E, uses @playwright/test)
-      "e2e/collaboration-5d-lead-coordination.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/error-404-path-coverage.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/five-domain-feedback-loop.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/interaction-expectation-coverage.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/mcp-16-tool-coverage.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/ops-e2e-4-tab.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/ops-e2e-error-6field.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/ops-e2e-i18n.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/streamable-http-reconnect.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/tmo-merge-task-flow.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/uat-100pct-coverage-assertion.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/worktree-canvas.spec.ts", // Playwright-only spec (per ULYS-57 worktree canvas E2E, uses @playwright/test)
-      "e2e/uat-3000-restore.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/uat-business-acceptance.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/worktree-creation-flow.spec.ts", // Playwright-only spec, uses @playwright/test
-      "e2e/diff-annotation.spec.ts", // Playwright-only spec (per ULYS-211 FR-ORCA-035 diff 标注 E2E, uses @playwright/test)
     ],
     setupFiles: ["./vitest.setup.ts"],
   },

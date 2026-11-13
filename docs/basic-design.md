@@ -1,5 +1,7 @@
 # Star 平台《基本设计書》
 
+> **9F4J 当前增量（2026-11-08）**：Native gRPC 的 Unauthenticated / PermissionDenied 统一映射为 Unauthorized；其他状态成为不带服务端详情的 Transport。应用适配器保留授权拒绝，消费者遇到该拒绝后进入 Blocked 并停止，不做传输重试或 ACK。定向 Rust 检查与源码审查只证明该分类切片；目标 PostgreSQL/RLS、真实 mTLS/RPC 和 ACK 网络验收未运行，BI 接收与执行保持 fail closed。详见 §16.79 和 DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001。
+
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 > **WLD-0 当前增量（2026-10-19）**：Run-to-Worktree binding owner 已实现受授权的绑定/重绑/解绑 API 源码切片，采用 CAS、持久幂等、Worktree advisory lock、SCD2、Audit 与同事务 Outbox；hostless Run 不要求远端 repository/Branch，但 binding 仍保留本地 Worktree repository 身份。Rust 1.99 all-targets check、全目标测试（在最后一项锁错误单测补充前）、补充后定向单测、变更文件 rustfmt 与 CypherGraph Guardian 均通过。目标数据库 migration、应用角色 grants/RLS、认证写入/回滚/并发尚未验收；执行 admission 保持关闭。
@@ -7,8 +9,11 @@
 
 > **WLD-1 Worktree 管理 Outbox 增量（2026-10-21）**：逻辑 archive/restore 在 Worktree owner transaction 中同步提交状态/version、append-only Audit、schema-v1 owner-local Outbox fact 与 `worktree_management_plan.result_body` exact replay receipt。同一 tenant/requester/idempotency key 的计划创建经事务级 advisory lock 串行化；请求 hash 不同则拒绝复用。状态 no-op 保留 version/retention expiry，不执行 archive Hook 或状态更新。事件只描述实际状态变化，payload 为 Worktree/plan identity 与连续 before/after archive/version allowlist；assign-owner 与 no-op 不产生 archive/restore fact。PostgreSQL 18.6 disposable fixture 双次迁移及 RLS/WORM/payload/状态事实断言通过；此 source slice 未验证 Rust 1.99.0、target DB/app-role grants/RLS 或真实 Host provider；没有 delivery consumer，也不执行物理 Git checkout cleanup。
 
-> **文档版本**: v6.94 (2026-10-22)
-> **上游要件定义书**: docs/requirements.md v6.91
+> **WLD-0 hostless Run HTTP acceptance（2026-10-23）**：REST 读写事务在 tenant/actor scope 初始化前显式切换至 `star_engineering_directory_owner`；该 role 仅对 Run identity、首个 revision、创建者 grant 获得 INSERT。fresh PostgreSQL 18 loopback runner 55/55 步通过，并以实际认证 HTTP 路由验证 hostless create、同键 replay、Project list、RunContext 和无 Run grant actor 的不可见性；同时覆盖绑定 race、outbox 故障回滚、detach。runner 未连接目标数据库，结束后停止并删除唯一临时 cluster。目标部署 login membership、目标 DB migration/grants、历史 reconciliation 与 hostless Task/CLI/执行仍未验收或保持 fail closed；详见 WLD-0 报告。
+> **WLD-1 Repository master review remediation（2026-10-24）**：SCM bounded context 增加 RepositoryMasterRevision 与 tenant RLS owner adapter。current partial unique index 保证每个身份至多一个 current revision，新增 DEFERRABLE INITIALLY DEFERRED 约束 trigger 在提交时保证至少一个；单独关闭 current revision 会回滚，关闭+连续 successor 同事务提交可成功。owner-role migration 在任何 role/schema/grant 变更前枚举 database、schema、relation/column、function、type、language、tablespace、FDW/server、large-object、default ACL 与可用 parameter ACL；发现 SCM schema 外直接 ACL、向外 role membership 或对象所有权即 fail closed，PUBLIC ACL 不误判为 owner direct grant，也不跨 schema 撤权。migration 显式获取 PoolConnection，在该物理连接上开始事务并执行身份复验和全部 DDL；pool 单连接上限仅控制资源。两个 PG bootstrap/drift probe 分支在 probe/task 与 cleanup 同时失败时都保留双方诊断；地址/端口 mismatch identity guard 负例通过。Rust 1.99 目标包 locked all-targets check、35+35 包测试、ignored PG target 编译和定向 rustfmt 检查通过；package fmt 检查被四个未改文件阻断。PostgreSQL test 仍 ignored 且未运行（缺一次性数据库 fixture），full workspace、Clippy、独立 lock/resolution、目标 DB/RLS/并发仍未验收。当前 Cargo.lock diff 仅新增 adapter 到既有 `domain-scm` package 的 direct dependency edge，无新增 package entry 或其他 lockfile 改动。Project link、Run binding、Host root registry、provider/API 与 Worktree/CLI admission 仍未实现。详见 PHASE-WLD1-REPOSITORY-MASTER-20261023.md。
+
+> **文档版本**: v7.12 (2026-10-25)
+> **上游要件定义书**: docs/requirements.md v7.08
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -22,11 +27,11 @@
 | 1 | [架构总览](#1-架构总览) | 117 | Star 5 大领域 / 模块依赖 / 数据流 |
 | 2 | [Domain / Module 划分](#2-domain--module-划分) | 312 | 27 域 + 23 service + 1 Tauri + 3 WASM (per PR-272 actualize) |
 | 3 | [Context Map](#3-context-mapdomain-间解耦) | 475 | Domain 间解耦 + ACL 边界 |
-| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 663 | canvas-game / canvas-engine / canvas-realtime / domain-canvas |
+| 4 | [关键 Module 详细设计](#4-关键-module-详细设计) | 663 | Star Canvas 服务：canvas-engine / domain-canvas / canvas-realtime |
 | 5 | [数据架构](#5-数据架构) | 2287 | DB schema + 索引 + 备份 |
 | 6 | [安全边界](#6-安全边界) | 2451 | 认证 / 授权 / 加密 / 审计 |
 | 7 | [关键状态机](#7-关键状态机) | 2624 | Workflow / Canvas / Worktree / Run |
-| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2779 | k3s + 5 services + Service mesh |
+| 8 | [部署与运行时拓扑](#8-部署与运行时拓扑) | 2779 | Star API + 3 Canvas 后端服务 + ingress / Service mesh |
 | 9 | [Traceability & AI Audit](#9-traceability--ai-audit) | 2961 | ADR ↔ SRS ↔ 代码追溯 |
 | 10 | [ADR 草案](#10-adr-草案对应-32-adr-016030) | 3101 | ADR-016 ~ ADR-030 |
 | 11 | [PoC 实施计划](#11-poc-实施计划对应-31-poc-016030) | 3329 | POC-016 ~ POC-030 |
@@ -2802,6 +2807,8 @@ DRAFT → OPEN → REVIEWING
 
 ### 8.1 K3s 集群布局
 
+当前 Star Canvas 服务范围为 `canvas-engine`、`domain-canvas`、`canvas-realtime` 三个后端；Envoy 是边缘入口，不计为 Canvas 应用服务。三个后端镜像由 [Canvas 发布 workflow](../.github/workflows/publish-star-canvas-services.yml) 构建和发布，再由 [`deploy/star-canvas-services-k3s.yaml`](../deploy/star-canvas-services-k3s.yaml) 部署；操作流程见 [Canvas 服务部署指南](deployment/star-canvas-services-deploy.md)。`star-api-rest` 使用独立部署清单，不并入 Canvas manifest；当前联通性检查覆盖三个 Canvas 后端与独立 Star API，详见 [`scripts/verify-star-services.sh`](../scripts/verify-star-services.sh)。
+
 ```mermaid
 flowchart TB
     subgraph Edge[Edge Layer]
@@ -4248,7 +4255,7 @@ Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 `ProjectWorktreeIndex` 与 `EngineeringRunShell` 是 UI 组合，不自动构成新的领域事实。Engineering Run Directory 持有 Project/Run 授权范围内的 `EngineeringRunWorktreeBinding` 关系及其 Run Outbox facts；Worktree Domain 持有本地 checkout lifecycle 和 Project-to-repository checkout ownership。两种关系分别版本化：Run/Worktree 使用 `binding_id` + `binding_version`，Project/repository 使用 `project_binding_id` + `project_binding_version`。`focus_version` 只标识 RunContext 中当前 Worktree focus 的修订；`worktree_generation` 与 `k3s_cluster_generation` 分别标识各自资源 incarnation，均不得替代 binding version。Run 可有多个本地 checkout，单个 Worktree 最多只有一个当前 Run binding，也可以没有；历史 TaskExecutionRun 的 Worktree/ref 是可空 snapshot，不建立阻止清理的外键。Branch 叶显示可信本地 checkout observation（`local_branch_ref`、`observation_source`、`observed_at`、`freshness`）；可选 `remote_branch_id` 是另一身份且须独立授权。缺失或陈旧的观察保持 unknown，不从远端 Branch 推断本地 checkout。目标授权以 Project/Run membership 与 Worktree capability 为准。
 
-**实现状态与迁移缺口**：Project-scoped Run list/create 与 Run-to-Worktree bind/reassign/detach API 源码切片存在；Run row 的 remote `repository_id/branch_id` 可空，而 binding 保留本地 Worktree repository identity。读写复验 Project membership、Run grant 与 Project/Worktree binding 的边界；binding owner 与字段词汇按本节 §16.2 的 canonical contract 对齐。相关 migration 仍未在目标 DB 验收，应用角色 grants/FORCE RLS、认证写入、回滚、replay、并发及历史 reconciliation 均未证明。旧 Branch/Run registry 与 task owner tuple 保留兼容；Task Card/CLI/Schedule owner 的 hostless 执行能力仍未完成，在缺少运行时身份、sandbox 与独立验证时保持 fail closed。Branch 叶依赖可信本地 checkout observation；缺失、陈旧或 provider 不可用时显示 unknown 并关闭依赖该状态的写操作，不创建或伪造 checkout。此处源码存在不等同于生产 binding acceptance。
+**实现状态与迁移缺口**：Project-scoped Run list/create 与 Run-to-Worktree bind/reassign/detach API 源码切片存在；Run row 的 remote `repository_id/branch_id` 可空，而 binding 保留本地 Worktree repository identity。读写复验 Project membership、Run grant 与 Project/Worktree binding 的边界；binding owner 与字段词汇按本节 §16.2 的 canonical contract 对齐。2026-10-23 在一次性 PostgreSQL 18 loopback cluster 上通过认证 HTTP hostless create、同键 replay、Project list、RunContext 与无 Run grant 不可见性测试；另覆盖 binding race、outbox 故障回滚和 detach。Directory owner role 的 Run identity/revision/creator-grant INSERT grants 也纳入 migration 与运行时权限断言。相关 migration、应用角色 grants/FORCE RLS 仍未在目标 DB 验收，生产 API-login membership、目标库回滚/replay/并发与历史 reconciliation 未证明。旧 Branch/Run registry 与 task owner tuple 保留兼容；Task Card/CLI/Schedule owner 的 hostless 执行能力仍未完成，在缺少运行时身份、sandbox 与独立验证时保持 fail closed。Branch 叶依赖可信本地 checkout observation；缺失、陈旧或 provider 不可用时显示 unknown 并关闭依赖该状态的写操作，不创建或伪造 checkout。该 disposable acceptance 不是生产 binding 部署验收。
 
 当前 `/worktree-canvas` 是 Project 范围的 **Worktree Overview Graph**，用于跨 Run/Worktree 冲突、依赖和热区总览。它不替代 Engineering Run 内的 **Infinite Canvas**。两个页面有不同 owner、路由和查询范围；Overview Graph 可深链到 Run Worktree，Run Canvas 可引用多个 Worktree 并链接回 Overview Graph。
 
@@ -4391,7 +4398,9 @@ Task Card review gate 的 canonical API 为 `POST /api/v1/engineering-runs/{engi
 
 Phase 3E 保留受保护的单 Canvas 兼容事件读取：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，以 `(occurred_at,event_id)` 复合游标返回最多 200 条（默认 100）。新增 Worktree 级 `GET /api/v1/worktrees/{worktree_id}/canvas-events`，供多个 Canvas 共用一个按 Worktree 隔离的顺序流；PostgreSQL identity `stream_offset` 由 tenant/worktree 事务 advisory lock 串行分配并持锁到提交，避免并发事务提交顺序与游标顺序相反。Canvas API 将数据库 statement timeout 限制为 5s、lock timeout 限制为 1s。新接口使用非负 `i64` offset、默认 50/最多 100 条，以十进制字符串编码 64 位值，并只返回 event/canvas/type/time 元数据，不返回 payload 或 EntityRef 目标。该读取端点是 Outbox 到 realtime/consumer 交付路径接通前的查询接口，不替代服务端 durable consumer acknowledgement、所选 messaging adapter、SSE/WebSocket 推送或跨 App 实时验收。
 
-浏览器 `CanvasOutboxPoller` 使用按 Worktree scope 隔离的本地十进制 `stream_offset` 作为可丢弃恢复提示；每页仍通过 Bearer API 重新授权，先刷新当前授权 projection，再写入下一 offset。客户端拒绝畸形页、空页游标不一致、offset 非单调或超出 PostgreSQL `BIGINT` 范围的结果；存储不可用/损坏时从 offset 0 at-least-once 重放。本地游标不包含身份凭据、不授予访问权、不是服务端 acknowledgement/checkpoint，也不代表 Platform Messaging adapter / SSE / WebSocket 实时链路完成。
+实时 Canvas 与其他协作编辑不运行定时 `CanvasOutboxPoller`。编辑事实由 Canvas/Task owner 的 revision transaction + Outbox 触发 WebSocket push；客户端仅在首次打开、断线重连、服务器报告 gap/`resync_required` 时，使用按 Worktree scope 隔离的本地十进制 `stream_offset` 做一次受保护的 cursor catch-up。每次 catch-up 仍通过 Bearer API 重新授权，并在一致的 snapshot/cursor 边界刷新投影；客户端拒绝畸形页、offset 非单调和超出 PostgreSQL `BIGINT` 范围的结果，存储不可用/损坏时从 snapshot 重建。本地游标不是授权凭据、业务 ACK 或 server-side consumer checkpoint。现有 poller 代码/兼容 endpoint 若尚未移除，只能作为迁移期显式恢复入口，不得按定时器触发，也不得据此宣称实时协作完成。
+
+**当前实现对账**：浏览器 Group 投影已接入 `CanvasOutboxPoller`，并在正常运行时按间隔调用 `pollOnce`；这就是现阶段 Canvas 更新的轮询路径，必须由 WLD-7 的授权资源推送替换。BFF 的 process-local WebSocket broadcast 与 Worktree SSE placeholder 尚未接入 owner Outbox 的跨实例可靠 fan-out，也没有双方草稿/冲突事实。该段描述的是目标架构；替换完成前，不得宣称当前产品已提供实时多人编辑。
 
 当前实现的隔离验证证据：Canvas base migration 与 stream-offset migration 在 disposable PostgreSQL 18.6 fixture 上各自可重复应用；既有 Outbox 行完成 identity offset 回填；FORCE RLS scope、append-only UPDATE 拒绝、advisory lock 等待顺序及 1s lock timeout fail-closed 均有验证。该 fixture 使用测试角色和临时授权，不代表目标数据库 migration、正式应用角色 grants、执行计划或生产消费者已验收。
 
@@ -4610,6 +4619,7 @@ Chat Bar(scope, text, entity_refs)
 | WTG-011 | §16.2、§16.10-16.11 | AC-WTG-008 |
 | WTG-012 | §16.2、§16.10-16.11 | AC-WTG-009 |
 | WTG-022 | §16.29 | AC-WTG-012 |
+| WTG-026 | §16.77；DD-WORKTREE-GROUP-001 §6.1.3 | AC-WTG-013 |
 | TCI-001 | §16.2-16.3 | AC-WTG-001 |
 | TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
 | CAN-001/002/003/004/005 | §16.2, §16.5, §16.9, §16.11 B | AC-CAN-001/002 |
@@ -4775,6 +4785,9 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 Schedule Loop 复用 `domain-automation` Rule/occurrence 架构：Phase 9F2 定义 `AutomationScheduleRuleRevisionV1`、tenant-scoped `AutomationOccurrenceKey`、immutable target/profile/HookSet snapshot 与 lease-fence contract，并新增 automation schema 五表 W/T/M migration（rule SCD2、append-only audit/occurrence/event、带 terminal retention 的 dispatch Work）；唯一槽位键为 tenant/rule/version/UTC slot。Phase 9F3 加入固定版本 `cron 0.17.0`/`chrono-tz 0.10.4` parser、timezone-aware bounded materializer 与 PostgreSQL occurrence/dispatch adapter，覆盖幂等写入、`SKIP LOCKED` claim/reclaim、heartbeat、retry、deadline/attempt exhaustion finalization 和 TTL purge。候选槽扫描和 DST 转换探测分别最多 32,768 步，窗口过宽由调用方拆分并使用游标续页；disabled Rule 在 materializer 与 adapter 两层 fail closed；lease-expired audit event 保留被回收的旧 attempt 与旧 fencing generation。该实现已在 PostgreSQL 18.6 disposable loopback cluster 重复迁移、核对五表 FORCE RLS，并通过四个数据库集成场景，`domain-automation` 最终 release tests 26/26 通过；不表示目标数据库部署、生产 role grants、rule 写 API 或长期 worker 已就绪。Occurrence 仍须经当前 Auth/target/quota admission 后才能同事务创建独立 Run 并固定 `schedule_rule_id/version/occurrence_id`。Workflow/LangGraph 编排已接受的 Run，不拥有第二份 schedule rule/timer source；`star-scheduler` 只处理 DAG dependency readiness、公平队列和 admission，不实现墙钟/Cron。
 
 #### Phase 9F4A Run-scoped Schedule Rule API
+#### WLD-3 hostless occurrence materialization boundary
+
+A Rule for a Run without remote Branch metadata may be materialized into a durable occurrence when its canonical tenant/Project/Engineering Run/Repository/Worktree/Task/Profile/HookSet scope is complete. Snapshot persistence permits Branch to be absent or JSON null, validates any present Branch as a non-nil UUID, and requires the remaining non-nil identity plus pinned positive Profile/HookSet versions and digests. PostgreSQL Rule replay compares nullable Branch values with null-safe equality. This storage/materialization boundary grants no admission; a binding that requires remote Branch context, missing current authorization, stale scope, absent reservation, or failed readiness remains fail-closed.
 
 Rule 读写路由置于 Project → Engineering Run 下。读取先验证当前 Project membership/role 与 Run grant；写入在单一 PostgreSQL transaction 内完成权限重验、Worktree→Run 与 Task↔Worktree 当前绑定检查、execution Profile/有效 HookSet snapshot 解析、rule validation、CAS revision 写入、Audit/Outbox 与幂等 receipt。Revision 是 Master/SCD2，旧版本只关闭不删除；Audit/Outbox 是 append-only Transaction，24 小时幂等记录是有界 Work。此 API 仅管理规则，不启动 occurrence worker，也不写 `TaskExecutionRun`。
 
@@ -5881,5 +5894,116 @@ W/T/M：无新表。`profile_log_binding`、`log_master`、`service_certificate_
 
 修订 v6.92 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 logical archive/restore source slice；在 §16.2 明确 Worktree owner-local Audit/Outbox/receipt 原子事务、事务级同键序列化、no-op 保留 version/retention、连续最小事件 payload 与 Run Directory Outbox 分离；记录 PostgreSQL 18.6 disposable fixture 和 Rust 1.98.1 diagnostic test 证据，并保留 Rust 1.99.0、目标 DB/grants、API 并发、consumer、Host provider 与物理 cleanup 未验收状态。同步 requirements v6.91 与 Group DD v5.15。
 
-修订 v6.94 · 2026-10-22 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-3 occurrence 快照约束实现；新增 SQL `NOT VALID` CHECK，强制新建/更新 occurrence 的 JSON Branch 快照为非 nil UUID，同时保留未修改的历史数据且不回填；hostless Rule 配置保持不变。记录静态契约测试 3/3，并明确 disposable PostgreSQL/Rust 验证尚未执行，worker/admission/executor 继续关闭。同步 Schedule API SRS v0.65 与 DD v0.77。
 修订 v6.93 · 2026-10-21 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD3 hostless Schedule Rule 授权设计与源码切片；明确无 Branch 的 Run 可配置/读取 Rule，branch-backed Run 仍校验 Branch，Rule 配置 branch_id 可空而 occurrence/admission/runtime 保持 Branch 必需和 fail closed；Rust 1.99.0、数据库重复迁移及新 ACL fixture 门禁尚未执行，不开放 Schedule worker/executor。同步 Schedule API SRS v0.64 与 DD v0.76。
+
+## 16.77 WLD-1 Repository identity 与 Worktree root 来源边界（设计 + source status）
+
+本节定义跨 owner 的身份契约及已落地的 Repository master 源码切片；其余 owner/provider 仍是设计目标：
+
+| 事实 | canonical owner | 约束 | 当前来源审计 |
+|---|---|---|---|
+| Repository master | SCM bounded context | 稳定 `RepositoryId`；provider key、URL、默认分支为可选的无凭据来源元数据；不能从 Branch row 汇总代替完整 Repository 目录 | 本分支已有 `RepositoryMasterRevision`、`PgScmRepositoryMasterRepository` 与 migration source；target DB、实际登录角色 membership 和数据库验收未证明 |
+| Project↔Repository authorization link | Project owner | 0..N 个有效关联、revision、授权来源和审计；默认项可空且只排序/预选，不自动绑定 Run | 不得把关联端口误称为 Repository master 或其持久化事实 |
+| Run→Repository binding | Engineering Run Directory owner | 显式可空、版本化；绑定/解绑 CAS、幂等、审计/Outbox，并复验 Project 授权关系 | 数据模型含可空 repository identity，但 binding mutation/HTTP acceptance 尚未由本次审计证明 |
+| Local repository root | trusted Host Infrastructure owner | 持久键为 HostEnvironment + RepositoryId + monotonic generation；仅 Host capability 解析原始 path | 未找到持久 registry；Worktree path/shared-dir/in-memory map 都不是该事实 |
+
+Run 内 repository candidate query 必须同时校验 Project membership 与 Run read grant；它只给可授权选择的脱敏候选，绝不自动形成 Run binding。未绑定 Run 仍可存在并使用不需要 checkout 的 Run Apps；`repository_id IS NULL` 时 Worktree subtree/create/import/CLI 禁用，不能由 Project default、remote Branch 或 history 推断。create/import/CLI 还需当前 grants、有效 Project↔Repository link、新鲜一致的 Host root generation 和已安装的生命周期 provider，任一缺失均失败关闭。浏览器、Agent、Plugin 不接收宿主 path。
+
+SCM master 的物理模型为 `scm.repository_master`：复合主键 `(tenant_id, repository_id, version)`、current revision partial unique、tenant+provider+remote identity current unique；SCD2 只关闭旧 revision 的 `valid_to`，禁止物理删除，随后插入连续版本。`scm.repository_master_event` 是 Transaction/append-only audit，由 insert trigger 在同事务写入且没有短 TTL。两表都 ENABLE/FORCE RLS；`star_scm_repository_owner` 是 NOLOGIN/NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS/NOINHERIT，adapter 每次事务显式切换角色、设置 tenant/actor/correlation，写操作在事务 advisory lock 下进行，revision 使用 expected-version CAS。migration 在任一 role/grant DDL 前检查向外 role membership、对象所有权、所有 database ACL 与其他 database 的 `pg_shdepend` direct ACL dependency，并检查当前 database 的 schema/object/column/function/type/language/tablespace/FDW/server/large-object/default/parameter ACL；其他 database 中任何 owner-role object ACL 都保守拒绝，当前 database 只在 `scm` 内归一化权限且不跨 schema 自动撤权。migration 显式获取 PoolConnection，在同一物理连接的事务中复验 admin identity 并执行全部 DDL；pool 单连接上限不提供连接亲和保证。目标包 Rust 1.99 locked all-targets check、选定包 35+35 tests、ignored PG target 编译、identity address/port negative test、四个变更 Rust 文件的定向 rustfmt 检查通过；package fmt check 因四个未修改文件不通过。忽略的 PostgreSQL acceptance 缺少一次性数据库 fixture，尚未运行，故无数据库运行证据。pool/fixture guard 不能证明 VM/cluster 可销毁，操作者必须提供一次性隔离集群。
+
+这一设计取代“仅依赖 Project repository list 就足以启动 Worktree lifecycle”的含混解释；当前已存在的 Project-scoped endpoint/provider seam 仍是兼容边界，默认无 provider 返回 503。源码审计见 [`PHASE-WLD1-REPOSITORY-MASTER-20261023.md`](reports/PHASE-WLD1-REPOSITORY-MASTER-20261023.md)。本次只实现 SCM master domain/adapter/migration source，并新增未执行的 ignored disposable PostgreSQL test 工件；Rust 目标包检查与测试通过不构成 migration/目标库行为验收。Project binding persistence、Run binding writer、Host root registry、实际应用 role membership、HTTP/provider 与跨 tenant/project 的负向验收均未证明。full workspace、Clippy、独立 lock/resolution、target PostgreSQL/RLS/grants/concurrency 未验收；此限制不降低 Worktree lifecycle 的授权/root/provider gates.
+
+修订 v6.94 · 2026-10-22 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-3 occurrence 快照约束实现；新增 SQL `NOT VALID` CHECK，强制新建/更新 occurrence 的 JSON Branch 快照为非 nil UUID，同时保留未修改的历史数据且不回填；hostless Rule 配置保持不变。记录静态契约测试 3/3，并明确 disposable PostgreSQL/Rust 验证尚未执行，worker/admission/executor 继续关闭。同步 Schedule API SRS v0.65 与 DD v0.77。
+修订 v6.95 · 2026-10-23 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-0 hostless Run authenticated HTTP acceptance；对齐 Project/Run owner role 的最小 Run/revision/creator-grant INSERT grants、55/55 disposable PostgreSQL runner 与 hostless create/replay/list/context/权限隔离证据，保留目标 DB、部署 identity 和执行闭环为开放门。详见 WLD-0 阶段报告。
+修订 v6.96 · 2026-10-23 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 Repository identity audit/design reconciliation；同步 requirements v6.93、SRS v1.5、BD v1.5、Group DD v5.18 与 Traceability v1.3；新增 SCM/Project/Run/Host owner 分工、nullable binding 与 fail-closed gate。仅更新设计，不表示持久化实现或运行时验收。详见 `PHASE-WLD1-REPOSITORY-IDENTITY-CONTRACT-20261023.md`。
+修订 v6.97 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 Repository master 源码实现；同步 requirements v6.94、BD v1.6、Group DD v5.19 与 Traceability v1.4，记录 M/SCD2 master、T/append-only audit、RLS owner adapter 和代码级 CAS/advisory lock；明确 target DB、实际 login membership、PostgreSQL/RLS/并发及 Project/Run/Host/provider lifecycle gates 未关闭。详见 `PHASE-WLD1-REPOSITORY-MASTER-20261023.md`。
+
+修订 v6.98 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 Repository master adapter/migration review；记录 scm-only 权限清理与其他 owner-role membership/对象所有权 fail-closed 条件；将 PostgreSQL acceptance test 标为 ignored 且未运行，并明确 Cargo/MSRV/DB/RLS/并发无验证结果和 Cargo.lock 排除原因。同步 requirements v6.95、SRS v1.6、BD v1.7、Group DD v5.20 与 Traceability v1.5。
+
+修订 v6.99 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD-1 independent review remediation；加入 transaction-end current revision deferred constraint、非 SCM direct ACL preflight（含 PUBLIC 过滤与角色/对象分类）、migration 前真实 target 双重 opt-in 与 loopback/database/token 验证，并披露 marker 无法证明整台 VM/cluster 可销毁；test 仍 ignored/unrun，Cargo 与 PostgreSQL 未验证。同步 requirements v6.96、SRS v1.7、BD v1.8、Group DD v5.21 与 Traceability v1.6。
+修订 v7.01 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD1 remediation；修复 ignored PG test 在 bootstrap/drift probe 与 cleanup 双失败时的诊断遮蔽，并将当前 Cargo.lock 状态订正为仅新增 direct `domain-scm` edge、无新增 package entry/无关改动；Cargo lock/resolution/Rust/PostgreSQL gates 未运行。同步 requirements v6.98、SRS v1.9、BD v1.10、Group DD v5.23 与 Traceability v1.8。
+
+修订 v7.02 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：WLD1 lane 完成 Rust 1.99 focused gates 与 same-physical-connection 闭环复核；同步 locked all-target check、35+35 package tests、ignored PG target compile 和定向 rustfmt 结果，标清 package fmt、PostgreSQL runtime、full workspace、Clippy 与独立 lock/resolution 仍开放。同步 requirements v6.99、SRS v1.10、BD v1.11、Group DD v5.24 与 Traceability v1.9。
+修订 v7.03 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。WLD-3 hostless occurrence：允许在完整本地 canonical identity 下物化并持久化 branchless occurrence，nullable Branch 以 null-safe Rule replay；更新 Schedule SRS/BD/DD、Group DD 与 WBS。实现门禁当时未运行；admission/execution 仍关闭。
+修订 v7.04 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。记录 WLD-3 在 Rust/Cargo 1.99.0 与本地一次性 PostgreSQL 的 47/47 runner 结果：domain 31/31、两个 API 授权测试各 1/1、Schedule PostgreSQL integration 6/6；注明 PostgreSQL NULL CHECK 语义修正和 changed-target scoped Clippy 边界。目标库、生产授权、worker/admission 与执行仍未验收并保持关闭。同步 requirements v7.01、Schedule SRS v0.67、BD v0.65、DD v0.79、Group DD v5.26。
+
+### 16.77.1 Project-Repository association retirement and migrate-before-unlink
+
+Project 可以关联 0..N 个 Repository；default_repository_id 可空，且只影响 UI 排序/预选。解除单个授权关联先由 Project owner 以 CAS 将 link 标记为 retiring，并在同一事务冻结新的 Run binding 与 Worktree create/import；owner Outbox 发出 operation_id、link revision 和可选替代 Repository 的迁移命令。Run Directory owner 迁移/清除 Run binding，Worktree/Host owner 验证并迁移 checkout 或显式退役不再需要的 checkout；各 owner 在自己的事务内复验当前授权和 revision，写入幂等回执及剩余活动引用数。替代 Repository 必须仍由该 Project 授权，checkout 变更须由可信 Host lifecycle provider 验证。所有必需回执成功且 retiring fence 阻止新增引用后，各 owner 串行化核验活动引用为零；Project owner 才能关闭关联并保留审计。失败、超时或未知状态继续保持 retiring/fail closed；不共享跨 owner 事务，也不改写历史只读 Repository identity。
+
+## 16.78 Resource-scoped push collaboration, drafts and conflict recovery
+
+实时协作以 Project→Engineering Run→Worktree 的已授权资源 scope 为边界。每个 Run App 窗口复用单个多路复用连接；订阅上限由版本化 Collaboration Profile 固定（100 是待测候选值，不是已批准的产品容量）。“全局通知”是对同一资源全部当前有权订阅者扇出，不是 tenant-wide broadcast。常态页面不定时轮询；WebSocket 负责事件推送，cursor catch-up 只在初次打开、断线重连或检测到 gap 时执行。当前 BFF 的内存 `tokio::broadcast` 与 SSE hub 只可作为低延迟进程内 fan-out；它们不是持久化事实、跨实例总线或 durable delivery。
+
+Owner transaction 同时写 Outbox 并产生轻量 transactional notification（如数据库 commit notification 或等价机制）；在线 relay 收到通知后立即有界 claim 与发布。进程内使用单一 pending latch 合并通知，不为每个编辑分配队列节点；通知或 relay listener 断开时，重连/重启先从 durable cursor/backlog 追赶。Outbox 是唯一持久事实，通知只负责唤醒；某事件发布失败时用该事件的有界 due retry 计时器重试。正常路径无固定客户端轮询、无周期 Outbox 扫表，恢复路径不以通知或 socket ACK 冒充 durable receipt。
+
+业务 owner 保持唯一真相：WorkItem owner 维护 Task revision/draft/conflict；Canvas owner 维护 Document revision/draft/conflict；协作 Gateway 管理授权订阅、连接和投递。每个编辑请求携带 `resource_ref`、`base_revision`、`draft_id`、`draft_revision`、`operation_id` 和受限 delta patch；actor、Project/Run/Worktree scope 与 capability 从当前认证上下文派生。Owner 在一个事务中复验授权、读取当前 revision、检测与已提交历史及同资源有效 draft 的 field/path/text-span 重叠、CAS 写入新 revision 或完整冲突事实、保存 draft、写 Audit/Outbox。draft checkpoint/seal 和 revision/resolve 必须取得同一短时 resource fence，原子检查 committed revision 与有效 draft 索引后再更新；避免并发 checkpoint 漏过正在提交的 revision。常态输入只 coalesce 更新 actor/device 的 draft head，不逐键击或逐 patch 追加 checkpoint；显式持久化/安全 flush 可 seal checkpoint。若资源 fence 下发现两个完整且 digest-verified 的 draft head 重叠，owner 在冲突 transaction 中自动 seal/pin 两侧精确 revision，再提交 conflict 和 Outbox，用户无需按最终 Save；之后输入只推进 draft head revision，不覆写已 pin 快照。fence 只覆盖数据库临界区，不覆盖网络收块；不同资源并行。有效 draft 通过 resource + changed-path index 做有界匹配，并受每资源并发编辑预算限制；每个完整 draft-head 更新和 revision commit 都检查同资源已授权的其他 draft head；发现完整、摘要验证通过的重叠版本时在同一 resource fence 自动 seal/pin 并生成冲突，使双方无需最终 Save。两份提案未完整 seal 前只显示各自同步状态。只有事务提交后才发布。跨 App 只使用版本化 owner API 与 Outbox/Inbox，不跨 owner 写表。
+
+不重叠的 field/path 可自动重基并提交；文本由服务端按语义范围检测重叠；任何重叠替换/删除或同一字段/path 的并发更改均形成显式持久冲突，即使 OT 可机械变换也不自动合并。OT 仅能在用户显式打开解决流程后提供预览，用户明确选择并通过当前 revision CAS 前不得写 canonical revision。Task lifecycle 只能走 owner command；Canvas 通过稳定 element/property ID 判断重叠，仅明确可交换的相对变换可自动合并。不得使用 last-write-wins。冲突只在双方完整提案通过摘要校验并 seal 后创建，确保提醒出现时每位参与者都能读取对方精确修改；上传未完成时仅将作者状态标为 `sync_pending`。冲突记录固定 base revision、已提交一方的 revision、另一方的 draft revision、参与者、重叠路径与状态，并 pin 冲突发生时的精确 draft revision；作者继续编辑时创建新 draft revision，不覆写仍被冲突引用的内容。双方的本地持久草稿在发送前先落盘，网络中断或刷新不清空；服务端收到的 draft patch 由资源 owner 持久化，未解决冲突不受 TTL 清理。冲突提醒同时指向两位参与者，包含稳定 `conflict_id` 和轻量摘要；用户再次授权后读取 base/current/mine/theirs 差异。非参与者不因订阅同一 Project 而自动得到未提交草稿。显式 resolve 使用当前 revision + 幂等键 CAS；发生后续编辑则保留原草稿并创建后继冲突，完成解决后才按 Project retention policy 清理草稿。
+
+文本编辑的客户端每次输入先写有界本地加密存储；桌面端密钥由 OS secure store 保护，Web 端使用 profile-scoped secure-storage adapter，未取得保护密钥时明确标为 `local_only` 并保持内存草稿，不宣称已持久化。仅在 draft 变脏时启动事件触发 debounce，活动编辑期间最迟每 250 ms 合并同步一次，空闲时不发轮询请求，并在 blur/提交/关闭时 flush；每个 draft 同时最多一个网络写入在途，在途期间的新输入合并到一个按 Project/profile 限额的待发送 delta，前一写入得到回执或进入可见失败状态后再提交下一增量。不可无限排队；超过字节/时长预算时保留加密本地稿并明确显示 `sync_pending`/延迟状态。常态 delta 只 coalesce 更新 draft head，不逐 patch 生成不可变快照；显式 checkpoint/安全 flush 或检测到完整重叠 draft head 时才 seal。重叠发生时 owner 自动在冲突事务里 seal/pin 双方准确版本，不要求最终 Save。patch/frame 上限 16 KiB 是协议边界；不发送全量 Canvas/Task 文档。冲突内容用单独受保护 API 按需读取。每连接发送队列同时限制条数和字节数，64 events / 128 KiB 是初始候选预算而非实测容量；具体值须由版本化 Collaboration Profile 固定，并结合目标 gateway、数据库、并发 workload 与 RSS/延迟测量校准。超限时发送 `resync_required` 并终止慢连接，客户端按 cursor 恢复，不静默跳过持久事件。presence/cursor 是短 TTL 的 observed state，按资源合并并限频，不写进 owner 业务事件历史。冷启动 snapshot 和 cursor 必须在一个一致性读视图中获取，避免 snapshot 与 live subscription 之间形成丢失窗口。
+
+协作事件的 stream identity 是 tenant + canonical resource + owner generation；每条 owner 事实包含 `event_id`、`stream_id`、单调 `sequence`、schema version、owner revision、actor、correlation/idempotency 与 occurred-at。Outbox relay 经可替换的持久 transport adapter 扇出；实时 gateway 是可重建投影。浏览器以 `(stream_id, sequence, event_id)` 去重，持久游标只表示恢复位置。慢消费者、跨实例切换或 gateway 重启后从 owner durable stream 恢复；cursor 已过保留边界时重新取得当前授权 snapshot，并显式报告历史缺口。
+
+**冲突延迟目标**：在线、授权有效且网络正常时，从 owner conflict transaction commit 到双方客户端显示带同一 `conflict_id` 的持久未读提醒，并能读取首个有界差异页（base/current/mine/theirs），p99 不超过 1 秒。1 秒是提醒与可读取性的端到端送达 SLO，不是固定轮询周期、冲突判定时间窗或草稿分块上传期限；冲突始终按 base revision 与重叠范围判定。冲突事实只在两份提案 complete、digest-verified、sealed 后提交，因此提醒不指向尚未可读的 `receiving` 内容。传输 ACK 只确认客户端收到事件，不清除未读冲突；用户查看冲突前，双方的未读状态与各自草稿均可恢复。超时不能转为静默成功：记录超时/未 ACK 状态、显示延迟标记，并确保冲突仍可从 Run Inbox/冲突列表或 cursor replay 读取。离线用户在恢复连接后看到同一持久冲突和自己的 draft。该目标须在目标 DB、跨 gateway 实例与指定并发档位下测量后方可关闭验收。
+
+**同秒冲突判定**：不建立一秒分桶、仲裁延迟或“等双方停止输入”的冲突定时器。按资源序列与 owner revision fence 判断有效草稿/提交之间的语义重叠；完整提案的服务端接收时间相差 ≤1000 ms 只是高并发验收刺激。第二份 complete、digest-verified 的重叠 draft head 被 owner 接受后，owner 立即在 resource fence 内 seal/pin 两侧确切版本，并在同一事务写入 conflict、双方 participant unread 与 Outbox。任何更长时间间隔的语义重叠也必须执行同一检查。客户端的 250 ms draft coalescing 只限制增量发送频率与写放大，不得作为冲突判定延迟。若上传尚未完整或摘要不匹配，不向另一方发出“可读取冲突”提醒；继续保留提交者本地稿并显示 `sync_pending`，待完整且验证后立即处理。
+
+**读取/解决 API 的逻辑契约**：
+
+| 命令/查询 | 最小输入 | 业务 owner 行为 | 实时副作用 |
+|---|---|---|---|
+| `SaveDraft` | resource ref、base revision、draft ID/revision、operation ID、delta patch | 当前授权校验，幂等保存 actor/device draft；必要时按 field/path/span 建冲突 | `DraftSaved` 或 `ConflictDetected` owner event；冲突事件只路由给参与者 |
+| `ReadConflict` | conflict ID、当前 actor | 再验证参与者/解决者权限，返回 base/current/mine/theirs 的受限差异 | 不广播内容；只写脱敏 access audit |
+| `ResolveConflict` | conflict ID、expected revision、resolution patch、idempotency key | 对最新 owner revision 执行 CAS，保存不可变 resolution/audit；新编辑则保持未解决并生成 successor | `ConflictResolved` 或新的 `ConflictDetected` |
+| `Subscribe` / `CatchUp` | resource scope、opaque cursor | Collaboration/owner 复验 viewer grant；首次或 gap 时返回一致 snapshot + cursor | 单 WebSocket 订阅；常态不轮询 |
+
+### 16.78.1 数据分类与保留
+
+| 数据 | 主责 owner | W/T/M 分类 | 生命周期与保留 |
+|---|---|---|---|
+| 当前文档 revision、已提交 patch、ConflictRaised/Resolved 与 Audit | 对应 Canvas/WorkItem owner | T，append-only transaction facts；当前状态为可重建 projection | 不因冲突解决而改写历史；按业务审计/备份政策保留 |
+| 每 Actor/Device draft checkpoint | 对应 Canvas/WorkItem owner | W，含明确 retention policy 的作业数据 | 未解决冲突被 retention lock 保护；解决/显式放弃后按 Project policy 到期清理；内容加密且 RLS 隔离 |
+| Presence、connection、subscription、短期 fan-out lease | Collaboration runtime | W，短 TTL | 按租约/TTL 清理，不做永久事件事实 |
+| Stream cursor 与客户端 resume hint | owner delivery / 客户端设备 | W 或可重建状态 | 只作位置；不可授权/不可作为业务 receipt；过期时 snapshot rebuild |
+
+### 16.78.2 Owner-local 目标记录映射
+
+WorkItem 与 Canvas 各自在自己的 owner schema 内落实相同的逻辑协作合同，不由 Collaboration runtime 建立第二份业务内容库。`edit_draft_head` 为 W 类可合并的当前草稿索引；普通输入只合并更新该 head，不逐击键/逐 delta 写快照；`edit_draft_checkpoint` 仅在显式持久化、安全 flush 或冲突 seal 时创建不可变版本（W，未解决冲突引用时 retention lock）；`edit_conflict`、`edit_conflict_participant`、`edit_conflict_view_receipt`、`edit_conflict_resolution` 与 owner Audit/Outbox 为 T 类持久业务/审计事实。各表统一带 tenant、Project、Run、canonical resource 与 owner generation；worktree 是受校验上下文，不是授权凭据。资源/参与者/草稿身份复合唯一约束、changed-path 索引、FORCE RLS、精确 grants、blob 加密与 retention 细节按 [`WLD-7 owner-local 数据设计`](data-design/WLD-7-COLLABORATION-DATA-DESIGN.md) 落到各 owner schema；目标记录不得计入已部署 inventory，迁移/目标库验收前保持未实现。
+
+不创建“协作服务的第二份 Task/Canvas 文档表”，也不逐订阅者持久化每条普通推送的完整副本。只为冲突参与者保存必要的未读/交付状态和审计；在线 fan-out telemetry 聚合为有界指标。draft content 不进入普通日志、BI 广播或插件事件正文。
+
+**授权/故障规则**：每次 subscribe、catch-up、draft save、conflict read/resolve 和 reconnect 均重新授权。撤权需关闭现存 socket、拒绝后续 cursor replay 与冲突读取。Owner commit 成功但 transport 未发送时由 Outbox retry；同事件重放必须幂等。Gateway 不能确认游标/送达时保持未确认并重放。DB、identity、owner stream 或 current policy 不可用时不接受写入，不以 browser cache 伪造 shared draft 已保存。
+
+**验收要求**：对相同 base 的双用户同字段编辑、不同字段编辑、重叠文本 span、服务端 ≤1000 ms 内到达的两份完整重叠提案（确认没有一秒 holdback）、250 ms draft sync、owner transaction/Outbox 原子性、重复/乱序/迟到事件、跨实例与进程重启恢复、离线参与者、权限撤销、并发 resolve、连接背压、队列 RSS、CPU 和 1 s p99 通知逐项出具可重放证据。E2E 同秒用例验证无等待；PT-09 单独测量 owner commit 到双方提醒/首个有界 diff 可读的 p99。单元测试、内存 hub 测试、浏览器本地草稿或单实例 smoke test 不能替代跨实例/目标 DB 性能验收。
+
+修订 v7.06 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：明确 p99 ≤1 秒是双方显示同一持久未读 conflict ID 的送达 SLO，不是轮询/冲突判定窗口；未读状态仅由查看/显式标记清除，双方 draft 在冲突事实中精确固定。同步 requirements v7.03、Group DD v5.28、WBS v0.30。当前内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
+修订 v7.07 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：要求 1 秒 p99 覆盖双方持久提醒与首个有界差异页可读取；禁止在冲突提案尚未完整校验/seal 时弹出不可读提醒；补充结构化路径自动合并和版本化有界文本 OT 边界、transaction-notification 唤醒/重连追赶/事件 due retry 与 cursor-only 恢复，并澄清每个 draft checkpoint seal 是可读不可变草稿快照而非最终 Save。同步 requirements v7.04、Group DD v5.29、collaboration spec v0.6、WBS v0.31。当前轮询、内存广播、SSE fan-in、持久草稿/冲突与跨实例实时门均未验收。
+修订 v7.08 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：为实时协作补充 owner-local draft/checkpoint/conflict/participant/receipt/resolution 的 W/T/M 逻辑映射、作用域唯一约束与目标迁移/RLS/retention 门，明确常态 patch 合并写 draft head、单在途写入及有界待发量、重叠 head 在冲突事务内自动 seal/pin，并链接双 actor/双 gateway 测试设计。同步 requirements v7.05、Group DD v5.30、collaboration spec v0.7、WBS v0.32。仅为逻辑数据设计；当前 Group 仍轮询，目标 DB、迁移与推送实现均未验收。
+
+修订 v7.09 · 2026-10-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：发现实时协作章节与旧 Schedule D5 共用 §16.56；将协作章节提升为 §16.78 并置于 §16.77 之后，保留 D5 的原编号，供所有需求/设计/测试引用使用唯一目标。设计内容与运行状态不变，WLD-7 仍未实施或验收。
+
+修订 v7.10 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：复核多人实时协作目标与低消耗边界；明确每窗口订阅数及 64 events / 128 KiB 队列为 Collaboration Profile 待固定、待目标环境测量的候选预算，16 KiB patch/frame 继续作为协议上限。同步 requirements v7.06、Group DD v5.32、collaboration spec v1.0、数据设计 v0.2、测试设计 v1.5 与 WBS v0.38。当前轮询/单进程广播及协作持久化、跨实例推送、性能验收仍未完成。
+
+修订 v7.11 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：将同秒重叠提案明确为立即 owner 冲突事务，禁止一秒聚合/仲裁等待；语义检测不受提案到达间隔限制，客户端 debounce 不得延迟冲突判定；新增 E2E-COLLAB-09 并将无等待行为与 p99 送达测量分开。同步 requirements v7.07、collaboration spec v1.1、数据设计 v0.3、测试设计 v1.6、WBS v0.39。当前轮询/单进程广播、草稿冲突持久化、跨实例推送及性能验收仍未完成。
+修订 v7.12 · 2026-10-25 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 Project→Repository 0..N 与 retiring/migrate-before-unlink owner receipt 流程；修正实时协作语义重叠规则，OT 仅为显式解决预览，未经用户确认与 CAS 不得自动改写 canonical revision。同步 requirements v7.08、Group DD v5.33、SRS v1.11、BD v1.12、collaboration spec v1.2、WLD-7 data v0.4、test design v1.7、WBS v0.45。运行时和数据库验证仍未完成。
+
+## 16.79 — Phase 9F4J Native event authorization error classification
+
+此设计增量把原生 transport 的授权拒绝与可重试传输故障分开传递，不增加数据库表或第二份业务事实，也不改变 event identity、route pin、当前 Profile、mTLS 身份验证及 BI owner Inbox 的责任边界。完整状态机和验收矩阵见 [DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001](detailed-design/DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001.md)。
+
+| 输入错误 | Native adapter 分类 | 应用 adapter 分类 | Task Event consumer 处理 |
+|---|---|---|---|
+| gRPC Unauthenticated / PermissionDenied | Unauthorized | Unauthorized | 标记 Blocked、停止；不当作 transport retry，不 ACK、不 terminal-dispose |
+| 其他 gRPC status | Transport，丢弃服务端 details / metadata | Transport | 沿用既有有界 retry / lease 上限；不得无限重试 |
+| Route Contract / Transport / Busy | 不适用 | 当前统一为 Transport | 维持既有有界 attempt / terminal policy；如需细分永久 contract fault，另行版本化错误契约 |
+
+Pull、origin verification 与 ACK 必须调用相同 native mapper 和应用分类器。分类器只解释 RPC 结果，不授予权限：每次操作仍要从受信 mTLS peer 和当前 Profile / route authorization 得到身份与当前授权。授权查询不可用、身份缺失或当前状态无法证明时 fail closed。
+
+Unauthorized 在 pull 前出现时，消费者停止且不创建 delivery 事实；在 source delivery 已领取后出现时，不确认来源、不写 quarantine terminal disposition，保留 lease/redelivery 路径。若 BI Inbox 与 fact 已在 owner 事务中提交、随后 ACK 遇到授权拒绝，消费者仍停止；授权恢复后由 source redelivery 触发 exact replay，回传原 receipt，不重复产生 fact。只有实时重验当前身份、授权、Profile 与 destination generation 成功后才可恢复消费。
+
+错误边界：RPC 对外结果只暴露稳定类别，不透传 tonic status details、metadata 或底层错误链中的凭据/事件内容；普通日志和指标只记录有界的类别、操作阶段与脱敏原因，不记录 wire、payload、证书内容或高基数业务身份。错误映射不改变 owner commit-before-ACK 顺序，也不把 ACK 响应作为业务 receipt。
+
+本地实现状态：native mapper 与应用适配器定向测试、star-api-rest all-targets 检查、Rust 格式检查和独立源码审查已在来源 lane 通过；集成到 dev 后未在本轮重跑 Rust gates。Clippy、目标 PostgreSQL/RLS/grants、真实 mTLS/RPC、commit-before-ACK latch、服务端授权撤销/轮换与生产恢复仍未验收。9F4J 继续 OPEN/PARTIAL，BI ingress 与 Schedule/Agent execution 不因本切片而启用。
+
+修订 v7.13 · 2026-11-08 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 9F4J 授权错误分类的应用层契约、消费者 fail-closed 行为和当前验证边界；§16.77（WLD-1）与 §16.78（协作）保持原义，新增 §16.79。

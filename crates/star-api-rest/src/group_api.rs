@@ -95,8 +95,8 @@
 //! CREATE (m)-[:CONTAINS]->(ba),(s)-[:USES]->(p),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(p),(b)-[:CALLS]->(ar);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
-    ProjectWorktreeRepository, RunWorktreeCreateCommand, RunWorktreeImportCommand,
-    RunWorktreeImportCandidatesQuery, RunWorktreeLifecycleProvider, RunWorktreeLifecycleReceipt,
+    ProjectWorktreeRepository, RunWorktreeCreateCommand, RunWorktreeImportCandidatesQuery,
+    RunWorktreeImportCommand, RunWorktreeLifecycleProvider, RunWorktreeLifecycleReceipt,
     RunWorktreeLifecycleState, RunWorktreeRepositoryQuery, WorktreeImportCandidate,
     WorktreeLifecycleProviderError,
 };
@@ -115,7 +115,8 @@ use domain_work_item::run_task_card::RunTaskCardCommandPort;
 use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
-// @cypher schema=1 source_sha256=77482eea713943d20600bae944210a174f21ba3cc513bbde60052e57ddca9070
+use star_pg_adapter::repository::{DeviceBindingRepository, PgDeviceBindingRepository};
+// @cypher schema=1 source_sha256=17aae0fc970d3b1392401e21b81f7254b8e7e120dbede48bd1b8532338a15c18
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})
@@ -149,6 +150,12 @@ use serde::{Deserialize, Serialize};
 // MERGE (runLifecycleProvider:Type {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider",kind:"trait"})
 // MERGE (runLifecycleInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_run_worktree_lifecycle_provider",kind:"method"})
 // MERGE (runLifecycleField:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.run_worktree_lifecycle_provider",kind:"field"})
+// MERGE (canvasWakeModule:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::module",kind:"module"})
+// MERGE (canvasWakeHub:Type {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub",kind:"struct"})
+// MERGE (canvasWakeRouter:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::router",kind:"function"})
+// MERGE (canvasWakeStart:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub.start",kind:"method"})
+// MERGE (canvasWakeInstall:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.with_canvas_event_wake_hub",kind:"method"})
+// MERGE (canvasWakeField:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.canvas_event_wake_hub",kind:"field"})
 // MERGE (api)-[:DEFINES]->(biAnalytics)
 // MERGE (api)-[:DEFINES]->(runWorktreeBindings)
 // MERGE (api)-[:DEFINES]->(worktreeLifecycle)
@@ -165,19 +172,39 @@ use serde::{Deserialize, Serialize};
 // MERGE (runLifecycleInstall)-[:WRITES]->(runLifecycleField)
 // MERGE (self)-[:CALLS]->(worktreeLifecycleRouter)
 // MERGE (build)-[:CALLS]->(worktreeLifecycleRouter)
+// MERGE (api)-[:DEFINES]->(canvasWakeModule)
+// MERGE (canvasWakeModule)-[:DEFINES]->(canvasWakeHub)
+// MERGE (canvasWakeModule)-[:DEFINES]->(canvasWakeRouter)
+// MERGE (canvasWakeHub)-[:HAS_METHOD]->(canvasWakeStart)
+// MERGE (self)-[:CALLS]->(canvasWakeRouter)
+// MERGE (build)-[:CALLS]->(canvasWakeRouter)
+// MERGE (taskState)-[:USES_TYPE]->(canvasWakeHub)
+// MERGE (taskState)-[:HAS_METHOD]->(canvasWakeInstall)
+// MERGE (canvasWakeInstall)-[:USES_TYPE]->(canvasWakeHub)
+// MERGE (canvasWakeInstall)-[:WRITES]->(canvasWakeField)
 // MERGE (taskState)-[:USES_TYPE]->(biQueryPort)
 // MERGE (taskState)-[:HAS_METHOD]->(biQueryInstall)
 // MERGE (biQueryInstall)-[:USES_TYPE]->(biQueryPort)
+// MERGE (deviceRepo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
+// MERGE (testCtor:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.new_with_device_binding_repo",kind:"method"})
+// MERGE (taskState)-[:USES_TYPE]->(deviceRepo)
+// MERGE (taskState)-[:HAS_METHOD]->(testCtor)
+// MERGE (testCtor)-[:USES_TYPE]->(deviceRepo)
+// MERGE (testCtor)-[:CALLS]->(taskStateNew)
 // @endcypher
 
 use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
+use crate::auth::{
+    oauth::{AuthenticatedDeviceContext, AuthenticatedUser},
+    AuthUser, JwtConfig,
+};
 
 mod bi_analytics;
 mod canvas;
+mod canvas_event_stream;
 mod cli_sessions;
 mod engineering_runs;
 mod execution_catalogs;
@@ -195,6 +222,7 @@ mod work_items;
 mod worktree_lifecycle;
 mod worktrees;
 
+pub use canvas_event_stream::CanvasEventWakeHub;
 pub use cli_sessions::{
     TaskCliSessionAccessCommand, TaskCliSessionListCommand, TaskCliSessionProvisionError,
     TaskCliSessionProvisioner, TaskCliSessionReceipt, TaskCliSessionStartCommand,
@@ -328,6 +356,7 @@ pub trait WorktreeArchiveReadinessObserver: Send + Sync {
 pub struct GroupApiState {
     jwt: Arc<JwtConfig>,
     resolver: GroupContextResolver,
+    device_binding_repo: Arc<dyn DeviceBindingRepository>,
     run_task_card_command_port: Arc<dyn RunTaskCardCommandPort>,
     run_task_card_pg_adapter: Arc<PgRunTaskCardAdapter>,
     task_cli_session_provisioner: Option<Arc<dyn TaskCliSessionProvisioner>>,
@@ -337,16 +366,20 @@ pub struct GroupApiState {
     worktree_archive_readiness_observer: Option<Arc<dyn WorktreeArchiveReadinessObserver>>,
     run_worktree_lifecycle_provider: Option<Arc<dyn RunWorktreeLifecycleProvider>>,
     bi_task_event_query_port: Option<Arc<dyn TaskEventQueryPort>>,
+    canvas_event_wake_hub: Option<Arc<CanvasEventWakeHub>>,
 }
 
 impl GroupApiState {
     pub fn new(jwt: Arc<JwtConfig>, pool: PgPool) -> Self {
         let run_task_card_pg_adapter = Arc::new(PgRunTaskCardAdapter::new(pool.clone()));
+        let device_binding_repo: Arc<dyn DeviceBindingRepository> =
+            Arc::new(PgDeviceBindingRepository::new(pool.clone()));
         let run_task_card_command_port: Arc<dyn RunTaskCardCommandPort> =
             run_task_card_pg_adapter.clone();
         Self {
             jwt,
             resolver: GroupContextResolver::new(pool),
+            device_binding_repo,
             run_task_card_command_port,
             run_task_card_pg_adapter,
             task_cli_session_provisioner: None,
@@ -356,7 +389,22 @@ impl GroupApiState {
             worktree_archive_readiness_observer: None,
             run_worktree_lifecycle_provider: None,
             bi_task_event_query_port: None,
+            canvas_event_wake_hub: None,
         }
+    }
+
+    /// Test seam: same as [`Self::new`] but with a stubbed device-binding repository,
+    /// so route tests can exercise authenticated handlers without a live PostgreSQL
+    /// device-binding table (per W16 device-identity hardening).
+    #[cfg(test)]
+    pub(crate) fn new_with_device_binding_repo(
+        jwt: Arc<JwtConfig>,
+        pool: PgPool,
+        device_binding_repo: Arc<dyn DeviceBindingRepository>,
+    ) -> Self {
+        let mut state = Self::new(jwt, pool);
+        state.device_binding_repo = device_binding_repo;
+        state
     }
 
     /// Install the trusted Local Runtime session provisioner for Task Card CLI routes.
@@ -416,6 +464,12 @@ impl GroupApiState {
         self
     }
 
+    /// Install the process-local fanout hub backed by transactional Canvas Outbox wakeups.
+    pub fn with_canvas_event_wake_hub(mut self, hub: Arc<CanvasEventWakeHub>) -> Self {
+        self.canvas_event_wake_hub = Some(hub);
+        self
+    }
+
     pub(super) fn run_admission_producer_available(&self) -> bool {
         self.task_cli_session_provisioner
             .as_ref()
@@ -430,6 +484,12 @@ impl GroupApiState {
 impl FromRef<GroupApiState> for Arc<JwtConfig> {
     fn from_ref(state: &GroupApiState) -> Self {
         state.jwt.clone()
+    }
+}
+
+impl FromRef<GroupApiState> for Arc<dyn DeviceBindingRepository> {
+    fn from_ref(state: &GroupApiState) -> Self {
+        Arc::clone(&state.device_binding_repo)
     }
 }
 
@@ -752,6 +812,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(run_worktree_bindings::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
+        .merge(canvas_event_stream::router())
         .merge(group_apps::router())
         .merge(hook_policies::router())
         .with_state(state)

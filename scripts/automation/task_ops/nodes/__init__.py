@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=756c67f31673146a8618f91d03b3a256d299eee7fcd3b3430b1bbe1eaf1b7748
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/__init__.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/__init__.py
 # TMO 7 节点 (M-N1..M-N7) 実装 (per 03-detailed-design.md v0.2 §3.2.1.1)
 #

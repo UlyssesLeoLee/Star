@@ -301,46 +301,55 @@ fn sse_paths() -> Value {
     let mut obj = serde_json::Map::new();
     for name in crate::worktree_canvas::dto::WorktreeSseEvent::ALL_NAMES {
         let path = format!("/v1/worktree-canvas/events/{name}");
-        obj.insert(path, json!({
+        obj.insert(
+            path,
+            json!({
+                "get": {
+                    "tags": ["events-sse"],
+                    "operationId": format!("subscribe{name}"),
+                    "summary": format!("SSE stream for {name} events (per spec §4.5)"),
+                    "responses": {
+                        "200": {
+                            "description": "text/event-stream",
+                            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+                        },
+                        "403": { "$ref": "#/components/responses/Forbidden" }
+                    }
+                }
+            }),
+        );
+    }
+    // Plus health stream.
+    obj.insert(
+        "/v1/worktree-canvas/health/stream".to_string(),
+        json!({
             "get": {
                 "tags": ["events-sse"],
-                "operationId": format!("subscribe{name}"),
-                "summary": format!("SSE stream for {name} events (per spec §4.5)"),
+                "operationId": "subscribeHealth",
+                "summary": "SSE health keepalive (per IMPL-PLAN §4.13)",
                 "responses": {
                     "200": {
                         "description": "text/event-stream",
                         "content": { "text/event-stream": { "schema": { "type": "string" } } }
-                    },
-                    "403": { "$ref": "#/components/responses/Forbidden" }
+                    }
                 }
             }
-        }));
-    }
-    // Plus health stream.
-    obj.insert("/v1/worktree-canvas/health/stream".to_string(), json!({
-        "get": {
-            "tags": ["events-sse"],
-            "operationId": "subscribeHealth",
-            "summary": "SSE health keepalive (per IMPL-PLAN §4.13)",
-            "responses": {
-                "200": {
-                    "description": "text/event-stream",
-                    "content": { "text/event-stream": { "schema": { "type": "string" } } }
-                }
-            }
-        }
-    }));
+        }),
+    );
     // WS realtime path (per IMPL-PLAN §4.13.4 + DD §21).
-    obj.insert("/v1/worktree-canvas/realtime".to_string(), json!({
-        "get": {
-            "tags": ["realtime-ws"],
-            "operationId": "realtimeWebSocket",
-            "summary": "WebSocket realtime channel (15 SSE events fanout + 30s heartbeat)",
-            "responses": {
-                "101": { "description": "Switching Protocols — WebSocket upgrade" }
+    obj.insert(
+        "/v1/worktree-canvas/realtime".to_string(),
+        json!({
+            "get": {
+                "tags": ["realtime-ws"],
+                "operationId": "realtimeWebSocket",
+                "summary": "WebSocket realtime channel (15 SSE events fanout + 30s heartbeat)",
+                "responses": {
+                    "101": { "description": "Switching Protocols — WebSocket upgrade" }
+                }
             }
-        }
-    }));
+        }),
+    );
     Value::Object(obj)
 }
 

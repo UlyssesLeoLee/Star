@@ -1,17 +1,63 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=1204efb2268324a5ef1933028acc26fe6300d899bd7625a10fa9c61c3355cec6
+@cypher schema=1 source_sha256=ab29f3fd71b02079b75ff7073eec3a3b6b8c05e517c59f0e311aac9fb411d415
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
 MERGE (pageTitle:Type {id:"frontend/src/lib/i18n/dictionary.ts::PageTitleI18n",kind:"interface"})
 MERGE (dictionary:Type {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary",kind:"interface"})
 MERGE (runDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory",kind:"property"})
+MERGE (sidebarOtherPages:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.otherPages",kind:"property"})
+MERGE (sidebarProjectNavigation:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectNavigation",kind:"property"})
+MERGE (sidebarOpenProjectDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.openProjectDirectory",kind:"property"})
+MERGE (sidebarProjectDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectory",kind:"property"})
+MERGE (sidebarProjectDirectoryTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectoryTitle",kind:"property"})
+MERGE (sidebarProjectDirectoryHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectoryHint",kind:"property"})
+MERGE (sidebarCloseProjectDirectory:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.closeProjectDirectory",kind:"property"})
+MERGE (runDirectoryUnavailableTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.directoryUnavailableTitle",kind:"property"})
+MERGE (runDirectoryUnavailableDescription:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.directoryUnavailableDescription",kind:"property"})
+MERGE (runDirectoryHierarchyHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.hierarchyHint",kind:"property"})
+MERGE (runDirectoryRefresh:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.refreshDirectory",kind:"property"})
+MERGE (runDirectoryIndexTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.projectWorktreeIndexTitle",kind:"property"})
+MERGE (runDirectoryUnknownCreate:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.unknownCreateResult",kind:"property"})
+MERGE (runDirectoryExpandNode:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.expandNode",kind:"property"})
+MERGE (runDirectoryCollapseNode:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.collapseNode",kind:"property"})
+MERGE (runDirectoryProjectChildren:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.projectChildren",kind:"property"})
+MERGE (runDirectoryWorktreeBranches:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.worktreeBranches",kind:"property"})
+MERGE (runDirectoryRunChildren:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.runChildren",kind:"property"})
+MERGE (runDirectorySelectNode:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.selectNode",kind:"property"})
+MERGE (runDirectoryOpenRunOverview:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.openRunOverview",kind:"property"})
+MERGE (runDirectoryFocusHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.runOverviewFocusHint",kind:"property"})
+MERGE (runDirectoryRetry:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.retryAction",kind:"property"})
+MERGE (runDirectoryProjectIdLabel:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.runDirectory.projectIdLabel",kind:"property"})
 MERGE (self)-[:DEFINES]->(category)
 MERGE (self)-[:DEFINES]->(module)
 MERGE (self)-[:DEFINES]->(pageTitle)
 MERGE (self)-[:DEFINES]->(dictionary)
 MERGE (dictionary)-[:DEFINES]->(runDirectory)
+MERGE (dictionary)-[:DEFINES]->(sidebarOtherPages)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectNavigation)
+MERGE (dictionary)-[:DEFINES]->(sidebarOpenProjectDirectory)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectDirectory)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectDirectoryTitle)
+MERGE (dictionary)-[:DEFINES]->(sidebarProjectDirectoryHint)
+MERGE (dictionary)-[:DEFINES]->(sidebarCloseProjectDirectory)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryUnavailableTitle)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryUnavailableDescription)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryHierarchyHint)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryRefresh)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryIndexTitle)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryUnknownCreate)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryExpandNode)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryCollapseNode)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryProjectChildren)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryWorktreeBranches)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryRunChildren)
+MERGE (dictionary)-[:DEFINES]->(runDirectorySelectNode)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryOpenRunOverview)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryFocusHint)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryRetry)
+MERGE (dictionary)-[:DEFINES]->(runDirectoryProjectIdLabel)
 @endcypher
 */
 
@@ -66,6 +112,22 @@ export interface Dictionary {
     cancel: string;
     hostIndependentHint: string;
     invalidRunName: string;
+    projectWorktreeIndexTitle: string;
+    directoryUnavailableTitle: string;
+    directoryUnavailableDescription: string;
+    hierarchyHint: string;
+    refreshDirectory: string;
+    unknownCreateResult: string;
+    expandNode: string;
+    collapseNode: string;
+    projectChildren: string;
+    worktreeBranches: string;
+    runChildren: string;
+    selectNode: string;
+    openRunOverview: string;
+    runOverviewFocusHint: string;
+    retryAction: string;
+    projectIdLabel: string;
     localWorktree: string;
     humanState: string;
     machineState: string;
@@ -132,13 +194,26 @@ export interface Dictionary {
   sidebar: {
     brandTagline: string;          // "VIBE CONTROL PLANE"
     vibeControlPlane: string;      // alias for brandTagline
-    groupWorkspaces: string;       // "Workspaces"
+    otherPages: string;            // secondary navigation disclosure
+    navHome: string;               // Home 组 (per ui-3pane-arch §1.2)
+    navPersonal: string;           // 个人区
+    navView: string;               // 视图组
+    navAdmin: string;              // 管理组
+    navAdminOrg: string;           // 管理→组织
+    navAdminIntegration: string;   // 管理→集成
+    navAdminOps: string;           // 管理→运维
+    navAdminDev: string;           // 管理→开发者
+    navOther: string;              // 其他入口兜底
+    projectNavigation: string;
+    openProjectDirectory: string;
+    projectDirectory: string;
+    projectDirectoryTitle: string;
+    projectDirectoryHint: string;
+    closeProjectDirectory: string;
+    groupWorkspaces: string;       // pinned workspace links
     groupTactical: string;         // "Tactical Views"
     pinned: string;                // "PINNED" badge
     customAdd: string;             // "+ 定制添加模块"
-    footerStatus: string;          // "SYS // TACTICAL"
-    footerStatusAllGreen: string;  // "ALL GREEN"
-    footerNode: string;            // "NERV-01 // VIBE CODING NODE"
     removeFromSidebar: string;     // "从左侧移除 {label}"
     removeFromPinned: string;      // "从视图移除 {label}"
     // 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)
@@ -167,6 +242,7 @@ export interface Dictionary {
     done: string;                  // "完成定制 (Done)"
     pinToSidebar: string;          // "钉选到左侧导航"
     unpinFromSidebar: string;      // "从左侧导航移除"
+    indexOwnedHint: string;        // "该模块由 Project Worktree Index 承载，请从左侧项目树进入"
     pinToHeader: string;           // "钉选到顶部标签"
     unpinFromHeader: string;       // "从顶部标签移除"
     openNow: string;               // "立即打开该模块"
@@ -417,5 +493,176 @@ export interface Dictionary {
     docsCategoryReport: string;
     docsCategoryOther: string;
     docsEmpty: string;
+  };
+  /** v0.9 (2026-11-13 WBS §23.32-B) 新增: /projects 下行 FilterBar 筛选标签页 */
+  projectsFilterBar: {
+    calendarSubTabs: string;
+    monthView: string;
+    weekView: string;
+    statusGroup: string;
+    priorityGroup: string;
+    memberGroup: string;
+    statusLabel: string;
+    priorityLabel: string;
+    memberLabel: string;
+    searchPlaceholder: string;
+    clearAll: string;
+  };
+  /** v0.9 (2026-11-13 WBS §23.32-D) 新增: IPA 技能板块三语文案 */
+  ipaSkills: {
+    humanGate: string;              // "人工审批门"
+    subtaskCount: string;           // "子任务 {count}"
+    inputs: string;                 // "输入"
+    outputs: string;                // "输出"
+    useAsTaskCard: string;          // "作为任务卡使用"
+    linkedSubtasks: string;         // "关联子任务"
+    totalSkills: string;            // "总技能 {count}"
+    phaseColumns: string;           // "工作流列 {count}"
+    humanGated: string;             // "人工审批门 {count}"
+    linkedTaskCards: string;        // "已关联任务卡 {count}"
+    everySkillIsTaskCard: string;   // "每个技能都是任务卡 · 点击展开契约与子任务"
+    hierarchyNote: string;          // "层级: 日本 IPA 开发流程 · 技能 → 任务卡 (同一套 WorkItem 模型, 与 kanban 互通)"
+    contractSource: string;         // "契约来自 ../IPA-Atomic-Skills workflow-contract.json"
+  }
+  nema: {
+    pageTitle: string;              // "NEMA · 文件即任务"
+    pageSubtitle: string;           // "共同编辑的文件自动产生 .nema 侧车 — .nema 可以作为 Star 任务打开"
+    formNotice: string;             // "filePath / title / editors 至少填一项"
+    coeditRule: string;             // "「{filePath}」当前编辑者 < 2 — 共同编辑才自动产生 .nema (文件即任务规则)"
+    sidecarCreated: string;         // "✓ 已自动产生 .nema 侧车: {nemaPath} (编辑者 {count} 人)"
+    nemaTasks: string;              // ".nema 任务"
+    boundTasks: string;             // "已绑定 Star 任务"
+    autoRule: string;               // "自动生成规则"
+    autoRuleValue: string;          // "≥2 编辑者"
+    autoRuleHint: string;
+    watcherTitle: string;          // per WBS 8.4.4 文件系统监听
+    watcherActive: string;
+    watcherInactive: string;
+    watcherScanned: string;
+    watcherImported: string;
+    watcherUpdated: string;
+    watcherScanNow: string;           // "共同编辑触发"
+    format: string;                 // "格式"
+    localFolderBridge: string;      // "本地文件夹 (受控只读桥接)"
+    connecting: string;             // "连接中…"
+    bridgeUnavailable: string;      // "本地桥接不可用: {error} — 文件关联将降级为 GitHub blob / 快照模式。"
+    parentDir: string;              // ".. (上级)"
+    emptyDir: string;               // "空目录"
+    registerSharedFile: string;     // "登记为共同编辑文件 (.nema)"
+    registerSharedFileAria: string; // "登记为共同编辑文件"
+    registerSectionTitle: string;   // "共同编辑文件登记 (自动 .nema 生成)"
+    pathPlaceholder: string;        // "文件路径 docs/design/auth.md"
+    titlePlaceholder: string;       // "任务标题 (What)"
+    editorsPlaceholder: string;     // "共同编辑者 (逗号/空格分隔, ≥2 触发)"
+    purposePlaceholder: string;     // "目的 (Why, 可选)"
+    registerButton: string;         // "登记文件 (自动生成 .nema)"
+    coeditRuleFootnote: string;     // "规则: editors ≥ 2 才自动产生 .nema; 单人编辑不产生 (per 2026-11-11 用户发令)。"
+    nemaTaskListTitle: string;      // ".nema 任务 ({count})"
+    emptyList: string;              // "暂无共同编辑文件。登记一个 ≥2 编辑者的文件后, 自动产生 .nema 侧车。"
+    openBoundTask: string;          // "已绑定 Star 任务 →"
+    openAsStarTask: string;         // "打开为 Star 任务"
+    fiveW1H: string;                // "5W1H"
+  };
+  /** v0.12 (2026-11-13 WBS §23.36) 新增: canvas 游戏模式 */
+  canvasGame: {
+    playButton: string;
+    exit: string;
+    move: string;
+    attack: string;
+    roll: string;
+    gameOver: string;
+    killsLabel: string;
+    restart: string;
+  };
+  /** v0.11 (2026-11-13 WBS §23.34) 新增: git 绑定面板 */
+  gitBinding: {
+    title: string;
+    description: string;
+    selfHostHint: string;
+    bindingTo: string;
+    fullNameLabel: string;
+    fullNameRequired: string;
+    baseUrlLabel: string;
+    baseUrlRequired: string;
+    localPathLabel: string;
+    localPathRequired: string;
+    defaultBranchLabel: string;
+    bindButton: string;
+    cancel: string;
+    addMore: string;
+    removeAria: string;
+    boundTitle: string;
+    boundDescription: string;
+  };
+  /** v0.10 (2026-11-13 WBS §23.33-B) 新增: Settings 能力管理面板 (MCP/Skills/Plugins) */
+  settingsCapabilities: {
+    mcp: {
+      title: string;
+      description: string;
+      enabledCount: string;
+      addServer: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      nameRequired: string;
+      transportLabel: string;
+      transportStdio: string;
+      transportSse: string;
+      transportHttp: string;
+      commandLabel: string;
+      commandPlaceholderStdio: string;
+      urlPlaceholder: string;
+      commandRequired: string;
+      argsLabel: string;
+      argsPlaceholder: string;
+      scopeLabel: string;
+      scopeUser: string;
+      scopeProject: string;
+      scopeUserShort: string;
+      scopeProjectShort: string;
+      addButton: string;
+      cancel: string;
+      empty: string;
+      healthLabel: string;
+      lastError: string;
+      enable: string;
+      disable: string;
+      on: string;
+      off: string;
+      removeAria: string;
+    };
+    skills: {
+      title: string;
+      description: string;
+      addSkill: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      nameRequired: string;
+      versionLabel: string;
+      descriptionLabel: string;
+      scopeLabel: string;
+      addButton: string;
+      empty: string;
+      removeAria: string;
+    };
+    plugins: {
+      title: string;
+      description: string;
+      addPlugin: string;
+      nameLabel: string;
+      namePlaceholder: string;
+      nameRequired: string;
+      versionLabel: string;
+      permissionsLabel: string;
+      permissionsPlaceholder: string;
+      descriptionLabel: string;
+      scopeLabel: string;
+      addButton: string;
+      empty: string;
+      removeAria: string;
+    };
+  };
+  markdownPreview: {
+    copy: string;
+    copied: string;
   };
 }

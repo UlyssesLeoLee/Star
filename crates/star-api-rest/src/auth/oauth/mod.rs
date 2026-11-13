@@ -1,4 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=c269479053d3aff9f6163eea6f29b29249a6174c16477407d1fd82ed7d308782
+MERGE (self:File {path:"crates/star-api-rest/src/auth/oauth/mod.rs"})
+MERGE (device:File {path:"crates/star-api-rest/src/auth/oauth/device_enrollment.rs"})
+MERGE (middleware:File {path:"crates/star-api-rest/src/auth/oauth/middleware.rs"})
+MERGE (context:Type {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedDeviceContext",kind:"struct"})
+MERGE (self)-[:IMPORTS]->(device)
+MERGE (self)-[:IMPORTS]->(middleware)
+MERGE (self)-[:EXPOSES]->(context)
+@endcypher
+*/
 //! OAuth2 server (per WBS v0.43 §14.12 IV phase 2)
 //!
 //! v0.43 端到端实装 (per 9/9 20:20 JST 用户拍板"both" (Authorization Code + PKCE + Client Credentials)):
@@ -18,6 +29,7 @@
 
 // v0.47 §14.12 IV OAuth2 server phase 2 (per 2026-09-09 22:18 JST 用户发令 worktree 收官)
 // 5 endpoints + middleware extractor + 5 域 RBAC scope helper 完整化
+pub mod device_enrollment;
 pub mod handlers;
 pub mod keypair;
 pub mod middleware;
@@ -25,5 +37,8 @@ pub mod pkce;
 
 pub use handlers::{OAuth2State, OAuthHandlerError};
 pub use keypair::{Jwk, Jwks, KeyPairError, OAuthKeyManager, OAuthKeyPair};
-pub use middleware::{require_role, require_scope, AuthenticatedUser, BearerError, BearerToken};
+pub use middleware::{
+    require_role, require_scope, AuthenticatedDeviceContext, AuthenticatedUser, BearerError,
+    BearerToken,
+};
 pub use pkce::{verify_pkce, PkceError};

@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=7e472b28c4604c18604430aceae1b7631cbe270f508ca7f67990fa3cbdfa82a9
+MERGE (self:File {path:"frontend/src/components/refactor/RefactorSettingsPopover.tsx"})
+MERGE (popover:Symbol {id:"frontend/src/components/refactor/RefactorSettingsPopover.tsx::RefactorSettingsPopover",kind:"component"})
+MERGE (self)-[:DEFINES]->(popover)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -73,7 +80,7 @@ export function RefactorSettingsPopover({
       {open && (
         <div
           data-testid="refactor-settings-popover"
-          className="absolute right-0 top-full mt-2 z-30 w-72 card border-accent/40 shadow-[0_4px_24px_rgba(0,0,0,0.4)] space-y-3"
+          className="popover-solid absolute right-0 top-full mt-2 z-30 w-72 card border-accent/40 shadow-[0_4px_24px_rgba(0,0,0,0.4)] space-y-3"
         >
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-mono uppercase tracking-wider text-ink-dim font-bold">

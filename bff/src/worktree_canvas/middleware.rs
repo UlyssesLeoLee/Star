@@ -15,9 +15,7 @@ use uuid::Uuid;
 use super::audit::{WorktreeAudit, WorktreeAuditEvent};
 use super::dto::WorktreeApiError;
 use super::idempotency::IdempotencyCache;
-use super::permission::{
-    ActionDanger, PermissionLevel, WorktreeAction, WorktreePermission,
-};
+use super::permission::{ActionDanger, PermissionLevel, WorktreeAction, WorktreePermission};
 use super::WorktreeCanvasState;
 
 // =====================================================================
@@ -47,10 +45,7 @@ pub fn require_action(
 // =====================================================================
 
 /// 检查 idempotency key 是否命中缓存; 命中返回 cached JSON value.
-pub fn idempotency_lookup(
-    cache: &IdempotencyCache,
-    key: Uuid,
-) -> Option<serde_json::Value> {
+pub fn idempotency_lookup(cache: &IdempotencyCache, key: Uuid) -> Option<serde_json::Value> {
     cache.lookup(key).map(|r| r.response)
 }
 
@@ -128,7 +123,12 @@ impl ActionMiddlewareGate {
     }
 
     /// 跑 audit 写 (如果 audit_required).
-    pub async fn write_audit(&self, state: &WorktreeCanvasState, worktree_id: Uuid, metadata: serde_json::Value) -> Result<(), WorktreeApiError> {
+    pub async fn write_audit(
+        &self,
+        state: &WorktreeCanvasState,
+        worktree_id: Uuid,
+        metadata: serde_json::Value,
+    ) -> Result<(), WorktreeApiError> {
         if !self.audit_required {
             return Ok(());
         }
@@ -167,8 +167,8 @@ pub fn current_tenant(state: &WorktreeCanvasState) -> Uuid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::worktree_canvas::permission::RoleSet;
     use crate::worktree_canvas::dto::WorktreeApiError;
+    use crate::worktree_canvas::permission::RoleSet;
 
     fn tenant() -> Uuid {
         Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
@@ -226,7 +226,9 @@ mod tests {
         assert!(gate.audit_required);
         // 写 audit 应该 OK.
         let wt = Uuid::new_v4();
-        gate.write_audit(&state, wt, serde_json::json!({})).await.unwrap();
+        gate.write_audit(&state, wt, serde_json::json!({}))
+            .await
+            .unwrap();
     }
 
     #[test]

@@ -5,6 +5,8 @@ CREATE (f:File {name:"engineering_run_directory.py",type:"file",language:"python
  (main:Function {name:"main",type:"function"}), (root:Variable {name:"ROOT",type:"variable"}),
  (ddl:Function {name:"validate_postgres_ddl",type:"function"}), (guards:Function {name:"task_run_identity_guard_sql",type:"function"}), (uuid:Function {name:"uuid4",type:"function"}),
  (migrationPlan:Function {name:"directory_migration_plan",type:"function"}), (applyPlan:Function {name:"apply_migration_plan",type:"function"}),
+ (reconcile:Function {name:"classify_migration_reconciliation",type:"function"}),
+ (ledgerEntry:Type {name:"MigrationLedgerEntry",type:"type"}),
  (bindingCatalog:Function {name:"run_binding_catalog_sql",type:"function"}), (fingerprint:Function {name:"migration_fingerprint_sql",type:"function"}),
  (roleSetup:Function {name:"run_binding_role_setup_sql",type:"function"}),
  (roleDrift:Function {name:"run_binding_role_drift_sql",type:"function"}),
@@ -27,9 +29,10 @@ CREATE (f:File {name:"engineering_run_directory.py",type:"file",language:"python
  (main)-[:CALLS]->(parse),(main)-[:CALLS]->(add),(main)-[:CALLS]->(dump),(main)-[:CALLS]->(text),
  (main)-[:CALLS]->(subn),
  (f)-[:CONTAINS]->(ddl),(f)-[:CONTAINS]->(guards),(main)-[:CALLS]->(ddl),(ddl)-[:CALLS]->(guards),(ddl)-[:CALLS]->(run),(ddl)-[:CALLS]->(uuid),(ddl)-[:CALLS]->(remove),(ddl)-[:CALLS]->(relative),
- (f)-[:CONTAINS]->(migrationPlan),(f)-[:CONTAINS]->(applyPlan),(f)-[:CONTAINS]->(bindingCatalog),(f)-[:CONTAINS]->(fingerprint),
+  (f)-[:CONTAINS]->(migrationPlan),(f)-[:CONTAINS]->(applyPlan),(f)-[:CONTAINS]->(reconcile),(f)-[:CONTAINS]->(bindingCatalog),(f)-[:CONTAINS]->(fingerprint),
  (f)-[:CONTAINS]->(roleSetup),(f)-[:CONTAINS]->(roleDrift),(f)-[:CONTAINS]->(roleAcceptance),
- (ddl)-[:CALLS]->(migrationPlan),(ddl)-[:CALLS]->(applyPlan),(ddl)-[:CALLS]->(bindingCatalog),(ddl)-[:CALLS]->(fingerprint),
+  (ddl)-[:CALLS]->(migrationPlan),(ddl)-[:CALLS]->(applyPlan),(ddl)-[:CALLS]->(bindingCatalog),(ddl)-[:CALLS]->(fingerprint),
+  (reconcile)-[:USES_TYPE]->(ledgerEntry),
  (ddl)-[:CALLS]->(roleSetup),(ddl)-[:CALLS]->(roleDrift),(ddl)-[:CALLS]->(roleAcceptance),(roleAcceptance)-[:READS]->(runRevision),
  (roleDrift)-[:CONFIGURES]->(ownerRole),
  (cargo)-[:USES]->(root),(run)-[:USES]->(root),(main)-[:USES]->(root);
@@ -42,7 +45,7 @@ See docs/automation-design.md sections 4.36 and 4.37. Optional Task Run DDL chec
 the new forward CLI identity gate and snapshot/FK constraints in the disposable cluster only.
 """
 
-# @cypher schema=1 source_sha256=450e4cd42fda2cb1aadd7bac3d2f60ba17ee9f82abc6491499a41aeb799600e8
+# @cypher schema=1 source_sha256=5d28b513197d24a7c8d712005da63c50dca738db069b28b125c565a0e10cb821
 # MERGE (self:File {path:"scripts/automation/engineering_run_directory.py"})
 # MERGE (find_cargo:Symbol {id:"scripts/automation/engineering_run_directory.py::find_cargo",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/engineering_run_directory.py::run_step",kind:"function"})
@@ -57,6 +60,8 @@ the new forward CLI identity gate and snapshot/FK constraints in the disposable 
 # MERGE (role_acceptance:Symbol {id:"scripts/automation/engineering_run_directory.py::run_binding_role_acceptance_sql",kind:"function"})
 # MERGE (run_revision:Table {id:"multica.engineering_run_revision",kind:"table"})
 # MERGE (owner_role:Type {id:"star_engineering_directory_owner",kind:"database_role"})
+# MERGE (lock_policy:File {path:"db/migrations/2026-10-23-engineering-directory-lock-only-policy.sql"})
+# MERGE (run_create_grants:File {path:"db/migrations/2026-10-23-engineering-run-create-owner-grants.sql"})
 # MERGE (main:Symbol {id:"scripts/automation/engineering_run_directory.py::main",kind:"function"})
 # MERGE (root:Config {id:"scripts/automation/engineering_run_directory.py::ROOT"})
 # MERGE (callable:Type {id:"collections.abc.Callable"})
@@ -85,6 +90,8 @@ the new forward CLI identity gate and snapshot/FK constraints in the disposable 
 # MERGE (validate_ddl)-[:CALLS]->(role_setup)
 # MERGE (validate_ddl)-[:CALLS]->(role_drift)
 # MERGE (validate_ddl)-[:CALLS]->(role_acceptance)
+# MERGE (migration_plan)-[:INCLUDES]->(lock_policy)
+# MERGE (migration_plan)-[:INCLUDES]->(run_create_grants)
 # MERGE (role_drift)-[:CONFIGURES]->(owner_role)
 # MERGE (role_acceptance)-[:READS]->(run_revision)
 # MERGE (apply_plan)-[:USES_TYPE]->(callable)
@@ -167,7 +174,7 @@ def run_expected_failure_step(
 
 
 def directory_migration_plan(run_binding: bool = False) -> list[tuple[str, str]]:
-    """Return the disposable directory chain; October 15 runs once, never as a replay probe."""
+    """Return the disposable directory chain; each audited forward migration applies once."""
     migrations = [
         ("postgres-worktree-base", "2026-09-16-worktree-canvas-worktree.sql"),
         ("postgres-project-binding", "2026-09-29-worktree-group-phase-2b.sql"),
@@ -182,6 +189,8 @@ def directory_migration_plan(run_binding: bool = False) -> list[tuple[str, str]]
             ("postgres-run-worktree-bindings", "2026-10-19-run-worktree-bindings.sql"),
             ("postgres-run-host-independent-task-owner", "2026-10-15-run-host-independent-task-owner.sql"),
             ("postgres-engineering-directory-owner-role", "2026-10-20-engineering-directory-owner-role.sql"),
+            ("postgres-engineering-directory-lock-only-policy", "2026-10-23-engineering-directory-lock-only-policy.sql"),
+            ("postgres-engineering-run-create-owner-grants", "2026-10-23-engineering-run-create-owner-grants.sql"),
         ])
     return migrations
 
@@ -203,6 +212,133 @@ def apply_migration_plan(
         if fingerprint["exit_code"] != 0:
             break
     return results
+
+
+MigrationLedgerEntry = tuple[str, str, str]
+
+
+def classify_migration_reconciliation(
+    migration_name: str,
+    migration_checksum: str,
+    expected_predecessors: list[MigrationLedgerEntry],
+    observed_ledger: list[MigrationLedgerEntry] | None,
+    expected_predecessor_fingerprint: str | None,
+    expected_applied_fingerprint: str | None,
+    observed_catalog_fingerprint: str | None,
+    expected_successors: list[MigrationLedgerEntry] | None = None,
+    *,
+    snapshot_complete: bool,
+    apply_outcome_ambiguous: bool = False,
+) -> dict[str, object]:
+    """Classify one exact ledger/catalog snapshot without performing database I/O.
+
+    Ledger entries are ``(migration_name, source_checksum, post_schema_fingerprint)``.
+    The caller must obtain the entries and catalog fingerprint from one complete,
+    authoritative read and supply the release-approved predecessor, target, and any
+    known-successor fingerprints. The catalog must match the exact last ledger entry;
+    this supports a target migration that is no longer the deployed chain tip. This
+    helper deliberately has no apply callback so it cannot replay a migration.
+    """
+
+    def result(status: str, reason: str) -> dict[str, object]:
+        return {
+            "status": status,
+            "reason": reason,
+            "action": "apply" if status == "safe_to_apply" else "stop" if status == "blocked" else "skip",
+            "safe_to_apply": status == "safe_to_apply",
+            "committed": status in {"already_applied", "committed_after_ambiguous_apply"},
+        }
+
+    if not snapshot_complete:
+        return result("blocked", "unknown_incomplete_snapshot")
+    if (
+        observed_ledger is None
+        or not isinstance(observed_catalog_fingerprint, str)
+        or not observed_catalog_fingerprint.strip()
+    ):
+        return result("blocked", "unknown_missing_ledger_or_catalog")
+    if not all(
+        isinstance(value, str) and value.strip()
+        for value in (
+            migration_name,
+            migration_checksum,
+            expected_predecessor_fingerprint,
+            expected_applied_fingerprint,
+        )
+    ):
+        return result("blocked", "unknown_incomplete_expected_manifest")
+    expected_successors = expected_successors or []
+
+    def valid_entry(entry: object) -> bool:
+        return (
+            isinstance(entry, tuple)
+            and len(entry) == 3
+            and all(isinstance(value, str) and value.strip() for value in entry)
+        )
+
+    if any(not valid_entry(entry) for entry in expected_predecessors):
+        return result("blocked", "unknown_invalid_predecessor_manifest")
+    if any(not valid_entry(entry) for entry in expected_successors):
+        return result("blocked", "unknown_invalid_successor_manifest")
+    if any(not valid_entry(entry) for entry in observed_ledger):
+        return result("blocked", "unknown_invalid_observed_ledger")
+
+    migration_names = [entry[0] for entry in expected_predecessors]
+    migration_names.extend([migration_name, *(entry[0] for entry in expected_successors)])
+    if len(migration_names) != len(set(migration_names)):
+        return result("blocked", "unknown_invalid_migration_order")
+    if (expected_predecessors
+            and expected_predecessors[-1][2] != expected_predecessor_fingerprint):
+        return result("blocked", "unknown_predecessor_fingerprint_manifest_mismatch")
+
+    target_entry: MigrationLedgerEntry = (
+        migration_name, migration_checksum, expected_applied_fingerprint
+    )
+    expected_current = [*expected_predecessors, target_entry]
+
+    if observed_ledger == expected_predecessors:
+        if observed_catalog_fingerprint == expected_predecessor_fingerprint:
+            reason = (
+                "complete snapshot proves the prior ambiguous attempt did not commit"
+                if apply_outcome_ambiguous
+                else "complete snapshot matches the required predecessor chain"
+            )
+            return result("safe_to_apply", reason)
+        if observed_catalog_fingerprint == expected_applied_fingerprint:
+            return result("blocked", "ledger_catalog_disagreement_target_fingerprint_without_entry")
+        return result("blocked", "partial_or_unrecognized_catalog_state")
+
+    observed_chain = [*expected_predecessors, target_entry]
+    successor_prefixes = [
+        [*expected_successors[:length]]
+        for length in range(len(expected_successors) + 1)
+    ]
+    for successor_prefix in successor_prefixes:
+        expected_current = [*observed_chain, *successor_prefix]
+        if observed_ledger != expected_current:
+            continue
+        expected_catalog = expected_current[-1][2]
+        if observed_catalog_fingerprint == expected_catalog:
+            status = "committed_after_ambiguous_apply" if apply_outcome_ambiguous else "already_applied"
+            reason = (
+                "complete later read proves the exact migration checksum and ledger-head fingerprint committed"
+                if apply_outcome_ambiguous
+                else "ledger checksums and ledger-head fingerprint exactly match the catalog"
+            )
+            return result(status, reason)
+        if observed_catalog_fingerprint == expected_predecessor_fingerprint:
+            return result("blocked", "ledger_catalog_disagreement_catalog_is_predecessor")
+        return result("blocked", "partial_or_unrecognized_catalog_state")
+
+    target_entries = [entry for entry in observed_ledger if entry[0] == migration_name]
+    if target_entries:
+        if len(target_entries) != 1 or target_entries[0] != target_entry:
+            return result("blocked", "ledger_catalog_disagreement_migration_entry_mismatch")
+        target_index = observed_ledger.index(target_entry)
+        if observed_ledger[:target_index] != expected_predecessors:
+            return result("blocked", "ledger_history_does_not_match_required_predecessor_chain")
+        return result("blocked", "ledger_history_contains_unapproved_successor")
+    return result("blocked", "ledger_history_does_not_match_required_predecessor_chain")
 
 
 def migration_fingerprint_sql() -> str:
@@ -388,15 +524,20 @@ def run_binding_role_acceptance_sql() -> str:
     DO $$
     DECLARE
       table_name TEXT;
+      expected_using TEXT;
       visible_rows INTEGER;
       changed_rows INTEGER;
       role_row RECORD;
+      update_sqlstate TEXT := NULL;
     BEGIN
       IF current_user <> 'star_engineering_directory_owner'
          OR session_user <> 'erun_directory_api_test' THEN
         RAISE EXCEPTION 'SET LOCAL ROLE did not establish the expected execution identity';
       END IF;
-      IF has_table_privilege(session_user,'multica.engineering_run_worktree_binding','INSERT') THEN
+      IF has_table_privilege(session_user,'multica.engineering_run_worktree_binding','INSERT')
+           OR has_table_privilege(session_user,'multica.engineering_run','INSERT')
+           OR has_table_privilege(session_user,'multica.engineering_run_revision','INSERT')
+           OR has_table_privilege(session_user,'permission.engineering_run_role_binding','INSERT') THEN
         RAISE EXCEPTION 'NOINHERIT runtime login unexpectedly inherited owner privileges';
       END IF;
       IF EXISTS (SELECT 1 FROM pg_auth_members WHERE member=current_user::regrole) THEN
@@ -448,11 +589,21 @@ def run_binding_role_acceptance_sql() -> str:
         'permission.cloud_branch_role_binding','permission.engineering_run_role_binding',
         'multica.engineering_run_revision','multica.worktree_project_binding','public.worktree_canvas_worktree',
         'multica.task_metadata','multica.work_item_worktree'] LOOP
+        expected_using := CASE
+          WHEN table_name = ANY (ARRAY[
+            'permission.project_role_binding',
+            'permission.engineering_run_role_binding',
+            'multica.engineering_run_revision',
+            'multica.worktree_project_binding',
+            'public.worktree_canvas_worktree'
+          ]::TEXT[]) THEN 'true'
+          ELSE 'false'
+        END;
         IF NOT EXISTS (
           SELECT 1 FROM pg_policy p
           WHERE p.polrelid=table_name::regclass AND p.polcmd='w' AND NOT p.polpermissive
             AND current_user::regrole::oid = ANY(p.polroles)
-            AND pg_get_expr(p.polqual,p.polrelid)='false'
+            AND pg_get_expr(p.polqual,p.polrelid)=expected_using
             AND pg_get_expr(p.polwithcheck,p.polrelid)='false'
         ) THEN
           RAISE EXCEPTION 'lock-only row UPDATE is not denied by restrictive RLS: %', table_name;
@@ -477,6 +628,9 @@ def run_binding_role_acceptance_sql() -> str:
         RAISE EXCEPTION 'owner role has an unexpected cross-owner or Outbox privilege';
       END IF;
       IF NOT has_table_privilege(current_user,'multica.engineering_run_worktree_binding','INSERT')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run','INSERT')
+         OR NOT has_table_privilege(current_user,'multica.engineering_run_revision','INSERT')
+         OR NOT has_table_privilege(current_user,'permission.engineering_run_role_binding','INSERT')
          OR NOT has_column_privilege(current_user,'multica.engineering_run_worktree_binding','valid_to','UPDATE')
          OR NOT has_table_privilege(current_user,'multica.engineering_run_command_idempotency','INSERT')
          OR NOT has_table_privilege(current_user,'multica.engineering_run_command_idempotency','DELETE')
@@ -496,10 +650,22 @@ def run_binding_role_acceptance_sql() -> str:
       IF visible_rows <> 1 THEN RAISE EXCEPTION 'tenant-scoped Task/Worktree relation is not visible'; END IF;
       PERFORM 1 FROM permission.project_role_binding
        WHERE id='40000000-0000-0000-0000-000000000001' FOR SHARE;
-      UPDATE permission.project_role_binding SET valid_to=now()
-       WHERE id='40000000-0000-0000-0000-000000000001';
-      GET DIAGNOSTICS changed_rows = ROW_COUNT;
-      IF changed_rows <> 0 THEN RAISE EXCEPTION 'lock-only UPDATE grant mutated Project membership'; END IF;
+      BEGIN
+        UPDATE permission.project_role_binding SET valid_to=now()
+         WHERE id='40000000-0000-0000-0000-000000000001';
+        GET DIAGNOSTICS changed_rows = ROW_COUNT;
+      EXCEPTION WHEN SQLSTATE '42501' THEN
+        GET STACKED DIAGNOSTICS update_sqlstate = RETURNED_SQLSTATE;
+      END;
+      IF update_sqlstate IS DISTINCT FROM '42501' THEN
+        RAISE EXCEPTION 'lock-only Project grant UPDATE must fail with SQLSTATE 42501; got %, rows=%',
+          update_sqlstate, changed_rows;
+      END IF;
+      SELECT count(*) INTO visible_rows FROM permission.project_role_binding
+       WHERE id='40000000-0000-0000-0000-000000000001' AND valid_to IS NULL;
+      IF visible_rows <> 1 THEN
+        RAISE EXCEPTION 'lock-only UPDATE changed or hid Project membership; active rows=%', visible_rows;
+      END IF;
       PERFORM 1 FROM multica.task_metadata
        WHERE metadata_id='a0000000-0000-0000-0000-000000000001' FOR SHARE;
       UPDATE multica.task_metadata SET valid_to=now()
@@ -692,6 +858,18 @@ def validate_postgres_ddl(bin_dir: Path, port: int, environment: dict[str, str],
                                                 "2026-10-20-engineering-directory-owner-role.sql"))
             if steps[-1]["exit_code"]:
                 return steps
+            for name, migration in (
+                ("postgres-engineering-directory-lock-only-policy-normalize",
+                 "2026-10-23-engineering-directory-lock-only-policy.sql"),
+                ("postgres-engineering-run-create-owner-grants-normalize",
+                 "2026-10-23-engineering-run-create-owner-grants.sql"),
+            ):
+                steps.append(apply_migration(name, migration))
+                if steps[-1]["exit_code"]:
+                    return steps
+                steps.append(fingerprint_migration(name, migration))
+                if steps[-1]["exit_code"]:
+                    return steps
             ownership_fixture = run_binding_role_ownership_fixture_sql()
             steps.append(run_step("postgres-engineering-directory-owner-role-ownership-fixture",
                                   psql + ["-c", ownership_fixture], ROOT, environment, output_dir))

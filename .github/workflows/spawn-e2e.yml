@@ -12,6 +12,9 @@ on:
 # (Linux setsid+cgroup / macOS setpgid / Windows Job Object)
 # + systemd-run 真实压测(per 第 8 节 P1 followup systemd-run CI 压测)
 
+permissions:
+  contents: read
+
 jobs:
   spawn-cross-platform:
     name: spawn-e2e (${{ matrix.os }})
@@ -19,17 +22,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-2025, macos-15]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
+          toolchain: 1.99.1
           components: clippy, rustfmt
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: cargo check domain-local-runtime
         run: cargo check -p domain-local-runtime --lib -j 4
@@ -51,17 +55,18 @@ jobs:
 
   systemd-run-e2e:
     name: systemd-run e2e (Linux only)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.99.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
+          toolchain: 1.99.1
           components: clippy, rustfmt
 
       - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Check systemd-run availability
         id: check_systemd

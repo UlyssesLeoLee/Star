@@ -1038,7 +1038,9 @@ mod tests {
     async fn per_user_backed_missing_file_returns_empty_lenient() {
         let tmp = TempDir::new("peruser-missing");
         let src = FileBackedPerUserSource::with_path(
-            tmp.path().join(PERUSER_CONFIG_DIR_NAME).join(PERUSER_CONFIG_FILE_NAME),
+            tmp.path()
+                .join(PERUSER_CONFIG_DIR_NAME)
+                .join(PERUSER_CONFIG_FILE_NAME),
         );
         let entries = src.list().await.unwrap();
         assert!(entries.is_empty());
@@ -1090,8 +1092,14 @@ mod tests {
             "/var/cache/build-output"
         });
         let paths: Vec<std::path::PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
-        assert!(paths.contains(&expected_a), "missing {expected_a:?} in {paths:?}");
-        assert!(paths.contains(&expected_b), "missing {expected_b:?} in {paths:?}");
+        assert!(
+            paths.contains(&expected_a),
+            "missing {expected_a:?} in {paths:?}"
+        );
+        assert!(
+            paths.contains(&expected_b),
+            "missing {expected_b:?} in {paths:?}"
+        );
         // 每条都标 P3 / PerUser / enabled / WorktreeAdd
         for e in &entries {
             assert_eq!(e.source, SharedDirSource::PerUser);
@@ -1220,8 +1228,11 @@ mod tests {
             tmp.path(),
             r#"{"worktree_shared_directories": ["/opt/cli/x"]}"#,
         );
-        let per_user_src =
-            FileBackedPerUserSource::with_path(tmp.path().join(PERUSER_CONFIG_DIR_NAME).join(PERUSER_CONFIG_FILE_NAME));
+        let per_user_src = FileBackedPerUserSource::with_path(
+            tmp.path()
+                .join(PERUSER_CONFIG_DIR_NAME)
+                .join(PERUSER_CONFIG_FILE_NAME),
+        );
         let resolver = InMemorySharedDirResolver::new(
             Arc::new(per_user_src),
             Arc::new(InMemorySharedDirWorkspaceSource::new(vec![ws(

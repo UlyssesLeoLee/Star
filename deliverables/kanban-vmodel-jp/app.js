@@ -829,8 +829,8 @@
     const delBtn = body.querySelector('#seDeleteBtn');
     if (delBtn) {
       delBtn.addEventListener('click', () => {
-        if (!confirm(`${draft.name} を削除しますか?\n配下のタスクは全件 Backlog に戻します (per Jira 設計)。`)) return;
-        // Jira 設計: 削除 Sprint の全タスクは Backlog に戻る
+        if (!confirm(`${draft.name} を削除しますか?\n配下のタスクは全件 Backlog に戻します (per Star workflow rule)。`)) return;
+        // Star workflow rule: 削除 Sprint の全タスクは Backlog に戻る
         const returned = returnSprintTasksToBacklog(draft);
         state.sprints = state.sprints.filter(s => s.id !== sprintId);
         save();
@@ -859,7 +859,7 @@
         (s.taskIds || []).forEach(tid => inOtherSprint.add(tid));
       }
     });
-    // Jira 設計: Sprint 計画は Backlog (status === 'backlog') からのみ追加可能
+    // Star workflow rule: Sprint 計画は Backlog (status === 'backlog') からのみ追加可能
     const backlog = allTaskIds.filter(id => {
       const t = state.tasks[id];
       return t && t.status === 'backlog' && !inSprint.has(id) && !inOtherSprint.has(id);
@@ -901,7 +901,7 @@
       body.innerHTML = `
         <div class="plan-hint">
           <span class="plan-hint__icon">💡</span>
-          <span><strong>Jira 設計準拠</strong>: Sprint には Backlog 状態 (status = backlog) のタスクのみ追加できます。Kanban Board で「バックログ」列に戻してから追加してください。</span>
+          <span><strong>Star workflow rule</strong>: Sprint には Backlog 状態 (status = backlog) のタスクのみ追加できます。Kanban Board で「バックログ」列に戻してから追加してください。</span>
         </div>
         ${notBacklogInSprint.length ? `
         <div class="plan-warn">
@@ -1005,7 +1005,7 @@
       toast('他 Sprint に既に所属', 'error');
       return;
     }
-    // Jira 设计: タスクは Backlog 状態 (status === 'backlog') でのみ Sprint に追加可能
+    // Star workflow rule: タスクは Backlog 状態 (status === 'backlog') でのみ Sprint に追加可能
     const t = state.tasks[taskId];
     if (!t) return;
     if (t.status !== 'backlog') {
@@ -1022,7 +1022,7 @@
     const s = getSprint(sprintId);
     if (!s) return;
     s.taskIds = s.taskIds.filter(id => id !== taskId);
-    // Jira 设计: Sprint から外したタスクは Backlog に戻る
+    // Star workflow rule: Sprint から外したタスクは Backlog に戻る
     const t = state.tasks[taskId];
     if (t) t.status = 'backlog';
     save();
@@ -1031,7 +1031,7 @@
     renderSprint();
   }
 
-  // ヘルパー: Sprint 内の全タスク (完了済以外) を Backlog に戻す (per Jira: 完了 Sprint の未完了タスクは Backlog に戻る)
+  // ヘルパー: Sprint 内の全タスク (完了済以外) を Backlog に戻す (Star workflow rule)
   function returnSprintTasksToBacklog(sprint, { onlyIncomplete = false } = {}) {
     if (!sprint) return 0;
     let count = 0;
@@ -1068,12 +1068,12 @@
     const commitment = sprintCapacity(s);
     const completed = (s.taskIds || []).filter(id => state.tasks[id] && state.tasks[id].status === 'done').length;
     const incomplete = s.taskIds.length - completed;
-    if (!confirm(`${s.id} を完了しますか?\n完了タスク: ${completed} / ${s.taskIds.length}\n完了工数: ${velocity}h / 計画 ${commitment}h\n未完了 ${incomplete} 件 は Backlog に戻します (per Jira 設計)`)) return;
+    if (!confirm(`${s.id} を完了しますか?\n完了タスク: ${completed} / ${s.taskIds.length}\n完了工数: ${velocity}h / 計画 ${commitment}h\n未完了 ${incomplete} 件 は Backlog に戻します (per Star workflow rule)`)) return;
     s.status = 'completed';
     s.completedAt = new Date().toISOString();
     s.velocity = velocity;
     state.activeSprintId = null;
-    // Jira 設計: 完了 Sprint の未完了タスクは Backlog に戻る
+    // Star workflow rule: 完了 Sprint の未完了タスクは Backlog に戻る
     const returned = returnSprintTasksToBacklog(s, { onlyIncomplete: true });
     save();
     renderSprint();
@@ -1082,11 +1082,11 @@
   function cancelSprint(sprintId) {
     const s = getSprint(sprintId);
     if (!s) return;
-    if (!confirm(`${s.id} を中止しますか?\n配下タスクは全件 Backlog に戻します (per Jira 設計)。他 Sprint で再計画可能。`)) return;
+    if (!confirm(`${s.id} を中止しますか?\n配下タスクは全件 Backlog に戻します (per Star workflow rule)。他 Sprint で再計画可能。`)) return;
     s.status = 'cancelled';
     s.cancelledAt = new Date().toISOString();
     if (state.activeSprintId === s.id) state.activeSprintId = null;
-    // Jira 設計: 中止 Sprint の全タスクは Backlog に戻る
+    // Star workflow rule: 中止 Sprint の全タスクは Backlog に戻る
     const returned = returnSprintTasksToBacklog(s);
     s.taskIds = [];
     save();

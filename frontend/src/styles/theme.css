@@ -22,6 +22,10 @@
 :root {
   color-scheme: light;
 
+  /* 弹层实色底 (per WBS §23.33-A: 弹出菜单/浮层禁止透底, 艺术主题的玻璃令牌只用于
+     背景装饰层, popover 一律实色) */
+  --popover-bg: #ffffff;
+
   /* === 主色 / 强调色 === */
   --color-primary:            #1a6cf6;
   --color-primary-glow:       rgba(26, 108, 246, 0.22);
@@ -142,6 +146,9 @@
 .dark {
   color-scheme: dark;
 
+  /* 弹层实色底 (per WBS §23.33-A) */
+  --popover-bg: #0d1322;
+
   --color-primary:            #00f0ff;
   --color-primary-glow:       rgba(0, 240, 255, 0.38);
   --color-secondary:          #ff2a85;
@@ -239,6 +246,10 @@
 html.christmas,
 .theme-christmas {
   color-scheme: dark;
+
+  /* 弹层实色底 (per WBS §23.33-A: christmas 玻璃令牌 rgba 半透明仅用于背景层,
+     popover 用实色深林绿, 防透底干扰阅读) */
+  --popover-bg: #0f1e16;
 
   /* === 主色 / 强调色 === */
   --color-primary:            #d42426;
@@ -353,6 +364,9 @@ html.christmas,
 html.charisma,
 .theme-charisma {
   color-scheme: dark;
+
+  /* 弹层实色底 (per WBS §23.33-A) */
+  --popover-bg: #171326;
 
   /* === 主色 / 强调色 === */
   --color-primary:            #8b5cf6;
@@ -479,6 +493,9 @@ html.shanghai,
 .theme-shanghai {
   color-scheme: light;
 
+  /* 弹层实色底 (per WBS §23.33-A) */
+  --popover-bg: #faf2de;
+
   /* === 主色 / 强调色 === */
   --color-primary:            #b8282b;
   --color-primary-glow:       rgba(184, 40, 43, 0.32);
@@ -598,6 +615,9 @@ html.shanghai,
 html.cel,
 .theme-cel {
   color-scheme: light;
+
+  /* 弹层实色底 (per WBS §23.33-A) */
+  --popover-bg: #ffffff;
 
   /* === 主色 / 强调色 === */
   --color-primary:            #2563eb;

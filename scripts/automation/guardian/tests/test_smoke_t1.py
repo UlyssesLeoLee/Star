@@ -69,7 +69,7 @@ def t3_block_命中_rm_rf():
         agent_role="orchestrator",
     )
     # 注意: 这条命令实际是 rm -rf /tmp/xxx, 不是 rm -rf /, 应该 PASS
-    decision = guard.evaluate(tc)
+    guard.evaluate(tc)
     # 让我换一条更明确的
     tc2 = ToolCall(
         tool_name="bash",
@@ -193,7 +193,7 @@ def t8_latency_benchmark():
     p99 = latencies[99]
     print(f"    p50 = {p50:.3f}ms, p99 = {p99:.3f}ms")
     assert p50 < 5, f"p50 = {p50:.3f}ms, 期望 < 5ms (NFR-P-1 违反)"
-    print(f"    OK: p50 < 5ms 满足 NFR-P-1")
+    print("    OK: p50 < 5ms 满足 NFR-P-1")
     db.stop()
 
 

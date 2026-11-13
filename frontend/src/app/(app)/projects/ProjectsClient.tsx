@@ -1,6 +1,16 @@
 /*
-@cypher schema=1 source_sha256=2f4f4ba4ece90ff429519daef938c735106cdfd4c6395541bd10d5986abd472c
+@cypher schema=1 source_sha256=890be4f6f2c626bb4b0b23ef2b6d3acfd45775de40321ada37ec9d1f0b0973d9
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
+MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
+MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
+MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
+MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (differenceInUtcCalendarDays:Function {name:"differenceInUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(dateUtils)
+MERGE (self)-[:DEFINES]->(projectsClient)
+MERGE (projectsClient)-[:CALLS]->(toUtcCalendarDate)
+MERGE (projectsClient)-[:CALLS]->(addUtcCalendarDays)
+MERGE (projectsClient)-[:CALLS]->(differenceInUtcCalendarDays)
 @endcypher
 */
 "use client";
@@ -49,6 +59,7 @@ MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
@@ -63,6 +74,8 @@ import { KanbanBoard } from "@/components/board/KanbanBoard";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { ArchGraphModal, useArchGraphTrigger } from "@/components/board/ArchGraphModal";
 import { GanttChart } from "@/components/gantt";
+import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
+import { IPA_SKILL_CATALOG } from "@/lib/ipa-skills/catalog";
 import { MonthView } from "@/components/calendar/MonthView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
@@ -80,14 +93,30 @@ import {
   Activity,
   Clock,
   GitBranch,
+  Workflow,
 } from "lucide-react";
-import { addDays, format, parseISO, differenceInDays } from "date-fns";
+import { format } from "date-fns";
+import {
+  addUtcCalendarDays,
+  differenceInUtcCalendarDays,
+  toUtcCalendarDate,
+} from "@/lib/gantt/dateUtils";
 import type {
   Board, Project, WorkItem, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
 } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 import { CelCard3D } from "@/components/effects/CelCard3D";
 import { CreateProjectDialog } from "@/components/project/CreateProjectDialog";
+import {
+  ProjectsFilterBar,
+  applyKanbanFilter,
+  applyWorktreeFilter,
+  isFilterActive,
+  KANBAN_STATUSES,
+  BACKLOG_PRIORITIES,
+  EMPTY_PROJECTS_FILTER,
+  type ProjectsFilterState,
+} from "./ProjectsFilterBar";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
@@ -96,6 +125,7 @@ const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode
   { id: "backlog",   label: "Backlog",   icon: <LayoutDashboard size={12} /> },
   { id: "agents",    label: "Agents",    icon: <Users size={12} /> },
   { id: "worktrees", label: "Worktrees", icon: <GitBranch size={12} /> },
+  { id: "ipa",       label: "IPA 技能",  icon: <Workflow size={12} /> },
 ];
 
 // Kanban 5 列 (per KANBAN_COLUMNS in mocks/data/kanban.ts, blocked 状态列入主面板)
@@ -111,6 +141,7 @@ function deriveRole(project: Project): "project_admin" | "developer" | "viewer" 
 
 export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTabId }) {
   const { t } = useTranslation();
+  const router = useRouter();
   // ---- store 订阅 (zustand selectors) ----
   const projects = useStore((s) => s.projects);
   const workItems = useStore((s) => s.workItems);
@@ -168,16 +199,77 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   //   URL ?tab=X > ?canvas= → backlog > cookie > "kanban"
   //   这里 useState 初始值直接用, client hydration 与 SSR HTML 一致
   const [tab, setTabInternal] = useState<ProjectsTabId>(initialTab);
+  // per 2026-11-12 用户发令 (导航切换修复): sidebar Timeline/Backlog/Kanban 等
+  // 跳本页不同 ?tab= 时组件不卸载, useState 初始值不会重跑 → 旧实现 tab 永远
+  // 停在进入时的值 ("timeline 打开是看板标签页" 根因)。这里监听 initialTab
+  // (server wrapper 每次导航都按 URL 重算) 同步状态。
+  useEffect(() => {
+    setTabInternal(initialTab);
+  }, [initialTab]);
   // 切 tab 时同步写 cookie (per 2026-09-01 16:41 JST cookie-default 拍板)
-  //   e2e hook / 内部 setTab 仍走 setTabInternal (不写 cookie, e2e test 不需要持久化)
+  //   同时写回 URL ?tab= 保证 前进/后退/分享链接 与 sidebar 高亮一致
+  //   (per 2026-11-12 用户发令: 每个导航按钮都要正确切换)
   const setTab = useCallback((id: ProjectsTabId) => {
     setTabInternal(id);
     if (isValidProjectsTab(id)) {
       writeProjectsDefaultTabCookie(id);
     }
-  }, []);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", id);
+      router.replace(`/projects?${params.toString()}`, { scroll: false });
+    } catch {
+      // jsdom / SSR 环境无 window.location.search 时降级: 只切 state
+    }
+  }, [router]);
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  // ---- 下行 FilterBar 筛选状态 (per WBS §23.32-B: 上下两块标签页区域) ----
+  // 状态存 useState + 写回 URL query (?status=todo,review&member=X&q=...) 保持可分享链接。
+  // 初始值从 URL query 解析一次 (client-only; SSR 不读 window)。
+  const [projectFilter, setProjectFilter] = useState<ProjectsFilterState>(() => {
+    if (typeof window === "undefined") return { ...EMPTY_PROJECTS_FILTER };
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const statuses = (params.get("status") ?? "")
+        .split(",")
+        .filter((s): s is WorkItemStatus => (KANBAN_STATUSES as readonly string[]).includes(s));
+      const priorities = (params.get("priority") ?? "")
+        .split(",")
+        .filter((p) => (BACKLOG_PRIORITIES as readonly string[]).includes(p));
+      const members = (params.get("member") ?? "")
+        .split(",")
+        .filter(Boolean);
+      return { statuses, priorities, memberIds: members, query: params.get("q") ?? "" };
+    } catch {
+      return { ...EMPTY_PROJECTS_FILTER };
+    }
+  });
+
+  // 筛选变化写回 URL query (与 setTab 的 ?tab= 写法一致)
+  const setProjectFilterWithUrl = useCallback(
+    (next: ProjectsFilterState) => {
+      setProjectFilter(next);
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (next.statuses.length > 0) params.set("status", next.statuses.join(","));
+        else params.delete("status");
+        if (next.priorities.length > 0) params.set("priority", next.priorities.join(","));
+        else params.delete("priority");
+        if (next.memberIds.length > 0) params.set("member", next.memberIds.join(","));
+        else params.delete("member");
+        if (next.query.trim()) params.set("q", next.query.trim());
+        else params.delete("q");
+        router.replace(`/projects?${params.toString()}`, { scroll: false });
+      } catch {
+        // jsdom / SSR 环境降级: 只切 state
+      }
+    },
+    [router],
+  );
+
+  // ---- 筛选后的派生数据 (useMemo, per FilterBar 开关) — 声明在 projectWorkItems/projectWorktrees 之后
   const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -210,6 +302,15 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const projectWorktrees = useMemo(
     () => worktrees.filter((w) => w.project_id === selectedProjectId),
     [worktrees, selectedProjectId],
+  );
+  // ---- 筛选后的派生数据 (per WBS §23.32-B 下行 FilterBar) ----
+  const filteredProjectWorkItems = useMemo(
+    () => applyKanbanFilter(projectWorkItems, identities, projectFilter),
+    [projectWorkItems, identities, projectFilter],
+  );
+  const filteredProjectWorktrees = useMemo(
+    () => applyWorktreeFilter(projectWorktrees, projectFilter),
+    [projectWorktrees, projectFilter],
   );
   // per DRIFT-α-009 修复: 当前 project 关联的 canvas (ref_kind === "project")
   const projectCanvases = useMemo(
@@ -322,22 +423,22 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
 
   // ---- ProjectTimeline: Gantt date range ----
   const ganttDateRange = useMemo(() => {
-    const all: Date[] = [
-      ...projectSprints.flatMap((s) => [parseISO(s.start_date), parseISO(s.end_date)]),
-      ...projectMilestones.map((m) => parseISO(m.due_date)),
+    const all = [
+      ...projectSprints.flatMap((s) => [toUtcCalendarDate(s.start_date), toUtcCalendarDate(s.end_date)]),
+      ...projectMilestones.map((m) => toUtcCalendarDate(m.due_date)),
     ];
     if (all.length === 0) {
-      const today = new Date();
-      return { start: format(today, "yyyy-MM-dd"), end: format(addDays(today, 60), "yyyy-MM-dd") };
+      const today = toUtcCalendarDate(new Date().toISOString());
+      return { start: today, end: addUtcCalendarDays(today, 60) };
     }
     const min = all.reduce((a, b) => (a < b ? a : b));
     const max = all.reduce((a, b) => (a > b ? a : b));
-    const start = addDays(min, -7);
-    const end = addDays(max, 7);
-    if (differenceInDays(end, start) > 180) {
-      return { start: format(start, "yyyy-MM-dd"), end: format(addDays(start, 180), "yyyy-MM-dd") };
+    const start = addUtcCalendarDays(min, -7);
+    const end = addUtcCalendarDays(max, 7);
+    if (differenceInUtcCalendarDays(end, start) > 180) {
+      return { start, end: addUtcCalendarDays(start, 180) };
     }
-    return { start: format(start, "yyyy-MM-dd"), end: format(end, "yyyy-MM-dd") };
+    return { start, end };
   }, [projectSprints, projectMilestones]);
 
   // ---- Gantt handlers (per 已知缺口 #2: 走 useStore.setState, 后端 PATCH D.6+) ----
@@ -497,7 +598,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         </CelCard3D>
       </div>
 
-      {/* ---- Tabs ---- */}
+      {/* ---- Tabs (上行: 切换当前标签页) ---- */}
       <Tabs
         active={tab}
         onChange={(id) => setTab(id as ProjectsTabId)}
@@ -511,8 +612,19 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             t.id === "backlog" ? projectWorkItems.filter((w) => w.status === "todo").length :
             t.id === "agents" ? projectMembers.length :
             t.id === "worktrees" ? projectWorktrees.length :
+            t.id === "ipa" ? IPA_SKILL_CATALOG.length :
             undefined,
         }))}
+      />
+
+      {/* ---- 下行 FilterBar: 筛选标签页里的内容 + timeline 子标签页 (per WBS §23.32-B) ---- */}
+      <ProjectsFilterBar
+        filter={projectFilter}
+        onChange={setProjectFilterWithUrl}
+        tab={tab}
+        memberChips={projectMembers.map((m) => ({ id: m.id, label: m.display_name }))}
+        calendarView={calendarView}
+        onCalendarViewChange={setCalendarView}
       />
 
       {/* ---- Tab content (5 tab per 2026-08-29 22:49 JST 拍板: Kanban / Timeline / Backlog / Agents / Worktrees) ---- */}
@@ -522,7 +634,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
           <DomainMarker domain="social" label="social 域 (collaboration/通知)" />
           <KanbanBoard
             board={projectBoard}
-            workItems={projectWorkItems}
+            workItems={filteredProjectWorkItems}
             identities={identities}
             onTransition={handleBoardTransition}
             onAddColumn={addBoardColumn}
@@ -541,6 +653,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             projectKey={selectedProject?.key}
             tenantId={selectedProject?.tenant_id}
             reporterId={selectedProject?.owner_id}
+            onOpenChildTask={(childId) => setWorkItemDrawer({ kind: "view", workItemId: childId })}
           />
           {/* 架构查看器 (per ADR-0041-arch-agent-graph-viewer v0.1) */}
           {arch.modalProps && (
@@ -635,8 +748,8 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       {tab === "backlog" && (
         <div data-testid="projects-backlog-tab" className="space-y-2">
           <DomainMarker domain="economy" label="economy 域 (billing/pricing/cost)" />
-          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数)</div>
-          {projectWorkItems.length === 0 ? (
+          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorkItems.length}` : ""})</div>
+          {filteredProjectWorkItems.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no work-items)</div>
           ) : (
             <table className="table">
@@ -651,7 +764,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
                 </tr>
               </thead>
               <tbody>
-                {[...projectWorkItems]
+                {[...filteredProjectWorkItems]
                   .sort((a, b) => {
                     // status 排序: todo > in_progress > review > blocked > done > wontfix (per WorkItemStatus 真实定义)
                     const order: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done", "wontfix"];
@@ -689,7 +802,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         <div data-testid="projects-worktrees-tab" className="space-y-2">
           <DomainMarker domain="admin" label="admin 域 (RBAC/permission/tenant)" />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
+            <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorktrees.length}` : ""})</div>
             <Link href="/worktree" className="btn-primary text-xs" data-testid="open-project-worktree-index">
               打开项目 Worktree 管理
             </Link>
@@ -712,7 +825,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
               ))}
             </div>
           )}
-          {projectWorktrees.length === 0 ? (
+          {filteredProjectWorktrees.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no worktrees)</div>
           ) : (
             <table className="table">
@@ -726,7 +839,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
                 </tr>
               </thead>
               <tbody>
-                {projectWorktrees.map((w) => (
+                {filteredProjectWorktrees.map((w) => (
                   <tr key={w.id} data-testid={`worktree-row-${w.id}`}>
                     <td className="font-mono text-[10px] text-ink-mute">{w.id.slice(0, 8)}</td>
                     <td className="font-mono text-xs">{w.name}</td>
@@ -742,6 +855,26 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {tab === "ipa" && (
+        <div data-testid="projects-ipa-tab">
+          <DomainMarker domain="match" label="IPA 技能工作流 (per 2026-11-11 用户发令: 技能 = 任务卡, 与 kanban 同一套内容)" />
+          <IpaSkillWorkflowBoard
+            projectId={selectedProjectId}
+            tenantId={selectedProject?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
+            reporterId={selectedProject?.owner_id}
+            onOpenTaskCard={(workItemId) => setWorkItemDrawer({ kind: "view", workItemId })}
+          />
+          <WorkItemDetailDrawer
+            open={workItemDrawer}
+            onClose={() => setWorkItemDrawer(null)}
+            projectId={selectedProjectId}
+            projectKey={selectedProject?.key}
+            tenantId={selectedProject?.tenant_id}
+            reporterId={selectedProject?.owner_id}
+          />
         </div>
       )}
     </div>

@@ -12,7 +12,7 @@
 //   6. 安全退出
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=581a8f942601f56cbab14630570cd1628aa602d1b48e586ab35c9a371d1549c4
+@cypher schema=1 source_sha256=688608c7c1f7d81739150853399e9f97f7bc3c8aada3cc849ce2b4a29e35860f
 MERGE (self:File {path:"frontend/src/components/UserMenu.tsx"})
 MERGE (menu:Symbol {id:"frontend/src/components/UserMenu.tsx::UserMenu",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -142,10 +142,10 @@ export function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-64 border-2 border-[var(--cel-ink)] bg-bg-card shadow-[6px_6px_0px_0px_var(--cel-ink),0_20px_40px_-10px_rgba(0,0,0,0.4)] z-50 overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="popover-solid absolute right-0 mt-2 w-64 border-2 border-[var(--cel-ink)] shadow-[6px_6px_0px_0px_var(--cel-ink),0_20px_40px_-10px_rgba(0,0,0,0.4)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         >
           {/* 用户信息区 */}
-          <div className="px-3.5 py-3 border-b border-line bg-bg-soft/70">
+          <div className="popover-panel px-3.5 py-3 border-b border-line">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-ink">Ulysses</div>
               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded border border-accent/40 bg-accent/10 text-accent">
@@ -159,7 +159,7 @@ export function UserMenu() {
 
           {/* 主题切换 (日漫风格双核切换) */}
           {mounted && (
-            <div className="px-3.5 py-2.5 border-b border-line bg-bg-soft/30">
+            <div className="popover-panel px-3.5 py-2.5 border-b border-line">
               <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-2 flex items-center justify-between font-mono">
                 <span className="flex items-center gap-1">
                   <Cpu size={10} className="text-accent" />
@@ -291,7 +291,7 @@ export function UserMenu() {
                 ref={langMenuRef}
                 role="menu"
                 data-testid="user-menu-language-menu"
-                className="mx-2 mb-1.5 mt-0.5 rounded-md border border-line bg-bg/95 overflow-hidden shadow-inner"
+                className="popover-panel mx-2 mb-1.5 mt-0.5 rounded-md border border-line overflow-hidden shadow-inner"
               >
                 {SUPPORTED_LANGUAGES.map((lang) => {
                   const meta = LANGUAGE_META[lang];

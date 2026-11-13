@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0ce079cd4bcd069fe258e56edc31caf42f3d1e1b66eb44f460a7c7d0afb82d58
+@cypher schema=1 source_sha256=65ba496bf2698b4f9db8f91dd37fe55bb2afcbeb15482579e0eaa6ea5ca51668
 MERGE (self:File {path:"frontend/src/components/navigation/GuardedLink.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::GuardedLink navigation tests",kind:"suite"})
 MERGE (navigationCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::cancels a supported internal route when the user stays and permits it after confirmation case",kind:"test"})
@@ -7,6 +7,7 @@ MERGE (cleanupCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.te
 MERGE (externalCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::does not prompt for external links or links opened in a new tab case",kind:"test"})
 MERGE (callbackCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::runs app-shell navigation callbacks only after the guard approves case",kind:"test"})
 MERGE (contentCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::guards arbitrary same-origin content anchors before their click effects and routes once after approval case",kind:"test"})
+MERGE (nestedContentCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::guards a nested content element through its containing same-origin anchor case",kind:"test"})
 MERGE (exemptionsCase:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::leaves external, modified, new-tab, download, hash-only, and normalized same-route anchors alone case",kind:"test"})
 MERGE (draft:Symbol {id:"frontend/src/components/navigation/GuardedLink.test.tsx::ActiveDraftGuard",kind:"component"})
 MERGE (link:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -17,6 +18,7 @@ MERGE (suite)-[:DEFINES]->(cleanupCase)
 MERGE (suite)-[:DEFINES]->(externalCase)
 MERGE (suite)-[:DEFINES]->(callbackCase)
 MERGE (suite)-[:DEFINES]->(contentCase)
+MERGE (suite)-[:DEFINES]->(nestedContentCase)
 MERGE (suite)-[:DEFINES]->(exemptionsCase)
 MERGE (suite)-[:DEFINES]->(draft)
 MERGE (navigationCase)-[:TESTS]->(link)
@@ -24,6 +26,7 @@ MERGE (cleanupCase)-[:TESTS]->(link)
 MERGE (externalCase)-[:TESTS]->(link)
 MERGE (callbackCase)-[:TESTS]->(link)
 MERGE (contentCase)-[:TESTS]->(provider)
+MERGE (nestedContentCase)-[:TESTS]->(provider)
 MERGE (exemptionsCase)-[:TESTS]->(provider)
 MERGE (draft)-[:CALLS]->(provider)
 @endcypher
@@ -196,6 +199,29 @@ describe("GuardedLink", () => {
     expect(onClick).toHaveBeenCalledOnce();
     expect(navigation.push).toHaveBeenCalledOnce();
     expect(navigation.push).toHaveBeenCalledWith("/work-items/wi-7");
+  });
+
+  it("guards a nested content element through its containing same-origin anchor", () => {
+    const confirm = window.confirm as ReturnType<typeof vi.fn>;
+    const onClick = vi.fn();
+    render(
+      <UnsavedNavigationGuardProvider>
+        <ActiveDraftGuard />
+        <a href="/work-items/wi-8" onClick={onClick}><span>Open nested work item</span></a>
+      </UnsavedNavigationGuardProvider>,
+    );
+
+    fireEvent.click(screen.getByText("Open nested work item"));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(onClick).not.toHaveBeenCalled();
+    expect(navigation.push).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByText("Open nested work item"));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(navigation.push).toHaveBeenCalledOnce();
+    expect(navigation.push).toHaveBeenCalledWith("/work-items/wi-8");
   });
 
   it("leaves external, modified, new-tab, download, hash-only, and normalized same-route anchors alone", () => {

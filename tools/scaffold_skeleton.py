@@ -7,7 +7,7 @@ Run from anywhere; the path is hardcoded to D:/Star-worktrees/dev-skeleton.
 """
 from __future__ import annotations
 
-# @cypher schema=1 source_sha256=76fc74c67727c5de897728e8f9b1f0227b788250d45e77976769d93b59feca8b
+# @cypher schema=1 source_sha256=f17fa578f9df9df26b6f3e0f2008e7279342f16d16d5d52990a990a92142f5ba
 # MERGE (self:File {path:"tools/scaffold_skeleton.py"})
 # MERGE (main:Symbol {id:"tools/scaffold_skeleton.py::main",kind:"function"})
 # MERGE (render_root:Symbol {id:"tools/scaffold_skeleton.py::render_root_cargo_toml",kind:"function"})
@@ -1511,7 +1511,7 @@ def render_root_cargo_toml(crates: list[str]) -> str:
         "[workspace.package]\n"
         "version = \"0.1.0\"\n"
         "edition = \"2021\"\n"
-        "rust-version = \"1.99.0\"\n"
+        "rust-version = \"1.99.1\"\n"
         "authors = [\"Star Team\"]\n"
         "license = \"Apache-2.0\"\n"
         "repository = \"https://github.com/UlyssesLeoLee/Star\"\n"

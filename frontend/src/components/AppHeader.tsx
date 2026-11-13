@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=13aad78317dbc1c24f547bd84ddbddc6a22c81081640560f89d7dd28b84302b9
+@cypher schema=1 source_sha256=3656a554e6f70cdbc61bd1e3392b8d0e8cdb41d1a9abde99eecd85c7ed4b82e5
 MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (self)-[:IMPORTS]->(guardedLink)
@@ -8,7 +8,8 @@ MERGE (self)-[:IMPORTS]->(guardedLink)
 "use client";
 
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import { clsx } from "clsx";
 import { useState } from "react";
 import {
@@ -44,6 +45,7 @@ const WORKTREE_BRANCH =
 
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
+  const searchParams = useSearchParams();
   const openCommandBar = useCommandBarStore((s) => s.open);
   const { t, tx } = useTranslation();
   const [notifCount] = useState(3); // mock — Phase I+ 接 SSE
@@ -106,7 +108,7 @@ export function AppHeader() {
               <HeaderTab
                 key={tab.id}
                 module={tab}
-                active={pathname === tab.href || pathname?.startsWith(tab.href + "/")}
+                active={moduleHrefMatches(tab.href, pathname, searchParams)}
                 onRemove={() => removeHeaderTab(tab.id)}
               />
             ))}

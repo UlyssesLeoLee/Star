@@ -1,4 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=71fdf171830b510648608e6f60e8a13d2579d746e32d1810f97128b2075823f9
+MERGE (self:File {path:"crates/star-api-rest/src/auth/mod.rs"})
+MERGE (claims:Type {id:"crates/star-api-rest/src/auth/mod.rs::Claims",kind:"struct"})
+MERGE (device:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
+MERGE (issue:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token_with_device_context",kind:"function"})
+MERGE (context:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::Claims.device_context",kind:"method"})
+MERGE (self)-[:DEFINES]->(claims)
+MERGE (self)-[:DEFINES]->(device)
+MERGE (self)-[:DEFINES]->(issue)
+MERGE (self)-[:DEFINES]->(context)
+MERGE (issue)-[:USES_TYPE]->(claims)
+MERGE (issue)-[:USES_TYPE]->(device)
+MERGE (context)-[:RETURNS_TYPE]->(device)
+@endcypher
+*/
 //! `star-api-rest::auth` — OAuth2 + JWT 鉴权 middleware (per §14.12 IV)
 //!
 //! v0.41 端到端实装 (per 2026-09-09 19:20 JST 用户拍板"OAuth2 + JWT (推荐)"):
@@ -19,6 +35,8 @@ use uuid::Uuid;
 
 // v0.43 §14.12 IV OAuth2 server (per 2026-09-09 20:20 JST 用户拍板 both flows)
 pub mod oauth;
+// 2026-11-11 Google OIDC 登录 + 管理员后台 (per 用户发令)
+pub mod google;
 
 /// JWT 错误 (4-variant, 跟 v0.30 6-field 错误模型一致)
 #[derive(Debug, Error)]
@@ -74,6 +92,23 @@ pub struct Claims {
     pub roles: Vec<String>,
     /// OAuth2 scope (e.g. "work-items:read work-items:write")
     pub scope: String,
+    /// Server-verified device identity; absent for legacy and unbound sessions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<Uuid>,
+    /// Monotonic device generation issued by the identity owner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_generation: Option<i64>,
+    /// Verified login email from the identity provider (e.g. Google login);
+    /// absent for legacy tokens issued before provider-email was carried.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+}
+
+/// Device identity copied only from a successfully verified issuer token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceTokenContext {
+    pub device_id: Uuid,
+    pub generation: i64,
 }
 
 /// JWT Config (RS256 keys 走 env var, 守门 #5 v2)
@@ -138,6 +173,18 @@ pub fn issue_token(
     roles: Vec<String>,
     scope: String,
 ) -> Result<(String, Claims), JwtError> {
+    issue_token_with_device_context(config, sub, tenant_id, roles, scope, None)
+}
+
+/// Issue a JWT optionally bound to a device generation from the identity owner.
+pub fn issue_token_with_device_context(
+    config: &JwtConfig,
+    sub: Uuid,
+    tenant_id: Uuid,
+    roles: Vec<String>,
+    scope: String,
+    device_context: Option<DeviceTokenContext>,
+) -> Result<(String, Claims), JwtError> {
     let now = Utc::now();
     let exp = now + Duration::seconds(config.ttl_seconds);
     let claims = Claims {
@@ -152,6 +199,9 @@ pub fn issue_token(
         user_id: sub,
         roles,
         scope,
+        device_id: device_context.map(|context| context.device_id),
+        device_generation: device_context.map(|context| context.generation),
+        email: None,
     };
     let header = Header::new(jsonwebtoken::Algorithm::RS256);
     let encoding_key = EncodingKey::from_rsa_pem(config.private_key_pem.as_bytes())
@@ -176,6 +226,21 @@ pub fn verify_token(config: &JwtConfig, token: &str) -> Result<Claims, JwtError>
     Ok(token_data.claims)
 }
 
+/// Issue a JWT carrying the provider-verified login email (e.g. Google login).
+pub fn issue_provider_token(
+    config: &JwtConfig,
+    sub: Uuid,
+    tenant_id: Uuid,
+    roles: Vec<String>,
+    scope: String,
+    email: String,
+) -> Result<(String, Claims), JwtError> {
+    let (token, mut claims) =
+        issue_token_with_device_context(config, sub, tenant_id, roles, scope, None)?;
+    claims.email = Some(email);
+    Ok((token, claims))
+}
+
 /// Authenticated user (从 JWT claims 提取, 注入 axum request)
 #[derive(Debug, Clone)]
 pub struct AuthUser {
@@ -183,6 +248,8 @@ pub struct AuthUser {
     pub tenant_id: Uuid,
     pub roles: Vec<String>,
     pub scope: String,
+    /// Provider-verified login email; absent for legacy tokens.
+    pub email: Option<String>,
 }
 
 impl From<Claims> for AuthUser {
@@ -192,6 +259,7 @@ impl From<Claims> for AuthUser {
             tenant_id: c.tenant_id,
             roles: c.roles,
             scope: c.scope,
+            email: c.email,
         }
     }
 }
@@ -204,6 +272,20 @@ impl Claims {
             tenant_id: self.tenant_id,
             roles: self.roles.clone(),
             scope: self.scope.clone(),
+            email: self.email.clone(),
+        }
+    }
+
+    /// Return a well-formed device identity only when both signed claims exist.
+    pub fn device_context(&self) -> Option<DeviceTokenContext> {
+        match (self.device_id, self.device_generation) {
+            (Some(device_id), Some(generation)) if !device_id.is_nil() && generation > 0 => {
+                Some(DeviceTokenContext {
+                    device_id,
+                    generation,
+                })
+            }
+            _ => None,
         }
     }
 
@@ -211,9 +293,4 @@ impl Claims {
     pub fn expires_at(&self) -> DateTime<Utc> {
         DateTime::from_timestamp(self.exp, 0).unwrap_or_else(Utc::now)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }

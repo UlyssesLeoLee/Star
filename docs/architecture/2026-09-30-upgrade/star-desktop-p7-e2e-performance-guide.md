@@ -1,5 +1,7 @@
 # Star Desktop — Tauri P7 Performance Baseline + E2E 验证指南
 
+> **历史验证快照（2026-10-30）**：本文件的 P7 五服务目标、`canvas-game` 及 `verify-5-services.sh` 步骤属于旧验证方案，已退役，不是当前操作指南。当前部署包括三个 Canvas 后端（`canvas-engine`、`domain-canvas`、`canvas-realtime`）与独立部署的 `star-api-rest`；Envoy 是入口，不计入应用服务数。请使用 [Star Canvas services deployment](../../deployment/star-canvas-services-deploy.md)、[`deploy/star-canvas-services-k3s.yaml`](../../../deploy/star-canvas-services-k3s.yaml) 与 [`scripts/verify-star-services.sh`](../../../scripts/verify-star-services.sh)。下文仅作为历史记录保留，不要按旧步骤启动或发布服务。
+
 > **date**: 2026-09-30 JST
 > **author**: Ulysses (一人公司 12 角色 per DEC-008) — minimax-agent
 > **trigger**: PR #254 follow-up of PR #253 (P6 distribution)

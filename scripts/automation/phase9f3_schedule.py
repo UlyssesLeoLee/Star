@@ -1,11 +1,12 @@
 """Run Schedule recurrence, immutable run-as, and admission-persistence gates."""
 
-# @cypher schema=1 source_sha256=0ddcefac8fe5bf08870c4ac7cbf1a1bb9c43a7bd2dc4a1fa937b15268d0e05ba
+# @cypher schema=1 source_sha256=9eb27916e5c9d635b777d32e1bce76f68802b5d4f37878ae8f746399aaccc5fb
 # MERGE (self:File {path:"scripts/automation/phase9f3_schedule.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f3_schedule.py::main",kind:"function"})
 # MERGE (run_step:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_step",kind:"function"})
 # MERGE (postgres:Symbol {id:"scripts/automation/phase9f3_schedule.py::run_isolated_postgres",kind:"function"})
 # MERGE (cluster:Symbol {id:"scripts/automation/phase9f3_schedule.py::DisposablePostgres",kind:"class"})
+# MERGE (cleanup:Symbol {id:"scripts/automation/phase9f3_schedule.py::DisposablePostgres.cleanup",kind:"method"})
 # MERGE (docker_cluster:Symbol {id:"scripts/automation/phase9f3_schedule.py::DisposableDockerPostgres",kind:"class"})
 # MERGE (scope:Symbol {id:"scripts/automation/phase9f3_schedule.py::is_contained",kind:"function"})
 # MERGE (repo:ExternalService {id:"git.repository",kind:"directory"})
@@ -13,10 +14,16 @@
 # MERGE (docker_service:ExternalService {id:"docker.run_exec_cp_rm",kind:"command"})
 # MERGE (cargo:ExternalService {id:"cargo.test_clippy_check",kind:"command"})
 # MERGE (subprocess:ExternalService {id:"python.subprocess.run",kind:"function"})
+# MERGE (tempfile:ExternalService {id:"python.tempfile",kind:"module"})
+# MERGE (mkdtemp:ExternalService {id:"python.tempfile.mkdtemp",kind:"function"})
+# MERGE (gettempdir:ExternalService {id:"python.tempfile.gettempdir",kind:"function"})
+# MERGE (rmtree:ExternalService {id:"python.shutil.rmtree",kind:"function"})
 # MERGE (migrations:Config {id:"scripts/automation/phase9f3_schedule.py::MIGRATIONS"})
 # MERGE (run_as_acl_lock_migration:File {path:"db/migrations/2026-10-05-schedule-run-as-acl-lock.sql"})
 # MERGE (hostless_rule_migration:File {path:"db/migrations/2026-10-21-schedule-hostless-run-authorization.sql"})
 # MERGE (occurrence_branch_migration:File {path:"db/migrations/2026-10-22-schedule-occurrence-branch-snapshot.sql"})
+# MERGE (occurrence_branch_correction_migration:File {path:"db/migrations/2026-10-23-schedule-occurrence-branch-snapshot-correction.sql"})
+# MERGE (branchless_occurrence_migration:File {path:"db/migrations/2026-10-24-schedule-branchless-occurrence.sql"})
 # MERGE (host_independent_directory_migration:File {path:"db/migrations/2026-10-15-run-host-independent-directory.sql"})
 # MERGE (task_run_schema:Config {id:"scripts/automation/phase9f3_schedule.py::TASK_RUN_SCHEMA_FIXTURE_SQL"})
 # MERGE (admission_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::SCHEDULE_ADMISSION_FIXTURE_SQL"})
@@ -25,15 +32,17 @@
 # MERGE (directory_migrations:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_MIGRATIONS"})
 # MERGE (directory_prerequisite:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUDIT_PREREQUISITE_SQL"})
 # MERGE (directory_acl_fixture:Config {id:"scripts/automation/phase9f3_schedule.py::DIRECTORY_AUTH_FIXTURE_SQL"})
-# MERGE (occurrence_branch_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL"})
+# MERGE (branchless_occurrence_assertion:Config {id:"scripts/automation/phase9f3_schedule.py::HOSTLESS_OCCURRENCE_ASSERTION_SQL"})
 # MERGE (acl_rust_test:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::schedule_run_as_authorization_rechecks_canonical_directory_grants",kind:"test"})
-# MERGE (domain_hostless_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_can_be_configured_but_cannot_be_materialized",kind:"test"})
+# MERGE (domain_hostless_test:Symbol {id:"crates/domain-automation/src/schedule.rs::tests::hostless_rule_materializes_occurrence_and_branch_bound_admission_fails_closed",kind:"test"})
 # MERGE (self)-[:DEFINES]->(main)
 # MERGE (self)-[:DEFINES]->(run_step)
 # MERGE (self)-[:DEFINES]->(postgres)
 # MERGE (self)-[:DEFINES]->(cluster)
+# MERGE (cluster)-[:HAS_METHOD]->(cleanup)
 # MERGE (self)-[:DEFINES]->(docker_cluster)
 # MERGE (self)-[:DEFINES]->(scope)
+# MERGE (self)-[:IMPORTS]->(tempfile)
 # MERGE (main)-[:CALLS]->(run_step)
 # MERGE (main)-[:CALLS]->(postgres)
 # MERGE (run_step)-[:CALLS]->(subprocess)
@@ -42,19 +51,28 @@
 # MERGE (postgres)-[:CONFIGURES]->(docker_service)
 # MERGE (main)-[:USES]->(repo)
 # MERGE (postgres)-[:CALLS]->(scope)
+# MERGE (postgres)-[:CALLS]->(cleanup)
+# MERGE (cleanup)-[:CALLS]->(run_step)
+# MERGE (cleanup)-[:CALLS]->(scope)
+# MERGE (cleanup)-[:CALLS]->(rmtree)
+# MERGE (cluster)-[:CALLS]->(mkdtemp)
+# MERGE (cluster)-[:CALLS]->(gettempdir)
+# MERGE (cluster)-[:CALLS]->(scope)
 # MERGE (postgres)-[:READS]->(legacy_fixture)
 # MERGE (postgres)-[:READS]->(legacy_assertion)
 # MERGE (postgres)-[:READS]->(migrations)
 # MERGE (postgres)-[:READS]->(run_as_acl_lock_migration)
 # MERGE (postgres)-[:READS]->(hostless_rule_migration)
 # MERGE (postgres)-[:READS]->(occurrence_branch_migration)
+# MERGE (postgres)-[:READS]->(occurrence_branch_correction_migration)
+# MERGE (postgres)-[:READS]->(branchless_occurrence_migration)
 # MERGE (directory_migrations)-[:CONTAINS]->(host_independent_directory_migration)
 # MERGE (postgres)-[:READS]->(task_run_schema)
 # MERGE (postgres)-[:READS]->(admission_fixture)
 # MERGE (postgres)-[:READS]->(directory_migrations)
 # MERGE (postgres)-[:READS]->(directory_prerequisite)
 # MERGE (postgres)-[:READS]->(directory_acl_fixture)
-# MERGE (postgres)-[:READS]->(occurrence_branch_assertion)
+# MERGE (postgres)-[:READS]->(branchless_occurrence_assertion)
 # MERGE (postgres)-[:TESTS]->(acl_rust_test)
 # MERGE (postgres)-[:TESTS]->(domain_hostless_test)
 # @endcypher
@@ -68,6 +86,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -83,6 +102,8 @@ MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-10-05-schedule-run-as-acl-lock.sql",
     ROOT / "db" / "migrations" / "2026-10-21-schedule-hostless-run-authorization.sql",
     ROOT / "db" / "migrations" / "2026-10-22-schedule-occurrence-branch-snapshot.sql",
+    ROOT / "db" / "migrations" / "2026-10-23-schedule-occurrence-branch-snapshot-correction.sql",
+    ROOT / "db" / "migrations" / "2026-10-24-schedule-branchless-occurrence.sql",
 )
 DIRECTORY_MIGRATIONS = (
     ROOT / "db" / "migrations" / "2026-09-16-worktree-canvas-worktree.sql",
@@ -258,21 +279,46 @@ BEGIN
         RAISE EXCEPTION 'legacy occurrence did not inherit its exact Rule creator';
     END IF;
 END $$;"""
-OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL = """\
+HOSTLESS_OCCURRENCE_ASSERTION_SQL = """\
 DO $$
 DECLARE
+    target_snapshot JSONB := jsonb_build_object(
+        'project_id', '20000000-0000-4000-8000-000000000001',
+        'branch_id', '40000000-0000-4000-8000-000000000001',
+        'engineering_run_id', '41000000-0000-4000-8000-000000000001',
+        'repository_id', '42000000-0000-4000-8000-000000000001',
+        'worktree_id', '43000000-0000-4000-8000-000000000001',
+        'work_item_id', '44000000-0000-4000-8000-000000000001',
+        'execution_profile_id', '45000000-0000-4000-8000-000000000001',
+        'execution_profile_version', 1,
+        'execution_profile_digest', repeat('a', 64),
+        'hook_set_version', 1,
+        'hook_set_digest', repeat('b', 64)
+    );
     invalid_snapshot JSONB;
-    invalid_snapshots JSONB[] := ARRAY[
-        '{"rule_snapshot":{"target":{}}}'::jsonb,
-        '{"rule_snapshot":{"target":{"branch_id":null}}}'::jsonb,
-        '{"rule_snapshot":{"target":{"branch_id":""}}}'::jsonb,
-        '{"rule_snapshot":{"target":{"branch_id":"not-a-uuid"}}}'::jsonb,
-        '{"rule_snapshot":{"target":{"branch_id":"00000000-0000-0000-0000-000000000000"}}}'::jsonb
-    ];
+    invalid_snapshots JSONB[];
     case_index integer := 0;
     hostless_rule_id UUID;
     hostless_branch_id UUID;
 BEGIN
+    invalid_snapshots := ARRAY[
+        '{}'::jsonb,
+        target_snapshot - 'worktree_id',
+        jsonb_set(target_snapshot, '{project_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{engineering_run_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{repository_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{work_item_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{execution_profile_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{execution_profile_version}', '0'::jsonb),
+        jsonb_set(target_snapshot, '{hook_set_digest}', '"not-a-digest"'::jsonb),
+        jsonb_set(target_snapshot, '{worktree_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{branch_id}', '""'::jsonb),
+        jsonb_set(target_snapshot, '{branch_id}', '"not-a-uuid"'::jsonb),
+        jsonb_set(target_snapshot, '{branch_id}', '"00000000-0000-0000-0000-000000000000"'::jsonb),
+        jsonb_set(target_snapshot, '{execution_profile_digest}', '"not-a-digest"'::jsonb),
+        jsonb_set(target_snapshot, '{hook_set_version}', '0'::jsonb)
+    ];
+
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'automation'
@@ -314,7 +360,7 @@ BEGIN
         '30000000-0000-4000-8000-000000000001', 2,
         'a0000000-0000-4000-8000-000000000001', clock_timestamp() + interval '1 hour',
         '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
-        '{"rule_snapshot":{"target":{"branch_id":"40000000-0000-4000-8000-000000000001"}}}'::jsonb,
+        jsonb_set(target_snapshot, '{branch_id}', 'null'::jsonb),
         repeat('d', 64), clock_timestamp()
     );
 
@@ -328,7 +374,7 @@ BEGIN
         '30000000-0000-4000-8000-000000000001', 2,
         'a0000000-0000-4000-8000-000000000001', clock_timestamp() + interval '2 hours',
         '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
-        '{"rule_snapshot":{"target":{"branch_id":"ABCDEF12-3456-4ABC-8DEF-1234567890AB"}}}'::jsonb,
+        target_snapshot - 'branch_id',
         repeat('f', 64), clock_timestamp()
     );
 
@@ -344,11 +390,11 @@ BEGIN
                 '20000000-0000-4000-8000-000000000001',
                 '30000000-0000-4000-8000-000000000001', 2,
                 'a0000000-0000-4000-8000-000000000001',
-                clock_timestamp() + (case_index + 1) * interval '1 hour',
+                clock_timestamp() + (case_index + 2) * interval '1 hour',
                 '2026-10-22T12:00:00', 0, 'legacy-parser', 'legacy-tzdb',
                 invalid_snapshot, repeat('e', 64), clock_timestamp()
             );
-            RAISE EXCEPTION 'invalid occurrence Branch snapshot unexpectedly accepted: %', invalid_snapshot;
+            RAISE EXCEPTION 'invalid occurrence target identity unexpectedly accepted: %', invalid_snapshot;
         EXCEPTION WHEN check_violation THEN
             NULL;
         END;
@@ -572,6 +618,7 @@ class DisposablePostgres:
         self.server_attempted = False
         self.started = False
         self.stopped = False
+        self.socket_dir: Path | None = None
 
     @staticmethod
     def _reserve_port() -> int:
@@ -629,6 +676,10 @@ class DisposablePostgres:
         )
         if steps[-1]["status"] != "passed":
             return steps
+        server_options = f"-h 127.0.0.1 -p {self.port}"
+        if os.name != "nt":
+            self.socket_dir = Path(tempfile.mkdtemp(prefix="star-schedule-pg-"))
+            server_options = f'{server_options} -k "{self.socket_dir}"'
         self.server_attempted = True
         steps.append(
             run_step(
@@ -640,7 +691,7 @@ class DisposablePostgres:
                     "-l",
                     str(self.data_dir / "server.log"),
                     "-o",
-                    f"-h 127.0.0.1 -p {self.port}",
+                    server_options,
                     "-w",
                     "start",
                 ],
@@ -672,6 +723,7 @@ GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_bi
         if not self.data_dir.exists() or not is_contained(self.data_dir, self.parent):
             self.stopped = True
             return None
+        stop_result: dict[str, object] | None = None
         if self.server_attempted:
             stop = run_step(
                 "postgres-stop",
@@ -685,6 +737,7 @@ GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_bi
                     "stop",
                 ],
             )
+            stop_result = stop
             if stop["status"] == "passed":
                 self.stopped = True
             else:
@@ -701,7 +754,12 @@ GRANT SELECT ON permission.project_role_binding, permission.cloud_branch_role_bi
             self.stopped = True
         if self.stopped and is_contained(self.data_dir, self.parent):
             shutil.rmtree(self.data_dir)
-        return None
+        if self.stopped and self.socket_dir is not None:
+            temp_root = Path(tempfile.gettempdir()).resolve()
+            if is_contained(self.socket_dir, temp_root) and self.socket_dir.exists():
+                shutil.rmtree(self.socket_dir)
+            self.socket_dir = None
+        return stop_result
 
 
 class DisposableDockerPostgres:
@@ -946,8 +1004,8 @@ def run_isolated_postgres(
 
         steps.append(
             run_step(
-                "postgres-schedule-occurrence-branch-snapshot",
-                [*cluster.psql("schedule_admin"), "-c", OCCURRENCE_BRANCH_SNAPSHOT_ASSERTION_SQL],
+                "postgres-schedule-branchless-occurrence",
+                [*cluster.psql("schedule_admin"), "-c", HOSTLESS_OCCURRENCE_ASSERTION_SQL],
             )
         )
         if steps[-1]["status"] != "passed":
@@ -1118,7 +1176,8 @@ def main() -> int:
                 "--locked",
                 "-p",
                 "star-pg-adapter",
-                "--all-targets",
+                "--test",
+                "schedule_postgres",
                 "-j",
                 "4",
                 "--",

@@ -35,7 +35,11 @@ fn star_cli_version_exits_zero_and_prints_name() {
         .arg("--version")
         .output()
         .expect("failed to execute star binary");
-    assert!(output.status.success(), "star --version should exit 0, got {:?}", output.status);
+    assert!(
+        output.status.success(),
+        "star --version should exit 0, got {:?}",
+        output.status
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.to_lowercase().contains("star"),
@@ -49,7 +53,11 @@ fn star_cli_help_exits_zero_and_prints_usage() {
         .arg("--help")
         .output()
         .expect("failed to execute star binary");
-    assert!(output.status.success(), "star --help should exit 0, got {:?}", output.status);
+    assert!(
+        output.status.success(),
+        "star --help should exit 0, got {:?}",
+        output.status
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("Usage") || stdout.contains("usage"),

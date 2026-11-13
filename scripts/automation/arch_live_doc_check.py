@@ -24,6 +24,15 @@
       "未注入"的真实值被判为一致 —— 两者缺一, 无法区分"门禁有牙"和"门禁没跑".
 """
 
+# @cypher schema=1 source_sha256=a46959c121a8ab5b3e27daf7e2616a1fe7fd7a532f2c0ea9a1f8829e01b8534a
+# MERGE (self:File {path:"scripts/automation/arch_live_doc_check.py"})
+# MERGE (families:Symbol {id:"scripts/automation/arch_live_doc_check.py::crate_families",kind:"function"})
+# MERGE (check:Symbol {id:"scripts/automation/arch_live_doc_check.py::check",kind:"function"})
+# MERGE (root:Config {id:"crates/"})
+# MERGE (self)-[:DEFINES]->(families)
+# MERGE (self)-[:DEFINES]->(check)
+# MERGE (families)-[:READS]->(root)
+# @endcypher
 from __future__ import annotations
 
 import argparse
@@ -182,7 +191,7 @@ def crate_families() -> list[tuple[str, str, list[tuple[str, int]]]]:
     views = {"star-task", "star-game", "star-workflow", "star-canvas", "star-scheduler",
              "shared-task", "leads", "star-registry", "star-taskgraph", "agent-domain", "canvas-collab"}
     support = {"api", "application", "infrastructure"}
-    surf = {"canvas-engine", "canvas-game", "canvas-realtime", "terminal-stack",
+    surf = {"canvas-engine", "canvas-realtime", "terminal-stack",
             "terminal-protocol", "ai-vault", "star-desktop"}
 
     buckets: dict[str, list[tuple[str, int]]] = {

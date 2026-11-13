@@ -1,4 +1,34 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=467068513f0fc3e94d943ea0a02d3ab69042f743bc84307bbd1374b4a58bbd6d
+MERGE (self:File {path:"crates/star-api-rest/src/auth/oauth/middleware.rs"})
+MERGE (extractor:Type {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedDeviceContext",kind:"struct"})
+MERGE (fromParts:Symbol {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedDeviceContext.from_request_parts",kind:"method"})
+MERGE (authenticatedUser:Type {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedUser",kind:"struct"})
+MERGE (userFromParts:Symbol {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedUser.from_request_parts",kind:"method"})
+MERGE (deviceGuard:Symbol {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::requires_active_device_context",kind:"function"})
+MERGE (claims:Type {id:"crates/star-api-rest/src/auth/mod.rs::Claims",kind:"struct"})
+MERGE (device:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
+MERGE (verify:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::verify_token",kind:"function"})
+MERGE (claimsContext:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::Claims.device_context",kind:"method"})
+MERGE (claimsUser:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::Claims.to_auth_user",kind:"method"})
+MERGE (bindingRepo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
+MERGE (isActive:Symbol {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::DeviceBindingRepository.is_active",kind:"method"})
+MERGE (self)-[:DEFINES]->(extractor)
+MERGE (extractor)-[:HAS_METHOD]->(fromParts)
+MERGE (self)-[:DEFINES]->(authenticatedUser)
+MERGE (authenticatedUser)-[:HAS_METHOD]->(userFromParts)
+MERGE (fromParts)-[:CALLS]->(verify)
+MERGE (fromParts)-[:CALLS]->(claimsContext)
+MERGE (fromParts)-[:CALLS]->(claimsUser)
+MERGE (extractor)-[:USES_TYPE]->(device)
+MERGE (userFromParts)-[:CALLS]->(verify)
+MERGE (userFromParts)-[:CALLS]->(claimsContext)
+MERGE (userFromParts)-[:CALLS]->(deviceGuard)
+MERGE (userFromParts)-[:CALLS]->(isActive)
+MERGE (userFromParts)-[:USES_TYPE]->(bindingRepo)
+@endcypher
+*/
 //! OAuth2 Bearer auth middleware helpers (per WBS v0.43 §14.12 IV phase 2)
 //!
 //! v0.47 完整化 (per brief §3.1):
@@ -12,13 +42,14 @@
 
 use axum::{
     extract::{FromRef, FromRequestParts},
-    http::{header, request::Parts, StatusCode},
+    http::{header, request::Parts, Method, StatusCode},
     response::{IntoResponse, Json, Response},
 };
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::auth::{verify_token, AuthUser, JwtConfig};
+use crate::auth::{verify_token, AuthUser, DeviceTokenContext, JwtConfig};
+use star_pg_adapter::repository::DeviceBindingRepository;
 
 /// Bearer auth 错误 (per RFC 6750 §3.1, 6-variant)
 #[derive(Debug)]
@@ -120,11 +151,66 @@ pub struct BearerToken(pub String);
 /// ```
 pub struct AuthenticatedUser(pub AuthUser);
 
+/// Issuer-authenticated actor and device generation from one verified JWT.
+/// This extractor does not claim the generation is still current; callers that
+/// authorize shared collaboration must re-check the identity owner before use.
+#[derive(Debug, Clone)]
+pub struct AuthenticatedDeviceContext {
+    pub actor: AuthUser,
+    pub device: DeviceTokenContext,
+}
+
+impl<S> FromRequestParts<S> for AuthenticatedDeviceContext
+where
+    S: Send + Sync,
+    Arc<JwtConfig>: axum::extract::FromRef<S>,
+{
+    type Rejection = BearerError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let auth_header = parts
+            .headers
+            .get(header::AUTHORIZATION)
+            .ok_or(BearerError::MissingHeader)?
+            .to_str()
+            .map_err(|_| BearerError::InvalidFormat)?;
+        let token = auth_header
+            .strip_prefix("Bearer ")
+            .ok_or(BearerError::InvalidFormat)?
+            .trim();
+        if token.is_empty() {
+            return Err(BearerError::InvalidFormat);
+        }
+
+        let jwt_config = Arc::<JwtConfig>::from_ref(state);
+        let claims = match verify_token(jwt_config.as_ref(), token) {
+            Ok(claims) => claims,
+            Err(crate::auth::JwtError::Expired) => return Err(BearerError::ExpiredToken),
+            Err(crate::auth::JwtError::Missing) => return Err(BearerError::MissingHeader),
+            Err(error) => return Err(BearerError::InvalidToken(error.code().to_string())),
+        };
+        if claims.sub != claims.user_id || claims.sub.is_nil() || claims.tenant_id.is_nil() {
+            return Err(BearerError::InvalidToken(
+                "subject claims mismatch".to_string(),
+            ));
+        }
+        let device = claims
+            .device_context()
+            .ok_or_else(|| BearerError::InvalidToken("device context required".to_string()))?;
+
+        Ok(Self {
+            actor: claims.to_auth_user(),
+            device,
+        })
+    }
+}
+
 /// Axum extractor 状态: 需要 JwtConfig
 impl<S> FromRequestParts<S> for AuthenticatedUser
 where
     S: Send + Sync,
     Arc<JwtConfig>: axum::extract::FromRef<S>,
+    Arc<dyn DeviceBindingRepository>: axum::extract::FromRef<S>,
 {
     type Rejection = BearerError;
 
@@ -163,8 +249,48 @@ where
             ));
         }
 
+        let device_context = claims.device_context();
+        if requires_active_device_context(&parts.method, parts.uri.path())
+            && device_context.is_none()
+        {
+            return Err(BearerError::InvalidToken(
+                "device context required for shared mutation".to_string(),
+            ));
+        }
+
+        if let Some(device) = device_context {
+            let device_binding_repo = Arc::<dyn DeviceBindingRepository>::from_ref(state);
+            let active = device_binding_repo
+                .is_active(
+                    claims.tenant_id,
+                    claims.user_id,
+                    device.device_id,
+                    device.generation,
+                )
+                .await
+                .map_err(|_| BearerError::ServerError("device binding unavailable".to_string()))?;
+            if !active {
+                return Err(BearerError::InvalidToken(
+                    "device binding revoked".to_string(),
+                ));
+            }
+        }
+
         Ok(AuthenticatedUser(claims.to_auth_user()))
     }
+}
+
+/// Mutating shared API requests require a currently active device identity.
+/// Device challenge creation and proof completion are exempted so a valid
+/// account session can bootstrap its first device binding.
+fn requires_active_device_context(method: &Method, path: &str) -> bool {
+    let safe_method = method == Method::GET || method == Method::HEAD || method == Method::OPTIONS;
+    let device_bootstrap = method == Method::POST
+        && matches!(
+            path,
+            "/oauth/device/challenges" | "/oauth/device/enrollments"
+        );
+    !safe_method && !device_bootstrap
 }
 
 /// Require scope helper (5 域 RBAC, per 守门 #14 v3 5 域 Lead 拍板 跨 session 续)
@@ -197,10 +323,43 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec!["user".to_string()],
             scope: "read write".to_string(),
+            email: None,
         };
         assert!(require_scope(&user, "read").is_ok());
         assert!(require_scope(&user, "write").is_ok());
         assert!(require_scope(&user, "admin").is_err());
+    }
+
+    #[test]
+    fn legacy_sessions_cannot_mutate_shared_routes_but_can_bootstrap_device_identity() {
+        assert!(!requires_active_device_context(
+            &Method::GET,
+            "/api/v1/group/tasks"
+        ));
+        assert!(requires_active_device_context(
+            &Method::POST,
+            "/api/v1/group/tasks"
+        ));
+        assert!(requires_active_device_context(
+            &Method::PATCH,
+            "/api/v1/group/tasks/wi-1"
+        ));
+        assert!(requires_active_device_context(
+            &Method::DELETE,
+            "/api/v1/group/tasks/wi-1"
+        ));
+        assert!(!requires_active_device_context(
+            &Method::POST,
+            "/oauth/device/challenges"
+        ));
+        assert!(!requires_active_device_context(
+            &Method::POST,
+            "/oauth/device/enrollments"
+        ));
+        assert!(requires_active_device_context(
+            &Method::POST,
+            "/oauth/device/00000000-0000-0000-0000-000000000001/revoke"
+        ));
     }
 
     #[test]
@@ -210,6 +369,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec!["player".to_string(), "ops".to_string()],
             scope: "".to_string(),
+            email: None,
         };
         assert!(require_role(&user, "player").is_ok());
         assert!(require_role(&user, "ops").is_ok());
@@ -223,6 +383,7 @@ mod tests {
             tenant_id: Uuid::nil(),
             roles: vec![],
             scope: "".to_string(),
+            email: None,
         };
         assert!(require_scope(&user, "read").is_err());
     }

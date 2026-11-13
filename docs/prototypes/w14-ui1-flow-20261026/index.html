@@ -1,0 +1,624 @@
+<!--
+@cypher schema=1 source_sha256=d3f3ed69fe3745d8d5f3c1bb5d176a6b17e12b99df3d3657b6be98f1b660d04c
+MERGE (self:File {path:"docs/prototypes/w14-ui1-flow-20261026/index.html"})
+MERGE (state:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::state", kind:"state"})
+MERGE (render:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::render", kind:"function"})
+MERGE (clearWorktreeFocus:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::clearWorktreeFocus", kind:"function"})
+MERGE (worktreeFocusReady:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::worktreeFocusReady", kind:"function"})
+MERGE (restoreIndexReturnView:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::restoreIndexReturnView", kind:"function"})
+MERGE (beginWorktreeAuthorization:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::beginWorktreeAuthorization", kind:"function"})
+MERGE (beginProjectIndexAuthorization:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::beginProjectIndexAuthorization", kind:"function"})
+MERGE (indexAuthorizationReady:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::indexAuthorizationReady", kind:"function"})
+MERGE (handleClick:Symbol {id:"docs/prototypes/w14-ui1-flow-20261026/index.html::handleClick", kind:"function"})
+MERGE (self)-[:DEFINES]->(state)
+MERGE (self)-[:DEFINES]->(render)
+MERGE (self)-[:DEFINES]->(clearWorktreeFocus)
+MERGE (self)-[:DEFINES]->(worktreeFocusReady)
+MERGE (self)-[:DEFINES]->(restoreIndexReturnView)
+MERGE (self)-[:DEFINES]->(beginWorktreeAuthorization)
+MERGE (self)-[:DEFINES]->(beginProjectIndexAuthorization)
+MERGE (self)-[:DEFINES]->(indexAuthorizationReady)
+MERGE (self)-[:DEFINES]->(handleClick)
+MERGE (render)-[:USES]->(state)
+MERGE (render)-[:CALLS]->(indexAuthorizationReady)
+MERGE (clearWorktreeFocus)-[:USES]->(state)
+MERGE (worktreeFocusReady)-[:USES]->(state)
+MERGE (restoreIndexReturnView)-[:USES]->(state)
+MERGE (beginWorktreeAuthorization)-[:USES]->(state)
+MERGE (beginWorktreeAuthorization)-[:CALLS]->(clearWorktreeFocus)
+MERGE (restoreIndexReturnView)-[:CALLS]->(worktreeFocusReady)
+MERGE (beginProjectIndexAuthorization)-[:USES]->(state)
+MERGE (beginProjectIndexAuthorization)-[:CALLS]->(worktreeFocusReady)
+MERGE (indexAuthorizationReady)-[:USES]->(state)
+MERGE (handleClick)-[:USES]->(state)
+MERGE (handleClick)-[:CALLS]->(beginWorktreeAuthorization)
+MERGE (handleClick)-[:CALLS]->(beginProjectIndexAuthorization)
+MERGE (handleClick)-[:CALLS]->(restoreIndexReturnView)
+MERGE (handleClick)-[:CALLS]->(worktreeFocusReady)
+MERGE (handleClick)-[:CALLS]->(render);
+@endcypher
+-->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11151c">
+  <title>W14 UI-1 · Project / Run / Worktree 流程原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #10141b;
+      --panel: #171d26;
+      --panel-raised: #1d2530;
+      --line: #2a3441;
+      --text: #eef3f8;
+      --muted: #9daab8;
+      --soft: #6f7d8d;
+      --accent: #7dd3c7;
+      --accent-strong: #b2f0e6;
+      --accent-wash: #173936;
+      --blue: #98b9ff;
+      --blue-wash: #202f4c;
+      --warn: #f2c77d;
+      --warn-wash: #392e1e;
+      --danger: #ffaaa5;
+      --radius: 16px;
+      font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+      background: var(--page);
+      color: var(--text);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 360px; min-height: 100vh; background: radial-gradient(ellipse at 56% -20%, #26344a 0, transparent 44%), var(--page); }
+    button, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .prototype-banner { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 10px 20px; border-bottom: 1px solid #56452d; background: #2b241a; color: #f5dcae; font-size: 12px; }
+    .prototype-banner strong { color: #ffe8b7; }
+    .prototype-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .quiet-button, .small-button, .tab, .scope-button, .switch-button, .nav-button, .index-link, .project-option, .tree-node, .worktree-row-button, .primary-button, .secondary-button {
+      border: 1px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; transition: background .16s, border-color .16s, transform .16s;
+    }
+    .quiet-button:hover, .small-button:hover, .nav-button:hover, .index-link:hover, .project-option:hover, .tree-node:hover, .worktree-row-button:hover, .secondary-button:hover { background: #26313e; border-color: #3a4858; }
+    .quiet-button { padding: 7px 10px; color: #efdfbf; border-color: #574731; font-size: 12px; }
+    .small-button { padding: 6px 9px; border-color: var(--line); color: var(--muted); font-size: 12px; }
+    .app-frame { max-width: 1600px; min-height: calc(100vh - 42px); margin: 0 auto; padding: 16px 18px 112px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 54px; margin-bottom: 14px; }
+    .brand-lockup { display: flex; align-items: center; gap: 11px; }
+    .brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 11px; background: linear-gradient(145deg, #a8e9dc, #548d9e); color: #102127; font-weight: 900; font-size: 18px; }
+    .brand-name { font-size: 14px; font-weight: 750; letter-spacing: .04em; }
+    .brand-subtitle { margin-top: 2px; color: var(--soft); font-size: 11px; }
+    .breadcrumbs { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 12px; }
+    .breadcrumbs span:last-child { overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+    .crumb-separator { color: #536173; }
+    .user-chip { display: flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; }
+    .avatar { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 50%; background: #314152; color: #d7e4f1; font-weight: 700; }
+    .layout { display: grid; gap: 14px; min-height: 650px; }
+    .sidebar, .project-rail, .run-panel, .main-panel, .index-panel, .focus-panel { border: 1px solid var(--line); border-radius: var(--radius); background: rgba(23, 29, 38, .96); box-shadow: 0 12px 34px rgba(0, 0, 0, .14); }
+    .sidebar { padding: 16px 12px; }
+    .section-label { margin: 0 0 10px; color: var(--soft); font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+    .project-option { display: flex; width: 100%; align-items: center; gap: 10px; padding: 11px 10px; border-color: #33404d; background: #202934; text-align: left; }
+    .project-icon, .node-icon { display: grid; flex: 0 0 auto; width: 25px; height: 25px; place-items: center; border-radius: 8px; background: #334150; color: #c8d4df; font-size: 12px; font-weight: 700; }
+    .project-copy, .node-copy { min-width: 0; flex: 1; }
+    .project-title, .node-title { display: block; overflow: hidden; color: var(--text); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .project-meta, .node-meta { display: block; margin-top: 3px; color: var(--soft); font-size: 10px; }
+    .tree-block { margin-top: 21px; }
+    .tree-indent { margin-left: 12px; padding-left: 12px; border-left: 1px solid #34414f; }
+    .tree-node { display: flex; width: 100%; align-items: center; gap: 8px; margin: 4px 0; padding: 8px 7px; text-align: left; }
+    .tree-access-state { margin: 6px 0 9px; padding: 9px; border: 1px dashed #384453; border-radius: 9px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .tree-node.selected { border-color: #3b6963; background: var(--accent-wash); }
+    .tree-node.selected .node-icon { background: #28544e; color: var(--accent-strong); }
+    .node-caret { width: 13px; color: var(--soft); font-size: 11px; }
+    .branch-leaf { margin: 3px 0 9px 16px; padding: 7px 8px; border-radius: 8px; background: #121820; color: #bdc7d2; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; overflow-wrap: anywhere; }
+    .index-link { display: flex; width: 100%; gap: 9px; align-items: center; margin-top: 16px; padding: 10px 9px; border-color: #30423f; color: var(--accent); text-align: left; font-size: 11px; }
+    .side-footer { margin-top: 23px; padding: 12px 9px 0; border-top: 1px solid var(--line); color: var(--soft); font-size: 10px; line-height: 1.5; }
+    .main-panel { min-width: 0; padding: 20px; }
+    .page-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
+    .eyebrow { margin-bottom: 6px; color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(20px, 2.3vw, 27px); letter-spacing: -.035em; }
+    .heading-subtitle { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .focus-pill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid #355a55; border-radius: 999px; background: #1a302e; color: var(--accent-strong); font-size: 11px; white-space: nowrap; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #76d7aa; box-shadow: 0 0 0 3px rgba(118, 215, 170, .13); }
+    .run-summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; margin: 18px 0; }
+    .summary-cell { min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: #131922; }
+    .summary-label { display: block; margin-bottom: 5px; color: var(--soft); font-size: 10px; }
+    .summary-value { display: block; overflow: hidden; color: #e6edf4; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .summary-value.mono { color: #c2ceda; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
+    .tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: #11171e; scrollbar-width: thin; }
+    .tab { flex: 0 0 auto; padding: 9px 12px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .tab.active { border-color: #395d58; background: #1b3432; color: #c2f1e7; }
+    .tab:hover:not(.active) { background: #202a35; }
+    .content-area { min-height: 330px; margin-top: 14px; }
+    .content-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 4px 0 13px; }
+    h2 { margin: 0; font-size: 15px; }
+    .subtle { color: var(--muted); font-size: 11px; }
+    .count-pill { padding: 4px 8px; border: 1px solid #344353; border-radius: 999px; color: #bdc9d5; font-size: 10px; }
+    .task-list { display: grid; gap: 9px; }
+    .task-card { display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: center; padding: 13px; border: 1px solid #303b48; border-radius: 13px; background: #1a212b; }
+    .task-mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: #263646; color: #a8c9f3; font-size: 12px; }
+    .task-title { color: var(--text); font-size: 12px; font-weight: 650; }
+    .task-meta { margin-top: 5px; color: var(--soft); font-size: 10px; }
+    .task-state { padding: 5px 8px; border-radius: 999px; background: #253226; color: #bde5bf; font-size: 10px; }
+    .task-state.review { background: #362d1e; color: #f2d69b; }
+    .task-detail { margin-top: 12px; padding: 16px; border: 1px solid #3b4a58; border-radius: 14px; background: #141b23; }
+    .detail-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr); gap: 14px; margin-top: 13px; }
+    .detail-block { padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #181f28; }
+    .detail-block h3 { margin: 0 0 9px; color: #dbe4ed; font-size: 11px; }
+    .detail-block p, .detail-block li { color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .detail-block ul { margin: 0; padding-left: 16px; }
+    .cli-locked { margin-top: 12px; padding: 12px; border: 1px solid #58452c; border-radius: 11px; background: var(--warn-wash); }
+    .cli-locked strong { display: block; color: #f4d28f; font-size: 11px; }
+    .cli-locked p { margin: 6px 0 0; color: #cab998; font-size: 10px; line-height: 1.5; }
+    .disabled-button { margin-top: 10px; padding: 8px 10px; border: 1px solid #695534; border-radius: 9px; background: #302718; color: #bda876; font-size: 10px; cursor: not-allowed; }
+    .canvas-board { position: relative; min-height: 270px; overflow: hidden; border: 1px solid #344253; border-radius: 14px; background-color: #141b24; background-image: radial-gradient(#435265 1px, transparent 1px); background-size: 20px 20px; }
+    .canvas-card { position: absolute; width: min(230px, 42%); padding: 12px; border: 1px solid #4b667d; border-radius: 12px; background: #202d3a; box-shadow: 0 10px 22px rgba(0,0,0,.22); }
+    .canvas-card.one { top: 30px; left: 7%; }
+    .canvas-card.two { top: 126px; left: 48%; border-color: #3c6a62; background: #1b302e; }
+    .canvas-card .task-title { font-size: 11px; }
+    .canvas-card .task-meta { line-height: 1.4; }
+    .connector { position: absolute; top: 111px; left: 32%; width: 19%; height: 1px; background: #88b5c8; transform: rotate(12deg); transform-origin: left; }
+    .index-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .index-table th { padding: 9px 8px; color: var(--soft); font-size: 10px; font-weight: 650; text-align: left; }
+    .index-table td { padding: 11px 8px; border-top: 1px solid #2d3743; color: #d8e0e8; font-size: 10px; vertical-align: middle; }
+    .mono-text { color: #aebdca; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .row-status { display: inline-flex; align-items: center; gap: 6px; color: #afddc3; }
+    .row-status .status-dot { width: 6px; height: 6px; }
+    .worktree-row-button { padding: 6px 9px; border-color: #3e645c; color: var(--accent); font-size: 10px; white-space: nowrap; }
+    .empty-state, .not-connected { display: grid; min-height: 300px; place-items: center; padding: 24px; border: 1px dashed #3a4654; border-radius: 14px; text-align: center; }
+    .empty-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+    .empty-icon { display: grid; width: 43px; height: 43px; place-items: center; margin: 0 auto 12px; border: 1px solid #405263; border-radius: 13px; background: #202a35; color: var(--blue); font-size: 18px; }
+    .empty-state h2, .empty-state h3, .not-connected h2 { margin: 0; font-size: 14px; }
+    .empty-state h3 { font-size: 13px; }
+    .empty-state p, .not-connected p { max-width: 420px; margin: 8px auto 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .primary-button { padding: 9px 12px; border-color: #55968b; background: #27635a; color: #e4fff7; font-size: 11px; font-weight: 650; }
+    .primary-button:hover { background: #34786c; transform: translateY(-1px); }
+    .secondary-button { padding: 8px 10px; border-color: var(--line); color: #ccd7e1; font-size: 10px; }
+    .auth-warning { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #59442b; border-radius: 10px; background: #30271b; color: #e6c889; font-size: 10px; line-height: 1.5; }
+    .chat-dock { position: fixed; z-index: 4; right: 0; bottom: 0; left: 0; display: flex; justify-content: center; padding: 12px 16px 16px; background: linear-gradient(180deg, transparent, rgba(16, 20, 27, .94) 30%); }
+    .chat-shell { display: grid; width: min(880px, 100%); grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: end; padding: 10px; border: 1px solid #3a4653; border-radius: 16px; background: #1a212a; box-shadow: 0 12px 34px rgba(0,0,0,.38); }
+    .scope-switch { display: flex; gap: 4px; align-self: stretch; align-items: center; padding: 3px; border: 1px solid #303b46; border-radius: 11px; background: #131920; }
+    .scope-button { padding: 8px 9px; color: var(--soft); font-size: 9px; font-weight: 750; letter-spacing: .03em; white-space: nowrap; }
+    .scope-button.active { background: var(--blue-wash); color: #c6d8ff; }
+    .scope-button:disabled { cursor: not-allowed; opacity: .4; }
+    .chat-input-wrap { min-width: 0; }
+    .chat-context { display: flex; gap: 7px; align-items: center; margin: 0 0 5px 2px; color: var(--muted); font-size: 9px; }
+    .chat-context strong { color: #c9d9ed; font-weight: 700; }
+    .chat-draft { width: 100%; min-height: 39px; max-height: 100px; resize: vertical; padding: 9px 10px; border: 1px solid #34404d; border-radius: 10px; background: #11171e; color: #e7edf4; font-size: 11px; }
+    .chat-draft::placeholder { color: #758392; }
+    .chat-send { align-self: end; padding: 9px 11px; border: 1px solid #3b4856; border-radius: 10px; background: #252f3b; color: #7f8d9c; font-size: 10px; cursor: not-allowed; }
+    .variant-switcher { position: fixed; z-index: 7; bottom: 104px; left: 50%; display: flex; align-items: center; gap: 12px; padding: 7px 9px; border: 1px solid #4a5a68; border-radius: 999px; background: rgba(31, 41, 52, .96); box-shadow: 0 8px 22px rgba(0,0,0,.28); transform: translateX(-50%); }
+    .switch-button { display: grid; width: 27px; height: 27px; place-items: center; border-color: #435160; background: #2a3643; color: #dce6ee; font-size: 14px; }
+    .variant-readout { min-width: 180px; text-align: center; }
+    .variant-name { color: #eef4f9; font-size: 10px; font-weight: 750; }
+    .variant-hint { margin-top: 2px; color: #98a8b8; font-size: 9px; }
+    .variant-switcher[hidden] { display: none; }
+    .layout-a { grid-template-columns: 248px minmax(0, 1fr); }
+    .layout-a .sidebar { grid-row: 1; }
+    .layout-a .main-panel { grid-column: 2; }
+    .layout-b { grid-template-columns: 214px minmax(0, 1fr); align-items: start; }
+    .layout-b .project-rail { padding: 15px 11px; }
+    .layout-b .run-panel { grid-column: 2; padding: 18px; }
+    .layout-b .project-rail .tree-block { margin-top: 17px; }
+    .layout-b .index-panel { grid-column: 2; margin-top: 0; padding: 18px; }
+    .layout-b .focus-panel { grid-column: 2; padding: 18px; }
+    .layout-b .workspace-grid { display: grid; grid-template-columns: minmax(320px, .78fr) minmax(440px, 1.22fr); gap: 14px; align-items: start; }
+    .layout-b .workspace-grid .index-panel, .layout-b .workspace-grid .focus-panel { grid-column: auto; }
+    .layout-c { grid-template-columns: 72px minmax(0, 1fr); }
+    .layout-c .project-rail { padding: 12px 8px; }
+    .layout-c .project-rail .section-label, .layout-c .project-rail .project-copy, .layout-c .project-rail .tree-block, .layout-c .project-rail .side-footer { display: none; }
+    .layout-c .project-option { justify-content: center; padding: 8px; }
+    .layout-c .project-icon { width: 36px; height: 36px; }
+    .layout-c .index-link { justify-content: center; padding: 10px 5px; font-size: 0; }
+    .layout-c .main-panel { padding: 18px; }
+    .stepper { display: flex; gap: 0; align-items: center; margin: 0 0 13px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #131922; }
+    .step { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .step.active { color: var(--accent-strong); }
+    .step-number { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid #445261; border-radius: 50%; font-size: 9px; }
+    .step.active .step-number { border-color: #57988c; background: #244b45; }
+    .step-line { flex: 1; min-width: 10px; height: 1px; margin: 0 9px; background: #384553; }
+    .layout-c .focus-panel { padding: 13px 15px; }
+    .layout-c .main-panel { display: flex; flex-direction: column; }
+    .layout-c .app-workspace { display: grid; grid-template-columns: minmax(170px, .3fr) minmax(0, 1fr); gap: 12px; }
+    .layout-c .focus-panel .branch-leaf { margin-left: 0; }
+    .layout-c .content-area { min-width: 0; margin-top: 0; }
+    .layout-c .app-caption { margin-bottom: 10px; color: var(--soft); font-size: 9px; }
+    .mini-branch { display: inline-flex; gap: 6px; align-items: center; margin-top: 11px; color: #b9c7d4; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
+    .mobile-project { display: none; }
+    @media (max-width: 980px) {
+      .layout-a, .layout-b, .layout-c { grid-template-columns: 190px minmax(0, 1fr); }
+      .layout-b .workspace-grid { grid-template-columns: 1fr; }
+      .layout-b .workspace-grid .index-panel, .layout-b .workspace-grid .focus-panel { grid-column: 1; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .user-chip .user-name { display: none; }
+    }
+    @media (max-width: 700px) {
+      .prototype-banner { align-items: flex-start; flex-direction: column; padding: 10px 13px; }
+      .app-frame { padding: 11px 10px 135px; }
+      .topbar { min-height: 42px; margin-bottom: 10px; }
+      .breadcrumbs { display: none; }
+      .layout-a, .layout-b, .layout-c { grid-template-columns: 1fr; gap: 9px; }
+      .layout-a .sidebar, .layout-b .project-rail, .layout-c .project-rail { grid-column: 1; padding: 10px; }
+      .layout-a .main-panel, .layout-b .run-panel, .layout-b .index-panel, .layout-b .focus-panel, .layout-c .main-panel { grid-column: 1; }
+      .layout-a .sidebar, .layout-b .project-rail { display: flex; gap: 9px; align-items: center; overflow-x: auto; }
+      .layout-a .sidebar > .section-label, .layout-b .project-rail > .section-label, .layout-a .tree-block, .layout-b .project-rail .tree-block, .layout-a .side-footer { display: none; }
+      .layout-a .project-option, .layout-b .project-option { width: auto; min-width: 180px; }
+      .layout-a .index-link, .layout-b .index-link { width: auto; min-width: max-content; margin: 0; }
+      .layout-c .project-rail { display: none; }
+      .mobile-project { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 9px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: #171d26; }
+      .layout-c .app-workspace { grid-template-columns: 1fr; }
+      .layout-c .focus-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+      .layout-c .focus-panel .section-label { grid-column: 1 / -1; margin: 0; }
+      .layout-c .focus-panel .tree-node { margin: 0; }
+      .layout-c .focus-panel .branch-leaf { grid-column: 1 / -1; margin: 0; }
+      .main-panel { padding: 14px; }
+      .page-heading { flex-direction: column; }
+      .run-summary { grid-template-columns: 1fr; gap: 6px; margin: 13px 0; }
+      .summary-cell { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; }
+      .summary-label { margin: 0; }
+      .tabs { margin-right: -3px; }
+      .task-card { grid-template-columns: auto 1fr; }
+      .task-state { grid-column: 2; justify-self: start; }
+      .index-panel, .run-panel, .focus-panel { padding: 13px; }
+      .index-table th:nth-child(3), .index-table td:nth-child(3) { display: none; }
+      .chat-dock { padding: 8px 9px 10px; }
+      .chat-shell { grid-template-columns: 1fr auto; gap: 7px; padding: 8px; }
+      .scope-switch { grid-column: 1 / -1; justify-content: flex-start; }
+      .scope-button { padding: 6px 8px; }
+      .chat-input-wrap { grid-column: 1; }
+      .chat-send { grid-column: 2; }
+      .variant-switcher { bottom: 130px; }
+      .variant-readout { min-width: 155px; }
+      .step { font-size: 8px; }
+      .step-line { margin: 0 4px; }
+      .step-number { width: 17px; height: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <div class="prototype-banner" role="note">
+    <span><strong>UI-1 本地交互原型</strong> · 仅演示导航与状态；目录为样例数据，不连接服务或执行命令。</span>
+    <div class="prototype-actions">
+      <button class="quiet-button" type="button" data-action="simulate-deep-link">模拟深链授权</button>
+      <button class="quiet-button" type="button" data-action="revoke-access">模拟撤销 Worktree 焦点权限</button>
+      <button class="quiet-button" type="button" data-action="revoke-index-access">模拟撤销 Project Index 列表权限</button>
+    </div>
+  </div>
+  <div class="app-frame">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">W</div>
+        <div><div class="brand-name">渡口</div><div class="brand-subtitle">Project workspace</div></div>
+      </div>
+      <nav class="breadcrumbs" aria-label="当前层级">
+        <span>Project</span><span class="crumb-separator">›</span><span>Engineering Run</span><span class="crumb-separator">›</span><span>Worktree</span><span class="crumb-separator">›</span><span>Branch</span>
+      </nav>
+      <div class="user-chip"><span class="avatar" aria-hidden="true">U</span><span class="user-name">本地原型会话</span><span aria-hidden="true">⌄</span></div>
+    </header>
+    <div id="prototype" aria-live="polite"></div>
+  </div>
+  <div class="chat-dock" id="chatDock"></div>
+  <nav class="variant-switcher" aria-label="切换原型布局">
+    <button class="switch-button" type="button" data-action="variant-prev" aria-label="上一种布局">‹</button>
+    <div class="variant-readout"><div class="variant-name" id="variantName"></div><div class="variant-hint">布局方案 · 可分享 ?variant= 参数</div></div>
+    <button class="switch-button" type="button" data-action="variant-next" aria-label="下一种布局">›</button>
+  </nav>
+  <script>
+    const variantNames = { A: "项目树 · 工作台", B: "Project Worktree Index", C: "聚焦式控制台" };
+    const variantOrder = ["A", "B", "C"];
+    const initialVariant = new URLSearchParams(window.location.search).get("variant");
+    const state = {
+      variant: variantNames[initialVariant] ? initialVariant : "A",
+      worktreeId: null,
+      focus: false,
+      authorization: "idle",
+      authorizationGeneration: 0,
+      authorizedGeneration: null,
+      indexAuthorization: "idle",
+      indexGeneration: 0,
+      indexAuthorizedGeneration: null,
+      indexReturnView: "workspace",
+      view: "workspace",
+      app: "tasks",
+      taskOpen: false,
+      chatScope: "GLOBAL",
+      pendingWorktreeId: null,
+      drafts: { WORKTREE: { "wt-navigation": "", "wt-validation": "" }, GLOBAL: "" }
+    };
+    const root = document.getElementById("prototype");
+
+    function clearWorktreeFocus(nextAuthorization = "idle") {
+      state.authorizationGeneration += 1;
+      state.authorizedGeneration = null;
+      state.worktreeId = null;
+      state.pendingWorktreeId = null;
+      state.focus = false;
+      state.authorization = nextAuthorization;
+      state.taskOpen = false;
+      state.chatScope = "GLOBAL";
+      state.indexReturnView = "workspace";
+    }
+
+    function worktreeFocusReady() {
+      return state.focus && state.authorization === "ready" && state.authorizedGeneration === state.authorizationGeneration && !!state.worktreeId;
+    }
+
+    function restoreIndexReturnView() {
+      state.view = worktreeFocusReady() && state.indexReturnView === "apps" ? "apps" : "workspace";
+      state.indexReturnView = "workspace";
+    }
+
+    function beginWorktreeAuthorization(worktreeId) {
+      clearWorktreeFocus("checking");
+      state.pendingWorktreeId = worktreeId;
+      state.view = "workspace";
+    }
+
+    function beginProjectIndexAuthorization() {
+      if (worktreeFocusReady()) state.indexReturnView = "apps";
+      else if (state.view !== "index") state.indexReturnView = "workspace";
+      state.indexGeneration += 1;
+      state.indexAuthorizedGeneration = null;
+      state.indexAuthorization = "checking";
+      state.view = "index";
+    }
+
+    function indexAuthorizationReady() {
+      return state.indexAuthorization === "ready" && state.indexAuthorizedGeneration === state.indexGeneration;
+    }
+
+    function render() {
+      const variant = state.variant;
+      const focusReady = worktreeFocusReady();
+      const showIndexRows = indexAuthorizationReady();
+      const showApps = focusReady && state.view === "apps";
+      const worktreeTree = showIndexRows ? `
+        <div class="tree-indent">
+          <button class="tree-node ${focusReady && state.worktreeId === "wt-navigation" ? "selected" : ""}" type="button" data-action="select-navigation">
+            <span class="node-icon" aria-hidden="true">W</span><span class="node-copy"><span class="node-title">导航流程</span><span class="node-meta">Worktree · Project 列表样例</span></span>
+          </button>
+          ${focusReady && state.worktreeId === "wt-navigation" ? `<div class="branch-leaf">Branch · local/ui/navigation</div>` : ""}
+          <button class="tree-node ${focusReady && state.worktreeId === "wt-validation" ? "selected" : ""}" type="button" data-action="select-validation">
+            <span class="node-icon" aria-hidden="true">W</span><span class="node-copy"><span class="node-title">授权验证</span><span class="node-meta">Worktree · Project 列表样例</span></span>
+          </button>
+          ${focusReady && state.worktreeId === "wt-validation" ? `<div class="branch-leaf">Branch · local/ui/validation</div>` : ""}
+        </div>` : `
+        <div class="tree-access-state">${state.indexAuthorization === "checking" ? "Project Index 列表权限正在验证；受保护的 Worktree 与 Branch 行已收起。" : state.indexAuthorization === "denied" || state.indexAuthorization === "revoked" ? "Project Index 列表未授权；受保护的 Worktree 与 Branch 行已隐藏。" : "先验证 Project Index 列表权限；对象名称与 Branch 值已隐藏。"}</div>`;
+      const projectTree = `
+        <div class="section-label">Project</div>
+        <button class="project-option" type="button" aria-current="page">
+          <span class="project-icon" aria-hidden="true">P</span>
+          <span class="project-copy"><span class="project-title">Project 导航容器</span><span class="project-meta">身份与资源按授权加载</span></span>
+          <span aria-hidden="true">⌄</span>
+        </button>
+        <div class="tree-block">
+          <div class="section-label">Engineering Runs</div>
+          <div class="tree-indent">
+            <div class="tree-node" aria-current="true"><span class="node-caret" aria-hidden="true">⌄</span><span class="node-icon" aria-hidden="true">R</span><span class="node-copy"><span class="node-title">Engineering Run</span><span class="node-meta">Run 导航容器</span></span></div>
+            ${worktreeTree}
+          </div>
+        </div>
+        <button class="index-link" type="button" data-action="show-index"><span aria-hidden="true">▦</span> Project Worktree Index <span aria-hidden="true">↗</span></button>
+        <div class="side-footer">Project 是第一层。Run、Worktree 与本地 Branch 按层展开。</div>`;
+      const summary = focusReady ? `
+        <div class="run-summary" aria-label="当前资源路径">
+          <div class="summary-cell"><span class="summary-label">Project</span><span class="summary-value">示例项目</span></div>
+          <div class="summary-cell"><span class="summary-label">Engineering Run</span><span class="summary-value">工作区导航</span></div>
+          <div class="summary-cell"><span class="summary-label">Worktree / Branch</span><span class="summary-value mono">${state.worktreeId === "wt-navigation" ? "导航流程 · local/ui/navigation" : "授权验证 · local/ui/validation"}</span></div>
+        </div>` : `
+        <div class="run-summary" aria-label="当前资源路径">
+          <div class="summary-cell"><span class="summary-label">Project</span><span class="summary-value">Project</span></div>
+          <div class="summary-cell"><span class="summary-label">Engineering Run</span><span class="summary-value">Engineering Run</span></div>
+          <div class="summary-cell"><span class="summary-label">Worktree</span><span class="summary-value">未验证</span></div>
+          <div class="summary-cell"><span class="summary-label">Branch</span><span class="summary-value">未加载</span></div>
+        </div>`;
+      const appTabs = showApps ? `
+        <nav class="tabs" aria-label="Run 应用">
+          <button class="tab ${state.app === "inbox" ? "active" : ""}" type="button" data-action="tab-inbox" aria-pressed="${state.app === "inbox"}">收件箱</button>
+          <button class="tab ${state.app === "tasks" ? "active" : ""}" type="button" data-action="tab-tasks" aria-pressed="${state.app === "tasks"}">Task Cards</button>
+          <button class="tab ${state.app === "canvas" ? "active" : ""}" type="button" data-action="tab-canvas" aria-pressed="${state.app === "canvas"}">Canvas</button>
+          <button class="tab ${state.app === "workflow" ? "active" : ""}" type="button" data-action="tab-workflow" aria-pressed="${state.app === "workflow"}">Workflow</button>
+          <button class="tab ${state.app === "bi" ? "active" : ""}" type="button" data-action="tab-bi" aria-pressed="${state.app === "bi"}">Run BI / Benchmark</button>
+          <button class="tab ${state.app === "plugins" ? "active" : ""}" type="button" data-action="tab-plugins" aria-pressed="${state.app === "plugins"}">Plugin Apps</button>
+        </nav>` : "";
+      const indexRows = `
+        <div style="overflow-x:auto">
+          <table class="index-table"><thead><tr><th>Engineering Run</th><th>Worktree</th><th>Branch（本地）</th><th>状态</th><th></th></tr></thead><tbody>
+            <tr><td>工作区导航</td><td>导航流程 · 样例</td><td class="mono-text">local/ui/navigation · 样例</td><td><span class="row-status">演示项</span></td><td><button class="worktree-row-button" type="button" data-action="open-navigation">验证并打开</button></td></tr>
+            <tr><td>工作区导航</td><td>授权验证 · 样例</td><td class="mono-text">local/ui/validation · 样例</td><td><span class="row-status">演示项</span></td><td><button class="worktree-row-button" type="button" data-action="open-validation">验证并打开</button></td></tr>
+          </tbody></table>
+        </div>`;
+      const indexStatus = state.indexAuthorization === "checking" ? `
+        <div class="empty-state"><div><div class="empty-icon" aria-hidden="true">…</div><h3>正在验证 Project Index 列表权限</h3><p>列表授权与 Worktree 焦点授权相互独立。验证期间不显示 Worktree 名称、计数或 Branch 值。</p><div class="empty-actions"><button class="primary-button" type="button" data-action="authorize-index">模拟列表验证通过</button><button class="secondary-button" type="button" data-action="deny-index">模拟无权查看列表</button><button class="quiet-button" type="button" data-action="cancel-index">取消</button></div></div></div>` : state.indexAuthorization === "denied" || state.indexAuthorization === "revoked" ? `
+        <div class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h3>Project Index 列表未授权</h3><p>受保护的 Worktree 行和 Branch 值已隐藏。重新验证仅检查列表权限，不会授权打开具体 Worktree。</p><button class="primary-button" type="button" data-action="retry-index">重新验证 Project Index</button></div></div>` : !indexAuthorizationReady() ? `
+        <div class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h3>先验证 Project Index 列表权限</h3><p>列表权限只允许查看 Project 范围的样例；打开每个 Worktree 时还会单独验证 Worktree 焦点。</p><button class="primary-button" type="button" data-action="retry-index">验证 Project Index 列表权限</button></div></div>` : indexRows;
+      const indexMarkup = `
+        <section class="index-panel" aria-labelledby="indexTitle">
+          <div class="content-heading"><div><div class="eyebrow">Project view</div><h2 id="indexTitle">Project Worktree Index</h2></div>${showIndexRows ? `<span class="count-pill">2 个样例 Worktrees</span>` : ""}</div>
+          ${state.view === "index" && focusReady ? `<button class="secondary-button" type="button" data-action="return-focus">返回当前 Worktree（取消列表验证）</button>` : ""}
+          <p class="subtle">Project 列表权限与单个 Worktree 焦点权限分别验证；列表行只代表独立列表授权，不代表当前 Worktree 焦点已授权。打开每个 Worktree 都会重新检查焦点。行内对象仅为原型样例。</p>
+          ${indexStatus}
+        </section>`;
+      let appMarkup = "";
+      if (state.view === "index" && variant === "B") {
+        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h2>${indexAuthorizationReady() ? "从左侧 Project Index 选择 Worktree" : "Project 列表尚未授权"}</h2><p>Index 只提供 Project 范围的列表视图。打开一项后还会单独验证 Worktree 焦点；两个权限没有相互继承关系。</p></div></section>`;
+      } else if (state.view === "index") {
+        appMarkup = indexMarkup;
+      } else if (state.authorization === "checking") {
+        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">…</div><h2>正在验证 Worktree scope</h2><p>验证期间隐藏 Run Apps、Branch 和旧焦点内容。按钮只切换本地原型状态。</p><div class="empty-actions"><button class="primary-button" type="button" data-action="authorize-link">模拟验证通过</button><button class="secondary-button" type="button" data-action="deny-link">模拟无权访问</button><button class="quiet-button" type="button" data-action="cancel-auth">取消并返回 Project</button></div></div></section>`;
+      } else if (!focusReady) {
+        appMarkup = `<section class="empty-state"><div><div class="empty-icon" aria-hidden="true">⌁</div><h2>${state.authorization === "denied" ? "当前身份无权访问此 Worktree" : state.authorization === "revoked" ? "Worktree 授权已撤销" : "先选择并验证一个 Worktree"}</h2><p>${state.authorization === "revoked" ? "Worktree 焦点、Run Apps、Branch 值和 WORKTREE 聊天范围已清除。" : state.authorization === "denied" ? "当前没有 Worktree 焦点；Run Apps、Branch 值和 WORKTREE 聊天范围均已清除。" : "Project 与 Run 导航保留；先验证 Project Index 列表，或显式模拟深链，再单独验证 Worktree 焦点。"}</p><div class="empty-actions"><button class="primary-button" type="button" data-action="show-index">验证 Project Index</button><button class="secondary-button" type="button" data-action="simulate-deep-link">显式模拟深链</button>${state.pendingWorktreeId ? `<button class="quiet-button" type="button" data-action="retry-auth">重新验证当前 Worktree</button>` : ""}</div></div></section>`;
+      } else if (state.taskOpen && state.app === "tasks") {
+        appMarkup = `
+          <section class="content-area" aria-labelledby="taskDetailTitle">
+            <div class="content-heading"><div><div class="eyebrow">Run 级 Task Card</div><h2 id="taskDetailTitle">整理 Project → Run 导航状态</h2></div><button class="small-button" type="button" data-action="close-task">返回任务列表</button></div>
+            <div class="detail-grid"><div class="detail-block"><h3>任务归属与执行上下文</h3><p>Task Card 归属当前 Engineering Run。Worktree 与本地 Branch 只是 CLI 的执行上下文，不改变任务归属；启用 CLI 时必须使用当前重新授权的 Worktree。</p><ul><li>任务归属：工作区导航 Run</li><li>CLI Worktree：${state.worktreeId === "wt-navigation" ? "导航流程" : "授权验证"}（当前授权焦点）</li><li>本地 Branch：${state.worktreeId === "wt-navigation" ? "local/ui/navigation" : "local/ui/validation"}</li><li>完成后需要独立验证并记录证据。</li></ul><div class="cli-locked"><strong>受控 CLI 尚未接入</strong><p>必须先具备真实 Agent Runtime、隔离 sandbox、原生 Hook、资源预算、当前授权复验、取消/恢复、独立验证和结果回写。</p><button class="disabled-button" type="button" disabled aria-disabled="true">打开受控 CLI · 当前不可用</button></div></div><div class="detail-block"><h3>任务状态</h3><p><span class="task-state review">待验证</span></p><p>任务可见不代表 Agent 执行 provider 已连接。此原型不会启动终端或写入任务数据。</p><button class="secondary-button" type="button" data-action="tab-canvas">在 Canvas 中查看关联</button></div></div>
+          </section>`;
+      } else if (state.app === "tasks") {
+        appMarkup = `
+          <section class="content-area" aria-labelledby="taskListTitle">
+            <div class="content-heading"><div><div class="eyebrow">Run App · Run 级任务</div><h2 id="taskListTitle">Task Cards</h2></div><span class="count-pill">2 个原型场景</span></div>
+            <div class="task-list">
+              <button class="task-card" type="button" data-action="open-task"><span class="task-mark" aria-hidden="true">T1</span><span style="text-align:left"><span class="task-title">整理 Project → Run 导航状态</span><span class="task-meta">负责人：本地场景 · 关联 Canvas 节点 1</span></span><span class="task-state review">待验证</span></button>
+              <button class="task-card" type="button" data-action="open-task"><span class="task-mark" aria-hidden="true">T2</span><span style="text-align:left"><span class="task-title">补齐 Worktree 焦点撤权流程</span><span class="task-meta">负责人：本地场景 · 关联 Canvas 节点 2</span></span><span class="task-state">待处理</span></button>
+            </div>
+            <div class="auth-warning">任务标题与状态只是原型演示数据。没有连接真实 Task owner 或 Agent provider。</div>
+          </section>`;
+      } else if (state.app === "canvas") {
+        appMarkup = `
+          <section class="content-area" aria-labelledby="canvasTitle">
+            <div class="content-heading"><div><div class="eyebrow">Run App · 同级应用</div><h2 id="canvasTitle">Canvas</h2></div><span class="subtle">画布节点只引用 Task Card，不复制任务事实</span></div>
+            <div class="canvas-board" aria-label="原型 Canvas 区域"><span class="connector" aria-hidden="true"></span><button class="canvas-card one" type="button" data-action="open-task"><span class="task-title">Task Card · 导航状态</span><span class="task-meta">打开 canonical Task Card</span></button><div class="canvas-card two"><span class="task-title">工作流注释</span><span class="task-meta">与任务建立引用关系；不产生第二份 Task 事实</span></div></div>
+          </section>`;
+      } else {
+        const appNames = { inbox: "收件箱", workflow: "Workflow", bi: "Run BI / Benchmark", plugins: "Plugin Apps" };
+        appMarkup = `<section class="not-connected"><div><div class="empty-icon" aria-hidden="true">↗</div><h2>${appNames[state.app] || "Run App"} 尚未连接</h2><p>原型只展示同级位置，不代表对应 owner API、授权、事件投递或生产数据已接入。</p><button class="secondary-button" type="button" data-action="tab-tasks">返回 Task Cards</button></div></section>`;
+      }
+      const statusPill = focusReady ? `<span class="focus-pill"><span class="status-dot" aria-hidden="true"></span>Worktree scope 已验证</span>` : `<span class="focus-pill" style="border-color:#624b30;background:#30271b;color:#f0d59b">${state.authorization === "checking" ? "正在验证 scope" : state.authorization === "revoked" ? "授权已撤销" : state.authorization === "denied" ? "无权访问" : "未建立 Worktree 焦点"}</span>`;
+      const bodyContent = variant === "B" ? `
+        <div class="workspace-grid">
+          ${indexMarkup}
+          <section class="focus-panel"><div class="page-heading"><div><div class="eyebrow">Current Worktree</div><h1>Run 工作区</h1><p class="heading-subtitle">从 Project Index 打开后，进入对应 Run 与 Worktree。</p></div>${statusPill}</div>${summary}${appTabs}${appMarkup}</section>
+        </div>` : `
+        <main class="main-panel">
+          <div class="page-heading"><div><div class="eyebrow">Engineering Run · 工作区</div><h1>${state.view === "index" ? "Project Worktree Index" : "Run 工作区"}</h1><p class="heading-subtitle">${state.view === "index" ? "跨 Worktree 汇总；选择一项后返回对应 Worktree。" : "先确定有效 Worktree 焦点，再浏览该 Run 的应用。"}</p></div>${statusPill}</div>
+          ${variant === "C" ? `<div class="stepper" aria-label="导航层级"><span class="step active"><span class="step-number">1</span>Project</span><span class="step-line"></span><span class="step active"><span class="step-number">2</span>Run</span><span class="step-line"></span><span class="step ${focusReady ? "active" : ""}"><span class="step-number">3</span>Worktree</span><span class="step-line"></span><span class="step ${focusReady ? "active" : ""}"><span class="step-number">4</span>Branch</span></div>` : ""}
+          ${summary}${appTabs}<div class="content-area">${appMarkup}</div>
+        </main>`;
+      if (variant === "A") {
+        root.innerHTML = `<div class="layout layout-a"><aside class="sidebar" aria-label="Project 导航">${projectTree}</aside>${bodyContent}</div>`;
+      } else if (variant === "B") {
+        root.innerHTML = `<div class="layout layout-b"><aside class="project-rail" aria-label="Project 与 Run 导航">${projectTree}</aside>${bodyContent}</div>`;
+      } else {
+        root.innerHTML = `<div class="layout layout-c"><aside class="project-rail" aria-label="Project 导航">${projectTree}</aside><div><div class="mobile-project"><strong>Project 导航</strong><button class="small-button" type="button" data-action="show-index">Worktree Index</button></div>${bodyContent}</div></div>`;
+      }
+      document.getElementById("chatDock").innerHTML = `
+        <div class="chat-shell" aria-label="底部聊天栏">
+          <div class="scope-switch" role="group" aria-label="聊天范围">
+            <button class="scope-button ${state.chatScope === "GLOBAL" ? "active" : ""}" type="button" data-action="scope-global" aria-pressed="${state.chatScope === "GLOBAL"}">GLOBAL</button>
+            <button class="scope-button ${state.chatScope === "WORKTREE" ? "active" : ""}" type="button" data-action="scope-worktree" aria-pressed="${state.chatScope === "WORKTREE"}" ${focusReady ? "" : "disabled"}>WORKTREE</button>
+          </div>
+          <div class="chat-input-wrap"><div class="chat-context"><strong>${state.chatScope}</strong><span>${state.chatScope === "WORKTREE" && focusReady ? `· 示例项目 / 工作区导航 / ${state.worktreeId === "wt-navigation" ? "导航流程" : "授权验证"}` : "· 不含隐式 Worktree 写入范围"}</span></div><textarea id="chatDraft" class="chat-draft" aria-label="本地草稿" placeholder="输入仅保存在当前原型内存中的草稿…"></textarea></div>
+          <button class="chat-send" type="button" disabled aria-disabled="true">发送未接入</button>
+        </div>`;
+      const draftEditor = document.getElementById("chatDraft");
+      draftEditor.value = state.chatScope === "WORKTREE" ? (state.drafts.WORKTREE[state.worktreeId] || "") : state.drafts.GLOBAL;
+      document.getElementById("variantName").textContent = `${variant} · ${variantNames[variant]}`;
+      document.querySelector(".variant-switcher").hidden = false;
+    }
+
+    function handleClick(event) {
+      const button = event.target.closest("[data-action]");
+      if (!button || button.disabled) return;
+      const action = button.dataset.action;
+      const focusReady = worktreeFocusReady();
+      const showIndexRows = indexAuthorizationReady();
+      const actionToApp = { "tab-inbox": "inbox", "tab-tasks": "tasks", "tab-canvas": "canvas", "tab-workflow": "workflow", "tab-bi": "bi", "tab-plugins": "plugins" };
+      if (action === "variant-prev" || action === "variant-next") {
+        const currentIndex = variantOrder.indexOf(state.variant);
+        const direction = action === "variant-next" ? 1 : -1;
+        state.variant = variantOrder[(currentIndex + direction + variantOrder.length) % variantOrder.length];
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set("variant", state.variant);
+        window.history.replaceState(null, "", nextUrl);
+      } else if ((action === "select-navigation" || action === "open-navigation") && showIndexRows) {
+        beginWorktreeAuthorization("wt-navigation");
+      } else if ((action === "select-validation" || action === "open-validation") && showIndexRows) {
+        beginWorktreeAuthorization("wt-validation");
+      } else if (action === "authorize-link") {
+        if (state.authorization === "checking" && state.pendingWorktreeId) {
+          state.worktreeId = state.pendingWorktreeId;
+          state.pendingWorktreeId = null;
+          state.focus = true;
+          state.authorization = "ready";
+          state.authorizedGeneration = state.authorizationGeneration;
+          state.view = "apps";
+          state.indexReturnView = "apps";
+        }
+      } else if (action === "cancel-auth") {
+        clearWorktreeFocus("idle");
+        state.view = indexAuthorizationReady() ? "index" : "workspace";
+      } else if (action === "deny-link") {
+        if (state.authorization === "checking" && state.pendingWorktreeId) {
+          state.authorizationGeneration += 1;
+          state.authorizedGeneration = null;
+          state.worktreeId = null;
+          state.focus = false;
+          state.authorization = "denied";
+          state.view = "workspace";
+          state.taskOpen = false;
+          state.chatScope = "GLOBAL";
+          state.indexReturnView = "workspace";
+        }
+      } else if (action === "retry-auth" || action === "restore-focus") {
+        const targetWorktreeId = state.pendingWorktreeId || state.worktreeId || "wt-navigation";
+        beginWorktreeAuthorization(targetWorktreeId);
+      } else if (action === "authorize-index") {
+        if (state.indexAuthorization === "checking") {
+          state.indexAuthorization = "ready";
+          state.indexAuthorizedGeneration = state.indexGeneration;
+          state.view = "index";
+        }
+      } else if (action === "deny-index") {
+        if (state.indexAuthorization === "checking") {
+          state.indexAuthorization = "denied";
+          state.indexAuthorizedGeneration = null;
+          restoreIndexReturnView();
+        }
+      } else if (action === "retry-index" || action === "show-index") {
+        beginProjectIndexAuthorization();
+      } else if (action === "cancel-index") {
+        state.indexGeneration += 1;
+        state.indexAuthorizedGeneration = null;
+        state.indexAuthorization = "idle";
+        restoreIndexReturnView();
+      } else if (action === "return-focus" && focusReady) {
+        if (state.indexAuthorization === "checking") {
+          state.indexGeneration += 1;
+          state.indexAuthorizedGeneration = null;
+          state.indexAuthorization = "idle";
+        }
+        state.view = "apps";
+        state.indexReturnView = "workspace";
+      } else if (action === "simulate-deep-link") {
+        beginWorktreeAuthorization(state.pendingWorktreeId || state.worktreeId || "wt-navigation");
+      } else if (action === "revoke-access") {
+        clearWorktreeFocus("revoked");
+        state.view = "workspace";
+      } else if (action === "revoke-index-access") {
+        if (state.view !== "index") state.indexReturnView = worktreeFocusReady() && state.view === "apps" ? "apps" : "workspace";
+        state.indexGeneration += 1;
+        state.indexAuthorizedGeneration = null;
+        state.indexAuthorization = "revoked";
+        restoreIndexReturnView();
+      } else if (action === "scope-global") {
+        state.chatScope = "GLOBAL";
+      } else if (action === "scope-worktree" && focusReady) {
+        state.chatScope = "WORKTREE";
+      } else if (action === "open-task" && focusReady) {
+        state.app = "tasks";
+        state.view = "apps";
+        state.taskOpen = true;
+      } else if (action === "close-task") {
+        state.taskOpen = false;
+      } else if (actionToApp[action] && focusReady) {
+        state.app = actionToApp[action];
+        state.view = "apps";
+        state.taskOpen = false;
+      }
+      render();
+    }
+
+    function handleInput(event) {
+      if (event.target.matches("#chatDraft")) {
+        if (state.chatScope === "WORKTREE") state.drafts.WORKTREE[state.worktreeId] = event.target.value;
+        else state.drafts.GLOBAL = event.target.value;
+      }
+    }
+
+    document.addEventListener("click", handleClick);
+    document.addEventListener("input", handleInput);
+    render();
+  </script>
+</body>
+</html>

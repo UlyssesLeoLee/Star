@@ -351,18 +351,12 @@ mod tests {
     #[test]
     fn replace_emoji_unknown_preserved() {
         // 不在表内的 emoji (e.g. 🥑) 保留原字符
-        assert_eq!(
-            replace_emoji_shortcodes("🥑 avocado"),
-            "🥑 avocado"
-        );
+        assert_eq!(replace_emoji_shortcodes("🥑 avocado"), "🥑 avocado");
     }
 
     #[test]
     fn replace_emoji_multiple_in_one_string() {
-        assert_eq!(
-            replace_emoji_shortcodes("🚀 fire 🔥"),
-            "rocket fire fire"
-        );
+        assert_eq!(replace_emoji_shortcodes("🚀 fire 🔥"), "rocket fire fire");
     }
 
     #[test]
@@ -381,18 +375,12 @@ mod tests {
 
     #[test]
     fn sanitize_replaces_invalid_chars_with_dash() {
-        assert_eq!(
-            sanitize_branch_chars("feat my work"),
-            "feat-my-work"
-        );
+        assert_eq!(sanitize_branch_chars("feat my work"), "feat-my-work");
     }
 
     #[test]
     fn sanitize_collapses_consecutive_dashes() {
-        assert_eq!(
-            sanitize_branch_chars("feat---x---y"),
-            "feat-x-y"
-        );
+        assert_eq!(sanitize_branch_chars("feat---x---y"), "feat-x-y");
     }
 
     #[test]

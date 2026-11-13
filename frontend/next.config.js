@@ -43,6 +43,18 @@ const nextConfig = {
     const { LEGACY_REDIRECTS } = require("./src/lib/redirects.shim.cjs");
     return LEGACY_REDIRECTS;
   },
+  // 2026-11-11 Google 登录/后台: 同源代理 /api/v1/* → 本地 star-api-rest (8081)。
+  // Vercel 上后端不可达时返回 502, 前端 auth lib 已做优雅降级 (显示 NETWORK_UNREACHABLE)。
+  async rewrites() {
+    const backend =
+      process.env.STAR_API_BACKEND_ORIGIN ?? "http://127.0.0.1:8081";
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${backend}/api/v1/:path*`,
+      },
+    ];
+  },
   // Phase F.2 MSW client (per docs/frontend/design/mock-msw-handlers.md §4 P2 缺口 #2):
   // - mockServiceWorker.js (per npx msw init public/) 在 production build 自动 copy
   // - headers: service worker 需 'Service-Worker-Allowed' header (per spec 2025-06-27)

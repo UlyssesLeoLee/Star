@@ -720,3 +720,49 @@ CREATE POLICY observation_tenant_isolation ON local_runtime.runtime_observation
 | multica.admission_message_delivery_receipt | T | Immutable terminal receipt; no TTL/deletion; FORCE tenant RLS |
 
 新增W/T/M=2/2/0；source views引用既有T事实，不新增业务表或归类为M。两owner独立事务、role与队列；原始wire不在W重复存储。验证状态见D13报告，未声称重新审计整个历史表索引。
+
+
+## D14 — 2026-10-25 監査差異記録（per 用户拍板：只补文档，不改分类归属）
+
+> **本节性质**: 记录实测差异，**不改** §2 明细与 §3.1/§3.2 的既有数字（per 用户 2026-10-25 拍板 `ask_b66403e46d985090ade079d4` Q1 =「只补文档不动别的」）。
+> 审计全量: `docs/reports/DDD-DOMAIN-MODEL-COMPLETENESS-AUDIT.md` v0.1 §4。
+
+### D14.1 集計数字の三箇所互斥（父会话实测复算）
+
+| 位置 | 既有記載 | 実測 | 判定 |
+|---|---|---|---|
+| §2（`:67-302`） | 100 テーブル 三類分類 | **100 行，逐行标记 M=42 / T=46 / W=12，混合 0，未识别 0** | ✅ 真值 |
+| §3.1（`:309-314`） | M=35 / T=49 / W=14，合計 **100** | 相加 = **98**（与標 100 矛盾） | ⚠️ 数字過期 |
+| §3.2（`:322-351`） | 計 **98** | 其 25 schema 行相加 = **101** | ⚠️ 数字過期 |
+| §3.2 `scm` 行（`:343`） | 計 9 | §2.18 scm 实为 **8** 行 | ⚠️ 唯一逐 schema 偏差（+1） |
+| `:353` 整合確認 | 「v0.2 §9 推測 2 混合（`ほか`）待 P3-B SRE Lead 拍板」 | §2 已无未识别行、混合 0 | ⚠️ 該待办描述已過期 |
+
+**复算方法**（可重放）：限定 §2 区間（L67-L302），取 `^\|\s*T\d+\s*\|` 行，第 3 列去 `*` 后按 `M`/`T`/`W`/含 `/` 计数。
+
+**待拍板**：§3.1 / §3.2 的数字应订正为 M=42 / T=46 / W=12（合計 100），且 `scm` 行由 9 订正为 8。本节按「只补文档不动别的」**未代为改写**。
+
+### D14.2 「100% 表覆盖」の適用範囲（重要限定）
+
+本索引の「100 テーブル 100% 覆盖」**仅在设计表宇宙（100 表 / 25 个 DDD 域 schema）内成立**。生产表宇宙与之**表名精确交集 = 0**：
+
+| 集合 | 実測 | schema 組織 |
+|---|---|---|
+| `db/migrations` 实建表 | **175** | 技術性 schema: `multica` 60 / `infrastructure` 19 / `automation` 11 / `platform_transport` 9 / `platform_messaging` 7 / `bi` 5 / `canvas` 5 / `plugin` 5 / `permission` 3 / `scm` 2 + 49 未限定 |
+| 本索引 / `00-INVENTORY.md` | **100** | DDD 域 schema: `development` 9 / `scm` 8 / `validation` 6 / `agent` 5 / `work_item` 5 / `local_runtime` 5 / `identity` 5 / `worktree` 5 / `feedback` 4 … 共 25 |
+
+→ **守门 #13 的 100% 覆盖要求对生产表实际为 0%。** 生产表侧的 W/T/M + RLS 13 類 + retention 归属尚未建立（本次不处理，仅登记；口径待拍板）。
+
+### D14.3 INVENTORY に crate 名が出現しない crate（16 個 — 名称照合であり「表級登録なし」の証明ではない）
+
+父会话实测（2026-10-25）：`00-INVENTORY.md` 全文检索 41 個の `domain-*` crate 名 → **命中 0 = 16 個**、命中あり = 25 個（各 3 回）：
+
+`domain-agent-windows` `domain-ai` `domain-batch` `domain-canvas` `domain-cli` `domain-dashboard` `domain-form` `domain-hook` `domain-infrastructure` `domain-kms` `domain-llm` `domain-mcp` `domain-report` `domain-task` `domain-theme` `domain-tool`
+
+> ⚠️ **解釈の限定**: 本索引は **schema 名**（`work_item` / `agent` / `tenant` …）で構造化されており crate 名ではない。よって「crate 名 0 命中」は **名称照合の結果** であり、「表級設計が登録されていない」ことの証明ではない（crate 名と schema 名が一致しない場合运会する）。真の判定には schema 単位の逐表核対が必要 — 本 D14 は照合結果の記録に留め、**未判定**（per 缺标比错标）。
+
+
+## D15 — 改訂履歴 (D14 追加分, 2026-10-25)
+
+| 版本 | 日付 | 改訂人 | 改訂内容 | 触发 |
+|---|---|---|---|---|
+| D14 | 2026-10-25 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 新增 D14 監査差異記録：① §3.1/§3.2 集計数字与 §2 明細的互斥点（实测 M=42/T=46/W=12，scm 8 vs 9）② 「100% 表覆盖」仅在设计表宇宙内成立的限定（生产 175 表交集 = 0）③ INVENTORY 中 crate 名 0 命中 = **16** 个（非 6 个），且明确标注「名称照合 ≠ 无表登记」为未判定。**未改写既有分类数字与归属** | 用户 2026-10-25 提问「各种 domain model 都齐全么?」+ 拍板 `ask_b66403e46d985090ade079d4`（Q1 = 只补文档不动别的） |

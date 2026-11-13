@@ -7,6 +7,15 @@
 //   3. localStorage 持久化 (key=star-language)
 //   4. <html lang="..."> 同步
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=4e6b131b078ceaf4bfab890d1fd9069075a00f1f54be695c33ab234d9b499d99
+MERGE (self:File {path:"frontend/src/lib/i18n/__tests__/I18nProvider.test.tsx"})
+MERGE (provider:File {path:"frontend/src/lib/i18n/I18nProvider.tsx"})
+MERGE (translationHook:File {path:"frontend/src/lib/i18n/useTranslation.ts"})
+MERGE (self)-[:TESTS]->(provider)
+MERGE (self)-[:TESTS]->(translationHook)
+@endcypher
+*/
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, render, screen, fireEvent, cleanup } from "@testing-library/react";
@@ -23,7 +32,7 @@ function Display() {
     <div>
       <span data-testid="current-lang">{language}</span>
       <span data-testid="signout">{t.userMenu.signOut}</span>
-            <span data-testid="tactical">{t.appHeader.workspaceSwitcher}</span>
+      <span data-testid="workspace-switcher">{t.appHeader.workspaceSwitcher}</span>
       <span data-testid="html-lang-attr">{document.documentElement.lang}</span>
       <button data-testid="set-en" onClick={() => setLanguage("en")}>
         EN
@@ -62,7 +71,7 @@ describe("I18nProvider", () => {
     expect(screen.getByTestId("current-lang").textContent).toBe("zh-CN");
     // 字典命中 zh-CN 字面量
     expect(screen.getByTestId("signout").textContent).toBe("退出登录");
-    expect(screen.getByTestId("tactical").textContent).toBe("战术跳转...");
+    expect(screen.getByTestId("workspace-switcher").textContent).toBe("切换工作区");
   });
 
   it("switches to en when setLanguage('en') is called", () => {
@@ -76,7 +85,7 @@ describe("I18nProvider", () => {
     });
     expect(screen.getByTestId("current-lang").textContent).toBe("en");
     expect(screen.getByTestId("signout").textContent).toBe("Sign Out");
-    expect(screen.getByTestId("tactical").textContent).toBe("Tactical Jump...");
+    expect(screen.getByTestId("workspace-switcher").textContent).toBe("Switch workspace");
   });
 
   it("switches to ja when setLanguage('ja') is called", () => {
@@ -90,7 +99,7 @@ describe("I18nProvider", () => {
     });
     expect(screen.getByTestId("current-lang").textContent).toBe("ja");
     expect(screen.getByTestId("signout").textContent).toBe("サインアウト");
-    expect(screen.getByTestId("tactical").textContent).toBe("タクティカルジャンプ...");
+    expect(screen.getByTestId("workspace-switcher").textContent).toBe("ワークスペース切替");
   });
 
   it("persists selected language to localStorage with key=star-language", () => {

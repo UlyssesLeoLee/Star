@@ -111,12 +111,12 @@ use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
 use thiserror::Error;
 use tokio::sync::{Semaphore, SemaphorePermit};
-use tonic::{Request, Response, Status, transport::Server};
+use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
 
 use crate::native_grpc::{
-    MAX_NATIVE_GRPC_MESSAGE_BYTES, NativeGrpcSetupError, peer_certificate_fingerprint,
-    server_mtls_config,
+    peer_certificate_fingerprint, server_mtls_config, NativeGrpcSetupError,
+    MAX_NATIVE_GRPC_MESSAGE_BYTES,
 };
 
 const MAX_SERVER_IN_FLIGHT: usize = 8;
@@ -504,18 +504,14 @@ mod tests {
 
     #[test]
     fn profile_digest_must_be_exact_sha256_width() {
-        assert!(
-            profile_digest(Some(wire::ProfilePin {
-                profile_digest: vec![1; 32],
-            }))
-            .is_ok()
-        );
-        assert!(
-            profile_digest(Some(wire::ProfilePin {
-                profile_digest: vec![1; 31],
-            }))
-            .is_err()
-        );
+        assert!(profile_digest(Some(wire::ProfilePin {
+            profile_digest: vec![1; 32],
+        }))
+        .is_ok());
+        assert!(profile_digest(Some(wire::ProfilePin {
+            profile_digest: vec![1; 31],
+        }))
+        .is_err());
         assert!(profile_digest(None).is_err());
     }
 

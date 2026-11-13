@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=12669d64442fa9a4b70fae372b680b9549e746f05de5311cf1974361a62b9e1e
+MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
+MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
+MERGE (deviceRouter:Symbol {id:"crates/star-api-rest/src/auth/oauth/device_enrollment.rs::router",kind:"function"})
+MERGE (self)-[:DEFINES]->(router)
+MERGE (router)-[:CALLS]->(deviceRouter)
+@endcypher
+*/
 //! `crates/star-api-rest` — STAR Developer REST API
 //!
 //! per `docs/architecture/2026-09-02-upgrade/spec/integration/02-developer-api-and-outbound-webhook-spec.md` (sibling) §1.1 + §2 + §7.3
@@ -34,6 +43,7 @@ pub mod middleware;
 pub mod rbac;
 pub mod response;
 pub mod routes;
+pub mod workspace_files;
 
 use axum::{
     routing::{delete, get, patch, post},
@@ -198,6 +208,7 @@ pub fn build_oauth_router() -> axum::Router<auth::oauth::OAuth2State> {
         .route("/.well-known/jwks.json", get(handlers::jwks_handler))
         .route("/oauth/introspect", post(handlers::introspect_handler))
         .route("/oauth/revoke", post(handlers::revoke_handler))
+        .merge(auth::oauth::device_enrollment::router())
 }
 
 /// 组合 router: REST API + OAuth2 5 endpoints (per brief v0.47 §3.1)
@@ -698,8 +709,12 @@ mod tests {
                 as Arc<dyn OAuthAuthorizationCodeRepository>,
             access_token_repo: Arc::new(PgOAuthAccessTokenRepository::new(pool.clone()))
                 as Arc<dyn OAuthAccessTokenRepository>,
-            refresh_token_repo: Arc::new(PgOAuthRefreshTokenRepository::new(pool))
+            refresh_token_repo: Arc::new(PgOAuthRefreshTokenRepository::new(pool.clone()))
                 as Arc<dyn OAuthRefreshTokenRepository>,
+            device_binding_repo: Arc::new(
+                star_pg_adapter::repository::PgDeviceBindingRepository::new(pool.clone()),
+            )
+                as Arc<dyn star_pg_adapter::repository::DeviceBindingRepository>,
         }
     }
 

@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=facd303687aabadc03a87da91727fbd4e1caee62301b0695a1e7f8aa5fc6f300
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/metadata_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/metadata_node.py
 # TMO M-N7 metadata_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #
@@ -29,7 +32,7 @@ import logging
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("task_ops.nodes.metadata_node")
 

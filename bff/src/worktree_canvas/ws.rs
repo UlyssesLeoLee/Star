@@ -39,7 +39,9 @@ async fn ws_handler(
     State(state): State<Arc<WorktreeCanvasState>>,
 ) -> Result<impl IntoResponse, WorktreeApiError> {
     // RBAC: View 即可 (per DD §44).
-    state.permission.require(super::permission::PermissionLevel::View)?;
+    state
+        .permission
+        .require(super::permission::PermissionLevel::View)?;
     Ok(ws.on_upgrade(move |socket| handle_socket(socket, state)))
 }
 

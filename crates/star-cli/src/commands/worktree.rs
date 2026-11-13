@@ -1,16 +1,16 @@
 //! `star worktree ...` (MVP 17 核心 #11-#13: create / enter / status)
 //!
-//! ULYS-218.2 加 `start-from-picker` 子命令 (per FR-ORCA-009 CLI 列表).
+//! ULYS-218.2 加 `start-from-picker` 子命令。
 //!
 //! ## 子命令概览
 //!
 //! - `star worktree create <id>` — MVP 17 stub (mock JSON 输出)
 //! - `star worktree enter <id>` — MVP 17 stub (stdout 打路径, 供 shell eval)
 //! - `star worktree status` — MVP 17 stub (mock JSON 输出)
-//! - `star worktree start-from-picker <repo>` — ULYS-218.2 新增 (per FR-ORCA-009 CLI).
+//! - `star worktree start-from-picker <repo>` — ULYS-218.2 新增。
 //!   调 backend `worktree-shared-dir::RealStartFromPicker::list_candidates` /
-//!   `resolve`. `<repo>` 是 git repo 本地路径 (后续 Multica 接入 name/UUID
-//!   解析后扩展, MVP 阶段 path 是最诚实的最小契约).
+//!   `resolve`. `<repo>` 是 git repo 本地路径；后续可由 Project registry
+//!   解析 name/UUID，MVP 阶段 path 是最小契约。
 //!
 //! ## DI 简述
 //!
@@ -28,16 +28,16 @@ use uuid::Uuid;
 
 use git_adapter::provider::GitProvider;
 use git_adapter::CliGitProvider;
+use worktree_shared_dir::start_from_picker::StartFromPicker;
 use worktree_shared_dir::{
     parse_candidate_id, PickerCandidate, RealStartFromPicker, SharedDirError,
     StartFromPickerRegistry,
 };
-use worktree_shared_dir::start_from_picker::StartFromPicker;
 
 use crate::error::StarError;
 use crate::output;
 
-/// `star worktree ...` 顶层 subcommand 枚举
+/// Worktree 操作与起点选择
 #[derive(Debug, Subcommand)]
 pub(crate) enum WorktreeCommand {
     /// MVP 17 核心 #11: stub create (mock JSON)
@@ -46,18 +46,14 @@ pub(crate) enum WorktreeCommand {
     Enter { id: String },
     /// MVP 17 核心 #13: stub status (mock JSON)
     Status,
-    /// ULYS-218.2 / FR-ORCA-009 CLI: 列 4 选 1 start-from picker candidates
+    /// 列出或解析 Worktree 起点候选
     StartFromPicker(StartFromPickerArgs),
 }
 
-/// Start-from Picker 子命令参数 (per FR-ORCA-009 CLI, ULYS-218.2).
-///
-/// `<repo>` 当前是 git repo 本地路径 (`-p` 等同 positional 别名,
-/// 跟 `git -C <path>` 命名风格对齐). 后续 Multica 项目名/UUID 接入后
-/// 扩展 `--repo-id <uuid>` flag.
+/// Worktree 起点选择参数
 #[derive(Debug, Args)]
 pub(crate) struct StartFromPickerArgs {
-    /// git repo 本地路径 (per FR-ORCA-009 CLI 列表)
+    /// 本地 Git 仓库路径
     pub repo: String,
     /// `--resolve <kind>:<value>`: resolve 单个候选, 输出 `StartFrom` JSON.
     /// `kind` ∈ {`repo_base`, `local_branch`, `commit_sha`, `remote_branch`}.
@@ -99,7 +95,7 @@ fn build_picker() -> Arc<RealStartFromPicker> {
     Arc::new(RealStartFromPicker::new(git, registry))
 }
 
-/// 渲染 picker 候选为人类可读 table (per FR-ORCA-009 CLI 默认输出).
+/// 渲染 picker 候选为人类可读 table。
 ///
 /// 4 选 1 分组: REPO BASE REF / LOCAL BRANCH / COMMIT SHA / REMOTE BRANCH.
 /// 每组 prefix 一行 group header, 后续每行 `<label>  <description>`.
@@ -114,8 +110,7 @@ fn render_candidates_table(candidates: &[PickerCandidate]) -> String {
     ];
     let mut out = String::new();
     for (kind, header) in HEADERS {
-        let group: Vec<&PickerCandidate> =
-            candidates.iter().filter(|c| c.kind == *kind).collect();
+        let group: Vec<&PickerCandidate> = candidates.iter().filter(|c| c.kind == *kind).collect();
         if group.is_empty() {
             continue;
         }
@@ -143,9 +138,8 @@ fn render_candidates_table(candidates: &[PickerCandidate]) -> String {
 
 /// 把 `<repo>` 字符串解析成绝对路径. 解析失败或路径不存在抛 `StarError::Picker`.
 ///
-/// MVP 阶段 `<repo>` 必须是 git repo 本地路径 (per FR-ORCA-009 CLI 契约).
-/// 后续 Multica 项目名/UUID 接入后, 这步会先调 project registry 解析,
-/// 再 fallback 到 path.
+/// MVP 阶段 `<repo>` 必须是 git repo 本地路径。
+/// 后续接入 Project registry 后，可先解析项目名/UUID，再回退到 path。
 fn resolve_repo_path(repo: &str) -> Result<PathBuf, StarError> {
     let path = PathBuf::from(repo);
     if !path.exists() {
@@ -236,7 +230,7 @@ fn worktree_status_stub() -> Result<(), StarError> {
     Ok(())
 }
 
-/// `star worktree start-from-picker <repo>` 顶层 handler (per FR-ORCA-009 CLI).
+/// `star worktree start-from-picker <repo>` 顶层 handler。
 ///
 /// 三种模式:
 /// - 默认 (`--resolve` 未传): 调 `list_candidates`, table 或 JSON 输出.
@@ -256,7 +250,10 @@ async fn run_start_from_picker(args: StartFromPickerArgs) -> Result<(), StarErro
             description: String::new(),
             kind,
         };
-        let resolved = picker.resolve(repo_id, candidate).await.map_err(picker_err)?;
+        let resolved = picker
+            .resolve(repo_id, candidate)
+            .await
+            .map_err(picker_err)?;
         println!(
             "{}",
             output::json_pretty(serde_json::json!({
@@ -272,10 +269,7 @@ async fn run_start_from_picker(args: StartFromPickerArgs) -> Result<(), StarErro
     }
 
     // mode 2: 列 candidates
-    let candidates = picker
-        .list_candidates(repo_id)
-        .await
-        .map_err(picker_err)?;
+    let candidates = picker.list_candidates(repo_id).await.map_err(picker_err)?;
 
     if args.json {
         println!(
@@ -313,7 +307,10 @@ mod tests {
     fn parse_candidate_id_recognizes_all_four_kinds() {
         assert_eq!(
             parse_candidate_id("repo_base:main").unwrap(),
-            (worktree_shared_dir::PickerCandidateKind::RepoBase, "main".into())
+            (
+                worktree_shared_dir::PickerCandidateKind::RepoBase,
+                "main".into()
+            )
         );
         assert_eq!(
             parse_candidate_id("local_branch:feat-x").unwrap(),
@@ -378,12 +375,27 @@ mod tests {
             },
         ];
         let table = render_candidates_table(&candidates);
-        assert!(table.contains("REPO BASE REF"), "should have REPO BASE REF header: {table}");
-        assert!(table.contains("main (default)"), "should list main: {table}");
-        assert!(table.contains("LOCAL BRANCH"), "should have LOCAL BRANCH header: {table}");
+        assert!(
+            table.contains("REPO BASE REF"),
+            "should have REPO BASE REF header: {table}"
+        );
+        assert!(
+            table.contains("main (default)"),
+            "should list main: {table}"
+        );
+        assert!(
+            table.contains("LOCAL BRANCH"),
+            "should have LOCAL BRANCH header: {table}"
+        );
         assert!(table.contains("feat-x"), "should list feat-x: {table}");
-        assert!(table.contains("REMOTE BRANCH"), "should have REMOTE BRANCH header: {table}");
-        assert!(!table.contains("COMMIT SHA"), "should skip empty COMMIT SHA group: {table}");
+        assert!(
+            table.contains("REMOTE BRANCH"),
+            "should have REMOTE BRANCH header: {table}"
+        );
+        assert!(
+            !table.contains("COMMIT SHA"),
+            "should skip empty COMMIT SHA group: {table}"
+        );
     }
 
     /// Test 5: `render_candidates_table` 空输入返回空串 (避免空 header 噪音)
@@ -404,8 +416,14 @@ mod tests {
         let cli_err = picker_err(backend_err);
         match cli_err {
             StarError::Picker(msg) => {
-                assert!(msg.contains("WSD.PICKER_GIT_OPEN_FAIL"), "code should be in msg: {msg}");
-                assert!(msg.contains("git open_repo failed"), "message should be in msg: {msg}");
+                assert!(
+                    msg.contains("WSD.PICKER_GIT_OPEN_FAIL"),
+                    "code should be in msg: {msg}"
+                );
+                assert!(
+                    msg.contains("git open_repo failed"),
+                    "message should be in msg: {msg}"
+                );
             }
             _ => panic!("expected StarError::Picker, got something else"),
         }
@@ -417,7 +435,10 @@ mod tests {
         let result = resolve_repo_path("/this/path/should/not/exist/abc-xyz");
         match result {
             Err(StarError::Picker(msg)) => {
-                assert!(msg.contains("does not exist"), "msg should mention missing: {msg}");
+                assert!(
+                    msg.contains("does not exist"),
+                    "msg should mention missing: {msg}"
+                );
             }
             Ok(p) => panic!("expected error for missing path, got Ok({p:?})"),
             Err(other) => panic!("expected Picker error, got {other:?}"),

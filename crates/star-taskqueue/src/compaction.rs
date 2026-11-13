@@ -128,11 +128,7 @@ impl CompactionMessage {
     }
 
     /// 构造 assistant 消息 (含 tool calls).
-    pub fn assistant(
-        id: Uuid,
-        content: impl Into<String>,
-        tool_calls: Vec<ToolCall>,
-    ) -> Self {
+    pub fn assistant(id: Uuid, content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
         Self {
             id,
             role: MessageRole::Assistant,
@@ -211,7 +207,12 @@ impl CompactionDetails {
 
     /// 从 `FileOps` 计算 read_files + modified_files (per pi.ts `computeFileLists`).
     pub fn from_file_ops(ops: &FileOps) -> Self {
-        let modified: BTreeSet<String> = ops.edited.iter().chain(ops.written.iter()).cloned().collect();
+        let modified: BTreeSet<String> = ops
+            .edited
+            .iter()
+            .chain(ops.written.iter())
+            .cloned()
+            .collect();
         let read_only: Vec<String> = ops.read.difference(&modified).cloned().collect();
         let modified_files: Vec<String> = modified.into_iter().collect();
         Self {
@@ -339,7 +340,10 @@ impl CutPoint {
 ///    turn-prefix 范围 = cut 之后的当前 turn 前半消息
 ///
 /// **返回 `None`**: 消息数 <= N, 无需 compaction.
-pub fn find_cut_point(messages: &[CompactionMessage], keep_last_n_turns: usize) -> Option<CutPoint> {
+pub fn find_cut_point(
+    messages: &[CompactionMessage],
+    keep_last_n_turns: usize,
+) -> Option<CutPoint> {
     if keep_last_n_turns == 0 {
         return None;
     }
@@ -826,7 +830,10 @@ fn list_entries_by_session(
     Ok(out)
 }
 
-fn latest_entry_for_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<CompactionEntry>> {
+fn latest_entry_for_session(
+    conn: &Connection,
+    session_id: &str,
+) -> rusqlite::Result<Option<CompactionEntry>> {
     let mut stmt = conn.prepare(
         r#"SELECT entry_id, session_id, first_kept_message_id, summary, tokens_before,
                   read_files, modified_files, kind, created_at_ms, input_tokens, output_tokens
@@ -973,7 +980,10 @@ mod tests {
             CompactionMessage::assistant(
                 Uuid::new_v4(),
                 "a2",
-                vec![tool_call("edit", "src/foo.rs"), tool_call("read", "src/bar.rs")],
+                vec![
+                    tool_call("edit", "src/foo.rs"),
+                    tool_call("read", "src/bar.rs"),
+                ],
             ),
             CompactionMessage::user(Uuid::new_v4(), "u3"),
             CompactionMessage::assistant(
@@ -985,7 +995,10 @@ mod tests {
             CompactionMessage::assistant(
                 Uuid::new_v4(),
                 "a4",
-                vec![tool_call("read", "src/foo.rs"), tool_call("edit", "src/qux.rs")],
+                vec![
+                    tool_call("read", "src/foo.rs"),
+                    tool_call("edit", "src/qux.rs"),
+                ],
             ),
             CompactionMessage::user(Uuid::new_v4(), "u5"),
             CompactionMessage::assistant(Uuid::new_v4(), "a5", vec![]),
@@ -996,8 +1009,14 @@ mod tests {
     fn extract_file_ops_from_assistant_read_write_edit() {
         let msgs = make_messages();
         let ops = extract_file_ops(&msgs);
-        assert_eq!(ops.read, BTreeSet::from(["src/foo.rs".into(), "src/bar.rs".into()]));
-        assert_eq!(ops.edited, BTreeSet::from(["src/foo.rs".into(), "src/qux.rs".into()]));
+        assert_eq!(
+            ops.read,
+            BTreeSet::from(["src/foo.rs".into(), "src/bar.rs".into()])
+        );
+        assert_eq!(
+            ops.edited,
+            BTreeSet::from(["src/foo.rs".into(), "src/qux.rs".into()])
+        );
         assert_eq!(ops.written, BTreeSet::from(["src/baz.rs".into()]));
     }
 
@@ -1009,7 +1028,11 @@ mod tests {
         // modified = edited ∪ written = {foo, qux, baz}
         assert_eq!(
             details.modified_files,
-            vec!["src/baz.rs".to_string(), "src/foo.rs".to_string(), "src/qux.rs".to_string()]
+            vec![
+                "src/baz.rs".to_string(),
+                "src/foo.rs".to_string(),
+                "src/qux.rs".to_string()
+            ]
         );
         // read_only = read - modified = {bar}
         assert_eq!(details.read_files, vec!["src/bar.rs".to_string()]);
@@ -1044,7 +1067,7 @@ mod tests {
     #[test]
     fn find_cut_point_keeps_last_n_turns() {
         let msgs = make_messages(); // 5 turns
-        // keep_last_n_turns=2 → cut 在第 3 个 user (idx=4, msgs[4]="u3")
+                                    // keep_last_n_turns=2 → cut 在第 3 个 user (idx=4, msgs[4]="u3")
         let cp = find_cut_point(&msgs, 2).expect("should find cut point");
         assert_eq!(cp.first_kept_idx, 6);
         assert_eq!(cp.first_kept_id(&msgs), Some(msgs[6].id));
@@ -1078,10 +1101,22 @@ mod tests {
         assert!(entry.summary.contains("u1"));
         assert!(entry.summary.contains("u2"));
         // modified_files 应含 foo + baz (a4/qux.rs 在保留区, 不进 details)
-        assert!(entry.details.modified_files.contains(&"src/foo.rs".to_string()));
-        assert!(entry.details.modified_files.contains(&"src/baz.rs".to_string()));
-        assert!(!entry.details.modified_files.contains(&"src/qux.rs".to_string()));
-        assert!(!entry.details.modified_files.contains(&"src/bar.rs".to_string()));
+        assert!(entry
+            .details
+            .modified_files
+            .contains(&"src/foo.rs".to_string()));
+        assert!(entry
+            .details
+            .modified_files
+            .contains(&"src/baz.rs".to_string()));
+        assert!(!entry
+            .details
+            .modified_files
+            .contains(&"src/qux.rs".to_string()));
+        assert!(!entry
+            .details
+            .modified_files
+            .contains(&"src/bar.rs".to_string()));
         // read_files 应只含 bar (foo 在 modified, 不在 read_only)
         assert_eq!(entry.details.read_files, vec!["src/bar.rs".to_string()]);
         // first_kept_message_id = msgs[6].id (u4)
@@ -1112,8 +1147,14 @@ mod tests {
             .compact(&msgs, "session-B", Some(&first), CompactionKind::Auto)
             .expect("second compact should produce entry");
         assert_eq!(second.details.modified_files.len(), 2);
-        assert!(second.details.modified_files.contains(&"src/foo.rs".to_string()));
-        assert!(second.details.modified_files.contains(&"src/baz.rs".to_string()));
+        assert!(second
+            .details
+            .modified_files
+            .contains(&"src/foo.rs".to_string()));
+        assert!(second
+            .details
+            .modified_files
+            .contains(&"src/baz.rs".to_string()));
         // read_only 只剩 bar (foo 被标记为 modified)
         assert_eq!(second.details.read_files, vec!["src/bar.rs".to_string()]);
     }

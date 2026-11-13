@@ -43,6 +43,8 @@ members = [
     "crates/domain-ai",
     # Phase 9F4E: isolated BI owner for durable Task event Inbox/facts.
     "crates/bi-owner-runtime",
+    # WBS W8: bounded native durable-event receive adapter for the BI owner.
+    "crates/bi-native-event-adapter",
     # Phase W17-W20 (2026-08-29) 新增 2 crate
     "crates/domain-cli",
     "crates/domain-agent-windows",
@@ -55,9 +57,13 @@ members = [
     # Phase D 骨架:2026-08-27 新增 3 crate
     "crates/star-cli",
     "crates/star-context",
-    # Phase G 骨架:2026-08-27 新增 crates/star-saga (Saga orchestrator + Q-003 跨域协调)
+    # Phase F 骨架:2026-08-27 新增 crates/star-saga (Saga orchestrator + Q-003 跨域协调)
     "crates/star-saga",
     "crates/star-mcp",
+    # WBS 6.5.2 (2026-11-14) 新增 crates/sandboxd (Sandbox-as-a-Service 独立 daemon, per SRS-SANDBOX-002 / BD-SANDBOX-002 / DD-SANDBOX-002 / docs/architecture/SANDBOX-002.md)
+    "crates/sandboxd",
+    # WBS 6.2 (2026-11-14) 新增 crates/star-agent-runtime (STAR Agent Runtime 双模式骨架, per SRS-STAR-AGENT-RUNTIME-001 / ADR-0044)
+    "crates/star-agent-runtime",
     # Phase OPS-INTRY: 2026-09-08 新增 crates/star-ops (Ops Console MVP-骨架, per SRS-STAR-OPS-001.md v0.1)
     "crates/star-ops",
     # v0.38: PG 持久化 adapter (per WBS v0.37 §14.10.4 缺口 #4 app 端 PG 持久化, F-05b 立新工作项)
@@ -94,14 +100,12 @@ members = [
     "crates/terminal-stack",
     # Phase W20-AV-AI-Vault-Domain (ULYS-157, 2026-09-23 JST): ai-vault crate (SearchPolicy + clear_search_index, per FR-ORCA-023/024 桌面索引控制 + Clear Index, spec v1.0 line 347-353, MVP v0 = local-only settings + idempotent clear)
     "crates/ai-vault",
-    # ULYS-160 (ULYS-104.16, 2026-09-26): canvas-engine crate (阶段 1 骨架, axum HTTP server 监听 :8080, /healthz + /ready + /version + 占位 endpoint, 阶段 2 落地 跨 5 domain 共享 API + 平台能力 per SRS-STAR-CANVAS-GAME-001 v0.1 §4.1, 守门 #1 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #14 v4 Mavis 临时代签 5 域 Lead 决策)
+    # Star Canvas platform service: health, readiness, version, and service metadata endpoints.
     "crates/canvas-engine",
-    # ULYS-160 (ULYS-104.16, 2026-09-26): domain-canvas crate (阶段 1 骨架, axum HTTP server 监听 :8081, /healthz + /ready + /version + /api/v1/canvas 占位, 阶段 2 落地 26 表 W/T/M + 5 角色 CRUD per SRS-STAR-CANVAS-GAME-001 v0.1 §4.2, 守门 #1 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #14 v4 Mavis 临时代签 5 域 Lead 决策)
+    # Star Canvas domain service: health, readiness, version, and Canvas API endpoints.
     "crates/domain-canvas",
-    # ULYS-160 (ULYS-104.16, 2026-09-26): canvas-realtime crate (阶段 1 骨架, axum HTTP server 监听 :8082 + tokio-tungstenite WSS :8083 echo, 阶段 2 落地 Yjs/yrs CRDT 集成 per SRS-STAR-CANVAS-GAME-001 v0.1 §4.3, 守门 #1 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #14 v4 Mavis 临时代签 5 域 Lead 决策)
+    # Star Canvas realtime service: HTTP health/metadata plus WebSocket collaboration endpoint.
     "crates/canvas-realtime",
-    # ULYS-160 (ULYS-104.16, 2026-09-26): canvas-game crate (阶段 1 骨架, axum HTTP server 监听 :8084, /healthz + /ready + /version + /api/v1/gameplay 占位, 阶段 2 落地 角色 / 弹幕 / 战斗 / 3D sprite 游戏逻辑 per SRS-STAR-CANVAS-GAME-001 v0.1 §4.4, 守门 #1 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #14 v4 Mavis 临时代签 5 域 Lead 决策)
-    "crates/canvas-game",
     # Phase G.3 (EventBus + Mailbox) 启动: 2026-09-07 注册 crates/star-eventbus (in-process pub/sub + Mailbox 3 模式, 守门 #13 a L0 协调 派生)
     "crates/star-eventbus",
     # Phase G.5 (Tenant Quota) 启动: 2026-09-07 注册 crates/star-quota (compute / storage / LLM token 配额, 守门 #13 d M 派生 SCD Type 2 + 13 類 RLS)
@@ -184,7 +188,7 @@ unreachable_pub = "deny"  # T1.5 step 1/3 (per WBS-001-refactor.md §1 T1.5): ca
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 authors = ["Star Team"]
 license = "Apache-2.0"
 repository = "https://github.com/UlyssesLeoLee/Star"

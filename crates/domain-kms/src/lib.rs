@@ -36,6 +36,57 @@
 //!
 //! 🟡 mock 备选 (E.4 phase 2 续, 等 Ulysses 凭证到位切真)
 
+//! Provider-neutral KMS contracts are additive; existing callers continue to use
+//! [`KmsClient`] until a separately reviewed migration is completed.
+
+/*
+@cypher schema=1 source_sha256=126e9218780de127462d90999cafac8bd8a2b85977b9abe73e57bd7f17e6cee2
+MERGE (self:File {path:"crates/domain-kms/src/lib.rs"})
+MERGE (profile:File {path:"crates/domain-kms/src/profile.rs"})
+MERGE (contract:File {path:"crates/domain-kms/src/provider_contract.rs"})
+MERGE (envelope:File {path:"crates/domain-kms/src/transcript_envelope.rs"})
+MERGE (self)-[:IMPORTS]->(profile)
+MERGE (self)-[:IMPORTS]->(contract)
+MERGE (self)-[:IMPORTS]->(envelope)
+MERGE (identity:Symbol {id:"crates/domain-kms/src/profile.rs::KmsProfileIdentity",kind:"type"})
+MERGE (provider:Symbol {id:"crates/domain-kms/src/provider_contract.rs::KmsProvider",kind:"trait"})
+MERGE (client:Symbol {id:"crates/domain-kms/src/provider_contract.rs::KmsProviderClient",kind:"type"})
+MERGE (self)-[:EXPOSES]->(identity)
+MERGE (self)-[:EXPOSES]->(provider)
+MERGE (self)-[:EXPOSES]->(client)
+MERGE (aad:Symbol {id:"crates/domain-kms/src/transcript_envelope.rs::TranscriptAad",kind:"type"})
+MERGE (transcript_envelope:Symbol {id:"crates/domain-kms/src/transcript_envelope.rs::TranscriptEnvelope",kind:"type"})
+MERGE (protector:Symbol {id:"crates/domain-kms/src/transcript_envelope.rs::TranscriptEnvelopeProtector",kind:"type"})
+MERGE (envelope_error:Symbol {id:"crates/domain-kms/src/transcript_envelope.rs::TranscriptEnvelopeError",kind:"enum"})
+MERGE (self)-[:EXPOSES]->(aad)
+MERGE (self)-[:EXPOSES]->(transcript_envelope)
+MERGE (self)-[:EXPOSES]->(protector)
+MERGE (self)-[:EXPOSES]->(envelope_error)
+@endcypher
+*/
+
+/// Trusted-resolver profile identity and capability metadata.
+pub mod profile;
+/// Provider-neutral operations and identity-pinning facade.
+pub mod provider_contract;
+/// Bounded authenticated transcript envelope core.
+pub mod transcript_envelope;
+
+pub use transcript_envelope::{
+    TranscriptAad, TranscriptEnvelope, TranscriptEnvelopeError, TranscriptEnvelopeProtector,
+    MAX_TRANSCRIPT_BODY_BYTES, MAX_TRANSCRIPT_ENVELOPE_JSON_BYTES, MAX_WRAPPED_DATA_KEY_BYTES,
+    TRANSCRIPT_AAD_SCHEMA_VERSION, TRANSCRIPT_ENVELOPE_FORMAT_VERSION,
+};
+
+pub use profile::{
+    KmsCapabilities, KmsCapability, KmsProfileError, KmsProfileIdentity, KmsProviderDescriptor,
+    ProfileDigest,
+};
+pub use provider_contract::{
+    GeneratedDataKey, KmsCallContext, KmsProvider, KmsProviderClient, KmsProviderError,
+    KmsProviderErrorKind, SecretDataKey, WrappedDataKey,
+};
+
 use async_trait::async_trait;
 use base64::Engine;
 use chrono::{DateTime, Utc};

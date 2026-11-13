@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=d451a762d24b307ee22ebbf30f42f18a2b80f56fa7f645a8eb13ac61228e0311
+@cypher schema=1 source_sha256=708856f1750989a7ff5164bd30422f1169f760657e0dfe122b5227884590b25a
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_receiver.rs"})
 MERGE (route:Type {id:"bi_owner_runtime::TaskEventReceiveRoute",kind:"struct"})
-MERGE (origin:Type {id:"bi_owner_runtime::TaskEventReceiveOrigin",kind:"struct"})
+MERGE (origin:Type {id:"bi_owner_runtime::TaskEventReceiveOrigin",kind:"type_alias"})
 MERGE (delivery:Type {id:"bi_owner_runtime::TaskEventReceiveDelivery",kind:"trait"})
 MERGE (transport:Type {id:"bi_owner_runtime::TaskEventReceiveTransport",kind:"trait"})
 MERGE (authorization:Type {id:"bi_owner_runtime::TaskEventReceiveAuthorization",kind:"trait"})
@@ -14,9 +14,9 @@ MERGE (fault:Type {id:"bi_owner_runtime::TaskEventQuarantineFault",kind:"enum"})
 MERGE (quarantine_receipt:Type {id:"bi_owner_runtime::TaskEventQuarantineReceipt",kind:"struct"})
 MERGE (outcome:Type {id:"bi_owner_runtime::TaskEventReceiveOutcome",kind:"enum"})
 MERGE (error:Type {id:"bi_owner_runtime::TaskEventReceiveError",kind:"enum"})
+MERGE (inbox_error:Type {id:"bi_owner_runtime::TaskEventInboxError",kind:"enum"})
 MERGE (semaphore:Type {id:"tokio::sync::Semaphore",kind:"struct"})
 MERGE (route_new:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveRoute.new",kind:"method"})
-MERGE (origin_new:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveOrigin.new",kind:"method"})
 MERGE (construct:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.new",kind:"method"})
 MERGE (receive:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.receive_one",kind:"method"})
 MERGE (process:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiver.process_one",kind:"method"})
@@ -26,11 +26,6 @@ MERGE (valid_label:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.r
 MERGE (tests:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests",kind:"module"})
 MERGE (route_tenant:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveRoute.tenant_id",kind:"method"})
 MERGE (route_pin:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveRoute.pin",kind:"method"})
-MERGE (origin_provider:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveOrigin.provider_identity",kind:"method"})
-MERGE (origin_log:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveOrigin.log_id",kind:"method"})
-MERGE (origin_generation:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveOrigin.log_generation",kind:"method"})
-MERGE (origin_sequence:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveOrigin.sequence",kind:"method"})
-MERGE (origin_message:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveOrigin.message_id",kind:"method"})
 MERGE (delivery_ack:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveDelivery.acknowledge",kind:"method"})
 MERGE (delivery_terminal:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveDelivery.terminate_permanently",kind:"method"})
 MERGE (transport_pull:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::TaskEventReceiveTransport.pull_one",kind:"method"})
@@ -41,11 +36,12 @@ MERGE (receiver_new:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.
 MERGE (test_commit:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.owner_commit_and_post_commit_origin_check_precede_ack",kind:"function"})
 MERGE (test_revoke:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.source_revocation_after_commit_leaves_delivery_unacknowledged",kind:"function"})
 MERGE (test_conflict:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.identity_conflict_requires_quarantine_commit_before_terminal_disposition",kind:"function"})
+MERGE (test_legacy_origin:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.legacy_exact_replay_without_source_origin_is_never_terminally_acknowledged",kind:"test"})
 MERGE (test_malformed:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.malformed_wire_is_quarantined_without_calling_inbox",kind:"function"})
 MERGE (test_quarantine:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.quarantine_failure_never_terminally_acknowledges",kind:"function"})
 MERGE (test_cancel:Symbol {id:"crates/bi-owner-runtime/src/task_event_receiver.rs::tests.cancellation_before_pull_has_no_transport_side_effects",kind:"function"})
 MERGE (self)-[:DEFINES]->(route)
-MERGE (self)-[:DEFINES]->(origin)
+MERGE (self)-[:EXPOSES]->(origin)
 MERGE (self)-[:DEFINES]->(delivery)
 MERGE (self)-[:DEFINES]->(transport)
 MERGE (self)-[:DEFINES]->(authorization)
@@ -59,12 +55,6 @@ MERGE (self)-[:DEFINES]->(error)
 MERGE (route)-[:DEFINES]->(route_new)
 MERGE (route)-[:DEFINES]->(route_tenant)
 MERGE (route)-[:DEFINES]->(route_pin)
-MERGE (origin)-[:DEFINES]->(origin_new)
-MERGE (origin)-[:DEFINES]->(origin_provider)
-MERGE (origin)-[:DEFINES]->(origin_log)
-MERGE (origin)-[:DEFINES]->(origin_generation)
-MERGE (origin)-[:DEFINES]->(origin_sequence)
-MERGE (origin)-[:DEFINES]->(origin_message)
 MERGE (delivery)-[:DEFINES]->(delivery_ack)
 MERGE (delivery)-[:DEFINES]->(delivery_terminal)
 MERGE (transport)-[:DEFINES]->(transport_pull)
@@ -81,11 +71,11 @@ MERGE (receive)-[:CALLS]->(process)
 MERGE (construct)-[:CREATES]->(semaphore)
 MERGE (receive)-[:USES_TYPE]->(semaphore)
 MERGE (receive)-[:CALLS]->(transport_pull)
-MERGE (origin_new)-[:CALLS]->(valid_label)
 MERGE (route_new)-[:CALLS]->(:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventRoutePin.is_valid",kind:"method"})
 MERGE (tests)-[:CONTAINS]->(test_commit)
 MERGE (tests)-[:CONTAINS]->(test_revoke)
 MERGE (tests)-[:CONTAINS]->(test_conflict)
+MERGE (tests)-[:CONTAINS]->(test_legacy_origin)
 MERGE (tests)-[:CONTAINS]->(test_malformed)
 MERGE (tests)-[:CONTAINS]->(test_quarantine)
 MERGE (tests)-[:CONTAINS]->(test_cancel)
@@ -96,6 +86,8 @@ MERGE (process)-[:CALLS]->(delivery_ack)
 MERGE (process)-[:USES_TYPE]->(transport)
 MERGE (process)-[:USES_TYPE]->(authorization)
 MERGE (process)-[:USES_TYPE]->(delivery)
+MERGE (process)-[:USES_TYPE]->(origin)
+MERGE (process)-[:USES_TYPE]->(inbox_error)
 MERGE (poison)-[:USES_TYPE]->(quarantine)
 MERGE (poison)-[:USES_TYPE]->(authorization)
 MERGE (poison)-[:USES_TYPE]->(delivery)
@@ -104,6 +96,8 @@ MERGE (poison)-[:CALLS]->(delivery_terminal)
 MERGE (test_commit)-[:CALLS]->(receive)
 MERGE (test_revoke)-[:CALLS]->(receive)
 MERGE (test_conflict)-[:CALLS]->(receive)
+MERGE (test_legacy_origin)-[:CALLS]->(receive)
+MERGE (test_legacy_origin)-[:USES_TYPE]->(inbox_error)
 MERGE (test_malformed)-[:CALLS]->(receive)
 MERGE (test_quarantine)-[:CALLS]->(receive)
 MERGE (test_cancel)-[:CALLS]->(receive)
@@ -131,6 +125,9 @@ use crate::task_event_inbox::{
     TaskEventInboxReceipt, TaskEventInboxStore, TaskEventRoutePin, MAX_TASK_WIRE_BYTES,
 };
 
+/// Source-compatible name for the provider-neutral origin carried through the receive ports.
+pub use crate::task_event_inbox::TaskEventSourceOrigin as TaskEventReceiveOrigin;
+
 /// Tenant and immutable route pin for one BI Task-event subscription.
 #[derive(Clone, Debug)]
 pub struct TaskEventReceiveRoute {
@@ -155,70 +152,6 @@ impl TaskEventReceiveRoute {
     /// Return the immutable sender, receiver, and transport profile binding.
     pub fn pin(&self) -> &TaskEventRoutePin {
         &self.pin
-    }
-}
-
-/// Durable transport origin independently checked against the pinned source service.
-#[derive(Clone, Debug)]
-pub struct TaskEventReceiveOrigin {
-    provider_identity: String,
-    log_id: String,
-    log_generation: Uuid,
-    sequence: i64,
-    message_id: Uuid,
-}
-
-impl TaskEventReceiveOrigin {
-    /// Construct an origin with bounded ASCII labels, non-nil identities, and a positive sequence.
-    ///
-    /// Returns [`TaskEventReceiveError::InvalidOrigin`] if any origin component is invalid.
-    pub fn new(
-        provider_identity: String,
-        log_id: String,
-        log_generation: Uuid,
-        sequence: i64,
-        message_id: Uuid,
-    ) -> Result<Self, TaskEventReceiveError> {
-        if !valid_label(&provider_identity, 64)
-            || !valid_label(&log_id, 128)
-            || log_generation.is_nil()
-            || sequence <= 0
-            || message_id.is_nil()
-        {
-            return Err(TaskEventReceiveError::InvalidOrigin);
-        }
-        Ok(Self {
-            provider_identity,
-            log_id,
-            log_generation,
-            sequence,
-            message_id,
-        })
-    }
-
-    /// Return the transport provider identity to compare with the route pin.
-    pub fn provider_identity(&self) -> &str {
-        &self.provider_identity
-    }
-
-    /// Return the durable log identifier within the provider.
-    pub fn log_id(&self) -> &str {
-        &self.log_id
-    }
-
-    /// Return the generation that distinguishes incarnations of the durable log.
-    pub fn log_generation(&self) -> Uuid {
-        self.log_generation
-    }
-
-    /// Return the positive position within this log generation.
-    pub fn sequence(&self) -> i64 {
-        self.sequence
-    }
-
-    /// Return the transport message identity that must match the envelope event identity.
-    pub fn message_id(&self) -> Uuid {
-        self.message_id
     }
 }
 
@@ -272,8 +205,9 @@ pub trait TaskEventReceiveAuthorization: Send + Sync {
 
 /// Metadata-only quarantine must durably and idempotently record route, origin, wire digest/length,
 /// and fault before a poison delivery can be terminally acknowledged. It must never persist the wire.
-/// Use `(route, provider_identity, log_generation, log_id, sequence)` as its key; a replay with a
-/// different wire digest or fault must fail closed instead of replacing the committed receipt.
+/// Use `(route, provider_identity, log_generation, log_id, sequence)` as its durable source key and
+/// retain the exact opaque cursor too; a replay with a different message identity, wire digest, or
+/// fault must fail closed instead of replacing the committed receipt.
 pub trait TaskEventQuarantinePort: Send + Sync {
     /// Commit or recover an exact metadata-only quarantine record before returning its receipt.
     async fn record(
@@ -294,6 +228,7 @@ pub trait TaskEventInboxCommitPort: Send + Sync {
         &self,
         principal: &AuthenticatedTaskEventPrincipal,
         route: &TaskEventRoutePin,
+        source_origin: &TaskEventReceiveOrigin,
         exact_wire: &[u8],
     ) -> Result<TaskEventInboxReceipt, TaskEventInboxError>;
 }
@@ -303,9 +238,11 @@ impl TaskEventInboxCommitPort for TaskEventInboxStore {
         &self,
         principal: &AuthenticatedTaskEventPrincipal,
         route: &TaskEventRoutePin,
+        source_origin: &TaskEventReceiveOrigin,
         exact_wire: &[u8],
     ) -> Result<TaskEventInboxReceipt, TaskEventInboxError> {
-        TaskEventInboxStore::commit_exact_wire(self, principal, route, exact_wire).await
+        TaskEventInboxStore::commit_exact_wire(self, principal, route, source_origin, exact_wire)
+            .await
     }
 }
 
@@ -453,7 +390,7 @@ where
             return Err(TaskEventReceiveError::WireTooLarge);
         }
         let origin = delivery.origin();
-        if origin.provider_identity != self.route.pin.transport_provider_id {
+        if origin.provider_identity() != self.route.pin.transport_provider_id {
             return Err(TaskEventReceiveError::Unauthorized);
         }
         self.authorization
@@ -469,7 +406,7 @@ where
             }
             Err(error) => return Err(TaskEventReceiveError::Inbox(error)),
         };
-        if event_id != origin.message_id {
+        if event_id != origin.message_id() {
             return self
                 .quarantine(&delivery, TaskEventQuarantineFault::MessageIdentityMismatch)
                 .await;
@@ -482,7 +419,7 @@ where
         };
         match self
             .inbox
-            .commit_exact_wire(&principal, &self.route.pin, exact_wire)
+            .commit_exact_wire(&principal, &self.route.pin, origin, exact_wire)
             .await
         {
             Ok(receipt) => {
@@ -533,14 +470,6 @@ where
             fault,
         })
     }
-}
-
-fn valid_label(value: &str, max_len: usize) -> bool {
-    (1..=max_len).contains(&value.len())
-        && value.as_bytes()[0].is_ascii_alphanumeric()
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
 }
 
 #[cfg(test)]
@@ -645,6 +574,7 @@ mod tests {
             &self,
             _principal: &AuthenticatedTaskEventPrincipal,
             _route: &TaskEventRoutePin,
+            _source_origin: &TaskEventReceiveOrigin,
             _exact_wire: &[u8],
         ) -> Result<TaskEventInboxReceipt, TaskEventInboxError> {
             self.events.push("commit");
@@ -709,6 +639,7 @@ mod tests {
             "task-event-facts".into(),
             Uuid::from_u128(13),
             1,
+            1_i64.to_be_bytes().to_vec(),
             Uuid::from_u128(5),
         )
         .expect("valid fixture origin")
@@ -767,6 +698,7 @@ mod tests {
             route_pin_sha256: [2; 32],
             receipt_id: Uuid::from_u128(12),
             wire_sha256: [3; 32],
+            source_origin: origin(),
             committed_at: Utc::now(),
             outcome,
         }
@@ -875,6 +807,23 @@ mod tests {
                 "terminate"
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn legacy_exact_replay_without_source_origin_is_never_terminally_acknowledged() {
+        let (receiver, events) = build_receiver(
+            valid_wire(),
+            Err(TaskEventInboxError::SourceOriginUnverifiable),
+            None,
+            false,
+        );
+        assert!(matches!(
+            receive(&receiver).await,
+            Err(TaskEventReceiveError::Inbox(
+                TaskEventInboxError::SourceOriginUnverifiable
+            ))
+        ));
+        assert_eq!(events.values(), ["pull", "verify", "commit"]);
     }
 
     #[tokio::test]

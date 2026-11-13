@@ -30,3 +30,6 @@ vitest-output.txt
 scripts/_validate-*.mjs
 scripts/_validate-*.mjs.bak
 
+
+.vercel
+.env*

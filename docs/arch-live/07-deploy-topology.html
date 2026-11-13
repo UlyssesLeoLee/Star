@@ -27,8 +27,8 @@
   <section class="hero">
     <div class="eyebrow">分册 07 · 运行环境</div>
     <h1>k3s 上的三个 namespace 与一条边缘</h1>
-    <p class="lead">本地部署是 k3s + kustomize：<code>star-system</code> 跑业务服务，<code>star</code> 跑 BFF 边缘，
-      另有 <code>star-system</code> 内的 canvas 四进程。边缘统一用 <b>envoy 独立 Deployment</b>，
+    <p class="lead">Star 当前 Canvas 部署包含 <code>canvas-engine</code>、<code>domain-canvas</code> 与 <code>canvas-realtime</code> 三个后端服务及 Envoy 边缘入口；<code>star-api-rest</code> 由独立清单部署。Canvas 服务的构建、发布和运行方式见 <code>docs/deployment/star-canvas-services-deploy.md</code>。
+      边缘统一用 <b>envoy Deployment</b>，
       不用 nginx、不用 istio sidecar。</p>
   </section>
 
@@ -93,7 +93,7 @@
       <!-- canvas -->
       <rect x="580" y="340" width="440" height="76" rx="12" fill="rgba(244,114,182,.05)" stroke="#f472b6" stroke-opacity=".3" stroke-dasharray="6 5"/>
       <text class="title" x="596" y="360">ns: star-system (canvas)</text>
-      <text class="sub2" x="596" y="382">engine 8080 · domain-canvas 8081 · realtime 8082 + WSS 8083 · game 8084</text>
+      <text class="sub2" x="596" y="382">Canvas backends: engine 8080 · domain 8081 · realtime 8082 + WSS 8083</text>
       <text class="sub2" x="596" y="402">istio-injection: disabled（显式禁用）</text>
 
       <g>
@@ -149,11 +149,9 @@
       <tr><td class="mono">star-ops</td><td class="mono">star-system</td><td class="mono">8082</td><td>—</td><td><code>/ready</code></td><td>envoy configmap cluster</td></tr>
       <tr><td class="mono">bff</td><td class="mono">star</td><td class="mono">3000（Service 80→3000）</td><td>ClusterIP</td><td>TCP 3000，2s 起 / 5s；liveness 5s / 10s</td><td>bff-deployment.yaml</td></tr>
       <tr><td class="mono">bff-envoy</td><td class="mono">star</td><td class="mono">8080（Service 80→8080）</td><td>ClusterIP</td><td>admin 9901</td><td>bff-deployment.yaml</td></tr>
-      <tr><td class="mono">canvas-engine</td><td class="mono">star-system</td><td class="mono">8080</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
-      <tr><td class="mono">domain-canvas</td><td class="mono">star-system</td><td class="mono">8081</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
-      <tr><td class="mono">canvas-realtime</td><td class="mono">star-system</td><td class="mono">8082 + 8083 (WSS)</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
-      <tr><td class="mono">canvas-game</td><td class="mono">star-system</td><td class="mono">8084</td><td>—</td><td><code>/healthz</code></td><td>canvas-game-k3s.yaml</td></tr>
-      <tr><td class="mono">canvas-game</td><td class="mono">gm (其他)</td><td class="mono">8787 / 5173 / 4173</td><td>NodePort</td><td>—</td><td>canvas-game-k3s.yaml</td></tr>
+      <tr><td class="mono">canvas-engine</td><td class="mono">star-system</td><td class="mono">8080</td><td>—</td><td><code>/healthz</code></td><td>deploy/star-canvas-services-k3s.yaml</td></tr>
+      <tr><td class="mono">domain-canvas</td><td class="mono">star-system</td><td class="mono">8081</td><td>—</td><td><code>/healthz</code></td><td>deploy/star-canvas-services-k3s.yaml</td></tr>
+      <tr><td class="mono">canvas-realtime</td><td class="mono">star-system</td><td class="mono">8082 + 8083 (WSS)</td><td>—</td><td><code>/healthz</code></td><td>deploy/star-canvas-services-k3s.yaml</td></tr>
     </tbody>
   </table></div>
 
@@ -225,7 +223,8 @@
         <li>envoy 路由 / cluster / 超时 / 熔断 / SDS：<code>deploy/k3s-local/envoy/configmap.yaml</code>。</li>
         <li>star-api-rest Deployment + Service + NodePort：<code>deploy/k3s-local/star-api-rest-deploy.yaml</code>（含 namespace <code>star-system</code>）。</li>
         <li>BFF + bff-envoy + 显式 <code>sidecar.istio.io/inject: "false"</code>：<code>deploy/k3s-local/bff-deployment.yaml</code>（ns <code>star</code>）。</li>
-        <li>canvas 四进程端口与镜像：<code>deploy/canvas-game-k3s.yaml</code>。</li>
+        <li>Canvas 三个后端服务及 Envoy：<code>deploy/star-canvas-services-k3s.yaml</code>。</li>
+        <li>Canvas 发布与操作步骤：<code>.github/workflows/publish-star-canvas-services.yml</code>、<code>docs/deployment/star-canvas-services-deploy.md</code>。</li>
         <li>Helm chart 现状：<code>deploy/helm/star/templates</code> 实际内容 + <code>star-api-rest-deploy.yaml</code> 头部注释（明写 chart 为 stub）。</li>
         <li>拉起顺序：本地实证得出的 3 条防御（container runtime 检查 / 60s 等待 / port-forward 先 disable），已固化进 <code>docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md</code>。</li>
         <li>star-mcp 默认 bind：<code>crates/star-mcp/src/main.rs</code>（<code>--bind-addr</code> 默认 <code>127.0.0.1:8080</code>，env <code>STAR_MCP_BIND_ADDR</code>）。</li>

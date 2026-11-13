@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# @cypher schema=1 source_sha256=f86935e1aa5f043aed10b99ec51da421f94fca5543bbff471c4ed0d4b978c3c5
+# MERGE (self:File {path:"scripts/automation/task_ops/task_metadata_repo.py"})
+# @endcypher
 """
 scripts/automation/task_ops/task_metadata_repo.py
 TaskMetadataRepository — task_metadata 表 CRUD 适配器 (per G-TMO-04b)
@@ -331,6 +334,6 @@ class TaskMetadataRepository:
             PermissionError: Master 表物理删除禁止
         """
         raise PermissionError(
-            f"task_metadata_repo: physical DELETE on Master table task_metadata is forbidden "
-            f"(per 守门 #13 c Master 100% RLS 必携 + 物理删除禁止)"
+            "task_metadata_repo: physical DELETE on Master table task_metadata is forbidden "
+            "(per 守门 #13 c Master 100% RLS 必携 + 物理删除禁止)"
         )

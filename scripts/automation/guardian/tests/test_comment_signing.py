@@ -13,12 +13,10 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 # Add scripts/automation/ to sys.path (per 守门 #1 跟 test_audit_logger.py 一致)
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))

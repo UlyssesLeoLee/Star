@@ -23,11 +23,10 @@ Per docs/architecture/SANDBOX-001.md §3 (设计) + AGENTS.md §4 守门 #9 派�
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import sys
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, List, Optional
 
@@ -64,7 +63,7 @@ def is_available() -> bool:
     if sys.platform != "win32":
         return False
     try:
-        import win32job  # noqa: F401
+        __import__("win32job")
         return True
     except ImportError:
         return False
@@ -158,8 +157,6 @@ def run_with_sandbox(
         return
 
     # Windows Job Object path
-    import win32job
-
     job = _create_windows_job(limits)
     try:
         # 用 Popen 而不是 run, 以便 assign pid to job

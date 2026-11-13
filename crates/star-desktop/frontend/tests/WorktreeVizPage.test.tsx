@@ -3,6 +3,14 @@
 // Vitest test — WorktreeVizPage (PR-265)
 // 验证 useLayoutEngine WASM hook 集成 100+ 节点 viz
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=d5c861dfc591ab660be17c71c89c80e132f640b8c74246525156db029467763b
+MERGE (self:File {path:"crates/star-desktop/frontend/tests/WorktreeVizPage.test.tsx"})
+MERGE (page:File {path:"crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx"})
+MERGE (self)-[:TESTS]->(page)
+@endcypher
+*/
+
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -42,7 +50,7 @@ describe('WorktreeVizPage (PR-265)', () => {
     expect(screen.getByTestId('viz-node-wt-0000')).toBeDefined();
     expect(screen.getByTestId('viz-node-wt-0050')).toBeDefined();
     expect(screen.getByTestId('viz-node-wt-0119')).toBeDefined();
-    const circles = document.querySelectorAll('[data-testid^="viz-node-"]');
+    const circles = document.querySelectorAll('[data-testid^="viz-node-wt-"]');
     expect(circles.length).toBe(120);
   });
 
@@ -57,7 +65,7 @@ describe('WorktreeVizPage (PR-265)', () => {
     // 50 < 100 → tree mode → dagre
     const algo = screen.getByTestId('viz-algorithm');
     expect(algo.textContent).toMatch(/algo:.*dagre/);
-    const circles = document.querySelectorAll('[data-testid^="viz-node-"]');
+    const circles = document.querySelectorAll('[data-testid^="viz-node-wt-"]');
     expect(circles.length).toBe(50);
   });
 

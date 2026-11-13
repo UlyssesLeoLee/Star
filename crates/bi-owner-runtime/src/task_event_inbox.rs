@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=c46cb9837ddb285d84e4f8861f876cbed5ebde91cde9433f7707f07754350f7f
+@cypher schema=1 source_sha256=df36e56222125da2e08c0b492768f45abd4f23bc166e84ad14e30bf8e25fe126
 MERGE (self:File {path:"crates/bi-owner-runtime/src/task_event_inbox.rs"})
 MERGE (store:Type {id:"bi_owner_runtime::TaskEventInboxStore",kind:"struct"})
 MERGE (wire:Type {id:"bi_owner_runtime::TaskEventWireV1",kind:"struct"})
 MERGE (validated:Type {id:"bi_owner_runtime::ValidatedTaskEventWire",kind:"struct"})
 MERGE (receipt:Type {id:"bi_owner_runtime::TaskEventInboxReceipt",kind:"struct"})
+MERGE (source_origin:Type {id:"bi_owner_runtime::TaskEventSourceOrigin",kind:"struct"})
 MERGE (route:Type {id:"bi_owner_runtime::TaskEventRoutePin",kind:"struct"})
 MERGE (max_wire:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::MAX_TASK_WIRE_BYTES",kind:"constant"})
+MERGE (max_cursor:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::MAX_SOURCE_CURSOR_BYTES",kind:"constant"})
 MERGE (principal:Type {id:"bi_owner_runtime::AuthenticatedTaskEventPrincipal",kind:"struct"})
 MERGE (route_input:Type {id:"bi_owner_runtime::RoutePinDigestInput",kind:"struct"})
 MERGE (outcome:Type {id:"bi_owner_runtime::ReceiptOutcome",kind:"enum"})
@@ -18,8 +20,16 @@ MERGE (begin:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEv
 MERGE (route_valid:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventRoutePin.is_valid",kind:"method"})
 MERGE (validate:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::validate_wire",kind:"function"})
 MERGE (event_id:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::validated_event_id",kind:"function"})
+MERGE (commit_outcome_error:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::commit_outcome_error",kind:"function"})
 MERGE (validate_payload:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::validate_payload_scope",kind:"function"})
 MERGE (route_digest:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventRoutePin.digest",kind:"method"})
+MERGE (origin_new:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.new",kind:"method"})
+MERGE (origin_provider:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.provider_identity",kind:"method"})
+MERGE (origin_log:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.log_id",kind:"method"})
+MERGE (origin_generation:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.log_generation",kind:"method"})
+MERGE (origin_sequence:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.source_sequence",kind:"method"})
+MERGE (origin_cursor:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.cursor",kind:"method"})
+MERGE (origin_message:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::TaskEventSourceOrigin.message_id",kind:"method"})
 MERGE (transport_label:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_transport_label",kind:"function"})
 MERGE (transport_version:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_transport_version",kind:"function"})
 MERGE (provider_id:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::valid_provider_id",kind:"function"})
@@ -32,13 +42,18 @@ MERGE (valid_lifecycle:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.
 MERGE (reject_tenant:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_authenticated_tenant_mismatch",kind:"test"})
 MERGE (reject_unknown:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_unknown_envelope_fields",kind:"test"})
 MERGE (reject_state:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.rejects_unrecognized_lifecycle_projection_values",kind:"test"})
+MERGE (legacy_origin:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.legacy_exact_replay_without_origin_is_unverifiable",kind:"test"})
+MERGE (legacy_origin_sql:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.legacy_origin_migration_has_distinct_unverifiable_outcome",kind:"test"})
+MERGE (source_sequence_conflict:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.source_sequence_collision_is_rejected_before_inbox_commit",kind:"test"})
+MERGE (positive_sequence:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox.rs::tests.source_origin_constructor_requires_a_positive_scoped_sequence",kind:"test"})
 MERGE (postgres_tests:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::postgres_tests",kind:"module"})
 MERGE (postgres_commit:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::pg_runtime_commit_is_durable_idempotent_and_conflict_safe",kind:"test"})
 MERGE (postgres_gate:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::require_runtime_contract",kind:"function"})
 MERGE (postgres_fixture:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::fresh_lifecycle_wire",kind:"function"})
 MERGE (postgres_route:Symbol {id:"crates/bi-owner-runtime/src/task_event_inbox_postgres_tests.rs::route_pin",kind:"function"})
-MERGE (store_fn:Database {id:"bi.commit_task_event_v2",kind:"stored_function"})
+MERGE (store_fn:Database {id:"bi.commit_task_event_v3",kind:"stored_function"})
 MERGE (inbox_table:Table {id:"bi.task_event_inbox",class:"Transaction"})
+MERGE (source_origin_table:Table {id:"bi.task_event_source_origin",class:"Transaction"})
 MERGE (fact_table:Table {id:"bi.task_event_fact",class:"Transaction"})
 MERGE (incident_table:Table {id:"bi.task_event_integrity_incident",class:"Transaction"})
 MERGE (chrono:ExternalService {id:"chrono",kind:"crate"})
@@ -51,8 +66,10 @@ MERGE (self)-[:DEFINES]->(store)
 MERGE (self)-[:DEFINES]->(wire)
 MERGE (self)-[:DEFINES]->(validated)
 MERGE (self)-[:DEFINES]->(receipt)
+MERGE (self)-[:DEFINES]->(source_origin)
 MERGE (self)-[:DEFINES]->(route)
 MERGE (self)-[:DEFINES]->(max_wire)
+MERGE (self)-[:DEFINES]->(max_cursor)
 MERGE (self)-[:DEFINES]->(principal)
 MERGE (self)-[:DEFINES]->(route_input)
 MERGE (self)-[:DEFINES]->(outcome)
@@ -68,8 +85,16 @@ MERGE (store)-[:DEFINES]->(commit)
 MERGE (store)-[:DEFINES]->(begin)
 MERGE (route)-[:DEFINES]->(route_valid)
 MERGE (route)-[:DEFINES]->(route_digest)
+MERGE (source_origin)-[:DEFINES]->(origin_new)
+MERGE (source_origin)-[:DEFINES]->(origin_provider)
+MERGE (source_origin)-[:DEFINES]->(origin_log)
+MERGE (source_origin)-[:DEFINES]->(origin_generation)
+MERGE (source_origin)-[:DEFINES]->(origin_sequence)
+MERGE (source_origin)-[:DEFINES]->(origin_cursor)
+MERGE (source_origin)-[:DEFINES]->(origin_message)
 MERGE (self)-[:DEFINES]->(validate)
 MERGE (self)-[:DEFINES]->(event_id)
+MERGE (self)-[:DEFINES]->(commit_outcome_error)
 MERGE (self)-[:DEFINES]->(validate_payload)
 MERGE (self)-[:DEFINES]->(transport_label)
 MERGE (self)-[:DEFINES]->(transport_version)
@@ -77,8 +102,13 @@ MERGE (self)-[:DEFINES]->(provider_id)
 MERGE (commit)-[:CALLS]->(validate)
 MERGE (commit)-[:CALLS]->(begin)
 MERGE (commit)-[:CALLS]->(store_fn)
+MERGE (commit)-[:CALLS]->(commit_outcome_error)
 MERGE (commit)-[:CALLS]->(route_digest)
 MERGE (commit)-[:CALLS]->(route_valid)
+MERGE (commit)-[:CALLS]->(origin_new)
+MERGE (commit)-[:CALLS]->(origin_sequence)
+MERGE (commit)-[:USES_TYPE]->(source_origin)
+MERGE (commit)-[:USES_TYPE]->(error)
 MERGE (event_id)-[:CALLS]->(validate)
 MERGE (commit)-[:READS]->(principal)
 MERGE (route_valid)-[:CALLS]->(transport_label)
@@ -94,6 +124,10 @@ MERGE (test_module)-[:DEFINES]->(valid_lifecycle)
 MERGE (test_module)-[:DEFINES]->(reject_tenant)
 MERGE (test_module)-[:DEFINES]->(reject_unknown)
 MERGE (test_module)-[:DEFINES]->(reject_state)
+MERGE (test_module)-[:DEFINES]->(legacy_origin)
+MERGE (test_module)-[:DEFINES]->(legacy_origin_sql)
+MERGE (test_module)-[:DEFINES]->(source_sequence_conflict)
+MERGE (test_module)-[:DEFINES]->(positive_sequence)
 MERGE (self)-[:DEFINES]->(postgres_tests)
 MERGE (postgres_tests)-[:DEFINES]->(postgres_commit)
 MERGE (postgres_tests)-[:DEFINES]->(postgres_gate)
@@ -107,6 +141,13 @@ MERGE (valid_lifecycle)-[:TESTS]->(validate)
 MERGE (reject_tenant)-[:TESTS]->(validate)
 MERGE (reject_unknown)-[:TESTS]->(validate)
 MERGE (reject_state)-[:TESTS]->(validate)
+MERGE (legacy_origin)-[:CALLS]->(commit_outcome_error)
+MERGE (legacy_origin)-[:TESTS]->(commit_outcome_error)
+MERGE (legacy_origin_sql)-[:TESTS]->(store_fn)
+MERGE (source_sequence_conflict)-[:TESTS]->(store_fn)
+MERGE (source_sequence_conflict)-[:TESTS]->(source_origin_table)
+MERGE (positive_sequence)-[:CALLS]->(origin_new)
+MERGE (positive_sequence)-[:TESTS]->(origin_new)
 MERGE (postgres_commit)-[:CALLS]->(postgres_gate)
 MERGE (postgres_commit)-[:CALLS]->(postgres_fixture)
 MERGE (postgres_commit)-[:CALLS]->(postgres_route)
@@ -177,6 +218,91 @@ pub struct TaskEventRoutePin {
     pub destination_id: String,
     /// Generation of the destination captured by the route pin.
     pub destination_generation: Uuid,
+}
+
+/// Provider-neutral durable source identity persisted with a BI Inbox receipt.
+///
+/// `cursor` is opaque to BI. A transport adapter is responsible for preserving its native cursor
+/// representation and for comparing it with the exact delivery retained for authorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskEventSourceOrigin {
+    provider_identity: String,
+    log_id: String,
+    log_generation: Uuid,
+    source_sequence: i64,
+    cursor: Vec<u8>,
+    message_id: Uuid,
+}
+
+impl TaskEventSourceOrigin {
+    /// Construct a bounded source origin without interpreting the provider's cursor bytes.
+    pub fn new(
+        provider_identity: String,
+        log_id: String,
+        log_generation: Uuid,
+        source_sequence: i64,
+        cursor: Vec<u8>,
+        message_id: Uuid,
+    ) -> Result<Self, TaskEventInboxError> {
+        if !valid_origin_label(&provider_identity, 64)
+            || !valid_origin_label(&log_id, 128)
+            || log_generation.is_nil()
+            || source_sequence <= 0
+            || cursor.is_empty()
+            || cursor.len() > MAX_SOURCE_CURSOR_BYTES
+            || message_id.is_nil()
+        {
+            return Err(TaskEventInboxError::InvalidSourceOrigin);
+        }
+        Ok(Self {
+            provider_identity,
+            log_id,
+            log_generation,
+            source_sequence,
+            cursor,
+            message_id,
+        })
+    }
+
+    /// Return the pinned provider identity for this durable source.
+    pub fn provider_identity(&self) -> &str {
+        &self.provider_identity
+    }
+
+    /// Return the source log identity within the provider.
+    pub fn log_id(&self) -> &str {
+        &self.log_id
+    }
+
+    /// Return the log generation that disambiguates recreated logs.
+    pub fn log_generation(&self) -> Uuid {
+        self.log_generation
+    }
+
+    /// Return the source sequence scoped to this provider, log, and generation.
+    pub fn source_sequence(&self) -> i64 {
+        self.source_sequence
+    }
+
+    /// Return the exact opaque cursor bytes supplied by the transport adapter.
+    pub fn cursor(&self) -> &[u8] {
+        &self.cursor
+    }
+
+    /// Return the immutable message identity associated with this source position.
+    pub fn message_id(&self) -> Uuid {
+        self.message_id
+    }
+}
+
+const MAX_SOURCE_CURSOR_BYTES: usize = 512;
+
+fn valid_origin_label(value: &str, max_len: usize) -> bool {
+    (1..=max_len).contains(&value.len())
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
 }
 
 /// Transport identity minted only inside this crate after a trusted receiver verifies it.
@@ -287,6 +413,8 @@ pub struct TaskEventInboxReceipt {
     pub receipt_id: Uuid,
     /// SHA-256 digest of the exact source event wire bytes.
     pub wire_sha256: [u8; 32],
+    /// Durable provider-neutral identity of the source delivery that produced this receipt.
+    pub source_origin: TaskEventSourceOrigin,
     /// Database time when the Inbox receipt was committed.
     pub committed_at: DateTime<Utc>,
     /// Whether this call created the receipt or returned an exact replay.
@@ -299,12 +427,18 @@ pub enum TaskEventInboxError {
     /// The wire envelope or bounded projection contract is invalid.
     #[error("invalid Task event envelope")]
     InvalidEnvelope,
+    /// Source provider, log, generation, cursor, or message identity is invalid for this receipt.
+    #[error("invalid BI Task source origin")]
+    InvalidSourceOrigin,
     /// The event tenant differs from the authenticated tenant scope.
     #[error("Task event tenant does not match the authenticated tenant scope")]
     TenantMismatch,
     /// The event identity was already used for different immutable content.
     #[error("Task event identity conflicts with previously committed BI content")]
     IdentityConflict,
+    /// An existing exact Inbox replay has no durable source cursor to authorize terminal ACK.
+    #[error("BI Task-event replay has no verifiable durable source origin")]
+    SourceOriginUnverifiable,
     /// Pinned transport identity does not match the authenticated connection.
     #[error("Task event route does not match the authenticated sender and BI receiver")]
     RouteIdentityMismatch,
@@ -334,6 +468,7 @@ impl TaskEventInboxStore {
         &self,
         principal: &AuthenticatedTaskEventPrincipal,
         route: &TaskEventRoutePin,
+        source_origin: &TaskEventSourceOrigin,
         wire: &[u8],
     ) -> Result<TaskEventInboxReceipt, TaskEventInboxError> {
         let validated = validate_wire(principal.tenant_id, wire)?;
@@ -344,15 +479,26 @@ impl TaskEventInboxStore {
         {
             return Err(TaskEventInboxError::RouteIdentityMismatch);
         }
+        if source_origin.provider_identity != route.transport_provider_id
+            || source_origin.log_id != route.destination_id
+            || source_origin.log_generation != route.destination_generation
+            || source_origin.source_sequence <= 0
+            || source_origin.message_id != validated.event.event_id
+        {
+            return Err(TaskEventInboxError::InvalidSourceOrigin);
+        }
         let route_pin_sha256 =
             route.digest(validated.event.schema_version, &validated.wire_sha256)?;
         let event = validated.event;
         let mut tx = self.begin_scoped(principal.tenant_id).await?;
         let row = sqlx::query(
-            r#"SELECT outcome, receipt_id, committed_at
-                 FROM bi.commit_task_event_v2(
+            r#"SELECT outcome, receipt_id, committed_at, source_provider_identity,
+                      source_log_id, source_log_generation, source_sequence,
+                      source_cursor, source_message_id
+                 FROM bi.commit_task_event_v3(
                       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-                      $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)"#,
+                      $15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,
+                      $26,$27,$28,$29,$30,$31)"#,
         )
         .bind(event.tenant_id)
         .bind(event.project_id)
@@ -379,19 +525,36 @@ impl TaskEventInboxStore {
         .bind(route.destination_generation)
         .bind(route_pin_sha256.as_slice())
         .bind(validated.wire_sha256.as_slice())
+        .bind(source_origin.provider_identity())
+        .bind(source_origin.log_id())
+        .bind(source_origin.log_generation())
+        .bind(source_origin.source_sequence())
+        .bind(source_origin.cursor())
+        .bind(source_origin.message_id())
         .fetch_one(&mut *tx)
         .await?;
 
         let outcome: String = row.try_get("outcome")?;
         let receipt_id: Option<Uuid> = row.try_get("receipt_id")?;
         let committed_at: Option<DateTime<Utc>> = row.try_get("committed_at")?;
-        if outcome == "conflict" {
+        if let Some(error) = commit_outcome_error(&outcome) {
             tx.commit().await?;
-            return Err(TaskEventInboxError::IdentityConflict);
+            return Err(error);
         }
 
         let receipt_id = receipt_id.ok_or(TaskEventInboxError::InvalidEnvelope)?;
         let committed_at = committed_at.ok_or(TaskEventInboxError::InvalidEnvelope)?;
+        let stored_origin = TaskEventSourceOrigin::new(
+            row.try_get("source_provider_identity")?,
+            row.try_get("source_log_id")?,
+            row.try_get("source_log_generation")?,
+            row.try_get("source_sequence")?,
+            row.try_get("source_cursor")?,
+            row.try_get("source_message_id")?,
+        )?;
+        if stored_origin != *source_origin {
+            return Err(TaskEventInboxError::InvalidSourceOrigin);
+        }
         let receipt_outcome = match outcome.as_str() {
             "committed" => ReceiptOutcome::Committed,
             "exact_replay" => ReceiptOutcome::ExactReplay,
@@ -416,6 +579,7 @@ impl TaskEventInboxStore {
             route_pin_sha256,
             receipt_id,
             wire_sha256: validated.wire_sha256,
+            source_origin: stored_origin,
             committed_at,
             outcome: receipt_outcome,
         })
@@ -462,6 +626,14 @@ fn valid_provider_id(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+fn commit_outcome_error(outcome: &str) -> Option<TaskEventInboxError> {
+    match outcome {
+        "conflict" => Some(TaskEventInboxError::IdentityConflict),
+        "source_origin_unverifiable" => Some(TaskEventInboxError::SourceOriginUnverifiable),
+        _ => None,
+    }
 }
 
 fn validate_wire(
@@ -688,6 +860,94 @@ mod tests {
         assert!(matches!(
             validate_wire(tenant_id, &invalid_wire),
             Err(TaskEventInboxError::InvalidEnvelope)
+        ));
+    }
+
+    #[test]
+    fn legacy_exact_replay_without_origin_is_unverifiable() {
+        assert!(matches!(
+            commit_outcome_error("source_origin_unverifiable"),
+            Some(TaskEventInboxError::SourceOriginUnverifiable)
+        ));
+        assert!(matches!(
+            commit_outcome_error("conflict"),
+            Some(TaskEventInboxError::IdentityConflict)
+        ));
+        assert!(commit_outcome_error("exact_replay").is_none());
+    }
+
+    #[test]
+    fn legacy_origin_migration_has_distinct_unverifiable_outcome() {
+        let migration =
+            include_str!("../../../db/migrations/2026-10-24-bi-task-event-source-origin.sql");
+        let commit_function = migration
+            .split("CREATE OR REPLACE FUNCTION bi.commit_task_event_v3")
+            .nth(1)
+            .expect("source-origin migration defines v3 commit")
+            .split("ALTER FUNCTION bi.commit_task_event_v3")
+            .next()
+            .expect("commit function body is bounded before owner/grant changes");
+        let source_lookup = commit_function
+            .find("SELECT source.*")
+            .expect("v3 checks the persisted source origin");
+        let missing_origin = commit_function
+            .find("IF NOT FOUND THEN")
+            .expect("a missing legacy source origin has an explicit outcome");
+        let missing_outcome = commit_function
+            .find("'source_origin_unverifiable'::TEXT")
+            .expect("missing legacy origin returns the dedicated outcome");
+        let origin_compare = commit_function
+            .find("IF stored_origin.provider_identity")
+            .expect("persisted origin fields are compared only after the missing-row branch");
+        assert!(source_lookup < missing_origin);
+        assert!(missing_origin < missing_outcome);
+        assert!(missing_outcome < origin_compare);
+    }
+
+    #[test]
+    fn source_sequence_collision_is_rejected_before_inbox_commit() {
+        let migration =
+            include_str!("../../../db/migrations/2026-10-24-bi-task-event-source-origin.sql");
+        let commit_function = migration
+            .split("CREATE OR REPLACE FUNCTION bi.commit_task_event_v3")
+            .nth(1)
+            .expect("source-origin migration defines v3 commit")
+            .split("ALTER FUNCTION bi.commit_task_event_v3")
+            .next()
+            .expect("commit function body is bounded before owner/grant changes");
+        let collision_lookup = commit_function
+            .find("SELECT count(*) INTO matching_origins")
+            .expect("v3 checks sequence and cursor identity collisions");
+        let inbox_commit = commit_function
+            .find("FROM bi.commit_task_event_v2(")
+            .expect("v3 delegates business facts only after origin validation");
+        assert!(collision_lookup < inbox_commit);
+        assert!(commit_function.contains(
+            "source.source_sequence = p_source_sequence OR source.source_cursor = p_source_cursor"
+        ));
+        assert!(commit_function.contains("stored_origin.source_sequence = p_source_sequence"));
+        assert!(commit_function.contains("'conflict'::TEXT"));
+        assert!(commit_function.contains("stored_receipt, stored_at"));
+        assert!(migration
+            .contains("CREATE UNIQUE INDEX IF NOT EXISTS task_event_source_origin_sequence_uq"));
+        assert!(migration
+            .contains("CREATE UNIQUE INDEX IF NOT EXISTS task_event_source_origin_cursor_uq"));
+        assert!(migration.contains("REVOKE ALL ON FUNCTION bi.commit_task_event_v3"));
+        assert!(migration.contains("GRANT EXECUTE ON FUNCTION bi.commit_task_event_v3"));
+    }
+
+    #[test]
+    fn source_origin_constructor_requires_a_positive_scoped_sequence() {
+        assert!(matches!(
+            TaskEventSourceOrigin::new(
+                "star-rust-log".to_owned(),
+                "task-events".to_owned(),
+                Uuid::from_u128(13),
+                0,
+                vec![1],
+                Uuid::from_u128(5),
+            ),
+            Err(TaskEventInboxError::InvalidSourceOrigin)
         ));
     }
 }

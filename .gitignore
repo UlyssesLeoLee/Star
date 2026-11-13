@@ -161,3 +161,6 @@ coverage-*/
 
 # Isolated, bounded merge review scratch data
 /.cache/dev-converge-20261004/
+
+.vercel
+.env*

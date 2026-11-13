@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d5ec89af6658d5fde7327ff4a6dd7fe4ac814d34fdebb06d280b5ab4dff7f298
+@cypher schema=1 source_sha256=03e034c96964c6fd5a24da47eee194ebabfe7dd631884a17dde8807cc378d6c5
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::module",kind:"module"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::router",kind:"function"})
@@ -14,6 +14,9 @@ MERGE (insertBinding:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree
 MERGE (authorize:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::authorize_run_manager",kind:"function"})
 MERGE (begin:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::begin_write",kind:"function"})
 MERGE (directoryRole:Type {id:"star_engineering_directory_owner",kind:"database_role"})
+MERGE (deviceContext:Type {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedDeviceContext",kind:"struct"})
+MERGE (deviceToken:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
+MERGE (deviceBindings:Table {id:"public.oauth_device_bindings",kind:"table"})
 MERGE (transition:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::validate_transition",kind:"function"})
 MERGE (validateProjectVersion:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::validate_project_binding_version",kind:"function"})
 MERGE (validateTarget:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::validate_target_repository",kind:"function"})
@@ -113,6 +116,11 @@ MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/work_i
 MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::request_hash",kind:"function"})
 MERGE (mutate)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api.rs::active_binding",kind:"function"})
 MERGE (begin)-[:CONFIGURES]->(directoryRole)
+MERGE (bind)-[:USES_TYPE]->(deviceContext)
+MERGE (detach)-[:USES_TYPE]->(deviceContext)
+MERGE (mutate)-[:USES_TYPE]->(deviceToken)
+MERGE (begin)-[:USES_TYPE]->(deviceToken)
+MERGE (begin)-[:READS]->(deviceBindings)
 MERGE (begin)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api.rs::set_tenant",kind:"function"})
 MERGE (authorize)-[:CALLS]->(:Symbol {id:"crates/star-api-rest/src/group_api/engineering_runs.rs::authorize_run_owned_task_scope",kind:"function"})
 MERGE (loadWorktree)-[:READS]->(:Table {id:"multica.worktree_project_binding",kind:"table"})
@@ -145,12 +153,14 @@ use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
+use crate::auth::DeviceTokenContext;
+
 use super::{
     active_binding,
     engineering_runs::{authorize_run_owned_task_scope, RunOwnedTaskScope},
     require_scope, set_tenant, validate_actor,
     work_items::{idempotency_key, request_hash},
-    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, ProjectBinding,
+    AuthUser, AuthenticatedDeviceContext, GroupApiError, GroupApiState, ProjectBinding,
 };
 
 const MAX_WRITE_BODY_BYTES: usize = 16 * 1024;
@@ -236,14 +246,15 @@ pub(super) fn router() -> Router<GroupApiState> {
 
 async fn bind_worktree(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((project_id, run_id, worktree_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<BindingMutationBody>,
 ) -> Result<Response, GroupApiError> {
     mutate_binding(
         state,
-        actor,
+        device_context.actor,
+        device_context.device,
         project_id,
         run_id,
         worktree_id,
@@ -256,14 +267,15 @@ async fn bind_worktree(
 
 async fn detach_worktree(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((project_id, run_id, worktree_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<BindingMutationBody>,
 ) -> Result<Response, GroupApiError> {
     mutate_binding(
         state,
-        actor,
+        device_context.actor,
+        device_context.device,
         project_id,
         run_id,
         worktree_id,
@@ -278,6 +290,7 @@ async fn detach_worktree(
 async fn mutate_binding(
     state: GroupApiState,
     actor: AuthUser,
+    device: DeviceTokenContext,
     project_id: String,
     run_id: String,
     worktree_id: String,
@@ -301,7 +314,7 @@ async fn mutate_binding(
     let request_operation = format!("{operation}:{project_id}:{run_id}:{worktree_id}");
     let request_digest = request_hash(&request_operation, &body)?;
 
-    let mut tx = begin_write(&state, &actor).await?;
+    let mut tx = begin_write(&state, &actor, &device).await?;
     let project = active_binding(&mut tx, &actor, project_id).await?;
     require_project_manager(&project)?;
     set_writer_context(&mut tx, actor.user_id, body.correlation_id).await?;
@@ -425,6 +438,7 @@ async fn mutate_binding(
 async fn begin_write(
     state: &GroupApiState,
     actor: &AuthUser,
+    device: &DeviceTokenContext,
 ) -> Result<Transaction<'static, Postgres>, GroupApiError> {
     let mut tx = state
         .resolver
@@ -437,12 +451,33 @@ async fn begin_write(
         .await
         .map_err(|_| GroupApiError::internal())?;
     set_tenant(&mut tx, actor.tenant_id).await?;
+    sqlx::query("SELECT set_config('app.actor_id',$1,true)")
+        .bind(actor.user_id.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
     sqlx::query(
         "SELECT set_config('statement_timeout','5000',true), set_config('lock_timeout','1000',true)",
     )
     .execute(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
+    let current_generation = sqlx::query_scalar::<_, i64>(
+        "SELECT generation FROM oauth_device_bindings \
+         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 \
+           AND generation=$4 AND status='active' AND revoked_at IS NULL \
+         FOR SHARE",
+    )
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .bind(device.device_id)
+    .bind(device.generation)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::feature_unavailable("device_generation_unavailable"))?;
+    if current_generation != Some(device.generation) {
+        return Err(GroupApiError::forbidden());
+    }
     Ok(tx)
 }
 

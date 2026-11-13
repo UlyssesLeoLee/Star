@@ -1,20 +1,21 @@
 /*
-@cypher schema=1 source_sha256=43dd95398e33d756b83923bdb67f24ab626064675a6934dd307aef9a92d78185
+@cypher schema=1 source_sha256=8d07450531418ba248ed77e1f29793e64456083864cc451214cc941d11a8d2ea
 MERGE (self:File {path:"frontend/src/lib/group/__tests__/groupProjection.test.tsx"});
 CREATE
   (suite:Function {name:"group projection tests",type:"function",signature:"describe('Worktree Group projection', ...)",visibility:"private",complexity:"moderate"}),
   (previewCase:Function {name:"missing provider case",type:"function",signature:"it('uses preview mode only when no host provider is installed', ...)",visibility:"private",complexity:"simple"}),
   (liveCase:Function {name:"authorized projection case",type:"function",signature:"it('loads API projections through the host user token', ...)",visibility:"private",complexity:"moderate"}),
+(staleSessionCase:Function {name:"stale session generation case",type:"function",signature:"it('ignores a delayed 401 from a replaced Group session and keeps the new projection live', ...)",visibility:"private",complexity:"complex"}),
   (canvasCase:Function {name:"Canvas projection case",type:"function",signature:"it('loads scoped Canvas data and starts the outbox poller for the Canvas app', ...)",visibility:"private",complexity:"complex"}),
   (failClosedCase:Function {name:"missing session case",type:"function",signature:"it('fails closed instead of displaying seed data when session is missing', ...)",visibility:"private",complexity:"moderate"}),
   (scopeCase:Function {name:"mismatched Project case",type:"function",signature:"it('rejects a GroupContext from another Project', ...)",visibility:"private",complexity:"moderate"}),
   (refreshCase:Function {name:"manual projection refresh case",type:"function",signature:"it('reloads the authorized projection when the refresh key changes', ...)",visibility:"private",complexity:"moderate"}),
-  (self)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(previewCase),(suite)-[:CONTAINS]->(liveCase),(suite)-[:CONTAINS]->(canvasCase),(suite)-[:CONTAINS]->(failClosedCase),(suite)-[:CONTAINS]->(scopeCase),(suite)-[:CONTAINS]->(refreshCase),
-  (previewCase)-[:CALLS]->(useProjection:Function {name:"useWorktreeGroupProjection",type:"function"}),(liveCase)-[:CALLS]->(provider:Function {name:"WorktreeGroupApiProvider",type:"function"}),(liveCase)-[:CALLS]->(useProjection),(canvasCase)-[:CALLS]->(provider),(canvasCase)-[:CALLS]->(useProjection),(failClosedCase)-[:CALLS]->(provider),(failClosedCase)-[:CALLS]->(useProjection),(scopeCase)-[:CALLS]->(provider),(scopeCase)-[:CALLS]->(useProjection),(refreshCase)-[:CALLS]->(provider),(refreshCase)-[:CALLS]->(useProjection);
+  (self)-[:CONTAINS]->(suite),(suite)-[:CONTAINS]->(previewCase),(suite)-[:CONTAINS]->(liveCase),(suite)-[:CONTAINS]->(staleSessionCase),(suite)-[:CONTAINS]->(canvasCase),(suite)-[:CONTAINS]->(failClosedCase),(suite)-[:CONTAINS]->(scopeCase),(suite)-[:CONTAINS]->(refreshCase),
+  (previewCase)-[:CALLS]->(useProjection:Function {name:"useWorktreeGroupProjection",type:"function"}),(liveCase)-[:CALLS]->(provider:Function {name:"WorktreeGroupApiProvider",type:"function"}),(liveCase)-[:CALLS]->(useProjection),(staleSessionCase)-[:CALLS]->(provider),(staleSessionCase)-[:CALLS]->(useProjection),(canvasCase)-[:CALLS]->(provider),(canvasCase)-[:CALLS]->(useProjection),(failClosedCase)-[:CALLS]->(provider),(failClosedCase)-[:CALLS]->(useProjection),(scopeCase)-[:CALLS]->(provider),(scopeCase)-[:CALLS]->(useProjection),(refreshCase)-[:CALLS]->(provider),(refreshCase)-[:CALLS]->(useProjection);
 @endcypher
 */
 
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
@@ -78,6 +79,113 @@ describe("Worktree Group projection", () => {
     expect(result.current).toEqual({ mode: "loading" });
     await waitFor(() => expect(result.current.mode).toBe("live"));
     expect(fetcher).toHaveBeenCalledTimes(6);
+  });
+
+  it("ignores a delayed 401 from a replaced Group session and keeps the new projection live", async () => {
+    type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
+    const deferred = <T,>(): Deferred<T> => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
+      return { promise, resolve };
+    };
+    const staleContext = deferred<Response>();
+    const staleWorkItems = deferred<Response>();
+    const delayedUnauthorized = deferred<Response>();
+    const unauthorizedBodyRead = deferred<void>();
+    let token = "old-session-token";
+    let sessionKey = "old-session-generation";
+    let refreshKey = 0;
+    let oldFetchMode: "initial" | "stale-projection" | "delayed-401" = "initial";
+
+    const responseFor = (path: string, label: string): Response => {
+      if (path.endsWith("/group-context")) {
+        return new Response(JSON.stringify({
+          group_context: { worktree_id: "wt-1", project_id: "project-1" },
+          worktree: { id: "wt-1", project_id: "project-1", name: label, branch: `branch-${label}`, human_state: "active", archived: false },
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        worktree_id: "wt-1", project_id: "project-1", work_items: [{
+          work_item_id: `wi-${label}`, item_type: "task", title: `${label} projection`, description: "",
+          priority: "medium", labels: [], reporter_user_id: "user-1", lifecycle: { status: "claimed", version: 1 },
+        }],
+      }), { status: 200 });
+    };
+    const unauthorizedResponse = new Response(JSON.stringify({
+      error: { code: "session_expired", message: "The old session expired." },
+    }), { status: 401 });
+    const originalUnauthorizedJson = unauthorizedResponse.json.bind(unauthorizedResponse);
+    vi.spyOn(unauthorizedResponse, "json").mockImplementation(async () => {
+      const payload = await originalUnauthorizedJson();
+      unauthorizedBodyRead.resolve();
+      return payload;
+    });
+
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const path = new URL(String(input), "http://localhost").pathname;
+      const authorization = new Headers(init?.headers).get("Authorization");
+      if (authorization === "Bearer old-session-token") {
+        if (oldFetchMode === "stale-projection") {
+          return path.endsWith("/group-context") ? staleContext.promise : staleWorkItems.promise;
+        }
+        if (oldFetchMode === "delayed-401" && path.endsWith("/group-context")) {
+          return delayedUnauthorized.promise;
+        }
+        return responseFor(path, oldFetchMode === "initial" ? "old-initial" : "old-unauthorized-request");
+      }
+      return responseFor(path, "new-session");
+    });
+    const getAccessToken = vi.fn(async () => token);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <WorktreeGroupApiProvider getAccessToken={getAccessToken} sessionKey={sessionKey} fetcher={fetcher}>{children}</WorktreeGroupApiProvider>
+    );
+
+    const { result, rerender } = renderHook(() => useWorktreeGroupProjection("wt-1", false, refreshKey), { wrapper });
+    await waitFor(() => expect(result.current).toMatchObject({
+      mode: "live", worktree: { name: "old-initial" }, work_items: [{ title: "old-initial projection" }],
+    }));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    oldFetchMode = "stale-projection";
+    refreshKey = 1;
+    rerender();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4));
+
+    oldFetchMode = "delayed-401";
+    refreshKey = 2;
+    rerender();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(6));
+    expect(fetcher.mock.calls.slice(4, 6).every(([, init]) => new Headers(init?.headers).get("Authorization") === "Bearer old-session-token")).toBe(true);
+
+    token = "new-session-token";
+    sessionKey = "new-session-generation";
+    rerender();
+    expect(result.current).toEqual({ mode: "loading" });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(8));
+    await waitFor(() => expect(result.current).toMatchObject({
+      mode: "live", worktree: { name: "new-session" }, work_items: [{ title: "new-session projection" }],
+    }));
+
+    await act(async () => {
+      staleContext.resolve(responseFor("/group-context", "old-delayed"));
+      staleWorkItems.resolve(responseFor("/work-items", "old-delayed"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current).toMatchObject({
+      mode: "live", worktree: { name: "new-session" }, work_items: [{ title: "new-session projection" }],
+    });
+
+    delayedUnauthorized.resolve(unauthorizedResponse);
+    await unauthorizedBodyRead.promise;
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current).toMatchObject({
+      mode: "live", worktree: { name: "new-session" }, work_items: [{ title: "new-session projection" }],
+    });
+    expect(fetcher.mock.calls.slice(6).every(([, init]) => new Headers(init?.headers).get("Authorization") === "Bearer new-session-token")).toBe(true);
   });
 
   it("loads scoped Canvas data and starts the outbox poller for the Canvas app", async () => {

@@ -57,8 +57,8 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use domain_llm::{
-    AgentStreamEvent, ChatMessage, ChatRequest, LlmProvider, LlmProviderRegistryError,
-    StopReason, StreamError, Usage,
+    AgentStreamEvent, ChatMessage, ChatRequest, LlmProvider, LlmProviderRegistryError, StopReason,
+    StreamError, Usage,
 };
 use star_context::ActorContext;
 
@@ -294,11 +294,8 @@ pub struct ConvertOutcome {
 /// `Send` bound is required so the stream crosses task boundaries (the
 /// agent loop runs in a tokio task and forwards events to the UI / SSE
 /// dispatcher).
-pub type StreamFn = Arc<
-    dyn Fn(ChatRequest) -> Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>>
-        + Send
-        + Sync,
->;
+pub type StreamFn =
+    Arc<dyn Fn(ChatRequest) -> Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> + Send + Sync>;
 
 // =====================================================================
 // BoundaryError (rare, non-stream-failure surfaces)
@@ -378,10 +375,7 @@ pub trait AgentLoopBoundary: Send + Sync {
         ctx: &LoopBoundaryContext,
         req: &ToolCallRequest,
     ) -> PolicyDecision {
-        policy_hooks::apply_before_tool_call_hooks(
-            &ctx.policy_hooks,
-            &build_hook_context(ctx, req),
-        )
+        policy_hooks::apply_before_tool_call_hooks(&ctx.policy_hooks, &build_hook_context(ctx, req))
     }
 
     /// **after_tool_call** -- policy hook fan-out (FR-26, PI-5).
@@ -437,29 +431,32 @@ impl AgentLoopBoundary for DefaultLoopBoundary {
 ///
 /// Caller passes the resulting `StreamFn` to the agent loop driver.
 pub fn default_stream_fn(provider: Arc<dyn LlmProvider>) -> StreamFn {
-    Arc::new(move |req: ChatRequest| -> Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> {
-        let provider = provider.clone();
-        Box::pin(stream::once(async move {
-            match provider.stream_completion_v2(req).await {
-                Ok(s) => Box::pin(s) as Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>>,
-                Err(err) => {
-                    let msg = err.to_string();
-                    Box::pin(stream::iter(vec![
-                        AgentStreamEvent::Error {
-                            error: StreamError::new(
-                                "provider_dispatch_failed",
-                                msg,
-                                false,
-                            ),
-                            recoverable: false,
-                        },
-                        AgentStreamEvent::done_default(),
-                    ])) as Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>>
-                }
-            }
-        })
-        .flat_map(|s| s))
-    })
+    Arc::new(
+        move |req: ChatRequest| -> Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> {
+            let provider = provider.clone();
+            Box::pin(
+                stream::once(async move {
+                    match provider.stream_completion_v2(req).await {
+                        Ok(s) => {
+                            Box::pin(s) as Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>>
+                        }
+                        Err(err) => {
+                            let msg = err.to_string();
+                            Box::pin(stream::iter(vec![
+                                AgentStreamEvent::Error {
+                                    error: StreamError::new("provider_dispatch_failed", msg, false),
+                                    recoverable: false,
+                                },
+                                AgentStreamEvent::done_default(),
+                            ]))
+                                as Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>>
+                        }
+                    }
+                })
+                .flat_map(|s| s),
+            )
+        },
+    )
 }
 
 // =====================================================================
@@ -568,8 +565,14 @@ impl FailureMode {
 /// standing up a real flaky provider.
 ///
 /// The stream is infallible: it never yields `Err`, only `AgentStreamEvent`.
-pub fn simulated_failure_stream(mode: FailureMode) -> Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> {
-    let mut err = StreamError::new(mode.kind(), format!("simulated {}", mode.kind()), mode.recoverable());
+pub fn simulated_failure_stream(
+    mode: FailureMode,
+) -> Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> {
+    let mut err = StreamError::new(
+        mode.kind(),
+        format!("simulated {}", mode.kind()),
+        mode.recoverable(),
+    );
     if let Some(status) = mode.http_status() {
         err = err.with_status(status);
     }
@@ -883,7 +886,10 @@ mod tests {
         match &events[0] {
             AgentStreamEvent::Error { error, recoverable } => {
                 assert_eq!(error.kind, "protocol_violation");
-                assert!(!(*recoverable), "protocol violation must NOT be recoverable");
+                assert!(
+                    !(*recoverable),
+                    "protocol violation must NOT be recoverable"
+                );
             }
             other => panic!("expected Error, got {other:?}"),
         }
@@ -894,10 +900,7 @@ mod tests {
     /// type compiles and the helper compiles.
     #[tokio::test]
     async fn no_throw_contract_is_type_enforced() {
-        fn assert_send_sync_stream<S: Stream<Item = AgentStreamEvent> + Send + Unpin>(
-            _s: &S,
-        ) {
-        }
+        fn assert_send_sync_stream<S: Stream<Item = AgentStreamEvent> + Send + Unpin>(_s: &S) {}
         let s = simulated_failure_stream(FailureMode::Timeout);
         assert_send_sync_stream(&s);
         // drain a few items to exercise the path
@@ -927,7 +930,10 @@ mod tests {
         let events = NoThrowProbe::collect(stream).await;
         // The default impl always emits Error + Done for the stub path.
         assert!(!events.is_empty(), "stream must yield >= 1 event");
-        assert!(events.last().unwrap().is_terminal(), "last event must be terminal");
+        assert!(
+            events.last().unwrap().is_terminal(),
+            "last event must be terminal"
+        );
     }
 
     // ---------- BoundaryError ----------

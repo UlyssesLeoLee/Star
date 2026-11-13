@@ -1,0 +1,130 @@
+// crates/sandboxd/proto/sandboxd.proto
+// Sandbox-as-a-Service gRPC schema (per BD-SANDBOX-002 §3.1, FR-2.1)
+// 4 RPC: CreateSession / RunCommand / DestroySession / StreamLogs
+syntax = "proto3";
+
+package sandboxd.v1;
+
+service SandboxService {
+  // 创建 1 个 ephemeral sandbox session
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+
+  // 在 session 内跑 1 个命令
+  rpc RunCommand(RunCommandRequest) returns (RunCommandResponse);
+
+  // 销毁 session
+  rpc DestroySession(DestroySessionRequest) returns (DestroySessionResponse);
+
+  // 流式订阅 session 日志
+  rpc StreamLogs(StreamLogsRequest) returns (stream LogEntry);
+}
+
+// ============ 消息定义 ============
+
+message CreateSessionRequest {
+  string client_id = 1;                // e.g. "dispatcher.py" / "mavis-desktop"
+  string task_id = 2;                 // 客户端 task 标识
+  string parent_session_id = 3;        // 父 session (嵌套), 空串 = 无父
+  SessionSpec policy = 4;              // 4 维隔离策略
+  uint32 timeout_sec = 5;              // session 超时 (0 = 服务端默认 1800s)
+}
+
+message CreateSessionResponse {
+  enum Status { READY = 0; FAILED = 1; }
+  string session_id = 1;              // UUID
+  Status status = 2;
+  string error = 3;                    // FAILED 时填
+}
+
+message SessionSpec {
+  ResourcePolicy resource = 1;
+  NetworkPolicy network = 2;
+  FsPolicy fs = 3;
+  CapabilityPolicy capability = 4;
+}
+
+message ResourcePolicy {
+  uint32 memory_mb = 1;               // 0 = 不限
+  uint32 cpu_percent = 2;             // 0 = 不限
+  uint32 max_processes = 3;           // 0 = 不限
+  bool kill_on_parent_exit = 4;
+}
+
+message NetworkPolicy {
+  enum Mode { ALLOWLIST = 0; BLOCK_ALL = 1; PASSTHROUGH = 2; }
+  Mode mode = 1;
+  repeated string allowlist = 2;       // 域名 (FQDN 通配符支持)
+  repeated string ip_allowlist = 3;   // CIDR 段 (per 缺口 #6 缓解)
+}
+
+message FsPolicy {
+  enum Mode { ALLOWLIST = 0; READ_ONLY_ROOT = 1; OPEN = 2; }
+  Mode mode = 1;
+  repeated FsPathRule allowlist = 2;
+}
+
+message FsPathRule {
+  string path = 1;                    // glob pattern
+  enum Mode { READ = 0; READWRITE = 1; }
+  Mode mode = 2;
+}
+
+message CapabilityPolicy {
+  enum LinuxMode { DROP_ALL = 0; ALLOW_NET_BIND_SERVICE = 1; CUSTOM = 2; }
+  LinuxMode linux_mode = 1;
+  repeated string custom_capabilities = 2;  // CUSTOM 模式填
+}
+
+message RunCommandRequest {
+  string session_id = 1;
+  CommandSpec command = 2;
+  uint32 timeout_sec = 3;              // 命令级超时 (0 = 不限)
+}
+
+message CommandSpec {
+  repeated string cmd = 1;            // argv (cmd[0] = executable)
+  repeated string env = 2;            // KEY=VALUE 形式 (per 守门 #5 不打印 env 内容)
+  string cwd = 3;
+  bool capture_output = 4;
+}
+
+message RunCommandResponse {
+  int32 returncode = 1;
+  string stdout = 2;
+  string stderr = 3;
+  uint64 latency_ms = 4;
+  repeated string hit_violations = 5;  // 命中违规描述 (per FR-4.2)
+}
+
+message DestroySessionRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+message DestroySessionResponse {
+  enum Status { DESTROYED = 0; NOT_FOUND = 1; }
+  Status status = 1;
+}
+
+message StreamLogsRequest {
+  string session_id = 1;
+  uint32 from_offset = 2;             // 重放起点 (default 0)
+}
+
+message LogEntry {
+  uint64 offset = 1;
+  string session_id = 2;
+  enum EventType {
+    RESOURCE_HIT = 0;
+    NETWORK_BLOCK = 1;
+    NETWORK_ALLOW = 2;
+    FS_BLOCK = 3;
+    FS_ALLOW = 4;
+    CAPABILITY_DROP = 5;
+    PROCESS_START = 6;
+    PROCESS_EXIT = 7;
+  }
+  EventType event_type = 3;
+  string details = 4;                 // JSON 格式
+  int64 timestamp_ms = 5;
+}

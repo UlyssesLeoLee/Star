@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=f7bdad6b8ded348bb3aa2066d0cc4dfe8682f3435357c2e7585e9558abe10c8b
+MERGE (self:File {path:"crates/star-pg-adapter/src/repository/oauth_access_tokens.rs"})
+MERGE (insert:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_access_tokens.rs::insert",kind:"method"})
+MERGE (tokens:Table {name:"oauth_access_tokens"})
+MERGE (self)-[:DEFINES]->(insert)
+MERGE (insert)-[:WRITES]->(tokens)
+@endcypher
+*/
 //! OAuthAccessToken Repository (Postgres impl, per WBS v0.42 §14.10.4 缺口 #4 5/6 Repository 续推)
 //!
 //! v0.42 端到端实装 (per 9/9 19:33 JST 用户拍板"5/6 Repository 续推" + 守门 #9 v19 Mavis 自驱):
@@ -146,6 +155,18 @@ impl OAuthAccessTokenRepository for PgOAuthAccessTokenRepository {
     }
 
     async fn insert(&self, token: &OAuthAccessToken) -> Result<(), PgAdapterError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| PgAdapterError::Query(format!("insert access token begin: {}", e)))?;
+        sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
+            .bind(token.tenant_id.to_string())
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                PgAdapterError::Query(format!("insert access token tenant scope: {}", e))
+            })?;
         sqlx::query(
             r#"
                         INSERT INTO oauth_access_tokens
@@ -174,10 +195,12 @@ impl OAuthAccessTokenRepository for PgOAuthAccessTokenRepository {
         .bind(&token.agent_id)
         .bind(&token.session_id)
         .bind(&token.trace_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| PgAdapterError::Query(format!("insert: {}", e)))?;
-        Ok(())
+        tx.commit()
+            .await
+            .map_err(|e| PgAdapterError::Query(format!("insert access token commit: {}", e)))
     }
 }
 

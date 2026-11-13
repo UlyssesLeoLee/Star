@@ -5,10 +5,20 @@
 // 返回 KeyboardLayout { swimlanes: W/T/M, statuses: 6 }
 // =====================================================================
 
+/*
+@cypher schema=1 source_sha256=637b32e72967e52cfb5c20af73e117210e60498b9a68c53ed48604f1a5078281
+MERGE (self:File {path:"crates/star-desktop/frontend/src/hooks/useTauriKeyboardLayout.ts"})
+MERGE (ids:File {path:"crates/star-desktop/frontend/src/types/ids.ts"})
+MERGE (constants:File {path:"crates/star-desktop/frontend/src/constants.ts"})
+MERGE (self)-[:IMPORTS]->(ids)
+MERGE (self)-[:IMPORTS]->(constants)
+@endcypher
+*/
+
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Wtm, WorkItemStatus } from "../types/ids";
-import { DEFAULT_SWIMLANES, ALL_WORK_ITEM_STATUSES } from "../constants";
+import { DEFAULT_SWIMLANES, type Wtm, type WorkItemStatus } from "../types/ids";
+import { ALL_WORK_ITEM_STATUSES } from "../constants";
 
 export interface KeyboardLayout {
   swimlanes: Wtm[];

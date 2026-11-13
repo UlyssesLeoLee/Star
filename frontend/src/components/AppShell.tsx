@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=96c5859439e4484d13b1c7e5cb97cf360ba94f1678c9f135b666e0a81db65075
+@cypher schema=1 source_sha256=edea614afaf9123620fb79af5f110762ef3bd76b7755a4c3eaf059520718cb16
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -16,7 +16,7 @@ MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 //   宽屏下 mx-auto 会在 sidebar 右侧留出很大的左侧空白 (per 2026-09-07 反馈:
 //   项目页面左边距过大, 应接近 agent-view 的贴边观感, 但仍需正常文档滚动/不能 overflow-hidden)
 // =====================================================================
-import { ReactNode } from "react";
+import { ReactNode, Suspense } from "react";
 import { AppHeader } from "./AppHeader";
 
 export interface AppShellProps {
@@ -37,7 +37,11 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-[var(--cel-crimson,#ff184c)] rounded-full blur-[160px] opacity-10" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[var(--cel-cyan,#00f0ff)] rounded-full blur-[160px] opacity-10" />
       </div>
-      <AppHeader />
+      {/* per 2026-11-12: AppHeader 用 useSearchParams 判定 query-href 高亮,
+          必须包 Suspense (Next 16 静态 prerender bailout 规则, 与 Sidebar 同) */}
+      <Suspense fallback={null}>
+        <AppHeader />
+      </Suspense>
       {/*
         SubNav slot — U2 接管, 会在路由为 /projects /agents /analytics 时
         自动渲染 180px sticky 左侧导航 (per §4). 当前 U1 不实现, 留 comment 占位.

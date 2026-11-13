@@ -1,10 +1,12 @@
 # UI 规划：Project / Run / Worktree 驱动的高性能桌面端
 
-**版本：** v0.9（UI-0 屏幕/状态与 Rust 桌面 ADR 完成）
+**版本：** v2.3（Project-first 桌面/移动导航；移动端中英日文案；UI-1/UI-2 八个 focused suites 35/35、typecheck 通过；三次既有 shared-Web run 已审计但没有重新采集；renderer/native 性能、读屏与授权导航仍开放）
 **日期：** 2026-10-22
 **设计基线：** 本地 dev 起始提交 a5b4404a；requirements v6.91、Schedule API SRS v0.65、basic design v6.94、Schedule BD v0.63、Schedule DD v0.77、DD-WORKTREE-GROUP-001.md v5.16、实施计划 v7.14、WBS v3.7、UI 规划 v0.6。
-**实现基线：** 本规划基于本地 dev 17b3d06539f0281b8a5f9e7a1576864487b26337；本地 main 为 8dcb65f7cc5602d4f7c6b681c368d5097bc12a22，main...dev = 0 209。此基线包含 WLD-1 Run-scoped Worktree Lifecycle API 源码切片：允许 hostless Run 与可选远端 Branch，变更要求 Run 当前绑定 Repository；真实 provider 默认未安装，前端仍使用旧 Project-scoped lifecycle paths，旧路径继续 fail closed。Rust 1.99.0、PostgreSQL 目标库/RLS、Run↔Worktree 持久绑定 owner、真实 provider 和完整产品闭环仍未验收。缓存 origin/dev 比本地 dev 落后 55 个提交；本轮未 fetch，远端 freshness 未知。UI-0 设计产物已完成，渲染器选择与目标机性能门仍开放。
+**实现基线：** 当前候选基于本地 `dev` `df1c22f66d8d0c3b48baac7e348494ba3466569b`；shared-Web evidence 源提交 `f286b6ac04dddee67ac75ffada4cc73afba4c9e8` 已在候选分支 cherry-pick 为 `45028bf3`，尚未集成到 dev。WLD-1 Run-scoped API 仍无默认可信 provider、Run↔Worktree binding writer、目标 DB/RLS 验收，UI 在缺少 owner/client 时 fail closed。UI-1 现将 Project/Run 选择与展开分开，移动端底栏改为 Project → Engineering Run → Worktree → Branch 目录入口，导航文案覆盖英语、简体中文和日语；Project Worktree Index 在没有授权客户端时不再显示本地预览 Worktree，并移除旧生命周期状态机大图。八个 UI-1/UI-2 focused suites 共 35/35 通过，包含 Project 选择、独立展开控件和 ArrowRight 展开回归；TypeScript typecheck 通过。浏览器 AX 显示 Project-first 层级和无授权目录状态；390×844 无横向溢出及 Escape 焦点恢复来自此前本轮浏览器验收。真实读屏、完整授权焦点转换及 owner-backed 闭环仍未验收。UI-0 的三个既有 shared-Web run（52/60/60 条样本）已逐项审计，但没有为本次集成重新采集；driver invocation 和实际 base URL provenance 未记录，R1 缺 8 条 warm FCP，R1/R2 无 host inventory。此证据不包含 Tauri/Rust-native 可比 run、native RSS/CPU、queue/cache、terminal/Canvas 或 cancel/drain 结果；renderer、阈值及 UI-0 整体验收保持开放。Production build 此前以 Node OOM/exit 134 失败，本轮未重跑。
 **状态：** 目标交互与分期规划；不是桌面端或所有 Run App 已完成的声明。
+
+**本轮 UI-1 增量：** 桌面侧栏不再有 Main/Project 范围切换，Project → Engineering Run → Worktree → Branch 始终是唯一主导航；未迁移到 Run 的现有页面仍可从“其他入口”折叠区访问。移除了没有运行时数据来源的静态“All Green”状态。移动目录导航使用三语文案；浏览器 AX 可见 Project-first 导航和 unavailable 状态。当前验证覆盖八个相关测试套件（35/35）、TypeScript typecheck 和 CypherGraph Guardian；ProjectRunTree 直接回归 Project 选择、Project/Run 展开分离及 ArrowRight 展开；390×844 无横向溢出及抽屉 Escape 焦点恢复由此前浏览器检查记录。真实读屏和完整授权目录交互仍待验收，阶段记录见 [WBS-UI1-PROJECT-FIRST-NAV-20261022](../reports/WBS-UI1-PROJECT-FIRST-NAV-20261022.md)。
 
 ## 0. 目的与本轮结论
 
@@ -14,14 +16,15 @@
 
 v0.8 以 v0.7 的屏幕规格为底稿，加入 WLD-1 Run-scoped lifecycle API 的当前实现边界，细化 Worktree 生命周期检查器、操作预览、Run API 接入门和分期 WBS。当前仍缺 Run↔Worktree 持久绑定 owner、真实 provider、目标 PostgreSQL/RLS 验收及前端 Run API 迁移；本文将这些写为接口/实现前置条件，不把现有 API seam、预览或不完整投影描述成已可用产品能力。
 
-v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run → Worktree → Branch 树始终承担目录管理；只选 Project/Run 时，右侧工作区显示授权摘要和 Worktree 选择，不挂载 Run App；选中并重新验证 Worktree 后，右侧工作区才显示该 Run 的同级 App tabs 与内容。UI-2 的 no-focus 门已在 dev 集成；当前选择器只显示第一页，有更多 Worktree 时引导用户从左侧目录继续，后续须补可搜索、可分页的右侧选择器。GLOBAL 聊天范围已显示，但聊天 Runtime 和发送仍禁用。
+v0.4 的导航决策落到清晰的双态：左侧 Project → Engineering Run → Worktree → Branch 树始终承担目录管理；只选 Project/Run 时，右侧工作区显示授权摘要和 Worktree 选择，不挂载 Run App；选中并重新验证 Worktree 后，右侧工作区才显示该 Run 的同级 App tabs 与内容。UI-2 的 no-focus 门已在 dev 集成；右侧 picker 已支持最多 4 页/200 条、已加载项搜索、重复游标与重复 Worktree ID 保护，并拒绝超过 50 条单页或 200 条总量的响应；服务端全目录搜索仍需 owner/API 合同。GLOBAL 聊天范围已显示，但聊天 Runtime 和发送仍禁用。
 
 ## 1. 现状基线与差距
 
 | 区域 | 当前证据 | UI 规划中的处理 |
 |---|---|---|
-| 左侧 Project 目录 | `ProjectRunTree` 按 Project → Engineering Run → Worktree → Branch 展示，并使用固定视口、行高、overscan 和键盘树导航；UI-1 切片分别呈现人工状态、机器状态、Agent 分配、Session/Runtime 绑定、归档状态和 binding 版本。锁、变更详情、观测时间、Branch 来源/新鲜度尚无可信观测，显示 unknown。 | 延续树形导航；补齐有 owner 证据的冲突、锁、freshness 和生命周期状态；Project Worktree Index 只作跨 Run 汇总，不取代主导航。 |
-| Run Shell | UI-2 已改为无 focus 时只读取该 Run 授权 Worktree 目录、显示摘要/选择器和 GLOBAL 范围；不挂载 Task Cards、BI、App tabs 或 App 数据请求。聚焦测试 2/2 与全量 TypeScript 检查通过。选中 Worktree 后，目标规范路由再次获取并验证 RunContext 才挂载现有 App 面板；当前只有 Task Cards 与 BI 面板，其他 tabs 明确待迁移。 | 保持 Worktree-first 焦点门；补齐分页/搜索和右侧工作区布局；按 owner capability 呈现可用、只读、不可用或等待状态。GLOBAL 聊天仍无 Runtime/send。 |
+| 左侧 Project 目录 | `ProjectRunTree` 按 Project → Engineering Run → Worktree → Branch 展示，并使用固定视口、行高、overscan 和键盘树导航；UI-1 切片分别呈现人工状态、机器状态、Agent 分配、Session/Runtime 绑定、归档状态和 binding 版本。锁、变更详情、观测时间、Branch 来源/新鲜度尚无可信观测，显示 unknown。移动端底栏打开同一层级树，路由变化后收起；无目录会话时明确显示 unavailable。桌面端不再切换 Main/Project scope；Project 树始终是主导航，未迁移页面收进“其他入口”次级 disclosure。抽屉支持 Escape 关闭与焦点恢复，导航标签有英语、简体中文和日语版本；390×844 viewport 未发现横向溢出。八个 focused suites 35/35、typecheck 和 CypherGraph Guardian 通过，且树组件具备 selection/expansion/keyboard 直接回归测试。 | 延续树形导航；补齐有 owner 证据的冲突、锁、freshness 和生命周期状态；通过真实屏幕阅读器验收。Project Worktree Index 只作跨 Run 汇总，不取代主导航。 |
+| Project Worktree Index | 选择 Project 后呈现授权 Worktree 摘要；无授权目录客户端时显示明确 unavailable/retry，不回退到 store seed 或本地预览。旧生命周期状态机大图已从此页面移除。跨 Run Index 仍缺可靠 owner 的 observed-at、锁/Lease 和 Branch freshness。 | 继续从 Run-owned 绑定源填充目录；缺失事实维持 unknown；连接跨 Run 汇总与左侧 Run 层级并保持其为深链入口。 |
+| Run Shell | UI-2 已改为无 focus 时只读取该 Run 授权 Worktree 目录、显示摘要/选择器和 GLOBAL 范围；不挂载 Task Cards、BI、App tabs 或 App 数据请求。八个相关 UI-1/UI-2 suites 合计 35/35；TypeScript typecheck 通过。浏览器 AX 确认 no-provider 的 `/worktree` 明确不可用。真实读屏和授权焦点转换仍开放。选择 Worktree 后，目标规范路由再次获取并验证 RunContext 才挂载现有 App 面板；当前只有 Task Cards 与 BI 面板，其他 tabs 明确待迁移。 | 保持 Worktree-first 焦点门；补齐分页/搜索和右侧工作区布局；按 owner capability 呈现可用、只读、不可用或等待状态。GLOBAL 聊天仍无 Runtime/send。 |
 | Worktree 生命周期 | WLD-1 已增加 Run-scoped repository discovery、import candidate、create/import API 与显式 provider 注入边界；缺少 provider 或 Run 当前 Repository binding 时 fail closed。Ready receipt 需 Run↔Worktree binding 身份/版本，但此切片不创建该绑定。前端仍调用旧 Project-scoped paths，API/DB/Rust/provider 验收未完成。 | 迁移 UI 到 Run-scoped API 合同；provider、binding owner、目标 DB/RLS 与持久 receipt 未验收前，操作显示不可用原因，不回退到 Project API、不做乐观成功。 |
 | Task Card / CLI | Task Card 有分页创建与读取切片；终端必须对应当前 Task、Worktree 和经服务端授权的 Session。无 provisioner、授权或状态不确定时 fail closed。 | 将 CLI 收入卡内执行面板；补全 Agent 分配、运行状态、取消/重接、验证证据与结果回写的界面闭环。不得显示假终端或把 Session 结束当作任务完成。 |
 | Canvas | 有独立 Canvas 页面和 Group Canvas/Worktree 图相关实现，但 Run 内统一入口和完整 owner 生产闭环尚未完成。 | Infinite Canvas 与 Task Card 在 Run 层同级；Canvas 保存几何、布局和 typed 引用，Task/Worktree/关系事实仍由其 owner API 管理。 |
@@ -203,7 +206,7 @@ Rust 服务 owner → DB/RLS + transactional Outbox/Inbox → 其他 owner/BI/Ru
 | UI-4 Infinite Canvas 与协作对象 | Run Canvas、WorkItem/Worktree/Branch/BI typed refs、关系检查器、从 Canvas 建 Task 的复合命令、跳转与回链。 | UI-2；Canvas 与 WorkItem owner contracts；WLD-2 中涉及 Task 的复合命令。 | Canvas 与 Task Card 同级；布局与业务关系分离；引用逐次授权；跨 owner 失败不留孤儿对象；大画布遵守视口/内存界限。 |
 | UI-5 Workflow、Schedule、Hooks 与 Plugin Apps | Workflow/Loop 状态；Schedule Rule 配置与执行分态；高级设置 Hooks 和全局未保存草稿守卫；Plugin Registry/热插拔/capability 可视化、授权撤销。 | UI-2；WLD-3/5；Plugin manifest/runtime contract。 | hostless Run 可配置规则只在 Rust/PostgreSQL acceptance 完成后展示为可用配置；明确它没有触发/Occurrence/执行能力。确认守卫覆盖全部离开路径；checkpoint 不作业务事实；resume/retry 复验权限、策略和幂等；核心 Hook 不可被插件削弱；卸载取消并 drain 在途插件调用。 |
 | UI-6 BI/Benchmark 与 Infrastructure 可视化 | Coverage-aware BI/Benchmark；Run/Host/Cluster/Instance/Reservation/readiness 分层详情和故障深链。 | UI-2；WLD-4/6；版本化指标和 Infrastructure Profile。 | Unknown/partial 不显示成功；host 与 cluster 容量分开；Run 固定 cluster generation；测试 Multipass inventory 仍最多 2 条记录，无自动清理。 |
-| UI-7 发布质量与 Rust 桌面替换 | 主要路径端到端验收、键盘/读屏/缩放、恢复与性能复测、打包/升级/迁移说明、Web/Rust 客户端一致性矩阵。 | UI-0..6；WLD-7 对应产品事实/owner 门关闭。 | Rust 1.99.0 工具链门、授权/目标 DB/runtime、性能与内存预算、恢复/取消、插件隔离和真实数据验收均有证据；未通过的功能在界面中保持禁用。 |
+| UI-7 发布质量与 Rust 桌面替换 | 主要路径端到端验收、键盘/读屏/缩放、恢复与性能复测、打包/升级/迁移说明、Web/Rust 客户端一致性矩阵。 | UI-0..6；WLD-7 对应产品事实/owner 门关闭。 | Rust 1.99.1 工具链门、授权/目标 DB/runtime、性能与内存预算、恢复/取消、插件隔离和真实数据验收均有证据；未通过的功能在界面中保持禁用。 |
 
 ### 8.1 v0.5 UI 规划：先后顺序与可审查产物
 
@@ -259,7 +262,7 @@ Project Worktree Index 提供跨 Run 的表格/列表、搜索、状态筛选和
 
 ### 核心用户流程
 
-~~~mermaid
+```mermaid
 flowchart TD
   P[选择 Project] --> R[展开 Engineering Run]
   R --> W[查看 Worktree 目录与跨 Run 汇总]
@@ -275,7 +278,7 @@ flowchart TD
   T -->|取消/恢复/验证| A
   C -->|打开 canonical owner 页面| A
   L -->|resume 前复验授权/版本| A
-~~~
+```
 
 | 用户任务 | 交互步骤 | 安全与可恢复门 |
 |---|---|---|
@@ -338,7 +341,7 @@ flowchart TD
 
 v0.7 是 UI 规划规格，不是页面实现。Project、Run、Worktree 必须分别表达“选中”与“展开/加载”；只有通过 RunContext 验证的 Worktree 才建立代码 checkout focus。选中 Project 或 Run 不得隐式聚焦某个 Worktree，不得挂载 Run App，也不得请求 Task、Canvas、BI 或 Plugin 内容。
 
-本版审查到的当前状态限定如下：Project/Run 树行目前主要控制展开，Worktree 才是可选焦点；Project 投影只含 ID/role，界面可能只能显示 ID。Run Worktree 投影含 Agent、Session、Runtime ID 和 binding 版本，但没有可信 lock、dirty、ahead/behind、观测时间、Branch freshness 或 assignment receipt。旧 Project Worktree Index 有部分 checkout 字段，却没有 Engineering Run ID，不能据此把记录归入某个 Run 或构造 Run 深链。创建/导入入口以 Project/Repository 为范围且没有 Run binding receipt；归档/恢复只改变管理状态，不执行 Git checkout 删除或宿主数据清理。当前 Run Shell 的 Task Cards 与任务事件页是局部面板；事件页不能表述为完整 BI/Benchmark。旧 Group 路由含本地 store 与预览回退，不作为生产工作区证据。以上字段/API 能力补齐并验收前，UI 只能显示明确的 unavailable/unknown 状态。
+本版审查到的当前状态限定如下：Project 与 Run 各自有独立的展开按钮和选择链接；Project 选择进入 Project Worktree Index，Run 选择进入无焦点概览，Worktree 才建立验证态焦点。当前仅有组件测试覆盖导航目标与展开不触发选择，浏览器导航、完整 roving focus、读屏和视觉验收仍开放；Project 投影只含 ID/role，界面可能只能显示 ID。Run Worktree 投影含 Agent、Session、Runtime ID 和 binding 版本，但没有可信 lock、dirty、ahead/behind、观测时间、Branch freshness 或 assignment receipt。旧 Project Worktree Index 有部分 checkout 字段，却没有 Engineering Run ID，不能据此把记录归入某个 Run 或构造 Run 深链。创建/导入入口以 Project/Repository 为范围且没有 Run binding receipt；归档/恢复只改变管理状态，不执行 Git checkout 删除或宿主数据清理。当前 Run Shell 的 Task Cards 与任务事件页是局部面板；事件页不能表述为完整 BI/Benchmark。旧 Group 路由含本地 store 与预览回退，不作为生产工作区证据。以上字段/API 能力补齐并验收前，UI 只能显示明确的 unavailable/unknown 状态。
 
 性能源码边界也按实况记录：共享 Web 树虽虚拟化已挂载行，发布更新仍会重建完整扁平快照；页大小为 50、父节点缓存最多 16 个且每个最多 4 页。当前 Tauri Worktree 视图默认生成 120 个 fixture 节点、上限 500，并逐节点绘制 SVG；Worktree/Canvas IPC 仍有 MockDb fixture。现有终端投影上限按每 pane 1,000,000 字符计算，输出时拼接已有字符串；字符数不能限制 UTF-8 字节或峰值 RSS。共享 Canvas 路径会遍历完整元素/缩略图并对每条连接逐次查找端点。当前任务事件页每页 50 条、最多保留 100 个分页游标、响应上限 512 KiB；它仍是事件浏览而非服务端 BI aggregation。这些都是待测旧实现的参考，不是未来架构预算或生产能力证明。
 
@@ -472,7 +475,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 - 完成定义：实现基线更新到 `8245b90c`；UI-2 集成状态、WLD-1 API/Provider gap 和所有后续 UI 阶段在计划与 WBS 中一致；Project → Run → Worktree → Branch 导航和无焦点 App mount 门不被改写；无 mock/seed 生产成功表述。
 - 本轮只更新规划文档，不实现新页面、不开放生命周期、任务执行、聊天发送或 BI ingress。
-- Rust 1.99.0、目标 PostgreSQL/RLS、真实 provider、Run↔Worktree 持久绑定、Runtime sandbox 与 UI 性能实测仍未验收；相应 UI capability 必须显示 disabled/unavailable。
+- Rust 1.99.1、目标 PostgreSQL/RLS、真实 provider、Run↔Worktree 持久绑定、Runtime sandbox 与 UI 性能实测仍未验收；相应 UI capability 必须显示 disabled/unavailable。
 
 ## 8.5 v0.9 UI-0 设计包与下一版工作顺序
 
@@ -482,7 +485,7 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 - [UI0-RUST-DESKTOP-ADR-20261022.md](UI0-RUST-DESKTOP-ADR-20261022.md) 固定 Rust 桌面职责、类型化 IPC scope/version/cancellation 边界、有界并发与缓存、原生 Hook/Plugin 隔离要求，以及可复测的性能报告协议。
 - [WBS-UI-PLAN-NEXT-20261022.md](WBS-UI-PLAN-NEXT-20261022.md) 将 UI-0..UI-7 排成依赖明确的交付批次。
 
-这轮只完成设计文档，没有改 UI 代码。UI-0 的设计包可供实现评审；目标设备库存与压力负载尚未采集，因此渲染 crate、绝对内存/延迟阈值和 Rust parity 结论仍未决定。不得把设计完成写作桌面实现或性能验收完成。
+本轮已完成 UI-2 picker 的有限分页/已加载项搜索实现和 focused test/typecheck；UI-0 generator/runner 与有界 driver 已提交，三次既有 shared-Web run 已审计。样本未在本次审计重新采集，实际 invocation/base URL provenance 未知，R1 缺 8 条 warm FCP，R1/R2 未提供 host inventory。R3 inventory 只对应 R3。浏览器数据不能代替目标机 Tauri/Rust-native 可比性能、process-tree RSS/CPU、资源队列/缓存和取消 drain 测量，因此渲染 crate、绝对内存/延迟阈值和 Rust parity 结论仍未决定。不得把设计完成写作桌面实现或性能验收完成。
 
 后续顺序：
 
@@ -513,10 +516,10 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 1. Rust 原生桌面渲染器尚未通过原型比较；UI-0 前不固定具体框架。
 2. 当前 Tauri + React/Vite 桌面原型的 Worktree/Canvas 数据与部分 IPC 仍是 fixture/preview 路径；Worktree 可视化没有视口裁剪。旧界面仅作交互参考，不能把样例记录带入生产路径或当作 Rust 桌面性能基线。
-3. UI-2 已关闭 Web Run Shell 的 no-focus Task Cards 偏差；Project/Run 仍没有独立选择态，树行主要负责展开，Run Worktree picker 仅呈现首个授权分页。右侧完整 App 工作区、Inspector、服务端范围搜索、聊天 Runtime/send、浏览器 Back/Forward、目标 DB、真实 session provisioner、Hook 生命周期和 BI receiver 仍开放。
+3. UI-2 已关闭 Web Run Shell 的 no-focus Task Cards 偏差；UI-1 已实现 Project/Run 选择与展开分离，组件测试覆盖 Project Index 导航、Project scope 更新、Run no-focus 导航及展开不隐式选择。浏览器/键盘/读屏仍未验收。Run Worktree picker 最多呈现 4 页/200 条并支持已加载项搜索。右侧完整 App 工作区、Inspector、服务端范围搜索、聊天 Runtime/send、浏览器 Back/Forward、目标 DB、真实 session provisioner、Hook 生命周期和 BI receiver 仍开放。
 4. Rust 前端的跨平台字体/输入法、屏幕阅读、窗口/多显示器、终端渲染以及插件沙箱具体协议，在 UI-0 用目标设备实测确定。
-5. 基准所用硬件型号、合成目录规模、绝对 RSS/延迟阈值需在 UI-0 定版；在此之前不得声称满足了性能目标。
-6. WLD-3 hostless Schedule Rule 与 Occurrence snapshot CHECK source slices 尚未通过 Rust 1.99.0 和 PostgreSQL migration/API acceptance；Occurrence 仍只有 JSONB `target_snapshot`，CHECK 约束 JSON path，不新增 Branch 列，也不实现 worker/materializer/admission/executor。
+5. 一份 R3 shared-Web inventory 和三个既有浏览器样本已单独记录；R1/R2 inventory、实际 endpoint provenance、缺失的 R1 warm FCP、完整 target-equivalent Tauri/Rust-native measurements、绝对 RSS/延迟阈值仍待补齐与评审。在此之前不得声称满足性能目标。
+6. WLD-3 hostless Schedule Rule 与 Occurrence snapshot CHECK source slices 尚未通过 Rust 1.99.1 和 PostgreSQL migration/API acceptance；Occurrence 仍只有 JSONB `target_snapshot`，CHECK 约束 JSON path，不新增 Branch 列，也不实现 worker/materializer/admission/executor。
 7. Project 投影当前只有 ID/role；Run Worktree projection 缺 lock、dirty/ahead/behind、observed-at、Branch freshness 与 assignment receipt。Project Worktree Index 缺 Engineering Run ID，创建/导入也没有 Run binding receipt。补齐 owner/API 合同前，不得把这些字段作为生产事实或开放 Run 级生命周期操作。
 8. 旧 Group 路由可回退至本地 store/预览；当前 BI 面板是任务事件视图，Canvas 未装配到 canonical Run Shell。仅凭这些现象不得声称完整 App 集成、BI/Benchmark 或生产数据闭环。
 9. WLD-1 Run-scoped lifecycle API 还没有真实 provider、Run↔Worktree binding writer 和目标数据库验收；现有 UI 未迁移至这些路径。Run API 与旧 Project API 的表面存在不可作为 UI 可用能力证明。
@@ -525,6 +528,19 @@ Rust 桌面目标以有界内存与可取消并行为硬条件：首屏只取 Pr
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
 |---|---|---|---|---|
+| v2.3 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录基于当前 dev `df1c22f6` 的隔离候选及三次既有 shared-Web run 审计；标明 driver provenance、R1 warm FCP 与 inventory 缺口，并保留 native/Rust 性能、renderer、阈值和 UI-0 全部发布门。 | UI0 evidence integration candidate |
+| v2.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 UI-1/UI-2 commit rebased onto UI-0 并 fast-forward 到本地 dev 的 HEAD `4dcf567d`；WBS 和阶段报告均同步 35/35 八套件结果及仍开放的授权/读屏/真实性能门。 | 完成 UI WBS 当前批次集成 |
+| v2.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 提交前自审恢复 ProjectRunTree 对 Project 选择、Project/Run 独立展开和 ArrowRight 键盘展开的直接回归测试；八个 UI-1/UI-2 suites 重新验证为 35/35，typecheck 与 CypherGraph Guardian 通过。 | UI 自审发现局部测试覆盖被替换 |
+| v2.0 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 UI-0 harness 集成到本地 dev 的提交和 UI-1/UI-2 当前 32/32（八个测试套件）验证结果；浏览器 AX 重验无授权目录 fail-closed 状态。明确真实 UI driver 样本、屏幕阅读器、授权焦点转换和 Rust renderer 性能结论仍开放。 | 用户要求在 UI 优化后继续按 WBS 推进 |
+| v1.9 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 Project 导航和移动目录抽屉补齐英语、简体中文和日语标签；390×844 浏览器检查无横向溢出，Escape 关闭后焦点恢复到触发按钮；五个 focused suites 21/21、TypeScript typecheck 通过。真实屏幕阅读器及授权目录导航仍开放；UI-0 harness lane 16/16 重跑通过但仍未提交/集成且无真实 UI 样本。 | 按 WBS 完成 UI-1 窄屏与移动键盘切片，并继续 UI-0 审查 |
+| v1.8 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project → Engineering Run → Worktree → Branch 为唯一侧栏主导航，移除 Main/Project 切换和静态成功状态，将旧页面入口放入次级折叠区；UI-1/UI-2 focused suites 18/18、typecheck 通过，浏览器 AX 显示授权目录不可用状态。 | 按 WBS 优化 Project-first 导航 |
+| v1.6 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 实现 UI-1 Project/Run 展开与选择分离；Project 进入 Project Worktree Index，Run 进入 no-focus 概览。UI-1/UI-2 focused tests 共 9/9、typecheck 与 CypherGraph Guardian 通过；组件级 ArrowRight disclosure 用例通过，浏览器/读屏和 production build 仍未通过/未验收。 | 按 WBS 推进 UI-1 选择态切片 |
+| v1.5 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | WBS UI-0 generator/runner 已登记独立 worktree 并开始实现；实际性能测量和 renderer 决策仍保持开放，dev integration 等待 Orca owner 状态允许。 | WBS UI-0 并行 lane 启动 |
+| v1.4 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 UI-2 6/6 focused tests/typecheck 通过，以及 production build 在主机可用内存约 0.81 GB 时 Node OOM/exit 134；build 不计为通过，浏览器验收仍开放。 | 本轮 UI-2 build validation |
+| v1.3 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修复 UI-2 页内重复 ID 和超量响应边界；首屏与后续页共用 50 条单页/200 条总量检查。focused Vitest 6/6、TypeScript typecheck 通过；生产 build、浏览器/e2e/无障碍仍开放。 | 按 WBS 继续并完成分页边界自审 |
+| v1.2 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为分页 Worktree picker 增加搜索/游标回归测试；focused Vitest 3/3、TypeScript typecheck、CypherGraph Guardian 和 git diff --check 通过，浏览器/e2e/无障碍仍开放；更新 WBS UI-0 下一步。 | 按 WBS 继续 UI-0 与 UI-2 验证 |
+| v1.1 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 UI0-BENCH-001 workload parameters 和目标机静态 inventory；记录 unknown 元数据标记及 UI-1 缺失 owner freshness facts，generator/runner 与实际测量仍开放。 | UI-0/UI-1 静态审计 |
+| v1.0 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 以 5a051bfd 为实现基线；记录 no-focus picker 的有限分页、已加载项搜索、200 条上限和 fail-closed 边界。 | 最新 dev 上的 UI/UX 改进 |
 | v0.9 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 基于实际 dev 17b3d065 更新规划基线；增加 UI-0 屏幕/状态包、Rust 桌面架构 ADR 与 UI-1..7 的下一版实施顺序。明确此次仅完成规划，renderer/目标机性能门仍开放，未修改 UI 实现。 | 本轮设计交付及与 dev 实际源码状态核对 |
 | v0.8 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将规划基线更新到 dev `8245b90c`；纳入 WLD-1 Run-scoped lifecycle API seam、provider 默认缺失、Run↔Worktree binding owner/目标 DB/Rust 门未关闭以及前端仍使用旧 Project routes 的事实；新增 Worktree 检查器、操作预览与 receipt 屏幕状态，细化 UI-0..7 下一版阶段、并行边界和低内存/可取消性能要求。此次为规划，未实现 UI 或解除执行 fail-closed。 | WLD-1 源码切片合入 dev 后，用户要求针对新版本开展 UI 规划 |
 | v0.7 | 2026-10-22 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在已合并的 dev `30c6b975` 基线上把 UI 规划升级为屏幕级规格：区分 Project/Run 选择与 Worktree focus，修正无焦点 Run 快捷入口、Project Index 缺 Run 归属、Run Worktree 状态字段和 lifecycle API 的证据边界；增加 App mount 状态、键盘/读屏、owner receipt 与幂等恢复合同，并细化 Tauri/Web/Rust parity 三条 UI-0 性能测量 lane、fixture、计数和 p50/p95 门。没有把规划写成已实现能力。 | 用户要求当前开发轮结束后，对新版本进行一轮 UI 规划；UX 与性能只读评审 |

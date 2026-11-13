@@ -1,12 +1,16 @@
 /*
-@cypher schema=1 source_sha256=136bae69f78617a6d1002bb8077fc5bab76b302507fac3ac0748badce7cf03a3
+@cypher schema=1 source_sha256=6d4cb708e7c197509d3f394c074557ff33593ce2adad929cb6d51f328045f09f
 MERGE (self:File {path:"crates/star-pg-adapter/tests/schedule_postgres.rs"})
 MERGE (fixture:Type {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture"})
+MERGE (branch_id:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture.branch_id",kind:"field"})
 MERGE (connect:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::connect_pools",kind:"function"})
 MERGE (seed_rule:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_rule",kind:"function"})
+MERGE (target_snapshot:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::target_snapshot",kind:"function"})
+MERGE (seed_rule_with_branch:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_rule_with_branch",kind:"function"})
 MERGE (seed_occurrence:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_pending_occurrence",kind:"function"})
 MERGE (seed_occurrence_deadline:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::seed_pending_occurrence_with_deadline",kind:"function"})
 MERGE (test_materialize:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::materialization_is_idempotent_and_tenant_scoped",kind:"test"})
+MERGE (test_hostless_materialize:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::hostless_occurrence_materialization_is_durable_and_idempotent",kind:"test"})
 MERGE (test_claim:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::concurrent_claims_and_fencing_are_database_authoritative",kind:"test"})
 MERGE (test_retry:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::retry_terminal_ttl_and_expired_lease_reclaim_are_durable",kind:"test"})
 MERGE (test_run_as:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::schedule_rule_run_as_actor_cannot_change_between_revisions",kind:"test"})
@@ -17,23 +21,34 @@ MERGE (occurrence_run_as_actor:Column {id:"automation.occurrence.run_as_actor_id
 MERGE (dispatch:Table {id:"automation.occurrence_dispatch"})
 MERGE (event:Table {id:"automation.occurrence_event"})
 MERGE (schedule_rule:Table {id:"automation.schedule_rule_revision"})
+MERGE (occurrence_target:Column {id:"automation.occurrence.target_snapshot"})
 MERGE (self)-[:DEFINES]->(fixture)
 MERGE (self)-[:DEFINES]->(connect)
 MERGE (self)-[:DEFINES]->(seed_rule)
+MERGE (self)-[:DEFINES]->(seed_rule_with_branch)
+MERGE (self)-[:DEFINES]->(target_snapshot)
 MERGE (self)-[:DEFINES]->(seed_occurrence)
 MERGE (self)-[:DEFINES]->(test_materialize)
+MERGE (self)-[:DEFINES]->(test_hostless_materialize)
 MERGE (self)-[:DEFINES]->(test_claim)
 MERGE (self)-[:DEFINES]->(test_retry)
 MERGE (self)-[:DEFINES]->(test_run_as)
 MERGE (self)-[:DEFINES]->(occurrence_run_as_actor)
 MERGE (connect)-[:CALLS]->(sqlx)
 MERGE (seed_rule)-[:WRITES]->(schedule_rule)
+MERGE (seed_rule)-[:CALLS]->(seed_rule_with_branch)
+MERGE (seed_rule)-[:CONTAINS]->(branch_id)
 MERGE (seed_occurrence)-[:CALLS]->(seed_occurrence_deadline)
 MERGE (seed_occurrence_deadline)-[:WRITES]->(occurrence)
+MERGE (target_snapshot)-[:CREATES]->(occurrence_target)
 MERGE (seed_occurrence_deadline)-[:WRITES]->(dispatch)
 MERGE (test_materialize)-[:CALLS]->(adapter)
 MERGE (test_materialize)-[:TESTS]->(occurrence)
 MERGE (test_materialize)-[:TESTS]->(event)
+MERGE (test_hostless_materialize)-[:CALLS]->(adapter)
+MERGE (test_hostless_materialize)-[:CALLS]->(seed_rule_with_branch)
+MERGE (test_hostless_materialize)-[:CALLS]->(target_snapshot)
+MERGE (test_hostless_materialize)-[:TESTS]->(occurrence_target)
 MERGE (test_claim)-[:CALLS]->(adapter)
 MERGE (test_claim)-[:TESTS]->(dispatch)
 MERGE (test_retry)-[:CALLS]->(adapter)
@@ -42,6 +57,7 @@ MERGE (test_retry)-[:TESTS]->(event)
 MERGE (test_run_as)-[:TESTS]->(schedule_rule)
 MERGE (test_run_as)-[:TESTS]->(occurrence)
 MERGE (test_run_as)-[:TESTS]->(occurrence_run_as_actor)
+MERGE (test_run_as)-[:CALLS]->(target_snapshot)
 @endcypher
 */
 
@@ -49,11 +65,11 @@ MERGE (test_run_as)-[:TESTS]->(occurrence_run_as_actor)
 
 use chrono::{Duration, Utc};
 use domain_automation::schedule::{
-    SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION, materialize_schedule_window,
+    materialize_schedule_window, SCHEDULE_PARSER_VERSION, SCHEDULE_TZDB_VERSION,
 };
 use serde_json::json;
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use star_pg_adapter::repository::{
     OccurrenceTerminalOutcome, PgAutomationScheduleRepository, ScheduleDispatchResult,
     ScheduleRepositoryError,
@@ -65,7 +81,7 @@ struct Fixture {
     tenant_id: Uuid,
     project_id: Uuid,
     rule_id: Uuid,
-    branch_id: Uuid,
+    branch_id: Option<Uuid>,
     engineering_run_id: Uuid,
     repository_id: Uuid,
     worktree_id: Uuid,
@@ -95,11 +111,19 @@ async fn connect_pools() -> (PgPool, PgPool) {
 }
 
 async fn seed_rule(admin: &PgPool, max_attempts: i16) -> Fixture {
+    seed_rule_with_branch(admin, max_attempts, Some(Uuid::new_v4())).await
+}
+
+async fn seed_rule_with_branch(
+    admin: &PgPool,
+    max_attempts: i16,
+    branch_id: Option<Uuid>,
+) -> Fixture {
     let fixture = Fixture {
         tenant_id: Uuid::new_v4(),
         project_id: Uuid::new_v4(),
         rule_id: Uuid::new_v4(),
-        branch_id: Uuid::new_v4(),
+        branch_id,
         engineering_run_id: Uuid::new_v4(),
         repository_id: Uuid::new_v4(),
         worktree_id: Uuid::new_v4(),
@@ -142,6 +166,22 @@ async fn seed_rule(admin: &PgPool, max_attempts: i16) -> Fixture {
     fixture
 }
 
+fn target_snapshot(fixture: &Fixture) -> serde_json::Value {
+    json!({
+        "project_id": fixture.project_id,
+        "branch_id": fixture.branch_id,
+        "engineering_run_id": fixture.engineering_run_id,
+        "repository_id": fixture.repository_id,
+        "worktree_id": fixture.worktree_id,
+        "work_item_id": fixture.work_item_id,
+        "execution_profile_id": fixture.execution_profile_id,
+        "execution_profile_version": 1,
+        "execution_profile_digest": fixture.execution_profile_digest,
+        "hook_set_version": 1,
+        "hook_set_digest": fixture.hook_set_digest,
+    })
+}
+
 async fn seed_pending_occurrence(
     admin: &PgPool,
     fixture: &Fixture,
@@ -173,11 +213,7 @@ async fn seed_pending_occurrence_with_deadline(
     .bind(scheduled_for)
     .bind(SCHEDULE_PARSER_VERSION)
     .bind(SCHEDULE_TZDB_VERSION)
-    .bind(json!({
-        "rule_snapshot": {
-            "target": { "branch_id": fixture.branch_id.to_string() }
-        }
-    }))
+    .bind(target_snapshot(fixture))
     .bind("c".repeat(64))
     .execute(admin)
     .await
@@ -228,20 +264,14 @@ async fn schedule_rule_run_as_actor_cannot_change_between_revisions() {
     .bind(replacement_actor)
     .bind(SCHEDULE_PARSER_VERSION)
     .bind(SCHEDULE_TZDB_VERSION)
-    .bind(json!({
-        "rule_snapshot": {
-            "target": { "branch_id": fixture.branch_id.to_string() }
-        }
-    }))
+    .bind(target_snapshot(&fixture))
     .bind("d".repeat(64))
     .execute(&admin)
     .await
     .expect_err("an occurrence must retain the pinned Rule revision's run-as principal");
-    assert!(
-        mismatched_occurrence_error
-            .to_string()
-            .contains("occurrence run-as identity differs from pinned Rule revision")
-    );
+    assert!(mismatched_occurrence_error
+        .to_string()
+        .contains("occurrence run-as identity differs from pinned Rule revision"));
 
     let initial_rule_id = Uuid::new_v4();
     let initial_error = sqlx::query(
@@ -264,11 +294,9 @@ async fn schedule_rule_run_as_actor_cannot_change_between_revisions() {
     .execute(&admin)
     .await
     .expect_err("an initial run-as principal must be the authenticated creator");
-    assert!(
-        initial_error
-            .to_string()
-            .contains("initial automation schedule run-as identity must match its creator")
-    );
+    assert!(initial_error
+        .to_string()
+        .contains("initial automation schedule run-as identity must match its creator"));
 
     let error = sqlx::query(
         "INSERT INTO automation.schedule_rule_revision \
@@ -384,6 +412,77 @@ async fn materialization_is_idempotent_and_tenant_scoped() {
 
 #[tokio::test]
 #[ignore = "requires the phase9f3_schedule.py disposable PostgreSQL runner"]
+async fn hostless_occurrence_materialization_is_durable_and_idempotent() {
+    let (admin, runtime) = connect_pools().await;
+    let fixture = seed_rule_with_branch(&admin, 3, None).await;
+    let repository = PgAutomationScheduleRepository::new(runtime.clone());
+    let rule = repository
+        .load_current_rule(
+            fixture.tenant_id,
+            domain_automation::RuleId::from_uuid(fixture.rule_id),
+        )
+        .await
+        .expect("runtime can read the branchless Rule under RLS");
+    assert!(rule.target.branch_id.is_none());
+
+    let now = Utc::now();
+    let batch = materialize_schedule_window(
+        &rule,
+        now - Duration::minutes(2),
+        now + Duration::minutes(10),
+        now - Duration::seconds(5),
+        now,
+        32,
+    )
+    .expect("branchless canonical target materializes");
+    assert!(!batch.occurrences.is_empty());
+    assert!(batch.occurrences.iter().all(|occurrence| {
+        occurrence.snapshot.rule_snapshot.target.branch_id.is_none()
+            && occurrence.snapshot.validate().is_ok()
+    }));
+
+    let inserted = repository
+        .persist_materialization_batch(fixture.tenant_id, &batch)
+        .await
+        .expect("branchless target snapshot, dispatch rows, and events persist atomically");
+    assert_eq!(inserted.len(), batch.occurrences.len());
+    let replay = repository
+        .persist_materialization_batch(fixture.tenant_id, &batch)
+        .await
+        .expect("branchless rule match uses null-safe Branch equality on replay");
+    assert!(replay.is_empty());
+
+    let mut scoped = runtime.begin().await.expect("runtime transaction");
+    sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
+        .bind(fixture.tenant_id.to_string())
+        .execute(&mut *scoped)
+        .await
+        .expect("set current tenant");
+    let persisted: serde_json::Value = sqlx::query_scalar(
+        "SELECT target_snapshot FROM automation.occurrence \
+         WHERE tenant_id=$1 AND occurrence_id=$2",
+    )
+    .bind(fixture.tenant_id)
+    .bind(inserted[0])
+    .fetch_one(&mut *scoped)
+    .await
+    .expect("hostless target snapshot is visible under its tenant");
+    assert_eq!(persisted["branch_id"], serde_json::Value::Null);
+    assert_eq!(persisted["project_id"], fixture.project_id.to_string());
+    assert_eq!(
+        persisted["engineering_run_id"],
+        fixture.engineering_run_id.to_string()
+    );
+    assert_eq!(persisted["worktree_id"], fixture.worktree_id.to_string());
+    assert_eq!(persisted["work_item_id"], fixture.work_item_id.to_string());
+    scoped.rollback().await.expect("release scoped transaction");
+
+    admin.close().await;
+    runtime.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires the phase9f3_schedule.py disposable PostgreSQL runner"]
 async fn concurrent_claims_and_fencing_are_database_authoritative() {
     let (admin, runtime) = connect_pools().await;
     let fixture = seed_rule(&admin, 3).await;
@@ -464,13 +563,11 @@ async fn retry_terminal_ttl_and_expired_lease_reclaim_are_durable() {
     let ScheduleDispatchResult::RetryScheduled { next_attempt_at } = retry else {
         panic!("first failed attempt must enter retry_wait");
     };
-    assert!(
-        repository
-            .claim_due_occurrences(fixture.tenant_id, Uuid::new_v4(), 30, 1)
-            .await
-            .expect("early retry poll")
-            .is_empty()
-    );
+    assert!(repository
+        .claim_due_occurrences(fixture.tenant_id, Uuid::new_v4(), 30, 1)
+        .await
+        .expect("early retry poll")
+        .is_empty());
     let remaining = (next_attempt_at - Utc::now()).to_std().unwrap_or_default();
     tokio::time::sleep(remaining + std::time::Duration::from_millis(150)).await;
 
@@ -567,13 +664,11 @@ async fn expired_deadlines_and_exhausted_leases_are_terminalized() {
     let deadline_occurrence =
         seed_pending_occurrence_with_deadline(&admin, &deadline_fixture, 60, 1).await;
     tokio::time::sleep(std::time::Duration::from_millis(1_150)).await;
-    assert!(
-        repository
-            .claim_due_occurrences(deadline_fixture.tenant_id, Uuid::new_v4(), 30, 10)
-            .await
-            .expect("deadline sweep succeeds")
-            .is_empty()
-    );
+    assert!(repository
+        .claim_due_occurrences(deadline_fixture.tenant_id, Uuid::new_v4(), 30, 10)
+        .await
+        .expect("deadline sweep succeeds")
+        .is_empty());
     let (deadline_state, deadline_code): (String, String) = sqlx::query_as(
         "SELECT dispatch_state, last_failure_code FROM automation.occurrence_dispatch \
          WHERE tenant_id = $1 AND occurrence_id = $2",
@@ -606,13 +701,11 @@ async fn expired_deadlines_and_exhausted_leases_are_terminalized() {
         .next()
         .expect("one attempt was claimed");
     tokio::time::sleep(std::time::Duration::from_millis(1_150)).await;
-    assert!(
-        repository
-            .claim_due_occurrences(exhausted_fixture.tenant_id, Uuid::new_v4(), 30, 10)
-            .await
-            .expect("exhausted lease sweep succeeds")
-            .is_empty()
-    );
+    assert!(repository
+        .claim_due_occurrences(exhausted_fixture.tenant_id, Uuid::new_v4(), 30, 10)
+        .await
+        .expect("exhausted lease sweep succeeds")
+        .is_empty());
     let (exhausted_state, exhausted_code): (String, String) = sqlx::query_as(
         "SELECT dispatch_state, last_failure_code FROM automation.occurrence_dispatch \
          WHERE tenant_id = $1 AND occurrence_id = $2",

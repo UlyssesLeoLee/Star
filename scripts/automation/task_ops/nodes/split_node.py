@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=4f01750d28257ee6137803e6c97c674df3754eb7b5bc039e86be5efade51cfb5
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/split_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/split_node.py
 # TMO M-N2 split_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #
@@ -24,7 +27,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Optional, Sequence
+from typing import Sequence
 
 logger = logging.getLogger("task_ops.nodes.split_node")
 
@@ -101,7 +104,7 @@ async def _snapshot_target(target_id: str, sub_pool) -> str:
     Returns:
         snapshot_checkpoint_id (append-only 永存)
     """
-    handle = sub_pool.get(target_id)
+    sub_pool.get(target_id)
     # 先把状态标 snapshot_pending, 让 UI 显示"拆分中"
     await sub_pool.update(target_id, {
         "status": "snapshot_pending",

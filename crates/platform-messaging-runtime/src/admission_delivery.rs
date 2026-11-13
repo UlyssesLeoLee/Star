@@ -138,7 +138,7 @@ MERGE (limits_test)-[:CALLS]->(test_fixture)
 use std::time::Duration;
 
 #[cfg(feature = "jetstream-adapter")]
-use async_nats::jetstream::{Context, message::PublishMessage};
+use async_nats::jetstream::{message::PublishMessage, Context};
 use chrono::{DateTime, Utc};
 use domain_automation::schedule::{
     ScheduleRunAdmissionCommandV1, ScheduleRunAdmissionResolutionV1, ScheduleRunAdmissionResultV1,
@@ -528,10 +528,9 @@ pub trait AdmissionTransport: Send + Sync {
         &'a self,
         owner: AdmissionDeliveryOwner,
         claim: &'a AdmissionDeliveryClaim,
-    ) -> impl std::future::Future<
-        Output = Result<AdmissionTransportReceipt, AdmissionTransportError>,
-    > + Send
-    + 'a;
+    ) -> impl std::future::Future<Output = Result<AdmissionTransportReceipt, AdmissionTransportError>>
+           + Send
+           + 'a;
 }
 
 /// Transitional JetStream adapter; all NATS subject/ID/header/PubAck mapping lives here.
@@ -912,15 +911,13 @@ mod tests {
             ("star-rust-log", "", "test"),
             ("star-rust-log", "1.0", "nats://user:password@host"),
         ] {
-            assert!(
-                AdmissionTransportProfile::new(
-                    provider.to_owned(),
-                    version.to_owned(),
-                    [1; 32],
-                    endpoint.to_owned()
-                )
-                .is_err()
-            );
+            assert!(AdmissionTransportProfile::new(
+                provider.to_owned(),
+                version.to_owned(),
+                [1; 32],
+                endpoint.to_owned()
+            )
+            .is_err());
         }
     }
 }

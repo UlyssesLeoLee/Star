@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=368f109780c1d477436ec7a2806858a21ddbc6bbb95bc8314d5e37ec486bbd12
+@cypher schema=1 source_sha256=5d9e51c449809ecbbc0c09a82de77bb0966d8021970be721bf1f123cf0d41719
 MERGE (self:File {path:"frontend/src/components/__tests__/AppHeader.test.tsx"})
 @endcypher
 */
@@ -20,8 +20,10 @@ import type { ReactNode } from "react";
 
 // ---- mock next/navigation ----
 const mockUsePathname = vi.fn(() => "/inbox");
+const mockUseSearchParams = vi.fn(() => new URLSearchParams(""));
 vi.mock("next/navigation", () => ({
   usePathname: () => mockUsePathname(),
+  useSearchParams: () => mockUseSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 

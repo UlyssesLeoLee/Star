@@ -70,13 +70,13 @@ impl ImportError {
         let trace_id = trace_id.into();
         match self {
             ImportError::GitCommand(msg) => ServiceError::new("WT.GIT_FAIL", msg, trace_id)
-                .with_location(
-                    "external_worktree_import.rs:scan_external_worktrees".to_string(),
-                ),
-            ImportError::Parse(msg) => {
-                ServiceError::new("WT.GIT_FAIL", format!("porcelain parse failed: {msg}"), trace_id)
-                    .with_location("external_worktree_import.rs:parse_porcelain".to_string())
-            }
+                .with_location("external_worktree_import.rs:scan_external_worktrees".to_string()),
+            ImportError::Parse(msg) => ServiceError::new(
+                "WT.GIT_FAIL",
+                format!("porcelain parse failed: {msg}"),
+                trace_id,
+            )
+            .with_location("external_worktree_import.rs:parse_porcelain".to_string()),
             ImportError::Io(e) => ServiceError::new("WT.IO_FAIL", e.to_string(), trace_id)
                 .with_location("external_worktree_import.rs".to_string()),
         }
@@ -87,7 +87,9 @@ impl ImportError {
 /// (FR-ORCA-011 AC-1).
 ///
 /// 调 git CLI, 解析 porcelain v2 输出 (per git 官方文档, 稳定于 git 2.34+).
-pub async fn scan_external_worktrees(repo_path: &Path) -> Result<Vec<ExternalWorktree>, ImportError> {
+pub async fn scan_external_worktrees(
+    repo_path: &Path,
+) -> Result<Vec<ExternalWorktree>, ImportError> {
     let output = tokio::process::Command::new("git")
         .arg("-C")
         .arg(repo_path)
@@ -165,8 +167,8 @@ pub fn parse_porcelain(stdout: &str) -> Result<Vec<ExternalWorktree>, ImportErro
         let worktree_path = wt_path.ok_or_else(|| {
             ImportError::Parse(format!("missing 'worktree' line in block: {block}"))
         })?;
-        let head_commit =
-            head.ok_or_else(|| ImportError::Parse(format!("missing 'HEAD' line in block: {block}")))?;
+        let head_commit = head
+            .ok_or_else(|| ImportError::Parse(format!("missing 'HEAD' line in block: {block}")))?;
 
         // git_path 推导: `.git/worktrees/<basename(worktree_path)>`
         let basename = worktree_path
@@ -189,7 +191,10 @@ pub fn parse_porcelain(stdout: &str) -> Result<Vec<ExternalWorktree>, ImportErro
 }
 
 /// 找出 **不在** `existing` 内的外部条目 (按 `worktree_path` 完全相等判断).
-pub fn diff_external(external: &[ExternalWorktree], existing: &[Worktree]) -> Vec<ExternalWorktree> {
+pub fn diff_external(
+    external: &[ExternalWorktree],
+    existing: &[Worktree],
+) -> Vec<ExternalWorktree> {
     let known: std::collections::HashSet<PathBuf> =
         existing.iter().map(|w| w.path.clone()).collect();
     external
@@ -206,9 +211,10 @@ pub fn diff_external(external: &[ExternalWorktree], existing: &[Worktree]) -> Ve
 /// - 默认 `human_state: Running` (git 层 OK)
 pub fn map_to_worktree(repo_id: RepoId, ext: &ExternalWorktree) -> Worktree {
     let now = Utc::now();
-    let branch = ext.branch.clone().unwrap_or_else(|| {
-        ext.head_commit.chars().take(7).collect::<String>()
-    });
+    let branch = ext
+        .branch
+        .clone()
+        .unwrap_or_else(|| ext.head_commit.chars().take(7).collect::<String>());
     let name = ext
         .worktree_path
         .file_name()
@@ -277,9 +283,15 @@ mod tests {
         let out = parse_porcelain(input).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].worktree_path, PathBuf::from("/tmp/wt1"));
-        assert_eq!(out[0].head_commit, "abc123def456789012345678901234567890abcd");
+        assert_eq!(
+            out[0].head_commit,
+            "abc123def456789012345678901234567890abcd"
+        );
         assert_eq!(out[0].branch.as_deref(), Some("feat-x"));
-        assert_eq!(out[0].locked.as_deref(), Some("reason: rebasing in progress"));
+        assert_eq!(
+            out[0].locked.as_deref(),
+            Some("reason: rebasing in progress")
+        );
         assert!(!out[0].prunable);
     }
 

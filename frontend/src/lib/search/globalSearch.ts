@@ -1,11 +1,20 @@
 /*
-@cypher schema=1 source_sha256=01bc7f4f2e9daf1305484de0a8ded178d43251314ae7047323f4c734746fcf52
+@cypher schema=1 source_sha256=14690226efba24e0360eac2880c7e8c7e7305c9761191944b45c7f1f73960542
 MERGE (self:File {path:"frontend/src/lib/search/globalSearch.ts"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
+MERGE (seed:File {path:"frontend/src/lib/seed.ts"})
+MERGE (registry:File {path:"frontend/src/lib/nav/registry.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
 MERGE (buildIndex:Function {name:"buildIndex", language:"typescript", visibility:"private"})
+MERGE (searchIndexEntries:Function {name:"searchIndexEntries", language:"typescript", visibility:"public"})
+MERGE (searchAll:Function {name:"searchAll", language:"typescript", visibility:"public"})
+MERGE (getSearchIndex:Function {name:"getSearchIndex", language:"typescript", visibility:"public"})
+MERGE (self)-[:IMPORTS]->(seed)
+MERGE (self)-[:IMPORTS]->(registry)
 MERGE (self)-[:IMPORTS]->(agentTypes)
 MERGE (buildIndex)-[:CALLS]->(agentKindDisplayLabel)
+MERGE (searchAll)-[:CALLS]->(getSearchIndex)
+MERGE (searchAll)-[:CALLS]->(searchIndexEntries)
 @endcypher
 */
 // =====================================================================
@@ -419,14 +428,18 @@ export interface SearchOptions {
   group?: boolean;
 }
 
-export function searchAll(query: string, options: SearchOptions = {}): SearchResult {
+/** @internal Search a supplied index; kept separate so search behavior can be tested with local fixtures. */
+export function searchIndexEntries(
+  query: string,
+  idx: readonly IndexEntry[],
+  options: SearchOptions = {},
+): SearchResult {
   const q = (query ?? "").trim().toLowerCase();
   const filter = options.filter ?? "all";
   const limit = options.limit ?? 50;
   const wantGroup = options.group ?? true;
   if (!q) return { query, total: 0, groups: [] };
 
-  const idx = getSearchIndex();
   const hits: SearchHit[] = [];
   for (const entry of idx) {
     if (filter !== "all" && entry.hit.type !== filter) continue;
@@ -467,6 +480,10 @@ export function searchAll(query: string, options: SearchOptions = {}): SearchRes
     if (!order.includes(t) && arr.length) groups.push({ type: t, hits: arr });
   }
   return { query, total: hits.length, groups };
+}
+
+export function searchAll(query: string, options: SearchOptions = {}): SearchResult {
+  return searchIndexEntries(query, getSearchIndex(), options);
 }
 
 // 单个类型标签 (中文)

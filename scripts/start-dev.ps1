@@ -1,19 +1,12 @@
-# =====================================================================
-# start-dev.ps1.deprecated — 已废弃, 保留为向后兼容 (per 2026-09-06 13:21 JST 拍板)
-# =====================================================================
-# 真实启动脚本已迁到 maintenance/start-frontend.ps1
-# 旧入口 start.bat 已改成薄包装, 自动转发到 maintenance/start-frontend.bat
-#
-# 如果有 CI / 文档还在调 scripts/start-dev.ps1, 请改成:
-#   - .\maintenance\start-frontend.bat    (推荐)
-#   - 或 .\start.bat                       (根目录薄包装)
-# =====================================================================
+# @cypher schema=1 source_sha256=2b2c57927f83557e82502751eb00b289bb80d2d17e595a6c2dfb9f7f98f76a72
+# MERGE (self:File {path:"scripts/start-dev.ps1"})
+# MERGE (entry:Symbol {id:"scripts/start-dev.ps1::entry",kind:"script_entry"})
+# MERGE (self)-[:DEFINES]->(entry)
+# MERGE (write_error:Symbol {id:"scripts/start-dev.ps1::System.Console.Error.WriteLine",kind:"external_method"})
+# MERGE (entry)-[:CALLS]->(write_error)
+# @endcypher
 
-Write-Host ""
-Write-Host "ERROR: scripts/start-dev.ps1 已废弃" -ForegroundColor Red
-Write-Host "请改用:" -ForegroundColor Yellow
-Write-Host "  .\maintenance\start-frontend.bat   一键启动前端" -ForegroundColor Yellow
-Write-Host "  .\maintenance\update-frontend.bat  更新前端" -ForegroundColor Yellow
-Write-Host "  .\maintenance\update-backend-k3s.bat 更新后端 (k3s)" -ForegroundColor Yellow
-Write-Host ""
-exit 1
+[Console]::Error.WriteLine('ERROR: This legacy development entrypoint is retired and makes no changes.')
+[Console]::Error.WriteLine('For the frontend dev server, use maintenance/start-frontend.bat.')
+[Console]::Error.WriteLine('For Canvas deployment, review docs/deployment/star-canvas-services-deploy.md and use only an already provisioned, reachable K3s context.')
+exit 2

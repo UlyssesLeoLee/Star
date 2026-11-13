@@ -245,10 +245,7 @@ impl AnthropicProvider {
         if self.no_network_mode {
             // Deterministic stub (守门 #25 v25): same shape as a real stream.
             return stream::iter(vec![
-                AgentStreamEvent::StreamStart {
-                    id,
-                    model,
-                },
+                AgentStreamEvent::StreamStart { id, model },
                 AgentStreamEvent::text_delta(format!(
                     "[anthropic stub: stream] {} messages",
                     req.messages.len()
@@ -514,7 +511,9 @@ impl LlmProvider for AnthropicProvider {
         &self,
         req: ChatRequest,
     ) -> Result<BoxStream<'static, AgentStreamEvent>, LlmProviderRegistryError> {
-        let inner = stream::once(self.clone().open_stream_v2(req)).flatten().boxed();
+        let inner = stream::once(self.clone().open_stream_v2(req))
+            .flatten()
+            .boxed();
         Ok(sse::no_throw("anthropic", inner))
     }
 }

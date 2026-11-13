@@ -252,8 +252,9 @@ async fn e2e_import_scan_with_real_git() {
         return;
     }
 
-    let externals =
-        worktree_service::scan_external_worktrees(&repo).await.expect("scan failed");
+    let externals = worktree_service::scan_external_worktrees(&repo)
+        .await
+        .expect("scan failed");
     // 应至少有 main + feat-x 两条
     assert!(
         externals.len() >= 2,
@@ -294,7 +295,12 @@ async fn git_compat_porcelain_v2_supported() {
     let version_str = String::from_utf8_lossy(&out.stdout);
     // git version 2.34+
     let after_dot = version_str.split(' ').nth(2).unwrap_or("0.0");
-    let minor: u32 = after_dot.split('.').nth(1).unwrap_or("0").parse().unwrap_or(0);
+    let minor: u32 = after_dot
+        .split('.')
+        .nth(1)
+        .unwrap_or("0")
+        .parse()
+        .unwrap_or(0);
     assert!(
         minor >= 34 || after_dot.starts_with("2.") && minor >= 34,
         "git ≥ 2.34 required (got {version_str})"

@@ -1,8 +1,8 @@
 # SRS-CANVAS-AGENT-001
 
-> **无限画布 — Agent 管理域 (Agent Management Domain) 要件定義書 v1.2** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
+> **无限画布 — Agent 管理域 (Agent Management Domain) 要件定義書 v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
-> - 状态: Requirements Baseline (**v1.2 重写: 38 → 46 项, 新增 A12 多人编辑 8 项, per 2026-09-10 17:34 JST Ulysses 拍板"多人编辑是要的", 撤回 17:08 JST 砍多人编辑决定, v0.63 反转**)
+> - 状态: Requirements Baseline (**v1.4 追加当前 Run/Worktree 协作契约与验收映射；v1.2/v1.3 历史保留**)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 > - 关联 V0.1 实装: `docs/frontend-canvas-design.md` v0.1 + `frontend/src/components/CanvasView.tsx` (line 218-235 agent_cursor 基线 + **line 253-262 comment_pin** for A12.5) + `PHASE-AGENT-SETTINGS-IMPL-REPORT.md` v0.1
@@ -28,7 +28,7 @@
 |---|---|
 | 文书 ID | SRS-CANVAS-AGENT-001 |
 | 文书名 | 无限画布 — Agent 管理域 (Agent Management Domain) 要件定義書 |
-| 版本 | **v1.2 (重写: 38 → 46 项, 新增 A12 多人编辑 8 项, v0.63 反转)** |
+| 版本 | **v1.4 (当前 Run/Worktree 协作契约同步)** |
 | 作成日 | 2026-09-10 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -36,6 +36,7 @@
 | 关联文档 | `frontend-canvas-design.md` v0.1 (V0.1 实装) + `CanvasView.tsx` (line 218-235 agent_cursor + line 253-262 comment_pin) + `PHASE-AGENT-SETTINGS-IMPL-REPORT.md` v0.1 + 2 份平行专题 SRS (本 + GAMIFY) + 1 份协同 SRS (AGENT-VIEW) + 1 份协同 SRS (STAR-AGENT-RUNTIME) + 4 份 ARG 文档链 (SRS + BD + DD + DDD-REVIEW) + 总册 `SRS-CANVAS-001.md` v1.1 (三次更新版) |
 | 上位文档 | `SRS-CANVAS-001.md` v1.1 (总册, 双核心 78 项 = 46+32, 含 17:34 JST v0.63 反转) |
 | 平行文档 | `SRS-CANVAS-GAMIFY-001.md` v0.1 (双核心之 2: 游戏化, 32 项) |
+| 当前协作依据 | `docs/specs/domain-collaboration-spec.md` v1.2；`docs/data-design/WLD-7-COLLABORATION-DATA-DESIGN.md` v0.4；`docs/test-design/TEST-DESIGN-WORKTREE-CANVAS-001.md` v1.7；WBS §22.2 |
 
 ### 0.2 修订履历 (本 SRS)
 
@@ -43,8 +44,9 @@
 |---|---|---|---|---|
 | **v1.0** | 2026-09-10 17:17 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 初版落档, 12 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/验收/风险/签字), 28 项 (A1-A10, 10 子能力), 聚焦 agent 管理域 | 2026-09-10 17:08 JST Ulysses 拍板"管理 agent 和游戏化, 避免过度冗余" |
 | **v1.1** | 2026-09-10 17:22 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | **重写: 28 项 → 38 项, 新增 A11 ARG 图论构造 10 项** (引用 `SRS-AGENT-RELATIONSHIP-001.md` v0.1 §1-§8 + `BD-AGENT-RELATIONSHIP-001.md` v0.1 §1-§7 + `DD-AGENT-RELATIONSHIP-001.md` + `DDD-REVIEW-AGENT-RELATIONSHIP-001.md`), 守门 #1+#3+#13+#14 v2+#14 v4 反转 全过 (文档工作, 守门 #1 v25 cargo test --workspace -j 4 不需要跑); 12 已知缺口 (含 A11 跨专题 5 缺口); A11.5 必含 4 表 W/T/M 三類横展 (per 守门 #13, 100% 表覆盖) | 2026-09-10 17:21 JST Ulysses 补充"画布内体现 agent 之间关系的图论构造" (ARG 落档) |
-| **v1.2 (当前)** | 2026-09-10 17:34 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | **v0.63 反转: 重写 38 项 → 46 项, 新增 A12 多人编辑 8 项**, **撤回 17:08 JST 砍多人编辑决定** (per 17:34 JST Ulysses 拍板"多人编辑是要的", 显式标 v0.63 反转行, per 守门 #1 禁回溯叙事); 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 comment_pin (A12.5); 46 项 1:1 展开 (FR-AGENT-A1.1-A12.8 + NFR-AGENT-16 项 + AC-AGENT-46 项), 28 用户故事 (≥ 28 满足, 46 × 60% = 27.6), 13 已知缺口 (含 A11 跨专题 5 缺口 + **A12 多人编辑 5 缺口**), A11.5 必含 4 表 W/T/M 三類横展 + **A12.8 必含新增表 `canvas_multi_user_audit` 100% RLS 13 类 + W/T/M Transaction append-only + SCD Type 2** (per 守门 #13, 100% 表覆盖), 守门 #1+#3+#5+#6+#7+#9+#10+#13+#14 v2+#14 v4+#15+#19+#23 v2+#1 v15 14 项全过 (文档工作, 守门 #1 v25 cargo test --workspace -j 4 不需要跑) | 2026-09-10 17:34 JST Ulysses 拍板"**多人编辑是要的**" (v0.63 反转) + 总册 `SRS-CANVAS-001.md` v1.1 三次更新版同步 |
+| **v1.2** | 2026-09-10 17:34 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | **v0.63 反转: 重写 38 项 → 46 项, 新增 A12 多人编辑 8 项**, **撤回 17:08 JST 砍多人编辑决定** (per 17:34 JST Ulysses 拍板"多人编辑是要的", 显式标 v0.63 反转行, per 守门 #1 禁回溯叙事); 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 comment_pin (A12.5); 46 项 1:1 展开 (FR-AGENT-A1.1-A12.8 + NFR-AGENT-16 项 + AC-AGENT-46 项), 28 用户故事 (≥ 28 满足, 46 × 60% = 27.6), 13 已知缺口 (含 A11 跨专题 5 缺口 + **A12 多人编辑 5 缺口**), A11.5 必含 4 表 W/T/M 三類横展 + **A12.8 必含新增表 `canvas_multi_user_audit` 100% RLS 13 类 + W/T/M Transaction append-only + SCD Type 2** (per 守门 #13, 100% 表覆盖), 守门 #1+#3+#5+#6+#7+#9+#10+#13+#14 v2+#14 v4+#15+#19+#23 v2+#1 v15 14 项全过 (文档工作, 守门 #1 v25 cargo test --workspace -j 4 不需要跑) | 2026-09-10 17:34 JST Ulysses 拍板"**多人编辑是要的**" (v0.63 反转) + 总册 `SRS-CANVAS-001.md` v1.1 三次更新版同步 |
 | **v1.3** | **2026-09-10 19:10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62)** | **IPA SEC 合规性修复: 不重写 §0-§12 旧内容 (per 守门 #1 禁回溯叙事, v1.3 反转行显式标). 仅在 §0.2 修订履历 + §12 修订历史 +1 行 v1.3 (本次修复), 段结构 13 段 (含 §11 签字栏 + §12 修订历史) 已合规, 无需加段.** | **2026-09-10 19:06 JST Ulysses 拍板"确保这里的文档符合日本 IPA 标准" + 守门 #9 v19 Mavis 自驱** |
+| **v1.4** | **2026-10-27** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | 同步 Run/Worktree 协作要求：明确 Project → Engineering Run → Worktree → 本地 Branch，Canvas 与任务卡同级；补充 owner-local revision/audit/Outbox 目标契约、逐次授权、双方草稿、语义冲突与显式 Resolve/CAS；新增 AC-COLLAB-09 和 E2E-COLLAB-10/11 追踪，并将旧 endpoint/schema/transport 与未测容量声明标为非规范/未验证；清理本文件的外部产品比较命名。仅为文档同步，未验证实现。 | WBS §22.2 与 WLD-7 Canvas 候选差异审计；当前协作 spec v1.2、数据设计 v0.4、测试设计 v1.7 |
 
 ---
 
@@ -118,21 +120,21 @@ STAR 平台 V0.1 MVP 无限画布 (per `frontend-canvas-design.md` v0.1, 2026-09
 
 ### 1.4 不包含范围 (Out-of-Scope, per 守门 #11 缺标比错标)
 
-**核心原则**: **避免过度冗余** (per 2026-09-10 17:08 JST Ulysses 拍板"避免过度冗余"), 以下 **Miro 通用功能 + 跨专题内容** 全部砍掉 / 留给其他 SRS, 本 SRS 不展开:
+**核心原则**: **避免过度冗余** (per 2026-09-10 17:08 JST Ulysses 拍板"避免过度冗余"). 本 SRS 聚焦画布内 Agent 管理、关系呈现与 Run-scoped 协作；通用演示、导出、通话、外部服务连接、移动端专属体验和完整通用图表套件不在本期范围，分别由对应产品域或后续规划管理。
 
-| 不包含类别 | 不包含内容 | 砍掉理由 / 转交方 |
+| 不包含类别 | 不包含内容 | 范围理由 / 转交方 |
 |---|---|---|
-| ~~**Miro 通用协作 (1 大类)**~~ | ~~多人同时编辑 / 实时 cursor / Follow mode / 评论线程 / @ 提醒 / 内置视频通话~~ | **v0.63 反转 (per 2026-09-10 17:34 JST Ulysses 拍板"多人编辑是要的")**: **多人编辑撤回砍掉决定, 本 SRS §4.12 A12 必含 8 项多人编辑**; 但**内置视频通话** (Miro Talk / Zoom 集成) 仍砍掉, 留 P3+; 协作工具集成 (Slack / Jira) 仍砍掉, 留 P3+ |
-| **Miro 通用演示** | Frame as slide / Guided Tour / Speaker notes / Timer 演讲 | 演示用 Keynote/PowerPoint 已成熟 |
-| **Miro 通用导出** | PDF / Word / Excel / CSV / SVG | PNG 已有 (V0.1), 文本导出超出核心 |
-| **Miro 通用版本** | Version history / Branching / Restore | 跟 Git worktree 重复, 用 Git 即可 |
-| **Miro 通用集成** | Slack / Jira / Asana / Figma / Notion / GitHub / Zoom | Star 25 module 已有, 集成超出画布核心 |
-| **Miro 通用移动** | iOS / Android native / Touch / Stylus / Offline | 客户端重投入, 短期 web 触控够用 |
-| **Miro 12 种 diagram** | Mind map / Flowchart / BPMN / ER / Wireframe / Kanban / Sequence / Smart drawing / Draw | 内容生产用专门工具 |
-| **Miro 模板库** | 2500+ 模板 | 评估做 5-10 个, 留 P3+ |
-| **Miro AI 通用** | 文本生成 diagram / 翻译 / 图像识别 | 仅留 sticky note 聚类 (GAMIFY G5) |
-| **Miro Tables / Chart widget / Form** | 表格 / 数据源 / Chart / 表单 | 跟 Star 数据模块重复 |
-| **Miro 完整 a11y (WCAG 2.1 AA)** | 完整合规 | 部分 a11y 跟随 V0.1, 完整合规留 P3+ |
+| 通用协作扩展 | 通话、外部通知与非 Run-scoped 协作管理 | A12 仅覆盖同一 Run/Worktree 授权边界内的协作；独立通信服务及跨项目协作另行规划 |
+| 通用演示 | 幻灯片演示、导览、演讲备注与计时器 | 不属于 Agent 管理核心 |
+| 通用导出 | 多格式文档、表格与矢量导出 | V0.1 图片导出已有；其他导出超出当前核心范围 |
+| 画布独立版本管理 | 画布自身的版本分支与恢复入口 | Worktree 与本地 Branch 生命周期负责版本隔离；画布只引用获授权的资源版本 |
+| 外部服务连接 | 通知、设计、代码托管、视频及知识服务集成 | 由 connector/API 域维护，不在画布需求中复制服务目录 |
+| 移动端专属体验 | 原生移动应用、触控笔专属与离线编辑套件 | 本期聚焦桌面/Web 已定义交互；移动端和离线需求单独评估 |
+| 通用图表套件 | 通用流程图、建模、线框图、看板和图表模板 | 内容生产由对应 App 承担；本画布聚焦 Agent 与 Run 的关系信息 |
+| 通用模板市场 | 大规模公开模板库 | 当前只维护产品必需的有限内置模板；容量与商业分发另行评估 |
+| 通用 AI 内容生成 | 通用文本生成、翻译与图像识别 | 本文不定义通用内容生成能力 |
+| 表格 / 图表 / 表单编辑器 | 通用数据编辑与表单构建 | 由对应数据与工作项 App 承担 |
+| 完整无障碍认证计划 | 全产品范围的合规认证 | 画布继续遵守产品无障碍基础要求；完整认证单独纳入发布计划 |
 | **5 域 Lead 真人到位前跨域编排决策** | 真人 Lead 决策 | per 9/3 11:35 JST 拍板 B: Mavis 临时代签, 真人到位后追溯签字 (per 守门 #14 v2 + 9/5 10:43 JST 拍板 D), **不沿用代签决策** (per 守门 #1 禁回溯叙事) |
 | **5 域独立 Lead ≠ Star 22 DDD bounded context** | 业务子域↔DDD 映射 | per 2026-08-31 22:45 JST Q1-D 拍板 disclaimer |
 | **基础画布能力 (pan/zoom/select/element/connector/frame)** | V0.1 已实装, 不重写 | per 守门 #1 v19 累积规: 不偷偷 commit 重新设计 |
@@ -183,9 +185,9 @@ STAR 平台 V0.1 MVP 无限画布 (per `frontend-canvas-design.md` v0.1, 2026-09
 | US-25 | SRE | 作为 SRE, 我希望 5 个团队模板 (Hub-and-Spoke / Mesh / Chain / Hierarchical / Review-Council) 在画布上 1-click 部署, 模板选择器 dropdown | A11.4 | P1 |
 | **US-26 (v1.2 新增)** | PM (Ulysses 类) | 作为 PM, 我希望跟 SRE / 5 域 Lead **多人同时编辑同一 canvas** (max 10 并发), 元素增删改实时同步 (≤ 200ms P95), 不需要互发截图 | A12.1 + A12.3 | P0 |
 | **US-27 (v1.2 新增)** | 5 域 Lead | 作为 Lead, 我希望看到**其他用户实时 cursor** + 名字 + 当前 viewport, 知道 SRE 在看哪个 agent_node, 减少沟通成本 | A12.2 | P0 |
-| **US-28 (v1.2 新增)** | PM | 作为 PM, 我希望 **Follow mode** 跟随 SRE 视角, SRE 移动 / 选中 element 时, 我的 viewport 同步, 跟 GitHub Live Share 一样 | A12.4 | P1 |
+| **US-28 (v1.2 新增)** | PM | 作为 PM，我希望使用 **Follow mode** 跟随 SRE 视角，SRE 移动或选中 element 时我的 viewport 同步 | A12.4 | P1 |
 | **US-29 (v1.2 新增)** | Dev | 作为 Dev, 我希望在 element 上**添加多人评论线程**, 跟其他用户**@ 提醒** (e.g. @ PM 审核), notification 域对接, 不切出画布 | A12.5 | P0 |
-| **US-30 (v1.2 新增)** | SRE | 作为 SRE, 我希望多人同时拖拽同一 element 不会冲突, 走 **CRDT (Yjs / Automerge / LWW) 自动 conflict-free merge**, 不需要锁 | A12.6 | P0 |
+| **US-30 (v1.2 新增)** | SRE | 作为 SRE，我希望重叠修改保留双方草稿并提示冲突，以便明确选择解决内容后再提交 | A12.6 | P0 |
 | **US-31 (v1.2 新增)** | 5 域 Lead | 作为 Lead, 我希望**view / comment / edit 3 级权限**, 外部用户仅 view, 内部 Lead 可 comment / edit, BFF API 层强制, 不依赖前端隐藏 | A12.7 | P1 |
 | **US-32 (v1.2 新增)** | SRE | 作为 SRE, 我希望所有**多人操作** (增删改 / cursor 移动 / 评论 / @) 100% 写到 audit log (Transaction append-only), 真人 Lead 到位后可追溯 | A12.8 | P0 |
 
@@ -199,7 +201,7 @@ STAR 平台 V0.1 MVP 无限画布 (per `frontend-canvas-design.md` v0.1, 2026-09
 
 | 用語 | 定義 | 出处 |
 |---|---|---|
-| 无限画布 (Infinite Canvas) | Miro 风格画布, 世界坐标 + viewport 转换, 鼠标 pan/zoom, 不强制栅格 | per `frontend-canvas-design.md` v0.1 §0 |
+| 无限画布 (Infinite Canvas) | 世界坐标 + viewport 转换，支持平移与缩放，不强制栅格 | per `frontend-canvas-design.md` v0.1 §0 |
 | 世界坐标 (World) | 画布无限延伸, 所有 element 真实位置 (x, y ∈ [-100K, 100K]) | per design §3.2 |
 | 屏幕坐标 (Screen) | 浏览器视口, 跟 world 转换公式 `screen = (world - viewport) * zoom` | per design §3.2 |
 | Viewport | 画布观察窗口, 含 pan (x, y) + zoom (0.1x ~ 4x) | per design §3.2 |
@@ -265,7 +267,7 @@ STAR 平台 V0.1 MVP 无限画布 (per `frontend-canvas-design.md` v0.1, 2026-09
 | **实时 Cursor 同步 (PresenceCursor Realtime)** | 其他用户光标位置 + 名字 + 当前 viewport 实时显示, 复用 V0.1 §4.6 PresenceCursor 升级 | per `frontend-canvas-design.md` §4.6 + 本 SRS A12.2 |
 | **PresenceCursor** | V0.1 已有 (per `CanvasView.tsx` line 218-235 + `frontend-canvas-design.md` §4.6), 锚定在 canvas 上特定 element + 名字 + 正在操作什么; A12.2 升级为**多人**实时显示 | per V0.1 §4.6 + 本 SRS A12.2 |
 | **元素增删改实时同步 (Element Realtime Sync)** | 1 用户拖拽 / 删除 / 修改 element, 其他用户 ≤ 200ms (P95) 看到, 走 WSS, 跟 V0.1 localStorage + zustand persist 冲突 (A12.3 需 backend 持久化) | per `frontend-canvas-design.md` §4.1 模式 A 扩展 + 本 SRS A12.3 |
-| **Follow Mode** | A 用户跟随 B 用户视角, B 移动 viewport / 选中 element 时, A 同步, 类似 GitHub Live Share | 本 SRS A12.4 |
+| **Follow Mode** | A 用户跟随 B 用户视角；B 移动 viewport 或选中 element 时，A 同步 | 本 SRS A12.4 |
 | **多人评论线程 (Multi-User Comment Thread)** | element 上挂载多人评论, 1 评论可被 N 用户回复 (thread 结构), V0.1 `comment_pin` (line 253-262) 升级 | per V0.1 `comment_pin` + 本 SRS A12.5 |
 | **@ 提醒 (@ Mention)** | 评论 / 状态变化中 @ 用户名 → 自动发 notification 到该用户 inbox, 跟 25 module notification 域对接 (per `SRS-CANVAS-001.md` v1.1 §6.3) | 本 SRS A12.5 |
 | **冲突解决 (Conflict Resolution) / CRDT** | 多用户同时改同 1 element 时的合并策略: **Yjs** (强 CRDT, 文本/JSON 友好) / **Automerge** (强 CRDT, JSON 友好) / **LWW** (Last-Write-Wins, 弱 CRDT, 简单); 拍板前 P0 阻塞 | per A11 同步桥同源 + 本 SRS A12.6 |
@@ -956,6 +958,8 @@ STAR 平台是 5 域 (player / economy / match / social / admin per 8/21 JST RGS
 > 3. 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 `comment_pin` (A12.5)
 > 4. A12.8 必含新增表 `canvas_multi_user_audit` W/T/M 必含 Transaction append-only + SCD Type 2 + 100% RLS 13 类 (per 守门 #13)
 > 5. per 守门 #1 禁回溯叙事: v0.63 反转行**显式标** (本段 + §0.2 v1.2 + §12 修订历史)
+>
+> **v1.4 当前规范优先级**：本节旧的端点、表结构、传输、算法候选与固定容量/延迟数字是早期设计记录，不代表当前 owner 契约或已实现能力。当前规范以 §4.12.9 与 §9.1 的 WLD-7 追踪为准，并与协作 spec v1.2、数据设计 v0.4、测试设计 v1.7 及 WBS §22.2 对齐；所有容量数值和 PT-09 结果仍待目标环境验收。
 
 #### 4.12.1 FR-A12.1 多人同时编辑同一 canvas (实时同步)
 
@@ -1019,7 +1023,7 @@ STAR 平台是 5 域 (player / economy / match / social / admin per 8/21 JST RGS
 | 项 | 内容 |
 |---|---|
 | ID | FR-AGENT-A12.4 |
-| 描述 | A 用户跟随 B 用户视角, B 移动 viewport (pan + zoom) / 选中 element 时, A 同步 (类似 GitHub Live Share), 1 canvas 仅支持 1 个 follower (per session), A 端顶部 toolbar 显示 "Following: {B user_name}", 退出 follow = A 主动点 "Stop Following" |
+| 描述 | A 用户跟随 B 用户视角，B 移动 viewport (pan + zoom) 或选中 element 时 A 同步；每个 canvas 每个 session 仅支持 1 个 follower，A 端显示当前跟随者并可主动停止跟随 |
 | 输入 | A 用户点 B 用户名字 → "Follow" 按钮 |
 | 输出 | A 端 viewport 跟 B 端同步, B 端不动 A |
 | 数据 schema 增项 | `canvas_followers` (新增, per canvas + follower_user_id + leader_user_id + started_at) |
@@ -1029,7 +1033,7 @@ STAR 平台是 5 域 (player / economy / match / social / admin per 8/21 JST RGS
 
 **用户故事**: US-28 (PM 跟随 SRE 视角)
 
-**验收标准**: AC-A12.4 — A 端点 B 端 "Follow" 按钮, A 端 viewport 实时跟 B 端同步 (≤ 100ms), 顶部 toolbar 显示 "Following: {B user_name}", "Stop Following" 按钮可退出, 跟总册 §6.2.2 端点 + GitHub Live Share UX 一致
+**验收标准**: AC-A12.4 — A 端可启动跟随 B 的视角，viewport 与选择状态按权限同步；显示当前跟随者并可停止跟随。指标仍为待测设计目标，不代表当前运行结果。
 
 **已知缺口**: 无 (P1, 实装待 P3-D 阶段)
 
@@ -1108,6 +1112,17 @@ STAR 平台是 5 域 (player / economy / match / social / admin per 8/21 JST RGS
 **验收标准**: AC-A12.8 — 任何多人操作 (增删改 / cursor 移动 / 评论 / @) 100% 写到 `canvas_multi_user_audit` 表 (Transaction append-only, SCD Type 2 version +1, 100% RLS 13 类必携, 1 操作 1 audit 行), 物理删除 0 次, 真人 Lead 到位后可追溯, 跟守门 #13 W/T/M 分类 + 总册 §6.2.2 端点 + 25 module audit 域对接一致
 
 **已知缺口**: 无 (新增表 W/T/M 分类已定: Transaction append-only + SCD Type 2 + 100% RLS 13 类必携, per 守门 #13)
+
+#### 4.12.9 WLD-7 当前协作契约（规范性要求；未实现声明）
+
+1. **产品树与作用域**：主导航固定为 Project → Engineering Run → Worktree → 本地 Branch。Engineering Run 可脱离宿主 Branch 创建、授权、列出和管理；远端 repository/provider/branch 是可选元数据。Worktree 表示 Run 管理的本地 checkout，Branch 仅表示该 checkout 的本地 ref/state。选择 Worktree 后，Canvas 与 Task Card/工作项作为同一 Run/Worktree 下的同级 App；Canvas 不拥有 Run/Worktree，也不改变其授权边界。
+2. **授权和私有草稿**：每次连接、订阅、读取、差异分页、恢复、解决及重连都必须按当前 Project/Run/Worktree/resource scope 重新授权。作者未完成的草稿默认仅作者可见；冲突双方的已封存草稿与差异只向当前获授权参与者开放。撤权立即停止相应推送并拒绝后续读取。
+3. **事实与通知**：各事实 owner 在自己的事务内写入 canonical revision、append-only audit、draft/conflict 事实和 transactional Outbox；跨 owner 不共享写事务。Outbox 事件仅作为轻量唤醒/版本提示，再按授权资源 fan-out；事件不携带草稿正文。该段是目标契约，不证明 durable push、Outbox relay、持久草稿/冲突或跨实例恢复已经实现。
+4. **冲突时序**：两份完整、摘要校验通过且语义重叠的 proposal，在第二份到达 owner 时立即形成一个稳定 conflict_id 并 pin 双方精确草稿；任何更长到达间隔的有效语义重叠仍须检测。第二份完整 proposal 在 ≤1000 ms 到达只是 E2E 测试刺激，不是提交时间差、冲突窗口、检测窗口或 holdback。PT-09 的 p99 ≤1 s 从 owner conflict transaction commit 起计，单独衡量双方同一 unread conflict_id 与首个有界差异页可读。
+5. **显式解决**：OT 只可在用户显式进入 Resolve 后生成无副作用预览。取消不得改变 canonical revision、conflict 或任何一侧草稿。只有用户明确选择结果，且 owner 对当前 revision 的 CAS 成功，才可写新 canonical revision。CAS 过期须保留双方草稿和原冲突事实，并展示可恢复状态。
+6. **资源限制和状态**：连接复用、按事件数与字节数限界队列、单草稿有界在途写入、合并 pending delta、presence 限频与慢消费者恢复须由版本化 Collaboration Profile 固定。候选容量均为待测参数；双 gateway、目标 PostgreSQL/RLS、资源占用、恢复与推送指标在 PT-09 前不得标为通过。
+
+当前验收追踪见 §9.1 AC-COLLAB-02/04/06/09，执行细节分别见 E2E-COLLAB-09/10/11 与 PT-09。旧物理接口、schema 和算法候选不得与此 owner-local 逻辑契约并列作为规范。
 
 ### 4.13 非功能需求 (NFR, 16 项)
 
@@ -1862,13 +1877,17 @@ interface PermissionGateProps {
 | **AC-A12.1 (v1.2 新增)** | **10 个用户同时编辑同一 canvas, 元素增删改 ≤ 200ms (P95) 反映到其他用户, WSS 连接稳定, envoy 独立 deployment, BFF 推 element 增删改, 跟 `frontend-canvas-design.md` §4.1 模式 A + §6.2 端点 `wss://canvas-collab/canvases/[id]` 一致** | 手动 + WSS latency 监控 | **A12.1** |
 | **AC-A12.2 (v1.2 新增)** | **10 个用户同时编辑, 每人 cursor ≤ 100ms 显示在其他用户 viewport 上, cursor 颜色按 user_id 哈希分配 (12 色调色板), 名字 + viewport + selection 同步, 跟 V0.1 §4.6 PresenceCursor 字段 + 总册 §6.2.2 端点一致** | 手动 + WSS latency 监控 | **A12.2** |
 | **AC-A12.3 (v1.2 新增)** | **1 用户拖拽 element, 其他用户 ≤ 200ms (P95) 看到 element 移动, backend 持久化成功, F5 刷新保留, V0.1 localStorage 不冲突 (降级为 fallback), 跟 V0.1 §4.1 模式 A + 总册 §6.2.2 端点一致** | 手动 + DB schema 验证 | **A12.3** |
-| **AC-A12.4 (v1.2 新增)** | **A 端点 B 端 "Follow" 按钮, A 端 viewport 实时跟 B 端同步 (≤ 100ms P95), 顶部 toolbar 显示 "Following: {B user_name}", "Stop Following" 按钮可退出, 跟总册 §6.2.2 端点 + GitHub Live Share UX 一致** | 手动 + WSS latency 监控 | **A12.4** |
+| **AC-A12.4 (v1.2 新增)** | **A 端可启动跟随 B 的视角，viewport 与选择状态按权限同步；显示当前跟随者并可停止跟随。指标仍为待测设计目标。** | 手动 + latency 监控 | **A12.4** |
 | **AC-A12.5 (v1.2 新增)** | **element 上右键 → "添加评论" → 弹 thread 输入框 → 提交 → 评论显示在 element 旁边, V0.1 💬 emoji + badge 保留; thread 内回复 + @ 用户 → notification 域发到被 @ 用户 inbox, 跟 V0.1 `CanvasView.tsx` line 253-262 `comment_pin` 升级一致 + 总册 §6.2.2 端点 + 25 module notification 对接** | 手动 + notification 域验证 | **A12.5** |
 | **AC-A12.6 (v1.2 新增)** | **2 用户同时拖拽同 1 element, 选型 CRDT 自动 conflict-free merge, 不需要锁, 不冲突, 选型后所有 element 自动 conflict-free, 跟 A11 同步桥设计同源** | 手动 + CRDT 选型决策 | **A12.6** |
 | **AC-A12.7 (v1.2 新增)** | **外部用户访问 canvas, BFF 校验 view 权限通过, 试图 edit 元素 → 403 Forbidden + UI 提示; 内部 Lead 默认 edit 权限; comment 权限用户可评论不能 edit; 跟总册 §6.2.2 + 守门 #14 v2 真人到位后追溯签字一致** | 手动 + BFF middleware 验证 | **A12.7** |
 | **AC-A12.8 (v1.2 新增)** | **任何多人操作 (增删改 / cursor 移动 / 评论 / @) 100% 写到 `canvas_multi_user_audit` 表 (Transaction append-only, SCD Type 2 version +1, 100% RLS 13 类必携, 1 操作 1 audit 行), 物理删除 0 次, 真人 Lead 到位后可追溯, 跟守门 #13 W/T/M 分类 + 总册 §6.2.2 端点 + 25 module audit 域对接一致** | 手动 + DB schema 验证 | **A12.8** |
+| **AC-COLLAB-02** | 语义重叠的完整 proposal 保留双方草稿并创建唯一可恢复冲突；≤1000 ms 仅表示第二份完整 proposal 到达 owner 的测试刺激，不形成时间窗口；更长间隔仍检测语义重叠 | E2E-COLLAB-09/10；owner fence/CAS 审计 | domain-collaboration-spec v1.2；数据设计 v0.4；测试设计 v1.7 §4.8；WBS §22.2 |
+| **AC-COLLAB-04** | 在线且仍有授权的双方看到同一持久 unread conflict_id 并能读取首个有界差异页；PT-09 从冲突事实提交起测量 p99 ≤1 s，和到达刺激分别计量 | E2E-COLLAB-09；PT-09 | domain-collaboration-spec v1.2；测试设计 v1.7 §4.8；WBS §22.2 |
+| **AC-COLLAB-06** | 连接、队列、帧、缓存、draft 写入与慢消费者恢复受当前版本化 Collaboration Profile 限界；候选数字不作为容量已验证证据 | PT-09 + PT-09-GATE-01 | 数据设计 v0.4；测试设计 v1.7 §4.8；WBS §22.2 |
+| **AC-COLLAB-09** | OT 只能作为显式 Resolve 的无副作用预览；取消无副作用；仅用户明确选定且 owner 当前 revision CAS 成功才提交。stale CAS 保留双方草稿与冲突事实 | E2E-COLLAB-11 + owner CAS audit | domain-collaboration-spec v1.2；数据设计 v0.4；测试设计 v1.7 §4.8；WBS §22.2 |
 
-**AC 数量统计**: **46 个** (≥ 46 满足), 涵盖 46 项需求 1:1
+**AC 数量统计**: 原 A1-A12 功能追踪仍为 **46 项**；新增 AC-COLLAB-02/04/06/09 是 WLD-7 的跨文档验收映射，不将其误计为已通过验收。
 
 ### 9.2 质量验收 (Quality AC)
 
@@ -1893,12 +1912,12 @@ interface PermissionGateProps {
 
 | AC | 描述 | 测量 |
 |---|---|---|
-| AC-D-1 | 本 SRS (要件定義書) 落档 | `docs/requirements/SRS-CANVAS-AGENT-001.md` 存在 (v1.2) |
-| AC-D-2 | BD (基本設計書) 落档 (P3-D 阶段) | `docs/design/BD-CANVAS-AGENT-001.md` 存在 (待落档) |
-| AC-D-3 | DD (詳細設計書) 落档 (P3-D 阶段) | `docs/design/DD-CANVAS-AGENT-001.md` 存在 (待落档) |
+| AC-D-1 | 本 SRS (要件定義書) 落档 | `docs/requirements/SRS-CANVAS-AGENT-001.md` 存在 (v1.4) |
+| AC-D-2 | BD (基本設計書) 落档 | `docs/design/BD-CANVAS-AGENT-001.md` 存在 (v0.2) |
+| AC-D-3 | DD (詳細設計書) 落档 | `docs/design/DD-CANVAS-AGENT-001.md` 存在 (v0.2) |
 | AC-D-4 | 実装報告 (7 段) 落档 (P3-D 阶段) | `docs/reports/PHASE-CANVAS-AGENT-IMPL-REPORT.md` 存在 (待落档) |
 | AC-D-5 | self-review 落地报告 (P3-D 阶段) | `docs/reports/PHASE-CANVAS-AGENT-SELF-REVIEW.md` 存在 (待落档) |
-| **AC-D-6 (v1.2 新增)** | A12 多人编辑 CRDT 选型决策文档落档 | `docs/design/CRDT-SELECTION-DECISION.md` 存在 (实装阶段) |
+| **AC-D-6 (v1.2 新增)** | 早期算法选择记录为历史资料；WLD-7 当前验收以 owner-local 协作契约及版本化 profile 为准 | 当前协作 spec v1.2 + 数据设计 v0.4 + 测试设计 v1.7 |
 
 ---
 
@@ -1956,4 +1975,5 @@ interface PermissionGateProps {
 | **v1.1** | 2026-09-10 17:22 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | **重写: 28 项 → 38 项, 新增 A11 ARG 图论构造 10 项** (引用 `SRS-AGENT-RELATIONSHIP-001.md` v0.1 §1-§8 + `BD-AGENT-RELATIONSHIP-001.md` v0.1 §1-§7 + `DD-AGENT-RELATIONSHIP-001.md` + `DDD-REVIEW-AGENT-RELATIONSHIP-001.md`), 38 项 1:1 展开 (FR-AGENT-A1.1-A11.10 + NFR-AGENT-12 项 + AC-AGENT-38 项), 25 用户故事 (≥ 23 满足), 12 已知缺口 (含 A11 跨专题 5 缺口), A11.5 必含 4 表 W/T/M 三類横展 (per 守门 #13, 100% 表覆盖), 守门 #1+#3+#5+#6+#7+#9+#10+#13+#14 v2+#14 v4+#15+#19+#23 v2+#1 v15 14 项全过 (文档工作, 守门 #1 v25 cargo test --workspace -j 4 不需要跑) | 2026-09-10 17:21 JST Ulysses 补充"画布内体现 agent 之间关系的图论构造" (ARG 落档触发重写) |
 | **v1.2 (A12 多人编辑 v0.63 反转)** | 2026-09-10 17:34 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | **v0.63 反转: 重写 38 项 → 46 项, 新增 A12 多人编辑 8 项**, **撤回 17:08 JST 砍多人编辑决定** (per 17:34 JST Ulysses 拍板"多人编辑是要的", 显式标 v0.63 反转行, per 守门 #1 禁回溯叙事); 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 comment_pin (A12.5); 46 项 1:1 展开 (FR-AGENT-A1.1-A12.8 + NFR-AGENT-16 项 + AC-AGENT-46 项), 28 用户故事 (≥ 28 满足, 46 × 60% = 27.6), 13 已知缺口 (含 A11 跨专题 5 缺口 + **A12 多人编辑 5 缺口**), A11.5 必含 4 表 W/T/M 三類横展 + **A12.8 必含新增表 `canvas_multi_user_audit` 100% RLS 13 类 + W/T/M Transaction append-only + SCD Type 2** (per 守门 #13, 100% 表覆盖), 守门 14 项全过 | 2026-09-10 17:34 JST Ulysses 拍板"**多人编辑是要的**" (v0.63 反转) + 总册 `SRS-CANVAS-001.md` v1.1 三次更新版同步 |
 | **v1.3 (IPA SEC 合规性修复)** | **2026-09-10 19:10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62)** | **IPA SEC 合规性修复: 不重写 §0-§12 旧内容 (per 守门 #1 禁回溯叙事, v1.3 反转行显式标). 13 段 (含 §11 签字栏 + §12 修订历史) 已合规, 无需加段. 仅在 §0.2 修订履历 + §12 修订历史 +1 行 v1.3 (本次修复).** | **2026-09-10 19:06 JST Ulysses 拍板"确保这里的文档符合日本 IPA 标准" + 守门 #9 v19 Mavis 自驱** |
-| **v1.2 (当前)** | 2026-09-10 17:34 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | **v0.63 反转: 重写 38 项 → 46 项, 新增 A12 多人编辑 8 项** (FR-AGENT-A12.1-A12.8 + NFR-AGENT-PERF-04/05/06 + NFR-AGENT-MU-CONS-01 + AC-AGENT-A12.1-A12.8 + UC-A11/UC-A12/UC-A13/UC-A14/UC-A15 + 缺口 #11-#17 共 7 个 + 已知缺口统计 19 个 ≥ 8 满足), **撤回 2026-09-10 17:08 JST 砍多人编辑决定** (per 17:34 JST Ulysses 拍板"**多人编辑是要的**", v0.63 反转行**显式标** per 守门 #1 禁回溯叙事, 出现在 §0.2 v1.2 + §1.4 + §3.3 BR-12/BR-13 + §4.12 A12 段头 + §7.3 A12.8 + §10 #11-#17 + 本 §12 v1.2 row), 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 `comment_pin` (A12.5); A12.8 必含新增表 `canvas_multi_user_audit` 7 表 W/T/M 必含 (per 守门 #13, 含 `canvas_multi_user_audit` Transaction append-only + SCD Type 2 + 100% RLS 13 类); 32 用户故事 (≥ 28 满足, 46 × 60% = 27.6); 16 NFR (含 v1.2 新增 PERF-04/05/06 + MU-CONS-01); 46 AC (1:1 覆盖 46 项); 守门 #1+#3+#5+#6+#7+#9+#10+#13+#14 v2+#14 v4+#15+#19+#23 v2+#1 v15+#1 v25+#7 v3+#1 v26+#24 v2+#6 v2 19 项全过 (文档工作, 守门 #1 v25 cargo test --workspace -j 4 不需要跑); 5 域 Lead 真人未到位前 Mavis 临时代签 (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事) | 2026-09-10 17:34 JST Ulysses 拍板"**多人编辑是要的**" (v0.63 反转) + 总册 `SRS-CANVAS-001.md` v1.1 三次更新版同步 (v0.63 反转行 显式标 + 78 项 = 46 + 32) |
+| **v1.4 (当前)** | **2026-10-27** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | 同步当前 Project/Engineering Run/Worktree/本地 Branch 层级、Canvas 与任务卡同级、逐次授权及 owner-local draft/conflict/Outbox 目标契约；区分 proposal 到达刺激与 PT-09 commit-to-read p99；追踪 AC-COLLAB-02/04/06/09 与 E2E-COLLAB-09/10/11。新增内容仅为目标设计和验收追踪，运行实现与性能均未验证。清理文内外部产品比较措辞。 | WBS §22.2 与 WLD-7 Canvas 文档同步；协作 spec v1.2、数据设计 v0.4、测试设计 v1.7 |
+| **v1.2** | 2026-09-10 17:34 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | **v0.63 反转: 重写 38 项 → 46 项, 新增 A12 多人编辑 8 项** (FR-AGENT-A12.1-A12.8 + NFR-AGENT-PERF-04/05/06 + NFR-AGENT-MU-CONS-01 + AC-AGENT-A12.1-A12.8 + UC-A11/UC-A12/UC-A13/UC-A14/UC-A15 + 缺口 #11-#17 共 7 个 + 已知缺口统计 19 个 ≥ 8 满足), **撤回 2026-09-10 17:08 JST 砍多人编辑决定** (per 17:34 JST Ulysses 拍板"**多人编辑是要的**", v0.63 反转行**显式标** per 守门 #1 禁回溯叙事, 出现在 §0.2 v1.2 + §1.4 + §3.3 BR-12/BR-13 + §4.12 A12 段头 + §7.3 A12.8 + §10 #11-#17 + 本 §12 v1.2 row), 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 (A12.1 + A12.3) + §4.6 PresenceCursor 升级 (A12.2) + `CanvasView.tsx` line 253-262 `comment_pin` (A12.5); A12.8 必含新增表 `canvas_multi_user_audit` 7 表 W/T/M 必含 (per 守门 #13, 含 `canvas_multi_user_audit` Transaction append-only + SCD Type 2 + 100% RLS 13 类); 32 用户故事 (≥ 28 满足, 46 × 60% = 27.6); 16 NFR (含 v1.2 新增 PERF-04/05/06 + MU-CONS-01); 46 AC (1:1 覆盖 46 项); 守门 #1+#3+#5+#6+#7+#9+#10+#13+#14 v2+#14 v4+#15+#19+#23 v2+#1 v15+#1 v25+#7 v3+#1 v26+#24 v2+#6 v2 19 项全过 (文档工作, 守门 #1 v25 cargo test --workspace -j 4 不需要跑); 5 域 Lead 真人未到位前 Mavis 临时代签 (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事) | 2026-09-10 17:34 JST Ulysses 拍板"**多人编辑是要的**" (v0.63 反转) + 总册 `SRS-CANVAS-001.md` v1.1 三次更新版同步 (v0.63 反转行 显式标 + 78 项 = 46 + 32) |

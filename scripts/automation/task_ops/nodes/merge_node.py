@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=dd4a4d7a544171230ee63cc961d7fc27af9d07d316542bee16eb0ed2b2cfe645
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/merge_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/merge_node.py
 # TMO M-N1 merge_node (per docs/architecture/2026-09-03-langgraph/03-detailed-design.md v0.2 §3.2.1.1)
 #
@@ -23,7 +26,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger("task_ops.nodes.merge_node")
 
@@ -60,7 +63,7 @@ async def _stash_states(target_ids: list[str], sub_pool) -> list[str]:
     """
     stash_ids: list[str] = []
     for tid in target_ids:
-        handle = sub_pool.get(tid)
+        sub_pool.get(tid)
         # 先把状态标 stash_pending, 让 UI 显示"合并中"
         await sub_pool.update(tid, {"status": "stash_pending", "stash_initiated_at": time.time()})
         stash_id = await sub_pool.checkpoint(tid, label=f"merge_stash_{tid}")

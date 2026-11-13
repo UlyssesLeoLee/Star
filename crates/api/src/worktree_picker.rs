@@ -73,14 +73,19 @@ pub struct PickerBffState {
 impl std::fmt::Debug for PickerBffState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PickerBffState")
-            .field("provider", &self.provider.as_ref().map(|_| "<dyn PickerQuery>"))
+            .field(
+                "provider",
+                &self.provider.as_ref().map(|_| "<dyn PickerQuery>"),
+            )
             .finish()
     }
 }
 
 impl Clone for PickerBffState {
     fn clone(&self) -> Self {
-        Self { provider: self.provider.clone() }
+        Self {
+            provider: self.provider.clone(),
+        }
     }
 }
 
@@ -112,7 +117,9 @@ pub enum PickerError {
 impl IntoResponse for PickerError {
     fn into_response(self) -> Response {
         let (status, code) = match &self {
-            PickerError::ProviderNotRegistered => (StatusCode::SERVICE_UNAVAILABLE, "PICKER.NOT_REGISTERED"),
+            PickerError::ProviderNotRegistered => {
+                (StatusCode::SERVICE_UNAVAILABLE, "PICKER.NOT_REGISTERED")
+            }
             PickerError::RepoNotFound(_) => (StatusCode::NOT_FOUND, "PICKER.REPO_NOT_FOUND"),
             PickerError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "PICKER.INTERNAL"),
         };

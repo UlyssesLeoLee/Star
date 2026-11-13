@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=64dc10e054a703e78e39f3da63612d5ad168dec389b105cf8908034120d934e8
+# MERGE (self:File {path:"scripts/automation/task_ops/bulk_queue.py"})
+# @endcypher
 """scripts/automation/task_ops/bulk_queue.py — TMO BulkOperationQueue (C-18, M-21)
 
 TMO v0.2 批量操作队列 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md §2.6.4 M-N4 +

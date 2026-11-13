@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=8276fc1b3828d9008dbf0a2b89dc39349e6797730e2424382515c0e0de7fcf30
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/create_node.py"})
+# @endcypher
 # scripts/automation/task_ops/nodes/create_node.py
 # M-N8 create_node (TMO-08, per ADR-0049 + docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md)
 #
@@ -26,11 +29,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import subprocess
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger("task_ops.create")
 

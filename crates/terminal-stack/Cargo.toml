@@ -10,7 +10,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "Star Terminal Stack — scrollback ring buffer + split-pane tree (per ULYS-200 + FR-ORCA-036/039 §12 v1.0 + 终端栈选型 = 候选 B per 2026-09-22 JST 决策)"
+description = "Star Terminal Stack — scrollback ring buffer and split-pane tree for the desktop workspace"
 
 [lib]
 name = "terminal_stack"

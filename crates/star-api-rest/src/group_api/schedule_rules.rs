@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=d3fe26c26ea38ae099e8a354efe1a9e30597f974e8d1ef618fe43c7687ad8e9e
+//! @cypher schema=1 source_sha256=6060121153fbbdeb0df3b29b346530a0e60d617a333cdef10d7f8c6af46111b0
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/schedule_rules.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::router",kind:"function"})
@@ -218,6 +218,17 @@
 //! MERGE (token_fixture)-[:CALLS]->(issue_token)
 //! MERGE (persist)-[:WRITES]->(rules)
 //! MERGE (persist)-[:WRITES]->(run_as_column)
+//! MERGE (deviceStub:Type {id:"crates/star-api-rest/src/group_api/schedule_rules.rs::tests::TestActiveDeviceBindingRepo",kind:"struct"})
+//! MERGE (tests)-[:DEFINES]->(deviceStub)
+//! MERGE (deviceStub)-[:IMPLEMENTS]->(deviceRepo)
+//! MERGE (deviceRepo:Type {id:"star_pg_adapter::repository::DeviceBindingRepository",kind:"trait"})
+//! MERGE (token_fixture)-[:CALLS]->(issue_token_with_device_context)
+//! MERGE (issue_token_with_device_context:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token_with_device_context",kind:"function"})
+//! MERGE (deviceContextType:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
+//! MERGE (token_fixture)-[:USES_TYPE]->(deviceContextType)
+//! MERGE (stateTestCtor:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.new_with_device_binding_repo",kind:"method"})
+//! MERGE (scope_test)-[:CALLS]->(stateTestCtor)
+//! MERGE (body_limit_test)-[:CALLS]->(stateTestCtor)
 //! MERGE (revise)-[:WRITES]->(rules)
 //! MERGE (revise)-[:READS]->(run_as_column)
 //! MERGE (prepare)-[:CONFIGURES]->(run_as_column)
@@ -855,15 +866,9 @@ fn validate_recurrence(rule: &AutomationScheduleRuleRevisionV1) -> Result<(), Gr
     let now = Utc::now();
     let mut candidate = rule.clone();
     candidate.enabled = true;
-    validate_schedule_recurrence(
-        &candidate,
-        now,
-        now + ChronoDuration::seconds(120),
-        now,
-        1,
-    )
-    .map(|_| ())
-    .map_err(|_| GroupApiError::invalid_request("invalid_schedule_recurrence"))
+    validate_schedule_recurrence(&candidate, now, now + ChronoDuration::seconds(120), now, 1)
+        .map(|_| ())
+        .map_err(|_| GroupApiError::invalid_request("invalid_schedule_recurrence"))
 }
 
 async fn persist_revision(
@@ -1252,6 +1257,69 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
+    use chrono::{DateTime, Utc};
+    use star_pg_adapter::repository::{
+        DeviceBinding, DeviceBindingRepository, DeviceChallengeCreateResult,
+        DeviceEnrollmentChallenge,
+    };
+    use star_pg_adapter::PgAdapterError;
+
+    // W16 device-identity hardening: AuthenticatedUser requires an active device
+    // context on mutating routes. Route tests issue a synthetic device-bound token
+    // and stub the repository so no live device-binding table is needed.
+    struct TestActiveDeviceBindingRepo;
+
+    #[async_trait::async_trait]
+    impl DeviceBindingRepository for TestActiveDeviceBindingRepo {
+        async fn create_challenge(
+            &self,
+            _challenge: &DeviceEnrollmentChallenge,
+        ) -> Result<DeviceChallengeCreateResult, PgAdapterError> {
+            unimplemented!("not exercised by schedule route tests")
+        }
+
+        async fn find_challenge(
+            &self,
+            _tenant_id: Uuid,
+            _actor_id: Uuid,
+            _challenge_id: Uuid,
+        ) -> Result<Option<DeviceEnrollmentChallenge>, PgAdapterError> {
+            unimplemented!("not exercised by schedule route tests")
+        }
+
+        async fn complete_challenge(
+            &self,
+            _tenant_id: Uuid,
+            _actor_id: Uuid,
+            _challenge_id: Uuid,
+            _challenge_hash: &[u8],
+            _device_id: Uuid,
+            _now: DateTime<Utc>,
+        ) -> Result<Option<DeviceBinding>, PgAdapterError> {
+            unimplemented!("not exercised by schedule route tests")
+        }
+
+        async fn is_active(
+            &self,
+            _tenant_id: Uuid,
+            _actor_id: Uuid,
+            _device_id: Uuid,
+            _generation: i64,
+        ) -> Result<bool, PgAdapterError> {
+            Ok(true)
+        }
+
+        async fn revoke(
+            &self,
+            _tenant_id: Uuid,
+            _actor_id: Uuid,
+            _device_id: Uuid,
+            _now: DateTime<Utc>,
+        ) -> Result<Option<DeviceBinding>, PgAdapterError> {
+            unimplemented!("not exercised by schedule route tests")
+        }
+    }
+
     fn route_test_jwt_config() -> Arc<crate::auth::JwtConfig> {
         Arc::new(crate::auth::JwtConfig {
             private_key_pem: include_str!("../../tests/fixtures/schedule-route-test-private.pem")
@@ -1265,12 +1333,16 @@ mod tests {
     }
 
     fn route_test_token(config: &crate::auth::JwtConfig, scope: &str) -> String {
-        crate::auth::issue_token(
+        crate::auth::issue_token_with_device_context(
             config,
             Uuid::new_v4(),
             Uuid::new_v4(),
             vec!["developer".to_owned()],
             scope.to_owned(),
+            Some(crate::auth::DeviceTokenContext {
+                device_id: Uuid::new_v4(),
+                generation: 1,
+            }),
         )
         .expect("fixed test-only RSA key should sign route test tokens")
         .0
@@ -1364,7 +1436,10 @@ mod tests {
         .fetch_one(&pool)
         .await
         .expect("Schedule occurrence target snapshot nullability should be queryable");
-        assert!(rule_branch_is_nullable, "Rule configuration may omit remote Branch context");
+        assert!(
+            rule_branch_is_nullable,
+            "Rule configuration may omit remote Branch context"
+        );
         assert!(
             occurrence_snapshot_is_required,
             "occurrences must keep a required immutable target snapshot"
@@ -1545,27 +1620,21 @@ mod tests {
                     assert_eq!(scope.repository_id, None);
                     assert_eq!(scope.branch_id, None);
                     let editor_read = authorize_run_principal(
-                        &mut tx,
-                        tenant_id,
-                        actor_id,
-                        project_id,
-                        run_id,
-                        false,
-                        false,
+                        &mut tx, tenant_id, actor_id, project_id, run_id, false, false,
                     )
                     .await;
-                    assert!(editor_read.is_ok(), "hostless Run read must use Project/Run grants");
+                    assert!(
+                        editor_read.is_ok(),
+                        "hostless Run read must use Project/Run grants"
+                    );
                     let editor_write = authorize_run_principal(
-                        &mut tx,
-                        tenant_id,
-                        actor_id,
-                        project_id,
-                        run_id,
-                        true,
-                        false,
+                        &mut tx, tenant_id, actor_id, project_id, run_id, true, false,
                     )
                     .await;
-                    assert!(editor_write.is_ok(), "hostless Rule write must use Project/Run writer grants");
+                    assert!(
+                        editor_write.is_ok(),
+                        "hostless Rule write must use Project/Run writer grants"
+                    );
                 }
             }
             tx.rollback()
@@ -1815,8 +1884,13 @@ mod tests {
         let pool = PgPoolOptions::new()
             .connect_lazy("postgres://localhost/unavailable-for-schedule-route-test")
             .expect("lazy test pool configuration should parse");
-        let app =
-            super::super::build_group_router(super::super::GroupApiState::new(jwt.clone(), pool));
+        let app = super::super::build_group_router(
+            super::super::GroupApiState::new_with_device_binding_repo(
+                jwt.clone(),
+                pool,
+                Arc::new(TestActiveDeviceBindingRepo),
+            ),
+        );
         let collection = "/api/v1/projects/00000000-0000-0000-0000-000000000001/engineering-runs/00000000-0000-0000-0000-000000000002/automation/schedule-rules";
         let item = format!("{collection}/00000000-0000-0000-0000-000000000003");
         let cases = [
@@ -1877,7 +1951,13 @@ mod tests {
         let pool = PgPoolOptions::new()
             .connect_lazy("postgres://localhost/unavailable-for-schedule-route-test")
             .expect("lazy test pool configuration should parse");
-        let app = super::super::build_group_router(super::super::GroupApiState::new(jwt, pool));
+        let app = super::super::build_group_router(
+            super::super::GroupApiState::new_with_device_binding_repo(
+                jwt,
+                pool,
+                Arc::new(TestActiveDeviceBindingRepo),
+            ),
+        );
         let body = vec![b'x'; 16 * 1024 + 1];
         let response = app
             .oneshot(

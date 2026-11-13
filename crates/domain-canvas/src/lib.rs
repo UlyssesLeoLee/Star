@@ -1,7 +1,37 @@
-//! domain-canvas lib: 业务域画布元数据 + axum router builder (per ULYS-160 §2 阶段 1 骨架)
+/*
+@cypher schema=1 source_sha256=2bf5cc788f4f280660769dea8ecefa172bdeab5eb0169ef511ffec0c218f0c58
+MERGE (self:File {path:"crates/domain-canvas/src/lib.rs"})
+MERGE (metadata:Type {id:"crates/domain-canvas/src/lib.rs::ServiceMetadata"})
+MERGE (phase:Type {id:"crates/domain-canvas/src/lib.rs::Phase"})
+MERGE (error:Type {id:"crates/domain-canvas/src/lib.rs::DomainCanvasError"})
+MERGE (router:Symbol {id:"crates/domain-canvas/src/lib.rs::router",kind:"function"})
+MERGE (healthz:Symbol {id:"crates/domain-canvas/src/lib.rs::healthz",kind:"function"})
+MERGE (ready:Symbol {id:"crates/domain-canvas/src/lib.rs::ready",kind:"function"})
+MERGE (version:Symbol {id:"crates/domain-canvas/src/lib.rs::version",kind:"function"})
+MERGE (canvas:Symbol {id:"crates/domain-canvas/src/lib.rs::canvas_placeholder",kind:"function"})
+MERGE (self)-[:DEFINES]->(metadata)
+MERGE (self)-[:DEFINES]->(phase)
+MERGE (self)-[:DEFINES]->(error)
+MERGE (self)-[:DEFINES]->(router)
+MERGE (self)-[:DEFINES]->(healthz)
+MERGE (self)-[:DEFINES]->(ready)
+MERGE (self)-[:DEFINES]->(version)
+MERGE (self)-[:DEFINES]->(canvas)
+MERGE (router)-[:EXPOSES]->(:Endpoint {path:"/healthz",method:"GET"})
+MERGE (router)-[:EXPOSES]->(:Endpoint {path:"/ready",method:"GET"})
+MERGE (router)-[:EXPOSES]->(:Endpoint {path:"/version",method:"GET"})
+MERGE (router)-[:EXPOSES]->(:Endpoint {path:"/api/v1/canvas",method:"GET"})
+MERGE (router)-[:CALLS]->(healthz)
+MERGE (router)-[:CALLS]->(ready)
+MERGE (router)-[:CALLS]->(version)
+MERGE (router)-[:CALLS]->(canvas)
+MERGE (ready)-[:USES_TYPE]->(metadata)
+MERGE (version)-[:USES_TYPE]->(metadata)
+@endcypher
+*/
+//! Star Canvas domain service metadata and Axum router.
 //!
-//! 阶段 1: 健康检查 + 服务版本 + 占位 endpoint. 0 业务.
-//! 阶段 2+: 26 表 W/T/M + 5 角色 业务逻辑 (per SRS-STAR-CANVAS-GAME-001 v0.1 §4.2).
+//! Provides health, version, and the current Canvas API scaffold.
 
 #![warn(missing_docs)]
 
@@ -15,18 +45,18 @@ pub struct ServiceMetadata {
     pub name: &'static str,
     /// 服务语义版本.
     pub version: &'static str,
-    /// HTTP 监听端口 (per deploy/canvas-game-k3s.yaml containerPort: 8081).
+    /// HTTP listener port (per deploy/star-canvas-services-k3s.yaml containerPort: 8081).
     pub http_port: u16,
-    /// 阶段 1 骨架 marker.
+    /// Current service implementation phase.
     pub phase: Phase,
 }
 
 /// 实现阶段 marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum Phase {
-    /// 阶段 1: 骨架, 仅健康检查 + 元数据 + 占位 endpoint.
+    /// Service scaffold with health and metadata endpoints.
     Skeleton,
-    /// 阶段 2+: 业务 logic 已落地.
+    /// Product operations have been implemented.
     Implemented,
 }
 
@@ -44,7 +74,7 @@ impl ServiceMetadata {
 #[derive(Debug, thiserror::Error)]
 pub enum DomainCanvasError {
     /// 阶段 1 基础 占位.
-    #[error("domain-canvas skeleton: not implemented (阶段 2 落地)")]
+    #[error("domain-canvas product operations are not implemented")]
     NotImplemented,
 }
 
@@ -81,6 +111,6 @@ async fn canvas_placeholder() -> Json<serde_json::Value> {
     Json(json!({
         "endpoint": "/api/v1/canvas",
         "phase": "skeleton",
-        "message": "阶段 2 落地: 26 表 W/T/M + 5 角色 CRUD (per SRS-STAR-CANVAS-GAME-001 v0.1 §4.2)",
+        "message": "Canvas domain API scaffold; product operations are not yet implemented.",
     }))
 }

@@ -27,6 +27,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
+futures-util = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
@@ -86,6 +87,13 @@ domain-validation = { path = "../domain-validation" }
 domain-hook = { path = "../domain-hook" }
 domain-automation = { path = "../domain-automation" }
 bi-owner-runtime = { path = "../bi-owner-runtime" }
+platform-messaging-runtime = { path = "../platform-messaging-runtime", default-features = false, features = ["native-grpc-adapter"] }
+# 2026-11-09 W8 接线 (per WBS §23.23 + 用户拍板 option A): 生产 receiver 改走共享 adapter crate,
+# 删除本 crate 内联的 NativeTaskEventTransport/Authorization/Delivery 副本, 并获得
+# connect 期 route-binding 校验 (profile lifecycle / sender-recipient allowlist / digest pin)。
+bi-native-event-adapter = { path = "../bi-native-event-adapter" }
+# 2026-11-11 Google 登录 (per 用户发令): 拉取 Google OIDC JWKS 验 ID token。
+reqwest = { workspace = true }
 
 # Webhook 出站 (复用 star-webhook DeliveryStore/RetryPolicy, per spec §7.3)
 star-webhook = { path = "../star-webhook" }

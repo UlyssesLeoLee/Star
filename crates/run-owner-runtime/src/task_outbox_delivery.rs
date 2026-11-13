@@ -160,37 +160,69 @@ impl fmt::Debug for TaskRunOutboxDeliveryClaim {
 
 impl TaskRunOutboxDeliveryClaim {
     /// Return the tenant identity bound to this database claim.
-    pub fn tenant_id(&self) -> Uuid { self.tenant_id }
+    pub fn tenant_id(&self) -> Uuid {
+        self.tenant_id
+    }
     /// Return the Project identity bound to the source event.
-    pub fn project_id(&self) -> Uuid { self.project_id }
+    pub fn project_id(&self) -> Uuid {
+        self.project_id
+    }
     /// Return the Engineering Run identity bound to the source event.
-    pub fn engineering_run_id(&self) -> Uuid { self.engineering_run_id }
+    pub fn engineering_run_id(&self) -> Uuid {
+        self.engineering_run_id
+    }
     /// Return the stable immutable source event identity.
-    pub fn event_id(&self) -> Uuid { self.event_id }
+    pub fn event_id(&self) -> Uuid {
+        self.event_id
+    }
     /// Return the Task Card aggregate identity.
-    pub fn work_item_id(&self) -> Uuid { self.work_item_id }
+    pub fn work_item_id(&self) -> Uuid {
+        self.work_item_id
+    }
     /// Return the aggregate stream name.
-    pub fn aggregate_type(&self) -> &str { &self.aggregate_type }
+    pub fn aggregate_type(&self) -> &str {
+        &self.aggregate_type
+    }
     /// Return the version within this aggregate stream.
-    pub fn aggregate_version(&self) -> i32 { self.aggregate_version }
+    pub fn aggregate_version(&self) -> i32 {
+        self.aggregate_version
+    }
     /// Return the typed source event name.
-    pub fn event_type(&self) -> &str { &self.event_type }
+    pub fn event_type(&self) -> &str {
+        &self.event_type
+    }
     /// Return the source event schema version.
-    pub fn schema_version(&self) -> i32 { self.schema_version }
+    pub fn schema_version(&self) -> i32 {
+        self.schema_version
+    }
     /// Return the source actor identity.
-    pub fn actor_id(&self) -> Uuid { self.actor_id }
+    pub fn actor_id(&self) -> Uuid {
+        self.actor_id
+    }
     /// Return the stable correlation identity.
-    pub fn correlation_id(&self) -> Uuid { self.correlation_id }
+    pub fn correlation_id(&self) -> Uuid {
+        self.correlation_id
+    }
     /// Return a borrowed view of the bounded immutable source payload.
-    pub fn payload(&self) -> &Value { &self.payload }
+    pub fn payload(&self) -> &Value {
+        &self.payload
+    }
     /// Return the source event time.
-    pub fn occurred_at(&self) -> DateTime<Utc> { self.occurred_at }
+    pub fn occurred_at(&self) -> DateTime<Utc> {
+        self.occurred_at
+    }
     /// Return the current lease worker identity.
-    pub fn worker_id(&self) -> Uuid { self.worker_id }
+    pub fn worker_id(&self) -> Uuid {
+        self.worker_id
+    }
     /// Return the current monotonic lease attempt.
-    pub fn attempt_count(&self) -> i32 { self.attempt_count }
+    pub fn attempt_count(&self) -> i32 {
+        self.attempt_count
+    }
     /// Return the database-clock lease expiry.
-    pub fn lease_expires_at(&self) -> DateTime<Utc> { self.lease_expires_at }
+    pub fn lease_expires_at(&self) -> DateTime<Utc> {
+        self.lease_expires_at
+    }
 
     /// Create a fenced dead-letter proof only when this immutable source event fails validation.
     pub fn invalid_envelope_proof(
@@ -285,25 +317,45 @@ impl TaskRunOutboxDeliveryRoute {
     }
 
     /// Return the authenticated sender service identity.
-    pub fn sender_service_id(&self) -> Uuid { self.sender_service_id }
+    pub fn sender_service_id(&self) -> Uuid {
+        self.sender_service_id
+    }
     /// Return the pinned receiver service identity.
-    pub fn receiver_service_id(&self) -> Uuid { self.receiver_service_id }
+    pub fn receiver_service_id(&self) -> Uuid {
+        self.receiver_service_id
+    }
     /// Return the pinned provider identifier.
-    pub fn provider_id(&self) -> &str { &self.provider_id }
+    pub fn provider_id(&self) -> &str {
+        &self.provider_id
+    }
     /// Return the pinned provider protocol version.
-    pub fn provider_version(&self) -> &str { &self.provider_version }
+    pub fn provider_version(&self) -> &str {
+        &self.provider_version
+    }
     /// Return the pinned Transport Profile identity.
-    pub fn profile_id(&self) -> Uuid { self.profile_id }
+    pub fn profile_id(&self) -> Uuid {
+        self.profile_id
+    }
     /// Return the pinned Transport Profile revision.
-    pub fn profile_revision(&self) -> i64 { self.profile_revision }
+    pub fn profile_revision(&self) -> i64 {
+        self.profile_revision
+    }
     /// Return the pinned Transport Profile content digest.
-    pub fn profile_digest(&self) -> [u8; 32] { self.profile_digest }
+    pub fn profile_digest(&self) -> [u8; 32] {
+        self.profile_digest
+    }
     /// Return the deployment-trusted endpoint label.
-    pub fn endpoint_identity(&self) -> &str { &self.endpoint_identity }
+    pub fn endpoint_identity(&self) -> &str {
+        &self.endpoint_identity
+    }
     /// Return the configured opaque destination label.
-    pub fn destination_id(&self) -> &str { &self.destination_id }
+    pub fn destination_id(&self) -> &str {
+        &self.destination_id
+    }
     /// Return the generation of the configured destination.
-    pub fn destination_generation(&self) -> Uuid { self.destination_generation }
+    pub fn destination_generation(&self) -> Uuid {
+        self.destination_generation
+    }
 }
 
 /// A claim whose exact bytes and immutable first-send route pin were verified by PostgreSQL.
@@ -733,17 +785,17 @@ fn valid_provider_id(value: &str) -> bool {
 fn valid_transport_version(value: &str) -> bool {
     (1..=64).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'+' | b'-')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'+' | b'-'))
 }
 
 fn valid_route_label(value: &str) -> bool {
     (1..=128).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'))
 }
 
 fn map_lease_error(error: sqlx::Error) -> TaskRunOutboxDeliveryError {
@@ -807,7 +859,10 @@ mod tests {
 
         assert_eq!(first, replay);
         assert!(first.len() <= MAX_TASK_WIRE_BYTES);
-        assert_eq!(parsed["engineering_run_id"], source.engineering_run_id.to_string());
+        assert_eq!(
+            parsed["engineering_run_id"],
+            source.engineering_run_id.to_string()
+        );
         assert_eq!(parsed["event_id"], source.event_id.to_string());
         assert_eq!(parsed["aggregate_type"], "lifecycle");
         assert_eq!(parsed["aggregate_version"], 7);

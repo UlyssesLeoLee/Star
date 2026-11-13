@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e68dd3ebc3f7ba01a4a1e755f91db09065e230b673bc4cd1b4692513e2256860
+@cypher schema=1 source_sha256=f1403b0022b1d93133fab5171f8756aad566cc374a6308a837db475c301ba15a
 MERGE (self:File {path:"crates/star-desktop/src-tauri/src/db_adapter.rs"})
 MERGE (error:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbAdapterError"})
 MERGE (worktree:Type {id:"crates/star-desktop/src-tauri/src/db_adapter.rs::DbWorktree"})
@@ -133,7 +133,7 @@ impl DbAdapter for MockDb {
         Ok(vec![
             DbWorktree {
                 id: "wt-001".to_string(),
-                name: "wt-canvas-game".to_string(),
+                name: "wt-star-api".to_string(),
                 branch: "dev".to_string(),
                 status: "active".to_string(),
             },
@@ -164,7 +164,7 @@ impl DbAdapter for MockDb {
             DbCanvasEntity {
                 id: "ent-001".to_string(),
                 kind: "worktree".to_string(),
-                title: "wt-canvas-game".to_string(),
+                title: "wt-star-api".to_string(),
                 x: 100.0,
                 y: 200.0,
             },
@@ -212,7 +212,7 @@ mod tests {
         let db = MockDb::new();
         let worktrees = db.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 4);
-        assert_eq!(worktrees[0].name, "wt-canvas-game");
+        assert_eq!(worktrees[0].name, "wt-star-api");
         assert_eq!(worktrees[1].name, "wt-canvas-engine");
         assert_eq!(worktrees[2].status, "behind");
         assert_eq!(worktrees[3].status, "ahead");

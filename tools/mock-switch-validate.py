@@ -30,9 +30,15 @@ from typing import Any, Optional
 
 SUPPORTED_PROJECTS = ("star-flash-mock", "ide1", "rgs", "cats", "im1", "gitgit", "ada")
 
+# 本仓自己的 mock 一定相对于本脚本解析, 不能写死 "D:/Star/...": 写死时在 CI runner
+# (Linux, 没有 D: 盘) 上连 Star 自己的校验都会失败, 而 workflow 的判定正是
+# "只有 Star mock 自身 FAIL 才 fail CI" (PR #301 实测: 7 个项目全部 FAIL)。
+_STAR_MOCK_ROOT = (Path(__file__).resolve().parent / "star-flash-mock").as_posix()
+
 # 每个项目根路径 (跟 ULYS-191 v0.3 G-ACI-01 盤點结论一致; Ada G-MS-01 已解决)
+# 其余 6 个是其他仓库在作者本机上的绝对路径; 在没有这些仓库的环境里预期 FAIL=6。
 DEFAULT_PROJECT_ROOTS = {
-    "star-flash-mock": "D:/Star/tools/star-flash-mock",
+    "star-flash-mock": _STAR_MOCK_ROOT,
     "ide1": "E:/IDE1.0",
     "rgs": "D:/RustGameServer/tools/rgs-flash-mock",
     "cats": "D:/CATs/crates/cats-mock",

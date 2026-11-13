@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ab9fc68904649135e3df63eb001002828ececc9b5a5dcbe6e435fe3bc81bde67
+@cypher schema=1 source_sha256=388f6cdb4b1d784e2feda43c67d700dac183ed7764527acc9b1c72e5eb775653
 MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
 MERGE (page:Function {name:"GroupWorkspacePage", language:"typescript", visibility:"public"})
 MERGE (resolveTaskCliUiState:Function {name:"resolveTaskCliUiState", language:"typescript", visibility:"public"})
@@ -24,7 +24,6 @@ CREATE
   (file:File {name:"frontend/src/app/worktree/[id]/group/page.tsx", type:"file", language:"tsx"}),
   (page:Function {name:"GroupWorkspacePage", type:"function", signature:"GroupWorkspacePage(props: PageProps): JSX.Element", visibility:"public", complexity:"complex"}),
   (apps:Variable {name:"GROUP_APPS", type:"variable", language:"typescript"}),
-  (pluginPreview:Variable {name:"PLUGIN_PREVIEW", type:"variable", language:"typescript"}),
   (visibleGroupApps:Variable {name:"visibleGroupApps", type:"variable", language:"typescript"}),
   (selectedPlugin:Variable {name:"selectedPlugin", type:"variable", language:"typescript"}),
   (statusOptions:Variable {name:"STATUS_OPTIONS", type:"variable", language:"typescript"}),
@@ -37,7 +36,6 @@ CREATE
   (pendingCanvasElementDelete:Class {name:"PendingCanvasElementDeleteCommand", type:"class", language:"typescript", visibility:"private"}),
   (isAppId:Function {name:"isAppId", type:"function", signature:"isAppId(value: string | null): value is AppId", visibility:"private", complexity:"simple"}),
   (resolveAppId:Function {name:"resolveAppId", type:"function", signature:"resolveAppId(value: string | null, pluginIds?: readonly string[]): AppId | null", visibility:"private", complexity:"simple"}),
-  (enabledPlugins:Variable {name:"enabledPlugins", type:"variable", language:"typescript"}),
   (groupCanvas:Variable {name:"groupCanvas", type:"variable", language:"typescript"}),
   (groupCanvases:Variable {name:"groupCanvases", type:"variable", language:"typescript"}),
   (requestedCanvasId:Variable {name:"requestedCanvasId", type:"variable", language:"typescript"}),
@@ -137,12 +135,9 @@ CREATE
   (boardTaskMap:Function {name:"boardTaskMap", type:"function", signature:"projectWorkItems.map(workItem => JSX.Element)", visibility:"private", complexity:"moderate"}),
   (statusMap:Function {name:"statusMap", type:"function", signature:"STATUS_OPTIONS.map(status => JSX.Element)", visibility:"private", complexity:"simple"}),
   (statusClick:Function {name:"statusClick", type:"function", signature:"onClick(): void", visibility:"private", complexity:"simple"}),
-  (pluginToggle:Function {name:"pluginToggle", type:"function", signature:"onChange(event): void", visibility:"private", complexity:"simple"}),
-  (pluginStateUpdate:Function {name:"pluginStateUpdate", type:"function", signature:"setEnabledPlugins(current => nextState)", visibility:"private", complexity:"simple"}),
   (paneRenderer:Function {name:"paneRenderer", type:"function", signature:"renderPane(paneId: string): JSX.Element", visibility:"private", complexity:"simple"}),
   (file)-[:CONTAINS]->(page),
   (file)-[:CONTAINS]->(apps),
-  (file)-[:CONTAINS]->(pluginPreview),
   (file)-[:CONTAINS]->(statusOptions),
   (file)-[:CONTAINS]->(appType),
   (file)-[:CONTAINS]->(scopeType),
@@ -159,12 +154,10 @@ CREATE
   (file)-[:CONTAINS]->(deleteCanvasElement),
   (file)-[:CONTAINS]->(isAppId),(file)-[:CONTAINS]->(resolveAppId),
   (page)-[:USES]->(apps),
-  (page)-[:USES]->(pluginPreview),
   (page)-[:USES]->(visibleGroupApps),
   (page)-[:USES]->(selectedPlugin),
   (page)-[:USES]->(statusOptions),
   (page)-[:USES]->(scope),
-  (page)-[:USES]->(enabledPlugins),
   (page)-[:USES]->(groupCanvas),
   (page)-[:USES]->(groupCanvases),
   (page)-[:USES]->(requestedCanvasId),
@@ -251,8 +244,6 @@ CREATE
   (page)-[:CONTAINS]->(boardTaskMap),
   (page)-[:CONTAINS]->(statusMap),
   (page)-[:CONTAINS]->(statusClick),
-  (page)-[:CONTAINS]->(pluginToggle),
-  (page)-[:CONTAINS]->(pluginStateUpdate),
   (page)-[:CONTAINS]->(paneRenderer),
   (page)-[:CALLS]->(taskHref),
   (page)-[:CALLS]->(appHref),
@@ -283,16 +274,11 @@ CREATE
   (page)-[:CALLS]->(taskMap),
   (page)-[:CALLS]->(appMap),
   (visibleGroupApps)-[:DERIVES_FROM]->(apps),
-  (visibleGroupApps)-[:DERIVES_FROM]->(pluginPreview),
-  (visibleGroupApps)-[:FILTERS_BY]->(enabledPlugins),
   (selectedPlugin)-[:DERIVES_FROM]->(currentApp),
-  (selectedPlugin)-[:LOOKS_UP]->(pluginPreview),
   (page)-[:CALLS]->(boardColumnMap),
   (page)-[:CALLS]->(boardTaskMap),
   (page)-[:CALLS]->(statusMap),
   (page)-[:CALLS]->(statusClick),
-  (page)-[:CALLS]->(pluginToggle),
-  (page)-[:CALLS]->(pluginStateUpdate),
   (page)-[:CALLS]->(paneRenderer),(stageCanvasViewport)-[:CALLS]->(getCanvasDocumentDraft),(stageCanvasViewport)-[:USES]->(pendingCanvasDocumentDraft),(getCanvasDocumentDraft)-[:USES]->(pendingCanvasDocumentDraft),(saveCanvasDocument)-[:USES]->(pendingCanvasDocumentDraft),(saveCanvasDocument)-[:USES]->(canvasDocumentCommand),(saveCanvasDocument)-[:CALLS]->(updateCanvasDocument),(stageCanvasFrame)-[:CALLS]->(getCanvasDocumentDraft),(stageCanvasFrame)-[:USES]->(pendingCanvasDocumentDraft),(removeCanvasFrame)-[:CALLS]->(getCanvasDocumentDraft),(removeCanvasFrame)-[:USES]->(pendingCanvasDocumentDraft),(addSelectedElementsToCanvasFrame)-[:CALLS]->(getCanvasDocumentDraft),(addSelectedElementsToCanvasFrame)-[:USES]->(selectedCanvasElementIds),(addCanvasVisualConnector)-[:CALLS]->(getCanvasDocumentDraft),(addCanvasVisualConnector)-[:USES]->(selectedCanvasElementIds),(removeCanvasVisualConnector)-[:CALLS]->(getCanvasDocumentDraft),(removeCanvasVisualConnector)-[:USES]->(pendingCanvasDocumentDraft),(linkExistingCanvasWorkItem)-[:CALLS]->(createCanvasElement),(saveCanvasElementPosition)-[:USES]->(canvasElementMoveCommands),(saveCanvasElementPosition)-[:USES]->(canvasElementMovePendingRef),(saveCanvasElementPosition)-[:CALLS]->(updateCanvasElement),(page)-[:USES]->(lifecycleCommands),(page)-[:USES]->(pendingLifecycleWorkItemId),(page)-[:USES]->(lifecycleError),(page)-[:CONTAINS]->(transitionLiveWorkItem),(page)-[:CONTAINS]->(getTaskDisplayStatus),(page)-[:CONTAINS]->(renderLifecycleActions),(page)-[:CALLS]->(transitionLiveWorkItem),(page)-[:CALLS]->(getTaskDisplayStatus),(page)-[:CALLS]->(renderLifecycleActions),(transitionLiveWorkItem)-[:USES]->(lifecycleCommands),(transitionLiveWorkItem)-[:USES]->(pendingLifecycleWorkItemId),(renderLifecycleActions)-[:CALLS]->(transitionLiveWorkItem),(transitionLiveWorkItem)-[:CALLS]->(transitionApi:Function {name:"WorktreeGroupApiClient.transitionWorkItem",type:"function"});
 */
 
@@ -417,6 +403,36 @@ CREATE (page)-[:USES]->(executionProfileId),(page)-[:USES]->(executionProfiles),
        (startCli)-[:USES]->(executionProfiles);
 */
 
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/app/worktree/[id]/group/page.tsx"}),
+      (page:Function {name:"GroupWorkspacePage"}),
+      (taskHref:Function {name:"taskHref"}),
+      (appHref:Function {name:"appHref"}),
+      (items:Variable {name:"projectWorkItems"});
+CREATE (closeTaskCard:Function {name:"closeTaskCard",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+       (leftPanelTab:Variable {name:"leftPanelTab",type:"variable",language:"typescript"}),
+       (rightPanelTab:Variable {name:"rightPanelTab",type:"variable",language:"typescript"}),
+       (rightPanelOpen:Variable {name:"rightPanelOpen",type:"variable",language:"typescript"}),
+       (workflowFilter:Variable {name:"workflowFilter",type:"variable",language:"typescript"}),
+       (workspaceSearch:Variable {name:"workspaceSearch",type:"variable",language:"typescript"}),
+       (worktreeDetailsOpen:Variable {name:"worktreeDetailsOpen",type:"variable",language:"typescript"}),
+       (filteredItems:Variable {name:"filteredProjectWorkItems",type:"variable",language:"typescript"}),
+       (sprintItems:Variable {name:"sprintWorkItems",type:"variable",language:"typescript"}),
+       (taskStatusGroups:Variable {name:"taskStatusGroups",type:"variable",language:"typescript"}),
+       (taskList:Variable {name:"taskList",type:"variable",language:"typescript"});
+CREATE (file)-[:CONTAINS]->(closeTaskCard),
+       (page)-[:CONTAINS]->(closeTaskCard),
+       (page)-[:USES]->(leftPanelTab),(page)-[:USES]->(rightPanelTab),
+       (page)-[:USES]->(rightPanelOpen),
+       (page)-[:USES]->(workflowFilter),(page)-[:USES]->(workspaceSearch),
+       (page)-[:USES]->(worktreeDetailsOpen),(page)-[:USES]->(items),
+       (page)-[:USES]->(filteredItems),(page)-[:USES]->(sprintItems),
+       (page)-[:USES]->(taskStatusGroups),(page)-[:USES]->(taskList),
+       (page)-[:CALLS]->(closeTaskCard),
+       (filteredItems)-[:DERIVES_FROM]->(items),(sprintItems)-[:DERIVES_FROM]->(filteredItems),
+       (taskList)-[:DERIVES_FROM]->(filteredItems);
+*/
+
 "use client";
 
 import { use as ReactUse, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -424,16 +440,27 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpRight,
+  Archive,
   Blocks,
+  Bot,
+  CalendarDays,
   CheckSquare,
+  ChevronRight,
   ClipboardList,
+  Cpu,
   GitBranch,
+  GripVertical,
+  Inbox,
   LayoutGrid,
   MessageSquareText,
   Plug,
   Plus,
+  Search,
+  ShieldCheck,
   SquareKanban,
+  Users,
   Workflow,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -491,8 +518,10 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-type AppId = "task-flow" | "board" | "task-card" | "canvas" | "workflow" | "plugins" | `plugin:${string}`;
+type AppId = "backlog" | "sprint" | "task-flow" | "board" | "task-card" | "canvas" | "workflow" | "bi" | "plugins" | `plugin:${string}`;
 type ChatScope = "WORKTREE" | "GLOBAL";
+type WorkspacePanel = "chat" | "worktree" | "team";
+type WorkflowFilter = "all" | "in_progress" | "review" | "blocked" | "done";
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (review:Function {name:"reviewLiveWorkItem"}),
       (reviewCommands:Variable {name:"reviewCommands"}),
@@ -568,8 +597,8 @@ function isAppId(value: string | null, pluginIds: readonly string[] = []): value
 }
 
 function resolveAppId(value: string | null, pluginIds: readonly string[] = []): AppId | null {
-  const canonical = value === "multica" ? "task-flow"
-    : value === "jira" || value === "work-items" ? "board"
+  const canonical = value === "task-card" || value === "jira" || value === "work-items" ? "backlog"
+    : value === "multica" ? "task-flow"
       : value;
   return isAppId(canonical, pluginIds) ? canonical : null;
 }
@@ -593,18 +622,14 @@ const GROUP_APPS: Array<{
   subtitle: string;
   icon: LucideIcon;
 }> = [
+  { id: "backlog", label: "Backlog", subtitle: "任务池与工作流分组", icon: SquareKanban },
+  { id: "sprint", label: "Sprint", subtitle: "周期计划与交付进度", icon: CalendarDays },
   { id: "task-flow", label: "任务生命周期", subtitle: "领取、执行与评审", icon: Blocks },
-  { id: "board", label: "工作项看板", subtitle: "阶段、待办与迭代", icon: SquareKanban },
-  { id: "task-card", label: "Task Cards", subtitle: "统一任务入口", icon: ClipboardList },
+  { id: "board", label: "工程看板", subtitle: "阶段、验证与 WIP", icon: ClipboardList },
   { id: "canvas", label: "无限画布", subtitle: "协作式空间画布", icon: LayoutGrid },
-  { id: "workflow", label: "Workflow", subtitle: "LangGraph / L0", icon: Workflow },
-  { id: "plugins", label: "Plugins", subtitle: "群组应用与能力", icon: Plug },
-];
-
-const PLUGIN_PREVIEW = [
-  { id: "canvas-insights", name: "Canvas Insights", capability: "canvas.read / relation.query" },
-  { id: "release-helper", name: "Release Helper", capability: "work_item.read / workflow.run" },
-  { id: "scm-bridge", name: "SCM Bridge", capability: "pull_request.read / status.subscribe" },
+  { id: "workflow", label: "Workflow", subtitle: "Agent 流程与恢复", icon: Workflow },
+  { id: "bi", label: "BI · Benchmark", subtitle: "分析与基准", icon: Cpu },
+  { id: "plugins", label: "Plugins", subtitle: "可授权的扩展能力", icon: Plug },
 ];
 
 const STATUS_OPTIONS: Array<{ value: WorkItemStatus; label: string }> = [
@@ -672,6 +697,15 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope: ChatScope = searchParams.get("scope") === "GLOBAL" ? "GLOBAL" : "WORKTREE";
+  const [leftPanelTab, setLeftPanelTab] = useState<"tree" | "updates">("tree");
+  const [rightPanelTab, setRightPanelTab] = useState<WorkspacePanel>("chat");
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  useEffect(() => {
+    setRightPanelOpen(window.matchMedia("(min-width: 1536px)").matches);
+  }, []);
+  const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>("all");
+  const [workspaceSearch, setWorkspaceSearch] = useState("");
+  const [worktreeDetailsOpen, setWorktreeDetailsOpen] = useState(false);
   const [canvasLinkError, setCanvasLinkError] = useState<string | null>(null);
   const [vmodelSelectedPhase, setVmodelSelectedPhase] = useState<VModelPhaseId>("P5");
   const [cliProfileId, setCliProfileId] = useState("");
@@ -763,15 +797,8 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const [canvasElementGeometrySaved, setCanvasElementGeometrySaved] = useState(false);
   const [canvasElementGeometryDraft, setCanvasElementGeometryDraft] = useState<CanvasElementGeometryDraft | null>(null);
   const [showCanvasLinkForm, setShowCanvasLinkForm] = useState(false);
-  const [enabledPlugins, setEnabledPlugins] = useState<Record<string, boolean>>({
-    "canvas-insights": true,
-    "release-helper": true,
-    "scm-bridge": false,
-  });
-
   const worktrees = useStore((state) => state.worktrees);
   const projects = useStore((state) => state.projects);
-  const workItems = useStore((state) => state.workItems);
   const canvases = useStore((state) => state.canvases);
   const canvasElements = useStore((state) => state.canvasElements);
   const canvasConnectors = useStore((state) => state.canvasConnectors);
@@ -794,16 +821,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
         manifestVersion: plugin.manifest_version,
         source: "registry" as const,
       }))
-    : activeGroupAppsState.mode === "preview"
-      ? PLUGIN_PREVIEW
-          .filter((plugin) => enabledPlugins[plugin.id])
-          .map((plugin) => ({ ...plugin, source: "preview" as const }))
-      : [];
+    : [];
   const resolvedApp = resolveAppId(requestedApp, availablePlugins.map((plugin) => plugin.id));
-  const currentApp = resolvedApp ?? "task-flow";
+  const currentApp = resolvedApp ?? "backlog";
   useEffect(() => {
-    const canonicalAppId = requestedApp === "multica" ? "task-flow"
-      : requestedApp === "jira" || requestedApp === "work-items" ? "board"
+    const canonicalAppId = requestedApp === "task-card" || requestedApp === "jira" || requestedApp === "work-items" ? "backlog"
+      : requestedApp === "multica" ? "task-flow"
         : null;
     if (!canonicalAppId) return;
     const query = new URLSearchParams(searchParams.toString());
@@ -990,13 +1013,17 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     return () => { active = false; };
   }, [groupApi, groupProjection.mode, scope, worktreeId]);
   const project = projects.find((item) => item.id === worktree?.project_id);
-  const storeWorkItems = worktree
-    ? workItems.filter((item) =>
-        item.project_id === worktree.project_id &&
-        (!item.worktree_id || item.worktree_id === worktree.id),
-      )
-    : [];
-  const projectWorkItems = groupProjection.mode === "live" ? groupProjection.work_items : storeWorkItems;
+  // Group pages only show server-authorized work items. Local seed data must
+  // not look like Project or LANE production work.
+  const projectWorkItems = groupProjection.mode === "live" ? groupProjection.work_items : [];
+  const filteredProjectWorkItems = projectWorkItems.filter((item) => {
+    const matchesStatus = workflowFilter === "all" || item.status === workflowFilter;
+    const query = workspaceSearch.trim().toLocaleLowerCase();
+    return matchesStatus && (!query || `${item.key} ${item.title}`.toLocaleLowerCase().includes(query));
+  });
+  const sprintWorkItems = filteredProjectWorkItems.filter((item) =>
+    "sprint_id" in item && typeof item.sprint_id === "string" && item.sprint_id.length > 0,
+  );
   const currentWorkItemId = searchParams.get("work_item_id");
   const selectedTask = projectWorkItems.find((item) => item.id === currentWorkItemId);
   const cliPreviewOpen = searchParams.get("cli") === "1" && selectedTask?.worktree_id === worktreeId;
@@ -1233,10 +1260,32 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     : undefined;
   const basePath = `/worktree/${encodeURIComponent(worktreeId)}/group`;
   function taskHref(workItemId: string, cli = false) {
-    const query = new URLSearchParams({ app: "task-card", work_item_id: workItemId, scope });
+    const query = new URLSearchParams({ app: "backlog", work_item_id: workItemId, scope });
     if (cli) query.set("cli", "1");
     return `${basePath}?${query.toString()}`;
   }
+
+  function closeTaskCard() {
+    const query = new URLSearchParams(searchParams.toString());
+    query.delete("work_item_id");
+    query.delete("cli");
+    query.set("app", "backlog");
+    router.replace(`${basePath}?${query.toString()}`, { scroll: false });
+  }
+
+  useEffect(() => {
+    if (!currentWorkItemId) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const query = new URLSearchParams(searchParams.toString());
+      query.delete("work_item_id");
+      query.delete("cli");
+      query.set("app", "backlog");
+      router.replace(`${basePath}?${query.toString()}`, { scroll: false });
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [basePath, currentWorkItemId, router, searchParams]);
 
   function appHref(appId: AppId, params: Record<string, string> = {}) {
     const query = new URLSearchParams({ app: appId, scope, ...params });
@@ -2465,81 +2514,270 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     );
   }
 
+  const taskStatusGroups: Array<{ status: WorkItemStatus; label: string }> = [
+    { status: "todo", label: "待办" },
+    { status: "in_progress", label: "进行中" },
+    { status: "review", label: "评审" },
+    { status: "blocked", label: "阻塞" },
+    { status: "done", label: "完成" },
+    { status: "wontfix", label: "不处理" },
+  ];
+  const statusDot: Record<WorkItemStatus, string> = {
+    todo: "bg-slate-400",
+    in_progress: "bg-sky-400",
+    review: "bg-amber-400",
+    blocked: "bg-rose-400",
+    done: "bg-emerald-400",
+    wontfix: "bg-slate-600",
+  };
   const taskList = (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {projectWorkItems.map((item) => (
-        <article key={item.id} className="card transition hover:border-accent/60" data-testid={`group-task-${item.id}`}>
-          <Link href={taskHref(item.id)} className="block rounded-sm hover:bg-bg-soft/60">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="font-mono text-xs text-info">{item.key}</span>
-              <StatusPill value={getTaskDisplayStatus(item)} size="xs" />
+    <div className="flex min-h-0 gap-3 overflow-x-auto pb-3" data-testid="group-backlog-columns">
+      {taskStatusGroups.map((group) => {
+        const items = filteredProjectWorkItems.filter((item) => getTaskDisplayStatus(item) === group.status);
+        return (
+          <section key={group.status} className="flex w-[252px] min-w-[252px] flex-col rounded-lg border border-line bg-bg-soft/35" aria-label={`${group.label}任务`}>
+            <header className="flex items-center justify-between border-b border-line px-3 py-2">
+              <h3 className="flex items-center gap-2 text-xs font-semibold"><span className={`size-2 rounded-full ${statusDot[group.status]}`} />{group.label}</h3>
+              <span className="font-mono text-[10px] text-ink-mute">{items.length}</span>
+            </header>
+            <div className="min-h-16 space-y-2 overflow-y-auto p-2">
+              {items.map((item) => (
+                <article key={item.id} className="rounded-md border border-line bg-bg-card p-2.5 transition hover:border-accent/60" data-testid={`group-task-${item.id}`}>
+                  <div className="flex items-start gap-1.5">
+                    <span className={`mt-1 size-2 shrink-0 rounded-full ${statusDot[getTaskDisplayStatus(item)]}`} aria-hidden="true" />
+                    <button type="button" disabled title="持久化排序 API 尚未接入" aria-label={`${item.key} 排序暂不可用`} className="mt-0.5 shrink-0 cursor-not-allowed text-ink-mute/35"><GripVertical size={12} /></button>
+                    <Link href={taskHref(item.id)} className="min-w-0 flex-1 rounded-sm hover:text-accent">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] text-info">{item.key}</span>
+                      </div>
+                      <div className="text-xs font-medium leading-relaxed">{item.title}</div>
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-ink-mute">
+                        <span>{item.kind} · {item.priority}</span>
+                        <span>{item.worktree_id === worktree.id ? "当前 Worktree" : "项目范围"}</span>
+                      </div>
+                    </Link>
+                    <button type="button" disabled title="当前授权 API 尚未提供任务卡归档命令" aria-label={`归档 ${item.key}`} className="rounded p-1 text-ink-mute/40 disabled:cursor-not-allowed"><Archive size={12} /></button>
+                  </div>
+                  {renderLifecycleActions(item)}
+                </article>
+              ))}
+              {items.length === 0 && <p className="rounded border border-dashed border-line px-2 py-4 text-center text-[10px] text-ink-mute">暂无任务</p>}
             </div>
-            <div className="text-sm font-medium">{item.title}</div>
-            <div className="mt-3 flex items-center justify-between text-[10px] text-ink-mute">
-              <span>{item.kind} · {item.priority}</span>
-              <span>{item.worktree_id === worktree.id ? "已绑定当前 Worktree" : "项目级示例任务"}</span>
-            </div>
-          </Link>
-          {renderLifecycleActions(item)}
-        </article>
-      ))}
+          </section>
+        );
+      })}
     </div>
   );
 
   return (
-    <main className="min-h-full pb-36">
-      <header className="border-b border-line bg-bg-soft/70 px-5 py-4 md:px-7">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-ink-mute">
-              <GitBranch size={12} /> Project · {project?.name ?? "Unknown Project"} / Worktree Group
-            </div>
-            <h1 className="truncate text-xl font-semibold">{worktree.name}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-xs text-ink-dim">
-              <span>{worktree.id}</span><span>·</span><span>{worktree.branch}</span>
-              <span>·</span><StatusPill value={worktree.status} size="xs" />
-            </div>
+    <main className="orbit-workspace relative flex h-screen min-h-[640px] flex-col overflow-hidden bg-bg text-ink" data-testid="worktree-workspace">
+      <style>{`
+        .orbit-workspace { --bg-DEFAULT:#0b1829; --bg-soft:#244a65; --bg-lighter:#315978; --bg-card:#153149; --ink-DEFAULT:#f3f7f9; --ink-dim:#d4e2e9; --ink-mute:#b6c8d4; --line-DEFAULT:#46687b; --border-line:#46687b; --color-accent:#5bbfc4; --color-primary:#5bbfc4; --color-success:#77c9a7; --color-warning:#f0bb68; --color-info:#b6d8e6; --cel-ink:#061321; font-family:Inter,"Microsoft YaHei","Segoe UI",sans-serif; }
+        .orbit-workspace > header { background:#10263b; border-bottom:2px solid #061321; }
+        .orbit-workspace [aria-label="Project LANE Worktree Branch 导航"] { background:#10263b; }
+        .orbit-workspace [aria-label="LANE 应用"] { background:#10263b; border-bottom:1px solid #46687b; }
+        .orbit-workspace [aria-label="LANE 应用"] a[aria-current="page"] { background:#244a65; color:#fff; border-top:2px solid #f0bb68; }
+        .orbit-workspace [aria-live="polite"] { background-color:#153149; background-image:radial-gradient(ellipse at 5% 12%,rgba(182,200,212,.10),transparent 32%),radial-gradient(ellipse at 95% 90%,rgba(91,191,196,.08),transparent 34%); }
+        .orbit-workspace .card { background:#244a65; border:2px solid #061321; box-shadow:3px 4px 0 #061321; }
+        .orbit-workspace .btn, .orbit-workspace .btn-primary { border:1px solid #061321; background:#244a65; color:#f3f7f9; box-shadow:2px 2px 0 #061321; }
+        .orbit-workspace .btn-primary { background:#315978; border-color:#5bbfc4; }
+        .orbit-workspace :focus-visible { outline:2px solid #ffe0a1; outline-offset:2px; }
+        .orbit-workspace button:disabled { opacity:.5; box-shadow:none; }
+        .orbit-workspace input, .orbit-workspace select, .orbit-workspace textarea { color:#e9edf0; }
+      `}</style>
+      <header className="z-20 flex h-[58px] shrink-0 items-center gap-4 border-b border-line bg-bg-card/95 px-4 backdrop-blur">
+        <Link href="/worktree" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight" aria-label="Star Worktree Index">
+          <span className="grid size-7 place-items-center rounded-md border border-accent/30 bg-accent/10 text-accent">S</span>
+          <span className="hidden sm:inline">Star</span>
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[10px] text-ink-mute" aria-label="Project 到 Branch 导航路径">
+            <span className="text-ink-dim">Project</span> / {project?.name ?? "未授权项目"} / <span className="text-ink-dim">LANE</span> / <span className="text-warning">绑定信息未返回</span> / <span className="text-ink-dim">Worktree</span> / {worktree.name} / <span className="text-ink-dim">Branch</span> / <span className="font-mono text-info">{worktree.branch}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {groupProjection.mode === "live"
-              ? <span className="rounded border border-success/40 bg-success/10 px-2 py-1 text-[10px] text-success">已授权 API 投影 · 受限写入</span>
-              : <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">前端原型 · mock store</span>}
-            <Link href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`} className="btn text-xs">Project Worktree Index</Link>
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="font-mono text-ink-mute">{worktree.id}</span>
+            <StatusPill value={worktree.status} size="xs" />
+            <span className={`rounded border px-1.5 py-0.5 ${groupProjection.mode === "live" ? "border-success/30 text-success" : "border-warning/30 text-warning"}`}>
+              {groupProjection.mode === "live" ? "授权投影" : "本地预览 · seed 任务已隐藏"}
+            </span>
           </div>
         </div>
+        <label className="hidden h-8 w-[220px] shrink-0 items-center gap-2 rounded-md border border-line bg-bg-soft px-2.5 text-ink-mute xl:flex">
+          <Search size={13} />
+          <input value={workspaceSearch} onChange={(event) => setWorkspaceSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-ink-mute" placeholder="搜索当前 Worktree" aria-label="搜索当前 Worktree 任务" />
+          <kbd className="rounded border border-line px-1 font-mono text-[9px]">/</kbd>
+        </label>
+        <Link href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`} className="btn h-8 shrink-0 px-2.5 text-[10px]">Worktree 操作 <ChevronRight size={12} /></Link>
       </header>
 
-      <div className="mx-auto grid max-w-[1500px] gap-5 px-4 py-5 md:grid-cols-[220px_minmax(0,1fr)] md:px-7">
-        <nav aria-label="Worktree 群组应用" className="h-fit rounded-lg border border-line bg-bg-card p-2 md:sticky md:top-4">
-          <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-ink-mute">{worktree.name} · 同级应用</div>
-          <div className="grid grid-cols-2 gap-1 md:grid-cols-1">
+      <div className={`grid min-h-0 flex-1 ${rightPanelOpen ? "grid-cols-[232px_minmax(0,1fr)_minmax(220px,304px)_44px] 2xl:grid-cols-[252px_minmax(0,1fr)_304px_52px]" : "grid-cols-[232px_minmax(0,1fr)_44px] 2xl:grid-cols-[252px_minmax(0,1fr)_52px]"}`}>
+        <aside className="flex min-h-0 flex-col border-r border-line bg-bg-card/70" aria-label="Project LANE Worktree Branch 导航">
+          <div className="grid grid-cols-2 gap-1 border-b border-line p-2" role="tablist" aria-label="任务与 AI 更新">
+            <button type="button" role="tab" aria-selected={leftPanelTab === "tree"} onClick={() => setLeftPanelTab("tree")} className={`rounded px-2 py-1.5 text-[11px] font-medium ${leftPanelTab === "tree" ? "bg-accent/15 text-accent" : "text-ink-mute hover:bg-bg-soft"}`}>
+              <GitBranch size={12} className="mr-1 inline" />导航
+            </button>
+            <button type="button" role="tab" aria-selected={leftPanelTab === "updates"} onClick={() => setLeftPanelTab("updates")} className={`rounded px-2 py-1.5 text-[11px] font-medium ${leftPanelTab === "updates" ? "bg-accent/15 text-accent" : "text-ink-mute hover:bg-bg-soft"}`}>
+              <Inbox size={12} className="mr-1 inline" />AI 更新
+            </button>
+          </div>
+
+          {leftPanelTab === "tree" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3" role="tree" aria-label="LANE Worktree Branch 任务树">
+              <div className="mb-2 flex items-center gap-2 rounded px-2 py-1.5 text-xs font-semibold text-ink">
+                <span className="size-2 rounded-sm bg-accent" />{project?.name ?? "当前 Project"}
+              </div>
+              <div className="ml-3 border-l border-line pl-2">
+                <div className="flex items-center gap-2 rounded px-2 py-1.5 text-[11px] font-medium text-ink-dim" role="treeitem" aria-expanded="true">
+                  <ChevronRight size={12} className="rotate-90 text-ink-mute" />
+                  <span className="size-2 rounded-full border border-warning/70" />
+                  <span className="min-w-0 flex-1 truncate">LANE · 绑定待接入</span>
+                </div>
+                <div className="ml-2 border-l border-line pl-2">
+                  <div className="flex items-center gap-2 rounded bg-accent/10 px-2 py-1.5 text-[11px] font-medium text-accent" role="treeitem" aria-expanded="true">
+                    <ChevronRight size={12} className="rotate-90" />
+                    <span className="size-2 rounded-full bg-accent" />
+                    <span className="min-w-0 flex-1 truncate">{worktree.name}</span>
+                  </div>
+                  <div className="ml-2 border-l border-line pl-2">
+                    <div className="flex items-center gap-2 px-2 py-1.5 text-[10px] text-ink-mute" role="treeitem">
+                      <GitBranch size={11} />
+                      <span className="truncate font-mono">{worktree.branch}</span>
+                      <span className="ml-auto rounded border border-line px-1 text-[8px]">本地</span>
+                    </div>
+                    {taskStatusGroups.map((group) => {
+                      const items = filteredProjectWorkItems.filter((item) => getTaskDisplayStatus(item) === group.status);
+                      if (items.length === 0) return null;
+                      return (
+                        <details key={group.status} open className="group/status">
+                          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded px-2 py-1 text-[9px] text-ink-mute hover:bg-bg-soft">
+                            <ChevronRight size={10} className="transition group-open/status:rotate-90" />{group.label}<span className="ml-auto font-mono">{items.length}</span>
+                          </summary>
+                          <div className="space-y-0.5 pb-1">
+                            {items.map((item) => (
+                              <Link key={item.id} href={taskHref(item.id)} role="treeitem" aria-label={`${item.key} ${item.title}`} className="group/task flex min-w-0 items-center gap-1.5 rounded px-2 py-1.5 text-[10px] text-ink-dim hover:bg-bg-soft hover:text-ink">
+                                <span className={`size-1.5 shrink-0 rounded-full ${statusDot[getTaskDisplayStatus(item)]}`} />
+                                <span className="min-w-0 flex-1 truncate">{item.key} · {item.title}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                    {groupProjection.mode !== "live" && <p className="ml-2 mt-1 rounded border border-dashed border-line px-2 py-2 text-[9px] leading-relaxed text-ink-mute">等待授权任务投影。旧 seed 任务已隐藏，避免混入真实管理视图。</p>}
+                    {groupProjection.mode === "live" && filteredProjectWorkItems.length === 0 && <p className="ml-2 mt-1 rounded border border-dashed border-line px-2 py-2 text-[9px] text-ink-mute">当前筛选下没有任务。</p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="ai-update-inbox">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xs font-semibold">AI 更新</h2>
+                <span className="text-[9px] text-ink-mute">最新优先</span>
+              </div>
+              <div className="rounded-lg border border-dashed border-line p-4 text-center">
+                <MessageSquareText size={18} className="mx-auto mb-2 text-ink-mute" />
+                <p className="text-[10px] font-medium text-ink-dim">暂无可读取的 AI 回复</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">Group Chat transcript 与事件流尚未接入；不会用示例消息填充收件箱。</p>
+              </div>
+            </div>
+          )}
+
+          <div className="shrink-0 border-t border-line p-2">
+            <div className="mb-1 px-1 text-[9px] font-semibold uppercase tracking-widest text-ink-mute">工作流筛选</div>
+            <div className="flex flex-wrap gap-1">
+              {([
+                ["all", "全部"], ["in_progress", "进行中"], ["review", "评审"], ["blocked", "阻塞"], ["done", "完成"],
+              ] as const).map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={workflowFilter === value} onClick={() => setWorkflowFilter(value)} className={`rounded border px-1.5 py-1 text-[9px] ${workflowFilter === value ? "border-accent/40 bg-accent/10 text-accent" : "border-line text-ink-mute hover:text-ink"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Link href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`} className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md border border-accent/30 bg-accent/10 text-[11px] font-semibold text-accent hover:bg-accent/15" data-testid="new-worktree-shortcut">
+              <Plus size={13} />新建 / 管理 Worktree
+            </Link>
+          </div>
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-col">
+          <nav aria-label="LANE 应用" className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-bg-card/70 px-3 scrollbar-none" data-testid="group-app-navigation">
             {visibleGroupApps.map((app) => {
               const Icon = app.icon;
-              const href = appHref(app.id);
               const active = currentApp === app.id;
               return (
-                <Link
-                  key={app.id}
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left transition ${active ? "bg-accent/15 text-accent" : "text-ink-dim hover:bg-bg-soft hover:text-ink"}`}
-                  data-testid={`group-app-${app.id}`}
-                >
-                  <Icon size={15} className="shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-medium">{app.label}</span>
-                    <span className="hidden truncate text-[9px] text-ink-mute md:block">{app.subtitle}</span>
-                  </span>
+                <Link key={app.id} href={appHref(app.id)} aria-current={active ? "page" : undefined} title={app.subtitle} className={`flex h-8 shrink-0 items-center gap-1.5 rounded px-2.5 text-[10px] font-medium transition ${active ? "bg-accent/15 text-accent" : "text-ink-mute hover:bg-bg-soft hover:text-ink"}`} data-testid={`group-app-${app.id}`}>
+                  <Icon size={13} />{app.label}
                 </Link>
               );
             })}
-          </div>
-          <div className="mt-3 border-t border-line px-2 pt-3 text-[10px] leading-relaxed text-ink-mute">
-            所有 App 共用 Worktree 上下文与 canonical WorkItem。切换入口不切换根节点。
-          </div>
-        </nav>
+          </nav>
+          <section className="min-h-0 flex-1 overflow-auto p-4 pb-36 xl:p-5" aria-live="polite">
+          {currentApp === "backlog" && (
+            <div className="space-y-4" data-testid="group-backlog">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-mute">LANE 工作管理</div>
+                  <h2 className="text-lg font-semibold">Backlog</h2>
+                  <p className="text-xs text-ink-mute">任务卡按 Branch 与工作流分组；点选任务后在当前页面打开详情子窗口。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">{filteredProjectWorkItems.length} 项</span>
+                  <button type="button" disabled title="当前 Worktree Group API 尚未提供创建任务命令" className="btn h-8 text-[10px] disabled:opacity-50"><Plus size={12} />新建任务卡</button>
+                </div>
+              </div>
+              {groupProjection.mode !== "live" && (
+                <div role="status" className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[10px] leading-relaxed text-warning">
+                  任务读取需要当前 Worktree 的授权 Group API。为避免把 seed 内容当作正式 Backlog，预览模式不显示示例任务。
+                </div>
+              )}
+              {taskList}
+              <p className="text-[9px] text-ink-mute">卡片拖动排序与归档控件等任务 API 提供持久化命令后启用；当前仅展示分组位置，不保存本地假状态。</p>
+            </div>
+          )}
 
-        <section className="min-w-0" aria-live="polite">
+          {currentApp === "sprint" && (
+            <div className="space-y-4" data-testid="group-sprint">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-mute">周期计划</div>
+                  <h2 className="text-lg font-semibold">Sprint</h2>
+                  <p className="text-xs text-ink-mute">查看周期目标、当前任务与 AI 最新更新；工作流筛选同步作用于左侧任务树和更新列表。</p>
+                </div>
+                <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">{sprintWorkItems.length} 个已关联任务</span>
+              </div>
+              {groupProjection.mode !== "live" ? (
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 text-xs text-warning" role="status">尚未连接授权的 Project / LANE 投影；Sprint 数据不会从本地 seed 生成。</div>
+              ) : sprintWorkItems.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-line p-6 text-center">
+                  <CalendarDays size={22} className="mx-auto mb-2 text-ink-mute" />
+                  <h3 className="text-sm font-semibold">当前 Group API 尚未提供 Sprint 计划</h3>
+                  <p className="mx-auto mt-1 max-w-lg text-[10px] leading-relaxed text-ink-mute">目前 Worktree Group 投影只包含 Worktree、任务和 Canvas，不含 Sprint 标识、周期目标或周期事件。接入这些服务端数据后，此页会按周期展示工作项，并将最新 AI 回复置顶。</p>
+                  <Link href="/projects" className="btn mt-3 inline-flex text-[10px]">打开 Project 规划入口 <ArrowUpRight size={12} /></Link>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {sprintWorkItems.map((item) => <article key={item.id} className="card"><Link href={taskHref(item.id)} className="block"><div className="font-mono text-[10px] text-info">{item.key}</div><div className="mt-1 text-xs font-medium">{item.title}</div></Link><div className="mt-2"><StatusPill value={getTaskDisplayStatus(item)} size="xs" /></div></article>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentApp === "bi" && (
+            <div className="space-y-4" data-testid="group-bi-benchmark">
+              <div>
+                <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-mute">LANE 数据面</div>
+                <h2 className="text-lg font-semibold">BI · Benchmark</h2>
+                <p className="text-xs text-ink-mute">Worktree 生命周期、Agent 运行、Hook 结果、验证证据与资源预算的统一分析入口。</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <article className="card space-y-2"><div className="flex items-center gap-2 text-xs font-semibold"><Cpu size={14} className="text-accent" />运行与资源</div><p className="text-[10px] leading-relaxed text-ink-mute">需要服务端 RunEvent、资源预算与执行回执；无完整事件时不计算或展示推测指标。</p><span className="inline-flex rounded border border-warning/30 px-2 py-1 text-[9px] text-warning">当前 LANE 投影未接入</span></article>
+                <article className="card space-y-2"><div className="flex items-center gap-2 text-xs font-semibold"><ShieldCheck size={14} className="text-accent" />验证与 Hook 质量</div><p className="text-[10px] leading-relaxed text-ink-mute">统计必须引用独立验证结果、原生 Hook 事件及策略版本，支持回溯到任务与 Worktree。</p><span className="inline-flex rounded border border-warning/30 px-2 py-1 text-[9px] text-warning">等待分析投影</span></article>
+              </div>
+              <Link href="/analytics" className="btn inline-flex text-[10px]">打开分析工作区 <ArrowUpRight size={12} /></Link>
+            </div>
+          )}
+
           {currentApp === "task-flow" && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
@@ -2669,10 +2907,13 @@ export default function GroupWorkspacePage({ params }: PageProps) {
             </div>
           )}
 
-          {currentApp === "task-card" && (
+          {selectedTask && currentWorkItemId && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm md:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) closeTaskCard(); }}>
+            <section role="dialog" aria-modal="true" aria-labelledby="task-subwindow-title" className="max-h-[92vh] w-full max-w-[1180px] overflow-y-auto rounded-xl border border-line bg-bg p-4 shadow-2xl md:p-5" data-testid="task-card-subwindow">
             <div className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">Task Card Index</h2><p className="text-xs text-ink-mute">任务卡与 Canvas、任务生命周期、工作项看板是同级入口。</p></div>
+                <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-mute">任务子窗口 · 当前 Worktree 上下文</div><h2 id="task-subwindow-title" className="text-lg font-semibold">{selectedTask.key} · {selectedTask.title}</h2></div>
+                <button type="button" className="btn h-8 px-2 text-[10px]" onClick={closeTaskCard} aria-label="关闭任务卡子窗口"><X size={14} />关闭</button>
                 <span className={`rounded border px-2 py-1 text-[10px] ${cliSessionForSelectedTask && cliPresentation === "ready" ? "border-success/40 bg-success/10 text-success" : "border-warning/40 bg-warning/10 text-warning"}`}>
                   {cliSessionForSelectedTask
                     ? cliPresentation === "ready" ? (cliWsConnected ? "Session 已连接" : "Session 已授权 · 等待连接")
@@ -2721,7 +2962,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                         ? <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 打开 Task CLI 面板</Link>
                         : <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">先绑定当前 Worktree 才能打开 CLI</span>}
                       {selectedTaskCanvasElement && <Link href={appHref("canvas", { highlight: selectedTaskCanvasElement.id })} className="btn text-xs"><LayoutGrid size={13} /> 在 Canvas 中定位</Link>}
-                      <Link href={appHref("board")} className="btn text-xs"><ArrowUpRight size={13} /> 打开工作项看板</Link>
+                      <Link href={appHref("backlog")} className="btn text-xs"><ArrowUpRight size={13} /> 返回 Backlog</Link>
                     </div>
                   </article>
                   <section className="card min-h-[320px] space-y-3">
@@ -2862,12 +3103,14 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 </>
               ) : taskList}
             </div>
+            </section>
+            </div>
           )}
 
           {currentApp === "canvas" && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">无限画布</h2><p className="text-xs text-ink-mute">Canvas 与 Task Card 同级；typed EntityRef 指向当前 Worktree 内的 canonical Work Item。</p></div>
+                <div><h2 className="text-lg font-semibold">无限画布</h2><p className="text-xs text-ink-mute">Canvas 是当前 Worktree 的协作空间，可链接 Branch 下的任务卡；typed EntityRef 指向授权投影中的 Work Item。</p></div>
                 <div className="flex items-center gap-2">
                   {groupProjection.mode === "live" && groupCanvases.length > 1 && groupCanvas && <label className="flex items-center gap-2 text-xs">Canvas<select className="input py-1 text-xs" aria-label="选择 Worktree Canvas" value={groupCanvas.id} onChange={(event) => selectCanvas(event.target.value)}>{groupCanvases.map((canvas) => <option key={canvas.id} value={canvas.id}>{canvas.title}</option>)}</select></label>}
                   {groupProjection.mode === "live" && groupCanvas && <button type="button" className="btn text-xs" disabled={canvasBootstrapPending} onClick={() => void createWorktreeCanvas(`Worktree Canvas ${groupCanvases.length + 1}`)}>{canvasBootstrapPending ? "正在创建…" : "新建 Canvas"}</button>}
@@ -3022,29 +3265,9 @@ export default function GroupWorkspacePage({ params }: PageProps) {
               </div>
 
               {activeGroupAppsState.mode === "preview" && (
-                <>
-                  <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-[10px] text-warning">本地原型列表。开关只改变本页预览，不会安装、卸载或授予任何 capability。</div>
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    {PLUGIN_PREVIEW.map((plugin) => (
-                      <article key={plugin.id} className="card flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 text-sm font-medium"><Plug size={14} className="text-accent" />{plugin.name}</div>
-                          <div className="mt-1 break-all font-mono text-[10px] text-ink-mute">{plugin.capability}</div>
-                        </div>
-                        <label className="flex shrink-0 items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={enabledPlugins[plugin.id]}
-                            onChange={(event) => setEnabledPlugins((current) => ({ ...current, [plugin.id]: event.target.checked }))}
-                            aria-label={`${plugin.name} 原型开关`}
-                            data-testid={`plugin-preview-${plugin.id}`}
-                          />
-                          {enabledPlugins[plugin.id] ? "预览启用" : "预览停用"}
-                        </label>
-                      </article>
-                    ))}
-                  </div>
-                </>
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 text-xs text-warning" role="status">
+                  Plugin Registry 尚未连接。当前不显示本地示例插件，也不提供安装、启用或授权操作。
+                </div>
               )}
 
               {activeGroupAppsState.mode === "loading" && (
@@ -3091,46 +3314,100 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 <h2 className="text-lg font-semibold">{selectedPlugin.name}</h2>
                 <p className="text-xs text-ink-mute">此插件入口作为 Worktree Group 的同级 App 显示。</p>
               </div>
-              {selectedPlugin.source === "registry" ? (
-                <>
-                  <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs text-accent">此入口来自当前 Worktree 的服务端授权 Registry 投影，manifest 版本为 {selectedPlugin.manifestVersion}。</div>
-                  <div className="card text-xs leading-relaxed text-ink-mute">插件执行 surface 尚未安装。可见导航不授予插件能力；每次运行仍须由后端 capability gateway 按当前 actor、Project、Worktree、manifest 与 grant 版本重新授权。</div>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs text-warning">本地预览入口。启用状态保存在当前页面内存中；尚未连接服务端 Plugin Registry、capability grant 或插件运行时。</div>
-                  <div className="card">
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-mute">声明能力（预览）</div>
-                    <div className="mt-2 break-all font-mono text-xs text-ink-dim">{selectedPlugin.capability}</div>
-                    <div className="mt-3 text-[10px] leading-relaxed text-ink-mute">此页面不调用这些 capability。生产接入必须经 Plugin Gateway 按当前 actor、Project、Worktree 和授权版本逐次检查。</div>
-                  </div>
-                </>
-              )}
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs text-accent">此入口来自当前 Worktree 的服务端授权 Registry 投影，manifest 版本为 {selectedPlugin.manifestVersion}。</div>
+              <div className="card text-xs leading-relaxed text-ink-mute">插件执行界面尚未安装。可见导航不授予插件能力；每次运行仍须由后端 capability gateway 按当前 actor、Project、Worktree、manifest 与 grant 版本重新授权。</div>
             </div>
           )}
-        </section>
+          </section>
+        </div>
+
+        <aside className={`${rightPanelOpen ? "flex" : "hidden"} min-h-0 flex-col border-l border-line bg-bg-card/65`} aria-label="聊天、Worktree 与团队面板">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {rightPanelTab === "chat" && (
+              <section data-testid="right-chat-panel" aria-label="聊天记录">
+                <div className="mb-3 flex items-center justify-between">
+                  <div><h2 className="text-xs font-semibold">聊天记录</h2><p className="mt-0.5 text-[9px] text-ink-mute">{scope === "WORKTREE" ? "当前 Worktree" : "全局授权范围"}</p></div>
+                  <span className="rounded border border-warning/30 px-1.5 py-0.5 text-[8px] text-warning">未连接</span>
+                </div>
+                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                  <MessageSquareText size={20} className="mb-2 text-ink-mute" />
+                  <p className="text-[10px] font-medium text-ink-dim">暂无聊天记录</p>
+                  <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">Transcript 与实时事件接口尚未接入。新回复接入后按时间倒序显示；当前不生成演示消息。</p>
+                </div>
+              </section>
+            )}
+
+            {rightPanelTab === "worktree" && (
+              <section data-testid="right-worktree-panel" aria-label="Worktree 状态">
+                <div className="mb-3 flex items-center justify-between">
+                  <div><h2 className="text-xs font-semibold">Worktree</h2><p className="mt-0.5 truncate text-[9px] text-ink-mute">{worktree.name}</p></div>
+                  <StatusPill value={worktree.status} size="xs" />
+                </div>
+                <details open={worktreeDetailsOpen} onToggle={(event) => setWorktreeDetailsOpen(event.currentTarget.open)} className="rounded-lg border border-line bg-bg-soft/50">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-[10px] font-medium">状态详情 <span className="ml-1 text-[8px] text-ink-mute">默认折叠</span></summary>
+                  <dl className="space-y-2 border-t border-line px-3 py-3 text-[9px]">
+                    <div><dt className="text-ink-mute">本地 Branch</dt><dd className="mt-0.5 break-all font-mono text-info">{worktree.branch}</dd></div>
+                    <div><dt className="text-ink-mute">Worktree ID</dt><dd className="mt-0.5 break-all font-mono">{worktree.id}</dd></div>
+                    <div><dt className="text-ink-mute">LANE 身份</dt><dd className="mt-0.5 text-warning">当前 Group API 未返回绑定信息</dd></div>
+                    <div><dt className="text-ink-mute">数据来源</dt><dd className="mt-0.5">{groupProjection.mode === "live" ? "授权服务端投影" : "本地 Worktree 预览"}</dd></div>
+                  </dl>
+                </details>
+                <Link href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`} className="btn mt-3 flex w-full justify-center text-[10px]">打开 Worktree Index <ArrowUpRight size={12} /></Link>
+              </section>
+            )}
+
+            {rightPanelTab === "team" && (
+              <section data-testid="right-team-panel" aria-label="Team 页面">
+                <div className="mb-3"><div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-mute">TEAM</div><h2 className="text-sm font-semibold">运行时与 Agent 小队</h2><p className="mt-1 text-[9px] leading-relaxed text-ink-mute">Runtime、Worker / Router 小队与跨租户协作统一在团队管理。</p></div>
+                <div className="space-y-2">
+                  <article className="rounded-lg border border-line bg-bg-soft/40 p-3">
+                    <div className="flex items-center gap-2 text-[10px] font-semibold"><Cpu size={13} className="text-accent" />Runtime / Daemon</div>
+                    <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">当前 Worktree 的 Runtime 绑定没有由 Group API 返回；不会显示或启动未授权的宿主命令。</p>
+                    <Link href="/local-runtime" className="mt-2 inline-flex items-center gap-1 text-[9px] text-accent">管理 Runtime <ArrowUpRight size={10} /></Link>
+                  </article>
+                  <article className="rounded-lg border border-line bg-bg-soft/40 p-3">
+                    <div className="flex items-center gap-2 text-[10px] font-semibold"><Bot size={13} className="text-accent" />Agent 小队</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                      <div className="rounded border border-line p-2"><div className="text-[9px] font-semibold">Worker</div><div className="mt-1 text-[8px] text-ink-mute">执行配置待授权</div></div>
+                      <div className="rounded border border-line p-2"><div className="text-[9px] font-semibold">Router</div><div className="mt-1 text-[8px] text-ink-mute">路由配置待授权</div></div>
+                    </div>
+                    <Link href="/agent-relationships" className="mt-2 inline-flex items-center gap-1 text-[9px] text-accent">管理小队关系 <ArrowUpRight size={10} /></Link>
+                    <Link href="/agents" className="ml-3 inline-flex items-center gap-1 text-[9px] text-accent">Agent 会话 <ArrowUpRight size={10} /></Link>
+                  </article>
+                  <article className="rounded-lg border border-line bg-bg-soft/40 p-3">
+                    <div className="flex items-center gap-2 text-[10px] font-semibold"><ShieldCheck size={13} className="text-accent" />多租户协作</div>
+                    <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">远程租户 Agent 仅凭可撤销的任务级授权参与评审和建议；任务所属租户的 Daemon 复验权限与预算，并在隔离 Runtime 中执行。</p>
+                    <div className="mt-2 rounded border border-warning/30 bg-warning/5 px-2 py-1.5 text-[8px] text-warning">Daemon 连接与租户授权目录未接入此面板</div>
+                    <Link href="/remote" className="mt-2 inline-flex items-center gap-1 text-[9px] text-accent">查看远程协作入口 <ArrowUpRight size={10} /></Link>
+                  </article>
+                </div>
+              </section>
+            )}
+          </div>
+        </aside>
+
+        <nav className="flex flex-col items-center gap-1 border-l border-line bg-bg-card/85 py-2" aria-label="右侧页面导航">
+          {([
+            ["chat", "聊天", MessageSquareText],
+            ["worktree", "Worktree", GitBranch],
+            ["team", "Team", Users],
+          ] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" aria-label={label} aria-pressed={rightPanelOpen && rightPanelTab === id} aria-expanded={rightPanelOpen && rightPanelTab === id} title={label} onClick={() => { if (rightPanelOpen && rightPanelTab === id) setRightPanelOpen(false); else { setRightPanelTab(id); setRightPanelOpen(true); } }} className={`grid size-10 place-items-center rounded-md transition ${rightPanelOpen && rightPanelTab === id ? "bg-accent/15 text-accent" : "text-ink-mute hover:bg-bg-soft hover:text-ink"}`} data-testid={`right-nav-${id}`}>
+              <Icon size={15} />
+            </button>
+          ))}
+        </nav>
       </div>
 
-      {selectedTask && currentApp === "task-card" && (
-        <Link href={appHref("task-card")} className="fixed bottom-36 right-4 z-30 rounded-full border border-line bg-bg-card px-3 py-2 text-[10px] text-ink-dim shadow-lg md:bottom-24">返回全部 Task Cards</Link>
-      )}
-
-      {/* 群组聊天栏 — 底部 dock。
-          per INV-LAYOUT-02/03: 原来硬编码 md:left-[17rem] (272px) 手工绕开侧栏，
-          但 Sidebar 折叠时只有 w-16 (64px)，会留下 208px 死区；改宽度还要同步改魔法数字。
-          现在读 var(--sidebar-w) 单一事实源 (globals.css)：
-          展开 256px / 折叠 64px / <768px 0px，且 z-[35] < Sidebar z-40 → 被侧栏覆盖。
-          max(0.75rem, ...) 保底 12px：--sidebar-w 在移动端是 0px，
-          而移动端原本靠 left-3 留边距；inline style 会盖掉 Tailwind 的 md: 断点，
-          所以这里必须自己算，不能靠 className 里的 left-3 / md:left-*。 */}
+      {/* Composer stays attached to the selected Worktree; execution remains
+          disabled until the authorized chat workflow and transcript are live. */}
       <aside
-        className="fixed bottom-[4.6rem] right-3 z-[35] mx-auto max-w-[960px] rounded-xl border border-line bg-bg-card/95 p-3 shadow-2xl backdrop-blur md:bottom-4 md:right-5"
-        style={{ left: "max(0.75rem, var(--sidebar-w, 0px))" }}
+        className={`fixed bottom-3 left-[calc(var(--sidebar-w,256px)_+_232px)] z-[55] rounded-lg border border-line bg-bg-card/95 p-2.5 shadow-2xl backdrop-blur 2xl:left-[calc(var(--sidebar-w,256px)_+_252px)] ${rightPanelOpen ? "right-[348px] 2xl:right-[356px]" : "right-[52px]"}`}
         data-testid="group-chat-bar"
       >
         <div className="flex flex-wrap items-center gap-2">
           <MessageSquareText size={15} className="shrink-0 text-accent" />
-          <label htmlFor="group-chat-scope" className="text-[10px] font-semibold uppercase tracking-wider text-ink-mute">Scope</label>
+          <label htmlFor="group-chat-scope" className="text-[10px] font-semibold uppercase tracking-wider text-ink-mute">对话范围</label>
           <select
             id="group-chat-scope"
             value={scope}
@@ -3186,14 +3463,14 @@ export default function GroupWorkspacePage({ params }: PageProps) {
               disabled
               value=""
               readOnly
-              placeholder={scope === "GLOBAL" ? "选择一个或多个授权 Worktree" : "Worktree scoped chat"}
+              placeholder={scope === "GLOBAL" ? "选择授权 Worktree 后才可发送" : "当前 Worktree 对话暂未连接"}
               className="w-full rounded-md border border-line bg-bg-soft px-3 py-2 text-xs opacity-70"
               aria-label="Group Chat message"
             />
           </div>
           <button type="button" disabled className="btn-primary text-xs opacity-50">发送</button>
           <span className="w-full pl-6 text-[9px] text-warning">
-            Group Chat workflow / Transcript / LangGraph runtime 尚未接入；发送保持禁用。目标选择不会授予额外权限。
+            聊天流程、历史记录与 LangGraph 执行器尚未接入；发送保持禁用。选择全局目标不会额外授予权限。
           </span>
         </div>
       </aside>

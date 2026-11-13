@@ -1,0 +1,896 @@
+name: Star Desktop stable bundle checks
+
+# @cypher schema=1 source_sha256=8e39e4b1f597bed0d262216ef91d2ce2b9602c9848bc8ac4d51d2cf30c535cc4
+# MERGE (self:File {path:".github/workflows/star-stable-desktop.yml"})
+# MERGE (checkout:ExternalService {id:"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",name:"actions/checkout v7.0.1"})
+# MERGE (setup_node:ExternalService {id:"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",name:"actions/setup-node v7.0.0"})
+# MERGE (upload_artifact:ExternalService {id:"actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",name:"actions/upload-artifact v7.0.2"})
+# MERGE (attest:ExternalService {id:"actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",name:"actions/attest v4.2.2"})
+# MERGE (download_artifact:ExternalService {id:"actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",name:"actions/download-artifact v8.0.2"})
+# MERGE (cargo_sbom:ExternalService {id:"cargo-sbom@0.10.0",name:"cargo-sbom 0.10.0 SPDX JSON"})
+# MERGE (npm_sbom:ExternalService {id:"npm-sbom",name:"npm sbom SPDX generator"})
+# MERGE (release_confirmation:Config {id:"workflow-dispatch.release-confirmation",name:"required APPROVED release confirmation"})
+# MERGE (release_environment:Config {id:"github-environment.star-stable-release",name:"protected star-stable-release environment"})
+# MERGE (release_license_gate:Config {id:"release-license.mit-metadata-match",name:"MIT workspace metadata and LICENSE heading must match"})
+# MERGE (sbom_validation:Config {id:"desktop-sbom.validation",name:"SPDX 2.3 non-empty arrays; expected roots; npm floor 225; Rust root-only floor 1"})
+# MERGE (toolchain:Config {id:"rust-toolchain.desktop-stable",name:"Rust 1.99.1"})
+# MERGE (node_runtime:Config {id:"node-runtime.desktop-stable",name:"Node.js 24.22.2"})
+# MERGE (frontend_tests:Config {id:"frontend-tests.desktop-stable",name:"npm test -- --reporter=dot on Node.js 24.22.2"})
+# MERGE (consumer_verify:Config {id:"desktop-consumer-attestation-verification",name:"separate read-only consumer verifies SLSA provenance and SPDX 2.3 SBOM attestations for every desktop installer"})
+# MERGE (consumer_sbom:Config {id:"desktop-consumer-spdx-sbom-verification",name:"verify SPDX 2.3 predicate, installer digest, and Rust/frontend SBOM roots"})
+# MERGE (release_verifier:Symbol {id:"scripts/release/verify_attested_release.py::main",kind:"function"})
+# MERGE (gh_attestation_verify:ExternalService {id:"gh-attestation-verify",name:"GitHub CLI gh attestation verify"})
+# MERGE (consumer_permissions:Config {id:"desktop-consumer-token-permissions",name:"contents:read and attestations:read only"})
+# MERGE (self)-[:CONFIGURES]->(frontend_tests)
+# MERGE (self)-[:CONFIGURES]->(consumer_verify)
+# MERGE (self)-[:CONFIGURES]->(consumer_sbom)
+# MERGE (self)-[:CONFIGURES]->(consumer_permissions)
+# MERGE (self)-[:CALLS]->(checkout)
+# MERGE (self)-[:CALLS]->(setup_node)
+# MERGE (self)-[:CALLS]->(upload_artifact)
+# MERGE (self)-[:CALLS]->(download_artifact)
+# MERGE (self)-[:CALLS]->(release_verifier)
+# MERGE (self)-[:CALLS]->(gh_attestation_verify)
+# MERGE (self)-[:CALLS]->(attest)
+# MERGE (self)-[:CONFIGURES]->(toolchain)
+# MERGE (self)-[:CONFIGURES]->(node_runtime)
+# MERGE (self)-[:CALLS]->(cargo_sbom)
+# MERGE (self)-[:CALLS]->(npm_sbom)
+# MERGE (self)-[:CONFIGURES]->(release_confirmation)
+# MERGE (self)-[:CONFIGURES]->(release_environment)
+# MERGE (self)-[:CONFIGURES]->(release_license_gate)
+# MERGE (self)-[:CONFIGURES]->(sbom_validation)
+# @endcypher
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/star-stable-desktop.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "scripts/build-desktop.sh"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/workflows/star-stable-desktop.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "scripts/build-desktop.sh"
+  workflow_dispatch:
+    inputs:
+      release_confirmation:
+        description: "Select APPROVED only when authorizing stable release attestations; keep NO for routine checks."
+        required: true
+        type: choice
+        default: "NO"
+        options:
+          - "NO"
+          - APPROVED
+
+permissions:
+  contents: read
+
+concurrency:
+  group: star-stable-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUSTUP_TOOLCHAIN: "1.99.1"
+  CARGO_BUILD_JOBS: "2"
+
+jobs:
+  linux:
+    name: Linux .deb and AppImage
+    runs-on: ubuntu-24.04
+    outputs:
+      release_tag: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+      release_version: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+      release_source_sha: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/crates/star-desktop/src-tauri/target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve exact stable tag before build mutations
+        id: resolve_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: python scripts/release/resolve_star_version.py --tag "$GITHUB_REF_NAME" --output "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: crates/star-desktop/frontend/package-lock.json
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            libssl-dev \
+            librsvg2-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            wget
+
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal
+
+      - name: Install pinned Rust SBOM generator
+        run: cargo install cargo-sbom --version 0.10.0 --locked
+
+      - name: Install locked frontend dependencies
+        working-directory: crates/star-desktop/frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        working-directory: crates/star-desktop/frontend
+        run: npm test -- --reporter=dot
+
+      - name: Build frontend
+        working-directory: crates/star-desktop/frontend
+        run: npm run build
+
+      - name: Build desktop bundles with canonical release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: crates/star-desktop
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${STAR_RELEASE_TAG:?missing resolver tag}"
+          : "${STAR_RELEASE_VERSION:?missing resolver version}"
+          : "${STAR_RELEASE_SOURCE_SHA:?missing resolver source SHA}"
+          frontend/node_modules/.bin/tauri build --config "{\"version\":\"${STAR_RELEASE_VERSION}\"}" --bundles deb,appimage -- --locked
+
+      - name: Build desktop bundles with the development crate version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        working-directory: crates/star-desktop
+        run: frontend/node_modules/.bin/tauri build --bundles deb,appimage -- --locked
+
+      - name: Write Linux build identity
+        shell: bash
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$STAR_RELEASE_TAG" ]]; then
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"stable","tag":os.environ["STAR_RELEASE_TAG"],"version":os.environ["STAR_RELEASE_VERSION"],"source_sha":os.environ["STAR_RELEASE_SOURCE_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          else
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"development","source_sha":os.environ["GITHUB_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          fi
+
+      - name: Require non-empty Linux bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find "$CARGO_TARGET_DIR/release/bundle/deb" -maxdepth 1 -type f -name '*.deb' -size +0c -print -quit)"
+          appimage="$(find "$CARGO_TARGET_DIR/release/bundle/appimage" -maxdepth 1 -type f -name '*.AppImage' -size +0c -print -quit)"
+          test -n "$deb" || { echo "Missing non-empty .deb artifact" >&2; exit 1; }
+          test -n "$appimage" || { echo "Missing non-empty AppImage artifact" >&2; exit 1; }
+          printf '%s\n%s\n' "$deb" "$appimage"
+
+      - name: Generate Rust dependency SBOM
+        shell: bash
+        run: cargo sbom --project-directory . --cargo-package star-desktop --output-format spdx_json_2_3 > crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Generate frontend dependency SBOM
+        working-directory: crates/star-desktop/frontend
+        shell: bash
+        run: npm sbom --package-lock-only --sbom-format=spdx > star-desktop-frontend.spdx.json
+
+      - name: Validate Linux SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust_sbom="crates/star-desktop/src-tauri/star-desktop-rust.spdx.json"
+          frontend_sbom="crates/star-desktop/frontend/star-desktop-frontend.spdx.json"
+          test -s "$rust_sbom"
+          test -s "$frontend_sbom"
+          node scripts/ci/validate_sbom.js "$rust_sbom" "$frontend_sbom"
+          if grep -Eiq 'star[-_]game' "$rust_sbom" "$frontend_sbom"; then echo "Unexpected retired game package in Desktop SBOM" >&2; exit 1; fi
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-desktop-linux-${{ steps.resolve_release.outputs.STAR_RELEASE_TAG || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA || github.sha }}-unsigned
+          path: |
+            crates/star-desktop/star-desktop-release-identity.json
+            crates/star-desktop/src-tauri/target/release/bundle/deb/*.deb
+            crates/star-desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+            crates/star-desktop/frontend/star-desktop-frontend.spdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    name: Windows MSI
+    runs-on: windows-2025
+    outputs:
+      release_tag: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+      release_version: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+      release_source_sha: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}\crates\star-desktop\src-tauri\target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve exact stable tag before build mutations
+        id: resolve_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: py -3 scripts/release/resolve_star_version.py --tag "$env:GITHUB_REF_NAME" --output "$env:GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: crates/star-desktop/frontend/package-lock.json
+
+      - name: Install Rust 1.99.1
+        run: rustup toolchain install 1.99.1 --profile minimal
+
+      - name: Install pinned Rust SBOM generator
+        run: cargo install cargo-sbom --version 0.10.0 --locked
+
+      - name: Install locked frontend dependencies
+        working-directory: crates/star-desktop/frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        working-directory: crates/star-desktop/frontend
+        run: npm test -- --reporter=dot
+
+      - name: Build frontend
+        working-directory: crates/star-desktop/frontend
+        run: npm run build
+
+      - name: Build Windows MSI with canonical release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: crates/star-desktop
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:STAR_RELEASE_TAG)) { throw "Missing resolver tag" }
+          if ([string]::IsNullOrWhiteSpace($env:STAR_RELEASE_VERSION)) { throw "Missing resolver version" }
+          if ([string]::IsNullOrWhiteSpace($env:STAR_RELEASE_SOURCE_SHA)) { throw "Missing resolver source SHA" }
+          frontend/node_modules/.bin/tauri.cmd build --config ('{"version":"' + $env:STAR_RELEASE_VERSION + '"}') --bundles msi -- --locked
+
+      - name: Build Windows MSI with the development crate version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        working-directory: crates/star-desktop
+        run: frontend/node_modules/.bin/tauri.cmd build --bundles msi -- --locked
+
+      - name: Write Windows build identity
+        shell: pwsh
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          if ($env:STAR_RELEASE_TAG) {
+            $identity = [ordered]@{
+              channel = 'stable'
+              tag = $env:STAR_RELEASE_TAG
+              version = $env:STAR_RELEASE_VERSION
+              source_sha = $env:STAR_RELEASE_SOURCE_SHA
+            }
+          } else {
+            $identity = [ordered]@{
+              channel = 'development'
+              source_sha = $env:GITHUB_SHA
+            }
+          }
+          $identity | ConvertTo-Json -Compress | Set-Content -LiteralPath 'crates/star-desktop/star-desktop-release-identity.json' -Encoding utf8NoBOM
+
+      - name: Require non-empty MSI
+        shell: pwsh
+        run: |
+          $bundleDirectory = Join-Path $env:CARGO_TARGET_DIR 'release\bundle\msi'
+          $installers = @(Get-ChildItem -LiteralPath $bundleDirectory -Filter '*.msi' -File -ErrorAction Stop | Where-Object { $_.Length -gt 0 })
+          if ($installers.Count -eq 0) { throw "Missing non-empty MSI under $bundleDirectory" }
+          $installers | ForEach-Object { $_.FullName }
+
+      - name: Generate Rust dependency SBOM
+        shell: bash
+        run: cargo sbom --project-directory . --cargo-package star-desktop --output-format spdx_json_2_3 > crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Generate frontend dependency SBOM
+        working-directory: crates/star-desktop/frontend
+        shell: bash
+        run: npm sbom --package-lock-only --sbom-format=spdx > star-desktop-frontend.spdx.json
+
+      - name: Validate Windows SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust_sbom="crates/star-desktop/src-tauri/star-desktop-rust.spdx.json"
+          frontend_sbom="crates/star-desktop/frontend/star-desktop-frontend.spdx.json"
+          test -s "$rust_sbom"
+          test -s "$frontend_sbom"
+          node scripts/ci/validate_sbom.js "$rust_sbom" "$frontend_sbom"
+          if grep -Eiq 'star[-_]game' "$rust_sbom" "$frontend_sbom"; then echo "Unexpected retired game package in Desktop SBOM" >&2; exit 1; fi
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-desktop-windows-${{ steps.resolve_release.outputs.STAR_RELEASE_TAG || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA || github.sha }}-unsigned
+          path: |
+            crates/star-desktop/star-desktop-release-identity.json
+            crates/star-desktop/src-tauri/target/release/bundle/msi/*.msi
+            crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+            crates/star-desktop/frontend/star-desktop-frontend.spdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    name: macOS universal DMG
+    runs-on: macos-15
+    outputs:
+      release_tag: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+      release_version: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+      release_source_sha: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/crates/star-desktop/src-tauri/target
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve exact stable tag before build mutations
+        id: resolve_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: python scripts/release/resolve_star_version.py --tag "$GITHUB_REF_NAME" --output "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: crates/star-desktop/frontend/package-lock.json
+
+      - name: Install Rust 1.99.1 and universal targets
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target add --toolchain 1.99.1 aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install pinned Rust SBOM generator
+        run: cargo install cargo-sbom --version 0.10.0 --locked
+
+      - name: Install locked frontend dependencies
+        working-directory: crates/star-desktop/frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Run frontend unit tests
+        working-directory: crates/star-desktop/frontend
+        run: npm test -- --reporter=dot
+
+      - name: Build frontend
+        working-directory: crates/star-desktop/frontend
+        run: npm run build
+
+      - name: Build universal macOS DMG with canonical release version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: crates/star-desktop
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${STAR_RELEASE_TAG:?missing resolver tag}"
+          : "${STAR_RELEASE_VERSION:?missing resolver version}"
+          : "${STAR_RELEASE_SOURCE_SHA:?missing resolver source SHA}"
+          frontend/node_modules/.bin/tauri build --config "{\"version\":\"${STAR_RELEASE_VERSION}\"}" --target universal-apple-darwin --bundles dmg -- --locked
+
+      - name: Build universal macOS DMG with the development crate version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        working-directory: crates/star-desktop
+        run: frontend/node_modules/.bin/tauri build --target universal-apple-darwin --bundles dmg -- --locked
+
+      - name: Write macOS build identity
+        shell: bash
+        env:
+          STAR_RELEASE_TAG: ${{ steps.resolve_release.outputs.STAR_RELEASE_TAG }}
+          STAR_RELEASE_VERSION: ${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION }}
+          STAR_RELEASE_SOURCE_SHA: ${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$STAR_RELEASE_TAG" ]]; then
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"stable","tag":os.environ["STAR_RELEASE_TAG"],"version":os.environ["STAR_RELEASE_VERSION"],"source_sha":os.environ["STAR_RELEASE_SOURCE_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          else
+            python -c 'import json,os,pathlib; pathlib.Path("crates/star-desktop/star-desktop-release-identity.json").write_text(json.dumps({"channel":"development","source_sha":os.environ["GITHUB_SHA"]},sort_keys=True)+chr(10),encoding="utf-8")'
+          fi
+
+      - name: Require non-empty macOS DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="$(find "$CARGO_TARGET_DIR/universal-apple-darwin/release/bundle/dmg" -maxdepth 1 -type f -name '*.dmg' -size +0c -print -quit)"
+          test -n "$dmg" || { echo "Missing non-empty universal macOS DMG" >&2; exit 1; }
+          printf '%s\n' "$dmg"
+
+      - name: Generate Rust dependency SBOM
+        shell: bash
+        run: cargo sbom --project-directory . --cargo-package star-desktop --output-format spdx_json_2_3 > crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Generate frontend dependency SBOM
+        working-directory: crates/star-desktop/frontend
+        shell: bash
+        run: npm sbom --package-lock-only --sbom-format=spdx > star-desktop-frontend.spdx.json
+
+      - name: Validate macOS SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust_sbom="crates/star-desktop/src-tauri/star-desktop-rust.spdx.json"
+          frontend_sbom="crates/star-desktop/frontend/star-desktop-frontend.spdx.json"
+          test -s "$rust_sbom"
+          test -s "$frontend_sbom"
+          node scripts/ci/validate_sbom.js "$rust_sbom" "$frontend_sbom"
+          if grep -Eiq 'star[-_]game' "$rust_sbom" "$frontend_sbom"; then echo "Unexpected retired game package in Desktop SBOM" >&2; exit 1; fi
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: star-desktop-macos-${{ steps.resolve_release.outputs.STAR_RELEASE_TAG || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_VERSION || 'development' }}-${{ steps.resolve_release.outputs.STAR_RELEASE_SOURCE_SHA || github.sha }}-unsigned
+          path: |
+            crates/star-desktop/star-desktop-release-identity.json
+            crates/star-desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            crates/star-desktop/src-tauri/star-desktop-rust.spdx.json
+            crates/star-desktop/frontend/star-desktop-frontend.spdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  release_metadata_gate:
+    name: Verify stable release license metadata
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require MIT workspace metadata and license heading
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          cargo = tomllib.loads(Path("Cargo.toml").read_text(encoding="utf-8"))
+          workspace_license = cargo.get("workspace", {}).get("package", {}).get("license")
+          license_lines = Path("LICENSE").read_text(encoding="utf-8").splitlines()
+          license_heading = license_lines[0].strip() if license_lines else ""
+          failures = []
+          if workspace_license != "MIT":
+              failures.append(f"[workspace.package].license must be MIT; found {workspace_license!r}")
+          if license_heading != "MIT License":
+              failures.append(f"LICENSE heading must be 'MIT License'; found {license_heading!r}")
+          if failures:
+              print("Stable-release attestation blocked: " + "; ".join(failures), file=sys.stderr)
+              raise SystemExit(1)
+          print("PASS: Cargo workspace license metadata and LICENSE heading both identify MIT.")
+          PY
+
+  attest_linux:
+    name: Attest Linux bundles
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, release_metadata_gate]
+    runs-on: ubuntu-24.04
+    environment:
+      name: star-stable-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download Linux build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-linux-${{ needs.linux.outputs.release_tag }}-${{ needs.linux.outputs.release_version }}-${{ needs.linux.outputs.release_source_sha }}-unsigned
+          path: artifacts/linux
+
+      - name: Require Linux attestation subjects and SBOMs
+        shell: bash
+        env:
+          EXPECTED_RELEASE_TAG: ${{ needs.linux.outputs.release_tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.linux.outputs.release_version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.linux.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+          deb="artifacts/linux/src-tauri/target/release/bundle/deb"
+          appimage="artifacts/linux/src-tauri/target/release/bundle/appimage"
+          test -n "$(find "$deb" -maxdepth 1 -type f -name '*.deb' -size +0c -print -quit)"
+          test -n "$(find "$appimage" -maxdepth 1 -type f -name '*.AppImage' -size +0c -print -quit)"
+          test -s artifacts/linux/src-tauri/star-desktop-rust.spdx.json
+          test -s artifacts/linux/frontend/star-desktop-frontend.spdx.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "channel": "stable",
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          actual = json.loads(Path("artifacts/linux/star-desktop-release-identity.json").read_text(encoding="utf-8"))
+          if actual != expected:
+              raise SystemExit(f"Linux release identity mismatch: {actual!r} != {expected!r}")
+          PY
+          node scripts/ci/validate_sbom.js artifacts/linux/src-tauri/star-desktop-rust.spdx.json artifacts/linux/frontend/star-desktop-frontend.spdx.json
+
+      - name: Attest Linux build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/linux/src-tauri/target/release/bundle/deb/*.deb
+            artifacts/linux/src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Attest Linux Rust SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/linux/src-tauri/target/release/bundle/deb/*.deb
+            artifacts/linux/src-tauri/target/release/bundle/appimage/*.AppImage
+          sbom-path: artifacts/linux/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Attest Linux frontend SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/linux/src-tauri/target/release/bundle/deb/*.deb
+            artifacts/linux/src-tauri/target/release/bundle/appimage/*.AppImage
+          sbom-path: artifacts/linux/frontend/star-desktop-frontend.spdx.json
+
+  attest_windows:
+    name: Attest Windows installer
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, release_metadata_gate]
+    runs-on: ubuntu-24.04
+    environment:
+      name: star-stable-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-windows-${{ needs.windows.outputs.release_tag }}-${{ needs.windows.outputs.release_version }}-${{ needs.windows.outputs.release_source_sha }}-unsigned
+          path: artifacts/windows
+
+      - name: Require Windows attestation subjects and SBOMs
+        shell: bash
+        env:
+          EXPECTED_RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.windows.outputs.release_version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.windows.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+          msi="artifacts/windows/src-tauri/target/release/bundle/msi"
+          test -n "$(find "$msi" -maxdepth 1 -type f -name '*.msi' -size +0c -print -quit)"
+          test -s artifacts/windows/src-tauri/star-desktop-rust.spdx.json
+          test -s artifacts/windows/frontend/star-desktop-frontend.spdx.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "channel": "stable",
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          actual = json.loads(Path("artifacts/windows/star-desktop-release-identity.json").read_text(encoding="utf-8"))
+          if actual != expected:
+              raise SystemExit(f"Windows release identity mismatch: {actual!r} != {expected!r}")
+          PY
+          node scripts/ci/validate_sbom.js artifacts/windows/src-tauri/star-desktop-rust.spdx.json artifacts/windows/frontend/star-desktop-frontend.spdx.json
+
+      - name: Attest Windows build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/windows/src-tauri/target/release/bundle/msi/*.msi
+
+      - name: Attest Windows Rust SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/windows/src-tauri/target/release/bundle/msi/*.msi
+          sbom-path: artifacts/windows/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Attest Windows frontend SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/windows/src-tauri/target/release/bundle/msi/*.msi
+          sbom-path: artifacts/windows/frontend/star-desktop-frontend.spdx.json
+
+  attest_macos:
+    name: Attest macOS universal installer
+    if: github.event_name == 'workflow_dispatch' && inputs.release_confirmation == 'APPROVED' && startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, release_metadata_gate]
+    runs-on: ubuntu-24.04
+    environment:
+      name: star-stable-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download macOS build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-macos-${{ needs.macos.outputs.release_tag }}-${{ needs.macos.outputs.release_version }}-${{ needs.macos.outputs.release_source_sha }}-unsigned
+          path: artifacts/macos
+
+      - name: Require macOS attestation subjects and SBOMs
+        shell: bash
+        env:
+          EXPECTED_RELEASE_TAG: ${{ needs.macos.outputs.release_tag }}
+          EXPECTED_RELEASE_VERSION: ${{ needs.macos.outputs.release_version }}
+          EXPECTED_RELEASE_SOURCE_SHA: ${{ needs.macos.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+          dmg="artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg"
+          test -n "$(find "$dmg" -maxdepth 1 -type f -name '*.dmg' -size +0c -print -quit)"
+          test -s artifacts/macos/src-tauri/star-desktop-rust.spdx.json
+          test -s artifacts/macos/frontend/star-desktop-frontend.spdx.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {
+              "channel": "stable",
+              "tag": os.environ["EXPECTED_RELEASE_TAG"],
+              "version": os.environ["EXPECTED_RELEASE_VERSION"],
+              "source_sha": os.environ["EXPECTED_RELEASE_SOURCE_SHA"],
+          }
+          actual = json.loads(Path("artifacts/macos/star-desktop-release-identity.json").read_text(encoding="utf-8"))
+          if actual != expected:
+              raise SystemExit(f"macOS release identity mismatch: {actual!r} != {expected!r}")
+          PY
+          node scripts/ci/validate_sbom.js artifacts/macos/src-tauri/star-desktop-rust.spdx.json artifacts/macos/frontend/star-desktop-frontend.spdx.json
+
+      - name: Attest macOS build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Attest macOS Rust SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          sbom-path: artifacts/macos/src-tauri/star-desktop-rust.spdx.json
+
+      - name: Attest macOS frontend SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          sbom-path: artifacts/macos/frontend/star-desktop-frontend.spdx.json
+
+  verify_desktop_release_consumers:
+    name: Independently verify Desktop installer provenance and SBOM attestations
+    if: >-
+      ${{ inputs.release_confirmation == 'APPROVED' &&
+          startsWith(github.ref, 'refs/tags/v') &&
+          needs.attest_linux.result == 'success' &&
+          needs.attest_windows.result == 'success' &&
+          needs.attest_macos.result == 'success' }}
+    needs:
+      - linux
+      - windows
+      - macos
+      - attest_linux
+      - attest_windows
+      - attest_macos
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - name: Checkout the exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.linux.outputs.release_tag }}
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Require matching resolver identities
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.linux.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.linux.outputs.release_version }}
+          RELEASE_SOURCE_SHA: ${{ needs.linux.outputs.release_source_sha }}
+          WINDOWS_RELEASE_TAG: ${{ needs.windows.outputs.release_tag }}
+          WINDOWS_RELEASE_VERSION: ${{ needs.windows.outputs.release_version }}
+          WINDOWS_RELEASE_SOURCE_SHA: ${{ needs.windows.outputs.release_source_sha }}
+          MACOS_RELEASE_TAG: ${{ needs.macos.outputs.release_tag }}
+          MACOS_RELEASE_VERSION: ${{ needs.macos.outputs.release_version }}
+          MACOS_RELEASE_SOURCE_SHA: ${{ needs.macos.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = tag
+          test "$GITHUB_REF_NAME" = "$RELEASE_TAG"
+          test "$WINDOWS_RELEASE_TAG" = "$RELEASE_TAG"
+          test "$MACOS_RELEASE_TAG" = "$RELEASE_TAG"
+          test "$WINDOWS_RELEASE_VERSION" = "$RELEASE_VERSION"
+          test "$MACOS_RELEASE_VERSION" = "$RELEASE_VERSION"
+          test "$WINDOWS_RELEASE_SOURCE_SHA" = "$RELEASE_SOURCE_SHA"
+          test "$MACOS_RELEASE_SOURCE_SHA" = "$RELEASE_SOURCE_SHA"
+          test "$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{}")" = "$RELEASE_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
+
+      - name: Download Linux release subjects
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-linux-${{ needs.linux.outputs.release_tag }}-${{ needs.linux.outputs.release_version }}-${{ needs.linux.outputs.release_source_sha }}-unsigned
+          path: artifacts/linux
+
+      - name: Download Windows release subjects
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-windows-${{ needs.windows.outputs.release_tag }}-${{ needs.windows.outputs.release_version }}-${{ needs.windows.outputs.release_source_sha }}-unsigned
+          path: artifacts/windows
+
+      - name: Download macOS release subjects
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: star-desktop-macos-${{ needs.macos.outputs.release_tag }}-${{ needs.macos.outputs.release_version }}-${{ needs.macos.outputs.release_source_sha }}-unsigned
+          path: artifacts/macos
+
+      - name: Verify each downloaded installer provenance and SPDX SBOM as a consumer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.linux.outputs.release_tag }}
+          RELEASE_SOURCE_SHA: ${{ needs.linux.outputs.release_source_sha }}
+        run: |
+          set -euo pipefail
+
+          verify_subjects() {
+            local platform="$1"
+            local bundle_dir="$2"
+            local pattern="$3"
+            local -a subjects=()
+            mapfile -d '' subjects < <(find "$bundle_dir" -type f -name "$pattern" -size +0c -print0)
+            if (( ${#subjects[@]} == 0 )); then
+              echo "No non-empty $platform release subjects found under $bundle_dir" >&2
+              return 1
+            fi
+            for subject in "${subjects[@]}"; do
+              local digest
+              digest="$(sha256sum -- "$subject" | awk '{print $1}')"
+              python3 scripts/release/verify_attested_release.py \
+                --kind desktop \
+                --repo "$GITHUB_REPOSITORY" \
+                --tag "$RELEASE_TAG" \
+                --source-commit "$RELEASE_SOURCE_SHA" \
+                --subject "$subject" \
+                --expected-digest "sha256:$digest"
+
+              EXPECTED_SUBJECT_SHA256="$digest" gh attestation verify "$subject" \
+                --repo "$GITHUB_REPOSITORY" \
+                --source-digest "$RELEASE_SOURCE_SHA" \
+                --source-ref "refs/tags/$RELEASE_TAG" \
+                --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/star-stable-desktop.yml" \
+                --predicate-type "https://spdx.dev/Document/v2.3" \
+                --format json |
+                EXPECTED_SUBJECT_SHA256="$digest" python3 -c '
+          import json
+          import os
+          import sys
+
+          predicate_type = "https://spdx.dev/Document/v2.3"
+          expected_digest = os.environ["EXPECTED_SUBJECT_SHA256"]
+          required_roots = {"star-desktop", "star-desktop-frontend"}
+          max_output_bytes = 64 * 1024 * 1024
+          raw = sys.stdin.buffer.read(max_output_bytes + 1)
+          if len(raw) > max_output_bytes:
+              raise SystemExit("gh attestation JSON exceeds the 64 MiB consumer limit")
+          try:
+              records = json.loads(raw.decode("utf-8"))
+          except (UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"gh attestation returned malformed JSON: {error}") from error
+          if not isinstance(records, list) or not records:
+              raise SystemExit("gh attestation returned no verified SPDX SBOM records")
+
+          verified_roots = set()
+          for index, record in enumerate(records):
+              if not isinstance(record, dict) or not isinstance(record.get("attestation"), dict):
+                  raise SystemExit(f"verified SPDX record {index} is missing its attestation bundle")
+              verification = record.get("verificationResult")
+              statement = verification.get("statement") if isinstance(verification, dict) else None
+              if not isinstance(statement, dict):
+                  raise SystemExit(f"verified SPDX record {index} is missing its statement")
+              if statement.get("predicateType") != predicate_type:
+                  raise SystemExit(f"verified SPDX record {index} has the wrong predicate type")
+
+              subjects = statement.get("subject")
+              if not isinstance(subjects, list) or not any(
+                  isinstance(subject, dict)
+                  and isinstance(subject.get("digest"), dict)
+                  and subject["digest"].get("sha256") == expected_digest
+                  for subject in subjects
+              ):
+                  raise SystemExit(f"verified SPDX record {index} does not bind the installer digest")
+
+              predicate = statement.get("predicate")
+              if not isinstance(predicate, dict) or predicate.get("spdxVersion") != "SPDX-2.3":
+                  raise SystemExit(f"verified SPDX record {index} does not contain an SPDX-2.3 document")
+              packages = predicate.get("packages")
+              relationships = predicate.get("relationships")
+              if not isinstance(packages, list) or not packages:
+                  raise SystemExit(f"verified SPDX record {index} has no packages")
+              if not isinstance(relationships, list) or not relationships:
+                  raise SystemExit(f"verified SPDX record {index} has no relationships")
+
+              described_roots = {
+                  package["name"]
+                  for package in packages
+                  if isinstance(package, dict)
+                  and package.get("name") in required_roots
+                  and isinstance(package.get("SPDXID"), str)
+                  and package.get("SPDXID")
+                  and any(
+                      isinstance(relationship, dict)
+                      and relationship.get("spdxElementId") == "SPDXRef-DOCUMENT"
+                      and relationship.get("relationshipType") == "DESCRIBES"
+                      and relationship.get("relatedSpdxElement") == package["SPDXID"]
+                      for relationship in relationships
+                  )
+              }
+              if len(described_roots) != 1:
+                  raise SystemExit(f"verified SPDX record {index} does not describe exactly one approved Desktop SBOM root")
+              verified_roots.update(described_roots)
+
+          if verified_roots != required_roots:
+              missing = sorted(required_roots - verified_roots)
+              raise SystemExit(f"missing an independently verified Rust/frontend SPDX SBOM root: {missing}")
+          print("Verified SPDX 2.3 SBOM attestations for Rust and frontend roots.")
+          '
+              printf '%s\n' "- Verified SLSA provenance and Rust/frontend SPDX 2.3 SBOMs for $platform subject: \`$subject\` (sha256:$digest)" >> "$GITHUB_STEP_SUMMARY"
+            done
+          }
+
+          verify_subjects linux-deb artifacts/linux/src-tauri/target/release/bundle/deb '*.deb'
+          verify_subjects linux-appimage artifacts/linux/src-tauri/target/release/bundle/appimage '*.AppImage'
+          verify_subjects windows-msi artifacts/windows/src-tauri/target/release/bundle/msi '*.msi'
+          verify_subjects macos-dmg artifacts/macos/src-tauri/target/universal-apple-darwin/release/bundle/dmg '*.dmg'

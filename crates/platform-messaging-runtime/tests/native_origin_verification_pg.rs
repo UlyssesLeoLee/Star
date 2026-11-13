@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=405930aa7db68c510dcacaa940b0d729b070f57849d930b1ffdb9a44d35b0b62
+@cypher schema=1 source_sha256=ea3fb3b756ee41f96688084f8e1d9fa2523b7df585704ab6735077799578dfff
 MERGE (self:File {path:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs"})
 MERGE (test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::native_origin_verification_sqlx_persists_and_revalidates_exact_origin",kind:"test"})
 MERGE (fixture:Type {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::TestFixture",kind:"struct"})
@@ -23,11 +23,18 @@ MERGE (source_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_
 MERGE (receipt_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::assert_ack_receipt_and_outbox",kind:"function"})
 MERGE (sqlstate_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::assert_sqlstate",kind:"function"})
 MERGE (receipt_retry:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::receipt_failure_rolls_back_and_retry_succeeds",kind:"function"})
+MERGE (active_lease_index_assert:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::assert_active_lease_lookup_index",kind:"function"})
+MERGE (static_lease_predicate_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::active_lease_query_and_partial_index_share_lease_predicate",kind:"test"})
+MERGE (pull_one_grant_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::pull_one_execute_is_revoked_from_the_runtime_role",kind:"test"})
+MERGE (direct_call_denial_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_origin_verification_pg.rs::native_runtime_cannot_execute_the_internal_pull_routine_directly",kind:"test"})
+MERGE (active_lease_index:Config {id:"ix_platform_transport_active_lease_lookup",kind:"postgres_index"})
+MERGE (runtime_role:Config {id:"star_platform_transport_runtime",kind:"postgres_role"})
 MERGE (profile_master:Type {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster",kind:"struct"})
 MERGE (profile_publish:Symbol {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster.publish_revision",kind:"method"})
 MERGE (profile_revision:Type {id:"crates/platform-messaging-runtime/src/transport_profile.rs::TransportProfileRevision",kind:"struct"})
 MERGE (append_db:Function {id:"platform_transport.append_authenticated",kind:"database_function"})
 MERGE (pull_db:Function {id:"platform_transport.pull_authenticated",kind:"database_function"})
+MERGE (pull_one_db:Function {id:"platform_transport.pull_one",kind:"database_function"})
 MERGE (verify_db:Function {id:"platform_transport.verify_origin_authenticated",kind:"database_function"})
 MERGE (ack_db:Function {id:"platform_transport.acknowledge_authenticated",kind:"database_function"})
 MERGE (message_work:Table {id:"platform_transport.message_work",class:"Work"})
@@ -56,7 +63,13 @@ MERGE (self)-[:DEFINES]->(source_assert)
 MERGE (self)-[:DEFINES]->(receipt_assert)
 MERGE (self)-[:DEFINES]->(sqlstate_assert)
 MERGE (self)-[:DEFINES]->(receipt_retry)
+MERGE (self)-[:DEFINES]->(active_lease_index_assert)
+MERGE (self)-[:DEFINES]->(static_lease_predicate_test)
+MERGE (self)-[:DEFINES]->(pull_one_grant_test)
+MERGE (self)-[:DEFINES]->(direct_call_denial_test)
 MERGE (self)-[:IMPORTS]->(profile_master)
+MERGE (self)-[:IMPORTS]->(:File {path:"db/migrations/2026-10-24-platform-native-transport-lease-order.sql"})
+MERGE (self)-[:IMPORTS]->(:File {path:"db/migrations/2026-11-09-platform-native-transport-pull-privilege.sql"})
 MERGE (prepare)-[:USES_TYPE]->(profile_revision)
 MERGE (test)-[:CALLS]->(prepare)
 MERGE (test)-[:CALLS]->(database_precondition)
@@ -78,6 +91,20 @@ MERGE (test)-[:CALLS]->(source_assert)
 MERGE (test)-[:CALLS]->(receipt_assert)
 MERGE (test)-[:CALLS]->(sqlstate_assert)
 MERGE (test)-[:CALLS]->(receipt_retry)
+MERGE (test)-[:CALLS]->(active_lease_index_assert)
+MERGE (test)-[:TESTS]->(active_lease_index)
+MERGE (static_lease_predicate_test)-[:TESTS]->(active_lease_index)
+MERGE (static_lease_predicate_test)-[:READS]->(:File {path:"db/migrations/2026-10-24-platform-native-transport-lease-order.sql"})
+MERGE (pull_one_grant_test)-[:TESTS]->(pull_one_db)
+MERGE (pull_one_grant_test)-[:TESTS]->(runtime_role)
+MERGE (pull_one_grant_test)-[:READS]->(:File {path:"db/migrations/2026-10-24-platform-native-transport-lease-order.sql"})
+MERGE (pull_one_grant_test)-[:READS]->(:File {path:"db/migrations/2026-11-09-platform-native-transport-pull-privilege.sql"})
+MERGE (direct_call_denial_test)-[:TESTS]->(pull_one_db)
+MERGE (direct_call_denial_test)-[:TESTS]->(runtime_role)
+MERGE (direct_call_denial_test)-[:TESTS]->(pull_db)
+MERGE (direct_call_denial_test)-[:READS]->(:File {path:"db/migrations/2026-11-09-platform-native-transport-pull-privilege.sql"})
+MERGE (direct_call_denial_test)-[:CALLS]->(sqlstate_assert)
+MERGE (active_lease_index_assert)-[:READS]->(active_lease_index)
 MERGE (append)-[:CALLS]->(append_db)
 MERGE (pull)-[:CALLS]->(pull_db)
 MERGE (verify)-[:CALLS]->(verify_db)
@@ -124,8 +151,8 @@ use platform_messaging_runtime::{
 };
 use sha2::{Digest, Sha256};
 use sqlx::{
-    PgPool, Postgres, Row, Transaction,
     postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Postgres, Row, Transaction,
 };
 use uuid::Uuid;
 
@@ -134,6 +161,10 @@ const PROVIDER_ID: &str = "star-rust-log";
 const PROVIDER_VERSION: &str = "1.0.0";
 const ENDPOINT_IDENTITY: &str = "native-origin-sqlx";
 const MESSAGE_KIND: &str = "request";
+const LEASE_ORDER_MIGRATION: &str =
+    include_str!("../../../db/migrations/2026-10-24-platform-native-transport-lease-order.sql");
+const PULL_PRIVILEGE_MIGRATION: &str =
+    include_str!("../../../db/migrations/2026-11-09-platform-native-transport-pull-privilege.sql");
 
 struct TestFixture {
     deployment_id: Uuid,
@@ -194,6 +225,7 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
 
     require_d20_database_identity(&pool).await;
     require_d20_database(&pool).await;
+    assert_active_lease_lookup_index(&pool).await;
     let fixture = prepare_fixture(&pool).await;
 
     let first_message_id = Uuid::new_v4();
@@ -236,6 +268,19 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .expect_err("same message identity with different wire bytes must fail closed");
     assert_sqlstate(&replay_conflict, "22000");
 
+    let second_message_id = Uuid::new_v4();
+    let second_wire = b"source certificate historical proof".to_vec();
+    let second_accepted = append_authenticated(
+        &pool,
+        &fixture,
+        &fixture.sender_certificate,
+        second_message_id,
+        &second_wire,
+    )
+    .await
+    .expect("append the next sequence before testing the active lease boundary");
+    assert_eq!(second_accepted.sequence, accepted.sequence + 1);
+
     let first_delivery = pull_authenticated(&pool, &fixture)
         .await
         .expect("pull the accepted message as its authorized receiver")
@@ -249,17 +294,22 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
         first_delivery.proof.payload_sha256,
         Sha256::digest(&first_delivery.wire).as_slice()
     );
-    assert_persisted_source(&pool, &fixture, &first_delivery).await;
     assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("verify current exact origin")
+        pull_authenticated(&pool, &fixture)
+            .await
+            .expect("a second pull should be checked against the durable active lease")
+            .is_none(),
+        "a later sequence must remain unavailable while the first lease is unexpired"
     );
+    assert_persisted_source(&pool, &fixture, &first_delivery).await;
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
+    )
+    .await
+    .expect("verify current exact origin"));
 
     let mut invalid = first_delivery.proof.clone();
     invalid.log_id.push_str("-other");
@@ -377,16 +427,14 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .expect_err("acknowledgement must reject a different message identity");
     assert_sqlstate(&invalid_ack, "42501");
 
-    assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("failed verification must leave the leased source proof retryable")
-    );
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
+    )
+    .await
+    .expect("failed verification must leave the leased source proof retryable"));
 
     let stale_lease = acknowledge_authenticated(
         &pool,
@@ -398,48 +446,35 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     .await
     .expect_err("acknowledgement with a stale lease identity must fail");
     assert_sqlstate(&stale_lease, "40001");
-    assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("stale lease failure must leave the current lease unchanged")
-    );
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
+    )
+    .await
+    .expect("stale lease failure must leave the current lease unchanged"));
 
     receipt_failure_rolls_back_and_retry_succeeds(&pool, &fixture, &first_delivery)
         .await
         .expect("receipt persistence conflict must roll back the ACK and allow retry");
-    assert!(
-        !verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &first_delivery.proof,
-        )
-        .await
-        .expect("acked messages must no longer be live origin proofs")
-    );
-    assert_ack_receipt_and_outbox(&pool, &fixture, &first_delivery).await;
-
-    let second_message_id = Uuid::new_v4();
-    let second_wire = b"source certificate historical proof".to_vec();
-    append_authenticated(
+    assert!(!verify_origin(
         &pool,
         &fixture,
-        &fixture.sender_certificate,
-        second_message_id,
-        &second_wire,
+        &fixture.receiver_certificate,
+        &first_delivery.proof,
     )
     .await
-    .expect("append a second message before source certificate revocation");
+    .expect("acked messages must no longer be live origin proofs"));
+    assert_ack_receipt_and_outbox(&pool, &fixture, &first_delivery).await;
+
     let second_delivery = pull_authenticated(&pool, &fixture)
         .await
-        .expect("pull the second exact message")
-        .expect("the second message should be leased");
+        .expect("pull after the first durable lease was ACKed")
+        .expect("the next sequence should now be leased");
     assert_eq!(second_delivery.proof.message_id, second_message_id);
+    assert_eq!(second_delivery.proof.sequence, second_accepted.sequence);
+    assert_eq!(second_delivery.wire, second_wire);
 
     sqlx::query("SELECT pg_sleep(0.01)")
         .execute(&pool)
@@ -448,16 +483,14 @@ async fn native_origin_verification_sqlx_persists_and_revalidates_exact_origin()
     revoke_certificate(&pool, &fixture, &fixture.sender_certificate)
         .await
         .expect("record source certificate revocation after acceptance");
-    assert!(
-        verify_origin(
-            &pool,
-            &fixture,
-            &fixture.receiver_certificate,
-            &second_delivery.proof,
-        )
-        .await
-        .expect("post-acceptance source revocation preserves historical origin evidence")
-    );
+    assert!(verify_origin(
+        &pool,
+        &fixture,
+        &fixture.receiver_certificate,
+        &second_delivery.proof,
+    )
+    .await
+    .expect("post-acceptance source revocation preserves historical origin evidence"));
 
     revoke_certificate(&pool, &fixture, &fixture.receiver_certificate)
         .await
@@ -482,6 +515,69 @@ struct AcceptedIdentity {
     sequence: i64,
     sha256: Vec<u8>,
     exact_replay: bool,
+}
+
+#[test]
+fn active_lease_query_and_partial_index_share_lease_predicate() {
+    let compact = LEASE_ORDER_MIGRATION
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(compact.contains("w.state='leased'andw.lease_expires_at>clock_timestamp()"));
+    assert!(compact.contains(
+        "(deployment_id,tenant_id,log_id,generation,recipient_service_id,lease_expires_at)wherestate='leased'"
+    ));
+}
+
+#[test]
+fn pull_one_execute_is_revoked_from_the_runtime_role() {
+    // The lease-order migration used to re-grant EXECUTE on the internal lease routine to
+    // the runtime role. That let a runtime caller supply the identity settings the
+    // SECURITY DEFINER routine reads, bypassing the certificate/profile authorization that
+    // platform_transport.pull_authenticated performs first. The forward remediation
+    // migration removes the direct grant, so the runtime reaches pull_one only through
+    // the authenticated wrapper.
+    let privilege_compact = PULL_PRIVILEGE_MIGRATION
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(privilege_compact.contains(
+        "revokeexecuteonfunctionplatform_transport.pull_one(text,uuid,integer)frompublic,star_platform_transport_runtime;"
+    ));
+    assert!(!privilege_compact.contains(
+        "grantexecuteonfunctionplatform_transport.pull_one(text,uuid,integer)tostar_platform_transport_runtime;"
+    ));
+
+    // The lease-order migration still owns the routine definition and the partial index.
+    let lease_order_compact = LEASE_ORDER_MIGRATION
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(lease_order_compact
+        .contains("createindexifnotexistsix_platform_transport_active_lease_lookup"));
+    assert!(lease_order_compact.contains("createorreplacefunctionplatform_transport.pull_one"));
+}
+
+async fn assert_active_lease_lookup_index(pool: &PgPool) {
+    let indexdef = sqlx::query_scalar::<_, String>(
+        "SELECT indexdef FROM pg_indexes WHERE schemaname = 'platform_transport' AND indexname = 'ix_platform_transport_active_lease_lookup'",
+    )
+    .fetch_optional(pool)
+    .await
+    .expect("read the active-lease index catalog entry")
+    .expect("active-lease partial index must be applied");
+    let compact = indexdef
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    assert!(compact.contains(
+        "(deployment_id,tenant_id,log_id,generation,recipient_service_id,lease_expires_at)"
+    ));
+    assert!(compact.contains("where(state='leased'"));
 }
 
 async fn require_d20_database_identity(pool: &PgPool) {
@@ -1176,4 +1272,107 @@ fn assert_sqlstate(error: &sqlx::Error, expected: &str) {
         Some(expected),
         "unexpected PostgreSQL error code or transaction outcome"
     );
+}
+
+/// The runtime role must not be able to reach the internal lease routine directly.
+///
+/// `platform_transport.pull_one` is SECURITY DEFINER and reads the caller-controlled
+/// `app.platform_deployment_id`, `app.platform_tenant_id` and `app.platform_service_id`
+/// settings. Only `platform_transport.pull_authenticated` may reach it, because that
+/// wrapper authorizes the client certificate and transport profile first. A direct call
+/// must be refused with insufficient_privilege, and the authenticated wrapper must keep
+/// working in the same database.
+#[tokio::test]
+#[ignore = "requires the dedicated star_d20_origin_test PostgreSQL database with D20 migrations and roles applied"]
+async fn native_runtime_cannot_execute_the_internal_pull_routine_directly() {
+    let database_url = env::var(DATABASE_URL_ENV).expect(
+        "D20 SQLx proof requires STAR_PLATFORM_PROFILE_TEST_DATABASE_URL pointing to a disposable PostgreSQL database",
+    );
+    let database_options = database_url
+        .parse::<PgConnectOptions>()
+        .expect("parse the disposable PostgreSQL connection options");
+    let database_host = database_options.get_host();
+    let is_loopback = database_host == "localhost"
+        || database_host
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.is_loopback());
+    assert!(
+        is_loopback && database_options.get_port() != 5432,
+        "the opt-in integration test must use a loopback PostgreSQL instance on a non-default port"
+    );
+
+    let pool = PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(database_options)
+        .await
+        .expect("connect to the disposable PostgreSQL integration database");
+    require_d20_database_identity(&pool).await;
+
+    // The catalog must agree with the migration text: the runtime holds no EXECUTE on the
+    // internal routine, and the authenticated wrapper keeps its grant.
+    let (runtime_can_execute_pull_one, runtime_can_execute_wrapper, public_can_execute_pull_one) =
+        sqlx::query_as::<_, (bool, bool, bool)>(
+            r#"
+            SELECT
+                has_function_privilege(
+                    'star_platform_transport_runtime',
+                    'platform_transport.pull_one(text,uuid,integer)',
+                    'EXECUTE'
+                ),
+                has_function_privilege(
+                    'star_platform_transport_runtime',
+                    'platform_transport.pull_authenticated(bytea,bytea,uuid,text,integer)',
+                    'EXECUTE'
+                ),
+                EXISTS (
+                    SELECT 1
+                      FROM pg_proc AS p
+                      CROSS JOIN LATERAL aclexplode(
+                          COALESCE(p.proacl, acldefault('f', p.proowner))
+                      ) AS acl
+                     WHERE p.oid = 'platform_transport.pull_one(text,uuid,integer)'::regprocedure
+                       AND acl.grantee = 0::oid
+                       AND acl.privilege_type = 'EXECUTE'
+                )
+            "#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("inspect the internal pull routine privilege boundary");
+    assert!(
+        !runtime_can_execute_pull_one,
+        "the runtime role must not hold EXECUTE on the internal pull routine"
+    );
+    assert!(
+        runtime_can_execute_wrapper,
+        "the runtime role must keep EXECUTE on the authenticated pull wrapper"
+    );
+    assert!(
+        !public_can_execute_pull_one,
+        "PUBLIC must not hold EXECUTE on the internal pull routine"
+    );
+
+    // A direct call must be refused, and it must be refused for the privilege reason
+    // rather than for an unrelated input error.
+    let mut tx = pool.begin().await.expect("begin the direct-call probe");
+    sqlx::query("SET LOCAL ROLE star_platform_transport_runtime")
+        .execute(&mut *tx)
+        .await
+        .expect("assume the runtime role for the direct-call probe");
+    let direct = sqlx::query(
+        "SELECT * FROM platform_transport.pull_one('native.origin.direct', gen_random_uuid(), 30)",
+    )
+    .fetch_all(&mut *tx)
+    .await;
+    match direct {
+        Ok(_) => panic!("the runtime role must not be able to execute the internal pull routine"),
+        Err(error) => {
+            assert_sqlstate(&error, "42501");
+        }
+    }
+    tx.rollback()
+        .await
+        .expect("roll back the direct-call probe");
+
+    pool.close().await;
 }

@@ -1,0 +1,34 @@
+{
+  "_comment": "sandboxd 默认 4 维策略 (per SRS-SANDBOX-002 §3.2 表 + 决策点 D-3/D-4), 跟 src/policy 默认值 1:1",
+  "resource": {
+    "memory_mb": 1024,
+    "cpu_percent": 50,
+    "max_processes": 100,
+    "kill_on_parent_exit": true
+  },
+  "network": {
+    "mode": "Allowlist",
+    "allowlist": [
+      "github.com",
+      "*.github.com",
+      "crates.io",
+      "*.crates.io",
+      "static.crates.io",
+      "index.crates.io",
+      "sh.rustup.rs"
+    ],
+    "ip_allowlist": []
+  },
+  "fs": {
+    "mode": "Allowlist",
+    "allowlist": [
+      { "path": "/worktree/**", "mode": "Read" },
+      { "path": "/worktree/.worktree-cache/**", "mode": "ReadWrite" },
+      { "path": "/tmp/**", "mode": "ReadWrite" }
+    ]
+  },
+  "capability": {
+    "linux_mode": "DropAll",
+    "custom_capabilities": []
+  }
+}

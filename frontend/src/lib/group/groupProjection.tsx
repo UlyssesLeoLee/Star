@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8e3220b83918e31cb0276e7b76623b1bb4303854fb4227e7fb2ffb3153afd84c
+@cypher schema=1 source_sha256=aa13aa3ec5b14eef4a6461ddb6e6d1ad576dd435b5db95915cb51b5b6901a3fe
 MERGE (self:File {path:"frontend/src/lib/group/groupProjection.tsx"})
 MERGE (projection:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupProjection",kind:"function"})
 MERGE (load:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::loadProjection",kind:"function"})
@@ -8,8 +8,8 @@ MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::
 MERGE (sessionState:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupSessionState",kind:"type"})
 MERGE (authError:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.invalidateAuthorization",kind:"method"})
 MERGE (invalidatedSession:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::invalidatedSession",kind:"state"})
-MERGE (poller:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller",kind:"class"})
-MERGE (run:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.run",kind:"method"})
+MERGE (wakeSubscriber:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxWakeSubscriber",kind:"class"})
+MERGE (wakeSubscribe:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxWakeSubscriber.subscribe",kind:"method"})
 MERGE (self)-[:DEFINES]->(projection)
 MERGE (self)-[:DEFINES]->(load)
 MERGE (self)-[:DEFINES]->(provider)
@@ -21,8 +21,8 @@ MERGE (provider)-[:WRITES]->(invalidatedSession)
 MERGE (provider)-[:READS]->(invalidatedSession)
 MERGE (projection)-[:CALLS]->(sessionStateHook)
 MERGE (projection)-[:USES_TYPE]->(sessionState)
-MERGE (projection)-[:CREATES]->(poller)
-MERGE (projection)-[:CALLS]->(run)
+MERGE (projection)-[:CREATES]->(wakeSubscriber)
+MERGE (projection)-[:CALLS]->(wakeSubscribe)
 @endcypher
 */
 /*
@@ -40,16 +40,16 @@ CREATE
   (mapElements:Function {name:"mapElements",type:"function",signature:"mapElements(response, canvasId, worktreeId)",visibility:"private",complexity:"moderate"}),
   (mapWorktree:Function {name:"mapWorktree",type:"function",signature:"mapWorktree(response, worktreeId)",visibility:"private",complexity:"simple"}),
   (file)-[:CONTAINS]->(provider),(file)-[:CONTAINS]->(useApi),(file)-[:CONTAINS]->(useProjection),(file)-[:CONTAINS]->(load),(file)-[:CONTAINS]->(mapWorkItems),(file)-[:CONTAINS]->(mapCanvas),(file)-[:CONTAINS]->(canvasRows),(file)-[:CONTAINS]->(projectedCanvases),(file)-[:CONTAINS]->(mapElements),(file)-[:CONTAINS]->(mapWorktree),
-  (provider)-[:CREATES]->(client:Class {name:"WorktreeGroupApiClient",type:"class"}),(useApi)-[:READS]->(provider),(useProjection)-[:CALLS]->(load),(useProjection)-[:CALLS]->(poller:Class {name:"CanvasOutboxPoller",type:"class"}),(load)-[:CALLS]->(mapWorktree),(load)-[:CALLS]->(mapWorkItems),(load)-[:CALLS]->(mapCanvas),(load)-[:USES]->(canvasRows),(load)-[:USES]->(projectedCanvases),(load)-[:CALLS]->(mapElements);
+  (provider)-[:CREATES]->(client:Class {name:"WorktreeGroupApiClient",type:"class"}),(useApi)-[:READS]->(provider),(useProjection)-[:CALLS]->(load),(useProjection)-[:CALLS]->(wakeSubscribe:Function {name:"CanvasOutboxWakeSubscriber.subscribe",type:"function"}),(load)-[:CALLS]->(mapWorktree),(load)-[:CALLS]->(mapWorkItems),(load)-[:CALLS]->(mapCanvas),(load)-[:USES]->(canvasRows),(load)-[:USES]->(projectedCanvases),(load)-[:CALLS]->(mapElements);
 */
 
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { CanvasConnector, CanvasElement, CanvasFrame, CanvasViewport, WorkItemKind, WorkItemPriority, WorkItemStatus, WorktreeStatus } from "@/types/ids";
 import {
-  CanvasOutboxPoller,
+  CanvasOutboxWakeSubscriber,
   GroupApiError,
   WorktreeGroupApiClient,
   type GroupAccessTokenProvider,
@@ -172,12 +172,24 @@ export function useWorktreeGroupProjection(
   const [internalState, setInternalState] = useState<{ requestKey: string; state: WorktreeGroupProjectionState }>(
     { requestKey: "preview", state: { mode: "preview" } },
   );
+  const currentRequestKeyRef = useRef(requestKey);
+  currentRequestKeyRef.current = requestKey;
+  const publishRef = useRef<(next: WorktreeGroupProjectionState | ((current: WorktreeGroupProjectionState) => WorktreeGroupProjectionState)) => void>(() => undefined);
+  const refreshProjectionRef = useRef<(signal: AbortSignal) => Promise<void>>(async () => undefined);
 
   const publish = (next: WorktreeGroupProjectionState | ((current: WorktreeGroupProjectionState) => WorktreeGroupProjectionState)) => {
     setInternalState((current) => {
       const base = current.requestKey === requestKey ? current.state : { mode: "loading" as const };
       return { requestKey, state: typeof next === "function" ? next(base) : next };
     });
+  };
+  publishRef.current = publish;
+  refreshProjectionRef.current = async (signal) => {
+    if (!client) return;
+    const projection = await loadProjection(client, worktreeId, subscribeCanvas, selectedCanvasId, signal);
+    if (!signal.aborted && currentRequestKeyRef.current === requestKey) {
+      publishRef.current({ mode: "live", ...projection });
+    }
   };
 
   useEffect(() => {
@@ -187,41 +199,38 @@ export function useWorktreeGroupProjection(
     }
 
     const controller = new AbortController();
-    let active = true;
     publish({ mode: "loading" });
-
-    const refresh = async () => {
-      const projection = await loadProjection(client, worktreeId, subscribeCanvas, selectedCanvasId);
-      if (active) publish({ mode: "live", ...projection });
-      return projection;
-    };
-
-    void refresh().then((projection) => {
-      if (!active || !subscribeCanvas || !projection.canvas) return;
-      const poller = new CanvasOutboxPoller(
-        client,
-        worktreeId,
-        async () => { await refresh(); },
-      );
-      void poller.run(controller.signal, (error) => {
-        if (!active) return;
-        const message = errorMessage(error);
-        publish((current) => {
-          if (error instanceof GroupApiError && (error.status === 401 || error.status === 403)) {
-            return { mode: "error", message };
-          }
-          return current.mode === "live" ? { ...current, refreshError: message } : current;
-        });
-      });
-    }).catch((error: unknown) => {
-      if (active) publish({ mode: "error", message: errorMessage(error) });
+    void refreshProjectionRef.current(controller.signal).catch((error: unknown) => {
+      if (!controller.signal.aborted && currentRequestKeyRef.current === requestKey) {
+        publishRef.current({ mode: "error", message: errorMessage(error) });
+      }
     });
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [client, requestKey, refreshKey, selectedCanvasId, subscribeCanvas, worktreeId]);
+
+  useEffect(() => {
+    if (!client || !subscribeCanvas) return;
+    const controller = new AbortController();
+    const subscriber = new CanvasOutboxWakeSubscriber(
+      client,
+      worktreeId,
+      async (signal) => { await refreshProjectionRef.current(signal); },
+    );
+    const unsubscribe = subscriber.subscribe(controller.signal, (error) => {
+      if (controller.signal.aborted) return;
+      const message = errorMessage(error);
+      publishRef.current((current) => {
+        if (error instanceof GroupApiError && (error.status === 401 || error.status === 403)) {
+          return { mode: "error", message };
+        }
+        return current.mode === "live" ? { ...current, refreshError: message } : current;
+      });
+    });
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
+  }, [client, subscribeCanvas, worktreeId]);
 
   if (!client) {
     return sessionState.status === "invalidated"
@@ -236,10 +245,11 @@ async function loadProjection(
   worktreeId: string,
   includeCanvas: boolean,
   selectedCanvasId?: string,
+  signal?: AbortSignal,
 ): Promise<WorktreeGroupProjection> {
   const [context, workItems] = await Promise.all([
-    client.getGroupContext<GroupContextEnvelope>(worktreeId),
-    client.listWorkItems<WorkItemEnvelope>(worktreeId),
+    client.getGroupContext<GroupContextEnvelope>(worktreeId, signal),
+    client.listWorkItems<WorkItemEnvelope>(worktreeId, signal),
   ]);
   const worktree = mapWorktree(context, worktreeId);
   if (workItems.worktree_id !== worktreeId) {
@@ -248,7 +258,7 @@ async function loadProjection(
   if (workItems.project_id !== worktree.project_id) {
     throw new Error("Group API returned mismatched Project scope.");
   }
-  const canvases = includeCanvas ? await client.listCanvases<CanvasEnvelope>(worktreeId) : undefined;
+  const canvases = includeCanvas ? await client.listCanvases<CanvasEnvelope>(worktreeId, signal) : undefined;
   if (canvases && (canvases.worktree_id !== worktreeId || canvases.project_id !== worktree.project_id)) {
     throw new Error("Group API returned Canvas data outside the active Project or Worktree.");
   }
@@ -260,7 +270,7 @@ async function loadProjection(
   const canvas = selectedCanvas ?? projectedCanvases[0];
   const canvasRow = canvasRows.find((row) => row.canvas_id === canvas?.id);
   const elementResponse = canvas
-    ? await client.listCanvasElements<ElementEnvelope>(worktreeId, canvas.id)
+    ? await client.listCanvasElements<ElementEnvelope>(worktreeId, canvas.id, signal)
     : undefined;
   if (elementResponse && elementResponse.worktree_id !== worktreeId) {
     throw new Error("Group API returned Canvas elements outside the active Worktree.");

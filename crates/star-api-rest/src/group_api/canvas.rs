@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1b8591221cc0dfefd69c831ac9c6c8805726b8e7f5b1fa1b3b23599dc4a2255a
+@cypher schema=1 source_sha256=493aca90f33d5f38aa5d7bea5da52d7fac52e20df8130d3351de2c519b39a68f
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas.rs"})
 MERGE (route:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::router",kind:"function"})
 MERGE (list:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::list_worktree_canvas_events",kind:"function"})
@@ -9,6 +9,9 @@ MERGE (append:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::append_e
 MERGE (query:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::WorktreeCanvasEventsQuery",kind:"struct"})
 MERGE (row:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::CanvasOutboxStreamRow",kind:"struct"})
 MERGE (scope:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::authorize_group_scope",kind:"function"})
+MERGE (wakeAuthorize:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::reauthorize_worktree_canvas_read",kind:"function"})
+MERGE (validateActor:Symbol {id:"crates/star-api-rest/src/group_api.rs::validate_actor",kind:"function"})
+MERGE (requireScope:Symbol {id:"crates/star-api-rest/src/group_api.rs::require_scope",kind:"function"})
 MERGE (worktree:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::request_worktree",kind:"function"})
 MERGE (outbox:Table {name:"canvas.canvas_group_outbox"})
 MERGE (advisory:Database {name:"PostgreSQL transaction advisory lock"})
@@ -17,6 +20,7 @@ MERGE (self)-[:DEFINES]->(validate)
 MERGE (self)-[:DEFINES]->(lock)
 MERGE (self)-[:DEFINES]->(query)
 MERGE (self)-[:DEFINES]->(row)
+MERGE (self)-[:DEFINES]->(wakeAuthorize)
 MERGE (route)-[:CALLS]->(list)
 MERGE (list)-[:CALLS]->(validate)
 MERGE (list)-[:CALLS]->(scope)
@@ -24,6 +28,9 @@ MERGE (list)-[:CALLS]->(worktree)
 MERGE (list)-[:READS]->(outbox)
 MERGE (append)-[:CALLS]->(lock)
 MERGE (lock)-[:USES]->(advisory)
+MERGE (wakeAuthorize)-[:CALLS]->(validateActor)
+MERGE (wakeAuthorize)-[:CALLS]->(requireScope)
+MERGE (wakeAuthorize)-[:CALLS]->(scope)
 MERGE (createTask:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::create_work_item_on_canvas",kind:"function"})
 
 MERGE (taskAdapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})
@@ -130,8 +137,8 @@ use super::work_items::{
     WorktreeScope,
 };
 use super::{
-    active_binding, require_scope, validate_actor, AuthUser, AuthenticatedUser, GroupApiError,
-    GroupApiState,
+    active_binding, require_scope, validate_actor, AuthUser, AuthenticatedDeviceContext,
+    GroupApiError, GroupApiState,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -431,15 +438,22 @@ pub(super) fn router() -> Router<GroupApiState> {
 
 async fn list_canvas_events(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id)): Path<(String, String)>,
     Query(query): Query<CanvasEventsQuery>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:read")?;
     let canvas_id = parse_id(&canvas_id)?;
     let (cursor_at, cursor_event_id, limit) = validated_cursor_and_limit(query)?;
-    let (mut tx, _) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, false).await?;
+    let (mut tx, _) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        false,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
 
     let events = sqlx::query_as::<_, CanvasOutboxEvent>(
@@ -470,14 +484,21 @@ async fn list_canvas_events(
 
 async fn list_worktree_canvas_events(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path(worktree_id): Path<String>,
     Query(query): Query<WorktreeCanvasEventsQuery>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:read")?;
     let (after_offset, limit) = validated_worktree_cursor_and_limit(query)?;
-    let (mut tx, _) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, false).await?;
+    let (mut tx, _) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        false,
+    )
+    .await?;
 
     let mut rows = sqlx::query_as::<_, CanvasOutboxStreamRow>(
         r#"SELECT stream_offset,event_id,canvas_id,event_type,occurred_at
@@ -549,11 +570,12 @@ fn validated_cursor_and_limit(
 
 async fn create_work_item_on_canvas(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id)): Path<(String, String)>,
     headers: HeaderMap,
     Json(body): Json<CreateWorkItemOnCanvasBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     validate_actor(&actor)?;
     require_scope(&actor, "work-item:write")?;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
@@ -583,8 +605,14 @@ async fn create_work_item_on_canvas(
         &body,
     )?;
 
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     let _run_scope = authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &scope).await?;
     validate_ai_task_scope(&item_for_validation, scope.repo_id)?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
@@ -705,12 +733,19 @@ async fn create_work_item_on_canvas(
 }
 async fn list_canvases(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path(worktree_id): Path<String>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:read")?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, false).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        false,
+    )
+    .await?;
     let rows = sqlx::query_as::<_, CanvasListRow>(
         r#"
         SELECT c.canvas_id, c.title, c.version, c.created_by, c.created_at,
@@ -737,19 +772,26 @@ async fn list_canvases(
 
 async fn create_canvas(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path(worktree_id): Path<String>,
     headers: HeaderMap,
     Json(body): Json<CreateCanvasBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     if body.title.trim().is_empty() || body.title.trim().len() > 200 {
         return Err(GroupApiError::invalid_request("invalid_canvas_title"));
     }
     let key = idempotency_key(&headers)?;
     let hash = request_hash(&format!("canvas:create:{worktree_id}"), &body)?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(Json(response));
@@ -797,11 +839,12 @@ async fn create_canvas(
 
 async fn update_document(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id)): Path<(String, String)>,
     headers: HeaderMap,
     Json(body): Json<CanvasDocumentBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     validate_document(&body)?;
@@ -820,8 +863,14 @@ async fn update_document(
         &format!("canvas:document:update:{worktree_id}:{canvas_id}"),
         &body,
     )?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -1011,13 +1060,20 @@ async fn validate_document_refs(
 
 async fn list_elements(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id)): Path<(String, String)>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:read")?;
     let canvas_id = parse_id(&canvas_id)?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, false).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        false,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     let elements = query_elements(
         &mut tx,
@@ -1038,11 +1094,12 @@ async fn list_elements(
 
 async fn create_element(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id)): Path<(String, String)>,
     headers: HeaderMap,
     Json(body): Json<CreateElementBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     validate_element_body(
@@ -1063,8 +1120,14 @@ async fn create_element(
         &format!("canvas:element:create:{worktree_id}:{canvas_id}"),
         &body,
     )?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -1144,11 +1207,12 @@ async fn create_element(
 
 async fn update_element(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id, element_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<UpdateElementBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     let element_id = parse_id(&element_id)?;
@@ -1160,8 +1224,14 @@ async fn update_element(
         &format!("canvas:element:update:{worktree_id}:{canvas_id}:{element_id}"),
         &body,
     )?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -1300,11 +1370,12 @@ async fn update_element(
 
 async fn set_entity_ref(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id, element_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<SetEntityRefBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     let element_id = parse_id(&element_id)?;
@@ -1321,8 +1392,14 @@ async fn set_entity_ref(
         &format!("canvas:entity-ref:set:{worktree_id}:{canvas_id}:{element_id}"),
         &body,
     )?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -1433,11 +1510,12 @@ async fn set_entity_ref(
 
 async fn clear_entity_ref(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id, element_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<ClearEntityRefBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     let element_id = parse_id(&element_id)?;
@@ -1449,8 +1527,14 @@ async fn clear_entity_ref(
         &format!("canvas:entity-ref:clear:{worktree_id}:{canvas_id}:{element_id}"),
         &body,
     )?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -1515,11 +1599,12 @@ async fn clear_entity_ref(
 
 async fn delete_element(
     State(state): State<GroupApiState>,
-    AuthenticatedUser(actor): AuthenticatedUser,
+    device_context: AuthenticatedDeviceContext,
     Path((worktree_id, canvas_id, element_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<DeleteElementBody>,
 ) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     let element_id = parse_id(&element_id)?;
@@ -1531,8 +1616,14 @@ async fn delete_element(
         &format!("canvas:element:delete:{worktree_id}:{canvas_id}:{element_id}"),
         &body,
     )?;
-    let (mut tx, scope) =
-        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        true,
+    )
+    .await?;
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -1676,9 +1767,15 @@ fn request_worktree(
 async fn authorize_group_scope<'a>(
     pool: &'a PgPool,
     actor: &AuthUser,
+    device_context: &AuthenticatedDeviceContext,
     worktree_id: Uuid,
     write: bool,
 ) -> Result<(Transaction<'a, Postgres>, WorktreeScope), GroupApiError> {
+    if actor.user_id != device_context.actor.user_id
+        || actor.tenant_id != device_context.actor.tenant_id
+    {
+        return Err(GroupApiError::unauthorized());
+    }
     let mut tx = pool.begin().await.map_err(|_| GroupApiError::internal())?;
     sqlx::query(
         "SELECT set_config('statement_timeout', '5000', true), \
@@ -1693,6 +1790,22 @@ async fn authorize_group_scope<'a>(
         .execute(&mut *tx)
         .await
         .map_err(|_| GroupApiError::internal())?;
+    let current_generation = sqlx::query_scalar::<_, i64>(
+        "SELECT generation FROM oauth_device_bindings \
+         WHERE tenant_id=$1 AND actor_id=$2 AND device_id=$3 \
+           AND generation=$4 AND status='active' AND revoked_at IS NULL \
+         FOR SHARE",
+    )
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .bind(device_context.device.device_id)
+    .bind(device_context.device.generation)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::feature_unavailable("device_generation_unavailable"))?;
+    if current_generation != Some(device_context.device.generation) {
+        return Err(GroupApiError::forbidden());
+    }
     let binding = active_binding(&mut tx, actor, scope.project_id).await?;
     let run_scope = authorize_task_run_for_worktree(&mut tx, actor, worktree_id, &scope).await?;
     if write {
@@ -1705,6 +1818,20 @@ async fn authorize_group_scope<'a>(
         .await
         .map_err(|_| GroupApiError::internal())?;
     Ok((tx, scope))
+}
+
+/// Re-check current request scopes and persisted Project/Run/Worktree access, then release the read transaction.
+pub(super) async fn reauthorize_worktree_canvas_read(
+    pool: &PgPool,
+    device_context: &AuthenticatedDeviceContext,
+    worktree_id: Uuid,
+) -> Result<(), GroupApiError> {
+    let actor = &device_context.actor;
+    validate_actor(actor)?;
+    require_scope(actor, "worktree:read")?;
+    require_scope(actor, "canvas:read")?;
+    let (tx, _) = authorize_group_scope(pool, actor, device_context, worktree_id, false).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())
 }
 
 async fn require_canvas(

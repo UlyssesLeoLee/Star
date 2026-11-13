@@ -1,6 +1,6 @@
 //! Owner-local, bounded admission receipt/result transactions. No executor is enabled.
 /*
-@cypher schema=1 source_sha256=3d5aee3093c97bbe762c59caccf0129aab6bf582a54af5d29d9e2b17a8e48c38
+@cypher schema=1 source_sha256=744c96ef067df3f4c63ca0d8c03f6cc2fdad204e62924485c29da7cc1ac50c0d
 MERGE (self:File {path:"crates/run-owner-runtime/src/schedule_admission.rs"})
 MERGE (begin:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::PostgresScheduleAdmissionStore.begin",kind:"method"})
 MERGE (commit:Symbol {id:"crates/run-owner-runtime/src/schedule_admission.rs::ScheduleAdmissionTransaction.commit_result",kind:"method"})
@@ -397,9 +397,8 @@ impl PostgresScheduleAdmissionStore {
         if row.try_get::<Uuid, _>("source_schedule_service_id")? != source.schedule_service_id {
             return Err(ScheduleAdmissionStoreError::UntrustedScope);
         }
-        let (command, _) = decode_branch_bound_schedule_command(
-            &row.try_get::<Vec<u8>, _>("command_wire")?,
-        )?;
+        let (command, _) =
+            decode_branch_bound_schedule_command(&row.try_get::<Vec<u8>, _>("command_wire")?)?;
         let result =
             ScheduleRunAdmissionResultV1::decode_json(&row.try_get::<Vec<u8>, _>("result_wire")?)?;
         result.validate_for_command(&command)?;
@@ -635,7 +634,7 @@ impl ScheduleAdmissionTransaction {
         .bind(command.tenant_id)
         .bind(command.occurrence.run_as_actor_id)
         .bind(target.project_id)
-        .bind(branch_id)
+        .bind(self.branch_id)
         .bind(target.engineering_run_id)
         .bind(target.repository_id)
         .bind(target.worktree_id)
@@ -790,8 +789,7 @@ impl ScheduleAdmissionTransaction {
 mod tests {
     use super::{
         decode_branch_bound_schedule_command, hostless_schedule_target_in_wire,
-        required_schedule_branch_id,
-        ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionStoreError,
+        required_schedule_branch_id, ScheduleAdmissionRejectionCodeV1, ScheduleAdmissionStoreError,
     };
     use uuid::Uuid;
 

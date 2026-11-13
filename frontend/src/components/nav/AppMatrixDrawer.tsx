@@ -1,7 +1,7 @@
 "use client";
 
 /*
-@cypher schema=1 source_sha256=777fb6104130cbce33b2949e1f00bd69f884abc22765b41f6b8494bb766e8712
+@cypher schema=1 source_sha256=ecbe7332e33d319d59fc87bd782778ffef6e75cae18b3e9ed26219629fa5caae
 MERGE (self:File {path:"frontend/src/components/nav/AppMatrixDrawer.tsx"})
 MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -13,7 +13,7 @@ MERGE (matrix)-[:CALLS]->(guardedLink)
 
 import { useState, useMemo } from "react";
 import { ALL_MODULES, CATEGORY_STYLES, getCategoryStyles, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
-import { useNavStore } from "@/lib/nav/navStore";
+import { useNavStore, WORKTREE_INDEX_OWNED_MODULES } from "@/lib/nav/navStore";
 import {
   Search,
   X,
@@ -250,6 +250,8 @@ function MatrixCard({
   const { t } = useTranslation();
   const Icon = m.icon;
   const cs = getCategoryStyles(m.category);
+  // per WBS §23.32-A: worktree 由 Project Worktree Index 承载, sidebar 钉选按钮禁用
+  const indexOwned = (WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id);
   return (
     <div
       data-testid={`matrix-card-${m.id}`}
@@ -294,14 +296,17 @@ function MatrixCard({
           <button
             type="button"
             onClick={onToggleSidebar}
+            disabled={indexOwned}
             data-testid={`pin-sidebar-${m.id}`}
             className={clsx(
               "px-2.5 py-1 text-[10px] font-mono font-bold flex items-center gap-1 transition-all border-2 border-black cel-shadow",
-              inSidebar
-                ? "bg-[var(--cel-cyan,#00f0ff)] text-black"
-                : "bg-black/60 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white hover:border-[var(--cel-cyan,#00f0ff)]"
+              indexOwned
+                ? "bg-black/40 text-[var(--cel-text-secondary,#94a3b8)] cursor-not-allowed opacity-60"
+                : inSidebar
+                  ? "bg-[var(--cel-cyan,#00f0ff)] text-black"
+                  : "bg-black/60 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white hover:border-[var(--cel-cyan,#00f0ff)]"
             )}
-            title={inSidebar ? t.appMatrix.unpinFromSidebar : t.appMatrix.pinToSidebar}
+            title={indexOwned ? t.appMatrix.indexOwnedHint : inSidebar ? t.appMatrix.unpinFromSidebar : t.appMatrix.pinToSidebar}
           >
             {inSidebar ? <Check size={11} className="stroke-[3]" /> : <Plus size={11} />}
             <span>{t.appMatrix.sidebarLabel}</span>

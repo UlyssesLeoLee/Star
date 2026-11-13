@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=7c9b394d33c1bb597c43a65d4bff8952e98a031922ec0bb8930291a73997fc76
+# MERGE (self:File {path:"scripts/automation/task_ops/nodes/bulk_node.py"})
+# @endcypher
 """scripts/automation/task_ops/nodes/bulk_node.py — TMO M-N4 bulk_node (per 03 §3.2.1.1)
 
 TMO v0.2 节点: N 张卡批量 action (pause/resume/cancel/set_priority)
@@ -33,14 +36,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from ..bulk_queue import (
     BulkAction,
-    BulkBatchResult,
     BulkOperationQueue,
     REVERSE_ACTION_MAP,
     VALID_ACTIONS,

@@ -40,16 +40,16 @@ pub mod start_from_picker;
 pub mod worktree_create_async;
 
 pub use branch_naming::{
+    normalize_branch, replace_emoji_shortcodes, sanitize_branch_chars, truncate_branch,
     BranchNamer, BranchNamingInput, BranchNamingResult, BranchNamingSource, DefaultBranchNamer,
-    EMOJI_SHORTCODE_TABLE, MAX_BRANCH_LENGTH, normalize_branch, replace_emoji_shortcodes,
-    sanitize_branch_chars, truncate_branch,
+    EMOJI_SHORTCODE_TABLE, MAX_BRANCH_LENGTH,
 };
 pub use error::{SharedDirError, SharedDirResult};
 pub use external_worktree_import::{
     DynExternalWorktreeImport, ExternalWorktree, ExternalWorktreeImport,
-    ExternalWorktreeImportError, ExternalWorktreeImportRegistry,
-    ExternalWorktreeImportResult, InMemoryExternalWorktreeImport, NoopPostImportHook,
-    PostImportHook, RealExternalWorktreeImport, WorktreeId,
+    ExternalWorktreeImportError, ExternalWorktreeImportRegistry, ExternalWorktreeImportResult,
+    InMemoryExternalWorktreeImport, NoopPostImportHook, PostImportHook, RealExternalWorktreeImport,
+    WorktreeId,
 };
 pub use shared_dir_resolver::{
     default_per_user_config_path, ConfigSource, FileBackedConfigSource, FileBackedPerUserSource,
@@ -64,8 +64,8 @@ pub use shared_dir_types::{
     SharedDirectory, SharedMountStrategy,
 };
 pub use start_from_picker::{
-    InMemoryStartFromPicker, RealStartFromPicker, RemoteFetch, StartFrom,
-    StartFromPickerError, StartFromPickerRegistry, describe_start_from, parse_candidate_id,
+    describe_start_from, parse_candidate_id, InMemoryStartFromPicker, RealStartFromPicker,
+    RemoteFetch, StartFrom, StartFromPickerError, StartFromPickerRegistry,
 };
 pub use worktree_create_async::{
     InMemoryWorktreeCreateAsync, RealWorktreeCreateAsync, WorktreeCreateAsync,

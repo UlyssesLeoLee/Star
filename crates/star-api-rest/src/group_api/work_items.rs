@@ -130,10 +130,10 @@
 //! @endcypher
 //!
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, post},
+    Json, Router,
 };
 use domain_work_item::run_task_card::{
     CreateRunTaskCardCommand, ReviewRunTaskCardCommand, RunTaskCardAiData,
@@ -142,14 +142,14 @@ use domain_work_item::run_task_card::{
 };
 use domain_work_item::{TenantId, UserId, WorktreeId};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
+    GroupApiState,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -1171,7 +1171,7 @@ pub(super) fn require_task_writer(role: &str) -> Result<(), GroupApiError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{LifecycleTransitionBody, ReviewCommandBody, route_worktree_focus};
+    use super::{route_worktree_focus, LifecycleTransitionBody, ReviewCommandBody};
     use serde_json::json;
     use uuid::Uuid;
 

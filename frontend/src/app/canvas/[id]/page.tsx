@@ -1,15 +1,28 @@
+/*
+@cypher schema=1 source_sha256=69df2ef9042f166e614efa45b70495b6d5bfd82c78b342a1918df725cc0fa91b
+MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasPage",kind:"component"})
+MERGE (overlay:Symbol {id:"frontend/src/components/canvas-game/CanvasGameOverlay.tsx::CanvasGameOverlay",kind:"component"})
+MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:IMPORTS]->(overlay)
+@endcypher
+*/
 "use client";
 
 import { useStore } from "@/lib/store";
+import { useShallow } from "zustand/react/shallow";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useRef, Suspense, use as ReactUse } from "react";
 import html2canvas from "html2canvas";
 import toast from "react-hot-toast";
 import { CanvasView } from "@/components/CanvasView";
+import { CanvasGameOverlay } from "@/components/canvas-game/CanvasGameOverlay";
 import { PageHeader } from "@/components/PageHeader";
-import { ArrowLeft, Share2, Download, Users } from "lucide-react";
+import { ArrowLeft, Share2, Download, Users, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
+import { useState } from "react";
+import type { EnemySpawnSeed } from "@/lib/canvas-game/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,10 +34,12 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight") || undefined;
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // 游戏模式 (per WBS §23.36: ?mode=game 或按钮切换)
+  const [gameMode, setGameMode] = useState(searchParams.get("mode") === "game");
 
-  const canvas = useStore((s) => s.canvases.find((c) => c.id === canvasId));
-  const elements = useStore((s) => s.canvasElements.filter((e) => e.canvas_id === canvasId));
-  const connectors = useStore((s) => s.canvasConnectors.filter((c) => c.canvas_id === canvasId));
+  const canvas = useStore(useShallow((s) => s.canvases.find((c) => c.id === canvasId)));
+  const elements = useStore(useShallow((s) => s.canvasElements.filter((e) => e.canvas_id === canvasId)));
+  const connectors = useStore(useShallow((s) => s.canvasConnectors.filter((c) => c.canvas_id === canvasId)));
   const worktrees = useStore((s) => s.worktrees);
   const agentSessions = useStore((s) => s.agentSessions);
   const feedbacks = useStore((s) => s.feedbacks);
@@ -94,6 +109,17 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
     );
   }
 
+  // 游戏模式: 从 canvas 节点生成敌人种子 (per WBS §23.36, work_item/agent 节点 = 关卡素材)
+  const gameSeeds: EnemySpawnSeed[] = elements
+    .filter((e) => e.kind === "work_item_card" || e.kind === "agent_cursor")
+    .map((e) => ({
+      id: e.id,
+      x: e.x + e.width / 2,
+      y: e.y + e.height / 2,
+      kind: e.kind === "agent_cursor" ? "agent" : "work_item",
+      difficulty: e.kind === "agent_cursor" ? 2 : 1,
+    }));
+
   return (
     <div className="w-full h-[calc(100vh-5rem)] flex flex-col">
       {/* Header */}
@@ -112,6 +138,14 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
         </div>
         <div className="flex items-center gap-2 text-[10px] text-ink-dim font-mono">
           <span className="flex items-center gap-1"><Users size={10} /> 3 online</span>
+          <button
+            type="button"
+            data-testid="canvas-game-mode-btn"
+            onClick={() => setGameMode((v) => !v)}
+            className={`btn py-0.5 text-[10px] ${gameMode ? "border-accent text-accent" : ""}`}
+          >
+            <Gamepad2 size={10} /> {t.canvasGame.playButton}
+          </button>
           <button data-testid="canvas-share-btn" onClick={onShare} className="btn text-[10px] py-0.5"><Share2 size={10} /> Share</button>
           <button data-testid="canvas-export-png-btn" onClick={onExportPng} className="btn text-[10px] py-0.5"><Download size={10} /> Export PNG</button>
         </div>
@@ -146,6 +180,12 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
             });
             return { id };
           }}
+        />
+        {/* 游戏模式覆盖层 (per WBS §23.36: 弹幕 Roguelike 像素风) */}
+        <CanvasGameOverlay
+          seeds={gameSeeds}
+          enabled={gameMode}
+          onExit={() => setGameMode(false)}
         />
       </div>
     </div>

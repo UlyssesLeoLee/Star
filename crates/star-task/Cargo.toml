@@ -10,7 +10,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Star Multica Task Lifecycle 抽象层 (R4 阶段 1: 7 态状态机 + session poison 5 reason + review gate + 4 类 404, per ADR-0027 R4 + plan-032 R4)"
+description = "Star Task Lifecycle abstraction with a seven-state machine, review gates, and explicit not-found outcomes"
 
 [dependencies]
 # workspace inheritance (per 守门 #1 + #19, 避免 version 重复)

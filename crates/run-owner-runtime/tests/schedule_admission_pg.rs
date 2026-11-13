@@ -916,11 +916,11 @@ async fn admission_receipt_replay_conflict_rollback_and_scope(
 async fn verify_admission_quarantine(
     admin: &sqlx::PgPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use platform_messaging_runtime::admission_quarantine_pg::PgAdmissionReceiveQuarantine;
     use platform_messaging_runtime::admission_receive::{
         AdmissionReceiveError, AdmissionReceiveKind, AdmissionReceiveOrigin,
         AdmissionReceivePoisonFault, AdmissionReceiveQuarantine, AdmissionReceiveScope,
     };
-    use platform_messaging_runtime::admission_quarantine_pg::PgAdmissionReceiveQuarantine;
 
     sqlx::raw_sql(
         "CREATE ROLE star_platform_ingress_test_login LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS;
@@ -959,7 +959,11 @@ async fn verify_admission_quarantine(
         .await?;
     assert!(matches!(
         quarantine
-            .record(&origin, b"different exact wire", AdmissionReceivePoisonFault::MalformedWire)
+            .record(
+                &origin,
+                b"different exact wire",
+                AdmissionReceivePoisonFault::MalformedWire
+            )
             .await,
         Err(AdmissionReceiveError::Quarantine)
     ));
@@ -989,7 +993,11 @@ async fn verify_admission_quarantine(
     cross_tenant.scope.tenant_id = Uuid::new_v4();
     assert!(matches!(
         quarantine
-            .record(&cross_tenant, wire, AdmissionReceivePoisonFault::MalformedWire)
+            .record(
+                &cross_tenant,
+                wire,
+                AdmissionReceivePoisonFault::MalformedWire
+            )
             .await,
         Err(AdmissionReceiveError::Quarantine)
     ));
@@ -999,7 +1007,10 @@ async fn verify_admission_quarantine(
     .bind(deployment_id)
     .fetch_one(admin)
     .await?;
-    assert_eq!(receipts, 2, "exact replay adds no receipt; another provider has its own key");
+    assert_eq!(
+        receipts, 2,
+        "exact replay adds no receipt; another provider has its own key"
+    );
     let mut receiver_origin = origin.clone();
     receiver_origin.sequence = 8;
     verify_actual_quarantine_receiver(
@@ -1386,7 +1397,9 @@ async fn seed_directory(
     let tenant = command.tenant_id;
     let actor = command.occurrence.run_as_actor_id;
     let project = t.project_id;
-    let branch = t.branch_id;
+    let branch = t
+        .branch_id
+        .expect("admission fixtures require a remote Branch");
     let run = t.engineering_run_id;
     let repo = t.repository_id;
     // Generated UUIDs and allowlisted state only; no external/user strings enter SQL.
@@ -1417,7 +1430,9 @@ async fn seed_task_binding(
     let tenant = command.tenant_id;
     let actor = command.occurrence.run_as_actor_id;
     let project = t.project_id;
-    let branch = t.branch_id;
+    let branch = t
+        .branch_id
+        .expect("admission fixtures require a remote Branch");
     let run = t.engineering_run_id;
     let repo = t.repository_id;
     let worktree = t.worktree_id;
@@ -2548,13 +2563,7 @@ async fn verify_admission_delivery(
         "test-star-log".to_owned(),
     )?;
     assert!(schedule_delivery
-        .claim(
-            cmd.tenant_id,
-            Uuid::new_v4(),
-            1,
-            120,
-            &replacement_profile,
-        )
+        .claim(cmd.tenant_id, Uuid::new_v4(), 1, 120, &replacement_profile,)
         .await?
         .is_empty());
     let second = schedule_delivery

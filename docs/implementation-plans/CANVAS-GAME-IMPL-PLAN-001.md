@@ -1,8 +1,10 @@
 # CANVAS-GAME-IMPL-PLAN-001
 
+> **历史状态（2026-10-30）**：实施计划已退役，不授权或描述当前 Star 产品发布。本文保留原始执行记录用于审计与历史追溯。
+
 > **STAR 画布游戏 (canvas-game) 实施计划 v0.1** (per SRS-STAR-CANVAS-GAME-001 v0.1 + BD-STAR-CANVAS-GAME-001 v0.1 + DD-STAR-CANVAS-GAME-001 v0.1)
 >
-> - 状态: 实施计划 Baseline Draft (per ULYS-160 issue #160)
+> - 状态: Retired Historical Record (已退役历史记录；不作为当前实施计划)
 > - 阶段 1 完成日: 2026-09-26 (4 crate 骨架 + Dockerfile + GHCR publish workflow + 部署手册)
 > - 阶段 2 触发: 5 域 Lead 真人到位后, per 守门 #14 v4 Mavis 临时代签反转为真 Lead
 > - 关联 SRS: `docs/requirements/SRS-STAR-CANVAS-GAME-001.md` v0.1 (commit `4ed55ae`)

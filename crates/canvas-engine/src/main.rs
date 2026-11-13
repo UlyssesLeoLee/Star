@@ -1,7 +1,18 @@
-//! canvas-engine main: axum HTTP server 监听 :8080 (per deploy/canvas-game-k3s.yaml).
+/*
+@cypher schema=1 source_sha256=8962094c15875cdbbb4fd81c1ff4aaf3b4a529b811cbeb04d5b8958d125049e7
+MERGE (self:File {path:"crates/canvas-engine/src/main.rs"})
+MERGE (main:Symbol {id:"crates/canvas-engine/src/main.rs::main",kind:"function"})
+MERGE (service:Type {id:"crates/canvas-engine/src/lib.rs::ServiceMetadata"})
+MERGE (router:Symbol {id:"crates/canvas-engine/src/lib.rs::router",kind:"function"})
+MERGE (self)-[:DEFINES]->(main)
+MERGE (self)-[:IMPORTS]->(:File {path:"crates/canvas-engine/src/lib.rs"})
+MERGE (main)-[:CALLS]->(router)
+MERGE (main)-[:USES_TYPE]->(service)
+@endcypher
+*/
+//! Star Canvas engine HTTP server; the deployment manifest configures port 8080.
 //!
-//! 阶段 1: 健康检查 + 服务版本 + 占位 endpoint. 0 业务.
-//! 阶段 2+: 落地 跨 5 domain 共享 API (per SRS-STAR-CANVAS-GAME-001 v0.1 §4.1).
+//! Serves health, readiness, version, and service metadata.
 
 use canvas_engine::router;
 use tracing::{info, warn};
@@ -11,7 +22,9 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> anyhow::Result<()> {
     // tracing init (per workspace lint + 守门 #13 a L0 协调)
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
 
     let port: u16 = std::env::var("PORT")

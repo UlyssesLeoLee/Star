@@ -1,8 +1,4 @@
-//! star-workflow — Jira-like 任务流 Rust 阶段 1 (R6 阶段 1) 🟢
-//!
-//! Per ADR-0027 v0.1 §2.3 + plan-032 R6: **Jira 长处整合** = Issue tracking + workflow rules
-//! (status transitions + 条件) + sprint + assign + 跨域依赖. **Jira 限制避免** = 不用 Jira JQL
-//! 复杂查询 (改 Rust enum + match) + 不用 Jira plugin 体系 (改 Rust trait 抽象).
+//! Star 任务工作流，支持事项跟踪、状态迁移规则、迭代、指派与跨域依赖。
 //!
 //! WBS 集成 (per ADR-0027 §2.3.2 共享 Task schema 跨 3 view):
 //! - WBS row = Issue (key + workflow + state + assignee + priority)
@@ -28,7 +24,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 // ============================================================================
-// §1 ID newtype (per Multica opaque ID 1:1 派生)
+// §1 ID newtype（稳定不透明标识）
 // ============================================================================
 
 /// Workflow ID
@@ -57,7 +53,7 @@ pub struct AttachmentId(pub Uuid);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SprintId(pub Uuid);
 
-/// Issue Key (Jira-style 业务 ID, e.g. "STAR-001", WBS row 共享主键)
+/// 事项业务标识，例如 `STAR-001`，同时用作 WBS 行主键。
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct IssueKey(pub String);
 
@@ -85,25 +81,25 @@ impl From<String> for IssueKey {
 }
 
 // ============================================================================
-// §2 Workflow 状态机 (Jira workflow rules, per plan-032 R6 Jira 长处整合)
+// §2 Workflow 状态机（状态迁移规则）
 // ============================================================================
 
-/// Workflow 5 态状态机 (per ADR-0027 §2.3 + Jira 默认 workflow)
+/// 工作流的五种状态。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WorkflowState {
-    /// 打开 (Jira "To Do" / "Open")
+    /// 待处理
     Open,
-    /// 进行中 (Jira "In Progress")
+    /// 进行中
     InProgress,
-    /// 评审中 (Jira "In Review" / "Code Review")
+    /// 评审中
     InReview,
-    /// 完成 (Jira "Done" / "Resolved")
+    /// 完成
     Done,
-    /// 关闭 (Jira "Closed")
+    /// 关闭
     Closed,
 }
 
-/// Workflow transition (from_state → to_state, 命名 per Jira workflow)
+/// 从一个工作流状态迁移到另一个状态的规则。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transition {
     /// Transition ID
@@ -128,7 +124,7 @@ impl Transition {
     }
 }
 
-/// Workflow (Jira workflow = name + states + transitions DAG)
+/// 由名称、描述和状态迁移规则组成的工作流。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Workflow {
     /// Workflow ID
@@ -159,7 +155,7 @@ impl Workflow {
     pub fn transitions_from(&self, from: WorkflowState) -> Vec<&Transition> {
         self.transitions.iter().filter(|t| t.from == from).collect()
     }
-    /// 找 from → to 的 transition (per Jira workflow rule 校验)
+    /// 查找从指定起始状态到目标状态的迁移规则。
     pub fn find_transition(&self, from: WorkflowState, to: WorkflowState) -> Option<&Transition> {
         self.transitions
             .iter()
@@ -167,12 +163,9 @@ impl Workflow {
     }
 }
 
-/// Jira-style "默认" workflow: Open → InProgress → InReview → Done → Closed (4 transition)
+/// 默认任务工作流依次经过 `Open`、`InProgress`、`InReview`、`Done` 和 `Closed`。
 pub fn default_workflow() -> Workflow {
-    let mut wf = Workflow::new(
-        "default",
-        "Default Jira-like workflow (5 states, 4 transitions)",
-    );
+    let mut wf = Workflow::new("default", "Default task workflow (5 states, 4 transitions)");
     wf.add_transition(Transition::new(
         "Start Progress",
         WorkflowState::Open,
@@ -200,12 +193,12 @@ pub fn default_workflow() -> Workflow {
 // §3 Issue (WBS row = Issue, per ADR-0027 §2.3.2 共享 schema 跨 3 view)
 // ============================================================================
 
-/// Issue 优先级 (per Jira priority scheme)
+/// 事项优先级。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum Priority {
     /// 低
     Low,
-    /// 中 (default, per Jira 默认)
+    /// 中（默认）
     #[default]
     Medium,
     /// 高
@@ -214,7 +207,7 @@ pub enum Priority {
     Critical,
 }
 
-/// Issue (Jira issue = WBS row, 跟 star-task 1:1 派生, R9 整合时统一)
+/// 与 WBS 行对应的工作流事项。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Issue {
     /// Issue Key (业务主键, e.g. "STAR-001")
@@ -261,10 +254,10 @@ impl Issue {
 }
 
 // ============================================================================
-// §4 Comment (Jira issue comment)
+// §4 Comment（事项评论）
 // ============================================================================
 
-/// Issue 评论 (Jira comment = text + author + timestamp)
+/// 事项评论，包含正文、作者和时间戳。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Comment {
     /// Comment ID
@@ -297,10 +290,10 @@ impl Comment {
 }
 
 // ============================================================================
-// §5 Attachment (Jira issue attachment)
+// §5 Attachment（事项附件）
 // ============================================================================
 
-/// Issue 附件 (Jira attachment = filename + mime + size + url)
+/// 事项附件，包含文件名、MIME 类型、大小和 URL。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Attachment {
     /// Attachment ID
@@ -346,10 +339,10 @@ impl Attachment {
 }
 
 // ============================================================================
-// §6 Sprint (Jira sprint = 时间盒 + issue 集合)
+// §6 Sprint（时间盒与事项集合）
 // ============================================================================
 
-/// Sprint (Jira sprint = 时间盒 + issue_keys 集合)
+/// 迭代，包含时间范围和事项标识集合。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sprint {
     /// Sprint ID

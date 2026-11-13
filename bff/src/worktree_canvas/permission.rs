@@ -104,10 +104,21 @@ impl WorktreeAction {
     /// Action 危险级别 (per spec §4.4 表 1:1).
     pub fn danger(self) -> ActionDanger {
         match self {
-            Self::CreateWorktree | Self::OpenWorktree | Self::OpenInIde | Self::Compare
-            | Self::Lock | Self::Unlock | Self::Focus | Self::ExplainRisk => ActionDanger::Safe,
-            Self::SyncMain | Self::Rebase | Self::CreatePR | Self::Archive | Self::MarkSuperseded
-            | Self::SetDependency | Self::RemoveDependency => ActionDanger::Warning,
+            Self::CreateWorktree
+            | Self::OpenWorktree
+            | Self::OpenInIde
+            | Self::Compare
+            | Self::Lock
+            | Self::Unlock
+            | Self::Focus
+            | Self::ExplainRisk => ActionDanger::Safe,
+            Self::SyncMain
+            | Self::Rebase
+            | Self::CreatePR
+            | Self::Archive
+            | Self::MarkSuperseded
+            | Self::SetDependency
+            | Self::RemoveDependency => ActionDanger::Warning,
             Self::Merge | Self::Delete | Self::Cleanup => ActionDanger::Destructive,
         }
     }
@@ -287,7 +298,9 @@ impl WorktreePermission {
                     || self.has_role(role::AGENT_BOT)
             }
             ActionDanger::Warning => {
-                self.has_role(role::EDITOR) || self.has_role(role::LEAD) || self.has_role(role::AGENT_BOT)
+                self.has_role(role::EDITOR)
+                    || self.has_role(role::LEAD)
+                    || self.has_role(role::AGENT_BOT)
             }
             ActionDanger::Destructive => self.has_role(role::LEAD),
         };
@@ -363,7 +376,11 @@ mod tests {
         roles.insert(role::PLATFORM_ADMIN.to_string());
         let p = WorktreePermission::new(tenant(), roles, PermissionLevel::View);
         for action in WorktreeAction::ALL {
-            assert!(p.require_action(*action).is_ok(), "admin failed {:?}", action);
+            assert!(
+                p.require_action(*action).is_ok(),
+                "admin failed {:?}",
+                action
+            );
         }
     }
 
@@ -395,7 +412,11 @@ mod tests {
         roles.insert(role::LEAD.to_string());
         let p = WorktreePermission::new(tenant(), roles, PermissionLevel::Edit);
         for action in WorktreeAction::ALL {
-            assert!(p.require_action(*action).is_ok(), "lead failed {:?}", action);
+            assert!(
+                p.require_action(*action).is_ok(),
+                "lead failed {:?}",
+                action
+            );
         }
     }
 }

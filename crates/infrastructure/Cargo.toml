@@ -45,6 +45,18 @@ platform-messaging-runtime = { path = "../platform-messaging-runtime", default-f
 # v0.66 P0-4 InMemoryAdapterRegistry 测试用 (#[tokio::test] async test runner)
 # v0.69 refactor: 加 rt-multi-thread 让 #[tokio::test] 跑 current_thread 默认 runtime (per Finding #3 follow-up)
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+# The native result delivery integration test exercises the native gRPC transport
+# adapter, so the test target needs platform-messaging-runtime with that feature.
+platform-messaging-runtime = { path = "../platform-messaging-runtime", default-features = false, features = ["native-grpc-adapter"] }
+
+# The native result delivery integration test uses the crate's own
+# native-grpc-adapter feature (the delivery route and the native consumer are
+# feature-gated in the library), so the test target declares it as required.
+# Without this, `cargo check --workspace --all-targets` compiles the test against
+# a library build without the feature and fails to resolve the gated items.
+[[test]]
+name = "infrastructure_native_result_delivery_pg"
+required-features = ["native-grpc-adapter"]
 
 [lints]
 workspace = true

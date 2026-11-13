@@ -1,13 +1,22 @@
 /*
-@cypher schema=1 source_sha256=489b087969002436af86ef34267b9342b64d544b7338e6b8d6b71ce5e83f4129
+@cypher schema=1 source_sha256=bdca515e15db24638fbcaedb839f285d9b6a5dc163543e955916c8a6acee506c
 MERGE (self:File {path:"frontend/src/lib/group/worktreeGroupApi.ts"})
 MERGE (client:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient",kind:"class"})
 MERGE (authFailure:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.invalidateAuthorization",kind:"method"})
 MERGE (authInvalidated:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.authorizationInvalidated",kind:"state"})
 MERGE (request:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.request",kind:"method"})
 MERGE (list:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.listWorktreeCanvasEvents",kind:"method"})
-MERGE (poller:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller",kind:"class"})
-MERGE (pollOnce:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.pollOnce",kind:"method"})
+MERGE (catchUp:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxCatchUp",kind:"class"})
+MERGE (catchUpRun:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxCatchUp.catchUp",kind:"method"})
+MERGE (wakeSubscriber:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxWakeSubscriber",kind:"class"})
+MERGE (wakeSubscribe:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxWakeSubscriber.subscribe",kind:"method"})
+MERGE (wakeMux:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanvasWakeMultiplexer",kind:"class"})
+MERGE (wakeMuxRun:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanvasWakeMultiplexer.run",kind:"method"})
+MERGE (openWake:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.openWorktreeCanvasWakeStream",kind:"method"})
+MERGE (subscribeWake:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.subscribeWorktreeCanvasWake",kind:"method"})
+MERGE (readWake:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::readWorktreeCanvasWakeStream",kind:"function"})
+MERGE (wakeMap:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeGroupApiClient.canvasWakeMultiplexers",kind:"state"})
+MERGE (wakeEvent:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanvasWakeEvent",kind:"type"})
 MERGE (cursorStore:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasEventCursorStore",kind:"interface"})
 MERGE (browserStore:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::BrowserCanvasEventCursorStore",kind:"class"})
 MERGE (loadCursor:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasEventCursorStore.load",kind:"method"})
@@ -19,11 +28,21 @@ MERGE (page:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::WorktreeCanv
 MERGE (validateOffset:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::isValidStreamOffset",kind:"function"})
 MERGE (validateEvent:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::isWorktreeCanvasOutboxEvent",kind:"function"})
 MERGE (compareOffset:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::compareStreamOffsets",kind:"function"})
-MERGE (refresh:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxPoller.refreshProjection",kind:"field"})
+MERGE (refresh:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxCatchUp.refreshProjection",kind:"field"})
 MERGE (self)-[:DEFINES]->(client)
 MERGE (self)-[:DEFINES]->(authFailure)
 MERGE (self)-[:DEFINES]->(authInvalidated)
-MERGE (self)-[:DEFINES]->(poller)
+MERGE (self)-[:DEFINES]->(catchUp)
+MERGE (self)-[:DEFINES]->(catchUpRun)
+MERGE (self)-[:DEFINES]->(wakeSubscriber)
+MERGE (self)-[:DEFINES]->(wakeSubscribe)
+MERGE (self)-[:DEFINES]->(wakeMux)
+MERGE (self)-[:DEFINES]->(wakeMuxRun)
+MERGE (self)-[:DEFINES]->(openWake)
+MERGE (self)-[:DEFINES]->(subscribeWake)
+MERGE (self)-[:DEFINES]->(readWake)
+MERGE (self)-[:DEFINES]->(wakeMap)
+MERGE (self)-[:DEFINES]->(wakeEvent)
 MERGE (self)-[:DEFINES]->(cursorStore)
 MERGE (self)-[:DEFINES]->(browserStore)
 MERGE (self)-[:DEFINES]->(loadCursor)
@@ -33,7 +52,6 @@ MERGE (self)-[:DEFINES]->(cursor)
 MERGE (self)-[:DEFINES]->(event)
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:DEFINES]->(list)
-MERGE (self)-[:DEFINES]->(pollOnce)
 MERGE (self)-[:DEFINES]->(validateOffset)
 MERGE (self)-[:DEFINES]->(validateEvent)
 MERGE (self)-[:DEFINES]->(compareOffset)
@@ -42,14 +60,22 @@ MERGE (request)-[:CALLS]->(authFailure)
 MERGE (request)-[:READS]->(authInvalidated)
 MERGE (authFailure)-[:WRITES]->(authInvalidated)
 MERGE (list)-[:CALLS]->(request)
-MERGE (pollOnce)-[:CALLS]->(list)
-MERGE (pollOnce)-[:USES_TYPE]->(page)
-MERGE (pollOnce)-[:CALLS]->(validateOffset)
-MERGE (pollOnce)-[:CALLS]->(validateEvent)
-MERGE (pollOnce)-[:CALLS]->(compareOffset)
-MERGE (pollOnce)-[:CALLS]->(refresh)
-MERGE (pollOnce)-[:CALLS]->(loadCursor)
-MERGE (pollOnce)-[:CALLS]->(saveCursor)
+MERGE (client)-[:CALLS]->(openWake)
+MERGE (client)-[:CALLS]->(subscribeWake)
+MERGE (client)-[:READS]->(wakeMap)
+MERGE (subscribeWake)-[:CREATES]->(wakeMux)
+MERGE (wakeMuxRun)-[:CALLS]->(openWake)
+MERGE (wakeMuxRun)-[:CALLS]->(readWake)
+MERGE (wakeSubscribe)-[:CALLS]->(subscribeWake)
+MERGE (wakeSubscribe)-[:CREATES]->(catchUp)
+MERGE (catchUpRun)-[:CALLS]->(list)
+MERGE (catchUpRun)-[:USES_TYPE]->(page)
+MERGE (catchUpRun)-[:CALLS]->(validateOffset)
+MERGE (catchUpRun)-[:CALLS]->(validateEvent)
+MERGE (catchUpRun)-[:CALLS]->(compareOffset)
+MERGE (catchUpRun)-[:CALLS]->(refresh)
+MERGE (catchUpRun)-[:CALLS]->(loadCursor)
+MERGE (catchUpRun)-[:CALLS]->(saveCursor)
 MERGE (browserStore)-[:IMPLEMENTS]->(cursorStore)
 MERGE (loadCursor)-[:CALLS]->(validCursor)
 MERGE (validCursor)-[:CALLS]->(validateOffset)
@@ -83,7 +109,7 @@ CREATE
   (client:Class {name:"WorktreeGroupApiClient",type:"class",visibility:"public"}),
   (ctor:Function {name:"WorktreeGroupApiClient.constructor",type:"function",signature:"constructor(getAccessToken: GroupAccessTokenProvider, fetcher?: typeof fetch, baseUrl?: string)",visibility:"public",complexity:"simple"}),
   (request:Function {name:"WorktreeGroupApiClient.request",type:"function",signature:"request<T>(path: string, init?: RequestInit): Promise<T>",visibility:"private",complexity:"moderate"}),
-  (groupContext:Function {name:"WorktreeGroupApiClient.getGroupContext",type:"function",signature:"getGroupContext<T>(worktreeId: string): Promise<T>",visibility:"public",complexity:"simple"}),
+  (groupContext:Function {name:"WorktreeGroupApiClient.getGroupContext",type:"function",signature:"getGroupContext<T>(worktreeId: string, signal?: AbortSignal): Promise<T>",visibility:"public",complexity:"simple"}),
   (index:Function {name:"WorktreeGroupApiClient.listProjectWorktrees",type:"function",signature:"listProjectWorktrees<T>(projectId: string, query?: WorktreeIndexQuery): Promise<T>",visibility:"public",complexity:"moderate"}),
   (listAuthorizedProjects:Function {name:"WorktreeGroupApiClient.listAuthorizedProjects",type:"function",signature:"listAuthorizedProjects<T>(query?: AuthorizedProjectsQuery): Promise<T>",visibility:"public",complexity:"moderate"}),
   (projectRepositories:Function {name:"WorktreeGroupApiClient.listProjectWorktreeRepositories",type:"function",signature:"listProjectWorktreeRepositories<T>(projectId: string): Promise<T>",visibility:"public",complexity:"simple"}),
@@ -93,29 +119,35 @@ CREATE
   (projectMembers:Function {name:"WorktreeGroupApiClient.listProjectMembers",type:"function",signature:"listProjectMembers<T>(projectId: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (managementPlan:Function {name:"WorktreeGroupApiClient.createManagementPlan",type:"function",signature:"createManagementPlan<T>(worktreeId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (managementConfirm:Function {name:"WorktreeGroupApiClient.confirmManagementPlan",type:"function",signature:"confirmManagementPlan<T>(worktreeId: string, planId: string): Promise<T>",visibility:"public",complexity:"simple"}),
-  (workItems:Function {name:"WorktreeGroupApiClient.listWorkItems",type:"function",signature:"listWorkItems<T>(worktreeId: string): Promise<T>",visibility:"public",complexity:"simple"}),
+  (workItems:Function {name:"WorktreeGroupApiClient.listWorkItems",type:"function",signature:"listWorkItems<T>(worktreeId: string, signal?: AbortSignal): Promise<T>",visibility:"public",complexity:"simple"}),
   (transitionWorkItem:Function {name:"WorktreeGroupApiClient.transitionWorkItem",type:"function",signature:"transitionWorkItem<T>(worktreeId: string, workItemId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
-  (canvases:Function {name:"WorktreeGroupApiClient.listCanvases",type:"function",signature:"listCanvases<T>(worktreeId: string): Promise<T>",visibility:"public",complexity:"simple"}),
+  (canvases:Function {name:"WorktreeGroupApiClient.listCanvases",type:"function",signature:"listCanvases<T>(worktreeId: string, signal?: AbortSignal): Promise<T>",visibility:"public",complexity:"simple"}),
   (createCanvas:Function {name:"WorktreeGroupApiClient.createCanvas",type:"function",signature:"createCanvas<T>(worktreeId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (createCanvasElement:Function {name:"WorktreeGroupApiClient.createCanvasElement",type:"function",signature:"createCanvasElement<T>(worktreeId: string, canvasId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (updateCanvasElement:Function {name:"WorktreeGroupApiClient.updateCanvasElement",type:"function",signature:"updateCanvasElement<T>(worktreeId: string, canvasId: string, elementId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (deleteCanvasElement:Function {name:"WorktreeGroupApiClient.deleteCanvasElement",type:"function",signature:"deleteCanvasElement<T>(worktreeId: string, canvasId: string, elementId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (updateCanvasDocument:Function {name:"WorktreeGroupApiClient.updateCanvasDocument",type:"function",signature:"updateCanvasDocument<T>(worktreeId: string, canvasId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
-  (elements:Function {name:"WorktreeGroupApiClient.listCanvasElements",type:"function",signature:"listCanvasElements<T>(worktreeId: string, canvasId: string): Promise<T>",visibility:"public",complexity:"simple"}),
+  (elements:Function {name:"WorktreeGroupApiClient.listCanvasElements",type:"function",signature:"listCanvasElements<T>(worktreeId: string, canvasId: string, signal?: AbortSignal): Promise<T>",visibility:"public",complexity:"simple"}),
   (events:Function {name:"WorktreeGroupApiClient.listCanvasEvents",type:"function",signature:"listCanvasEvents<T>(worktreeId: string, canvasId: string, cursor?: CanvasEventCursor, limit?: number): Promise<T>",visibility:"public",complexity:"moderate"}),
   (createItem:Function {name:"WorktreeGroupApiClient.createWorkItemOnCanvas",type:"function",signature:"createWorkItemOnCanvas<T>(worktreeId: string, canvasId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
-  (poller:Class {name:"CanvasOutboxPoller",type:"class",visibility:"public"}),
-  (pollerCtor:Function {name:"CanvasOutboxPoller.constructor",type:"function",signature:"constructor(client, worktreeId, canvasId, refreshProjection, options)",visibility:"public",complexity:"simple"}),
-  (pollOnce:Function {name:"CanvasOutboxPoller.pollOnce",type:"function",signature:"pollOnce(): Promise<number>",visibility:"public",complexity:"moderate"}),
-  (runPoller:Function {name:"CanvasOutboxPoller.run",type:"function",signature:"run(signal: AbortSignal, onError?): Promise<void>",visibility:"public",complexity:"moderate"}),
+  (catchUp:Class {name:"CanvasOutboxCatchUp",type:"class",visibility:"public"}),
+  (catchUpRun:Function {name:"CanvasOutboxCatchUp.catchUp",type:"function",signature:"catchUp(signal: AbortSignal): Promise<number>",visibility:"public",complexity:"complex"}),
+  (wakeSubscriber:Class {name:"CanvasOutboxWakeSubscriber",type:"class",visibility:"public"}),
+  (wakeSubscribe:Function {name:"CanvasOutboxWakeSubscriber.subscribe",type:"function",signature:"subscribe(signal: AbortSignal, onError?): () => void",visibility:"public",complexity:"complex"}),
+  (wakeMux:Class {name:"WorktreeCanvasWakeMultiplexer",type:"class",visibility:"private"}),
+  (wakeMuxRun:Function {name:"WorktreeCanvasWakeMultiplexer.run",type:"function",signature:"run(signal: AbortSignal): Promise<void>",visibility:"private",complexity:"complex"}),
+  (openWake:Function {name:"WorktreeGroupApiClient.openWorktreeCanvasWakeStream",type:"function",signature:"openWorktreeCanvasWakeStream(worktreeId, signal): Promise<ReadableStream<Uint8Array>>",visibility:"public",complexity:"moderate"}),
+  (subscribeWake:Function {name:"WorktreeGroupApiClient.subscribeWorktreeCanvasWake",type:"function",signature:"subscribeWorktreeCanvasWake(worktreeId, listener): () => void",visibility:"public",complexity:"moderate"}),
+  (readWake:Function {name:"readWorktreeCanvasWakeStream",type:"function",signature:"readWorktreeCanvasWakeStream(stream, signal, onEvent)",visibility:"private",complexity:"complex"}),
+  (waitReconnect:Function {name:"waitForReconnect",type:"function",signature:"waitForReconnect(ms, signal)",visibility:"private",complexity:"simple"}),
   (readError:Function {name:"readApiError",type:"function",signature:"readApiError(response: Response): Promise<GroupApiError>",visibility:"private",complexity:"simple"}),
   (normalizeBaseUrl:Function {name:"normalizeBaseUrl",type:"function",signature:"normalizeBaseUrl(baseUrl: string): string",visibility:"private",complexity:"moderate"}),
-  (waitPoll:Function {name:"waitForPoll",type:"function",signature:"waitForPoll(ms: number, signal: AbortSignal): Promise<void>",visibility:"private",complexity:"simple"}),
-  (file)-[:CONTAINS]->(token),(file)-[:CONTAINS]->(cursor),(file)-[:CONTAINS]->(event),(file)-[:CONTAINS]->(eventPage),(file)-[:CONTAINS]->(indexQuery),(file)-[:CONTAINS]->(projectsQuery),(file)-[:CONTAINS]->(authorizedProject),(file)-[:CONTAINS]->(repository),(file)-[:CONTAINS]->(candidate),(file)-[:CONTAINS]->(lifecycleReceipt),(file)-[:CONTAINS]->(error),(file)-[:CONTAINS]->(client),(file)-[:CONTAINS]->(projectMembers),(file)-[:CONTAINS]->(poller),(file)-[:CONTAINS]->(readError),(file)-[:CONTAINS]->(waitPoll),
+  (waitReconnect:Function {name:"waitForReconnect",type:"function",signature:"waitForReconnect(ms: number, signal: AbortSignal): Promise<void>",visibility:"private",complexity:"simple"}),
+  (file)-[:CONTAINS]->(token),(file)-[:CONTAINS]->(cursor),(file)-[:CONTAINS]->(event),(file)-[:CONTAINS]->(eventPage),(file)-[:CONTAINS]->(indexQuery),(file)-[:CONTAINS]->(projectsQuery),(file)-[:CONTAINS]->(authorizedProject),(file)-[:CONTAINS]->(repository),(file)-[:CONTAINS]->(candidate),(file)-[:CONTAINS]->(lifecycleReceipt),(file)-[:CONTAINS]->(error),(file)-[:CONTAINS]->(client),(file)-[:CONTAINS]->(projectMembers),(file)-[:CONTAINS]->(listWorktreeEvents),(file)-[:CONTAINS]->(worktreeEventPage),(file)-[:CONTAINS]->(catchUp),(file)-[:CONTAINS]->(wakeSubscriber),(file)-[:CONTAINS]->(wakeMux),(file)-[:CONTAINS]->(openWake),(file)-[:CONTAINS]->(subscribeWake),(file)-[:CONTAINS]->(readWake),(file)-[:CONTAINS]->(waitReconnect),(file)-[:CONTAINS]->(readError),
   (error)-[:HAS_METHOD]->(errorCtor),
-  (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(request),(client)-[:HAS_METHOD]->(groupContext),(client)-[:HAS_METHOD]->(index),(client)-[:HAS_METHOD]->(listAuthorizedProjects),(client)-[:HAS_METHOD]->(projectRepositories),(client)-[:HAS_METHOD]->(importCandidates),(client)-[:HAS_METHOD]->(createWorktree),(client)-[:HAS_METHOD]->(importWorktree),(client)-[:HAS_METHOD]->(projectMembers),(client)-[:HAS_METHOD]->(managementPlan),(client)-[:HAS_METHOD]->(managementConfirm),(client)-[:HAS_METHOD]->(workItems),(client)-[:HAS_METHOD]->(transitionWorkItem),(client)-[:HAS_METHOD]->(canvases),(client)-[:HAS_METHOD]->(createCanvas),(client)-[:HAS_METHOD]->(createCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasElement),(client)-[:HAS_METHOD]->(deleteCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasDocument),(client)-[:HAS_METHOD]->(elements),(client)-[:HAS_METHOD]->(events),(client)-[:HAS_METHOD]->(createItem),
-  (poller)-[:HAS_METHOD]->(pollerCtor),(poller)-[:HAS_METHOD]->(pollOnce),(poller)-[:HAS_METHOD]->(runPoller),
-  (ctor)-[:CALLS]->(normalizeBaseUrl),(request)-[:CALLS]->(readError),(groupContext)-[:CALLS]->(request),(index)-[:CALLS]->(request),(index)-[:USES]->(indexQuery),(listAuthorizedProjects)-[:CALLS]->(request),(listAuthorizedProjects)-[:USES]->(projectsQuery),(projectRepositories)-[:CALLS]->(request),(importCandidates)-[:CALLS]->(request),(createWorktree)-[:CALLS]->(request),(importWorktree)-[:CALLS]->(request),(projectMembers)-[:CALLS]->(request),(managementPlan)-[:CALLS]->(request),(managementConfirm)-[:CALLS]->(request),(workItems)-[:CALLS]->(request),(transitionWorkItem)-[:CALLS]->(request),(canvases)-[:CALLS]->(request),(createCanvas)-[:CALLS]->(request),(createCanvasElement)-[:CALLS]->(request),(updateCanvasElement)-[:CALLS]->(request),(updateCanvasDocument)-[:CALLS]->(request),(elements)-[:CALLS]->(request),(events)-[:CALLS]->(request),(createItem)-[:CALLS]->(request),(pollerCtor)-[:USES]->(event),(pollerCtor)-[:USES]->(eventPage),(pollOnce)-[:CALLS]->(events),(runPoller)-[:CALLS]->(pollOnce),(runPoller)-[:CALLS]->(waitPoll);
+  (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(request),(client)-[:HAS_METHOD]->(groupContext),(client)-[:HAS_METHOD]->(index),(client)-[:HAS_METHOD]->(listAuthorizedProjects),(client)-[:HAS_METHOD]->(projectRepositories),(client)-[:HAS_METHOD]->(importCandidates),(client)-[:HAS_METHOD]->(createWorktree),(client)-[:HAS_METHOD]->(importWorktree),(client)-[:HAS_METHOD]->(projectMembers),(client)-[:HAS_METHOD]->(managementPlan),(client)-[:HAS_METHOD]->(managementConfirm),(client)-[:HAS_METHOD]->(workItems),(client)-[:HAS_METHOD]->(transitionWorkItem),(client)-[:HAS_METHOD]->(canvases),(client)-[:HAS_METHOD]->(createCanvas),(client)-[:HAS_METHOD]->(createCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasElement),(client)-[:HAS_METHOD]->(deleteCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasDocument),(client)-[:HAS_METHOD]->(elements),(client)-[:HAS_METHOD]->(events),(client)-[:HAS_METHOD]->(listWorktreeEvents),(client)-[:HAS_METHOD]->(createItem),(client)-[:HAS_METHOD]->(openWake),(client)-[:HAS_METHOD]->(subscribeWake),
+  (catchUp)-[:HAS_METHOD]->(catchUpRun),(wakeSubscriber)-[:HAS_METHOD]->(wakeSubscribe),(wakeMux)-[:HAS_METHOD]->(wakeMuxRun),
+  (ctor)-[:CALLS]->(normalizeBaseUrl),(request)-[:CALLS]->(readError),(groupContext)-[:CALLS]->(request),(index)-[:CALLS]->(request),(index)-[:USES]->(indexQuery),(listAuthorizedProjects)-[:CALLS]->(request),(listAuthorizedProjects)-[:USES]->(projectsQuery),(projectRepositories)-[:CALLS]->(request),(importCandidates)-[:CALLS]->(request),(createWorktree)-[:CALLS]->(request),(importWorktree)-[:CALLS]->(request),(projectMembers)-[:CALLS]->(request),(managementPlan)-[:CALLS]->(request),(managementConfirm)-[:CALLS]->(request),(workItems)-[:CALLS]->(request),(transitionWorkItem)-[:CALLS]->(request),(canvases)-[:CALLS]->(request),(createCanvas)-[:CALLS]->(request),(createCanvasElement)-[:CALLS]->(request),(updateCanvasElement)-[:CALLS]->(request),(updateCanvasDocument)-[:CALLS]->(request),(elements)-[:CALLS]->(request),(events)-[:CALLS]->(request),(listWorktreeEvents)-[:CALLS]->(request),(createItem)-[:CALLS]->(request),(catchUpRun)-[:CALLS]->(listWorktreeEvents),(catchUpRun)-[:USES]->(worktreeEventPage),(wakeSubscribe)-[:CALLS]->(subscribeWake),(wakeSubscribe)-[:CREATES]->(catchUp),(wakeMuxRun)-[:CALLS]->(openWake),(wakeMuxRun)-[:CALLS]->(readWake),(wakeMuxRun)-[:CALLS]->(waitReconnect);
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
@@ -165,12 +197,12 @@ CREATE (file)-[:CONTAINS]->(startCli),
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
-MATCH (poller:Class {name:"CanvasOutboxPoller"}),
+MATCH (catchUp:Class {name:"CanvasOutboxCatchUp"}),
       (cursorStore:Class {name:"BrowserCanvasEventCursorStore"}),
       (loadCursor:Function {name:"BrowserCanvasEventCursorStore.load"}),
       (saveCursor:Function {name:"BrowserCanvasEventCursorStore.save"}),
       (validCursor:Function {name:"isWorktreeCanvasEventCursor"});
-CREATE (poller)-[:USES]->(cursorStore),
+CREATE (catchUp)-[:USES]->(cursorStore),
        (cursorStore)-[:HAS_METHOD]->(loadCursor),
        (cursorStore)-[:HAS_METHOD]->(saveCursor),
        (loadCursor)-[:CALLS]->(validCursor);
@@ -221,8 +253,8 @@ CREATE (file)-[:CONTAINS]->(chatTarget),(file)-[:CONTAINS]->(chatTargetPage),
 MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
       (client:Class {name:"WorktreeGroupApiClient"}),
       (request:Function {name:"WorktreeGroupApiClient.request"}),
-      (poller:Class {name:"CanvasOutboxPoller"}),
-      (pollOnce:Function {name:"CanvasOutboxPoller.pollOnce"}),
+      (catchUp:Class {name:"CanvasOutboxCatchUp"}),
+      (catchUpRun:Function {name:"CanvasOutboxCatchUp.catchUp"}),
       (refresh:Function {name:"projection refresh callback"}),
       (cursorStore:Class {name:"BrowserCanvasEventCursorStore"});
 CREATE (worktreeEventCursor:Class {name:"WorktreeCanvasEventCursor",type:"interface",language:"typescript",visibility:"public"}),
@@ -234,9 +266,9 @@ CREATE (worktreeEventCursor:Class {name:"WorktreeCanvasEventCursor",type:"interf
        (compareOffset:Function {name:"compareStreamOffsets",type:"function",language:"typescript",visibility:"private",complexity:"simple"});
 CREATE (file)-[:CONTAINS]->(worktreeEventCursor),(file)-[:CONTAINS]->(worktreeEvent),(file)-[:CONTAINS]->(worktreeEventPage),
        (client)-[:HAS_METHOD]->(listWorktreeEvents),(listWorktreeEvents)-[:CALLS]->(request),
-       (poller)-[:USES]->(worktreeEventPage),(pollOnce)-[:CALLS]->(listWorktreeEvents),
-       (pollOnce)-[:USES]->(validOffset),(pollOnce)-[:USES]->(validEvent),(pollOnce)-[:USES]->(compareOffset),
-       (pollOnce)-[:USES]->(cursorStore),(pollOnce)-[:CALLS]->(refresh);
+       (catchUp)-[:USES]->(worktreeEventPage),(catchUpRun)-[:CALLS]->(listWorktreeEvents),
+       (catchUpRun)-[:USES]->(validOffset),(catchUpRun)-[:USES]->(validEvent),(catchUpRun)-[:USES]->(compareOffset),
+       (catchUpRun)-[:USES]->(cursorStore),(catchUpRun)-[:CALLS]->(refresh);
 */
 
 export type GroupAccessTokenProvider = () => Promise<string | null>;
@@ -360,6 +392,13 @@ export interface CanvasEventCursor {
 export interface WorktreeCanvasEventCursor {
   after_offset: string;
 }
+
+export type WorktreeCanvasWakeEvent =
+  | { type: "canvas-wake" }
+  | { type: "resync_required" }
+  | { type: "error"; error: unknown };
+
+export type WorktreeCanvasWakeListener = (event: WorktreeCanvasWakeEvent) => void;
 
 export interface CanvasOutboxEventMetadata {
   event_id: string;
@@ -762,6 +801,7 @@ export class GroupApiError extends Error {
 export class WorktreeGroupApiClient {
   private readonly baseUrl: string;
   private authorizationInvalidated = false;
+  private readonly canvasWakeMultiplexers = new Map<string, WorktreeCanvasWakeMultiplexer>();
 
   constructor(
     private readonly getAccessToken: GroupAccessTokenProvider,
@@ -775,6 +815,9 @@ export class WorktreeGroupApiClient {
   private invalidateAuthorization(error: GroupApiError): void {
     if (this.authorizationInvalidated || error.status !== 401) return;
     this.authorizationInvalidated = true;
+    for (const multiplexer of [...this.canvasWakeMultiplexers.values()]) {
+      multiplexer.stop(error);
+    }
     this.onAuthorizationError?.(error);
   }
 
@@ -783,6 +826,7 @@ export class WorktreeGroupApiClient {
       throw new GroupApiError(401, "session_invalidated", "Group API session has been invalidated.");
     }
     const token = (await this.getAccessToken())?.trim();
+    if (init.signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
     if (!token) {
       const error = new GroupApiError(401, "session_required", "Group API requires an authenticated user session.");
       this.invalidateAuthorization(error);
@@ -812,8 +856,8 @@ export class WorktreeGroupApiClient {
     return (await response.json()) as T;
   }
 
-  getGroupContext<T>(worktreeId: string): Promise<T> {
-    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/group-context`);
+  getGroupContext<T>(worktreeId: string, signal?: AbortSignal): Promise<T> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/group-context`, { signal });
   }
 
   listGroupApps(worktreeId: string): Promise<GroupAppRegistryProjection> {
@@ -953,8 +997,8 @@ export class WorktreeGroupApiClient {
     );
   }
 
-  listWorkItems<T>(worktreeId: string): Promise<T> {
-    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/work-items`);
+  listWorkItems<T>(worktreeId: string, signal?: AbortSignal): Promise<T> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/work-items`, { signal });
   }
 
   listTaskRuns(
@@ -1135,8 +1179,8 @@ export class WorktreeGroupApiClient {
     );
   }
 
-  listCanvases<T>(worktreeId: string): Promise<T> {
-    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/canvases`);
+  listCanvases<T>(worktreeId: string, signal?: AbortSignal): Promise<T> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/canvases`, { signal });
   }
 
   createCanvas<T>(worktreeId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T> {
@@ -1213,9 +1257,10 @@ export class WorktreeGroupApiClient {
     );
   }
 
-  listCanvasElements<T>(worktreeId: string, canvasId: string): Promise<T> {
+  listCanvasElements<T>(worktreeId: string, canvasId: string, signal?: AbortSignal): Promise<T> {
     return this.request(
       `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/canvases/${encodeURIComponent(canvasId)}/elements`,
+      { signal },
     );
   }
 
@@ -1235,11 +1280,66 @@ export class WorktreeGroupApiClient {
     );
   }
 
-  listWorktreeCanvasEvents<T>(worktreeId: string, afterOffset: string, limit = 50): Promise<T> {
+  listWorktreeCanvasEvents<T>(worktreeId: string, afterOffset: string, limit = 50, signal?: AbortSignal): Promise<T> {
     const query = new URLSearchParams({ after_offset: afterOffset, limit: String(limit) });
     return this.request(
       `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/canvas-events?${query}`,
+      { signal },
     );
+  }
+
+  async openWorktreeCanvasWakeStream(worktreeId: string, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+    if (this.authorizationInvalidated) {
+      throw new GroupApiError(401, "session_invalidated", "Group API session has been invalidated.");
+    }
+    const token = (await this.getAccessToken())?.trim();
+    if (signal.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+    if (!token) {
+      const error = new GroupApiError(401, "session_required", "Group API requires an authenticated user session.");
+      this.invalidateAuthorization(error);
+      throw error;
+    }
+
+    const response = await this.fetcher(
+      `${this.baseUrl}/api/v1/worktrees/${encodeURIComponent(worktreeId)}/canvas-events/stream`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "text/event-stream",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "omit",
+        cache: "no-store",
+        redirect: "error",
+        signal,
+      },
+    );
+    if (!response.ok) {
+      const error = await readApiError(response);
+      this.invalidateAuthorization(error);
+      throw error;
+    }
+    const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+    if (contentType !== "text/event-stream" || !response.body) {
+      throw new GroupApiError(502, "invalid_event_stream", "Canvas wake endpoint did not return an SSE stream.");
+    }
+    return response.body;
+  }
+
+  subscribeWorktreeCanvasWake(worktreeId: string, listener: WorktreeCanvasWakeListener): () => void {
+    let multiplexer = this.canvasWakeMultiplexers.get(worktreeId);
+    if (!multiplexer) {
+      multiplexer = new WorktreeCanvasWakeMultiplexer(
+        (signal) => this.openWorktreeCanvasWakeStream(worktreeId, signal),
+        () => {
+          if (this.canvasWakeMultiplexers.get(worktreeId) === multiplexer) {
+            this.canvasWakeMultiplexers.delete(worktreeId);
+          }
+        },
+      );
+      this.canvasWakeMultiplexers.set(worktreeId, multiplexer);
+    }
+    return multiplexer.subscribe(listener);
   }
 
   createWorkItemOnCanvas<T>(
@@ -1259,9 +1359,8 @@ export class WorktreeGroupApiClient {
   }
 }
 
-export interface CanvasOutboxPollerOptions {
+export interface CanvasOutboxCatchUpOptions {
   initialCursor?: WorktreeCanvasEventCursor;
-  intervalMs?: number;
   pageSize?: number;
   cursorStore?: CanvasEventCursorStore;
 }
@@ -1271,7 +1370,7 @@ export interface CanvasEventCursorStore {
   save(scopeKey: string, cursor: WorktreeCanvasEventCursor): void;
 }
 
-/** Stores an untrusted resume hint; authorization is checked on every poll. */
+/** Stores an untrusted resume hint; every catch-up page is authorized by the API. */
 export class BrowserCanvasEventCursorStore implements CanvasEventCursorStore {
   load(scopeKey: string): WorktreeCanvasEventCursor | undefined {
     try {
@@ -1295,10 +1394,9 @@ export class BrowserCanvasEventCursorStore implements CanvasEventCursorStore {
 
 const browserCanvasEventCursorStore = new BrowserCanvasEventCursorStore();
 
-export class CanvasOutboxPoller {
+export class CanvasOutboxCatchUp {
   private cursor?: WorktreeCanvasEventCursor;
   private cursorLoaded: boolean;
-  private readonly intervalMs: number;
   private readonly pageSize: number;
   private readonly cursorStore: CanvasEventCursorStore;
   private readonly cursorScopeKey: string;
@@ -1306,91 +1404,264 @@ export class CanvasOutboxPoller {
   constructor(
     private readonly client: WorktreeGroupApiClient,
     private readonly worktreeId: string,
-    private readonly refreshProjection: () => Promise<void>,
-    options: CanvasOutboxPollerOptions = {},
+    private readonly refreshProjection: (signal: AbortSignal) => Promise<void>,
+    options: CanvasOutboxCatchUpOptions = {},
   ) {
     this.cursor = isWorktreeCanvasEventCursor(options.initialCursor) ? options.initialCursor : undefined;
     this.cursorLoaded = this.cursor !== undefined;
-    this.intervalMs = options.intervalMs ?? 1_000;
     this.pageSize = options.pageSize ?? 100;
     this.cursorStore = options.cursorStore ?? browserCanvasEventCursorStore;
     this.cursorScopeKey = worktreeId;
-    if (this.intervalMs < 100 || this.intervalMs > 30_000 || this.pageSize < 1 || this.pageSize > 100) {
-      throw new RangeError("Canvas Outbox poll settings are outside the supported bounds.");
+    if (this.pageSize < 1 || this.pageSize > 100) {
+      throw new RangeError("Canvas Outbox catch-up page size is outside the supported bounds.");
     }
   }
 
-  async pollOnce(): Promise<number> {
+  async catchUp(signal: AbortSignal): Promise<number> {
     if (!this.cursorLoaded) {
       const storedCursor = this.cursorStore.load(this.cursorScopeKey);
       this.cursor = isWorktreeCanvasEventCursor(storedCursor) ? storedCursor : undefined;
       this.cursorLoaded = true;
     }
-    const currentOffset = this.cursor?.after_offset ?? "0";
-    const page = await this.client.listWorktreeCanvasEvents<WorktreeCanvasOutboxEventPage>(
-      this.worktreeId,
-      currentOffset,
-      this.pageSize,
-    );
-    if (
-      !page
-      || !Array.isArray(page.events)
-      || page.events.length > this.pageSize
-      || typeof page.has_more !== "boolean"
-      || !isValidStreamOffset(page.next_offset)
-    ) {
-      throw new Error("Canvas Outbox page has an invalid shape.");
-    }
-    if (page.events.length === 0) {
-      if (page.has_more || page.next_offset !== currentOffset) {
-        throw new Error("Empty Canvas Outbox page returned an inconsistent cursor.");
-      }
-      return 0;
-    }
-    if (page.has_more && page.events.length < this.pageSize) {
-      throw new Error("Canvas Outbox page has an inconsistent continuation flag.");
-    }
-
-    let previousOffset = currentOffset;
-    for (const event of page.events) {
+    let totalEvents = 0;
+    while (!signal.aborted) {
+      const currentOffset = this.cursor?.after_offset ?? "0";
+      const page = await this.client.listWorktreeCanvasEvents<WorktreeCanvasOutboxEventPage>(
+        this.worktreeId,
+        currentOffset,
+        this.pageSize,
+        signal,
+      );
+      if (signal.aborted) return totalEvents;
       if (
-        !isWorktreeCanvasOutboxEvent(event)
-        || compareStreamOffsets(event.stream_offset, previousOffset) <= 0
+        !page
+        || !Array.isArray(page.events)
+        || page.events.length > this.pageSize
+        || typeof page.has_more !== "boolean"
+        || !isValidStreamOffset(page.next_offset)
       ) {
-        throw new Error("Canvas Outbox page contains a non-monotonic stream offset.");
+        throw new Error("Canvas Outbox page has an invalid shape.");
       }
-      previousOffset = event.stream_offset;
-    }
-    if (!isValidStreamOffset(page.next_offset) || page.next_offset !== previousOffset) {
-      throw new Error("Canvas Outbox page returned an invalid next offset.");
-    }
+      if (page.events.length === 0) {
+        if (page.has_more || page.next_offset !== currentOffset) {
+          throw new Error("Empty Canvas Outbox page returned an inconsistent cursor.");
+        }
+        return totalEvents;
+      }
+      if (page.has_more && page.events.length < this.pageSize) {
+        throw new Error("Canvas Outbox page has an inconsistent continuation flag.");
+      }
 
-    // Refresh the current authorized projection before persisting or advancing the hint.
-    await this.refreshProjection();
-    const nextCursor = { after_offset: page.next_offset };
-    this.cursorStore.save(this.cursorScopeKey, nextCursor);
-    this.cursor = nextCursor;
-    return page.events.length;
+      let previousOffset = currentOffset;
+      for (const event of page.events) {
+        if (
+          !isWorktreeCanvasOutboxEvent(event)
+          || compareStreamOffsets(event.stream_offset, previousOffset) <= 0
+        ) {
+          throw new Error("Canvas Outbox page contains a non-monotonic stream offset.");
+        }
+        previousOffset = event.stream_offset;
+      }
+      if (!isValidStreamOffset(page.next_offset) || page.next_offset !== previousOffset) {
+        throw new Error("Canvas Outbox page returned an invalid next offset.");
+      }
+
+      // Refresh authorized content before advancing the untrusted resume hint.
+      await this.refreshProjection(signal);
+      if (signal.aborted) return totalEvents;
+      const nextCursor = { after_offset: page.next_offset };
+      this.cursorStore.save(this.cursorScopeKey, nextCursor);
+      this.cursor = nextCursor;
+      totalEvents += page.events.length;
+      if (!page.has_more) return totalEvents;
+    }
+    return totalEvents;
+  }
+}
+
+const INITIAL_CANVAS_WAKE_RETRY_MS = 500;
+const MAX_CANVAS_WAKE_RETRY_MS = 30_000;
+const STABLE_CANVAS_WAKE_CONNECTION_MS = 30_000;
+const MAX_CANVAS_WAKE_FRAME_CHARS = 4_096;
+
+class WorktreeCanvasWakeMultiplexer {
+  private readonly listeners = new Set<WorktreeCanvasWakeListener>();
+  private lifecycle?: AbortController;
+  private terminalError?: unknown;
+  private connected = false;
+
+  constructor(
+    private readonly openStream: (signal: AbortSignal) => Promise<ReadableStream<Uint8Array>>,
+    private readonly onEmpty: () => void,
+  ) {}
+
+  subscribe(listener: WorktreeCanvasWakeListener): () => void {
+    if (this.terminalError !== undefined) {
+      this.notifyOne(listener, { type: "error", error: this.terminalError });
+      return () => undefined;
+    }
+    this.listeners.add(listener);
+    if (this.listeners.size === 1) {
+      this.lifecycle = new AbortController();
+      void this.run(this.lifecycle.signal);
+    } else if (this.connected) {
+      this.notifyOne(listener, { type: "resync_required" });
+    }
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      this.listeners.delete(listener);
+      if (this.listeners.size === 0) {
+        this.lifecycle?.abort();
+        this.lifecycle = undefined;
+        this.connected = false;
+        this.onEmpty();
+      }
+    };
   }
 
-  async run(signal: AbortSignal, onError: (error: unknown) => void = () => undefined): Promise<void> {
-    let retryMs = this.intervalMs;
-    while (!signal.aborted) {
+  stop(error?: unknown): void {
+    if (error !== undefined) this.terminalError = error;
+    if (error !== undefined) this.notify({ type: "error", error });
+    this.lifecycle?.abort();
+    this.connected = false;
+  }
+
+  private async run(signal: AbortSignal): Promise<void> {
+    let retryMs = INITIAL_CANVAS_WAKE_RETRY_MS;
+    while (!signal.aborted && this.listeners.size > 0 && this.terminalError === undefined) {
+      const connectedAt = Date.now();
       try {
-        const consumed = await this.pollOnce();
-        retryMs = this.intervalMs;
-        if (consumed < this.pageSize) await waitForPoll(this.intervalMs, signal);
+        const stream = await this.openStream(signal);
+        if (signal.aborted) return;
+        this.connected = true;
+        this.notify({ type: "resync_required" });
+        await readWorktreeCanvasWakeStream(stream, signal, (type) => {
+          this.notify({ type });
+        });
+        this.connected = false;
+        if (signal.aborted) return;
       } catch (error) {
-        try {
-          onError(error);
-        } catch {
-          // An observer must not alter cursor or retry behavior.
+        this.connected = false;
+        if (signal.aborted || this.terminalError !== undefined) return;
+        this.notify({ type: "error", error });
+        if (error instanceof GroupApiError && (error.status === 401 || error.status === 403)) {
+          this.terminalError = error;
+          return;
         }
-        if (error instanceof GroupApiError && (error.status === 401 || error.status === 403)) return;
-        await waitForPoll(retryMs, signal);
-        retryMs = Math.min(retryMs * 2, 30_000);
       }
+      if (signal.aborted || this.listeners.size === 0 || this.terminalError !== undefined) return;
+      if (Date.now() - connectedAt >= STABLE_CANVAS_WAKE_CONNECTION_MS) {
+        retryMs = INITIAL_CANVAS_WAKE_RETRY_MS;
+      }
+      await waitForReconnect(retryMs, signal);
+      retryMs = Math.min(retryMs * 2, MAX_CANVAS_WAKE_RETRY_MS);
     }
+  }
+
+  private notify(event: WorktreeCanvasWakeEvent): void {
+    for (const listener of [...this.listeners]) this.notifyOne(listener, event);
+  }
+
+  private notifyOne(listener: WorktreeCanvasWakeListener, event: WorktreeCanvasWakeEvent): void {
+    try {
+      listener(event);
+    } catch {
+      // Subscriber failures must not interrupt other listeners or reconnect behavior.
+    }
+  }
+}
+
+export class CanvasOutboxWakeSubscriber {
+  constructor(
+    private readonly client: WorktreeGroupApiClient,
+    private readonly worktreeId: string,
+    private readonly refreshProjection: (signal: AbortSignal) => Promise<void>,
+    private readonly options: CanvasOutboxCatchUpOptions = {},
+  ) {}
+
+  subscribe(signal: AbortSignal, onError: (error: unknown) => void = () => undefined): () => void {
+    const catchUp = new CanvasOutboxCatchUp(this.client, this.worktreeId, this.refreshProjection, this.options);
+    const subscription = new AbortController();
+    const subscriptionSignal = subscription.signal;
+    let active = true;
+    let requested = false;
+    let running: Promise<void> | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryMs = INITIAL_CANVAS_WAKE_RETRY_MS;
+    let unsubscribe: () => void = () => undefined;
+    const stop = () => {
+      if (!active) return;
+      active = false;
+      subscription.abort();
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      retryTimer = undefined;
+      signal.removeEventListener("abort", stop);
+      unsubscribe();
+    };
+    const report = (error: unknown) => {
+      if (!active) return;
+      try {
+        onError(error);
+      } catch {
+        // Observer failures must not alter delivery or retry behavior.
+      }
+    };
+    const requestCatchUp = () => {
+      if (!active || subscriptionSignal.aborted) return;
+      if (retryTimer !== undefined) {
+        clearTimeout(retryTimer);
+        retryTimer = undefined;
+      }
+      requested = true;
+      if (running) return;
+      running = (async () => {
+        // Batch wake frames that arrive in the same stream turn.
+        await Promise.resolve();
+        while (requested && active && !subscriptionSignal.aborted) {
+          requested = false;
+          await catchUp.catchUp(subscriptionSignal);
+          retryMs = INITIAL_CANVAS_WAKE_RETRY_MS;
+        }
+      })().catch((error: unknown) => {
+        if (!active || subscriptionSignal.aborted) return;
+        report(error);
+        if (error instanceof GroupApiError && (error.status === 401 || error.status === 403)) {
+          stop();
+          return;
+        }
+        if (retryTimer === undefined) {
+          const delay = retryMs;
+          retryMs = Math.min(retryMs * 2, MAX_CANVAS_WAKE_RETRY_MS);
+          retryTimer = setTimeout(() => {
+            retryTimer = undefined;
+            requestCatchUp();
+          }, delay);
+        }
+      }).finally(() => {
+        running = undefined;
+        if (requested && active && !subscriptionSignal.aborted) requestCatchUp();
+      });
+    };
+
+    if (signal.aborted) {
+      active = false;
+      subscription.abort();
+      return () => undefined;
+    }
+    signal.addEventListener("abort", stop, { once: true });
+    unsubscribe = this.client.subscribeWorktreeCanvasWake(this.worktreeId, (event) => {
+      if (event.type === "canvas-wake" || event.type === "resync_required") {
+        requestCatchUp();
+      } else {
+        report(event.error);
+        if (event.error instanceof GroupApiError && (event.error.status === 401 || event.error.status === 403)) {
+          stop();
+        }
+      }
+    });
+    return stop;
   }
 }
 
@@ -1462,7 +1733,7 @@ function normalizeBaseUrl(baseUrl: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
 }
 
-function waitForPoll(ms: number, signal: AbortSignal): Promise<void> {
+function waitForReconnect(ms: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
     const finish = () => {
@@ -1473,6 +1744,96 @@ function waitForPoll(ms: number, signal: AbortSignal): Promise<void> {
     const timer = setTimeout(finish, ms);
     signal.addEventListener("abort", finish, { once: true });
   });
+}
+
+async function readWorktreeCanvasWakeStream(
+  stream: ReadableStream<Uint8Array>,
+  signal: AbortSignal,
+  onEvent: (type: "canvas-wake" | "resync_required") => void,
+): Promise<"closed" | "resync_required" | "aborted"> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let eventName = "";
+  let frameChars = 0;
+  let streamDone = false;
+  const cancelOnAbort = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal.addEventListener("abort", cancelOnAbort, { once: true });
+
+  const processLine = (line: string): boolean => {
+    frameChars += line.length + 1;
+    if (frameChars > MAX_CANVAS_WAKE_FRAME_CHARS) {
+      throw new Error("Canvas wake SSE frame exceeds its bounded size.");
+    }
+    if (line === "") {
+      const completedEvent = eventName;
+      eventName = "";
+      frameChars = 0;
+      if (completedEvent === "canvas-wake" || completedEvent === "resync_required") {
+        onEvent(completedEvent);
+        return completedEvent === "resync_required";
+      }
+      return false;
+    }
+    if (line.startsWith(":")) return false;
+    const separator = line.indexOf(":");
+    const field = separator < 0 ? line : line.slice(0, separator);
+    if (field === "event") {
+      const value = separator < 0 ? "" : line.slice(separator + 1).replace(/^ /, "");
+      if (value.length > 128) throw new Error("Canvas wake SSE event name is too long.");
+      eventName = value;
+    }
+    return false;
+  };
+
+  const consumeLines = (final: boolean): "resync_required" | undefined => {
+    let start = 0;
+    for (let index = 0; index < buffer.length; index += 1) {
+      const char = buffer[index];
+      if (char !== "\n" && char !== "\r") continue;
+      if (char === "\r" && index + 1 === buffer.length && !final) break;
+      const line = buffer.slice(start, index);
+      if (line.length > MAX_CANVAS_WAKE_FRAME_CHARS) throw new Error("Canvas wake SSE line exceeds its bounded size.");
+      const next = buffer[index + 1];
+      const end = char === "\r" && next === "\n" ? index + 2 : index + 1;
+      if (processLine(line)) return "resync_required";
+      start = end;
+      index = end - 1;
+    }
+    buffer = buffer.slice(start);
+    if (buffer.length > MAX_CANVAS_WAKE_FRAME_CHARS) throw new Error("Canvas wake SSE frame exceeds its bounded size.");
+    if (final && buffer.length > 0) {
+      const line = buffer;
+      buffer = "";
+      if (processLine(line)) return "resync_required";
+    }
+    return undefined;
+  };
+
+  try {
+    while (!signal.aborted) {
+      const result = await reader.read();
+      if (result.done) {
+        streamDone = true;
+        buffer += decoder.decode();
+        return consumeLines(true) ?? "closed";
+      }
+      buffer += decoder.decode(result.value, { stream: true });
+      const outcome = consumeLines(false);
+      if (outcome) return outcome;
+    }
+    return "aborted";
+  } finally {
+    signal.removeEventListener("abort", cancelOnAbort);
+    if (!streamDone) void reader.cancel().catch(() => undefined);
+    try {
+      reader.releaseLock();
+    } catch {
+      // The fetch may already have released its stream after abort.
+    }
+  }
 }
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b2649d76df507a09c71fb78ca3178d31c4542bea139f132408e7b13833a29069
+@cypher schema=1 source_sha256=16fcaed3c0ef215ec8b2e2b52ea12b1e8dca6b774b00e0c16f89033334929e09
 MERGE (self:File {path:"frontend/src/lib/run/runDirectoryApi.ts"})
 MERGE (create:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createRunTaskCard",kind:"method"})
 MERGE (createLegacy:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLegacyRunTaskCard",kind:"method"})
@@ -229,7 +229,7 @@ function uuid(value: unknown): string {
   return value.toLowerCase();
 }
 function biProjectionError(): never {
-  throw new RunDirectoryError(0, "invalid_projection", "Run 分析事件响应无效。");
+  throw new RunDirectoryError(0, "invalid_projection", "LANE 分析事件响应无效。");
 }
 function biKeys(row: Record<string, unknown>, keys: string[]): void {
   if (Object.keys(row).length !== keys.length || Object.keys(row).some((key) => !keys.includes(key))) biProjectionError();
@@ -266,7 +266,7 @@ function mapRunBiTaskEventPage(value: unknown, run: EngineeringRun, cursor?: Run
   const row = record(value);
   biKeys(row, ["project_id", "engineering_run_id", "items", "has_more", "next_cursor", "coverage"]);
   if (uuid(row.project_id) !== uuid(run.project_id) || uuid(row.engineering_run_id) !== uuid(run.engineering_run_id)) {
-    throw new RunDirectoryError(0, "scope_mismatch", "分析事件不属于当前 Project 或 Run。");
+    throw new RunDirectoryError(0, "scope_mismatch", "分析事件不属于当前 Project 或 LANE。");
   }
   if (!Array.isArray(row.items) || row.items.length > RUN_BI_TASK_EVENT_PAGE_SIZE) biProjectionError();
   const items = row.items.map(mapRunBiTaskEvent);
@@ -367,7 +367,7 @@ function mapRunContext(value: unknown): RunContextEnvelope {
     (focus && (focus.project_id !== context.project_id ||
       (context.repository_id !== null && focus.repository_id !== context.repository_id) ||
       focus.engineering_run_id !== context.engineering_run_id))) {
-    throw new RunDirectoryError(0, "scope_mismatch", "RunContext 的 Project、Branch、Run 或 Worktree 关联不一致。");
+    throw new RunDirectoryError(0, "scope_mismatch", "RunContext 的 Project、Branch、LANE 或 Worktree 关联不一致。");
   }
   const focusVersion = envelope.focus_version === null ? null : boundedText(envelope.focus_version, 1024);
   if ((focus === null) !== (focusVersion === null)) throw new RunDirectoryError(0, "scope_mismatch", "Checkout 焦点版本与 Worktree 不一致。");
@@ -445,13 +445,13 @@ function validateRunTaskCardWriteContext(context: RunContextEnvelope): {
     (focus !== null && (focus.archived || uuid(focus.engineering_run_id) !== runId ||
       uuid(focus.project_id) !== projectId ||
       (repositoryId !== null && uuid(focus.repository_id) !== repositoryId)))) {
-    throw new RunDirectoryError(0, "scope_mismatch", "当前 Run、Branch 或 Worktree 焦点关联不一致，不能更新任务卡。");
+    throw new RunDirectoryError(0, "scope_mismatch", "当前 LANE、Branch 或 Worktree 焦点关联不一致，不能更新任务卡。");
   }
   if (!context.run_context.granted_scopes.includes("work-item:write")) {
-    throw new RunDirectoryError(403, "insufficient_scope", "当前 Run 会话没有更新任务卡的授权。");
+    throw new RunDirectoryError(403, "insufficient_scope", "当前 LANE 会话没有更新任务卡的授权。");
   }
   if (!context.capabilities.task_cards_available) {
-    throw new RunDirectoryError(403, "task_cards_unavailable", "当前 Run 尚未开放 Task Cards。");
+    throw new RunDirectoryError(403, "task_cards_unavailable", "当前 LANE 尚未开放 Task Cards。");
   }
   return { runId, projectId, focusWorktreeId: focus ? uuid(focus.worktree_id) : null };
 }
@@ -461,7 +461,7 @@ function mapRunTaskCardBody(value: unknown, run: EngineeringRun, after?: string)
   if (uuid(envelope.engineering_run_id) !== run.engineering_run_id || uuid(envelope.project_id) !== run.project_id ||
     nullableUuid(envelope.repository_id) !== run.repository_id || nullableUuid(envelope.branch_id) !== run.branch_id ||
     envelope.limit !== RUN_TASK_CARD_PAGE_SIZE || !Array.isArray(envelope.work_items) || envelope.work_items.length > RUN_TASK_CARD_PAGE_SIZE) {
-    throw new RunDirectoryError(0, "scope_mismatch", "Task Card 返回页不属于请求的 Engineering Run 或超过分页上限。");
+    throw new RunDirectoryError(0, "scope_mismatch", "Task Card 返回页不属于请求的 LANE 或超过分页上限。");
   }
   const rows: RunTaskCard[] = [];
   for (const item of envelope.work_items) {
@@ -491,10 +491,10 @@ function trustedBaseUrl(baseUrl: string, trustedOrigins: readonly string[]): str
   if (!base) return "";
   if (base.startsWith("/") && !base.startsWith("//") && !/[?#\\]/.test(base)) return base;
   let url: URL;
-  try { url = new URL(base); } catch { throw new RunDirectoryError(0, "invalid_origin", "Run Directory API 地址无效。"); }
+  try { url = new URL(base); } catch { throw new RunDirectoryError(0, "invalid_origin", "LANE Directory API 地址无效。"); }
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) || url.username || url.password || url.search || url.hash || !trustedOrigins.includes(url.origin)) {
-    throw new RunDirectoryError(0, "untrusted_origin", "Run Directory API 必须使用宿主授权的地址。");
+    throw new RunDirectoryError(0, "untrusted_origin", "LANE Directory API 必须使用宿主授权的地址。");
   }
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
 }
@@ -523,7 +523,7 @@ async function readBoundedJson(response: Response, signal: AbortSignal, maxBytes
     reader.releaseLock();
   }
 }
-function aborted(): DOMException { return new DOMException("Run Directory request cancelled", "AbortError"); }
+function aborted(): DOMException { return new DOMException("LANE Directory request cancelled", "AbortError"); }
 /** Release the request slot even if a trusted host operation ignores AbortSignal. */
 function awaitAbortable<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(aborted());
@@ -630,7 +630,7 @@ export class RunDirectoryApiClient {
     const result = record(await this.request(`/api/v1/projects/${id}/engineering-runs?${pageQuery(cursor)}`, signal));
     const page = mapPage(result, "engineering_runs", mapRun, (row) => row.engineering_run_id);
     if (uuid(result.project_id) !== id || page.rows.some((row) => row.project_id !== id)) {
-      throw new RunDirectoryError(0, "scope_mismatch", "Engineering Run 目录不属于当前 Project。");
+      throw new RunDirectoryError(0, "scope_mismatch", "LANE 目录不属于当前 Project。");
     }
     return page;
   }
@@ -645,7 +645,7 @@ export class RunDirectoryApiClient {
     const normalizedTitle = boundedText(title.trim(), 500);
     const key = boundedText(idempotencyKey, 128);
     const correlation = uuid(correlationId);
-    if (!normalizedTitle) throw new RunDirectoryError(0, "invalid_request", "Run 名称不能为空。");
+    if (!normalizedTitle) throw new RunDirectoryError(0, "invalid_request", "LANE 名称不能为空。");
     const result = record(await this.request(
       `/api/v1/projects/${id}/engineering-runs`,
       signal,
@@ -654,7 +654,7 @@ export class RunDirectoryApiClient {
     ));
     const run = mapRun(result.engineering_run);
     if (uuid(result.project_id) !== id || run.project_id !== id || run.repository_id !== null || run.branch_id !== null) {
-      throw new RunDirectoryError(0, "invalid_projection", "新建 Run 响应没有保持 Project 所属且无宿主 Branch 的目录身份。");
+      throw new RunDirectoryError(0, "invalid_projection", "新建 LANE 响应没有保持 Project 所属且无宿主 Branch 的目录身份。");
     }
     return run;
   }
@@ -669,7 +669,7 @@ export class RunDirectoryApiClient {
     const result = record(await this.request(`/api/v1/branches/${uuid(branch.branch_id)}/engineering-runs?${pageQuery(cursor)}`, signal));
     const page = mapPage(result, "engineering_runs", mapRun, (row) => row.engineering_run_id);
     if (uuid(result.project_id) !== branch.project_id || uuid(result.branch_id) !== branch.branch_id || page.rows.some((row) => row.project_id !== branch.project_id || row.branch_id !== branch.branch_id || row.repository_id !== branch.repository_id)) {
-      throw new RunDirectoryError(0, "scope_mismatch", "Engineering Run 目录不属于当前 Branch。");
+      throw new RunDirectoryError(0, "scope_mismatch", "LANE 目录不属于当前 Branch。");
     }
     return page;
   }
@@ -677,7 +677,7 @@ export class RunDirectoryApiClient {
     const result = record(await this.request(`/api/v1/engineering-runs/${uuid(run.engineering_run_id)}/worktrees?${pageQuery(cursor)}`, signal));
     const page = mapPage(result, "worktrees", mapWorktree, (row) => row.worktree_id);
     if (uuid(result.project_id) !== run.project_id || nullableUuid(result.branch_id) !== run.branch_id || uuid(result.engineering_run_id) !== run.engineering_run_id || page.rows.some((row) => row.project_id !== run.project_id || row.engineering_run_id !== run.engineering_run_id || (run.repository_id !== null && row.repository_id !== run.repository_id))) {
-      throw new RunDirectoryError(0, "scope_mismatch", "Worktree 目录不属于当前 Engineering Run。");
+      throw new RunDirectoryError(0, "scope_mismatch", "Worktree 目录不属于当前 LANE。");
     }
     return page;
   }
@@ -729,13 +729,13 @@ export class RunDirectoryApiClient {
       uuid(context.run_context.engineering_run_id) !== runId ||
       uuid(focus.engineering_run_id) !== runId || uuid(focus.project_id) !== projectId ||
       (repositoryId !== null && uuid(focus.repository_id) !== repositoryId)))) {
-      throw new RunDirectoryError(0, "scope_mismatch", "当前 Run、Branch 或 Worktree 焦点关联不一致，不能创建任务卡。");
+      throw new RunDirectoryError(0, "scope_mismatch", "当前 LANE、Branch 或 Worktree 焦点关联不一致，不能创建任务卡。");
     }
     if (!context.run_context.granted_scopes.includes("work-item:write")) {
-      throw new RunDirectoryError(403, "insufficient_scope", "当前 Run 会话没有创建任务卡的授权。");
+      throw new RunDirectoryError(403, "insufficient_scope", "当前 LANE 会话没有创建任务卡的授权。");
     }
     if (!context.capabilities.task_cards_available) {
-      throw new RunDirectoryError(403, "task_cards_unavailable", "当前 Run 尚未开放 Task Cards。");
+      throw new RunDirectoryError(403, "task_cards_unavailable", "当前 LANE 尚未开放 Task Cards。");
     }
     const title = boundedText(input.title.trim(), RUN_TASK_CARD_CREATE_TITLE_MAX_CHARS);
     const description = boundedString(input.description, RUN_TASK_CARD_CREATE_DESCRIPTION_MAX_CHARS);
@@ -788,7 +788,7 @@ export class RunDirectoryApiClient {
       throw new RunDirectoryError(0, "invalid_request", "Task Card 状态命令与当前版本不一致。");
     }
     if (["claimed", "in_progress"].includes(input.target_status) && !focusWorktreeId) {
-      throw new RunDirectoryError(409, "task_worktree_required", "领取或开始任务前，请先选择当前 Run 的 Worktree。");
+      throw new RunDirectoryError(409, "task_worktree_required", "领取或开始任务前，请先选择当前 LANE 的 Worktree。");
     }
     if (["claimed", "in_progress"].includes(card.lifecycle.status) &&
       ["in_progress", "completed", "failed", "cancelled"].includes(input.target_status) &&
@@ -817,7 +817,7 @@ export class RunDirectoryApiClient {
     const updated = mapRunTaskCard(rawTaskCard);
     if (uuid(result.project_id) !== projectId || uuid(result.engineering_run_id) !== runId ||
       updated.work_item_id !== workItemId || uuid(rawTaskCard.task_card_id) !== workItemId) {
-      throw new RunDirectoryError(0, "invalid_projection", "Task Card 状态更新响应不属于当前 Project、Run 或任务。");
+      throw new RunDirectoryError(0, "invalid_projection", "Task Card 状态更新响应不属于当前 Project、LANE 或任务。");
     }
     return updated;
   }
@@ -863,7 +863,7 @@ export class RunDirectoryApiClient {
     const updated = mapRunTaskCard(rawTaskCard);
     if (uuid(result.project_id) !== projectId || uuid(result.engineering_run_id) !== runId ||
       updated.work_item_id !== workItemId || uuid(rawTaskCard.task_card_id) !== workItemId) {
-      throw new RunDirectoryError(0, "invalid_projection", "Task Card 审查响应不属于当前 Project、Run 或任务。");
+      throw new RunDirectoryError(0, "invalid_projection", "Task Card 审查响应不属于当前 Project、LANE 或任务。");
     }
     return updated;
   }
@@ -889,13 +889,13 @@ export class RunDirectoryApiClient {
       uuid(branch.branch_id) !== branchId || uuid(branch.project_id) !== projectId || uuid(branch.repository_id) !== repositoryId ||
       uuid(focus.worktree_id) !== targetId || uuid(focus.engineering_run_id) !== runId ||
       uuid(focus.project_id) !== projectId || uuid(focus.repository_id) !== repositoryId) {
-      throw new RunDirectoryError(0, "scope_mismatch", "旧请求的 Worktree、Branch 或 Run 身份已变化，已阻止重放。");
+      throw new RunDirectoryError(0, "scope_mismatch", "旧请求的 Worktree、Branch 或 LANE 身份已变化，已阻止重放。");
     }
     if (!context.run_context.granted_scopes.includes("work-item:write")) {
-      throw new RunDirectoryError(403, "insufficient_scope", "当前 Run 会话没有创建任务卡的授权。");
+      throw new RunDirectoryError(403, "insufficient_scope", "当前 LANE 会话没有创建任务卡的授权。");
     }
     if (!context.capabilities.task_cards_available) {
-      throw new RunDirectoryError(403, "task_cards_unavailable", "当前 Run 尚未开放 Task Cards。");
+      throw new RunDirectoryError(403, "task_cards_unavailable", "当前 LANE 尚未开放 Task Cards。");
     }
     const title = boundedText(input.title.trim(), RUN_TASK_CARD_CREATE_TITLE_MAX_CHARS);
     const description = boundedString(input.description, RUN_TASK_CARD_CREATE_DESCRIPTION_MAX_CHARS);
@@ -926,7 +926,7 @@ export class RunDirectoryApiClient {
     const query = focus ? `?${new URLSearchParams({ focus_worktree_id: focus })}` : "";
     const result = mapRunContext(await this.request(`/api/v1/engineering-runs/${run}/context${query}`, signal));
     if (result.run_context.engineering_run_id !== run || (focus ? result.focus?.worktree_id !== focus : result.focus !== null)) {
-      throw new RunDirectoryError(0, "scope_mismatch", "RunContext 不属于请求的 Run 或 Worktree。");
+      throw new RunDirectoryError(0, "scope_mismatch", "RunContext 不属于请求的 LANE 或 Worktree。");
     }
     return result;
   }

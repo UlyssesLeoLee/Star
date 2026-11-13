@@ -1,185 +1,126 @@
-// Star Mobile Bottom Navigation (per 2026-09-01 PHASE-MOBILE-PWA)
-// 仅在 <768px 视口显示,与 Sidebar 互斥。
-// 5 个核心入口:Dashboard / Worktree / Agent / Feedback / More
 /*
-@cypher schema=1 source_sha256=befab9fb571bdb5dc7367df3f6a955a733ddbc9a429322ce8b76e6128a70ce57
+@cypher schema=1 source_sha256=852a06a8ad888dee8012e19c5f9d0c3476f7be352bcbfd8e889c61c40a34f131
 MERGE (self:File {path:"frontend/src/components/MobileBottomNav.tsx"})
 MERGE (navigation:Symbol {id:"frontend/src/components/MobileBottomNav.tsx::MobileBottomNav",kind:"component"})
-MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
+MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
+MERGE (pathname:ExternalService {name:"next/navigation usePathname"})
+MERGE (translation:Symbol {id:"frontend/src/lib/i18n/useTranslation.ts::useTranslation",kind:"hook"})
+MERGE (projectNavigationLabel:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectNavigation",kind:"property"})
+MERGE (openDirectoryLabel:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.openProjectDirectory",kind:"property"})
+MERGE (directoryLabel:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectory",kind:"property"})
+MERGE (directoryTitle:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectoryTitle",kind:"property"})
+MERGE (directoryHint:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.projectDirectoryHint",kind:"property"})
+MERGE (closeDirectoryLabel:Symbol {id:"frontend/src/lib/i18n/dictionary.ts::Dictionary.sidebar.closeProjectDirectory",kind:"property"})
 MERGE (self)-[:DEFINES]->(navigation)
-MERGE (self)-[:IMPORTS]->(guardedLink)
-MERGE (navigation)-[:CALLS]->(guardedLink)
+MERGE (self)-[:IMPORTS]->(projectTree)
+MERGE (self)-[:IMPORTS]->(pathname)
+MERGE (self)-[:IMPORTS]->(translation)
+MERGE (navigation)-[:CALLS]->(projectTree)
+MERGE (navigation)-[:CALLS]->(pathname)
+MERGE (navigation)-[:CALLS]->(translation)
+MERGE (navigation)-[:READS]->(projectNavigationLabel)
+MERGE (navigation)-[:READS]->(openDirectoryLabel)
+MERGE (navigation)-[:READS]->(directoryLabel)
+MERGE (navigation)-[:READS]->(directoryTitle)
+MERGE (navigation)-[:READS]->(directoryHint)
+MERGE (navigation)-[:READS]->(closeDirectoryLabel)
 @endcypher
 */
 "use client";
 
-import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
+import { ProjectRunTree } from "@/components/run/ProjectRunTree";
 import { usePathname } from "next/navigation";
-import { clsx } from "clsx";
-import {
-  Home,
-  GitBranch,
-  Bot,
-  MessageSquare,
-  MoreHorizontal,
-} from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
-
-interface NavItem {
-  id: string;
-  label: string;
-  href: string;
-  icon: typeof Home;
-  match: (pathname: string) => boolean;
-}
-
-const ITEMS: NavItem[] = [
-  {
-    id: "home",
-    label: "首页",
-    href: "/",
-    icon: Home,
-    match: (p) => p === "/" || p === "",
-  },
-  {
-    id: "worktree",
-    label: "Worktree",
-    href: "/worktree",
-    icon: GitBranch,
-    match: (p) => p?.startsWith("/worktree") ?? false,
-  },
-  {
-    id: "agent",
-    label: "Agent",
-    href: "/agent",
-    icon: Bot,
-    match: (p) => p?.startsWith("/agent") ?? false,
-  },
-  {
-    id: "feedback",
-    label: "Feedback",
-    href: "/feedback",
-    icon: MessageSquare,
-    match: (p) => p?.startsWith("/feedback") ?? false,
-  },
-  {
-    id: "more",
-    label: "更多",
-    href: "#more",
-    icon: MoreHorizontal,
-    match: () => false,
-  },
-];
+import { ChevronDown, FolderTree } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 export function MobileBottomNav() {
-  const { t } = useTranslation();
   const pathname = usePathname() ?? "/";
-  const [moreOpen, setMoreOpen] = useState(false);
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
 
-  // "更多" 入口跳出一张速查表(9 个常去页面)
-  const moreItems: { label: string; href: string }[] = [
-    { label: "远程控制", href: "/remote" },
-    { label: "项目 Projects", href: "/projects" },
-    { label: "工作项 WorkItem", href: "/work-item" },
-    { label: "看板 Board", href: "/board" },
-    { label: "通知 Notification", href: "/notification" },
-    { label: "审计 Audit", href: "/audit" },
-    { label: "搜索 ⌘K", href: "/search" },
-    { label: "权限 Permission", href: "/permission" },
-    { label: "本地 Runtime", href: "/local-runtime" },
-    { label: "设置 Settings", href: "/settings" },
-  ];
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (open) {
+      wasOpen.current = true;
+      closeRef.current?.focus();
+      return;
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [open]);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape" && open) {
+      event.preventDefault();
+      setOpen(false);
+    }
+  }
 
   return (
     <>
       <nav
         data-testid="mobile-bottom-nav"
-        aria-label={t.ariaLabels.mobilePrimaryNav}
+        aria-label={t.sidebar.projectNavigation}
         className="md:hidden fixed bottom-0 inset-x-0 border-t-2 border-[var(--cel-ink)] bg-bg/95 backdrop-blur-xl shadow-[0_-3px_0px_0px_var(--cel-ink)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)", zIndex: 9999 }}
       >
-        <ul className="grid grid-cols-5 h-14">
-          {ITEMS.map((item) => {
-            const active = item.match(pathname);
-            const Icon = item.icon;
-            const isMore = item.id === "more";
-            return (
-              <li key={item.id}>
-                {isMore ? (
-                  <button
-                    type="button"
-                    onClick={() => setMoreOpen(true)}
-                    data-testid={`mobile-nav-${item.id}`}
-                    className="w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-ink-dim hover:text-ink transition-colors"
-                    aria-label={t.ariaLabels.moreNav}
-                  >
-                    <Icon size={18} />
-                    <span>{item.label}</span>
-                  </button>
-                ) : (
-                  <Link
-                    href={item.href}
-                    data-testid={`mobile-nav-${item.id}`}
-                    aria-current={active ? "page" : undefined}
-                    className={clsx(
-                      "w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
-                      active ? "text-accent" : "text-ink-dim hover:text-ink",
-                    )}
-                  >
-                    <Icon
-                      size={18}
-                      className={active ? "drop-shadow-[2px_2px_0_rgba(0,240,255,0.9)]" : ""}
-                    />
-                    <span>{item.label}</span>
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <button
+          ref={triggerRef}
+          type="button"
+          data-testid="mobile-nav-project"
+          aria-label={t.sidebar.openProjectDirectory}
+          aria-expanded={open}
+          aria-controls="mobile-project-directory"
+          onClick={() => setOpen((current) => !current)}
+          className="flex h-14 w-full items-center justify-center gap-2 text-xs font-medium text-ink-dim hover:text-ink focus:outline focus:outline-2 focus:outline-accent"
+        >
+          <FolderTree size={18} aria-hidden="true" />
+          <span>{t.sidebar.projectDirectoryTitle}</span>
+          <ChevronDown
+            size={14}
+            aria-hidden="true"
+            className={`transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
       </nav>
 
-      {/* "更多" 抽屉 */}
-      {moreOpen && (
-        <div
-          data-testid="mobile-more-drawer"
-          className="md:hidden fixed inset-0 z-50 flex items-end"
-          onClick={() => setMoreOpen(false)}
-        >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div
-            className="relative w-full max-h-[80vh] overflow-y-auto rounded-t-2xl border-t-2 border-[var(--cel-ink)] bg-bg-soft p-4 pb-8 shadow-[0_-4px_0px_0px_var(--cel-ink)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-1 bg-line rounded-full mx-auto mb-4" />
-            <h2 className="text-xs font-mono uppercase tracking-widest text-ink-mute px-2 mb-3">
-              所有模块
-            </h2>
-            <ul className="grid grid-cols-3 gap-2">
-              {moreItems.map((it) => (
-                <li key={it.href}>
-                  <Link
-                    href={it.href}
-                    onNavigate={() => setMoreOpen(false)}
-                    data-testid={`mobile-more-${it.href.replace(/\W+/g, "-")}`}
-                    className="block px-3 py-3 rounded-xl border-2 border-line bg-bg/50 text-xs text-ink-dim hover:text-ink hover:border-accent/40 transition-colors text-center shadow-[2px_2px_0px_0px_var(--cel-shadow-color)]"
-                  >
-                    {it.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              onClick={() => setMoreOpen(false)}
-              className="w-full mt-4 py-3 rounded-xl border border-line text-xs text-ink-dim hover:text-ink"
-            >
-              关闭
-            </button>
+      <section
+        id="mobile-project-directory"
+        data-testid="mobile-project-directory"
+        aria-label={t.sidebar.projectDirectory}
+        hidden={!open}
+        onKeyDown={handleKeyDown}
+        className="md:hidden fixed inset-x-0 bottom-14 z-[9998] max-h-[min(70dvh,32rem)] overflow-y-auto border-t-2 border-[var(--cel-ink)] bg-bg-soft p-3 shadow-[0_-4px_0px_0px_var(--cel-shadow-color)]"
+        style={{ bottom: "calc(3.5rem + env(safe-area-inset-bottom))" }}
+      >
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">{t.sidebar.projectDirectoryTitle}</h2>
+            <p className="text-[10px] text-ink-mute">
+              {t.sidebar.projectDirectoryHint}
+            </p>
           </div>
+          <button
+            ref={closeRef}
+            type="button"
+            data-testid="mobile-project-directory-close"
+            onClick={() => setOpen(false)}
+            className="shrink-0 rounded border border-line px-3 py-2 text-xs text-ink-dim hover:text-ink focus:outline focus:outline-2 focus:outline-accent"
+          >
+            {t.sidebar.closeProjectDirectory}
+          </button>
         </div>
-      )}
+        {open && <ProjectRunTree collapsed={false} />}
+      </section>
     </>
   );
 }

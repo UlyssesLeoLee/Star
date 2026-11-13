@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a705920a895bf5d80a26729424d271c3bdcd0874ae2c26f991b21ad81cdf4119
+@cypher schema=1 source_sha256=539c4055fbbcb7b5625bf3b2fdbe047c1a060e50f5aa4f4a7a5fdb589ef9124e
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs"})
 MERGE (provider:Type {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider",kind:"trait"})
 MERGE (providerList:Symbol {id:"crates/star-api-rest/src/group_api/worktree_lifecycle.rs::RunWorktreeLifecycleProvider.list_project_repositories",kind:"method"})
@@ -179,7 +179,6 @@ MERGE (tests)-[:TESTS]->(router)
 //!        (ref_test)-[:CALLS]->(validate_ref),(candidate_test)-[:CALLS]->(validate_candidate),(role_test)-[:CALLS]->(writer_role),(head_test)-[:CALLS]->(validate_head),(projection_test)-[:CALLS]->(validate_repositories),(hostless_test)-[:CALLS]->(repository_binding),(binding_test)-[:CALLS]->(repository_binding),(provider_test)-[:CALLS]->(require_provider),(correlation_test)-[:CALLS]->(correlation),(nil_correlation_test)-[:CALLS]->(correlation),(route_test)-[:CALLS]->(router),(dto_test)-[:CALLS]->(validate_create),(receipt_test)-[:CALLS]->(validate_receipt);
 //! CYPHER STRUCTURAL MANIFEST END
 
-
 use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
@@ -201,10 +200,10 @@ use uuid::Uuid;
 
 use crate::auth::AuthUser;
 
+use super::engineering_runs::{authorize_run_owned_task_scope, RunOwnedTaskScope};
 use super::{
     require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError, GroupApiState,
 };
-use super::engineering_runs::{authorize_run_owned_task_scope, RunOwnedTaskScope};
 
 /// An opaque Git Worktree candidate returned for a Run-bound Repository by the trusted host registry.
 /// This DTO deliberately contains no checkout path, repository URL, or executable command.
@@ -433,7 +432,8 @@ async fn list_run_worktree_repositories(
     Path(run_id): Path<String>,
 ) -> Result<impl IntoResponse, GroupApiError> {
     let run_id = Uuid::parse_str(&run_id).map_err(|_| GroupApiError::bad_request())?;
-    let scope = authorize_run_worktree_scope(&state, &actor, run_id, "worktree:read", false).await?;
+    let scope =
+        authorize_run_worktree_scope(&state, &actor, run_id, "worktree:read", false).await?;
     let provider = require_lifecycle_provider(state.run_worktree_lifecycle_provider.clone())?;
     let repositories = provider
         .list_project_repositories(RunWorktreeRepositoryQuery {
@@ -449,7 +449,9 @@ async fn list_run_worktree_repositories(
     validate_run_repositories(&repositories, scope.repository_id)?;
     Ok((
         [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
-        Json(json!({ "project_id": scope.project_id, "engineering_run_id": run_id, "repositories": repositories })),
+        Json(
+            json!({ "project_id": scope.project_id, "engineering_run_id": run_id, "repositories": repositories }),
+        ),
     ))
 }
 
@@ -541,7 +543,8 @@ async fn list_import_candidates(
     let repository_id =
         Uuid::parse_str(&query.repository_id).map_err(|_| GroupApiError::bad_request())?;
     let limit = query.limit.unwrap_or(25).clamp(1, 50);
-    let scope = authorize_run_worktree_scope(&state, &actor, run_id, "worktree:create", true).await?;
+    let scope =
+        authorize_run_worktree_scope(&state, &actor, run_id, "worktree:create", true).await?;
     require_run_repository_binding(&scope, repository_id)?;
     let provider = require_lifecycle_provider(state.run_worktree_lifecycle_provider.clone())?;
     let provider_query = RunWorktreeImportCandidatesQuery {
@@ -591,7 +594,8 @@ async fn create_run_worktree(
     let run_id = Uuid::parse_str(&run_id).map_err(|_| GroupApiError::bad_request())?;
     validate_create_body(&body)?;
     let key = read_idempotency_key(&headers)?;
-    let scope = authorize_run_worktree_scope(&state, &actor, run_id, "worktree:create", true).await?;
+    let scope =
+        authorize_run_worktree_scope(&state, &actor, run_id, "worktree:create", true).await?;
     require_run_repository_binding(&scope, body.repository_id)?;
     let correlation_id = resolve_correlation_id(
         body.correlation_id,
@@ -622,7 +626,13 @@ async fn create_run_worktree(
     };
     let provider = require_lifecycle_provider(state.run_worktree_lifecycle_provider.clone())?;
     let receipt = provider.create(command).await.map_err(map_provider_error)?;
-    validate_receipt(&receipt, run_id, scope.project_id, body.repository_id, correlation_id)?;
+    validate_receipt(
+        &receipt,
+        run_id,
+        scope.project_id,
+        body.repository_id,
+        correlation_id,
+    )?;
     if receipt.branch != body.branch {
         return Err(GroupApiError::internal());
     }
@@ -645,7 +655,8 @@ async fn import_run_worktree(
         return Err(GroupApiError::invalid_request("invalid_import_candidate"));
     }
     let key = read_idempotency_key(&headers)?;
-    let scope = authorize_run_worktree_scope(&state, &actor, run_id, "worktree:create", true).await?;
+    let scope =
+        authorize_run_worktree_scope(&state, &actor, run_id, "worktree:create", true).await?;
     require_run_repository_binding(&scope, body.repository_id)?;
     let correlation_id = resolve_correlation_id(
         body.correlation_id,
@@ -675,7 +686,13 @@ async fn import_run_worktree(
     };
     let provider = require_lifecycle_provider(state.run_worktree_lifecycle_provider.clone())?;
     let receipt = provider.import(command).await.map_err(map_provider_error)?;
-    validate_receipt(&receipt, run_id, scope.project_id, body.repository_id, correlation_id)?;
+    validate_receipt(
+        &receipt,
+        run_id,
+        scope.project_id,
+        body.repository_id,
+        correlation_id,
+    )?;
     Ok((
         StatusCode::ACCEPTED,
         [(CACHE_CONTROL, "no-store")],
@@ -733,14 +750,8 @@ fn resolve_correlation_id(
         };
     }
 
-    let material = serde_json::to_vec(&(
-        tenant_id,
-        run_id,
-        actor_id,
-        operation,
-        idempotency_key,
-    ))
-    .map_err(|_| GroupApiError::internal())?;
+    let material = serde_json::to_vec(&(tenant_id, run_id, actor_id, operation, idempotency_key))
+        .map_err(|_| GroupApiError::internal())?;
     let digest = Sha256::digest(material);
     let mut bytes = [0_u8; 16];
     bytes.copy_from_slice(&digest[..16]);
@@ -812,8 +823,10 @@ fn validate_receipt(
             }
             RunWorktreeLifecycleState::Ready => {
                 receipt.run_binding_id.is_none()
-                    || receipt.run_binding_id.is_some_and(Uuid::is_nil)
-                    || receipt.run_binding_version.is_none_or(|version| version <= 0)
+                    || receipt.run_binding_id.is_some_and(|id| id.is_nil())
+                    || receipt
+                        .run_binding_version
+                        .is_none_or(|version| version <= 0)
             }
         }
     {
@@ -943,7 +956,10 @@ mod tests {
         let error = require_lifecycle_provider(None)
             .err()
             .expect("provider absence must fail closed");
-        assert_eq!(error.into_response().status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            error.into_response().status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
     }
 
     #[test]
@@ -1028,19 +1044,31 @@ mod tests {
             accepted_at: Utc::now(),
             correlation_id,
         };
-        assert!(validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_ok());
+        assert!(
+            validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_ok()
+        );
         receipt.engineering_run_id = Uuid::new_v4();
-        assert!(validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err());
+        assert!(
+            validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err()
+        );
         receipt.engineering_run_id = run_id;
         receipt.state = RunWorktreeLifecycleState::Ready;
-        assert!(validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err());
+        assert!(
+            validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err()
+        );
         receipt.run_binding_id = Some(Uuid::new_v4());
         receipt.run_binding_version = Some(1);
-        assert!(validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_ok());
+        assert!(
+            validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_ok()
+        );
         receipt.repository_id = Uuid::new_v4();
-        assert!(validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err());
+        assert!(
+            validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err()
+        );
         receipt.repository_id = repository_id;
         receipt.correlation_id = Uuid::new_v4();
-        assert!(validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err());
+        assert!(
+            validate_receipt(&receipt, run_id, project_id, repository_id, correlation_id).is_err()
+        );
     }
 }

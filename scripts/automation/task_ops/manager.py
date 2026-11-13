@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=37ec56967311e9cf1802a6c8adab87dc1cebe74e361e6b4cfe3f1a16989d32d5
+# MERGE (self:File {path:"scripts/automation/task_ops/manager.py"})
+# @endcypher
 # scripts/automation/task_ops/manager.py
 # TaskOperationsManager (C-16, per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6)
 #
@@ -20,13 +23,15 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .task_metadata_repo import TaskMetadataRepository
 
 logger = logging.getLogger("task_ops.manager")
 

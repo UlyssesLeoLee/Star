@@ -34,7 +34,9 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
-use worktree_shared_dir::{ExternalWorktree, ExternalWorktreeImport, InMemoryExternalWorktreeImport};
+use worktree_shared_dir::{
+    ExternalWorktree, ExternalWorktreeImport, InMemoryExternalWorktreeImport,
+};
 
 use crate::error::RestError;
 use crate::response::RestResponse;
@@ -283,7 +285,9 @@ mod tests {
 
         let req = Request::builder()
             .method("GET")
-            .uri("/api/v1/worktrees/external-worktrees?repo_id=00000000-0000-0000-0000-000000000001")
+            .uri(
+                "/api/v1/worktrees/external-worktrees?repo_id=00000000-0000-0000-0000-000000000001",
+            )
             .body(Body::empty())
             .unwrap();
 

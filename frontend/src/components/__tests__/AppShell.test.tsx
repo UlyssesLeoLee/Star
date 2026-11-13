@@ -1,6 +1,13 @@
 // =====================================================================
 // AppShell.test.tsx — AppShell layout test (per design §3 + §8.1)
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=9cb1c103f823e5ae9e8d320dc7470fd4b4275c43d14eee94aacf41129e15d16c
+MERGE (self:File {path:"frontend/src/components/__tests__/AppShell.test.tsx"})
+MERGE (shell:Symbol {id:"frontend/src/components/AppShell.tsx::AppShell",kind:"component"})
+MERGE (self)-[:IMPORTS]->(shell)
+@endcypher
+*/
 // 3 个测试 (per 任务要求 ≥2):
 //   1. 渲染 [data-testid=app-shell] + [data-testid=app-header] + [data-testid=app-main]
 //   2. children 透传到 main 区
@@ -14,6 +21,7 @@ import type { ReactNode } from "react";
 // Mock next/navigation — AppHeader 通过 usePathname 读 active tab
 vi.mock("next/navigation", () => ({
   usePathname: () => "/sprint",
+  useSearchParams: () => new URLSearchParams(""),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
@@ -78,6 +86,7 @@ describe("AppShell", () => {
       </AppShell>
     );
     const main = screen.getByTestId("app-main");
-    expect(main.style.minHeight).toBe("calc(100vh - 64px)");
+        // calc(-64px + 100vh) 与 calc(100vh - 64px) 数学等价，浏览器标准化后顺序不固定
+        expect(main.style.minHeight).toMatch(/calc\(.*(100vh.*64px|64px.*100vh).*\)/);
   });
 });

@@ -102,11 +102,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{AgentId, AgentSessionId, TenantId};
 use crate::loop_boundary::{
     AgentLoopBoundary, InternalContext, InternalMessage, InternalRole, LoopBoundaryContext,
     TransformOutcome,
 };
+use crate::{AgentId, AgentSessionId, TenantId};
 
 // =====================================================================
 // 错误
@@ -1144,9 +1144,7 @@ impl AgentQueue for InMemoryAgentQueue {
         if let Some(entry) = g.priority.pop() {
             return Ok(entry.task);
         }
-        g.fifo
-            .pop_front()
-            .ok_or(AgentQueueError::Empty)
+        g.fifo.pop_front().ok_or(AgentQueueError::Empty)
     }
 
     async fn cancel(&self, actor_tenant: TenantId, task_id: Uuid) -> AgentQueueResult<()> {
@@ -1156,9 +1154,8 @@ impl AgentQueue for InMemoryAgentQueue {
             .map_err(|e| AgentQueueError::Internal(format!("queue poisoned: {e}")))?;
         // FIFO 桶
         let before = g.fifo.len();
-        g.fifo.retain(|t| {
-            !(t.task_id == task_id && t.tenant_id == actor_tenant)
-        });
+        g.fifo
+            .retain(|t| !(t.task_id == task_id && t.tenant_id == actor_tenant));
         let removed_fifo = before != g.fifo.len();
         // Priority 桶
         let drained: Vec<PriorityEntry> = std::mem::take(&mut g.priority).into_iter().collect();
@@ -1415,13 +1412,13 @@ impl AgentQueue for InMemoryAgentQueue {
     }
 
     async fn running_task_id(&self) -> Option<Uuid> {
-        self.running.lock().ok().and_then(|g| g.as_ref().map(|r| r.task_id))
+        self.running
+            .lock()
+            .ok()
+            .and_then(|g| g.as_ref().map(|r| r.task_id))
     }
 
-    async fn register_preemption_listener(
-        &self,
-        listener: std::sync::Arc<dyn PreemptionListener>,
-    ) {
+    async fn register_preemption_listener(&self, listener: std::sync::Arc<dyn PreemptionListener>) {
         if let Ok(mut g) = self.listeners.lock() {
             g.push(listener);
         }
@@ -1461,11 +1458,7 @@ impl AgentQueue for InMemoryAgentQueue {
 // **租户守门失效说明(W2 legacy)**:W2 `mark_running(task_id)` 因为 trait 签名只接
 // task_id,无法记录真实 tenant_id(占位 nil)。W3 已加 `mark_running_with`
 // 修这一 trade-off,但仍保留 W2 路径以兼容旧 driver。
-fn maybe_fire_preemption(
-    queue: &InMemoryAgentQueue,
-    incoming: &QueuedTask,
-    mode: QueueMode,
-) {
+fn maybe_fire_preemption(queue: &InMemoryAgentQueue, incoming: &QueuedTask, mode: QueueMode) {
     // 取 running 快照 (短暂持锁)
     let running_snapshot = match queue.running.lock() {
         Ok(g) => g.clone(),
@@ -1518,12 +1511,7 @@ mod tests {
     use std::sync::Arc;
 
     fn make_task(tenant: TenantId, prompt: &str, priority: i32) -> QueuedTask {
-        let mut t = QueuedTask::new(
-            tenant,
-            AgentId::new(),
-            AgentSessionId::new(),
-            prompt,
-        );
+        let mut t = QueuedTask::new(tenant, AgentId::new(), AgentSessionId::new(), prompt);
         t.priority = priority;
         t
     }
@@ -1639,12 +1627,9 @@ mod tests {
             q.enqueue(make_task(t, "normal-2", DEFAULT_PRIORITY), QueueMode::Fifo)
                 .await
                 .unwrap();
-            q.enqueue(
-                make_interrupt_task(t, "interrupt-1"),
-                QueueMode::Fifo,
-            )
-            .await
-            .unwrap();
+            q.enqueue(make_interrupt_task(t, "interrupt-1"), QueueMode::Fifo)
+                .await
+                .unwrap();
             assert_eq!(q.take_next().await.unwrap().prompt, "interrupt-1");
             assert_eq!(q.take_next().await.unwrap().prompt, "normal-1");
             assert_eq!(q.take_next().await.unwrap().prompt, "normal-2");
@@ -1912,7 +1897,11 @@ mod tests {
             // 另一租户 1 个 task,不应被 t1 cancel_many 命中
             let other = make_task(t2, "other-tenant", DEFAULT_PRIORITY);
 
-            for t in fifo_tasks.iter().chain(prio_tasks.iter()).chain(std::iter::once(&other)) {
+            for t in fifo_tasks
+                .iter()
+                .chain(prio_tasks.iter())
+                .chain(std::iter::once(&other))
+            {
                 let mode = if t.prompt.starts_with("prio-") {
                     QueueMode::Priority
                 } else {
@@ -1955,14 +1944,20 @@ mod tests {
         let t2 = TenantId::new();
         block_on(async {
             for i in 0..3 {
-                q.enqueue(make_task(t1, &format!("t1-{i}"), DEFAULT_PRIORITY), QueueMode::Fifo)
-                    .await
-                    .unwrap();
+                q.enqueue(
+                    make_task(t1, &format!("t1-{i}"), DEFAULT_PRIORITY),
+                    QueueMode::Fifo,
+                )
+                .await
+                .unwrap();
             }
             for i in 0..2 {
-                q.enqueue(make_task(t2, &format!("t2-{i}"), DEFAULT_PRIORITY), QueueMode::Fifo)
-                    .await
-                    .unwrap();
+                q.enqueue(
+                    make_task(t2, &format!("t2-{i}"), DEFAULT_PRIORITY),
+                    QueueMode::Fifo,
+                )
+                .await
+                .unwrap();
             }
             assert_eq!(q.len().await, 5);
 
@@ -2282,10 +2277,7 @@ mod tests {
 
             // 只 cancel a 和一个不存在的 id → 1 found, 1 missing
             let nonexistent = Uuid::new_v4();
-            let report = q
-                .cancel_many(t, &[a.task_id, nonexistent])
-                .await
-                .unwrap();
+            let report = q.cancel_many(t, &[a.task_id, nonexistent]).await.unwrap();
             assert_eq!(report.found, vec![a.task_id]);
             assert_eq!(report.missing, vec![nonexistent]);
             assert_eq!(q.len().await, 2);
@@ -2340,7 +2332,10 @@ mod tests {
             // 我们没有公开的 getter 直接拿 running.snapshot 字段,
             // 但通过 take_next 不受影响(因为 task 不在 queue)验证 running 是
             // 我们传的 task:
-            assert!(q.take_next().await.is_err(), "queue 空,task 在 running 不在 queue");
+            assert!(
+                q.take_next().await.is_err(),
+                "queue 空,task 在 running 不在 queue"
+            );
         });
     }
 
@@ -2469,7 +2464,8 @@ mod tests {
         let q = InMemoryAgentQueue::new();
         let t = TenantId::new();
         let sink = Arc::new(InMemoryCollabSink::new());
-        let bridge: Arc<dyn PreemptionListener> = Arc::new(CollabPreemptionBridge::new(sink.clone()));
+        let bridge: Arc<dyn PreemptionListener> =
+            Arc::new(CollabPreemptionBridge::new(sink.clone()));
         block_on(async {
             q.register_preemption_listener(bridge).await;
             let running = make_task(t, "running-task", DEFAULT_PRIORITY);
@@ -2518,7 +2514,8 @@ mod tests {
         let q: Arc<dyn AgentQueue> = Arc::new(InMemoryAgentQueue::new());
         let t = TenantId::new();
         let sink = Arc::new(InMemoryCollabSink::new());
-        let bridge: Arc<dyn PreemptionListener> = Arc::new(CollabPreemptionBridge::new(sink.clone()));
+        let bridge: Arc<dyn PreemptionListener> =
+            Arc::new(CollabPreemptionBridge::new(sink.clone()));
         block_on(async {
             q.register_preemption_listener(bridge).await;
             // 1. driver 拉 normal task 入 queue,再 take + mark_running_with
@@ -2591,10 +2588,22 @@ mod tests {
         let cmds = sink.commands();
         assert_eq!(cmds.len(), 1, "bridge must dispatch exactly once");
         let cmd = &cmds[0];
-        assert_eq!(cmd.current_agent_id, current_agent, "W5: current_agent_id from QueuedTask");
-        assert_eq!(cmd.current_session_id, current_session, "W5: current_session_id from QueuedTask");
-        assert_eq!(cmd.incoming_agent_id, incoming_agent, "W5: incoming_agent_id from QueuedTask");
-        assert_eq!(cmd.incoming_session_id, incoming_session, "W5: incoming_session_id from QueuedTask");
+        assert_eq!(
+            cmd.current_agent_id, current_agent,
+            "W5: current_agent_id from QueuedTask"
+        );
+        assert_eq!(
+            cmd.current_session_id, current_session,
+            "W5: current_session_id from QueuedTask"
+        );
+        assert_eq!(
+            cmd.incoming_agent_id, incoming_agent,
+            "W5: incoming_agent_id from QueuedTask"
+        );
+        assert_eq!(
+            cmd.incoming_session_id, incoming_session,
+            "W5: incoming_session_id from QueuedTask"
+        );
         // 守门:4 个新字段 ≠ 任何 task_id(W4 占位 = incoming_task_id 已废止)
         assert_ne!(cmd.current_agent_id.as_uuid(), current.task_id);
         assert_ne!(cmd.current_session_id.as_uuid(), current.task_id);
@@ -2621,10 +2630,22 @@ mod tests {
         assert!(!cmd.incoming_agent_id.as_uuid().is_nil());
         assert!(!cmd.incoming_session_id.as_uuid().is_nil());
         // 跨字段独立性:任一字段都不应等于另一字段(W4 占位串同 UUID 的风险被消)
-        assert_ne!(cmd.current_agent_id.as_uuid(), cmd.current_session_id.as_uuid());
-        assert_ne!(cmd.incoming_agent_id.as_uuid(), cmd.incoming_session_id.as_uuid());
-        assert_ne!(cmd.current_agent_id.as_uuid(), cmd.incoming_agent_id.as_uuid());
-        assert_ne!(cmd.current_session_id.as_uuid(), cmd.incoming_session_id.as_uuid());
+        assert_ne!(
+            cmd.current_agent_id.as_uuid(),
+            cmd.current_session_id.as_uuid()
+        );
+        assert_ne!(
+            cmd.incoming_agent_id.as_uuid(),
+            cmd.incoming_session_id.as_uuid()
+        );
+        assert_ne!(
+            cmd.current_agent_id.as_uuid(),
+            cmd.incoming_agent_id.as_uuid()
+        );
+        assert_ne!(
+            cmd.current_session_id.as_uuid(),
+            cmd.incoming_session_id.as_uuid()
+        );
     }
 
     /// **ULYS-207 PI-9 W5**:`CollabSteeringCommand::new` 构造函数签名扩到
@@ -2642,7 +2663,8 @@ mod tests {
         let ia = AgentId::new();
         let is_ = AgentSessionId::new();
         let ts = SystemTime::now();
-        let cmd = CollabSteeringCommand::new(t, ct, ce.clone(), ca, cs, it, ie.clone(), ia, is_, ts);
+        let cmd =
+            CollabSteeringCommand::new(t, ct, ce.clone(), ca, cs, it, ie.clone(), ia, is_, ts);
         assert_eq!(cmd.tenant_id, t);
         assert_eq!(cmd.current_task_id, ct);
         assert_eq!(cmd.current_prompt_excerpt, ce);
@@ -2705,10 +2727,7 @@ mod tests {
     fn queued_task_payload_op_apply_reducer_end_to_end_w6() {
         use star_dto::delta::{apply, Op};
         let tenant = TenantId::from(Uuid::new_v4());
-        let op = Op::Set(
-            vec!["greeting".to_string()],
-            serde_json::json!("hello"),
-        );
+        let op = Op::Set(vec!["greeting".to_string()], serde_json::json!("hello"));
         let task = make_task(tenant, "apply me", DEFAULT_PRIORITY).with_payload_op(op.clone());
 
         // 模拟 agent loop 优先用 payload_op 调 apply

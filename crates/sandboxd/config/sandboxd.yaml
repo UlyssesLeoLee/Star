@@ -1,0 +1,57 @@
+# sandboxd 默认配置 (per BD-SANDBOX-002 §2.3)
+# 平台默认路径: Linux /etc/sandboxd/config.yaml / Windows $ProgramData/sandboxd/config.yaml
+# 偏差标注: BD 期望 metrics/health 跟 gRPC 同端口 (50051), tonic 0.12 无 accept_http1 (0.14 才引入),
+#   故 v0.1 同进程不同端口 (http_port 50052)。"跟 gRPC 同进程" 保持。
+
+server:
+  grpc_port: 50051
+  http_port: 50052
+  max_concurrent_sessions: 100
+  default_session_timeout_sec: 1800   # 30 min (per FR-4.3)
+  grace_shutdown_sec: 30              # FR-1.3 优雅停机宽限期
+
+isolation:
+  resource:
+    default_memory_mb: 1024
+    default_cpu_percent: 50
+    default_max_processes: 100
+    kill_on_parent_exit: true
+  network:
+    default_mode: allowlist          # per 决策点 D-3
+    default_allowlist:
+      - "github.com"
+      - "*.github.com"
+      - "crates.io"
+      - "*.crates.io"
+      - "static.crates.io"
+      - "index.crates.io"
+      - "sh.rustup.rs"
+    default_ip_allowlist: []
+  fs:
+    default_mode: allowlist          # per 决策点 D-4
+    default_allowlist:
+      - path: "/worktree"
+        mode: read
+      - path: "/worktree/.worktree-cache"
+        mode: readwrite
+      - path: "/tmp"
+        mode: readwrite
+  capability:
+    linux_default: drop_all
+    windows_default: drop_se_debug
+
+observability:
+  prometheus_enabled: true
+  audit_log_file: "sandboxd-audit.jsonl"    # JSON Lines append-only (per NFR-M-3)
+  audit_log_pg_url: ""                       # 空 = 不启用 PG (per FR-6.2)
+  audit_log_retention_days: 90
+
+failover:
+  enable_v0_2_subprocess_fallback: true     # per FR-7.1 跟 SANDBOX-001 v0.2 兼容
+  fallback_path: "scripts/automation/guardian/sandbox.py"
+  root_session_notify: true
+
+actor:                                        # RLS 13 類三元组 (v0.1 服务端注入, per 守门 #13c)
+  tenant_id: ""
+  workspace_id: ""
+  actor_id: ""

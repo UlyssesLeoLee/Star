@@ -1,5 +1,13 @@
 ﻿# =====================================================================
 # update-frontend.ps1 — Star 更新前端 (per 2026-09-06 13:21 JST 拍板)
+# @cypher schema=1 source_sha256=ab70d67b6fd522b91e70828d333b9cbdce9ee1015bd5e013d28f41bb2e5435b6
+# MERGE (self:File {path:"maintenance/update-frontend.ps1"})
+# MERGE (entry:Symbol {id:"maintenance/update-frontend.ps1::entry",kind:"script_entry"})
+# MERGE (cleanup:Symbol {id:"maintenance/update-frontend.ps1::Stop-TrackedTree",kind:"function"})
+# MERGE (self)-[:DEFINES]->(entry)
+# MERGE (self)-[:DEFINES]->(cleanup)
+# MERGE (entry)-[:CALLS]->(cleanup)
+# @endcypher
 # =====================================================================
 # 职责: 只拉前端依赖
 #   1. 切到仓库根
@@ -9,7 +17,8 @@
 #
 # 不做 (per 缺标比错标):
 #   - 不 rm -rf node_modules (npm ci 本身就是从锁文件重装, 删了反而会丢掉 npm 缓存)
-#   - 不动后端 (后端更新走 update-backend-k3s.ps1)
+#   - 不管理后端; Canvas 部署见 docs/deployment/star-canvas-services-deploy.md,
+#     仅面向已配置且可达的 K3s context
 #   - 不动 helm / k3s
 #   - 不动 env var 内容 (per 8/27 11:06 JST hard ban)
 #
@@ -237,6 +246,6 @@ if ($CiOk) {
 Write-Host ""
 Write-Host "[3/3] 前端已更新, 下一步可:" -ForegroundColor Cyan
 Write-Host "      - 调 .\maintenance\start-frontend.bat 启 dev server" -ForegroundColor Yellow
-Write-Host "      - 调 .\maintenance\update-backend-k3s.bat 更新后端" -ForegroundColor Yellow
+Write-Host "      - Canvas 部署请先查看 docs\deployment\star-canvas-services-deploy.md; 需要现有可达的 K3s context" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "==== 前端更新完成 ====" -ForegroundColor Green

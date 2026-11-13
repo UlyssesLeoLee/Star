@@ -11,7 +11,7 @@
 
 | Group | Branch 模板 | 守门边界 |
 |---|---|---|
-| **canvas-group** | `codex/worktree-group-canvas-dev` | 0 改 frontend `src/`、`crates/domain-*`、`crates/api`、`crates/bff`；只动 `crates/canvas-*` + `deploy/canvas-game-k3s.yaml` + GHCR image publish workflow |
+| **canvas-group** | `codex/worktree-group-canvas-dev` | 0 改 frontend `src/`、`crates/domain-*`、`crates/api`、`crates/bff`；只动 `crates/canvas-*` + `deploy/star-canvas-services-k3s.yaml` + `.github/workflows/publish-star-canvas-services.yml` |
 | **domain-group** | `codex/worktree-group-domain-dev` | 0 改 frontend `src/`、`crates/canvas-*`、`crates/api`、`crates/bff`；只动 `crates/domain-*` + `crates/star-*` infrastructure |
 | **frontend-group** | `codex/worktree-group-frontend-dev` | 0 改 `crates/`、`bff/`、`deploy/`；只动 `frontend/src/` + frontend e2e + frontend tests |
 | **core-group** (root) | `dev` / `main` | 无 Group 约束，仅顶层守门 #1+#11+#19 v19 |
@@ -82,13 +82,13 @@ export NEXT_PUBLIC_WORKTREE_ID=$(basename $(git rev-parse --show-toplevel))
 ### 5.1 canvas-group 启动新 canvas-engine 业务
 
 ```bash
-git worktree add -b codex/worktree-group-canvas-engine-gameplay \
+git worktree add -b codex/worktree-group-canvas-realtime \
   .worktrees/wt-canvas-engine origin/codex/worktree-group-canvas-dev
 cd .worktrees/wt-canvas-engine
 export NEXT_PUBLIC_GROUP_ID=canvas
 export NEXT_PUBLIC_WORKTREE_ID=wt-canvas-engine
 
-# 改 crates/canvas-engine/ + crates/canvas-game/
+# 改 crates/canvas-engine/ + crates/canvas-realtime/
 # 不动 frontend / crates / bff
 # 实装完 push → PR → merge to codex/worktree-group-canvas-dev
 # Group 分支再 merge to dev

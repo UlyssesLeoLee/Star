@@ -1,6 +1,15 @@
 // =====================================================================
 // Star Platform — Shared Type Definitions
 // =====================================================================
+/*
+@cypher schema=1 source_sha256=39c3dd60b0980036a6bf5d1c908856039391fac253295350b8d4d387530d25d1
+MERGE (self:File {path:"frontend/src/types/ids.ts"})
+MERGE (workItem:Type {id:"frontend/src/types/ids.ts::WorkItem",kind:"interface"})
+MERGE (workItemDoc:Type {id:"frontend/src/types/ids.ts::WorkItemDocument",kind:"interface"})
+MERGE (self)-[:DEFINES]->(workItem)
+MERGE (self)-[:DEFINES]->(workItemDoc)
+@endcypher
+*/
 // 来源: docs/api-design.md §2.1 (25 Module Resource Model) +
 //       docs/specs/* (25 个 domain spec) + docs/basic-design.md §7
 //       (5 状态机: Worktree 17 / WorkItem 3-5 / Feedback 6 / Agent 14 / PR 7)
@@ -256,9 +265,30 @@ export interface WorkItem {
   // W/T/M 横展開分類 (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md)
   // 缺省: kind → WT_M_FROM_KIND 派生. 但允许 WorkItem 显式 override (例如 promotion: spike → M 后被改派为 task → T)
   w_t_m?: WtmCategory;
+  // per 2026-11-11 用户发令: 每个任务卡可关联多个文档, 点击直接打开。
+  // 文档 path 支持仓库路径 (docs/…, 打开到 GitHub dev blob) 或完整 http(s) URL。
+  documents?: WorkItemDocument[];
+  // per 2026-11-11 用户发令: 任务卡可开子任务 (parent_id 指向父任务卡);
+  // 文件与 IPA 技能内容都可以作为子任务/关联内容 (同一套 WorkItem 内容模型)。
+  parent_id?: Uuid;
+  // 关联的 IPA 技能 id (catalog.ts skill id, e.g. "ipa-s01-001")
+  ipa_skill_ids?: string[];
+  // 文件即任务: 该任务卡代表一个文件 (path 为仓库路径或 URL)
+  file_path?: string;
   created_at: Iso8601;
   updated_at: Iso8601;
   }
+
+/** 任务卡关联文档 (per 2026-11-11 用户发令: 一卡多文档, 可直接点开) */
+export interface WorkItemDocument {
+  id: Uuid;
+  title: string;
+  /** 仓库内路径 (docs/s01/ipa-s01-001.md) 或 http(s) 完整 URL */
+  path: string;
+  /** 文档类型徽标 (document / review / approval / evidence / link) */
+  kind: "document" | "review" | "approval" | "evidence" | "link";
+  added_at: Iso8601;
+}
 
 // =====================================================================
 // 5b. design-artifact (per test-design.md §6.3.3 V1 Should-Have Test)
@@ -804,6 +834,13 @@ export interface CanvasConnector {
   kind: CanvasConnectorKind;
   from_element_id: Uuid;
   to_element_id: Uuid;
+  /**
+   * 输入/输出端点 (per WBS §23.35, 2026-11-13 用户发令: Canvas 输入输出端点完善)。
+   * from_port 默认 "output" (源元素输出端点), to_port 默认 "input" (目标元素输入端点);
+   * null = 兼容旧数据, 端点回落元素中心点。
+   */
+  from_port?: "input" | "output" | null;
+  to_port?: "input" | "output" | null;
   routing: "straight" | "curved" | "orthogonal";
   arrow_start: boolean;
   arrow_end: boolean;

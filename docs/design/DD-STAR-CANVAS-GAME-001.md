@@ -1,8 +1,10 @@
 # DD-STAR-CANVAS-GAME-001
 
+> **历史状态（2026-10-30）**：已退役，不属于当前 Star 产品设计或发布范围。本文保留原始内容用于审计与历史追溯；当前 Canvas 服务以 `docs/basic-design.md` 和 `docs/deployment/star-canvas-services-deploy.md` 为准。
+
 > **STAR 画布游戏 詳細設計書 v0.1** (弹幕 Roguelike + 3渲2 像素风机器人)
 >
-> - 状态: Detailed Design Baseline
+> - 状态: Retired Historical Record (已退役历史记录；不作为当前产品设计)
 > - 目标阶段: 詳細設計 → 実装 → 単体テスト → 結合テスト → リリース
 > - 上位要件: [`docs/requirements/SRS-STAR-CANVAS-GAME-001.md`](../requirements/SRS-STAR-CANVAS-GAME-001.md) v0.1 (commit `4ed55ae`)
 > - 上位設計: [`docs/design/BD-STAR-CANVAS-GAME-001.md`](./BD-STAR-CANVAS-GAME-001.md) v0.1 (commit `64df37f`)

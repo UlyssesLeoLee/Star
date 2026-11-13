@@ -1,3 +1,6 @@
+# @cypher schema=1 source_sha256=aacf74be8f7fcbbd6ad5ae88937334acd608b0e138dcaedfa848b19660b074de
+# MERGE (self:File {path:"scripts/automation/task_ops/__init__.py"})
+# @endcypher
 # scripts/automation/task_ops/__init__.py
 # TMO (Task Management Operations) Python 化基类 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6)
 #
@@ -10,13 +13,15 @@
 #   - M-N6 reassign_node:  sub-agent 类型 SA-XX 切换 (planned)
 #   - M-N7 metadata_node:  task_metadata 表更新 (Master RLS 必携 per 守门 #13 c, planned)
 #
-# 模块 (合并 wt-tmo-01 + wt-tmo-03 + wt-tmo-04 实装):
+# 模块 (合并 wt-tmo-01 + wt-tmo-03 + wt-tmo-04 实装 + WBS 6.3):
 #   - manager:            TaskOperationsManager 集中调度 (wt-tmo-01)
 #   - protocols:          7 协议 TypedDict (wt-tmo-01)
 #   - relationship_graph: TaskRelationshipGraph 4 字段 DAG (wt-tmo-03)
 #   - dag_validator:      DAGValidator cycle detection O(V+E) (wt-tmo-03, 守门 #13 a 强约束)
 #   - bulk_queue:         BulkOperationQueue asyncio.gather + partial failure rollback (wt-tmo-04)
 #   - nodes:              7 节点 子包
+#   - spawn_subtask:      M-N8 Sub-task Binding 8 模块 M-26..M-33 (WBS 6.3,
+#                         per docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md)
 #
 # 守门 (per AGENTS.md §4):
 #   - 守门 #13 a: L1↔L1 禁止通信 → TMO 7 节点全部 L0 协调
@@ -36,4 +41,5 @@ __all__ = [
     "dag_validator",
     "bulk_queue",
     "nodes",
+    "spawn_subtask",
 ]

@@ -1,9 +1,11 @@
-# Default values for star chart
-# Phase I production rollout (per ADR-0038)
+# Retired placeholder values for the Star chart.
+# The chart has no active workload templates and is not used for deployment.
+# The active Canvas image contract is maintained by the publish workflow,
+# deploy/star-canvas-services-k3s.yaml, Kargo, and the deployment guide.
 
 # Global
 global:
-  imageRegistry: ghcr.io/ulysses-lee-lee
+  imageRegistry: ghcr.io/ulyssesleolee
   imageTag: git-b0a93db  # TODO: Phase I+ 实测 tag
   namespace: star-system
   tenantNamespace: star-tenant-{id}

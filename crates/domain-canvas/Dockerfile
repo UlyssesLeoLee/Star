@@ -1,15 +1,17 @@
-# domain-canvas Dockerfile (per ULYS-160 §2 阶段 1 骨架)
+# Star Canvas domain service. The workflow supplies a minimal, filtered Cargo
+# workspace as this Dockerfile's context; it must never receive the monorepo.
 
-FROM rust:slim-bookworm AS builder
+FROM rust:1.99.1-bookworm@sha256:cfcbed05398d0f6f81b7c3a24579475c567f97007ae7837ab421f9ca3e66333d AS builder
 WORKDIR /build
-RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
-COPY crates ./crates
-RUN cargo build --release -p domain-canvas
+COPY crates/domain-canvas ./crates/domain-canvas
+RUN cargo build --locked --release --package domain-canvas
 
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /build/target/release/domain-canvas /usr/local/bin/domain-canvas
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+COPY --from=builder --chown=10001:10001 /build/target/release/domain-canvas /usr/local/bin/domain-canvas
+COPY LICENSE /LICENSE
+USER 10001:10001
+LABEL org.opencontainers.image.licenses="MIT"
 ENV PORT=8081
 EXPOSE 8081
 ENTRYPOINT ["/usr/local/bin/domain-canvas"]

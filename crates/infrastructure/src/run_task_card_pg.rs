@@ -140,7 +140,7 @@ use domain_work_item::run_task_card::{
     TransitionRunTaskCardCommand,
 };
 use domain_work_item::{RepositoryId, WorkItemId, WorktreeId};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 

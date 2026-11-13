@@ -5,6 +5,14 @@
 // 适配: 不依赖 @/ alias + i18n (独立 Tauri 端常量)
 // =====================================================================
 
+/*
+@cypher schema=1 source_sha256=ec7768ba2ee9064fc53c51c8e1e841fbe8226ba109ca24d32c5414852f27d5d0
+MERGE (self:File {path:"crates/star-desktop/frontend/src/constants.ts"})
+MERGE (ids:File {path:"crates/star-desktop/frontend/src/types/ids.ts"})
+MERGE (self)-[:IMPORTS]->(ids)
+@endcypher
+*/
+
 import {
   DEFAULT_KANBAN_COLUMNS,
   TODO_FALLBACK_STATUS,
@@ -12,8 +20,8 @@ import {
   type WorkItemStatus,
 } from "./types/ids";
 
-// Re-export 兜底列判定
-export { TODO_FALLBACK_STATUS, isFallbackStatus };
+// Re-export shared board defaults and fallback status helpers.
+export { DEFAULT_KANBAN_COLUMNS, TODO_FALLBACK_STATUS, isFallbackStatus };
 
 /**
  * 4 种 sort modes (per docs §3.4 + §7)

@@ -1,0 +1,13 @@
+# Star monorepo — Vercel 只构建 frontend/ (rootDirectory=frontend)
+crates
+bff
+docs
+tools
+scripts
+target
+worktrees
+D:/Star-worktrees
+*.gif
+frontend/node_modules
+frontend/.next
+frontend/.vercel
