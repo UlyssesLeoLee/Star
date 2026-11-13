@@ -212,3 +212,108 @@ export function enemyRadialBullets(
   }
   return bullets;
 }
+
+/** 敌人弹幕: spiral (螺旋 2-5 条, 角速度 30-90°/s, per BD §5.1.2) */
+export function enemySpiralBullets(
+  enemy: { x: number; y: number },
+  arms: number,
+  speed: number,
+  phaseOffset: number,
+  bulletSeq: () => string,
+): Bullet[] {
+  const bullets: Bullet[] = [];
+  for (let i = 0; i < arms; i++) {
+    const angle = phaseOffset + (i / arms) * Math.PI * 2;
+    bullets.push({
+      id: bulletSeq(),
+      kind: "enemy_spiral",
+      x: enemy.x,
+      y: enemy.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      damage: 6,
+      ttlFrames: 200,
+      radius: 5,
+    });
+  }
+  return bullets;
+}
+
+/** 敌人弹幕: wave (波浪 sin 摆动, per BD §5.1.2) */
+export function enemyWaveBullets(
+  enemy: { x: number; y: number },
+  target: { x: number; y: number },
+  count: number,
+  speed: number,
+  bulletSeq: () => string,
+): Bullet[] {
+  const bullets: Bullet[] = [];
+  const baseAngle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+  for (let i = 0; i < count; i++) {
+    const spread = (i - (count - 1) / 2) * 0.18;
+    bullets.push({
+      id: bulletSeq(),
+      kind: "enemy_wave",
+      x: enemy.x,
+      y: enemy.y,
+      vx: Math.cos(baseAngle + spread) * speed,
+      vy: Math.sin(baseAngle + spread) * speed,
+      damage: 7,
+      ttlFrames: 160,
+      radius: 5,
+      phase: i * 0.9,
+    });
+  }
+  return bullets;
+}
+
+/** 敌人弹幕: laser (锁定目标点直线飞行, per BD §5.1.2) */
+export function enemyLaserBullets(
+  enemy: { x: number; y: number },
+  target: { x: number; y: number },
+  count: number,
+  speed: number,
+  bulletSeq: () => string,
+): Bullet[] {
+  const bullets: Bullet[] = [];
+  const dx = target.x - enemy.x;
+  const dy = target.y - enemy.y;
+  const len = Math.hypot(dx, dy) || 1;
+  for (let i = 0; i < count; i++) {
+    bullets.push({
+      id: bulletSeq(),
+      kind: "enemy_laser",
+      x: enemy.x,
+      y: enemy.y,
+      vx: (dx / len) * speed,
+      vy: (dy / len) * speed,
+      damage: 10,
+      ttlFrames: 120,
+      radius: 3,
+      targetX: target.x,
+      targetY: target.y,
+    });
+  }
+  return bullets;
+}
+
+/** 玩家大招 (Q 键, per BD §3.1.7 FR-GAME-602): 全屏 16 向爆发 */
+export function fireUltimate(robot: PlayerRobot, damageLevel: number, bulletSeq: () => string): Bullet[] {
+  const bullets: Bullet[] = [];
+  const count = 16;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    bullets.push({
+      id: bulletSeq(),
+      kind: "player",
+      x: robot.x,
+      y: robot.y,
+      vx: Math.cos(angle) * 360,
+      vy: Math.sin(angle) * 360,
+      damage: 14 + damageLevel * 4,
+      ttlFrames: 80,
+      radius: 5,
+    });
+  }
+  return bullets;
+}

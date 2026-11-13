@@ -43,7 +43,7 @@ export interface PlayerRobot {
   kills: number;
 }
 
-export type BulletKind = "player" | "enemy_aimed" | "enemy_radial";
+export type BulletKind = "player" | "enemy_aimed" | "enemy_radial" | "enemy_spiral" | "enemy_wave" | "enemy_laser";
 
 export interface Bullet {
   id: string;
@@ -56,6 +56,22 @@ export interface Bullet {
   /** 存活帧数 (子弹池回收依据) */
   ttlFrames: number;
   radius: number;
+  /** wave 模式: 相位偏移 (sin 摆动, per BD §5.1.2) */
+  phase?: number;
+  /** laser 模式: 目标点 (发射时锁定, 飞行到达后消失) */
+  targetX?: number;
+  targetY?: number;
+}
+
+/** Roguelike 升级道具 (per BD §3.1.6 FR-GAME-505 掉落) */
+export type PowerUpKind = "damage" | "firerate" | "heal";
+
+export interface PowerUp {
+  id: string;
+  kind: PowerUpKind;
+  x: number;
+  y: number;
+  ttlFrames: number;
 }
 
 export interface Enemy {
@@ -70,6 +86,8 @@ export interface Enemy {
   /** 弹幕发射间隔 (帧) */
   fireIntervalFrames: number;
   framesSinceFire: number;
+  /** 已发射次数 (弹幕模式轮换用, per BD §5.1.2) */
+  fireCount: number;
   /** 来源 canvas 元素 id (work_item/agent 节点) */
   sourceElementId: string;
   kind: "work_item" | "agent";
@@ -90,10 +108,16 @@ export interface GameState {
   bullets: Bullet[];
   enemies: Enemy[];
   explosions: ExplosionParticle[];
+  powerUps: PowerUp[];
   /** 玩家输入 (rAF 循环消费) */
   input: { up: boolean; down: boolean; left: boolean; right: boolean };
   /** 本局击杀数 */
   kills: number;
+  /** Roguelike 升级 (per BD §3.1.2 FR-GAME-110~112): 伤害/射速等级 */
+  damageLevel: number;
+  firerateLevel: number;
+  /** 大招冷却 (Q 键, per BD §3.1.7 FR-GAME-602) */
+  ultimateCooldownUntil: number;
   /** game over 标志 */
   gameOver: boolean;
   /** 游戏开始时间 (ms) */

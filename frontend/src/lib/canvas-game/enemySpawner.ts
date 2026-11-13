@@ -15,8 +15,14 @@ MERGE (self)-[:IMPORTS]->(types)
 // =====================================================================
 
 import { GAME_WORLD } from "./robotController";
-import type { Bullet, Enemy, EnemySpawnSeed } from "./types";
-import { enemyAimedBullet, enemyRadialBullets } from "./robotController";
+import type { Bullet, Enemy, EnemySpawnSeed, PowerUp } from "./types";
+import {
+  enemyAimedBullet,
+  enemyLaserBullets,
+  enemyRadialBullets,
+  enemySpiralBullets,
+  enemyWaveBullets,
+} from "./robotController";
 
 /** canvas 元素 → 敌人种子 (坐标归一化到游戏世界 1200x800) */
 export function enemiesFromCanvas(
@@ -26,22 +32,23 @@ export function enemiesFromCanvas(
   return seeds.map((s) => {
     const variant = (s.kind === "agent" ? 2 : 0) + (s.difficulty % 3 === 0 ? 1 : 0);
     return {
-      id: enemySeq(),
-      x: s.x,
-      y: s.y,
-      hp: s.kind === "agent" ? 60 : 30,
-      maxHp: s.kind === "agent" ? 60 : 30,
-      variant: variant % 3,
-      speed: s.kind === "agent" ? 40 : 26,
-      fireIntervalFrames: s.kind === "agent" ? 90 : 140,
-      framesSinceFire: Math.floor(Math.random() * 30),
-      sourceElementId: s.id,
-      kind: s.kind,
-    };
+          id: enemySeq(),
+          x: s.x,
+          y: s.y,
+          hp: s.kind === "agent" ? 60 : 30,
+          maxHp: s.kind === "agent" ? 60 : 30,
+          variant: variant % 3,
+          speed: s.kind === "agent" ? 40 : 26,
+          fireIntervalFrames: s.kind === "agent" ? 90 : 140,
+          framesSinceFire: Math.floor(Math.random() * 30),
+          fireCount: 3, // 初始为 3, 第一次开火 cycle = (3+1)%4 = 0 = radial
+          sourceElementId: s.id,
+          kind: s.kind,
+        };
   });
 }
 
-/** 敌人 AI 步进: 缓慢追踪玩家 + 定时弹幕 (aimed / radial 交替) */
+/** 敌人 AI 步进: 缓慢追踪玩家 + 定时弹幕 (5 模式轮换, per BD §5.1.2) */
 export function stepEnemies(
   enemies: Enemy[],
   player: { x: number; y: number },
@@ -58,11 +65,22 @@ export function stepEnemies(
     const ny = e.y + (dy / len) * e.speed;
 
     let framesSinceFire = e.framesSinceFire + 1;
+    let fireCount = e.fireCount;
     if (framesSinceFire >= e.fireIntervalFrames) {
       framesSinceFire = 0;
-      // 弹幕模式: work_item → aimed, agent → radial 8 颗 (per BD §5.1.2)
+      fireCount += 1;
+      // 弹幕模式轮换 (per BD §5.1.2): radial → spiral → wave → laser 循环
       if (e.kind === "agent") {
-        nextBullets.push(...enemyRadialBullets(e, 8, 150, bulletSeq));
+        const cycle = fireCount % 4;
+        if (cycle === 0) {
+          nextBullets.push(...enemyRadialBullets(e, 8, 150, bulletSeq));
+        } else if (cycle === 1) {
+          nextBullets.push(...enemySpiralBullets(e, 3, 170, fireCount * 0.35, bulletSeq));
+        } else if (cycle === 2) {
+          nextBullets.push(...enemyWaveBullets(e, player, 6, 190, bulletSeq));
+        } else {
+          nextBullets.push(...enemyLaserBullets(e, player, 3, 320, bulletSeq));
+        }
       } else {
         nextBullets.push(enemyAimedBullet(e, player, 200, bulletSeq));
       }
@@ -73,8 +91,21 @@ export function stepEnemies(
       x: Math.max(10, Math.min(GAME_WORLD.width - 10, nx)),
       y: Math.max(10, Math.min(GAME_WORLD.height - 10, ny)),
       framesSinceFire,
+      fireCount,
     };
   });
 
   return { enemies: nextEnemies, newBullets: nextBullets };
+}
+
+/** 敌人死亡掉落 Roguelike 升级道具 (per BD §3.1.6 FR-GAME-505, 40% 概率) */
+export function rollPowerUpDrop(
+  enemy: Enemy,
+  powerUpSeq: () => string,
+): PowerUp | null {
+  const kinds: PowerUp["kind"][] = ["damage", "firerate", "heal"];
+  const roll = (enemy.kind === "agent" ? 0.6 : 0.35);
+  if (Math.random() > roll) return null;
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  return { id: powerUpSeq(), kind, x: enemy.x, y: enemy.y, ttlFrames: 420 };
 }

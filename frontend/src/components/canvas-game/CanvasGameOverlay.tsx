@@ -38,6 +38,13 @@ interface CanvasGameOverlayProps {
 
 const EXPLOSION_COLORS = ["#ffd43b", "#ff922b"];
 
+/** 道具色表 (per BD §3.1.6): damage=红 / firerate=蓝 / heal=绿 */
+const POWERUP_COLORS: Record<string, string> = {
+  damage: "#ff6b6b",
+  firerate: "#4dabf7",
+  heal: "#51cf66",
+};
+
 function SpriteMatrix({ matrix, palette, cellSize }: { matrix: number[][]; palette: Record<number, string>; cellSize: number }) {
   const rects: React.ReactNode[] = [];
   matrix.forEach((row, y) => {
@@ -54,7 +61,7 @@ function SpriteMatrix({ matrix, palette, cellSize }: { matrix: number[][]; palet
 }
 
 function GameCanvasSvg({ state }: { state: GameState }) {
-  const { robot, bullets, enemies, explosions } = state;
+  const { robot, bullets, enemies, explosions, powerUps } = state;
   const moving = robot.state === "moving" || robot.state === "rolling";
   const robotMatrix = moving ? ROBOT_SPRITE_MOVE : ROBOT_SPRITE;
   const robotSize = 40; // 世界单位
@@ -86,7 +93,7 @@ function GameCanvasSvg({ state }: { state: GameState }) {
         </g>
       ))}
 
-      {/* 子弹 (像素方形) */}
+      {/* 子弹 (像素方形, per kind 分色: spiral 紫 / wave 青 / laser 亮红) */}
       {bullets.map((b) => (
         <rect
           key={b.id}
@@ -95,9 +102,24 @@ function GameCanvasSvg({ state }: { state: GameState }) {
           y={b.y - b.radius}
           width={b.radius * 2}
           height={b.radius * 2}
-          fill={b.kind === "player" ? "#51cf66" : b.kind === "enemy_radial" ? "#ff6b6b" : "#ffd43b"}
+          fill={
+            b.kind === "player" ? "#51cf66"
+            : b.kind === "enemy_radial" ? "#ff6b6b"
+            : b.kind === "enemy_spiral" ? "#cc5de8"
+            : b.kind === "enemy_wave" ? "#3bc9db"
+            : b.kind === "enemy_laser" ? "#ffa8a8"
+            : "#ffd43b"
+          }
           shapeRendering="crispEdges"
         />
+      ))}
+
+      {/* Roguelike 升级道具 (per BD §3.1.6): 红=伤害 蓝=射速 绿=回血 */}
+      {powerUps.map((p) => (
+        <g key={p.id} data-testid={`game-powerup-${p.id}`} transform={`translate(${p.x - 8}, ${p.y - 8})`} opacity={p.ttlFrames < 90 ? 0.5 : 1}>
+          <rect width={16} height={16} fill="#111" stroke={POWERUP_COLORS[p.kind]} strokeWidth={2} shapeRendering="crispEdges" />
+          <rect x={4} y={4} width={8} height={8} fill={POWERUP_COLORS[p.kind]} shapeRendering="crispEdges" />
+        </g>
       ))}
 
       {/* 敌人 (16x16 像素精灵, 3 色变体) */}
