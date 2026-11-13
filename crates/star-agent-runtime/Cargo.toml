@@ -1,0 +1,25 @@
+[package]
+name = "star-agent-runtime"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.99.1"
+description = "STAR Agent Runtime ECS skeleton (WBS 6.2) — Agent-oriented minimal ECS + Runtime 双模式, per SRS-STAR-AGENT-RUNTIME-001 + docs/architecture/2026-09-03-agent-runtime/"
+license = "Apache-2.0"
+
+# 独立 workspace: 本 crate 暂未注册进根 Cargo.toml members (根 Cargo.toml 在
+# MAGOS 文件域之外, per TASK WBS 6.2 manifest), 以独立 workspace 落地。
+# cargo check/test 等价验证命令:
+#   cargo check  --manifest-path crates/star-agent-runtime/Cargo.toml
+#   cargo test   --manifest-path crates/star-agent-runtime/Cargo.toml
+# 后续注册进根 workspace 时移除本 [workspace] 段 + 追加 members 行即可
+# (per 守门 #12 缺标比错标: 未注册状态显式声明)。
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[dependencies]
+# 骨架 std-only (0 依赖): 组件/状态机/模式管理/调度/反压/限流/重试全同步纯逻辑,
+# 无需 tokio/bevy (per TASK 落地原则: 依赖过重 → 骨架 + 接口 + 测试)。
+# 后续 P3-B 选型 (bevy_ecs / flecs, per 03-DD §1.3) 时替换 ecs.rs 存储层。
