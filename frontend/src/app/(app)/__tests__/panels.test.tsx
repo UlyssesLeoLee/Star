@@ -100,44 +100,38 @@ describe("U4 minimal panels — render smoke", () => {
     expect(list.querySelectorAll("li[data-testid^='inbox-item-']").length).toBe(10);
   });
 
-  it("renders /settings without error (default tab = profile)", () => {
+  it("renders /settings without error (default panel = MCP 服务器, per 2026-11-14 参考 UI)", () => {
     renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-page")).toBeInTheDocument();
-    // v0.6: zh-CN 下 page title "系统设置"
-    expect(screen.getByText("系统设置")).toBeInTheDocument();
-    // default profile tab
-    expect(screen.getByTestId("settings-panel-profile")).toBeInTheDocument();
-    // 5 个 tab 通过 Tabs 渲染 — role="tablist"
-    expect(screen.getByRole("tablist")).toBeInTheDocument();
+    // 左导航 5 组 (per mockup Settings.dc.html)
+    expect(screen.getByTestId("settings-nav")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-nav-profile")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-nav-mcp")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-nav-dev-mode")).toBeInTheDocument();
+    // 默认面板 = MCP 服务器 (mockup 主区)
+    expect(screen.getByTestId("settings-panel-mcp")).toBeInTheDocument();
+    // MCP 服务器卡片 (官方目录)
+    expect(screen.getByTestId("settings-mcp-GitHub")).toBeInTheDocument();
   });
 
-  it("switches /settings tab to api keys", () => {
-    const { rerender } = renderWithI18n(<SettingsPage />);
-    // v0.6: zh-CN 下 tab "API 凭据"
-    const apiTab = screen.getByRole("tab", { name: /API 凭据/i });
-    fireEvent.click(apiTab);
-    // per DRIFT-α-007: tab 纯从 URL 派生 (无本地 state), 点击先触发 router.push
-    // 写入正确的 ?tab=apikeys ...
-    expect(mockPush).toHaveBeenCalledWith("/test?tab=apikeys");
-    // ...真实 App Router 会在 push 后重渲染同一棵树, mock 的 push 已把新
-    // params 写回 getMockSearchParams() 读的那份状态 — 这里手动 rerender
-    // 模拟那次重渲染, 断言面板真的切到了 apikeys (而不只是 push 参数对了)
-    rerender(<I18nProvider initialLanguage="zh-CN"><SettingsPage /></I18nProvider>);
+  it("deep-links /settings?tab=apikeys to 凭据与 API Key panel", () => {
+    // per mockup: 左导航 = <a href="/settings?tab=...">, 面板从 URL 派生
+    setMockSearchParams(new URLSearchParams("tab=apikeys"));
+    renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-panel-apikeys")).toBeInTheDocument();
   });
 
-  it("deep-links /settings?tab=billing straight to the Billing panel", () => {
-    // per DRIFT-α-007 修复核心验证: URL ?tab= 优先于默认 profile
+  it("deep-links /settings?tab=billing to the 租户 panel (legacy tab map)", () => {
+    // per DRIFT-α-007: URL ?tab= 优先; billing → 租户 (per mockup 组织与权限组)
     setMockSearchParams(new URLSearchParams("tab=billing"));
     renderWithI18n(<SettingsPage />);
-    expect(screen.getByTestId("settings-panel-billing")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-panel-tenant")).toBeInTheDocument();
   });
 
-  it("falls back to profile when /settings?tab= is not one of the 5 implemented tabs", () => {
-    // per DRIFT-α-007 已知缺口 #3: permissions/members/workspace/integrations
-    // 4 个 legacy redirect 目标 tab 本身未实装, 未命中时应落 profile 而非崩溃
+  it("falls back to MCP panel when /settings?tab= is not implemented", () => {
+    // 未实装/未知 tab → 默认 MCP 面板 (不崩溃)
     setMockSearchParams(new URLSearchParams("tab=permissions"));
     renderWithI18n(<SettingsPage />);
-    expect(screen.getByTestId("settings-panel-profile")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-panel-mcp")).toBeInTheDocument();
   });
 });
