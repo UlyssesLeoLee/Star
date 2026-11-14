@@ -349,6 +349,31 @@ pub enum PipelineStatus {
     Canceled,
 }
 
+impl ReviewState {
+    /// Upper-case API/MCP wire string (distinct from the snake_case serde form).
+    pub fn as_api_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "PENDING",
+            Self::Approved => "APPROVED",
+            Self::ChangesRequested => "CHANGES_REQUESTED",
+            Self::Commented => "COMMENTED",
+        }
+    }
+}
+
+impl PipelineStatus {
+    /// Upper-case API/MCP wire string (distinct from the snake_case serde form).
+    pub fn as_api_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "PENDING",
+            Self::Running => "RUNNING",
+            Self::Success => "SUCCESS",
+            Self::Failed => "FAILED",
+            Self::Canceled => "CANCELED",
+        }
+    }
+}
+
 /// **Webhook 事件类型**
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

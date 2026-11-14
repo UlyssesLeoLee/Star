@@ -35,16 +35,6 @@ pub struct SubmitBody {
     pub work_item_id: Option<String>,
 }
 
-fn status_str(s: ValidationStatus) -> &'static str {
-    match s {
-        ValidationStatus::Pending => "PENDING",
-        ValidationStatus::Running => "RUNNING",
-        ValidationStatus::Passed => "PASSED",
-        ValidationStatus::Failed => "FAILED",
-        ValidationStatus::Skipped => "SKIPPED",
-    }
-}
-
 /// `POST /api/v1/submissions`
 pub async fn submit(Json(body): Json<SubmitBody>) -> Result<Json<RestResponse<Value>>, RestError> {
     let worktree_uuid = Uuid::parse_str(&body.worktree_id).map_err(|e| {
@@ -73,7 +63,7 @@ pub async fn submit(Json(body): Json<SubmitBody>) -> Result<Json<RestResponse<Va
             json!({
                 "id": r.id.to_string(),
                 "kind": r.kind.as_str(),
-                "status": status_str(r.status),
+                "status": r.status.as_str(),
                 "worktree_id": r.worktree_id.map(|x| x.to_string()),
                 "work_item_id": r.work_item_id.map(|x| x.to_string()),
             })

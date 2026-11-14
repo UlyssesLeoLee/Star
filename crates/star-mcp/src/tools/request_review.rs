@@ -43,15 +43,6 @@ pub(crate) fn service_for_test() -> &'static Arc<InMemoryScmService> {
     service()
 }
 
-fn review_state_str(s: &domain_scm::ReviewState) -> &'static str {
-    match s {
-        domain_scm::ReviewState::Pending => "PENDING",
-        domain_scm::ReviewState::Approved => "APPROVED",
-        domain_scm::ReviewState::ChangesRequested => "CHANGES_REQUESTED",
-        domain_scm::ReviewState::Commented => "COMMENTED",
-    }
-}
-
 /// `request_review` tool
 ///
 /// P2 工具链 (per docs/briefs/tool-p2-impl-001.md §1.3) — 调 `InMemoryScmService::request_review` 真实 service
@@ -89,7 +80,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
             json!({
                 "id": r.id.to_string(),
                 "reviewer_user_id": r.reviewer_user_id.to_string(),
-                "state": review_state_str(&r.state),
+                "state": r.state.as_api_str(),
                 "submitted_at": r.submitted_at.to_rfc3339(),
             })
         })

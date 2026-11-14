@@ -47,32 +47,6 @@ pub(crate) fn service_for_test() -> &'static Arc<InMemoryValidationService> {
     service()
 }
 
-fn status_str(s: ValidationStatus) -> &'static str {
-    match s {
-        ValidationStatus::Pending => "PENDING",
-        ValidationStatus::Running => "RUNNING",
-        ValidationStatus::Passed => "PASSED",
-        ValidationStatus::Failed => "FAILED",
-        ValidationStatus::Skipped => "SKIPPED",
-    }
-}
-
-fn parse_kind(s: &str) -> Option<ValidationKind> {
-    match s {
-        "BUILD" => Some(ValidationKind::Build),
-        "UNIT_TEST" => Some(ValidationKind::UnitTest),
-        "INTEGRATION_TEST" => Some(ValidationKind::IntegrationTest),
-        "LINT" => Some(ValidationKind::Lint),
-        "FORMAT" => Some(ValidationKind::Format),
-        "STATIC_ANALYSIS" => Some(ValidationKind::StaticAnalysis),
-        "SECURITY_CHECK" => Some(ValidationKind::SecurityCheck),
-        "ACCEPTANCE_CHECK" => Some(ValidationKind::AcceptanceCheck),
-        "REVIEW" => Some(ValidationKind::Review),
-        "CUSTOM_VALIDATION" => Some(ValidationKind::CustomValidation),
-        _ => None,
-    }
-}
-
 /// `run_validation` tool
 ///
 /// P2 工具链 (per docs/briefs/tool-p2-impl-001.md §1.4) — 调 `InMemoryValidationService::list_results` 真实 service
@@ -87,7 +61,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
         .and_then(|v| v.as_array())
         .map(|arr| {
             arr.iter()
-                .filter_map(|x| x.as_str().and_then(parse_kind))
+                .filter_map(|x| x.as_str().and_then(ValidationKind::from_wire))
                 .collect()
         })
         .filter(|v: &Vec<ValidationKind>| !v.is_empty())
@@ -140,7 +114,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
         items_json.push(json!({
             "id": r.id.to_string(),
             "kind": r.kind.as_str(),
-            "status": status_str(r.status),
+            "status": r.status.as_str(),
             "work_item_id": r.work_item_id.map(|x| x.to_string()),
             "worktree_id": r.worktree_id.map(|x| x.to_string()),
             "log_excerpt_ref": r.log_excerpt_ref,

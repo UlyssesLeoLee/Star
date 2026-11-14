@@ -41,16 +41,6 @@ pub(crate) fn service_for_test() -> &'static Arc<InMemoryScmService> {
     service()
 }
 
-fn pipeline_status_str(s: domain_scm::PipelineStatus) -> &'static str {
-    match s {
-        domain_scm::PipelineStatus::Pending => "PENDING",
-        domain_scm::PipelineStatus::Running => "RUNNING",
-        domain_scm::PipelineStatus::Success => "SUCCESS",
-        domain_scm::PipelineStatus::Failed => "FAILED",
-        domain_scm::PipelineStatus::Canceled => "CANCELED",
-    }
-}
-
 /// `get_pipeline_status` tool
 ///
 /// P2 工具链 (per docs/briefs/tool-p2-impl-001.md §1.2) — 调 `InMemoryScmService::find_pipeline_by_external_id` 真实 service
@@ -70,7 +60,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
         "pipeline": {
             "id": pipeline.id.to_string(),
             "external_id": pipeline.external_id,
-            "status": pipeline_status_str(pipeline.status),
+            "status": pipeline.status.as_api_str(),
             "head_sha": pipeline.head_sha,
             "url": pipeline.url,
             "started_at": pipeline.started_at.map(|t| t.to_rfc3339()),

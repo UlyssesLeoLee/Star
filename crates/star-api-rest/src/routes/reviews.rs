@@ -29,15 +29,6 @@ pub struct RequestBody {
     pub reviewers: Option<Vec<String>>,
 }
 
-fn review_state_str(s: &domain_scm::ReviewState) -> &'static str {
-    match s {
-        domain_scm::ReviewState::Pending => "PENDING",
-        domain_scm::ReviewState::Approved => "APPROVED",
-        domain_scm::ReviewState::ChangesRequested => "CHANGES_REQUESTED",
-        domain_scm::ReviewState::Commented => "COMMENTED",
-    }
-}
-
 /// `POST /api/v1/reviews`
 pub async fn request(
     Json(body): Json<RequestBody>,
@@ -57,7 +48,7 @@ pub async fn request(
             json!({
                 "id": r.id.to_string(),
                 "reviewer_user_id": r.reviewer_user_id.to_string(),
-                "state": review_state_str(&r.state),
+                "state": r.state.as_api_str(),
                 "submitted_at": r.submitted_at.to_rfc3339(),
             })
         })

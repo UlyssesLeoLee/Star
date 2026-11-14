@@ -19,16 +19,6 @@ pub(crate) fn service() -> &'static Arc<InMemoryScmService> {
     SVC.get_or_init(|| InMemoryScmService::new_for_test())
 }
 
-fn pipeline_status_str(s: domain_scm::PipelineStatus) -> &'static str {
-    match s {
-        domain_scm::PipelineStatus::Pending => "PENDING",
-        domain_scm::PipelineStatus::Running => "RUNNING",
-        domain_scm::PipelineStatus::Success => "SUCCESS",
-        domain_scm::PipelineStatus::Failed => "FAILED",
-        domain_scm::PipelineStatus::Canceled => "CANCELED",
-    }
-}
-
 /// `GET /api/v1/pipelines/{id}` (id = external_id, e.g. "PIPE-xxx")
 pub async fn get_status(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     if id.is_empty() {
@@ -43,7 +33,7 @@ pub async fn get_status(Path(id): Path<String>) -> Result<Json<RestResponse<Valu
         "pipeline": {
             "id": pipeline.id.to_string(),
             "external_id": pipeline.external_id,
-            "status": pipeline_status_str(pipeline.status),
+            "status": pipeline.status.as_api_str(),
             "head_sha": pipeline.head_sha,
             "url": pipeline.url,
             "started_at": pipeline.started_at.map(|t| t.to_rfc3339()),

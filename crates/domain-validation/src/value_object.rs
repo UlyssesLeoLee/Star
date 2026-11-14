@@ -68,6 +68,23 @@ impl ValidationKind {
         Self::SOW_REQUIRED.contains(self)
     }
 
+    /// Inverse of [`ValidationKind::as_str`]; exact (case-sensitive) wire string match.
+    pub fn from_wire(s: &str) -> Option<Self> {
+        match s {
+            "BUILD" => Some(Self::Build),
+            "UNIT_TEST" => Some(Self::UnitTest),
+            "INTEGRATION_TEST" => Some(Self::IntegrationTest),
+            "LINT" => Some(Self::Lint),
+            "FORMAT" => Some(Self::Format),
+            "STATIC_ANALYSIS" => Some(Self::StaticAnalysis),
+            "SECURITY_CHECK" => Some(Self::SecurityCheck),
+            "ACCEPTANCE_CHECK" => Some(Self::AcceptanceCheck),
+            "REVIEW" => Some(Self::Review),
+            "CUSTOM_VALIDATION" => Some(Self::CustomValidation),
+            _ => None,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Build => "BUILD",
@@ -112,6 +129,17 @@ pub enum ValidationStatus {
 }
 
 impl ValidationStatus {
+    /// Stable SCREAMING_SNAKE_CASE wire string (same text as `Display`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "PENDING",
+            Self::Running => "RUNNING",
+            Self::Passed => "PASSED",
+            Self::Failed => "FAILED",
+            Self::Skipped => "SKIPPED",
+        }
+    }
+
     /// 是否终态
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Passed | Self::Failed | Self::Skipped)

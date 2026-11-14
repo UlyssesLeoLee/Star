@@ -32,32 +32,6 @@ pub struct RunBody {
     pub kinds: Option<Vec<String>>,
 }
 
-fn status_str(s: ValidationStatus) -> &'static str {
-    match s {
-        ValidationStatus::Pending => "PENDING",
-        ValidationStatus::Running => "RUNNING",
-        ValidationStatus::Passed => "PASSED",
-        ValidationStatus::Failed => "FAILED",
-        ValidationStatus::Skipped => "SKIPPED",
-    }
-}
-
-fn parse_kind(s: &str) -> Option<ValidationKind> {
-    match s {
-        "BUILD" => Some(ValidationKind::Build),
-        "UNIT_TEST" => Some(ValidationKind::UnitTest),
-        "INTEGRATION_TEST" => Some(ValidationKind::IntegrationTest),
-        "LINT" => Some(ValidationKind::Lint),
-        "FORMAT" => Some(ValidationKind::Format),
-        "STATIC_ANALYSIS" => Some(ValidationKind::StaticAnalysis),
-        "SECURITY_CHECK" => Some(ValidationKind::SecurityCheck),
-        "ACCEPTANCE_CHECK" => Some(ValidationKind::AcceptanceCheck),
-        "REVIEW" => Some(ValidationKind::Review),
-        "CUSTOM_VALIDATION" => Some(ValidationKind::CustomValidation),
-        _ => None,
-    }
-}
-
 /// `POST /api/v1/validations`
 pub async fn run(Json(body): Json<RunBody>) -> Result<Json<RestResponse<Value>>, RestError> {
     let worktree_id = body
@@ -69,7 +43,7 @@ pub async fn run(Json(body): Json<RunBody>) -> Result<Json<RestResponse<Value>>,
         .kinds
         .unwrap_or_default()
         .iter()
-        .filter_map(|s| parse_kind(s))
+        .filter_map(|s| ValidationKind::from_wire(s))
         .collect();
     let kinds = if kinds.is_empty() {
         ValidationKind::SOW_REQUIRED.to_vec()
@@ -114,7 +88,7 @@ pub async fn run(Json(body): Json<RunBody>) -> Result<Json<RestResponse<Value>>,
         items_json.push(json!({
             "id": r.id.to_string(),
             "kind": r.kind.as_str(),
-            "status": status_str(r.status),
+            "status": r.status.as_str(),
             "work_item_id": r.work_item_id.map(|x| x.to_string()),
             "worktree_id": r.worktree_id.map(|x| x.to_string()),
             "log_excerpt_ref": r.log_excerpt_ref,
