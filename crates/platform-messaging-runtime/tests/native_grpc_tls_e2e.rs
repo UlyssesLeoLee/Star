@@ -1,49 +1,120 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=b9e7f14d63a6c70bf11121b8b679861a7910c50069069fe96b09d969ae734a9b
+@cypher schema=1 source_sha256=4b49a9173716c33da2a27a61c459c1bc31e0c322b4aabc85920af2d81842992f
 MERGE (self:File {path:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs"})
-MERGE (test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::native_grpc_requires_mtls_and_rechecks_revocation",kind:"test"})
+MERGE (trusted_handshake_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::trusted_client_completes_the_mtls_handshake_and_reaches_the_service",kind:"test"})
+MERGE (no_certificate_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::client_without_a_certificate_is_rejected",kind:"test"})
+MERGE (wrong_ca_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::client_trusting_an_unrelated_ca_is_rejected",kind:"test"})
+MERGE (wrong_name_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::client_pinning_a_mismatched_server_name_is_rejected",kind:"test"})
+MERGE (pg_revocation_test:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::trusted_append_succeeds_and_sql_revocation_fails_the_followup",kind:"test"})
 MERGE (certificates:Type {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::TestCertificates",kind:"struct"})
 MERGE (fixture:Type {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::TestFixture",kind:"struct"})
+MERGE (server_handle:Type {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::TestServerHandle",kind:"struct"})
 MERGE (make_certificates:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::make_test_certificates",kind:"function"})
+MERGE (spawn_server:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::spawn_test_server",kind:"function"})
+MERGE (spawn_server_pool:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::spawn_test_server_with_pool",kind:"function"})
+MERGE (write_pem:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::write_pem",kind:"function"})
+MERGE (client_for:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::client_for",kind:"function"})
+MERGE (append_probe:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::append_probe",kind:"function"})
+MERGE (append_request:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::append_request",kind:"function"})
 MERGE (prepare_fixture:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::prepare_fixture",kind:"function"})
 MERGE (provision_fixture:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::provision_fixture",kind:"function"})
+MERGE (set_owner_scope:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::set_owner_scope",kind:"function"})
 MERGE (lane_database:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::require_lane_database_name",kind:"function"})
+MERGE (require_schema:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::require_d20_schema",kind:"function"})
 MERGE (revoke:Symbol {id:"crates/platform-messaging-runtime/tests/native_grpc_tls_e2e.rs::revoke_certificate",kind:"function"})
-MERGE (client_config:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
-MERGE (server_config:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
+MERGE (client_tls:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::client_tls_config",kind:"function"})
+MERGE (server_tls:Symbol {id:"crates/platform-messaging-runtime/src/native_grpc.rs::server_mtls_config",kind:"function"})
 MERGE (service:Type {id:"crates/platform-messaging-runtime/src/native_grpc_server.rs::NativeGrpcTransportServer",kind:"struct"})
 MERGE (profile_master:Type {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster",kind:"struct"})
 MERGE (rpc:ExternalService {id:"platform_messaging_proto::wire::DurableTransportClient::append",kind:"method"})
 MERGE (database:ExternalService {id:"sqlx::PgPool",kind:"type"})
 MERGE (current_database:ExternalService {id:"PostgreSQL.current_database",kind:"function"})
 MERGE (tonic_server:ExternalService {id:"tonic::transport::Server::tls_config",kind:"method"})
-MERGE (self)-[:DEFINES]->(test)
+MERGE (certificate_table:Table {id:"platform_transport.service_certificate_identity",class:"Master"})
+MERGE (log_table:Table {id:"platform_transport.log_master",class:"Master"})
+MERGE (binding_table:Table {id:"platform_transport.profile_log_binding",class:"Master"})
+MERGE (self)-[:DEFINES]->(trusted_handshake_test)
+MERGE (self)-[:DEFINES]->(no_certificate_test)
+MERGE (self)-[:DEFINES]->(wrong_ca_test)
+MERGE (self)-[:DEFINES]->(wrong_name_test)
+MERGE (self)-[:DEFINES]->(pg_revocation_test)
 MERGE (self)-[:DEFINES]->(certificates)
 MERGE (self)-[:DEFINES]->(fixture)
+MERGE (self)-[:DEFINES]->(server_handle)
 MERGE (self)-[:DEFINES]->(make_certificates)
+MERGE (self)-[:DEFINES]->(spawn_server)
+MERGE (self)-[:DEFINES]->(spawn_server_pool)
+MERGE (self)-[:DEFINES]->(write_pem)
+MERGE (self)-[:DEFINES]->(client_for)
+MERGE (self)-[:DEFINES]->(append_probe)
+MERGE (self)-[:DEFINES]->(append_request)
 MERGE (self)-[:DEFINES]->(prepare_fixture)
 MERGE (self)-[:DEFINES]->(provision_fixture)
+MERGE (self)-[:DEFINES]->(set_owner_scope)
 MERGE (self)-[:DEFINES]->(lane_database)
+MERGE (self)-[:DEFINES]->(require_schema)
 MERGE (self)-[:DEFINES]->(revoke)
-MERGE (test)-[:CALLS]->(make_certificates)
-MERGE (test)-[:CALLS]->(prepare_fixture)
-MERGE (test)-[:CALLS]->(lane_database)
-MERGE (test)-[:CALLS]->(rpc)
-MERGE (test)-[:CALLS]->(revoke)
-MERGE (test)-[:CALLS]->(server_config)
-MERGE (test)-[:USES_TYPE]->(service)
-MERGE (test)-[:CALLS]->(tonic_server)
+MERGE (trusted_handshake_test)-[:CALLS]->(make_certificates)
+MERGE (trusted_handshake_test)-[:CALLS]->(spawn_server)
+MERGE (trusted_handshake_test)-[:CALLS]->(client_tls)
+MERGE (trusted_handshake_test)-[:CALLS]->(client_for)
+MERGE (trusted_handshake_test)-[:CALLS]->(append_probe)
+MERGE (trusted_handshake_test)-[:CALLS]->(rpc)
+MERGE (no_certificate_test)-[:CALLS]->(make_certificates)
+MERGE (no_certificate_test)-[:CALLS]->(spawn_server)
+MERGE (no_certificate_test)-[:CALLS]->(client_for)
+MERGE (no_certificate_test)-[:CALLS]->(append_probe)
+MERGE (no_certificate_test)-[:CALLS]->(rpc)
+MERGE (wrong_ca_test)-[:CALLS]->(make_certificates)
+MERGE (wrong_ca_test)-[:CALLS]->(spawn_server)
+MERGE (wrong_ca_test)-[:CALLS]->(client_tls)
+MERGE (wrong_ca_test)-[:CALLS]->(client_for)
+MERGE (wrong_ca_test)-[:CALLS]->(append_probe)
+MERGE (wrong_ca_test)-[:CALLS]->(rpc)
+MERGE (wrong_name_test)-[:CALLS]->(make_certificates)
+MERGE (wrong_name_test)-[:CALLS]->(spawn_server)
+MERGE (wrong_name_test)-[:CALLS]->(client_tls)
+MERGE (wrong_name_test)-[:CALLS]->(client_for)
+MERGE (wrong_name_test)-[:CALLS]->(append_probe)
+MERGE (wrong_name_test)-[:CALLS]->(rpc)
+MERGE (pg_revocation_test)-[:CALLS]->(make_certificates)
+MERGE (pg_revocation_test)-[:CALLS]->(prepare_fixture)
+MERGE (pg_revocation_test)-[:CALLS]->(lane_database)
+MERGE (pg_revocation_test)-[:CALLS]->(require_schema)
+MERGE (pg_revocation_test)-[:CALLS]->(spawn_server_pool)
+MERGE (pg_revocation_test)-[:CALLS]->(client_tls)
+MERGE (pg_revocation_test)-[:CALLS]->(client_for)
+MERGE (pg_revocation_test)-[:CALLS]->(append_request)
+MERGE (pg_revocation_test)-[:CALLS]->(rpc)
+MERGE (pg_revocation_test)-[:CALLS]->(revoke)
+MERGE (pg_revocation_test)-[:TESTS]->(certificate_table)
+MERGE (pg_revocation_test)-[:TESTS]->(log_table)
+MERGE (pg_revocation_test)-[:TESTS]->(binding_table)
 MERGE (prepare_fixture)-[:USES_TYPE]->(profile_master)
 MERGE (prepare_fixture)-[:CALLS]->(provision_fixture)
-MERGE (provision_fixture)-[:WRITES]->(database)
+MERGE (provision_fixture)-[:WRITES]->(certificate_table)
+MERGE (provision_fixture)-[:WRITES]->(log_table)
+MERGE (provision_fixture)-[:WRITES]->(binding_table)
 MERGE (lane_database)-[:CALLS]->(current_database)
-MERGE (revoke)-[:WRITES]->(database)
-MERGE (test)-[:CALLS]->(client_config)
+MERGE (revoke)-[:WRITES]->(certificate_table)
+MERGE (spawn_server)-[:CALLS]->(spawn_server_pool)
+MERGE (spawn_server_pool)-[:CALLS]->(server_tls)
+MERGE (spawn_server_pool)-[:USES_TYPE]->(service)
+MERGE (spawn_server_pool)-[:CALLS]->(tonic_server)
+MERGE (spawn_server_pool)-[:USES_TYPE]->(database)
 @endcypher
 */
 
 //! Live Tonic mTLS coverage for the PostgreSQL-backed native transport service.
+//!
+//! Four handshake-level cases run on every `cargo test` invocation with no external services:
+//! a trusted client completes the mandatory mTLS handshake and reaches the real
+//! [`NativeGrpcTransportServer`] service, and clients without a certificate, with an unrelated
+//! CA, or with a mismatched pinned server name are rejected. The bounded-append success and the
+//! SQL-layer certificate revocation proof are PostgreSQL-backed and remain opt-in behind the
+//! `STAR_PLATFORM_PROFILE_TEST_DATABASE_URL` environment variable; without a live disposable
+//! database they are reported as ignored, never as passed.
 #![cfg(all(feature = "native-grpc-adapter", feature = "durable-quarantine"))]
 
 use std::{
@@ -52,6 +123,7 @@ use std::{
     fs,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use platform_messaging_proto::wire::{self, durable_transport_client::DurableTransportClient};
@@ -71,7 +143,7 @@ use sqlx::{
     PgPool, Postgres, Transaction,
 };
 use tempfile::TempDir;
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::{net::TcpListener, sync::oneshot, task::JoinHandle};
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::{
     transport::{Certificate as TonicCertificate, Channel, ClientTlsConfig, Endpoint, Server},
@@ -84,6 +156,7 @@ const PROVIDER_ID: &str = "star-rust-log";
 const PROVIDER_VERSION: &str = "1.0.0";
 const MESSAGE_KIND: &str = "request";
 const GENERATION_POLICY: &str = "native-grpc-mtls-e2e-v1";
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 struct TestCertificates {
     _directory: TempDir,
@@ -109,9 +182,136 @@ struct TestFixture {
     client_sha256: [u8; 32],
 }
 
+struct TestServerHandle {
+    address: SocketAddr,
+    shutdown: Option<oneshot::Sender<()>>,
+    task: JoinHandle<Result<(), tonic::transport::Error>>,
+}
+
+impl TestServerHandle {
+    async fn stop(mut self) {
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(());
+        }
+        self.task
+            .await
+            .expect("join the loopback gRPC server task")
+            .expect("gracefully stop the Tonic server");
+    }
+}
+
+/// The trusted handshake must reach the real service. The SQL layer is the only stage that can
+/// still fail here, and its failure message is distinct from any TLS-level transport error.
 #[tokio::test]
-#[ignore = "requires STAR_PLATFORM_PROFILE_TEST_DATABASE_URL for disposable database star_d19_test with the four D20 migrations and role memberships"]
-async fn native_grpc_requires_mtls_and_rechecks_revocation() {
+async fn trusted_client_completes_the_mtls_handshake_and_reaches_the_service() {
+    let certificates = make_test_certificates().expect("create isolated test-only TLS material");
+    let server = spawn_test_server(&certificates).await;
+    let mut trusted_client = client_for(
+        server.address,
+        client_tls_config(
+            "localhost",
+            &certificates.ca_certificate,
+            &certificates.client_certificate,
+            &certificates.client_private_key,
+        )
+        .expect("build the production client TLS configuration"),
+    );
+    let error = trusted_client
+        .append(append_probe(b"trusted mTLS handshake probe"))
+        .await
+        .expect_err(
+            "this executed case has no PostgreSQL instance, so the durable append must fail",
+        );
+    // A TLS rejection would never reach the SQL dispatch: the exact database-error mapping is
+    // produced only by the real service after `authenticated_peer` accepted the client leaf.
+    assert_eq!(error.code(), Code::Unavailable);
+    assert_eq!(
+        error.message(),
+        "native transport durable store is unavailable"
+    );
+    drop(trusted_client);
+    server.stop().await;
+}
+
+/// The server must reject a client that presents no certificate during the mandatory handshake.
+#[tokio::test]
+async fn client_without_a_certificate_is_rejected() {
+    let certificates = make_test_certificates().expect("create isolated test-only TLS material");
+    let server = spawn_test_server(&certificates).await;
+    let no_certificate_tls = ClientTlsConfig::new()
+        .domain_name("localhost")
+        .ca_certificate(TonicCertificate::from_pem(
+            fs::read(&certificates.ca_certificate).expect("read the test server CA"),
+        ));
+    let mut no_certificate_client = client_for(server.address, no_certificate_tls);
+    assert!(
+        no_certificate_client
+            .append(append_probe(b"missing client identity"))
+            .await
+            .is_err(),
+        "the server must reject a client without a certificate"
+    );
+    drop(no_certificate_client);
+    server.stop().await;
+}
+
+/// The client must reject a server whose certificate chains to an unrelated CA.
+#[tokio::test]
+async fn client_trusting_an_unrelated_ca_is_rejected() {
+    let certificates = make_test_certificates().expect("create isolated test-only TLS material");
+    let server = spawn_test_server(&certificates).await;
+    let mut wrong_ca_client = client_for(
+        server.address,
+        client_tls_config(
+            "localhost",
+            &certificates.wrong_ca_certificate,
+            &certificates.client_certificate,
+            &certificates.client_private_key,
+        )
+        .expect("build a client with an untrusted server CA"),
+    );
+    assert!(
+        wrong_ca_client
+            .append(append_probe(b"untrusted server CA"))
+            .await
+            .is_err(),
+        "the client must reject a server outside its configured CA"
+    );
+    drop(wrong_ca_client);
+    server.stop().await;
+}
+
+/// The client must reject a server whose certificate name does not match the pinned domain.
+#[tokio::test]
+async fn client_pinning_a_mismatched_server_name_is_rejected() {
+    let certificates = make_test_certificates().expect("create isolated test-only TLS material");
+    let server = spawn_test_server(&certificates).await;
+    let mut wrong_name_client = client_for(
+        server.address,
+        client_tls_config(
+            "wrong.example",
+            &certificates.ca_certificate,
+            &certificates.client_certificate,
+            &certificates.client_private_key,
+        )
+        .expect("build a client with a mismatched server name"),
+    );
+    assert!(
+        wrong_name_client
+            .append(append_probe(b"wrong server name"))
+            .await
+            .is_err(),
+        "the client must reject a server whose certificate name does not match"
+    );
+    drop(wrong_name_client);
+    server.stop().await;
+}
+
+/// PostgreSQL-backed proof: a trusted client reaches a bounded append, and SQL-layer revocation
+/// of the exact peer certificate makes the next authenticated operation fail closed.
+#[tokio::test]
+#[ignore = "requires STAR_PLATFORM_PROFILE_TEST_DATABASE_URL pointing at a loopback disposable PostgreSQL database named star_d19_test on a non-default port, with the four D20 migrations applied and login memberships in star_platform_profile_owner, star_platform_transport_owner, and star_platform_transport_runtime"]
+async fn trusted_append_succeeds_and_sql_revocation_fails_the_followup() {
     let database_url = env::var(DATABASE_URL_ENV).expect(
         "set STAR_PLATFORM_PROFILE_TEST_DATABASE_URL to a disposable PostgreSQL database; never use a production database",
     );
@@ -150,32 +350,10 @@ async fn native_grpc_requires_mtls_and_rechecks_revocation() {
         .connect(&database_url)
         .await
         .expect("connect a runtime-role database pool for the real gRPC service");
-
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind a loopback-only ephemeral gRPC port");
-    let address = listener.local_addr().expect("read the bound gRPC address");
-    let server_tls = server_mtls_config(
-        &certificates.server_certificate,
-        &certificates.server_private_key,
-        &certificates.ca_certificate,
-    )
-    .expect("build the production mandatory-mTLS server configuration");
-    let server_service = NativeGrpcTransportServer::new(runtime_pool.clone()).into_service();
-    let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    let server_task = tokio::spawn(async move {
-        Server::builder()
-            .tls_config(server_tls)
-            .expect("configure Tonic TLS with the production mTLS settings")
-            .add_service(server_service)
-            .serve_with_incoming_shutdown(TcpListenerStream::new(listener), async {
-                let _ = shutdown_rx.await;
-            })
-            .await
-    });
+    let server = spawn_test_server_with_pool(&certificates, runtime_pool.clone()).await;
 
     let mut trusted_client = client_for(
-        address,
+        server.address,
         client_tls_config(
             "localhost",
             &certificates.ca_certificate,
@@ -195,56 +373,6 @@ async fn native_grpc_requires_mtls_and_rechecks_revocation() {
     assert!(accepted.sequence > 0);
     assert_eq!(accepted.wire_sha256, Sha256::digest(&first_wire).as_slice());
 
-    let no_certificate_tls = ClientTlsConfig::new()
-        .domain_name("localhost")
-        .ca_certificate(TonicCertificate::from_pem(
-            fs::read(&certificates.ca_certificate).expect("read the test server CA"),
-        ));
-    let mut no_certificate_client = client_for(address, no_certificate_tls);
-    assert!(
-        no_certificate_client
-            .append(append_request(&fixture, b"missing client identity"))
-            .await
-            .is_err(),
-        "the server must reject a client without a certificate"
-    );
-
-    let mut wrong_ca_client = client_for(
-        address,
-        client_tls_config(
-            "localhost",
-            &certificates.wrong_ca_certificate,
-            &certificates.client_certificate,
-            &certificates.client_private_key,
-        )
-        .expect("build a client with an untrusted server CA"),
-    );
-    assert!(
-        wrong_ca_client
-            .append(append_request(&fixture, b"untrusted server CA"))
-            .await
-            .is_err(),
-        "the client must reject a server outside its configured CA"
-    );
-
-    let mut wrong_name_client = client_for(
-        address,
-        client_tls_config(
-            "wrong.example",
-            &certificates.ca_certificate,
-            &certificates.client_certificate,
-            &certificates.client_private_key,
-        )
-        .expect("build a client with a mismatched server name"),
-    );
-    assert!(
-        wrong_name_client
-            .append(append_request(&fixture, b"wrong server name"))
-            .await
-            .is_err(),
-        "the client must reject a server whose certificate name does not match"
-    );
-
     revoke_certificate(&admin_pool, &fixture)
         .await
         .expect("revoke the exact client certificate identity in PostgreSQL");
@@ -254,15 +382,54 @@ async fn native_grpc_requires_mtls_and_rechecks_revocation() {
         .expect_err("the established TLS connection must recheck revocation on each RPC");
     assert_eq!(revoked.code(), Code::PermissionDenied);
 
-    shutdown_tx
-        .send(())
-        .expect("signal the loopback test server to stop");
-    server_task
-        .await
-        .expect("join the gRPC server task")
-        .expect("gracefully stop the Tonic server");
+    drop(trusted_client);
+    server.stop().await;
     runtime_pool.close().await;
     admin_pool.close().await;
+}
+
+async fn spawn_test_server(certificates: &TestCertificates) -> TestServerHandle {
+    // The handshake-level cases never reach the database, so a lazy pool that is never
+    // connected is enough: no PostgreSQL instance is required for them to run.
+    let disconnected_pool = PgPoolOptions::new()
+        .max_connections(1)
+        .acquire_timeout(Duration::from_secs(2))
+        .connect_lazy("postgres://127.0.0.1:1/native-grpc-tls-e2e-disconnected")
+        .expect("construct a lazy pool that is never connected for the TLS-only cases");
+    spawn_test_server_with_pool(certificates, disconnected_pool).await
+}
+
+async fn spawn_test_server_with_pool(
+    certificates: &TestCertificates,
+    pool: PgPool,
+) -> TestServerHandle {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind a loopback-only ephemeral gRPC port");
+    let address = listener.local_addr().expect("read the bound gRPC address");
+    let server_tls = server_mtls_config(
+        &certificates.server_certificate,
+        &certificates.server_private_key,
+        &certificates.ca_certificate,
+    )
+    .expect("build the production mandatory-mTLS server configuration");
+    let server_service = NativeGrpcTransportServer::new(pool).into_service();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let task = tokio::spawn(async move {
+        Server::builder()
+            .tls_config(server_tls)
+            .expect("configure Tonic TLS with the production mTLS settings")
+            .add_service(server_service)
+            .serve_with_incoming_shutdown(TcpListenerStream::new(listener), async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+    });
+    TestServerHandle {
+        address,
+        shutdown: Some(shutdown_tx),
+        task,
+    }
 }
 
 async fn require_lane_database_name(pool: &PgPool) {
@@ -279,9 +446,25 @@ async fn require_lane_database_name(pool: &PgPool) {
 fn client_for(address: SocketAddr, tls: ClientTlsConfig) -> DurableTransportClient<Channel> {
     let endpoint = Endpoint::from_shared(format!("https://localhost:{}", address.port()))
         .expect("construct a valid loopback gRPC endpoint")
+        .timeout(REQUEST_TIMEOUT)
         .tls_config(tls)
         .expect("configure the client TLS identity");
     DurableTransportClient::new(endpoint.connect_lazy())
+}
+
+/// A well-formed append for the TLS-only cases; the profile digest is shape-valid but the
+/// request never reaches the SQL layer without a live database.
+fn append_probe(bytes: &[u8]) -> wire::AppendRequest {
+    wire::AppendRequest {
+        profile: Some(wire::ProfilePin {
+            profile_digest: vec![0u8; 32],
+        }),
+        recipient_service_id: Uuid::new_v4().as_bytes().to_vec(),
+        message_kind: MESSAGE_KIND.to_owned(),
+        message_id: Uuid::new_v4().as_bytes().to_vec(),
+        wire: bytes.to_vec(),
+        wire_sha256: Sha256::digest(bytes).to_vec(),
+    }
 }
 
 fn append_request(fixture: &TestFixture, bytes: &[u8]) -> wire::AppendRequest {
