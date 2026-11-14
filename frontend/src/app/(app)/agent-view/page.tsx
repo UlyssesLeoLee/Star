@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f5b13df75a3bf1db2f1c1243179a12a513505934af1bf9f4fdff206b8c05b108
+@cypher schema=1 source_sha256=25bc13a3837ba157855784df0569bf0e19fcdf6fc3c92c9510e5f54e80887b2f
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
@@ -425,10 +425,12 @@ function AgentViewContent() {
   );
 }
 
-export default function AgentViewPage() {
+export function AgentViewPage() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-ink-dim">Loading Agent workspace…</div>}>
       <AgentViewContent />
     </Suspense>
   );
 }
+
+export default AgentViewPage;

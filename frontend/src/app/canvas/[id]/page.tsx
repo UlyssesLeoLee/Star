@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c6df28ed8798cf56098be87173ce9c0b8f83599b0d2cc78d8dfb60ada7b34fbc
+@cypher schema=1 source_sha256=a5059b67cadb85756971f5e3521115f38834e2ebc15855d518fc3c4fbd5a424c
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (workflowPage:Symbol {id:"frontend/src/app/workflow/page.tsx::WorkflowPage",kind:"component"})
@@ -22,9 +22,10 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "@/components/StatusPill";
 import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
+import { AgentViewPage } from "@/app/(app)/agent-view/page";
 import { ArrowRight, GitBranch, Workflow, Network } from "lucide-react";
 
-const CANVAS_SUB_TABS = ["关系图", "IPA (V字模型)", "低代码流程"] as const;
+const CANVAS_SUB_TABS = ["关系图", "Agent 画布", "IPA (V字模型)", "低代码流程"] as const;
 
 export default function CanvasDetailPage() {
   const [activeTab, setActiveTab] = useState<typeof CANVAS_SUB_TABS[number]>("低代码流程");
@@ -60,6 +61,13 @@ export default function CanvasDetailPage() {
                 <a href="/collaboration" className="text-[11px] px-2 py-1 rounded border border-line text-accent hover:bg-accent/10">协同 →</a>
               </div>
             </div>
+          </div>
+        );
+      case "Agent 画布":
+        // 所有无限画布集中到 canvas (per 2026-11-14 用户发令: agent 总览画布并入)
+        return (
+          <div className="h-full overflow-hidden" data-testid="canvas-tab-agent-canvas">
+            <AgentViewPage />
           </div>
         );
       case "IPA (V字模型)":

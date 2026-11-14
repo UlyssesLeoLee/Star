@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=615f8b0a0df7f7a6602623b9579b9d0460e29b8558fa73a1eca1da1291edfc76
+@cypher schema=1 source_sha256=25622f4a870071758b1115f522d74b7226775306f00cf03073f1b37e01df02ad
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -751,8 +751,8 @@ export const MODULE_GROUPS: ModuleGroupDef[] = [
   {
     id: "canvas",
     name: "画布",
-    blurb: "白板 · 关系图 · 流程 · 协同 · 原型",
-    tabs: ["canvas", "agent-view", "workflow", "context", "relation", "collaboration", "prototype"],
+    blurb: "全部无限画布集中: 白板/关系图/Agent画布/流程/原型",
+    tabs: ["canvas", "agent-view", "agent-relationships", "workflow", "context", "relation", "collaboration", "prototype"],
     defaultTab: "canvas",
   },
   {
