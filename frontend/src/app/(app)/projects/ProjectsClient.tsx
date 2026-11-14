@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=890be4f6f2c626bb4b0b23ef2b6d3acfd45775de40321ada37ec9d1f0b0973d9
+@cypher schema=1 source_sha256=ad6101578f937b8a224f38455cfb5148a90587af089fc284ce3b3d7ba94d329e
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
@@ -76,10 +76,7 @@ import { ArchGraphModal, useArchGraphTrigger } from "@/components/board/ArchGrap
 import { GanttChart } from "@/components/gantt";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { IPA_SKILL_CATALOG } from "@/lib/ipa-skills/catalog";
-import { MonthView } from "@/components/calendar/MonthView";
-import { WeekView } from "@/components/calendar/WeekView";
-import { CalendarHeader } from "@/components/calendar/CalendarHeader";
-import { CalendarLegend } from "@/components/calendar/CalendarLegend";
+import { CalendarView } from "@/components/calendar/CalendarView";
 import { buildEvents } from "@/components/calendar/events";
 import {
   FolderTree,
@@ -270,10 +267,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   );
 
   // ---- 筛选后的派生数据 (useMemo, per FilterBar 开关) — 声明在 projectWorkItems/projectWorktrees 之后
-  const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
-  });
+
   const [weekStart, setWeekStart] = useState<Date>(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -686,61 +680,16 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
           <div className="text-[10px] text-ink-mute font-mono">
             ⚠ 拖动 milestone / sprint 改 due_date / 起止, 走 store + useStore.setState; 后端 PATCH D.6+ 接
           </div>
-          {/* Calendar 视图 (per 5 tab 拍板: Calendar 并入 Timeline, 保留 month/week 切换) */}
+          {/* Calendar 视图 (per 2026-11-14: 提取 CalendarView 组件合并复用, kanban 日历 tab 同源) */}
           <div className="border-t border-line pt-4">
-            <div className="text-xs font-mono text-ink-mute mb-2">📅 Calendar (月/周视图, per 5 tab 拍板合并)</div>
-            <CalendarHeader
-              year={calendarCursor.year}
-              month={calendarCursor.month}
-              weekStart={weekStart}
+            <CalendarView
+              sprints={projectSprints}
+              milestones={projectMilestones}
+              workItems={projectWorkItems}
+              onEventMove={handleCalendarEventMove}
               view={calendarView}
-              onPrev={() => {
-                if (calendarView === "month") {
-                  const d = new Date(calendarCursor.year, calendarCursor.month - 1, 1);
-                  setCalendarCursor({ year: d.getFullYear(), month: d.getMonth() });
-                } else {
-                  const d = new Date(weekStart);
-                  d.setDate(d.getDate() - 7);
-                  setWeekStart(d);
-                }
-              }}
-              onNext={() => {
-                if (calendarView === "month") {
-                  const d = new Date(calendarCursor.year, calendarCursor.month + 1, 1);
-                  setCalendarCursor({ year: d.getFullYear(), month: d.getMonth() });
-                } else {
-                  const d = new Date(weekStart);
-                  d.setDate(d.getDate() + 7);
-                  setWeekStart(d);
-                }
-              }}
-              onToday={() => {
-                const now = new Date();
-                setCalendarCursor({ year: now.getFullYear(), month: now.getMonth() });
-                const w = new Date(now);
-                w.setHours(0, 0, 0, 0);
-                setWeekStart(w);
-              }}
               onViewChange={setCalendarView}
-              userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
             />
-            {calendarView === "month" ? (
-              <MonthView
-                year={calendarCursor.year}
-                month={calendarCursor.month}
-                events={projectEvents}
-                onEventMove={handleCalendarEventMove}
-                onMonthChange={(y, m) => setCalendarCursor({ year: y, month: m })}
-              />
-            ) : (
-              <WeekView
-                startDate={weekStart}
-                events={projectEvents}
-                onEventMove={handleCalendarEventMove}
-                userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
-              />
-            )}
-            <CalendarLegend />
           </div>
         </div>
       )}

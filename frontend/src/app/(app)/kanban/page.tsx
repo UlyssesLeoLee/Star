@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7d1c7aa6dd441a561ba8ce5c4759d46d1656957534cf849e00fdd96b38b1d1cc
+@cypher schema=1 source_sha256=c02c33a7ed9714d574338d2107d37b392d6fcae4e69af32eeff85ece62461be2
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -37,6 +37,7 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
 import { GanttView } from "@/components/gantt";
+import { CalendarView } from "@/components/calendar/CalendarView";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { KANBAN_COLUMNS } from "@/mocks/data/kanban";
@@ -72,6 +73,8 @@ export default function KanbanPage() {
 
   // ---- 真实数据源 (store) ----
   const workItems = useStore((s) => s.workItems);
+  const sprints = useStore((s) => s.sprints);
+  const milestones = useStore((s) => s.milestones);
   const identities = useStore((s) => s.identities);
   const board = useStore((s) => s.board);
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
@@ -225,10 +228,13 @@ export default function KanbanPage() {
           </section>
         )}
         {activeView === "日历" && (
-          <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
-            <div className="flex h-full items-center justify-center text-ink-dim">
-              <p>日历视图 (待实装: W3 Calendar 月/周视图)</p>
-            </div>
+          <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full overflow-auto">
+            {/* 老版本日历移植 (per 2026-11-14: 从 ProjectsClient 提取 CalendarView 合并复用) */}
+            <CalendarView
+              sprints={sprints}
+              milestones={milestones}
+              workItems={workItems}
+            />
           </section>
         )}
       </main>
