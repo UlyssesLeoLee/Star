@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2bdabc1dc49b56c93a078bfcd883c882594da14df44c811010b085598abfca07
+@cypher schema=1 source_sha256=85447033ebacff7b90e81e85fcbd388ec475710674c60239e41679f07ea3e6c5
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -660,6 +660,19 @@ export const zhCN: Dictionary = {
     openBoundTask: "已绑定 Star 任务 →",
     openAsStarTask: "打开为 Star 任务",
     fiveW1H: "5W1H",
+  },
+  review: {
+    title: "Review / 自审交叉审核",
+    subtitle: "ReviewRecord 列表 · 按状态分组 (per requirements §27.4 RVW-001/002)",
+    author: "作者",
+    reviewer: "审核人",
+    status: {
+      IN_PROGRESS: "待审",
+      CHANGES_REQUESTED: "已请求修改",
+      APPROVED: "已通过",
+      REJECTED: "已拒绝",
+      SUPERSEDED: "已取代",
+    },
   },
   canvasGame: {
     playButton: "游戏模式",

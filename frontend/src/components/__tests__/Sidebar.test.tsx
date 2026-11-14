@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8fe84e3376a742ccb0cef39893f419a85b50a9c370576eb3d0834e06da1a4bda
+@cypher schema=1 source_sha256=d9c7a19b1312e39a5e5e0db5952bc7abab4eeb448007d4e50c26421e5eff839e
 MERGE (self:File {path:"frontend/src/components/__tests__/Sidebar.test.tsx"})
 MERGE (sidebar:Symbol {id:"frontend/src/components/Sidebar.tsx::Sidebar",kind:"component"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::Sidebar Project-first navigation",kind:"suite"})
@@ -61,16 +61,26 @@ describe("Sidebar Project-first navigation", () => {
     resetNavStore();
   });
 
-  it("keeps Project hierarchy primary and secondary routes reachable", () => {
+  it("keeps Home 核心区 primary per ui-3pane-arch §1.2 (5 项常驻) and secondary routes reachable", () => {
     renderWithI18n(<Sidebar />);
 
     const sidebar = screen.getByTestId("app-sidebar");
     expect(sidebar).toHaveAttribute("data-nav-model", "project-run");
     expect(sidebar).toHaveAttribute("data-fold", "expanded");
     expect(screen.getByRole("navigation", { name: "Project 导航" })).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-brand")).toHaveAttribute("href", "/projects");
-    expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-brand")).toHaveAttribute("href", "/worktree");
+    // 设计书 §1.2: 侧栏顶部不再渲染 Project→Run→Worktree 状态树
+    // (该状态树移入 Worktree 控制中心页; 2026-11-14 实测对照设计书)
+    expect(screen.queryByTestId("project-run-directory")).toBeNull();
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
+
+    // Home 核心区 5 项 (Worktree 控制中心 / Agent / Feedback / Validation / Review)
+    const homeCore = screen.getByTestId("sidebar-group-home-core");
+    expect(within(homeCore).getByTestId("sidebar-item-worktree")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-agents")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-feedback")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-validation")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-review")).toBeInTheDocument();
 
     const otherEntries = screen.getByTestId("sidebar-other-entries");
     expect(otherEntries.tagName).toBe("DETAILS");
@@ -90,29 +100,32 @@ describe("Sidebar Project-first navigation", () => {
     expect(screen.queryByText("ALL GREEN")).toBeNull();
   });
 
-  it("shows Project workspace views without switching navigation scope", () => {
+  it("shows Project workspace views in the 视图组 without switching navigation scope", () => {
     mockUsePathname.mockReturnValue("/projects");
     mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=kanban"));
     renderWithI18n(<Sidebar />);
 
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
-    expect(screen.getByTestId("sidebar-subnav-item-kanban")).toHaveAttribute("data-active", "true");
-    expect(screen.getByTestId("sidebar-subnav-item-timeline")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-subnav-item-backlog")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-subnav-item-agents")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-subnav-item-worktrees")).toBeInTheDocument();
+    // 视图组 (per ui-3pane-arch §1.2): 看板/时间线/待办池 + 重构/搜索
+    const viewGroup = screen.getByTestId("sidebar-group-view");
+    expect(within(viewGroup).getByTestId("sidebar-item-kanban")).toBeInTheDocument();
+    expect(within(viewGroup).getByTestId("sidebar-item-timeline")).toBeInTheDocument();
+    expect(within(viewGroup).getByTestId("sidebar-item-backlog")).toBeInTheDocument();
+    expect(within(viewGroup).getByTestId("sidebar-item-refactor")).toBeInTheDocument();
+    expect(within(viewGroup).getByTestId("sidebar-item-search")).toBeInTheDocument();
   });
 
   // per 2026-11-12 用户发令 (梳理重复导航 / 整合在一起):
   //   /projects 有 SubNav 时, pinned 的 kanban/timeline (同 pathname)
-  //   不再重复渲染 — SubNav 已是 6 tab 的单一来源。
-  it("hides pinned modules that duplicate the current page's SubNav", () => {
+  //   不再重复渲染 — 视图组已是单一来源。
+  it("hides pinned modules that duplicate the current page's views", () => {
     mockUsePathname.mockReturnValue("/projects");
     mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=kanban"));
     renderWithI18n(<Sidebar />);
 
-    // SubNav 仍然完整
-    expect(screen.getByTestId("sidebar-subnav-item-timeline")).toBeInTheDocument();
+    // 视图组仍然完整
+    const viewGroup = screen.getByTestId("sidebar-group-view");
+    expect(within(viewGroup).getByTestId("sidebar-item-timeline")).toBeInTheDocument();
     // pinned kanban/timeline/projects 不在 "other entries" 里重复出现
     const otherEntries = screen.getByTestId("sidebar-other-entries");
     expect(within(otherEntries).queryByTestId("sidebar-item-kanban")).toBeNull();

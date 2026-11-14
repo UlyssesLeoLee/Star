@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=da84b246a2d63a65804c51ae5133a65702b5ba18822c581c85b2fe5b4ff6b6e9
+@cypher schema=1 source_sha256=2ea61e9e1541b94897340b59dbd31f7b986625300c6c456bba3f0a074efb62a6
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -646,6 +646,19 @@ export const ja: Dictionary = {
     openBoundTask: "バインド済み Star タスク →",
     openAsStarTask: "Star タスクとして開く",
     fiveW1H: "5W1H",
+  },
+  review: {
+    title: "Review / 自己・交差レビュー",
+    subtitle: "ReviewRecord 一覧 · ステータス別グループ (per requirements §27.4 RVW-001/002)",
+    author: "作成者",
+    reviewer: "レビューア",
+    status: {
+      IN_PROGRESS: "レビュー中",
+      CHANGES_REQUESTED: "変更依頼",
+      APPROVED: "承認済み",
+      REJECTED: "却下",
+      SUPERSEDED: "置換済み",
+    },
   },
   canvasGame: {
     playButton: "ゲームモード",

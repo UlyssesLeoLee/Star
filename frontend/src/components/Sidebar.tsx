@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=95a57c941d50b4ad88e7b516a6a73e5a03c007a29c028d166776dfae1674a385
+@cypher schema=1 source_sha256=41644335a4ae466bfbb08c3bf74f5f3d99fd1a46a145cad0237f4a4a0298bd31
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -29,18 +29,11 @@ import {
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useNavStore, WORKTREE_INDEX_OWNED_MODULES } from "@/lib/nav/navStore";
+import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type ModuleCategory, type NavGroupId } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
-import {
-  findSubNavGroup,
-  findActiveSubNavItem,
-  type SubNavEntry,
-} from "@/lib/nav/subNavRegistry";
+import { findSubNavGroup } from "@/lib/nav/subNavRegistry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
-import { ProjectWorktreeIndexLink } from "@/components/worktree-shared/ProjectWorktreeIndexLink";
-import { ProjectRunTree } from "@/components/run/ProjectRunTree";
-import { useRunDirectory } from "@/lib/run/runDirectorySession";
 
 // =====================================================================
 // Sidebar — Project-first navigation.
@@ -69,9 +62,6 @@ export function Sidebar() {
   const sidebarFold = useNavStore((s) => s.sidebarFold);
   const toggleSidebarFold = useNavStore((s) => s.toggleSidebarFold);
   const setSidebarFold = useNavStore((s) => s.setSidebarFold);
-  const selectedProjectId = useNavStore((s) => s.selectedProjectId);
-  const { focus: runFocus } = useRunDirectory();
-  const projectIndexHint = runFocus?.run_context.project_id ?? selectedProjectId;
 
   useEffect(() => setMounted(true), []);
 
@@ -81,13 +71,11 @@ export function Sidebar() {
   // 解析当前用户钉选到左侧的模块对象
   const activeSidebarModules = sidebarItemIds
     .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m))
-    .filter((m) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id));
+    .filter((m): m is ModuleDefinition => Boolean(m));
 
   const activePinnedModules = pinnedViewIds
     .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m))
-    .filter((m) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id));
+    .filter((m): m is ModuleDefinition => Boolean(m));
 
   // =====================================================================
   // Project scope 数据源 (per 2026-09-03 12:36 JST 拍板 #1 复用 SubNav 数据源)
@@ -96,14 +84,6 @@ export function Sidebar() {
   // - 若未命中, project scope 不可用 (灰显 + tooltip 提示)
   // - active item 由 query 字符串决定 (e.g. /projects?tab=kanban → kanban)
   const subNavGroup = useMemo(() => findSubNavGroup(pathname), [pathname]);
-  const searchString = useMemo(() => {
-    const s = searchParams?.toString();
-    return s ? `?${s}` : "";
-  }, [searchParams]);
-  const activeSubNavId = useMemo(
-    () => (subNavGroup ? findActiveSubNavItem(subNavGroup, searchString) : null),
-    [subNavGroup, searchString]
-  );
 
   // =====================================================================
   // per 2026-11-12 用户发令 (梳理重复导航 / 整合在一起):
@@ -119,27 +99,21 @@ export function Sidebar() {
     (item: ModuleDefinition) => moduleHrefMatches(item.href, pathname, searchParams),
     [pathname, searchParams]
   );
-  // Project scope stays available in the Project workspace and the Project Worktree Index.
-  // A validated Run focus supplies the route hint; the Index still reloads its authorized directory.
-  const hasSelectedProject = projectIndexHint.trim().length > 0;
-  const isProjectWorkspacePath = pathname === "/projects" || pathname.startsWith("/projects/");
-  const isProjectWorktreePath = pathname === "/worktree" || pathname.startsWith("/worktree/");
 
   // =====================================================================
   // 5 组结构分组解析 (per ui-3pane-arch §1.2 v0.2)
   // =====================================================================
-  // 组内模块: 按 NAV_GROUPS id 映射, 过滤 WORKTREE_INDEX_OWNED_MODULES
-  // (worktree 等集中在 Project Worktree Index, per 2026-11-12 用户发令去重)
+  // 组内模块: 按 NAV_GROUPS id 映射
+  // (worktree 保留在 Home 核心区, per ui-3pane-arch §1.2.1 "保留独立路由, 仅导航位置上移")
   const groupModules = (groupId: NavGroupId): ModuleDefinition[] =>
     NAV_GROUPS[groupId]
       .map((id) => MODULE_MAP.get(id))
-      .filter((m): m is ModuleDefinition => Boolean(m))
-      .filter((m) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(m.id));
+      .filter((m): m is ModuleDefinition => Boolean(m));
 
   // 未映射模块 → "其他入口" 兜底 (设计映射表未覆盖, per 守门 #11 不消失)
   const mappedIds = new Set<string>(Object.values(NAV_GROUPS).flat());
   const otherModuleIds = [...MODULE_MAP.keys()].filter(
-    (id) => !mappedIds.has(id) && !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id),
+    (id) => !mappedIds.has(id),
   );
   const otherModules = otherModuleIds
     .map((id) => MODULE_MAP.get(id))
@@ -198,7 +172,8 @@ export function Sidebar() {
         )}
       >
         <Link
-          href="/projects"
+          // per ui-3pane-arch §1.2.1: Home 落地页 = Worktree 控制中心首屏
+          href="/worktree"
           className={clsx(
             "flex items-center group",
             isCollapsed ? "" : "gap-3"
@@ -227,12 +202,9 @@ export function Sidebar() {
                 )}>
                   STAR
                 </span>
-                <span className="font-mono text-[10px] font-black px-1.5 py-0.5 bg-[var(--cel-crimson,var(--color-secondary,#ff184c))] text-[var(--color-on-primary,#ffffff)] border border-[var(--cel-ink,var(--color-border))] italic">
-                  CEL-NPR
-                </span>
               </div>
               <div className="text-[11px] font-mono tracking-wider text-[var(--cel-text-secondary,#94a3b8)] uppercase font-bold">
-                時の限界を打ち砕け！！
+                Star — Work Management
               </div>
             </div>
           )}
@@ -277,22 +249,8 @@ export function Sidebar() {
         )}
         aria-label={t.sidebar.projectNavigation}
       >
-        <ProjectRunTree collapsed={isCollapsed} />
-        {isProjectWorkspacePath && subNavGroup && (
-          <SubNavGroupList
-            group={subNavGroup}
-            activeId={activeSubNavId}
-            collapsed={isCollapsed}
-          />
-        )}
-        {(isProjectWorkspacePath || hasSelectedProject || isProjectWorktreePath) && (
-          <ProjectWorktreeIndexLink
-            projectId={projectIndexHint}
-            active={pathname === "/worktree"}
-            collapsed={isCollapsed}
-          />
-        )}
-
+        {/* per ui-3pane-arch §1.2: 侧栏仅承载 5 组导航; Project→Run→Worktree 状态树
+            移入 Worktree 控制中心页 (/worktree) 内展示, 不占用侧栏顶部 (2026-11-14 实测对照设计书) */}
         {/* Home 核心区 (per §1.2: 常驻置顶, 不可折叠, accent 边框 + core 徽标) */}
         <NavGroupSection
           testId="sidebar-group-home-core"
@@ -486,103 +444,6 @@ export function Sidebar() {
 
 
     </aside>
-  );
-}
-
-interface SubNavGroupListProps {
-  group: ReturnType<typeof findSubNavGroup>;
-  activeId: string | null;
-  collapsed: boolean;
-}
-
-function SubNavGroupList({ group, activeId, collapsed }: SubNavGroupListProps) {
-  if (!group) return null;
-  return (
-    <div data-testid="sidebar-subnav-group" data-prefix={group.pathnamePrefix}>
-      {!collapsed && (
-        <div
-          data-testid="sidebar-subnav-top-label"
-          className="px-2.5 py-1 text-xs font-mono uppercase tracking-wider text-ink-mute font-bold"
-        >
-          {group.topLabel}
-        </div>
-      )}
-      <ul className={clsx(collapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-        {group.items.map((item) => (
-          <SubNavGroupRow
-            key={item.id}
-            item={item}
-            href={`${group.pathnamePrefix}?${item.query}`}
-            active={activeId === item.id}
-            collapsed={collapsed}
-          />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-interface SubNavGroupRowProps {
-  item: SubNavEntry;
-  href: string;
-  active: boolean;
-  collapsed: boolean;
-}
-
-function SubNavGroupRow({ item, href, active, collapsed }: SubNavGroupRowProps) {
-  const cs = getCategoryStyles(item.category);
-  const Icon = item.icon;
-  return (
-    <li>
-      <Link
-        href={href}
-        data-testid={`sidebar-subnav-item-${item.id}`}
-        data-active={active ? "true" : "false"}
-        aria-current={active ? "page" : undefined}
-        className={clsx(
-          "relative flex items-center rounded-xl text-sm font-medium transition-all duration-200",
-          collapsed ? "justify-center p-1.5" : "gap-2.5 px-2.5 py-1.5",
-          active
-            ? "bg-bg-soft/80 text-ink border border-line shadow-soft font-semibold"
-            : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink border border-transparent"
-        )}
-      >
-        <div
-          className={clsx(
-            "rounded-lg grid place-items-center shrink-0 border transition-all duration-200",
-            collapsed ? "size-9" : "size-8",
-            cs.bg,
-            cs.border,
-            cs.text,
-            active && clsx(cs.bgActive, cs.borderActive, cs.glow)
-          )}
-          aria-hidden="true"
-        >
-          <Icon size={collapsed ? 16 : 15} strokeWidth={2.25} />
-        </div>
-        {!collapsed && (
-          <>
-            <span className="flex-1 truncate tracking-tight">{item.label}</span>
-            <span className="text-[10px] font-mono text-ink-mute px-1.5 py-0.5 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity font-bold">
-              {item.code}
-            </span>
-            {active && (
-              <span
-                className={clsx("size-1.5 rounded-full animate-pulse", cs.dot)}
-                aria-hidden="true"
-              />
-            )}
-          </>
-        )}
-        {collapsed && active && (
-          <span
-            data-testid={`sidebar-subnav-active-dot-${item.id}`}
-            className={clsx("absolute top-0.5 right-0.5 size-1.5 rounded-full", cs.dot)}
-            aria-hidden="true"
-          />
-        )}
-      </Link>
-    </li>
   );
 }
 

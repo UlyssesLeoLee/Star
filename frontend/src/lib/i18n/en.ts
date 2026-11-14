@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0c1bca4404e44cc1207c74a30ae7f2644f2b4031d46ce23ca9c950971292ec12
+@cypher schema=1 source_sha256=447e0467c91e86d7fd33587cb47f167226c079a7238361eabfbfe66a787e9f54
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -645,6 +645,19 @@ export const en: Dictionary = {
     openBoundTask: "Bound Star task →",
     openAsStarTask: "Open as Star task",
     fiveW1H: "5W1H",
+  },
+  review: {
+    title: "Review / Cross Review",
+    subtitle: "ReviewRecord list · grouped by status (per requirements §27.4 RVW-001/002)",
+    author: "Author",
+    reviewer: "Reviewer",
+    status: {
+      IN_PROGRESS: "In Progress",
+      CHANGES_REQUESTED: "Changes Requested",
+      APPROVED: "Approved",
+      REJECTED: "Rejected",
+      SUPERSEDED: "Superseded",
+    },
   },
   canvasGame: {
     playButton: "Game Mode",

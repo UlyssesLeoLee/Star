@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=eaa7f0f272d151c1e1f69e40dbccc00d22ec22bb9dbe9403bfc7a36aa200cfbe
+@cypher schema=1 source_sha256=fdd2258f3d44997c4a1f6b88164a432e7211009d876b1091cc2da7afbd5776df
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -567,6 +567,47 @@ export const ALL_MODULES: ModuleDefinition[] = [
     description: "文件即任务 · 共同编辑文件自动 .nema 侧车, 可打开为 Star 任务",
     icon: FileText,
   },
+  {
+    id: "canvas",
+    label: "Canvas",
+    code: "CNV",
+    href: "/canvas/canvas-001",
+    category: "work",
+    categoryLabel: "Work Management",
+    description: "无限画布 · 帧/端点/连接线 (per DRIFT-α-009: 补 nav registry 入口, seed canvas-001 关联 prj-physis)",
+    icon: Network,
+  },
+  {
+    id: "review",
+    label: "Review",
+    code: "RVW",
+    href: "/review",
+    category: "core",
+    categoryLabel: "Core Workspace",
+    description: "自审 / 交叉审核 ReviewRecord 列表 (按 Status 分组, per requirements §27.4 RVW-001/002)",
+    icon: MessageSquare,
+    isCore: true,
+  },
+  {
+    id: "notification",
+    label: "Notifications",
+    code: "NTF",
+    href: "/notification",
+    category: "integration",
+    categoryLabel: "Integration & Security",
+    description: "站内通知与订阅管理 (per ui-3pane-arch §1.2.1 管理→集成)",
+    icon: Bell,
+  },
+  {
+    id: "collaboration",
+    label: "Collaboration",
+    code: "COL",
+    href: "/collaboration",
+    category: "system",
+    categoryLabel: "System & Meta",
+    description: "多用户协同工作区与设备身份 (per ui-3pane-arch §1.2.1 管理→运维)",
+    icon: Users,
+  },
 ];
 
 export const MODULE_MAP = new Map<string, ModuleDefinition>(
@@ -576,12 +617,15 @@ export const MODULE_MAP = new Map<string, ModuleDefinition>(
 // =====================================================================
 // NAV_GROUPS — Sidebar 5 组结构 (per docs/frontend/design/ui-3pane-arch.md
 // §1.2 v0.2 + §1.2.1 26 路由映射, 2026-11-13 用户发令 "左侧导航按文档")
-//
-// 组结构: home-core (常驻置顶, 不可折叠) / home-personal (默认折叠)
-//        / project (分组落地页) / view (项目内视图预设)
-//        / admin-org / admin-integration / admin-ops / admin-dev (4 二级子组)
-// 未映射模块 (issues/analytics/settings/agent-windows/agent-view 等)
-// 落 "other" 兜底折叠区 (守门 #11 缺标比错标: 不消失)。
+// 2026-11-14 实测生产与设计书核对后修正:
+//   - home-core 补齐 Review (设计书 5 核心项, /review 路由本轮新建)
+//   - project 组 + nema (文件即任务, 工作入口)
+//   - view 组 + refactor/search (设计书视图族 + "我保存的搜索")
+//   - admin-org 移出 admin → admin-dev (内部页, 设计书组织组=Tenant/Identity/Permission/Workspace)
+//   - admin-integration + notification (设计书 = SCM/Integration/Notification)
+//   - admin-ops + collaboration (设计书 = LocalRuntime/Audit/Automation/Collaboration)
+//   - admin-dev 收敛为设计书 4 项 + 新路由兜底 (advanced-settings/developer-console/admin)
+//   - other 不再兜底未映射模块: ALL_MODULES 全量显式映射, other 仅承载用户钉选
 // =====================================================================
 export type NavGroupId =
   | "home-core"
@@ -595,33 +639,31 @@ export type NavGroupId =
   | "other";
 
 export const NAV_GROUPS: Record<NavGroupId, string[]> = {
-  // per §1.2 核心区 5 项 (Review 无独立路由 → 缺标, 4 项落地)
-  "home-core": ["worktree", "agents", "feedback", "validation"],
+  // per §1.2 核心区 5 项 (Review 本轮补齐 /review 路由)
+  "home-core": ["worktree", "agents", "feedback", "validation", "review"],
   // per §1.2 个人区 (提及我/已关注/草稿 无页面 → 缺标, 只留 inbox)
   "home-personal": ["inbox"],
-  // per §1.2.1 /project + /planning → 项目
-  project: ["projects", "planning"],
-  // per §1.2.1 视图预设 (列表/日历/概览 无独立页 → 缺标)
-  view: ["kanban", "timeline", "backlog"],
-  // per §1.2.1 管理 → 组织
-  "admin-org": ["tenant", "identity", "permission", "admin"],
-  // per §1.2.1 管理 → 集成
-  "admin-integration": ["scm", "integration", "webhooks", "api-keys", "cli-profiles"],
-  // per §1.2.1 管理 → 运维
-  "admin-ops": ["local-runtime", "audit", "automation", "remote"],
-  // per §1.2.1 管理 → 开发者 (过渡)
+  // per §1.2.1 /project + /planning → 项目; nema (文件即任务) 归工作入口
+  project: ["projects", "planning", "nema"],
+  // per §1.2.1 视图预设; canvas (无限画布入口) + refactor/search 为项目内视图族成员
+  view: ["kanban", "timeline", "backlog", "canvas", "refactor", "search"],
+  // per §1.2.1 管理 → 组织 (Workspace 无路由 → 缺标; Admin Console 移 admin-dev)
+  "admin-org": ["tenant", "identity", "permission"],
+  // per §1.2.1 管理 → 集成 (SCM/Integration/Notification + 新路由)
+  "admin-integration": ["scm", "integration", "notification", "webhooks", "api-keys", "cli-profiles"],
+  // per §1.2.1 管理 → 运维 (LocalRuntime/Audit/Automation/Collaboration + remote)
+  "admin-ops": ["local-runtime", "audit", "automation", "collaboration", "remote"],
+  // per §1.2.1 管理 → 开发者 (过渡: Development/Workflow/Relation/Context + 内部页)
   "admin-dev": [
     "development",
     "workflow",
     "relation",
     "context",
-    "refactor",
-    "nema",
     "advanced-settings",
     "developer-console",
-    "search",
+    "admin",
   ],
-  // 兜底: 设计映射表未覆盖 + 用户钉选自定义
+  // 仅承载用户钉选自定义 (per §1.2 交互原则 Pinned ≤3); 不再兜底未映射模块
   other: [],
 };
 

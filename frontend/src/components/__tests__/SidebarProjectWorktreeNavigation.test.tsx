@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6fb96f6f6681aa894f24f18bb63c99d2dcd5ae25eb8e966e497482156c10cef5
+@cypher schema=1 source_sha256=73489654752bd11c064af62cc8816bc7f41643e01a2665305f30224bb4f8a57f
 MERGE (self:File {path:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx"})
 MERGE (sidebar:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (tree:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
@@ -72,7 +72,7 @@ MERGE (navigationTest)-[:TESTS]->(sidebar)
 //   (fetcher)-[:CALLS]->(newResponse);
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Sidebar } from "../Sidebar";
 import { ProjectRunTree } from "../run/ProjectRunTree";
 import { useNavStore } from "@/lib/nav/navStore";
@@ -97,7 +97,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Project Worktree Index sidebar navigation", () => {
-  it("keeps the Project hierarchy primary and exposes the authorized Project Worktree Index", () => {
+  it("exposes the Worktree 控制中心 through the Home 核心区 (per ui-3pane-arch §1.2)", () => {
     useNavStore.setState({
       sidebarItemIds: ["inbox", "issues", "projects", "agents"],
       pinnedViewIds: ["kanban", "timeline"],
@@ -115,13 +115,13 @@ describe("Project Worktree Index sidebar navigation", () => {
     );
 
     expect(screen.getByTestId("app-sidebar")).toHaveAttribute("data-nav-model", "project-run");
-    expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
-    const link = screen.getByTestId("sidebar-project-worktree-index");
-    expect(link).toHaveAttribute(
-      "href",
-      `/worktree?project_id=${encodeURIComponent(projectId)}`,
-    );
-    expect(link).toHaveAttribute("data-active", "true");
+    // 设计书 §1.2: 侧栏不再渲染 Project Run 状态树 (移入 /worktree 页)
+    expect(screen.queryByTestId("project-run-directory")).toBeNull();
+    // Worktree 入口 = Home 核心区 sidebar-item-worktree
+    const homeCore = screen.getByTestId("sidebar-group-home-core");
+    expect(homeCore).toBeInTheDocument();
+    const worktreeItem = within(homeCore).getByTestId("sidebar-item-worktree");
+    expect(worktreeItem).toHaveAttribute("href", "/worktree");
   });
 
   it("Run Worktree rows distinguish lifecycle and binding facts without exposing identifiers", async () => {

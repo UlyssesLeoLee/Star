@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=ab29f3fd71b02079b75ff7073eec3a3b6b8c05e517c59f0e311aac9fb411d415
+@cypher schema=1 source_sha256=83db108e0ec2b09200f8fcbcb2d0655df261b6a225463844c4dc62f4f4acba12
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -562,6 +562,20 @@ export interface Dictionary {
     openBoundTask: string;          // "已绑定 Star 任务 →"
     openAsStarTask: string;         // "打开为 Star 任务"
     fiveW1H: string;                // "5W1H"
+  };
+
+  review: {
+    title: string;                  // "Review / 自审交叉审核"
+    subtitle: string;               // "ReviewRecord 列表 · 按状态分组 (per requirements §27.4)"
+    author: string;                 // "作者"
+    reviewer: string;               // "审核人"
+    status: {
+      IN_PROGRESS: string;
+      CHANGES_REQUESTED: string;
+      APPROVED: string;
+      REJECTED: string;
+      SUPERSEDED: string;
+    };
   };
   /** v0.12 (2026-11-13 WBS §23.36) 新增: canvas 游戏模式 */
   canvasGame: {
