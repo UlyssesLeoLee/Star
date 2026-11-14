@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=42d01351c9032180c6c0fa8c8001b699b5779bcf0b2d2613dfb76cc009f6f098
+@cypher schema=1 source_sha256=6bd49c329d446defd84ea4c9bac8a587c60c02c8a78ef482f6f4e432d95b45a7
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -189,10 +189,19 @@ function FallbackProjectRunTree() {
                         </Link>
                       </div>
                       {wtExpanded && (
-                        <div className="ml-7 flex items-center gap-1 py-0.5 text-[10px] text-ink-mute" role="treeitem" aria-level={4}>
+                        <Link
+                          role="treeitem"
+                          aria-level={4}
+                          data-testid={`branch-entry-${wt.id}`}
+                          href={`/worktree?project_id=${encodeURIComponent(project.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                          prefetch={false}
+                          onNavigate={() => selectProject(project.id)}
+                          title={wt.branch}
+                          className="ml-7 flex items-center gap-1 py-0.5 text-[10px] text-ink-mute hover:bg-accent/10 hover:text-accent"
+                        >
                           <GitBranch size={11} className="shrink-0" />
                           <span className="truncate">{wt.branch}</span>
-                        </div>
+                        </Link>
                       )}
                     </li>
                   );
