@@ -188,8 +188,8 @@
 | 10.2.3 | 依赖漏洞处置（4 advisory audit.toml 显式处置 + followup 计划; rusqlite 升级被 sqlx links 锁死） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.3 | 发布编排 | Ulysses |  |  |  |  |  | 进行中 |
 | 10.3.1 | 统一发布编排 release.yml（预检与 draft Release） | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
-| 10.3.2 | release.yml 真实发布路径验证 |  |  |  |  |  | 0 | 未开始 |
-| 10.3.3 | star-stable-release GitHub environment 与 required reviewers |  |  |  |  |  | 0 | 未开始 |
+| 10.3.2 | release.yml 真实发布路径验证 (preflight 组件级全过 + 旧 tag fail-closed 实证; 真实 tag e2e 留正式 release) | Ulysses |  |  | 2026-11-14 |  | 85 | 进行中 |
+| 10.3.3 | star-stable-release GitHub environment 与 required reviewers (environment + UlyssesLeoLee reviewer + main branch policy) | Ulysses |  |  | 2026-11-14 |  | 100 | 已完成 |
 | 10.3.4 | 桌面 SBOM 校验器与 cargo-sbom 输出格式适配 (validate_sbom.js 等价形态 DESCRIBES-A/B + 6 处内联 JS 替换) | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |
 | 10.4 | 稳定版发布闭环（v1.0.6，W0–W9） | Ulysses |  |  |  |  |  | 进行中 |
 | 10.4.1 | W0 发行矩阵与版本所有权 | Ulysses |  |  |  |  |  | 进行中 |
