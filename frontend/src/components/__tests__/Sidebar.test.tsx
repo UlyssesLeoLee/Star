@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d1e06e54accdb014290baa408b2e3ea62888f27e4f1ba8b5521f974d6cd6e44f
+@cypher schema=1 source_sha256=7938ab3cad082e2b0231c2597dfdece7ee0c4dcbb4f3807a7223bebb8b028411
 MERGE (self:File {path:"frontend/src/components/__tests__/Sidebar.test.tsx"})
 MERGE (sidebar:Symbol {id:"frontend/src/components/Sidebar.tsx::Sidebar",kind:"component"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::Sidebar Project-first navigation",kind:"suite"})
@@ -74,13 +74,13 @@ describe("Sidebar Project-first navigation", () => {
     expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
 
-    // Home 核心区 5 项 (Worktree 控制中心 / Agent / Feedback / Validation / Review)
+    // Home 核心区 5 项 (per 2026-11-14 artifact 页面结构: 统一画布/任务IPA看板/协同/沙盒/原型)
     const homeCore = screen.getByTestId("sidebar-group-home-core");
-    expect(within(homeCore).getByTestId("sidebar-item-worktree")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-agents")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-feedback")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-validation")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-review")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-canvas")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-kanban")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-nema")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-sandbox")).toBeInTheDocument();
+    expect(within(homeCore).getByTestId("sidebar-item-prototype")).toBeInTheDocument();
 
     const otherEntries = screen.getByTestId("sidebar-other-entries");
     expect(otherEntries.tagName).toBe("DETAILS");
@@ -106,9 +106,9 @@ describe("Sidebar Project-first navigation", () => {
     renderWithI18n(<Sidebar />);
 
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
-    // 视图组 (per ui-3pane-arch §1.2): 看板/时间线/待办池 + 重构/搜索
+    // 视图组 (per artifact: 分析(5) 首 + 时间线/待办池/重构/搜索)
     const viewGroup = screen.getByTestId("sidebar-group-view");
-    expect(within(viewGroup).getByTestId("sidebar-item-kanban")).toBeInTheDocument();
+    expect(within(viewGroup).getByTestId("sidebar-item-analytics")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-timeline")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-backlog")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-refactor")).toBeInTheDocument();

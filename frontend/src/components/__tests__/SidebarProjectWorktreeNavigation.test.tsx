@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d1129295f905a1b4753d9367f0c7ed438394db93d2005018145531e008743d9d
+@cypher schema=1 source_sha256=393d3ee14bf4615721faaff0b1a00b5c05bf7634774fe80e5ffb1899ec7d5209
 MERGE (self:File {path:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx"})
 MERGE (sidebar:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (tree:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
@@ -118,10 +118,10 @@ describe("Project Worktree Index sidebar navigation", () => {
     // per 2026-11-14 用户发令: 恢复 LANE 层级树 (无宿主时降级为可达演示目录)
     expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
     expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
-    // Worktree 入口 = Home 核心区 sidebar-item-worktree
-    const homeCore = screen.getByTestId("sidebar-group-home-core");
-    expect(homeCore).toBeInTheDocument();
-    const worktreeItem = within(homeCore).getByTestId("sidebar-item-worktree");
+    // Worktree 入口 = 项目组 sidebar-item-worktree (per 2026-11-14 artifact 重排)
+    const projectGroup = screen.getByTestId("sidebar-group-project");
+    expect(projectGroup).toBeInTheDocument();
+    const worktreeItem = within(projectGroup).getByTestId("sidebar-item-worktree");
     expect(worktreeItem).toHaveAttribute("href", "/worktree");
   });
 

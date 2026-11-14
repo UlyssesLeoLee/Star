@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e8754987a1e37e670a55bba3a05fff192a831228fcab0ebaf0c80d09c1c92673
+@cypher schema=1 source_sha256=32ceeb3ffe9e82de80c0b7cecae39d2bc76f3e62cf0c5a26915371935c97e975
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -115,6 +115,7 @@ export const en: Dictionary = {
     vibeControlPlane: "VIBE CONTROL PLANE",
     navHome: "Home",
     navPersonal: "Personal",
+    navProject: "Projects",
     navView: "Views",
     navAdmin: "Admin",
     navAdminOrg: "Organization",
@@ -647,6 +648,21 @@ export const en: Dictionary = {
     openBoundTask: "Bound Star task →",
     openAsStarTask: "Open as Star task",
     fiveW1H: "5W1H",
+  },
+  sandbox: {
+    title: "Sandbox",
+    subtitle: "Sandbox-as-a-Service session console (sandboxd gRPC)",
+    sessions: "Sessions",
+    newSession: "New session",
+    destroy: "Destroy",
+    runCommand: "Run command",
+    commandHint: "Run a command in an isolated sandbox (resource / network / fs / capability isolation)",
+    run: "Run",
+    backendHint: "Backend = crates/sandboxd (WBS 6.5.2); gRPC 4 RPC once host is attached",
+  },
+  prototype: {
+    title: "Prototype",
+    subtitle: "Design prototype and experiment gallery",
   },
   branchWorkspace: {
     title: "Branch Workspace",

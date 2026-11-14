@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2e77bd6c50676d216c5599697c8218c099a4783d176902698706c55ae76dc11c
+@cypher schema=1 source_sha256=e82f632bfd5180180673a3f05b26378f8a0bb04baf59a806061292f3f22f9a3c
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -44,6 +44,7 @@ import {
   Code2,
   Bell,
   ShieldAlert,
+  Palette,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -568,6 +569,36 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: FileText,
   },
   {
+    id: "ops",
+    label: "Ops Console",
+    code: "OPS",
+    href: "/ops",
+    category: "system",
+    categoryLabel: "System & Meta",
+    description: "运维控制台 (仅管理员, per 2026-11-14 页面结构 7)",
+    icon: Monitor,
+  },
+  {
+    id: "sandbox",
+    label: "Sandbox",
+    code: "SBX",
+    href: "/sandbox",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "沙盒控制台 · 会话列表 / 运行命令 (sandboxd gRPC 接入点, WBS 6.5.2)",
+    icon: Boxes,
+  },
+  {
+    id: "prototype",
+    label: "Prototype",
+    code: "PTY",
+    href: "/prototype",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "设计原型与实验区画廊 (wireframe / 游戏 / IPA 看板原型)",
+    icon: Palette,
+  },
+  {
     id: "canvas",
     label: "Canvas",
     code: "CNV",
@@ -639,20 +670,22 @@ export type NavGroupId =
   | "other";
 
 export const NAV_GROUPS: Record<NavGroupId, string[]> = {
-  // per §1.2 核心区 5 项 (Review 本轮补齐 /review 路由)
-  "home-core": ["worktree", "agents", "feedback", "validation", "review"],
-  // per §1.2 个人区 (提及我/已关注/草稿 无页面 → 缺标, 只留 inbox)
+  // per 2026-11-14 页面结构 (artifact GVPrQUc4yWZoKo2dLpT2vz):
+  //   2 统一画布 / 1b 任务 IPA 看板 / 2b 协同(文件即任务) / 2c 沙盒 / 2d 原型 = 工作区核心
+  //   3 收件箱 = 个人; 5 分析 = 视图组首; 6 设置 = 管理; 7 运维控制台 = admin-ops 首(仅管理员)
+  "home-core": ["canvas", "kanban", "nema", "sandbox", "prototype"],
+  // per 页面结构 3: 收件箱
   "home-personal": ["inbox"],
-  // per §1.2.1 /project + /planning → 项目; issues (Sprint) + nema (文件即任务) 归工作入口
-  project: ["projects", "planning", "issues", "nema"],
-  // per §1.2.1 视图预设; canvas + analytics (图表中心, per ui-detailed-design §2) + refactor/search
-  view: ["kanban", "timeline", "backlog", "canvas", "analytics", "refactor", "search"],
+  // 项目与工作流类 (worktree/agent/feedback/validation/review 收纳)
+  project: ["projects", "planning", "issues", "worktree", "agents", "feedback", "validation", "review"],
+  // 视图: 分析(5) 首 + 其余视图族
+  view: ["analytics", "timeline", "backlog", "refactor", "search"],
   // per §1.2.1 管理 → 组织 (Workspace 无路由 → 缺标; settings = 租户全局配置)
   "admin-org": ["tenant", "identity", "permission", "settings"],
   // per §1.2.1 管理 → 集成 (SCM/Integration/Notification + 新路由)
   "admin-integration": ["scm", "integration", "notification", "webhooks", "api-keys", "cli-profiles"],
-  // per §1.2.1 管理 → 运维 (LocalRuntime/Audit/Automation/Collaboration + remote)
-  "admin-ops": ["local-runtime", "audit", "automation", "collaboration", "remote"],
+  // per §1.2.1 管理 → 运维 (7 运维控制台 首; LocalRuntime/Audit/Automation/Collaboration + remote)
+  "admin-ops": ["ops", "local-runtime", "audit", "automation", "collaboration", "remote"],
   // per §1.2.1 管理 → 开发者 (过渡: Development/Workflow/Relation/Context + 内部页)
   "admin-dev": [
     "development",
@@ -669,7 +702,6 @@ export const NAV_GROUPS: Record<NavGroupId, string[]> = {
   other: [],
 };
 
-/** 分组显示顺序 (Sidebar 渲染顺序) */
 export const NAV_GROUP_ORDER: NavGroupId[] = [
   "home-core",
   "home-personal",

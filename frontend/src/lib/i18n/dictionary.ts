@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=a58ce7be3d4f53efedc8f0c997d0300852c4af9c71ca80fb3e872e9c67ab7ffa
+@cypher schema=1 source_sha256=572cfeb5cfed37e0936f040e4b196bc8497b4d77f9c6c4ff92932b75be316a2f
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -199,6 +199,7 @@ export interface Dictionary {
     otherPages: string;            // secondary navigation disclosure
     navHome: string;               // Home 组 (per ui-3pane-arch §1.2)
     navPersonal: string;           // 个人区
+    navProject: string;             // "项目"
     navView: string;               // 视图组
     navAdmin: string;              // 管理组
     navAdminOrg: string;           // 管理→组织
@@ -566,6 +567,21 @@ export interface Dictionary {
     fiveW1H: string;                // "5W1H"
   };
 
+  sandbox: {
+    title: string;                  // "沙盒"
+    subtitle: string;               // "Sandbox-as-a-Service 会话控制台 (sandboxd gRPC)"
+    sessions: string;               // "会话"
+    newSession: string;             // "新建会话"
+    destroy: string;                // "销毁"
+    runCommand: string;             // "运行命令"
+    commandHint: string;            // "在隔离沙盒中执行命令 (resource/network/fs/capability 4 维隔离)"
+    run: string;                    // "运行"
+    backendHint: string;            // "后端 = crates/sandboxd (WBS 6.5.2); 宿主装配后走 gRPC 4 RPC"
+  };
+  prototype: {
+    title: string;                  // "原型"
+    subtitle: string;               // "设计原型与实验区画廊"
+  };
   branchWorkspace: {
     title: string;                  // "Branch 工作区"
     subtitle: string;               // "该 Branch 的功能集 (per Tenant → Project → LANE → Worktree → Branch 树形架构)"

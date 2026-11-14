@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c16fa3519feb4f642ba25d22b79c429bdab22dad95a350979cdd797e6e507024
+@cypher schema=1 source_sha256=cbcdf5ee518d7d1ae779670289fa77c414a9a1054c844334a85f48cfd95c25a8
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -126,6 +126,7 @@ export const zhCN: Dictionary = {
     vibeControlPlane: "VIBE CONTROL PLANE",
     navHome: "Home",
     navPersonal: "个人",
+    navProject: "项目",
     navView: "视图",
     navAdmin: "管理",
     navAdminOrg: "组织",
@@ -662,6 +663,21 @@ export const zhCN: Dictionary = {
     openBoundTask: "已绑定 Star 任务 →",
     openAsStarTask: "打开为 Star 任务",
     fiveW1H: "5W1H",
+  },
+  sandbox: {
+    title: "沙盒",
+    subtitle: "Sandbox-as-a-Service 会话控制台 (sandboxd gRPC)",
+    sessions: "会话",
+    newSession: "新建会话",
+    destroy: "销毁",
+    runCommand: "运行命令",
+    commandHint: "在隔离沙盒中执行命令 (resource / network / fs / capability 4 维隔离)",
+    run: "运行",
+    backendHint: "后端 = crates/sandboxd (WBS 6.5.2); 宿主装配后走 gRPC 4 RPC",
+  },
+  prototype: {
+    title: "原型",
+    subtitle: "设计原型与实验区画廊",
   },
   branchWorkspace: {
     title: "Branch 工作区",

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=56cf326703aab45225655ff9418b6f11f4463b4f9755ba7f79ebe2a097bdb434
+@cypher schema=1 source_sha256=30915d0c62826892fb43301e3e00bfe67932b2cc103ae026757ec5719e4c96cd
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -278,6 +278,15 @@ export function Sidebar() {
             <NavModuleList modules={groupModules("home-personal")} collapsed={isCollapsed} isActive={isModuleActive} />
           )}
         </details>
+
+        {/* 项目组 (per ui-3pane-arch §1.2: 📂 项目, 项目/工作流类功能收纳) */}
+        <NavGroupSection
+          testId="sidebar-group-project"
+          label={t.sidebar.navProject}
+          modules={groupModules("project")}
+          collapsed={isCollapsed}
+          isActive={isModuleActive}
+        />
 
         {/* 视图组 (per §1.2.1: 项目内视图预设) */}
         <NavGroupSection

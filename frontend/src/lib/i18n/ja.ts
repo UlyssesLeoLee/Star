@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ed6e23212812f817f762066acaa8aac4012f89531b3ff86d9e8eb7ad3c9b116c
+@cypher schema=1 source_sha256=34abe623aa3807510d334a23ad819d4699f8abf01a922ff33b39461caa80e22a
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -116,6 +116,7 @@ export const ja: Dictionary = {
     vibeControlPlane: "VIBE CONTROL PLANE",
     navHome: "ホーム",
     navPersonal: "個人",
+    navProject: "プロジェクト",
     navView: "ビュー",
     navAdmin: "管理",
     navAdminOrg: "組織",
@@ -648,6 +649,21 @@ export const ja: Dictionary = {
     openBoundTask: "バインド済み Star タスク →",
     openAsStarTask: "Star タスクとして開く",
     fiveW1H: "5W1H",
+  },
+  sandbox: {
+    title: "サンドボックス",
+    subtitle: "Sandbox-as-a-Service セッションコンソール (sandboxd gRPC)",
+    sessions: "セッション",
+    newSession: "新規セッション",
+    destroy: "破棄",
+    runCommand: "コマンド実行",
+    commandHint: "隔離サンドボックスでコマンドを実行 (resource / network / fs / capability の 4 次元隔離)",
+    run: "実行",
+    backendHint: "バックエンド = crates/sandboxd (WBS 6.5.2); ホスト接続後に gRPC 4 RPC",
+  },
+  prototype: {
+    title: "プロトタイプ",
+    subtitle: "設計プロトタイプと実験ギャラリー",
   },
   branchWorkspace: {
     title: "Branch ワークスペース",

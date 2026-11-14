@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=59f2a75e3009fa01e1677130503ff72c41132ff219339b6f44eec3437a882c90
+@cypher schema=1 source_sha256=1f0ab358fac3311ae09bd689566e426688ad31dd7a2c1d24712083d6c0283659
 MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})
@@ -220,8 +220,8 @@ export const useNavStore = create<NavState>()(
     {
       // bump v4: WBS §23.32-A — worktree 模块移出 sidebar/pinned, kanban/timeline/backlog 归并 pinned
       name: "star-nav-store:v2",
-      // v6 (2026-11-14): 全量模块显式映射后二次清理 (issues/analytics/settings 等 v5 时未映射)
-      version: 6,
+      // v7 (2026-11-14): 页面结构重排 (artifact: 工作区核心 5 项 + 收件箱/分析/设置/运维)
+      version: 7,
       migrate: (persistedState) => migratePersistedNavState(persistedState),
       storage: createJSONStorage(() => (typeof window !== "undefined" ? localStorage : {
         getItem: () => null,
