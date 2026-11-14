@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1cf6853abe8807007a95fef2e9d8fc1485f463df521cac05f8b072d37bbbfaff
+@cypher schema=1 source_sha256=88e415f96fc61a68867eb8f01c46577058b34446f84b6f4bef2556927f22e89b
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -115,6 +115,7 @@ export const en: Dictionary = {
     vibeControlPlane: "VIBE CONTROL PLANE",
     navHome: "Home",
     navPersonal: "Personal",
+    navGlobal: "Global",
     navProject: "Projects",
     navView: "Views",
     navAdmin: "Admin",

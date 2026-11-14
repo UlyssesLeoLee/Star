@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=48fdcb13881f0b185adf0285f82bfdad5d71709a5b669825ecb353a9b9c37601
+@cypher schema=1 source_sha256=62418c93cc33d187119f90223e990b8a779dc77eefd0f1f180972e7d0635d653
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -199,6 +199,7 @@ export interface Dictionary {
     otherPages: string;            // secondary navigation disclosure
     navHome: string;               // Home 组 (per ui-3pane-arch §1.2)
     navPersonal: string;           // 个人区
+    navGlobal: string;              // "全局" (artifact 左栏底部组)
     navProject: string;             // "项目"
     navView: string;               // 视图组
     navAdmin: string;              // 管理组

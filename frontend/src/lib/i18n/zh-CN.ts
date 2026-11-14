@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=329fbf75f40fce2da138b2372a016bcecb495671374380c34d2205732ffafa5e
+@cypher schema=1 source_sha256=c5dd78b4139059a538456ac0ed648524c522c9cb92391a7d5e7ea1e296d670a3
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -126,6 +126,7 @@ export const zhCN: Dictionary = {
     vibeControlPlane: "VIBE CONTROL PLANE",
     navHome: "Home",
     navPersonal: "个人",
+    navGlobal: "全局",
     navProject: "项目",
     navView: "视图",
     navAdmin: "管理",

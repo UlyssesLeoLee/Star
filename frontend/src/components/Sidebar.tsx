@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c34e23f0af0642e71d48f56c508da0ab372622b415799ddff67f86e605d21e3b
+@cypher schema=1 source_sha256=34836b8339e4510e9ffc0b97ce06b7671985447df58ba5426ce6752028c86c68
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -20,19 +20,16 @@ MERGE (self)-[:READS]->(projectNavigationLabel)
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  Plus,
   X,
   PanelLeftClose,
   PanelLeftOpen,
-  FolderKanban,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type ModuleCategory, type NavGroupId } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
-import { findSubNavGroup } from "@/lib/nav/subNavRegistry";
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
@@ -55,11 +52,6 @@ export function Sidebar() {
   const { t, tx } = useTranslation();
 
   // navStore: 折叠状态 / scope / 数据
-  const sidebarItemIds = useNavStore((s) => s.sidebarItemIds);
-  const removeSidebarItem = useNavStore((s) => s.removeSidebarItem);
-  const pinnedViewIds = useNavStore((s) => s.pinnedViewIds);
-  const removePinnedView = useNavStore((s) => s.removePinnedView);
-  const openMatrix = useNavStore((s) => s.openMatrix);
   const sidebarFold = useNavStore((s) => s.sidebarFold);
   const toggleSidebarFold = useNavStore((s) => s.toggleSidebarFold);
   const setSidebarFold = useNavStore((s) => s.setSidebarFold);
@@ -69,33 +61,10 @@ export function Sidebar() {
   const isDark = !mounted || theme === "dark" || (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
   const isCollapsed = sidebarFold === "collapsed";
 
-  // 解析当前用户钉选到左侧的模块对象
-  const activeSidebarModules = sidebarItemIds
-    .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m));
-
-  const activePinnedModules = pinnedViewIds
-    .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m));
-
   // =====================================================================
-  // Project scope 数据源 (per 2026-09-03 12:36 JST 拍板 #1 复用 SubNav 数据源)
+  // per 2026-11-14 artifact 参考 UI: 左侧 = 项目列表(LANE 树) + 底部全局组,
+  // 用户钉选(pinned/sidebarItemIds)不再在侧栏渲染 — 入口统一走顶栏 App Matrix
   // =====================================================================
-  // - 从 subNavRegistry 按 pathname 查 group
-  // - 若未命中, project scope 不可用 (灰显 + tooltip 提示)
-  // - active item 由 query 字符串决定 (e.g. /projects?tab=kanban → kanban)
-  const subNavGroup = useMemo(() => findSubNavGroup(pathname), [pathname]);
-
-  // =====================================================================
-  // per 2026-11-12 用户发令 (梳理重复导航 / 整合在一起):
-  //   - 当前 pathname 有 SubNav (e.g. /projects 的 6 tab) 时, 隐藏 pinned/
-  //     sidebar 里指向同一 pathname 的模块 (SubNav 已覆盖, 不再重复展示)
-  //   - 带 query 的模块 (e.g. /projects?tab=timeline) 用 query 精确判定 active
-  // =====================================================================
-  const dedupeBySubNav = (m: ModuleDefinition) =>
-    !subNavGroup || m.href.split("?")[0] !== pathname;
-  const visibleSidebarModules = activeSidebarModules.filter(dedupeBySubNav);
-  const visiblePinnedModules = activePinnedModules.filter(dedupeBySubNav);
   const isModuleActive = useCallback(
     (item: ModuleDefinition) => moduleHrefMatches(item.href, pathname, searchParams),
     [pathname, searchParams]
@@ -110,20 +79,6 @@ export function Sidebar() {
     NAV_GROUPS[groupId]
       .map((id) => MODULE_MAP.get(id))
       .filter((m): m is ModuleDefinition => Boolean(m));
-
-  // 未映射模块 → "其他入口" 兜底 (设计映射表未覆盖, per 守门 #11 不消失)
-  const mappedIds = new Set<string>(Object.values(NAV_GROUPS).flat());
-  const otherModuleIds = [...MODULE_MAP.keys()].filter(
-    (id) => !mappedIds.has(id),
-  );
-  const otherModules = otherModuleIds
-    .map((id) => MODULE_MAP.get(id))
-    .filter((m): m is ModuleDefinition => Boolean(m));
-
-  const isOtherEntryActive =
-    visibleSidebarModules.some(isModuleActive) ||
-    visiblePinnedModules.some(isModuleActive) ||
-    otherModuleIds.some((id) => isModuleActive(MODULE_MAP.get(id)!));
 
   // 键盘快捷键 Ctrl+B 折叠/展开 (per 守门 #11 缺标比错标: shortcut 是 power user
   // 必备延伸, 不强制; 这里落地)
@@ -253,206 +208,16 @@ export function Sidebar() {
         {/* Project → LANE → Worktree → Branch 层级树 (per 2026-11-14 用户发令:
             恢复 LANE 层级设计; 无宿主会话时降级为可达的演示目录, 不显示死块) */}
         <ProjectRunTree collapsed={isCollapsed} />
-        {/* Home 核心区: Branch 功能已移至顶栏 (per 2026-11-14 artifact), 空则跳过 */}
-        {groupModules("home-core").length > 0 && (
+        {/* 全局组 (per 2026-11-14 artifact 参考 UI: 左栏 = 项目列表 + 底部全局组) */}
+        <div className="mt-auto">
           <NavGroupSection
-            testId="sidebar-group-home-core"
-            label={t.sidebar.navHome}
-            modules={groupModules("home-core")}
+            testId="sidebar-group-global"
+            label={t.sidebar.navGlobal}
+            modules={groupModules("home-personal")}
             collapsed={isCollapsed}
-            showCoreBadge
             isActive={isModuleActive}
           />
-        )}
-
-        {/* 个人区 (per §1.2: 默认折叠为 1 行摘要) */}
-        <details
-          data-testid="sidebar-group-home-personal"
-          className="border-t border-line/60 pt-3"
-          open={groupModules("home-personal").some(isModuleActive)}
-        >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded px-2 py-2 text-xs font-semibold text-ink-mute hover:bg-bg-soft/60 hover:text-ink">
-            <span className={clsx(isCollapsed && "sr-only")}>
-              {t.sidebar.navPersonal} ({groupModules("home-personal").length})
-            </span>
-          </summary>
-          {!isCollapsed && (
-            <NavModuleList modules={groupModules("home-personal")} collapsed={isCollapsed} isActive={isModuleActive} />
-          )}
-        </details>
-
-        {/* 项目组 (per ui-3pane-arch §1.2: 📂 项目, 项目/工作流类功能收纳) */}
-        <NavGroupSection
-          testId="sidebar-group-project"
-          label={t.sidebar.navProject}
-          modules={groupModules("project")}
-          collapsed={isCollapsed}
-          isActive={isModuleActive}
-        />
-
-        {/* 视图组 (per §1.2.1: 项目内视图预设) */}
-        <NavGroupSection
-          testId="sidebar-group-view"
-          label={t.sidebar.navView}
-          modules={groupModules("view")}
-          collapsed={isCollapsed}
-          isActive={isModuleActive}
-        />
-
-        {/* 管理组 (per §1.2.1: 4 个二级子组) */}
-        <details
-          data-testid="sidebar-group-admin"
-          className="border-t border-line/60 pt-3"
-          open={["admin-org", "admin-integration", "admin-ops", "admin-dev"].some((g) =>
-            groupModules(g as NavGroupId).some(isModuleActive),
-          )}
-        >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded px-2 py-2 text-xs font-semibold text-ink-mute hover:bg-bg-soft/60 hover:text-ink">
-            <span className={clsx(isCollapsed && "sr-only")}>{t.sidebar.navAdmin}</span>
-          </summary>
-          {!isCollapsed && (
-            <div className="mt-2 space-y-4">
-              <NavGroupSection
-                testId="sidebar-group-admin-org"
-                label={t.sidebar.navAdminOrg}
-                modules={groupModules("admin-org")}
-                collapsed={isCollapsed}
-                sub
-                isActive={isModuleActive}
-              />
-              <NavGroupSection
-                testId="sidebar-group-admin-integration"
-                label={t.sidebar.navAdminIntegration}
-                modules={groupModules("admin-integration")}
-                collapsed={isCollapsed}
-                sub
-                isActive={isModuleActive}
-              />
-              <NavGroupSection
-                testId="sidebar-group-admin-ops"
-                label={t.sidebar.navAdminOps}
-                modules={groupModules("admin-ops")}
-                collapsed={isCollapsed}
-                sub
-                isActive={isModuleActive}
-              />
-              <NavGroupSection
-                testId="sidebar-group-admin-dev"
-                label={t.sidebar.navAdminDev}
-                modules={groupModules("admin-dev")}
-                collapsed={isCollapsed}
-                sub
-                isActive={isModuleActive}
-              />
-            </div>
-          )}
-        </details>
-
-        {/* 其他入口兜底 (设计映射表未覆盖 + 用户钉选自定义, per 守门 #11 不消失) */}
-        <details
-          data-testid="sidebar-other-entries"
-          className="border-t border-line/60 pt-3"
-          open={isOtherEntryActive}
-        >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded px-2 py-2 text-xs font-semibold text-ink-mute hover:bg-bg-soft/60 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-            <span className="flex min-w-0 items-center gap-2">
-              <FolderKanban size={15} aria-hidden="true" />
-              <span className={clsx(isCollapsed && "sr-only")}>{t.sidebar.otherPages}</span>
-            </span>
-            <span className={clsx("text-[10px] font-mono", isCollapsed && "sr-only")}>
-              {visibleSidebarModules.length + visiblePinnedModules.length + otherModuleIds.length}
-            </span>
-          </summary>
-          <div className="mt-3 space-y-5">
-            <div>
-              {!isCollapsed && (
-                <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
-                  <span>{t.sidebar.groupWorkspaces}</span>
-                  <span className="text-[9px] font-mono opacity-70 border border-line px-1.5 py-0.2 rounded">
-                    {visibleSidebarModules.length} {t.sidebar.pinned}
-                  </span>
-                </div>
-              )}
-              <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-                {visibleSidebarModules.map((item) => (
-                  <SidebarRow
-                    key={item.id}
-                    module={item}
-                    active={isModuleActive(item)}
-                    onRemove={removeSidebarItem}
-                    removeTitle={tx(t.sidebar.removeFromSidebar, { label: "" })}
-                    dataTestIdBase="sidebar-item"
-                    removeDataTestIdBase="remove-sidebar"
-                    collapsed={isCollapsed}
-                  />
-                ))}
-              </ul>
-            </div>
-
-            {visiblePinnedModules.length > 0 && (
-              <div>
-                {!isCollapsed && (
-                  <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
-                    <span>{t.sidebar.groupTactical}</span>
-                    <span className="text-[9px] font-mono opacity-70 border border-line px-1.5 py-0.2 rounded">{t.sidebar.pinned}</span>
-                  </div>
-                )}
-                <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-                  {visiblePinnedModules.map((item) => (
-                    <SidebarRow
-                      key={item.id}
-                      module={item}
-                      active={isModuleActive(item)}
-                      onRemove={removePinnedView}
-                      removeTitle={tx(t.sidebar.removeFromPinned, { label: "" })}
-                      dataTestIdBase="sidebar-item"
-                      removeDataTestIdBase="remove-pinned"
-                      collapsed={isCollapsed}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {otherModuleIds.length > 0 && (
-              <div>
-                {!isCollapsed && (
-                  <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
-                    <span>{t.sidebar.navOther}</span>
-                  </div>
-                )}
-                <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-                  {otherModules.map((item) => (
-                    <SidebarRow
-                      key={item.id}
-                      module={item}
-                      active={isModuleActive(item)}
-                      onRemove={() => undefined}
-                      removeTitle=""
-                      dataTestIdBase="sidebar-item"
-                      removeDataTestIdBase="remove-other"
-                      collapsed={isCollapsed}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {!isCollapsed && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={openMatrix}
-                  data-testid="sidebar-add-custom"
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-dashed border-[var(--cel-ink)] hover:border-accent/60 bg-bg-soft/40 hover:bg-accent/10 text-xs font-mono text-ink-mute hover:text-accent transition-all duration-200 group hover:shadow-[2px_2px_0px_0px_var(--cel-ink),0_0_12px_rgba(0,240,255,0.15)]"
-                >
-                  <Plus size={13} className="text-accent group-hover:rotate-90 transition-transform duration-300" />
-                  <span className="font-semibold">{t.sidebar.customAdd}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </details>
+        </div>
       </nav>
 
 
