@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6cd41e5a646a6753ca80a883e3833d3608b6c39dead501191784118f17ae1428
+@cypher schema=1 source_sha256=9ad6180ccf025d1151ce1c7abd6e4445df476bceb345e85af9dfcf1f82ce339e
 MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
 MERGE (self)-[:DEFINES]->(suite)
@@ -96,20 +96,17 @@ describe("U4 minimal panels — render smoke", () => {
     expect(screen.getByTestId("live-activity-placeholder")).toBeInTheDocument();
   });
 
-  it("renders /analytics without error", () => {
+  it("renders /analytics without error (per 2026-11-14 参考 UI: 3 子 tab + KPI + IPA 阶段进度)", () => {
     renderWithI18n(<AnalyticsPage />);
-    expect(screen.getByTestId("analytics-page")).toBeInTheDocument();
-    // v0.6: zh-CN 下 page title "效能分析"
-    expect(screen.getByText("效能分析")).toBeInTheDocument();
-    // KPI 4 个 (label 全部渲染)
-    expect(screen.getByText("Cost (24h)")).toBeInTheDocument();
-    expect(screen.getByText("Tokens (24h)")).toBeInTheDocument();
-    // Default tab is burndown
-    expect(screen.getByTestId("tab-burndown")).toBeInTheDocument();
-    // Switch to cost tab -> SVG 折线图存在
-    const costTab = screen.getByRole("tab", { name: /Cost/i });
-    fireEvent.click(costTab);
-    expect(screen.getByTestId("cost-trend-chart")).toBeInTheDocument();
+    // 4 KPI 卡片 (真实 store 数据驱动)
+    expect(screen.getByTestId("analytics-kpi-0")).toBeInTheDocument();
+    expect(screen.getByTestId("analytics-kpi-3")).toBeInTheDocument();
+    expect(screen.getByText("完成任务")).toBeInTheDocument();
+    expect(screen.getByText("IPA 技能覆盖")).toBeInTheDocument();
+    // IPA 阶段进度条 (P2 → P6.2)
+    expect(screen.getByTestId("analytics-ipa-phases")).toBeInTheDocument();
+    expect(screen.getByText("需求定义")).toBeInTheDocument();
+    expect(screen.getByText("集成测试")).toBeInTheDocument();
   });
 
   it("renders /inbox without error", () => {

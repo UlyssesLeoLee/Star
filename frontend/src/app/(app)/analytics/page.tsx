@@ -1,382 +1,232 @@
-"use client";
-
-// =====================================================================
-// /analytics — Dashboard KPI + 图表中心 (Burndown, Gantt, Cost, Velocity, Leaderboard)
-// =====================================================================
-// 日漫风格 Charisma 科技美学 + 低认知负荷选项卡架构
-// =====================================================================
-
 /*
-@cypher schema=1 source_sha256=97b8c2e69493c8e3a415dc51e465faa9f0ed2c2472203a526249a45c478ed70d
+@cypher schema=1 source_sha256=1882ccd8f0c61f2e368c81e54b2d8a65c6a6a3ddf53982454176cbf56e1f2e9e
 MERGE (self:File {path:"frontend/src/app/(app)/analytics/page.tsx"})
-MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
-MERGE (analyticsPage:Function {name:"AnalyticsPage", language:"typescript", visibility:"public"})
-MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
-MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
-MERGE (differenceInUtcCalendarDays:Function {name:"differenceInUtcCalendarDays", language:"typescript", visibility:"public"})
-MERGE (self)-[:IMPORTS]->(dateUtils)
-MERGE (self)-[:DEFINES]->(analyticsPage)
-MERGE (analyticsPage)-[:CALLS]->(toUtcCalendarDate)
-MERGE (analyticsPage)-[:CALLS]->(addUtcCalendarDays)
-MERGE (analyticsPage)-[:CALLS]->(differenceInUtcCalendarDays)
+MERGE (page:Symbol {id:"frontend/src/app/(app)/analytics/page.tsx::AnalyticsPage",kind:"component"})
+MERGE (self)-[:DEFINES]->(page)
 @endcypher
 */
+// =====================================================================
+// /analytics — 分析 (per 0·页面合并图 & Analytics.dc.html mockup)
+// 3 子 tab: 概览 / 运维 / 审计日志
+// 概览: 4 KPI 卡片 + IPA 阶段进度条 (P2 需求定义 → P6.2 集成测试)
+// =====================================================================
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
-import { Tabs } from "@/components/Tabs";
-import { GanttChart } from "@/components/gantt";
 import { useStore } from "@/lib/store";
 import {
   BarChart3,
-  TrendingDown,
+  CheckCircle2,
   TrendingUp,
-  SquareChartGantt,
-  Activity,
-  Trophy,
-  DollarSign,
   Cpu,
+  AlertTriangle,
+  FileText,
+  GitBranch,
+  ChevronDown,
 } from "lucide-react";
-import { MOCK_KPI_FALLBACK, COST_SERIES_FALLBACK } from "@/mocks/data";
-import type { KpiCard, CostPoint } from "@/mocks/schemas/analytics";
 import { useTranslation } from "@/lib/i18n";
-import { CelButton3D } from "@/components/effects/Cel3DUI";
-import { CelCard3D } from "@/components/effects/CelCard3D";
-import {
-  addUtcCalendarDays,
-  differenceInUtcCalendarDays,
-  toUtcCalendarDate,
-} from "@/lib/gantt/dateUtils";
 
-function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
-  const { t } = useTranslation();
-  const W = 500;
-  const H = 160;
-  const PAD = 16;
-  const max = Math.max(...data.map((d) => d.usd), 1);
-  const stepX = (W - PAD * 2) / Math.max(data.length - 1, 1);
-  const points = data.map((d, i) => {
-    const x = PAD + i * stepX;
-    const y = H - PAD - (d.usd / max) * (H - PAD * 2);
-    return `${x},${y}`;
-  });
-  const linePath = `M ${points.join(" L ")}`;
-  return (
-    <svg
-      data-testid="cost-trend-chart"
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full h-48"
-      role="img"
-      aria-label={t.ariaLabels.costTrend}
-    >
-      <defs>
-        <linearGradient id="cost-fill-anime" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--color-border)" strokeWidth="1" />
-      <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="var(--color-border)" strokeWidth="1" />
-      <path
-        d={`${linePath} L ${PAD + (data.length - 1) * stepX},${H - PAD} L ${PAD},${H - PAD} Z`}
-        fill="url(#cost-fill-anime)"
-      />
-      <path
-        d={linePath}
-        fill="none"
-        stroke="#00f0ff"
-        strokeWidth={2}
-        className="drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]"
-      />
-      {data.map((d, i) => {
-        const x = PAD + i * stepX;
-        const y = H - PAD - (d.usd / max) * (H - PAD * 2);
-        return (
-          <circle
-            key={d.day}
-            cx={x}
-            cy={y}
-            r={3.5}
-            className="fill-accent stroke-bg-card stroke-2 drop-shadow-[0_0_6px_rgba(0,240,255,0.8)]"
-          />
-        );
-      })}
-    </svg>
-  );
-}
+const ANALYTICS_TABS = ["概览", "运维", "审计日志"] as const;
+
+const IPA_PHASES = [
+  { id: "P2", label: "需求定义", done: 2, total: 20 },
+  { id: "P3", label: "基本设计", done: 1, total: 21 },
+  { id: "P4", label: "详细设计", done: 2, total: 20 },
+  { id: "P5", label: "实现", done: 2, total: 15 },
+  { id: "P6.1", label: "单元测试", done: 2, total: 11 },
+  { id: "P6.2", label: "集成测试", done: 1, total: 12 },
+] as const;
 
 export default function AnalyticsPage() {
-  const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<string>("burndown");
-  const [kpi, setKpi] = useState<ReadonlyArray<KpiCard>>(MOCK_KPI_FALLBACK);
-  const [costSeries, setCostSeries] = useState<ReadonlyArray<CostPoint>>(COST_SERIES_FALLBACK);
+  const { t, tx } = useTranslation();
+  const [activeTab, setActiveTab] = useState<typeof ANALYTICS_TABS[number]>("概览");
 
-  // Store data for Gantt & Burndown
-  const sprints = useStore((s) => s.sprints);
-  const milestones = useStore((s) => s.milestones);
+  // 真实 store 数据
   const workItems = useStore((s) => s.workItems);
-  const burndown = useStore((s) => s.burndownSeries);
-  const transitionMilestone = useStore((s) => s.transitionMilestone);
-  const transitionSprint = useStore((s) => s.transitionSprint);
+  const worktrees = useStore((s) => s.worktrees);
+  const agents = useStore((s) => s.agentSessions);
 
-  useEffect(() => {
-    fetch("/api/analytics/kpi")
-      .then((r) => r.json())
-      .then((data: ReadonlyArray<KpiCard>) => setKpi(data))
-      .catch(() => {
-        /* keep FALLBACK (per §4 #1 缺标) */
-      });
-  }, []);
+  // 计算 KPI (真实数据 + fallback)
+  const kpiData = useMemo(() => {
+    const completed = workItems.filter((w) => w.status === "done").length;
+    const total = workItems.length || 1;
+    const completionRate = Math.round((completed / total) * 100);
+    const totalTokens = agents.reduce((sum, a) => sum + (a.token_usage?.total || 0), 0);
+    const avgTokens = agents.length > 0 ? Math.round(totalTokens / agents.length / 1000) : 0;
+    const ipaSkills = workItems.filter((w) => w.ipa_skill_ids && w.ipa_skill_ids.length > 0).length;
+    const ipaCoverage = workItems.length > 0 ? Math.round((ipaSkills / workItems.length) * 100) : 0;
 
-  useEffect(() => {
-    fetch("/api/analytics/cost")
-      .then((r) => r.json())
-      .then((data: ReadonlyArray<CostPoint>) => setCostSeries(data))
-      .catch(() => {
-        /* keep FALLBACK (per §4 #1 缺标) */
-      });
-  }, []);
-
-  const maxRemaining = Math.max(...burndown.map((b) => b.remaining_points), 1);
-
-  const dateRange = useMemo(() => {
-    const all = [
-      ...sprints.flatMap((s) => [toUtcCalendarDate(s.start_date), toUtcCalendarDate(s.end_date)]),
-      ...milestones.map((m) => toUtcCalendarDate(m.due_date)),
+    return [
+      { label: "完成任务", value: `${completed} / ${total}`, icon: CheckCircle2, trend: "+12%", trendUp: true },
+      { label: "验证通过率", value: `${completionRate}%`, icon: TrendingUp, trend: "+5%", trendUp: true },
+      { label: "Agent 运行时长", value: `${avgTokens}K tokens 平均`, icon: Cpu, trend: "-3%", trendUp: false },
+      { label: "IPA 技能覆盖", value: `${ipaCoverage}%`, icon: FileText, trend: "+8%", trendUp: true },
     ];
-    if (all.length === 0) {
-      const today = toUtcCalendarDate(new Date().toISOString());
-      return { start: today, end: addUtcCalendarDays(today, 60) };
-    }
-    const min = all.reduce((a, b) => (a < b ? a : b));
-    const max = all.reduce((a, b) => (a > b ? a : b));
-    const start = addUtcCalendarDays(min, -7);
-    const end = addUtcCalendarDays(max, 7);
-    if (differenceInUtcCalendarDays(end, start) > 180) {
-      return { start, end: addUtcCalendarDays(start, 180) };
-    }
-    return { start, end };
-  }, [sprints, milestones]);
-
-  const handleMilestoneUpdate = (id: string, newDueDate: string) => {
-    transitionMilestone(id, newDueDate);
-  };
-  const handleSprintUpdate = (id: string, newStart: string, newEnd: string) => {
-    transitionSprint(id, newStart, newEnd);
-  };
-  const handleWorkItemMove = (workItemId: string, newSprintId: string) => {
-    useStore.setState((s) => ({
-      workItems: s.workItems.map((w) =>
-        w.id === workItemId
-          ? { ...w, sprint_id: newSprintId, updated_at: new Date().toISOString() }
-          : w,
-      ),
-    }));
-  };
+  }, [workItems, agents]);
 
   return (
-    <div className="max-w-7xl mx-auto" data-testid="analytics-page">
-      <PageHeader
-        title={t.pageTitles['/analytics'].title}
-        subtitle="日漫科技分析中心: 甘特图 / 燃尽图 / 成本趋势 / 速率 / 排行榜"
-        icon={<BarChart3 className="text-accent" size={20} />}
-        count={`${kpi.length} KPIs`}
-      />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        {kpi.map((k) => (
-          <CelCard3D key={k.label} className="h-full">
-            <Stat label={k.label} value={k.value} hint={k.hint} tone={k.tone} />
-          </CelCard3D>
-        ))}
-      </div>
-
-      <Tabs
-        active={activeTab}
-        onChange={setActiveTab}
-        items={[
-          { id: "burndown", label: "Burndown 燃尽图", icon: <TrendingDown size={12} />, badge: `${burndown.length}d` },
-          { id: "gantt", label: "Gantt 甘特图", icon: <SquareChartGantt size={12} />, badge: milestones.length },
-          { id: "cost", label: "Cost 成本趋势", icon: <DollarSign size={12} />, badge: `${costSeries.length}d` },
-          { id: "velocity", label: "Velocity 速率", icon: <Activity size={12} /> },
-          { id: "leaderboard", label: "Leaderboard 排行榜", icon: <Trophy size={12} /> },
-        ]}
-      />
-
-      {activeTab === "burndown" && (
-        <CelCard3D>
-          <div data-testid="tab-burndown" className="card relative overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <SectionTitle><TrendingDown size={11} className="inline mr-1 text-accent" /> Sprint Burndown Chart (14 days)</SectionTitle>
-              <span className="text-xs text-ink-dim font-mono flex items-center gap-1.5">
-                <Cpu size={11} className="text-accent" />
-                <span>MAX: <strong className="text-accent font-semibold">{maxRemaining} SP</strong></span>
-              </span>
-            </div>
-            <svg viewBox="0 0 500 200" className="w-full h-64">
-              <defs>
-                <linearGradient id="burn-fill-analytics" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <line x1="30" y1="170" x2="490" y2="170" stroke="var(--color-border)" />
-              <line x1="30" y1="20" x2="30"  y2="170" stroke="var(--color-border)" />
-              <line x1="30" y1="30" x2="490" y2="155" stroke="#6e7681" strokeDasharray="4,4" />
-              <path
-                d={`M 30 ${170 - (burndown[0]?.remaining_points || 0) / maxRemaining * 140} ` +
-                   burndown.map((b, i) => `L ${30 + (i * 460 / (Math.max(burndown.length - 1, 1)))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ") +
-                   ` L 490 170 L 30 170 Z`}
-                fill="url(#burn-fill-analytics)"
-              />
-              <path
-                d={`M 30 ${170 - (burndown[0]?.remaining_points || 0) / maxRemaining * 140} ` +
-                   burndown.map((b, i) => `L ${30 + (i * 460 / (Math.max(burndown.length - 1, 1)))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ")}
-                fill="none"
-                stroke="#00f0ff"
-                strokeWidth="2.5"
-                className="drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]"
-              />
-              <text x="5" y="30" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">{maxRemaining}</text>
-              <text x="5" y="170" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">0</text>
-              <text x="240" y="190" fontSize="11" fill="var(--color-text-dim)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">// SPRINT TIMELINE (14 DAYS) //</text>
-            </svg>
-            <div className="flex items-center gap-4 text-sm text-ink-dim mt-2 pt-2 border-t border-line">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-info shadow-[0_0_6px_rgba(0,240,255,0.8)]" /> 实际剩余点数 (Actual Remaining)</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 border-t border-dashed border-ink-mute" /> 理想燃尽斜率 (Ideal Guideline)</span>
-            </div>
-          </div>
-        </CelCard3D>
-      )}
-
-      {activeTab === "gantt" && (
-        <div data-testid="tab-gantt" className="space-y-3">
-          <GanttChart
-            sprints={sprints}
-            milestones={milestones}
-            workItems={workItems}
-            dateRange={dateRange}
-            onMilestoneUpdate={handleMilestoneUpdate}
-            onSprintUpdate={handleSprintUpdate}
-            onWorkItemMove={handleWorkItemMove}
-          />
+    <div className="flex h-full flex-col bg-bg">
+      {/* 头部: 标题 + 租户/时间范围选择器 */}
+      <header className="border-b border-line bg-bg-card px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-bold text-ink">分析</h1>
+          <span className="text-[10px] px-1.5 py-0.5 rounded border border-line text-ink-dim">全局</span>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as typeof ANALYTICS_TABS[number])}
+            className="text-xs px-2 py-1.5 rounded border border-line bg-bg-soft text-ink"
+          >
+            {ANALYTICS_TABS.map((tab) => (
+              <option key={tab} value={tab}>{tab}</option>
+            ))}
+          </select>
+          <select className="text-xs px-2 py-1.5 rounded border border-line bg-bg-soft text-ink">
+            <option>Physis / GVPE</option>
+            <option>StarGate Dashboard</option>
+            <option>Mobile Companion</option>
+          </select>
+          <select className="text-xs px-2 py-1.5 rounded border border-line bg-bg-soft text-ink">
+            <option>近 14 天</option>
+            <option>近 30 天</option>
+            <option>本季度</option>
+          </select>
+        </div>
+      </header>
 
-      {activeTab === "cost" && (
-        <CelCard3D className="mb-3">
-          <div className="card" data-testid="cost-trend-card">
-            <div className="flex items-center justify-between mb-2">
-              <SectionTitle>Daily Cost Trend (7-day API & Model Spend)</SectionTitle>
-              <TrendingUp size={14} className="text-ok drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-            </div>
-            <MiniLineChart data={costSeries} />
-            <div className="flex justify-between mt-2 font-mono text-xs text-ink-dim">
-              {costSeries.map((d) => (
-                <span key={d.day}>{d.day} (${d.usd})</span>
+      {/* 主内容 */}
+      <main className="flex-1 overflow-auto bg-bg p-4">
+        {activeTab === "概览" && (
+          <div className="max-w-7xl mx-auto space-y-4">
+            {/* 4 KPI 卡片 (真实 store 数据) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {kpiData.map((kpi, i) => (
+                <div key={i} data-testid={`analytics-kpi-${i}`} className="bg-bg-card rounded-xl border border-line p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-ink-dim">{kpi.label}</span>
+                    <kpi.icon size={14} className={i === 0 ? "text-ok" : i === 1 ? "text-accent" : i === 2 ? "text-info" : "text-warn"} />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-2xl font-bold text-ink">{kpi.value}</span>
+                    <span className={`text-xs font-semibold ${kpi.trendUp ? "text-ok" : "text-err"}`}>{kpi.trend}</span>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        </CelCard3D>
-      )}
 
-      {activeTab === "velocity" && (
-        <div className="space-y-6" data-testid="tab-velocity">
-          <div className="card text-center py-10" data-testid="tab-velocity-inner">
-            <Activity size={36} className="mx-auto text-[var(--cel-cyan,#00f0ff)] mb-3" />
-            <div className="text-base font-black uppercase tracking-wider text-[var(--cel-text-primary,#ffffff)]">
-              Team Velocity Tracking 〔チーム開発速度分析〕
-            </div>
-            <div className="text-xs text-[var(--cel-text-secondary,#94a3b8)] mt-2 max-w-md mx-auto">
-              历史冲刺速率分析与预测模型已对齐 3渲2 战术指标。当前平均团队速率为 <strong className="text-[var(--cel-cyan,#00f0ff)] font-mono">38 SP / Sprint</strong>。
-            </div>
-          </div>
+            {/* IPA 阶段进度 */}
+            <section data-testid="analytics-ipa-phases" className="bg-bg-card rounded-xl border border-line p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-ink">IPA 阶段进度</h2>
+                <span className="text-[10px] px-1.5 py-0.5 rounded border border-line text-ink-dim">Branch: feat/relation-bfs</span>
+              </div>
+              <div className="space-y-2">
+                {IPA_PHASES.map((phase, i) => {
+                  const pct = phase.total > 0 ? Math.round((phase.done / phase.total) * 100) : 0;
+                  return (
+                    <div key={phase.id} className="flex items-center gap-3">
+                      <span className="text-[10px] font-mono text-ink-dim w-10 text-right">{phase.id}</span>
+                      <span className="text-xs text-ink-dim w-24">{phase.label}</span>
+                      <div className="flex-1 h-3 bg-bg-soft rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-accent rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono text-ink-dim w-20 text-right">
+                        {phase.done} / {phase.total} ({pct}%)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
 
-          {/* Quick Tactical 3D Action Controls */}
-          <div className="card">
-            <SectionTitle
-              action={
-                <span className="text-[9px] font-mono text-[var(--cel-gold,#ffc400)] font-bold">
-                  TACTICAL_DISPATCH
-                </span>
-              }
-            >
-              Velocity Dispatch Protocols 〔戦術派発〕
-            </SectionTitle>
-            <div className="flex flex-wrap gap-4 justify-center pt-2">
-              <CelButton3D
-                label="01 // RECALCULATE SP"
-                sublabel="VELOCITY MODEL"
-                variant="cyan"
-                onClick={() => alert("【3D 战术派发】速率模型重算完毕：基线 38 SP / 周期稳定。")}
-              />
-              <CelButton3D
-                label="02 // AUDIT BURNDOWN"
-                sublabel="ZERO VARIANCE"
-                variant="gold"
-                onClick={() => alert("【3D 战术派发】燃尽图斜率校验完成：无方差逃逸。")}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "leaderboard" && (
-        <div className="space-y-6" data-testid="tab-leaderboard">
-          {/* Masterpiece Accreditation Deck from chrono-vibe */}
-          <div className="card relative overflow-hidden clip-hud-corner">
-            <div className="border-b-2 border-black pb-2.5 mb-4 flex items-center justify-between">
-              <div>
-                <div className="text-[9px] font-black text-[var(--cel-crimson,#ff184c)] uppercase tracking-widest font-mono">
-                  // CHARISMA ACCREDITATION
+            {/* 租户/项目概览 */}
+            <section data-testid="analytics-scope" className="bg-bg-card rounded-xl border border-line p-4">
+              <h2 className="text-sm font-bold text-ink mb-3">范围: Physis / GVPE</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-lg bg-bg-soft border border-line">
+                  <span className="text-ink-dim">项目</span>
+                  <p className="font-mono text-ink mt-1">Physis / GVPE · StarGate Dashboard · Mobile Companion</p>
                 </div>
-                <h2 className="text-sm font-black uppercase text-[var(--cel-text-primary,#ffffff)] tracking-wider">
-                  MASTERPIECE RANKING <span className="text-[var(--cel-gold,#ffc400)]">〔殿堂評価〕</span>
-                </h2>
+                <div className="p-3 rounded-lg bg-bg-soft border border-line">
+                  <span className="text-ink-dim">时间范围</span>
+                  <p className="font-mono text-ink mt-1">近 14 天</p>
+                </div>
+                <div className="p-3 rounded-lg bg-bg-soft border border-line">
+                  <span className="text-ink-dim">当前 Branch</span>
+                  <p className="font-mono text-ink mt-1">feat/relation-bfs</p>
+                </div>
               </div>
-              <span className="text-xl">👑</span>
-            </div>
-
-            <div className="bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-4 mb-4 text-center cel-shadow">
-              <div className="text-[9px] font-mono text-[var(--cel-text-secondary,#94a3b8)] uppercase tracking-widest">
-                SYSTEM EVALUATION
-              </div>
-              <div className="text-lg sm:text-xl font-black text-[var(--cel-gold,#ffc400)] italic tracking-wider my-1">
-                ✦ 殿堂入り神作 ✦
-              </div>
-              <div className="text-[11px] text-[var(--cel-text-secondary,#94a3b8)]">
-                「毫无多余认知负荷，直击灵魂的美学碾压与硬核工程守门」
-              </div>
-            </div>
-
-            <div className="flex items-center justify-around border-t-2 border-black pt-3 font-mono text-xs">
-              <div className="text-center">
-                <div className="text-[9px] text-[var(--cel-text-secondary,#94a3b8)]">NEURAL SYNC</div>
-                <div className="text-base font-bold text-[var(--cel-cyan,#00f0ff)]">99.8%</div>
-              </div>
-              <div className="h-6 w-px bg-black" />
-              <div className="text-center">
-                <div className="text-[9px] text-[var(--cel-text-secondary,#94a3b8)]">SAGA INTEGRITY</div>
-                <div className="text-base font-bold text-emerald-400">100% PASS</div>
-              </div>
-              <div className="h-6 w-px bg-black" />
-              <div className="text-center">
-                <div className="text-[9px] text-[var(--cel-text-secondary,#94a3b8)]">UI AESTHETICS</div>
-                <div className="text-base font-bold text-[var(--cel-crimson,#ff184c)]">3渲2 CEL-NPR</div>
-              </div>
-            </div>
+            </section>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="card text-xs text-ink-dim mt-4">
-        <SectionTitle>Data Source & Known Gaps (缺标比错标安全)</SectionTitle>
-        <ul className="space-y-1 list-disc pl-4 text-ink-dim">
-          <li>Gantt / Burndown 已迁移至本视图，由全局 store 统一驱动。</li>
-          <li>Cost 真实数据: <span className="font-mono text-ink-mute">/api/analytics/cost</span> 待接入真实流。</li>
-          <li>Token 真实数据: <span className="font-mono text-ink-mute">/api/analytics/tokens</span> 待接入。</li>
-        </ul>
-      </div>
+        {activeTab === "运维" && (
+          <div className="max-w-7xl mx-auto space-y-4">
+            <section className="bg-bg-card rounded-xl border border-line p-4">
+              <h2 className="text-sm font-bold text-ink mb-3">运维指标 (对接 MetricsTab / LogAITab)</h2>
+              <p className="text-xs text-ink-dim">集成 /ops (运维控制台) 与 star-api-rest / canvas-engine 等服务指标</p>
+              <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                {[
+                  { label: "API 可用性", value: "99.97%", color: "text-ok" },
+                  { label: "P95 延迟", value: "142ms", color: "text-info" },
+                  { label: "错误率", value: "0.03%", color: "text-ok" },
+                  { label: "事件积压", value: "12", color: "text-warn" },
+                ].map((m, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-bg-soft border border-line">
+                    <span className="text-ink-dim">{m.label}</span>
+                    <p className={`font-mono text-ink ${m.color} mt-0.5`}>{m.value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === "审计日志" && (
+          <div className="max-w-7xl mx-auto space-y-4">
+            <section className="bg-bg-card rounded-xl border border-line p-4">
+              <h2 className="text-sm font-bold text-ink mb-3">审计日志</h2>
+              <p className="text-xs text-ink-dim mb-3">系统关键操作记录 (登录 / 权限变更 / 部署 / 删除 等)</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-ink-dim border-b border-line">
+                      <th className="py-2 px-3">时间</th>
+                      <th className="py-2 px-3">用户</th>
+                      <th className="py-2 px-3">操作</th>
+                      <th className="py-2 px-3">资源</th>
+                      <th className="py-2 px-3">结果</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { time: "2026-11-14 10:23", user: "Ulysses", action: "部署", resource: "canvas-engine 0.3.2", result: "成功" },
+                      { time: "2026-11-14 09:45", user: "Agent A1", action: "权限变更", resource: "worktree wt-001", result: "成功" },
+                      { time: "2026-11-14 08:12", user: "Ulysses", action: "删除", resource: "work-item T-098", result: "失败" },
+                      { time: "2026-11-13 18:30", user: "System", action: "定时备份", resource: "全库", result: "成功" },
+                    ].map((log, i) => (
+                      <tr key={i} className="border-b border-line/50 hover:bg-bg-soft">
+                        <td className="py-2 px-3 font-mono text-ink-dim">{log.time}</td>
+                        <td className="py-2 px-3 text-ink">{log.user}</td>
+                        <td className="py-2 px-3 text-ink">{log.action}</td>
+                        <td className="py-2 px-3 font-mono text-ink-dim">{log.resource}</td>
+                        <td className="py-2 px-3">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${log.result === "成功" ? "bg-ok/10 text-ok" : "bg-err/10 text-err"}`}>{log.result}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

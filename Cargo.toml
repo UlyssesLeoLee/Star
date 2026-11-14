@@ -62,6 +62,10 @@ members = [
     "crates/star-mcp",
     # WBS 6.5.2 (2026-11-14) 新增 crates/sandboxd (Sandbox-as-a-Service 独立 daemon, per SRS-SANDBOX-002 / BD-SANDBOX-002 / DD-SANDBOX-002 / docs/architecture/SANDBOX-002.md)
     "crates/sandboxd",
+    # nema-codec: 移植自 IDE1.0 (MIT 授权, per REUSE-MAP-COLLAB-SANDBOX-001 §4 v0.2 2026-11-14)
+    "crates/nema-codec",
+    # nema-codec-wasm: wasm-bindgen 绑定, 前端替换 lib/nema/nema.ts
+    "crates/nema-codec-wasm",
     # WBS 6.2 (2026-11-14) 新增 crates/star-agent-runtime (STAR Agent Runtime 双模式骨架, per SRS-STAR-AGENT-RUNTIME-001 / ADR-0044)
     "crates/star-agent-runtime",
     # Phase OPS-INTRY: 2026-09-08 新增 crates/star-ops (Ops Console MVP-骨架, per SRS-STAR-OPS-001.md v0.1)

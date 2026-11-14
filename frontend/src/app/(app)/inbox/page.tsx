@@ -1,32 +1,43 @@
+/*
+@cypher schema=1 source_sha256=89ce0730ffd95f604388ef98d3c047bc18ab93665fd8970de902d4e9faa1a63e
+MERGE (self:File {path:"frontend/src/app/(app)/inbox/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/(app)/inbox/page.tsx::InboxPage",kind:"component"})
+MERGE (self)-[:DEFINES]->(page)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
-// /inbox — Tactical Speech Comms & Transmission Feed (战术通信与指令流)
-// =====================================================================
-// 全面应用 3渲2 (3D-to-2D NPR Cel-Shaded) 艺术级日漫科技美学:
-//   1. Tactical Speech Bubble 漫画对白气泡架构
-//   2. 3D Cel-Beacon 状态指示器与阶梯墨边
-//   3. 独立双主题自适应与低认知负荷排版
+// /inbox — 收件箱 (per 2026-11-14 参考 mockup: Inbox.dc.html)
+// 分类 tabs (全部/评审请求/评论/通知) + 消息列表 + 右侧详情面板
+// 保留真实功能: read/unread toggle + /api/notifications 联动
 // =====================================================================
 
 import { useEffect, useState } from "react";
-import { PageHeader, SectionTitle } from "@/components/PageHeader";
-import { StatusPill } from "@/components/StatusPill";
-import { Inbox, Bell, Radio, CheckCircle, ShieldAlert } from "lucide-react";
+import { Bell, GitBranch, MessageSquare, CheckCircle2, X } from "lucide-react";
+import { clsx } from "clsx";
 import { MOCK_NOTIFS_FALLBACK } from "@/mocks/data";
 import type { MockNotif } from "@/mocks/schemas/inbox";
 import { useTranslation } from "@/lib/i18n";
-import { CelBeacon3D } from "@/components/effects/Cel3DUI";
-import { CelCard3D } from "@/components/effects/CelCard3D";
+
+type Category = "全部" | "评审请求" | "评论" | "通知";
+
+// 分类映射: mock 通知按 subject/body 特征归类 (per mockup 的分类结构)
+function categoryOf(n: MockNotif): Exclude<Category, "全部"> {
+  const text = `${n.subject} ${n.body}`;
+  if (/PR|评审|review|Review/i.test(text)) return "评审请求";
+  if (/评论|comment|Comment/i.test(text)) return "评论";
+  return "通知";
+}
 
 export default function InboxPage() {
   const { t } = useTranslation();
   const [notifs, setNotifs] = useState<ReadonlyArray<MockNotif>>(MOCK_NOTIFS_FALLBACK);
-
-  // local-only read/unread toggle
   const [readSet, setReadSet] = useState<Set<string>>(
     () => new Set(MOCK_NOTIFS_FALLBACK.filter((n) => n.read).map((n) => n.id)),
   );
+  const [activeCategory, setActiveCategory] = useState<Category>("全部");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/notifications")
@@ -40,7 +51,7 @@ export default function InboxPage() {
       });
   }, []);
 
-  const toggle = (id: string) => {
+  const toggleRead = (id: string) => {
     setReadSet((prev) => {
       const next = new Set(prev);
       const wasRead = next.has(id);
@@ -53,121 +64,121 @@ export default function InboxPage() {
       return next;
     });
   };
+
+  const visible = activeCategory === "全部"
+    ? notifs
+    : notifs.filter((n) => categoryOf(n) === activeCategory);
   const unread = notifs.filter((n) => !readSet.has(n.id)).length;
+  const selected = notifs.find((n) => n.id === selectedId) ?? visible[0] ?? null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-6" data-testid="inbox-page">
-      <PageHeader
-        title={t.pageTitles['/inbox'].title}
-        subtitle="Tactical Comms Stream & Neural Audit Feed (战术通信与指令审计流)"
-        icon={<Inbox className="text-[var(--cel-cyan,#00f0ff)]" size={22} />}
-        count={`${unread} unread`}
-      />
-
-      {/* Tactical Speech Bubble Briefing Card (from chrono-vibe with 3渲2 触觉物理卡片) */}
-      <CelCard3D>
-        <div className="card relative overflow-hidden clip-hud-corner">
-          <div className="flex items-center justify-between border-b-2 border-[var(--cel-ink,#000)] pb-2.5 mb-3.5">
-            <h3 className="text-sm font-black uppercase tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-              <Radio size={15} className="text-[var(--cel-crimson,#ff184c)] animate-pulse" />
-              <span>TACTICAL TRANSMISSION // CHANNEL 01</span>
-            </h3>
-            <span className="text-xs font-mono font-bold bg-[var(--cel-surface-stage,#000)] text-[var(--cel-gold,#ffc400)] px-2.5 py-0.5 border border-[var(--cel-ink,#000)]">
-              HIGH PRIORITY
-            </span>
-          </div>
-
-          <div className="border-2 border-[var(--cel-ink,#000)] p-4 bg-[var(--cel-surface-stage,#090d16)] cel-shadow relative">
-            <p className="text-sm font-medium leading-relaxed text-[var(--cel-text-primary,#ffffff)]">
-              <strong className="text-[var(--cel-crimson,#ff184c)] font-black mr-2">[MAVIS // 統制官]:</strong>
-              「全站 3渲2 视觉构架已接入中央通信信道。所有领域状态流转均以高对比度墨线阶梯卡片呈现，零脏状态逃逸，随时执行战术派发！」
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-3">
-            <span className="flex items-center gap-1.5">
-              <span className="size-2 bg-emerald-400 border border-[var(--cel-ink,#000)] rotate-45" />
-              COGNITIVE LOAD: 0.12 (OPTIMAL)
-            </span>
-            <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">CHARISMA: MAXIMAL</span>
-          </div>
+    <div className="flex h-full flex-col bg-bg" data-testid="inbox-page">
+      {/* 头部: 全局 / 收件箱 */}
+      <header className="border-b border-line bg-bg-card px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-ink-dim">全局</span>
+          <span className="text-ink-dim">/</span>
+          <h1 className="font-bold text-ink">收件箱</h1>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-err/10 text-err font-semibold" data-testid="inbox-unread-count">
+            {unread}
+          </span>
         </div>
-      </CelCard3D>
+      </header>
 
-      {/* Notifications Inked Feed */}
-      <div className="card">
-        <SectionTitle
-          action={
-            <span className="text-xs font-mono font-bold text-[var(--cel-gold,#ffc400)]">
-              {unread} UNREAD / {notifs.length} TOTAL
-            </span>
-          }
-        >
-          Transmissions 〔受信通知一覧〕
-        </SectionTitle>
+      {/* 分类 tabs */}
+      <div data-testid="inbox-categories" className="border-b border-line bg-bg-card px-3 flex items-center gap-1">
+        {(["全部", "评审请求", "评论", "通知"] as const).map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setActiveCategory(cat)}
+            data-testid={`inbox-category-${cat}`}
+            className={clsx(
+              "px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
+              activeCategory === cat
+                ? "border-accent text-accent font-semibold"
+                : "border-transparent text-ink-dim hover:text-ink",
+            )}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
 
-        <ul className="space-y-3" data-testid="inbox-list">
-          {notifs.map((n, idx) => {
+      {/* 列表 + 详情 */}
+      <div className="flex flex-1 min-h-0">
+        {/* 消息列表 */}
+        <ul className="w-96 shrink-0 border-r border-line overflow-y-auto" data-testid="inbox-list">
+          {visible.map((n) => {
             const isRead = readSet.has(n.id);
+            const cat = categoryOf(n);
             return (
               <li
                 key={n.id}
                 data-testid={`inbox-item-${n.id}`}
-                className={`p-4 border-2 border-[var(--cel-ink,#000)] transition-all flex items-start gap-3.5 ${
-                  isRead
-                    ? "bg-[var(--cel-surface-stage,#090d16)] opacity-75"
-                    : "bg-[var(--cel-surface-sub,#151c2c)] cel-shadow hover:-translate-x-0.5 hover:-translate-y-0.5"
-                }`}
+                onClick={() => setSelectedId(n.id)}
+                className={clsx(
+                  "px-4 py-3 border-b border-line/60 cursor-pointer transition-colors",
+                  selectedId === n.id ? "bg-accent/5 border-l-2 border-l-accent" : "hover:bg-bg-soft/60",
+                  isRead && "opacity-60",
+                )}
               >
-                <div className="shrink-0 mt-1">
-                  <CelBeacon3D
-                    status={isRead ? "idle" : idx % 2 === 0 ? "active" : "success"}
-                    size={28}
-                    title={isRead ? "Read" : "Unread Transmission"}
-                  />
+                <div className="flex items-center gap-2">
+                  <span className={clsx(
+                    "text-[10px] px-1.5 py-0.5 rounded border shrink-0",
+                    cat === "评审请求" ? "bg-accent/10 text-accent border-accent/40" :
+                    cat === "评论" ? "bg-info/10 text-info border-info/40" : "bg-bg-soft text-ink-dim border-line",
+                  )}>
+                    {cat}
+                  </span>
+                  <span className="font-mono text-xs font-semibold text-ink truncate flex-1">{n.subject}</span>
+                  {!isRead && <span className="size-1.5 rounded-full bg-accent shrink-0" />}
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-mono text-xs font-bold text-[var(--cel-crimson,#ff184c)]">
-                      [{String(idx + 1).padStart(2, "0")}]
-                    </span>
-                    <StatusPill value={isRead ? "read" : "pending"} size="xs" />
-                    <span className="text-sm font-bold text-[var(--cel-text-primary,#ffffff)] truncate">
-                      {n.subject}
-                    </span>
-                    <span className="font-mono text-xs text-[var(--cel-text-secondary,#94a3b8)] ml-auto shrink-0 bg-[var(--cel-surface-stage,#090d16)]/60 px-2 py-0.5 border border-[var(--cel-ink,#000)]">
-                      {n.ago}
-                    </span>
-                  </div>
-
-                  <div className="text-sm text-[var(--cel-text-secondary,#94a3b8)] leading-relaxed mt-1.5">
-                    {n.body}
-                  </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="text-xs text-ink-dim truncate">{n.body}</span>
+                  <span className="text-[10px] font-mono text-ink-mute shrink-0">{n.ago}</span>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => toggle(n.id)}
-                  aria-label={isRead ? "mark unread" : "mark read"}
-                  className="shrink-0 text-xs font-mono font-bold px-3 py-1.5 min-h-[32px] border-2 border-[var(--cel-ink,#000)] cel-shadow bg-[var(--cel-surface-stage,#090d16)] hover:bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] transition-colors"
-                >
-                  {isRead ? "UNREAD" : "READ"}
-                </button>
               </li>
             );
           })}
         </ul>
-      </div>
 
-      {/* P3 Notice */}
-      <div className="card text-sm text-[var(--cel-text-secondary,#94a3b8)]">
-        <SectionTitle>Notification Service — P3 规范</SectionTitle>
-        <ul className="space-y-1.5 list-disc pl-4">
-          <li>当前 read/unread 本地持久化，与 <span className="font-mono text-[var(--cel-cyan,#00f0ff)]">/api/notifications</span> PATCH 校验联动</li>
-          <li>实时 SSE 广播流对接 Phase I+ 战术信道</li>
-          <li>全要素遵循 3渲2 日漫科技美学与米勒定律三区信息聚合</li>
-        </ul>
+        {/* 详情面板 */}
+        <aside className="flex-1 min-w-0 overflow-y-auto p-4">
+          {selected ? (
+            <div data-testid="inbox-detail" className="bg-bg-card rounded-xl border border-line p-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={clsx(
+                  "text-[10px] px-1.5 py-0.5 rounded border",
+                  categoryOf(selected) === "评审请求" ? "bg-accent/10 text-accent border-accent/40" :
+                  categoryOf(selected) === "评论" ? "bg-info/10 text-info border-info/40" : "bg-bg-soft text-ink-dim border-line",
+                )}>
+                  {categoryOf(selected)} · {selected.ago}
+                </span>
+                <span className="font-mono text-xs text-ink-mute">{selected.subject}</span>
+              </div>
+              <h2 className="mt-2 text-base font-bold text-ink">{selected.subject}</h2>
+              <p className="mt-2 text-sm text-ink-dim leading-relaxed">{selected.body}</p>
+              <div className="mt-4 flex items-center gap-2">
+                <button type="button" data-testid="inbox-open-branch" className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent/90">
+                  <GitBranch size={12} /> 在 Branch 中打开
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleRead(selected.id)}
+                  data-testid="inbox-mark-read"
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
+                >
+                  <CheckCircle2 size={12} /> {readSet.has(selected.id) ? "标为未读" : "标为已读"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-ink-mute text-sm">
+              <Bell size={32} className="mb-2" /> 该分类暂无消息
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   );

@@ -4344,6 +4344,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "nema-codec"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "nema-codec-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "nema-codec",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures 0.4.80",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

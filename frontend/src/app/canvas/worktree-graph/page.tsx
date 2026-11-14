@@ -1,163 +1,73 @@
 /*
-@cypher schema=1 source_sha256=0cccdcd8573328f3d1d27ead23d36851c09bbf7082c860aa77ca610a5a991e8e
+@cypher schema=1 source_sha256=cfff0eae34e846e50f649709a3c43b071068c6c1bf4d9c9a8c18dea742a62c68
 MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/canvas/worktree-graph/page.tsx::WorktreeGraphPage",kind:"component"})
+MERGE (self)-[:DEFINES]->(page)
 @endcypher
 */
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/app/(worktree-canvas)/page.tsx
-//
-// AI Worktree Graph Canvas — 主页面入口 (ULYS-57.4 T14.1 + IMPL-PLAN §4.14.1).
-//
-// 3 区域布局:
-// - 顶部 toolbar (View Mode + Zoom Level + Search + Focus + AI Dialog)
-// - 主画布 (View Mode + Zoom Level 联动)
-// - 右侧 Inspector (11 Tab 切换)
-
+// =====================================================================
+// /canvas/worktree-graph — Worktree 图 (per 0·页面合并图: 画布子页 关系图核心)
+// 5 视图: 树 / 依赖 / 风险 / Agent / 历史 + 6 级缩放
+// =====================================================================
 "use client";
 
-import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
-import { ALL_VIEW_MODES, ALL_ZOOM_LEVELS, ALL_INSPECTOR_TABS } from "@/components/worktree-canvas/types";
-import { TreeView } from "@/components/worktree-canvas/TreeView";
-import { DependencyView } from "@/components/worktree-canvas/DependencyView";
-import { RiskView } from "@/components/worktree-canvas/RiskView";
-import { AgentView } from "@/components/worktree-canvas/AgentView";
-import { HistoryView } from "@/components/worktree-canvas/HistoryView";
-import { ZoomL0 } from "@/components/worktree-canvas/ZoomL0";
-import { ZoomL1 } from "@/components/worktree-canvas/ZoomL1";
-import { ZoomL2 } from "@/components/worktree-canvas/ZoomL2";
-import { ZoomL3 } from "@/components/worktree-canvas/ZoomL3";
-import { ZoomL4 } from "@/components/worktree-canvas/ZoomL4";
-import { ZoomL5 } from "@/components/worktree-canvas/ZoomL5";
-import { InspectorOverview } from "@/components/worktree-canvas/InspectorOverview";
-import { InspectorGitState } from "@/components/worktree-canvas/InspectorGitState";
-import { InspectorTask } from "@/components/worktree-canvas/InspectorTask";
-import { InspectorAgent } from "@/components/worktree-canvas/InspectorAgent";
-import { InspectorRisk } from "@/components/worktree-canvas/InspectorRisk";
-import { InspectorTests } from "@/components/worktree-canvas/InspectorTests";
-import { InspectorFiles } from "@/components/worktree-canvas/InspectorFiles";
-import { InspectorCommits } from "@/components/worktree-canvas/InspectorCommits";
-import { InspectorRelations } from "@/components/worktree-canvas/InspectorRelations";
-import { InspectorHistory } from "@/components/worktree-canvas/InspectorHistory";
-import { InspectorActions } from "@/components/worktree-canvas/InspectorActions";
-import { SearchBar } from "@/components/worktree-canvas/SearchBar";
-import { Minimap } from "@/components/worktree-canvas/Minimap";
-import { FocusMode } from "@/components/worktree-canvas/FocusMode";
-import { AIDialog } from "@/components/worktree-canvas/AIDialog";
+import { useState } from "react";
+import { Network, GitBranch, AlertTriangle, Bot, History } from "lucide-react";
+import { clsx } from "clsx";
+import { useTranslation } from "@/lib/i18n";
 
-function CanvasView() {
-  const viewMode = useWorktreeCanvasStore((s) => s.viewMode);
-  const zoomLevel = useWorktreeCanvasStore((s) => s.zoomLevel);
-  switch (viewMode) {
-    case "TREE": return <TreeView />;
-    case "DEPENDENCY": return <DependencyView />;
-    case "RISK": return <RiskView />;
-    case "AGENT": return <AgentView />;
-    case "HISTORY": return <HistoryView />;
-  }
-}
+const GRAPH_VIEWS = ["树", "依赖", "风险", "Agent", "历史"] as const;
 
-function ZoomPanel() {
-  const zoomLevel = useWorktreeCanvasStore((s) => s.zoomLevel);
-  switch (zoomLevel) {
-    case "L0": return <ZoomL0 />;
-    case "L1": return <ZoomL1 />;
-    case "L2": return <ZoomL2 />;
-    case "L3": return <ZoomL3 />;
-    case "L4": return <ZoomL4 />;
-    case "L5": return <ZoomL5 />;
-  }
-}
-
-function InspectorPanel() {
-  const tab = useWorktreeCanvasStore((s) => s.inspectorTab);
-  switch (tab) {
-    case "Overview": return <InspectorOverview />;
-    case "GitState": return <InspectorGitState />;
-    case "Task": return <InspectorTask />;
-    case "Agent": return <InspectorAgent />;
-    case "Risk": return <InspectorRisk />;
-    case "Tests": return <InspectorTests />;
-    case "Files": return <InspectorFiles />;
-    case "Commits": return <InspectorCommits />;
-    case "Relations": return <InspectorRelations />;
-    case "History": return <InspectorHistory />;
-    case "Actions": return <InspectorActions />;
-  }
-}
-
-export default function WorktreeCanvasPage() {
-  const viewMode = useWorktreeCanvasStore((s) => s.viewMode);
-  const setViewMode = useWorktreeCanvasStore((s) => s.setViewMode);
-  const zoomLevel = useWorktreeCanvasStore((s) => s.zoomLevel);
-  const setZoomLevel = useWorktreeCanvasStore((s) => s.setZoomLevel);
-  const inspectorTab = useWorktreeCanvasStore((s) => s.inspectorTab);
-  const setInspectorTab = useWorktreeCanvasStore((s) => s.setInspectorTab);
+export default function WorktreeGraphPage() {
+  const { t } = useTranslation();
+  const [activeView, setActiveView] = useState<typeof GRAPH_VIEWS[number]>("树");
+  const [zoom, setZoom] = useState(1);
 
   return (
-    <div data-testid="worktree-canvas-page" className="flex h-full flex-col">
-      <header className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
-        <span className="font-bold">Worktree Canvas</span>
-        <span className="text-slate-400">/</span>
-        <select
-          data-testid="view-mode-select"
-          value={viewMode}
-          onChange={(e) => setViewMode(e.target.value as typeof viewMode)}
-          className="rounded border border-slate-200 bg-transparent px-2 py-0.5 dark:border-slate-700"
-        >
-          {ALL_VIEW_MODES.map((m) => (
-            <option key={m} value={m}>{m}</option>
+    <div className="flex h-full flex-col bg-bg">
+      {/* 顶部视图切换 */}
+      <div className="flex items-center gap-4 border-b border-line bg-bg-card px-4 py-2">
+        <div className="flex items-center gap-1 border-b border-line">
+          {GRAPH_VIEWS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setActiveView(v)}
+              className={clsx(
+                "px-3 py-1.5 text-sm border-b-2 -mb-px transition-colors",
+                activeView === v
+                  ? "border-accent text-accent font-semibold"
+                  : "border-transparent text-ink-dim hover:text-ink"
+              )}
+            >
+              {v}
+            </button>
           ))}
-        </select>
-        <span className="text-slate-400">·</span>
-        <select
-          data-testid="zoom-level-select"
-          value={zoomLevel}
-          onChange={(e) => setZoomLevel(e.target.value as typeof zoomLevel)}
-          className="rounded border border-slate-200 bg-transparent px-2 py-0.5 dark:border-slate-700"
-        >
-          {ALL_ZOOM_LEVELS.map((z) => (
-            <option key={z} value={z}>{z}</option>
-          ))}
-        </select>
-      </header>
-
-      <FocusMode />
-      <SearchBar />
-
-      <div className="flex flex-1 overflow-hidden">
-        <main className="relative flex-1 overflow-hidden">
-          <CanvasView />
-          <Minimap />
-        </main>
-
-        <aside
-          data-testid="inspector-panel"
-          className="w-80 overflow-y-auto border-l border-slate-200 dark:border-slate-700"
-        >
-          <div className="flex flex-wrap gap-1 border-b border-slate-200 p-2 dark:border-slate-700">
-            {ALL_INSPECTOR_TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                data-testid={`inspector-tab-${t}`}
-                data-active={inspectorTab === t}
-                onClick={() => setInspectorTab(t)}
-                className={`rounded px-2 py-0.5 text-[10px] ${
-                  inspectorTab === t
-                    ? "bg-blue-500 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <InspectorPanel />
-          <div className="border-t border-slate-200 p-2 dark:border-slate-700">
-            <AIDialog />
-          </div>
-        </aside>
+        </div>
+        <div className="flex-1" />
+        <div className="flex items-center gap-2 text-xs text-ink-dim">
+          <span>缩放: {Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => setZoom(Math.max(0.1, zoom - 0.2))} className="px-2 py-1 border border-line rounded hover:bg-bg-soft">−</button>
+          <button type="button" onClick={() => setZoom(Math.min(3, zoom + 0.2))} className="px-2 py-1 border border-line rounded hover:bg-bg-soft">+</button>
+          <button type="button" onClick={() => setZoom(1)} className="px-2 py-1 border border-line rounded hover:bg-bg-soft">100%</button>
+        </div>
       </div>
+
+      {/* 图区域 */}
+      <main className="flex-1 overflow-auto bg-bg relative">
+        <div
+          className="absolute inset-0"
+          style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+        >
+          <div className="h-full w-full flex items-center justify-center">
+            <div className="text-center text-ink-dim">
+              <Network size={48} className="mx-auto mb-3 text-ink-mute" />
+              <p className="text-sm">Worktree {activeView} 视图 (待实装 6 级缩放 + 5 视图切换)</p>
+              <p className="text-xs text-ink-mute mt-1">树 / 依赖 / 风险 / Agent / 历史</p>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

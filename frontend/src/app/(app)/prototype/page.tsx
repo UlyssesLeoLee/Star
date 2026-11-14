@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=42602cf8fab1e64fb0c1182f5f174c5e792ba95136c80f8d4f466981c3751851
+@cypher schema=1 source_sha256=0b63c321926967237e04ba296ab47eb8449268f4c4c83d0f66d61f53ef2b5d2f
 MERGE (self:File {path:"frontend/src/app/(app)/prototype/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/prototype/page.tsx::PrototypePage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -13,7 +13,7 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Layout,
   Network,
@@ -36,8 +36,48 @@ import {
   Palette,
   Settings2,
   GitBranch,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 import { clsx } from "clsx";
+
+// =====================================================================
+// GemArc MCP 集成 (per INTEGRATION-MAP-GITHUB-REPOS-001 §2.1)
+// 流水线 建模→校验→推演→构建→验证→导出 = GemArc tools
+//   gemarc_brief(建模) → gemarc_validate(校验) → gemarc_simulate(推演)
+//   → gemarc_build(构建) → gemarc_verify(验证)
+// 经 /api/gemarc 代理调用本地 GemArc Streamable HTTP (E:\\GemArc)
+// =====================================================================
+interface GemArcStep {
+  id: string;
+  label: string;
+  tool: string;
+}
+
+const GEMARC_PIPELINE: GemArcStep[] = [
+  { id: "brief", label: "建模", tool: "gemarc_brief" },
+  { id: "validate", label: "校验", tool: "gemarc_validate" },
+  { id: "simulate", label: "推演", tool: "gemarc_simulate" },
+  { id: "build", label: "构建", tool: "gemarc_build" },
+  { id: "verify", label: "验证", tool: "gemarc_verify" },
+  { id: "export", label: "导出", tool: "gemarc_render" },
+];
+
+async function callGemArc(tool: string, args: Record<string, unknown>, source: "local" | "remote") {
+  const res = await fetch("/api/gemarc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name: tool, arguments: args, _meta: { source: source === "remote" ? "remote" : "local" } } }),
+  });
+  if (!res.ok) throw new Error(`gemarc ${tool}: HTTP ${res.status}`);
+  const payload = await res.json();
+  if (payload?.error) throw new Error(`gemarc ${tool}: ${payload.error.message ?? JSON.stringify(payload.error)}`);
+  const content = payload?.result?.content;
+  if (Array.isArray(content)) {
+    return content.map((c: { text?: string }) => c.text ?? "").join("\n");
+  }
+  return JSON.stringify(payload?.result ?? payload);
+}
 
 const GEN_TYPES = [
   { id: "ui", icon: Layout, label: "UI 界面", sub: "可点击的多页面" },
@@ -55,6 +95,47 @@ const PIPELINE = ["建模", "校验", "推演", "构建", "验证", "导出"] as
 export default function PrototypePage() {
   const [genType, setGenType] = useState("ui");
   const [device, setDevice] = useState<"mobile" | "desktop">("mobile");
+  const [dataSource, setDataSource] = useState<"sample" | "branch">("sample");
+  const [prompt, setPrompt] = useState("做一个手机端的关系查询界面，能切换出边、入边、环路径");
+  const [gemarcStatus, setGemarcStatus] = useState<"checking" | "up" | "down">("checking");
+  const [runningStep, setRunningStep] = useState<string | null>(null);
+  const [pipelineLog, setPipelineLog] = useState<string>("");
+
+  // GemArc 健康检查 (本地 full + 远端 stateless 双通道)
+  useEffect(() => {
+    fetch("/api/gemarc", { method: "GET" })
+      .then((r) => r.json())
+      .then((d: { local?: { status?: string }; remote?: { status?: string } }) => {
+        const localUp = d?.local?.status === "ok";
+        const remoteUp = d?.remote?.status === "ok";
+        if (localUp && dataSource === "branch") setGemarcStatus("up");
+        else if (remoteUp && dataSource === "sample") setGemarcStatus("up");
+        else if (localUp || remoteUp) setGemarcStatus("up");
+        else setGemarcStatus("down");
+      })
+      .catch(() => setGemarcStatus("down"));
+  }, [dataSource]);
+
+  // 真实流水线执行 (建模→校验→推演→构建→验证)
+  const runPipeline = useCallback(async () => {
+    setPipelineLog("");
+    for (const step of GEMARC_PIPELINE) {
+      setRunningStep(step.id);
+      try {
+        const out = await callGemArc(
+          step.tool,
+          { project: "prototype-demo", query: prompt, note: `device=${device}` },
+          dataSource === "sample" ? "remote" : "local",
+        );
+        setPipelineLog((prev) => `${prev}\n[${step.label}] ${out.slice(0, 300)}`);
+      } catch (err) {
+        setPipelineLog((prev) => `${prev}\n[${step.label}] 失败: ${String(err)}`);
+        setRunningStep(null);
+        return;
+      }
+    }
+    setRunningStep(null);
+  }, [prompt, device, dataSource]);
 
   return (
     <div className="flex flex-col h-full bg-bg">
@@ -107,16 +188,30 @@ export default function PrototypePage() {
             <textarea
               data-testid="prototype-prompt"
               rows={4}
-              defaultValue="做一个手机端的关系查询界面，能切换出边、入边、环路径"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
               className="w-full rounded-xl border border-line bg-bg-card p-3.5 text-sm text-ink focus:border-accent focus:outline-none shadow-soft"
             />
             <p className="text-xs text-ink-dim">
-              已生成 3 个页签的可点击原型，数据来自示例。可以把数据来源切到当前 Branch 的接口。
+              已生成 3 个页签的可点击原型，数据来自{dataSource === "sample" ? "示例" : "当前 Branch 的接口"}。
+              <span className="font-mono">建模→校验→推演→构建→验证→导出 = GemArc MCP tools</span>
             </p>
+            {pipelineLog && (
+              <pre data-testid="prototype-pipeline-log" className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-line bg-bg-soft p-2.5 text-[10px] font-mono text-ink-dim whitespace-pre-wrap">
+                {pipelineLog}
+              </pre>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-xs text-ink-dim flex-1">描述你要的原型</span>
-              <button type="button" data-testid="prototype-generate" className="text-xs px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft font-semibold">
-                生成
+              <button
+                type="button"
+                onClick={() => void runPipeline()}
+                disabled={runningStep !== null || gemarcStatus !== "up"}
+                data-testid="prototype-generate"
+                className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft font-semibold disabled:opacity-50"
+              >
+                {runningStep !== null ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                生成 (GemArc 流水线)
               </button>
               <button type="button" className="text-xs px-3 py-2 rounded-lg border border-line text-ink-dim hover:border-accent/60">
                 从模板
@@ -261,8 +356,23 @@ export default function PrototypePage() {
 
         <span className="flex items-center gap-1.5">
           <span className="text-ink-dim">数据来源</span>
-          <span className="px-2 py-0.5 rounded border border-accent/50 bg-accent/10 text-accent">示例数据（原型用）</span>
-          <span className="px-2 py-0.5 rounded border border-line text-ink-dim flex items-center gap-1"><GitBranch size={11} /> 当前 Branch 的接口</span>
+          <button
+            type="button"
+            onClick={() => setDataSource("sample")}
+            className={clsx("px-2 py-0.5 rounded border", dataSource === "sample" ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-dim")}
+          >
+            示例数据（原型用）
+          </button>
+          <button
+            type="button"
+            onClick={() => setDataSource("branch")}
+            className={clsx("px-2 py-0.5 rounded border flex items-center gap-1", dataSource === "branch" ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-dim")}
+          >
+            <GitBranch size={11} /> 当前 Branch 的接口
+          </button>
+          <span data-testid="prototype-gemarc-status" className={clsx("flex items-center gap-1 text-[10px] font-mono", gemarcStatus === "up" ? "text-ok" : gemarcStatus === "down" ? "text-err" : "text-ink-mute")}>
+            {gemarcStatus === "up" ? "● GemArc MCP 在线" : gemarcStatus === "down" ? "○ GemArc MCP 离线" : "… GemArc 检测中"}
+          </span>
         </span>
 
         <span className="mx-1 w-px h-4 bg-bg-soft" />

@@ -1,12 +1,82 @@
 [
-  { "id": "n-001", "kind": "agent_decision_required", "subject": "ag-005 awaiting decision",         "body": "Spec excerpt conflicts with INV-RT-03, please confirm",     "read": false, "ago": "2 min ago" },
-  { "id": "n-002", "kind": "ci_failed",                "subject": "CI failed: Physis-builder #482", "body": "test:integration:rt_step failed 3/12",                     "read": false, "ago": "8 min ago" },
-  { "id": "n-003", "kind": "review_requested",         "subject": "Review: feat/w2-gantt → main",   "body": "@Ulysses review required (5 files, +420 -118)",             "read": false, "ago": "23 min ago"},
-  { "id": "n-004", "kind": "merge_conflict",           "subject": "Merge conflict on planning/page", "body": "Resolve conflict before pushing (per §4 fix/*)",          "read": true,  "ago": "1 h ago"   },
-  { "id": "n-005", "kind": "budget_alert",             "subject": "Budget 80% used",                "body": "ag-002 Physis-builder hit $4.00/$5.00 daily cap",           "read": false, "ago": "1 h ago"   },
-  { "id": "n-006", "kind": "policy_violation",         "subject": "Policy violation: INV-FB-02",    "body": "ag-005 reported feedback required, lease paused",          "read": true,  "ago": "2 h ago"   },
-  { "id": "n-007", "kind": "feedback_question",        "subject": "ag-007 asks: which spec?",       "body": "Multiple matches for SPEC-001 vs SPEC-002",                "read": false, "ago": "3 h ago"   },
-  { "id": "n-008", "kind": "ci_failed",                "subject": "CI failed: Star-frontend #117",  "body": "typecheck exit 1 — see log",                                "read": true,  "ago": "5 h ago"   },
-  { "id": "n-009", "kind": "review_requested",         "subject": "Review: DTL-036 v1.4 hotfix",    "body": "3 P1/P2/P3 violations — please review",                    "read": true,  "ago": "1 d ago"   },
-  { "id": "n-010", "kind": "budget_alert",             "subject": "Weekly cost summary",            "body": "Total $87.42 across 5 agents (down 12% vs last week)",     "read": true,  "ago": "2 d ago"   }
+  {
+    "id": "n-001",
+    "kind": "review_requested",
+    "subject": "PR #44 TASK-143 关系权重",
+    "body": "请你评审 · Agent A 提交了关系权重实现，验证 2/2 通过，等待人工闸门放行",
+    "read": false,
+    "ago": "2 分钟前"
+  },
+  {
+    "id": "n-002",
+    "kind": "feedback_question",
+    "subject": "评论 TASK-142 BFS 环检测",
+    "body": "Agent B：自环判定已补，需要确认是否输出完整环路径",
+    "read": false,
+    "ago": "15 分钟前"
+  },
+  {
+    "id": "n-003",
+    "kind": "merge_conflict",
+    "subject": "通知 wt-context-cache 已回退",
+    "body": "Worktree 已回退到 dev 基线",
+    "read": false,
+    "ago": "1 小时前"
+  },
+  {
+    "id": "n-004",
+    "kind": "merge_conflict",
+    "subject": "fix/cache-ttl 有 2 处冲突待解决",
+    "body": "评审请求 · 与 dev 基线冲突，需要人工确认保留哪一侧",
+    "read": false,
+    "ago": "3 小时前"
+  },
+  {
+    "id": "n-005",
+    "kind": "agent_decision_required",
+    "subject": "LANE auth-refactor 进入 P6",
+    "body": "通知 Physis / GVPE · 测试阶段开始，请确认验收入口",
+    "read": false,
+    "ago": "昨天"
+  },
+  {
+    "id": "n-006",
+    "kind": "ci_failed",
+    "subject": "CI failed: Star-frontend #117",
+    "body": "typecheck exit 1 — see log",
+    "read": true,
+    "ago": "5 小时前"
+  },
+  {
+    "id": "n-007",
+    "kind": "budget_alert",
+    "subject": "Agent 预算 80% 已用",
+    "body": "ag-002 Physis-builder hit $4.00/$5.00 daily cap",
+    "read": true,
+    "ago": "1 小时前"
+  },
+  {
+    "id": "n-008",
+    "kind": "policy_violation",
+    "subject": "Policy violation: INV-FB-02",
+    "body": "ag-005 reported feedback required, lease paused",
+    "read": true,
+    "ago": "2 小时前"
+  },
+  {
+    "id": "n-009",
+    "kind": "review_requested",
+    "subject": "Review: feat/w2-gantt → main",
+    "body": "@Ulysses review required (5 files, +420 -118)",
+    "read": true,
+    "ago": "23 分钟前"
+  },
+  {
+    "id": "n-010",
+    "kind": "budget_alert",
+    "subject": "Weekly cost summary",
+    "body": "Total $87.42 across 5 agents (down 12% vs last week)",
+    "read": true,
+    "ago": "2 天前"
+  }
 ]

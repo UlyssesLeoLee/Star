@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c407d1bbbb45758a16cce5d196df3222ddecfc558f4b0bc6b6d17855d45de8b9
+@cypher schema=1 source_sha256=38416908b6b67820c16e958240b7cf0e5c812044e2f08e600bc3838c2c19bfb4
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -98,6 +98,7 @@ import dynamic from "next/dynamic";
 import { ProjectWorktreeLifecycleControls } from "./ProjectWorktreeLifecycleControls";
 import { AuthorizedProjectSelector, type AuthorizedProjectDirectoryState } from "./AuthorizedProjectSelector";
 import { GitBindingPanel } from "./GitBindingPanel";
+import { MagosLanePanel } from "@/components/magos/MagosLanePanel";
 import { BranchWorkspace } from "@/components/run/BranchWorkspace";
 import { findWorktreeGitBinding, useGitBindings } from "@/lib/group/gitBindingStore";
 
@@ -568,6 +569,8 @@ function WorktreePageInner() {
           <h1 className="text-xl font-semibold">{t.runDirectory.projectWorktreeIndexTitle}</h1>
           <p className="mt-1 text-xs text-ink-mute">{t.sidebar.projectDirectory}</p>
         </header>
+        {/* MAGOS 车道管理 (per INTEGRATION-MAP-GITHUB-REPOS-001 §2.2, web 版无宿主同样可用) */}
+        <MagosLanePanel />
         {/* per WBS §23.34: 未绑定 git 时, ProjectWorktree Index 首先显示绑定入口
             (GitHub/GitLab/自托管); 绑定后显示绑定行, 表格自动识别本地目录+远端 branch */}
         <GitBindingPanel />
@@ -605,6 +608,11 @@ function WorktreePageInner() {
         track="B"
         count={displayedWorktreeCount}
       />
+
+      {/* MAGOS 车道管理 (per INTEGRATION-MAP-GITHUB-REPOS-001 §2.2) */}
+      <div className="mb-4">
+        <MagosLanePanel />
+      </div>
 
       <section className="card mb-4 flex flex-wrap items-center gap-3" aria-label="项目 Worktree 范围">
         <label htmlFor="worktree-project" className="text-xs font-semibold text-ink-dim">Project</label>

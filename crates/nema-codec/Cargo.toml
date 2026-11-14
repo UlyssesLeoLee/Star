@@ -1,0 +1,26 @@
+# =====================================================================
+# nema-codec — NEMA v1.5 编解码器
+# 来源: IDE1.0 (E:\IDE1.0) crates/nema-codec @ a200e5d
+#   src/lib.rs         sha256 前缀 1a71ad20b81a161c
+#   src/interpreter.rs sha256 前缀 57d51a5e756ef30f
+# 许可: 权利人授权按 Star MIT 复用 (per docs/architecture/2026-11-14-ops-console/
+#   REUSE-MAP-COLLAB-SANDBOX-001.md §4 v0.2, 2026-11-14)
+# 落点: 替换前端 lib/nema/nema.ts 的规范子集解析; 后端 Rust 实现
+# =====================================================================
+[package]
+name = "nema-codec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+authors.workspace = true
+repository.workspace = true
+description = "NEMA v1.5 lossless structured text parser, token-aware transport codec (.nema / .nemat), graph layout engine, and IME1.0 lease arbitrator — 移植自 IDE1.0 (MIT 授权)"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
