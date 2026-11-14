@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fdd2258f3d44997c4a1f6b88164a432e7211009d876b1091cc2da7afbd5776df
+@cypher schema=1 source_sha256=d758001769deefc33d85ab93e4a5fc20d52333d8ccb108704db3856023d9d446
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -643,12 +643,12 @@ export const NAV_GROUPS: Record<NavGroupId, string[]> = {
   "home-core": ["worktree", "agents", "feedback", "validation", "review"],
   // per §1.2 个人区 (提及我/已关注/草稿 无页面 → 缺标, 只留 inbox)
   "home-personal": ["inbox"],
-  // per §1.2.1 /project + /planning → 项目; nema (文件即任务) 归工作入口
-  project: ["projects", "planning", "nema"],
-  // per §1.2.1 视图预设; canvas (无限画布入口) + refactor/search 为项目内视图族成员
-  view: ["kanban", "timeline", "backlog", "canvas", "refactor", "search"],
-  // per §1.2.1 管理 → 组织 (Workspace 无路由 → 缺标; Admin Console 移 admin-dev)
-  "admin-org": ["tenant", "identity", "permission"],
+  // per §1.2.1 /project + /planning → 项目; issues (Sprint) + nema (文件即任务) 归工作入口
+  project: ["projects", "planning", "issues", "nema"],
+  // per §1.2.1 视图预设; canvas + analytics (图表中心, per ui-detailed-design §2) + refactor/search
+  view: ["kanban", "timeline", "backlog", "canvas", "analytics", "refactor", "search"],
+  // per §1.2.1 管理 → 组织 (Workspace 无路由 → 缺标; settings = 租户全局配置)
+  "admin-org": ["tenant", "identity", "permission", "settings"],
   // per §1.2.1 管理 → 集成 (SCM/Integration/Notification + 新路由)
   "admin-integration": ["scm", "integration", "notification", "webhooks", "api-keys", "cli-profiles"],
   // per §1.2.1 管理 → 运维 (LocalRuntime/Audit/Automation/Collaboration + remote)
@@ -659,6 +659,8 @@ export const NAV_GROUPS: Record<NavGroupId, string[]> = {
     "workflow",
     "relation",
     "context",
+    "agent-windows",
+    "agent-view",
     "advanced-settings",
     "developer-console",
     "admin",
