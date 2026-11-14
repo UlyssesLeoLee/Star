@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=54aaad0dae8a3fae4e811e6f356b083671040f1f2645f47b60572f1728a3e8d8
+@cypher schema=1 source_sha256=2278a3d04bf1594da86e555797bd47ace1893df5f4288307fa411ebe5281c549
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
 MERGE (self)-[:IMPORTS]->(agentSettings)
@@ -361,6 +361,11 @@ interface StoreState {
   moveCanvasElement: (id: string, x: number, y: number) => void;
   /** 双击编辑 text/sticky (per WBS-BACKEND-SUPPORT-001 W3.4) */
   replaceCanvasElementContent: (id: string, contentPatch: Partial<CanvasElement["content"]>) => void;
+  replaceCanvasElements: (
+    els: Array<
+      Pick<CanvasElement, "id" | "canvas_id" | "kind" | "x" | "y" | "width" | "height" | "rotation" | "z_index" | "entity_ref" | "content" | "locked" | "hidden"> & { version?: number }
+    >
+  ) => void;
   deleteCanvasElement: (id: string) => void;
   addCanvasConnector: (connector: CanvasConnector) => void;
   setCanvasViewport: (canvasId: string, x: number, y: number, zoom: number) => void;
@@ -1046,6 +1051,19 @@ const initialState = (set: any, get?: any): StoreState => ({
       canvasElements: s.canvasElements.map((e) => e.id === id
         ? { ...e, content: { ...e.content, ...contentPatch }, updated_at: new Date().toISOString() }
         : e),
+    })),
+  replaceCanvasElements: (els) =>
+    set((s: StoreState) => ({
+      canvasElements: els.map((e) => {
+        const existing = s.canvasElements.find((x) => x.id === e.id);
+        // 撤销删除: 快照元素当前不存在 → 补齐元数据默认值恢复
+        const defaults: Partial<CanvasElement> = {
+          created_by: existing?.created_by ?? "usr-001",
+          created_at: existing?.created_at ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        return { ...defaults, ...existing, ...e } as CanvasElement;
+      }),
     })),
   addCanvasConnector: (connector) =>
     set((s: StoreState) => ({ canvasConnectors: [...s.canvasConnectors, connector] })),

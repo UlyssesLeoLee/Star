@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f6cd240d0f3542946a28346d18edbef89526b46aa3afb15d2a26ce12d33c1aff
+@cypher schema=1 source_sha256=72641aa03894b4987fdcf754d8bb813be4a8914ba6450608beeb42691c19f61c
 MERGE (self:File {path:"frontend/src/components/CanvasView.tsx"})
 MERGE (props:Type {id:"frontend/src/components/CanvasView.tsx::CanvasViewProps",kind:"interface"})
 MERGE (view:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -49,7 +49,7 @@ import type {
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "./StatusPill";
-import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush, Minus, MessageSquare, Eraser } from "lucide-react";
+import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush, Minus, MessageSquare, Eraser, Undo2, Redo2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
@@ -117,6 +117,15 @@ export function CanvasView(props: CanvasViewProps) {
   const [shapeKind, setShapeKind] = useState<ShapeKind>("rect");
   // 直线工具起点 (mousedown 记录, mouseup 提交 line element)
   const [lineStart, setLineStart] = useState<{ x: number; y: number } | null>(null);
+  // Space 临时平移 (Miro 标准, per 2026-11-14 调研)
+  const [spacePanning, setSpacePanning] = useState(false);
+  // 撤销/重做栈 (per WBS W3.2; 仅 store 模式 onCreateElement===undefined 时生效)
+  const undoStackRef = useRef<typeof elements[]>([]);
+  const redoStackRef = useRef<typeof elements[]>([]);
+  const pushUndoSnapshot = useCallback(() => {
+    undoStackRef.current = [...undoStackRef.current.slice(-29), elements];
+    redoStackRef.current = [];
+  }, [elements]);
   // 双击编辑 (per W3.4): 编辑中的 text/sticky element id
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -255,7 +264,7 @@ export function CanvasView(props: CanvasViewProps) {
 
   // pan / drag 处理
   const onMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && tool === "pan") || e.shiftKey) {
+    if (e.button === 1 || (e.button === 0 && tool === "pan") || e.shiftKey || spacePanning) {
       // 中键 / pan 工具 / shift = pan viewport
       dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y, elId: null, expectedVersion: 0 };
     } else if (e.button === 0 && tool === "brush" && !readOnly) {
@@ -380,6 +389,7 @@ export function CanvasView(props: CanvasViewProps) {
     if (tool === "pan") return;
     // 橡皮擦: 划过/点击元素即删除 (per WBS-BACKEND-SUPPORT-001 W3.1, Miro eraser 语义)
     if (tool === "eraser" && !readOnly) {
+      if (onCreateElement === undefined) pushUndoSnapshot();
       if (onDeleteElements) void onDeleteElements([el.id]).catch(() => undefined);
       else deleteCanvasElement(el.id);
       return;
@@ -409,6 +419,7 @@ export function CanvasView(props: CanvasViewProps) {
   const deleteSelection = async () => {
     if (selected.length === 0) return;
     try {
+      if (onCreateElement === undefined) pushUndoSnapshot();
       if (onDeleteElements) await onDeleteElements(selected);
       else selected.forEach((id) => deleteCanvasElement(id));
       setSelected([]);
@@ -424,8 +435,52 @@ export function CanvasView(props: CanvasViewProps) {
       const target = ev.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       if (editingId) return;
-      if (ev.ctrlKey || ev.metaKey) return;
+      // Space 按住 = 临时平移 (Miro/FigJam 标准)
+      if (ev.code === "Space" && !ev.repeat) {
+        setSpacePanning(true);
+        return;
+      }
+      if (ev.ctrlKey || ev.metaKey) {
+        // 撤销/重做 (store 模式)
+        if (ev.key.toLowerCase() === "z" && onCreateElement === undefined && !readOnly) {
+          ev.preventDefault();
+          if (ev.shiftKey) {
+            const redoEls = redoStackRef.current.pop();
+            if (redoEls) {
+              undoStackRef.current = [...undoStackRef.current, elements];
+              useStore.getState().replaceCanvasElements(redoEls);
+            }
+          } else {
+            const prevEls = undoStackRef.current.pop();
+            if (prevEls) {
+              redoStackRef.current = [...redoStackRef.current, elements];
+              useStore.getState().replaceCanvasElements(prevEls);
+            }
+          }
+        }
+        return;
+      }
       switch (ev.key.toLowerCase()) {
+        // Shift+1 适应全部 / Shift+2 适应选中 (Miro 标准)
+        case "!": {
+          if (ev.shiftKey) {
+            updateViewport({ x: minX - 40, y: minY - 40, zoom: Math.min(1200 / (maxX - minX + 80), 800 / (maxY - minY + 80), 1) });
+          }
+          break;
+        }
+        case "@": {
+          if (ev.shiftKey && selected.length > 0) {
+            const selEls = elements.filter((el) => selected.includes(el.id));
+            if (selEls.length > 0) {
+              const sx = Math.min(...selEls.map((e) => e.x));
+              const sy = Math.min(...selEls.map((e) => e.y));
+              const ex = Math.max(...selEls.map((e) => e.x + e.width));
+              const ey = Math.max(...selEls.map((e) => e.y + e.height));
+              updateViewport({ x: sx - 40, y: sy - 40, zoom: Math.min(1200 / (ex - sx + 80), 800 / (ey - sy + 80), 1.5) });
+            }
+          }
+          break;
+        }
         case "v": setTool("select"); break;
         case "h": setTool("pan"); break;
         case "p": setTool("brush"); break;
@@ -447,8 +502,15 @@ export function CanvasView(props: CanvasViewProps) {
         default: break;
       }
     };
+    const onKeyUp = (ev: KeyboardEvent) => {
+      if (ev.code === "Space") setSpacePanning(false);
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, editingId, readOnly, tool]);
 
@@ -520,6 +582,7 @@ export function CanvasView(props: CanvasViewProps) {
     content: CanvasElement["content"] = {},
   ) => {
     if (readOnly || !onCreateElement || createPending) return;
+    pushUndoSnapshot();
     const world = { x: e.clientX / viewport.zoom + viewport.x, y: e.clientY / viewport.zoom + viewport.y };
     if (!world) return;
     setCreateError(null);
@@ -552,6 +615,7 @@ export function CanvasView(props: CanvasViewProps) {
    */
   const createPathElement = async (path: NonNullable<typeof drawingPath>) => {
     if (readOnly || !onCreateElement || createPending) return;
+    pushUndoSnapshot();
     if (path.points.length < 2) {
       // 误触 (单击未拖), 丢弃
       setDrawingPath(null);
@@ -1116,6 +1180,41 @@ export function CanvasView(props: CanvasViewProps) {
           <Maximize2 size={14} />
         </button>
         <span className="text-[10px] text-ink-dim font-mono px-2">{Math.round(viewport.zoom * 100)}%</span>
+        {onCreateElement === undefined && !readOnly && (
+          <>
+            <div className="w-px h-5 bg-line" />
+            <button
+              onClick={() => {
+                const prevEls = undoStackRef.current.pop();
+                if (prevEls) {
+                  redoStackRef.current = [...redoStackRef.current, elements];
+                  useStore.getState().replaceCanvasElements(prevEls);
+                }
+              }}
+              disabled={undoStackRef.current.length === 0}
+              className="btn p-1.5 disabled:opacity-40"
+              title="撤销 (Ctrl+Z)"
+              data-testid="canvas-tool-undo"
+            >
+              <Undo2 size={14} />
+            </button>
+            <button
+              onClick={() => {
+                const redoEls = redoStackRef.current.pop();
+                if (redoEls) {
+                  undoStackRef.current = [...undoStackRef.current, elements];
+                  useStore.getState().replaceCanvasElements(redoEls);
+                }
+              }}
+              disabled={redoStackRef.current.length === 0}
+              className="btn p-1.5 disabled:opacity-40"
+              title="重做 (Ctrl+Shift+Z)"
+              data-testid="canvas-tool-redo"
+            >
+              <Redo2 size={14} />
+            </button>
+          </>
+        )}
         <div className="w-px h-5 bg-line" />
         {selected.length > 0 && (!readOnly || onDeleteElements) && (
           <button onClick={() => void deleteSelection()} disabled={selected.some((id) => elements.some((element) => element.id === id && element.locked))} className="btn p-1.5 text-err disabled:opacity-40" title={t.ariaLabels.canvasDelete}>
@@ -1175,7 +1274,7 @@ export function CanvasView(props: CanvasViewProps) {
         data-testid="canvas-svg"
         viewBox="0 0 1200 800"
         className="w-full h-full"
-        style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, var(--color-surface))", backgroundImage: "radial-gradient(circle, var(--cel-ink, var(--color-border)) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+        style={{ cursor: tool === "pan" || spacePanning ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, var(--color-surface))", backgroundImage: "radial-gradient(circle, var(--cel-ink, var(--color-border)) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
         onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
