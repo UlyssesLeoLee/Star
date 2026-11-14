@@ -8,15 +8,17 @@
 // =====================================================================
 #![allow(missing_docs, unreachable_pub)]
 
-use wasm_bindgen::prelude::*;
 use nema_codec::{NemaCodec, StandardNemaCodec};
+use wasm_bindgen::prelude::*;
 
 /// 解析 .nema 源码 → NemaDocument JSON 字符串。
 /// 前端: JSON.parse(parseNema(src)) 后按 nema.ts 的 NemaDocument 类型消费。
 #[wasm_bindgen(js_name = parseNema)]
 pub fn parse_nema_wasm(source: &str) -> Result<String, JsError> {
     let codec = StandardNemaCodec;
-    let doc = codec.parse(source).map_err(|e| JsError::new(&e.to_string()))?;
+    let doc = codec
+        .parse(source)
+        .map_err(|e| JsError::new(&e.to_string()))?;
     serde_json::to_string(&doc).map_err(|e| JsError::new(&e.to_string()))
 }
 

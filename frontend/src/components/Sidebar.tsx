@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=34836b8339e4510e9ffc0b97ce06b7671985447df58ba5426ce6752028c86c68
+@cypher schema=1 source_sha256=acaba5fdb286226b6bfaa3c8df0a8730a76285aa51d49c5bfd863ad335407ce9
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -208,15 +208,60 @@ export function Sidebar() {
         {/* Project → LANE → Worktree → Branch 层级树 (per 2026-11-14 用户发令:
             恢复 LANE 层级设计; 无宿主会话时降级为可达的演示目录, 不显示死块) */}
         <ProjectRunTree collapsed={isCollapsed} />
-        {/* 全局组 (per 2026-11-14 artifact 参考 UI: 左栏 = 项目列表 + 底部全局组) */}
-        <div className="mt-auto">
-          <NavGroupSection
-            testId="sidebar-group-global"
-            label={t.sidebar.navGlobal}
-            modules={groupModules("home-personal")}
-            collapsed={isCollapsed}
-            isActive={isModuleActive}
-          />
+        {/* 全局组 (per 2026-11-14 用户发令: 参考设计带标签页形式 —
+            竖向 tab pills: icon + label + count 徽标, 激活态 accent 左条) */}
+        <div className="mt-auto border-t border-line/60 pt-3" data-testid="sidebar-group-global">
+          {!isCollapsed && (
+            <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-mute">
+              {t.sidebar.navGlobal}
+            </div>
+          )}
+          <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
+            {groupModules("home-personal").map((item) => {
+              const active = isModuleActive(item);
+              const Icon = item.icon;
+              return (
+                <li key={item.id} className="relative">
+                  <Link
+                    href={item.href}
+                    data-testid={`sidebar-item-${item.id}`}
+                    data-active={active ? "true" : "false"}
+                    aria-current={active ? "page" : undefined}
+                    title={isCollapsed ? useModuleTranslation(item).label : undefined}
+                    className={clsx(
+                      "flex items-center rounded-lg transition-colors",
+                      isCollapsed ? "justify-center p-1.5" : "gap-2.5 px-2.5 py-2",
+                      active
+                        ? "bg-accent/10 text-accent font-semibold"
+                        : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink",
+                    )}
+                  >
+                    {/* tab 左条 (激活态) */}
+                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded bg-accent" aria-hidden="true" />}
+                    <span
+                      className={clsx(
+                        "rounded-md grid place-items-center shrink-0 border",
+                        isCollapsed ? "size-9" : "size-7",
+                        active ? "bg-accent/15 border-accent/50 text-accent" : "border-transparent text-ink-mute",
+                      )}
+                    >
+                      <Icon size={isCollapsed ? 15 : 13} />
+                    </span>
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 truncate tracking-tight">{useModuleTranslation(item).label}</span>
+                        {item.count !== undefined && item.count > 0 && (
+                          <span className="min-w-[18px] h-4.5 rounded-full bg-err text-white text-[10px] font-mono grid place-items-center px-1 font-bold">
+                            {item.count}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </nav>
 

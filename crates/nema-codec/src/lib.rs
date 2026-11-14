@@ -364,7 +364,11 @@ impl TokenProfile {
                 if ascii_run > 0 {
                     tokens += ascii_run.div_ceil(4);
                 }
-                (tokens.max(1), false, "BPE 启发估算 (不等同于官方计费 Token)")
+                (
+                    tokens.max(1),
+                    false,
+                    "BPE 启发估算 (不等同于官方计费 Token)",
+                )
             }
             Self::UnigramHeuristic { .. } => {
                 let mut tokens = 0usize;
@@ -982,7 +986,9 @@ pub fn join_intents<S: AsRef<str>>(chunks: &[S], language: &str, exact_name: boo
         let exact = exact_name || has_lit_prefix;
         let body = if has_lit_prefix { &chunk[2..] } else { chunk };
         let has_cjk = body.chars().any(is_cjk_v12_char);
-        let has_special = body.chars().any(|c| matches!(c, '.' | '/' | ':' | '#' | '@'));
+        let has_special = body
+            .chars()
+            .any(|c| matches!(c, '.' | '/' | ':' | '#' | '@'));
         let atoms: Vec<String> = if exact
             || matches!(language, "zh" | "ja")
             || (language == "auto" && has_cjk)
@@ -1277,9 +1283,12 @@ pub fn parse_source(source: &str) -> Result<NemaDocument, NemaError> {
                     if !raw_header.is_empty() {
                         if let Ok(labels) = split_x_v12(raw_header) {
                             if !labels.is_empty()
-                                && labels.iter().all(|v| !v.is_empty() && is_valid_table_header_ident(v))
+                                && labels
+                                    .iter()
+                                    .all(|v| !v.is_empty() && is_valid_table_header_ident(v))
                             {
-                                let unique: HashSet<&str> = labels.iter().map(String::as_str).collect();
+                                let unique: HashSet<&str> =
+                                    labels.iter().map(String::as_str).collect();
                                 if unique.len() == labels.len() {
                                     current.mode = DomainMode::Table;
                                     current.columns = labels;
@@ -1371,7 +1380,14 @@ pub fn parse_source(source: &str) -> Result<NemaDocument, NemaError> {
                             return Err(NemaError::BlankContinuation);
                         }
                         let rec = current.records.last_mut().expect("record exists");
-                        append_v12_cols(rec, cells, &doc.dictionary, line_start, line.len(), line_no)?;
+                        append_v12_cols(
+                            rec,
+                            cells,
+                            &doc.dictionary,
+                            line_start,
+                            line.len(),
+                            line_no,
+                        )?;
                     } else if let Some(after_space) = line.strip_prefix(' ') {
                         let cells = split_x_v12(after_space)?;
                         if cells.is_empty() || !is_valid_graph_ident(&cells[0]) {
@@ -2625,15 +2641,15 @@ pub fn decode_transport(text: &str) -> Result<String, NemaError> {
 /// 定位所有字典引用 `^N` 及高频候选词在文档中的精确坐标（供 UI「显示复用位置」高亮/跳转）
 pub fn find_reused_positions(source: &str) -> Vec<ReusedPosition> {
     let normalized = normalize_nema_newlines(source);
-    let lines: Vec<&str> = normalized
-        .trim_end_matches('\n')
-        .split('\n')
-        .collect();
+    let lines: Vec<&str> = normalized.trim_end_matches('\n').split('\n').collect();
     let cands = candidate_dictionary(&lines, 48);
     let mut positions = Vec::new();
 
     for (line_idx, &line) in lines.iter().enumerate() {
-        if line.starts_with('\t') || parse_domain_header(line).is_some() || parse_domain_header_v12(line).is_some() {
+        if line.starts_with('\t')
+            || parse_domain_header(line).is_some()
+            || parse_domain_header_v12(line).is_some()
+        {
             continue;
         }
         let chars: Vec<char> = line.chars().collect();
@@ -2705,14 +2721,13 @@ pub fn toggle_table_header_in_source(source: &str, target_domain_id: Option<&str
     let mut is_v12_domain = false;
     for line in &mut lines {
         if let Some((is_graph, id, _)) = parse_domain_header_v12(line) {
-            in_target_domain =
-                !is_graph && target_domain_id.map_or(true, |target| target == id);
+            in_target_domain = !is_graph && target_domain_id.map_or(true, |target| target == id);
             is_v12_domain = true;
             continue;
         }
         if let Some((mode, id, _)) = parse_domain_header(line) {
-            in_target_domain = mode == DomainMode::Table
-                && target_domain_id.map_or(true, |target| target == id);
+            in_target_domain =
+                mode == DomainMode::Table && target_domain_id.map_or(true, |target| target == id);
             is_v12_domain = false;
             continue;
         }
@@ -2834,15 +2849,11 @@ pub fn render_to_json_value(doc: &RenderedDocument) -> serde_json::Value {
                         n_map.insert("id".to_string(), serde_json::Value::String(nid.clone()));
                         n_map.insert(
                             "name".to_string(),
-                            serde_json::Value::String(
-                                r.cells.get(1).cloned().unwrap_or_default(),
-                            ),
+                            serde_json::Value::String(r.cells.get(1).cloned().unwrap_or_default()),
                         );
                         n_map.insert(
                             "description".to_string(),
-                            serde_json::Value::String(
-                                r.cells.get(2).cloned().unwrap_or_default(),
-                            ),
+                            serde_json::Value::String(r.cells.get(2).cloned().unwrap_or_default()),
                         );
                         if !r.extensions.is_empty() {
                             let mut ext_map = serde_json::Map::new();
@@ -2857,10 +2868,7 @@ pub fn render_to_json_value(doc: &RenderedDocument) -> serde_json::Value {
                         nodes.push(serde_json::Value::Object(n_map));
                     } else if let Some(edge) = &r.edge {
                         let mut e_map = serde_json::Map::new();
-                        e_map.insert(
-                            "id".to_string(),
-                            serde_json::Value::String(edge.id.clone()),
-                        );
+                        e_map.insert("id".to_string(), serde_json::Value::String(edge.id.clone()));
                         e_map.insert(
                             "source".to_string(),
                             serde_json::Value::String(edge.from.clone()),
@@ -2875,15 +2883,11 @@ pub fn render_to_json_value(doc: &RenderedDocument) -> serde_json::Value {
                         );
                         e_map.insert(
                             "name".to_string(),
-                            serde_json::Value::String(
-                                r.cells.get(1).cloned().unwrap_or_default(),
-                            ),
+                            serde_json::Value::String(r.cells.get(1).cloned().unwrap_or_default()),
                         );
                         e_map.insert(
                             "description".to_string(),
-                            serde_json::Value::String(
-                                r.cells.get(2).cloned().unwrap_or_default(),
-                            ),
+                            serde_json::Value::String(r.cells.get(2).cloned().unwrap_or_default()),
                         );
                         if !r.extensions.is_empty() {
                             let mut ext_map = serde_json::Map::new();
@@ -3435,7 +3439,11 @@ impl NemaLeaseArbitrator {
     /// 1. `request_lease(source_hash, revision)`
     ///
     /// 若同一 `(source_hash, revision)` 已提交过，直接返回缓存的幂等结果。
-    pub fn request_lease(&mut self, source_hash: u64, revision: u64) -> (u64, Option<EncodedChoice>) {
+    pub fn request_lease(
+        &mut self,
+        source_hash: u64,
+        revision: u64,
+    ) -> (u64, Option<EncodedChoice>) {
         if let Some(cached) = &self.last_commit {
             if cached.source_hash == source_hash && cached.revision == revision {
                 return (cached.epoch, Some(cached.choice.clone()));
@@ -3555,7 +3563,8 @@ mod tests {
         let err1 = parse_source(&doc("\t>1\nA Node\nA>X>B Reads")).unwrap_err();
         assert!(matches!(err1, NemaError::UndefinedGraphNode(_, _)));
 
-        let err2 = parse_source(&doc("\t>1\nA Node\nB Node\nA>X>B Reads\nB<X<A Writes")).unwrap_err();
+        let err2 =
+            parse_source(&doc("\t>1\nA Node\nB Node\nA>X>B Reads\nB<X<A Writes")).unwrap_err();
         assert!(matches!(err2, NemaError::DuplicateEdgeId(_)));
     }
 
@@ -3569,10 +3578,12 @@ mod tests {
         assert_eq!(d1.columns, vec!["column1", "column2", "column3"]);
         assert_eq!(d1.rows[0].cells[2], "HTTP It Is");
 
-        let d2 = render_source(&doc("\t\\1\n\\ Agent Status Note\nClaude Ready CheckSession"))
-            .unwrap()
-            .domains
-            .remove(0);
+        let d2 = render_source(&doc(
+            "\t\\1\n\\ Agent Status Note\nClaude Ready CheckSession",
+        ))
+        .unwrap()
+        .domains
+        .remove(0);
         assert!(d2.explicit_header);
         assert_eq!(d2.columns, vec!["Agent", "Status", "Note"]);
         assert_eq!(d2.rows.len(), 1);
@@ -3653,7 +3664,10 @@ mod tests {
         .unwrap()
         .domains
         .remove(0);
-        assert_eq!(vert.rows.last().unwrap().cells[2], "Check Session Retry Once");
+        assert_eq!(
+            vert.rows.last().unwrap().cells[2],
+            "Check Session Retry Once"
+        );
     }
 
     #[test]
@@ -3714,7 +3728,8 @@ mod tests {
                 let parsed = codec.parse(&raw).unwrap();
                 assert!(!parsed.domains.is_empty());
                 let ch = codec.encode(&raw, &profile).unwrap();
-                if path.file_name().and_then(|s| s.to_str()) == Some("bench_high_entropy_120.nema") {
+                if path.file_name().and_then(|s| s.to_str()) == Some("bench_high_entropy_120.nema")
+                {
                     assert_eq!(ch.format, CodecFormat::Nema);
                 }
                 let roundtrip = if ch.format == CodecFormat::Nemat {
@@ -3819,28 +3834,64 @@ mod tests {
     #[test]
     fn test_space_domain_header_v12() {
         // v1.2 字母域名头支持空格前缀与 \ 标记
-        assert_eq!(parse_domain_header_v12(r" \?task1 1"), Some((false, "task1".into(), 1)));
-        assert_eq!(parse_domain_header_v12(r" \>auth1 1"), Some((true, "auth1".into(), 1)));
-        assert_eq!(parse_domain_header_v12(r" >auth1 1"), Some((true, "auth1".into(), 1)));
-        assert_eq!(parse_domain_header_v12(r" ?task1 1"), Some((false, "task1".into(), 1)));
-        assert_eq!(parse_domain_header_v12("\t\\>auth1 1"), Some((true, "auth1".into(), 1)));
-        assert_eq!(parse_domain_header_v12("\t>Gauth1 1"), Some((true, "Gauth1".into(), 1)));
-        assert!(parse_domain_header_v12(r"  \>auth1 1").is_none(), "double space must be rejected as continuation line");
+        assert_eq!(
+            parse_domain_header_v12(r" \?task1 1"),
+            Some((false, "task1".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header_v12(r" \>auth1 1"),
+            Some((true, "auth1".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header_v12(r" >auth1 1"),
+            Some((true, "auth1".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header_v12(r" ?task1 1"),
+            Some((false, "task1".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header_v12("\t\\>auth1 1"),
+            Some((true, "auth1".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header_v12("\t>Gauth1 1"),
+            Some((true, "Gauth1".into(), 1))
+        );
+        assert!(
+            parse_domain_header_v12(r"  \>auth1 1").is_none(),
+            "double space must be rejected as continuation line"
+        );
 
         // 全局域头解析支持单空格数字域头
-        assert_eq!(parse_domain_header(r" \1 1"), Some((DomainMode::Table, "1".into(), 1)));
-        assert_eq!(parse_domain_header(r" \?2 1"), Some((DomainMode::FiveWOneH, "2".into(), 1)));
-        assert_eq!(parse_domain_header(r" \>3 1"), Some((DomainMode::Graph, "3".into(), 1)));
+        assert_eq!(
+            parse_domain_header(r" \1 1"),
+            Some((DomainMode::Table, "1".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header(r" \?2 1"),
+            Some((DomainMode::FiveWOneH, "2".into(), 1))
+        );
+        assert_eq!(
+            parse_domain_header(r" \>3 1"),
+            Some((DomainMode::Graph, "3".into(), 1))
+        );
 
         // 空格前缀的 Table 领域头及表头识别测试
         let src_space_table = " Ttable1 1\n Agent Status Note\nClaude Ready 认证完成\n\n\n";
         let doc_space = render_source(src_space_table).expect("space table parse");
         assert_eq!(doc_space.domains[0].mode, DomainMode::Table);
-        assert_eq!(doc_space.domains[0].columns, vec!["Agent", "Status", "Note"]);
+        assert_eq!(
+            doc_space.domains[0].columns,
+            vec!["Agent", "Status", "Note"]
+        );
 
         let src_slash_table = " \\table1 1\n \\ Agent Status Note\nClaude Ready 认证完成\n\n\n";
         let doc_slash = render_source(src_slash_table).expect("slash table parse");
         assert_eq!(doc_slash.domains[0].mode, DomainMode::Table);
-        assert_eq!(doc_slash.domains[0].columns, vec!["Agent", "Status", "Note"]);
+        assert_eq!(
+            doc_slash.domains[0].columns,
+            vec!["Agent", "Status", "Note"]
+        );
     }
 }

@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=5aff6a2e955dc3d142532dcc223d527fd78d0208e79f8a929ad4f93f949669ff
+MERGE (self:File {path:"frontend/src/components/board/KanbanCard.tsx"})
+MERGE (card:Symbol {id:"frontend/src/components/board/KanbanCard.tsx::KanbanCard",kind:"component"})
+MERGE (chatStore:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
+MERGE (self)-[:DEFINES]->(card)
+MERGE (self)-[:LINKS_TO]->(chatStore)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -22,7 +31,7 @@
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { StatusPill } from "@/components/StatusPill";
-import { Flag, User, Network, FileText } from "lucide-react";
+import { Flag, User, Network, FileText, MessageSquare } from "lucide-react";
 import type { WorkItem, Identity } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 import { openWorkItemDocument, DOCUMENT_KIND_META } from "@/lib/documents";
@@ -149,6 +158,17 @@ export function KanbanCard({
           {priorityLabel}
         </span>
         <div className="flex items-center gap-1.5">
+          {/* 聊天按钮 (per 2026-11-14 用户发令: 点击任务卡打开与该任务卡相关的聊天页) */}
+          <a
+            href={`/worktree/chat?task=${encodeURIComponent(workItem.key)}&title=${encodeURIComponent(workItem.title)}`}
+            data-testid={`kanban-card-chat-${workItem.id}`}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Open chat for ${workItem.key}`}
+            title="打开该任务卡的聊天"
+            className="text-ink-mute hover:text-accent transition-colors p-0.5 rounded hover:bg-accent/10"
+          >
+            <MessageSquare size={10} />
+          </a>
           {/* Arch icon button (per ADR-0041 §2.3.1) */}
           {onArchClick && (
             <button

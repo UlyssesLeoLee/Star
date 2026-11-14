@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fee79b38444e14757e8a3284edb071fef0f1099e5de68f0dacb93dc62f144be8
+@cypher schema=1 source_sha256=199afb501ee214ed042ba94801041b94984d9fb4039a47346e2140de1c1097ba
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -177,7 +177,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     description: "通知中心、@提及与审计流聚合工作台",
     icon: Inbox,
     isCore: true,
-    count: 3,
+    count: 5,
   },
   {
     id: "issues",

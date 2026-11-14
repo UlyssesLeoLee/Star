@@ -128,7 +128,10 @@ pub fn get_active_interpreter() -> InterpreterConfig {
 
 /// 设置或切换解释器配置
 pub fn set_active_interpreter(cfg: InterpreterConfig) {
-    HAS_CUSTOM.store(cfg.enabled && !cfg.path.trim().is_empty(), Ordering::Relaxed);
+    HAS_CUSTOM.store(
+        cfg.enabled && !cfg.path.trim().is_empty(),
+        Ordering::Relaxed,
+    );
     if let Ok(mut guard) = ACTIVE_CONFIG.lock() {
         *guard = Some(cfg);
     }
@@ -140,8 +143,14 @@ pub fn discover_candidates(project_root: Option<&Path>) -> Vec<DiscoveredCandida
 
     // 1. 官方参考解释器标准路径
     let official_paths = [
-        ("E:\\.NEMA\\codec\\native.py", "官方 Python 参考解释器 (native.py)"),
-        ("E:\\.NEMA\\codec\\cli.py", "官方 Python CLI 解释器 (cli.py)"),
+        (
+            "E:\\.NEMA\\codec\\native.py",
+            "官方 Python 参考解释器 (native.py)",
+        ),
+        (
+            "E:\\.NEMA\\codec\\cli.py",
+            "官方 Python CLI 解释器 (cli.py)",
+        ),
         ("..\\.NEMA\\codec\\native.py", "相对路径官方参考解释器"),
     ];
     for (p, label) in &official_paths {
@@ -151,7 +160,11 @@ pub fn discover_candidates(project_root: Option<&Path>) -> Vec<DiscoveredCandida
             name: label.to_string(),
             path: p.to_string(),
             candidate_type: "python_script".to_string(),
-            confidence: if exists { "High (Recommended)".to_string() } else { "Low".to_string() },
+            confidence: if exists {
+                "High (Recommended)".to_string()
+            } else {
+                "Low".to_string()
+            },
             exists,
         });
     }
@@ -168,7 +181,10 @@ pub fn discover_candidates(project_root: Option<&Path>) -> Vec<DiscoveredCandida
         for path in &ws_candidates {
             if path.exists() {
                 candidates.push(DiscoveredCandidate {
-                    name: format!("工作区内置解释器 ({})", path.file_name().unwrap_or_default().to_string_lossy()),
+                    name: format!(
+                        "工作区内置解释器 ({})",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ),
                     path: path.to_string_lossy().to_string(),
                     candidate_type: if path.extension().and_then(|s| s.to_str()) == Some("py") {
                         "python_script".to_string()
@@ -189,7 +205,11 @@ pub fn discover_candidates(project_root: Option<&Path>) -> Vec<DiscoveredCandida
             name: "环境变量 NEMA_INTERPRETER".to_string(),
             path: env_path,
             candidate_type: "environment_variable".to_string(),
-            confidence: if exists { "High".to_string() } else { "Medium".to_string() },
+            confidence: if exists {
+                "High".to_string()
+            } else {
+                "Medium".to_string()
+            },
             exists,
         });
     }
@@ -227,7 +247,8 @@ pub fn probe_interpreter(raw_target: &str, preferred_runner: Option<&str>) -> Pr
     }
 
     let target_path = PathBuf::from(target);
-    let is_py = target.ends_with(".py") || target.contains("native.py") || target.contains("cli.py");
+    let is_py =
+        target.ends_with(".py") || target.contains("native.py") || target.contains("cli.py");
     let runner = match preferred_runner {
         Some("python") | Some("py") => "python",
         Some(custom) if !custom.is_empty() && custom != "auto" => custom,
@@ -274,7 +295,10 @@ pub fn probe_interpreter(raw_target: &str, preferred_runner: Option<&str>) -> Pr
         sample_ast_nodes: 0,
         sample_ast_edges: 0,
         raw_output_preview: String::new(),
-        error: Some(format!("未能自动适配此解释器 ({target}): {}", err_collector.join("; "))),
+        error: Some(format!(
+            "未能自动适配此解释器 ({target}): {}",
+            err_collector.join("; ")
+        )),
     }
 }
 
@@ -351,22 +375,39 @@ print(json.dumps({{
     cmd.arg("-c").arg(&inline_py);
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-    let output = cmd.output().map_err(|e| format!("启动 Python 进程失败: {e}"))?;
+    let output = cmd
+        .output()
+        .map_err(|e| format!("启动 Python 进程失败: {e}"))?;
     let elapsed_us = start.elapsed().as_micros() as u64;
 
     if !output.status.success() {
         let err_msg = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Python 探针执行失败 (code {:?}): {}", output.status.code(), err_msg));
+        return Err(format!(
+            "Python 探针执行失败 (code {:?}): {}",
+            output.status.code(),
+            err_msg
+        ));
     }
 
     let out_str = String::from_utf8_lossy(&output.stdout);
-    let json_val: serde_json::Value = serde_json::from_str(out_str.trim())
-        .map_err(|e| format!("探针输出非合法 JSON: {e}; 输出前段: {}", out_str.chars().take(200).collect::<String>()))?;
+    let json_val: serde_json::Value = serde_json::from_str(out_str.trim()).map_err(|e| {
+        format!(
+            "探针输出非合法 JSON: {e}; 输出前段: {}",
+            out_str.chars().take(200).collect::<String>()
+        )
+    })?;
 
     let ast = json_val.get("ast").cloned().unwrap_or_default();
     let (domains, nodes, edges) = inspect_ast_counts(&ast);
-    let latency_us = json_val.get("latency_us").and_then(|v| v.as_u64()).unwrap_or(elapsed_us);
-    let version = json_val.get("version").and_then(|v| v.as_str()).unwrap_or("1.5.0").to_string();
+    let latency_us = json_val
+        .get("latency_us")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(elapsed_us);
+    let version = json_val
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("1.5.0")
+        .to_string();
 
     Ok(ProbeReport {
         success: true,
@@ -418,8 +459,8 @@ fn probe_official_cli(target: &Path) -> Result<ProbeReport, String> {
     }
 
     let out_str = String::from_utf8_lossy(&output.stdout);
-    let ast: serde_json::Value = serde_json::from_str(out_str.trim())
-        .map_err(|e| format!("CLI 输出非合法 JSON: {e}"))?;
+    let ast: serde_json::Value =
+        serde_json::from_str(out_str.trim()).map_err(|e| format!("CLI 输出非合法 JSON: {e}"))?;
 
     let (domains, nodes, edges) = inspect_ast_counts(&ast);
 
@@ -456,7 +497,9 @@ fn probe_generic_binary(target: &str, runner: &str) -> Result<ProbeReport, Strin
     };
 
     // 先尝试通过 stdin 喂入测试用例
-    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     let start = Instant::now();
     if let Ok(mut child) = cmd.spawn() {
@@ -578,15 +621,23 @@ except Exception as e:
             cmd.env("PYTHONUTF8", "1");
             cmd.env("PYTHONIOENCODING", "utf-8");
             cmd.arg("-c").arg(&inline_py);
-            cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+            cmd.stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
 
-            let mut child = cmd.spawn().map_err(|e| format!("启动 Python 进程失败: {e}"))?;
+            let mut child = cmd
+                .spawn()
+                .map_err(|e| format!("启动 Python 进程失败: {e}"))?;
             if let Some(mut stdin) = child.stdin.take() {
                 use std::io::Write;
-                stdin.write_all(source.as_bytes()).map_err(|e| format!("向解释器写入数据失败: {e}"))?;
+                stdin
+                    .write_all(source.as_bytes())
+                    .map_err(|e| format!("向解释器写入数据失败: {e}"))?;
             }
 
-            let output = child.wait_with_output().map_err(|e| format!("等待解释器输出失败: {e}"))?;
+            let output = child
+                .wait_with_output()
+                .map_err(|e| format!("等待解释器输出失败: {e}"))?;
             let latency_us = start.elapsed().as_micros() as u64;
 
             if !output.status.success() {
@@ -601,14 +652,18 @@ except Exception as e:
             Ok((ast, latency_us))
         }
         InterpreterProtocol::OfficialCliRender => {
-            let tmp_file = std::env::temp_dir().join(format!("nema_render_{}.nema", std::process::id()));
+            let tmp_file =
+                std::env::temp_dir().join(format!("nema_render_{}.nema", std::process::id()));
             std::fs::write(&tmp_file, source).map_err(|e| format!("写临时文件失败: {e}"))?;
 
             let mut cmd = Command::new("python");
             cmd.env("PYTHONUTF8", "1");
             cmd.env("PYTHONIOENCODING", "utf-8");
             let target_path = PathBuf::from(&cfg.path);
-            let grand = target_path.parent().and_then(|p| p.parent()).unwrap_or(Path::new("."));
+            let grand = target_path
+                .parent()
+                .and_then(|p| p.parent())
+                .unwrap_or(Path::new("."));
             cmd.env("PYTHONPATH", grand);
             cmd.args(["-m", "codec.cli", "render", &tmp_file.to_string_lossy()]);
             cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -630,15 +685,21 @@ except Exception as e:
         }
         InterpreterProtocol::GenericJsonAstStdin => {
             let mut cmd = Command::new(&cfg.path);
-            cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+            cmd.stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
 
             let mut child = cmd.spawn().map_err(|e| format!("启动进程失败: {e}"))?;
             if let Some(mut stdin) = child.stdin.take() {
                 use std::io::Write;
-                stdin.write_all(source.as_bytes()).map_err(|e| format!("写入失败: {e}"))?;
+                stdin
+                    .write_all(source.as_bytes())
+                    .map_err(|e| format!("写入失败: {e}"))?;
             }
 
-            let output = child.wait_with_output().map_err(|e| format!("等待输出失败: {e}"))?;
+            let output = child
+                .wait_with_output()
+                .map_err(|e| format!("等待输出失败: {e}"))?;
             let latency_us = start.elapsed().as_micros() as u64;
 
             if !output.status.success() {
@@ -663,7 +724,13 @@ pub fn adaptive_render_view(source: &str) -> (serde_json::Value, u64, String, bo
     if cfg.enabled && !cfg.path.trim().is_empty() {
         if let Ok((ast, latency_us)) = execute_interpreter(&cfg, source) {
             let engine_label = if cfg.metadata.engine_name.is_empty() {
-                format!("外部解释器 ({})", Path::new(&cfg.path).file_name().unwrap_or_default().to_string_lossy())
+                format!(
+                    "外部解释器 ({})",
+                    Path::new(&cfg.path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                )
             } else {
                 cfg.metadata.engine_name.clone()
             };

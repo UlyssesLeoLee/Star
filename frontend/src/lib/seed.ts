@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e244bff31a51b4b171ccd3cd2ed4ced804c1503219adc9038b3ee3b836a0dbe5
+@cypher schema=1 source_sha256=ce870bf371e858cedabd8feb1f0efb4e9e210f1337a4c908a449a8cdaf8650f7
 MERGE (self:File {path:"frontend/src/lib/seed.ts"})
 MERGE (integrations:Symbol {id:"frontend/src/lib/seed.ts::integrations",kind:"constant"})
 MERGE (canvases:Symbol {id:"frontend/src/lib/seed.ts::canvases",kind:"constant"})
@@ -91,7 +91,16 @@ export const workspaces: Workspace[] = [
 // =====================================================================
 // Historical wi-001..wi-030 values were demo seed records, not user tasks.
 // New Work Items must arrive from the Run-scoped backend or an explicit user action.
-export const workItems: WorkItem[] = [];
+// per 2026-11-14 聊天功能: 任务卡 → 聊天页需要真实卡片数据 (host server 未运行时 dev 看板不空)
+// 与 sprint/收件箱 mock 引用的 wt-relation-bfs 语境对齐 (T-142 BFS 环检测等)
+export const workItems: WorkItem[] = [
+  { id: "wi-t142", tenant_id: TENANT_ID, project_id: "prj-physis", key: "T-142", title: "BFS 环检测", description: "Relation graph BFS 自环判定 + 环路径输出", kind: "task", status: "in_progress", priority: "p1", assignee_id: "usr-001", reporter_id: "usr-002", story_points: 5, labels: ['graph'], created_at: ago(60 * 480), updated_at: ago(60 * 160), sprint_id: "sp-12", worktree_id: "wt-relation-bfs" },
+  { id: "wi-t143", tenant_id: TENANT_ID, project_id: "prj-physis", key: "T-143", title: "邻接表→关系图渲染", description: "Adjacency list to relation graph renderer", kind: "task", status: "in_progress", priority: "p1", assignee_id: "usr-001", reporter_id: "usr-002", story_points: 3, labels: ['graph'], created_at: ago(60 * 420), updated_at: ago(60 * 140), sprint_id: "sp-12", worktree_id: "wt-relation-bfs" },
+  { id: "wi-t145", tenant_id: TENANT_ID, project_id: "prj-physis", key: "T-145", title: "遍历深度上限配置", description: "BFS depth cap 5-7 层配置项", kind: "task", status: "todo", priority: "p2", assignee_id: "usr-003", reporter_id: "usr-002", story_points: 2, labels: ['graph'], created_at: ago(60 * 300), updated_at: ago(60 * 100), sprint_id: "sp-12", worktree_id: "wt-relation-bfs" },
+  { id: "wi-t147", tenant_id: TENANT_ID, project_id: "prj-physis", key: "T-147", title: "IPA 技能验收报告模板", description: "IPA skill acceptance report template", kind: "task", status: "review", priority: "p2", assignee_id: "usr-002", reporter_id: "usr-002", story_points: 1, labels: ['ipa'], created_at: ago(60 * 240), updated_at: ago(60 * 80), sprint_id: "sp-12" },
+  { id: "wi-t148", tenant_id: TENANT_ID, project_id: "prj-physis", key: "T-148", title: "环路径 JSON 输出格式", description: "Cycle path output JSON schema", kind: "task", status: "done", priority: "p3", assignee_id: "usr-003", reporter_id: "usr-002", story_points: 2, labels: ['graph'], created_at: ago(60 * 300), updated_at: ago(60 * 100), sprint_id: "sp-12", worktree_id: "wt-relation-bfs" },
+  { id: "wi-t149", tenant_id: TENANT_ID, project_id: "prj-physis", key: "T-149", title: "收件箱通知聚合", description: "Inbox notification aggregation rule", kind: "task", status: "todo", priority: "p3", assignee_id: "usr-002", reporter_id: "usr-002", story_points: 3, labels: ['inbox'], created_at: ago(60 * 180), updated_at: ago(60 * 60), sprint_id: "sp-12" },
+];
 
 // =====================================================================
 // comments
