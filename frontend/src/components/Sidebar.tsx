@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=41644335a4ae466bfbb08c3bf74f5f3d99fd1a46a145cad0237f4a4a0298bd31
+@cypher schema=1 source_sha256=56cf326703aab45225655ff9418b6f11f4463b4f9755ba7f79ebe2a097bdb434
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -33,6 +33,7 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type ModuleCategory, type NavGroupId } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import { findSubNavGroup } from "@/lib/nav/subNavRegistry";
+import { ProjectRunTree } from "@/components/run/ProjectRunTree";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 // =====================================================================
@@ -249,8 +250,9 @@ export function Sidebar() {
         )}
         aria-label={t.sidebar.projectNavigation}
       >
-        {/* per ui-3pane-arch §1.2: 侧栏仅承载 5 组导航; Project→Run→Worktree 状态树
-            移入 Worktree 控制中心页 (/worktree) 内展示, 不占用侧栏顶部 (2026-11-14 实测对照设计书) */}
+        {/* Project → LANE → Worktree → Branch 层级树 (per 2026-11-14 用户发令:
+            恢复 LANE 层级设计; 无宿主会话时降级为可达的演示目录, 不显示死块) */}
+        <ProjectRunTree collapsed={isCollapsed} />
         {/* Home 核心区 (per §1.2: 常驻置顶, 不可折叠, accent 边框 + core 徽标) */}
         <NavGroupSection
           testId="sidebar-group-home-core"

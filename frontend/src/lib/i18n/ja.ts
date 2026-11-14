@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2ea61e9e1541b94897340b59dbd31f7b986625300c6c456bba3f0a074efb62a6
+@cypher schema=1 source_sha256=b00e3ff56813c24b19bad5ccf1ee4f0674678831f7ca4e816790bfd25f753578
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -35,6 +35,8 @@ export const ja: Dictionary = {
     directoryUnavailableTitle: "認証済みディレクトリを利用できません",
     directoryUnavailableDescription: "現在のセッションには検証可能な Project と LANE のディレクトリ接続がありません。復旧するまでは、サンプル状態を Worktree 管理の事実と誤認しないよう、ローカルのプレビュー、キャッシュ、seed レコードを表示しません。",
     hierarchyHint: "LANE → ローカル Worktree → Branch",
+    fallbackHint: "デモディレクトリ — ホストセッション未接続, seed 階層を表示 (Web 版フォールバック, すべて到達可能)",
+    fallbackLane: "デフォルト LANE",
     refreshDirectory: "認証済みディレクトリを再読み込み",
     unknownCreateResult: "前回のリクエスト結果は不明です。再送時は同じリクエスト ID を使用します。",
     expandNode: "展開",

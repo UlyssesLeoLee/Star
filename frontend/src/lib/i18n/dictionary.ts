@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=83db108e0ec2b09200f8fcbcb2d0655df261b6a225463844c4dc62f4f4acba12
+@cypher schema=1 source_sha256=cc2705969c78f5a5d71ca5560cb9c3f5fa48ef2bd300604184cd42a29c1f53bb
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -116,6 +116,8 @@ export interface Dictionary {
     directoryUnavailableTitle: string;
     directoryUnavailableDescription: string;
     hierarchyHint: string;
+    fallbackHint: string;           // "演示目录 — 宿主会话未装配, 显示 seed 层级 (网页版降级)"
+    fallbackLane: string;           // "默认 LANE"
     refreshDirectory: string;
     unknownCreateResult: string;
     expandNode: string;

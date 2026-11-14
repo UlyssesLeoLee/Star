@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=53f4ca854a9aa8f302476e71452cca5a3e33905dcb74d71a4f8c922397545c0e
+@cypher schema=1 source_sha256=5c1a567c884e4497514bf9a18272be293b8e721dd1e9d74b8e05b41687633232
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::ProjectRunTree behavior and localization",kind:"suite"})
 MERGE (selection:Symbol {id:"frontend/src/components/run/ProjectRunTree.test.tsx::selecting a Project updates the Project context and clears Worktree focus",kind:"test"})
@@ -167,6 +167,9 @@ describe("ProjectRunTree behavior and localization", () => {
     expect(screen.getByText(navigation)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: directoryLabel })).toBeInTheDocument();
     expect(screen.getByText(hierarchy)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("No authorized directory connection");
+    // per 2026-11-14 用户发令 "确保导航可达": missing 状态渲染可达降级目录
+    // (seed 项目树 + 降级提示), 不再显示 "No authorized directory connection" 死块
+    expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
+    expect(screen.getByRole("tree")).toBeInTheDocument();
   });
 });

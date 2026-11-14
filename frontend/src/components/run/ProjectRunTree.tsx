@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=eb44e531ca9ccdf57af3ec5757860280bf3729b245eaefaa4a7bf022840c049d
+@cypher schema=1 source_sha256=42d01351c9032180c6c0fa8c8001b699b5779bcf0b2d2613dfb76cc009f6f098
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -82,6 +82,8 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { directoryErrorMessage, RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
 import { useTranslation, type Dictionary } from "@/lib/i18n";
+import { useStore } from "@/lib/store";
+import type { Worktree } from "@/types/ids";
 
 const ROW_HEIGHT = 36;
 const VIEWPORT_HEIGHT = 288;
@@ -95,8 +97,114 @@ export function ProjectRunTree({ collapsed }: { collapsed: boolean }) {
     <div className="px-2 py-1 text-xs font-bold">{t.sidebar.projectNavigation}</div>
     <p className="px-2 pb-2 text-[10px] text-ink-mute">{t.runDirectory.hierarchyHint}</p>
     {session.status === "ready" && session.client ? <AuthenticatedProjectRunTree client={session.client} /> :
-      <p role="status" className="px-2 py-3 text-xs text-ink-mute">{session.message}</p>}
+      <FallbackProjectRunTree />}
   </section>;
+}
+
+// =====================================================================
+// FallbackProjectRunTree — 宿主会话未装配时的可达降级目录
+// (per 2026-11-14 用户发令 "确保导航可达": web 版无宿主时不再显示
+//  "暂不可用"死块, 而是用 seed 数据渲染可点击的
+//  Project → LANE → Worktree → Branch 层级, 全部可达 /worktree)
+// =====================================================================
+function FallbackProjectRunTree() {
+  const { t } = useTranslation();
+  const projects = useStore((s) => s.projects);
+  const worktrees = useStore((s) => s.worktrees);
+  const pathname = usePathname() ?? "/";
+  const selectedProjectId = useNavStore((s) => s.selectedProjectId);
+  const setSelectedProjectId = useNavStore((s) => s.setSelectedProjectId);
+  const setSidebarScope = useNavStore((s) => s.setSidebarScope);
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const [expandedWorktrees, setExpandedWorktrees] = useState<Record<string, boolean>>({});
+
+  const byProject = useMemo(() => {
+    const map = new Map<string, Worktree[]>();
+    for (const w of worktrees) {
+      const list = map.get(w.project_id) ?? [];
+      list.push(w);
+      map.set(w.project_id, list);
+    }
+    return map;
+  }, [worktrees]);
+
+  function selectProject(projectId: string) {
+    setSelectedProjectId(projectId);
+    setSidebarScope("project");
+  }
+  const toggleProject = (id: string) =>
+    setExpandedProjects((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleWorktree = (id: string) =>
+    setExpandedWorktrees((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  return <div data-testid="project-run-directory-fallback">
+    <p role="status" className="px-2 pb-1 text-[10px] text-ink-mute">{t.runDirectory.fallbackHint}</p>
+    <ul role="tree" aria-label={t.sidebar.projectDirectory} className="max-h-[288px] overflow-y-auto">
+      {projects.map((project) => {
+        const laneWorktrees = byProject.get(project.id) ?? [];
+        const expanded = Boolean(expandedProjects[project.id]);
+        const selected = selectedProjectId === project.id;
+        return (
+          <li key={project.id}>
+            <div className="flex items-center gap-1 px-1">
+              <button type="button" aria-expanded={expanded} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
+                onClick={() => toggleProject(project.id)}>
+                {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              </button>
+              <Link role="treeitem" aria-level={1} aria-expanded={expanded} aria-selected={selected}
+                href={`/worktree?project_id=${encodeURIComponent(project.id)}`} prefetch={false}
+                onNavigate={() => selectProject(project.id)}
+                className={`flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10 ${selected ? "bg-accent/15 text-accent" : ""}`}>
+                <FolderKanban size={13} className="shrink-0" />
+                <span className="min-w-0">
+                  <span className="block truncate text-xs">{project.name}</span>
+                  <span className="block truncate text-[9px] text-ink-mute">Project · {project.key}</span>
+                </span>
+              </Link>
+            </div>
+            {expanded && (
+              <ul className="ml-3 border-l border-line/60 pl-1">
+                <li className="flex items-center gap-1 py-0.5 pl-3 text-[10px] text-ink-mute" aria-level={2}>
+                  <Layers size={11} className="shrink-0" />
+                  <span className="truncate">{t.runDirectory.fallbackLane}</span>
+                </li>
+                {laneWorktrees.map((wt) => {
+                  const wtExpanded = Boolean(expandedWorktrees[wt.id]);
+                  return (
+                    <li key={wt.id} className="ml-2">
+                      <div className="flex items-center gap-1">
+                        <button type="button" aria-expanded={wtExpanded} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
+                          onClick={() => toggleWorktree(wt.id)}>
+                          {wtExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        </button>
+                        <Link role="treeitem" aria-level={3} aria-expanded={wtExpanded}
+                          href={`/worktree?project_id=${encodeURIComponent(project.id)}`} prefetch={false}
+                          onNavigate={() => selectProject(project.id)}
+                          className="flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10">
+                          <Monitor size={12} className="shrink-0" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs">{wt.name}</span>
+                            <span className="block truncate text-[9px] text-ink-mute">{t.runDirectory.localWorktree} · {wt.status}</span>
+                          </span>
+                        </Link>
+                      </div>
+                      {wtExpanded && (
+                        <div className="ml-7 flex items-center gap-1 py-0.5 text-[10px] text-ink-mute" role="treeitem" aria-level={4}>
+                          <GitBranch size={11} className="shrink-0" />
+                          <span className="truncate">{wt.branch}</span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+    <p className="px-2 pt-1 text-[10px] text-ink-mute">{t.sidebar.projectDirectoryHint}</p>
+  </div>;
 }
 
 function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient }) {

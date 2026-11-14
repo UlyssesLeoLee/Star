@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=73489654752bd11c064af62cc8816bc7f41643e01a2665305f30224bb4f8a57f
+@cypher schema=1 source_sha256=d1129295f905a1b4753d9367f0c7ed438394db93d2005018145531e008743d9d
 MERGE (self:File {path:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx"})
 MERGE (sidebar:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (tree:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
@@ -115,8 +115,9 @@ describe("Project Worktree Index sidebar navigation", () => {
     );
 
     expect(screen.getByTestId("app-sidebar")).toHaveAttribute("data-nav-model", "project-run");
-    // 设计书 §1.2: 侧栏不再渲染 Project Run 状态树 (移入 /worktree 页)
-    expect(screen.queryByTestId("project-run-directory")).toBeNull();
+    // per 2026-11-14 用户发令: 恢复 LANE 层级树 (无宿主时降级为可达演示目录)
+    expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
+    expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
     // Worktree 入口 = Home 核心区 sidebar-item-worktree
     const homeCore = screen.getByTestId("sidebar-group-home-core");
     expect(homeCore).toBeInTheDocument();

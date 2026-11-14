@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d9c7a19b1312e39a5e5e0db5952bc7abab4eeb448007d4e50c26421e5eff839e
+@cypher schema=1 source_sha256=d1e06e54accdb014290baa408b2e3ea62888f27e4f1ba8b5521f974d6cd6e44f
 MERGE (self:File {path:"frontend/src/components/__tests__/Sidebar.test.tsx"})
 MERGE (sidebar:Symbol {id:"frontend/src/components/Sidebar.tsx::Sidebar",kind:"component"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::Sidebar Project-first navigation",kind:"suite"})
@@ -69,9 +69,9 @@ describe("Sidebar Project-first navigation", () => {
     expect(sidebar).toHaveAttribute("data-fold", "expanded");
     expect(screen.getByRole("navigation", { name: "Project 导航" })).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-brand")).toHaveAttribute("href", "/worktree");
-    // 设计书 §1.2: 侧栏顶部不再渲染 Project→Run→Worktree 状态树
-    // (该状态树移入 Worktree 控制中心页; 2026-11-14 实测对照设计书)
-    expect(screen.queryByTestId("project-run-directory")).toBeNull();
+    // per 2026-11-14 用户发令: 恢复 LANE 层级树 (无宿主时降级为可达演示目录)
+    expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
+    expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
 
     // Home 核心区 5 项 (Worktree 控制中心 / Agent / Feedback / Validation / Review)

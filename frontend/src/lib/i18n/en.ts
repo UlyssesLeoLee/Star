@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=447e0467c91e86d7fd33587cb47f167226c079a7238361eabfbfe66a787e9f54
+@cypher schema=1 source_sha256=ffcfc2e3628d489f01f88280cbd63f43eb43fd1e271e15b6dc97a51261900646
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -34,6 +34,8 @@ export const en: Dictionary = {
     directoryUnavailableTitle: "Authorized directory unavailable",
     directoryUnavailableDescription: "This session has no verifiable Project and LANE directory connection. Until it is restored, local previews, cached data, and seed records are hidden so sample state cannot be mistaken for Worktree management facts.",
     hierarchyHint: "LANE → Local Worktree → Branch",
+    fallbackHint: "Demo directory — host session not attached, showing seed hierarchy (web fallback, fully reachable)",
+    fallbackLane: "Default LANE",
     refreshDirectory: "Refresh authorized directory",
     unknownCreateResult: "The previous request result is unknown; retrying reuses the same request ID.",
     expandNode: "Expand",
