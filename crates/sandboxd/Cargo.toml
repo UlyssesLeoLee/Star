@@ -31,14 +31,14 @@ futures-util = { workspace = true }
 async-trait = { workspace = true }
 
 # gRPC (per TASK.md 关键决策: tonic 0.12 + prost 0.13, 已拍板不重议)
-tonic = "0.12"
-prost = "0.13"
+tonic = "0.14"
+prost = "0.14"
 
 # HTTP (用于 /metrics + /healthz, axum 0.8 跟 workspace 一致)
 axum = { workspace = true }
 
 # Metrics (per FR-6.1, 9 sandboxd 指标)
-prometheus = "0.13"
+prometheus = "0.14"
 
 # Config (per FR-1.1, YAML 配置文件)
 serde_yaml = "0.9"
@@ -58,7 +58,7 @@ sqlx = { workspace = true }
 win32job = { workspace = true }
 
 [build-dependencies]
-tonic-build = "0.12"
+tonic-build = "0.14"
 # protoc 二进制 vendored (per crates/platform-messaging-proto 同款, 不依赖系统 protoc)
 protoc-bin-vendored = "3.3"
 
