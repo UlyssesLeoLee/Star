@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=30915d0c62826892fb43301e3e00bfe67932b2cc103ae026757ec5719e4c96cd
+@cypher schema=1 source_sha256=c34e23f0af0642e71d48f56c508da0ab372622b415799ddff67f86e605d21e3b
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -253,15 +253,17 @@ export function Sidebar() {
         {/* Project → LANE → Worktree → Branch 层级树 (per 2026-11-14 用户发令:
             恢复 LANE 层级设计; 无宿主会话时降级为可达的演示目录, 不显示死块) */}
         <ProjectRunTree collapsed={isCollapsed} />
-        {/* Home 核心区 (per §1.2: 常驻置顶, 不可折叠, accent 边框 + core 徽标) */}
-        <NavGroupSection
-          testId="sidebar-group-home-core"
-          label={t.sidebar.navHome}
-          modules={groupModules("home-core")}
-          collapsed={isCollapsed}
-          showCoreBadge
-          isActive={isModuleActive}
-        />
+        {/* Home 核心区: Branch 功能已移至顶栏 (per 2026-11-14 artifact), 空则跳过 */}
+        {groupModules("home-core").length > 0 && (
+          <NavGroupSection
+            testId="sidebar-group-home-core"
+            label={t.sidebar.navHome}
+            modules={groupModules("home-core")}
+            collapsed={isCollapsed}
+            showCoreBadge
+            isActive={isModuleActive}
+          />
+        )}
 
         {/* 个人区 (per §1.2: 默认折叠为 1 行摘要) */}
         <details

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5d9e51c449809ecbbc0c09a82de77bb0966d8021970be721bf1f123cf0d41719
+@cypher schema=1 source_sha256=41ede5a09499adc7ff86a9aa508b19b60418d6ec411499d79720ed2741fbbd6a
 MERGE (self:File {path:"frontend/src/components/__tests__/AppHeader.test.tsx"})
 @endcypher
 */
@@ -59,52 +59,52 @@ describe("AppHeader", () => {
     resetCommandBarStore();
   });
 
-  it("renders 5 primary tabs + Settings 齿轮 (per §3 5 视图 tab)", () => {
+  it("renders 5 Branch 功能 tabs + Settings 齿轮 (per 2026-11-14 artifact 顶栏设计)", () => {
     renderWithI18n(<AppHeader />);
-    expect(screen.getByTestId("tab-inbox")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-issues")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-projects")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-agents")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-analytics")).toBeInTheDocument();
+    // per artifact: 顶栏 = 任务(kanban)/画布(canvas)/协同(nema)/沙盒(sandbox)/原型(prototype)
+    expect(screen.getByTestId("tab-kanban")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-canvas")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-nema")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-sandbox")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-prototype")).toBeInTheDocument();
     expect(screen.getByTestId("settings-gear")).toBeInTheDocument();
   });
 
   it("marks the active tab by pathname + applies category color (per 2026-09-02 18:16 JST)", () => {
-    mockUsePathname.mockReturnValue("/sprint");
+    mockUsePathname.mockReturnValue("/kanban");
     renderWithI18n(<AppHeader />);
-    const issuesTab = screen.getByTestId("tab-issues");
-    const inboxTab = screen.getByTestId("tab-inbox");
-    expect(issuesTab.getAttribute("data-active")).toBe("true");
-    expect(inboxTab.getAttribute("data-active")).toBe("false");
-    // issues 是 work 域, active 用 blue-900 + border-blue-500
-    // (per 2026-09-02 18:16 JST 推: 顶栏 active 改域色, 替换旧 accent)
-    expect(issuesTab.className).toMatch(/text-blue-900/);
-    expect(issuesTab.className).toMatch(/border-blue-500/);
+    const kanbanTab = screen.getByTestId("tab-kanban");
+    const canvasTab = screen.getByTestId("tab-canvas");
+    expect(kanbanTab.getAttribute("data-active")).toBe("true");
+    expect(canvasTab.getAttribute("data-active")).toBe("false");
+    // kanban = work 域, active 用 blue-900 + border-blue-500
+    expect(kanbanTab.className).toMatch(/text-blue-900/);
+    expect(kanbanTab.className).toMatch(/border-blue-500/);
   });
 
   it("applies different category colors per tab (per 2026-09-02 18:16 JST 推)", () => {
-    // inbox=core (cyan), issues=work (blue), agents=agent (emerald), settings=system (amber)
-    mockUsePathname.mockReturnValue("/inbox");
+    // kanban=work (blue), canvas=agent (emerald), nema=agent (emerald), sandbox=system (amber), prototype=agent (violet)
+    mockUsePathname.mockReturnValue("/nema");
     renderWithI18n(<AppHeader />);
-    // inbox active = cyan
-    expect(screen.getByTestId("tab-inbox").className).toMatch(/text-cyan-900/);
-    // 其他 tab inactive 用 ink-dim, 不应该有 cyan/blue/emerald/amber 域色
-    expect(screen.getByTestId("tab-issues").className).toMatch(/text-ink-dim/);
+    // nema active = agent 域 = emerald
+    expect(screen.getByTestId("tab-nema").className).toMatch(/text-emerald-900/);
+    // 其他 tab inactive 用 ink-dim
+    expect(screen.getByTestId("tab-canvas").className).toMatch(/text-ink-dim/);
   });
 
   it("renders 5 tab icon tiles with category color when active (per 2026-09-02 18:23 JST 推 icon)", () => {
-    mockUsePathname.mockReturnValue("/agents");
+    mockUsePathname.mockReturnValue("/canvas");
     renderWithI18n(<AppHeader />);
-    // agents 是 agent 域, active icon tile 用 emerald-500/20 + border-emerald-500/50
-    const agentsIcon = screen.getByTestId("tab-icon-tile-agents");
-    expect(agentsIcon.className).toMatch(/bg-emerald-500\/20/);
-    expect(agentsIcon.className).toMatch(/border-emerald-500\/50/);
-    expect(agentsIcon.className).toMatch(/text-emerald-900/);
+    // canvas 是 agent 域, active icon tile 用 emerald-500/20 + border-emerald-500/50
+    const canvasIcon = screen.getByTestId("tab-icon-tile-canvas");
+    expect(canvasIcon.className).toMatch(/bg-emerald-500\/20/);
+    expect(canvasIcon.className).toMatch(/border-emerald-500\/50/);
+    expect(canvasIcon.className).toMatch(/text-emerald-900/);
 
     // inactive tab icon tile 应该 transparent (不染域色)
-    const inboxIcon = screen.getByTestId("tab-icon-tile-inbox");
-    expect(inboxIcon.className).not.toMatch(/bg-cyan-500/);
-    expect(inboxIcon.className).toMatch(/border-transparent/);
+    const kanbanIcon = screen.getByTestId("tab-icon-tile-kanban");
+    expect(kanbanIcon.className).not.toMatch(/bg-blue-500/);
+    expect(kanbanIcon.className).toMatch(/border-transparent/);
   });
 
   it("clicking ⌘K trigger calls commandBarStore.open() (per §6 + §3 右栏搜索)", () => {

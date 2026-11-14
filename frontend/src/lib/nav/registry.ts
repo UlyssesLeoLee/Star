@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e82f632bfd5180180673a3f05b26378f8a0bb04baf59a806061292f3f22f9a3c
+@cypher schema=1 source_sha256=fee79b38444e14757e8a3284edb071fef0f1099e5de68f0dacb93dc62f144be8
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -269,7 +269,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "kanban",
     label: "Kanban Board",
     code: "KB",
-    href: "/projects?tab=kanban",
+    href: "/kanban",
     category: "work",
     categoryLabel: "Work Management",
     description: "4 态泳道即时拖拽任务看板",
@@ -603,8 +603,8 @@ export const ALL_MODULES: ModuleDefinition[] = [
     label: "Canvas",
     code: "CNV",
     href: "/canvas",
-    category: "work",
-    categoryLabel: "Work Management",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
     description: "无限画布中心 · Canvas / Worktree 图 / Agent 拓扑统一入口 (per 2026-11-14 用户发令整合)",
     icon: Network,
   },
@@ -670,16 +670,15 @@ export type NavGroupId =
   | "other";
 
 export const NAV_GROUPS: Record<NavGroupId, string[]> = {
-  // per 2026-11-14 页面结构 (artifact GVPrQUc4yWZoKo2dLpT2vz):
-  //   2 统一画布 / 1b 任务 IPA 看板 / 2b 协同(文件即任务) / 2c 沙盒 / 2d 原型 = 工作区核心
-  //   3 收件箱 = 个人; 5 分析 = 视图组首; 6 设置 = 管理; 7 运维控制台 = admin-ops 首(仅管理员)
-  "home-core": ["canvas", "kanban", "nema", "sandbox", "prototype"],
-  // per 页面结构 3: 收件箱
-  "home-personal": ["inbox"],
+  // per 2026-11-14 artifact 设计: Branch 功能 tabs 在顶栏 (DEFAULT_HEADER_TABS),
+  // 侧栏收敛为 项目列表(LANE树) + 全局组(收件箱/Agent中心/分析) + 管理(4子组)
+  "home-core": [],
+  // 全局组 (per artifact: 左栏底部 全局)
+  "home-personal": ["inbox", "agents", "analytics"],
   // 项目与工作流类 (worktree/agent/feedback/validation/review 收纳)
-  project: ["projects", "planning", "issues", "worktree", "agents", "feedback", "validation", "review"],
-  // 视图: 分析(5) 首 + 其余视图族
-  view: ["analytics", "timeline", "backlog", "refactor", "search"],
+  project: ["projects", "planning", "issues", "worktree", "feedback", "validation", "review"],
+  // 视图: 其余视图族
+  view: ["timeline", "backlog", "refactor", "search"],
   // per §1.2.1 管理 → 组织 (Workspace 无路由 → 缺标; settings = 租户全局配置)
   "admin-org": ["tenant", "identity", "permission", "settings"],
   // per §1.2.1 管理 → 集成 (SCM/Integration/Notification + 新路由)

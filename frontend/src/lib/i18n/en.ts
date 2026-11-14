@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=32ceeb3ffe9e82de80c0b7cecae39d2bc76f3e62cf0c5a26915371935c97e975
+@cypher schema=1 source_sha256=1cf6853abe8807007a95fef2e9d8fc1485f463df521cac05f8b072d37bbbfaff
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -663,6 +663,14 @@ export const en: Dictionary = {
   prototype: {
     title: "Prototype",
     subtitle: "Design prototype and experiment gallery",
+  },
+  kanban: {
+    title: "IPA Kanban",
+    subtitle: "4-state swimlane drag-and-drop task board",
+    filter: "Filter",
+    newTask: "New task",
+    emptyColumn: "No cards",
+    addCard: "Add card",
   },
   branchWorkspace: {
     title: "Branch Workspace",

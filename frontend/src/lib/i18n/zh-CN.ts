@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=cbcdf5ee518d7d1ae779670289fa77c414a9a1054c844334a85f48cfd95c25a8
+@cypher schema=1 source_sha256=329fbf75f40fce2da138b2372a016bcecb495671374380c34d2205732ffafa5e
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -678,6 +678,14 @@ export const zhCN: Dictionary = {
   prototype: {
     title: "原型",
     subtitle: "设计原型与实验区画廊",
+  },
+  kanban: {
+    title: "任务 IPA 看板",
+    subtitle: "4 态泳道即时拖拽任务看板",
+    filter: "筛选",
+    newTask: "新建任务",
+    emptyColumn: "暂无任务卡片",
+    addCard: "添加卡片",
   },
   branchWorkspace: {
     title: "Branch 工作区",

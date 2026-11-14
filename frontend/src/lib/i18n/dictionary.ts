@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=572cfeb5cfed37e0936f040e4b196bc8497b4d77f9c6c4ff92932b75be316a2f
+@cypher schema=1 source_sha256=48fdcb13881f0b185adf0285f82bfdad5d71709a5b669825ecb353a9b9c37601
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -581,6 +581,14 @@ export interface Dictionary {
   prototype: {
     title: string;                  // "原型"
     subtitle: string;               // "设计原型与实验区画廊"
+  };
+  kanban: {
+    title: string;                  // "任务 IPA 看板"
+    subtitle: string;               // "4 态泳道即时拖拽任务看板"
+    filter: string;                 // "筛选"
+    newTask: string;                // "新建任务"
+    emptyColumn: string;            // "暂无任务卡片"
+    addCard: string;                // "添加卡片"
   };
   branchWorkspace: {
     title: string;                  // "Branch 工作区"

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7938ab3cad082e2b0231c2597dfdece7ee0c4dcbb4f3807a7223bebb8b028411
+@cypher schema=1 source_sha256=47a01f7820a508b602cf66405a7290a9ff73241cf785e352d0ac9f6f5d14e3e9
 MERGE (self:File {path:"frontend/src/components/__tests__/Sidebar.test.tsx"})
 MERGE (sidebar:Symbol {id:"frontend/src/components/Sidebar.tsx::Sidebar",kind:"component"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::Sidebar Project-first navigation",kind:"suite"})
@@ -38,9 +38,9 @@ function renderWithI18n(ui: ReactNode) {
 
 function resetNavStore() {
   useNavStore.setState({
-    sidebarItemIds: ["inbox", "issues", "projects", "agents", "advanced-settings"],
-    pinnedViewIds: ["kanban", "timeline"],
-    headerTabIds: ["inbox", "issues", "projects", "agents", "analytics"],
+    sidebarItemIds: ["inbox", "agents", "analytics", "advanced-settings"],
+    pinnedViewIds: ["timeline"],
+    headerTabIds: ["kanban", "canvas", "nema", "sandbox", "prototype"],
     sidebarFold: "expanded",
     sidebarScope: "main",
     selectedProjectId: "",
@@ -61,7 +61,7 @@ describe("Sidebar Project-first navigation", () => {
     resetNavStore();
   });
 
-  it("keeps Home 核心区 primary per ui-3pane-arch §1.2 (5 项常驻) and secondary routes reachable", () => {
+  it("keeps Home 核心区 primary per artifact (Branch 功能已移顶栏 → 空) and global items in home-personal", () => {
     renderWithI18n(<Sidebar />);
 
     const sidebar = screen.getByTestId("app-sidebar");
@@ -74,17 +74,17 @@ describe("Sidebar Project-first navigation", () => {
     expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
 
-    // Home 核心区 5 项 (per 2026-11-14 artifact 页面结构: 统一画布/任务IPA看板/协同/沙盒/原型)
-    const homeCore = screen.getByTestId("sidebar-group-home-core");
-    expect(within(homeCore).getByTestId("sidebar-item-canvas")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-kanban")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-nema")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-sandbox")).toBeInTheDocument();
-    expect(within(homeCore).getByTestId("sidebar-item-prototype")).toBeInTheDocument();
+    // Home 核心区: 空 (Branch 功能 tabs 在顶栏, per artifact 设计)
+    expect(screen.queryByTestId("sidebar-group-home-core")).toBeNull();
+
+    // 全局组 home-personal: 收件箱/Agent中心/分析 (per artifact 左栏底部)
+    const homePersonal = screen.getByTestId("sidebar-group-home-personal");
+    expect(within(homePersonal).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
+    expect(within(homePersonal).getByTestId("sidebar-item-agents")).toBeInTheDocument();
+    expect(within(homePersonal).getByTestId("sidebar-item-analytics")).toBeInTheDocument();
 
     const otherEntries = screen.getByTestId("sidebar-other-entries");
     expect(otherEntries.tagName).toBe("DETAILS");
-    expect(within(otherEntries).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
     expect(within(otherEntries).getByTestId("sidebar-item-advanced-settings")).toBeInTheDocument();
   });
 
@@ -106,30 +106,34 @@ describe("Sidebar Project-first navigation", () => {
     renderWithI18n(<Sidebar />);
 
     expect(screen.queryByTestId("sidebar-scope-toggle")).toBeNull();
-    // 视图组 (per artifact: 分析(5) 首 + 时间线/待办池/重构/搜索)
+    // 视图组 (per artifact: 分析已移至 home-personal, 这里只有 timeline/backlog/refactor/search)
     const viewGroup = screen.getByTestId("sidebar-group-view");
-    expect(within(viewGroup).getByTestId("sidebar-item-analytics")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-timeline")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-backlog")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-refactor")).toBeInTheDocument();
     expect(within(viewGroup).getByTestId("sidebar-item-search")).toBeInTheDocument();
+    // analytics 不在 view 组 (已移至 home-personal)
+    expect(within(viewGroup).queryByTestId("sidebar-item-analytics")).toBeNull();
   });
 
   // per 2026-11-12 用户发令 (梳理重复导航 / 整合在一起):
-  //   /projects 有 SubNav 时, pinned 的 kanban/timeline (同 pathname)
+  //   /projects 有 SubNav 时, pinned 的 timeline (href=/projects?tab=timeline)
   //   不再重复渲染 — 视图组已是单一来源。
+  //   kanban 现在是顶栏 tab (href=/kanban), 不是 /projects 子 tab, 不应被 deduplicate
   it("hides pinned modules that duplicate the current page's views", () => {
     mockUsePathname.mockReturnValue("/projects");
-    mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=kanban"));
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=timeline"));
     renderWithI18n(<Sidebar />);
 
     // 视图组仍然完整
     const viewGroup = screen.getByTestId("sidebar-group-view");
     expect(within(viewGroup).getByTestId("sidebar-item-timeline")).toBeInTheDocument();
-    // pinned kanban/timeline/projects 不在 "other entries" 里重复出现
+    // pinned timeline (sub-tab of /projects) 不在 "other entries" 里重复出现
     const otherEntries = screen.getByTestId("sidebar-other-entries");
-    expect(within(otherEntries).queryByTestId("sidebar-item-kanban")).toBeNull();
     expect(within(otherEntries).queryByTestId("sidebar-item-timeline")).toBeNull();
+    // kanban 是顶栏 tab (href=/kanban), 不是 /projects 子 tab, 如果 pinned 会显示在 other entries
+    expect(within(otherEntries).queryByTestId("sidebar-item-kanban")).toBeInTheDocument();
+    // projects 不在 other entries (它在项目组)
     expect(within(otherEntries).queryByTestId("sidebar-item-projects")).toBeNull();
     // 非本页模块保留 (inbox)
     expect(within(otherEntries).getByTestId("sidebar-item-inbox")).toBeInTheDocument();

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1f0ab358fac3311ae09bd689566e426688ad31dd7a2c1d24712083d6c0283659
+@cypher schema=1 source_sha256=18b54eafbb9cbf684008684b9a96f6bfd8dd88e0e731984d7e8919d194e40618
 MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})
@@ -84,7 +84,8 @@ export interface NavState {
 export const DEFAULT_SIDEBAR_ITEMS: string[] = [];
 // per 2026-11-14: 视图组已承载 kanban/timeline/backlog/canvas/refactor/search, 默认不预填
 export const DEFAULT_PINNED_VIEWS: string[] = [];
-export const DEFAULT_HEADER_TABS = ["inbox", "issues", "projects", "agents", "analytics"];
+// per 2026-11-14 artifact 设计: 顶栏 = Branch 功能 tabs (任务/画布/协同/沙盒/原型)
+export const DEFAULT_HEADER_TABS = ["kanban", "canvas", "nema", "sandbox", "prototype"];
 
 /** 由 Project Worktree Index 承载的模块 id — 不允许出现在 sidebar/pinned/其他入口 */
 export const WORKTREE_INDEX_OWNED_MODULES = ["worktree"] as const;
@@ -220,8 +221,8 @@ export const useNavStore = create<NavState>()(
     {
       // bump v4: WBS §23.32-A — worktree 模块移出 sidebar/pinned, kanban/timeline/backlog 归并 pinned
       name: "star-nav-store:v2",
-      // v7 (2026-11-14): 页面结构重排 (artifact: 工作区核心 5 项 + 收件箱/分析/设置/运维)
-      version: 7,
+      // v8 (2026-11-14): 顶栏 Branch 功能 tabs (设计对齐), 侧栏收敛为 项目列表+全局+管理
+      version: 8,
       migrate: (persistedState) => migratePersistedNavState(persistedState),
       storage: createJSONStorage(() => (typeof window !== "undefined" ? localStorage : {
         getItem: () => null,
