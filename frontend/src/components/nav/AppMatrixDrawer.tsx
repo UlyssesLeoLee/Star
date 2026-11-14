@@ -1,7 +1,7 @@
 "use client";
 
 /*
-@cypher schema=1 source_sha256=ecbe7332e33d319d59fc87bd782778ffef6e75cae18b3e9ed26219629fa5caae
+@cypher schema=1 source_sha256=b24b096f1ebb490450cdee91e181cbb509f0b348d30b28308be9081d279f90f8
 MERGE (self:File {path:"frontend/src/components/nav/AppMatrixDrawer.tsx"})
 MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -12,7 +12,7 @@ MERGE (matrix)-[:CALLS]->(guardedLink)
 */
 
 import { useState, useMemo } from "react";
-import { ALL_MODULES, CATEGORY_STYLES, getCategoryStyles, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
+import { ALL_MODULES, CATEGORY_STYLES, MODULE_GROUPS, SETTINGS_DOMAIN_IDS, getCategoryStyles, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
 import { useNavStore, WORKTREE_INDEX_OWNED_MODULES } from "@/lib/nav/navStore";
 import {
   Search,
@@ -25,12 +25,29 @@ import {
   ArrowRight,
   RotateCcw,
   Pin,
+  KanbanSquare,
+  PenTool,
+  Rocket,
+  BarChart3,
+  Bot,
+  Puzzle,
+  Settings,
 } from "lucide-react";
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { clsx } from "clsx";
 import { useTranslation, useModuleTranslation, type Dictionary } from "@/lib/i18n";
 
 type CategoryId = "all" | ModuleCategory;
+
+// 模块汇总卡图标 (per 2026-11-14 6 模块归并)
+const GROUP_ICONS: Record<string, typeof KanbanSquare> = {
+  tasks: KanbanSquare,
+  canvas: PenTool,
+  execution: Rocket,
+  analytics: BarChart3,
+  agents: Bot,
+  plugins: Puzzle,
+};
 
 export function AppMatrixDrawer() {
   const { t } = useTranslation();
@@ -44,6 +61,8 @@ export function AppMatrixDrawer() {
 
   const [query, setQuery] = useState("");
   const [selectedCat, setSelectedCat] = useState<CategoryId>("all");
+  // 视图: 默认 = 6 模块汇总 (降低认知负荷); 搜索/分类时切到全部应用网格
+  const [view, setView] = useState<"groups" | "all">("groups");
 
   // 6 个 category tab, label/tag 走 i18n
   // 5 域各带独立色 (per 2026-09-02 15:42 JST 拍板), 'all' 用中性色
@@ -146,7 +165,11 @@ export function AppMatrixDrawer() {
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                if (e.target.value) setView("all");
+                else setView("groups");
+              }}
               placeholder={t.appMatrix.searchPlaceholder}
               className="w-full pl-10 pr-4 py-2 text-xs border-2 border-black bg-[var(--cel-surface-card,#0f1422)] text-white placeholder:text-[var(--cel-text-secondary,#94a3b8)] focus:outline-none focus:border-[var(--cel-cyan,#00f0ff)] cel-shadow font-mono"
               autoFocus
@@ -161,7 +184,7 @@ export function AppMatrixDrawer() {
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setSelectedCat(cat.id)}
+                  onClick={() => { setSelectedCat(cat.id); setView("all"); }}
                   data-testid={`matrix-cat-${cat.id}`}
                   className={clsx(
                     "px-3.5 py-1.5 text-xs font-mono font-bold whitespace-nowrap transition-all border-2 border-black flex items-center gap-1.5 cel-shadow",
@@ -185,20 +208,120 @@ export function AppMatrixDrawer() {
           </div>
         </div>
 
-        {/* === Modules Grid (3 列 3渲2 战术卡片) === */}
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredModules.map((m) => (
-            <MatrixCard
-              key={m.id}
-              module={m}
-              inSidebar={sidebarItemIds.includes(m.id)}
-              inHeader={headerTabIds.includes(m.id)}
-              onToggleSidebar={() => toggleSidebarItem(m.id)}
-              onToggleHeader={() => toggleHeaderTab(m.id)}
-              onOpen={close}
-            />
-          ))}
-        </div>
+        {/* === 模块汇总视图 (per 2026-11-14 用户发令: 汇总成少数模块 + 标签, 降低认知负荷) === */}
+        {view === "groups" ? (
+          <div className="flex-1 overflow-y-auto p-6 space-y-3" data-testid="matrix-groups-view">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[11px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">
+                6 个模块 · 近似功能已合并为标签 · 点击「+ 添加」将该模块默认标签加入顶栏
+              </p>
+              <button
+                type="button"
+                onClick={() => setView("all")}
+                data-testid="matrix-view-all"
+                className="text-[11px] font-mono px-2.5 py-1 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-cyan,#00f0ff)] hover:text-white cel-shadow flex items-center gap-1"
+              >
+                全部应用 ({ALL_MODULES.length}) <ArrowRight size={11} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {MODULE_GROUPS.map((g) => {
+                const Icon = GROUP_ICONS[g.id] ?? Layers;
+                const added = g.tabs.some((id) => headerTabIds.includes(id));
+                const tabNames = g.tabs.map((id) => {
+                  const mod = (t.modules as Dictionary["modules"])[id];
+                  return mod?.label ?? id;
+                });
+                return (
+                  <div
+                    key={g.id}
+                    data-testid={`matrix-group-${g.id}`}
+                    className="relative border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] hover:bg-[var(--cel-surface-card,#0f1422)] cel-shadow hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#000000] transition-all flex flex-col p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="size-9 grid place-items-center border-2 border-black bg-black text-[var(--cel-cyan,#00f0ff)] cel-shadow shrink-0">
+                          <Icon size={16} />
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-black text-white leading-tight">{g.name}</h3>
+                          <p className="text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)] truncate">{g.blurb}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = g.defaultTab ?? g.tabs[0];
+                          if (target && !headerTabIds.includes(target)) toggleHeaderTab(target);
+                          close();
+                        }}
+                        data-testid={`matrix-group-add-${g.id}`}
+                        title={added ? "已添加, 点击打开" : "添加该模块到顶栏"}
+                        className={clsx(
+                          "shrink-0 size-7 grid place-items-center border-2 border-black cel-shadow transition-all active:translate-y-0.5",
+                          added ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-crimson,#ff184c)] text-black"
+                        )}
+                      >
+                        {added ? <Check size={13} /> : <Plus size={13} />}
+                      </button>
+                    </div>
+
+                    {/* 标签 chips (近似功能合并为标签) */}
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {tabNames.map((name, i) => (
+                        <span
+                          key={i}
+                          data-testid={`matrix-group-tab-${g.id}-${g.tabs[i]}`}
+                          className={clsx(
+                            "text-[10px] font-mono px-1.5 py-0.5 border border-black",
+                            i === 0 ? "bg-[var(--cel-cyan,#00f0ff)] text-black font-bold" : "bg-black/40 text-[var(--cel-text-secondary,#94a3b8)]"
+                          )}
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* 设置卡 (右上角用户菜单, 不算模块) */}
+              <Link
+                href="/settings"
+                onClick={close}
+                data-testid="matrix-group-settings"
+                className="relative border-2 border-dashed border-[var(--cel-text-secondary,#94a3b8)] bg-transparent hover:bg-[var(--cel-surface-sub,#151c2c)] transition-all flex items-center gap-3 p-4"
+              >
+                <span className="size-9 grid place-items-center border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-gold,#ffc400)] shrink-0">
+                  <Settings size={16} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-white">设置</h3>
+                  <p className="text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)] truncate">
+                    账户 · 权限 · 租户 · 集成 · API 密钥 ({SETTINGS_DOMAIN_IDS.length} 项 · 右上角用户菜单)
+                  </p>
+                </div>
+                <ArrowRight size={13} className="ml-auto text-[var(--cel-text-secondary,#94a3b8)]" />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          /* === Modules Grid (3 列 3渲2 战术卡片) === */
+          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredModules.map((m) => (
+              <MatrixCard
+                key={m.id}
+                module={m}
+                inSidebar={sidebarItemIds.includes(m.id)}
+                inHeader={headerTabIds.includes(m.id)}
+                onToggleSidebar={() => toggleSidebarItem(m.id)}
+                onToggleHeader={() => toggleHeaderTab(m.id)}
+                onOpen={close}
+              />
+            ))}
+          </div>
+        )}
 
         {/* === Footer === */}
         <div className="px-6 py-3.5 border-t-2 border-black bg-[var(--cel-surface-card,#0f1422)] flex items-center justify-between text-xs text-[var(--cel-text-secondary,#94a3b8)] font-mono">

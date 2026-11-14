@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=199afb501ee214ed042ba94801041b94984d9fb4039a47346e2140de1c1097ba
+@cypher schema=1 source_sha256=615f8b0a0df7f7a6602623b9579b9d0460e29b8558fa73a1eca1da1291edfc76
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -712,3 +712,80 @@ export const NAV_GROUP_ORDER: NavGroupId[] = [
   "admin-dev",
   "other",
 ];
+
+
+// =====================================================================
+// MODULE_GROUPS — 模块汇总 (per 2026-11-14 用户发令: 添加模块界面汇总成
+// 少数模块, 近似功能做成标签, 降低认知负荷)
+// 归并依据: 44 个实际模块 + 页面合并图 (Sitemap.dc.html) 参考结构
+//   Branch 固定页签(任务/画布) + 可添加页签(验证/BI/插件) + 全局组 + 设置
+// 归并结果: 6 模块 + 设置(右上角用户菜单, 不算模块)
+//   1. 任务 (看板/Backlog/时间线/问题/规划/Sprint/Worktree)
+//   2. 画布 (白板/关系图/流程/上下文/协同/原型)
+//   3. 执行 (开发/重构/NEMA/验证/反馈)
+//   4. 分析 (概览/运维/审计/沙盒)
+//   5. Agent 中心 (会话/Runtime/远程/搜索 + 收件箱流)
+//   6. 插件 (集成/Webhooks/开发者控制台/SCM/自动化)
+// =====================================================================
+export interface ModuleGroupDef {
+  /** 组 id (英文 key) */
+  id: string;
+  /** 组显示名 (zh) */
+  name: string;
+  /** 组副标题 (一句话说明) */
+  blurb: string;
+  /** 组内模块 (标签) — registry 模块 id */
+  tabs: string[];
+  /** 点击添加时默认加到顶栏的标签 (默认 = 第一个) */
+  defaultTab?: string;
+}
+
+export const MODULE_GROUPS: ModuleGroupDef[] = [
+  {
+    id: "tasks",
+    name: "任务",
+    blurb: "看板 · 迭代 · 规划 · Worktree 全生命周期",
+    tabs: ["kanban", "backlog", "timeline", "issues", "planning", "worktree"],
+    defaultTab: "kanban",
+  },
+  {
+    id: "canvas",
+    name: "画布",
+    blurb: "白板 · 关系图 · 流程 · 协同 · 原型",
+    tabs: ["canvas", "agent-view", "workflow", "context", "relation", "collaboration", "prototype"],
+    defaultTab: "canvas",
+  },
+  {
+    id: "execution",
+    name: "执行",
+    blurb: "开发 · 重构 · NEMA · 验证 · 反馈",
+    tabs: ["development", "refactor", "nema", "validation", "feedback"],
+    defaultTab: "development",
+  },
+  {
+    id: "analytics",
+    name: "分析",
+    blurb: "概览 · 运维 · 审计日志 · 沙盒",
+    tabs: ["analytics", "ops", "audit", "sandbox"],
+    defaultTab: "analytics",
+  },
+  {
+    id: "agents",
+    name: "Agent 中心",
+    blurb: "会话 · Runtime · 远程 · 搜索 · 收件箱流",
+    tabs: ["agents", "agent-windows", "local-runtime", "remote", "search", "inbox", "review", "notification", "comment"],
+    defaultTab: "agents",
+  },
+  {
+    id: "plugins",
+    name: "插件",
+    blurb: "集成 · Webhooks · 开发者控制台 · SCM · 自动化",
+    tabs: ["integration", "webhooks", "developer-console", "scm", "automation"],
+    defaultTab: "integration",
+  },
+];
+
+/** 设置域模块 (右上角用户菜单, 不算汇总模块) */
+export const SETTINGS_DOMAIN_IDS = [
+  "settings", "advanced-settings", "identity", "permission", "tenant", "admin", "api-keys", "cli-profiles",
+] as const;

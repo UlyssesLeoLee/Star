@@ -66,6 +66,10 @@ members = [
     "crates/nema-codec",
     # nema-codec-wasm: wasm-bindgen 绑定, 前端替换 lib/nema/nema.ts
     "crates/nema-codec-wasm",
+  "crates/ide-collab-core",
+  "crates/star-git-core",
+  "crates/sandtree-core",
+  "crates/argo-core",
     # WBS 6.2 (2026-11-14) 新增 crates/star-agent-runtime (STAR Agent Runtime 双模式骨架, per SRS-STAR-AGENT-RUNTIME-001 / ADR-0044)
     "crates/star-agent-runtime",
     # Phase OPS-INTRY: 2026-09-08 新增 crates/star-ops (Ops Console MVP-骨架, per SRS-STAR-OPS-001.md v0.1)

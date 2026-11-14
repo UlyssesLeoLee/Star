@@ -1,0 +1,11 @@
+[package]
+name = "argo-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Argo multi-machine agent task model (author re-licensed for Star)"
+
+[dependencies]
+serde = { workspace = true }
+sqlx = { workspace = true }
+serde_json = { workspace = true }

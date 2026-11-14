@@ -1,0 +1,14 @@
+[package]
+name = "sandtree-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "SandTree sandbox resource topology kernel (Apache-2.0, ported with NOTICE)"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+blake3 = "1.5"

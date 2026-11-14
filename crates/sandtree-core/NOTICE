@@ -1,0 +1,4 @@
+Star includes code ported from UlyssesLeoLee/SandTree (https://github.com/UlyssesLeoLee/SandTree)
+Copyright (c) UlyssesLeoLee
+Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+Ported modules: crates/sandtree-core (sandtree-model, sandtree-observation-model, sandtree-resource-graph).
