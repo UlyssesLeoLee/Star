@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=9361b125393b3fc81d34c7a625157afe225404c72e645dccaae91e306b2a42d8
+MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
+MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
+MERGE (self)-[:DEFINES]->(suite)
+@endcypher
+*/
 // =====================================================================
 // panels.test.tsx — 4 panel render smoke tests (U4 极简任务)
 // =====================================================================
