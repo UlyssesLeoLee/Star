@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=18b54eafbb9cbf684008684b9a96f6bfd8dd88e0e731984d7e8919d194e40618
+@cypher schema=1 source_sha256=af3d734f287745f7f6be1d1355dd7d46fd80886f1dbc314e23e87ee787983e0b
 MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})
@@ -115,12 +115,21 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
   const cleanedSidebar = storedSidebarItems.filter((id) => !mappedIds.has(id));
   const cleanedPinned = storedPinnedViews.filter((id) => !mappedIds.has(id));
 
+  // per 2026-11-14 artifact 重排 (v8): 顶栏从 inbox/issues/projects/agents/analytics
+  // 改为 Branch 功能 5 tabs — 旧持久化的 headerTabIds 一次性替换, 不复用
+  // (否则浏览器 localStorage 残留旧 tabs, UI 看起来"没变化")
+  const headerTabIds = Array.isArray(persisted?.headerTabIds)
+    ? persisted.headerTabIds
+    : DEFAULT_HEADER_TABS;
+  const hasLegacyHeaderTabs = headerTabIds.some((id) =>
+    ["inbox", "issues", "projects", "agents", "analytics"].includes(id),
+  );
+  const cleanedHeaderTabs = hasLegacyHeaderTabs ? DEFAULT_HEADER_TABS : headerTabIds;
+
   return {
     sidebarItemIds: cleanedSidebar,
     pinnedViewIds: cleanedPinned,
-    headerTabIds: Array.isArray(persisted?.headerTabIds)
-      ? persisted.headerTabIds
-      : DEFAULT_HEADER_TABS,
+    headerTabIds: cleanedHeaderTabs,
     sidebarFold: persisted?.sidebarFold === "collapsed" ? "collapsed" : "expanded",
     sidebarScope: persisted?.sidebarScope === "project" ? "project" : "main",
     selectedProjectId:
@@ -221,8 +230,8 @@ export const useNavStore = create<NavState>()(
     {
       // bump v4: WBS §23.32-A — worktree 模块移出 sidebar/pinned, kanban/timeline/backlog 归并 pinned
       name: "star-nav-store:v2",
-      // v8 (2026-11-14): 顶栏 Branch 功能 tabs (设计对齐), 侧栏收敛为 项目列表+全局+管理
-      version: 8,
+      // v9 (2026-11-14): v8 的 migrate 沿用了旧持久化 headerTabIds — 再跑一次强制替换
+      version: 9,
       migrate: (persistedState) => migratePersistedNavState(persistedState),
       storage: createJSONStorage(() => (typeof window !== "undefined" ? localStorage : {
         getItem: () => null,
