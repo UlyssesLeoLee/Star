@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=edc30dca9329c2ae66f7300452b6204e0ecb23ea8a91dd0c3678ed7fa03194c6
+@cypher schema=1 source_sha256=c881a31cf487254403ed998790717348a0409f952e4575cf44689f4fbdcef250
 MERGE (self:File {path:"frontend/src/lib/redirects.shim.cjs"})
 @endcypher
 */
@@ -33,7 +33,7 @@ const LEGACY_REDIRECTS = [
   { source: "/planning", destination: "/projects?tab=timeline", permanent: false },
   { source: "/scm", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/collaboration", destination: "/projects?tab=worktrees", permanent: false },
-  { source: "/workflow", destination: "/projects?tab=worktrees", permanent: false },
+  { source: "/workflow", destination: "/canvas/canvas-001", permanent: false },
   { source: "/relation", destination: "/projects?tab=worktrees", permanent: false },
   // /canvas/:id 不在 legacy redirect 列表 (per 2026-09-04 canvas e2e 守门 prerequisite):
   //   app/canvas/[id]/page.tsx (CanvasView 详情页) 是设计文档意图主入口.

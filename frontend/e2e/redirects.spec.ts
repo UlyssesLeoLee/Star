@@ -88,12 +88,9 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     expect(r?.destination).toBe("/projects?tab=timeline");
   });
 
-  it("/workflow → /projects?tab=worktrees (case 6, per 2026-08-31 12:42 JST DRIFT-α-004 修复)", () => {
-    // per handoff 兜底 + 5 tab 拍板:
-    //   /scm /collaboration /workflow /relation 4 redirect 旧 tab=workflow/relations 不存在
-    //   全部改 tab=worktrees (5 tab 之一, worktree domain 入口)
+  it("/workflow → /canvas/canvas-001 (per 2026-11-14: workflow 内容并入 canvas 低代码流程标签)", () => {
     const r = findRedirect("/workflow");
-    expect(r?.destination).toBe("/projects?tab=worktrees");
+    expect(r?.destination).toBe("/canvas/canvas-001");
   });
 
   it("/workspace/:id → /projects/:id (case 7, path-param variant)", () => {
@@ -138,6 +135,7 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
       "/agents",
       "/agent-view", // per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect
       "/settings",
+      "/canvas", // per 2026-11-14: workflow/context/relation/collaboration 并入 canvas 标签
     ];
     for (const r of LEGACY_REDIRECTS) {
       const ok = PANEL_PREFIXES.some(

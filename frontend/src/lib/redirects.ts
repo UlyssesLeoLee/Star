@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=341571f18a85095ebb3274fe4c3c643bdc332636991f8642936e6b4489044ae3
+@cypher schema=1 source_sha256=1dd4b27e617d4a83c7f2fbce87ffba48b0d7c0f47928ff8e32bbb0161bf14503
 MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 @endcypher
 */
@@ -69,8 +69,9 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     permanent: false,
   },
   {
+    // per 2026-11-14: workflow 内容已并入 canvas 低代码流程标签
     source: "/workflow",
-    destination: "/projects?tab=worktrees",
+    destination: "/canvas/canvas-001",
     permanent: false,
   },
   {
