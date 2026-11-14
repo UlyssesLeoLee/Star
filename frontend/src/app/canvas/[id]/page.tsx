@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=02e91eeb4c9f49b452419944a01a8ceba604ed6703927f51a3da42ddb84f1136
+@cypher schema=1 source_sha256=c6df28ed8798cf56098be87173ce9c0b8f83599b0d2cc78d8dfb60ada7b34fbc
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (workflowPage:Symbol {id:"frontend/src/app/workflow/page.tsx::WorkflowPage",kind:"component"})
@@ -21,6 +21,7 @@ MERGE (self)-[:REUSES]->(workflowPage)
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "@/components/StatusPill";
+import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
 import { ArrowRight, GitBranch, Workflow, Network } from "lucide-react";
 
 const CANVAS_SUB_TABS = ["关系图", "IPA (V字模型)", "低代码流程"] as const;
@@ -35,13 +36,12 @@ export default function CanvasDetailPage() {
       case "关系图":
         return (
           <div className="h-full overflow-y-auto p-4" data-testid="canvas-tab-relation">
-            <div className="bg-bg-card rounded-xl border border-line p-4 mb-3">
+            {/* 真实关系图组件 (per 2026-11-14: 关系图标签接真实图, 替换占位列表) */}
+            <RelationshipView tenantId="tn-001" />
+            <div className="bg-bg-card rounded-xl border border-line p-4 mt-3">
               <h2 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">
-                <Network size={14} className="text-accent" /> 关系图 · Worktree / 任务 / 文件 / 上下文
+                <Network size={14} className="text-accent" /> Worktree 列表
               </h2>
-              <p className="text-xs text-ink-dim mb-3">
-                4 层关系: Worktree 层 → 任务层 → 文件层 → 上下文层。点击节点跳对应详情。
-              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {worktrees.slice(0, 6).map((wt) => (
                   <div key={wt.id} className="rounded-lg border border-line bg-bg p-2.5 flex items-center gap-2">
