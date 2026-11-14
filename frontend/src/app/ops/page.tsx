@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3b6ec728b740eb45218288ad2464d65afd54fd88a783f3e9e5bc6aee492bf12a
+@cypher schema=1 source_sha256=15716ff60cb6e8e8078c8bb702fef29c007ca0669765ee55e551398a17f7d353
 MERGE (self:File {path:"frontend/src/app/ops/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/ops/page.tsx::OpsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -21,6 +21,7 @@ import { clsx } from "clsx";
 import { LogAITab } from "./components/LogAITab";
 import { MetricsTab } from "./components/MetricsTab";
 import { DocsTab } from "./components/DocsTab";
+import { ClusterTab } from "./components/ClusterTab";
 
 const OPS_TABS = ["运维数据", "App 集群", "租户", "用户与权限", "审计"] as const;
 
@@ -203,7 +204,15 @@ export default function OpsPage() {
 
       {/* 内容 */}
       <main className="flex-1 overflow-y-auto p-4">
-        {activeTab === "App 集群" && <AppClusterPanel />}
+        {activeTab === "App 集群" && (
+          <div className="space-y-4">
+            <AppClusterPanel />
+            <section data-testid="ops-cluster-tab" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <h2 className="text-sm font-bold text-gray-900 mb-2">集群更新（F-01 实装）</h2>
+              <ClusterTab />
+            </section>
+          </div>
+        )}
         {activeTab === "运维数据" && (
           <div className="space-y-4">
             <MetricsTab />

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=175e9ccc175fe1686e6b942fd6d71b7ab404eb04a0347d2fbcb857b657fa3c4d
+@cypher schema=1 source_sha256=95529379f02d38988fc6aefcf97d5d840dd8cea7790547cd86d3efcfba165769
 MERGE (self:File {path:"frontend/src/app/(app)/nema/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::NemaPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -14,6 +14,7 @@ MERGE (self)-[:DEFINES]->(page)
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileCode2,
   FileText,
@@ -21,21 +22,18 @@ import {
   Plus,
   Users,
   GitBranch,
-  ChevronDown,
   Send,
   Lock,
   Terminal,
   UserPlus,
+  X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useNemaStore } from "@/lib/nema/nemaStore";
+import { useNemaWatcher } from "@/lib/nema/nemaWatcher";
+import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
 
 const PIPELINE = ["① 路由拆分", "② 并行编辑", "③ 语义合并", "④ 生成代码", "⑤ 验证"] as const;
-
-const TASKS = [
-  { id: "T-142", title: "BFS 环检测", status: "进行中" },
-  { id: "T-126", title: "BFS 模块接口", status: "" },
-  { id: "T-150", title: "环检测边界用例", status: "" },
-];
 
 const CODE_FILES = [
   { name: "bfs.rs", people: 3, kind: "code" },
@@ -81,7 +79,49 @@ const CODE_LINES = [
 ];
 
 export default function NemaPage() {
+  const router = useRouter();
   const [scope, setScope] = useState<"task" | "other">("task");
+  const [showForm, setShowForm] = useState(false);
+  const [filePath, setFilePath] = useState("");
+  const [title, setTitle] = useState("");
+  const [editorsText, setEditorsText] = useState("");
+
+  // ---- 真实功能接线 ----
+  const nemaTasks = useNemaStore((s) => s.nemaTasks);
+  const registerSharedFile = useNemaStore((s) => s.registerSharedFile);
+  const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
+  const nemaWatcher = useNemaWatcher([""]);
+
+  const taskRows = nemaTasks.filter((x) => x.workItemId).map((x) => ({
+    id: x.workItemId ?? x.id,
+    title: x.title || x.filePath,
+    status: "已开卡",
+  }));
+  const otherRows = nemaTasks.filter((x) => !x.workItemId).map((x) => ({
+    id: x.id,
+    title: x.title || x.filePath,
+    status: "",
+  }));
+  const visibleTasks = scope === "task" ? taskRows : otherRows;
+
+  const codeFiles = nemaTasks.map((x) => ({
+    name: x.filePath.split("/").pop() ?? x.filePath,
+    people: x.editors.length,
+    task: x,
+  }));
+  const docFiles = nemaTasks
+    .filter((x) => /\.(md|sheet)$/i.test(x.filePath))
+    .map((x) => ({ name: x.filePath.split("/").pop() ?? x.filePath, people: x.editors.length, task: x }));
+
+  const handleRegister = () => {
+    const editors = editorsText.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (!filePath.trim() || editors.length === 0) return;
+    registerSharedFile({ filePath: filePath.trim(), title: title.trim(), editors });
+    setShowForm(false);
+    setFilePath("");
+    setTitle("");
+    setEditorsText("");
+  };
 
   return (
     <div className="flex h-full bg-gray-50">
@@ -115,22 +155,31 @@ export default function NemaPage() {
           {/* 任务卡选择 */}
           <div>
             <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">任务卡</div>
-            <ul className="space-y-1">
-              {TASKS.map((task) => (
-                <li
-                  key={task.id}
-                  data-testid={`nema-task-${task.id}`}
-                  className={clsx(
-                    "flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs",
-                    task.status ? "border-indigo-300 bg-indigo-50" : "border-gray-200 hover:border-gray-300",
-                  )}
-                >
-                  <span className="font-mono font-semibold text-gray-600">{task.id}</span>
-                  <span className="flex-1 truncate text-gray-800">{task.title}</span>
-                  {task.status && <span className="text-[10px] text-indigo-700">{task.status}</span>}
-                </li>
-              ))}
-            </ul>
+            {visibleTasks.length === 0 ? (
+              <p className="text-[11px] text-gray-400 px-1 py-2">暂无{scope === "task" ? "已开卡" : "未开卡"}的 .nema 文件</p>
+            ) : (
+              <ul className="space-y-1">
+                {visibleTasks.map((task) => (
+                  <li
+                    key={task.id}
+                    data-testid={`nema-task-${task.id}`}
+                    className={clsx(
+                      "flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs",
+                      task.status ? "border-indigo-300 bg-indigo-50" : "border-gray-200 hover:border-gray-300",
+                    )}
+                  >
+                    <span className="font-mono font-semibold text-gray-600 truncate w-14">{task.id}</span>
+                    <span className="flex-1 truncate text-gray-800">{task.title}</span>
+                    {task.status && <span className="text-[10px] text-indigo-700">{task.status}</span>}
+                    {task.status && (
+                      <button type="button" onClick={() => router.push(`/work-item/${task.id}`)} className="text-[10px] text-gray-400 hover:text-indigo-700">
+                        打开
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="mt-1.5 text-[11px] font-mono text-indigo-700 flex items-center gap-1">
               <FileCode2 size={11} /> ipa-s05-002 ソースコード作成 · 文件即任务
             </div>
@@ -141,41 +190,78 @@ export default function NemaPage() {
             <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5 flex items-center justify-between">
               <span>代码 <span className="text-gray-300">4</span></span>
             </div>
-            <ul className="space-y-1">
-              {CODE_FILES.map((f) => (
-                <li key={f.name} data-testid={`nema-file-${f.name}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs hover:border-indigo-300">
-                  <FileCode2 size={12} className="text-gray-400 shrink-0" />
-                  <span className="flex-1 truncate font-mono text-gray-800">{f.name}</span>
-                  {f.people > 0 && (
+            {codeFiles.length === 0 ? (
+              <p className="text-[11px] text-gray-400 px-1 py-2">暂无代码文件 — 关联共享文件后自动生成 .nema 侧车</p>
+            ) : (
+              <ul className="space-y-1">
+                {codeFiles.map((f) => (
+                  <li key={f.name} data-testid={`nema-file-${f.name}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs hover:border-indigo-300">
+                    <FileCode2 size={12} className="text-gray-400 shrink-0" />
+                    <span className="flex-1 truncate font-mono text-gray-800">{f.name}</span>
                     <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
                       <Users size={10} /> {f.people} 人
                     </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    {!f.task.workItemId && (
+                      <button
+                        type="button"
+                        data-testid={`nema-open-task-${f.name}`}
+                        onClick={() => {
+                          const wid = openNemaAsStarTask(f.task.id);
+                          if (wid) router.push(`/work-item/${wid}`);
+                        }}
+                        className="text-[10px] text-indigo-700 hover:underline"
+                      >
+                        开卡
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div>
             <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">文档与表格 <span className="text-gray-300">2</span></div>
-            <ul className="space-y-1">
-              {DOC_FILES.map((f) => (
-                <li key={f.name} data-testid={`nema-file-${f.name}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs hover:border-indigo-300">
-                  {f.kind === "doc" ? <FileText size={12} className="text-gray-400 shrink-0" /> : <Table size={12} className="text-gray-400 shrink-0" />}
-                  <span className="flex-1 truncate font-mono text-gray-800">{f.name}</span>
-                  {f.people > 0 && (
+            {docFiles.length === 0 ? (
+              <p className="text-[11px] text-gray-400 px-1 py-2">暂无文档/表格</p>
+            ) : (
+              <ul className="space-y-1">
+                {docFiles.map((f) => (
+                  <li key={f.name} data-testid={`nema-file-${f.name}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs hover:border-indigo-300">
+                    <FileText size={12} className="text-gray-400 shrink-0" />
+                    <span className="flex-1 truncate font-mono text-gray-800">{f.name}</span>
                     <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
                       <Users size={10} /> {f.people} 人
                     </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          <button type="button" data-testid="nema-link-file" className="w-full flex items-center justify-center gap-1.5 text-xs py-2 rounded-lg border border-dashed border-gray-300 text-gray-600 hover:border-indigo-400 hover:text-indigo-700">
-            <Plus size={12} /> 关联文件到此任务卡
+          <button type="button" onClick={() => setShowForm((v) => !v)} data-testid="nema-link-file" className="w-full flex items-center justify-center gap-1.5 text-xs py-2 rounded-lg border border-dashed border-gray-300 text-gray-600 hover:border-indigo-400 hover:text-indigo-700">
+            <Plus size={12} /> 关联共享文件（自动生成 .nema 侧车）
           </button>
+
+          {showForm && (
+            <div data-testid="nema-register-form" className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-2.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-indigo-700">注册共享文件（共同编辑 ≥2 人）</span>
+                <button type="button" onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+              </div>
+              <LocalFolderBrowser onPickFile={(p) => setFilePath(p)} />
+              <input value={filePath} onChange={(e) => setFilePath(e.target.value)} placeholder="文件路径 (e.g. src/graph/bfs.rs)" className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono" />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="任务标题 (可选)" className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs" />
+              <input value={editorsText} onChange={(e) => setEditorsText(e.target.value)} placeholder="编辑者 (逗号分隔, e.g. 林, Agent A1)" className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs" />
+              <button type="button" onClick={handleRegister} className="w-full text-xs py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+                注册并生成 .nema
+              </button>
+            </div>
+          )}
+
+          <div data-testid="nema-watcher-status" className="text-[10px] text-gray-400 font-mono">
+            {nemaWatcher.watching ? "● 文件监听中 (轮询 .nema 变化 → 任务回写)" : "○ 文件监听未启动"}
+          </div>
 
           <p className="text-[11px] text-gray-500 leading-relaxed bg-gray-50 rounded-lg p-2.5 border border-gray-200">
             每个文件可配 .nema 侧车。多人和多个 Agent 优先在 .nema 上并行编辑，汇总后再生成代码。

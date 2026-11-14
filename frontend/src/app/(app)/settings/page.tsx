@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=28ef19a522edca7c80ff11d09cf07e334c7c2b5e901e18d35b275904213feca8
+@cypher schema=1 source_sha256=e2097d7d7b512c6f97ea78b586e81fbf2c0170e16757148b4de751dfd602ae95
 MERGE (self:File {path:"frontend/src/app/(app)/settings/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::SettingsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -13,8 +13,7 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   User,
   Key,
@@ -49,8 +48,8 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
     group: "账户",
     items: [
       { id: "profile", label: "个人资料", icon: <User size={13} />, href: "" },
-      { id: "apikeys", label: "凭据与 API Key", icon: <Key size={13} />, href: "" },
-      { id: "cli-profiles", label: "CLI 配置", icon: <Terminal size={13} />, href: "" },
+      { id: "apikeys", label: "凭据与 API Key", icon: <Key size={13} />, href: "/settings/api-keys" },
+      { id: "cli-profiles", label: "CLI 配置", icon: <Terminal size={13} />, href: "/settings/cli-profiles" },
     ],
   },
   {
@@ -81,8 +80,8 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
   {
     group: "开发者",
     items: [
-      { id: "dev-mode", label: "开发者模式", icon: <Code2 size={13} />, href: "" },
-      { id: "debug", label: "调试工具", icon: <Bug size={13} />, href: "" },
+      { id: "dev-mode", label: "开发者模式", icon: <Code2 size={13} />, href: "/settings/developer" },
+      { id: "debug", label: "调试工具", icon: <Bug size={13} />, href: "/settings/developer" },
       { id: "webhooks", label: "API 与 Webhook", icon: <Globe size={13} />, href: "" },
       { id: "flags", label: "Feature Flags", icon: <Flag size={13} />, href: "" },
     ],
@@ -151,11 +150,20 @@ function McpPanel() {
   );
 }
 
-function StubPanel({ id, label }: { id: string; label: string }) {
+function StubPanel({ id, label, realHref }: { id: string; label: string; realHref?: string }) {
   return (
-    <div data-testid={`settings-panel-${id}`}>
-      <h2 className="text-base font-bold text-gray-900">{label}</h2>
-      <p className="text-xs text-gray-500 mt-1">该面板待接入（P2 功能缺口，per 缺标比错标）</p>
+    <div data-testid={`settings-panel-${id}`} className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+      <h2 className="text-sm font-bold text-gray-900">{label}</h2>
+      {realHref ? (
+        <>
+          <p className="text-xs text-gray-500 mt-1">该面板的完整实现在子路由 {realHref}</p>
+          <a href={realHref} data-testid={`settings-panel-${id}-go`} className="inline-flex items-center gap-1.5 mt-3 text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+            前往 {realHref}
+          </a>
+        </>
+      ) : (
+        <p className="text-xs text-gray-500 mt-1">该面板待接入（P2 功能缺口，per 缺标比错标）</p>
+      )}
     </div>
   );
 }
@@ -184,8 +192,12 @@ const LEGACY_TAB_MAP: Record<string, { id: string; label: string }> = {
 };
 
 function SettingsInner() {
-  const searchParams = useSearchParams();
-  const rawTab = searchParams?.get("tab") ?? "";
+  // 深链 ?tab= (client-only 解析; 不用 useSearchParams — dev 下双份 DOM)
+  const [rawTab, setRawTab] = useState("");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setRawTab(new URLSearchParams(window.location.search).get("tab") ?? "");
+  }, []);
   const resolved = LEGACY_TAB_MAP[rawTab] ?? { id: "mcp", label: "MCP 服务器" };
   const activeId = resolved.id;
 
@@ -233,7 +245,20 @@ function SettingsInner() {
             </button>
           </div>
 
-          {activeId === "mcp" ? <McpPanel /> : <StubPanel id={activeId} label={resolved.label} />}
+          {activeId === "mcp" ? (
+            <McpPanel />
+          ) : (
+            <StubPanel
+              id={activeId}
+              label={resolved.label}
+              realHref={
+                activeId === "apikeys" ? "/settings/api-keys" :
+                activeId === "cli-profiles" ? "/settings/cli-profiles" :
+                activeId === "dev-mode" || activeId === "debug" ? "/settings/developer" :
+                undefined
+              }
+            />
+          )}
         </div>
       </main>
     </div>
@@ -241,9 +266,5 @@ function SettingsInner() {
 }
 
 export default function SettingsPage() {
-  return (
-    <Suspense fallback={null}>
-      <SettingsInner />
-    </Suspense>
-  );
+  return <SettingsInner />;
 }

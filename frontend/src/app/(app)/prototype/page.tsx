@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d15a96f04bae673f9a00dfb12451d6c40fc3c4d264f0e7d2ec894c7a5d8fb6b0
+@cypher schema=1 source_sha256=c13df99de068c255f7693a69bace80c4fac393fd197e33460ab43b4477d775f6
 MERGE (self:File {path:"frontend/src/app/(app)/prototype/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/prototype/page.tsx::PrototypePage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -276,12 +276,12 @@ export default function PrototypePage() {
 
         <div className="flex-1" />
 
-        <button type="button" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+        <a href="/kanban?view=%E6%8C%89%E6%96%87%E4%BB%B6%E5%BC%80%E5%8D%A1" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
           附加到任务卡 T-142
-        </button>
-        <button type="button" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+        </a>
+        <a href="/canvas/canvas-001" data-testid="prototype-to-canvas" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
           放进画布白板
-        </button>
+        </a>
         <button type="button" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
           导出 HTML / 视频
         </button>

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9361b125393b3fc81d34c7a625157afe225404c72e645dccaae91e306b2a42d8
+@cypher schema=1 source_sha256=6cd41e5a646a6753ca80a883e3833d3608b6c39dead501191784118f17ae1428
 MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
 MERGE (self)-[:DEFINES]->(suite)
@@ -54,6 +54,21 @@ import { I18nProvider } from "@/lib/i18n";
 // per 2026-08-31 i18n 补缺口: PageHeader 内 useTranslation() 必须包 I18nProvider
 function renderWithI18n(ui: ReactNode) {
   return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
+
+// settings 页深链改为 window.location.search 解析 (不用 useSearchParams, per 2026-11-14)
+let mockLocationSearch = "";
+function setMockLocationSearch(qs: string) {
+  mockLocationSearch = qs;
+  const location = window.location;
+  delete (window as unknown as Record<string, unknown>).location;
+  (window as unknown as Record<string, unknown>).location = {
+    ...location,
+    search: qs,
+    href: location.href.split("?")[0] + qs,
+    assign: vi.fn(),
+    replace: vi.fn(),
+  };
 }
 
 describe("U4 minimal panels — render smoke", () => {
@@ -122,22 +137,22 @@ describe("U4 minimal panels — render smoke", () => {
   });
 
   it("deep-links /settings?tab=apikeys to 凭据与 API Key panel", () => {
-    // per mockup: 左导航 = <a href="/settings?tab=...">, 面板从 URL 派生
-    setMockSearchParams(new URLSearchParams("tab=apikeys"));
+    // per mockup: 左导航 = <a href="/settings?tab=...">, 面板从 URL 派生 (window.location.search)
+    setMockLocationSearch("?tab=apikeys");
     renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-panel-apikeys")).toBeInTheDocument();
   });
 
   it("deep-links /settings?tab=billing to the 租户 panel (legacy tab map)", () => {
     // per DRIFT-α-007: URL ?tab= 优先; billing → 租户 (per mockup 组织与权限组)
-    setMockSearchParams(new URLSearchParams("tab=billing"));
+    setMockLocationSearch("?tab=billing");
     renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-panel-tenant")).toBeInTheDocument();
   });
 
   it("falls back to MCP panel when /settings?tab= is not implemented", () => {
     // 未实装/未知 tab → 默认 MCP 面板 (不崩溃)
-    setMockSearchParams(new URLSearchParams("tab=permissions"));
+    setMockLocationSearch("?tab=permissions");
     renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-panel-mcp")).toBeInTheDocument();
   });
